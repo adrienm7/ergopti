@@ -49,6 +49,7 @@ Test("Logger: high volume (300+) ERROR must fill errors-only sink correctly", Te
 _ResetLogger() {
 	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, LOGGER_MIN_LEVEL, _LOGGER_PENDING
 	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PENDING_ERRORS
+	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
 	LOGGER_RING_BUFFER := []
 	LOGGER_RING_CURSOR := 0
 	LOGGER_MIN_LEVEL := "DEBUG"
@@ -56,6 +57,12 @@ _ResetLogger() {
 	_LOGGER_PENDING_ERRORS := []
 	LOGGER_LOG_PATH := ""
 	LOGGER_ERRORS_LOG_PATH := ""
+	; Clear dedup state so a streak left by a prior test cannot inject a summary
+	; line into this test's ring/pending assertions.
+	_LOGGER_DEDUP_KEY := ""
+	_LOGGER_DEDUP_LEVEL := ""
+	_LOGGER_DEDUP_COUNT := 0
+	_LastErrTime := 0
 	_LoggerRefreshFastFlags()
 }
 
@@ -132,6 +139,32 @@ TestLogger_RingWraparound() {
 }
 Test("Ring buffer: overflow wraps and snapshot reorders chronologically",
 	TestLogger_RingWraparound)
+
+
+
+
+; ==============================
+; Deduplication (all levels + summary) — must match the macOS driver
+; ==============================
+TestLogger_DedupCollapsesWithSummary() {
+	_ResetLogger()
+	; Three identical INFO lines back-to-back: the first is emitted, the next two
+	; are suppressed (within the 5000 ms window). A different line then closes the
+	; streak and triggers the "N identical lines suppressed" summary.
+	LoggerInfo("Dedup", "same line")
+	LoggerInfo("Dedup", "same line")
+	LoggerInfo("Dedup", "same line")
+	LoggerInfo("Dedup", "different line")
+	; Expect exactly: [same line] [summary] [different line] = 3 ring entries.
+	AssertEqual(3, LOGGER_RING_BUFFER.Length,
+		"consecutive identical lines (any level) must collapse to one line + one summary")
+	AssertContains(LOGGER_RING_BUFFER[1], "same line")
+	AssertContains(LOGGER_RING_BUFFER[2], "identical")
+	AssertContains(LOGGER_RING_BUFFER[2], "suppressed")
+	AssertContains(LOGGER_RING_BUFFER[3], "different line")
+}
+Test("Dedup: consecutive identical lines collapse to one + a suppressed-count summary",
+	TestLogger_DedupCollapsesWithSummary)
 
 
 
