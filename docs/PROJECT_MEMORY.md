@@ -464,6 +464,25 @@ The "bypass AHK's dispatcher" fix is no longer pending — it ships as **`lib/me
 - [feedback-loader-target-explicit](feedback_loader_target_explicit.md) — different concern, same tray_menu.ahk neighborhood.
 - [project-config-v2-refactor](project_config_v2_refactor.md) — Phase 2 was wrongly suspected of causing this.
 
+### project-webview2-bridge-gotchas
+
+_Hosting a shared HTML/JS frontend in a WebView2 control (thqby `vendor/WebView2.ahk`) on Windows has FOUR distinct gotchas that each silently break the JS↔AHK bridge. The onboarding wizard (`ui/onboarding/webview.ahk`) hit all four in sequence; model_browser predates some of the fixes._
+
+<sub>slug: `project_webview2_bridge_gotchas`</sub>
+
+Symptom progression while bringing up the onboarding webview: blank gray panel → renders but no flags → renders but language switch does nothing → switches once then freezes. Each was a separate root cause:
+
+1. **Show the window BEFORE `WebView2.create` + `Controller.Fill()`.** Creating/filling against a still-hidden Gui sizes the control to a zero client rect → blank gray page that never lays out. `g.Show()` first (model_browser already did this; onboarding originally didn't).
+2. **`file://` is an opaque/unique origin** — Chromium logs "Unsafe attempt to load URL … 'file:' URLs are treated as unique security origins" and the `window.chrome.webview` message channel does not reliably deliver from it. `postMessage` returns `undefined` (looks fine) but nothing arrives host-side. FIX: `SetVirtualHostNameToFolderMapping("ergopti.onboarding", folder, 1)` and navigate to `https://<host>/index.html`. Map a second host for assets outside the page folder (flag PNGs, layout JPG live under `_StaticDir`, not the onboarding folder). Windows also has no flag-emoji font, so flags MUST be `<img>` PNGs served via the host, never emoji text.
+3. **`X.WebMessageReceived(cb)` returns a subscription object whose `__Delete` unsubscribes.** Discarding the return value lets AHK GC it immediately → the handler is removed the instant it's added → exactly zero messages delivered. FIX: store the handle in a persistent global (`_OnbWeb_MsgSub`); clear it only on teardown.
+4. **`ExecuteScript()` is `ExecuteScriptAsync().await()`, and `.await()` spins a NESTED message loop.** Calling it synchronously inside the `WebMessageReceived` STA callback wedges further event delivery (channel delivers exactly one message — `ready` — then goes silent). Even deferred out of the callback, the `.await()` on a large (~135 KB locale-string) injection can fail to complete and freeze the AHK thread (the script's side effect runs — button updates — but `.await()` never returns). FIX: use **fire-and-forget `ExecuteScriptAsync` (NO `.await()`)** for host→page injection; we don't need the result, and WebView2 holds the completion handler so the script still runs. See `_OnbWeb_RunScript`.
+
+**How to apply / diagnose:**
+- When a webview bridge "renders but is dead," confirm message arrival host-side first (log the raw inbound message — but strip `{ }` from the logged substring, or the AHK logger's `Format()` chokes on JSON braces and the `try`-wrapped log silently no-ops, hiding the very messages you're hunting). Use Info level, not Debug, while diagnosing.
+- WebView2 caches virtual-host sub-resources by URL: navigate `index.html?cb=<A_TickCount>` (fresh HTML each launch) and bump `?v=N` on `script.js`/`style.css` when they change, else an edited frontend is served stale.
+- A `SafetyFlush` timer that injects initData if `ready` never arrives keeps the wizard from being blank; if it fires regularly, the channel is broken.
+- These four are independent — fixing one reveals the next. Any new WebView2 window (e.g. the hotstring editor) should clone `webview.ahk`'s post-fix shape wholesale.
+
 ### project-config-v2-refactor
 
 _State of the v2 config schema refactor (Scope C) — branch refactor/config-schema-v2 with 5 dormant commits. Cut-over to actually migrate the AHK driver runtime is the open piece._

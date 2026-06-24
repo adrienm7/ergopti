@@ -4,7 +4,10 @@
 	<head>
 		<meta charset="utf-8" />
 		<title>ErgoptiPlus</title>
-		<link rel="stylesheet" href="style.css" />
+		<!-- Bump the ?v= on style.css/script.js whenever either changes: the host
+		     loads index.html fresh each launch (cache-busted) but WebView2 caches
+		     these sub-resources by URL, so the version query forces a refresh. -->
+		<link rel="stylesheet" href="style.css?v=4" />
 	</head>
 	<body>
 		<div id="wizard">
@@ -156,6 +159,6 @@
 			</div>
 		</div>
 
-		<script src="script.js"></script>
+		<script src="script.js?v=4"></script>
 	</body>
 </html>
