@@ -31,7 +31,12 @@ _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
 
 	PersonalMenu := Menu()
 	for _, Name in Names {
-		MenuAddItem(PersonalMenu, "Shortcuts.Personal", Name)
+		; Label comes straight from the registry (the description, or the name
+		; itself when none); the v2 path keys the lowercased name under
+		; [ahk.shortcuts.personal]. Names are already lowercased at registration.
+		Desc  := _PersonalShortcutsRegistry.Has(Name) ? _PersonalShortcutsRegistry[Name] : ""
+		Label := (Desc != "") ? Desc : Name
+		MenuAddItemWithLabel(PersonalMenu, "ahk.shortcuts.personal." . Name, Label, "Shortcuts")
 	}
 	ShortcutsMenu.Add()
 	ShortcutsMenu.Add(t("menu.shortcuts.personal"), PersonalMenu)

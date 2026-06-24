@@ -612,7 +612,9 @@ _HS_Personal(M, _Cat) {
 					continue
 				SecData  := TomlData["sections"][SecName]
 				SecLabel := SecData["description"] . " (" . FmtCount(SecData["entries"].Length) . ")"
-				MenuAddItemWithLabel(PersonalMenu, "Personal." . SecName, SecLabel, "Hotstrings")
+				; v2 path for a runtime-discovered personal section: the Features
+				; node (and config.toml section) key the lowercased TOML section name.
+				MenuAddItemWithLabel(PersonalMenu, "hotstrings.personal." . StrLower(SecName), SecLabel, "Hotstrings")
 			}
 		}
 		PersonalActiveCount := 0
