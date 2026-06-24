@@ -178,7 +178,11 @@ Chemin identique d'un driver à l'autre → l'analogue se trouve au même endroi
 
 ## P7 — Mise en commun profonde (gros blast radius — en dernier, livré sous-étape par sous-étape)
 
-- [ ] Logger → cœur partagé `_shared/lua/logger` via `set_sink()` (les deux drivers).
+- [x] **Loggers HS + AHK rendus exactement équivalents** ✅ (directive mainteneur : « rends-les exactement pareil, aligne sur la meilleure version »). Le cœur partagé `_shared/lua/logger` (+ `set_sink`) existe déjà et sert le daemon Linux ; les deux loggers de PROD (HS `macos/lib/logger.lua`, AHK `windows/lib/logger.ahk`) sont maintenant alignés sur le contrat canonique :
+  - **Format identique** : `YYYY-MM-DD HH:MM:SS:mmm [LEVEL] [module] body`. Suppression de l'indentation de 10 espaces des lignes DEBUG côté macOS (déviation propre à HS ; le SPEC, le cœur partagé, AHK et Linux étaient déjà sans indent).
+  - **Dedup identique** : suppression des lignes consécutives identiques (TOUS niveaux) dans une fenêtre de 5000 ms, puis un résumé `[LEVEL] [logger] ↑ N identical lines suppressed`. Union du meilleur des deux : macOS gagne la fenêtre (corrige sa suppression-permanente latente, le bug que le garde AHK `logger-dedup-tick` interdit) ; AHK passe d'ERROR-only à tous-niveaux + résumé. État dedup AHK passé en globals (réinitialisable par les tests). Clé de dedup = identité sans horodatage des deux côtés.
+  - **Marqueur de session** : AHK écrit désormais la même bannière `===== <ts> — ErgoptiPlus session opened =====` que HS (une fois/session, log principal). `—` et `↑` via `Chr()` pour rester ASCII-safe.
+  - Différences restantes = intégration platform-specific non observable (numérotation interne des niveaux 1-4 vs 10-40 — sortie identique car basée sur les labels ; source de config hs.settings vs config.toml ; capture print() macOS ; hooks healthcheck AHK). +1 test de régression AHK (collapse + résumé). Suite AHK **2447/0**, HS **2380/0**, encoding 622, lint vert. **⏳ En attente de reload-test (macOS + Windows) par le mainteneur.**
 - [ ] Tooltip AHK lit `_shared/modules/tooltip/constants.toml` ; ⚠️ divergences d'alpha → clés per-platform reproduisant l'existant (gate : snapshot avant/après).
 - [ ] **tap_hold** → `_shared/tap_hold/defaults.toml`. ⚠️ **TOML Windows vs JSON macOS diffèrent probablement déjà** → prouver l'équivalence byte d'abord, sinon c'est un `feat`, pas un refactor.
 - [ ] Codegen du codec TOML + parser LLM AHK depuis `_shared/lua` ; éliminer `path_translator.ahk` (map d'ids générée ou migration snake_case).
