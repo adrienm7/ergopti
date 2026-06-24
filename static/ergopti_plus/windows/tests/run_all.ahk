@@ -94,6 +94,7 @@ OnError(_FatalErrorHandler)
 #Include ../lib/hotstrings/hotstring_engine.ahk
 #Include ../lib/hotstrings/hotstring_engine_main.ahk
 #Include ../lib/hotstrings/hotstring_live_toggle.ahk
+#Include ../lib/hotstrings/hotstring_count_policy.ahk
 #Include ../lib/hotstrings/hotstring_prefix_watcher.ahk
 #Include ../lib/master_gates.ahk
 ; Generated terminator catalogue (shared single source) — exercised by
@@ -182,6 +183,7 @@ InstallSendNoOps()
 #Include unit/test_hotstring_engine_main.ahk
 #Include unit/test_suppress_refcount.ahk
 #Include unit/test_hotstring_live_toggle.ahk
+#Include unit/test_hotstring_count_policy.ahk
 #Include unit/test_prefix_watcher_index.ahk
 #Include unit/test_prefix_index_cache_equiv.ahk
 #Include unit/test_master_gates.ahk

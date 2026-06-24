@@ -111,7 +111,6 @@ initMenu() {
 	; personal tree, extensions). The toggle is rendered by the manifest toggle
 	; type entry but uses the ToggleAllHostrings* pattern for hotstrings.
 	HotstringsAllEnabled := IsCategoryGated("Hotstrings")
-	_CountFn := HotstringsAllEnabled ? _CountEnabledForCategory : _CountAllForCategory
 
 	_HotDynHandlers := Map(
 		"hotstring_categories_standard", (M, C) => _HS_CategoriesStandard(M, C),
