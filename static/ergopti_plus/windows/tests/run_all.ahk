@@ -105,6 +105,7 @@ OnError(_FatalErrorHandler)
 #Include ../lib/tap_hold/tap_hold_loader.ahk
 #Include ../_generated/features_manifest.ahk
 #Include ../lib/manifest_reader.ahk
+#Include ../lib/feature_io.ahk
 #Include ../lib/hotstrings/hotstrings_config.ahk
 #Include ../ui/personal_toml_editor.ahk
 #Include ../modules/keymap/layout/layout_altgr.ahk
@@ -165,6 +166,7 @@ InstallSendNoOps()
 
 ; ── Per-module test files (each registers Test() cases) ──
 #Include unit/test_adapter_compliance_new.ahk
+#Include unit/test_feature_io_locator.ahk
 #Include unit/test_adapter_contract_vectors.ahk
 #Include unit/test_text_sender_modifiers.ahk
 #Include unit/test_timer_scheduler.ahk

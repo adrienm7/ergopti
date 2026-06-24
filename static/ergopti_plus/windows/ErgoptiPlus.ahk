@@ -22,6 +22,7 @@ global TapHold := Map("keys", Map(), "layers", Map())
 global _PersonalShortcutsRegistry := Map("__Order", [])
 #Include lib/manifest_reader.ahk
 #Include lib/path_translator.ahk
+#Include lib/feature_io.ahk
 
 ; In compiled mode the .exe ships an embedded zip of every runtime asset
 ; (hotstrings TOMLs, locales, icons, _shared tree, vendor DLLs). The bundle
