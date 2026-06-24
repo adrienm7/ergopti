@@ -211,6 +211,12 @@ _OnbWeb_OnWebMessage(Handler, Args) {
 		_OnbWeb_PickConfigDir(Payload.Has("current") ? Payload["current"] : "")
 	} else if (Action == "loadExistingConfig") {
 		_OnbWeb_LoadExistingConfig(Payload.Has("config_dir") ? Payload["config_dir"] : "")
+	} else if (Action == "registerGesturesAuto") {
+		; Defer out of the COM callback: the auto-config does a blocking elevated
+		; RunWait (UAC + PnP cycle), which must not run inside WebMessageReceived.
+		SetTimer(_OnbWeb_RegisterGesturesAuto, -1)
+	} else if (Action == "registerGesturesManual") {
+		SetTimer(_OnbWeb_RegisterGesturesManual, -1)
 	} else if (Action == "finish") {
 		_OnbWeb_Finish(Payload.Has("answers") ? Payload["answers"] : Map())
 	}
@@ -302,6 +308,9 @@ _OnbWeb_InjectInitData() {
 		. ",default_config_dir:" . _OnbWeb_JsStr(defaultDir)
 		. ",system_layout:" . _OnbWeb_JsStr(_OnbWeb_SystemLayoutHint())
 		. ",layout_image_url:" . _OnbWeb_JsStr(_OnbWeb_LayoutImageUrl())
+		; Platform hint: the gestures step (5) renders Windows-only auto/manual
+		; registration buttons, whereas macOS shows only the system-gesture warning.
+		. ",platform:" . _OnbWeb_JsStr("windows")
 		. ",strings:" . _OnbWeb_LocaleStringsExpr(_ob_locale)
 		. "})"
 	_OnbWeb_Eval(js)
@@ -388,6 +397,50 @@ _OnbWeb_Finish(answers) {
 	; upcoming Reload (the WebView2 spec requires Controller.Close first).
 	_OnbWeb_Reset()
 	_Onboarding_Commit()
+}
+
+; Runs the synchronous, elevated touchpad-gesture configuration (same registry
+; value set + PnP cycle as the native step's _Step5_AutoRegister) and pushes a
+; green/red result back to the page via window.setGestureRegisterStatus. Mirrors
+; the native auto-register path so the webview and native wizards configure
+; gestures identically. Scheduled out of the WebMessageReceived callback because
+; the elevated RunWait blocks while the UAC prompt + touchpad cycle complete.
+_OnbWeb_RegisterGesturesAuto() {
+	ScriptPath := A_Temp . "\ergopti_gesture_config.ps1"
+	try {
+		if FileExist(ScriptPath)
+			FileDelete(ScriptPath)
+		FileAppend(_Onboarding_BuildGesturePsScript(), ScriptPath, "UTF-8")
+	} catch as e {
+		try LoggerError("Onboarding", "Could not write gesture PS script to '{1}': {2}.", ScriptPath, e.Message)
+		_OnbWeb_Eval("window.setGestureRegisterStatus(false)")
+		return
+	}
+
+	try LoggerStart("Onboarding", "Auto-configuring touchpad gestures…")
+	exitCode := -1
+	try {
+		exitCode := RunWait('*RunAs powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . ScriptPath . '"', , "Hide")
+	} catch as e {
+		try LoggerError("Onboarding", "Gesture auto-config powershell threw: {1}.", e.Message)
+		exitCode := -1
+	}
+	try FileDelete(ScriptPath)
+
+	ok := (exitCode == 0)
+	if (ok) {
+		try LoggerSuccess("Onboarding", "Gesture auto-configuration succeeded.")
+	} else {
+		try LoggerWarn("Onboarding", "Gesture auto-configuration failed (exitCode={1}).", exitCode)
+	}
+	_OnbWeb_Eval("window.setGestureRegisterStatus(" . (ok ? "true" : "false") . ")")
+}
+
+; Opens the shared manual-tutorial dialog (single source of truth in
+; modules/gestures.ahk) — the same popup the native step's manual button and the
+; tray menu show.
+_OnbWeb_RegisterGesturesManual() {
+	try GestureShowManualTutorialDialog()
 }
 
 
