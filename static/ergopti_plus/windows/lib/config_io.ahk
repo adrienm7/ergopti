@@ -90,10 +90,10 @@ ToggleAllFeatures(Value) {
     TOML_BatchWrite(ConfigurationFile, Updates)
     if Bool {
         HsBatch := []
-        for V1Path in _CollectAllHotstringsV1Paths()
-            HsBatch.Push(Map("v1_path", V1Path . ".Enabled", "value", true))
+        for V2Path in _CollectAllHotstringsV2Paths()
+            HsBatch.Push(Map("path", V2Path, "value", true))
         if (HsBatch.Length > 0)
-            WriteFeatureBatch(HsBatch)
+            WriteFeatureBatchV2(HsBatch)
     }
     Reload
 }
@@ -111,10 +111,10 @@ ToggleAllHotstrings(Value) {
     TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", "hotstrings")
     if Bool {
         Batch := []
-        for V1Path in _CollectAllHotstringsV1Paths()
-            Batch.Push(Map("v1_path", V1Path . ".Enabled", "value", true))
+        for V2Path in _CollectAllHotstringsV2Paths()
+            Batch.Push(Map("path", V2Path, "value", true))
         if (Batch.Length > 0)
-            WriteFeatureBatch(Batch)
+            WriteFeatureBatchV2(Batch)
     }
     Reload
 }
