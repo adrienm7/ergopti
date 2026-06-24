@@ -1,0 +1,187 @@
+﻿; lib/feature_io.ahk
+
+; ==============================================================================
+; MODULE: Feature I/O (v2-native)
+; DESCRIPTION:
+; v2-native feature locator + write/batch for the tray menu, replacing the
+; v1->v2 path translator (lib/path_translator.ahk). Given a canonical v2 manifest
+; path (e.g. "ahk.layout.ergopti_base", "shortcuts.gpt", "shortcuts.gpt.letter",
+; "hotstrings.autocorrection.accents") it resolves the config.toml {section, key}
+; and the in-memory Features node by INTROSPECTING the Features Map — no
+; hand-maintained PascalCase rename tables.
+;
+; FEATURES & RATIONALE:
+; 1. Derivation, not translation: the v2 manifest path already encodes the full
+;    config section (incl. the ahk. driver-namespace prefix). The Features node is
+;    found by walking Features along the (ahk-stripped) path. A node that is a Map
+;    carrying "enabled" is a Modelisation-alpha feature (its section IS the path so
+;    far; its leaf key is an explicit property or "enabled"); a bool leaf is a
+;    plain feature (section = path minus leaf, key = leaf, node = parent Map).
+; 2. Single write path: WriteFeatureV2 mutates the Features node and persists to
+;    config.toml in lock-step, exactly like the retired translator did, so a tray
+;    toggle survives reload. WriteFeatureBatchV2 batches the persistence.
+; 3. Migration safety: while call sites are being migrated, the v1 translator
+;    functions delegate here (v1 path -> v2 path -> locate), so this core is
+;    exercised by every existing toggle and proven equivalent by
+;    tests/meta/test_feature_io_locator_parity.ahk before any call site flips.
+; ==============================================================================
+
+
+
+
+
+; ==============================================================
+; ====================================
+; ======= 1/ v2-native locator =======
+; ====================================
+; ==============================================================
+
+; Join Parts[FromIdx..ToIdx] with ".". Returns "" when the range is empty.
+_FeatureJoin(Parts, FromIdx, ToIdx) {
+	Out := ""
+	if (ToIdx < FromIdx)
+		return ""
+	Loop ToIdx - FromIdx + 1 {
+		I := FromIdx + A_Index - 1
+		Out .= (Out == "" ? "" : ".") . Parts[I]
+	}
+	return Out
+}
+
+; Resolve a v2 manifest path to a Map {section, key, v2_node, is_alpha}, or false
+; when the path does not resolve against the live Features Map.
+; @param V2Path  Canonical v2 path; may carry a leading "ahk." driver prefix.
+; @param Prop    Optional explicit alpha property leaf (e.g. "letter"). When set,
+;                the path is treated as the alpha feature and Prop is the key.
+FeatureLocateV2(V2Path, Prop := "") {
+	global Features
+	if !IsSet(Features) or !(Features is Map)
+		return false
+
+	SecParts := StrSplit(V2Path, ".")
+	if (SecParts.Length < 1)
+		return false
+
+	; Features keys carry no ahk. namespace — that prefix lives only in the TOML
+	; section. WalkParts drives the Features descent; SecParts builds the section.
+	WalkParts := SecParts
+	if (SecParts[1] == "ahk") {
+		WalkParts := []
+		Loop SecParts.Length - 1 {
+			WalkParts.Push(SecParts[A_Index + 1])
+		}
+	}
+	Offset := SecParts.Length - WalkParts.Length   ; 1 when an ahk. prefix was stripped
+	if (WalkParts.Length < 1)
+		return false
+
+	Node := Features
+	Parent := false
+	LastKey := ""
+	Idx := 0
+	for _, Seg in WalkParts {
+		Idx += 1
+		if (Type(Node) != "Map" or !Node.Has(Seg))
+			return false
+		Parent := Node
+		LastKey := Seg
+		Node := Node[Seg]
+		; Alpha feature: a Map carrying "enabled". Its section is the path up to
+		; and including this segment; the leaf key is the explicit Prop, the next
+		; path segment (an alpha property like "letter"), or "enabled".
+		if (Type(Node) == "Map" and Node.Has("enabled")) {
+			Section := _FeatureJoin(SecParts, 1, Idx + Offset)
+			Key := (Prop != "") ? Prop
+				: (Idx < WalkParts.Length ? WalkParts[Idx + 1] : "enabled")
+			return Map("section", Section, "key", Key, "v2_node", Node, "is_alpha", true)
+		}
+	}
+
+	; Plain feature: terminal bool leaf. Section = path minus leaf, key = leaf,
+	; node = the parent Map that holds it.
+	if (Type(Parent) != "Map")
+		return false
+	Section := _FeatureJoin(SecParts, 1, SecParts.Length - 1)
+	return Map("section", Section, "key", LastKey, "v2_node", Parent, "is_alpha", false)
+}
+
+
+
+
+
+; ==============================================================
+; ===================================
+; ======= 2/ v2-native writes =======
+; ===================================
+; ==============================================================
+
+; Apply one v2-path mutation to both the in-memory Features node and config.toml.
+; @param V2Path  Canonical v2 path (toggle target, e.g. "shortcuts.gpt").
+; @param Value   New value (bool, or string for alpha props like a letter/link).
+; @param Prop    Optional alpha property leaf (e.g. "letter"); omit for the
+;                enabled/plain toggle.
+; @return        true on success, false when the path does not resolve.
+WriteFeatureV2(V2Path, Value, Prop := "") {
+	global ConfigurationFile
+	Loc := FeatureLocateV2(V2Path, Prop)
+	if (Loc == false)
+		return false
+	Node := Loc["v2_node"]
+	K := Loc["key"]
+	if (Type(Node) == "Map")
+		Node[K] := Value
+	TOML_Write(Value, ConfigurationFile, Loc["section"], K)
+	return true
+}
+
+; Apply a batch of v2-path mutations in one read-modify-write of config.toml.
+; Each entry is a Map("path" => "<v2 path>", "value" => <v>, "prop" => "<leaf>"?).
+; Entries that do not resolve are skipped (logged). Returns the number applied.
+WriteFeatureBatchV2(Entries) {
+	global ConfigurationFile
+	Updates := []
+	for Entry in Entries {
+		V2Path := Entry["path"]
+		Value  := Entry["value"]
+		Prop   := Entry.Has("prop") ? Entry["prop"] : ""
+		Loc := FeatureLocateV2(V2Path, Prop)
+		if (Loc == false) {
+			try LoggerWarn("FeatureIO", "WriteFeatureBatchV2: unresolved v2 path '{1}' — skipped.", V2Path)
+			continue
+		}
+		Node := Loc["v2_node"]
+		K := Loc["key"]
+		if (Type(Node) == "Map")
+			Node[K] := Value
+		Updates.Push({ Section: Loc["section"], Key: K, Value: Value })
+	}
+	if (Updates.Length > 0)
+		TOML_BatchWrite(ConfigurationFile, Updates)
+	return Updates.Length
+}
+
+; Read the runtime state of a v2 feature. Returns a Map keyed by the v2 property
+; names present on the feature node (enabled, letter, link, search_engine, …),
+; or an empty Map when the path does not resolve. Mirrors the shape the menu
+; needs while dropping the v1 PascalCase property names.
+ReadFeatureStateV2(V2Path) {
+	State := Map()
+	Loc := FeatureLocateV2(V2Path)
+	if (Loc == false)
+		return State
+	Node := Loc["v2_node"]
+	if (Type(Node) != "Map")
+		return State
+	if Loc["is_alpha"] {
+		for _, P in ["enabled", "letter", "link", "search_engine", "search_engine_url_query"
+			, "dated_notes", "destination_folder", "pattern_max_length"] {
+			if Node.Has(P)
+				State[P] := (P == "enabled" or P == "dated_notes") ? (Node[P] = true) : Node[P]
+		}
+	} else {
+		K := Loc["key"]
+		if Node.Has(K)
+			State["enabled"] := (Node[K] = true)
+	}
+	return State
+}
