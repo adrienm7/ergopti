@@ -25,17 +25,18 @@
 ; comes from the inverse rename table via ``ManifestPathToLegacyPath``.
 MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 	V2Path := ManifestEntry["path"]
-	V1Path := ManifestPathToLegacyPath(V2Path)
-	if (V1Path == "") {
-		try LoggerWarn("Menu", "MenuAddItemFromManifest: no v1 path for '{1}' — skipping.", V2Path)
+	; Skip an item whose feature does not resolve in the live Features Map — it
+	; could not be toggled. Features is manifest-derived, so this only trips on a
+	; malformed or partial manifest entry.
+	if (FeatureLocateV2(V2Path) == false) {
+		try LoggerWarn("Menu", "MenuAddItemFromManifest: '{1}' does not resolve in Features — skipping.", V2Path)
 		return
 	}
 	MenuTitle := MenuLabelFromManifestEntry(ManifestEntry)
-	; Apply the same runtime substitutions ``GetMenuTitleByPath`` does for
-	; the legacy path (count suffix " (N)" for hotstring categories, the
-	; live ``{date}`` for DynamicHotstrings entries) so the manifest-driven
-	; render is visually identical to the v1 Features-driven render.
-	MenuTitle := _ApplyMenuLabelDynamicSubstitutions(MenuTitle, V1Path)
+	; Apply the same runtime substitutions ``GetMenuTitleByPath`` does (count
+	; suffix " (N)" for hotstring categories, the live ``{date}`` for dynamic
+	; hotstrings entries) so the manifest-driven render is visually identical.
+	MenuTitle := _ApplyMenuLabelDynamicSubstitutions(MenuTitle, V2Path)
 	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleFeatureV2(V2Path))
 
 	State := ReadFeatureStateV2(V2Path)
@@ -254,11 +255,11 @@ GetMenuTitleByPath(FullPath) {
 	if (Entry != false) {
 		Label := TryMenuLabelFromManifestEntry(Entry)
 		if (Label != "") {
-			Label := _ApplyMenuLabelDynamicSubstitutions(Label, FullPath)
+			Label := _ApplyMenuLabelDynamicSubstitutions(Label, V2Path)
 			if _ManifestEntryHasLetter(Entry) {
-				State := GetFeatureState(FullPath)
-				if (State.Has("Letter") and State["Letter"] != "") {
-					Label := Label StrUpper(State["Letter"])
+				State := ReadFeatureStateV2(V2Path)
+				if (State.Has("letter") and State["letter"] != "") {
+					Label := Label StrUpper(State["letter"])
 				}
 			}
 		}
@@ -315,38 +316,39 @@ _ManifestEntryHasLetter(Entry) {
 	return false
 }
 
-; Apply runtime substitutions to a menu label fresh out of i18n.
-_ApplyMenuLabelDynamicSubstitutions(Label, V1Path) {
-	; {date} substitution
+; Apply runtime substitutions to a menu label fresh out of i18n, keyed by the
+; canonical v2 manifest path (e.g. "hotstrings.dynamic.date_fr",
+; "hotstrings.autocorrection.accents").
+_ApplyMenuLabelDynamicSubstitutions(Label, V2Path) {
+	; {date} substitution — only the three dynamic-date entries carry it.
 	if (InStr(Label, "{date}")) {
-		switch V1Path {
-			case "DynamicHotstrings.DateFr":
+		switch V2Path {
+			case "hotstrings.dynamic.date_fr":
 				Label := StrReplace(Label, "{date}", FormatTime(, "dd/MM/yyyy"))
-			case "DynamicHotstrings.DateLongFr":
+			case "hotstrings.dynamic.date_long_fr":
 				static _Days   := ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"]
 				static _Months := ["janvier", "février", "mars", "avril", "mai", "juin",
 				            "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
 				_Long := _Days[A_WDay] . " " . FormatTime(, "d") . " " . _Months[FormatTime(, "M") + 0] . " " . FormatTime(, "yyyy")
 				Label := StrReplace(Label, "{date}", _Long)
-			case "DynamicHotstrings.Date":
+			case "hotstrings.dynamic.date":
 				Label := StrReplace(Label, "{date}", FormatTime(, "yyyy_MM_dd"))
 		}
 	}
-	; Append hotstring entry counts
-	Parts := StrSplit(V1Path, ".")
-	if (Parts.Length == 2) {
-		switch Parts[1] {
-			case "Autocorrection", "DistancesReduction", "MagicKey", "Rolls", "SFBsReduction":
-				V2FullPath := LegacyPathToManifestPath(V1Path)
-				if (V2FullPath != "") {
-					V2Parts := StrSplit(V2FullPath, ".")
-					V2SecId := V2Parts[V2Parts.Length]
-					N := CountTomlSection(Parts[1], V2SecId)
-					if (N > 0)
-						Label := Label . " (" . N . ")"
-				}
-			case "DynamicHotstrings":
-				N := CountDynamicSection(Parts[2])
+	; Append hotstring entry counts. Bundled hotstring features are
+	; "hotstrings.<cat>.<id>"; the TOML loader category drops the underscores
+	; from the v2 category (distances_reduction -> distancesreduction).
+	Parts := StrSplit(V2Path, ".")
+	if (Parts.Length == 3 and Parts[1] == "hotstrings") {
+		V2Cat := Parts[2]
+		V2SecId := Parts[3]
+		switch V2Cat {
+			case "autocorrection", "distances_reduction", "magic_key", "rolls", "sfbs_reduction":
+				N := CountTomlSection(StrReplace(V2Cat, "_", ""), V2SecId)
+				if (N > 0)
+					Label := Label . " (" . N . ")"
+			case "dynamic":
+				N := CountDynamicSection(V2SecId)
 				if (N > 0)
 					Label := Label . " (" . N . ")"
 		}
