@@ -180,6 +180,78 @@ local function toggleSectionFn(ctx, group_name, sec_name, sec_label)
 	end
 end
 
+--- Force every section of one group on or off (bulk action). Enabling also
+--- lifts the group gate (and starts the engine) so the change is immediately
+--- effective; disabling just clears the sections.
+--- @param ctx table Context.
+--- @param group_name string Group name.
+--- @param enable boolean true = enable all sections, false = disable all.
+--- @return function
+local function setGroupSectionsFn(ctx, group_name, enable)
+	return function()
+		local km = ctx.keymap
+		local secs = (km and type(km.get_sections) == "function") and km.get_sections(group_name) or nil
+		if type(secs) == "table" then
+			for _, sec in ipairs(secs) do
+				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
+					if enable and type(km.enable_section) == "function" then
+						pcall(km.enable_section, group_name, sec.name)
+					elseif not enable and type(km.disable_section) == "function" then
+						pcall(km.disable_section, group_name, sec.name)
+					end
+				end
+			end
+		end
+		if enable then
+			ctx.state.hotstrings[group_name] = true
+			if type(km.enable_group) == "function" then pcall(km.enable_group, group_name) end
+			if not ctx.state.keymap then
+				ctx.state.keymap = true
+				if type(km.start) == "function" then pcall(km.start) end
+			end
+		end
+		ctx.save_prefs()
+		ctx.updateMenu()
+	end
+end
+
+--- Force every section of EVERY hotstring group on or off (whole-tree bulk
+--- action for the top of the Hotstrings menu). Enabling lifts each group gate so
+--- the activation is immediately effective.
+--- @param ctx table Context.
+--- @param enable boolean true = enable everything, false = disable everything.
+--- @return function
+local function setAllSectionsFn(ctx, enable)
+	return function()
+		local km = ctx.keymap
+		for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
+			local name = ctx.get_group_name and ctx.get_group_name(f) or f
+			local secs = (km and type(km.get_sections) == "function") and km.get_sections(name) or nil
+			if type(secs) == "table" then
+				for _, sec in ipairs(secs) do
+					if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
+						if enable and type(km.enable_section) == "function" then
+							pcall(km.enable_section, name, sec.name)
+						elseif not enable and type(km.disable_section) == "function" then
+							pcall(km.disable_section, name, sec.name)
+						end
+					end
+				end
+			end
+			if enable then
+				ctx.state.hotstrings[name] = true
+				if type(km.enable_group) == "function" then pcall(km.enable_group, name) end
+			end
+		end
+		if enable and not ctx.state.keymap then
+			ctx.state.keymap = true
+			if type(km.start) == "function" then pcall(km.start) end
+		end
+		ctx.save_prefs()
+		ctx.updateMenu()
+	end
+end
+
 --- Builds menu items for personal information.
 --- @param ctx table Context.
 --- @param description string Description of the item.
@@ -273,6 +345,18 @@ function M.build_groups(ctx, only, counts)
 				}
 				sec_menu[#sec_menu + 1] = { title = "-" }
 			end
+			-- Section-level bulk actions for this category.
+			sec_menu[#sec_menu + 1] = {
+				title    = i18n.get("menu.hotstrings.enable_all"),
+				disabled = ctx.paused or nil,
+				fn       = not ctx.paused and setGroupSectionsFn(ctx, name, true) or nil,
+			}
+			sec_menu[#sec_menu + 1] = {
+				title    = i18n.get("menu.hotstrings.disable_all"),
+				disabled = ctx.paused or nil,
+				fn       = not ctx.paused and setGroupSectionsFn(ctx, name, false) or nil,
+			}
+			sec_menu[#sec_menu + 1] = { title = "-" }
 			-- "replace" (J→★ key remapping) is shown in Disposition Ergopti instead.
 			local prev_was_sep = true -- Suppress a potential leading separator
 			for _, sec in ipairs(ordered_secs) do
@@ -719,6 +803,18 @@ function M.build_management(ctx)
 	if exp_item then table.insert(menu, exp_item) end
 	if delays_item then table.insert(menu, delays_item) end
 	table.insert(menu, { title = "-" })
+	-- Whole-tree bulk actions, right after the separator (mirrors the AHK
+	-- placement inside the Paramètres group): force every section on / off.
+	table.insert(menu, {
+		title    = i18n.get("menu.hotstrings.enable_all"),
+		disabled = ctx.paused or nil,
+		fn       = not ctx.paused and setAllSectionsFn(ctx, true) or nil,
+	})
+	table.insert(menu, {
+		title    = i18n.get("menu.hotstrings.disable_all"),
+		disabled = ctx.paused or nil,
+		fn       = not ctx.paused and setAllSectionsFn(ctx, false) or nil,
+	})
 	if bubble_item then table.insert(menu, bubble_item) end
 	table.insert(menu, { title = "-" })
 	local hs_state  = ctx and ctx.state
@@ -975,6 +1071,19 @@ function M.build_custom(ctx, counts)
 			end
 		end
 		if not has_real then return end
+
+		-- Section-level bulk actions for this personal subgroup.
+		target[#target + 1] = {
+			title    = i18n.get("menu.hotstrings.enable_all"),
+			disabled = paused or nil,
+			fn       = not paused and setGroupSectionsFn(ctx, group_name, true) or nil,
+		}
+		target[#target + 1] = {
+			title    = i18n.get("menu.hotstrings.disable_all"),
+			disabled = paused or nil,
+			fn       = not paused and setGroupSectionsFn(ctx, group_name, false) or nil,
+		}
+		target[#target + 1] = { title = "-" }
 
 		for _, sec in ipairs(secs) do
 			if type(sec) ~= "table" then goto continue_sec end
