@@ -188,41 +188,38 @@ _CountAllForCategory(V1Cat) {
 }
 
 
-; Collect every v1 feature path that belongs to the Hotstrings category:
-; flat TOML categories (Autocorrection, DistancesReduction, …), dynamic
-; hotstrings, and personal TOML sections. Used by ToggleAllHotstrings to
-; activate every individual feature when the user clicks "tout activer".
-_CollectAllHotstringsV1Paths() {
+; Collect every canonical v2 feature path that belongs to the Hotstrings
+; category: flat TOML categories (autocorrection, distances_reduction, …),
+; dynamic hotstrings, and personal TOML sections. Used by the "tout activer"
+; actions to enable every individual feature in one v2 batch write.
+_CollectAllHotstringsV2Paths() {
 	global _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap
-	global _LegacyDynamicHotstringsKeyMap
 	Paths := []
 
-	; Flat categories — read entries from the manifest
+	; Flat categories — the manifest entry path IS the canonical v2 path.
 	for _, V1Cat in _FLAT_HOTSTRING_V1_CATS {
 		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
 		if (V2Section == "") {
 			continue
 		}
 		for _, Entry in ManifestFeaturesForSection(V2Section) {
-			V1Path := ManifestPathToLegacyPath(Entry["path"])
-			if (V1Path != "") {
-				Paths.Push(V1Path)
-			}
+			Paths.Push(Entry["path"])
 		}
 	}
 
-	; Dynamic hotstrings — one toggle per entry in the key map
-	for V1Id, _V2Id in _LegacyDynamicHotstringsKeyMap {
-		Paths.Push("DynamicHotstrings." . V1Id)
+	; Dynamic hotstrings — read straight from the manifest section.
+	for _, Entry in ManifestFeaturesForSection("hotstrings.dynamic") {
+		Paths.Push(Entry["path"])
 	}
 
-	; Personal TOML sections
+	; Personal TOML sections — the Features node + config section key the
+	; lowercased TOML section name.
 	PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
 	if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
 		PersonalTomlData := ReadPersonalToml()
 		for _, SecName in PersonalTomlData["sections_order"] {
 			if (SecName != "-") {
-				Paths.Push("Personal." . SecName)
+				Paths.Push("hotstrings.personal." . StrLower(SecName))
 			}
 		}
 	}
