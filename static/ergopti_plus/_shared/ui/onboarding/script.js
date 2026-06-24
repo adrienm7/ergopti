@@ -353,7 +353,56 @@ function renderStep5() {
 	radios.forEach(function (r) {
 		r.checked = r.value === (_answers.use_gestures ? 'yes' : 'no');
 	});
+
+	// Platform split: Windows offers the touchpad-gesture registration panel
+	// (auto/manual buttons); macOS shows only the system-gesture conflict warning.
+	var isWindows = window.PLATFORM_OS === 'windows';
+	var warning = document.getElementById('s5-warning');
+	if (warning) warning.classList.toggle('hidden', isWindows);
+	if (isWindows) {
+		document.getElementById('s5-register-section').textContent = _t(
+			'onboarding.gestures.register_section'
+		);
+		document.getElementById('s5-register-auto').textContent = _t('onboarding.gestures.register_auto');
+		document.getElementById('s5-register-auto-hint').textContent = _t(
+			'onboarding.gestures.register_auto_hint'
+		);
+		document.getElementById('s5-register-manual').textContent = _t(
+			'onboarding.gestures.register_manual'
+		);
+		document.getElementById('s5-register-manual-hint').textContent = _t(
+			'onboarding.gestures.register_manual_hint'
+		);
+	}
+	_updateGestureRegisterVisibility();
 }
+
+/**
+ * Shows the Windows gesture-registration panel only when the platform is Windows
+ * AND the user selected "Yes". Called on render and on every gestures-radio change.
+ */
+function _updateGestureRegisterVisibility() {
+	var panel = document.getElementById('s5-register');
+	if (!panel) return;
+	var isWindows = window.PLATFORM_OS === 'windows';
+	var checked = document.querySelector("input[name='gestures']:checked");
+	var yes = checked ? checked.value === 'yes' : false;
+	panel.classList.toggle('hidden', !(isWindows && yes));
+}
+
+/**
+ * Called by the host (Windows) after the elevated touchpad-gesture configuration
+ * finishes, to show a green success / red failure line in the registration panel.
+ * @param {boolean} ok
+ */
+window.setGestureRegisterStatus = function (ok) {
+	var el = document.getElementById('s5-register-status');
+	if (!el) return;
+	el.textContent = _t(ok ? 'onboarding.gestures.register_success' : 'onboarding.gestures.register_failed');
+	el.classList.remove('hidden');
+	el.classList.toggle('register-ok', !!ok);
+	el.classList.toggle('register-err', !ok);
+};
 
 // ======================================
 // ======================================
@@ -443,6 +492,9 @@ window.initData = function (data) {
 	// Layout preview image URL (file:// URI to static/img/ergopti.jpg).
 	// Optional — when absent step 2 renders without the visual cue.
 	if (data && data.layout_image_url) window.LAYOUT_IMAGE_URL = data.layout_image_url;
+	// Host platform ("windows" / "macos") — drives the gestures step 5 split
+	// (Windows registration buttons vs macOS warning). Absent ⇒ treated as macOS.
+	if (data && data.platform) window.PLATFORM_OS = data.platform;
 	window.applyStrings(data && data.strings ? data.strings : {});
 	renderStep1();
 	showStep(1);
@@ -568,6 +620,18 @@ document.getElementById('s5-finish').addEventListener('click', function () {
 	var checked = document.querySelector("input[name='gestures']:checked");
 	_answers.use_gestures = checked ? checked.value === 'yes' : false;
 	_post({ action: 'finish', answers: _answers });
+});
+// Toggle the Windows registration panel as the gestures Yes/No choice changes.
+document.querySelectorAll("input[name='gestures']").forEach(function (r) {
+	r.addEventListener('change', _updateGestureRegisterVisibility);
+});
+// Windows gesture registration (no-op on macOS, where the panel stays hidden).
+// Auto → host runs the elevated touchpad config; Manual → host opens the tutorial.
+document.getElementById('s5-register-auto').addEventListener('click', function () {
+	_post({ action: 'registerGesturesAuto' });
+});
+document.getElementById('s5-register-manual').addEventListener('click', function () {
+	_post({ action: 'registerGesturesManual' });
 });
 
 // Signal the host that the page is ready to receive initData. Routed through

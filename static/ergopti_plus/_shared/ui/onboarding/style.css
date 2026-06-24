@@ -411,3 +411,56 @@ button:hover {
 	background: #e0e0e0;
 	color: #333;
 }
+
+/* General hide utility. The step show/hide uses ``.step.hidden`` specifically,
+   but the gestures step's warning, the Windows registration panel and its status
+   line are not ``.step`` elements and need a plain hide rule too. */
+.hidden {
+	display: none;
+}
+
+
+/* ============================================== */
+/* ============================================== */
+/* ======= 9/ Gesture Registration (Win) ======= */
+/* ============================================== */
+/* ============================================== */
+
+/* Windows-only touchpad-gesture registration panel on step 5 (auto/manual
+   buttons + result line). Hidden on macOS, which shows the warning box instead. */
+.gesture-register {
+	border-top: 1px solid #e8e8e8;
+	margin-top: 14px;
+	padding-top: 12px;
+}
+
+.register-section {
+	color: #1d1d1f;
+	font-size: 12px;
+	font-weight: 600;
+	margin: 0 0 10px;
+}
+
+.register-btn {
+	display: block;
+	width: 100%;
+}
+
+/* Tighten the gap between each button and its explanatory hint. */
+.register-btn + .hint {
+	margin-bottom: 10px;
+}
+
+.register-status {
+	font-size: 12px;
+	font-weight: 600;
+	margin: 12px 0 0;
+}
+
+.register-status.register-ok {
+	color: #1a8c3a;
+}
+
+.register-status.register-err {
+	color: #d11;
+}
