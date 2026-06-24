@@ -263,6 +263,16 @@ function M.generate(ctx, menu_mods, actions)
 			table.insert(hotstrings_menu, { title = "-" })
 		end
 
+		-- Whole-tree bulk actions, siblings of the Paramètres sub-menu (after its
+		-- separator), so they sit at the top of the menu rather than buried inside it.
+		if type(menu_mods.hotstrings.build_bulk_actions) == "function" then
+			local bulk = menu_mods.hotstrings.build_bulk_actions(ctx)
+			if type(bulk) == "table" and #bulk > 0 then
+				for _, it in ipairs(bulk) do table.insert(hotstrings_menu, it) end
+				table.insert(hotstrings_menu, { title = "-" })
+			end
+		end
+
 		-- 2a. Common hotstring groups (non-Ergopti) with a disabled header
 		local function collect_groups(only_filter, counts_arg)
 			local result = {}

@@ -370,6 +370,10 @@
 			"type": "---"
 		},
 		{
+			"type": "dynamic",
+			"id": "hotstring_bulk_actions"
+		},
+		{
 			"type": "section_header",
 			"i18n": "menu.hotstrings.header_common"
 		},
@@ -427,10 +431,6 @@
 		},
 		{
 			"type": "---"
-		},
-		{
-			"type": "dynamic",
-			"id": "hotstring_bulk_actions"
 		},
 		{
 			"type": "dynamic",
