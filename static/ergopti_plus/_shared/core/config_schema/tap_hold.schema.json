@@ -2,7 +2,7 @@
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://ergopti.com/schema/tap_hold.schema.json",
 	"title": "Ergopti+ tap-hold configuration (shared)",
-	"description": "JSON Schema for windows/data/tap_hold/defaults.toml AND for the AHK driver's complete tap-hold configuration under config/ergopti_plus/ahk/tap_hold.toml. The per-driver file is seeded once from the driver-local defaults at first boot and then owned by the user — there is no runtime merge.",
+	"description": "JSON Schema for _shared/tap_hold/defaults.toml AND for the AHK driver's complete tap-hold configuration under config/ergopti_plus/ahk/tap_hold.toml. The per-driver file is seeded once from the driver-local defaults at first boot and then owned by the user — there is no runtime merge.",
 	"type": "object",
 	"additionalProperties": false,
 	"required": ["tap_hold"],

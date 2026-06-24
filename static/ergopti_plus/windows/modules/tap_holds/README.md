@@ -11,9 +11,9 @@ Implements tap-vs-hold disambiguation for keys that have dual roles: a short pre
 | `KeyboardHook`   | `#HotIf`-gated hotkeys for every tap/hold key                                   |
 | `TimerScheduler` | Hold-threshold timers (`TAP_MIN_DURATION_MS`) used to distinguish tap from hold |
 
-## Driver-local data (`windows/data/tap_hold/`)
+## Shared data (`_shared/tap_hold/`)
 
-- `windows/data/tap_hold/defaults.toml` — timing and disambiguation defaults that seed the user config at first boot
+- `_shared/tap_hold/defaults.toml` — cross-driver timing and disambiguation defaults that seed the user config at first boot (consumed by both the AHK loader and, going forward, the macOS Karabiner generator)
 
 ## Public API
 

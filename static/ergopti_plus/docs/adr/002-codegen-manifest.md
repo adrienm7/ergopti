@@ -32,7 +32,7 @@ driver-specific feature registries from it at build time.
 
 The build script (`tools/build/build-features-manifest.js`, exposed as
 `npm run build:manifest`) reads `manifest.toml` (and
-`static/ergopti_plus/windows/data/tap_hold/defaults.toml`) and emits:
+`static/ergopti_plus/_shared/tap_hold/defaults.toml`) and emits:
 
 - `static/ergopti_plus/windows/_generated/features_manifest.ahk` — AHK `Map`
 - `static/ergopti_plus/macos/_generated/features_manifest.lua` — Lua table
