@@ -12,6 +12,7 @@
 		"format": "prettier --plugin-search-dir . --write .",
 		"prepare": "husky install",
 		"build:manifest": "node ./tools/build/build-features-manifest.js",
+		"build:menu": "node ./tools/build/build-menu-manifest.js",
 		"build:domain": "node ./tools/build/build-domain.cjs",
 		"codegen": "npm run build:domain",
 		"lint:banners": "node ./tools/lint/audit-banner-alignment.js static/ergopti_plus/_shared",

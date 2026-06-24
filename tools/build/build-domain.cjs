@@ -189,6 +189,14 @@ const PIPELINE = [
 		},
 		generated: ['static/ergopti_plus/windows/_generated/prompt_builder.ahk']
 	},
+	{
+		name: 'build:menu — emit menu_manifest.json from manifest.toml [menu.*]',
+		run() {
+			const { ok, stderr } = runNpmScript('build:menu');
+			return { ok, detail: ok ? undefined : stderr };
+		},
+		generated: ['static/ergopti_plus/_shared/modules/menu/menu_manifest.json']
+	},
 
 	// -------------------------------------------------------
 	// Step 2: Cross-driver manifest parity (AHK ↔ HS)
