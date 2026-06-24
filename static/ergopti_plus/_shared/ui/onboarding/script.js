@@ -351,13 +351,25 @@ function renderStep5() {
 // ======================================
 
 /**
- * Posts a message to the Lua usercontent bridge.
+ * Posts a message to the host bridge. Host-agnostic so the same frontend runs
+ * under both drivers: macOS Hammerspoon exposes the WKWebView usercontent
+ * channel (window.webkit.messageHandlers.hsOnboarding, which accepts a JS
+ * object directly), while Windows WebView2 exposes window.chrome.webview, which
+ * takes a string — so we JSON-encode there and the AHK host JsonParse-s it.
  * @param {Object} msg
  */
 function _post(msg) {
 	setTimeout(function () {
 		try {
-			window.webkit.messageHandlers.hsOnboarding.postMessage(msg);
+			if (
+				window.webkit &&
+				window.webkit.messageHandlers &&
+				window.webkit.messageHandlers.hsOnboarding
+			) {
+				window.webkit.messageHandlers.hsOnboarding.postMessage(msg);
+			} else if (window.chrome && window.chrome.webview) {
+				window.chrome.webview.postMessage(JSON.stringify(msg));
+			}
 		} catch (e) {
 			console.error('[onboarding] postMessage failed:', e);
 		}
@@ -541,13 +553,7 @@ document.getElementById('s5-finish').addEventListener('click', function () {
 	_post({ action: 'finish', answers: _answers });
 });
 
-// Signal Lua that the page is ready to receive initData
-(function () {
-	setTimeout(function () {
-		try {
-			window.webkit.messageHandlers.hsOnboarding.postMessage({ action: 'ready' });
-		} catch (e) {
-			console.error('[onboarding] ready postMessage failed:', e);
-		}
-	}, 0);
-})();
+// Signal the host that the page is ready to receive initData. Routed through
+// _post so it works under both the WKWebView (macOS) and WebView2 (Windows)
+// bridges rather than hard-coding the macOS-only channel.
+_post({ action: 'ready' });
