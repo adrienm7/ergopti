@@ -260,18 +260,18 @@ function M.generate(ctx, menu_mods, actions)
 			and Logger.build(LOG, "hotstrings.build_management", menu_mods.hotstrings.build_management, ctx)
 		if mgmt_item then
 			table.insert(hotstrings_menu, mgmt_item)
-			table.insert(hotstrings_menu, { title = "-" })
 		end
 
-		-- Whole-tree bulk actions, siblings of the Paramètres sub-menu (after its
-		-- separator), so they sit at the top of the menu rather than buried inside it.
+		-- Whole-tree bulk actions, siblings of the Paramètres sub-menu (directly
+		-- under it, with the separator AFTER them), so they sit at the top of the
+		-- menu rather than buried inside it.
 		if type(menu_mods.hotstrings.build_bulk_actions) == "function" then
 			local bulk = menu_mods.hotstrings.build_bulk_actions(ctx)
 			if type(bulk) == "table" and #bulk > 0 then
 				for _, it in ipairs(bulk) do table.insert(hotstrings_menu, it) end
-				table.insert(hotstrings_menu, { title = "-" })
 			end
 		end
+		table.insert(hotstrings_menu, { title = "-" })
 
 		-- 2a. Common hotstring groups (non-Ergopti) with a disabled header
 		local function collect_groups(only_filter, counts_arg)
