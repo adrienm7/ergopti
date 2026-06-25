@@ -55,6 +55,24 @@ ShowKeyboardSlotPicker(Prefix) {
 
 ShowActionPicker(Title, Current, OnConfirm, ShowNative := false) {
     global GESTURE_ACTION_NAMES, GESTURE_ACTIONS
+    ; Prefer the shared WebView2 picker (identical UI to macOS). It receives the
+    ; non-special action list (the page injects its own native/none rows); the
+    ; native searchable ListBox below remains as an automatic fallback.
+    _apActions := []
+    _apCat := ""
+    for _apName in GESTURE_ACTION_NAMES {
+        if (_apName == "--" or _apName == "none")
+            continue
+        if (SubStr(_apName, 1, 1) = "#") {
+            _apHdr := t("sg_actions.sg_order.header." . SubStr(_apName, 2))
+            _apCat := SubStr(_apHdr, 1, 1) = "#" ? SubStr(_apHdr, 2) : _apHdr
+            continue
+        }
+        if GESTURE_ACTIONS.Has(_apName)
+            _apActions.Push({ Id: _apName, Label: _GestureActionLabel(_apName), Cat: _apCat })
+    }
+    if _ActPickWeb_TryOpen(Title, Current, _apActions, OnConfirm, ShowNative)
+        return
     AllItems := []
     _PushItem(Id, Label, Cat) {
         AllItems.Push({ Id: Id, Label: Label, Cat: Cat })

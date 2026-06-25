@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "Fejlrapport gemt",
 	"dialog.action_picker.disabled": "∅ Intet",
 	"dialog.action_picker.label": "Handling:",
+	"dialog.action_picker.no_results": "Ingen matchende handling",
+	"dialog.action_picker.search": "Søg efter en handling…",
 	"dialog.app_picker.active_suffix": " (aktiv)",
 	"dialog.app_picker.prompt": "Vælg programmer:",
 	"dialog.app_picker.running_count": "{n} kørende program(mer).",

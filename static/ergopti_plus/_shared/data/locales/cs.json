@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "Hlášení pádu uloženo",
 	"dialog.action_picker.disabled": "∅ Nic",
 	"dialog.action_picker.label": "Akce:",
+	"dialog.action_picker.no_results": "Žádná odpovídající akce",
+	"dialog.action_picker.search": "Hledat akci…",
 	"dialog.app_picker.active_suffix": " (aktivní)",
 	"dialog.app_picker.prompt": "Vyberte aplikace:",
 	"dialog.app_picker.running_count": "{n} spuštěná/spuštěných aplikace/í.",

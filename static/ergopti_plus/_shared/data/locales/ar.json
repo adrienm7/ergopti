@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "تم حفظ تقرير الأعطال",
 	"dialog.action_picker.disabled": "∅ لا شيء",
 	"dialog.action_picker.label": "الإجراء:",
+	"dialog.action_picker.no_results": "لا يوجد إجراء مطابق",
+	"dialog.action_picker.search": "البحث عن إجراء…",
 	"dialog.app_picker.active_suffix": " (نشط)",
 	"dialog.app_picker.prompt": "اختر التطبيقات:",
 	"dialog.app_picker.running_count": "{n} تطبيق(ات) قيد التشغيل.",

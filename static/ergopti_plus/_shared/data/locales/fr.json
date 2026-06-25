@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "Rapport d'erreur enregistré",
 	"dialog.action_picker.disabled": "∅ Rien",
 	"dialog.action_picker.label": "Action :",
+	"dialog.action_picker.no_results": "Aucune action correspondante",
+	"dialog.action_picker.search": "Rechercher une action…",
 	"dialog.app_picker.active_suffix": " (en cours)",
 	"dialog.app_picker.prompt": "Sélectionnez les applications :",
 	"dialog.app_picker.running_count": "{n} application(s) en cours.",

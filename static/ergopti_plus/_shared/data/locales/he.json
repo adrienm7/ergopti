@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "דוח הקריסה נשמר",
 	"dialog.action_picker.disabled": "∅ כלום",
 	"dialog.action_picker.label": "פעולה:",
+	"dialog.action_picker.no_results": "אין פעולה תואמת",
+	"dialog.action_picker.search": "חיפוש פעולה…",
 	"dialog.app_picker.active_suffix": " (פעיל)",
 	"dialog.app_picker.prompt": "בחר יישומים:",
 	"dialog.app_picker.running_count": "{n} יישום(ים) רצים.",

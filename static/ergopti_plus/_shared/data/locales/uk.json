@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "Звіт про збій збережено",
 	"dialog.action_picker.disabled": "∅ Нічого",
 	"dialog.action_picker.label": "Дія:",
+	"dialog.action_picker.no_results": "Немає відповідної дії",
+	"dialog.action_picker.search": "Пошук дії…",
 	"dialog.app_picker.active_suffix": " (активна)",
 	"dialog.app_picker.prompt": "Виберіть програми:",
 	"dialog.app_picker.running_count": "{n} запущених програм.",

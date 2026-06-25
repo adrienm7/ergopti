@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "क्रैश रिपोर्ट सहेजी गई",
 	"dialog.action_picker.disabled": "∅ कुछ नहीं",
 	"dialog.action_picker.label": "क्रिया:",
+	"dialog.action_picker.no_results": "कोई मिलती-जुलती क्रिया नहीं",
+	"dialog.action_picker.search": "क्रिया खोजें…",
 	"dialog.app_picker.active_suffix": " (सक्रिय)",
 	"dialog.app_picker.prompt": "अनुप्रयोग चुनें:",
 	"dialog.app_picker.running_count": "{n} चल रहा है अनुप्रयोग।",
