@@ -43,6 +43,7 @@
 		"test:dynamic-hs-labels": "node ./tools/test/test-dynamic-hotstrings-menu-labels.cjs",
 		"test:hs-config-bridge": "node ./tools/test/test-hotstrings-config-window-bridge.cjs",
 		"test:prompt-editor-bridge": "node ./tools/test/test-prompt-editor-bridge.cjs",
+		"test:action-picker-bridge": "node ./tools/test/test-action-picker-bridge.cjs",
 		"test:js": "node ./tools/test/run-js-suite.cjs",
 		"test:hs": "cd static/ergopti_plus/macos && lua tests/run.lua",
 		"test:linux": "cd static/ergopti_plus/linux && luajit tests/run.lua",

@@ -19,6 +19,7 @@ local gestures_mod  = require("modules.gestures")
 local dialog        = require("lib.dialog_util")
 local i18n          = require("lib.i18n")
 local ManifestMenu  = require("lib.manifest_menu")
+local ActionPicker  = require("ui.action_picker")
 
 
 
@@ -103,52 +104,43 @@ function M.build(ctx)
 	-- ===== 2.1) Helper Functions =====
 	-- =================================
 
-	--- Builds hs.chooser choices from the SG names list, grouping by category.
-	--- Each choice carries text (action label), subText (category name), and id (action name).
-	--- @param names table Ordered list of action names and sentinels from get_sg_names().
-	--- @param current string|nil Currently assigned action name.
-	--- @return table choices, number selectedIdx
-	local function build_chooser_choices(names, current)
-		local choices     = {}
-		local selected    = 1
+	--- Builds the categorised action list ({id,label,category}) for the shared
+	--- picker from the ordered SG names. Separators, the "none" sentinel (the
+	--- picker injects its own "disabled" row), and "#" category headers are folded
+	--- into the per-item category instead of becoming rows.
+	--- @param names table Ordered list of action names and sentinels.
+	--- @return table actions Array of { id, label, category }.
+	local function build_action_list(names)
+		local actions     = {}
 		local current_cat = ""
-
-		-- "Désactivé" entry first
-		local disabled_lbl = i18n.get("menu.gestures.action_disabled") ~= "menu.gestures.action_disabled"
-			and i18n.get("menu.gestures.action_disabled")
-			or i18n.get("dialog.action_picker.disabled")
-		table.insert(choices, { text = disabled_lbl, subText = "", id = "none" })
-		if current == "none" or current == nil then selected = 1 end
-
 		if type(names) == "table" then
 			for _, aname in ipairs(names) do
-				if aname == "-" or aname == "--" then
-					-- skip separators — categories provide visual grouping
-				elseif aname == "none" then
-					-- "none" is already inserted above — skip to avoid a duplicate entry
+				if aname == "-" or aname == "--" or aname == "none" then
+					-- skip separators + the none sentinel (the picker adds its own)
 				elseif aname:sub(1, 1) == "#" then
 					current_cat = aname:sub(2)
 				else
 					local lbl = type(gestures.get_action_label) == "function"
 						and gestures.get_action_label(aname) or aname
-					table.insert(choices, { text = lbl, subText = current_cat, id = aname })
-					if aname == current then selected = #choices end
+					table.insert(actions, { id = aname, label = lbl, category = current_cat })
 				end
 			end
 		end
-		return choices, selected
+		return actions
 	end
 
-	--- Opens a hs.chooser to pick an action for a gesture slot.
+	--- Opens the shared webview picker to pick an action for a gesture slot.
 	--- Applies the chosen action, saves prefs, and handles conflict dialogs.
 	--- @param slot string The internal slot identifier.
 	--- @param names table Ordered names list from get_sg_names().
 	--- @param current string|nil Currently assigned action name.
 	local function open_action_chooser(slot, names, current)
-		local choices, selected = build_chooser_choices(names, current)
-		local picker = hs.chooser.new(function(choice)
-			if not choice then return end
-			local a = choice.id
+		ActionPicker.open({
+			title   = slot_label(slot),
+			label   = i18n.get("dialog.action_picker.label"),
+			current = current or "none",
+			actions = build_action_list(names),
+		}, function(a)
 			if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, a) end
 			local conflict = type(gestures.on_action_changed) == "function" and gestures.on_action_changed(slot, a) or nil
 			ctx.save_prefs()
@@ -164,10 +156,6 @@ function M.build(ctx)
 				end)
 			end
 		end)
-		picker:choices(choices)
-		picker:searchSubText(true)
-		picker:select(selected)
-		picker:show()
 	end
 
 	--- Generates a menu item for a specific gesture slot.

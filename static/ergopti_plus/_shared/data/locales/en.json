@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "Crash report saved",
 	"dialog.action_picker.disabled": "∅ Nothing",
 	"dialog.action_picker.label": "Action:",
+	"dialog.action_picker.no_results": "No matching action",
+	"dialog.action_picker.search": "Search an action…",
 	"dialog.app_picker.active_suffix": " (active)",
 	"dialog.app_picker.prompt": "Select applications:",
 	"dialog.app_picker.running_count": "{n} running application(s).",

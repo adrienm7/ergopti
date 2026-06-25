@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "Отчёт о сбое сохранён",
 	"dialog.action_picker.disabled": "∅ Ничего",
 	"dialog.action_picker.label": "Действие:",
+	"dialog.action_picker.no_results": "Нет подходящего действия",
+	"dialog.action_picker.search": "Поиск действия…",
 	"dialog.app_picker.active_suffix": " (активно)",
 	"dialog.app_picker.prompt": "Выберите приложения:",
 	"dialog.app_picker.running_count": "{n} запущенных приложений.",

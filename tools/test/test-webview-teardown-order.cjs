@@ -72,6 +72,12 @@ const HOSTS = [
 		file: 'static/ergopti_plus/windows/ui/prompt_editor/init.ahk',
 		close: '_PromptEdWeb_Controller.Close()',
 		subs: ['_PromptEdWeb_MsgSub     := unset', '_PromptEdWeb_NavSub     := unset']
+	},
+	{
+		label: 'action picker host',
+		file: 'static/ergopti_plus/windows/ui/action_picker_webview.ahk',
+		close: '_ActPickWeb_Controller.Close()',
+		subs: ['_ActPickWeb_MsgSub     := unset', '_ActPickWeb_NavSub     := unset']
 	}
 ];
 

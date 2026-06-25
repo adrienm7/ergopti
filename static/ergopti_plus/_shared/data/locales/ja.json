@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "クラッシュレポートを保存しました",
 	"dialog.action_picker.disabled": "∅ なし",
 	"dialog.action_picker.label": "アクション:",
+	"dialog.action_picker.no_results": "一致するアクションがありません",
+	"dialog.action_picker.search": "アクションを検索…",
 	"dialog.app_picker.active_suffix": "（アクティブ）",
 	"dialog.app_picker.prompt": "アプリケーションを選択:",
 	"dialog.app_picker.running_count": "{n}個のアプリケーションが実行中。",

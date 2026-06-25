@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="stylesheet" href="style.css" />
+		<script src="../i18n.js"></script>
+	</head>
+	<body>
+		<header id="hdr">
+			<h1 id="title"></h1>
+			<p id="subtitle"></p>
+		</header>
+
+		<div id="search-bar">
+			<span class="search-ico" aria-hidden="true">⌕</span>
+			<input
+				id="search"
+				type="text"
+				autocomplete="off"
+				autocorrect="off"
+				spellcheck="false"
+			/>
+		</div>
+
+		<main id="list" tabindex="-1"></main>
+
+		<div id="empty" hidden></div>
+
+		<footer id="ftr">
+			<span id="count"></span>
+			<button id="btn-cancel" type="button" onclick="doCancel()"></button>
+		</footer>
+
+		<script src="script.js"></script>
+	</body>
+</html>

@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "Relatório de erro guardado",
 	"dialog.action_picker.disabled": "∅ Nada",
 	"dialog.action_picker.label": "Ação:",
+	"dialog.action_picker.no_results": "Nenhuma ação correspondente",
+	"dialog.action_picker.search": "Procurar uma ação…",
 	"dialog.app_picker.active_suffix": " (ativo)",
 	"dialog.app_picker.prompt": "Selecionar aplicativos:",
 	"dialog.app_picker.running_count": "{n} aplicativo(s) em execução.",

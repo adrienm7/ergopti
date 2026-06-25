@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "Raport awarii zapisany",
 	"dialog.action_picker.disabled": "∅ Nic",
 	"dialog.action_picker.label": "Akcja:",
+	"dialog.action_picker.no_results": "Brak pasującej akcji",
+	"dialog.action_picker.search": "Szukaj akcji…",
 	"dialog.app_picker.active_suffix": " (aktywna)",
 	"dialog.app_picker.prompt": "Wybierz aplikacje:",
 	"dialog.app_picker.running_count": "{n} działająca(-e) aplikacja(-e).",

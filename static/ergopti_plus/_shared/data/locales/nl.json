@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "Crashrapport opgeslagen",
 	"dialog.action_picker.disabled": "∅ Niets",
 	"dialog.action_picker.label": "Actie:",
+	"dialog.action_picker.no_results": "Geen overeenkomende actie",
+	"dialog.action_picker.search": "Zoek een actie…",
 	"dialog.app_picker.active_suffix": " (actief)",
 	"dialog.app_picker.prompt": "Selecteer toepassingen:",
 	"dialog.app_picker.running_count": "{n} actieve toepassing(en).",

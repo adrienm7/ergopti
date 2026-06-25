@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "Absturzbericht gespeichert",
 	"dialog.action_picker.disabled": "∅ Nichts",
 	"dialog.action_picker.label": "Aktion:",
+	"dialog.action_picker.no_results": "Keine passende Aktion",
+	"dialog.action_picker.search": "Aktion suchen…",
 	"dialog.app_picker.active_suffix": " (aktiv)",
 	"dialog.app_picker.prompt": "Anwendungen auswählen:",
 	"dialog.app_picker.running_count": "{n} laufende Anwendung(en).",

@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "崩溃报告已保存",
 	"dialog.action_picker.disabled": "∅ 无",
 	"dialog.action_picker.label": "动作：",
+	"dialog.action_picker.no_results": "没有匹配的操作",
+	"dialog.action_picker.search": "搜索操作…",
 	"dialog.app_picker.active_suffix": " (运行中)",
 	"dialog.app_picker.prompt": "选择应用程序：",
 	"dialog.app_picker.running_count": "{n} 个运行中的应用。",

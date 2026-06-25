@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "충돌 보고서가 저장되었습니다",
 	"dialog.action_picker.disabled": "∅ 없음",
 	"dialog.action_picker.label": "동작:",
+	"dialog.action_picker.no_results": "일치하는 동작 없음",
+	"dialog.action_picker.search": "동작 검색…",
 	"dialog.app_picker.active_suffix": " (활성)",
 	"dialog.app_picker.prompt": "응용 프로그램을 선택하세요:",
 	"dialog.app_picker.running_count": "{n}개 실행 중인 응용 프로그램.",

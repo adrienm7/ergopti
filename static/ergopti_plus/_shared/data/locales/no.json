@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "Krassjrapport lagret",
 	"dialog.action_picker.disabled": "∅ Ingenting",
 	"dialog.action_picker.label": "Handling:",
+	"dialog.action_picker.no_results": "Ingen samsvarende handling",
+	"dialog.action_picker.search": "Søk etter en handling…",
 	"dialog.app_picker.active_suffix": " (aktiv)",
 	"dialog.app_picker.prompt": "Velg programmer:",
 	"dialog.app_picker.running_count": "{n} kjørende program(er).",

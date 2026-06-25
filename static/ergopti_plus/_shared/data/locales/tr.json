@@ -155,6 +155,8 @@
 	"crash.report.saved_title": "Çökme raporu kaydedildi",
 	"dialog.action_picker.disabled": "∅ Hiçbir şey",
 	"dialog.action_picker.label": "Eylem:",
+	"dialog.action_picker.no_results": "Eşleşen eylem yok",
+	"dialog.action_picker.search": "Bir eylem ara…",
 	"dialog.app_picker.active_suffix": " (etkin)",
 	"dialog.app_picker.prompt": "Uygulamaları seçin:",
 	"dialog.app_picker.running_count": "{n} çalışan uygulama.",
