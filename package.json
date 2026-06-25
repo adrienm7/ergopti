@@ -40,6 +40,7 @@
 		"test:macos-bundle-layout": "node ./tools/test/test-macos-bundle-layout.cjs",
 		"test:hs-editor-confirm": "node ./tools/test/test-hotstring-editor-confirm-wiring.cjs",
 		"test:webview-teardown": "node ./tools/test/test-webview-teardown-order.cjs",
+		"test:dynamic-hs-labels": "node ./tools/test/test-dynamic-hotstrings-menu-labels.cjs",
 		"test:js": "node ./tools/test/run-js-suite.cjs",
 		"test:hs": "cd static/ergopti_plus/macos && lua tests/run.lua",
 		"test:linux": "cd static/ergopti_plus/linux && luajit tests/run.lua",

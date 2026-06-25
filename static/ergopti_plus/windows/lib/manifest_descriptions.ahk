@@ -159,6 +159,23 @@ _MenuLabelCandidateKeys(DescKey, Path) {
         Out.Push(_StripUnderscores(Trimmed))
     }
 
+    ; The dynamic-hotstrings category folds to "dynamichotstrings" in the locale
+    ; (the menu category name), whereas the manifest path/description_key use the
+    ; short "dynamic" segment. The transformations above only strip underscores,
+    ; so they never bridge "dynamic" -> "dynamichotstrings" and every dynamic
+    ; section would fall back to its raw id. Emit the folded category key
+    ; explicitly: hotstrings.dynamic.text_expansion_personal_information ->
+    ; dynamichotstrings.textexpansionpersonalinformation.
+    Combined := (DescKey != "") ? DescKey : Path
+    DynPos := InStr(Combined, ".dynamic.")
+    if (DynPos) {
+        Section := SubStr(Combined, DynPos + StrLen(".dynamic."))
+        if (Section != "") {
+            Out.Push("dynamichotstrings." . Section)
+            Out.Push("dynamichotstrings." . _StripUnderscores(Section))
+        }
+    }
+
     return Out
 }
 
