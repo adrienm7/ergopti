@@ -104,29 +104,31 @@ function M.build(ctx)
 	-- ===== 2.1) Helper Functions =====
 	-- =================================
 
-	--- Builds the categorised action list ({id,label,category}) for the shared
-	--- picker from the ordered SG names. Separators, the "none" sentinel (the
-	--- picker injects its own "disabled" row), and "#" category headers are folded
-	--- into the per-item category instead of becoming rows.
+	--- Builds the ordered item list for the shared picker from the SG names.
+	--- Each entry is either a heading ({type="heading", level, text}) or an action
+	--- ({type="action", id, label}); the number of leading "#" on a header encodes
+	--- its level (h1/h2/…) so the picker can render a foldable hierarchy + TOC.
+	--- Separators and the "none" sentinel (the picker injects its own disabled row)
+	--- are dropped.
 	--- @param names table Ordered list of action names and sentinels.
-	--- @return table actions Array of { id, label, category }.
-	local function build_action_list(names)
-		local actions     = {}
-		local current_cat = ""
+	--- @return table items Array of heading/action tables.
+	local function build_items(names)
+		local items = {}
 		if type(names) == "table" then
 			for _, aname in ipairs(names) do
 				if aname == "-" or aname == "--" or aname == "none" then
 					-- skip separators + the none sentinel (the picker adds its own)
 				elseif aname:sub(1, 1) == "#" then
-					current_cat = aname:sub(2)
+					local hashes = aname:match("^#+")
+					table.insert(items, { type = "heading", level = #hashes, text = aname:sub(#hashes + 1) })
 				else
 					local lbl = type(gestures.get_action_label) == "function"
 						and gestures.get_action_label(aname) or aname
-					table.insert(actions, { id = aname, label = lbl, category = current_cat })
+					table.insert(items, { type = "action", id = aname, label = lbl })
 				end
 			end
 		end
-		return actions
+		return items
 	end
 
 	--- Opens the shared webview picker to pick an action for a gesture slot.
@@ -139,7 +141,7 @@ function M.build(ctx)
 			title   = slot_label(slot),
 			label   = i18n.get("dialog.action_picker.label"),
 			current = current or "none",
-			actions = build_action_list(names),
+			items   = build_items(names),
 		}, function(a)
 			if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, a) end
 			local conflict = type(gestures.on_action_changed) == "function" and gestures.on_action_changed(slot, a) or nil

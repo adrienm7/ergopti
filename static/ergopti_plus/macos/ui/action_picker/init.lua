@@ -87,7 +87,7 @@ function M.open(opts, on_confirm)
 		searchPlaceholder = i18n.get("dialog.action_picker.search"),
 		noResults         = i18n.get("dialog.action_picker.no_results"),
 		cancelLabel       = i18n.get("button.cancel"),
-		actions           = opts.actions or {},
+		items             = opts.items or {},
 	}
 
 	local function push_init()
@@ -132,7 +132,7 @@ function M.open(opts, on_confirm)
 			_usercontent = nil
 		end,
 	})
-	Logger.info(LOG, "Action picker opened (%d action(s)).", #payload.actions)
+	Logger.info(LOG, "Action picker opened (%d item(s)).", #payload.items)
 end
 
 --- Close and destroy the picker window.

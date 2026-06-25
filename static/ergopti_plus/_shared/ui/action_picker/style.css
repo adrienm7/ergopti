@@ -1,9 +1,9 @@
 /* _shared/ui/action_picker/style.css */
 
 /* =========================================================================== */
-/* Action Picker — a polished, searchable, categorised chooser shared by the    */
-/* AHK (WebView2) and Hammerspoon (WKWebView) drivers. Flat, dense, fits a      */
-/* compact utility panel; supports both light and dark appearances.             */
+/* Action Picker — a polished, searchable, foldable, multi-level chooser shared */
+/* by the AHK (WebView2) and Hammerspoon (WKWebView) drivers. Flat, dense, fits  */
+/* a compact utility panel; supports both light and dark appearances.           */
 /* =========================================================================== */
 
 /* =============================== */
@@ -61,6 +61,7 @@ body {
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
 	font-size: 13.5px;
 	line-height: 1.4;
+	position: relative;
 }
 
 /* =================================== */
@@ -70,7 +71,15 @@ body {
 /* =================================== */
 
 #hdr {
+	align-items: flex-start;
+	display: flex;
+	gap: 12px;
+	justify-content: space-between;
 	padding: 16px 20px 10px;
+}
+
+.hdr-text {
+	min-width: 0;
 }
 
 #title {
@@ -90,6 +99,22 @@ body {
 	display: none;
 }
 
+#toc-btn {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	color: var(--text);
+	cursor: pointer;
+	flex-shrink: 0;
+	font-size: 15px;
+	line-height: 1;
+	padding: 7px 10px;
+	transition: border-color 0.12s, background 0.12s;
+}
+#toc-btn:hover {
+	border-color: var(--accent);
+}
+
 #search-bar {
 	align-items: center;
 	background: var(--surface);
@@ -102,7 +127,6 @@ body {
 	padding: 0 12px;
 	transition: border-color 0.12s, box-shadow 0.12s;
 }
-
 #search-bar:focus-within {
 	border-color: var(--accent);
 	box-shadow: 0 0 0 3px var(--accent-soft);
@@ -126,7 +150,7 @@ body {
 
 /* =============================== */
 /* =============================== */
-/* ======= 3/ Action list ======== */
+/* ======= 3/ List & rows ======== */
 /* =============================== */
 /* =============================== */
 
@@ -137,18 +161,68 @@ body {
 	padding: 0 12px 8px;
 }
 
-.cat-header {
+/* ----- Headings (h1/h2/h3…) ----- */
+
+.heading {
+	align-items: center;
 	color: var(--sub);
-	font-size: 10.5px;
-	font-weight: 600;
-	letter-spacing: 0.04em;
-	padding: 12px 8px 4px;
+	cursor: pointer;
+	display: flex;
+	gap: 6px;
+	padding: 8px;
 	position: sticky;
-	text-transform: uppercase;
 	top: 0;
-	background: var(--bg);
 	z-index: 1;
+	background: var(--bg);
+	user-select: none;
 }
+.heading.static {
+	cursor: default;
+}
+
+.heading .caret {
+	color: var(--sub);
+	flex-shrink: 0;
+	font-size: 10px;
+	transition: transform 0.12s ease;
+	width: 12px;
+}
+.heading.collapsed .caret {
+	transform: rotate(-90deg);
+}
+.heading.static .caret {
+	visibility: hidden;
+}
+
+.heading-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.heading.lvl1 {
+	color: var(--text);
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: 0.01em;
+	margin-top: 8px;
+	text-transform: uppercase;
+}
+.heading.lvl2 {
+	font-size: 11.5px;
+	font-weight: 600;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
+}
+.heading.lvl3,
+.heading.lvl4 {
+	font-size: 11px;
+	font-weight: 600;
+	font-style: italic;
+	text-transform: none;
+}
+
+/* ----- Action rows ----- */
 
 .row {
 	align-items: center;
@@ -159,16 +233,13 @@ body {
 	padding: 9px 12px;
 	user-select: none;
 }
-
 .row:hover {
 	background: var(--surface);
 }
-
 .row.active {
 	background: var(--accent);
 	color: #fff;
 }
-
 .row.active .row-tick {
 	color: #fff;
 }
@@ -180,8 +251,6 @@ body {
 	white-space: nowrap;
 }
 
-/* The currently-assigned action carries a check mark; it stays visible even when
-   the row is not the keyboard-active one so the user sees the live selection. */
 .row-tick {
 	color: var(--accent);
 	flex-shrink: 0;
@@ -201,11 +270,6 @@ body {
 	color: #fff;
 }
 
-.sep {
-	border-top: 1px solid var(--border);
-	margin: 6px 4px;
-}
-
 #empty {
 	color: var(--sub);
 	flex: 1;
@@ -220,9 +284,59 @@ body {
 	display: none;
 }
 
+/* =============================== */
+/* =============================== */
+/* ======= 4/ TOC drawer ========= */
+/* =============================== */
+/* =============================== */
+
+#toc {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+	max-height: 70%;
+	overflow-y: auto;
+	padding: 8px;
+	position: absolute;
+	right: 16px;
+	top: 56px;
+	width: 260px;
+	z-index: 10;
+}
+#toc[hidden] {
+	display: none;
+}
+
+.toc-item {
+	border-radius: 6px;
+	color: var(--text);
+	cursor: pointer;
+	overflow: hidden;
+	padding: 7px 10px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.toc-item:hover {
+	background: var(--accent-soft);
+}
+.toc-item.lvl1 {
+	font-weight: 700;
+}
+.toc-item.lvl2 {
+	color: var(--sub);
+	font-size: 12.5px;
+}
+.toc-item.lvl3,
+.toc-item.lvl4 {
+	color: var(--sub);
+	font-size: 12px;
+	font-style: italic;
+}
+
 /* ===================================== */
 /* ===================================== */
-/* ======= 4/ Footer & Controls ======== */
+/* ======= 5/ Footer & Controls ======== */
 /* ===================================== */
 /* ===================================== */
 

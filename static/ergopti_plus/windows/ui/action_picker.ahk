@@ -56,22 +56,29 @@ ShowKeyboardSlotPicker(Prefix) {
 ShowActionPicker(Title, Current, OnConfirm, ShowNative := false) {
     global GESTURE_ACTION_NAMES, GESTURE_ACTIONS
     ; Prefer the shared WebView2 picker (identical UI to macOS). It receives the
-    ; non-special action list (the page injects its own native/none rows); the
-    ; native searchable ListBox below remains as an automatic fallback.
-    _apActions := []
-    _apCat := ""
+    ; ordered item list (headings carry their level, derived from the number of
+    ; leading "#" on the catalogue entry; the page injects its own native/none
+    ; rows). The native searchable ListBox below remains as an automatic fallback.
+    _apItems := []
     for _apName in GESTURE_ACTION_NAMES {
         if (_apName == "--" or _apName == "none")
             continue
         if (SubStr(_apName, 1, 1) = "#") {
-            _apHdr := t("sg_actions.sg_order.header." . SubStr(_apName, 2))
-            _apCat := SubStr(_apHdr, 1, 1) = "#" ? SubStr(_apHdr, 2) : _apHdr
+            _apLvl := 0
+            while (SubStr(_apName, _apLvl + 1, 1) = "#")
+                _apLvl++
+            _apHdr := t("sg_actions.sg_order.header." . SubStr(_apName, _apLvl + 1))
+            ; The locale value carries a legacy "#" prefix — strip it so the level
+            ; comes only from the catalogue marker, not the translated text.
+            while (SubStr(_apHdr, 1, 1) = "#")
+                _apHdr := SubStr(_apHdr, 2)
+            _apItems.Push({ Type: "heading", Level: _apLvl, Text: _apHdr })
             continue
         }
         if GESTURE_ACTIONS.Has(_apName)
-            _apActions.Push({ Id: _apName, Label: _GestureActionLabel(_apName), Cat: _apCat })
+            _apItems.Push({ Type: "action", Id: _apName, Label: _GestureActionLabel(_apName) })
     }
-    if _ActPickWeb_TryOpen(Title, Current, _apActions, OnConfirm, ShowNative)
+    if _ActPickWeb_TryOpen(Title, Current, _apItems, OnConfirm, ShowNative)
         return
     AllItems := []
     _PushItem(Id, Label, Cat) {
@@ -85,8 +92,15 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false) {
         if (ActionName == "--" or ActionName == "none")
             continue
         if (SubStr(ActionName, 1, 1) = "#") {
-            local TranslatedHeader := t("sg_actions.sg_order.header." . SubStr(ActionName, 2))
-            CurrentCat := SubStr(TranslatedHeader, 1, 1) = "#" ? SubStr(TranslatedHeader, 2) : TranslatedHeader
+            ; Level-aware: strip every leading "#" (h1/h2/…) from the catalogue
+            ; marker to resolve the locale key, and any legacy "#" from the value.
+            local _hl := 0
+            while (SubStr(ActionName, _hl + 1, 1) = "#")
+                _hl++
+            local TranslatedHeader := t("sg_actions.sg_order.header." . SubStr(ActionName, _hl + 1))
+            while (SubStr(TranslatedHeader, 1, 1) = "#")
+                TranslatedHeader := SubStr(TranslatedHeader, 2)
+            CurrentCat := TranslatedHeader
             continue
         }
         if GESTURE_ACTIONS.Has(ActionName)
