@@ -3,262 +3,208 @@
 --- ==============================================================================
 --- MODULE: Personal Information Editor UI
 --- DESCRIPTION:
---- Spins up a temporary local HTTP server to display a clean web form
---- in the user’s default browser. This approach bypasses Hammerspoon’s 
---- webview limitations regarding certain keyboard event interceptions.
---- 
---- Acts as a lightweight router to serve the HTML, CSS, and JS assets 
---- from its dedicated subfolder.
+--- Standalone WKWebView form for editing the user's personal information. Loads
+--- the shared frontend from _shared/ui/personal_info_editor/ so the AHK and
+--- Hammerspoon drivers render an identical window, and talks to it over the same
+--- usercontent message bridge every other editor uses (no more local HTTP server
+--- / browser tab — the field inputs work fine inside the WKWebView, as proven by
+--- the hotstring and paths editors).
+---
+--- FEATURES & RATIONALE:
+--- 1. Shared frontend — resolved through Paths.shared so both drivers share it.
+--- 2. Message bridge — initData injects {fields, strings}; the page posts
+---    {action} messages (ready/save/cancel) back through the "hsPersonalInfo"
+---    usercontent handler.
+--- 3. Singleton — a second open focuses the existing window.
 --- ==============================================================================
 
 local M = {}
 
 local hs     = hs
-local timer  = hs.timer
 local Logger = require("lib.logger")
 local i18n   = require("lib.i18n")
+local Paths  = require("lib.paths")
 
 local LOG   = "personal_info_editor"
 
-
-
-
-
--- ====================================
---- ====================================
--- ======= 1/ Constants & State =======
---- ====================================
--- ====================================
-
-local SERVER_PORT       = 18743
--- Auto-close the server if the browser tab is closed without submitting or
--- cancelling. 10 minutes is generous enough for a form this size.
-local SESSION_TIMEOUT_SEC = 600
-local _srv        = nil
-local _timeout    = nil
+-- Absolute path to the shared frontend assets (index.html, script.js, style.css).
+local ASSETS_DIR = (Paths.shared("ui/personal_info_editor") or "") .. "/"
 
 -- Field definitions for the form. Keys match the preferences table.
 local FIELDS = {
-	{ key = "first_name",            label = i18n.get("personal_info.field_firstname") },
-	{ key = "last_name",             label = "Nom" },
-	{ key = "date_of_birth",         label = "Date de naissance" },
-	{ key = "email_address",         label = "E-mail" },
-	{ key = "work_email_address",    label = "E-mail professionnel" },
-	{ key = "phone_number",          label = i18n.get("personal_info.field_phone_digits") },
-	{ key = "phone_number_clean",    label = i18n.get("personal_info.field_phone_formatted") },
-	{ key = "street_address",        label = "Adresse" },
-	{ key = "postal_code",           label = "Code postal" },
-	{ key = "city",                  label = "Ville" },
-	{ key = "country",               label = "Pays" },
-	{ key = "iban",                  label = "IBAN" },
-	{ key = "bic",                   label = "BIC" },
-	{ key = "credit_card",           label = i18n.get("personal_info.field_credit_card") },
+	{ key = "first_name",             label = i18n.get("personal_info.field_firstname") },
+	{ key = "last_name",              label = "Nom" },
+	{ key = "date_of_birth",          label = "Date de naissance" },
+	{ key = "email_address",          label = "E-mail" },
+	{ key = "work_email_address",     label = "E-mail professionnel" },
+	{ key = "phone_number",           label = i18n.get("personal_info.field_phone_digits") },
+	{ key = "phone_number_clean",     label = i18n.get("personal_info.field_phone_formatted") },
+	{ key = "street_address",         label = "Adresse" },
+	{ key = "postal_code",            label = "Code postal" },
+	{ key = "city",                   label = "Ville" },
+	{ key = "country",                label = "Pays" },
+	{ key = "iban",                   label = "IBAN" },
+	{ key = "bic",                    label = "BIC" },
+	{ key = "credit_card",            label = i18n.get("personal_info.field_credit_card") },
 	{ key = "social_security_number", label = i18n.get("personal_info.field_ssn") },
 }
 
--- Response HTML displayed after a successful save (built at require-time so
--- i18n is already loaded and the locale is active)
-local function build_html_ok()
-	return "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
-		.. "<style>body{font-family:-apple-system,sans-serif;padding:40px;text-align:center}"
-		.. "h2{color:#007AFF}</style></head>"
-		.. "<body><h2>" .. i18n.get("personal_info.saved_title") .. "</h2>"
-		.. "<p>" .. i18n.get("personal_info.saved_body") .. "</p>"
-		.. "<script>window.close()</script></body></html>"
-end
-
--- Determine absolute path to the assets directory
-local _src  = debug.getinfo(1, "S").source:sub(2)
-local ASSETS_DIR = _src:match("^(.*[/\\])") or "./"
+-- WebView state (singleton).
+local _webview     = nil
+local _usercontent = nil
+local _save_cb     = nil
+local _current     = {}
 
 
 
 
+-- =============================
+-- =============================
+-- ======= 1/ Internals =======
+-- =============================
+-- =============================
 
--- ===================================
---- ===================================
--- ======= 2/ String Utilities =======
---- ===================================
--- ===================================
-
---- URL-decodes a percent-encoded string.
---- @param s string The encoded string.
---- @return string The decoded string.
-local function urldecode(s)
-	if type(s) ~= "string" then return s end
-	return (s:gsub("+", " "):gsub("%%(%x%x)", function(h)
-		return string.char(tonumber(h, 16))
-	end))
-end
-
-
-
-
-
--- ===================================
---- ===================================
--- ======= 3/ Asset Management =======
---- ===================================
--- ===================================
-
---- Reads the content of a file from disk safely.
---- @param filename string The name of the file inside the ASSETS_DIR.
---- @return string The file content, or empty string on failure.
-local function read_asset(filename)
-	if type(filename) ~= "string" then return "" end
-	
-	local path = ASSETS_DIR .. filename
-	local ok, fh = pcall(io.open, path, "r")
-	if not ok or not fh then
-		Logger.error(LOG, string.format("Error loading asset from: %s.", tostring(path)))
-		return ""
+--- Closes and cleans up the editor webview.
+local function close_webview()
+	if _webview then
+		pcall(function() _webview:delete() end)
+		_webview     = nil
+		_usercontent = nil
 	end
-	
-	local content = fh:read("*a")
-	pcall(function() fh:close() end)
-	
-	return content or ""
 end
 
---- Builds the HTML form using the current information, injecting rows dynamically.
---- @param current_info table The current personal information dictionary.
---- @return string The complete HTML document ready to be served.
-local function build_html(current_info)
-	current_info = type(current_info) == "table" and current_info or {}
-	
-	-- Generate the input rows dynamically based on the FIELDS table
-	local rows = {}
+--- Builds the ordered field list (key/label/value) for the frontend.
+--- @param current_info table The current personal-information map.
+--- @return table
+local function build_fields(current_info)
+	local fields = {}
 	for _, f in ipairs(FIELDS) do
-		local val = tostring(current_info[f.key] or "")
-			:gsub("&", "&amp;")
-			:gsub("<", "&lt;")
-			:gsub("\"", "&quot;")
-			
-		table.insert(rows, string.format(
-			"<div class=\"row\"><label>%s</label><input name=\"%s\" value=\"%s\" autocomplete=\"off\"></div>",
-			f.label, f.key, val
-		))
+		fields[#fields + 1] = {
+			key   = f.key,
+			label = f.label,
+			value = tostring(current_info[f.key] or ""),
+		}
 	end
-	local rows_html = table.concat(rows, "\n")
-
-	-- Load the external HTML template
-	local html_template = read_asset("index.html")
-
-	-- Fallback if index.html is missing
-	if html_template == "" then
-		return "<html><body style=\"font-family:sans-serif;padding:20px;\"><h1>Error 500</h1><p>UI Template missing.</p></body></html>"
-	end
-
-	-- Inject dynamic rows using string replacement
-	local final_html = html_template:gsub("{{ROWS}}", function() return rows_html end)
-
-	return final_html
+	return fields
 end
 
+--- Injects window.initData({fields, strings}) into the page.
+local function inject_init_data()
+	if not _webview then return end
+	local payload = {
+		fields  = build_fields(_current),
+		strings = {
+			["editor.personal_info.window_title"] = i18n.get("editor.personal_info.window_title"),
+			["common.save"]                       = i18n.get("common.save"),
+			["common.cancel"]                     = i18n.get("common.cancel"),
+		},
+	}
+	local ok_enc, json = pcall(hs.json.encode, payload)
+	if not ok_enc or not json then
+		Logger.error(LOG, "Failed to encode initData payload.")
+		return
+	end
+	pcall(function()
+		_webview:evaluateJavaScript("if(window.initData) window.initData(" .. json .. ")")
+	end)
+end
+
+--- Handles an incoming message from the JavaScript frontend.
+--- @param body table The decoded message body ({action, …}).
+local function handle_message(body)
+	if type(body) ~= "table" then return end
+	local action = body.action
+	Logger.debug(LOG, "usercontent message received: action='%s'.", tostring(action))
+
+	if action == "ready" then
+		inject_init_data()
+	elseif action == "save" then
+		local values = type(body.values) == "table" and body.values or {}
+		if type(_save_cb) == "function" then
+			pcall(_save_cb, values)
+		end
+		close_webview()
+	elseif action == "cancel" then
+		close_webview()
+	end
+end
 
 
 
 
 -- =============================
 --- =============================
--- ======= 4/ Public API =======
+-- ======= 2/ Public API =======
 --- =============================
 -- =============================
 
---- Stops the HTTP server and cancels the watchdog timer.
-local function stop_server()
-	if _timeout then _timeout:stop(); _timeout = nil end
-	if _srv and type(_srv.stop) == "function" then
-		pcall(function() _srv:stop() end)
-		_srv = nil
-		Logger.info(LOG, "Editor server stopped.")
-	end
-end
-
---- Closes the editor and releases the HTTP port.
---- Call this when the parent UI is dismissed or the module is torn down.
+--- Closes the editor and releases its resources.
 function M.close()
-	stop_server()
+	close_webview()
 end
 
---- Opens the editor in the system’s default web browser.
+--- Opens the editor as a standalone WKWebView window.
 --- @param current_info table Current data used to populate form fields.
---- @param save_callback function Invoked when the user submits the form.
+--- @param save_callback function Invoked with the edited {key=value} map on save.
 function M.open(current_info, save_callback)
-	-- Prevent launching multiple server instances
-	if _srv then
-		Logger.warn(LOG, string.format("Server already running on port %d.", SERVER_PORT))
-		pcall(hs.execute, string.format("open \"http://127.0.0.1:%d/\"", SERVER_PORT))
+	_current = type(current_info) == "table" and current_info or {}
+	_save_cb = save_callback
+
+	-- Singleton — focus the existing window instead of opening a second one.
+	if _webview then
+		local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+		if ok_ui and ui_builder then
+			ui_builder.force_focus(_webview)
+		else
+			pcall(function() _webview:bringToFront() end)
+		end
 		return
 	end
 
-	local html_form = build_html(current_info)
-
-	-- Primary HTTP request handler and router
-	local function handler(method, path, headers, body)
-		
-		-- 1. Route for the main HTML form
-		if path == "/" then
-			return html_form, 200, { ["Content-Type"] = "text/html; charset=utf-8" }
-			
-		-- 2. Route for the CSS stylesheet
-		elseif path == "/style.css" or path == "style.css" then
-			local css = read_asset("style.css")
-			return css, 200, { ["Content-Type"] = "text/css; charset=utf-8" }
-			
-		-- 3. Route for the Javascript logic
-		elseif path == "/script.js" or path == "script.js" then
-			local js = read_asset("script.js")
-			return js, 200, { ["Content-Type"] = "application/javascript; charset=utf-8" }
-			
-		-- 4. Form submission handler
-		elseif path == "/save" and method == "POST" then
-			local new_info = {}
-			for k, v in (body or ""):gmatch("([^&=]+)=([^&]*)") do
-				new_info[urldecode(k)] = urldecode(v)
-			end
-			
-			-- Persist data via the callback
-			if type(save_callback) == "function" then
-				pcall(save_callback, new_info)
-			end
-			
-			-- Gracefully shut down the server after the response is sent
-			timer.doAfter(0.5, stop_server)
-			return build_html_ok(), 200, { ["Content-Type"] = "text/html; charset=utf-8" }
-
-		-- 5. Cancellation handler
-		elseif path == "/cancel" then
-			timer.doAfter(0.5, stop_server)
-			return "", 200, {}
+	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsPersonalInfo")
+	if not ok_uc or not uc then
+		Logger.error(LOG, "Failed to create webview usercontent bridge.")
+		return
+	end
+	_usercontent = uc
+	_usercontent:setCallback(function(message)
+		if message and type(message.body) == "table" then
+			handle_message(message.body)
 		end
-		
-		return "Not found", 404, {}
+	end)
+
+	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+	if not ok_ui or not ui_builder then
+		Logger.error(LOG, "Failed to load ui_builder module.")
+		return
 	end
 
-	-- Initialize and start the HTTP server
-	local ok, h_srv = pcall(hs.httpserver.new, false, false)
-	if ok and h_srv then
-		_srv = h_srv
-		pcall(function() 
-			_srv:setPort(SERVER_PORT)
-			_srv:setCallback(handler)
-			_srv:start()
-		end)
-		
-		-- Open the browser to the local server address
-		pcall(hs.execute, string.format("open \"http://127.0.0.1:%d/\"", SERVER_PORT))
-		Logger.info(LOG, string.format("Editor server active on port %d.", SERVER_PORT))
+	local masks       = hs.webview.windowMasks
+	local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2)
 
-		-- Watchdog: stop the server after SESSION_TIMEOUT_SEC even if the user
-		-- closed the browser tab without submitting or cancelling (ui-windows-b-5).
-		_timeout = timer.doAfter(SESSION_TIMEOUT_SEC, function()
-			Logger.warn(LOG, "Session timed out — stopping idle editor server.")
-			stop_server()
-		end)
-	else
-		Logger.error(LOG, "Failed to initialize local HTTP server.")
-	end
+	local screen = hs.screen.mainScreen()
+	local sf     = screen and type(screen.frame) == "function" and screen:frame() or { w = 1440, h = 900 }
+	local win_w  = math.min(560, math.floor((sf.w or 1440) * 0.5))
+	local win_h  = math.min(720, math.floor((sf.h or 900) * 0.85))
+
+	_webview = ui_builder.show_webview({
+		frame         = ui_builder.get_centered_frame(win_w, win_h),
+		title         = i18n.get("editor.personal_info.window_title"),
+		style_masks   = style_masks,
+		usercontent   = _usercontent,
+		assets_dir    = ASSETS_DIR,
+		on_close      = function()
+			_webview     = nil
+			_usercontent = nil
+		end,
+		on_navigation = function(action)
+			if action == "didFinishNavigation" then
+				hs.timer.doAfter(0.05, inject_init_data)
+			end
+			return true
+		end,
+	})
+	Logger.info(LOG, "Personal info editor shown via WebView.")
 end
 
 return M

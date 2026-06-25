@@ -49,6 +49,10 @@ ToggleRepeatKeyEnabled(*) {
 }
 
 PersonalInformationEditor(*) {
+    ; Prefer the shared WebView2 editor (identical UI to macOS); the native
+    ; multi-field dialog below remains as an automatic fallback.
+    if _PiEdWeb_TryOpen()
+        return
     GuiToShow := Gui(, t("dialog.personal_info.title"))
     UpdatedPersonalInformation := Map()
     ReverseLetters := Map()
