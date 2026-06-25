@@ -1,4 +1,4 @@
-// ui/paths_editor/script.js
+// _shared/ui/paths_editor/script.js
 
 // ========================================
 // ========================================
@@ -75,12 +75,36 @@ function refreshTag() {
 
 // =============================================
 // =============================================
-// ======= 3/ Lua Bridge =======================
+// ======= 3/ Host Bridge ======================
 // =============================================
 // =============================================
 
 /**
- * Called by Lua once the webview is ready, with initial data.
+ * Posts a message to the native host, host-agnostically. Windows WebView2
+ * exposes window.chrome.webview (takes a JSON string); macOS WKWebView exposes
+ * window.webkit.messageHandlers.hsPaths (takes an object).
+ * @param {Object} msg - The message payload ({action, …}).
+ */
+function _post(msg) {
+	try {
+		if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function') {
+			window.chrome.webview.postMessage(JSON.stringify(msg));
+			return;
+		}
+	} catch (e) {
+		/* fall through to the WKWebView channel */
+	}
+	try {
+		if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.hsPaths) {
+			window.webkit.messageHandlers.hsPaths.postMessage(msg);
+		}
+	} catch (e) {
+		console.error('paths_editor post failed:', e);
+	}
+}
+
+/**
+ * Called by the host once the webview is ready, with initial data.
  * @param {Object} data - {configDir, defaultConfigDir}
  */
 window.initData = function (data) {
@@ -126,31 +150,19 @@ dirInput().addEventListener('input', function () {
 
 document.getElementById('btn-browse').addEventListener('click', function () {
 	setTimeout(function () {
-		try {
-			window.webkit.messageHandlers.hsPaths.postMessage({ action: 'browse' });
-		} catch (e) {
-			console.error('browse postMessage failed:', e);
-		}
+		_post({ action: 'browse' });
 	}, 0);
 });
 
 document.getElementById('btn-save').addEventListener('click', function () {
 	setTimeout(function () {
-		try {
-			window.webkit.messageHandlers.hsPaths.postMessage({ action: 'save', configDir: _currentDir });
-		} catch (e) {
-			console.error('save postMessage failed:', e);
-		}
+		_post({ action: 'save', configDir: _currentDir });
 	}, 0);
 });
 
 document.getElementById('btn-cancel').addEventListener('click', function () {
 	setTimeout(function () {
-		try {
-			window.webkit.messageHandlers.hsPaths.postMessage({ action: 'cancel' });
-		} catch (e) {
-			console.error('cancel postMessage failed:', e);
-		}
+		_post({ action: 'cancel' });
 	}, 0);
 });
 
@@ -172,10 +184,6 @@ document.getElementById('btn-reset').addEventListener('click', function () {
 // didFinishNavigation as a fallback — this postMessage is a best-effort hint.
 (function () {
 	setTimeout(function () {
-		try {
-			window.webkit.messageHandlers.hsPaths.postMessage({ action: 'ready' });
-		} catch (e) {
-			console.error('ready postMessage failed:', e);
-		}
+		_post({ action: 'ready' });
 	}, 0);
 })();

@@ -154,6 +154,10 @@ ShowKeyboardShortcutPicker(SlotId) {
 
 FilePathsEditor(*) {
     global _ConfigDir, _PathsFile
+    ; Prefer the shared WebView2 editor (identical UI to macOS); the native
+    ; single-field dialog below remains as an automatic fallback.
+    if _PathsEdWeb_TryOpen()
+        return
     W := Gui(, t("dialog.config_folder.title"))
     W.SetFont("s10", "Segoe UI")
     W.MarginX := 12

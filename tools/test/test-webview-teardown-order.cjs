@@ -48,6 +48,12 @@ const HOSTS = [
 		file: 'static/ergopti_plus/windows/ui/onboarding/webview.ahk',
 		close: '_OnbWeb_Controller.Close()',
 		subs: ['_OnbWeb_MsgSub := unset']
+	},
+	{
+		label: 'paths editor host',
+		file: 'static/ergopti_plus/windows/ui/paths_editor/init.ahk',
+		close: '_PathsEdWeb_Controller.Close()',
+		subs: ['_PathsEdWeb_MsgSub := unset', '_PathsEdWeb_NavSub := unset']
 	}
 ];
 
