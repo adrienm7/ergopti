@@ -543,6 +543,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include unit/test_delay_edit_non_integer_personal_truncation.ahk
 #Include unit/test_freshness_same_second_edit_window.ahk
 #Include unit/test_inline_autotype_not_synthetic.ahk
+#Include unit/test_loadexttoml_skips_meta_sections.ahk
 #Include unit/test_json_number_misleading_error.ahk
 #Include unit/test_ollama_curl_temp_pii_plaintext.ahk
 #Include unit/test_parsetomlgroupconfig_missing_file_cache_key.ahk

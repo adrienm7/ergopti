@@ -408,6 +408,13 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
         if (CurrentSection == "") {
             continue
         }
+        ; Metadata blocks ([_meta], [_meta.sections], [_meta.sections.<x>]) describe
+        ; the file — they are NOT hotstrings. Skip them so a key like
+        ; description="Hotstrings personnels" or a section label never registers as
+        ; an expandable trigger (mirrors CountTomlSection and _HotstringsCacheBuildRows).
+        if (CurrentSection == "_meta" or InStr(CurrentSection, "_meta.")) {
+            continue
+        }
         if !RegExMatch(Line, '^(?:"[^"]+"|[A-Za-z0-9_.-]+)\s*=') {
             continue
         }

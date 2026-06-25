@@ -96,8 +96,8 @@ _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu) {
 }
 _TogglePersonalCloseOnAdd(PersonalMenu) {
     Label  := t("menu.hotstrings.close_on_add")
-    NewVal := (_EditorPrefGet("CloseOnAdd", "1") == "1") ? "0" : "1"
-    _EditorPrefSet("CloseOnAdd", NewVal)
+    NewVal := (_EditorPrefGet("close_on_add", "1") == "1") ? "0" : "1"
+    _EditorPrefSet("close_on_add", NewVal)
     if (NewVal == "1") {
         PersonalMenu.Check(Label)
     } else {

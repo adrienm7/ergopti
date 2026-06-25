@@ -68,6 +68,7 @@ body {
 		--tag-on: #0a3a6e;
 		--tag-on-c: #64b5f6;
 		--chip-bg: #5e5f60;
+		--chip-c: #cfe0ff;
 		--cmd-hover-bg: #131313;
 		--chip-bd: rgba(147, 184, 248, 0.28);
 		--row-hover: #333335;
@@ -357,10 +358,10 @@ body {
 }
 
 .tc {
-	background: var(--chip-bg);
-	border: 1px solid var(--chip-bd);
+	background: var(--accent);
+	border: 1px solid var(--accent);
 	border-radius: 3px;
-	color: var(--chip-c);
+	color: #fff;
 	display: inline-block;
 	font-family: 'SF Mono', Menlo, monospace;
 	font-size: 10.5px;
@@ -413,10 +414,10 @@ body {
 
 .btn-add {
 	align-items: center;
-	background: var(--tag-on);
+	background: var(--accent);
 	border: none;
 	border-radius: 7px;
-	color: var(--accent);
+	color: #fff;
 	cursor: pointer;
 	display: flex;
 	font-size: 13px;
@@ -439,6 +440,60 @@ body {
 	line-height: 2.2;
 	padding: 52px 16px;
 	text-align: center;
+}
+
+#search-bar {
+	align-items: center;
+	background: var(--surface);
+	border-bottom: 1px solid var(--border);
+	display: flex;
+	flex-shrink: 0;
+	gap: 8px;
+	padding: 8px 16px;
+}
+
+.search-icon {
+	color: var(--hint);
+	font-size: 16px;
+	line-height: 1;
+}
+
+.search-input {
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 7px;
+	color: var(--text);
+	flex: 1;
+	font-size: 13px;
+	outline: none;
+	padding: 6px 10px;
+}
+
+.search-input:focus {
+	border-color: var(--accent);
+}
+
+.search-input::placeholder {
+	color: var(--hint);
+}
+
+.search-clear {
+	align-items: center;
+	background: var(--tag-bg);
+	border: none;
+	border-radius: 50%;
+	color: var(--sub);
+	cursor: pointer;
+	flex-shrink: 0;
+	font-size: 11px;
+	height: 20px;
+	justify-content: center;
+	line-height: 1;
+	width: 20px;
+}
+
+.search-clear:hover {
+	color: var(--text);
 }
 
 .btn {
@@ -753,7 +808,7 @@ body {
 	cursor: pointer;
 	display: flex;
 	font-family: 'SF Mono', Menlo, monospace;
-	font-size: 20px;
+	font-size: 13px;
 	font-weight: 600;
 	justify-content: center;
 	line-height: 1;
@@ -928,6 +983,20 @@ body {
 	white-space: nowrap;
 }
 
+/* Output-token chips in the edit field must read identically to the blue
+   output pills (.tc) shown on the home row — same accent variables, not the
+   grey trigger-chip palette. Trigger chips carry data-trig-char, so this
+   selector leaves the magic-key chip untouched. */
+/* Both output-token chips and the trigger magic-key chip read as filled blue
+   pills (same accent variables as the home-row .tc pills), so the editor and
+   the list look identical. */
+.token-chip[data-token],
+.token-chip[data-trig-char] {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: #fff;
+}
+
 #ac-popup {
 	background: var(--surface);
 	border: 1px solid var(--border);
@@ -1023,7 +1092,7 @@ details.cmd-help[open] summary::before {
 	background: var(--surface);
 	border: 1px solid var(--border);
 	border-radius: 5px;
-	color: var(--chip-c);
+	color: var(--accent);
 	cursor: pointer;
 	display: flex;
 	flex-direction: column;
@@ -1047,6 +1116,20 @@ details.cmd-help[open] summary::before {
 		sans-serif;
 	font-size: 18px;
 	line-height: 1.1;
+}
+
+/* Several symbol glyphs (the ⌦ Delete sign, the ⇥ Tab arrow and the ←→↑↓
+   arrows) render noticeably smaller/lighter than the text symbols
+   (Home/End/Esc) and ⌫ in system-ui, so bump them up to visually match their
+   siblings in the grid. */
+.cmd-ref .cmd-sym[data-tok="Delete"],
+.cmd-ref .cmd-sym[data-tok="Tab"],
+.cmd-ref .cmd-sym[data-tok="Left"],
+.cmd-ref .cmd-sym[data-tok="Right"],
+.cmd-ref .cmd-sym[data-tok="Up"],
+.cmd-ref .cmd-sym[data-tok="Down"] {
+	font-size: 22px;
+	font-weight: 600;
 }
 
 .cmd-ref .cmd-lbl {
