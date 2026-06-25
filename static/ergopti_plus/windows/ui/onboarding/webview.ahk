@@ -622,13 +622,15 @@ _OnbWeb_OnClose(*) {
 ; whether to destroy the window). Safe to call repeatedly.
 _OnbWeb_Reset() {
 	global _OnbWeb_Controller, _OnbWeb_WebView, _OnbWeb_Ready, _OnbWeb_Queue, _OnbWeb_MsgSub
+	; Release the subscription handle FIRST, while the controller is still alive.
+	; Its __Delete unsubscribes via remove_WebMessageReceived on the live controller;
+	; doing it AFTER Controller.Close() raises a COM error that — uncaught in the
+	; window's Close-event thread — terminates the entire AHK script.
+	try _OnbWeb_MsgSub := unset
 	if IsSet(_OnbWeb_Controller)
 		try _OnbWeb_Controller.Close()
 	_OnbWeb_Controller := unset
 	_OnbWeb_WebView    := unset
-	; Dropping the subscription handle fires its __Delete (unsubscribe) — fine
-	; here since the controller is being torn down anyway.
-	_OnbWeb_MsgSub     := unset
 	_OnbWeb_Ready      := false
 	_OnbWeb_Queue      := []
 }

@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="UTF-8" />
 		<title data-i18n="editor.hotstrings.window_title"></title>
-		<link rel="stylesheet" href="style.css" />
+		<link rel="stylesheet" href="style.css?v=10" />
 		<script src="../i18n.js"></script>
 	</head>
 	<body>
@@ -22,6 +22,28 @@
 					data-i18n="editor.hotstrings.btn_add_section"
 				></button>
 			</div>
+			<div id="search-bar">
+				<span class="search-icon">⌕</span>
+				<input
+					id="search-input"
+					class="search-input"
+					type="text"
+					autocomplete="off"
+					spellcheck="false"
+					placeholder="Rechercher un déclencheur ou un texte…"
+					oninput="onSearch(this.value)"
+				/>
+				<button
+					id="search-clear"
+					class="search-clear"
+					type="button"
+					title="Effacer"
+					onclick="clearSearch()"
+					style="display: none"
+				>
+					✕
+				</button>
+			</div>
 			<div id="content">
 				<div id="secs-container"></div>
 				<div
@@ -30,6 +52,9 @@
 					style="display: none"
 					data-i18n="editor.hotstrings.empty_hint"
 				></div>
+				<div id="no-results" class="empty" style="display: none">
+					Aucun résultat pour cette recherche.
+				</div>
 			</div>
 		</div>
 
@@ -227,6 +252,6 @@
 			</div>
 		</div>
 
-		<script src="script.js"></script>
+		<script src="script.js?v=3"></script>
 	</body>
 </html>

@@ -194,6 +194,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; runtime TOML parser on a cache miss. No generated CODE is kept in the repo.
 #Include lib/hotstrings/hotstrings_cache.ahk
 #Include ui/personal_toml_editor.ahk
+#Include ui/personal_toml_editor_webview.ahk
 #Include modules/keymap/layout/layout_altgr.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
 #Include lib/app_picker.ahk

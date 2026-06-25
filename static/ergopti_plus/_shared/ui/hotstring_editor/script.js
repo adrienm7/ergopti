@@ -30,6 +30,9 @@ let defaultSec = null;
 let defaultPrio = null;
 let openMode = 'menu';
 
+// Lower-cased, trimmed live filter applied to the entry list (trigger + output).
+let searchQuery = '';
+
 const TOKEN_NORM = {
 	esc: 'Escape',
 	escape: 'Escape',
@@ -773,11 +776,16 @@ function buildCmdGrid() {
 			const el = document.createElement('div');
 			el.className = 'cmd-ref';
 			el.title = '{' + c.token + '} — ' + c.desc;
+			// Label shows the canonical token name (Enter, Tab, Left…) — identical
+			// across every locale and always capitalised; the localisable French
+			// description stays in the hover tooltip above.
 			el.innerHTML =
-				'<span class="cmd-sym">' +
+				'<span class="cmd-sym" data-tok="' +
+				esc(c.token) +
+				'">' +
 				esc(c.sym) +
 				'</span><span class="cmd-lbl">' +
-				esc(c.desc) +
+				esc(c.token) +
 				'</span>';
 			el.addEventListener('mousedown', (e) => e.preventDefault());
 			el.addEventListener('click', () => insertChipAtCursor(c.token));
@@ -848,9 +856,51 @@ function togSec(si) {
 	}
 }
 
+/**
+ * Tests whether an entry matches the active search query. Matches against both
+ * the raw trigger/output and their display form (so a query typed with the
+ * user's magic-key character also hits stored stars).
+ * @param {Object} e - The hotstring entry.
+ * @returns {boolean} True when no query is active or the entry matches.
+ */
+function entryMatches(e) {
+	if (!searchQuery) return true;
+	const hay = (
+		(e.trigger || '') +
+		'\n' +
+		(e.output || '') +
+		'\n' +
+		toDisplay(e.trigger || '') +
+		'\n' +
+		toDisplay(e.output || '')
+	).toLowerCase();
+	return hay.indexOf(searchQuery) !== -1;
+}
+
+window.onSearch = function (v) {
+	searchQuery = (v || '').toLowerCase().trim();
+	const clr = document.getElementById('search-clear');
+	if (clr) clr.style.display = searchQuery ? 'flex' : 'none';
+	render();
+};
+
+window.clearSearch = function () {
+	const inp = document.getElementById('search-input');
+	if (inp) inp.value = '';
+	searchQuery = '';
+	const clr = document.getElementById('search-clear');
+	if (clr) clr.style.display = 'none';
+	render();
+};
+
 function render() {
 	const cont = document.getElementById('secs-container');
 	const empty = document.getElementById('empty');
+	const noRes = document.getElementById('no-results');
+	const searching = searchQuery.length > 0;
+
+	empty.style.display = 'none';
+	if (noRes) noRes.style.display = 'none';
 
 	if (!D || !D.sections || !D.sections.length) {
 		cont.innerHTML = '';
@@ -858,16 +908,28 @@ function render() {
 		return;
 	}
 
-	empty.style.display = 'none';
 	let html = '';
+	let shownSections = 0;
 
 	D.sections.forEach((s, si) => {
-		const cnt = s.entries ? s.entries.length : 0;
-		const exp = s._exp !== false;
+		const allEntries = s.entries || [];
+		// Keep original indices so edit/delete/bulk keep targeting the right entry.
+		const idx = [];
+		allEntries.forEach((e, ei) => {
+			if (entryMatches(e)) idx.push(ei);
+		});
+		// While searching, drop sections that have no matching entry entirely.
+		if (searching && idx.length === 0) return;
+		shownSections++;
+
+		const cnt = allEntries.length;
+		// Force-expand while searching so matches are always visible.
+		const exp = searching ? true : s._exp !== false;
 
 		html += '<div class="sec-card" id="sc-' + si + '">';
 		html += '<div class="sec-head' + (exp ? ' open' : '') + '">';
-		html += '<span class="drag-handle" id="dh-' + si + '" title="Glisser">☰</span>';
+		// Reordering by drag is meaningless on a filtered view, so hide the handle.
+		if (!searching) html += '<span class="drag-handle" id="dh-' + si + '" title="Glisser">☰</span>';
 		html +=
 			'<span class="caret' + (exp ? ' open' : '') + '" onclick="togSec(' + si + ')">▶</span>';
 		html +=
@@ -876,7 +938,7 @@ function render() {
 			')">' +
 			esc(s.description || s.name) +
 			'</span>';
-		html += '<span class="sec-cnt">(' + cnt + ')</span>';
+		html += '<span class="sec-cnt">(' + (searching ? idx.length : cnt) + ')</span>';
 		html +=
 			'<button class="sec-del" onclick="delSec(' +
 			si +
@@ -885,7 +947,8 @@ function render() {
 
 		if (exp) {
 			html += '<div class="' + (compactView ? 'compact' : 'expanded') + '">';
-			(s.entries || []).forEach((e, ei) => {
+			idx.forEach((ei) => {
+				const e = allEntries[ei];
 				html +=
 					'<div class="entry-row" onmousedown="onRowMouseDown(event)" onclick="handleRowClick(event,' +
 					si +
@@ -918,16 +981,29 @@ function render() {
 				html += '<span class="e-del" onclick="delEntryStop(event,' + si + ',' + ei + ')">✕</span>';
 				html += '</div>';
 			});
-			html +=
-				'<button class="btn-add" onclick="showAddEntry(' +
-				si +
-				')">＋ Ajouter un hotstring</button>';
+			// The add button is hidden on a filtered view to avoid appending into
+			// a section the user is only browsing through search results.
+			if (!searching)
+				html +=
+					'<button class="btn-add" onclick="showAddEntry(' +
+					si +
+					')">＋ Ajouter un hotstring</button>';
 			html += '</div>';
 		}
 		html += '</div>';
 	});
+
+	if (searching && shownSections === 0) {
+		cont.innerHTML = '';
+		if (noRes) noRes.style.display = 'block';
+		return;
+	}
+
 	cont.innerHTML = html;
 
+	// Drag-to-reorder is only wired in the unfiltered view (handles aren't rendered
+	// while searching, and reordering a partial list would corrupt section order).
+	if (searching) return;
 	D.sections.forEach((_, si) => {
 		const handle = document.getElementById('dh-' + si);
 		const card = document.getElementById('sc-' + si);
@@ -1409,7 +1485,32 @@ document.getElementById('confirm-modal').addEventListener('keydown', (e) => {
 		_confirmCb = null;
 		closeModal('confirm-modal');
 	}
+	if (e.key === 'Enter') {
+		e.preventDefault();
+		runConfirm();
+	}
 });
+
+// The confirm dialog's OK/Cancel buttons carry no inline onclick (unlike the
+// add/edit modals), so their behaviour must be wired here. Without this the
+// pending `_confirmCb` is set but never fired — delete actions silently no-op.
+document.getElementById('confirm-ok').addEventListener('click', runConfirm);
+document.getElementById('confirm-cancel').addEventListener('click', () => {
+	_confirmCb = null;
+	closeModal('confirm-modal');
+});
+
+/**
+ * Runs the pending confirmation callback (if any) and closes the dialog.
+ * Clears the callback before invoking it so a callback that itself opens
+ * another confirm cannot be clobbered.
+ */
+function runConfirm() {
+	const cb = _confirmCb;
+	_confirmCb = null;
+	closeModal('confirm-modal');
+	if (cb) cb();
+}
 
 document.getElementById('sec-modal').addEventListener('keydown', (e) => {
 	if (e.key === 'Enter') {

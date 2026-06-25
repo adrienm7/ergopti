@@ -599,7 +599,7 @@ _HS_Personal(M, _Cat) {
 		PersonalMenu.Add(t("menu.hotstrings.default_category_prefix") . CurDefaultLabel, DefaultSectionMenu)
 		CloseOnAddLabel := t("menu.hotstrings.close_on_add")
 		RegisterMenuItem(PersonalMenu, CloseOnAddLabel, (*) => _TogglePersonalCloseOnAdd(PersonalMenu))
-		if (_EditorPrefGet("CloseOnAdd", "1") == "1")
+		if (_EditorPrefGet("close_on_add", "1") == "1")
 			PersonalMenu.Check(CloseOnAddLabel)
 		if (TomlData["sections_order"].Length > 0) {
 			PersonalMenu.Add()

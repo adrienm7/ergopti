@@ -572,6 +572,12 @@ _GetSharedPersonalDefault() {
 OpenPersonalEditor(DefaultSection := "") {
     global _PersonalEditorGui, _PersonalEditorData, _PersonalEditorSection
 
+    ; Prefer the shared WebView2 frontend (identical to the macOS editor) when
+    ; available; fall back to the native Gui below otherwise. _HsEdWeb_TryOpen
+    ; manages its own singleton window and returns true once it is shown.
+    if _HsEdWeb_TryOpen(DefaultSection)
+        return
+
     ; Bring existing window to front
     if IsObject(_PersonalEditorGui) {
         try {
@@ -589,7 +595,7 @@ OpenPersonalEditor(DefaultSection := "") {
     ; Resolve the section to open
     TargetSection := DefaultSection
     if (TargetSection == "") {
-        TargetSection := _EditorPrefGet("DefaultSection", "")
+        TargetSection := _EditorPrefGet("default_section", "")
     }
     if (TargetSection == "" and _PersonalEditorData["sections_order"].Length > 0) {
         TargetSection := _PersonalEditorData["sections_order"][1]
@@ -670,7 +676,7 @@ OpenPersonalEditor(DefaultSection := "") {
     PrioEdit.GetPos(, &PrioY, , &PrioH)
     BtnAdd := W.Add("Button", "xm y" . (PrioY + PrioH + 12) . " w110 h26", t("editor.hotstrings.btn_add"))
     CloseOnAddChk := W.Add("CheckBox", "x+10 yp+5 w120", t("editor.hotstrings.chk_close_after"))
-    CloseOnAddChk.Value := (_EditorPrefGet("CloseOnAdd", "0") == "1") ? 1 : 0
+    CloseOnAddChk.Value := (_EditorPrefGet("close_on_add", "0") == "1") ? 1 : 0
 
     ; Token help — to the right of the Add button, vertically centered
     BtnAdd.GetPos(, &BtnAddY, , &BtnAddH)
@@ -712,7 +718,7 @@ OpenPersonalEditor(DefaultSection := "") {
     SectionDrop.OnEvent("Change", (*) => _OnSectionChange(SectionDrop, LV,
         TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText))
 
-    CloseOnAddChk.OnEvent("Click", (*) => _EditorPrefSet("CloseOnAdd",
+    CloseOnAddChk.OnEvent("Click", (*) => _EditorPrefSet("close_on_add",
         CloseOnAddChk.Value ? "1" : "0"))
 
     W.OnEvent("Close", (*) => _OnEditorClose())
@@ -961,7 +967,7 @@ _DeleteEntry(W, LV, StatusText) {
 _OnSectionChange(SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText) {
     global _PersonalEditorSection
     _PersonalEditorSection := _CurrentSectionFromDrop(SectionDrop)
-    _EditorPrefSet("DefaultSection", _PersonalEditorSection)
+    _EditorPrefSet("default_section", _PersonalEditorSection)
     global _PersonalEditorData
     _PopulateList(LV, _PersonalEditorData, _PersonalEditorSection)
     _ClearForm(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal)
@@ -999,7 +1005,7 @@ _NewSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, 
     _RebuildDropdown(SectionDrop, _PersonalEditorData)
     _SelectDropDown(SectionDrop, SecName)
     _PersonalEditorSection := SecName
-    _EditorPrefSet("DefaultSection", SecName)
+    _EditorPrefSet("default_section", SecName)
     ; Refresh the list and form to reflect the (empty) new section —
     ; without this the ListView keeps showing the previous section's entries
     _PopulateList(LV, _PersonalEditorData, _PersonalEditorSection)
