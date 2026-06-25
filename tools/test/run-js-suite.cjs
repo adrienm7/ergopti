@@ -48,6 +48,7 @@ const CHECKS = [
 	{ name: 'WebView2 host teardown order (closing a window must not quit AHK)', cmd: 'node', args: ['tools/test/test-webview-teardown-order.cjs'], repro: 'node tools/test/test-webview-teardown-order.cjs' },
 	{ name: 'dynamic hotstrings menu labels (resolver bridge + locale keys)', cmd: 'node', args: ['tools/test/test-dynamic-hotstrings-menu-labels.cjs'], repro: 'node tools/test/test-dynamic-hotstrings-menu-labels.cjs' },
 	{ name: 'hotstrings config window bridge (shared frontend ↔ Windows host)', cmd: 'node', args: ['tools/test/test-hotstrings-config-window-bridge.cjs'], repro: 'node tools/test/test-hotstrings-config-window-bridge.cjs' },
+	{ name: 'prompt editor bridge (shared frontend ↔ Windows host)', cmd: 'node', args: ['tools/test/test-prompt-editor-bridge.cjs'], repro: 'node tools/test/test-prompt-editor-bridge.cjs' },
 	{ name: 'file-path headers (convention 3, every source file names itself)', cmd: 'node', args: ['tools/lint/audit-file-headers.cjs'], repro: 'node tools/lint/audit-file-headers.cjs' }
 ];
 

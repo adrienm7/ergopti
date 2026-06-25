@@ -1,4 +1,4 @@
-// ui/prompt_editor/script.js
+// _shared/ui/prompt_editor/script.js
 
 /**
  * ==============================================================================
@@ -554,11 +554,24 @@ function init(data) {
 	}, 100);
 }
 
+// Host-agnostic post: Windows WebView2 takes a JSON string over
+// window.chrome.webview; macOS WKWebView takes a structured object over the
+// prompt_bridge usercontent handler. The page never assumes one host.
+function post(payload) {
+	if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function') {
+		window.chrome.webview.postMessage(JSON.stringify(payload));
+		return;
+	}
+	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.prompt_bridge) {
+		window.webkit.messageHandlers.prompt_bridge.postMessage(payload);
+	}
+}
+
 /**
- * Communicates the cancellation request back to Hammerspoon.
+ * Communicates the cancellation request back to the host.
  */
 function doCancel() {
-	window.webkit.messageHandlers.prompt_bridge.postMessage({ action: 'cancel' });
+	post({ action: 'cancel' });
 }
 
 /**
@@ -574,7 +587,7 @@ function doSave() {
 		return alert('Le nom et le prompt sont requis.');
 	}
 
-	window.webkit.messageHandlers.prompt_bridge.postMessage({
+	post({
 		action: 'save',
 		name: promptName,
 		batch: promptMode === 'batch',
