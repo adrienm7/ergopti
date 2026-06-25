@@ -31,6 +31,7 @@ local Logger            = require("lib.logger")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local TomlReader        = require("lib.toml_reader")
 local i18n              = require("lib.i18n")
+local Paths            = require("lib.paths")
 
 local LOG = "hotstrings_config_window"
 
@@ -57,8 +58,10 @@ local WINDOW_HEIGHT = 640
 -- Mirrored from hotstrings_config GLOBAL_DEFAULT_DELAY — both must stay in sync.
 local GLOBAL_DEFAULT_DELAY_MS = 750
 
-local _src       = debug.getinfo(1, "S").source:sub(2)
-local ASSETS_DIR = _src:match("^(.*[/\\])") or "./"
+-- The frontend (index.html / script.js / style.css) lives in the cross-driver
+-- _shared/ui/ tree so the Windows WebView2 host renders the identical UI; both
+-- drivers resolve it through Paths.shared. This init.lua stays macOS-specific.
+local ASSETS_DIR = (Paths.shared("ui/hotstrings_config_window") or "") .. "/"
 
 -- Display order for the built-in categories — matches the menu and the AHK driver.
 local CATEGORY_ORDER = {

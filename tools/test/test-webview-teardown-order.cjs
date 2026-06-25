@@ -60,6 +60,12 @@ const HOSTS = [
 		file: 'static/ergopti_plus/windows/ui/personal_info_editor/init.ahk',
 		close: '_PiEdWeb_Controller.Close()',
 		subs: ['_PiEdWeb_MsgSub := unset', '_PiEdWeb_NavSub := unset']
+	},
+	{
+		label: 'hotstrings config window host',
+		file: 'static/ergopti_plus/windows/ui/hotstrings_config_window/webview.ahk',
+		close: '_HCWWeb_Controller.Close()',
+		subs: ['_HCWWeb_MsgSub     := unset', '_HCWWeb_NavSub     := unset']
 	}
 ];
 
