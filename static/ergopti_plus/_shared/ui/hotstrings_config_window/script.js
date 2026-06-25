@@ -1,4 +1,4 @@
-// ui/hotstrings_config_window/script.js
+// _shared/ui/hotstrings_config_window/script.js
 
 /**
  * ==============================================================================
@@ -40,7 +40,14 @@ function applyTemplateI18n(node) {
 // 1/ Bridge primitives
 // ============================================================
 
+// Host-agnostic post: Windows WebView2 takes a JSON string over
+// window.chrome.webview; macOS WKWebView takes a structured object over the
+// hotstrings_config_bridge usercontent handler. The page never assumes one host.
 function send(payload) {
+	if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function') {
+		window.chrome.webview.postMessage(JSON.stringify(payload));
+		return;
+	}
 	if (
 		window.webkit &&
 		window.webkit.messageHandlers &&

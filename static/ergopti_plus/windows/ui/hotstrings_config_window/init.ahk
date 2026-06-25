@@ -297,6 +297,10 @@ _HCW_FmtMs(Ms) {
 
 OpenHotstringsConfigWindow() {
 	global _HCWGui, _HCWWidgets
+	; Prefer the shared WebView2 frontend (identical UI to macOS). It falls back
+	; to the native Gui below only when the WebView2 runtime is unavailable.
+	if _HCWWeb_TryOpen()
+		return
 	_HCW_InitLocaleStrings()
 	_HCW_BuildCategoryList()
 	_HCW_BuildGroupList()
