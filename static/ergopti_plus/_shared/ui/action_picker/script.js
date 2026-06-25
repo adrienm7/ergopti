@@ -4,15 +4,15 @@
  * ==============================================================================
  * MODULE: Action Picker UI Script
  * DESCRIPTION:
- * Renders a searchable, categorised list of actions and reports the chosen one
- * back to the native host. The host (AHK WebView2 or macOS WKWebView) pushes the
- * catalogue + current selection via init(); the page posts {action:'confirm',id}
- * on a pick and {action:'cancel'} on dismiss. The page keeps no truth of its own
- * beyond the transient search/highlight state.
+ * Renders a searchable, foldable, multi-level action list and reports the chosen
+ * action back to the native host. The host (AHK WebView2 or macOS WKWebView)
+ * pushes the catalogue via init() as an ordered `items` list of headings
+ * ({type:"heading",level,text}) and actions ({type:"action",id,label}); the page
+ * posts {action:'confirm',id} on a pick and {action:'cancel'} on dismiss.
  *
  * UX: type to filter, ↑/↓ to move the highlight, Enter to confirm, Esc to cancel,
- * click a row to pick it immediately. The currently-assigned action carries a
- * check mark so the live selection is always visible.
+ * click a row to pick it. Headings render as h1/h2/h3… by their level, fold their
+ * descendants on click, and a table-of-contents button jumps to any heading.
  * ==============================================================================
  */
 
@@ -49,17 +49,18 @@ function doCancel() {
 // 2/ State
 // ============================================================
 
-// Full ordered entry list: [native?, none, ...actions]. Each entry is
-// { id, label, category, special }.
+// Ordered entries: specials first ({kind:'action',special:true}), then the
+// host's items as {kind:'heading',level,text} / {kind:'action',id,label}.
 let entries = [];
 
-// The visible (post-filter) item rows in display order: { id, el }.
+// Heading entry-indices the user has collapsed (folded). Survives re-render.
+const collapsed = new Set();
+
+// Visible (rendered + focusable) action rows in display order: {id, el}.
 let visible = [];
 let activeIndex = 0;
 
-// The currently-assigned action id (for the persistent check mark).
 let currentId = 'none';
-
 let strings = { noResults: 'No matching action' };
 
 function el(id) {
@@ -70,11 +71,6 @@ function el(id) {
 // 3/ Init (host -> page)
 // ============================================================
 
-/**
- * Initialise the picker with the host-provided catalogue.
- * @param {Object} data - { title, label, current, allowNative, nativeLabel,
- *   noneLabel, searchPlaceholder, noResults, cancelLabel, actions:[{id,label,category}] }.
- */
 function init(data) {
 	data = data || {};
 	strings.noResults = data.noResults || 'No matching action';
@@ -84,7 +80,6 @@ function init(data) {
 	el('search').placeholder = data.searchPlaceholder || '';
 	el('btn-cancel').textContent = data.cancelLabel || 'Cancel';
 
-	// The host sends "" for the synthetic "native" / unset selection.
 	currentId = data.current;
 	if (currentId === '' || currentId === undefined || currentId === null) {
 		currentId = data.allowNative ? '__native__' : 'none';
@@ -92,14 +87,19 @@ function init(data) {
 
 	entries = [];
 	if (data.allowNative) {
-		entries.push({ id: '__native__', label: data.nativeLabel || '', category: '', special: true });
+		entries.push({ kind: 'action', id: '__native__', label: data.nativeLabel || '', special: true });
 	}
-	entries.push({ id: 'none', label: data.noneLabel || '', category: '', special: true });
-	(data.actions || []).forEach(function (a) {
-		entries.push({ id: a.id, label: a.label, category: a.category || '', special: false });
+	entries.push({ kind: 'action', id: 'none', label: data.noneLabel || '', special: true });
+	(data.items || []).forEach(function (it) {
+		if (it.type === 'heading') {
+			entries.push({ kind: 'heading', level: it.level || 1, text: it.text || '' });
+		} else if (it.type === 'action') {
+			entries.push({ kind: 'action', id: it.id, label: it.label, special: false });
+		}
 	});
 
-	render('');
+	collapsed.clear();
+	render();
 	focusSearch();
 }
 
@@ -107,79 +107,147 @@ function focusSearch() {
 	const s = el('search');
 	if (!s) return;
 	s.focus();
-	// A couple of delayed retries — WKWebView occasionally drops the first focus.
 	setTimeout(function () { s.focus(); }, 60);
 }
 
 // ============================================================
-// 4/ Rendering
+// 4/ Heading / ancestor helpers
 // ============================================================
 
-function render(query) {
+// Indices (into `entries`) of the heading ancestors enclosing entry `i`: the
+// chain of headings with strictly increasing level that contain it.
+function ancestorsOf(i) {
+	const stack = [];
+	for (let j = 0; j < i; j++) {
+		const e = entries[j];
+		if (e.kind !== 'heading') continue;
+		while (stack.length && entries[stack[stack.length - 1]].level >= e.level) stack.pop();
+		stack.push(j);
+	}
+	// Drop any trailing headings that are siblings (level >= entries[i].level when i is a heading).
+	if (entries[i] && entries[i].kind === 'heading') {
+		while (stack.length && entries[stack[stack.length - 1]].level >= entries[i].level) stack.pop();
+	}
+	return stack;
+}
+
+// Whether any ancestor heading of entry `i` is currently collapsed.
+function hiddenByFold(i) {
+	const anc = ancestorsOf(i);
+	for (const h of anc) if (collapsed.has(h)) return true;
+	return false;
+}
+
+// ============================================================
+// 5/ Rendering
+// ============================================================
+
+function render() {
 	const list = el('list');
-	const empty = el('empty');
 	list.innerHTML = '';
 	visible = [];
 
-	const q = (query || '').trim().toLowerCase();
-	const matched = entries.filter(function (e) {
-		return q === '' || (e.label || '').toLowerCase().indexOf(q) !== -1;
-	});
+	const q = el('search').value.trim().toLowerCase();
+	const searching = q !== '';
 
-	// Separator between the pinned special rows and the real actions.
-	let specialsRendered = false;
-	let actionsStarted = false;
-	let lastCat = null;
-
-	matched.forEach(function (e) {
-		if (!e.special && !actionsStarted) {
-			actionsStarted = true;
-			if (specialsRendered) {
-				const sep = document.createElement('div');
-				sep.className = 'sep';
-				list.appendChild(sep);
+	// When searching, mark headings that have at least one matching descendant.
+	const headingHasMatch = new Set();
+	if (searching) {
+		const stack = [];
+		for (let i = 0; i < entries.length; i++) {
+			const e = entries[i];
+			if (e.kind === 'heading') {
+				while (stack.length && entries[stack[stack.length - 1]].level >= e.level) stack.pop();
+				stack.push(i);
+			} else if (matches(e, q)) {
+				for (const h of stack) headingHasMatch.add(h);
 			}
 		}
-		if (e.special) specialsRendered = true;
+	}
 
-		if (!e.special && e.category && e.category !== lastCat) {
-			lastCat = e.category;
-			const h = document.createElement('div');
-			h.className = 'cat-header';
-			h.textContent = e.category;
-			list.appendChild(h);
+	let curLevel = 0; // depth of the last rendered heading → indent of its actions
+	for (let i = 0; i < entries.length; i++) {
+		const e = entries[i];
+		if (e.kind === 'heading') {
+			if (searching) {
+				if (!headingHasMatch.has(i)) continue;
+			} else if (hiddenByFold(i)) {
+				continue;
+			}
+			curLevel = Math.min(e.level, 4);
+			list.appendChild(buildHeadingRow(i, e));
+		} else {
+			if (searching) {
+				if (!matches(e, q)) continue;
+			} else if (hiddenByFold(i)) {
+				continue;
+			}
+			const row = buildActionRow(e, e.special ? 0 : curLevel);
+			list.appendChild(row);
+			visible.push({ id: e.id, el: row });
 		}
+	}
 
-		const row = document.createElement('div');
-		row.className = 'row' + (e.special ? ' special' : '') + (e.id === currentId ? ' current' : '');
-		row.dataset.id = e.id;
-
-		const tick = document.createElement('span');
-		tick.className = 'row-tick';
-		tick.textContent = '✓';
-		const label = document.createElement('span');
-		label.className = 'row-label';
-		label.textContent = e.label;
-		row.appendChild(tick);
-		row.appendChild(label);
-
-		const idx = visible.length;
-		row.addEventListener('click', function () { doConfirm(e.id); });
-		row.addEventListener('mousemove', function () { setActive(idx); });
-		list.appendChild(row);
-		visible.push({ id: e.id, el: row });
-	});
-
-	empty.hidden = visible.length > 0;
-	if (!empty.hidden) empty.textContent = strings.noResults;
+	el('empty').hidden = visible.length > 0;
+	if (!el('empty').hidden) el('empty').textContent = strings.noResults;
 	el('count').textContent = visible.length ? String(visible.length) : '';
 
-	// Highlight the current selection if it survived the filter, else the first row.
 	let start = 0;
-	for (let i = 0; i < visible.length; i++) {
-		if (visible[i].id === currentId) { start = i; break; }
+	for (let k = 0; k < visible.length; k++) {
+		if (visible[k].id === currentId) { start = k; break; }
 	}
-	setActive(start, true);
+	if (visible.length) setActive(start, true);
+}
+
+function matches(actionEntry, q) {
+	return (actionEntry.label || '').toLowerCase().indexOf(q) !== -1;
+}
+
+function buildHeadingRow(i, e) {
+	const row = document.createElement('div');
+	const lvl = Math.min(e.level, 4);
+	row.className = 'heading lvl' + lvl + (collapsed.has(i) ? ' collapsed' : '');
+	row.style.paddingLeft = 8 + (lvl - 1) * 16 + 'px';
+
+	const caret = document.createElement('span');
+	caret.className = 'caret';
+	caret.textContent = '▾';
+	const txt = document.createElement('span');
+	txt.className = 'heading-text';
+	txt.textContent = e.text;
+	row.appendChild(caret);
+	row.appendChild(txt);
+
+	// Folding is a fold of the live tree, so it is disabled while searching
+	// (search already expands only the relevant matches).
+	const searching = el('search').value.trim() !== '';
+	if (!searching) {
+		row.addEventListener('click', function () { toggleFold(i); });
+	} else {
+		row.classList.add('static');
+	}
+	return row;
+}
+
+function buildActionRow(e, depth) {
+	const row = document.createElement('div');
+	row.className = 'row' + (e.special ? ' special' : '') + (e.id === currentId ? ' current' : '');
+	row.dataset.id = e.id;
+	row.style.paddingLeft = 12 + (depth || 0) * 16 + 'px';
+
+	const tick = document.createElement('span');
+	tick.className = 'row-tick';
+	tick.textContent = '✓';
+	const label = document.createElement('span');
+	label.className = 'row-label';
+	label.textContent = e.label;
+	row.appendChild(tick);
+	row.appendChild(label);
+
+	const idx = visible.length;
+	row.addEventListener('click', function () { doConfirm(e.id); });
+	row.addEventListener('mousemove', function () { setActive(idx); });
+	return row;
 }
 
 function setActive(idx, instant) {
@@ -190,17 +258,84 @@ function setActive(idx, instant) {
 	activeIndex = idx;
 	const row = visible[activeIndex].el;
 	row.classList.add('active');
-	row.scrollIntoView({ block: 'nearest', behavior: instant ? 'auto' : 'auto' });
+	row.scrollIntoView({ block: 'nearest' });
+}
+
+function toggleFold(i) {
+	if (collapsed.has(i)) collapsed.delete(i);
+	else collapsed.add(i);
+	render();
 }
 
 // ============================================================
-// 5/ Events
+// 6/ Table of contents
+// ============================================================
+
+function toggleToc() {
+	const toc = el('toc');
+	if (toc.hidden) {
+		buildToc();
+		toc.hidden = false;
+	} else {
+		toc.hidden = true;
+	}
+}
+
+function buildToc() {
+	const inner = el('toc-inner');
+	inner.innerHTML = '';
+	for (let i = 0; i < entries.length; i++) {
+		const e = entries[i];
+		if (e.kind !== 'heading') continue;
+		const lvl = Math.min(e.level, 4);
+		const a = document.createElement('div');
+		a.className = 'toc-item lvl' + lvl;
+		a.style.paddingLeft = 10 + (lvl - 1) * 16 + 'px';
+		a.textContent = e.text;
+		a.addEventListener('click', function () { tocGoto(i); });
+		inner.appendChild(a);
+	}
+}
+
+function tocGoto(i) {
+	// Expand every ancestor so the heading is visible, then scroll to it.
+	for (const h of ancestorsOf(i)) collapsed.delete(h);
+	el('search').value = '';
+	el('toc').hidden = true;
+	render();
+	// Find the heading row by re-walking; headings carry no id, so match by order.
+	const rows = el('list').children;
+	let seen = -1;
+	for (let r = 0; r < rows.length; r++) {
+		if (rows[r].classList.contains('heading')) {
+			seen++;
+			if (headingDomToEntry(seen) === i) {
+				rows[r].scrollIntoView({ block: 'start' });
+				break;
+			}
+		}
+	}
+}
+
+// Maps the Nth rendered heading (DOM order) back to its entry index. Rebuilt
+// each call from the current fold state so it always matches what is on screen.
+function headingDomToEntry(nth) {
+	let seen = -1;
+	for (let i = 0; i < entries.length; i++) {
+		if (entries[i].kind !== 'heading') continue;
+		if (hiddenByFold(i)) continue;
+		seen++;
+		if (seen === nth) return i;
+	}
+	return -1;
+}
+
+// ============================================================
+// 7/ Events
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', function () {
-	el('search').addEventListener('input', function (e) {
-		render(e.target.value);
-	});
+	el('search').addEventListener('input', function () { render(); });
 
 	document.addEventListener('keydown', function (e) {
 		if (e.key === 'ArrowDown') {
@@ -214,10 +349,10 @@ document.addEventListener('DOMContentLoaded', function () {
 			if (visible.length && visible[activeIndex]) doConfirm(visible[activeIndex].id);
 		} else if (e.key === 'Escape') {
 			e.preventDefault();
+			if (!el('toc').hidden) { el('toc').hidden = true; return; }
 			doCancel();
 		}
 	});
 
-	// Best-effort ready ping; the host also pushes init() on navigation-complete.
 	post({ action: 'ready' });
 });

@@ -102,16 +102,35 @@ for (const a of [...actions].sort()) {
 
 // 4. initData-shape parity — both hosts emit every field the page reads.
 const FIELDS = ['title', 'label', 'current', 'allowNative', 'nativeLabel', 'noneLabel',
-	'searchPlaceholder', 'noResults', 'cancelLabel', 'actions'];
+	'searchPlaceholder', 'noResults', 'cancelLabel', 'items'];
 for (const f of FIELDS) {
 	check(`page reads data.${f}`, script.includes(`data.${f}`) || script.includes(`.${f}`));
 	check(`Windows host emits "${f}"`, winHost.includes(`"${f}"`));
 	check(`macOS host emits ${f}`, new RegExp(`\\b${f}\\b`).test(macHost));
 }
-// Per-action keys.
-for (const k of ['id', 'label', 'category']) {
-	check(`page reads action.${k}`, new RegExp(`a\\.${k}|\\.${k}\\b`).test(script));
+
+// 4b. Ordered-item shape — headings ({type,level,text}) + actions ({type,id,label}).
+for (const k of ['type', 'level', 'text', 'id', 'label']) {
+	check(`page reads item.${k}`, new RegExp(`it\\.${k}|\\.${k}\\b`).test(script));
 }
+for (const tok of ['"heading"', '"action"', '"level"', '"text"']) {
+	check(`Windows host serializes ${tok}`, winHost.includes(tok));
+}
+check('macOS host builds heading/action items',
+	/type\s*=\s*"heading"/.test(macMenu) && /type\s*=\s*"action"/.test(macMenu) && /level\s*=/.test(macMenu));
+
+// 4c. Hierarchy / fold / TOC features present in the frontend.
+check('frontend folds headings (toggleFold)', /function toggleFold/.test(script) && /collapsed/.test(script));
+check('frontend renders heading levels', /lvl/.test(script) && /level/.test(script));
+check('frontend has a table of contents (toggleToc + buildToc)',
+	/function toggleToc/.test(script) && /function buildToc/.test(script));
+check('index.html exposes the TOC button + drawer',
+	/id="toc-btn"/.test(index) && /id="toc"/.test(index));
+
+// 4d. Catalogue is now multi-level (at least one "##" sub-header in sg_order).
+const catalogue = read('static/ergopti_plus/_shared/modules/gestures/actions.toml');
+check('actions.toml sg_order has h1 group parents (grp_*) + h2 sub-headers (##)',
+	/"#grp_/.test(catalogue) && /"##/.test(catalogue));
 
 // 5. Wiring + native fallback preserved.
 check('Windows ShowActionPicker tries the webview first',
@@ -124,7 +143,8 @@ check('macOS open_action_chooser routes through the shared picker',
 // 6. Locale keys present.
 let locale = {};
 try { locale = JSON.parse(enLocale); } catch (err) { check('en.json parses', false, err.message); }
-for (const key of ['dialog.action_picker.search', 'dialog.action_picker.no_results']) {
+for (const key of ['dialog.action_picker.search', 'dialog.action_picker.no_results',
+	'sg_actions.sg_order.header.grp_input', 'sg_actions.sg_order.header.grp_system']) {
 	check(`locale has "${key}"`, typeof locale[key] === 'string' && locale[key].length > 0);
 }
 

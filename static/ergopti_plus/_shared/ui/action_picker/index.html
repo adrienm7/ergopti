@@ -8,8 +8,11 @@
 	</head>
 	<body>
 		<header id="hdr">
-			<h1 id="title"></h1>
-			<p id="subtitle"></p>
+			<div class="hdr-text">
+				<h1 id="title"></h1>
+				<p id="subtitle"></p>
+			</div>
+			<button id="toc-btn" type="button" title="" onclick="toggleToc()" aria-label="Table of contents">☰</button>
 		</header>
 
 		<div id="search-bar">
@@ -26,6 +29,11 @@
 		<main id="list" tabindex="-1"></main>
 
 		<div id="empty" hidden></div>
+
+		<!-- Table-of-contents drawer: lists every heading (indented by level). -->
+		<div id="toc" hidden>
+			<div id="toc-inner"></div>
+		</div>
 
 		<footer id="ftr">
 			<span id="count"></span>

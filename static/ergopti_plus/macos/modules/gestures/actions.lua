@@ -765,30 +765,36 @@ local function build_sg_names(shared)
 		if item == "--" then
 			out[#out + 1] = "-"
 		elseif item:sub(1, 1) == "#" then
-			-- Header key from TOML: "#mouse_nav" -> translated section title
-			local key_suffix = item:sub(2)
+			-- Header from TOML: the number of leading "#" encodes the heading
+			-- level ("#grp_input" = h1, "##mouse_nav" = h2). Re-emit with the
+			-- SAME marker so the picker can render the hierarchy. The locale value
+			-- carries a legacy "#" prefix — strip it so the level comes only from
+			-- the TOML marker, not the translated text.
+			local hashes     = item:match("^#+")
+			local key_suffix = item:sub(#hashes + 1)
 			local i18n_key   = "sg_actions.sg_order.header." .. key_suffix
 			local translated = i18n.get(i18n_key)
-			-- Keep the # prefix so menu_gestures.lua can detect it as a disabled header
-			out[#out + 1] = "#" .. ((translated ~= i18n_key) and translated or key_suffix)
+			local title      = (translated ~= i18n_key) and translated or key_suffix
+			title            = (title:gsub("^#+", ""))
+			out[#out + 1] = hashes .. title
 		elseif item == "_cmd_placeholder" then
-			out[#out + 1] = "#" .. i18n.get("sg_actions.sg_order.header.cmd")
+			out[#out + 1] = "#" .. (i18n.get("sg_actions.sg_order.header.cmd"):gsub("^#+", ""))
 			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "cmd_" .. l end
 			for d = 0, 9 do out[#out + 1] = "cmd_" .. d end
 			for _, sk in ipairs({"space","enter","period","comma"}) do out[#out + 1] = "cmd_" .. sk end
 		elseif item == "_cmd_shift_placeholder" then
-			out[#out + 1] = "#" .. i18n.get("sg_actions.sg_order.header.cmd_shift")
+			out[#out + 1] = "#" .. (i18n.get("sg_actions.sg_order.header.cmd_shift"):gsub("^#+", ""))
 			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "cmd_shift_" .. l end
 		elseif item == "_hs_ctrl_placeholder" then
-			out[#out + 1] = "#" .. i18n.get("sg_actions.sg_order.header.hs_ctrl")
+			out[#out + 1] = "#" .. (i18n.get("sg_actions.sg_order.header.hs_ctrl"):gsub("^#+", ""))
 			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "hs_ctrl_" .. l end
 			for d = 0, 9 do out[#out + 1] = "hs_ctrl_" .. d end
 			for _, sk in ipairs({"space","enter","period","comma"}) do out[#out + 1] = "hs_ctrl_" .. sk end
 		elseif item == "_hs_ctrl_shift_placeholder" then
-			out[#out + 1] = "#" .. i18n.get("sg_actions.sg_order.header.hs_ctrl_shift")
+			out[#out + 1] = "#" .. (i18n.get("sg_actions.sg_order.header.hs_ctrl_shift"):gsub("^#+", ""))
 			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "hs_ctrl_shift_" .. l end
 		elseif item == "_hs_option_placeholder" then
-			out[#out + 1] = "#" .. i18n.get("sg_actions.sg_order.header.hs_option")
+			out[#out + 1] = "#" .. (i18n.get("sg_actions.sg_order.header.hs_option"):gsub("^#+", ""))
 			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "hs_option_" .. l end
 			for d = 0, 9 do out[#out + 1] = "hs_option_" .. d end
 			for _, sk in ipairs({"space","enter","period","comma"}) do out[#out + 1] = "hs_option_" .. sk end

@@ -65,9 +65,10 @@ _ActPickWeb_Available() {
 
 ; Attempts to show the action picker in a WebView2 window. Returns true on success
 ; (the caller must NOT also build the native ListBox), false to fall back.
-; Actions is an array of { Id, Label, Cat }; Current is the assigned id ("" means
-; the synthetic native pick); OnConfirm(id) is invoked with the chosen id.
-_ActPickWeb_TryOpen(Title, Current, Actions, OnConfirm, ShowNative := false) {
+; Items is an ordered array of headings ({ Type:"heading", Level, Text }) and
+; actions ({ Type:"action", Id, Label }); Current is the assigned id ("" means the
+; synthetic native pick); OnConfirm(id) is invoked with the chosen id.
+_ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false) {
 	global _ActPickWeb_Gui, _ActPickWeb_Controller, _ActPickWeb_WebView
 	global _ActPickWeb_MsgSub, _ActPickWeb_NavSub, _ActPickWeb_OnConfirm, _ActPickWeb_InitJs
 	global _VendorDir, _SharedDir
@@ -81,7 +82,7 @@ _ActPickWeb_TryOpen(Title, Current, Actions, OnConfirm, ShowNative := false) {
 		_ActPickWeb_Close()
 
 	_ActPickWeb_OnConfirm := OnConfirm
-	_ActPickWeb_InitJs    := _ActPickWeb_BuildInitJs(Title, Current, Actions, ShowNative)
+	_ActPickWeb_InitJs    := _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative)
 
 	g := Gui("+Resize +MinSize360x360", Title)
 	g.BackColor := "0x1e1e1e"
@@ -129,7 +130,7 @@ _ActPickWeb_TryOpen(Title, Current, Actions, OnConfirm, ShowNative := false) {
 	try _ActPickWeb_WebView.Navigate(_ActPickWeb_HtmlUrl())
 	try _ActPickWeb_Controller.Fill()
 
-	try LoggerSuccess("ActionPicker", "Action picker shown via WebView2 ({1} action(s)).", Actions.Length)
+	try LoggerSuccess("ActionPicker", "Action picker shown via WebView2 ({1} item(s)).", Items.Length)
 	return true
 }
 
@@ -198,16 +199,24 @@ _ActPickWeb_Confirm(Id) {
 ; ==============================================================
 
 ; Build the `init({...})` call string consumed by the frontend.
-_ActPickWeb_BuildInitJs(Title, Current, Actions, ShowNative) {
-	ActionsJson := ""
-	for _, A in Actions {
-		if (ActionsJson != "")
-			ActionsJson .= ","
-		ActionsJson .= "{"
-			. _ActPickWeb_Kv("id", A.Id) . ","
-			. _ActPickWeb_Kv("label", A.Label) . ","
-			. _ActPickWeb_Kv("category", A.HasOwnProp("Cat") ? A.Cat : "")
-			. "}"
+_ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative) {
+	ItemsJson := ""
+	for _, It in Items {
+		if (ItemsJson != "")
+			ItemsJson .= ","
+		if (It.Type == "heading") {
+			ItemsJson .= "{"
+				. _ActPickWeb_Kv("type", "heading") . ","
+				. '"level":' . It.Level . ","
+				. _ActPickWeb_Kv("text", It.Text)
+				. "}"
+		} else {
+			ItemsJson .= "{"
+				. _ActPickWeb_Kv("type", "action") . ","
+				. _ActPickWeb_Kv("id", It.Id) . ","
+				. _ActPickWeb_Kv("label", It.Label)
+				. "}"
+		}
 	}
 
 	Json := "{"
@@ -220,7 +229,7 @@ _ActPickWeb_BuildInitJs(Title, Current, Actions, ShowNative) {
 		. _ActPickWeb_Kv("searchPlaceholder", t("dialog.action_picker.search")) . ","
 		. _ActPickWeb_Kv("noResults", t("dialog.action_picker.no_results")) . ","
 		. _ActPickWeb_Kv("cancelLabel", t("button.cancel")) . ","
-		. '"actions":[' . ActionsJson . "]"
+		. '"items":[' . ItemsJson . "]"
 		. "}"
 
 	return "if(window.init)window.init(" . Json . ")"
