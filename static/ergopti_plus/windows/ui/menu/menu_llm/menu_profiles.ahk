@@ -266,6 +266,11 @@ LLM_Menu_OnUserProfileClick(profile) {
 LLM_Menu_PromptCreateProfile() {
 	global _LLM_Menu
 
+	; Prefer the shared WebView2 editor (identical rich UI to macOS). Falls back
+	; to the native InputBox wizard below when the WebView2 runtime is absent.
+	if _PromptEdWeb_TryOpen(0)
+		return
+
 	; Step 1: label
 	ib_label := InputBox(t("menu.profiles.prompt_label"), t("menu.profiles.create_profile"), "w450 h120")
 	if (ib_label.Result != "OK" || Trim(ib_label.Value) == "")
@@ -303,6 +308,11 @@ LLM_Menu_PromptCreateProfile() {
 LLM_Menu_PromptEditProfile(profile) {
 	global _LLM_Menu
 	pid := profile.Has("id") ? profile["id"] : ""
+
+	; Prefer the shared WebView2 editor (identical rich UI to macOS). Falls back
+	; to the native InputBox wizard below when the WebView2 runtime is absent.
+	if _PromptEdWeb_TryOpen(profile)
+		return
 
 	ib_label := InputBox(t("menu.profiles.prompt_label"), t("menu.profiles.edit_profile"), "w450 h120",
 		profile.Has("label") ? profile["label"] : "")

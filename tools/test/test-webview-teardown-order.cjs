@@ -66,6 +66,12 @@ const HOSTS = [
 		file: 'static/ergopti_plus/windows/ui/hotstrings_config_window/webview.ahk',
 		close: '_HCWWeb_Controller.Close()',
 		subs: ['_HCWWeb_MsgSub     := unset', '_HCWWeb_NavSub     := unset']
+	},
+	{
+		label: 'prompt editor host',
+		file: 'static/ergopti_plus/windows/ui/prompt_editor/init.ahk',
+		close: '_PromptEdWeb_Controller.Close()',
+		subs: ['_PromptEdWeb_MsgSub     := unset', '_PromptEdWeb_NavSub     := unset']
 	}
 ];
 

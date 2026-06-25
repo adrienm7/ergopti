@@ -19,6 +19,7 @@ local hs         = hs
 local ui_builder = require("ui.ui_builder")
 local Logger     = require("lib.logger")
 local i18n       = require("lib.i18n")
+local Paths      = require("lib.paths")
 
 local LOG = "prompt_editor"
 
@@ -38,9 +39,10 @@ local _usercontent = nil
 local WINDOW_WIDTH  = 550
 local WINDOW_HEIGHT = 480
 
--- Determine absolute path to the assets directory
-local _src  = debug.getinfo(1, "S").source:sub(2)
-local ASSETS_DIR = _src:match("^(.*[/\\])") or "./"
+-- The frontend (index.html / script.js / style.css) lives in the cross-driver
+-- _shared/ui/ tree so the Windows WebView2 host renders the identical UI; both
+-- drivers resolve it through Paths.shared. This init.lua stays macOS-specific.
+local ASSETS_DIR = (Paths.shared("ui/prompt_editor") or "") .. "/"
 
 
 

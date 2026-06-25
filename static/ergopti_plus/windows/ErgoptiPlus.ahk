@@ -183,6 +183,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/hotstrings/hotstrings_config.ahk
 #Include ui/hotstrings_config_window/init.ahk
 #Include ui/hotstrings_config_window/webview.ahk
+#Include ui/prompt_editor/init.ahk
 #Include lib/wrap_symbols_config.ahk
 #Include lib/ui_style.ahk
 #Include ui/tooltip/init.ahk
