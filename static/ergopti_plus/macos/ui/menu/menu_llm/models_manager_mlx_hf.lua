@@ -14,9 +14,9 @@
 ---    obj.get_mlx_repo unchanged while this auth/catalogue logic lives on its own.
 --- 2. Self-contained auth: the token webview and its validation subprocess are
 ---    isolated from the server-lifecycle and download logic.
---- 3. Same-directory invariant: this file MUST sit beside models_manager_mlx.lua
----    so prompt_hf_login's debug.getinfo-relative "../../token_prompt/" path
----    resolves to ui/token_prompt/ exactly as it did before the split.
+--- 3. Shared token frontend: prompt_hf_login loads the token UI from the
+---    cross-driver _shared/ui/token_prompt/ tree (resolved via Paths.shared), so
+---    the same frontend can later back a Windows WebView2 host.
 --- ==============================================================================
 
 local M = {}
@@ -25,6 +25,7 @@ local hs            = hs
 local notifications = require("lib.notifications")
 local ui_builder    = require("ui.ui_builder")
 local i18n          = require("lib.i18n")
+local Paths         = require("lib.paths")
 
 local HF_TOKEN_FILE = (os.getenv("HOME") or "") .. "/.huggingface/token"
 
@@ -112,8 +113,9 @@ function M.install(ctx)
 			end
 
 			local _token_wv = nil
-			local _src = debug.getinfo(1, "S").source:sub(2)
-			local ASSETS_DIR = _src:match("^(.*[/\\])") or "./"
+			-- The token_prompt frontend now lives in the cross-driver _shared/ui/
+			-- tree (shared with a future Windows host); resolve it via Paths.shared.
+			local TOKEN_ASSETS_DIR = (Paths.shared("ui/token_prompt") or "") .. "/"
 
 			local _ucc = hs.webview.usercontent.new("token_bridge")
 			_ucc:setCallback(function(msg)
@@ -169,7 +171,7 @@ function M.install(ctx)
 				allow_text_entry  = true,
 				allow_new_windows = false,
 				usercontent       = _ucc,
-				assets_dir        = ASSETS_DIR .. "../../token_prompt/",
+				assets_dir        = TOKEN_ASSETS_DIR,
 				on_close          = function()
 					_token_wv = nil
 					if type(on_done) == "function" then pcall(on_done, false) end
