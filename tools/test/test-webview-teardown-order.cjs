@@ -54,6 +54,12 @@ const HOSTS = [
 		file: 'static/ergopti_plus/windows/ui/paths_editor/init.ahk',
 		close: '_PathsEdWeb_Controller.Close()',
 		subs: ['_PathsEdWeb_MsgSub := unset', '_PathsEdWeb_NavSub := unset']
+	},
+	{
+		label: 'personal info editor host',
+		file: 'static/ergopti_plus/windows/ui/personal_info_editor/init.ahk',
+		close: '_PiEdWeb_Controller.Close()',
+		subs: ['_PiEdWeb_MsgSub := unset', '_PiEdWeb_NavSub := unset']
 	}
 ];
 
