@@ -23,6 +23,7 @@ local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
 local i18n   = require("lib.i18n")
+local Paths  = require("lib.paths")
 local LOG    = "menu_paths"
 
 -- Bootstrap file lives next to init.lua (gitignored).
@@ -31,9 +32,12 @@ local PATHS_FILENAME = "paths.toml"
 -- The single key stored in paths.toml.
 local CONFIG_DIR_KEY = "ConfigDirPath"
 
--- Absolute path to the assets directory (same folder as this file).
+-- Absolute path to the assets directory. The frontend (index.html, script.js,
+-- style.css) lives in the cross-driver _shared/ui/ tree so the Windows WebView2
+-- host renders the identical UI; both drivers resolve it through Paths.shared
+-- (mirrors hotstring_editor / onboarding / model_browser).
 local _src       = debug.getinfo(1, "S").source:sub(2)
-local ASSETS_DIR = (_src:match("^(.*[/\\])") or "./"):gsub("menu[/\\]$", "") .. "paths_editor/"
+local ASSETS_DIR = (Paths.shared("ui/paths_editor") or "") .. "/"
 
 -- Driver root (where paths.toml lives) â€” derived at module-load time from
 -- this file's own path so that get_config_dir() can read paths.toml even
