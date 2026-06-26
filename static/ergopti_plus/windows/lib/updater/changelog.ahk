@@ -130,7 +130,7 @@ _Updater_OneClickUpdateCallback(Json, Current) {
 		return
 	}
 	if !_Updater_IsNewerVersion(Latest, Current) {
-		try LoggerInfo("Updater", "One-click check: already up to date ({1}).", Current)
+		try LoggerSuccess("Updater", "One-click check: already up to date ({1}).", Current)
 		try SetTimer((*) => initMenu(), -50)
 		TrayTip(Format(t("updater.up_to_date"), Current), t("updater.title_update"))
 		return
