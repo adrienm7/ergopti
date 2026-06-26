@@ -165,3 +165,36 @@ Test("meta input: LayerDispatch serializes letter emit with Critical (HIGH-01)",
 	_MIS_CheckLayerDispatchCritical)
 Test("meta input: AltGrShiftDispatch serializes emit with Critical (HIGH-01)",
 	_MIS_CheckAltGrShiftDispatchCritical)
+
+; F-M02: the two AltGr roll handlers (SC138&SC012, SC138&SC017) are a parallel AltGr
+; emit path registered directly via _RegisterRollsAltGrHotkeys (NOT via
+; AltGrShiftDispatch), so the HIGH-01 Critical hardening missed them. Their pure
+; SendEvent emits must be serialized through _RollEmitCritical; the WrapTextIfSelected
+; branch must stay OUT of Critical (it Sleeps).
+_MIS_CheckRollHandlersCritical() {
+	Helper := _DriverFuncBody("_RollEmitCritical")
+	Assert(Helper != "", "_RollEmitCritical(Text, Record) must exist (AltGr roll emit serialization)")
+	HCrit := InStr(Helper, 'Critical("On")')
+	HEmit := InStr(Helper, "SendNewResult(")
+	Assert(HCrit > 0 and HEmit > 0 and HCrit < HEmit,
+		"_RollEmitCritical must enter Critical(On) before SendNewResult so roll emits serialize (remap-emit-critical-uneven)")
+	Assert(InStr(Helper, "finally") > 0,
+		"_RollEmitCritical must restore Critical in a finally so a throw cannot leak Critical")
+
+	; Each roll handler/builder must route its pure emit through _RollEmitCritical and
+	; contain NO bare SendNewResult( — a bare emit would be un-serialized (the bug).
+	for Fn in ["_RollChevronEqualHandler", "AddRollEqual", "_RollHashtagQuoteHandler", "HashtagOrQuote"] {
+		Body := _DriverFuncBody(Fn)
+		Assert(Body != "", Fn . " must exist in layout.ahk")
+		Assert(!InStr(Body, "SendNewResult("),
+			Fn . " must not emit via a bare SendNewResult( — route pure emits through _RollEmitCritical so they serialize (F-M02 remap-emit-critical-uneven)")
+	}
+
+	; The Sleep-y WrapTextIfSelected branch must remain a direct call in the two builders.
+	Assert(InStr(_DriverFuncBody("AddRollEqual"), "WrapTextIfSelected(") > 0,
+		"AddRollEqual must keep its WrapTextIfSelected branch (out of Critical)")
+	Assert(InStr(_DriverFuncBody("HashtagOrQuote"), "WrapTextIfSelected(") > 0,
+		"HashtagOrQuote must keep its WrapTextIfSelected branch (out of Critical)")
+}
+Test("meta input: AltGr roll handlers serialize emits via _RollEmitCritical (F-M02 remap-emit-critical-uneven)",
+	_MIS_CheckRollHandlersCritical)

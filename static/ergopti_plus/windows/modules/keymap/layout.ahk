@@ -801,9 +801,23 @@ RegisterCapsLockLayer()
 ; _RegisterRollsAltGrHotkeys() below. Static ``SC138 & SC012::`` would have AHK
 ; promote SC138 to a prefix key at parse time, which silently breaks native
 ; AltGr/Kana behaviour during the first-run onboarding wizard.
+; AltGr roll pure-emit serialization: the roll SendEvents share the per-key Critical
+; contract (remap-emit-critical-uneven / HIGH-01) so a fast follow-up key cannot
+; interleave its remap SendEvent and reorder output. WrapTextIfSelected stays OUT of
+; Critical — it Sleeps (clipboard), and a Sleep under Critical breaks the no-yield guarantee.
+_RollEmitCritical(Text, Record := "") {
+	_AtCrit := Critical("On")
+	try {
+		SendNewResult(Text)
+		if (Record != "")
+			UpdateLastSentCharacter(Record)
+	} finally {
+		Critical(_AtCrit)
+	}
+}
 _RollChevronEqualHandler(*) {
 	if GetKeyState("Shift", "P") {
-		Features["layout"]["ergopti_plus"] ? SendNewResult(" %") : SendNewResult("Œ")
+		Features["layout"]["ergopti_plus"] ? _RollEmitCritical(" %") : _RollEmitCritical("Œ")
 	} else {
 		AddRollEqual()
 	}
@@ -814,12 +828,11 @@ AddRollEqual() {
 		LastSentCharacter == "<" or LastSentCharacter == ">")
 	and A_TimeSincePriorHotkey < (HotstringsResolve("rolls", "chevron_equal").Delay * 1000
 	) {
-		SendNewResult("=")
-		UpdateLastSentCharacter("=")
+		_RollEmitCritical("=", "=")
 	} else if Features["layout"]["ergopti_plus"] {
 		WrapTextIfSelected("%", "%", "%")
 	} else {
-		SendNewResult("œ")
+		_RollEmitCritical("œ")
 	}
 }
 
@@ -827,7 +840,7 @@ AddRollEqual() {
 ; rationale as the SC012 block above.
 _RollHashtagQuoteHandler(*) {
 	if GetKeyState("Shift", "P") {
-		SendNewResult("%")
+		_RollEmitCritical("%")
 	} else {
 		HashtagOrQuote()
 	}
@@ -846,8 +859,7 @@ HashtagOrQuote() {
 		and A_TimeSincePriorHotkey < (HotstringsResolve("rolls", "hashtag_quote").Delay * 1000)
 		and Features["hotstrings"]["rolls"].Has(_QuoteSection)
 		and Features["hotstrings"]["rolls"][_QuoteSection]["enabled"]) {
-		SendNewResult('"')
-		UpdateLastSentCharacter('"')
+		_RollEmitCritical('"', '"')
 	} else {
 		WrapTextIfSelected("#", "#", "#")
 	}
