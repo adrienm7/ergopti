@@ -2206,5 +2206,10 @@
 	"updater.update_dialog_open": "Ouvrir sur GitHub",
 	"updater.update_dialog_title": "ErgoptiPlus — Installer la mise à jour",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nOuvrir la page des releases sur GitHub ?",
-	"vscode.reload_required": "Veuillez recharger VSCode (Cmd+Shift+P > Reload Window) pour activer l’extension de frappe"
+	"vscode.reload_required": "Veuillez recharger VSCode (Cmd+Shift+P > Reload Window) pour activer l’extension de frappe",
+	"menu.llm.backend_title": "Moteur IA (Backend) : ",
+	"menu.llm.backend_unknown": "Inconnu",
+	"mlx.init_title": "Initialisation du moteur IA (MLX)",
+	"mlx.init_subtitle": "Initialisation IA en cours, veuillez patienter…",
+	"menu.shortcuts.key_layer_scroll": "Layer + Scroll"
 }

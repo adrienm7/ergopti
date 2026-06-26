@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇨🇳",
 	"_meta.locale": "zh",
 	"_meta.name": "中文",
@@ -2206,5 +2206,10 @@
 	"updater.update_dialog_open": "在 GitHub 上打开",
 	"updater.update_dialog_title": "ErgoptiPlus — 安装更新",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\n在 GitHub 上打开发布页面?",
-	"vscode.reload_required": "请重新加载 VSCode（Cmd+Shift+P > Reload Window）以激活输入扩展"
+	"vscode.reload_required": "请重新加载 VSCode（Cmd+Shift+P > Reload Window）以激活输入扩展",
+	"menu.llm.backend_title": "AI engine (Backend): ",
+	"menu.llm.backend_unknown": "Unknown",
+	"mlx.init_title": "Initializing the AI engine (MLX)",
+	"mlx.init_subtitle": "AI initialization in progress, please wait…",
+	"menu.shortcuts.key_layer_scroll": "Layer + Scroll"
 }

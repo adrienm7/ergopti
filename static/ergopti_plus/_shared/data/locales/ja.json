@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇯🇵",
 	"_meta.locale": "ja",
 	"_meta.name": "日本語",
@@ -2206,5 +2206,10 @@
 	"updater.update_dialog_open": "GitHub で開く",
 	"updater.update_dialog_title": "ErgoptiPlus — アップデートのインストール",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nGitHub のリリースページを開きますか?",
-	"vscode.reload_required": "タイピング拡張機能を有効にするには VSCode を再読込してください (Cmd+Shift+P > Reload Window)"
+	"vscode.reload_required": "タイピング拡張機能を有効にするには VSCode を再読込してください (Cmd+Shift+P > Reload Window)",
+	"menu.llm.backend_title": "AI engine (Backend): ",
+	"menu.llm.backend_unknown": "Unknown",
+	"mlx.init_title": "Initializing the AI engine (MLX)",
+	"mlx.init_subtitle": "AI initialization in progress, please wait…",
+	"menu.shortcuts.key_layer_scroll": "Layer + Scroll"
 }

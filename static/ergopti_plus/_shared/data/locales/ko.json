@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇰🇷",
 	"_meta.locale": "ko",
 	"_meta.name": "한국어",
@@ -2206,5 +2206,10 @@
 	"updater.update_dialog_open": "GitHub에서 열기",
 	"updater.update_dialog_title": "ErgoptiPlus — 업데이트 설치",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nGitHub의 릴리스 페이지를 여시겠습니까?",
-	"vscode.reload_required": "타이핑 확장 프로그램을 활성화하려면 VSCode를 다시 로드하세요 (Cmd+Shift+P > Reload Window)"
+	"vscode.reload_required": "타이핑 확장 프로그램을 활성화하려면 VSCode를 다시 로드하세요 (Cmd+Shift+P > Reload Window)",
+	"menu.llm.backend_title": "AI engine (Backend): ",
+	"menu.llm.backend_unknown": "Unknown",
+	"mlx.init_title": "Initializing the AI engine (MLX)",
+	"mlx.init_subtitle": "AI initialization in progress, please wait…",
+	"menu.shortcuts.key_layer_scroll": "Layer + Scroll"
 }

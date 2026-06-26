@@ -288,8 +288,8 @@ function M.new(deps, presets)
 					if not llm_progress.is_active() then
 						pcall(llm_progress.show, {
 							kind     = "mlx_install",
-							title    = "Initialisation du moteur IA (MLX)",
-							subtitle = "Initialisation IA en cours, veuillez patienter…",
+							title    = i18n.get("mlx.init_title"),
+							subtitle = i18n.get("mlx.init_subtitle"),
 						})
 					end
 					pcall(mlx_deps_checker.check_and_install_deps)
