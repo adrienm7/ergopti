@@ -124,6 +124,14 @@ function M.load_with_stubs(module_name, hs_overrides)
 	package.loaded["toml_codec"]       = nil
 	package.loaded["toml_codec.codec"] = nil
 
+	-- Drop the keyboard-layout install / input-source modules (split out of
+	-- ui/menu/menu_keyboard_layout.lua in audit F4). They hold session caches and
+	-- capture `local hs` at require-time, so a test that stubs hs.task to drive the
+	-- async active-layout probe must get them reloaded under the fresh stub — not a
+	-- cached instance bound to a previous test's hs. Same rationale as text_utils.
+	package.loaded["modules.keymap.layout_install"] = nil
+	package.loaded["modules.keymap.input_sources"]  = nil
+
 	-- Always inject a minimal lib.i18n stub so that modules calling i18n.get()
 	-- at require-time (terminators, conflicts, actions, profiles …) never crash
 	-- with "attempt to call a nil value (field 'get')". The real lib.i18n depends
