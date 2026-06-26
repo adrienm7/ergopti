@@ -21,8 +21,20 @@
 --- ==============================================================================
 
 local M = {}
-local Logger = require("lib.logger")
-local i18n   = require("lib.i18n")
+-- Logger / i18n are resolved SOFTLY so this shared module genuinely loads on every
+-- Lua runtime (the Linux daemon, LuaJIT test runners, build scripts), not only the
+-- macOS driver. macOS still gets its real ring-buffer logger and localised section
+-- descriptions; elsewhere a print shim + key-passthrough i18n take over. Hard
+-- requires on lib.logger / lib.i18n here were the impurity that forced the Linux
+-- driver to fork its own TOML parser (audit SS-2).
+local _ok_log, Logger = pcall(require, "lib.logger")
+if not _ok_log or type(Logger) ~= "table" then
+	Logger = require("logger.shim")
+end
+local _ok_i18n, i18n = pcall(require, "lib.i18n")
+if not _ok_i18n or type(i18n) ~= "table" then
+	i18n = { get = function(k) return k end, get_locale = function() return "fr" end }
+end
 local LOG    = "toml_writer"
 
 

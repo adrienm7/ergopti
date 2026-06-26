@@ -17,6 +17,13 @@
 ---    entries from other files are still returned.
 --- 4. Flag normalisation: the TOML "flags" array is converted to the boolean
 ---    fields (is_word, is_case_sensitive) expected by the engine.
+---
+--- MIGRATION NOTE (audit SS-2): this zero-dependency fork originally existed
+--- because the shared reader (_shared/lua/toml_codec/reader.lua) hard-required
+--- the macOS-only lib.logger, so it could not load here. That impurity is now
+--- fixed (the shared reader resolves Logger/i18n softly), so this loader CAN be
+--- migrated onto require("toml_codec").reader to delete the parallel parser. The
+--- migration is deferred until it can be validated under luajit/test:linux.
 --- ==============================================================================
 
 local M = {}

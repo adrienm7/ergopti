@@ -20,7 +20,17 @@
 --- ==============================================================================
 
 local M = {}
-local Logger = require("lib.logger")
+-- Logger is resolved SOFTLY so this shared module genuinely loads on every Lua
+-- runtime (the Linux daemon, LuaJIT test runners, build scripts) — not only the
+-- macOS driver. The macOS driver logger (ring buffer + file, read by the
+-- healthcheck diagnostic) is preferred when present so on-macOS routing is
+-- unchanged; otherwise the platform-neutral print shim takes over. A hard
+-- require("lib.logger") here was the impurity that forced the Linux driver to
+-- fork its own TOML parser (audit SS-2).
+local _ok_log, Logger = pcall(require, "lib.logger")
+if not _ok_log or type(Logger) ~= "table" then
+	Logger = require("logger.shim")
+end
 local LOG    = "toml_reader"
 
 -- Optional disk-cache provider, injected by the host driver via
