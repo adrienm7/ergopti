@@ -73,10 +73,13 @@ _SAR_AsyncRunPresent() {
 Test("Screenshot hotkey: async Run() used in SC029 block (screenshot-async-run)", _SAR_AsyncRunPresent)
 
 
-; F-H07: the gesture screenshot capture paths (GestureCaptureRegion for window/
-; fullscreen, GestureScreenshotRegion's post-ClipWait PNG save) used RunWait, blocking
-; the keyboard hook thread for the whole PowerShell capture on every screenshot gesture.
-; They were missed by the SC029 fix above; both must now use async Run.
+; F-H07: GestureCaptureRegion (window/fullscreen capture) used RunWait, blocking the
+; keyboard hook thread for the whole PowerShell capture (~300-1500 ms) on every such
+; screenshot gesture — the SC029 fix missed it. It must now use async Run. (The region
+; save GestureScreenshotRegion deliberately stays synchronous: it runs AFTER the user
+; finishes snipping — when they are not typing — and a synchronous RunWait is required so
+; its finally restores the clipboard before A_Clipboard is reused; that invariant is
+; guarded by test_screenshot_region_clipwait_clobber.ahk.)
 _SAR_GestureCaptureNoRunWait() {
 	Body := _DriverFuncBody("GestureCaptureRegion")
 	Assert(Body != "", "GestureCaptureRegion(X,Y,W,H,Mode,Path) must exist")
@@ -86,13 +89,3 @@ _SAR_GestureCaptureNoRunWait() {
 		"GestureCaptureRegion must launch the capture via async Run()")
 }
 Test("Gesture screenshot: GestureCaptureRegion uses async Run, not RunWait (gesture-capture-async-run)", _SAR_GestureCaptureNoRunWait)
-
-_SAR_GestureRegionNoRunWait() {
-	Body := _DriverFuncBody("GestureScreenshotRegion")
-	Assert(Body != "", "GestureScreenshotRegion(Mode) must exist")
-	Assert(InStr(Body, "RunWait") = 0,
-		"GestureScreenshotRegion must not use RunWait for the post-snip PNG save — defer it via async Run + a bounded clipboard-restore poll (gesture-capture-async-run)")
-	Assert(InStr(Body, "Run(") > 0,
-		"GestureScreenshotRegion save path must launch PowerShell via async Run()")
-}
-Test("Gesture screenshot: GestureScreenshotRegion save uses async Run, not RunWait (gesture-capture-async-run)", _SAR_GestureRegionNoRunWait)
