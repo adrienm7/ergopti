@@ -187,7 +187,7 @@ function M.build_default_state(tap_hold_keys, mod_combos)
 	for _, key_def in ipairs(tap_hold_keys or {}) do
 		local d = Defaults.tap_hold[key_def.id]
 		if not d then
-			Logger.warn(LOG, "No default entry for key '%s' in defaults.lua — using none/none.", key_def.id)
+			Logger.warn(LOG, "No default entry for key '%s' in the shared tap-hold defaults (defaults.toml) — using none/none.", key_def.id)
 		end
 		tap_hold_config[key_def.id] = {
 			tap  = d and d[1] or "none",
@@ -199,7 +199,7 @@ function M.build_default_state(tap_hold_keys, mod_combos)
 	for _, combo_def in ipairs(mod_combos or {}) do
 		local d = Defaults.combos[combo_def.id]
 		if not d then
-			Logger.warn(LOG, "No default entry for combo '%s' in defaults.lua — using none/none/none.", combo_def.id)
+			Logger.warn(LOG, "No default entry for combo '%s' in the shared tap-hold defaults (defaults.toml) — using none/none/none.", combo_def.id)
 		end
 		mod_combos_config[combo_def.id] = {
 			combo = d and d[1] or "none",

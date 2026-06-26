@@ -8,10 +8,11 @@
 ; truth at ``_shared/modules/features/manifest.toml``.
 ;
 ; FEATURES & RATIONALE:
-; 1. Optional include: the generated manifest is gitignored — a fresh clone has
-;    no manifest until the user runs ``npm run build:manifest``. The ``*i``
-;    flag lets the driver load anyway; every public accessor guards on
-;    ``ManifestEnsureLoaded()`` and fails loudly when the manifest is missing.
+; 1. Defensive optional include: the generated manifest is committed and
+;    drift-gated (``build:domain`` compares it against HEAD), so a normal clone
+;    already has it. The ``*i`` flag is a safety net — if the file is ever
+;    deleted or not yet regenerated, every public accessor guards on
+;    ``ManifestEnsureLoaded()`` and fails loudly instead of crashing at parse.
 ; 2. Hierarchical Map builder: ``ManifestBuildFeaturesMap`` rebuilds the legacy
 ;    ``Features`` Map shape from the flat entry list — same nesting semantics
 ;    as the old hardcoded literal in ``features_config.ahk``, but with v2
@@ -32,8 +33,9 @@
 ; check the generated file's encoding before debugging the codegen logic.
 ; ==============================================================================
 
-; Optional include — file is produced by ``npm run build:manifest`` and is
-; gitignored. Missing manifest is surfaced by ManifestEnsureLoaded() instead of
+; Defensive optional include — file is produced by ``npm run build:manifest``,
+; committed, and drift-gated. The ``*i`` flag means a missing manifest (deleted
+; or not yet regenerated) is surfaced by ManifestEnsureLoaded() instead of
 ; crashing at parse time.
 #Include *i ..\_generated\features_manifest.ahk
 
