@@ -861,8 +861,6 @@ if Features["hotstrings"]["magic_key"]["repeat_corrections"]["enabled"] {
 }
 try BootProfile_Mark("HS sub: dynamic + repeat-key registered")
 
-CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
-
 
 
 
