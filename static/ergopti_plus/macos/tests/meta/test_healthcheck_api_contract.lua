@@ -3,9 +3,9 @@
 --- ==============================================================================
 --- MODULE: Healthcheck Diagnostic API Contract
 --- DESCRIPTION:
---- Pins every external module symbol that lib/healthcheck.lua's collectors call,
---- so a renamed or removed API fails CI here instead of silently degrading the
---- user-facing diagnostic.
+--- Pins every external module symbol that ui/healthcheck/helpers.lua's collectors
+--- call, so a renamed or removed API fails CI here instead of silently degrading
+--- the user-facing diagnostic.
 ---
 --- WHY THIS EXISTS (regression for project-healthcheck-stale-api):
 --- The diagnostic collectors probed functions that did not exist — log_manager
@@ -19,13 +19,13 @@
 --- contract makes the breakage visible: it asserts the REAL functions the
 --- collectors now depend on actually exist on the real modules.
 ---
---- MAINTENANCE: when a collector in lib/healthcheck.lua starts calling a new
---- module function, add it here. Keep this list in lock-step with the collectors.
+--- MAINTENANCE: when a collector in ui/healthcheck/helpers.lua starts calling a
+--- new module function, add it here. Keep this list in lock-step with the collectors.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
--- The exact external surface lib/healthcheck.lua's collectors rely on.
+-- The exact external surface ui/healthcheck/helpers.lua's collectors rely on.
 -- mod = require path; fns = functions that must exist; constants = fields read.
 local CONTRACT = {
 	{ mod = "lib.logger",                       constants = { "UNIFIED_LOG_FILE", "ERRORS_LOG_FILE" }, fns = { "ring_buffer_snapshot" } },
@@ -89,7 +89,9 @@ helpers.describe("meta: healthcheck.run() probes no nonexistent API", function()
 	helpers.load_with_stubs("lib.logger")
 	-- Force the real llm module (load_with_stubs injects a DEFAULT_STATE-only stub).
 	package.loaded["modules.llm.init"] = nil
-	package.loaded["lib.healthcheck"] = nil
+	package.loaded["ui.healthcheck"] = nil
+	package.loaded["ui.healthcheck.core"] = nil
+	package.loaded["ui.healthcheck.helpers"] = nil
 
 	local Logger = require("lib.logger")
 	local stale_probes = {}
@@ -109,7 +111,7 @@ helpers.describe("meta: healthcheck.run() probes no nonexistent API", function()
 	end
 
 	local ok_run, snap = pcall(function()
-		return require("lib.healthcheck").run()
+		return require("ui.healthcheck").run()
 	end)
 	Logger.warn = orig_warn
 

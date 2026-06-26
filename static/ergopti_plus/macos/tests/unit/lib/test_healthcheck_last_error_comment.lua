@@ -9,9 +9,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "lib/healthcheck.lua"
+-- After the F2 split, the _last_error declaration + comment live in core.lua
+-- (the public-API half of ui/healthcheck/), not the former monolithic lib file.
+local src_path = helpers.driver_root() .. "ui/healthcheck/core.lua"
 local fh = io.open(src_path, "r")
-if not fh then error("healthcheck.lua not readable at: " .. src_path) end
+if not fh then error("healthcheck core.lua not readable at: " .. src_path) end
 local src = fh:read("*a") ; fh:close()
 
 -- Test 1: the old incorrect claim must not appear in the source.

@@ -33,9 +33,10 @@ local helpers = require("tests.helpers")
 helpers.describe("healthcheck — evaluateJavaScript pcall guard (healthcheck-webview-dead-userdata)", function()
 
 	local function read_source()
-		local src_path = helpers.driver_root() .. "lib/healthcheck.lua"
+		-- After the F2 split, the webview poll-timer logic lives in core.lua.
+		local src_path = helpers.driver_root() .. "ui/healthcheck/core.lua"
 		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "healthcheck.lua must be readable")
+		helpers.assert_true(fh ~= nil, "healthcheck core.lua must be readable")
 		local src = fh:read("*a"); fh:close()
 		return src
 	end

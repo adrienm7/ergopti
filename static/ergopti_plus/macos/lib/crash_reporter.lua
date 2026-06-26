@@ -170,7 +170,7 @@ function M.report(err, context)
 	local adapters_failed = ""
 	local session_warnings = "0"
 	local session_errors   = "0"
-	local ok_hc, hc = pcall(require, "lib.healthcheck")
+	local ok_hc, hc = pcall(require, "ui.healthcheck")
 	if ok_hc and hc and type(hc.run) == "function" then
 		local ok_run, snap = pcall(hc.run)
 		if ok_run and type(snap) == "table" then

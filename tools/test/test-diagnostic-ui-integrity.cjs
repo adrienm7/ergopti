@@ -63,46 +63,50 @@ function checkNegative(label, file, pattern) {
 console.log('\n=== Diagnostic UI Integrity Validation ===');
 
 // --- Hammerspoon (macOS) Checks ---
-const HS_FILE = 'static/ergopti_plus/macos/lib/healthcheck.lua';
+// After the F2 split, healthcheck is ui/healthcheck/{init,core,helpers}.lua,
+// mirroring the Windows layout. The probe + window live in core.lua; the
+// state-gathering probes + HTML rendering live in helpers.lua. The former
+// "forward-declare then assign" idiom (and its shadowing foot-gun) is gone by
+// construction — helpers are direct table members on H, resolved at call time —
+// so the integrity invariant is now "the renderer/probe are exported on H AND
+// core actually wires them in", which is what these checks pin.
+const HS_CORE = 'static/ergopti_plus/macos/ui/healthcheck/core.lua';
+const HS_HELPERS = 'static/ergopti_plus/macos/ui/healthcheck/helpers.lua';
 
 check(
-    'HS: has M.show_window export',
-    HS_FILE,
+    'HS: has M.show_window export (core)',
+    HS_CORE,
     /function M\.show_window\(\)/
 );
 
 check(
-    'HS: has forward declarations for internal helpers',
-    HS_FILE,
-    /local _sys_info[\s\S]*local _snapshot_to_html/
-);
-
-checkNegative(
-    'HS: NO shadowed implementation for _sys_info',
-    HS_FILE,
-    /local function _sys_info\(\)/
-);
-
-checkNegative(
-    'HS: NO shadowed implementation for _snapshot_to_html',
-    HS_FILE,
-    /local function _snapshot_to_html\(/
+    'HS: sys_info probe is defined on the helpers table',
+    HS_HELPERS,
+    /function H\.sys_info\(\)/
 );
 
 check(
-    'HS: correct assignment for _sys_info',
-    HS_FILE,
-    /_sys_info = function\(\)/
+    'HS: snapshot_to_html renderer is defined on the helpers table',
+    HS_HELPERS,
+    /function H\.snapshot_to_html\(/
 );
 
 check(
-    'HS: correct assignment for _snapshot_to_html',
-    HS_FILE,
-    /_snapshot_to_html = function\(/
+    'HS: core wires the sys_info probe (H.sys_info)',
+    HS_CORE,
+    /H\.sys_info/
+);
+
+check(
+    'HS: core wires the snapshot renderer (H.snapshot_to_html)',
+    HS_CORE,
+    /H\.snapshot_to_html/
 );
 
 // --- AutoHotkey (Windows) Checks ---
-const AHK_FILE = 'static/ergopti_plus/windows/lib/healthcheck.ahk';
+// Windows healthcheck was moved lib/ → ui/healthcheck/{init,core,helpers}.ahk;
+// the probe + window + WebView2 host live in core.ahk.
+const AHK_FILE = 'static/ergopti_plus/windows/ui/healthcheck/core.ahk';
 
 check(
     'AHK: has HealthCheck_ShowWindow export',
