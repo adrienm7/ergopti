@@ -146,8 +146,12 @@ GestureToggleRightClick() {
 
     ; Install a keyboard hook that releases the button on any key press
     GestureStartKeyboardWatcher()
-    ; Subscribe via HookDispatcher so the shared ~LButton handler is preserved;
-    ; a bare Hotkey("~LButton", …) call would replace the dispatcher's handler.
+    ; Subscribe via HookDispatcher so the shared ~LButton/~RButton handlers are
+    ; preserved; a bare Hotkey(…) call would replace the dispatcher's handlers. A
+    ; physical right-click (the natural way to fire the held button) releases the hold
+    ; too, mirroring GestureToggleLeftClick's dual subscription so a right-hold can
+    ; never outlive a physical right-click (gesture-right-hold-tap-release).
+    HookDispatcher.Register("mouse_rdown", GestureReleaseRightClick)
     HookDispatcher.Register("mouse_ldown", GestureReleaseRightClick)
     LoggerInfo("gestures", "Right-click hold mode enabled.")
 }
@@ -160,8 +164,9 @@ GestureReleaseRightClick(*) {
         return
     }
 
-    ; Unsubscribe via HookDispatcher — Hotkey("~LButton", …, "Off") would
-    ; disable the shared ~LButton handler that the dispatcher registered.
+    ; Unsubscribe via HookDispatcher — Hotkey(…, "Off") would disable the shared
+    ; ~LButton/~RButton handlers that the dispatcher registered.
+    HookDispatcher.Unregister("mouse_rdown", GestureReleaseRightClick)
     HookDispatcher.Unregister("mouse_ldown", GestureReleaseRightClick)
     LoggerDebug("gestures", "Disabling right-click hold mode…")
     Click("Right", "Up")
