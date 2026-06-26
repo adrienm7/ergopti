@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇺🇦",
 	"_meta.locale": "uk",
 	"_meta.name": "Українська",
@@ -2206,5 +2206,10 @@
 	"updater.update_dialog_open": "Відкрити на GitHub",
 	"updater.update_dialog_title": "ErgoptiPlus — Встановлення оновлення",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nВідкрити сторінку релізів на GitHub?",
-	"vscode.reload_required": "Перезавантажте VSCode (Cmd+Shift+P > Reload Window), щоб активувати розширення введення"
+	"vscode.reload_required": "Перезавантажте VSCode (Cmd+Shift+P > Reload Window), щоб активувати розширення введення",
+	"menu.llm.backend_title": "AI engine (Backend): ",
+	"menu.llm.backend_unknown": "Unknown",
+	"mlx.init_title": "Initializing the AI engine (MLX)",
+	"mlx.init_subtitle": "AI initialization in progress, please wait…",
+	"menu.shortcuts.key_layer_scroll": "Layer + Scroll"
 }

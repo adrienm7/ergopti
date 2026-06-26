@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇩🇰",
 	"_meta.locale": "da",
 	"_meta.name": "Dansk",
@@ -2206,5 +2206,10 @@
 	"updater.update_dialog_open": "Åbn på GitHub",
 	"updater.update_dialog_title": "ErgoptiPlus — Installér opdatering",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nÅbn udgivelsessiden på GitHub?",
-	"vscode.reload_required": "Genindlæs VSCode (Cmd+Shift+P > Reload Window) for at aktivere skriveudvidelsen"
+	"vscode.reload_required": "Genindlæs VSCode (Cmd+Shift+P > Reload Window) for at aktivere skriveudvidelsen",
+	"menu.llm.backend_title": "AI engine (Backend): ",
+	"menu.llm.backend_unknown": "Unknown",
+	"mlx.init_title": "Initializing the AI engine (MLX)",
+	"mlx.init_subtitle": "AI initialization in progress, please wait…",
+	"menu.shortcuts.key_layer_scroll": "Layer + Scroll"
 }

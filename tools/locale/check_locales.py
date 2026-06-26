@@ -73,7 +73,11 @@ def dump_locale(path: Path, data: dict[str, str]) -> None:
 	only touch the keys that genuinely changed.
 	"""
 	sorted_data = {k: data[k] for k in sorted(data)}
-	with path.open("w", encoding="utf-8-sig", newline="\n") as f:
+	# Write WITHOUT a BOM (encoding "utf-8", not "utf-8-sig"): the committed locale
+	# files have no BOM, and the macOS lib.locale reader mis-parses a leading BOM
+	# (it lands on the first key name, so the first lookup silently returns empty).
+	# Reading still uses utf-8-sig so a stray BOM is tolerated on input.
+	with path.open("w", encoding="utf-8", newline="\n") as f:
 		json.dump(sorted_data, f, ensure_ascii=False, indent="\t")
 		f.write("\n")
 
@@ -157,6 +161,18 @@ def main(argv: list[str]) -> int:
 
 	failed = False
 	locale_files = sorted(LOCALES_DIR.glob("*.json"))
+	# A leading UTF-8 BOM breaks the macOS lib.locale reader (the BOM attaches to
+	# the first key, so its first lookup returns empty). Guard against it on EVERY
+	# file, reference included — --fix rewrites them BOM-free via dump_locale.
+	for path in locale_files:
+		if path.read_bytes()[:3] == b"\xef\xbb\xbf":
+			if args.fix:
+				dump_locale(path, load_locale(path))
+				print(f"  -> {path.name}: stripped UTF-8 BOM")
+			else:
+				print(f"  - BOM: {path.name} starts with a UTF-8 BOM (run --fix)")
+				failed = True
+
 	for path in locale_files:
 		code = path.stem
 		if code == REFERENCE:

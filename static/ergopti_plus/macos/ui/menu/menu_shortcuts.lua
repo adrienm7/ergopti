@@ -55,7 +55,7 @@ M.DEFAULT_STATE = {
 --- @return string Display label for the trigger key(s).
 local function pretty_key(id, state)
 	if id == "at_hash" then return i18n.get("menu.shortcuts.key_at_hash") end
-	if id == "layer_scroll" or id == "layer+scroll" then return "Layer + Scroll" end
+	if id == "layer_scroll" or id == "layer+scroll" then return i18n.get("menu.shortcuts.key_layer_scroll") end
 	if id == "wrap_text_if_selected" then return i18n.get("menu.shortcuts.altgr_symbol") end
 
 	local parts = {}

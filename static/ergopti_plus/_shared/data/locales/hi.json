@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇮🇳",
 	"_meta.locale": "hi",
 	"_meta.name": "हिन्दी",
@@ -2206,5 +2206,10 @@
 	"updater.update_dialog_open": "GitHub पर खोलें",
 	"updater.update_dialog_title": "ErgoptiPlus — अपडेट इंस्टॉल करें",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nGitHub पर रिलीज़ पेज खोलें?",
-	"vscode.reload_required": "टाइपिंग एक्सटेंशन सक्रिय करने के लिए VSCode पुनः लोड करें (Cmd+Shift+P > Reload Window)"
+	"vscode.reload_required": "टाइपिंग एक्सटेंशन सक्रिय करने के लिए VSCode पुनः लोड करें (Cmd+Shift+P > Reload Window)",
+	"menu.llm.backend_title": "AI engine (Backend): ",
+	"menu.llm.backend_unknown": "Unknown",
+	"mlx.init_title": "Initializing the AI engine (MLX)",
+	"mlx.init_subtitle": "AI initialization in progress, please wait…",
+	"menu.shortcuts.key_layer_scroll": "Layer + Scroll"
 }

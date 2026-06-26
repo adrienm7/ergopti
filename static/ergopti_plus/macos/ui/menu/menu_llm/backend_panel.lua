@@ -75,11 +75,11 @@ function M.build(ctx)
 	local WarmupCtrl            = ctx.WarmupCtrl
 
 	-- Title reflects current active backend
-	local backend_title_str = "Moteur IA (Backend) : "
+	local backend_title_str = i18n.get("menu.llm.backend_title")
 	if state.llm_backend == "mlx" then     backend_title_str = backend_title_str .. "MLX 🚀"
 	elseif state.llm_backend == "ollama" then backend_title_str = backend_title_str .. "Ollama 🦙"
 	elseif state.llm_backend == "api" then   backend_title_str = backend_title_str .. "API 🌐"
-	else                                     backend_title_str = backend_title_str .. "Inconnu" end
+	else                                     backend_title_str = backend_title_str .. i18n.get("menu.llm.backend_unknown") end
 
 	local backend_menu = {}
 

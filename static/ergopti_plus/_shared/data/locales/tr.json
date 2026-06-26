@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇹🇷",
 	"_meta.locale": "tr",
 	"_meta.name": "Türkçe",
@@ -2206,5 +2206,10 @@
 	"updater.update_dialog_open": "GitHub'da aç",
 	"updater.update_dialog_title": "ErgoptiPlus — Güncellemeyi yükle",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nGitHub’da sürümler sayfasını açayım mı?",
-	"vscode.reload_required": "Yazım uzantısını etkinleştirmek için VSCode’u yeniden yükleyin (Cmd+Shift+P > Reload Window)"
+	"vscode.reload_required": "Yazım uzantısını etkinleştirmek için VSCode’u yeniden yükleyin (Cmd+Shift+P > Reload Window)",
+	"menu.llm.backend_title": "AI engine (Backend): ",
+	"menu.llm.backend_unknown": "Unknown",
+	"mlx.init_title": "Initializing the AI engine (MLX)",
+	"mlx.init_subtitle": "AI initialization in progress, please wait…",
+	"menu.shortcuts.key_layer_scroll": "Layer + Scroll"
 }

@@ -2206,5 +2206,10 @@
 	"updater.update_dialog_open": "Open on GitHub",
 	"updater.update_dialog_title": "ErgoptiPlus — Install update",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nOpen the releases page on GitHub?",
-	"vscode.reload_required": "Please reload VSCode (Cmd+Shift+P > Reload Window) to activate the typing extension"
+	"vscode.reload_required": "Please reload VSCode (Cmd+Shift+P > Reload Window) to activate the typing extension",
+	"menu.llm.backend_title": "AI engine (Backend): ",
+	"menu.llm.backend_unknown": "Unknown",
+	"mlx.init_title": "Initializing the AI engine (MLX)",
+	"mlx.init_subtitle": "AI initialization in progress, please wait…",
+	"menu.shortcuts.key_layer_scroll": "Layer + Scroll"
 }
