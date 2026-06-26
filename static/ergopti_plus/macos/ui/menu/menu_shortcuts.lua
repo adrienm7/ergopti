@@ -331,10 +331,16 @@ function M.build(ctx)
 		checked = state.shortcuts or nil,
 		fn      = function()
 			state.shortcuts = not state.shortcuts
+			-- Toggle ONLY the user-facing bindings + keyboard shortcuts. We must NOT
+			-- call shortcuts.start/stop here: stop() also tears down the script-control
+			-- eventtap (AltGr+Enter/Backspace/Escape pause/reload/quit) and start() is a
+			-- Bindings-only proxy that never revives it, so the feature toggle would
+			-- permanently kill the panic shortcuts. resume_bindings/pause_bindings are
+			-- the symmetric pair that leave the script-control tap untouched.
 			if state.shortcuts then
-				if type(shortcuts.start) == "function" then pcall(shortcuts.start) end
+				if type(shortcuts.resume_bindings) == "function" then pcall(shortcuts.resume_bindings) end
 			else
-				if type(shortcuts.stop) == "function" then pcall(shortcuts.stop) end
+				if type(shortcuts.pause_bindings) == "function" then pcall(shortcuts.pause_bindings) end
 			end
 			ctx.save_prefs()
 			ctx.notify_feature(i18n.get("menu.shortcuts.title"), state.shortcuts)

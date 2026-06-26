@@ -253,6 +253,26 @@ LLM_Bridge_ScheduleAfterHotstring(items) {
 	LLM_Engine_StartTimer(delaySec, buffer)
 }
 
+; Returns true when char ``c`` is a word boundary — whitespace or common sentence/
+; clause punctuation. Apostrophes are intentionally NOT boundaries (French "l'arbre").
+_LLM_Bridge_IsBoundaryChar(c) {
+	static _boundaries := " `t`n`r.,;:!?" . Chr(0x00A0) . Chr(0x202F)
+	return (c != "" and InStr(_boundaries, c) > 0)
+}
+
+; True when the just-typed char completes a word and instant_on_word_end is enabled:
+; the char is a boundary and the character before it (the buffer already has ch
+; appended) is a word character. Mirrors macOS engine.start_timer_word_end gating.
+_LLM_Bridge_IsWordEndTrigger(ch) {
+	global _LLM_Engine, _LLM_Bridge_Buffer
+	if !(_LLM_Engine.Has("instant_on_word_end") and _LLM_Engine["instant_on_word_end"])
+		return false
+	if !_LLM_Bridge_IsBoundaryChar(ch)
+		return false
+	prev := SubStr(_LLM_Bridge_Buffer, -2, 1)  ; the char before the just-appended ch
+	return (prev != "" and !_LLM_Bridge_IsBoundaryChar(prev))
+}
+
 /**
  * Must be called from a hotkey or keyboard hook on every typed character.
  * Maintains the rolling context buffer and feeds it to the prediction engine.
@@ -299,7 +319,14 @@ LLM_Bridge_OnChar(ch) {
 		_LLM_Bridge_LastLogTick := now
 		try LoggerInfo("LLM", "Keystroke buffered ({1} chars) — debounce pending.", StrLen(_LLM_Bridge_Buffer))
 	}
-	LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer)
+	; instant_on_word_end: when the just-typed char completes a word (a word char
+	; followed by whitespace/punctuation) and the user enabled the option, fire the
+	; prediction immediately instead of waiting the full debounce — macOS parity with
+	; engine.start_timer_word_end (llm-instant-word-end-trigger).
+	if _LLM_Bridge_IsWordEndTrigger(ch)
+		LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer, 0)
+	else
+		LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer)
 }
 
 /**
