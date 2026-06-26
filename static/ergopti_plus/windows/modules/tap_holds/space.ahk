@@ -67,6 +67,11 @@ SpaceTapHold(HoldFn) {
 	ih := InputHook("L1 T" . Round(InputTimeoutSec, 1))
 	ih.Start()
 	ih.Wait()
+	; A live InputHook bypasses native Suspend; if a pause arrived while Wait() was
+	; blocking, discard the capture so no phantom modified keystroke leaks into the
+	; foreground app while the driver is paused (space-hold-inputhook-suspend-guard).
+	if A_IsSuspended
+		return
 	; Skip modifier on empty capture — no phantom modifier on empty chord.
 	if (ih.Input != "" and ih.Input != " ")
 		HoldFn.Call(ih.Input)
