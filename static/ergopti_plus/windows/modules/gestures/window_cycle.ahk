@@ -96,6 +96,7 @@ GestureGetCyclableWindows(ProcessFilter := "") {
 ; corrupt the manually-built recency order.
 _GestureOnForeground(hWinEventHook, Event, HWnd, IdObject, IdChild, Thread, Time) {
     global _GestureWinOrder, _GestureCycling, GESTURE_WIN_ORDER_MAX
+    global _GestureSelfActivated, GESTURE_SELF_ACTIVATE_TTL_MS
     ; Do not churn the tracker while paused — the driver is inert and any
     ; recency recorded now would be stale by the time it resumes.
     if (A_IsSuspended) {
@@ -103,6 +104,17 @@ _GestureOnForeground(hWinEventHook, Event, HWnd, IdObject, IdChild, Thread, Time
     }
     if (_GestureCycling) {
         return
+    }
+    ; The WinEvent for our own programmatic activation is delivered async (OUTOFCONTEXT),
+    ; after the _GestureCycling bracket has already cleared, so also consume a matching
+    ; self-activated HWND here. Delete on every match so a stale entry cannot linger;
+    ; only suppress when the activation is recent (gesture-cycle-winevent-async-fence).
+    if (_GestureSelfActivated.Has(HWnd)) {
+        Age := (A_TickCount - _GestureSelfActivated[HWnd]) & 0xFFFFFFFF
+        _GestureSelfActivated.Delete(HWnd)
+        if (Age < GESTURE_SELF_ACTIVATE_TTL_MS) {
+            return
+        }
     }
     ; Skip non-window objects (menus, scroll bars, etc.)
     if (IdObject != 0) {
@@ -187,6 +199,10 @@ _GestureOrderedWindows(ProcessFilter := "") {
 ; (Windows propagates focus async, and a strict check causes false negatives
 ; that make the cycle skip windows).
 GestureActivateWindow(HWnd) {
+    global _GestureSelfActivated
+    ; Mark this as a self-induced activation so _GestureOnForeground can fence the async
+    ; EVENT_SYSTEM_FOREGROUND it triggers (gesture-cycle-winevent-async-fence).
+    _GestureSelfActivated[HWnd] := A_TickCount
     try {
         if (WinGetMinMax("ahk_id " . HWnd) = -1) {
             WinRestore("ahk_id " . HWnd)
