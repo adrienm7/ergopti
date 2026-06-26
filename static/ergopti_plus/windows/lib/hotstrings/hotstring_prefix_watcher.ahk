@@ -868,11 +868,17 @@ _OnPrefixChar(IH, Char) {
                     Right := Pair["right"]
                     ; Erase the character already delivered by the pass-through hook,
                     ; then send the wrapped replacement without re-triggering hotstrings.
+                    ; Release the suppression in a finally: a throwing SendEvent/SendInstant
+                    ; would otherwise leave the depth counter latched at >=1, silently killing
+                    ; the whole hotstring engine + preview for the session (uia-wrap-suppress-latch).
                     PrefixWatcherSuppress(true)
-                    SendEvent("{BackSpace}")
-                    SendInstant(Left . UIASel . Right)
-                    PrefixWatcherSuppress(false)
-                    _ResetPrefixBuffer()
+                    try {
+                        SendEvent("{BackSpace}")
+                        SendInstant(Left . UIASel . Right)
+                    } finally {
+                        PrefixWatcherSuppress(false)
+                        _ResetPrefixBuffer()
+                    }
                     return
                 }
             } catch as _UIAErr {
