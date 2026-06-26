@@ -24,16 +24,5 @@
 	"llm_val_modifiers": ["alt"],
 	"llm_ollama_port": 11434,
 
-	"_comment_platform": "These values differ per platform and are NOT overridden by this file.",
-	"_platform_defaults": {
-		"ahk": {
-			"llm_model": "Qwen3.5-0.8B",
-			"llm_backend": "ollama"
-		},
-		"hs": {
-			"llm_model_ollama": "gemma-4-E2B-it",
-			"llm_model_mlx": "Qwen3.5-2B",
-			"llm_backend": "ollama"
-		}
-	}
+	"_comment_platform": "Per-platform model/backend defaults are intentionally NOT in this shared file: the available models and default backend differ by platform, so each driver owns them (windows/lib/llm_defaults.ahk, macos/modules/llm/init.lua)."
 }
