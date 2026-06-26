@@ -211,7 +211,7 @@ LLM_Engine_SetEnabled(state) {
  * Callers (llm_bridge.ahk) pass the current typed buffer.
  * @param {string} buffer - Full typed context up to the caret.
  */
-LLM_Engine_OnKeystroke(buffer) {
+LLM_Engine_OnKeystroke(buffer, delay_override_ms := "") {
 	global _LLM_Engine
 	local _c := Critical("On")
 	try {
@@ -231,7 +231,10 @@ LLM_Engine_OnKeystroke(buffer) {
 		; (macOS parity) derives capped context + tail inside FirePrediction.
 		_LLM_Engine["last_buffer"] := buffer
 		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer)
-		SetTimer(_LLM_Engine["pending_timer"], -_LLM_Engine["debounce_ms"])
+		; A word-end fast-fire (instant_on_word_end) passes a delay override; otherwise the
+		; configured debounce applies. Max(1, ...) keeps an override of 0 near-immediate.
+		_arm_ms := (delay_override_ms != "" and IsNumber(delay_override_ms)) ? Max(1, delay_override_ms) : _LLM_Engine["debounce_ms"]
+		SetTimer(_LLM_Engine["pending_timer"], -_arm_ms)
 		_LLM_Engine["timer_active"] := true
 		; Capture the source window so the accept guard can verify the user
 		; hasn't switched focus between prediction trigger and Tab press
