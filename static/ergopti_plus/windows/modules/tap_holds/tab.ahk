@@ -66,6 +66,16 @@ SC00F::
 			TextPressKey("LAlt", "Up")
 			AltTabMonitor()
 		}
+	} else {
+		; Held past the tap window: the native Alt+Tab switcher stays up via the
+		; synthetic LAlt Down. Bound the wait and release in a finally so a lost
+		; SC00F key-up (Suspend toggled mid-hold disarms the SC00F Up:: fallback)
+		; can never latch Alt Down system-wide (hold-modifier-unbounded-keywait)
+		try {
+			KeyWait("SC00F", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+		} finally {
+			TextPressKey("LAlt", "Up")
+		}
 	}
 }
 SC00F Up:: TextPressKey("LAlt", "Up")

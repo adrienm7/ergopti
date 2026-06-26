@@ -167,8 +167,15 @@ SC038::
 		TextPressKey("LAlt", "Up")
 		AltTabMonitor()
 	} else {
-		KeyWait("SC038", "U")
-		TextPressKey("LAlt", "Up")
+		; Bound the wait and release LAlt in a finally so a lost SC038 key-up (Alt+Tab
+		; focus steal, a UAC prompt, or Suspend toggled mid-press) can never latch Alt
+		; Down system-wide — this else is the SOLE release path (no SC038 Up:: fallback
+		; exists here, unlike tab.ahk) (hold-modifier-unbounded-keywait)
+		try {
+			KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+		} finally {
+			TextPressKey("LAlt", "Up")
+		}
 	}
 }
 #HotIf
