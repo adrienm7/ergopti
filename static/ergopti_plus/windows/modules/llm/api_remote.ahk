@@ -213,7 +213,21 @@ _LLMRemote_PollRequest(req_id) {
     }
     http := entry["http"]
     ready := false
-    try ready := http.WaitForResponse(0)
+    ; A COM exception from WaitForResponse (connection dropped mid-request: WiFi cut,
+    ; provider socket reset, VPN flap) must abort the dead request immediately rather than
+    ; swallow the error and keep waking the message loop every poll interval for the full
+    ; deadline. Mirrors the Ollama fix (ollama-com-exception-busy-loop), which the remote
+    ; twin never received.
+    try {
+        ready := http.WaitForResponse(0)
+    } catch as com_err {
+        on_fail := entry["on_fail"]
+        try http.Abort()
+        _LLM_Remote_Async.Delete(req_id)
+        try LoggerWarn("LLM.remote", "WaitForResponse COM error for req_id={1}: {2} — aborting.", req_id, com_err.Message)
+        try on_fail()
+        return
+    }
     if !ready {
         SetTimer(() => _LLMRemote_PollRequest(req_id), -LLM_REMOTE_POLL_MS)
         return
