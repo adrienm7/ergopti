@@ -28,6 +28,7 @@ local LOG     = "menu.keyboard_layout"
 -- Install-layer helpers used by the enumeration / selection logic below.
 local highest_installed  = install.highest_installed
 local path_exists        = install.path_exists
+local version_gt         = install.version_gt
 local USER_LAYOUTS_DIR   = install.USER_LAYOUTS_DIR
 local SYSTEM_LAYOUTS_DIR = install.SYSTEM_LAYOUTS_DIR
 
