@@ -156,9 +156,12 @@ Test("keylogger: keylogger_hook.ahk context_at TTL uses & 0xFFFFFFFF mask (tickc
 ; =========================================================================
 
 _KLTO_KeyloggerIngestWrapSafe() {
-	Raw := _KLTO_ReadSource("modules/keylogger/keylogger.ahk")
+	; Whole keylogger module dir — the password-cache guard lives in the
+	; keylogger_password.ahk sibling after the F1 split, the ingest guards in
+	; keylogger.ahk; concatenating the dir keeps every mask assertion move-resilient.
+	Raw := _DriverDirConcat("modules/keylogger")
 	Src := _KLTO_StripComments(Raw)
-	Assert(Src != "", "modules/keylogger/keylogger.ahk must be readable")
+	Assert(Src != "", "modules/keylogger sources must be readable")
 
 	; Ingest idle guard must be masked
 	Assert(!RegExMatch(Src, "A_TickCount - KLHook\.last_tick < KeylogConst\.INGEST_IDLE_MS"),
@@ -174,7 +177,7 @@ _KLTO_KeyloggerIngestWrapSafe() {
 
 	; Password cache TTL must be masked
 	Assert(InStr(Src, "(KLPasswordCache.last_at) & 0xFFFFFFFF) >= KLPW_CACHE_TTL_MS") > 0,
-		"keylogger.ahk must mask password cache TTL with & 0xFFFFFFFF (tickcount-wrap)")
+		"keylogger module must mask password cache TTL with & 0xFFFFFFFF (tickcount-wrap)")
 }
 Test("keylogger: keylogger.ahk ingest and password-cache guards use & 0xFFFFFFFF mask (tickcount-wrap)", _KLTO_KeyloggerIngestWrapSafe)
 
