@@ -29,12 +29,14 @@ local helpers = require("tests.helpers")
 -- ===========================================================================================================
 -- ===========================================================================================================
 
-helpers.describe("menu_keyboard_layout: build_kl_name_to_tis_id forward-declared (ui-menu-layout-hot-1 regression)", function()
+helpers.describe("input_sources: build_kl_name_to_tis_id forward-declared (ui-menu-layout-hot-1 regression)", function()
 
+	-- After the F4 split, build_kl_name_to_tis_id (and its set_input_source call
+	-- site) live in modules/keymap/input_sources.lua, not the menu module.
 	helpers.it("source: 'local build_kl_name_to_tis_id' appears before the call site", function()
-		local src_path = helpers.driver_root() .. "ui/menu/menu_keyboard_layout.lua"
+		local src_path = helpers.driver_root() .. "modules/keymap/input_sources.lua"
 		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "menu_keyboard_layout.lua must be readable")
+		helpers.assert_true(fh ~= nil, "input_sources.lua must be readable")
 		local src = fh:read("*a"); fh:close()
 
 		-- Forward declaration must exist
@@ -46,11 +48,11 @@ helpers.describe("menu_keyboard_layout: build_kl_name_to_tis_id forward-declared
 		local def_pos  = src:find("\nfunction build_kl_name_to_tis_id()", 1, true)
 
 		helpers.assert_true(fwd_pos ~= nil,
-			"menu_keyboard_layout.lua must have a 'local build_kl_name_to_tis_id' forward declaration")
+			"input_sources.lua must have a 'local build_kl_name_to_tis_id' forward declaration")
 		helpers.assert_true(call_pos ~= nil,
-			"menu_keyboard_layout.lua must still contain a call to build_kl_name_to_tis_id()")
+			"input_sources.lua must still contain a call to build_kl_name_to_tis_id()")
 		helpers.assert_true(def_pos ~= nil,
-			"menu_keyboard_layout.lua must assign the function via 'function build_kl_name_to_tis_id()' (not 'local function')")
+			"input_sources.lua must assign the function via 'function build_kl_name_to_tis_id()' (not 'local function')")
 		helpers.assert_true(fwd_pos < call_pos,
 			"the forward declaration must appear before the call site")
 		helpers.assert_true(call_pos < def_pos,
@@ -58,7 +60,7 @@ helpers.describe("menu_keyboard_layout: build_kl_name_to_tis_id forward-declared
 	end)
 
 	helpers.it("source: no 'local function build_kl_name_to_tis_id' (which would shadow the forward decl)", function()
-		local src_path = helpers.driver_root() .. "ui/menu/menu_keyboard_layout.lua"
+		local src_path = helpers.driver_root() .. "modules/keymap/input_sources.lua"
 		local fh = io.open(src_path, "r")
 		helpers.assert_true(fh ~= nil)
 		local src = fh:read("*a"); fh:close()

@@ -240,8 +240,8 @@ end)
 -- The tests fail only if the count INCREASES beyond these thresholds, preventing
 -- regressions while allowing incremental clean-up of the backlog.
 -- TODO: drive all baselines to zero as modules are refactored to use port adapters.
-local LUA_HS_BASELINE       = 952  -- hs.* calls in macos/modules/ and macos/lib/ (bumped: hs.timer.secondsSinceEpoch() added to vscode_bridge for AX-call TTL cache +1, and ke_lifecycle.kill_async for microsecond-precision script path +1; +2 from relocating hs.fs.attributes + hs.json.decode out of init.lua into lib/personal_hotstrings during boot-orchestrator thinning — not new OS calls, init.lua is outside this scan)
-local LUA_IO_OS_BASELINE    = 71   -- io.open / os.execute calls in macos/modules/ and macos/lib/ (bumped after errors-sink + diagnostic + menu + sg feature work; +1 from relocating the priority.json io.open out of init.lua into lib/personal_hotstrings — not a new OS call, init.lua is outside this scan)
+local LUA_HS_BASELINE       = 956  -- hs.* calls in macos/modules/ and macos/lib/ (bumped: hs.timer.secondsSinceEpoch() added to vscode_bridge for AX-call TTL cache +1, and ke_lifecycle.kill_async for microsecond-precision script path +1; +2 from relocating hs.fs.attributes + hs.json.decode out of init.lua into lib/personal_hotstrings during boot-orchestrator thinning; +4 from audit F4 relocating the keyboard-layout install/TIS glue out of ui/menu/menu_keyboard_layout.lua into modules/keymap/{layout_install,input_sources} — not new OS calls, ui/ is outside this scan)
+local LUA_IO_OS_BASELINE    = 76   -- io.open / os.execute calls in macos/modules/ and macos/lib/ (bumped after errors-sink + diagnostic + menu + sg feature work; +1 from relocating the priority.json io.open out of init.lua into lib/personal_hotstrings; +5 from audit F4 relocating the keyboard-layout install/TIS glue out of ui/menu/menu_keyboard_layout.lua into modules/keymap/{layout_install,input_sources} — not new OS calls, ui/ is outside this scan)
 
 helpers.describe("meta: _shared/ code purity", function()
 	local shared_dir = SHARED_DIR
