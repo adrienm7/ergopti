@@ -1157,10 +1157,14 @@ _ResetPrefixBuffer(ConsumedByFire := false) {
         _NotifySuggestionConsumed()
     } else {
         _NotifySuggestionDismissed()
-        ; Near-miss and manual-trigger detection on non-fire resets.
-        ; Only worth checking when the buffer has meaningful length.
-        if (StrLen(Buf) >= 2)
-            try _CheckNearMiss(Buf)
+        ; Near-miss / manual-trigger detection is pure keylogger analytics with no
+        ; ordering requirement, so (a) skip it entirely when the keylogger is inactive
+        ; — the default case pays zero — and (b) defer the O(n) trigger-set scan off the
+        ; synchronous, Critical keystroke thread to the next idle tick, so a logging
+        ; session never pays it on the typing path (near-miss-on-hotpath-scan). Buf is a
+        ; value copy, so the deferred scan sees the buffer as it was at reset time.
+        if (StrLen(Buf) >= 2 and Keylogger.initialized)
+            SetTimer(_CheckNearMiss.Bind(Buf), -1)
     }
 }
 
@@ -1169,6 +1173,12 @@ _ResetPrefixBuffer(ConsumedByFire := false) {
 ; of a known trigger (hotstring_near_miss).
 _CheckNearMiss(Buf) {
     global _TriggerSet
+    ; Defense in depth: the sole consumer (KL_LogHotstringNearMiss) is inert when the
+    ; keylogger is off, so the whole O(n) scan is dead work then. _ResetPrefixBuffer
+    ; already gates + defers this, but guard here too in case the keylogger stopped
+    ; between the deferred schedule and this firing (near-miss-on-hotpath-scan).
+    if !Keylogger.initialized
+        return
     key := StrLower(Buf)
     ; Exact match → user typed a known trigger without using the expansion
     if _TriggerSet.Has(key) {
