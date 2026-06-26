@@ -58,3 +58,24 @@ _GLHTR_ReleaseLeftUnsubscribesLDown() {
 		"GestureReleaseLeftClick must unsubscribe mouse_ldown on teardown (gesture-left-hold-tap-release)")
 }
 Test("gestures: left hold unsubscribes mouse_ldown on release (gesture-left-hold-tap-release)", _GLHTR_ReleaseLeftUnsubscribesLDown)
+
+; F-M10: the RIGHT hold was the missed sibling — it subscribed only mouse_ldown, so a
+; physical right-click (the natural way to fire the held button) never released it and
+; the OS right button stayed latched. It must mirror the left's dual subscription.
+_GLHTR_ToggleRightSubscribesRDown() {
+	Body := _DriverFuncBody("GestureToggleRightClick")
+	Assert(Body != "", "GestureToggleRightClick must exist in the gestures driver")
+	Assert(InStr(Body, 'HookDispatcher.Register("mouse_rdown", GestureReleaseRightClick)') > 0,
+		"GestureToggleRightClick must subscribe mouse_rdown so a physical right-click releases the right hold, mirroring the left hold (gesture-right-hold-tap-release)")
+	Assert(InStr(Body, 'HookDispatcher.Register("mouse_ldown", GestureReleaseRightClick)') > 0,
+		"GestureToggleRightClick must keep the mouse_ldown (left-click) release path (gesture-right-hold-tap-release)")
+}
+Test("gestures: right hold releases on a physical right-click via mouse_rdown (gesture-right-hold-tap-release)", _GLHTR_ToggleRightSubscribesRDown)
+
+_GLHTR_ReleaseRightUnsubscribesRDown() {
+	Body := _DriverFuncBody("GestureReleaseRightClick")
+	Assert(Body != "", "GestureReleaseRightClick must exist in the gestures driver")
+	Assert(InStr(Body, 'HookDispatcher.Unregister("mouse_rdown", GestureReleaseRightClick)') > 0,
+		"GestureReleaseRightClick must unsubscribe mouse_rdown on teardown (gesture-right-hold-tap-release)")
+}
+Test("gestures: right hold unsubscribes mouse_rdown on release (gesture-right-hold-tap-release)", _GLHTR_ReleaseRightUnsubscribesRDown)
