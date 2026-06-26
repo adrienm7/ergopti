@@ -13,6 +13,7 @@
 --- ==============================================================================
 
 local M = {}
+local i18n = require("lib.i18n")
 
 --- Builds the canonical ✅/❌ category toggle item followed by a separator.
 --- Mirrors AHK's AddCategoryToggleItem — keeps both platforms structurally identical.
@@ -32,7 +33,7 @@ end
 --- @param label string The section label (already localized).
 --- @return table Single disabled menu item.
 function M.build_section_header(label)
-	return { title = "— " .. label .. " —", disabled = true }
+	return { title = i18n.decorate_section(label), disabled = true }
 end
 
 --- Builds a filtered and grouped picker submenu for a list of named actions.

@@ -303,7 +303,7 @@ function M.generate(ctx, menu_mods, actions)
 
 		local std_groups = collect_groups(non_ergopti_filter, counts)
 		if #std_groups > 0 then
-			local common_header = "— " .. string.format(i18n.get("menu.hotstrings.header_common_count"), fmt_grand(common_total)) .. " —"
+			local common_header = i18n.decorate_section(string.format(i18n.get("menu.hotstrings.header_common_count"), fmt_grand(common_total)))
 			table.insert(hotstrings_menu, { title = common_header, disabled = true })
 			for _, it in ipairs(std_groups) do table.insert(hotstrings_menu, it) end
 		end
@@ -312,7 +312,7 @@ function M.generate(ctx, menu_mods, actions)
 		local ergopti_groups_built = collect_groups(ERGOPTI_GROUPS, counts)
 		if #ergopti_groups_built > 0 then
 			if #std_groups > 0 then table.insert(hotstrings_menu, { title = "-" }) end
-			local ergopti_header = "— " .. string.format(i18n.get("menu.hotstrings.header_ergopti_count"), fmt_grand(ergopti_total)) .. " —"
+			local ergopti_header = i18n.decorate_section(string.format(i18n.get("menu.hotstrings.header_ergopti_count"), fmt_grand(ergopti_total)))
 			table.insert(hotstrings_menu, { title = ergopti_header, disabled = true })
 			for _, it in ipairs(ergopti_groups_built) do table.insert(hotstrings_menu, it) end
 		end
@@ -322,7 +322,7 @@ function M.generate(ctx, menu_mods, actions)
 			and Logger.build(LOG, "hotstrings.build_custom", function(c) return menu_mods.hotstrings.build_custom(c, counts) end, ctx)
 		if custom_item then
 			table.insert(hotstrings_menu, { title = "-" })
-			local personal_header = "— " .. string.format(i18n.get("menu.hotstrings.header_personal_count"), fmt_grand(personal_total)) .. " —"
+			local personal_header = i18n.decorate_section(string.format(i18n.get("menu.hotstrings.header_personal_count"), fmt_grand(personal_total)))
 			table.insert(hotstrings_menu, { title = personal_header, disabled = true })
 			table.insert(hotstrings_menu, custom_item)
 		end
@@ -332,8 +332,8 @@ function M.generate(ctx, menu_mods, actions)
 			table.insert(hotstrings_menu, { title = "-" })
 			local ext_base   = i18n.get("menu.extensions.header")
 			local ext_header = ext_has_count
-				and ("— " .. ext_base .. " (" .. fmt_grand(ext_total) .. ") —")
-				or  ("— " .. ext_base .. " —")
+				and i18n.decorate_section(ext_base .. " (" .. fmt_grand(ext_total) .. ")")
+				or  i18n.decorate_section(ext_base)
 			table.insert(hotstrings_menu, { title = ext_header, disabled = true })
 
 			for _, ext in ipairs(counts.ext_details) do

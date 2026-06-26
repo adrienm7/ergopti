@@ -138,10 +138,16 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- on hs.settings and locale JSON files unavailable in headless unit tests.
 	-- Tests that need a richer stub should override package.loaded["lib.i18n"]
 	-- AFTER calling load_with_stubs (this baseline is always restored here).
+	-- decorate_section / section mirror the real i18n: menu builders (via
+	-- ui.menu.menu_utils.build_section_header) wrap disabled headers in the
+	-- canonical "— … —" decoration, so the stub must expose them or any builder
+	-- that renders a section header crashes with a nil-field call.
 	package.loaded["lib.i18n"] = {
-		get        = function(key) return key end,
-		get_locale = function() return "fr" end,
-		set_locale = function() end,
+		get             = function(key) return key end,
+		get_locale      = function() return "fr" end,
+		set_locale      = function() end,
+		decorate_section = function(text) return "— " .. text .. " —" end,
+		section          = function(key) return "— " .. key .. " —" end,
 	}
 
 	-- Stub lib.paths so that any module (e.g. llm/api_remote, profiles resolution)
