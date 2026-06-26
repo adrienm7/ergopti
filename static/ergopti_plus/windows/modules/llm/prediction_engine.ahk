@@ -445,6 +445,27 @@ LLM_Engine_FirePrediction(buffer) {
 	_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
 	this_request_id := _LLM_Engine["request_id"]
 
+	; Honour the disabled_apps user preference: skip prediction entirely when the focused
+	; app is on the user's exclusion list, so typed context never leaves an app the user
+	; opted out of (privacy parity with macOS app_filter.is_blocked). The flag is persisted
+	; and shown in the menu but was previously never enforced. Resolve the focused process
+	; only when the list is non-empty, so no OS call runs on the per-fire path when the user
+	; has not excluded any app (llm-app-filter-enforced).
+	if (_LLM_Engine.Has("disabled_apps") && (_LLM_Engine["disabled_apps"] is Array)
+			&& _LLM_Engine["disabled_apps"].Length > 0) {
+		_focused_app := ""
+		try _focused_app := StrLower(WIGetFocused()["appId"])
+		if (_focused_app != "") {
+			_focused_app := RegExReplace(_focused_app, "\.exe$", "")
+			for _excluded_app in _LLM_Engine["disabled_apps"] {
+				if (StrLower(RegExReplace(_excluded_app, "\.exe$", "")) == _focused_app) {
+					try LoggerInfo("LLM", "Prediction suppressed - '{1}' is on the disabled-apps list.", _focused_app)
+					return
+				}
+			}
+		}
+	}
+
 	backend_now := _LLM_Engine.Has("backend") ? _LLM_Engine["backend"] : "ollama"
 	if (backend_now = "ollama" and IsSet(LLM_OllamaAllowInference) and !LLM_OllamaAllowInference()) {
 		static _LLM_LastDeferLogTick := 0
