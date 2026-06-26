@@ -63,6 +63,12 @@ TYPE_RE = re.compile(r"^([a-z]+)(?:\(([^)]+)\))?(!)?:\s+(.+)$")
 
 # Co-author trailer pattern. Project rule forbids AI / bot credits, so any
 # leftover trailer is stripped from the rendered body.
+# GitHub API hard cap for release body length.
+# The workflow appends ~3 KB of platform-section text after the changelog,
+# so we leave a safety margin below the 125 000-char limit.
+GITHUB_RELEASE_BODY_LIMIT = 125_000
+CHANGELOG_MAX_CHARS = GITHUB_RELEASE_BODY_LIMIT - 10_000
+
 COAUTHOR_RE = re.compile(r"^Co-[Aa]uthored-[Bb]y:", re.MULTILINE)
 
 
@@ -227,6 +233,21 @@ def render(prev_tag: str | None, commits: list[dict[str, str]]) -> str:
 	return "\n".join(out_lines)
 
 
+def truncate_changelog(text: str, max_chars: int) -> str:
+	"""Clip the changelog at the last newline before max_chars and append a note.
+
+	The GitHub Releases API rejects bodies longer than 125 000 characters.
+	Truncating at word/line boundaries keeps the markdown valid.
+	"""
+	if len(text) <= max_chars:
+		return text
+	cutoff = text.rfind("\n", 0, max_chars)
+	if cutoff < 0:
+		cutoff = max_chars
+	note = "\n\n> _(Changelog truncated — too many commits to display in full on this release page.)_\n\n---\n\n"
+	return text[:cutoff] + note
+
+
 def render_first_release(sha: str) -> str:
 	"""Fallback when no prior tag exists — surface the single commit's title
 	and body verbatim so the release page is never empty.
@@ -270,7 +291,7 @@ def main() -> int:
 		# No commits in range — emit an empty block so the concatenation is a no-op.
 		return 0
 
-	sys.stdout.write(render(prev_tag, commits))
+	sys.stdout.write(truncate_changelog(render(prev_tag, commits), CHANGELOG_MAX_CHARS))
 	return 0
 
 
