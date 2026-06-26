@@ -111,3 +111,33 @@ _MetaRunLoggerPairingTests() {
 }
 
 _MetaRunLoggerPairingTests()
+
+; F-L08: a LoggerStart immediately before Reload() leaves a START with no reachable
+; SUCCESS — the process restarts before the pair closes, so it reads as a silent failure
+; to anyone auditing the prior process's rolled-over log. Guard the whole driver source.
+_MetaNoStartBeforeReload() {
+	SplitPath(A_ScriptDir, , &Root)
+	Root := StrReplace(Root, "\", "/")
+	offenders := ""
+	for Sub in ["lib", "modules", "ui"] {
+		Loop Files, Root . "/" . Sub . "/*.ahk", "FR" {
+			src := FileRead(A_LoopFileFullPath)
+			if RegExMatch(src, "LoggerStart\([^\r\n]*\)\s*\r?\n\s*Reload")
+				offenders .= "`n  " . A_LoopFileFullPath
+		}
+	}
+	Assert(offenders == "",
+		"A LoggerStart must not immediately precede Reload() — the paired SUCCESS never fires (dangling-start-before-reload). Use LoggerInfo/LoggerSuccess before Reload. Offenders:" . offenders)
+}
+Test("logger: no LoggerStart immediately precedes Reload (dangling-start-before-reload)", _MetaNoStartBeforeReload)
+
+; F-L09: the updater one-click up-to-date branch is a successful completion of the check,
+; so it must close its START with LoggerSuccess, not LoggerInfo.
+_MetaUpdaterUpToDateLogsSuccess() {
+	SplitPath(A_ScriptDir, , &Root)
+	src := FileRead(StrReplace(Root, "\", "/") . "/lib/updater/changelog.ahk")
+	Assert(InStr(src, "already up to date") > 0, "sanity: the up-to-date message must exist in changelog.ahk")
+	Assert(RegExMatch(src, "LoggerInfo\([^\r\n]*already up to date") == 0,
+		"the one-click up-to-date path must close its START with LoggerSuccess, not LoggerInfo (updater-up-to-date-pairing)")
+}
+Test("logger: updater one-click up-to-date path closes START with SUCCESS (updater-up-to-date-pairing)", _MetaUpdaterUpToDateLogsSuccess)

@@ -154,7 +154,7 @@ _PiEdWeb_Save(Values) {
 	for Key, Val in Values
 		PersonalInformation[Key] := Val
 	WritePersonalInfoToml(ScriptInformation["PersonalInfoTomlPath"])
-	try LoggerStart("PersonalInfo", "Saved personal information — reloading…")
+	try LoggerInfo("PersonalInfo", "Saved personal information — reloading…")
 	Reload()
 }
 

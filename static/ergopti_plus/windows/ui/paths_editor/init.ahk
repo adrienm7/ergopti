@@ -187,7 +187,7 @@ _PathsEdWeb_Save(ConfigDir) {
 		f.Write('# Custom paths' . "`r`n" . 'ConfigDirPath = "' . StrReplace(N, "\", "/") . '"' . "`r`n")
 		f.Close()
 	}
-	try LoggerStart("PathsEditor", "Applying new config directory and reloading…")
+	try LoggerInfo("PathsEditor", "Applying new config directory and reloading…")
 	Reload()
 }
 
