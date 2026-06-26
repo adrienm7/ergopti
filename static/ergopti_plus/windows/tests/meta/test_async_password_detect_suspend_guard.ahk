@@ -51,3 +51,21 @@ _APDSG_SuspendCheckBeforeDetect() {
 		"keylogger.ahk: A_IsSuspended guard must precede KL_DetectPasswordFor in KL_AsyncPasswordDetect")
 }
 Test("KL_AsyncPasswordDetect: suspend guard precedes KL_DetectPasswordFor (async-password-detect-suspend)", _APDSG_SuspendCheckBeforeDetect)
+
+
+; F-M12: the suspend-guard hardening introduced an abort path that returned WITHOUT
+; clearing the pending_hwnd dedupe guard (cleared only at the end after a successful
+; detect). KL_SchedulePasswordDetect then dedupes every future re-schedule for that
+; hwnd, so the conservative password verdict latches and the field's typing is silently
+; dropped from all metrics after resume. The suspend branch must release pending_hwnd.
+_APDSG_SuspendClearsPendingHwnd() {
+	block := _DriverFuncBody("KL_AsyncPasswordDetect")
+	posGuard  := InStr(block, "A_IsSuspended")
+	posDetect := InStr(block, "KL_DetectPasswordFor")
+	posReset  := InStr(block, "pending_hwnd := 0")
+	Assert(posReset > 0,
+		"KL_AsyncPasswordDetect must reset pending_hwnd on the suspend abort path (async-password-detect-suspend-latch)")
+	Assert(posReset > posGuard and posReset < posDetect,
+		"the pending_hwnd reset must be INSIDE the A_IsSuspended branch (after the guard, before KL_DetectPasswordFor) so the dedupe guard is released on a pause abort and a post-resume re-schedule can re-arm (async-password-detect-suspend-latch)")
+}
+Test("KL_AsyncPasswordDetect: suspend abort clears pending_hwnd so re-schedule recovers (async-password-detect-suspend-latch)", _APDSG_SuspendClearsPendingHwnd)

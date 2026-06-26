@@ -124,8 +124,15 @@ KL_AsyncPasswordDetect(hwnd) {
     ; Timer callbacks fire even while the script is suspended. Skip detection
     ; while suspended so UIA / Win32 round-trips do not run when the keylogger
     ; is intentionally paused.
-    if A_IsSuspended
+    if A_IsSuspended {
+        ; Pause aborts the off-thread detection, but the scheduler guard MUST be released
+        ; or KL_SchedulePasswordDetect dedupes every future re-schedule for this hwnd
+        ; forever — latching the conservative password verdict and silently dropping all
+        ; typing metrics in the field after resume (async-password-detect-suspend-latch).
+        if (KLPasswordCache.pending_hwnd = hwnd)
+            KLPasswordCache.pending_hwnd := 0
         return
+    }
     Result := KL_DetectPasswordFor(hwnd)
     ; Commit through the publish-after-fill helper: last_hwnd is written LAST so
     ; the keystroke reader (a different pseudo-thread) can never see this hwnd
