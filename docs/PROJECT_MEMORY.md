@@ -577,9 +577,14 @@ consumers). A2 resolved them:
   hand-written `modules/keymap/{registry,expander}.lua` diverged far past the
   pure generated contract (TOML loading, `hs.settings`, priority cascade,
   case-variant generation, i18n), so the generated adapters could never replace
-  them. The AHK `expander.ahk`/`registry.ahk` are KEPT — unlike the macOS ones
-  they are TESTED (`test_domain_{registry,expander}.ahk`) and are the only
-  exercised impl of the shared `Registry.spec.js`/`Expander.spec.js` contracts.
+  them. **Update (audit 2026-06-26, GEN-1/2): the AHK `expander.ahk`/`registry.ahk`
+  were ALSO deleted.** The earlier "KEPT because TESTED" rationale was wrong: the
+  `test_domain_{registry,expander}.ahk` tests exercise the hand-written `HSE_*`
+  engine (`hotstring_engine_main.ahk`) against the shared `Registry.spec.js` /
+  `Expander.spec.js` contracts — NOT the generated classes, which were never
+  `#Include`'d or instantiated (grep-proven). So both drivers' generated
+  registry/expander ports are now gone, along with their codegen + npm scripts;
+  the `SubStr(-0)` regression guard was retargeted to the live engine.
 - **`features_manifest.lua` got a reader** — `macos/lib/manifest_reader.lua`
   (counterpart of `manifest_reader.ahk`). `modules/keymap/init.lua` `DEFAULT_STATE`
   now sources its hotstring/preview defaults via `Manifest.default_for("hs.hotstrings.<id>")`

@@ -9,17 +9,12 @@ Run the corresponding npm script to regenerate.
 | `terminators.ahk`        | `npm run codegen:terminators`                | ✅ Wired — `#Include`'d in `ErgoptiPlus.ahk`                      |
 | `personal_shortcuts.ahk` | generated at runtime by `PersonalTomlEditor` | ✅ Wired — loaded dynamically                                     |
 | `prompt_builder.ahk`     | `npm run codegen:prompt-builder:ahk`         | ✅ Wired — `#Include`'d in tests, used by `prediction_engine.ahk` |
-| `registry.ahk`           | `npm run codegen:registry`                   | ⏳ Orphaned — generated but not yet `#Include`'d in the driver    |
-| `expander.ahk`           | `npm run codegen:expander:ahk`               | ⏳ Orphaned — generated but not yet `#Include`'d in the driver    |
 
-## Orphaned files
-
-`registry.ahk` and `expander.ahk` contain a full AHK v2 port of the shared
-`Registry.spec.js` / `Expander.spec.js` domain contracts. They are tested
-indirectly via `tests/test_domain_registry.ahk` and `tests/test_domain_expander.ahk`
-but the main driver (`ErgoptiPlus.ahk`) still uses the legacy registry/expander
-implementation directly.
-
-**Roadmap**: Replace the legacy implementations with these generated adapters
-once integration tests confirm parity. This is a Batch-9 / hexagonal-doctrine
-migration item.
+> **Removed (audit 2026-06-26, GEN-1/2):** `registry.ahk` and `expander.ahk` were
+> orphaned codegen ports of the `Registry.spec.js` / `Expander.spec.js` domain
+> contracts — never `#Include`'d, never instantiated. The production hotstring
+> path uses the hand-written `HSE_*` engine (`lib/hotstrings/hotstring_engine_main.ahk`),
+> and `test_domain_registry.ahk` / `test_domain_expander.ahk` exercise that live
+> engine against the shared specs — not the generated classes. The files, their
+> `codegen-{registry,expander}-ahk.cjs` generators, and the `codegen:registry` /
+> `codegen:expander:ahk` npm scripts were deleted.

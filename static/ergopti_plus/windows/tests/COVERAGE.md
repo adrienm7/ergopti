@@ -81,7 +81,7 @@ When adding a new IA menu option: extend the JSON contract, wire `ui/menu/menu_l
 
 | Test file                                           | Fix guarded                                                                       |
 | --------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `meta/test_generated_substr_minus_one.ahk`          | `SubStr(trigger, -0)` → `SubStr(trigger, -1)` in `_generated/registry.ahk` and `_generated/expander.ahk` |
+| `meta/test_generated_substr_minus_one.ahk`          | `SubStr(Trigger, -0)` → `SubStr(Trigger, -1)` tail-char bug in the live engine `lib/hotstrings/hotstring_engine_main.ahk` (retargeted from the deleted `_generated/{registry,expander}.ahk`) |
 | `meta/test_toml_multiline_array_depth.ahk`          | Multi-line TOML array uses bracket-depth counter + quote state (not naive `InStr(Line, "]")`) |
 | `meta/test_toml_unescape_ordering.ahk`              | `_WS_UnescapeToml` replaces `\\` before `\"` to avoid corrupting `\\"` sequences |
 | `meta/test_clipboard_sentinel.ahk`                  | `CB_Save` returns `"__CB_SAVE_ERROR__"` sentinel; `CB_Restore` skips on sentinel |
