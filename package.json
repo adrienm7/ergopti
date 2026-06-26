@@ -37,6 +37,7 @@
 		"test:no-pinned-source-reads": "node ./tools/test/test-no-pinned-source-reads.cjs",
 		"test:max-tokens-single-source": "node ./tools/test/test-max-tokens-single-source.cjs",
 		"test:temperature-single-source": "node ./tools/test/test-temperature-single-source.cjs",
+		"test:ollama-port-single-source": "node ./tools/test/test-ollama-port-single-source.cjs",
 		"test:macos-bundle-layout": "node ./tools/test/test-macos-bundle-layout.cjs",
 		"test:hs-editor-confirm": "node ./tools/test/test-hotstring-editor-confirm-wiring.cjs",
 		"test:webview-teardown": "node ./tools/test/test-webview-teardown-order.cjs",

@@ -420,7 +420,7 @@ LLM_Menu_PromptDebounce() {
 ; of the api_ollama client, not of the engine options.
 LLM_Menu_PromptOllamaPort() {
 	global _LLM_Menu
-	current := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : 11434
+	current := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_port")
 	ib := InputBox(t("menu.llm.ollama_port_prompt"), t("menu.llm.ollama_port_title"), "w400 h120", current)
 	if (ib.Result != "OK" || ib.Value == "")
 		return

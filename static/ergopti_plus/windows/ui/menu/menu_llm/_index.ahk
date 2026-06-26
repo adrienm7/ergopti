@@ -94,9 +94,11 @@ _LLMMenuBuildIndentRange() {
 global _LLM_Menu := Map(
 	"enabled",                    false,
 	"backend",                    "ollama",
-	; Local Ollama daemon port. 11434 is Ollama's standard; user-overridable from
-	; the backend submenu (persisted under [llm] ollama_port) for non-standard setups.
-	"ollama_port",                11434,
+	; Local Ollama daemon port — placeholder, replaced at startup by
+	; LLM_Menu_ApplySharedDefaults() from the shared default (defaults.json
+	; llm_ollama_port). User-overridable from the backend submenu (persisted
+	; under [llm] ollama_port) for non-standard setups.
+	"ollama_port",                0,
 	"model",                      "",
 	"profile_id",                 "basic",
 	"user_profiles",              [],
@@ -209,7 +211,8 @@ LLM_Menu_ApplySharedDefaults() {
 		"llm_disable_url_bars",        "disable_url_bars",
 		"llm_disable_password_fields", "disable_password_fields",
 		"llm_nav_modifiers",           "nav_modifiers",
-		"llm_val_modifiers",           "val_modifiers"
+		"llm_val_modifiers",           "val_modifiers",
+		"llm_ollama_port",             "ollama_port"
 	)
 
 	for shared_key, tray_key in _key_map {

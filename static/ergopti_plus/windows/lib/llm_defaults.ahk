@@ -188,7 +188,7 @@ LLM_Defaults_Load() {
 
 	; Numbers
 	for key in ["llm_num_predictions", "llm_debounce_ms", "llm_context_length",
-		"llm_min_words", "llm_max_words", "llm_pred_indent"] {
+		"llm_min_words", "llm_max_words", "llm_pred_indent", "llm_ollama_port"] {
 		if !_LLMD_HasKey(raw, key)
 			missing.Push(key)
 		else

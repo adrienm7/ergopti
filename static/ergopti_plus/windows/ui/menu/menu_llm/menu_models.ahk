@@ -62,13 +62,13 @@ LLM_Menu_BuildBackendMenu() {
 	; so a user running Ollama on a non-standard port (or behind a proxy) can still
 	; reach it. Shown unconditionally: the user may set it before switching backend.
 	m.Add()
-	port_display := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : 11434
+	port_display := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_port")
 	RegisterMenuItem(m, StrReplace(t("menu.llm.ollama_port_label"), "%s", port_display),
 		(*) => LLM_Menu_PromptOllamaPort())
 	_LLM_MaybeAddReset(m,
 		port_display,
-		_LLM_DefaultFor("llm_ollama_port", 11434),
-		(*) => LLM_Menu_ResetOllamaPort(_LLM_DefaultFor("llm_ollama_port", 11434)))
+		_LLM_DefaultFor("llm_ollama_port"),
+		(*) => LLM_Menu_ResetOllamaPort(_LLM_DefaultFor("llm_ollama_port")))
 	return m
 }
 
