@@ -445,8 +445,28 @@ function M.get_action(slot)         return CoreState.ga[slot]                   
 function M.set_action(slot, action) CoreState.ga[slot] = action                 end
 function M.get_mode(slot)           return CoreState.modes[slot] or "x1"        end
 function M.set_mode(slot, mode)     CoreState.modes[slot] = mode                end
-function M.get_sensitivity(slot)    return CoreState.sensitivities[slot] or M.DEFAULT_SENSITIVITY end
-function M.set_sensitivity(slot, s) CoreState.sensitivities[slot] = s           end
+function M.get_sensitivity(slot)    return tonumber(CoreState.sensitivities[slot]) or M.DEFAULT_SENSITIVITY end
+
+--- Stores a gesture sensitivity, failing closed to DEFAULT_SENSITIVITY when the
+--- value is not a positive number. A persisted config.toml / plist value can
+--- arrive as a string (hand edit, AHK migration, half-written plist); the engine
+--- divides by this (math.floor(abs(sd) / sensitivity)) inside the gesture eventtap
+--- and the menu runs string.format("%.1f", …) on it, so a non-number would crash
+--- the tap (swallowed to Console) and blank the gestures submenu under the
+--- menu-builder pcall. The fallback IS the single-source default (no new literal).
+--- @param slot string Gesture slot id.
+--- @param s any Candidate sensitivity (coerced to a positive number).
+function M.set_sensitivity(slot, s)
+	local n = tonumber(s)
+	if type(n) == "number" and n > 0 then
+		CoreState.sensitivities[slot] = n
+		Logger.debug(LOG, "Sensitivity['%s'] = %s.", tostring(slot), tostring(n))
+	else
+		CoreState.sensitivities[slot] = M.DEFAULT_SENSITIVITY
+		Logger.warn(LOG, "set_sensitivity('%s'): non-numeric/non-positive value %s — using default %s.",
+			tostring(slot), tostring(s), tostring(M.DEFAULT_SENSITIVITY))
+	end
+end
 function M.get_space_wrap()         return CoreState.space_wrap                 end
 function M.set_space_wrap(wrap)     CoreState.space_wrap = wrap                 end
 
