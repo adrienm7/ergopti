@@ -241,11 +241,19 @@ local function do_expand(combo)
 	local n_back = 1 + #combo
 	local parts  = resolve_combo(combo)
 	_replacing = true
+	-- `emitted` joins the fields with a tab for the human-readable fallback notify.
+	-- `echoed` is what the OS actually echoes as CHARACTER events: the field values
+	-- WITHOUT the inter-field tab (the tab is fired as a real Tab keyStroke, which
+	-- the keymap does not see as a literal \t — see the fallback comment below).
+	-- expected_synthetic_chars and CoreState.buffer must be armed with `echoed`,
+	-- NOT `emitted`: a \t in expected_synthetic_chars is never matched by the Tab
+	-- echo and desynced the buffer after every multi-field @-tag expansion.
 	local emitted = table.concat(parts, "\t")
+	local echoed  = table.concat(parts, "")
 
 	local ok, err = pcall(function()
 		if _keymap and type(_keymap.inject_dynamic) == "function" then
-			_keymap.inject_dynamic(n_back, emitted, function()
+			_keymap.inject_dynamic(n_back, echoed, function()
 				local c = 0
 				local ok_tu, text_utils = pcall(require, "lib.text_utils")
 				for i, value in ipairs(parts) do
@@ -260,7 +268,9 @@ local function do_expand(combo)
 						c = c + 1
 					end
 				end
-				return c, emitted
+				-- Return the tab-free echo string so expected_synthetic_chars holds
+				-- exactly the codepoints the OS echoes (values only).
+				return c, echoed
 			end, "personal")
 		else
 			-- Fallback: emit raw keystrokes without inject_dynamic.
