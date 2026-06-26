@@ -118,7 +118,7 @@ checkNegative(
 // We exclude dialog_util itself from this check.
 const filesToAudit = [
     'static/ergopti_plus/macos/ui/onboarding/init.lua',
-    'static/ergopti_plus/macos/lib/healthcheck.lua',
+    'static/ergopti_plus/macos/ui/healthcheck/core.lua',
     'static/ergopti_plus/macos/lib/crash_reporter.lua',
     'static/ergopti_plus/macos/modules/karabiner/onboarding.lua'
 ];

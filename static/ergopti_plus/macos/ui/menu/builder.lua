@@ -483,7 +483,7 @@ function M.generate(ctx, menu_mods, actions)
 		})
 	end
 
-	local healthcheck  = require("lib.healthcheck")
+	local healthcheck  = require("ui.healthcheck")
 	local debug_order  = load_debug_menu()
 	local debug_items  = {}
 	for _, entry in ipairs(debug_order) do
