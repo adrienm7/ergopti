@@ -1,10 +1,13 @@
+// tools/lint/audit-gui-titles.cjs
+
 /**
- ; tools/lint/audit-gui-titles.cjs
- ;
- ; DESCRIPTION:
- ; Scans AHK and Lua source files for Gui creation and windowTitle settings.
- ; Verifies that all window titles follow the mandatory format: "ErgoptiPlus — Nom".
- ; Fails if any title uses a hardcoded string that doesn't include the prefix.
+ * ==============================================================================
+ * MODULE: GUI Window Title Auditor
+ * DESCRIPTION:
+ * Scans AHK and Lua source for Gui() creation and :windowTitle() settings and
+ * verifies every window title carries the mandatory "ErgoptiPlus" prefix
+ * (format "ErgoptiPlus — Nom"). Fails on any hardcoded title missing the prefix.
+ * ==============================================================================
  */
 
 const fs = require('fs');
