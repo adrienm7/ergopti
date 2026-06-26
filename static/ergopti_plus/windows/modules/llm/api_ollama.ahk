@@ -35,11 +35,13 @@
 ; =====================================
 ; =====================================
 
-; Ollama server port. 11434 is Ollama's own standard; the user can override it
+; Ollama server port. The default lives in exactly ONE place —
+; _shared/modules/llm/defaults.json (llm_ollama_port). The user can override it
 ; from the tray menu (persisted under [llm] ollama_port in config.toml) when they
-; run the daemon on a non-standard port. LLM_OLLAMA_BASE_URL is DERIVED from it so
-; every request below follows the configured port — change it via LLM_Ollama_SetPort.
-global LLM_OLLAMA_PORT     := 11434
+; run the daemon on a non-standard port. Sentinel 0 — sourced at boot from
+; LLM_Defaults by LLM_Ollama_LoadDefaults() (well before any request fires).
+; LLM_OLLAMA_BASE_URL is DERIVED from it; change both via LLM_Ollama_SetPort.
+global LLM_OLLAMA_PORT     := 0
 global LLM_OLLAMA_BASE_URL := "http://localhost:" . LLM_OLLAMA_PORT
 ; Weak laptops running qwen3.5:0.8b on CPU can exceed 30 s per token batch.
 ; WinHTTP aborts the whole request when this fires — too low and the tooltip
@@ -66,6 +68,16 @@ LLMApiLoadTimings() {
 	LLM_REMOTE_TIMEOUT_MS      := TimingsGet("llm", "request_timeout_ms")
 	LLM_REMOTE_POLL_MS         := TimingsGet("llm", "poll_interval_ms")
 	LLM_INSTALLED_CACHE_TTL_MS := TimingsGet("llm", "installed_cache_ttl_ms")
+}
+
+; Source the Ollama port default from the shared registry (LLM_Defaults, loaded
+; from _shared/modules/llm/defaults.json) at boot — keeps 11434 in exactly one
+; place. Mirrors LLMApiLoadTimings; called right after it in lib/boot.ahk, after
+; LLM_Defaults_Load(). The per-user override is applied later by LLM_Menu_Init.
+LLM_Ollama_LoadDefaults() {
+	global LLM_Defaults
+	if IsSet(LLM_Defaults) and Type(LLM_Defaults) == "Map" and LLM_Defaults.Has("llm_ollama_port")
+		LLM_Ollama_SetPort(LLM_Defaults["llm_ollama_port"])
 }
 
 ; Maximum number of in-flight async requests kept in the registry. Once we
