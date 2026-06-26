@@ -77,7 +77,7 @@ KS_IsUp(KeyName) {
 KS_ResolveKeyboardLayout() {
 	local hkl := GetForegroundKeyboardLayout()
 	if hkl = 0
-		hkl := DllCall("GetKeyboardLayout", "UInt", A_ThreadID, "Ptr")
+		hkl := DllCall("GetKeyboardLayout", "UInt", DllCall("GetCurrentThreadId", "UInt"), "Ptr")
 	if hkl = 0 {
 		; SPI_GETDEFAULTINPUTLANG = 0x0059; pvParam receives an HKL.
 		local buf := Buffer(A_PtrSize, 0)
