@@ -41,7 +41,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-hs-onboarding-config-schema](#project-hs-onboarding-config-schema) — the first-run wizard MUST write config.toml using the canonical HS schema (ui/menu/preferences.lua KEY_MAP: lowercase sections, clean `enabled` flags) — NOT AHK-style keys — or every wizard choice is silently dropped on the post-wizard reload; locale persists via hs.settings, not config.toml
   - [Keymap module architecture and refactor decisions](#keymap-module-architecture-and-refactor-decisions) — Structure of the keymap module, where defaults live, which files do what
   - [project-hs-synthetic-injection-choke-point](#project-hs-synthetic-injection-choke-point) — The macOS driver has TWO synthetic-keystroke trackers (keymap expected_synthetic_* + keylogger synth_queue); injectors that bypass perform_text_replacement desync them and can corrupt typed output — see AUDIT_HAMMERSPOON_BUGS.md
-  - [project-locale-parity-test](#project-locale-parity-test) — en.json is the canonical key set; tools/check_locales.py enforces parity in CI
+  - [project-locale-parity-test](#project-locale-parity-test) — en.json is the canonical key set; the AHK meta-test test_locale_json_valid.ahk enforces parity in CI; check_locales.py --fix is the manual backfill tool
   - [project-locale-fast-cache](#project-locale-fast-cache) — The Windows driver's locale .tsv is a gitignored self-healing fast-parse cache regenerated from the canonical .json on a miss/staleness; only .json is tracked, no committed duplication
   - [project_metrics_pipeline_17](#project-metrics-pipeline-17) — AHK metrics pipeline — bug #17 CLOSED, follow-up bugs fixed
   - [project-suspend-pause-invariant](#project-suspend-pause-invariant) — Pause must fully silence ALL features (no tooltip/LLM/keylogger/widget). AHK Suspend only disarms hotkeys — InputHooks/timers/OnMessage bypass it and need explicit A_IsSuspended guards.
@@ -373,7 +373,7 @@ _All user-facing UI text must go through the i18n system in 21 supported languag
 
 <sub>slug: `feedback_ui_must_be_i18n`</sub>
 
-All user-facing text in the ergopti project must be served via the i18n system, in **all 21 supported languages** (ar, cs, da, de, en, es, fr, he, hi, it, ja, ko, nl, no, pl, pt, ru, sv, tr, uk, zh). Locale files live in [[reference-locales-files]] at `static/locales/<lang>.json`.
+All user-facing text in the ergopti project must be served via the i18n system, in **all 21 supported languages** (ar, cs, da, de, en, es, fr, he, hi, it, ja, ko, nl, no, pl, pt, ru, sv, tr, uk, zh). Locale files live in [[reference-locales-files]] at `static/ergopti_plus/_shared/data/locales/<lang>.json`.
 
 **Why:** CLAUDE.md already mandates "UI is French, code is English" but in practice the project ships in 21 languages — French was just the dev-time default. Hardcoded French strings in `_shared/ui/metrics_typing/*.js`, `_shared/ui/download_window/*.js`, etc. break the multilingual contract and shame anyone who tries to use the app in another language.
 
@@ -972,18 +972,21 @@ has no idle drain. Related: [[project_keymap_architecture]],
 
 ### project-locale-parity-test
 
-_en.json is the canonical key set; tools/check_locales.py enforces parity in CI_
+_en.json is the canonical key set; the AHK meta-test test_locale_json_valid.ahk enforces parity in CI; check_locales.py --fix is the manual backfill tool_
 
 <sub>slug: `project_locale_parity_test`</sub>
 
-`static/locales/en.json` is the canonical reference. Every other locale
-file must mirror its key set exactly — no missing, no extra.
+`static/ergopti_plus/_shared/data/locales/en.json` is the canonical reference.
+Every other locale file must mirror its key set exactly — no missing, no extra.
 
 **Why:** Stale keys (removed from EN but lingering in translations) and
 missing keys (added to EN but not yet translated) both ship as bugs.
-The CI workflow `.github/workflows/test_locales.yml` runs
-`tools/check_locales.py` on every push touching `static/locales/` and
-fails on any drift.
+Parity is enforced in CI by the AHK meta-test
+`windows/tests/meta/test_locale_json_valid.ahk` (run by `run_all.ahk` in the
+`test-ahk` job), which ASSERTS that all 21 locales expose exactly `en.json`'s key
+set (currently 2208 keys). `tools/check_locales.py` is the manual developer tool
+that asserts the same parity locally and, via `--fix`, PRODUCES it. There is no
+`.github/workflows/test_locales.yml` — that workflow never existed.
 
 **How to apply:**
 
@@ -1005,7 +1008,7 @@ _The Windows driver's locale .tsv is a gitignored self-healing cache regenerated
 
 <sub>slug: `project_locale_fast_cache`</sub>
 
-`JsonParse` of a 2196-key locale costs ~180 ms on the boot critical path (the tray
+`JsonParse` of a 2208-key locale costs ~180 ms on the boot critical path (the tray
 menu needs `t()`); parsing the flat `key<TAB>value` `.tsv` instead is ~16 ms
 (~×11). To keep that speed WITHOUT committing the same data twice, the `.tsv`
 files under `static/ergopti_plus/_shared/data/locales/` are a **gitignored, self-healing

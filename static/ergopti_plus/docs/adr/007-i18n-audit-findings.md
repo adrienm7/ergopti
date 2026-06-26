@@ -1,7 +1,10 @@
 # ADR 007 — i18n Audit Findings (1.3.6)
 
 **Date:** 2026-05-26  
-**Status:** Partially resolved — AHK startup MsgBox still pending (see Cluster C)
+**Status:** Resolved (2026-06-26) — all 17 tracked violations fixed, including the
+AHK startup MsgBox (`ErgoptiPlus.ahk` now calls `MsgBox(t("startup.manifest_missing"), …)`).
+The remaining, broader i18n debt lives in the shared webview frontends
+(`_shared/ui/**/*.js`) and is tracked separately as audit finding **I18N-4**, not here.
 
 ---
 
@@ -61,16 +64,17 @@ The Karabiner onboarding error-path calls `callback(false, "…")` and
 
 | Line    | Issue                                                                                                  | Status                                            |
 | ------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
-| 603–605 | `MsgBox(…"Erreur de démarrage : …", "ErgoptiPlus — manifest manquant"…)` — hardcoded French UI         | **Pending** — will be fixed in a dedicated commit |
+| 603–605 | `MsgBox(…"Erreur de démarrage : …", "ErgoptiPlus — manifest manquant"…)` — hardcoded French UI         | **Resolved** — now `MsgBox(t("startup.manifest_missing"), …)` |
 | 883–894 | Log messages in French ("ignoré", "enregistré", "Échec") — violates log rule (§4.4: English-only logs) | Fixed                                             |
 
 **Fix for MsgBox:** move to a dedicated startup error handler; use i18n key
 `startup.manifest_missing`. **Fix for logs:** translate to English in place
 (no i18n needed — logs are developer-facing).
 
-> **Note (2026-05-28):** The French `MsgBox` at `windows/ErgoptiPlus.ahk:603–605`
-> is the sole remaining violation. It will be resolved in a follow-up commit
-> once the startup error handler is in place.
+> **Note (2026-06-26):** The French `MsgBox` at `windows/ErgoptiPlus.ahk` is now
+> resolved — it routes through `t("startup.manifest_missing")`. All 17 violations
+> in this ADR are fixed; see audit finding I18N-4 for the separate shared-webview
+> i18n debt.
 
 ---
 
