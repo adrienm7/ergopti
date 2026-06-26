@@ -60,8 +60,8 @@ _AGHF_CheckHKLFallbackPresent() {
 	; The block must resolve HKL into a variable and apply thread-layout fallback
 	Assert(InStr(Src, "_DetectHKL"),
 		"AltGrDetect block must cache the resolved HKL in _DetectHKL")
-	Assert(InStr(Src, "GetKeyboardLayout") && InStr(Src, "A_ThreadID"),
-		"AltGrDetect block must include GetKeyboardLayout(A_ThreadID) as first HKL fallback")
+	Assert(InStr(Src, "GetKeyboardLayout") && InStr(Src, "GetCurrentThreadId"),
+		"AltGrDetect block must include GetKeyboardLayout(GetCurrentThreadId()) as first HKL fallback")
 }
 
 

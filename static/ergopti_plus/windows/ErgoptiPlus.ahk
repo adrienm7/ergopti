@@ -414,7 +414,7 @@ global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 ;
 ; HKL resolution cascade: at script startup there may be no foreground window
 ; (AHK launches tray-only), so GetForegroundKeyboardLayout() returns 0.
-; Fallback 1: GetKeyboardLayout(A_ThreadID) — layout of the AHK thread itself.
+; Fallback 1: GetKeyboardLayout(GetCurrentThreadId()) — layout of the AHK thread itself.
 ; Fallback 2: SystemParametersInfo(SPI_GETDEFAULTINPUTLANG) — system default.
 ; HKL resolution + the no-modifier scancode scan live in adapters/key_state.ahk
 ; so the layout-detection DllCalls (MapVirtualKeyExW / ToUnicodeEx) are isolated
