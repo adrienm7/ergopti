@@ -34,7 +34,6 @@ const fs = require('fs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const PASS_SYMBOL = '✓';
 const FAIL_SYMBOL = '✗';
-const WARN_SYMBOL = '⚠';
 
 let total_pass = 0;
 let total_fail = 0;
@@ -136,10 +135,8 @@ const PIPELINE = [
 		generated: [
 			'static/ergopti_plus/windows/_generated/features_manifest.ahk',
 			'static/ergopti_plus/windows/_generated/config_template.toml',
-			'static/ergopti_plus/windows/_generated/tap_hold_template.toml',
 			'static/ergopti_plus/macos/_generated/features_manifest.lua',
-			'static/ergopti_plus/macos/_generated/config_template.toml',
-			'static/ergopti_plus/macos/_generated/tap_hold_template.toml'
+			'static/ergopti_plus/macos/_generated/config_template.toml'
 		]
 	},
 
@@ -162,7 +159,7 @@ const PIPELINE = [
 		},
 		generated: [
 			'static/ergopti_plus/windows/_generated/terminators.ahk',
-			'static/ergopti_plus/macos/_generated/terminators.lua'
+			'static/ergopti_plus/_shared/lua/keymap/terminators_catalogue.lua'
 		]
 	},
 	{
@@ -271,18 +268,29 @@ const PIPELINE = [
  * build:domain — flag it as a failure so CI catches it.
  */
 function runDriftCheck() {
-	const allGenerated = PIPELINE.flatMap((step) => step.generated || []).map((p) =>
-		path.resolve(ROOT, p)
-	);
+	const allGenerated = PIPELINE.flatMap((step) => step.generated || []);
 
-	// Only check files that actually exist
-	const existing = allGenerated.filter((p) => fs.existsSync(p));
-
-	if (existing.length === 0) {
-		console.log(`  ${WARN_SYMBOL}  drift-check — no generated files found, skipping`);
+	// Existence assertion: every declared generated path MUST exist on disk after
+	// its step ran. A path listed here that no generator actually produces is a
+	// phantom drift-gate entry — it would silently pass the diff below (because a
+	// non-existent file has no diff) and create false confidence (TT-1). Fail
+	// loudly so phantom entries can never be reintroduced.
+	const missing = allGenerated.filter((p) => !fs.existsSync(path.resolve(ROOT, p)));
+	if (missing.length > 0) {
+		console.log(
+			`  ${FAIL_SYMBOL}  drift-check — ${missing.length} declared generated file(s) missing on disk (phantom drift-gate entries):`
+		);
+		for (const p of missing) {
+			console.log(`       - ${p}`);
+		}
+		console.log(
+			`       Every PIPELINE[].generated path must be produced by its step — remove the phantom entry or fix the generator.`
+		);
+		total_fail++;
 		return;
 	}
 
+	const existing = allGenerated.map((p) => path.resolve(ROOT, p));
 	const drifted = detectDrift(existing);
 	if (drifted.length === 0) {
 		console.log(

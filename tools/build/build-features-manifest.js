@@ -12,10 +12,8 @@
 // Outputs:
 //   static/ergopti_plus/windows/_generated/features_manifest.ahk
 //   static/ergopti_plus/windows/_generated/config_template.toml
-//   static/ergopti_plus/windows/_generated/tap_hold_template.toml
 //   static/ergopti_plus/macos/_generated/features_manifest.lua
 //   static/ergopti_plus/macos/_generated/config_template.toml
-//   static/ergopti_plus/macos/_generated/tap_hold_template.toml
 //
 // Usage:
 //   npm run build:manifest
