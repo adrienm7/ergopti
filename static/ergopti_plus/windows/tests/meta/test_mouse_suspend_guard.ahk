@@ -115,3 +115,53 @@ _MMSG_StopClearsScrollFlushFn() {
 		"KL_Mouse_Stop must set scroll_flush_fn := unset after cancelling the timer so re-entry cannot re-arm the stale bound reference")
 }
 Test("mouse: KL_Mouse_Stop clears scroll_flush_fn after cancellation", _MMSG_StopClearsScrollFlushFn)
+
+
+; F-M09: the privacy filter (MF_ShouldFilter) must run BEFORE the counter bump, so a
+; click/scroll in a password field / disabled app / private-browsing window does not
+; accrue into session_clicks/session_scrolls — counts that ride into a later typing row.
+; This is distinct from the suspend ordering above (which guards A_IsSuspended).
+_MMSG_LUpFilterBeforeBump() {
+	Body := _DriverFuncBody("KL_Mouse_OnLUp")
+	PosFilter := InStr(Body, "MF_ShouldFilter")
+	PosBump   := InStr(Body, "KL_BumpMouseClick")
+	Assert(PosFilter > 0 and PosBump > 0 and PosFilter < PosBump,
+		"KL_Mouse_OnLUp must consult MF_ShouldFilter BEFORE KL_BumpMouseClick so a filtered window does not bump the click count (mouse-counter-privacy-filter)")
+}
+Test("mouse: KL_Mouse_OnLUp filters before bumping the click count (mouse-counter-privacy-filter)", _MMSG_LUpFilterBeforeBump)
+
+_MMSG_RUpFilterBeforeBump() {
+	Body := _DriverFuncBody("KL_Mouse_OnRUp")
+	PosFilter := InStr(Body, "MF_ShouldFilter")
+	PosBump   := InStr(Body, "KL_BumpMouseClick")
+	Assert(PosFilter > 0 and PosBump > 0 and PosFilter < PosBump,
+		"KL_Mouse_OnRUp must consult MF_ShouldFilter BEFORE KL_BumpMouseClick (mouse-counter-privacy-filter)")
+}
+Test("mouse: KL_Mouse_OnRUp filters before bumping the click count (mouse-counter-privacy-filter)", _MMSG_RUpFilterBeforeBump)
+
+_MMSG_MUpFilterBeforeBump() {
+	Body := _DriverFuncBody("KL_Mouse_OnMUp")
+	PosFilter := InStr(Body, "MF_ShouldFilter")
+	PosBump   := InStr(Body, "KL_BumpMouseClick")
+	Assert(PosFilter > 0 and PosBump > 0 and PosFilter < PosBump,
+		"KL_Mouse_OnMUp must consult MF_ShouldFilter BEFORE KL_BumpMouseClick (mouse-counter-privacy-filter)")
+}
+Test("mouse: KL_Mouse_OnMUp filters before bumping the click count (mouse-counter-privacy-filter)", _MMSG_MUpFilterBeforeBump)
+
+_MMSG_AccumScrollFiltersBeforeBump() {
+	Body := _DriverFuncBody("KL_Mouse_AccumScroll")
+	PosFilter := InStr(Body, "MF_ShouldFilter")
+	PosBump   := InStr(Body, "KL_BumpMouseScroll")
+	Assert(PosFilter > 0 and PosBump > 0 and PosFilter < PosBump,
+		"KL_Mouse_AccumScroll must consult MF_ShouldFilter BEFORE KL_BumpMouseScroll so a filtered window does not bump the scroll count (mouse-counter-privacy-filter)")
+}
+Test("mouse: KL_Mouse_AccumScroll filters before bumping the scroll count (mouse-counter-privacy-filter)", _MMSG_AccumScrollFiltersBeforeBump)
+
+_MMSG_AccumScrollHFiltersBeforeBump() {
+	Body := _DriverFuncBody("KL_Mouse_AccumScrollH")
+	PosFilter := InStr(Body, "MF_ShouldFilter")
+	PosBump   := InStr(Body, "KL_BumpMouseScroll")
+	Assert(PosFilter > 0 and PosBump > 0 and PosFilter < PosBump,
+		"KL_Mouse_AccumScrollH must consult MF_ShouldFilter BEFORE KL_BumpMouseScroll (mouse-counter-privacy-filter)")
+}
+Test("mouse: KL_Mouse_AccumScrollH filters before bumping the scroll count (mouse-counter-privacy-filter)", _MMSG_AccumScrollHFiltersBeforeBump)
