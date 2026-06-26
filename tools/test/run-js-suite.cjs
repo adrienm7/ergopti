@@ -48,6 +48,8 @@ const CHECKS = [
 	{ name: 'cross-driver manifest equivalence (resolved values identical across drivers)', cmd: 'node', args: ['tools/test/test-manifest-equivalence.cjs'], repro: 'node tools/test/test-manifest-equivalence.cjs' },
 	{ name: 'diagnostic UI integrity (macOS + Windows healthcheck render path)', cmd: 'node', args: ['tools/test/test-diagnostic-ui-integrity.cjs'], repro: 'node tools/test/test-diagnostic-ui-integrity.cjs' },
 	{ name: 'UI focus-fix regression (force-focus + no raw blockAlert)', cmd: 'node', args: ['tools/test/test-ui-focus-fix.cjs'], repro: 'node tools/test/test-ui-focus-fix.cjs' },
+	{ name: 'click-lock fix (non-consuming watcher + keystroke release, both drivers)', cmd: 'node', args: ['tools/test/test-click-lock-fix.cjs'], repro: 'node tools/test/test-click-lock-fix.cjs' },
+	{ name: 'Hammerspoon integrity (no global leaks, M.stop present, shutdown wired)', cmd: 'node', args: ['tools/test/test-hammerspoon-integrity.cjs'], repro: 'node tools/test/test-hammerspoon-integrity.cjs' },
 	{ name: 'macOS bundle layout (build script + launcher mirror the repo)', cmd: 'node', args: ['tools/test/test-macos-bundle-layout.cjs'], repro: 'node tools/test/test-macos-bundle-layout.cjs' },
 	{ name: 'menu manifest drift (feature paths + i18n keys resolve against manifest.toml)', cmd: 'node', args: ['tools/test/test-menu-manifest.cjs'], repro: 'node tools/test/test-menu-manifest.cjs' },
 	{ name: 'hotstring editor confirm dialog wiring (delete actually fires)', cmd: 'node', args: ['tools/test/test-hotstring-editor-confirm-wiring.cjs'], repro: 'node tools/test/test-hotstring-editor-confirm-wiring.cjs' },

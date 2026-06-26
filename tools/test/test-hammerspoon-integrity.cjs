@@ -66,7 +66,7 @@ console.log('\n=== Hammerspoon Code Integrity Validation ===');
 // --- Global Leak Audit ---
 check(
     'Gestures Actions: gestureInProgress is local',
-    'static/ergopti_plus/macos/modules/gestures/actions.lua',
+    'static/ergopti_plus/macos/modules/gestures/actions_click.lua',
     /local gestureInProgress/
 );
 
