@@ -552,9 +552,13 @@ end
 --- @param module_name string Short identifier of the calling module.
 --- @param msg string Message or printf-style format string.
 --- @param ... any Optional arguments for string.format.
+--- @return boolean emitted True when the line was actually written to the sinks;
+---   false when it was filtered by level or suppressed by the dedup window. Callers
+---   that mirror a line elsewhere (M.error → notification handler) must follow this
+---   decision so a deduped line does not produce a side effect the log itself suppressed.
 local function _log(variant_key, module_name, msg, ...)
 	local variant = VARIANTS[variant_key]
-	if not variant or variant.level < M.current_level then return end
+	if not variant or variant.level < M.current_level then return false end
 
 	local ok, base = pcall(tostring, msg)
 	local text = ok and base or "???"
@@ -575,7 +579,7 @@ local function _log(variant_key, module_name, msg, ...)
 	local _now = _gettime()
 	if line == _dedup.line and (_now - _dedup.time) < 5 then
 		_dedup.count = _dedup.count + 1
-		return
+		return false
 	end
 	_flush_dedup_summary()
 	_dedup.line        = line
@@ -616,6 +620,8 @@ local function _log(variant_key, module_name, msg, ...)
 			end
 		end)
 	end
+
+	return true
 end
 
 
@@ -675,13 +681,16 @@ function M.warn(module_name, msg, ...) _log("WARNING", module_name, msg, ...) en
 
 --- Logs an ERROR message — a failure that requires attention.
 --- Also fires the registered notification handler (if any) so errors surface as
---- system notifications in addition to the console log.
+--- system notifications in addition to the console log — but ONLY when the line was
+--- actually emitted. A line suppressed by the dedup window must not fire a toast the
+--- log itself swallowed, otherwise a hot-path error recurring every keystroke buries
+--- the user under identical notifications while the log shows a single deduped line.
 --- @param module_name string Short module identifier.
 --- @param msg string Message or format string.
 --- @param ... any Optional format arguments.
 function M.error(module_name, msg, ...)
-	_log("ERROR", module_name, msg, ...)
-	if _error_notification_handler then
+	local emitted = _log("ERROR", module_name, msg, ...)
+	if emitted and _error_notification_handler then
 		local ok, base = pcall(tostring, msg)
 		local text = ok and base or "???"
 		if select("#", ...) > 0 then
