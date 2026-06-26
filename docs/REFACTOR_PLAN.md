@@ -214,7 +214,7 @@ Chemin identique d'un driver à l'autre → l'analogue se trouve au même endroi
 1. **layout/keymap Windows** : `lib/keymap/` ou `modules/keymap/` ? (macOS = `modules/keymap/`.)
 2. **Placement menu** : plié dans `manifest.toml` (1 SSoT, gros codegen) ou `menu_manifest.json` + drift gate ?
 3. **`lib/` Windows foldéré vs `lib/` macOS plat** : converger dans quel sens ?
-4. **`_generated/registry.ahk` + `expander.ahk` orphelins** : adopter ou supprimer (+ scripts codegen) ? *(P0/P5 : ne PAS supprimer sans grep des `#Include`.)*
+4. **`_generated/registry.ahk` + `expander.ahk` orphelins** : ✅ RÉSOLU (audit 2026-06-26, GEN-1/2) — **supprimés**. Orphelins prouvés par grep (0 `#Include`, 0 instanciation) ; les tests `test_domain_{registry,expander}.ahk` exercent le moteur vivant `HSE_*` (`hotstring_engine_main.ahk`), pas les classes générées. Scripts codegen + npm + steps drift-gate retirés ; garde `SubStr(-0)` repointé sur le moteur vivant.
 5. **Codec TOML + parser LLM AHK** : transpile Lua→AHK ou génération corpus-driven + bannière hand-port ?
 6. **`linux/`** : même passe ou suivi séparé ? (Au min. vérifier l'absence de surface de crash `Features` brute.)
 

@@ -260,7 +260,9 @@ Resolved per artifact:
   (+ its dead `windows/_generated/shortcuts_bindings.ahk`), and the 3 npm scripts.
   Kept the AHK `expander.ahk`/`registry.ahk` tested adapters + the shared specs
   (the cross-driver contract). Fixed both `_generated/README.md` (false "✅ Wired"
-  claims).
+  claims). **(Update 2026-06-26, audit GEN-1/2: the AHK `expander.ahk`/`registry.ahk`
+  were later deleted too — equally orphaned; the `test_domain_{registry,expander}.ahk`
+  tests exercise the live `HSE_*` engine, not the generated classes.)**
 - ✅ **features_manifest → wired (the real mutualization win).** Built
   `macos/lib/manifest_reader.lua` (the counterpart of the AHK `manifest_reader.ahk`,
   which already does `Features := ManifestBuildFeaturesMap()` in production) and
