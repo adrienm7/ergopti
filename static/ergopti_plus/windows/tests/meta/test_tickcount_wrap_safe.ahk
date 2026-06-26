@@ -101,8 +101,9 @@ Test("logger: ERROR dedup TickCount delta uses wrap-safe (now - last + 0x1000000
 ; ==========================================================================
 
 _TTCWS_WpmWidgetWrapSafe() {
-	Src := _TTCWS_StripLineComments(_TTCWS_ReadSource("ui/wpm/init.ahk"))
-	Assert(Src != "", "ui/wpm_widget.ahk must be readable")
+	; Scan the whole wpm module (init.ahk + wpm_widget.ahk after the F3 split).
+	Src := _TTCWS_StripLineComments(_DriverDirConcat("ui/wpm"))
+	Assert(Src != "", "ui/wpm sources must be readable")
 
 	; The wrap-safe delta helper must be present — this constant cannot appear in
 	; color values (ARGB uses 0xFFFFFFFF, not 0x100000000), so its presence
