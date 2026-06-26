@@ -12,10 +12,11 @@
 ; follow this). The fix wraps the per-Push LoggerDebug line in
 ; `if LoggerIsDebugEnabled()` so nothing is interpolated below DEBUG level.
 ;
-; This is a meta-static test: ui/wpm_widget.ahk registers GUI / timer
-; state and is NOT in the headless run_all include graph, so a source-text
-; guard is the only automated net available. ASCII-only per the suite
-; convention. If the gate is removed this test fails.
+; This is a meta-static test: ui/wpm/ registers GUI / timer state and is NOT in
+; the headless run_all include graph, so a source-text guard is the only
+; automated net available. It introspects one function body via _DriverFuncBody
+; (whole-tree, split-resilient). ASCII-only per the suite convention. If the gate
+; is removed this test fails.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -25,30 +26,13 @@
 
 ; ==================================================
 ; ==================================================
-; ======= 1/ Source scan helpers ===================
-; ==================================================
-; ==================================================
-
-; A_ScriptDir is the runner dir (tests\); its parent is the windows\ root.
-_WpmDbg_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-
-
-
-; ==================================================
-; ==================================================
-; ======= 2/ Debug-gate assertion ==================
+; ======= 1/ Debug-gate assertion ==================
 ; ==================================================
 ; ==================================================
 
 _WpmDbg_PushDebugIsGated() {
-	Src := _WpmDbg_ReadSource("ui/wpm/init.ahk")
 	Seg := _DriverFuncBody("WPMWidget_Push")
-	Assert(Seg != "", "WPMWidget_Push declaration must exist in wpm_widget.ahk")
+	Assert(Seg != "", "WPMWidget_Push declaration must exist in ui/wpm/")
 
 	DbgIdx := InStr(Seg, "LoggerDebug(")
 	Assert(DbgIdx > 0,

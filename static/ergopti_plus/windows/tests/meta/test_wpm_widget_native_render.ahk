@@ -17,7 +17,7 @@
 ;   the widget, that whole-keyboard-freeze regression returns — this test makes
 ;   that loud.
 ;
-; SCOPE: source introspection of ui/wpm_widget.ahk + ui/tray_menu.ahk
+; SCOPE: source introspection of ui/wpm/ (init.ahk + wpm_widget.ahk) + ui/tray_menu.ahk
 ;   (neither is loaded by the headless run_all, so a code-level guard is the only
 ;   automated net available for them). ASCII-only per the suite convention.
 ; ==============================================================================
@@ -36,11 +36,12 @@
 
 _MetaCheckWpmWidgetNativeRender() {
 	SplitPath(A_ScriptDir, , &WindowsDir)   ; A_ScriptDir is tests\ -> WindowsDir is windows\
-	WpmFile := WindowsDir . "\ui\wpm\init.ahk"
 
-	Body := ""
-	try Body := FileRead(WpmFile)
-	Assert(Body != "", "wpm_widget.ahk must be readable for the native-render guard")
+	; Scan the whole wpm module (init.ahk + the wpm_widget.ahk render layer after
+	; the F3 split) so the GDI+ assertions stay green regardless of which sibling
+	; the renderer lives in.
+	Body := _DriverDirConcat("ui/wpm")
+	Assert(Body != "", "ui/wpm sources must be readable for the native-render guard")
 
 	; No WebView2 CODE may remain (comments may still mention the word historically,
 	; so ban the actual call/property tokens, which only appear in real usage).

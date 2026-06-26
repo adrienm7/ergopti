@@ -17,15 +17,6 @@
 ;   wpm-webview-temp-dir-leak            — the WPM widget has no live WebView2 (GDI+ migration).
 ; ==============================================================================
 
-; Reads a windows/-relative source file (A_ScriptDir is the runner dir tests/).
-; Retained only for the wpm_widget WebView2-absence check, which is genuinely
-; file-scoped: other ui/ files use WebView2 in live code, so the framework's
-; dir/tree concat helpers would false-trip the absence assertion.
-_ATG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
-}
-
 ; Drops full-line comments so assertions never match an explanatory comment.
 _ATG_StripComments(Src) {
 	Out := ""
@@ -117,10 +108,11 @@ Test("keylogger_av: master-volume probe uses the winmm path, code matches docs (
 ; =========================================================
 
 _ATG_WpmWidgetHasNoLiveWebView2() {
-	; Cannot broaden to _DriverDirConcat("ui"): other ui/ files (changelog,
-	; model browser, healthcheck) reference WebView2 in live code, so a dir/tree
-	; scan would false-trip this file-scoped "wpm_widget has none" invariant.
-	Src := _ATG_StripComments(_ATG_ReadSource("ui/wpm/init.ahk"))
+	; Scope the scan to ui/wpm (both init.ahk and the wpm_widget.ahk render layer
+	; after the F3 split) — NOT _DriverDirConcat("ui"): other ui/ files (changelog,
+	; model browser, healthcheck) reference WebView2 in live code, so a whole-tree
+	; scan would false-trip this module-scoped "wpm widget has none" invariant.
+	Src := _ATG_StripComments(_DriverDirConcat("ui/wpm"))
 	; The graph renderer was migrated to a GDI+ layered window; with no live
 	; WebView2 controller there is no per-process user-data folder to orphan on
 	; Reload, eliminating the temp-dir leak at the source.

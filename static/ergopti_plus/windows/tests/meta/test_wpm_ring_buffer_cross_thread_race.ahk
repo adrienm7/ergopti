@@ -15,10 +15,11 @@
 ; atomically with respect to the other (the regions contain no Send/Sleep, so
 ; Critical cannot starve the hook).
 ;
-; This is a meta-static test: ui/wpm_widget.ahk registers GUI / timer
-; state and is NOT in the headless run_all include graph, so a source-text
-; guard is the only automated net available. ASCII-only per the suite
-; convention. If either Critical bracket is removed this test fails.
+; This is a meta-static test: ui/wpm/ registers GUI / timer state and is NOT in
+; the headless run_all include graph, so a source-text guard is the only
+; automated net available. It introspects function bodies via _DriverFuncBody
+; (whole-tree, split-resilient). ASCII-only per the suite convention. If either
+; Critical bracket is removed this test fails.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -28,30 +29,13 @@
 
 ; ==================================================
 ; ==================================================
-; ======= 1/ Source scan helpers ===================
-; ==================================================
-; ==================================================
-
-; A_ScriptDir is the runner dir (tests\); its parent is the windows\ root.
-_WpmRace_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-
-
-
-; ==================================================
-; ==================================================
-; ======= 2/ Critical-guard assertions =============
+; ======= 1/ Critical-guard assertions =============
 ; ==================================================
 ; ==================================================
 
 _WpmRace_PushGuardsRingMutation() {
-	Src := _WpmRace_ReadSource("ui/wpm/init.ahk")
 	Seg := _DriverFuncBody("WPMWidget_Push")
-	Assert(Seg != "", "WPMWidget_Push declaration must exist in wpm_widget.ahk")
+	Assert(Seg != "", "WPMWidget_Push declaration must exist in ui/wpm/")
 	Assert(InStr(Seg, "_ring.Push") > 0,
 		"WPMWidget_Push must still own the ring-buffer Push mutation")
 	Assert(InStr(Seg, Chr(34) . "On" . Chr(34)) > 0 && InStr(Seg, "Critical") > 0,
@@ -62,9 +46,8 @@ _WpmRace_PushGuardsRingMutation() {
 Test("wpm_widget: WPMWidget_Push brackets the ring mutation with Critical (wpm-ring-buffer-cross-thread-race)", _WpmRace_PushGuardsRingMutation)
 
 _WpmRace_CalcGuardsEnumeration() {
-	Src := _WpmRace_ReadSource("ui/wpm/init.ahk")
 	Seg := _DriverFuncBody("WPMWidget_Calc")
-	Assert(Seg != "", "WPMWidget_Calc declaration must exist in wpm_widget.ahk")
+	Assert(Seg != "", "WPMWidget_Calc declaration must exist in ui/wpm/")
 	Assert(InStr(Seg, "for _, ev in WPMWidget._ring") > 0,
 		"WPMWidget_Calc must still enumerate the ring buffer")
 	Assert(InStr(Seg, "Critical") > 0 && InStr(Seg, Chr(34) . "On" . Chr(34)) > 0,
