@@ -3,13 +3,15 @@
 ==============================================================================
 MODULE: Locale Consistency Checker
 DESCRIPTION:
-Verifies that every locale file under ``static/locales/`` exposes exactly the
-same set of keys as ``en.json`` — no extra (stale) keys, no missing ones.
+Verifies that every locale file under ``static/ergopti_plus/_shared/data/locales/``
+exposes exactly the same set of keys as ``en.json`` — no extra (stale) keys, no
+missing ones.
 
 FEATURES & RATIONALE:
-1. CI gate: the matching workflow runs this with no flag so any divergence
-	between locales fails the pipeline. Catches forgotten translations and
-	dead keys before a release ships them.
+1. Parity gate: locale key parity is enforced in CI by the AHK meta-test
+	``test_locale_json_valid.ahk`` (run by run_all.ahk in the test-ahk job). This
+	script is the manual developer tool that ASSERTS the same parity locally and,
+	via ``--fix``, PRODUCES it — catching forgotten translations and dead keys.
 2. ``--fix`` mode: rewrites each locale so its key set matches ``en.json``
 	exactly. Extra keys are dropped; missing keys are inserted with the
 	English value as a placeholder so translators have a clear "to do" list
