@@ -177,13 +177,16 @@ KL_Mouse_OnLUp(*) {
         dy       := my - KLMouse.lbtn_down_y
         dist     := Sqrt(dx*dx + dy*dy)
         duration := (A_TickCount - KLMouse.lbtn_down_tick) & 0xFFFFFFFF
-        KL_BumpMouseClick()
         filtered := false
         try filtered := MF_ShouldFilter()
         if filtered
             return
         if !Keylogger.initialized
             return
+        ; Bump the click counter only AFTER the privacy filter + init checks, so clicks in
+        ; a password field / disabled app / private window do not accrue into the counts
+        ; that later ride into a typing row (mouse-counter-privacy-filter).
+        KL_BumpMouseClick()
         ; Use an async one-shot timer so context refresh doesn't block the hook thread
         try SetTimer(KL_Hook_RefreshContext.Bind(), -1)
         if (dist >= KLMouseConst.DRAG_MIN_PX) {
@@ -222,13 +225,16 @@ KL_Mouse_OnRUp(*) {
         dy       := my - KLMouse.rbtn_down_y
         dist     := Sqrt(dx*dx + dy*dy)
         duration := (A_TickCount - KLMouse.rbtn_down_tick) & 0xFFFFFFFF
-        KL_BumpMouseClick()
         filtered := false
         try filtered := MF_ShouldFilter()
         if filtered
             return
         if !Keylogger.initialized
             return
+        ; Bump the click counter only AFTER the privacy filter + init checks, so clicks in
+        ; a password field / disabled app / private window do not accrue into the counts
+        ; that later ride into a typing row (mouse-counter-privacy-filter).
+        KL_BumpMouseClick()
         ; Use an async one-shot timer so context refresh doesn't block the hook thread
         try SetTimer(KL_Hook_RefreshContext.Bind(), -1)
         if (dist >= KLMouseConst.DRAG_MIN_PX) {
@@ -263,13 +269,16 @@ KL_Mouse_OnMUp(*) {
     try {
         CoordMode("Mouse", "Screen")
         MouseGetPos(&mx, &my)
-        KL_BumpMouseClick()
         filtered := false
         try filtered := MF_ShouldFilter()
         if filtered
             return
         if !Keylogger.initialized
             return
+        ; Bump the click counter only AFTER the privacy filter + init checks, so clicks in
+        ; a password field / disabled app / private window do not accrue into the counts
+        ; that later ride into a typing row (mouse-counter-privacy-filter).
+        KL_BumpMouseClick()
         ; Use an async one-shot timer so context refresh doesn't block the hook thread
         try SetTimer(KL_Hook_RefreshContext.Bind(), -1)
         KL_Mouse_LogClick("middle", KLMouse.mbtn_down_x, KLMouse.mbtn_down_y)
@@ -305,6 +314,13 @@ KL_Mouse_OnWheelLeft(*) {
 KL_Mouse_AccumScroll(delta) {
     if A_IsSuspended
         return
+    ; Scrolls in a filtered window (password field / disabled app / private) must not
+    ; accrue into session_scrolls — gate accumulation behind the privacy filter, cached
+    ; (~250 ms TTL) so the hot-path cost stays negligible (mouse-counter-privacy-filter).
+    filtered := false
+    try filtered := MF_ShouldFilter()
+    if filtered
+        return
     now := A_TickCount
     if (KLMouse.scroll_last > 0
             and (now - KLMouse.scroll_last) > KLMouseConst.SCROLL_BURST_GAP_MS) {
@@ -322,6 +338,12 @@ KL_Mouse_AccumScroll(delta) {
 
 KL_Mouse_AccumScrollH(delta) {
     if A_IsSuspended
+        return
+    ; Same privacy gate as KL_Mouse_AccumScroll — a filtered window must not accrue into
+    ; session_scrolls via the horizontal wheel either (mouse-counter-privacy-filter).
+    filtered := false
+    try filtered := MF_ShouldFilter()
+    if filtered
         return
     now := A_TickCount
     if (KLMouse.scroll_last > 0
