@@ -693,18 +693,23 @@ local function onKeyDownRaw(e)
 	-- fresh word-start. Every other Cmd/Ctrl combo (cut, paste, undo,
 	-- redo, app shortcuts, …) leaves the cursor in unobservable territory.
 	if flags.cmd or flags.ctrl then
+		-- Drain the dedicated paste counter for a Cmd+V echo FIRST — before the
+		-- chars guard below. A terminator-expand-via-paste (e.g. a long/unicode
+		-- hotstring whose non-consumed space terminator is re-typed) arms BOTH
+		-- expected_synthetic_pastes (the Cmd+V echo) AND expected_synthetic_chars
+		-- (the terminator). The OS posts the Cmd+V echo first; if the chars guard
+		-- ran first it would intercept that echo and the paste counter would never
+		-- be drained, leaving it stuck at >0 so the user's NEXT genuine Cmd+V is
+		-- silently swallowed. Order matters: paste check precedes chars check.
+		if flags.cmd and keyCode == hs.keycodes.map["v"]
+			and (CoreState.expected_synthetic_pastes or 0) > 0 then
+			CoreState.expected_synthetic_pastes = CoreState.expected_synthetic_pastes - 1
+			return false
+		end
 		-- If expected_synthetic_chars is non-empty, this Cmd keystroke is the
 		-- Cmd+V echo from our own clipboard-paste expansion — do not wipe the
 		-- buffer; the synthetic chars will be consumed by the filter below.
 		if #CoreState.expected_synthetic_chars > 0 then
-			return false
-		end
-		-- When a paste expansion is in flight, the Cmd+V echo must be swallowed
-		-- without wiping the buffer. Use a dedicated counter so expected_synthetic_chars
-		-- is not polluted with paste text that Cmd+V never echoes individually.
-		if flags.cmd and keyCode == hs.keycodes.map["v"]
-			and (CoreState.expected_synthetic_pastes or 0) > 0 then
-			CoreState.expected_synthetic_pastes = CoreState.expected_synthetic_pastes - 1
 			return false
 		end
 		CoreState.buffer = ""
