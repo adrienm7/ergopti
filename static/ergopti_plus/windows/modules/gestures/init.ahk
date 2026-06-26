@@ -1071,6 +1071,14 @@ for _Slot, _Action in GESTURE_FACTORY_DEFAULTS
 global _GestureWinOrder   := []   ; Array of HWNDs, index 1 = most recently manually focused
 global _GestureCycling    := False
 global _GestureWinHook    := 0    ; DllCall hook handle
+; HWNDs we just activated programmatically (cycle gestures), mapped to the tick at
+; activation time. The EVENT_SYSTEM_FOREGROUND for our own WinActivate is delivered
+; ASYNCHRONOUSLY (OUTOFCONTEXT hook), so the synchronous _GestureCycling boolean is
+; already cleared by the time it fires and the recency tracker would otherwise record
+; our own activation as a manual one. _GestureOnForeground consumes a matching HWND
+; within the TTL below to fence the async event (gesture-cycle-winevent-async-fence).
+global _GestureSelfActivated := Map()
+global GESTURE_SELF_ACTIVATE_TTL_MS := 500  ; ms a self-activation's WinEvent is expected within
 
 ; Upper bound on the recency tracker. WinEvent fires on every foreground change,
 ; so on a machine left running for days opening/closing thousands of transient
