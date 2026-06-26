@@ -446,7 +446,7 @@ local function build_raccourcis_items(karabiner, action_index, update_menu, enab
 		if is_symmetric and non_canonical[combo_def.id] then goto continue end
 
 		if combo_def.group ~= current_group then
-			items[#items + 1] = { title = "— " .. combo_def.group .. " —", disabled = true }
+			items[#items + 1] = MenuUtils.build_section_header(combo_def.group)
 			current_group = combo_def.group
 		end
 		items[#items + 1] = build_one_combo_item(

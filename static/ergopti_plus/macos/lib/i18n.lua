@@ -272,12 +272,24 @@ function M.locales()
 	return LOCALES
 end
 
+--- Wraps already-translated text in the section-title dashes used for disabled
+--- menu headers. THE single source of the "— … —" decoration on macOS — AHK's
+--- MenuSectionTitle (lib/menu_helpers.ahk) mirrors it. Every menu builder must
+--- route through this (or M.section) instead of inlining the dashes, so the
+--- decoration can never silently drift between the ~10 macOS menu sites or the
+--- two drivers. Guarded by test-section-decoration-parity.cjs.
+--- @param text string Already-localized label.
+--- @return string Formatted as "— text —".
+function M.decorate_section(text)
+	return "— " .. text .. " —"
+end
+
 --- Wraps a translated string in section-title dashes for disabled menu headers.
 --- Use instead of embedding — directly in locale values.
 --- @param key string i18n key to translate.
 --- @return string Formatted as "— Value —".
 function M.section(key)
-	return "— " .. M.get(key) .. " —"
+	return M.decorate_section(M.get(key))
 end
 
 return M

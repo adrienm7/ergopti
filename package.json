@@ -28,6 +28,7 @@
 		"test:click-lock": "node ./tools/test/test-click-lock-fix.cjs",
 		"test:ui-focus": "node ./tools/test/test-ui-focus-fix.cjs",
 		"test:hs-integrity": "node ./tools/test/test-hammerspoon-integrity.cjs",
+		"test:section-decoration": "node ./tools/test/test-section-decoration-parity.cjs",
 		"test:diagnostic-ui": "node ./tools/test/test-diagnostic-ui-integrity.cjs",
 		"test:manifest-equivalence": "node ./tools/test/test-manifest-equivalence.cjs",
 		"test:feature-read-sites": "node ./tools/test/test-feature-read-sites.js",

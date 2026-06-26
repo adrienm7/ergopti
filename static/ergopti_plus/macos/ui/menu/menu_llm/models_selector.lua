@@ -482,7 +482,7 @@ function M.build(ctx)
 				if hw_active.download_gb or hw_active.disk_gb or hw_active.ram_gb then
 					table.insert(model_submenu, { title = "-" })
 					table.insert(model_submenu, {
-						title    = "— " .. string.format(i18n.get("menu.llm.hw_header"), display_backend) .. " —",
+						title    = i18n.decorate_section(string.format(i18n.get("menu.llm.hw_header"), display_backend)),
 						disabled = true
 					})
 					if hw_active.download_gb then

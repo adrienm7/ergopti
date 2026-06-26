@@ -434,7 +434,7 @@ function M.build(ctx)
 				if label == "-" then
 					table.insert(sub, { title = "-" })
 				elseif act:match("^#") then
-					table.insert(sub, { title = "— " .. label .. " —", disabled = true })
+					table.insert(sub, { title = i18n.decorate_section(label), disabled = true })
 				else
 					table.insert(sub, {
 						title    = label,
@@ -548,7 +548,7 @@ function M.build(ctx)
 		end
 
 		if #ext_menu_items > 0 then
-			table.insert(items, { title = "— " .. i18n.get("menu.extensions.header") .. " —", disabled = true })
+			table.insert(items, { title = i18n.section("menu.extensions.header"), disabled = true })
 			for _, it in ipairs(ext_menu_items) do
 				table.insert(items, it)
 			end

@@ -48,10 +48,6 @@ end
 
 helpers.describe("menu_karabiner picker-tree memoisation", function()
 	local kar = helpers.load_with_stubs("ui.menu.menu_karabiner")
-	-- The baseline i18n stub lacks section(); add it on the shared table the module
-	-- already captured at require-time so the builders can render section headers.
-	local i18n = package.loaded["lib.i18n"]
-	i18n.section = i18n.section or function(k) return k end
 
 	helpers.it("reuses the cached trees when the binding state is unchanged", function()
 		kar._reset_picker_cache()
