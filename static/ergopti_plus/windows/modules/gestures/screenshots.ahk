@@ -19,6 +19,12 @@
 
 #Requires AutoHotkey v2.0
 
+; Async region-save tuning: the save-mode PNG write runs in a PowerShell child so the
+; hook thread is never blocked; the clipboard (holding the snip) is restored only after
+; that child exits, polled at this cadence with a safety cap.
+global GESTURE_REGION_SAVE_POLL_MS := 100   ; async PNG-save child poll cadence (ms)
+global GESTURE_REGION_SAVE_MAX_POLLS := 80  ; ~8 s safety cap before forcing the clipboard restore
+
 ; Returns the absolute path to the screenshots directory, creating it if missing.
 ; Mirrors Hammerspoon's convention: %USERPROFILE%\Pictures\screenshots\
 GestureScreenshotsDir() {
@@ -69,8 +75,13 @@ GestureCaptureRegion(X, Y, W, H, Mode, Path := "") {
         PSArgs := '-NoProfile -Sta -WindowStyle Hidden -Command "' . PSScript . '"'
     }
     try {
-        RunWait('powershell.exe ' . PSArgs, , "Hide")
-        return (Mode == "save") ? (FileExist(Path) ? True : False) : True
+        ; Run async (NOT RunWait): the keyboard hook thread must return immediately — a
+        ; RunWait here froze every keystroke for the whole capture (~300-1500 ms cold) on
+        ; each window/fullscreen screenshot gesture (gesture-capture-async-run). The
+        ; PowerShell capture runs in its own process; fire-and-forget like the SC029 and
+        ; GestureScreenshotInstant siblings, so the save-mode success TrayTip is optimistic.
+        Run('powershell.exe ' . PSArgs, , "Hide")
+        return True
     } catch as e {
         LoggerError("gestures", "Screenshot failed: {1}.", e.Message)
         return False
@@ -147,32 +158,47 @@ GestureScreenshotRegion(Mode) {
     LoggerStart("gestures", "Region screenshot to disk — opening Snip & Sketch…")
     OldClip := ClipboardAll()
     A_Clipboard := ""
-    try {
-        SendEvent("#+s")
-        ; Wait up to 30 s for the user to finish their selection
-        if !ClipWait(30, 2) {
-            LoggerWarn("gestures", "Region screenshot: no image captured (timeout or cancel).")
-            return
-        }
-        ; Save the clipboard PNG to disk via PowerShell
-        EscapedPath := StrReplace(Path, "'", "''")
-        PSScript :=
-            "Add-Type -AssemblyName System.Windows.Forms;" .
-            "Add-Type -AssemblyName System.Drawing;" .
-            "$img = [System.Windows.Forms.Clipboard]::GetImage();" .
-            "if ($img) { $img.Save('" . EscapedPath . "', [System.Drawing.Imaging.ImageFormat]::Png) }"
-        try {
-            RunWait('powershell.exe -NoProfile -Sta -WindowStyle Hidden -Command "' . PSScript . '"', , "Hide")
-            if FileExist(Path) {
-                LoggerSuccess("gestures", "Region screenshot saved: '{1}'.", Path)
-                TrayTip(t("notify.screenshot_saved"), Path, "Iconi Mute")
-            } else {
-                LoggerWarn("gestures", "Region screenshot: clipboard image was not saved.")
-            }
-        } catch as e {
-            LoggerError("gestures", "Region screenshot save failed: {1}.", e.Message)
-        }
-    } finally {
+    SendEvent("#+s")
+    ; Wait up to 30 s for the user to finish their selection (a deliberate user-wait).
+    if !ClipWait(30, 2) {
+        LoggerWarn("gestures", "Region screenshot: no image captured (timeout or cancel).")
         A_Clipboard := OldClip
+        return
+    }
+    ; Save the clipboard PNG to disk via PowerShell. Run async (NOT RunWait) so the hook
+    ; thread is not blocked on the PNG write. The snip image must stay on the clipboard
+    ; until PowerShell has read it, so OldClip is restored only AFTER the child exits —
+    ; deferred to a bounded poll, never inline here (gesture-capture-async-run).
+    EscapedPath := StrReplace(Path, "'", "''")
+    PSScript :=
+        "Add-Type -AssemblyName System.Windows.Forms;" .
+        "Add-Type -AssemblyName System.Drawing;" .
+        "$img = [System.Windows.Forms.Clipboard]::GetImage();" .
+        "if ($img) { $img.Save('" . EscapedPath . "', [System.Drawing.Imaging.ImageFormat]::Png) }"
+    Pid := 0
+    try {
+        Run('powershell.exe -NoProfile -Sta -WindowStyle Hidden -Command "' . PSScript . '"', , "Hide", &Pid)
+    } catch as e {
+        LoggerError("gestures", "Region screenshot save failed: {1}.", e.Message)
+        A_Clipboard := OldClip
+        return
+    }
+    SetTimer(_GestureRegionSavePoll.Bind(Pid, Path, OldClip, GESTURE_REGION_SAVE_MAX_POLLS), -GESTURE_REGION_SAVE_POLL_MS)
+}
+
+; Polls the async region-save PowerShell child to completion, then restores the
+; clipboard (the snip image has been read by then) and notifies the user. A poll-count
+; safety cap still restores the clipboard if the child ever hangs.
+_GestureRegionSavePoll(Pid, Path, OldClip, PollsLeft) {
+    if (ProcessExist(Pid) and PollsLeft > 0) {
+        SetTimer(_GestureRegionSavePoll.Bind(Pid, Path, OldClip, PollsLeft - 1), -GESTURE_REGION_SAVE_POLL_MS)
+        return
+    }
+    A_Clipboard := OldClip
+    if FileExist(Path) {
+        LoggerSuccess("gestures", "Region screenshot saved: '{1}'.", Path)
+        TrayTip(t("notify.screenshot_saved"), Path, "Iconi Mute")
+    } else {
+        LoggerWarn("gestures", "Region screenshot: clipboard image was not saved.")
     }
 }
