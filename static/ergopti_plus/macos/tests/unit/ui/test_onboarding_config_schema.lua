@@ -40,10 +40,13 @@ helpers.describe("onboarding: config updates use the canonical HS schema", funct
 		helpers.assert_eq(tc.value, "★")
 	end)
 
-	helpers.it("maps boolean answers to TOML 'true'/'false'", function()
+	helpers.it("maps boolean answers to real Lua booleans (not quoted strings)", function()
 		local u = Onboarding._build_config_updates({ use_metrics = true, use_gestures = false })
-		helpers.assert_eq(find(u, "metrics", "enabled").value, "true")
-		helpers.assert_eq(find(u, "gestures", "enabled").value, "false")
+		-- Must be booleans, NOT the strings "true"/"false": a quoted "false" decodes
+		-- to the truthy Lua string "false" and silently re-enables a declined feature.
+		helpers.assert_eq(find(u, "metrics", "enabled").value, true)
+		helpers.assert_eq(find(u, "gestures", "enabled").value, false)
+		helpers.assert_eq(type(find(u, "gestures", "enabled").value), "boolean")
 	end)
 
 	helpers.it("never emits the old AHK-style keys the macOS loader ignores", function()

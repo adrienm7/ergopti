@@ -259,11 +259,15 @@ end
 -- ============================================
 -- ============================================
 
---- Converts a JS truthy value to a TOML boolean string.
+--- Converts a JS truthy value to a real Lua boolean so toml_writer emits a BARE
+--- TOML boolean (`true`/`false`), not a quoted "true"/"false" string. A quoted
+--- "false" decodes back to the Lua STRING "false", which is truthy — so a feature
+--- the user explicitly DECLINED in the wizard would silently re-activate on the
+--- post-wizard reload (every boot gate is a bare `if state.flag then`).
 --- @param value any
---- @return string
+--- @return boolean
 local function to_bool(value)
-	return (value == true or value == "true") and "true" or "false"
+	return value == true or value == "true"
 end
 
 --- Builds the config.toml update list from the wizard answers, using the CANONICAL
