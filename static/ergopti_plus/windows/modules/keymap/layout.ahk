@@ -328,6 +328,11 @@ DeadKey(Mapping) {
 		)
 		ih.Start()
 		ih.Wait()
+		; A live InputHook bypasses native Suspend, so a pause can land DURING Wait().
+		; If the driver was paused mid-sequence, emit nothing — « pause = tout eteint »
+		; (deadkey-inputhook-post-wait-suspend-leak). The finally still resets the flag.
+		if A_IsSuspended
+			return
 		if (ih.EndReason = "Timeout") {
 			if Mapping.Has(" ")
 				SendNewResult(Mapping[" "])
