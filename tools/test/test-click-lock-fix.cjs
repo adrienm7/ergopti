@@ -45,22 +45,28 @@ function check(label, file, pattern) {
 console.log('\n=== Click Lock Fix Structural Validation ===');
 
 // Check AHK Fixes
+//
+// The watcher is a NON-CONSUMING ("V") Level-3 InputHook: keys pass through to the
+// focused app instead of being swallowed and re-sent. This replaced the earlier
+// block-then-SendLevel(3)-resend design; asserting "V L3" locks the current root
+// cause so a regression back to a consuming hook (which would drop the keystroke
+// that releases the hold) fails here.
 check(
-    'AHK: InputHook level set to L3 and no V option',
-    'static/ergopti_plus/windows/modules/gestures.ahk',
-    /InputHook\("L3"\)(?![\s\S]*InputHook\(".*V.*\)\")/
+    'AHK: keyboard watcher is a non-consuming Level-3 InputHook ("V L3")',
+    'static/ergopti_plus/windows/modules/gestures/click.ahk',
+    /GestureKeyboardHook := InputHook\("V L3"\)[\s\S]*\.KeyOpt\("\{All\}", "N"\)/
 );
 
 check(
-    'AHK: GestureOnKeyDown stops hook and re-sends with higher level',
-    'static/ergopti_plus/windows/modules/gestures.ahk',
-    /GestureOnKeyDown\(ih, vk, sc\) \{[\s\S]*ih\.Stop\(\)[\s\S]*GestureReleaseLeftClick\(\)[\s\S]*SendLevel\(3\)[\s\S]*Send\(Format\("{Blind}\{vk\{:x\}sc\{:x\}\}", vk, sc\)\)[\s\S]*\}/
+    'AHK: GestureOnKeyDown stops the hook and releases both held buttons (suspend-aware)',
+    'static/ergopti_plus/windows/modules/gestures/click.ahk',
+    /GestureOnKeyDown\(ih, vk, sc\) \{[\s\S]*A_IsSuspended[\s\S]*ih\.Stop\(\)[\s\S]*GestureReleaseLeftClick\(\)[\s\S]*GestureReleaseRightClick\(\)[\s\S]*\}/
 );
 
 // Check Hammerspoon Fixes
 check(
     'HS: click_key_watcher includes flagsChanged',
-    'static/ergopti_plus/macos/modules/gestures/actions.lua',
+    'static/ergopti_plus/macos/modules/gestures/actions_click.lua',
     /hs\.eventtap\.event\.types\.flagsChanged/
 );
 
