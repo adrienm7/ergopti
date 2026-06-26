@@ -36,7 +36,7 @@ const CHECKS = [
 		why: 'the 20-key AHK defaults mirror is gone — read every shared key from defaults.json (fail fast)'
 	},
 	{
-		file: 'windows/ui/tray_llm/menu_settings.ahk',
+		file: 'windows/ui/menu/menu_llm/menu_settings.ahk',
 		forbid: /_LLM_DEFAULTS_FALLBACK/,
 		why: '_LLM_DefaultFor must read LLM_Defaults, never the deleted fallback mirror'
 	},

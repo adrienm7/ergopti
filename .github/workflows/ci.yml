@@ -128,11 +128,22 @@ jobs:
         run: npm run test:properties
 
       - name: Mutation tests — domain layer (Stryker, break=25)
-        # Guards the shared domain spec files (Registry, HotstringMatcher)
+        # Guards the shared domain spec files (Registry, HotstringMatcher).
+        # Stryker only mutates the JS domain specs, yet it's the most expensive
+        # step and validate-js is a `needs` of every driver job — so it gated the
+        # whole graph on every push. Run it on main only (TT-4); PRs/branches still
+        # get every other validate-js check, including the full test:js umbrella.
+        if: github.ref == 'refs/heads/main'
         run: npm run test:mutation
 
       - name: Convention lint (strict — banners, spacing, section headers)
         run: npm run lint:conventions:strict
+
+      - name: JS validation suite (umbrella — every run-js-suite check)
+        # Gates the full run-js-suite (drift, parity, single-source ratchets,
+        # bridge wiring, diagnostic-UI / focus / no-fallback §5.9 regressions, …).
+        # Previously these ran only via the local `test:js` and never in CI (TT-3).
+        run: npm run test:js
 
   # ─────────────────────────────────────────────────
   # 1.4) Translation consistency audit
