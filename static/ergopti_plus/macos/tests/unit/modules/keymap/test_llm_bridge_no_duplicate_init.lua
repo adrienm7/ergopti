@@ -159,6 +159,7 @@ package.loaded["modules.llm.prediction_engine"] = {
 
 -- modules.keymap.registry: no-op stub.
 package.loaded["modules.keymap.registry"] = {
+	init                   = function() end,
 	mappings_for_tail      = function() return nil end,
 	mappings_for_star_tail = function() return nil end,
 }
