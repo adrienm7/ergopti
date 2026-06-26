@@ -757,7 +757,7 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 					chunk_txt := chunk.HasOwnProp("text") ? chunk.text : ""
 					if (chunk_txt == "")
 						continue
-					chunk_color := (chunk.type == "insert") ? UI_LLM_CORR_SEL_HEX : UI_LLM_UNSEL_GRAY_HEX
+					chunk_color := (chunk.HasOwnProp("type") and chunk.type == "insert") ? UI_LLM_CORR_SEL_HEX : UI_LLM_UNSEL_GRAY_HEX
 					CSz := _TooltipMeasureText(chunk_txt)
 					G.SetFont("norm c" . chunk_color . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 					G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
