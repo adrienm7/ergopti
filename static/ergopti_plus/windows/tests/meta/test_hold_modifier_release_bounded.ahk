@@ -150,3 +150,18 @@ _HMRB_SpaceWinGuarded() {
 	Assert(!InStr(Body, "U T2"), "space.ahk _SpaceHoldWin must not contain magic number " . Chr(34) . "U T2" . Chr(34) . " — use STUCK_MODIFIER_RELEASE_TIMEOUT_SEC")
 }
 Test("tap-holds: Space-Win hold-modifier release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_SpaceWinGuarded)
+
+; alt_tab_monitor blocks were missed by the original hardening sweep: the LAlt 4.3
+; block (lalt.ahk) had a bare unbounded KeyWait(SC038, "U") as its SOLE release path,
+; and the Tab 8.1 hold path (tab.ahk) relied only on a Suspend-disarmable SC00F Up::.
+_HMRB_LAltAltTabGuarded() {
+	Q := Chr(34)
+	_HMRB_AssertBounded("modules/tap_holds/lalt.ahk", "TapHoldTapAction(TapHold, " . Q . "left_alt" . Q . ") == " . Q . "alt_tab_monitor" . Q, "lalt.ahk 4.3 alt_tab_monitor")
+}
+Test("tap-holds: LAlt alt_tab_monitor hold release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_LAltAltTabGuarded)
+
+_HMRB_TabAltTabGuarded() {
+	Q := Chr(34)
+	_HMRB_AssertBounded("modules/tap_holds/tab.ahk", "TapHoldTapAction(TapHold, " . Q . "tab" . Q . ") == " . Q . "alt_tab_monitor" . Q, "tab.ahk 8.1 alt_tab_monitor")
+}
+Test("tap-holds: Tab alt_tab_monitor hold release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_TabAltTabGuarded)
