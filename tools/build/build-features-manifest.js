@@ -273,21 +273,23 @@ function luaEscapeString(s) {
 		.replace(/\t/g, '\\t');
 }
 
-function luaLiteral(value, indent = '') {
+// Renders a JS value as an inline Lua literal (objects and arrays stay on one
+// line). loadfile parses inline tables identically to multi-line ones, so this
+// only affects the committed file's size/readability, never the resolved data.
+function luaLiteral(value) {
 	if (value === null || value === undefined) return 'nil';
 	if (typeof value === 'boolean') return value ? 'true' : 'false';
 	if (typeof value === 'number') return String(value);
 	if (typeof value === 'string') return `"${luaEscapeString(value)}"`;
 	if (Array.isArray(value)) {
-		const inner = value.map((v) => luaLiteral(v, indent + '\t')).join(', ');
-		return `{ ${inner} }`;
+		return `{ ${value.map((v) => luaLiteral(v)).join(', ')} }`;
 	}
 	if (typeof value === 'object') {
 		const entries = Object.entries(value).map(([k, v]) => {
 			const keyLit = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(k) ? k : `["${luaEscapeString(k)}"]`;
-			return `${indent}\t${keyLit} = ${luaLiteral(v, indent + '\t')}`;
+			return `${keyLit} = ${luaLiteral(v)}`;
 		});
-		return `{\n${entries.join(',\n')}\n${indent}}`;
+		return `{ ${entries.join(', ')} }`;
 	}
 	throw new Error(`cannot represent ${typeof value} in Lua literal`);
 }
@@ -313,7 +315,7 @@ function renderLuaManifest(manifest, sections, features) {
 			subsections: s.subsections
 		};
 		const keyLit = `["${luaEscapeString(s.path)}"]`;
-		lines.push(`\t${keyLit} = ${luaLiteral(meta, '\t')},`);
+		lines.push(`\t${keyLit} = ${luaLiteral(meta)},`);
 	}
 	lines.push('}');
 	lines.push('');
@@ -330,7 +332,16 @@ function renderLuaManifest(manifest, sections, features) {
 			platforms: f.platforms
 		};
 		if (f.enum_values) entry.enum_values = f.enum_values;
-		lines.push(`\t${luaLiteral(entry, '\t')},`);
+		// Emit each feature compactly: opening brace, all fields on one line, then
+		// the closing brace. ~3 lines/feature instead of ~9, while keeping the
+		// entry's opening "{" on its own line so the regex manifest parsers
+		// (parseLuaFeatures, depth-based) still walk each block correctly.
+		const fields = Object.entries(entry)
+			.map(([k, v]) => `${k} = ${luaLiteral(v)}`)
+			.join(', ');
+		lines.push('\t{');
+		lines.push(`\t\t${fields},`);
+		lines.push('\t},');
 	}
 	lines.push('}');
 	lines.push('');
