@@ -60,6 +60,11 @@ local _active_layouts_cache = nil
 local _active_layouts_last_refresh = 0
 -- Guards against overlapping async refreshes.
 local _active_layouts_refreshing = false
+-- GC-root for in-flight probe hs.task handles. An hs.task that is not referenced
+-- from a reachable table can be collected before the subprocess finishes, which
+-- silently drops its completion callback (see adapters/shell_runner's identical
+-- pin). Keys are the live task handles; cleared in the callback / on a failed start.
+local _active_probe_tasks = {}
 
 --- Clears the active-layout cache and resets the throttle so the next menu open
 --- recomputes immediately. Called after the enabled input-source set changes.
@@ -301,14 +306,31 @@ local function refresh_active_layouts_async(on_done)
 
 	if hs.task and type(hs.task.new) == "function" then
 		-- Non-blocking: the click handler returns immediately; the cache updates
-		-- when python3 finishes and is read on the NEXT open.
+		-- when python3 finishes and is read on the NEXT open. The handle is
+		-- forward-declared ABOVE its callback (closure-nil rule) and pinned in a
+		-- GC root for the whole subprocess lifetime — python3 cold-start is
+		-- 300 ms–1 s and an unreferenced hs.task could be collected before it
+		-- fires, dropping the callback so finish() never runs and the refresh flag
+		-- stays wedged true for the session.
+		local probe_task
 		local ok = pcall(function()
-			local t = hs.task.new("/usr/bin/python3", function(_code, stdout, _stderr)
+			probe_task = hs.task.new("/usr/bin/python3", function(_code, stdout, _stderr)
+				if probe_task then _active_probe_tasks[probe_task] = nil end
 				finish(stdout)
 			end, { "-c", ACTIVE_LAYOUTS_PY })
-			t:start()
+			_active_probe_tasks[probe_task] = true
+			-- :start() returns false (it does not raise) on a launch failure, so we
+			-- must check it: otherwise finish() never runs and the flag wedges.
+			if not probe_task:start() then
+				_active_probe_tasks[probe_task] = nil
+				probe_task = nil
+				finish(nil)
+			end
 		end)
-		if not ok then finish(nil) end
+		if not ok then
+			if probe_task then _active_probe_tasks[probe_task] = nil end
+			finish(nil)
+		end
 	else
 		finish(nil)
 	end
