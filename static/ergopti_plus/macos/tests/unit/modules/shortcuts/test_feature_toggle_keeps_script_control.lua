@@ -1,32 +1,27 @@
 --- tests/unit/modules/shortcuts/test_feature_toggle_keeps_script_control.lua
 
 --- ==============================================================================
---- MODULE: Regression — the "Shortcuts" feature toggle must NOT kill the script-control tap
+--- MODULE: Regression — "Shortcuts" feature toggle must NOT kill the script-control tap
 --- DESCRIPTION:
 --- Audit finding F-H5. The tray "Shortcuts" feature toggle paired
 --- shortcuts.start()/shortcuts.stop() for the user-facing feature. But
 --- shortcuts.stop() ALSO calls ScriptControl.stop(), which tears down the
 --- AltGr+Enter/Backspace/Escape (pause/reload/quit) eventtap, and shortcuts.start()
---- is a Bindings-only proxy that never revives it — so toggling the feature OFF
---- then ON silently and permanently killed the panic shortcuts until a full reload.
+--- is a Bindings-only proxy that never revives it — so toggling the feature off
+--- then on silently and permanently killed the panic shortcuts until a reload.
 ---
 --- Root cause encoded two ways so a regression cannot slip through:
----   (1) Behavioral contract: pause_bindings()/resume_bindings() (the pair the
----       toggle now uses) stop/start ONLY bindings + keyboard shortcuts and must
----       never touch script_control, whereas stop() must.
----   (2) Source invariant: the menu_shortcuts top-level feature toggle calls
----       resume_bindings/pause_bindings and contains no bare shortcuts.start/stop.
+---   1. Behavioral contract — pause_bindings()/resume_bindings() (the pair the
+---      toggle now uses) stop/start ONLY bindings + keyboard shortcuts and must
+---      never touch script_control, whereas stop() must.
+---   2. Source invariant — the menu_shortcuts top-level feature toggle calls
+---      resume_bindings/pause_bindings and contains no bare shortcuts.start/stop.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
 
-
-
--- =========================================================
--- ===== 1) Behavioral — pause_bindings spares the tap =====
--- =========================================================
-
+-- 1) Behavioral contract — the toggle's pair spares the script-control tap.
 helpers.describe("shortcuts feature toggle keeps the script-control tap alive", function()
 	local function load_with_counting_submodules()
 		local calls = { bindings_start = 0, bindings_stop = 0, kbd_start = 0, kbd_stop = 0, sc_start = 0, sc_stop = 0 }
@@ -88,12 +83,7 @@ helpers.describe("shortcuts feature toggle keeps the script-control tap alive", 
 end)
 
 
-
-
--- =================================================================
--- ===== 2) Source invariant — toggle never calls stop()/start =====
--- =================================================================
-
+-- 2) Source invariant — the toggle never calls the tap-killing stop()/start.
 helpers.describe("menu_shortcuts feature toggle is wired to the binding-only pair", function()
 	helpers.it("the top-level toggle uses resume_bindings/pause_bindings, not shortcuts.start/stop", function()
 		local path = helpers.driver_root() .. "ui/menu/menu_shortcuts.lua"
@@ -113,6 +103,6 @@ helpers.describe("menu_shortcuts feature toggle is wired to the binding-only pai
 		helpers.assert_true(toggle:find("shortcuts%.stop%s*%)") == nil,
 			"feature toggle must NOT call shortcuts.stop() — it kills the script-control tap")
 		helpers.assert_true(toggle:find("shortcuts%.start%s*%)") == nil,
-			"feature toggle must NOT call shortcuts.start() — it is a Bindings-only proxy that never revives the tap")
+			"feature toggle must NOT call shortcuts.start() — it never revives the tap")
 	end)
 end)
