@@ -206,6 +206,7 @@ _CollectAllHotstringsV2Paths() {
 		PersonalTomlData := ReadPersonalToml()
 		for _, SecName in PersonalTomlData["sections_order"] {
 			if (SecName != "-") {
+				EnsurePersonalHotstringFeature(SecName)
 				Paths.Push("hotstrings.personal." . StrLower(SecName))
 			}
 		}

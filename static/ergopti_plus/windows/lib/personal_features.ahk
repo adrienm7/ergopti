@@ -56,3 +56,18 @@ PersonalFeatureEnabled(name) {
         return false
     }
 }
+
+; Seed a file-discovered personal HOTSTRING section into Features["hotstrings"]["personal"]
+; as a default-disabled Map node (mirroring the manifest shape), so custom sections beyond
+; the fixed manifest 5 are toggleable + loadable. No-op when already present (manifest seed
+; or a prior call). Mirrors RegisterPersonalFeature for shortcuts (personal-hotstring-seed).
+EnsurePersonalHotstringFeature(SecName) {
+    global Features
+    SecName := StrLower(SecName)
+    if !(IsSet(Features) and Features.Has("hotstrings"))
+        return
+    if !Features["hotstrings"].Has("personal")
+        Features["hotstrings"]["personal"] := Map()
+    if !Features["hotstrings"]["personal"].Has(SecName)
+        Features["hotstrings"]["personal"][SecName] := Map("enabled", false, "time_activation_seconds", 0)
+}
