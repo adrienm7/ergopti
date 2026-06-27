@@ -46,10 +46,13 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
     ; Offer the user an opt-in crash report before surfacing the generic alert.
     ; CrashReport_PromptUser is guarded internally so a failure here cannot
     ; re-enter the error handler.
-    try {
-        Report := CrashReport_Build(Exc)
-        CrashReport_PromptUser(Report)
-    }
+    ; Defer the heavy crash-report collection OFF the input/dispatch thread. CrashReport_Build
+    ; does WMI ConnectServer + RegRead + a git subprocess Sleep-poll + a full healthcheck —
+    ; ~100-500 ms of blocking work. This handler can fire mid-keystroke (OnError, or
+    ; HookDispatcher's per-subscriber catch), so running it inline froze the keyboard. Schedule
+    ; it on a one-shot timer so the keystroke dispatch returns immediately; the cheap modifier
+    ; release + LoggerError above stay synchronous (crash-build-offthread).
+    SetTimer(_ErgoptiDeferredCrashReport.Bind(Exc), -1)
     ; Surface the error via a NON-BLOCKING tray notification, not a modal MsgBox.
     ; A modal dialog on the input thread starves the keyboard hook — every key
     ; pressed while it is up is dropped or queued, turning an uncaught error into
@@ -57,4 +60,14 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
     try NotifierSend(t("ergopti.error_caught") . "`n`n" . Exc.Message,
         Map("title", "ErgoptiPlus", "level", "error"))
     return true
+}
+
+; Builds the crash report and shows the opt-in prompt. Always invoked off the input
+; thread via a one-shot SetTimer from ErgoptiGlobalErrorHandler, so its blocking
+; WMI/RegRead/git/healthcheck work cannot starve the keyboard hook (crash-build-offthread).
+_ErgoptiDeferredCrashReport(Exc) {
+	try {
+		Report := CrashReport_Build(Exc)
+		CrashReport_PromptUser(Report)
+	}
 }
