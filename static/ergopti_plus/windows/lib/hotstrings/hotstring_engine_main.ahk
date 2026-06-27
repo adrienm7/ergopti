@@ -1436,7 +1436,7 @@ HSE_DispatchMatch(Spec, EndChar) {
             } finally {
                 Critical(_AtCrit)
             }
-            UpdateLastSentCharacter(SubStr(EndChar != "" ? EndChar : Replacement, -1))
+            UpdateLastSentCharacter(SubStr(EndCharPart != "" ? EndCharPart : Replacement, -1))
             SentBurst := Burst
         }
 

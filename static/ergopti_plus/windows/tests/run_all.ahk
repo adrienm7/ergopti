@@ -420,6 +420,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_av_warmup_cancellable.ahk
 #Include meta/test_remote_poll_com_exception_bails.ahk
 #Include meta/test_cle_emoji_gated.ahk
+#Include meta/test_hse_consumed_endchar_ring.ahk
 #Include meta/test_personal_load_once.ahk
 #Include meta/test_menu_llm_actions_include.ahk
 #Include meta/test_llm_menu_disabled_greyed.ahk
