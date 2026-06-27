@@ -397,6 +397,19 @@ if !ManifestEnsureLoaded() {
 	ExitApp(1)
 }
 global Features := ManifestBuildFeaturesMap()
+; Seed file-discovered personal hotstring sections (beyond the manifest's fixed 5) into
+; Features["hotstrings"]["personal"] BEFORE ApplyConfigToml, so a persisted toggle for a
+; custom section is accepted (not rejected as an unknown path) and the section's hotstrings
+; register + honour the tray toggle like the built-ins (personal-hotstring-seed).
+try {
+	_PersonalHsData := ReadPersonalToml()
+	if (_PersonalHsData is Map and _PersonalHsData.Has("sections_order")) {
+		for _, _PHSec in _PersonalHsData["sections_order"] {
+			if (_PHSec != "-")
+				EnsurePersonalHotstringFeature(_PHSec)
+		}
+	}
+}
 ApplyConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_SharedDir . "\tap_hold\defaults.toml")

@@ -268,8 +268,10 @@ HS_TogglePersonalAllSections(Enable) {
     Data := ReadPersonalToml()
     Batch := []
     for _, SecName in Data["sections_order"] {
-        if (SecName != "-")
+        if (SecName != "-") {
+            EnsurePersonalHotstringFeature(SecName)
             Batch.Push(Map("path", "hotstrings.personal." . StrLower(SecName), "value", Bool))
+        }
     }
     if (Batch.Length > 0)
         WriteFeatureBatchV2(Batch)

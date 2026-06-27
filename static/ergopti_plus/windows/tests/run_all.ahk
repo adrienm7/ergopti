@@ -333,6 +333,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_logger_pairing.ahk
 #Include meta/test_crash_build_offthread.ahk
 #Include meta/test_personal_hotstring_node_shape.ahk
+#Include meta/test_personal_hotstring_seed.ahk
 #Include meta/test_no_duplicate_defaults.ahk
 #Include meta/test_require_state_pattern.ahk
 #Include meta/test_keylogger_pause_guard.ahk
