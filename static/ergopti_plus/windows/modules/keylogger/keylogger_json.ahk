@@ -77,51 +77,166 @@ KL_JoinArray(arr, sep) {
     return out
 }
 
+; Hand-rolled recursive-descent JSON parser so cross-process replay + state.json
+; restore work on the shipped 64-bit binary - ComObject("ScriptControl") is x86-only,
+; so the old COM path returned an empty Map() on 64-bit, silently dropping every
+; today.log line AND the persisted offset (which then reset to 0 and lost the resume
+; point). Parses exactly what KL_JsonEncode emits (compact objects/arrays/strings with
+; \"/\\/\n/\r/\t/\b/\f/\uXXXX escapes, numbers, true/false/null). Returns Map() on any
+; parse error so a malformed line is skipped, never crashing the ingest tick
+; (keylogger-json-64bit-decode).
 KL_JsonDecode(s) {
-    ; ScriptControl is x86-only — silently unavailable on 64-bit AHK hosts.
-    ; A_PtrSize == 8 means 64-bit; skip the COM path entirely to avoid the
-    ; "Too many parameters" crash that ComObject("ScriptControl") throws there.
-    static sc := ""
-    static sc_available := -1
-    if (sc_available = -1)
-        sc_available := (A_PtrSize = 4) ? 1 : 0
-    if (!sc_available)
-        return Map()
-    if (sc = "") {
-        try {
-            sc := ComObject("ScriptControl")
-            sc.Language := "JScript"
-        } catch {
-            sc_available := 0
-            return Map()
-        }
-    }
+    pos := 1
     try {
-        ; Wrap in parens so JS evaluates as expression, not block.
-        result := sc.Eval("(function(){return " . s . ";})()")
-        return KL_ComToMap(result)
+        return _KL_JsonParseValue(s, &pos)
     } catch {
         return Map()
     }
 }
 
-KL_ComToMap(v) {
-    ; ScriptControl returns COM JS objects; recursively convert to Map/Array.
-    if !IsObject(v)
-        return v
-    ; Try array indexing.
-    try {
-        if (HasProp(v, "length")) {
-            arr := []
-            Loop v.length
-                arr.Push(KL_ComToMap(v[A_Index - 1]))
-            return arr
+_KL_JsonSkipWs(s, &pos) {
+    len := StrLen(s)
+    while (pos <= len) {
+        c := SubStr(s, pos, 1)
+        if (c = " " or c = "`t" or c = "`n" or c = "`r")
+            pos++
+        else
+            break
+    }
+}
+
+_KL_JsonParseValue(s, &pos) {
+    _KL_JsonSkipWs(s, &pos)
+    c := SubStr(s, pos, 1)
+    if (c = "{")
+        return _KL_JsonParseObject(s, &pos)
+    if (c = "[")
+        return _KL_JsonParseArray(s, &pos)
+    if (c = '"')
+        return _KL_JsonParseString(s, &pos)
+    if (c = "t") {
+        pos += 4
+        return true
+    }
+    if (c = "f") {
+        pos += 5
+        return false
+    }
+    if (c = "n") {
+        pos += 4
+        return ""
+    }
+    return _KL_JsonParseNumber(s, &pos)
+}
+
+_KL_JsonParseObject(s, &pos) {
+    obj := Map()
+    pos++
+    _KL_JsonSkipWs(s, &pos)
+    if (SubStr(s, pos, 1) = "}") {
+        pos++
+        return obj
+    }
+    loop {
+        _KL_JsonSkipWs(s, &pos)
+        key := _KL_JsonParseString(s, &pos)
+        _KL_JsonSkipWs(s, &pos)
+        if (SubStr(s, pos, 1) != ":")
+            throw Error("expected colon")
+        pos++
+        obj[key] := _KL_JsonParseValue(s, &pos)
+        _KL_JsonSkipWs(s, &pos)
+        c := SubStr(s, pos, 1)
+        if (c = ",") {
+            pos++
+            continue
+        }
+        if (c = "}") {
+            pos++
+            break
+        }
+        throw Error("bad object")
+    }
+    return obj
+}
+
+_KL_JsonParseArray(s, &pos) {
+    arr := []
+    pos++
+    _KL_JsonSkipWs(s, &pos)
+    if (SubStr(s, pos, 1) = "]") {
+        pos++
+        return arr
+    }
+    loop {
+        arr.Push(_KL_JsonParseValue(s, &pos))
+        _KL_JsonSkipWs(s, &pos)
+        c := SubStr(s, pos, 1)
+        if (c = ",") {
+            pos++
+            continue
+        }
+        if (c = "]") {
+            pos++
+            break
+        }
+        throw Error("bad array")
+    }
+    return arr
+}
+
+_KL_JsonParseString(s, &pos) {
+    if (SubStr(s, pos, 1) != '"')
+        throw Error("expected string")
+    pos++
+    out := ""
+    len := StrLen(s)
+    while (pos <= len) {
+        c := SubStr(s, pos, 1)
+        if (c = '"') {
+            pos++
+            return out
+        }
+        if (c = '\') {
+            pos++
+            e := SubStr(s, pos, 1)
+            switch e {
+                case '"': out .= '"'
+                case '\': out .= '\'
+                case "/": out .= "/"
+                case "n": out .= "`n"
+                case "r": out .= "`r"
+                case "t": out .= "`t"
+                case "b": out .= "`b"
+                case "f": out .= "`f"
+                case "u":
+                    out .= Chr(Integer("0x" . SubStr(s, pos + 1, 4)))
+                    pos += 4
+                default: out .= e
+            }
+            pos++
+        } else {
+            out .= c
+            pos++
         }
     }
-    out := Map()
-    try {
-        for prop, _ in v
-            out[prop] := KL_ComToMap(v[prop])
+    throw Error("unterminated string")
+}
+
+_KL_JsonParseNumber(s, &pos) {
+    start := pos
+    len := StrLen(s)
+    while (pos <= len) {
+        c := SubStr(s, pos, 1)
+        if (InStr("0123456789+-.eE", c) > 0)
+            pos++
+        else
+            break
     }
-    return out
+    numStr := SubStr(s, start, pos - start)
+    if (numStr = "")
+        throw Error("expected number")
+    if (InStr(numStr, ".") or InStr(numStr, "e") or InStr(numStr, "E"))
+        return numStr + 0.0
+    return Integer(numStr)
 }
