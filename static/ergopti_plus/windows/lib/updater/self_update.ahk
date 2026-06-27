@@ -371,7 +371,7 @@ _Updater_ShowAvailableUpdateCallback(Json) {
 Updater_DownloadAndInstall(Release) {
 	global BUNDLE_RELEASE_ASSET
 	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
-	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
+	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS
 	if (Type(Release) != "Object" or !Release.HasProp("RawJson")) {
 		MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
 		return
@@ -419,8 +419,10 @@ Updater_DownloadAndInstall(Release) {
 		Req := ComObject("WinHttp.WinHttpRequest.5.1")
 		Req.Open("GET", AssetUrl, true)  ; async mode
 		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
+		; Download phase: use the large download receive budget so a slow/metered link is
+		; not aborted at the 30 s API receive timeout (updater-download-receive-timeout).
 		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
-			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
+			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS)
 		Req.Send()
 	} catch as Err {
 		_UpdaterDownloadInProgress := false

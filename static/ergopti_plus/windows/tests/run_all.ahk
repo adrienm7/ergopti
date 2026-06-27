@@ -424,6 +424,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_parsetomlfile_unterminated_array_recovers.ahk
 #Include meta/test_dispatcher_register_duplicate_label.ahk
 #Include meta/test_updater_cancel_fires_on_json.ahk
+#Include meta/test_updater_download_receive_timeout.ahk
 #Include meta/test_personal_load_once.ahk
 #Include meta/test_menu_llm_actions_include.ahk
 #Include meta/test_llm_menu_disabled_greyed.ahk

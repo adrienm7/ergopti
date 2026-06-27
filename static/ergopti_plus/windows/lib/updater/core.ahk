@@ -42,6 +42,11 @@ global UPDATER_HTTP_RESOLVE_TIMEOUT_MS := 5000     ; DNS resolution
 global UPDATER_HTTP_CONNECT_TIMEOUT_MS := 15000    ; TCP connect
 global UPDATER_HTTP_SEND_TIMEOUT_MS    := 30000    ; request send
 global UPDATER_HTTP_RECEIVE_TIMEOUT_MS := 30000    ; response receive
+; The download phase streams a multi-MB binary asset, so it needs a far larger receive
+; budget than the tiny JSON API calls above. Reusing the 30 s API value made the
+; WinHttpRequest receive timeout abort the transfer at 30 s on slow/metered links,
+; defeating the 600 s SetTimer poll ceiling (updater-download-receive-timeout).
+global UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS := 600000  ; binary download receive
 
 ; Floor for the downloaded exe size (512 KB). A real ErgoptiPlus binary is
 ; several MB; anything below this is certainly a partial download or a CDN
