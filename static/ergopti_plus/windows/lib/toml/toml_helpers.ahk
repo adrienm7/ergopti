@@ -115,6 +115,20 @@ ParseTomlFile(Path) {
             if (Stripped == "" or SubStr(Stripped, 1, 1) == "#") {
                 continue
             }
+            ; A section header while the array is still open means its closing ] was lost
+            ; (hand-edited file). Abort the array and re-process this line as a header, else
+            ; the parser swallows it and every following section into one PendingVal and
+            ; drops them all at EOF - silent whole-file-tail config loss
+            ; (toml-unterminated-array-recovery).
+            if (SubStr(Stripped, 1, 1) == "[") {
+                try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' in [{2}] - aborting array, resuming section parse.", PendingKey, Section)
+                PendingKey := ""
+                PendingVal := ""
+                Section := Trim(RegExReplace(Line, "^\[+|\]+$", ""))
+                if !Sections.Has(Section)
+                    Sections[Section] := Map()
+                continue
+            }
             PendingVal .= " " . Line
             ; Count unquoted ] to detect the real closing bracket — ignores ] inside strings
             InStr2 := false
@@ -179,6 +193,8 @@ ParseTomlFile(Path) {
 
         Sections[Section][key] := TOML_CoerceValue(val)
     }
+    if (PendingKey != "")
+        try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' reached EOF in [{2}] - value dropped.", PendingKey, Section)
     _ParseTomlCache[Path] := Sections
     return Sections
 }
