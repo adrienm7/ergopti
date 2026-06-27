@@ -254,25 +254,16 @@ RegisterMenuItem(MenuObj, ItemName, Callback) {
         return 0  ; Add itself failed — bail out cleanly.
     }
 
-    ; Discover the ID via Menu.Handle + GetMenuItemID. Last added item
-    ; sits at position Count - 1.
-    ItemId := 0
-    try {
-        HMENU := MenuObj.Handle
-        if (HMENU) {
-            Count := DllCall("GetMenuItemCount", "ptr", HMENU, "int")
-            if (Count > 0) {
-                Raw := DllCall("GetMenuItemID", "ptr", HMENU, "int", Count - 1, "uint")
-                if (Raw and Raw != 0xFFFFFFFF) {
-                    ItemId := Raw
-                }
-            }
-        }
-    } catch {
-        ; Menu.Handle may be unavailable.
-    }
-
+    ; Discover the ID by UNIQUE name match (NOT GetMenuItemCount-1): AHK Menu.Add with an
+    ; already-present ItemName MODIFIES the existing item in place and does NOT grow the
+    ; menu, so trusting Count-1 binds the dispatch bypass to whatever unrelated item sits
+    ; last. On a non-unique/unresolvable label _FindUniqueMenuItemIdByName returns 0;
+    ; degrade to AHK native dispatch (loud WARN) rather than mis-bind to the wrong id
+    ; (menu-add-duplicate-label-misbind). This is the same fail-soft policy already used
+    ; by RegisterMenuItemInsert.
+    ItemId := _FindUniqueMenuItemIdByName(MenuObj, ItemName)
     if (!ItemId) {
+        try LoggerWarn("MenuDispatcher", "Ambiguous or unresolvable menu label '{1}' - degrading to native dispatch (no bypass).", ItemName)
         return 0
     }
 
