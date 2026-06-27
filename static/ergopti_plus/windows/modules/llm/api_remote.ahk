@@ -76,7 +76,7 @@ LLM_RemoteGenerate(Entry, SystemPrompt, FullText, Temperature := 0.1, TailText :
     try {
         Http := ComObject("WinHttp.WinHttpRequest.5.1")
         Http.Open("POST", Url, false)
-        Http.SetTimeouts(LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS,
+        Http.SetTimeouts(LLM_REMOTE_CONNECT_TIMEOUT_MS, LLM_REMOTE_CONNECT_TIMEOUT_MS,
                         LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS)
         Http.SetRequestHeader("Content-Type", "application/json")
         _LLMRemoteSetAuthHeaders(Http, resolved["Format"], resolved["Token"])
@@ -101,6 +101,13 @@ global _LLM_Remote_Async := Map()
 global _LLM_Remote_AsyncCounter := 0
 global LLM_REMOTE_POLL_MS := 0   ; sentinel — sourced at boot by LLMApiLoadTimings ([llm] poll_interval_ms)
 global LLM_REMOTE_MAX_INFLIGHT := 16
+; WinHttpRequest does the DNS resolve + TCP connect SYNCHRONOUSLY on the message-loop
+; thread (its "async" mode only makes the RESPONSE wait async), so a stalled remote host
+; freezes typing for the whole connect. This caps the resolve+connect phase so the worst-
+; case freeze is bounded; the COMPLETE fix is to move the POST onto a curl child process
+; (mirror _LLM_Ollama_DispatchAsync) - see remote-generate-connect-blocks (needs a live
+; remote-API key to validate end-to-end).
+global LLM_REMOTE_CONNECT_TIMEOUT_MS := 5000
 
 /**
  * Non-blocking variant of LLM_RemoteGenerate. Mirrors hs.http.asyncPost on
@@ -135,7 +142,7 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
     try {
         http := ComObject("WinHttp.WinHttpRequest.5.1")
         http.Open("POST", Url, true)
-        http.SetTimeouts(LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS)
+        http.SetTimeouts(LLM_REMOTE_CONNECT_TIMEOUT_MS, LLM_REMOTE_CONNECT_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS)
         http.SetRequestHeader("Content-Type", "application/json")
         _LLMRemoteSetAuthHeaders(http, resolved["Format"], resolved["Token"])
         http.Send(Payload)
