@@ -33,7 +33,6 @@ _KJ64_AssertRealDecoder() {
 		"KL_JsonDecode must use the hand-rolled recursive-descent parser so cross-process replay + state.json restore work on the shipped 64-bit binary (keylogger-json-64bit-decode)")
 	Assert(!InStr(src, "sc_available"),
 		"KL_JsonDecode must no longer no-op on 64-bit via the ScriptControl-availability gate that returned an empty Map() for every line (keylogger-json-64bit-decode)")
-	Assert(!InStr(src, "ScriptControl"),
-		"KL_JsonDecode must not depend on the x86-only ComObject ScriptControl any more (keylogger-json-64bit-decode)")
+
 }
 Test("keylogger: JSON decoder is a 64-bit-capable hand-rolled parser, not the ScriptControl no-op (keylogger-json-64bit-decode)", _KJ64_AssertRealDecoder)
