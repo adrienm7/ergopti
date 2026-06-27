@@ -556,7 +556,20 @@ _Updater_CancelAsyncChecks() {
 	global _UpdaterAsyncRequests
 	if (_UpdaterAsyncRequests.Count == 0)
 		return
+	; Honour each pending request's contract before dropping it: a bare Clear() abandons
+	; the stored on_json callback, so any consumer that owns external state tied to its
+	; callback (e.g. the one-click _UpdaterCheckInProgress flag and its disabled menu item)
+	; latches forever, unrecoverable without a restart. Snapshot first and Clear() up front
+	; so a re-entrant dispatch from a callback cannot mutate the map mid-iteration, then fire
+	; each on_json("") so consumers reset themselves (updater-cancel-fires-on-json).
+	pending := []
+	for _id, rec in _UpdaterAsyncRequests
+		pending.Push(rec)
 	_UpdaterAsyncRequests.Clear()
+	for rec in pending {
+		if (rec is Map and rec.Has("on_json"))
+			try rec["on_json"]("")
+	}
 	try LoggerDebug("Updater", "Cancelled all in-flight async update checks.")
 }
 
