@@ -49,7 +49,7 @@ if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
 		PV2Id    := StrLower(SecName2)
 		PEnabled := Features["hotstrings"].Has("personal")
 			and Features["hotstrings"]["personal"].Has(PV2Id)
-			and Features["hotstrings"]["personal"][PV2Id]["enabled"]
+			and (Features["hotstrings"]["personal"][PV2Id] is Map) and Features["hotstrings"]["personal"][PV2Id].Has("enabled") and Features["hotstrings"]["personal"][PV2Id]["enabled"]
 		if PEnabled
 			PersonalActiveCount += PersonalTomlData["sections"][SecName2]["entries"].Length
 	}
@@ -631,7 +631,7 @@ _HS_Personal(M, _Cat) {
 			PV2Id    := StrLower(SecName2)
 			PEnabled := Features["hotstrings"].Has("personal")
 				and Features["hotstrings"]["personal"].Has(PV2Id)
-				and Features["hotstrings"]["personal"][PV2Id]["enabled"]
+				and (Features["hotstrings"]["personal"][PV2Id] is Map) and Features["hotstrings"]["personal"][PV2Id].Has("enabled") and Features["hotstrings"]["personal"][PV2Id]["enabled"]
 			if PEnabled
 				PersonalActiveCount += TomlData["sections"][SecName2]["entries"].Length
 			else

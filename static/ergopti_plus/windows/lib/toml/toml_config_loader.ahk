@@ -205,6 +205,14 @@ ApplyConfigToml(Features, FilePath) {
 		; properties are both accepted to match the legacy Features shape.
 		try {
 			if (Type(Node) == "Map") {
+				; Refuse to flatten a seeded Map node (e.g. {enabled:...}) into a scalar via a
+				; colliding flat-form [section] key (or vice versa) — that clobbers the shape and
+				; crashes a later [...]["enabled"] access (toml-loader-shape-mismatch).
+				if (Node.Has(Key) and (Node[Key] is Map) != (Value is Map)) {
+					try LoggerWarn("TomlConfigLoader",
+						"v2 override skipped - [{1}].{2} would change Map/scalar shape; keeping the manifest-seeded node.", CurrentSection, Key)
+					continue
+				}
 				Node[Key] := Value
 			} else if IsObject(Node) {
 				Node.%Key% := Value
