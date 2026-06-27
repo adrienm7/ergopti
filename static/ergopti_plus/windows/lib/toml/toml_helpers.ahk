@@ -194,7 +194,7 @@ ParseTomlFile(Path) {
         Sections[Section][key] := TOML_CoerceValue(val)
     }
     if (PendingKey != "")
-        try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' reached EOF in [{2}] - value dropped.", PendingKey, Section)
+        try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' reached EOF in [{2}] - the value is lost.", PendingKey, Section)
     _ParseTomlCache[Path] := Sections
     return Sections
 }
