@@ -258,6 +258,17 @@ local function resume_all()
 	if _karabiner and type(_karabiner.resume) == "function" then
 		pcall(function() _karabiner.resume() end)
 	end
+	-- Symmetric to the pause-side wc.stop(): re-arm the warmup chain. If pause hit
+	-- during the LLM cold-start window, stop() killed the in-flight warmup and the
+	-- backend never got re-probed, so api.is_ready() stays false and predictions are
+	-- silently dead for the rest of the session. schedule_warmup_with_retry is fully
+	-- self-guarding — it no-ops when the LLM is disabled, the model is unresolved, or
+	-- the backend is already ready — so it never warms from anything but a genuinely
+	-- cold, enabled backend (never from profile restoration alone).
+	local ok_wc, wc = pcall(require, "modules.llm.warmup_controller")
+	if ok_wc and wc and type(wc.schedule_warmup_with_retry) == "function" then
+		pcall(function() wc.schedule_warmup_with_retry("script resume") end)
+	end
 end
 
 --- Dispatches a configured action by its identifier.
