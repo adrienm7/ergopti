@@ -307,6 +307,24 @@ helpers.describe("prediction_engine — configuration setters", function()
 		PE.set_llm_num_predictions(5)
 	end)
 
+	-- F-M10: a wrong-typed config.toml / plist value (e.g. max_words = "five")
+	-- reached `<=`/`>` in the prompt_builder and `> 0` in the menu, crashing both.
+	-- The setters now coerce + fail closed to the numeric default.
+	helpers.it("set_llm_max_words / set_llm_min_words coerce a wrong type to a number", function()
+		PE.set_llm_max_words("five")
+		local mx = hs.settings.get("llm_max_words")
+		helpers.assert_eq(type(mx), "number")
+		-- Exactly the comparison that crashed on the raw string.
+		helpers.assert_true(pcall(function() return mx > 0 end))
+
+		PE.set_llm_min_words("seven")
+		helpers.assert_eq(type(hs.settings.get("llm_min_words")), "number")
+
+		-- A genuine numeric string is still accepted (coerced).
+		PE.set_llm_max_words("12")
+		helpers.assert_eq(hs.settings.get("llm_max_words"), 12)
+	end)
+
 	helpers.it("set_llm_debounce recreates the timer without throwing", function()
 		PE.set_llm_debounce(0.5)
 	end)
