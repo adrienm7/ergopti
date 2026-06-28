@@ -31,7 +31,11 @@ helpers.describe("llm_bridge: chain delay must not be the INFINITE tooltip senti
 
 	helpers.it("computes the chain delay gated on any_enabled", function()
 		local src = read_src()
-		helpers.assert_true(src:find("chain_delay = any_enabled", 1, true) ~= nil,
+		-- Accept the parenthesised clamped form `chain_delay = (any_enabled and ...`
+		-- introduced by the F-M1 fix, as well as the original bare form.
+		helpers.assert_true(
+			src:find("chain_delay = (any_enabled", 1, true) ~= nil
+				or src:find("chain_delay = any_enabled", 1, true) ~= nil,
 			"the chain delay must be gated on any_enabled (short offset when no tooltip is shown)")
 		helpers.assert_true(src:find("engine.start_timer(chain_delay)", 1, true) ~= nil,
 			"start_timer must use the gated chain_delay")
@@ -41,5 +45,15 @@ helpers.describe("llm_bridge: chain delay must not be the INFINITE tooltip senti
 		local src = read_src()
 		helpers.assert_true(src:find("engine.start_timer(tooltip_timeout + HOTSTRING_CHAIN_OFFSET_SEC)", 1, true) == nil,
 			"the chain timer must not be armed with tooltip_timeout directly (it is INFINITE_TOOLTIP_SEC when no row is enabled)")
+	end)
+
+	-- F-M1: an ENABLED preview row can still carry a 0 ms ("infinite") delay, so
+	-- tooltip_timeout degenerates to INFINITE_TOOLTIP_SEC while any_enabled is true.
+	-- The any_enabled gate alone (F-MED-4) did NOT cover this; the delay must also
+	-- be clamped against the sentinel.
+	helpers.it("clamps the chain delay against the INFINITE sentinel even when a row IS enabled (F-M1)", function()
+		local src = read_src()
+		helpers.assert_true(src:find("tooltip_timeout < INFINITE_TOOLTIP_SEC", 1, true) ~= nil,
+			"chain_delay must guard against tooltip_timeout == INFINITE_TOOLTIP_SEC (a 0 ms enabled row)")
 	end)
 end)
