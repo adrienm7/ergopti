@@ -270,7 +270,13 @@ local function start_watchers()
 					-- Left shift → back (-1), right shift → forward (+1)
 					local direction = (_shift_side == "right") and 1 or -1
 					_state.navigation_started = true
-					M.navigate(direction)
+					-- Defer the re-render off the eventtap (HID) thread: M.navigate ->
+					-- Renderer.render -> resolve_anchor runs synchronous cross-process
+					-- AX queries that can block for the AX timeout against a hung/
+					-- beach-balling app, tripping kCGEventTapDisabledByTimeout and
+					-- killing this very tap. The index/highlight is not perceptibly
+					-- delayed by one runloop tick.
+					hs.timer.doAfter(0, function() M.navigate(direction) end)
 					return true
 				end
 			else
@@ -329,7 +335,10 @@ local function start_watchers()
 				-- mid-decision (timer reset is also done inside M.navigate()).
 				_state.navigation_started = true
 				reset_idle_timer()
-				M.navigate(nav_direction)
+				-- Defer off the eventtap thread (see the Shift+Tab branch): the
+				-- AX-bearing render must not run synchronously on the HID thread or a
+				-- hung focused app can trip kCGEventTapDisabledByTimeout.
+				hs.timer.doAfter(0, function() M.navigate(nav_direction) end)
 				return true
 			end
 		end
