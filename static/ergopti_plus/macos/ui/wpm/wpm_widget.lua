@@ -112,6 +112,18 @@ local function _load_shared_const()
 	-- Strip leading '#' from hex strings for hs.canvas compatibility.
 	local function hex(s) return (s or ""):gsub("^#", "") end
 
+	-- Scale a TOML value, failing SOFT (per field) when the key is missing/renamed.
+	-- A bare `nil / 255` (etc.) would raise at module load and the require-time pcall
+	-- in menu_metrics would silently drop the ENTIRE widget; instead yield nil and
+	-- surface the drift loudly (rule 5.3). Downstream consumers tolerate a nil here.
+	local function scaled(v, divisor, key)
+		if type(v) ~= "number" then
+			Logger.error(LOG, "_load_shared_const: missing/non-numeric '%s' — leaving nil.", key)
+			return nil
+		end
+		return v / divisor
+	end
+
 	-- No literal fallbacks below: the shared TOML is the single source of truth
 	-- (rules 5.2 / 5.4), mirroring the AHK WPMWidgetConst sentinel/fail-fast class.
 	-- A missing TOML is already logged as an ERROR above; a missing key then
@@ -131,14 +143,14 @@ local function _load_shared_const()
 		-- Colors — _shared/modules/wpm_widget/constants.toml [colors]
 		color_bg_manual       = "#" .. hex(colors.bg_manual),
 		color_bg_idle         = "#" .. hex(colors.bg_idle),
-		color_txt_active_alpha = transp.alpha_active / 255,
+		color_txt_active_alpha = scaled(transp.alpha_active, 255, "[transparency].alpha_active"),
 		-- HSL target to normalise hotstring accent hues to the same brightness as bg_manual.
 		widget_hsl_l          = tonumber(colors.widget_hsl_l),
 		widget_hsl_s          = tonumber(colors.widget_hsl_s),
 
 		-- Idle hide and color-hold durations — _shared/modules/timings/constants.toml [ui]
-		idle_hide_s           = (tc.ui and tc.ui.wpm_widget_idle_hide_ms) / 1000,
-		source_color_duration = (tc.ui and tc.ui.wpm_color_hold_ms)       / 1000,
+		idle_hide_s           = scaled(tc.ui and tc.ui.wpm_widget_idle_hide_ms, 1000, "[ui].wpm_widget_idle_hide_ms"),
+		source_color_duration = scaled(tc.ui and tc.ui.wpm_color_hold_ms,      1000, "[ui].wpm_color_hold_ms"),
 
 		-- Graph mode (HS-only, not in shared TOML)
 		use_fixed_scale       = true,
