@@ -499,6 +499,13 @@ function M.is_enabled()  return CoreState.enabled end
 -- clobber the user's intent with a stale snapshot.
 function M.suspend()
 	CoreState.suspended = true
+	-- "Pause = everything off": also quiesce state armed mid-gesture. The suspended
+	-- flag only gates NEW activity; a scroll-block armed by a 3+finger gesture keeps
+	-- swallowing native scroll until finger-lift, and a held synthetic click-lock
+	-- (left/right_click_toggle) keeps its drag + key-watcher eventtaps live. Release
+	-- both here, exactly as M.stop() does (force_cleanup is idempotent).
+	pcall(Engine.unblock_scroll)
+	pcall(Actions.force_cleanup)
 	Logger.debug(LOG, "Gestures suspended (feature flag preserved).")
 end
 function M.resume()
