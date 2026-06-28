@@ -640,13 +640,15 @@ function M.create(deps)
             end
         })
 
-        local min_words_display = (state.llm_min_words and state.llm_min_words > 0) and tostring(state.llm_min_words) or "1"
+        local mw_min = tonumber(state.llm_min_words)
+        local min_words_display = (mw_min and mw_min > 0) and tostring(mw_min) or "1"
         table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.min_words_label"), min_words_display), disabled = is_disabled or nil, fn = settings_mgr.set_min_words })
         if state.llm_min_words ~= llm_mod.DEFAULT_STATE.llm_min_words then
             table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_min_words)), disabled = is_disabled or nil, fn = settings_mgr.reset_min_words })
         end
 
-        local max_words_display = (state.llm_max_words and state.llm_max_words > 0) and tostring(state.llm_max_words) or i18n.get("menu.llm.unlimited")
+        local mw_max = tonumber(state.llm_max_words)
+        local max_words_display = (mw_max and mw_max > 0) and tostring(mw_max) or i18n.get("menu.llm.unlimited")
         table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.max_words_label"), max_words_display), disabled = is_disabled or nil, fn = settings_mgr.set_max_words })
         if state.llm_max_words ~= llm_mod.DEFAULT_STATE.llm_max_words then
             local def_w_disp = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0) and tostring(llm_mod.DEFAULT_STATE.llm_max_words) or i18n.get("menu.llm.unlimited")

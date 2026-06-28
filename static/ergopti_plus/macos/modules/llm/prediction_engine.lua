@@ -142,8 +142,8 @@ local llm_display_name        = core_llm.get_current_model()  -- Human-readable 
 local llm_backend_label       = nil                           -- "Ollama 🦙", "MLX 🚀", or a custom label
 local temperature             = LLM_DEFAULTS.llm_temperature
 local context_window_chars    = LLM_DEFAULTS.llm_context_length
-local min_words               = hs.settings.get("llm_min_words") or LLM_DEFAULTS.llm_min_words
-local max_words               = hs.settings.get("llm_max_words") or LLM_DEFAULTS.llm_max_words
+local min_words               = tonumber(hs.settings.get("llm_min_words")) or LLM_DEFAULTS.llm_min_words
+local max_words               = tonumber(hs.settings.get("llm_max_words")) or LLM_DEFAULTS.llm_max_words
 local num_predictions         = LLM_DEFAULTS.llm_num_predictions
 local prediction_indent       = LLM_DEFAULTS.llm_pred_indent
 local validation_mods         = LLM_DEFAULTS.llm_val_modifiers
@@ -312,15 +312,18 @@ function M.set_llm_nav_modifiers(mods)
 end
 
 function M.set_llm_min_words(w)
-	min_words = w
-	hs.settings.set("llm_min_words", w)
-	Logger.debug(LOG, "Min words: %s.", tostring(w))
+	-- Coerce + fail closed: a value from config.toml / a half-written plist can be a
+	-- string, which later reaches `<=`/`>` comparisons in the shared prompt_builder
+	-- and `> 0` in the menu — both crash on a non-number. Persist the coerced number.
+	min_words = tonumber(w) or LLM_DEFAULTS.llm_min_words
+	hs.settings.set("llm_min_words", min_words)
+	Logger.debug(LOG, "Min words: %s.", tostring(min_words))
 end
 
 function M.set_llm_max_words(w)
-	max_words = w
-	hs.settings.set("llm_max_words", w)
-	Logger.debug(LOG, "Max words: %s (0 = unlimited).", tostring(w))
+	max_words = tonumber(w) or LLM_DEFAULTS.llm_max_words
+	hs.settings.set("llm_max_words", max_words)
+	Logger.debug(LOG, "Max words: %s (0 = unlimited).", tostring(max_words))
 end
 
 
