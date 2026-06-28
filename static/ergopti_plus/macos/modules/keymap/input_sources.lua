@@ -60,10 +60,10 @@ local _active_layouts_cache = nil
 local _active_layouts_last_refresh = 0
 -- Guards against overlapping async refreshes.
 local _active_layouts_refreshing = false
--- GC-root for in-flight probe hs.task handles. An hs.task that is not referenced
--- from a reachable table can be collected before the subprocess finishes, which
--- silently drops its completion callback (see adapters/shell_runner's identical
--- pin). Keys are the live task handles; cleared in the callback / on a failed start.
+-- GC-root for in-flight probe task handles. An async task handle that is not
+-- referenced from a reachable table can be collected before the subprocess
+-- finishes, which silently drops its completion callback (see adapters/shell_runner's
+-- identical pin). Keys are the live handles; cleared in the callback / on a failed start.
 local _active_probe_tasks = {}
 
 --- Clears the active-layout cache and resets the throttle so the next menu open
@@ -309,7 +309,7 @@ local function refresh_active_layouts_async(on_done)
 		-- when python3 finishes and is read on the NEXT open. The handle is
 		-- forward-declared ABOVE its callback (closure-nil rule) and pinned in a
 		-- GC root for the whole subprocess lifetime — python3 cold-start is
-		-- 300 ms–1 s and an unreferenced hs.task could be collected before it
+		-- 300 ms–1 s and an unreferenced async handle could be collected before it
 		-- fires, dropping the callback so finish() never runs and the refresh flag
 		-- stays wedged true for the session.
 		local probe_task
