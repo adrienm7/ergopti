@@ -139,6 +139,15 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
     Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
     Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens)
 
+    ; Prefer a curl child process so the synchronous DNS resolve + TCP connect (which
+    ; WinHttpRequest.5.1 performs on the message-loop thread even in "async" mode) never
+    ; freezes typing. _LLMRemote_DispatchCurl returns true once it owns the request
+    ; (dispatched, or already failed via on_fail); only fall through to the WinHTTP path
+    ; when curl is unavailable on this host (remote-generate-connect-blocks).
+    timeout_ms := (LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000
+    if (_LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, timeout_ms))
+        return req_id
+
     try {
         http := ComObject("WinHttp.WinHttpRequest.5.1")
         http.Open("POST", Url, true)
@@ -167,24 +176,147 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
     return req_id
 }
 
+; True iff curl.exe is present on this host (Windows 10+ ships it at System32\curl.exe).
+_LLMRemote_CurlAvailable() {
+    return FileExist(A_WinDir . "\System32\curl.exe") != ""
+}
+
+; Build the curl auth -H args for a provider format, mirroring _LLMRemoteSetAuthHeaders.
+; The token is shell-quoted via _Q so an odd key cannot break the curl arg parsing.
+_LLMRemote_BuildCurlAuthArgs(Format, Token) {
+    if (Format == "anthropic") {
+        args := ""
+        if (Token != "")
+            args .= "-H " . _Q("x-api-key: " . Token) . " "
+        args .= "-H " . _Q("anthropic-version: 2023-06-01") . " "
+        return args
+    }
+    if (Format == "gemini")
+        return ""   ; token is carried in the URL
+    if (Token != "")
+        return "-H " . _Q("Authorization: Bearer " . Token) . " "
+    return ""
+}
+
+; Removes the per-request temp files (the payload carries the user's typed PII, so it
+; must not linger). Best-effort.
+_LLMRemote_CurlCleanup(entry) {
+    try FSDelete(entry["tmp_payload"])
+    try FSDelete(entry["tmp_stdout"])
+}
+
+; Dispatch the POST through a curl child process so the connect happens in curl's own
+; process — the AHK message loop only polls ProcessExist. Mirrors _LLM_Ollama_DispatchAsync.
+; Returns true once it owns the request (dispatched, or failed and fired on_fail); returns
+; false ONLY when curl is unavailable, so the caller falls back to WinHTTP.
+_LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, timeout_ms) {
+    global _LLM_Remote_Async
+    curl_exe := A_WinDir . "\System32\curl.exe"
+    if !FileExist(curl_exe)
+        return false
+    uid := req_id . "_" . A_TickCount
+    tmp_dir := _LLM_Ollama_TempDir()
+    tmp_payload := tmp_dir . "\ergopti_remote_" . uid . ".json"
+    tmp_stdout  := tmp_dir . "\ergopti_remote_" . uid . ".out"
+    if !FSWrite(tmp_payload, Payload) {
+        try LoggerWarn("LLM.remote", "Failed to write curl payload file.")
+        try on_fail()
+        return true
+    }
+    cmdLine := '"' . curl_exe . '" -s -S -X POST '
+        . '-H "Content-Type: application/json" '
+        . _LLMRemote_BuildCurlAuthArgs(resolved["Format"], resolved["Token"])
+        . '--data-binary @' . _Q(tmp_payload) . ' '
+        . _Q(Url) . ' '
+        . '-o ' . _Q(tmp_stdout)
+    pid := 0
+    try {
+        Run(cmdLine, , "Hide", &pid)
+    } catch as err {
+        try FSDelete(tmp_payload)
+        try LoggerWarn("LLM.remote", "curl launch failed: {1}.", err.Message)
+        try on_fail()
+        return true
+    }
+    _LLMRemote_TrimAsyncRegistry()
+    _LLM_Remote_Async[req_id] := Map(
+        "transport", "curl", "pid", pid,
+        "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout,
+        "format", resolved["Format"], "on_success", on_success, "on_fail", on_fail,
+        "cancelled", false, "start_tick", A_TickCount, "timeout_ms", timeout_ms)
+    _LLMRemote_PollCurl(req_id)
+    return true
+}
+
+; Polls the curl child WITHOUT blocking the message loop. Mirrors _LLM_Ollama_PollRequest.
+_LLMRemote_PollCurl(req_id) {
+    global _LLM_Remote_Async, LLM_REMOTE_POLL_MS
+    if !_LLM_Remote_Async.Has(req_id)
+        return
+    entry := _LLM_Remote_Async[req_id]
+    if entry["cancelled"] {
+        try ProcessClose(entry["pid"])
+        _LLMRemote_CurlCleanup(entry)
+        _LLM_Remote_Async.Delete(req_id)
+        return
+    }
+    if (_LLM_DeadlineExpired(entry["start_tick"], entry["timeout_ms"])) {
+        try ProcessClose(entry["pid"])
+        _LLMRemote_CurlCleanup(entry)
+        _LLM_Remote_Async.Delete(req_id)
+        try LoggerWarn("LLM.remote", "curl poll deadline exceeded for req_id={1} - aborting.", req_id)
+        try entry["on_fail"]()
+        return
+    }
+    if ProcessExist(entry["pid"]) {
+        SetTimer(() => _LLMRemote_PollCurl(req_id), -LLM_REMOTE_POLL_MS)
+        return
+    }
+    on_success := entry["on_success"]
+    on_fail    := entry["on_fail"]
+    fmt        := entry["format"]
+    body := ""
+    try body := FileRead(entry["tmp_stdout"], "UTF-8")
+    _LLMRemote_CurlCleanup(entry)
+    _LLM_Remote_Async.Delete(req_id)
+    if (body == "") {
+        try on_fail()
+        return
+    }
+    text := _LLMRemoteParseResponse(fmt, body)
+    if (text == "") {
+        try on_fail()
+        return
+    }
+    try on_success(text)
+}
+
 LLM_RemoteCancelAsync(req_id) {
     global _LLM_Remote_Async
     if !_LLM_Remote_Async.Has(req_id)
         return
     entry := _LLM_Remote_Async[req_id]
     entry["cancelled"] := true
-    ; Abort the live WinHTTP request immediately so it does not keep
-    ; consuming network bandwidth and the message pump stays responsive.
-    try entry["http"].Abort()
+    ; Release the in-flight request immediately: a curl child is killed (the poll tick
+    ; then cleans up its PII temp files); a WinHTTP request is aborted.
+    if (entry.Has("transport") and entry["transport"] == "curl") {
+        try ProcessClose(entry["pid"])
+    } else {
+        try entry["http"].Abort()
+    }
 }
 
 LLM_RemoteCancelAllAsync() {
     global _LLM_Remote_Async
     for _id, entry in _LLM_Remote_Async {
         entry["cancelled"] := true
-        ; Abort each live request so the WinHTTP threads are released now
-        ; rather than waiting for each poll loop's next WaitForResponse(0).
-        try entry["http"].Abort()
+        ; Release each live request now (curl child killed / WinHTTP aborted); the
+        ; per-request poll tick performs the temp-file cleanup on its next iteration.
+        if (entry.Has("transport") and entry["transport"] == "curl") {
+            try ProcessClose(entry["pid"])
+        } else {
+            try entry["http"].Abort()
+        }
     }
 }
 
@@ -338,6 +470,10 @@ _LLMRemote_TrimAsyncRegistry() {
         ; released now rather than lingering until WinHTTP's own timeout.
         if oldest_entry.Has("http")
             try oldest_entry["http"].Abort()
+        if (oldest_entry.Has("transport") and oldest_entry["transport"] == "curl") {
+            try ProcessClose(oldest_entry["pid"])
+            _LLMRemote_CurlCleanup(oldest_entry)
+        }
         ; Honour the async contract: exactly one of on_success / on_fail must
         ; fire. Without this the caller (e.g. the prediction engine slot state
         ; machine) hangs forever waiting for a callback that will never arrive.
