@@ -836,6 +836,21 @@ function M.init(core_state, actions_mod)
 	Logger.success(LOG, "Gestures engine dependencies initialized.")
 end
 
+--- Releases an armed scroll-block (the permanent scrollBlocker eventtap keeps
+--- running but its swallow decision goes back to false). Called on pause/suspend:
+--- a scroll-block armed mid-gesture (3+ fingers) otherwise keeps swallowing native
+--- scroll until the user lifts all fingers — a "pause = everything off" violation.
+--- Idempotent and safe when nothing is armed.
+function M.unblock_scroll()
+	stopScrollBlock()
+end
+
+--- Returns whether the scroll-block is currently swallowing scroll events.
+--- @return boolean
+function M.is_blocking_scroll()
+	return isBlockingScroll
+end
+
 --- Stops the engine and releases the scroll-blocker eventtap.
 --- Must be called from gestures init.lua M.stop() so the tap is not left armed
 --- across reloads (N reloads without stop → N concurrent scroll eventtaps).
