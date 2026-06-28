@@ -575,7 +575,12 @@ function M.update_preview(buf)
 		-- must fire promptly. Using the sentinel armed the LLM for ~24 h (it never
 		-- fired) and every further matching keystroke re-armed the same 24 h timer.
 		if fire_llm_after_hotstring and llm_on then
-			local chain_delay = any_enabled
+			-- Clamp against the INFINITE sentinel regardless of any_enabled: an
+			-- ENABLED preview row can still carry a 0 ms ("infinite") delay, so
+			-- tooltip_timeout degenerates to INFINITE_TOOLTIP_SEC even though a row is
+			-- shown. Waiting ~24 h means the chained prediction never appears. When
+			-- there is no FINITE auto-close to wait for, fire after the short offset.
+			local chain_delay = (any_enabled and tooltip_timeout < INFINITE_TOOLTIP_SEC)
 				and (tooltip_timeout + HOTSTRING_CHAIN_OFFSET_SEC)
 				or HOTSTRING_CHAIN_OFFSET_SEC
 			Logger.debug(LOG, "LLM chain scheduled in %.3gs.", chain_delay)
