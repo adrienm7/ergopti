@@ -691,34 +691,31 @@ end
 --- for users who remap their right-hand key to a left/plain option via their own
 --- Karabiner rules — `right_option` alone never matched their held modifier, so the
 --- paused sentinel was not emitted and a second AltGr+Enter could not un-pause.
---- @return table List of Karabiner rule objects (one per slot).
+--- @return table List of Karabiner rule objects (one per modifier × slot).
 function M.build_paused_script_control_rules()
 	local rules = {}
-	-- The genuine AltGr-while-paused chord is right_command + option held TOGETHER
-	-- (option is side-agnostic so a left/plain-option remap still matches). Both are
-	-- MANDATORY: emitting one rule per modifier — as a previous revision did — made
-	-- the bare-"option" rule match a plain Option+Backspace/Enter/Escape, i.e. the
-	-- standard macOS editing chords, which then silently un-paused (or even quit) the
-	-- script while paused. Requiring the full chord lets the panic shortcuts still
-	-- un-pause while leaving plain Option chords to native macOS behaviour.
-	local mandatory = { "right_command", "option" }
+	-- right_command + option (either side) un-pause while paused — mirrors the
+	-- HS-side AltGr guard so the same physical chord that pauses also resumes.
+	local mods = { "right_command", "option" }
 	for _, slot in ipairs(SCRIPT_CONTROL_SENTINEL_SLOTS) do
-		rules[#rules + 1] = {
-			description  = string.format(
-				"Paused script control: right_command+option + %s → %s",
-				slot.from_key, slot.sentinel
-			),
-			manipulators = {
-				{
-					type = "basic",
-					from = {
-						key_code  = slot.from_key,
-						modifiers = { mandatory = mandatory, optional = { "any" } },
+		for _, mod in ipairs(mods) do
+			rules[#rules + 1] = {
+				description  = string.format(
+					"Paused script control: %s + %s → %s",
+					mod, slot.from_key, slot.sentinel
+				),
+				manipulators = {
+					{
+						type = "basic",
+						from = {
+							key_code  = slot.from_key,
+							modifiers = { mandatory = { mod }, optional = { "any" } },
+						},
+						to = { { key_code = slot.sentinel, modifiers = { SCRIPT_CONTROL_SENTINEL_TAG } } },
 					},
-					to = { { key_code = slot.sentinel, modifiers = { SCRIPT_CONTROL_SENTINEL_TAG } } },
 				},
-			},
-		}
+			}
+		end
 	end
 	return rules
 end
