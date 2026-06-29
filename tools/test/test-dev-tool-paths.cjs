@@ -4,9 +4,10 @@
  * ==============================================================================
  * MODULE: Dev-Tool Path Guard
  * DESCRIPTION:
- * Regression guard for the private-AHK workflow tools under tools/dev/. The
+ * Regression guard for the private-AHK workflow tools under tools/dev/ (the
+ * sync/strip/watch scripts plus the pm2 install/uninstall-ahk-watcher.js pair). The
  * static/drivers -> static/ergopti_plus and scripts -> tools/dev reorg left
- * sync-private-ahk.js and watch-ahk.js pointing at dead pre-reorg paths
+ * sync-private-ahk.js, watch-ahk.js and the watcher installers pointing at dead pre-reorg paths
  * (static/hotstrings/.local_ahk_path, static/drivers/autohotkey/ErgoptiPlus.ahk,
  * scripts/*.js, the removed update-ahk-date.js, and the removed Python hotstrings
  * generator). The whole private-sync pipeline was therefore broken: every run
@@ -28,7 +29,13 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const DEV = path.join(ROOT, 'tools', 'dev');
 
-const SCRIPTS = ['sync-private-ahk.js', 'remove_ahk_personal_configuration.js', 'watch-ahk.js'];
+const SCRIPTS = [
+	'sync-private-ahk.js',
+	'remove_ahk_personal_configuration.js',
+	'watch-ahk.js',
+	'install-ahk-watcher.js',
+	'uninstall-ahk-watcher.js'
+];
 
 // Canonical post-reorg override location, expressed both as a slash path (for
 // .gitignore) and as a path.join segment sequence (for the JS sources).
@@ -64,8 +71,8 @@ for (const s of SCRIPTS) {
 	}
 }
 
-// 2. The two tools that read the override must agree on the canonical location.
-for (const s of ['sync-private-ahk.js', 'watch-ahk.js']) {
+// 2. The tools that read the override must agree on the canonical location.
+for (const s of ['sync-private-ahk.js', 'watch-ahk.js', 'install-ahk-watcher.js']) {
 	if (!OVERRIDE_JOIN_RE.test(read(s))) {
 		errors.push(`${s}: must read .local_ahk_path from static/ergopti_plus/windows/.local_ahk_path.`);
 	}

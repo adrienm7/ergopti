@@ -191,7 +191,7 @@ En place : [`windows/README.md`](../static/ergopti_plus/windows/README.md), [`ma
 
 | St | Étape | Objectif · Preuve | Action · Test · Diagnostic |
 |----|-------|-------------------|----------------------------|
-| ☐ | **P8.1** | Réparer `install-ahk-watcher.js` cassé · `tools/dev/install-ahk-watcher.js:23,15,26` chemins morts | corriger les 3 chemins + l'ajouter au scan `test-dev-tool-paths.cjs`. *Test :* guard étendu. *Diag :* « path X introuvable ». `JS`. **Faible** |
+| ✅ | **P8.1** | Réparer `install-ahk-watcher.js` cassé · `tools/dev/install-ahk-watcher.js:23,15,26` chemins morts | ✅ 3 chemins corrigés + même bug repo-root dans `uninstall-ahk-watcher.js` + paire câblée (`watch:ahk:install`/`:uninstall`) + 2 installeurs ajoutés au guard `test-dev-tool-paths.cjs`. `JS` vert. |
 | ☐ | **P8.2** | Supprimer `update-ahk-date.js` mort · `test-dev-tool-paths.cjs:11,44` le dit « removed », fichier présent | `git rm`. *Test :* guard cohérent. `JS`. **Faible** |
 | ☐ | **P8.3** | Alias npm orphelins + headers périmés · `package.json:18` `lint:banners` 0 appelant ; `new-driver.js:1`, `audit-banner-alignment.js:2` claims `scripts/...` ; paire `*-ahk-watcher.js` | retirer l'alias, fixer les headers, trancher la paire. `JS`. **Faible** |
 

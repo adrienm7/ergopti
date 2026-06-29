@@ -2,7 +2,8 @@ import { execFileSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// This file lives in tools/dev/, so the repo root is two directories up.
+const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const PM2 = path.join(PROJECT_DIR, 'node_modules', '.bin', 'pm2');
 const APP_NAME = 'ergopti-ahk-watcher';

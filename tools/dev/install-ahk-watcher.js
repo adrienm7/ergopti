@@ -12,7 +12,8 @@ import { fileURLToPath } from 'url';
 //   npx pm2 startup
 // and execute the command it prints — this makes the watcher survive reboots.
 
-const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// This file lives in tools/dev/, so the repo root is two directories up.
+const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const PM2 = path.join(
 	PROJECT_DIR,
@@ -20,10 +21,10 @@ const PM2 = path.join(
 	'.bin',
 	'pm2' + (os.platform() === 'win32' ? '.cmd' : '')
 );
-const WATCHER = path.join(PROJECT_DIR, 'scripts', 'watch-ahk.js');
+const WATCHER = path.join(PROJECT_DIR, 'tools', 'dev', 'watch-ahk.js');
 const APP_NAME = 'ergopti-ahk-watcher';
 
-const overrideFile = path.join(PROJECT_DIR, 'static', 'drivers', 'hotstrings', '.local_ahk_path');
+const overrideFile = path.join(PROJECT_DIR, 'static', 'ergopti_plus', 'windows', '.local_ahk_path');
 
 if (!existsSync(overrideFile)) {
 	console.error('❌ No .local_ahk_path found.');
