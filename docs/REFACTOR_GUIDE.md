@@ -321,7 +321,7 @@ Pipeline prouvé (P4/P5) : extraction PowerShell (BOM+CRLF) remplaçant le bloc 
 |----|-------|--------|
 | ✅ | **B7.1** DC-shims (§5.6) | ✅ `set_llm_show_model_name` supprimé (prediction_engine + bridge + init + 3 stubs) ; `HealthCheck_Format` supprimé ; `LLM_OllamaGenerate` (sync, 0 callers) supprimé. Tests : 2 Lua (`test_prediction_engine_no_dead_shims`) + 2 AHK méta (`test_b7_1_dead_shims_absent`) — macOS 2476/13, JS 36/36. |
 | ✅ | **B7.2** DC-dead-modules | ✅ `macos/ui/menu/menu_script_control.lua` (+ entrée MENU_MODULES dans `test_pause_checked_state`) ; `macos/lib/color_utils.lua` + `_shared/lua/color_utils/init.lua` + `test_color_utils.lua` ; `_shared/lua/keycodes/qwerty_names.lua` supprimés. Méta-test Lua `test_b7_2_dead_modules_absent` (4 guards). macOS 2478/0, JS 36/36. |
-| ☐ | **B7.3** DC-dead-AHK-fns | ~43 fns 0-appelant (clusters `keylogger/*`, `llm/*`) — batché, `build:domain`+`AHK` vert par commit |
+| ✅ | **B7.3** DC-dead-AHK-fns | ✅ 4 fns 0-appelant supprimées : `KL_FileExists`, `KL_ReadAll`, `_KL_RegexEscape` (keylogger.ahk) ; `LLM_RemoteGenerate` sync (api_remote.ahk, miroir du B7.1 OllamaGenerate). Méta-test AHK `test_b7_3_dead_fns_absent` (4 guards). AHK 2533/0, JS 36/36. Note : inventaire initial estimait ~43 — revérification montre 4 fns réellement sans appelant. |
 
 #### Reportés (gros effort) — non détaillés
 
