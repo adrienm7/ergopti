@@ -6,8 +6,7 @@
 ; Synchronous HTTP client for remote LLM APIs (OpenAI, Anthropic, Google Gemini,
 ; and any OpenAI-Chat-Completions-compatible endpoint such as Groq, OpenRouter,
 ; LM Studio, vLLM, llama.cpp's HTTP server, …). Sits next to api_ollama.ahk and
-; exposes the same surface — ``LLM_RemoteGenerate`` returns the generated text
-; (or "" on error) for the prediction engine to consume.
+; exposes the same async surface as api_ollama.ahk.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Provider catalogue defines per-provider base URL + auth scheme + request
@@ -52,44 +51,6 @@ global LLM_REMOTE_TIMEOUT_MS := 0   ; sentinel — sourced at boot by LLMApiLoad
 ; ============================================
 ; ============================================
 
-; Dispatch a prediction request to the remote API entry. Entry is the per-user
-; record (Map or object) carrying:
-;   - Provider — one of LLM_API_PROVIDERS keys.
-;   - BaseUrl  — the endpoint URL (Entry.BaseUrl overrides the provider default).
-;   - Token    — the API key / bearer.
-;   - Model    — model name to request.
-;
-; Returns the generated text, or "" on any error (network, HTTP non-2xx, parse
-; failure). Failure is silent by design so the prediction loop never crashes —
-; the user gets no tooltip instead of an error dialog mid-typing.
-LLM_RemoteGenerate(Entry, SystemPrompt, FullText, Temperature := 0.1, TailText := "", max_tokens := "") {
-    global LLM_API_PROVIDERS, LLM_REMOTE_TIMEOUT_MS
-
-    resolved := _LLMRemoteResolveEntry(Entry)
-    if (resolved == "")
-        return ""
-
-    req := _LLMRemote_BuildRequestContext(SystemPrompt, FullText, TailText)
-    Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
-    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens)
-
-    try {
-        Http := ComObject("WinHttp.WinHttpRequest.5.1")
-        Http.Open("POST", Url, false)
-        Http.SetTimeouts(LLM_REMOTE_CONNECT_TIMEOUT_MS, LLM_REMOTE_CONNECT_TIMEOUT_MS,
-                        LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS)
-        Http.SetRequestHeader("Content-Type", "application/json")
-        _LLMRemoteSetAuthHeaders(Http, resolved["Format"], resolved["Token"])
-        Http.Send(Payload)
-        if (Http.Status < 200 or Http.Status >= 300) {
-            return ""
-        }
-        return _LLMRemoteParseResponse(resolved["Format"], Http.ResponseText)
-    } catch as err {
-        return ""
-    }
-}
-
 
 
 ; =========================
@@ -110,7 +71,7 @@ global LLM_REMOTE_MAX_INFLIGHT := 16
 global LLM_REMOTE_CONNECT_TIMEOUT_MS := 5000
 
 /**
- * Non-blocking variant of LLM_RemoteGenerate. Mirrors hs.http.asyncPost on
+ * Non-blocking remote LLM generation. Mirrors hs.http.asyncPost on
  * the HS side: fire-and-forget dispatch, callbacks fire when ready. See
  * LLM_OllamaGenerate_Async for the polling model — both share the same
  * WinHTTP-async + SetTimer-poll pattern.
