@@ -264,6 +264,7 @@ local _is_ready          = false
 -- MLX server that can only process one request at a time, which is the very reason
 -- the warmup never received a 200
 local _warmup_in_flight  = false
+local _warmup_gen        = 0     -- bumped on reset/load-failure; a warmup callback whose captured gen is stale must NOT flip _is_ready (F-L4)
 local _warmup_timeout    = nil   -- hard-timeout timer; cleared on callback or cancellation
 
 -- Permanent load-failure surface. Warmup retries on every non-200, which is correct
@@ -326,6 +327,7 @@ end
 --- @param notify boolean When true, fire the one-time error notification from here.
 function M.mark_load_failed(model_name, notify)
 	_is_ready = false
+	_warmup_gen = _warmup_gen + 1  -- invalidate any in-flight warmup callback (F-L4)
 	if _warmup_timeout then
 		pcall(function() _warmup_timeout:stop() end)
 		_warmup_timeout = nil
@@ -414,6 +416,11 @@ function M.reset_endpoints()
 	-- belong to this controller.
 	ApiMlxDiscovery.reset()
 	_is_ready                    = false
+	-- Invalidate any in-flight warmup POST: its 200 response is for the OLD server/
+	-- model and must NOT flip _is_ready=true after this reset switched servers (F-L4).
+	-- Also clear the in-flight flag so a fresh warmup for the new model is not blocked.
+	_warmup_gen                  = _warmup_gen + 1
+	_warmup_in_flight            = false
 	_active_server_pgid          = nil   -- cleared until the new server reports its PGID
 	_server_pgid_pending         = true  -- block zombie kills until set_active_server_pgid() fires
 	_last_zombie_kill_at         = 0     -- allow an immediate kill on the first mismatch after PGID is known
@@ -600,6 +607,10 @@ function M.warmup(model_name, profile)
 	end
 
 	_warmup_in_flight = true
+	-- Snapshot the warmup generation: if reset_endpoints()/mark_load_failed() bump it
+	-- while this POST is in flight, the response is for a now-stale server/model and
+	-- its callback must discard itself rather than flip _is_ready=true (F-L4).
+	local my_warmup_gen = _warmup_gen
 	-- Hard timeout: hs.http.asyncPost has no built-in timeout, so if the server
 	-- accepts the TCP connection but never sends a response (e.g. during model
 	-- weight loading or a stale GPU stream), _warmup_in_flight would stay true
@@ -620,6 +631,12 @@ function M.warmup(model_name, profile)
 			if _warmup_timeout then
 				TimerScheduler.cancel(_warmup_timeout)
 				_warmup_timeout = nil
+			end
+			-- Discard a stale warmup: a reset/load-failure since this POST was issued
+			-- means its result describes the OLD server. Do NOT touch _is_ready (F-L4).
+			if my_warmup_gen ~= _warmup_gen then
+				Logger.debug(LOG, "Discarding stale warmup response (gen %d != %d).", my_warmup_gen, _warmup_gen)
+				return
 			end
 			_warmup_in_flight = false
 			-- A 200 with an empty or choices-less body means the server accepted the
