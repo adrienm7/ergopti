@@ -64,10 +64,13 @@ function checkNegative(label, file, pattern) {
 console.log('\n=== Hammerspoon Code Integrity Validation ===');
 
 // --- Global Leak Audit ---
-check(
-    'Gestures Actions: gestureInProgress is local',
+// F-L5/F-I2: the gestureInProgress flag was write-only dead state (set but never
+// read — the drag-protect guard it claimed to provide was never wired). It was
+// removed entirely, so it must NOT reappear in any form (local OR global leak).
+checkNegative(
+    'Gestures Actions: dead gestureInProgress flag stays removed',
     'static/ergopti_plus/macos/modules/gestures/actions_click.lua',
-    /local gestureInProgress/
+    /gestureInProgress/
 );
 
 // --- Initialization Audit ---
