@@ -165,3 +165,31 @@ _HMRB_TabAltTabGuarded() {
 	_HMRB_AssertBounded("modules/tap_holds/tab.ahk", "TapHoldTapAction(TapHold, " . Q . "tab" . Q . ") == " . Q . "alt_tab_monitor" . Q, "tab.ahk 8.1 alt_tab_monitor")
 }
 Test("tap-holds: Tab alt_tab_monitor hold release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_TabAltTabGuarded)
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 3/ Whole-class KeyWait guard =============
+; ==================================================
+; ==================================================
+
+; Scans the ENTIRE modules/tap_holds/ directory for any bare KeyWait(key, "U")
+; call — the unbounded form that can latch a modifier or layer permanently on a
+; lost key-up event. The per-block guards above cover the documented regression
+; sites; this guard catches any missed sibling added to any tap_holds file.
+_HMRB_WholeClassNoBareUnbounded() {
+	Q := Chr(34)
+	Src := _DriverDirConcat("modules/tap_holds")
+	; Q . "U" . Q . ")" is the 4-char token "U") — the bare unbounded form of the
+	; KeyWait mode argument. The bounded form "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC
+	; never produces this token because the timeout constant follows before the closing
+	; paren, making the mode string "U T<N>" not "U".
+	Assert(!InStr(Src, Q . "U" . Q . ")"),
+		"modules/tap_holds/ contains a bare KeyWait(key, " . Q . "U" . Q . ") "
+		. "— all hold-modifier and hold-layer long-press waits must use "
+		. Q . "U T" . Q . " . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC "
+		. "so a lost key-up never latches a modifier or layer permanently")
+}
+Test("tap-holds: no bare unbounded KeyWait anywhere in modules/tap_holds/ (hold-keywait-whole-class)", _HMRB_WholeClassNoBareUnbounded)
