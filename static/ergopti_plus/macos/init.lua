@@ -335,6 +335,19 @@ end
 local config_overrides = require("lib.config_overrides")
 config_overrides.apply(menu_paths.get("ConfigTomlPath"))
 
+-- Re-apply the log level AFTER overrides. Logger.set_level already ran at boot
+-- (above), BEFORE config_overrides — so a [script] log_level / LogLevel override
+-- (which config_overrides maps onto the canonical "ergopti.log_level" key) would
+-- otherwise be written but never consumed. Re-derive and apply it here so the
+-- documented expert override actually takes effect on a reload.
+do
+	local lvl = hs.settings.get("ergopti.log_level")
+	local valid_levels = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
+	if type(lvl) == "string" and valid_levels[lvl:upper()] then
+		Logger.set_level(lvl:upper())
+	end
+end
+
 local Preferences = require("ui.menu.preferences")
 local ok_core_llm, core_llm = pcall(require, "modules.llm")
 local boot_saved_prefs = Preferences.load(menu_paths.get("ConfigTomlPath"))
