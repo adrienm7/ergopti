@@ -32,9 +32,14 @@ helpers.assert_true(
 	"The shutdown MLX kill block must be guarded by 'if not reload_guard.is_reloading()'"
 )
 
+-- F-M7 moved the actual pgrep/lsof sweep into the shared
+-- menu_llm.terminate_orphan_mlx_server() (so the shutdown and script_quit paths
+-- cannot drift). The reload GATE — the invariant this test protects — still wraps
+-- the kill: the guarded region must invoke that shared helper. The pgrep command
+-- itself is asserted in test_script_quit_kills_karabiner / test_audit_senior_hs_fixes.
 helpers.assert_true(
-	region:find("pgrep", 1, true) ~= nil,
-	"The guarded region must contain the pgrep kill command"
+	region:find("terminate_orphan_mlx_server", 1, true) ~= nil,
+	"The reload-guarded region must invoke menu_llm.terminate_orphan_mlx_server (the MLX kill)"
 )
 
 print("[PASS] test_init_mlx_kill_reload_gated")
