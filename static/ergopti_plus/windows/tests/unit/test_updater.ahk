@@ -29,6 +29,22 @@ _UpdaterTest_CompareVersions() {
 }
 Test("Updater: semver comparisons", _UpdaterTest_CompareVersions)
 
+
+_UpdaterTest_VersionVectorParity() {
+	; D-1 parity gate: _Updater_CompareVersions MUST agree with the shared
+	; cross-driver vector table (also driven by the JS and macOS suites) so the
+	; three hand-ported semver impls cannot drift. The fail-closed non-semver
+	; fallback (expect 0) is the case that had drifted before D-1.
+	VectorsPath := A_ScriptDir . "\..\..\_shared\modules\updater\version_vectors.json"
+	AssertTrue(FileExist(VectorsPath) != "", "version vectors must exist at: " . VectorsPath)
+	Data := JsonParse(FileRead(VectorsPath, "UTF-8"))
+	Vectors := Data["vectors"]
+	AssertTrue(Vectors.Length >= 10, "version vectors: >=10 expected, got " . Vectors.Length)
+	for _, V in Vectors
+		AssertEqual(V["expect"], _Updater_CompareVersions(V["a"], V["b"]), "compare(" . V["a"] . ", " . V["b"] . ") [" . V["id"] . "]")
+}
+Test("Updater: cross-driver version vectors (version-compare-parity)", _UpdaterTest_VersionVectorParity)
+
 _UpdaterTest_ParseVersion() {
 	v := _Updater_ParseVersion("v2.5.0-dev.3")
 	AssertEqual(2, v.Maj)

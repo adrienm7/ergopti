@@ -212,7 +212,7 @@ En place : [`windows/README.md`](../static/ergopti_plus/windows/README.md), [`ma
 | ☐ | **P10.1** D-2 | Updater single-source · TOML **mort** (0 lecteur), en-tête faux | brancher les 2 drivers sur le TOML **ou** supprimer le TOML+en-tête (§5.6). *Test :* `test_updater_constants_single_source.{ahk,lua}`. **Moyen** (`reload_only` si branché) |
 | ☐ | **P10.2** D-3 | Stop-tokens single-source · drift MLX | bloc `stop_sequences` dans `_shared/modules/llm/inference.json`. *Test :* `test_llm_stop_sequences_single_source`. **Faible** (ollama) — MLX = M4 |
 | ✅ | **P10.3** | Littéraux → manifeste · `chatgpt_url`/`gpt.link`/`Qwen3.5-0.8B` | ✅ macOS `chatgpt_url` lit `Manifest.default_for` + drift guard (HS 2459/0) ; AHK `gpt.link` fallback littéral supprimé → fail-fast (lit `Features["shortcuts"]["gpt"]["link"]`) ; modèle `Qwen3.5-0.8B` single-sourcé dans `_LLM_LOCAL_DEFAULTS` (`models.ahk`+`actions.ahk` lisent la map). Guard `test-llm-model-single-source.cjs` câblé (`test:js` 33/33, AHK 2523/0). |
-| ☐ | **P10.4** D-1 | Parity gate semver · fallback **divergent** | **décision M3** (fail-closed) → vecteurs partagés + `test_version_compare_contract.{js,ahk,lua}`. **Moyen** (`feat`) |
+| ✅ | **P10.4** D-1 | Parity gate semver · fallback **divergent** | ✅ M3 tranché → **fail-closed partout** : JS `version.js` + AHK `core.ahk` alignés sur macOS (déjà fail-closed). SSoT `_shared/modules/updater/version_vectors.json` (16 vecteurs, dont non-semver). Gate 3 drivers : JS `test-version-compare-contract.cjs` (test:js 34/34), AHK `ok 873` (2524/0), macOS 16 vecteurs (2476/0) — tous lisent le même fichier. Bonus : test macOS source-grep converti en behavior (ratchet 134→133). `feat` assumé. |
 
 #### P11 — Splits god-files (mirror, behavior-neutral, `reload_only`)
 
@@ -402,7 +402,7 @@ CI gate **monotone** (échoue si ça monte), comme le ratchet `hs.*`.
 | ☐ | 2 | 12 presets · `core.ahk:71-84`,`updater.lua:38-51`,`constants.toml:23-69` | `shared_defaults` | non | `test_updater_interval_presets_match_shared` |
 | ☐ | 3 | interval 86400 + boot 30 · `core.ahk:30`,`updater.lua:19-20`,`constants.toml:17,19` | `shared_defaults` | non | étendre #1 |
 | ☐ | 4 | noms d'asset `.exe`/`.app.zip` · `updater.lua:16`,`constants.toml:12-13` | `driver_specific` | non | si branché : asset==`[assets].<platform>` |
-| ☐ | 5 | semver + **fallback divergent** · `version.js:89-111`,`core.ahk:270-337`,`updater.lua:69-133` | `driver_specific` + gate | **oui** | `test_version_compare_contract.{js,ahk,lua}` |
+| ✅ | 5 | semver + **fallback divergent** · `version.js:89-111`,`core.ahk:270-337`,`updater.lua:69-133` | `driver_specific` + gate | **oui** | ✅ fail-closed partout + `version_vectors.json` 3-driver gate (P10.4) |
 | ☐ | 6 | stop-tokens (**drift MLX**) · `api_ollama.ahk:111-112`,`api_ollama.lua:280-281`,`api_mlx_inference.lua:104-105` | `shared_defaults` | non/M4 | `test_llm_stop_sequences_single_source` |
 | ☐ | 7 | `chatgpt_url` macOS · `bindings.lua:36`↔`manifest.toml:1048` | `manifest` | non | `test_shortcuts_chatgpt_url_from_manifest` |
 | ☐ | 8 | `gpt.link` AHK · `gestures/init.ahk:604`↔`manifest.toml:1061` | `manifest` | non | `test_gpt_link_single_source` |
@@ -425,7 +425,7 @@ CI gate **monotone** (échoue si ça monte), comme le ratchet `hs.*`.
 |----|---|----------|-------------------------|
 | ☐ | **M1** | `lib/` foldérisé (Win) vs plat (macOS) | (a) Win→plat (b) macOS→folder (c) statu quo+doc. **Reco (c)** (l'ordre `#Include`/`#InputLevel` porte des invariants). **Élevé** |
 | ☐ | **M2** | Frontière `keymap`/`llm` (`llm_bridge` sous `modules/llm` Win vs `modules/keymap` macOS) | aligner le parent. **Reco : différer** (couple M1). **Élevé** |
-| ☐ | **M3** | D-1 fallback semver (lexico vs fail-closed, **déjà divergent**) | **Reco : fail-closed partout** avant le gate. **Moyen — `feat`** |
+| ✅ | **M3** | D-1 fallback semver (lexico vs fail-closed, **déjà divergent**) | ✅ **tranché : fail-closed partout** (P10.4) — JS + AHK alignés sur macOS, parity gate à vecteurs partagés en place. |
 | ☐ | **M4** | D-3 sous-ensemble MLX des stop-tokens (drop voulu ?) | unifier vs clé `mlx` distincte. **Reco : clé distincte** si drop voulu. **Faible** |
 | ☐ | **M5** | Splits parité 1:1 (`keylogger_walker.ahk`↔`aggregator.lua`) | splitter **ensemble** ou laisser. **Reco : laisser** sauf besoin testabilité. **Élevé** |
 | ☐ | **M6** | Adapters OS-helpers Windows (`shell_runner/toml_cache/json_codec`) | ajouter (symétrie/SOLID-I) vs accepter l'asymétrie. **Reco : ajouter `shell_runner`**, différer le reste. **Moyen** |

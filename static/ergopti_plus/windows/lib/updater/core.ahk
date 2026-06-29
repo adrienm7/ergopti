@@ -327,10 +327,12 @@ _Updater_CompareVersions(A, B) {
 	Pa := _Updater_ParseVersion(A)
 	Pb := _Updater_ParseVersion(B)
 	if (Pa == 0 or Pb == 0) {
-		Na := _Updater_NormalizeTag(A)
-		Nb := _Updater_NormalizeTag(B)
-		Cmp := StrCompare(Na, Nb)
-		return (Cmp > 0) ? 1 : (Cmp < 0) ? -1 : 0
+		; Non-semver tag(s): refuse to order them. Fail closed (return 0 = "not
+		; newer") rather than guess lexicographically — "10" vs "9" and other
+		; ambiguous tags must never trigger or suppress an update by accident.
+		; Mirrors macOS lib/updater.lua + _shared/.../version.js; kept in
+		; lock-step by the version-compare parity gate (D-1)
+		return 0
 	}
 	if (Pa.Maj != Pb.Maj)
 		return (Pa.Maj > Pb.Maj) ? 1 : -1

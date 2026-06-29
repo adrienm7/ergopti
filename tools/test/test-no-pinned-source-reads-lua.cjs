@@ -34,7 +34,7 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'tests');
 // Frozen baseline — the current count of path-pinned source-reading macOS test
 // files. Drive toward zero by migrating each to a behaviour assertion or a
 // move-resilient helper; NEVER raise it to make a new test pass.
-const BASELINE = 134;
+const BASELINE = 133;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read). None exists yet;
 // listed so that converting a test to such a helper drops it from the count.

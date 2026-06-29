@@ -1,45 +1,39 @@
 --- tests/unit/lib/test_updater_version_compare.lua
 
---- Regression test for lib-update-03: updater.lua compare_versions() used
---- lexicographic string comparison (na > nb) as a fallback for non-semver tags.
---- This returned the wrong result for tags like "10" vs "9" ("10" < "9"
---- lexicographically), which could cause the updater to miss an available update.
+--- Behavior parity gate for the semver comparator (lib-update-03 + D-1).
+--- Drives macos/lib/updater.lua compare_versions over the SHARED cross-driver
+--- vector table (_shared/modules/updater/version_vectors.json), which the JS
+--- (tools/test/test-version-compare-contract.cjs) and AHK (test_updater.ahk)
+--- suites also read. Non-semver tags MUST be fail-closed (expect 0) so an
+--- ambiguous tag like "10" vs "9" can neither trigger nor suppress an update —
+--- that lexicographic drift is exactly what this gate prevents.
 ---
---- Fix: the non-semver fallback is now fail-closed — it returns 0 (equal) and
---- logs a WARNING, ensuring ambiguous comparisons never incorrectly trigger an
---- update or block one.
+--- This loads the module and asserts the RESULT, replacing the former
+--- source-grep (which broke on a file move and asserted text tokens, not the
+--- comparison outcome).
 
 local helpers = require("tests.helpers")
+local json    = require("json")
 
-local src_path = helpers.driver_root() .. "lib/updater.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("updater.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+helpers.describe("updater.compare_versions: cross-driver version vectors (version-compare-parity)", function()
+	-- lib.updater requires lib.logger / lib.dialog_util; stub the logger so the
+	-- pure comparator loads headless under the hs stub.
+	package.loaded["lib.logger"] = helpers.make_logger_stub()
+	local updater = helpers.load_with_stubs("lib.updater")
 
--- Test 1: the old lexicographic fallback must not be present.
-local cmp_pos = src:find("function M.compare_versions(", 1, true)
-helpers.assert_true(cmp_pos ~= nil, "updater.lua must define M.compare_versions (lib-update-03)")
-local cmp_body = src:sub(cmp_pos, cmp_pos + 600)
+	local path = helpers.shared("modules/updater/version_vectors.json")
+	local fh = io.open(path, "r")
+	helpers.assert_true(fh ~= nil, "version vectors must exist at: " .. path)
+	local raw = fh:read("*a") ; fh:close()
+	local vectors = (json.decode(raw) or {}).vectors or {}
+	helpers.assert_true(#vectors >= 10, "version vectors: >=10 expected, got " .. #vectors)
 
--- Old pattern: "return na > nb and 1 or -1"
-local has_old_lex = cmp_body:find("na > nb and 1 or %-1", 1, false) ~= nil
-helpers.assert_true(
-	not has_old_lex,
-	"compare_versions must not use lexicographic fallback (na > nb and 1 or -1) for non-semver (lib-update-03)"
-)
-
--- Test 2: the fallback must return 0 (fail-closed).
-local has_fail_closed = cmp_body:find("return 0", 1, true) ~= nil
-helpers.assert_true(
-	has_fail_closed,
-	"compare_versions non-semver fallback must return 0 (fail-closed) (lib-update-03)"
-)
-
--- Test 3: the fallback must log a warning.
-local has_warn = cmp_body:find("Logger.warn", 1, true) ~= nil
-helpers.assert_true(
-	has_warn,
-	"compare_versions non-semver fallback must call Logger.warn (lib-update-03)"
-)
-
-print("[PASS] test_updater_version_compare")
+	for _, v in ipairs(vectors) do
+		helpers.it(
+			"compare(" .. v.a .. ", " .. v.b .. ") == " .. tostring(v.expect) .. " [" .. v.id .. "]",
+			function()
+				helpers.assert_eq(updater.compare_versions(v.a, v.b), v.expect, v.id)
+			end
+		)
+	end
+end)
