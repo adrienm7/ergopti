@@ -102,7 +102,9 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 			local applied = Overrides.apply(path)
 
 			helpers.assert_true(applied >= 1, "applied count")
-			helpers.assert_eq(stored["LogLevel"], "INFO", "LogLevel after comment strip")
+			-- LogLevel maps to the canonical ergopti.log_level key (F-M4); the comment
+			-- must still be stripped from the value.
+			helpers.assert_eq(stored["ergopti.log_level"], "INFO", "LogLevel after comment strip")
 		end)
 	end)
 

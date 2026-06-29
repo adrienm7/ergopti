@@ -81,7 +81,11 @@ LogLevel = "DEBUG"
 ]], function(path)
 			local applied = Overrides.apply(path)
 			helpers.assert_true(applied >= 1)
-			helpers.assert_eq(stored["LogLevel"], "DEBUG")
+			-- log_level / LogLevel are special-cased onto the canonical key the logger
+			-- restore reads (ergopti.log_level); a bare "LogLevel" key has no reader and
+			-- would silently no-op (F-M4).
+			helpers.assert_eq(stored["ergopti.log_level"], "DEBUG")
+			helpers.assert_nil(stored["LogLevel"])
 		end)
 	end)
 
