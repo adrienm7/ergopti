@@ -283,6 +283,8 @@ end
 
 local _suite_results = { passed = 0, failed = 0, failures = {} }
 local _before_each_fn = nil
+-- When set (via --only), M.it runs only tests whose name contains this substring.
+local _only_filter = nil
 
 --- Declares a test suite (analogous to busted’s `describe`).
 --- @param name string Suite name, printed in the output.
@@ -310,6 +312,10 @@ end
 --- @param name string Test name, printed in the output.
 --- @param fn function Test body.
 function M.it(name, fn)
+	-- --only <substr>: run only tests whose name contains the filter (plain
+	-- substring, no Lua pattern magic) so one behaviour can be re-run in
+	-- isolation from a red message (REFACTOR_GUIDE P9.5).
+	if _only_filter and not string.find(name, _only_filter, 1, true) then return end
 	local ok, err = pcall(function()
 		if _before_each_fn then _before_each_fn() end
 		fn()
@@ -352,5 +358,9 @@ function M.reset_results()
 	_suite_results.failed = 0
 	_suite_results.failures = {}
 end
+
+--- Restricts M.it execution to tests whose name contains `substr` (the --only filter).
+--- @param substr string|nil Substring to match; nil clears the filter (run all).
+function M.set_only_filter(substr) _only_filter = substr end
 
 return M

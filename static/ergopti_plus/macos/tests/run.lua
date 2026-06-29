@@ -66,6 +66,24 @@ package.path = table.concat({
 
 local helpers = require("tests.helpers")
 
+-- --only <substr> / --only=<substr>: run only test cases whose name contains the
+-- substring, so a single behaviour can be re-run in isolation from a red message
+-- (REFACTOR_GUIDE P9.5). arg is the global Lua args table.
+local only_filter = nil
+if arg then
+	for i = 1, #arg do
+		if arg[i] == "--only" then
+			only_filter = arg[i + 1]
+		elseif type(arg[i]) == "string" and arg[i]:match("^%-%-only=") then
+			only_filter = arg[i]:gsub("^%-%-only=", "")
+		end
+	end
+end
+if only_filter and only_filter ~= "" then
+	helpers.set_only_filter(only_filter)
+	print(string.format("Filtering to test cases matching: %q", only_filter))
+end
+
 -- Inject the hs stub as a global before any test loads source modules
 _G.hs = require("tests.stubs.hs")
 
@@ -185,7 +203,10 @@ print(string.format(
 if r.failed > 0 then
 	print("\n--- DETAILED FAILURES ---")
 	for i, f in ipairs(r.failures) do
-		print(string.format("[%d] %s\n    Error: %s\n", i, f.name, f.err))
+		print(string.format(
+				"[%d] %s\n    Error: %s\n    replay: lua tests/run.lua --only %q\n",
+				i, f.name, f.err, f.name
+			))
 	end
 	os.exit(1)
 end

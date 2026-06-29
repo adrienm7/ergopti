@@ -53,6 +53,23 @@ package.path = table.concat({
 
 local helpers = require("tests.helpers")
 
+-- --only <substr> / --only=<substr>: run only test cases whose name contains the
+-- substring, so a single behaviour can be re-run in isolation (REFACTOR_GUIDE P9.5).
+local only_filter = nil
+if arg then
+	for i = 1, #arg do
+		if arg[i] == "--only" then
+			only_filter = arg[i + 1]
+		elseif type(arg[i]) == "string" and arg[i]:match("^%-%-only=") then
+			only_filter = arg[i]:gsub("^%-%-only=", "")
+		end
+	end
+end
+if only_filter and only_filter ~= "" then
+	helpers.set_only_filter(only_filter)
+	print(string.format("Filtering to test cases matching: %q", only_filter))
+end
+
 
 -- ===================================
 -- ===================================
@@ -144,13 +161,13 @@ end
 
 local r = helpers.get_results()
 print(string.format(
-	"\n========================================\nTotal: %d module(s) loaded — %d passed, %d failed\n========================================",
+	"\n========================================\nOVERALL RESULTS:\nTotal modules: %d\nPassed tests:  %d\nFailed tests:  %d\n========================================",
 	total_modules, r.passed, r.failed
 ))
 
 if r.failed > 0 then
 	for _, f in ipairs(r.failures) do
-		print(string.format("  - %s : %s", f.name, f.err))
+		print(string.format("  - %s : %s\n    replay: luajit tests/run.lua --only %q", f.name, f.err, f.name))
 	end
 	os.exit(1)
 end

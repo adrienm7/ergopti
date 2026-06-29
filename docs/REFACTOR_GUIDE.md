@@ -203,7 +203,7 @@ En place : [`windows/README.md`](../static/ergopti_plus/windows/README.md), [`ma
 | ☐ | **P9.2** | « un déplacement ne casse aucun test » · 128 file-pinnés | méta-test `git mv` à blanc en worktree temp → compte de tests inchangé. **Moyen** |
 | ☐ | **P9.3** | Collapse invariants whole-class · 8 missed-siblings | scan déclaratif unique (modèle `test_require_state_pattern.lua`). *Diag :* « bloc Z non borné ». `AHK`/`HS`. **Moyen** |
 | ☐ | **P9.4** | Conversion behavior (bucket A) · 226 AHK + 128 macOS | convertir par lot ; chaque conv = behavior rouge-avant/vert-après. `AHK`/`HS`. **Faible** (tests-only) |
-| ☐ | **P9.5** | Replay 1-test + slug · macOS/Linux sans `--only` | `--only <substr>` dans `macos/tests/run.lua`+`linux/tests/run.lua` ; footer Linux aligné ; lint slug kebab. **Faible** |
+| ✅ | **P9.5** | Replay 1-test + slug · macOS/Linux sans `--only` | ✅ `--only <substr>` ajouté aux runners macOS + Linux (+ helpers) ; ligne `replay: … --only "<nom>"` sous chaque échec ; footer Linux aligné sur `Passed/Failed tests:` (parsable par `report.cjs`). Vérifié vert (macOS 2459/0, Linux 37/0) + filtre OK. *Reste :* lint slug-kebab (passe séparée, flaggerait beaucoup de noms existants). |
 
 #### P10 — Defaults & SSoT — *détail §7*
 
