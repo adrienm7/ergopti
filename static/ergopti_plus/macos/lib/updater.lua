@@ -9,15 +9,52 @@ local hs           = hs
 local Logger       = require("lib.logger")
 local i18n       = require("lib.i18n")
 local dialog     = require("lib.dialog_util")
+local Paths      = require("lib.paths")
+local FileSystem = require("adapters.file_system")
+local JsonCodec  = require("adapters.json_codec")
 local LOG        = "updater"
 
-local GH_OWNER   = "adrienm7"
-local GH_REPO    = "ergopti"
+-- Hardcoded fallback — mirrors defaults.json committed alongside. Keeps the
+-- engine functional when the shared tree is unreachable (packaged edge-case).
+local _DEFAULTS_FALLBACK = {
+	github = { owner = "adrienm7", repo = "ergopti" },
+	timing = { default_check_interval_sec = 86400, boot_check_delay_sec = 30 },
+}
+
+--- Loads shared scalars from _shared/modules/updater/defaults.json. Falls back
+--- to _DEFAULTS_FALLBACK so a missing/corrupt JSON is never silent.
+--- @return table The parsed or fallback defaults table.
+local function load_updater_defaults()
+	local p = Paths.shared("modules/updater/defaults.json")
+	if type(p) == "string" and p ~= "" then
+		local raw = FileSystem.read(p)
+		if raw then
+			local ok, parsed = pcall(JsonCodec.decode, raw)
+			if ok and type(parsed) == "table" then
+				Logger.debug(LOG, "Loaded updater defaults from %s.", p)
+				return parsed
+			end
+		end
+	end
+	Logger.warn(LOG, "defaults.json not found — using hardcoded updater fallback.")
+	return _DEFAULTS_FALLBACK
+end
+
+local _defs = load_updater_defaults()
+local GH_OWNER             = (_defs.github and _defs.github.owner) or _DEFAULTS_FALLBACK.github.owner
+local GH_REPO              = (_defs.github and _defs.github.repo)  or _DEFAULTS_FALLBACK.github.repo
+local DEFAULT_INTERVAL_SEC = (_defs.timing and _defs.timing.default_check_interval_sec) or _DEFAULTS_FALLBACK.timing.default_check_interval_sec
+local BOOT_CHECK_DELAY_SEC = (_defs.timing and _defs.timing.boot_check_delay_sec)        or _DEFAULTS_FALLBACK.timing.boot_check_delay_sec
+
+-- Exposed for testability — let unit tests assert the resolved values.
+M.GH_OWNER             = GH_OWNER
+M.GH_REPO              = GH_REPO
+M.DEFAULT_INTERVAL_SEC = DEFAULT_INTERVAL_SEC
+M.BOOT_CHECK_DELAY_SEC = BOOT_CHECK_DELAY_SEC
+
 local ASSET_NAME = "ErgoptiPlus.app.zip"
 local BUNDLED_ID = "com.ergopti.app"
 local USER_AGENT = "ErgoptiPlus-Updater/1.0"
-local DEFAULT_INTERVAL_SEC = 86400
-local BOOT_CHECK_DELAY_SEC = 30
 local DEV_PAGE_SIZE = 10
 
 -- Module state shared with menu_about.lua
