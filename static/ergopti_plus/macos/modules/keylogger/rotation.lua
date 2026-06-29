@@ -82,11 +82,9 @@ local function _today()
 end
 
 --- Returns a "%Y-%m-%d HH:MM:SS.mmm" timestamp string (local time).
-local function _now_ts()
-	return string.format("%s.%03d",
-		os.date("%Y-%m-%d %H:%M:%S"),
-		math.floor(hs.timer.absoluteTime() / 1000000) % 1000)
-end
+-- Single-sourced in modules/keylogger/timestamp.lua so the seconds and the .mmm
+-- fraction share one wall clock (F-L1).
+local _now_ts = require("modules.keylogger.timestamp").now_ts
 
 
 
