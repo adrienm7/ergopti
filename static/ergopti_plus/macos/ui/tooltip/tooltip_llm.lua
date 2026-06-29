@@ -660,29 +660,6 @@ function M.set_timing(ttft_ms, ttlt_ms)
 	end)
 end
 
---- Installs the stable "model + prompt" header at the top of the tooltip.
---- This zone is rendered ONCE at the start of a chain and never redrawn while
---- streaming — pass nil to clear it (e.g. when the chain ends).
---- @param model_name string|nil Display name of the active LLM model.
---- @param prompt_label string|nil Short label of the current prompt.
-function M.set_model_info(model_name, prompt_label)
-	pcall(function()
-		if not model_name and not prompt_label then
-			Renderer.set_element_text(Renderer.ELEM_MODEL_INFO, nil)
-			return
-		end
-		local pieces = {}
-		if model_name   and model_name   ~= "" then pieces[#pieces + 1] = tostring(model_name)   end
-		if prompt_label and prompt_label ~= "" then pieces[#pieces + 1] = tostring(prompt_label) end
-		local text = table.concat(pieces, " · ")
-		local styled = hs.styledtext.new(text, {
-			font           = { name = Config.fonts.main, size = Config.sizes.info },
-			color          = Config.colors.info_bar,
-			paragraphStyle = { alignment = "center" },
-		})
-		Renderer.set_element_text(Renderer.ELEM_MODEL_INFO, styled)
-	end)
-end
 
 --- Records the epoch timestamp at which the active chain started.
 --- Called by prediction_engine right before the first backend dispatch of a

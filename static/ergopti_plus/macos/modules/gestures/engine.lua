@@ -192,7 +192,6 @@ local function resetGS()
 		-- 4-finger swipe ends with one finger lifting before the others.
 		peakN          = 0,
 		peakNFirstSeen = nil,
-		peakNFrames    = 0,  -- Number of frames observed at >= peakN (for sustained-peak detection)
 		-- Candidate spike confirmation state (joining)
 		candidateFingers = nil,
 		candidateSince   = nil,
@@ -601,7 +600,6 @@ function M.process_frame(touches)
 			gs.fingerCountChangedAt = now
 			gs.peakN          = n
 			gs.peakNFirstSeen = now
-			gs.peakNFrames    = 1
 
 			gs.tentativeLifting       = false
 			gs.tentativeLiftingSince  = nil
@@ -614,9 +612,6 @@ function M.process_frame(touches)
 			if n > (gs.peakN or 0) then
 				gs.peakN = n
 				gs.peakNFirstSeen = now
-				gs.peakNFrames = 1
-			elseif n == gs.peakN then
-				gs.peakNFrames = (gs.peakNFrames or 0) + 1
 			end
 
 			-- StartPos Compensation: if finger count changed, the centroid (pos) jumps.
@@ -747,7 +742,6 @@ function M.process_frame(touches)
 					-- not influence the peak override for the fresh one).
 					gs.peakN          = n
 					gs.peakNFirstSeen = now
-					gs.peakNFrames    = 1
 					return
 				end
 			end
