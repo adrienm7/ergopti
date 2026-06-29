@@ -688,7 +688,12 @@ function M.build_management(ctx)
 			Logger.error(LOG, "make_delay_item(): default_val nil for '%s' — keymap.DELAYS_DEFAULT may be outdated.", title)
 			return { title = title .. " : " .. i18n.get("menu.hotstrings.missing_value"), disabled = true }
 		end
-		local cur_val = is_base and state.expansion_delay or (state.delays[key] or default_val)
+		-- Coerce + fail closed to default_val: state.expansion_delay (and per-key
+		-- delays) come straight from config.toml and can be a string (hand edit /
+		-- AHK migration). The engine apply is already type-guarded (menu_state.lua),
+		-- but this arithmetic (cur_val * 1000) would crash the delay submenu build —
+		-- swallowed by the builder pcall, dropping the whole Paramètres submenu (F-L13).
+		local cur_val = tonumber(is_base and state.expansion_delay or (state.delays[key] or default_val)) or default_val
 		local cur_ms = math.floor(cur_val * 1000 + 0.5)
 		local def_ms = math.floor(default_val * 1000 + 0.5)
 		local display_ms = (cur_ms == 0) and i18n.get("menu.hotstrings.infinite") or (cur_ms .. " ms")
