@@ -153,12 +153,17 @@ function M.open_db()
 
 	_db = db
 
-	-- Ensure meta keys exist (INSERT OR IGNORE is idempotent on replay).
+	-- Ensure meta keys exist (INSERT OR IGNORE is idempotent on replay). This set MUST
+	-- stay in lockstep with the meta seeds in _shared/data/db/schema.sql: the schema
+	-- block runs only on a fresh DB, so any key missing here is never back-filled into
+	-- an existing/older DB, and writes to it become silent no-op UPDATEs. 'rev' was the
+	-- omitted key — its UPDATE froze the UI cache-invalidation counter at 0 (F-L2).
 	for _, kv in ipairs({
 		{ "next_event_id",    "1"  },
 		{ "today_log_offset", "0"  },
 		{ "today_log_date",   ""   },
 		{ "ngram_ctx_json",   "{}" },
+		{ "rev",              "0"  },
 	}) do
 		_db:exec(string.format(
 			"INSERT OR IGNORE INTO meta (key, value) VALUES ('%s', '%s');",
