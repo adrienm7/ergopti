@@ -508,40 +508,42 @@ helpers.describe("Generator.build_paused_script_control_rules (exempt-from-pause
 	-- the paused config so the script-management shortcuts stay exempt from pause.
 	local rules = Generator.build_paused_script_control_rules()
 
-	helpers.it("emits 6 rules — 3 slots × {right_command, option}", function()
+	helpers.it("emits 3 rules — one per script-control slot", function()
+		-- While paused the remap is off, so the user reaches these with the REAL option
+		-- key (option+Enter/Backspace/Escape). One rule per slot, option-only — NOT one
+		-- per modifier, and NOT a right_command variant (the user does not press rcmd
+		-- while paused, and rcmd+Backspace/Escape would shadow native macOS chords). F-H6.
 		helpers.assert_true(type(rules) == "table", "must return a table")
-		helpers.assert_eq(#rules, 6)
+		helpers.assert_eq(#rules, 3)
 	end)
 
-	helpers.it("each rule is self-contained: modifier-gated, NO variable_if condition", function()
-		-- The whole point: the paused config strips the holder tap/hold rule, so the
-		-- sentinels must NOT depend on ke_held_* — they gate on a mandatory modifier.
+	helpers.it("each rule is self-contained: option-gated, NO variable_if condition", function()
+		-- The paused config strips the holder tap/hold rule, so the sentinels must NOT
+		-- depend on ke_held_* — they gate directly on the real option key.
 		for _, rule in ipairs(rules) do
 			local m = rule.manipulators[1]
 			helpers.assert_true(type(m) == "table", "rule must have a manipulator")
 			helpers.assert_nil(m.conditions, "paused rule must not use a variable_if holder condition")
 			helpers.assert_true(type(m.from.modifiers) == "table"
 				and type(m.from.modifiers.mandatory) == "table"
-				and #m.from.modifiers.mandatory == 1,
-				"paused rule must gate on a single mandatory modifier")
+				and #m.from.modifiers.mandatory == 1
+				and m.from.modifiers.mandatory[1] == "option",
+				"paused rule must gate on the real option key only")
 		end
 	end)
 
-	helpers.it("covers right_command + either-side option and all three script-control keys", function()
-		-- The accepted modifiers must mirror the HS-side guard (right command + option
-		-- on either side). The side-agnostic "option" un-pauses for users who remap
-		-- their right-hand key to a left/plain option (script-control-altgr-leftmod):
-		-- "right_option" alone never matched their held modifier while paused.
-		local mods, keys = {}, {}
+	helpers.it("gates on the real option key (NOT right_command) for all three keys", function()
+		-- While paused we do not touch the real rcmd; the shortcuts are option+key.
+		local keys = {}
 		for _, rule in ipairs(rules) do
 			local m = rule.manipulators[1]
-			mods[m.from.modifiers.mandatory[1]] = true
+			local set = {}
+			for _, mod in ipairs(m.from.modifiers.mandatory) do set[mod] = true end
+			helpers.assert_true(set.option, "option must be mandatory in every paused rule")
+			helpers.assert_true(set.right_command == nil,
+				"paused rules must NOT gate on right_command — rcmd is not used while paused")
 			keys[m.from.key_code] = true
 		end
-		helpers.assert_true(mods.right_command, "right_command must un-pause")
-		helpers.assert_true(mods.option, "either-side option must un-pause (covers a remapped left/plain option)")
-		helpers.assert_true(mods.right_option == nil,
-			"the side-specific right_option is replaced by the side-agnostic option")
 		helpers.assert_true(keys.return_or_enter and keys.delete_or_backspace and keys.escape,
 			"all three script-control keys must be present")
 	end)
@@ -562,18 +564,19 @@ helpers.describe("Generator.build_paused_script_control_rules (exempt-from-pause
 		end
 	end)
 
-	helpers.it("right_command + return emits the F13 return sentinel", function()
-		-- With the test keycode stub, F13_KARABINER_RETURN = 105 → to_name → "key_105".
+	helpers.it("option + return emits the F13 return sentinel", function()
+		-- Paused rules gate on the REAL option key (F-H6). With the test keycode stub,
+		-- F13_KARABINER_RETURN = 105 → to_name → "key_105".
 		local found = false
 		for _, rule in ipairs(rules) do
 			local m = rule.manipulators[1]
-			if m.from.modifiers.mandatory[1] == "right_command"
+			if m.from.modifiers.mandatory[1] == "option"
 				and m.from.key_code == "return_or_enter" then
 				helpers.assert_eq(m.to[1].key_code, "key_105", "return sentinel must be F13")
 				found = true
 			end
 		end
-		helpers.assert_true(found, "right_command + return rule must exist")
+		helpers.assert_true(found, "option + return rule must exist")
 	end)
 end)
 

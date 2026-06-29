@@ -686,36 +686,32 @@ end
 --- AltGr+Enter / Backspace / Escape keep emitting F13 / F14 / F15 (consumed by
 --- modules/shortcuts/script_control.lua) even while every other remap is off, so
 --- the script-control shortcuts stay identical and working while paused.
---- The accepted modifiers MUST mirror the HS-side guard (KeyState.is_right_altgr_held):
---- right_command + option on EITHER side. The side-agnostic "option" is required
---- for users who remap their right-hand key to a left/plain option via their own
---- Karabiner rules — `right_option` alone never matched their held modifier, so the
---- paused sentinel was not emitted and a second AltGr+Enter could not un-pause.
---- @return table List of Karabiner rule objects (one per modifier × slot).
+--- While paused the remap layer is OFF, so the user reaches these shortcuts with the
+--- REAL option key — option+Enter / option+Backspace / option+Escape. The rules gate
+--- ONLY on the side-agnostic real "option" key and deliberately do NOT include a
+--- right_command variant: the user does not press the real rcmd while paused, and a
+--- right_command+Backspace/Escape rule would shadow native macOS chords (e.g.
+--- Cmd+Delete = delete-to-line-start). One rule per slot (F-H6).
+--- @return table List of Karabiner rule objects (one per slot).
 function M.build_paused_script_control_rules()
 	local rules = {}
-	-- right_command + option (either side) un-pause while paused — mirrors the
-	-- HS-side AltGr guard so the same physical chord that pauses also resumes.
-	local mods = { "right_command", "option" }
 	for _, slot in ipairs(SCRIPT_CONTROL_SENTINEL_SLOTS) do
-		for _, mod in ipairs(mods) do
-			rules[#rules + 1] = {
-				description  = string.format(
-					"Paused script control: %s + %s → %s",
-					mod, slot.from_key, slot.sentinel
-				),
-				manipulators = {
-					{
-						type = "basic",
-						from = {
-							key_code  = slot.from_key,
-							modifiers = { mandatory = { mod }, optional = { "any" } },
-						},
-						to = { { key_code = slot.sentinel, modifiers = { SCRIPT_CONTROL_SENTINEL_TAG } } },
+		rules[#rules + 1] = {
+			description  = string.format(
+				"Paused script control: option + %s → %s",
+				slot.from_key, slot.sentinel
+			),
+			manipulators = {
+				{
+					type = "basic",
+					from = {
+						key_code  = slot.from_key,
+						modifiers = { mandatory = { "option" }, optional = { "any" } },
 					},
+					to = { { key_code = slot.sentinel, modifiers = { SCRIPT_CONTROL_SENTINEL_TAG } } },
 				},
-			}
-		end
+			},
+		}
 	end
 	return rules
 end
