@@ -90,10 +90,12 @@ function compareVersions(a, b) {
 	const pa = parseVersion(a);
 	const pb = parseVersion(b);
 	if (!pa || !pb) {
-		const na = normalizeTag(a);
-		const nb = normalizeTag(b);
-		if (na === nb) return 0;
-		return na > nb ? 1 : -1;
+		// Non-semver tag(s): refuse to order them. Fail closed (return 0 = "not
+		// newer") rather than guess lexicographically — "10" vs "9" and other
+		// ambiguous tags must never trigger or suppress an update by accident.
+		// Mirrors macOS lib/updater.lua and AHK _Updater_CompareVersions; the
+		// three are kept in lock-step by the version-compare parity gate (D-1).
+		return 0;
 	}
 	if (pa.major !== pb.major) return pa.major > pb.major ? 1 : -1;
 	if (pa.minor !== pb.minor) return pa.minor > pb.minor ? 1 : -1;
@@ -257,7 +259,7 @@ function versionTestVectors() {
 	];
 }
 
-module.exports = {
+export {
 	DEFAULT_GH_OWNER,
 	DEFAULT_GH_REPO,
 	DEV_RELEASES_PAGE_SIZE,
