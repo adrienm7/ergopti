@@ -585,6 +585,17 @@ function M.update_preview(buf)
 				or HOTSTRING_CHAIN_OFFSET_SEC
 			Logger.debug(LOG, "LLM chain scheduled in %.3gs.", chain_delay)
 			engine.start_timer(chain_delay)
+		elseif llm_on then
+			-- Chain-after-hotstring is OFF but the LLM is on. update_preview stopped the
+			-- inactivity timer at the top and this matches branch otherwise re-arms
+			-- NOTHING, so predictions would silently stop on any keystroke whose buffer
+			-- tail matches a hotstring trigger. Re-arm the inactivity timer exactly as
+			-- the no-match branch does (F-L9).
+			if is_word_boundary(buf) then
+				engine.start_timer_word_end()
+			else
+				engine.start_timer()
+			end
 		end
 
 		local trigger_key = primary_match.input or last_word
