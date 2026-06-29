@@ -433,7 +433,7 @@ LLM_Menu_EnsureModelReady() {
 	_LLM_WarmInstalledTagsSync()
 	model := _LLM_Menu["model"]
 	if (model == "")
-		model := _LLM_DefaultFor("llm_model", "Qwen3.5-0.8B")
+		model := _LLM_DefaultFor("llm_model", _LLM_LOCAL_DEFAULTS["llm_model"])
 	if LLM_IsModelInstalled(model) {
 		if (_LLM_Menu["model"] == "")
 			_LLM_Menu["model"] := model

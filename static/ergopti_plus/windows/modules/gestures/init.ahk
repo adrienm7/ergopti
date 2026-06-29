@@ -601,7 +601,7 @@ GestureOpenConfiguredURL() {
         URL := Features["shortcuts"]["gpt"]["link"]
     }
     if (URL = "")
-        URL := "https://chatgpt.com/"
+        return  ; link comes from the manifest-backed Features map above (the SSoT); an empty link is a config bug, fail fast rather than mask it with a hardcoded fallback (rules 5.2/5.4)
     Run(URL)
 }
 

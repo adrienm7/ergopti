@@ -44,6 +44,7 @@ const CHECKS = [
 	{ name: 'max_tokens single source (no literal default in backend adapters)', cmd: 'node', args: ['tools/test/test-max-tokens-single-source.cjs'], repro: 'node tools/test/test-max-tokens-single-source.cjs' },
 	{ name: 'temperature single source (no literal 0.1 default in macOS adapters)', cmd: 'node', args: ['tools/test/test-temperature-single-source.cjs'], repro: 'node tools/test/test-temperature-single-source.cjs' },
 	{ name: 'ollama port single source (no hardcoded port literal in AHK LLM files)', cmd: 'node', args: ['tools/test/test-ollama-port-single-source.cjs'], repro: 'node tools/test/test-ollama-port-single-source.cjs' },
+	{ name: 'LLM model + GPT link single source (no re-typed default literals in AHK)', cmd: 'node', args: ['tools/test/test-llm-model-single-source.cjs'], repro: 'node tools/test/test-llm-model-single-source.cjs' },
 	{ name: 'shared TOML codec purity (no hard driver requires — loads on every Lua runtime)', cmd: 'node', args: ['tools/test/test-shared-toml-codec-purity.cjs'], repro: 'node tools/test/test-shared-toml-codec-purity.cjs' },
 	{ name: 'no fallback literals (LLM defaults read from JSON, never a deleted mirror)', cmd: 'node', args: ['tools/test/test-no-fallback-literals.cjs'], repro: 'node tools/test/test-no-fallback-literals.cjs' },
 	{ name: 'cross-driver manifest equivalence (resolved values identical across drivers)', cmd: 'node', args: ['tools/test/test-manifest-equivalence.cjs'], repro: 'node tools/test/test-manifest-equivalence.cjs' },
