@@ -478,6 +478,12 @@ function M.new(deps)
 		if deps.active_tasks and deps.active_tasks["mlx_server"] then
 			pcall(function() deps.active_tasks["mlx_server"]:terminate() end)
 			deps.active_tasks["mlx_server"] = nil
+			-- Make the readiness reset INTRINSIC to "MLX stops serving", not incidental
+			-- to the process dying: clear the server identity and force a fresh readiness
+			-- verdict so a stale-true _is_ready / _server_target can never describe a
+			-- killed server (the latent MLX twin of the Ollama stale-ready bug, F-L15).
+			obj._server_target = nil
+			pcall(function() require("modules.llm.api_mlx").reset_endpoints() end)
 			Logger.info(LOG, "MLX server stopped safely.")
 		end
 	end
