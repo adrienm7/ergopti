@@ -125,7 +125,6 @@ M.force_cleanup           = Click.force_cleanup
 M.toggle_right_click      = Click.toggle_right_click
 M.toggle_left_click       = Click.toggle_left_click
 M.is_right_click_held     = Click.is_right_click_held
-M.set_gesture_in_progress = Click.set_gesture_in_progress
 
 local function show_application_switcher_overlay()
     pcall(hs.eventtap.keyStroke, {"cmd"}, "tab")

@@ -32,7 +32,6 @@ local CLICK_COOLDOWN_SEC = Timings.sec("gestures", "click_cooldown_ms")
 
 local rightClickHeld    = false
 local leftClickHeld     = false
-local gestureInProgress = false
 local rightMouseTap     = nil
 local leftMouseTap      = nil
 local click_key_watcher = nil
@@ -245,12 +244,6 @@ end
 --- @return boolean Whether a synthetic right-click is currently held.
 function M.is_right_click_held()
 	return rightClickHeld
-end
-
---- Records whether a gesture is currently in progress.
---- @param active boolean True while a gesture is being processed.
-function M.set_gesture_in_progress(active)
-	gestureInProgress = active
 end
 
 return M
