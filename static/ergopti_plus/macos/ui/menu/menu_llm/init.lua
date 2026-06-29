@@ -173,6 +173,26 @@ function M.terminate_helper_processes()
 	pcall(hs.execute, "pkill -f 'ergopti_plus_http_server'", true)
 end
 
+--- Kills any orphan mlx_lm.server and frees its listening port. stop_mlx_server()
+--- only terminates the in-process hs.task WRAPPER; the Python server runs in its
+--- OWN process group (set +m) and survives that, so it must be reaped explicitly
+--- via pgrep/lsof. Shared by BOTH the hs.shutdownCallback genuine-quit branch and
+--- the script_quit (os.exit) action so the two quit paths can never drift — without
+--- this, script_quit left the GPU-resident server holding the port (F-M7). The port
+--- is read from the single source api_mlx.get_port().
+function M.terminate_orphan_mlx_server()
+	pcall(function()
+		local ok_m, am = pcall(require, "modules.llm.api_mlx")
+		local raw_port = (ok_m and type(am.get_port) == "function" and am.get_port())
+		             or  (ok_m and am.DEFAULT_PORT)
+		             or  3460
+		local p = tostring(raw_port)
+		hs.execute(
+			"pgrep -f 'mlx_lm.*server' | xargs kill -9 2>/dev/null; " ..
+			"lsof -tiTCP:" .. p .. " -sTCP:LISTEN | xargs kill -9 2>/dev/null", true)
+	end)
+end
+
 
 
 
