@@ -199,7 +199,7 @@ En place : [`windows/README.md`](../static/ergopti_plus/windows/README.md), [`ma
 
 | St | Étape | Objectif · Preuve | Action · Test · Diagnostic |
 |----|-------|-------------------|----------------------------|
-| ☐ | **P9.1** | Métrique + ratchet · ratios 0,836 / 0,637 | `tools/test/test-introspection-ratio.cjs` (échoue si un ratio monte ; baseline = jour). *Diag :* « ratio AHK 0.84→0.85 : N nouveaux ». `JS`. **Faible** |
+| ✅ | **P9.1** | Métrique + ratchet · ratios 0,836 / 0,637 | ✅ ratchet AHK pré-existait (`test-no-pinned-source-reads.cjs`, baseline 19) ; **ajouté le jumeau macOS** `test-no-pinned-source-reads-lua.cjs` (baseline **134** — les `driver_root() .. "x.lua"` épinglés, la plus grosse mine non gardée) ; câblé dans `test:js` (32 checks). Fail-path prouvé (133<134→exit 1). *Diag :* « path-pinned macOS 134→135 : un test lit une source par chemin codé ». |
 | ☐ | **P9.2** | « un déplacement ne casse aucun test » · 128 file-pinnés | méta-test `git mv` à blanc en worktree temp → compte de tests inchangé. **Moyen** |
 | ☐ | **P9.3** | Collapse invariants whole-class · 8 missed-siblings | scan déclaratif unique (modèle `test_require_state_pattern.lua`). *Diag :* « bloc Z non borné ». `AHK`/`HS`. **Moyen** |
 | ☐ | **P9.4** | Conversion behavior (bucket A) · 226 AHK + 128 macOS | convertir par lot ; chaque conv = behavior rouge-avant/vert-après. `AHK`/`HS`. **Faible** (tests-only) |
