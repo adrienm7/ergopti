@@ -97,6 +97,17 @@ function M.is_ready()
 	return _is_ready
 end
 
+--- Clears the readiness flag so the NEXT warmup must re-confirm the backend.
+--- _is_ready is only ever set true by a 200 warmup; nothing else cleared it, so a
+--- backend round-trip (MLX kills `ollama serve`, then back to Ollama) or a model
+--- switch left it stale-true. The warmup retry chain then self-terminates on the
+--- stale flag and perform_check dispatches to a dead/cold server. Mirrors the MLX
+--- reset_endpoints() invariant: a fresh server/model deserves a fresh verdict (F-M8).
+function M.reset_ready()
+	_is_ready = false
+	Logger.debug(LOG, "Ollama readiness flag reset — next warmup must re-confirm.")
+end
+
 -- Delay before launching Ollama after killing a stale instance (seconds)
 local OLLAMA_KILL_SETTLE_SEC = 0.1
 

@@ -419,6 +419,12 @@ function M.set_backend(backend)
 		CoreState.backend = backend
 		-- Prevent any future auto-detection from overwriting this explicit choice
 		CoreState.user_override_backend = true
+		-- Any backend transition forces a fresh Ollama readiness verdict: leaving MLX
+		-- kills `ollama serve`, and returning relaunches it async (not yet listening).
+		-- Without this, a stale-true _is_ready would make the warmup chain self-terminate
+		-- and predictions dispatch to a cold/dead server (F-M8). ensure_running launches
+		-- the daemon but must NEVER imply readiness.
+		pcall(function() ApiOllama.reset_ready() end)
 		if backend == "ollama" then
 			pcall(function() ApiOllama.ensure_running() end)
 		end
@@ -534,6 +540,10 @@ end
 function M.set_llm_model_ollama(model_name)
 	if type(model_name) == "string" then
 		CoreState.llm_model_ollama = model_name
+		-- A model switch is a fresh (server, model) identity: clear readiness so the
+		-- scheduled warmup actually re-primes model B instead of self-terminating on
+		-- model A's stale-true flag (F-M8).
+		pcall(function() ApiOllama.reset_ready() end)
 	end
 end
 
