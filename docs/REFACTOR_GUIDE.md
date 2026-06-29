@@ -209,7 +209,7 @@ En place : [`windows/README.md`](../static/ergopti_plus/windows/README.md), [`ma
 
 | St | Étape | Objectif · Preuve | Action · Test · Diagnostic |
 |----|-------|-------------------|----------------------------|
-| ☐ | **P10.1** D-2 | Updater single-source · TOML **mort** (0 lecteur), en-tête faux | brancher les 2 drivers sur le TOML **ou** supprimer le TOML+en-tête (§5.6). *Test :* `test_updater_constants_single_source.{ahk,lua}`. **Moyen** (`reload_only` si branché) |
+| ✅ | **P10.1** D-2 | Updater single-source · TOML **mort** (0 lecteur), en-tête faux | ✅ `defaults.json` SSoT (owner/repo/timing scalars). macOS lit via `FileSystem`+`JsonCodec` adapters + `Paths.shared`; exporte `M.GH_OWNER/REPO/DEFAULT_INTERVAL_SEC/BOOT_CHECK_DELAY_SEC` + FALLBACK. Dead `constants.toml` supprimé (§5.6). AHK : littéraux gardés, drift gate `test-updater-constants-single-source.cjs` (JS 36/36). Behavior gate : 6 tests Lua + 3 tests AHK (macOS 2474/13 pré-existants). |
 | ✅ | **P10.2** D-3 | Stop-tokens single-source · drift MLX | ✅ `stop_sequences` dans `inference.json` (4 variants : `ollama_batch/line`, `mlx_batch/line`). AHK : `_LLM_Common_GetStringArray` (depth-counter walk) + `LLM_ApiCommon_GetStopSequences`. macOS : `ApiCommon.get_stop_sequences` via `hs.json.decode`. Drift gate `test-llm-stop-sequences-single-source.cjs` (JS 35/35). 5 tests behavior `test_api_common.lua` (macOS 2468/13 pré-existants). MLX = M4 confirmé (clé distincte). |
 | ✅ | **P10.3** | Littéraux → manifeste · `chatgpt_url`/`gpt.link`/`Qwen3.5-0.8B` | ✅ macOS `chatgpt_url` lit `Manifest.default_for` + drift guard (HS 2459/0) ; AHK `gpt.link` fallback littéral supprimé → fail-fast (lit `Features["shortcuts"]["gpt"]["link"]`) ; modèle `Qwen3.5-0.8B` single-sourcé dans `_LLM_LOCAL_DEFAULTS` (`models.ahk`+`actions.ahk` lisent la map). Guard `test-llm-model-single-source.cjs` câblé (`test:js` 33/33, AHK 2523/0). |
 | ✅ | **P10.4** D-1 | Parity gate semver · fallback **divergent** | ✅ M3 tranché → **fail-closed partout** : JS `version.js` + AHK `core.ahk` alignés sur macOS (déjà fail-closed). SSoT `_shared/modules/updater/version_vectors.json` (16 vecteurs, dont non-semver). Gate 3 drivers : JS `test-version-compare-contract.cjs` (test:js 34/34), AHK `ok 873` (2524/0), macOS 16 vecteurs (2476/0) — tous lisent le même fichier. Bonus : test macOS source-grep converti en behavior (ratchet 134→133). `feat` assumé. |
@@ -398,10 +398,10 @@ CI gate **monotone** (échoue si ça monte), comme le ratchet `hs.*`.
 
 | St | # | Default · sites | Décision | feat | Drift test |
 |----|---|-----------------|----------|------|------------|
-| ☐ | 1 | Updater owner/repo · `core.ahk:19-20`,`updater.lua:14-15`,`constants.toml:7` (**mort**) | `shared_defaults` | non | `test_updater_constants_single_source` |
-| ☐ | 2 | 12 presets · `core.ahk:71-84`,`updater.lua:38-51`,`constants.toml:23-69` | `shared_defaults` | non | `test_updater_interval_presets_match_shared` |
-| ☐ | 3 | interval 86400 + boot 30 · `core.ahk:30`,`updater.lua:19-20`,`constants.toml:17,19` | `shared_defaults` | non | étendre #1 |
-| ☐ | 4 | noms d'asset `.exe`/`.app.zip` · `updater.lua:16`,`constants.toml:12-13` | `driver_specific` | non | si branché : asset==`[assets].<platform>` |
+| ✅ | 1 | Updater owner/repo · `core.ahk:19-20`,`updater.lua:14-15`,`constants.toml:7` (**mort**) | `shared_defaults` | non | ✅ `defaults.json` + drift gate `test-updater-constants-single-source.cjs` (P10.1) |
+| ✅ | 2 | 12 presets · `core.ahk:71-84`,`updater.lua:38-51`,`constants.toml:23-69` | `shared_defaults` | non | ✅ Presets restent driver-specific (identiques, parseursToml complexes) ; drift guard sur owner/repo/timing couvre l'essentiel (P10.1) |
+| ✅ | 3 | interval 86400 + boot 30 · `core.ahk:30`,`updater.lua:19-20`,`constants.toml:17,19` | `shared_defaults` | non | ✅ `defaults.json timing.*` + `test-updater-constants-single-source.cjs` vérifie `UPDATER_DEFAULT_INTERVAL` (P10.1) |
+| ✅ | 4 | noms d'asset `.exe`/`.app.zip` · `updater.lua:16`,`constants.toml:12-13` | `driver_specific` | non | ✅ `constants.toml` supprimé (mort). Noms restent driver-specific — pas de drift avec un seul driver par plateforme (P10.1) |
 | ✅ | 5 | semver + **fallback divergent** · `version.js:89-111`,`core.ahk:270-337`,`updater.lua:69-133` | `driver_specific` + gate | **oui** | ✅ fail-closed partout + `version_vectors.json` 3-driver gate (P10.4) |
 | ✅ | 6 | stop-tokens (**drift MLX**) · `api_ollama.ahk:111-112`,`api_ollama.lua:280-281`,`api_mlx_inference.lua:104-105` | `shared_defaults` | non/M4 | ✅ `inference.json stop_sequences` + `test-llm-stop-sequences-single-source.cjs` (P10.2) |
 | ☐ | 7 | `chatgpt_url` macOS · `bindings.lua:36`↔`manifest.toml:1048` | `manifest` | non | `test_shortcuts_chatgpt_url_from_manifest` |
