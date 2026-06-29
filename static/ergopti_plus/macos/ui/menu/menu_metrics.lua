@@ -159,6 +159,14 @@ function M.build(ctx)
 	-- canvas under pause.
 	local paused = script_control and type(script_control.is_paused) == "function"
 		and script_control.is_paused() or false
+	-- Live pause state for the interactive toggle handlers below. They run at CLICK
+	-- time (later than this build), so re-derive pause then — toggling a WPM feature
+	-- ON while paused must record the preference but NOT arm the 0.2s render timer +
+	-- global mouse eventtap until resume (« pause = tout éteint », F-L10).
+	local function paused_now()
+		return script_control and type(script_control.is_paused) == "function"
+			and script_control.is_paused() or false
+	end
 	if state.keylogger_enabled then
 		local WpmMenubar = require("ui.wpm.wpm_menubar")
 		if type(WpmMenubar.set_use_source_colors) == "function" then
@@ -378,7 +386,7 @@ function M.build(ctx)
 				if type(WpmMenubar.set_use_source_colors) == "function" then
 					WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
 				end
-				if state.keylogger_menubar_wpm then WpmMenubar.start() else WpmMenubar.stop() end
+				if state.keylogger_menubar_wpm and not paused_now() then WpmMenubar.start() else WpmMenubar.stop() end
 				updateMenu()
 			end,
 		})
@@ -396,7 +404,7 @@ function M.build(ctx)
 				if type(WpmMenubar.set_use_source_colors) == "function" then
 					WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
 				end
-				if state.keylogger_menubar_wpm then WpmMenubar.start() end
+				if state.keylogger_menubar_wpm and not paused_now() then WpmMenubar.start() end
 				updateMenu()
 			end,
 		})
@@ -414,7 +422,7 @@ function M.build(ctx)
 				if type(WpmWidget.set_use_source_colors) == "function" then
 					WpmWidget.set_use_source_colors(state.keylogger_float_colors)
 				end
-				if state.keylogger_float_wpm then WpmWidget.start(state.keylogger_float_graph) else WpmWidget.stop() end
+				if state.keylogger_float_wpm and not paused_now() then WpmWidget.start(state.keylogger_float_graph) else WpmWidget.stop() end
 				updateMenu()
 			end,
 		})
@@ -432,7 +440,7 @@ function M.build(ctx)
 				if type(WpmWidget.set_use_source_colors) == "function" then
 					WpmWidget.set_use_source_colors(state.keylogger_float_colors)
 				end
-				if state.keylogger_float_wpm then WpmWidget.start(state.keylogger_float_graph) end
+				if state.keylogger_float_wpm and not paused_now() then WpmWidget.start(state.keylogger_float_graph) end
 				updateMenu()
 			end,
 		})
@@ -450,7 +458,7 @@ function M.build(ctx)
 				if type(WpmWidget.set_use_source_colors) == "function" then
 					WpmWidget.set_use_source_colors(state.keylogger_float_colors)
 				end
-				if state.keylogger_float_wpm then WpmWidget.start(state.keylogger_float_graph) end
+				if state.keylogger_float_wpm and not paused_now() then WpmWidget.start(state.keylogger_float_graph) end
 				updateMenu()
 			end,
 		})
