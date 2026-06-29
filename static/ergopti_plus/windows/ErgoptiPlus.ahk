@@ -137,7 +137,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; Active-app cache must come before hotstring_engine.ahk because both
 ; ``HotstringHandler`` and ``MicrosoftApps``.
 #Include lib/window_utils.ahk
-#Include lib/string_utils.ahk
+#Include lib/text_utils.ahk
 #Include ui/spotlight/init.ahk
 #Include lib/nav_layer_helpers.ahk
 
