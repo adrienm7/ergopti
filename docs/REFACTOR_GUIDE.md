@@ -56,7 +56,7 @@ Par impact décroissant (gain → chantier) :
 6. **SOLID — violations concrètes.** Appels OS hors `adapters/`, action gestuelle ajoutée = patch de N sites (OCP), setter-alias qui ne loggue pas (LSP). → §5.
 7. **Symétrie : 80 % déjà miroir, divergences ciblées.** Restent des renommages low-risk et **2 décisions à fort blast radius** (`lib/` foldérisé vs plat ; frontière `keymap`/`llm`). → §8.
 8. **Onboarding.** READMEs drivers + boundary `_shared/` existent ; manquent les **README par feature** + le schéma « trajet d'une feature » + la **carte test → source**. → §4.
-9. **Correctness (Track B, plus haut gain utilisateur).** Les 28 défauts (fuite de contexte LLM, gel de frappe, modificateurs latchés…) consolidés en §5 Track B, chacun avec son test. *(`fix`/`feat`)*
+9. **Correctness (Track B) — ✅ DÉJÀ FAIT.** Les 28 défauts + S-01 (fuite de contexte LLM, gel de frappe, modificateurs latchés…) ont **tous** été implémentés avant ce chantier (audit retiré en `a8fa60b82` « every finding is implemented », vérifié par spot-check). §5 Track B est conservé comme **registre** des correctifs + tests. Rien à refaire.
 10. **Hygiène tooling (P8).** Outils dev cassés/morts — quick wins, risque nul.
 11. **Frontends webview & Linux.** 12 apps redéfinissent le host-bridge (bug latent), `escape_html` ×3 divergent, loader TOML Linux à rebrancher.
 12. **Garde-fou anti-régression.** Chaque chantier installe un drift test / ratchet : le temps rend la suite *strictement plus robuste*.
@@ -249,64 +249,71 @@ Pipeline prouvé (P4/P5) : extraction PowerShell (BOM+CRLF) remplaçant le bloc 
 > défauts confirmés + 1 suspecté.** Chacun a son `path:line` (site primaire), son correctif
 > et son **test de régression imposé** (cause racine, rouge-avant/vert-après). Ordre =
 > remédiation audit §10. *(« missed-sibling » = un invariant déjà appliqué ailleurs, oublié sur ce site.)*
+>
+> **✅ ENTIÈREMENT IMPLÉMENTÉ avant ce chantier** — l'audit a été retiré en `a8fa60b82`
+> (« remove the AHK audit reports now that every finding is implemented », ancêtre de HEAD).
+> Vérifié par spot-check code (F-H01 `lalt.ahk` borné, F-H03 `api_remote` curl, F-H04
+> `disabled_apps` consulté, F-H05 décodeur JSONL réel, F-H07 `Run` async, F-M05/M07/M11,
+> S-01 `UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS:=600000` à `core.ahk:49`) + tests de
+> régression présents. **Rien à refaire** : les tables ci-dessous sont un **registre** (✅).
 
 #### B1 — Privacy & lag sur le chemin cœur (HIGH)
 
 | St | ID · Garantie | Site | Correctif | Test |
 |----|---------------|------|-----------|------|
-| ☐ | **F-H04** G2 (privacy) | `modules/llm/prediction_engine.ahk:409,177,116` | gate app-block dans `LLM_Engine_FirePrediction` (lit `disabled_apps` via `WIGetFocused`) ; `disable_url_bars` = infra net-new séparée | `meta/test_llm_app_filter_enforced.ahk` |
-| ☐ | **F-H03** G4/G3 | `modules/llm/api_remote.ahk:137,141` ; `prediction_engine.ahk:639` | dispatch POST via `curl` enfant (comme Ollama) + poll `ProcessExist` ; PII via temp per-pid | `meta/test_remote_generate_async_nonblocking.ahk` |
+| ✅ | **F-H04** G2 (privacy) | `modules/llm/prediction_engine.ahk:409,177,116` | gate app-block dans `LLM_Engine_FirePrediction` (lit `disabled_apps` via `WIGetFocused`) ; `disable_url_bars` = infra net-new séparée | `meta/test_llm_app_filter_enforced.ahk` |
+| ✅ | **F-H03** G4/G3 | `modules/llm/api_remote.ahk:137,141` ; `prediction_engine.ahk:639` | dispatch POST via `curl` enfant (comme Ollama) + poll `ProcessExist` ; PII via temp per-pid | `meta/test_remote_generate_async_nonblocking.ahk` |
 
 #### B2 — Intégrité clavier (HIGH/MED, suspend/latch)
 
 | St | ID · Garantie | Site | Correctif | Test |
 |----|---------------|------|-----------|------|
-| ☐ | **F-H01** G1 | `modules/tap_holds/lalt.ahk:162,170,171` (+`tab.ahk:58`) | borner `KeyWait("SC038","U T" . STUCK_…_SEC)` + `finally` release (miroir des autres long-press) | `meta/test_hold_modifier_release_bounded.ahk` (+`_HMRB_LAltAltTabGuarded`) |
-| ☐ | **F-M03** G2/G3 | `modules/tap_holds/space.ahk:59,67,143` | `if A_IsSuspended return` après `ih.Wait()` | `meta/test_space_hold_suspend_guard.ahk` |
-| ☐ | **F-M01** G2/G1 | `modules/keymap/layout.ahk:321-353` | re-check `A_IsSuspended` après `ih.Wait()` dans `DeadKey` | étendre `test_deadkey_suspend_guard.ahk` (garde **après** `Wait`) |
-| ☐ | **F-M02** G3 | `modules/keymap/layout.ahk:799-849` | wrap les branches direct-emit des 2 roll handlers en `Critical` (save/restore) | étendre `test_input_serialization.ahk` |
+| ✅ | **F-H01** G1 | `modules/tap_holds/lalt.ahk:162,170,171` (+`tab.ahk:58`) | borner `KeyWait("SC038","U T" . STUCK_…_SEC)` + `finally` release (miroir des autres long-press) | `meta/test_hold_modifier_release_bounded.ahk` (+`_HMRB_LAltAltTabGuarded`) |
+| ✅ | **F-M03** G2/G3 | `modules/tap_holds/space.ahk:59,67,143` | `if A_IsSuspended return` après `ih.Wait()` | `meta/test_space_hold_suspend_guard.ahk` |
+| ✅ | **F-M01** G2/G1 | `modules/keymap/layout.ahk:321-353` | re-check `A_IsSuspended` après `ih.Wait()` dans `DeadKey` | étendre `test_deadkey_suspend_guard.ahk` (garde **après** `Wait`) |
+| ✅ | **F-M02** G3 | `modules/keymap/layout.ahk:799-849` | wrap les branches direct-emit des 2 roll handlers en `Critical` (save/restore) | étendre `test_input_serialization.ahk` |
 
 #### B3 — Thread clavier non bloquant (HIGH)
 
 | St | ID · Garantie | Site | Correctif | Test |
 |----|---------------|------|-----------|------|
-| ☐ | **F-H06** G4/G1 | `lib/crash_reporter.ahk:324,358-372` ; `error_net.ahk:50` | différer `CrashReport_Build`+`PromptUser` via `SetTimer(…,-1)` (garder release modifier inline) | `meta/test_crash_build_offthread.ahk` |
-| ☐ | **F-H07** G4 | `modules/gestures/screenshots.ahk:72,165` | `Run` async au lieu de `RunWait` (miroir SC029/Instant) | `meta/test_gesture_capture_async_run.ahk` |
+| ✅ | **F-H06** G4/G1 | `lib/crash_reporter.ahk:324,358-372` ; `error_net.ahk:50` | différer `CrashReport_Build`+`PromptUser` via `SetTimer(…,-1)` (garder release modifier inline) | `meta/test_crash_build_offthread.ahk` |
+| ✅ | **F-H07** G4 | `modules/gestures/screenshots.ahk:72,165` | `Run` async au lieu de `RunWait` (miroir SC029/Instant) | `meta/test_gesture_capture_async_run.ahk` |
 
 #### B4 — États silencieux / mauvais état (HIGH/MED)
 
 | St | ID · Garantie | Site | Correctif | Test |
 |----|---------------|------|-----------|------|
-| ☐ | **F-H05** G2 | `modules/keylogger/keylogger.ahk:842,907,369` ; `keylogger_json.ahk:86-89` | décodeur JSONL réel (encodeur déjà main) ; ne pas avancer l'offset si rien décodé ; `Logger.warn` | `meta/test_keylogger_json_roundtrip_64bit.ahk` |
-| ☐ | **F-M05** G2 | `lib/menu_dispatcher.ahk:257-270` ; `menu_hotstrings.ahk:591,621` | `_FindUniqueMenuItemIdByName` au lieu de `Count-1` (dégrade en natif si label dup) | `meta/test_dispatcher_register_duplicate_label.ahk` |
-| ☐ | **F-M08** G2/G3 | `lib/updater/changelog.ahk:101,112,116` ; `core.ahk:508,555` | `_Updater_CancelAsyncChecks` fire chaque `on_json("")` (snapshot+Clear+try) | `unit/test_updater.ahk` |
-| ☐ | **F-M11** G2 | `lib/config_io.ahk:258,270` ; `modules/hotstrings.ahk:888` | seeder les sections perso découvertes au boot (restaure `BootstrapPersonalFeatures`) | `unit/test_personal_toml_toggle_unmanifested_section.ahk` |
+| ✅ | **F-H05** G2 | `modules/keylogger/keylogger.ahk:842,907,369` ; `keylogger_json.ahk:86-89` | décodeur JSONL réel (encodeur déjà main) ; ne pas avancer l'offset si rien décodé ; `Logger.warn` | `meta/test_keylogger_json_roundtrip_64bit.ahk` |
+| ✅ | **F-M05** G2 | `lib/menu_dispatcher.ahk:257-270` ; `menu_hotstrings.ahk:591,621` | `_FindUniqueMenuItemIdByName` au lieu de `Count-1` (dégrade en natif si label dup) | `meta/test_dispatcher_register_duplicate_label.ahk` |
+| ✅ | **F-M08** G2/G3 | `lib/updater/changelog.ahk:101,112,116` ; `core.ahk:508,555` | `_Updater_CancelAsyncChecks` fire chaque `on_json("")` (snapshot+Clear+try) | `unit/test_updater.ahk` |
+| ✅ | **F-M11** G2 | `lib/config_io.ahk:258,270` ; `modules/hotstrings.ahk:888` | seeder les sections perso découvertes au boot (restaure `BootstrapPersonalFeatures`) | `unit/test_personal_toml_toggle_unmanifested_section.ahk` |
 
 #### B5 — Races, perf, privacy-count, dead-config (MED)
 
 | St | ID · Garantie | Site | Correctif | Test |
 |----|---------------|------|-----------|------|
-| ☐ | **F-M04** G4/G3 | `lib/hotstrings/hotstring_prefix_watcher.ahk:1176,893` | early-return si `!Keylogger.initialized` + index length-bucketed ; sortir l'analytics de `Critical` | `meta/test_near_miss_scan_bounded.ahk` |
-| ☐ | **F-M06** G4 | `modules/llm/api_remote.ahk:215-218` | `try/catch` autour de `WaitForResponse(0)` → `on_fail` immédiat, pas de re-arm | `meta/test_remote_poll_com_exception_bails.ahk` |
-| ☐ | **F-M07** G2 | `modules/llm/prediction_engine.ahk:47,112` ; `llm_bridge.ahk:261` | implémenter `instant_on_word_end` (détecteur word-boundary + `StartTimer(0)`) + setter DEBUG | behavior : word+boundary arme délai ~0 vs mid-word = `debounce_ms` |
-| ☐ | **F-M09** G2 (privacy) | `modules/keylogger/keylogger_mouse.ahk:180,225,266,318,335` | `KL_BumpMouseClick` **après** `MF_ShouldFilter` ; filtre tôt dans `AccumScroll` | étendre `meta/test_mouse_suspend_guard.ahk` (bump-après-filtre) |
-| ☐ | **F-M10** G2 | `modules/gestures/click.ahk:151,165` | `Register("mouse_rdown", GestureReleaseRightClick)` (symétrie left) | `meta/test_gesture_right_hold_tap_release.ahk` |
-| ☐ | **F-M12** G2/G1 | `modules/keylogger/keylogger_password.ahk:113-118,127` | clear `pending_hwnd` avant le `return` de la branche `A_IsSuspended` | étendre `meta/test_async_password_detect_suspend_guard.ahk` |
+| ✅ | **F-M04** G4/G3 | `lib/hotstrings/hotstring_prefix_watcher.ahk:1176,893` | early-return si `!Keylogger.initialized` + index length-bucketed ; sortir l'analytics de `Critical` | `meta/test_near_miss_scan_bounded.ahk` |
+| ✅ | **F-M06** G4 | `modules/llm/api_remote.ahk:215-218` | `try/catch` autour de `WaitForResponse(0)` → `on_fail` immédiat, pas de re-arm | `meta/test_remote_poll_com_exception_bails.ahk` |
+| ✅ | **F-M07** G2 | `modules/llm/prediction_engine.ahk:47,112` ; `llm_bridge.ahk:261` | implémenter `instant_on_word_end` (détecteur word-boundary + `StartTimer(0)`) + setter DEBUG | behavior : word+boundary arme délai ~0 vs mid-word = `debounce_ms` |
+| ✅ | **F-M09** G2 (privacy) | `modules/keylogger/keylogger_mouse.ahk:180,225,266,318,335` | `KL_BumpMouseClick` **après** `MF_ShouldFilter` ; filtre tôt dans `AccumScroll` | étendre `meta/test_mouse_suspend_guard.ahk` (bump-après-filtre) |
+| ✅ | **F-M10** G2 | `modules/gestures/click.ahk:151,165` | `Register("mouse_rdown", GestureReleaseRightClick)` (symétrie left) | `meta/test_gesture_right_hold_tap_release.ahk` |
+| ✅ | **F-M12** G2/G1 | `modules/keylogger/keylogger_password.ahk:113-118,127` | clear `pending_hwnd` avant le `return` de la branche `A_IsSuspended` | étendre `meta/test_async_password_detect_suspend_guard.ahk` |
 
 #### B6 — Low + suspecté
 
 | St | ID · Garantie | Site | Correctif | Test |
 |----|---------------|------|-----------|------|
-| ☐ | **F-L01** G2 | `modules/hotstrings.ahk:864` | **supprimer** la ligne (doublon de `magickey.toml:670`, gated par `text_expansion_emojis`) | assert : emojis off ⇒ aucun spec `clé★` |
-| ☐ | **F-L02** G2 | `lib/hotstrings/hotstring_engine_main.ahk:1418,1439` | `UpdateLastSentCharacter(SubStr(EndCharPart != "" ? EndCharPart : Replacement, -1))` | ring vs écran sync sur délimiteur consommé |
-| ☐ | **F-L03** G2 | `ui/tooltip/llm.ahk:760,770` | `chunk.HasOwnProp("type")` au site `:760` (miroir `:770`) | `unit/test_llm_tooltip_render.ahk` |
-| ☐ | **F-L04** G3 | `modules/gestures/window_cycle.ahk:259-261,303-305` | fence par HWND-set + TTL (pas le `SetTimer`) | méta source-scan (HWND consulté, pas juste le bool) |
-| ☐ | **F-L05** G1/G2 | `lib/toml/toml_helpers.ahk:108,122-138` | récupérer le header de section sous `Depth>0` (array non terminé) + warn | `unit/test_parsetomlfile_unterminated_array_recovers.ahk` |
-| ☐ | **F-L06** G1 | `ui/menu/menu_hotstrings.ahk:50-52,632-634` ; `toml_config_loader.ahk:207` | shape-guard `(PNode is Map) and PNode.Has("enabled")` ; loader warn sur Map↔scalar | guard + loader skip-with-warn |
-| ☐ | **F-L07** G1 | `modules/keylogger/keylogger_av_state.ahk:293,298` | warm-up stocké/cancellable (`KLAVState.warmup_fn`), pas une arrow anonyme | `meta/test_av_warmup_cancellable.ahk` |
-| ☐ | **F-L08** G2 | `ui/paths_editor/init.ahk:190` ; `ui/personal_info_editor/init.ahk:157` | `LoggerSuccess`/`Info` avant `Reload()` (pas `LoggerStart`) | étendre `test_logger_pairing.ahk` à `ui/` (**échoue**, pas warn) |
-| ☐ | **F-L09** G2 | `lib/updater/changelog.ahk:105,133` | branche up-to-date → `LoggerSuccess` (pas `LoggerInfo`) | assertion branch-specific |
-| ☐ | **S-01** G2 (suspecté) | `lib/updater/self_update.ahk:422,447` ; `core.ahk:44` | constante dédiée `UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS:=600000` pour le GET d'asset | assert : pas `UPDATER_HTTP_RECEIVE_TIMEOUT_MS` au slot receive (après test download live) |
+| ✅ | **F-L01** G2 | `modules/hotstrings.ahk:864` | **supprimer** la ligne (doublon de `magickey.toml:670`, gated par `text_expansion_emojis`) | assert : emojis off ⇒ aucun spec `clé★` |
+| ✅ | **F-L02** G2 | `lib/hotstrings/hotstring_engine_main.ahk:1418,1439` | `UpdateLastSentCharacter(SubStr(EndCharPart != "" ? EndCharPart : Replacement, -1))` | ring vs écran sync sur délimiteur consommé |
+| ✅ | **F-L03** G2 | `ui/tooltip/llm.ahk:760,770` | `chunk.HasOwnProp("type")` au site `:760` (miroir `:770`) | `unit/test_llm_tooltip_render.ahk` |
+| ✅ | **F-L04** G3 | `modules/gestures/window_cycle.ahk:259-261,303-305` | fence par HWND-set + TTL (pas le `SetTimer`) | méta source-scan (HWND consulté, pas juste le bool) |
+| ✅ | **F-L05** G1/G2 | `lib/toml/toml_helpers.ahk:108,122-138` | récupérer le header de section sous `Depth>0` (array non terminé) + warn | `unit/test_parsetomlfile_unterminated_array_recovers.ahk` |
+| ✅ | **F-L06** G1 | `ui/menu/menu_hotstrings.ahk:50-52,632-634` ; `toml_config_loader.ahk:207` | shape-guard `(PNode is Map) and PNode.Has("enabled")` ; loader warn sur Map↔scalar | guard + loader skip-with-warn |
+| ✅ | **F-L07** G1 | `modules/keylogger/keylogger_av_state.ahk:293,298` | warm-up stocké/cancellable (`KLAVState.warmup_fn`), pas une arrow anonyme | `meta/test_av_warmup_cancellable.ahk` |
+| ✅ | **F-L08** G2 | `ui/paths_editor/init.ahk:190` ; `ui/personal_info_editor/init.ahk:157` | `LoggerSuccess`/`Info` avant `Reload()` (pas `LoggerStart`) | étendre `test_logger_pairing.ahk` à `ui/` (**échoue**, pas warn) |
+| ✅ | **F-L09** G2 | `lib/updater/changelog.ahk:105,133` | branche up-to-date → `LoggerSuccess` (pas `LoggerInfo`) | assertion branch-specific |
+| ✅ | **S-01** G2 | `lib/updater/self_update.ahk:425` ; `core.ahk:49` | ✅ fait : `UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS := 600000` (`core.ahk:49`) passé au GET d'asset ; `UPDATER_HTTP_RECEIVE_TIMEOUT_MS:=30000` réservé aux appels API | confirmation live du symptôme reste optionnelle |
 
 #### B7 — Dead code (batché, suite verte par commit)
 
