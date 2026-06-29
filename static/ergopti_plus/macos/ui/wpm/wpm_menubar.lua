@@ -26,6 +26,17 @@ local _timer             = nil
 local _running           = false -- true between start() and stop(); guards redundant restarts
 local _use_source_colors = true
 
+-- Source-color hold duration in seconds, single-sourced from the SAME shared TOML
+-- the floating widget uses (wpm_color_hold_ms via wpm_widget._load_shared_const), so
+-- the menubar and widget agree on how long the hotstring color lingers. Hardcoding it
+-- (was 3.0) drifted from the widget's 1.0 s (F-L7). Read once at module load.
+local COLOR_HOLD_FALLBACK_S = 1.0  -- mirrors wpm_color_hold_ms = 1000 when the TOML is unreadable
+local COLOR_HOLD_S = (function()
+	local ok, ww = pcall(require, "ui.wpm.wpm_widget")
+	local d = ok and type(ww._load_shared_const) == "function" and ww._load_shared_const().source_color_duration
+	return (type(d) == "number" and d) or COLOR_HOLD_FALLBACK_S
+end)()
+
 
 
 
@@ -41,7 +52,7 @@ local function update_menubar()
 	local stats = keylogger.get_live_stats()
 	local display_wpm = stats.wpm or 0
 	local now = hs.timer.absoluteTime() / 1000000000
-	local active_source = WPMShared.get_active_source(stats, 3.0, now)
+	local active_source = WPMShared.get_active_source(stats, COLOR_HOLD_S, now)
 	
 	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
 	local tooltip_visible = false
