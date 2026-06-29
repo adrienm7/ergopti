@@ -119,7 +119,13 @@ function M.apply(file_path)
 					value = value:match("^%s*(.-)%s*$")
 					local coerced = M.coerce(value)
 					if section == "script" then
-						hs.settings.set(key, coerced)
+						-- The logger restore reads the canonical "ergopti.log_level" key, so map
+						-- the expert [script] log_level / LogLevel (AHK parity) override onto it —
+						-- a bare "log_level"/"LogLevel" settings key has no reader and would no-op.
+						local setting_key = key
+						local kl = key:lower()
+						if kl == "log_level" or kl == "loglevel" then setting_key = "ergopti.log_level" end
+						hs.settings.set(setting_key, coerced)
 						applied = applied + 1
 						Logger.debug(LOG, "Override [script].%s = %s.", key, tostring(coerced))
 					elseif section == "features" then
