@@ -207,6 +207,7 @@ InstallSendNoOps()
 #Include unit/test_registry.ahk
 #Include unit/test_nav_layer_helpers.ahk
 #Include unit/test_updater.ahk
+#Include unit/test_updater_constants_single_source.ahk
 #Include meta/test_updater_load_interval_guard.ahk
 
 ; Shortcuts modules — dispatcher logic is testable without real hotkeys firing;
