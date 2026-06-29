@@ -575,12 +575,6 @@ function M.process_frame(touches)
 			Logger.debug(LOG, "process_frame: n=0 but startPos/endPos missing (startPos=%s, endPos=%s)",
 				tostring(gs.startPos), tostring(gs.endPos))
 		end
-		-- Signal the actions module that the gesture is over before resetting,
-		-- so leftMouseUp events generated after the finger lift are not silenced
-		-- beyond the gesture boundary.
-		if _actions and type(_actions.set_gesture_in_progress) == "function" then
-			pcall(_actions.set_gesture_in_progress, false)
-		end
 		resetGS()
 		return
 	end
@@ -591,11 +585,6 @@ function M.process_frame(touches)
 		local pos = Geometry.avgPos(touches)
 		if not gs.active then
 			Logger.info(LOG, "GESTURE START: fingers=%d pos=(%.1f,%.1f) ts=%.3f", n, pos.x, pos.y, now)
-			-- Signal the actions module that a new gesture has begun, so any
-			-- leftMouseUp from trackpad contact does not cancel drag selection.
-			if _actions and type(_actions.set_gesture_in_progress) == "function" then
-				pcall(_actions.set_gesture_in_progress, true)
-			end
 			gs.active         = true
 			gs.startTime      = now
 			gs.startPos       = {x = pos.x, y = pos.y}
