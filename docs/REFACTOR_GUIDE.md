@@ -232,7 +232,7 @@ Pipeline prouvé (P4/P5) : extraction PowerShell (BOM+CRLF) remplaçant le bloc 
 
 | St | Étape | Objectif · Preuve | Action · Diagnostic |
 |----|-------|-------------------|---------------------|
-| ☐ | **P12.1** | Renommages 1:1 · `menu_manifest.ahk` vs `manifest_menu.lua` ; `string_utils.ahk` vs `text_utils.lua` ; `action_picker.ahk` flat vs `action_picker/init.lua` | converger nommage/forme + repointer `#Include`/`require`. *Test :* méta parité de noms. **Faible** |
+| ✅ | **P12.1** | Renommages 1:1 · `string_utils.ahk` → `text_utils.ahk` (symétrie `lib/text_utils.lua`) ; `ui/action_picker.ahk` → `ui/action_picker/init.ahk` (symétrie `ui/action_picker/init.lua`). Note : `menu_manifest.ahk` vs `manifest_menu.lua` — **pas de renommage** : `manifest_menu.ahk` (renderer) est déjà symétrique de `manifest_menu.lua` ; `menu_manifest.ahk` est le loader AHK-only sans peer macOS (macOS intègre loading + rendering dans `manifest_menu.lua`). Méta parité : `test-p12-1-name-parity.cjs` (8 invariants). AHK 2533/0, JS 37/37. |
 | ☐ | **P12.2** | README par feature + glossary · §4 | `README.md` court par `modules/<feature>/`+`ui/<window>/` ; `docs/glossary.md`. **Faible** |
 
 #### P13 — Frontends webview & Linux (medium, `reload_only` 2 plateformes)
