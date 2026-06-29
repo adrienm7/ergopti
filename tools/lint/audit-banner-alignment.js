@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// scripts/audit-banner-alignment.js
+// tools/lint/audit-banner-alignment.js
 // Audit (and optionally fix) banner-comment alignment across .toml files following
 // the CLAUDE.md rules:
 //   - Major section: 5 lines (2 banner + 1 title + 2 banner), 7 ``=`` on each side
