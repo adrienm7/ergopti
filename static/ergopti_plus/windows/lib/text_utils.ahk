@@ -1,7 +1,7 @@
-﻿; lib/string_utils.ahk
+﻿; lib/text_utils.ahk
 
 ; ==============================================================================
-; MODULE: String Utilities
+; MODULE: Text Utilities
 ; DESCRIPTION:
 ; Pure string-manipulation helpers shared across AHK modules. Extracted here
 ; so they can be exercised by unit tests without loading any hotkey-registration

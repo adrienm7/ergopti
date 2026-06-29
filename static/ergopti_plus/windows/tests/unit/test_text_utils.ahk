@@ -1,9 +1,9 @@
-﻿; static/ergopti_plus/windows/tests/unit/test_string_utils.ahk
+﻿; static/ergopti_plus/windows/tests/unit/test_text_utils.ahk
 
 ; ==============================================================================
-; MODULE: String Utilities Tests
+; MODULE: Text Utilities Tests
 ; DESCRIPTION:
-; Unit-tests for the pure string helpers in lib/string_utils.ahk.
+; Unit-tests for the pure string helpers in lib/text_utils.ahk.
 ; ==============================================================================
 
 

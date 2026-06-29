@@ -617,5 +617,5 @@ if Features["shortcuts"]["open_downloads"] {
         return ""
     }
 
-    ; UriDecode is defined in lib/string_utils.ahk and visible globally.
+    ; UriDecode is defined in lib/text_utils.ahk and visible globally.
 }

@@ -17,9 +17,9 @@
 ; The fix reassembles the raw bytes into a buffer and decodes the whole run as
 ; UTF-8. This test asserts the correct codepoints come back. It would FAIL
 ; before the fix (mojibake of two/three code units) and PASS after, while the
-; existing ASCII / space / lone-% cases in test_string_utils.ahk still hold.
+; existing ASCII / space / lone-% cases in test_text_utils.ahk still hold.
 ;
-; lib/string_utils.ahk is #Included by run_all.ahk and UriDecode is a pure
+; lib/text_utils.ahk is #Included by run_all.ahk and UriDecode is a pure
 ; function with no OS/COM/network side effects, so a behavioral test is safe.
 ; ==============================================================================
 

@@ -90,7 +90,7 @@ OnError(_FatalErrorHandler)
 #Include ../lib/timings/timings_config.ahk
 
 #Include ../lib/window_utils.ahk
-#Include ../lib/string_utils.ahk
+#Include ../lib/text_utils.ahk
 #Include ../lib/nav_layer_helpers.ahk
 #Include ../lib/hotstrings/hotstring_engine.ahk
 #Include ../lib/hotstrings/hotstring_engine_main.ahk
@@ -204,7 +204,7 @@ InstallSendNoOps()
 #Include unit/test_tap_hold_loader.ahk
 #Include unit/test_i18n.ahk
 #Include unit/test_window_utils.ahk
-#Include unit/test_string_utils.ahk
+#Include unit/test_text_utils.ahk
 #Include unit/test_registry.ahk
 #Include unit/test_nav_layer_helpers.ahk
 #Include unit/test_updater.ahk
