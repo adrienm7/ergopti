@@ -459,7 +459,11 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	local function process_sse_line(line)
 		Logger.debug(LOG, "[%s] #%d SSE line: '%s'", model_name, req_id, line:sub(1, 120))
 		if line:sub(1, 6) ~= "data: " then return end
-		local json_str = line:sub(7)
+		-- Strip a trailing CR: a CRLF-emitting mlx-lm/uvicorn build (or a proxy) sends
+		-- "data: {...}\r"; flush_lines splits only on "\n", so without this the trailing
+		-- CR makes the structural guard below see last_char == "\r" (not "}"/"]") and
+		-- drop EVERY chunk — an empty stream with no prediction (F-L3). SSE permits CRLF.
+		local json_str = line:sub(7):gsub("\r$", "")
 		if json_str == "[DONE]" then return end
 		-- Reject structurally incomplete chunks early: a valid JSON object or array
 		-- must end with "}" or "]"; anything shorter is a split TCP chunk that
