@@ -15,7 +15,6 @@
 		"build:menu": "node ./tools/build/build-menu-manifest.js",
 		"build:domain": "node ./tools/build/build-domain.cjs",
 		"codegen": "npm run build:domain",
-		"lint:banners": "node ./tools/lint/audit-banner-alignment.js static/ergopti_plus/_shared",
 		"lint:file-headers": "node ./tools/lint/audit-file-headers.cjs",
 		"lint:conventions": "node ./tools/lint/lint-conventions.js --warn-only",
 		"lint:conventions:strict": "node ./tools/lint/lint-conventions.js --fail-on-violations",
