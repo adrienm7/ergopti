@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local TARGETS = {
-	"lib.color_utils", "lib.text_utils", "lib.toml_reader", "lib.logger",
+	"lib.text_utils", "lib.toml_reader", "lib.logger",
 	"lib.keycodes", "lib.layout", "lib.perf",
 	"modules.keymap.terminators", "modules.keymap.utils",
 	"modules.karabiner.defaults", "modules.karabiner.config",
