@@ -52,6 +52,16 @@ local CLIPBOARD_RESTORE_DELAY_S = Timings.sec("debounce", "clipboard_restore_ms"
 local PASTE_KEY      = "v"
 local PASTE_MODIFIER = { "cmd" }
 
+-- Serialised clipboard save/restore state. Two clipboard sends within
+-- CLIPBOARD_RESTORE_DELAY_S of each other must NOT each save() — the second would
+-- capture the first's still-injected payload as "the user's clipboard" and both
+-- restores would then clobber the real original. On an overlapping send we cancel
+-- the pending restore but KEEP the first-captured original (mirrors the
+-- keymap/utils.lua paste discipline). Declared ABOVE M.send so the restore closures
+-- capture them correctly (F-L8).
+local _paste_saved_original = nil
+local _paste_pending_timer  = nil
+
 
 -- =========================================
 -- =========================================
@@ -82,14 +92,23 @@ function M.send(text, opts, callback)
 	local ok, err
 	if mode == "clipboard" then
 		ok, err = pcall(function()
-			-- Save via the Clipboard port so the user's clipboard is restored
-			-- cleanly after the paste completes.
-			local saved = Clipboard.save()
+			-- If a restore is still pending from a previous clipboard send, cancel it
+			-- but KEEP the first-captured original; only capture the user's clipboard
+			-- when no send is in flight (otherwise we'd save our own injected payload).
+			if _paste_pending_timer then
+				pcall(function() _paste_pending_timer:stop() end)
+				_paste_pending_timer = nil
+			else
+				_paste_saved_original = Clipboard.save()
+			end
+			local saved = _paste_saved_original  -- bind the correct value into the closure
 			Clipboard.write(text)
 			hs.eventtap.keyStroke(PASTE_MODIFIER, PASTE_KEY)
 			-- Restore after a short delay so the paste completes before we overwrite.
-			hs.timer.doAfter(CLIPBOARD_RESTORE_DELAY_S, function()
+			_paste_pending_timer = hs.timer.doAfter(CLIPBOARD_RESTORE_DELAY_S, function()
+				_paste_pending_timer  = nil
 				Clipboard.restore(saved)
+				_paste_saved_original = nil
 			end)
 		end)
 	else
