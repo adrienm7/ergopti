@@ -673,7 +673,7 @@ global _FmtCountCache := Map()
 
 #Include lib/config_io.ahk
 
-#Include ui/action_picker.ahk
+#Include ui/action_picker/init.ahk
 #Include ui/action_picker_webview.ahk
 #Include ui/paths_editor/init.ahk
 #Include ui/personal_info_editor/init.ahk

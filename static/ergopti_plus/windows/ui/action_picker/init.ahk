@@ -1,4 +1,4 @@
-﻿; ui/action_picker.ahk
+﻿; ui/action_picker/init.ahk
 
 ; ==============================================================================
 ; MODULE: Action & Slot Pickers (GUI dialogs)

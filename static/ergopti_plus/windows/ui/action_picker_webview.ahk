@@ -5,8 +5,8 @@
 ; DESCRIPTION:
 ; Renders the action chooser on Windows via WebView2, loading the shared frontend
 ; at _shared/ui/action_picker/ so the AHK and Hammerspoon drivers show an
-; identical searchable, categorised picker. Backs ShowActionPicker (ui/
-; action_picker.ahk), whose native searchable ListBox remains as an automatic
+; identical searchable, categorised picker. Backs ShowActionPicker
+; (ui/action_picker/init.ahk), whose native ListBox remains as a fallback.
 ; fallback when the WebView2 runtime is unavailable.
 ;
 ; FEATURES & RATIONALE:
