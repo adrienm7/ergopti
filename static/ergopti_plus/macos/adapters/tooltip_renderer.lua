@@ -109,7 +109,6 @@ function M.updateElement(draw_call)
 	local DRAW_CALL_TO_ELEM = {
 		preds      = _renderer.ELEM_PREDS,
 		info       = _renderer.ELEM_INFO,
-		model_info = _renderer.ELEM_MODEL_INFO,
 	}
 	local elem_index = draw_call.id and DRAW_CALL_TO_ELEM[draw_call.id]
 	if elem_index and draw_call.text then
