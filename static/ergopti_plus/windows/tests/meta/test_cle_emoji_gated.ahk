@@ -23,8 +23,9 @@
 
 
 _CEG_AssertNoUngatedCleEmoji() {
-	SplitPath(A_ScriptDir, , &Root)
-	Src := FileRead(StrReplace(Root, "\", "/") . "/modules/hotstrings.ahk")
+	; Scan the whole driver source (move-resilient) — the key emoji must appear in
+	; NO file, an even stronger guarantee than checking hotstrings.ahk alone.
+	Src := _DriverSourceConcat()
 	Assert(InStr(Src, "RegisterAllHotstrings") > 0, "hotstrings.ahk must define RegisterAllHotstrings (sanity)")
 	KeyEmoji := Chr(0x1F511)  ; the key emoji that only the stray ungated line emitted
 	Assert(!InStr(Src, KeyEmoji),

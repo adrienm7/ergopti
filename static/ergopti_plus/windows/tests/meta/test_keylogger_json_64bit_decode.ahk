@@ -26,8 +26,8 @@
 
 
 _KJ64_AssertRealDecoder() {
-	SplitPath(A_ScriptDir, , &Root)
-	src := FileRead(StrReplace(Root, "\", "/") . "/modules/keylogger/keylogger_json.ahk")
+	; Scan the whole driver source so the test survives a file move of the decoder.
+	src := _DriverSourceConcat()
 	Assert(InStr(src, "KL_JsonEncode(v)") > 0, "keylogger_json.ahk must still define the encoder (sanity)")
 	Assert(InStr(src, "_KL_JsonParseValue") > 0,
 		"KL_JsonDecode must use the hand-rolled recursive-descent parser so cross-process replay + state.json restore work on the shipped 64-bit binary (keylogger-json-64bit-decode)")

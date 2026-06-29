@@ -22,12 +22,12 @@
 
 
 _PHNS_AssertNodeShapeGuards() {
-	SplitPath(A_ScriptDir, , &Root)
-	Root := StrReplace(Root, "\", "/")
-	menu := FileRead(Root . "/ui/menu/menu_hotstrings.ahk")
+	; Scan the whole driver source (move-resilient) — both guards live in unique
+	; top-level functions, so a file move never breaks these presence checks.
+	menu := _DriverSourceConcat()
 	Assert(InStr(menu, "[PV2Id] is Map") > 0,
 		"the personal-hotstrings count helper must verify the section node is a Map before indexing [enabled] — a hand-edited flat [hotstrings.personal] bool leaf can clobber the seeded Map and throw (personal-hotstring-node-shape)")
-	loader := FileRead(Root . "/lib/toml/toml_config_loader.ahk")
+	loader := menu
 	Assert(InStr(loader, "(Node[Key] is Map) != (Value is Map)") > 0,
 		"the v2 config loader must skip (with a WARN) a leaf assignment that would change a node's Map/scalar shape, so a flat-form key cannot flatten a seeded {enabled:...} Map node (toml-loader-shape-mismatch)")
 }
