@@ -510,6 +510,11 @@ function M.ingest_once()
 		table.concat(statements, "\n"))
 
 	local ok, exec_err = pcall(function()
+		-- Defensively clear any transaction a prior step (e.g. a torn foreign
+		-- data.sql sync) may have left open, so our BEGIN below can never fail with
+		-- "cannot start a transaction within a transaction" and abort this batch
+		-- (F-M3). Harmless no-op when no transaction is active.
+		pcall(function() db:exec("ROLLBACK;") end)
 		db:exec("BEGIN TRANSACTION;")
 		for _, sql in ipairs(statements) do
 			local rc = db:exec(sql)
