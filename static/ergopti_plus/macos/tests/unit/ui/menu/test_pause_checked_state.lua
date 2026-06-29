@@ -59,7 +59,6 @@ local MENU_MODULES = {
 	"ui.menu.menu_gestures",
 	"ui.menu.menu_hotstrings",
 	"ui.menu.menu_shortcuts",
-	"ui.menu.menu_script_control",
 	"ui.menu.builder",
 	"ui.menu.menu_llm.init",
 }

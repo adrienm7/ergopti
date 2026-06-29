@@ -7,7 +7,6 @@ intentionally skips, and the rationale for each deferral.
 
 | Module                                                    | Test file                                                         | Cases       |
 | --------------------------------------------------------- | ----------------------------------------------------------------- | ----------- |
-| `lib.color_utils`                                         | `tests/unit/lib/test_color_utils.lua`                             | 12          |
 | `lib.text_utils`                                          | `tests/unit/lib/test_text_utils.lua`                              | 38          |
 | `lib.toml_reader`                                         | `tests/unit/lib/test_toml_reader.lua`                             | 7           |
 | `lib.toml_writer`                                         | `tests/unit/lib/test_toml_writer.lua`                             | 16          |
