@@ -37,7 +37,10 @@
 ; Loaded from inference.json on first access (cached for the session). ``unset``
 ; so the first call probes the JSON exactly once. There is no in-code mirror of
 ; these tunables — inference.json is the single source and is required.
-global _LLM_COMMON_INFERENCE := unset
+global _LLM_COMMON_INFERENCE     := unset
+; Raw text of inference.json, cached alongside the parsed map so array-valued
+; sections can be extracted by _LLM_Common_GetStringArray without a second read.
+global _LLM_COMMON_INFERENCE_RAW := unset
 
 /**
  * Returns the cached inference-constants table, lazy-loading from inference.json
@@ -46,7 +49,7 @@ global _LLM_COMMON_INFERENCE := unset
  * @returns {Map} Constants table parsed from inference.json.
  */
 _LLM_Common_GetInference() {
-	global _LLM_COMMON_INFERENCE, _SharedDir
+	global _LLM_COMMON_INFERENCE, _LLM_COMMON_INFERENCE_RAW, _SharedDir
 	if IsSet(_LLM_COMMON_INFERENCE)
 		return _LLM_COMMON_INFERENCE
 	; Canonical path next to defaults.json / models.json.
@@ -60,6 +63,7 @@ _LLM_Common_GetInference() {
 		LoggerError("LLMCommon", "_shared/modules/llm/inference.json could not be read at '{1}'.", path)
 		throw Error("ergopti_plus: _shared/modules/llm/inference.json could not be read")
 	}
+	_LLM_COMMON_INFERENCE_RAW := raw
 	parsed := _LLM_Common_ParseInferenceJson(raw)
 	if (parsed.Count == 0) {
 		LoggerError("LLMCommon", "_shared/modules/llm/inference.json parsed to an empty table — malformed JSON.")
@@ -185,6 +189,76 @@ LLM_ApiCommon_GetRateLimitMs(backend_id) {
 		return rateMap["ollama"]
 	LoggerError("LLMCommon", "inference.json rate_limit_min_interval_ms has neither '{1}' nor 'ollama'.", backend_id)
 	throw Error("ergopti_plus: inference.json rate_limit floor unavailable")
+}
+
+/**
+ * Extracts a string array from inference.json by section and key. Uses the
+ * raw text cached alongside the parsed Map — the scalar-only Map parser cannot
+ * represent arrays, so we walk the raw JSON with a depth counter.
+ * @param {string} section - Top-level section name (e.g. "stop_sequences").
+ * @param {string} key     - Array key within the section (e.g. "ollama_batch").
+ * @returns {Array} Unescaped string array.
+ */
+_LLM_Common_GetStringArray(section, key) {
+	global _LLM_COMMON_INFERENCE_RAW, _SharedDir
+	if !IsSet(_LLM_COMMON_INFERENCE_RAW) {
+		; Fallback path: raw not yet cached — read the file directly.
+		path := _SharedDir . "\modules\llm\inference.json"
+		raw := FSRead(path)
+		if (raw == false)
+			throw Error("ergopti_plus: inference.json unavailable for array extraction")
+		_LLM_COMMON_INFERENCE_RAW := raw
+	}
+	raw := _LLM_COMMON_INFERENCE_RAW
+	; Locate the section object: "section": { ... }
+	if !RegExMatch(raw, '"' . section . '"\s*:\s*\{', &sec_match)
+		throw Error("ergopti_plus: inference.json missing section " . section)
+	sec_start := sec_match.Pos + sec_match.Len
+	depth := 1
+	i := sec_start
+	while (i <= StrLen(raw) and depth > 0) {
+		c := SubStr(raw, i, 1)
+		if (c == "{")
+			depth += 1
+		else if (c == "}")
+			depth -= 1
+		i += 1
+	}
+	sec_body := SubStr(raw, sec_start, i - sec_start - 1)
+	; Locate the array value within the section: "key": [ ... ]
+	if !RegExMatch(sec_body, '"' . key . '"\s*:\s*\[', &key_match)
+		throw Error("ergopti_plus: inference.json missing array " . section . "." . key)
+	arr_start := key_match.Pos + key_match.Len
+	depth := 1
+	i := arr_start
+	while (i <= StrLen(sec_body) and depth > 0) {
+		c := SubStr(sec_body, i, 1)
+		if (c == "[")
+			depth += 1
+		else if (c == "]")
+			depth -= 1
+		i += 1
+	}
+	arr_body := SubStr(sec_body, arr_start, i - arr_start - 1)
+	; Extract and unescape each quoted string element.
+	result := []
+	pos := 1
+	while RegExMatch(arr_body, '"((?:[^"\\]|\\.)*)"', &m, pos) {
+		result.Push(LLM_UnescapeJSON(m[1]))
+		pos := m.Pos + m.Len
+	}
+	return result
+}
+
+/**
+ * Returns the stop-sequence array for the given backend variant from
+ * inference.json (single source). Variants: "ollama_batch", "ollama_line",
+ * "mlx_batch", "mlx_line". Raises if the key is absent — fail fast.
+ * @param {string} variant - Key within stop_sequences in inference.json.
+ * @returns {Array} Array of stop-token strings.
+ */
+LLM_ApiCommon_GetStopSequences(variant) {
+	return _LLM_Common_GetStringArray("stop_sequences", variant)
 }
 
 /**

@@ -233,6 +233,49 @@ end)
 
 
 
+-- ============================================
+-- ============================================
+-- ======= 8/ get_stop_sequences (D-3) =======
+-- ============================================
+-- ============================================
+
+helpers.describe("ApiCommon.get_stop_sequences: stop-sequences single source (D-3)", function()
+	helpers.it("returns a non-empty table for ollama_batch", function()
+		local seq = ApiCommon.get_stop_sequences("ollama_batch")
+		helpers.assert_true(type(seq) == "table" and #seq > 0, "ollama_batch must be a non-empty table")
+	end)
+
+	helpers.it("ollama_line is strictly longer than ollama_batch", function()
+		local batch = ApiCommon.get_stop_sequences("ollama_batch")
+		local line  = ApiCommon.get_stop_sequences("ollama_line")
+		helpers.assert_true(#line > #batch, "ollama_line must extend ollama_batch with newline/separator stops")
+	end)
+
+	helpers.it("first element of every variant is <|eot_id|>", function()
+		for _, v in ipairs({ "ollama_batch", "ollama_line", "mlx_batch", "mlx_line" }) do
+			local seq = ApiCommon.get_stop_sequences(v)
+			helpers.assert_eq(seq[1], "<|eot_id|>", v .. " first token must be <|eot_id|>")
+		end
+	end)
+
+	helpers.it("mlx_batch does not contain TAIL: (intentional MLX subset, decision M4)", function()
+		local seq = ApiCommon.get_stop_sequences("mlx_batch")
+		local found = false
+		for _, tok in ipairs(seq) do if tok == "TAIL:" then found = true ; break end end
+		helpers.assert_true(not found, "mlx_batch must not contain TAIL: (MLX drops it intentionally)")
+	end)
+
+	helpers.it("ollama_batch contains TAIL:", function()
+		local seq = ApiCommon.get_stop_sequences("ollama_batch")
+		local found = false
+		for _, tok in ipairs(seq) do if tok == "TAIL:" then found = true ; break end end
+		helpers.assert_true(found, "ollama_batch must contain TAIL:")
+	end)
+end)
+
+
+
+
 -- =========================================
 --- =========================================
 -- ======= 7/ insert_prediction edge =======
