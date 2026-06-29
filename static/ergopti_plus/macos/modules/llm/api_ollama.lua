@@ -278,18 +278,11 @@ end
 --- ======================================
 -- ======================================
 
--- Pre-allocated stop sequences. Two flavours:
---   STOP_BATCH — used by batch / non-line-mode requests. Prevents the
---                model from drifting into its instruction tags and from
---                echoing the PREFIX / TAIL markers back into the answer.
---   STOP_LINE  — used in line mode (single completion, profile expects
---                one continuation). Extends STOP_BATCH with newlines,
---                the ``===`` separator (so a model that drifts into
---                batch shape gets cut), the closing-tag prefix ``</``
---                and a couple of common over-explanation tokens
---                (``Suite finale``, ``SUITE``, ``NEXT_WORDS:``).
-local STOP_BATCH    = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:" }
-local STOP_LINE     = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:", "\n\n", "===", "\n", "\r", "</", "Suite finale", "SUITE", "NEXT_WORDS:" }
+-- Stop sequences from inference.json (single source — eliminates the
+-- per-file literal that used to live here; rationale in the JSON comment).
+-- Two flavours as before: batch mode vs. line mode.
+local STOP_BATCH = ApiCommon.get_stop_sequences("ollama_batch")
+local STOP_LINE  = ApiCommon.get_stop_sequences("ollama_line")
 
 --- Builds the options payload for the Ollama API (optimized for speed).
 --- @param temperature number The creativity parameter.

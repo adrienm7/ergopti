@@ -107,10 +107,6 @@ global _LLM_Ollama_ActiveStreams := []
 global _LLM_Ollama_LastSweepTick := 0
 global _LLM_OLLAMA_ORPHAN_SWEEP_MS := 60000
 
-; Stop tokens — same lists as macOS api_ollama.lua (STOP_BATCH / STOP_LINE).
-global _LLM_OLLAMA_STOP_BATCH := ["<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:"]
-global _LLM_OLLAMA_STOP_LINE := ["<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:", "`n`n", "===", "`n", "`r", "</", "Suite finale", "SUITE", "NEXT_WORDS:"]
-
 ; True after warmup succeeds — mirrors macOS api_ollama ``_is_ready``.
 global _LLM_Ollama_IsReady := false
 ; Warmup retry loop (macOS warmup_controller parity). Without this, a single
@@ -1468,8 +1464,7 @@ _LLM_Ollama_IsLineMode(system_prompt, is_batch) {
 _LLM_Ollama_StopsArray(stop_sequences, line_mode, is_batch) {
 	if (stop_sequences != "" and Type(stop_sequences) == "Array" and stop_sequences.Length > 0)
 		return stop_sequences
-	global _LLM_OLLAMA_STOP_BATCH, _LLM_OLLAMA_STOP_LINE
-	return (line_mode && !is_batch) ? _LLM_OLLAMA_STOP_LINE : _LLM_OLLAMA_STOP_BATCH
+	return (line_mode && !is_batch) ? LLM_ApiCommon_GetStopSequences("ollama_line") : LLM_ApiCommon_GetStopSequences("ollama_batch")
 }
 
 _LLM_Ollama_StopsJson(stop_sequences, line_mode, is_batch) {

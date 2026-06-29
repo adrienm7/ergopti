@@ -59,6 +59,12 @@ local FALLBACK = {
 		mlx    = 300,
 		api    = 500,
 	},
+	stop_sequences = {
+		ollama_batch = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:" },
+		ollama_line  = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:", "\n\n", "===", "\n", "\r", "</", "Suite finale", "SUITE", "NEXT_WORDS:" },
+		mlx_batch    = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:" },
+		mlx_line     = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "\n\n", "</", "Suite finale", "SUITE", "NEXT_WORDS:" },
+	},
 }
 
 --- Loads the inference.json sitting next to defaults.json. The path is resolved
@@ -141,6 +147,25 @@ function M.get_retry_policy()
 	return cfg("retry", "max_multiplier"),
 		cfg("retry", "retry_temperature_step"),
 		cfg("retry", "retry_extra_tokens")
+end
+
+--- Returns the stop-sequence array for the given backend variant.
+--- Reads directly from the INFERENCE table (arrays survive hs.json.decode natively).
+--- Falls back to FALLBACK on a missing key so a corrupt inference.json never
+--- leaves the engine with a nil stop list.
+--- @param variant string One of "ollama_batch", "ollama_line", "mlx_batch", "mlx_line".
+--- @return table Array of stop-token strings.
+function M.get_stop_sequences(variant)
+	local seqs = INFERENCE.stop_sequences
+	if type(seqs) == "table" and type(seqs[variant]) == "table" then
+		return seqs[variant]
+	end
+	local fb = FALLBACK.stop_sequences and FALLBACK.stop_sequences[variant]
+	if type(fb) == "table" then
+		Logger.warn(LOG, "inference.json missing stop_sequences.%s — using hardcoded fallback.", variant)
+		return fb
+	end
+	error("ergopti_plus: inference.json missing stop_sequences." .. tostring(variant) .. " and no fallback available")
 end
 
 
