@@ -218,7 +218,7 @@ LLM_ResolveOllamaTag(display_name) {
  */
 LLM_PickBestInstalledDisplayName() {
 	preferred := IsSet(LLM_Defaults) && LLM_Defaults.Has("llm_model")
-		? LLM_Defaults["llm_model"] : "Qwen3.5-0.8B"
+		? LLM_Defaults["llm_model"] : _LLM_LOCAL_DEFAULTS["llm_model"]
 	if (preferred != "" && LLM_IsModelInstalled(preferred))
 		return preferred
 	for _, name in LLM_GetAllModelNames() {

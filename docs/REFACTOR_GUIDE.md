@@ -211,7 +211,7 @@ En place : [`windows/README.md`](../static/ergopti_plus/windows/README.md), [`ma
 |----|-------|-------------------|----------------------------|
 | ☐ | **P10.1** D-2 | Updater single-source · TOML **mort** (0 lecteur), en-tête faux | brancher les 2 drivers sur le TOML **ou** supprimer le TOML+en-tête (§5.6). *Test :* `test_updater_constants_single_source.{ahk,lua}`. **Moyen** (`reload_only` si branché) |
 | ☐ | **P10.2** D-3 | Stop-tokens single-source · drift MLX | bloc `stop_sequences` dans `_shared/modules/llm/inference.json`. *Test :* `test_llm_stop_sequences_single_source`. **Faible** (ollama) — MLX = M4 |
-| 🔄 | **P10.3** | Littéraux → manifeste · `chatgpt_url`/`gpt.link`/`Qwen3.5-0.8B` | ✅ **macOS `chatgpt_url`** : `bindings.lua` lit `Manifest.default_for("shortcuts.chatgpt_url")` + drift guard dans `test_bindings.lua` (HS 2459/0). ☐ reste `gpt.link` (AHK) + modèle `Qwen3.5-0.8B` (1 source AHK). **Faible** |
+| ✅ | **P10.3** | Littéraux → manifeste · `chatgpt_url`/`gpt.link`/`Qwen3.5-0.8B` | ✅ macOS `chatgpt_url` lit `Manifest.default_for` + drift guard (HS 2459/0) ; AHK `gpt.link` fallback littéral supprimé → fail-fast (lit `Features["shortcuts"]["gpt"]["link"]`) ; modèle `Qwen3.5-0.8B` single-sourcé dans `_LLM_LOCAL_DEFAULTS` (`models.ahk`+`actions.ahk` lisent la map). Guard `test-llm-model-single-source.cjs` câblé (`test:js` 33/33, AHK 2523/0). |
 | ☐ | **P10.4** D-1 | Parity gate semver · fallback **divergent** | **décision M3** (fail-closed) → vecteurs partagés + `test_version_compare_contract.{js,ahk,lua}`. **Moyen** (`feat`) |
 
 #### P11 — Splits god-files (mirror, behavior-neutral, `reload_only`)
