@@ -25,7 +25,9 @@
 _PHS_AssertSeedingWired() {
 	SplitPath(A_ScriptDir, , &Root)   ; A_ScriptDir = windows/tests -> Root = windows
 	Root := StrReplace(Root, "\", "/")
-	pf := FileRead(Root . "/lib/personal_features.ahk")
+	; Scan the whole driver source for the seeding helper (move-resilient); the
+	; ErgoptiPlus.ahk entrypoint read below stays pinned (the entrypoint never moves).
+	pf := _DriverSourceConcat()
 	Assert(InStr(pf, "EnsurePersonalHotstringFeature(SecName)") > 0,
 		"EnsurePersonalHotstringFeature must exist to seed custom personal hotstring sections (personal-hotstring-seed)")
 	Assert(InStr(pf, '["hotstrings"]["personal"][SecName] := Map(') > 0,

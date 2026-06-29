@@ -20,8 +20,8 @@
 
 
 _HCER_AssertRingUsesEmittedEndChar() {
-	SplitPath(A_ScriptDir, , &Root)
-	Src := FileRead(StrReplace(Root, "\", "/") . "/lib/hotstrings/hotstring_engine_main.ahk")
+	; Scan the whole driver source so the test survives a file move of the engine.
+	Src := _DriverSourceConcat()
 	Assert(InStr(Src, "UpdateLastSentCharacter(SubStr(EndCharPart") > 0,
 		"the atomic-branch UpdateLastSentCharacter must record the EMITTED end-char (EndCharPart, which drops a consumed delimiter), not the raw EndChar (consumed-endchar-ring-desync)")
 	Assert(!InStr(Src, "UpdateLastSentCharacter(SubStr(EndChar !="),

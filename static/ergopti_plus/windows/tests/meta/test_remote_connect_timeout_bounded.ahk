@@ -26,8 +26,8 @@
 
 
 _RCT_AssertConnectBounded() {
-	SplitPath(A_ScriptDir, , &Root)
-	src := FileRead(StrReplace(Root, "\", "/") . "/modules/llm/api_remote.ahk")
+	; Scan the whole driver source so the test survives a file move of api_remote.
+	src := _DriverSourceConcat()
 	Assert(InStr(src, "LLM_REMOTE_CONNECT_TIMEOUT_MS :=") > 0,
 		"a dedicated short connect timeout must bound the synchronous resolve+connect phase (remote-generate-connect-blocks)")
 	Assert(!InStr(src, "SetTimeouts(LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS"),
