@@ -21,6 +21,7 @@ local sys_acts    = require("modules.shortcuts.actions.system")
 local app_acts    = require("modules.shortcuts.actions.apps")
 local Logger      = require("lib.logger")
 local i18n        = require("lib.i18n")
+local Manifest    = require("lib.manifest_reader")
 
 local LOG = "shortcuts.bindings"
 
@@ -33,7 +34,11 @@ local LOG = "shortcuts.bindings"
 --- ====================================
 -- ====================================
 
-M.DEFAULT_CHATGPT_URL = "https://chat.openai.com"
+-- Sourced from the manifest (the cross-driver SSoT, platforms ahk+hs) rather
+-- than re-declared, so a change to shortcuts.chatgpt_url cannot diverge from the
+-- AHK driver (which reads the same default from its generated map). Fails fast
+-- if the path is absent.
+M.DEFAULT_CHATGPT_URL = Manifest.default_for("shortcuts.chatgpt_url")
 
 local hotkeys       = {}   -- Active hotkey/tap objects, keyed by shortcut id
 local hotkey_defs   = {}   -- Factory functions that create and return a hotkey object

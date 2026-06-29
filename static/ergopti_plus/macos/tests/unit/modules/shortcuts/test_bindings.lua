@@ -135,6 +135,14 @@ helpers.describe("shortcuts.bindings: public API", function()
 		helpers.assert_eq(type(Bindings.DEFAULT_CHATGPT_URL), "string")
 		helpers.assert_true(#Bindings.DEFAULT_CHATGPT_URL > 0)
 	end)
+
+	helpers.it("sources DEFAULT_CHATGPT_URL from the manifest, not a re-typed literal (shortcuts-chatgpt-url-ssot)", function()
+		-- Drift guard (REFACTOR_GUIDE P10.3): the macOS default MUST equal the
+		-- cross-driver manifest default so a change to shortcuts.chatgpt_url cannot
+		-- silently diverge from the AHK driver, which reads the same default.
+		local Manifest = require("lib.manifest_reader")
+		helpers.assert_eq(Bindings.DEFAULT_CHATGPT_URL, Manifest.default_for("shortcuts.chatgpt_url"))
+	end)
 end)
 
 
