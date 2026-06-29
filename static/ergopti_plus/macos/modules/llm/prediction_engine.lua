@@ -731,6 +731,11 @@ function M.reset()
 	last_buffer_signature      = nil
 	llm_request_counter        = llm_request_counter + 1
 	fetch_request_counter      = fetch_request_counter + 1
+	-- Clear the rate-limit deferral's profile label. It is otherwise cleared ONLY by
+	-- the inactivity-timer callback that consumes it; a reset that tears down that
+	-- timer before it fires would leave the stale label to mis-attribute the NEXT,
+	-- unrelated prediction's info bar (F-L12).
+	_deferred_profile_name     = nil
 
 	-- Clear chain state before tearing down other resources so any fallback
 	-- timer callback that fires between now and its cancellation sees
@@ -742,8 +747,13 @@ function M.reset()
 	if tooltip.hide_forced then tooltip.hide_forced() else tooltip.hide() end
 	stop_inactivity_timer()
 	StreamingHandler.stop_watchdog()
-	-- Cancel any in-flight streaming curl task so it doesn't fire stale callbacks
-	if is_streaming_enabled then pcall(core_llm.cancel_streaming) end
+	-- Cancel any in-flight streaming curl UNCONDITIONALLY — not gated on the current
+	-- is_streaming_enabled. A stream dispatched while streaming was ON can still be in
+	-- flight after the user toggles streaming OFF; gating on the live flag would skip
+	-- the cancel and leak the curl task (and on MLX, the single-request connection it
+	-- holds blocks the next prediction). cancel_streaming is a null-safe idempotent
+	-- no-op when nothing is streaming, mirroring stop_timer()'s unconditional cancel (F-L11).
+	pcall(core_llm.cancel_streaming)
 
 	if was_visible then
 		Logger.debug(LOG, "Predictions cleared (were visible).")
