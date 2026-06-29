@@ -223,11 +223,6 @@ function M.set_llm_display_model_name(name)
 	Logger.debug(LOG, "Model display name: '%s'.", tostring(name))
 end
 
-function M.set_llm_show_model_name(name)
-	-- Alias kept for compatibility with older menu versions
-	llm_display_name = name
-end
-
 function M.set_llm_backend_name(label)
 	llm_backend_label = label
 	Logger.debug(LOG, "Backend label: '%s'.", tostring(label))

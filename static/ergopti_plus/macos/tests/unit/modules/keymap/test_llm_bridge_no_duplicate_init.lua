@@ -122,7 +122,6 @@ package.loaded["modules.llm.prediction_engine"] = {
 	get_llm_enabled               = function() return ENGINE_ENABLED end,
 	set_llm_model                 = function() end,
 	set_llm_display_model_name    = function() end,
-	set_llm_show_model_name       = function() end,
 	set_llm_backend_name          = function() end,
 	set_llm_context_length        = function() end,
 	set_llm_temperature           = function() end,

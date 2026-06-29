@@ -449,15 +449,6 @@ HealthCheck_FormatPlain(Snapshot) {
 	return Out
 }
 
-; Kept for backwards compatibility — delegates to HealthCheck_FormatPlain.
-; @param Snapshot {Map|0} Result from HealthCheck_Run(), or 0 to run fresh.
-; @return {String}
-HealthCheck_Format(Snapshot := 0) {
-	if !(Snapshot is Map)
-		Snapshot := HealthCheck_Run()
-	return HealthCheck_FormatPlain(Snapshot)
-}
-
 
 
 

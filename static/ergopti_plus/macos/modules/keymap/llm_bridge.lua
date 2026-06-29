@@ -292,7 +292,6 @@ function M.set_llm_enabled(v)               engine.set_llm_enabled(v)           
 function M.get_llm_enabled()                return engine.get_llm_enabled()          end
 function M.set_llm_model(name)              engine.set_llm_model(name)              end
 function M.set_llm_display_model_name(name) engine.set_llm_display_model_name(name) end
-function M.set_llm_show_model_name(name)    engine.set_llm_show_model_name(name)    end
 function M.set_llm_backend_name(label)      engine.set_llm_backend_name(label)      end
 function M.set_llm_context_length(l)        engine.set_llm_context_length(l)        end
 function M.set_llm_temperature(t)           engine.set_llm_temperature(t)           end
