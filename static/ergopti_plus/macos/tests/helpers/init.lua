@@ -132,6 +132,19 @@ function M.load_with_stubs(module_name, hs_overrides)
 	package.loaded["modules.keymap.layout_install"] = nil
 	package.loaded["modules.keymap.input_sources"]  = nil
 
+	-- Drop every cached ui.menu.* module so a menu builder that captured lib.i18n at
+	-- require-time (e.g. menu_karabiner / menu_utils call i18n.section) is ALWAYS
+	-- re-bound to THIS test's canonical lib.i18n stub set below — never a section-less
+	-- `{ get = ... }` stub a previous test file installed at module scope. Without this
+	-- the full run.lua suite was order/GC-dependently RED at menu_karabiner.lua:317
+	-- (i18n.section nil), masking real regressions behind a flaky failure (F-T1).
+	-- Setting an existing key to nil during pairs() is safe (only ADDING keys is not).
+	for name in pairs(package.loaded) do
+		if type(name) == "string" and name:match("^ui%.menu") then
+			package.loaded[name] = nil
+		end
+	end
+
 	-- Always inject a minimal lib.i18n stub so that modules calling i18n.get()
 	-- at require-time (terminators, conflicts, actions, profiles …) never crash
 	-- with "attempt to call a nil value (field 'get')". The real lib.i18n depends

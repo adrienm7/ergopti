@@ -80,8 +80,8 @@ local _capsword_last_check_s = 0
 -- Guard against spawning concurrent async checks while one is already in flight.
 local _capsword_check_pending = false
 -- Max time to wait for the karabiner_cli probe to complete before force-releasing
--- the pending lock. hs.task only fires its callback on process EXIT, so a started-
--- but-hung/zombied CLI would otherwise leave the lock set forever (F-L6).
+-- the pending lock. The async task only fires its callback on process EXIT, so a
+-- started-but-hung/zombied CLI would otherwise leave the lock set forever (F-L6).
 local CAPSWORD_PROBE_TIMEOUT_SEC = 1.5
 -- Watchdog timer declared ABOVE deactivate_capsword (closure-nil rule) so the task
 -- callback can cancel it and the watchdog callback can reach the pending flag.
@@ -157,7 +157,7 @@ local function deactivate_capsword()
 		Logger.error(LOG, "CapsWord check task failed to start (karabiner-capsword-lock-leak).")
 		return
 	end
-	-- Started OK, but hs.task fires its callback only on process EXIT. Arm a watchdog
+	-- Started OK, but the async task fires its callback only on process EXIT. Arm a watchdog
 	-- so a CLI that starts then hangs/zombies still releases the pending lock instead
 	-- of permanently disabling trackpad auto-deactivation of CapsWord (F-L6).
 	if _capsword_probe_watchdog then pcall(function() _capsword_probe_watchdog:stop() end) end
