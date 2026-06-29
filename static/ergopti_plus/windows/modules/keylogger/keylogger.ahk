@@ -222,16 +222,6 @@ KL_MkdirP(path) {
     try DirCreate(path)
 }
 
-KL_FileExists(path) {
-    return FileExist(path) ? true : false
-}
-
-KL_ReadAll(path) {
-    if !FileExist(path)
-        return ""
-    return FileRead(path, "UTF-8")
-}
-
 KL_WriteAtomic(path, content) {
     ; Write via .tmp + atomic rename so a crash mid-write cannot corrupt the
     ; final file. The previous implementation did FileDelete(path) + FileMove
@@ -437,20 +427,6 @@ KL_ScanMaxEventId(sql_text, device_id_lit) {
         return Integer(m[1])
     
     return 0
-}
-
-; Escapes the RegEx metacharacters that can appear in a UUID SQL literal —
-; the wrapping single quotes are literal, and a UUID is hex+dashes, but the
-; doubled-quote escaping in KL_SqlStr could in theory inject other chars, so
-; escape defensively rather than trusting the device-id shape.
-_KL_RegexEscape(s) {
-    static META := "\.*?+[]{}()|^$"
-    out := ""
-    Loop Parse, s {
-        c := A_LoopField
-        out .= InStr(META, c) ? ("\" . c) : c
-    }
-    return out
 }
 
 ; Single source of truth for the starting next_event_id: the larger of the
