@@ -208,28 +208,6 @@ LLM_OllamaAllowInference() {
 	return false
 }
 
-LLM_OllamaGenerate(model, system_prompt, full_text, temperature := 0.1, tail_text := "") {
-	; Sync path has no max_words context, so it asks for the shared default budget
-	; explicitly via PB_DEFAULT_MAX_TOKENS (no literal — single cross-driver source)
-	payload := LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, false, "", PB_DEFAULT_MAX_TOKENS, false, tail_text)
-
-	try {
-		http := ComObject("WinHttp.WinHttpRequest.5.1")
-		http.Open("POST", LLM_OLLAMA_BASE_URL "/api/chat", false)
-		http.SetTimeouts(LLM_OLLAMA_TIMEOUT, LLM_OLLAMA_TIMEOUT, LLM_OLLAMA_TIMEOUT, LLM_OLLAMA_TIMEOUT)
-		_LLM_Ollama_SendUtf8(http, payload)
-
-		if (http.Status != 200) {
-			return ""
-		}
-
-		raw := http.ResponseText
-		return LLM_ParseOllamaChatResponse(raw)
-	} catch as err {
-		return ""
-	}
-}
-
 /**
  * Checks whether the Ollama server is reachable (blocking, short timeout).
  * @returns {boolean} True if the server responds to GET /.
@@ -458,7 +436,7 @@ LLM_OllamaDeleteModel(tag) {
 ; =====================================
 
 /**
- * Non-blocking variant of LLM_OllamaGenerate. Returns immediately; calls
+ * Non-blocking Ollama generation. Returns immediately; calls
  * ``on_success(text)`` when the model finishes responding, or ``on_fail()``
  * on any HTTP / parse failure. Mirrors hs.http.asyncPost on the HS side.
  *

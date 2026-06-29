@@ -468,7 +468,6 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			set_llm_enabled         = function() end,
 			set_llm_model           = function() end,
 			set_llm_display_model_name = function() end,
-			set_llm_show_model_name = function() end,
 			set_llm_backend_name    = function() end,
 			set_llm_context_length  = function() end,
 			set_llm_temperature     = function() end,
