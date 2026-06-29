@@ -445,6 +445,11 @@ sg("script_quit",                         function()
 		if ok_llm and type(menu_llm) == "table" then
 			if type(menu_llm.stop_mlx_server) == "function" then menu_llm.stop_mlx_server() end
 			if type(menu_llm.terminate_helper_processes) == "function" then menu_llm.terminate_helper_processes() end
+			-- stop_mlx_server only kills the in-process wrapper; the detached
+			-- mlx_lm.server (own process group) must be reaped via pgrep/lsof or it
+			-- keeps holding GPU memory + the MLX port after quit. Same sweep the
+			-- shutdown callback runs (script_quit is always a genuine quit) (F-M7).
+			if type(menu_llm.terminate_orphan_mlx_server) == "function" then menu_llm.terminate_orphan_mlx_server() end
 		end
 	end)
 	pcall(function() hs.timer.doAfter(0.1, function() os.exit(0) end) end)

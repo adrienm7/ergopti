@@ -784,18 +784,10 @@ hs.shutdownCallback = function()
 	pcall(function() require("ui.menu.menu_llm").terminate_helper_processes() end)
 	-- Kill any orphan mlx_lm.server on genuine quit only — not on reload.
 	-- Boot logic deliberately spares a healthy server across sessions; killing it
-	-- on every reload makes the cold-restart avoidance dead code.
+	-- on every reload makes the cold-restart avoidance dead code. Shared with the
+	-- script_quit (os.exit) action so the two quit paths cannot drift (F-M7).
 	if not reload_guard.is_reloading() then
-		pcall(function()
-			local ok_m, am = pcall(require, "modules.llm.api_mlx")
-			local raw_port = (ok_m and type(am.get_port) == "function" and am.get_port())
-			             or  (ok_m and am.DEFAULT_PORT)
-			             or  3460
-			local p = tostring(raw_port)
-			hs.execute(
-				"pgrep -f 'mlx_lm.*server' | xargs kill -9 2>/dev/null; " ..
-				"lsof -tiTCP:" .. p .. " -sTCP:LISTEN | xargs kill -9 2>/dev/null", true)
-		end)
+		pcall(function() require("ui.menu.menu_llm").terminate_orphan_mlx_server() end)
 	end
 	-- Stop all path-watchers that were pinned at module scope to survive GC.
 	-- Explicit :stop() prevents stray file-system callbacks from firing during
