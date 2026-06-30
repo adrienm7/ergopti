@@ -39,6 +39,7 @@ local Profiles       = require("modules.llm.profiles")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
 local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
+local TokenCrypto    = require("modules.llm.api_token_crypto")
 local _http_adapter  = require("adapters.http_client")
 local _infer_client  = _http_adapter.new()   -- used for inference POST requests
 local _check_client  = _http_adapter.new()   -- used for health-check GET requests
@@ -213,15 +214,26 @@ end
 
 --- Resolve the currently active entry, falling back to the first configured
 --- one when no id matches. Returns nil when no entry exists at all.
+--- Tokens stored as ``keychain:<id>`` references are decrypted on first call
+--- and the cleartext is cached back into the entry so the Keychain subprocess
+--- fires at most once per entry across the session lifetime.
 --- @return table|nil entry
 function M.get_active_entry()
 	if #_entries == 0 then return nil end
+	local entry
 	if _active_id ~= "" then
 		for _, e in ipairs(_entries) do
-			if e.id == _active_id then return e end
+			if e.id == _active_id then entry = e; break end
 		end
 	end
-	return _entries[1]
+	entry = entry or _entries[1]
+	if not entry then return nil end
+	-- Lazy-resolve the Keychain reference on first use so the blocking
+	-- security(1) subprocess never fires on the boot or load tick.
+	if type(entry.token) == "string" and TokenCrypto.is_encrypted(entry.token) then
+		entry.token = TokenCrypto.decrypt(entry.token)
+	end
+	return entry
 end
 
 

@@ -283,11 +283,9 @@ function M.load_api_entries()
 	local entries = hs.settings.get(API_ENTRIES_KEY)
 	local active_id = hs.settings.get(API_ENTRY_ID_KEY)
 	if type(entries) == "table" then
-		for _, e in ipairs(entries) do
-			if type(e) == "table" and type(e.token) == "string" and e.token ~= "" then
-				e.token = TokenCrypto.decrypt(e.token)
-			end
-		end
+		-- Tokens stored as keychain:<id> references are resolved lazily on first
+		-- use inside ApiRemote.get_active_entry() to avoid blocking Keychain
+		-- subprocess calls on the boot or load tick.
 		ApiRemote.set_entries(entries)
 	end
 	if type(active_id) == "string" then
