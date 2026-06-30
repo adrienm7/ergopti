@@ -639,6 +639,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_llm_dispatch_not_under_critical.ahk
 #Include meta/test_dead_ps1_pipeline_absent.ahk
 #Include meta/test_deps_fail_restores_priority.ahk
+#Include meta/test_gesture_toggle_ui_errors_logged.ahk
 #Include meta/test_llmdiff_has_corrections_ltrim.ahk
 #Include meta/test_audit_test_gaps.ahk
 #Include meta/test_keylogger_flush_atomic.ahk
