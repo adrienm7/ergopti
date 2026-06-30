@@ -320,8 +320,14 @@ if Features["shortcuts"]["search"]["enabled"] {
             "i)^(?:[\w-]{1,63}\.){1,4}[a-z]{2,63}(?:/[^\s]*)?$"
         )
 
-        if FilePath {
-            Run(SelectedText, , "Max")
+        ; AHK-18: FilePath regex matches SHAPE only — verify existence before Run so a
+        ; selected-but-non-existent path string falls through to the web-search branch
+        ; instead of throwing an OSError that escalates to the crash-report error net.
+        if (FilePath and FileExist(SelectedText)) {
+            try Run(SelectedText, , "Max")
+            catch as _e {
+                LoggerWarn("Search", "Could not open path '{1}': {2}.", SelectedText, _e.Message)
+            }
         } else if RegeditPath {
             RegJump(SelectedText)
         } else {
@@ -333,13 +339,25 @@ if Features["shortcuts"]["search"]["enabled"] {
             SelectedText := StrReplace(SelectedText, '"', "%22")
 
             if URLPath {
-                Run(SelectedText)
+                try Run(SelectedText)
+                catch as _e {
+                    LoggerWarn("Search", "Could not open URL '{1}': {2}.", SelectedText, _e.Message)
+                }
             } else if (WebsitePath) {
-                Run("https://" . SelectedText)
+                try Run("https://" . SelectedText)
+                catch as _e {
+                    LoggerWarn("Search", "Could not open website '{1}': {2}.", SelectedText, _e.Message)
+                }
             } else if (SelectedText == "") { ; If nothing was copied
-                Run(Features["shortcuts"]["search"]["search_engine"])
+                try Run(Features["shortcuts"]["search"]["search_engine"])
+                catch as _e {
+                    LoggerWarn("Search", "Could not open search engine: {1}.", _e.Message)
+                }
             } else {
-                Run(Features["shortcuts"]["search"]["search_engine_url_query"] . SelectedText)
+                try Run(Features["shortcuts"]["search"]["search_engine_url_query"] . SelectedText)
+                catch as _e {
+                    LoggerWarn("Search", "Could not open search URL: {1}.", _e.Message)
+                }
             }
         }
     }
