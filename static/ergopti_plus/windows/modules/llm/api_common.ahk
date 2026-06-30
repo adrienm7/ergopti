@@ -196,7 +196,7 @@ LLM_ApiCommon_GetRateLimitMs(backend_id) {
  * raw text cached alongside the parsed Map — the scalar-only Map parser cannot
  * represent arrays, so we walk the raw JSON with a depth counter.
  * @param {string} section - Top-level section name (e.g. "stop_sequences").
- * @param {string} key     - Array key within the section (e.g. "ollama_batch").
+ * @param {string} key     - Array key within the section (e.g. "batch").
  * @returns {Array} Unescaped string array.
  */
 _LLM_Common_GetStringArray(section, key) {
@@ -252,8 +252,8 @@ _LLM_Common_GetStringArray(section, key) {
 
 /**
  * Returns the stop-sequence array for the given backend variant from
- * inference.json (single source). Variants: "ollama_batch", "ollama_line",
- * "mlx_batch", "mlx_line". Raises if the key is absent — fail fast.
+ * inference.json (single source). Variants: "batch", "line".
+ * Raises if the key is absent — fail fast.
  * @param {string} variant - Key within stop_sequences in inference.json.
  * @returns {Array} Array of stop-token strings.
  */
