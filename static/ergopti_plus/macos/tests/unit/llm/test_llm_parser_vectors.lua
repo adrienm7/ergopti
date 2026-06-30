@@ -207,17 +207,30 @@ end)
 
 
 
--- ============================================
--- ============================================
--- ======= 4/ Ollama Non-Streaming ============
--- ============================================
--- ============================================
+-- =====================================================
+-- =====================================================
+-- ======= 4/ Ollama Non-Streaming (AHK /generate) ====
+-- =====================================================
+-- =====================================================
 
+-- Returns true if a corpus vector is scoped exclusively to the macOS driver.
+-- Vectors with no "driver" field are universal and run on all drivers.
+local function is_macos_only(vec)
+	if type(vec.driver) ~= "table" then return false end
+	for _, d in ipairs(vec.driver) do
+		if d ~= "macos" then return false end
+	end
+	return true
+end
+
+-- This section tests the /api/generate response shape (resp.response field).
+-- Vectors scoped to driver=["macos"] use the /api/chat shape (message.content)
+-- and are covered by tests/unit/meta/test_corpus_llm_parser.lua instead.
 helpers.describe("LLM parser corpus — Ollama non-streaming", function()
 	if not corpus then return end
 
 	for _, v in ipairs(corpus.vectors) do
-		if v.parser == "ollama_nonstream" then
+		if v.parser == "ollama_nonstream" and not is_macos_only(v) then
 			-- Capture v in the closure explicitly
 			local vec = v
 			helpers.it(vec.id .. ": " .. (vec.description or ""), function()

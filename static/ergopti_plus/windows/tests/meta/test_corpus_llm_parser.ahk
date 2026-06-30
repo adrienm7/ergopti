@@ -97,6 +97,21 @@ _LLMParserCorpus_RegisterAll() {
 			continue
 		}
 
+		; Skip vectors scoped to other drivers (e.g. driver=["macos"]).
+		; A vector with no "driver" field is universal and runs on all drivers.
+		if (Vec.Has("driver")) {
+			DriverArr := Vec["driver"]
+			IsAhk := false
+			for D in DriverArr {
+				if (D = "ahk") {
+					IsAhk := true
+					break
+				}
+			}
+			if (!IsAhk)
+				continue
+		}
+
 		; Capture loop variables for the closure.
 		VecCopy    := Vec
 		NameCopy   := "[corpus:" . Id . "] " . SubStr(Desc, 1, 70)
