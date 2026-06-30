@@ -238,6 +238,8 @@ try FileAppend("# [marker] starting direct include of LLM production modules`r`n
 #Include ../modules/llm/api_remote.ahk
 #Include unit/test_llm_api_ollama.ahk
 #Include unit/test_llm_api_remote.ahk
+; Remote catalogue load must fall back gracefully when api_providers.json is missing/malformed.
+#Include meta/test_remote_catalog_load_graceful.ahk
 #Include ../modules/llm/prediction_engine.ahk
 #Include unit/test_llm_prediction_engine.ahk
 #Include unit/test_llm_defaults.ahk
@@ -316,6 +318,8 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 #Include unit/test_keylogger_walker.ahk
 #Include unit/test_keylogger_app_categories.ahk
 #Include unit/test_keylogger_reader.ahk
+; KLW_GetMap and KLW_GetAppCtx must handle missing context keys without throwing.
+#Include unit/test_walker_ctx_missing_key.ahk
 ; Shared timings (A3): tap_holds/constants.ahk defines the tap-hold timing
 ; globals + TapHoldsLoadTimings() and has NO top-level hotkeys, so it is safe to
 ; include here (unlike most modules/). test_timings_config exercises the shared
@@ -628,6 +632,15 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_llm_dispatch_not_under_critical.ahk
 #Include meta/test_dead_ps1_pipeline_absent.ahk
 #Include meta/test_deps_fail_restores_priority.ahk
+#Include meta/test_tab_accept_invalidates_inflight.ahk
+#Include meta/test_llm_accept_suppress_balance.ahk
+#Include meta/test_altgr_latch_dispatch_aborts.ahk
+#Include meta/test_gesture_click_hold_released_on_suspend.ahk
+#Include meta/test_walker_batch_drained_on_rollover_and_stop.ahk
+#Include meta/test_tap_hold_none_sentinel.ahk
+#Include meta/test_deps_check_epoch_guard.ahk
+#Include meta/test_updater_rebuild_resets_dispatcher.ahk
+#Include meta/test_capsword_reset_on_suspend.ahk
 #Include meta/test_gesture_toggle_ui_errors_logged.ahk
 #Include meta/test_lalt_capslock_enabled_gate.ahk
 #Include meta/test_wpm_mousewatch_suspend_guard.ahk
@@ -695,6 +708,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_llm_nav_loop_ten.ahk
 #Include meta/test_api_entries_persist_error_logged.ahk
 #Include meta/test_updater_callback_suspend_guard.ahk
+#Include meta/test_altgr_dispatch_resume_aware.ahk
 #Include meta/test_updater_self_update_bak_rollback.ahk
 #Include meta/test_bundle_resolve_dir_local_appdata.ahk
 #Include meta/test_altgr_detect_hkl_fallback.ahk
