@@ -68,6 +68,20 @@ Ergopti_OnSuspendEnter() {
     ; surface a TrayTip or rebuild the menu while paused ("pause = tout éteint").
     try _Updater_CancelAsyncChecks()
     try StopActivitySimulation()
+    ; AHK-12: A gesture left/right click-hold (SendEvent "{LButton Down}") that
+    ; was in progress when the user pauses the driver outlives the suspend because
+    ; SetTimer callbacks bypass native Suspend — the button stays logically held
+    ; until the next mouse event. Release both hold states unconditionally here so
+    ; no synthetic button-down leaks into the suspended window ("pause = tout éteint").
+    try GestureReleaseLeftClick()
+    try GestureReleaseRightClick()
+    ; AHK-16: CapsWord keeps the hardware CapsLock LED lit (via UpdateCapsLockLED)
+    ; and continues arming its mouse-cancel HookDispatcher listeners even when the
+    ; driver is suspended — the LED misleads the user and the listeners fire through
+    ; native Suspend. DisableCapsWord resets CapsWordEnabled, unregisters mouse
+    ; listeners, and corrects the LED ("pause = tout éteint" invariant).
+    if IsSet(DisableCapsWord)
+        try DisableCapsWord()
     ; Reset OneShotShift so a shift armed just before suspension is not applied
     ; to the first keystroke after resume ("pause = tout éteint" invariant)
     global OneShotShiftEnabled := False
