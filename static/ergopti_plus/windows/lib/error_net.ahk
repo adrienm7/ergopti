@@ -36,7 +36,10 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
     ; the failed callback — never yank a key the user is still pressing.
     for _, ModKey in ["LControl", "RControl", "LShift", "RShift", "LAlt", "RAlt", "LWin", "RWin"] {
         if _ShouldReleaseModifier(ModKey) {
-            SendEvent("{" ModKey " Up}")
+            ; AHK-35: SendEvent can throw on a hook conflict or foreground-window race;
+            ; guard it so a failure on one modifier doesn't abort releasing the others
+            ; or skip the deferred crash report + tray toast that follow
+            try SendEvent("{" ModKey " Up}")
         }
     }
     ; Best-effort logging — guarded because the logger may not be initialised
