@@ -333,7 +333,11 @@ TooltipShow(Items, DurationSec := 0) {
         return
     }
 
+    ; AHK-34: the UIA COM call is the hottest blocking call on this path;
+    ; wrap it so a slow resolve surfaces in HotPath slow-segment logs
+    _hpResolve := HotPath_Now()
     Pos := _TooltipResolvePosition()
+    HotPath_LogIfSlow("Tooltip.ResolvePos", _hpResolve, "")
     Row := Rows[1]
     ; Snapshot generation before present so any exception still arms the timer
     ; correctly and the ghost cannot outlive the safety deadline.
