@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇩🇪",
 	"_meta.locale": "de",
 	"_meta.name": "Deutsch",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "Kein aktives Fenster",
 	"shortcuts.no_other_monitor": "Kein anderer Monitor erkannt",
 	"shortcuts.opendownloads": "Win + D(ownloads) = Downloads-Ordner öffnen",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: Ohne Formatierung einfügen. Excel behält sein natives Verhalten",
 	"shortcuts.pixel_read_error": "Pixelfarbe konnte nicht gelesen werden",
 	"shortcuts.saved": "Gespeichert: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Bildschirmaufnahme (Win + Shift + S)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "Screenshot in die Zwischenablage kopiert",
 	"shortcuts.screenshot_title": "Screenshot",
 	"shortcuts.search": "Win + S(uche) = Auswahl im Internet suchen. Im Explorer: Pfad der ausgewählten Datei kopieren",
-	"shortcuts.selectline": "Win + A(ll) = Gesamte Zeile auswählen",
 	"shortcuts.shortcut_format_hint": "Format: Mods+Taste (z.B. cmd+alt+p)\nVerfügbare Mods: cmd, alt, ctrl, shift\nLeer lassen zum Deaktivieren",
 	"shortcuts.shortcut_label": "Tastenkürzel",
 	"shortcuts.spotlightmouse": "Win + ' = Maus mit gelbem Ring hervorheben",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = In Titelschreibweise umwandeln (erster Buchstabe jedes Wortes groß)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Auswahl in Groß-/Kleinbuchstaben umwandeln",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "Ein Symbol bei Textauswahl eintippen umschließt die Auswahl.",
 	"startup.manifest_missing": "Startfehler: die Datei _generated/features_manifest.ahk fehlt oder ist beschädigt.\n\nFühre `npm run build:manifest` im Projektverzeichnis aus und starte das Skript neu.",
 	"startup.manifest_title": "ErgoptiPlus — Manifest fehlt",
 	"tap_hold.action.disable": "Nichts (deaktivieren)",

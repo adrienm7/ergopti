@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇮🇳",
 	"_meta.locale": "hi",
 	"_meta.name": "हिन्दी",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "कोई सक्रिय विंडो नहीं",
 	"shortcuts.no_other_monitor": "कोई अन्य मॉनिटर नहीं मिला",
 	"shortcuts.opendownloads": "Win + D(ownloads) = डाउनलोड फोल्डर खोलें",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: फॉर्मेटिंग के बिना पेस्ट करें। Excel अपना मूल व्यवहार बनाए रखता है",
 	"shortcuts.pixel_read_error": "पिक्सेल रंग नहीं पढ़ सका",
 	"shortcuts.saved": "सहेजा गया: %s",
 	"shortcuts.screen": "Win + H (screensHot) = स्क्रीन कैप्चर (Win + Shift + S ट्रिगर करता है)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "स्क्रीनशॉट क्लिपबोर्ड पर कॉपी किया",
 	"shortcuts.screenshot_title": "स्क्रीनशॉट",
 	"shortcuts.search": "Win + S(earch) = इंटरनेट पर चयन खोजें। एक्सप्लोरर में, चयनित फाइल पथ कॉपी करता है",
-	"shortcuts.selectline": "Win + A(ll) = संपूर्ण पंक्ति चुनें",
 	"shortcuts.shortcut_format_hint": "प्रारूप: mods+key (जैसे cmd+alt+p)\nउपलब्ध mods: cmd, alt, ctrl, shift\nअक्षम करने के लिए खाली छोड़ें",
 	"shortcuts.shortcut_label": "शॉर्टकट",
 	"shortcuts.spotlightmouse": "Win + ' = माउस को पीली रिंग से हाइलाइट करें",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = शीर्षक केस में कनवर्ट करें (प्रत्येक शब्द के पहले अक्षर को बड़ा करें)",
 	"shortcuts.uppercase": "Win + U(ppercase) = चयन अपरकेस/लोअरकेस टॉगल करें",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "चयनित पाठ होने पर एक प्रतीक टाइप करने से वह प्रतीक चयन को घेरता है।",
 	"startup.manifest_missing": "स्टार्टअप त्रुटि: _generated/features_manifest.ahk फ़ाइल अनुपस्थित या दूषित है।\n\nप्रोजेक्ट डायरेक्टरी से `npm run build:manifest` चलाएं, फिर स्क्रिप्ट को पुनः प्रारंभ करें।",
 	"startup.manifest_title": "ErgoptiPlus — manifest अनुपस्थित",
 	"tap_hold.action.disable": "कुछ नहीं (अक्षम करें)",

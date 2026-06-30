@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇫🇷",
 	"_meta.locale": "fr",
 	"_meta.name": "Français",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "Aucune fenêtre active",
 	"shortcuts.no_other_monitor": "Aucun autre moniteur détecté",
 	"shortcuts.opendownloads": "Win + D(ownloads) = Ouvre le dossier Téléchargements",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V : coller sans la mise en forme. Excel garde son comportement natif",
 	"shortcuts.pixel_read_error": "Impossible de lire la couleur du pixel",
 	"shortcuts.saved": "Sauvegardé : %s",
 	"shortcuts.screen": "Win + H (screensHot) = Capture de l'écran (réalise le raccourci Win + Shift + S)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "Capture d'écran copiée dans le presse-papiers",
 	"shortcuts.screenshot_title": "Capture d’écran",
 	"shortcuts.search": "Win + S(earch) = Recherche de la sélection sur Internet. Dans l'explorateur, récupération du chemin du fichier sélectionné",
-	"shortcuts.selectline": "Win + A(ll) = Sélection de toute la ligne",
 	"shortcuts.shortcut_format_hint": "Format : mods+touche (ex : cmd+alt+p)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
 	"shortcuts.shortcut_label": "Raccourci",
 	"shortcuts.spotlightmouse": "Win + ' = Met la souris en surbrillance avec un anneau jaune",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = Conversion en casse de titre (majuscule à chaque première lettre de mot)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Conversion en majuscules/minuscules la sélection",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "Taper un symbole lors d'une sélection de texte va encadrer celle-ci par le symbole.",
 	"startup.manifest_missing": "Erreur de démarrage : le fichier _generated/features_manifest.ahk est absent ou corrompu.\n\nLancez `npm run build:manifest` depuis le répertoire du projet, puis relancez le script.",
 	"startup.manifest_title": "ErgoptiPlus — manifest manquant",
 	"tap_hold.action.disable": "Rien (désactiver)",

@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇨🇳",
 	"_meta.locale": "zh",
 	"_meta.name": "中文",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "无活动窗口",
 	"shortcuts.no_other_monitor": "未检测到其他显示器",
 	"shortcuts.opendownloads": "Win + D（下载）= 打开下载文件夹",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V：无格式粘贴。Excel 保留原生行为",
 	"shortcuts.pixel_read_error": "无法读取像素颜色",
 	"shortcuts.saved": "已保存：%s",
 	"shortcuts.screen": "Win + H（截屏）= 屏幕截图（触发 Win + Shift + S）",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "截图已复制到剪贴板",
 	"shortcuts.screenshot_title": "截图",
 	"shortcuts.search": "Win + S（搜索）= 在网上搜索选中内容。在资源管理器中复制所选文件路径",
-	"shortcuts.selectline": "Win + A（全选）= 选择整行",
 	"shortcuts.shortcut_format_hint": "格式：修饰键+键（如 cmd+alt+p）\n可用修饰键：cmd, alt, ctrl, shift\n留空则禁用",
 	"shortcuts.shortcut_label": "快捷键",
 	"shortcuts.spotlightmouse": "Win + ' = 用黄色圆圈高亮鼠标",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = 转换为首字母大写（每词首字母大写）",
 	"shortcuts.uppercase": "Win + U（大写）= 切换选区大小写",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "选中文字时输入符号可将选区用该符号包围。",
 	"startup.manifest_missing": "启动错误：_generated/features_manifest.ahk 文件缺失或已损坏。\n\n从项目目录运行 `npm run build:manifest`，然后重新启动脚本。",
 	"startup.manifest_title": "ErgoptiPlus — manifest 缺失",
 	"tap_hold.action.disable": "无（禁用）",

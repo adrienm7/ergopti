@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇳🇴",
 	"_meta.locale": "no",
 	"_meta.name": "Norsk",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "Ingen aktivt vindu",
 	"shortcuts.no_other_monitor": "Ingen annen skjerm funnet",
 	"shortcuts.opendownloads": "Win + D(ownloads) = Åpne Downloads-mappen",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: lim inn uten formatering. Excel beholder sitt opprinnelige atferd",
 	"shortcuts.pixel_read_error": "Kan ikke lese pikselfargen",
 	"shortcuts.saved": "Lagret: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Skjermbilde (utløser Win + Shift + S)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "Skjermbilde kopiert til utklippstavle",
 	"shortcuts.screenshot_title": "Skjermbilde",
 	"shortcuts.search": "Win + S(earch) = Søk merkingen på internett. I Explorer kopierer den filstien for den valgte filen",
-	"shortcuts.selectline": "Win + A(ll) = Velg hele linjen",
 	"shortcuts.shortcut_format_hint": "Format: mods+key (f.eks cmd+alt+p)\nTilgjengelige mods: cmd, alt, ctrl, shift\nLa stå tomt for å deaktivere",
 	"shortcuts.shortcut_label": "Snarvei",
 	"shortcuts.spotlightmouse": "Win + ' = Fremhev musen med en gul ring",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = Konverter til tittelformat (stavelse med stor bokstav i begynnelsen av hvert ord)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Veksle merkingen mellom store/små bokstaver",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "Tastering av symbol mens tekst er merket omgir merkingen med det symbolet.",
 	"startup.manifest_missing": "Oppstartsfeil: filen _generated/features_manifest.ahk mangler eller er skadet.\n\nKjør `npm run build:manifest` fra prosjektmappen og start skriptet på nytt.",
 	"startup.manifest_title": "ErgoptiPlus — manifest mangler",
 	"tap_hold.action.disable": "Ingenting (deaktiver)",

@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇨🇿",
 	"_meta.locale": "cs",
 	"_meta.name": "Čeština",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "Žádné aktivní okno",
 	"shortcuts.no_other_monitor": "Žádný jiný monitor nebyl nalezen",
 	"shortcuts.opendownloads": "Win + D(ownloads) = Otevřít složku Stažené soubory",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: vložit bez formátování. Excel si zachovává své chování",
 	"shortcuts.pixel_read_error": "Nelze přečíst barvu pixelu",
 	"shortcuts.saved": "Uloženo: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Snímek obrazovky (spustí Win + Shift + S)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "Snímek obrazovky zkopírován do schránky",
 	"shortcuts.screenshot_title": "Snímek obrazovky",
 	"shortcuts.search": "Win + S(earch) = Hledat výběr na internetu. V Průzkumníku zkopíruje cestu k vybranému souboru",
-	"shortcuts.selectline": "Win + A(ll) = Vybrat celý řádek",
 	"shortcuts.shortcut_format_hint": "Formát: modifikátory+klávesa (např. cmd+alt+p)\nDostupné modifikátory: cmd, alt, ctrl, shift\nPonechte prázdné pro deaktivaci",
 	"shortcuts.shortcut_label": "Zkratka",
 	"shortcuts.spotlightmouse": "Win + ' = Zvýraznit myš žlutým kroužkem",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = Převést na formát názvu (velké první písmeno každého slova)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Přepnout výběr velká/malá písmena",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "Zadání symbolu při označeném textu jej obalí tímto symbolem.",
 	"startup.manifest_missing": "Chyba při spuštění: soubor _generated/features_manifest.ahk chybí nebo je poškozen.\n\nSpusťte `npm run build:manifest` z adresáře projektu a skript restartujte.",
 	"startup.manifest_title": "ErgoptiPlus — manifest chybí",
 	"tap_hold.action.disable": "Nic (zakázat)",

@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇹🇷",
 	"_meta.locale": "tr",
 	"_meta.name": "Türkçe",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "Etkin pencere yok",
 	"shortcuts.no_other_monitor": "Başka monitör algılanmadı",
 	"shortcuts.opendownloads": "Win + D(ownloads) = İndirilenler klasörünü aç",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: biçimlendirme olmadan yapıştır. Excel yerel davranışını korur",
 	"shortcuts.pixel_read_error": "Piksel rengi okunamıyor",
 	"shortcuts.saved": "Kaydedildi: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Ekran görüntüsü (Win + Shift + S'yi tetikler)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "Ekran görüntüsü panoya kopyalandı",
 	"shortcuts.screenshot_title": "Ekran görüntüsü",
 	"shortcuts.search": "Win + S(earch) = Seçimi İnternette ara. Gezgin'de seçili dosya yolunu kopyalar",
-	"shortcuts.selectline": "Win + A(ll) = Tüm satırı seç",
 	"shortcuts.shortcut_format_hint": "Biçim: mod+tuş (ör. cmd+alt+p)\nMevcut modlar: cmd, alt, ctrl, shift\nDevre dışı bırakmak için boş bırakın",
 	"shortcuts.shortcut_label": "Kısayol",
 	"shortcuts.spotlightmouse": "Win + ' = Fareyi sarı halkayla vurgula",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = Başlık durumuna dönüştür (her kelimenin ilk harfi büyük)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Seçimde büyük/küçük harf arasında geçiş yap",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "Metin seçiliyken sembol yazmak seçimi o sembolle sarar.",
 	"startup.manifest_missing": "Başlangıç hatası: _generated/features_manifest.ahk dosyası eksik veya bozuk.\n\nProje dizininden `npm run build:manifest` komutunu çalıştırın ve betiği yeniden başlatın.",
 	"startup.manifest_title": "ErgoptiPlus — manifest eksik",
 	"tap_hold.action.disable": "Hiçbir şey (devre dışı)",

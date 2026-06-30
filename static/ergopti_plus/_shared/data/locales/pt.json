@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇧🇷",
 	"_meta.locale": "pt",
 	"_meta.name": "Português",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "Sem janela ativa",
 	"shortcuts.no_other_monitor": "Nenhum outro monitor detectado",
 	"shortcuts.opendownloads": "Win + D(ownloads) = Abrir a pasta Downloads",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: colar sem formatação. Excel mantém seu comportamento nativo",
 	"shortcuts.pixel_read_error": "Não foi possível ler a cor do pixel",
 	"shortcuts.saved": "Guardado: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Captura de tela (aciona Win + Shift + S)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "Captura de ecrã copiada para a área de transferência",
 	"shortcuts.screenshot_title": "Captura de ecrã",
 	"shortcuts.search": "Win + S(earch) = Pesquisar a seleção na Internet. No Explorer, copia o caminho do arquivo selecionado",
-	"shortcuts.selectline": "Win + A(ll) = Selecionar a linha inteira",
 	"shortcuts.shortcut_format_hint": "Formato: mods+tecla (ex.: cmd+alt+p)\nMods disponíveis: cmd, alt, ctrl, shift\nDeixe vazio para desativar",
 	"shortcuts.shortcut_label": "Atalho",
 	"shortcuts.spotlightmouse": "Win + ' = Destacar o mouse com um anel amarelo",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = Converter para maiúsculas iniciais (capitalizar a primeira letra de cada palavra)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Alternar seleção maiúsculas/minúsculas",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "Digitar um símbolo com texto selecionado envolve a seleção com esse símbolo.",
 	"startup.manifest_missing": "Erro de início: o arquivo _generated/features_manifest.ahk está ausente ou corrompido.\n\nExecute `npm run build:manifest` a partir do diretório do projeto e reinicie o script.",
 	"startup.manifest_title": "ErgoptiPlus — manifest ausente",
 	"tap_hold.action.disable": "Nada (desativar)",

@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇷🇺",
 	"_meta.locale": "ru",
 	"_meta.name": "Русский",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "Нет активного окна",
 	"shortcuts.no_other_monitor": "Другой монитор не обнаружен",
 	"shortcuts.opendownloads": "Win + D(ownloads) = Открыть папку Загрузки",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: вставить без форматирования. Excel сохраняет своё поведение",
 	"shortcuts.pixel_read_error": "Не удалось прочитать цвет пикселя",
 	"shortcuts.saved": "Сохранено: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Снимок экрана (запускает Win + Shift + S)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "Снимок экрана скопирован в буфер обмена",
 	"shortcuts.screenshot_title": "Снимок экрана",
 	"shortcuts.search": "Win + S(earch) = Поиск выделенного текста в Интернете. В проводнике копирует путь к выбранному файлу",
-	"shortcuts.selectline": "Win + A(ll) = Выбрать всю строку",
 	"shortcuts.shortcut_format_hint": "Формат: модификаторы+клавиша (напр. cmd+alt+p)\nДоступные модификаторы: cmd, alt, ctrl, shift\nОставьте пустым для отключения",
 	"shortcuts.shortcut_label": "Сочетание клавиш",
 	"shortcuts.spotlightmouse": "Win + ' = Выделить мышь жёлтым кольцом",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = Преобразовать в заголовочный регистр (заглавная первая буква каждого слова)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Переключить регистр выделения",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "Ввод символа при выделенном тексте оборачивает выделение этим символом.",
 	"startup.manifest_missing": "Ошибка запуска: файл _generated/features_manifest.ahk отсутствует или повреждён.\n\nЗапустите `npm run build:manifest` из каталога проекта и перезапустите скрипт.",
 	"startup.manifest_title": "ErgoptiPlus — manifest отсутствует",
 	"tap_hold.action.disable": "Ничего (отключить)",

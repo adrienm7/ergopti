@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇩🇰",
 	"_meta.locale": "da",
 	"_meta.name": "Dansk",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "Intet aktivt vindue",
 	"shortcuts.no_other_monitor": "Ingen anden skærm fundet",
 	"shortcuts.opendownloads": "Win + D(ownloads) = Åbn Hentninger-mappen",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: indsæt uden formatering. Excel beholder sin oprindelige opførsel",
 	"shortcuts.pixel_read_error": "Kan ikke aflæse pixelfarven",
 	"shortcuts.saved": "Gemt: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Skærmbillede (aktiverer Win + Shift + S)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "Skærmbillede kopieret til udklipsholder",
 	"shortcuts.screenshot_title": "Skærmbillede",
 	"shortcuts.search": "Win + S(earch) = Søg valget på internettet. I Explorer kopieres den valgte fils sti",
-	"shortcuts.selectline": "Win + A(ll) = Vælg hele linjen",
 	"shortcuts.shortcut_format_hint": "Format: mods+tast (f.eks. cmd+alt+p)\nTilgængelige mods: cmd, alt, ctrl, shift\nLad være tom for at deaktivere",
 	"shortcuts.shortcut_label": "Genvej",
 	"shortcuts.spotlightmouse": "Win + ' = Fremhæv musen med en gul ring",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = Konvertér til titelformat (kapitalisér første bogstav i hvert ord)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Slå valg versaler/gemener til/fra",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "Indtastning af symbol mens tekst er valgt omslutter valget med det symbol.",
 	"startup.manifest_missing": "Opstartsfejl: filen _generated/features_manifest.ahk mangler eller er beskadiget.\n\nKør `npm run build:manifest` fra projektmappen og genstart scriptet.",
 	"startup.manifest_title": "ErgoptiPlus — manifest mangler",
 	"tap_hold.action.disable": "Intet (deaktiver)",
