@@ -162,7 +162,7 @@ function M.new(deps, presets, ram_getter)
 	--- @param on_ready function Callback executed when ready.
 	--- @param on_fail function Callback executed when failed.
 	local function ensure_ollama_running(on_ready, on_fail)
-		local ok, result = pcall(hs.execute, "curl -s http://localhost:11434/api/version 2>/dev/null")
+		local ok, result = pcall(hs.execute, "curl -s --max-time 5 http://localhost:11434/api/version 2>/dev/null")
 		if ok and result and result:find('"version"') then
 			if type(on_ready) == "function" then on_ready() end
 			return
@@ -173,7 +173,7 @@ function M.new(deps, presets, ram_getter)
 			local retries = 0
 			local function check_ready()
 				retries = retries + 1
-				local ok2, result2 = pcall(hs.execute, "curl -s http://localhost:11434/api/version 2>/dev/null")
+				local ok2, result2 = pcall(hs.execute, "curl -s --max-time 5 http://localhost:11434/api/version 2>/dev/null")
 				if ok2 and result2 and result2:find('"version"') then
 					if type(on_ready) == "function" then on_ready() end
 				elseif retries < 30 then
@@ -410,44 +410,50 @@ function M.new(deps, presets, ram_getter)
 		Logger.debug(LOG, string.format("Checking Ollama requirements for %s…", target_model))
 		
 		ensure_ollama_running(function()
-			-- Force a fresh synchronous check since daemon is confirmed up
 			local bin = get_ollama_path() or "/usr/local/bin/ollama"
-			local ok, stdout = pcall(hs.execute, bin .. " list 2>/dev/null")
-			local installed = {}
-			if ok and type(stdout) == "string" then
-				for line in stdout:gmatch("[^\r\n]+") do
-					local name = line:match("^(%S+)")
-					if name and name ~= "NAME" then installed[name] = true end
-				end
-			end
-
-			local repo = get_ollama_repo(target_model)
-			-- Resolve the actual Ollama name (repo may differ from display name, e.g. "gemma-4-E2B-it" vs "gemma4:e2b")
-			local actual_model = (repo and repo ~= target_model) and repo or target_model
-			
-			if installed[actual_model] or installed[actual_model .. ":latest"] or installed[repo] or installed[repo .. ":latest"] then
-				check_model_loadable(actual_model, function()
-					if type(on_success) == "function" then on_success() end
-				end, function(_, is_load_error)
-					if is_load_error and get_ollama_path() then
-						if not silent then
-							pcall(notifications.notify, i18n.get("ollama.model_repair_title"), string.format(i18n.get("ollama.model_repair"), target_model), "info")
-						end
-						obj.pull_model(target_model, repo, on_success)
-						return
+			local task
+			task = hs.task.new(bin, function(code, stdout)
+				if task then _active_tasks[task] = nil end
+				local installed = {}
+				if code == 0 and type(stdout) == "string" then
+					for line in stdout:gmatch("[^\r\n]+") do
+						local name = line:match("^(%S+)")
+						if name and name ~= "NAME" then installed[name] = true end
 					end
-					if type(on_cancel) == "function" then on_cancel() end
-				end)
-			else
-				if type(deps.shared_system_check) == "function" then
-					deps.shared_system_check(target_model, "Ollama", repo, function()
+				end
+
+				local repo = get_ollama_repo(target_model)
+				-- Resolve the actual Ollama name (repo may differ from display name, e.g. "gemma-4-E2B-it" vs "gemma4:e2b")
+				local actual_model = (repo and repo ~= target_model) and repo or target_model
+
+				if installed[actual_model] or installed[actual_model .. ":latest"] or installed[repo] or installed[repo .. ":latest"] then
+					check_model_loadable(actual_model, function()
+						if type(on_success) == "function" then on_success() end
+					end, function(_, is_load_error)
+						if is_load_error and get_ollama_path() then
+							if not silent then
+								pcall(notifications.notify, i18n.get("ollama.model_repair_title"), string.format(i18n.get("ollama.model_repair"), target_model), "info")
+							end
+							obj.pull_model(target_model, repo, on_success)
+							return
+						end
+						if type(on_cancel) == "function" then on_cancel() end
+					end)
+				else
+					if type(deps.shared_system_check) == "function" then
+						deps.shared_system_check(target_model, "Ollama", repo, function()
+							if get_ollama_path() then obj.pull_model(target_model, repo, on_success)
+							else obj.install_ollama_then_pull(target_model, repo, on_success) end
+						end, on_cancel)
+					else
 						if get_ollama_path() then obj.pull_model(target_model, repo, on_success)
 						else obj.install_ollama_then_pull(target_model, repo, on_success) end
-					end, on_cancel)
-				else
-					if get_ollama_path() then obj.pull_model(target_model, repo, on_success)
-					else obj.install_ollama_then_pull(target_model, repo, on_success) end
+					end
 				end
+			end, {"list"})
+			if task then
+				_active_tasks[task] = true
+				pcall(function() task:start() end)
 			end
 		end, on_cancel)
 	end
@@ -458,14 +464,20 @@ function M.new(deps, presets, ram_getter)
 		
 		ensure_ollama_running(function()
 			local bin = get_ollama_path() or "/usr/local/bin/ollama"
-			local ok, output = pcall(hs.execute, bin .. " rm " .. model_name .. " 2>&1")
-			
-			if ok then
-				pcall(notifications.notify, i18n.get("ollama.deleted_title"), string.format(i18n.get("ollama.model_deleted"), model_name), "success")
-				if deps.update_menu then pcall(deps.update_menu) end
-				Logger.info(LOG, string.format("Ollama model %s deleted successfully.", model_name))
-			else
-				pcall(notifications.notify, i18n.get("ollama.delete_fail_title"), string.format(i18n.get("ollama.delete_error"), model_name, tostring(output)), "error")
+			local task
+			task = hs.task.new(bin, function(code, stdout)
+				if task then _active_tasks[task] = nil end
+				if code == 0 then
+					pcall(notifications.notify, i18n.get("ollama.deleted_title"), string.format(i18n.get("ollama.model_deleted"), model_name), "success")
+					if deps.update_menu then pcall(deps.update_menu) end
+					Logger.info(LOG, string.format("Ollama model %s deleted successfully.", model_name))
+				else
+					pcall(notifications.notify, i18n.get("ollama.delete_fail_title"), string.format(i18n.get("ollama.delete_error"), model_name, tostring(stdout)), "error")
+				end
+			end, {"rm", model_name})
+			if task then
+				_active_tasks[task] = true
+				pcall(function() task:start() end)
 			end
 		end)
 	end
