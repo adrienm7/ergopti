@@ -1,4 +1,4 @@
---- ui/menu/preferences.lua
+﻿--- ui/menu/preferences.lua
 
 --- ==============================================================================
 --- MODULE: Menu Preferences
@@ -31,7 +31,7 @@
 
 local M = {}
 local hs        = hs
-local TomlCodec = require("lib.toml_codec")
+local TomlCodec = require("lib.toml.codec")
 
 
 --- Top-level TOML section names in the order they appear on disk.

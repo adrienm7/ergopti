@@ -1,4 +1,4 @@
---- init.lua
+﻿--- init.lua
 
 --- ==============================================================================
 --- MODULE: Application Entry Point
@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 -- Inject the _shared/lua root into package.path so that lib/ shims for
--- toml_codec, toml_reader, and toml_writer can resolve their shared modules.
+-- lib.toml.codec, lib.toml.reader, and lib.toml.writer can resolve their shared modules.
 -- This must run before any require() that pulls in those libs.
 do
 	local _src = debug.getinfo(1, "S").source:gsub("^@", "")
@@ -203,7 +203,7 @@ do
 	local ok_cache, toml_cache = pcall(require, "adapters.toml_cache")
 	if ok_cache and type(toml_cache) == "table" and type(toml_cache.init) == "function" then
 		toml_cache.init((hs.configdir or ".") .. "/cache/toml_hotstrings")
-		local ok_reader, toml_reader = pcall(require, "lib.toml_reader")
+		local ok_reader, toml_reader = pcall(require, "lib.toml.reader")
 		if ok_reader and type(toml_reader) == "table" and type(toml_reader.set_cache_provider) == "function" then
 			toml_reader.set_cache_provider(toml_cache)
 		end

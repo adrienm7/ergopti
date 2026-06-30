@@ -1,4 +1,4 @@
---- tests/unit/lib/test_toml_fuzz.lua
+﻿--- tests/unit/lib/test_toml_fuzz.lua
 
 --- ==============================================================================
 --- MODULE: TOML Fuzz + Crash-Safety Tests
@@ -19,7 +19,7 @@
 --- ==============================================================================
 
 local helpers    = require("tests.helpers")
-local toml_codec = helpers.load_with_stubs("lib.toml_codec")
+local toml_codec = helpers.load_with_stubs("lib.toml.codec")
 
 
 

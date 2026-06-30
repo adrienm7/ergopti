@@ -1,11 +1,11 @@
---- tests/unit/menu/test_llm_menu_regressions.lua
+﻿--- tests/unit/menu/test_llm_menu_regressions.lua
 ---
 --- Non-regression guards for fixed LLM tray/menu bugs (Hammerspoon). Mirrors
 --- windows/tests/test_llm_menu_regressions.ahk where the platform shares the bug class.
 
 local helpers = require("tests.helpers")
 local prefs   = helpers.load_with_stubs("ui.menu.preferences")
-local codec   = helpers.load_with_stubs("lib.toml_codec")
+local codec   = helpers.load_with_stubs("lib.toml.codec")
 
 local function contract_path()
 	return helpers.shared("modules/llm/menu_persistence_contract.json")

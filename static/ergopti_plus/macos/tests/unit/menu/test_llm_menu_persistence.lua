@@ -1,4 +1,4 @@
---- tests/unit/menu/test_llm_menu_persistence.lua
+﻿--- tests/unit/menu/test_llm_menu_persistence.lua
 
 --- ==============================================================================
 --- MODULE: LLM Menu Persistence Tests (Hammerspoon)
@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local prefs   = helpers.load_with_stubs("ui.menu.preferences")
-local codec   = helpers.load_with_stubs("lib.toml_codec")
+local codec   = helpers.load_with_stubs("lib.toml.codec")
 
 local function contract_path()
 	return helpers.shared("modules/llm/menu_persistence_contract.json")

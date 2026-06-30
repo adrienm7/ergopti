@@ -1,4 +1,4 @@
---- tests/helpers/init.lua
+﻿--- tests/helpers/init.lua
 
 --- ==============================================================================
 --- MODULE: Test Helpers
@@ -120,7 +120,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- pure Lua and loads fine in CI; the stub's encode() returns "" which
 	-- causes preferences.save() to write an empty TOML file and all persistence
 	-- tests to see flat = {}.
-	package.loaded["lib.toml_codec"]   = nil
+	package.loaded["lib.toml.codec"]   = nil
 	package.loaded["toml_codec"]       = nil
 	package.loaded["toml_codec.codec"] = nil
 

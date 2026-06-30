@@ -1,4 +1,4 @@
---- ui/hotstrings_config_window/init.lua
+﻿--- ui/hotstrings_config_window/init.lua
 
 --- ==============================================================================
 --- MODULE: Hotstrings Config Window
@@ -29,7 +29,7 @@ local hs                = hs
 local ui_builder        = require("ui.ui_builder")
 local Logger            = require("lib.logger")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
-local TomlReader        = require("lib.toml_reader")
+local TomlReader        = require("lib.toml.reader")
 local i18n              = require("lib.i18n")
 local Paths            = require("lib.paths")
 

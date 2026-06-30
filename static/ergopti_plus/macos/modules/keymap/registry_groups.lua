@@ -1,4 +1,4 @@
---- modules/keymap/registry_groups.lua
+﻿--- modules/keymap/registry_groups.lua
 
 --- ==============================================================================
 --- MODULE: Keymap Registry — Group Loaders & Lifecycle
@@ -155,7 +155,7 @@ function M.load_toml(name, path)
 
 	Logger.start(LOG, "Loading TOML mapping file '%s'…", name)
 
-	local toml_reader  = require("lib.toml_reader")
+	local toml_reader  = require("lib.toml.reader")
 	local ok, data     = pcall(toml_reader.parse, path)
 	if not ok or type(data) ~= "table" then
 		Logger.error(LOG, "Failed to parse TOML '%s': %s.", path, tostring(data))

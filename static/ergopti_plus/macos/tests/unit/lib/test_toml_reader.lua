@@ -1,4 +1,4 @@
---- tests/unit/lib/test_toml_reader.lua
+﻿--- tests/unit/lib/test_toml_reader.lua
 
 --- ==============================================================================
 --- MODULE: toml_reader Unit Tests
@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
 
-local reader = helpers.load_with_stubs("lib.toml_reader")
+local reader = helpers.load_with_stubs("lib.toml.reader")
 
 local function write_temp(name, body)
 	local path = os.tmpname()

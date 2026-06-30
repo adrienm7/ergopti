@@ -1,11 +1,10 @@
---- lib/toml_reader.lua
+--- lib/toml/reader.lua
 
 --- ==============================================================================
---- MODULE: TOML Reader — Compatibility Shim
+--- MODULE: TOML Reader — macOS shim
 --- DESCRIPTION:
---- Re-exports the canonical TOML reader from the shared Lua library so that
---- existing callers using require("lib.toml_reader") continue to work without
---- modification. The real implementation lives at:
+--- Re-exports the canonical TOML reader from the shared Lua library.
+--- Callers: require("lib.toml.reader"). The real implementation lives at:
 ---   static/ergopti_plus/_shared/lua/toml_codec/reader.lua
 ---
 --- RATIONALE:

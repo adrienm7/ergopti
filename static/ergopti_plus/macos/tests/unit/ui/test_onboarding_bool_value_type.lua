@@ -1,4 +1,4 @@
---- tests/unit/ui/test_onboarding_bool_value_type.lua
+﻿--- tests/unit/ui/test_onboarding_bool_value_type.lua
 
 --- ==============================================================================
 --- MODULE: Onboarding Wizard — boolean value TYPE (regression)
@@ -17,8 +17,8 @@
 local helpers = require("tests.helpers")
 
 local Onboarding  = helpers.load_with_stubs("ui.onboarding")
-local toml_writer = require("lib.toml_writer")
-local toml_codec  = require("lib.toml_codec")
+local toml_writer = require("lib.toml.writer")
+local toml_codec  = require("lib.toml.codec")
 
 local function enabled_value(updates, section)
 	for _, u in ipairs(updates) do

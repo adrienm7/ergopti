@@ -8,9 +8,9 @@ intentionally skips, and the rationale for each deferral.
 | Module                                                    | Test file                                                         | Cases       |
 | --------------------------------------------------------- | ----------------------------------------------------------------- | ----------- |
 | `lib.text_utils`                                          | `tests/unit/lib/test_text_utils.lua`                              | 38          |
-| `lib.toml_reader`                                         | `tests/unit/lib/test_toml_reader.lua`                             | 7           |
-| `lib.toml_writer`                                         | `tests/unit/lib/test_toml_writer.lua`                             | 16          |
-| `lib.toml_reader` ↔ `lib.toml_writer`                    | `tests/unit/lib/test_toml_roundtrip.lua`                          | 7           |
+| `lib.toml.reader`                                         | `tests/unit/lib/test_toml_reader.lua`                             | 7           |
+| `lib.toml.writer`                                         | `tests/unit/lib/test_toml_writer.lua`                             | 16          |
+| `lib.toml.reader` ↔ `lib.toml.writer`                    | `tests/unit/lib/test_toml_roundtrip.lua`                          | 7           |
 | `lib.logger`                                              | `tests/unit/lib/test_logger.lua`                                  | 10          |
 | `lib.perf`                                                | `tests/unit/lib/test_perf.lua`                                    | 2           |
 | `lib.keycodes`                                            | `tests/unit/lib/test_keycodes.lua`                                | 25          |

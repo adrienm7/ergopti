@@ -1,4 +1,4 @@
---- modules/karabiner/defaults.lua
+﻿--- modules/karabiner/defaults.lua
 
 --- ==============================================================================
 --- MODULE: Karabiner Defaults
@@ -20,7 +20,7 @@
 --- there is no driver-side fallback table (would mask a broken install).
 --- ==============================================================================
 
-local TomlReader = require("lib.toml_reader")
+local TomlReader = require("lib.toml.reader")
 
 local D = {}
 

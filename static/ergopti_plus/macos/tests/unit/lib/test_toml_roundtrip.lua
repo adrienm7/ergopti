@@ -1,4 +1,4 @@
---- tests/unit/lib/test_toml_roundtrip.lua
+﻿--- tests/unit/lib/test_toml_roundtrip.lua
 
 --- ==============================================================================
 --- MODULE: TOML Roundtrip Tests
@@ -12,8 +12,8 @@ local helpers = require("tests.helpers")
 
 package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
-local writer = helpers.load_with_stubs("lib.toml_writer")
-local reader = helpers.load_with_stubs("lib.toml_reader")
+local writer = helpers.load_with_stubs("lib.toml.writer")
+local reader = helpers.load_with_stubs("lib.toml.reader")
 
 
 --- Writes the given data to a temp file, parses it back, and returns the parsed

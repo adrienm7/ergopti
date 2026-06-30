@@ -44,7 +44,7 @@ end
 
 -- The _shared/ Lua libraries live one level above the HS driver root
 -- (i.e. in static/ergopti_plus/_shared/lua/). The shims in lib/ need this
--- entry to resolve toml_codec, toml_reader, and toml_writer modules.
+-- entry to resolve lib.toml.codec, lib.toml.reader, and lib.toml.writer modules.
 local drivers_root  = driver_root:match("^(.*)/[^/]+$") or driver_root
 local shared_lua    = drivers_root .. "/_shared/lua"
 

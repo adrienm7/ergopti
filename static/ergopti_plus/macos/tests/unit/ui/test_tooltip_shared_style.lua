@@ -1,4 +1,4 @@
---- tests/unit/ui/test_tooltip_shared_style.lua
+﻿--- tests/unit/ui/test_tooltip_shared_style.lua
 
 --- ==============================================================================
 --- MODULE: Tooltip Shared-Style Contract Tests
@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 -- the source of truth, not to a copied literal. The reader wraps named TOML
 -- sections under `.sections`, mirroring how config.lua's require_key indexes them.
 local function shared_constants()
-	local toml_reader = require("lib.toml_reader")
+	local toml_reader = require("lib.toml.reader")
 	local path = helpers.shared("modules/tooltip/constants.toml")
 	local ok, data = pcall(toml_reader.parse, path)
 	helpers.assert_true(ok and type(data) == "table" and type(data.sections) == "table",

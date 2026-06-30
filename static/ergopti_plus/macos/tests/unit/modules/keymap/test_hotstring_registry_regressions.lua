@@ -1,4 +1,4 @@
---- static/ergopti_plus/macos/tests/unit/modules/keymap/test_hotstring_registry_regressions.lua
+﻿--- static/ergopti_plus/macos/tests/unit/modules/keymap/test_hotstring_registry_regressions.lua
 ---
 --- DESCRIPTION:
 --- Regression tests for registry counting and loading bugs fixed during the session.
@@ -48,8 +48,8 @@ helpers.describe("Registry — hotstring counting regressions", function()
 		}
 		
 		-- Mock lib.toml_reader parse to return our data table directly
-		local old_toml_reader = package.loaded["lib.toml_reader"]
-		package.loaded["lib.toml_reader"] = {
+		local old_toml_reader = package.loaded["lib.toml.reader"]
+		package.loaded["lib.toml.reader"] = {
 			parse = function(path) return data end
 		}
 
@@ -67,7 +67,7 @@ helpers.describe("Registry — hotstring counting regressions", function()
 		for _ in pairs(state.mappings) do count = count + 1 end
 		helpers.assert_eq(count, 12, "total mappings should be 12")
 		
-		package.loaded["lib.toml_reader"] = old_toml_reader
+		package.loaded["lib.toml.reader"] = old_toml_reader
 	end)
 end)
 
@@ -182,9 +182,9 @@ helpers.describe("Registry — section priority from the shared override file", 
 		package.loaded["modules.keymap.terminators"] = nil
 		local Registry = require("modules.keymap.registry")
 
-		local old_toml = package.loaded["lib.toml_reader"]
+		local old_toml = package.loaded["lib.toml.reader"]
 		local old_hcfg = package.loaded["modules.hotstrings.hotstrings_config"]
-		package.loaded["lib.toml_reader"]          = { parse = function() return toml_data end }
+		package.loaded["lib.toml.reader"]          = { parse = function() return toml_data end }
 		package.loaded["modules.hotstrings.hotstrings_config"] = { get_user_override = override_fn }
 
 		local state = {
@@ -195,7 +195,7 @@ helpers.describe("Registry — section priority from the shared override file", 
 		Registry.init(state)
 		Registry.load_toml("rolls", "dummy.toml")
 
-		package.loaded["lib.toml_reader"]          = old_toml
+		package.loaded["lib.toml.reader"]          = old_toml
 		package.loaded["modules.hotstrings.hotstrings_config"] = old_hcfg
 
 		local prio

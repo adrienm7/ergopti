@@ -1,4 +1,4 @@
---- tests/unit/ui/test_tooltip_stacked_panel.lua
+﻿--- tests/unit/ui/test_tooltip_stacked_panel.lua
 
 --- ==============================================================================
 --- MODULE: Tooltip Stacked Panel — Outer-Box Rounding, Per-Row Colors (regression)
@@ -33,7 +33,7 @@ local helpers = require("tests.helpers")
 -- (e.g. missing the [typography] section that config.lua requires).
 package.loaded["ui.tooltip.config"] = nil
 package.loaded["toml_codec.reader"] = nil
-package.loaded["lib.toml_reader"]   = nil
+package.loaded["lib.toml.reader"]   = nil
 
 local Renderer = helpers.load_with_stubs("ui.tooltip.renderer")
 
