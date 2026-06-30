@@ -68,6 +68,10 @@ local INGEST_TICK_SEC = Timings.sec("keylogger", "ingest_tick_ms")
 --- value ([keylogger] max_keystroke_delay_ms).
 local WPM_MAX_EVENT_DELAY_MS = Timings.ms("keylogger", "max_keystroke_delay_ms")
 
+--- Maximum drain iterations during day_rollover. At 5000 lines/batch this
+--- covers 100 000 lines before giving up and preserving the file.
+local MAX_ROLLOVER_DRAIN_ITERS = 20
+
 
 
 
@@ -587,8 +591,37 @@ end
 --- Rotation.rollover to reset the file and offset.
 function M.day_rollover()
 	if not _require_state("day_rollover") then return end
-	pcall(M.ingest_once)
-	Rotation.rollover(_paths.data_sql_path)
+
+	-- read_new_entries caps at INGEST_BATCH_LINES per call, so a single
+	-- ingest_once may leave data behind. Loop until empty or stalled to prevent
+	-- Rotation.rollover from deleting un-ingested lines.
+	local drained = false
+	local prev_offset = Rotation.get_offset()
+	for _ = 1, MAX_ROLLOVER_DRAIN_ITERS do
+		local pending = Rotation.read_new_entries()
+		if #pending == 0 then
+			drained = true
+			break
+		end
+		pcall(M.ingest_once)
+		local new_offset = Rotation.get_offset()
+		if new_offset == prev_offset then
+			-- Offset unchanged after a batch with pending data: persistent SQL
+			-- error; preserve today.log so un-ingested lines survive the rollover.
+			Logger.warn(LOG,
+				"day_rollover: ingest stalled at offset %d — preserving today.log.",
+				prev_offset)
+			break
+		end
+		prev_offset = new_offset
+	end
+
+	if not drained then
+		Logger.warn(LOG, "day_rollover: today.log not fully drained — file preserved, rotation skipped.")
+	else
+		Rotation.rollover(_paths.data_sql_path)
+	end
+
 	Aggregator.reset_ngram_ctx()
 	local db = SqliteWriter.get_db()
 	if db then
