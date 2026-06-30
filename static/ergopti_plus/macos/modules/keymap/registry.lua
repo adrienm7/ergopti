@@ -10,8 +10,8 @@
 --- FEATURES & RATIONALE:
 --- 1. Data Isolation: Keeps heavy lookup tables and file-loading logic out of
 ---    the main event loop in init.lua.
---- 2. File Loading: Parses both TOML and Lua files to populate the mapping
----    database at startup and whenever a group is toggled.
+--- 2. Group Forwarding: Delegates file-loading and group-lifecycle calls to
+---    registry_groups.lua via a shared CoreState reference.
 --- 3. Smart Casing: Auto-generates lowercase, Title Case, and UPPERCASE
 ---    variants for every hotstring so the expansion matches the user's casing.
 --- ==============================================================================
@@ -23,6 +23,7 @@ local text_utils  = require("lib.text_utils")
 local km_utils    = require("modules.keymap.utils")
 local Logger      = require("lib.logger")
 local Terminators = require("modules.keymap.terminators")
+local Groups      = require("modules.keymap.registry_groups")
 
 local LOG    = "keymap.registry"
 local _state = nil  -- Injected via M.init(); required before all public functions.
@@ -248,6 +249,11 @@ local function rebuild_tail_indexes()
 	_state.mappings_by_star_tail_char = star_idx
 end
 
+-- Expose internal rebuild helpers so registry_groups.lua can call them when
+-- purging a disabled group's entries from the live buckets (disable_group).
+-- Passed to Groups.init() inside M.init() below.
+local _rebuild_callbacks = nil
+
 --- Sorts the mappings list: longest trigger first, then word-boundary, then insertion order.
 --- Longer triggers must be tested before shorter prefixes to prevent premature matches.
 --- While a defer_sort() is active, the actual sort is postponed until flush_sort().
@@ -378,58 +384,6 @@ function M.flush_sort()
 		M.sort_mappings()
 	end
 	Logger.debug(LOG, "Sort flushed.")
-end
-
---- Records the sequence numbers belonging to the current group after a load.
---- Preserves the group's existing `group_order` across reloads so the sort
---- tiebreaker stays stable (B3.6): disable_group + enable_group must not
---- change the relative priority of same-length triggers.
---- @param name string Group identifier.
---- @param path string|nil File path (nil for programmatic groups).
---- @param kind string "lua" or "toml".
-local function record_group(name, path, kind)
-	local seqs = {}
-	for _, m in ipairs(_state.mappings) do
-		if m.group == name then table.insert(seqs, m.seq) end
-	end
-	local existing = _state.groups[name]
-	local group_order = (existing and existing.group_order)
-		or (_state.group_order_counter or 0) + 1
-	if not existing or not existing.group_order then
-		_state.group_order_counter = group_order
-	end
-	_state.groups[name] = {
-		path        = path,
-		seqs        = seqs,
-		enabled     = true,
-		kind        = kind or "lua",
-		group_order = group_order,
-	}
-end
-
---- Ensures a group entry exists with a stable `group_order` before any of
---- its mappings are added via add_raw. Called from the start of load_file /
---- load_toml so that each entry can store the stable order at insertion time
---- instead of having to back-fill it after record_group runs. Preserves any
---- existing group_order on reload.
---- @param name string Group identifier.
-local function ensure_group_order(name)
-	if not _state or not name or name == "" then return end
-	_state.group_order_counter = _state.group_order_counter or 0
-	local g = _state.groups[name]
-	if g and g.group_order then return end
-	_state.group_order_counter = _state.group_order_counter + 1
-	if g then
-		g.group_order = _state.group_order_counter
-	else
-		_state.groups[name] = {
-			path        = nil,
-			seqs        = {},
-			enabled     = true,
-			kind        = "pending",
-			group_order = _state.group_order_counter,
-		}
-	end
 end
 
 --- Registers a mapping entry with smart case-variant generation.
@@ -693,40 +647,21 @@ end
 
 
 
--- ================================
---- ================================
--- ======= 3/ Group Loaders =======
---- ================================
--- ================================
+-- ===================================================
+-- ===================================================
+-- ======= 3/ Group Loaders (registry_groups) =======
+-- ===================================================
+-- ===================================================
+
+-- All group-loading and group-lifecycle logic lives in registry_groups.lua.
+-- The public surface below is a thin forward layer so callers of registry.lua
+-- keep an identical API without modification.
 
 --- Loads mappings from a Lua file via dofile and records the group.
 --- @param name string Group identifier used as the key in _state.groups.
 --- @param path string Absolute path to the Lua hotstring file.
 function M.load_file(name, path)
-	if not require_state("load_file") then return end
-	if type(name) ~= "string" or name == "" then
-		Logger.error(LOG, "load_file: name must be a non-empty string."); return
-	end
-	if type(path) ~= "string" or path == "" then
-		Logger.error(LOG, "load_file: path must be a non-empty string."); return
-	end
-
-	Logger.start(LOG, "Loading Lua mapping file '%s'…", name)
-	ensure_group_order(name)
-	_state.current_group = name
-
-	local ok, err = pcall(dofile, path)
-	if not ok then
-		Logger.error(LOG, "Error loading '%s': %s.", path, tostring(err))
-	end
-
-	_state.current_group = nil
-	record_group(name, path, "lua")
-	M.sort_mappings()
-
-	if ok then
-		Logger.success(LOG, "Lua mapping file '%s' loaded (%d total mapping(s)).", name, #_state.mappings)
-	end
+	Groups.load_file(name, path)
 end
 
 --- Loads and parses mappings from a TOML configuration file.
@@ -734,172 +669,57 @@ end
 --- @param name string Group identifier used as the key in _state.groups.
 --- @param path string Absolute path to the TOML file.
 function M.load_toml(name, path)
-	if not require_state("load_toml") then return end
-	if type(name) ~= "string" or name == "" then
-		Logger.error(LOG, "load_toml: name must be a non-empty string."); return
-	end
-	if type(path) ~= "string" or path == "" then
-		Logger.error(LOG, "load_toml: path must be a non-empty string."); return
-	end
+	Groups.load_toml(name, path)
+end
 
-	Logger.start(LOG, "Loading TOML mapping file '%s'…", name)
+--- Manually sets the current group context used by M.add() to tag new entries.
+--- Must be reset to nil after the relevant block of M.add() calls.
+--- @param name string|nil Group name.
+function M.set_group_context(name)
+	Groups.set_group_context(name)
+end
 
-	local toml_reader  = require("lib.toml_reader")
-	local ok, data     = pcall(toml_reader.parse, path)
-	if not ok or type(data) ~= "table" then
-		Logger.error(LOG, "Failed to parse TOML '%s': %s.", path, tostring(data))
-		return
-	end
+--- Registers a callback invoked after a group is enabled or re-loaded.
+--- @param name string Group identifier.
+--- @param f function The post-load hook.
+function M.set_post_load_hook(name, f)
+	Groups.set_post_load_hook(name, f)
+end
 
-	ensure_group_order(name)
-	_state.current_group = name
-	local sections_info  = {}
+--- Disables a group: removes its mappings from the live database.
+--- No-op when the group is already disabled or unknown.
+--- @param name string Group identifier.
+function M.disable_group(name)
+	Groups.disable_group(name)
+end
 
-	-- Collision-priority cascade inputs (individual > section > file > source).
-	-- The shared user-override file (hotstrings_config.toml) sits ABOVE the TOML
-	-- [_meta], mirroring how the AHK engine reads HotstringsResolve: the order is
-	-- user-section > user-file > meta-section > meta-file > source default. The
-	-- override module is required lazily (it does not require us, but stay defensive
-	-- against load order / headless tests where it may be absent — gotcha G6).
-	local ok_hcfg, hcfg = pcall(require, "modules.hotstrings.hotstrings_config")
-	local hotstrings_config = ok_hcfg and hcfg or nil
-	local function user_priority(section_name)
-		if not hotstrings_config or type(hotstrings_config.get_user_override) ~= "function" then
-			return nil
-		end
-		local ok_ov, ov = pcall(hotstrings_config.get_user_override, name, section_name)
-		return (ok_ov and type(ov) == "table") and ov.priority or nil
-	end
-	local file_user_priority = user_priority(nil)
-	local file_meta_priority = (type(data.meta) == "table" and type(data.meta.priority) == "number")
-		and data.meta.priority or nil
-	local meta_sections = (type(data.meta) == "table" and type(data.meta.sections) == "table")
-		and data.meta.sections or {}
+--- Returns true when the named group exists and is currently enabled.
+--- @param name string Group identifier.
+--- @return boolean
+function M.is_group_enabled(name)
+	return Groups.is_group_enabled(name)
+end
 
-	local sections_order = (data.sections_order and #data.sections_order > 0)
-		and data.sections_order
-		or  (data.meta and data.meta.sections_order or {})
+--- Returns a flat table of {name → enabled} for all registered groups.
+--- @return table
+function M.list_groups()
+	return Groups.list_groups()
+end
 
-	for _, sec_name in ipairs(sections_order) do
-		if sec_name == "-" then
-			table.insert(sections_info, { name = "-", description = "-", count = 0 })
-			goto continue_sec
-		end
+--- Registers a programmatic (non-file) group with an optional metadata block.
+--- Used by Lua modules that call M.add() directly instead of loading a file.
+--- @param name string Group identifier.
+--- @param meta_description string|nil Prose description for the menu.
+--- @param sections table|nil Array of section descriptor tables.
+function M.register_lua_group(name, meta_description, sections)
+	Groups.register_lua_group(name, meta_description, sections)
+end
 
-		local sec = data.sections and data.sections[sec_name]
-		if not sec then goto continue_sec end
-
-		if sec.is_placeholder then
-			table.insert(sections_info, {
-				name                = sec_name,
-				description         = sec.description,
-				count               = 0,
-				is_module_placeholder = true,
-			})
-			goto continue_sec
-		end
-
-		local entries = {}
-		local count = 0
-		if type(sec.entries) == "table" then
-			-- Legacy format: [[section]] entries = [...]
-			entries = sec.entries
-			count = #entries
-		else
-			-- Modern format: [[section]] followed by key = value pairs
-			-- or [section] table.
-			for k, v in pairs(sec) do
-				if type(k) == "string" and k ~= "description" and k ~= "is_placeholder" then
-					count = count + 1
-					if type(v) == "table" then
-						table.insert(entries, {
-							trigger           = k,
-							output            = v.output,
-							is_word           = v.is_word,
-							auto_expand       = v.auto_expand,
-							is_case_sensitive = v.is_case_sensitive,
-							final_result      = v.final_result,
-							priority          = v.priority,
-						})
-					else
-						table.insert(entries, {
-							trigger = k,
-							output  = tostring(v),
-						})
-					end
-				end
-			end
-		end
-
-		if M.is_section_enabled(name, sec_name) then
-			-- Flatten the user/TOML layers into one effective override priority so
-			-- the order matches AHK exactly (user-section > user-file > meta-section
-			-- > meta-file). The individual per-entry priority and the source default
-			-- are applied above/below it by resolve_priority.
-			local sec_meta = meta_sections[sec_name]
-			local sec_meta_priority = (type(sec_meta) == "table" and type(sec_meta.priority) == "number")
-				and sec_meta.priority or nil
-			local override_priority = user_priority(sec_name) or file_user_priority
-				or sec_meta_priority or file_meta_priority
-			for _, entry in ipairs(entries) do
-				M.add(entry.trigger, entry.output, {
-					is_word           = entry.is_word,
-					auto_expand       = entry.auto_expand,
-					is_case_sensitive = entry.is_case_sensitive,
-					final_result      = entry.final_result,
-					section           = sec_name,
-					priority          = resolve_priority(entry.priority, override_priority, nil, name),
-				})
-			end
-		else
-			Logger.debug(LOG, "Section '%s/%s' skipped (disabled in hs.settings).", name, sec_name)
-		end
-
-		table.insert(sections_info, {
-			name        = sec_name,
-			description = sec.description or sec_name,
-			count       = count,
-		})
-
-		::continue_sec::
-	end
-
-	_state.current_group = nil
-	M.sort_mappings()
-
-	-- Per-section delay overrides from [_meta.section_delays] (seconds). Merge
-	-- into the shared map so mapping_fires can apply them (precedence: user >
-	-- section > group > base), then resize the word-inactivity timeout so a long
-	-- per-section window (e.g. comma_j = 5 s) is not cut short by the timeout.
-	if type(data.meta) == "table" and type(data.meta.section_delays) == "table" then
-		for sec_name, secs in pairs(data.meta.section_delays) do
-			if type(secs) == "number" then
-				_state.SECTION_DELAYS[sec_name] = secs
-			end
-		end
-		if type(_state.recompute_word_timeout) == "function" then
-			_state.recompute_word_timeout()
-		end
-	end
-
-	local seqs = {}
-	for _, m in ipairs(_state.mappings) do
-		if m.group == name then table.insert(seqs, m.seq) end
-	end
-	-- Preserve group_order across reloads: ensure_group_order() stamped it earlier,
-	-- but overwriting the table would silently drop the value and break sort stability
-	local existing_order = _state.groups[name] and _state.groups[name].group_order or nil
-	_state.groups[name] = {
-		path             = path,
-		seqs             = seqs,
-		enabled          = true,
-		kind             = "toml",
-		meta_description = data.meta and data.meta.description or nil,
-		sections         = sections_info,
-		group_order      = existing_order,
-	}
-
-	Logger.success(LOG, "TOML mapping file '%s' loaded (%d total mapping(s)).", name, #_state.mappings)
+--- Enables a previously disabled group by reloading its file (or re-running its hook).
+--- No-op when the group is already enabled.
+--- @param name string Group identifier.
+function M.enable_group(name)
+	Groups.enable_group(name)
 end
 
 
@@ -984,129 +804,6 @@ function M.get_meta_description(name)
 	return raw
 end
 
---- Manually sets the current group context used by M.add() to tag new entries.
---- Must be reset to nil after the relevant block of M.add() calls. When a
---- non-nil group name is supplied, ensure_group_order stamps a stable
---- group_order on the group so subsequent add_raw calls tag their entries
---- with the same priority value that would survive a later reload.
---- @param name string|nil Group name.
-function M.set_group_context(name)
-	if not require_state("set_group_context") then return end
-	if name and name ~= "" then ensure_group_order(name) end
-	_state.current_group = name
-end
-
---- Registers a callback invoked after a group is enabled or re-loaded.
---- @param name string Group identifier.
---- @param f function The post-load hook.
-function M.set_post_load_hook(name, f)
-	if not require_state("set_post_load_hook") then return end
-	if type(f) ~= "function" then
-		Logger.error(LOG, "set_post_load_hook: f must be a function."); return
-	end
-	_state.group_post_load_hooks[name] = f
-end
-
---- Disables a group: removes its mappings from the live database.
---- No-op when the group is already disabled or unknown.
---- @param name string Group identifier.
-function M.disable_group(name)
-	if not require_state("disable_group") then return end
-	local g = _state.groups[name]
-	if not g or not g.enabled then return end
-
-	g.enabled = false
-
-	-- Purge all mappings belonging to this group from the live list.
-	-- Programmatic groups (g.path == nil, e.g. "dynamichotstrings") must be
-	-- purged too — their mappings are re-created by enable_group's post-load
-	-- hook, so leaving them here would fire disabled hotstrings indefinitely.
-	-- rebuild_tail_indexes() is required after the purge so the O(1) buckets
-	-- used by the hot-path (mappings_by_tail_char) no longer point at the
-	-- removed entries; previously only rebuild_lookup() was called, leaving
-	-- stale bucket pointers that caused disabled hotstrings to still trigger.
-	local kept = {}
-	for _, m in ipairs(_state.mappings) do
-		if m.group ~= name then table.insert(kept, m) end
-	end
-	_state.mappings = kept
-	rebuild_lookup()
-	rebuild_tail_indexes()
-
-	Logger.debug(LOG, "Group '%s' disabled (%d mapping(s) remaining).", name, #_state.mappings)
-end
-
---- Returns true when the named group exists and is currently enabled.
---- @param name string Group identifier.
---- @return boolean
-function M.is_group_enabled(name)
-	return _state and _state.groups[name] ~= nil and _state.groups[name].enabled or false
-end
-
---- Returns a flat table of {name → enabled} for all registered groups.
---- @return table
-function M.list_groups()
-	if not _state then return {} end
-	local out = {}
-	for name, g in pairs(_state.groups) do out[name] = g.enabled end
-	return out
-end
-
---- Registers a programmatic (non-file) group with an optional metadata block.
---- Used by Lua modules that call M.add() directly instead of loading a file.
---- @param name string Group identifier.
---- @param meta_description string|nil Prose description for the menu.
---- @param sections table|nil Array of section descriptor tables.
-function M.register_lua_group(name, meta_description, sections)
-	if not require_state("register_lua_group") then return end
-	if type(name) ~= "string" or name == "" then
-		Logger.error(LOG, "register_lua_group: name must be a non-empty string."); return
-	end
-	_state.groups[name] = {
-		path             = nil,
-		seqs             = {},
-		enabled          = true,
-		kind             = "lua",
-		meta_description = meta_description,
-		sections         = type(sections) == "table" and sections or {},
-	}
-	Logger.debug(LOG, "Lua group '%s' registered.", name)
-end
-
---- Enables a previously disabled group by reloading its file (or re-running its hook).
---- No-op when the group is already enabled.
---- @param name string Group identifier.
-function M.enable_group(name)
-	if not require_state("enable_group") then return end
-	local g = _state.groups[name]
-	if not g then
-		Logger.warn(LOG, "enable_group: unknown group '%s'.", tostring(name))
-		return
-	end
-	if g.enabled then return end
-
-	Logger.debug(LOG, "Enabling group '%s' (kind: %s)…", name, g.kind or "?")
-
-	if g.path == nil then
-		-- Programmatic group: mark enabled and run the post-load hook if any.
-		g.enabled = true
-		local hook = _state.group_post_load_hooks[name]
-		if type(hook) == "function" then hook() end
-		M.sort_mappings()
-		return
-	end
-
-	if g.kind == "toml" then
-		M.load_toml(name, g.path)
-	else
-		M.load_file(name, g.path)
-	end
-
-	local hook = _state.group_post_load_hooks[name]
-	if type(hook) == "function" then hook() end
-	M.sort_mappings()
-end
-
 
 
 
@@ -1129,6 +826,14 @@ function M.init(core_state)
 		return
 	end
 	_state = core_state
+	Groups.init(core_state, {
+		add                  = M.add,
+		sort_mappings        = M.sort_mappings,
+		is_section_enabled   = M.is_section_enabled,
+		resolve_priority     = resolve_priority,
+		rebuild_lookup       = rebuild_lookup,
+		rebuild_tail_indexes = rebuild_tail_indexes,
+	})
 	Logger.debug(LOG, "Registry initialized.")
 end
 
