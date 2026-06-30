@@ -79,29 +79,7 @@ function refreshTag() {
 // =============================================
 // =============================================
 
-/**
- * Posts a message to the native host, host-agnostically. Windows WebView2
- * exposes window.chrome.webview (takes a JSON string); macOS WKWebView exposes
- * window.webkit.messageHandlers.hsPaths (takes an object).
- * @param {Object} msg - The message payload ({action, …}).
- */
-function _post(msg) {
-	try {
-		if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function') {
-			window.chrome.webview.postMessage(JSON.stringify(msg));
-			return;
-		}
-	} catch (e) {
-		/* fall through to the WKWebView channel */
-	}
-	try {
-		if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.hsPaths) {
-			window.webkit.messageHandlers.hsPaths.postMessage(msg);
-		}
-	} catch (e) {
-		console.error('paths_editor post failed:', e);
-	}
-}
+const _post = makeHostBridge('hsPaths');
 
 /**
  * Called by the host once the webview is ready, with initial data.

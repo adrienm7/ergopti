@@ -156,25 +156,7 @@ function getCategoryColor(catName, score) {
 	return CHART_PALETTE[paletteIndex(catName)];
 }
 
-/**
- * Sends an action to the Lua side via the WebKit message bridge.
- * @param {object} payload - {action: string, ...}
- */
-function postBridge(payload) {
-	try {
-		if (
-			window.webkit &&
-			window.webkit.messageHandlers &&
-			window.webkit.messageHandlers.metrics_apps_bridge
-		) {
-			window.webkit.messageHandlers.metrics_apps_bridge.postMessage(payload);
-		} else {
-			console.error('metrics_apps_bridge unavailable');
-		}
-	} catch (e) {
-		console.error('postBridge failed', e);
-	}
-}
+const postBridge = makeHostBridge('metrics_apps_bridge');
 
 function getAppColor(appName, score) {
 	// Always prefer the dominant icon colour — score is reflected in the score column, not the bar

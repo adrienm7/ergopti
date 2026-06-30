@@ -20,10 +20,6 @@
  * ==============================================================================
  */
 
-// Bridge name the macOS usercontent controller registers under. WebView2 ignores
-// it (it has a single global chrome.webview channel).
-var BRIDGE_NAME = 'model_browser_bridge';
-
 var _models = []; // Full catalogue (normalised rows), as injected by the backend.
 var _backend = ''; // "mlx" | "ollama" — affects which RAM/install column applies.
 var _active = ''; // Currently-selected model name (highlighted with a dot).
@@ -37,22 +33,7 @@ var _sortDir = 1; // 1 = ascending, -1 = descending.
 // =========================================
 // =========================================
 
-/**
- * Sends a message to the native backend (WebView2 on Windows, WKWebView on macOS).
- * @param {string|object} msg - The message to post (objects are JSON-encoded).
- */
-function postBridgeMessage(msg) {
-	var payload = typeof msg === 'string' ? msg : JSON.stringify(msg);
-	if (window.chrome && window.chrome.webview) {
-		window.chrome.webview.postMessage(payload);
-	} else if (
-		window.webkit &&
-		window.webkit.messageHandlers &&
-		window.webkit.messageHandlers[BRIDGE_NAME]
-	) {
-		window.webkit.messageHandlers[BRIDGE_NAME].postMessage(payload);
-	}
-}
+var postBridgeMessage = makeHostBridge('model_browser_bridge');
 
 /**
  * Called by the native backend to populate the table.

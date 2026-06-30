@@ -34,6 +34,7 @@ const REPO_ROOT = path.resolve(__dirname, '../..');
 const FRONT = 'static/ergopti_plus/_shared/ui/action_picker';
 const SCRIPT = `${FRONT}/script.js`;
 const INDEX = `${FRONT}/index.html`;
+const HOST_BRIDGE = 'static/ergopti_plus/_shared/ui/host_bridge.js';
 const WIN_HOST = 'static/ergopti_plus/windows/ui/action_picker_webview.ahk';
 const WIN_NATIVE = 'static/ergopti_plus/windows/ui/action_picker/init.ahk';
 const MAC_HOST = 'static/ergopti_plus/macos/ui/action_picker/init.lua';
@@ -66,6 +67,7 @@ function read(rel) {
 console.log('\n=== Action Picker Shared-Frontend Bridge ===');
 
 const script = read(SCRIPT);
+const bridge = read(HOST_BRIDGE);
 const index = read(INDEX);
 const winHost = read(WIN_HOST);
 const winNative = read(WIN_NATIVE);
@@ -74,18 +76,21 @@ const macMenu = read(MAC_MENU);
 const enLocale = read(EN_LOCALE);
 
 // 1. Host-agnostic post().
-const chromeIdx = script.indexOf('window.chrome.webview');
-const webkitIdx = script.indexOf('window.webkit');
-check('script.js probes window.chrome.webview (Windows channel)', chromeIdx !== -1);
-check('script.js still supports window.webkit (macOS channel)', webkitIdx !== -1);
-check('script.js JSON-stringifies the WebView2 payload',
-	/chrome\.webview\.postMessage\(\s*JSON\.stringify\(/.test(script));
+// Bridge patterns now live in host_bridge.js (shared across all webview apps).
+const chromeIdx = bridge.indexOf('window.chrome.webview');
+const webkitIdx = bridge.indexOf('window.webkit');
+check('host_bridge.js probes window.chrome.webview (Windows channel)', chromeIdx !== -1);
+check('host_bridge.js still supports window.webkit (macOS channel)', webkitIdx !== -1);
+check('host_bridge.js JSON-stringifies the WebView2 payload',
+	/chrome\.webview\.postMessage\(/.test(bridge) && /JSON\.stringify\(/.test(bridge));
 check('chrome.webview is probed before webkit',
 	chromeIdx !== -1 && webkitIdx !== -1 && chromeIdx < webkitIdx);
 
-// 2. index.html loads the shared i18n.js at the right depth.
+// 2. index.html loads the shared i18n.js at the right depth and host_bridge.js.
 check('index.html loads ../i18n.js',
 	/src=["']\.\.\/i18n\.js["']/.test(index) && !/\.\.\/\.\.\//.test(index));
+check('index.html loads ../host_bridge.js',
+	/src=["']\.\.\/host_bridge\.js["']/.test(index));
 
 // 3. Action parity across both hosts.
 const actions = new Set();

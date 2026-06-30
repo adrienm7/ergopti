@@ -39,6 +39,7 @@ const REPO_ROOT = path.resolve(__dirname, '../..');
 const FRONT_DIR = 'static/ergopti_plus/_shared/ui/prompt_editor';
 const SCRIPT = `${FRONT_DIR}/script.js`;
 const INDEX = `${FRONT_DIR}/index.html`;
+const HOST_BRIDGE = 'static/ergopti_plus/_shared/ui/host_bridge.js';
 const WIN_HOST = 'static/ergopti_plus/windows/ui/prompt_editor/init.ahk';
 const WIN_MENU = 'static/ergopti_plus/windows/ui/menu/menu_llm/menu_profiles.ahk';
 
@@ -63,31 +64,34 @@ function read(rel) {
 console.log('\n=== Prompt Editor Shared-Frontend Bridge ===');
 
 let script = '';
+let bridge = '';
 let index = '';
 let host = '';
 let menu = '';
 try { script = read(SCRIPT); } catch (err) { check('script.js readable at shared path', false, err.message); }
+try { bridge = read(HOST_BRIDGE); } catch (err) { check('host_bridge.js readable', false, err.message); }
 try { index = read(INDEX); } catch (err) { check('index.html readable at shared path', false, err.message); }
 try { host = read(WIN_HOST); } catch (err) { check('Windows host readable', false, err.message); }
 try { menu = read(WIN_MENU); } catch (err) { check('Windows menu_profiles readable', false, err.message); }
 
 // 1. Host-agnostic post(): chrome.webview probed before webkit.
-const chromeIdx = script.indexOf('window.chrome.webview');
-const webkitIdx = script.indexOf('window.webkit');
+// Bridge patterns now live in host_bridge.js (shared across all webview apps).
+const chromeIdx = bridge.indexOf('window.chrome.webview');
+const webkitIdx = bridge.indexOf('window.webkit');
 check(
-	'script.js probes window.chrome.webview (Windows channel present)',
+	'host_bridge.js probes window.chrome.webview (Windows channel present)',
 	chromeIdx !== -1,
-	'The Windows WebView2 branch is missing — the editor cannot post to AHK.'
+	'The Windows WebView2 branch is missing from host_bridge.js — the editor cannot post to AHK.'
 );
 check(
-	'script.js still supports window.webkit (macOS channel present)',
+	'host_bridge.js still supports window.webkit (macOS channel present)',
 	webkitIdx !== -1,
-	'The macOS WKWebView branch was dropped.'
+	'The macOS WKWebView branch was dropped from host_bridge.js.'
 );
 check(
-	'script.js posts a JSON string to the WebView2 channel',
-	/chrome\.webview\.postMessage\(\s*JSON\.stringify\(/.test(script),
-	'WebView2 requires a string payload — JSON.stringify is missing.'
+	'host_bridge.js posts a JSON string to the WebView2 channel',
+	/chrome\.webview\.postMessage\(/.test(bridge) && /JSON\.stringify\(/.test(bridge),
+	'WebView2 requires a string payload — JSON.stringify is missing from host_bridge.js.'
 );
 check(
 	'chrome.webview is probed before webkit',
@@ -100,6 +104,11 @@ check(
 	'index.html loads ../i18n.js (shared loader, correct depth)',
 	/src=["']\.\.\/i18n\.js["']/.test(index) && !/\.\.\/\.\.\//.test(index),
 	'After the move to _shared/ui/<name>/, i18n.js sits at ../i18n.js.'
+);
+check(
+	'index.html loads host_bridge.js (../host_bridge.js)',
+	/src=["']\.\.\/host_bridge\.js["']/.test(index),
+	'host_bridge.js must be loaded before script.js in index.html.'
 );
 
 // 3. Action parity — every action the page posts is handled by the Windows host.

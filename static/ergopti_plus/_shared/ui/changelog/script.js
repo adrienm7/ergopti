@@ -38,22 +38,7 @@ var _fallbackTimer = null;
 // =========================================
 // =========================================
 
-/**
- * Sends a message to the native backend (AHK WebView2 or Hammerspoon WKWebView).
- * @param {string|object} msg - The message to post.
- */
-function postBridgeMessage(msg) {
-	var payload = typeof msg === 'string' ? msg : JSON.stringify(msg);
-	if (window.chrome && window.chrome.webview) {
-		window.chrome.webview.postMessage(payload);
-	} else if (
-		window.webkit &&
-		window.webkit.messageHandlers &&
-		window.webkit.messageHandlers.changelog_bridge
-	) {
-		window.webkit.messageHandlers.changelog_bridge.postMessage(payload);
-	}
-}
+var postBridgeMessage = makeHostBridge('changelog_bridge');
 
 /**
  * Called by the native backend to inject fetched release data.

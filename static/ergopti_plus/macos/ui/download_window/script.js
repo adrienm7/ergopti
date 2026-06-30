@@ -16,6 +16,8 @@
 let globalLogLines = [];
 let globalDoneState = false;
 
+const postBridgeMessage = makeHostBridge('dl_bridge');
+
 function _t(key) {
 	return (window._i18n_strings && window._i18n_strings[key]) || null;
 }
@@ -131,27 +133,21 @@ function doCancel() {
 		cancelButton.textContent = _t('download_window.cancelling') || 'Cancelling…';
 	}
 
-	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage('cancel');
-	}
+	postBridgeMessage('cancel');
 }
 
 /**
  * Sends a request to the backend to open the Terminal for manual intervention.
  */
 function doTerm() {
-	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage('terminal');
-	}
+	postBridgeMessage('terminal');
 }
 
 /**
  * Sends a retry request to relaunch the download.
  */
 function doRetry() {
-	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage('retry');
-	}
+	postBridgeMessage('retry');
 }
 
 // =============================
@@ -268,9 +264,7 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
  */
 function showLog() {
 	document.getElementById('log-area').style.display = 'block';
-	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage('expand');
-	}
+	postBridgeMessage('expand');
 }
 
 /**
