@@ -850,11 +850,15 @@ _LLMRemoteJsonEscape(s) {
 ; output, no need for the full JSON spec since we never feed the result back
 ; into a JSON parser.
 _LLMRemoteJsonUnescape(s) {
-    s := StrReplace(s, "\n", "`n")
-    s := StrReplace(s, "\r", "`r")
-    s := StrReplace(s, "\t", "`t")
-    s := StrReplace(s, '\"', '"')
-    s := StrReplace(s, "\\",  "\")
+    ; AHK-26: neutralise \\ FIRST via Chr(0) sentinel so that \\n / \\t / \\r
+    ; sequences are not munged by the later single-char escape passes (the old
+    ; ordering let \\n → \newline instead of the correct \n).
+    s := StrReplace(s, "\\",    Chr(0))  ; sentinel for literal backslash
+    s := StrReplace(s, "\n",   "`n")
+    s := StrReplace(s, "\r",   "`r")
+    s := StrReplace(s, "\t",   "`t")
+    s := StrReplace(s, '\"',   '"')
+    s := StrReplace(s, Chr(0), "\")     ; restore literal backslash
     return s
 }
 
@@ -921,4 +925,13 @@ _LLMRemote_LoadCatalog() {
     }
 }
 
-_LLMRemote_LoadCatalog()
+; AHK-05: a corrupt or user-edited api_providers.json must disable only the remote
+; backend, not abort the whole driver boot. Mirror the graceful-degradation pattern
+; used by _LLM_LoadPresets (models.ahk) and LLM_LoadProfilesJSON (profiles.ahk).
+try _LLMRemote_LoadCatalog()
+catch as _e {
+	LLM_API_PROVIDERS := Map()
+	LLM_API_PROVIDER_ORDER := []
+	LLM_REMOTE_MODEL_PRICES := Map()
+	try LoggerError("LLM.remote", "api_providers.json load failed — remote API backend disabled: {1}.", _e.Message)
+}
