@@ -31,9 +31,10 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SSOT_FILE = path.join(ROOT, 'static/ergopti_plus/_shared/modules/llm/defaults.json');
 
 // AHK files that must source the Ollama port default from LLM_Defaults, never
-// from a local literal.
+// from a local literal. api_ollama.ahk is a redirect shim; constants live in
+// the init sub-file which is the authoritative gate for this invariant.
 const FILES = [
-	'static/ergopti_plus/windows/modules/llm/api_ollama.ahk',
+	'static/ergopti_plus/windows/modules/llm/api_ollama/init.ahk',
 	'static/ergopti_plus/windows/ui/menu/menu_llm/_index.ahk',
 	'static/ergopti_plus/windows/ui/menu/menu_llm/menu_models.ahk',
 	'static/ergopti_plus/windows/ui/menu/menu_llm/menu_settings.ahk'
