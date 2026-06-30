@@ -180,6 +180,34 @@ LLM_Bridge_FeedCharIfActive(ch) {
 }
 
 /**
+ * Mirror a hotstring expansion into the LLM rolling context buffer.
+ * Called from HSE_DispatchMatch right after HSE_ApplyExpansion so the LLM
+ * buffer stays in sync with the on-screen text even though physical chars
+ * typed inside the 60 ms post-fire suppression window are not fed via
+ * LLM_Bridge_FeedCharIfActive (AHK-23).
+ * Mirrors HSE_ApplyExpansion semantics: strip Spec.Length + EndChar off the
+ * right end of _LLM_Bridge_Buffer, then append Replacement + EndChar.
+ * @param {Object} Spec - Hotstring spec with a .Length property.
+ * @param {string} Replacement - The expanded text.
+ * @param {string} EndChar - The terminator char, empty for star triggers.
+ */
+LLM_Bridge_ApplyExpansionIfActive(Spec, Replacement, EndChar := "") {
+	global _LLM_Bridge_Active, _LLM_Bridge_Buffer
+	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active)
+		return
+	StripLen := Spec.Length + (EndChar != "" ? 1 : 0)
+	BufLen := StrLen(_LLM_Bridge_Buffer)
+	if (BufLen >= StripLen) {
+		_LLM_Bridge_Buffer := SubStr(_LLM_Bridge_Buffer, 1, BufLen - StripLen)
+	} else {
+		_LLM_Bridge_Buffer := ""
+	}
+	_LLM_Bridge_Buffer .= Replacement
+	if (EndChar != "")
+		_LLM_Bridge_Buffer .= EndChar
+}
+
+/**
  * Called from PrefixWatcher OnKeyDown for navigation / editing keys.
  * @param {Integer} vk - Virtual key code.
  */
@@ -537,6 +565,13 @@ _LLM_PointerWatch_OnMoveTick(*) {
  */
 LLM_Bridge_OnAccept(text) {
 	global _LLM_Bridge_Buffer
+	; AHK-09: invalidate every in-flight sequential/streaming variant callback so
+	; they cannot re-show the tooltip after the user has already accepted a
+	; suggestion. StopGeneration bumps request_id (all async callbacks bail on id
+	; mismatch), cancels curl+WinHTTP streams, cancels the debounce timer, and
+	; drops last_ctx/last_results so the dismissed context cannot replay from cache.
+	; Must run BEFORE the injection so the id is bumped while callbacks are live.
+	try LLM_Engine_StopGeneration()
 	; Mute the hotstring InputHook before injecting the prediction so the
 	; synthetic characters do not re-enter the engine and trigger false
 	; hotstring matches on the appended text.
@@ -553,7 +588,17 @@ LLM_Bridge_OnAccept(text) {
 	; The callback also resyncs the LSC ring to the trailing chars of the
 	; injected text so dead-key and ellipsis decisions see the prediction's
 	; tail, not pre-prediction characters.
+	; AHK-10: PrefixWatcherSuppress and KL_MarkSynthetic are DEPTH COUNTERS that must
+	; be released exactly once per acquire. TextSend calls _InjectCallback on success
+	; (synchronously for direct mode, deferred via SetTimer for clipboard mode >1000 chars)
+	; and the callback owns the release. The finally must release ONLY when TextSend
+	; threw before invoking the callback. Use an exception-thrown gate so clipboard-
+	; mode defers never release synchronously ahead of the paste. A `released` flag
+	; is wrong for clipboard mode (TextSend returns before invoking the callback so
+	; `released` is still false when the finally runs — the correct gate is whether
+	; TextSend threw, not whether the callback ran synchronously).
 	_InjectCallback := _LLM_Bridge_OnInjectComplete.Bind(text)
+	_threw := false
 	try {
 		TextSend(text, 0, _InjectCallback)
 		; Clear the stale pre-prediction HSE and prefix buffers — the cursor is
@@ -563,15 +608,17 @@ LLM_Bridge_OnAccept(text) {
 		if IsSet(_ResetPrefixBuffer)
 			try _ResetPrefixBuffer()
 	} catch as _e {
-		; Re-throw after the finally block releases guards, so the caller sees
-		; the original error and no suppression state is left armed.
+		; TextSend threw before the callback could run — arm the finally release
+		_threw := true
 		throw _e
 	} finally {
-		; Ensure suppression is always released even when TextSend throws —
-		; the finally block runs whether the try body succeeded or threw.
-		try KL_ClearSynthetic()
-		if IsSet(PrefixWatcherSuppress)
-			try PrefixWatcherSuppress(false)
+		; Release guards only when TextSend threw and never invoked the callback.
+		; On the success path (direct or clipboard) the callback owns the release.
+		if _threw {
+			try KL_ClearSynthetic()
+			if IsSet(PrefixWatcherSuppress)
+				try PrefixWatcherSuppress(false)
+		}
 	}
 	_LLM_Bridge_Buffer .= text
 	; Audit event — pairs with the llm_suggested event the engine emitted
