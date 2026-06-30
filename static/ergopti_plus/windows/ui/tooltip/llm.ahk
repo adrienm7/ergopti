@@ -619,6 +619,13 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 	global UI_LLM_CORR_SEL_HEX, UI_LLM_NW_SEL_HEX, UI_LLM_UNSEL_GRAY_HEX, UI_LLM_LOADING_HEX
 	global UI_LLM_CURSOR_HEX, UI_LLM_CMD_SEL_HEX, UI_LLM_CMD_DIM_HEX
 	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_FOOTER_COMBINED_SEP
+	; AHK-17: a hotstring dequeue cycle (_TooltipDequeueActive=true) with a 100 ms
+	; poll timer fires into a freshly-rendered LLM prediction and force-hides or
+	; clobbers it. Clear both dequeue state variables here so the poll timer bails
+	; immediately on its next tick (empty items + inactive = no-op in DequeuePollFn).
+	global _TooltipDequeueActive, _TooltipDequeueItems
+	_TooltipDequeueActive := false
+	_TooltipDequeueItems  := 0
 
 	_TooltipSuspendSurfaces()
 	_TooltipTeardownBorder()
