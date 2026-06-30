@@ -269,6 +269,12 @@ LLM_Defaults_Load()
 
 #Include lib/feature_state.ahk
 
+; AHK-21: clear the stock AHK tray items (Pause/Suspend/Reload/Exit/Edit)
+; BEFORE the blocking onboarding wizard so those stock actions are never live
+; during first-run setup. On a normal (non-first-run) boot Onboarding_Run is
+; a no-op, so this move is safe — and it closes the brief stock-menu window
+; regardless of the boot path (normal OR first-run).
+A_TrayMenu.Delete()
 Onboarding_Run()
 
 global _IniCache := ParseTomlFile(ConfigurationFile)
@@ -601,12 +607,10 @@ BootProfile_Mark("Config, features & shortcuts loaded")
 ; single largest remaining time-to-ready chunk, and the menu is only needed once the
 ; user right-clicks the tray. So it is DEFERRED off the boot critical path: built by
 ; BuildTrayMenuDeferred armed right after "ready" (see the deferred-task block).
-; Clear AHK's stock tray items now so an early right-click in that brief window shows
-; an empty menu rather than the default Suspend/Pause that would bypass the driver.
-; _DriverReady stays false until "ready"; the deferred initMenu then builds every
-; submenu (incl. the 21-locale language one) synchronously in ONE uninterrupted
-; (Critical) pass, so the "menu shows only the first items" half-build bug cannot
-; recur. The tray ICON is already set earlier (TraySetIcon), so it stays visible.
+; Stock tray items (Pause/Suspend/Reload/Exit/Edit) are cleared once at boot,
+; before Onboarding_Run (AHK-21), so they are never live during the first-run wizard.
+; This second Delete() is a safe no-op on an already-empty menu — kept to make the
+; comment block here accurate; _DriverReady stays false until "ready".
 _DriverReady := false
 _LangMenuRef := ""
 _LangMenuBuildPending := false
