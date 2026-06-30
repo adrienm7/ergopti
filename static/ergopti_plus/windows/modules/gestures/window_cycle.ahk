@@ -199,7 +199,19 @@ _GestureOrderedWindows(ProcessFilter := "") {
 ; (Windows propagates focus async, and a strict check causes false negatives
 ; that make the cycle skip windows).
 GestureActivateWindow(HWnd) {
-    global _GestureSelfActivated
+    global _GestureSelfActivated, GESTURE_SELF_ACTIVATE_TTL_MS
+    ; AHK-24: prune stale entries before inserting — entries whose WinEvent never
+    ; arrived (failed/no-op activations, suspended-race) are never reclaimed by
+    ; _GestureOnForeground and would grow the Map unbounded over a long session.
+    ; The TTL prune keeps the Map bounded to in-flight self-activations within one
+    ; GESTURE_SELF_ACTIVATE_TTL_MS window, mirroring the cap on _GestureWinOrder.
+    _StaleSelfActivated := []
+    for _sa_hwnd, _sa_tick in _GestureSelfActivated {
+        if ((A_TickCount - _sa_tick) & 0xFFFFFFFF >= GESTURE_SELF_ACTIVATE_TTL_MS)
+            _StaleSelfActivated.Push(_sa_hwnd)
+    }
+    for _sa_hwnd in _StaleSelfActivated
+        _GestureSelfActivated.Delete(_sa_hwnd)
     ; Mark this as a self-induced activation so _GestureOnForeground can fence the async
     ; EVENT_SYSTEM_FOREGROUND it triggers (gesture-cycle-winevent-async-fence).
     _GestureSelfActivated[HWnd] := A_TickCount
