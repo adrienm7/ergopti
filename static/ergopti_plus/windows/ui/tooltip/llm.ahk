@@ -834,7 +834,10 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 		return
 	}
 
+	; AHK-34: mirror core.ahk — UIA COM must be profiled on the LLM path too
+	_hpResolve := HotPath_Now()
 	Pos := _TooltipResolvePosition()
+	HotPath_LogIfSlow("Tooltip.ResolvePos", _hpResolve, "")
 	Row := Rows[1]
 	_TooltipTimerGeneration := _TooltipGeneration
 	try {
