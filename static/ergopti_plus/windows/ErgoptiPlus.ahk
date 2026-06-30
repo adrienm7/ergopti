@@ -244,7 +244,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 LLM_Defaults_Load()
 #Include modules/llm/profiles.ahk
 #Include modules/llm/prediction_engine.ahk
-#Include modules/llm/llm_bridge.ahk
+#Include modules/keymap/llm_bridge.ahk
 #Include modules/llm/ollama_webview.ahk
 #Include modules/llm/ollama_deps_checker.ahk
 #Include ui/tooltip/tooltip_llm.ahk

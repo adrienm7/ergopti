@@ -19,7 +19,7 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	"modules/keylogger/keylogger_hook.ahk", true,
 	"modules/hotstrings/personal_toml_editor.ahk", true,
 	"lib/tap_hold/tap_hold_loader.ahk", true,
-	"modules/llm/llm_bridge.ahk", true,
+	"modules/keymap/llm_bridge.ahk", true,
 	"modules/metrics/metrics_shortcuts.ahk", true,
 	"ui/tray_menu.ahk", true,
 	"modules/keylogger/aggregator.ahk", true,

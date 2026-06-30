@@ -19,7 +19,7 @@
 ; branch or drops the live feed fails here.
 ;
 ; Meta-static because _OnPrefixKeyDown depends on LLM_Bridge_FeedKeyDownIfActive
-; (defined in modules/llm/llm_bridge.ahk, NOT in the run_all include graph) and
+; (defined in modules/keymap/llm_bridge.ahk, NOT in the run_all include graph) and
 ; on tooltip / HSE side effects; calling it headless is unsafe. The assertions
 ; read the function body via the move-resilient _DriverFuncBody helper, so they
 ; survive a move of hotstring_prefix_watcher.ahk.

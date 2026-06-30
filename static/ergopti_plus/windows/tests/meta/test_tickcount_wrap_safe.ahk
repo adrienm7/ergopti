@@ -4,7 +4,7 @@
 ; MODULE: A_TickCount Wrap-Safe Delta Formula Guard
 ; DESCRIPTION:
 ; Static source guard for the A_TickCount wrap-safe formula fix in
-; modules/llm/prediction_engine.ahk and modules/llm/llm_bridge.ahk.
+; modules/llm/prediction_engine.ahk and modules/keymap/llm_bridge.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; A_TickCount is a 32-bit unsigned counter that wraps from 0xFFFFFFFF back to 0
@@ -60,8 +60,8 @@ Test("prediction_engine: TickCount delta uses wrap-safe (now - last + 0x10000000
 ; ==========================================================================
 
 _TTCWS_LlmBridgeWrapSafe() {
-	Src := _TTCWS_StripLineComments(_TTCWS_ReadSource("modules/llm/llm_bridge.ahk"))
-	Assert(Src != "", "modules/llm/llm_bridge.ahk must be readable")
+	Src := _TTCWS_StripLineComments(_TTCWS_ReadSource("modules/keymap/llm_bridge.ahk"))
+	Assert(Src != "", "modules/keymap/llm_bridge.ahk must be readable")
 
 	Assert(InStr(Src, "0x100000000") > 0,
 		"llm_bridge.ahk must use the wrap-safe constant 0x100000000 in TickCount delta computation")

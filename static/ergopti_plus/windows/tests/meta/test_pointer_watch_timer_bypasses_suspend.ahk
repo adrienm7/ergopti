@@ -15,7 +15,7 @@
 ; inert while paused. This test scans the function body and asserts the guard
 ; is present.
 ;
-; Meta-static because modules/llm/llm_bridge.ahk registers top-level state and
+; Meta-static because modules/keymap/llm_bridge.ahk registers top-level state and
 ; is not part of the headless run_all include graph.
 ; ==============================================================================
 

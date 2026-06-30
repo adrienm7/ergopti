@@ -60,9 +60,9 @@ _LACF_AfterFinally(Body) {
 ; LLM_Bridge_OnAccept must use try { ... } finally { ... } so the cleanup
 ; timers fire even when TextSend raises an error.
 _LACF_BridgeHasFinally() {
-	Src := _LACF_ReadSource("modules/llm/llm_bridge.ahk")
+	Src := _LACF_ReadSource("modules/keymap/llm_bridge.ahk")
 	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
-	Assert(Body != "", "LLM_Bridge_OnAccept must exist in modules/llm/llm_bridge.ahk")
+	Assert(Body != "", "LLM_Bridge_OnAccept must exist in modules/keymap/llm_bridge.ahk")
 	Assert(InStr(Body, "} finally {") > 0,
 		"LLM_Bridge_OnAccept must use try { ... } finally { ... } so cleanup timers fire even when TextSend fails (llm-accept-cleanup-in-finally)")
 }
@@ -71,9 +71,9 @@ Test("llm_bridge: LLM_Bridge_OnAccept wraps TextSend in try/finally (llm-accept-
 ; KL_ClearSynthetic must be scheduled from the finally block so it fires
 ; unconditionally -- not only on the success path after TextSend.
 _LACF_BridgeKLClearInFinally() {
-	Src := _LACF_ReadSource("modules/llm/llm_bridge.ahk")
+	Src := _LACF_ReadSource("modules/keymap/llm_bridge.ahk")
 	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
-	Assert(Body != "", "LLM_Bridge_OnAccept must exist in modules/llm/llm_bridge.ahk")
+	Assert(Body != "", "LLM_Bridge_OnAccept must exist in modules/keymap/llm_bridge.ahk")
 	FinallyBlock := _LACF_AfterFinally(Body)
 	Assert(FinallyBlock != "", "LLM_Bridge_OnAccept must have a } finally { block (llm-accept-cleanup-in-finally)")
 	Assert(InStr(FinallyBlock, "KL_ClearSynthetic") > 0,
@@ -84,7 +84,7 @@ Test("llm_bridge: KL_ClearSynthetic timer is scheduled from the finally block (l
 ; PrefixWatcherSuppress(false) release timer must also be in the finally
 ; block -- a stuck suppression silences the hotstring engine permanently.
 _LACF_BridgePrefixSupInFinally() {
-	Src := _LACF_ReadSource("modules/llm/llm_bridge.ahk")
+	Src := _LACF_ReadSource("modules/keymap/llm_bridge.ahk")
 	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
 	FinallyBlock := _LACF_AfterFinally(Body)
 	Assert(FinallyBlock != "", "LLM_Bridge_OnAccept must have a } finally { block (llm-accept-cleanup-in-finally)")

@@ -4,7 +4,7 @@
 ; MODULE: LLM_Bridge_Stop + StopGeneration Order Guard
 ; DESCRIPTION:
 ; Static source guard for the LLM_Bridge_Stop ordering fix in
-; modules/llm/llm_bridge.ahk.
+; modules/keymap/llm_bridge.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; The original LLM_Bridge_Stop called LLM_Engine_SetEnabled(false) before
@@ -43,11 +43,11 @@ _TLBSO_StripLineComments(Src) {
 ; ====================================================================
 
 _TLBSO_StopBeforeDisable() {
-	Src := _TLBSO_StripLineComments(_TLBSO_ReadSource("modules/llm/llm_bridge.ahk"))
-	Assert(Src != "", "modules/llm/llm_bridge.ahk must be readable")
+	Src := _TLBSO_StripLineComments(_TLBSO_ReadSource("modules/keymap/llm_bridge.ahk"))
+	Assert(Src != "", "modules/keymap/llm_bridge.ahk must be readable")
 
 	Body := _DriverFuncBody("LLM_Bridge_Stop")
-	Assert(Body != "", "LLM_Bridge_Stop must be defined in modules/llm/llm_bridge.ahk")
+	Assert(Body != "", "LLM_Bridge_Stop must be defined in modules/keymap/llm_bridge.ahk")
 
 	; Both calls must be present
 	StopPos    := InStr(Body, "LLM_Engine_StopGeneration()")
