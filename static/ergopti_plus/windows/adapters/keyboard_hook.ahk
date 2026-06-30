@@ -158,7 +158,9 @@ _KH_DispatchChar(IH, Char) {
 	if _KH_ON_CHAR = 0
 		return
 	Evt := Map("char", Char, "timestamp", A_TickCount, "appId", _KH_CONTEXT["appId"])
-	try _KH_ON_CHAR(Evt)
+	; AHK-20: let exceptions propagate to HookDispatcher.Dispatch (the centralized
+	; error sink) — a bare try here would swallow them and bypass stuck-modifier recovery
+	_KH_ON_CHAR(Evt)
 }
 
 ; Called by HookDispatcher for each key-down event (keyboard_down event).
@@ -168,7 +170,8 @@ _KH_DispatchKey(IH, VK, SC) {
 	if _KH_ON_KEY = 0
 		return
 	Evt := Map("key", Format("{:02X}", VK), "timestamp", A_TickCount, "appId", _KH_CONTEXT["appId"])
-	try _KH_ON_KEY(Evt)
+	; AHK-20: same as above — let exceptions propagate to HookDispatcher.Dispatch
+	_KH_ON_KEY(Evt)
 }
 
 ; Port dispatch map (ADAPTER_KEYBOARD_HOOK) — the single-source-of-truth contract
