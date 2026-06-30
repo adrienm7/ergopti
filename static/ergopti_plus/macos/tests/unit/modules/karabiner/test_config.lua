@@ -1,4 +1,4 @@
---- tests/unit/modules/karabiner/test_config.lua
+﻿--- tests/unit/modules/karabiner/test_config.lua
 
 --- ==============================================================================
 --- MODULE: karabiner.config Unit Tests
@@ -18,7 +18,7 @@ local _ = helpers.load_with_stubs("lib.logger")
 -- monkey-patched per test where TOML parsing matters.
 local _toml_stub = { encode = function() return "" end, decode = function() return {} end }
 package.loaded["toml_codec"]     = _toml_stub
-package.loaded["lib.toml_codec"] = _toml_stub
+package.loaded["lib.toml.codec"] = _toml_stub
 
 local Config = helpers.load_with_stubs("modules.karabiner.config")
 

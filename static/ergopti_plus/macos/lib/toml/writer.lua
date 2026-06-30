@@ -1,11 +1,10 @@
---- lib/toml_writer.lua
+--- lib/toml/writer.lua
 
 --- ==============================================================================
---- MODULE: TOML Writer — Compatibility Shim
+--- MODULE: TOML Writer — macOS shim
 --- DESCRIPTION:
---- Re-exports the canonical TOML writer from the shared Lua library so that
---- existing callers using require("lib.toml_writer") continue to work without
---- modification. The real implementation lives at:
+--- Re-exports the canonical TOML writer from the shared Lua library.
+--- Callers: require("lib.toml.writer"). The real implementation lives at:
 ---   static/ergopti_plus/_shared/lua/toml_codec/writer.lua
 ---
 --- RATIONALE:

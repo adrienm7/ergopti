@@ -1,4 +1,4 @@
---- tests/unit/lib/test_toml_reader_cache_hook.lua
+﻿--- tests/unit/lib/test_toml_reader_cache_hook.lua
 
 --- ==============================================================================
 --- MODULE: toml_reader cache-provider hook (regression)
@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 
 package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
-local reader = helpers.load_with_stubs("lib.toml_reader")
+local reader = helpers.load_with_stubs("lib.toml.reader")
 
 --- Writes a TOML body to a temp file and returns its path.
 local function write_temp(name, body)

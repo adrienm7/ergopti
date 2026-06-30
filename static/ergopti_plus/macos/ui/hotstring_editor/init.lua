@@ -1,4 +1,4 @@
---- ui/hotstring_editor/init.lua
+﻿--- ui/hotstring_editor/init.lua
 
 --- ==============================================================================
 --- MODULE: Hotstring Editor UI
@@ -16,8 +16,8 @@
 local M = {}
 
 local hs            = hs
-local toml_reader   = require("lib.toml_reader")
-local toml_writer   = require("lib.toml_writer")
+local toml_reader   = require("lib.toml.reader")
+local toml_writer   = require("lib.toml.writer")
 local ui_builder    = require("ui.ui_builder")
 local Logger        = require("lib.logger")
 local notifications = require("lib.notifications")

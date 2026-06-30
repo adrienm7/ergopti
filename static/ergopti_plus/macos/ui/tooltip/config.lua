@@ -1,4 +1,4 @@
---- ui/tooltip/config.lua
+﻿--- ui/tooltip/config.lua
 
 --- ==============================================================================
 --- MODULE: Tooltip Configuration
@@ -203,7 +203,7 @@ end
 --- Reads _shared/modules/tooltip/constants.toml at require-time. Missing file, section,
 --- or key → error (fail fast — no driver-side fallback values).
 local function load_from_shared()
-	local toml_reader = require("lib.toml_reader")
+	local toml_reader = require("lib.toml.reader")
 
 	-- Locate shared dir by walking up from this file:
 	-- macos/ui/tooltip/config.lua → macos/ui/tooltip → macos/ui → macos → ergopti_plus → shared

@@ -1,11 +1,10 @@
---- lib/toml_codec.lua
+--- lib/toml/codec.lua
 
 --- ==============================================================================
---- MODULE: TOML Codec — Compatibility Shim
+--- MODULE: TOML Codec — macOS shim
 --- DESCRIPTION:
---- Re-exports the canonical TOML codec from the shared Lua library so that
---- existing callers using require("lib.toml_codec") continue to work without
---- modification. The real implementation lives at:
+--- Re-exports the canonical TOML codec from the shared Lua library.
+--- Callers: require("lib.toml.codec"). The real implementation lives at:
 ---   static/ergopti_plus/_shared/lua/toml_codec/codec.lua
 ---
 --- RATIONALE:

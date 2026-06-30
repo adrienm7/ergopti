@@ -1,4 +1,4 @@
---- modules/hotstrings/hotstrings_config.lua
+﻿--- modules/hotstrings/hotstrings_config.lua
 
 --- ==============================================================================
 --- MODULE: Hotstrings Config
@@ -24,13 +24,13 @@
 --- 2. Cross-driver overrides: the user override file lives at a shared path
 ---    so changes made from the HS menu show up in AHK (and vice versa).
 --- 3. Lazy TOML parsing: each category TOML is parsed at most once per
----    session via the existing `lib.toml_reader` to avoid duplicate I/O.
+---    session via the existing `lib.toml.reader` to avoid duplicate I/O.
 --- ==============================================================================
 
 local M = {}
 local Logger     = require("lib.logger")
 local Paths      = require("lib.paths")
-local TomlReader = require("lib.toml_reader")
+local TomlReader = require("lib.toml.reader")
 local LOG        = "hotstrings_config"
 
 

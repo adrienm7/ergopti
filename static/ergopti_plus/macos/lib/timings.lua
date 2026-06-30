@@ -1,4 +1,4 @@
---- lib/timings.lua
+﻿--- lib/timings.lua
 
 --- ==============================================================================
 --- MODULE: Shared Timings Reader (Hammerspoon)
@@ -31,7 +31,7 @@
 local M = {}
 local Logger = require("lib.logger")
 local Paths = require("lib.paths")
-local TomlReader = require("lib.toml_reader")
+local TomlReader = require("lib.toml.reader")
 local LOG = "timings"
 
 -- Number of milliseconds in one second — the registry stores every value in ms.

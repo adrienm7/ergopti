@@ -1,4 +1,4 @@
---- tests/unit/modules/test_hotstrings_defaults.lua
+﻿--- tests/unit/modules/test_hotstrings_defaults.lua
 
 --- ==============================================================================
 --- MODULE: hotstrings_config Shared-Defaults Single-Source Tests
@@ -43,7 +43,7 @@ end
 
 --- Parse the canonical shared file directly (same reader both drivers use).
 local function read_defaults()
-	local reader = require("lib.toml_reader")
+	local reader = require("lib.toml.reader")
 	local parsed = reader.parse(defaults_path)
 	return parsed and parsed.sections or nil
 end

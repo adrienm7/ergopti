@@ -1,4 +1,4 @@
---- tests/unit/lib/test_toml_codec_edge_cases.lua
+﻿--- tests/unit/lib/test_toml_codec_edge_cases.lua
 
 --- ==============================================================================
 --- MODULE: TOML Codec Edge-Case Regression Tests
@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local codec   = helpers.load_with_stubs("lib.toml_codec")
+local codec   = helpers.load_with_stubs("lib.toml.codec")
 
 
 -- =====================================================================

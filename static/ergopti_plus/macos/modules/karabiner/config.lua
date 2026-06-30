@@ -1,4 +1,4 @@
---- modules/karabiner/config.lua
+﻿--- modules/karabiner/config.lua
 
 --- ==============================================================================
 --- MODULE: Karabiner Config Loader and Persistence
@@ -47,7 +47,7 @@ local COMBO_SYMMETRIC_DEFAULT           = Defaults.combo_symmetric
 --- Loads and parses a JSON file. Logs an error and returns nil on any failure.
 --- @param path string Absolute path to the JSON file.
 --- @return table|nil Decoded table, or nil.
-local TomlCodec = require("lib.toml_codec")
+local TomlCodec = require("lib.toml.codec")
 
 --- Load a TOML user-config file. Returns a Lua table or nil if absent.
 function M._load_toml_file(path)

@@ -1,4 +1,4 @@
---- ui/onboarding/init.lua
+﻿--- ui/onboarding/init.lua
 
 --- ==============================================================================
 --- MODULE: Onboarding Wizard
@@ -21,8 +21,8 @@
 local M = {}
 
 local i18n         = require("lib.i18n")
-local toml_writer  = require("lib.toml_writer")
-local toml_codec   = require("lib.toml_codec")
+local toml_writer  = require("lib.toml.writer")
+local toml_codec   = require("lib.toml.codec")
 local notifications = require("lib.notifications")
 local Paths        = require("lib.paths")
 local Logger       = require("lib.logger")

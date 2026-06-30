@@ -1,4 +1,4 @@
---- tests/unit/lib/test_toml_writer.lua
+﻿--- tests/unit/lib/test_toml_writer.lua
 
 --- ==============================================================================
 --- MODULE: toml_writer Unit Tests
@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 
 package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
-local writer = helpers.load_with_stubs("lib.toml_writer")
+local writer = helpers.load_with_stubs("lib.toml.writer")
 
 
 --- Convenience: writes a TOML payload to a temp file and returns its content.

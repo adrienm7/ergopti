@@ -1,4 +1,4 @@
---- tests/integration/run_in_hs.lua
+﻿--- tests/integration/run_in_hs.lua
 
 --- ==============================================================================
 --- MODULE: In-Hammerspoon Integration Smoke Test
@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local TARGETS = {
-	"lib.text_utils", "lib.toml_reader", "lib.logger",
+	"lib.text_utils", "lib.toml.reader", "lib.logger",
 	"lib.keycodes", "lib.layout", "lib.perf",
 	"modules.keymap.terminators", "modules.keymap.utils",
 	"modules.karabiner.defaults", "modules.karabiner.config",
