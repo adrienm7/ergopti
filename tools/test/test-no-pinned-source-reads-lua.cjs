@@ -42,7 +42,11 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'tests');
 //                     test_mlx_warmup_timeout_cancel.lua, test_menu_quit_mlx_teardown.lua,
 //                     test_menu_state_keeps_script_control.lua §1 — each backed by a
 //                     stronger behaviour assertion in a companion section)
-const BASELINE = 136;
+//          136 → 140 (four new deliberate source invariants added with bug-fix commits:
+//                     test_day_rollover_drain.lua §2 (drain-loop guard),
+//                     test_api_token_lazy_decrypt.lua (init.lua + api_remote.lua source scan),
+//                     test_ollama_manager_nonblocking.lua §1 (blocking-call source guard))
+const BASELINE = 140;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read). None exists yet;
 // listed so that converting a test to such a helper drops it from the count.
