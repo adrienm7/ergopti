@@ -241,15 +241,6 @@ function precomputeIconColors() {
 	).then(() => undefined);
 }
 
-function escapeHtml(unsafe) {
-	if (!unsafe) return '';
-	return unsafe
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#039;');
-}
 
 function formatDuration(ms) {
 	if (!ms && ms !== 0) return '0m';

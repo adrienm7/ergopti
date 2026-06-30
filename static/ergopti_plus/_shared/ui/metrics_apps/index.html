@@ -5,6 +5,7 @@
 		<title>Temps sur les applications</title>
 		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 		<script src="../host_bridge.js"></script>
+		<script src="../dom_utils.js"></script>
 		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
@@ -1189,7 +1190,12 @@
 		</div>
 
 		<script src="../i18n.js"></script>
-		<script src="script.js"></script>
+		<!-- Load order: helpers (colors/format) → state → main (init+render) → charts → modal -->
+		<script src="helpers.js"></script>
+		<script src="state.js"></script>
+		<script src="main.js"></script>
+		<script src="charts.js"></script>
+		<script src="modal.js"></script>
 
 		<!--
 			Edge --app= bootstrap (B niveau 1 contract — AHK driver only).

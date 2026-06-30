@@ -100,18 +100,6 @@ const CMD_GROUPS = [
 // ====================================
 // ====================================
 
-/**
- * Escapes HTML characters in a string to prevent XSS and formatting issues.
- * @param {string} s - The raw string.
- * @returns {string} The escaped string.
- */
-function esc(s) {
-	return String(s || '')
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;');
-}
 
 /**
  * Normalizes a raw token name into its canonical PascalCase representation.
@@ -279,7 +267,7 @@ function updateCbDescs() {
 
 	document.getElementById('desc-auto').innerHTML = a
 		? 'S’expand immédiatement (idéal pour les déclencheurs finissant par ' +
-			esc(TRIGGER_CHAR) +
+			escapeHtml(TRIGGER_CHAR) +
 			').'
 		: 'Nécessite de taper Espace/Entrée (conseillé pour l’autocorrection).';
 
@@ -301,9 +289,9 @@ function updateHints() {
 		if (TRIGGER_CHAR !== STAR) {
 			hint.innerHTML =
 				'<span class="star-badge">' +
-				esc(TRIGGER_CHAR) +
+				escapeHtml(TRIGGER_CHAR) +
 				'</span> affiché, stocké en <span class="star-badge">' +
-				esc(STAR) +
+				escapeHtml(STAR) +
 				'</span>';
 		} else {
 			hint.textContent = '';
@@ -771,11 +759,11 @@ function buildCmdGrid() {
 			// description stays in the hover tooltip above.
 			el.innerHTML =
 				'<span class="cmd-sym" data-tok="' +
-				esc(c.token) +
+				escapeHtml(c.token) +
 				'">' +
-				esc(c.sym) +
+				escapeHtml(c.sym) +
 				'</span><span class="cmd-lbl">' +
-				esc(c.token) +
+				escapeHtml(c.token) +
 				'</span>';
 			el.addEventListener('mousedown', (e) => e.preventDefault());
 			el.addEventListener('click', () => insertChipAtCursor(c.token));
@@ -786,17 +774,17 @@ function buildCmdGrid() {
 
 function dispTrig(s) {
 	if (!s) return '';
-	return esc(toDisplay(s))
-		.split(esc(TRIGGER_CHAR))
-		.join('<span class="trig-star">' + esc(TRIGGER_CHAR) + '</span>');
+	return escapeHtml(toDisplay(s))
+		.split(escapeHtml(TRIGGER_CHAR))
+		.join('<span class="trig-star">' + escapeHtml(TRIGGER_CHAR) + '</span>');
 }
 
 function dispOutput(s) {
 	if (!s) return '';
-	let out = esc(toDisplay(s));
+	let out = escapeHtml(toDisplay(s));
 	out = out.replace(/\{([^}]+)\}/g, function (_, name) {
 		const canon = normToken(name);
-		return '<span class="tc" data-tok="' + esc(canon) + '">' + esc(canon) + '</span>';
+		return '<span class="tc" data-tok="' + escapeHtml(canon) + '">' + escapeHtml(canon) + '</span>';
 	});
 	if (!compactView) {
 		out = out.replace(/<span class="tc" data-tok="Enter">Enter<\/span>/g, '<br>');
@@ -926,7 +914,7 @@ function render() {
 			'<span class="sec-title" onmousedown="onRowMouseDown(event)" onclick="handleSecTitleClick(event,' +
 			si +
 			')">' +
-			esc(s.description || s.name) +
+			escapeHtml(s.description || s.name) +
 			'</span>';
 		html += '<span class="sec-cnt">(' + (searching ? idx.length : cnt) + ')</span>';
 		html +=
@@ -1252,9 +1240,9 @@ function saveEntry(andNew) {
 	if (dupSection) {
 		showConfirm(
 			'Le déclencheur <strong>' +
-				esc(toDisplay(trig)) +
+				escapeHtml(toDisplay(trig)) +
 				'</strong> existe déjà dans <em>' +
-				esc(dupSection) +
+				escapeHtml(dupSection) +
 				'</em>.<br><br>Voulez-vous vraiment le redéfinir ?',
 			executeSave,
 			{ okLabel: 'Redéfinir', okColor: '#ff9500', isWarning: true }
@@ -1272,7 +1260,7 @@ function delEntryStop(e, si, ei) {
 function delEntry(si, ei) {
 	const trig = toDisplay(D.sections[si].entries[ei].trigger);
 	showConfirm(
-		(_t('editor.hotstrings.confirm_del_entry') || 'Delete « %s »?').replace('%s', esc(trig)),
+		(_t('editor.hotstrings.confirm_del_entry') || 'Delete « %s »?').replace('%s', escapeHtml(trig)),
 		function () {
 			D.sections[si].entries.splice(ei, 1);
 			persist();
@@ -1295,7 +1283,7 @@ window.updateBulk = function () {
 		const sel = document.getElementById('bulk-sec-sel');
 		sel.innerHTML = '<option value="">Déplacer vers…</option>';
 		D.sections.forEach((s, idx) => {
-			sel.innerHTML += '<option value="' + idx + '">' + esc(s.description || s.name) + '</option>';
+			sel.innerHTML += '<option value="' + idx + '">' + escapeHtml(s.description || s.name) + '</option>';
 		});
 		bar.style.display = 'flex';
 	} else {

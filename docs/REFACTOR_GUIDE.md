@@ -245,7 +245,7 @@ Pipeline prouvé (P4/P5) : extraction PowerShell (BOM+CRLF) remplaçant le bloc 
 | St | Étape | Objectif · Preuve | Action · Diagnostic |
 |----|-------|-------------------|---------------------|
 | ✅ | **P13.1** UI-A | host-bridge unifié · 12 apps WebView2/WKWebView | `_shared/ui/host_bridge.js` → `makeHostBridge(name)` ; tous les scripts et HTML mis à jour, 3 tests de contrat mis à jour. |
-| ☐ | **P13.2** UI-B/C/D | dédup DOM · `escape_html` ×3 divergents, DOM-ready ×7, monolithe `metrics_apps/script.js` | `_shared/ui/dom_utils.js` ; split `metrics_apps` miroir `metrics_typing`. **Moyen** |
+| ✅ | **P13.2** UI-B/C/D | dédup DOM · `escape_html` ×3 divergents, monolithe `metrics_apps/script.js` (3499 l.) | `_shared/ui/dom_utils.js` → `escapeHtml` + `domReady` ; `metrics_apps` splitté en helpers/state/main/charts/modal.js. |
 | ☐ | **P13.3** LIN-1 | Linux TOML loader · `linux/modules/hotstrings/loader.lua:79-208` réimplémente un parser | déléguer à `_shared/lua/toml_codec.reader` + test équivalence + `test:linux`. **Moyen, reload Linux** |
 
 ### Track B — Correctness (`fix`/`feat`, comportement modifié)

@@ -48,15 +48,9 @@ function format_date_iso(d) {
 	return `${yyyy}-${mm}-${dd}`;
 }
 
-/**
- * Escapes HTML special characters to prevent XSS.
- * @param {string} str - The raw string to escape.
- * @returns {string} The escaped string safe for HTML insertion.
- */
-function escape_html(str) {
-	if (!str) return '';
-	return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
+// Alias the canonical escapeHtml from dom_utils.js for backward compatibility
+// with the snake_case callers in this suite.
+var escape_html = escapeHtml;
 
 // ======================================
 // ======================================
