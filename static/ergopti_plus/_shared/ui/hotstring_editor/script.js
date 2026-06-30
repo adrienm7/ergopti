@@ -65,34 +65,36 @@ const TOKEN_NAMES = [
 	'Enter'
 ];
 
-const CMD_GROUPS = [
-	{
-		lbl: 'Flèches',
-		cmds: [
-			{ token: 'Left', sym: '←', desc: 'gauche' },
-			{ token: 'Right', sym: '→', desc: 'droite' },
-			{ token: 'Up', sym: '↑', desc: 'haut' },
-			{ token: 'Down', sym: '↓', desc: 'bas' }
-		]
-	},
-	{
-		lbl: 'Navigation',
-		cmds: [
-			{ token: 'Home', sym: 'Home', desc: 'début ligne' },
-			{ token: 'End', sym: 'End', desc: 'fin ligne' },
-			{ token: 'Tab', sym: '⇥', desc: 'tabulation' },
-			{ token: 'Escape', sym: 'Esc', desc: 'Échap' }
-		]
-	},
-	{
-		lbl: 'Édition',
-		cmds: [
-			{ token: 'BackSpace', sym: '⌫', desc: 'effacer ←' },
-			{ token: 'Delete', sym: '⌦', desc: 'effacer →' },
-			{ token: 'Enter', sym: '↩', desc: 'saut de ligne' }
-		]
-	}
-];
+function getCmdGroups() {
+	return [
+		{
+			lbl: _t('editor.hotstrings.cmd_group_arrows') || 'Arrows',
+			cmds: [
+				{ token: 'Left', sym: '←', desc: _t('editor.hotstrings.cmd_left') || 'left' },
+				{ token: 'Right', sym: '→', desc: _t('editor.hotstrings.cmd_right') || 'right' },
+				{ token: 'Up', sym: '↑', desc: _t('editor.hotstrings.cmd_up') || 'up' },
+				{ token: 'Down', sym: '↓', desc: _t('editor.hotstrings.cmd_down') || 'down' }
+			]
+		},
+		{
+			lbl: 'Navigation',
+			cmds: [
+				{ token: 'Home', sym: 'Home', desc: _t('editor.hotstrings.cmd_home') || 'line start' },
+				{ token: 'End', sym: 'End', desc: _t('editor.hotstrings.cmd_end') || 'line end' },
+				{ token: 'Tab', sym: '⇥', desc: _t('editor.hotstrings.cmd_tab') || 'tab' },
+				{ token: 'Escape', sym: 'Esc', desc: _t('editor.hotstrings.cmd_escape') || 'Escape' }
+			]
+		},
+		{
+			lbl: _t('editor.hotstrings.cmd_group_edition') || 'Edition',
+			cmds: [
+				{ token: 'BackSpace', sym: '⌫', desc: _t('editor.hotstrings.cmd_backspace') || 'delete ←' },
+				{ token: 'Delete', sym: '⌦', desc: _t('editor.hotstrings.cmd_delete') || 'delete →' },
+				{ token: 'Enter', sym: '↩', desc: _t('editor.hotstrings.cmd_enter') || 'new line' }
+			]
+		}
+	];
+}
 
 // ====================================
 // ====================================
@@ -262,22 +264,20 @@ function updateCbDescs() {
 	const f = document.getElementById('cb-final').checked;
 
 	document.getElementById('desc-word').innerHTML = w
-		? 'Ne se déclenche que si c’est un mot complet.<br>Ex : <em>tel</em>→téléphone mais pas <em>hôtel</em>'
-		: 'S’active partout, même comme sous-chaîne.<br>Ex : s’activera à l’intérieur de <em>hôtel</em>';
+		? (_t('editor.hotstrings.desc_word_on') || 'Only triggers when it matches a standalone word.<br>Ex: <em>tel</em>→telephone but not <em>hotel</em>')
+		: (_t('editor.hotstrings.desc_word_off') || 'Triggers anywhere, even inside a word.<br>Ex: will trigger inside <em>hotel</em>');
 
 	document.getElementById('desc-auto').innerHTML = a
-		? 'S’expand immédiatement (idéal pour les déclencheurs finissant par ' +
-			escapeHtml(TRIGGER_CHAR) +
-			').'
-		: 'Nécessite de taper Espace/Entrée (conseillé pour l’autocorrection).';
+		? (_t('editor.hotstrings.desc_auto_on') || 'Expands immediately (ideal for triggers ending with %s).').replace('%s', escapeHtml(TRIGGER_CHAR))
+		: (_t('editor.hotstrings.desc_auto_off') || 'Requires Space or Enter to expand (recommended for autocorrect).');
 
 	document.getElementById('desc-case').innerHTML = c
-		? 'Différencie strictement majuscules/minuscules.<br>Ex : <em>Btw</em> ≠ <em>btw</em>'
-		: 'Le moteur générera les versions minuscule, Titlecase et MAJUSCULE.';
+		? (_t('editor.hotstrings.desc_case_on') || 'Strictly distinguishes uppercase/lowercase.<br>Ex: <em>Btw</em> ≠ <em>btw</em>')
+		: (_t('editor.hotstrings.desc_case_off') || 'The engine generates lowercase, Titlecase and UPPERCASE variants.');
 
 	document.getElementById('desc-final').innerHTML = f
-		? 'Le résultat ne sera pas re-analysé comme déclencheur.'
-		: 'Le résultat pourra déclencher d’autres hotstrings en cascade.';
+		? (_t('editor.hotstrings.desc_final_on') || 'The result will not be re-parsed as a trigger.')
+		: (_t('editor.hotstrings.desc_final_off') || 'The result can trigger other hotstrings in cascade.');
 }
 
 /**
@@ -290,7 +290,7 @@ function updateHints() {
 			hint.innerHTML =
 				'<span class="star-badge">' +
 				escapeHtml(TRIGGER_CHAR) +
-				'</span> affiché, stocké en <span class="star-badge">' +
+				'</span> ' + (_t('editor.hotstrings.trig_hint_text') || 'shown, stored as') + ' <span class="star-badge">' +
 				escapeHtml(STAR) +
 				'</span>';
 		} else {
@@ -303,7 +303,7 @@ function updateHints() {
 
 function updateCompactBtn() {
 	const b = document.getElementById('compact-btn');
-	if (b) b.textContent = compactView ? 'Vue développée' : 'Vue compacte';
+	if (b) b.textContent = compactView ? (_t('editor.hotstrings.btn_view_expanded') || 'Expanded view') : (_t('editor.hotstrings.btn_view_compact') || 'Compact view');
 }
 
 function toggleCompact() {
@@ -740,7 +740,7 @@ function cleanDrag() {
 function buildCmdGrid() {
 	const b = document.getElementById('cmd-block');
 	b.innerHTML = '';
-	CMD_GROUPS.forEach((g, gi) => {
+	getCmdGroups().forEach((g, gi) => {
 		if (gi > 0) {
 			const s = document.createElement('hr');
 			s.className = 'cmd-sep';
@@ -907,7 +907,7 @@ function render() {
 		html += '<div class="sec-card" id="sc-' + si + '">';
 		html += '<div class="sec-head' + (exp ? ' open' : '') + '">';
 		// Reordering by drag is meaningless on a filtered view, so hide the handle.
-		if (!searching) html += '<span class="drag-handle" id="dh-' + si + '" title="Glisser">☰</span>';
+		if (!searching) html += '<span class="drag-handle" id="dh-' + si + '" title="' + (_t('editor.hotstrings.drag_handle_title') || 'Drag') + '">☰</span>';
 		html +=
 			'<span class="caret' + (exp ? ' open' : '') + '" onclick="togSec(' + si + ')">▶</span>';
 		html +=
@@ -965,7 +965,7 @@ function render() {
 				html +=
 					'<button class="btn-add" onclick="showAddEntry(' +
 					si +
-					')">＋ Ajouter un hotstring</button>';
+					')">' + (_t('editor.hotstrings.btn_add_entry') || '＋ Add a hotstring') + '</button>';
 			html += '</div>';
 		}
 		html += '</div>';
@@ -1005,7 +1005,7 @@ function render() {
 
 function showAddSec() {
 	edSec = null;
-	document.getElementById('sec-modal-title').textContent = 'Nouvelle section';
+	document.getElementById('sec-modal-title').textContent = _t('editor.hotstrings.sec_modal_title_new') || 'New section';
 	const idEl = document.getElementById('sec-id');
 	idEl.value = '';
 	idEl.disabled = false;
@@ -1018,7 +1018,7 @@ function showAddSec() {
 function showEditSec(si) {
 	edSec = si;
 	const s = D.sections[si];
-	document.getElementById('sec-modal-title').textContent = 'Renommer la section';
+	document.getElementById('sec-modal-title').textContent = _t('editor.hotstrings.sec_modal_title_rename') || 'Rename section';
 	const idEl = document.getElementById('sec-id');
 	idEl.value = s.name;
 	idEl.disabled = true;
@@ -1035,22 +1035,22 @@ function saveSec() {
 
 	if (edSec === null) {
 		if (!id) {
-			setFieldError('sec-id', 'sec-id-err', 'L’identifiant est requis.');
-			document.getElementById('sec-id').focus();
+			setFieldError(‘sec-id’, ‘sec-id-err’, _t(‘editor.hotstrings.err_id_required’) || ‘The identifier is required.’);
+			document.getElementById(‘sec-id’).focus();
 			return;
 		}
 		if (!/^[a-z0-9_]+$/.test(id)) {
 			setFieldError(
-				'sec-id',
-				'sec-id-err',
-				'Identifiant invalide : uniquement minuscules, chiffres et underscores.'
+				‘sec-id’,
+				‘sec-id-err’,
+				_t(‘editor.hotstrings.err_id_invalid’) || ‘Invalid identifier: lowercase letters, digits and underscores only.’
 			);
-			document.getElementById('sec-id').focus();
+			document.getElementById(‘sec-id’).focus();
 			return;
 		}
 		if (D.sections.some((s) => s.name === id)) {
-			setFieldError('sec-id', 'sec-id-err', '« ' + id + ' » existe déjà.');
-			document.getElementById('sec-id').focus();
+			setFieldError(‘sec-id’, ‘sec-id-err’, (_t(‘editor.hotstrings.err_id_exists’) || ‘« %s » already exists.’).replace(‘%s’, id));
+			document.getElementById(‘sec-id’).focus();
 			return;
 		}
 		D.sections.push({ name: id, description: desc || id, entries: [], _exp: true });
@@ -1174,12 +1174,12 @@ function saveEntry(andNew) {
 	const out = serializeEditor(document.getElementById('e-out'));
 
 	if (!trig) {
-		setFieldError('e-trig', 'trig-err', 'Le déclencheur est requis.');
+		setFieldError('e-trig', 'trig-err', _t('editor.hotstrings.err_trigger_empty') || 'The trigger is required.');
 		setTimeout(() => document.getElementById('e-trig').focus(), 0);
 		return;
 	}
 	if (!out.trim()) {
-		setFieldError('e-out', 'out-err', 'Le remplacement est requis.');
+		setFieldError('e-out', 'out-err', _t('editor.hotstrings.err_output_empty') || 'The replacement is required.');
 		setTimeout(() => document.getElementById('e-out').focus(), 0);
 		return;
 	}
@@ -1222,8 +1222,9 @@ function saveEntry(andNew) {
 		if (andNew) {
 			edEntry = { si: si, ei: null };
 			const secName = D.sections[si].description || D.sections[si].name;
-			document.getElementById('entry-modal-title').textContent =
-				'Création d’un hotstring — Section «\xA0' + secName + '\xA0»';
+			document.getElementById(‘entry-modal-title’).textContent = (
+				_t(‘editor.hotstrings.add_entry_title’) || ‘Create a hotstring — Section « %s »’
+			).replace(‘%s’, secName);
 			resetEntryForm();
 			setTimeout(() => document.getElementById('e-trig').focus(), 50);
 			return;
@@ -1239,13 +1240,11 @@ function saveEntry(andNew) {
 
 	if (dupSection) {
 		showConfirm(
-			'Le déclencheur <strong>' +
-				escapeHtml(toDisplay(trig)) +
-				'</strong> existe déjà dans <em>' +
-				escapeHtml(dupSection) +
-				'</em>.<br><br>Voulez-vous vraiment le redéfinir ?',
+			(_t('editor.hotstrings.err_trigger_dup_msg') || 'The trigger <strong>%s</strong> already exists in <em>%s</em>.<br><br>Do you really want to redefine it?')
+				.replace('%s', escapeHtml(toDisplay(trig)))
+				.replace('%s', escapeHtml(dupSection)),
 			executeSave,
-			{ okLabel: 'Redéfinir', okColor: '#ff9500', isWarning: true }
+			{ okLabel: _t('editor.hotstrings.btn_redefine') || 'Redefine', okColor: '#ff9500', isWarning: true }
 		);
 	} else {
 		executeSave();
@@ -1279,9 +1278,12 @@ window.updateBulk = function () {
 	const bar = document.getElementById('bulk-bar');
 	if (cbs.length > 0) {
 		const cnt = cbs.length;
-		document.getElementById('bulk-cnt').textContent = cnt + ' sélectionné' + (cnt > 1 ? 's' : '');
+		document.getElementById('bulk-cnt').textContent =
+			cnt + ' ' + (cnt > 1
+				? (_t('editor.hotstrings.bulk_selected_other') || 'selected')
+				: (_t('editor.hotstrings.bulk_selected_one') || 'selected'));
 		const sel = document.getElementById('bulk-sec-sel');
-		sel.innerHTML = '<option value="">Déplacer vers…</option>';
+		sel.innerHTML = '<option value="">' + (_t('editor.hotstrings.bulk_move_placeholder') || 'Move to…') + '</option>';
 		D.sections.forEach((s, idx) => {
 			sel.innerHTML += '<option value="' + idx + '">' + escapeHtml(s.description || s.name) + '</option>';
 		});
