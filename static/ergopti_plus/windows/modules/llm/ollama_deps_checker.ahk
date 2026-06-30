@@ -5,25 +5,20 @@
 ; DESCRIPTION:
 ; Windows equivalent of the Hammerspoon ollama_deps_checker.lua.
 ; Ensures the Ollama binary is installed and the local inference server is
-; reachable on http://localhost:11434. The heavy lifting is done by the shared
-; PowerShell installer (_shared/modules/llm/install/ollama_install.ps1); this module
-; handles async invocation, output parsing, and drives the shared WebView2
-; download_window UI (ollama_webview.ahk) — the same HTML/CSS/JS used on macOS.
+; reachable on http://localhost:11434.
 ;
 ; FEATURES & RATIONALE:
-; 1. Self-bootstrapping: runs the shared PS1 installer silently, pulling the
-;    configured default model automatically — zero manual setup for the user.
+; 1. Self-bootstrapping: hands install off to winget (native Ollama installer
+;    with its own progress UI) or opens the download page as a fallback — zero
+;    manual setup for the user.
 ; 2. Silent fast path: when Ollama is already running, the check exits in
 ;    milliseconds with no UI shown.
-; 3. Shared WebView UI: drives setKind / setStep / setDetail / addLog / update /
-;    done via OllamaWV_* so macOS and Windows show the same window.
-; 4. Rich progress parsing: extracts percentage, downloaded/total size, speed,
-;    and ETA from ollama pull output lines and pushes them to the UI.
-; 5. No-block execution: the Ollama reachability check and PS1 process are run
-;    from a SetTimer callback — never from the main AHK thread — so the
-;    keyboard and hotkeys remain fully responsive during install.
-; 6. Hidden PowerShell: stdout is redirected to a temp file so no console
-;    window appears; the poll timer tails that file every 500 ms.
+; 3. No-block execution: the Ollama reachability check runs from a SetTimer
+;    callback — never from the main AHK thread — so the keyboard and hotkeys
+;    remain fully responsive during install.
+; 4. Epoch-guarded async: every async callback captures the epoch at dispatch
+;    time and discards itself when a newer check or Cancel() has bumped the
+;    counter, preventing stale callbacks from corrupting shared state.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -38,12 +33,22 @@
 ; ====================================
 ; ==========================================
 
+; AHK-30: ceiling for the daemon-reachability poll to prevent AHK from being
+; held at High priority indefinitely when the user installs Ollama via the
+; browser fallback and then abandons the install without clicking Cancel.
+global LLM_DEPS_POLL_TIMEOUT_MS := 1800000      ; 30 min; matches typical installer upper bound
+
 global _LLM_Deps_State          := "pending"   ; "pending" | "ready" | "failed"
 global _LLM_Deps_FailureMessage := ""
 global _LLM_Deps_Checking       := false        ; guard against concurrent calls
+; AHK-14: epoch counter — bumped every time a new check starts (or is cancelled).
+; Async callbacks capture the epoch at dispatch time and discard themselves when
+; the captured epoch no longer matches the global, preventing a preempted silent
+; check's late callback from clearing _LLM_Deps_Checking that now belongs to a
+; newer check.
+global _LLM_Deps_Epoch          := 0
 global _LLM_Deps_PollTimer      := unset        ; lambda reference kept for explicit cancellation
-global _LLM_Deps_OutFile        := ""           ; temp file path for PS1 stdout
-global _LLM_Deps_OutPos         := 0            ; byte offset already consumed from OutFile
+global _LLM_Deps_PollStartTick  := 0            ; TickCount when RunInstaller armed the poll timer
 ; PID of the running PowerShell installer, or 0 when no install is in
 ; flight. LLM_Deps_Cancel reads this to terminate the process tree when
 ; the user clicks Cancel in the WebView — without it, closing the
@@ -119,7 +124,7 @@ LLM_Deps_GetFailureMessage() {
  *                                 Pass true only when the user explicitly triggered the install.
  */
 LLM_Deps_CheckAndInstall(default_model := "", on_ready := unset, on_failed := unset, show_ui := true) {
-	global _LLM_Deps_Checking, _LLM_Deps_State
+	global _LLM_Deps_Checking, _LLM_Deps_State, _LLM_Deps_Epoch
 
 	LoggerInfo("LLM", "CheckAndInstall — state: " _LLM_Deps_State ", checking: " (_LLM_Deps_Checking ? "true" : "false") " show_ui=" (show_ui ? "true" : "false") ".")
 
@@ -140,6 +145,10 @@ LLM_Deps_CheckAndInstall(default_model := "", on_ready := unset, on_failed := un
 			return
 		}
 	}
+	; AHK-14: bump epoch so any in-flight async callback from the preempted
+	; check recognises itself as stale and discards its result without clearing
+	; _LLM_Deps_Checking that now belongs to this newer check.
+	_LLM_Deps_Epoch   += 1
 	_LLM_Deps_Checking := true
 
 	; Reset failure state so a re-try after a failed install can proceed
@@ -175,22 +184,31 @@ LLM_Deps_AsyncCheck(default_model, on_ready, on_failed, show_ui) {
  * check and either fast-paths (already running) or launches the installer.
  */
 LLM_Deps_DoCheck(default_model, on_ready?, on_failed?, show_ui?) {
-	global _LLM_Deps_Checking, _LLM_Deps_State
+	global _LLM_Deps_Checking, _LLM_Deps_State, _LLM_Deps_Epoch
 
 	t_start := A_TickCount
+	; AHK-14: capture the current epoch so the async callback can bail when
+	; a newer check or Cancel() has bumped the epoch counter since dispatch.
+	captured_epoch := _LLM_Deps_Epoch
 	LoggerInfo("LLM", "DoCheck — checking if Ollama is running…")
-	LLM_OllamaIsRunning_Async((running) => _LLM_Deps_DoCheck_Result(running, t_start, default_model, on_ready?, on_failed?, show_ui?))
+	LLM_OllamaIsRunning_Async((running) => _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_ready?, on_failed?, show_ui?))
 }
 
-_LLM_Deps_DoCheck_Result(running, t_start, default_model, on_ready?, on_failed?, show_ui?) {
-	global _LLM_Deps_Checking, _LLM_Deps_State
+_LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_ready?, on_failed?, show_ui?) {
+	global _LLM_Deps_Checking, _LLM_Deps_State, _LLM_Deps_Epoch
+	; AHK-14: discard stale callbacks from preempted checks. When Cancel() or a
+	; second CheckAndInstall bumps the epoch, any in-flight curl callback fires
+	; with a captured_epoch that no longer matches — bail without touching the
+	; shared state that now belongs to the newer check.
+	if (captured_epoch != _LLM_Deps_Epoch) {
+		LoggerInfo("LLM", "DoCheck_Result — stale epoch " captured_epoch " (current=" _LLM_Deps_Epoch "), discarding.")
+		return
+	}
 	LoggerInfo("LLM", "DoCheck — Ollama reachability check took " (A_TickCount - t_start) " ms, result=" (running ? "running" : "not running") ".")
 	if running {
 		LoggerInfo("LLM", "Ollama already running — fast path, state → ready.")
 		_LLM_Deps_State    := "ready"
 		_LLM_Deps_Checking := false
-		if IsSet(show_ui) && show_ui && OllamaWV_IsAlive()
-			OllamaWV_Close()
 		if IsSet(on_ready)
 			on_ready()
 		return
@@ -302,6 +320,7 @@ LLM_Deps_RunInstaller(model, on_ready?, on_failed?) {
 
 	; Poll the daemon every 3 s. When it answers, fire on_ready.
 	LoggerInfo("LLM", "Polling http://localhost:11434 every 3 s until Ollama responds…")
+	global _LLM_Deps_PollStartTick := A_TickCount
 	_LLM_Deps_PollTimer := () => LLM_Deps_PollServerReady(on_ready?, on_failed?)
 	SetTimer(_LLM_Deps_PollTimer, 3000)
 }
@@ -335,7 +354,19 @@ _LLM_Deps_HasWinget() {
 LLM_Deps_PollServerReady(on_ready?, on_failed?) {
 	if A_IsSuspended
 		return
-	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_PollTimer
+	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_PollTimer, _LLM_Deps_Epoch
+	global _LLM_Deps_PollStartTick, LLM_DEPS_POLL_TIMEOUT_MS
+	; AHK-30: bound the poll so a user who installs via the browser fallback
+	; and then abandons the install without clicking Cancel does not leave AHK
+	; pinned at High priority indefinitely.
+	elapsed := (A_TickCount - _LLM_Deps_PollStartTick) & 0xFFFFFFFF
+	if (elapsed >= LLM_DEPS_POLL_TIMEOUT_MS) {
+		LoggerWarn("LLM", "Daemon poll timed out after " Round(elapsed / 60000) " min — aborting.")
+		if IsSet(_LLM_Deps_PollTimer)
+			SetTimer(_LLM_Deps_PollTimer, 0)
+		LLM_Deps_Fail(t("llm.deps.fail_timeout"), on_failed?)
+		return
+	}
 	; ASYNC probe — never call the sync LLM_OllamaIsRunning here. When
 	; Ollama isn't installed yet, that sync call blocks the message loop
 	; for ~4 s (4 × 1 s WinHTTP phases) at every poll tick. With the
@@ -343,7 +374,9 @@ LLM_Deps_PollServerReady(on_ready?, on_failed?) {
 	; install — the user's typing lagged hard for as long as the install
 	; ran. The async version dispatches the probe to WinHTTP's
 	; background thread and the result lands in a separate callback.
-	try LLM_OllamaIsRunning_Async((reachable) => _LLM_Deps_OnPollProbeResult(reachable, on_ready?, on_failed?))
+	; AHK-14: capture epoch so the poll callback can detect preemption.
+	captured_epoch := _LLM_Deps_Epoch
+	try LLM_OllamaIsRunning_Async((reachable) => _LLM_Deps_OnPollProbeResult(reachable, captured_epoch, on_ready?, on_failed?))
 }
 
 /**
@@ -352,8 +385,13 @@ LLM_Deps_PollServerReady(on_ready?, on_failed?) {
  * reachable, we finalise the install; otherwise we just wait for the
  * next 3 s tick — no work done on the main thread.
  */
-_LLM_Deps_OnPollProbeResult(reachable, on_ready?, on_failed?) {
-	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_PollTimer
+_LLM_Deps_OnPollProbeResult(reachable, captured_epoch, on_ready?, on_failed?) {
+	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_PollTimer, _LLM_Deps_Epoch
+	; AHK-14: discard stale poll callbacks from a preempted or cancelled check.
+	if (captured_epoch != _LLM_Deps_Epoch) {
+		LoggerInfo("LLM", "OnPollProbeResult — stale epoch " captured_epoch " (current=" _LLM_Deps_Epoch "), discarding.")
+		return
+	}
 	if !reachable
 		return    ; still not up — next tick will probe again
 	LoggerInfo("LLM", "Ollama is now reachable — install complete.")
@@ -362,28 +400,8 @@ _LLM_Deps_OnPollProbeResult(reachable, on_ready?, on_failed?) {
 	_LLM_Deps_State    := "ready"
 	_LLM_Deps_Checking := false
 	try ProcessSetPriority("Normal")
-	try OllamaWV_Close()
 	if IsSet(on_ready)
 		on_ready()
-}
-
-/**
- * User-driven cancel handler — bridges the WebView Cancel button to a
- * full feature deactivation. Cancels the install (LLM_Deps_Cancel) AND
- * flips ``_LLM_Menu["enabled"]`` to false so the tray toggle reflects
- * the user's intent and LLM_Bridge_Stop releases its resources. Saves
- * the new state so the toggle stays OFF across reloads.
- */
-LLM_Deps_OnUserCancel() {
-	global _LLM_Menu
-	LoggerInfo("LLM", "User clicked Cancel — aborting install and disabling feature.")
-	LLM_Deps_Cancel()
-	if IsSet(_LLM_Menu) and _LLM_Menu["enabled"] {
-		_LLM_Menu["enabled"] := false
-		try LLM_Bridge_Stop()
-		try LLM_Menu_SaveConfig()
-		try LLM_Menu_Build()
-	}
 }
 
 /**
@@ -397,7 +415,7 @@ LLM_Deps_OnUserCancel() {
  * the user closed every visible cue.
  */
 LLM_Deps_Cancel() {
-	global _LLM_Deps_InstallerPid, _LLM_Deps_PollTimer, _LLM_Deps_Checking, _LLM_Deps_State
+	global _LLM_Deps_InstallerPid, _LLM_Deps_PollTimer, _LLM_Deps_Checking, _LLM_Deps_State, _LLM_Deps_Epoch
 
 	if _LLM_Deps_InstallerPid {
 		LoggerInfo("LLM", "Cancel — killing installer PID=" _LLM_Deps_InstallerPid " and its child tree.")
@@ -411,6 +429,10 @@ LLM_Deps_Cancel() {
 		try SetTimer(_LLM_Deps_PollTimer, 0)
 		_LLM_Deps_PollTimer := unset
 	}
+	; AHK-14: bump epoch so in-flight async callbacks from the cancelled check
+	; recognise themselves as stale (captured epoch != _LLM_Deps_Epoch) and
+	; bail before touching _LLM_Deps_Checking or _LLM_Deps_State.
+	_LLM_Deps_Epoch   += 1
 	_LLM_Deps_Checking := false
 	; State stays "pending" — the user explicitly aborted, but the next
 	; toggle ON should be able to retry the install cleanly.
@@ -418,169 +440,6 @@ LLM_Deps_Cancel() {
 	; Restore Normal priority — the install was running with AHK in
 	; High priority. Cancelling means we no longer need the boost.
 	try ProcessSetPriority("Normal")
-}
-
-/**
- * Polling callback: reads new content from the PS1 output file and
- * detects process completion by checking whether the PID is still alive.
- * @param {integer} pid - PID returned by shell.Run.
- * @param {Func} on_ready - Callback on success.
- * @param {Func} on_failed - Callback on failure.
- */
-LLM_Deps_PollFile(pid, on_ready?, on_failed?) {
-	if A_IsSuspended
-		return
-	global _LLM_Deps_OutFile, _LLM_Deps_OutPos, _LLM_Deps_Checking, _LLM_Deps_PollTimer
-
-	; Read any new bytes from the output file
-	LLM_Deps_DrainOutputFile()
-
-	; Check if the process is still running by testing its existence
-	still_running := ProcessExist(pid) ? true : false
-	if still_running
-		return   ; still running — timer will fire again
-
-	; Process finished — do one final drain then evaluate the exit state
-	LoggerInfo("LLM", "PS1 process (PID=" pid ") no longer running.")
-
-	; Stop the poll timer
-	if IsSet(_LLM_Deps_PollTimer)
-		SetTimer(_LLM_Deps_PollTimer, 0)
-
-	; Final drain
-	LLM_Deps_DrainOutputFile()
-
-	; Clean up temp file
-	try FileDelete(_LLM_Deps_OutFile)
-
-	_LLM_Deps_Checking := false
-	; Clear the global installer PID — the process is gone, so a later
-	; LLM_Deps_Cancel() must not try to taskkill a recycled PID.
-	global _LLM_Deps_InstallerPid := 0
-
-	; We cannot read the exit code from shell.Run. Instead we verify
-	; Ollama reachability directly — if the server answers, install succeeded.
-	LoggerInfo("LLM", "Verifying Ollama reachability after PS1 exit…")
-	LLM_OllamaIsRunning_Async((running) => _LLM_Deps_OnPs1Exit_Result(running, on_ready?, on_failed?))
-}
-
-_LLM_Deps_OnPs1Exit_Result(running, on_ready?, on_failed?) {
-	if running {
-		LoggerInfo("LLM", "Ollama confirmed running — state → ready.")
-		OllamaWV_Done(true, t("llm.deps.done_success"))
-		global _LLM_Deps_State := "ready"
-		if IsSet(on_ready)
-			on_ready()
-	} else {
-		LoggerError("LLM", "PS1 exited but Ollama is not reachable.")
-		LLM_Deps_Fail(t("llm.deps.fail_server_not_responding"), on_failed?)
-	}
-}
-
-/**
- * Reads all new content from the PS1 output file since the last read
- * position, splits it into lines, and routes each line to HandleLine.
- */
-LLM_Deps_DrainOutputFile() {
-	global _LLM_Deps_OutFile, _LLM_Deps_OutPos
-
-	if !FileExist(_LLM_Deps_OutFile)
-		return
-
-	try {
-		f := FileOpen(_LLM_Deps_OutFile, "r", "UTF-8")
-		if !f
-			return
-		f.Seek(_LLM_Deps_OutPos, 0)
-		new_content := f.Read()
-		_LLM_Deps_OutPos := f.Pos
-		f.Close()
-	} catch {
-		return
-	}
-
-	if (new_content == "")
-		return
-
-	; Split on newlines and process each line
-	loop parse, new_content, "`n", "`r" {
-		line := A_LoopField
-		if (line != "")
-			LLM_Deps_HandleLine(line)
-	}
-}
-
-/**
- * Routes a single output line to the appropriate WebView update.
- * @param {string} line - Raw line from the installer stdout file.
- */
-LLM_Deps_HandleLine(line) {
-	line := Trim(line)
-	if (line == "")
-		return
-
-	; Marker lines drive the step label (same protocol as the PS1 script)
-	if (line == "OLLAMA_INSTALLING") {
-		LoggerInfo("LLM", "Marker: OLLAMA_INSTALLING.")
-		OllamaWV_SetStep(t("ollama.deps_step_installing"))
-		return
-	}
-	if (line == "OLLAMA_STARTING") {
-		LoggerInfo("LLM", "Marker: OLLAMA_STARTING.")
-		OllamaWV_SetStep(t("ollama.deps_step_starting"))
-		return
-	}
-	if (line == "OLLAMA_READY") {
-		LoggerInfo("LLM", "Marker: OLLAMA_READY.")
-		OllamaWV_SetStep(t("ollama.deps_step_ready"))
-		return
-	}
-
-	; Progress lines from "ollama pull" — try to parse and push stats
-	if LLM_Deps_TryParseProgress(line)
-		return
-
-	; All other lines go to the terminal log area
-	OllamaWV_SetDetail(line)
-	OllamaWV_AddLog(line)
-}
-
-/**
- * Attempts to parse an ollama pull progress line and push stats to the WebView.
- * Returns true when the line was a recognised progress line.
- * @param {string} line - Raw output line.
- * @returns {boolean}
- */
-LLM_Deps_TryParseProgress(line) {
-	; Ollama pull lines look like:
-	;   pulling abc123... 47% ▕████  ▏ 1.1 GB/2.3 GB 12 MB/s 1m34s
-	; Require at least a percentage match to identify a progress line.
-	if !RegExMatch(line, "(\d+)%", &m)
-		return false
-
-	pct := Integer(m[1])
-
-	; Extract downloaded/total (e.g. "1.1 GB/2.3 GB")
-	dl_str := ""
-	if RegExMatch(line, "(\d+\.?\d*\s*[KMGkmg]?B)\s*/\s*(\d+\.?\d*\s*[KMGkmg]?B)", &ms)
-		dl_str := ms[1] " / " ms[2]
-
-	; Extract speed (e.g. "12 MB/s")
-	speed_str := ""
-	if RegExMatch(line, "(\d+\.?\d*\s*[KMGkmg]?B/s)", &mv)
-		speed_str := mv[1]
-
-	; Extract ETA (e.g. "1m34s", "45s", "2h5m")
-	eta_str := ""
-	if RegExMatch(line, "\s(\d+[hms]\d*[ms]?\d*[s]?)\s*$", &me)
-		eta_str := me[1]
-
-	; Ignore a bare "0%" with no size — not a real progress line
-	if (pct == 0 && dl_str == "" && speed_str == "")
-		return false
-
-	OllamaWV_Update(pct, dl_str, speed_str, eta_str)
-	return true
 }
 
 /**
@@ -594,8 +453,9 @@ LLM_Deps_Fail(msg, on_failed) {
 	_LLM_Deps_State          := "failed"
 	_LLM_Deps_FailureMessage := msg
 	_LLM_Deps_Checking       := false
-	OllamaWV_SetError("❌ " msg)
-	OllamaWV_Done(false, "❌ " msg)
+	; AHK-30: restore Normal priority — the install ran with AHK at High.
+	; Mirror of the same restore in LLM_Deps_Cancel.
+	try ProcessSetPriority("Normal")
 	if IsSet(on_failed)
 		on_failed(msg)
 }
