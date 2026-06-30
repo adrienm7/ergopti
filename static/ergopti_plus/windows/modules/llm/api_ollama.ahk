@@ -1583,11 +1583,15 @@ LLM_ParseOllamaResponse(raw) {
  * @returns {string} Unescaped string.
  */
 LLM_UnescapeJSON(s) {
-	s := StrReplace(s, "\n",  "`n")
-	s := StrReplace(s, "\r",  "`r")
-	s := StrReplace(s, "\t",  "`t")
-	s := StrReplace(s, '\"', '"')
-	s := StrReplace(s, "\\", "\")
+	; AHK-26: neutralise \\ FIRST via Chr(0) sentinel so that \\n / \\t / \\r
+	; sequences are not munged by the later single-char escape passes (same bug
+	; as _LLMRemoteJsonUnescape — the old ordering let \\n → \newline).
+	s := StrReplace(s, "\\",    Chr(0))  ; sentinel for literal backslash
+	s := StrReplace(s, "\n",   "`n")
+	s := StrReplace(s, "\r",   "`r")
+	s := StrReplace(s, "\t",   "`t")
+	s := StrReplace(s, '\"',   '"')
+	s := StrReplace(s, Chr(0), "\")     ; restore literal backslash
 
 	; Decode \uXXXX Unicode escape sequences
 	out := ""
