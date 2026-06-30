@@ -231,7 +231,7 @@ Pipeline prouvé (P4/P5) : extraction PowerShell (BOM+CRLF) remplaçant le bloc 
 | ✅ | **P11.6b1** | macOS `menu_hotstrings.lua` 1322 | → `menu_hotstrings_{management,custom}.lua` ; `build_management` et `build_custom` extraits en sous-modules (425+479+597 l.). |
 | ✅ | **P11.6b2** | macOS `keymap/registry.lua` 917 | index→`registry_index.lua` ; group-loader forwards et section-management extraits ; fichier principal allégé. |
 | ✅ | **P11.7a** | `keylogger_walker.ahk` 1254 | → `keylogger_walker_{core,events,sql}.ahk`. |
-| ☐ | **P11.7b** | `aggregator.lua` 1122 | split miroir côté macOS — Lua `local` scope rend l'extraction non-triviale (shared-state table required). **Élevé — déféré** |
+| ✅ | **P11.7b** | `aggregator.lua` 1122 | ✅ split en `aggregator/{state,core,events,sql}.lua` + coordinateur mince ; module-cache Lua shared-state pattern (pas d'injection — `require()` retourne la même table mutable). Commit `26a57f29f`. |
 
 #### P12 — Symétrie & onboarding (renommages low-risk + docs)
 
@@ -409,9 +409,9 @@ CI gate **monotone** (échoue si ça monte), comme le ratchet `hs.*`.
 | ✅ | 4 | noms d'asset `.exe`/`.app.zip` · `updater.lua:16`,`constants.toml:12-13` | `driver_specific` | non | ✅ `constants.toml` supprimé (mort). Noms restent driver-specific — pas de drift avec un seul driver par plateforme (P10.1) |
 | ✅ | 5 | semver + **fallback divergent** · `version.js:89-111`,`core.ahk:270-337`,`updater.lua:69-133` | `driver_specific` + gate | **oui** | ✅ fail-closed partout + `version_vectors.json` 3-driver gate (P10.4) |
 | ✅ | 6 | stop-tokens (**drift MLX**) · `api_ollama.ahk:111-112`,`api_ollama.lua:280-281`,`api_mlx_inference.lua:104-105` | `shared_defaults` | non/M4 | ✅ `inference.json stop_sequences` + `test-llm-stop-sequences-single-source.cjs` (P10.2) |
-| ☐ | 7 | `chatgpt_url` macOS · `bindings.lua:36`↔`manifest.toml:1048` | `manifest` | non | `test_shortcuts_chatgpt_url_from_manifest` |
-| ☐ | 8 | `gpt.link` AHK · `gestures/init.ahk:604`↔`manifest.toml:1061` | `manifest` | non | `test_gpt_link_single_source` |
-| ☐ | 9 | modèle `Qwen3.5-0.8B` ×3 · `llm_defaults.ahk:37`,`models.ahk:221`,`menu_llm/actions.ahk:436` | `driver_specific` (1 source) | non | `test_llm_model_default_single_source` |
+| ✅ | 7 | `chatgpt_url` macOS · `bindings.lua:36`↔`manifest.toml:1048` | `manifest` | non | ✅ `Manifest.default_for` + drift guard (P10.3) |
+| ✅ | 8 | `gpt.link` AHK · `gestures/init.ahk:604`↔`manifest.toml:1061` | `manifest` | non | ✅ littéral supprimé → fail-fast `Features["shortcuts"]["gpt"]["link"]` (P10.3) |
+| ✅ | 9 | modèle `Qwen3.5-0.8B` ×3 · `llm_defaults.ahk:37`,`models.ahk:221`,`menu_llm/actions.ahk:436` | `driver_specific` (1 source) | non | ✅ SSoT `_LLM_LOCAL_DEFAULTS` + guard `test-llm-model-single-source.cjs` (P10.3) |
 | — | 10-11 | macOS `STAR_TRIGGER` 2.0 / `llm_prediction` 20.0 / per-group delays · `keymap/init.lua:52-58` | `driver_specific` (mono-sité, filet) | non | aucun requis (valeurs live = TOML catégorie) |
 
 ✅ **Vérifiés-clean (NE PAS toucher, modèles à copier)** : `_shared/modules/hotstrings/defaults.toml` (drift-gated), `_shared/tap_hold/defaults.toml` (fail-fast `karabiner/defaults.lua:54-73`), `_shared/modules/llm/defaults.json` (21 défauts), `_shared/modules/tooltip/tint.js` (parity-gated). Tables `DEFAULT_STATE` macOS lisent déjà via `Manifest.default_for`/`feat_enabled`.
@@ -428,14 +428,14 @@ CI gate **monotone** (échoue si ça monte), comme le ratchet `hs.*`.
 
 | St | # | Décision | Options · Reco · Risque |
 |----|---|----------|-------------------------|
-| ☐ | **M1** | `lib/` foldérisé (Win) vs plat (macOS) | (a) Win→plat (b) macOS→folder (c) statu quo+doc. **Reco (c)** (l'ordre `#Include`/`#InputLevel` porte des invariants). **Élevé** |
-| ☐ | **M2** | Frontière `keymap`/`llm` (`llm_bridge` sous `modules/llm` Win vs `modules/keymap` macOS) | aligner le parent. **Reco : différer** (couple M1). **Élevé** |
+| ✅ | **M1** | `lib/` foldérisé (Win) vs plat (macOS) | **Décision : statu quo + doc.** L'ordre `#Include`/`#InputLevel` porte des invariants — aligner casserait les gardes boot. Documenté en §8 + commentaires `ErgoptiPlus.ahk`. |
+| ✅ | **M2** | Frontière `keymap`/`llm` (`llm_bridge` sous `modules/llm` Win vs `modules/keymap` macOS) | **Décision : différer** — couplé à M1 (même blast radius, même risque boot). Asymétrie acceptée, documentée. |
 | ✅ | **M3** | D-1 fallback semver (lexico vs fail-closed, **déjà divergent**) | ✅ **tranché : fail-closed partout** (P10.4) — JS + AHK alignés sur macOS, parity gate à vecteurs partagés en place. |
-| ☐ | **M4** | D-3 sous-ensemble MLX des stop-tokens (drop voulu ?) | unifier vs clé `mlx` distincte. **Reco : clé distincte** si drop voulu. **Faible** |
-| ☐ | **M5** | Splits parité 1:1 (`keylogger_walker.ahk`↔`aggregator.lua`) | splitter **ensemble** ou laisser. **Reco : laisser** sauf besoin testabilité. **Élevé** |
-| ☐ | **M6** | Adapters OS-helpers Windows (`shell_runner/toml_cache/json_codec`) | ajouter (symétrie/SOLID-I) vs accepter l'asymétrie. **Reco : ajouter `shell_runner`**, différer le reste. **Moyen** |
-| ☐ | **M7** | Codec TOML + parser LLM AHK (transpile vs corpus) | **déjà tranché net-négatif** (transpile rejeté) — *confirmer*. **Élevé si rouvert** |
-| ☐ | **M8** | `linux/` (même passe ou suivi séparé) | **Reco : LIN-1 maintenant, reste séparé**. **Moyen (reload Linux)** |
+| ✅ | **M4** | D-3 sous-ensemble MLX des stop-tokens (drop voulu ?) | ✅ **tranché : clé `mlx` distincte** — `inference.json` avec 4 variants (ollama_batch/line, mlx_batch/line). Drift gate `test-llm-stop-sequences-single-source.cjs`. Commit `69472a3ab`. |
+| ✅ | **M5** | Splits parité 1:1 (`keylogger_walker.ahk`↔`aggregator.lua`) | ✅ **les deux splitté** — AHK P11.7a (commit `e2f775ab1`), macOS P11.7b (commit `26a57f29f`). Besoin testabilité avéré. |
+| ✅ | **M6** | Adapters OS-helpers Windows (`shell_runner/toml_cache/json_codec`) | ✅ **`shell_runner` ajouté** (commit `d44245722`) ; `toml_cache`/`json_codec` différés (pas de callers manquants, ratchet pureté OK). |
+| ✅ | **M7** | Codec TOML + parser LLM AHK (transpile vs corpus) | ✅ **corpus** — driver-scoped vectors JSON + consommateurs macOS (`test_corpus_toml_fuzz.lua`, `test_corpus_llm_parser.lua`) + guard AHK mis à jour. Commit `21f0bf5a8`. |
+| ✅ | **M8** | `linux/` (même passe ou suivi séparé) | ✅ **LIN-1 fait** (P13.3 commit `106bf348f`) — loader TOML délégué au codec partagé + test régression. Reste Linux (timer luv, evdev) = suivi séparé hors périmètre. |
 
 > **NE PAS rouvrir** (déjà tranché) : manifeste = SSoT ; `adapters/` = isolation OS (sortir
 > json_codec/shell_runner/toml_cache **casse le ratchet de pureté**,
