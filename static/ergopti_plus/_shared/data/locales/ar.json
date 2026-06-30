@@ -515,6 +515,7 @@
 	"llm.deps.browser_install_tip": "نزّل Ollama لنظام Windows من الصفحة التي فُتحت في متصفحك، شغّل المثبّت، ثم عُد إلى هنا — سيتم اكتشاف الاتصال تلقائيًا.",
 	"llm.deps.done_success": "✅ Ollama جاهز",
 	"llm.deps.fail_server_not_responding": "انتهى المثبّت لكن خادم Ollama لا يستجيب.",
+	"llm.deps.fail_timeout": "انتهت مهلة الانتظار لاستجابة Ollama بعد التثبيت.",
 	"llm.generating": "⏳ جاري التوليد…",
 	"llm.profile.advanced.label": "●●○ متقدم — تصحيح + توقع",
 	"llm.profile.basic.label": "●○○ أساسي — توقع بسيط",

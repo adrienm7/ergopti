@@ -515,6 +515,7 @@
 	"llm.deps.browser_install_tip": "ブラウザで開いたページから Windows 用 Ollama をダウンロードし、インストーラを実行してここに戻ってください。接続は自動的に検出されます。",
 	"llm.deps.done_success": "✅ Ollama 準備完了",
 	"llm.deps.fail_server_not_responding": "インストーラーが終了しましたが、Ollamaサーバーが応答しません。",
+	"llm.deps.fail_timeout": "インストール後、Ollamaの応答を待つ間にタイムアウトしました。",
 	"llm.generating": "⏳ 生成中…",
 	"llm.profile.advanced.label": "●●○ 高度 — 修正 + 予測",
 	"llm.profile.basic.label": "●○○ 基本 — シンプルな予測",

@@ -328,7 +328,8 @@ function M.estimate_position()
 	return { x = x, y = y, h = M.LINE_HEIGHT, type = "vscode_caret" }
 end
 
---- Initializes the bridge daemons on module load.
+--- Initializes the bridge: installs the VS Code extension and starts the HTTP server.
+--- Called explicitly from init.lua after the tooltip subsystem is ready.
 function M.setup()
 	M.install_extension()
 	M.start_server()

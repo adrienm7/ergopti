@@ -510,6 +510,7 @@
 	"llm.deps.browser_install_tip": "Download Ollama for Windows from the page just opened in your browser, run the installer, then come back — the connection will be detected automatically.",
 	"llm.deps.done_success": "✅ Ollama ready",
 	"llm.deps.fail_server_not_responding": "Installer exited but the Ollama server is not responding.",
+	"llm.deps.fail_timeout": "Timed out waiting for Ollama to respond after installation.",
 	"llm.generating": "⏳ Generating…",
 	"llm.profile.advanced.label": "●●○ Advanced — Correction + Prediction",
 	"llm.profile.basic.label": "●○○ Basic — Simple prediction",

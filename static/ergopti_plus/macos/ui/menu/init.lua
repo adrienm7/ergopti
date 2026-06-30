@@ -732,6 +732,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					end
 				end)
 				pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
+				-- Full orphan teardown before os.exit — os.exit() bypasses
+				-- hs.shutdownCallback so terminate_helper_processes and
+				-- terminate_orphan_mlx_server (called there) must be replicated here.
+				-- Without this the detached mlx_lm.server + helper daemons survive
+				-- indefinitely after a menubar-Quit (M-11 / F-MED-7 missed sibling).
+				pcall(function()
+					local mlm = require("ui.menu.menu_llm")
+					if type(mlm.terminate_helper_processes) == "function" then mlm.terminate_helper_processes() end
+					if type(mlm.terminate_orphan_mlx_server) == "function" then mlm.terminate_orphan_mlx_server() end
+				end)
 				-- Flush keylogger before os.exit() — it bypasses hs.shutdownCallback
 				-- where the normal flush lives.
 				pcall(function()

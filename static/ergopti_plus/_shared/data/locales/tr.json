@@ -515,6 +515,7 @@
 	"llm.deps.browser_install_tip": "Tarayıcınızda açılan sayfadan Windows için Ollama'yı indirin, yükleyiciyi çalıştırın ve buraya dönün — bağlantı otomatik olarak algılanacak.",
 	"llm.deps.done_success": "✅ Ollama hazır",
 	"llm.deps.fail_server_not_responding": "Yükleyici tamamlandı, ancak Ollama sunucusu yanıt vermiyor.",
+	"llm.deps.fail_timeout": "Kurulum sonrasında Ollama nın yanıt vermesi beklenirken zaman aşımına uğradı.",
 	"llm.generating": "⏳ Oluşturuluyor…",
 	"llm.profile.advanced.label": "●●○ Gelişmiş — Düzeltme + Tahmin",
 	"llm.profile.basic.label": "●○○ Temel — Basit tahmin",

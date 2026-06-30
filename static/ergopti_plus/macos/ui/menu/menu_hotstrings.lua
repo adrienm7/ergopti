@@ -949,12 +949,21 @@ function M.build_custom(ctx, counts)
 		return { mods = {"ctrl"}, key = state.trigger_char }
 	end
 
+	-- Coerce sc.mods to a table so that a persisted scalar string (e.g. mods="ctrl"
+	-- written by an AHK-migrated config) never crashes table.concat/ipairs (M-13).
+	local function coerce_mods(mods)
+		if type(mods) == "table" then return mods end
+		if type(mods) == "string" and mods ~= "" then return { mods } end
+		return {}
+	end
+
 	local function sc_is_default(sc)
 		if not sc or sc == false or type(sc) ~= "table" then return false end
 		local def = default_sc()
 		if sc.key ~= def.key then return false end
-		if #(sc.mods or {}) ~= 1 then return false end
-		return sc.mods[1] == "ctrl"
+		local m = coerce_mods(sc.mods)
+		if #m ~= 1 then return false end
+		return m[1] == "ctrl"
 	end
 
 	local function sc_label()
@@ -963,7 +972,7 @@ function M.build_custom(ctx, counts)
 		if sc_is_default(sc) then
 			return string.format(i18n.get("menu.hotstrings.shortcut_default_ctrl"), state.trigger_char)
 		end
-		local mods_str = table.concat(sc.mods or {}, "+")
+		local mods_str = table.concat(coerce_mods(sc.mods), "+")
 		return mods_str ~= "" and (mods_str .. " + " .. (sc.key or "?"):upper())
 				or (sc.key or "?"):upper()
 	end

@@ -36,6 +36,12 @@ local LOG = "menu_llm.warmup"
 --- Safe to call even when no model is configured: exits silently in that case.
 --- @param label string Short call-site label used in log messages.
 function M.warmup(label)
+	-- Gate on the runtime enable flag so backend/API panel actions reachable
+	-- while LLM is off cannot trigger paid remote POST requests (M-12).
+	if type(llm_mod.get_runtime_llm_enabled) == "function" and not llm_mod.get_runtime_llm_enabled() then
+		Logger.debug(LOG, "warmup('%s'): runtime LLM disabled — skipping.", tostring(label))
+		return
+	end
 	local model = llm_mod.get_current_model and llm_mod.get_current_model()
 	if type(model) ~= "string" or model == "" then
 		Logger.debug(LOG, "warmup('%s'): no active model — skipping.", tostring(label))
@@ -56,6 +62,11 @@ end
 --- @param model string The backend model name to warm up.
 --- @param label string Short call-site label used in log messages.
 function M.warmup_model(model, label)
+	-- Gate on the runtime enable flag (M-12); mirrors set_active_profile's guard.
+	if type(llm_mod.get_runtime_llm_enabled) == "function" and not llm_mod.get_runtime_llm_enabled() then
+		Logger.debug(LOG, "warmup_model('%s'): runtime LLM disabled — skipping.", tostring(label))
+		return
+	end
 	if type(model) ~= "string" or model == "" then
 		Logger.debug(LOG, "warmup_model('%s'): empty model name — skipping.", tostring(label))
 		return

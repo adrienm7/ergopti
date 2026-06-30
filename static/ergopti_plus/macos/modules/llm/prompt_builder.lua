@@ -45,7 +45,7 @@ local LOG = "llm.prompt_builder"
 ---
 --- @param buffer string The current tracked context buffer.
 --- @param config table Must contain: temperature, max_words, min_words,
----        num_predictions, auto_raise_temperature.
+---        num_predictions, auto_raise_temperature. Optional: context_window_chars.
 --- @param last_signature string|nil Signature of the last dispatched request.
 --- @param force_trigger boolean When true, bypasses freshness and length guards.
 --- @return table|nil params Built request params in HS field shape, or nil on skip.
@@ -54,12 +54,13 @@ local LOG = "llm.prompt_builder"
 function M.build(buffer, config, last_signature, force_trigger)
 	-- Delegate pure computation to the shared module
 	local p = Shared.build_params(buffer, {
-		max_words           = config.max_words,
-		min_words           = config.min_words,
-		num_predictions     = config.num_predictions,
-		temperature         = config.temperature,
-		auto_raise_temp     = config.auto_raise_temperature,
-		language            = config.language,
+		max_words            = config.max_words,
+		min_words            = config.min_words,
+		num_predictions      = config.num_predictions,
+		temperature          = config.temperature,
+		auto_raise_temp      = config.auto_raise_temperature,
+		language             = config.language,
+		context_window_chars = config.context_window_chars,
 	})
 
 	local sig = buffer .. "\n" .. p.context_tail

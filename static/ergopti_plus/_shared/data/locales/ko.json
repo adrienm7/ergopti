@@ -515,6 +515,7 @@
 	"llm.deps.browser_install_tip": "브라우저에서 열린 페이지에서 Windows용 Ollama를 다운로드하고 설치 프로그램을 실행한 후 다시 돌아오세요 — 연결이 자동으로 감지됩니다.",
 	"llm.deps.done_success": "✅ Ollama 逌비됨",
 	"llm.deps.fail_server_not_responding": "설치 프로그램이 종료되었지만 Ollama 서버가 응답하지 않습니다.",
+	"llm.deps.fail_timeout": "설치 후 Ollama 응답을 기다리는 중 시간이 초과되었습니다.",
 	"llm.generating": "⏳ 생성 중…",
 	"llm.profile.advanced.label": "●●○ 고급 — 교정 + 예측",
 	"llm.profile.basic.label": "●○○ 기본 — 단순 예측",

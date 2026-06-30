@@ -688,6 +688,10 @@ menu.start(
 )
 Boot.mark("UI: menu.start (menubar + state sync + engines + LLM handler)")
 
+-- Wire the VS Code caret bridge now that the tooltip subsystem is up.
+-- install_extension() is idempotent; start_server() is safe to call every boot.
+pcall(function() require("lib.vscode_bridge").setup() end)
+
 -- Script control is now managed through the shortcuts module
 Logger.debug(LOG, "Starting script control engine…")
 shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)
@@ -779,10 +783,16 @@ hs.shutdownCallback = function()
 		end
 	end)
 
-	-- 5. Terminate any running MLX server process
+	-- 5. Stop the VS Code caret bridge HTTP server
+	pcall(function()
+		local ok_vb, vb = pcall(require, "lib.vscode_bridge")
+		if ok_vb and vb and type(vb.stop_server) == "function" then vb.stop_server() end
+	end)
+
+	-- 7. Terminate any running MLX server process
 	pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
 
-	-- 6. Kill orphan child processes — shared with the script_quit action via
+	-- 8. Kill orphan child processes — shared with the script_quit action via
 	-- menu_llm.terminate_helper_processes() so the os.exit quit path performs the
 	-- identical teardown and the two paths can never drift.
 	pcall(function() require("ui.menu.menu_llm").terminate_helper_processes() end)

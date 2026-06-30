@@ -463,6 +463,12 @@ end
 --- day rollover or after init_log_path() re-points UNIFIED_LOG_FILE.
 local function _ensure_log_file()
 	local today = os.date("%Y-%m-%d")
+	-- Recompute the dated paths when the calendar date changes so midnight
+	-- rollovers write to the new day's file rather than reopening yesterday's.
+	if _log_dir and _last_log_date ~= today then
+		M.UNIFIED_LOG_FILE = _log_dir .. "ErgoptiPlus_" .. today .. ".log"
+		M.ERRORS_LOG_FILE  = _log_dir .. "ErgoptiPlus_errors_" .. today .. ".log"
+	end
 	if _file_handle and _last_log_date == today and _last_log_path == M.UNIFIED_LOG_FILE then
 		return _file_handle
 	end

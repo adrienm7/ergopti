@@ -139,21 +139,21 @@ local function is_right_modifier_held()
 	return KeyState.is_right_altgr_held()
 end
 
---- Returns true when the sentinel event carries the synthetic control tag that
+--- Returns true when the sentinel event carries the synthetic two-modifier tag that
 --- Karabiner stamps onto every emitted F13/F14/F15 (generator
---- SCRIPT_CONTROL_SENTINEL_TAG = "left_control"). This is the remap-independent,
---- consume-proof signal: the paused rules gate on a MANDATORY modifier that KE
---- consumes, so the live keyboard state is empty by the time we poll — but the tag
---- rides on the sentinel event itself. A bare physical F13/F14/F15 press has no
---- tag. Accepting (live modifier OR tag) keeps the working active path intact while
---- fixing the paused path, with zero regression if the tag ever fails to propagate.
+--- SCRIPT_CONTROL_SENTINEL_TAGS = {"left_control","left_shift"}). Both modifiers
+--- must be present — requiring left_control alone is indistinguishable from a real
+--- physical Ctrl+F15 keypress (M-6 / F-CRIT-1 residual), so we require BOTH.
+--- A bare physical Ctrl+F15 carries flags.ctrl but NOT flags.shift, so it is
+--- correctly rejected. A physical Ctrl+Shift+F15 is theoretically an edge case but
+--- is unreachable in any normal keyboard interaction.
 --- @param e userdata The hs.eventtap.event for the sentinel keystroke.
 --- @return boolean
 local function sentinel_is_tagged(e)
 	-- Real hs events are userdata; a table is accepted too so the guard is unit-testable.
 	if (type(e) ~= "userdata" and type(e) ~= "table") or type(e.getFlags) ~= "function" then return false end
 	local ok, flags = pcall(function() return e:getFlags() end)
-	return ok and type(flags) == "table" and flags.ctrl == true
+	return ok and type(flags) == "table" and flags.ctrl == true and flags.shift == true
 end
 
 --- A genuine sentinel is confirmed by EITHER the live AltGr modifier (active path,
@@ -196,14 +196,18 @@ local function pause_all()
 	if _keymap and type(_keymap.reset_predictions) == "function" then
 		pcall(function() _keymap.reset_predictions() end)
 	end
-	-- Stop the LLM warmup retry chain. It runs on its own self-rescheduling timer
-	-- chain gated only on the LLM feature toggle (which pause does not change), so a cold-start
-	-- warmup in flight would keep POSTing to the backend through the pause —
-	-- reset_predictions() does not touch it. stop() bumps the warmup generation so
-	-- the next armed try_warmup self-discards. Require-guarded for stripped builds.
+	-- Stop BOTH warmup drivers: warmup_controller's scheduled retry chain AND
+	-- api_mlx's own self-rescheduling retry (which is gated only on the LLM
+	-- feature toggle, not on pause). Without api_mlx.stop_warmup() a cold-start
+	-- warmup keeps POSTing through the pause and fires the "server ready"
+	-- notification mid-pause (M-3).
 	local ok_wc, wc = pcall(require, "modules.llm.warmup_controller")
 	if ok_wc and wc and type(wc.stop) == "function" then
 		pcall(function() wc.stop() end)
+	end
+	local ok_api, api = pcall(require, "modules.llm.api_mlx")
+	if ok_api and api and type(api.stop_warmup) == "function" then
+		pcall(function() api.stop_warmup() end)
 	end
 	local ok_tt, tt = pcall(require, "ui.tooltip")
 	if ok_tt and tt and type(tt.hide_forced) == "function" then
@@ -258,13 +262,16 @@ local function resume_all()
 	if _karabiner and type(_karabiner.resume) == "function" then
 		pcall(function() _karabiner.resume() end)
 	end
-	-- Symmetric to the pause-side wc.stop(): re-arm the warmup chain. If pause hit
-	-- during the LLM cold-start window, stop() killed the in-flight warmup and the
-	-- backend never got re-probed, so api.is_ready() stays false and predictions are
-	-- silently dead for the rest of the session. schedule_warmup_with_retry is fully
-	-- self-guarding — it no-ops when the LLM is disabled, the model is unresolved, or
-	-- the backend is already ready — so it never warms from anything but a genuinely
-	-- cold, enabled backend (never from profile restoration alone).
+	-- Symmetric to the pause-side stop_warmup()/wc.stop() pair: re-arm both warmup
+	-- drivers. resume_warmup() clears the _warmup_stopped short-circuit so that
+	-- api_mlx's own retry chain can run again (M-3). schedule_warmup_with_retry is
+	-- fully self-guarding — it no-ops when LLM is disabled, model is unresolved, or
+	-- backend is already ready — so it never fires from anything but a genuinely cold,
+	-- enabled backend (never from profile restoration alone).
+	local ok_api, api = pcall(require, "modules.llm.api_mlx")
+	if ok_api and api and type(api.resume_warmup) == "function" then
+		pcall(function() api.resume_warmup() end)
+	end
 	local ok_wc, wc = pcall(require, "modules.llm.warmup_controller")
 	if ok_wc and wc and type(wc.schedule_warmup_with_retry) == "function" then
 		pcall(function() wc.schedule_warmup_with_retry("script resume") end)

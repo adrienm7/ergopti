@@ -517,17 +517,35 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 	helpers.it("a TAGGED sentinel with NO live modifier (paused path) DOES dispatch", function()
 		-- Paused rules gate on a MANDATORY modifier KE consumes, so nothing is held when
 		-- HS polls (the field log showed "(none)"). KE stamps the sentinel with the
-		-- left_control tag, which HS reads off the event to un-pause anyway.
+		-- two-modifier tag (left_control + left_shift), which HS reads off the event.
+		-- Both flags must be present (M-6 fix: lone ctrl is indistinguishable from physical
+		-- Ctrl+F15 and is no longer accepted as a genuine tag).
 		dispatched = nil
 		live_mods = { _raw = 0 }  -- nothing held (consumed)
 		local tagged = {
 			getKeyCode = function() return ESCAPE_SENTINEL end,
-			getFlags   = function() return { ctrl = true } end,  -- the KE tag rides on the event
+			getFlags   = function() return { ctrl = true, shift = true } end,  -- full two-modifier KE tag
 		}
 		local consumed = handler(tagged)
 		helpers.assert_eq(dispatched, "script_quit",
-			"a KE-tagged sentinel must dispatch even when no live modifier is detectable")
+			"a KE-tagged sentinel (ctrl+shift) must dispatch even when no live modifier is detectable")
 		helpers.assert_eq(consumed, true)
+	end)
+
+	helpers.it("physical Ctrl+F15 (ctrl only, no shift) does NOT dispatch (M-6 regression)", function()
+		-- M-6 root cause: bare left_control flag alone was indistinguishable from a
+		-- physical Ctrl+F15. A real Ctrl+F15 produces flags={ctrl=true} with no shift.
+		-- The two-modifier tag requirement (ctrl+shift) correctly rejects this.
+		dispatched = nil
+		live_mods = { _raw = 0 }  -- no live AltGr held
+		local ctrl_f15 = {
+			getKeyCode = function() return ESCAPE_SENTINEL end,
+			getFlags   = function() return { ctrl = true } end,  -- only ctrl, no shift
+		}
+		local consumed = handler(ctrl_f15)
+		helpers.assert_eq(dispatched, nil,
+			"physical Ctrl+F15 (ctrl-only tag) must NOT dispatch — lone ctrl is not a genuine sentinel (M-6)")
+		helpers.assert_eq(consumed, false, "physical Ctrl+F15 must pass through to the OS")
 	end)
 
 	helpers.it("an UNtagged F15 with no live modifier still does NOT dispatch", function()

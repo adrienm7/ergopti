@@ -248,11 +248,14 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			if type(gestures.set_space_wrap) == "function" then pcall(gestures.set_space_wrap, state.gesture_space_wrap) end
 		end
 	end
+	-- Drive shortcuts with binding-only helpers so the script-control eventtap
+	-- (AltGr+Enter/Backspace/Escape) is never destroyed mid-session.
+	-- stop()/start() would kill the tap; pause_bindings/resume_bindings is safe.
 	if core_mods.shortcuts_mod then
 		if state.shortcuts then
-			if type(core_mods.shortcuts_mod.start) == "function" then pcall(core_mods.shortcuts_mod.start) end
+			if type(core_mods.shortcuts_mod.resume_bindings) == "function" then pcall(core_mods.shortcuts_mod.resume_bindings) end
 		else
-			if type(core_mods.shortcuts_mod.stop) == "function" then pcall(core_mods.shortcuts_mod.stop) end
+			if type(core_mods.shortcuts_mod.pause_bindings) == "function" then pcall(core_mods.shortcuts_mod.pause_bindings) end
 		end
 	end
 	if core_mods.dyn_hot_mod then
