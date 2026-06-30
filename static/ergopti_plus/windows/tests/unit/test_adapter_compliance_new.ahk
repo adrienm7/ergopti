@@ -3,8 +3,9 @@
 ; ==============================================================================
 ; MODULE: Adapter Compliance Tests (new adapters)
 ; DESCRIPTION:
-; Surface-level compliance tests for the four new port adapters:
-; SecureFieldDetector, Clipboard, Storage, and ProcessLifecycle.
+; Surface-level compliance tests for the new adapters:
+; SecureFieldDetector, Clipboard, Storage, ProcessLifecycle, KeyState,
+; and ShellRunner (OS-infrastructure helper, mirrors macos/adapters/shell_runner).
 ; Each test verifies that the public API is callable and returns values of the
 ; expected type, without exercising OS side-effects in depth.
 ;
@@ -329,3 +330,92 @@ _KS_ScanScancodeForChar_ReturnsMap() {
 	AssertTrue(found.Has("scan") && found.Has("vk"), "result Map must carry scan + vk keys")
 }
 Test("KS_ScanScancodeForChar: callable, returns a Map with scan + vk", _KS_ScanScancodeForChar_ReturnsMap)
+
+
+
+
+; ==============================================
+; ==============================================
+; ======= 7/ ShellRunner (OS helper) ===========
+; ==============================================
+; ==============================================
+
+; Regression guard for M6 (REFACTOR_GUIDE.md): ShellRunner is an
+; OS-infrastructure adapter (not a formal port) that mirrors
+; macos/adapters/shell_runner.lua so domain modules share the same surface
+; on both drivers. Tests assert the contract without exercising real OS side-effects.
+
+_SR_Exec_EmptyStringReturnsEmpty() {
+	AssertEqual("", ShellRunner_Exec(""))
+}
+Test("ShellRunner_Exec: empty command returns empty string", _SR_Exec_EmptyStringReturnsEmpty)
+
+_SR_Exec_NonStringReturnsEmpty() {
+	AssertEqual("", ShellRunner_Exec(0))
+}
+Test("ShellRunner_Exec: non-string command returns empty string", _SR_Exec_NonStringReturnsEmpty)
+
+_SR_Exec_SimpleCommand_ReturnsString() {
+	; "echo hello" is a cmd.exe builtin — always available, zero side-effects.
+	local out := ShellRunner_Exec("echo hello")
+	AssertTrue(Type(out) = "String", "ShellRunner_Exec must return a String")
+	AssertTrue(InStr(out, "hello"), "stdout must contain the echoed text")
+}
+Test("ShellRunner_Exec: simple echo returns trimmed stdout", _SR_Exec_SimpleCommand_ReturnsString)
+
+_SR_Exec_FailedCommand_ReturnsString() {
+	; An invalid command must not throw — it must return "" gracefully.
+	local out := ShellRunner_Exec("ergopti_nonexistent_cmd_xyz")
+	AssertTrue(Type(out) = "String", "ShellRunner_Exec must return a String even on failure")
+}
+Test("ShellRunner_Exec: invalid command does not throw, returns String", _SR_Exec_FailedCommand_ReturnsString)
+
+_SR_Spawn_ReturnsHandle() {
+	; spawn() must return a Map-like object with start() and terminate().
+	local h := ShellRunner_Spawn("cmd.exe", ["/c", "echo test"])
+	AssertTrue(IsObject(h), "ShellRunner_Spawn must return an object handle")
+	AssertTrue(HasMethod(h, "start"), "handle must expose start()")
+	AssertTrue(HasMethod(h, "terminate"), "handle must expose terminate()")
+}
+Test("ShellRunner_Spawn: returns handle with start() and terminate()", _SR_Spawn_ReturnsHandle)
+
+_SR_Spawn_TerminateBeforeStart_NoCrash() {
+	; terminate() called before start() must not crash (idempotent).
+	local h := ShellRunner_Spawn("cmd.exe", ["/c", "echo test"])
+	h.terminate()
+	AssertTrue(1, "terminate() before start() must not throw")
+}
+Test("ShellRunner_Spawn: terminate() before start() is safe", _SR_Spawn_TerminateBeforeStart_NoCrash)
+
+_SR_Spawn_StartOnDone_Called() {
+	; start() a real process and verify OnDone fires (spin up to 2 s).
+	local done := false
+	local captured_stdout := ""
+	local h := ShellRunner_Spawn("cmd.exe", ["/c", "echo shell_runner_test"],
+		(exit_code, stdout, stderr) => (done := true, captured_stdout := stdout))
+	h.start()
+
+	; Spin until OnDone fires or 2 000 ms elapsed (100 ms × 20 iterations).
+	local ticks := 0
+	while (!done && ticks < 20) {
+		Sleep(100)
+		ticks++
+	}
+
+	AssertTrue(done, "OnDone must be called after the process exits")
+	AssertTrue(InStr(captured_stdout, "shell_runner_test"),
+		"stdout must contain the echoed text: " . captured_stdout)
+}
+Test("ShellRunner_Spawn: OnDone is called with stdout after process exits", _SR_Spawn_StartOnDone_Called)
+
+_SR_ActiveTasks_IsMap() {
+	AssertTrue(_SR_ActiveTasks is Map, "_SR_ActiveTasks must be a Map (GC-pin table)")
+}
+Test("ShellRunner: _SR_ActiveTasks global is a Map", _SR_ActiveTasks_IsMap)
+
+_SR_GetExitCode_InvalidPid_ReturnsZero() {
+	; A PID of 0 (no such process) must return 0 without crashing.
+	local code := _SR_GetExitCode(0)
+	AssertEqual(0, code)
+}
+Test("_SR_GetExitCode: invalid PID returns 0", _SR_GetExitCode_InvalidPid_ReturnsZero)

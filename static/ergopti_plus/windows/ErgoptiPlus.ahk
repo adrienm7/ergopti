@@ -125,6 +125,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include adapters/window_manager.ahk
 #Include adapters/graphics_renderer.ahk
 #Include adapters/tooltip_renderer.ahk
+#Include adapters/shell_runner.ahk
 
 ; INI helpers extracted to their own lib so the test runner can ``#Include``
 ; them without bootstrapping the rest of the driver.
