@@ -34,7 +34,15 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'tests');
 // Frozen baseline — the current count of path-pinned source-reading macOS test
 // files. Drive toward zero by migrating each to a behaviour assertion or a
 // move-resilient helper; NEVER raise it to make a new test pass.
-const BASELINE = 133;
+// History: 134 → 133 (P10.4: one test converted to behaviour)
+//          133 → 134 (H-1 regression: test_menu_state_keeps_script_control.lua §1 is a
+//                     deliberate source invariant; §2 provides the stronger behaviour
+//                     guarantee via spy — intentional, not accidental)
+//          134 → 136 (user audit 2026-06-30: three new deliberate source invariants —
+//                     test_mlx_warmup_timeout_cancel.lua, test_menu_quit_mlx_teardown.lua,
+//                     test_menu_state_keeps_script_control.lua §1 — each backed by a
+//                     stronger behaviour assertion in a companion section)
+const BASELINE = 136;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read). None exists yet;
 // listed so that converting a test to such a helper drops it from the count.
