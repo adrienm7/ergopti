@@ -46,30 +46,7 @@ function applyDomStrings() {
 // =================================
 // =================================
 
-/**
- * Posts a message to the native host, host-agnostically. Windows WebView2
- * exposes window.chrome.webview (takes a JSON string); macOS WKWebView exposes
- * window.webkit.messageHandlers.hsPersonalInfo (takes an object).
- * @param {Object} msg - The message payload ({action, …}).
- * @returns {void}
- */
-function _post(msg) {
-	try {
-		if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function') {
-			window.chrome.webview.postMessage(JSON.stringify(msg));
-			return;
-		}
-	} catch (e) {
-		/* fall through to the WKWebView channel */
-	}
-	try {
-		if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.hsPersonalInfo) {
-			window.webkit.messageHandlers.hsPersonalInfo.postMessage(msg);
-		}
-	} catch (e) {
-		console.error('personal_info post failed:', e);
-	}
-}
+const _post = makeHostBridge('hsPersonalInfo');
 
 // =================================
 // =================================

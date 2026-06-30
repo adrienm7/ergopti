@@ -20,22 +20,7 @@ function _t(key) {
 	return (window._i18n_strings && window._i18n_strings[key]) || null;
 }
 
-/**
- * Sends a message to the native backend, supporting both WebView2 (Windows/AHK)
- * and WKWebView (macOS/Hammerspoon) bridge APIs.
- * @param {string} msg - Message string to post.
- */
-function postBridgeMessage(msg) {
-	if (window.chrome && window.chrome.webview) {
-		window.chrome.webview.postMessage(msg);
-	} else if (
-		window.webkit &&
-		window.webkit.messageHandlers &&
-		window.webkit.messageHandlers.dl_bridge
-	) {
-		window.webkit.messageHandlers.dl_bridge.postMessage(msg);
-	}
-}
+const postBridgeMessage = makeHostBridge('dl_bridge');
 
 // Signal readiness to the AHK/Lua backend so queued JS calls can be flushed
 if (document.readyState === 'loading') {

@@ -20,21 +20,7 @@
 // 1/ Host-agnostic bridge
 // ============================================================
 
-// Windows WebView2 takes a JSON string over window.chrome.webview; macOS
-// WKWebView takes a structured object over the action_picker_bridge handler.
-function post(payload) {
-	if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function') {
-		window.chrome.webview.postMessage(JSON.stringify(payload));
-		return;
-	}
-	if (
-		window.webkit &&
-		window.webkit.messageHandlers &&
-		window.webkit.messageHandlers.action_picker_bridge
-	) {
-		window.webkit.messageHandlers.action_picker_bridge.postMessage(payload);
-	}
-}
+var post = makeHostBridge('action_picker_bridge');
 
 function doConfirm(id) {
 	if (id === '' || id === undefined || id === null) return;

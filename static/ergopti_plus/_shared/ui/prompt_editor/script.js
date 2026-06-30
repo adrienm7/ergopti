@@ -554,18 +554,7 @@ function init(data) {
 	}, 100);
 }
 
-// Host-agnostic post: Windows WebView2 takes a JSON string over
-// window.chrome.webview; macOS WKWebView takes a structured object over the
-// prompt_bridge usercontent handler. The page never assumes one host.
-function post(payload) {
-	if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function') {
-		window.chrome.webview.postMessage(JSON.stringify(payload));
-		return;
-	}
-	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.prompt_bridge) {
-		window.webkit.messageHandlers.prompt_bridge.postMessage(payload);
-	}
-}
+var post = makeHostBridge('prompt_bridge');
 
 /**
  * Communicates the cancellation request back to the host.

@@ -410,37 +410,10 @@ window.setGestureRegisterStatus = function (ok) {
 // ======================================
 // ======================================
 
-/**
- * Posts a message to the host bridge. Host-agnostic so the same frontend runs
- * under both drivers: macOS Hammerspoon exposes the WKWebView usercontent
- * channel (window.webkit.messageHandlers.hsOnboarding, which accepts a JS
- * object directly), while Windows WebView2 exposes window.chrome.webview, which
- * takes a string — so we JSON-encode there and the AHK host JsonParse-s it.
- * @param {Object} msg
- */
-function _post(msg) {
-	// Mirror the proven model_browser bridge: post SYNCHRONOUSLY and probe the
-	// WebView2 (window.chrome.webview) channel FIRST. The previous version
-	// wrapped the call in setTimeout(0) and probed WKWebView first; under
-	// WebView2 that combination silently dropped every message (the host never
-	// received "ready", so the wizard only rendered via the safety fallback and
-	// no interactive message — previewLocale, finish — ever arrived).
-	try {
-		if (window.chrome && window.chrome.webview) {
-			// WebView2 (Windows) takes a string — the AHK host JsonParse-s it.
-			window.chrome.webview.postMessage(JSON.stringify(msg));
-		} else if (
-			window.webkit &&
-			window.webkit.messageHandlers &&
-			window.webkit.messageHandlers.hsOnboarding
-		) {
-			// WKWebView (macOS) accepts a JS object directly.
-			window.webkit.messageHandlers.hsOnboarding.postMessage(msg);
-		}
-	} catch (e) {
-		console.error('[onboarding] postMessage failed:', e);
-	}
-}
+// makeHostBridge probes WebView2 (Windows) first and returns synchronously,
+// matching the onboarding requirement: the previous version probed WKWebView
+// first inside setTimeout(0) and silently dropped every message under WebView2.
+var _post = makeHostBridge('hsOnboarding');
 
 /**
  * Called by Lua to inject translated strings for the selected locale.

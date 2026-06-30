@@ -38,6 +38,7 @@ const REPO_ROOT = path.resolve(__dirname, '../..');
 const FRONT_DIR = 'static/ergopti_plus/_shared/ui/hotstrings_config_window';
 const SCRIPT = `${FRONT_DIR}/script.js`;
 const INDEX = `${FRONT_DIR}/index.html`;
+const HOST_BRIDGE = 'static/ergopti_plus/_shared/ui/host_bridge.js';
 const WIN_HOST = 'static/ergopti_plus/windows/ui/hotstrings_config_window/webview.ahk';
 
 let total_pass = 0;
@@ -61,12 +62,18 @@ function read(rel) {
 console.log('\n=== Hotstrings Config Window Shared-Frontend Bridge ===');
 
 let script = '';
+let bridge = '';
 let index = '';
 let host = '';
 try {
 	script = read(SCRIPT);
 } catch (err) {
 	check('script.js readable at shared path', false, err.message);
+}
+try {
+	bridge = read(HOST_BRIDGE);
+} catch (err) {
+	check('host_bridge.js readable', false, err.message);
 }
 try {
 	index = read(INDEX);
@@ -80,27 +87,34 @@ try {
 }
 
 // 1. Host-agnostic send(): chrome.webview probed before webkit.
-const chromeIdx = script.indexOf('window.chrome.webview');
-const webkitIdx = script.indexOf('window.webkit');
+// Bridge patterns now live in host_bridge.js (shared across all webview apps).
+const bridgeSource = bridge;
+const chromeIdx = bridgeSource.indexOf('window.chrome.webview');
+const webkitIdx = bridgeSource.indexOf('window.webkit');
 check(
-	'script.js send() probes window.chrome.webview (Windows channel present)',
+	'host_bridge.js probes window.chrome.webview (Windows channel present)',
 	chromeIdx !== -1,
-	'The Windows WebView2 branch is missing — the page cannot post to AHK.'
+	'The Windows WebView2 branch is missing from host_bridge.js — the page cannot post to AHK.'
 );
 check(
-	'script.js still supports window.webkit (macOS channel present)',
+	'host_bridge.js still supports window.webkit (macOS channel present)',
 	webkitIdx !== -1,
-	'The macOS WKWebView branch was dropped.'
+	'The macOS WKWebView branch was dropped from host_bridge.js.'
 );
 check(
-	'script.js posts a JSON string to the WebView2 channel',
-	/chrome\.webview\.postMessage\(\s*JSON\.stringify\(/.test(script),
-	'WebView2 requires a string payload — JSON.stringify is missing.'
+	'host_bridge.js posts a JSON string to the WebView2 channel',
+	/chrome\.webview\.postMessage\(/.test(bridgeSource) && /JSON\.stringify\(/.test(bridgeSource),
+	'WebView2 requires a string payload — JSON.stringify is missing from host_bridge.js.'
 );
 check(
 	'chrome.webview is probed before webkit',
 	chromeIdx !== -1 && webkitIdx !== -1 && chromeIdx < webkitIdx,
 	'On Windows both objects may exist; the WebView2 branch must win.'
+);
+check(
+	'index.html loads host_bridge.js (../host_bridge.js)',
+	/src=["']\.\.\/host_bridge\.js["']/.test(index),
+	'host_bridge.js must be loaded before script.js in index.html.'
 );
 
 // 2. index.html references the shared i18n.js one level up (../i18n.js).

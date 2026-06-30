@@ -151,25 +151,15 @@ function toCanonical(s) {
 // ====================================
 // ====================================
 
+const _bridge = makeHostBridge('hsEditor');
+
 /**
- * Sends a message to the host backend. Host-agnostic so the same frontend runs
- * under both drivers: Windows WebView2 exposes window.chrome.webview (which takes
- * a string — the AHK host JsonParse-s it), while macOS WKWebView exposes
- * window.webkit.messageHandlers.hsEditor (which accepts a JS object directly).
+ * Sends an action message to the native host.
  * @param {string} action - The action identifier (e.g., 'save', 'close').
  * @param {Object} [data] - The payload to send along with the action.
  */
 function toLua(action, data) {
-	var msg = { action: action, data: data || {} };
-	try {
-		if (window.chrome && window.chrome.webview) {
-			window.chrome.webview.postMessage(JSON.stringify(msg));
-		} else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.hsEditor) {
-			window.webkit.messageHandlers.hsEditor.postMessage(msg);
-		}
-	} catch (e) {
-		console.error('[hsEditor]', e);
-	}
+	_bridge({ action: action, data: data || {} });
 }
 
 // ====================================

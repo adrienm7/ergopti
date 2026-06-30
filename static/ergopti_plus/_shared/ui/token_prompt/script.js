@@ -3,18 +3,7 @@
  * HuggingFace token input UI — shared frontend for both drivers.
  */
 
-// Host-agnostic post: Windows WebView2 takes a string over window.chrome.webview
-// (objects are JSON-encoded); macOS WKWebView takes the raw payload over the
-// token_bridge usercontent handler. The page never assumes one host.
-function post(payload) {
-	if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function') {
-		window.chrome.webview.postMessage(typeof payload === 'string' ? payload : JSON.stringify(payload));
-		return;
-	}
-	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.token_bridge) {
-		window.webkit.messageHandlers.token_bridge.postMessage(payload);
-	}
-}
+const post = makeHostBridge('token_bridge');
 
 function doOpenLink() {
 	post('open_link');
