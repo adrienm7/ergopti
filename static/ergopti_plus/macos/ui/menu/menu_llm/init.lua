@@ -555,6 +555,7 @@ function M.create(deps)
                 save_prefs    = save_prefs,
                 update_menu   = update_menu,
                 DEFAULT_STATE = M.DEFAULT_STATE,
+                paused        = paused,   -- gate model rows while paused (M-16)
             })
 
             -- MLX server port — Ergopti's own server, so let the user move it off

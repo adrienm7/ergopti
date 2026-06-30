@@ -41,7 +41,8 @@ helpers.describe("menu_state: sync_state_to_modules uses pause/resume_bindings (
 		-- Isolate the sync function body (from its declaration to end of file).
 		local sync_body = src:match("function M%.sync_state_to_modules(.+)$") or src
 		helpers.assert_true(
-			sync_body:find("shortcuts_mod%.stop", 1, true) == nil,
+			-- Pattern mode: %.stop matches literal ".stop" (no %-escape needed since we want pattern)
+			sync_body:find("shortcuts_mod%.stop") == nil,
 			"sync_state_to_modules must NOT call shortcuts_mod.stop() — it destroys the script-control tap"
 		)
 	end)
@@ -50,7 +51,7 @@ helpers.describe("menu_state: sync_state_to_modules uses pause/resume_bindings (
 		local src = read_menu_state_src()
 		local sync_body = src:match("function M%.sync_state_to_modules(.+)$") or src
 		helpers.assert_true(
-			sync_body:find("shortcuts_mod%.start", 1, true) == nil,
+			sync_body:find("shortcuts_mod%.start[^_]") == nil,
 			"sync_state_to_modules must NOT call shortcuts_mod.start() — it destroys the script-control tap"
 		)
 	end)
@@ -59,7 +60,7 @@ helpers.describe("menu_state: sync_state_to_modules uses pause/resume_bindings (
 		local src = read_menu_state_src()
 		local sync_body = src:match("function M%.sync_state_to_modules(.+)$") or src
 		helpers.assert_true(
-			sync_body:find("shortcuts_mod%.pause_bindings", 1, true) ~= nil,
+			sync_body:find("shortcuts_mod%.pause_bindings") ~= nil,
 			"sync_state_to_modules must call shortcuts_mod.pause_bindings() when shortcuts disabled"
 		)
 	end)
@@ -68,7 +69,7 @@ helpers.describe("menu_state: sync_state_to_modules uses pause/resume_bindings (
 		local src = read_menu_state_src()
 		local sync_body = src:match("function M%.sync_state_to_modules(.+)$") or src
 		helpers.assert_true(
-			sync_body:find("shortcuts_mod%.resume_bindings", 1, true) ~= nil,
+			sync_body:find("shortcuts_mod%.resume_bindings") ~= nil,
 			"sync_state_to_modules must call shortcuts_mod.resume_bindings() when shortcuts enabled"
 		)
 	end)
@@ -110,7 +111,8 @@ helpers.describe("menu_state: spy — disable shortcuts calls pause_bindings not
 		}
 		local saved       = {}
 		local config_absent = false
-		local deps        = { core_mods = { shortcuts_mod = spy_shortcuts } }
+		local stub_editor = { set_trigger_char = function() end, set_default_section = function() end, set_close_on_add = function() end }
+		local deps        = { core_mods = { shortcuts_mod = spy_shortcuts }, hotstring_editor = stub_editor }
 
 		menu_state.sync_state_to_modules(state, saved, config_absent, deps)
 
@@ -146,7 +148,8 @@ helpers.describe("menu_state: spy — disable shortcuts calls pause_bindings not
 			gesture_modes     = {},
 			gesture_actions   = {},
 		}
-		local deps = { core_mods = { shortcuts_mod = spy_shortcuts } }
+		local stub_editor2 = { set_trigger_char = function() end, set_default_section = function() end, set_close_on_add = function() end }
+		local deps = { core_mods = { shortcuts_mod = spy_shortcuts }, hotstring_editor = stub_editor2 }
 
 		menu_state.sync_state_to_modules(state, {}, false, deps)
 

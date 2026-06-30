@@ -201,11 +201,19 @@ function M.build(ctx)
 		})
 	end
 
+	-- Coerce sc.mods to a table so that a disk-persisted scalar string (e.g.
+	-- mods="ctrl") never crashes ipairs/table.concat (M-13).
+	local function coerce_mods(mods)
+		if type(mods) == "table" then return mods end
+		if type(mods) == "string" and mods ~= "" then return { mods } end
+		return {}
+	end
+
 	local function dyn_shortcut_typing(items, _ctx)
 		local sc_label = i18n.get("menu.metrics.shortcut_none")
 		if type(state.metrics_shortcut) == "table" then
 			local mods_cap = {}
-			for _, m in ipairs(state.metrics_shortcut.mods or {}) do
+			for _, m in ipairs(coerce_mods(state.metrics_shortcut.mods)) do
 				table.insert(mods_cap, m:sub(1, 1):upper() .. m:sub(2))
 			end
 			local mods_str = table.concat(mods_cap, "+")
@@ -217,7 +225,7 @@ function M.build(ctx)
 			fn       = function()
 				local current_str = ""
 				if type(state.metrics_shortcut) == "table" then
-					current_str = table.concat(state.metrics_shortcut.mods or {}, "+") .. "+" .. (state.metrics_shortcut.key or "")
+					current_str = table.concat(coerce_mods(state.metrics_shortcut.mods), "+") .. "+" .. (state.metrics_shortcut.key or "")
 				end
 				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					i18n.get("menu.metrics.shortcut_typing_title"),
@@ -262,7 +270,7 @@ function M.build(ctx)
 		local sc_label = i18n.get("menu.metrics.shortcut_none")
 		if type(state.apps_time_shortcut) == "table" then
 			local mods_cap = {}
-			for _, m in ipairs(state.apps_time_shortcut.mods or {}) do
+			for _, m in ipairs(coerce_mods(state.apps_time_shortcut.mods)) do
 				table.insert(mods_cap, m:sub(1, 1):upper() .. m:sub(2))
 			end
 			local mods_str = table.concat(mods_cap, "+")
@@ -274,7 +282,7 @@ function M.build(ctx)
 			fn       = function()
 				local current_str = ""
 				if type(state.apps_time_shortcut) == "table" then
-					current_str = table.concat(state.apps_time_shortcut.mods or {}, "+") .. "+" .. (state.apps_time_shortcut.key or "")
+					current_str = table.concat(coerce_mods(state.apps_time_shortcut.mods), "+") .. "+" .. (state.apps_time_shortcut.key or "")
 				end
 				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					i18n.get("menu.metrics.shortcut_apps_title"),

@@ -72,6 +72,13 @@ local function interceptor(event, km_buffer)
 	local char = event:getCharacters(false) or ""
 	if char ~= _trigger then return nil end
 
+	-- Gate on the group master toggle so that disabling the dynamichotstrings group
+	-- (or "Disable all hotstrings") stops date expansion even though date rules are
+	-- matched through the interceptor rather than registry mappings (M-9).
+	if type(_km.is_group_enabled) == "function" and not _km.is_group_enabled(GROUP_NAME) then
+		return nil
+	end
+
 	local is_sec_enabled = _km.is_section_enabled
 	local guard = is_sec_enabled
 		and function(grp, sec) return is_sec_enabled(grp, sec) end
@@ -325,13 +332,18 @@ function M.start(keymap_module)
 		_km.register_interceptor(interceptor)
 	end
 
-	-- Register preview provider — delegates matching to the shared engine
+	-- Register preview provider — delegates matching to the shared engine.
+	-- Also gate on the group master so preview is suppressed when the group is
+	-- disabled (symmetric to the interceptor gate above, M-9).
 	if type(_km.register_preview_provider) == "function" then
 		local is_sec_enabled = _km.is_section_enabled
 		local guard = is_sec_enabled
 			and function(grp, sec) return is_sec_enabled(grp, sec) end
 			or nil
 		_km.register_preview_provider(function(buf)
+			if type(_km.is_group_enabled) == "function" and not _km.is_group_enabled(GROUP_NAME) then
+				return nil
+			end
 			return SharedEngine.preview(buf, GROUP_NAME, guard)
 		end)
 	end

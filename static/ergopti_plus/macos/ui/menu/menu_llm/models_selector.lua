@@ -52,6 +52,9 @@ function M.build(ctx)
 	local save_prefs    = ctx.save_prefs
 	local update_menu   = ctx.update_menu
 	local DEFAULT_STATE = ctx.DEFAULT_STATE
+	-- Disable all model-switch rows while the driver is paused so a model
+	-- click cannot trigger backend loading mid-pause (M-16).
+	local paused        = ctx.paused or false
 
 	Logger.debug(LOG, "Building models selection menu…")
 	local menu = {}
@@ -266,9 +269,10 @@ function M.build(ctx)
 
 	-- "No model" option so the user can explicitly disable predictions
 	table.insert(menu, {
-		title   = i18n.get("menu.llm.no_model"),
-		checked = (not state.llm_model or state.llm_model == ""),
-		fn      = function()
+		title    = i18n.get("menu.llm.no_model"),
+		checked  = (not state.llm_model or state.llm_model == ""),
+		disabled = paused or nil,
+		fn       = function()
 			Logger.info(LOG, "Switching model to None (disabled).")
 			state.llm_model = ""
 			save_prefs(); update_menu()
@@ -281,9 +285,10 @@ function M.build(ctx)
 	local backend_default = get_display_model_name(backend_default_raw, presets)
 	if backend_default and backend_default ~= "" then
 		table.insert(menu, {
-			title   = string.format(i18n.get("menu.llm.backend_default_model"), backend_default),
-			checked = (active_display_model == backend_default),
-			fn      = function()
+			title    = string.format(i18n.get("menu.llm.backend_default_model"), backend_default),
+			checked  = (active_display_model == backend_default),
+			disabled = paused or nil,
+			fn       = function()
 				Logger.info(LOG, string.format("Restoring backend default model -> %s", backend_default))
 				switch_model(backend_default)
 			end
@@ -303,8 +308,9 @@ function M.build(ctx)
 			and i18n.get("menu.llm.hf_token_set")
 			or  i18n.get("menu.llm.hf_token_unset")
 		table.insert(menu, {
-			title = string.format(i18n.get("menu.llm.hf_token_label"), token_status),
-			fn = function()
+			title    = string.format(i18n.get("menu.llm.hf_token_label"), token_status),
+			disabled = paused or nil,
+			fn       = function()
 				if models_mgr and type(models_mgr.prompt_hf_login) == "function" then
 					models_mgr.prompt_hf_login(function()
 						save_prefs(); update_menu()
@@ -331,9 +337,10 @@ function M.build(ctx)
 			local prefix = (state.llm_model == m_name) and "✓ " or "  "
 			local model_submenu = {}
 			table.insert(model_submenu, {
-				title   = i18n.get("menu.llm.select_model"),
-				checked = (state.llm_model == m_name),
-				fn      = function() switch_model(m_name) end
+				title    = i18n.get("menu.llm.select_model"),
+				checked  = (state.llm_model == m_name),
+				disabled = paused or nil,
+				fn       = function() switch_model(m_name) end
 			})
 			table.insert(model_submenu, {
 				title = i18n.get("menu.llm.remove_user_model"),
@@ -350,9 +357,10 @@ function M.build(ctx)
 				end
 			})
 			table.insert(user_sub, {
-				title   = prefix .. m_name,
-				menu    = model_submenu,
-				fn      = function() pcall(function() switch_model(m_name) end) end
+				title    = prefix .. m_name,
+				menu     = model_submenu,
+				disabled = paused or nil,
+				fn       = function() pcall(function() switch_model(m_name) end) end
 			})
 		end
 		table.insert(menu, { title = i18n.get("menu.llm.my_models"), menu = user_sub })
@@ -394,9 +402,10 @@ function M.build(ctx)
 				local model_submenu = {}
 
 				table.insert(model_submenu, {
-					title   = i18n.get("menu.llm.select_model"),
-					checked = (active_display_model == m_name),
-					fn      = function() switch_model(m_name) end
+					title    = i18n.get("menu.llm.select_model"),
+					checked  = (active_display_model == m_name),
+					disabled = paused or nil,
+					fn       = function() switch_model(m_name) end
 				})
 
 				if is_inst then
@@ -506,10 +515,11 @@ function M.build(ctx)
 				end
 
 				table.insert(family_sub, {
-					title = title,
-					menu  = model_submenu,
+					title    = title,
+					menu     = model_submenu,
+					disabled = paused or nil,
 					-- Clicking the model row title selects it directly (same as "Select model")
-					fn    = function() pcall(function() switch_model(m_name) end) end
+					fn       = function() pcall(function() switch_model(m_name) end) end
 				})
 
 				::continue_model::
@@ -631,12 +641,14 @@ function M.build(ctx)
 
 	table.insert(menu, { title = "-" })
 	table.insert(menu, {
-		title = i18n.get("menu.llm.browse_models_entry"),
-		fn    = function() open_model_browser() end,
+		title    = i18n.get("menu.llm.browse_models_entry"),
+		disabled = paused or nil,
+		fn       = function() open_model_browser() end,
 	})
 	table.insert(menu, {
-		title = i18n.get("menu.llm.add_model_entry"),
-		fn    = function() prompt_add_user_model() end,
+		title    = i18n.get("menu.llm.add_model_entry"),
+		disabled = paused or nil,
+		fn       = function() prompt_add_user_model() end,
 	})
 
 	return menu

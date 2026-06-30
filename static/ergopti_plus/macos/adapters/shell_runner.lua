@@ -105,7 +105,17 @@ function M.spawn(executable, args, on_done, on_chunk)
 	local function wrapped_on_done(exit_code, stdout, stderr)
 		if _task then M._active_tasks[_task] = nil end
 		if type(on_done) == "function" then
-			pcall(on_done, exit_code, stdout, stderr)
+			-- xpcall instead of pcall so a throw in on_done is surfaced (not swallowed).
+			-- A silently-swallowed throw here is the root cause of the "vert mais aucune
+			-- prédiction" class of bugs — the entire callback body aborts on its first
+			-- line with no log line anywhere.
+			local ok, err = xpcall(function() on_done(exit_code, stdout, stderr) end, debug.traceback)
+			if not ok then
+				Logger.error(LOG, "on_done callback threw for '%s': %s", tostring(executable), tostring(err))
+				if type(_G.ergopti_report_crash) == "function" then
+					pcall(_G.ergopti_report_crash, "shell_runner.on_done: " .. tostring(err))
+				end
+			end
 		end
 	end
 

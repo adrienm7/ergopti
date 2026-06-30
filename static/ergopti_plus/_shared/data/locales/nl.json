@@ -515,6 +515,7 @@
 	"llm.deps.browser_install_tip": "Download Ollama voor Windows van de pagina die net in je browser is geopend, voer het installatieprogramma uit en kom terug — de verbinding wordt automatisch gedetecteerd.",
 	"llm.deps.done_success": "✅ Ollama klaar",
 	"llm.deps.fail_server_not_responding": "Installatieprogramma beëindigd, maar de Ollama-server reageert niet.",
+	"llm.deps.fail_timeout": "Time-out bij het wachten op reactie van Ollama na installatie.",
 	"llm.generating": "⏳ Genereren…",
 	"llm.profile.advanced.label": "●●○ Geavanceerd — Correctie + Voorspelling",
 	"llm.profile.basic.label": "●○○ Basis — Eenvoudige voorspelling",

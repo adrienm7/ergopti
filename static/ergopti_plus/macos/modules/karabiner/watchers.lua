@@ -246,12 +246,17 @@ end
 --- to eliminate, and worse on the Sequoia machines this poll exists for.
 --- @param callback fun(layout_name: string|nil)
 local function read_layout_async(callback)
-	ShellRunner.spawn("/usr/bin/defaults",
+	-- Capture the handle and call start() — ShellRunner.spawn() builds the task
+	-- but deliberately does NOT start it; the caller must invoke handle.start().
+	-- Without this the subprocess never launches, the completion callback never
+	-- fires, and _layout_poll_pending leaks true forever (F-LOW-4 regression).
+	local handle = ShellRunner.spawn("/usr/bin/defaults",
 		{ "read", "com.apple.HIToolbox", "AppleSelectedInputSources" },
 		function(exit_code, stdout, _)
 			if exit_code ~= 0 then callback(nil); return end
 			callback(parse_layout_name(stdout))
 		end)
+	handle.start()
 end
 
 --- Fires the on_change callback with proper debouncing, updating _last_known_layout.

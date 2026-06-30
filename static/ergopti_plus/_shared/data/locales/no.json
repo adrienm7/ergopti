@@ -515,6 +515,7 @@
 	"llm.deps.browser_install_tip": "Last ned Ollama for Windows fra siden som åpnet seg i nettleseren, kjør installasjonsprogrammet og kom tilbake — tilkoblingen oppdages automatisk.",
 	"llm.deps.done_success": "✅ Ollama klar",
 	"llm.deps.fail_server_not_responding": "Installasjonsprogrammet er ferdig, men Ollama-serveren svarer ikke.",
+	"llm.deps.fail_timeout": "Tidsavbrudd under ventetid på svar fra Ollama etter installasjon.",
 	"llm.generating": "⏳ Genererer…",
 	"llm.profile.advanced.label": "●●○ Avansert — Rettelse + Forutsigelse",
 	"llm.profile.basic.label": "●○○ Grunnleggende — Enkel forutsigelse",

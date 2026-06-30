@@ -515,6 +515,7 @@
 	"llm.deps.browser_install_tip": "הורד את Ollama עבור Windows מהדף שנפתח בדפדפן, הפעל את תוכנת ההתקנה וחזור לכאן — החיבור יזוהה אוטומטית.",
 	"llm.deps.done_success": "✅ Ollama מוכן",
 	"llm.deps.fail_server_not_responding": "תוכנית ההתקנה סיימה אך שרת Ollama אינו מגיב.",
+	"llm.deps.fail_timeout": "פג הזמן המוקצב להמתנה לתגובת Ollama לאחר ההתקנה.",
 	"llm.generating": "⏳ מייצר…",
 	"llm.profile.advanced.label": "●●○ מתקדם — תיקון + ניבוי",
 	"llm.profile.basic.label": "●○○ בסיסי — ניבוי פשוט",

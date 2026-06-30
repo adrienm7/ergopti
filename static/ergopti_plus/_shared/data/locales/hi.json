@@ -515,6 +515,7 @@
 	"llm.deps.browser_install_tip": "ब्राउज़र में खुले पृष्ठ से Windows के लिए Ollama डाउनलोड करें, इंस्टॉलर चलाएँ, फिर यहाँ वापस आएँ — कनेक्शन स्वचालित रूप से पहचाना जाएगा।",
 	"llm.deps.done_success": "✅ Ollama तैयार है",
 	"llm.deps.fail_server_not_responding": "इंस्टॉलर समाप्त हो गया लेकिन Ollama सर्वर प्रतिक्रिया नहीं दे रहा।",
+	"llm.deps.fail_timeout": "इंस्टालेशन के बाद Ollama की प्रतिक्रिया की प्रतीक्षा में समय समाप्त हो गया।",
 	"llm.generating": "⏳ जनरेट हो रहा है…",
 	"llm.profile.advanced.label": "●●○ उन्नत — सुधार + भविष्यवाणी",
 	"llm.profile.basic.label": "●○○ बुनियादी — सरल भविष्यवाणी",

@@ -515,6 +515,7 @@
 	"llm.deps.browser_install_tip": "Скачайте Ollama для Windows со страницы, открывшейся в браузере, запустите установщик и вернитесь сюда — подключение будет обнаружено автоматически.",
 	"llm.deps.done_success": "✅ Ollama готов",
 	"llm.deps.fail_server_not_responding": "Установщик завершился, но сервер Ollama не отвечает.",
+	"llm.deps.fail_timeout": "Истекло время ожидания ответа Ollama после установки.",
 	"llm.generating": "⏳ Генерация…",
 	"llm.profile.advanced.label": "●●○ Расширенный — Коррекция + Предсказание",
 	"llm.profile.basic.label": "●○○ Базовый — Простое предсказание",

@@ -94,10 +94,13 @@ local SCRIPT_CONTROL_HOLDER_KEY     = "right_command"
 -- is unreliable: the paused rules gate on a MANDATORY modifier that KE consumes,
 -- so by the time HS polls, nothing is held (the second AltGr+Enter could not
 -- un-pause). A bare physical F13/F14/F15 press carries no such flag, so this stays
--- a valid genuine-vs-stray discriminator. left_control is chosen because a real
--- ctrl+Enter/Backspace/Escape never matches a script-control rule (those gate on
--- right_command/option), so it is only ever present on a KE-emitted sentinel.
-local SCRIPT_CONTROL_SENTINEL_TAG   = "left_control"
+-- a valid genuine-vs-stray discriminator.
+-- Two-modifier tag (left_control + left_shift) instead of lone left_control so that
+-- a physical Ctrl+F15 (flags.ctrl only, no shift) cannot misfire as a genuine
+-- sentinel — that was the M-6 / F-CRIT-1-residual misfire. left_control alone is
+-- indistinguishable from a real Ctrl+F15 keypress; requiring BOTH modifiers makes
+-- the tag pair unforgeable by any ordinary keyboard interaction.
+local SCRIPT_CONTROL_SENTINEL_TAGS  = { "left_control", "left_shift" }
 local SCRIPT_CONTROL_SENTINEL_SLOTS = {
 	{ from_key = "delete_or_backspace", sentinel = Keycodes.to_name(Keycodes.F14_KARABINER_BACKSPACE), slot_label = "backspace" },
 	{ from_key = "return_or_enter",     sentinel = Keycodes.to_name(Keycodes.F13_KARABINER_RETURN),    slot_label = "return"    },
@@ -669,7 +672,7 @@ local function build_script_control_sentinel_rules()
 							value = 1,
 						},
 					},
-					to = { { key_code = slot.sentinel, modifiers = { SCRIPT_CONTROL_SENTINEL_TAG } } },
+					to = { { key_code = slot.sentinel, modifiers = SCRIPT_CONTROL_SENTINEL_TAGS } },
 				},
 			},
 		}
@@ -708,7 +711,7 @@ function M.build_paused_script_control_rules()
 						key_code  = slot.from_key,
 						modifiers = { mandatory = { "option" }, optional = { "any" } },
 					},
-					to = { { key_code = slot.sentinel, modifiers = { SCRIPT_CONTROL_SENTINEL_TAG } } },
+					to = { { key_code = slot.sentinel, modifiers = SCRIPT_CONTROL_SENTINEL_TAGS } },
 				},
 			},
 		}

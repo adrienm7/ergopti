@@ -547,6 +547,7 @@ function M.perform_check(force_trigger, profile_name)
 		min_words               = min_words,
 		num_predictions         = num_predictions,
 		auto_raise_temperature  = auto_raise_temperature,
+		context_window_chars    = context_window_chars,
 	}, last_buffer_signature, force_trigger)
 
 	if not params then

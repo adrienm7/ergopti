@@ -515,6 +515,7 @@
 	"llm.deps.browser_install_tip": "请从浏览器打开的页面下载 Windows 版 Ollama，运行安装程序后返回 — 连接将被自动检测。",
 	"llm.deps.done_success": "✅ Ollama 已就绪",
 	"llm.deps.fail_server_not_responding": "安装程序已退出，但 Ollama 服务器没有响应。",
+	"llm.deps.fail_timeout": "安装后等待 Ollama 响应时超时。",
 	"llm.generating": "⏳ 生成中…",
 	"llm.profile.advanced.label": "●●○ 高级 — 纠错 + 预测",
 	"llm.profile.basic.label": "●○○ 基础 — 简单预测",

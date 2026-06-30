@@ -266,6 +266,7 @@ local _is_ready          = false
 local _warmup_in_flight  = false
 local _warmup_gen        = 0     -- bumped on reset/load-failure; a warmup callback whose captured gen is stale must NOT flip _is_ready (F-L4)
 local _warmup_timeout    = nil   -- hard-timeout timer; cleared on callback or cancellation
+local _warmup_stopped    = false -- set by stop_warmup(); blocks the self-retry chain during pause/disable (M-3)
 
 -- Permanent load-failure surface. Warmup retries on every non-200, which is correct
 -- for a model that is merely SLOW to load — but a model that can NEVER load (an
@@ -329,7 +330,10 @@ function M.mark_load_failed(model_name, notify)
 	_is_ready = false
 	_warmup_gen = _warmup_gen + 1  -- invalidate any in-flight warmup callback (F-L4)
 	if _warmup_timeout then
-		pcall(function() _warmup_timeout:stop() end)
+		-- Use TimerScheduler.cancel (not :stop()) — the handle is a {fired,id,timer}
+		-- table with no :stop method; calling :stop() raises and the underlying timer
+		-- keeps running, leaking an orphaned timer that fires and clobbers a future warmup.
+		TimerScheduler.cancel(_warmup_timeout)
 		_warmup_timeout = nil
 	end
 	_warmup_in_flight = false
@@ -346,6 +350,29 @@ function M.mark_load_failed(model_name, notify)
 		pcall(Notifications.notify, "MLX incompatible",
 			string.format(i18n.get("mlx.model_incompatible"), tostring(model_name)), "error")
 	end
+end
+
+--- Stops the api_mlx self-retry warmup chain (M-3).
+--- Bumps the generation counter (invalidates any in-flight callback), cancels the
+--- hard-timeout timer, and sets _warmup_stopped so any 2s retry that fires from
+--- the TimerScheduler queue self-discards inside M.warmup().
+--- Called from script_control.pause_all() alongside warmup_controller.stop().
+function M.stop_warmup()
+	_warmup_gen     = _warmup_gen + 1
+	_warmup_stopped = true
+	_warmup_in_flight = false
+	if _warmup_timeout then
+		TimerScheduler.cancel(_warmup_timeout)
+		_warmup_timeout = nil
+	end
+	Logger.debug(LOG, "stop_warmup() — gen bumped to %d, self-retry chain stopped.", _warmup_gen)
+end
+
+--- Clears the _warmup_stopped flag so M.warmup() may proceed (M-3).
+--- Called from script_control.resume_all() before re-arming warmup_controller.
+function M.resume_warmup()
+	_warmup_stopped = false
+	Logger.debug(LOG, "resume_warmup() — self-retry chain re-enabled.")
 end
 
 --- @return integer The MLX server port (override > shared JSON > dedicated default 3460).
@@ -493,6 +520,13 @@ function M.warmup(model_name, profile)
 		Logger.debug(LOG, "MLX warmup skipped — model '%s' already marked as failed to load.", tostring(model_name))
 		return
 	end
+	-- Bail when the driver is paused or LLM has been disabled: stop_warmup() sets this
+	-- flag so that any 2s retry still in the TimerScheduler queue self-discards here
+	-- rather than firing a POST mid-pause or after set_llm_enabled(false) (M-3).
+	if _warmup_stopped then
+		Logger.debug(LOG, "MLX warmup skipped — warmup stopped (paused or LLM disabled).")
+		return
+	end
 	-- Skip if a warmup is already in flight; otherwise the user's log shows 4
 	-- simultaneous POST requests piling up against the single-threaded server
 	if _warmup_in_flight then
@@ -615,7 +649,7 @@ function M.warmup(model_name, profile)
 	-- accepts the TCP connection but never sends a response (e.g. during model
 	-- weight loading or a stale GPU stream), _warmup_in_flight would stay true
 	-- forever, silently blocking every subsequent warmup call.
-	if _warmup_timeout then pcall(function() _warmup_timeout:stop() end) end
+	if _warmup_timeout then TimerScheduler.cancel(_warmup_timeout) end
 	local _wt_handle = TimerScheduler.after(WARMUP_POST_TIMEOUT_SEC, function()
 		_warmup_timeout = nil
 		if not _warmup_in_flight then return end
