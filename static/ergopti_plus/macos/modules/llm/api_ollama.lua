@@ -278,11 +278,10 @@ end
 --- ======================================
 -- ======================================
 
--- Stop sequences from inference.json (single source — eliminates the
--- per-file literal that used to live here; rationale in the JSON comment).
--- Two flavours as before: batch mode vs. line mode.
-local STOP_BATCH = ApiCommon.get_stop_sequences("ollama_batch")
-local STOP_LINE  = ApiCommon.get_stop_sequences("ollama_line")
+-- Stop sequences from inference.json (single source — unified keys shared
+-- with all backends, eliminates per-backend drift; rationale in the JSON comment).
+local STOP_BATCH = ApiCommon.get_stop_sequences("batch")
+local STOP_LINE  = ApiCommon.get_stop_sequences("line")
 
 --- Builds the options payload for the Ollama API (optimized for speed).
 --- @param temperature number The creativity parameter.

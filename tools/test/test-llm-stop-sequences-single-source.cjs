@@ -42,11 +42,41 @@ function check(label, filePath, pattern, mustMatch) {
 	}
 }
 
-// inference.json must contain the stop_sequences section
+const INFERENCE_JSON = path.join(EP, '_shared', 'modules', 'llm', 'inference.json');
+
+// inference.json must contain the stop_sequences section with unified keys
 check(
 	'inference.json has stop_sequences',
-	path.join(EP, '_shared', 'modules', 'llm', 'inference.json'),
+	INFERENCE_JSON,
 	/"stop_sequences"\s*:/,
+	true
+);
+
+// Guard against regression to per-backend keys (ollama_batch etc.)
+check(
+	'inference.json: no legacy per-backend key "ollama_batch"',
+	INFERENCE_JSON,
+	/"ollama_batch"\s*:/,
+	false
+);
+check(
+	'inference.json: no legacy per-backend key "mlx_batch"',
+	INFERENCE_JSON,
+	/"mlx_batch"\s*:/,
+	false
+);
+
+// Verify the unified keys are present
+check(
+	'inference.json has unified "batch" key',
+	INFERENCE_JSON,
+	/"batch"\s*:/,
+	true
+);
+check(
+	'inference.json has unified "line" key',
+	INFERENCE_JSON,
+	/"line"\s*:/,
 	true
 );
 

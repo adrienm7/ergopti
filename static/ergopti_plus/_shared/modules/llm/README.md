@@ -9,7 +9,7 @@ Cross-driver data for the LLM subsystem. Contains the shared defaults file consu
 | File                    | Description                                                              |
 | ----------------------- | ------------------------------------------------------------------------ |
 | `defaults.json`         | Canonical LLM defaults (temperature, debounce, token budget, port, …)   |
-| `inference.json`        | Stop-token sequences for all backends (ollama_batch/line, mlx_batch/line)|
+| `inference.json`        | Stop-token sequences for all backends (unified batch/line keys)          |
 | `models.json`           | Model catalogue (name, size, RAM estimate, engine compatibility)          |
 | `profiles.json`         | Named prompt profiles with system prompt and generation parameters        |
 | `api_providers.json`    | Remote API provider list (name, endpoint template, auth header name)      |

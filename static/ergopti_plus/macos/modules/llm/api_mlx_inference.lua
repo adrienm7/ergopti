@@ -100,11 +100,10 @@ end
 --- ======================================
 --- ======================================
 
--- Stop sequences from inference.json (single source). MLX uses a tighter
--- subset than Ollama — TAIL: and some newline/separator stops are excluded
--- (maintainer decision M4, documented in the JSON comment).
-local STOP_BASE_MLX = ApiCommon.get_stop_sequences("mlx_batch")
-local STOP_LINE_MLX = ApiCommon.get_stop_sequences("mlx_line")
+-- Stop sequences from inference.json (single source — unified keys shared
+-- with all backends; rationale in the JSON comment).
+local STOP_BASE_MLX = ApiCommon.get_stop_sequences("batch")
+local STOP_LINE_MLX = ApiCommon.get_stop_sequences("line")
 
 local function build_options(temperature, num_predict_tokens, is_batch, line_mode)
     local opts = {

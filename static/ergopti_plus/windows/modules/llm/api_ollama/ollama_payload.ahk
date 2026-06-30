@@ -53,7 +53,7 @@ _LLM_Ollama_IsLineMode(system_prompt, is_batch) {
 _LLM_Ollama_StopsArray(stop_sequences, line_mode, is_batch) {
 	if (stop_sequences != "" and Type(stop_sequences) == "Array" and stop_sequences.Length > 0)
 		return stop_sequences
-	return (line_mode && !is_batch) ? LLM_ApiCommon_GetStopSequences("ollama_line") : LLM_ApiCommon_GetStopSequences("ollama_batch")
+	return (line_mode && !is_batch) ? LLM_ApiCommon_GetStopSequences("line") : LLM_ApiCommon_GetStopSequences("batch")
 }
 
 _LLM_Ollama_StopsJson(stop_sequences, line_mode, is_batch) {

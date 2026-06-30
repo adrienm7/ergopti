@@ -60,10 +60,8 @@ local FALLBACK = {
 		api    = 500,
 	},
 	stop_sequences = {
-		ollama_batch = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:" },
-		ollama_line  = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:", "\n\n", "===", "\n", "\r", "</", "Suite finale", "SUITE", "NEXT_WORDS:" },
-		mlx_batch    = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:" },
-		mlx_line     = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "\n\n", "</", "Suite finale", "SUITE", "NEXT_WORDS:" },
+		batch = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:" },
+		line  = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:", "\n\n", "===", "\n", "\r", "</", "Suite finale", "SUITE", "NEXT_WORDS:" },
 	},
 }
 
@@ -153,7 +151,7 @@ end
 --- Reads directly from the INFERENCE table (arrays survive hs.json.decode natively).
 --- Falls back to FALLBACK on a missing key so a corrupt inference.json never
 --- leaves the engine with a nil stop list.
---- @param variant string One of "ollama_batch", "ollama_line", "mlx_batch", "mlx_line".
+--- @param variant string One of "batch", "line".
 --- @return table Array of stop-token strings.
 function M.get_stop_sequences(variant)
 	local seqs = INFERENCE.stop_sequences

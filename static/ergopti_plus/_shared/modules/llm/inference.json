@@ -30,10 +30,8 @@
 	},
 
 	"stop_sequences": {
-		"_comment": "Backend-specific stop tokens — single source replacing the per-file literals in api_ollama.{ahk,lua} and api_mlx_inference.lua (P10.2). The MLX subset intentionally drops TAIL: and some newline/separator tokens that Ollama line-mode uses but MLX line-mode does not need (maintainer decision M4).",
-		"ollama_batch": ["<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:"],
-		"ollama_line": ["<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:", "\n\n", "===", "\n", "\r", "</", "Suite finale", "SUITE", "NEXT_WORDS:"],
-		"mlx_batch": ["<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:"],
-		"mlx_line": ["<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "\n\n", "</", "Suite finale", "SUITE", "NEXT_WORDS:"]
+		"_comment": "Unified stop tokens shared by all backends — single source replacing the per-file literals in api_ollama.{ahk,lua} and api_mlx_inference.lua (P10.2). Both Ollama and MLX use the same superset so no per-backend drift can accumulate (M4 decision).",
+		"batch": ["<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:"],
+		"line":  ["<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:", "\n\n", "===", "\n", "\r", "</", "Suite finale", "SUITE", "NEXT_WORDS:"]
 	}
 }
