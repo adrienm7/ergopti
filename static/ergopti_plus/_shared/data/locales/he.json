@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇮🇱",
 	"_meta.locale": "he",
 	"_meta.name": "עברית",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "אין חלון פעיל",
 	"shortcuts.no_other_monitor": "לא נמצא צג נוסף",
 	"shortcuts.opendownloads": "Win + D(ownloads) = פתח את תיקיית ההורדות",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: הדבק ללא עיצוב. Excel שומר את התנהגותו המקורית",
 	"shortcuts.pixel_read_error": "לא ניתן לקרוא את צבע הפיקסל",
 	"shortcuts.saved": "נשמר: %s",
 	"shortcuts.screen": "Win + H (screensHot) = צילום מסך (מפעיל Win + Shift + S)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "צילום מסך הועתק ללוח",
 	"shortcuts.screenshot_title": "צילום מסך",
 	"shortcuts.search": "Win + S(earch) = חפש את הבחירה באינטרנט. ב-Explorer, מעתיק את נתיב הקובץ הנבחר",
-	"shortcuts.selectline": "Win + A(ll) = בחר את כל השורה",
 	"shortcuts.shortcut_format_hint": "פורמט: mods+key (לדוגמה cmd+alt+p)\nMods זמינים: cmd, alt, ctrl, shift\nהשאר ריק להשבתה",
 	"shortcuts.shortcut_label": "קיצור",
 	"shortcuts.spotlightmouse": "Win + ' = הדגש את העכבר בטבעת צהובה",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = המר ל-title case (אות גדולה בתחילת כל מילה)",
 	"shortcuts.uppercase": "Win + U(ppercase) = החלף בחירה אותיות גדולות/קטנות",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "הקלדת סמל כשהטקסט נבחר עוטפת את הבחירה בסמל זה.",
 	"startup.manifest_missing": "שגיאת הפעלה: הקובץ _generated/features_manifest.ahk חסר או פגום.\n\nהפעל `npm run build:manifest` מתיקיית הפרויקט ולאחר מכן הפעל מחדש את הסקריפט.",
 	"startup.manifest_title": "ErgoptiPlus — manifest חסר",
 	"tap_hold.action.disable": "כלום (השבת)",

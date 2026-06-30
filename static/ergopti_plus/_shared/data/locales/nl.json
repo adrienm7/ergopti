@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇳🇱",
 	"_meta.locale": "nl",
 	"_meta.name": "Nederlands",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "Geen actief venster",
 	"shortcuts.no_other_monitor": "Geen ander scherm gevonden",
 	"shortcuts.opendownloads": "Win + D(ownloads) = Open de map Downloads",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: plakken zonder opmaak. Excel behoudt zijn eigen gedrag",
 	"shortcuts.pixel_read_error": "Kan pixelkleur niet lezen",
 	"shortcuts.saved": "Opgeslagen: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Schermopname (activeert Win + Shift + S)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "Screenshot gekopieerd naar klembord",
 	"shortcuts.screenshot_title": "Schermafbeelding",
 	"shortcuts.search": "Win + S(earch) = Zoek de selectie op internet. In Verkenner kopieert het het geselecteerde bestandspad",
-	"shortcuts.selectline": "Win + A(ll) = Selecteer de hele regel",
 	"shortcuts.shortcut_format_hint": "Indeling: mod+toets (bijv. cmd+alt+p)\nBeschikbare mods: cmd, alt, ctrl, shift\nLeeg laten om uit te schakelen",
 	"shortcuts.shortcut_label": "Sneltoets",
 	"shortcuts.spotlightmouse": "Win + ' = Markeer de muis met een gele ring",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = Converteer naar titelnotatie (eerste letter van elk woord in hoofdletters)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Schakel selectie hoofdletters/kleine letters",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "Een symbool typen terwijl tekst is geselecteerd omsluit de selectie met dat symbool.",
 	"startup.manifest_missing": "Opstartfout: het bestand _generated/features_manifest.ahk ontbreekt of is beschadigd.\n\nVoer `npm run build:manifest` uit vanuit de projectmap en start het script opnieuw.",
 	"startup.manifest_title": "ErgoptiPlus — manifest ontbreekt",
 	"tap_hold.action.disable": "Niets (uitschakelen)",

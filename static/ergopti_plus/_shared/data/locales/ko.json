@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇰🇷",
 	"_meta.locale": "ko",
 	"_meta.name": "한국어",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "활성 창 없음",
 	"shortcuts.no_other_monitor": "다른 모니터가 감지되지 않음",
 	"shortcuts.opendownloads": "Win + D(ownloads) = 다운로드 폴더 열기",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: 서식 없이 붙여넣기. Excel은 기본 동작 유지",
 	"shortcuts.pixel_read_error": "픽셀 색상을 읽을 수 없습니다",
 	"shortcuts.saved": "저장됨: %s",
 	"shortcuts.screen": "Win + H (screensHot) = 화면 캡처 (Win + Shift + S 실행)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "스크린샷이 클립보드에 복사되었습니다",
 	"shortcuts.screenshot_title": "스크린샷",
 	"shortcuts.search": "Win + S(earch) = 인터넷에서 선택 항목 검색. 탐색기에서는 선택한 파일 경로 복사",
-	"shortcuts.selectline": "Win + A(ll) = 전체 줄 선택",
 	"shortcuts.shortcut_format_hint": "형식: 수정키+키 (예: cmd+alt+p)\n사용 가능한 수정키: cmd, alt, ctrl, shift\n비활성화하려면 비워두세요",
 	"shortcuts.shortcut_label": "단축키",
 	"shortcuts.spotlightmouse": "Win + ' = 노란색 링으로 마우스 강조",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = 타이틀 케이스로 변환 (각 단어의 첫 글자 대문자)",
 	"shortcuts.uppercase": "Win + U(ppercase) = 선택 대문자/소문자 토글",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "텍스트를 선택한 상태에서 기호를 입력하면 선택 영역이 해당 기호로 감싸집니다.",
 	"startup.manifest_missing": "시작 오류: _generated/features_manifest.ahk 파일이 없거나 손상되었습니다.\n\n프로젝트 디렉터리에서 `npm run build:manifest`를 실행한 후 스크립트를 다시 시작하세요.",
 	"startup.manifest_title": "ErgoptiPlus — manifest 누락",
 	"tap_hold.action.disable": "없음 (비활성화)",

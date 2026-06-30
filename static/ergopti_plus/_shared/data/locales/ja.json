@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇯🇵",
 	"_meta.locale": "ja",
 	"_meta.name": "日本語",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "アクティブなウィンドウがありません",
 	"shortcuts.no_other_monitor": "他のモニターが見つかりません",
 	"shortcuts.opendownloads": "Win + D(ownloads) = ダウンロードフォルダーを開く",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: 書式なしで貼り付け。Excelはネイティブ動作を維持",
 	"shortcuts.pixel_read_error": "ピクセルカラーを読み取れません",
 	"shortcuts.saved": "保存しました：%s",
 	"shortcuts.screen": "Win + H (screensHot) = スクリーンショット (Win + Shift + S を起動)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "スクリーンショットをクリップボードにコピーしました",
 	"shortcuts.screenshot_title": "スクリーンショット",
 	"shortcuts.search": "Win + S(earch) = インターネットで選択テキストを検索。エクスプローラーでは選択ファイルパスをコピー",
-	"shortcuts.selectline": "Win + A(ll) = 行全体を選択",
 	"shortcuts.shortcut_format_hint": "形式: mods+キー (例: cmd+alt+p)\n使用可能なmods: cmd, alt, ctrl, shift\n無効にするには空白のまま",
 	"shortcuts.shortcut_label": "ショートカット",
 	"shortcuts.spotlightmouse": "Win + ' = 黄色いリングでマウスをハイライト",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = タイトルケースに変換（各単語の頭文字を大文字に）",
 	"shortcuts.uppercase": "Win + U(ppercase) = 選択範囲の大文字/小文字を切り替え",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "テキスト選択中にシンボルを入力すると、選択範囲がそのシンボルで囲まれます。",
 	"startup.manifest_missing": "起動エラー：_generated/features_manifest.ahk ファイルが見つからないか破損しています。\n\nプロジェクトディレクトリで `npm run build:manifest` を実行し、スクリプトを再起動してください。",
 	"startup.manifest_title": "ErgoptiPlus — manifest が見つかりません",
 	"tap_hold.action.disable": "なし（無効）",

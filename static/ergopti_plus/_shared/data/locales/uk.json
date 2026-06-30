@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇺🇦",
 	"_meta.locale": "uk",
 	"_meta.name": "Українська",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "Немає активного вікна",
 	"shortcuts.no_other_monitor": "Інший монітор не знайдено",
 	"shortcuts.opendownloads": "Win + D(ownloads) = Відкрити папку Завантаження",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: вставити без форматування. Excel зберігає свою поведінку",
 	"shortcuts.pixel_read_error": "Не вдалося зчитати колір пікселя",
 	"shortcuts.saved": "Збережено: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Знімок екрана (запускає Win + Shift + S)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "Знімок екрана скопійовано до буфера обміну",
 	"shortcuts.screenshot_title": "Знімок екрана",
 	"shortcuts.search": "Win + S(earch) = Пошук виділеного тексту в Інтернеті. У провіднику копіює шлях до вибраного файлу",
-	"shortcuts.selectline": "Win + A(ll) = Виділити весь рядок",
 	"shortcuts.shortcut_format_hint": "Формат: модифікатори+клавіша (напр. cmd+alt+p)\nДоступні модифікатори: cmd, alt, ctrl, shift\nЗалиште порожнім для вимкнення",
 	"shortcuts.shortcut_label": "Скорочення",
 	"shortcuts.spotlightmouse": "Win + ' = Виділити мишу жовтим кільцем",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = Перетворити на заголовний регістр (велика перша літера кожного слова)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Перемикати регістр виділення",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "Введення символу при виділеному тексті огортає виділення цим символом.",
 	"startup.manifest_missing": "Помилка запуску: файл _generated/features_manifest.ahk відсутній або пошкоджений.\n\nЗапустіть `npm run build:manifest` з каталогу проекту та перезапустіть скрипт.",
 	"startup.manifest_title": "ErgoptiPlus — manifest відсутній",
 	"tap_hold.action.disable": "Нічого (вимкнути)",

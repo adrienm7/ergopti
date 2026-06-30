@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇵🇱",
 	"_meta.locale": "pl",
 	"_meta.name": "Polski",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "Brak aktywnego okna",
 	"shortcuts.no_other_monitor": "Nie wykryto innego monitora",
 	"shortcuts.opendownloads": "Win + D(ownloads) = Otwórz folder Pobrane",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: wklej bez formatowania. Excel zachowuje swoje natywne zachowanie",
 	"shortcuts.pixel_read_error": "Nie można odczytać koloru piksela",
 	"shortcuts.saved": "Zapisano: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Zrzut ekranu (uruchamia Win + Shift + S)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "Zrzut ekranu skopiowany do schowka",
 	"shortcuts.screenshot_title": "Zrzut ekranu",
 	"shortcuts.search": "Win + S(earch) = Szukaj zaznaczenia w Internecie. W Eksploratorze kopiuje ścieżkę wybranego pliku",
-	"shortcuts.selectline": "Win + A(ll) = Zaznacz cały wiersz",
 	"shortcuts.shortcut_format_hint": "Format: mod+klawisz (np. cmd+alt+p)\nDostępne mod: cmd, alt, ctrl, shift\nZostaw puste, aby wyłączyć",
 	"shortcuts.shortcut_label": "Skrót",
 	"shortcuts.spotlightmouse": "Win + ' = Podświetl mysz żółtym pierścieniem",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = Konwertuj na tytuł (pierwsza litera każdego słowa wielką literą)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Przełącz zaznaczenie wielkie/małe litery",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "Wpisanie symbolu z zaznaczonym tekstem otacza zaznaczenie tym symbolem.",
 	"startup.manifest_missing": "Błąd uruchomienia: plik _generated/features_manifest.ahk jest nieobecny lub uszkodzony.\n\nUruchom `npm run build:manifest` z katalogu projektu i zrestartuj skrypt.",
 	"startup.manifest_title": "ErgoptiPlus — brak manifestu",
 	"tap_hold.action.disable": "Nic (wyłącz)",

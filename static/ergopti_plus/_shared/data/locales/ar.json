@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇸🇦",
 	"_meta.locale": "ar",
 	"_meta.name": "العربية",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "لا توجد نافذة نشطة",
 	"shortcuts.no_other_monitor": "لم يتم اكتشاف شاشة أخرى",
 	"shortcuts.opendownloads": "Win + D(ownloads) = فتح مجلد التنزيلات",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: لصق بدون تنسيق. يحتفظ Excel بسلوكه الافتراضي",
 	"shortcuts.pixel_read_error": "تعذّر قراءة لون البكسل",
 	"shortcuts.saved": "تم الحفظ: %s",
 	"shortcuts.screen": "Win + H (screensHot) = لقطة شاشة (يُشغّل Win + Shift + S)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "تم نسخ لقطة الشاشة إلى الحافظة",
 	"shortcuts.screenshot_title": "لقطة شاشة",
 	"shortcuts.search": "Win + S(earch) = البحث عن التحديد على الإنترنت. في المستكشف، يُنسخ مسار الملف المحدد",
-	"shortcuts.selectline": "Win + A(ll) = تحديد السطر بالكامل",
 	"shortcuts.shortcut_format_hint": "الصيغة: معدّلات+مفتاح (مثال: cmd+alt+p)\nالمعدّلات المتاحة: cmd, alt, ctrl, shift\naتركه فارغًا للتعطيل",
 	"shortcuts.shortcut_label": "الاختصار",
 	"shortcuts.spotlightmouse": "Win + ' = تمييز الفأرة بحلقة صفراء",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = التحويل إلى حالة العنوان (رسملة أول حرف من كل كلمة)",
 	"shortcuts.uppercase": "Win + U(ppercase) = تبديل التحديد بين الأحرف الكبيرة والصغيرة",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "كتابة رمز أثناء تحديد نص يُحيط التحديد بذلك الرمز.",
 	"startup.manifest_missing": "خطأ في بدء التشغيل: الملف _generated/features_manifest.ahk مفقود أو تالف.\n\nشغّل `npm run build:manifest` من مجلد المشروع، ثم أعد تشغيل السكريبت.",
 	"startup.manifest_title": "ErgoptiPlus — ملف manifest مفقود",
 	"tap_hold.action.disable": "لا شيء (تعطيل)",

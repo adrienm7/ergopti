@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇪🇸",
 	"_meta.locale": "es",
 	"_meta.name": "Español",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "Sin ventana activa",
 	"shortcuts.no_other_monitor": "No se detectó otro monitor",
 	"shortcuts.opendownloads": "Win + D(ownloads) = Abrir la carpeta de Descargas",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: pegar sin formato. Excel mantiene su comportamiento nativo",
 	"shortcuts.pixel_read_error": "No se puede leer el color del píxel",
 	"shortcuts.saved": "Guardado: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Captura de pantalla (Win + Shift + S)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "Captura de pantalla copiada al portapapeles",
 	"shortcuts.screenshot_title": "Captura de pantalla",
 	"shortcuts.search": "Win + S(earch) = Buscar la selección en Internet. En el explorador: copiar la ruta del archivo seleccionado",
-	"shortcuts.selectline": "Win + A(ll) = Seleccionar toda la línea",
 	"shortcuts.shortcut_format_hint": "Formato: mods+tecla (ej: cmd+alt+p)\nMods disponibles: cmd, alt, ctrl, shift\nDejar vacío para desactivar",
 	"shortcuts.shortcut_label": "Atajo",
 	"shortcuts.spotlightmouse": "Win + ' = Resaltar el ratón con un anillo amarillo",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = Convertir a mayúsculas de título (primera letra de cada palabra en mayúscula)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Convertir selección a mayúsculas/minúsculas",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "Escribir un símbolo con texto seleccionado rodea la selección con ese símbolo.",
 	"startup.manifest_missing": "Error de inicio: el archivo _generated/features_manifest.ahk está ausente o dañado.\n\nEjecuta `npm run build:manifest` desde el directorio del proyecto y reinicia el script.",
 	"startup.manifest_title": "ErgoptiPlus — manifest ausente",
 	"tap_hold.action.disable": "Nada (desactivar)",

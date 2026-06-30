@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇸🇪",
 	"_meta.locale": "sv",
 	"_meta.name": "Svenska",
@@ -1597,7 +1597,6 @@
 	"shortcuts.no_active_window": "Inget aktivt fönster",
 	"shortcuts.no_other_monitor": "Ingen annan skärm hittades",
 	"shortcuts.opendownloads": "Win + D(ownloads) = Öppna mappen Nedladdningar",
-	"shortcuts.pastewithoutformatting": "Ctrl + Shift + V: klistra in utan formatering. Excel behåller sitt ursprungliga beteende",
 	"shortcuts.pixel_read_error": "Kan inte läsa pixelfärg",
 	"shortcuts.saved": "Sparat: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Skärmfångst (utlöser Win + Shift + S)",
@@ -1606,7 +1605,6 @@
 	"shortcuts.screenshot_copied": "Skärmdump kopierad till urklipp",
 	"shortcuts.screenshot_title": "Skärmdump",
 	"shortcuts.search": "Win + S(earch) = Sök markeringen på Internet. I Explorer kopieras sökvägen för den valda filen",
-	"shortcuts.selectline": "Win + A(ll) = Markera hela raden",
 	"shortcuts.shortcut_format_hint": "Format: mods+key (t.ex. cmd+alt+p)\nTillgängliga mods: cmd, alt, ctrl, shift\nLämna tomt för att inaktivera",
 	"shortcuts.shortcut_label": "Genvär",
 	"shortcuts.spotlightmouse": "Win + ' = Markera musen med en gul ring",
@@ -1616,7 +1614,6 @@
 	"shortcuts.titlecase": "Win + W = Konvertera till titel-case (kapitalisera första bokstaven i varje ord)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Växla markeringens versaler/gemener",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
-	"shortcuts.wraptextifselected": "Att skriva en symbol när text är markerad omger markeringen med denna symbol.",
 	"startup.manifest_missing": "Startfel: filen _generated/features_manifest.ahk saknas eller är skadad.\n\nKör `npm run build:manifest` från projektmappen och starta om skriptet.",
 	"startup.manifest_title": "ErgoptiPlus — manifest saknas",
 	"tap_hold.action.disable": "Ingenting (inaktivera)",

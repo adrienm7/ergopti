@@ -1102,7 +1102,7 @@ platforms = ["ahk"]
 id = "paste_without_formatting"
 default = false
 type = "boolean"
-description_key = "menu.shortcuts.paste_without_formatting"
+description_key = "shortcuts.label_cmd_shift_v"
 platforms = ["ahk"]
 
 [[features.shortcuts]]
@@ -1137,7 +1137,7 @@ platforms = ["ahk"]
 id = "wrap_text_if_selected"
 default = true
 type = "boolean"
-description_key = "menu.shortcuts.wrap_text_if_selected"
+description_key = "shortcuts.label_wrap_text"
 platforms = ["ahk"]
 
 
@@ -1280,7 +1280,7 @@ description_key = "menu.ahk.shortcuts.screen"
 id = "screen_instant"
 default = true
 type = "boolean"
-description_key = "menu.ahk.shortcuts.screen_instant"
+description_key = "shortcuts.label_at_hash"
 
 [[features.ahk.shortcuts]]
 id = "win_caps_lock"
