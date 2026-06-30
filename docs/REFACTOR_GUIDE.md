@@ -220,13 +220,16 @@ Pipeline prouvé (P4/P5) : extraction PowerShell (BOM+CRLF) remplaçant le bloc 
 
 | St | Étape | Fichier (lignes) | Action (index + parts) · Diagnostic |
 |----|-------|------------------|-------------------------------------|
-| ☐ | **P11.1** F5 | `gestures/init.ahk` (1288) | catalogue+actions `:514-1089` → `gestures/actions.ahk` (miroir `actions.lua`). **Moyen** |
-| ☐ | **P11.2** F6 | `ui/personal_toml_editor.ahk` (1099) | codec `:32-503` → `lib/hotstrings/personal_toml_io.ahk` (testable sans Gui). **Moyen** |
-| ☐ | **P11.3** | `modules/llm/api_ollama.ahk` (1638) | → `api_ollama/{init,ollama_http,ollama_streaming,ollama_warmup,ollama_payload}.ahk`. **Moyen** |
-| ☐ | **P11.4** | engine hotstrings (5 fichiers : `hotstring_engine_main` 1509, `prefix_watcher` 1462, `hotstring_engine` 936, `hotstrings_config` 1060, `modules/hotstrings.ahk` 1081) | splits match/dispatch, registry/inputhook, send/builder, io/catalogue, par catégorie. **Moyen-élevé** (hot path) |
-| ☐ | **P11.5** | `prediction_engine.ahk` 1344, `hotstrings_config_window/init.ahk` 1331, `onboarding/steps.ahk` 1046, `wpm/init.ahk` 991, `keylogger_reader.ahk` 1157 (fix banner dup `5/`) | splits config/keystroke/exec ; entry/mutations/helpers ; par groupe ; ring/config ; reader/projections. **Moyen** |
-| ☐ | **P11.6** F7/F8 | macOS `shortcuts/actions/system.lua` 1076, `keymap/registry.lua` 1212, `menu_hotstrings.lua` (god-fn) | `system.lua`→4 ; index→`registry_index.lua` ; décomposer `build_management`. **F8 hot-path — mesurer** |
-| ☐ | **P11.7** | `keylogger_walker.ahk` 1254 ↔ `aggregator.lua` 1122 (**parité 1:1**) | split **simultané** des 2 côtés. **Élevé — M5** |
+| ✅ | **P11.1** F5 | `gestures/init.ahk` (1288) | → `gestures/actions.ahk` (miroir `actions.lua`). |
+| ✅ | **P11.2** F6 | `ui/personal_toml_editor.ahk` (1099) | → `lib/hotstrings/personal_toml_io.ahk`. |
+| ✅ | **P11.3** | `modules/llm/api_ollama.ahk` (1638) | → `api_ollama/{init,ollama_http,ollama_streaming,ollama_warmup,ollama_payload}.ahk`. |
+| ✅ | **P11.4a** | `hotstring_engine_main` 1509, `prefix_watcher` 1462, `hotstrings_config` 1060 | → match/dispatch, registry/inputhook, io/catalogue. |
+| ✅ | **P11.4b** | `modules/hotstrings.ahk` 1079 | → `hotstrings/{distances,autocorrection,text_expansion,personal,helpers}.ahk`. |
+| ✅ | **P11.5a** | `prediction_engine.ahk` 1344, `hotstrings_config_window/init.ahk` 1331, `onboarding/steps.ahk` 1046, `wpm/init.ahk` 991 | → prediction_keylogger/exec ; hcw_helpers/mutations ; steps_config/keyboard/metrics ; wpm_display/config. |
+| ✅ | **P11.5b** | `keylogger_reader.ahk` 1157 | → `keylogger_reader_{db,manifest,ngrams}.ahk`. |
+| ✅ | **P11.6a** | macOS `shortcuts/actions/system.lua` 1076 | → system_mouse.lua + system_pixel.lua (658 l. restant). |
+| ☐ | **P11.6b** | macOS `keymap/registry.lua` 917, `menu_hotstrings.lua` 1322 | index→`registry_index.lua` ; décomposer `build_management`. **F8 hot-path** |
+| ☐ | **P11.7** | `keylogger_walker.ahk` 1254 ↔ `aggregator.lua` 1122 (**parité 1:1**) | split **simultané** des 2 côtés. **Élevé** |
 
 #### P12 — Symétrie & onboarding (renommages low-risk + docs)
 
