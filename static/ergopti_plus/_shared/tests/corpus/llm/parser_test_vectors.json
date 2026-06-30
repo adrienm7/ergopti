@@ -1,12 +1,13 @@
 {
 	"$schema": "https://ergopti.com/schema/corpus/llm-parser.v1.json",
-	"description": "Cross-driver corpus for LLM response parser functions. Covers Ollama (non-streaming and streaming), OpenAI, Anthropic, and Gemini formats. Every vector must produce the same result in both the AHK regex-based parsers and the Hammerspoon JSON-based parsers.",
-	"version": "1.0.0",
+	"description": "Cross-driver corpus for LLM response parser functions. Covers Ollama (non-streaming and streaming), OpenAI, Anthropic, and Gemini formats. Every vector must produce the same result in the applicable driver parsers. Vectors with a 'driver' array are scoped to the listed drivers only; absent or empty means all drivers.",
+	"version": "1.1.0",
 	"vectors": [
 		{
 			"id": "ollama_nonstream_basic",
 			"description": "Standard Ollama /api/generate non-streaming response with a simple text completion.",
 			"parser": "ollama_nonstream",
+			"driver": ["ahk"],
 			"input": "{\"model\":\"qwen2.5:3b\",\"created_at\":\"2024-01-01T00:00:00Z\",\"response\":\"bonjour monde\",\"done\":true}",
 			"expected": {
 				"text": "bonjour monde",
@@ -15,8 +16,9 @@
 		},
 		{
 			"id": "ollama_nonstream_with_escape",
-			"description": "Ollama response whose text contains a JSON-escaped newline and quote.",
+			"description": "Ollama /api/generate response whose text contains a JSON-escaped newline and quote.",
 			"parser": "ollama_nonstream",
+			"driver": ["ahk"],
 			"input": "{\"response\":\"line one\\nline two\",\"done\":true}",
 			"expected": {
 				"text": "line one\nline two",
@@ -25,8 +27,9 @@
 		},
 		{
 			"id": "ollama_nonstream_empty_response",
-			"description": "Ollama response with an empty string value for the response field.",
+			"description": "Ollama /api/generate response with an empty string value for the response field.",
 			"parser": "ollama_nonstream",
+			"driver": ["ahk"],
 			"input": "{\"response\":\"\",\"done\":true}",
 			"expected": {
 				"text": "",
@@ -35,8 +38,9 @@
 		},
 		{
 			"id": "ollama_nonstream_done_signal",
-			"description": "Ollama final done-only line has no response field — should produce empty.",
+			"description": "Ollama /api/generate final done-only line has no response field — should produce empty.",
 			"parser": "ollama_nonstream",
+			"driver": ["ahk"],
 			"input": "{\"done\":true,\"done_reason\":\"stop\",\"eval_count\":42}",
 			"expected": {
 				"text": "",
@@ -45,8 +49,9 @@
 		},
 		{
 			"id": "ollama_nonstream_whitespace_response",
-			"description": "Ollama response where the response field is whitespace only.",
+			"description": "Ollama /api/generate response where the response field is whitespace only.",
 			"parser": "ollama_nonstream",
+			"driver": ["ahk"],
 			"input": "{\"response\":\"   \",\"done\":true}",
 			"expected": {
 				"text": "   ",
@@ -54,9 +59,76 @@
 			}
 		},
 		{
+			"id": "ollama_nonstream_backslash_in_response",
+			"description": "Ollama /api/generate response whose text contains a literal backslash (JSON double-escaped).",
+			"parser": "ollama_nonstream",
+			"driver": ["ahk"],
+			"input": "{\"response\":\"chemin: C:\\\\Users\\\\test\",\"done\":true}",
+			"expected": {
+				"text": "chemin: C:\\Users\\test",
+				"ok": true
+			}
+		},
+		{
+			"id": "ollama_chat_basic",
+			"description": "Ollama /api/chat non-streaming response (macOS driver format) with a simple text completion.",
+			"parser": "ollama_nonstream",
+			"driver": ["macos"],
+			"input": "{\"message\":{\"role\":\"assistant\",\"content\":\"bonjour monde\"},\"done\":false}",
+			"expected": {
+				"text": "bonjour monde",
+				"ok": true
+			}
+		},
+		{
+			"id": "ollama_chat_with_escape",
+			"description": "Ollama /api/chat response whose content contains a JSON-escaped newline.",
+			"parser": "ollama_nonstream",
+			"driver": ["macos"],
+			"input": "{\"message\":{\"role\":\"assistant\",\"content\":\"line one\\nline two\"},\"done\":false}",
+			"expected": {
+				"text": "line one\nline two",
+				"ok": true
+			}
+		},
+		{
+			"id": "ollama_chat_empty_content",
+			"description": "Ollama /api/chat response with an empty content string — should produce empty.",
+			"parser": "ollama_nonstream",
+			"driver": ["macos"],
+			"input": "{\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":false}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "ollama_chat_no_message",
+			"description": "Ollama /api/chat done-sentinel without a message field — should produce empty.",
+			"parser": "ollama_nonstream",
+			"driver": ["macos"],
+			"input": "{\"done\":true,\"done_reason\":\"stop\",\"eval_count\":42}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "ollama_chat_backslash_content",
+			"description": "Ollama /api/chat response with a backslash in the content (JSON double-escaped).",
+			"parser": "ollama_nonstream",
+			"driver": ["macos"],
+			"input": "{\"message\":{\"role\":\"assistant\",\"content\":\"C:\\\\Users\\\\test\"},\"done\":false}",
+			"expected": {
+				"text": "C:\\Users\\test",
+				"ok": true
+			}
+		},
+		{
 			"id": "ollama_stream_chunk_token",
 			"description": "Single Ollama streaming NDJSON line containing one token in the chat format.",
 			"parser": "ollama_stream_line",
+			"driver": ["ahk"],
 			"input": "{\"message\":{\"role\":\"assistant\",\"content\":\"bonjour\"},\"done\":false}",
 			"expected": {
 				"token": "bonjour",
@@ -68,6 +140,7 @@
 			"id": "ollama_stream_chunk_empty_token",
 			"description": "Streaming line with an empty content string — no token to accumulate.",
 			"parser": "ollama_stream_line",
+			"driver": ["ahk"],
 			"input": "{\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":false}",
 			"expected": {
 				"token": "",
@@ -79,6 +152,7 @@
 			"id": "ollama_stream_done_line",
 			"description": "Streaming done=true sentinel line — signals end of generation.",
 			"parser": "ollama_stream_line",
+			"driver": ["ahk"],
 			"input": "{\"done\":true,\"done_reason\":\"stop\",\"eval_count\":17}",
 			"expected": {
 				"token": "",
@@ -90,6 +164,7 @@
 			"id": "ollama_stream_multi_char_token",
 			"description": "Streaming line with a multi-character token including accented characters.",
 			"parser": "ollama_stream_line",
+			"driver": ["ahk"],
 			"input": "{\"message\":{\"role\":\"assistant\",\"content\":\" monde\"},\"done\":false}",
 			"expected": {
 				"token": " monde",
@@ -101,6 +176,7 @@
 			"id": "ollama_stream_escaped_token",
 			"description": "Streaming token containing a JSON-escaped backslash.",
 			"parser": "ollama_stream_line",
+			"driver": ["ahk"],
 			"input": "{\"message\":{\"role\":\"assistant\",\"content\":\"C:\\\\Users\"},\"done\":false}",
 			"expected": {
 				"token": "C:\\Users",
@@ -310,16 +386,6 @@
 			"input": "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"  \"}}]}",
 			"expected": {
 				"text": "  ",
-				"ok": true
-			}
-		},
-		{
-			"id": "ollama_nonstream_backslash_in_response",
-			"description": "Ollama response whose text contains a literal backslash (JSON double-escaped).",
-			"parser": "ollama_nonstream",
-			"input": "{\"response\":\"chemin: C:\\\\Users\\\\test\",\"done\":true}",
-			"expected": {
-				"text": "chemin: C:\\Users\\test",
 				"ok": true
 			}
 		},
