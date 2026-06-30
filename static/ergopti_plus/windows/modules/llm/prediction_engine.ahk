@@ -428,7 +428,12 @@ LLM_Engine_FirePrediction(buffer) {
 	; context. Gate is only active when the flag is on to avoid the OS call
 	; on every keystroke when the user has not opted in.
 	if (_LLM_Engine.Has("disable_password_fields") && _LLM_Engine["disable_password_fields"]) {
-		if IsSet(SFD_IsSecureField) && SFD_IsSecureField() {
+		; Use the fail-safe, UIA-backed, cached detector used by the keylogger and metrics
+		; filter — SFD_IsSecureField is fail-open and misses browser/Electron/WPF password
+		; fields (AHK-01). IsSet guard covers include-order: keylogger loads after prediction_engine.
+		IsPw := false
+		try IsPw := IsSet(KL_IsFocusedFieldPassword) && KL_IsFocusedFieldPassword()
+		if IsPw {
 			try LoggerInfo("LLM", "Prediction suppressed — password field detected.")
 			return
 		}
@@ -656,8 +661,12 @@ LLM_Engine_FirePrediction(buffer) {
 		streaming_enabled := false
 	if (backend == "api") {
 		entry := _LLM_Engine_GetActiveApiEntry()
-		if (entry == "")
+		if (entry == "") {
+			; AHK-26: fail fast with a diagnostic — a silent return here left the
+			; user with no tooltip and no log, indistinguishable from a working state
+			try LoggerWarn("LLM", "API backend selected but no entry configured — prediction skipped.")
 			return
+		}
 		model_tag := (entry is Map and entry.Has("Model")) ? entry["Model"] : (entry.HasOwnProp("Model") ? entry.Model : "")
 		log_model := model_tag
 		dispatch_fn := (temp, on_succ, on_fail) =>
