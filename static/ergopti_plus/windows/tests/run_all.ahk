@@ -238,9 +238,11 @@ try FileAppend("# [marker] starting direct include of LLM production modules`r`n
 #Include ../modules/llm/api_remote.ahk
 #Include unit/test_llm_api_ollama.ahk
 #Include unit/test_llm_api_remote.ahk
+#Include meta/test_remote_catalog_load_graceful.ahk
 #Include ../modules/llm/prediction_engine.ahk
 #Include unit/test_llm_prediction_engine.ahk
 #Include unit/test_llm_defaults.ahk
+#Include unit/test_llm_bridge_apply_expansion.ahk
 ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,
 ; which let a crash in its Levenshtein helper survive — include it + its tests.
 #Include ../modules/llm/parser.ahk
@@ -313,6 +315,7 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 ; "nonexistent function" error that hangs the headless runner with no output.
 #Include ../modules/keylogger/keylogger_clipboard.ahk
 #Include unit/test_keylogger_walker.ahk
+#Include unit/test_walker_ctx_missing_key.ahk
 #Include unit/test_keylogger_app_categories.ahk
 #Include unit/test_keylogger_reader.ahk
 ; Shared timings (A3): tap_holds/constants.ahk defines the tap-hold timing
@@ -616,6 +619,26 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_terminators_requires_directive.ahk
 #Include meta/test_layout_poll_pending_hkl.ahk
 #Include meta/test_llmbridge_stop_order.ahk
+#Include meta/test_tab_accept_invalidates_inflight.ahk
+#Include meta/test_llm_accept_suppress_balance.ahk
+#Include meta/test_altgr_latch_dispatch_aborts.ahk
+#Include meta/test_gesture_click_hold_released_on_suspend.ahk
+#Include meta/test_walker_batch_drained_on_rollover_and_stop.ahk
+#Include meta/test_tap_hold_none_sentinel.ahk
+#Include meta/test_deps_check_epoch_guard.ahk
+#Include meta/test_updater_rebuild_resets_dispatcher.ahk
+#Include meta/test_capsword_reset_on_suspend.ahk
+#Include meta/test_llm_render_clears_dequeue.ahk
+#Include meta/test_search_shortcut_run_path_existence_guard.ahk
+#Include meta/test_updater_swap_exit_guard.ahk
+#Include meta/test_keyboard_hook_dispatch_error_logged.ahk
+#Include meta/test_tray_menu_cleared_before_onboarding.ahk
+#Include meta/test_config_shortcuts_unescape_ordering.ahk
+#Include meta/test_gesture_selfactivated_bounded.ahk
+#Include meta/test_llm_api_no_entry_logged.ahk
+#Include meta/test_llm_dispatch_not_under_critical.ahk
+#Include meta/test_dead_ps1_pipeline_absent.ahk
+#Include meta/test_deps_fail_restores_priority.ahk
 #Include meta/test_llmdiff_has_corrections_ltrim.ahk
 #Include meta/test_audit_test_gaps.ahk
 #Include meta/test_keylogger_flush_atomic.ahk
@@ -667,6 +690,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_toml_render_bool_sentinel.ahk
 #Include meta/test_llm_menu_loaded_gate.ahk
 #Include meta/test_altgr_dispatch_suspend_guard.ahk
+#Include meta/test_altgr_dispatch_resume_aware.ahk
 #Include meta/test_llm_inject_complete_callback.ahk
 #Include meta/test_ngram_esrc_json_accumulate.ahk
 #Include meta/test_ngram_tables_not_cleared_on_refresh.ahk
@@ -731,6 +755,8 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 ; the duplicate test_framework.ahk includes were stripped so they integrate.
 #Include meta/test_dpapi_blob_size.ahk
 #Include meta/test_llm_diff_french_accents.ahk
+; LLM render must clear the dequeue state before rendering (llm-render-clears-dequeue).
+#Include meta/test_llm_render_clears_dequeue.ahk
 #Include unit/test_audit_v5_fixes.ahk
 ; Healthcheck pure formatters (uptime / HTML-escape) — coverage preserved from
 ; the deleted P5-stale test_session_regressions orphan. helpers.ahk is
