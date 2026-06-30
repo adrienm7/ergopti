@@ -643,6 +643,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_lalt_capslock_enabled_gate.ahk
 #Include meta/test_wpm_mousewatch_suspend_guard.ahk
 #Include meta/test_tooltip_resolve_pos_profiled.ahk
+#Include meta/test_error_net_guarded_send.ahk
 #Include meta/test_llmdiff_has_corrections_ltrim.ahk
 #Include meta/test_audit_test_gaps.ahk
 #Include meta/test_keylogger_flush_atomic.ahk
