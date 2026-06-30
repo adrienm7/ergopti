@@ -19,7 +19,7 @@
 ; flush is wired end-to-end through the watcher.
 ;
 ; Meta-static because _OnPrefixKeyDown and LLM_Bridge_FeedKeyDownIfActive
-; (modules/llm/llm_bridge.ahk) are not both in the run_all include graph and
+; (modules/keymap/llm_bridge.ahk) are not both in the run_all include graph and
 ; have OS / tooltip side effects.
 ; ==============================================================================
 
@@ -66,7 +66,7 @@ _PTLFG_EnterFlushReachesBridgeFromWatcher() {
 Test("PrefixWatcher: Enter flush reaches the LLM bridge via the watcher (prefix-onkeydown-tab-llm-feed-gap)", _PTLFG_EnterFlushReachesBridgeFromWatcher)
 
 _PTLFG_BridgeMapsEnterToFlush() {
-	Src := _PTLFG_ReadSource("modules/llm/llm_bridge.ahk")
+	Src := _PTLFG_ReadSource("modules/keymap/llm_bridge.ahk")
 	Seg := _DriverFuncBody("LLM_Bridge_FeedKeyDownIfActive")
 	Assert(Seg != "", "LLM_Bridge_FeedKeyDownIfActive must exist in llm_bridge.ahk")
 	; The bridge entry point must still route Enter (0x0D) to a flush, otherwise

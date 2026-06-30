@@ -43,7 +43,7 @@ LLM_Tooltip_Hide(accepted := false) {
 	_MMP_HideHits += 1
 }
 
-#Include ../modules/llm/llm_bridge.ahk
+#Include ../modules/keymap/llm_bridge.ahk
 
 ; The include re-declares ``global _LLM_Bridge_Active := false`` at load, which
 ; overwrites the pre-include value — restore the active state the tests need.

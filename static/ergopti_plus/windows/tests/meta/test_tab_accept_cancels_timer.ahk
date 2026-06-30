@@ -16,7 +16,7 @@
 ; injected text.
 ;
 ; Meta-static because LLM_Bridge_FeedKeyDownIfActive lives in
-; modules/llm/llm_bridge.ahk, which pulls in the full LLM stack (engine,
+; modules/keymap/llm_bridge.ahk, which pulls in the full LLM stack (engine,
 ; tooltip, pointer watcher, HookDispatcher, etc.). Loading it headless would
 ; require dozens of stubs and is unsafe; a byte-offset scan is the correct
 ; tool here, following the same pattern as test_onkeydown_dead_llm_branch.ahk.
@@ -51,10 +51,10 @@ _TACT_ReadSource(RelPath) {
 ; ====================================================
 
 _TACT_CancelTimerCalledAfterTryAcceptTab() {
-	Src := _TACT_ReadSource("modules/llm/llm_bridge.ahk")
+	Src := _TACT_ReadSource("modules/keymap/llm_bridge.ahk")
 	Body := _DriverFuncBody("LLM_Bridge_FeedKeyDownIfActive")
 	Assert(Body != "",
-		"LLM_Bridge_FeedKeyDownIfActive must exist in modules/llm/llm_bridge.ahk")
+		"LLM_Bridge_FeedKeyDownIfActive must exist in modules/keymap/llm_bridge.ahk")
 
 	; Locate the TryAcceptTab call inside the function body first.
 	AcceptPos := InStr(Body, "LLM_Tooltip_TryAcceptTab")

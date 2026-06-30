@@ -32,7 +32,7 @@
 ;   (c) _LLM_Bridge_OnInjectComplete calls _LSCResetFrom.
 ;   (d) The fixed-delay SetTimer for KL_ClearSynthetic is absent in OnAccept.
 ;
-; SCOPE: source introspection of modules/llm/llm_bridge.ahk.
+; SCOPE: source introspection of modules/keymap/llm_bridge.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -60,8 +60,8 @@ _LICC_ReadSource(RelPath) {
 ; ===================================================
 
 _LICC_CheckCallbackWired() {
-	Src := _LICC_ReadSource("modules/llm/llm_bridge.ahk")
-	Assert(Src != "", "modules/llm/llm_bridge.ahk must be readable")
+	Src := _LICC_ReadSource("modules/keymap/llm_bridge.ahk")
+	Assert(Src != "", "modules/keymap/llm_bridge.ahk must be readable")
 
 	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
 	Assert(Body != "", "LLM_Bridge_OnAccept must be present in llm_bridge.ahk")
@@ -76,8 +76,8 @@ _LICC_CheckCallbackWired() {
 }
 
 _LICC_CheckCompleteFnExists() {
-	Src := _LICC_ReadSource("modules/llm/llm_bridge.ahk")
-	Assert(Src != "", "modules/llm/llm_bridge.ahk must be readable")
+	Src := _LICC_ReadSource("modules/keymap/llm_bridge.ahk")
+	Assert(Src != "", "modules/keymap/llm_bridge.ahk must be readable")
 
 	Body := _DriverFuncBody("_LLM_Bridge_OnInjectComplete")
 	Assert(Body != "", "_LLM_Bridge_OnInjectComplete must be defined in llm_bridge.ahk")
@@ -92,8 +92,8 @@ _LICC_CheckCompleteFnExists() {
 }
 
 _LICC_CheckNoFixedTimerForClear() {
-	Src := _LICC_ReadSource("modules/llm/llm_bridge.ahk")
-	Assert(Src != "", "modules/llm/llm_bridge.ahk must be readable")
+	Src := _LICC_ReadSource("modules/keymap/llm_bridge.ahk")
+	Assert(Src != "", "modules/keymap/llm_bridge.ahk must be readable")
 
 	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
 	Assert(Body != "", "LLM_Bridge_OnAccept must be present in llm_bridge.ahk")

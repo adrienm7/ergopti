@@ -17,7 +17,7 @@
 ; LLM_Bridge_OnChar body and asserts the dismiss branch schedules a deferred
 ; hide rather than calling LLM_Tooltip_Hide synchronously in-line.
 ;
-; Meta-static because modules/llm/llm_bridge.ahk registers top-level state and
+; Meta-static because modules/keymap/llm_bridge.ahk registers top-level state and
 ; is not part of the headless run_all include graph.
 ; ==============================================================================
 
@@ -34,7 +34,7 @@
 
 _TtkbOnCharDefersHide() {
 	; Move-resilient: extract LLM_Bridge_OnChar()'s body by name via the framework
-	; helper instead of a pinned modules/llm/llm_bridge.ahk read.
+	; helper instead of a pinned modules/keymap/llm_bridge.ahk read.
 	Seg := _DriverFuncBody("LLM_Bridge_OnChar")
 	Assert(Seg != "", "LLM_Bridge_OnChar(ch) declaration must exist in llm_bridge.ahk")
 	; The dismiss branch must hand the teardown to a fresh timer thread, not run

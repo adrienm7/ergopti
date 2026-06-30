@@ -21,7 +21,7 @@
 ;   2. The StopGeneration call precedes the TextSend injection call.
 ;   3. LLM_Engine_StopGeneration increments request_id so callbacks self-discard.
 ;
-; SCOPE: source introspection of modules/llm/llm_bridge.ahk and
+; SCOPE: source introspection of modules/keymap/llm_bridge.ahk and
 ;        modules/llm/prediction_keylogger.ahk.
 ; ==============================================================================
 

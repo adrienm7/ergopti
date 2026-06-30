@@ -57,7 +57,7 @@ _LAHS_WindowStripped(Src, Anchor) {
 
 _LAHS_AcceptSuppressesBefore() {
 	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
-	Assert(Body != "", "LLM_Bridge_OnAccept must exist in modules/llm/llm_bridge.ahk")
+	Assert(Body != "", "LLM_Bridge_OnAccept must exist in modules/keymap/llm_bridge.ahk")
 	Assert(InStr(Body, "PrefixWatcherSuppress") > 0,
 		"LLM_Bridge_OnAccept must call PrefixWatcherSuppress to mute the hotstring InputHook before injecting the prediction")
 }
@@ -65,7 +65,7 @@ Test("llm_bridge: LLM_Bridge_OnAccept calls PrefixWatcherSuppress to suppress ho
 
 _LAHS_AcceptResetsHSE() {
 	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
-	Assert(Body != "", "LLM_Bridge_OnAccept must exist in modules/llm/llm_bridge.ahk")
+	Assert(Body != "", "LLM_Bridge_OnAccept must exist in modules/keymap/llm_bridge.ahk")
 	Assert(InStr(Body, "HSE_HardReset") > 0,
 		"LLM_Bridge_OnAccept must call HSE_HardReset() after TextSend to clear the stale pre-prediction buffer")
 }

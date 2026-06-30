@@ -21,7 +21,7 @@
 ;   4. PrefixWatcherSuppress is a depth counter: incrementing on true,
 ;      decrementing on false, never going below zero.
 ;
-; SCOPE: source introspection of modules/llm/llm_bridge.ahk and
+; SCOPE: source introspection of modules/keymap/llm_bridge.ahk and
 ;        lib/hotstrings/hotstring_prefix_watcher.ahk.
 ; ==============================================================================
 
