@@ -34,7 +34,9 @@ _LAltKeepsBareModifierForCapsLockCombo() {
     return false
 }
 
-#HotIf _LAltKeepsBareModifierForCapsLockCombo()
+; AHK-32: mirror the AltGr siblings — fall back to native CapsLock when the
+; whole group is disabled, instead of consuming the chord and returning silently
+#HotIf _LAltKeepsBareModifierForCapsLockCombo() and _AnyShortcutEnabled("lalt_caps_lock")
 SC038 & SC03A:: LAltCapsLockShortcut()
 #HotIf
 
