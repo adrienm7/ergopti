@@ -505,8 +505,27 @@ _LLM_Ollama_DispatchAsync(job) {
 	tmp_dir := _LLM_Ollama_TempDir()
 	tmp_payload := tmp_dir . "\ergopti_ollama_" . uid . ".json"
 	tmp_stdout := tmp_dir . "\ergopti_ollama_" . uid . ".out"
+	_LLM_Ollama_TrimAsyncRegistry()
+	; AHK-28: mark the slot busy synchronously so DrainPending's
+	; _LLM_Ollama_Async.Count > 0 coalescing check sees it before the
+	; deferred spawn runs. FSWrite + Run are deferred via SetTimer(-1)
+	; to release the Critical region before the blocking OS calls.
+	_LLM_Ollama_Async[req_id] := Map(
+		"pid", 0, "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout,
+		"on_success", job["on_success"], "on_fail", job["on_fail"],
+		"cancelled", false, "start_tick", A_TickCount,
+		"timeout_ms", LLM_OLLAMA_TIMEOUT + 5000, "payload_snip", "")
+	SetTimer(() => _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job), -1)
+}
+
+; Deferred spawn: writes the payload file and launches curl outside the
+; Critical region. The slot in _LLM_Ollama_Async was reserved synchronously
+; in _LLM_Ollama_DispatchAsync so the coalescing count is correct throughout.
+_LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job) {
+	global _LLM_Ollama_Async, LLM_OLLAMA_BASE_URL
 	if !FSWrite(tmp_payload, payload) {
 		try LoggerWarn("LLM.ollama", "Failed to write curl payload file.")
+		_LLM_Ollama_Async.Delete(req_id)
 		try job["on_fail"]()
 		_LLM_Ollama_DrainPending()
 		return
@@ -523,17 +542,16 @@ _LLM_Ollama_DispatchAsync(job) {
 	} catch as err {
 		try FSDelete(tmp_payload)
 		try LoggerWarn("LLM.ollama", "curl launch failed: {1}.", err.Message)
+		_LLM_Ollama_Async.Delete(req_id)
 		try job["on_fail"]()
 		_LLM_Ollama_DrainPending()
 		return
 	}
-	_LLM_Ollama_TrimAsyncRegistry()
 	payload_snip := StrLen(payload) > 160 ? SubStr(payload, 1, 160) . "…" : payload
-	_LLM_Ollama_Async[req_id] := Map(
-		"pid", pid, "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout,
-		"on_success", job["on_success"], "on_fail", job["on_fail"],
-		"cancelled", false, "start_tick", A_TickCount,
-		"timeout_ms", LLM_OLLAMA_TIMEOUT + 5000, "payload_snip", payload_snip)
+	if _LLM_Ollama_Async.Has(req_id) {
+		_LLM_Ollama_Async[req_id]["pid"]          := pid
+		_LLM_Ollama_Async[req_id]["payload_snip"] := payload_snip
+	}
 	_LLM_Ollama_PollCurl(req_id)
 }
 
