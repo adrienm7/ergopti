@@ -232,7 +232,7 @@ Updater_SetCheckInterval(Seconds) {
 	; is defined in ui/tray_menu.ahk; we call it indirectly via SetTimer so the
 	; rebuild happens off the click handler's call stack (avoids surprising
 	; reentrancy if the rebuild ever opens a fresh menu under the cursor).
-	try SetTimer((*) => initMenu(), -50)
+	try SetTimer((*) => _Updater_RebuildMenu(), -50)
 }
 
 
@@ -240,6 +240,16 @@ Updater_SetCheckInterval(Seconds) {
 ; ====================================
 ; ===== 1.3) Version helpers ==========
 ; ====================================
+
+; AHK-15: wrapper called from all updater SetTimer(-50) tray rebuild sites.
+; initMenu() deletes and rebuilds the tray menu but never calls
+; MenuDispatcher_Reset(), causing the dispatcher Map to accumulate stale IDs
+; with each rebuild — eventually a recycled ID could fire the wrong action.
+; Reset before rebuild mirrors the contract in RebuildTrayMenu (menu_rebuild.ahk).
+_Updater_RebuildMenu() {
+	try MenuDispatcher_Reset()
+	try initMenu()
+}
 
 ; Returns true when running directly from the AHK source tree (not compiled).
 ; Detected by checking A_IsCompiled, which is 1 only for .exe builds.
@@ -780,9 +790,10 @@ _Updater_ParsePublishedAt(Json) {
 ; otherwise both pre-releases and stables come through so the dev channel can
 ; show every nightly side by side with the latest stable.
 ;
-; Each entry: { Tag, Body, HtmlUrl, PublishedAt, Prerelease }. The original
+; Each entry: { Tag, Body, HtmlUrl, PublishedAt, Prerelease, RawJson }. The original
 ; API order is preserved (GitHub returns most-recent first) so callers do not
-; need to sort.
+; need to sort. RawJson carries the per-release JSON chunk so changelog-list install
+; can resolve the asset download URL via _Updater_FindAssetUrl (AHK-07).
 Updater_ParseReleasesList(Json, MainOnly := false) {
 	out := []
 	for _, chunk in _Updater_SplitReleasesArray(Json) {
@@ -791,7 +802,8 @@ Updater_ParseReleasesList(Json, MainOnly := false) {
 			Body:        Updater_ParseBody(chunk),
 			HtmlUrl:     _Updater_ParseHtmlUrl(chunk),
 			PublishedAt: _Updater_ParsePublishedAt(chunk),
-			Prerelease:  _Updater_ParsePrerelease(chunk)
+			Prerelease:  _Updater_ParsePrerelease(chunk),
+			RawJson:     chunk
 		}
 		if (rec.Tag == "")
 			continue
