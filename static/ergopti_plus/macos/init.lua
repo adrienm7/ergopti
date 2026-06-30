@@ -254,6 +254,23 @@ end
 
 
 
+-- First-launch guard — before anything starts, bail if there is no config.toml.
+-- The onboarding wizard writes the file then calls hs.reload(), so the full boot
+-- must not run. Checked here, before Section 1 pre-start, so gestures and
+-- shortcuts are never armed during the wizard (they default enabled=true which
+-- would fire touch callbacks and synthetic keys before the user consented).
+do
+	local ok_ob, onboarding_mod = pcall(require, "ui.onboarding")
+	if ok_ob and type(onboarding_mod) == "table" then
+		local cfg_path = menu_paths.get("ConfigTomlPath")
+		if onboarding_mod.should_run(cfg_path) then
+			onboarding_mod.run(cfg_path)
+			return
+		end
+	end
+end
+
+
 -- ===================================
 -- ====================================
 -- ======= 1/ Module Pre-start =======
@@ -313,19 +330,6 @@ Boot.mark("MLX server cleanup")
 -- ======= 3/ Config Loading & Setup =======
 -- ==========================================
 -- =======================================
-
--- Show the onboarding wizard on first launch (config.toml absent) and bail early —
--- the wizard writes the file and calls hs.reload(), so normal init must not proceed
-do
-	local ok_ob, onboarding_mod = pcall(require, "ui.onboarding")
-	if ok_ob and type(onboarding_mod) == "table" then
-		local cfg_path = menu_paths.get("ConfigTomlPath")
-		if onboarding_mod.should_run(cfg_path) then
-			onboarding_mod.run(cfg_path)
-			return
-		end
-	end
-end
 
 -- Apply optional user overrides from hammerspoon/config.toml on top of
 -- hs.settings. The [script] and [features] sections are an optional "expert"
