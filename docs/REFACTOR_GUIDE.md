@@ -229,7 +229,8 @@ Pipeline prouvé (P4/P5) : extraction PowerShell (BOM+CRLF) remplaçant le bloc 
 | ✅ | **P11.5b** | `keylogger_reader.ahk` 1157 | → `keylogger_reader_{db,manifest,ngrams}.ahk`. |
 | ✅ | **P11.6a** | macOS `shortcuts/actions/system.lua` 1076 | → system_mouse.lua + system_pixel.lua (658 l. restant). |
 | ☐ | **P11.6b** | macOS `keymap/registry.lua` 917, `menu_hotstrings.lua` 1322 | index→`registry_index.lua` ; décomposer `build_management`. **F8 hot-path** |
-| ☐ | **P11.7** | `keylogger_walker.ahk` 1254 ↔ `aggregator.lua` 1122 (**parité 1:1**) | split **simultané** des 2 côtés. **Élevé** |
+| ✅ | **P11.7a** | `keylogger_walker.ahk` 1254 | → `keylogger_walker_{core,events,sql}.ahk`. |
+| ☐ | **P11.7b** | `aggregator.lua` 1122 | split miroir côté macOS — Lua `local` scope rend l'extraction non-triviale (shared-state table required). **Élevé — déféré** |
 
 #### P12 — Symétrie & onboarding (renommages low-risk + docs)
 
