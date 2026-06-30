@@ -18,6 +18,10 @@
 --- 3. Display Mirror: Calls CGBeginDisplayConfiguration / CGConfigureDisplayMirrorOfDisplay
 ---    via an inline Python script, bypassing keyboard shortcuts entirely so mirroring
 ---    toggles reliably regardless of F-key mode or system preferences.
+---
+--- Sub-modules (merged into this table at load time):
+---   * system_pixel.lua  — pixel color copy and screenshot helpers (section 3)
+---   * system_mouse.lua  — mouse teleport, display mirror, emoji picker, spotlight (section 5)
 --- ==============================================================================
 
 local M = {}
@@ -79,34 +83,6 @@ local KEEP_AWAKE_WAKE_KEY    = Keycodes.F18_WAKE_OS
 -- auto-disables keep-awake, so the next Ctrl+M re-enables instead of disabling.
 local AWAKE_ACTIVATION_GRACE_SEC = 1.0
 
--- Spotlight ring color (circle on the screen that holds the cursor)
-local SPOTLIGHT_COLOR = {red = 1, green = 0.85, blue = 0}    -- Yellow
-
--- Cross marker color (× shown on every screen NOT holding the cursor)
-local CROSS_COLOR     = {red = 0.9, green = 0.1, blue = 0.05} -- Red
-
--- Shared stroke alpha for all overlay shapes (circle and crosses)
-local OVERLAY_STROKE_ALPHA = 0.9  -- High opacity so the border reads against any background
-
--- Mouse spotlight ring parameters (circle shown on the screen that holds the cursor)
-local SPOTLIGHT_RADIUS_PX   = 60    -- Outer ring radius around the cursor center
-local SPOTLIGHT_STROKE_PX   = 6     -- Ring stroke width
-local SPOTLIGHT_FILL_ALPHA  = 0.40  -- Fill opacity for the ring
-local SPOTLIGHT_DURATION_S  = 5     -- Max seconds before auto-dismiss (overridden by mouse move)
-local SPOTLIGHT_PADDING_PX  = 12    -- Canvas padding so the stroke is never clipped
-
--- Cross marker parameters (shown centered on every screen that does NOT hold the cursor)
-local CROSS_ARM_HALF_PX  = 60   -- Half-length of each arm; total span = 120 px
-local CROSS_ARM_WIDTH_PX = 14   -- Thickness of each bar
-local CROSS_STROKE_PX    = 6    -- Border stroke width, matches the circle ring
-local CROSS_FILL_ALPHA   = 0.40 -- Fill opacity for the cross markers
-local CROSS_PADDING_PX   = 12   -- Canvas padding so strokes are never clipped
-
--- Tap and teleport timing
-local SPOTLIGHT_TAP_DELAY_SEC       = 0.05 -- Delay before arming the mouseMoved tap; prevents
-                                           -- a programmatic warp from immediately dismissing spotlight
-local SPOTLIGHT_TELEPORT_DURATION_S = 3    -- Shorter duration when triggered by teleport
-
 local awake_timer      = nil
 local awake_active     = false
 local awake_origin_pos = nil
@@ -124,9 +100,6 @@ local awake_input_watcher = nil
 -- Handle returned by hs.alert.show so the persistent "active" banner can be
 -- dismissed precisely when keep-awake is disabled, without closing other alerts.
 local awake_alert_id = nil
-
--- Spotlight state
-local _spotlight_dismiss = nil  -- Dismiss fn for the active spotlight; nil when none active
 
 -- Closes the persistent keep-awake banner. closeAll(0) is used rather than
 -- closeSpecific because the banner is always the only long-lived alert, so we
@@ -291,7 +264,7 @@ function M.toggle_awake()
 		end
 
 		-- Watch for any real keyboard or touchpad activity (key press, scroll,
-		-- swipe, tap, pinch, rotate…). We cut silently (no alert) since the user
+		-- swipe, tap, pinch, rotate...). We cut silently (no alert) since the user
 		-- is clearly back — the visual noise would be worse than the keep-awake itself.
 		local ev = eventtap.event.types
 		local watch_types = {
@@ -417,109 +390,7 @@ end
 
 -- =============================================
 --- =============================================
--- ======= 3/ Pixel Color Implementation =======
---- =============================================
--- =============================================
-
---- Reads the hex color of the pixel at (x, y) via a minimal inline Python PNG decoder.
---- Captures a 3×3-pixel region and samples the center pixel.
---- Python is used because Hammerspoon has no native per-pixel color API.
---- @param x number X screen coordinate.
---- @param y number Y screen coordinate.
---- @return string|nil Hex color string like "#a1b2c3", or nil on failure.
-local function pixel_hex_at(x, y)
-	Logger.trace(LOG, "Pixel color read started…")
-	local tmpfile = "/tmp/_hs_pixel_cap.png"
-	local safe_x  = math.floor(tonumber(x) or 0) - 1
-	local safe_y  = math.floor(tonumber(y) or 0) - 1
-
-	local cap_cmd = string.format("screencapture -x -R \"%d,%d,3,3\" \"%s\"", safe_x, safe_y, tmpfile)
-	local ok_cap  = pcall(hs.execute, cap_cmd)
-	if not ok_cap then
-		Logger.error(LOG, "screencapture failed — pixel read aborted.")
-		return nil
-	end
-
-	local py = string.format([[python3 -c "
-import struct,zlib
-try:
-  data=open('%s','rb').read()
-  w,h=struct.unpack('>II',data[16:24])
-  ct=data[25];bpp=4 if ct==6 else 3
-  i,chunks=8,b''
-  while i<len(data)-12:
-    l=struct.unpack('>I',data[i:i+4])[0];t=data[i+4:i+8]
-    if t==b'IDAT':chunks+=data[i+8:i+8+l]
-    elif t==b'IEND':break
-    i+=l+12
-  raw=zlib.decompress(chunks)
-  cx=w//2;cy=h//2;off=cy*(1+w*bpp)+1+cx*bpp
-  r,g,b=raw[off],raw[off+1],raw[off+2]
-  print('#%%02x%%02x%%02x' %% (r,g,b))
-except Exception:
-  pass
-"
-]], tmpfile)
-
-	local ok_py, out = pcall(hs.execute, py)
-	if ok_py and out then
-		local hex = out:match("(#%x%x%x%x%x%x)")
-		if hex then
-			Logger.done(LOG, "Pixel color read — %s.", hex)
-			return hex
-		end
-	end
-
-	Logger.warn(LOG, "Python pixel extractor returned no valid hex code.")
-	return nil
-end
-
---- Reads the color of the pixel currently under the mouse cursor and copies it to the clipboard.
-function M.copy_pixel_color()
-	local ok, pos = pcall(hs.mouse.absolutePosition)
-	if not ok or not pos then
-		Logger.error(LOG, "copy_pixel_color: failed to read mouse position.")
-		return
-	end
-
-	local hex = pixel_hex_at(math.floor(pos.x), math.floor(pos.y))
-	if not hex then
-		notifications.notify(i18n.get("shortcuts.pixel_read_error"), nil, "error")
-		return
-	end
-
-	pcall(pasteboard.setContents, hex)
-	notifications.notify(string.format(i18n.get("shortcuts.color_copied"), hex), nil, "success")
-end
-
---- Launches the native macOS interactive screenshot tool and copies the result to the clipboard.
-function M.interactive_screenshot()
-	Logger.trace(LOG, "Interactive screenshot started…")
-	local ok, task = pcall(hs.task.new,
-		"/usr/sbin/screencapture",
-		function(exit_code, _, _)
-			if exit_code == 0 then
-				notifications.notify(i18n.get("shortcuts.screenshot_copied"), nil, "success")
-				Logger.done(LOG, "Interactive screenshot completed.")
-			else
-				Logger.warn(LOG, "Interactive screenshot failed or was cancelled.")
-			end
-		end,
-		{"-i", "-c"}
-	)
-	if ok and task then
-		task:start()
-	else
-		Logger.error(LOG, "Failed to create screenshot task.")
-	end
-end
-
-
-
-
--- =============================================
---- =============================================
--- ======= 4/ EventTap Factory Functions =======
+-- ======= 3/ EventTap Factory Functions =======
 --- =============================================
 -- =============================================
 
@@ -636,8 +507,8 @@ function M.bind_layer_scroll()
 	}
 end
 
---- Intercepts Cmd+★ / Cmd+* and re-fires as Cmd+S, preserving any additional modifiers.
---- hs.hotkey.bind cannot reliably intercept ★ (Shift+8 on some layouts) because the
+--- Intercepts Cmd+star / Cmd+* and re-fires as Cmd+S, preserving any additional modifiers.
+--- hs.hotkey.bind cannot reliably intercept star (Shift+8 on some layouts) because the
 --- OS assigns the character after modifier processing; a raw tap fires first.
 --- @param on_trigger function|nil Called as on_trigger(label, app_name) for shortcut logging.
 --- @return table Fake-hotkey object with :delete().
@@ -648,7 +519,7 @@ function M.bind_cmd_star(on_trigger)
 
 		local ok, ch = pcall(function() return e:getCharacters() end)
 		if not ok or not ch then return false end
-		if ch ~= "★" and ch ~= "*" and ch ~= "✱" then return false end
+		if ch ~= "\xe2\x98\x85" and ch ~= "*" and ch ~= "\xe2\x9c\xb1" then return false end
 
 		-- Build the modifier list to re-fire the keystroke faithfully
 		local mods = {}
@@ -687,8 +558,6 @@ end
 
 
 
-
-
 --- Pure decision for the wrap eventtap, extracted so the two hard-won rules can
 --- be unit-tested without synthesising key events.
 --- Returns "wrap" when the eventtap must SUPPRESS the keystroke and wrap the
@@ -701,7 +570,7 @@ end
 ---   2. When no selection is readable (nothing selected, or an app such as VS Code
 ---      that does not expose AXSelectedText), pass the symbol through rather than
 ---      suppressing it.
---- @param flags table Modifier flags from the keyDown event (cmd/ctrl/alt/…).
+--- @param flags table Modifier flags from the keyDown event (cmd/ctrl/alt/...).
 --- @param ch string The character the keystroke produced.
 --- @param pairs_tbl table The active {[char]={left,right}} wrap table.
 --- @param has_selection boolean Whether a non-empty selection was readable.
@@ -745,7 +614,7 @@ function M.bind_wrap_text_if_selected(get_wrap_pairs)
 		-- the decision for punctuation keys, which is what makes a "does not wrap
 		-- here" report diagnosable without code changes.
 		if ch:match("%w") == nil and ch:match("%s") == nil then
-			Logger.debug(LOG, "wrap key=%q alt=%s match=%s sel=%s → %s",
+			Logger.debug(LOG, "wrap key=%q alt=%s match=%s sel=%s => %s",
 				ch, tostring(flags.alt == true), tostring(pair ~= nil), tostring(sel ~= nil), decision)
 		end
 
@@ -760,317 +629,30 @@ end
 
 
 
--- ============================================
---- ============================================
--- ======= 5/ Mouse & Display Utilities =======
---- ============================================
--- ============================================
+-- ===========================================
+--- ===========================================
+-- ======= 4/ Sub-module Merge (Pixel) =======
+--- ===========================================
+-- ===========================================
 
---- Teleports the mouse cursor to the center of the next screen (cycles through all screens).
---- Shows a 1-second spotlight at the destination so the cursor is easy to locate.
---- Notifies the user when only one screen is available.
-function M.teleport_mouse()
-	local ok_cur, current = pcall(hs.mouse.getCurrentScreen)
-	if not ok_cur or not current then
-		Logger.warn(LOG, "teleport_mouse: could not determine current screen.")
-		return
-	end
-
-	local all = hs.screen.allScreens()
-	if #all < 2 then
-		notifications.notify(i18n.get("shortcuts.no_other_monitor"), nil, "warning")
-		Logger.info(LOG, "teleport_mouse: single screen — nothing to do.")
-		return
-	end
-
-	-- Find the next screen in the list, wrapping around
-	local target     = nil
-	local current_id = current:id()
-	for i, s in ipairs(all) do
-		if s:id() == current_id then
-			target = all[(i % #all) + 1]
-			break
-		end
-	end
-	if not target then target = all[1] end
-
-	local f        = target:frame()
-	local ok_move  = pcall(hs.mouse.absolutePosition, {
-		x = f.x + math.floor(f.w / 2),
-		y = f.y + math.floor(f.h / 2),
-	})
-
-	if ok_move then
-		Logger.info(LOG, "Mouse teleported to screen '%s'.", target:name() or "unknown")
-		-- Brief spotlight so the cursor is immediately visible at its new location
-		M.spotlight_mouse(SPOTLIGHT_TELEPORT_DURATION_S)
-	else
-		Logger.error(LOG, "teleport_mouse: failed to set mouse position.")
-	end
-end
-
---- Locks the screen immediately using the system screensaver engine.
-function M.lock_screen()
-	Logger.start(LOG, "Locking screen…")
-	local ok, err = pcall(hs.caffeinate.lockScreen)
-	if ok then
-		Logger.success(LOG, "Screen locked.")
-	else
-		Logger.error(LOG, "lock_screen: failed — %s.", tostring(err))
-	end
+-- Merge pixel-color and screenshot helpers from system_pixel so callers that
+-- require("modules.shortcuts.actions.system") continue to see one flat table.
+local pixel_mod = require("modules.shortcuts.actions.system_pixel")
+for k, v in pairs(pixel_mod) do
+	M[k] = v
 end
 
 
---- Opens the macOS Character Viewer (emoji picker) via the system shortcut.
---- Mirrors Windows' native Win + . behaviour for cross-platform parity.
-function M.open_emoji_picker()
-	Logger.start(LOG, "Opening emoji picker…")
-	local ok, err = pcall(function()
-		eventtap.keyStroke({"ctrl", "cmd"}, "space", 0)
-	end)
-	if ok then
-		Logger.success(LOG, "Emoji picker triggered.")
-	else
-		Logger.error(LOG, "open_emoji_picker: failed — %s.", tostring(err))
-	end
-end
+-- ===========================================
+--- ===========================================
+-- ======= 5/ Sub-module Merge (Mouse) =======
+--- ===========================================
+-- ===========================================
 
-
---- Toggles display mirroring using CoreGraphics via an inline Python script.
---- CGBeginDisplayConfiguration / CGConfigureDisplayMirrorOfDisplay are the
---- official public APIs for this; the hs.eventtap Cmd+F1 approach is unreliable
---- because macOS maps that shortcut through the media-key layer, which Hammerspoon
---- cannot dependably replicate.
-function M.toggle_display_mirror()
-	Logger.start(LOG, "Toggling display mirror via CoreGraphics…")
-
-	local py = [[
-import ctypes, sys
-CG = "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics"
-cg = ctypes.cdll.LoadLibrary(CG)
-cg.CGGetOnlineDisplayList.restype = ctypes.c_int32
-cg.CGMainDisplayID.restype        = ctypes.c_uint32
-cg.CGDisplayIsInMirrorSet.restype = ctypes.c_bool
-MAX = 16
-n   = ctypes.c_uint32(0)
-ids = (ctypes.c_uint32 * MAX)()
-cg.CGGetOnlineDisplayList(MAX, ids, ctypes.byref(n))
-count = n.value
-if count < 2:
-    print("single_screen")
-    sys.exit(0)
-main      = cg.CGMainDisplayID()
-mirroring = any(cg.CGDisplayIsInMirrorSet(ids[i]) for i in range(count) if ids[i] != main)
-cfg = ctypes.c_void_p()
-cg.CGBeginDisplayConfiguration(ctypes.byref(cfg))
-if mirroring:
-    for i in range(count):
-        if ids[i] != main:
-            cg.CGConfigureDisplayMirrorOfDisplay(cfg, ids[i], 0)
-    cg.CGCompleteDisplayConfiguration(cfg, 1)
-    print("mirror_disabled")
-else:
-    for i in range(count):
-        if ids[i] != main:
-            cg.CGConfigureDisplayMirrorOfDisplay(cfg, ids[i], main)
-    cg.CGCompleteDisplayConfiguration(cfg, 1)
-    print("mirror_enabled")
-]]
-
-	local tmpfile  = "/tmp/_hs_mirror_toggle.py"
-	local ok_write = pcall(function()
-		local f = io.open(tmpfile, "w")
-		if not f then error("io.open failed") end
-		f:write(py)
-		f:close()
-	end)
-	if not ok_write then
-		Logger.error(LOG, "toggle_display_mirror: could not write Python script to temp file.")
-		return
-	end
-
-	local ok_py, out = pcall(hs.execute, "python3 \"" .. tmpfile .. "\" 2>&1")
-	if not ok_py or not out then
-		Logger.error(LOG, "toggle_display_mirror: Python execution failed.")
-		return
-	end
-
-	local result = (out or ""):match("(%S+)")
-	if result == "mirror_enabled" then
-		Logger.success(LOG, "Display mirroring enabled.")
-	elseif result == "mirror_disabled" then
-		Logger.success(LOG, "Display mirroring disabled.")
-	elseif result == "single_screen" then
-		Logger.info(LOG, "Display mirror toggle: single screen — nothing to do.")
-	else
-		Logger.error(LOG, "toggle_display_mirror: unexpected Python output: '%s'.", tostring(out):gsub("\n", " "))
-	end
-end
-
---- Builds and immediately shows a yellow × marker centered on the given screen.
---- The × is defined as a 12-vertex closed polygon with the arm tips computed
---- directly in diagonal coordinates, so each tip edge is perfectly perpendicular
---- to its arm direction (flat square ends, no triangular artefacts).
---- Single polygon = uniform fill, stroke only on the outer perimeter.
---- @param screen userdata The hs.screen to draw on.
---- @return userdata|nil The hs.canvas object, or nil on error.
-local function create_cross_canvas(screen)
-	local f    = screen:frame()
-	local H    = CROSS_ARM_HALF_PX
-	local W    = CROSS_ARM_WIDTH_PX
-	local pad  = CROSS_PADDING_PX
-	local hw   = W / 2
-	local side = H * 2 + pad * 2
-	local cx   = f.x + math.floor((f.w - side) / 2)
-	local cy   = f.y + math.floor((f.h - side) / 2)
-
-	local ok_c, cv = pcall(hs.canvas.new, {x = cx, y = cy, w = side, h = side})
-	if not ok_c or not cv then
-		Logger.warn(LOG, "create_cross_canvas: failed to create canvas for screen '%s'.", screen:name() or "?")
-		return nil
-	end
-
-	local ox  = side / 2
-	local oy  = side / 2
-	local sq2 = math.sqrt(2)
-
-	-- Each × arm points along a 45° diagonal. The arm tip edges are perpendicular
-	-- to that diagonal, so they are themselves diagonal — giving flat square ends.
-	-- The three distances (in axis-aligned pixels from the centre) that fully
-	-- describe the shape:
-	local tip_far  = (H + hw) / sq2  -- far  corner of each arm tip (cardinal extent)
-	local tip_near = (H - hw) / sq2  -- near corner of each arm tip (cardinal extent)
-	local concave  = hw * sq2        -- concave inner corner (cardinal extent)
-
-	-- 12 vertices, clockwise from the upper-left corner of the NE arm tip.
-	-- The pattern repeats 4× with 90° rotational symmetry.
-	local pts = {
-		{x = ox + tip_near, y = oy - tip_far },  --  1: NE tip — leading corner (CW)
-		{x = ox + tip_far,  y = oy - tip_near},  --  2: NE tip — trailing corner
-		{x = ox + concave,  y = oy            },  --  3: right inner concave corner
-		{x = ox + tip_far,  y = oy + tip_near},  --  4: SE tip — leading corner
-		{x = ox + tip_near, y = oy + tip_far },  --  5: SE tip — trailing corner
-		{x = ox,            y = oy + concave  },  --  6: bottom inner concave corner
-		{x = ox - tip_near, y = oy + tip_far },  --  7: SW tip — leading corner
-		{x = ox - tip_far,  y = oy + tip_near},  --  8: SW tip — trailing corner
-		{x = ox - concave,  y = oy            },  --  9: left inner concave corner
-		{x = ox - tip_far,  y = oy - tip_near},  -- 10: NW tip — leading corner
-		{x = ox - tip_near, y = oy - tip_far },  -- 11: NW tip — trailing corner
-		{x = ox,            y = oy - concave  },  -- 12: top inner concave corner
-	}
-
-	cv[1] = {
-		type        = "segments",
-		closed      = true,
-		action      = "strokeAndFill",
-		fillColor   = {red = CROSS_COLOR.red, green = CROSS_COLOR.green, blue = CROSS_COLOR.blue, alpha = CROSS_FILL_ALPHA},
-		strokeColor = {red = CROSS_COLOR.red, green = CROSS_COLOR.green, blue = CROSS_COLOR.blue, alpha = OVERLAY_STROKE_ALPHA},
-		strokeWidth = CROSS_STROKE_PX,
-		coordinates = pts,
-	}
-
-	cv:level(hs.canvas.windowLevels.overlay)
-	cv:show()
-	return cv
-end
-
---- Shows a yellow filled ring around the current mouse position and a yellow cross
---- centered on every other connected screen.
---- Auto-dismisses after `duration_s` seconds OR immediately when the mouse moves.
---- All overlays (circle + crosses) are dismissed together.
---- Calling this while a spotlight is already active cancels the previous one first,
---- so canvases never stack and opacity never compounds.
---- @param duration_s number|nil Override for the auto-dismiss delay (defaults to SPOTLIGHT_DURATION_S).
-function M.spotlight_mouse(duration_s)
-	-- Enforce uniqueness: cancel any previously active spotlight before creating a new one
-	if _spotlight_dismiss then
-		pcall(_spotlight_dismiss)
-		_spotlight_dismiss = nil
-	end
-
-	local dur = (type(duration_s) == "number" and duration_s > 0) and duration_s or SPOTLIGHT_DURATION_S
-
-	local ok, pos = pcall(hs.mouse.absolutePosition)
-	if not ok or not pos then
-		Logger.error(LOG, "spotlight_mouse: failed to read mouse position.")
-		return
-	end
-
-	local r   = SPOTLIGHT_RADIUS_PX
-	local pad = SPOTLIGHT_PADDING_PX
-	local d   = r * 2
-
-	-- Circle canvas on the screen holding the cursor
-	local ok_c, circle = pcall(hs.canvas.new, {
-		x = math.floor(pos.x) - r - pad,
-		y = math.floor(pos.y) - r - pad,
-		w = d + pad * 2,
-		h = d + pad * 2,
-	})
-	if not ok_c or not circle then
-		Logger.error(LOG, "spotlight_mouse: failed to create circle canvas.")
-		return
-	end
-
-	circle[1] = {
-		type        = "oval",
-		fillColor   = {red = SPOTLIGHT_COLOR.red, green = SPOTLIGHT_COLOR.green, blue = SPOTLIGHT_COLOR.blue, alpha = SPOTLIGHT_FILL_ALPHA},
-		strokeColor = {red = SPOTLIGHT_COLOR.red, green = SPOTLIGHT_COLOR.green, blue = SPOTLIGHT_COLOR.blue, alpha = OVERLAY_STROKE_ALPHA},
-		strokeWidth = SPOTLIGHT_STROKE_PX,
-		frame       = {x = pad, y = pad, w = d, h = d},
-	}
-	circle:level(hs.canvas.windowLevels.overlay)
-	circle:show()
-
-	-- Cross canvases on every screen that does NOT hold the cursor
-	local crosses      = {}
-	local ok_ms, ms    = pcall(hs.mouse.getCurrentScreen)
-	local mouse_scr_id = (ok_ms and ms) and ms:id() or nil
-	for _, s in ipairs(hs.screen.allScreens()) do
-		if s:id() ~= mouse_scr_id then
-			local cv = create_cross_canvas(s)
-			if cv then table.insert(crosses, cv) end
-		end
-	end
-
-	Logger.debug(LOG, "Mouse spotlight shown at (%.0f, %.0f); %d cross(es); %.1fs duration.", pos.x, pos.y, #crosses, dur)
-
-	-- Shared dismissal guard: cleans up all overlays, watchers, and cursor zoom exactly once
-	local dismissed = false
-	local timer_ref = nil
-	local move_tap  = nil
-
-	local function dismiss()
-		if dismissed then return end
-		dismissed = true
-		_spotlight_dismiss = nil
-		if timer_ref then pcall(function() timer_ref:stop() end); timer_ref = nil end
-		if move_tap  then pcall(function() move_tap:stop()  end); move_tap  = nil end
-		pcall(function() circle:delete() end)
-		for _, cv in ipairs(crosses) do pcall(function() cv:delete() end) end
-		Logger.debug(LOG, "Mouse spotlight dismissed.")
-	end
-
-	_spotlight_dismiss = dismiss
-
-	-- Arm the mouseMoved tap after a brief delay so a programmatic cursor warp
-	-- (e.g. from teleport_mouse) does not fire and immediately dismiss the spotlight
-	hs.timer.doAfter(SPOTLIGHT_TAP_DELAY_SEC, function()
-		if dismissed then return end
-		local ok_tap, tap = pcall(hs.eventtap.new, {hs.eventtap.event.types.mouseMoved}, function()
-			dismiss()
-			return false  -- Do not consume the event; the cursor must keep moving normally
-		end)
-		if ok_tap and tap then
-			move_tap = tap
-			pcall(function() move_tap:start() end)
-		else
-			Logger.warn(LOG, "spotlight_mouse: could not create move watcher — timeout only.")
-		end
-	end)
-
-	-- Fallback: auto-dismiss after the configured duration even without movement
-	timer_ref = hs.timer.doAfter(dur, dismiss)
+-- Merge mouse/display/spotlight utilities from system_mouse for the same reason.
+local mouse_mod = require("modules.shortcuts.actions.system_mouse")
+for k, v in pairs(mouse_mod) do
+	M[k] = v
 end
 
 return M
