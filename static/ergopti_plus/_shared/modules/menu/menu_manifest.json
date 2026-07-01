@@ -663,9 +663,8 @@
 			"type": "---"
 		},
 		{
-			"type": "feature",
+			"type": "dynamic",
 			"id": "circular_spaces",
-			"i18n": "menu.gestures.circular_spaces",
 			"platforms": [
 				"hs"
 			]
