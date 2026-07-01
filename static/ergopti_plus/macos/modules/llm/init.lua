@@ -315,6 +315,15 @@ function M.load_api_entries()
 	if type(active_id) == "string" then
 		ApiRemote.set_active_entry_id(active_id)
 	end
+	-- Pre-warm the active entry's decrypted token cache asynchronously so a
+	-- LATER call to ApiRemote.get_active_entry() from a warmup or
+	-- first-prediction timer callback almost always hits the cached
+	-- cleartext instead of shelling out to `security` synchronously — a
+	-- locked Keychain there would otherwise freeze the whole run loop on a
+	-- modal unlock prompt (F-MED-9). This call itself is already off the
+	-- boot path (load_api_entries is deferred via TimerScheduler.after(0,…)
+	-- below), so the extra async hop here costs nothing at boot.
+	pcall(ApiRemote.prewarm_active_entry_decrypt)
 end
 
 --- Persist the current API entry list + active id to hs.settings. Called by
