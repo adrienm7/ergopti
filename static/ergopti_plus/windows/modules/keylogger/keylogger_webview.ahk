@@ -139,7 +139,7 @@ KLWV_Open(which, metrics_dir) {
     ; delayed push triggers a fast manifest-only build so the user sees
     ; KPIs within 2 s, and the first live tick (≤30 s) fills in n-grams.
 
-    title := (which = "typing") ? "Métriques de frappe" : "Temps sur les applications"
+    title := (which = "typing") ? t("keylogger_ui.typing_metrics") : t("metrics_apps.window_title")
     g := Gui("+Resize +MinSize800x600", title)
     g.MarginX := 0
     g.MarginY := 0
@@ -220,8 +220,13 @@ KLWV_Open(which, metrics_dir) {
     try settings.AreBrowserAcceleratorKeysEnabled := true
 
     ; Bridge: JS → AHK. Page sends `chrome.webview.postMessage(obj)`;
-    ; we receive a string here.
-    webview.WebMessageReceived := KLWV_OnWebMessage.Bind(which)
+    ; we receive a string here. Must be a METHOD CALL, not a property
+    ; assignment -- vendor WebView2.ahk's base class has no __Set
+    ; meta-method, so `webview.WebMessageReceived := handler` is a silent
+    ; no-op and the bridge never actually subscribes. The subscription
+    ; handle is stored in KLWV.windows[which] (not discarded) so AHK's
+    ; refcounting does not __Delete it and unsubscribe near-immediately.
+    msg_sub := webview.WebMessageReceived(KLWV_OnWebMessage.Bind(which))
 
     ; Inject i18n base URL and locale code before page scripts run so
     ; i18n.js can resolve locale files without relying on currentScript
@@ -244,12 +249,11 @@ KLWV_Open(which, metrics_dir) {
             "KLWV_Open: WebView2 navigate to '{1}' failed ('{2}').",
             asset, err.Message)
     }
-    ; The chrome.webview.postMessage('ready') handshake from JS goes
-    ; through ICoreWebView2WebMessageReceived which thqby's wrapper
-    ; binds via add_WebMessageReceived(TypedHandler) — a binding we
-    ; haven't wired up yet. Instead, push the freshest blob a beat
-    ; after navigation: 1.5 s is enough for a local file:// page +
-    ; CDN-backed scripts to be ready to receive a postMessage.
+    ; Belt-and-suspenders alongside the "ready" handshake wired above:
+    ; push the freshest blob a beat after navigation too, in case the page's
+    ; own chrome.webview.postMessage('ready') races the subscription above
+    ; (e.g. fires before AddScriptToExecuteOnDocumentCreated has run). 1.5 s
+    ; is enough for a local file:// page + CDN-backed scripts to be ready.
     SetTimer(KLWV_DelayedFirstPush.Bind(which), -1500)
 
     KLWV.windows[which] := Map(
@@ -257,7 +261,8 @@ KLWV_Open(which, metrics_dir) {
         "gui", g,
         "controller", controller,
         "webview", webview,
-        "udir", udir
+        "udir", udir,
+        "msg_sub", msg_sub
     )
     KLWV_FitWebView(which)
     return true
