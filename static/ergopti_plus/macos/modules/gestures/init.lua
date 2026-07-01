@@ -487,9 +487,24 @@ function M.get_all_sensitivities()
 end
 
 function M.enable_all()  CoreState.enabled = true  end
-function M.disable_all() CoreState.enabled = false end
+
+--- Disables gestures entirely (menu master toggle and the dedicated "disable
+--- all" action both route through this single function). Mirrors what
+--- M.suspend()/M.stop() already do: release any held synthetic click-lock
+--- and unblock native scroll BEFORE flipping the flag, otherwise an
+--- already-engaged click-drag (left/right_click_toggle) or an armed
+--- scroll-block is orphaned — it self-heals on the next real keypress/
+--- mouseUp, but until then the OS is left with a button stuck down or
+--- native scroll still swallowed (gestures-disable-all-stuck-click, F-MED-22).
+function M.disable_all()
+	pcall(Engine.unblock_scroll)
+	pcall(Actions.force_cleanup)
+	CoreState.enabled = false
+end
 function M.enable(name)  if name == "all" then CoreState.enabled = true  end end
-function M.disable(name) if name == "all" then CoreState.enabled = false end end
+-- Delegates to M.disable_all() (single source of truth) so this legacy
+-- name-based entry point gets the same click-lock release (F-MED-22).
+function M.disable(name) if name == "all" then M.disable_all() end end
 function M.is_enabled()  return CoreState.enabled end
 
 -- Suspend/resume keep the user feature flag (enabled) intact while enforcing
