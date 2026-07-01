@@ -156,6 +156,27 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 		end)
 	end)
 
+
+	helpers.it("does NOT truncate a value containing an escaped double-quote (F-MED-23)", function()
+		stored = {}
+		_G.hs.settings.set = function(k, v) stored[k] = v end
+
+		-- F-MED-23: the quote-aware fast-path regex `'^"[^"]*"'` is not escape-aware
+		-- and stops at the FIRST literal `"` — including one preceded by a backslash.
+		-- Before the fix, `key = "a \"quoted\" word"  # comment` truncated the
+		-- extracted value to `"a \"` (silently dropping the rest of the value AND
+		-- the genuine trailing comment) and coerced to the mangled string `a \`.
+		-- The fix walks the string honouring `\"` escapes so the full value round-
+		-- trips and the trailing comment is still stripped correctly.
+		with_tmp('[features]\nkey = "a \\"quoted\\" word"  # comment\n', function(path)
+			local applied = Overrides.apply(path)
+
+			helpers.assert_true(applied >= 1, "applied count")
+			helpers.assert_eq(stored["key"], 'a "quoted" word',
+				"escaped quotes inside the value must round-trip and the trailing comment must be stripped")
+		end)
+	end)
+
 end)
 
 

@@ -35,6 +35,35 @@ local LOG    = "config_overrides"
 -- =================================
 -- =================================
 
+--- Finds the end of a double-quoted TOML string, honouring `\"` escapes.
+--- Lua patterns have no alternation, so a naive `'^"[^"]*"'` (or any pattern
+--- built from character classes) cannot skip over an escaped quote — it always
+--- stops at the FIRST literal `"`, even one preceded by a backslash. This walks
+--- the string character by character, jumping two positions on `\` so an
+--- escaped quote is never mistaken for the closing delimiter (F-MED-23: without
+--- this, `"a \"quoted\" word"  -- comment` truncated to `"a \"` and silently
+--- dropped both the rest of the value and the genuine trailing comment).
+--- @param value string String starting with `"` (the opening quote).
+--- @return string|nil The substring from the opening quote through its matching
+---   closing quote (inclusive), or nil if no unescaped closing quote is found.
+local function match_quoted_prefix(value)
+	if value:sub(1, 1) ~= '"' then return nil end
+	local len = #value
+	local i = 2
+	while i <= len do
+		local c = value:sub(i, i)
+		if c == "\\" then
+			i = i + 2 -- skip the escaped character; it can never close the string
+		elseif c == '"' then
+			return value:sub(1, i)
+		else
+			i = i + 1
+		end
+	end
+	return nil -- unterminated quoted value — caller falls back to the raw string
+end
+
+
 --- Converts a raw TOML literal into the appropriate Lua type.
 --- - "true" / "false" → boolean
 --- - integer / float  → number
@@ -113,8 +142,11 @@ function M.apply(file_path)
 					-- unquoted values strip from the first # (old `[^"]*$` pattern stopped
 					-- at a " inside the comment, leaving the remainder unsplit — lib-config-1).
 					if value:sub(1, 1) == '"' then
-						-- Keep only through the closing double-quote; any trailing `# …` is a comment
-						value = value:match('^"[^"]*"') or value
+						-- Escape-aware: skip over `\"` sequences instead of treating them as
+						-- the closing quote (F-MED-23 — the old `'^"[^"]*"'` pattern truncated
+						-- at the first literal ", silently dropping the rest of the value AND
+						-- the genuine trailing comment).
+						value = match_quoted_prefix(value) or value
 					else
 						value = value:gsub('%s*#.*$', "")
 					end
