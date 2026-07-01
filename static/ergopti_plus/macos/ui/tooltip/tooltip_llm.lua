@@ -816,11 +816,6 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 			return
 		end
 
-		-- Mark canvas as visible before rendering; covers the loading state
-		-- (empty predictions, reserved_slots > 0) where raw_predictions is
-		-- still empty but the canvas IS shown to the user.
-		_is_visible = true
-
 		_state.raw_predictions = type(predictions) == "table" and predictions or {}
 		_state.current_index   = current_index or 1
 		_state.info_bar        = info_bar
@@ -898,6 +893,14 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 		_state.navigation_started = false
 
 		Renderer.render(assemble_blocks(_state, render_count), _state, start_watchers)
+
+		-- Only flip the visibility flag after Renderer.render() has returned
+		-- without raising. Setting it earlier (before the width-calc loop and
+		-- the render call) left _is_visible stuck true forever if any of that
+		-- work threw — is_visible() is read by llm_bridge.lua to decide whether
+		-- keystrokes are routed to the tooltip, so a stuck-true flag with no
+		-- actual canvas on screen silently misroutes every subsequent keypress.
+		_is_visible = true
 	end)
 
 	if ok then
