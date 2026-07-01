@@ -102,5 +102,10 @@ _ErgoptiDeferredCrashReport(Exc) {
 	try {
 		Report := CrashReport_Build(Exc)
 		CrashReport_PromptUser(Report)
+	} catch as Err {
+		; This IS the safety net — a bare try with no catch here means a
+		; failure inside the crash-reporting pipeline itself is completely
+		; silent, with no trace of either the original crash or this one.
+		try LoggerError("ErgoptiPlus", "Deferred crash-report build/prompt failed: {1}.", Err.Message)
 	}
 }
