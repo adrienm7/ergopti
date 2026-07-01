@@ -47,8 +47,22 @@ end)()
 -- =================================
 -- =================================
 
+-- Forward declaration: update_menubar() (the pcall wrapper) is defined before its
+-- body so the body can be a plain local function referenced by name below.
+local update_menubar_body
+
 --- Fetches the live stats and updates the menubar item.
+--- Wrapped end-to-end in a pcall (mirrors tooltip_hotstring.lua / tooltip_llm.lua):
+--- this runs on a bare hs.timer callback with no caller to catch a raised error,
+--- and there is no hs.uncaughtErrorHandler anywhere in the tree, so an unguarded
+--- fault here would silently kill the 0.5 s timer with nothing in the file logger.
 local function update_menubar()
+	local ok, err = pcall(update_menubar_body)
+	if not ok then Logger.error(LOG, "Crash during menubar update: " .. tostring(err) .. ".") end
+end
+
+--- Actual menubar-update body, wrapped by update_menubar() above.
+update_menubar_body = function()
 	local stats = keylogger.get_live_stats()
 	local display_wpm = stats.wpm or 0
 	local now = hs.timer.absoluteTime() / 1000000000
