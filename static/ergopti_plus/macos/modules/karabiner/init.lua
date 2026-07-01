@@ -482,9 +482,10 @@ end
 --- Only the complex_modifications section is replaced; all other KE settings
 --- (devices, fn_function_keys, simple_modifications, global flags) are preserved.
 ---
---- Always uses KILL_FAST_CMD (plain pkill, no sleep loops) to clear any stale
---- bridge before writing, then re-primes via polling. This avoids a race where
---- the shutdown async script kills the bridge after bridge_alive was sampled.
+--- Stability-first strategy: deliberately never kills the bridge before
+--- writing. KE's own FSEvents watcher picks up the new file and applies it to
+--- the already-running daemon, so the keyboard is never left unresponsive by
+--- a failed or late re-prime after an unnecessary kill/relaunch cycle.
 function M.regenerate()
 	if not require_state("regenerate") then return end
 	Logger.start(LOG, "Regenerating Karabiner config…")
