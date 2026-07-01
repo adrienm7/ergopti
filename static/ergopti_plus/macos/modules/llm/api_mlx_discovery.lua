@@ -67,6 +67,14 @@ local _endpoint_probe_in_flight = false
 -- discover() call during a probe enqueues its on_done here so no
 -- caller is silently dropped when a second warmup fires mid-poll.
 local _discovery_pending_callbacks = {}
+-- Bumped on reset(); a discovery cycle whose captured gen has gone stale must
+-- not let its opportunistic background chat-route probe overwrite whatever a
+-- NEWER cycle has already cached. Unlike api_mlx.lua's _warmup_gen (which only
+-- gates a single is_ready flip), this module has a background probe that keeps
+-- running well after finish_discovery() returns (the "Only update the cached
+-- URL" comment below) — without this guard, a stale probe from a superseded
+-- model could silently clobber a freshly-discovered chat route (F-MED-8).
+local _discovery_gen = 0
 -- Canonical model ID reported by the server via GET /v1/models.
 -- mlx-lm 0.26+ validates the model field in request payloads against the ID
 -- of the loaded model (typically the full HF path, e.g.
@@ -211,6 +219,10 @@ function M.reset()
 	_server_model_id             = nil
 	_expected_model_id           = nil
 	_model_hf_path               = nil
+	-- Invalidate any in-flight discover() cycle (including its opportunistic
+	-- background chat-route probe) so a stale response cannot overwrite the
+	-- routes the NEXT discovery cycle caches (F-MED-8).
+	_discovery_gen = _discovery_gen + 1
 end
 
 
@@ -248,6 +260,10 @@ function M.discover(on_done)
 	end
 	if _endpoint_probe_in_flight then return end
 	_endpoint_probe_in_flight = true
+	-- Captured now so every async callback below (including the opportunistic
+	-- background chat probe, which can outlive finish_discovery) can detect a
+	-- reset() that started a newer cycle and discard its own stale write (F-MED-8).
+	local my_discovery_gen = _discovery_gen
 
 	local probe_completions = JsonCodec.encode({ prompt = " ", max_tokens = 1 })
 	local probe_chat        = JsonCodec.encode({
@@ -306,6 +322,14 @@ function M.discover(on_done)
 		end
 
 		probe_one(COMPLETIONS_CANDIDATES, 1, nil, "completions", function(found)
+			-- A reset() (model switch) since this cycle started means whatever
+			-- routes a NEWER discover() call has already cached must not be
+			-- clobbered by this superseded cycle's result (F-MED-8).
+			if my_discovery_gen ~= _discovery_gen then
+				Logger.debug(LOG, "Endpoint discovery: stale completions probe discarded (gen %d != %d).",
+					my_discovery_gen, _discovery_gen)
+				return
+			end
 			if found then _completions_endpoint = found end
 			if found then
 				-- Completions route confirmed — resolve immediately. Do NOT wait for
@@ -318,15 +342,26 @@ function M.discover(on_done)
 				finish_discovery(true)
 				probe_one(CHAT_CANDIDATES, 1, nil, "chat", function(found_chat)
 					-- Only update the cached URL — never call finish_discovery here.
-					-- By the time this fires, reset() may have run for a new
-					-- model; calling finish_discovery would corrupt the new server's state.
-					if found_chat then _chat_endpoint = found_chat end
+					-- By the time this fires, reset() may have run for a new model;
+					-- calling finish_discovery would corrupt the new server's state.
+					-- Gen guard: this probe can outlive finish_discovery() by an
+					-- arbitrary amount, so it must re-check for a newer cycle here
+					-- too, not just at entry — a stale chat route must never
+					-- overwrite a fresher one a newer discover() already cached.
+					if found_chat and my_discovery_gen == _discovery_gen then
+						_chat_endpoint = found_chat
+					end
 				end)
 				return
 			end
 			-- Completions route not found — fall through to chat so the user still
 			-- gets predictions on mlx-lm builds that only expose the chat route.
 			probe_one(CHAT_CANDIDATES, 1, nil, "chat", function(found_chat)
+				if my_discovery_gen ~= _discovery_gen then
+					Logger.debug(LOG, "Endpoint discovery: stale chat-fallback probe discarded (gen %d != %d).",
+						my_discovery_gen, _discovery_gen)
+					return
+				end
 				if found_chat then _chat_endpoint = found_chat end
 				if not found_chat then
 					-- All routes returned 404. The model is likely still loading in
