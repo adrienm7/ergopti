@@ -117,6 +117,27 @@ end
 -- ============================================
 -- ============================================
 
+--- Calls a manifest-driven handler under pcall isolation so a single broken
+--- entry cannot unwind through M.build and take down the entire menu tree —
+--- the single outer pcall in the caller's rebuild_menu_cache() would otherwise
+--- catch the failure at the granularity of the WHOLE menu, not just this item.
+--- Logs ERROR (with the manifest key and item id for triage) and swallows the
+--- failure so the loop continues to the next item.
+--- @param manifest_key string Menu definition key, for the error message.
+--- @param item_id string The failing item's id, for the error message.
+--- @param fn function Handler to call.
+--- @param ... any Arguments forwarded to fn.
+--- @return boolean ok True when fn ran without raising.
+--- @return any result The handler's return value when ok is true, nil otherwise.
+local function call_isolated(manifest_key, item_id, fn, ...)
+	local ok, result = pcall(fn, ...)
+	if not ok then
+		Logger.error(LOG, "Handler for '%s.%s' raised: %s — item skipped.", manifest_key, item_id, tostring(result))
+		return false, nil
+	end
+	return true, result
+end
+
 --- Build an hs.menubar items table from a manifest menu definition array.
 ---
 --- ``manifest_key``      — key in menu_manifest.json (e.g. ``"shortcuts_menu"``)
@@ -170,8 +191,8 @@ function M.build(manifest_key, category, dynamic_handlers, group_builders, ctx)
 			local action_id = type(item.id) == "string" and item.id or ""
 			if action_id ~= "" and type(dynamic_handlers[action_id]) == "function" then
 				flush_sep()
-				dynamic_handlers[action_id](result, ctx)
-				item_count = item_count + 1
+				local ok = call_isolated(manifest_key, action_id, dynamic_handlers[action_id], result, ctx)
+				if ok then item_count = item_count + 1 end
 			end
 
 		elseif t == "section_header" then
@@ -192,7 +213,8 @@ function M.build(manifest_key, category, dynamic_handlers, group_builders, ctx)
 			local label = i18n.get(i18n_key)
 			local built = nil
 			if type(group_builders[group_id]) == "function" then
-				built = group_builders[group_id](ctx)
+				local _ok
+				_ok, built = call_isolated(manifest_key, group_id, group_builders[group_id], ctx)
 			else
 				built = M.build_builtin_group(group_id, ctx)
 			end
@@ -209,8 +231,8 @@ function M.build(manifest_key, category, dynamic_handlers, group_builders, ctx)
 			local dyn_id = type(item.id) == "string" and item.id or ""
 			if dyn_id ~= "" and type(dynamic_handlers[dyn_id]) == "function" then
 				flush_sep()
-				dynamic_handlers[dyn_id](result, ctx)
-				item_count = item_count + 1
+				local ok = call_isolated(manifest_key, dyn_id, dynamic_handlers[dyn_id], result, ctx)
+				if ok then item_count = item_count + 1 end
 			end
 
 		else
