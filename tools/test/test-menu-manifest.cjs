@@ -81,7 +81,12 @@ function loadLocaleKeys() {
 	const keysByLocale = {};
 	for (const name of ['fr', 'en']) {
 		const file = resolve(LOCALES_DIR, `${name}.json`);
-		keysByLocale[name] = new Set(Object.keys(JSON.parse(readFileSync(file, 'utf8'))));
+		// Locale JSON files are UTF-8-with-BOM by convention (matches the AHK
+		// driver) — strip the leading BOM code point before parsing, the same
+		// fix as audit-translations.cjs already applies to these same files.
+		let raw = readFileSync(file, 'utf8');
+		if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
+		keysByLocale[name] = new Set(Object.keys(JSON.parse(raw)));
 	}
 	return keysByLocale;
 }
