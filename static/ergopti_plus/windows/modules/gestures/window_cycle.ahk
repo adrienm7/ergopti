@@ -289,10 +289,19 @@ GestureCycleWindows(Forward) {
     loop N - 1 {
         Target := GestureNextIndex(Target, N, Forward)
         ; Suppress the WinEvent hook so this programmatic activation does not
-        ; reorder the manual history.
-        _GestureCycling := True
-        Activated := GestureActivateWindow(Windows[Target])
-        _GestureCycling := False
+        ; reorder the manual history. Critical serializes the flag/activation
+        ; bracket against a second window-cycle gesture hotkey interleaving on
+        ; its own pseudo-thread mid-activation, which could otherwise clear
+        ; the flag early (unlike hook_dispatcher.ahk's shared-state mutations,
+        ; this plain global boolean had no Critical section at all).
+        _PrevCrit := Critical("On")
+        try {
+            _GestureCycling := True
+            Activated := GestureActivateWindow(Windows[Target])
+        } finally {
+            _GestureCycling := False
+            Critical(_PrevCrit)
+        }
         if Activated {
             LoggerDebug("gestures", "Activated HWND {1} (idx={2}).", Windows[Target], Target)
             return
@@ -334,9 +343,15 @@ GestureCycleAppWindows(Forward) {
     Target := Index
     loop N - 1 {
         Target := GestureNextIndex(Target, N, Forward)
-        _GestureCycling := True
-        Activated := GestureActivateWindow(Windows[Target])
-        _GestureCycling := False
+        ; Same Critical-serialized flag/activation bracket as GestureCycleWindows.
+        _PrevCrit := Critical("On")
+        try {
+            _GestureCycling := True
+            Activated := GestureActivateWindow(Windows[Target])
+        } finally {
+            _GestureCycling := False
+            Critical(_PrevCrit)
+        }
         if Activated {
             LoggerDebug("gestures", "Activated HWND {1} (idx={2}).", Windows[Target], Target)
             return
