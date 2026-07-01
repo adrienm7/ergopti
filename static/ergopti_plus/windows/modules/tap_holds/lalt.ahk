@@ -164,7 +164,12 @@ SC038::
 	TextPressKey("LAlt", "Down")
 	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
 	if tap {
+		; The synthetic LAlt Down armed above must always be released regardless
+		; of Suspend state; only the AltTabMonitor() side effect is guarded —
+		; native Suspend() never disarms this hotkey's own KeyWait/dispatch.
 		TextPressKey("LAlt", "Up")
+		if A_IsSuspended
+			return
 		AltTabMonitor()
 	} else {
 		; Bound the wait and release LAlt in a finally so a lost SC038 key-up (Alt+Tab

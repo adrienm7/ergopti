@@ -366,6 +366,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_halflife_tick_suspend_guard.ahk
 #Include meta/test_layout_poll_suspend_guard.ahk
 #Include meta/test_lalt_rctrl_accept_suspend_guard.ahk
+#Include meta/test_tap_hold_fire_action_suspend_guard.ahk
 #Include meta/test_layout_poll_blacklist_guard.ahk
 #Include meta/test_layout_quiescence.ahk
 #Include meta/test_hse_register_atomic.ahk
