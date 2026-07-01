@@ -567,7 +567,23 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 	try LoggerInfo("Updater", "Launching swap script and exiting in 1s…")
 	; Run detached and hidden so the user does not see a black flash. Then
 	; ExitApp so our handle on the current exe drops and the swap can proceed.
-	try Run('cmd /c "' . SwapBat . '"', , "Hide")
+	; _SwapLaunched only flips true on an actual successful Run() — a bare
+	; unconditional ExitApp after a swallowed Run() failure (cmd.exe blocked by
+	; AppLocker/SRP/AV) would kill the driver with nothing left running and no
+	; swap process to relaunch it (AHK-19).
+	_SwapLaunched := false
+	try {
+		Run('cmd /c "' . SwapBat . '"', , "Hide")
+		_SwapLaunched := true
+	} catch as e {
+		try LoggerError("Updater", "Swap script launch failed: {1}.", e.Message)
+	}
+	if !_SwapLaunched {
+		_UpdaterDownloadInProgress := false
+		try SetTimer((*) => _Updater_RebuildMenu(), -50)
+		MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
+		return
+	}
 	; Reset the dedupe so a future user-driven check after a failure can
 	; re-prompt; the post-swap exe will set its own state from scratch.
 	global UPDATER_LAST_NOTIFIED_TAG := ""
