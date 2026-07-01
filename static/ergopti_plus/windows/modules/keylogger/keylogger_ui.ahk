@@ -271,18 +271,6 @@ KLUI_ToggleDashboard(which, title) {
     }
 }
 
-KLUI_OpenTyping(*) {
-    KLUI_EnsureUrls()
-    if !KLUI_IsRunning(KLUI.typing_pid)
-        KLUI.typing_pid := KLUI_LaunchWindow(KLUI.typing_url, "Métriques de frappe")
-}
-
-KLUI_OpenApps(*) {
-    KLUI_EnsureUrls()
-    if !KLUI_IsRunning(KLUI.apps_pid)
-        KLUI.apps_pid := KLUI_LaunchWindow(KLUI.apps_url, "Temps sur les applications")
-}
-
 KLUI_CloseAll() {
     try KLWV_CloseAll()
     KLUI_KillWindow(KLUI.typing_pid)
