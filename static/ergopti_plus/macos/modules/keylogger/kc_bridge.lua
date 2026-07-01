@@ -195,11 +195,17 @@ end
 --- Drains new lines from KC_LOG_PATH since _file_offset.
 --- Each line is a Karabiner key_code name (e.g. "left_command").
 --- Converts to numeric kc and calls LogManager.log_karabiner_press().
+---
+--- F-MED-26 / F-MED-33: KcBridge.init() arms the watcher/poll timer at module
+--- load time regardless of whether the keylogger feature is enabled (KE writes
+--- to the log unconditionally), but _log_manager is only injected once the
+--- feature is turned on. The file-offset bookkeeping below MUST always advance
+--- — even while _log_manager is nil and the logging branch is skipped —
+--- otherwise every line KE appends while the feature is off piles up unread,
+--- and the very first drain_log() after the feature is enabled replays the
+--- entire backlog in one burst with fabricated (current-time) timestamps
+--- instead of the real press times.
 local function drain_log()
-	-- Skip draining when LogManager has not been injected yet
-	-- (keylogger feature is off but KE still writes to the log)
-	if not _log_manager then return end
-
 	local fh = io.open(KC_LOG_PATH, "r")
 	if not fh then
 		Logger.trace(LOG, "KC log not yet created — nothing to drain.")
@@ -237,12 +243,17 @@ local function drain_log()
 					local down_at = _pending_down[kc_num]
 					_pending_down[kc_num] = nil
 					local hold_ms = down_at and math.floor(now_ms - down_at) or 0
-					if type(_log_manager.log_karabiner_release) == "function" then
+					-- LogManager is nil while the keylogger feature is off (F-MED-26):
+					-- keep advancing the offset/pending_down bookkeeping below, but
+					-- there is no consumer for the event, so skip only the log call.
+					if _log_manager and type(_log_manager.log_karabiner_release) == "function" then
 						_log_manager.log_karabiner_release(kc_num, app_name, hold_ms)
 					end
 				else
 					_pending_down[kc_num] = hs.timer.absoluteTime() / 1000000
-					_log_manager.log_karabiner_press(kc_num, app_name)
+					if _log_manager then
+						_log_manager.log_karabiner_press(kc_num, app_name)
+					end
 				end
 				drained = drained + 1
 			else
