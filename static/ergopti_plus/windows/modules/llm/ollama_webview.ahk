@@ -377,7 +377,30 @@ OllamaWV_EvalJS(js) {
 		_OllamaWV_Queue.Push(js)
 		return
 	}
-	try _OllamaWV_WebView.ExecuteScript(js)
+	; Run OUTSIDE the current call stack via a one-shot timer. ExecuteScript is
+	; ExecuteScriptAsync().await(), which spins a NESTED message loop; calling
+	; it synchronously from inside the WebMessageReceived COM callback (as the
+	; "ready" handler does) re-enters the STA apartment and wedges further
+	; WebView2 message delivery.
+	SetTimer(OllamaWV_RunScript.Bind(js), -1)
+}
+
+/**
+ * Executes a queued script on a fresh call stack (scheduled by OllamaWV_EvalJS
+ * via a -1 timer). Fire-and-forget ExecuteScriptAsync (no .await()) -- we do
+ * not need the return value, and awaiting it here would reintroduce the same
+ * nested-message-loop wedge OllamaWV_EvalJS's deferral avoids.
+ * @param {string} js - JavaScript expression to evaluate.
+ */
+OllamaWV_RunScript(js) {
+	global _OllamaWV_WebView
+	if !IsSet(_OllamaWV_WebView)
+		return
+	try {
+		_OllamaWV_WebView.ExecuteScriptAsync(js)
+	} catch as Err {
+		try LoggerError("LLM", "ExecuteScriptAsync failed (len={1}): {2}.", StrLen(js), Err.Message)
+	}
 }
 
 /**
@@ -393,11 +416,13 @@ OllamaWV_FlushQueue() {
 	if _OllamaWV_Ready   ; Guard: flush must only run once
 		return
 	_OllamaWV_Ready := true
-	; Inject the full locale strings now that the DOM exists
+	; Inject the full locale strings now that the DOM exists. Deferred (see
+	; OllamaWV_EvalJS) so none of these run re-entrantly inside the
+	; WebMessageReceived callback that typically triggers this flush.
 	i18n_js := OllamaWV_I18nApplyScript(_I18nLocale)
-	try _OllamaWV_WebView.ExecuteScript(i18n_js)
+	SetTimer(OllamaWV_RunScript.Bind(i18n_js), -1)
 	for _, js in _OllamaWV_Queue
-		try _OllamaWV_WebView.ExecuteScript(js)
+		SetTimer(OllamaWV_RunScript.Bind(js), -1)
 	_OllamaWV_Queue := []
 }
 
