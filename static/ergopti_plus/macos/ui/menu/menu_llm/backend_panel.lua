@@ -28,6 +28,11 @@ local ApiMlx              = require("modules.llm.api_mlx")
 
 --- Returns whether the current machine has Apple Silicon.
 --- Lazily evaluated once so the shell call does not repeat on every menu open.
+--- Single source of truth for Apple-Silicon detection across the LLM menu tree
+--- (F-MED-4): exported as M.is_apple_silicon so ui/menu/menu_llm/init.lua's
+--- DEFAULT_STATE.llm_backend seed reads the SAME uname-based detector instead
+--- of duplicating a filesystem-existence heuristic (hs.fs.attributes("/opt/homebrew"))
+--- that is wrong on a fresh arm64 Mac with no Homebrew installed yet.
 local _is_apple_silicon = nil
 local function is_apple_silicon()
 	if _is_apple_silicon == nil then
@@ -36,6 +41,7 @@ local function is_apple_silicon()
 	end
 	return _is_apple_silicon
 end
+M.is_apple_silicon = is_apple_silicon
 
 --- Triggers the deps checker matching the given backend name.
 --- Safe to call repeatedly — each script is hash-gated and silent on the fast path.
