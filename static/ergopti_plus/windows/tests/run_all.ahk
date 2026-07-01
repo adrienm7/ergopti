@@ -394,6 +394,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_spotlight_gdiplus_leak.ahk
 #Include meta/test_toml_batchwrite_atomic.ahk
 #Include meta/test_webview2_temp_leak.ahk
+#Include meta/test_ollama_webview_executescript_deferred.ahk
 #Include meta/test_webview_low_ram_native_fallback.ahk
 #Include meta/test_hookdispatcher_swallow.ahk
 #Include meta/test_llm_json_parser_silent_fail.ahk
