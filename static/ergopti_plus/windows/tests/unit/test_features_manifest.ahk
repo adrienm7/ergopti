@@ -425,6 +425,71 @@ TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash() {
 Test("ApplyConfigToml: unknown sections warn but do not abort other overrides",
 	TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash)
 
+TestFMv2_ApplyPersonalHotstringUserChosenNameNotSkipped() {
+	; hotstrings.personal.<name> is seeded at runtime from the user's own
+	; personal_hotstrings.toml section names (EnsurePersonalHotstringFeature) --
+	; it can never be enumerated ahead of time in the static manifest, so this
+	; path must be applied directly instead of being rejected as "unknown".
+	OldFeatures := _FM_BeginIsolated()
+	try {
+		Path := _FM_WriteFixture("personal_hotstring_user_section",
+			"[hotstrings.personal.emailshortcuts]`r`n"
+			. "enabled = true`r`n"
+			. "time_activation_seconds = 0.75`r`n")
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(2, Applied)
+		AssertTrue(Features["hotstrings"]["personal"].Has("emailshortcuts"))
+		Entry := Features["hotstrings"]["personal"]["emailshortcuts"]
+		AssertEqual(true, Entry["enabled"])
+		AssertEqual(0.75, Entry["time_activation_seconds"])
+		FileDelete(Path)
+	}
+	_FM_EndIsolated(OldFeatures)
+}
+Test("ApplyConfigToml: hotstrings.personal.<user-chosen-name> is applied, not skipped as unknown",
+	TestFMv2_ApplyPersonalHotstringUserChosenNameNotSkipped)
+
+TestFMv2_ApplyPersonalHotstringAnotherUserChosenNameNotSkipped() {
+	; A second, differently-named user section (professionalvocabulary) must be
+	; equally accepted -- the exemption is namespace-wide, not a hardcoded list
+	; of known section names.
+	OldFeatures := _FM_BeginIsolated()
+	try {
+		Path := _FM_WriteFixture("personal_hotstring_user_section_2",
+			"[hotstrings.personal.professionalvocabulary]`r`n"
+			. "enabled = false`r`n")
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(1, Applied)
+		AssertTrue(Features["hotstrings"]["personal"].Has("professionalvocabulary"))
+		AssertEqual(false, Features["hotstrings"]["personal"]["professionalvocabulary"]["enabled"])
+		FileDelete(Path)
+	}
+	_FM_EndIsolated(OldFeatures)
+}
+Test("ApplyConfigToml: a second hotstrings.personal.<user-chosen-name> section is also applied",
+	TestFMv2_ApplyPersonalHotstringAnotherUserChosenNameNotSkipped)
+
+TestFMv2_ApplyPersonalEditorSectionNotSkipped() {
+	; [personal_editor] (ahk. prefix already stripped) holds flat UI-preference
+	; keys written by ui/personal_toml_editor.ahk (_EditorPrefSet/_EditorPrefGet)
+	; via the legacy flat TOML_Write/TOML_Read path -- it is never part of the
+	; manifest-built Features tree, so it must not be flagged as unknown either.
+	OldFeatures := _FM_BeginIsolated()
+	try {
+		Path := _FM_WriteFixture("personal_editor_section",
+			"[personal_editor]`r`n"
+			. "default_section = " . '"' . "code" . '"' . "`r`n")
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(1, Applied)
+		AssertTrue(Features.Has("personal_editor"))
+		AssertEqual("code", Features["personal_editor"]["default_section"])
+		FileDelete(Path)
+	}
+	_FM_EndIsolated(OldFeatures)
+}
+Test("ApplyConfigToml: [personal_editor] is applied, not skipped as unknown",
+	TestFMv2_ApplyPersonalEditorSectionNotSkipped)
+
 TestFMv2_ApplyArrayValue() {
 	OldFeatures := _FM_BeginIsolated()
 	try {

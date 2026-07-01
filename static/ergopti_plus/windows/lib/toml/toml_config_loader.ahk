@@ -22,6 +22,11 @@
 ;    ERROR level ensures the problem is impossible to miss during log review.
 ; 4. Dormant until cut-over: written ahead of the migration so the disruptive
 ;    PR can be focused on call-site rewrites only.
+; 5. ``hotstrings.personal.<user-chosen-name>`` and ``personal_editor`` are
+;    exempt from the manifest-tree validation in (3): their leaf names are
+;    per-user runtime data (personal hotstring categories, editor UI prefs),
+;    not compile-time schema, so missing segments are auto-vivified rather
+;    than logged as an error.
 ; ==============================================================================
 
 
@@ -33,6 +38,25 @@
 ; ======= 1. Value coercion =======
 ; =================================
 ; ==============================================================
+
+; True when ``SectionPath`` is a namespace that is inherently dynamic and can
+; never be enumerated in the static, compile-time manifest:
+;   - ``hotstrings.personal.<name>`` — <name> is a user-chosen personal
+;     hotstring category created at runtime via the personal TOML editor
+;     (see EnsurePersonalHotstringFeature in lib/personal_features.ahk).
+;   - ``personal_editor`` — flat UI-preference keys written directly by
+;     ui/personal_toml_editor.ahk via TOML_Write/TOML_Read, never routed
+;     through the manifest-built Features tree at all.
+; Both would otherwise fail the "every segment must already exist in the
+; manifest" walk below on every single boot, since neither can be declared
+; ahead of time in manifest.toml.
+TomlSectionIsDynamicPersonalNamespace(SectionPath) {
+	if (SectionPath == "personal_editor") {
+		return true
+	}
+	return (StrLen(SectionPath) >= 19 and SubStr(SectionPath, 1, 19) == "hotstrings.personal")
+		and (SectionPath == "hotstrings.personal" or SubStr(SectionPath, 20, 1) == ".")
+}
 
 ; Coerce a raw TOML literal to an AHK value. Extends the base ``TomlCoerceValue``
 ; with single-line array support (``[a, b, c]``). Nested arrays and inline
@@ -174,6 +198,12 @@ ApplyConfigToml(Features, FilePath) {
 		; Walk the section path. Each segment must already exist in Features —
 		; the manifest defines the universe of valid paths. Unknown paths
 		; trigger a WARN and are skipped.
+		;
+		; Exception: hotstrings.personal.<user-chosen-name> and personal_editor
+		; are dynamic, per-user namespaces that structurally cannot appear in the
+		; static manifest (see TomlSectionIsDynamicPersonalNamespace) — missing
+		; segments are auto-vivified as empty Maps instead of being rejected.
+		IsDynamicPersonalNamespace := TomlSectionIsDynamicPersonalNamespace(CurrentSection)
 		Parts := StrSplit(CurrentSection, ".")
 		Node := Features
 		Failed := false
@@ -185,6 +215,9 @@ ApplyConfigToml(Features, FilePath) {
 				Node := Node[Part]
 			} else if (IsObject(Node) and Node.HasOwnProp(Part)) {
 				Node := Node.%Part%
+			} else if (IsDynamicPersonalNamespace and Type(Node) == "Map") {
+				Node[Part] := Map()
+				Node := Node[Part]
 			} else {
 				Failed := true
 				break
