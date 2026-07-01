@@ -345,8 +345,17 @@ _LLM_ModelBrowser_OnClose(*) {
 global _LLM_MBW_Gui        := unset
 global _LLM_MBW_WebView    := unset
 global _LLM_MBW_Controller := unset
+global _LLM_MBW_MsgSub     := unset
 global _LLM_MBW_Ready      := false
 global _LLM_MBW_Queue      := []
+
+; Virtual host mapped to _SharedDir so the document and its relative assets
+; and the locale fetch resolve over https:// -- file:// is an opaque origin
+; and the chrome.webview JS->AHK channel does not reliably deliver from it
+; (see PROJECT_MEMORY project-webview2-bridge-gotchas).
+global LLM_MBW_VHOST := "ergopti.modelbrowser"   ; -> _SharedDir
+; COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW.
+global LLM_MBW_HOST_ACCESS_ALLOW := 1
 
 /**
  * Builds (or brings forward) the shared web model browser in a WebView2 window.
@@ -404,8 +413,14 @@ _LLM_ModelBrowser_ShowWeb() {
 		s.IsSwipeNavigationEnabled         := false
 	}
 
-	; JS -> AHK bridge.
-	_LLM_MBW_WebView.WebMessageReceived(_LLM_MBW_OnWebMessage)
+	; JS -> AHK bridge. Store the subscription handle in a persistent global --
+	; discarding it lets the binding GC it and silently unsubscribe the handler.
+	global _LLM_MBW_MsgSub := _LLM_MBW_WebView.WebMessageReceived(_LLM_MBW_OnWebMessage)
+
+	; Map the virtual host BEFORE navigating so the document and every relative
+	; asset and the locale fetch resolve through it instead of an opaque file://
+	; origin.
+	try _LLM_MBW_WebView.SetVirtualHostNameToFolderMapping(LLM_MBW_VHOST, _SharedDir, LLM_MBW_HOST_ACCESS_ALLOW)
 
 	; Seed the i18n base + locale before the page scripts run so i18n.js resolves.
 	seed := "window.__i18n_base='" . _LLM_MBW_LocalesUrl() . "';"
@@ -488,7 +503,12 @@ _LLM_MBW_InjectCatalogue() {
 _LLM_MBW_Eval(Js) {
 	global _LLM_MBW_WebView, _LLM_MBW_Ready, _LLM_MBW_Queue
 	if (_LLM_MBW_Ready && IsSet(_LLM_MBW_WebView)) {
-		try _LLM_MBW_WebView.ExecuteScript(Js)
+		; Run OUTSIDE the current call stack via a one-shot timer. ExecuteScript
+		; is ExecuteScriptAsync().await(), which spins a NESTED message loop;
+		; calling it synchronously from inside the WebMessageReceived COM
+		; callback (as the "ready" handler does) re-enters the STA apartment
+		; and wedges further WebView2 message delivery.
+		SetTimer(_LLM_MBW_RunScript.Bind(Js), -1)
 	} else {
 		_LLM_MBW_Queue.Push(Js)
 		if (_LLM_MBW_Queue.Length > 50)
@@ -496,12 +516,29 @@ _LLM_MBW_Eval(Js) {
 	}
 }
 
+; Executes a queued script on a fresh call stack (scheduled by _LLM_MBW_Eval
+; via a -1 timer). Fire-and-forget ExecuteScriptAsync (no .await()) -- we do
+; not need the return value, and awaiting it here would reintroduce the same
+; nested-message-loop wedge _LLM_MBW_Eval's deferral avoids.
+_LLM_MBW_RunScript(Js) {
+	global _LLM_MBW_WebView
+	if !IsSet(_LLM_MBW_WebView)
+		return
+	try {
+		_LLM_MBW_WebView.ExecuteScriptAsync(Js)
+	} catch as Err {
+		try LoggerError("LLM.browser", "ExecuteScriptAsync failed (len={1}): {2}.", StrLen(Js), Err.Message)
+	}
+}
+
 _LLM_MBW_FlushQueue() {
 	global _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_WebView
 	_LLM_MBW_Ready := true
+	; Defer each queued script (see _LLM_MBW_Eval) so none runs re-entrantly
+	; inside the WebMessageReceived callback that typically triggers this flush.
 	for _, Js in _LLM_MBW_Queue {
 		if IsSet(_LLM_MBW_WebView)
-			try _LLM_MBW_WebView.ExecuteScript(Js)
+			SetTimer(_LLM_MBW_RunScript.Bind(Js), -1)
 	}
 	_LLM_MBW_Queue := []
 }
@@ -558,20 +595,20 @@ _LLM_MBW_WebView2Available() {
 	return IsSet(WebView2) && FileExist(loader)
 }
 
-/** Returns the file:// URL for _shared/ui/model_browser/index.html. */
+/**
+ * Returns the https:// virtual-host URL for _shared/ui/model_browser/index.html.
+ * A per-open cache-buster forces a fresh document each launch instead of a
+ * WebView2-cached stale copy from the virtual host.
+ */
 _LLM_MBW_HtmlUrl() {
-	global _SharedDir
-	base := _SharedDir . "\ui\model_browser\index.html"
-	loop files, base
-		base := A_LoopFileFullPath
-	return "file:///" . StrReplace(base, "\", "/")
+	global LLM_MBW_VHOST
+	return "https://" . LLM_MBW_VHOST . "/ui/model_browser/index.html?cb=" . A_TickCount
 }
 
-/** Returns the file:// URL for _shared/data/locales/ (trailing slash). */
+/** Returns the https:// virtual-host URL for _shared/data/locales/ (trailing slash). */
 _LLM_MBW_LocalesUrl() {
-	global _SharedDir
-	base := _SharedDir . "\data\locales\"
-	return "file:///" . StrReplace(base, "\", "/")
+	global LLM_MBW_VHOST
+	return "https://" . LLM_MBW_VHOST . "/data/locales/"
 }
 
 /** Builds the ExecuteScript call that applies i18n strings (read from disk). */
@@ -629,7 +666,11 @@ _LLM_MBW_OnResize(GuiObj, MinMax, Width, Height) {
 }
 
 _LLM_MBW_Reset() {
-	global _LLM_MBW_Gui, _LLM_MBW_WebView, _LLM_MBW_Controller, _LLM_MBW_Ready, _LLM_MBW_Queue
+	global _LLM_MBW_Gui, _LLM_MBW_WebView, _LLM_MBW_Controller, _LLM_MBW_MsgSub, _LLM_MBW_Ready, _LLM_MBW_Queue
+	; Release the subscription FIRST, while the controller is still alive. Its
+	; __Delete unsubscribes via remove_WebMessageReceived on the live
+	; controller; doing it AFTER Controller.Close() raises a COM error.
+	try _LLM_MBW_MsgSub := unset
 	if IsSet(_LLM_MBW_Controller)
 		try _LLM_MBW_Controller.Close()
 	_LLM_MBW_Gui        := unset

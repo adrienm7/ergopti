@@ -764,6 +764,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_keyboard_shortcut_groups_register_dispatch.ahk
 #Include meta/test_changelog_fetch_async.ahk
 #Include meta/test_changelog_webview_bridge.ahk
+#Include meta/test_model_browser_webview_bridge.ahk
 #Include meta/test_deferred_ext_scan_critical_file_io.ahk
 #Include meta/test_wpm_compact_color_validation.ahk
 #Include meta/test_backspace_repeat_suspend_guard.ahk
