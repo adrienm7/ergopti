@@ -115,6 +115,15 @@ end
 -- Forward declaration required because schedule_awake_tick calls itself recursively
 local schedule_awake_tick
 
+-- AX selection cache for the wrap-text eventtap: read_ax_selection() is two
+-- synchronous cross-process Accessibility calls, and the eventtap fires on
+-- EVERY keystroke matching a wrap symbol with no caching at all — a slow AX
+-- call here risks kCGEventTapDisabledByTimeout. Mirrors lib/vscode_bridge.lua's
+-- get_editor_ax_frame() TTL-cache pattern (shortcuts-wrap-ax-uncached).
+local _wrap_ax_selection_cache = nil
+local _wrap_ax_selection_ts    = 0
+local WRAP_AX_SELECTION_TTL_SEC = 0.2
+
 --- Posts a single no-op F18 key event (down + up) to register KEYBOARD activity
 --- with the OS and with presence-aware apps. Exposed as M._emit_activity_keystroke
 --- so the regression test can assert it fires. The auto-deactivation watcher
@@ -587,6 +596,24 @@ function M.wrap_event_decision(flags, ch, pairs_tbl, has_selection)
 	return "wrap"
 end
 
+--- Reads the current AX selection with a short-lived cache, mirroring
+--- lib/vscode_bridge.lua's get_editor_ax_frame(). read_ax_selection() performs
+--- two synchronous cross-process Accessibility calls; without caching, a run of
+--- rapid wrap-symbol keystrokes (e.g. a held key, or fast typing that repeats a
+--- wrap char) would each pay that cost inline on the CGEventTap thread, risking
+--- kCGEventTapDisabledByTimeout (shortcuts-wrap-ax-uncached).
+--- @return string|nil The selected text, or nil when unavailable.
+local function read_wrap_ax_selection_cached()
+	local now = hs.timer.secondsSinceEpoch()
+	if _wrap_ax_selection_cache ~= nil and (now - _wrap_ax_selection_ts) < WRAP_AX_SELECTION_TTL_SEC then
+		return _wrap_ax_selection_cache
+	end
+	local sel = text_acts.read_ax_selection()
+	_wrap_ax_selection_cache = sel
+	_wrap_ax_selection_ts    = now
+	return sel
+end
+
 --- Starts a keyDown eventtap that wraps the current text selection with the typed symbol.
 --- When no text is selected (or the focused app hides its selection), the key event
 --- is passed through unchanged so the symbol is never swallowed.
@@ -609,8 +636,9 @@ function M.bind_wrap_text_if_selected(get_wrap_pairs)
 
 		-- Probe the selection ONLY for configured wrap symbols (avoids an AX call on
 		-- every other keystroke). nil = nothing selected OR the app hides
-		-- AXSelectedText (e.g. VS Code / Electron).
-		local sel = pair and text_acts.read_ax_selection() or nil
+		-- AXSelectedText (e.g. VS Code / Electron). Cached for WRAP_AX_SELECTION_TTL_SEC
+		-- so rapid repeated wrap-key presses pay the AX cost at most once per window.
+		local sel = pair and read_wrap_ax_selection_cached() or nil
 
 		local decision = M.wrap_event_decision(flags, ch, pairs_tbl, sel ~= nil)
 		-- Per-keystroke, so DEBUG only (silent at the default WARNING level): traces
