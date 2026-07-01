@@ -340,6 +340,13 @@ local _prime_probe_timer = nil
 local _last_karabiner_ready_notify_at = 0
 local _pending_karabiner_ready_notify = false
 local _karabiner_ready_notify_timer = nil
+-- Holds the retry timer armed when the cooldown branch defers a notification.
+-- Without this, flush_pending_ready_notification() is only ever called once
+-- (from the boot-completion call site in init.lua) — a re-prime landing inside
+-- the 10 s cooldown window would re-arm _pending_karabiner_ready_notify but
+-- nothing would ever call flush again, silently dropping the notification
+-- forever despite the debug log claiming "will retry" (F-MED-18).
+local _karabiner_ready_retry_timer = nil
 local is_ipc_bridge_fully_ready
 local _last_runtime_probe_ok = false
 local _last_runtime_probe_at = 0
@@ -395,6 +402,19 @@ local function notify_karabiner_ready()
 				-- Re-arm the pending flag so flush_pending_ready_notification delivers
 				-- the notification once the cooldown window expires.
 				_pending_karabiner_ready_notify = true
+				-- Actually arm the retry the debug log above promises (F-MED-18): without
+				-- this, flush_pending_ready_notification() is only ever called once at
+				-- boot completion, so a re-prime landing inside the cooldown window would
+				-- silently drop the notification forever. Fire slightly after the cooldown
+				-- expires so the retry's own now-check passes on its first attempt.
+				if _karabiner_ready_retry_timer then
+					pcall(function() _karabiner_ready_retry_timer:stop() end)
+				end
+				local retry_delay = (KARABINER_READY_NOTIFY_COOLDOWN_SEC - (now - _last_karabiner_ready_notify_at)) + 0.1
+				_karabiner_ready_retry_timer = hs.timer.doAfter(retry_delay, function()
+					_karabiner_ready_retry_timer = nil
+					M.flush_pending_ready_notification()
+				end)
 				return
 			end
 			_last_karabiner_ready_notify_at = now
