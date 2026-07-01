@@ -429,6 +429,7 @@ generate_info_plist() {
 			<key>CFBundleIconFile</key>               <string>ErgoptiPlus</string>
 			<key>LSMinimumSystemVersion</key>         <string>11.0</string>
 			<key>LSUIElement</key>                    <false/>
+			<key>LSMultipleInstancesProhibited</key>  <true/>
 			<key>NSHighResolutionCapable</key>        <true/>
 			<key>NSSupportsAutomaticGraphicsSwitching</key> <true/>
 			<key>NSPrincipalClass</key>               <string>NSApplication</string>
