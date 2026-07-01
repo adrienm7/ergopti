@@ -272,12 +272,22 @@ end
 
 -- Returns a hex color darkened by the given factor (each RGB channel × factor).
 -- Input may include a leading "#"; output always includes it.
-local function _wpm_darken_hex(hex, factor)
-	local h = hex:gsub("^#", "")
-	local r = math.floor(tonumber(h:sub(1, 2), 16) * factor)
-	local g = math.floor(tonumber(h:sub(3, 4), 16) * factor)
-	local b = math.floor(tonumber(h:sub(5, 6), 16) * factor)
-	return string.format("#%02x%02x%02x", r, g, b)
+-- hex ultimately traces back to a hotstring group's TOML _meta.color, which the
+-- user can freely edit (ui/wpm/shared.lua resolve_source_hex) — a shorthand
+-- "#fff", a bare color name, or plain garbage would otherwise reach the
+-- tonumber(h:sub(...), 16) arithmetic below and either raise (nil arithmetic)
+-- or silently produce a nonsense strip color. Mirrors the same length/format
+-- guard already applied a few lines above in _wpm_normalise_hex.
+local function _wpm_darken_hex(hex, factor, fallback_hex)
+	local h = (hex or ""):gsub("^#", "")
+	if #h ~= 6 then return fallback_hex end
+	local r = tonumber(h:sub(1, 2), 16)
+	local g = tonumber(h:sub(3, 4), 16)
+	local b = tonumber(h:sub(5, 6), 16)
+	if not r or not g or not b then return fallback_hex end
+
+	return string.format("#%02x%02x%02x",
+		math.floor(r * factor), math.floor(g * factor), math.floor(b * factor))
 end
 
 
@@ -476,7 +486,9 @@ update_widget_body = function()
 			})
 
 			-- Darker strip behind the unit label (square bottom — the pill rounding clips it).
-			local strip_hex = _wpm_darken_hex(bg_hex, CONFIG.compact_unit_darken)
+			-- Falls back to the manual-mode blue (same default resolve_source_hex uses)
+			-- if bg_hex is a malformed user-edited TOML color.
+			local strip_hex = _wpm_darken_hex(bg_hex, CONFIG.compact_unit_darken, CONFIG.color_bg_manual)
 			table.insert(elements, {
 				type = "rectangle", action = "fill",
 				fillColor = { hex = strip_hex, alpha = main_alpha },
