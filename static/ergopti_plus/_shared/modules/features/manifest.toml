@@ -2842,6 +2842,13 @@ id = "script_control_shortcuts"
 [[menu.shortcuts_menu]]
 type = "dynamic"
 id = "personal_shortcuts"
+# AHK-only (mirrors wrap_symbols_menu above): the Windows driver maintains a
+# structured personal_shortcuts.ahk registry it can walk to list each
+# individually-registered shortcut. macOS's personal_shortcuts.lua is an
+# arbitrary dofile()-loaded script (hs.hotkey.bind calls are not
+# introspectable), so there is no equivalent registry to render here — the
+# macOS "edit_shortcuts" action below already covers "open the file to edit".
+platforms = ["ahk"]
 
 [[menu.shortcuts_menu]]
 type = "action"

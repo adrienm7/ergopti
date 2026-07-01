@@ -267,7 +267,10 @@
 		},
 		{
 			"type": "dynamic",
-			"id": "personal_shortcuts"
+			"id": "personal_shortcuts",
+			"platforms": [
+				"ahk"
+			]
 		},
 		{
 			"type": "action",
