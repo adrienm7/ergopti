@@ -93,8 +93,6 @@ CrashReport_Build(ErrorObj) {
 	; ── Timestamp ────────────────────────────────────────────────────────────
 	Ts := _CrashReport_IsoTimestamp()
 
-	; ── Full system info (mirrors healthcheck _HealthCheck_SysInfo + enriched fields) ──────────
-	Sys := _CrashReport_SysInfo()
 	; Run the healthcheck EXACTLY ONCE per crash and reuse its result for both the
 	; enriched system fields and the adapter / session block below. HealthCheck_Run
 	; re-validates every port adapter and is non-trivial work; the error handler
@@ -102,6 +100,12 @@ CrashReport_Build(ErrorObj) {
 	; already degraded, so a second redundant run only widens the input-dead window.
 	HC := ""
 	try HC := HealthCheck_Run()
+	; ── Full system info (mirrors healthcheck _HealthCheck_SysInfo + enriched fields) ──────────
+	; HC["sys"] already ran the exact same WMI ConnectServer / RegRead / git-subprocess
+	; probes above via HealthCheck_Run — recomputing them here would double that
+	; blocking work on the crash handler's deferred timer (crash-report-sysinfo-dedup).
+	; Only fall back to a fresh probe if the healthcheck itself failed to produce one.
+	Sys := (HC != "" and HC.Has("sys")) ? HC["sys"] : _CrashReport_SysInfo()
 	; Pull a few safe enriched fields from the live healthcheck for even richer crash reports (pause state, key logs paths, etc.)
 	try {
 		if (HC != "") {
