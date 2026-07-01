@@ -562,22 +562,37 @@ function M.generate(ctx, menu_mods, actions)
 		end
 	end
 
-	-- Collect the download item now so it participates in canvas width calculation below
+	-- Collect the download item now so it participates in canvas width calculation below.
+	-- pcall-isolated like every other component builder above (e.g. the AI zone at
+	-- line ~447) — an exception here must degrade to "no download item", not take
+	-- down the whole menu-build pipeline.
 	local _dl_item = nil
 	if type(ctx.llm_handler) == "table" and type(ctx.llm_handler.build_download_item) == "function" then
-		_dl_item = ctx.llm_handler.build_download_item()
+		local ok_dl, dl_result = pcall(ctx.llm_handler.build_download_item)
+		if ok_dl then
+			_dl_item = dl_result
+		else
+			Logger.error(LOG, string.format("Error building LLM download item: %s.", tostring(dl_result)))
+		end
 	end
 	if _dl_item then
 		table.insert(items, 1, { title = "-" })
 		table.insert(items, 1, _dl_item)
 	end
 
-	CanvasBadge.prepend_to(items, ctx, function()
+	-- This is the single highest-blast-radius call in the whole build pipeline:
+	-- it is the LAST step and mutates `items` in place, so an unguarded exception
+	-- here would unwind past every component built above and turn one broken
+	-- badge render into a total menu-rebuild failure.
+	local ok_badge, badge_err = pcall(CanvasBadge.prepend_to, items, ctx, function()
 		if ctx and ctx.script_control then
 			if type(ctx.script_control.toggle_script_control) == "function" then pcall(ctx.script_control.toggle_script_control) end
 			if type(ctx.script_control.toggle) == "function" then pcall(ctx.script_control.toggle) end
 		end
 	end)
+	if not ok_badge then
+		Logger.error(LOG, string.format("Error building canvas badge: %s.", tostring(badge_err)))
+	end
 
 	return items
 end
