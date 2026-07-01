@@ -785,6 +785,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_g5_updater_download.ahk
 #Include meta/test_key_state_dllcall_guards.ahk
 #Include meta/test_updater_loadchannel_try_wrap.ahk
+#Include meta/test_updater_pollasync_critical_restore.ahk
 
 ; -- Previously-orphaned regression tests (on disk but never wired into the
 ;    runner; re-wired so they actually execute). All were silently skipped; the
