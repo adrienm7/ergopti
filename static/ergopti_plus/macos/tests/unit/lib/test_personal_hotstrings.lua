@@ -130,4 +130,73 @@ helpers.describe("lib/personal_hotstrings — load contract", function()
 
 		helpers.assert_true(ok, "load() must terminate and not throw/hang on a directory cycle: " .. tostring(err))
 	end)
+
+	helpers.it("warns instead of silently overwriting on a flat/nested group-name collision (F-LOW-5)", function()
+		-- A flat "a__b.toml" and a nested "a/b.toml" both derive the group name
+		-- "personal_ext_a__b" — "__" is used both as a literal character allowed
+		-- in a stem AND as the path-segment join separator. Before the fix, the
+		-- second file loaded silently overwrote the first's registration with no
+		-- warning. Fixture: /fake/hot/ contains a__b.toml AND a subdirectory a/
+		-- containing b.toml; alphabetical sort processes the flat file "a__b.toml"
+		-- before the subdirectory "a", so the SECOND (colliding) load is the
+		-- nested one — the warn must fire and the loaded list must still record
+		-- something sane rather than throwing.
+		mock("modules.keymap", {
+			load_toml = function(_, _) end,
+			source_priority = function(_) return nil end,
+		})
+		mock("ui.hotstring_editor", { init = function() end })
+		mock("ui.menu.menu_paths", {
+			get = function(key)
+				if key == "PersonalTomlPath" then return "/fake/hot/personal_hotstrings.toml" end
+				if key == "PersonalHotstringsDir" then return "/fake/hot/" end
+				return nil
+			end,
+		})
+		mock("lib.fs_dir", {
+			entries = function(dir)
+				if dir == "/fake/hot" then return { "a__b.toml", "a" } end
+				if dir == "/fake/hot/a" then return { "b.toml" } end
+				return {}
+			end,
+		})
+
+		local prev_attr, prev_json = hs.fs.attributes, hs.json
+		hs.fs.attributes = function(path)
+			if path == "/fake/hot" or path == "/fake/hot/a" then return { mode = "directory" } end
+			if path:match("%.toml$") then return { mode = "file" } end
+			return nil
+		end
+		hs.json = { decode = function(_) return nil end }
+
+		-- Capture Logger.warn calls without silencing them (same pattern as
+		-- tests/meta/test_healthcheck_api_contract.lua).
+		package.loaded["lib.personal_hotstrings"] = nil
+		local Logger = require("lib.logger")
+		local warnings = {}
+		local orig_warn = Logger.warn
+		Logger.warn = function(log_obj, fmt, ...)
+			warnings[#warnings + 1] = string.format(fmt, ...)
+			return orig_warn(log_obj, fmt, ...)
+		end
+
+		local PH = require("lib.personal_hotstrings")
+		local ok, loaded = pcall(PH.load, { bundled_hotstrings_dir = "/fake/bundle/" })
+
+		Logger.warn = orig_warn
+		hs.fs.attributes, hs.json = prev_attr, prev_json
+		restore_all()
+
+		helpers.assert_true(ok, "load() must not throw on a group-name collision: " .. tostring(loaded))
+
+		local collision_warned = false
+		for _, w in ipairs(warnings) do
+			if w:find("collision", 1, true) and w:find("personal_ext_a__b", 1, true) then
+				collision_warned = true
+			end
+		end
+		helpers.assert_true(collision_warned,
+			"a Logger.warn must fire naming the colliding group 'personal_ext_a__b' (got: "
+				.. table.concat(warnings, " | ") .. ")")
+	end)
 end)
