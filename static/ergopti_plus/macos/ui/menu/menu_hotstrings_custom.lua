@@ -267,7 +267,10 @@ function M.build_custom(ctx, counts)
 	local function sc_fn()
 		local current_str = ""
 		if type(state.custom_editor_shortcut) == "table" then
-			current_str = table.concat(state.custom_editor_shortcut.mods or {}, "+")
+			-- coerce_mods guards against a persisted scalar string .mods (M-13):
+			-- concatenating that field directly here would throw, same as the
+			-- sc_is_default/sc_label call sites it already protects (PF-7 fix).
+			current_str = table.concat(coerce_mods(state.custom_editor_shortcut.mods), "+")
 				.. "+" .. (state.custom_editor_shortcut.key or "")
 		end
 		local ok_p, btn, raw = pcall(dialog.text_prompt,
