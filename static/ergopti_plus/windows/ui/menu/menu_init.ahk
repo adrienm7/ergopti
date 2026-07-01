@@ -188,15 +188,81 @@ initMenu() {
 		A_TrayMenu.Check(GetCategoryTitle("Gestures"))
 	}
 
-	GlobalActionsMenu := Menu()
-	RegisterMenuItem(GlobalActionsMenu, t("menu.global.enable_all"),  ToggleAllFeaturesOn)
-	RegisterMenuItem(GlobalActionsMenu, t("menu.global.disable_all"), ToggleAllFeaturesOff)
-	RegisterMenuItem(GlobalActionsMenu, t("menu.global.reset_defaults"), ReloadWithDefaultConfig)
-	A_TrayMenu.Add(t("menu.global.title"), GlobalActionsMenu)
-	BootProfile_Mark("MENU/initMenu: tap-holds/gestures/global menus")
+	; ─── Tail (global_actions onwards): order driven by the shared manifest top_level.
+	; Each id dispatches to its builder/registrar — only action closures and OS glue
+	; live here; layout data comes from menu_manifest.json.
+	_MI_AppendTail()
+	BootProfile_Mark("MENU/initMenu: tail (global_actions…debug)")
+}
 
-	A_TrayMenu.Add()
 
+; Appends the tail section of the tray menu (from global_actions to debug) in the
+; order declared in menu_manifest.json top_level, filtered for AHK.  Behaviour
+; change vs. the previous hard-coded order: language now sits right after
+; global_actions, config_folder before setup_wizard, about after setup_wizard.
+_MI_AppendTail() {
+	global A_TrayMenu, _DriverReady, _LangMenuRef, _LangMenuBuildPending, MenuSuspend
+
+	TailItems := MenuManifest_LoadTopLevelTail()
+	for _, Entry in TailItems {
+		Id := Entry["id"]
+		if Id == "---" {
+			A_TrayMenu.Add()
+		} else if Id == "global_actions" {
+			GlobalActionsMenu := _MI_BuildGlobalActionsMenu()
+			A_TrayMenu.Add(t("menu.global.title"), GlobalActionsMenu)
+		} else if Id == "language" {
+			LangMenu := Menu()
+			A_TrayMenu.Add(t("menu.global.language"), LangMenu)
+			; The 21-locale language submenu costs ~156 ms on the first build.
+			; On the boot pass, defer it; on a live rebuild populate synchronously.
+			_LangMenuRef := LangMenu
+			if _DriverReady
+				I18nBuildLanguageMenu(LangMenu)
+			else
+				_LangMenuBuildPending := true
+		} else if Id == "config_folder" {
+			RegisterMenuItem(A_TrayMenu, t("menu.global.config_folder"), FilePathsEditor)
+		} else if Id == "setup_wizard" {
+			RegisterMenuItem(A_TrayMenu, t("menu.global.setup_wizard"), Onboarding_ShowFromMenu)
+		} else if Id == "about" {
+			A_TrayMenu.Add(t("menu.about.title"), _MI_BuildAboutMenu())
+		} else if Id == "suspend" {
+			MenuSuspend := t("menu.global.suspend")
+			RegisterMenuItem(A_TrayMenu, MenuSuspend, ToggleSuspend)
+		} else if Id == "reload" {
+			RegisterMenuItem(A_TrayMenu, t("menu.global.reload"), ActivateReload)
+		} else if Id == "quit" {
+			RegisterMenuItem(A_TrayMenu, t("menu.global.quit"), ActivateExitApp)
+		} else if Id == "debug" {
+			A_TrayMenu.Add(t("menu.debug.title"), _MI_BuildDebuggingMenu())
+		}
+	}
+}
+
+
+; Builds the "Actions globales" submenu from the manifest's global_actions array (MENU-2).
+_MI_BuildGlobalActionsMenu() {
+	M := Menu()
+	for _, Entry in MenuManifest_LoadGlobalActions() {
+		Id := Entry["id"]
+		if Id == "---" {
+			M.Add()
+		} else if Id == "enable_all" {
+			RegisterMenuItem(M, t("menu.global.enable_all"),    ToggleAllFeaturesOn)
+		} else if Id == "disable_all" {
+			RegisterMenuItem(M, t("menu.global.disable_all"),   ToggleAllFeaturesOff)
+		} else if Id == "reset_defaults" {
+			RegisterMenuItem(M, t("menu.global.reset_defaults"), ReloadWithDefaultConfig)
+		}
+	}
+	return M
+}
+
+
+; Builds the About submenu (version, channel, update frequency, changelog).
+_MI_BuildAboutMenu() {
+	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INTERVAL_PRESETS, UPDATER_LATEST_RELEASE
 	AboutMenu := Menu()
 	Ver := Updater_CurrentVersion()
 	VerLabel := "ErgoptiPlus " . Ver
@@ -206,8 +272,6 @@ initMenu() {
 	} else {
 		RegisterMenuItem(AboutMenu, VerLabel, Updater_OpenCurrentRelease)
 	}
-	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INTERVAL_PRESETS
-	global UPDATER_LATEST_RELEASE
 	AboutMenu.Add()
 	ChannelMenu := Menu()
 	RegisterMenuItem(ChannelMenu, t("menu.about.channel_main"), (*) => Updater_SetChannel("main"))
@@ -216,7 +280,6 @@ initMenu() {
 	ChannelDisplay := (UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main")
 	AboutMenu.Add(t("menu.about.channel_menu") . ": " . ChannelDisplay, ChannelMenu)
 	if not Updater_IsLocalSource() {
-
 		FreqMenu := Menu()
 		CurrentLabel := ""
 		CurrentCode  := ""
@@ -232,7 +295,6 @@ initMenu() {
 			FreqMenu.Check(CurrentLabel)
 		FreqDisplay := (CurrentCode != "") ? CurrentCode : "?"
 		AboutMenu.Add(t("menu.about.frequency_menu") . ": " . FreqDisplay, FreqMenu)
-
 		UpdateLabel := Updater_GetUpdateMenuLabel()
 		RegisterMenuItem(AboutMenu, UpdateLabel, Updater_OneClickUpdate)
 		if (Updater_GetUpdateState() == "checking")
@@ -241,58 +303,35 @@ initMenu() {
 	AboutMenu.Add()
 	RegisterMenuItem(AboutMenu, t("menu.about.changelog"), Updater_ShowChangelog)
 	RegisterMenuItem(AboutMenu, t("menu.about.open_releases_page"), (*) => Run(Updater_ReleasesPageUrl()))
-	A_TrayMenu.Add(t("menu.about.title"), AboutMenu)
-	BootProfile_Mark("MENU/initMenu: about menu")
+	return AboutMenu
+}
 
-	RegisterMenuItem(A_TrayMenu, t("menu.global.setup_wizard"), Onboarding_ShowFromMenu)
 
-	global MenuSuspend
-	MenuSuspend := t("menu.global.suspend")
-	RegisterMenuItem(A_TrayMenu, t("menu.global.config_folder"), FilePathsEditor)
-
-	LangMenu := Menu()
-	A_TrayMenu.Add(t("menu.global.language"), LangMenu)
-	; The 21-locale language submenu costs ~156 ms (Win32 menu-item registration +
-	; flag-icon loads). On the boot pass, defer it off the critical path (the boot
-	; tail arms BuildLanguageMenuDeferred); on a live rebuild (initMenu re-run via a
-	; -50 ms timer, already off-path) populate it synchronously. Nothing reads the
-	; submenu before the user opens it.
-	_LangMenuRef := LangMenu
-	if _DriverReady
-		I18nBuildLanguageMenu(LangMenu)
-	else
-		_LangMenuBuildPending := true
-	A_TrayMenu.Add()
-	RegisterMenuItem(A_TrayMenu, MenuSuspend, ToggleSuspend)
-	RegisterMenuItem(A_TrayMenu, t("menu.global.reload"), ActivateReload)
-	RegisterMenuItem(A_TrayMenu, t("menu.global.quit"), ActivateExitApp)
-	BootProfile_Mark("MENU/initMenu: language + global actions")
-
+; Builds the Debug submenu from the manifest's debug_menu array.
+_MI_BuildDebuggingMenu() {
 	DebuggingMenu := Menu()
-	DebugOrder    := MenuManifest_LoadDebugMenu()
-	for _, Entry in DebugOrder {
+	for _, Entry in MenuManifest_LoadDebugMenu() {
 		Id := Entry["id"]
 		if Id == "---" {
 			DebuggingMenu.Add()
 		} else if Id == "window_spy" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.window_spy"),    WindowSpy)
+			RegisterMenuItem(DebuggingMenu, t("menu.debug.window_spy"),     WindowSpy)
 		} else if Id == "list_vars" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.list_vars"),     ActivateListVars)
+			RegisterMenuItem(DebuggingMenu, t("menu.debug.list_vars"),      ActivateListVars)
 		} else if Id == "key_history" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.key_history"),   ActivateKeyHistory)
+			RegisterMenuItem(DebuggingMenu, t("menu.debug.key_history"),    ActivateKeyHistory)
 		} else if Id == "log_level" {
 			DebuggingMenu.Add(_LogLevelMenuLabel(), _BuildLogLevelMenu())
 		} else if Id == "open_logs" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.open_logs"),     OpenLogsFolder)
+			RegisterMenuItem(DebuggingMenu, t("menu.debug.open_logs"),      OpenLogsFolder)
 		} else if Id == "open_today_log" {
 			RegisterMenuItem(DebuggingMenu, t("menu.debug.open_today_log"), OpenTodayLog)
 		} else if Id == "open_error_log" {
 			RegisterMenuItem(DebuggingMenu, t("menu.debug.open_error_log"), OpenErrorLog)
 		} else if Id == "healthcheck" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.healthcheck"),   ShowHealthCheck)
+			RegisterMenuItem(DebuggingMenu, t("menu.debug.healthcheck"),    ShowHealthCheck)
 		}
 	}
-	A_TrayMenu.Add(t("menu.debug.title"), DebuggingMenu)
-	BootProfile_Mark("MENU/initMenu: debug menu")
+	return DebuggingMenu
 }
 

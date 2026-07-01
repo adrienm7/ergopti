@@ -124,16 +124,19 @@
 			"id": "global_actions"
 		},
 		{
+			"id": "language"
+		},
+		{
 			"id": "config_folder"
 		},
 		{
 			"id": "setup_wizard"
 		},
 		{
-			"id": "---"
+			"id": "about"
 		},
 		{
-			"id": "edit_shortcuts"
+			"id": "---"
 		},
 		{
 			"id": "suspend",
@@ -160,12 +163,6 @@
 		},
 		{
 			"id": "reset_defaults"
-		},
-		{
-			"id": "---"
-		},
-		{
-			"id": "language"
 		}
 	],
 	"debug_menu": [

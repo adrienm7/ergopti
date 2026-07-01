@@ -33,6 +33,8 @@ global _MM_FALLBACK_DYNAMIC   := ["DynamicHotstrings"]
 ; Cached objects to avoid redundant disk I/O and JSON parsing
 global _MM_HOTSTRING_GROUPS_CACHE := false
 global _MM_DEBUG_MENU_CACHE       := false
+global _MM_TOP_LEVEL_TAIL_CACHE   := false
+global _MM_GLOBAL_ACTIONS_CACHE   := false
 
 
 
@@ -78,8 +80,11 @@ _MM_ResolveIdArray(IdsArr, CategoryKeysMap, GroupName, Fallback) {
 ; Invalidates all manifest-driven caches.
 MenuManifest_InvalidateCache() {
 	global _MM_HOTSTRING_GROUPS_CACHE, _MM_DEBUG_MENU_CACHE
+	global _MM_TOP_LEVEL_TAIL_CACHE, _MM_GLOBAL_ACTIONS_CACHE
 	_MM_HOTSTRING_GROUPS_CACHE := false
 	_MM_DEBUG_MENU_CACHE       := false
+	_MM_TOP_LEVEL_TAIL_CACHE   := false
+	_MM_GLOBAL_ACTIONS_CACHE   := false
 }
 
 ; Loads ``static/ergopti_plus/_shared/menu_manifest.json`` and converts the hotstring group id lists
@@ -251,5 +256,181 @@ _MM_DebugFallback() {
 		Map("id", "open_error_log"),
 		Map("id", "---"),
 		Map("id", "healthcheck"),
+	]
+}
+
+
+
+
+; ======================================================
+; ======================================================
+; ======= 3/ Top-Level Tail Loader (MENU-1) ============
+; ======================================================
+; ======================================================
+
+; Loads the tail slice of the ``top_level`` array from the shared manifest —
+; starting at the "global_actions" entry — and returns it as an Array of Maps,
+; filtered for the AHK platform.  Used by _MI_AppendTail() to drive the
+; lower-menu assembly in manifest order rather than imperative order.
+MenuManifest_LoadTopLevelTail() {
+	global _SharedDir, _MM_TOP_LEVEL_TAIL_CACHE
+
+	if (_MM_TOP_LEVEL_TAIL_CACHE != false)
+		return _MM_TOP_LEVEL_TAIL_CACHE
+
+	FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
+
+	if !FileExist(FilePath) {
+		try LoggerWarn("MenuManifest", "manifest not found — using fallback top-level tail.")
+		return _MM_TopLevelTailFallback()
+	}
+
+	FileContent := ""
+	try FileContent := FileRead(FilePath, "UTF-8")
+	if FileContent == ""
+		return _MM_TopLevelTailFallback()
+
+	Root := ""
+	try Root := JsonParse(FileContent)
+	if !(Root is Map)
+		return _MM_TopLevelTailFallback()
+
+	RawItems := _MM_MapGet(Root, "top_level")
+	if !(RawItems is Array) || RawItems.Length == 0
+		return _MM_TopLevelTailFallback()
+
+	; Find the index of the first "global_actions" entry — that is where the tail starts
+	TailStart := 0
+	for Idx, Entry in RawItems {
+		if !(Entry is Map)
+			continue
+		if _MM_MapGet(Entry, "id") == "global_actions" {
+			TailStart := Idx
+			break
+		}
+	}
+	if TailStart == 0 {
+		try LoggerWarn("MenuManifest", "top_level has no 'global_actions' entry — using fallback tail.")
+		return _MM_TopLevelTailFallback()
+	}
+
+	Result := []
+	Loop RawItems.Length - TailStart + 1 {
+		Entry := RawItems[TailStart + A_Index - 1]
+		if !(Entry is Map)
+			continue
+		Id := _MM_MapGet(Entry, "id")
+		if Id == ""
+			continue
+		; Filter by platform: skip entries that explicitly exclude "ahk"
+		Platforms := _MM_MapGet(Entry, "platforms", 0)
+		if Platforms is Array {
+			IsForAhk := false
+			for P in Platforms {
+				if P == "ahk" {
+					IsForAhk := true
+					break
+				}
+			}
+			if !IsForAhk
+				continue
+		}
+		Result.Push(Map("id", Id))
+	}
+
+	try LoggerDone("MenuManifest", "Top-level tail loaded ({1} item(s)).", Result.Length)
+	_MM_TOP_LEVEL_TAIL_CACHE := Result.Length > 0 ? Result : _MM_TopLevelTailFallback()
+	return _MM_TOP_LEVEL_TAIL_CACHE
+}
+
+; Hard-coded fallback — mirrors the canonical AHK tail defined in menu_manifest.json.
+_MM_TopLevelTailFallback() {
+	return [
+		Map("id", "global_actions"),
+		Map("id", "language"),
+		Map("id", "config_folder"),
+		Map("id", "setup_wizard"),
+		Map("id", "about"),
+		Map("id", "---"),
+		Map("id", "suspend"),
+		Map("id", "reload"),
+		Map("id", "quit"),
+		Map("id", "debug"),
+	]
+}
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 4/ Global Actions Loader (MENU-2) ========
+; ==================================================
+; ==================================================
+
+; Loads the ``global_actions`` array from the shared manifest (items for the
+; "Actions globales" submenu), filtered for the AHK platform.  Returned as
+; an Array of Maps with "id".  Used by _MI_BuildGlobalActionsMenu().
+MenuManifest_LoadGlobalActions() {
+	global _SharedDir, _MM_GLOBAL_ACTIONS_CACHE
+
+	if (_MM_GLOBAL_ACTIONS_CACHE != false)
+		return _MM_GLOBAL_ACTIONS_CACHE
+
+	FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
+
+	if !FileExist(FilePath) {
+		try LoggerWarn("MenuManifest", "manifest not found — using fallback global_actions.")
+		return _MM_GlobalActionsFallback()
+	}
+
+	FileContent := ""
+	try FileContent := FileRead(FilePath, "UTF-8")
+	if FileContent == ""
+		return _MM_GlobalActionsFallback()
+
+	Root := ""
+	try Root := JsonParse(FileContent)
+	if !(Root is Map)
+		return _MM_GlobalActionsFallback()
+
+	RawItems := _MM_MapGet(Root, "global_actions")
+	if !(RawItems is Array) || RawItems.Length == 0
+		return _MM_GlobalActionsFallback()
+
+	Result := []
+	for Entry in RawItems {
+		if !(Entry is Map)
+			continue
+		Id := _MM_MapGet(Entry, "id")
+		if Id == ""
+			continue
+		; Filter by platform
+		Platforms := _MM_MapGet(Entry, "platforms", 0)
+		if Platforms is Array {
+			IsForAhk := false
+			for P in Platforms {
+				if P == "ahk" {
+					IsForAhk := true
+					break
+				}
+			}
+			if !IsForAhk
+				continue
+		}
+		Result.Push(Map("id", Id))
+	}
+
+	try LoggerDone("MenuManifest", "Global actions loaded ({1} item(s)).", Result.Length)
+	_MM_GLOBAL_ACTIONS_CACHE := Result.Length > 0 ? Result : _MM_GlobalActionsFallback()
+	return _MM_GLOBAL_ACTIONS_CACHE
+}
+
+; Hard-coded fallback — mirrors the canonical content of menu_manifest.json global_actions.
+_MM_GlobalActionsFallback() {
+	return [
+		Map("id", "enable_all"),
+		Map("id", "disable_all"),
+		Map("id", "reset_defaults"),
 	]
 }

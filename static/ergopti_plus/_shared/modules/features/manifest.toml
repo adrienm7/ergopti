@@ -2724,16 +2724,19 @@ id = "---"
 id = "global_actions"
 
 [[menu.top_level]]
+id = "language"
+
+[[menu.top_level]]
 id = "config_folder"
 
 [[menu.top_level]]
 id = "setup_wizard"
 
 [[menu.top_level]]
-id = "---"
+id = "about"
 
 [[menu.top_level]]
-id = "edit_shortcuts"
+id = "---"
 
 [[menu.top_level]]
 id = "suspend"
@@ -2756,12 +2759,6 @@ id = "disable_all"
 
 [[menu.global_actions]]
 id = "reset_defaults"
-
-[[menu.global_actions]]
-id = "---"
-
-[[menu.global_actions]]
-id = "language"
 
 [[menu.debug_menu]]
 id = "window_spy"
