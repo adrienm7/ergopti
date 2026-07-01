@@ -44,13 +44,13 @@ _TLANEL_CheckNoEntryLogged() {
 	; Locate the guard and assert a Logger call is nearby
 	GuardPos := InStr(Body, "entry == " Chr(34) Chr(34))
 	Assert(GuardPos > 0,
-		"AHK-27: LLM_Engine_FirePrediction must contain 'if (entry == \"\")' guard for the no-API-entry case")
+		"AHK-27: LLM_Engine_FirePrediction must contain a guard for entry == empty string (the no-API-entry case)")
 
 	; Assert a LoggerWarn or LoggerInfo appears within a short window after the guard
 	; (both the guard block and the Logger call must be present)
 	LocalBody := SubStr(Body, GuardPos, 300)
 	Assert(InStr(LocalBody, "LoggerWarn") or InStr(LocalBody, "LoggerInfo"),
-		"AHK-27: the 'if (entry == \"\")' branch in LLM_Engine_FirePrediction must call LoggerWarn or LoggerInfo before returning — a silent return here is a §5.3 fail-fast violation; the user gets no feedback that predictions are impossible in this configuration")
+		"AHK-27: the entry == empty string branch in LLM_Engine_FirePrediction must call LoggerWarn or LoggerInfo before returning — a silent return here is a §5.3 fail-fast violation; the user gets no feedback that predictions are impossible in this configuration")
 }
 
 
