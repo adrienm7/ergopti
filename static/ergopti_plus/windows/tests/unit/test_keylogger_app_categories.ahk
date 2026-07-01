@@ -260,3 +260,43 @@ TestKLSortArray_SortsAlphabeticStringsWithoutThrowing() {
 }
 Test("KL_SortArray: sorts ordinary alphabetic app-name strings without throwing",
 	TestKLSortArray_SortsAlphabeticStringsWithoutThrowing)
+
+
+
+
+
+; ============================================================
+; ==============================================================
+; ======= 4/ KL_AppCat_DeferredSave — suspend guard (1g) =======
+; ==============================================================
+; ============================================================
+
+; Regression for Pattern 1 (1g): KL_AppCat_DeferredSave runs on a SetTimer,
+; which native Suspend() never disarms. A pending write must be deferred
+; (not lost — KLAppCat.dirty stays true) while paused, and must actually
+; persist once resumed.
+TestKLAppCat_DeferredSaveSkipsWriteWhileSuspended() {
+	_KLAppCatReset()
+	TmpPath := A_Temp . "\ergopti_test_appcat_suspend_" . A_TickCount . ".json"
+	KLAppCat.file_path := TmpPath
+	KLAppCat.categories["TestApp.exe"] := "productive"
+	KLAppCat.dirty := true
+
+	Suspend(1)
+	try {
+		KL_AppCat_DeferredSave()
+		AssertTrue(KLAppCat.dirty, "KL_AppCat_DeferredSave must leave dirty=true when suspended -- the write is deferred, not lost")
+		AssertEqual("", FileExist(TmpPath), "KL_AppCat_DeferredSave must not write to disk while suspended")
+	} finally {
+		Suspend(0)
+	}
+
+	KL_AppCat_DeferredSave()
+	AssertFalse(KLAppCat.dirty, "KL_AppCat_DeferredSave must persist and clear dirty once resumed")
+	AssertTrue(FileExist(TmpPath) != "", "KL_AppCat_DeferredSave must actually write to disk once resumed")
+
+	try FileDelete(TmpPath)
+	KLAppCat.dirty := false
+}
+Test("keylogger_app_categories: KL_AppCat_DeferredSave defers (does not lose) a pending write while suspended (suspend-guard-pattern-1)",
+	TestKLAppCat_DeferredSaveSkipsWriteWhileSuspended)

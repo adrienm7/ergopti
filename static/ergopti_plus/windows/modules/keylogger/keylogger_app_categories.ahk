@@ -238,6 +238,13 @@ KL_AppCat_Save() {
 ; Deferred save — called by timer so rapid new-app discoveries are
 ; batched into one write rather than one write per app.
 KL_AppCat_DeferredSave() {
+    ; SetTimer callbacks bypass native Suspend() (only Hotkeys/Hotstrings are
+    ; disarmed). The data behind a pending write was already legitimately
+    ; collected before any pause, so skipping the write here just defers it
+    ; rather than losing it — KLAppCat.dirty stays true and the next tick
+    ; after resume persists it.
+    if A_IsSuspended
+        return
     if KLAppCat.dirty
         KL_AppCat_Save()
 }
