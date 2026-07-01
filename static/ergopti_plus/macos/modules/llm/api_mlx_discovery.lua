@@ -135,12 +135,6 @@ local DISCOVERY_MAX_WAIT_SEC        = 180  -- Stop polling /v1/models after this
                                            -- discovered routes fresh and silences the scary warning).
 local DISCOVERY_POLL_INITIAL_SEC    = Timings.sec("llm", "discovery_poll_initial_ms")  -- First inter-probe delay (doubles each miss, capped below)
 local DISCOVERY_POLL_MAX_SEC        = Timings.sec("llm", "discovery_poll_max_ms")       -- Cap for the exponential backoff interval
--- After this many seconds of persistent model-ID mismatch, bypass the check and
--- proceed to POST probes. A mismatch beyond this window means either (a) the old
--- server's socket lingered in CLOSE_WAIT and the zombie killer couldn't find the
--- process, or (b) the new server itself reports a stale model ID while loading
--- its weights from GPU cache. In both cases waiting longer achieves nothing.
-local DISCOVERY_MODEL_ID_BYPASS_SEC = 20
 
 
 
