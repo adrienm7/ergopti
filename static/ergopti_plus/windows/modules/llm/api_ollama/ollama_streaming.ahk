@@ -374,6 +374,15 @@ _LLM_Ollama_CleanupCurlFiles(entry) {
  */
 _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
 	text := LLM_ParseOllamaChatResponse(body)
+	; LLM_ParseOllamaChatResponse returns a structured Map("error", true, ...)
+	; on a JSON parse failure (malformed body) instead of an empty string, so
+	; that case must be checked before the empty-string "parse miss" branch —
+	; otherwise on_fail would receive the raw Map as if it were prediction text.
+	if (text is Map) and text.Has("error") {
+		try LoggerWarn("LLM.ollama", "Ollama response parse failed: {1}.", text.Has("message") ? text["message"] : "unknown error")
+		try on_fail(text)
+		return
+	}
 	if (text == "") {
 		snip := StrLen(body) > 120 ? SubStr(body, 1, 120) . "…" : body
 		payload_hint := ""
