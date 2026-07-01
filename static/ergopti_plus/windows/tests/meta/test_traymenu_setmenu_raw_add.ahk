@@ -65,3 +65,17 @@ _TMRA_NoRawActionableAdd() {
 		"TrayMenuSetMenu must NOT add actionable items via raw A_TrayMenu.Add(ItemTitle, ItemFn) — that bypasses the menu_dispatcher retry and drops clicks")
 }
 Test("tray_menu: no raw two-arg A_TrayMenu.Add for actionable items (traymenu-setmenu-raw-add-drops-clicks)", _TMRA_NoRawActionableAdd)
+
+_TMRA_ResetsMenuDispatcherBeforeDelete() {
+	Seg := _DriverFuncBody("TrayMenuSetMenu")
+	ResetPos  := InStr(Seg, "MenuDispatcher_Reset()")
+	Assert(ResetPos > 0,
+		"TrayMenuSetMenu must call MenuDispatcher_Reset() before clearing the menu -- a raw A_TrayMenu.Delete() leaves stale menu-item IDs in the dispatcher's tracking Maps, which can be recycled by the next Add() and fire the wrong callback")
+
+	DeletePos := InStr(Seg, "A_TrayMenu.Delete()")
+	Assert(DeletePos > 0, "TrayMenuSetMenu must still call A_TrayMenu.Delete()")
+	Assert(ResetPos < DeletePos,
+		"MenuDispatcher_Reset() must run BEFORE A_TrayMenu.Delete() -- resetting after the delete would not prevent the stale-ID recycling it guards against")
+}
+Test("tray_menu: TrayMenuSetMenu resets the menu dispatcher before clearing the menu (traymenu-stale-id-recycle)",
+	_TMRA_ResetsMenuDispatcherBeforeDelete)

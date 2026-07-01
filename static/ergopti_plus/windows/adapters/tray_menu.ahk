@@ -49,6 +49,12 @@ TrayMenuSetIcon(Opts) {
 ; Clears the existing menu and rebuilds it from the Items array.
 ; @param Items {Array} Array of Maps: { title, fn [, checked, disabled, separator] }
 TrayMenuSetMenu(Items) {
+	; Stale menu-item IDs left in the dispatcher's tracking Maps after a raw
+	; Delete() can be recycled by the next Add() and fire the wrong callback --
+	; the same AHK 2.0 click-drop class RegisterMenuItem below exists to guard
+	; against. Reset the dispatcher's bookkeeping before rebuilding, mirroring
+	; _Updater_RebuildMenu (lib/updater/core.ahk).
+	try MenuDispatcher_Reset()
 	try A_TrayMenu.Delete()
 	if !(Items is Array)
 		return
