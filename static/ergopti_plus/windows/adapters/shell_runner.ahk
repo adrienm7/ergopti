@@ -244,6 +244,14 @@ _SR_Poll() {
 		return
 	}
 
+	; This periodic SetTimer bypasses native Suspend() (only Hotkeys/Hotstrings
+	; are disarmed) — skip firing OnDone callbacks while paused. Tasks stay in
+	; _SR_ActiveTasks and the next tick after resume picks them back up; the
+	; timer itself is left armed (unlike the empty-queue branch above) since
+	; there is still work pending.
+	if A_IsSuspended
+		return
+
 	; Iterate over a snapshot so callbacks that add new tasks don't affect this pass.
 	for task_id, task in _SR_ActiveTasks.Clone() {
 		if ProcessExist(task["Pid"]) {
