@@ -54,6 +54,60 @@ let kHammerspoonConfigKey = "MJConfigFile"
 
 // =====================================
 // =====================================
+// ======= 1.1) Persistent Logging =====
+// =====================================
+// =====================================
+
+// Before this (F-MED-30), the only diagnostic artifact on any launcher failure
+// was a single NSLog call — invisible in any headless/automated launch (no
+// Console.app session watching, no attached debugger). A user reporting "it
+// just doesn't start" gave us nothing to go on. LauncherLog appends a
+// timestamped line to a small on-disk file next to every NSAlert/failure path
+// (and a few success milestones) so a post-mortem is always possible.
+enum LauncherLog {
+	// Standard macOS per-app log location; readable by the user without special
+	// permissions and rotated by nothing — kept deliberately tiny (one line per
+	// launch event) so unbounded growth is not a practical concern.
+	private static let logDirectory = NSHomeDirectory() + "/Library/Logs/ErgoptiPlus"
+	private static let logPath = logDirectory + "/launcher.log"
+
+	private static let dateFormatter: DateFormatter = {
+		let f = DateFormatter()
+		f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+		return f
+	}()
+
+	/// Appends one timestamped line to ~/Library/Logs/ErgoptiPlus/launcher.log.
+	/// Best-effort: a logging failure must never prevent the launcher from
+	/// proceeding, so every step here is wrapped defensively.
+	static func write(_ message: String) {
+		let timestamp = dateFormatter.string(from: Date())
+		let line = "[\(timestamp)] \(message)\n"
+
+		if !FileManager.default.fileExists(atPath: logDirectory) {
+			try? FileManager.default.createDirectory(
+				atPath: logDirectory, withIntermediateDirectories: true)
+		}
+
+		guard let data = line.data(using: .utf8) else { return }
+
+		if FileManager.default.fileExists(atPath: logPath) {
+			if let handle = FileHandle(forWritingAtPath: logPath) {
+				handle.seekToEndOfFile()
+				handle.write(data)
+				handle.closeFile()
+			}
+		} else {
+			try? data.write(to: URL(fileURLWithPath: logPath))
+		}
+	}
+}
+
+
+
+
+// =====================================
+// =====================================
 // ======= 2/ AppDelegate ==============
 // =====================================
 // =====================================
@@ -71,6 +125,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// =====================================
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
+		LauncherLog.write("applicationDidFinishLaunching — version \(bundleVersionString())")
+
 		// Hide the launcher from the Dock — Hammerspoon's own menubar item
 		// is the only UI affordance the user should see.
 		NSApp.setActivationPolicy(.accessory)
@@ -216,6 +272,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			// too so the user is never left with an orphaned process.
 			let code = terminated.terminationStatus
 			NSLog("[Ergopti] embedded Hammerspoon exited with code \(code)")
+			LauncherLog.write("embedded Hammerspoon exited with code \(code)")
 			DispatchQueue.main.async {
 				NSApp.terminate(self)
 			}
@@ -224,6 +281,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		do {
 			try proc.run()
 			hsProcess = proc
+			LauncherLog.write("embedded Hammerspoon launched at \(binaryPath)")
 		} catch {
 			fail("Failed to launch embedded Hammerspoon: \(error.localizedDescription)")
 		}
@@ -239,7 +297,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// Surface a fatal error to the user before quitting; running with no
 	// Hammerspoon to spawn means the .app is broken and we must not pretend
 	// otherwise (fail-fast principle from copilot-instructions.md).
+	//
+	// Also persisted to LauncherLog (F-MED-30) — the NSAlert is the only
+	// diagnostic surface in an interactive session, but a headless/automated
+	// launch (Sparkle's silent-update relaunch, a CI smoke test, a script
+	// wrapping the app) never sees it. Without a durable artifact a failure in
+	// that context left literally nothing to investigate after the fact.
 	private func fail(_ message: String) {
+		LauncherLog.write("FATAL: \(message)")
+
 		let alert = NSAlert()
 		alert.messageText = "Ergopti n'a pas pu démarrer"
 		alert.informativeText = message
