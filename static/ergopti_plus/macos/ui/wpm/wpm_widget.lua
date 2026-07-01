@@ -198,6 +198,18 @@ local _use_source_colors = true
 local _last_active_sec   = 0    -- wall clock of the last keystroke seen by this widget
 local _last_mouse_sec    = 0    -- wall clock of the last mouse/touchpad event
 
+-- Current-cycle canvas geometry, shared with the mouseCallback closure below.
+-- The closure is created ONCE, the first time update_widget_body() creates
+-- _canvas — but canvas_width/compact_w/compact_h are plain locals re-declared
+-- on every subsequent call. A closure that captured those locals directly
+-- would keep reading the values from the single call that happened to create
+-- the canvas, forever — including after the user toggles graph mode, at which
+-- point a drag's mouseUp position math (target compact-anchor conversion)
+-- would use stale dimensions from a completely different mode. Routing both
+-- the read (mouseCallback) and the write (every update_widget_body cycle)
+-- through this same table keeps the closure's view of geometry current.
+local _canvas_geom = { canvas_width = 0, canvas_height = 0, compact_w = 0, compact_h = 0 }
+
 -- Saved position: top-left of the compact mode widget; nil = recalculate default.
 -- Persisted across sessions via hs.settings so drag survives a Hammerspoon reload.
 local _SETTINGS_X = "ergopti.wpm_widget.pos_x"
@@ -364,6 +376,13 @@ update_widget_body = function()
 			canvas_height = compact_h
 		end
 
+		-- Publish this cycle's geometry for the mouseCallback closure (see the
+		-- _canvas_geom declaration in section 2 for why this indirection exists).
+		_canvas_geom.canvas_width  = canvas_width
+		_canvas_geom.canvas_height = canvas_height
+		_canvas_geom.compact_w     = compact_w
+		_canvas_geom.compact_h     = compact_h
+
 		-- Compute default compact top-left (bottom-right corner at screen edge - margin).
 		if not _pos_x then
 			local margin_bottom = graph_margin
@@ -398,10 +417,16 @@ update_widget_body = function()
 					_drag_start_mouse = nil
 					_drag_start_frame = nil
 					-- Persist final compact-anchor position.
+					-- Read geometry from the live _canvas_geom table, not the plain
+					-- canvas_width/compact_w/compact_h locals from the update cycle
+					-- that first created this canvas — those locals are frozen at
+					-- creation time, while _canvas_geom is refreshed on every
+					-- update_widget_body() cycle and reflects the CURRENT mode
+					-- (e.g. after the user toggled graph mode post-creation).
 					local f = c:frame()
 					if _show_graph then
-						_pos_x = f.x + canvas_width  - compact_w
-						_pos_y = f.y + canvas_height - compact_h
+						_pos_x = f.x + _canvas_geom.canvas_width  - _canvas_geom.compact_w
+						_pos_y = f.y + _canvas_geom.canvas_height - _canvas_geom.compact_h
 					else
 						_pos_x = f.x
 						_pos_y = f.y
