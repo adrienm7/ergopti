@@ -26,9 +26,11 @@ local CanvasBadge = require("ui.menu.canvas_badge")
 -- file is read and parsed only once, no matter how many menu rebuilds occur.
 -- Never invalidated on toggle (the manifest is a static asset that never
 -- changes at runtime); only a full hs.reload() resets this module.
-local _manifest_cache       = nil
-local _ergopti_groups_cache = nil
-local _debug_menu_cache     = nil
+local _manifest_cache          = nil
+local _ergopti_groups_cache    = nil
+local _debug_menu_cache        = nil
+local _top_level_tail_cache    = nil
+local _global_actions_cache    = nil
 
 --- Loads and caches menu_manifest.json once per session.
 --- @return table|nil Parsed manifest data, or nil on failure.
@@ -105,6 +107,77 @@ local function load_debug_menu()
 	Logger.debug(LOG, "Debug menu order loaded from manifest (%d item(s)).", #result)
 	_debug_menu_cache = result
 	return _debug_menu_cache
+end
+
+
+--- Loads the top_level tail (from "global_actions" onwards) from menu_manifest.json,
+--- filtered for the "hs" platform.
+--- Returns an empty array on failure and logs ERROR (fail-loud — no stale copy).
+--- @return table Array of {id} entries in display order.
+local function load_top_level_tail()
+	if _top_level_tail_cache then return _top_level_tail_cache end
+	local data = load_manifest()
+	if not data or type(data.top_level) ~= "table" then
+		Logger.error(LOG, "Failed to load top_level from manifest — tail will be empty.")
+		return {}
+	end
+	local tail_start = nil
+	for i, entry in ipairs(data.top_level) do
+		if type(entry) == "table" and entry.id == "global_actions" then
+			tail_start = i
+			break
+		end
+	end
+	if not tail_start then
+		Logger.error(LOG, "top_level has no 'global_actions' entry — tail will be empty.")
+		return {}
+	end
+	local result = {}
+	for i = tail_start, #data.top_level do
+		local entry = data.top_level[i]
+		if type(entry) ~= "table" or type(entry.id) ~= "string" then goto continue end
+		if type(entry.platforms) == "table" then
+			local for_hs = false
+			for _, p in ipairs(entry.platforms) do
+				if p == "hs" then for_hs = true; break end
+			end
+			if not for_hs then goto continue end
+		end
+		table.insert(result, { id = entry.id })
+		::continue::
+	end
+	Logger.debug(LOG, "Top-level tail loaded from manifest (%d item(s)).", #result)
+	_top_level_tail_cache = result
+	return _top_level_tail_cache
+end
+
+
+--- Loads the global_actions array from menu_manifest.json, filtered for "hs".
+--- Returns an empty array on failure and logs ERROR (fail-loud — no stale copy).
+--- @return table Array of {id} entries.
+local function load_global_actions()
+	if _global_actions_cache then return _global_actions_cache end
+	local data = load_manifest()
+	if not data or type(data.global_actions) ~= "table" then
+		Logger.error(LOG, "Failed to load global_actions from manifest — submenu will be empty.")
+		return {}
+	end
+	local result = {}
+	for _, entry in ipairs(data.global_actions) do
+		if type(entry) ~= "table" or type(entry.id) ~= "string" then goto continue end
+		if type(entry.platforms) == "table" then
+			local for_hs = false
+			for _, p in ipairs(entry.platforms) do
+				if p == "hs" then for_hs = true; break end
+			end
+			if not for_hs then goto continue end
+		end
+		table.insert(result, { id = entry.id })
+		::continue::
+	end
+	Logger.debug(LOG, "Global actions loaded from manifest (%d item(s)).", #result)
+	_global_actions_cache = result
+	return _global_actions_cache
 end
 
 
@@ -407,55 +480,17 @@ function M.generate(ctx, menu_mods, actions)
 	end
 
 
-	-- Actions globales — last item of the features block (sits just above the
-	-- separator that closes the block), grouped with the other user-facing
-	-- toggles rather than with the About / version / language items.
-	table.insert(items, {
-		title = i18n.get("menu.global.title"),
-		menu = {
-			{ title = i18n.get("menu.global.enable_all"),    fn = actions.enable_all },
-			{ title = i18n.get("menu.global.disable_all"),   fn = actions.disable_all },
-			{ title = i18n.get("menu.global.reset_defaults"), fn = actions.reset_defaults },
-		}
-	})
-	table.insert(items, { title = "-" })
-	-- About / Update — sits directly below Actions globales in the same block
-	if type(menu_mods.about) == "table" and type(menu_mods.about.build) == "function" then
-		local ok_a, about_item = pcall(menu_mods.about.build, ctx)
-		if ok_a and about_item then
-			table.insert(items, about_item)
-		end
-	end
-	-- Language selector closes the block
-	table.insert(items, {
-		title = i18n.get("menu.global.language"),
-		menu  = i18n.build_language_menu_items(),
-	})
-	table.insert(items, { title = i18n.get("menu.global.config_folder"), fn = actions.open_paths })
-	table.insert(items, { title = i18n.get("menu.global.setup_wizard"),  fn = actions.show_setup_wizard })
-	table.insert(items, { title = "-" })
-	-- Strip the leading emoji token from the shared i18n string and replace with
-	-- plain Unicode symbols — emoji render poorly in native macOS menu bars
-	table.insert(items, { title = "↺ " .. i18n.get("menu.global.reload"):gsub("^%S+ ", ""),  fn = actions.reload })
-	table.insert(items, { title = "✕ " .. i18n.get("menu.global.quit"):gsub("^%S+ ", ""),    fn = actions.quit })
-
-	-- Build the log level submenu with a checkmark on the active level
-	local log_level_items = {}
+	-- ── Tail: order driven by the shared manifest top_level (MENU-1/MENU-2).
+	-- Build log-level items first (needed only when "debug" id is dispatched).
 	local Logger_mod = require("lib.logger")
 	local active_level_name = "INFO"
-
 	local function log_level_emoji(lvl)
-		local emojis = {
-			DEBUG   = "🐛",
-			INFO    = "ℹ️",
-			WARNING = "⚠️",
-			ERROR   = "❌",
-		}
+		local emojis = { DEBUG = "🐛", INFO = "ℹ️", WARNING = "⚠️", ERROR = "❌" }
 		return emojis[lvl] or "📝"
 	end
-
+	local log_level_items = {}
 	for _, lvl in ipairs({ "DEBUG", "INFO", "WARNING", "ERROR" }) do
-		local lvl_num = Logger_mod.LEVELS[lvl]
+		local lvl_num  = Logger_mod.LEVELS[lvl]
 		local is_active = (Logger_mod.current_level == lvl_num)
 		if is_active then active_level_name = lvl end
 		local lvl_capture = lvl
@@ -465,32 +500,67 @@ function M.generate(ctx, menu_mods, actions)
 			fn      = function() actions.set_log_level(lvl_capture) end,
 		})
 	end
+	local healthcheck = require("ui.healthcheck")
 
-	local healthcheck  = require("ui.healthcheck")
-	local debug_order  = load_debug_menu()
-	local debug_items  = {}
-	for _, entry in ipairs(debug_order) do
+	for _, entry in ipairs(load_top_level_tail()) do
 		local id = entry.id
 		if id == "---" then
-			table.insert(debug_items, { title = "-" })
-		elseif id == "console" then
-			table.insert(debug_items, { title = i18n.get("menu.debug.console"), fn = actions.open_console })
-		elseif id == "log_level" then
-			table.insert(debug_items, { title = i18n.get("menu.debug.log_level") .. " : " .. log_level_emoji(active_level_name) .. " " .. active_level_name, menu = log_level_items })
-		elseif id == "open_logs" then
-			table.insert(debug_items, { title = i18n.get("menu.debug.open_logs"), fn = actions.open_logs })
-		elseif id == "open_today_log" then
-			table.insert(debug_items, { title = i18n.get("menu.debug.open_today_log"), fn = actions.open_today_log })
-		elseif id == "open_error_log" then
-			table.insert(debug_items, { title = i18n.get("menu.debug.open_error_log"), fn = actions.open_error_log })
-		elseif id == "healthcheck" then
-			table.insert(debug_items, { title = i18n.get("menu.debug.healthcheck"), fn = function() healthcheck.show_window() end })
+			table.insert(items, { title = "-" })
+		elseif id == "global_actions" then
+			local ga_items = {}
+			for _, ga in ipairs(load_global_actions()) do
+				local gid = ga.id
+				if gid == "---" then
+					table.insert(ga_items, { title = "-" })
+				elseif gid == "enable_all" then
+					table.insert(ga_items, { title = i18n.get("menu.global.enable_all"),    fn = actions.enable_all })
+				elseif gid == "disable_all" then
+					table.insert(ga_items, { title = i18n.get("menu.global.disable_all"),   fn = actions.disable_all })
+				elseif gid == "reset_defaults" then
+					table.insert(ga_items, { title = i18n.get("menu.global.reset_defaults"), fn = actions.reset_defaults })
+				end
+			end
+			table.insert(items, { title = i18n.get("menu.global.title"), menu = ga_items })
+		elseif id == "language" then
+			table.insert(items, { title = i18n.get("menu.global.language"), menu = i18n.build_language_menu_items() })
+		elseif id == "config_folder" then
+			table.insert(items, { title = i18n.get("menu.global.config_folder"), fn = actions.open_paths })
+		elseif id == "setup_wizard" then
+			table.insert(items, { title = i18n.get("menu.global.setup_wizard"), fn = actions.show_setup_wizard })
+		elseif id == "about" then
+			if type(menu_mods.about) == "table" and type(menu_mods.about.build) == "function" then
+				local ok_a, about_item = pcall(menu_mods.about.build, ctx)
+				if ok_a and about_item then table.insert(items, about_item) end
+			end
+		elseif id == "reload" then
+			-- Strip the leading emoji token — emoji render poorly in native macOS menu bars
+			table.insert(items, { title = "↺ " .. i18n.get("menu.global.reload"):gsub("^%S+ ", ""), fn = actions.reload })
+		elseif id == "quit" then
+			table.insert(items, { title = "✕ " .. i18n.get("menu.global.quit"):gsub("^%S+ ", ""), fn = actions.quit })
+		elseif id == "debug" then
+			local debug_items = {}
+			for _, dbg in ipairs(load_debug_menu()) do
+				local did = dbg.id
+				if did == "---" then
+					table.insert(debug_items, { title = "-" })
+				elseif did == "console" then
+					table.insert(debug_items, { title = i18n.get("menu.debug.console"), fn = actions.open_console })
+				elseif did == "log_level" then
+					local lbl = i18n.get("menu.debug.log_level") .. " : " .. log_level_emoji(active_level_name) .. " " .. active_level_name
+					table.insert(debug_items, { title = lbl, menu = log_level_items })
+				elseif did == "open_logs" then
+					table.insert(debug_items, { title = i18n.get("menu.debug.open_logs"), fn = actions.open_logs })
+				elseif did == "open_today_log" then
+					table.insert(debug_items, { title = i18n.get("menu.debug.open_today_log"), fn = actions.open_today_log })
+				elseif did == "open_error_log" then
+					table.insert(debug_items, { title = i18n.get("menu.debug.open_error_log"), fn = actions.open_error_log })
+				elseif did == "healthcheck" then
+					table.insert(debug_items, { title = i18n.get("menu.debug.healthcheck"), fn = function() healthcheck.show_window() end })
+				end
+			end
+			table.insert(items, { title = i18n.get("menu.debug.title"), menu = debug_items })
 		end
 	end
-	table.insert(items, {
-		title = i18n.get("menu.debug.title"),
-		menu  = debug_items,
-	})
 
 	-- Collect the download item now so it participates in canvas width calculation below
 	local _dl_item = nil
