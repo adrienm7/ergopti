@@ -179,17 +179,23 @@ local function ensure_ucc()
 			return
 		end
 
-		local ok, payload = pcall(hs.json.decode, body or "")
-		if not ok or type(payload) ~= "table" then return end
+		-- host_bridge.js's makeHostBridge() posts non-string payloads RAW (no
+		-- JSON.stringify) on WKWebView — WebKit itself converts the JS object into
+		-- a native Lua table, so `body` already IS that table here. Passing it
+		-- through hs.json.decode (which expects a JSON *string*) always threw,
+		-- and the bare pcall around it swallowed the error with zero logging —
+		-- matching the convention already used by action_picker / hotstring_editor
+		-- / hotstrings_config_window / metrics_apps, read the table directly.
+		if type(body) ~= "table" then return end
 
-		if payload.action == "select_model" and type(payload.name) == "string" and payload.name ~= "" then
-			Logger.info(LOG, "Model selected via browser: %s.", payload.name)
+		if body.action == "select_model" and type(body.name) == "string" and body.name ~= "" then
+			Logger.info(LOG, "Model selected via browser: %s.", body.name)
 			local cb = _on_select
 			M.close()
-			if type(cb) == "function" then pcall(cb, payload.name) end
-		elseif payload.action == "open_url" and type(payload.url) == "string" then
-			Logger.info(LOG, "Opening model source URL: %s.", payload.url)
-			pcall(hs.urlevent.openURL, payload.url)
+			if type(cb) == "function" then pcall(cb, body.name) end
+		elseif body.action == "open_url" and type(body.url) == "string" then
+			Logger.info(LOG, "Opening model source URL: %s.", body.url)
+			pcall(hs.urlevent.openURL, body.url)
 		end
 	end)
 end
