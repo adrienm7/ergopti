@@ -146,6 +146,12 @@ local CoreState = {
 	-- Set to true when the user explicitly picks a backend; prevents any future
 	-- auto_detect_backend() call from silently overwriting the manual choice
 	user_override_backend  = false,
+	-- Bumped by set_backend(); lets set_active_profile()'s deferred (0-delay
+	-- timer) warmup discard itself if the backend was switched within the
+	-- same tick — otherwise the deferred callback would dispatch a stale
+	-- model name (captured against the OLD backend) to the NEW backend's
+	-- warmup() (F-MED-6). Mirrors detection_generation's pattern.
+	backend_generation     = 0,
 }
 
 
@@ -406,7 +412,19 @@ function M.set_active_profile(id)
 	local model = M.get_current_model()
 	if type(model) == "string" and model ~= "" then
 		local new_profile = M.get_active_profile()
-		hs.timer.doAfter(0, function() pcall(M.warmup_model, model, new_profile) end)
+		-- Capture the backend generation now so the deferred warmup below can
+		-- detect a set_backend() call that lands within the same tick and
+		-- discard itself instead of dispatching `model` (resolved against the
+		-- OLD backend) to the NEW backend's warmup() (F-MED-6).
+		local my_backend_generation = CoreState.backend_generation
+		hs.timer.doAfter(0, function()
+			if CoreState.backend_generation ~= my_backend_generation then
+				Logger.debug(LOG, "set_active_profile: backend switched before deferred warmup fired — discarding stale dispatch for '%s'.",
+					tostring(model))
+				return
+			end
+			pcall(M.warmup_model, model, new_profile)
+		end)
 	end
 end
 
@@ -432,6 +450,9 @@ function M.set_backend(backend)
 	if type(backend) == "string" and backend ~= "" then
 		-- Invalidate in-flight auto-detect probes before writing the new value
 		CoreState.detection_generation = CoreState.detection_generation + 1
+		-- Invalidate any deferred set_active_profile() warmup scheduled against
+		-- the OLD backend (F-MED-6) — see backend_generation's declaration comment.
+		CoreState.backend_generation   = CoreState.backend_generation + 1
 		CoreState.backend = backend
 		-- Prevent any future auto-detection from overwriting this explicit choice
 		CoreState.user_override_backend = true

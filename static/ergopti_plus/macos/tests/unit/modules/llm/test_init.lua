@@ -258,6 +258,82 @@ helpers.describe("Core profile accessors", function()
 		Core.set_runtime_llm_enabled(false)
 	end)
 
+	helpers.it("does NOT dispatch the deferred warmup if the backend was switched before it fires (F-MED-6)", function()
+		-- Before the fix, set_active_profile's hs.timer.doAfter(0, ...) captured
+		-- `model` at profile-set time with no guard: a set_backend() call landing
+		-- within the same tick (before the deferred callback runs) would still let
+		-- the stale dispatch fire warmup_model(OLD model name) against the NEW
+		-- backend. Capture the callback instead of letting it fire immediately so
+		-- this test can interleave set_backend() exactly like the real race.
+		local captured = {}
+		local old_do_after = hs.timer.doAfter
+		hs.timer.doAfter = function(delay, fn)
+			captured[#captured + 1] = { delay = delay, fn = fn }
+			return { stop = function() end }
+		end
+
+		local warmup_calls = {}
+		local old_warmup_model = Core.warmup_model
+		Core.warmup_model = function(model_name, profile)
+			warmup_calls[#warmup_calls + 1] = { model = model_name, profile = profile }
+		end
+
+		Core.set_llm_model_ollama("gemma-4-E2B-it")
+		Core.set_runtime_llm_enabled(true)
+		Core.set_backend("ollama")
+		captured = {}  -- discard the doAfter(s) triggered by the setup above
+
+		Core.set_active_profile("advanced")
+		helpers.assert_eq(#captured, 1, "set_active_profile must schedule exactly one deferred warmup")
+
+		-- Switch backends BEFORE the deferred callback fires — mirrors a user
+		-- flipping MLX/Ollama within the same tick as a profile change.
+		Core.set_backend("mlx")
+
+		-- Now fire the deferred callback captured earlier.
+		captured[1].fn()
+
+		hs.timer.doAfter   = old_do_after
+		Core.warmup_model  = old_warmup_model
+		Core.set_runtime_llm_enabled(false)
+
+		helpers.assert_eq(#warmup_calls, 0,
+			"a backend switch before the deferred warmup fires must discard the stale dispatch (F-MED-6)")
+	end)
+
+	helpers.it("DOES dispatch the deferred warmup when the backend is unchanged (F-MED-6 control)", function()
+		local captured = {}
+		local old_do_after = hs.timer.doAfter
+		hs.timer.doAfter = function(delay, fn)
+			captured[#captured + 1] = { delay = delay, fn = fn }
+			return { stop = function() end }
+		end
+
+		local warmup_calls = {}
+		local old_warmup_model = Core.warmup_model
+		Core.warmup_model = function(model_name, profile)
+			warmup_calls[#warmup_calls + 1] = { model = model_name, profile = profile }
+		end
+
+		Core.set_llm_model_ollama("gemma-4-E2B-it")
+		Core.set_runtime_llm_enabled(true)
+		Core.set_backend("ollama")
+		captured = {}
+
+		Core.set_active_profile("advanced")
+		helpers.assert_eq(#captured, 1, "set_active_profile must schedule exactly one deferred warmup")
+
+		-- No backend switch this time — the deferred warmup must proceed normally.
+		captured[1].fn()
+
+		hs.timer.doAfter  = old_do_after
+		Core.warmup_model = old_warmup_model
+		Core.set_runtime_llm_enabled(false)
+
+		helpers.assert_eq(#warmup_calls, 1,
+			"the deferred warmup must still dispatch when the backend was not switched in between")
+	end)
+
 	helpers.it("get_all_profiles includes the four built-ins", function()
 		local all = Core.get_all_profiles()
 		helpers.assert_true(#all >= 4)
