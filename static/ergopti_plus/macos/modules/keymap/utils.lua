@@ -55,6 +55,14 @@ local PASTE_THRESHOLD = 50
 -- Shared cross-driver value ([debounce] clipboard_restore_ms).
 local CLIPBOARD_RESTORE_SEC = Timings.sec("debounce", "clipboard_restore_ms")
 
+-- Minimum gap enforced between two consecutive clipboard pastes emitted from the
+-- same emit_tokens() call. CGEventPost is asynchronous, so issuing a second
+-- setContents+Cmd+V pair back-to-back can overwrite the clipboard before the OS
+-- has delivered the first paste to the target app, corrupting that first segment
+-- (multi-segment-paste-race). Reuses the existing paste-settle value rather than
+-- introducing a new duplicate constant ([debounce] clipboard_paste_settle_ms).
+local CLIPBOARD_PASTE_GAP_SEC = Timings.sec("debounce", "clipboard_paste_settle_ms")
+
 -- Safety TTL (seconds) for the ignored-window cache. The cache is normally
 -- invalidated on focus-change events (hs.application.watcher + hs.window.filter),
 -- so this long TTL only acts as a net in the unlikely case the watcher misses an
@@ -108,7 +116,49 @@ function M.take_paste_ops()
 	return n
 end
 
+--- Mutates the clipboard with `value` and issues the Cmd+V keystroke, then
+--- arms the async restore-to-original timer. Extracted so both emit_text and
+--- emit_tokens (which may need to defer this call — see the serialisation
+--- comment in emit_tokens) share the exact same paste + restore contract.
+--- @param value string The text to paste.
+local function perform_paste(value)
+	-- Serialise clipboard ownership: if a restore is already pending,
+	-- cancel it but keep _paste_saved_original (the user's real
+	-- clipboard) — reading readAllData() now would return the first
+	-- expansion's data rather than what the user had copied.
+	if _paste_pending_timer then
+		pcall(function() _paste_pending_timer:stop() end)
+		_paste_pending_timer = nil
+	else
+		-- Preserve all clipboard types (images, RTF, etc.), not just plain text.
+		_paste_saved_original = hs.pasteboard.readAllData()
+	end
+	hs.pasteboard.setContents(value)
+	keyStroke({ "cmd" }, "v", 0)
+	-- Restore clipboard asynchronously after the target app has received the paste.
+	local saved = _paste_saved_original
+	_paste_pending_timer = hs.timer.doAfter(CLIPBOARD_RESTORE_SEC, function()
+		_paste_pending_timer  = nil
+		_paste_saved_original = nil
+		if type(saved) == "table" and next(saved) ~= nil then
+			pcall(hs.pasteboard.writeAllData, saved)
+		else
+			pcall(hs.pasteboard.setContents, "")
+		end
+	end)
+end
+
 --- Emits a sequence of tokens by simulating keystrokes or pasting via the clipboard.
+---
+--- Consecutive paste-worthy tokens (e.g. two long segments separated by a
+--- literal newline, as in a signature/address block) are serialised via a
+--- named inter-token delay: CGEventPost is asynchronous, so mutating the
+--- clipboard again before the OS has delivered the previous Cmd+V would
+--- overwrite it mid-flight and corrupt the earlier segment
+--- (multi-segment-paste-race). Only the FIRST paste in the loop fires
+--- synchronously; every subsequent one is chained onto hs.timer.doAfter so
+--- each paste's Cmd+V has CLIPBOARD_PASTE_GAP_SEC to be consumed before the
+--- next setContents() call runs.
 --- @param tokens table The token list produced by tokens_from_repl().
 --- @return number, string Total characters emitted and the keystroke portion only (paste chars excluded).
 function M.emit_tokens(tokens)
@@ -118,8 +168,12 @@ function M.emit_tokens(tokens)
 	end
 
 	Logger.trace(LOG, "Emitting %d token(s)…", #tokens)
-	local count       = 0
-	local emitted_str = ""
+	local count        = 0
+	local emitted_str  = ""
+	-- Chain cursor: seconds from now at which the NEXT paste in this call is
+	-- allowed to mutate the clipboard. 0 means "fire immediately" (no prior
+	-- paste queued yet in this emit_tokens call).
+	local next_paste_delay = 0
 
 	for _, tok in ipairs(tokens) do
 		if type(tok) ~= "table" then goto continue end
@@ -130,33 +184,20 @@ function M.emit_tokens(tokens)
 
 		elseif tok.kind == "text" then
 			if M.should_paste(tok.value) then
-				-- Serialise clipboard ownership: if a restore is already pending,
-				-- cancel it but keep _paste_saved_original (the user's real
-				-- clipboard) — reading readAllData() now would return the first
-				-- expansion's data rather than what the user had copied.
-				if _paste_pending_timer then
-					pcall(function() _paste_pending_timer:stop() end)
-					_paste_pending_timer = nil
-				else
-					-- Preserve all clipboard types (images, RTF, etc.), not just plain text.
-					_paste_saved_original = hs.pasteboard.readAllData()
-				end
-				hs.pasteboard.setContents(tok.value)
-				keyStroke({ "cmd" }, "v", 0)
 				local ok_l, tok_len = pcall(text_utils.utf8_len, tok.value)
 				count              = count + (ok_l and tok_len or 1)
 				_paste_ops_pending = _paste_ops_pending + 1
-				-- Restore clipboard asynchronously after the target app has received the paste.
-				local saved = _paste_saved_original
-				_paste_pending_timer = hs.timer.doAfter(CLIPBOARD_RESTORE_SEC, function()
-					_paste_pending_timer  = nil
-					_paste_saved_original = nil
-					if type(saved) == "table" and next(saved) ~= nil then
-						pcall(hs.pasteboard.writeAllData, saved)
-					else
-						pcall(hs.pasteboard.setContents, "")
-					end
-				end)
+
+				if next_paste_delay <= 0 then
+					perform_paste(tok.value)
+				else
+					Logger.debug(LOG, "Deferring paste of %d char(s) by %.2fs to avoid clipboard race.",
+						ok_l and tok_len or 1, next_paste_delay)
+					hs.timer.doAfter(next_paste_delay, function() perform_paste(tok.value) end)
+				end
+				-- Every following paste-worthy token must wait at least one more
+				-- gap so two deferred pastes never collapse onto the same tick.
+				next_paste_delay = next_paste_delay + CLIPBOARD_PASTE_GAP_SEC
 			else
 				keyStrokes(tok.value)
 				local ok, len = pcall(text_utils.utf8_len, tok.value)
@@ -184,26 +225,7 @@ function M.emit_text(text)
 	Logger.trace(LOG, "Emitting text ('%s')…", text)
 
 	if M.should_paste(text) then
-		-- Serialise clipboard ownership across overlapping paste expansions.
-		if _paste_pending_timer then
-			pcall(function() _paste_pending_timer:stop() end)
-			_paste_pending_timer = nil
-		else
-			-- Preserve all clipboard types (images, RTF, etc.), not just plain text.
-			_paste_saved_original = hs.pasteboard.readAllData()
-		end
-		hs.pasteboard.setContents(text)
-		keyStroke({ "cmd" }, "v", 0)
-		local saved = _paste_saved_original
-		_paste_pending_timer = hs.timer.doAfter(CLIPBOARD_RESTORE_SEC, function()
-			_paste_pending_timer  = nil
-			_paste_saved_original = nil
-			if type(saved) == "table" and next(saved) ~= nil then
-				pcall(hs.pasteboard.writeAllData, saved)
-			else
-				pcall(hs.pasteboard.setContents, "")
-			end
-		end)
+		perform_paste(text)
 		Logger.done(LOG, "Text pasted via clipboard.")
 		-- Signal the pending Cmd+V echo to expander via the paste counter, NOT
 		-- via expected_synthetic_chars. Returning text as emitted_str would fill
