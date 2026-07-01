@@ -44,6 +44,16 @@ global _PromptEdWeb_Controller := unset
 global _PromptEdWeb_WebView    := unset
 global _PromptEdWeb_MsgSub     := unset
 global _PromptEdWeb_NavSub     := unset
+; True once _PromptEdWeb_Reset() has torn the controller down. _PromptEdWeb_Close()
+; (and therefore Reset()) is reachable from THREE independent triggers for the
+; same window — the native Gui Close event, the frontend "cancel" message, and
+; a successful "save" (_PromptEdWeb_Save calls _PromptEdWeb_Close directly). A
+; second pass's unsubscribe line calls remove_WebMessageReceived via ComCall
+; against a CoreWebView2 pointer already invalidated by the first pass's
+; Controller.Close() — a genuine SEH access violation no AHK try/catch can
+; intercept (see personal_toml_editor_webview.ahk _HsEdWeb_ResetDone for the
+; crash this mirrors). The flag makes the second call a true no-op instead.
+global _PromptEdWeb_ResetDone  := false
 
 ; Open context captured at TryOpen time and consumed by the init push / save.
 global _PromptEdWeb_IsEdit     := false
@@ -73,7 +83,7 @@ _PromptEdWeb_Available() {
 ; Existing is the user profile Map to edit, or 0 for a new profile.
 _PromptEdWeb_TryOpen(Existing) {
 	global _PromptEdWeb_Gui, _PromptEdWeb_Controller, _PromptEdWeb_WebView
-	global _PromptEdWeb_MsgSub, _PromptEdWeb_NavSub, _VendorDir, _SharedDir
+	global _PromptEdWeb_MsgSub, _PromptEdWeb_NavSub, _PromptEdWeb_ResetDone, _VendorDir, _SharedDir
 	global _PromptEdWeb_IsEdit, _PromptEdWeb_EditId
 	global _PromptEdWeb_InitName, _PromptEdWeb_InitPrompt, _PromptEdWeb_InitBatch
 
@@ -122,6 +132,10 @@ _PromptEdWeb_TryOpen(Existing) {
 	}
 
 	_PromptEdWeb_WebView := _PromptEdWeb_Controller.CoreWebView2
+	; This controller/webview pair is fresh — re-arm the Reset() guard so this
+	; session's close actually tears it down instead of short-circuiting on a
+	; flag left behind by an earlier _PromptEdWeb_Reset() call.
+	_PromptEdWeb_ResetDone := false
 
 	try {
 		s := _PromptEdWeb_WebView.Settings
@@ -311,17 +325,38 @@ _PromptEdWeb_Close() {
 }
 
 ; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
-; whether to destroy the window). Safe to call repeatedly.
+; whether to destroy the window). Idempotent: a second call (e.g. the native
+; Close event firing after "save"/"cancel" already tore the same window down)
+; is a true no-op instead of touching the globals again.
 _PromptEdWeb_Reset() {
 	global _PromptEdWeb_Controller, _PromptEdWeb_WebView, _PromptEdWeb_MsgSub, _PromptEdWeb_NavSub
-	; Release the subscriptions FIRST, while the controller is still alive. Their
-	; __Delete unsubscribes via remove_X on the live controller; doing it AFTER
-	; Controller.Close() raises a COM error that — uncaught in the window's
-	; Close-event thread — terminates the entire AHK script.
-	try _PromptEdWeb_MsgSub := unset
-	try _PromptEdWeb_NavSub := unset
-	if IsSet(_PromptEdWeb_Controller)
-		try _PromptEdWeb_Controller.Close()
+	global _PromptEdWeb_ResetDone
+
+	; A prior Reset() already released remove_WebMessageReceived/remove_Navigation-
+	; Completed against this controller. Re-running the unset lines below would
+	; call __Delete's bound ComCall a SECOND time against a COM pointer WebView2
+	; has already torn down (Controller.Close() releases CoreWebView2's underlying
+	; interfaces) — a genuine SEH access violation that no try/catch can intercept.
+	if _PromptEdWeb_ResetDone
+		return
+	_PromptEdWeb_ResetDone := true
+
+	; The whole teardown runs under one try: a hard COM access violation can
+	; occur mid-sequence, and a bare per-line `try` only catches ordinary AHK
+	; exceptions — it does NOT catch that class of failure, but wrapping the
+	; sequence still protects the *other* lines from a preceding non-fatal COM
+	; error so the globals below are always cleared even when the unsubscribe
+	; itself fails.
+	try {
+		; Release the subscriptions FIRST, while the controller is still alive. Their
+		; __Delete unsubscribes via remove_X on the live controller; doing it AFTER
+		; Controller.Close() raises a COM error that — uncaught in the window's
+		; Close-event thread — terminates the entire AHK script.
+		_PromptEdWeb_MsgSub := unset
+		_PromptEdWeb_NavSub := unset
+		if IsSet(_PromptEdWeb_Controller)
+			_PromptEdWeb_Controller.Close()
+	}
 	_PromptEdWeb_Controller := unset
 	_PromptEdWeb_WebView    := unset
 }

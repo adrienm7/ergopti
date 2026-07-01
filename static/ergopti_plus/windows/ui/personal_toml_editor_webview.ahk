@@ -48,6 +48,15 @@ global _HsEdWeb_WebView    := unset
 ; unsubscribes), so both MUST be kept alive in persistent globals.
 global _HsEdWeb_MsgSub     := unset
 global _HsEdWeb_NavSub     := unset
+; True once _HsEdWeb_Reset() has torn the controller down. Both the JS "close"
+; message and the Gui "Close" event route through _HsEdWeb_Close(), so a
+; double-close (e.g. the frontend's close button firing, followed by Windows
+; delivering the native Close event for the same destroy) can invoke Reset()
+; twice against a controller that is already gone — the second pass's
+; remove_WebMessageReceived ComCall then dereferences a freed COM pointer,
+; which is a hard access violation no AHK try/catch can intercept. The flag
+; makes the second call a true no-op instead of reaching that ComCall at all.
+global _HsEdWeb_ResetDone  := false
 
 
 
@@ -75,6 +84,7 @@ _HsEdWeb_Available() {
 ;        frontend restores its own default-section preference).
 _HsEdWeb_TryOpen(DefaultSection := "") {
 	global _HsEdWeb_Gui, _HsEdWeb_Controller, _HsEdWeb_WebView, _HsEdWeb_MsgSub, _HsEdWeb_NavSub
+	global _HsEdWeb_ResetDone
 	global _VendorDir, _SharedDir
 
 	if !_HsEdWeb_Available()
@@ -111,6 +121,10 @@ _HsEdWeb_TryOpen(DefaultSection := "") {
 	}
 
 	_HsEdWeb_WebView := _HsEdWeb_Controller.CoreWebView2
+	; This controller/webview pair is fresh — re-arm the Reset() guard so the
+	; NEXT close actually tears it down instead of short-circuiting on the flag
+	; left behind by a previous editor session.
+	_HsEdWeb_ResetDone := false
 
 	; Harden the surface — no devtools, context menu, status bar, accelerators.
 	try {
@@ -418,18 +432,41 @@ _HsEdWeb_OnClose(*) {
 }
 
 ; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
-; whether to destroy the window). Safe to call repeatedly.
+; whether to destroy the window). Idempotent: a second call (e.g. the JS "close"
+; message and the native Gui "Close" event both firing for the same teardown) is
+; a true no-op instead of touching the globals again.
 _HsEdWeb_Reset() {
 	global _HsEdWeb_Controller, _HsEdWeb_WebView, _HsEdWeb_MsgSub, _HsEdWeb_NavSub
-	; Release the event subscriptions FIRST, while the controller is still alive.
-	; Each handle's __Delete unsubscribes via remove_X on the live controller; doing
-	; it AFTER Controller.Close() raises a COM error that — uncaught in the window's
-	; Close-event thread — terminates the entire AHK script (so closing the editor
-	; would also quit Ergopti+). Wrapped in try as belt-and-suspenders.
-	try _HsEdWeb_MsgSub := unset
-	try _HsEdWeb_NavSub := unset
-	if IsSet(_HsEdWeb_Controller)
-		try _HsEdWeb_Controller.Close()
+	global _HsEdWeb_ResetDone
+
+	; A prior Reset() already released remove_WebMessageReceived/remove_NavigationCompleted
+	; against this controller. Re-running the unset lines below would call __Delete's
+	; bound ComCall a SECOND time against a COM pointer WebView2 has already torn down
+	; (Controller.Close() releases CoreWebView2's underlying interfaces) — that is a
+	; genuine SEH access violation (real crash: "[ComCall] ... remove_WebMessageReceived"),
+	; which no try/catch can intercept because it never raises an AHK exception.
+	if _HsEdWeb_ResetDone
+		return
+	_HsEdWeb_ResetDone := true
+
+	; The whole teardown runs under one try: a hard COM access violation can occur
+	; mid-sequence (e.g. if the controller was invalidated by the host Gui already
+	; being destroyed), and a bare per-line `try` only catches ordinary AHK
+	; exceptions — it does NOT catch that class of failure, but wrapping the
+	; sequence still protects the *other* lines from a preceding non-fatal COM
+	; error (e.g. remove_NavigationCompleted throwing a normal exception) so the
+	; globals below are always cleared even when the unsubscribe itself fails.
+	try {
+		; Release the event subscriptions FIRST, while the controller is still alive.
+		; Each handle's __Delete unsubscribes via remove_X on the live controller; doing
+		; it AFTER Controller.Close() raises a COM error that — uncaught in the window's
+		; Close-event thread — terminates the entire AHK script (so closing the editor
+		; would also quit Ergopti+).
+		_HsEdWeb_MsgSub := unset
+		_HsEdWeb_NavSub := unset
+		if IsSet(_HsEdWeb_Controller)
+			_HsEdWeb_Controller.Close()
+	}
 	_HsEdWeb_Controller := unset
 	_HsEdWeb_WebView    := unset
 }

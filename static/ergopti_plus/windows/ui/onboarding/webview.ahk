@@ -58,6 +58,17 @@ global _OnbWeb_Queue       := []
 ; silently unsubscribing the handler. It MUST be kept alive in a persistent
 ; global for the JS->AHK channel to keep delivering messages.
 global _OnbWeb_MsgSub      := unset
+; True once _OnbWeb_Reset() has torn the controller down. _OnbWeb_Reset is
+; reachable from BOTH _OnbWeb_Finish (JS "finish" -> _Onboarding_Commit ->
+; Reload, which restarts the whole process and can itself surface the Gui's
+; native Close event for _ob_gui) and _OnbWeb_OnClose (X / Alt+F4) — so the
+; SAME teardown can run twice. A second pass's `_OnbWeb_MsgSub := unset` calls
+; remove_WebMessageReceived via ComCall against a CoreWebView2 pointer already
+; invalidated by the first pass's Controller.Close(): a genuine SEH access
+; violation no AHK try/catch can intercept (see personal_toml_editor_webview.ahk
+; _HsEdWeb_ResetDone for the crash this mirrors). The flag makes the second
+; call a true no-op before that ComCall is ever reached.
+global _OnbWeb_ResetDone   := false
 
 
 
@@ -87,6 +98,7 @@ _OnbWeb_Available() {
 ; Onboarding_Run park-loop and the standard close handling apply unchanged.
 _Onboarding_TryWeb() {
 	global _OnbWeb_Controller, _OnbWeb_WebView, _OnbWeb_Ready, _OnbWeb_Queue
+	global _OnbWeb_ResetDone
 	global _ob_gui, _VendorDir, _SharedDir
 
 	if !_OnbWeb_Available() {
@@ -130,6 +142,10 @@ _Onboarding_TryWeb() {
 	}
 
 	_OnbWeb_WebView := _OnbWeb_Controller.CoreWebView2
+	; This controller/webview pair is fresh — re-arm the Reset() guard so this
+	; session's close actually tears it down instead of short-circuiting on a
+	; flag left behind by an earlier _OnbWeb_Reset() call.
+	_OnbWeb_ResetDone := false
 
 	; Harden the surface — no devtools, context menu, status bar, accelerators.
 	try {
@@ -619,16 +635,38 @@ _OnbWeb_OnClose(*) {
 }
 
 ; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
-; whether to destroy the window). Safe to call repeatedly.
+; whether to destroy the window). Idempotent: a second call (e.g. _OnbWeb_Finish
+; and _OnbWeb_OnClose both firing for the same teardown) is a true no-op instead
+; of touching the globals again.
 _OnbWeb_Reset() {
 	global _OnbWeb_Controller, _OnbWeb_WebView, _OnbWeb_Ready, _OnbWeb_Queue, _OnbWeb_MsgSub
-	; Release the subscription handle FIRST, while the controller is still alive.
-	; Its __Delete unsubscribes via remove_WebMessageReceived on the live controller;
-	; doing it AFTER Controller.Close() raises a COM error that — uncaught in the
-	; window's Close-event thread — terminates the entire AHK script.
-	try _OnbWeb_MsgSub := unset
-	if IsSet(_OnbWeb_Controller)
-		try _OnbWeb_Controller.Close()
+	global _OnbWeb_ResetDone
+
+	; A prior Reset() already released remove_WebMessageReceived against this
+	; controller. Re-running the unset line below would call __Delete's bound
+	; ComCall a SECOND time against a COM pointer WebView2 has already torn down
+	; (Controller.Close() releases CoreWebView2's underlying interfaces) — a
+	; genuine SEH access violation that no try/catch can intercept.
+	if _OnbWeb_ResetDone
+		return
+	_OnbWeb_ResetDone := true
+
+	; The whole teardown runs under one try: a hard COM access violation can
+	; occur mid-sequence (e.g. if the controller was invalidated by the host Gui
+	; already being destroyed), and a bare per-line `try` only catches ordinary
+	; AHK exceptions — it does NOT catch that class of failure, but wrapping the
+	; sequence still protects the *other* lines from a preceding non-fatal COM
+	; error so the globals below are always cleared even when the unsubscribe
+	; itself fails.
+	try {
+		; Release the subscription handle FIRST, while the controller is still alive.
+		; Its __Delete unsubscribes via remove_WebMessageReceived on the live controller;
+		; doing it AFTER Controller.Close() raises a COM error that — uncaught in the
+		; window's Close-event thread — terminates the entire AHK script.
+		_OnbWeb_MsgSub := unset
+		if IsSet(_OnbWeb_Controller)
+			_OnbWeb_Controller.Close()
+	}
 	_OnbWeb_Controller := unset
 	_OnbWeb_WebView    := unset
 	_OnbWeb_Ready      := false
