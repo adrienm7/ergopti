@@ -11,13 +11,18 @@
 --- cur_val, failing closed to the numeric default_val (the menu_hotstrings pattern).
 --- make_delay_item is a deep local; the coercion is pinned at source + as an
 --- arithmetic-safety unit on the exact expression.
+---
+--- PF-4: ui/menu/menu_hotstrings.lua was later split into
+--- menu_hotstrings_management.lua + menu_hotstrings_custom.lua, relocating the
+--- fix to menu_hotstrings_management.lua — this test's hardcoded path is
+--- updated to follow it. The runtime fix itself was never lost.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
 helpers.describe("hotstrings delay item coerces a wrong-typed delay", function()
 	helpers.it("source: cur_val is tonumber-coerced before the *1000 arithmetic", function()
-		local fh = assert(io.open(helpers.driver_root() .. "ui/menu/menu_hotstrings.lua", "r"))
+		local fh = assert(io.open(helpers.driver_root() .. "ui/menu/menu_hotstrings_management.lua", "r"))
 		local src = fh:read("*a"); fh:close()
 		helpers.assert_true(src:find("tonumber(is_base and state.expansion_delay", 1, true) ~= nil,
 			"cur_val must be tonumber-coerced (fail closed to default_val) before * 1000")
