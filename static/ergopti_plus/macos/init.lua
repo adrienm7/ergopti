@@ -78,7 +78,13 @@ end
 
 local Logger             = require("lib.logger")
 local LOG                = "init"
-local HS_BOOT_READY_SETTING_KEY = "ergopti_hs_boot_ready_v1"
+
+-- Single source of truth (F-LOW-11): ke_lifecycle.lua owns and exports this
+-- constant since it is the sole reader; init.lua only ever writes it. A
+-- future rename in only one file used to silently desync the boot-readiness
+-- notification with no error — reading it here instead of re-declaring the
+-- literal makes that impossible.
+local HS_BOOT_READY_SETTING_KEY = require("modules.karabiner.ke_lifecycle").HS_BOOT_READY_SETTING_KEY
 
 -- Guard setting consumed by KE lifecycle notifications. It is set to false at
 -- boot start and flipped to true only once init has fully completed.
