@@ -117,11 +117,26 @@ _BuildShiftCapsTables() {
 ; the hotkey name AHK passes when invoking a hotkey callback. The callable is
 ; extracted to a local before the call to defeat any ``obj.method`` implicit
 ; first-arg passing that AHK applies for property-stored Funcs.
-LayerDispatch(SC, SymbolMap, *) {
+; ``SerializeSymbols`` lets the CapsLock-layer registration opt into the same
+; Critical serialization the letter-fallback path below always gets: unlike
+; some ``SHIFT_SYMBOLS`` entries (e.g. ActivateHotstrings), no ``CAPSLOCK_SYMBOLS``
+; entry ever Sleeps, so wrapping only that path in Critical cannot introduce a
+; stall — it just closes the narrow interleaving window against neighbouring
+; remapped-letter emits (layer-dispatch-capslock-symbols-unserialized).
+LayerDispatch(SC, SymbolMap, SerializeSymbols := false, *) {
 	if SymbolMap.Has(SC) {
 		Cb := SymbolMap[SC]
-		; No Critical here — symbol callbacks may Sleep (ActivateHotstrings)
-		Cb()
+		if SerializeSymbols {
+			_AtCrit := Critical("On")
+			try {
+				Cb()
+			} finally {
+				Critical(_AtCrit)
+			}
+		} else {
+			; No Critical here — SHIFT_SYMBOLS callbacks may Sleep (ActivateHotstrings)
+			Cb()
+		}
 		return
 	}
 	if SHIFTED_LETTERS.Has(SC) {
@@ -199,10 +214,10 @@ RegisterCapsLockLayer() {
 	for SC in SHIFTED_LETTERS {
 		if (SkipDigitRow && _SHIFT_DIGIT_SCS.Has(SC))
 			continue
-		Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS), "I2")
+		Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS, true), "I2")
 	}
 	for SC in CAPSLOCK_SYMBOLS {
-		Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS), "I2")
+		Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS, true), "I2")
 	}
 	HotIf()
 	try LoggerSuccess("LayoutCaps", "CapsLock layer registered ({1} entries).",
