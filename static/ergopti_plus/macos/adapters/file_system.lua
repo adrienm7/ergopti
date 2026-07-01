@@ -78,8 +78,17 @@ local function ensure_dir(dir)
 	pcall(function() hs.fs.mkdir(dir) end)
 end
 
---- Writes content to a file, overwriting any existing content.
---- Creates parent directories when they do not exist.
+--- Writes content to a file atomically (temp file + rename), overwriting any
+--- existing content. Creates parent directories when they do not exist.
+--- A crash or process kill mid-write can never leave a torn/truncated file at
+--- `path` — a reader (e.g. Karabiner-Elements' own FSEvents watcher on
+--- karabiner.json) either sees the old complete content or the new complete
+--- content, never a partial write (filesystem-adapter-nonatomic-write).
+--- Symlink-safe: if `path` is (or resolves through) a symlink, the temp file
+--- is written and renamed at the RESOLVED real target, so the symlink itself
+--- is left untouched — renaming directly over a symlink path would otherwise
+--- replace the symlink with a plain file, breaking the documented
+--- "deploy_string works for regular paths and Unix symlinks" contract.
 --- @param path    string Absolute path to the file.
 --- @param content string UTF-8 content to write.
 --- @return boolean true on success, false on any error.
@@ -96,15 +105,47 @@ function M.write(path, content)
 		-- (filesystem-adapter-missing-mkdir).
 		local dir = path:match("^(.+)/[^/]+$")
 		if dir then ensure_dir(dir) end
-		local fh, err = io.open(path, "w")
+
+		-- Resolve `path` to its real target BEFORE writing, so a rename lands on
+		-- the file a symlink points to rather than replacing the symlink itself.
+		-- pathToAbsolute returns nil when nothing exists yet at `path` — in that
+		-- case there is no symlink to preserve, so fall back to `path` verbatim.
+		local real_path = path
+		if hs and hs.fs and type(hs.fs.pathToAbsolute) == "function" then
+			local ok_abs, abs = pcall(hs.fs.pathToAbsolute, path)
+			if ok_abs and type(abs) == "string" and abs ~= "" then
+				real_path = abs
+			end
+		end
+
+		local tmp_path = real_path .. ".tmp"
+		local fh, err  = io.open(tmp_path, "w")
 		if not fh then
-			Logger.error(LOG, "write(): cannot open '%s' for writing — %s", path, tostring(err))
+			Logger.error(LOG, "write(): cannot open '%s' for writing — %s", tmp_path, tostring(err))
 			return false
 		end
 		local write_ok, write_err = pcall(function() fh:write(content) end)
 		fh:close()
 		if not write_ok then
-			Logger.error(LOG, "write(): write failed for '%s' — %s", path, tostring(write_err))
+			Logger.error(LOG, "write(): write failed for '%s' — %s", tmp_path, tostring(write_err))
+			pcall(os.remove, tmp_path)
+			return false
+		end
+
+		local rename_ok, rename_err = os.rename(tmp_path, real_path)
+		if not rename_ok then
+			-- POSIX rename() atomically replaces an existing destination; some
+			-- non-POSIX os.rename implementations instead fail with "File exists"
+			-- when the destination is already present. Retry once after removing
+			-- the stale destination so the adapter behaves consistently across
+			-- test/dev environments — production (macOS/Hammerspoon) never needs
+			-- this fallback since its os.rename is already atomic-replace.
+			pcall(os.remove, real_path)
+			rename_ok, rename_err = os.rename(tmp_path, real_path)
+		end
+		if not rename_ok then
+			Logger.error(LOG, "write(): rename '%s' -> '%s' failed — %s", tmp_path, real_path, tostring(rename_err))
+			pcall(os.remove, tmp_path)
 			return false
 		end
 		return true
