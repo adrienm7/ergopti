@@ -329,6 +329,7 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 #Include ../modules/keylogger/keylogger_clipboard.ahk
 #Include unit/test_keylogger_walker.ahk
 #Include unit/test_keylogger_app_categories.ahk
+#Include meta/test_keylogger_ui_dead_code.ahk
 #Include unit/test_keylogger_reader.ahk
 ; KLW_GetMap and KLW_GetAppCtx must handle missing context keys without throwing.
 #Include unit/test_walker_ctx_missing_key.ahk
@@ -518,6 +519,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_global_error_handler_sendevent_storm.ahk
 #Include meta/test_health_probe_timer_suspend_guard.ahk
 #Include meta/test_healthcheck_init_dead_reference.ahk
+#Include meta/test_healthcheck_onwebmsg_dead_code.ahk
 #Include meta/test_hse_disable_group_atomic.ahk
 #Include meta/test_insert_id_discovery_label_collision.ahk
 #Include meta/test_isrepeat_section_name_mismatch_latent_divergence.ahk

@@ -331,18 +331,6 @@ HealthCheck_ShowWindow() {
 	_HealthCheck_AddFallbackEdit(G, ContentCtl, PlainText)
 }
 
-; Handles messages posted from the HTML page via chrome.webview.postMessage.
-; "copy_and_close" copies the plain-text report to the clipboard then destroys the window.
-_HealthCheck_OnWebMsg(WV, MsgArgs, PlainText, G) {
-	try {
-		Msg := MsgArgs.TryGetWebMessageAsString()
-		if Msg = "copy_and_close" {
-			A_Clipboard := PlainText
-			_HealthCheck_CloseGui(G)
-		}
-	}
-}
-
 ; Overlays a selectable read-only Edit on the same slot as the given placeholder control.
 _HealthCheck_AddFallbackEdit(G, HostCtl, Text) {
 	HostCtl.GetPos(&X, &Y, &W, &H)
