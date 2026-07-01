@@ -32,6 +32,15 @@ local hotstring_editor = require("ui.hotstring_editor")
 
 local LOG = "personal_hotstrings"
 
+-- Hard cap on how deep the recursive extension-TOML scan descends. The scanned
+-- tree is a user-writable folder, so a self-referential symlink would make a
+-- naive recursion loop forever — Lua has no tail-call optimisation for this
+-- call shape, so that ends in a stack overflow that aborts boot (F-LOW-4).
+-- 16 levels mirrors the AHK driver's _HS_SCAN_MAX_DEPTH and is far deeper than
+-- any real personal hotstrings layout; past it we stop descending and warn.
+local SCAN_MAX_DEPTH = 16
+
+
 
 
 
@@ -73,11 +82,31 @@ function M.load(ctx)
 	keymap.load_toml("personal", personal_path)
 	table.insert(loaded, { name = "personal", path = personal_path })
 
-	-- Recursively scan for extra TOML files in the hotstrings folder
+	-- Recursively scan for extra TOML files in the hotstrings folder.
+	-- ``depth`` caps descent and ``visited`` is a set of canonical (lowercased,
+	-- trailing-slash-stripped) absolute directory paths already entered —
+	-- together they guarantee the walk terminates even on a self-referential
+	-- symlink cycle in the user's folder (F-LOW-4).
 	local hs_dir = menu_paths.get("PersonalHotstringsDir")
-	local function scan_recursive(dir, prefix)
+	local visited = {}
+	local function scan_recursive(dir, prefix, depth)
+		if depth > SCAN_MAX_DEPTH then
+			Logger.warn(LOG, "Personal ext scan hit max depth %d at '%s' — not descending further (directory cycle?).",
+				SCAN_MAX_DEPTH, dir)
+			return
+		end
+
 		local ok_attr, attr = pcall(hs.fs.attributes, dir)
 		if not (ok_attr and type(attr) == "table" and attr.mode == "directory") then return end
+
+		-- Canonicalise so two spellings of the same directory collapse to one key;
+		-- a re-visit means we are inside a cycle and must stop.
+		local canonical = dir:gsub("[/\\]+$", ""):lower()
+		if visited[canonical] then
+			Logger.warn(LOG, "Personal ext scan revisited '%s' — skipping to break a directory cycle.", dir)
+			return
+		end
+		visited[canonical] = true
 
 		local items = {}
 		for _, fname in ipairs(fs_dir.entries(dir)) do
@@ -109,12 +138,12 @@ function M.load(ctx)
 			else
 				-- Recurse into subdirectory
 				local new_prefix = (prefix == "") and item.name or (prefix .. "__" .. item.name)
-				scan_recursive(item.path, new_prefix)
+				scan_recursive(item.path, new_prefix, depth + 1)
 			end
 		end
 	end
 
-	scan_recursive(hs_dir:gsub("[/\\]+$", ""), "")
+	scan_recursive(hs_dir:gsub("[/\\]+$", ""), "", 1)
 
 	return loaded
 end

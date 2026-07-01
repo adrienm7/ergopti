@@ -60,4 +60,41 @@ helpers.describe("lib/file_watchers — arming contract", function()
 			.. ", pinned=" .. #_G.script_watchers .. ")")
 		_G.script_watchers = nil
 	end)
+
+	helpers.it("watch_personal_hotstrings_dir terminates on a self-referential directory cycle (F-LOW-4)", function()
+		-- Simulate a self-referential symlink under the personal-hotstrings tree:
+		-- every directory contains one further "loop" entry that resolves back to
+		-- a directory again — a growing-path cycle indistinguishable, from this
+		-- module's point of view, from a real filesystem symlink loop. Before the
+		-- depth guard, M.start would recurse until Lua's C-stack limit aborted.
+		local prev_fs_dir = package.loaded["lib.fs_dir"]
+		package.loaded["lib.fs_dir"] = {
+			entries = function(_dir) return { "loop" } end,
+		}
+		package.loaded["lib.file_watchers"] = nil
+		local FW = require("lib.file_watchers")
+
+		local prev_pw, prev_timer, prev_attr = hs.pathwatcher, hs.timer, hs.fs.attributes
+		hs.pathwatcher = { new = function(_path, _cb)
+			return { start = function() end }
+		end }
+		hs.timer = { doAfter = function(_s, _fn) return { stop = function() end } end }
+		-- Every path in this fixture is a directory — there is no file to bottom
+		-- out on, so only the depth guard can stop the recursion.
+		hs.fs.attributes = function(_p) return { mode = "directory" } end
+
+		_G.script_watchers = nil
+		local ok, err = pcall(FW.start, {
+			hotstrings_dir = "/fake/hotstrings/",
+			base_dir = "/fake/base/",
+			personal_hotstrings_dir = "/fake/personal",
+		})
+
+		hs.pathwatcher, hs.timer, hs.fs.attributes = prev_pw, prev_timer, prev_attr
+		package.loaded["lib.fs_dir"] = prev_fs_dir
+		package.loaded["lib.file_watchers"] = nil
+		_G.script_watchers = nil
+
+		helpers.assert_true(ok, "start() must terminate and not throw/hang on a directory cycle: " .. tostring(err))
+	end)
 end)

@@ -31,6 +31,12 @@ local fs_dir        = require("lib.fs_dir")
 
 local LOG = "file_watchers"
 
+-- Hard cap on how deep the recursive personal-hotstrings watcher scan descends.
+-- Same rationale as lib/personal_hotstrings.lua's SCAN_MAX_DEPTH: the scanned
+-- tree is a user-writable folder, so a self-referential symlink would make a
+-- naive recursion loop forever and abort boot with a stack overflow (F-LOW-4).
+local SCAN_MAX_DEPTH = 16
+
 
 
 
@@ -86,9 +92,29 @@ function M.start(ctx)
 	dir_watcher:start()
 	table.insert(_G.script_watchers, dir_watcher)
 
-	local function watch_personal_hotstrings_dir(dir)
+	-- ``visited`` is a set of canonical (lowercased, trailing-slash-stripped)
+	-- absolute directory paths already entered; combined with the depth cap
+	-- below it guarantees the walk terminates even on a self-referential
+	-- symlink cycle in the user's folder (F-LOW-4 — same guard as
+	-- lib/personal_hotstrings.lua's scan_recursive).
+	local visited = {}
+	local function watch_personal_hotstrings_dir(dir, depth)
+		depth = depth or 1
+		if depth > SCAN_MAX_DEPTH then
+			Logger.warn(LOG, "Personal hotstrings watcher scan hit max depth %d at '%s' — not descending further (directory cycle?).",
+				SCAN_MAX_DEPTH, dir)
+			return
+		end
+
 		local ok_attr, attr = pcall(hs.fs.attributes, dir)
 		if not (ok_attr and type(attr) == "table" and attr.mode == "directory") then return end
+
+		local canonical = dir:gsub("[/\\]+$", ""):lower()
+		if visited[canonical] then
+			Logger.warn(LOG, "Personal hotstrings watcher scan revisited '%s' — skipping to break a directory cycle.", dir)
+			return
+		end
+		visited[canonical] = true
 
 		local w = hs.pathwatcher.new(dir, function(paths)
 			for _, p in ipairs(paths) do
@@ -107,7 +133,7 @@ function M.start(ctx)
 				local ok_a, a = pcall(hs.fs.attributes, path)
 				if ok_a and type(a) == "table" then
 					if a.mode == "directory" then
-						watch_personal_hotstrings_dir(path)
+						watch_personal_hotstrings_dir(path, depth + 1)
 					elseif a.mode == "file" and fname:match("%.toml$") then
 						local fw = hs.pathwatcher.new(path, function()
 							schedule_reload(i18n.get("init.reload_hotstrings"))
