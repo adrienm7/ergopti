@@ -5,16 +5,30 @@
 --- DESCRIPTION:
 --- Guards the script-control modifier guard that gates rcmd+Escape/Return/Backspace.
 ---
---- ROOT CAUSE ENCODED (script-control-altgr-leftmod):
---- is_right_altgr_held() accepted ONLY the right-hand command/option device masks.
---- A user who remaps their right command to option via their own Karabiner rules
---- holds a key that registers as a LEFT/plain option (deviceLeftAlternate). KE
---- still emitted the F15 escape sentinel, but the right-only guard returned false,
---- so script_control passed the sentinel through and rcmd+Escape (quit) silently
---- did nothing. The field log proved it: "Escape sentinel (F15) seen but no right
---- AltGr held — passing through." The guard only needs to tell a genuine chord
---- (any cmd/opt held) from a bare F13/F14/F15 keypress (no modifier), so it now
---- accepts a command OR option modifier on either side.
+--- HISTORY (script-control-altgr-leftmod, then F-HIGH-22):
+--- is_right_altgr_held() originally accepted ONLY the right-hand command/option
+--- device masks. A user who remaps their right command to option via their own
+--- Karabiner rules holds a key that registers as a LEFT/plain option
+--- (deviceLeftAlternate); the right-only guard returned false and rcmd+Escape/
+--- Return/Backspace silently did nothing (script-control-altgr-leftmod). Two
+--- follow-up commits progressively widened the mask to also accept
+--- deviceLeftAlternate and then a side-agnostic `mods.alt == true` fallback with
+--- NO device bit at all — but that widening regressed a CRITICAL invariant
+--- (F-HIGH-22): holding plain LEFT Option (no right-hand modifier whatsoever)
+--- while pressing a physical F13/F14/F15 key now ALSO read as "genuine",
+--- dispatching script_pause/reload/quit from a chord that was never meant to be
+--- a sentinel.
+---
+--- The fix narrows is_right_altgr_held() strictly back to right-hand-only device
+--- masks (deviceRightCommand | deviceRightAlternate). The remapped-rcmd scenario
+--- that motivated the original widening is now covered by a DIFFERENT, safer
+--- mechanism: sentinel_is_tagged() in script_control.lua, which checks that the
+--- KE-emitted sentinel event itself carries the ctrl+shift
+--- SCRIPT_CONTROL_SENTINEL_TAGS output modifiers that every genuine sentinel rule
+--- stamps (karabiner/generator.lua). sentinel_is_genuine() accepts EITHER this
+--- narrowed live-modifier check OR the tag, so genuine right-command-remapped-to-
+--- option chords still dispatch correctly — see test_script_control.lua's
+--- F-CRIT-1 describe block for the tag-based coverage.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -49,20 +63,27 @@ local function load_with_raw(raw_bits, extra_flags)
 	})
 end
 
-helpers.describe("key_state.is_right_altgr_held accepts either-side cmd/option", function()
-	helpers.it("returns true for a held LEFT option (the remapped-rcmd case)", function()
+helpers.describe("key_state.is_right_altgr_held is strictly right-hand-only (F-HIGH-22)", function()
+	-- F-HIGH-22 regression guard: a held LEFT option must NOT qualify. The prior
+	-- widening accepted deviceLeftAlternate so a remapped-rcmd chord would pass,
+	-- but that also meant a plain left-Option hold (no right-hand modifier at
+	-- all) plus a physical F13/F14/F15 press dispatched script_pause/reload/quit
+	-- unintentionally. The remapped-rcmd scenario is now covered by
+	-- sentinel_is_tagged() in script_control.lua instead (see test_script_control.lua).
+	helpers.it("returns FALSE for a held LEFT option (F-HIGH-22 — must not be mistaken for a sentinel)", function()
 		local KS = load_with_raw(MASKS.deviceLeftAlternate)
-		helpers.assert_true(KS.is_right_altgr_held(),
-			"a held left option must qualify — a remapped right-cmd registers as left/plain option")
+		helpers.assert_true(not KS.is_right_altgr_held(),
+			"a held left option must NOT qualify — sentinel_is_tagged() covers the remapped-rcmd case instead (F-HIGH-22)")
 	end)
 
-	helpers.it("returns true for a generic `alt` flag with NO device-side option bit", function()
-		-- A Karabiner right-command→option remap can surface the held key only as the
-		-- side-agnostic `alt` flag, setting no deviceLeftAlternate/deviceRightAlternate
-		-- bit. The device-bit-only check missed it and the sentinel did nothing.
+	-- F-HIGH-22 regression guard: a generic `alt` flag with no device bit (which a
+	-- bare physical Option key legitimately produces) must NOT qualify either —
+	-- this was the exact widening that let a plain left-Option + F15 dispatch
+	-- script_quit.
+	helpers.it("returns FALSE for a generic `alt` flag with NO device-side option bit (F-HIGH-22)", function()
 		local KS = load_with_raw(0, { alt = true })
-		helpers.assert_true(KS.is_right_altgr_held(),
-			"option held as a generic `alt` (no device bit) must still qualify as AltGr")
+		helpers.assert_true(not KS.is_right_altgr_held(),
+			"a generic `alt` flag with no device bit must NOT qualify as AltGr (F-HIGH-22)")
 	end)
 
 	helpers.it("returns false for a generic `cmd` flag with no device bit (plain Cmd)", function()

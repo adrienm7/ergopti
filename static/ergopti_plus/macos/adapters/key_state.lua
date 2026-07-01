@@ -80,24 +80,24 @@ end
 --- — required by the script-control sentinel guard, which must accept a genuine
 --- AltGr + key chord but reject a bare function key (no modifier held at all).
 ---
---- Accepts the AltGr family: right command, OR option on EITHER side. The guard's
---- job is to tell a KE-emitted sentinel (the user is physically holding their
---- AltGr) apart from a stray bare F13/F14/F15 keypress. Restricting to the RIGHT
---- side alone broke users who remap their right command to option via their own
---- Karabiner rules: the held key then registers as a left/plain option
---- (deviceLeftAlternate), the right-only check returned false, and
---- rcmd+Escape/Return/Backspace silently did nothing (script-control-altgr-leftmod).
---- Left COMMAND is deliberately excluded — it is the ordinary ⌘ used for app
---- shortcuts, so a stray ⌘ + physical-F-key must not be mistaken for a sentinel.
---- A held OPTION is accepted in ANY form — the device-side right/left option bit,
---- OR the side-agnostic `alt` flag with no device bit set. Some Karabiner remaps
---- (right command → option) surface the held key only as the generic `alt` and
---- never set deviceLeftAlternate/deviceRightAlternate, so the device-bit-only
---- check still rejected them and the sentinel did nothing. A bare F-key press
---- carries neither, so this stays a valid genuine-vs-stray discriminator.
---- Falls back to the side-agnostic cmd/alt flags when the raw masks are
---- unavailable (never on real macOS).
---- @return boolean True if right command or option (any form) is currently down.
+--- STRICTLY right-hand-only (right command OR right option — device bits only).
+--- A prior widening (accepting deviceLeftAlternate, then a side-agnostic
+--- `mods.alt == true` fallback with no device bit at all) was meant to support
+--- Karabiner remaps that surface a remapped right_command as a generic left/plain
+--- option, but it regressed a CRITICAL invariant: holding plain LEFT Option (no
+--- right-hand modifier at all) while pressing a physical F13/F14/F15 key would
+--- also read as "genuine", dispatching script_pause/reload/quit from an
+--- unintentional chord (F-HIGH-22). sentinel_is_tagged() in script_control.lua is
+--- now the primary discriminator for the KE-active path — every genuine KE-emitted
+--- sentinel carries the ctrl+shift SCRIPT_CONTROL_SENTINEL_TAGS output modifiers
+--- (karabiner/generator.lua build_script_control_sentinel_rules /
+--- build_paused_script_control_rules), which a bare physical F-key press or a
+--- left-Option chord can never carry. That tag check makes this narrower mask safe
+--- again: genuine Karabiner remaps of right_command → option are still covered
+--- because sentinel_is_genuine() accepts EITHER this live-modifier check OR the tag.
+--- Falls back to the side-agnostic cmd flag only (never alt) when the raw masks are
+--- unavailable (never on real macOS), so a bare key still cannot pass via alt alone.
+--- @return boolean True if right command or right option is currently down.
 function M.is_right_altgr_held()
 	local ok, result = pcall(function()
 		if not (hs.eventtap and hs.eventtap.checkKeyboardModifiers) then return false end
@@ -107,15 +107,14 @@ function M.is_right_altgr_held()
 		local raw   = mods._raw
 		local masks = hs.eventtap.event and hs.eventtap.event.rawFlagMasks
 		if type(raw) == "number" and type(masks) == "table" then
-			-- AltGr family: right command + option (either side), OR a generic `alt`
-			-- flag for remaps that set no device-side option bit. Left command (plain
-			-- ⌘) stays excluded so an app ⌘-shortcut can never look like a sentinel.
+			-- AltGr family: right command OR right option — device bits ONLY. Left
+			-- command/option are excluded so a stray ⌘/⌥ + physical-F-key (or a plain
+			-- left-Option hold) can never be mistaken for a genuine sentinel.
 			local altgr = (masks.deviceRightCommand   or 0)
 				| (masks.deviceRightAlternate or 0)
-				| (masks.deviceLeftAlternate  or 0)
-			return (raw & altgr) ~= 0 or mods.alt == true
+			return (raw & altgr) ~= 0
 		end
-		return mods.cmd == true or mods.alt == true
+		return mods.cmd == true
 	end)
 	if not ok then
 		Logger.error(LOG, "is_right_altgr_held(): %s", tostring(result))

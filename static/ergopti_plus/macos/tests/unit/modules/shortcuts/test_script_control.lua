@@ -517,6 +517,34 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 		helpers.assert_eq(consumed, true, "a genuine sentinel must be consumed")
 	end)
 
+	-- F-HIGH-22 regression: a prior fix required a genuinely right-hand AltGr hold,
+	-- but three follow-up commits progressively widened KeyState.is_right_altgr_held()
+	-- until it also accepted a bare LEFT Option hold (deviceLeftAlternate) and even a
+	-- side-agnostic `mods.alt == true` fallback with NO device bit at all. That meant
+	-- holding plain left Option (no right-hand modifier whatsoever) while pressing a
+	-- physical F15 dispatched script_quit — a chord that was never meant to be a
+	-- genuine sentinel. The fix narrows is_right_altgr_held() back to right-hand-only
+	-- masks; sentinel_is_tagged() remains the safety net for the KE-paused path.
+	helpers.it("F15 with LEFT Option held (0x20, no tag) does NOT dispatch (F-HIGH-22)", function()
+		dispatched = nil
+		live_mods = { _raw = 0x20 }  -- left option only — must NOT qualify as a sentinel
+		local consumed = handler(make_event(ESCAPE_SENTINEL))
+		helpers.assert_eq(dispatched, nil,
+			"plain left-Option + physical F15 must NOT dispatch — it is not a genuine right-AltGr sentinel (F-HIGH-22)")
+		helpers.assert_eq(consumed, false, "left-Option + F15 must pass through to the OS")
+	end)
+
+	-- Same invariant via the generic (device-bit-less) `alt` flag path, which is
+	-- exactly what the removed `or mods.alt == true` fallback used to accept.
+	helpers.it("F15 with a generic getFlags()={alt=true} (no device bit) does NOT dispatch (F-HIGH-22)", function()
+		dispatched = nil
+		live_mods = { _raw = 0, alt = true }  -- side-agnostic alt flag, no device-side bit at all
+		local consumed = handler(make_event(ESCAPE_SENTINEL))
+		helpers.assert_eq(dispatched, nil,
+			"a generic alt=true flag with no device bit must NOT qualify as a genuine sentinel (F-HIGH-22)")
+		helpers.assert_eq(consumed, false, "generic-alt + F15 must pass through to the OS")
+	end)
+
 	helpers.it("a TAGGED sentinel with NO live modifier (paused path) DOES dispatch", function()
 		-- Paused rules gate on a MANDATORY modifier KE consumes, so nothing is held when
 		-- HS polls (the field log showed "(none)"). KE stamps the sentinel with the
