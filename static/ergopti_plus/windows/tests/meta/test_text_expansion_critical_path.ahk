@@ -18,8 +18,12 @@
 ;   the most-used feature silently goes offline for the first ~half second after
 ;   boot: exactly the regression this test makes loud.
 ;
-; SCOPE: source introspection of modules/hotstrings.ahk (the registration module
-;   the headless runner does not load).
+; SCOPE: source introspection of modules/hotstrings.ahk and its modules/hotstrings/
+;   sub-modules (the registration module the headless runner does not load). The
+;   god-file split (334b5c04a) moved the section-loader helpers and the 4.3-4.5
+;   subsections out of the shim into modules/hotstrings/*.ahk, so the shim alone
+;   no longer contains them -- concatenate shim + sub-dir like every other
+;   introspection test does for a module the split touched.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -41,6 +45,10 @@ _MetaCheckTextExpansionOnCriticalPath() {
 	Body := ""
 	try Body := FileRead(HsFile)
 	Assert(Body != "", "modules\hotstrings.ahk must be readable for the text-expansion critical-path meta-test")
+	; The shim itself only #Includes the sub-modules now -- fold in modules/hotstrings/
+	; (hotstrings_helpers.ahk + hotstrings_text_expansion.ahk) so the assertions below
+	; see the same source the running driver actually loads.
+	Body .= _DriverDirConcat("modules/hotstrings")
 
 	; The shared section loader must exist and load the magickey.text_expansion section.
 	Assert(InStr(Body, "_RegisterTextExpansionSections("),

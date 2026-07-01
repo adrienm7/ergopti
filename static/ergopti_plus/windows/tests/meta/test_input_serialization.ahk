@@ -23,7 +23,11 @@
 ;
 ; SCOPE: source introspection of modules/keymap/layout.ahk, the prefix watcher and the
 ;   hotstring engine (timing/concurrency cannot be reproduced in the synchronous
-;   headless harness, so the structural guarantee is what we pin).
+;   headless harness, so the structural guarantee is what we pin). The god-file
+;   split (334b5c04a) turned hotstring_prefix_watcher.ahk and
+;   hotstring_engine_main.ahk into thin shims that #Include their sub-modules
+;   (hotstring_inputhook.ahk and hotstring_dispatch.ahk respectively), so both
+;   FileReads below are folded together with lib/hotstrings dir concat.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -64,9 +68,13 @@ _MetaCheckInputSerialization() {
 
 	; --- Watcher: the match -> fire -> buffer region must be Critical ---
 	WatcherFile := WindowsDir . "\lib\hotstrings\hotstring_prefix_watcher.ahk"
-	W := ""
-	try W := FileRead(WatcherFile)
-	Assert(W != "", "hotstring_prefix_watcher.ahk must be readable")
+	WShim := ""
+	try WShim := FileRead(WatcherFile)
+	Assert(WShim != "", "hotstring_prefix_watcher.ahk must be readable")
+	; hotstring_prefix_watcher.ahk is a shim (#Include hotstring_inputhook.ahk +
+	; hotstring_registry.ahk) -- _OnPrefixChar / _PrefixRenderFlush live in the
+	; included sub-module, so fold in the whole lib/hotstrings dir.
+	W := WShim . _DriverDirConcat("lib/hotstrings")
 
 	OnCharPos := InStr(W, "_OnPrefixChar(IH, Char) {")
 	Assert(OnCharPos > 0, "watcher must define _OnPrefixChar(IH, Char)")
@@ -87,9 +95,12 @@ _MetaCheckInputSerialization() {
 
 	; --- Dispatch: atomic burst Critical; Notepad (Sleeps) releases Critical ---
 	EngineFile := WindowsDir . "\lib\hotstrings\hotstring_engine_main.ahk"
-	E := ""
-	try E := FileRead(EngineFile)
-	Assert(E != "", "hotstring_engine_main.ahk must be readable")
+	EShim := ""
+	try EShim := FileRead(EngineFile)
+	Assert(EShim != "", "hotstring_engine_main.ahk must be readable")
+	; hotstring_engine_main.ahk is likewise a shim -- HSE_DispatchMatch lives in
+	; the included hotstring_dispatch.ahk sub-module.
+	E := EShim . _DriverDirConcat("lib/hotstrings")
 
 	DispPos := InStr(E, "HSE_DispatchMatch(Spec, EndChar) {")
 	Assert(DispPos > 0, "engine must define HSE_DispatchMatch(Spec, EndChar)")

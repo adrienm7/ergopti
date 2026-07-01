@@ -10,7 +10,7 @@
 
 _REQUIRE_STATE_ALLOWLIST := Map(
 	"modules/llm/api_common.ahk", true,
-	"modules/llm/api_ollama.ahk", true,
+	"modules/llm/api_ollama/init.ahk", true,
 	"modules/llm/api_remote.ahk", true,
 	"modules/llm/models.ahk", true,
 	"modules/llm/profiles.ahk", true,

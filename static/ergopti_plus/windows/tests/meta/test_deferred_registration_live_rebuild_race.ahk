@@ -2,10 +2,18 @@
 
 #Requires AutoHotkey v2.0
 
+; Reads modules/hotstrings.ahk (the orchestrator shim) concatenated with its
+; modules/hotstrings/ sub-modules -- the god-file split (334b5c04a) moved
+; RegisterEmojisSymbolsDeferred and friends out of the shim into
+; hotstrings_helpers.ahk, so a plain FileRead of the shim alone no longer sees
+; them even though the driver still loads both via #Include.
 _DRLR_ReadSource(RelPath) {
 	SplitPath(A_ScriptDir, , &Root)
 	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+	Src := FileRead(Path)
+	if (RelPath == "modules/hotstrings.ahk")
+		Src .= _DriverDirConcat("modules/hotstrings")
+	return Src
 }
 
 _DRLR_FuncBodyStripped(Src, FuncDef) {

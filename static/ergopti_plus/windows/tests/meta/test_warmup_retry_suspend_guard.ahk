@@ -67,15 +67,14 @@ _WRS_SuspendEnterCancelsWarmupRetry() {
 }
 Test("ErgoptiPlus: Ergopti_OnSuspendEnter cancels Ollama warmup retry on pause", _WRS_SuspendEnterCancelsWarmupRetry)
 _WRS_DepsPollHasSuspendGuard() {
-	Src := _WRS_ReadSource("modules/llm/ollama_deps_checker.ahk")
-	
 	Seg1 := _DriverFuncBody("LLM_Deps_PollServerReady")
 	Assert(InStr(Seg1, "A_IsSuspended") > 0,
 		"LLM_Deps_PollServerReady must check A_IsSuspended (warmup-retry-ignores-suspend)")
-		
-	Seg2 := _DriverFuncBody("LLM_Deps_PollFile")
-	Assert(InStr(Seg2, "A_IsSuspended") > 0,
-		"LLM_Deps_PollFile must check A_IsSuspended (warmup-retry-ignores-suspend)")
+	; LLM_Deps_PollFile (the PS1-stdout poll callback this invariant originally
+	; guarded alongside PollServerReady) was deleted by the AHK-29 winget
+	; refactor as unreachable dead code — winget has no PS1 stdout to poll, so
+	; there is no second poll callback left to check; see
+	; test_dead_ps1_pipeline_absent.ahk for the regression guard on its removal.
 }
 Test("ollama_deps_checker: deps poll callbacks have A_IsSuspended guard", _WRS_DepsPollHasSuspendGuard)
 

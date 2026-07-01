@@ -30,45 +30,22 @@
 
 
 
-; ===================================================
-; ===================================================
-; ======= 1/ Source scan helpers ====================
-; ===================================================
-; ===================================================
 
-_WBPG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-
-; ===================================================
-; ===================================================
-; ======= 2/ Assertions =============================
-; ===================================================
-; ===================================================
+; =============================
+; =============================
+; ======= 1/ Assertions =======
+; =============================
+; =============================
 
 _WBPG_CancelHasResetBackoffParam() {
-	Src := _WBPG_ReadSource("modules/llm/api_ollama.ahk")
-	; Locate the function DEFINITION line — the one ending in `{` — not a call
-	; site. Callers like `LLM_OllamaCancelWarmupRetry(true)` / `(...)` appear
-	; earlier in the file, so matching the first occurrence picked a caller (no
-	; param) and false-failed; the definition is the occurrence whose line opens
-	; the body with a brace.
-	DeclLine := ""
-	Pos := 1
-	while (Pos := InStr(Src, "LLM_OllamaCancelWarmupRetry(", false, Pos)) {
-		LineEnd := InStr(Src, "`n", false, Pos)
-		ThisLine := (LineEnd > 0) ? SubStr(Src, Pos, LineEnd - Pos) : SubStr(Src, Pos)
-		if (InStr(ThisLine, "{")) {   ; definition lines end with ") {"
-			DeclLine := ThisLine
-			break
-		}
-		Pos += 1
-	}
+	; Move-resilient: LLM_OllamaCancelWarmupRetry used to live directly in
+	; modules/llm/api_ollama.ahk, but that file is now a thin #Include redirect
+	; shim to api_ollama/ollama_warmup.ahk (post-split). _DriverFuncBody already
+	; anchors on the column-0 DEFINITION line (never a call site) across the
+	; whole driver, so it survives further file moves.
+	DeclLine := _DriverFuncBody("LLM_OllamaCancelWarmupRetry")
 	Assert(DeclLine != "",
-		"LLM_OllamaCancelWarmupRetry definition (a line opening the body with `{`) must exist in api_ollama.ahk")
+		"LLM_OllamaCancelWarmupRetry definition must exist in the Ollama API module")
 	Assert(InStr(DeclLine, "reset_backoff") > 0,
 		"LLM_OllamaCancelWarmupRetry declaration must include the reset_backoff parameter "
 		. "— callers rely on a default of false so that ordinary cancels do not reset "
@@ -78,10 +55,9 @@ Test("api_ollama: LLM_OllamaCancelWarmupRetry has reset_backoff parameter",
 	_WBPG_CancelHasResetBackoffParam)
 
 _WBPG_BackoffResetIsConditional() {
-	Src := _WBPG_ReadSource("modules/llm/api_ollama.ahk")
 	Body := _DriverFuncBody("LLM_OllamaCancelWarmupRetry")
 	Assert(Body != "",
-		"LLM_OllamaCancelWarmupRetry body must be extractable from api_ollama.ahk")
+		"LLM_OllamaCancelWarmupRetry body must be extractable from the Ollama API module")
 
 	; The backoff reset assignment must be present somewhere in the body
 	AssignPos := InStr(Body, "_LLM_Ollama_WarmupRetryIntervalMs := 5000")

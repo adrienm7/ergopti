@@ -198,7 +198,7 @@ Test("grace contract: the show-time stamp is reset on hide / loading",
 
 
 _TestGrace_BridgeGatesDismiss() {
-	Body := FileRead(A_ScriptDir . "\..\modules\llm\llm_bridge.ahk", "UTF-8")
+	Body := FileRead(A_ScriptDir . "\..\modules\keymap\llm_bridge.ahk", "UTF-8")
 	; Both the keystroke and the pointer dismiss paths must consult the window.
 	Assert(InStr(Body, "LLM_Tooltip_InGracePeriod()") > 0,
 		"the bridge dismiss paths must gate on the min-display window")
