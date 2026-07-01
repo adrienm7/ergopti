@@ -86,7 +86,7 @@ ShellRunner_Exec(Cmd) {
 		; quote pair differs between a silent no-op and a working capture).
 		RunWait('cmd.exe /c "' . Cmd . ' > "' . TmpFile . '" 2>&1"', , "Hide")
 	} catch as Err {
-		LoggerError("adapters.shell_runner", "exec() failed for '%s': %s", Cmd, Err.Message)
+		LoggerError("adapters.shell_runner", "exec() failed for '{1}': {2}", Cmd, Err.Message)
 		return ""
 	}
 
@@ -187,7 +187,7 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 			)
 			_SR_EnsurePoller()
 		} catch as Err {
-			LoggerError("adapters.shell_runner", "spawn.start() failed for '%s': %s", Executable, Err.Message)
+			LoggerError("adapters.shell_runner", "spawn.start() failed for '{1}': {2}", Executable, Err.Message)
 			; Clean up temp file if Run threw before creating the process.
 			try FileDelete(tmp_file)
 		}
@@ -278,7 +278,7 @@ _SR_Poll() {
 			try {
 				task["OnDone"].Call(exit_code, stdout, "")
 			} catch as Err {
-				LoggerError("adapters.shell_runner", "on_done callback threw: %s", Err.Message)
+				LoggerError("adapters.shell_runner", "on_done callback threw: {1}", Err.Message)
 			}
 		}
 	}
