@@ -345,7 +345,13 @@ end
 function M.resolve_disabled_when(menu_key, item_id, getters)
 	local item = find_item_by_id(menu_key, item_id)
 	if item == nil then
-		return false
+		-- A lookup miss means the caller passed an id that does not exist in
+		-- menu_key's array — a typo'd or drifted manifest reference. Failing
+		-- OPEN here would silently render a security-sensitive item (e.g. a
+		-- keylogger-gated toggle) as always-enabled; fail CLOSED instead,
+		-- matching the sibling getter-mismatch branch below.
+		Logger.error(LOG, "No manifest item '%s.%s' — treating as disabled.", menu_key, item_id)
+		return true
 	end
 
 	local keys = item.disabled_when
