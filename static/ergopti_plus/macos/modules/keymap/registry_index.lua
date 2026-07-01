@@ -20,6 +20,18 @@ local LOG    = "keymap.registry"
 
 local _state = nil
 
+--- Guard: verifies that M.setup() was called before any state-dependent public
+--- function. Mirrors registry_groups.lua's require_state verbatim (section 5.8).
+--- @param func_name string Name of the calling function (for error messages).
+--- @return boolean True if _state is ready, false otherwise.
+local function require_state(func_name)
+	if not _state then
+		Logger.error(LOG, "'%s' called before M.setup() — shared state not initialized.", func_name)
+		return false
+	end
+	return true
+end
+
 --- Injects the shared CoreState so state-dependent functions become live.
 --- Called once from registry.lua's M.init() after the main state is wired up.
 --- @param core_state table The shared CoreState from keymap/init.lua.
@@ -173,7 +185,8 @@ end
 --- @param name string Group identifier.
 --- @return table|nil
 function M.get_sections(name)
-	return _state and _state.groups[name] and _state.groups[name].sections or nil
+	if not require_state("get_sections") then return nil end
+	return _state.groups[name] and _state.groups[name].sections or nil
 end
 
 --- Returns the prose description from the TOML [_meta] block, or nil.
@@ -181,7 +194,8 @@ end
 --- @param name string Group identifier.
 --- @return string|nil
 function M.get_meta_description(name)
-	local raw = _state and _state.groups[name] and _state.groups[name].meta_description or nil
+	if not require_state("get_meta_description") then return nil end
+	local raw = _state.groups[name] and _state.groups[name].meta_description or nil
 	if type(raw) == "table" then
 		local code = i18n.get_locale()
 		return raw[code] or raw["fr"] or nil
