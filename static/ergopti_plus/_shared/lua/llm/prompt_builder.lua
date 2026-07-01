@@ -131,12 +131,24 @@ local function compute_temperature(base_temperature, num_predictions, auto_raise
 	return t
 end
 
---- Truncates the context to a character limit proportional to max_words.
---- Prevents oversized prefill tokens from driving up TTFT on short predictions.
+--- Truncates the context to a character limit.
+--- context_window_chars, when positive, is an AUTHORITATIVE user override (from
+--- the LLM menu's "context length" setting) and takes priority over the
+--- max_words heuristic — it was previously accepted as a parameter throughout
+--- the call chain (HS shim -> Shared.build_params) but silently dropped here,
+--- so setting llm_context_length in the menu had zero effect (F-HIGH-24).
+--- With no override (context_window_chars nil/0), falls back to the
+--- max_words-proportional heuristic so short prediction budgets keep getting
+--- a smaller prefill, unchanged from the pre-fix behaviour.
 --- @param buffer string The full context buffer.
---- @param max_words number Max predicted words (0 = unlimited, returns buffer unchanged).
+--- @param max_words number Max predicted words (0 = unlimited, returns buffer unchanged when context_window_chars is also unset).
+--- @param context_window_chars number|nil User-configured hard char cap (0/nil = no override).
 --- @return string The possibly truncated context.
-local function cap_context(buffer, max_words)
+local function cap_context(buffer, max_words, context_window_chars)
+	if context_window_chars and context_window_chars > 0 then
+		if #buffer <= context_window_chars then return buffer end
+		return buffer:sub(-context_window_chars)
+	end
 	if not max_words or max_words <= 0 then return buffer end
 	local char_limit = math.max(M.CONTEXT_MIN_CHARS, max_words * M.CONTEXT_CHARS_PER_WORD)
 	if #buffer <= char_limit then return buffer end
@@ -157,22 +169,23 @@ end
 ---
 --- @param buffer string The current typing buffer.
 --- @param config table Fields: max_words, min_words, num_predictions, temperature,
----        auto_raise_temp, language.
+---        auto_raise_temp, language, context_window_chars.
 --- @return table params Keys: context, context_tail, max_tokens, temperature,
 ---         min_words, max_words, language, num_predictions.
 function M.build_params(buffer, config)
 	config = config or {}
-	local max_words       = config.max_words       or 0
-	local min_words       = config.min_words       or 1
-	local num_predictions = config.num_predictions or 1
-	local temperature     = config.temperature     or 0.1
-	local auto_raise      = config.auto_raise_temp or false
-	local language        = config.language        or "fr"
+	local max_words            = config.max_words            or 0
+	local min_words            = config.min_words            or 1
+	local num_predictions      = config.num_predictions      or 1
+	local temperature          = config.temperature          or 0.1
+	local auto_raise           = config.auto_raise_temp      or false
+	local language             = config.language             or "fr"
+	local context_window_chars = config.context_window_chars or 0
 
 	if temperature == nil then temperature = 0.1 end
 
 	local _, tail   = extract_tail(buffer)
-	local context   = cap_context(buffer, max_words)
+	local context   = cap_context(buffer, max_words, context_window_chars)
 
 	return {
 		context          = context,
