@@ -10,9 +10,11 @@
  * description_key + platforms fields, and feature paths with their id and type.
  *
  * FEATURES & RATIONALE:
- * 1. Codegen drift detection: both generated files are gitignored; if the build
- *    script is updated to emit different data for one target, this test fails
- *    immediately, preventing silent per-driver divergence.
+ * 1. Codegen drift detection: both generated files are git-tracked (NOT
+ *    gitignored — CI always regenerates-then-tests, but a stale hand-edit is
+ *    still invisible to a local build that never re-runs the generator); if
+ *    the build script is updated to emit different data for one target, this
+ *    test fails immediately, preventing silent per-driver divergence.
  * 2. Regex-based parsing: both files are tightly formatted machine-generated
  *    output, so lightweight regex extraction is reliable and avoids the need
  *    for a Lua or AHK interpreter in CI.
