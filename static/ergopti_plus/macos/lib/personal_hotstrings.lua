@@ -44,7 +44,6 @@ local SCAN_MAX_DEPTH = 16
 
 
 
-
 -- ===============================================
 --- ==============================================
 --- ======= 1/ Personal Hotstrings Loading =======
@@ -89,6 +88,13 @@ function M.load(ctx)
 	-- symlink cycle in the user's folder (F-LOW-4).
 	local hs_dir = menu_paths.get("PersonalHotstringsDir")
 	local visited = {}
+	-- Maps a derived group_name to the FIRST source path that produced it, so a
+	-- second file resolving to the same name can be flagged instead of silently
+	-- overwriting the first one's registration (F-LOW-5). This collision is real:
+	-- a flat "a__b.toml" and a nested "a/b.toml" both derive "personal_ext_a__b",
+	-- because "__" is used both as a literal character allowed in a stem AND as
+	-- the path-segment join separator.
+	local group_name_sources = {}
 	local function scan_recursive(dir, prefix, depth)
 		if depth > SCAN_MAX_DEPTH then
 			Logger.warn(LOG, "Personal ext scan hit max depth %d at '%s' — not descending further (directory cycle?).",
@@ -132,6 +138,17 @@ function M.load(ctx)
 			if item.type == "file" then
 				local new_prefix = (prefix == "") and item.stem or (prefix .. "__" .. item.stem)
 				local group_name = "personal_ext_" .. new_prefix
+				local prior_path = group_name_sources[group_name]
+				if prior_path then
+					-- F-LOW-5: e.g. a flat "a__b.toml" and a nested "a/b.toml" both derive
+					-- "personal_ext_a__b". Warn loudly instead of silently overwriting the
+					-- first file's path metadata with the second's — the two are unrelated
+					-- source files that happen to collide onto the same keymap group name.
+					Logger.warn(LOG,
+						"Personal ext group name collision: '%s' already loaded from '%s' — '%s' resolves to the same group name and will overwrite it.",
+						group_name, prior_path, item.path)
+				end
+				group_name_sources[group_name] = item.path
 				keymap.load_toml(group_name, item.path)
 				table.insert(loaded, { name = group_name, path = item.path })
 				Logger.info(LOG, "Loaded extra personal hotstrings group '%s' from '%s'.", group_name, item.path)
