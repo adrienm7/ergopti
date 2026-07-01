@@ -168,12 +168,15 @@ function checkTomlKeys(file) {
 // Check 4 — Section spacing (AHK and Lua)
 // ──────────────────────────────────────────────────────────────────────────────
 
-// Major: ======= Title ======= (7 = on each side)
+// Major: ======= Title ======= (7 = on each side). Lua banners legitimately use
+// either "--" (the language's own comment marker, the dominant convention) or
+// "---" (the EmmyLua docstring marker, used where a banner opens right after a
+// module docstring) — both must be recognized, or spacing goes unchecked.
 const MAJOR_TITLE_AHK = /^; ={7} .+ ={7}$/;
-const MAJOR_TITLE_LUA = /^--- ={7} .+ ={7}$/;
+const MAJOR_TITLE_LUA = /^---? ={7} .+ ={7}$/;
 // Minor: ===== Title ===== (5 = on each side)
 const MINOR_TITLE_AHK = /^; ={5} .+ ={5}$/;
-const MINOR_TITLE_LUA = /^--- ={5} .+ ={5}$/;
+const MINOR_TITLE_LUA = /^---? ={5} .+ ={5}$/;
 
 function countTrailingBlanks(lines, idx) {
 	let count = 0;
@@ -219,15 +222,17 @@ function checkSectionSpacing(file) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 function checkBannerAlignment(file) {
-	const ext = extname(file);
-	const isAhk = ext === '.ahk';
-	const prefix = isAhk ? '; ' : '--- ';
 	const lines = readLines(file);
 
 	lines.forEach((line, i) => {
-		// Match a title line: prefix + 5 or 7 = + space + title + space + 5 or 7 =
+		// Match a title line: marker + 5 or 7 = + space + title + space + 5 or 7 =
 		const m = line.match(/^(;|---?) (={5,7}) (.+) (={5,7})$/);
 		if (!m) return;
+		// The real prefix is THIS line's own marker + space — never assumed from
+		// the file extension. Lua banners legitimately use "--" or "---" (see
+		// MAJOR_TITLE_LUA); hardcoding one produced a false "length mismatch" on
+		// every correctly-aligned "--"-marker banner (marker.length off by one).
+		const prefix = m[1] + ' ';
 		const leftEq = m[2].length;
 		const title = m[3];
 		const rightEq = m[4].length;
@@ -243,8 +248,13 @@ function checkBannerAlignment(file) {
 		for (const adj of [i - 1, i + 1]) {
 			if (adj < 0 || adj >= lines.length) continue;
 			const adjLine = lines[adj];
-			// A banner line: prefix + one or more =
-			if (!/^(;|---?) =+$/.test(adjLine)) continue;
+			// A banner line: SAME marker as the title line + one or more =
+			const adjMatch = adjLine.match(/^(;|---?) (=+)$/);
+			if (!adjMatch) continue;
+			if (adjMatch[1] !== m[1]) {
+				warn(file, adj + 1, `Banner marker '${adjMatch[1]}' does not match title line marker '${m[1]}'`);
+				continue;
+			}
 			if (adjLine.length !== expectedBannerLen) {
 				warn(
 					file,
@@ -261,9 +271,6 @@ function checkBannerAlignment(file) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 function fixBannersInFile(file) {
-	const ext = extname(file);
-	const isAhk = ext === '.ahk';
-	const prefix = isAhk ? '; ' : '--- ';
 	const raw = readFileSync(file, 'utf8');
 	const hasBom = raw.startsWith('﻿');
 	const lines = raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').split('\n');
@@ -277,14 +284,25 @@ function fixBannersInFile(file) {
 		const rightEq = m[4].length;
 		if (leftEq !== rightEq) continue; // unbalanced — skip
 
+		// The real prefix is THIS line's own marker + space — never assumed from
+		// the file extension (see checkBannerAlignment). Using a hardcoded "--- "
+		// on a file whose banners use "--" rewrote correctly-aligned fill lines
+		// with a mismatched marker, turning an aligned banner into a broken one.
+		const prefix = m[1] + ' ';
 		const expectedLen = prefix.length + leftEq + 1 + title.length + 1 + rightEq;
 		const bannerBody = '='.repeat(expectedLen - prefix.length);
 		const bannerLine = prefix + bannerBody;
 
 		for (const adj of [i - 1, i + 1]) {
 			if (adj < 0 || adj >= lines.length) continue;
-			if (!/^(;|---?) =+$/.test(lines[adj])) continue;
-			if (lines[adj].length !== expectedLen) {
+			const adjMatch = lines[adj].match(/^(;|---?) (=+)$/);
+			if (!adjMatch) continue;
+			// Repair BOTH a wrong marker and a wrong length — a fill line
+			// belongs to this title's banner and must match it on both. This
+			// is what actually heals the accumulated damage from the old
+			// hardcoded-prefix bug (mismatched-marker fill lines left behind
+			// by previous runs), rather than just refusing to touch them.
+			if (adjMatch[1] !== m[1] || lines[adj].length !== expectedLen) {
 				lines[adj] = bannerLine;
 				changed = true;
 			}
@@ -293,11 +311,10 @@ function fixBannersInFile(file) {
 
 	if (!changed) return false;
 
-	const enc = isAhk ? 'utf8' : 'utf8'; // both UTF-8
 	const content = (hasBom ? '﻿' : '') + lines.join('\n');
 	// Preserve original line endings
 	const crlf = raw.includes('\r\n');
-	writeFileSync(file, crlf ? content.replace(/\n/g, '\r\n') : content, enc);
+	writeFileSync(file, crlf ? content.replace(/\n/g, '\r\n') : content, 'utf8');
 	return true;
 }
 
@@ -347,9 +364,6 @@ function fixSpacingInFile(file) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 function fixUnbalancedInFile(file) {
-	const ext = extname(file);
-	const isAhk = ext === '.ahk';
-	const prefix = isAhk ? '; ' : '--- ';
 	const raw = readFileSync(file, 'utf8');
 	const hasBom = raw.startsWith('﻿');
 	const lines = raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').split('\n');
@@ -363,6 +377,9 @@ function fixUnbalancedInFile(file) {
 		const rightEq = m[4].length;
 		if (leftEq === rightEq) continue; // already balanced
 
+		// The real prefix is THIS line's own marker + space — never assumed from
+		// the file extension (see checkBannerAlignment / fixBannersInFile).
+		const prefix = m[1] + ' ';
 		// Use the larger side as the canonical count
 		const eq = Math.max(leftEq, rightEq);
 		const newTitle = `${prefix}${'='.repeat(eq)} ${title} ${'='.repeat(eq)}`;
@@ -374,8 +391,9 @@ function fixUnbalancedInFile(file) {
 		const bannerLine = prefix + bannerBody;
 		for (const adj of [i - 1, i + 1]) {
 			if (adj < 0 || adj >= lines.length) continue;
-			if (!/^(;|---?) =+$/.test(lines[adj])) continue;
-			lines[adj] = bannerLine;
+			const adjMatch = lines[adj].match(/^(;|---?) (=+)$/);
+			if (!adjMatch) continue;
+			lines[adj] = bannerLine; // repair marker + length to match this title
 		}
 		changed = true;
 	}
