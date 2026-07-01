@@ -67,7 +67,8 @@ end
 --- Builds the full backend-switcher submenu and returns it as two values:
 --- the title string for the parent row and the menu table to embed in it.
 --- @param ctx table Context with fields: state, keymap, paused, models_mgr,
----   get_display_model_name, switch_model, save_prefs, update_menu, WarmupCtrl.
+---   get_display_model_name, switch_model, save_prefs, update_menu, WarmupCtrl,
+---   reset_llm_health_status (optional).
 --- @return string title   Title string for the backend parent menu row.
 --- @return table  menu    Populated backend_menu table.
 function M.build(ctx)
@@ -80,6 +81,9 @@ function M.build(ctx)
 	local save_prefs            = ctx.save_prefs
 	local update_menu           = ctx.update_menu
 	local WarmupCtrl            = ctx.WarmupCtrl
+	-- Resets the shared _llm_health_status flag so a prior MLX/Ollama reading
+	-- does not leak into the API backend's status-dot display (F-LOW-6).
+	local reset_llm_health_status = ctx.reset_llm_health_status
 
 	-- Title reflects current active backend
 	local backend_title_str = i18n.get("menu.llm.backend_title")
@@ -198,6 +202,11 @@ function M.build(ctx)
 				Logger.info(LOG, "Activating remote API backend…")
 				state.llm_backend = "api"
 				llm_mod.set_backend("api")
+				-- probe_llm_health() intentionally skips the API backend (no local
+				-- server to probe there); without resetting it here, a prior
+				-- MLX/Ollama reading would leak into the API backend's status
+				-- dot until the next full backend round-trip (F-LOW-6).
+				if type(reset_llm_health_status) == "function" then pcall(reset_llm_health_status) end
 				-- Kill any local server that would burn RAM / GPU for nothing
 				if models_mgr.stop_mlx_server_if_needed then pcall(models_mgr.stop_mlx_server_if_needed) end
 				os.execute("pkill -f '[o]llama serve' 2>/dev/null || true")
