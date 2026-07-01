@@ -958,22 +958,28 @@ and resyncs the buffer. `llm_bridge.apply_prediction` mostly mirrors it.
 **Foot-gun (the class of bug found in the 2026-06 HS audit, see
 `AUDIT_HAMMERSPOON_BUGS.md` at repo root):** injectors that emit raw
 `hs.eventtap.keyStroke("delete")` + `emit_text` **outside** that choke point
-desync the two trackers. `dynamic_hotstrings/rules_engine` is the worst case —
-it calls neither `suppress_rescan` nor the counters nor `notify_synthetic`, so
-its emitted text can re-trigger a nested expansion (corrupted on-screen output)
-and is logged as human typing. `personal_info.do_expand` calls `suppress_rescan`
-(so the keymap is protected) but still skips `notify_synthetic` (private data
-logged as human keystrokes). The paste branch (`emit_text` returns `(1,"")` for
->50 chars or codepoints >U+FFFF) leaves `expected_synthetic_chars` empty and the
-synthetic Cmd+V then hits the Cmd/Ctrl buffer-wipe branch.
+desync the two trackers. Both named injectors below were fixed by the
+2026-07-01 audit's implementation pass and now route through the choke point —
+this entry previously (incorrectly) described them as still bypassing it; keep
+this paragraph in sync with the source when either injector changes again.
+`dynamic_hotstrings/rules_engine` now routes through `keymap.inject_dynamic`
+(with a fallback path that itself calls `suppress_rescan`, the counters, and
+`notify_synthetic`). `personal_info.do_expand` likewise now calls
+`notify_synthetic`, not just `suppress_rescan`. The paste branch (`emit_text`
+returns `(1,"")` for >50 chars or codepoints >U+FFFF) leaves
+`expected_synthetic_chars` empty and the synthetic Cmd+V then hits the
+Cmd/Ctrl buffer-wipe branch — this remains a live constraint for any new
+injector to respect.
 
 **How to apply:** never emit synthetic deletes/text from a new injector with raw
 `hs.eventtap` calls. Route it through `perform_text_replacement` or a shared
 `keymap.inject_replacement(deletes, text, variant)` helper so the bookkeeping is
 guaranteed. The two synthetic trackers must also stay in sync on recovery: the
-keymap self-heals (`dt > 0.5s` reset) but the keylogger `synth_queue` currently
-has no idle drain. Related: [[project_keymap_architecture]],
-[[feedback_regression_tests]].
+keymap self-heals (`dt > 0.5s` reset) and the keylogger `synth_queue` now also
+self-heals via a `SYNTH_IDLE_DRAIN_MS` (500 ms) idle drain in
+`modules/keylogger/init.lua`. This foot-gun watch-list entry is about the NEXT
+injector someone adds, not `rules_engine`/`personal_info` specifically anymore.
+Related: [[project_keymap_architecture]], [[feedback_regression_tests]].
 
 ### project-locale-parity-test
 
