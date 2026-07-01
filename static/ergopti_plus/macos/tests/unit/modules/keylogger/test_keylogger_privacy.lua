@@ -8,6 +8,16 @@
 --- active. Each test case corresponds to a vector in:
 ---   static/ergopti_plus/_shared/tests/corpus/security/keylogger_no_persist_vectors.json
 ---
+--- F-HIGH-15 (false-green test): earlier revisions of this file drove a
+--- hand-copied push_char() harness that only replicated 4 of the real
+--- handle_key()'s 6 guard stages — missing is_paused() and the disabled_apps
+--- check entirely, so those two invariants had zero behavioral coverage
+--- despite the corpus "passing". This file now loads the real
+--- modules.keylogger.init module via tests.helpers.load_with_stubs and drives
+--- the actual production handle_key callback (captured off the real
+--- hs.eventtap.new() call in M.start()), so every guard — including pause and
+--- disabled_apps — is exercised as production code, not a re-implementation.
+---
 --- FEATURES & RATIONALE:
 --- 1. Secure Field Guard: CoreState.is_secure_field=true must prevent any
 ---    buffer mutation or log entry from being produced (SEC-001 through SEC-003).
@@ -20,6 +30,11 @@
 --- 5. Buffer flush on field transition: buffered text from a normal field is
 ---    flushed before the secure session begins; nothing from the secure session
 ---    leaks into that flush (SEC-008).
+--- 6. Pause guard: script_control.is_paused()=true must block handle_key before
+---    any buffer mutation, flushing whatever was already buffered (previously
+---    only covered by a source-order string check in test_pause_guard_position.lua).
+--- 7. Disabled-apps guard: CoreState.disabled_apps entries must drop keystrokes
+---    for the matching bundle/path (previously entirely uncovered).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -28,111 +43,212 @@ local helpers = require("tests.helpers")
 
 
 
--- ======================================
--- ======================================
--- ======= 1/ Shared Stub Factory =======
--- ======================================
--- ======================================
+-- ============================================
+-- ============================================
+-- ======= 1/ Real handle_key() Harness =======
+-- ============================================
+-- ============================================
 
---- Builds a minimal CoreState table with safe defaults.
---- @param overrides table Fields to override on top of the defaults.
---- @return table The merged CoreState.
-local function make_core_state(overrides)
-	local base = {
-		LOG_DIR                       = "/tmp/test_metrics",
-		is_enabled                    = true,
-		private_filter_enabled        = true,
-		secure_field_filter_enabled   = true,
-		system_auth_filter_enabled    = true,
-		is_private_window             = false,
-		is_secure_field               = false,
-		active_app_bundle             = "com.example.TestApp",
-		active_app_path               = nil,
-		disabled_apps                 = {},
-		buffer_events                 = {},
-		buffer_text                   = "",
-		rich_chunks                   = {},
-		last_time                     = 0,
-		last_flush_time               = 0,
-		session_app_name              = "TestApp",
-		session_win_title             = "Test Window",
-		session_url                   = nil,
-		session_field_role            = "AXTextField",
-		session_layout                = "ABC",
-		session_document_path         = nil,
-		is_fullscreen                 = false,
-		in_meeting                    = false,
-		session_mouse_clicks          = 0,
-		session_mouse_scrolls         = 0,
-		mouse_distance_px             = 0,
-		current_session_pause         = 0,
-		current_battery_level         = nil,
-		current_audio_volume          = nil,
-		session_start_time            = 0,
-		session_last_active           = 0,
-		is_micro_idle                 = false,
-		recent_typing_eff             = {},
-		recent_typing_phys            = {},
-		synth_queue                   = {},
-		pending_keyup                 = {},
-		focus_pending_at              = nil,
-		focus_pending_app             = nil,
-		prev_flags                    = {},
-		modifier_down_at              = {},
-		passive_started_at            = nil,
-		passive_kind                  = nil,
-		last_source_type              = "none",
-		last_source_variant           = "none",
-		last_source_time              = 0,
-		today_idx                     = {},
-		manifest                      = {},
-		ngram_context                 = nil,
-		active_app_name               = "TestApp",
-		active_app_start              = 0,
-		active_app_pid                = 1,
-		ax_observer                   = nil,
-		options                       = { encrypt = false },
-	}
-	if type(overrides) == "table" then
-		for k, v in pairs(overrides) do base[k] = v end
-	end
-	return base
-end
+-- Timings stub shared by every scenario load: returns fixed values so the
+-- harness never depends on the real _shared/modules/timings/constants.toml
+-- file being reachable from the unit-test cwd (mirrors test_log_manager.lua).
+local _TIMINGS_MS = { keylogger = { max_keystroke_delay_ms = 5000 } }
 
---- Installs a fresh log_manager stub and returns the captured append list.
---- @return table The list of entries appended via rotation.append_log.
-local function make_append_capture()
-	local captured = {}
+--- Loads a fresh, fully-wired modules.keylogger.init with every I/O sub-module
+--- stubbed in-memory (mirrors the stubbing already established for
+--- modules.keylogger.log_manager tests), then starts it and captures both the
+--- real handle_key callback (off the hs.eventtap.new() call) and a live
+--- reference to the module's private CoreState table (captured via the
+--- modules.keylogger.context_tracker.init(core_state, ...) hook — the only
+--- place CoreState crosses a stubbable module boundary).
+--- @return table session A handle exposing:
+---   handle_key(event) — invokes the real production event-tap callback.
+---   core_state() — returns the live reference to the module's CoreState.
+---   appended — the list of entries persisted via Rotation.append_log (i.e.
+---     what actually reached the log on flush/rollover).
+---   set_paused(bool) — controls the script_control.is_paused() stub.
+---   set_disabled_apps(apps) — delegates to the real M.set_disabled_apps.
+---   stop() — flushes the buffer and stops the engine.
+local function start_real_keylogger()
+	local captured_handle_key = nil
+	local captured_core_state = nil
+	local appended_entries    = {}
+
 	package.loaded["modules.keylogger.rotation"] = {
-		init              = function() end,
-		append_log        = function(e) table.insert(captured, e) end,
-		read_new_entries  = function() return {}, 0 end,
-		get_offset        = function() return 0 end,
-		get_date          = function() return os.date("%Y-%m-%d") end,
-		set_offset        = function() end,
-		rollover          = function() end,
+		init             = function() end,
+		append_log       = function(e) table.insert(appended_entries, e) end,
+		read_new_entries = function() return {}, 0 end,
+		get_offset       = function() return 0 end,
+		get_date         = function() return os.date("%Y-%m-%d") end,
+		set_offset       = function() end,
+		rollover         = function() end,
 	}
-	return captured
+	package.loaded["modules.keylogger.sqlite_writer"] = {
+		init                  = function() end,
+		open_db               = function() return true end,
+		close_db              = function() end,
+		get_db                = function() return nil end,
+		build_inserts         = function() return {} end,
+		get_next_event_id     = function() return 0 end,
+		set_next_event_id     = function() end,
+		persist_next_event_id = function() end,
+	}
+	package.loaded["modules.keylogger.aggregator"] = {
+		init               = function() end,
+		walk_typing        = function() end,
+		walk_app_switch    = function() end,
+		walk_window_switch = function() end,
+		walk_system_event  = function() end,
+		flush              = function() end,
+		get_ngram_ctx       = function() return {} end,
+		set_ngram_ctx       = function() end,
+		reset_ngram_ctx     = function() end,
+	}
+	package.loaded["modules.keylogger.export"] = {
+		init                    = function() end,
+		get_native_app_category = function() return "other" end,
+		get_device_short_id     = function() return "abcd" end,
+		get_sqlite_path         = function() return "/tmp/test.sqlite" end,
+		get_db_rev              = function() return 0 end,
+		sync_foreign_data_sql   = function() end,
+	}
+	package.loaded["lib.i18n"] = { t = function(key) return key end, get = function(key) return key end }
+	package.loaded["lib.timings"] = {
+		ms  = function(section, key) return (_TIMINGS_MS[section] or {})[key] or 1000 end,
+		sec = function(_section, _key) return 1.0 end,
+	}
+
+	-- CoreState never crosses a public accessor in init.lua; capture the exact
+	-- live reference at the one point it is handed to a stubbable sub-module.
+	package.loaded["modules.keylogger.context_tracker"] = {
+		init                   = function(core_state, _log_manager) captured_core_state = core_state end,
+		update_private_status  = function() end,
+		app_watcher_cb         = function() end,
+		update_ax_observer     = function() end,
+	}
+
+	-- Force a fresh require of every sub-module that holds its own _state so a
+	-- prior scenario's M.init() cannot leak into this one (each is a singleton).
+	package.loaded["modules.keylogger.log_manager"] = nil
+	package.loaded["modules.keylogger.kc_bridge"]   = nil
+	package.loaded["modules.keylogger.watchers"]    = nil
+
+	local hs_overrides = {
+		eventtap = {
+			new = function(_events, callback)
+				captured_handle_key = callback
+				return { start = function() end, stop = function() end, isEnabled = function() return true end }
+			end,
+			event = {
+				types = {
+					keyDown = 10, keyUp = 11, flagsChanged = 12,
+					leftMouseDown = 1, rightMouseDown = 2, scrollWheel = 3,
+				},
+			},
+			checkKeyboardModifiers = function() return {} end,
+		},
+		application = {
+			watcher = {
+				new       = function() return { start = function() end, stop = function() end } end,
+				activated = 1,
+			},
+			frontmostApplication = function()
+				return {
+					title      = function() return "TestApp" end,
+					mainWindow = function() return nil end,
+					pid        = function() return 123 end,
+					bundleID   = function() return "com.example.TestApp" end,
+				}
+			end,
+		},
+		caffeinate = { watcher = { new = function() return { start = function() end, stop = function() end } end } },
+		timer = {
+			doAfter      = function(_delay, fn) fn() end,
+			new          = function() return { start = function() end, stop = function() end } end,
+			-- Must be strictly monotonic: handle_key gates its one-shot
+			-- session_start log on `session_start_time == 0`, so a clock stuck at
+			-- a constant value (e.g. always 0) re-triggers "session_start" on
+			-- every single keystroke instead of once per session.
+			absoluteTime = (function()
+				local KEYSTROKE_STEP_NS = 80 * 1000000 -- 80 ms/keystroke in nanoseconds
+				local t = 0
+				return function()
+					t = t + KEYSTROKE_STEP_NS
+					return t
+				end
+			end)(),
+		},
+		fs = {
+			attributes = function() return nil end,
+			dir        = function() return function() return nil end end,
+		},
+		keycodes = { currentLayout = function() return "ABC" end },
+		execute  = function() return "" end,
+	}
+
+	local km = helpers.load_with_stubs("modules.keylogger.init", hs_overrides)
+	local is_paused = false
+	local script_control = { is_paused = function() return is_paused end }
+	km.start(script_control)
+
+	return {
+		handle_key      = function(...) return captured_handle_key(...) end,
+		core_state      = function() return captured_core_state end,
+		appended        = appended_entries,
+		set_paused      = function(v) is_paused = v end,
+		set_disabled_apps = km.set_disabled_apps,
+		stop            = km.stop,
+	}
 end
 
---- Simulates pushing a printable character into CoreState as handle_key would.
---- This replicates the hot-path logic from init.lua Section 5 for the simple
---- single-codepoint case, without the full eventtap scaffolding.
---- @param state table The CoreState table.
---- @param char string A single printable character.
---- @param delay number Inter-key delay in ms.
-local function push_char(state, char, delay)
-	-- Mirrors handle_key: guards run first, then buffer mutation
-	if not state.is_enabled then return end
-	if state.private_filter_enabled and state.is_private_window then return end
-	if state.secure_field_filter_enabled and state.is_secure_field then return end
-	if state.system_auth_filter_enabled and state.active_app_bundle
-	and (state.active_app_bundle == "com.apple.SecurityAgent"
-		or state.active_app_bundle == "com.apple.CoreAuthUI") then return end
+--- Builds a fake hs.eventtap keyDown event carrying exactly one character.
+--- @param char string The composed character this keystroke produces.
+--- @param keycode number|nil The physical keycode (defaults to 0 — ordinary letter).
+--- @return table A minimal event object satisfying handle_key's getters.
+local function fake_key_event(char, keycode)
+	return {
+		getType       = function() return 10 end, -- keyDown
+		getKeyCode    = function() return keycode or 0 end,
+		getFlags      = function() return {} end,
+		getCharacters = function(_raw) return char end,
+	}
+end
 
-	-- Buffer mutation only reached when all guards pass
-	state.buffer_text = state.buffer_text .. char
-	table.insert(state.buffer_events, { char, delay, { s = false } })
+--- Types `text` through the real handle_key(), one keyDown event per character,
+--- then stops the engine (flushing any remaining buffer) and returns every
+--- entry that reached Rotation.append_log — i.e. what actually got persisted.
+--- @param overrides table|nil CoreState field overrides applied before typing
+--- (is_secure_field, is_private_window, active_app_bundle, disabled_apps).
+--- @param text string The characters to type.
+--- @return table appended_entries Entries persisted via Rotation.append_log.
+local function type_through_real_pipeline(overrides, text)
+	local session = start_real_keylogger()
+	local state = session.core_state()
+
+	if overrides then
+		if overrides.is_secure_field   ~= nil then state.is_secure_field   = overrides.is_secure_field   end
+		if overrides.is_private_window ~= nil then state.is_private_window = overrides.is_private_window end
+		if overrides.active_app_bundle ~= nil then state.active_app_bundle = overrides.active_app_bundle end
+		if overrides.disabled_apps     ~= nil then session.set_disabled_apps(overrides.disabled_apps)     end
+	end
+
+	for char in text:gmatch(".") do
+		session.handle_key(fake_key_event(char))
+	end
+
+	session.stop()
+	return session.appended
+end
+
+--- Counts how many "typing" entries are present in a set of appended log entries.
+--- @param entries table Entries returned by type_through_real_pipeline.
+--- @return number count The number of typing-type entries.
+local function count_typing_entries(entries)
+	local count = 0
+	for _, e in ipairs(entries) do
+		if e.type == "typing" then count = count + 1 end
+	end
+	return count
 end
 
 
@@ -191,29 +307,27 @@ helpers.describe("corpus: keylogger_no_persist_vectors.json — guard invariants
 		if type(inp.sequence) == "table" then goto next_vec end
 
 		do
-			local vec_id   = id
-			local vec_inp  = inp
-			local vec_exp  = exp
+			local vec_id  = id
+			local vec_inp = inp
+			local vec_exp = exp
 
 			helpers.it(string.format("%s — %s", vec_id, vec.description or ""), function()
-				local overrides = {}
-				if vec_inp.is_secure_field    ~= nil then overrides.is_secure_field    = vec_inp.is_secure_field    end
-				if vec_inp.is_private_window  ~= nil then overrides.is_private_window  = vec_inp.is_private_window  end
-				if vec_inp.active_app_bundle  ~= nil then overrides.active_app_bundle  = vec_inp.active_app_bundle  end
-
-				local state = make_core_state(overrides)
-				local text  = vec_inp.text or ""
-				for char in text:gmatch(".") do push_char(state, char, 80) end
+				local overrides = {
+					is_secure_field   = vec_inp.is_secure_field,
+					is_private_window = vec_inp.is_private_window,
+					active_app_bundle = vec_inp.active_app_bundle,
+				}
+				local text    = vec_inp.text or ""
+				local entries = type_through_real_pipeline(overrides, text)
+				local typing  = count_typing_entries(entries)
 
 				if vec_exp.events_persisted == 0 then
-					helpers.assert_eq(#state.buffer_events, 0,
-						string.format("%s: expected 0 buffered events but got %d", vec_id, #state.buffer_events))
-					helpers.assert_eq(state.buffer_text, "",
-						string.format("%s: expected empty buffer_text but got %q", vec_id, state.buffer_text))
+					helpers.assert_eq(typing, 0,
+						string.format("%s: expected 0 typing entries but got %d", vec_id, typing))
 				else
 					-- events_persisted > 0 means the text SHOULD enter the buffer
-					helpers.assert_true(#state.buffer_events > 0,
-						string.format("%s: expected buffered events but buffer is empty", vec_id))
+					helpers.assert_true(typing > 0,
+						string.format("%s: expected a typing entry but none was persisted", vec_id))
 				end
 			end)
 		end
@@ -233,31 +347,19 @@ end)
 
 helpers.describe("SEC-001..003 — secure field guard", function()
 
-	helpers.it("SEC-001: password characters never enter the buffer when is_secure_field=true", function()
-		local state = make_core_state({ is_secure_field = true })
-		for char in ("password123"):gmatch(".") do
-			push_char(state, char, 80)
-		end
-		helpers.assert_eq(#state.buffer_events, 0)
-		helpers.assert_eq(state.buffer_text, "")
+	helpers.it("SEC-001: password characters never reach the log when is_secure_field=true", function()
+		local entries = type_through_real_pipeline({ is_secure_field = true }, "password123")
+		helpers.assert_eq(count_typing_entries(entries), 0)
 	end)
 
-	helpers.it("SEC-002: API key never enters buffer when field is secure", function()
-		local state = make_core_state({ is_secure_field = true })
-		for char in ("sk-abc123XYZ987"):gmatch(".") do
-			push_char(state, char, 60)
-		end
-		helpers.assert_eq(#state.buffer_events, 0)
-		helpers.assert_eq(state.buffer_text, "")
+	helpers.it("SEC-002: API key never reaches the log when field is secure", function()
+		local entries = type_through_real_pipeline({ is_secure_field = true }, "sk-abc123XYZ987")
+		helpers.assert_eq(count_typing_entries(entries), 0)
 	end)
 
-	helpers.it("SEC-003: 2FA / TOTP code never enters buffer when field is secure", function()
-		local state = make_core_state({ is_secure_field = true })
-		for char in ("847291"):gmatch(".") do
-			push_char(state, char, 100)
-		end
-		helpers.assert_eq(#state.buffer_events, 0)
-		helpers.assert_eq(state.buffer_text, "")
+	helpers.it("SEC-003: 2FA / TOTP code never reaches the log when field is secure", function()
+		local entries = type_through_real_pipeline({ is_secure_field = true }, "847291")
+		helpers.assert_eq(count_typing_entries(entries), 0)
 	end)
 
 end)
@@ -275,27 +377,19 @@ end)
 helpers.describe("SEC-004..005 — system auth dialog guard", function()
 
 	helpers.it("SEC-004: keystrokes in SecurityAgent are dropped unconditionally", function()
-		local state = make_core_state({
+		local entries = type_through_real_pipeline({
 			active_app_bundle = "com.apple.SecurityAgent",
 			is_secure_field   = false,
-		})
-		for char in ("adminpassword"):gmatch(".") do
-			push_char(state, char, 80)
-		end
-		helpers.assert_eq(#state.buffer_events, 0)
-		helpers.assert_eq(state.buffer_text, "")
+		}, "adminpassword")
+		helpers.assert_eq(count_typing_entries(entries), 0)
 	end)
 
 	helpers.it("SEC-005: keystrokes in CoreAuthUI are dropped unconditionally", function()
-		local state = make_core_state({
+		local entries = type_through_real_pipeline({
 			active_app_bundle = "com.apple.CoreAuthUI",
 			is_secure_field   = false,
-		})
-		for char in ("pin1234"):gmatch(".") do
-			push_char(state, char, 80)
-		end
-		helpers.assert_eq(#state.buffer_events, 0)
-		helpers.assert_eq(state.buffer_text, "")
+		}, "pin1234")
+		helpers.assert_eq(count_typing_entries(entries), 0)
 	end)
 
 end)
@@ -312,15 +406,11 @@ end)
 helpers.describe("SEC-006 — private browsing guard", function()
 
 	helpers.it("SEC-006: keystrokes are dropped when is_private_window=true", function()
-		local state = make_core_state({
+		local entries = type_through_real_pipeline({
 			is_private_window = true,
 			is_secure_field   = false,
-		})
-		for char in ("hello world"):gmatch(".") do
-			push_char(state, char, 70)
-		end
-		helpers.assert_eq(#state.buffer_events, 0)
-		helpers.assert_eq(state.buffer_text, "")
+		}, "hello world")
+		helpers.assert_eq(count_typing_entries(entries), 0)
 	end)
 
 end)
@@ -337,15 +427,15 @@ end)
 
 helpers.describe("SEC-007 — normal field: events ARE logged", function()
 
-	helpers.it("SEC-007: ordinary text populates buffer when no privacy guard is active", function()
-		local state = make_core_state()
-		local text = "hello world"
-		for char in text:gmatch(".") do
-			push_char(state, char, 70)
-		end
-		-- The buffer must contain exactly as many events as typed characters
-		helpers.assert_eq(#state.buffer_events, #text)
-		helpers.assert_eq(state.buffer_text, text)
+	helpers.it("SEC-007: ordinary text populates the log when no privacy guard is active", function()
+		local text    = "hello world"
+		local entries = type_through_real_pipeline({}, text)
+		-- Exactly one typing entry, carrying the full typed text
+		helpers.assert_eq(count_typing_entries(entries), 1)
+		local typing_entry = nil
+		for _, e in ipairs(entries) do if e.type == "typing" then typing_entry = e end end
+		helpers.assert_true(typing_entry ~= nil, "a typing entry must be present")
+		helpers.assert_eq(typing_entry.text, text)
 	end)
 
 end)
@@ -361,41 +451,48 @@ end)
 
 helpers.describe("SEC-008 — field transition: normal text flushed, secure text never logged", function()
 
-	helpers.it("SEC-008: normal text is in buffer before transition; secure text never reaches it", function()
-		-- Phase 1: user types username in a normal field
-		local state = make_core_state({ is_secure_field = false })
-		for char in ("username@example.com"):gmatch(".") do
-			push_char(state, char, 70)
+	helpers.it("SEC-008: normal text is flushed before transition; secure text never reaches the log", function()
+		local session = start_real_keylogger()
+		local state = session.core_state()
+
+		-- Phase 1: user types a username in a normal field. Deliberately free of
+		-- '.', '?', '!' — handle_key flushes on sentence-ending punctuation, which
+		-- would otherwise split this single burst into multiple typing entries
+		-- and defeat the "exactly one entry" assertion below.
+		local username = "myusername123"
+		for char in username:gmatch(".") do
+			session.handle_key(fake_key_event(char))
 		end
-		local events_before = #state.buffer_events
-		local text_before   = state.buffer_text
 
-		-- Phase 2: field transitions to secure — a real app would flush here
-		-- (LogManager.flush_buffer is called on field transitions in context_tracker)
-		-- We just snapshot the normal buffer before the secure phase begins
-		helpers.assert_true(events_before > 0)
-		helpers.assert_eq(text_before, "username@example.com")
-
-		-- Phase 3: user types password in the secure field — simulate the transition
+		-- Phase 2: field transitions to secure — a real app would flush here.
+		-- context_tracker normally does this on every app switch/AX transition;
+		-- we drive the exact same LogManager.flush_buffer() call the production
+		-- field-transition path uses, via M.stop()+M.start() being overkill —
+		-- instead call flush_buffer through the log_manager module directly,
+		-- exactly like ContextTracker would on a field transition.
+		require("modules.keylogger.log_manager").flush_buffer()
 		state.is_secure_field = true
-		-- In the real code, flush_buffer() is called here. We simulate that by
-		-- capturing what would be flushed, then resetting the buffer manually.
-		local flushed_text   = state.buffer_text
-		local flushed_events = #state.buffer_events
-		state.buffer_text   = ""
-		state.buffer_events = {}
 
-		-- Now type the password — must not enter buffer
+		-- Phase 3: user types password in the secure field — must not enter the log
 		for char in ("mysecretpassword"):gmatch(".") do
-			push_char(state, char, 70)
+			session.handle_key(fake_key_event(char))
 		end
 
-		-- Assertions
-		helpers.assert_eq(flushed_text, "username@example.com")
-		helpers.assert_true(flushed_events > 0)
-		-- Nothing from the secure session leaked into the buffer
-		helpers.assert_eq(#state.buffer_events, 0)
-		helpers.assert_eq(state.buffer_text, "")
+		session.stop()
+
+		local typing_entries = {}
+		for _, e in ipairs(session.appended) do
+			if e.type == "typing" then table.insert(typing_entries, e) end
+		end
+
+		helpers.assert_eq(#typing_entries, 1,
+			"exactly one typing entry must be persisted — the flushed normal-field text")
+		helpers.assert_eq(typing_entries[1].text, username)
+		-- Nothing from the secure session leaked into any entry
+		for _, e in ipairs(typing_entries) do
+			helpers.assert_true(not e.text:find("mysecretpassword", 1, true),
+				"secure-field text must never appear in a persisted typing entry")
+		end
 	end)
 
 end)
@@ -412,34 +509,134 @@ end)
 helpers.describe("filter toggles — disabling a guard allows logging to resume", function()
 
 	helpers.it("turning OFF secure_field_filter allows keystrokes in secure fields (user opt-out)", function()
-		-- This tests that the filter is genuinely guarded by the toggle flag,
-		-- not hard-coded. If the user explicitly disables it, the keylogger
-		-- must respect that configuration.
-		local state = make_core_state({
-			is_secure_field                 = true,
-			secure_field_filter_enabled     = false,  -- user disabled the guard
-		})
-		push_char(state, "a", 80)
-		-- When the guard is deliberately off, the char reaches the buffer
-		helpers.assert_eq(#state.buffer_events, 1)
+		local session = start_real_keylogger()
+		local state = session.core_state()
+		state.is_secure_field             = true
+		state.secure_field_filter_enabled  = false -- user disabled the guard
+		session.handle_key(fake_key_event("a"))
+		session.stop()
+		helpers.assert_eq(count_typing_entries(session.appended), 1)
 	end)
 
 	helpers.it("turning OFF system_auth_filter allows logging in auth dialogs (user opt-out)", function()
-		local state = make_core_state({
-			active_app_bundle               = "com.apple.SecurityAgent",
-			system_auth_filter_enabled      = false,  -- user disabled the guard
-		})
-		push_char(state, "x", 80)
-		helpers.assert_eq(#state.buffer_events, 1)
+		local session = start_real_keylogger()
+		local state = session.core_state()
+		state.active_app_bundle          = "com.apple.SecurityAgent"
+		state.system_auth_filter_enabled = false -- user disabled the guard
+		session.handle_key(fake_key_event("x"))
+		session.stop()
+		helpers.assert_eq(count_typing_entries(session.appended), 1)
 	end)
 
 	helpers.it("turning OFF private_filter allows logging in private windows (user opt-out)", function()
-		local state = make_core_state({
-			is_private_window               = true,
-			private_filter_enabled          = false,  -- user disabled the guard
-		})
-		push_char(state, "y", 80)
-		helpers.assert_eq(#state.buffer_events, 1)
+		local session = start_real_keylogger()
+		local state = session.core_state()
+		state.is_private_window  = true
+		state.private_filter_enabled = false -- user disabled the guard
+		session.handle_key(fake_key_event("y"))
+		session.stop()
+		helpers.assert_eq(count_typing_entries(session.appended), 1)
+	end)
+
+end)
+
+
+
+
+-- ======================================================================
+-- ======================================================================
+-- ======= 9/ Pause Guard — Previously Uncovered (F-HIGH-15) ===========
+-- ======================================================================
+-- ======================================================================
+
+helpers.describe("pause guard — script_control.is_paused() blocks handle_key (F-HIGH-15)", function()
+
+	helpers.it("keystrokes typed while paused never reach the log", function()
+		local session = start_real_keylogger()
+		session.set_paused(true)
+		session.handle_key(fake_key_event("s"))
+		session.handle_key(fake_key_event("e"))
+		session.handle_key(fake_key_event("c"))
+		session.stop()
+		helpers.assert_eq(count_typing_entries(session.appended), 0,
+			"handle_key must drop every keystroke while script_control.is_paused() is true")
+	end)
+
+	helpers.it("pausing mid-session flushes the already-buffered text but blocks anything typed after", function()
+		local session = start_real_keylogger()
+		session.handle_key(fake_key_event("h"))
+		session.handle_key(fake_key_event("i"))
+
+		session.set_paused(true)
+		session.handle_key(fake_key_event("z")) -- must not reach the buffer
+
+		session.stop()
+
+		local typing_entries = {}
+		for _, e in ipairs(session.appended) do
+			if e.type == "typing" then table.insert(typing_entries, e) end
+		end
+		helpers.assert_eq(#typing_entries, 1,
+			"exactly one typing entry: the pre-pause buffer, flushed by the pause guard itself")
+		helpers.assert_eq(typing_entries[1].text, "hi",
+			"the flushed entry must contain only the pre-pause text — 'z' must never appear")
+	end)
+
+	helpers.it("resuming from pause allows logging again", function()
+		local session = start_real_keylogger()
+		session.set_paused(true)
+		session.handle_key(fake_key_event("q")) -- dropped while paused
+		session.set_paused(false)
+		session.handle_key(fake_key_event("r")) -- must be logged now
+		session.stop()
+
+		local typing_entries = {}
+		for _, e in ipairs(session.appended) do
+			if e.type == "typing" then table.insert(typing_entries, e) end
+		end
+		helpers.assert_eq(#typing_entries, 1)
+		helpers.assert_eq(typing_entries[1].text, "r",
+			"only the post-resume keystroke must appear — the paused 'q' must never leak in")
+	end)
+
+end)
+
+
+
+
+
+-- ==========================================================================
+-- ==========================================================================
+-- ======= 10/ Disabled-apps Guard — Previously Uncovered (F-HIGH-15) =======
+-- ==========================================================================
+-- ==========================================================================
+
+helpers.describe("disabled-apps guard — CoreState.disabled_apps blocks matching apps (F-HIGH-15)", function()
+
+	helpers.it("keystrokes in a bundleID-disabled app never reach the log", function()
+		local entries = type_through_real_pipeline({
+			active_app_bundle = "com.example.TestApp",
+			disabled_apps     = { { bundleID = "com.example.TestApp" } },
+		}, "secretnote")
+		helpers.assert_eq(count_typing_entries(entries), 0,
+			"a bundleID match in CoreState.disabled_apps must drop every keystroke")
+	end)
+
+	helpers.it("keystrokes in a non-disabled app are unaffected by an unrelated disabled_apps entry", function()
+		local entries = type_through_real_pipeline({
+			active_app_bundle = "com.example.TestApp",
+			disabled_apps     = { { bundleID = "com.other.App" } },
+		}, "hello")
+		helpers.assert_eq(count_typing_entries(entries), 1,
+			"disabled_apps must only match its own bundleID/appPath — other apps keep logging")
+	end)
+
+	helpers.it("an empty disabled_apps list logs normally (no accidental blanket block)", function()
+		local entries = type_through_real_pipeline({
+			active_app_bundle = "com.example.TestApp",
+			disabled_apps     = {},
+		}, "hello")
+		helpers.assert_eq(count_typing_entries(entries), 1)
 	end)
 
 end)
