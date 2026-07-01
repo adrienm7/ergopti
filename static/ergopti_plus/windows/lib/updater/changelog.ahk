@@ -190,6 +190,11 @@ _Updater_OpenChangelogWindow(Channel) {
 ; falls back to a plain-text Edit when WebView2 is unavailable.
 _Updater_BuildChangelogGui(Json, Channel) {
 	global _VendorDir
+	; The async WinHTTP fetch this callback answers bypasses native Suspend()
+	; (which only disarms Hotkeys/Hotstrings), so a pause toggled while the
+	; request was in flight must not still pop the changelog window on return.
+	if A_IsSuspended
+		return
 	if (Json == "") {
 		; Surface non-blocking — a modal MsgBox here would starve the keyboard hook
 		try NotifierSend(t("updater.no_connection"), Map("title", t("updater.title_changelog"), "level", "warning"))
