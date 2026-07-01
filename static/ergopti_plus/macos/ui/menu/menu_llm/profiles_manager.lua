@@ -244,8 +244,9 @@ local function build_profile_menu(deps, models_mgr)
 				},
 				{ title = "-" },
 				{
-					title = i18n.get("menu.profiles.edit_profile"),
-					fn    = function()
+					title    = i18n.get("menu.profiles.edit_profile"),
+					disabled = paused or nil,
+					fn       = not paused and function()
 						if prompt_editor and type(prompt_editor.open) == "function" then
 							hs.timer.doAfter(0.1, function()
 								pcall(prompt_editor.open, profile, function(updated)
@@ -264,11 +265,12 @@ local function build_profile_menu(deps, models_mgr)
 								end)
 							end)
 						end
-					end,
+					end or nil,
 				},
 				{
-					title = i18n.get("menu.profiles.delete_profile"),
-					fn    = function()
+					title    = i18n.get("menu.profiles.delete_profile"),
+					disabled = paused or nil,
+					fn       = not paused and function()
 						local ok_c, choice = pcall(dialog.block_alert,
 							string.format(i18n.get("menu.profiles.delete_confirm_title"), display_label),
 							i18n.get("menu.profiles.delete_confirm_body"),
@@ -283,7 +285,7 @@ local function build_profile_menu(deps, models_mgr)
 								if type(p) == "table" and p.id ~= pid then table.insert(kept, p) end
 							end
 							state.llm_user_profiles = kept
-							if state.llm_active_profile == pid then 
+							if state.llm_active_profile == pid then
 								state.llm_active_profile = "basic"
 								llm_mod.set_active_profile("basic")
 							end
@@ -291,7 +293,7 @@ local function build_profile_menu(deps, models_mgr)
 						pcall(deps.save_prefs)
 						pcall(deps.update_menu)
 						end
-					end,
+					end or nil,
 				},
 			}
 			table.insert(menu, item)
