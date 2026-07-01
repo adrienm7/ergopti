@@ -80,9 +80,13 @@ end
 -- (e.g., the Hammerspoon shutdown callback) without requiring a reference chain.
 local _active_models_mgr = nil
 
--- Detect Apple Silicon via filesystem check (no shell spawn needed:
--- Homebrew on ARM installs to /opt/homebrew, Intel uses /usr/local)
-local is_apple_silicon = hs.fs.attributes("/opt/homebrew", "mode") == "directory"
+-- Single source of truth for Apple-Silicon detection (F-MED-4): delegates to
+-- BackendPanel.is_apple_silicon(), which uses `uname -m` — NOT a filesystem
+-- existence check on /opt/homebrew. The old heuristic ("Homebrew on ARM
+-- installs to /opt/homebrew") is wrong on a fresh arm64 Mac that has not
+-- installed Homebrew yet, causing a first-run to seed llm_backend as
+-- "ollama" on Apple Silicon instead of "mlx".
+local is_apple_silicon = BackendPanel.is_apple_silicon()
 
 M.DEFAULT_STATE = {
     llm_enabled           = llm_mod.DEFAULT_STATE.llm_enabled,
