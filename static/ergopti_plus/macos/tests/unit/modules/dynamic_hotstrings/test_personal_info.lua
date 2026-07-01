@@ -78,3 +78,56 @@ helpers.describe("PersonalInfo.save_info", function()
 		PI.save_info(42)
 	end)
 end)
+
+
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= 4/ TOML round-trip for underscore keys (F-CRIT-1) ==========
+-- =====================================================================
+-- =====================================================================
+
+-- Regression for F-CRIT-1: parse_toml_section's key pattern used to be
+-- '^(%w+)%s*=%s*"(.*)"$' — Lua's %w class excludes '_', so every
+-- underscore-named key (date_of_birth, phone_number, social_security_number,
+-- …) silently failed to parse and fell back to DEFAULT_CONFIG on every
+-- restart, wiping the user's real personal data with no error.
+helpers.describe("PersonalInfo TOML round-trip — underscore-named keys survive a restart (F-CRIT-1 regression)", function()
+
+	helpers.it("every DEFAULT_CONFIG.info key, including underscore-named ones, round-trips through a real file", function()
+		local tmp_path = os.tmpname()
+
+		local lines = { "[info]" }
+		local expected = {}
+
+		-- Build a personal_info.toml exercising every default key with a
+		-- distinct, non-default sentinel value (underscore-heavy on purpose).
+		local sentinel_keys = {
+			"first_name", "last_name", "date_of_birth", "email_address",
+			"work_email_address", "phone_number", "phone_number_clean",
+			"street_address", "city", "country", "postal_code", "iban",
+			"bic", "credit_card", "social_security_number",
+		}
+		for _, key in ipairs(sentinel_keys) do
+			local value = "SENTINEL_" .. key:upper()
+			expected[key] = value
+			table.insert(lines, string.format('%s = "%s"', key, value))
+		end
+
+		local fh = io.open(tmp_path, "w")
+		helpers.assert_true(fh ~= nil, "must be able to write the temp personal_info.toml")
+		fh:write(table.concat(lines, "\n") .. "\n")
+		fh:close()
+
+		PI.start(nil, nil, tmp_path)
+		local info = PI.get_info()
+
+		for _, key in ipairs(sentinel_keys) do
+			helpers.assert_eq(info[key], expected[key], "field '" .. key .. "' must round-trip, not silently fall back to its default")
+		end
+
+		os.remove(tmp_path)
+	end)
+
+end)

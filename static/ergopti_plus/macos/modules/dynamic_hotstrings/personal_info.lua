@@ -111,7 +111,10 @@ local function parse_toml_section(content, section)
 		if line:match("^%[") then
 			in_section = (line == "[" .. section .. "]")
 		elseif in_section then
-			local key, val = line:match('^(%w+)%s*=%s*"(.*)"$')
+			-- %w alone excludes '_', which silently dropped every underscore-named
+			-- key (date_of_birth, phone_number, social_security_number, …) back to
+			-- DEFAULT_CONFIG on every restart; match the sibling parser's class.
+			local key, val = line:match('^([%w_%-]+)%s*=%s*"(.*)"$')
 			if key then
 				-- Single-pass unescape: process \\(.) left-to-right so \\n is correctly
 			-- decoded as backslash+n, not as newline (the chained-gsub bug corrupted
@@ -157,7 +160,15 @@ local function load_config(toml_path)
 	-- Fall back to defaults for any missing field
 	local merged_info    = {}
 	local merged_letters = {}
-	for k, v in pairs(DEFAULT_CONFIG.info)    do merged_info[k]    = info[k]    or v end
+	for k, v in pairs(DEFAULT_CONFIG.info) do
+		merged_info[k] = info[k] or v
+		-- A non-empty parsed section that is still missing a known key almost
+		-- always means the parser regex silently rejected that key's line —
+		-- warn loudly instead of letting it look like a legitimately-absent key.
+		if info[k] == nil and next(info) ~= nil then
+			Logger.warn(LOG, "Key '%s' absent from a non-empty [info] section — falling back to default (check for a parser/regex mismatch).", k)
+		end
+	end
 	for k, v in pairs(DEFAULT_CONFIG.letters) do merged_letters[k] = letters[k] or v end
 
 	Logger.info(LOG, "Personal info configuration loaded successfully.")
