@@ -563,7 +563,22 @@ function M.get_override_path()
 	return _state.path
 end
 
---- Re-reads the override file from disk. Useful when AHK has written to it.
+--- Re-reads the override file from disk, discarding the in-memory overrides
+--- table and rebuilding it from `_state.path`. Intended for the case where the
+--- AHK driver has externally rewritten the shared override file while this
+--- process is still running.
+---
+--- NOT CURRENTLY WIRED IN (F-LOW-7): no production call site invokes this —
+--- every setter in this module (M.set_override, M.clear_override,
+--- M.set_word_delimiters) already keeps `_state.overrides` in sync in-memory
+--- AND writes to disk immediately, so a same-process caller never needs to
+--- re-read what it just wrote. There is also no cross-process file-watcher
+--- on `_state.path` that would make an externally written file get picked up
+--- automatically — this function only helps if something calls it
+--- explicitly, which nothing currently does. Note it also
+--- would NOT invalidate `_state.toml_cache` even if called: a reload after an
+--- external write would still serve stale cached TOML `[_meta]` metadata for
+--- any category already resolved once this session.
 --- @return boolean
 function M.reload()
 	if not require_state("reload") then return false end
