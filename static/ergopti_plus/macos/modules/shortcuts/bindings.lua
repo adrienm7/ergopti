@@ -57,6 +57,13 @@ local started = false
 -- Falls back to nil so bind_wrap_text_if_selected uses the full built-in catalogue.
 local _wrap_pairs_getter = nil
 
+-- User-configured ChatGPT URL, persisted to config.toml by the menu's save
+-- callback. Set by M.set_chatgpt_url() at boot-time state restoration and on
+-- every menu edit, so ctrl_g always opens the URL the user actually configured
+-- instead of the hardcoded manifest default (shortcuts-ctrl-g-ignores-config).
+-- Falls back to nil so ctrl_g uses M.DEFAULT_CHATGPT_URL.
+local _chatgpt_url = nil
+
 -- Canonical modifier ordering used to build display labels
 local MOD_ORDER  = {"cmd", "ctrl", "alt", "shift", "fn"}
 local MOD_LABELS = {cmd = "Cmd", ctrl = "Ctrl", alt = "Alt", shift = "Shift", fn = "Fn"}
@@ -169,7 +176,7 @@ end
 hotkey_labels.ctrl_g = i18n.get("shortcuts.label_ctrl_g")
 hotkey_defs.ctrl_g   = function()
 	return bind_log({"ctrl"}, "g", function()
-		app_acts.open_chatgpt(M.DEFAULT_CHATGPT_URL)
+		app_acts.open_chatgpt(_chatgpt_url or M.DEFAULT_CHATGPT_URL)
 	end)
 end
 
@@ -421,6 +428,17 @@ function M.set_wrap_pairs_getter(getter)
 			end
 		end
 	end
+end
+
+--- Sets the ChatGPT URL that Ctrl+G opens. Call this whenever the user edits the
+--- URL from the menu, and once at boot-time state restoration, so ctrl_g always
+--- reflects config.toml (the SSoT) instead of the hardcoded manifest default.
+--- No re-arm is needed here (unlike set_wrap_pairs_getter): ctrl_g's closure
+--- reads _chatgpt_url fresh on every keypress rather than capturing it once.
+--- @param url string|nil The configured URL, or nil to fall back to the default.
+function M.set_chatgpt_url(url)
+	_chatgpt_url = (type(url) == "string" and url ~= "") and url or nil
+	Logger.debug(LOG, "chatgpt_url updated: %s.", tostring(_chatgpt_url))
 end
 
 --- Returns a sorted array of all registered shortcuts with their current status.

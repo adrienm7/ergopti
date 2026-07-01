@@ -53,6 +53,7 @@ M.enable                 = Bindings.enable
 M.disable                = Bindings.disable
 M.is_enabled             = Bindings.is_enabled
 M.set_wrap_pairs_getter  = Bindings.set_wrap_pairs_getter
+M.set_chatgpt_url        = Bindings.set_chatgpt_url
 
 -- Proxy Script Control Methods
 M.ACTIONS               = ScriptControl.ACTIONS
