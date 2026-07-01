@@ -225,3 +225,76 @@ helpers.describe("gestures.actions: execute helpers do not crash", function()
 		helpers.assert_true(true)
 	end)
 end)
+
+
+
+
+
+-- ===============================================================
+-- ===============================================================
+-- ======= 7/ Throwing actions are traced via Logger.pcall =======
+-- ===============================================================
+-- ===============================================================
+
+-- Regression: execute_single/execute_axis dispatched every registered action (~150+ closures)
+-- via a bare pcall(s.fn) with the (ok, err) tuple discarded — a thrown exception left NO trace
+-- anywhere. The fix replaces both bare pcalls with Logger.pcall(LOG, ...) so a throwing action
+-- is always logged at ERROR level.
+helpers.describe("gestures.actions: throwing actions are traced via Logger.pcall (gestures-actions-silent-pcall regression)", function()
+
+	-- Loads a fresh actions module with a REAL (not stubbed) lib.logger instance so the
+	-- ring buffer genuinely reflects what Logger.pcall wrote, plus hs.timer.doAfter
+	-- replaced with a function that raises — driving an actual thrown exception through
+	-- the real action registry rather than a synthetic stub action.
+	local function make_actions_with_real_logger_and_throwing_timer()
+		package.loaded["lib.logger"] = nil
+		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		FreshLogger.set_level("DEBUG")
+
+		package.loaded["modules.gestures.actions"] = nil
+		package.loaded["modules.gestures.actions_click"] = nil
+		local Actions2 = helpers.load_with_stubs("modules.gestures.actions", {
+			timer = {
+				doAfter = function() error("boom: injected hs.timer.doAfter failure") end,
+			},
+		})
+		return Actions2, FreshLogger
+	end
+
+	helpers.it("execute_single logs an ERROR when the dispatched action throws ('lookup' via hs.timer.doAfter)", function()
+		local Actions2, FreshLogger = make_actions_with_real_logger_and_throwing_timer()
+
+		-- 'lookup' -> M.trigger_lookup() calls hs.timer.doAfter(...) UNPROTECTED
+		-- (no internal pcall), so stubbing it to error() reaches Logger.pcall's guard.
+		local ok = pcall(Actions2.execute_single, "lookup")
+		helpers.assert_true(ok, "execute_single itself must never raise — Logger.pcall must contain the exception")
+
+		local snap = FreshLogger.ring_buffer_snapshot()
+		local found_error = false
+		for _, line in ipairs(snap) do
+			if line:find("[ERROR]", 1, true) and line:find("gestures.actions", 1, true) then
+				found_error = true
+			end
+		end
+		helpers.assert_true(found_error,
+			"a throwing action must leave an ERROR-level Logger trace (gestures-actions-silent-pcall)")
+	end)
+
+	helpers.it("execute_axis logs an ERROR when the dispatched axis action throws ('lines' via hs.timer.doAfter)", function()
+		local Actions2, FreshLogger = make_actions_with_real_logger_and_throwing_timer()
+
+		-- 'lines' next/prev call hs.timer.doAfter(...) UNPROTECTED directly.
+		local ok = pcall(Actions2.execute_axis, "lines", true)
+		helpers.assert_true(ok, "execute_axis itself must never raise — Logger.pcall must contain the exception")
+
+		local snap = FreshLogger.ring_buffer_snapshot()
+		local found_error = false
+		for _, line in ipairs(snap) do
+			if line:find("[ERROR]", 1, true) and line:find("gestures.actions", 1, true) then
+				found_error = true
+			end
+		end
+		helpers.assert_true(found_error,
+			"a throwing axis action must leave an ERROR-level Logger trace (gestures-actions-silent-pcall)")
+	end)
+end)

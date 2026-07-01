@@ -920,7 +920,10 @@ function M.execute_single(name)
 	if name ~= "left_click_toggle" and name ~= "right_click_toggle" then
 		Click.release_held_for_tap(name)
 	end
-	pcall(s.fn)
+	-- Logger.pcall (not a bare pcall) so a throwing action leaves a trace: with
+	-- ~150+ registered closures dispatched here, a caught-then-dropped exception
+	-- would otherwise be completely invisible in the logs (gestures-actions-silent-pcall).
+	Logger.pcall(LOG, s.fn)
 end
 
 function M.execute_axis(name, goNext)
@@ -928,7 +931,7 @@ function M.execute_axis(name, goNext)
 	if not a then return end
 	local fn = goNext and a.next or a.prev
 	if type(fn) == "function" then
-		pcall(fn)
+		Logger.pcall(LOG, fn)
 	end
 end
 
