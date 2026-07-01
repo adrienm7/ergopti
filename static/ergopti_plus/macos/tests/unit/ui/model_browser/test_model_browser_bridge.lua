@@ -66,6 +66,16 @@ local function install_hs_stubs()
 	_G.hs.json = _G.hs.json or {}
 	_G.hs.json.encode = function(_t) return "mock_json" end
 
+	-- ui_builder's post-open focus retry (try_focus, added 2026-06-09) always
+	-- runs on M.open() and falls into its "handle not ready" branch here since
+	-- this stub's webview mock has no working hswindow()/focus(); without a
+	-- doAfter stub the very first retry crashes with "attempt to call a nil
+	-- value (field 'doAfter')" before the test ever reaches the bridge
+	-- assertions. Invoking synchronously just drains the bounded retry loop
+	-- (max_attempts = 20) down to the pcall-guarded bringToFront fallback.
+	_G.hs.timer = _G.hs.timer or {}
+	_G.hs.timer.doAfter = _G.hs.timer.doAfter or function(_delay, fn) fn() end
+
 	return function() return bridge_callback end
 end
 
