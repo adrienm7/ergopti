@@ -346,7 +346,14 @@ local _last_runtime_probe_at = 0
 
 local KARABINER_READY_NOTIFY_COOLDOWN_SEC = 10
 local KARABINER_READY_NOTIFY_DELAY_SEC = 2.5
-local HS_BOOT_READY_SETTING_KEY = "ergopti_hs_boot_ready_v1"
+
+-- Single source of truth for the boot-readiness settings key (F-LOW-11):
+-- init.lua sets it to false at boot start and true once boot fully completes;
+-- this module only ever reads it. Exposed on M so init.lua can require() this
+-- constant instead of re-declaring the literal — a future rename in only one
+-- file used to silently desync the boot-readiness notification with no error.
+M.HS_BOOT_READY_SETTING_KEY = "ergopti_hs_boot_ready_v1"
+local HS_BOOT_READY_SETTING_KEY = M.HS_BOOT_READY_SETTING_KEY
 
 --- Returns true only when init.lua has completed the full boot sequence.
 --- @return boolean
