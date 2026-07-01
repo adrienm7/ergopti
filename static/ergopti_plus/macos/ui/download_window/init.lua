@@ -406,8 +406,7 @@ function M.show(opts)
         eval(string.format("setKind(%s,null,null)", js_str(_kind)))
         -- _current_model is nil for bootstrap kinds (mlx_install, ollama_install)
         if M._current_model then
-            local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
-            eval("setModel(\"" .. safe .. "\")")
+            eval("setModel(" .. js_str(M._current_model) .. ")")
         end
         return
     end
@@ -420,8 +419,7 @@ function M.show(opts)
 
     eval(string.format("setKind(%s,null,null)", js_str(_kind)))
     if M._current_model then
-        local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
-        eval("setModel(\"" .. safe .. "\")")
+        eval("setModel(" .. js_str(M._current_model) .. ")")
     end
 end
 
