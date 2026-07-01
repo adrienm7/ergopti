@@ -335,12 +335,18 @@ KL_JsonStr(s) {
 
 KL_SortArray(arr) {
     ; Bubble sort — the array is at most a few hundred entries; O(n²) is fine.
+    ; StrCompare (not the ">" operator) is required here: AHK v2's relational
+    ; operators are numeric-only and THROW "Expected a Number but got a String"
+    ; when either side is a non-numeric string, so ">" on two ordinary app-name
+    ; keys (e.g. "chrome.exe" > "code.exe") aborted every KL_AppCat_Save() call
+    ; as soon as the map held 2+ entries — i.e. on every boot, since DEFAULTS
+    ; alone ships 80+ keys.
     n := arr.Length
     loop n - 1 {
         i := A_Index
         loop n - i {
             j := A_Index
-            if (arr[j] > arr[j + 1]) {
+            if (StrCompare(arr[j], arr[j + 1]) > 0) {
                 tmp        := arr[j]
                 arr[j]     := arr[j + 1]
                 arr[j + 1] := tmp

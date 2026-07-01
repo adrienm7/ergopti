@@ -93,8 +93,11 @@ Test("KLAppCatConst.DEFAULTS: notepad.exe -> productive", _KLAppCat_Defaults_Not
 
 ; Seed a clean in-memory map before each test group so tests are isolated.
 _KLAppCat_SeedMap() {
-	; Set file_path to a non-empty sentinel so KL_AppCat_RequireInit passes
-	KLAppCat.file_path := "stub"
+	; Non-empty sentinel so KL_AppCat_RequireInit passes. Must not be a bare
+	; relative name: KL_AppCat_Get() on an unseen app arms the deferred-save
+	; timer, which can fire after this test function returns and write
+	; wherever the current working directory happens to be at that point.
+	KLAppCat.file_path := A_Temp . "\ergopti_test_appcat_seed_unused.json"
 	KLAppCat.categories := Map(
 		"code.exe",     "productive",
 		"discord.exe",  "communication",
@@ -207,3 +210,53 @@ TestKLAppCat_SaveRoundTrip() {
 	try FileDelete(TmpPath)
 }
 Test("keylogger_app_categories: save round-trips a custom category", TestKLAppCat_SaveRoundTrip)
+
+; Regression test for the production incident where KL_AppCat_Save() failed on
+; every boot with "Expected a Number but got a String." (96+ occurrences in the
+; live error log). Root cause: KL_SortArray used the ">" relational operator to
+; sort the categories' string keys, but AHK v2's relational operators are
+; numeric-only and throw on any two non-numeric strings — so sorting ANY 2+
+; ordinary app-name keys (e.g. "chrome.exe" vs "code.exe") aborted the save.
+; This reproduces with the real KLAppCatConst.DEFAULTS table (80+ alphabetic
+; keys) — the exact shape that broke in production on every single boot.
+TestKLAppCat_SaveSucceedsWithMultipleAlphaKeys() {
+	_KLAppCatReset()
+	TmpPath := A_Temp . "\ergopti_test_appcat_multikey_" . A_TickCount . ".json"
+	KLAppCat.file_path := TmpPath
+
+	; Seed with the real production DEFAULTS table — this is the exact Map
+	; shape KL_AppCat_Reload() builds on every boot before the first save.
+	for k, v in KLAppCatConst.DEFAULTS
+		KLAppCat.categories[k] := v
+	KLAppCat.dirty := true
+
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	KL_AppCat_Save()
+	LoggerClearTestSink()
+
+	AssertEqual(0, Captured.Length,
+		"KL_AppCat_Save must not log any error when sorting 2+ alphabetic app-name keys")
+	AssertFalse(KLAppCat.dirty, "dirty must clear to false once the sorted-key save succeeds")
+	AssertTrue(FileExist(TmpPath) != "", "app_categories.json must actually be written to disk")
+
+	try FileDelete(TmpPath)
+	KLAppCat.dirty := false
+}
+Test("keylogger_app_categories: save succeeds and logs no error with 2+ alphabetic app-name keys (KL_SortArray regression)",
+	TestKLAppCat_SaveSucceedsWithMultipleAlphaKeys)
+
+; Narrower unit test directly on KL_SortArray itself, isolating the exact
+; comparison that threw — proves the sort now produces correct lexical order
+; using StrCompare instead of the numeric-only ">" operator.
+TestKLSortArray_SortsAlphabeticStringsWithoutThrowing() {
+	Input := ["chrome.exe", "code.exe", "1password.exe", "zoom.exe", "autohotkey64.exe"]
+	Sorted := KL_SortArray(Input)
+	AssertEqual("1password.exe", Sorted[1])
+	AssertEqual("autohotkey64.exe", Sorted[2])
+	AssertEqual("chrome.exe", Sorted[3])
+	AssertEqual("code.exe", Sorted[4])
+	AssertEqual("zoom.exe", Sorted[5])
+}
+Test("KL_SortArray: sorts ordinary alphabetic app-name strings without throwing",
+	TestKLSortArray_SortsAlphabeticStringsWithoutThrowing)
