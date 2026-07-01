@@ -281,8 +281,22 @@ local function _wpm_darken_hex(hex, factor)
 end
 
 
+-- Forward declaration: update_widget() (the pcall wrapper) is defined before its
+-- body so the body can be a plain local function referenced by name below.
+local update_widget_body
+
 --- Polls the engine and redraws the canvas.
+--- Wrapped end-to-end in a pcall (mirrors tooltip_hotstring.lua / tooltip_llm.lua):
+--- this runs on a bare hs.timer callback with no caller to catch a raised error,
+--- and there is no hs.uncaughtErrorHandler anywhere in the tree, so an unguarded
+--- fault here would silently kill the 0.2 s timer with nothing in the file logger.
 local function update_widget()
+	local ok, err = pcall(update_widget_body)
+	if not ok then Logger.error(LOG, "Crash during widget update: " .. tostring(err) .. ".") end
+end
+
+--- Actual widget-update body, wrapped by update_widget() above.
+update_widget_body = function()
 	local stats = keylogger.get_live_stats()
 	local display_wpm = stats.wpm or 0
 	local now = hs.timer.absoluteTime() / 1000000000
@@ -310,7 +324,15 @@ local function update_widget()
 	if #_wpm_history > 60 then table.remove(_wpm_history, 1) end
 
 	if display_wpm > 0 or tooltip_visible or recently_active then
+		-- hs.screen.mainScreen() is documented as possibly returning nil (e.g. no
+		-- display attached, or a display-reconfiguration race) — dereferencing it
+		-- unconditionally would raise inside this pcall-wrapped body every 0.2 s
+		-- until a screen reappears. Skip this cycle instead of crashing.
 		local screen = hs.screen.mainScreen()
+		if not screen then
+			Logger.error(LOG, "update_widget: hs.screen.mainScreen() returned nil — skipping this cycle.")
+			return
+		end
 		local full_frame = screen:fullFrame()
 		local work_frame = screen:frame()
 
