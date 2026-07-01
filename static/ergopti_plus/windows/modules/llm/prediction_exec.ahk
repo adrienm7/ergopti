@@ -66,12 +66,17 @@ LLM_Engine_FirePrediction(buffer) {
 	; password/secure fields to avoid leaking typed credentials into the LLM
 	; context. Gate is only active when the flag is on to avoid the OS call
 	; on every keystroke when the user has not opted in.
+	;
+	; MUST be the adapters/secure_field_detector.ahk port contract function
+	; (SFD_IsSecureField) — not the keylogger's own KL_IsFocusedFieldPassword —
+	; so this privacy gate has a single, directly-testable source of truth
+	; shared with every other consumer of the SecureFieldDetector port instead
+	; of duplicating Win32-class/style detection logic locally (MED-02: the
+	; flag was stored from config but nothing ever consulted a detector at
+	; prediction time, so enabling it in the tray menu had no effect).
 	if (_LLM_Engine.Has("disable_password_fields") && _LLM_Engine["disable_password_fields"]) {
-		; Use the fail-safe, UIA-backed, cached detector used by the keylogger and metrics
-		; filter — SFD_IsSecureField is fail-open and misses browser/Electron/WPF password
-		; fields (AHK-01). IsSet guard covers include-order: keylogger loads after prediction_engine.
 		IsPw := false
-		try IsPw := IsSet(KL_IsFocusedFieldPassword) && KL_IsFocusedFieldPassword()
+		try IsPw := SFD_IsSecureField()
 		if IsPw {
 			try LoggerInfo("LLM", "Prediction suppressed — password field detected.")
 			return
