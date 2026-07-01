@@ -109,6 +109,11 @@ M.timer = {
 -- fallback that handles the limited shapes used in tests.
 local function _json_decode(s)
 	if type(s) ~= "string" or s == "" then return nil end
+	-- All real locale JSON files are UTF-8-with-BOM by convention. The real
+	-- (native) hs.json.decode tolerates a leading BOM transparently; this
+	-- hand-rolled stub parser does not skip it, so it silently returned 0 keys
+	-- for every locale file (PF-3 fix). Strip it before parsing.
+	s = s:gsub("^\239\187\191", "")
 	-- Minimal JSON parser sufficient for fixture-based tests
 	local pos = 1
 	local function skip_ws() while pos <= #s and s:sub(pos, pos):match("%s") do pos = pos + 1 end end
