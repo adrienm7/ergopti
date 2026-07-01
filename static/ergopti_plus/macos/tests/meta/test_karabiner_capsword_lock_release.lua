@@ -75,14 +75,20 @@ helpers.describe("karabiner/watchers.lua: CapsWord lock release (karabiner-capsw
 	-- F-L6: hs.task fires its callback only on process EXIT, so a started-but-hung
 	-- karabiner_cli would leave _capsword_check_pending true forever. A watchdog timer
 	-- must force-release the lock after a timeout (and the callback must cancel it).
+	--
+	-- The watchdog is scheduled via the TimerScheduler adapter (not raw hs.timer.doAfter)
+	-- per PF-1 — routing this OS call through adapters/ keeps the hs.* purity ratchet
+	-- meta-test (test_port_adapter_coverage.lua) from re-flagging it as a violation.
 	helpers.it("a watchdog releases the lock if the started task never completes (F-L6)", function()
 		local src = strip_comments(read_source("modules/karabiner/watchers.lua"))
 		helpers.assert_true(src:find("_capsword_probe_watchdog", 1, true) ~= nil,
 			"deactivate_capsword must arm a watchdog timer (_capsword_probe_watchdog)")
 		helpers.assert_true(src:find("CAPSWORD_PROBE_TIMEOUT_SEC", 1, true) ~= nil,
 			"the watchdog must use a named timeout constant, not a magic number")
+		helpers.assert_true(src:find("TimerScheduler.after(CAPSWORD_PROBE_TIMEOUT_SEC", 1, true) ~= nil,
+			"the watchdog must be scheduled via the TimerScheduler adapter, not raw hs.timer.doAfter (PF-1)")
 		-- The watchdog callback must release the pending lock.
-		local wd = src:find("doAfter(CAPSWORD_PROBE_TIMEOUT_SEC", 1, true)
+		local wd = src:find("TimerScheduler.after(CAPSWORD_PROBE_TIMEOUT_SEC", 1, true)
 		helpers.assert_true(wd ~= nil and src:find("_capsword_check_pending = false", wd) ~= nil,
 			"the watchdog callback must set _capsword_check_pending = false")
 	end)
