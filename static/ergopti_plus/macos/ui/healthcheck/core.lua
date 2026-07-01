@@ -65,61 +65,133 @@ end
 --- ==========================================
 --- ============================================
 
--- Each entry: { id = "require.path", contract = { "method1", "method2", … } }
+-- Each entry: { id = "require.path", contract = { "method1", "method2", … }, wired = bool }
 -- Contract methods are the minimal public surface that must be present for the
 -- adapter to be considered operational.
+--
+-- `wired` records whether at least one non-test, non-healthcheck production file
+-- actually calls require() on this adapter (audit F-HIGH-10). A contract-healthy
+-- adapter that is NOT wired can load fine and expose every method yet still be
+-- completely unreachable from any real feature — the migration onto the port/
+-- adapter architecture is incomplete for it. Keeping this flag in lock-step with
+-- reality is enforced by tests/meta/test_adapter_wiring_reachability.lua, which
+-- greps production sources for a require("adapters.<id>") call site and fails if
+-- the flag disagrees with what it finds.
 local ADAPTER_SPECS = {
+	{
+		id       = "adapters.app_launcher",
+		contract = { "launch", "launchWithArgs", "isRunning" },
+		wired    = false,
+	},
 	{
 		id       = "adapters.clipboard",
 		contract = { "read", "write" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.crypto",
+		contract = { "sha256" },
+		wired    = false,
 	},
 	{
 		id       = "adapters.file_system",
 		contract = { "read", "write", "exists" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.graphics_renderer",
+		contract = { "createWindow", "destroyWindow", "drawBitmap", "show", "hide" },
+		wired    = false,
 	},
 	{
 		id       = "adapters.http_client",
 		contract = { "get", "post" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.json_codec",
+		contract = { "encode", "decode" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.key_state",
+		contract = { "isDown", "isUp" },
+		wired    = true,
 	},
 	{
 		id       = "adapters.keyboard_hook",
 		contract = { "start", "stop" },
+		wired    = false,
+	},
+	{
+		id       = "adapters.mouse_control",
+		contract = { "setPos", "getPos" },
+		wired    = false,
+	},
+	{
+		id       = "adapters.network_info",
+		contract = { "getSsidHash", "getSignalStrength", "isInternetReachable", "isVpnActive" },
+		wired    = false,
 	},
 	{
 		id       = "adapters.notifier",
 		contract = { "send" },
+		wired    = false,
 	},
 	{
 		id       = "adapters.process_lifecycle",
 		contract = { "start", "stop" },
+		wired    = false,
 	},
 	{
 		id       = "adapters.secure_field_detector",
 		contract = { "isSecureField", "isSecureApp", "refresh" },
+		wired    = false,
+	},
+	{
+		id       = "adapters.shell_runner",
+		contract = { "exec", "spawn" },
+		wired    = true,
 	},
 	{
 		id       = "adapters.storage",
 		contract = { "get", "set" },
+		wired    = true,
 	},
 	{
 		id       = "adapters.text_sender",
 		contract = { "send" },
+		wired    = false,
 	},
 	{
 		id       = "adapters.timer_scheduler",
 		contract = { "after", "every" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.toml_cache",
+		contract = { "init", "load", "store", "stats" },
+		wired    = true,
 	},
 	{
 		id       = "adapters.tooltip_renderer",
 		contract = { "show", "hide" },
+		wired    = false,
 	},
 	{
 		id       = "adapters.tray_menu",
 		contract = { "setIcon", "setMenu", "setTooltip", "destroy" },
+		wired    = false,
 	},
 	{
 		id       = "adapters.window_info",
 		contract = { "getFocused", "getAll" },
+		wired    = false,
+	},
+	{
+		id       = "adapters.window_manager",
+		contract = { "activate", "exists", "kill", "getList" },
+		wired    = false,
 	},
 }
 
@@ -161,8 +233,12 @@ function M.run()
 	local loaded_adapters  = {}
 	local ports_validated  = {}
 	local failed_adapters  = {}
+	local wired_count      = 0
+	local unwired_adapters = {}
 
 	for _, spec in ipairs(ADAPTER_SPECS) do
+		if spec.wired then wired_count = wired_count + 1 else table.insert(unwired_adapters, spec.id) end
+
 		local ok, mod = pcall(require, spec.id)
 		if not ok then
 			table.insert(failed_adapters, spec.id .. " (load failed)")
@@ -232,27 +308,30 @@ function M.run()
 	end
 
 	local result = {
-		version         = version,
-		loaded_adapters = loaded_adapters,
-		ports_validated = ports_validated,
-		failed_adapters = failed_adapters,
-		last_error      = _last_error,
-		uptime_sec      = uptime_sec,
-		warn_count      = warn_count,
-		err_count       = err_count,
-		recent_issues   = recent_issues,
-		sys             = safe_collect("sys_info",            H.sys_info),
-		pause_state     = safe_collect("pause_state",         H.collect_pause_state),
-		keylogger       = safe_collect("keylogger_summary",   H.collect_keylogger_summary),
-		llm             = safe_collect("llm_state",           H.collect_llm_state),
-		layout          = safe_collect("layout_state",        H.collect_layout_state),
-		hotstrings      = safe_collect("hotstrings_state",    H.collect_hotstrings_state),
-		logs            = safe_collect("logs_info",           H.collect_logs_info),
-		config          = safe_collect("config_summary",      H.collect_config_summary),
+		version          = version,
+		loaded_adapters  = loaded_adapters,
+		ports_validated  = ports_validated,
+		failed_adapters  = failed_adapters,
+		wired_count      = wired_count,
+		adapter_count    = #ADAPTER_SPECS,
+		unwired_adapters = unwired_adapters,
+		last_error       = _last_error,
+		uptime_sec       = uptime_sec,
+		warn_count       = warn_count,
+		err_count        = err_count,
+		recent_issues    = recent_issues,
+		sys              = safe_collect("sys_info",            H.sys_info),
+		pause_state      = safe_collect("pause_state",         H.collect_pause_state),
+		keylogger        = safe_collect("keylogger_summary",   H.collect_keylogger_summary),
+		llm              = safe_collect("llm_state",           H.collect_llm_state),
+		layout           = safe_collect("layout_state",        H.collect_layout_state),
+		hotstrings       = safe_collect("hotstrings_state",    H.collect_hotstrings_state),
+		logs             = safe_collect("logs_info",           H.collect_logs_info),
+		config           = safe_collect("config_summary",      H.collect_config_summary),
 	}
 
-	Logger.success(LOG, "Healthcheck complete — %d adapter(s) OK, %d failed, uptime %ds.",
-		#ports_validated, #failed_adapters, uptime_sec)
+	Logger.success(LOG, "Healthcheck complete — %d/%d adapter(s) wired, %d contract-healthy, %d failed, uptime %ds.",
+		wired_count, #ADAPTER_SPECS, #ports_validated, #failed_adapters, uptime_sec)
 
 	return result
 end
@@ -509,9 +588,16 @@ function M.format_plain(snapshot)
 		table.insert(lines, string.format("Hotstrings       : terminators=%s personal=%s dyn=%s magic=%s", tostring(hs.terminators), tostring(hs.personal_count), tostring(hs.dynamic_count), tostring(hs.magic_key)))
 	end
 
-	local ok_list   = s.ports_validated or {}
-	local fail_list = s.failed_adapters or {}
-	table.insert(lines, string.format("Adapters OK (%d):", #ok_list))
+	local ok_list      = s.ports_validated  or {}
+	local fail_list    = s.failed_adapters  or {}
+	local unwired_list = s.unwired_adapters or {}
+	-- "Contract-healthy" (all methods present) is NOT the same claim as "reachable
+	-- from a real feature" — an unwired adapter can be 100% contract-healthy while
+	-- no production code ever calls it (audit F-HIGH-10). Report both numbers so
+	-- this window can never again imply full coverage when it is not the case.
+	table.insert(lines, string.format("Adapters: %d/%d wired, %d/%d contract-healthy",
+		s.wired_count or 0, s.adapter_count or 0, #ok_list, s.adapter_count or 0))
+	table.insert(lines, string.format("Contract-healthy (%d):", #ok_list))
 	for _, name in ipairs(ok_list) do
 		table.insert(lines, "  + " .. name)
 	end
@@ -522,6 +608,12 @@ function M.format_plain(snapshot)
 		end
 	else
 		table.insert(lines, "Failed : none")
+	end
+	if #unwired_list > 0 then
+		table.insert(lines, string.format("Unwired (%d) — no production call site yet:", #unwired_list))
+		for _, name in ipairs(unwired_list) do
+			table.insert(lines, "  ~ " .. name)
+		end
 	end
 
 	table.insert(lines, "")

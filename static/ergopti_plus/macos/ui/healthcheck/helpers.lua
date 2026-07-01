@@ -431,11 +431,14 @@ end
 --- @param btn_label string Translated label for the copy-and-close button.
 --- @return string Complete HTML document.
 function H.snapshot_to_html(snapshot, btn_label)
-	local s         = snapshot
-	local sys       = s.sys or {}
-	local ok_list   = s.ports_validated or {}
-	local fail_list = s.failed_adapters or {}
-	local total     = #ok_list + #fail_list
+	local s            = snapshot
+	local sys          = s.sys or {}
+	local ok_list      = s.ports_validated  or {}
+	local fail_list    = s.failed_adapters  or {}
+	local unwired_list = s.unwired_adapters or {}
+	local total        = #ok_list + #fail_list
+	local wired_count  = s.wired_count   or 0
+	local adapter_count = s.adapter_count or total
 	local warn_count = s.warn_count or 0
 	local err_count  = s.err_count  or 0
 	local issues     = s.recent_issues or {}
@@ -459,7 +462,7 @@ function H.snapshot_to_html(snapshot, btn_label)
 		"#footer button{display:block;width:100%;padding:7px 20px;font-family:-apple-system,sans-serif;font-size:13px;background:#0078d4;color:#fff;border:none;border-radius:4px;cursor:pointer;}",
 		"#footer button:hover{background:#106ebe;}",
 		"em{font-style:italic;color:#666;}",
-		".ok{color:#1a7f37;font-weight:600;}.fail{color:#cf222e;font-weight:600;}",
+		".ok{color:#1a7f37;font-weight:600;}.fail{color:#cf222e;font-weight:600;}.unwired{color:#9a6700;font-weight:600;}",
 	}, "")
 
 	-- System table
@@ -492,10 +495,19 @@ function H.snapshot_to_html(snapshot, btn_label)
 		.. "<tr><td>🔴 Errors</td><td>"   .. e_count .. "</td></tr>"
 		.. "</table>"
 
-	-- Adapters list
+	-- Adapters list — a contract-healthy adapter that is not wired into any real
+	-- feature is flagged separately (audit F-HIGH-10) so this report never implies
+	-- full reachability when an adapter is merely loadable in isolation.
+	local unwired_set = {}
+	for _, name in ipairs(unwired_list) do unwired_set[name] = true end
+
 	local adap_items = {}
 	for _, name in ipairs(ok_list) do
-		table.insert(adap_items, "<li><span class=ok>✓</span> " .. H.hcode(name) .. "</li>")
+		if unwired_set[name] then
+			table.insert(adap_items, "<li><span class=unwired>~</span> " .. H.hcode(name) .. " <em>(contract-healthy, not wired into any feature)</em></li>")
+		else
+			table.insert(adap_items, "<li><span class=ok>✓</span> " .. H.hcode(name) .. "</li>")
+		end
 	end
 	for _, name in ipairs(fail_list) do
 		table.insert(adap_items, "<li><span class=fail>✗</span> " .. H.hcode(name) .. "</li>")
@@ -584,7 +596,7 @@ function H.snapshot_to_html(snapshot, btn_label)
 		.. "<h2>System</h2>"           .. sys_tbl
 		.. "<h2>Session counters</h2>" .. ctr_tbl
 		.. enriched_html
-		.. "<h2>Adapters (" .. #ok_list .. "/" .. total .. " OK)</h2>" .. adap_html
+		.. "<h2>Adapters (" .. #ok_list .. "/" .. total .. " OK — " .. wired_count .. "/" .. adapter_count .. " wired)</h2>" .. adap_html
 		.. "<h2>Last recorded error</h2>" .. last_err_html
 		.. "<h2>Recent warnings / errors (" .. #issues .. "/100)</h2>" .. issues_html
 		.. "</div>"
