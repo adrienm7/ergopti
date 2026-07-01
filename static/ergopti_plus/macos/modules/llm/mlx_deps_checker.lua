@@ -592,4 +592,29 @@ function M.has_failed() return _bootstrap_state == "failed" end
 --- (stderr tail), or nil when bootstrap is pending or successful.
 function M.get_failure_message() return _last_failure_message end
 
+--- Resets a definitively-"failed" bootstrap back to "pending" so the tray
+--- menu's "install now" action (or any subsequent check_and_install_deps
+--- call) can retry instead of hitting the permanent dead end the "failed"
+--- state used to be (F-LOW-10). Without this, a TRANSIENT failure (network
+--- down during the uv/Python download, a momentarily-locked file) required a
+--- full Hammerspoon reload to recover from — check_and_install_deps() short-
+--- circuits unconditionally on "failed" with no way back to "pending".
+--- A no-op while a bootstrap task is already running (retrying mid-flight
+--- would race the in-progress hs.task).
+--- @return boolean True if the reset was applied, false if a no-op (already
+--- pending/ready, or a bootstrap task is currently running).
+function M.reset_bootstrap_state()
+	if _task_running then
+		Logger.debug(LOG, "reset_bootstrap_state(): a bootstrap task is already running — ignoring.")
+		return false
+	end
+	if _bootstrap_state ~= "failed" then
+		return false
+	end
+	Logger.info(LOG, "Resetting MLX bootstrap state from 'failed' back to 'pending' — retry now possible.")
+	_bootstrap_state      = "pending"
+	_last_failure_message = nil
+	return true
+end
+
 return M

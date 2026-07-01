@@ -278,4 +278,26 @@ function M.has_failed() return _bootstrap_state == "failed" end
 --- @return string|nil Last failure message captured from the bash script.
 function M.get_failure_message() return _last_failure_message end
 
+--- Resets a definitively-"failed" bootstrap back to "pending" so the tray
+--- menu's "install now" action can retry (F-LOW-10). check_and_install_deps()
+--- here has no state-based early return, so it already re-runs the script on
+--- a later call even without this reset — but exposing the same symmetric
+--- reset API as mlx_deps_checker.lua lets callers treat both backends
+--- identically and gives the UI an explicit "clear the failed state" action.
+--- A no-op while a bootstrap task is already running.
+--- @return boolean True if the reset was applied, false if a no-op.
+function M.reset_bootstrap_state()
+	if _task_running then
+		Logger.debug(LOG, "reset_bootstrap_state(): a bootstrap task is already running — ignoring.")
+		return false
+	end
+	if _bootstrap_state ~= "failed" then
+		return false
+	end
+	Logger.info(LOG, "Resetting Ollama bootstrap state from 'failed' back to 'pending' — retry now possible.")
+	_bootstrap_state      = "pending"
+	_last_failure_message = nil
+	return true
+end
+
 return M

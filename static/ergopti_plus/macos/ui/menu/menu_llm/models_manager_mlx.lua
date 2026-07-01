@@ -299,6 +299,16 @@ function M.new(deps, presets)
 					Logger.error(LOG, "MLX dependencies missing — bootstrap definitively failed: %s",
 						tostring(cause):gsub("\n", " | "))
 					pcall(notifications.notify, i18n.get("mlx.deps_missing"), cause, "error")
+					-- F-LOW-10: the "failed" state used to be a permanent dead end —
+					-- check_and_install_deps() short-circuited on it forever, so a
+					-- transient (now-resolved) failure required a full HS reload to
+					-- recover from. Reset back to "pending" so the NEXT attempt (the
+					-- user retrying "install now" via this same check_requirements
+					-- path) actually re-runs the bootstrap instead of hitting the
+					-- same cached failure again.
+					if mlx_deps_checker.reset_bootstrap_state then
+						pcall(mlx_deps_checker.reset_bootstrap_state)
+					end
 				else
 					Logger.error(LOG, "MLX dependencies missing in %s — auto-bootstrap may have failed.", project_venv_python_escaped)
 					pcall(notifications.notify, i18n.get("mlx.deps_missing"),
