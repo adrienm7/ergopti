@@ -80,16 +80,18 @@ ST_Get(Key, DefaultValue) {
 	}
 }
 
-; Deletes a value from the registry. Returns true even when the key is absent.
+; Deletes a value from the registry. Reg_DeleteValue itself already treats a
+; missing value as success (idempotent delete); only a genuine failure (e.g.
+; permission denied) returns false, honouring the Storage port's
+; error_behavior=return_false contract.
 ; @param Key {String} The value name to remove under STORAGE_REG_BASE.
-; @return {Boolean} True always (deletion of absent keys is a no-op success).
+; @return {Boolean} True on success (including "already absent"), false on error.
 ST_Delete(Key) {
 	try {
-		Reg_DeleteValue(STORAGE_REG_BASE, Key)
-		return true
-	} catch {
-		; Key absent or already deleted — contract treats this as success
-		return true
+		return Reg_DeleteValue(STORAGE_REG_BASE, Key)
+	} catch as e {
+		LoggerError("storage", "ST_Delete failed for '{1}': {2}.", Key, e.Message)
+		return false
 	}
 }
 
