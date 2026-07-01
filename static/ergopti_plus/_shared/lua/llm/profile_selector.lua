@@ -35,31 +35,39 @@ local M = {}
 -- =============================================
 -- =============================================
 
--- Resolve profiles.json path relative to this file's location.
--- _shared/lua/llm/ -> _shared/modules/llm/profiles.json
-local _PROFILES_JSON_PATH = nil
+-- Resolve a shared LLM JSON file's path relative to this file's location.
+-- _shared/lua/llm/ -> _shared/modules/llm/<name>
+local _RESOLVED_PATHS = {}
 
---- Returns the absolute path to profiles.json.
---- Deferred to first call so the path resolution works in test environments.
+--- Returns the absolute path to a file under _shared/modules/llm/, or nil if
+--- it cannot be resolved / does not exist. Deferred to first call per name so
+--- the resolution works in test environments, and cached thereafter.
+--- @param name string File name under _shared/modules/llm/, e.g. "profiles.json".
 --- @return string|nil path Absolute path, or nil if not resolvable.
-local function get_profiles_path()
-	if _PROFILES_JSON_PATH then return _PROFILES_JSON_PATH end
+local function get_llm_json_path(name)
+	if _RESOLVED_PATHS[name] then return _RESOLVED_PATHS[name] end
 	-- Try to resolve relative to this source file's directory
 	local src = debug.getinfo(1, "S").source
 	if src and src:sub(1, 1) == "@" then
 		local dir = src:sub(2):match("^(.+)[/\\][^/\\]+$")
 		if dir then
-			-- Navigate up two levels: llm/ -> lua/ -> _shared/ -> modules/llm/profiles.json
-			local candidate = dir .. "/../../modules/llm/profiles.json"
+			-- Navigate up two levels: llm/ -> lua/ -> _shared/ -> modules/llm/<name>
+			local candidate = dir .. "/../../modules/llm/" .. name
 			local fh = io.open(candidate, "r")
 			if fh then
 				fh:close()
-				_PROFILES_JSON_PATH = candidate
-				return _PROFILES_JSON_PATH
+				_RESOLVED_PATHS[name] = candidate
+				return candidate
 			end
 		end
 	end
 	return nil
+end
+
+--- Returns the absolute path to profiles.json.
+--- @return string|nil path Absolute path, or nil if not resolvable.
+local function get_profiles_path()
+	return get_llm_json_path("profiles.json")
 end
 
 
@@ -83,6 +91,26 @@ function M.load_built_in_profiles()
 	fh:close()
 	-- Use the platform-agnostic shared JSON decoder so this module stays
 	-- usable outside Hammerspoon (hs.json is HS-only and must not leak here).
+	local ok_json, json = pcall(require, "json")
+	if not ok_json or not json then return {} end
+	local ok2, decoded = pcall(json.decode, raw)
+	if ok2 and type(decoded) == "table" then
+		return decoded
+	end
+	return {}
+end
+
+--- Loads the profile-id migration table from legacy_ids.json (DL-2). Returns
+--- an empty table (never nil) if the file cannot be read or parsed, so a
+--- missing/corrupt file degrades to "no migration" rather than throwing.
+--- @return table<string,string> legacy_ids Map of old profile id -> current id.
+function M.load_legacy_ids()
+	local path = get_llm_json_path("legacy_ids.json")
+	if not path then return {} end
+	local fh = io.open(path, "r")
+	if not fh then return {} end
+	local raw = fh:read("*a")
+	fh:close()
 	local ok_json, json = pcall(require, "json")
 	if not ok_json or not json then return {} end
 	local ok2, decoded = pcall(json.decode, raw)
