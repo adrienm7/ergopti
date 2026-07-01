@@ -131,6 +131,17 @@ M.DEFAULT_STATE = {
 -- nil = not yet checked, true = server responded, false = server unreachable.
 local _llm_health_status = nil
 
+--- Resets the cached health-status flag to nil (not-yet-checked).
+--- probe_llm_health() intentionally skips the "api" backend entirely (no
+--- local server to probe there), so without this the status dot could show
+--- a stale MLX/Ollama reading (e.g. a residual orange "warming up") that
+--- leaked into the API backend's display until the user switched away and
+--- back again (F-LOW-6). Call this whenever the active backend changes to
+--- "api" so the indicator starts from a clean, honest "not applicable" state.
+function M.reset_llm_health_status()
+	_llm_health_status = nil
+end
+
 --- Fires an async health probe against the active backend.
 --- Updates _llm_health_status and calls refresh_fn() when the result arrives.
 --- @param backend string "mlx" or "ollama".
@@ -452,6 +463,10 @@ function M.create(deps)
             save_prefs           = save_prefs,
             update_menu          = update_menu,
             WarmupCtrl           = WarmupCtrl,
+            -- So the API-backend switch can clear a stale MLX/Ollama health
+            -- reading instead of leaking it into the API backend's status
+            -- dot display (F-LOW-6).
+            reset_llm_health_status = M.reset_llm_health_status,
         })
 
         table.insert(main_menu, {

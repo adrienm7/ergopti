@@ -7,6 +7,14 @@
 ---
 --- Fix: added an early return for backend == "api" at the top of
 --- probe_llm_health so no async probe is launched in that mode.
+---
+--- F-LOW-6: that early-return guard means _llm_health_status is never
+--- ASSIGNED while backend == "api" — but nothing ever RESET it either, so a
+--- prior MLX/Ollama reading (true = warming/yellow) leaked into the API
+--- backend's status-dot display until an unrelated full backend round-trip
+--- happened to overwrite it. Fix: M.reset_llm_health_status() clears the
+--- flag, threaded through BackendPanel.build's ctx and called from the API
+--- entry's switch handler in backend_panel.lua.
 
 local helpers = require("tests.helpers")
 
@@ -33,6 +41,41 @@ local url_pos       = fn_body:find("url = ", 1, true)
 helpers.assert_true(
 	api_guard_pos ~= nil and (url_pos == nil or api_guard_pos < url_pos),
 	"api guard must precede URL construction in probe_llm_health (ui-menu-llm-core-1)"
+)
+
+-- Test 3 (F-LOW-6): menu_llm/init.lua must expose a reset function for the
+-- health-status flag.
+helpers.assert_true(
+	src:find("function M.reset_llm_health_status()", 1, true) ~= nil,
+	"menu_llm/init.lua must define M.reset_llm_health_status (F-LOW-6)"
+)
+local reset_fn_pos = src:find("function M.reset_llm_health_status()", 1, true)
+local reset_fn_body = src:sub(reset_fn_pos, reset_fn_pos + 150)
+helpers.assert_true(
+	reset_fn_body:find("_llm_health_status = nil", 1, true) ~= nil,
+	"M.reset_llm_health_status must set _llm_health_status back to nil (F-LOW-6)"
+)
+
+-- Test 4 (F-LOW-6): BackendPanel.build must be called with a
+-- reset_llm_health_status hook wired to M.reset_llm_health_status.
+helpers.assert_true(
+	src:find("reset_llm_health_status = M.reset_llm_health_status", 1, true) ~= nil,
+	"menu_llm/init.lua must thread M.reset_llm_health_status into BackendPanel.build's ctx (F-LOW-6)"
+)
+
+-- Test 5 (F-LOW-6): backend_panel.lua's API-backend switch handler must call
+-- the reset hook when activating the API backend.
+local backend_panel_path = helpers.driver_root() .. "ui/menu/menu_llm/backend_panel.lua"
+local fh2 = io.open(backend_panel_path, "r")
+helpers.assert_true(fh2 ~= nil, "backend_panel.lua must be readable")
+local panel_src = fh2:read("*a"); fh2:close()
+
+local api_switch_pos = panel_src:find('state.llm_backend = "api"', 1, true)
+helpers.assert_true(api_switch_pos ~= nil, "backend_panel.lua must set state.llm_backend = \"api\" on API switch")
+local api_switch_body = panel_src:sub(api_switch_pos, api_switch_pos + 500)
+helpers.assert_true(
+	api_switch_body:find("reset_llm_health_status", 1, true) ~= nil,
+	"backend_panel.lua's API-backend switch handler must call reset_llm_health_status (F-LOW-6)"
 )
 
 print("[PASS] test_menu_llm_api_backend_probe")
