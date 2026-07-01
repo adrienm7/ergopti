@@ -117,3 +117,28 @@ _UCSG_CheckBuildChangelogGuiHasSuspendGuard() {
 }
 Test("meta updater-callback-suspend: _Updater_BuildChangelogGui guards A_IsSuspended (suspend-guard-pattern-1)",
 	_UCSG_CheckBuildChangelogGuiHasSuspendGuard)
+
+; _Updater_OnTrayMsg (Pattern 1, 1i): an OnMessage handler for WM_TRAYICON
+; balloon clicks, which bypasses native Suspend() entirely (not just async
+; callbacks). Deliberately narrower than the tests above: the guard must gate
+; the balloon-click branch specifically, not Updater_ShowAvailableUpdate
+; itself, which also backs the tray menu's "check for updates" item and must
+; keep working while paused.
+_UCSG_CheckOnTrayMsgHasSuspendGuard() {
+	Src := _DriverDirConcat("lib/updater")
+	Assert(Src != "", "the lib/updater module must be readable")
+
+	Body := _UCSG_FuncBody(Src, "_Updater_OnTrayMsg(wParam, lParam, msg, hwnd) {")
+	Assert(Body != "", "_Updater_OnTrayMsg must be present in the lib/updater module")
+
+	SuspendPos := InStr(Body, "A_IsSuspended")
+	Assert(SuspendPos > 0,
+		"_Updater_OnTrayMsg must check A_IsSuspended — an OnMessage handler bypasses native Suspend() entirely")
+
+	CallPos := InStr(Body, "Updater_ShowAvailableUpdate()")
+	Assert(CallPos > 0, "_Updater_OnTrayMsg must still call Updater_ShowAvailableUpdate() on a genuine balloon click")
+	Assert(SuspendPos < CallPos,
+		"_Updater_OnTrayMsg: A_IsSuspended guard must appear BEFORE the Updater_ShowAvailableUpdate() call")
+}
+Test("meta updater-callback-suspend: _Updater_OnTrayMsg guards A_IsSuspended (suspend-guard-pattern-1)",
+	_UCSG_CheckOnTrayMsgHasSuspendGuard)
