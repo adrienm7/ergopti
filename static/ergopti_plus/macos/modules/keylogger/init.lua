@@ -1280,15 +1280,25 @@ function M.start(script_control)
 	-- Application watcher. The browser window-filter is created LAZILY on the first
 	-- browser activation (see ensure_browser_window_filter) so the keylogger never
 	-- pays hs.window.filter's whole-window-tree enumeration at start.
+	-- pcall-guarded: the watcher-registration call failing here would otherwise
+	-- abort M.start() outright, silently leaving app-switch tracking (and
+	-- therefore the AX observer attachment chain) permanently unattached.
 	if not _app_watcher then
-		_app_watcher = hs.application.watcher.new(function(app_name, event_type, app_object)
+		local ok_watcher, watcher = pcall(hs.application.watcher.new, function(app_name, event_type, app_object)
 			if event_type == hs.application.watcher.activated and BROWSER_APP_SET[app_name] then
 				ensure_browser_window_filter()
 			end
 			ContextTracker.app_watcher_cb(app_name, event_type, app_object)
 		end)
+		if ok_watcher and watcher then
+			_app_watcher = watcher
+		else
+			Logger.error(LOG, "Failed to create application watcher: %s.", tostring(watcher))
+		end
 	end
-	_app_watcher:start()
+	if _app_watcher then
+		pcall(function() _app_watcher:start() end)
+	end
 
 	-- Evaluate the current window's private status on the next tick (independent of
 	-- the lazy browser filter), keeping it off the synchronous start path.
