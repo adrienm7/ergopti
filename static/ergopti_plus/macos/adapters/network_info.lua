@@ -15,14 +15,32 @@
 --- 2. Null-on-disconnect: Wi-Fi methods return nil/null when no interface is
 ---    connected, matching the port contract error_behavior.
 --- 3. Defensive pcall: all hs.wifi and shell calls are wrapped.
+--- 4. Non-blocking shell-outs: isInternetReachable() and isVpnActive() require a
+---    `ping`/`ifconfig` subprocess — the port contract mandates a synchronous
+---    boolean return, so a blocking hs.execute() on the main run loop would stall
+---    every other Hammerspoon callback for up to the ping timeout (F-LOW-8).
+---    Both methods instead return the last cached probe result immediately and
+---    kick off an async refresh via adapters.shell_runner (mirrors the
+---    read_layout_async() cached-async pattern in modules/karabiner/watchers.lua)
+---    so the NEXT call reflects reality without ever blocking the caller.
 --- ==============================================================================
 
 local M = {}
 
-local hs     = hs
-local Logger = require("lib.logger")
+local hs          = hs
+local Logger      = require("lib.logger")
+local ShellRunner = require("adapters.shell_runner")
 
 local LOG = "adapters.network_info"
+
+-- Absolute binary paths — adapters.shell_runner.spawn() takes no shell, so the
+-- executable must be resolved ahead of time (macOS ships both under /sbin).
+local PING_BIN     = "/sbin/ping"
+local IFCONFIG_BIN = "/sbin/ifconfig"
+
+-- ping's own deadline in seconds before giving up on a reply (kept short so a
+-- probe refresh cannot pile up if the network is genuinely unreachable).
+local PING_TIMEOUT_SEC = 1
 
 
 
@@ -97,34 +115,82 @@ function M.getSignalStrength()
 	return result
 end
 
+-- Last known probe results, updated asynchronously by _refresh_*(). Both start
+-- false — the first call always kicks off a refresh and reports the safe
+-- (unreachable / no VPN) default until that refresh lands.
+local _cached_internet_reachable = false
+local _cached_vpn_active         = false
+
+-- Guards against piling up a second in-flight probe while one is still
+-- running (e.g. isInternetReachable() polled faster than the ping timeout).
+local _internet_probe_inflight = false
+local _vpn_probe_inflight      = false
+
+--- Kicks off an async `ping` probe and updates _cached_internet_reachable when
+--- it completes. Fire-and-forget — never blocks the caller.
+local function _refresh_internet_reachable()
+	if _internet_probe_inflight then return end
+	_internet_probe_inflight = true
+
+	local handle = ShellRunner.spawn(PING_BIN,
+		{ "-c", "1", "-t", tostring(PING_TIMEOUT_SEC), "8.8.8.8" },
+		function(exit_code, stdout, _stderr)
+			_internet_probe_inflight = false
+			_cached_internet_reachable = exit_code == 0
+				and type(stdout) == "string"
+				and stdout:find("1 packets received") ~= nil
+			Logger.debug(LOG, "isInternetReachable() refreshed: %s", tostring(_cached_internet_reachable))
+		end)
+	local ok, err = pcall(function() handle.start() end)
+	if not ok then
+		_internet_probe_inflight = false
+		Logger.error(LOG, "isInternetReachable(): failed to start async ping probe — %s", tostring(err))
+	end
+end
+
+--- Kicks off an async `ifconfig` probe and updates _cached_vpn_active when it
+--- completes. Fire-and-forget — never blocks the caller.
+local function _refresh_vpn_active()
+	if _vpn_probe_inflight then return end
+	_vpn_probe_inflight = true
+
+	local handle = ShellRunner.spawn(IFCONFIG_BIN, {},
+		function(exit_code, stdout, _stderr)
+			_vpn_probe_inflight = false
+			if exit_code ~= 0 or type(stdout) ~= "string" then
+				_cached_vpn_active = false
+				return
+			end
+			-- Count utun* interfaces directly in Lua — no grep subprocess needed
+			-- now that we already have the full ifconfig output in-process.
+			local count = 0
+			for _ in stdout:gmatch("utun%d+") do count = count + 1 end
+			_cached_vpn_active = count > 0
+			Logger.debug(LOG, "isVpnActive() refreshed: %s", tostring(_cached_vpn_active))
+		end)
+	local ok, err = pcall(function() handle.start() end)
+	if not ok then
+		_vpn_probe_inflight = false
+		Logger.error(LOG, "isVpnActive(): failed to start async ifconfig probe — %s", tostring(err))
+	end
+end
+
 --- Returns whether the host has a working internet connection.
+--- Never blocks: returns the last cached probe result immediately and kicks off
+--- an async refresh (via adapters.shell_runner) so the NEXT call is current.
 --- @return boolean
 function M.isInternetReachable()
-	local ok, result = pcall(function()
-		local out = hs.execute("ping -c 1 -t 1 8.8.8.8 2>/dev/null")
-		return type(out) == "string" and out:find("1 packets received") ~= nil
-	end)
-	if not ok then
-		Logger.error(LOG, "isInternetReachable(): error — %s", tostring(result))
-		return false
-	end
-	return result == true
+	_refresh_internet_reachable()
+	return _cached_internet_reachable == true
 end
 
 --- Returns whether at least one VPN adapter is currently up.
+--- Never blocks: returns the last cached probe result immediately and kicks off
+--- an async refresh (via adapters.shell_runner) so the NEXT call is current.
 --- @return boolean
 function M.isVpnActive()
-	local ok, result = pcall(function()
-		local out = hs.execute("ifconfig 2>/dev/null | grep -c 'utun[0-9]'")
-		if type(out) ~= "string" then return false end
-		local count = tonumber(out:match("%d+")) or 0
-		return count > 0
-	end)
-	if not ok then
-		Logger.error(LOG, "isVpnActive(): error — %s", tostring(result))
-		return false
-	end
-	return result == true
+	_refresh_vpn_active()
+	return _cached_vpn_active == true
 end
 
 return M
