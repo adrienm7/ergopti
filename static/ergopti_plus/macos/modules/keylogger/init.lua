@@ -928,12 +928,27 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, deleted_
 	end
 
 	if text and text ~= "" then
-		for _, code in utf8.codes(text) do
-			table.insert(CoreState.synth_queue, { char = utf8.char(code), type = source_type })
+		-- Validate BEFORE iterating: utf8.codes raises immediately on a malformed
+		-- sequence (e.g. a truncated LLM completion cut mid-codepoint — French
+		-- accents, curly quotes, em-dashes are all multi-byte), whereas utf8.len
+		-- fails closed with nil instead of throwing. Mirrors the same
+		-- validate-then-iterate pattern used for the physical-keystroke split at
+		-- handle_key's normal-character branch (F-HIGH-16 fix).
+		local ok_len, char_count = pcall(utf8.len, text)
+		if ok_len and char_count then
+			for _, code in utf8.codes(text) do
+				table.insert(CoreState.synth_queue, { char = utf8.char(code), type = source_type })
+			end
+		else
+			-- Malformed UTF-8 — queue one opaque, non-validated entry rather than
+			-- raising and aborting the expansion mid-flight (which would leave the
+			-- synthetic-injection trackers desynced for every subsequent keystroke).
+			Logger.warn(LOG, "notify_synthetic: malformed UTF-8 in synthetic text — queuing an opaque fallback entry.")
+			table.insert(CoreState.synth_queue, { char = text, type = source_type })
+			char_count = 1
 		end
 		-- Add timestamps for all synthetic chars so the WPM window reflects them
-		local now_ms   = hs.timer.absoluteTime() / 1000000
-		local char_count = utf8.len(text) or 0
+		local now_ms = hs.timer.absoluteTime() / 1000000
 		for _ = 1, char_count do
 			table.insert(CoreState.recent_typing_eff, now_ms)
 		end
