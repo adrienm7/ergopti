@@ -61,7 +61,8 @@ GR_CreateWindow(Opts) {
 	if AlwaysOnTop
 		ExStyle |= 0x00000008   ; WS_EX_TOPMOST
 
-	Hwnd := DllCall("User32\CreateWindowEx",
+	Hwnd := 0
+	try Hwnd := DllCall("User32\CreateWindowEx",
 		"UInt",  ExStyle,
 		"Str",   "Static",
 		"Str",   "",
@@ -84,7 +85,7 @@ GR_CreateWindow(Opts) {
 	; DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_DONOTROUND = 1.
 	Pref := Buffer(4, 0)
 	NumPut("UInt", 1, Pref)
-	DllCall("Dwmapi\DwmSetWindowAttribute",
+	try DllCall("Dwmapi\DwmSetWindowAttribute",
 		"Ptr", Hwnd, "UInt", 33, "Ptr", Pref, "UInt", 4)
 
 	return Hwnd
