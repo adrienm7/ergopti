@@ -159,7 +159,11 @@ function setChannel(channel) {
 
 	// Ask the native backend to re-fetch; fall back to direct API call after 800 ms
 	// only if the native backend has not responded (browser preview or no bridge).
-	postBridgeMessage(JSON.stringify({ action: 'fetch', channel: channel }));
+	// Raw object, not JSON.stringify()-ed: makeHostBridge() (host_bridge.js)
+	// already stringifies for WebView2 and posts the object as-is for WKWebView,
+	// matching the openOnGitHub() call below and the Lua bridge's read-as-table
+	// convention (action_picker / hotstring_editor / metrics_apps).
+	postBridgeMessage({ action: 'fetch', channel: channel });
 	showLoading();
 	_nativeResponded = false;
 	_releases = [];
