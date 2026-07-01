@@ -3,7 +3,7 @@
 
 # Architecture Overview
 
-> Generated on 2026-06-21 from port specs, domain specs, and adapter file listings.
+> Generated on 2026-07-01 from port specs, domain specs, and adapter file listings.
 
 The diagram below shows the three-layer hexagonal architecture:
 **Ports** (shared contracts) → **Adapters** (driver-specific implementations) → **Domain** (pure business logic).
@@ -48,6 +48,7 @@ graph TD
         AHK_notifier["Notifier.ahk"]
         AHK_process_lifecycle["ProcessLifecycle.ahk"]
         AHK_secure_field_detector["SecureFieldDetector.ahk"]
+        AHK_shell_runner["ShellRunner.ahk"]
         AHK_storage["Storage.ahk"]
         AHK_text_sender["TextSender.ahk"]
         AHK_timer_scheduler["TimerScheduler.ahk"]
