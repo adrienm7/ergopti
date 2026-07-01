@@ -299,6 +299,17 @@ function renderLuaManifest(manifest, sections, features) {
 	lines.push('--- _generated/features_manifest.lua');
 	lines.push('--- AUTO-GENERATED from _shared/modules/features/manifest.toml.');
 	lines.push('--- DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.');
+	lines.push('---');
+	lines.push('--- NOTE (F-LOW-15): description_key is emitted here for structural');
+	lines.push('--- parity with the AHK twin (features_manifest.ahk) and because');
+	lines.push('--- test-manifest-parity.cjs cross-checks it between the two generated');
+	lines.push('--- files — but no Lua module on macOS reads entry.description_key today');
+	lines.push('--- (confirmed via a repo-wide grep; lib/manifest_reader.lua\'s own');
+	lines.push('--- docstring documents it as exposing only what macOS modules actually');
+	lines.push('--- consume). The AHK driver genuinely resolves every description_key via');
+	lines.push('--- its menu builder. Removing the field from this side alone would break');
+	lines.push('--- the shared parity-test regex parsers, which require it to even match a');
+	lines.push('--- section/feature block — left as-is rather than touching that shared path.');
 	lines.push('');
 	lines.push('local M = {}');
 	lines.push('');

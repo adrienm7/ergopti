@@ -8,6 +8,20 @@ Run the corresponding npm script to regenerate.
 | `features_manifest.lua` | `npm run build:manifest`      | ✅ Wired — read via `lib/manifest_reader.lua`     |
 | `terminators.lua`       | `npm run codegen:terminators` | ✅ Wired — loaded by `modules.keymap.terminators` |
 
+### `features_manifest.lua` — `description_key` is AHK-only consumed
+
+Every entry (section and feature) carries a `description_key` field, but no
+Lua module on macOS reads `entry.description_key` today — `lib/manifest_reader.lua`
+only exposes per-path default lookups. The AHK driver genuinely resolves every
+`description_key` via its menu builder. The field is still emitted on the Lua
+side for structural parity with the AHK twin (`features_manifest.ahk`) and
+because `tools/test/test-manifest-parity.cjs` cross-checks it between the two
+generated files — its regex parsers require the field to be present to match a
+section/feature block at all, so removing it here would break that shared
+parity-testing path. See the generator's own comment in
+`tools/build/build-features-manifest.js` (`renderLuaManifest`) for the same
+rationale (F-LOW-15).
+
 ## Why no `prompt_builder.lua`?
 
 The Hammerspoon driver uses the shared Lua implementation directly:

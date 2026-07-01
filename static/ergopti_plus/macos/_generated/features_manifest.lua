@@ -1,6 +1,17 @@
 --- _generated/features_manifest.lua
 --- AUTO-GENERATED from _shared/modules/features/manifest.toml.
 --- DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.
+---
+--- NOTE (F-LOW-15): description_key is emitted here for structural
+--- parity with the AHK twin (features_manifest.ahk) and because
+--- test-manifest-parity.cjs cross-checks it between the two generated
+--- files — but no Lua module on macOS reads entry.description_key today
+--- (confirmed via a repo-wide grep; lib/manifest_reader.lua's own
+--- docstring documents it as exposing only what macOS modules actually
+--- consume). The AHK driver genuinely resolves every description_key via
+--- its menu builder. Removing the field from this side alone would break
+--- the shared parity-test regex parsers, which require it to even match a
+--- section/feature block — left as-is rather than touching that shared path.
 
 local M = {}
 
