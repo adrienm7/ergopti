@@ -49,6 +49,12 @@ local DEDUPLICATION_ENABLED = M.DEDUPLICATION_ENABLED
 local STREAM_CONNECT_TIMEOUT_SEC = Timings.sec("llm", "stream_connect_timeout_ms") -- Fail fast if the MLX server does not accept the TCP connection
 local STREAM_HARD_TIMEOUT_SEC    = Timings.sec("llm", "stream_hard_timeout_ms")    -- Kill the task if the server accepts but never sends a token
 local NON_STREAM_TIMEOUT_SEC     = Timings.sec("llm", "non_stream_timeout_ms")  -- Non-streaming inference hard timeout; prevents a hung server from blocking on_fail indefinitely
+-- Safety-net delay before the fallback removal of the streaming payload temp
+-- file (seconds). on_done removes it immediately in the normal case; this is
+-- only reached if on_done fires late or not at all. Must be strictly greater
+-- than STREAM_HARD_TIMEOUT_SEC so the file is never deleted while curl is
+-- still reading it (mirrors api_ollama.lua's STREAM_TMPFILE_CLEANUP_SEC).
+local STREAM_TMPFILE_CLEANUP_SEC = STREAM_HARD_TIMEOUT_SEC + 10
 
 -- Controller state injected by api_mlx via M.init(): the live endpoint routes,
 -- model identifiers, the active-model-arg reader, and the shared streaming-task
@@ -451,6 +457,27 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		return
 	end
 
+	-- Write payload to a temp file so curl reads it directly — avoids the
+	-- stdin-pipe/streaming-callback conflict in hs.task.
+	-- os.tmpname() creates an empty file at the base path; remove it immediately
+	-- so only the suffixed path (which we own) exists in /tmp.
+	-- Declared BEFORE on_done so the closure captures the real `tmp_path` upvalue
+	-- (Lua lexical scoping: a local declared after the closure resolves to the
+	-- nil global inside that closure, making os.remove(tmp_path) throw and abort
+	-- the whole callback — mirrors the exact gotcha already fixed in
+	-- api_ollama.lua's streaming twin).
+	local _tmp_base = os.tmpname()
+	local tmp_path = _tmp_base .. "_mlx_stream.json"
+	os.remove(_tmp_base)
+	local fh = io.open(tmp_path, "w")
+	if not fh then
+		Logger.error(LOG, "Failed to open temp file '%s' for MLX streaming payload.", tmp_path)
+		if type(on_fail) == "function" then pcall(on_fail) end
+		return
+	end
+	fh:write(encoded)
+	fh:close()
+
 	local accumulated   = ""
 	local line_buf      = ""
 	local in_reasoning  = false  -- Currently accumulating delta.reasoning(_content) tokens — close </think> on transition or end
@@ -592,6 +619,11 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 
 	-- Completion callback: fired when curl exits
 	local function on_done(exit_code, remaining, stderr_out)
+		-- Remove the payload temp file as soon as curl exits so it doesn't linger
+		-- for the full STREAM_TMPFILE_CLEANUP_SEC fallback window (mirrors the
+		-- Ollama backend's streaming twin; F-MED-3).
+		os.remove(tmp_path)
+
 		Logger.debug(LOG, "[%s] #%d STREAM on_done: exit=%s remaining_len=%d stderr='%s'",
 			model_name, req_id, tostring(exit_code),
 			(remaining and #remaining or -1),
@@ -679,22 +711,6 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		if type(on_success) == "function" then pcall(on_success, results) end
 	end
 
-	-- Write payload to a temp file so curl reads it directly — avoids the
-	-- stdin-pipe/streaming-callback conflict in hs.task.
-	-- os.tmpname() creates an empty file at the base path; remove it immediately
-	-- so only the suffixed path (which we own) exists in /tmp.
-	local _tmp_base = os.tmpname()
-	local tmp_path = _tmp_base .. "_mlx_stream.json"
-	os.remove(_tmp_base)
-	local fh = io.open(tmp_path, "w")
-	if not fh then
-		Logger.error(LOG, "Failed to open temp file '%s' for MLX streaming payload.", tmp_path)
-		if type(on_fail) == "function" then pcall(on_fail) end
-		return
-	end
-	fh:write(encoded)
-	fh:close()
-
 	if _ctx.stream.timeout then
 		TimerScheduler.cancel(_ctx.stream.timeout)
 		_ctx.stream.timeout = nil
@@ -723,8 +739,10 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	-- surfaced via on_fail instead of freezing the UI on a stuck spinner.
 	arm_stream_idle_watchdog()
 
-	-- Clean up the temp file once the task has had time to read it
-	TimerScheduler.after(10, function()
+	-- Safety-net: remove the payload temp file even if on_done fires late or not
+	-- at all. The normal-path removal now happens immediately in on_done above;
+	-- this is only the fallback for an on_done that never runs.
+	TimerScheduler.after(STREAM_TMPFILE_CLEANUP_SEC, function()
 		os.remove(tmp_path)
 	end)
 end
