@@ -142,7 +142,8 @@ function M.load_file(name, path)
 end
 
 --- Loads and parses mappings from a TOML configuration file.
---- Respects per-section enable/disable state stored in hs.settings.
+--- Skips sections the user has disabled, per _callbacks.is_section_enabled
+--- (the persisted enable/disable state itself is owned by registry_index.lua).
 --- @param name string Group identifier used as the key in _state.groups.
 --- @param path string Absolute path to the TOML file.
 function M.load_toml(name, path)

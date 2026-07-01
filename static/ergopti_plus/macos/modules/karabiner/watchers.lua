@@ -25,11 +25,12 @@
 
 local M = {}
 
-local hs          = hs
-local Logger      = require("lib.logger")
-local Timings     = require("lib.timings")
-local Keycodes    = require("lib.keycodes")
-local ShellRunner = require("adapters.shell_runner")
+local hs             = hs
+local Logger         = require("lib.logger")
+local Timings        = require("lib.timings")
+local Keycodes       = require("lib.keycodes")
+local ShellRunner    = require("adapters.shell_runner")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 
 local LOG = "karabiner"
@@ -120,7 +121,7 @@ local function deactivate_capsword()
 	local task = hs.task.new(KARABINER_CLI, function(exit_code, stdout, _)
 		_capsword_check_pending = false
 		if _capsword_probe_watchdog then
-			pcall(function() _capsword_probe_watchdog:stop() end)
+			TimerScheduler.cancel(_capsword_probe_watchdog)
 			_capsword_probe_watchdog = nil
 		end
 		if exit_code ~= 0 or tonumber(stdout) ~= 1 then return end
@@ -160,9 +161,11 @@ local function deactivate_capsword()
 	end
 	-- Started OK, but the async task fires its callback only on process EXIT. Arm a watchdog
 	-- so a CLI that starts then hangs/zombies still releases the pending lock instead
-	-- of permanently disabling trackpad auto-deactivation of CapsWord (F-L6).
-	if _capsword_probe_watchdog then pcall(function() _capsword_probe_watchdog:stop() end) end
-	_capsword_probe_watchdog = hs.timer.doAfter(CAPSWORD_PROBE_TIMEOUT_SEC, function()
+	-- of permanently disabling trackpad auto-deactivation of CapsWord (F-L6). Scheduled
+	-- via the TimerScheduler adapter (not raw hs.timer.doAfter) so this OS call is
+	-- properly attributed to the adapter boundary (PF-1).
+	if _capsword_probe_watchdog then TimerScheduler.cancel(_capsword_probe_watchdog) end
+	_capsword_probe_watchdog = TimerScheduler.after(CAPSWORD_PROBE_TIMEOUT_SEC, function()
 		_capsword_probe_watchdog = nil
 		if _capsword_check_pending then
 			_capsword_check_pending = false
