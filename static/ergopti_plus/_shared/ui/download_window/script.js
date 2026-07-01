@@ -15,6 +15,12 @@
 
 let globalLogLines = [];
 let globalDoneState = false;
+// Set by done() from the Lua-side error_kind (e.g. "gated" for a private/gated
+// HuggingFace repo). Read by doRetry() so the same button can either relaunch
+// the download as-is or trigger the "log in and retry" flow — the Lua side
+// already implements resolve_gated (models_manager_mlx_download.lua), but no
+// JS trigger ever posted "resolve", so that flow was permanently unreachable.
+let globalErrorKind = null;
 
 function _t(key) {
 	return (window._i18n_strings && window._i18n_strings[key]) || null;
@@ -153,10 +159,13 @@ function doTerm() {
 }
 
 /**
- * Sends a retry request to relaunch the download.
+ * Sends a retry request to relaunch the download. When the last failure was a
+ * gated/private HuggingFace repo (globalErrorKind === 'gated'), posts 'resolve'
+ * instead so the Lua side runs its "log in and retry" flow (resolve_gated) —
+ * a plain retry would just fail again with the identical gated error.
  */
 function doRetry() {
-	postBridgeMessage('retry');
+	postBridgeMessage(globalErrorKind === 'gated' ? 'resolve' : 'retry');
 }
 
 // =============================
@@ -171,6 +180,7 @@ function doRetry() {
 function resetUI() {
 	globalLogLines = [];
 	globalDoneState = false;
+	globalErrorKind = null;
 
 	const barFill = document.getElementById('bar-fill');
 	barFill.style.width = '0%';
@@ -302,10 +312,13 @@ function addLog(line) {
  * Transitions the UI to its final state (success or error).
  * @param {boolean} isSuccess - True if the download completed successfully, false otherwise.
  * @param {string} message - The final message to display to the user.
- * @param {string} errorKind - The error kind, such as "gated".
+ * @param {string} errorKind - The error kind, such as "gated". Read by doRetry()
+ *   so the retry button triggers the Lua-side "log in and retry" flow instead
+ *   of a plain retry when the failure was a gated/private HuggingFace repo.
  */
 function done(isSuccess, message, errorKind) {
 	globalDoneState = true;
+	globalErrorKind = errorKind || null;
 
 	const cancelButton = document.getElementById('btn-cancel');
 	if (cancelButton) cancelButton.style.display = 'none';
