@@ -73,6 +73,16 @@ function M.new(ctx)
 	local get_profile_hks            = ctx.get_profile_hks
 
 	local _check_startup_attempts = nil
+	-- Shared guard between the self-rescheduling primary requirements chain
+	-- (do_check_requirements) and the unrelated 3 s "backup" check below: both
+	-- independently call keymap.set_llm_enabled(true) on success with no
+	-- coordination, so if the primary chain's disable_llm() already ran
+	-- (state.llm_enabled = false) the backup's later success could silently
+	-- re-enable LLM against that decision, or the two checks could otherwise
+	-- race with no defined winner (F-MED-32). Bumped whenever a chain
+	-- reaches a terminal outcome (success or disable_llm); each chain
+	-- captures its own generation up front and re-checks it before acting.
+	local _startup_check_generation = 0
 
 
 	-- =====================================================
@@ -181,6 +191,10 @@ function M.new(ctx)
 		local function disable_llm()
 			Logger.error(LOG, "Disabling LLM (requirements check failed).")
 			state.llm_enabled = false
+			-- Bump so a still-pending backup/primary check (whichever did not
+			-- reach this terminal outcome) discards its own later success and
+			-- does not silently re-enable LLM against this decision (F-MED-32).
+			_startup_check_generation = _startup_check_generation + 1
 			if keymap and type(keymap.set_llm_enabled) == "function" then
 				pcall(keymap.set_llm_enabled, false)
 			end
@@ -209,6 +223,12 @@ function M.new(ctx)
 
 		Logger.debug(LOG, string.format("Checking model requirements: %s.", state.llm_model))
 
+		-- Captured once for this boot's pair of independently-scheduled checks
+		-- (the self-rescheduling primary chain and the unrelated 3 s "backup"
+		-- check) so each can detect whether the OTHER already reached a
+		-- terminal outcome and discard its own stale success (F-MED-32).
+		local my_startup_gen = _startup_check_generation
+
 		-- Poll installed-models cache until populated — refresh_installed_async fires
 		-- at doAfter(0), so the first tick may return an empty table.
 		local function do_check_requirements()
@@ -236,6 +256,14 @@ function M.new(ctx)
 			end
 
 			check_fn(state.llm_model, function()
+				-- Discard if the OTHER (backup) check already reached a terminal
+				-- outcome (e.g. disable_llm ran) since this chain started (F-MED-32).
+				if my_startup_gen ~= _startup_check_generation then
+					Logger.debug(LOG, "Startup primary check: stale success discarded (gen %d != %d).",
+						my_startup_gen, _startup_check_generation)
+					return
+				end
+				_startup_check_generation = _startup_check_generation + 1
 				Logger.info(LOG, string.format("Requirements verified for %s.", state.llm_model))
 				if state.llm_backend == "mlx" and state.llm_enabled
 					and keymap and type(keymap.set_llm_enabled) == "function" then
@@ -249,11 +277,25 @@ function M.new(ctx)
 		-- Backup path: re-run the MLX boot check after 3 s in case the primary
 		-- callback chain was skipped (edge case on very slow machines).
 		hs.timer.doAfter(3, function()
+			-- The primary chain (or a prior disable_llm) may have already
+			-- reached a terminal outcome by now — skip entirely rather than
+			-- dispatching a redundant/racing force_mlx_check (F-MED-32).
+			if my_startup_gen ~= _startup_check_generation then
+				Logger.debug(LOG, "Startup MLX backup check: primary chain already resolved (gen %d != %d) — skipping.",
+					my_startup_gen, _startup_check_generation)
+				return
+			end
 			if state.llm_backend == "mlx" and state.llm_enabled
 				and state.llm_model and state.llm_model ~= ""
 				and type(models_mgr.force_mlx_check) == "function" then
 				Logger.debug(LOG, string.format("Startup MLX backup check fired for %s.", state.llm_model))
 				models_mgr.force_mlx_check(state.llm_model, function()
+					if my_startup_gen ~= _startup_check_generation then
+						Logger.debug(LOG, "Startup MLX backup check: stale success discarded (gen %d != %d).",
+							my_startup_gen, _startup_check_generation)
+						return
+					end
+					_startup_check_generation = _startup_check_generation + 1
 					Logger.info(LOG, string.format("Startup MLX backup check succeeded for %s.", state.llm_model))
 					if keymap and type(keymap.set_llm_enabled) == "function" then
 						pcall(keymap.set_llm_enabled, true)
