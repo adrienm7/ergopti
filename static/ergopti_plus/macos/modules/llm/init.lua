@@ -210,21 +210,39 @@ function M.auto_detect_backend(callback)
 		if type(callback) == "function" then pcall(callback, CoreState.backend) end
 	end
 
-	pcall(hs.http.asyncGet, "http://127.0.0.1:11434/api/version", {}, function(status, body)
+	-- pcall's boolean result must be checked: if hs.http.asyncGet throws
+	-- SYNCHRONOUSLY (e.g. a malformed URL), its callback never fires and the
+	-- discarded failure left ollama_done/mlx_done stuck at false forever —
+	-- on_both_done() never completes and auto_detect_backend()'s callback is
+	-- silently dropped. Mark the leg done+failed instead, mirroring the
+	-- pattern already used in adapters/http_client.lua's post()/get() (F-MED-5).
+	local ollama_probe_ok = pcall(hs.http.asyncGet, "http://127.0.0.1:11434/api/version", {}, function(status, body)
 		ollama_ok = (status == 200) and type(body) == "string" and body:find('"version"') ~= nil
 		ollama_done = true
 		on_both_done()
 	end)
+	if not ollama_probe_ok then
+		Logger.error(LOG, "auto_detect_backend: hs.http.asyncGet threw synchronously for the Ollama probe.")
+		ollama_ok   = false
+		ollama_done = true
+		on_both_done()
+	end
 
 	-- The MLX probe follows the configured port via api_mlx.get_base_url() — the
 	-- single source of truth. ApiMlx is required at the top of this file, so no
 	-- local re-require and no hardcoded port literal here.
 	local mlx_models_url = ApiMlx.get_base_url() .. "/v1/models"
-	pcall(hs.http.asyncGet, mlx_models_url, {}, function(status, body)
+	local mlx_probe_ok = pcall(hs.http.asyncGet, mlx_models_url, {}, function(status, body)
 		mlx_ok = (status == 200) and type(body) == "string" and body:find('"object"') ~= nil
 		mlx_done = true
 		on_both_done()
 	end)
+	if not mlx_probe_ok then
+		Logger.error(LOG, "auto_detect_backend: hs.http.asyncGet threw synchronously for the MLX probe.")
+		mlx_ok   = false
+		mlx_done = true
+		on_both_done()
+	end
 end
 
 --- Pre-warms TCP connections to both backends (async, non-blocking).

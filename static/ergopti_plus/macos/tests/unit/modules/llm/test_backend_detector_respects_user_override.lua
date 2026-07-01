@@ -166,6 +166,75 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 	return LLM, fire_probes
 end
 
+--- Loads a fresh copy of modules.llm.init with hs.http.asyncGet REPLACED so it
+--- throws synchronously for the leg identified by `throw_on_url_substr` (e.g.
+--- "11434" for Ollama, anything else for MLX), and completes normally for the
+--- other leg via the deferred-callback mechanism above.
+--- @param throw_on_url_substr string Substring identifying which probe's URL must throw.
+--- @param other_status number HTTP status for the OTHER (non-throwing) leg.
+--- @param other_body   string HTTP body for the OTHER (non-throwing) leg.
+--- @return table, function The loaded module and the fire_probes trigger (fires only the surviving leg).
+local function load_llm_init_with_one_leg_throwing(throw_on_url_substr, other_status, other_body)
+	local LLM, fire_probes -- forward-declared; overwritten below with a throwing asyncGet
+	local keys_to_clear = {
+		"modules.llm.init", "modules.llm.profiles", "modules.llm.api_ollama",
+		"modules.llm.api_mlx", "modules.llm.api_remote", "modules.llm.api_token_crypto",
+		"modules.llm.api_common", "modules.llm.parser", "adapters.http_client",
+		"adapters.json_codec", "adapters.timer_scheduler", "adapters.shell_runner",
+		"lib.logger", "lib.notifications", "lib.paths", "lib.i18n", "hs", "tests.stubs.hs",
+	}
+	for _, key in ipairs(keys_to_clear) do package.loaded[key] = nil end
+
+	local hs_stub = require("tests.stubs.hs")
+	hs_stub.__reset()
+	_G.hs = hs_stub
+	package.loaded["hs"] = hs_stub
+
+	package.loaded["lib.i18n"] = {
+		get        = function(key) return key end,
+		get_locale = function() return "fr" end,
+		set_locale = function() end,
+	}
+	package.loaded["lib.paths"] = {
+		shared = function(rel) return helpers.shared(rel) end,
+		shared_root = function() return helpers.shared() end,
+		shared_llm_path = function(name) return helpers.shared("modules/llm/" .. name) end,
+		find_from_configdir = function(relative_target)
+			return helpers.driver_root() .. "../../" .. relative_target
+		end,
+	}
+	package.loaded["lib.notifications"] = { send = function() end, error = function() end }
+
+	package.loaded["modules.llm.profiles"]         = make_profiles_stub()
+	package.loaded["modules.llm.api_ollama"]       = make_api_stub()
+	package.loaded["modules.llm.api_token_crypto"] = {
+		encrypt = function(_, t) return t end,
+		decrypt = function(t) return t end,
+	}
+	local mlx_stub = make_api_stub()
+	mlx_stub.get_base_url = function() return "http://127.0.0.1:18888" end
+	package.loaded["modules.llm.api_mlx"]    = mlx_stub
+	package.loaded["modules.llm.api_remote"] = make_api_stub()
+
+	local pending_gets = {}
+	hs_stub.http.asyncGet = function(url, _headers, callback)
+		if url:find(throw_on_url_substr, 1, true) then
+			error("synchronous throw simulating a malformed URL / transport failure")
+		end
+		pending_gets[#pending_gets + 1] = { url = url, callback = callback }
+	end
+
+	LLM = require("modules.llm.init")
+
+	fire_probes = function()
+		for _, req in ipairs(pending_gets) do
+			if type(req.callback) == "function" then req.callback(other_status, other_body, {}) end
+		end
+	end
+
+	return LLM, fire_probes
+end
+
 
 
 
@@ -300,6 +369,70 @@ helpers.describe("llm.init — set_backend() override survives probe completion"
 		-- The user_override_backend flag must have prevented the probe from writing
 		helpers.assert_eq(LLM.get_backend(), "api",
 			"user_override_backend flag must block a subsequent auto_detect from overwriting the manual choice")
+	end)
+
+end)
+
+
+
+
+-- ========================================================================
+-- ========================================================================
+-- ======= 2/ auto_detect_backend survives a synchronous throw (F-MED-5) =
+-- ========================================================================
+-- ========================================================================
+
+helpers.describe("llm.init — auto_detect_backend survives a synchronous asyncGet throw (F-MED-5)", function()
+
+	helpers.it("completes detection when the Ollama leg throws synchronously", function()
+		-- Before the fix, pcall(hs.http.asyncGet, ...)'s boolean result was
+		-- discarded: a synchronous throw left ollama_done stuck at false forever,
+		-- so on_both_done() never fired and the callback was silently dropped.
+		local LLM, fire_mlx_leg = load_llm_init_with_one_leg_throwing(
+			"11434",                  -- Ollama leg throws
+			200, '{"object":"list"}'  -- MLX leg: healthy
+		)
+
+		local callback_fired = false
+		local reported_backend = nil
+		LLM.auto_detect_backend(function(backend)
+			callback_fired = true
+			reported_backend = backend
+		end)
+
+		-- Deliver the surviving (MLX) leg's response — the Ollama leg already
+		-- "completed" (as a failure) synchronously inside auto_detect_backend.
+		fire_mlx_leg()
+
+		helpers.assert_true(callback_fired,
+			"auto_detect_backend's callback must still fire after one leg throws synchronously (F-MED-5)")
+		helpers.assert_eq(reported_backend, "mlx",
+			"with Ollama failed and MLX healthy, detection must resolve to mlx")
+		helpers.assert_eq(LLM.get_backend(), "mlx",
+			"CoreState.backend must be updated even though one probe leg threw synchronously")
+	end)
+
+	helpers.it("completes detection when the MLX leg throws synchronously", function()
+		local LLM, fire_ollama_leg = load_llm_init_with_one_leg_throwing(
+			"18888",                     -- MLX leg throws (matches the stubbed get_base_url())
+			200, '{"version":"0.5.0"}'   -- Ollama leg: healthy
+		)
+
+		local callback_fired = false
+		local reported_backend = nil
+		LLM.auto_detect_backend(function(backend)
+			callback_fired = true
+			reported_backend = backend
+		end)
+
+		fire_ollama_leg()
+
+		helpers.assert_true(callback_fired,
+			"auto_detect_backend's callback must still fire after the MLX leg throws synchronously (F-MED-5)")
+		helpers.assert_eq(reported_backend, "ollama",
+			"with MLX failed and Ollama healthy, detection must resolve to ollama")
+		helpers.assert_eq(LLM.get_backend(), "ollama",
+			"CoreState.backend must be updated even though the MLX probe leg threw synchronously")
 	end)
 
 end)
