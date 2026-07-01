@@ -112,8 +112,17 @@ function M.spawn(executable, args, on_done, on_chunk)
 			local ok, err = xpcall(function() on_done(exit_code, stdout, stderr) end, debug.traceback)
 			if not ok then
 				Logger.error(LOG, "on_done callback threw for '%s': %s", tostring(executable), tostring(err))
+				-- Defer the crash-report call via hs.timer.doAfter(0, ...) so it never
+				-- runs on this hs.task completion callback's own stack frame — the
+				-- reporter chain ends in a SYNCHRONOUS hs.dialog.blockAlert, and calling
+				-- it inline here would freeze the run loop on every task failure (F-HIGH-20).
 				if type(_G.ergopti_report_crash) == "function" then
-					pcall(_G.ergopti_report_crash, "shell_runner.on_done: " .. tostring(err))
+					local report_ctx = "shell_runner.on_done: " .. tostring(err)
+					if type(hs.timer) == "table" and type(hs.timer.doAfter) == "function" then
+						hs.timer.doAfter(0, function() pcall(_G.ergopti_report_crash, report_ctx) end)
+					else
+						pcall(_G.ergopti_report_crash, report_ctx)
+					end
 				end
 			end
 		end
