@@ -3,6 +3,16 @@
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
 
+; Raise this process above the default OS scheduling class. The keyboard hook
+; and hotstring engine are latency-sensitive on every keystroke; at Normal
+; priority, Windows can leave them waiting behind other processes that are
+; saturating the CPU (a busy IDE/build/watch process, a background scan, …),
+; which surfaces as multi-second "Slow OnChar"/"Slow HSE.FeedChar" HotPath
+; warnings even though this driver's own per-keystroke work is sub-millisecond.
+; AboveNormal (not High) keeps this driver ahead of ordinary background work
+; without contending with genuinely real-time OS/driver threads (hotpath-priority-starvation).
+try ProcessSetPriority("AboveNormal")
+
 ; Globals referenced by ``#HotIf`` expressions across the driver. They MUST
 ; be assigned before any code that pumps the message loop runs — otherwise
 ; AHK throws "global variable has not been assigned a value" the first time
