@@ -169,6 +169,14 @@ const PIPELINE = [
 		generated: ['static/ergopti_plus/windows/_generated/prompt_builder.ahk']
 	},
 	{
+		name: 'codegen:llm-profiles-data:ahk — regenerate llm_profiles_data.ahk (DL-2+DL-3)',
+		run() {
+			const { ok, stderr } = runNpmScript('codegen:llm-profiles-data:ahk');
+			return { ok, detail: ok ? undefined : stderr };
+		},
+		generated: ['static/ergopti_plus/windows/_generated/llm_profiles_data.ahk']
+	},
+	{
 		name: 'build:menu — emit menu_manifest.json from manifest.toml [menu.*]',
 		run() {
 			const { ok, stderr } = runNpmScript('build:menu');
@@ -185,6 +193,15 @@ const PIPELINE = [
 		run() {
 			const { ok, stdout, stderr } = runNpmScript('test:manifest-parity');
 			// Extract summary line from test output (last non-empty line)
+			const lines = (stdout + stderr).trim().split('\n').filter(Boolean);
+			const summary = lines[lines.length - 1] || '';
+			return { ok, detail: ok ? undefined : summary };
+		}
+	},
+	{
+		name: 'test:llm-legacy-basic-prompt-single-source — DL-2+DL-3 parity',
+		run() {
+			const { ok, stdout, stderr } = runNpmScript('test:llm-legacy-basic-prompt-single-source');
 			const lines = (stdout + stderr).trim().split('\n').filter(Boolean);
 			const summary = lines[lines.length - 1] || '';
 			return { ok, detail: ok ? undefined : summary };

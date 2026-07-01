@@ -29,8 +29,11 @@ local hs       = hs
 local LOG      = "llm.profiles"
 
 
--- Fallback prompt used when the profile object is malformed.
-local BASIC_PROMPT_FALLBACK = [[You are an ultra-concise keyboard completion engine.
+-- Ultimate degraded-mode text: used only if profiles.json cannot be read at
+-- all, so BASIC_PROMPT_FALLBACK below still has a value to fall back to. This
+-- is the single hand-maintained copy of the "basic" prompt on this driver —
+-- everywhere else derives from profiles.json (DL-3).
+local BASIC_PROMPT_EMERGENCY = [[You are an ultra-concise keyboard completion engine.
 User context: {context}
 
 Output strictly the immediate continuation of the context.
@@ -69,6 +72,19 @@ end
 for _, p in ipairs(LOADED_PROFILES) do decorate_label(p) end
 M.BUILTIN_PROFILES = LOADED_PROFILES
 
+-- Fallback prompt used when a profile object is malformed or missing a
+-- prompt field (M.resolve_system_prompt below). Derived from the "basic"
+-- profile actually loaded from profiles.json (DL-3) so it can never drift
+-- from the prompt the user sees when everything is working; only falls back
+-- to the hand-maintained emergency copy if profiles.json failed to load.
+local BASIC_PROMPT_FALLBACK = BASIC_PROMPT_EMERGENCY
+for _, p in ipairs(LOADED_PROFILES) do
+	if p.id == "basic" and type(p.system_single) == "string" and p.system_single ~= "" then
+		BASIC_PROMPT_FALLBACK = p.system_single
+		break
+	end
+end
+
 
 --- Combines built-in profiles and user profiles into a single table.
 --- User profiles with the same id override built-in ones (via profile_selector).
@@ -82,14 +98,10 @@ function M.get_all_profiles(user_profiles)
 end
 
 
--- Migration table for IDs that were renamed in previous versions.
--- Kept here (not in profile_selector) because it encodes macOS driver history.
-local LEGACY_IDS = {
-	parallel          = "basic",
-	batch             = "batch_advanced",
-	parallel_advanced = "advanced",
-	base_completion   = "raw",
-}
+-- Migration table for IDs that were renamed in previous versions. Shared with
+-- the AHK driver via _shared/modules/llm/legacy_ids.json (DL-2) — both
+-- drivers had the identical mapping hand-copied, not "macOS driver history".
+local LEGACY_IDS = Selector.load_legacy_ids()
 
 --- Retrieves the currently active profile object, falling back to basic if invalid.
 --- Silently migrates stale profile IDs that were renamed in previous versions.

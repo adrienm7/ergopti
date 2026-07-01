@@ -242,6 +242,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; LLM_GetSharedPath is now available — load the cross-platform defaults before
 ; prediction_engine.ahk and menu_llm.ahk initialise their state maps.
 LLM_Defaults_Load()
+#Include _generated/llm_profiles_data.ahk
 #Include modules/llm/profiles.ahk
 #Include modules/llm/prediction_engine.ahk
 #Include modules/keymap/llm_bridge.ahk

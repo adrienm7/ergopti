@@ -231,6 +231,9 @@ try FileAppend("# [marker] starting direct include of LLM production modules`r`n
 try FileAppend("# [marker] starting direct include of LLM production modules`r`n", "*")
 #Include ../modules/llm/models.ahk
 #Include ../lib/llm_defaults.ahk
+; llm_profiles_data.ahk (generated) defines LLM_LEGACY_IDS + LLM_GetBasicPrompt()
+; which profiles.ahk depends on — see DL-2/DL-3.
+#Include ../_generated/llm_profiles_data.ahk
 #Include ../modules/llm/profiles.ahk
 #Include unit/test_llm_profiles.ahk
 #Include ../modules/llm/api_common.ahk

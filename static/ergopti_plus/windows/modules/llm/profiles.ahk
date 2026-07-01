@@ -52,16 +52,11 @@ LLM_GetAllProfiles(user_profiles := []) {
  * @returns {Object} The matched profile Map object.
  */
 LLM_GetActiveProfile(active_id, user_profiles := []) {
-	static legacy := Map(
-		"parallel",          "basic",
-		"batch",             "batch_advanced",
-		"parallel_advanced", "advanced",
-		"base_completion",   "raw"
-	)
+	global LLM_LEGACY_IDS
 
 	id := String(active_id)
-	if legacy.Has(id)
-		id := legacy[id]
+	if LLM_LEGACY_IDS.Has(id)
+		id := LLM_LEGACY_IDS[id]
 
 	for _, p in LLM_GetAllProfiles(user_profiles) {
 		if (p.Has("id") && p["id"] == id)
@@ -234,17 +229,6 @@ LLM_ParseProfileObject(obj) {
 	return m
 }
 
-/**
- * Returns the basic profile's system_single prompt as a hardcoded fallback.
- * Used when the JSON file cannot be loaded.
- * @returns {string} The basic system prompt.
- */
-LLM_GetBasicPrompt() {
-	return "You are an ultra-concise keyboard completion engine.`n"
-		. "User context: {context}`n`n"
-		. "Output strictly the immediate continuation of the context.`n"
-		. "ABSOLUTE RULE: generate AT LEAST {min_words} words and AT MOST {max_words} words. NOT ONE WORD MORE OR LESS.`n"
-		. "Match the language of the context. If the context language is ambiguous, default to {language}.`n"
-		. "No explanation, no comment, no list, no bullet, no quote, no rephrasing of the context.`n"
-		. "Return only the words to append."
-}
+; LLM_GetBasicPrompt() is provided by _generated/llm_profiles_data.ahk (DL-3) —
+; generated from the "basic" profile's system_single in profiles.json so the
+; fallback text can never drift from the profile it mirrors.
