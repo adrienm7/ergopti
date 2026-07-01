@@ -125,8 +125,11 @@ Test("meta input: keystroke path is Critical-serialized (no fast-typing reorder 
 ; HIGH-01: LayerDispatch (Shift/CapsLock layer) re-emitted SHIFTED_LETTERS via
 ; SendNewResult with no Critical, so a second fast key could start its remap
 ; thread mid-send and reorder the output. The pure-letter emit path must now be
-; serialized with Critical("On"). The symbol-callback branch must stay OUT of
-; Critical because those callbacks may Sleep (ActivateHotstrings).
+; serialized with Critical("On"). The SHIFT_SYMBOLS callback branch (Cb() called
+; with SerializeSymbols=false) must stay OUT of Critical because those callbacks
+; may Sleep (ActivateHotstrings). The CAPSLOCK_SYMBOLS branch (SerializeSymbols=true)
+; is the exception: none of its callbacks ever Sleep, so it opts INTO Critical
+; serialization (layer-dispatch-capslock-symbols-unserialized).
 _MIS_CheckLayerDispatchCritical() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
 	Src := ""
@@ -134,7 +137,7 @@ _MIS_CheckLayerDispatchCritical() {
 	Assert(Src != "", "layout_shift_caps.ahk must be readable")
 
 	Body := _DriverFuncBody("LayerDispatch")
-	Assert(Body != "", "LayerDispatch(SC, SymbolMap, *) must exist in layout_shift_caps.ahk")
+	Assert(Body != "", "LayerDispatch(SC, SymbolMap, SerializeSymbols, *) must exist in layout_shift_caps.ahk")
 
 	CritPos := InStr(Body, 'Critical("On")')
 	Assert(CritPos > 0, "LayerDispatch must call Critical(On) before the letter emit (HIGH-01)")
@@ -143,13 +146,32 @@ _MIS_CheckLayerDispatchCritical() {
 	Assert(CritPos < EmitPos,
 		"LayerDispatch must enter Critical(On) BEFORE SendNewResult(SHIFTED_LETTERS) so the letter emit serializes (HIGH-01)")
 
-	; The symbol-callback branch (Cb()) must NOT be preceded by Critical — those
+	; The unserialized (SHIFT_SYMBOLS) callback branch — the "else" arm of the
+	; SerializeSymbols conditional — must NOT wrap its Cb() in Critical: those
 	; callbacks may Sleep (ActivateHotstrings) and a Sleep under Critical breaks
-	; the no-yield guarantee. Cb() appears before the letter emit in source order.
-	CbPos := InStr(Body, "Cb()")
-	Assert(CbPos > 0, "LayerDispatch must still invoke the symbol callback Cb()")
-	Assert(CbPos < CritPos,
-		"LayerDispatch must NOT enter Critical before the symbol callback Cb() — symbol callbacks may Sleep (HIGH-01)")
+	; the no-yield guarantee.
+	ElsePos := InStr(Body, "} else {")
+	Assert(ElsePos > 0 and ElsePos < EmitPos,
+		"LayerDispatch must have an else branch (SerializeSymbols=false) for the unserialized symbol callback")
+	ElseCbPos := InStr(Body, "Cb()", , ElsePos)
+	Assert(ElseCbPos > 0 and ElseCbPos < EmitPos,
+		"LayerDispatch's else branch must still invoke the symbol callback Cb()")
+	ElseBlockEnd := InStr(Body, "}", , ElseCbPos)
+	ElseBlock := SubStr(Body, ElsePos, ElseBlockEnd - ElsePos)
+	Assert(!InStr(ElseBlock, "Critical("),
+		"LayerDispatch's unserialized else branch must NOT wrap Cb() in Critical — SHIFT_SYMBOLS callbacks may Sleep (HIGH-01)")
+
+	; The serialized (CAPSLOCK_SYMBOLS) branch — SerializeSymbols=true — must wrap
+	; its Cb() in Critical, since none of those callbacks ever Sleep
+	; (layer-dispatch-capslock-symbols-unserialized).
+	IfSerPos := InStr(Body, "if SerializeSymbols")
+	Assert(IfSerPos > 0 and IfSerPos < ElsePos,
+		"LayerDispatch must gate symbol serialization on a SerializeSymbols flag (layer-dispatch-capslock-symbols-unserialized)")
+	IfSerCritPos := InStr(Body, 'Critical("On")', , IfSerPos)
+	IfSerCbPos := InStr(Body, "Cb()", , IfSerPos)
+	Assert(IfSerCritPos > 0 and IfSerCbPos > 0 and IfSerCritPos < IfSerCbPos and IfSerCbPos < ElsePos,
+		"LayerDispatch's SerializeSymbols branch must enter Critical(On) BEFORE Cb() so CAPSLOCK_SYMBOLS "
+		. "callbacks serialize against neighbouring remapped-letter emits (layer-dispatch-capslock-symbols-unserialized)")
 }
 
 ; HIGH-01: AltGrShiftDispatch invoked its AltGr emit callback with no Critical,

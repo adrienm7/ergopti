@@ -132,7 +132,7 @@ _SDPS_CheckCapsLockSkipUsedInsideLoop() {
 
 	LoopPos   := InStr(Body, "for SC in SHIFTED_LETTERS")
 	SkipPos   := InStr(Body, "_SHIFT_DIGIT_SCS.Has(SC)")
-	HotkeyPos := InStr(Body, "Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS)")
+	HotkeyPos := InStr(Body, "Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS")
 
 	Assert(LoopPos > 0, "RegisterCapsLockLayer must iterate SHIFTED_LETTERS")
 	Assert(SkipPos > LoopPos,
