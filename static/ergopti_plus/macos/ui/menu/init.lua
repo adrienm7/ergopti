@@ -728,14 +728,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		reload                    = function() do_reload("menu") end,
 		quit                      = function()
 			hs.timer.doAfter(0.05, function()
+				-- Tear down Karabiner-Elements via karabiner.kill() — the SAME
+				-- ownership-respecting path script_quit (modules/gestures/actions.lua)
+				-- and hs.shutdownCallback (init.lua) already use. The previous
+				-- run_total_reset_async() call bypassed kill()'s is_hs_owned_bridge()
+				-- guard entirely, so it could tear down a user-managed KE install that
+				-- Hammerspoon never started (F-MED-13).
 				pcall(function()
-					local ok_k, k = pcall(require, "modules.karabiner")
-					local ok_l, kl = pcall(require, "modules.karabiner.ke_lifecycle")
-					local ke_enabled = ok_k and k and type(k.get_enabled) == "function" and k.get_enabled() or false
-					local _, has_user_ke = hs.execute("/usr/bin/pgrep -x karabiner_console_user_server >/dev/null 2>&1 || /usr/bin/pgrep -x karabiner_session_monitor >/dev/null 2>&1 || /usr/bin/pgrep -x Karabiner-NotificationWindow >/dev/null 2>&1")
-					if (ke_enabled or has_user_ke == true) and ok_l and kl and type(kl.run_total_reset_async) == "function" then
-						local out, ok = kl.run_total_reset_async()
-						Logger.info(LOG, "Quit cleanup KE total reset async: ok=%s out=%s.", tostring(ok), tostring(out))
+					local ok_kb, karabiner = pcall(require, "modules.karabiner")
+					if ok_kb and type(karabiner) == "table" and type(karabiner.kill) == "function" then
+						karabiner.kill()
 					end
 				end)
 				pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
