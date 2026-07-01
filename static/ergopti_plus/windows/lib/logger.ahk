@@ -288,6 +288,17 @@ _LoggerFlush(ForceFlush := false) {
 }
 
 _LoggerOnExitFlush(ExitReason, ExitCode) {
+    global _LOGGER_DEDUP_COUNT, _LOGGER_DEDUP_LEVEL
+    ; If the very last log call before shutdown was itself a suppressed
+    ; duplicate, its streak's "N more identical lines" summary is still
+    ; pending — the streak only ever gets flushed when a DIFFERENT line
+    ; arrives (see _LoggerEmit). Emit it now so a repeating warning/error
+    ; storm immediately preceding this exit/reload is not silently lost
+    ; (logger-dedup-streak-lost-on-exit).
+    if (_LOGGER_DEDUP_COUNT > 0) {
+        _LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)
+        _LOGGER_DEDUP_COUNT := 0
+    }
     ; Use the forced-flush path on exit too — a subsequent OS kill cannot
     ; replay the buffered FileAppend.
     _LoggerFlush(true)
