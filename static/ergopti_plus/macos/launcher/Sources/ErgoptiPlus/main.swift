@@ -92,6 +92,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			fail("Embedded Hammerspoon binary not found inside the .app bundle.")
 			return
 		}
+
+		// Hammerspoon itself tolerates a missing/invalid MJConfigFile by starting
+		// normally with no Lua loaded — no crash, exit code 0. Without this check
+		// a partial unzip, a disk-full install, or a build-script regression that
+		// silently drops the Lua tree would all produce an app that launches,
+		// shows nothing wrong, and remaps nothing (F-HIGH-28). Fail loudly instead.
+		guard FileManager.default.fileExists(atPath: bundledInitLuaPath()) else {
+			fail("Bundled configuration (init.lua) not found inside the .app bundle.")
+			return
+		}
+
 		launchHammerspoon(at: hsBinary)
 	}
 
