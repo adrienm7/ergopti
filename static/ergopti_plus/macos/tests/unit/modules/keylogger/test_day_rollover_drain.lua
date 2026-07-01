@@ -17,6 +17,13 @@
 ---    must be skipped and a warning emitted rather than deleting the file.
 --- 3. Source guard: the implementation must call read_new_entries in a loop
 ---    and condition the rollover call on the drain result.
+--- 4. Side-effect parity (F-HIGH-2): a stalled drain must NOT run
+---    Aggregator.reset_ngram_ctx() or touch the today_log_offset /
+---    today_log_date / ngram_ctx_json meta rows — those bookmarks are the
+---    only way a retried rollover knows where to resume, so gating the
+---    file-deleting Rotation.rollover() call while still unconditionally
+---    firing the other three side effects would silently wipe the
+---    resumption state even though the drain deliberately stalled.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -155,9 +162,218 @@ end)
 
 
 
+-- =======================================================
+-- =======================================================
+-- ======= 2/ Real day_rollover() Side-effect Gate =======
+-- =======================================================
+-- =======================================================
+
+--- Loads the real modules.keylogger.log_manager with every I/O sub-module
+--- stubbed, so M.day_rollover() runs its actual production logic (not a
+--- hand-copied harness) while Rotation/Aggregator/SqliteWriter stay
+--- in-memory and observable.
+--- @param stall boolean If true, Rotation.read_new_entries() never empties out
+--- and Rotation.set_offset() never advances the observed offset, forcing the
+--- drain loop to stall exactly like a persistent SQL error would.
+--- @return table log_manager instance, table observation counters
+local function load_real_day_rollover(stall)
+	local observed = {
+		rollover_called       = false,
+		reset_ngram_ctx_calls = 0,
+		meta_exec_statements  = {},
+	}
+
+	local offset = 0
+	package.loaded["modules.keylogger.rotation"] = {
+		init = function() end,
+		append_log = function() end,
+		read_new_entries = function()
+			if stall then
+				-- Always reports pending data without ever advancing the offset —
+				-- the exact "persistent SQL error" shape day_rollover must detect.
+				return { { entry = { type = "typing" } } }, offset
+			end
+			return {}, offset
+		end,
+		get_offset = function() return offset end,
+		get_date   = function() return "2099-07-01" end,
+		set_offset = function(new_offset) offset = new_offset end,
+		rollover   = function() observed.rollover_called = true end,
+	}
+
+	package.loaded["modules.keylogger.sqlite_writer"] = {
+		init                  = function() end,
+		open_db               = function() return true end,
+		close_db              = function() end,
+		-- Returning nil makes M.ingest_once() an immediate no-op, so the stall
+		-- scenario reaches MAX_ROLLOVER_DRAIN_ITERS without a real SQLite cache.
+		get_db                = function() return nil end,
+		build_inserts         = function() return {} end,
+		get_next_event_id     = function() return 0 end,
+		set_next_event_id     = function() end,
+		persist_next_event_id = function() end,
+	}
+
+	package.loaded["modules.keylogger.aggregator"] = {
+		init               = function() end,
+		walk_typing        = function() end,
+		walk_app_switch    = function() end,
+		walk_window_switch = function() end,
+		walk_system_event  = function() end,
+		flush              = function() end,
+		get_ngram_ctx      = function() return {} end,
+		set_ngram_ctx      = function() end,
+		reset_ngram_ctx    = function() observed.reset_ngram_ctx_calls = observed.reset_ngram_ctx_calls + 1 end,
+	}
+
+	package.loaded["modules.keylogger.export"] = {
+		init                    = function() end,
+		get_native_app_category = function() return "other" end,
+		get_device_short_id     = function() return "abcd" end,
+		get_sqlite_path         = function() return "/tmp/test.sqlite" end,
+		get_db_rev              = function() return 0 end,
+		sync_foreign_data_sql   = function() end,
+	}
+
+	package.loaded["lib.i18n"] = { t = function(key) return key end }
+	package.loaded["lib.timings"] = {
+		ms  = function() return 1000 end,
+		sec = function() return 1.0 end,
+	}
+
+	local hs_overrides = {
+		fs = {
+			attributes = function() return nil end,
+			dir        = function() return function() return nil end end,
+		},
+		execute = function() return "" end,
+	}
+
+	local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
+	lm.init({
+		LOG_DIR              = "/tmp/test_day_rollover",
+		buffer_events        = {},
+		buffer_text          = "",
+		rich_chunks          = {},
+		session_mouse_clicks  = 0,
+		session_mouse_scrolls = 0,
+		mouse_distance_px     = 0,
+		last_flush_time       = 0,
+		last_time             = 0,
+		pending_keyup         = {},
+		today_idx             = {},
+		manifest              = {},
+	})
+
+	-- A db present here would make M.day_rollover() write meta UPDATE statements;
+	-- since SqliteWriter.get_db() returns nil above, those writes are unreachable
+	-- and are instead exercised directly with a recording fake db, below.
+	return lm, observed
+end
+
+helpers.describe("day_rollover: real M.day_rollover() gates side effects on drain success (F-HIGH-2)", function()
+
+	helpers.it("stalled drain: Rotation.rollover is NOT called and day_rollover returns false", function()
+		local lm, observed = load_real_day_rollover(true)
+		local result = lm.day_rollover()
+		helpers.assert_true(result == false,
+			"day_rollover must report failure (false) when the drain stalls")
+		helpers.assert_true(not observed.rollover_called,
+			"Rotation.rollover must not run when the drain stalls")
+	end)
+
+	helpers.it("stalled drain: Aggregator.reset_ngram_ctx is NOT called", function()
+		-- This is the core F-HIGH-2 regression: a prior fix gated Rotation.rollover
+		-- on `drained` but left reset_ngram_ctx() and the meta resets unconditional,
+		-- wiping the ngram resumption bookmark even though the drain deliberately
+		-- stalled and the rest of today.log survived untouched.
+		local lm, observed = load_real_day_rollover(true)
+		lm.day_rollover()
+		helpers.assert_eq(observed.reset_ngram_ctx_calls, 0,
+			"Aggregator.reset_ngram_ctx must NOT run when the drain stalls — "
+			.. "it wipes the in-memory ngram context that a retried rollover still needs")
+	end)
+
+	helpers.it("successful drain (already empty): Rotation.rollover runs and day_rollover returns true", function()
+		local lm, observed = load_real_day_rollover(false)
+		local result = lm.day_rollover()
+		helpers.assert_true(result == true,
+			"day_rollover must report success (true) once the drain completes")
+		helpers.assert_true(observed.rollover_called,
+			"Rotation.rollover must run once today.log is fully drained")
+	end)
+
+	helpers.it("successful drain: Aggregator.reset_ngram_ctx runs exactly once", function()
+		local lm, observed = load_real_day_rollover(false)
+		lm.day_rollover()
+		helpers.assert_eq(observed.reset_ngram_ctx_calls, 1,
+			"Aggregator.reset_ngram_ctx must run exactly once after a successful drain")
+	end)
+
+end)
+
+
+
+
+
+-- ====================================================
+-- ====================================================
+-- ======= 3/ Real day_rollover() Meta Row Gate =======
+-- ====================================================
+-- ====================================================
+
+--- Same harness as section 2, but SqliteWriter.get_db() returns a recording
+--- fake db so the today_log_offset / today_log_date / ngram_ctx_json meta
+--- UPDATE statements (the other two side effects named in F-HIGH-2) are
+--- directly observable.
+--- @param stall boolean Same meaning as load_real_day_rollover's argument.
+--- @return table log_manager instance, table exec'd meta statements
+local function load_real_day_rollover_with_db(stall)
+	local lm, observed = load_real_day_rollover(stall)
+
+	local exec_statements = {}
+	local fake_db = {
+		exec = function(_self, sql)
+			table.insert(exec_statements, sql)
+			return 0 -- sqlite3.OK stand-in; these are meta UPDATEs, not batch inserts
+		end,
+	}
+	package.loaded["modules.keylogger.sqlite_writer"].get_db = function() return fake_db end
+
+	return lm, exec_statements
+end
+
+helpers.describe("day_rollover: meta bookmark rows (offset/date/ngram_ctx) gate on drain success (F-HIGH-2)", function()
+
+	helpers.it("stalled drain: no meta UPDATE statements are executed", function()
+		local lm, exec_statements = load_real_day_rollover_with_db(true)
+		lm.day_rollover()
+		helpers.assert_eq(#exec_statements, 0,
+			"a stalled drain must not touch today_log_offset / today_log_date / "
+			.. "ngram_ctx_json — those are the exact resumption bookmarks the retry needs")
+	end)
+
+	helpers.it("successful drain: all three meta rows are reset", function()
+		local lm, exec_statements = load_real_day_rollover_with_db(false)
+		lm.day_rollover()
+		local joined = table.concat(exec_statements, " | ")
+		helpers.assert_true(joined:find("today_log_offset") ~= nil,
+			"successful drain must reset the today_log_offset meta row")
+		helpers.assert_true(joined:find("today_log_date") ~= nil,
+			"successful drain must reset the today_log_date meta row")
+		helpers.assert_true(joined:find("ngram_ctx_json") ~= nil,
+			"successful drain must reset the ngram_ctx_json meta row")
+	end)
+
+end)
+
+
+
+
+
 -- ================================================
 -- ===============================================
--- ======= 2/ Source-level Structure Guard =======
+-- ======= 4/ Source-level Structure Guard =======
 -- ===============================================
 -- ================================================
 

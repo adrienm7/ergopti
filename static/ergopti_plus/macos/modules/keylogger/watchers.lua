@@ -191,12 +191,20 @@ function M.perform_maintenance()
 		LogManager.flush_buffer()
 		-- New model: day_rollover drains today.log into data.sql + sqlite,
 		-- then deletes today.log. The in-memory today_idx / ngram context
-		-- are reset because the next day starts fresh.
-		LogManager.day_rollover()
-		_state.today_idx     = {}
-		_state.ngram_context = nil
-		_current_day = today
-		Logger.success(LOG, "Midnight rotation complete — now tracking %s.", today)
+		-- are reset because the next day starts fresh — but only once the
+		-- drain actually completes. A stalled drain returns false, and every
+		-- resumption bookmark (today_idx, ngram_context, _current_day) must
+		-- stay untouched so the very next maintenance tick retries the same
+		-- rollover instead of silently skipping straight to "today" (G1, G2).
+		local rolled_over = LogManager.day_rollover()
+		if rolled_over then
+			_state.today_idx     = {}
+			_state.ngram_context = nil
+			_current_day = today
+			Logger.success(LOG, "Midnight rotation complete — now tracking %s.", today)
+		else
+			Logger.warn(LOG, "Midnight rotation stalled — will retry on next maintenance tick.")
+		end
 	end
 	poll_mouse_distance()
 end
