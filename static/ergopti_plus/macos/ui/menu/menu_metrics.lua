@@ -649,8 +649,15 @@ function M.build(ctx)
 				if WpmWidget and type(WpmWidget.set_use_source_colors) == "function" then
 					pcall(WpmWidget.set_use_source_colors, state.keylogger_float_colors)
 				end
-				if state.keylogger_menubar_wpm and WpmMenubar and type(WpmMenubar.start) == "function" then pcall(WpmMenubar.start) end
-				if state.keylogger_float_wpm and WpmWidget and type(WpmWidget.start) == "function" then pcall(WpmWidget.start, state.keylogger_float_graph) end
+				-- Gate on pause exactly like the 5 sibling per-feature toggles above
+				-- (dyn_wpm_menubar, dyn_menubar_colors, dyn_wpm_widget, dyn_widget_colors,
+				-- dyn_include_realtime): re-enabling the master switch while paused must
+				-- record the preference but NOT arm the widget's 0.2s render timer +
+				-- global mouse eventtap or the menubar's 0.5s timer until resume
+				-- (« pause = tout éteint », F-L10) — this call site was the one place
+				-- that still started both unconditionally on re-enable (F-LOW-13).
+				if state.keylogger_menubar_wpm and not paused_now() and WpmMenubar and type(WpmMenubar.start) == "function" then pcall(WpmMenubar.start) end
+				if state.keylogger_float_wpm and not paused_now() and WpmWidget and type(WpmWidget.start) == "function" then pcall(WpmWidget.start, state.keylogger_float_graph) end
 			else
 				if Keylogger and type(Keylogger.stop) == "function" then pcall(Keylogger.stop) end
 				if WpmMenubar and type(WpmMenubar.stop) == "function" then pcall(WpmMenubar.stop) end
