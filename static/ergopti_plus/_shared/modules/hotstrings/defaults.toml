@@ -49,7 +49,7 @@ personal = "#6e6e73"
 [delays]
 
 # Global default expansion delay (seconds) applied when no user/TOML delay is set.
-# Mirrored as _shared/modules/timings/constants.toml [timers] hotstring_expansion_ms = 750.
+# Mirrored as _shared/modules/timings/constants.toml [debounce] hotstring_expansion_ms = 750.
 # This file (hotstrings/defaults.toml) is the authoritative source; the timings
 # entry mirrors it for cross-module discovery.
 default_sec = 0.75

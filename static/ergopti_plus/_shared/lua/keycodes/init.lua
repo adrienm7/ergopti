@@ -3,9 +3,10 @@
 --- ==============================================================================
 --- MODULE: Keycode Registry (Shared)
 --- DESCRIPTION:
---- Platform-neutral, single-source-of-truth registry of every macOS HID
---- keycode used as a sentinel, signal, or hotkey across the Ergopti+ codebase.
---- Shared across all Ergopti+ drivers (Hammerspoon, Linux, and future platforms).
+--- Hammerspoon-specific registry of every macOS HID keycode used as a sentinel,
+--- signal, or hotkey across the Ergopti+ codebase.  These are macOS HID numeric
+--- codes (F13–F17 sentinels, etc.) and are NOT meaningful on Linux (which uses
+--- evdev codes — see _shared/data/keycodes/evdev.json).
 --- Any module that needs to compare against a literal keycode MUST require this
 --- module instead of redeclaring the value locally.
 ---

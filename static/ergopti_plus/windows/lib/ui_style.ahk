@@ -3,10 +3,10 @@
 ; ==============================================================================
 ; MODULE: UI Style Constants
 ; DESCRIPTION:
-; AHK-side mirror of the cross-driver tooltip visual constants.  The canonical
-; source of truth is static/ergopti_plus/_shared/modules/tooltip/constants.toml — every
-; value declared here MUST match the corresponding entry in that file.  When
-; constants.toml is updated, this file must be updated to match.
+; AHK-side consumer of the cross-driver tooltip visual constants.  The canonical
+; source of truth is static/ergopti_plus/_shared/modules/tooltip/constants.toml — all
+; values are loaded at boot by UiStyle_LoadSharedConst() (fail-fast; any missing
+; key aborts startup).  Do NOT edit the numbers below; edit constants.toml.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Cross-driver parity: every constant here has a named equivalent in
@@ -14,8 +14,8 @@
 ;    Divergences between these three files are bugs.
 ; 2. No magic numbers: every tooltip.ahk layout value must originate here,
 ;    never be inlined at the call site.
-; 3. Future-proof: a Linux or web driver reads constants.toml directly;
-;    AHK and HS mirror it here as language-native globals for zero-cost access.
+; 3. Future-proof: Linux/WebKitGTK host will also read constants.toml directly,
+;    exactly as AHK does via UiStyle_LoadSharedConst() at boot.
 ;
 ; CROSS-REFERENCES (constants.toml key → AHK global):
 ;   [typography]  font_main_ahk          → UI_FONT_NAME

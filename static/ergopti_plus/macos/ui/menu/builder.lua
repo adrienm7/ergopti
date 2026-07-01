@@ -21,21 +21,6 @@ local HotCounter  = require("ui.menu.hotstring_counter")
 local CanvasBadge = require("ui.menu.canvas_badge")
 
 
--- Fallback used when the manifest cannot be loaded
-local ERGOPTI_GROUPS_FALLBACK = { sfbsreduction = true, rolls = true }
-
--- Fallback debug menu order — mirrors menu_manifest.json debug_menu.
-local DEBUG_MENU_FALLBACK = {
-	{ id = "console" },
-	{ id = "---" },
-	{ id = "log_level" },
-	{ id = "open_logs" },
-	{ id = "open_today_log" },
-	{ id = "---" },
-	{ id = "healthcheck" },
-}
-
-
 -- Single parsed representation of menu_manifest.json for the session.
 -- Both load_ergopti_groups() and load_debug_menu() share this cache so the
 -- file is read and parsed only once, no matter how many menu rebuilds occur.
@@ -68,15 +53,14 @@ local function load_manifest()
 end
 
 --- Loads hotstring group classification from the shared menu_manifest.json.
---- Falls back to the hardcoded set if the file cannot be read or parsed.
---- Logs ERROR if manifest is not found (fail-fast philosophy).
+--- Returns an empty set on failure and logs ERROR (fail-loud — no stale copy).
 --- @return table<string,boolean> Set of group IDs specific to the Ergopti layout.
 local function load_ergopti_groups()
 	if _ergopti_groups_cache then return _ergopti_groups_cache end
 	local data = load_manifest()
 	if not data or type(data.hotstring_groups) ~= "table" then
-		Logger.error(LOG, "Cannot load Ergopti groups from manifest — using fallback.")
-		return ERGOPTI_GROUPS_FALLBACK
+		Logger.error(LOG, "Cannot load Ergopti groups from manifest — groups will be empty.")
+		return {}
 	end
 	local groups = {}
 	for _, id in ipairs(data.hotstring_groups.ergopti or {}) do
@@ -93,15 +77,14 @@ end
 
 --- Loads the debug_menu ordered array from the shared menu_manifest.json.
 --- Filters out entries whose platforms list does not include "hs".
---- Falls back to DEBUG_MENU_FALLBACK on any read or parse failure.
---- Logs ERROR if manifest is not found (fail-fast philosophy).
+--- Returns an empty array on failure and logs ERROR (fail-loud — no stale copy).
 --- @return table Array of {id} entries in display order.
 local function load_debug_menu()
 	if _debug_menu_cache then return _debug_menu_cache end
 	local data = load_manifest()
 	if not data or type(data.debug_menu) ~= "table" then
-		Logger.error(LOG, "Failed to load debug_menu from manifest — using fallback.")
-		return DEBUG_MENU_FALLBACK
+		Logger.error(LOG, "Failed to load debug_menu from manifest — debug submenu will be empty.")
+		return {}
 	end
 
 	local result = {}
@@ -120,7 +103,7 @@ local function load_debug_menu()
 	end
 
 	Logger.debug(LOG, "Debug menu order loaded from manifest (%d item(s)).", #result)
-	_debug_menu_cache = #result > 0 and result or DEBUG_MENU_FALLBACK
+	_debug_menu_cache = result
 	return _debug_menu_cache
 end
 

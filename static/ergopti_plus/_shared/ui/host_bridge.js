@@ -5,9 +5,11 @@
 // DESCRIPTION:
 // Provides makeHostBridge(name) — a factory for host-agnostic post functions
 // used by every webview app. On Windows (WebView2) the payload is sent as a
-// JSON string over window.chrome.webview; on macOS (WKWebView) the raw payload
-// is posted over window.webkit.messageHandlers[name]. String payloads bypass
-// JSON.stringify so plain-string commands ('ready', 'open_link', …) travel as-is.
+// JSON string over window.chrome.webview; on macOS (WKWebView) and Linux
+// (WebKit2GTK) the raw payload is posted over window.webkit.messageHandlers[name]
+// — both use the same WebKit JS API, so no third probe is needed for Linux.
+// String payloads bypass JSON.stringify so plain-string commands ('ready',
+// 'open_link', …) travel as-is.
 // ===========================================================================
 
 /**
