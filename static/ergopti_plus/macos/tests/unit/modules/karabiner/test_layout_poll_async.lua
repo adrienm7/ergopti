@@ -81,7 +81,16 @@ helpers.describe("karabiner.watchers: layout fallback poll is async (F-LOW-4)", 
 		local watchers = helpers.load_with_stubs("modules.karabiner.watchers", {
 			timer    = { doEvery = function() return { stop = function() end } end,
 			          doAfter  = function() return { stop = function() end } end },
-			keycodes = { inputSourceChanged = function() end, currentLayout = function() return "ABC" end },
+			-- load_with_stubs replaces hs.keycodes wholesale (shallow key
+			-- overwrite, not a merge — see helpers/init.lua), so this override
+			-- must carry its own .map. watchers.lua calls
+			-- Keycodes.to_name(Keycodes.F17_CYCLE_WINDOWS) at module load time
+			-- (top-level KEYCODE_F17_NAME assignment), which does
+			-- `for _, code in pairs(hs.keycodes.map)` — without .map here that
+			-- pairs() crashes on nil before this test's own assertions run.
+			-- F17_CYCLE_WINDOWS = 64 in _shared/lua/keycodes/init.lua.
+			keycodes = { inputSourceChanged = function() end, currentLayout = function() return "ABC" end,
+			          map = { f17 = 64 } },
 			execute  = function() return "", true end,
 		})
 
