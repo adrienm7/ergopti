@@ -286,6 +286,20 @@ shortcuts.start()
 Logger.info(LOG, "Main modules initialized successfully.")
 Boot.mark("Gestures + shortcuts pre-start")
 
+-- Script control (the AltGr+Enter/Backspace/Escape panic-button eventtap) is
+-- armed as early as its real dependencies allow. M.start() only stores the
+-- keymap/shortcuts/gestures/karabiner module TABLES for later pause/resume
+-- dispatch and creates its own eventtap — it does not call into any of their
+-- own start-up entry points, so it has no technical dependency on the keymap
+-- engine, the Karabiner bridge, or the LLM/TOML boot steps below. Moved here
+-- (right after the gestures/shortcuts pre-start) so the user's one boot-time
+-- recourse exists for the entire remainder of a slow boot, instead of only
+-- after MLX cleanup, LLM bootstrap, TOML loading and the keymap engine startup
+-- have all completed (F-MED-19).
+Logger.debug(LOG, "Starting script control engine…")
+shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)
+Boot.mark("Script control engine started (panic-button eventtap)")
+
 -- Fast-path LLM check: if LLM is explicitly disabled in hs.settings, skip the
 -- synchronous MLX cleanup (lsof + curl) — its sole consumer is the warmup retry
 -- loop which is also gated on LLM being enabled. When the setting is nil (user
@@ -309,12 +323,22 @@ local mlx_cleanup_enabled = hs.settings.get("llm.enabled") ~= false
 -- The MLX port is the single source of truth from api_mlx (_shared/modules/llm/mlx_server.json).
 -- Decision is spare-all-or-nuke-all: under SO_REUSEPORT the listening PID is
 -- unreliable to single out (bash wrapper vs Python child — see api_mlx.lua), so we
--- never pick individual PIDs. Synchronous on purpose: the port state must settle
--- before the warmup retry loop fires its first probe.
+-- never pick individual PIDs.
+--
+-- Deferred via hs.timer.doAfter(0, ...) so the synchronous shell work (lsof +
+-- curl + sleep, up to ~1.3s) never blocks the boot before EITHER eventtap
+-- exists: keymap.start() (the typing eventtap) and start_script_control()
+-- (the panic-button eventtap, now armed above) both complete synchronously
+-- before this tick fires. The port state still settles before the warmup retry
+-- loop's first probe, because that loop is itself scheduled no earlier than the
+-- LLM backend bootstrap below, which runs after this same event-loop tick
+-- (F-HIGH-12).
 if mlx_cleanup_enabled then
-	require("modules.llm.boot_cleanup").run_selective_cleanup()
+	hs.timer.doAfter(0, function()
+		require("modules.llm.boot_cleanup").run_selective_cleanup()
+	end)
 end -- if mlx_cleanup_enabled
-Boot.mark("MLX server cleanup")
+Boot.mark("MLX server cleanup scheduled (deferred off boot critical path)")
 
 -- Background deps check for the active LLM backend. The detector picks
 -- MLX on Apple Silicon (≥ macOS 13) and Ollama everywhere else; a
@@ -692,12 +716,11 @@ Boot.mark("UI: menu.start (menubar + state sync + engines + LLM handler)")
 -- install_extension() is idempotent; start_server() is safe to call every boot.
 pcall(function() require("lib.vscode_bridge").setup() end)
 
--- Script control is now managed through the shortcuts module
-Logger.debug(LOG, "Starting script control engine…")
-shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)
-
+-- Script control (the AltGr+Enter/Backspace/Escape panic-button tap) was moved
+-- to Section 1 (Module Pre-start) so the panic button exists for the entire
+-- boot, not only after the LLM/TOML/keymap steps have completed (F-MED-19).
 Logger.info(LOG, "User interface initialized successfully.")
-Boot.mark("UI: script control start")
+Boot.mark("UI: menu + vscode bridge ready")
 
 
 
