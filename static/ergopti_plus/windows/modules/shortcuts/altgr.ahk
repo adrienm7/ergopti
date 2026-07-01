@@ -53,6 +53,14 @@ IsAltGrLAltEnabled() {
 ; returns -- keeps SC138 a vanilla key until the wizard is done.
 
 AltGrLAltShortcut() {
+    global Features
+    ; Defense-in-depth: the #HotIf guard only fires this dispatcher when
+    ; _AnyShortcutEnabled("alt_gr_lalt") is already true, which requires the
+    ; sub-map to exist -- but a direct call (or a future dispatch path that
+    ; skips the #HotIf) against malformed/missing config must degrade
+    ; gracefully instead of throwing on the raw Map access below.
+    if !Features.Has("shortcuts") or !Features["shortcuts"].Has("alt_gr_lalt")
+        return
     if Features["shortcuts"]["alt_gr_lalt"]["backspace"] {
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
@@ -113,6 +121,12 @@ IsAltGrCapsLockEnabled() {
 AltGrCapsLockShortcut() {
     ; Inline v2 if/else cascade -- same 10-action surface as LAltCapsLockShortcut
     ; but reads from the alt_gr_caps_lock sub-Map.
+    global Features
+    ; Defense-in-depth: same guard as AltGrLAltShortcut -- the #HotIf normally
+    ; ensures this sub-map exists, but a direct call against malformed/missing
+    ; config must degrade gracefully instead of throwing on the raw Map access.
+    if !Features.Has("shortcuts") or !Features["shortcuts"].Has("alt_gr_caps_lock")
+        return
     if Features["shortcuts"]["alt_gr_caps_lock"]["backspace"] {
         TextPressKey("BackSpace", [])
     } else if Features["shortcuts"]["alt_gr_caps_lock"]["caps_lock"] {
