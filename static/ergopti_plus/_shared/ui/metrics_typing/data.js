@@ -857,7 +857,7 @@ function render_repetitions_kpi() {
 			`<div style="display:flex;align-items:center;gap:6px;">` +
 			`<span>${format_number(rep_pct.toFixed(1))}<span class="stat-unit">%</span></span>` +
 			`<span class="tooltip stat-inline-tooltip" style="color:var(--kpi-rep-color);">${INFO_SVG}` +
-			`<span class="tooltiptext">Part des bigrammes qui sont des redoublements (ex. « aa », « ll »). Réflète le mode source actif — comparez « Sans Ergopti+ » et « + Hotstrings » pour voir si la touche ★ est utilisée.</span>` +
+			``<span class="tooltiptext">${_t('ui_typing.tooltip_rep_pct')}</span>` +
 			`</span></div>`;
 	}
 
@@ -1149,7 +1149,7 @@ function render_sfb_kpi() {
 			`<div style="display:flex;align-items:center;gap:6px;">` +
 			`<span>${format_number(sfb_pct.toFixed(1))}<span class="stat-unit">%</span></span>` +
 			`<span class="tooltip stat-inline-tooltip" style="color:var(--kpi-sfb-color);">${INFO_SVG}` +
-			`<span class="tooltiptext">Part des bigrammes manuels frappés par le même doigt. Hors hotstrings — ce KPI mesure la difficulté physique brute du layout.</span>` +
+			`<span class="tooltiptext">${_t('ui_typing.tooltip_sfb_pct')}</span>` +
 			`</span></div>`;
 	}
 
@@ -1302,7 +1302,7 @@ function toggle_sfb_same_key() {
 	const btn = document.getElementById('sfb_same_key_btn');
 	if (btn) {
 		btn.classList.toggle('active', _sfb_include_same_key);
-		btn.textContent = _sfb_include_same_key ? 'Doublons inclus' : 'Doublons exclus';
+		btn.textContent = _sfb_include_same_key ? _t('ui_typing.btn_doublings_included') : _t('ui_typing.btn_doublings_excluded');
 	}
 	render_sfb_kpi();
 }
@@ -1631,7 +1631,7 @@ function render_avg_words_kpi() {
 	sub_el.innerHTML =
 		`<div style="margin-top:5px;">` +
 		`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(total_words)}</strong>` +
-		` <span class="stat-unit" style="font-size:0.9em;">mots tapés au total</span>` +
+		` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.unit_words_typed')}</span>` +
 		`</div>`;
 }
 
@@ -1804,14 +1804,7 @@ function render_ergo_bigram_kpi() {
 	// Info tooltip — concise glossary so users can self-serve the meaning.
 	const info = document.getElementById('ergo_bigram_info');
 	if (info && typeof INFO_SVG === 'string') {
-		const NBSP = String.fromCharCode(160);
-		const tip =
-			`<strong>SHB / SHU${NBSP}:</strong> bigrammes même main / leur part dans le total des bigrammes.<br>` +
-			`<strong>Roulement intérieur${NBSP}:</strong> auriculaire vers index. Le plus confortable.<br>` +
-			`<strong>Roulement extérieur${NBSP}:</strong> index vers auriculaire.<br>` +
-			`<strong>LSB${NBSP}:</strong> Lateral Stretch Bigram — un des deux doigts s'écarte d'au moins 1,5 colonne de son repos.<br>` +
-			`<strong>Ciseau${NBSP}:</strong> SHB qui croise ≥ 2 rangées avec le doigt court qui descend (ex. auriculaire en bas + majeur en haut).`;
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
+		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_ergo_bigram')}</span>`;
 	}
 
 	// Build a sortable detail table — the 12 worst pairs from each "bad" group
@@ -2000,13 +1993,7 @@ function render_ergo_trigram_kpi() {
 
 	const info = document.getElementById('ergo_trigram_info');
 	if (info && typeof INFO_SVG === 'string') {
-		const NBSP = String.fromCharCode(160);
-		const tip =
-			`<strong>SFS${NBSP}:</strong> Same-Finger Skipgram — un SFB avec une touche d'un autre doigt intercalée (ex. EAD).<br>` +
-			`<strong>SKS${NBSP}:</strong> Same-Key Skipgram — la même touche en positions 1 et 3 (ex. ELE).<br>` +
-			`<strong>Redirection${NBSP}:</strong> trois touches même main avec un changement de direction (auriculaire→majeur→annulaire = pic). Inconfortable.<br>` +
-			`<strong>Mauv. redir.${NBSP}:</strong> redirection où aucun des trois doigts n'est l'index. Parmi les pires enchaînements faisables sur un clavier.`;
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
+		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_ergo_trigram')}</span>`;
 	}
 
 	const top_n = (arr, n) => arr.sort((a, b) => b.count - a.count).slice(0, n);
@@ -2152,13 +2139,7 @@ function render_errors_kpi() {
 
 	const info = document.getElementById('errors_info');
 	if (info && typeof INFO_SVG === 'string') {
-		const NBSP = String.fromCharCode(160);
-		const tip =
-			`<strong>Lecture${NBSP}:</strong> bigrammes (deux touches consécutives) classés par <em>taux d'erreur</em> = nombre de fois où la 2ᵉ touche a été effacée par un backspace, divisé par le nombre d'occurrences totales.<br><br>` +
-			`<strong>Filtre${NBSP}:</strong> seuls les bigrammes apparus ≥ 5 fois sur la période sont affichés, pour éviter le bruit statistique des séquences rares.<br><br>` +
-			`<strong>Cascades${NBSP}:</strong> runs de ≥ 3 backspaces consécutifs (correction majeure : un mot ou une phrase effacés). Le compteur sépare ce signal des erreurs ponctuelles.<br><br>` +
-			`<strong>Temps de récup.${NBSP}:</strong> délai moyen entre un backspace et la touche suivante. Plus c'est long, plus la correction casse votre flux mental.`;
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
+		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_errors')}</span>`;
 	}
 
 	_err_data = rows;
@@ -2300,11 +2281,11 @@ function render_roi_kpi() {
 	};
 	set(
 		'roi_val',
-		`${format_number(total_saved)}<span class="stat-unit">caractères économisés</span>`
+		`${format_number(total_saved)}<span class="stat-unit">${_t('ui_typing.unit_chars_saved')}</span>`
 	);
 	set('roi_time_saved', total_saved > 0 ? fmt_duration(time_saved_ms) : '—');
-	set('roi_hs_saved', `${format_number(hs_saved)} (${hs_triggers} déclench.)`);
-	set('roi_llm_saved', `${format_number(llm_saved)} (${llm_triggers} déclench.)`);
+	set('roi_hs_saved', `${format_number(hs_saved)} (${hs_triggers} ${_t('ui_typing.unit_triggers')})`);
+	set('roi_llm_saved', `${format_number(llm_saved)} (${llm_triggers} ${_t('ui_typing.unit_triggers')})`);
 	set(
 		'roi_llm_acc',
 		llm_suggested > 0
@@ -2320,12 +2301,7 @@ function render_roi_kpi() {
 
 	const info = document.getElementById('roi_info');
 	if (info && typeof INFO_SVG === 'string') {
-		const NBSP = String.fromCharCode(160);
-		const tip =
-			`<strong>Caractères économisés${NBSP}:</strong> sortie nette des expansions HS / IA, c.-à-d. caractères ajoutés à l'écran moins ceux qui ont déclenché l'expansion (et qui ont donc été tapés manuellement).<br><br>` +
-			`<strong>Temps économisé${NBSP}:</strong> caractères économisés × cadence moyenne (temps actif manuel ÷ nombre de frappes manuelles) sur la même période. C'est une borne inférieure honnête : c'est ce que vous auriez mis pour les taper vous-même.<br><br>` +
-			`<strong>Acceptation IA${NBSP}:</strong> part des suggestions IA affichées qui ont été acceptées par l'utilisateur.`;
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
+		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_roi')}</span>`;
 	}
 }
 
@@ -2392,12 +2368,7 @@ function render_lexical_kpi() {
 
 	const info = document.getElementById('lexical_info');
 	if (info && typeof INFO_SVG === 'string') {
-		const NBSP = String.fromCharCode(160);
-		const tip =
-			`<strong>Richesse${NBSP}:</strong> mots uniques ÷ mots totaux. Plus c'est haut, plus le vocabulaire est varié. Un texte littéraire sera vers 40–60${NBSP}%, du chat ou du code beaucoup plus bas.<br><br>` +
-			`<strong>Longueur moyenne${NBSP}:</strong> moyenne pondérée par fréquence — c'est la longueur du mot que vous tapez "en moyenne", pas la longueur médiane du dictionnaire.<br><br>` +
-			`<strong>Filtre${NBSP}:</strong> les mots de moins de 2 caractères sont ignorés (ce sont presque toujours des résidus de découpage par ponctuation).`;
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
+		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_lexical')}</span>`;
 	}
 
 	// Histogram of word lengths — horizontal bars normalised to the max bucket.
@@ -2426,7 +2397,7 @@ function render_lexical_kpi() {
 		);
 	}
 	container.innerHTML =
-		`<div style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">Distribution des longueurs (pondérée par fréquence)</div>` +
+		`<div style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_word_length_dist')}</div>` +
 		`<table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>${bars_html.join('')}</tbody></table>`;
 }
 
@@ -2529,12 +2500,7 @@ function render_rhythm_kpi() {
 
 	const info = document.getElementById('rhythm_info');
 	if (info && typeof INFO_SVG === 'string') {
-		const NBSP = String.fromCharCode(160);
-		const tip =
-			`<strong>Rafale${NBSP}:</strong> stretch de frappe sans gap > 1${NBSP}s entre deux touches.<br><br>` +
-			`<strong>CPM pic${NBSP}:</strong> meilleur CPM observé sur une rafale d'au moins 10 caractères. Le seuil exclut les sprints fugaces non représentatifs.<br><br>` +
-			`<strong>Régularité (CV)${NBSP}:</strong> coefficient de variation = écart-type ÷ moyenne. 0 = métronome parfait, > 0,6 = très irrégulier.`;
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
+		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_rhythm')}</span>`;
 	}
 
 	const container = document.getElementById('rhythm_distribution_container');
@@ -2565,7 +2531,7 @@ function render_rhythm_kpi() {
 		})
 		.join('');
 	container.innerHTML =
-		`<div style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">Distribution des longueurs de rafales</div>` +
+		`<div style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_burst_length_dist')}</div>` +
 		`<table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>${bars}</tbody></table>`;
 }
 
@@ -2608,7 +2574,7 @@ function render_sessions_kpi() {
 		const el = document.getElementById(id);
 		if (el) el.innerHTML = html;
 	};
-	set('sessions_val', `${format_number(count)}<span class="stat-unit">séances</span>`);
+	set('sessions_val', `${format_number(count)}<span class="stat-unit">${_t('ui_typing.unit_sessions')}</span>`);
 	set('sessions_total_time', count > 0 ? _fmt_duration_ms(total_active_ms) : '—');
 	set('sessions_longest_time', longest_ms > 0 ? _fmt_duration_ms(longest_ms) : '—');
 	set('sessions_longest_chars', longest_chars > 0 ? `${format_number(longest_chars)} car.` : '—');
@@ -2621,12 +2587,7 @@ function render_sessions_kpi() {
 
 	const info = document.getElementById('sessions_info');
 	if (info && typeof INFO_SVG === 'string') {
-		const NBSP = String.fromCharCode(160);
-		const tip =
-			`<strong>Séance${NBSP}:</strong> bloc de typing avec aucun gap > 5${NBSP}min entre deux frappes consécutives. Détecté côté keylogger, donc indépendant du filtre de pause de l'UI.<br><br>` +
-			`<strong>Temps actif total${NBSP}:</strong> somme des durées de toutes les séances — c'est-à-dire le temps réellement passé à taper, en ignorant les pauses > 5${NBSP}min.<br><br>` +
-			`<strong>Plus longue (chars)${NBSP}:</strong> peut concerner une séance différente de celle qui a la plus longue durée — par exemple une longue séance lente versus une courte séance ultra-rapide.`;
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
+		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_sessions')}</span>`;
 	}
 }
 
@@ -2741,11 +2702,7 @@ function render_records_kpi() {
 
 	const info = document.getElementById('records_info');
 	if (info && typeof INFO_SVG === 'string') {
-		const NBSP = String.fromCharCode(160);
-		const tip =
-			`<strong>Portée${NBSP}:</strong> les records sont calculés sur <em>toute</em> la base de données — ils ne suivent pas le filtre de dates de l'UI (sinon le record disparaît dès qu'on zoome). Le filtre d'apps reste appliqué.<br><br>` +
-			`<strong>Streak${NBSP}:</strong> plus longue suite de jours consécutifs avec au moins une frappe. Manquer une journée remet le compteur à zéro.`;
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
+		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_records')}</span>`;
 	}
 }
 
@@ -2756,11 +2713,11 @@ function render_records_kpi() {
 // =================================================
 
 const CHARMIX_CATEGORIES = [
-	{ key: 'letter', label: 'Lettres', color: 'rgb(96,165,250)' },
-	{ key: 'digit', label: 'Chiffres', color: 'rgb(251,191,36)' },
-	{ key: 'punct', label: 'Ponctuation', color: 'rgb(248,113,113)' },
-	{ key: 'space', label: 'Espaces', color: 'rgb(74,222,128)' },
-	{ key: 'other', label: 'Autres', color: 'rgb(168,162,158)' }
+	{ key: 'letter', labelKey: 'ui_typing.charmix_letters', color: 'rgb(96,165,250)' },
+	{ key: 'digit', labelKey: 'ui_typing.charmix_digits', color: 'rgb(251,191,36)' },
+	{ key: 'punct', labelKey: 'ui_typing.charmix_punct', color: 'rgb(248,113,113)' },
+	{ key: 'space', labelKey: 'ui_typing.charmix_spaces', color: 'rgb(74,222,128)' },
+	{ key: 'other', labelKey: 'ui_typing.charmix_other', color: 'rgb(168,162,158)' }
 ];
 
 /**
@@ -2821,7 +2778,7 @@ function render_charmix_kpi() {
 	set(
 		'charmix_val',
 		dominant && grand > 0
-			? `${((dom_n / grand) * 100).toFixed(0)}<span class="stat-unit">% ${dominant.label.toLowerCase()}</span>`
+			? `${((dom_n / grand) * 100).toFixed(0)}<span class="stat-unit">% ${_t(dominant.labelKey).toLowerCase()}</span>`
 			: `—`
 	);
 
@@ -2832,11 +2789,7 @@ function render_charmix_kpi() {
 
 	const info = document.getElementById('charmix_info');
 	if (info && typeof INFO_SVG === 'string') {
-		const NBSP = String.fromCharCode(160);
-		const tip =
-			`<strong>Catégories${NBSP}:</strong> chaque caractère manuel typé est rangé Lua-side dans une des cinq catégories — lettres latines (incluant accentuées courantes), chiffres, ponctuation et symboles, espaces (incluant NBSP / NNBSP / tab / retour), et autres (caractères non-latins, marqueurs spéciaux du keylogger).<br><br>` +
-			`<strong>Indication${NBSP}:</strong> code-heavy = beaucoup de ponctuation et chiffres ; prose-heavy = essentiellement lettres et espaces ; chat = équilibre avec un peu de tout.`;
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
+		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_charmix')}</span>`;
 	}
 
 	// Stacked horizontal bar — segments proportional to each category's share,
@@ -2850,8 +2803,7 @@ function render_charmix_kpi() {
 	const segments = CHARMIX_CATEGORIES.map((c) => {
 		const n = totals[c.key] || 0;
 		const pct = (n / grand) * 100;
-		const label =
-			pct >= 6 ? `${c.label.charAt(0).toUpperCase()}${c.label.slice(1)} ${pct.toFixed(0)}%` : '';
+		const label = pct >= 6 ? `${_t(c.labelKey)} ${pct.toFixed(0)}%` : '';
 		return { ...c, n, pct, label };
 	}).filter((s) => s.pct > 0);
 	const bar_html = segments
@@ -2863,7 +2815,7 @@ function render_charmix_kpi() {
 		)
 		.join('');
 	container.innerHTML =
-		`<div style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">Répartition (${format_number(grand)} caractères)</div>` +
+		`<div style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_charmix_dist').replace('%s', format_number(grand))}</div>` +
 		`<div style="display:flex;height:24px;border-radius:6px;overflow:hidden;">${bar_html}</div>`;
 }
 
@@ -3014,11 +2966,7 @@ function render_apps_kpi() {
 
 	const info = document.getElementById('apps_info');
 	if (info && typeof INFO_SVG === 'string') {
-		const NBSP = String.fromCharCode(160);
-		const tip =
-			`<strong>App la + rapide${NBSP}:</strong> CPM moyen le plus élevé sur les apps avec ≥ 200 caractères tapés (en dessous on tomberait sur des apps utilisées 2 secondes).<br><br>` +
-			`<strong>Paire fréquente${NBSP}:</strong> les deux apps entre lesquelles vous alternez le plus, dans les deux sens. Indique votre workflow type (éditeur ↔ navigateur, doc ↔ chat…).`;
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
+		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_apps')}</span>`;
 	}
 
 	render_apps_table();
@@ -3188,13 +3136,13 @@ function render_wellness_kpi() {
 		signal_color = '';
 	if (total_chars > 0) {
 		if (long_sessions >= 2 || max_finger_streak >= 8) {
-			signal_label = 'Vigilance';
+			signal_label = _t('ui_typing.signal_vigilance');
 			signal_color = 'color:rgb(248,113,113);';
 		} else if (long_sessions >= 1 || max_finger_streak >= 6 || max_hand_streak >= 12) {
-			signal_label = 'Surveillé';
+			signal_label = _t('ui_typing.signal_surveille');
 			signal_color = 'color:rgb(251,191,36);';
 		} else {
-			signal_label = 'Équilibré';
+			signal_label = _t('ui_typing.signal_equilibre');
 			signal_color = 'color:rgb(74,222,128);';
 		}
 	}
@@ -3226,13 +3174,7 @@ function render_wellness_kpi() {
 
 	const info = document.getElementById('wellness_info');
 	if (info && typeof INFO_SVG === 'string') {
-		const NBSP = String.fromCharCode(160);
-		const tip =
-			`<strong>Signal global${NBSP}:</strong> rouge "Vigilance" si ≥ 2 séances de plus de 90${NBSP}min ou un streak doigt ≥ 8 ; orange "Surveillé" si ≥ 1 séance longue ou streak doigt ≥ 6 ou main ≥ 12 ; vert "Équilibré" sinon.<br><br>` +
-			`<strong>Ratio actif${NBSP}:</strong> temps réellement passé à taper ÷ temps où l'app était en focus. Bas = vous lisez beaucoup, ce qui réduit la charge frappe mais signale aussi un déséquilibre input/output si chronique.<br><br>` +
-			`<strong>Streak doigt / main${NBSP}:</strong> longest run de touches consécutives sur le même doigt ou la même main. Au-delà de 5 (doigt) ou 12 (main), la charge n'est plus distribuée.<br><br>` +
-			`<strong>Séances longues${NBSP}:</strong> séances ≥ 90${NBSP}min sans pause. Seuil clinique au-delà duquel le risque TMS augmente sensiblement.`;
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
+		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_wellness')}</span>`;
 	}
 
 	// Cumulative finger load: horizontal bar showing each finger's share of
@@ -3282,7 +3224,7 @@ function render_wellness_kpi() {
 		);
 	}).join('');
 	container.innerHTML =
-		`<div style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">Charge cumulée par doigt — répartition idéale ≈ 12,5% chacun</div>` +
+		`<div style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_finger_load_dist')}</div>` +
 		`<table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>${rows}</tbody></table>`;
 }
 
