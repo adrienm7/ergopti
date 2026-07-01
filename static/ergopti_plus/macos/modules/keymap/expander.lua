@@ -112,7 +112,15 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	-- to avoid a no-op synth_queue entry that would absorb the first real keystroke typed
 	-- immediately after a cancelled or empty expansion.
 	if (deletes > 0 or emitted_str ~= "") and keylogger and type(keylogger.notify_synthetic) == "function" then
-		keylogger.notify_synthetic(emitted_str, source_type or "hotstring", deletes, source_variant)
+		-- pcall-wrapped like the neighboring buffer_action call below: a truncated
+		-- LLM completion cut mid-codepoint (French accents, curly quotes, em-dashes)
+		-- can reach notify_synthetic with malformed UTF-8, and its utf8.codes loop
+		-- would otherwise raise, aborting the expansion mid-flight and leaving the
+		-- synthetic-injection trackers desynced (F-HIGH-16 fix).
+		local ok_notify, notify_err = pcall(keylogger.notify_synthetic, emitted_str, source_type or "hotstring", deletes, source_variant)
+		if not ok_notify then
+			Logger.error(LOG, "notify_synthetic failed: %s.", tostring(notify_err))
+		end
 	end
 
 	if type(buffer_action) == "function" then
