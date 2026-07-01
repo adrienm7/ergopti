@@ -200,10 +200,18 @@ jobs:
         run: node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua
 
   # ─────────────────────────────────────────────────
-  # 2.2) Hammerspoon E2E (virtual-keyboard harness)
+  # 2.2) Hammerspoon virtual-keyboard harness (stubbed, NOT real macOS/HS)
   # ─────────────────────────────────────────────────
+  # This job runs on ubuntu-latest against the same in-memory tests/stubs/hs.lua
+  # fake that tests/unit uses — no real Hammerspoon process, no WindowServer, no
+  # CGEventPost round-trip is ever exercised here. It is a corpus-driven
+  # virtual-keyboard replay of the Registry + Expander logic layer, not an
+  # OS-level end-to-end test. See tests/e2e/PLAN_E2E_REAL_HS.md for what a real
+  # macOS/Hammerspoon E2E run would require (a self-hosted GUI runner) and why
+  # it is not wired in today. Named/commented explicitly so a green check here
+  # never implies OS-level coverage it does not have (F-HIGH-30).
   e2e-hs:
-    name: 'macOS · E2E'
+    name: 'macOS · virtual-keyboard harness (stubbed, not real HS)'
     runs-on: ubuntu-latest
     needs: [test-hs]
 
@@ -216,7 +224,7 @@ jobs:
           sudo apt-get install -y lua5.4 liblua5.4-dev luarocks
           sudo luarocks --lua-version 5.4 install luafilesystem
 
-      - name: Run E2E virtual-keyboard harness
+      - name: Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)
         # Exercises Registry + Expander via the stub layer against
         # hardcoded scenarios and all corpus vectors.
         # Exit 0 = all pass, 1 = at least one failure.
