@@ -187,8 +187,18 @@ RegisterCapsLockLayer() {
 	Hotkey(ScriptInformation["MagicKeySourceScan"], ((*) => SendNewResult(ScriptInformation["MagicKey"])), "I2")
 
 	; --- Letters and symbols (registered last, highest precedence) ---
+	; Same OS-layout-shifted-digit exclusion as RegisterShiftLayer: without it,
+	; toggling CapsLock on shadows the global direct_access_digits passthrough
+	; hotkeys with an ergopti_base variant, silently regressing the
+	; auto-advance-skips-a-field fix for OTP/device-login digit boxes.
+	SkipDigitRow := IsSet(Features)
+		&& Features["layout"]["direct_access_digits"]
+		&& IsSet(_OsLayoutDigitsAreShifted)
+		&& _OsLayoutDigitsAreShifted()
 	HotIf((*) => GetCapsLockCondition() and Features["layout"]["ergopti_base"])
 	for SC in SHIFTED_LETTERS {
+		if (SkipDigitRow && _SHIFT_DIGIT_SCS.Has(SC))
+			continue
 		Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS), "I2")
 	}
 	for SC in CAPSLOCK_SYMBOLS {
