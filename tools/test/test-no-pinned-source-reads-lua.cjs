@@ -46,7 +46,29 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'tests');
 //                     test_day_rollover_drain.lua §2 (drain-loop guard),
 //                     test_api_token_lazy_decrypt.lua (init.lua + api_remote.lua source scan),
 //                     test_ollama_manager_nonblocking.lua §1 (blocking-call source guard))
-const BASELINE = 140;
+//          140 → 153 (2026-07-01 audit implementation pass: 13 new deliberate source
+//                     invariants, each either audit-prescribed (a source-only check is
+//                     the audit's own proposed test for a narrow mechanical fix — e.g.
+//                     test_mlx_manager_delete_nonblocking.lua's "no os.execute('rm -rf'
+//                     remains, hs.task.new + '-rf' + _active_tasks present" check,
+//                     test_api_mlx_discovery_dead_constant_removed.lua's "constant is
+//                     gone" check — behaviorally untestable, absence is inherently a
+//                     source fact) or backed by a stronger companion behaviour section
+//                     in the same file (test_wpm_timer_callbacks_pcall.lua,
+//                     test_tooltip_llm_is_visible_after_render_crash.lua,
+//                     test_disable_all_releases_clicklock.lua,
+//                     test_synthetic_paste_not_logged_as_shortcut.lua,
+//                     test_context_tracker_ax_focused_element_pcall.lua,
+//                     test_wpm_widget_mouse_callback_stale_geometry.lua,
+//                     test_wpm_darken_hex_malformed_input.lua) or a documented
+//                     faithful-mirror test pinned against source because the real
+//                     function is gated behind private module state unreachable from
+//                     the headless stub (test_notify_synthetic_malformed_utf8.lua,
+//                     same accepted shape as test_synth_queue_drain.lua's
+//                     simulate_drain), plus test_api_mlx_discovery_generation_guard.lua,
+//                     test_menu_metrics_master_toggle_pause_gate.lua, and
+//                     test_menu_quit_karabiner_ownership.lua)
+const BASELINE = 153;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read). None exists yet;
 // listed so that converting a test to such a helper drops it from the count.
