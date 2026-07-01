@@ -61,6 +61,12 @@ GestureGetCyclableWindows(ProcessFilter := "") {
                 }
             }
             Result.Push(HWnd)
+        } catch as Err {
+            ; A window closing mid-enumeration (a routine race, not a bug)
+            ; throws TargetError on the next WinGet* call for that HWnd — skip
+            ; just this window instead of aborting the whole cycle list.
+            LoggerDebug("gestures", "GestureGetCyclableWindows: skipped ahk_id {1}: {2}.", HWnd, Err.Message)
+            continue
         }
     }
 

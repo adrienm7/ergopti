@@ -376,6 +376,8 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_gesture_takenote_winwait.ahk
 #Include meta/test_takenote_winmaximize_guard.ahk
 #Include meta/test_gesture_takenote_winmaximize_guard.ahk
+#Include meta/test_gesture_get_cyclable_windows_catch.ahk
+#Include meta/test_open_downloads_catch.ahk
 #Include meta/test_gesture_exit_button_release.ahk
 #Include meta/test_textsend_clipall.ahk
 #Include meta/test_llm_autotype_hse_suppress.ahk
@@ -668,6 +670,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_tooltip_resolve_pos_profiled.ahk
 #Include meta/test_error_net_guarded_send.ahk
 #Include meta/test_error_net_uia_orphan_suppress.ahk
+#Include meta/test_deferred_crash_report_catch.ahk
 #Include meta/test_llmdiff_has_corrections_ltrim.ahk
 #Include meta/test_audit_test_gaps.ahk
 #Include meta/test_keylogger_flush_atomic.ahk
