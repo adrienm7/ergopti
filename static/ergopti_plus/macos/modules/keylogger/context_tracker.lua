@@ -186,7 +186,16 @@ function M.update_ax_observer(app_pid)
 	-- removeWatcher call fires on E1 when E2 gets focus; without this assignment
 	-- the guard `if _last_focused_element` is always nil on the first switch and
 	-- the bootstrap watcher leaks (orphaned watchers accumulate per app activation).
-	local focused = app_element:attributeValue("AXFocusedUIElement")
+	-- pcall-guarded like every other AX call in this function: a throw here would
+	-- otherwise propagate out of the application-watcher callback that invokes this
+	-- function (which reports errors only to the HS Console) and silently leave the
+	-- new app's observer unattached, even though `observer` and `app_element` were
+	-- already created successfully.
+	local ok_focused, focused = pcall(function() return app_element:attributeValue("AXFocusedUIElement") end)
+	if not ok_focused then
+		Logger.warn(LOG, "Failed to read AXFocusedUIElement for PID %s.", tostring(app_pid))
+		focused = nil
+	end
 	if focused then
 		pcall(function() observer:addWatcher(focused, "AXValueChanged") end)
 		_last_focused_element = focused
