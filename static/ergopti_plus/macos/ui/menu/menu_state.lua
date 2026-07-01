@@ -155,6 +155,14 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	if type(hotstring_editor.set_default_section) == "function" then pcall(hotstring_editor.set_default_section, state.custom_default_section) end
 	if type(hotstring_editor.set_close_on_add) == "function"    then pcall(hotstring_editor.set_close_on_add, state.custom_close_on_add) end
 
+	-- Sync the dynamic-hotstrings RulesEngine's trigger char too — without this
+	-- it only ever sees the value captured once at boot, orphaning every
+	-- date/prefix rule from a magic-key change made via the menu (F-HIGH-8 fix).
+	local dyn_hot_mod = core_mods and core_mods.dyn_hot_mod
+	if dyn_hot_mod and type(dyn_hot_mod.set_trigger_char) == "function" then
+		pcall(dyn_hot_mod.set_trigger_char, state.trigger_char)
+	end
+
 	local sc = state.custom_editor_shortcut
 	if sc == nil then
 		local def = { mods = {"ctrl"}, key = state.trigger_char }

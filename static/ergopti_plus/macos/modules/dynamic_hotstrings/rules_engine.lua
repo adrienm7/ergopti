@@ -267,6 +267,23 @@ function M.inject_data(personal_data, trigger_char)
 	register_prefix_entries()
 end
 
+--- Live-updates the trigger character the interceptor listens for.
+--- Called from menu_state.lua's sync_state_to_modules alongside the existing
+--- keymap/hotstring_editor trigger-char calls, so a magic-key change made via
+--- the menu reaches this engine without requiring a full reload (F-HIGH-8 fix:
+--- previously this engine only ever saw the value captured once at boot from
+--- personal_info.toml's own independent default, orphaning every date/prefix
+--- rule the moment a user customized the magic key).
+--- @param char string The new trigger character (must be a non-empty string).
+function M.set_trigger_char(char)
+	if type(char) ~= "string" or char == "" then
+		Logger.warn(LOG, "set_trigger_char: received an invalid value ('%s') — ignored.", tostring(char))
+		return
+	end
+	_trigger = char
+	Logger.debug(LOG, "Trigger char: '%s'.", char)
+end
+
 --- Initializes the engine, wiring it into the keymap engine.
 --- @param keymap_module table The active keymap module reference.
 function M.start(keymap_module)

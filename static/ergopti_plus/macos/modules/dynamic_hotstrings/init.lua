@@ -69,12 +69,20 @@ function M.start(base_dir, keymap_module, info_toml_path)
 
 	-- Start the personal info tracker
 	PersonalInfo.start(base_dir, keymap_module, info_toml_path)
-	
+
 	Logger.debug(LOG, "Injecting personal data into the rules engine…")
-	
-	-- Pass the securely loaded data from PersonalInfo to the Rules Engine
-	RulesEngine.inject_data(PersonalInfo.get_info(), PersonalInfo.get_trigger_char())
-	
+
+	-- Source the trigger from the real, user-configurable magic key
+	-- (keymap_module.get_trigger_char(), backed by CoreState.magic_key) instead
+	-- of PersonalInfo.get_trigger_char() — the latter is just personal_info.toml's
+	-- own independent default and never reflects a magic-key change made via the
+	-- menu (F-HIGH-8 fix). A live RulesEngine.set_trigger_char() call is also
+	-- wired into menu_state.lua's sync so later changes keep reaching this engine.
+	local trigger_char = (type(keymap_module) == "table" and type(keymap_module.get_trigger_char) == "function")
+		and keymap_module.get_trigger_char()
+		or PersonalInfo.get_trigger_char()
+	RulesEngine.inject_data(PersonalInfo.get_info(), trigger_char)
+
 	Logger.debug(LOG, "Starting the dynamic rules engine…")
 	
 	-- Start the dynamic rules engine
@@ -95,5 +103,10 @@ end
 M.open_editor = PersonalInfo.open_editor
 M.enable      = PersonalInfo.enable
 M.disable     = PersonalInfo.disable
+
+-- Proxy the RulesEngine's live trigger-char setter so menu_state.lua's
+-- sync_state_to_modules can update this engine the same way it already
+-- updates keymap and hotstring_editor (F-HIGH-8 fix).
+M.set_trigger_char = RulesEngine.set_trigger_char
 
 return M
