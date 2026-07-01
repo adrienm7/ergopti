@@ -34,10 +34,12 @@
 #HotIf TapHoldTapAction(TapHold, "right_shift") != "" and not LayerEnabled
 ~$SC036::
 {
+	; Bounded (unlike a bare KeyWait): a lost SC036 key-up can never wedge
+	; this hotkey's tap/hold discrimination forever (hold-keywait-whole-class).
 	TimeBefore := A_TickCount
-	KeyWait("SC036")
+	Released := KeyWait("SC036", "T" . TapHoldDuration(TapHold, "right_shift"))
 	TimeAfter := A_TickCount
-	tap := ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "right_shift") * 1000)
+	tap := Released and ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "right_shift") * 1000)
 	if (
 		tap
 		and (TimeAfter - TimeBefore) >= TapMinDurationMs()

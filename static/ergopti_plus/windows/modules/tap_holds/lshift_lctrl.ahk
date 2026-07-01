@@ -40,10 +40,13 @@
 #HotIf TapHoldTapAction(TapHold, "left_shift") != "" and not LayerEnabled
 ~$SC02A::
 {
+	; Bounded (unlike a bare KeyWait): a lost SC02A key-up (focus stolen by a
+	; UAC prompt, Suspend toggled mid-press) can never wedge this hotkey's
+	; tap/hold discrimination forever (hold-keywait-whole-class).
 	TimeBefore := A_TickCount
-	KeyWait("SC02A")
+	Released := KeyWait("SC02A", "T" . TapHoldDuration(TapHold, "left_shift"))
 	TimeAfter := A_TickCount
-	tap := ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "left_shift") * 1000)
+	tap := Released and ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "left_shift") * 1000)
 	if (
 		tap
 		and (TimeAfter - TimeBefore) >= TapMinDurationMs()
@@ -77,10 +80,12 @@ _LShiftDispatch() {
 ~$SC01D::
 {
 	UpdateLastSentCharacter("LControl")
+	; Bounded (unlike a bare KeyWait): a lost SC01D key-up can never wedge
+	; this hotkey's tap/hold discrimination forever (hold-keywait-whole-class).
 	TimeBefore := A_TickCount
-	KeyWait("SC01D")
+	Released := KeyWait("SC01D", "T" . TapHoldDuration(TapHold, "left_ctrl"))
 	TimeAfter := A_TickCount
-	tap := ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "left_ctrl") * 1000)
+	tap := Released and ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "left_ctrl") * 1000)
 	if (
 		tap
 		and (TimeAfter - TimeBefore) >= TapMinDurationMs()
