@@ -49,13 +49,14 @@ helpers.describe("keylogger: midnight rotation invariants (C3)", function()
 
 	local function extract_maintenance(src)
 		-- Extract the body of perform_maintenance() by finding its definition
-		-- and taking the next ~600 chars (the function is short — ~15 lines).
-		-- After the watchers extraction it is exposed as M.perform_maintenance;
-		-- accept both the old local form and the public form (move-resilient).
+		-- and taking the next ~1300 chars (the function grew past ~15 lines
+		-- once the drain-success gate was added — see F-HIGH-2). After the
+		-- watchers extraction it is exposed as M.perform_maintenance; accept
+		-- both the old local form and the public form (move-resilient).
 		local fn_start = src:find("local function perform_maintenance()", 1, true)
 			or src:find("function M.perform_maintenance()", 1, true)
 		helpers.assert_true(fn_start ~= nil, "perform_maintenance() must exist in keylogger init/watchers")
-		return src:sub(fn_start, fn_start + 600)
+		return src:sub(fn_start, fn_start + 1300)
 	end
 
 

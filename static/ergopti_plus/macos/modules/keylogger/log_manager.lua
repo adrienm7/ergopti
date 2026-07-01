@@ -597,8 +597,11 @@ end
 
 --- Day rollover handler. Drains remaining today.log then delegates to
 --- Rotation.rollover to reset the file and offset.
+--- @return boolean True when the drain fully completed and rollover ran; false
+--- when the drain stalled and today.log/state were deliberately preserved for
+--- retry on the next midnight tick.
 function M.day_rollover()
-	if not _require_state("day_rollover") then return end
+	if not _require_state("day_rollover") then return false end
 
 	-- read_new_entries caps at INGEST_BATCH_LINES per call, so a single
 	-- ingest_once may leave data behind. Loop until empty or stalled to prevent
@@ -625,11 +628,14 @@ function M.day_rollover()
 	end
 
 	if not drained then
+		-- The drain stalled: today.log, the ngram context, and the meta
+		-- bookmarks must all survive untouched so the next midnight tick can
+		-- retry from exactly where this attempt gave up (G1, G2).
 		Logger.warn(LOG, "day_rollover: today.log not fully drained — file preserved, rotation skipped.")
-	else
-		Rotation.rollover(_paths.data_sql_path)
+		return false
 	end
 
+	Rotation.rollover(_paths.data_sql_path)
 	Aggregator.reset_ngram_ctx()
 	local db = SqliteWriter.get_db()
 	if db then
@@ -638,6 +644,7 @@ function M.day_rollover()
 			"UPDATE meta SET value='%s' WHERE key='today_log_date';", Rotation.get_date() or ""))
 		db:exec("UPDATE meta SET value='{}' WHERE key='ngram_ctx_json';")
 	end
+	return true
 end
 
 
