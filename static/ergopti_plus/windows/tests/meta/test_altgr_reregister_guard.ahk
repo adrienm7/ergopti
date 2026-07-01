@@ -84,3 +84,32 @@ _AGRG_RegistrationIsLogged() {
 		"_RegisterAltGrShortcutsHotkeys must set _AltGrShortcutsRegistered := true after a successful registration")
 }
 Test("Shortcuts/altgr: AltGr combo registration is wrapped in a LoggerStart/Success pair (altgr-shortcut-hotkeys-reregister-unguarded)", _AGRG_RegistrationIsLogged)
+
+; Regression: both Hotkey() calls used a bare `try` with no `catch`, so a
+; failed registration (invalid syntax, duplicate binding, permission issue)
+; was silently swallowed and execution fell through to LoggerSuccess anyway
+; -- defeating the very LoggerStart/LoggerSuccess pairing asserted above,
+; since the log would claim success even when registration actually failed.
+_AGRG_HotkeyFailuresAreCaughtAndLogged() {
+	Seg := _DriverFuncBody("_RegisterAltGrShortcutsHotkeys")
+	Assert(Seg != "", "_RegisterAltGrShortcutsHotkeys() declaration must exist in altgr.ahk")
+
+	for _, Combo in ["SC138 & SC038", "SC138 & SC03A"] {
+		CallNeedle := 'Hotkey("' . Combo . '"'
+		CallPos := InStr(Seg, CallNeedle)
+		Assert(CallPos > 0, "_RegisterAltGrShortcutsHotkeys must still register " . Combo)
+
+		Window := SubStr(Seg, CallPos, 250)
+		Assert(InStr(Window, "catch") > 0,
+			"_RegisterAltGrShortcutsHotkeys: the Hotkey(" . Combo . ") call must have a catch clause -- a bare try silently swallows a registration failure and still reaches LoggerSuccess")
+		Assert(InStr(Window, "LoggerError") > 0,
+			"_RegisterAltGrShortcutsHotkeys: a failed Hotkey(" . Combo . ") registration must LoggerError so it is diagnosable")
+
+		SuccessPos := InStr(Seg, "LoggerSuccess")
+		CatchReturnPos := InStr(Window, "return")
+		Assert(CatchReturnPos > 0 and (CallPos + CatchReturnPos) < SuccessPos,
+			"_RegisterAltGrShortcutsHotkeys: the catch clause for " . Combo . " must return BEFORE LoggerSuccess -- otherwise a failed registration would still log success")
+	}
+}
+Test("Shortcuts/altgr: failed Hotkey() registrations are caught, logged, and skip LoggerSuccess (altgr-hotkey-registration-swallowed)",
+	_AGRG_HotkeyFailuresAreCaughtAndLogged)

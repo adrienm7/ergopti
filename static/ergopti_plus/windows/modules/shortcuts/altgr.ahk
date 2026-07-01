@@ -166,8 +166,18 @@ _RegisterAltGrShortcutsHotkeys() {
     opts := "I3"
     HotIf((*) => IsAltGrLAltEnabled() and IsRealAltGrPress())
     try Hotkey("SC138 & SC038", (*) => AltGrLAltShortcut(), opts)
+    catch as Err {
+        HotIf()
+        LoggerError("shortcuts", "Failed to register SC138 & SC038 (AltGr+LAlt): {1}.", Err.Message)
+        return
+    }
     HotIf((*) => IsAltGrCapsLockEnabled() and IsRealAltGrPress())
     try Hotkey("SC138 & SC03A", (*) => AltGrCapsLockShortcut(), opts)
+    catch as Err {
+        HotIf()
+        LoggerError("shortcuts", "Failed to register SC138 & SC03A (AltGr+CapsLock): {1}.", Err.Message)
+        return
+    }
     HotIf()
     _AltGrShortcutsRegistered := true
     LoggerSuccess("shortcuts", "AltGr shortcut combos registered.")
