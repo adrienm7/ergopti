@@ -850,15 +850,20 @@ _LLMRemoteJsonEscape(s) {
 ; output, no need for the full JSON spec since we never feed the result back
 ; into a JSON parser.
 _LLMRemoteJsonUnescape(s) {
-    ; AHK-26: neutralise \\ FIRST via Chr(0) sentinel so that \\n / \\t / \\r
+    ; AHK-26: neutralise \\ FIRST via a sentinel so that \\n / \\t / \\r
     ; sequences are not munged by the later single-char escape passes (the old
-    ; ordering let \\n → \newline instead of the correct \n).
-    s := StrReplace(s, "\\",    Chr(0))  ; sentinel for literal backslash
+    ; ordering let \\n → \newline instead of the correct \n). Chr(0) cannot be
+    ; used as that sentinel — AHK strings are internally null-terminated, so
+    ; StrReplace() with a null character silently truncates the string instead
+    ; of substituting it. A Unicode private-use codepoint is a normal character
+    ; to AHK's string engine and is not expected to appear in real LLM output.
+    static sentinel := Chr(0xE000)
+    s := StrReplace(s, "\\",    sentinel)  ; sentinel for literal backslash
     s := StrReplace(s, "\n",   "`n")
     s := StrReplace(s, "\r",   "`r")
     s := StrReplace(s, "\t",   "`t")
     s := StrReplace(s, '\"',   '"')
-    s := StrReplace(s, Chr(0), "\")     ; restore literal backslash
+    s := StrReplace(s, sentinel, "\")      ; restore literal backslash
     return s
 }
 

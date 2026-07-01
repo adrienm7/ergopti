@@ -194,15 +194,21 @@ LLM_ParseOllamaResponse(raw) {
  * @returns {string} Unescaped string.
  */
 LLM_UnescapeJSON(s) {
-	; AHK-26: neutralise \\ FIRST via Chr(0) sentinel so that \\n / \\t / \\r
+	; AHK-26: neutralise \\ FIRST via a sentinel so that \\n / \\t / \\r
 	; sequences are not munged by the later single-char escape passes (same bug
-	; as _LLMRemoteJsonUnescape — the old ordering let \\n → \newline).
-	s := StrReplace(s, "\\",    Chr(0))  ; sentinel for literal backslash
+	; as _LLMRemoteJsonUnescape — the old ordering let \\n → \newline). Chr(0)
+	; cannot be used as that sentinel — AHK strings are internally
+	; null-terminated, so StrReplace() with a null character silently
+	; truncates/drops it instead of substituting it. A Unicode private-use
+	; codepoint is a normal character to AHK's string engine and is not
+	; expected to appear in real LLM output.
+	static sentinel := Chr(0xE000)
+	s := StrReplace(s, "\\",    sentinel)  ; sentinel for literal backslash
 	s := StrReplace(s, "\n",   "`n")
 	s := StrReplace(s, "\r",   "`r")
 	s := StrReplace(s, "\t",   "`t")
 	s := StrReplace(s, '\"',   '"')
-	s := StrReplace(s, Chr(0), "\")     ; restore literal backslash
+	s := StrReplace(s, sentinel, "\")      ; restore literal backslash
 
 	; Decode \uXXXX Unicode escape sequences
 	out := ""

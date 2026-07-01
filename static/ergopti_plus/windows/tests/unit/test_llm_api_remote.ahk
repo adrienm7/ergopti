@@ -265,6 +265,20 @@ _RemoteJsonUnescape_BackslashRestored() {
 Test("_LLMRemoteJsonUnescape: \\\\ restored to single backslash", _RemoteJsonUnescape_BackslashRestored)
 
 
+; Regression: an escaped backslash immediately followed by another escape
+; sequence used to silently lose the backslash entirely. The neutralising
+; sentinel used to be Chr(0) -- AHK strings are internally null-terminated,
+; so StrReplace() with a null character truncates/drops it instead of
+; substituting it, corrupting anything the sentinel touched. Chr(0xE000) (a
+; Unicode private-use codepoint, never null) fixes it.
+_RemoteJsonUnescape_BackslashAdjacentToAnotherEscape() {
+	result := _LLMRemoteJsonUnescape("a\\\nb")
+	AssertEqual("a\`nb", result, "an escaped backslash immediately before another escape sequence must not be dropped")
+}
+Test("_LLMRemoteJsonUnescape: an escaped backslash adjacent to another escape sequence is not lost",
+	_RemoteJsonUnescape_BackslashAdjacentToAnotherEscape)
+
+
 
 
 ; =====================================================

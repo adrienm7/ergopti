@@ -257,6 +257,22 @@ _UnescapeJSON_PlainStringUnchanged() {
 Test("LLM_UnescapeJSON: plain string without escapes is unchanged", _UnescapeJSON_PlainStringUnchanged)
 
 
+; Regression: an escaped backslash immediately followed by another escape
+; sequence used to silently lose the backslash entirely. The neutralising
+; sentinel used to be Chr(0) -- AHK strings are internally null-terminated,
+; so StrReplace() with a null character truncates/drops it instead of
+; substituting it, corrupting anything the sentinel touched. Verified with a
+; standalone probe: StrReplace("a\\\nb", "\\", Chr(0)) produced a 4-char
+; result instead of the correct 5 (sentinel, real backslash, "n", intact).
+; Chr(0xE000) (a Unicode private-use codepoint, never null) fixes it.
+_UnescapeJSON_BackslashAdjacentToAnotherEscape() {
+	result := LLM_UnescapeJSON("a\\\nb")
+	AssertEqual("a\`nb", result, "an escaped backslash immediately before another escape sequence must not be dropped")
+}
+Test("LLM_UnescapeJSON: an escaped backslash adjacent to another escape sequence is not lost",
+	_UnescapeJSON_BackslashAdjacentToAnotherEscape)
+
+
 
 
 ; ====================================================
