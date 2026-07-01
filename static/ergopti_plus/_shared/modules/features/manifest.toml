@@ -3151,9 +3151,8 @@ platforms = ["hs"]
 type = "---"
 
 [[menu.gestures_menu]]
-type = "feature"
+type = "dynamic"
 id = "circular_spaces"
-i18n = "menu.gestures.circular_spaces"
 platforms = ["hs"]
 
 [[menu.gestures_menu]]
