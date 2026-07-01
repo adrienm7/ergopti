@@ -41,14 +41,19 @@ _TTCWS_StripLineComments(Src) {
 ; ==========================================================================
 
 _TTCWS_PredictionEngineWrapSafe() {
-	Src := _TTCWS_StripLineComments(_TTCWS_ReadSource("modules/llm/prediction_engine.ahk"))
-	Assert(Src != "", "modules/llm/prediction_engine.ahk must be readable")
+	; Move-resilient: the debounce-rate-limit wrap-safe delta used to live
+	; directly in modules/llm/prediction_engine.ahk, but that logic now lives
+	; in LLM_Engine_FirePrediction (modules/llm/prediction_exec.ahk) after the
+	; engine was split — scan the function body by name across the whole
+	; driver so a further file move cannot go unnoticed.
+	Src := _TTCWS_StripLineComments(_DriverFuncBody("LLM_Engine_FirePrediction"))
+	Assert(Src != "", "LLM_Engine_FirePrediction must exist in the LLM prediction module")
 
 	; Both halves of the formula must be present
 	Assert(InStr(Src, "0x100000000") > 0,
-		"prediction_engine.ahk must use the wrap-safe constant 0x100000000 in TickCount delta computation")
+		"LLM_Engine_FirePrediction must use the wrap-safe constant 0x100000000 in TickCount delta computation")
 	Assert(InStr(Src, "0xFFFFFFFF") > 0,
-		"prediction_engine.ahk must mask with 0xFFFFFFFF in wrap-safe TickCount delta computation")
+		"LLM_Engine_FirePrediction must mask with 0xFFFFFFFF in wrap-safe TickCount delta computation")
 }
 Test("prediction_engine: TickCount delta uses wrap-safe (now - last + 0x100000000) & 0xFFFFFFFF formula", _TTCWS_PredictionEngineWrapSafe)
 
@@ -123,15 +128,19 @@ Test("wpm_widget: TickCount delta uses wrap-safe (now - last + 0x100000000) & 0x
 ; ========================================================================
 
 _TTCWS_OllamaWarmupWrapSafe() {
-	Src := _TTCWS_StripLineComments(_TTCWS_ReadSource("modules/llm/api_ollama.ahk"))
-	Assert(Src != "", "modules/llm/api_ollama.ahk must be readable")
+	; Move-resilient: LLM_OllamaAllowInference used to live directly in
+	; modules/llm/api_ollama.ahk, but that file is now a thin #Include redirect
+	; shim to api_ollama/ollama_http.ahk (post-split) — scan the function body
+	; by name across the whole driver so a further file move cannot go unnoticed.
+	Src := _TTCWS_StripLineComments(_DriverFuncBody("LLM_OllamaAllowInference"))
+	Assert(Src != "", "LLM_OllamaAllowInference must exist in the Ollama API module")
 
 	; Negative: bare subtraction on warmup tick must not appear in a comparison
 	Assert(!InStr(Src, "(A_TickCount - _LLM_Ollama_WarmupStartedTick) >= 8000"),
-		"api_ollama.ahk must not compare warmup elapsed time without & 0xFFFFFFFF mask (tickcount-wrap)")
+		"LLM_OllamaAllowInference must not compare warmup elapsed time without & 0xFFFFFFFF mask (tickcount-wrap)")
 
 	; Positive: masked form must be present
 	Assert(InStr(Src, "(_LLM_Ollama_WarmupStartedTick) & 0xFFFFFFFF) >= 8000") > 0,
-		"api_ollama.ahk must mask warmup elapsed comparison with & 0xFFFFFFFF (tickcount-wrap)")
+		"LLM_OllamaAllowInference must mask warmup elapsed comparison with & 0xFFFFFFFF (tickcount-wrap)")
 }
 Test("api_ollama: warmup elapsed comparison uses & 0xFFFFFFFF mask (tickcount-wrap)", _TTCWS_OllamaWarmupWrapSafe)
