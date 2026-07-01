@@ -170,6 +170,36 @@ _DriverSourceConcat() {
 	return cache
 }
 
+; Strips every full-line ";"-comment (a line whose first non-whitespace
+; character is ";") from Src, preserving all other lines verbatim. Trailing/
+; inline comments (a `code ; comment` line) are left whole — full-line prose
+; blocks are the common case this guards against. Single source of truth for
+; every source-scan test that counts/matches tokens against driver source: a
+; naive raw-substring count is fragile against explanatory comments that
+; happen to contain the same token as the real code (see suspend-watchdog-
+; no-prefix-keywait, where "; native Suspend() never disarms..." comments
+; added by the Pattern-1 hardening campaign inflated a raw "Suspend(" count).
+_StripFullLineComments(Src) {
+	Out := ""
+	for Line in StrSplit(Src, "`n", "`r")
+		if !RegExMatch(Line, "^\s*;")
+			Out .= Line . "`n"
+	return Out
+}
+
+; Returns the whole driver source (see _DriverSourceConcat) with every
+; full-line comment stripped. Use for source-scan invariants that count or
+; match a token across the ENTIRE driver tree (not just one function body) —
+; without this, an explanatory comment anywhere in lib/modules/adapters/ui
+; can silently trip a naive substring count. Cached after first use.
+_DriverSourceNoComments() {
+	static cache := ""
+	if (cache != "")
+		return cache
+	cache := _StripFullLineComments(_DriverSourceConcat())
+	return cache
+}
+
 ; Returns the body (signature through the matching closing brace, full-line
 ; comments stripped) of a top-level driver function, found across the whole
 ; driver source. Anchors on the column-0 DEFINITION, so a call site (always
@@ -204,11 +234,7 @@ _DriverFuncBody(Name) {
 		i++
 	}
 	Body := SubStr(Src, Idx, BodyEnd - Idx + 1)
-	Out := ""
-	for Line in StrSplit(Body, "`n", "`r")
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	return Out
+	return _StripFullLineComments(Body)
 }
 
 ; Reads every .ahk under a windows/-relative directory (recursive), concatenated

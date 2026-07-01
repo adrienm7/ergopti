@@ -63,9 +63,12 @@ _SWNPK_CountOccurrences(Hay, Needle) {
 ; Invariant 1: the only Suspend(...) call site is ToggleSuspend's Suspend(-1).
 ; The token "Suspend(" appears in source only as the ToggleSuspend( declaration
 ; and as the Suspend(-1) call; any other occurrence is a path that bypasses the
-; prefix drain.
+; prefix drain. Scans the COMMENT-STRIPPED source (_DriverSourceNoComments) —
+; a raw scan would also match "Suspend(" inside explanatory prose like
+; "native Suspend() never disarms...", which the Pattern-1 hardening campaign
+; added to a dozen sites and which is not a real call site.
 _SWNPK_OnlyCallSiteIsToggleSuspend() {
-	Src := _DriverSourceConcat()
+	Src := _DriverSourceNoComments()
 	TotalSuspendParen := _SWNPK_CountOccurrences(Src, "Suspend(")
 	ToggleDecls       := _SWNPK_CountOccurrences(Src, "ToggleSuspend(")
 	RealCalls         := _SWNPK_CountOccurrences(Src, "Suspend(-1)")
@@ -77,6 +80,27 @@ _SWNPK_OnlyCallSiteIsToggleSuspend() {
 		"Every 'Suspend(' must be a ToggleSuspend( reference or the Suspend(-1) call — any other Suspend() call bypasses the SC138 prefix drain and can reintroduce the 'AltGr latched' bug")
 }
 Test("ErgoptiPlus: Suspend(-1) is the only suspend call site (suspend-watchdog-no-prefix-keywait)", _SWNPK_OnlyCallSiteIsToggleSuspend)
+
+; Regression guard for the counter's own fragility (root cause, not the
+; symptom): a full-line comment containing the literal substring "Suspend("
+; must NOT inflate the count above. This bit CI on 2026-07-01 — the AHK suite
+; went from 2807/2807 to 2806 passed/1 failed purely because the Pattern-1
+; Suspend-guard hardening campaign added ~10 explanatory comments like
+; "; native Suspend() never disarms this hotkey's own KeyWait/dispatch" across
+; lib/modules/adapters/ui, none of which added a real Suspend() call site.
+; Without _StripFullLineComments/_DriverSourceNoComments, ANY future
+; explanatory comment mentioning "Suspend(" reintroduces this false failure.
+_SWNPK_CommentDoesNotInflateSuspendCount() {
+	Fake := "; native Suspend() never disarms this hotkey's own KeyWait/dispatch, so a`n"
+		. "; SetTimer callback must check A_IsSuspended() itself.`n"
+		. "SomeUnrelatedFunction(*) {`n"
+		. "`treturn 1`n"
+		. "}`n"
+	Stripped := _StripFullLineComments(Fake)
+	Assert(_SWNPK_CountOccurrences(Stripped, "Suspend(") = 0,
+		"A full-line comment containing 'Suspend(' must be stripped before the source-scan invariant counts it — a raw substring count over unstripped source is fragile against explanatory prose and will false-fail CI whenever a new comment mentions Suspend()")
+}
+Test("suspend-watchdog meta-test: an explanatory comment must not inflate the Suspend( count (suspend-watchdog-no-prefix-keywait)", _SWNPK_CommentDoesNotInflateSuspendCount)
 
 ; Invariant 2: ToggleSuspend drains the prefix before flipping Suspend.
 _SWNPK_ToggleDrainsBeforeSuspend() {
