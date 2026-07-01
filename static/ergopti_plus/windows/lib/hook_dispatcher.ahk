@@ -99,17 +99,21 @@ class HookDispatcher {
 	; and the `is` operator raises PropertyError before it can evaluate.
 	static _ih := false
 
-	; Bound references for mouse Hotkey() calls so Stop() can disable them.
-	static _hk_ldown  := unset
-	static _hk_lup    := unset
-	static _hk_rdown  := unset
-	static _hk_rup    := unset
-	static _hk_mdown  := unset
-	static _hk_mup    := unset
-	static _hk_wup    := unset
-	static _hk_wdn    := unset
-	static _hk_wright := unset
-	static _hk_wleft  := unset
+	; Bound references for mouse Hotkey() calls so Stop() can disable them, or
+	; false when not yet bound / after Stop(). Using false (not unset) so
+	; `_hk_ldown is Func` never throws even without the HasOwnProp guard in
+	; Stop() — the same PropertyError trap fixed for `_ih` above: an `unset`
+	; static is unreadable, and `is` reads its left side before evaluating.
+	static _hk_ldown  := false
+	static _hk_lup    := false
+	static _hk_rdown  := false
+	static _hk_rup    := false
+	static _hk_mdown  := false
+	static _hk_mup    := false
+	static _hk_wup    := false
+	static _hk_wdn    := false
+	static _hk_wright := false
+	static _hk_wleft  := false
 
 	; Guards against double-Start().
 	static _started := false
@@ -413,18 +417,19 @@ class HookDispatcher {
 			try Hotkey("~WheelLeft",  HookDispatcher._hk_wleft,  "Off")
 		}
 
-		; Reset the hotkey references to unset so a subsequent Start() rebinds
-		; cleanly rather than reusing stale BoundFuncs.
-		HookDispatcher._hk_ldown  := unset
-		HookDispatcher._hk_lup    := unset
-		HookDispatcher._hk_rdown  := unset
-		HookDispatcher._hk_rup    := unset
-		HookDispatcher._hk_mdown  := unset
-		HookDispatcher._hk_mup    := unset
-		HookDispatcher._hk_wup    := unset
-		HookDispatcher._hk_wdn    := unset
-		HookDispatcher._hk_wright := unset
-		HookDispatcher._hk_wleft  := unset
+		; Reset the hotkey references to false so a subsequent Start() rebinds
+		; cleanly rather than reusing stale BoundFuncs. false (not unset) keeps
+		; `_hk_ldown is Func` readable on a second Stop() with no live hotkeys.
+		HookDispatcher._hk_ldown  := false
+		HookDispatcher._hk_lup    := false
+		HookDispatcher._hk_rdown  := false
+		HookDispatcher._hk_rup    := false
+		HookDispatcher._hk_mdown  := false
+		HookDispatcher._hk_mup    := false
+		HookDispatcher._hk_wup    := false
+		HookDispatcher._hk_wdn    := false
+		HookDispatcher._hk_wright := false
+		HookDispatcher._hk_wleft  := false
 
 		; Clear the subscriber registry so a fresh Start() begins with an empty
 		; fan-out table. Without this a Stop()/Start() cycle would inherit the

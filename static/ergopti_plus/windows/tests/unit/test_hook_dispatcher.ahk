@@ -194,3 +194,99 @@ _HD_IhIsInputHookCheckDoesNotThrow() {
 	AssertEqual(false, result, "'false is InputHook' must evaluate to false")
 }
 Test("HookDispatcher._ih is InputHook does not throw when _ih is the false sentinel", _HD_IhIsInputHookCheckDoesNotThrow)
+
+
+
+
+
+; ======================================================================
+; ======================================================================
+; ======= 5/ _hk_* mouse sentinels initialised as readable false =======
+; ======================================================================
+; ======================================================================
+
+; Sibling of the `_ih` PropertyError trap fixed in section 4: the ten mouse
+; Hotkey() bound-func caches (_hk_ldown, _hk_lup, _hk_rdown, _hk_rup,
+; _hk_mdown, _hk_mup, _hk_wup, _hk_wdn, _hk_wright, _hk_wleft) used to be
+; declared `static _hk_* := unset` and reset to `unset` at the end of Stop().
+; Stop() reads them behind a `HasOwnProp("_hk_ldown")` guard before the `is
+; Func` check, which does prevent the throw in practice (HasOwnProp on an
+; unset static returns false, short-circuiting the `&&` before `is` runs) —
+; but leaving the sentinel as `unset` is still a latent trap for any future
+; caller that reads `_hk_*` without remembering that guard. Fixed to `false`
+; for the same defence-in-depth reason as `_ih`.
+
+_HD_HkSentinelsInitialisedReadable() {
+	; Every _hk_* static must be readable immediately — no PropertyError on
+	; first access, mirroring the _ih contract in section 4.
+	AssertEqual(false, HookDispatcher._hk_ldown,  "_hk_ldown must be false (readable sentinel), not unset")
+	AssertEqual(false, HookDispatcher._hk_lup,    "_hk_lup must be false (readable sentinel), not unset")
+	AssertEqual(false, HookDispatcher._hk_rdown,  "_hk_rdown must be false (readable sentinel), not unset")
+	AssertEqual(false, HookDispatcher._hk_rup,    "_hk_rup must be false (readable sentinel), not unset")
+	AssertEqual(false, HookDispatcher._hk_mdown,  "_hk_mdown must be false (readable sentinel), not unset")
+	AssertEqual(false, HookDispatcher._hk_mup,    "_hk_mup must be false (readable sentinel), not unset")
+	AssertEqual(false, HookDispatcher._hk_wup,    "_hk_wup must be false (readable sentinel), not unset")
+	AssertEqual(false, HookDispatcher._hk_wdn,    "_hk_wdn must be false (readable sentinel), not unset")
+	AssertEqual(false, HookDispatcher._hk_wright, "_hk_wright must be false (readable sentinel), not unset")
+	AssertEqual(false, HookDispatcher._hk_wleft,  "_hk_wleft must be false (readable sentinel), not unset")
+}
+Test("HookDispatcher._hk_* mouse sentinels are initialised as false (readable), not unset", _HD_HkSentinelsInitialisedReadable)
+
+_HD_HkSentinelIsFuncCheckDoesNotThrow() {
+	; The exact guarded expression from Stop() must not throw, with or without
+	; the HasOwnProp guard, whether called on a fresh class (never Start()ed)
+	; or after a Stop()/Start()/Stop() cycle reset it back to false.
+	threw := false
+	result := false
+	try {
+		result := HookDispatcher._hk_ldown is Func
+	} catch {
+		threw := true
+	}
+	AssertEqual(false, threw, "'_hk_ldown is Func' must not throw when _hk_ldown is the false sentinel")
+	AssertEqual(false, result, "'false is Func' must evaluate to false")
+
+	; Same check via the exact guarded pattern used in Stop() itself.
+	guardedThrew := false
+	try {
+		if HookDispatcher.HasOwnProp("_hk_ldown") && HookDispatcher._hk_ldown is Func
+			guardedResult := true
+		else
+			guardedResult := false
+	} catch {
+		guardedThrew := true
+	}
+	AssertEqual(false, guardedThrew, "Stop()'s guarded '_hk_ldown is Func' pattern must not throw on the false sentinel")
+}
+Test("HookDispatcher._hk_ldown is Func does not throw when _hk_ldown is the false sentinel", _HD_HkSentinelIsFuncCheckDoesNotThrow)
+
+_HD_StopBeforeStartDoesNotThrow() {
+	; Stop() called before any Start() must be a safe no-op — it must not
+	; throw PropertyError while reading the _hk_* sentinels or _ih.
+	threw := false
+	errMsg := ""
+	try {
+		HookDispatcher.Stop()
+	} catch as e {
+		threw := true
+		errMsg := e.Message
+	}
+	AssertEqual(false, threw, "HookDispatcher.Stop() before Start() must not throw" . (threw ? " (" . errMsg . ")" : ""))
+}
+Test("HookDispatcher.Stop() called before Start() does not throw (hook-dispatcher-hk-property-error)", _HD_StopBeforeStartDoesNotThrow)
+
+_HD_DoubleStopDoesNotThrow() {
+	; Two consecutive Stop() calls (the second with every _hk_* already reset
+	; to false by the first) must not throw either.
+	threw := false
+	errMsg := ""
+	try {
+		HookDispatcher.Stop()
+		HookDispatcher.Stop()
+	} catch as e {
+		threw := true
+		errMsg := e.Message
+	}
+	AssertEqual(false, threw, "HookDispatcher.Stop() called twice in a row must not throw" . (threw ? " (" . errMsg . ")" : ""))
+}
+Test("HookDispatcher.Stop() called twice in a row does not throw (hook-dispatcher-hk-property-error)", _HD_DoubleStopDoesNotThrow)
