@@ -214,7 +214,13 @@ Updater_InitTrayNotifyHandler() {
 ; lParam 0x405 = NIN_BALLOONUSERCLICK — user clicked the notification body.
 ; Returns "" to let AHK continue its own tray processing.
 _Updater_OnTrayMsg(wParam, lParam, msg, hwnd) {
-	if (lParam == 0x405)
+	; An OnMessage handler bypasses native Suspend() entirely (it only disarms
+	; Hotkeys/Hotstrings) — a balloon click landing after the driver was paused
+	; must not still pop the update prompt. Deliberately narrower than guarding
+	; Updater_ShowAvailableUpdate itself, which also backs the tray menu's
+	; "check for updates" item — a menu click is an explicit interaction that
+	; must keep working while paused (the tray menu is how the user un-pauses).
+	if (lParam == 0x405 and !A_IsSuspended)
 		try Updater_ShowAvailableUpdate()
 	return ""
 }
