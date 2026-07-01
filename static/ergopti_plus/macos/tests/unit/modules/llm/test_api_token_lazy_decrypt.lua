@@ -28,7 +28,7 @@ local remote_src = fh2:read("*a") ; fh2:close()
 -- A decrypt call at load time is the root cause: any positive match here means
 -- the eager-decrypt pattern was reintroduced.
 helpers.assert_true(
-	init_src:find("TokenCrypto%.decrypt", 1, true) == nil,
+	init_src:find("TokenCrypto.decrypt", 1, true) == nil,
 	"load_api_entries must not call TokenCrypto.decrypt — eager decryption blocks the boot tick"
 )
 
@@ -41,7 +41,10 @@ helpers.assert_true(
 -- Test 3: get_active_entry must call TokenCrypto.decrypt for lazy resolution.
 -- The call must appear in the body of get_active_entry (after the function
 -- declaration and before the end), not elsewhere.
-local fn_start = remote_src:find("function M%.get_active_entry", 1, true)
+-- Anchor on the exact signature (with the empty parens) — the bare prefix
+-- "function M.get_active_entry" also matches "function M.get_active_entry_id",
+-- which is declared earlier in the file and has no decrypt call in its body.
+local fn_start = remote_src:find("function M.get_active_entry()", 1, true)
 helpers.assert_true(fn_start ~= nil, "api_remote.lua must define M.get_active_entry")
 
 local fn_body_start = fn_start
@@ -50,7 +53,7 @@ helpers.assert_true(fn_end ~= nil, "get_active_entry function body must have a m
 
 local fn_body = remote_src:sub(fn_body_start, fn_end)
 helpers.assert_true(
-	fn_body:find("TokenCrypto%.decrypt", 1, true) ~= nil,
+	fn_body:find("TokenCrypto.decrypt", 1, true) ~= nil,
 	"get_active_entry must call TokenCrypto.decrypt for lazy Keychain resolution"
 )
 
