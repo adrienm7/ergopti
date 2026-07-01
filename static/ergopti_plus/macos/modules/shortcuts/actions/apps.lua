@@ -166,25 +166,6 @@ local function center_frontmost_after(delay)
 	end)
 end
 
---- Reads the ChatGPT URL from config.json, returning the provided default on any failure.
---- @param default_url string The fallback URL.
---- @return string The resolved URL.
-local function read_chatgpt_url(default_url)
-	local cfg_path = hs.configdir .. "/config.json"
-	local ok, fh   = pcall(io.open, cfg_path, "r")
-	if not ok or not fh then return default_url end
-
-	local content = fh:read("*a")
-	pcall(function() fh:close() end)
-
-	local dec_ok, tbl = pcall(hs.json.decode, content)
-	if dec_ok and type(tbl) == "table" and type(tbl.chatgpt_url) == "string" and tbl.chatgpt_url ~= "" then
-		return tbl.chatgpt_url
-	end
-
-	return default_url
-end
-
 --- Opens a URL directly, or falls back to a Google search for plain text.
 --- @param text string The selected text or path to act on.
 local function open_or_search(text)
@@ -270,10 +251,12 @@ function M.open_finder()
 	center_frontmost_after(CENTER_DELAY_SEC)
 end
 
---- Opens the configured ChatGPT URL (or the provided default) in the default browser.
---- @param default_url string Fallback URL when config.json has no override.
-function M.open_chatgpt(default_url)
-	local url = read_chatgpt_url(default_url)
+--- Opens the given ChatGPT URL in the default browser. The caller resolves the
+--- URL (live-configured value or the manifest default) — this function is a
+--- thin, side-effect-only opener so there is a single source of truth for URL
+--- resolution (modules.shortcuts.bindings) instead of a second config reader here.
+--- @param url string The ChatGPT URL to open.
+function M.open_chatgpt(url)
 	Logger.debug(LOG, "Opening ChatGPT URL: %s.", url)
 	pcall(urlevent.openURL, url)
 end

@@ -695,6 +695,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end)
 			end
 		end
+
+		-- Restore the user-configured ChatGPT URL at boot the same way: without this,
+		-- ctrl_g silently ignores config.toml and always opens the manifest default
+		-- until the user happens to re-save the URL from the menu (shortcuts-ctrl-g-ignores-config).
+		if type(core_mods.shortcuts_mod.set_chatgpt_url) == "function" then
+			pcall(core_mods.shortcuts_mod.set_chatgpt_url, state.chatgpt_url)
+		end
 	end
 
 	-- ctx and actions are built once and reused across menu opens.

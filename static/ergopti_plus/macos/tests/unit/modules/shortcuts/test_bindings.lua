@@ -303,6 +303,106 @@ end)
 -- =================================
 -- =================================
 
+-- ==========================================================================================
+-- ==========================================================================================
+-- ======= 6/ set_chatgpt_url (shortcuts-ctrl-g-ignores-config regression) =================
+-- ==========================================================================================
+-- ==========================================================================================
+
+-- Guards F-HIGH-3: ctrl_g used to always open M.DEFAULT_CHATGPT_URL, ignoring the
+-- URL the user persisted via the menu to config.toml. The fix adds set_chatgpt_url()
+-- (mirroring set_wrap_pairs_getter) and makes ctrl_g read the live value.
+helpers.describe("shortcuts.bindings: set_chatgpt_url (shortcuts-ctrl-g-ignores-config regression)", function()
+
+	-- Builds a fresh Bindings instance with hs.hotkey.bind stubbed to capture the
+	-- ctrl_g callback, and hs.urlevent.openURL stubbed to record the URL it opened.
+	local function make_bindings_with_ctrl_g_spy()
+		package.loaded["lib.keycodes"] = {
+			F18_WAKE_OS                = 79,
+			F19_VOLUME_SCROLL_MODIFIER = 80,
+			to_name = function(code)
+				local MAP = { [79] = "f18", [80] = "f19" }
+				return MAP[code] or ("keycode_" .. tostring(code))
+			end,
+		}
+		package.loaded["lib.i18n"] = { get = function(key) return key end }
+		package.loaded["modules.shortcuts.bindings"] = nil
+		-- apps.lua captures `local urlevent = hs.urlevent` at module load time, so a
+		-- cached instance from an earlier test would still call the OLD hs stub's
+		-- openURL, not the spy installed below — force it to reload under this stub.
+		package.loaded["modules.shortcuts.actions.apps"] = nil
+
+		local captured_ctrl_g = nil
+		local opened_urls = {}
+
+		local B = helpers.load_with_stubs("modules.shortcuts.bindings", {
+			hotkey = {
+				bind = function(_mods, key, fn)
+					if key == "g" then captured_ctrl_g = fn end
+					return { delete = function() end }
+				end,
+			},
+			urlevent = {
+				bind    = function() end,
+				openURL = function(url) table.insert(opened_urls, url) end,
+			},
+			-- bind_log's get_frontmost_app_name() calls app:title(); the base stub's
+			-- frontmostApplication() only exposes name(), not title()
+			application = {
+				frontmostApplication = function() return { title = function() return "TestApp" end } end,
+			},
+		})
+
+		B.start()
+		return B, captured_ctrl_g, opened_urls
+	end
+
+	helpers.it("exposes set_chatgpt_url as a function", function()
+		local B = helpers.load_with_stubs("modules.shortcuts.bindings")
+		helpers.assert_eq(type(B.set_chatgpt_url), "function")
+	end)
+
+	helpers.it("ctrl_g opens M.DEFAULT_CHATGPT_URL when set_chatgpt_url was never called", function()
+		local B, ctrl_g, opened_urls = make_bindings_with_ctrl_g_spy()
+		helpers.assert_true(type(ctrl_g) == "function", "ctrl_g callback must have been captured")
+		ctrl_g()
+		helpers.assert_eq(#opened_urls, 1, "ctrl_g must open exactly one URL")
+		helpers.assert_eq(opened_urls[1], B.DEFAULT_CHATGPT_URL)
+	end)
+
+	helpers.it("ctrl_g opens the configured URL, NOT the hardcoded default, after set_chatgpt_url()", function()
+		local B, ctrl_g, opened_urls = make_bindings_with_ctrl_g_spy()
+		local configured_url = "https://chatgpt.example.test/configured"
+
+		B.set_chatgpt_url(configured_url)
+		ctrl_g()
+
+		helpers.assert_eq(#opened_urls, 1, "ctrl_g must open exactly one URL")
+		helpers.assert_eq(opened_urls[1], configured_url,
+			"ctrl_g must open the user-configured URL, not M.DEFAULT_CHATGPT_URL (F-HIGH-3)")
+		helpers.assert_true(opened_urls[1] ~= B.DEFAULT_CHATGPT_URL,
+			"the configured URL in this test is deliberately different from the default")
+	end)
+
+	helpers.it("set_chatgpt_url(nil) falls back to M.DEFAULT_CHATGPT_URL", function()
+		local B, ctrl_g, opened_urls = make_bindings_with_ctrl_g_spy()
+		B.set_chatgpt_url("https://chatgpt.example.test/configured")
+		B.set_chatgpt_url(nil)
+		ctrl_g()
+		helpers.assert_eq(opened_urls[1], B.DEFAULT_CHATGPT_URL)
+	end)
+
+	helpers.it("set_chatgpt_url(\"\") falls back to M.DEFAULT_CHATGPT_URL (empty string is not a valid URL)", function()
+		local B, ctrl_g, opened_urls = make_bindings_with_ctrl_g_spy()
+		B.set_chatgpt_url("")
+		ctrl_g()
+		helpers.assert_eq(opened_urls[1], B.DEFAULT_CHATGPT_URL)
+	end)
+end)
+
+
+
+
 helpers.describe("shortcuts.bindings: start/stop lifecycle", function()
 	local B = helpers.load_with_stubs("modules.shortcuts.bindings")
 
