@@ -54,8 +54,17 @@ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 	; _MasterCategoryFor maps hotstring sub-categories to the Hotstrings master;
 	; the first path segment is the sub-category itself (a no-op extra check for
 	; non-hotstring categories, whose first segment IS their master gate).
+	;
+	; DynamicHotstrings is excluded from that second check: unlike its five
+	; siblings (Autocorrection/DistancesReduction/SFBsReduction/Rolls/MagicKey),
+	; it has no independent per-file CategoryEnabled entry -- it follows the
+	; Hotstrings master directly (see menu_hotstrings.ahk's _HS_CategoriesDynamic
+	; comment). IsCategoryGated("DynamicHotstrings") would log a spurious
+	; "unknown category" warning on every menu build for no behavioral gain --
+	; the first check above already covers it via _MasterCategoryFor.
+	SubCategory := StrSplit(V1CategoryPath, ".")[1]
 	if !IsCategoryGated(_MasterCategoryFor(V1CategoryPath))
-		or !IsCategoryGated(StrSplit(V1CategoryPath, ".")[1]) {
+		or (SubCategory != "DynamicHotstrings" and !IsCategoryGated(SubCategory)) {
 		try MenuParent.Disable(MenuTitle)
 	}
 }
