@@ -542,3 +542,88 @@ helpers.describe("aggregator — walk_system_event manifest_increment (F-HIGH-26
 	end)
 
 end)
+
+
+
+
+-- ============================================================================
+-- ============================================================================
+-- ======= 11/ focus_first_key — focus_to_first_key_sum_ms/count (F-MED-27) ==
+-- ============================================================================
+-- ============================================================================
+
+-- F-MED-27: same shape as F-HIGH-26 — LogManager.log_focus_first_key() appends
+-- a {action="focus_first_key", app=..., latency_ms=...} system_event row, but
+-- walk_system_event() had no branch for it and the destination columns
+-- (focus_to_first_key_sum_ms/count, which live in agg_app_day_ergo, not
+-- agg_app_day) were absent from the UPSERT — the latency metric was computed,
+-- logged, and then silently discarded before ever reaching SQLite.
+helpers.describe("aggregator — walk_system_event focus_first_key (F-MED-27)", function()
+
+	--- Reads the live agg_batch.ergo row for (date, app) via the shared
+	--- aggregator.state singleton.
+	--- @param date string "YYYY-MM-DD".
+	--- @param app string Application name.
+	--- @return table|nil The accumulated row, or nil if nothing was walked yet.
+	local function read_ergo_row(date, app)
+		local S = require("modules.keylogger.aggregator.state")
+		if not S.agg_batch then return nil end
+		return S.agg_batch.ergo[date .. "\1" .. app]
+	end
+
+	helpers.it("focus_first_key accumulates sum_ms and count into agg_batch.ergo", function()
+		local a = helpers.load_with_stubs("modules.keylogger.aggregator")
+		package.loaded["modules.keylogger.sqlite_writer"] = { get_db = function() return nil end }
+		package.loaded["modules.keylogger.export"]        = { get_native_app_category = function() return "Dev" end }
+		a.init({ device_id = "focus-first-key-uuid" })
+
+		a.walk_system_event({
+			action = "focus_first_key", app = "TestApp", latency_ms = 250,
+			timestamp = "2024-07-01 10:00:00.000",
+		})
+		a.walk_system_event({
+			action = "focus_first_key", app = "TestApp", latency_ms = 150,
+			timestamp = "2024-07-01 10:00:05.000",
+		})
+
+		local row = read_ergo_row("2024-07-01", "TestApp")
+		helpers.assert_true(row ~= nil, "ergo row must exist after two focus_first_key events")
+		helpers.assert_eq(row.focus_to_first_key_sum_ms, 400,
+			"focus_to_first_key_sum_ms must accumulate the latency_ms of both events instead of being discarded")
+		helpers.assert_eq(row.focus_to_first_key_count, 2,
+			"focus_to_first_key_count must be bumped once per focus_first_key event")
+	end)
+
+	helpers.it("focus_first_key and walk_typing share the same ergo row without a nil-arithmetic crash", function()
+		-- Regression for the shape-mismatch hazard: walk_typing's S.agg_batch.ergo
+		-- default must carry focus_to_first_key_sum_ms/count too, or a
+		-- walk_typing-first ordering leaves those fields nil and the
+		-- focus_first_key branch crashes on `nil + number`.
+		local a = helpers.load_with_stubs("modules.keylogger.aggregator")
+		package.loaded["modules.keylogger.sqlite_writer"] = { get_db = function() return nil end }
+		package.loaded["modules.keylogger.export"]        = { get_native_app_category = function() return "Dev" end }
+		a.init({ device_id = "focus-shared-row-uuid" })
+
+		-- walk_typing runs FIRST and creates the ergo row via its own default.
+		a.walk_typing({
+			app = "SharedApp", timestamp = "2024-07-02 09:00:00.000",
+			events = { { "a", 100, {} } },
+		})
+
+		local ok = pcall(function()
+			a.walk_system_event({
+				action = "focus_first_key", app = "SharedApp", latency_ms = 300,
+				timestamp = "2024-07-02 09:00:01.000",
+			})
+		end)
+		helpers.assert_true(ok, "focus_first_key must not crash when the ergo row was created by walk_typing first")
+
+		local row = read_ergo_row("2024-07-02", "SharedApp")
+		helpers.assert_true(row ~= nil)
+		helpers.assert_eq(row.focus_to_first_key_sum_ms, 300)
+		helpers.assert_eq(row.focus_to_first_key_count, 1)
+		-- walk_typing's own fields must still be intact on the shared row.
+		helpers.assert_eq(row.same_finger_streak_max, 0)
+	end)
+
+end)

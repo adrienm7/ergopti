@@ -69,7 +69,15 @@ function M.walk_typing(entry)
 	local m5  = C.gc(S.agg_batch.hourly_min5, min5_key,   { date=date_str, app=app, slot=current_min5, c=0, e=0, es=0, e_buckets={} })
 	local cc  = C.gc(S.agg_batch.chars_class, app_day_key,{ date=date_str, app=app, letter=0,digit=0,punct=0,space=0,other=0 })
 	local er  = C.gc(S.agg_batch.errors,      app_day_key,{ date=date_str, app=app, bs_total=0,cascade_count=0,cascade_max_len=0,recovery_sum_ms=0,recovery_count=0 })
-	local eg  = C.gc(S.agg_batch.ergo,        app_day_key,{ date=date_str, app=app, same_finger_streak_max=0,same_hand_streak_max=0,auto_repeat_count=0 })
+	-- Shape must match the default used by walk_system_event's focus_first_key
+	-- branch below (same S.agg_batch.ergo row, keyed by the same app_day_key) —
+	-- whichever walker runs first for a given app-day creates the row via C.gc,
+	-- so both defaults must carry every field either walker increments.
+	local eg  = C.gc(S.agg_batch.ergo,        app_day_key,{
+		date=date_str, app=app,
+		same_finger_streak_max=0, same_hand_streak_max=0, auto_repeat_count=0,
+		focus_to_first_key_sum_ms=0, focus_to_first_key_count=0,
+	})
 
 	if type(entry.layout) == "string" and entry.layout ~= "" then
 		local lk = app_day_key .. "\1" .. entry.layout
@@ -440,6 +448,23 @@ function M.walk_system_event(entry)
 	if action == "manifest_increment" and MANIFEST_STAT_FIELDS[entry.stat] then
 		local app = entry.app or "Unknown"
 		C.bump_app_day(date_str, app, entry.stat, tonumber(entry.amount) or 1)
+	end
+	if action == "focus_first_key" then
+		-- F-MED-27: same shape as F-HIGH-26 — LogManager.log_focus_first_key()
+		-- appends this event, but walk_system_event had no branch for it and the
+		-- destination columns were absent from the agg_app_day_ergo UPSERT, so
+		-- the latency metric was computed, logged, and then silently discarded.
+		-- Default shape MUST match walk_typing's S.agg_batch.ergo default above —
+		-- whichever walker runs first for an app-day creates the row via C.gc.
+		local app = entry.app or "Unknown"
+		local key = date_str .. "\1" .. app
+		local eg = C.gc(S.agg_batch.ergo, key, {
+			date=date_str, app=app,
+			same_finger_streak_max=0, same_hand_streak_max=0, auto_repeat_count=0,
+			focus_to_first_key_sum_ms=0, focus_to_first_key_count=0,
+		})
+		eg.focus_to_first_key_sum_ms = eg.focus_to_first_key_sum_ms + (tonumber(entry.latency_ms) or 0)
+		eg.focus_to_first_key_count  = eg.focus_to_first_key_count + 1
 	end
 	if action == "modifier_hold" or action == "karabiner_release" then
 		local kc  = entry.keycode
