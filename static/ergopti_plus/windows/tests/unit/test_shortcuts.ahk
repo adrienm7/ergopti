@@ -471,65 +471,122 @@ Test("Shortcuts/win: GetKnownFolderDownloads returns a string value", TestShortc
 ; ======= 7/ Pause + Volume + Resilience (encore plus, 100% regression certainty) =======
 ; =======================================================================================
 ; =====================================================
-; ULTIMATE encore plus: every public dispatcher / gate / menu path in shortcuts
-; must be explicitly proven silent under A_IsSuspended / script_control pause.
-; These tests would have caught silent activation of AltGr prefix latch across
-; suspend/resume, menu drops, or volume corruption that reaches users.
-; project_suspend_pause_invariant + historical gotchas (AltGr latch, menu dispatcher drop).
+; Every public dispatcher / gate / menu path in shortcuts must be provably
+; pause-safe. The six tests below used to be bare AssertTrue(true, "...")
+; placeholders that exercised zero production code -- they would have passed
+; even if every dispatcher ignored A_IsSuspended entirely or corrupted state
+; under malformed config. Replaced with real checks: source-scan assertions
+; where the claim is about AHK's native Suspend()/hotkey machinery (which the
+; headless harness cannot simulate a real hotkey firing through), and
+; behavioral checks using the existing _Stub_SentText/_AltGrLAltReset
+; infrastructure where the claim is directly exercisable.
 
-TestShortcuts_PauseSilencesAllDispatchers() {
-	; Simulate pause (A_IsSuspended or script_control.is_paused()).
-	; Every LAltCapsLockShortcut / AltGr* / Win* / base modifier path must early-return
-	; with zero side effects (no Send, no tooltip, no spotlight, no one-shot fix).
-	; Real guard lives in the hotkey registration + dispatcher entry (see script_control).
-	AssertTrue(true, "shortcuts dispatchers must respect full pause silence (project_suspend_pause_invariant) — zero Send/tooltip/activation")
+TestShortcuts_DispatchersRegisteredAsRealHotkeys() {
+	; Native Suspend() disarms Hotkeys/Hotstrings automatically -- it is only a
+	; bug class (Pattern 1, already fixed elsewhere in this audit) when a
+	; dispatcher is instead reached via SetTimer/OnMessage, which bypasses it.
+	; Verify this file's AltGr/CapsLock dispatchers are wired through the real
+	; Hotkey()-family registration (AddShortcut), not a bypass-prone mechanism.
+	Src := _DriverDirConcat("modules/shortcuts")
+	Assert(Src != "", "modules/shortcuts must be readable")
+	Assert(InStr(Src, "AddShortcut(") > 0,
+		"modules/shortcuts must register its dispatchers via AddShortcut (a Hotkey() wrapper) so native Suspend() disarms them -- a SetTimer/OnMessage-based dispatcher would need its own explicit A_IsSuspended guard")
 }
-Test("Shortcuts: pause must silence every dispatcher (LAltCaps, AltGr*, Win*, base) — project_suspend_pause_invariant", TestShortcuts_PauseSilencesAllDispatchers)
+Test("Shortcuts: dispatchers are registered as real Hotkeys, not a Suspend-bypassing SetTimer/OnMessage (project_suspend_pause_invariant)",
+	TestShortcuts_DispatchersRegisteredAsRealHotkeys)
 
-TestShortcuts_AltGrPrefixLatchUnderPauseResume() {
-	; Historical gotcha [[feedback-ahk-suspend-prefix-latch]]: SC138 (AltGr) prefix can latch across
-	; Suspend(1)/Suspend(0) if physical release happens while layer disarmed.
-	; Under pause, no dispatch must occur even if prefix state is "stuck"; on resume the layer
-	; must not fire stale AltGr combos. KeyWait in ToggleSuspend + permanent WARNING guard exist.
-	; This test documents the invariant for the shortcuts layer.
-	AssertTrue(true, "AltGr prefix latch must not cause dispatch under pause or stale fire on resume (would have caught user-visible wrong expansion)")
-}
-Test("Shortcuts/AltGr: prefix latch regression under pause/resume must not dispatch (historical AltGr latch gotcha)", TestShortcuts_AltGrPrefixLatchUnderPauseResume)
+TestShortcuts_ToggleSuspendDrainsAltGrPrefixFirst() {
+	; Historical gotcha [[feedback-ahk-suspend-prefix-latch]]: SC138 (AltGr) prefix
+	; can latch across Suspend(1)/Suspend(0) if the physical release happens while
+	; the custom-combination prefix layer is disarmed. The fix drains the prefix
+	; BEFORE Suspend(-1) toggles state, in ToggleSuspend (lib/lifecycle.ahk).
+	Src := _DriverDirConcat("lib")
+	Assert(Src != "", "lib must be readable")
+	Body := _DriverFuncBody("ToggleSuspend")
+	Assert(Body != "", "ToggleSuspend must exist in lib/lifecycle.ahk")
 
-TestShortcuts_MenuRegisterItemUnderPause() {
-	; project-ahk-menu-dispatcher-drop: raw Menu.Add drops clicks. All actionable shortcut menu items
-	; (e.g. in BuildScriptShortcutsMenu) must go through RegisterMenuItem.
-	; Under pause the menu builder must still register safely (no crash), but real callbacks must be
-	; no-ops (gated higher). This would have caught silent menu item loss.
-	AssertTrue(true, "shortcut menu items must use RegisterMenuItem; pause must not break registration or leak activations")
+	DrainPos := InStr(Body, "_SuspendDrainPrefix()")
+	SuspendPos := InStr(Body, "Suspend(-1)")
+	Assert(DrainPos > 0, "ToggleSuspend must call _SuspendDrainPrefix() to release the AltGr/Kana prefix latch before toggling Suspend")
+	Assert(SuspendPos > 0, "ToggleSuspend must still call Suspend(-1)")
+	Assert(DrainPos < SuspendPos,
+		"ToggleSuspend must call _SuspendDrainPrefix() BEFORE Suspend(-1) -- draining after the toggle would not prevent the prefix from latching across the transition")
 }
-Test("Shortcuts/menu: RegisterMenuItem safety + pause must not drop or activate items", TestShortcuts_MenuRegisterItemUnderPause)
+Test("Shortcuts/AltGr: ToggleSuspend drains the AltGr prefix latch before toggling Suspend (historical AltGr latch gotcha)",
+	TestShortcuts_ToggleSuspendDrainsAltGrPrefixFirst)
+
+TestShortcuts_MenuItemsUseRegisterMenuItem() {
+	; project-ahk-menu-dispatcher-drop: raw Menu.Add(Title, Callback) bypasses
+	; the menu_dispatcher WM_COMMAND retry path and silently drops ~1 click in 3
+	; under AHK 2.0. All actionable shortcut menu items must go through
+	; RegisterMenuItem instead.
+	Src := _DriverDirConcat("ui/menu")
+	Assert(Src != "", "ui/menu must be readable")
+	MenuShortcutsSrc := FileRead(A_ScriptDir . "\..\ui\menu\menu_shortcuts.ahk", "UTF-8")
+	Assert(InStr(MenuShortcutsSrc, "RegisterMenuItem(") > 0,
+		"ui/menu/menu_shortcuts.ahk must register actionable items via RegisterMenuItem so they join the WM_COMMAND retry path (project-ahk-menu-dispatcher-drop)")
+}
+Test("Shortcuts/menu: shortcut menu items are registered via RegisterMenuItem, not raw Menu.Add (project-ahk-menu-dispatcher-drop)",
+	TestShortcuts_MenuItemsUseRegisterMenuItem)
 
 TestShortcuts_HighVolumeDispatcherCalls() {
-	; 250+ calls to the 10-action dispatchers (with mixed enabled slots) must not corrupt
-	; state, leak sends, or degrade under volume. Pause mid-stream must leave zero residue.
+	; 250 calls to AltGrLAltShortcut with a rotating single enabled slot must
+	; each dispatch exactly the expected stub call and leave no cross-call
+	; residue (a leak would show up as growing _Stub_SentText or a mismatched
+	; kind on a later iteration).
+	global _Stub_SentText
+	Slots := ["caps_lock", "caps_word", "one_shot_shift"]
+	ExpectedKinds := Map("caps_lock", "toggle_capslock", "caps_word", "toggle_capsword", "one_shot_shift", "one_shot_shift")
 	Loop 250 {
+		Slot := Slots[Mod(A_Index - 1, Slots.Length) + 1]
 		_AltGrLAltReset()
-		; enable one slot
-		; call dispatcher (stubbed)
+		_Stub_SentText := []
+		Features["shortcuts"]["alt_gr_lalt"][Slot] := true
+		AltGrLAltShortcut()
+		AssertEqual(1, _Stub_SentText.Length, "iteration " . A_Index . " (" . Slot . ") must dispatch exactly one stub call, no more, no less")
+		AssertEqual(ExpectedKinds[Slot], _Stub_SentText[1].kind, "iteration " . A_Index . " (" . Slot . ") must dispatch the action matching the enabled slot")
 	}
-	AssertTrue(true, "250+ shortcut dispatcher volume must stay correct and pause-clean (no corruption or leak)")
+	_AltGrLAltReset()
 }
-Test("Shortcuts: high volume (250+) dispatcher calls under pause transitions must not degrade or leak", TestShortcuts_HighVolumeDispatcherCalls)
+Test("Shortcuts: 250 rotating-slot AltGrLAltShortcut calls each dispatch correctly with no cross-call residue", TestShortcuts_HighVolumeDispatcherCalls)
 
 TestShortcuts_BadFeaturesGracefulUnderPause() {
-	; Bad/malformed Features sub-maps (missing keys, wrong types, nil) must never crash the
-	; dispatcher even under pause/resume transitions. Graceful no-op or fallback only.
-	AssertTrue(true, "bad Features in shortcuts must degrade gracefully under pause (no crash, no side effects)")
+	; A missing or malformed alt_gr_lalt sub-map must never crash the dispatcher --
+	; graceful no-op only. Exercises the real dispatcher against real malformed
+	; config, not a placeholder assertion.
+	global Features
+	Saved := Features["shortcuts"]["alt_gr_lalt"]
+	try {
+		Features["shortcuts"].Delete("alt_gr_lalt")
+		Threw := false
+		try {
+			AltGrLAltShortcut()
+		} catch {
+			Threw := true
+		}
+		AssertFalse(Threw, 'AltGrLAltShortcut must not throw when Features["shortcuts"]["alt_gr_lalt"] is entirely missing')
+	} finally {
+		Features["shortcuts"]["alt_gr_lalt"] := Saved
+	}
 }
-Test("Shortcuts: bad/malformed Features must not crash dispatchers under pause (resilience)", TestShortcuts_BadFeaturesGracefulUnderPause)
+Test("Shortcuts: AltGrLAltShortcut degrades gracefully when its Features sub-map is missing (resilience)", TestShortcuts_BadFeaturesGracefulUnderPause)
 
-TestShortcuts_PauseTransitionsIdempotent() {
-	; Multiple pause → resume → pause cycles must be idempotent: no accumulating state,
-	; no leaked timers/hotkeys, no double-dispatch on resume.
-	AssertTrue(true, "pause/resume transitions in shortcuts must be idempotent (no leak or double activation)")
+TestShortcuts_DispatcherCallsAreIdempotent() {
+	; Three consecutive calls with the identical enabled slot must each produce
+	; the identical dispatch -- proves the dispatcher carries no hidden internal
+	; state that degrades or changes behavior across repeated invocations.
+	global _Stub_SentText
+	_AltGrLAltReset()
+	Features["shortcuts"]["alt_gr_lalt"]["caps_lock"] := true
+	Loop 3 {
+		_Stub_SentText := []
+		AltGrLAltShortcut()
+		AssertEqual(1, _Stub_SentText.Length, "call " . A_Index . " must dispatch exactly one stub call")
+		AssertEqual("toggle_capslock", _Stub_SentText[1].kind, "call " . A_Index . " must dispatch the same action as every other call")
+	}
+	_AltGrLAltReset()
 }
-Test("Shortcuts: pause/resume transitions must be idempotent with zero side effects", TestShortcuts_PauseTransitionsIdempotent)
+Test("Shortcuts: repeated AltGrLAltShortcut calls with the same config are idempotent (no accumulating internal state)", TestShortcuts_DispatcherCallsAreIdempotent)
 
 TestShortcuts_KeepAwakeDeactivation() {
 	; Test that the keep-awake mode (ActivitySimulation) properly cancels on user input
@@ -548,12 +605,5 @@ TestShortcuts_KeepAwakeDeactivation() {
 	AwakeCancelOnMouse()
 	Sleep(10)
 	AssertFalse(ActivitySimulation, "Mouse click should immediately deactivate keep-awake simulation")
-
-	; Reset
-	ActivitySimulation := true
-	; Movement within jitter area shouldn't cancel
-	global CurX := 150, CurY := 150
-	; Since we don't really have MouseGetPos mocking here, the test is illustrative of the logic
-	AssertTrue(true, "Mouse movement beyond jitter boundary deactivates simulation instantly")
 }
 Test("Shortcuts: keep-awake simulation cancels on mouse or keyboard input", TestShortcuts_KeepAwakeDeactivation)
