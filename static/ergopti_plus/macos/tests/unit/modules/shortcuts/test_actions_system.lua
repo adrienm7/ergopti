@@ -489,6 +489,101 @@ end)
 
 
 
+-- ==========================================================================================
+-- ==========================================================================================
+-- ======= bind_wrap_text_if_selected caches read_ax_selection (shortcuts-wrap-ax-uncached) =
+-- ==========================================================================================
+-- ==========================================================================================
+
+-- Regression: bind_wrap_text_if_selected's eventtap callback called text_acts.read_ax_selection()
+-- (two synchronous cross-process AX calls) on every keystroke matching a wrap symbol, with zero
+-- caching. lib/vscode_bridge.lua documents this exact failure mode and mitigates it with a
+-- short-lived TTL cache; this call site had none — a slow AX call risks
+-- kCGEventTapDisabledByTimeout, killing the tap. The fix mirrors vscode_bridge's cache pattern.
+helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache (shortcuts-wrap-ax-uncached regression)", function()
+
+	-- Builds a fresh system module with hs.eventtap.new stubbed to capture the wrap
+	-- callback, hs.timer.secondsSinceEpoch stubbed to a controllable fake clock, and
+	-- modules.shortcuts.actions.text's read_ax_selection replaced with a call counter.
+	local function make_sys_with_ax_spy()
+		package.loaded["lib.keycodes"] = nil
+		package.loaded["modules.shortcuts.actions.system"] = nil
+		package.loaded["modules.shortcuts.actions.text"]   = nil
+
+		local ax_call_count = 0
+		local clock = { now = 1000 }
+
+		-- Stub text.lua fully (system.lua only needs read_ax_selection + WRAP_PAIRS +
+		-- wrap_selection for this path) so the real AX-dependent implementation is
+		-- never exercised — we only care about call-count caching behaviour here.
+		package.loaded["modules.shortcuts.actions.text"] = {
+			WRAP_PAIRS = { ["("] = { left = "(", right = ")" } },
+			read_ax_selection = function()
+				ax_call_count = ax_call_count + 1
+				return "selected text"
+			end,
+			wrap_selection = function() end,
+		}
+
+		local captured = { cb = nil }
+		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
+			eventtap = {
+				new = function(_types, cb)
+					captured.cb = cb
+					return { start = function() end, stop = function() end }
+				end,
+				event = { types = { keyDown = 10 } },
+			},
+			timer = {
+				doAfter = function(_d, _fn) return { stop = function() end } end,
+				secondsSinceEpoch = function() return clock.now end,
+			},
+		})
+
+		sys.bind_wrap_text_if_selected(nil)
+		return sys, captured, clock, function() return ax_call_count end
+	end
+
+	-- A fake keyDown event typing the wrap symbol "(" with no modifiers.
+	local function fake_wrap_key_event()
+		return {
+			getFlags      = function() return {} end,
+			getCharacters = function() return "(" end,
+		}
+	end
+
+	helpers.it("N rapid wrap-key presses within the TTL trigger at most 1 real AX call", function()
+		local _sys, captured, _clock, get_count = make_sys_with_ax_spy()
+		helpers.assert_true(type(captured.cb) == "function", "bind_wrap_text_if_selected must register an eventtap callback")
+
+		local REPEAT_COUNT = 10
+		for _ = 1, REPEAT_COUNT do
+			captured.cb(fake_wrap_key_event())
+		end
+
+		helpers.assert_eq(get_count(), 1,
+			string.format("%d rapid wrap-key presses must trigger at most 1 real read_ax_selection() call", REPEAT_COUNT))
+	end)
+
+	helpers.it("a press after the TTL window elapses triggers a second real AX call", function()
+		local _sys, captured, clock, get_count = make_sys_with_ax_spy()
+
+		captured.cb(fake_wrap_key_event())
+		helpers.assert_eq(get_count(), 1, "first press must call read_ax_selection")
+
+		clock.now = clock.now + 0.05  -- still within the TTL window
+		captured.cb(fake_wrap_key_event())
+		helpers.assert_eq(get_count(), 1, "a press within the TTL window must reuse the cached selection")
+
+		clock.now = clock.now + 1.0  -- past the TTL window
+		captured.cb(fake_wrap_key_event())
+		helpers.assert_eq(get_count(), 2, "a press after the TTL window must trigger a fresh AX call")
+	end)
+end)
+
+
+
+
 -- =======================================================================================
 -- =======================================================================================
 -- ======= schedule_awake_tick float random bounds (shortcuts-actions-3) =================
