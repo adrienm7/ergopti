@@ -84,6 +84,18 @@ helpers.describe("keymap.expander: perform_text_replacement survives notify_synt
 			false, false, "test"
 		)
 
+		-- Must run before any assertion could fail-and-return-early below:
+		-- this test is the only one that ever assigns a raising stub into
+		-- package.loaded["modules.keylogger"]. Without clearing it here, the
+		-- poisoned stub leaks into every later test file that requires
+		-- modules.keylogger in this same Lua process — it doesn't crash them
+		-- (the real notify_synthetic pcall guard swallows it), but for a
+		-- module like test_expander.lua that reads notify_synthetic's return
+		-- value or side effects, the always-raising stub silently changes
+		-- behaviour and fails unrelated tests with this file's own error
+		-- message, which is exactly what happened in CI on 2026-07-01.
+		package.loaded["modules.keylogger"] = nil
+
 		helpers.assert_true(ok, "perform_text_replacement must not propagate a notify_synthetic error")
 		helpers.assert_true(buf_called, "buffer_action must still run after notify_synthetic throws")
 		helpers.assert_eq(s.buffer, "hewrld")
