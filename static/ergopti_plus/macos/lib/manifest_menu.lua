@@ -193,6 +193,12 @@ function M.build(manifest_key, category, dynamic_handlers, group_builders, ctx)
 				flush_sep()
 				local ok = call_isolated(manifest_key, action_id, dynamic_handlers[action_id], result, ctx)
 				if ok then item_count = item_count + 1 end
+			else
+				-- A manifest entry with an id but no matching handler renders one item
+				-- short, permanently and undetected (F-HIGH-25) — log so a drifted
+				-- manifest/handler pairing surfaces instead of vanishing silently.
+				Logger.warn(LOG, "No 'action' handler registered for id '%s' in '%s' — item skipped.",
+					tostring(action_id), manifest_key)
 			end
 
 		elseif t == "section_header" then
@@ -233,6 +239,14 @@ function M.build(manifest_key, category, dynamic_handlers, group_builders, ctx)
 				flush_sep()
 				local ok = call_isolated(manifest_key, dyn_id, dynamic_handlers[dyn_id], result, ctx)
 				if ok then item_count = item_count + 1 end
+			else
+				-- Same class of bug as the "action" branch above (F-HIGH-25): a
+				-- misclassified or drifted id-bearing entry with no handler must
+				-- never fail silently — it either belongs on this platform (and the
+				-- caller's dyn_handlers table is missing a key) or the manifest entry
+				-- needs a `platforms` restriction.
+				Logger.warn(LOG, "No 'dynamic' handler registered for id '%s' in '%s' — item skipped.",
+					tostring(dyn_id), manifest_key)
 			end
 
 		else
