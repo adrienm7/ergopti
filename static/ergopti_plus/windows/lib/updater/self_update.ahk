@@ -481,8 +481,11 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 		return
 	}
 	
-	Critical "On"
-	
+	; Captures the prior critical state so every early-return below this point
+	; can restore it — a bare "Critical On" left the whole thread uninterruptible
+	; forever on any of the failure branches that follow (updater-critical-leak).
+	_PrevCrit := Critical("On")
+
 	try {
 		Stream := ComObject("ADODB.Stream")
 		Stream.Type := 1     ; adTypeBinary
@@ -493,11 +496,13 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 	} catch as e {
 		try LoggerError("Updater", "Download failed: {1}.", e.Message)
 		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+		Critical(_PrevCrit)
 		return
 	}
 	if !FileExist(NewExe) {
 		try LoggerError("Updater", "Download completed but file missing at '{1}'.", NewExe)
 		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+		Critical(_PrevCrit)
 		return
 	}
 	; Partial-download guard: compare Content-Length to the actual saved size.
@@ -514,6 +519,7 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 			ContentLength, ActualSize)
 		try FileDelete(NewExe)
 		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+		Critical(_PrevCrit)
 		return
 	}
 	if (ActualSize < UPDATER_MIN_EXE_SIZE_BYTES) {
@@ -522,6 +528,7 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 			ActualSize, UPDATER_MIN_EXE_SIZE_BYTES)
 		try FileDelete(NewExe)
 		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+		Critical(_PrevCrit)
 		return
 	}
 	try LoggerSuccess("Updater", "Update downloaded to '{1}'.", NewExe)
@@ -568,6 +575,7 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 	} catch as e {
 		try LoggerError("Updater", "Could not write swap script: {1}.", e.Message)
 		MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
+		Critical(_PrevCrit)
 		return
 	}
 	try LoggerInfo("Updater", "Launching swap script and exiting in 1s…")
@@ -588,6 +596,7 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 		_UpdaterDownloadInProgress := false
 		try SetTimer((*) => _Updater_RebuildMenu(), -50)
 		MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
+		Critical(_PrevCrit)
 		return
 	}
 	; Reset the dedupe so a future user-driven check after a failure can

@@ -11,7 +11,7 @@
 ; 1. _Updater_PollDownloadAsync MUST check A_IsSuspended and abort the download
 ;    if it caught the driver in a suspended state.
 ; 2. The block that writes the file and swaps the binary MUST be wrapped in
-;    Critical "On" so that a Suspend hotkey cannot interrupt it mid-write.
+;    Critical("On") so that a Suspend hotkey cannot interrupt it mid-write.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -29,7 +29,7 @@ _G5UD_CheckDownloadPollGuards() {
 	Assert(Seg != "", "_Updater_PollDownloadAsync must exist in updater.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
 		"_Updater_PollDownloadAsync must check A_IsSuspended and abort (Garantie G5)")
-	Assert(InStr(Seg, 'Critical "On"') > 0,
+	Assert(InStr(Seg, 'Critical("On")') > 0,
 		"_Updater_PollDownloadAsync must use Critical On for the disk swap (Garantie G5)")
 }
 Test("updater: G5 Guarantee guards present in _Updater_PollDownloadAsync", _G5UD_CheckDownloadPollGuards)
