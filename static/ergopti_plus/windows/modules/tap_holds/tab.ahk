@@ -61,9 +61,18 @@ SC00F::
 	tap := KeyWait("SC00F", "T" . TapHoldDuration(TapHold, "tab"))
 	if tap {
 		if TapHoldTapAction(TapHold, "left_alt") == "tab" and KS_IsDown("SC038") { ; LAlt physically held
+			; Native Suspend() never disarms this hotkey's own KeyWait/dispatch —
+			; a pause toggled inside the tap threshold must not still send Alt+Tab.
+			if A_IsSuspended
+				return
 			TextPressKey("Tab", "Alt")
 		} else {
+			; The synthetic LAlt Down armed above must always be released
+			; regardless of Suspend state; only AltTabMonitor()'s side effect
+			; is guarded.
 			TextPressKey("LAlt", "Up")
+			if A_IsSuspended
+				return
 			AltTabMonitor()
 		}
 	} else {

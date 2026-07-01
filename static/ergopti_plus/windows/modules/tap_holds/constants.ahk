@@ -84,6 +84,12 @@ TapHoldsLoadTimings() {
 ; require Blind modifiers, UpdateLastSentCharacter, or CtrlActivated wrapping.
 _TapHoldFireAction(KeyId) {
 	global GESTURE_ACTIONS, TapHold
+	; Native Suspend() only disarms Hotkeys/Hotstrings, never a tap's dispatch
+	; call itself — a key release landing inside the tap threshold shortly
+	; after a pause toggle must not fire a configured action (script_reload,
+	; open_url, take_note, …) while « pause = tout éteint ».
+	if A_IsSuspended
+		return
 	ActionId := TapHoldTapAction(TapHold, KeyId)
 	if GESTURE_ACTIONS.Has(ActionId) {
 		GESTURE_ACTIONS[ActionId].Fn.Call()
