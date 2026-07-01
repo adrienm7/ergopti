@@ -95,6 +95,24 @@ function M.spawn(executable, args, on_done, on_chunk)
 		end
 	end
 
+	--- Forwards a callback's throw to the log + crash reporter, deferring the
+	--- reporter call off the current callback's stack frame (it ends in a
+	--- synchronous hs.dialog.blockAlert, which would freeze the run loop if
+	--- invoked inline from an hs.task completion/streaming callback).
+	--- @param label string Identifies which callback threw, for the log line.
+	--- @param err any The error value captured by xpcall.
+	local function report_callback_throw(label, err)
+		Logger.error(LOG, "%s callback threw for '%s': %s", label, tostring(executable), tostring(err))
+		if type(_G.ergopti_report_crash) == "function" then
+			local report_ctx = "shell_runner." .. label .. ": " .. tostring(err)
+			if type(hs.timer) == "table" and type(hs.timer.doAfter) == "function" then
+				hs.timer.doAfter(0, function() pcall(_G.ergopti_report_crash, report_ctx) end)
+			else
+				pcall(_G.ergopti_report_crash, report_ctx)
+			end
+		end
+	end
+
 	-- Wrap on_done to release the GC-root reference once the subprocess exits.
 	-- hs.task completion callback signature is (exitCode, stdOut, stdErr) — no
 	-- task object is passed. Use the closure upvalue `_task` for the GC-pin release,
@@ -111,27 +129,35 @@ function M.spawn(executable, args, on_done, on_chunk)
 			-- line with no log line anywhere.
 			local ok, err = xpcall(function() on_done(exit_code, stdout, stderr) end, debug.traceback)
 			if not ok then
-				Logger.error(LOG, "on_done callback threw for '%s': %s", tostring(executable), tostring(err))
-				-- Defer the crash-report call via hs.timer.doAfter(0, ...) so it never
-				-- runs on this hs.task completion callback's own stack frame — the
-				-- reporter chain ends in a SYNCHRONOUS hs.dialog.blockAlert, and calling
-				-- it inline here would freeze the run loop on every task failure (F-HIGH-20).
-				if type(_G.ergopti_report_crash) == "function" then
-					local report_ctx = "shell_runner.on_done: " .. tostring(err)
-					if type(hs.timer) == "table" and type(hs.timer.doAfter) == "function" then
-						hs.timer.doAfter(0, function() pcall(_G.ergopti_report_crash, report_ctx) end)
-					else
-						pcall(_G.ergopti_report_crash, report_ctx)
-					end
-				end
+				report_callback_throw("on_done", err)
 			end
 		end
+	end
+
+	-- Wrap on_chunk the same way wrapped_on_done wraps on_done. Before this fix,
+	-- on_chunk was passed raw into hs.task.new — a throw inside SSE-chunk
+	-- handling (e.g. api_ollama/api_mlx_inference's streaming parsers) was
+	-- swallowed to the HS Console only, reintroducing the "vert mais aucune
+	-- prédiction" silent-failure class specifically for the streaming path
+	-- (F-HIGH-21). hs.task's streaming callback contract expects a boolean
+	-- return (true = keep streaming, false = stop); default to true on a
+	-- caught throw so a single bad chunk does not also kill the whole stream
+	-- (the real production on_chunk closures already re-check their own
+	-- generation guards on the next chunk).
+	local function wrapped_on_chunk(task, stdout_chunk, stderr_chunk)
+		if type(on_chunk) ~= "function" then return true end
+		local ok, result_or_err = xpcall(function() return on_chunk(task, stdout_chunk, stderr_chunk) end, debug.traceback)
+		if not ok then
+			report_callback_throw("on_chunk", result_or_err)
+			return true
+		end
+		return result_or_err
 	end
 
 	-- Build the hs.task — choose 3-arg or 4-arg form depending on on_chunk.
 	local ok, task_or_err
 	if type(on_chunk) == "function" then
-		ok, task_or_err = pcall(hs.task.new, executable, wrapped_on_done, on_chunk, args)
+		ok, task_or_err = pcall(hs.task.new, executable, wrapped_on_done, wrapped_on_chunk, args)
 	else
 		ok, task_or_err = pcall(hs.task.new, executable, wrapped_on_done, args)
 	end
