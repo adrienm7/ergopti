@@ -28,6 +28,18 @@
 ---    synthesizes an error callback when the OS request has not completed.
 --- 5. encodeForQuery: thin pass-through to hs.http.encodeForQuery so callers
 ---    (api_remote.lua) have no direct hs.http dependency for URL encoding.
+--- 6. Generation guard: cancel()'s doc claims it "synchronously and
+---    unconditionally" prevents a superseded callback from firing, but
+---    hs.http.asyncPost/asyncGet may already have queued their OS-level
+---    completion before cancel() runs (the task handle does not guarantee
+---    the underlying NSURLSession delegate call is aborted in time). Each
+---    post()/get() call is stamped with a monotonic generation captured by
+---    its own wrapped callback; the callback checks it against the
+---    instance's current generation before delivering, so a stale callback
+---    from a superseded request (e.g. a warmup POST outlived by a real
+---    inference POST sharing the same instance) is discarded instead of
+---    delivering its result to the wrong caller. Mirrors lib/updater.lua's
+---    _poll_generation pattern.
 --- ==============================================================================
 
 local hs     = hs
@@ -66,12 +78,16 @@ local function new()
 	local _active_task   = nil
 	local _timeout_timer = nil
 	local _cancelled     = false
+	-- Bumped on every post()/get()/cancel() so a callback captured by an
+	-- older generation can detect it has been superseded and self-discard,
+	-- even if cancel() did not manage to abort the OS-level request in time.
+	local _generation    = 0
 
 	-- ── Internal helpers ──────────────────────────────────────────────────
 
-	local function _arm_timeout(callback)
+	local function _arm_timeout(callback, my_generation)
 		_timeout_timer = hs.timer.doAfter(DEFAULT_TIMEOUT_MS / MS_PER_SEC, function()
-			if _cancelled then return end
+			if _cancelled or my_generation ~= _generation then return end
 			_cancelled = true
 			if _active_task then
 				pcall(function() _active_task:cancel() end)
@@ -91,8 +107,15 @@ local function new()
 		end
 	end
 
-	local function _make_cb(callback)
+	local function _make_cb(callback, my_generation)
 		return function(status, response_body, _response_headers)
+			-- Discard a stale callback from a superseded request: cancel() cannot
+			-- guarantee the underlying OS request has not already queued its
+			-- completion, so the generation check is the only reliable guard.
+			if my_generation ~= _generation then
+				Logger.debug(LOG, "stale response discarded (gen %d != %d).", my_generation, _generation)
+				return
+			end
 			if _cancelled then return end
 			_cancelled   = true
 			_active_task = nil
@@ -119,9 +142,11 @@ local function new()
 	--- @param callback function Called with { ok, status, body, error }.
 	function inst.post(url, headers, body, callback)
 		if _active_task then inst.cancel() end
-		_cancelled = false
-		_arm_timeout(callback)
-		local ok, task_or_err = pcall(hs.http.asyncPost, url, body, headers, _make_cb(callback))
+		_cancelled  = false
+		_generation = _generation + 1
+		local my_generation = _generation
+		_arm_timeout(callback, my_generation)
+		local ok, task_or_err = pcall(hs.http.asyncPost, url, body, headers, _make_cb(callback, my_generation))
 		if not ok then
 			_cancelled = true
 			_stop_timeout()
@@ -140,9 +165,11 @@ local function new()
 	--- @param callback function Called with { ok, status, body, error }.
 	function inst.get(url, headers, callback)
 		if _active_task then inst.cancel() end
-		_cancelled = false
-		_arm_timeout(callback)
-		local ok, task_or_err = pcall(hs.http.asyncGet, url, headers, _make_cb(callback))
+		_cancelled  = false
+		_generation = _generation + 1
+		local my_generation = _generation
+		_arm_timeout(callback, my_generation)
+		local ok, task_or_err = pcall(hs.http.asyncGet, url, headers, _make_cb(callback, my_generation))
 		if not ok then
 			_cancelled = true
 			_stop_timeout()
@@ -157,7 +184,8 @@ local function new()
 
 	--- Aborts the in-flight request. The callback is NOT called after cancel().
 	function inst.cancel()
-		_cancelled = true
+		_cancelled  = true
+		_generation = _generation + 1
 		if _active_task then
 			pcall(function() _active_task:cancel() end)
 			_active_task = nil
