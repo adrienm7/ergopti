@@ -75,16 +75,24 @@ KS_IsUp(KeyName) {
 ; tray-only startup there may be no foreground window, hence the fallbacks.
 ; @return {Integer} The resolved HKL, or 0 when none could be obtained.
 KS_ResolveKeyboardLayout() {
-	local hkl := GetForegroundKeyboardLayout()
-	if hkl = 0
-		hkl := DllCall("GetKeyboardLayout", "UInt", DllCall("GetCurrentThreadId", "UInt"), "Ptr")
-	if hkl = 0 {
-		; SPI_GETDEFAULTINPUTLANG = 0x0059; pvParam receives an HKL.
-		local buf := Buffer(A_PtrSize, 0)
-		DllCall("SystemParametersInfo", "UInt", 0x0059, "UInt", 0, "Ptr", buf, "UInt", 0)
-		hkl := NumGet(buf, 0, "Ptr")
+	; Same fail-safe contract as KS_IsDown/KS_IsUp above: an unguarded DllCall
+	; failure at boot must degrade to the documented "could not resolve" return
+	; (0), not propagate uncaught and abort the boot sequence.
+	try {
+		local hkl := GetForegroundKeyboardLayout()
+		if hkl = 0
+			hkl := DllCall("GetKeyboardLayout", "UInt", DllCall("GetCurrentThreadId", "UInt"), "Ptr")
+		if hkl = 0 {
+			; SPI_GETDEFAULTINPUTLANG = 0x0059; pvParam receives an HKL.
+			local buf := Buffer(A_PtrSize, 0)
+			DllCall("SystemParametersInfo", "UInt", 0x0059, "UInt", 0, "Ptr", buf, "UInt", 0)
+			hkl := NumGet(buf, 0, "Ptr")
+		}
+		return hkl
+	} catch as e {
+		try LoggerError("KeyState", "KS_ResolveKeyboardLayout failed: {1}.", e.Message)
+		return 0
 	}
-	return hkl
 }
 
 ; Reverse-probes VK_RMENU (0xA5) into a scancode under the given layout
@@ -93,7 +101,12 @@ KS_ResolveKeyboardLayout() {
 ; @param Hkl {Integer} The keyboard layout handle to probe.
 ; @return {Integer} The scancode for VK_RMENU, or 0 when it is unmapped.
 KS_ProbeRightAltScancode(Hkl) {
-	return DllCall("MapVirtualKeyExW", "UInt", 0xA5, "UInt", 4, "Ptr", Hkl, "UInt")
+	try {
+		return DllCall("MapVirtualKeyExW", "UInt", 0xA5, "UInt", 4, "Ptr", Hkl, "UInt")
+	} catch as e {
+		try LoggerError("KeyState", "KS_ProbeRightAltScancode failed: {1}.", e.Message)
+		return 0
+	}
 }
 
 ; Enumerates base scancodes 0x01-0x7F under Hkl and returns the first whose
@@ -105,27 +118,31 @@ KS_ProbeRightAltScancode(Hkl) {
 KS_ScanScancodeForChar(Hkl, TargetChar) {
 	local keyState := Buffer(256, 0)  ; all modifier keys unpressed
 	local foundScan := 0, foundVK := 0
-	; Probe every base scancode. 0x01-0x58 covers all standard keys;
-	; extend to 0x7F as a safety margin for exotic layouts.
-	Loop 127 {
-		local sc := A_Index
-		; MAPVK_VSC_TO_VK_EX = 3: extended-key-aware SC -> VK.
-		local vk := DllCall("MapVirtualKeyExW", "UInt", sc, "UInt", 3, "Ptr", Hkl, "UInt")
-		if vk = 0
-			continue
-		; Reset buffer before each call - dead-key state can persist across calls.
-		local charBuf := Buffer(10, 0)
-		local len := DllCall("ToUnicodeEx",
-			"UInt", vk, "UInt", sc, "Ptr", keyState,
-			"Ptr", charBuf, "Int", 4, "UInt", 0x4, "Ptr", Hkl, "Int")
-		if len <= 0
-			continue
-		local ch := StrGet(charBuf, len, "UTF-16")
-		if ch = TargetChar {
-			foundScan := sc
-			foundVK := vk
-			break
+	try {
+		; Probe every base scancode. 0x01-0x58 covers all standard keys;
+		; extend to 0x7F as a safety margin for exotic layouts.
+		Loop 127 {
+			local sc := A_Index
+			; MAPVK_VSC_TO_VK_EX = 3: extended-key-aware SC -> VK.
+			local vk := DllCall("MapVirtualKeyExW", "UInt", sc, "UInt", 3, "Ptr", Hkl, "UInt")
+			if vk = 0
+				continue
+			; Reset buffer before each call - dead-key state can persist across calls.
+			local charBuf := Buffer(10, 0)
+			local len := DllCall("ToUnicodeEx",
+				"UInt", vk, "UInt", sc, "Ptr", keyState,
+				"Ptr", charBuf, "Int", 4, "UInt", 0x4, "Ptr", Hkl, "Int")
+			if len <= 0
+				continue
+			local ch := StrGet(charBuf, len, "UTF-16")
+			if ch = TargetChar {
+				foundScan := sc
+				foundVK := vk
+				break
+			}
 		}
+	} catch as e {
+		try LoggerError("KeyState", "KS_ScanScancodeForChar failed: {1}.", e.Message)
 	}
 	return Map("scan", foundScan, "vk", foundVK)
 }
