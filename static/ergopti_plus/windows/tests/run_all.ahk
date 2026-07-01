@@ -110,6 +110,9 @@ OnError(_FatalErrorHandler)
 #Include ../lib/feature_io.ahk
 #Include ../lib/hotstrings/hotstrings_config.ahk
 #Include ../ui/personal_toml_editor.ahk
+; Pure helpers (no boot-time side effects) — CountDynamicSection is exercised
+; by the DL-4 corpus parity test.
+#Include ../lib/menu_helpers.ahk
 #Include ../modules/keymap/layout/layout_altgr.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
@@ -370,6 +373,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_gesture_shared_lbutton.ahk
 #Include meta/test_gesture_left_hold_tap_release.ahk
 #Include meta/test_gesture_takenote_winwait.ahk
+#Include meta/test_takenote_winmaximize_guard.ahk
 #Include meta/test_gesture_exit_button_release.ahk
 #Include meta/test_textsend_clipall.ahk
 #Include meta/test_llm_autotype_hse_suppress.ahk
@@ -464,6 +468,8 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_wrap_symbols_catalogue.ahk
 ; ── Cross-driver corpus consumers ──
 #Include meta/test_corpus_hotstrings.ahk
+#Include meta/test_corpus_dynamic_hotstrings_prefix.ahk
+#Include meta/test_corpus_hotstrings_config_resolve.ahk
 #Include meta/test_corpus_tap_hold.ahk
 #Include meta/test_corpus_hotstring_matcher.ahk
 ; LLM parser corpus -- tests LLM_ParseOllamaResponse and _LLMRemoteParseResponse
@@ -659,6 +665,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_wpm_mousewatch_suspend_guard.ahk
 #Include meta/test_tooltip_resolve_pos_profiled.ahk
 #Include meta/test_error_net_guarded_send.ahk
+#Include meta/test_error_net_uia_orphan_suppress.ahk
 #Include meta/test_llmdiff_has_corrections_ltrim.ahk
 #Include meta/test_audit_test_gaps.ahk
 #Include meta/test_keylogger_flush_atomic.ahk
@@ -783,6 +790,10 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 ; headless-safe (function definitions only, no top-level side effects).
 #Include ../ui/healthcheck/helpers.ahk
 #Include meta/test_healthcheck_format_helpers.ahk
+
+; Guards the _HsEdWeb_Reset() idempotency fix for the live-log access-violation
+; crash (double-unsubscribe against an already torn-down WebView2 controller).
+#Include meta/test_hsedweb_reset_idempotent.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
