@@ -136,8 +136,18 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	; timer firing must not still write the clipboard and paste. Nothing has
 	; been written to the clipboard yet at this point, so there is nothing to
 	; restore — the caller's Saved snapshot is simply never consumed.
-	if A_IsSuspended
+	;
+	; Every bail-out below calls Callback() before returning. Callers such as
+	; modules/keymap/llm_bridge.ahk's _InjectCallback own depth-counter guards
+	; (PrefixWatcherSuppress/KL_MarkSynthetic) that are released exactly once,
+	; by the callback, on any path where TextSend itself did not throw --  a
+	; bail-out here that never invokes Callback leaked those guards forever,
+	; permanently suppressing normal hotstring/keylogger observation.
+	if A_IsSuspended {
+		if Callback != 0
+			try Callback()
 		return
+	}
 
 	; Claim this injection's slot. The restore closure below compares against this
 	; snapshot and no-ops if a newer clipboard-mode TextSend has since taken over.
@@ -152,6 +162,8 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	if !ClipWait(TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC) {
 		LoggerError("TextSender", "TextSend: clipboard did not settle within {1}s - skipping paste to avoid injecting stale content.", TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC)
 		CB_RestoreAll(Saved)
+		if Callback != 0
+			try Callback()
 		return
 	}
 
@@ -159,6 +171,8 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	; blocked inside ClipWait; pasting now would clobber its content.
 	if (Generation != _TEXT_CLIPBOARD_GENERATION) {
 		CB_RestoreAll(Saved)
+		if Callback != 0
+			try Callback()
 		return
 	}
 
