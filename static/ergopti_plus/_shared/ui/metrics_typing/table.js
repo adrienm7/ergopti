@@ -1161,14 +1161,14 @@ function render_kc_heatmap(kc_data_arr) {
 				`&nbsp;&nbsp;Tap&nbsp;&nbsp;: <b>${format_number(tap_n)}</b> (${tap_pct}% des taps)`
 			);
 			tip_lines.push(`&nbsp;&nbsp;Hold : <b>${format_number(hold_n)}</b> (${hold_pct}% des holds)`);
-			tip_lines.push(`Fréquence totale : <b>${freq_pct}%</b>`);
+			tip_lines.push(`${_t('ui_typing.key_tip_freq_total')} <b>${freq_pct}%</b>`);
 			if (kh.n > 0) {
 				const mean = Math.round(kh.s / kh.n);
-				tip_lines.push(`Durée moy. : <b>${mean} ms</b> (max ${kh.m})`);
+				tip_lines.push(`${_t('ui_typing.key_tip_avg_dur')} <b>${mean} ms</b> (max ${kh.m})`);
 			}
 		} else {
 			tip_lines.push(`Presses : <b>${format_number(count)}</b>`);
-			tip_lines.push(`Fréquence : <b>${freq_pct}%</b>`);
+			tip_lines.push(`${_t('ui_typing.key_tip_freq')} ${freq_pct}%</b>`);
 		}
 
 		// Modifier combos
@@ -1610,7 +1610,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 					`<td style="padding:1px 6px 1px 0;">Paire</td>` +
 					`<td style="padding:1px 4px;text-align:right;">nb</td>` +
 					`<td style="padding:1px 4px;text-align:right;" title="Part de ce SFB parmi les SFBs de la touche">% /SFBs touche</td>` +
-					`<td style="padding:1px 4px;text-align:right;" title="Fréquence : nb SFB / nb occurrences de la touche">taux</td>` +
+					`<td style="padding:1px 4px;text-align:right;" title="${_t('ui_typing.tooltip_sfb_rate')}">taux</td>` +
 					`<td style="padding:1px 0 1px 4px;text-align:right;" title="Part de ce SFB parmi tous les SFBs">% SFBs tot.</td>` +
 					`</tr>`
 			);
