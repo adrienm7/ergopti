@@ -83,13 +83,14 @@ function M.flush()
 	for _, row in pairs(S.agg_batch.app_day) do
 		local cat = Export.get_native_app_category(row.app)
 		exec(string.format(
-			"INSERT INTO agg_app_day (device_id, date, app, chars, pauses, time_ms, think_time_ms, hs_chars, llm_chars, hs_triggers, llm_triggers, hs_input_chars, llm_input_chars, category) "
-			.. "VALUES (%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s) "
+			"INSERT INTO agg_app_day (device_id, date, app, chars, pauses, time_ms, think_time_ms, hs_chars, llm_chars, hs_triggers, llm_triggers, hs_suggested, llm_suggested, hs_input_chars, llm_input_chars, category) "
+			.. "VALUES (%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s) "
 			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
 			.. "chars=chars+excluded.chars,pauses=pauses+excluded.pauses,"
 			.. "time_ms=time_ms+excluded.time_ms,think_time_ms=think_time_ms+excluded.think_time_ms,"
 			.. "hs_chars=hs_chars+excluded.hs_chars,llm_chars=llm_chars+excluded.llm_chars,"
 			.. "hs_triggers=hs_triggers+excluded.hs_triggers,llm_triggers=llm_triggers+excluded.llm_triggers,"
+			.. "hs_suggested=hs_suggested+excluded.hs_suggested,llm_suggested=llm_suggested+excluded.llm_suggested,"
 			.. "hs_input_chars=hs_input_chars+excluded.hs_input_chars,"
 			.. "llm_input_chars=llm_input_chars+excluded.llm_input_chars,"
 			.. "category=COALESCE(agg_app_day.category, excluded.category)",
@@ -97,6 +98,7 @@ function M.flush()
 			i(row.chars), i(row.pauses), i(row.time_ms), i(row.think_time_ms),
 			i(row.hs_chars), i(row.llm_chars),
 			i(row.hs_triggers), i(row.llm_triggers),
+			i(row.hs_suggested), i(row.llm_suggested),
 			i(row.hs_input_chars), i(row.llm_input_chars), sq(cat)))
 	end
 

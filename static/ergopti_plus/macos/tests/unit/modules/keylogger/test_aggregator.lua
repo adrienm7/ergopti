@@ -453,3 +453,92 @@ helpers.describe("aggregator — walk_system_event", function()
 		helpers.assert_true(ok)
 	end)
 end)
+
+
+
+
+-- ======================================================================
+-- ======================================================================
+-- ======= 10/ manifest_increment — hs_suggested/llm_suggested (F-HIGH-26) =
+-- ======================================================================
+-- ======================================================================
+
+-- F-HIGH-26: LogManager.increment_manifest_stat() appends a
+-- {action="manifest_increment", stat=..., amount=...} system_event row, but
+-- walk_system_event() had no branch for it — the entry was silently ignored
+-- with no fall-through warning, so hs_suggested/llm_suggested were computed,
+-- logged, and then discarded before ever reaching agg_app_day / SQLite.
+helpers.describe("aggregator — walk_system_event manifest_increment (F-HIGH-26)", function()
+
+	--- Reads the live agg_batch.app_day row for (date, app) via the shared
+	--- aggregator.state singleton — the same table every aggregator sub-module
+	--- mutates, since Lua's module cache returns one instance per require().
+	--- @param date string "YYYY-MM-DD".
+	--- @param app string Application name.
+	--- @return table|nil The accumulated row, or nil if nothing was walked yet.
+	local function read_app_day_row(date, app)
+		local S = require("modules.keylogger.aggregator.state")
+		if not S.agg_batch then return nil end
+		return S.agg_batch.app_day[date .. "\1" .. app]
+	end
+
+	helpers.it("hs_suggested manifest_increment accumulates into agg_batch.app_day", function()
+		local a = helpers.load_with_stubs("modules.keylogger.aggregator")
+		package.loaded["modules.keylogger.sqlite_writer"] = { get_db = function() return nil end }
+		package.loaded["modules.keylogger.export"]        = { get_native_app_category = function() return "Dev" end }
+		a.init({ device_id = "manifest-hs-uuid" })
+
+		a.walk_system_event({
+			action = "manifest_increment", stat = "hs_suggested", amount = 1,
+			app = "TestApp", timestamp = "2024-06-01 10:00:00.000",
+		})
+		a.walk_system_event({
+			action = "manifest_increment", stat = "hs_suggested", amount = 1,
+			app = "TestApp", timestamp = "2024-06-01 10:00:01.000",
+		})
+
+		local row = read_app_day_row("2024-06-01", "TestApp")
+		helpers.assert_true(row ~= nil, "app_day row must exist after two manifest_increment events")
+		helpers.assert_eq(row.hs_suggested, 2,
+			"hs_suggested must accumulate the manifest_increment amounts instead of being discarded")
+	end)
+
+	helpers.it("llm_suggested manifest_increment honors a custom amount", function()
+		local a = helpers.load_with_stubs("modules.keylogger.aggregator")
+		package.loaded["modules.keylogger.sqlite_writer"] = { get_db = function() return nil end }
+		package.loaded["modules.keylogger.export"]        = { get_native_app_category = function() return "Dev" end }
+		a.init({ device_id = "manifest-llm-uuid" })
+
+		a.walk_system_event({
+			action = "manifest_increment", stat = "llm_suggested", amount = 3,
+			app = "TestApp", timestamp = "2024-06-01 11:00:00.000",
+		})
+
+		local row = read_app_day_row("2024-06-01", "TestApp")
+		helpers.assert_true(row ~= nil, "app_day row must exist after a manifest_increment event")
+		helpers.assert_eq(row.llm_suggested, 3,
+			"llm_suggested must be bumped by the event's amount field")
+	end)
+
+	helpers.it("an unrecognized stat name is ignored (whitelist, no arbitrary column injection)", function()
+		local a = helpers.load_with_stubs("modules.keylogger.aggregator")
+		package.loaded["modules.keylogger.sqlite_writer"] = { get_db = function() return nil end }
+		package.loaded["modules.keylogger.export"]        = { get_native_app_category = function() return "Dev" end }
+		a.init({ device_id = "manifest-bad-uuid" })
+
+		local ok = pcall(function()
+			a.walk_system_event({
+				action = "manifest_increment", stat = "not_a_real_column", amount = 1,
+				app = "TestApp", timestamp = "2024-06-01 12:00:00.000",
+			})
+		end)
+		helpers.assert_true(ok, "an unknown stat name must not crash walk_system_event")
+
+		local row = read_app_day_row("2024-06-01", "TestApp")
+		if row then
+			helpers.assert_nil(row.not_a_real_column,
+				"an unwhitelisted stat name must never be written into the batch row")
+		end
+	end)
+
+end)

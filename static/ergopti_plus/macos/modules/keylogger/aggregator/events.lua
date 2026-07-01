@@ -420,6 +420,16 @@ function M.walk_window_switch(entry)
 	tr.ms = tr.ms + (entry.duration_ms or 0)
 end
 
+-- Manifest stat names that LogManager.increment_manifest_stat() is allowed to
+-- bump on agg_app_day. Whitelisted (rather than trusting entry.stat blindly)
+-- so a future caller cannot inject an arbitrary column name into the batch —
+-- see modules/keylogger/init.lua log_hotstring_suggested / log_llm_suggested,
+-- the only two current producers of the manifest_increment system_event.
+local MANIFEST_STAT_FIELDS = {
+	hs_suggested  = true,
+	llm_suggested = true,
+}
+
 --- Handles kc_hold + per-day system stats on system_event entries.
 --- @param entry table Decoded system_event JSONL entry.
 function M.walk_system_event(entry)
@@ -427,6 +437,10 @@ function M.walk_system_event(entry)
 	C.ensure_batch()
 	local date_str = entry.timestamp:sub(1, 10)
 	local action   = entry.action
+	if action == "manifest_increment" and MANIFEST_STAT_FIELDS[entry.stat] then
+		local app = entry.app or "Unknown"
+		C.bump_app_day(date_str, app, entry.stat, tonumber(entry.amount) or 1)
+	end
 	if action == "modifier_hold" or action == "karabiner_release" then
 		local kc  = entry.keycode
 		local app = entry.app or "Unknown"
