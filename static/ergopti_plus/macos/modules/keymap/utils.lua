@@ -116,6 +116,25 @@ function M.take_paste_ops()
 	return n
 end
 
+--- Pure predicate: is this exact keystroke the Cmd+V echo of a pending
+--- synthetic paste? Mirrors the check keymap/init.lua's onKeyDownRaw already
+--- uses to DRAIN expected_synthetic_pastes, but as a read-only peek so a
+--- second caller (the keylogger's shortcut-classification branch) can consult
+--- the same fact without mutating the counter itself (F-HIGH-17 fix: without
+--- this, every long paste-worthy expansion was logged as a genuine user
+--- Cmd+V keyboard shortcut, inflating the shortcut-count metric).
+--- Takes `is_v_key` as an already-resolved boolean (rather than a raw keycode
+--- + keycode-map lookup) so this pure function never needs its own OS call.
+--- @param flags table The modifier flags from the key event.
+--- @param is_v_key boolean Whether the keystroke's keycode resolves to "v".
+--- @param pending_pastes number The current CoreState.expected_synthetic_pastes count.
+--- @return boolean True when this keystroke is a pending synthetic paste echo.
+function M.is_synthetic_paste_keystroke(flags, is_v_key, pending_pastes)
+	return type(flags) == "table" and flags.cmd == true
+		and is_v_key == true
+		and (tonumber(pending_pastes) or 0) > 0
+end
+
 --- Mutates the clipboard with `value` and issues the Cmd+V keystroke, then
 --- arms the async restore-to-original timer. Extracted so both emit_text and
 --- emit_tokens (which may need to defer this call — see the serialisation

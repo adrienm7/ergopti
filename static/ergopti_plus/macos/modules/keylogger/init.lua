@@ -547,14 +547,24 @@ local function handle_key(event_obj)
 		local flags   = event_obj:getFlags() or {}
 		local keycode = event_obj:getKeyCode()
 
-		-- Shortcuts: flush then log immediately without entering the typing pipeline
+		-- Shortcuts: flush then log immediately without entering the typing pipeline.
+		-- Gate on the keymap's own pending-synthetic-paste peek FIRST: any hotstring/
+		-- personal-info/LLM expansion whose replacement exceeds the paste threshold
+		-- synthesizes a Cmd+V, which is a genuine cmd+key combo and would otherwise
+		-- match is_shortcut_candidate unconditionally, inflating the user's logged
+		-- Cmd+V shortcut count with synthetic paste echoes (F-HIGH-17 fix).
 		if is_shortcut_candidate(flags, keycode) then
-			LogManager.flush_buffer()
-			local front_app = hs.application.frontmostApplication()
-			LogManager.log_shortcut(
-				build_shortcut_key(event_obj, flags, keycode),
-				front_app and front_app:title() or "Unknown"
-			)
+			local is_synth_paste = _keymap_mod
+				and type(_keymap_mod.is_pending_synthetic_paste) == "function"
+				and _keymap_mod.is_pending_synthetic_paste(flags, keycode)
+			if not is_synth_paste then
+				LogManager.flush_buffer()
+				local front_app = hs.application.frontmostApplication()
+				LogManager.log_shortcut(
+					build_shortcut_key(event_obj, flags, keycode),
+					front_app and front_app:title() or "Unknown"
+				)
+			end
 			return
 		end
 
