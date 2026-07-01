@@ -32,9 +32,18 @@
 global _CLW_Gui        := unset
 global _CLW_WebView    := unset
 global _CLW_Controller := unset
+global _CLW_MsgSub     := unset
 global _CLW_Ready      := false
 global _CLW_Queue      := []
 global _CLW_Channel    := "dev"
+
+; Virtual host mapped to _SharedDir so the document and its relative assets
+; and the locale fetch resolve over https:// -- file:// is an opaque origin
+; and the chrome.webview JS->AHK channel does not reliably deliver from it
+; (see PROJECT_MEMORY project-webview2-bridge-gotchas).
+global CHANGELOG_VHOST := "ergopti.changelog"   ; -> _SharedDir
+; COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW.
+global CHANGELOG_HOST_ACCESS_ALLOW := 1
 
 
 
@@ -144,8 +153,14 @@ _CLW_BuildWindow(Channel) {
 		s.IsSwipeNavigationEnabled         := false
 	}
 
-	; JS → AHK bridge.
-	_CLW_WebView.WebMessageReceived(_CLW_OnWebMessage)
+	; JS → AHK bridge. Store the subscription handle in a persistent global --
+	; discarding it lets the binding GC it and silently unsubscribe the handler.
+	global _CLW_MsgSub := _CLW_WebView.WebMessageReceived(_CLW_OnWebMessage)
+
+	; Map the virtual host BEFORE navigating so the document and every relative
+	; asset and the locale fetch resolve through it instead of an opaque file://
+	; origin.
+	try _CLW_WebView.SetVirtualHostNameToFolderMapping(CHANGELOG_VHOST, _SharedDir, CHANGELOG_HOST_ACCESS_ALLOW)
 
 	; Inject i18n base URL and active locale BEFORE the page scripts run,
 	; exactly as ollama_webview.ahk does. Also inject repo config and channel.
@@ -193,7 +208,13 @@ _CLW_BuildWindow(Channel) {
 _CLW_Eval(Js) {
 	global _CLW_WebView, _CLW_Ready, _CLW_Queue
 	if (_CLW_Ready && IsSet(_CLW_WebView)) {
-		try _CLW_WebView.ExecuteScript(Js)
+		; Run OUTSIDE the current call stack via a one-shot timer. ExecuteScript
+		; is ExecuteScriptAsync().await(), which spins a NESTED message loop;
+		; calling it synchronously from inside the WebMessageReceived COM
+		; callback (as the "ready" handler does) re-enters the STA apartment
+		; and wedges further WebView2 message delivery -- the channel then
+		; delivers exactly one message then goes silent.
+		SetTimer(_CLW_RunScript.Bind(Js), -1)
 	} else {
 		_CLW_Queue.Push(Js)
 		; Cap the queue to avoid unbounded growth if the page never becomes ready.
@@ -203,14 +224,34 @@ _CLW_Eval(Js) {
 }
 
 /**
+ * Executes a queued script on a fresh call stack (scheduled by _CLW_Eval via a
+ * -1 timer). Uses ExecuteScriptAsync fire-and-forget (no .await()) -- we do
+ * not need the script's return value, and awaiting it here would reintroduce
+ * the same nested-message-loop wedge _CLW_Eval's deferral avoids.
+ * @param {string} Js - JavaScript expression.
+ */
+_CLW_RunScript(Js) {
+	global _CLW_WebView
+	if !IsSet(_CLW_WebView)
+		return
+	try {
+		_CLW_WebView.ExecuteScriptAsync(Js)
+	} catch as Err {
+		try LoggerError("Changelog", "ExecuteScriptAsync failed (len={1}): {2}.", StrLen(Js), Err.Message)
+	}
+}
+
+/**
  * Flushes all queued JS calls now that the page is ready.
  */
 _CLW_FlushQueue() {
 	global _CLW_Ready, _CLW_Queue, _CLW_WebView
 	_CLW_Ready := true
+	; Defer each queued script (see _CLW_Eval) so none runs re-entrantly inside
+	; the WebMessageReceived callback that typically triggers this flush.
 	for _, Js in _CLW_Queue {
 		if IsSet(_CLW_WebView)
-			try _CLW_WebView.ExecuteScript(Js)
+			SetTimer(_CLW_RunScript.Bind(Js), -1)
 	}
 	_CLW_Queue := []
 }
@@ -392,25 +433,23 @@ _CLW_WebView2Available() {
 }
 
 /**
- * Returns the file:// URL for _shared/ui/changelog/index.html.
+ * Returns the https:// virtual-host URL for _shared/ui/changelog/index.html.
+ * A per-open cache-buster forces a fresh document each launch instead of a
+ * WebView2-cached stale copy from the virtual host.
  * @returns {string}
  */
 _CLW_HtmlUrl() {
-	global _SharedDir
-	base := _SharedDir . "\ui\changelog\index.html"
-	loop files, base
-		base := A_LoopFileFullPath
-	return "file:///" . StrReplace(base, "\", "/")
+	global CHANGELOG_VHOST
+	return "https://" . CHANGELOG_VHOST . "/ui/changelog/index.html?cb=" . A_TickCount
 }
 
 /**
- * Returns the file:// URL for _shared/data/locales/ (trailing slash).
+ * Returns the https:// virtual-host URL for _shared/data/locales/ (trailing slash).
  * @returns {string}
  */
 _CLW_LocalesUrl() {
-	global _SharedDir
-	base := _SharedDir . "\data\locales\"
-	return "file:///" . StrReplace(base, "\", "/")
+	global CHANGELOG_VHOST
+	return "https://" . CHANGELOG_VHOST . "/data/locales/"
 }
 
 /**
@@ -446,7 +485,11 @@ _CLW_JsStr(s) {
  * Resets all module-level state after window close.
  */
 _CLW_Reset() {
-	global _CLW_Gui, _CLW_WebView, _CLW_Controller, _CLW_Ready, _CLW_Queue
+	global _CLW_Gui, _CLW_WebView, _CLW_Controller, _CLW_MsgSub, _CLW_Ready, _CLW_Queue
+	; Release the subscription FIRST, while the controller is still alive. Its
+	; __Delete unsubscribes via remove_WebMessageReceived on the live
+	; controller; doing it AFTER Controller.Close() raises a COM error.
+	try _CLW_MsgSub := unset
 	if IsSet(_CLW_Controller)
 		try _CLW_Controller.Close()
 	_CLW_Gui        := unset
