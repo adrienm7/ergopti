@@ -2877,11 +2877,13 @@ category = "Metrics"
 type = "action"
 id = "show_typing"
 i18n = "menu.metrics.show_typing"
+disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
 type = "action"
 id = "shortcut_typing"
 i18n_dynamic = "menu.metrics.shortcut_prefix"
+disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
 type = "---"
@@ -2890,43 +2892,48 @@ type = "---"
 type = "action"
 id = "show_apps"
 i18n = "menu.metrics.show_apps"
+disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
 type = "action"
 id = "shortcut_apps"
 i18n_dynamic = "menu.metrics.shortcut_prefix"
+disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
 type = "---"
 
 [[menu.metrics_menu]]
-type = "feature"
+type = "dynamic"
 id = "wpm_menubar"
-i18n = "menu.metrics.show_wpm_menubar"
 platforms = ["hs"]
+disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
-type = "feature"
+type = "dynamic"
 id = "menubar_colors"
-i18n = "menu.metrics.colors_by_source"
 platforms = ["hs"]
-depends_on = "wpm_menubar"
+disabled_when = ["keylogger_enabled", "wpm_menubar_visible"]
 
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "wpm_widget"
+disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "widget_colors"
+disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
 
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "include_realtime"
+disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
 
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "reset_wpm_position"
+disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
 
 [[menu.metrics_menu]]
 type = "---"
@@ -2938,18 +2945,22 @@ i18n = "menu.metrics.privacy_header"
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "filter_private"
+disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "filter_secure"
+disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "filter_sysauth"
+disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "exclude_apps"
+disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
 type = "---"
@@ -2958,6 +2969,7 @@ type = "---"
 type = "dynamic"
 id = "encryption"
 platforms = ["hs"]
+disabled_when = ["keylogger_enabled"]
 
 [[menu.layout_menu]]
 type = "toggle"

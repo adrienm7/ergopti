@@ -244,6 +244,11 @@ try FileAppend("# [marker] starting direct include of LLM production modules`r`n
 #Include ../modules/llm/prediction_engine.ahk
 #Include unit/test_llm_prediction_engine.ahk
 #Include unit/test_llm_defaults.ahk
+; llm_bridge.ahk itself — needed so test_llm_bridge_apply_expansion.ahk can call
+; the real LLM_Bridge_ApplyExpansionIfActive() instead of hitting an undefined
+; function (other llm_bridge.ahk tests only source-scan it; this one is a real
+; unit test of the function's behaviour).
+#Include ../modules/keymap/llm_bridge.ahk
 #Include unit/test_llm_bridge_apply_expansion.ahk
 ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,
 ; which let a crash in its Levenshtein helper survive — include it + its tests.
@@ -447,6 +452,8 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_llm_menu_layout_shared.ahk
 ; Drift gate: manifest top_level tail (from global_actions) must match the AHK dispatch table.
 #Include meta/test_menu_top_level_drift_gate.ahk
+; Contract gate: metrics_menu disabled_when predicate == AHK handler resolver calls (MG-1/MG-2).
+#Include meta/test_menu_metrics_disabled_when.ahk
 #Include meta/test_port_adapter_coverage.ahk
 #Include meta/test_no_class_global_conflict.ahk
 #Include meta/test_locale_json_valid.ahk

@@ -36,9 +36,9 @@ local _prog_canvas = nil
 
 
 -- ================================
---- ================================
+-- ================================
 -- ======= 1/ Default State =======
---- ================================
+-- ================================
 -- ================================
 
 M.DEFAULT_STATE = {
@@ -62,9 +62,9 @@ M.DEFAULT_STATE = {
 
 
 -- ==================================
---- ==================================
+-- ==================================
 -- ======= 2/ Local Utilities =======
---- ==================================
+-- ==================================
 -- ==================================
 
 --- Draws or updates the floating progress bar during mass encryption/decryption.
@@ -135,9 +135,9 @@ end
 
 
 -- ==============================
---- ==============================
+-- ==============================
 -- ======= 3/ Factory API =======
---- ==============================
+-- ==============================
 -- ==============================
 
 --- Builds the Keylogger menu item and defines callbacks.
@@ -190,10 +190,21 @@ function M.build(ctx)
 	-- ===== 3.1) Dynamic Handlers for Manifest Items =====
 	-- =====================================================
 
+	-- Canonical state-key getters for the disabled_when resolver (MG-1) —
+	-- maps the manifest's driver-neutral keys to the concrete Lua state reads
+	-- they proxy. Shared by every dynamic handler below so the dependency
+	-- graph (which item greys out on which toggle) lives once in
+	-- menu_manifest.json instead of being re-derived per handler.
+	local STATE_GETTERS = {
+		keylogger_enabled   = function() return state.keylogger_enabled end,
+		wpm_widget_visible  = function() return state.keylogger_float_wpm end,
+		wpm_menubar_visible = function() return state.keylogger_menubar_wpm end,
+	}
+
 	local function dyn_show_typing(items, _ctx)
 		table.insert(items, {
 			title    = i18n.get("menu.metrics.show_typing"),
-			disabled = not state.keylogger_enabled,
+			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "show_typing", STATE_GETTERS),
 			fn       = function()
 				local Keylogger = require("modules.keylogger")
 				Keylogger.show_metrics()
@@ -221,7 +232,7 @@ function M.build(ctx)
 		end
 		table.insert(items, {
 			title    = string.format(i18n.get("menu.metrics.shortcut_item"), sc_label),
-			disabled = not state.keylogger_enabled,
+			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "shortcut_typing", STATE_GETTERS),
 			fn       = function()
 				local current_str = ""
 				if type(state.metrics_shortcut) == "table" then
@@ -256,7 +267,7 @@ function M.build(ctx)
 	local function dyn_show_apps(items, _ctx)
 		table.insert(items, {
 			title    = i18n.get("menu.metrics.show_apps"),
-			disabled = not state.keylogger_enabled,
+			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "show_apps", STATE_GETTERS),
 			fn       = function()
 				local ok, at = pcall(require, "ui.metrics_apps")
 				if ok and type(at.show) == "function" then
@@ -278,7 +289,7 @@ function M.build(ctx)
 		end
 		table.insert(items, {
 			title    = string.format(i18n.get("menu.metrics.shortcut_item"), sc_label),
-			disabled = not state.keylogger_enabled,
+			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "shortcut_apps", STATE_GETTERS),
 			fn       = function()
 				local current_str = ""
 				if type(state.apps_time_shortcut) == "table" then
@@ -314,7 +325,7 @@ function M.build(ctx)
 		table.insert(items, {
 			title    = i18n.get("menu.metrics.filter_private"),
 			checked  = state.keylogger_private_filter_enabled,
-			disabled = not state.keylogger_enabled,
+			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "filter_private", STATE_GETTERS),
 			fn       = function()
 				state.keylogger_private_filter_enabled = not state.keylogger_private_filter_enabled
 				local Keylogger = require("modules.keylogger")
@@ -330,7 +341,7 @@ function M.build(ctx)
 		table.insert(items, {
 			title    = i18n.get("menu.metrics.filter_secure"),
 			checked  = state.keylogger_secure_filter_enabled,
-			disabled = not state.keylogger_enabled,
+			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "filter_secure", STATE_GETTERS),
 			fn       = function()
 				state.keylogger_secure_filter_enabled = not state.keylogger_secure_filter_enabled
 				local Keylogger = require("modules.keylogger")
@@ -346,7 +357,7 @@ function M.build(ctx)
 		table.insert(items, {
 			title    = i18n.get("menu.metrics.filter_sysauth"),
 			checked  = state.keylogger_system_auth_filter_enabled,
-			disabled = not state.keylogger_enabled,
+			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "filter_sysauth", STATE_GETTERS),
 			fn       = function()
 				state.keylogger_system_auth_filter_enabled = not state.keylogger_system_auth_filter_enabled
 				local Keylogger = require("modules.keylogger")
@@ -377,7 +388,7 @@ function M.build(ctx)
 		)
 		table.insert(items, {
 			title    = label,
-			disabled = not state.keylogger_enabled,
+			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "exclude_apps", STATE_GETTERS),
 			menu     = exclusion_menu,
 		})
 	end
@@ -386,7 +397,7 @@ function M.build(ctx)
 		table.insert(items, {
 			title    = i18n.get("menu.metrics.show_wpm_menubar"),
 			checked  = state.keylogger_menubar_wpm,
-			disabled = not state.keylogger_enabled,
+			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "wpm_menubar", STATE_GETTERS),
 			fn       = function()
 				state.keylogger_menubar_wpm = not state.keylogger_menubar_wpm
 				save_prefs()
@@ -404,7 +415,7 @@ function M.build(ctx)
 		table.insert(items, {
 			title    = i18n.get("menu.metrics.colors_by_source"),
 			checked  = state.keylogger_menubar_colors,
-			disabled = not state.keylogger_enabled or not state.keylogger_menubar_wpm,
+			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "menubar_colors", STATE_GETTERS),
 			fn       = function()
 				state.keylogger_menubar_colors = not state.keylogger_menubar_colors
 				save_prefs()
@@ -422,7 +433,7 @@ function M.build(ctx)
 		table.insert(items, {
 			title    = i18n.get("menu.metrics.show_wpm_widget"),
 			checked  = state.keylogger_float_wpm,
-			disabled = not state.keylogger_enabled,
+			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "wpm_widget", STATE_GETTERS),
 			fn       = function()
 				state.keylogger_float_wpm = not state.keylogger_float_wpm
 				save_prefs()
@@ -440,7 +451,7 @@ function M.build(ctx)
 		table.insert(items, {
 			title    = i18n.get("menu.metrics.colors_by_source"),
 			checked  = state.keylogger_float_colors,
-			disabled = not state.keylogger_enabled or not state.keylogger_float_wpm,
+			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "widget_colors", STATE_GETTERS),
 			fn       = function()
 				state.keylogger_float_colors = not state.keylogger_float_colors
 				save_prefs()
@@ -458,7 +469,7 @@ function M.build(ctx)
 		table.insert(items, {
 			title    = i18n.get("menu.metrics.include_realtime"),
 			checked  = state.keylogger_float_graph,
-			disabled = not state.keylogger_enabled or not state.keylogger_float_wpm,
+			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "include_realtime", STATE_GETTERS),
 			fn       = function()
 				state.keylogger_float_graph = not state.keylogger_float_graph
 				save_prefs()
@@ -475,7 +486,7 @@ function M.build(ctx)
 	local function dyn_reset_wpm_position(items, _ctx)
 		table.insert(items, {
 			title    = i18n.get("menu.metrics.reset_wpm_position"),
-			disabled = not state.keylogger_enabled or not state.keylogger_float_wpm,
+			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "reset_wpm_position", STATE_GETTERS),
 			fn       = function()
 				local WpmWidget = require("ui.wpm.wpm_widget")
 				if type(WpmWidget.reset_position) == "function" then WpmWidget.reset_position() end
@@ -487,7 +498,7 @@ function M.build(ctx)
 		table.insert(items, {
 			title    = i18n.get("menu.metrics.encrypt_toggle"),
 			checked  = state.keylogger_encrypt,
-			disabled = not state.keylogger_enabled,
+			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "encryption", STATE_GETTERS),
 			fn       = function()
 				local log_manager = require("modules.keylogger.log_manager")
 				local log_dir     = hs.configdir .. "/logs"

@@ -325,3 +325,60 @@ _MR_BuildBuiltinGroup(GroupId, CategoryName) {
 	try LoggerWarn("MenuRenderer", "Unknown built-in group '{1}'.", GroupId)
 	return false
 }
+
+
+
+
+
+; =======================================================
+; =======================================================
+; ======= 5/ Declarative Disabled Resolver (MG-1) =======
+; =======================================================
+; =======================================================
+
+; Finds the manifest item with the given ``id`` inside the ``MenuKey`` array.
+; Returns the item Map, or ``false`` if not found.
+_MR_FindItemById(MenuKey, ItemId) {
+	MenuDef := _MR_GetMenuDef(MenuKey)
+	for Item in MenuDef {
+		if (Item is Map) and _MR_Get(Item, "id") == ItemId {
+			return Item
+		}
+	}
+	return false
+}
+
+; Evaluates the declarative ``disabled_when`` predicate of a manifest item
+; against a caller-supplied Map of canonical state key -> zero-arg getter Func.
+;
+; ``disabled_when`` is an array of canonical state keys; the item is enabled
+; only when EVERY key's getter returns a truthy value — it is disabled as
+; soon as any one of them is falsy. Items without a ``disabled_when`` array
+; are never disabled by this mechanism (returns ``false``).
+;
+; A missing getter for a declared key means the manifest and the driver's
+; getters Map have drifted — logged as ERROR and treated as disabled so the
+; mismatch fails loud instead of silently rendering an always-enabled item (§5.3).
+MenuRenderer_ResolveDisabledWhen(MenuKey, ItemId, Getters) {
+	Item := _MR_FindItemById(MenuKey, ItemId)
+	if (Item == false) {
+		return false
+	}
+
+	Keys := _MR_Get(Item, "disabled_when", 0)
+	if !(Keys is Array) or Keys.Length == 0 {
+		return false
+	}
+
+	for Key in Keys {
+		if !(Getters is Map) or !Getters.Has(Key) {
+			try LoggerError("MenuRenderer", "No getter for disabled_when key '{1}' on item '{2}.{3}' — treating as disabled.", Key, MenuKey, ItemId)
+			return true
+		}
+		if !(Getters[Key])() {
+			return true
+		}
+	}
+
+	return false
+}

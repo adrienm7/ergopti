@@ -32,10 +32,11 @@ local _cache = nil
 
 
 
+
 -- ==============================================
--- ==============================================
+-- =============================================
 -- ======= 1/ Manifest Root Access Layer =======
--- ==============================================
+-- =============================================
 -- ==============================================
 
 --- Loads and caches the shared manifest JSON.
@@ -264,6 +265,69 @@ end
 --- @return table
 function M.get_array(key)
 	return get_menu_def(key)
+end
+
+
+
+
+
+-- ========================================================
+-- =======================================================
+-- ======= 6/ Declarative Disabled Resolver (MG-1) =======
+-- =======================================================
+-- ========================================================
+
+--- Finds the manifest item with the given ``id`` inside the ``menu_key`` array.
+--- @param menu_key string
+--- @param item_id string
+--- @return table|nil
+local function find_item_by_id(menu_key, item_id)
+	local menu_def = get_menu_def(menu_key)
+	for _, item in ipairs(menu_def) do
+		if type(item) == "table" and item.id == item_id then
+			return item
+		end
+	end
+	return nil
+end
+
+--- Evaluates the declarative ``disabled_when`` predicate of a manifest item
+--- against a caller-supplied table of canonical state key -> zero-arg getter function.
+---
+--- ``disabled_when`` is an array of canonical state keys; the item is enabled
+--- only when EVERY key's getter returns a truthy value — it is disabled as
+--- soon as any one of them is falsy. Items without a ``disabled_when`` array
+--- are never disabled by this mechanism (returns ``false``).
+---
+--- A missing getter for a declared key means the manifest and the driver's
+--- getters table have drifted — logged as ERROR and treated as disabled so the
+--- mismatch fails loud instead of silently rendering an always-enabled item.
+--- @param menu_key string
+--- @param item_id string
+--- @param getters table
+--- @return boolean
+function M.resolve_disabled_when(menu_key, item_id, getters)
+	local item = find_item_by_id(menu_key, item_id)
+	if item == nil then
+		return false
+	end
+
+	local keys = item.disabled_when
+	if type(keys) ~= "table" or #keys == 0 then
+		return false
+	end
+
+	for _, key in ipairs(keys) do
+		if type(getters) ~= "table" or type(getters[key]) ~= "function" then
+			Logger.error(LOG, "No getter for disabled_when key '%s' on item '%s.%s' — treating as disabled.", key, menu_key, item_id)
+			return true
+		end
+		if not getters[key]() then
+			return true
+		end
+	end
+
+	return false
 end
 
 return M
