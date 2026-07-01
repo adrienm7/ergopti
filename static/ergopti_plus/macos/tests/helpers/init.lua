@@ -133,6 +133,22 @@ function M.load_with_stubs(module_name, hs_overrides)
 	package.loaded["modules.keymap.layout_install"] = nil
 	package.loaded["modules.keymap.input_sources"]  = nil
 
+	-- Drop every cached modules.keymap.registry* sub-module (registry.lua was split
+	-- into registry_groups.lua + registry_index.lua). All three capture `local hs = hs`
+	-- at require-time; when a test file requires only "modules.keymap.registry" (which
+	-- itself requires the two split files), load_with_stubs's first line only clears
+	-- the exact module_name key, leaving registry_index/registry_groups cached from
+	-- whatever earlier test file first required them — bound to THAT test's now
+	-- disconnected hs stub instance. Registry.is_section_enabled then silently
+	-- reads/writes hs.settings against a stale store for the rest of the run
+	-- (F-HIGH-23 fix). Pattern-based like the ui.menu sweep above so any future split
+	-- under modules.keymap.registry* is covered automatically.
+	for name in pairs(package.loaded) do
+		if type(name) == "string" and name:match("^modules%.keymap%.registry") then
+			package.loaded[name] = nil
+		end
+	end
+
 	-- Drop every cached ui.menu.* module so a menu builder that captured lib.i18n at
 	-- require-time (e.g. menu_karabiner / menu_utils call i18n.section) is ALWAYS
 	-- re-bound to THIS test's canonical lib.i18n stub set below — never a section-less
