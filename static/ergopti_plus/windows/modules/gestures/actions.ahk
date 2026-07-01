@@ -489,15 +489,24 @@ GestureTakeNote() {
         NotepadMatch := FileName . " ahk_exe notepad.exe"
         if WMExists(NotepadMatch) {
             WMActivate(NotepadMatch)
-            WinWaitActive(NotepadMatch, , 3)
+            NoteWindowIsActive := WinWaitActive(NotepadMatch, , 3)
         } else {
             Run('notepad.exe "' . FilePath . '"')
             WinWait(NotepadMatch, , 7)
             WMActivate(NotepadMatch)
-            WinWaitActive(FileName . " ahk_exe notepad.exe", , 3)
+            NoteWindowIsActive := WinWaitActive(FileName . " ahk_exe notepad.exe", , 3)
         }
-        WinMaximize()
-        Sleep(100)
+        ; WinWaitActive returns 0 (not a throw) on timeout, so a slow/blocked
+        ; Notepad launch must not fall through to a bare WinMaximize -- that
+        ; operates on the last-found-window and throws TargetError when the
+        ; wait never actually found one (same bug as the already-fixed sibling
+        ; TakeNote in modules/shortcuts/win.ahk).
+        if not NoteWindowIsActive {
+            LoggerWarn("GestureTakeNote", "Notepad window '{1}' never became active -- skipping maximize.", NotepadMatch)
+        } else {
+            WinMaximize()
+            Sleep(100)
+        }
     } finally {
         SetTitleMatchMode(PreviousTitleMatchMode)
     }
