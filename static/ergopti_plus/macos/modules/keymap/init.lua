@@ -185,6 +185,26 @@ function M.get_trigger_char()
 	return CoreState.magic_key or M.DEFAULT_STATE.trigger_char
 end
 
+--- Read-only peek: is the given keystroke the Cmd+V echo of a pending
+--- synthetic paste queued by the expander? Exposed so OTHER event taps
+--- (namely the keylogger's shortcut-classification branch) can consult the
+--- same fact onKeyDownRaw already uses to drain expected_synthetic_pastes,
+--- without mutating the counter themselves — only onKeyDownRaw's own drain
+--- below is allowed to decrement it (F-HIGH-17 fix).
+--- Uses Keycodes.to_name() (which reverse-maps the keycode registry already
+--- required by lib/keycodes.lua) rather than a fresh keycode-map lookup here,
+--- so this peek adds no new raw OS-API call site to keymap/init.lua (tracked
+--- by the OS-API purity baseline meta-test).
+--- @param flags table The modifier flags from the key event.
+--- @param key_code number The raw keycode.
+--- @return boolean True when this keystroke is a pending synthetic paste echo.
+function M.is_pending_synthetic_paste(flags, key_code)
+	local ok, name = pcall(Keycodes.to_name, key_code)
+	local is_v_key = ok and name == "v"
+	return km_utils.is_synthetic_paste_keystroke(
+		flags, is_v_key, CoreState.expected_synthetic_pastes)
+end
+
 --- Pauses eventtap processing — all keystrokes pass through unmodified.
 function M.pause_processing()
 	CoreState.processing_paused = true
