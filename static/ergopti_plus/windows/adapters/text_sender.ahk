@@ -131,6 +131,14 @@ _TextSenderModifierString(ModStr) {
 _TextSendClipboard(Text, Saved, Callback := 0) {
 	global TEXT_CLIPBOARD_RESTORE_DELAY_MS, TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC, _TEXT_CLIPBOARD_GENERATION
 
+	; This whole round-trip runs on a SetTimer callback, which native Suspend()
+	; never disarms — a pause toggled between TextSend's scheduling and this
+	; timer firing must not still write the clipboard and paste. Nothing has
+	; been written to the clipboard yet at this point, so there is nothing to
+	; restore — the caller's Saved snapshot is simply never consumed.
+	if A_IsSuspended
+		return
+
 	; Claim this injection's slot. The restore closure below compares against this
 	; snapshot and no-ops if a newer clipboard-mode TextSend has since taken over.
 	_TEXT_CLIPBOARD_GENERATION += 1
@@ -177,6 +185,10 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 ; @param Generation {Integer}             Counter value captured at scheduling.
 _TextSendRestoreClipboard(Saved, Generation) {
 	global _TEXT_CLIPBOARD_GENERATION
+	; Also a SetTimer callback — bypasses native Suspend() like its sibling
+	; above. Restoring the clipboard is harmless while paused (it undoes the
+	; write _TextSendClipboard already made before any pause could have
+	; started), so this still runs; only a NEW clipboard write is guarded.
 	if (Generation != _TEXT_CLIPBOARD_GENERATION)
 		return
 	CB_RestoreAll(Saved)
