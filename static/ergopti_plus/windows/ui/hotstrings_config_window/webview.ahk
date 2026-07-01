@@ -48,6 +48,15 @@ global _HCWWeb_Controller := unset
 global _HCWWeb_WebView    := unset
 global _HCWWeb_MsgSub     := unset
 global _HCWWeb_NavSub     := unset
+; True once _HCWWeb_Reset() has torn the controller down. Both the frontend
+; "close" message (_HCWWeb_Dispatch) and the native Gui Close event route
+; through the SAME _HCWWeb_Close() -> _HCWWeb_Reset() call, and a second
+; pass's unsubscribe line calls remove_WebMessageReceived via ComCall against
+; a CoreWebView2 pointer already invalidated by the first pass's
+; Controller.Close() — a genuine SEH access violation no AHK try/catch can
+; intercept (see personal_toml_editor_webview.ahk _HsEdWeb_ResetDone for the
+; crash this mirrors). The flag makes the second call a true no-op instead.
+global _HCWWeb_ResetDone  := false
 
 ; Virtual host that maps to _SharedDir so the document and its relative assets
 ; (style.css, ../i18n.js) and the locale fetch all resolve over https.
@@ -73,7 +82,7 @@ _HCWWeb_Available() {
 ; (the caller must NOT also build the native Gui), false to fall back.
 _HCWWeb_TryOpen() {
 	global _HCWWeb_Gui, _HCWWeb_Controller, _HCWWeb_WebView
-	global _HCWWeb_MsgSub, _HCWWeb_NavSub, _VendorDir, _SharedDir
+	global _HCWWeb_MsgSub, _HCWWeb_NavSub, _HCWWeb_ResetDone, _VendorDir, _SharedDir
 
 	if !_HCWWeb_Available()
 		return false
@@ -115,6 +124,10 @@ _HCWWeb_TryOpen() {
 	}
 
 	_HCWWeb_WebView := _HCWWeb_Controller.CoreWebView2
+	; This controller/webview pair is fresh — re-arm the Reset() guard so this
+	; session's close actually tears it down instead of short-circuiting on a
+	; flag left behind by an earlier _HCWWeb_Reset() call.
+	_HCWWeb_ResetDone := false
 
 	try {
 		s := _HCWWeb_WebView.Settings
@@ -494,17 +507,38 @@ _HCWWeb_Close() {
 }
 
 ; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
-; whether to destroy the window). Safe to call repeatedly.
+; whether to destroy the window). Idempotent: a second call (e.g. the frontend
+; "close" message and the native Gui Close event both firing for the same
+; teardown) is a true no-op instead of touching the globals again.
 _HCWWeb_Reset() {
 	global _HCWWeb_Controller, _HCWWeb_WebView, _HCWWeb_MsgSub, _HCWWeb_NavSub
-	; Release the subscriptions FIRST, while the controller is still alive. Their
-	; __Delete unsubscribes via remove_X on the live controller; doing it AFTER
-	; Controller.Close() raises a COM error that — uncaught in the window's
-	; Close-event thread — terminates the entire AHK script.
-	try _HCWWeb_MsgSub := unset
-	try _HCWWeb_NavSub := unset
-	if IsSet(_HCWWeb_Controller)
-		try _HCWWeb_Controller.Close()
+	global _HCWWeb_ResetDone
+
+	; A prior Reset() already released remove_WebMessageReceived/remove_Navigation-
+	; Completed against this controller. Re-running the unset lines below would
+	; call __Delete's bound ComCall a SECOND time against a COM pointer WebView2
+	; has already torn down (Controller.Close() releases CoreWebView2's underlying
+	; interfaces) — a genuine SEH access violation that no try/catch can intercept.
+	if _HCWWeb_ResetDone
+		return
+	_HCWWeb_ResetDone := true
+
+	; The whole teardown runs under one try: a hard COM access violation can
+	; occur mid-sequence, and a bare per-line `try` only catches ordinary AHK
+	; exceptions — it does NOT catch that class of failure, but wrapping the
+	; sequence still protects the *other* lines from a preceding non-fatal COM
+	; error so the globals below are always cleared even when the unsubscribe
+	; itself fails.
+	try {
+		; Release the subscriptions FIRST, while the controller is still alive. Their
+		; __Delete unsubscribes via remove_X on the live controller; doing it AFTER
+		; Controller.Close() raises a COM error that — uncaught in the window's
+		; Close-event thread — terminates the entire AHK script.
+		_HCWWeb_MsgSub := unset
+		_HCWWeb_NavSub := unset
+		if IsSet(_HCWWeb_Controller)
+			_HCWWeb_Controller.Close()
+	}
 	_HCWWeb_Controller := unset
 	_HCWWeb_WebView    := unset
 }

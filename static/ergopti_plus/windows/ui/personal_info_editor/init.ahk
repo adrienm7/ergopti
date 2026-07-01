@@ -39,6 +39,15 @@ global _PiEdWeb_Controller := unset
 global _PiEdWeb_WebView    := unset
 global _PiEdWeb_MsgSub     := unset
 global _PiEdWeb_NavSub     := unset
+; True once _PiEdWeb_Reset() has torn the controller down. Both the frontend
+; "cancel" message and the native Gui Close event route through the SAME
+; _PiEdWeb_Close() -> _PiEdWeb_Reset() call, and a second pass's unsubscribe
+; line calls remove_WebMessageReceived via ComCall against a CoreWebView2
+; pointer already invalidated by the first pass's Controller.Close() — a
+; genuine SEH access violation no AHK try/catch can intercept (see
+; personal_toml_editor_webview.ahk _HsEdWeb_ResetDone for the crash this
+; mirrors). The flag makes the second call a true no-op instead.
+global _PiEdWeb_ResetDone  := false
 
 global PIED_VHOST             := "ergopti.personalinfo"
 global PIED_HOST_ACCESS_ALLOW := 1
@@ -54,7 +63,7 @@ _PiEdWeb_Available() {
 ; caller must NOT also build the native dialog), false to fall back.
 _PiEdWeb_TryOpen() {
 	global _PiEdWeb_Gui, _PiEdWeb_Controller, _PiEdWeb_WebView
-	global _PiEdWeb_MsgSub, _PiEdWeb_NavSub, _VendorDir, _SharedDir
+	global _PiEdWeb_MsgSub, _PiEdWeb_NavSub, _PiEdWeb_ResetDone, _VendorDir, _SharedDir
 
 	if !_PiEdWeb_Available()
 		return false
@@ -88,6 +97,10 @@ _PiEdWeb_TryOpen() {
 	}
 
 	_PiEdWeb_WebView := _PiEdWeb_Controller.CoreWebView2
+	; This controller/webview pair is fresh — re-arm the Reset() guard so this
+	; session's close actually tears it down instead of short-circuiting on a
+	; flag left behind by an earlier _PiEdWeb_Reset() call.
+	_PiEdWeb_ResetDone := false
 
 	try {
 		s := _PiEdWeb_WebView.Settings
@@ -255,18 +268,39 @@ _PiEdWeb_Close() {
 	_PiEdWeb_Gui := 0
 }
 
-; Tears down the WebView2 controller + host state (NOT the Gui). Safe to call
-; repeatedly.
+; Tears down the WebView2 controller + host state (NOT the Gui). Idempotent: a
+; second call (e.g. the frontend "cancel" message and the native Gui Close
+; event both firing for the same teardown) is a true no-op instead of touching
+; the globals again.
 _PiEdWeb_Reset() {
 	global _PiEdWeb_Controller, _PiEdWeb_WebView, _PiEdWeb_MsgSub, _PiEdWeb_NavSub
-	; Release the subscriptions FIRST, while the controller is still alive. Their
-	; __Delete unsubscribes via remove_X on the live controller; doing it AFTER
-	; Controller.Close() raises a COM error that — uncaught in the window's
-	; Close-event thread — terminates the entire AHK script.
-	try _PiEdWeb_MsgSub := unset
-	try _PiEdWeb_NavSub := unset
-	if IsSet(_PiEdWeb_Controller)
-		try _PiEdWeb_Controller.Close()
+	global _PiEdWeb_ResetDone
+
+	; A prior Reset() already released remove_WebMessageReceived/remove_Navigation-
+	; Completed against this controller. Re-running the unset lines below would
+	; call __Delete's bound ComCall a SECOND time against a COM pointer WebView2
+	; has already torn down (Controller.Close() releases CoreWebView2's underlying
+	; interfaces) — a genuine SEH access violation that no try/catch can intercept.
+	if _PiEdWeb_ResetDone
+		return
+	_PiEdWeb_ResetDone := true
+
+	; The whole teardown runs under one try: a hard COM access violation can
+	; occur mid-sequence, and a bare per-line `try` only catches ordinary AHK
+	; exceptions — it does NOT catch that class of failure, but wrapping the
+	; sequence still protects the *other* lines from a preceding non-fatal COM
+	; error so the globals below are always cleared even when the unsubscribe
+	; itself fails.
+	try {
+		; Release the subscriptions FIRST, while the controller is still alive. Their
+		; __Delete unsubscribes via remove_X on the live controller; doing it AFTER
+		; Controller.Close() raises a COM error that — uncaught in the window's
+		; Close-event thread — terminates the entire AHK script.
+		_PiEdWeb_MsgSub := unset
+		_PiEdWeb_NavSub := unset
+		if IsSet(_PiEdWeb_Controller)
+			_PiEdWeb_Controller.Close()
+	}
 	_PiEdWeb_Controller := unset
 	_PiEdWeb_WebView    := unset
 }

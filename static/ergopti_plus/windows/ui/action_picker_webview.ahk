@@ -42,6 +42,17 @@ global _ActPickWeb_Controller := unset
 global _ActPickWeb_WebView    := unset
 global _ActPickWeb_MsgSub     := unset
 global _ActPickWeb_NavSub     := unset
+; True once _ActPickWeb_Reset() has torn the controller down. _ActPickWeb_Close()
+; (and therefore Reset()) is reachable from THREE independent triggers for the
+; same window — the native Gui Close event, the frontend "cancel" message, and
+; the frontend "confirm" message (_ActPickWeb_Confirm) — plus a re-open of the
+; singleton while one is already showing (_ActPickWeb_TryOpen). A second pass's
+; unsubscribe line calls remove_WebMessageReceived via ComCall against a
+; CoreWebView2 pointer already invalidated by the first pass's
+; Controller.Close() — a genuine SEH access violation no AHK try/catch can
+; intercept (see personal_toml_editor_webview.ahk _HsEdWeb_ResetDone for the
+; crash this mirrors). The flag makes the second call a true no-op instead.
+global _ActPickWeb_ResetDone  := false
 
 ; The chosen-action callback + the init payload captured at open time.
 global _ActPickWeb_OnConfirm  := 0
@@ -71,6 +82,7 @@ _ActPickWeb_Available() {
 _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false) {
 	global _ActPickWeb_Gui, _ActPickWeb_Controller, _ActPickWeb_WebView
 	global _ActPickWeb_MsgSub, _ActPickWeb_NavSub, _ActPickWeb_OnConfirm, _ActPickWeb_InitJs
+	global _ActPickWeb_ResetDone
 	global _VendorDir, _SharedDir
 
 	if !_ActPickWeb_Available()
@@ -109,6 +121,10 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false) {
 	}
 
 	_ActPickWeb_WebView := _ActPickWeb_Controller.CoreWebView2
+	; This controller/webview pair is fresh — re-arm the Reset() guard so this
+	; session's close actually tears it down instead of short-circuiting on a
+	; flag left behind by an earlier _ActPickWeb_Reset() call.
+	_ActPickWeb_ResetDone := false
 
 	try {
 		s := _ActPickWeb_WebView.Settings
@@ -310,18 +326,39 @@ _ActPickWeb_Close() {
 }
 
 ; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
-; whether to destroy the window). Safe to call repeatedly.
+; whether to destroy the window). Idempotent: a second call (e.g. the native
+; Close event firing after the frontend's "cancel"/"confirm" message already
+; tore the same window down) is a true no-op instead of touching the globals
+; again.
 _ActPickWeb_Reset() {
 	global _ActPickWeb_Controller, _ActPickWeb_WebView, _ActPickWeb_MsgSub, _ActPickWeb_NavSub
-	global _ActPickWeb_OnConfirm
-	; Release the subscriptions FIRST, while the controller is still alive. Their
-	; __Delete unsubscribes via remove_X on the live controller; doing it AFTER
-	; Controller.Close() raises a COM error that — uncaught in the window's
-	; Close-event thread — terminates the entire AHK script.
-	try _ActPickWeb_MsgSub := unset
-	try _ActPickWeb_NavSub := unset
-	if IsSet(_ActPickWeb_Controller)
-		try _ActPickWeb_Controller.Close()
+	global _ActPickWeb_OnConfirm, _ActPickWeb_ResetDone
+
+	; A prior Reset() already released remove_WebMessageReceived/remove_Navigation-
+	; Completed against this controller. Re-running the unset lines below would
+	; call __Delete's bound ComCall a SECOND time against a COM pointer WebView2
+	; has already torn down (Controller.Close() releases CoreWebView2's underlying
+	; interfaces) — a genuine SEH access violation that no try/catch can intercept.
+	if _ActPickWeb_ResetDone
+		return
+	_ActPickWeb_ResetDone := true
+
+	; The whole teardown runs under one try: a hard COM access violation can
+	; occur mid-sequence, and a bare per-line `try` only catches ordinary AHK
+	; exceptions — it does NOT catch that class of failure, but wrapping the
+	; sequence still protects the *other* lines from a preceding non-fatal COM
+	; error so the globals below are always cleared even when the unsubscribe
+	; itself fails.
+	try {
+		; Release the subscriptions FIRST, while the controller is still alive. Their
+		; __Delete unsubscribes via remove_X on the live controller; doing it AFTER
+		; Controller.Close() raises a COM error that — uncaught in the window's
+		; Close-event thread — terminates the entire AHK script.
+		_ActPickWeb_MsgSub := unset
+		_ActPickWeb_NavSub := unset
+		if IsSet(_ActPickWeb_Controller)
+			_ActPickWeb_Controller.Close()
+	}
 	_ActPickWeb_Controller := unset
 	_ActPickWeb_WebView    := unset
 	_ActPickWeb_OnConfirm  := 0

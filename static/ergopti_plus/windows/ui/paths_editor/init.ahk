@@ -37,6 +37,15 @@ global _PathsEdWeb_Controller := unset
 global _PathsEdWeb_WebView    := unset
 global _PathsEdWeb_MsgSub     := unset
 global _PathsEdWeb_NavSub     := unset
+; True once _PathsEdWeb_Reset() has torn the controller down. Both the
+; frontend "cancel" message and the native Gui Close event route through the
+; SAME _PathsEdWeb_Close() -> _PathsEdWeb_Reset() call, and a second pass's
+; unsubscribe line calls remove_WebMessageReceived via ComCall against a
+; CoreWebView2 pointer already invalidated by the first pass's
+; Controller.Close() — a genuine SEH access violation no AHK try/catch can
+; intercept (see personal_toml_editor_webview.ahk _HsEdWeb_ResetDone for the
+; crash this mirrors). The flag makes the second call a true no-op instead.
+global _PathsEdWeb_ResetDone  := false
 
 ; Virtual host that maps to _SharedDir so the document and its relative assets
 ; resolve over https (file:// is an opaque origin and breaks the JS->AHK channel).
@@ -54,7 +63,7 @@ _PathsEdWeb_Available() {
 ; (the caller must NOT also build the native dialog), false to fall back.
 _PathsEdWeb_TryOpen() {
 	global _PathsEdWeb_Gui, _PathsEdWeb_Controller, _PathsEdWeb_WebView
-	global _PathsEdWeb_MsgSub, _PathsEdWeb_NavSub, _VendorDir, _SharedDir
+	global _PathsEdWeb_MsgSub, _PathsEdWeb_NavSub, _PathsEdWeb_ResetDone, _VendorDir, _SharedDir
 
 	if !_PathsEdWeb_Available()
 		return false
@@ -90,6 +99,10 @@ _PathsEdWeb_TryOpen() {
 	}
 
 	_PathsEdWeb_WebView := _PathsEdWeb_Controller.CoreWebView2
+	; This controller/webview pair is fresh — re-arm the Reset() guard so this
+	; session's close actually tears it down instead of short-circuiting on a
+	; flag left behind by an earlier _PathsEdWeb_Reset() call.
+	_PathsEdWeb_ResetDone := false
 
 	try {
 		s := _PathsEdWeb_WebView.Settings
@@ -284,17 +297,38 @@ _PathsEdWeb_Close() {
 }
 
 ; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
-; whether to destroy the window). Safe to call repeatedly.
+; whether to destroy the window). Idempotent: a second call (e.g. the frontend
+; "cancel" message and the native Gui Close event both firing for the same
+; teardown) is a true no-op instead of touching the globals again.
 _PathsEdWeb_Reset() {
 	global _PathsEdWeb_Controller, _PathsEdWeb_WebView, _PathsEdWeb_MsgSub, _PathsEdWeb_NavSub
-	; Release the subscriptions FIRST, while the controller is still alive. Their
-	; __Delete unsubscribes via remove_X on the live controller; doing it AFTER
-	; Controller.Close() raises a COM error that — uncaught in the window's
-	; Close-event thread — terminates the entire AHK script.
-	try _PathsEdWeb_MsgSub := unset
-	try _PathsEdWeb_NavSub := unset
-	if IsSet(_PathsEdWeb_Controller)
-		try _PathsEdWeb_Controller.Close()
+	global _PathsEdWeb_ResetDone
+
+	; A prior Reset() already released remove_WebMessageReceived/remove_Navigation-
+	; Completed against this controller. Re-running the unset lines below would
+	; call __Delete's bound ComCall a SECOND time against a COM pointer WebView2
+	; has already torn down (Controller.Close() releases CoreWebView2's underlying
+	; interfaces) — a genuine SEH access violation that no try/catch can intercept.
+	if _PathsEdWeb_ResetDone
+		return
+	_PathsEdWeb_ResetDone := true
+
+	; The whole teardown runs under one try: a hard COM access violation can
+	; occur mid-sequence, and a bare per-line `try` only catches ordinary AHK
+	; exceptions — it does NOT catch that class of failure, but wrapping the
+	; sequence still protects the *other* lines from a preceding non-fatal COM
+	; error so the globals below are always cleared even when the unsubscribe
+	; itself fails.
+	try {
+		; Release the subscriptions FIRST, while the controller is still alive. Their
+		; __Delete unsubscribes via remove_X on the live controller; doing it AFTER
+		; Controller.Close() raises a COM error that — uncaught in the window's
+		; Close-event thread — terminates the entire AHK script.
+		_PathsEdWeb_MsgSub := unset
+		_PathsEdWeb_NavSub := unset
+		if IsSet(_PathsEdWeb_Controller)
+			_PathsEdWeb_Controller.Close()
+	}
 	_PathsEdWeb_Controller := unset
 	_PathsEdWeb_WebView    := unset
 }
