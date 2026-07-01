@@ -359,8 +359,18 @@ KL_Mouse_AccumScrollH(delta) {
 }
 
 KL_Mouse_FlushScroll() {
-    if A_IsSuspended
+    if A_IsSuspended {
+        ; Mirror KL_Mouse_ParkTick's suspend-path reset (line ~425): without
+        ; clearing the accumulator here, scroll_start/scroll_last stay stale
+        ; across the whole suspend window, so the next post-resume flush
+        ; computes a duration/velocity spanning the entire pause instead of
+        ; just the burst that actually occurred (keylogger-mouse-scroll-suspend-reset).
+        KLMouse.scroll_ticks   := 0
+        KLMouse.scroll_h_ticks := 0
+        KLMouse.scroll_start   := 0
+        KLMouse.scroll_last    := 0
         return
+    }
     if (KLMouse.scroll_ticks = 0 and KLMouse.scroll_h_ticks = 0)
         return
 

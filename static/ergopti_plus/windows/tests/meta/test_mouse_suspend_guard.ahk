@@ -107,6 +107,41 @@ _MMSG_FlushScrollHasSuspendGuard() {
 Test("mouse: KL_Mouse_FlushScroll has A_IsSuspended guard", _MMSG_FlushScrollHasSuspendGuard)
 
 
+; keylogger-mouse-scroll-suspend-reset: unlike KL_Mouse_ParkTick (which resets
+; prev_x/prev_y/park_last_x on its suspended path), KL_Mouse_FlushScroll's
+; A_IsSuspended branch used to return without clearing scroll_start/scroll_last.
+; A one-shot flush timer armed just before a Suspend, then firing WHILE
+; suspended, left those timestamps stale for the whole pause window; the next
+; post-resume scroll then flushed a duration/velocity spanning the entire pause
+; instead of just the burst that actually occurred.
+_MMSG_FlushScrollResetsAccumulatorWhenSuspended() {
+	Body := _DriverFuncBody("KL_Mouse_FlushScroll")
+	Assert(Body != "", "KL_Mouse_FlushScroll must exist in keylogger_mouse.ahk")
+
+	GuardPos := InStr(Body, "A_IsSuspended")
+	Assert(GuardPos > 0, "KL_Mouse_FlushScroll must check A_IsSuspended")
+
+	; All four accumulator fields must be reset, and the reset must happen
+	; INSIDE the suspended branch (before its own "return"), not merely
+	; somewhere later in the function (that would only cover the non-suspended path).
+	SuspendedBranchEnd := InStr(Body, "return", , GuardPos)
+	Assert(SuspendedBranchEnd > 0, "KL_Mouse_FlushScroll's A_IsSuspended branch must contain a return")
+	SuspendedBranch := SubStr(Body, GuardPos, SuspendedBranchEnd - GuardPos)
+
+	; Column-aligned assignments (KLMouse.scroll_ticks   := 0) use variable
+	; whitespace before `:=`, matching the existing non-suspended reset block's
+	; style — tolerate any run of spaces there instead of assuming exactly one.
+	for _, Field in ["scroll_ticks", "scroll_h_ticks", "scroll_start", "scroll_last"]
+		Assert(RegExMatch(SuspendedBranch, "KLMouse\." . Field . "\s*:=\s*0"),
+			"KL_Mouse_FlushScroll's A_IsSuspended branch must reset KLMouse." . Field
+			. " := 0 before returning — mirroring KL_Mouse_ParkTick's own suspended-path "
+			. "reset — otherwise stale pre-suspend timestamps corrupt the next post-resume "
+			. "flush's duration/velocity (keylogger-mouse-scroll-suspend-reset)")
+}
+Test("mouse: KL_Mouse_FlushScroll resets the scroll accumulator on its suspended path (keylogger-mouse-scroll-suspend-reset)",
+	_MMSG_FlushScrollResetsAccumulatorWhenSuspended)
+
+
 _MMSG_StopClearsScrollFlushFn() {
 	Src := _MMSG_ReadSource("modules/keylogger/keylogger_mouse.ahk")
 	Body := _DriverFuncBody("KL_Mouse_Stop")
