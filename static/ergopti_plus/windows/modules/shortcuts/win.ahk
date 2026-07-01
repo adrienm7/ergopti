@@ -91,18 +91,26 @@ if Features["shortcuts"]["take_note"]["enabled"] {
             if WMExists(WinPattern) {
                 WindowAlreadyOpen := True
                 WMActivate(WinPattern)
-                WinWaitActive(WinPattern, , 3)
+                NoteWindowIsActive := WinWaitActive(WinPattern, , 3)
             } else {
                 Run('notepad.exe "' . FilePath . '"')
                 WinWait(FileName, , 7)
                 WMActivate(FileName)
-                WinWaitActive(FileName, , 3)
+                NoteWindowIsActive := WinWaitActive(FileName, , 3)
             }
 
-            WinMaximize
-            Sleep(100)
-            if not WindowAlreadyOpen {
-                SendFinalResult("^{End}{Enter}") ; Jump to the end of the file and start a new line
+            ; WinWaitActive returns 0 (not a throw) on timeout, so a slow/blocked
+            ; Notepad launch must not fall through to a bare WinMaximize -- that
+            ; operates on the last-found-window and throws TargetError when the
+            ; wait never actually found one
+            if not NoteWindowIsActive {
+                LoggerWarn("TakeNote", "Notepad window '{1}' never became active -- skipping maximize.", WinPattern)
+            } else {
+                WinMaximize
+                Sleep(100)
+                if not WindowAlreadyOpen {
+                    SendFinalResult("^{End}{Enter}") ; Jump to the end of the file and start a new line
+                }
             }
         } finally {
             SetTitleMatchMode(PreviousTitleMatchMode)
