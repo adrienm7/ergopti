@@ -830,6 +830,14 @@ local _in_crash_report = false
 
 --- Forwards an uncaught runtime error to the global crash reporter, if wired.
 --- Best-effort: never throws, never recurses, never spams.
+---
+--- The actual reporter call is deferred via hs.timer.doAfter(0, ...) so it never
+--- runs on the throwing callback's own stack frame. crash_reporter.prompt_user
+--- ends in a SYNCHRONOUS hs.dialog.blockAlert; calling that inline from here
+--- would freeze the whole run loop until a human dismisses a dialog, for ANY
+--- recoverable error in ANY hs.timer callback across the driver (F-HIGH-20).
+--- Deferring lets the guarded callback return immediately — the crash report
+--- still happens, just off the hot path, one tick later.
 --- @param err any The error value / traceback captured by the guard.
 --- @param context string Where the error originated (e.g. "timer:doAfter").
 local function _forward_crash(err, context)
@@ -839,9 +847,20 @@ local function _forward_crash(err, context)
 	local now = os.time()
 	if (now - _last_crash_report_time) < CRASH_REPORT_MIN_INTERVAL_SEC then return end
 	_last_crash_report_time = now
-	_in_crash_report = true
-	pcall(reporter, err, { driver = "hammerspoon", source = context })
-	_in_crash_report = false
+
+	local hs_ref = rawget(_G, "hs")
+	local schedule = (type(hs_ref) == "table" and type(hs_ref.timer) == "table" and hs_ref.timer.doAfter) or nil
+	local function _run_reporter()
+		_in_crash_report = true
+		pcall(reporter, err, { driver = "hammerspoon", source = context })
+		_in_crash_report = false
+	end
+	if type(schedule) == "function" then
+		schedule(0, _run_reporter)
+	else
+		-- No hs.timer available (e.g. headless context) — best-effort inline call.
+		_run_reporter()
+	end
 end
 
 --- Wraps a timer callback so an uncaught error is logged WITH a traceback

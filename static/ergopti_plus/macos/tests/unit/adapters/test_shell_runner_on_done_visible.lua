@@ -77,15 +77,6 @@ end)
 helpers.describe("ShellRunner: ERROR logged when on_done throws (M-4 behaviour)", function()
 
 	helpers.it("captures Logger.error when on_done throws 'boom'", function()
-		-- Capture log output via Logger.set_sink
-		local errors_logged = {}
-		local logger = helpers.load_with_stubs("lib.logger")
-		if type(logger.set_sink) == "function" then
-			logger.set_sink(function(level, _module, msg)
-				if level == "ERROR" then errors_logged[#errors_logged + 1] = msg end
-			end)
-		end
-
 		-- Stub hs.task so start() immediately fires the wrapped completion callback
 		local captured_completion_cb = nil
 		local hs_overrides = {
@@ -101,9 +92,21 @@ helpers.describe("ShellRunner: ERROR logged when on_done throws (M-4 behaviour)"
 			},
 		}
 
-		-- Reload shell_runner under the stub hs
+		-- Reload shell_runner under the stub hs — this also resets the "hs" package
+		-- entry, so Logger.set_sink must be wired AFTER this reload to observe the
+		-- same _G.hs / lib.logger instance that shell_runner's Logger.error goes through.
 		package.loaded["adapters.shell_runner"] = nil
-		local sr = helpers.load_with_stubs("adapters.shell_runner", hs_overrides)
+		local sr     = helpers.load_with_stubs("adapters.shell_runner", hs_overrides)
+		local logger = require("lib.logger")
+
+		-- Capture log output via Logger.set_sink. Real signature is
+		-- fn(console_line, sink_variant) — a 2-tuple, not (level, module, msg).
+		local errors_logged = {}
+		if type(logger.set_sink) == "function" then
+			logger.set_sink(function(console_line, sink_variant)
+				if sink_variant == "error" then errors_logged[#errors_logged + 1] = console_line end
+			end)
+		end
 
 		local crash_called = false
 		_G.ergopti_report_crash = function() crash_called = true end
@@ -114,8 +117,8 @@ helpers.describe("ShellRunner: ERROR logged when on_done throws (M-4 behaviour)"
 		end)
 		handle.start()
 
-		-- At least one ERROR mentioning the throw must have been logged
-		-- (If Logger.set_sink is not available we fall back to the source check above)
+		-- The Logger.error call for the caught throw is synchronous (F-HIGH-20 only
+		-- deferred the crash-REPORT forwarding, not the error log line itself).
 		if type(logger.set_sink) == "function" then
 			local found_error = false
 			for _, msg in ipairs(errors_logged) do
@@ -123,10 +126,24 @@ helpers.describe("ShellRunner: ERROR logged when on_done throws (M-4 behaviour)"
 					found_error = true; break
 				end
 			end
-			helpers.assert_true(found_error or crash_called,
-				"an ERROR mentioning the throw must be logged (or crash reporter called) when on_done throws")
+			helpers.assert_true(found_error,
+				"an ERROR mentioning the throw must be logged synchronously when on_done throws")
 		end
 
+		-- The crash-reporter forward is now deferred via hs.timer.doAfter(0, ...)
+		-- (F-HIGH-20) — it must NOT have fired yet, then must fire once the nested
+		-- timer is driven.
+		helpers.assert_true(not crash_called,
+			"the crash reporter must not be invoked synchronously from wrapped_on_done (F-HIGH-20)")
+		local timers = hs.timer.__timers
+		local nested = timers[#timers]
+		helpers.assert_true(nested ~= nil and nested.running == true,
+			"wrapped_on_done must schedule the deferred crash report via hs.timer.doAfter(0, ...)")
+		nested:fire()
+		helpers.assert_true(crash_called,
+			"the crash reporter must still fire once the deferred timer runs")
+
+		logger.set_sink(nil)
 		_G.ergopti_report_crash = nil
 	end)
 end)
