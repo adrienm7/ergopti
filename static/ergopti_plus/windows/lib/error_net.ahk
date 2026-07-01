@@ -31,7 +31,37 @@ _ShouldReleaseModifier(ModKey) {
     ; "P" = physical key state; the default state is the logical state AHK reports.
     return GetKeyState(ModKey) and !GetKeyState(ModKey, "P")
 }
+
+; Recognises the benign vendor/UIA.ahk "orphaned pattern object" defect: when
+; el.GetPattern(...) receives a null COM pointer (the target element went stale
+; between an IsTextPatternAvailable probe and the GetPattern call — e.g. its
+; window closed or lost focus mid-poll), UIA.IUIAutomationBase.__New throws
+; ValueError BEFORE DefineProp("ptr", ...) runs. AHK v2 then immediately invokes
+; __Delete on the orphaned, ptr-less instance to unwind the failed construction,
+; and that __Delete-time PropertyError is raised by the runtime's own cleanup
+; machinery — it can NEVER be caught by a try/catch at the call site (confirmed
+; empirically: a try/catch around the exact same construction pattern still
+; receives the ORIGINAL ValueError normally, but OnError is separately and
+; unavoidably invoked first for the PropertyError from __Delete). The call site
+; (_UIA_SelectionPollTick in modules/keymap/layout.ahk) already catches the
+; original ValueError and degrades to "no selection" — this is not a functional
+; failure, only an unavoidable extra OnError notification for an already-handled
+; condition. Suppressing the disruptive crash-report/toast for exactly this
+; signature keeps the safety net intact for every other error while stopping the
+; false-alarm noise (crash_reports/2026-06-25T17-14-06Z.json).
+_IsBenignUiaOrphanedPatternError(Exc) {
+    return Type(Exc) == "PropertyError"
+        and Exc.HasProp("Extra") and Exc.Extra == "ptr"
+        and Exc.HasProp("What") and InStr(Exc.What, "UIA.IUIAutomationBase.Prototype.Release") == 1
+}
+
 ErgoptiGlobalErrorHandler(Exc, Mode) {
+    if _IsBenignUiaOrphanedPatternError(Exc) {
+        ; Log at WARNING (not ERROR) and skip the crash-report prompt/toast — the
+        ; originating call site already caught and handled the real error.
+        try LoggerWarn("ErgoptiPlus", "Benign UIA orphaned-pattern PropertyError suppressed: {1}.", Exc.Message)
+        return true
+    }
     ; Release ONLY modifiers that are logically stuck (not physically held) after
     ; the failed callback — never yank a key the user is still pressing.
     for _, ModKey in ["LControl", "RControl", "LShift", "RShift", "LAlt", "RAlt", "LWin", "RWin"] {
