@@ -99,7 +99,7 @@ Updater_OneClickUpdate(*) {
 	; Slow path: need to check first. Mark in-progress and rebuild the menu so the
 	; item shows "Vérification…" and is disabled while the network call runs.
 	_UpdaterCheckInProgress := true
-	try SetTimer((*) => initMenu(), -50)
+	try SetTimer((*) => _Updater_RebuildMenu(), -50)
 
 	Current := Updater_CurrentVersion()
 	try LoggerStart("Updater", "One-click update check (channel: {1}, current: {2})…", UPDATER_CHANNEL, Current)
@@ -118,20 +118,20 @@ _Updater_OneClickUpdateCallback(Json, Current) {
 
 	if (Json == "") {
 		try LoggerWarn("Updater", "One-click check: network unreachable.")
-		try SetTimer((*) => initMenu(), -50)
+		try SetTimer((*) => _Updater_RebuildMenu(), -50)
 		TrayTip(t("updater.no_connection"), t("updater.title_update"))
 		return
 	}
 	Latest := Updater_ParseTagName(Json)
 	if (Latest == "") {
 		try LoggerWarn("Updater", "One-click check: tag parse failed.")
-		try SetTimer((*) => initMenu(), -50)
+		try SetTimer((*) => _Updater_RebuildMenu(), -50)
 		TrayTip(t("updater.parse_failed"), t("updater.title_update"))
 		return
 	}
 	if !_Updater_IsNewerVersion(Latest, Current) {
 		try LoggerSuccess("Updater", "One-click check: already up to date ({1}).", Current)
-		try SetTimer((*) => initMenu(), -50)
+		try SetTimer((*) => _Updater_RebuildMenu(), -50)
 		TrayTip(Format(t("updater.up_to_date"), Current), t("updater.title_update"))
 		return
 	}
@@ -147,7 +147,7 @@ _Updater_OneClickUpdateCallback(Json, Current) {
 		Prerelease:  _Updater_ParsePrerelease(Json)
 	}
 	try LoggerSuccess("Updater", "One-click check: new version {1} found — installing.", Latest)
-	try SetTimer((*) => initMenu(), -50)
+	try SetTimer((*) => _Updater_RebuildMenu(), -50)
 	Updater_DownloadAndInstall(UPDATER_LATEST_RELEASE)
 }
 

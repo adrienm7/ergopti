@@ -192,7 +192,7 @@ _Updater_HandleBackgroundResult(Json, Current) {
 	try LoggerInfo("Updater", "New release available: {1} (current: {2}).", Latest, Current)
 	; Rebuild the tray menu so the one-click item label changes to
 	; "Mettre à jour vers vX.Y.Z" without requiring a manual open.
-	try SetTimer((*) => initMenu(), -50)
+	try SetTimer((*) => _Updater_RebuildMenu(), -50)
 	; The TrayTip is the user's entry point: clicking the notification bubble opens
 	; the full update prompt. The click is intercepted via OnMessage below.
 	try TrayTip(Format(t("updater.tray_new_version_body"), Latest), t("updater.tray_new_version_title"))
@@ -413,7 +413,7 @@ Updater_DownloadAndInstall(Release) {
 	
 	global _UpdaterDownloadInProgress
 	_UpdaterDownloadInProgress := true
-	try SetTimer((*) => initMenu(), -50)
+	try SetTimer((*) => _Updater_RebuildMenu(), -50)
 	
 	try {
 		Req := ComObject("WinHttp.WinHttpRequest.5.1")
@@ -426,7 +426,7 @@ Updater_DownloadAndInstall(Release) {
 		Req.Send()
 	} catch as Err {
 		_UpdaterDownloadInProgress := false
-		try SetTimer((*) => initMenu(), -50)
+		try SetTimer((*) => _Updater_RebuildMenu(), -50)
 		try LoggerError("Updater", "Asset download dispatch failed: {1}.", Err.Message)
 		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
 		return
@@ -441,7 +441,7 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 		try LoggerWarn("Updater", "Async download aborted: driver suspended mid-flight (G5 Guarantee).")
 		try Req.Abort()
 		_UpdaterDownloadInProgress := false
-		try SetTimer((*) => initMenu(), -50)
+		try SetTimer((*) => _Updater_RebuildMenu(), -50)
 		return
 	}
 	; Give the download up to 600 seconds to complete — slow connections on
@@ -467,7 +467,7 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 	}
 	
 	_UpdaterDownloadInProgress := false
-	try SetTimer((*) => initMenu(), -50)
+	try SetTimer((*) => _Updater_RebuildMenu(), -50)
 	
 	if (failed or Req.Status != 200) {
 		try LoggerError("Updater", "Asset download returned HTTP {1}.", failed ? "FAIL" : Req.Status)
