@@ -323,10 +323,33 @@ function M.new(deps, presets)
 		local home = os.getenv("HOME")
 		local safe_repo = "models--" .. repo:gsub("/", "--")
 		local path = home .. "/.cache/huggingface/hub/" .. safe_repo
-		os.execute("rm -rf " .. path)
-		invalidate_installed_cache()
-		pcall(notifications.notify, i18n.get("mlx.model_deleted"), model_name, "success")
-		pcall(deps.update_menu)
+		Logger.debug(LOG, "Deleting MLX model %s at %s…", tostring(model_name), path)
+
+		-- A multi-GB model-cache delete must never run synchronously on the
+		-- menu-click handler's thread — Hammerspoon has a single main run loop,
+		-- and a blocking synchronous shell-out here freezes keystrokes, timers,
+		-- and the menubar for the whole deletion (mirrors the identical bug class
+		-- already fixed on the Ollama manager's task-based deletes).
+		local delete_task
+		delete_task = hs.task.new("/bin/rm", function(code, _stdout, stderr)
+			if delete_task then M._active_tasks[delete_task] = nil end  -- delete_task captured by closure
+			invalidate_installed_cache()
+			if code == 0 then
+				Logger.info(LOG, "MLX model %s deleted successfully.", tostring(model_name))
+				pcall(notifications.notify, i18n.get("mlx.model_deleted"), model_name, "success")
+			else
+				Logger.error(LOG, "MLX model delete failed for %s: %s", tostring(model_name), tostring(stderr))
+				pcall(notifications.notify, i18n.get("mlx.model_deleted"), model_name, "error")
+			end
+			pcall(deps.update_menu)
+		end, {"-rf", path})
+
+		if delete_task then
+			M._active_tasks[delete_task] = true
+			pcall(function() delete_task:start() end)
+		else
+			Logger.error(LOG, "Failed to create MLX model delete task for %s.", tostring(model_name))
+		end
 	end
 
 	return obj
