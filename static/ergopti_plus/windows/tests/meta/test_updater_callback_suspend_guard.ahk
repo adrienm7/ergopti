@@ -89,3 +89,31 @@ Test("meta updater-callback-suspend: _Updater_ShowAvailableUpdateCallback guards
 
 Test("meta updater-callback-suspend: _Updater_HandleBackgroundResult guards A_IsSuspended",
 	() => _UCSG_CheckFnHasSuspendGuard("_Updater_HandleBackgroundResult(Json, Current) {"))
+
+; _Updater_BuildChangelogGui answers an async WinHTTP fetch (Pattern 1, 1e) —
+; same bypass-Suspend exposure as the callbacks above, but it pops a Gui
+; window rather than a MsgBox/TrayTip/install call, so it is checked directly
+; here instead of through the FirstAction token list _UCSG_CheckFnHasSuspendGuard
+; uses (that check is a no-op when none of its tokens are present).
+_UCSG_CheckBuildChangelogGuiHasSuspendGuard() {
+	Src := _DriverDirConcat("lib/updater")
+	Assert(Src != "", "the lib/updater module must be readable")
+
+	Body := _UCSG_FuncBody(Src, "_Updater_BuildChangelogGui(Json, Channel) {")
+	Assert(Body != "", "_Updater_BuildChangelogGui must be present in the lib/updater module")
+
+	SuspendPos := InStr(Body, "A_IsSuspended")
+	Assert(SuspendPos > 0,
+		"_Updater_BuildChangelogGui must check A_IsSuspended — it answers an async WinHTTP fetch that bypasses native Suspend")
+
+	; Search for the actual Gui-construction call (opening quote right after
+	; the paren) rather than a bare "Gui(" — the function's OWN name ends in
+	; "...ChangelogGui(Json" at the very top of Body, which would otherwise
+	; false-match "Gui(" one character into the function signature itself.
+	GuiPos := InStr(Body, 'Gui("')
+	if (GuiPos > 0)
+		Assert(SuspendPos < GuiPos,
+			"_Updater_BuildChangelogGui: A_IsSuspended guard must precede Gui construction")
+}
+Test("meta updater-callback-suspend: _Updater_BuildChangelogGui guards A_IsSuspended (suspend-guard-pattern-1)",
+	_UCSG_CheckBuildChangelogGuiHasSuspendGuard)
