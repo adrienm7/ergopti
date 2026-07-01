@@ -88,4 +88,46 @@ helpers.describe("lib/personal_hotstrings — load contract", function()
 			helpers.assert_eq(registered[i].path, g.path, "registration path must match returned path")
 		end
 	end)
+
+	helpers.it("terminates on a self-referential directory cycle instead of recursing forever (F-LOW-4)", function()
+		-- Simulate a self-referential symlink: every directory named "loop"
+		-- contains one entry, also named "loop", that resolves to a directory
+		-- again — the exact shape hs.fs.attributes/fs_dir.entries cannot tell
+		-- apart from a real filesystem symlink loop. Before the depth guard,
+		-- M.load would recurse until Lua's C-stack limit aborted the process.
+		mock("modules.keymap", {
+			load_toml = function(_, _) end,
+			source_priority = function(_) return nil end,
+		})
+		mock("ui.hotstring_editor", { init = function() end })
+		mock("ui.menu.menu_paths", {
+			get = function(key)
+				if key == "PersonalTomlPath" then return "/fake/hot/personal_hotstrings.toml" end
+				if key == "PersonalHotstringsDir" then return "/fake/hot/" end
+				return nil
+			end,
+		})
+		mock("lib.fs_dir", {
+			-- Every directory in this fixture contains exactly one further "loop"
+			-- entry that resolves back to a directory — a growing-path cycle.
+			entries = function(_dir) return { "loop" } end,
+		})
+
+		local prev_attr, prev_json = hs.fs.attributes, hs.json
+		hs.fs.attributes = function(_path)
+			-- Every path in this fixture is a directory — there is no file to
+			-- bottom out on, so only the depth guard can stop the recursion.
+			return { mode = "directory" }
+		end
+		hs.json = { decode = function(_) return nil end }
+
+		package.loaded["lib.personal_hotstrings"] = nil
+		local PH = require("lib.personal_hotstrings")
+		local ok, err = pcall(PH.load, { bundled_hotstrings_dir = "/fake/bundle/" })
+
+		hs.fs.attributes, hs.json = prev_attr, prev_json
+		restore_all()
+
+		helpers.assert_true(ok, "load() must terminate and not throw/hang on a directory cycle: " .. tostring(err))
+	end)
 end)
