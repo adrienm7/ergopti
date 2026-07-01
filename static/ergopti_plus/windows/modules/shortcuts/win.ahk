@@ -337,7 +337,10 @@ if Features["shortcuts"]["search"]["enabled"] {
                 LoggerWarn("Search", "Could not open path '{1}': {2}.", SelectedText, _e.Message)
             }
         } else if RegeditPath {
-            RegJump(SelectedText)
+            try RegJump(SelectedText)
+            catch as _e {
+                LoggerWarn("Search", "Could not jump to registry path '{1}': {2}.", SelectedText, _e.Message)
+            }
         } else {
             ; Modify some characters that screw up the URL
             SelectedText := StrReplace(SelectedText, "`r`n", " ")
