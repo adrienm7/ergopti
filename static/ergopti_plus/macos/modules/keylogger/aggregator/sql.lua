@@ -294,13 +294,16 @@ function M.flush()
 
 	for key, row in pairs(S.agg_batch.ergo) do
 		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_ergo (device_id, date, app, same_finger_streak_max, same_hand_streak_max, auto_repeat_count) VALUES (%s,%s,%s,%d,%d,%d) "
+			"INSERT INTO agg_app_day_ergo (device_id, date, app, same_finger_streak_max, same_hand_streak_max, auto_repeat_count, focus_to_first_key_sum_ms, focus_to_first_key_count) VALUES (%s,%s,%s,%d,%d,%d,%d,%d) "
 			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
 			.. "same_finger_streak_max=MAX(same_finger_streak_max, excluded.same_finger_streak_max),"
 			.. "same_hand_streak_max=MAX(same_hand_streak_max, excluded.same_hand_streak_max),"
-			.. "auto_repeat_count=auto_repeat_count+excluded.auto_repeat_count",
+			.. "auto_repeat_count=auto_repeat_count+excluded.auto_repeat_count,"
+			.. "focus_to_first_key_sum_ms=focus_to_first_key_sum_ms+excluded.focus_to_first_key_sum_ms,"
+			.. "focus_to_first_key_count=focus_to_first_key_count+excluded.focus_to_first_key_count",
 			d, sq(row.date), sq(row.app),
-			i(row.same_finger_streak_max), i(row.same_hand_streak_max), i(row.auto_repeat_count)))
+			i(row.same_finger_streak_max), i(row.same_hand_streak_max), i(row.auto_repeat_count),
+			i(row.focus_to_first_key_sum_ms), i(row.focus_to_first_key_count)))
 		if ok then S.agg_batch.ergo[key] = nil end
 	end
 
