@@ -60,6 +60,7 @@ const CHECKS = [
 	{ name: 'macOS bundle layout (build script + launcher mirror the repo)', cmd: 'node', args: ['tools/test/test-macos-bundle-layout.cjs'], repro: 'node tools/test/test-macos-bundle-layout.cjs' },
 	{ name: 'launcher single-instance guard (LSMultipleInstancesProhibited in Info.plist)', cmd: 'node', args: ['tools/test/test-launcher-single-instance.cjs'], repro: 'node tools/test/test-launcher-single-instance.cjs' },
 	{ name: 'menu manifest drift (feature paths + i18n keys resolve against manifest.toml)', cmd: 'node', args: ['tools/test/test-menu-manifest.cjs'], repro: 'node tools/test/test-menu-manifest.cjs' },
+	{ name: 'features manifest no-drift (committed .lua/.ahk match the live generator)', cmd: 'node', args: ['tools/test/test-features-manifest-no-drift.cjs'], repro: 'node tools/test/test-features-manifest-no-drift.cjs' },
 	{ name: 'hotstring editor confirm dialog wiring (delete actually fires)', cmd: 'node', args: ['tools/test/test-hotstring-editor-confirm-wiring.cjs'], repro: 'node tools/test/test-hotstring-editor-confirm-wiring.cjs' },
 	{ name: 'WebView2 host teardown order (closing a window must not quit AHK)', cmd: 'node', args: ['tools/test/test-webview-teardown-order.cjs'], repro: 'node tools/test/test-webview-teardown-order.cjs' },
 	{ name: 'dynamic hotstrings menu labels (resolver bridge + locale keys)', cmd: 'node', args: ['tools/test/test-dynamic-hotstrings-menu-labels.cjs'], repro: 'node tools/test/test-dynamic-hotstrings-menu-labels.cjs' },
