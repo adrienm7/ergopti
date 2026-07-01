@@ -596,8 +596,19 @@ if Features["shortcuts"]["open_downloads"] {
                             return
                         }
                     }
+                } catch as Err {
+                    ; A window closing mid-enumeration, or a COM property access
+                    ; on a stale Win reference, must not abort the whole scan --
+                    ; skip just this window and keep looking for Downloads.
+                    LoggerDebug("Search", "OpenDownloads: skipped a window during Explorer scan: {1}.", Err.Message)
+                    continue
                 }
             }
+        } catch as Err {
+            ; Shell.Application COM enumeration itself can fail (Explorer not
+            ; running, COM re-init race); fall through to opening a fresh
+            ; window below instead of letting the exception propagate.
+            LoggerWarn("Search", "OpenDownloads: Explorer window scan failed, opening a fresh window: {1}.", Err.Message)
         }
 
         ; No existing window -- open a fresh one and force it to the foreground.
