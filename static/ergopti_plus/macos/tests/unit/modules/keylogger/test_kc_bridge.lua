@@ -352,3 +352,56 @@ helpers.describe("kc_bridge — stop/start lifecycle (e2e-async-lifecycle-1)", f
 		helpers.assert_true(ok, "M.start() before M.init() must not raise")
 	end)
 end)
+
+
+
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= 7/ require_state guard behavioral coverage (F-LOW-14) =======
+-- =====================================================================
+-- =====================================================================
+
+-- F-LOW-14: kc_bridge.lua was the sole keylogger sibling module missing the
+-- canonical require_state(func_name) guard — every _state-touching function
+-- independently hand-rolled its own ad hoc `if not _state then ... end` check.
+-- This section pins the behavioral contract: a public function called before
+-- M.init() must both (a) not crash and (b) log via Logger.error, exactly like
+-- every other keylogger sibling module's require_state helper.
+helpers.describe("kc_bridge — require_state guard fires Logger.error before init (F-LOW-14)", function()
+
+	--- Loads a fresh kc_bridge with a Logger.error spy installed, so tests can
+	--- assert the guard actually logs rather than merely not crashing.
+	--- @return table module, table error_calls
+	local function load_kc_bridge_with_error_spy()
+		local error_calls = {}
+		package.loaded["lib.logger"] = {
+			debug = function() end, trace = function() end, done = function() end,
+			info  = function() end, start = function() end, success = function() end,
+			warn  = function() end,
+			error = function(_log, fmt, ...) table.insert(error_calls, string.format(fmt, ...)) end,
+		}
+		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_overrides)
+		return kc, error_calls
+	end
+
+	helpers.it("start() before init logs Logger.error and does not crash", function()
+		local kc, error_calls = load_kc_bridge_with_error_spy()
+		local ok = pcall(function() kc.start() end)
+		helpers.assert_true(ok, "M.start() before M.init() must not raise")
+		helpers.assert_true(#error_calls > 0,
+			"M.start() called before M.init() must log via Logger.error (require_state contract)")
+	end)
+
+	helpers.it("start() after init does NOT log an error", function()
+		local kc, error_calls = load_kc_bridge_with_error_spy()
+		kc.init({ ok = true }, nil, {}, {})
+		error_calls = {} -- clear any init-time noise before the call under test
+		local ok = pcall(function() kc.start() end)
+		helpers.assert_true(ok)
+		helpers.assert_eq(#error_calls, 0,
+			"M.start() after a successful M.init() must not trip the require_state guard")
+	end)
+
+end)
