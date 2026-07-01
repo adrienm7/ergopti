@@ -102,3 +102,43 @@ Test("meta shift-digit-passthrough: RegisterShiftLayer has skip guard for direct
 
 Test("meta shift-digit-passthrough: digit-row skip applied inside SHIFTED_LETTERS loop before Hotkey call",
 	_SDPS_CheckSkipUsedInsideLoop)
+
+; Regression: RegisterCapsLockLayer had the identical hotkey-shape and the
+; identical exposure (its own SC002..SC00B letters loop shadows the global
+; direct_access_digits passthrough whenever CapsLock is toggled on) but never
+; received the equivalent SkipDigitRow guard RegisterShiftLayer already has --
+; silently regressing the auto-advance-skips-a-field fix for OTP/device-login
+; digit boxes specifically on the CapsLock layer.
+
+_SDPS_CheckRegisterCapsLockHasSkipGuard() {
+	Src := _SDPS_ReadSource("modules/keymap/layout/layout_shift_caps.ahk")
+	Assert(Src != "", "modules/keymap/layout/layout_shift_caps.ahk must be readable")
+
+	Body := _DriverFuncBody("RegisterCapsLockLayer")
+	Assert(Body != "", "RegisterCapsLockLayer must be present in layout_shift_caps.ahk")
+
+	Assert(InStr(Body, "SkipDigitRow") || InStr(Body, "_SHIFT_DIGIT_SCS"),
+		"RegisterCapsLockLayer must check for digit-row exclusion to avoid shadowing the passthrough, mirroring RegisterShiftLayer")
+
+	Assert(InStr(Body, "direct_access_digits"),
+		"RegisterCapsLockLayer must gate the exclusion on Features[layout][direct_access_digits]")
+}
+Test("meta shift-digit-passthrough: RegisterCapsLockLayer has skip guard for direct_access_digits (caps-digit-passthrough-shadow)",
+	_SDPS_CheckRegisterCapsLockHasSkipGuard)
+
+_SDPS_CheckCapsLockSkipUsedInsideLoop() {
+	Body := _DriverFuncBody("RegisterCapsLockLayer")
+	Assert(Body != "", "RegisterCapsLockLayer must be present in layout_shift_caps.ahk")
+
+	LoopPos   := InStr(Body, "for SC in SHIFTED_LETTERS")
+	SkipPos   := InStr(Body, "_SHIFT_DIGIT_SCS.Has(SC)")
+	HotkeyPos := InStr(Body, "Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS)")
+
+	Assert(LoopPos > 0, "RegisterCapsLockLayer must iterate SHIFTED_LETTERS")
+	Assert(SkipPos > LoopPos,
+		"Digit-row skip check must appear inside RegisterCapsLockLayer's SHIFTED_LETTERS loop")
+	Assert(HotkeyPos > SkipPos,
+		"Hotkey registration must come after the digit-row skip guard in RegisterCapsLockLayer's loop")
+}
+Test("meta shift-digit-passthrough: CapsLock digit-row skip applied inside SHIFTED_LETTERS loop before Hotkey call (caps-digit-passthrough-shadow)",
+	_SDPS_CheckCapsLockSkipUsedInsideLoop)
