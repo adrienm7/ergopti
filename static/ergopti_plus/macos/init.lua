@@ -714,7 +714,15 @@ Boot.mark("UI: menu.start (menubar + state sync + engines + LLM handler)")
 
 -- Wire the VS Code caret bridge now that the tooltip subsystem is up.
 -- install_extension() is idempotent; start_server() is safe to call every boot.
-pcall(function() require("lib.vscode_bridge").setup() end)
+-- The (ok, err) pair is captured and logged on failure (F-MED-7) — a bare pcall
+-- here previously discarded both return values, so a setup() throw (e.g. a
+-- failed extension install or a port bind failure) vanished with no trace.
+do
+	local ok_vscode, vscode_err = pcall(function() require("lib.vscode_bridge").setup() end)
+	if not ok_vscode then
+		Logger.error(LOG, "VS Code caret bridge setup() failed: %s.", tostring(vscode_err))
+	end
+end
 
 -- Script control (the AltGr+Enter/Backspace/Escape panic-button tap) was moved
 -- to Section 1 (Module Pre-start) so the panic button exists for the entire
