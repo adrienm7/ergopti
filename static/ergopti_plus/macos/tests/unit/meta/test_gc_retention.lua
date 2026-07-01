@@ -25,16 +25,32 @@ local function read_source(rel_path)
 	return src
 end
 
---- Checks that a source file using hs.task.new also has an _active_tasks table.
+--- Checks that a source file using hs.task.new also has a recognizable
+--- GC-root pin. Two spellings are recognized (F-MED-20):
+---   1. The canonical own-module root: `_active_tasks` (M._active_tasks or
+---      a local _active_tasks table declared in the same file).
+---   2. The DELEGATED-pin spelling used by the models_manager_mlx_* split:
+---      `deps.active_tasks[...]` / `active_tasks_gc_root` — the task is
+---      pinned in a GC-root table owned by the PARENT module and injected
+---      via ctx/deps, not redeclared locally. This is an equally valid pin
+---      (deps is a long-lived table held by the caller) but the original
+---      substring check (bare "_active_tasks") does not match "active_tasks"
+---      preceded by a "." instead of "_", so these files silently passed by
+---      accident (their hs.task.new calls happened to also contain a
+---      DIFFERENT unrelated occurrence, or were never checked at all because
+---      they were missing from the file list below).
 --- @param rel_path string Relative path from the macos/ root.
 local function assert_gc_pinned(rel_path)
 	local src, err = read_source(rel_path)
 	assert(src, (err or "missing") .. " — " .. rel_path)
 	if not src:find("hs%.task%.new", 1, false) then return end  -- file does not use hs.task; skip
-	local has_pin = src:find("_active_tasks", 1, false) ~= nil
-	assert(has_pin,
-		rel_path .. ": uses hs.task.new but has no _active_tasks GC-root table — "
-		.. "add M._active_tasks = {} and pin each task before :start()")
+	local has_own_pin      = src:find("_active_tasks", 1, false) ~= nil
+	local has_delegated_pin = src:find("%.active_tasks") ~= nil
+		or src:find("active_tasks_gc_root", 1, false) ~= nil
+	assert(has_own_pin or has_delegated_pin,
+		rel_path .. ": uses hs.task.new but has no recognizable GC-root pin — "
+		.. "add M._active_tasks = {} (own root) or pin via deps.active_tasks / "
+		.. "active_tasks_gc_root (delegated root) before :start()")
 end
 
 helpers.describe("GC retention: hs.task pinning", function()
@@ -57,6 +73,20 @@ helpers.describe("GC retention: hs.task pinning", function()
 
 	helpers.it("models_manager_mlx_server: sweep and probe tasks are pinned", function()
 		assert_gc_pinned("ui/menu/menu_llm/models_manager_mlx_server.lua")
+	end)
+
+	-- F-MED-20: these 2 of the 6 files split out of the old
+	-- models_manager_mlx.lua monolith were missing from this allowlist
+	-- entirely — their hs.task.new call sites pin via the DELEGATED spelling
+	-- (deps.active_tasks[...]), which the original bare "_active_tasks"
+	-- substring check did not recognize. New unpinned hs.task.new() calls in
+	-- these files could previously ship with the suite still green.
+	helpers.it("models_manager_mlx_download: pull/tail tasks are pinned (F-MED-20)", function()
+		assert_gc_pinned("ui/menu/menu_llm/models_manager_mlx_download.lua")
+	end)
+
+	helpers.it("models_manager_mlx_hf: hf_login task is pinned (F-MED-20)", function()
+		assert_gc_pinned("ui/menu/menu_llm/models_manager_mlx_hf.lua")
 	end)
 
 	helpers.it("onboarding: shasum / curl / hdiutil / osascript tasks are pinned", function()
