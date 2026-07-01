@@ -481,10 +481,15 @@ function M.decode(content)
 			local path = trim(trimmed:sub(2, -2))
 			-- Empty section name → error
 			if path == "" then return nil end
-			-- Detect duplicate regular section header (TOML forbids re-opening a table)
-			if seen_sections[path] then return nil end
-			seen_sections[path] = true
 			local segments = split_section_path(path)
+			-- Detect duplicate regular section header (TOML forbids re-opening a table).
+			-- Dedup on the RESOLVED segments (quotes stripped), not the raw header text —
+			-- otherwise [a] and ["a"] hash to different seen_sections keys even though
+			-- split_section_path()/nav() resolve them to the exact same table, silently
+			-- allowing a table to be re-opened through its quoted-key spelling (F-LOW-3).
+			local dedup_key = table.concat(segments, "\1")
+			if seen_sections[dedup_key] then return nil end
+			seen_sections[dedup_key] = true
 			current = nav(root, segments)
 			if not seen_keys[current] then seen_keys[current] = {} end
 

@@ -127,3 +127,55 @@ helpers.describe("toml_codec: non-finite float literals", function()
 	end)
 
 end)
+
+
+
+
+
+-- ======================================================================
+-- ======================================================================
+-- ======= 4/ Duplicate-section detection via quoted-key spelling =======
+-- ======================================================================
+-- ======================================================================
+
+helpers.describe("toml_codec: duplicate section detection (F-LOW-3)", function()
+
+	helpers.it("rejects [a] re-opened as [\"a\"]", function()
+		-- F-LOW-3: seen_sections used to key off the RAW un-normalized header text
+		-- ("a" vs '"a"'), so re-opening the same table through its quoted-key
+		-- spelling bypassed the duplicate-section check entirely even though
+		-- split_section_path()/nav() resolve both headers to the exact same table.
+		local src = "[a]\nx = 1\n[\"a\"]\ny = 2\n"
+		local got = codec.decode(src)
+		helpers.assert_true(got == nil,
+			"[a] followed by [\"a\"] must be rejected as a duplicate section, not silently merged")
+	end)
+
+	helpers.it("rejects [\"a\"] re-opened as [a]", function()
+		-- Symmetric case: the quoted spelling declared FIRST, re-opened via the
+		-- bare spelling second. The dedup key must be direction-independent.
+		local src = "[\"a\"]\nx = 1\n[a]\ny = 2\n"
+		local got = codec.decode(src)
+		helpers.assert_true(got == nil,
+			"[\"a\"] followed by [a] must be rejected as a duplicate section")
+	end)
+
+	helpers.it("still allows two genuinely distinct sections", function()
+		-- Sanity-check companion: the fix must not become over-eager and reject
+		-- unrelated sections that merely share a substring.
+		local src = "[a]\nx = 1\n[ab]\ny = 2\n"
+		local got = codec.decode(src)
+		helpers.assert_true(got ~= nil, "distinct sections [a] and [ab] must both decode fine")
+		helpers.assert_eq(got.a.x, 1)
+		helpers.assert_eq(got.ab.y, 2)
+	end)
+
+	helpers.it("still rejects a genuine unquoted duplicate ([a] then [a])", function()
+		-- Regression companion: the pre-existing (already-working) case must
+		-- keep working after switching the dedup key to the resolved segments.
+		local src = "[a]\nx = 1\n[a]\ny = 2\n"
+		local got = codec.decode(src)
+		helpers.assert_true(got == nil, "[a] followed by [a] must still be rejected as a duplicate")
+	end)
+
+end)
