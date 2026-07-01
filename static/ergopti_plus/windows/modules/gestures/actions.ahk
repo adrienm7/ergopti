@@ -753,13 +753,21 @@ GestureGenericToggleUI(get_hwnd_fn, open_fn, close_fn) {
         focused := 0
         try focused := WinGetID("A")
         if (focused = hwnd) {
-            try close_fn.Call()
+            try {
+                close_fn.Call()
+            } catch as Err {
+                LoggerError("gestures", "GestureGenericToggleUI close_fn threw: {1}.", Err.Message)
+            }
         } else {
             try WMActivate("ahk_id " . hwnd)
         }
         return
     }
-    try open_fn.Call()
+    try {
+        open_fn.Call()
+    } catch as Err {
+        LoggerError("gestures", "GestureGenericToggleUI open_fn threw: {1}.", Err.Message)
+    }
 }
 
 ; True when the foreground window is a shell / terminal. Ctrl+S there is not a
