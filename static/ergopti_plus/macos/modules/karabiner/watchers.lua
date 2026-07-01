@@ -191,7 +191,13 @@ function M.start_gesture_watcher(gestures_engine)
 			ev.otherMouseDown,
 		},
 		function(_event)
-			deactivate_capsword()
+			-- This callback fires on mouseMoved/scrollWheel/gesture/click — the
+			-- hottest possible eventtap. deactivate_capsword() contains an
+			-- unguarded hs.task.new(...) call; every sibling eventtap added in
+			-- the same refactor window wraps its callback body, so an unhandled
+			-- exception here would silently disable the whole tap
+			-- (karabiner-watchers-unguarded-capsword).
+			Logger.pcall(LOG, deactivate_capsword)
 			return false
 		end
 	)
