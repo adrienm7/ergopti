@@ -294,7 +294,7 @@ HotstringEngineInit()
 ; Initialise the logger now that the ini cache is built and ScriptInformation
 ; reflects user overrides — LoggerInit reads [Script] LogLevel from the ini.
 LoggerInit()
-Updater_LoadChannel()
+try Updater_LoadChannel()
 try Updater_LoadCheckInterval()
 ; Schedule the background update poller. No-op in dev / source mode, or
 ; when the user has chosen "never" — those checks happen inside the helper.
