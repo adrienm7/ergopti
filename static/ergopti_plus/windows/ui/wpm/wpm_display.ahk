@@ -819,6 +819,12 @@ _WPMWidget_HideSurface(gui_ref) {
 WPMWidget_MouseWatch() {
     if !WPMWidget.visible
         return
+
+    ; SetTimer callbacks keep firing under native Suspend() (only Hotkeys/Hotstrings
+    ; are disarmed), so this fast watch needs its own guard — mirrors WPMWidget_Tick.
+    if A_IsSuspended
+        return
+
     MouseGetPos(&mx, &my)
     if (mx == WPMWidget._last_mouse_x and my == WPMWidget._last_mouse_y)
         return
