@@ -418,22 +418,21 @@ Test("Shortcuts/altgr: AltGr+LAlt with all actions off is a no-op", TestShortcut
 ; =====================================================
 
 TestShortcuts_SearchPath_FileDetection() {
-	; SearchPath internally calls Run() on Windows paths — but we only
-	; verify the regex branch; wrap in a pcall since Run() fails in
-	; headless CI. The real check is that SearchPath does not throw.
-	; (A regex match on a file path must not raise an exception.)
-	Threw := false
-	try {
-		SearchPath("C:\Users\test\file.txt")
-	} catch {
-		Threw := true
-	}
-	; We accept either path: Run() may throw in headless CI, but the
-	; function itself must not crash before reaching the Run() call.
-	; The key contract is: no AHK logic error on a valid Windows path.
-	AssertFalse(false, "SearchPath on a file path must not raise an AHK logic error")
+	; Every branch inside SearchPath() ends in a real Run() (open the file,
+	; RegJump, open a URL, or fire a real web search) — there is no
+	; dependency-injection seam for Run in this module, so calling the live
+	; function with ANY input performs a genuine OS-visible action (this
+	; used to open the machine's actual default browser with a Google
+	; search for the literal test string once AHK-18 routed a shape-matched
+	; but non-existent path to the web-search fallback). Verify the pure
+	; regex-shape contract in isolation instead of invoking the dispatcher.
+	FilePath := RegExMatch(
+		"C:\Users\test\file.txt",
+		"^[A-Za-z]:[\\/](?:[^<>:" . '"' . "|?*\r\n]+[\\/]?)*$"
+	)
+	AssertTrue(FilePath, "the FilePath detection regex must match a well-formed Windows path shape")
 }
-Test("Shortcuts/win: SearchPath handles Windows file paths without logic error", TestShortcuts_SearchPath_FileDetection)
+Test("Shortcuts/win: SearchPath's FilePath regex matches Windows file path shapes", TestShortcuts_SearchPath_FileDetection)
 
 TestShortcuts_DOMPathToFilesystem_LocalFile() {
 	; file:///C:/Users/test should become C:\Users\test.
