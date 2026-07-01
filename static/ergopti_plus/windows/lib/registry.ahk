@@ -206,7 +206,12 @@ Reg_DeleteValue(keyPath, valueName) {
 		return true
 	} catch as e {
 		; 2 = ERROR_FILE_NOT_FOUND — treat as success (idempotent delete).
-		if (e.Extra = 2)
+		; The Win32 error code lands in OSError's Number property, not Extra
+		; (Extra is empty for RegDelete's OSError; confirmed empirically —
+		; the old `e.Extra = 2` check never matched, so every not-found
+		; delete fell through to the false/LoggerError path below despite
+		; the docstring's "true on ... not found" contract).
+		if (e.Number = 2)
 			return true
 		LoggerError("registry", "Reg_DeleteValue failed — {1}\{2}: {3}", keyPath, valueName, e.Message)
 		return false
@@ -225,7 +230,9 @@ Reg_DeleteKey(keyPath) {
 		LoggerDebug("registry", "Reg_DeleteKey: {1}.", keyPath)
 		return true
 	} catch as e {
-		if (e.Extra = 2)
+		; 2 = ERROR_FILE_NOT_FOUND — treat as success (idempotent delete).
+		; The Win32 error code lands in OSError's Number property, not Extra.
+		if (e.Number = 2)
 			return true
 		LoggerError("registry", "Reg_DeleteKey failed — {1}: {2}", keyPath, e.Message)
 		return false
@@ -298,13 +305,19 @@ Reg_KeyExists(keyPath) {
 	; perfectly valid existing key — the common case for an app settings key.
 	; Probe sub-keys and values independently; only the default-value RegRead is
 	; a last-resort fallback, so existence never hinges on a (Default) being set.
+	; ERROR_FILE_NOT_FOUND (2) / ERROR_PATH_NOT_FOUND (3) = key absent, the
+	; expected outcome of every negative probe below. The Win32 error code
+	; lands in OSError's Number property, not Extra (confirmed empirically:
+	; Extra is empty for RegDelete/RegRead/Reg-loop OSErrors) — the old
+	; `e.Extra` checks never matched, so EVERY absent-key probe fell through
+	; to the "unexpected error" LoggerWarn branch, spamming a warning on the
+	; ordinary, ubiquitous case of checking whether a key exists yet.
 	try {
 		Loop Reg, keyPath, "K" {
 			return true
 		}
 	} catch as e {
-		; ERROR_FILE_NOT_FOUND (2) or ERROR_PATH_NOT_FOUND (3) = key absent.
-		if (e.Extra != 2 and e.Extra != 3)
+		if (e.Number != 2 and e.Number != 3)
 			LoggerWarn("registry", "Reg_KeyExists sub-key probe error — {1}: {2}", keyPath, e.Message)
 		return false
 	}
@@ -313,7 +326,7 @@ Reg_KeyExists(keyPath) {
 			return true
 		}
 	} catch as e {
-		if (e.Extra != 2 and e.Extra != 3)
+		if (e.Number != 2 and e.Number != 3)
 			LoggerWarn("registry", "Reg_KeyExists value probe error — {1}: {2}", keyPath, e.Message)
 		return false
 	}
@@ -323,7 +336,7 @@ Reg_KeyExists(keyPath) {
 		RegRead(keyPath, "")
 		return true
 	} catch as e {
-		if (e.Extra = 2 or e.Extra = 3)
+		if (e.Number = 2 or e.Number = 3)
 			return false
 		; Any other error: key may exist but is inaccessible
 		LoggerWarn("registry", "Reg_KeyExists probe error — {1}: {2}", keyPath, e.Message)

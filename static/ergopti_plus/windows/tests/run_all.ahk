@@ -564,6 +564,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_prefix_index_rebuild_no_suspend_guard.ahk
 #Include meta/test_prefix_onkeydown_tab_llm_feed_gap.ahk
 #Include meta/test_reg_keyexists_value_only.ahk
+#Include meta/test_registry_oserror_number_not_extra.ahk
 #Include meta/test_remap_emit_critical_uneven.ahk
 #Include meta/test_remote_api_validate_async.ahk
 #Include meta/test_roi_current_word_unbounded_growth.ahk
@@ -729,6 +730,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_shell_runner_poll_suspend_guard.ahk
 #Include meta/test_disable_password_fields_gate.ahk
 #Include meta/test_menu_dynamic_hotstrings_category_gate.ahk
+#Include unit/test_storage_st_delete_contract.ahk
 #Include meta/test_boot_dircreate_guarded.ahk
 #Include meta/test_toml_render_bool_sentinel.ahk
 #Include meta/test_llm_menu_loaded_gate.ahk
