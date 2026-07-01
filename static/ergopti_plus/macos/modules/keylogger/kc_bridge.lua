@@ -302,9 +302,34 @@ end
 
 
 
+-- ====================================
+-- ====================================
+-- ======= 3/ Guard Enforcement =======
+-- ====================================
+-- ====================================
+
+--- Guards every _state-dependent function against being called before
+--- M.init(). Kc_bridge was the sole keylogger sibling module missing this
+--- canonical guard (F-LOW-14) — every _state-touching function had
+--- independently hand-rolled its own ad hoc `if not _state then return end`
+--- check instead of routing through one shared, consistently-logged helper.
+--- @param func_name string The calling function name for the error message.
+--- @return boolean False if _state is not initialized yet, true otherwise.
+local function require_state(func_name)
+	if not _state then
+		Logger.error(LOG, "'%s' called before M.init() — bridge not functional.", func_name)
+		return false
+	end
+	return true
+end
+
+
+
+
+
 -- =============================
 -- =============================
--- ======= 3/ Public API =======
+-- ======= 4/ Public API =======
 -- =============================
 -- =============================
 
@@ -333,7 +358,7 @@ end
 --- the handles already exist so stop/start cycles can call this repeatedly.
 --- Must only be called after _state is set.
 local function _arm_watchers()
-	if not _state then return end
+	if not require_state("_arm_watchers") then return end
 
 	-- Touch: hs.pathwatcher binds to an inode; the file must exist before
 	-- watcher:start() or creation events may be missed on some macOS versions.
@@ -408,10 +433,7 @@ end
 --- M.init() is also a no-op (no _state yet). Called unconditionally from
 --- keylogger M.start() so the bridge survives toggle OFF/ON.
 function M.start()
-	if not _state then
-		Logger.warn(LOG, "M.start() called before M.init() — bridge not functional.")
-		return
-	end
+	if not require_state("start") then return end
 	_arm_watchers()
 	Logger.done(LOG, "KE bridge watchers ensured.")
 end
