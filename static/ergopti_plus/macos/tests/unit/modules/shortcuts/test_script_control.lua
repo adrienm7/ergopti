@@ -171,10 +171,13 @@ helpers.describe("ScriptControl.set_extras", function()
 end)
 
 
+
+
+
 -- =====================================
---- ===============================================
+-- ===============================================
 -- ======= 6/ Pause invariant (regression) =======
---- ===============================================
+-- ===============================================
 -- =====================================
 -- Critical: pause must fully silence features (no LLM, keylogger, gestures, tooltips,
 -- predictions, etc.). See project_suspend_pause_invariant in PROJECT_MEMORY.
