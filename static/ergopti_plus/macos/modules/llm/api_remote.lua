@@ -212,13 +212,12 @@ function M.get_active_entry_id()
 	return _active_id
 end
 
---- Resolve the currently active entry, falling back to the first configured
---- one when no id matches. Returns nil when no entry exists at all.
---- Tokens stored as ``keychain:<id>`` references are decrypted on first call
---- and the cleartext is cached back into the entry so the Keychain subprocess
---- fires at most once per entry across the session lifetime.
+--- Finds the currently active entry object (by id, falling back to the
+--- first configured entry) WITHOUT resolving its token. Shared by
+--- get_active_entry() and prewarm_active_entry_decrypt() so both agree on
+--- exactly which entry is "active".
 --- @return table|nil entry
-function M.get_active_entry()
+local function find_active_entry()
 	if #_entries == 0 then return nil end
 	local entry
 	if _active_id ~= "" then
@@ -226,7 +225,26 @@ function M.get_active_entry()
 			if e.id == _active_id then entry = e; break end
 		end
 	end
-	entry = entry or _entries[1]
+	return entry or _entries[1]
+end
+
+--- Resolve the currently active entry, falling back to the first configured
+--- one when no id matches. Returns nil when no entry exists at all.
+--- Tokens stored as ``keychain:<id>`` references are decrypted on first call
+--- and the cleartext is cached back into the entry so the Keychain subprocess
+--- fires at most once per entry across the session lifetime.
+---
+--- This is still a SYNCHRONOUS decrypt (TokenCrypto.decrypt uses hs.execute)
+--- because every caller here (warmup/check_availability/post_and_parse) needs
+--- the token immediately to build its request. A locked Keychain can freeze
+--- the run loop on this call. Callers reachable from a timer callback (not
+--- the hot keystroke eventtap) should call prewarm_active_entry_decrypt()
+--- first, off the initial load tick, so this synchronous path almost always
+--- hits the already-cached cleartext branch below instead of shelling out
+--- (F-MED-9).
+--- @return table|nil entry
+function M.get_active_entry()
+	local entry = find_active_entry()
 	if not entry then return nil end
 	-- Lazy-resolve the Keychain reference on first use so the blocking
 	-- security(1) subprocess never fires on the boot or load tick.
@@ -234,6 +252,31 @@ function M.get_active_entry()
 		entry.token = TokenCrypto.decrypt(entry.token)
 	end
 	return entry
+end
+
+--- Asynchronously pre-warms the active entry's decrypted token cache using
+--- TokenCrypto.decrypt_async (a non-blocking ShellRunner.spawn) instead of
+--- the synchronous security(1) shell-out. Call this once, off the boot tick,
+--- right after entries load — every LATER call to get_active_entry() from a
+--- warmup or first-prediction timer callback then hits the already-cached
+--- cleartext and never blocks on the Keychain (F-MED-9).
+--- Safe to call with no entries configured, or when the active entry's token
+--- is already cleartext (is_encrypted() false) — both are no-ops.
+function M.prewarm_active_entry_decrypt()
+	local entry = find_active_entry()
+	if not entry then return end
+	if type(entry.token) ~= "string" or not TokenCrypto.is_encrypted(entry.token) then return end
+	TokenCrypto.decrypt_async(entry.token, function(cleartext)
+		-- The entry list or active id may have changed while the async
+		-- Keychain read was in flight; only cache back if this entry is
+		-- STILL the active one and still holds the same encrypted reference
+		-- we resolved (otherwise we would clobber a fresher lazy decrypt).
+		local still_active = find_active_entry()
+		if still_active == entry and TokenCrypto.is_encrypted(entry.token) then
+			entry.token = cleartext
+			Logger.debug(LOG, "Pre-warmed Keychain decrypt for active API entry '%s'.", tostring(entry.id))
+		end
+	end)
 end
 
 

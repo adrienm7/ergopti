@@ -28,6 +28,14 @@
 local M = {}
 local hs = hs
 local Logger = require("lib.logger")
+-- Async Keychain read (F-MED-9): M.decrypt() below is a synchronous
+-- hs.execute shell-out that can raise a modal Keychain-unlock prompt,
+-- freezing the ENTIRE Hammerspoon run loop (all keystroke processing, every
+-- timer) until the user responds. Optional require so this module still
+-- loads if adapters/shell_runner.lua is ever unavailable in a stripped test
+-- environment — M.decrypt_async falls back to the sync path in that case.
+local ok_sr, ShellRunner = pcall(require, "adapters.shell_runner")
+if not ok_sr then ShellRunner = nil end
 local LOG = "llm.api_token_crypto"
 
 -- Marker prefix on encrypted blobs. Anything starting with this string is
@@ -134,6 +142,44 @@ function M.decrypt(stored)
 		return ""
 	end
 	return (out:gsub("\n+$", ""))
+end
+
+--- Async twin of M.decrypt(): resolves a stored value to cleartext without
+--- ever blocking the run loop. Use this whenever the caller can defer the
+--- rest of its work to a callback — e.g. pre-warming the cache right after
+--- entries load, off the boot/timer tick that would otherwise call the
+--- synchronous M.decrypt() through get_active_entry() (F-MED-9). Falls back
+--- to the synchronous path only if adapters/shell_runner is unavailable.
+--- @param stored string The value as stored on disk.
+--- @param callback function Called with (cleartext) — "" on any failure.
+function M.decrypt_async(stored, callback)
+	if type(callback) ~= "function" then return end
+	if type(stored) ~= "string" or stored == "" then
+		callback("")
+		return
+	end
+	if not M.is_encrypted(stored) then
+		callback(stored)
+		return
+	end
+	if not ShellRunner then
+		-- No async adapter available (e.g. a stripped test load) — fall back
+		-- to the synchronous path rather than silently never calling back.
+		callback(M.decrypt(stored))
+		return
+	end
+	local entry_id = stored:sub(#KEYCHAIN_PREFIX + 1)
+	local task = ShellRunner.spawn("/usr/bin/security", {
+		"find-generic-password", "-a", entry_id, "-s", KEYCHAIN_SERVICE, "-w",
+	}, function(exit_code, stdout, _stderr)
+		if exit_code ~= 0 or type(stdout) ~= "string" or stdout == "" then
+			Logger.warn(LOG, "Async Keychain read failed for entry '%s'.", tostring(entry_id))
+			callback("")
+			return
+		end
+		callback((stdout:gsub("\n+$", "")))
+	end)
+	task.start()
 end
 
 --- Removes a Keychain entry. Called by the tray delete flow so the
