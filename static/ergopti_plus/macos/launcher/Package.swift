@@ -13,6 +13,10 @@
 //    free of test boilerplate that would never run in production.
 // 2. Sparkle via SPM: the official channel; locks Sparkle to a known-good
 //    minor so a Sparkle 2.x → 3.x bump cannot land silently via tag drift.
+// 3. ErgoptiPlusTests: a minimal XCTest target covering the fail-fast bundle
+//    validation in main.swift (F-HIGH-28) — asserts a bundle missing the Lua
+//    tree is detected via the same FileManager.fileExists(atPath:) predicate
+//    the launcher's guard uses, before any child process would be spawned.
 
 import PackageDescription
 
@@ -41,6 +45,11 @@ let package = Package(
 				// frameworks that land in Contents/Frameworks/ (not next to the binary).
 				.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])
 			]
+		),
+		.testTarget(
+			name: "ErgoptiPlusTests",
+			dependencies: ["ErgoptiPlus"],
+			path: "Tests/ErgoptiPlusTests"
 		)
 	]
 )
