@@ -198,8 +198,7 @@ KL_BuildInserts(entry) {
         case "hotstring":           return [KL_BuildInsertHotstring(entry, id, "fired")]
         case "hotstring_suggested": return [KL_BuildInsertHotstring(entry, id, "suggested")]
         case "hotstring_dismissed":          return [KL_BuildInsertHotstring(entry, id, "dismissed")]
-        case "hotstring_near_miss":
-        case "manual_typed_known_trigger":   return [KL_BuildInsertHotstring(entry, id, t)]
+        case "hotstring_near_miss", "manual_typed_known_trigger":   return [KL_BuildInsertHotstring(entry, id, t)]
         case "llm_generation":      return [KL_BuildInsertLlm(entry, id, "generation")]
         case "llm_suggested":       return [KL_BuildInsertLlm(entry, id, "suggested")]
         case "llm_dismissed":       return [KL_BuildInsertLlm(entry, id, "dismissed")]
@@ -209,15 +208,18 @@ KL_BuildInserts(entry) {
         case "idle_start":          return [KL_BuildInsertSession(entry, id, "idle_start")]
         case "idle_end":            return [KL_BuildInsertSession(entry, id, "idle_end")]
         case "ergo_event":              return [KL_BuildInsertErgoEvent(entry, id)]
-        case "window_resize":
-        case "window_move":
-        case "window_state_change":
-        case "monitor_focus_change":
-        case "virtual_desktop_switch": return [KL_BuildInsertWindowTopoEvent(entry, id)]
-        case "mouse_click":
-        case "mouse_drag":
-        case "mouse_scroll":
-        case "mouse_idle_park":     return [KL_BuildInsertMouseEvent(entry, id)]
+        case "window_resize", "window_move", "window_state_change", "monitor_focus_change",
+             "virtual_desktop_switch": return [KL_BuildInsertWindowTopoEvent(entry, id)]
+        case "mouse_click", "mouse_drag", "mouse_scroll",
+             "mouse_idle_park":     return [KL_BuildInsertMouseEvent(entry, id)]
+        case "volume_change", "screen_recording_start",
+             "screen_recording_end": return [KL_BuildInsertAvEvent(entry, id)]
+        case "network_change", "internet_up", "internet_down", "vpn_connected",
+             "vpn_disconnected": return [KL_BuildInsertNetworkEvent(entry, id)]
+        case "clipboard_copy", "clipboard_paste",
+             "paste_burst": return [KL_BuildInsertClipboardEvent(entry, id)]
+        case "roi_snapshot", "new_trigger_candidate",
+             "trigger_halflife": return [KL_BuildInsertRoiEvent(entry, id)]
     }
     ; Unknown type — silently skip; future schemas may handle it on replay.
     return []
@@ -268,6 +270,78 @@ KL_BuildInsertMouseEvent(e, id) {
     }
     return Format(
         "INSERT OR IGNORE INTO events_mouse (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
+        Keylogger._device_id_lit, id,
+        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
+        KL_SqlStr(t),
+        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
+        KL_SqlJson(meta)
+    )
+}
+
+KL_BuildInsertAvEvent(e, id) {
+    ts   := e["timestamp"]
+    t    := e["type"]
+    meta := Map()
+    for k, v in e {
+        if (k != "type" && k != "timestamp" && k != "app")
+            meta[k] := v
+    }
+    return Format(
+        "INSERT OR IGNORE INTO events_av (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
+        Keylogger._device_id_lit, id,
+        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
+        KL_SqlStr(t),
+        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
+        KL_SqlJson(meta)
+    )
+}
+
+KL_BuildInsertNetworkEvent(e, id) {
+    ts   := e["timestamp"]
+    t    := e["type"]
+    meta := Map()
+    for k, v in e {
+        if (k != "type" && k != "timestamp" && k != "app")
+            meta[k] := v
+    }
+    return Format(
+        "INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
+        Keylogger._device_id_lit, id,
+        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
+        KL_SqlStr(t),
+        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
+        KL_SqlJson(meta)
+    )
+}
+
+KL_BuildInsertClipboardEvent(e, id) {
+    ts   := e["timestamp"]
+    t    := e["type"]
+    meta := Map()
+    for k, v in e {
+        if (k != "type" && k != "timestamp" && k != "app")
+            meta[k] := v
+    }
+    return Format(
+        "INSERT OR IGNORE INTO events_clipboard (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
+        Keylogger._device_id_lit, id,
+        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
+        KL_SqlStr(t),
+        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
+        KL_SqlJson(meta)
+    )
+}
+
+KL_BuildInsertRoiEvent(e, id) {
+    ts   := e["timestamp"]
+    t    := e["type"]
+    meta := Map()
+    for k, v in e {
+        if (k != "type" && k != "timestamp" && k != "app")
+            meta[k] := v
+    }
+    return Format(
+        "INSERT OR IGNORE INTO events_roi (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
         Keylogger._device_id_lit, id,
         KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
         KL_SqlStr(t),
