@@ -414,6 +414,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_gesture_keywatcher_suspend.ahk
 #Include meta/test_activitysim_collision.ahk
 #Include meta/test_metrics_focus_cache_atomic.ahk
+#Include meta/test_metrics_focus_ttl_leak.ahk
 #Include meta/test_clipboard_ram_leak.ahk
 #Include meta/test_space_tap_dispatch.ahk
 #Include meta/test_roi_map_mutation_race.ahk

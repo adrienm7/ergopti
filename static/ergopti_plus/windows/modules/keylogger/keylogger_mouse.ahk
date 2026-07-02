@@ -316,7 +316,7 @@ KL_Mouse_AccumScroll(delta) {
         return
     ; Scrolls in a filtered window (password field / disabled app / private) must not
     ; accrue into session_scrolls — gate accumulation behind the privacy filter, cached
-    ; (~250 ms TTL) so the hot-path cost stays negligible (mouse-counter-privacy-filter).
+    ; (~50 ms TTL) so the hot-path cost stays negligible (mouse-counter-privacy-filter).
     filtered := false
     try filtered := MF_ShouldFilter()
     if filtered
