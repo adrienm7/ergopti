@@ -68,40 +68,49 @@ AltTabMonitor() {
 	AppWindowsOnMonitorFiltered := []
 
 	for WindowId in WinGetList() {
-		if WindowId == CurrentWindowId {
+		try {
+			if WindowId == CurrentWindowId {
+				continue
+			}
+
+			WinGetPos(&x, &y, &w, &h, WindowId)
+
+			if (w < 100 || h < 100) {
+				continue
+			}
+
+			CenterX := x + w // 2
+			CenterY := y + h // 2
+			if GetMonitorFromPoint(CenterX, CenterY) != MonitorNum {
+				continue
+			}
+
+			; Skip windows with no title — often tooltips, overlays, or hidden UI
+			; elements, windows shown during drag operations, and file-operation dialogs
+			; Cache the title once to avoid a TOCTOU race if the window title changes between calls
+			WindowTitle := WinGetTitle(WindowId)
+			if WindowTitle == "" or WindowTitle == "Drag" or WinGetClass(WindowId) == "OperationStatusWindow" {
+				continue
+			}
+
+			; Exclude known system window classes:
+			; - Shell_TrayWnd: Windows taskbar
+			; - Progman: desktop background
+			; - WorkerW: hidden background windows
+			WindowClass := WinGetClass(WindowId)
+			if (WindowClass == "Shell_TrayWnd" || WindowClass == "Progman" || WindowClass == "WorkerW") {
+				continue
+			}
+
+			AppWindowsOnMonitorFiltered.Push(WindowId)
+		} catch as Err {
+			; A window closing mid-enumeration (a routine race, not a bug) throws
+			; TargetError on the next WinGet* call for that HWnd — skip just this
+			; window instead of aborting the whole per-monitor cycle, mirroring
+			; GestureGetCyclableWindows's identical TOCTOU guard.
+			LoggerDebug("WindowUtils", "AltTabMonitor: skipped ahk_id {1}: {2}.", WindowId, Err.Message)
 			continue
 		}
-
-		WinGetPos(&x, &y, &w, &h, WindowId)
-
-		if (w < 100 || h < 100) {
-			continue
-		}
-
-		CenterX := x + w // 2
-		CenterY := y + h // 2
-		if GetMonitorFromPoint(CenterX, CenterY) != MonitorNum {
-			continue
-		}
-
-		; Skip windows with no title — often tooltips, overlays, or hidden UI
-		; elements, windows shown during drag operations, and file-operation dialogs
-		; Cache the title once to avoid a TOCTOU race if the window title changes between calls
-		WindowTitle := WinGetTitle(WindowId)
-		if WindowTitle == "" or WindowTitle == "Drag" or WinGetClass(WindowId) == "OperationStatusWindow" {
-			continue
-		}
-
-		; Exclude known system window classes:
-		; - Shell_TrayWnd: Windows taskbar
-		; - Progman: desktop background
-		; - WorkerW: hidden background windows
-		WindowClass := WinGetClass(WindowId)
-		if (WindowClass == "Shell_TrayWnd" || WindowClass == "Progman" || WindowClass == "WorkerW") {
-			continue
-		}
-
-		AppWindowsOnMonitorFiltered.Push(WindowId)
 	}
 
 	if AppWindowsOnMonitorFiltered.Length > 0 {
