@@ -873,6 +873,9 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_window_adapters_catch.ahk
 #Include meta/test_onbweb_singleton_guard.ahk
 #Include meta/test_webview_shared_env_reentrancy_guard.ahk
+; AltTabMonitor bare-try-no-catch fix (F37) — sibling of the
+; GestureGetCyclableWindows TOCTOU guard (commit 7b701020d).
+#Include meta/test_alt_tab_monitor_catch.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
