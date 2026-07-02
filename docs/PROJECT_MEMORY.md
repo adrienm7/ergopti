@@ -28,6 +28,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-updater-nonblocking-http](#project-updater-nonblocking-http) — The updater background poll must never do synchronous WinHttp on the main thread (it freezes all remapping); WinHttp SetTimeouts 0 = infinite. Use the async WinHTTP + WaitForResponse(0) + SetTimer-poll pattern.
   - [project-config-v2-refactor](#project-config-v2-refactor) — State of the v2 config schema refactor (Scope C) — branch refactor/config-schema-v2 with 5 dormant commits. Cut-over to actually migrate the AHK driver runtime is the open piece.
   - [project_debug_menu_sync](#project-debug-menu-sync) — Debug menu order is defined in _shared/modules/menu/menu_manifest.json debug_menu — both AHK and Lua drivers consume it
+  - [project_menu_manifest_macos_hotstrings_layout_gap](#project-menu-manifest-macos-hotstrings-layout-gap) — macOS never reads menu_manifest.json's hotstrings_menu/layout_menu keys (unlike gestures_menu/metrics_menu/shortcuts_menu, which ARE manifest-driven on both platforms) — a drift GATE exists, the actual migration does not
   - [project-shared-tree-layout](#project-shared-tree-layout) — _shared/ is 6 folders (modules/core/data/lua/tests/ui); each layer resolves the shared root in ONE place (SSOT), but renames/moves still need call-site subpath edits — and several sites bypass the SSOT, so only the test suites catch them
   - [project-gestures-reversal-detection](#project-gestures-reversal-detection) — How direction reversals are detected in the gestures engine (x1 vs incremental)
   - [project-gestures-startup-design](#project-gestures-startup-design) — Design choices for the macOS gestures startup path — primer-as-wakeup-signal vs burst probes
@@ -751,6 +752,24 @@ The debug submenu order is the single source of truth in `_shared/menu_manifest.
 **Why:** User requires that menu order be defined once in _shared/ — never duplicated per-platform.
 
 **How to apply:** To reorder or add debug menu items, only edit `menu_manifest.json`. Both drivers pick it up automatically at next load.
+
+See also [[project_menu_manifest_macos_hotstrings_layout_gap]] — the same SSOT manifest correctly drives `debug_menu` on both platforms, but `hotstrings_menu`/`layout_menu` are only consumed on Windows.
+
+### project-menu-manifest-macos-hotstrings-layout-gap
+
+_macOS never reads menu_manifest.json's hotstrings_menu/layout_menu keys (unlike gestures_menu/metrics_menu/shortcuts_menu, which ARE manifest-driven on both platforms) — a drift gate exists, the actual migration does not_
+
+<sub>slug: `project_menu_manifest_macos_hotstrings_layout_gap`</sub>
+
+`_shared/modules/menu/menu_manifest.json` is the intended single source of truth for tray-menu structure across both drivers. On Windows, `hotstrings_menu` and `layout_menu` are consumed generically through `lib/manifest_menu.ahk`'s `MenuRenderer_Build`, exactly like `gestures_menu`/`metrics_menu`/`shortcuts_menu` — so reordering the manifest updates all four menus with no code change. On macOS, `gestures_menu`/`metrics_menu`/`shortcuts_menu` were correctly migrated to the equivalent `lib/manifest_menu.lua`'s `ManifestMenu.build`, but `ui/menu/menu_hotstrings.lua`, `ui/menu/builder.lua`, and `ui/menu/menu_keyboard_layout.lua` still hand-assemble the hotstrings and layout submenus imperatively — zero references to the manifest's `hotstrings_menu`/`layout_menu` arrays anywhere in that code. Reordering or editing those two manifest keys silently desyncs the two platforms' tray menus, with nothing catching it until a human notices the mismatch.
+
+**Interim mitigation (2026-07-03):** `macos/tests/meta/test_menu_hotstrings_layout_drift_gate.lua` pins the current `hotstrings_menu`/`layout_menu` shape (hs-filtered signatures) against two hardcoded `CANONICAL_*` tables. This makes a manifest edit fail LOUDLY (the test breaks) instead of silently — a human is now forced to look at whether the macOS hand-built menu needs the same change — but it does not make macOS manifest-driven. The real fix is migrating `menu_hotstrings.lua`/`menu_keyboard_layout.lua`/`builder.lua` to read the manifest the way `gestures_menu` already does; that migration was assessed as a larger, riskier refactor than a bounded single-commit fix warrants (unfamiliar macOS Lua UI code, two menus' worth of imperative logic to replace) and was deliberately deferred rather than rushed.
+
+**Why:** Found during the 2026-07-01 AHK driver audit's `project_debug_menu_sync` watch-list re-check — the same SSOT manifest that correctly drives `debug_menu` on both platforms also defines `hotstrings_menu`/`layout_menu`, but only Windows actually consumes them.
+
+**How to apply:** Before editing `hotstrings_menu`/`layout_menu` in `menu_manifest.json`, run the macOS Lua suite (`cd static/ergopti_plus/macos && lua tests/run.lua`) — the drift gate will fail if the edit isn't also reflected in macOS's hand-built menu code. When picking up the deferred migration: mirror how `gestures_menu` was done (`lib/manifest_menu.lua`'s `ManifestMenu.build`, consumed from `builder.lua`), then delete the drift-gate test since it becomes structurally redundant once macOS is manifest-driven.
+
+See also [[project_debug_menu_sync]].
 
 ### project-gestures-reversal-detection
 
