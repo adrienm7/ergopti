@@ -550,8 +550,9 @@ _LLM_Menu_FormatBillions(n) {
 
 /**
  * Confirms the delete with the user, then drops the Ollama-side model cache
- * through the HTTP DELETE /api/delete endpoint. The tray rebuild at the end
- * refreshes the installed dot so the row stops showing the green badge.
+ * through the async curl-child DELETE /api/delete pattern (mirrors
+ * LLM_OllamaListModels_Async — F24). The tray rebuild happens in the
+ * completion callback so it never fires before the daemon actually answers.
  */
 _LLM_Menu_PromptDeleteCachedModel(name) {
 	tag := LLM_ResolveOllamaTag(name)
@@ -562,10 +563,26 @@ _LLM_Menu_PromptDeleteCachedModel(name) {
 	choice := MsgBox(body, title, "YesNo Icon!")
 	if (choice != "Yes")
 		return
-	try LLM_OllamaDeleteModel(tag)
+	; AHK v2 closures capture outer-scope variables by reference, but `name`
+	; and `tag` are call-scoped parameters/locals here (not a for-loop
+	; variable), so the direct fat-arrow capture below is safe.
+	LLM_OllamaDeleteModel_Async(tag, (ok) => _LLM_Menu_OnDeleteCachedModelDone(name, tag, ok))
+}
+
+/**
+ * Completion callback for the async model-cache delete (F24). Invalidates
+ * the install-status cache and rebuilds the tray so the green "installed"
+ * dot disappears once Ollama confirms the model was removed.
+ * @param {string}  name - Catalogue display name (logging only).
+ * @param {string}  tag  - Resolved Ollama tag that was deleted.
+ * @param {Boolean} ok   - True when the DELETE succeeded.
+ */
+_LLM_Menu_OnDeleteCachedModelDone(name, tag, ok) {
+	global _LLM_InstalledTagsCacheAt
+	if !ok
+		try LoggerWarn("LLM", "Model cache delete failed for '{1}' (tag '{2}').", name, tag)
 	; Invalidate the install-status cache so the next rebuild reflects the
 	; new state immediately instead of waiting for the 2 s TTL.
-	global _LLM_InstalledTagsCacheAt
 	_LLM_InstalledTagsCacheAt := 0
 	LLM_Menu_Build()
 }

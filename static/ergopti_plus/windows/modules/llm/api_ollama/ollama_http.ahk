@@ -241,35 +241,92 @@ _LLM_Ollama_TagsPoll(pid, tmp_out, on_result, start_tick) {
 
 /**
  * Removes the local copy of an Ollama model via the daemon's
- * ``DELETE /api/delete`` endpoint. Blocking — the caller is responsible
- * for confirming with the user before invoking this.
+ * ``DELETE /api/delete`` endpoint. Non-blocking — mirrors
+ * ``LLM_OllamaListModels_Async``: a curl child performs the request and we
+ * only poll ``ProcessExist`` (instant), so the tray-menu/message-loop thread
+ * is never frozen for the DELETE's up-to-10 s round trip. Every sibling
+ * Ollama HTTP surface had already been migrated to this pattern; the
+ * "Delete model cache" action was the one that was missed (F24).
  *
- * @param {string} tag - Ollama model tag (e.g. ``qwen3-coder:30b``).
- * @returns {Boolean} True on HTTP 200, false on any failure.
+ * @param {string}   tag       - Ollama model tag (e.g. ``qwen3-coder:30b``).
+ * @param {function} on_result - Callback receiving a Boolean (true on success).
  */
-LLM_OllamaDeleteModel(tag) {
-	if (tag == "")
-		return false
+LLM_OllamaDeleteModel_Async(tag, on_result) {
+	global LLM_OLLAMA_BASE_URL, LLM_OLLAMA_DELETE_TIMEOUT_MS
+	if (tag == "") {
+		try on_result(false)
+		return
+	}
 	try {
-		http := ComObject("WinHttp.WinHttpRequest.5.1")
-		http.Open("DELETE", LLM_OLLAMA_BASE_URL "/api/delete", false)
-		http.SetTimeouts(5000, 5000, 10000, 10000)
-		http.SetRequestHeader("Content-Type", "application/json")
+		uid := _LLM_Ollama_NextStreamUid()
+		tmp_payload := _LLM_Ollama_TempDir() . "\ergopti_ollama_delete_" . uid . ".json"
+		tmp_out     := _LLM_Ollama_TempDir() . "\ergopti_ollama_delete_" . uid . ".out"
 		; The payload is intentionally minimal — Ollama tolerates the
 		; ``model`` field too on newer versions, but ``name`` is the
-		; documented one and works on every release we care about.
+		; documented one and works on every release we care about
+		; (mirrors the retired blocking body).
 		body := '{"name":"' . StrReplace(tag, '"', '\"') . '"}'
-		http.Send(body)
-		ok := (http.Status >= 200 and http.Status < 300)
-		try {
-			if (ok)
-				LoggerSuccess("LLM.ollama", "Deleted Ollama model '{1}'.", tag)
-			else
-				LoggerWarn("LLM.ollama", "Ollama delete '{1}' returned HTTP {2}.", tag, http.Status)
+		if !FSWrite(tmp_payload, body) {
+			try LoggerWarn("LLM.ollama", "Failed to write delete payload file for '{1}'.", tag)
+			try on_result(false)
+			return
 		}
-		return ok
+		curl_exe := A_WinDir . "\System32\curl.exe"
+		cmdLine := '"' . curl_exe . '" -s -S -m ' . (LLM_OLLAMA_DELETE_TIMEOUT_MS // 1000) . ' -X DELETE '
+			. '-H "Content-Type: application/json" '
+			. '--data-binary @' . _Q(tmp_payload) . ' '
+			. _Q(LLM_OLLAMA_BASE_URL . "/api/delete") . ' '
+			. '-o ' . _Q(tmp_out)
+		pid := 0
+		Run(cmdLine, , "Hide", &pid)
+		_LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, tag, on_result, A_TickCount)
 	} catch as e {
-		try LoggerError("LLM.ollama", "Ollama delete '{1}' failed: {2}.", tag, e.Message)
-		return false
+		try LoggerError("LLM.ollama", "Ollama delete '{1}' launch failed: {2}.", tag, e.Message)
+		try on_result(false)
 	}
+}
+
+/**
+ * Polls a model-delete curl child WITHOUT blocking the message loop (mirrors
+ * ``_LLM_Ollama_TagsPoll``). Ollama's ``DELETE /api/delete`` returns an
+ * empty body on HTTP 200 and a JSON ``{"error": …}`` body on failure (model
+ * not found, daemon busy, …), so success is read straight off the stdout file.
+ * @param {integer}  pid         - curl child PID (0 if Run failed).
+ * @param {string}   tmp_payload - Temp payload file to clean up once done.
+ * @param {string}   tmp_out     - Temp file curl writes the response body to.
+ * @param {string}   tag         - Ollama model tag, for logging.
+ * @param {function} on_result   - Callback receiving a Boolean (true on success).
+ * @param {integer}  start_tick  - A_TickCount at dispatch, for the deadline backstop.
+ */
+_LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, tag, on_result, start_tick) {
+	global LLM_OLLAMA_POLL_MS, LLM_OLLAMA_DELETE_TIMEOUT_MS
+	if (pid > 0 and ProcessExist(pid)) {
+		; 5 s backstop beyond curl's own -m ceiling: ProcessClose a wedged
+		; child so it can never keep the poll chain (or its temp files) alive.
+		if (_LLM_DeadlineExpired(start_tick, LLM_OLLAMA_DELETE_TIMEOUT_MS + 5000)) {
+			try ProcessClose(pid)
+			try FSDelete(tmp_payload)
+			try FSDelete(tmp_out)
+			try LoggerWarn("LLM.ollama", "Ollama delete '{1}' timed out.", tag)
+			try on_result(false)
+			return
+		}
+		SetTimer(() => _LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, tag, on_result, start_tick), -LLM_OLLAMA_POLL_MS)
+		return
+	}
+	body := ""
+	try {
+		if FileExist(tmp_out)
+			body := FileRead(tmp_out, "UTF-8-RAW")
+	}
+	try FSDelete(tmp_payload)
+	try FSDelete(tmp_out)
+	ok := (body == "")
+	try {
+		if (ok)
+			LoggerSuccess("LLM.ollama", "Deleted Ollama model '{1}'.", tag)
+		else
+			LoggerWarn("LLM.ollama", "Ollama delete '{1}' failed: {2}.", tag, body)
+	}
+	try on_result(ok)
 }
