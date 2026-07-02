@@ -257,11 +257,18 @@ HSE_DispatchMatch(Spec, EndChar) {
             EndCharEmitted := (EndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
             _NpCrit := Critical("Off")
             try {
-                SendNewResult(BackSpaceSeq, false)
+                ; UpdateRing=false: BackSpaceSeq is a control sequence ("{BackSpace N}"),
+                ; not a real emitted character — letting SendNewResult record
+                ; SubStr(BackSpaceSeq, -1) ("}") into the last-sent-character ring
+                ; corrupts _LSC_RING and LastSentCharacterKeyTime. The real emitted
+                ; text is recorded explicitly below, after the paste, mirroring the
+                ; atomic branch's UpdateLastSentCharacter call.
+                SendNewResult(BackSpaceSeq, false, false)
                 SendInstant(Replacement . EndCharEmitted)
             } finally {
                 Critical(_NpCrit)
             }
+            UpdateLastSentCharacter(SubStr(EndCharEmitted != "" ? EndCharEmitted : Replacement, -1))
             SentBurst := BackSpaceSeq . "[clip]" . Replacement . EndCharEmitted
         } else {
             ; SendInput is atomic: the ENTIRE backspace+replacement+endchar burst is

@@ -28,3 +28,50 @@ _HCER_AssertRingUsesEmittedEndChar() {
 		"the atomic-branch UpdateLastSentCharacter must NOT record the raw EndChar — a consumed delimiter is not emitted, so recording it desyncs the last-sent ring from the screen (consumed-endchar-ring-desync)")
 }
 Test("hotstrings: atomic-branch ring records the emitted end-char, not the raw EndChar (consumed-endchar-ring-desync)", _HCER_AssertRingUsesEmittedEndChar)
+
+
+
+
+; ===================================================================
+; ===================================================================
+; ======= 2/ Notepad-branch ring corruption guard (F8) =============
+; ===================================================================
+; ===================================================================
+
+; Extracts the Notepad branch body from HSE_DispatchMatch: the block that
+; starts with `if IsNotepadApp {` and ends at the matching `} else {` that
+; opens the atomic branch. Mirrors _THNCD_ExtractNotepadBranch in
+; tests/meta/test_hse_notepad_consumed_delimiter.ahk.
+_HCER_ExtractNotepadBranch(Src) {
+	Marker := "if IsNotepadApp {"
+	StartIdx := InStr(Src, Marker)
+	if !StartIdx
+		return ""
+	ElseMarker := "} else {"
+	ElseIdx := InStr(Src, ElseMarker, , StartIdx)
+	if !ElseIdx
+		return SubStr(Src, StartIdx)
+	return SubStr(Src, StartIdx, ElseIdx - StartIdx + StrLen(ElseMarker))
+}
+
+_HCER_AssertNotepadBranchDoesNotCorruptRing() {
+	Src := _DriverSourceConcat()
+	Branch := _HCER_ExtractNotepadBranch(Src)
+	Assert(Branch != "", "HSE_DispatchMatch's Notepad branch (if IsNotepadApp) must exist")
+
+	; The pre-paste backspace is a control sequence ("{BackSpace N}"), not a real
+	; emitted character. SendNewResult's third arg (UpdateRing) must be false so
+	; SubStr(BackSpaceSeq, -1) — the sequence's trailing "}" — never reaches the
+	; last-sent-character ring (F8: notepad-clipboard-ring-corruption).
+	Assert(InStr(Branch, "SendNewResult(BackSpaceSeq, false, false)") > 0,
+		"Notepad branch must call SendNewResult(BackSpaceSeq, false, false) — UpdateRing=false — so the backspace control sequence never pollutes the last-sent-character ring (F8)")
+	Assert(!InStr(Branch, "SendNewResult(BackSpaceSeq, false)"),
+		"Notepad branch must NOT call the 2-arg SendNewResult(BackSpaceSeq, false) — that form lets SendNewResult record the backspace sequence's trailing char into the ring (F8)")
+
+	; The REAL emitted text (the clipboard paste) must feed the ring explicitly,
+	; mirroring the atomic branch's UpdateLastSentCharacter(SubStr(EndCharPart ...))
+	; call right after its SendInput burst.
+	Assert(InStr(Branch, "UpdateLastSentCharacter(SubStr(EndCharEmitted") > 0,
+		"Notepad branch must call UpdateLastSentCharacter with the real emitted text (EndCharEmitted / Replacement) after the paste, mirroring the atomic branch (F8)")
+}
+Test("hotstrings: Notepad branch does not corrupt the last-sent ring with the backspace sequence (F8)", _HCER_AssertNotepadBranchDoesNotCorruptRing)
