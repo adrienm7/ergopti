@@ -653,6 +653,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_toml_multiline_array_depth.ahk
 #Include meta/test_toml_unescape_ordering.ahk
 #Include meta/test_clipboard_sentinel.ahk
+#Include meta/test_clipboard_saveall_sentinel.ahk
 #Include meta/test_textsend_callback_wired.ahk
 #Include meta/test_is_category_all_enabled_loop.ahk
 #Include meta/test_regread_no_type_arg.ahk
