@@ -114,6 +114,12 @@ OnError(_FatalErrorHandler)
 ; is harmless (#Warn VarUnset is off).
 #Include ../lib/personal_features.ahk
 #Include ../lib/hotstrings/hotstrings_config.ahk
+; _CollectFeatureUpdates / _CollectFeatureFlipUpdates are exercised directly by
+; the F5/F48 regression tests (test_config_io_feature_section_prefix.ahk).
+; ToggleAllFeatures/SaveFullConfig themselves are never invoked here (they
+; depend on numerous boot-only globals and end in an unconditional Reload()),
+; so including this file is safe — only function definitions at top level.
+#Include ../lib/config_io.ahk
 #Include ../ui/personal_toml_editor.ahk
 ; Pure helpers (no boot-time side effects) — CountDynamicSection is exercised
 ; by the DL-4 corpus parity test.
@@ -210,6 +216,7 @@ InstallSendNoOps()
 
 #Include unit/test_config.ahk
 #Include unit/test_features_manifest.ahk
+#Include unit/test_config_io_feature_section_prefix.ahk
 #Include unit/test_hotstrings_full.ahk
 #Include unit/test_tap_hold_loader.ahk
 #Include unit/test_i18n.ahk

@@ -160,6 +160,31 @@ ManifestFindEntryByPath(V2Path) {
 	return false
 }
 
+; Resolve the correct (possibly ahk.-prefixed) TOML section for one leaf of the
+; already ahk.-stripped in-memory Features tree. ManifestBuildFeaturesMap strips
+; the ahk. driver namespace uniformly, so several top-level Features keys (e.g.
+; "shortcuts", "metrics", "gestures") merge entries from both a shared
+; (unprefixed) manifest section and an ahk.-only one -- walking the stripped
+; tree alone cannot recover which namespace a given leaf came from. Looking the
+; full leaf path up in the manifest's own path index is the single source of
+; truth; every call site that flattens the Features tree into TOML writes
+; (_CollectFeatureUpdates, _CollectFeatureFlipUpdates) must resolve through
+; this helper instead of re-deriving the section from the stripped nesting.
+; @param StrippedLeafPath  Dot path to the leaf as walked in the stripped
+;                          Features tree (e.g. "shortcuts.personal.laptop_broken_key",
+;                          "gestures.enabled").
+; @param FallbackSection   Section to use when the leaf has no direct manifest
+;                          entry -- true for every property nested under a
+;                          single-entry (table-default) alpha feature (e.g.
+;                          "shortcuts.gpt.enabled", "hotstrings.autocorrection.accents.enabled")
+;                          since none of those ever carry an ahk. prefix, so the
+;                          un-prefixed walked section is already correct.
+; @return                  The resolved TOML section.
+ManifestResolveFeatureSection(StrippedLeafPath, FallbackSection) {
+	Entry := ManifestFindEntryByPath(StrippedLeafPath)
+	return (Entry != false) ? Entry["section"] : FallbackSection
+}
+
 
 
 
