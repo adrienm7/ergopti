@@ -393,6 +393,11 @@ KLR_RebuildAggregates(db) {
 	; fired / suggested are separate rows; we join them here rather than duplicating the
 	; fired INSERT above so each kind gets a clean COUNT(*).
 	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, hs_suggested) SELECT device_id, date, app, COUNT(*) FROM events_hotstring WHERE kind = 'suggested' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_suggested=hs_suggested+excluded.hs_suggested;")
+	; agg_app_day — LLM suggestion count (denominator for the acceptance rate
+	; KPI), mirroring the hs_suggested rollup immediately above. events_llm
+	; was previously written to but never read anywhere (F19); this is the
+	; SQL-side half of wiring it up end-to-end.
+	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, llm_suggested) SELECT device_id, date, app, COUNT(*) FROM events_llm WHERE kind = 'suggested' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET llm_suggested=llm_suggested+excluded.llm_suggested;")
 
 	; agg_app_day — app foreground time from events_app_switch.
 	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, app_time_ms) SELECT device_id, date, prev_app, SUM(COALESCE(duration_ms,0)) FROM events_app_switch WHERE prev_app IS NOT NULL AND prev_app != '' GROUP BY device_id, date, prev_app ON CONFLICT(device_id, date, app) DO UPDATE SET app_time_ms=app_time_ms+excluded.app_time_ms;")

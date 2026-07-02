@@ -144,6 +144,31 @@ KL_BuildInsertHotstring(e, id, kind) {
     )
 }
 
+; Mirrors _builders.llm in the macOS sqlite_writer.lua sibling. `kind` is
+; supplied by the caller (KL_BuildInserts), not read off the event, so the
+; llm_generation / llm_suggested / llm_dismissed / llm_accepted event types
+; can all funnel through one builder while writing the CHECK-constraint-
+; compatible kind value ('generation'/'suggested'/'dismissed'/'accepted').
+KL_BuildInsertLlm(e, id, kind) {
+    ts := e["timestamp"]
+    return Format(
+        "INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, {15});",
+        Keylogger._device_id_lit, id,
+        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
+        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
+        KL_SqlStr(kind),
+        KL_SqlNullable(KL_GetMap(e, "context", "")),
+        KL_SqlJson(KL_GetMap(e, "predictions", "")),
+        KL_SqlNullable(KL_GetMap(e, "prediction", "")),
+        KL_SqlJson(KL_GetMap(e, "all_predictions", "")),
+        KL_SqlNum(KL_GetMap(e, "chosen_index", "")),
+        KL_SqlNum(KL_GetMap(e, "deletes", "")),
+        KL_SqlNullable(KL_GetMap(e, "deleted_text", "")),
+        KL_SqlNum(KL_GetMap(e, "net_saved_chars", "")),
+        KL_SqlNum(KL_GetMap(e, "count", ""))
+    )
+}
+
 KL_BuildInsertSession(e, id, kind) {
     ts := e["timestamp"]
     return Format(
@@ -175,6 +200,10 @@ KL_BuildInserts(entry) {
         case "hotstring_dismissed":          return [KL_BuildInsertHotstring(entry, id, "dismissed")]
         case "hotstring_near_miss":
         case "manual_typed_known_trigger":   return [KL_BuildInsertHotstring(entry, id, t)]
+        case "llm_generation":      return [KL_BuildInsertLlm(entry, id, "generation")]
+        case "llm_suggested":       return [KL_BuildInsertLlm(entry, id, "suggested")]
+        case "llm_dismissed":       return [KL_BuildInsertLlm(entry, id, "dismissed")]
+        case "llm_accepted":        return [KL_BuildInsertLlm(entry, id, "accepted")]
         case "session_start":       return [KL_BuildInsertSession(entry, id, "session_start")]
         case "session_end":         return [KL_BuildInsertSession(entry, id, "session_end")]
         case "idle_start":          return [KL_BuildInsertSession(entry, id, "idle_start")]

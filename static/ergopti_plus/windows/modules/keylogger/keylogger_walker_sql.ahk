@@ -92,11 +92,14 @@ KLW_BuildBatchSql() {
 
     ; agg_app_day — walker-owned columns ONLY. `time_ms` stays here because
     ; the walker's capped inter-key accounting is more accurate than a naive
-    ; json_each delta sum, and llm_* have no SQL-rebuild source yet (the
-    ; events_llm table is currently unused). Every other column — chars,
-    ; pauses, think_time_ms, hs_chars, hs_triggers, hs_input_chars and
-    ; app_time_ms — is owned by KLR_RebuildAggregates, which computes it once
-    ; all-time from events_*; writing it here too would double-count it.
+    ; json_each delta sum. `llm_chars`/`llm_triggers`/`llm_input_chars` still
+    ; have no SQL-rebuild source (they need per-keystroke context that
+    ; KLR_RebuildAggregates doesn't have) — but `llm_suggested` IS now owned
+    ; by KLR_RebuildAggregates from events_llm (F19 fix), mirroring
+    ; hs_suggested. Every other column — chars, pauses, think_time_ms,
+    ; hs_chars, hs_triggers, hs_input_chars and app_time_ms — is owned by
+    ; KLR_RebuildAggregates, which computes it once all-time from events_*;
+    ; writing it here too would double-count it.
     for _, row in KLW.batch["app_day"] {
         out .= Format(
             "INSERT INTO agg_app_day (device_id, date, app, time_ms, llm_chars, llm_triggers, llm_input_chars) VALUES ({1},{2},{3},{4},{5},{6},{7}) ON CONFLICT(device_id, date, app) DO UPDATE SET time_ms=time_ms+excluded.time_ms,llm_chars=llm_chars+excluded.llm_chars,llm_triggers=llm_triggers+excluded.llm_triggers,llm_input_chars=llm_input_chars+excluded.llm_input_chars;`n",
