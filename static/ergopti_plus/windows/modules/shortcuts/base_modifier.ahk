@@ -41,6 +41,16 @@ SC038 & SC03A:: LAltCapsLockShortcut()
 #HotIf
 
 LAltCapsLockShortcut() {
+    ; Defense-in-depth: the #HotIf guard above only fires this dispatcher
+    ; when _AnyShortcutEnabled("lalt_caps_lock") is already true, which
+    ; requires the sub-map to exist -- but this function is also reachable
+    ; via 6 direct calls that bypass #HotIf entirely (5 in
+    ; modules/tap_holds/capslock.ahk, 1 in modules/tap_holds/nav_layer.ahk),
+    ; so malformed/missing config must degrade gracefully instead of throwing
+    ; on the raw Map access below. Mirrors AltGrLAltShortcut/
+    ; AltGrCapsLockShortcut in modules/shortcuts/altgr.ahk.
+    if !Features.Has("shortcuts") or !Features["shortcuts"].Has("lalt_caps_lock")
+        return
     ; All ten possible actions are simple, no Shift inversion or modifier
     ; bracketing needed -- inline v2 if/else cascade (action table is the
     ; SIMPLE_ACTIONS Map that used to live in lib/dispatchers.ahk).
