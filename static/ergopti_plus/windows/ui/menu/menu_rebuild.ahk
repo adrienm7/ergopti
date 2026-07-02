@@ -65,6 +65,15 @@ RebuildTrayMenu() {
 	MenuDispatcher_Reset()
 	A_TrayMenu.Delete()
 	SubMenus := Map()
+	; Force a fresh personal-hotstrings extension-tree scan on every explicit
+	; rebuild. Without this, _HS_PreScanPersonalCacheLoaded latches true after
+	; the first scan and a personal extension .toml added/edited mid-session
+	; (outside the editor) never surfaces in the tray menu again
+	; (personal-hotstring-cache-never-invalidated). Safe here specifically
+	; because RebuildTrayMenu, unlike BuildTrayMenuDeferred's boot pass, runs
+	; off the Critical path — see BuildTrayMenuDeferred's own comment on why
+	; its InitSubMenus() call must keep hitting an already-warm cache instead.
+	_HS_InvalidatePersonalCache()
 	InitSubMenus()
 	initMenu()
 }
