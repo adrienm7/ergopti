@@ -555,6 +555,11 @@ _LLM_MBW_SafetyFlush() {
  *   {"action":"open_url","url":"…"}          — open the model page in the browser
  */
 _LLM_MBW_OnWebMessage(Handler, Args) {
+	; WebMessageReceived is a COM callback that bypasses native Suspend, so
+	; without this guard a paused driver would still let select_model mutate
+	; the live LLM config/engine ("pause = tout éteint" invariant).
+	if A_IsSuspended
+		return
 	try Msg := Args.TryGetWebMessageAsString()
 	if !IsSet(Msg)
 		return

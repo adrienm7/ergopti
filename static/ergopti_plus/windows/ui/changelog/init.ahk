@@ -274,6 +274,11 @@ _CLW_SafetyFlush() {
  */
 _CLW_OnWebMessage(Handler, Args) {
 	global _CLW_Channel
+	; WebMessageReceived is a COM callback that bypasses native Suspend, so
+	; without this guard a paused driver would still dispatch a network fetch
+	; and mutate _CLW_Channel ("pause = tout éteint" invariant).
+	if A_IsSuspended
+		return
 	try Msg := Args.TryGetWebMessageAsString()
 	if !IsSet(Msg)
 		return
