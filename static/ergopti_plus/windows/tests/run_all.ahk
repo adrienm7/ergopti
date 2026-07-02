@@ -864,6 +864,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_updater_onjson_callback_catch.ahk
 #Include meta/test_webview_bridge_suspend_guard.ahk
 #Include meta/test_changelog_close_order.ahk
+#Include meta/test_updater_changelog_install_closegui.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
