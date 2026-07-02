@@ -518,3 +518,57 @@ TestPE_RoundTripPriority() {
 }
 Test("Personal TOML round-trip: explicit per-hotstring priority is preserved",
 	TestPE_RoundTripPriority)
+
+
+
+
+; ==========================
+; ReloadPersonalSection — stale-group clearing (F7)
+; ==========================
+; Regression for personal-hotstring-live-reload-stale-group: saving the same
+; personal-hotstring trigger twice with a different output must make the
+; SECOND output win, not sit as a dead duplicate behind the stale first one.
+TestPE_ReloadClearsStaleGroup() {
+	global Features
+	HSE_RegistryClear()
+	SavedFeatures := Features
+	Features := Map("hotstrings", Map("personal", Map(
+		"reloadtest", Map("enabled", true, "time_activation_seconds", 0),
+	)))
+
+	Data := Map(
+		"sections_order", ["reloadtest"],
+		"sections", Map(
+			"reloadtest", Map(
+				"description", "Reload Test",
+				"entries", [Map(
+					"trigger", "rlx", "output", "FIRST", "is_word", true,
+					"auto_expand", true, "is_case_sensitive", true,
+					"final_result", false, "strict_case", false, "line_index", 0,
+				)],
+			),
+		),
+		"meta_description", "Test",
+	)
+	FeatureConfig := Map("enabled", true, "time_activation_seconds", 0)
+	ReloadPersonalSection(Data, "reloadtest", FeatureConfig)
+
+	; Edit the entry's output and reload again — mirrors "save after edit" in
+	; the live editor without a script Reload.
+	Data["sections"]["reloadtest"]["entries"][1]["output"] := "SECOND"
+	ReloadPersonalSection(Data, "reloadtest", FeatureConfig)
+
+	Matches := []
+	for _, Spec in HSE_MappingsForTail("x") {
+		if (Spec.Trigger == "rlx")
+			Matches.Push(Spec)
+	}
+	AssertEqual(1, Matches.Length,
+		"the stale first registration must be cleared, not left as a dead duplicate (personal-hotstring-live-reload-stale-group)")
+	AssertEqual("SECOND", Matches[1].Repl,
+		"the newest edit must win — the group must be cleared before re-registering (personal-hotstring-live-reload-stale-group)")
+
+	Features := SavedFeatures
+}
+Test("Personal TOML: ReloadPersonalSection clears the stale HSE group before re-registering (personal-hotstring-live-reload-stale-group)",
+	TestPE_ReloadClearsStaleGroup)
