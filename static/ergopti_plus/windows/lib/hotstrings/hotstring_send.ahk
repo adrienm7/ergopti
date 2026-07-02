@@ -107,8 +107,13 @@ _MirrorRegistrationToHSE(TriggerSpec, Callback, Meta := unset) {
 
 ; Hotstrings will still be triggered downstream, so SendNewResult("a") can
 ; cascade a ➜ b ➜ c (final result). OnlyText=true wraps the payload in {Text}
-; to avoid modifier side effects on symbols like ', ", accents.
-SendNewResult(Text, OnlyText := True) {
+; to avoid modifier side effects on symbols like ', ", accents. UpdateRing
+; controls whether Text feeds the last-sent-character ring: pass false for a
+; backspace-only call (e.g. the Notepad clipboard branch's pre-paste erase),
+; where Text is a control sequence ("{BackSpace 5}") rather than a real
+; emitted character — SubStr(Text, -1) on that sequence would record its
+; trailing "}" instead of what actually landed on screen.
+SendNewResult(Text, OnlyText := True, UpdateRing := True) {
     if _SendHook {
         Hook := _SendHook
         Hook("SendNewResult", Text, OnlyText)
@@ -119,7 +124,9 @@ SendNewResult(Text, OnlyText := True) {
             SendEvent(Text)
         }
     }
-    UpdateLastSentCharacter(SubStr(Text, -1))
+    if UpdateRing {
+        UpdateLastSentCharacter(SubStr(Text, -1))
+    }
 }
 
 ; SendInput prevents other hotstrings/hotkeys from activating, so this is the
