@@ -388,6 +388,83 @@ Test("_LLM_Ollama_TrimAsyncRegistry: no-op when registry is below cap", _OllamaT
 
 
 
+; ====================================================
+; ====================================================
+; ======= 5b/ _LLM_Ollama_DoSpawn — cancel/suspend ===
+; ====================================================
+; ====================================================
+
+; F23: the deferred SetTimer(-1) spawn must never write the PII payload file
+; or launch curl once the request has been cancelled — mirrors the sibling
+; poll functions' "cancelled" re-check.
+_OllamaDoSpawn_SkipsWhenCancelled() {
+	global _LLM_Ollama_Async
+	fake_id := 99930
+	tmp_payload := A_Temp . "\ergopti_test_dospawn_cancel_" . fake_id . ".json"
+	tmp_stdout := A_Temp . "\ergopti_test_dospawn_cancel_" . fake_id . ".out"
+	try FSDelete(tmp_payload)
+	failed := 0
+	job := Map("on_success", (*) => 0, "on_fail", (*) => failed += 1)
+	_LLM_Ollama_Async[fake_id] := Map("pid", 0, "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout,
+		"on_success", job["on_success"], "on_fail", job["on_fail"], "cancelled", true,
+		"start_tick", A_TickCount, "timeout_ms", 5000, "payload_snip", "")
+	_LLM_Ollama_DoSpawn(fake_id, '{"model":"m"}', tmp_payload, tmp_stdout, job)
+	AssertFalse(FileExist(tmp_payload) != "", "a cancelled deferred spawn must never write the PII payload file to disk")
+	AssertFalse(_LLM_Ollama_Async.Has(fake_id), "the cancelled entry must be removed from the registry")
+	AssertEqual(1, failed, "on_fail must fire exactly once for a spawn skipped due to cancellation")
+	try FSDelete(tmp_payload)
+}
+Test("_LLM_Ollama_DoSpawn: skips writing payload + launching curl when cancelled before dispatch (F23)", _OllamaDoSpawn_SkipsWhenCancelled)
+
+
+; F23: the deferred spawn must also never fire once the driver is suspended,
+; even though no cancel was issued (the two menu/engine paths that call
+; LLM_OllamaCancelAllAsync on suspend are a separate safety net — this guard
+; is the last line of defence inside the spawn itself).
+_OllamaDoSpawn_SkipsWhenSuspended() {
+	global _LLM_Ollama_Async
+	fake_id := 99931
+	tmp_payload := A_Temp . "\ergopti_test_dospawn_susp_" . fake_id . ".json"
+	tmp_stdout := A_Temp . "\ergopti_test_dospawn_susp_" . fake_id . ".out"
+	try FSDelete(tmp_payload)
+	failed := 0
+	job := Map("on_success", (*) => 0, "on_fail", (*) => failed += 1)
+	_LLM_Ollama_Async[fake_id] := Map("pid", 0, "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout,
+		"on_success", job["on_success"], "on_fail", job["on_fail"], "cancelled", false,
+		"start_tick", A_TickCount, "timeout_ms", 5000, "payload_snip", "")
+	Suspend(1)
+	try {
+		_LLM_Ollama_DoSpawn(fake_id, '{"model":"m"}', tmp_payload, tmp_stdout, job)
+	} finally {
+		Suspend(0)
+	}
+	AssertFalse(FileExist(tmp_payload) != "", "a deferred spawn firing after Suspend must never write the PII payload file to disk")
+	AssertEqual(1, failed, "on_fail must fire exactly once for a spawn skipped due to suspend")
+	try FSDelete(tmp_payload)
+}
+Test("_LLM_Ollama_DoSpawn: skips writing payload + launching curl when driver is suspended (F23)", _OllamaDoSpawn_SkipsWhenSuspended)
+
+
+; F23: an entry that vanished before the tick fired (e.g. TrimAsyncRegistry
+; already evicted it and fired on_fail) must be a silent no-op — calling
+; on_fail again here would violate the "exactly once" async contract.
+_OllamaDoSpawn_MissingEntryIsSilentNoOp() {
+	global _LLM_Ollama_Async
+	fake_id := 99932
+	if _LLM_Ollama_Async.Has(fake_id)  ; ensure absent — Map.Delete() throws on a missing key
+		_LLM_Ollama_Async.Delete(fake_id)
+	failed := 0
+	job := Map("on_success", (*) => 0, "on_fail", (*) => failed += 1)
+	tmp_payload := A_Temp . "\ergopti_test_dospawn_missing_" . fake_id . ".json"
+	_LLM_Ollama_DoSpawn(fake_id, '{"model":"m"}', tmp_payload, tmp_payload, job)
+	AssertEqual(0, failed, "a spawn tick for an already-evicted entry must not re-fire on_fail")
+	try FSDelete(tmp_payload)
+}
+Test("_LLM_Ollama_DoSpawn: missing registry entry is a silent no-op, not a second on_fail (F23)", _OllamaDoSpawn_MissingEntryIsSilentNoOp)
+
+
+
+
 ; ===================================================
 ; ===================================================
 ; ======= 6/ Stream UID helper =======================

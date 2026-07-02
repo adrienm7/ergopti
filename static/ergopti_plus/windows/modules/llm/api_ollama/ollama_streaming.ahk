@@ -106,6 +106,30 @@ _LLM_Ollama_DispatchAsync(job) {
 ; in _LLM_Ollama_DispatchAsync so the coalescing count is correct throughout.
 _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job) {
 	global _LLM_Ollama_Async, LLM_OLLAMA_BASE_URL
+	; This SetTimer(-1) tick is the only step of the dispatch chain that runs
+	; OUTSIDE the Critical region where the slot was reserved, so it is the
+	; one place a Suspend or a cancel (LLM_OllamaCancelAllAsync) landing in the
+	; gap between reservation and this callback firing can still slip a real
+	; HTTP POST + PII payload write out the door — no curl PID exists yet for
+	; the cancel path to kill. Mirrors the "cancelled" re-check that
+	; _LLM_Ollama_PollCurl / _LLM_Ollama_PollRequest already do on every tick
+	; (F23: deferred-spawn-ignores-cancel-suspend).
+	if !_LLM_Ollama_Async.Has(req_id) {
+		; Entry vanished before this tick fired (e.g. evicted by
+		; _LLM_Ollama_TrimAsyncRegistry, which already fired on_fail for it) —
+		; mirror the sibling poll functions' silent return so the async
+		; contract's "exactly once" callback guarantee is not violated by a
+		; double on_fail.
+		return
+	}
+	if (A_IsSuspended or _LLM_Ollama_Async[req_id]["cancelled"]) {
+		try LoggerInfo("LLM.ollama", "Deferred spawn for req {1} skipped — {2}.",
+			req_id, A_IsSuspended ? "suspended" : "cancelled before dispatch")
+		_LLM_Ollama_Async.Delete(req_id)
+		try job["on_fail"]()
+		_LLM_Ollama_DrainPending()
+		return
+	}
 	if !FSWrite(tmp_payload, payload) {
 		try LoggerWarn("LLM.ollama", "Failed to write curl payload file.")
 		_LLM_Ollama_Async.Delete(req_id)
