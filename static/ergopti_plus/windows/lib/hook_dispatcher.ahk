@@ -323,16 +323,32 @@ class HookDispatcher {
 		if HookDispatcher._ih is InputHook {
 			ih := HookDispatcher._ih
 		} else {
-			ih := InputHook(HookDispatcherConst.INPUT_HOOK_OPTS)
-			; Notify on every key (no end-key filter needed)
-			ih.KeyOpt("{All}", "+N")
-			; Non-text keys (arrows, F-keys, Esc, BS, Enter) must raise OnKeyDown
-			ih.NotifyNonText := true
-			ih.OnChar    := HookDispatcher._OnChar.Bind(HookDispatcher)
-			ih.OnKeyDown := HookDispatcher._OnKeyDown.Bind(HookDispatcher)
-			ih.OnKeyUp   := HookDispatcher._OnKeyUp.Bind(HookDispatcher)
-			ih.Start()
-			HookDispatcher._ih := ih
+			; Construction/configuration/.Start() is guarded — symmetric with the
+			; safe-hotkey-wrapper pattern used for the mouse hotkeys below. Contested
+			; low-level hook creation (RDP, another AHK/accessibility tool,
+			; transient OS resource exhaustion) can throw here; the bare call from
+			; ErgoptiPlus.ahk would otherwise only be caught by the global error
+			; handler, leaving every hook-dependent feature (remap, hotstrings,
+			; keylogger, CapsWord cancel, gestures, LLM dismiss-on-click) silently
+			; dead for the rest of the session with no dispatcher-specific signal.
+			try {
+				ih := InputHook(HookDispatcherConst.INPUT_HOOK_OPTS)
+				; Notify on every key (no end-key filter needed)
+				ih.KeyOpt("{All}", "+N")
+				; Non-text keys (arrows, F-keys, Esc, BS, Enter) must raise OnKeyDown
+				ih.NotifyNonText := true
+				ih.OnChar    := HookDispatcher._OnChar.Bind(HookDispatcher)
+				ih.OnKeyDown := HookDispatcher._OnKeyDown.Bind(HookDispatcher)
+				ih.OnKeyUp   := HookDispatcher._OnKeyUp.Bind(HookDispatcher)
+				ih.Start()
+				HookDispatcher._ih := ih
+			} catch as e {
+				; The InputHook is the only non-recoverable resource here — bail
+				; out so _started stays false rather than proceeding with a dead
+				; or half-configured hook (fail-fast, §5.3).
+				LoggerError("HookDispatcher", "InputHook construction failed: {1} — hook-dependent features unavailable this session.", e.Message)
+				return
+			}
 		}
 
 		; The InputHook (the only non-recoverable resource) is now live, so the

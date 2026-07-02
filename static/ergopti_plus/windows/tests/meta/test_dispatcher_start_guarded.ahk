@@ -98,3 +98,29 @@ _DSG_IhInitializedToFalse() {
 		"HookDispatcher must declare ``static _ih := false`` — without the initializer, ``HookDispatcher._ih is InputHook`` raises PropertyError before any InputHook exists (hook-dispatcher-ih-property-error 2026-06-16)")
 }
 Test("HookDispatcher: static _ih is initialized to false, not left unset (hook-dispatcher-ih-property-error)", _DSG_IhInitializedToFalse)
+
+_DSG_InputHookConstructionGuarded() {
+	Src := _DriverDirConcat("lib")
+	Seg := _DSG_MethodBody(Src, "static Start() {")
+	Assert(Seg != "", "HookDispatcher.Start() must exist in hook_dispatcher.ahk")
+
+	ElseIdx := InStr(Seg, "} else {")
+	Assert(ElseIdx > 0, "Start() must branch on whether _ih is already a live InputHook")
+
+	TryIdx := InStr(Seg, "try {", , ElseIdx)
+	ConstructIdx := InStr(Seg, "ih := InputHook(", , ElseIdx)
+	Assert(TryIdx > 0 && ConstructIdx > 0 && TryIdx < ConstructIdx,
+		"HookDispatcher.Start()'s InputHook construction must open with `try {` BEFORE `ih := InputHook(...)`, symmetric with the existing _SafeHotkey() pattern used for mouse hotkeys (dispatcher-start-inputhook-unguarded)")
+
+	StartCallIdx := InStr(Seg, "ih.Start()", , ConstructIdx)
+	Assert(StartCallIdx > 0, "Start() must call ih.Start() to arm the InputHook")
+
+	CatchIdx := InStr(Seg, "catch", , StartCallIdx)
+	Assert(CatchIdx > 0,
+		"HookDispatcher.Start()'s try-block must have a matching catch AFTER ih.Start() so a throw anywhere across construction/configuration/.Start() is caught (dispatcher-start-inputhook-unguarded)")
+
+	CatchBody := SubStr(Seg, CatchIdx, InStr(Seg, "}", , CatchIdx) - CatchIdx)
+	Assert(InStr(CatchBody, "LoggerError") > 0,
+		"HookDispatcher.Start() must log at ERROR when InputHook construction fails, so a dead dispatcher is diagnosable instead of only surfacing via the global error handler (dispatcher-start-inputhook-unguarded)")
+}
+Test("HookDispatcher: Start()'s InputHook construction is guarded by try/catch with LoggerError on failure (dispatcher-start-inputhook-unguarded)", _DSG_InputHookConstructionGuarded)
