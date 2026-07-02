@@ -496,3 +496,51 @@ _TH_InheritDefaultsFalseSkipsShippedDefaults() {
 	AssertEqual(0, TH["keys"].Count)
 }
 Test("LoadTapHoldToml: inherit_defaults=false skips shipped defaults", _TH_InheritDefaultsFalseSkipsShippedDefaults)
+
+
+
+
+
+; ==========================================================
+; =========================================================
+; ======= 8/ ResolveHoldModifierKey (single-source) =======
+; =========================================================
+; ==========================================================
+
+_TH_ResolveHoldModifierKeyKnownValuesMap() {
+	AssertEqual("LCtrl", ResolveHoldModifierKey("ctrl", "backspace"))
+	AssertEqual("LShift", ResolveHoldModifierKey("shift", "backspace"))
+	AssertEqual("LAlt", ResolveHoldModifierKey("alt", "backspace"))
+	AssertEqual("RAlt", ResolveHoldModifierKey("alt_gr", "backspace"))
+	AssertEqual("LWin", ResolveHoldModifierKey("win", "backspace"))
+}
+Test("ResolveHoldModifierKey: maps every known hold_modifier value", _TH_ResolveHoldModifierKeyKnownValuesMap)
+
+_TH_ResolveHoldModifierKeyCtrlOverride() {
+	AssertEqual("RCtrl", ResolveHoldModifierKey("ctrl", "right_ctrl", "RCtrl"),
+		"rctrl.ahk must be able to override the ctrl-case key so its own hold-modifier arms RCtrl, not LCtrl")
+}
+Test("ResolveHoldModifierKey: CtrlKeyName override maps ctrl to RCtrl for rctrl.ahk", _TH_ResolveHoldModifierKeyCtrlOverride)
+
+_TH_ResolveHoldModifierKeyUnknownReturnsEmpty() {
+	AssertEqual("", ResolveHoldModifierKey("contrl", "backspace"),
+		"an unrecognized hold_modifier (typo) must resolve to empty, never a garbage key name")
+}
+Test("ResolveHoldModifierKey: unrecognized value returns empty string", _TH_ResolveHoldModifierKeyUnknownReturnsEmpty)
+
+_TH_ResolveHoldModifierKeyUnknownLogsWarning() {
+	; Distinct value/field pair from the previous test's "contrl"/"backspace"
+	; call — an identical (Tag, Body) within Logger's 5000 ms dedup window
+	; would suppress this second emission before it ever reaches the sink.
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	ResolveHoldModifierKey("bogus_mod", "escape")
+	LoggerClearTestSink()
+	Found := false
+	for Line in Captured {
+		if (InStr(Line, "[WARNING]") and InStr(Line, "bogus_mod") and InStr(Line, "escape"))
+			Found := true
+	}
+	Assert(Found, "unrecognized hold_modifier must log a WARNING naming both the bad value and the affected tap-holds field so the config typo is easy to locate")
+}
+Test("ResolveHoldModifierKey: unrecognized value logs a WARNING naming the value and field", _TH_ResolveHoldModifierKeyUnknownLogsWarning)

@@ -65,14 +65,7 @@ _LAltIsSpecialTap() {
 
 ; Return the AHK key name for the configured hold modifier.
 _LAltHoldModKey() {
-	switch TapHoldHoldModifier(TapHold, "left_alt") {
-		case "ctrl":   return "LCtrl"
-		case "shift":  return "LShift"
-		case "alt":    return "LAlt"
-		case "alt_gr": return "RAlt"
-		case "win":    return "LWin"
-		default:       return ""
-	}
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "left_alt"), "left_alt")
 }
 
 

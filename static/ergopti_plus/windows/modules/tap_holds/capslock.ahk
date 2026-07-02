@@ -62,14 +62,7 @@ _CapsLockHasHoldLayer() {
 
 ; Return the AHK key name for the configured hold modifier.
 _CapsLockHoldModKey() {
-	switch TapHoldHoldModifier(TapHold, "caps_lock") {
-		case "ctrl":   return "LCtrl"
-		case "shift":  return "LShift"
-		case "alt":    return "LAlt"
-		case "alt_gr": return "RAlt"
-		case "win":    return "LWin"
-		default:       return ""
-	}
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "caps_lock"), "caps_lock")
 }
 
 

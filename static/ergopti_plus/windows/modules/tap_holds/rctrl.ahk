@@ -41,16 +41,11 @@ _RCtrlIsSpecialTap() {
 		or action == "one_shot_shift"
 }
 
-; Return the AHK key name for the configured hold modifier.
+; Return the AHK key name for the configured hold modifier. "ctrl" maps to
+; RCtrl (not the shared default LCtrl) so holding the physical Right Ctrl as
+; its own hold modifier arms the right-side key.
 _RCtrlHoldModKey() {
-	switch TapHoldHoldModifier(TapHold, "right_ctrl") {
-		case "ctrl":   return "RCtrl"
-		case "shift":  return "LShift"
-		case "alt":    return "LAlt"
-		case "alt_gr": return "RAlt"
-		case "win":    return "LWin"
-		default:       return ""
-	}
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "right_ctrl"), "right_ctrl", "RCtrl")
 }
 
 
