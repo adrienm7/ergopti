@@ -36,15 +36,18 @@
  * @param {Map} saved_opts - Persisted settings loaded from INI/registry.
  */
 LLM_Menu_Init(saved_opts := Map()) {
-	global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray
+	global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray, DRIVER_BASELINE_PRIORITY_CLASS
 
 	; Defensive: a previous session that crashed mid-install would have
 	; left the AHK process at PriorityClass = High (we boost it in
 	; LLM_Deps_RunInstaller to keep typing responsive during winget,
 	; and lower it back in LLM_Deps_OnPollProbeResult on completion).
-	; Reset to Normal at every boot so a fresh script never inherits a
-	; stale boost.
-	try ProcessSetPriority("Normal")
+	; Reset to the driver baseline at every boot so a fresh script never
+	; inherits a stale boost. MUST use the shared constant, not a hardcoded
+	; "Normal" literal — this call runs ~16 ms after ErgoptiPlus.ahk's boot
+	; boost, and a literal here silently reverted it every session
+	; (driver-baseline-priority-reverted-to-normal).
+	try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
 
 	static _str_keys := ["model", "profile_id", "language", "temperature", "nav_modifiers", "val_modifiers", "trigger_shortcut", "backend"]
 	static _num_keys := ["n_predictions", "min_words", "max_words", "debounce_ms", "ctx_chars", "pred_indent", "ollama_port"]
