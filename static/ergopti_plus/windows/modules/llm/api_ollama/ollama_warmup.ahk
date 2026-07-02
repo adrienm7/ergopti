@@ -85,6 +85,14 @@ _LLM_Ollama_OnWarmupDone(status, gen := 0) {
 LLM_OllamaScheduleWarmupRetry(model := "") {
 	global _LLM_Ollama_WarmupRetryModel, _LLM_Ollama_WarmupRetryIntervalMs, _LLM_Ollama_WarmupRetryFn
 		, _LLM_Ollama_WarmupStartedTick
+	; Pause must silence every LLM background activity — no HTTP while suspended.
+	; LLM_Ollama_WarmupRetryTick (the recurring retry tick) already guards
+	; itself, but this function's FIRST dispatch is reachable directly from two
+	; menu-click paths (LLM_Menu_SetModel, LLM_Menu_OnDepsReady) with no guard
+	; anywhere else on that path, so clicking either while suspended fired a
+	; real WinHTTP POST (F26). Guarding here protects both call sites at once.
+	if A_IsSuspended
+		return
 	if (_LLM_Ollama_WarmupStartedTick = 0)
 		_LLM_Ollama_WarmupStartedTick := A_TickCount
 	if (model != "")

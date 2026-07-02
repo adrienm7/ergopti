@@ -98,3 +98,17 @@ _WRS_SuspendEnterCancelsDepsPoll() {
 		"Ergopti_OnSuspendResume must resume _LLM_Deps_PollTimer if checking")
 }
 Test("ErgoptiPlus: Suspend toggles pause deps poll timer", _WRS_SuspendEnterCancelsDepsPoll)
+
+
+; F26: LLM_OllamaScheduleWarmupRetry's FIRST dispatch is reachable directly
+; from LLM_Menu_SetModel and LLM_Menu_OnDepsReady while suspended, with no
+; guard anywhere else on that path — unlike the recurring retry tick above,
+; which was already guarded. The fix adds the guard at the top of the
+; function itself so both menu-click call sites are protected at once.
+_WRS_ScheduleWarmupRetryHasSuspendGuard() {
+	Seg := _DriverFuncBody("LLM_OllamaScheduleWarmupRetry")
+	Assert(Seg != "", "LLM_OllamaScheduleWarmupRetry must exist in modules/llm/api_ollama")
+	Assert(InStr(Seg, "A_IsSuspended") > 0,
+		"LLM_OllamaScheduleWarmupRetry must check A_IsSuspended at its own top — its first dispatch is reachable directly from LLM_Menu_SetModel and LLM_Menu_OnDepsReady while suspended (F26)")
+}
+Test("api_ollama: LLM_OllamaScheduleWarmupRetry guards its own first dispatch against Suspend (F26)", _WRS_ScheduleWarmupRetryHasSuspendGuard)
