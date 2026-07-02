@@ -249,6 +249,7 @@ _Step5_AutoRegister(statusLbl, *) {
 ; in red. The translation key — not the literal message — is chosen up front
 ; so the locale's wording always wins over any cached string.
 _Step5_ShowGestureStatus(statusLbl, ok) {
+	global _ob_gui
 	Key := ok ? "onboarding.gestures.register_success" : "onboarding.gestures.register_failed"
 	Color := ok ? "cGreen" : "cRed"
 	Msg := t(Key)
@@ -257,8 +258,17 @@ _Step5_ShowGestureStatus(statusLbl, ok) {
 	try statusLbl.Text    := Msg
 	try statusLbl.Visible := true
 	try statusLbl.Redraw()
-	; Guaranteed visible feedback — see comment above.
+	; Guaranteed visible feedback — see comment above. The wizard window is
+	; +AlwaysOnTop (see _StepConfigDir_Browse in steps_config.ahk), which wins
+	; the topmost tie against this MsgBox on Windows and renders it BEHIND the
+	; wizard, appearing to hang. Drop the wizard's topmost flag for the
+	; duration of the MsgBox, then restore it afterwards (try-wrapped so the
+	; MsgBox still shows even if _ob_gui is unexpectedly 0).
+	if (_ob_gui != 0)
+		try _ob_gui.Opt("-AlwaysOnTop")
 	try MsgBox(Msg, t("onboarding.gestures.title"), ok ? "Iconi" : "Icon!")
+	if (_ob_gui != 0)
+		try _ob_gui.Opt("+AlwaysOnTop")
 }
 
 ; Builds a self-contained PowerShell script that writes every PrecisionTouchPad
