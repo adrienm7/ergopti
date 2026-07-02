@@ -867,6 +867,9 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_updater_changelog_install_closegui.ahk
 ; MCSetPos/MCGetPos bare-try-no-catch fix (F32).
 #Include meta/test_mouse_control_error_logging.ahk
+; WMGetList/WIGetAll bare-try-no-catch fix (F33) — sibling of the
+; GestureGetCyclableWindows TOCTOU guard (commit 7b701020d).
+#Include meta/test_window_adapters_catch.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
