@@ -199,6 +199,13 @@ SQLite_Exec(db, sql, YieldOps := 0) {
                 if (step_rc != SQLiteConst.ROW)
                     break
             }
+            ; A terminal code other than DONE (e.g. CONSTRAINT on a CHECK/
+            ; UNIQUE violation) means the row was rejected. The loop above only
+            ; ever checked "!= ROW", so a CONSTRAINT/ERROR code was previously
+            ; treated identically to a clean DONE — the row silently vanished
+            ; with zero trace (F20).
+            if (step_rc != SQLiteConst.DONE)
+                try LoggerWarn("sqlite3", "sqlite3_step returned rc={1} (not DONE) — row rejected: {2}", step_rc, SQLite_LastError(db))
             DllCall(SQLiteConst.DLL . "\sqlite3_finalize", "Ptr", pstmt)
         }
         if (!ptail || ptail = cur)

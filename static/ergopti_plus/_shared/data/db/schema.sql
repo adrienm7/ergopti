@@ -148,7 +148,7 @@ CREATE TABLE IF NOT EXISTS events_hotstring (
 	ts               TEXT NOT NULL,
 	date             TEXT NOT NULL,
 	app              TEXT NOT NULL,
-	kind             TEXT NOT NULL CHECK (kind IN ('fired','suggested','dismissed')),
+	kind             TEXT NOT NULL CHECK (kind IN ('fired','suggested','dismissed','hotstring_near_miss','manual_typed_known_trigger')),
 	trigger          TEXT NOT NULL,
 	replacement      TEXT NOT NULL,
 	h_type           TEXT,
