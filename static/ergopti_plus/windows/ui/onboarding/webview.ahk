@@ -107,6 +107,20 @@ _Onboarding_TryWeb() {
 		try LoggerInfo("Onboarding", "WebView2 unavailable ({1}) — using native AHK pages.", _OnbWeb_UnavailableReason())
 		return false
 	}
+
+	; Singleton — bring the existing wizard window to the front instead of
+	; opening a second one. Every sibling WebView2 host (paths_editor,
+	; personal_info_editor, prompt_editor, hotstrings_config_window) has this
+	; guard; without it here, a second tray-menu click while the wizard is open
+	; silently overwrites the shared _ob_gui sentinel below with a NEW window,
+	; orphaning the first one — and on close, _OnbWeb_OnClose always reads
+	; whichever Gui _ob_gui currently points to, so it tears down the SECOND
+	; (live) window instead of the orphaned first one.
+	if (_ob_gui != 0) {
+		try WinActivate("ahk_id " . _ob_gui.Hwnd)
+		return true
+	}
+
 	try LoggerStart("Onboarding", "Launching wizard via WebView2 (shared frontend)…")
 
 	_OnbWeb_Ready := false
