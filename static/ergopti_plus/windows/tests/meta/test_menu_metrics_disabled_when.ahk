@@ -167,3 +167,50 @@ _MMDW_GettersMapCorrect() {
 		"_MET_STATE_GETTERS must map wpm_widget_visible to WPMWidget.visible")
 }
 Test("menu-metrics-disabled-when: shared getters map reads the correct AHK state", _MMDW_GettersMapCorrect)
+
+
+
+
+
+; =======================================================
+; =======================================================
+; ======= 4/ Master toggle wiring (F2 regression) =======
+; =======================================================
+; =======================================================
+
+; ToggleMetricsEnabled() holds the real MetricsShortcuts.enabled flip plus the
+; confirm/security-warning dialogs. If it has zero call sites, the master
+; toggle row either doesn't exist or silently falls through to the generic
+; manifest renderer (which writes a key ApplyMasterGatesToFeatures never
+; reads) — see F2 in AUDIT_AHK_2026-07-01.md.
+_MMDW_ToggleMetricsEnabledIsWired() {
+	Src := _DriverSourceConcat()
+	Assert(InStr(Src, "ToggleMetricsEnabled())") > 0,
+		"BuildMetricsMenu must wire the master row to ToggleMetricsEnabled() via AddCategoryToggleItem — found no call site")
+}
+Test("menu-metrics-disabled-when: ToggleMetricsEnabled has a real call site (F2)", _MMDW_ToggleMetricsEnabledIsWired)
+
+; The manifest's own generic toggle entry must be excluded on AHK — otherwise
+; _MR_RenderToggle auto-renders a second, non-functional master row that
+; writes a dead ToggleCategoryAllFeatures("Metrics", ...) key. Mirrors the
+; gestures_menu toggle entry, which already carries platforms:["hs"].
+_MMDW_ManifestToggleExcludesAhk() {
+	; NOTE: this file's tests are static-source-scan only — lib/manifest_menu.ahk
+	; (which defines _MR_Get/MenuRenderer_Build) is deliberately NOT #Included by
+	; run_all.ahk, so this reads the parsed JSON directly via Map access rather
+	; than calling into manifest_menu.ahk's helpers.
+	for Entry in _MMDW_LoadMetricsMenu() {
+		if !(Entry is Map)
+			continue
+		if !Entry.Has("type") || Entry["type"] != "toggle"
+			continue
+		Assert(Entry.Has("platforms"), "metrics_menu toggle entry must declare a platforms filter excluding ahk (F2)")
+		Plats := Entry["platforms"]
+		Assert(Plats is Array, "metrics_menu toggle entry's platforms must be an array")
+		for P in Plats
+			Assert(P != "ahk", "metrics_menu toggle entry must NOT include 'ahk' in platforms — the real toggle is BuildMetricsMenu's AddCategoryToggleItem (F2)")
+		return
+	}
+	Assert(false, "metrics_menu must declare a type=toggle entry")
+}
+Test("menu-metrics-disabled-when: manifest toggle entry excludes ahk so the bespoke toggle isn't shadowed (F2)", _MMDW_ManifestToggleExcludesAhk)

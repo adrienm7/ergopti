@@ -310,7 +310,10 @@
 			"type": "toggle",
 			"i18n_on": "menu.metrics.on",
 			"i18n_off": "menu.metrics.off",
-			"category": "Metrics"
+			"category": "Metrics",
+			"platforms": [
+				"hs"
+			]
 		},
 		{
 			"type": "action",
