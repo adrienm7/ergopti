@@ -122,3 +122,67 @@ _CFP_CollectFeatureUpdates_SharedLeavesStayUnprefixed() {
 }
 Test("config_io: _CollectFeatureUpdates leaves shared (non-ahk) sections un-prefixed (F5)",
 	_CFP_CollectFeatureUpdates_SharedLeavesStayUnprefixed)
+
+
+
+
+
+; ==============================================================================
+; ==============================================================================
+; ======= 3/ _CollectFeatureFlipUpdates (ToggleAllFeatures path, F48) ========
+; ==============================================================================
+; ==============================================================================
+
+; Mirrors ToggleAllFeatures's own top-level loop, without ever calling
+; ToggleAllFeatures itself -- ToggleAllFeatures ends with an unconditional
+; Reload(), which would tear down the headless test runner (see
+; tests/meta/test_updater_setchannel_cancels_async.ahk for the same
+; constraint). _CollectFeatureFlipUpdates is a plain module function (not a
+; nested closure), so it is directly reachable here.
+_CFP_RunAllFeaturesFlip(Bool, Fixture) {
+	Updates := []
+	for TopKey, TopVal in Fixture {
+		if (Type(TopVal) == "Map")
+			_CollectFeatureFlipUpdates(Bool, TopKey, TopVal, Updates)
+	}
+	return Updates
+}
+
+_CFP_ToggleAllFeatures_AhkLeavesPrefixed() {
+	ManifestEnsureLoaded()
+	Updates := _CFP_RunAllFeaturesFlip(false, _CFP_Fixture())
+
+	AssertTrue(_CFP_HasUpdate(Updates, "ahk.layout", "ergopti_base", false),
+		"ToggleAllFeatures must write layout.ergopti_base to [ahk.layout], not [layout]")
+	AssertTrue(_CFP_HasUpdate(Updates, "ahk.shortcuts.personal", "laptop_broken_key", false),
+		"ToggleAllFeatures must write shortcuts.personal.laptop_broken_key to [ahk.shortcuts.personal]")
+	AssertTrue(_CFP_HasUpdate(Updates, "ahk.category_enabled", "hotstrings", false),
+		"ToggleAllFeatures must write category_enabled.hotstrings to [ahk.category_enabled]")
+	; "gestures" is itself alpha-shaped (carries "enabled" alongside action
+	; strings), so the flip walker's alpha branch fires and flips ONLY "enabled".
+	AssertTrue(_CFP_HasUpdate(Updates, "ahk.gestures", "enabled", false),
+		"ToggleAllFeatures must write gestures.enabled to [ahk.gestures], not [gestures]")
+
+	AssertFalse(_CFP_HasUpdate(Updates, "layout", "ergopti_base", false),
+		"ToggleAllFeatures must not emit a spurious bare [layout] write")
+	AssertFalse(_CFP_HasUpdate(Updates, "shortcuts.personal", "laptop_broken_key", false),
+		"ToggleAllFeatures must not emit a spurious bare [shortcuts.personal] write")
+	AssertFalse(_CFP_HasUpdate(Updates, "category_enabled", "hotstrings", false),
+		"ToggleAllFeatures must not emit a spurious bare [category_enabled] write")
+	AssertFalse(_CFP_HasUpdate(Updates, "gestures", "enabled", false),
+		"ToggleAllFeatures must not emit a spurious bare [gestures] write")
+}
+Test("config_io: ToggleAllFeatures's flip walker re-prefixes every AHK-only leaf with ahk. (F48)",
+	_CFP_ToggleAllFeatures_AhkLeavesPrefixed)
+
+_CFP_ToggleAllFeatures_MutatesFixtureInPlace() {
+	; The flip walker must still mutate Features nodes in place (the in-memory
+	; state the rest of the driver reads) in addition to collecting the writes.
+	Fixture := _CFP_Fixture()
+	_CFP_RunAllFeaturesFlip(true, Fixture)
+	AssertEqual(true, Fixture["layout"]["ergopti_base"])
+	AssertEqual(true, Fixture["gestures"]["enabled"])
+	AssertEqual(true, Fixture["shortcuts"]["microsoft_bold"])
+}
+Test("config_io: ToggleAllFeatures's flip walker still mutates Features in place (F48)",
+	_CFP_ToggleAllFeatures_MutatesFixtureInPlace)

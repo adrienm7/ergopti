@@ -48,32 +48,42 @@ _GlobalClearAllBindings(&Updates) {
         try _TH_WriteTapHoldDisabled()
 }
 
+; Recursively force every leaf under Node to Bool ("tout activer"/"tout
+; desactiver"), mutating Features in place and appending the required
+; {Section, Key, Value} TOML writes to Updates. Extracted out of ToggleAllFeatures
+; as a standalone module function (rather than a nested closure) so the flip
+; logic is directly testable without triggering ToggleAllFeatures's trailing
+; Reload(). Reuses ManifestResolveFeatureSection (lib/manifest_reader.ahk) --
+; the single source of truth introduced for _CollectFeatureUpdates -- to
+; re-derive the ahk.-prefixed TOML section per leaf instead of the raw
+; (already ahk.-stripped) Features nesting.
+_CollectFeatureFlipUpdates(Bool, SectionPath, Node, Updates) {
+    if (Type(Node) != "Map")
+        return
+    if Node.Has("enabled") and (Type(Node["enabled"]) != "Map") {
+        Node["enabled"] := Bool
+        Updates.Push({ Section: ManifestResolveFeatureSection(SectionPath . ".enabled", SectionPath), Key: "enabled", Value: Bool })
+        return
+    }
+    for K, V in Node {
+        if (Type(V) == "Map")
+            _CollectFeatureFlipUpdates(Bool, SectionPath . "." . K, V, Updates)
+        else {
+            Node[K] := Bool
+            Updates.Push({ Section: ManifestResolveFeatureSection(SectionPath . "." . K, SectionPath), Key: K, Value: Bool })
+        }
+    }
+}
+
 ToggleAllFeatures(Value) {
     global Features, CategoryEnabled, ConfigurationFile
     if !IsSet(Features)
         return
     Bool := (Value = true or Value = 1)
     Updates := []
-    EmitFlip(SectionPath, Node) {
-        if (Type(Node) != "Map")
-            return
-        if Node.Has("enabled") and (Type(Node["enabled"]) != "Map") {
-            Node["enabled"] := Bool
-            Updates.Push({ Section: SectionPath, Key: "enabled", Value: Bool })
-            return
-        }
-        for K, V in Node {
-            if (Type(V) == "Map")
-                EmitFlip(SectionPath . "." . K, V)
-            else {
-                Node[K] := Bool
-                Updates.Push({ Section: SectionPath, Key: K, Value: Bool })
-            }
-        }
-    }
     for TopKey, TopVal in Features {
         if (Type(TopVal) == "Map")
-            EmitFlip(TopKey, TopVal)
+            _CollectFeatureFlipUpdates(Bool, TopKey, TopVal, Updates)
     }
     for Category, _ in CategoryEnabled {
         CategoryEnabled[Category] := Bool
