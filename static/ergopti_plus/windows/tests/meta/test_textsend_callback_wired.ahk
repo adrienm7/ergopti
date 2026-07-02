@@ -74,8 +74,11 @@ _TTCW_CallbackAfterPaste() {
 	Body := _DriverFuncBody("_TextSendClipboard")
 	Assert(Body != "", "_TextSendClipboard must accept a Callback parameter")
 
-	; The Callback must be invoked inside _TextSendClipboard (after Ctrl+V)
-	Assert(InStr(Body, "Callback()") > 0,
-		"_TextSendClipboard must call Callback() after the paste keystroke")
+	; The Callback must be invoked inside _TextSendClipboard (after Ctrl+V).
+	; Routed through _TextSenderInvokeCallback (bare-try-anti-pattern /
+	; F52b fix) instead of a raw "Callback()" call — that helper is still the
+	; thing that ultimately calls Callback().
+	Assert(InStr(Body, "_TextSenderInvokeCallback(Callback)") > 0,
+		"_TextSendClipboard must call _TextSenderInvokeCallback(Callback) after the paste keystroke")
 }
 Test("text_sender: _TextSendClipboard invokes Callback after Ctrl+V (not before)", _TTCW_CallbackAfterPaste)

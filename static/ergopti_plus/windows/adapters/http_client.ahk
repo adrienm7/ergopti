@@ -75,8 +75,13 @@ HTTPPost(Url, Headers, Body, Callback) {
 		Result["error"] := Err.Message
 	}
 	_HTTP_ACTIVE_REQUEST := 0
-	if Callback != 0
-		try Callback(Result)
+	if Callback != 0 {
+		try
+			Callback(Result)
+		catch as Err {
+			LoggerError("HttpClient", "HTTPPost: completion callback threw: {1}", Err.Message)
+		}
+	}
 }
 
 ; Aborts any in-flight WinHttp request and clears the active-request slot.
