@@ -572,3 +572,49 @@ TestPE_ReloadClearsStaleGroup() {
 }
 Test("Personal TOML: ReloadPersonalSection clears the stale HSE group before re-registering (personal-hotstring-live-reload-stale-group)",
 	TestPE_ReloadClearsStaleGroup)
+
+
+
+
+; ==========================
+; ReloadPersonalSection — gating (F12)
+; ==========================
+; Regression for personal-hotstring-live-reload-ignores-gate: a disabled
+; section's editor save must not register it live, matching the still-
+; unchecked tray checkbox.
+TestPE_ReloadSkipsDisabledSection() {
+	global Features
+	HSE_RegistryClear()
+	SavedFeatures := Features
+	Features := Map("hotstrings", Map("personal", Map(
+		"gated", Map("enabled", false, "time_activation_seconds", 0),
+	)))
+
+	Data := Map(
+		"sections_order", ["gated"],
+		"sections", Map(
+			"gated", Map(
+				"description", "Gated",
+				"entries", [Map(
+					"trigger", "gtx", "output", "SHOULD_NOT_REGISTER", "is_word", true,
+					"auto_expand", true, "is_case_sensitive", true,
+					"final_result", false, "strict_case", false, "line_index", 0,
+				)],
+			),
+		),
+		"meta_description", "Test",
+	)
+	FeatureConfig := Map("enabled", false, "time_activation_seconds", 0)
+	ReloadPersonalSection(Data, "gated", FeatureConfig)
+
+	Matches := 0
+	for _, Spec in HSE_MappingsForTail("x") {
+		if (Spec.Trigger == "gtx")
+			Matches += 1
+	}
+	AssertEqual(0, Matches, "a disabled section must not register live via ReloadPersonalSection")
+
+	Features := SavedFeatures
+}
+Test("Personal TOML: ReloadPersonalSection skips a disabled section (personal-hotstring-live-reload-ignores-gate)",
+	TestPE_ReloadSkipsDisabledSection)
