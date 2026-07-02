@@ -2879,6 +2879,7 @@ type = "toggle"
 i18n_on = "menu.metrics.on"
 i18n_off = "menu.metrics.off"
 category = "Metrics"
+platforms = ["hs"]
 
 [[menu.metrics_menu]]
 type = "action"
