@@ -18,25 +18,57 @@
 ; rest of the session.
 global _WebView_SharedEnv := 0
 
+; True while a CreateEnvironmentAsync boot is in flight. Promise.await() pumps
+; the Windows message queue while it blocks, so a second WebView2 host opened
+; during the FIRST caller's await can reach WebView_SharedEnvironment before
+; _WebView_SharedEnv is published -- without this flag it would race a second
+; CreateEnvironmentAsync against the same locked WEBVIEW_SHARED_UDIR. Set
+; BEFORE the await begins (not just around it) and always cleared in a
+; ``finally`` so a boot failure cannot leave a waiting caller stuck forever.
+global _WebView_SharedEnvCreating := false
+
 ; One stable user-data folder for the whole session. Unlike the former per-open
 ; "<prefix>_<A_TickCount>" folders, this fixed path cannot accumulate (there is
 ; exactly one and it is reused forever), so it is leak-free by construction.
 global WEBVIEW_SHARED_UDIR := A_Temp . "\ergopti_wv_shared"
+
+; Poll cadence (ms) for a second caller waiting on an in-flight environment
+; boot. Short enough that the second WebView2 window does not feel stalled once
+; the first caller's CreateEnvironmentAsync resolves.
+global WEBVIEW_SHARED_ENV_WAIT_POLL_MS := 20
 
 ; Returns the shared WebView2 environment, booting it on first use.
 ; @param loader {String} Absolute path to WebView2Loader.dll.
 ; @returns {WebView2.Environment} The cached environment. Throws on boot failure,
 ;          so the caller's WebView2.create try/catch can degrade gracefully.
 WebView_SharedEnvironment(loader) {
-	global _WebView_SharedEnv, WEBVIEW_SHARED_UDIR
+	global _WebView_SharedEnv, _WebView_SharedEnvCreating, WEBVIEW_SHARED_UDIR, WEBVIEW_SHARED_ENV_WAIT_POLL_MS
 	; Warm path -- reuse the already-running browser process.
 	if _WebView_SharedEnv
 		return _WebView_SharedEnv
+
+	; A second caller arriving while the first's await() below is pumping the
+	; message queue must wait for that boot to finish instead of racing it with
+	; its own CreateEnvironmentAsync against the same locked user-data folder.
+	if _WebView_SharedEnvCreating {
+		while _WebView_SharedEnvCreating
+			Sleep(WEBVIEW_SHARED_ENV_WAIT_POLL_MS)
+		if _WebView_SharedEnv
+			return _WebView_SharedEnv
+		; The first caller's boot failed -- fall through and attempt our own,
+		; exactly as if we had arrived first.
+	}
+
+	_WebView_SharedEnvCreating := true
 	try DirCreate(WEBVIEW_SHARED_UDIR)
-	; await() blocks until the environment (and its browser process) is ready.
-	; Assigned only on success: a boot failure leaves the cache at 0 and lets the
-	; exception propagate to the caller for graceful fallback.
-	_WebView_SharedEnv := WebView2.CreateEnvironmentAsync(0, WEBVIEW_SHARED_UDIR, "", loader).await()
+	try {
+		; await() blocks until the environment (and its browser process) is ready.
+		; Assigned only on success: a boot failure leaves the cache at 0 and lets the
+		; exception propagate to the caller for graceful fallback.
+		_WebView_SharedEnv := WebView2.CreateEnvironmentAsync(0, WEBVIEW_SHARED_UDIR, "", loader).await()
+	} finally {
+		_WebView_SharedEnvCreating := false
+	}
 	return _WebView_SharedEnv
 }
 

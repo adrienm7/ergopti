@@ -872,6 +872,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 ; GestureGetCyclableWindows TOCTOU guard (commit 7b701020d).
 #Include meta/test_window_adapters_catch.ahk
 #Include meta/test_onbweb_singleton_guard.ahk
+#Include meta/test_webview_shared_env_reentrancy_guard.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
