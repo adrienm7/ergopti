@@ -88,3 +88,19 @@ _HCWRA_FlushBeforeDestroy() {
 		"_HCW_FlushNumericWrite() must appear BEFORE .Destroy() in _HCW_ResetAll — controls must still be live when flushed (hcw-reset-all-teardown)")
 }
 Test("hcw_reset_all: _HCW_FlushNumericWrite() appears before Destroy()", _HCWRA_FlushBeforeDestroy)
+
+; F46 (2026-07-01 audit): _HCW_FlushNumericWrite() used to run AFTER the reset
+; loop, not just before Destroy(). If a numeric edit (delay/priority) was still
+; inside its 250ms debounce window when Reset All was clicked, that eager flush
+; re-persisted the exact override the reset loop had just cleared moments
+; earlier, silently un-resetting that one field. The fix moves the flush to the
+; TOP of the function so it commits, and the reset loop then genuinely
+; overwrites it last.
+_HCWRA_FlushBeforeResetLoop() {
+	Body := _DriverFuncBody("_HCW_ResetAll")
+	IdxFlush := InStr(Body, "_HCW_FlushNumericWrite()")
+	IdxLoop := InStr(Body, "for _, E in _HCW_CATEGORY_LIST")
+	Assert(IdxFlush > 0 and IdxLoop > 0 and IdxFlush < IdxLoop,
+		"_HCW_FlushNumericWrite() must run BEFORE the reset loop — flushing after the loop lets a still-pending debounced numeric edit silently re-commit the override the reset just cleared (hcw-reset-all-flush-order / F46)")
+}
+Test("hcw_reset_all: _HCW_FlushNumericWrite() runs before the reset loop, not after (F46)", _HCWRA_FlushBeforeResetLoop)
