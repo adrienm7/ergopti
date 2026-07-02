@@ -175,6 +175,20 @@ MS_ApplyAll(ToggleTypingFn, ToggleAppsFn) {
 ; =====================================
 ; ============================================
 
+; Decides whether a candidate shortcut string is safe to persist to disk.
+; ``raw`` is the trimmed, lower-cased user input; ``bound_ahk`` is what
+; MS_BindHotkey() actually managed to register ("" on a rejected Hotkey() call
+; OR on an explicit clear). A cleared shortcut (raw == "") is always safe to
+; persist. A non-empty raw that failed registration must NOT be persisted --
+; else the same broken string is replayed by MS_ApplyAll() on every future
+; boot, re-triggering the Hotkey() failure (and its blocking MsgBox) forever.
+; @param raw {String} The trimmed, lower-cased user input.
+; @param bound_ahk {String} The AHK-syntax hotkey MS_BindHotkey() bound, or "".
+; @returns {Boolean} True when ``raw`` is safe to write to the persisted state.
+MS_ShouldPersistShortcut(raw, bound_ahk) {
+    return (raw = "") || (bound_ahk != "")
+}
+
 MS_PromptShortcut(which, ToggleFn) {
     ; Shows an InputBox to capture the new shortcut. ``which`` ∈
     ; {"typing", "apps"}. Empty string clears the binding.
@@ -187,11 +201,21 @@ MS_PromptShortcut(which, ToggleFn) {
     raw := Trim(StrLower(ib.Value))
 
     if (which = "typing") {
-        MetricsShortcuts.typing_ahk := MS_BindHotkey(MetricsShortcuts.typing_ahk, raw, ToggleFn)
-        MetricsShortcuts.typing_str := raw
+        new_ahk := MS_BindHotkey(MetricsShortcuts.typing_ahk, raw, ToggleFn)
+        if MS_ShouldPersistShortcut(raw, new_ahk) {
+            MetricsShortcuts.typing_str := raw
+        } else {
+            LoggerWarn("MetricsShortcuts", "Shortcut '{1}' failed Hotkey() registration for '{2}' — keeping previous value '{3}' instead of persisting the broken string.", raw, which, MetricsShortcuts.typing_str)
+        }
+        MetricsShortcuts.typing_ahk := new_ahk
     } else {
-        MetricsShortcuts.apps_ahk   := MS_BindHotkey(MetricsShortcuts.apps_ahk,   raw, ToggleFn)
-        MetricsShortcuts.apps_str   := raw
+        new_ahk := MS_BindHotkey(MetricsShortcuts.apps_ahk, raw, ToggleFn)
+        if MS_ShouldPersistShortcut(raw, new_ahk) {
+            MetricsShortcuts.apps_str := raw
+        } else {
+            LoggerWarn("MetricsShortcuts", "Shortcut '{1}' failed Hotkey() registration for '{2}' — keeping previous value '{3}' instead of persisting the broken string.", raw, which, MetricsShortcuts.apps_str)
+        }
+        MetricsShortcuts.apps_ahk := new_ahk
     }
     MS_SaveToIni()
 }
