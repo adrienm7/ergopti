@@ -265,6 +265,30 @@ TestShortcuts_LaltCapsLock_NoActionNoSend() {
 }
 Test("Shortcuts/base_modifier: LAlt+CapsLock with all actions off is a no-op", TestShortcuts_LaltCapsLock_NoActionNoSend)
 
+TestShortcuts_LaltCapsLock_BadFeaturesGraceful() {
+	; A missing or malformed lalt_caps_lock sub-map must never crash the
+	; dispatcher -- graceful no-op only. LAltCapsLockShortcut is reachable
+	; via 6 direct calls that bypass #HotIf (5 in tap_holds/capslock.ahk, 1 in
+	; tap_holds/nav_layer.ahk), so this defense-in-depth guard cannot rely on
+	; the #HotIf's _AnyShortcutEnabled check alone. Mirrors
+	; TestShortcuts_BadFeaturesGracefulUnderPause for AltGrLAltShortcut.
+	global Features
+	Saved := Features["shortcuts"]["lalt_caps_lock"]
+	try {
+		Features["shortcuts"].Delete("lalt_caps_lock")
+		Threw := false
+		try {
+			LAltCapsLockShortcut()
+		} catch {
+			Threw := true
+		}
+		AssertFalse(Threw, 'LAltCapsLockShortcut must not throw when Features["shortcuts"]["lalt_caps_lock"] is entirely missing')
+	} finally {
+		Features["shortcuts"]["lalt_caps_lock"] := Saved
+	}
+}
+Test("Shortcuts/base_modifier: LAltCapsLockShortcut degrades gracefully when its Features sub-map is missing (resilience)", TestShortcuts_LaltCapsLock_BadFeaturesGraceful)
+
 
 
 
