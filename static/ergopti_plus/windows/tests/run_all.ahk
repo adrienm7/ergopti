@@ -890,6 +890,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_adapter_callback_swallow_logged.ahk
 #Include meta/test_text_send_direct_mode_guarded.ahk
 #Include meta/test_http_post_reentrancy_guard.ahk
+#Include meta/test_personal_editor_autoexpand_i18n.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,

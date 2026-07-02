@@ -181,7 +181,7 @@ OpenPersonalEditor(DefaultSection := "") {
 	; Flags — placed to the right of TriggerEdit, anchored at TriggerEdit top via yp
 	TriggerEdit.GetPos(, &TrigY)
 	ChkIsWord := W.Add("CheckBox", "x644 y" . TrigY . " w180", t("editor.hotstrings.chk_word"))
-	ChkAutoExp := W.Add("CheckBox", "x644 y+11 w180", "Auto-expand")
+	ChkAutoExp := W.Add("CheckBox", "x644 y+11 w180", t("editor.hotstrings.cb_auto"))
 	ChkCaseSens := W.Add("CheckBox", "x644 y+11 w180", t("editor.hotstrings.chk_case"))
 	ChkFinal := W.Add("CheckBox", "x644 y+11 w180", t("editor.hotstrings.chk_final"))
 	ChkAutoExp.Value := 1
