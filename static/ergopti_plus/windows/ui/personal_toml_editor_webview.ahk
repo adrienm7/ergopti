@@ -413,7 +413,7 @@ _HsEdWeb_JsStr(s) {
 	s := StrReplace(s, "\",  "\\")
 	s := StrReplace(s, '"',  '\"')
 	s := StrReplace(s, "`n", "\n")
-	s := StrReplace(s, "`r", "")
+	s := StrReplace(s, "`r", "\r")
 	s := StrReplace(s, "`t", "\t")
 	return '"' . s . '"'
 }
