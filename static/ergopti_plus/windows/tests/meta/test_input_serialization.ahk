@@ -231,3 +231,47 @@ _MIS_CheckRollHandlersCritical() {
 }
 Test("meta input: AltGr roll handlers serialize emits via _RollEmitCritical (F-M02 remap-emit-critical-uneven)",
 	_MIS_CheckRollHandlersCritical)
+
+
+
+
+; =====================================
+; =====================================
+; ======= 3/ Dead-key wait release ====
+; =====================================
+; =====================================
+
+; F6: LayerDispatch's SerializeSymbols path and AltGrShiftDispatch's unconditional
+; wrap both invoke dead-key callbacks from inside Critical("On"). ih.Wait() is a
+; blocking, message-pumping InputHook wait with up to a 2s timeout ("L1 T2") --
+; running it under Critical stalls the ENTIRE AHK message pump (every hotkey and
+; timer in the process) for up to 2 seconds on every CapsLock dead-key press.
+; DeadKey must release Critical before the wait and restore it only after
+; (deadkey-wait-under-critical-stalls-pump).
+_MIS_CheckDeadKeyReleasesCriticalBeforeWait() {
+	Body := _DriverFuncBody("DeadKey")
+	Assert(Body != "", "DeadKey(Mapping) must exist in layout.ahk")
+
+	WaitPos := InStr(Body, "ih.Wait()")
+	Assert(WaitPos > 0, "DeadKey must call ih.Wait()")
+
+	OffPos := InStr(Body, 'Critical("Off")')
+	Assert(OffPos > 0 and OffPos < WaitPos,
+		'DeadKey must call Critical("Off") before ih.Wait() so the blocking wait does not stall '
+		. "the message pump when a caller (LayerDispatch/AltGrShiftDispatch) dispatched it under Critical (F6)")
+
+	RestorePos := InStr(Body, "Critical(_AtCrit)")
+	Assert(RestorePos > WaitPos,
+		"DeadKey must restore the caller's Critical setting via Critical(_AtCrit) AFTER ih.Wait() completes, "
+		. "so the final emit (SendNewResult) below is still serialized as the caller intended (F6)")
+
+	; The release must be scoped to a try/finally around the InputHook creation and
+	; Wait() call, so an exception during ih.Start()/Wait() cannot leave the thread
+	; stuck with Critical permanently released or never restored.
+	FinallyPos := InStr(Body, "finally")
+	Assert(FinallyPos > 0 and FinallyPos > OffPos and FinallyPos < RestorePos,
+		"DeadKey must restore Critical inside a finally block wrapping ih.Start()/ih.Wait(), "
+		. "not an unconditional statement after Wait() (F6)")
+}
+Test("meta input: DeadKey releases Critical before the blocking ih.Wait() and restores it after (F6 deadkey-wait-under-critical-stalls-pump)",
+	_MIS_CheckDeadKeyReleasesCriticalBeforeWait)

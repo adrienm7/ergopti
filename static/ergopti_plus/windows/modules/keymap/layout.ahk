@@ -322,12 +322,27 @@ DeadKey(Mapping) {
 		return
 	InDeadKeySequence := true
 	try {
-		ih := InputHook(
-			"L1 T2",
-			"{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Ins}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
-		)
-		ih.Start()
-		ih.Wait()
+		; Callers dispatch dead keys from inside Critical("On") (LayerDispatch's
+		; SerializeSymbols path, AltGrShiftDispatch's unconditional wrap) so their
+		; own SendEvent-based emits serialize against neighbouring remapped keys.
+		; ih.Wait() below is a blocking, message-pumping wait with up to a 2s
+		; timeout ("L1 T2") -- running THAT under Critical stalls the ENTIRE AHK
+		; message pump (every hotkey/timer in the process) for up to 2 seconds on
+		; every CapsLock dead-key press, not just this key
+		; (deadkey-wait-under-critical-stalls-pump). Release Critical for the wait
+		; and restore whatever the caller had in a finally, so the final emit
+		; below still serializes exactly as the caller intended.
+		_AtCrit := Critical("Off")
+		try {
+			ih := InputHook(
+				"L1 T2",
+				"{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Ins}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
+			)
+			ih.Start()
+			ih.Wait()
+		} finally {
+			Critical(_AtCrit)
+		}
 		; A live InputHook bypasses native Suspend, so a pause can land DURING Wait().
 		; If the driver was paused mid-sequence, emit nothing — « pause = tout eteint »
 		; (deadkey-inputhook-post-wait-suspend-leak). The finally still resets the flag.
