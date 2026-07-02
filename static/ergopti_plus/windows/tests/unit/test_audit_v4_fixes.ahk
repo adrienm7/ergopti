@@ -55,10 +55,12 @@ TestAuditV4_MaxHotkeysNotInHotkey() {
 	; takes effect after the first wheel event, too late to suppress the warning.
 	; The fix: move assignment to module top-level (runs at #Include time).
 
-	; Confirm the assignment exists (somewhere before the hotkey section)
+	; Confirm the assignment exists (somewhere before the hotkey section).
+	; Single-sourced from lib/nav_layer_helpers.ahk's NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
+	; constant (F16) rather than a duplicated literal.
 	AssertTrue(
-		InStr(Src, "A_MaxHotkeysPerInterval := 1000"),
-		"nav_layer.ahk must set A_MaxHotkeysPerInterval := 1000"
+		InStr(Src, "A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL"),
+		"nav_layer.ahk must set A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL"
 	)
 
 	; Extract the *WheelUp hotkey body and assert it no longer sets the variable

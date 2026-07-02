@@ -114,40 +114,41 @@ Test("ActionLayer: resets NumberOfRepetitions after firing", _NL_ActionLayerRese
 ; =====================================================================
 ; =====================================================================
 
-_NL_DisableLayerRaisesLimit() {
-	global LayerEnabled := true
-	global CapsWordEnabled := false
-	ResetStubRecorders()
-	; Start from the default so the raise is observable.
-	A_MaxHotkeysPerInterval := 70
-	DisableLayer()
-	Assert(A_MaxHotkeysPerInterval > 70,
-		"DisableLayer must raise A_MaxHotkeysPerInterval above the default 70 to allow nav-layer key bursts")
-}
-Test("DisableLayer: raises A_MaxHotkeysPerInterval above default (layer-rate-limit)", _NL_DisableLayerRaisesLimit)
-
-
-_NL_ActivateLayerRestoresLimit() {
+_NL_ActivateLayerRaisesLimit() {
 	global LayerEnabled := false
 	global CapsWordEnabled := false
 	ResetStubRecorders()
-	; Simulate the state left by DisableLayer.
-	A_MaxHotkeysPerInterval := 150
+	; Start from AHK's own low default so the raise is observable.
+	A_MaxHotkeysPerInterval := 70
 	ActivateLayer()
-	Assert(A_MaxHotkeysPerInterval < 150,
-		"ActivateLayer must restore A_MaxHotkeysPerInterval to the AHK default — DisableLayer raised it and ActivateLayer must undo that")
+	AssertEqual(NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL, A_MaxHotkeysPerInterval,
+		"ActivateLayer must RAISE A_MaxHotkeysPerInterval — bursts happen while the layer is held active, not while it is idle")
 }
-Test("ActivateLayer: restores A_MaxHotkeysPerInterval after DisableLayer raised it (layer-rate-limit)", _NL_ActivateLayerRestoresLimit)
+Test("ActivateLayer: raises A_MaxHotkeysPerInterval to the shared raised ceiling (layer-rate-limit)", _NL_ActivateLayerRaisesLimit)
 
 
-_NL_DisableActivateCycleRestoresLimit() {
+_NL_DisableLayerRestoresRaisedLimit() {
 	global LayerEnabled := true
 	global CapsWordEnabled := false
 	ResetStubRecorders()
+	; Simulate a degraded ceiling to prove DisableLayer restores the single
+	; raised boot-time value rather than leaving/lowering it to a different number.
 	A_MaxHotkeysPerInterval := 70
 	DisableLayer()
-	ActivateLayer()
-	Assert(A_MaxHotkeysPerInterval <= 70,
-		"After Disable→Activate cycle A_MaxHotkeysPerInterval must not remain elevated")
+	AssertEqual(NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL, A_MaxHotkeysPerInterval,
+		"DisableLayer must restore A_MaxHotkeysPerInterval to the same raised boot-time ceiling nav_layer.ahk set, not a different hardcoded number")
 }
-Test("ActivateLayer after DisableLayer: A_MaxHotkeysPerInterval restored to default (layer-rate-limit)", _NL_DisableActivateCycleRestoresLimit)
+Test("DisableLayer: restores A_MaxHotkeysPerInterval to the raised boot-time ceiling (layer-rate-limit)", _NL_DisableLayerRestoresRaisedLimit)
+
+
+_NL_ActivateDisableCycleNeverDropsBelowRaisedLimit() {
+	global LayerEnabled := false
+	global CapsWordEnabled := false
+	ResetStubRecorders()
+	A_MaxHotkeysPerInterval := 70
+	ActivateLayer()
+	DisableLayer()
+	AssertEqual(NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL, A_MaxHotkeysPerInterval,
+		"After an Activate→Disable cycle A_MaxHotkeysPerInterval must remain at the raised ceiling, never clobbered back down toward the AHK default")
+}
+Test("Activate/DisableLayer cycle: A_MaxHotkeysPerInterval stays at the raised ceiling (layer-rate-limit)", _NL_ActivateDisableCycleNeverDropsBelowRaisedLimit)

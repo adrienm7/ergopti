@@ -13,8 +13,11 @@
 #Requires AutoHotkey v2.0
 
 ; Raise the per-interval hotkey limit once at load time so rapid wheel events
-; never trigger the "too many hotkeys" warning before the first WheelUp/Down fires
-A_MaxHotkeysPerInterval := 1000
+; never trigger the "too many hotkeys" warning before the first WheelUp/Down
+; fires. Single-sourced from lib/nav_layer_helpers.ahk (loaded earlier, see
+; ErgoptiPlus.ahk's #Include order) so ActivateLayer/DisableLayer restore
+; this exact same ceiling instead of drifting to a different hardcoded number.
+A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
 
 
 
