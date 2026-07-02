@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (プレリリースチャンネル)",
 	"updater.channel_local_source_suffix": " (ローカルソース — リリースビルドではありません)",
 	"updater.channel_main_suffix": " (安定版チャンネル)",
+	"updater.channel_switch_blocked_download": "現在アップデートをダウンロード中です。ダウンロードが完了するまで待つか、アプリを再起動してからチャンネルを切り替えてください。",
 	"updater.checking": "「{1}」チャンネルでアップデートを確認しています…\n(数秒かかる場合があります。)",
 	"updater.close": "閉じる",
 	"updater.install_error": "アップデートをインストールできませんでした。詳細はログを確認してください。",

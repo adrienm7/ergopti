@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (प्री-रिलीज़ चैनल)",
 	"updater.channel_local_source_suffix": " (स्थानीय स्रोत — रिलीज़ बिल्ड नहीं)",
 	"updater.channel_main_suffix": " (स्थिर चैनल)",
+	"updater.channel_switch_blocked_download": "एक अपडेट अभी डाउनलोड हो रहा है। चैनल बदलने से पहले इसके पूरा होने की प्रतीक्षा करें (या ऐप को पुनः आरंभ करें)।",
 	"updater.checking": "‘{1}’ चैनल पर अपडेट खोजे जा रहे हैं…\n(इसमें कुछ सेकंड लग सकते हैं।)",
 	"updater.close": "बंद करें",
 	"updater.install_error": "अपडेट इंस्टॉल नहीं किया जा सका। विवरण के लिए लॉग देखें।",

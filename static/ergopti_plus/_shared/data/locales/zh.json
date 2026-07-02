@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (预发布通道)",
 	"updater.channel_local_source_suffix": " (本地源 — 非发布版本)",
 	"updater.channel_main_suffix": " (稳定通道)",
+	"updater.channel_switch_blocked_download": "正在下载更新。请等待下载完成（或重启应用）后再切换通道。",
 	"updater.checking": "正在“{1}”通道上检查更新…\n(可能需要几秒钟。)",
 	"updater.close": "关闭",
 	"updater.install_error": "无法安装更新。请查看日志了解详情。",

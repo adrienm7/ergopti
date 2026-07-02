@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (ön sürüm kanalı)",
 	"updater.channel_local_source_suffix": " (yerel kaynak — yayın sürümü değil)",
 	"updater.channel_main_suffix": " (kararlı kanal)",
+	"updater.channel_switch_blocked_download": "Şu anda bir güncelleme indiriliyor. Kanalı değiştirmeden önce indirmenin bitmesini bekleyin (veya uygulamayı yeniden başlatın).",
 	"updater.checking": "“{1}” kanalında güncellemeler aranıyor…\n(Bu işlem birkaç saniye sürebilir.)",
 	"updater.close": "Kapat",
 	"updater.install_error": "Güncelleme yüklenemedi. Ayrıntılar için günlüklere bakın.",

@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (Vorab-Kanal)",
 	"updater.channel_local_source_suffix": " (lokale Quelle — kein Release-Build)",
 	"updater.channel_main_suffix": " (stabiler Kanal)",
+	"updater.channel_switch_blocked_download": "Ein Update wird gerade heruntergeladen. Warten Sie, bis es abgeschlossen ist (oder starten Sie die App neu), bevor Sie den Kanal wechseln.",
 	"updater.checking": "Suche nach Aktualisierungen im Kanal „{1}“…\n(Dies kann einige Sekunden dauern.)",
 	"updater.close": "Schließen",
 	"updater.install_error": "Das Update konnte nicht installiert werden. Details finden Sie in den Logs.",

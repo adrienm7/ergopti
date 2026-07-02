@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (preview-kanaal)",
 	"updater.channel_local_source_suffix": " (lokale bron — geen release-build)",
 	"updater.channel_main_suffix": " (stabiel kanaal)",
+	"updater.channel_switch_blocked_download": "Er wordt momenteel een update gedownload. Wacht tot deze is voltooid (of start de app opnieuw) voordat u van kanaal wisselt.",
 	"updater.checking": "Bezig met zoeken naar updates op kanaal '{1}'…\n(Dit kan enkele seconden duren.)",
 	"updater.close": "Sluiten",
 	"updater.install_error": "De update kan niet worden geïnstalleerd. Raadpleeg de logboeken voor details.",

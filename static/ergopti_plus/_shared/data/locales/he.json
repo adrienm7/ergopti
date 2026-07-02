@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (ערוץ קדם-הפצה)",
 	"updater.channel_local_source_suffix": " (מקור מקומי — אינו בניית הפצה)",
 	"updater.channel_main_suffix": " (ערוץ יציב)",
+	"updater.channel_switch_blocked_download": "עדכון מורד כעת. המתן עד לסיומו (או הפעל מחדש את היישום) לפני החלפת הערוץ.",
 	"updater.checking": "מחפש עדכונים בערוץ \"{1}\"…\n(הפעולה עשויה להימשך מספר שניות.)",
 	"updater.close": "סגור",
 	"updater.install_error": "לא ניתן להתקין את העדכון. בדוק את היומנים לפרטים נוספים.",

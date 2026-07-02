@@ -151,8 +151,21 @@ Updater_LoadChannel() {
 ; Persists the chosen channel to config.toml and reloads the menu.
 Updater_SetChannel(Channel) {
 	global UPDATER_CHANNEL, ConfigurationFile, UPDATER_INI_SECTION, UPDATER_INI_KEY
+	global _UpdaterDownloadInProgress
 	if (Channel != "main" and Channel != "dev")
 		return
+	; The self-update download's WinHttp request and poll-timer chain are
+	; tracked only as local closures inside Updater_DownloadAndInstall /
+	; _Updater_PollDownloadAsync -- never registered in the shared
+	; _UpdaterAsyncRequests map that channel-switch cancellation drains. A
+	; Reload here would orphan the in-flight request and the partial staging
+	; file with zero log trace. Block the switch instead of racing it
+	; (updater-channel-switch-download-race).
+	if _UpdaterDownloadInProgress {
+		try LoggerWarn("Updater", "Channel switch to '{1}' blocked: a download is currently in progress.", Channel)
+		MsgBox(t("updater.channel_switch_blocked_download"), t("updater.title_update"), "Icon!")
+		return
+	}
 	UPDATER_CHANNEL := Channel
 	TOML_Write(Channel, ConfigurationFile, UPDATER_INI_SECTION, UPDATER_INI_KEY)
 	; Cancel in-flight async checks and stop the focus/background timers before
