@@ -42,6 +42,14 @@ global _OllamaWV_Margin := 10   ; gap from screen edge and taskbar (physical pix
 global _OllamaWV_Gui        := unset
 global _OllamaWV_Controller := unset
 global _OllamaWV_WebView    := unset
+; Subscription handle returned by WebView2.WebMessageReceived(). The thqby
+; binding ties the event subscription to this object's LIFETIME: when it is
+; garbage-collected its __Delete unsubscribes via remove_WebMessageReceived —
+; silently killing the handler the instant it is discarded. It MUST be kept
+; alive in a persistent global for the JS->AHK channel to keep delivering
+; messages (see ui/onboarding/webview.ahk's _OnbWeb_MsgSub for the sibling
+; fix this mirrors).
+global _OllamaWV_MsgSub     := unset
 global _OllamaWV_Ready      := false   ; true once JS signals "ready"
 global _OllamaWV_Queue      := []      ; JS calls buffered before page ready
 global _OllamaWV_OnCancel   := unset
@@ -148,9 +156,15 @@ OllamaWV_Done(is_success, msg := "") {
  * Hides and destroys the window.
  */
 OllamaWV_Close() {
-	global _OllamaWV_Gui, _OllamaWV_Controller, _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_Udir
+	global _OllamaWV_Gui, _OllamaWV_Controller, _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_Udir, _OllamaWV_MsgSub
 	_OllamaWV_Ready := false
 	_OllamaWV_Queue := []
+	; Release the subscription handle FIRST, while the controller is still
+	; alive — its __Delete unsubscribes via remove_WebMessageReceived on the
+	; live controller; doing it AFTER Controller.Close() would raise a COM
+	; error against an already-invalidated pointer (see
+	; ui/onboarding/webview.ahk's _OnbWeb_Reset for the sibling ordering fix).
+	_OllamaWV_MsgSub := unset
 	if IsSet(_OllamaWV_Controller)
 		try _OllamaWV_Controller.Close()
 	if IsSet(_OllamaWV_Gui)
@@ -197,7 +211,7 @@ OllamaWV_IsAlive() {
  * @param {string} subtitle - Subtitle for bootstrap mode.
  */
 OllamaWV_Create(kind, subtitle) {
-	global _OllamaWV_Gui, _OllamaWV_Controller, _OllamaWV_WebView
+	global _OllamaWV_Gui, _OllamaWV_Controller, _OllamaWV_WebView, _OllamaWV_MsgSub
 	global _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_W, _OllamaWV_H, _OllamaWV_Margin
 
 	_OllamaWV_Ready := false
@@ -267,7 +281,12 @@ OllamaWV_Create(kind, subtitle) {
 	; JS → AHK message bridge (cancel / retry buttons).
 	; The wrapper's __Call intercepts obj.Method(fn) and routes it to
 	; add_WebMessageReceived — the := assignment form does NOT work.
-	_OllamaWV_WebView.WebMessageReceived(OllamaWV_OnWebMessage)
+	; The returned subscription handle MUST be stored in a persistent global:
+	; discarding it lets AHK garbage-collect it immediately, whose __Delete
+	; unsubscribes via remove_WebMessageReceived — silently killing the
+	; JS->AHK channel the instant it is created (see ui/onboarding/webview.ahk's
+	; _OnbWeb_MsgSub for the sibling fix this mirrors).
+	_OllamaWV_MsgSub := _OllamaWV_WebView.WebMessageReceived(OllamaWV_OnWebMessage)
 
 	; Inject i18n base URL and locale code before page scripts run.
 	; The JSON strings are pushed later via ExecuteScript in FlushQueue to avoid
