@@ -90,9 +90,15 @@ Changelog_Open(Channel := "dev") {
  */
 Changelog_Close() {
 	global _CLW_Gui
-	if IsSet(_CLW_Gui)
-		try _CLW_Gui.Destroy()
+	; Same reorder as _CLW_OnClose -- close the WebView2 controller before
+	; destroying the Gui (WebView2 spec requirement).
+	saved_gui := IsSet(_CLW_Gui) ? _CLW_Gui : 0
 	_CLW_Reset()
+	try {
+		if saved_gui
+			saved_gui.Destroy()
+	}
+	_CLW_Gui := unset   ; Always clear the reference, even if Destroy threw
 }
 
 
@@ -517,9 +523,18 @@ _CLW_Reset() {
 
 _CLW_OnClose(*) {
 	global _CLW_Gui
-	if IsSet(_CLW_Gui)
-		try _CLW_Gui.Destroy()
+	; Save the Gui reference BEFORE Reset clears the global, then close the
+	; WebView2 controller first (while the parent window is still alive) and
+	; only destroy the Gui afterwards -- the WebView2 spec requires Controller
+	; to be closed before its host HWND is destroyed. Mirrors
+	; ui/model_browser/init.ahk's _LLM_MBW_OnClose.
+	saved_gui := IsSet(_CLW_Gui) ? _CLW_Gui : 0
 	_CLW_Reset()
+	try {
+		if saved_gui
+			saved_gui.Destroy()
+	}
+	_CLW_Gui := unset   ; Always clear the reference, even if Destroy threw
 }
 
 _CLW_OnResize(GuiObj, MinMax, Width, Height) {
