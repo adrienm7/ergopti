@@ -862,6 +862,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 ; got the identical F7 fix applied.
 #Include meta/test_webview_reset_idempotent_siblings.ahk
 #Include meta/test_updater_onjson_callback_catch.ahk
+#Include meta/test_webview_bridge_suspend_guard.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
