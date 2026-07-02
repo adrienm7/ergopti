@@ -457,3 +457,71 @@ _I18nSortedDoesNotMutateOriginal() {
 	AssertEqual(OrigFirst, I18N_LOCALES[1].Code)
 }
 Test("i18n _I18nSortedLocales: does not mutate original I18N_LOCALES", _I18nSortedDoesNotMutateOriginal)
+
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 6/ I18nSetLocale logger start pairing =======
+; =====================================================
+; =====================================================
+
+; Regression guard for F51 (AUDIT_AHK_2026-07-01.md): I18nSetLocale used to
+; log Logger.start synchronously on EVERY call, before the debounce timer
+; that performs the real reload. Two rapid switches ('fr'->'de'->'es') within
+; _I18nReloadDebounceMs each logged a START, but re-arming SetTimer with the
+; same function reference coalesces the pending call - only the LAST one
+; ever fires _I18nDoReload, so only one SUCCESS was ever logged. The fix
+; moves the LoggerStart call into _I18nDoReload, beside the LoggerSuccess it
+; already logs, so a START is only ever logged once per reload attempt that
+; actually completes.
+
+_I18nSLP_SetLocaleOmitsStart() {
+	Body := _DriverFuncBody("I18nSetLocale")
+	AssertTrue(Body != "", "I18nSetLocale must be defined in lib/i18n.ahk")
+	AssertTrue(InStr(Body, "LoggerStart") == 0,
+		"I18nSetLocale must not call LoggerStart directly - it used to fire once per call regardless of debounce coalescing, leaving intermediate switches with an unpaired START")
+}
+Test("i18n I18nSetLocale: no longer logs LoggerStart at the call site (F51)", _I18nSLP_SetLocaleOmitsStart)
+
+_I18nSLP_DoReloadLogsPair() {
+	Body := _DriverFuncBody("_I18nDoReload")
+	AssertTrue(Body != "", "_I18nDoReload must be defined in lib/i18n.ahk")
+	AssertTrue(InStr(Body, "LoggerStart") > 0,
+		"_I18nDoReload must log LoggerStart right before the real reload work happens (F51)")
+	AssertTrue(InStr(Body, "LoggerSuccess") > 0,
+		"_I18nDoReload must still log LoggerSuccess - the Start/Success pair now lives together where the reload actually happens")
+}
+Test("i18n _I18nDoReload: logs a matched Start/Success pair (F51)", _I18nSLP_DoReloadLogsPair)
+
+; Two rapid I18nSetLocale calls must not emit any "[i18n]" log line
+; synchronously - both the log AND the reload are now entirely deferred to
+; the debounce timer. This test deliberately never lets that timer fire
+; (calling _I18nDoReload for real would invoke the AHK Reload command and
+; restart the whole test process mid-suite) - it cancels the pending timer
+; before returning, then asserts the call-time capture is empty.
+_I18nSLP_RapidSwitchLogsNothingSynchronously() {
+	global _I18nLocale, _I18nCacheLoaded, _I18nFallbacksWarmed
+	_I18nLocale := "fr"
+	_I18nCacheLoaded := true
+	_I18nFallbacksWarmed := true
+
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	I18nSetLocale("de")
+	I18nSetLocale("es")
+	LoggerClearTestSink()
+	SetTimer(_I18nDoReload, 0)   ; cancel the pending debounce - never let Reload fire in tests
+
+	I18nLines := 0
+	for Line in Captured {
+		if InStr(Line, "[i18n]")
+			I18nLines += 1
+	}
+	AssertEqual(0, I18nLines,
+		"two rapid I18nSetLocale calls must not log any [i18n] line synchronously - logging is deferred to the debounce timer (F51)")
+	_I18nTestReset()
+}
+Test("i18n I18nSetLocale: rapid switches log nothing synchronously (F51)", _I18nSLP_RapidSwitchLogsNothingSynchronously)
