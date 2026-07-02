@@ -81,6 +81,15 @@ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 ; top-level category whose master-gate state controls greying (``Hotstrings``,
 ; ``Shortcuts``).
 MenuAddItemWithLabel(MenuParent, V2Path, MenuTitle, MasterCategory) {
+	; Mirror MenuAddItemFromManifest's guard: skip an item whose feature does not
+	; resolve in the live Features Map instead of wiring a toggle/Check call that
+	; can silently no-op forever (personal-hotstring-live-toggle-seed). This is a
+	; defensive backstop — the normal path always seeds the Features node first
+	; (see EnsurePersonalHotstringFeature / RegisterPersonalFeature).
+	if (FeatureLocateV2(V2Path) == false) {
+		try LoggerWarn("Menu", "MenuAddItemWithLabel: '{1}' does not resolve in Features — skipping.", V2Path)
+		return
+	}
 	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleFeatureV2(V2Path))
 
 	State := ReadFeatureStateV2(V2Path)

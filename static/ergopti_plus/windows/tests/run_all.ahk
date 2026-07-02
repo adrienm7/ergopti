@@ -108,6 +108,11 @@ OnError(_FatalErrorHandler)
 #Include ../_generated/features_manifest.ahk
 #Include ../lib/manifest_reader.ahk
 #Include ../lib/feature_io.ahk
+; EnsurePersonalHotstringFeature is exercised directly by the F4 regression
+; test (test_feature_io_locator.ahk) — RegisterPersonalFeature in the same file
+; is never called here, so its own unseeded global (_PersonalShortcutsRegistry)
+; is harmless (#Warn VarUnset is off).
+#Include ../lib/personal_features.ahk
 #Include ../lib/hotstrings/hotstrings_config.ahk
 #Include ../ui/personal_toml_editor.ahk
 ; Pure helpers (no boot-time side effects) — CountDynamicSection is exercised
@@ -357,6 +362,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_crash_build_offthread.ahk
 #Include meta/test_personal_hotstring_node_shape.ahk
 #Include meta/test_personal_hotstring_seed.ahk
+#Include meta/test_personal_hotstring_new_section_seed.ahk
 #Include meta/test_no_duplicate_defaults.ahk
 #Include meta/test_require_state_pattern.ahk
 #Include meta/test_keylogger_pause_guard.ahk

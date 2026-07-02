@@ -533,6 +533,14 @@ _NewSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, 
 		"entries", [],
 		"line_start", 0,
 	)
+	; Seed the Features node for this brand-new section right away — without this,
+	; ToggleFeatureV2's live-toggle fast path (WriteFeatureV2) silently no-ops on
+	; the unresolved "hotstrings.personal.<name>" path, because the boot-time
+	; seeding pass (ErgoptiPlus.ahk) and the bulk enable/disable-all path
+	; (HS_TogglePersonalAllSections) are the only other call sites and neither
+	; runs again for a section created live in this editor session
+	; (personal-hotstring-live-toggle-seed).
+	EnsurePersonalHotstringFeature(SecName)
 	; Persist and rebuild dropdown
 	WritePersonalToml(_PersonalEditorData)
 	_RebuildDropdown(SectionDrop, _PersonalEditorData)
