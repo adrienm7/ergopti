@@ -390,7 +390,7 @@ _CollectFeatureUpdates(Updates, SectionPath, Node) {
         if (Type(Value) == "Map")
             _CollectFeatureUpdates(Updates, Sub, Value)
         else
-            Updates.Push({ Section: SectionPath, Key: Key, Value: Value })
+            Updates.Push({ Section: ManifestResolveFeatureSection(Sub, SectionPath), Key: Key, Value: Value })
     }
 }
 
