@@ -41,11 +41,14 @@ _TSCB_CheckBailoutInvokesCallback(Needle, Label) {
 	ReturnPos := InStr(Window, "return")
 	Assert(ReturnPos > 0, Label . ": bail-out must still return")
 
-	CallbackPos := InStr(Window, "Callback()")
+	; Routed through _TextSenderInvokeCallback (bare-try-anti-pattern / F52b
+	; fix) instead of a raw "Callback()" call -- that helper is still the
+	; thing that ultimately calls Callback().
+	CallbackPos := InStr(Window, "_TextSenderInvokeCallback(Callback)")
 	Assert(CallbackPos > 0,
-		Label . ": _TextSendClipboard must invoke Callback() on this bail-out path -- otherwise a caller whose cleanup depends on the callback (e.g. llm_bridge.ahk's depth-counter guards) leaks forever")
+		Label . ": _TextSendClipboard must invoke _TextSenderInvokeCallback(Callback) on this bail-out path -- otherwise a caller whose cleanup depends on the callback (e.g. llm_bridge.ahk's depth-counter guards) leaks forever")
 	Assert(CallbackPos < ReturnPos,
-		Label . ": Callback() must be invoked BEFORE the return, not after")
+		Label . ": _TextSenderInvokeCallback(Callback) must be invoked BEFORE the return, not after")
 }
 
 Test("text_sender: A_IsSuspended bail-out invokes Callback before returning (textsend-callback-leaked-on-bailout)",

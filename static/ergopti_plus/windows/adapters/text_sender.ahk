@@ -113,6 +113,23 @@ _TextSenderModifierString(ModStr) {
 ; =======================================================
 ; =======================================================
 
+; Invokes an optional completion callback, logging (never propagating) any
+; exception it throws. Mirrors the try/catch + LoggerError pattern used by
+; sibling adapters (adapters/shell_runner.ahk's on_done wrapper,
+; adapters/timer_scheduler.ahk's _OneShot/_Repeating wrappers) so a throwing
+; Callback cannot silently vanish — unlike a bare "try Callback()" with no
+; catch, which swallows the exception with zero log trace.
+; @param Callback {Func|0} Optional zero-arity completion callback.
+_TextSenderInvokeCallback(Callback) {
+	if Callback = 0
+		return
+	try
+		Callback()
+	catch as Err {
+		LoggerError("TextSender", "completion callback threw: {1}", Err.Message)
+	}
+}
+
 ; Performs the clipboard write / wait / paste / restore round-trip.
 ; Runs on a one-shot timer (off the keyboard thread) so the blocking ClipWait
 ; cannot starve the low-level keyboard hook. Bails loudly without pasting if the
@@ -144,8 +161,7 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	; bail-out here that never invokes Callback leaked those guards forever,
 	; permanently suppressing normal hotstring/keylogger observation.
 	if A_IsSuspended {
-		if Callback != 0
-			try Callback()
+		_TextSenderInvokeCallback(Callback)
 		return
 	}
 
@@ -162,8 +178,7 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	if !ClipWait(TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC) {
 		LoggerError("TextSender", "TextSend: clipboard did not settle within {1}s - skipping paste to avoid injecting stale content.", TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC)
 		CB_RestoreAll(Saved)
-		if Callback != 0
-			try Callback()
+		_TextSenderInvokeCallback(Callback)
 		return
 	}
 
@@ -171,8 +186,7 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	; blocked inside ClipWait; pasting now would clobber its content.
 	if (Generation != _TEXT_CLIPBOARD_GENERATION) {
 		CB_RestoreAll(Saved)
-		if Callback != 0
-			try Callback()
+		_TextSenderInvokeCallback(Callback)
 		return
 	}
 
@@ -181,8 +195,7 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	; Fire the completion callback now that the paste keystroke has been emitted.
 	; Placed before the restore timer so callers can inspect A_Clipboard while it
 	; still holds the injected text, but after ^v so the paste is guaranteed to land.
-	if Callback != 0
-		try Callback()
+	_TextSenderInvokeCallback(Callback)
 
 	; Restore after a short delay so the paste completes before we overwrite.
 	; The closure no-ops if a newer injection advanced the generation counter,
@@ -243,8 +256,7 @@ TextSend(Text, Opts, Callback) {
 		; SendText uses the "Text" mode that bypasses hotkey triggers and sends
 		; Unicode characters as raw keystrokes — the safest injection path.
 		_AHK_SendText.Call(Text)
-		if Callback != 0
-			try Callback()
+		_TextSenderInvokeCallback(Callback)
 	}
 }
 
