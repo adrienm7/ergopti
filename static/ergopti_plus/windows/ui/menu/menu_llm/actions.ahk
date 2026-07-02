@@ -178,6 +178,12 @@ LLM_Menu_SetBackend(id) {
 	global _LLM_Menu
 	_LLM_Menu["backend"] := id
 	LLM_Menu_SaveConfig()
+	; Every sibling setter (SetModel, SetProfile, SetN, SetIndent) re-inits the
+	; live engine; this one was the sole exception. Without it the engine kept
+	; dispatching to the stale backend until some other setter incidentally
+	; called Init, and LLM_Engine_Init's own "stop in-flight generation when
+	; the backend changes" safety net never triggered on a backend switch (F25).
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
 	LLM_Menu_Build()
 }
 
