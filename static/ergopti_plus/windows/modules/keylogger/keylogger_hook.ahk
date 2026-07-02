@@ -29,7 +29,7 @@
 ;    BEFORE landing in the buffer. Disabled apps, private browsing,
 ;    system-auth dialogs and password fields are short-circuited at
 ;    the source. The cache inside MF_ShouldFilter keeps the per-keystroke
-;    cost negligible (≤ 250 ms TTL).
+;    cost negligible (≤ 50 ms TTL).
 ; 4. Per-keystroke metadata: each event carries a ``kc`` (virtual
 ;    keycode) entry inside its meta Map so the walker's same-finger /
 ;    same-hand streak detection has the input it needs. The QWERTY

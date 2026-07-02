@@ -88,7 +88,14 @@ MF_SaveToIni() {
 ; Cached focused-window probe. UIA-style filters can be expensive to run
 ; on every keystroke; we cache the (process_name, title, class) of the
 ; focused window for MF_FOCUS_TTL_MS so the per-call cost stays near-zero.
-global MF_FOCUS_TTL_MS := 250
+; Kept short (50 ms, not the original 250 ms): the TTL gate is time-only,
+; independent of real focus-change events, so a fast typist landing 2-3
+; keystrokes inside a 250 ms window right after alt-tabbing into a
+; disabled/private app would read the PREVIOUS window's stale context and
+; slip past the privacy filter (metrics-focus-cache-ttl-leak). 50 ms sits
+; below realistic inter-keystroke intervals for virtually all typists
+; while still keeping the hot-path check cheap.
+global MF_FOCUS_TTL_MS := 50
 
 class MetricsFocusCache {
     ; Build-then-swap pattern for atomic state updates: multiple properties
