@@ -63,9 +63,13 @@ CryptoSha256(Data) {
         for b in hash_bytes
             out .= Format("{:02x}", b)
         return out
-    } catch {
+    } catch as Err {
         ; DJB2 fallback when .NET COM classes are unavailable — returns an 8-char
-        ; hex string so callers can detect degraded mode by checking length != 64
+        ; hex string so callers can detect degraded mode by checking length != 64.
+        ; This is a silent privacy downgrade (SSID hashes etc. become far weaker
+        ; and collision-prone), so — unlike a routine recoverable failure — it
+        ; must leave a log trace instead of degrading invisibly.
+        LoggerWarn("Crypto", "CryptoSha256: SHA-256 COM classes unavailable ({1}) - falling back to degraded DJB2 hash (8 hex chars instead of 64).", Err.Message)
         h := 5381
         loop StrLen(Data) {
             h := ((h << 5) + h) + Ord(SubStr(Data, A_Index, 1))
