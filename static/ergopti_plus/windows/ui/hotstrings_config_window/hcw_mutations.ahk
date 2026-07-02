@@ -117,6 +117,13 @@ _HCW_ClearField(Field) {
 
 _HCW_ResetAll() {
 	global _HCW_CATEGORY_LIST, _HCWGui, _HCWWidgets
+	; Commit any debounced numeric edit BEFORE the reset loop runs. Flushing
+	; AFTER the loop (the previous order) let a still-pending edit — armed by
+	; _HCW_ArmNumericWrite up to _HCW_NUMERIC_DEBOUNCE_MS ago — persist on top
+	; of the override the reset loop just cleared, silently un-resetting that
+	; one field. Flushing first makes the loop's Clear/PatchTomlMeta calls the
+	; genuinely last write for every field.
+	_HCW_FlushNumericWrite()
 	for _, E in _HCW_CATEGORY_LIST {
 		if E.IsPersonal {
 			_HCW_PatchTomlMeta(E.Path, "", "delay", "")
@@ -139,8 +146,6 @@ _HCW_ResetAll() {
 			}
 		}
 	}
-	; Flush any pending debounce timer before controls are destroyed
-	_HCW_FlushNumericWrite()
 	if (_HCWGui != 0) {
 		_HCWGui.Destroy()
 	}
