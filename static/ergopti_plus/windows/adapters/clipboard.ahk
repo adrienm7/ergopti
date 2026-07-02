@@ -99,19 +99,30 @@ CB_Restore(Saved) {
 
 ; Snapshots ALL clipboard formats (text, images, files, RTF, HTML …) for later
 ; restoration. Use instead of CB_Save when the caller may hold non-text content.
-; @return {ClipboardAll|String} Opaque all-formats snapshot, or "" on error.
+; Returns "__CB_SAVE_ERROR__" when the clipboard is locked so callers (and
+; CB_RestoreAll) can distinguish a read failure from a legitimately empty
+; clipboard — same sentinel contract as CB_Save.
+; @return {ClipboardAll|String} Opaque all-formats snapshot, or "__CB_SAVE_ERROR__" on failure.
 CB_SaveAll() {
 	try {
 		return ClipboardAll()
-	} catch {
-		return ""
+	} catch as Err {
+		try LoggerWarn("Clipboard", "CB_SaveAll failed: {1}.", Err.Message)
+		return "__CB_SAVE_ERROR__"
 	}
 }
 
 ; Restores a previously saved all-formats clipboard snapshot.
+; Skips the restore when Saved is the error sentinel "__CB_SAVE_ERROR__" so a
+; failed CB_SaveAll never wipes the clipboard (a bare A_Clipboard := "" would
+; be indistinguishable from "clipboard was legitimately empty").
 ; @param Saved {ClipboardAll|String} Value previously returned by CB_SaveAll().
-; @return {Boolean} True on success, false on error.
+; @return {Boolean} True on success, false on error or when Saved is the error sentinel.
 CB_RestoreAll(Saved) {
+	if (Type(Saved) == "String" and Saved == "__CB_SAVE_ERROR__") {
+		try LoggerWarn("Clipboard", "CB_RestoreAll: skipping restore — Saved is the __CB_SAVE_ERROR__ sentinel from a failed CB_SaveAll.")
+		return false
+	}
 	try {
 		A_Clipboard := Saved
 		return true
