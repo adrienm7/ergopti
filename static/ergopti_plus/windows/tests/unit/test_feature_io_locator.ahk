@@ -24,7 +24,9 @@
 ; ==============================================================
 
 ; Runs Fn with global Features swapped to Fixture, restoring the original after
-; so the shared harness state is never polluted.
+; so the shared harness state is never polluted. Still needed by Section 3 below,
+; which exercises EnsurePersonalHotstringFeature (a real global-Features mutator)
+; through the public WriteFeatureV2 wrapper.
 _FIL_WithFeatures(Fixture, Fn) {
 	global Features
 	Saved := IsSet(Features) ? Features : ""
@@ -50,8 +52,11 @@ _FIL_Fixture() {
 	)
 }
 
-_FIL_AssertLoc(V2Path, ExpSection, ExpKey, ExpAlpha, Prop := "") {
-	Loc := FeatureLocateV2(V2Path, Prop)
+; Calls _FeatureLocateV2Impl directly against Fixture -- no global Features
+; swap needed since the impl takes its target Map as an explicit parameter
+; (feedback_loader_target_explicit).
+_FIL_AssertLoc(Fixture, V2Path, ExpSection, ExpKey, ExpAlpha, Prop := "") {
+	Loc := _FeatureLocateV2Impl(Fixture, V2Path, Prop)
 	AssertTrue(Loc != false, "FeatureLocateV2('" . V2Path . "') must resolve")
 	AssertEqual(ExpSection, Loc["section"], "section for '" . V2Path . "'")
 	AssertEqual(ExpKey, Loc["key"], "key for '" . V2Path . "'")
@@ -59,8 +64,7 @@ _FIL_AssertLoc(V2Path, ExpSection, ExpKey, ExpAlpha, Prop := "") {
 }
 
 _FIL_PlainAhkLayout() {
-	_FIL_WithFeatures(_FIL_Fixture(), () =>
-		_FIL_AssertLoc("ahk.layout.ergopti_base", "ahk.layout", "ergopti_base", 0))
+	_FIL_AssertLoc(_FIL_Fixture(), "ahk.layout.ergopti_base", "ahk.layout", "ergopti_base", 0)
 }
 Test("feature_io: ahk-prefixed plain feature -> [ahk.layout] ergopti_base", _FIL_PlainAhkLayout)
 
@@ -68,48 +72,40 @@ _FIL_GesturesMaster() {
 	; gestures is a top-level Map carrying "enabled" -> classified alpha, but the
 	; resolved {section, key, node} are identical to the translator's, so the
 	; write is byte-identical.
-	_FIL_WithFeatures(_FIL_Fixture(), () =>
-		_FIL_AssertLoc("ahk.gestures.enabled", "ahk.gestures", "enabled", 1))
+	_FIL_AssertLoc(_FIL_Fixture(), "ahk.gestures.enabled", "ahk.gestures", "enabled", 1)
 }
 Test("feature_io: gestures master -> [ahk.gestures] enabled", _FIL_GesturesMaster)
 
 _FIL_PlainShortcut() {
-	_FIL_WithFeatures(_FIL_Fixture(), () =>
-		_FIL_AssertLoc("shortcuts.microsoft_bold", "shortcuts", "microsoft_bold", 0))
+	_FIL_AssertLoc(_FIL_Fixture(), "shortcuts.microsoft_bold", "shortcuts", "microsoft_bold", 0)
 }
 Test("feature_io: un-prefixed plain bool -> [shortcuts] microsoft_bold", _FIL_PlainShortcut)
 
 _FIL_AlphaToggle() {
-	_FIL_WithFeatures(_FIL_Fixture(), () =>
-		_FIL_AssertLoc("shortcuts.gpt", "shortcuts.gpt", "enabled", 1))
+	_FIL_AssertLoc(_FIL_Fixture(), "shortcuts.gpt", "shortcuts.gpt", "enabled", 1)
 }
 Test("feature_io: alpha feature toggle -> [shortcuts.gpt] enabled", _FIL_AlphaToggle)
 
 _FIL_AlphaPropByPath() {
-	_FIL_WithFeatures(_FIL_Fixture(), () =>
-		_FIL_AssertLoc("shortcuts.gpt.link", "shortcuts.gpt", "link", 1))
+	_FIL_AssertLoc(_FIL_Fixture(), "shortcuts.gpt.link", "shortcuts.gpt", "link", 1)
 }
 Test("feature_io: alpha property via path -> [shortcuts.gpt] link", _FIL_AlphaPropByPath)
 
 _FIL_AlphaPropByArg() {
 	; The explicit Prop argument resolves the same alpha property as the dotted path.
-	_FIL_WithFeatures(_FIL_Fixture(), () =>
-		_FIL_AssertLoc("shortcuts.gpt", "shortcuts.gpt", "link", 1, "link"))
+	_FIL_AssertLoc(_FIL_Fixture(), "shortcuts.gpt", "shortcuts.gpt", "link", 1, "link")
 }
 Test("feature_io: alpha property via Prop arg -> [shortcuts.gpt] link", _FIL_AlphaPropByArg)
 
 _FIL_NestedAlpha() {
-	_FIL_WithFeatures(_FIL_Fixture(), () =>
-		_FIL_AssertLoc("hotstrings.autocorrection.accents",
-			"hotstrings.autocorrection.accents", "enabled", 1))
+	_FIL_AssertLoc(_FIL_Fixture(), "hotstrings.autocorrection.accents",
+		"hotstrings.autocorrection.accents", "enabled", 1)
 }
 Test("feature_io: nested alpha -> [hotstrings.autocorrection.accents] enabled", _FIL_NestedAlpha)
 
 _FIL_Unresolved() {
-	_FIL_WithFeatures(_FIL_Fixture(), () => (
-		AssertEqual(false, FeatureLocateV2("shortcuts.does_not_exist"),
-			"unknown path must return false")
-	))
+	AssertEqual(false, _FeatureLocateV2Impl(_FIL_Fixture(), "shortcuts.does_not_exist"),
+		"unknown path must return false")
 }
 Test("feature_io: unknown path returns false", _FIL_Unresolved)
 
