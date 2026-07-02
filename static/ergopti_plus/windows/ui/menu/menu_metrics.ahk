@@ -54,6 +54,15 @@ BuildMetricsMenu() {
 	)
 
 	MetricsMenu := MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers)
+	; Metrics toggle uses a dedicated fn (confirm/security-warning dialogs +
+	; MetricsShortcuts.enabled + MS_SaveToIni) rather than the generic
+	; ToggleCategoryAllFeatures used by manifest-only menus — same pattern
+	; Gestures uses (see BuildGesturesMenu / AddCategoryToggleItem). The
+	; manifest's metrics_menu toggle entry carries platforms:["hs"] so the
+	; generic renderer never double-renders this row on AHK.
+	AddCategoryToggleItem(MetricsMenu,
+		t("menu.metrics.on"), t("menu.metrics.off"),
+		MetricsShortcuts.enabled, (*) => ToggleMetricsEnabled())
 	A_TrayMenu.Add(t("menu.metrics.title"), MetricsMenu)
 }
 
