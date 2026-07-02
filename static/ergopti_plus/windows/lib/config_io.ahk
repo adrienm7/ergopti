@@ -303,7 +303,7 @@ _CategoryEnabledKey(Category) {
 }
 
 SaveFullConfig() {
-    global Features, ScriptInformation, ScriptShortcutAssignments, GestureAssignments, KeyboardShortcutAssignments, ConfigurationFile, _TOML_STRICT_CANON_IN_PROGRESS, PrevCanonState
+    global Features, ScriptInformation, ScriptShortcutAssignments, GestureAssignments, KeyboardShortcutAssignments, ConfigurationFile, _TOML_STRICT_CANON_IN_PROGRESS
     ; Guard: the driver must be fully initialised before writing config — prevents
     ; a partial config flush triggered by the -500 ms boot timer from clobbering the
     ; user's file with uninitialised defaults (e.g. before Features or GestureAssignments
