@@ -55,7 +55,10 @@ TooltipRShow(Payload) {
 		TooltipShow(Items, DurationSec)
 		_TOOLTIP_R_VISIBLE := true
 	} catch as Err {
-		OutputDebug("TooltipRShow error: " . Err.Message)
+		; Route through the centralized Logger like every other adapter's catch
+		; block in this zone (mouse_control.ahk, window_manager.ahk) — OutputDebug
+		; is invisible outside an attached debugger and never reaches ErgoptiPlus.log.
+		try LoggerWarn("TooltipRenderer", "TooltipRShow error: {1}.", Err.Message)
 		TooltipRHide()
 	}
 }
@@ -63,7 +66,11 @@ TooltipRShow(Payload) {
 ; Removes the tooltip from the screen immediately.
 TooltipRHide() {
 	global _TOOLTIP_R_VISIBLE
-	try TooltipHide()
+	try {
+		TooltipHide()
+	} catch as Err {
+		try LoggerWarn("TooltipRenderer", "TooltipRHide: TooltipHide() failed: {1}.", Err.Message)
+	}
 	_TOOLTIP_R_VISIBLE := false
 }
 
