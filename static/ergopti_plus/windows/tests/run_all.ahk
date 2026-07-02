@@ -874,6 +874,8 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_updater_changelog_install_closegui.ahk
 ; MCSetPos/MCGetPos bare-try-no-catch fix (F32).
 #Include meta/test_mouse_control_error_logging.ahk
+; TooltipRHide bare-try-no-catch + TooltipRShow OutputDebug-instead-of-Logger fix (F50).
+#Include meta/test_tooltip_renderer_error_logging.ahk
 ; WMGetList/WIGetAll bare-try-no-catch fix (F33) — sibling of the
 ; GestureGetCyclableWindows TOCTOU guard (commit 7b701020d).
 #Include meta/test_window_adapters_catch.ahk
