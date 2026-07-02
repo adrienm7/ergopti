@@ -223,6 +223,60 @@ CREATE TABLE IF NOT EXISTS events_window_topo (
 );
 CREATE INDEX IF NOT EXISTS idx_events_window_topo_date ON events_window_topo(date);
 
+-- Minimal viable schema for event families that were previously written to
+-- today.log with no CREATE TABLE anywhere and destroyed at every day
+-- rollover (F21): volume/screen-recording, network/VPN, clipboard, and
+-- ROI/trigger-candidate events. Each follows the same generic
+-- (kind, app, meta_json) shape as events_window_topo/events_mouse/events_ergo
+-- above rather than one bespoke table per event type.
+CREATE TABLE IF NOT EXISTS events_av (
+	device_id   TEXT NOT NULL,
+	id          INTEGER NOT NULL,
+	ts          TEXT NOT NULL,
+	date        TEXT NOT NULL,
+	kind        TEXT NOT NULL,
+	app         TEXT NOT NULL,
+	meta_json   TEXT,
+	PRIMARY KEY (device_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_events_av_date ON events_av(date);
+
+CREATE TABLE IF NOT EXISTS events_network (
+	device_id   TEXT NOT NULL,
+	id          INTEGER NOT NULL,
+	ts          TEXT NOT NULL,
+	date        TEXT NOT NULL,
+	kind        TEXT NOT NULL,
+	app         TEXT NOT NULL,
+	meta_json   TEXT,
+	PRIMARY KEY (device_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_events_network_date ON events_network(date);
+
+CREATE TABLE IF NOT EXISTS events_clipboard (
+	device_id   TEXT NOT NULL,
+	id          INTEGER NOT NULL,
+	ts          TEXT NOT NULL,
+	date        TEXT NOT NULL,
+	kind        TEXT NOT NULL,
+	app         TEXT NOT NULL,
+	meta_json   TEXT,
+	PRIMARY KEY (device_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_events_clipboard_date ON events_clipboard(date);
+
+CREATE TABLE IF NOT EXISTS events_roi (
+	device_id   TEXT NOT NULL,
+	id          INTEGER NOT NULL,
+	ts          TEXT NOT NULL,
+	date        TEXT NOT NULL,
+	kind        TEXT NOT NULL,
+	app         TEXT NOT NULL,
+	meta_json   TEXT,
+	PRIMARY KEY (device_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_events_roi_date ON events_roi(date);
+
 
 -- ============================================================================
 -- 3. PRECOMPUTED AGGREGATES
