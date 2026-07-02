@@ -237,6 +237,7 @@ InstallSendNoOps()
 ; registered at top level) so the file is safe to include in the headless runner.
 #Include ../lib/metrics/metrics_shortcuts.ahk
 #Include unit/test_metrics_shortcut_named_key.ahk
+#Include unit/test_metrics_shortcut_persist_on_bind_failure.ahk
 
 ; LLM modules — pure-logic subset (profiles, models, api_common, api_ollama,
 ; api_remote, prediction_engine) included here to test JSON parsing, profile
@@ -876,6 +877,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 ; AltTabMonitor bare-try-no-catch fix (F37) — sibling of the
 ; GestureGetCyclableWindows TOCTOU guard (commit 7b701020d).
 #Include meta/test_alt_tab_monitor_catch.ahk
+#Include meta/test_metrics_shortcut_persist_guard.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
