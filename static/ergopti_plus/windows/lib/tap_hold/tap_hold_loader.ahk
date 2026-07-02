@@ -292,3 +292,43 @@ TapHoldHoldLayer(TapHold, KeyId) {
 	Entry := TapHold["keys"][KeyId]
 	return Entry.Has("hold_layer") ? Entry["hold_layer"] : ""
 }
+
+
+
+
+
+; ==============================================================
+; ===========================================
+; ======= 4. Hold-modifier resolution =======
+; ===========================================
+; ==============================================================
+
+; Central hold_modifier -> AHK key-name resolver shared by every tap-holds
+; module's per-key XxxHoldModKey() wrapper. Centralizing the switch means a
+; typo'd hold_modifier value (e.g. "contrl") — which passes the #HotIf
+; non-empty gate but matches no case here — is caught and logged in exactly
+; one place instead of silently degrading to an empty ModKey in 9 separate
+; copies of this switch, each fed unguarded into TextPressKey.
+; @param ModifierValue {String} Raw hold_modifier value, typically read via
+;        TapHoldHoldModifier(TapHold, FieldLabel).
+; @param FieldLabel {String} The tap-holds field name (e.g. "backspace"),
+;        used only in the warning message so the log pinpoints the bad
+;        tap_hold.toml row.
+; @param CtrlKeyName {String} AHK key name for the "ctrl" case. Defaults to
+;        "LCtrl"; rctrl.ahk passes "RCtrl" so holding the physical Right Ctrl
+;        key as its own "ctrl" hold modifier arms the right-side key.
+; @returns {String} An AHK key name suitable for TextPressKey, or "" when
+;        ModifierValue is unrecognized.
+ResolveHoldModifierKey(ModifierValue, FieldLabel, CtrlKeyName := "LCtrl") {
+	switch ModifierValue {
+		case "ctrl":   return CtrlKeyName
+		case "shift":  return "LShift"
+		case "alt":    return "LAlt"
+		case "alt_gr": return "RAlt"
+		case "win":    return "LWin"
+		default:
+			try LoggerWarn("TapHoldLoader", "Unrecognized hold_modifier '{1}' for tap-hold key '{2}' — check tap_hold.toml for a typo; no modifier will be armed (expected one of ctrl/shift/alt/alt_gr/win).",
+				ModifierValue, FieldLabel)
+			return ""
+	}
+}

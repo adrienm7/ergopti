@@ -265,6 +265,16 @@ TextEraseChars(Count) {
 TextPressKey(Key, Modifiers) {
 	; "Down" / "Up" — sustained press or release for hold-modifier patterns.
 	if (Modifiers == "Down" or Modifiers == "Up") {
+		; An empty Key here means an upstream hold_modifier resolver already
+		; logged a WARNING and bailed to "" (see ResolveHoldModifierKey in
+		; lib/tap_hold/tap_hold_loader.ahk). Sending "{ Down}" / "{ Up}" would
+		; silently arm nothing while still consuming the keystroke — refuse it
+		; here too as a second line of defense instead of a blind SendInput
+		; with a blank key name.
+		if (Key == "") {
+			LoggerError("TextSender", "TextPressKey: refusing to send '{1}' with an empty Key — caller must resolve the key name before calling.", Modifiers)
+			return
+		}
 		_AHK_SendInput.Call("{" . Key . " " . Modifiers . "}")
 		return
 	}

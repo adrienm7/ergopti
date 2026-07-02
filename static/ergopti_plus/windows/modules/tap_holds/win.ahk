@@ -28,14 +28,7 @@
 ; Helper predicates -------------------------------------------------------
 
 _WinHoldModKey() {
-	switch TapHoldHoldModifier(TapHold, "win") {
-		case "ctrl":   return "LCtrl"
-		case "shift":  return "LShift"
-		case "alt":    return "LAlt"
-		case "alt_gr": return "RAlt"
-		case "win":    return "LWin"
-		default:       return ""
-	}
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "win"), "win")
 }
 
 

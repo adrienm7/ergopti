@@ -98,3 +98,28 @@ _TSM_DownStillSustained() {
 		"Down must still emit a sustained key-down event")
 }
 Test("TextPressKey: 'Down' still emits a sustained press", _TSM_DownStillSustained)
+
+
+
+
+; ==========================================
+; ==========================================
+; ======= 4/ Empty-Key guard (F17) =========
+; ==========================================
+; ==========================================
+
+; Regression for the "unrecognized hold_modifier -> empty ModKey -> unguarded
+; SendInput('{ Down}')" bug: a typo'd hold_modifier resolved to "" and was fed
+; straight into TextPressKey. TextPressKey must now refuse to send anything
+; for an empty Key instead of emitting a blank-key SendInput call.
+_TSM_EmptyKeyDownIsRefused() {
+	AssertEqual("", _TSM_Capture("", "Down"),
+		"TextPressKey('', 'Down') must refuse to send — sending '{ Down}' would silently arm nothing while still consuming the keystroke")
+}
+Test("TextPressKey: empty Key with 'Down' is refused, not sent as '{ Down}'", _TSM_EmptyKeyDownIsRefused)
+
+_TSM_EmptyKeyUpIsRefused() {
+	AssertEqual("", _TSM_Capture("", "Up"),
+		"TextPressKey('', 'Up') must refuse to send for the same reason as the Down case")
+}
+Test("TextPressKey: empty Key with 'Up' is refused, not sent as '{ Up}'", _TSM_EmptyKeyUpIsRefused)
