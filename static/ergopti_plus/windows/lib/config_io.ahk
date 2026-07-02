@@ -207,15 +207,27 @@ ToggleCategoryAllFeatures(Category, Value) {
         ; snapshot-on-OFF preserves any live section toggles made while it was on.
         V2Cat := _CategoryEnabledKey(Category)
         try LoggerDebug("Menu", "Live category toggle: {1} -> {2}.", Category, Bool ? "ON" : "OFF")
-        if Bool {
-            _HSRestoreCategory(V2Cat)
-        } else {
-            _HSSnapshotCategory(V2Cat)
+        ; Wrap the WHOLE mutation window (snapshot/restore -> gate flip -> master
+        ; gates -> engine rebuild) in Critical, not just the final rebuild step —
+        ; otherwise a keystroke landing between the snapshot/restore and
+        ; RebuildHotstringsLive() could observe transiently inconsistent Features/
+        ; TapHold state via a concurrent #HotIf/InputHook evaluation.
+        ; RebuildHotstringsLive() re-enters Critical internally; that is safe, it
+        ; just re-applies "On" and hands back to the level saved here.
+        _TcafCrit := Critical("On")
+        try {
+            if Bool {
+                _HSRestoreCategory(V2Cat)
+            } else {
+                _HSSnapshotCategory(V2Cat)
+            }
+            CategoryEnabled[Category] := Bool
+            TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
+            ApplyMasterGatesToFeatures()
+            RebuildHotstringsLive()
+        } finally {
+            Critical(_TcafCrit)
         }
-        CategoryEnabled[Category] := Bool
-        TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
-        ApplyMasterGatesToFeatures()
-        RebuildHotstringsLive()
         return
     }
     CategoryEnabled[Category] := Bool
