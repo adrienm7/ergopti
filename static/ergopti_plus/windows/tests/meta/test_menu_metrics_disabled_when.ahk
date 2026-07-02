@@ -214,3 +214,29 @@ _MMDW_ManifestToggleExcludesAhk() {
 	Assert(false, "metrics_menu must declare a type=toggle entry")
 }
 Test("menu-metrics-disabled-when: manifest toggle entry excludes ahk so the bespoke toggle isn't shadowed (F2)", _MMDW_ManifestToggleExcludesAhk)
+
+; The two prior assertions only read the GENERATED menu_manifest.json, which
+; can silently drift from its own source: an earlier fix pass hand-edited the
+; generated JSON directly instead of manifest.toml, so regenerating via
+; `node tools/build/build-menu-manifest.js` reintroduced the F2 bug (the
+; regenerated JSON lost platforms:["hs"] because manifest.toml never had it).
+; This guards the TRUE source of truth so a future regeneration can never
+; silently resurrect the dead duplicate toggle.
+_MMDW_ManifestTomlSourceExcludesAhk() {
+	SplitPath(A_ScriptDir, , &WinDir)
+	SplitPath(WinDir, , &EpDir)
+	TomlPath := EpDir . "\_shared\modules\features\manifest.toml"
+	Toml := ""
+	try Toml := FileRead(TomlPath, "UTF-8")
+	Assert(Toml != "", "manifest.toml must be readable")
+
+	HeaderPos := InStr(Toml, "[[menu.metrics_menu]]")
+	Assert(HeaderPos > 0, "manifest.toml must declare a [[menu.metrics_menu]] table")
+	NextTablePos := InStr(Toml, "[[", , HeaderPos + StrLen("[[menu.metrics_menu]]"))
+	Body := (NextTablePos > 0) ? SubStr(Toml, HeaderPos, NextTablePos - HeaderPos) : SubStr(Toml, HeaderPos)
+	Assert(InStr(Body, 'type = "toggle"') > 0,
+		'the first [[menu.metrics_menu]] table must be the type="toggle" master entry')
+	Assert(InStr(Body, 'platforms = ["hs"]') > 0,
+		'manifest.toml`'s [[menu.metrics_menu]] toggle entry must declare platforms = ["hs"] — without it, regenerating menu_manifest.json from source silently resurrects the dead duplicate toggle (F2)')
+}
+Test("menu-metrics-disabled-when: manifest.toml SOURCE excludes ahk from the metrics toggle, not just the generated JSON (F2)", _MMDW_ManifestTomlSourceExcludesAhk)
