@@ -520,6 +520,9 @@ _Updater_FetchLatestJsonAsync(Channel, OnJson) {
 	} catch as Err {
 		try LoggerDebug("Updater", "Async check dispatch failed: {1}.", Err.Message)
 		try OnJson("")
+		catch as OnJsonErr {
+			try LoggerError("Updater", "OnJson callback threw after an async check dispatch failure: {1}.", OnJsonErr.Message)
+		}
 		return
 	}
 	_UpdaterAsyncCounter += 1
@@ -575,6 +578,9 @@ _Updater_PollAsync(id) {
 		}
 	}
 	try OnJson(Json)
+	catch as OnJsonErr {
+		try LoggerError("Updater", "OnJson callback threw while completing an async background check: {1}.", OnJsonErr.Message)
+	}
 }
 
 ; Abandons every in-flight async update check. Called when background checks are
@@ -623,6 +629,9 @@ _Updater_FetchReleasesListJsonAsync(Channel, OnJson) {
 	} catch as Err {
 		try LoggerDebug("Updater", "Async releases-list dispatch failed: {1}.", Err.Message)
 		try OnJson("")
+		catch as OnJsonErr {
+			try LoggerError("Updater", "OnJson callback threw after an async releases-list dispatch failure: {1}.", OnJsonErr.Message)
+		}
 		return
 	}
 	_Updater_PollReleasesListAsync(Req, Url, OnJson, 0)
@@ -664,6 +673,9 @@ _Updater_PollReleasesListAsync(Req, Url, OnJson, Polls) {
 		}
 	}
 	try OnJson(Json)
+	catch as OnJsonErr {
+		try LoggerError("Updater", "OnJson callback threw while completing an async releases-list fetch: {1}.", OnJsonErr.Message)
+	}
 }
 
 ; Given a GitHub releases array JSON string, return the JSON object of the
