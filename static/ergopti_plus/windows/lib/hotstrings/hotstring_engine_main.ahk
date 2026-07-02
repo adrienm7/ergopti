@@ -565,6 +565,23 @@ HSE_EnableGroup(Group) {
     }
 }
 
+; Fully wipe a single HSE group in preparation for a live section-scoped
+; reload (as opposed to HSE_DisableGroup, which only STASHES the group's specs
+; so a later HSE_EnableGroup can restore them). Reuses HSE_DisableGroup's
+; Critical-wrapped live-index splice, then also discards the stash and lifts
+; the disabled marker so the caller's fresh HSE_Register calls for this group
+; land in a clean, live-eligible index instead of extending stale specs behind
+; the newest registration or being silently dropped by the disabled-group gate
+; (personal-hotstring-live-reload-stale-group).
+; @param Group {String} HSE group string ("<loader_category>.<section>").
+HSE_ClearGroupForReload(Group) {
+    global HSE_RegistryByGroup, HSE_DisabledGroups
+    HSE_DisableGroup(Group)
+    HSE_RegistryByGroup[Group] := []
+    if HSE_DisabledGroups.Has(Group)
+        HSE_DisabledGroups.Delete(Group)
+}
+
 ; Return the total number of active mappings across all groups.
 ; Mirrors Registry.spec.js size().
 HSE_Size() {

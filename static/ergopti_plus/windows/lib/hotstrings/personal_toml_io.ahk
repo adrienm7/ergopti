@@ -447,6 +447,15 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
 	if !Data["sections"].Has(SectionName) {
 		return
 	}
+	; Clear the section's OLD HSE group before re-registering. Without this the
+	; fresh spec for an edited trigger lands as a dead duplicate BEHIND the
+	; stale one (HSE's Seq tie-break favours the older/lower-Seq registration),
+	; so a same-trigger edit could never take effect until a full Reload
+	; (personal-hotstring-live-reload-stale-group). This Group string must stay
+	; byte-identical to the one HSE_Register derives below from Options'
+	; "Category"/"Section" (Meta.Category . "." . Meta.Section).
+	Group := "personal." . SectionName
+	HSE_ClearGroupForReload(Group)
 	for E in Data["sections"][SectionName]["entries"] {
 		Trigger := StrReplace(E["trigger"], "★", ScriptInformation["MagicKey"])
 		Output := E["output"]
@@ -472,6 +481,12 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
 			"TimeActivationSeconds", 0,
 			"FinalResult", E["final_result"],
 			"Category", "personal",
+			; Without this, HSE_Register's Group derivation requires BOTH
+			; Category and Section to be set, so every re-registered personal
+			; hotstring fell back to the generic "default" group — which is
+			; never cleared on a normal reload (personal-hotstring-live-
+			; reload-stale-group). Must match the "Group" string built above.
+			"Section", SectionName,
 			"Priority", EntryPriority,
 		)
 		if E["is_case_sensitive"] {
