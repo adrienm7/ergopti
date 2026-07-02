@@ -44,13 +44,13 @@
 ; ===================================================================
 
 _TDFRP_CheckFailRestoresPriority() {
-	; (a) LLM_Deps_Fail must restore Normal priority
+	; (a) LLM_Deps_Fail must restore the driver baseline priority
 	FailBody := _DriverFuncBody("LLM_Deps_Fail")
 	Assert(FailBody != "", "LLM_Deps_Fail must exist in ollama_deps_checker.ahk")
 	Assert(InStr(FailBody, "ProcessSetPriority"),
-		"AHK-30: LLM_Deps_Fail must call ProcessSetPriority(Normal) — when the browser-fallback URL fails to open, RunInstaller has already boosted to High and the call to LLM_Deps_Fail is the only exit that restores priority")
-	Assert(InStr(FailBody, Chr(0x22) . "Normal" . Chr(0x22)),
-		"AHK-30: LLM_Deps_Fail must restore to Normal (not High) priority class")
+		"AHK-30: LLM_Deps_Fail must call ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS) — when the browser-fallback URL fails to open, RunInstaller has already boosted to High and the call to LLM_Deps_Fail is the only exit that restores priority")
+	Assert(InStr(FailBody, "DRIVER_BASELINE_PRIORITY_CLASS"),
+		"AHK-30 / driver-baseline-priority-reverted-to-normal: LLM_Deps_Fail must restore via the shared DRIVER_BASELINE_PRIORITY_CLASS constant, not a hardcoded Normal literal, so it stays in sync with the boot-time boost class")
 }
 
 _TDFRP_CheckPollTimeout() {

@@ -3,6 +3,15 @@
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
 
+; Single source of truth for the driver's baseline (non-boosted) process
+; priority class. Every restore site outside a transient boost — LLM_Menu_Init's
+; defensive reset, LLM_Deps_Fail, LLM_Deps_Cancel, _LLM_Deps_OnPollProbeResult —
+; MUST reference this constant instead of a hardcoded "Normal" literal. Before
+; this fix those four sites restored to the OS default "Normal", silently
+; undoing the AboveNormal boot boost below the first time any of them ran
+; (driver-baseline-priority-reverted-to-normal).
+global DRIVER_BASELINE_PRIORITY_CLASS := "AboveNormal"
+
 ; Raise this process above the default OS scheduling class. The keyboard hook
 ; and hotstring engine are latency-sensitive on every keystroke; at Normal
 ; priority, Windows can leave them waiting behind other processes that are
@@ -11,7 +20,7 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 ; warnings even though this driver's own per-keystroke work is sub-millisecond.
 ; AboveNormal (not High) keeps this driver ahead of ordinary background work
 ; without contending with genuinely real-time OS/driver threads (hotpath-priority-starvation).
-try ProcessSetPriority("AboveNormal")
+try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
 
 ; Globals referenced by ``#HotIf`` expressions across the driver. They MUST
 ; be assigned before any code that pumps the message loop runs — otherwise

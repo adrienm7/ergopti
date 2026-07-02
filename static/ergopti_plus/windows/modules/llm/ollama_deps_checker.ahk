@@ -386,7 +386,7 @@ LLM_Deps_PollServerReady(on_ready?, on_failed?) {
  * next 3 s tick — no work done on the main thread.
  */
 _LLM_Deps_OnPollProbeResult(reachable, captured_epoch, on_ready?, on_failed?) {
-	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_PollTimer, _LLM_Deps_Epoch
+	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_PollTimer, _LLM_Deps_Epoch, DRIVER_BASELINE_PRIORITY_CLASS
 	; AHK-14: discard stale poll callbacks from a preempted or cancelled check.
 	if (captured_epoch != _LLM_Deps_Epoch) {
 		LoggerInfo("LLM", "OnPollProbeResult — stale epoch " captured_epoch " (current=" _LLM_Deps_Epoch "), discarding.")
@@ -399,7 +399,9 @@ _LLM_Deps_OnPollProbeResult(reachable, captured_epoch, on_ready?, on_failed?) {
 		SetTimer(_LLM_Deps_PollTimer, 0)
 	_LLM_Deps_State    := "ready"
 	_LLM_Deps_Checking := false
-	try ProcessSetPriority("Normal")
+	; Restore the driver baseline (not a hardcoded "Normal") — must stay in
+	; sync with the boot-time boost class (driver-baseline-priority-reverted-to-normal).
+	try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
 	if IsSet(on_ready)
 		on_ready()
 }
@@ -415,7 +417,7 @@ _LLM_Deps_OnPollProbeResult(reachable, captured_epoch, on_ready?, on_failed?) {
  * the user closed every visible cue.
  */
 LLM_Deps_Cancel() {
-	global _LLM_Deps_InstallerPid, _LLM_Deps_PollTimer, _LLM_Deps_Checking, _LLM_Deps_State, _LLM_Deps_Epoch
+	global _LLM_Deps_InstallerPid, _LLM_Deps_PollTimer, _LLM_Deps_Checking, _LLM_Deps_State, _LLM_Deps_Epoch, DRIVER_BASELINE_PRIORITY_CLASS
 
 	if _LLM_Deps_InstallerPid {
 		LoggerInfo("LLM", "Cancel — killing installer PID=" _LLM_Deps_InstallerPid " and its child tree.")
@@ -437,9 +439,11 @@ LLM_Deps_Cancel() {
 	; State stays "pending" — the user explicitly aborted, but the next
 	; toggle ON should be able to retry the install cleanly.
 	_LLM_Deps_State := "pending"
-	; Restore Normal priority — the install was running with AHK in
-	; High priority. Cancelling means we no longer need the boost.
-	try ProcessSetPriority("Normal")
+	; Restore the driver baseline priority — the install was running with AHK
+	; boosted to High. Cancelling means we no longer need the boost. MUST use
+	; the shared constant, not a hardcoded "Normal" literal
+	; (driver-baseline-priority-reverted-to-normal).
+	try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
 }
 
 /**
@@ -448,14 +452,16 @@ LLM_Deps_Cancel() {
  * @param {Func} on_failed - Optional callback.
  */
 LLM_Deps_Fail(msg, on_failed) {
-	global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking
+	global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, DRIVER_BASELINE_PRIORITY_CLASS
 	LoggerError("LLM", "Deps failure: " msg)
 	_LLM_Deps_State          := "failed"
 	_LLM_Deps_FailureMessage := msg
 	_LLM_Deps_Checking       := false
-	; AHK-30: restore Normal priority — the install ran with AHK at High.
-	; Mirror of the same restore in LLM_Deps_Cancel.
-	try ProcessSetPriority("Normal")
+	; AHK-30: restore the driver baseline priority — the install ran with AHK
+	; boosted to High. Mirror of the same restore in LLM_Deps_Cancel. MUST use
+	; the shared constant, not a hardcoded "Normal" literal
+	; (driver-baseline-priority-reverted-to-normal).
+	try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
 	if IsSet(on_failed)
 		on_failed(msg)
 }

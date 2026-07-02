@@ -790,6 +790,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_logger_dedup_exit_flush.ahk
 #Include meta/test_shell_runner_boot_crash_and_quoting.ahk
 #Include meta/test_hotpath_priority_starvation.ahk
+#Include meta/test_priority_baseline_single_source.ahk
 
 ; -- Previously-orphaned regression tests (on disk but never wired into the
 ;    runner; re-wired so they actually execute). All were silently skipped; the

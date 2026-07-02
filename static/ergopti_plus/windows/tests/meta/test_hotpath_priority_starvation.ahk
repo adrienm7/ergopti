@@ -46,10 +46,17 @@ _THPS_CheckPriorityRaisedEarly() {
 	try Body := FileRead(BootFile)
 	Assert(Body != "", "ErgoptiPlus.ahk must be readable for the priority-starvation meta-test")
 
-	PriorityPos := InStr(Body, 'ProcessSetPriority("AboveNormal")')
+	; driver-baseline-priority-reverted-to-normal: the boost now goes through a
+	; shared named constant instead of a standalone literal, so both the
+	; declaration and the call site must be present.
+	Assert(InStr(Body, 'global DRIVER_BASELINE_PRIORITY_CLASS := "AboveNormal"') > 0,
+		'ErgoptiPlus.ahk must declare DRIVER_BASELINE_PRIORITY_CLASS := "AboveNormal" as the single source of '
+		. 'truth for the driver baseline priority (driver-baseline-priority-reverted-to-normal)')
+
+	PriorityPos := InStr(Body, "ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)")
 	Assert(PriorityPos > 0,
-		'ErgoptiPlus.ahk must call ProcessSetPriority("AboveNormal") at boot so Windows schedules the '
-		. 'keyboard-hook/hotstring-engine threads promptly even when another process saturates the CPU '
+		'ErgoptiPlus.ahk must call ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS) at boot so Windows schedules '
+		. 'the keyboard-hook/hotstring-engine threads promptly even when another process saturates the CPU '
 		. '(hotpath-priority-starvation)')
 
 	; Must be try-wrapped: ProcessSetPriority can fail under restrictive OS
