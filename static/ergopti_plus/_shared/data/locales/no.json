@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (forhåndskanal)",
 	"updater.channel_local_source_suffix": " (lokal kilde — ikke et utgivelsesbygg)",
 	"updater.channel_main_suffix": " (stabil kanal)",
+	"updater.channel_switch_blocked_download": "En oppdatering lastes ned nå. Vent til den er ferdig (eller start appen på nytt) før du bytter kanal.",
 	"updater.checking": "Leter etter oppdateringer i kanalen «{1}»…\n(Dette kan ta noen sekunder.)",
 	"updater.close": "Lukk",
 	"updater.install_error": "Oppdateringen kunne ikke installeres. Se loggene for detaljer.",

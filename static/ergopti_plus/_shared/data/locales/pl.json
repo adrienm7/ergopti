@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (kanał wstępny)",
 	"updater.channel_local_source_suffix": " (źródło lokalne — nie kompilacja wydania)",
 	"updater.channel_main_suffix": " (kanał stabilny)",
+	"updater.channel_switch_blocked_download": "Trwa pobieranie aktualizacji. Poczekaj, aż się zakończy (lub uruchom ponownie aplikację), zanim zmienisz kanał.",
 	"updater.checking": "Sprawdzanie aktualizacji w kanale „{1}”…\n(Może to potrwać kilka sekund.)",
 	"updater.close": "Zamknij",
 	"updater.install_error": "Nie udało się zainstalować aktualizacji. Szczegóły znajdziesz w logach.",

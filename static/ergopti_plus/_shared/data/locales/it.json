@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (canale pre-release)",
 	"updater.channel_local_source_suffix": " (sorgente locale — non è una build di release)",
 	"updater.channel_main_suffix": " (canale stabile)",
+	"updater.channel_switch_blocked_download": "È in corso il download di un aggiornamento. Attendi il completamento (o riavvia l'app) prima di cambiare canale.",
 	"updater.checking": "Ricerca aggiornamenti sul canale «{1}»…\n(L’operazione può richiedere qualche secondo.)",
 	"updater.close": "Chiudi",
 	"updater.install_error": "Impossibile installare l'aggiornamento. Consulta i log per i dettagli.",

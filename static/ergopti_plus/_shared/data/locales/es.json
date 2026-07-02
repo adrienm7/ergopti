@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (canal de pre-versión)",
 	"updater.channel_local_source_suffix": " (fuente local — no es una versión de release)",
 	"updater.channel_main_suffix": " (canal estable)",
+	"updater.channel_switch_blocked_download": "Actualmente se está descargando una actualización. Espere a que finalice (o reinicie la aplicación) antes de cambiar de canal.",
 	"updater.checking": "Buscando actualizaciones en el canal «{1}»…\n(La operación puede tardar unos segundos.)",
 	"updater.close": "Cerrar",
 	"updater.install_error": "No se pudo instalar la actualización. Consulte los registros para más detalles.",

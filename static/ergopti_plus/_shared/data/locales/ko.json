@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (사전 릴리스 채널)",
 	"updater.channel_local_source_suffix": " (로컬 소스 — 릴리스 빌드 아님)",
 	"updater.channel_main_suffix": " (안정 채널)",
+	"updater.channel_switch_blocked_download": "현재 업데이트를 다운로드하는 중입니다. 채널을 전환하기 전에 다운로드가 끝날 때까지 기다리거나 앱을 다시 시작하세요.",
 	"updater.checking": "‘{1}’ 채널에서 업데이트를 확인하는 중…\n(몇 초가 걸릴 수 있습니다.)",
 	"updater.close": "닫기",
 	"updater.install_error": "업데이트를 설치할 수 없습니다. 자세한 내용은 로그를 확인하십시오.",

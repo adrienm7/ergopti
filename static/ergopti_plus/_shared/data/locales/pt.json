@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (canal de pré-lançamento)",
 	"updater.channel_local_source_suffix": " (origem local — não é uma build de release)",
 	"updater.channel_main_suffix": " (canal estável)",
+	"updater.channel_switch_blocked_download": "Uma atualização está a ser transferida. Aguarde que termine (ou reinicie a aplicação) antes de mudar de canal.",
 	"updater.checking": "A procurar atualizações no canal «{1}»…\n(Esta operação pode demorar alguns segundos.)",
 	"updater.close": "Fechar",
 	"updater.install_error": "Não foi possível instalar a atualização. Consulte os registos para mais detalhes.",

@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (předběžný kanál)",
 	"updater.channel_local_source_suffix": " (lokální zdroj — není to vydané sestavení)",
 	"updater.channel_main_suffix": " (stabilní kanál)",
+	"updater.channel_switch_blocked_download": "Právě probíhá stahování aktualizace. Počkejte, až skončí (nebo aplikaci restartujte), než změníte kanál.",
 	"updater.checking": "Hledám aktualizace v kanálu „{1}“…\n(Operace může trvat několik sekund.)",
 	"updater.close": "Zavřít",
 	"updater.install_error": "Nelze nainstalovat aktualizaci. Podrobnosti najdete v logu.",

@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (قناة ما قبل الإطلاق)",
 	"updater.channel_local_source_suffix": " (مصدر محلي — ليس إصدار إطلاق)",
 	"updater.channel_main_suffix": " (القناة المستقرة)",
+	"updater.channel_switch_blocked_download": "يجري حاليًا تنزيل تحديث. انتظر حتى ينتهي (أو أعد تشغيل التطبيق) قبل تغيير القناة.",
 	"updater.checking": "جاري البحث عن تحديثات على القناة «{1}»…\n(قد تستغرق هذه العملية بضع ثوانٍ.)",
 	"updater.close": "إغلاق",
 	"updater.install_error": "تعذّر تثبيت التحديث. راجع السجلات للاطّلاع على التفاصيل.",

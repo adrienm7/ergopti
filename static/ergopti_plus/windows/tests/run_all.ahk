@@ -622,6 +622,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_uia_error_logged.ahk
 #Include meta/test_updater_focus_poll_suspend_guard.ahk
 #Include meta/test_updater_setchannel_cancels_async.ahk
+#Include meta/test_updater_setchannel_blocks_during_download.ahk
 #Include meta/test_updater_setcheckinterval_coerces.ahk
 #Include meta/test_webview_temp_dir_and_com_leak_on_reload.ahk
 #Include meta/test_win_l_lock_resets_context.ahk

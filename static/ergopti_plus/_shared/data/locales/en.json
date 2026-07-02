@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (pre-release channel)",
 	"updater.channel_local_source_suffix": " (local source — not a release build)",
 	"updater.channel_main_suffix": " (stable channel)",
+	"updater.channel_switch_blocked_download": "An update is currently downloading. Wait for it to finish (or restart the app) before switching channels.",
 	"updater.checking": "Checking for updates on the '{1}' channel…\n(This may take a few seconds.)",
 	"updater.close": "Close",
 	"updater.install_error": "Could not install the update. Check the logs for details.",

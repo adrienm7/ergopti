@@ -2246,6 +2246,7 @@
 	"updater.channel_dev_suffix": " (canal pré-version)",
 	"updater.channel_local_source_suffix": " (source locale — pas une version de release)",
 	"updater.channel_main_suffix": " (canal stable)",
+	"updater.channel_switch_blocked_download": "Une mise à jour est en cours de téléchargement. Patientez jusqu'à la fin du téléchargement (ou redémarrez l'application) avant de changer de canal.",
 	"updater.checking": "Recherche de mises à jour sur le canal « {1} »…\n(L’opération peut prendre quelques secondes.)",
 	"updater.close": "Fermer",
 	"updater.install_error": "Impossible d’installer la mise à jour. Consultez les journaux pour plus de détails.",
