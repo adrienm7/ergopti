@@ -562,6 +562,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_hse_disable_group_atomic.ahk
 #Include meta/test_insert_id_discovery_label_collision.ahk
 #Include meta/test_isrepeat_section_name_mismatch_latent_divergence.ahk
+#Include meta/test_text_expansion_auto_toml_backed.ahk
 #Include meta/test_kh_intercept_dead_flag.ahk
 #Include meta/test_kl_refresh_context_blocks_on_keystroke.ahk
 #Include meta/test_kl_stop_dead_no_exit_flush.ahk
