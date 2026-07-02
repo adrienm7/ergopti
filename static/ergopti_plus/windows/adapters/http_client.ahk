@@ -31,6 +31,9 @@
 global _HTTP_ACTIVE_REQUEST := 0
 ; Timeout in milliseconds — matches HttpClient.spec.js DEFAULT_TIMEOUT_MS.
 global HTTP_TIMEOUT_MS := 30000
+; Monotonic counter guarding a reentrant HTTPPost call from clobbering a newer
+; in-flight request's active-slot state (see HTTPPost's MyGeneration comment).
+global _HTTP_REQUEST_GENERATION := 0
 
 
 
@@ -47,10 +50,19 @@ global HTTP_TIMEOUT_MS := 30000
 ; @param Body     {String}   JSON-encoded request body.
 ; @param Callback {Func}     Called with a Map: { ok, status, body, error }.
 HTTPPost(Url, Headers, Body, Callback) {
-	global _HTTP_ACTIVE_REQUEST, HTTP_TIMEOUT_MS
+	global _HTTP_ACTIVE_REQUEST, HTTP_TIMEOUT_MS, _HTTP_REQUEST_GENERATION
 	if _HTTP_ACTIVE_REQUEST != 0 {
+		LoggerWarn("HttpClient", "HTTPPost: reentrant call for '{1}' while a request is already active - cancelling the in-flight request first.", Url)
 		HTTPCancel()
 	}
+	; A reentrant call can start AND finish while THIS call is still blocked
+	; inside Req.Send() (WinHttp's synchronous COM call pumps Windows messages,
+	; letting a timer/hotkey fire a nested HTTPPost). MyGeneration lets the
+	; cleanup below detect that case and avoid clobbering the newer request's
+	; HTTPCancel()/HTTPIsActive() visibility — mirrors the generation-counter
+	; guard adapters/text_sender.ahk uses for its clipboard-restore race.
+	_HTTP_REQUEST_GENERATION += 1
+	MyGeneration := _HTTP_REQUEST_GENERATION
 	Result := Map("ok", false, "status", 0, "body", "", "error", "")
 	try {
 		Req := ComObject("WinHttp.WinHttpRequest.5.1")
@@ -74,7 +86,10 @@ HTTPPost(Url, Headers, Body, Callback) {
 	} catch as Err {
 		Result["error"] := Err.Message
 	}
-	_HTTP_ACTIVE_REQUEST := 0
+	; Only clear the active-request slot if no newer call has taken over — see
+	; the generation comment above.
+	if (_HTTP_REQUEST_GENERATION == MyGeneration)
+		_HTTP_ACTIVE_REQUEST := 0
 	if Callback != 0 {
 		try
 			Callback(Result)
