@@ -211,7 +211,6 @@ I18nSetLocale(Code) {
 	global _I18nLocale, _I18nCacheLoaded, _I18nFallbacksWarmed, ConfigurationFile, _I18nReloadDebounceMs
 	if _I18nLocale == Code
 		return
-	try LoggerStart("i18n", "Switching locale to '{1}'…", Code)
 	_I18nLocale           := Code
 	_I18nCacheLoaded      := false
 	_I18nFallbacksWarmed  := false
@@ -221,9 +220,15 @@ I18nSetLocale(Code) {
 	SetTimer(_I18nDoReload, -_I18nReloadDebounceMs)
 }
 
-; Called by the debounce timer — performs the actual script reload.
+; Called by the debounce timer — performs the actual script reload. LoggerStart
+; is logged HERE, not in I18nSetLocale: re-arming SetTimer with the same
+; function reference coalesces rapid successive calls into a single firing, so
+; logging the start at the call site emitted one unpaired START per superseded
+; intermediate switch (F51). Logging it right before the SUCCESS it always
+; pairs with guarantees exactly one START per reload attempt that completes.
 _I18nDoReload() {
 	global _I18nLocale
+	try LoggerStart("i18n", "Switching locale to '{1}'…", _I18nLocale)
 	try LoggerSuccess("i18n", "Locale set to '{1}' — reloading script.", _I18nLocale)
 	Reload
 }
