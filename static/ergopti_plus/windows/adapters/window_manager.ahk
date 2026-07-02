@@ -106,8 +106,18 @@ WMGetList() {
 	local Results := []
 	try {
 		local HWNDs := WinGetList()
-		for HWND in HWNDs
-			Results.Push(HWND)
+		for HWND in HWNDs {
+			try {
+				Results.Push(HWND)
+			} catch as Err {
+				; A window closing mid-enumeration (a routine race, not a bug) can
+				; invalidate the HWND before it is captured — skip just this window
+				; instead of aborting the whole list, mirroring the identical TOCTOU
+				; guard already applied to GestureGetCyclableWindows.
+				try LoggerDebug("WindowManager", "WMGetList: skipped a window during enumeration: {1}.", Err.Message)
+				continue
+			}
+		}
 	}
 	return Results
 }

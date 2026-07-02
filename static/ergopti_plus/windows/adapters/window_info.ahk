@@ -95,10 +95,20 @@ WIGetAll() {
 	try {
 		local HWNDs := WinGetList()
 		for HWND in HWNDs {
-			local Info := _WIInfoFromHwnd(HWND)
-			; Skip windows with no process name (system internals, invisible windows)
-			if Info["appId"] != ""
-				Results.Push(Info)
+			try {
+				local Info := _WIInfoFromHwnd(HWND)
+				; Skip windows with no process name (system internals, invisible windows)
+				if Info["appId"] != ""
+					Results.Push(Info)
+			} catch as Err {
+				; A window closing mid-enumeration (a routine race, not a bug)
+				; throws TargetError on the next WinGet* call for that HWnd — skip
+				; just this window instead of aborting the whole enumeration,
+				; mirroring the identical TOCTOU guard already applied to
+				; GestureGetCyclableWindows.
+				try LoggerDebug("WindowInfo", "WIGetAll: skipped ahk_id {1}: {2}.", HWND, Err.Message)
+				continue
+			}
 		}
 	}
 	return Results
