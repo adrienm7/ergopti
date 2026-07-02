@@ -271,6 +271,7 @@ try FileAppend("# [marker] starting direct include of LLM production modules`r`n
 ; unit test of the function's behaviour).
 #Include ../modules/keymap/llm_bridge.ahk
 #Include unit/test_llm_bridge_apply_expansion.ahk
+#Include unit/test_llm_bridge_buffer_cap.ahk
 ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,
 ; which let a crash in its Levenshtein helper survive — include it + its tests.
 #Include ../modules/llm/parser.ahk

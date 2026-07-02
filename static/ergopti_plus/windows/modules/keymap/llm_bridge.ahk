@@ -33,6 +33,16 @@
 ; ===============================
 ; ===============================
 
+; Hard ceiling on the rolling context buffer. Unlike HSE_Buffer (capped at 64
+; chars — the longest hotstring trigger it must match), this buffer feeds
+; menu_settings.ahk's SubStr(_LLM_Bridge_Buffer, -_LLM_Menu["ctx_chars"]), and
+; ctx_chars is user-configurable up to 10000 (LLM_Menu_PromptCtxChars's range
+; in menu_settings.ahk) — so the cap must stay >= that maximum or a high
+; ctx_chars setting would silently lose context. It exists only to bound
+; per-keystroke growth on an unbroken long typing run: every sibling hot-path
+; buffer (HSE_Buffer, KLRoi.current_word) is capped; this one previously was
+; not (F47).
+global LLM_BRIDGE_BUFFER_MAX_CHARS := 10000
 global _LLM_Bridge_Buffer := ""
 global _LLM_Bridge_Active := false
 ; Fallback path when Ollama becomes ready before PrefixWatcher's InputHook exists.
@@ -307,11 +317,15 @@ _LLM_Bridge_IsWordEndTrigger(ch) {
  * @param {string} ch - The character that was just typed.
  */
 LLM_Bridge_OnChar(ch) {
-	global _LLM_Bridge_Buffer, _LLM_Bridge_Active
+	global _LLM_Bridge_Buffer, _LLM_Bridge_Active, LLM_BRIDGE_BUFFER_MAX_CHARS
 	if !_LLM_Bridge_Active
 		return
 
 	_LLM_Bridge_Buffer .= ch
+	if (StrLen(_LLM_Bridge_Buffer) > LLM_BRIDGE_BUFFER_MAX_CHARS)
+		; Drop the oldest characters, keep the most recent typing — mirrors
+		; HSE_FeedChar's trim-to-tail pattern (F47).
+		_LLM_Bridge_Buffer := SubStr(_LLM_Bridge_Buffer, -LLM_BRIDGE_BUFFER_MAX_CHARS)
 	; Hotstring tooltip priority: if the PrefixWatcher's tooltip is visible,
 	; update the buffer but do NOT arm the LLM timer — LLM_Bridge_ScheduleAfterHotstring
 	; (fired from _LookupAndRender / TooltipRearmTimer) owns the chain delay until
