@@ -28,27 +28,34 @@
 ; ======================================
 ; ======================================
 
-; Default A_MaxHotkeysPerInterval as shipped by AHK v2 — restored on
-; ActivateLayer to undo the elevated limit that DisableLayer sets.
-global _NAV_DEFAULT_MAX_HOTKEYS := 70
+; Raised A_MaxHotkeysPerInterval ceiling used while the nav layer is engaged
+; and restored on release — bursts (holding Ctrl+Shift+Right, scrolling the
+; wheel right as the layer engages/disengages) must never trigger AHK's "too
+; many hotkeys" warning. Single-sourced here so nav_layer.ahk's boot-time
+; raise reads this same value instead of hardcoding its own number — the
+; previous version had ActivateLayer LOWER this on key-down (exactly when
+; bursts are about to happen) and DisableLayer raise it to a DIFFERENT
+; hardcoded number on release, permanently clobbering the boot-time raise on
+; every hold cycle.
+global NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL := 1000
 
 ActivateLayer() {
 	global LayerEnabled := True
-	; Restore the standard rate limit — DisableLayer raised it to let the
-	; nav layer send many synthetic keys; once the layer is off the elevated
-	; limit is no longer needed and must be reset to avoid masking accidental
-	; hotkey storms in the normal typing path.
-	A_MaxHotkeysPerInterval := _NAV_DEFAULT_MAX_HOTKEYS
+	; Bursts happen WHILE the layer is held active (rapid nav/scroll
+	; keystrokes fire back-to-back), so the ceiling must be RAISED on
+	; activation, not lowered.
+	A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
 	ResetNumberOfRepetitions()
 	UpdateCapsLockLED()
 }
 
 DisableLayer() {
 	global LayerEnabled := False
-	; Raise the per-interval cap while the nav layer is active so rapid
-	; navigation bursts (e.g. Ctrl+Shift+Right held down) do not trigger
-	; AHK's "too many hotkeys" warning.
-	A_MaxHotkeysPerInterval := 150
+	; Restore the same raised ceiling nav_layer.ahk set at boot rather than a
+	; different hardcoded number — a burst can still be in flight at the exact
+	; moment the hold key is released (e.g. a trailing wheel event), and there
+	; is no separate "idle" ceiling single-sourced anywhere in this codebase.
+	A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
 	UpdateCapsLockLED()
 }
 
