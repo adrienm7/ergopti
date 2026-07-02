@@ -660,6 +660,10 @@ KL_LogLlmSuggested(app_name, count) {
 class Keylogger {
     static synth_active := 0
     static synth_type   := "none"
+    ; Needed by KL_BuildInserts / KL_AllocEventId (modules/keylogger/keylogger_sql.ahk)
+    ; when that pure builder module is exercised directly from unit tests.
+    static _device_id_lit := "'test-device'"
+    static next_event_id  := 1
 }
 
 ; Synthetic keystroke tagging. In production this lives in keylogger.ahk.
@@ -687,26 +691,3 @@ KL_WriteAtomic(path, content) {
     FileAppend(content, path, "UTF-8")
 }
 
-; Array join helper — in production lives in keylogger.ahk (not included).
-; Concatenates array elements with sep between each pair.
-KL_JoinArray(arr, sep) {
-    out := ""
-    for i, v in arr {
-        if (i > 1)
-            out .= sep
-        out .= v
-    }
-    return out
-}
-
-; Minimal flat JSON object decoder — in production lives in keylogger.ahk.
-; Handles the flat-object format produced by KL_JsonEncodeObject.
-KL_JsonDecode(s) {
-    result := Map()
-    pos := 1
-    while RegExMatch(s, '"([^"\\]*)"\s*:\s*"([^"\\]*)"', &m, pos) {
-        result[m[1]] := m[2]
-        pos := m.Pos + m.Len
-    }
-    return result
-}

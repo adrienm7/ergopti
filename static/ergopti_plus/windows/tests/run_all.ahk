@@ -340,7 +340,16 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 ; the test's direct call to _KL_Clip_CharCountFromByteSize is a load-time
 ; "nonexistent function" error that hangs the headless runner with no output.
 #Include ../modules/keylogger/keylogger_clipboard.ahk
+; keylogger_json.ahk (KL_JsonEncode) and keylogger_sql.ahk (KL_BuildInserts +
+; the per-type KL_BuildInsertXxx builders) are pure definitions with no
+; top-level hotkeys/OS hooks, so — like the walker sub-modules above — they
+; are safe to load directly for unit coverage of the INSERT-statement
+; builders (F19/F21: llm_*/av/network/clipboard/roi event types must not
+; silently fall through KL_BuildInserts's switch).
+#Include ../modules/keylogger/keylogger_json.ahk
+#Include ../modules/keylogger/keylogger_sql.ahk
 #Include unit/test_keylogger_walker.ahk
+#Include unit/test_keylogger_sql.ahk
 #Include unit/test_keylogger_app_categories.ahk
 #Include meta/test_keylogger_ui_dead_code.ahk
 #Include unit/test_keylogger_reader.ahk
@@ -431,6 +440,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_b7_3_dead_fns_absent.ahk
 #Include meta/test_updater_sync_winhttp_blocks.ahk
 #Include meta/test_sqlite_progress_yield.ahk
+#Include meta/test_agg_app_day_llm_suggested.ahk
 #Include meta/test_logger_sync_warning.ahk
 #Include meta/test_keylogger_deferred_write.ahk
 #Include meta/test_deadkey_timeout.ahk
