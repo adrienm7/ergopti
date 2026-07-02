@@ -14,18 +14,39 @@
 ActivateEdit(*) {
     Edit()
 }
-; Drains the SC138 (AltGr/Kana) custom-combination prefix latch BEFORE a suspend
-; flips. AHK prefix flags latch across Suspend and cannot be cleared by synthetic
-; events — they must be prevented at the source by waiting (briefly) for the
-; physical key to lift before suspending. Factored out of ToggleSuspend so EVERY
-; code path that can trigger a suspend can call the same drain, and so a future
-; native/external suspend hotkey cannot silently reintroduce the « AltGr bloqué »
-; regression by bypassing the wait. Safe no-op when entering from suspended state,
-; when the Kana fixup is off, or when SC138 is not physically held.
+; Physical keys registered as an AHK custom-combination PREFIX (the left side of
+; a "&" hotkey definition, e.g. "SC138 & SC01C::" in script_altgr_hotkeys.ahk or
+; "SC038 & SC03A::" in modules/shortcuts/base_modifier.ahk). AHK's custom-
+; combination prefix-down flag latches across Suspend() and cannot be cleared by
+; synthetic events -- see _SuspendDrainPrefix below. Single source of truth: add
+; any NEW custom-combination prefix key here so it is drained automatically
+; before every future suspend instead of leaving a THIRD un-drained sibling for
+; the same latch bug to hide in (feedback_ahk_suspend_prefix_latch, F42).
+global SUSPEND_CUSTOM_COMBO_PREFIX_KEYS := ["SC138", "SC038"]
+
+; Drains every registered custom-combination prefix key (see
+; SUSPEND_CUSTOM_COMBO_PREFIX_KEYS) BEFORE a suspend flips. AHK prefix flags
+; latch across Suspend and cannot be cleared by synthetic events — they must be
+; prevented at the source by waiting (briefly) for the physical key to lift
+; before suspending. Factored out of ToggleSuspend so EVERY code path that can
+; trigger a suspend can call the same drain, and so a future native/external
+; suspend hotkey cannot silently reintroduce the « AltGr/LAlt bloqué »
+; regression by bypassing the wait. Safe no-op when entering from suspended
+; state, when a key's own feature gate is off (SC138 only arms as a prefix when
+; the Kana fixup is active), or when the key is not physically held.
 _SuspendDrainPrefix() {
     global _ALTGR_KANA_FIXUP
-    if !A_IsSuspended and IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP and GetKeyState("SC138", "P")
-        KeyWait("SC138", "T1")
+    if A_IsSuspended
+        return
+    for PrefixKey in SUSPEND_CUSTOM_COMBO_PREFIX_KEYS {
+        ; SC138 (AltGr/Kana) only behaves as an armed prefix when the Kana
+        ; fixup is active on the current keyboard layout -- draining it
+        ; unconditionally would KeyWait on a key that is not really latching.
+        if (PrefixKey = "SC138") and !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
+            continue
+        if GetKeyState(PrefixKey, "P")
+            KeyWait(PrefixKey, "T1")
+    }
 }
 ; Releases every modifier + the SC138 (AltGr/Kana) prefix key to clear any
 ; OS-level phantom "down" state carried across a Reload. A Reload — the driver's

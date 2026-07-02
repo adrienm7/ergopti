@@ -117,17 +117,34 @@ _SWNPK_ToggleDrainsBeforeSuspend() {
 }
 Test("ErgoptiPlus: ToggleSuspend drains prefix before Suspend (suspend-watchdog-no-prefix-keywait)", _SWNPK_ToggleDrainsBeforeSuspend)
 
-; Invariant 3: the drain helper performs the KeyWait("SC138"...) wait.
-_SWNPK_DrainHelperWaitsSc138() {
+; Invariant 3: every registered custom-combination prefix key is drained.
+; SC138 (AltGr/Kana) and SC038 (LAlt, "SC038 & SC03A::" in base_modifier.ahk)
+; both latch AHK's internal prefix-down flag across Suspend() the same way
+; (F42 -- same_class_found_elsewhere regression of
+; feedback_ahk_suspend_prefix_latch). _SuspendDrainPrefix drains the whole
+; SUSPEND_CUSTOM_COMBO_PREFIX_KEYS list generically so a future THIRD prefix
+; key only needs a one-line addition to the list, not a new hand-rolled
+; drain call site.
+_SWNPK_DrainHelperWaitsEveryPrefix() {
 	Src := _DriverSourceConcat()
 	Seg := _DriverFuncBody("_SuspendDrainPrefix")
-	Assert(Seg != "", "_SuspendDrainPrefix() must exist in ErgoptiPlus.ahk")
+	Assert(Seg != "", "_SuspendDrainPrefix() must exist in lib/lifecycle.ahk")
 	; Q is the ASCII double-quote (the linter bans the backtick-quote escape).
 	Q := Chr(34)
-	Assert(InStr(Seg, "KeyWait(" . Q . "SC138" . Q) > 0,
-		"_SuspendDrainPrefix must KeyWait on SC138 to let the physical AltGr/Kana key lift before suspending — synthetic events cannot clear the latched prefix flag")
+	ListPos := InStr(Src, "SUSPEND_CUSTOM_COMBO_PREFIX_KEYS")
+	Assert(ListPos > 0,
+		"SUSPEND_CUSTOM_COMBO_PREFIX_KEYS must exist as the single source of truth for custom-combination prefix keys the suspend drain must cover")
+	ListDecl := SubStr(Src, ListPos, 200)
+	Assert(InStr(ListDecl, Q . "SC138" . Q) > 0,
+		"SUSPEND_CUSTOM_COMBO_PREFIX_KEYS must list SC138 (AltGr/Kana) — the original documented drain target")
+	Assert(InStr(ListDecl, Q . "SC038" . Q) > 0,
+		"SUSPEND_CUSTOM_COMBO_PREFIX_KEYS must list SC038 (LAlt, 'SC038 & SC03A::' in base_modifier.ahk) — it has the identical unprotected prefix-latch exposure as SC138 (F42)")
+	Assert(InStr(Seg, "SUSPEND_CUSTOM_COMBO_PREFIX_KEYS") > 0,
+		"_SuspendDrainPrefix must iterate SUSPEND_CUSTOM_COMBO_PREFIX_KEYS, not hardcode a single key, so every listed prefix is drained")
+	Assert(InStr(Seg, "KeyWait(") > 0,
+		"_SuspendDrainPrefix must KeyWait on the physical prefix key to let it lift before suspending — synthetic events cannot clear the latched prefix flag")
 }
-Test("ErgoptiPlus: _SuspendDrainPrefix waits on SC138 (suspend-watchdog-no-prefix-keywait)", _SWNPK_DrainHelperWaitsSc138)
+Test("lifecycle: _SuspendDrainPrefix drains every registered custom-combination prefix key, including SC038 (suspend-watchdog-no-prefix-keywait, F42)", _SWNPK_DrainHelperWaitsEveryPrefix)
 
 
 
