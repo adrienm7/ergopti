@@ -32,6 +32,11 @@ global LLM_OLLAMA_BASE_URL := "http://localhost:" . LLM_OLLAMA_PORT
 ; never appears despite Ollama still computing in the background.
 global LLM_OLLAMA_TIMEOUT  := 180000  ; ms (3 min) — cold CPU inference headroom
 
+; DELETE /api/delete round-trip ceiling for LLM_OllamaDeleteModel_Async.
+; Mirrors the retired blocking version's WinHTTP receive timeout so observed
+; behaviour is unchanged — only non-blocking now (F24).
+global LLM_OLLAMA_DELETE_TIMEOUT_MS := 10000  ; ms
+
 ; Polling interval for the async path. 50 ms is the same cadence the HS side
 ; effectively gets from hs.http.asyncPost's underlying CFRunLoop tick — fine
 ; for interactive feedback (≤ 1 keystroke of latency) and cheap on CPU.
