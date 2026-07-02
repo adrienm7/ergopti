@@ -20,6 +20,17 @@
 ; ==================================
 ; ==================================
 
+; TTL for the per-signature crash-report dedup cache below. Mirrors
+; HookDispatcher.Dispatch's own _err_cache pattern: a repeatedly-throwing
+; callback OUTSIDE that dispatcher (a SetTimer callback, a hotkey the user
+; holds/auto-repeats) would otherwise re-run the full WMI/healthcheck/git
+; crash-report pipeline on every single occurrence, backing up the one
+; thread that also serves every keystroke.
+global ERROR_NET_DEDUP_TTL_MS := 60000
+; Cap on the dedup cache before a hard Clear() — bounds memory when many
+; DISTINCT error signatures accumulate over a long-running session.
+global ERROR_NET_DEDUP_CACHE_CAP := 256
+
 ; Decides whether the error handler should force-release a modifier. A modifier
 ; is only RELEASED when it is LOGICALLY down (held by the driver / a failed
 ; callback) but the user is NOT physically holding it — i.e. genuinely stuck.
@@ -56,6 +67,7 @@ _IsBenignUiaOrphanedPatternError(Exc) {
 }
 
 ErgoptiGlobalErrorHandler(Exc, Mode) {
+    global ERROR_NET_DEDUP_TTL_MS, ERROR_NET_DEDUP_CACHE_CAP
     if _IsBenignUiaOrphanedPatternError(Exc) {
         ; Log at WARNING (not ERROR) and skip the crash-report prompt/toast — the
         ; originating call site already caught and handled the real error.
@@ -76,6 +88,26 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
     ; yet when an early-boot error fires the handler.
     try LoggerError("ErgoptiPlus", "Uncaught error: {1}",
         Exc.Message . (Exc.HasProp("Stack") ? " | " . Exc.Stack : ""))
+
+    ; Per-signature dedup, mirroring HookDispatcher.Dispatch's _err_cache. A
+    ; repeatedly-throwing callback OUTSIDE that dispatcher's own throttle (a
+    ; SetTimer callback, a hotkey the user holds/auto-repeats) would otherwise
+    ; re-run the full WMI/healthcheck/git crash-report pipeline on every single
+    ; occurrence, backing up the one thread that also serves every keystroke.
+    ; The modifier release + LoggerError above already ran unconditionally, so
+    ; nothing is silently dropped from the logs — only the expensive deferred
+    ; report + toast are throttled per fault signature.
+    static _geh_dedup_map := Map()
+    Sig := Exc.Message . "@" . (Exc.HasProp("What") ? Exc.What : "") . ":" . (Exc.HasProp("Line") ? Exc.Line : "")
+    Now := A_TickCount
+    if (_geh_dedup_map.Count >= ERROR_NET_DEDUP_CACHE_CAP)
+        _geh_dedup_map.Clear()
+    if (_geh_dedup_map.Has(Sig) and ((Now - _geh_dedup_map[Sig]) & 0xFFFFFFFF) <= ERROR_NET_DEDUP_TTL_MS) {
+        try LoggerDebug("ErgoptiPlus", "Uncaught error signature throttled (seen within {1} ms): {2}.", ERROR_NET_DEDUP_TTL_MS, Sig)
+        return true
+    }
+    _geh_dedup_map[Sig] := Now
+
     ; Offer the user an opt-in crash report before surfacing the generic alert.
     ; CrashReport_PromptUser is guarded internally so a failure here cannot
     ; re-enter the error handler.
