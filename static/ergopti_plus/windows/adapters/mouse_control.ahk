@@ -68,6 +68,11 @@ _MCZeroBounds() {
 MCSetPos(X, Y) {
 	try {
 		DllCall("SetPhysicalCursorPos", "Int", X, "Int", Y)
+	} catch as Err {
+		; Port contract (MouseControl.spec.js) mandates error_behavior "silent_noop"
+		; for setPos — callers never see a return value — so the failure must stay
+		; silent to the caller while still being diagnosable in the log.
+		try LoggerWarn("MouseControl", "MCSetPos failed for ({1}, {2}): {3}.", X, Y, Err.Message)
 	}
 }
 
@@ -82,6 +87,8 @@ MCGetPos() {
 		DllCall("GetPhysicalCursorPos", "Ptr", POINT)
 		Info["x"] := NumGet(POINT, 0, "Int")
 		Info["y"] := NumGet(POINT, 4, "Int")
+	} catch as Err {
+		try LoggerWarn("MouseControl", "MCGetPos failed: {1}.", Err.Message)
 	}
 	return Info
 }
