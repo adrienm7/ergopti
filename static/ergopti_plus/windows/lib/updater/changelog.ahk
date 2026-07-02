@@ -313,10 +313,10 @@ _Updater_BuildChangelogGui(Json, Channel) {
 			: _Updater_RefreshInstallBtn(BtnInstall, Releases, 0, IsLocal)
 	)
 
-	; Capture Idx before G.Destroy() — Lb.Value returns 0 once the window is gone.
+	; Capture Idx before _Updater_CloseGui(G) — Lb.Value returns 0 once the window is gone.
 	InstallSelected := (*) => (
 		((Idx2 := Lb.Value) > 0 and !IsLocal)
-			? (G.Destroy(),
+			? (_Updater_CloseGui(G),
 			   Updater_ShowUpdatePrompt(Releases[Idx2]))
 			: ""
 	)
