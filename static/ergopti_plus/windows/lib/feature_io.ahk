@@ -50,12 +50,13 @@ _FeatureJoin(Parts, FromIdx, ToIdx) {
 
 ; Resolve a v2 manifest path to a Map {section, key, v2_node, is_alpha}, or false
 ; when the path does not resolve against ``FeaturesMap``.
-; @param FeaturesMap  The Features Map to resolve against, passed explicitly
-;                      rather than reached for via global (feedback_loader_target_explicit).
+; @param FeaturesMap  The Features Map to resolve against. Always passed explicitly
+;                      by the caller (feedback_loader_target_explicit) — this
+;                      function never reaches for a global itself.
 ; @param V2Path  Canonical v2 path; may carry a leading "ahk." driver prefix.
 ; @param Prop    Optional explicit alpha property leaf (e.g. "letter"). When set,
 ;                the path is treated as the alpha feature and Prop is the key.
-_FeatureLocateV2Impl(FeaturesMap, V2Path, Prop := "") {
+FeatureLocateV2(FeaturesMap, V2Path, Prop := "") {
 	if !(FeaturesMap is Map)
 		return false
 
@@ -106,16 +107,6 @@ _FeatureLocateV2Impl(FeaturesMap, V2Path, Prop := "") {
 	return Map("section", Section, "key", LastKey, "v2_node", Parent, "is_alpha", false)
 }
 
-; Thin wrapper binding _FeatureLocateV2Impl to the live production Features
-; global. The mutation/lookup logic itself never reaches for a global — see
-; _FeatureLocateV2Impl (feedback_loader_target_explicit).
-FeatureLocateV2(V2Path, Prop := "") {
-	global Features
-	if !IsSet(Features) or !(Features is Map)
-		return false
-	return _FeatureLocateV2Impl(Features, V2Path, Prop)
-}
-
 
 
 
@@ -127,16 +118,17 @@ FeatureLocateV2(V2Path, Prop := "") {
 ; ==============================================================
 
 ; Apply one v2-path mutation to both ``FeaturesMap`` and config.toml.
-; @param FeaturesMap  The Features Map to mutate, passed explicitly rather than
-;                      reached for via global (feedback_loader_target_explicit).
+; @param FeaturesMap  The Features Map to mutate. Always passed explicitly by
+;                      the caller (feedback_loader_target_explicit) — this
+;                      function never reaches for a global itself.
 ; @param V2Path  Canonical v2 path (toggle target, e.g. "shortcuts.gpt").
 ; @param Value   New value (bool, or string for alpha props like a letter/link).
 ; @param Prop    Optional alpha property leaf (e.g. "letter"); omit for the
 ;                enabled/plain toggle.
 ; @return        true on success, false when the path does not resolve.
-_WriteFeatureV2Impl(FeaturesMap, V2Path, Value, Prop := "") {
+WriteFeatureV2(FeaturesMap, V2Path, Value, Prop := "") {
 	global ConfigurationFile
-	Loc := _FeatureLocateV2Impl(FeaturesMap, V2Path, Prop)
+	Loc := FeatureLocateV2(FeaturesMap, V2Path, Prop)
 	if (Loc == false) {
 		; Mirror WriteFeatureBatchV2's logging so a single-path write on an
 		; unresolved/unseeded feature is never silent (personal-hotstring-live-
@@ -152,28 +144,21 @@ _WriteFeatureV2Impl(FeaturesMap, V2Path, Value, Prop := "") {
 	return true
 }
 
-; Thin wrapper binding _WriteFeatureV2Impl to the live production Features
-; global. The mutation logic itself never reaches for a global — see
-; _WriteFeatureV2Impl (feedback_loader_target_explicit).
-WriteFeatureV2(V2Path, Value, Prop := "") {
-	global Features
-	return _WriteFeatureV2Impl(Features, V2Path, Value, Prop)
-}
-
 ; Apply a batch of v2-path mutations to ``FeaturesMap`` in one read-modify-write
 ; of config.toml. Each entry is a Map("path" => "<v2 path>", "value" => <v>,
 ; "prop" => "<leaf>"?). Entries that do not resolve are skipped (logged).
-; @param FeaturesMap  The Features Map to mutate, passed explicitly rather than
-;                      reached for via global (feedback_loader_target_explicit).
+; @param FeaturesMap  The Features Map to mutate. Always passed explicitly by
+;                      the caller (feedback_loader_target_explicit) — this
+;                      function never reaches for a global itself.
 ; @return  Number of entries applied.
-_WriteFeatureBatchV2Impl(FeaturesMap, Entries) {
+WriteFeatureBatchV2(FeaturesMap, Entries) {
 	global ConfigurationFile
 	Updates := []
 	for Entry in Entries {
 		V2Path := Entry["path"]
 		Value  := Entry["value"]
 		Prop   := Entry.Has("prop") ? Entry["prop"] : ""
-		Loc := _FeatureLocateV2Impl(FeaturesMap, V2Path, Prop)
+		Loc := FeatureLocateV2(FeaturesMap, V2Path, Prop)
 		if (Loc == false) {
 			try LoggerWarn("FeatureIO", "WriteFeatureBatchV2: unresolved v2 path '{1}' — skipped.", V2Path)
 			continue
@@ -189,21 +174,19 @@ _WriteFeatureBatchV2Impl(FeaturesMap, Entries) {
 	return Updates.Length
 }
 
-; Thin wrapper binding _WriteFeatureBatchV2Impl to the live production Features
-; global. The mutation logic itself never reaches for a global — see
-; _WriteFeatureBatchV2Impl (feedback_loader_target_explicit).
-WriteFeatureBatchV2(Entries) {
-	global Features
-	return _WriteFeatureBatchV2Impl(Features, Entries)
-}
-
 ; Read the runtime state of a v2 feature. Returns a Map keyed by the v2 property
 ; names present on the feature node (enabled, letter, link, search_engine, …),
 ; or an empty Map when the path does not resolve. Mirrors the shape the menu
 ; needs while dropping the v1 PascalCase property names.
+; Read-only accessor — binding the production Features global here is the
+; explicit carve-out feedback_loader_target_explicit allows (the mutating
+; FeatureLocateV2/WriteFeatureV2/WriteFeatureBatchV2 never do).
 ReadFeatureStateV2(V2Path) {
+	global Features
 	State := Map()
-	Loc := FeatureLocateV2(V2Path)
+	if !IsSet(Features) or !(Features is Map)
+		return State
+	Loc := FeatureLocateV2(Features, V2Path)
 	if (Loc == false)
 		return State
 	Node := Loc["v2_node"]

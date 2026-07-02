@@ -103,7 +103,7 @@ ToggleAllFeatures(Value) {
         for V2Path in _CollectAllHotstringsV2Paths()
             HsBatch.Push(Map("path", V2Path, "value", true))
         if (HsBatch.Length > 0)
-            WriteFeatureBatchV2(HsBatch)
+            WriteFeatureBatchV2(Features, HsBatch)
     }
     Reload
 }
@@ -115,7 +115,7 @@ ToggleAllHotstringsOff(*) {
     ToggleAllHotstrings(0)
 }
 ToggleAllHotstrings(Value) {
-    global CategoryEnabled, ConfigurationFile
+    global CategoryEnabled, ConfigurationFile, Features
     Bool := (Value = true or Value = 1)
     ; Force every individual section to Bool — "tout activer" turns them all on,
     ; "tout désactiver" turns them all off (a real bulk action, not just the
@@ -127,7 +127,7 @@ ToggleAllHotstrings(Value) {
     for V2Path in _CollectAllHotstringsV2Paths()
         Batch.Push(Map("path", V2Path, "value", Bool))
     if (Batch.Length > 0)
-        WriteFeatureBatchV2(Batch)
+        WriteFeatureBatchV2(Features, Batch)
     Reload
 }
 
@@ -242,7 +242,7 @@ ToggleCategoryAllFeatures(Category, Value) {
 ; clears the sections. ``V1Cat`` is the PascalCase category id (e.g. "Rolls",
 ; "DynamicHotstrings").
 ToggleCategoryAllSections(V1Cat, Enable) {
-    global CategoryEnabled, ConfigurationFile, _LegacyTopCategoryMap
+    global CategoryEnabled, ConfigurationFile, _LegacyTopCategoryMap, Features
     Bool := (Enable = true or Enable = 1)
     V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
     if (V2Section == "") {
@@ -269,7 +269,7 @@ ToggleCategoryAllSections(V1Cat, Enable) {
     for _, Entry in ManifestFeaturesForSection(V2Section)
         Batch.Push(Map("path", Entry["path"], "value", Bool))
     if (Batch.Length > 0)
-        WriteFeatureBatchV2(Batch)
+        WriteFeatureBatchV2(Features, Batch)
     Reload
 }
 
@@ -278,7 +278,7 @@ ToggleCategoryAllSections(V1Cat, Enable) {
 ; TOML section names (hotstrings.personal.<lower(section)>). Enabling lifts the
 ; Hotstrings master gate so the sections fire immediately.
 HS_TogglePersonalAllSections(Enable) {
-    global CategoryEnabled, ConfigurationFile, ScriptInformation
+    global CategoryEnabled, ConfigurationFile, ScriptInformation, Features
     Bool := (Enable = true or Enable = 1)
     PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
     if (PersonalTomlPath == "" or !FileExist(PersonalTomlPath))
@@ -296,7 +296,7 @@ HS_TogglePersonalAllSections(Enable) {
         }
     }
     if (Batch.Length > 0)
-        WriteFeatureBatchV2(Batch)
+        WriteFeatureBatchV2(Features, Batch)
     Reload
 }
 

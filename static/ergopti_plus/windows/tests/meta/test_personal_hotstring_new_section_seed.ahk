@@ -39,7 +39,7 @@ Test("editor: _NewSection seeds the Features node for a brand-new section (perso
 _PHNS_AssertMenuAddItemWithLabelGuarded() {
 	Body := _DriverFuncBody("MenuAddItemWithLabel")
 	Assert(Body != "", "MenuAddItemWithLabel() declaration must exist in ui/menu/menu_engine.ahk")
-	Assert(InStr(Body, "FeatureLocateV2(V2Path) == false") > 0,
+	Assert(InStr(Body, "FeatureLocateV2(Features, V2Path) == false") > 0,
 		"MenuAddItemWithLabel must skip an item whose feature does not resolve, mirroring MenuAddItemFromManifest's guard (personal-hotstring-live-toggle-seed)")
 }
 Test("menu: MenuAddItemWithLabel skips an unresolved v2 path instead of wiring a dead toggle (personal-hotstring-live-toggle-seed)",
