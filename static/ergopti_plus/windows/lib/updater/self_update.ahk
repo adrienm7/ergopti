@@ -231,16 +231,33 @@ _Updater_OnTrayMsg(wParam, lParam, msg, hwnd) {
 ; ===== 2.3) "Update now" UI ============
 ; =========================================
 
+; Singleton handle for the update-prompt Gui -- reused across calls so a second
+; trigger (TrayTip click, changelog "Install this version", "Show update" menu
+; item) brings the existing dialog to the front instead of opening a duplicate
+; that could race Updater_DownloadAndInstall against the same staging file
+; (updater-download-reentrancy).
+global _Updater_PromptGui := unset
+
 ; Two-pane window: release tag/date on the left summary, full release notes
 ; on the right, with three buttons at the bottom: ``Update now`` (downloads
 ; the asset and triggers the swap), ``Open on GitHub`` (browser fallback),
 ; and ``Later`` (close). Used both from the TrayTip click and from the
 ; explicit "Show update" menu item that appears on new-version availability.
 Updater_ShowUpdatePrompt(Release) {
-	global _VendorDir
+	global _VendorDir, _Updater_PromptGui
 	if (Type(Release) != "Object")
 		return
+	; Singleton: bring the existing prompt forward instead of opening a
+	; duplicate dialog that could trigger a second concurrent download
+	; (updater-download-reentrancy).
+	if IsSet(_Updater_PromptGui) {
+		try LoggerDebug("Updater", "Update prompt already open -- reusing existing window instead of opening a duplicate.")
+		try _Updater_PromptGui.Restore()
+		try WinActivate(_Updater_PromptGui.Hwnd)
+		return
+	}
 	G := Gui("+Resize +MinSize720x420 +AlwaysOnTop", t("updater.update_dialog_title"))
+	_Updater_PromptGui := G
 	G.SetFont("s11 bold", "Segoe UI")
 	G.MarginX := 14
 	G.MarginY := 12
@@ -307,9 +324,17 @@ Updater_ShowUpdatePrompt(Release) {
 }
 
 _Updater_CloseGui(G) {
+	global _Updater_PromptGui
+	; Identity check happens BEFORE Destroy() so it never depends on reading
+	; state from an already torn-down Gui. _Updater_CloseGui is shared with
+	; the changelog window's own Gui instance, so only clear the singleton
+	; when this call is actually closing the update prompt.
+	IsPromptGui := IsSet(_Updater_PromptGui) && (G.Hwnd == _Updater_PromptGui.Hwnd)
 	if G.HasProp("WVC") && G.WVC
 		try G.WVC.Close()
 	try G.Destroy()
+	if IsPromptGui
+		_Updater_PromptGui := unset
 }
 
 
@@ -378,6 +403,19 @@ Updater_DownloadAndInstall(Release) {
 	global BUNDLE_RELEASE_ASSET
 	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
 	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS
+	global _UpdaterDownloadInProgress
+	; Re-entrancy guard: two independent "Update now" triggers (the TrayTip
+	; update prompt and the changelog's "Install this version" button, each
+	; opening its own dialog) can both reach this function before the first
+	; download finishes. Without this check both open a second async WinHTTP
+	; request against the SAME staging file, and the two eventual stream
+	; writes to disk race with no lock, risking a corrupted or truncated exe
+	; that the swap script then moves into production
+	; (updater-download-reentrancy).
+	if _UpdaterDownloadInProgress {
+		try LoggerWarn("Updater", "Download already in progress -- ignoring duplicate Updater_DownloadAndInstall call.")
+		return
+	}
 	if (Type(Release) != "Object" or !Release.HasProp("RawJson")) {
 		MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
 		return
@@ -416,8 +454,7 @@ Updater_DownloadAndInstall(Release) {
 			FileDelete(NewExe)
 	}
 	try LoggerStart("Updater", "Downloading update '{1}' from {2}…", Release.Tag, AssetUrl)
-	
-	global _UpdaterDownloadInProgress
+
 	_UpdaterDownloadInProgress := true
 	try SetTimer((*) => _Updater_RebuildMenu(), -50)
 	
