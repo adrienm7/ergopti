@@ -569,6 +569,14 @@ _HS_Personal(M, _Cat) {
 
 	if (PersonalTomlData != false) {
 		TomlData := PersonalTomlData
+		; Two sections with an identical user-typed description would otherwise
+		; produce identical menu labels, and AHK's name-based Menu.Check/Uncheck
+		; always resolves to the FIRST match — toggling/selecting the SECOND
+		; section silently painted the checkmark on the FIRST
+		; (duplicate-personal-section-desc-menu-mistarget). Every Check/Uncheck-
+		; relevant label below is built from this map instead of the raw
+		; (possibly-duplicate) description.
+		DisambiguatedLabels := _HS_BuildDisambiguatedSectionLabels(TomlData)
 		PersonalMenu := Menu()
 		RegisterMenuItem(PersonalMenu, t("menu.hotstrings.open_editor"), (*) => OpenPersonalEditor())
 		RegisterMenuItem(PersonalMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(PersonalTomlPath))
@@ -579,22 +587,23 @@ _HS_Personal(M, _Cat) {
 		CurDefaultSec := _EditorPrefGet("DefaultSection", "")
 		DefaultSectionMenu := Menu()
 		RegisterMenuItem(DefaultSectionMenu, t("menu.hotstrings.default_none"),
-			(*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu))
+			(*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels))
 		if (CurDefaultSec == "")
 			DefaultSectionMenu.Check(t("menu.hotstrings.default_none"))
 		DefaultSectionMenu.Add()
 		for _, SecName in TomlData["sections_order"] {
 			if (SecName == "-")
 				continue
-			SecData  := TomlData["sections"][SecName]
-			SecLabel := SecData["description"]
+			if !TomlData["sections"].Has(SecName)
+				continue
+			SecLabel := DisambiguatedLabels[SecName]
 			RegisterMenuItem(DefaultSectionMenu, SecLabel,
-				_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu))
+				_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels))
 			if (CurDefaultSec == SecName)
 				DefaultSectionMenu.Check(SecLabel)
 		}
 		CurDefaultLabel := (CurDefaultSec == "") ? t("menu.hotstrings.default_none")
-			: (TomlData["sections"].Has(CurDefaultSec) ? TomlData["sections"][CurDefaultSec]["description"] : CurDefaultSec)
+			: (DisambiguatedLabels.Has(CurDefaultSec) ? DisambiguatedLabels[CurDefaultSec] : CurDefaultSec)
 		global _PrevDefaultLabel := CurDefaultLabel
 		PersonalMenu.Add(t("menu.hotstrings.default_category_prefix") . CurDefaultLabel, DefaultSectionMenu)
 		CloseOnAddLabel := t("menu.hotstrings.close_on_add")
@@ -615,7 +624,7 @@ _HS_Personal(M, _Cat) {
 				if !TomlData["sections"].Has(SecName)
 					continue
 				SecData  := TomlData["sections"][SecName]
-				SecLabel := SecData["description"] . " (" . FmtCount(SecData["entries"].Length) . ")"
+				SecLabel := DisambiguatedLabels[SecName] . " (" . FmtCount(SecData["entries"].Length) . ")"
 				; v2 path for a runtime-discovered personal section: the Features
 				; node (and config.toml section) key the lowercased TOML section name.
 				MenuAddItemWithLabel(PersonalMenu, "hotstrings.personal." . StrLower(SecName), SecLabel, "Hotstrings")

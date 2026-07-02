@@ -70,29 +70,34 @@ CountDynamicSection(SectionName) {
 _MakeOpenSectionFn(SecName) {
     return (*) => OpenPersonalEditor(SecName)
 }
-_SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu) {
+; DisambiguatedLabels is the Map built by _HS_BuildDisambiguatedSectionLabels —
+; Check/Uncheck must target the SAME (possibly-suffixed) label the menu was
+; actually built with, or a duplicate description would resolve to the wrong
+; item (duplicate-personal-section-desc-menu-mistarget).
+_SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels) {
     global _PrevDefaultLabel
     _EditorPrefSet("DefaultSection", SecName)
     DefaultSectionMenu.Uncheck(t("menu.hotstrings.default_none"))
     for _, SN in TomlData["sections_order"] {
         if (SN == "-")
             continue
-        SD := TomlData["sections"][SN]
-        try DefaultSectionMenu.Uncheck(SD["description"])
+        if !TomlData["sections"].Has(SN)
+            continue
+        try DefaultSectionMenu.Uncheck(DisambiguatedLabels[SN])
     }
     if (SecName == "") {
         DefaultSectionMenu.Check(t("menu.hotstrings.default_none"))
     } else if (TomlData["sections"].Has(SecName)) {
-        DefaultSectionMenu.Check(TomlData["sections"][SecName]["description"])
+        DefaultSectionMenu.Check(DisambiguatedLabels[SecName])
     }
     NewLabel := (SecName == "") ? t("menu.hotstrings.default_none")
-        : (TomlData["sections"].Has(SecName) ? TomlData["sections"][SecName]["description"] : SecName)
+        : (DisambiguatedLabels.Has(SecName) ? DisambiguatedLabels[SecName] : SecName)
     try PersonalMenu.Rename(t("menu.hotstrings.default_category_prefix") . _PrevDefaultLabel,
         t("menu.hotstrings.default_category_prefix") . NewLabel)
     _PrevDefaultLabel := NewLabel
 }
-_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu) {
-    return (*) => _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu)
+_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels) {
+    return (*) => _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels)
 }
 _TogglePersonalCloseOnAdd(PersonalMenu) {
     Label  := t("menu.hotstrings.close_on_add")
@@ -211,4 +216,28 @@ NoAction(*) {
 }
 MenuSectionTitle(Text) {
     return "— " . Text . " —"
+}
+
+; Build a Map(SecName -> disambiguated description) for the personal-hotstrings
+; section list. AHK's Menu.Check/Uncheck resolves a name to the FIRST menu item
+; carrying it, so two user-typed sections sharing the same description made
+; toggling/selecting the SECOND section silently paint the checkmark on the
+; FIRST (duplicate-personal-section-desc-menu-mistarget). Only the 2nd+
+; occurrence of a given description gets a numeric " #N" suffix, so the common
+; (unique) case renders identically to before, and every label built from the
+; result is guaranteed unique — no i18n string needed since the disambiguator
+; is a bare digit.
+; @param TomlData {Map} Parsed personal_hotstrings.toml (ReadPersonalToml shape).
+; @returns {Map} SecName -> disambiguated description string.
+_HS_BuildDisambiguatedSectionLabels(TomlData) {
+    Seen := Map()
+    Out := Map()
+    for _, SecName in TomlData["sections_order"] {
+        if (SecName == "-" or !TomlData["sections"].Has(SecName))
+            continue
+        Desc := TomlData["sections"][SecName]["description"]
+        Seen[Desc] := (Seen.Has(Desc) ? Seen[Desc] : 0) + 1
+        Out[SecName] := (Seen[Desc] > 1) ? (Desc . " #" . Seen[Desc]) : Desc
+    }
+    return Out
 }

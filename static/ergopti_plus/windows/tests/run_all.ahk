@@ -205,6 +205,7 @@ InstallSendNoOps()
 #Include unit/test_hotstrings_config.ahk
 #Include unit/test_terminators.ahk
 #Include unit/test_personal_toml_editor.ahk
+#Include unit/test_menu_helpers.ahk
 #Include unit/test_layout_tables.ahk
 
 #Include unit/test_config.ahk
@@ -364,6 +365,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_personal_hotstring_seed.ahk
 #Include meta/test_personal_hotstring_new_section_seed.ahk
 #Include meta/test_personal_hotstring_cache_invalidation.ahk
+#Include meta/test_personal_section_label_disambiguation_wired.ahk
 #Include meta/test_no_duplicate_defaults.ahk
 #Include meta/test_require_state_pattern.ahk
 #Include meta/test_keylogger_pause_guard.ahk
