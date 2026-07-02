@@ -59,12 +59,12 @@ _LLM_Menu_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 	; this function (binding broken, menu not bound to A_TrayMenu,
 	; AHK message loop saturated). Either way the answer is in the
 	; TrayTip's presence, not in a buried log line.
-	try TrayTip("Ergopti — IA", "Lancement de l'installation Ollama…", 0x1)
+	try TrayTip(t("llm.deps.tray_title"), t("llm.deps.install_launching"), 0x1)
 	try {
 		LLM_Menu_BootstrapOllama(true)
 	} catch as err {
 		LoggerError("LLM", "Bootstrap raised: " err.Message ".")
-		try TrayTip("Ergopti — IA", "Erreur : " err.Message, 0x3)
+		try TrayTip(t("llm.deps.tray_title"), t("common.error_prefix") . err.Message, 0x3)
 	}
 }
 
@@ -74,7 +74,7 @@ _LLM_Menu_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 ; can rescue an LLM in a broken state without re-toggling anything.
 ^!+i:: {
 	LoggerInfo("LLM", "Debug hotkey Ctrl+Alt+Shift+I — direct install trigger.")
-	try TrayTip("Ergopti — IA", "Installation Ollama (déclenchée par raccourci)…", 0x1)
+	try TrayTip(t("llm.deps.tray_title"), t("llm.deps.install_launching_hotkey"), 0x1)
 	try LLM_Menu_BootstrapOllama(true)
 }
 

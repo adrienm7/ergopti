@@ -129,11 +129,11 @@ global UI_TIMEOUT_FLOOR_SEC     := 0
 ; =================================================================
 
 _UiStyleFatal(section, key, detail := "") {
-	msg := Format("Erreur fatale : _shared/modules/tooltip/constants.toml — clé manquante ou invalide : [{1}] {2}", section, key)
+	msg := Format(t("dialog.fatal_error.toml_key_missing"), section, key)
 	if (detail != "")
 		msg .= "`n" . detail
 	LoggerError("UiStyle", msg)
-	MsgBox(msg . "`nErgopti+ ne peut pas démarrer.", "ErgoptiPlus", 16)
+	MsgBox(msg . "`n" . t("dialog.fatal_error.cannot_start"), "ErgoptiPlus", 16)
 	ExitApp()
 }
 
@@ -166,7 +166,7 @@ UiStyle_LoadSharedConst() {
 	c := ParseTomlFile(path)
 	if !c.Count {
 		LoggerError("UiStyle", "_shared/modules/tooltip/constants.toml not found — cannot start.")
-		MsgBox("Erreur fatale : _shared/modules/tooltip/constants.toml introuvable.`nErgopti+ ne peut pas démarrer.", "ErgoptiPlus", 16)
+		MsgBox(t("dialog.fatal_error.toml_not_found") . "`n" . t("dialog.fatal_error.cannot_start"), "ErgoptiPlus", 16)
 		ExitApp()
 	}
 
