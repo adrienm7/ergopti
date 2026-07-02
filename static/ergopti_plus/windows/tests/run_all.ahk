@@ -388,6 +388,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_changelog_http_timeout.ahk
 #Include meta/test_dpapi_decrypt_safe.ahk
 #Include meta/test_menu_dispatcher_critical.ahk
+#Include meta/test_llm_setbackend_propagates_to_engine.ahk
 #Include meta/test_warmup_retry_suspend_guard.ahk
 #Include meta/test_halflife_tick_suspend_guard.ahk
 #Include meta/test_layout_poll_suspend_guard.ahk
