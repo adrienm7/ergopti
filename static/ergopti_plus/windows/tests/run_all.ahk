@@ -546,6 +546,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_kh_intercept_dead_flag.ahk
 #Include meta/test_kl_refresh_context_blocks_on_keystroke.ahk
 #Include meta/test_kl_stop_dead_no_exit_flush.ahk
+#Include meta/test_kl_switch_privacy_filter_outgoing.ahk
 #Include meta/test_kl_window_switch_pre_flush.ahk
 #Include meta/test_klpf_writeatomic_delete_window.ahk
 #Include meta/test_klr_builddatabase_debug_fileappend_hot.ahk
