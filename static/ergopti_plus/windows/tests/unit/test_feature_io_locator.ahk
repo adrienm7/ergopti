@@ -52,11 +52,11 @@ _FIL_Fixture() {
 	)
 }
 
-; Calls _FeatureLocateV2Impl directly against Fixture -- no global Features
-; swap needed since the impl takes its target Map as an explicit parameter
+; Calls FeatureLocateV2 directly against Fixture -- no global Features swap
+; needed since it takes its target Map as an explicit parameter
 ; (feedback_loader_target_explicit).
 _FIL_AssertLoc(Fixture, V2Path, ExpSection, ExpKey, ExpAlpha, Prop := "") {
-	Loc := _FeatureLocateV2Impl(Fixture, V2Path, Prop)
+	Loc := FeatureLocateV2(Fixture, V2Path, Prop)
 	AssertTrue(Loc != false, "FeatureLocateV2('" . V2Path . "') must resolve")
 	AssertEqual(ExpSection, Loc["section"], "section for '" . V2Path . "'")
 	AssertEqual(ExpKey, Loc["key"], "key for '" . V2Path . "'")
@@ -104,7 +104,7 @@ _FIL_NestedAlpha() {
 Test("feature_io: nested alpha -> [hotstrings.autocorrection.accents] enabled", _FIL_NestedAlpha)
 
 _FIL_Unresolved() {
-	AssertEqual(false, _FeatureLocateV2Impl(_FIL_Fixture(), "shortcuts.does_not_exist"),
+	AssertEqual(false, FeatureLocateV2(_FIL_Fixture(), "shortcuts.does_not_exist"),
 		"unknown path must return false")
 }
 Test("feature_io: unknown path returns false", _FIL_Unresolved)
@@ -167,21 +167,25 @@ Test("feature_io: mutex enumerator empty for non-mutex paths", _FIL_MutexEmptyFo
 ; once EnsurePersonalHotstringFeature has seeded the Features node — exactly
 ; what the editor's _NewSection fix now does before the tray menu can ever
 ; reach the section's toggle.
+_FIL_PersonalSectionUnseededFailsBody() {
+	global Features
+	AssertEqual(false, WriteFeatureV2(Features, "hotstrings.personal.voyage", true),
+		"WriteFeatureV2 must fail (not silently mutate nothing) when the section was never seeded")
+}
 _FIL_PersonalSectionUnseededFails() {
-	_FIL_WithFeatures(Map("hotstrings", Map()), () => (
-		AssertEqual(false, WriteFeatureV2("hotstrings.personal.voyage", true),
-			"WriteFeatureV2 must fail (not silently mutate nothing) when the section was never seeded")
-	))
+	_FIL_WithFeatures(Map("hotstrings", Map()), _FIL_PersonalSectionUnseededFailsBody)
 }
 Test("feature_io: WriteFeatureV2 fails for an unseeded personal section (personal-hotstring-live-toggle-seed)",
 	_FIL_PersonalSectionUnseededFails)
 
+_FIL_PersonalSectionSeededSucceedsBody() {
+	global Features
+	EnsurePersonalHotstringFeature("voyage")
+	AssertTrue(WriteFeatureV2(Features, "hotstrings.personal.voyage", true),
+		"WriteFeatureV2 must succeed once EnsurePersonalHotstringFeature has seeded the section")
+}
 _FIL_PersonalSectionSeededSucceeds() {
-	_FIL_WithFeatures(Map("hotstrings", Map()), () => (
-		EnsurePersonalHotstringFeature("voyage"),
-		AssertTrue(WriteFeatureV2("hotstrings.personal.voyage", true),
-			"WriteFeatureV2 must succeed once EnsurePersonalHotstringFeature has seeded the section")
-	))
+	_FIL_WithFeatures(Map("hotstrings", Map()), _FIL_PersonalSectionSeededSucceedsBody)
 }
 Test("feature_io: WriteFeatureV2 succeeds after EnsurePersonalHotstringFeature seeds the section (personal-hotstring-live-toggle-seed)",
 	_FIL_PersonalSectionSeededSucceeds)

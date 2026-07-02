@@ -24,11 +24,12 @@
 ; ``V1CategoryPath`` is the PascalCase top-level category (``Layout``,
 ; ``Shortcuts``, ``Autocorrection``, …) used only for the master-gate greying.
 MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
+	global Features
 	V2Path := ManifestEntry["path"]
 	; Skip an item whose feature does not resolve in the live Features Map — it
 	; could not be toggled. Features is manifest-derived, so this only trips on a
 	; malformed or partial manifest entry.
-	if (FeatureLocateV2(V2Path) == false) {
+	if (FeatureLocateV2(Features, V2Path) == false) {
 		try LoggerWarn("Menu", "MenuAddItemFromManifest: '{1}' does not resolve in Features — skipping.", V2Path)
 		return
 	}
@@ -81,12 +82,13 @@ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 ; top-level category whose master-gate state controls greying (``Hotstrings``,
 ; ``Shortcuts``).
 MenuAddItemWithLabel(MenuParent, V2Path, MenuTitle, MasterCategory) {
+	global Features
 	; Mirror MenuAddItemFromManifest's guard: skip an item whose feature does not
 	; resolve in the live Features Map instead of wiring a toggle/Check call that
 	; can silently no-op forever (personal-hotstring-live-toggle-seed). This is a
 	; defensive backstop — the normal path always seeds the Features node first
 	; (see EnsurePersonalHotstringFeature / RegisterPersonalFeature).
-	if (FeatureLocateV2(V2Path) == false) {
+	if (FeatureLocateV2(Features, V2Path) == false) {
 		try LoggerWarn("Menu", "MenuAddItemWithLabel: '{1}' does not resolve in Features — skipping.", V2Path)
 		return
 	}
@@ -142,10 +144,11 @@ _MasterCategoryFor(FeatureCategoryPath) {
 ; whenever the feature is enabled, and its label remains the canonical
 ; "<description><LETTER>" string built by GetMenuTitleByPath.
 MenuAddLetterPicker(MenuParent, V2Path, MasterCategory) {
+	global Features
 	; Everything — label, state read, letter writes — is driven by the canonical
 	; v2 alpha path (e.g. "shortcuts.e_grave"). MasterCategory is the PascalCase
 	; gate category used only for greying.
-	if (FeatureLocateV2(V2Path) == false) {
+	if (FeatureLocateV2(Features, V2Path) == false) {
 		try LoggerWarn("Menu", "MenuAddLetterPicker: '{1}' does not resolve in Features — skipping.", V2Path)
 		return
 	}
@@ -196,7 +199,8 @@ MenuAddLetterPicker(MenuParent, V2Path, MasterCategory) {
 ; from Features via lib/master_gates.ahk — no need to mutate v1 in-place.
 ; @param V2Path  Canonical v2 alpha path (e.g. "shortcuts.e_grave").
 SetFeatureLetter(V2Path, Letter) {
-	WriteFeatureBatchV2([
+	global Features
+	WriteFeatureBatchV2(Features, [
 		Map("path", V2Path, "value", true),
 		Map("path", V2Path, "value", Letter, "prop", "letter"),
 	])
@@ -207,7 +211,8 @@ SetFeatureLetter(V2Path, Letter) {
 ; previously-selected mapping is restored on the next picker selection.
 ; @param V2Path  Canonical v2 alpha path (e.g. "shortcuts.e_grave").
 SetFeatureLetterOff(V2Path) {
-	WriteFeatureV2(V2Path, false)
+	global Features
+	WriteFeatureV2(Features, V2Path, false)
 	Reload
 }
 
@@ -319,6 +324,7 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V2Path) {
 ; persists the flip and Reloads. Reads + writes go through lib/feature_io.ahk, so
 ; no v1 PascalCase path or rename table is consulted.
 ToggleFeatureV2(V2Path) {
+	global Features
 	; Fast path: live hotstring section toggle, no Reload (see _HS_TryLiveToggleV2).
 	if _HS_TryLiveToggleV2(V2Path) {
 		return
@@ -335,7 +341,7 @@ ToggleFeatureV2(V2Path) {
 		Batch.Push(Map("path", SiblingPath, "value", false))
 	}
 	Batch.Push(Map("path", V2Path, "value", NewValue))
-	WriteFeatureBatchV2(Batch)
+	WriteFeatureBatchV2(Features, Batch)
 	Reload
 }
 
@@ -346,6 +352,7 @@ ToggleFeatureV2(V2Path) {
 ; path. Bundled hotstring entries are bare "hotstrings.<cat>.<id>" (no ahk. prefix);
 ; personal sections never reach here (they keep the v1 MenuAddItemWithLabel path).
 _HS_TryLiveToggleV2(V2Path) {
+	global Features
 	V2Parts := StrSplit(V2Path, ".")
 	if (V2Parts.Length != 3 or V2Parts[1] != "hotstrings") {
 		try LoggerDebug("Menu", "Live-toggle (v2): '{1}' is not a hotstring section → Reload.", V2Path)
@@ -360,7 +367,7 @@ _HS_TryLiveToggleV2(V2Path) {
 	NewEnabled := !(State.Has("enabled") and State["enabled"])
 	; WriteFeatureV2 mutates the in-memory Features node AND persists to disk, so
 	; the rebuild below re-reads the new value with no Reload.
-	WriteFeatureV2(V2Path, NewEnabled)
+	WriteFeatureV2(Features, V2Path, NewEnabled)
 	RebuildHotstringsLive()
 	return true
 }
