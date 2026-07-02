@@ -156,3 +156,36 @@ _FIL_MutexEmptyForPlain() {
 		"layout feature has no mutex siblings")
 }
 Test("feature_io: mutex enumerator empty for non-mutex paths", _FIL_MutexEmptyForPlain)
+
+
+
+
+; =================================================================
+; =================================================================
+; ======= 3/ Personal-hotstring section seeding (F4) ==============
+; =================================================================
+; =================================================================
+
+; Regression for personal-hotstring-live-toggle-seed: WriteFeatureV2 must fail
+; fast (return false, and log) for an unseeded personal section, and succeed
+; once EnsurePersonalHotstringFeature has seeded the Features node — exactly
+; what the editor's _NewSection fix now does before the tray menu can ever
+; reach the section's toggle.
+_FIL_PersonalSectionUnseededFails() {
+	_FIL_WithFeatures(Map("hotstrings", Map()), () => (
+		AssertEqual(false, WriteFeatureV2("hotstrings.personal.voyage", true),
+			"WriteFeatureV2 must fail (not silently mutate nothing) when the section was never seeded")
+	))
+}
+Test("feature_io: WriteFeatureV2 fails for an unseeded personal section (personal-hotstring-live-toggle-seed)",
+	_FIL_PersonalSectionUnseededFails)
+
+_FIL_PersonalSectionSeededSucceeds() {
+	_FIL_WithFeatures(Map("hotstrings", Map()), () => (
+		EnsurePersonalHotstringFeature("voyage"),
+		AssertTrue(WriteFeatureV2("hotstrings.personal.voyage", true),
+			"WriteFeatureV2 must succeed once EnsurePersonalHotstringFeature has seeded the section")
+	))
+}
+Test("feature_io: WriteFeatureV2 succeeds after EnsurePersonalHotstringFeature seeds the section (personal-hotstring-live-toggle-seed)",
+	_FIL_PersonalSectionSeededSucceeds)

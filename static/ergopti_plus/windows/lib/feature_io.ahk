@@ -124,8 +124,13 @@ FeatureLocateV2(V2Path, Prop := "") {
 WriteFeatureV2(V2Path, Value, Prop := "") {
 	global ConfigurationFile
 	Loc := FeatureLocateV2(V2Path, Prop)
-	if (Loc == false)
+	if (Loc == false) {
+		; Mirror WriteFeatureBatchV2's logging so a single-path write on an
+		; unresolved/unseeded feature is never silent (personal-hotstring-live-
+		; toggle-seed) — previously this returned false with zero logging.
+		try LoggerWarn("FeatureIO", "WriteFeatureV2: unresolved v2 path '{1}' — skipped.", V2Path)
 		return false
+	}
 	Node := Loc["v2_node"]
 	K := Loc["key"]
 	if (Type(Node) == "Map")
