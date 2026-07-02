@@ -181,6 +181,15 @@ KL_Hook_RefreshContext(force := false) {
     }
     Now := A_TickCount
 
+    ; Snapshot the outgoing app BEFORE any mutation below. The app-switch
+    ; block updates KLHook.prev_app in place the instant the app itself
+    ; changes, so by the time the title-change block runs (same refresh
+    ; tick, e.g. Alt-Tab to a different app with a different title)
+    ; KLHook.prev_app would already read the NEW app. KL_LogWindowSwitch
+    ; must be attributed to the app that actually owned prev_title, not
+    ; the one the user switched into (F9 fix).
+    outgoing_app := KLHook.prev_app
+
     ; Emit app_switch / window_switch the first time we observe a change.
     ; HS tracks app and title separately because a window-title-only change
     ; (e.g. switching tabs in a browser) is interesting on its own — it
@@ -199,13 +208,13 @@ KL_Hook_RefreshContext(force := false) {
         KLHook.app_entered_at := Now
     }
     if (NewTitle != KLHook.prev_title) {
-        if (KLHook.prev_title != "" and KLHook.prev_app != "") {
+        if (KLHook.prev_title != "" and outgoing_app != "") {
             duration := Now - KLHook.title_entered_at
             ; Flush before logging so the typing buffer is attributed to
             ; the previous window context, not the new one. Mirrors the
             ; flush that already precedes KL_LogAppSwitch above (M-01 fix).
             try KL_FlushBuffer()
-            try KL_LogWindowSwitch(KLHook.prev_app, KLHook.prev_title, NewTitle, duration)
+            try KL_LogWindowSwitch(outgoing_app, KLHook.prev_title, NewTitle, duration)
         }
         KLHook.prev_title := NewTitle
         KLHook.title_entered_at := Now

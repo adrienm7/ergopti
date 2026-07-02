@@ -222,6 +222,43 @@ MF_ShouldFilter() {
 
 
 
+; =========================================
+; ===== 4.1) Outgoing-context variant =====
+; =========================================
+
+; Same predicate as MF_ShouldFilter() but evaluates an explicit (app, title)
+; pair instead of the live MetricsFocusCache snapshot. KL_AppendLog uses this
+; to re-check the OUTGOING side of an app_switch / window_switch transition:
+; by the time such an event is emitted the live focus cache already points
+; at the NEW (non-excluded) window, so MF_ShouldFilter() alone always answers
+; the wrong question for these two event types (F9 fix). The secure-field
+; (password) check is intentionally omitted — it depends on a live UIA probe
+; of the CURRENTLY focused control and has no meaning for a context that has
+; already lost focus.
+MF_ShouldFilterFor(app, title) {
+    proc := StrLower(app)
+
+    ; 1. Disabled-apps list.
+    if (proc != "" && MetricsFilters.disabled_apps.Has(proc))
+        return true
+
+    ; 2. System-auth dialogs — process name only, there is no live window
+    ;    class available for a non-focused snapshot.
+    if (MetricsFilters.system_auth && proc != "" && MF_SYSTEM_AUTH_PROCESSES.Has(proc))
+        return true
+
+    ; 3. Private browsing (title pattern match).
+    if (MetricsFilters.private_browsing && title != "") {
+        for _, pat in MF_PRIVATE_TITLE_PATTERNS {
+            if RegExMatch(title, pat)
+                return true
+        }
+    }
+    return false
+}
+
+
+
 
 
 ; ===================================================

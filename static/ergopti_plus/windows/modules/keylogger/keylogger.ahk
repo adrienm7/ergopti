@@ -493,6 +493,27 @@ KL_AppendLog(entry) {
     }
     if filtered
         return
+    ; app_switch / window_switch carry the OUTGOING (prev_app / prev_title)
+    ; context as their payload, but MF_ShouldFilter() above only evaluated the
+    ; LIVE (new) focused window — which by definition is never excluded, since
+    ; the hook just detected a switch AWAY from it. Explicitly re-check the
+    ; outgoing side so a switch away from an excluded app / private-browsing
+    ; window never leaks its process name or verbatim title into the log (F9).
+    if (entry["type"] = "app_switch" || entry["type"] = "window_switch") {
+        outgoing_filtered := false
+        try {
+            outgoing_filtered := (entry["type"] = "app_switch")
+                ? MF_ShouldFilterFor(entry["prev_app"], "")
+                : MF_ShouldFilterFor(entry["app"], entry["prev_title"])
+        } catch {
+            ; Module not loaded or error — fail closed, same contract as the
+            ; live-focus check above.
+            outgoing_filtered := true
+            try LoggerWarn("Keylogger", "MF_ShouldFilterFor unavailable — defaulting to filtered.")
+        }
+        if outgoing_filtered
+            return
+    }
     if !entry.Has("timestamp")
         entry["timestamp"] := KL_NowTimestamp()
 	; Queue the live Map for the ingest tick — no JSON round-trip needed
