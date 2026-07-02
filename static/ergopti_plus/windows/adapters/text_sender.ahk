@@ -255,7 +255,15 @@ TextSend(Text, Opts, Callback) {
 	} else {
 		; SendText uses the "Text" mode that bypasses hotkey triggers and sends
 		; Unicode characters as raw keystrokes — the safest injection path.
-		_AHK_SendText.Call(Text)
+		; Wrapped in try/catch matching this adapter's own convention (every
+		; other OS-level call in this file is defensively guarded) — currently
+		; masked by both production callers' own outer guards, but a contested
+		; low-level hook can still throw here.
+		try
+			_AHK_SendText.Call(Text)
+		catch as Err {
+			LoggerError("TextSender", "TextSend: direct-mode SendText failed: {1}", Err.Message)
+		}
 		_TextSenderInvokeCallback(Callback)
 	}
 }
