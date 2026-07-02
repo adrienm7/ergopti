@@ -94,3 +94,35 @@ _SFND_BuildTrayMenuDeferredTryFinally() {
 		"_DriverReady := _SavedReady must appear AFTER the finally keyword, not only on the success path (buildtraymenu-driverready-lost-on-error)")
 }
 Test("ErgoptiPlus: BuildTrayMenuDeferred restores _DriverReady in finally block (buildtraymenu-driverready-lost-on-error)", _SFND_BuildTrayMenuDeferredTryFinally)
+
+
+
+
+; ====================================================
+; ====================================================
+; ======= 3/ PrevCanonState is function-local ========
+; ====================================================
+; ====================================================
+
+_SFND_PrevCanonStateIsLocal() {
+	Body := _DriverFuncBody("SaveFullConfig")
+	Assert(Body != "", "SaveFullConfig() must exist in the driver source")
+
+	Assert(RegExMatch(Body, "global\s+([^\r\n]+)", &m) > 0,
+		"SaveFullConfig must declare its global dependencies")
+	GlobalLine := m[1]
+
+	Assert(!InStr(GlobalLine, "PrevCanonState"),
+		"SaveFullConfig must NOT declare PrevCanonState as global -- a shared global "
+		. "canonicalization-guard snapshot lets a re-entrant call (e.g. the boot retry "
+		. "timer landing mid-execution of another SaveFullConfig caller) clobber the "
+		. "outer call's captured value, permanently wedging _TOML_STRICT_CANON_IN_PROGRESS "
+		. "to true and silently disabling future TOML re-normalization (savefullconfig-prevcanonstate-shared-global)")
+
+	Assert(InStr(Body, "PrevCanonState := _TOML_STRICT_CANON_IN_PROGRESS") > 0,
+		"SaveFullConfig must still snapshot the previous canonicalization-guard state")
+	Assert(InStr(Body, "_TOML_STRICT_CANON_IN_PROGRESS := PrevCanonState") > 0,
+		"SaveFullConfig must still restore the previous canonicalization-guard state")
+}
+Test("ErgoptiPlus: SaveFullConfig's PrevCanonState is function-local, not a shared global (savefullconfig-prevcanonstate-shared-global)", _SFND_PrevCanonStateIsLocal)
+
