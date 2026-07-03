@@ -793,6 +793,75 @@ jobs:
           GH_REPO: ${{ github.event.repository.name }}
         run: bash tools/build/build_macos_app.sh
 
+      - name: Smoke test built ErgoptiPlus.app (crash-on-launch guard)
+        # Mirrors the Windows ErgoptiPlus.exe smoke test in build-windows: the
+        # unit suite (test-hs) runs Lua against a stubbed hs.lua fake, so real
+        # hs.fs / shell-exec bugs in the driver's early bootstrap are invisible
+        # to CI. That bootstrap runs unconditionally on every launch, before
+        # the first-launch onboarding guard: main.swift's
+        # applicationDidFinishLaunching locates the embedded Hammerspoon
+        # binary and validates init.lua exists, then init.lua itself resolves
+        # ~/.config/ergopti_plus/ (menu_paths.init) and initialises the logger
+        # (Logger.init_log_path, which shells out to mkdir -p) against the
+        # real APIs. This step launches the actual built .app (unsigned-for-
+        # Gatekeeper-purposes but ad-hoc codesigned by the build script, and
+        # never downloaded so no quarantine flag is set) and proves it survives
+        # that bootstrap instead of dying or hanging silently.
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          APP="${{ github.workspace }}/build/macos/ErgoptiPlus.app"
+          LAUNCHER_LOG="$HOME/Library/Logs/ErgoptiPlus/launcher.log"
+          LUA_LOG_DIR="$HOME/.config/ergopti_plus/hammerspoon/logs"
+          rm -f "$LAUNCHER_LOG"
+          rm -rf "$LUA_LOG_DIR"
+
+          "$APP/Contents/MacOS/ErgoptiPlus" &
+          PID=$!
+
+          deadline=$((SECONDS + 20))
+          lua_boot_seen=false
+          launcher_fatal=false
+          while [ "$SECONDS" -lt "$deadline" ]; do
+              if ! kill -0 "$PID" 2>/dev/null; then
+                  break
+              fi
+              if [ -f "$LAUNCHER_LOG" ] && grep -q "FATAL:" "$LAUNCHER_LOG" 2>/dev/null; then
+                  launcher_fatal=true
+                  break
+              fi
+              if [ -d "$LUA_LOG_DIR" ] && ls "$LUA_LOG_DIR"/ErgoptiPlus_*.log >/dev/null 2>&1; then
+                  lua_boot_seen=true
+                  break
+              fi
+              sleep 0.25
+          done
+
+          crashed_early=false
+          if ! kill -0 "$PID" 2>/dev/null; then
+              crashed_early=true
+          fi
+
+          # Always clean up — never leave the embedded Hammerspoon process
+          # (or its watcher/menu-bar state) resident on the runner.
+          kill "$PID" 2>/dev/null || true
+          pkill -f "Frameworks/Hammerspoon.app" 2>/dev/null || true
+
+          if [ "$crashed_early" = true ] || [ "$launcher_fatal" = true ] || [ "$lua_boot_seen" = false ]; then
+              echo "---- launcher.log ----"
+              cat "$LAUNCHER_LOG" 2>/dev/null || echo "(missing)"
+              if [ "$launcher_fatal" = true ]; then
+                  echo "::error::ErgoptiPlus.app logged a FATAL launcher error — see launcher.log above."
+              elif [ "$crashed_early" = true ]; then
+                  echo "::error::ErgoptiPlus.app exited during startup — see launcher.log above."
+              else
+                  echo "::error::ErgoptiPlus.app did not initialise its Hammerspoon log within 20s (early-boot bootstrap likely failing silently)."
+              fi
+              exit 1
+          fi
+          echo "OK: ErgoptiPlus.app survived startup — Hammerspoon Lua log created under $LUA_LOG_DIR"
+
       - name: Install Sparkle signing tool
         if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
         shell: bash
@@ -945,6 +1014,59 @@ jobs:
               exit 1
           }
           Write-Host "Compiled: $out ($('{0:N0}' -f (Get-Item $out).Length) bytes)"
+
+      - name: Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)
+        # The unit test suite (test-ahk job) runs against source .ahk files with
+        # A_IsCompiled == false, so it never exercises compiled-mode-only code
+        # paths like Bundle_Init(). That gap let a 100%-reproducible startup
+        # crash (unassigned A_LocalAppData — not a real AHK v2 built-in) ship
+        # through fully-green CI. This step launches the actual compiled exe
+        # and proves it gets past first-launch bundle extraction instead of
+        # dying on the very first line of the auto-execute section.
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          $exe = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
+          $markerFile = "$env:LOCALAPPDATA\Ergopti\bundle\.bundle-version"
+          Remove-Item "$env:LOCALAPPDATA\Ergopti\bundle" -Recurse -Force -ErrorAction SilentlyContinue
+          $stdout = "$env:TEMP\ergopti_smoke_stdout.txt"
+          $stderr = "$env:TEMP\ergopti_smoke_stderr.txt"
+
+          # /ErrorStdOut only routes LOAD-time errors (parse / missing include)
+          # to stderr; a RUNTIME error like the one this step guards against
+          # still pops a blocking MsgBox, so the real signal below is
+          # behavioural (marker file written / early exit), not the exit code.
+          $proc = Start-Process -FilePath $exe -ArgumentList "/ErrorStdOut" -PassThru `
+              -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+
+          $deadline = (Get-Date).AddSeconds(20)
+          $markerSeen = $false
+          while ((Get-Date) -lt $deadline) {
+              if ($proc.HasExited) { break }
+              if (Test-Path $markerFile) { $markerSeen = $true; break }
+              Start-Sleep -Milliseconds 250
+          }
+          $crashedEarly = $proc.HasExited
+          $exitCode = $null
+          if ($crashedEarly) { $exitCode = $proc.ExitCode }
+
+          # Always clean up — this is a resident tray app with a keyboard hook;
+          # never leave it running on the runner regardless of outcome.
+          if (-not $proc.HasExited) {
+              Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          }
+
+          if ($crashedEarly -or -not $markerSeen) {
+              Write-Host "---- stdout ----"; Get-Content $stdout -ErrorAction SilentlyContinue
+              Write-Host "---- stderr ----"; Get-Content $stderr -ErrorAction SilentlyContinue
+              if ($crashedEarly) {
+                  Write-Error "ErgoptiPlus.exe exited during startup (code $exitCode) — see output above."
+              } else {
+                  Write-Error "ErgoptiPlus.exe did not extract its runtime bundle within 20s — a blocking startup dialog is likely (crash-on-launch)."
+              }
+              exit 1
+          }
+          Write-Host "OK: ErgoptiPlus.exe survived startup and extracted its bundle to $markerFile"
 
       - name: Rename Windows keyboard layout for upload
         shell: bash
