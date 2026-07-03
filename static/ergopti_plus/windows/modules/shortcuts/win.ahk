@@ -171,6 +171,13 @@ if Features["shortcuts"]["move"] {
 
     StopActivitySimulation() {
         global ActivitySimulation, AwakeInputHook
+        ; Ergopti_OnSuspendEnter calls this unconditionally on every pause so
+        ; keep-awake can never outlive a suspend ("pause = tout eteint"
+        ; invariant). Capture the prior state so the "stopped" toast below only
+        ; fires when keep-awake was actually running -- otherwise every single
+        ; pause (AltGr+Enter included) shows a false "antiveille desactive"
+        ; notification even when it was never turned on.
+        WasActive := ActivitySimulation
         ActivitySimulation := False
         SetTimer(SimulateActivity, 0)
         SetTimer(AwakeCheckMouseMoved, 0)
@@ -184,7 +191,8 @@ if Features["shortcuts"]["move"] {
             try AwakeInputHook.Stop()
             AwakeInputHook := ""
         }
-        try TrayTip(t("keepawake.stopped"), t("keepawake.title"), "Iconi Mute")
+        if WasActive
+            try TrayTip(t("keepawake.stopped"), t("keepawake.title"), "Iconi Mute")
     }
 
     AwakeReturnToOrigin() {
