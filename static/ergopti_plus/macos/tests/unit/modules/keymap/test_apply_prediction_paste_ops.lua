@@ -139,8 +139,14 @@ helpers.describe("apply_prediction — paste-ops drain (keymap-bridge-001)", fun
 
 		-- llm core stub
 		package.loaded["modules.llm"] = {
-			check_modifiers = function() return false end,
-			get_backend     = function() return "ollama" end,
+			check_modifiers   = function() return false end,
+			get_backend       = function() return "ollama" end,
+			-- prediction_engine.lua's module-level code calls this unconditionally
+			-- at require-time; without it, any later test whose require chain
+			-- reaches prediction_engine while this stub is still cached (this
+			-- table is never restored after the test) crashes with
+			-- "attempt to call a nil value (field 'get_current_model')".
+			get_current_model = function() return "stub-model" end,
 		}
 
 		-- keycodes stub
@@ -216,8 +222,14 @@ helpers.describe("apply_prediction — paste-ops drain (keymap-bridge-001)", fun
 		}
 
 		package.loaded["modules.llm"] = {
-			check_modifiers = function() return false end,
-			get_backend     = function() return "ollama" end,
+			check_modifiers   = function() return false end,
+			get_backend       = function() return "ollama" end,
+			-- prediction_engine.lua's module-level code calls this unconditionally
+			-- at require-time; without it, any later test whose require chain
+			-- reaches prediction_engine while this stub is still cached (this
+			-- table is never restored after the test) crashes with
+			-- "attempt to call a nil value (field 'get_current_model')".
+			get_current_model = function() return "stub-model" end,
 		}
 
 		package.loaded["lib.keycodes"] = {

@@ -20,7 +20,14 @@ local helpers = require("tests.helpers")
 -- profile_label requires modules.llm only for the canonical default prediction
 -- count (DEFAULT_STATE). Inject a stub with a DISTINCTIVE default (3) so the
 -- fallback path is unambiguous — a leftover hardcoded "1" would not match.
-package.loaded["modules.llm"] = { DEFAULT_STATE = { llm_num_predictions = 3 } }
+-- get_current_model is called unconditionally by prediction_engine.lua's
+-- module-level code; without it, any later test whose require chain reaches
+-- prediction_engine while this stub is still cached crashes with
+-- "attempt to call a nil value (field 'get_current_model')".
+package.loaded["modules.llm"] = {
+	DEFAULT_STATE = { llm_num_predictions = 3 },
+	get_current_model = function() return "stub-model" end,
+}
 package.loaded["ui.menu.menu_llm.profile_label"] = nil
 local ProfileLabel = require("ui.menu.menu_llm.profile_label")
 
