@@ -314,6 +314,17 @@ MenuManifest_LoadTopLevelTail() {
 		return _MM_TopLevelTailFallback()
 	}
 
+	; Pull in the separator that visually closes the feature-toggle head section
+	; (Gestures on AHK) when the manifest declares one immediately before
+	; global_actions — otherwise the tray menu shows no divider there even
+	; though menu_manifest.json's top_level array puts one in that exact spot.
+	if (TailStart > 1) {
+		PrevEntry := RawItems[TailStart - 1]
+		if (PrevEntry is Map) and (_MM_MapGet(PrevEntry, "id") == "---") {
+			TailStart := TailStart - 1
+		}
+	}
+
 	Result := []
 	Loop RawItems.Length - TailStart + 1 {
 		Entry := RawItems[TailStart + A_Index - 1]
@@ -346,6 +357,7 @@ MenuManifest_LoadTopLevelTail() {
 ; Hard-coded fallback — mirrors the canonical AHK tail defined in menu_manifest.json.
 _MM_TopLevelTailFallback() {
 	return [
+		Map("id", "---"),
 		Map("id", "global_actions"),
 		Map("id", "language"),
 		Map("id", "config_folder"),
