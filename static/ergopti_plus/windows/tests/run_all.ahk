@@ -462,6 +462,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_deadkey_timeout.ahk
 #Include meta/test_sendinstant_deferred_clipboard.ahk
 #Include meta/test_keepawake_pause_gate.ahk
+#Include meta/test_keepawake_stop_notify_gate.ahk
 #Include meta/test_mouse_park_gate.ahk
 #Include meta/test_mouse_hotkey_clobber.ahk
 #Include meta/test_mouse_suspend_guard.ahk
@@ -510,8 +511,14 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_menu_llm_actions_include.ahk
 #Include meta/test_llm_menu_disabled_greyed.ahk
 #Include meta/test_llm_menu_layout_shared.ahk
+; MenuManifest_LoadTopLevelTail/LoadGlobalActions/LoadDebugMenu — needed so
+; the gestures-actions-separator regression test can exercise the real
+; production loader (not a source-scan) against the real shared manifest.
+#Include ../lib/menu_manifest.ahk
 ; Drift gate: manifest top_level tail (from global_actions) must match the AHK dispatch table.
 #Include meta/test_menu_top_level_drift_gate.ahk
+; Regression: the separator between Gestures and "Actions globales" must survive the tail loader.
+#Include meta/test_menu_gestures_actions_separator.ahk
 ; Contract gate: metrics_menu disabled_when predicate == AHK handler resolver calls (MG-1/MG-2).
 #Include meta/test_menu_metrics_disabled_when.ahk
 #Include meta/test_port_adapter_coverage.ahk

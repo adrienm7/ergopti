@@ -13,6 +13,7 @@
 
 ; Canonical ids in manifest order -- AHK platform (suspend present, karabiner absent)
 global _DG_AHK_IDS := [
+	"---",
 	"global_actions",
 	"language",
 	"config_folder",
@@ -68,6 +69,15 @@ _DriftGateAhkRun() {
 		}
 		Test("menu drift gate (AHK): global_actions present in top_level", _DGNoGaFail)
 		return
+	}
+
+	; Pull in the separator immediately preceding global_actions, mirroring
+	; MenuManifest_LoadTopLevelTail()'s leading-separator inclusion.
+	if (TailStart > 1) {
+		PrevEntry := TopLevel[TailStart - 1]
+		if (PrevEntry is Map) && (PrevEntry.Has("id")) && (PrevEntry["id"] == "---") {
+			TailStart := TailStart - 1
+		}
 	}
 
 	; Collect the AHK tail with platform filter
