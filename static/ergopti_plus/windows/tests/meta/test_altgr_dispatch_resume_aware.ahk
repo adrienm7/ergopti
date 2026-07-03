@@ -14,18 +14,21 @@
 ;    physically completed just before a suspend/resume toggle from replaying on
 ;    the fresh thread spawned after resume — the timestamp comparison catches it.
 ;
-; B. Suspended-state SC138 HotIf block (pass-through during suspend)
+; B. Suspended-state SC138 HotIf block (keyboard control while paused)
 ;    _RegisterScriptAltGrHotkeys registers a second set of SC138+key hotkeys
 ;    under HotIf((*) => A_IsSuspended and GetKeyState("SC138", "P")).
-;    Without this block, a user pressing SC138+Enter while the driver is
-;    suspended would produce no output at all, because the non-suspended
-;    hotkeys are disabled by Suspend and the fallback ^! variant only fires
-;    on physical Ctrl+Alt. The pass-through block sends the native keystroke
-;    and returns, so the user still gets the expected character.
+;    Without this block, a user pausing from the tray menu or a gesture would
+;    have no keyboard way back — the prefix-armed "SC138 & X" combos above can
+;    silently stop firing across that kind of pause (hook rebuilt off-thread),
+;    and the fallback ^! variant only fires on physical Ctrl+Alt. This block's
+;    suffix-only hotkeys need no prefix arming, so they reliably reach
+;    _ScriptAltGrDispatch and — same as the active-state path — actually RUN
+;    the assigned action (pause toggle / reload / open personal shortcuts /
+;    quit), not just pass a native keystroke through.
 ;
 ; This test asserts:
 ;   1. _ScriptAltGrChordDebounce uses a per-slot map keyed on Slot.
-;   2. The debounce check appears before A_IsSuspended in _ScriptAltGrDispatch.
+;   2. The debounce check appears before the action call in _ScriptAltGrDispatch.
 ;   3. A HotIf predicate combining A_IsSuspended and SC138 state is registered.
 ;
 ; SCOPE: source introspection of lib/script_altgr_hotkeys.ahk.
@@ -69,23 +72,23 @@ Test("script_altgr: _ScriptAltGrChordDebounce uses per-slot static Map (altgr-di
 	_ADRA_ChordDebouncePerSlotMap)
 
 
-_ADRA_DebounceBeforeSuspendCheck() {
+_ADRA_DebounceBeforeAction() {
 	Body := _DriverFuncBody("_ScriptAltGrDispatch")
 	Assert(Body != "", "_ScriptAltGrDispatch must be defined — prerequisite for this test")
 
 	DebouncePos := InStr(Body, "_ScriptAltGrChordDebounce(Slot)")
-	SuspendPos  := InStr(Body, "A_IsSuspended")
+	ActionPos   := InStr(Body, "RunScriptShortcutAction(Slot)")
 
 	Assert(DebouncePos > 0,
 		"_ScriptAltGrDispatch must call _ScriptAltGrChordDebounce(Slot) — the debounce guard prevents rapid re-fire across a suspend/resume boundary")
-	Assert(SuspendPos > 0,
-		"_ScriptAltGrDispatch must check A_IsSuspended — prerequisite for the ordering check")
-	Assert(DebouncePos < SuspendPos,
-		"_ScriptAltGrChordDebounce must run BEFORE A_IsSuspended in _ScriptAltGrDispatch — the debounce check is cheaper and prevents redundant work for the more expensive suspend check")
+	Assert(ActionPos > 0,
+		"_ScriptAltGrDispatch must call RunScriptShortcutAction(Slot)")
+	Assert(DebouncePos < ActionPos,
+		"_ScriptAltGrChordDebounce must run BEFORE RunScriptShortcutAction in _ScriptAltGrDispatch — the debounce check is what prevents a chord completed just before a suspend/resume toggle from replaying the action on the fresh thread spawned after resume")
 }
 
-Test("script_altgr: chord debounce check runs before A_IsSuspended guard (altgr-dispatch-resume-aware)",
-	_ADRA_DebounceBeforeSuspendCheck)
+Test("script_altgr: chord debounce check runs before the action call (altgr-dispatch-resume-aware)",
+	_ADRA_DebounceBeforeAction)
 
 
 _ADRA_SuspendedHotIfBlockRegistered() {
@@ -101,19 +104,15 @@ Test("script_altgr: suspended-state HotIf block is registered in _RegisterScript
 	_ADRA_SuspendedHotIfBlockRegistered)
 
 
-_ADRA_ResumePathCallsRunScriptShortcutAction() {
+_ADRA_ActionUnconditionalOnSuspendState() {
 	Body := _DriverFuncBody("_ScriptAltGrDispatch")
 	Assert(Body != "", "_ScriptAltGrDispatch must be defined — prerequisite for this test")
 
-	; After the suspended check, when NOT suspended, RunScriptShortcutAction must be called
-	SuspendPos := InStr(Body, "A_IsSuspended")
-	ActionPos  := InStr(Body, "RunScriptShortcutAction(Slot)")
-
-	Assert(ActionPos > 0,
-		"_ScriptAltGrDispatch must call RunScriptShortcutAction(Slot) on the active (non-suspended) path — the action must fire when the driver is running normally")
-	Assert(SuspendPos < ActionPos,
-		"RunScriptShortcutAction(Slot) must appear after the A_IsSuspended guard in _ScriptAltGrDispatch — the action is the non-suspended (resume-active) path")
+	Assert(InStr(Body, "RunScriptShortcutAction(Slot)") > 0,
+		"_ScriptAltGrDispatch must call RunScriptShortcutAction(Slot) — the action must fire once a chord is confirmed physically pressed, whether the driver is running or paused")
+	Assert(!InStr(Body, "A_IsSuspended"),
+		"_ScriptAltGrDispatch must not reference A_IsSuspended at all — the dedicated already-suspended fallback hotkeys (see _RegisterScriptAltGrHotkeys) are what makes paused-state control reachable; a suspend check inside the shared dispatch body would silence RunScriptShortcutAction while paused again")
 }
 
-Test("script_altgr: RunScriptShortcutAction appears on the resume-active path (altgr-dispatch-resume-aware)",
-	_ADRA_ResumePathCallsRunScriptShortcutAction)
+Test("script_altgr: RunScriptShortcutAction fires regardless of suspend state (altgr-dispatch-resume-aware)",
+	_ADRA_ActionUnconditionalOnSuspendState)

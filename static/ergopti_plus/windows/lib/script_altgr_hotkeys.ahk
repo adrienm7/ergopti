@@ -38,13 +38,13 @@ _ScriptAltGrDispatch(SuffixSC, Slot, NativeSend, CtrlAltSuffixKey) {
             SendInput(NativeSend)
         return
     }
-    ; AHK suspend bypasses #HotIf and timer pseudo-threads; a chord that was
-    ; physically started before suspend was toggled can land here while the
-    ; driver is paused. Pass the keystroke natively rather than running an action.
-    if A_IsSuspended {
-        SendInput(NativeSend)
-        return
-    }
+    ; Run the action even while suspended: _RegisterScriptAltGrHotkeys registers
+    ; a dedicated set of suffix-only hotkeys gated on "A_IsSuspended and
+    ; GetKeyState(SC138, 'P')" precisely so the script-management chords (pause
+    ; toggle, reload, open personal shortcuts, quit) keep working from the
+    ; keyboard while paused -- otherwise a user paused via the tray menu or a
+    ; gesture has no keyboard way back (feedback: AltGr+Enter/BackSpace silently
+    ; no-op while paused).
     RunScriptShortcutAction(Slot)
     ResetScriptComboKeys(SuffixSC)
 }
