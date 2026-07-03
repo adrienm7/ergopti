@@ -17,7 +17,7 @@
 ; the menu manifest, tray icons, language flags, gestures shared TOML, the
 ; ``_shared`` driver tree (WebView HTML/CSS/JS, LLM defaults, DB schema) and
 ; the native DLLs that DllCall expects. The bootstrapper extracts this zip
-; into A_LocalAppData\Ergopti\bundle-<version>\ on first launch, then exposes
+; into %LOCALAPPDATA%\Ergopti\bundle-<version>\ on first launch, then exposes
 ; the resolved path via the global ``_BundleDir`` so the rest of the driver
 ; can read assets without caring whether it runs from source or from a
 ; compiled binary.
@@ -84,11 +84,36 @@ global _BundleDir := ""
 ; ===== 1.2) Internal helper functions =====
 ; ==========================================
 
-; Returns the single extraction root inside A_LocalAppData. We use one fixed
-; folder (no version suffix) so disk usage stays bounded — on version change
-; the folder is wiped by Bundle_Init() before the new bundle is extracted.
+; Resolves the current user's Local AppData directory. AutoHotkey v2 has no
+; built-in variable for it (unlike the Roaming ``A_AppData``) — ``EnvGet``
+; is the only OS-native accessor. A prior version of this file referenced a
+; nonexistent ``A_LocalAppData`` built-in directly; AHK auto-declared it as an
+; unassigned local and threw on every compiled launch, before Logger even
+; existed to record why. Falls back to deriving the path from
+; ``%USERPROFILE%`` for the rare case ``LOCALAPPDATA`` itself is stripped from
+; the environment. Shared by every module that needs this path (bundle, updater
+; staging, personal-shortcuts stub) so the fallback chain has one owner.
+; @return {String} The Local AppData path, or "" if both lookups fail.
+ResolveLocalAppDataDir() {
+	Resolved := EnvGet("LOCALAPPDATA")
+	if (Resolved != "")
+		return Resolved
+	UserProfile := EnvGet("USERPROFILE")
+	if (UserProfile != "")
+		return UserProfile . "\AppData\Local"
+	return ""
+}
+
+; Returns the single extraction root inside the user's Local AppData directory.
+; We use one fixed folder (no version suffix) so disk usage stays bounded — on
+; version change the folder is wiped by Bundle_Init() before the new bundle is
+; extracted.
+; @return {String} The bundle root path, or "" if Local AppData cannot be resolved.
 _Bundle_ResolveDir() {
-	return A_LocalAppData . "\Ergopti\bundle"
+	LocalAppData := ResolveLocalAppDataDir()
+	if (LocalAppData == "")
+		return ""
+	return LocalAppData . "\Ergopti\bundle"
 }
 
 ; Reads the marker file's first line; returns "" if the file is missing or
@@ -157,6 +182,13 @@ Bundle_Init() {
 		return
 
 	BundleDir := _Bundle_ResolveDir()
+	if (BundleDir == "") {
+		; Neither %LOCALAPPDATA% nor %USERPROFILE% resolved — the exe has no
+		; usable extraction root, so it cannot serve any runtime asset.
+		MsgBox("Bundle extraction failed: could not resolve the Local AppData directory.",
+			"ErgoptiPlus", "Icon!")
+		ExitApp(1)
+	}
 	global _BundleDir := BundleDir
 
 	; Ensure the parent dir exists. The bundle dir itself is (re)created

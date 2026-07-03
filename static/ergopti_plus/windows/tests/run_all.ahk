@@ -82,6 +82,14 @@ OnError(_FatalErrorHandler)
 
 ; ── Production lib files in dependency order ──
 #Include ../lib/app_state.ahk
+; Compiled-mode bundle bootstrapper — included this early (matching its real
+; position right after app_state.ahk in ErgoptiPlus.ahk) so its functions are
+; actually exercised by meta/test_bundle_resolve_dir_local_appdata.ahk instead
+; of only being scanned as raw text. Bundle_Init() itself is never called here
+; (A_IsCompiled is false in the test runner, and it would ExitApp on failure
+; anyway) — only its pure helpers (_Bundle_ResolveDir, ResolveLocalAppDataDir)
+; are invoked directly by the regression test.
+#Include ../lib/bundle.ahk
 #Include ../lib/ui_style.ahk
 #Include ../lib/logger.ahk
 #Include ../lib/toml/toml_helpers.ahk
@@ -790,6 +798,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_altgr_dispatch_resume_aware.ahk
 #Include meta/test_updater_self_update_bak_rollback.ahk
 #Include meta/test_bundle_resolve_dir_local_appdata.ahk
+#Include meta/test_personal_shortcuts_compiled_include_path.ahk
 #Include meta/test_altgr_detect_hkl_fallback.ahk
 #Include meta/test_spotlight_gdiplus_free_library.ahk
 #Include meta/test_case_transform_synthetic_mark.ahk

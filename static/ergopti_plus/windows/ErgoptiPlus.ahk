@@ -522,16 +522,7 @@ EnsurePersonalShortcutsFile(Path) {
     }
     StubDir := ""
     if A_IsCompiled {
-        LocalAppData := EnvGet("LOCALAPPDATA")
-        if (LocalAppData == "") {
-            try LocalAppData := A_LocalAppData
-        }
-        if (LocalAppData == "") {
-            UserProfile := EnvGet("USERPROFILE")
-            if (UserProfile != "") {
-                LocalAppData := UserProfile . "\AppData\Local"
-            }
-        }
+        LocalAppData := ResolveLocalAppDataDir()
         if (LocalAppData == "") {
             try LoggerWarn("ErgoptiPlus", "EnsurePersonalShortcutsFile: cannot resolve LocalAppData — skipping stub creation.")
             return
@@ -578,7 +569,7 @@ try {
 }
 #InputLevel 2
 #Include *i _generated/personal_shortcuts.ahk
-#Include *i %A_LocalAppData%\Ergopti\_generated\personal_shortcuts.ahk
+#Include *i %LocalAppData%\Ergopti\_generated\personal_shortcuts.ahk
 #Include %A_ScriptDir%
 #InputLevel 0
 ; Capture the un-gated per-section hotstring Features BEFORE gating, so a live

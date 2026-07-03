@@ -436,10 +436,7 @@ Updater_DownloadAndInstall(Release) {
 		return
 	}
 
-	LocalAppData := EnvGet("LOCALAPPDATA")
-	if (LocalAppData == "") {
-		try LocalAppData := A_LocalAppData
-	}
+	LocalAppData := ResolveLocalAppDataDir()
 	if (LocalAppData == "") {
 		MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
 		return
