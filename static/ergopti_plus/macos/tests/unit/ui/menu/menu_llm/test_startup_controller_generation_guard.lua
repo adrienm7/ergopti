@@ -100,7 +100,11 @@ local function load_fresh_startup_controller()
 		},
 	}
 	package.loaded["ui.menu.menu_llm.startup_controller"] = nil
-	package.loaded["modules.llm"] = { BUILTIN_PROFILES = {} }
+	-- get_current_model is called unconditionally by prediction_engine.lua's
+	-- module-level code; without it, any later test whose require chain
+	-- reaches prediction_engine while this stub is still cached crashes with
+	-- "attempt to call a nil value (field 'get_current_model')".
+	package.loaded["modules.llm"] = { BUILTIN_PROFILES = {}, get_current_model = function() return "stub-model" end }
 	local StartupCtrl = helpers.load_with_stubs("ui.menu.menu_llm.startup_controller", hs_overrides)
 	return StartupCtrl, captured_timers
 end

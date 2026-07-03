@@ -78,6 +78,11 @@ package.loaded["modules.llm"] = {
 		llm_reset_on_nav      = false,
 	},
 	check_modifiers = function() return false end,
+	-- get_current_model is called unconditionally by prediction_engine.lua's
+	-- module-level code; without it, any later test whose require chain
+	-- reaches prediction_engine while this stub is still cached crashes with
+	-- "attempt to call a nil value (field 'get_current_model')".
+	get_current_model = function() return "stub-model" end,
 }
 
 -- lib.keycodes: only the constants accessed at load time matter.

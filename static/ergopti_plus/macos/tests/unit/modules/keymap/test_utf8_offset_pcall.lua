@@ -451,6 +451,11 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 				llm_reset_on_nav    = false,
 			},
 			check_modifiers = function() return false end,
+			-- get_current_model is called unconditionally by prediction_engine.lua's
+			-- module-level code; without it, any later test whose require chain
+			-- reaches prediction_engine while this stub is still cached crashes
+			-- with "attempt to call a nil value (field 'get_current_model')".
+			get_current_model = function() return "stub-model" end,
 		}
 
 		-- Minimal prediction engine stub — all operations are no-ops.
