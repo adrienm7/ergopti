@@ -125,6 +125,16 @@ function M.load_with_stubs(module_name, hs_overrides)
 	package.loaded["toml_codec"]       = nil
 	package.loaded["toml_codec.codec"] = nil
 
+	-- Clear any partial lib.timings stub installed at module level by test files
+	-- that only need M.sec (e.g. test_apply_prediction_paste_ops.lua installs
+	-- { sec = function() ... end }, no M.ms). lib.timings has no hs dependency
+	-- and is cheap to re-parse from constants.toml, so always reloading the real
+	-- module is safe. Without this, any later test whose require chain reaches
+	-- modules.keylogger (which calls Timings.ms(...) at module load time, e.g.
+	-- via modules.keymap.llm_bridge) crashes with "attempt to call a nil value
+	-- (field 'ms')" the moment modules.keylogger is not already cached.
+	package.loaded["lib.timings"] = nil
+
 	-- Drop the keyboard-layout install / input-source modules (split out of
 	-- ui/menu/menu_keyboard_layout.lua in audit F4). They hold session caches and
 	-- capture `local hs` at require-time, so a test that stubs hs.task to drive the
