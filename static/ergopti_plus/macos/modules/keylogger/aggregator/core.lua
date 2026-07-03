@@ -13,8 +13,10 @@
 
 local M = {}
 
+local hs      = hs
 local utf8    = utf8
 local Logger  = require("lib.logger")
+local Paths   = require("lib.paths")
 local Timings = require("lib.timings")
 local LOG     = "keylogger.aggregator"
 
@@ -71,10 +73,22 @@ local HOLD_THRESHOLD_MS = Timings.ms("keylogger", "hold_threshold_ms")
 --- Window-titles cap per (device,date,app).
 local TITLE_CAP_PER_APP_DAY = 100
 
---- macOS virtual-keycode → finger column. Kept in sync with KEYCODE_DATA in
---- ui/metrics_typing/state.js. Only "content" keys are listed; modifiers are
---- intentionally absent so they do not break a streak in the middle.
-local KC_TO_FINGER = {
+--- Keycodes counted as "content" for same-finger/same-hand streak tracking —
+--- deliberately excludes modifiers, function keys, arrows, space, and a
+--- handful of punctuation/dead-key keycodes, so they do not break a streak in
+--- the middle (see the nil short-circuit at the KC_TO_FINGER lookup site,
+--- events.lua ~line 301). This is analysis scope, not layout data, so it stays
+--- local rather than living in azerty.json.
+local CONTENT_KCS = {
+	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11,
+	12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+	25, 26, 28, 29, 31, 32, 34, 35, 37, 38, 40, 41, 43, 44, 45, 46, 47,
+}
+
+--- Emergency-only fallback used when the shared azerty.json catalogue cannot
+--- be read/parsed, so a transient I/O failure degrades streak-tracking
+--- accuracy instead of crashing the aggregator. Values mirror CONTENT_KCS.
+local FALLBACK_KC_TO_FINGER = {
 	[0]="r_pinky",[1]="r_ring",[2]="r_mid",[3]="r_idx",[4]="l_idx",[5]="r_idx",
 	[6]="r_ring",[7]="r_mid",[8]="r_idx",[9]="r_idx",[11]="r_idx",
 	[12]="r_pinky",[13]="r_ring",[14]="r_mid",[15]="r_idx",[16]="l_idx",[17]="r_idx",
@@ -84,6 +98,43 @@ local KC_TO_FINGER = {
 	[37]="l_ring",[38]="l_idx",[40]="l_mid",[41]="l_pinky",
 	[43]="l_mid",[44]="l_pinky",[45]="l_idx",[46]="l_idx",[47]="l_ring",
 }
+
+--- Reads the shared azerty.json keycode catalogue (the same file the JS
+--- typing-heatmap's KEYCODE_DATA is generated from, DC-1) and returns a
+--- {kc=finger} lookup restricted to CONTENT_KCS, or nil on failure.
+--- @return table<number,string>|nil
+local function load_shared_kc_to_finger()
+	local path = Paths.shared("data/keycodes/azerty.json")
+	if type(path) ~= "string" or path == "" then return nil end
+	local fh = io.open(path, "r")
+	if not fh then return nil end
+	local content = fh:read("*a")
+	fh:close()
+	if type(content) ~= "string" or content == "" then return nil end
+	-- Strip a leading UTF-8 BOM — hs.json.decode rejects it.
+	if content:sub(1, 3) == "\239\187\191" then content = content:sub(4) end
+	local ok, data = pcall(hs.json.decode, content)
+	if not ok or type(data) ~= "table" or type(data.keys) ~= "table" then return nil end
+
+	local wanted = {}
+	for _, kc in ipairs(CONTENT_KCS) do wanted[kc] = true end
+
+	local out = {}
+	for _, entry in ipairs(data.keys) do
+		if type(entry) == "table" and wanted[entry.kc] and type(entry.finger) == "string" then
+			out[entry.kc] = entry.finger
+		end
+	end
+	return out
+end
+
+--- macOS virtual-keycode → finger column, derived from the shared azerty.json
+--- catalogue instead of a hand-copied literal (DC-1). Restricted to CONTENT_KCS.
+local KC_TO_FINGER = load_shared_kc_to_finger()
+if not KC_TO_FINGER or next(KC_TO_FINGER) == nil then
+	Logger.warn(LOG, "Shared azerty.json keycode catalogue unreadable — using emergency fallback finger map.")
+	KC_TO_FINGER = FALLBACK_KC_TO_FINGER
+end
 
 -- Export constants so events.lua and sql.lua can reference them via C.*
 M.THINK_PAUSE_THRESHOLD_MS = THINK_PAUSE_THRESHOLD_MS

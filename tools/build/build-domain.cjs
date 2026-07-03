@@ -177,6 +177,14 @@ const PIPELINE = [
 		generated: ['static/ergopti_plus/windows/_generated/llm_profiles_data.ahk']
 	},
 	{
+		name: 'codegen:keycode-data:js — regenerate keycode_data.js (DC-1)',
+		run() {
+			const { ok, stderr } = runNpmScript('codegen:keycode-data:js');
+			return { ok, detail: ok ? undefined : stderr };
+		},
+		generated: ['static/ergopti_plus/_shared/ui/metrics_typing/_generated/keycode_data.js']
+	},
+	{
 		name: 'build:menu — emit menu_manifest.json from manifest.toml [menu.*]',
 		run() {
 			const { ok, stderr } = runNpmScript('build:menu');
@@ -202,6 +210,15 @@ const PIPELINE = [
 		name: 'test:llm-legacy-basic-prompt-single-source — DL-2+DL-3 parity',
 		run() {
 			const { ok, stdout, stderr } = runNpmScript('test:llm-legacy-basic-prompt-single-source');
+			const lines = (stdout + stderr).trim().split('\n').filter(Boolean);
+			const summary = lines[lines.length - 1] || '';
+			return { ok, detail: ok ? undefined : summary };
+		}
+	},
+	{
+		name: 'test:keycode-data-js-parity — DC-1 parity',
+		run() {
+			const { ok, stdout, stderr } = runNpmScript('test:keycode-data-js-parity');
 			const lines = (stdout + stderr).trim().split('\n').filter(Boolean);
 			const summary = lines[lines.length - 1] || '';
 			return { ok, detail: ok ? undefined : summary };

@@ -23,6 +23,7 @@
 		"test:priority-parity": "node ./tools/test/test-priority-parity.cjs",
 		"test:manifest-parity": "node ./tools/test/test-manifest-parity.cjs",
 		"test:llm-legacy-basic-prompt-single-source": "node ./tools/test/test-llm-legacy-basic-prompt-single-source.cjs",
+		"test:keycode-data-js-parity": "node ./tools/test/test-keycode-data-js-parity.cjs",
 		"test:config-schema": "node ./tools/test/test-config-schema.cjs",
 		"test:ahk-encoding": "node ./tools/test/test-ahk-encoding.cjs",
 		"test:click-lock": "node ./tools/test/test-click-lock-fix.cjs",
@@ -68,6 +69,7 @@
 		"codegen:prompt-builder:hs": "node ./tools/codegen/codegen-prompt-builder-hs.cjs",
 		"codegen:contracts": "node ./tools/codegen/codegen-contracts-json.cjs",
 		"codegen:llm-profiles-data:ahk": "node ./tools/codegen/codegen-llm-profiles-data-ahk.cjs",
+		"codegen:keycode-data:js": "node ./tools/codegen/codegen-keycode-data-js.cjs",
 		"test:mutation": "stryker run"
 	},
 	"type": "module",
