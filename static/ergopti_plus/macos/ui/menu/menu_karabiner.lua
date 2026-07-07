@@ -173,18 +173,66 @@ end
 -- =========================================
 
 -- Keys belonging to the left hand (including spacebar, typically thumb-left).
--- Right-hand keys are everything else. Order follows tap_hold_keys.json.
-local LEFT_HAND_IDS = {
-	escape        = true,
-	tab           = true,
-	caps_lock     = true,
-	left_shift    = true,
-	fn            = true,
-	left_control  = true,
-	left_option   = true,
-	left_command  = true,
-	spacebar      = true,
-}
+-- Right-hand keys are everything else.
+--
+-- **Derived from _shared/modules/menu/menu_manifest.json tap_hold_keys_catalog
+-- (MENU-4).** Keys with hand="left" and platforms including "hs" are left-hand;
+-- everything else is right-hand. The catalog is the single source of truth.
+local LEFT_HAND_IDS = _load_left_hand_from_catalog()
+
+--- Reads tap_hold_keys_catalog from the shared menu manifest and returns a
+--- lookup table of key_id -> true for keys with hand="left" and platforms
+--- including "hs". Falls back to the hardcoded set on any load failure.
+--- @return table
+local function _load_left_hand_from_catalog()
+	local fallback = {
+		escape        = true,
+		tab           = true,
+		caps_lock     = true,
+		left_shift    = true,
+		fn            = true,
+		left_control  = true,
+		left_option   = true,
+		left_command  = true,
+		spacebar      = true,
+	}
+	-- Reuse manifest_menu's cached root to avoid a duplicate JSON parse (MG-3).
+	local ok_mm, mm = pcall(require, "lib.manifest_menu")
+	local data = nil
+	if ok_mm and mm and type(mm.get_root) == "function" then
+		data = mm.get_root()
+	end
+	if type(data) ~= "table" then
+		-- Fallback: direct read (manifest_menu may not be loaded yet).
+		local Paths = require("lib.paths")
+		local path = Paths.shared("modules/menu/menu_manifest.json") or ""
+		local ok_r, fh = pcall(io.open, path, "r")
+		if not ok_r or not fh then return fallback end
+		local content = fh:read("*a")
+		fh:close()
+		local ok_j
+		ok_j, data = pcall(hs.json.decode, content)
+		if not ok_j or type(data) ~= "table" then return fallback end
+	end
+	local catalog = data.tap_hold_keys_catalog
+	if type(catalog) ~= "table" then return fallback end
+	local result = {}
+	for _, key_def in ipairs(catalog) do
+		if type(key_def) ~= "table" then goto continue end
+		if key_def.hand ~= "left" then goto continue end
+		local plats = key_def.platforms
+		if type(plats) ~= "table" then goto continue end
+		for _, p in ipairs(plats) do
+			if p == "hs" then
+				result[key_def.id] = true
+				break
+			end
+		end
+		::continue::
+	end
+	if next(result) == nil then return fallback end
+	return result
+end
 
 --- Builds a single tap / hold menu item for one key definition.
 --- @param karabiner   table    The karabiner module.
@@ -740,6 +788,16 @@ local function get_ke_status(update_menu)
 	return _ke_status
 end
 
+--- Builds the complete Karabiner menu item with its submenu.
+---
+--- **Menu skeleton order mirrors _shared/modules/menu/menu_manifest.json
+--- karabiner_menu (MENU-3).** The imperative build below follows the same
+--- sequence: status → gui → start → stop → (warnings) → --- → clear/restore/
+--- copy → --- → delays/symmetric/sticky → --- → tap_hold keys → --- →
+--- shortcuts. Platform-specific closures (KE probes, AppleScript dialogs,
+--- picker trees) remain here as the glue layer.
+--- @param ctx table Global UI context (must contain ctx.karabiner).
+--- @return table|nil A hs.menubar menu item with a submenu, or nil on failure.
 function M.build(ctx)
 	local karabiner   = ctx and ctx.karabiner
 	local update_menu = ctx and ctx.updateMenu

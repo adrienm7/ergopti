@@ -86,14 +86,12 @@ ApplyMasterGatesToFeatures() {
     ; neither fire nor preview, while the rest of the hotstrings stay live. The
     ; per-section choices on disk are preserved for when the gate flips back on.
     ; Skipped when the top gate is off (everything was already zeroed above).
+    ;
+    ; **Sub-category mapping is single-sourced from menu_manifest.json
+    ; master_gates.sub_categories (MG-3).** Defaults below are the fallback when
+    ; the manifest is unreadable at boot.
     if IsCategoryGated("Hotstrings") and Features.Has("hotstrings") {
-        SubGates := Map(
-            "Autocorrection",     "autocorrection",
-            "DistancesReduction", "distances_reduction",
-            "SFBsReduction",      "sfbs_reduction",
-            "Rolls",              "rolls",
-            "MagicKey",           "magic_key"
-        )
+        SubGates := _MG_LoadSubCategories()
         for SubV1, SubV2 in SubGates {
             if !IsCategoryGated(SubV1) and Features["hotstrings"].Has(SubV2) {
                 for V2Id, V2Val in Features["hotstrings"][SubV2] {
@@ -115,4 +113,50 @@ ApplyMasterGatesToFeatures() {
     }
 
     try LoggerDebug("MasterGates", "ApplyMasterGatesToFeatures done.")
+}
+
+
+
+
+
+; ================================================================
+; =============================================================
+; ======= 2/ Manifest-driven Sub-Category Loader (MG-3) =======
+; =============================================================
+; ================================================================
+
+; Reads master_gates.sub_categories from menu_manifest.json. Falls back to the
+; hardcoded map when the manifest is unreadable.
+_MG_LoadSubCategories() {
+    global _SharedDir
+    Default := Map(
+        "Autocorrection",     "autocorrection",
+        "DistancesReduction", "distances_reduction",
+        "SFBsReduction",      "sfbs_reduction",
+        "Rolls",              "rolls",
+        "MagicKey",           "magic_key"
+    )
+    FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
+    if !FileExist(FilePath) {
+        return Default
+    }
+    Content := ""
+    try Content := FileRead(FilePath, "UTF-8")
+    if (Content == "") {
+        return Default
+    }
+    Root := ""
+    try Root := JsonParse(Content)
+    if !(Root is Map) or !Root.Has("master_gates") {
+        return Default
+    }
+    Gates := Root["master_gates"]
+    if !(Gates is Map) or !Gates.Has("sub_categories") {
+        return Default
+    }
+    SubCats := Gates["sub_categories"]
+    if !(SubCats is Map) or SubCats.Count == 0 {
+        return Default
+    }
+    return SubCats
 }

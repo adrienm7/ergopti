@@ -362,7 +362,7 @@ function M.resolve_disabled_when(menu_key, item_id, getters)
 	for _, key in ipairs(keys) do
 		if type(getters) ~= "table" or type(getters[key]) ~= "function" then
 			Logger.error(LOG, "No getter for disabled_when key '%s' on item '%s.%s' — treating as disabled.", key, menu_key, item_id)
-			return true
+		return true
 		end
 		if not getters[key]() then
 			return true
@@ -370,6 +370,62 @@ function M.resolve_disabled_when(menu_key, item_id, getters)
 	end
 
 	return false
+end
+
+
+
+
+-- ========================================================
+-- ========================================================
+-- ======= 7/ Master-Gate Category Resolver (MG-3) ========
+-- ========================================================
+-- ========================================================
+
+--- Returns the master-category name for a given sub-category id.
+--- Reads master_gates.hotstring_sub_categories from the manifest (MG-3).
+--- Hotstring sub-categories inherit the "Hotstrings" master; everything
+--- else returns itself (first-segment = master).
+--- @param category string Sub-category name (e.g. "Autocorrection", "Shortcuts").
+--- @return string Master category name.
+function M.resolve_master_gate(category)
+	if category == nil or category == "" then
+		return ""
+	end
+	local root = get_manifest_root()
+	if type(root) ~= "table" then
+		return category
+	end
+	local gates = root.master_gates
+	if type(gates) ~= "table" then
+		return category
+	end
+	local hotstring_subs = gates.hotstring_sub_categories
+	if type(hotstring_subs) ~= "table" then
+		-- Fallback: hardcoded list matching the shared catalog (MG-3).
+		hotstring_subs = {"Autocorrection", "DistancesReduction", "SFBsReduction",
+			"Rolls", "MagicKey", "DynamicHotstrings", "Personal"}
+	end
+	for _, sub in ipairs(hotstring_subs) do
+		if sub == category then
+			return "Hotstrings"
+		end
+	end
+	return category
+end
+
+--- Returns the master_categories array from the manifest, or a hardcoded
+--- fallback. Used by drivers to iterate known master gates.
+--- @return table
+function M.get_master_categories()
+	local root = get_manifest_root()
+	if type(root) ~= "table" then
+		return {"Layout", "Shortcuts", "Hotstrings", "TapHolds"}
+	end
+	local gates = root.master_gates
+	if type(gates) ~= "table" or type(gates.master_categories) ~= "table" then
+		return {"Layout", "Shortcuts", "Hotstrings", "TapHolds"}
+	end
+	return gates.master_categories
 end
 
 return M
