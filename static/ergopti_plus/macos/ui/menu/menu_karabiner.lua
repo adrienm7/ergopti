@@ -172,17 +172,13 @@ end
 -- =========================================
 -- =========================================
 
--- Keys belonging to the left hand (including spacebar, typically thumb-left).
--- Right-hand keys are everything else.
---
--- **Derived from _shared/modules/menu/menu_manifest.json tap_hold_keys_catalog
--- (MENU-4).** Keys with hand="left" and platforms including "hs" are left-hand;
--- everything else is right-hand. The catalog is the single source of truth.
-local LEFT_HAND_IDS = _load_left_hand_from_catalog()
-
 --- Reads tap_hold_keys_catalog from the shared menu manifest and returns a
 --- lookup table of key_id -> true for keys with hand="left" and platforms
 --- including "hs". Falls back to the hardcoded set on any load failure.
+---
+--- Defined BEFORE the LEFT_HAND_IDS call site below: a `local function` is not
+--- hoisted, so calling it above its definition would bind the nil global and
+--- crash the module at load time (project-lua-closure-before-local-nil-global).
 --- @return table
 local function _load_left_hand_from_catalog()
 	local fallback = {
@@ -233,6 +229,14 @@ local function _load_left_hand_from_catalog()
 	if next(result) == nil then return fallback end
 	return result
 end
+
+-- Keys belonging to the left hand (including spacebar, typically thumb-left).
+-- Right-hand keys are everything else.
+--
+-- **Derived from _shared/modules/menu/menu_manifest.json tap_hold_keys_catalog
+-- (MENU-4).** Keys with hand="left" and platforms including "hs" are left-hand;
+-- everything else is right-hand. The catalog is the single source of truth.
+local LEFT_HAND_IDS = _load_left_hand_from_catalog()
 
 --- Builds a single tap / hold menu item for one key definition.
 --- @param karabiner   table    The karabiner module.
