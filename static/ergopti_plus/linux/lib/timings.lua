@@ -50,12 +50,12 @@ local function resolve_toml_path()
 	local src = debug and debug.getinfo and debug.getinfo(1, "S")
 	if src and src.source then
 		local s = src.source
-		if s:sub(1, 1) == "@" then s = s:sub(2) end
-		local dir = s:match("^(.*[/\\])") or ""
-		-- dir is .../linux/lib/ → walk up 2 levels to repo root
-		local root = dir:gsub("[/\\]$", "")
-		root = root:gsub("[/\\][^/\\]+[/\\][^/\\]+$", "")
-		if root and root ~= dir then
+		-- Strip leading '@' (LuaJIT) or '=' (Lua 5.4 chunk marker)
+		if s:sub(1, 1) == "@" or s:sub(1, 1) == "=" then s = s:sub(2) end
+		s = s:gsub("\\", "/")
+		-- s is .../ergopti_plus/linux/lib/timings.lua — walk up 3 levels to .../ergopti_plus/
+		local root = s:match("^(.*)/[^/]+/[^/]+/[^/]+$")  -- strips /linux/lib/timings.lua
+		if root then
 			return root .. "/_shared/modules/timings/constants.toml"
 		end
 	end
