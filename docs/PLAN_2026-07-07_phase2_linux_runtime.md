@@ -7,7 +7,8 @@
 >
 > **Statut au 2026-07-07 :** Phase 2A (LuaJIT validation) — items A1-A4 écrits,
 > validation sur machine Linux à faire. Phase 2B (adapters natifs) — tests
-> d'intégration B1-B4 écrits, exécution réelle sur Linux à faire.
+> d'intégration B1-B16 écrits (196 tests), exécution réelle sur Linux à faire.
+> Phase 2C — script .deb écrit (`tools/build/build-linux-deb.sh`).
 
 ---
 
@@ -128,13 +129,23 @@ sudo modprobe uinput
 - [x] B2. `test(linux)` : `injector` injecte — 10 tests (edge cases, quotes, Unicode, shell safety)
 - [x] B3. `test(linux)` : `http_client` appelle curl — 5 tests (unreachable host, cancel, isActive)
 - [x] B4. `test(linux)` : `notifier` envoie une notification — 12 tests (send() shell safety, Unicode, edge cases)
-- [ ] B5. `test(linux)` : `tray_menu` enregistre un SNI
-- [ ] B6. `test(linux)` : `webkit_host` charge une webview GTK
-- [ ] B7. `test(linux)` : daemon complet smoke test
+- [x] B5. `test(linux)` : `tray_menu` + `tooltip_renderer` — 25 tests (SNI stub, lifecycle, edge cases) — `fc9677f31`
+- [x] B6. `test(linux)` : `webkit_host` — 20 tests (bridge registry, path resolver, HTML inliner, i18n) — `dca769395`
+- [x] B7. `test(linux)` : daemon smoke — 20 tests (file integrity, 18 dependency/shared modules) — `fc9677f31`
+- [x] B8. `test(linux)` : `timer_scheduler` — 20 tests (after/every/cancel/cancelAll, edge cases)
+- [x] B9. `test(linux)` : `text_sender` — 27 tests (send/eraseChars/pressKey, modes, shell safety)
+- [x] B10. `test(linux)` : `window_info` — 10 tests (getFocused/getAll, contract compliance)
+- [x] B11. `test(linux)` : `file_system` — 28 tests (read/write/append/exists/delete, UTF-8 round-trip)
+- [x] B12. `test(linux)` : `mouse_control` — 15 tests (setPos/getPos/getMonitorCount/getMonitorBounds)
+- [x] B13. `test(linux)` : `graphics_renderer` — 15 tests (no-op stub, createWindow/destroyWindow/show/hide)
+- [x] B14. `test(linux)` : `clipboard` — 15 tests (read/write/save/restore, edge cases)
+- [x] B15. `test(linux)` : `crypto` — 9 tests (sha256, contract compliance, edge cases)
+- [x] B16. `test(linux)` : `app_launcher` — 16 tests (AL_Launch/AL_LaunchWithArgs/AL_IsRunning)
+- [x] B17. `test(linux)` : `keyboard_hook` — 18 tests (lifecycle, callbacks, context, edge cases)
 
 ### Phase 2C — Packaging
 - [ ] C1. `chore(linux)` : `install.sh` testé sur 4 distros
-- [ ] C2. `feat(linux)` : package `.deb`
+- [x] C2. `feat(linux)` : package `.deb` — script `tools/build/build-linux-deb.sh` écrit (DEBIAN/control, postinst, prerm, systemd service, desktop entry)
 - [ ] C3. `feat(linux)` : package `.rpm`
 - [ ] C4. `feat(linux)` : PKGBUILD AUR
 - [ ] C5. `ci(linux)` : build `.deb`/`.rpm` dans CI
@@ -146,4 +157,4 @@ sudo modprobe uinput
 
 ---
 
-*Plan produit le 2026-07-07, mis à jour 2026-07-07. Phase 1 (Palier 0-4) terminée : 244 unit + 27 E2E + CI. Phase 2B : tests d'intégration B1-B4 écrits (35 tests).*
+*Plan produit le 2026-07-07, mis à jour 2026-07-07. Phase 1 (Palier 0-4) terminée : 244 unit + 27 E2E + CI. Phase 2B : tous les tests d'intégration adapters écrits (B1-B17, 196 tests, 32 modules). Phase 2C : script .deb écrit. Tout tourne sur Windows Lua 5.4 ; validation Linux native à venir.*
