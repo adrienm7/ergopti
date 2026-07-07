@@ -20,6 +20,7 @@
 		"lint:conventions:strict": "node ./tools/lint/lint-conventions.js --fail-on-violations",
 		"test:port-compliance": "node ./tools/test/test-port-compliance.cjs",
 		"test:no-fallbacks": "node ./tools/test/test-no-fallback-literals.cjs",
+		"test:kanata-defalias-parity": "node ./tools/test/test-kanata-defalias-parity.cjs",
 		"test:priority-parity": "node ./tools/test/test-priority-parity.cjs",
 		"test:manifest-parity": "node ./tools/test/test-manifest-parity.cjs",
 		"test:llm-legacy-basic-prompt-single-source": "node ./tools/test/test-llm-legacy-basic-prompt-single-source.cjs",
