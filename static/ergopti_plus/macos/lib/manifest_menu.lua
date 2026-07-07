@@ -95,17 +95,25 @@ end
 -- ============================================
 -- ============================================
 
---- Returns true when the entry has no ``platforms`` restriction or when
---- ``"hs"`` appears in its ``platforms`` array.
+--- Returns true when the entry is visible on ``platform``.
+--- Driver-neutral: call as is_for_platform(entry, "hs") for macOS,
+--- is_for_platform(entry, "linux") for the future Linux driver.
+--- An entry with no ``platforms`` restriction is visible on all platforms.
 --- @param entry table Manifest item entry.
+--- @param platform string Platform token: "ahk", "hs", or "linux".
 --- @return boolean
-local function is_for_hs(entry)
+local function is_for_platform(entry, platform)
 	if type(entry) ~= "table" then return false end
 	if type(entry.platforms) ~= "table" then return true end
 	for _, p in ipairs(entry.platforms) do
-		if p == "hs" then return true end
+		if p == platform then return true end
 	end
 	return false
+end
+
+--- Legacy alias: macOS driver entry point.
+local function is_for_hs(entry)
+	return is_for_platform(entry, "hs")
 end
 
 

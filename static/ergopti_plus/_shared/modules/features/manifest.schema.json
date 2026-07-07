@@ -44,7 +44,7 @@
 				"description_key": { "type": "string" },
 				"platforms": {
 					"type": "array",
-					"items": { "enum": ["ahk", "hs"] },
+					"items": { "enum": ["ahk", "hs", "linux"] },
 					"minItems": 1,
 					"uniqueItems": true
 				},
@@ -83,7 +83,8 @@
 					"additionalProperties": false,
 					"properties": {
 						"ahk": {},
-						"hs": {}
+						"hs": {},
+						"linux": {}
 					},
 					"description": "Per-platform default value. Use only when the default legitimately differs per driver."
 				},
@@ -98,7 +99,7 @@
 				"description_key": { "type": "string" },
 				"platforms": {
 					"type": "array",
-					"items": { "enum": ["ahk", "hs"] },
+					"items": { "enum": ["ahk", "hs", "linux"] },
 					"minItems": 1,
 					"uniqueItems": true
 				}

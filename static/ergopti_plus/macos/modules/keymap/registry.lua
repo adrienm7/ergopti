@@ -22,6 +22,7 @@ local hs          = hs
 local text_utils  = require("lib.text_utils")
 local km_utils    = require("modules.keymap.utils")
 local Logger      = require("lib.logger")
+local Paths       = require("lib.paths")
 local Terminators = require("modules.keymap.terminators")
 local Groups      = require("modules.keymap.registry_groups")
 local RI          = require("modules.keymap.registry_index")
@@ -57,12 +58,44 @@ end
 -- outrank "ext." packages, which outrank bundled common ones. The cascade above
 -- these defaults (individual > section > file) is resolved by the loader before
 -- M.add; these are the final fallback.
--- SINGLE SOURCE OF TRUTH: _shared/modules/hotstrings/priority.json. These literals are
--- held identical to it (and to the AHK HSE_PRIORITY_* in hotstring_engine_main.ahk)
--- by the gate tools/test/test-priority-parity.cjs — change the JSON and all three.
+-- SINGLE SOURCE OF TRUTH: _shared/modules/hotstrings/priority.json, LOADED at
+-- module-init time (fail-fast: a missing or malformed file logs ERROR and falls
+-- back to the hardcoded tier values). The AHK driver still mirrors the same
+-- values (HSE_PRIORITY_*), locked by tools/test/test-priority-parity.cjs.
 local PRIORITY_COMMON   = 10
 local PRIORITY_PACKAGE  = 30
 local PRIORITY_PERSONAL = 50
+
+-- Load the canonical priority tiers from the shared JSON at module-init time.
+-- On success the literals above are overwritten; on failure (missing file,
+-- bad JSON, missing key) the hardcoded fallbacks stay and an ERROR is logged.
+do
+	local function _load_priority_tiers()
+		local prio_path = Paths.shared("modules/hotstrings/priority.json")
+		if not prio_path then
+			Logger.error(LOG, "priority.json: Paths.shared returned nil — keeping hardcoded tiers.")
+			return
+		end
+		local fh, err = io.open(prio_path, "r")
+		if not fh then
+			Logger.error(LOG, "priority.json: cannot open %q: %s — keeping hardcoded tiers.", prio_path, err or "unknown error")
+			return
+		end
+		local raw = fh:read("*a")
+		fh:close()
+		local ok, data = pcall(hs.json.decode, raw)
+		if not ok or type(data) ~= "table" then
+			Logger.error(LOG, "priority.json: JSON parse failed — keeping hardcoded tiers.")
+			return
+		end
+		if type(data.common)   == "number" then PRIORITY_COMMON   = data.common   end
+		if type(data.package)  == "number" then PRIORITY_PACKAGE  = data.package  end
+		if type(data.personal) == "number" then PRIORITY_PERSONAL = data.personal end
+		Logger.debug(LOG, "priority.json loaded: common=%d, package=%d, personal=%d.",
+			PRIORITY_COMMON, PRIORITY_PACKAGE, PRIORITY_PERSONAL)
+	end
+	_load_priority_tiers()
+end
 
 --- Source-default priority for a category name.
 --- Mirrors the Windows _HSE_SourcePriority tiers. The macOS loader names the

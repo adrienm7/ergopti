@@ -28,8 +28,9 @@ local M = {}
 -- =========================================
 -- =========================================
 
-local Logger  = require("logger.shim")
-local Metrics = require("keylogger.metrics")
+local Logger   = require("logger.shim")
+local Metrics  = require("keylogger.metrics")
+local Timings  = require("lib.timings")
 
 local LOG = "modules.keylogger.metrics_collector"
 
@@ -38,25 +39,21 @@ local LOG = "modules.keylogger.metrics_collector"
 -- =========================================
 -- ======= 2/ Constants ====================
 -- =========================================
--- =========================================
 
--- Default inactivity gap after which the rolling WPM window is considered stale.
--- If no key is pressed for this long the WPM calculation resets to 0. Mirrors the
--- canonical macOS value (keylogger/init.lua SESSION_TIMEOUT_MS = 5*60*1000) and
--- _shared/modules/timings/constants.toml [keylogger] session_timeout_ms so the WPM/session
--- math is identical across drivers (was a divergent 30 s).
-local DEFAULT_SESSION_TIMEOUT_MS = 300000   -- 5 min — canonical, matches macOS
+-- Inactivity gap after which the rolling WPM window is considered stale.
+-- Read from the shared timings registry (DD-3/DC-2): single source of truth
+-- for every timing constant — edit constants.toml to tune, never the driver.
+local SESSION_TIMEOUT_MS = Timings.ms("keylogger", "session_timeout_ms")
 
--- Default rolling window used for the live WPM calculation. Mirrors the canonical
--- macOS value (keylogger/init.lua WPM_WINDOW_MS = 15*1000) so identical typing
--- yields the same live WPM on every driver (was a divergent 10 s).
-local DEFAULT_WPM_WINDOW_MS = 15000   -- 15 s sliding window — canonical, matches macOS
+-- Rolling window for the live WPM calculation. Same source as above.
+local WPM_WINDOW_MS = Timings.ms("keylogger", "wpm_window_ms")
 
--- Default n-gram length (bigrams by default).
+-- Characters per word: single-sourced from the shared keylogger metrics module
+-- (DD-10). 5 is the industry standard convention in typing tests.
+local CHARS_PER_WORD = Metrics.DEFAULT_CHARS_PER_WORD
+
+-- Default n-gram length (bigrams by default) — algorithmic bound, not a timing.
 local DEFAULT_NGRAM_SIZE = 2
-
--- Characters per word: 5 is the accepted convention in typing tests.
-local CHARS_PER_WORD = 5
 
 -- Maximum entries stored in the rolling timestamp ring-buffer.
 -- Caps memory at a fixed bound regardless of typing speed.
@@ -132,8 +129,8 @@ function M.init(config)
 	local cfg = type(config) == "table" and config or {}
 
 	_state = {
-		session_timeout_ms = cfg.session_timeout_ms or DEFAULT_SESSION_TIMEOUT_MS,
-		wpm_window_ms      = cfg.wpm_window_ms      or DEFAULT_WPM_WINDOW_MS,
+		session_timeout_ms = cfg.session_timeout_ms or SESSION_TIMEOUT_MS,
+		wpm_window_ms      = cfg.wpm_window_ms      or WPM_WINDOW_MS,
 		ngram_size         = cfg.ngram_size          or DEFAULT_NGRAM_SIZE,
 
 		-- Session accumulators.

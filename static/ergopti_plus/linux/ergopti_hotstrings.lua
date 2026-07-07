@@ -69,6 +69,15 @@ package.path = SCRIPT_DIR .. "/?.lua;" ..
 -- =========================================
 -- =========================================
 
+-- Install the pure-Lua utf8 compatibility shim BEFORE any shared module require.
+-- LuaJIT 2.x does not bundle Lua 5.3's utf8 library, and shared modules
+-- (terminators, text_utils, toml_codec) call utf8.* via pcall. The shim makes
+-- those calls succeed instead of silently degrading to ASCII fallbacks (SLP-1).
+local utf8_compat = require("compat.utf8")
+if utf8_compat.install() then
+	-- Installed — shared modules will now get real utf8 support.
+end
+
 -- Use the canonical shared logger shim. It tries the shared logger core and
 -- the macOS driver logger before falling back to plain print.
 local Logger = require("logger.shim")
