@@ -63,30 +63,64 @@ function $id(id) {
 // ===================================
 // ===================================
 
-const MAC_CATEGORIES_FR = {
-	Productivity: 'Productivité',
-	'Social networking': 'Réseaux sociaux',
-	Games: 'Jeux',
-	Entertainment: 'Divertissement',
-	Utilities: 'Utilitaires',
-	Education: 'Éducation',
-	Finance: 'Finance',
-	Business: 'Business',
-	'Graphics design': 'Design graphique',
-	Photography: 'Photographie',
-	Video: 'Vidéo',
-	Music: 'Musique',
-	Medical: 'Médical',
-	'Health fitness': 'Santé & Forme',
-	Lifestyle: 'Style de vie',
-	News: 'Actualités',
-	Weather: 'Météo',
-	Sports: 'Sport',
-	Travel: 'Voyage',
-	Navigation: 'Navigation',
-	Reference: 'Références',
-	'Developer tools': 'Développement',
-	Unknown: 'Général'
+// Map macOS LSApplicationCategoryType (English) → stable i18n id matching
+// _shared/data/locales/<code>.json app_category.* keys.
+const CATEGORY_ID_MAP = {
+	Productivity: 'productivity',
+	'Social networking': 'social',
+	Games: 'games',
+	Entertainment: 'entertainment',
+	Utilities: 'utility',
+	Education: 'education',
+	Finance: 'finance',
+	Business: 'business',
+	'Graphics design': 'graphics_design',
+	Photography: 'photography',
+	Video: 'video',
+	Music: 'music',
+	Medical: 'medical',
+	'Health fitness': 'health',
+	Lifestyle: 'lifestyle',
+	News: 'news',
+	Weather: 'weather',
+	Sports: 'sports',
+	Travel: 'travel',
+	Navigation: 'navigation',
+	Reference: 'reference',
+	'Developer tools': 'development',
+	Unknown: 'general'
+};
+
+// Reverse map (any locale label → stable id), populated lazily by translateCategory
+// so getCategoryColor can resolve a translated label back to its id.
+const _labelToId = {};
+
+// Pre-seed the French legacy labels so existing user categories stored with
+// the old hardcoded French strings still resolve to the correct id.
+const _FRENCH_LEGACY_LABELS = {
+	'Productivité': 'productivity',
+	'Réseaux sociaux': 'social',
+	'Jeux': 'games',
+	'Divertissement': 'entertainment',
+	'Utilitaires': 'utility',
+	'Éducation': 'education',
+	'Finance': 'finance',
+	'Business': 'business',
+	'Design graphique': 'graphics_design',
+	'Photographie': 'photography',
+	'Vidéo': 'video',
+	'Musique': 'music',
+	'Médical': 'medical',
+	'Santé & Forme': 'health',
+	'Style de vie': 'lifestyle',
+	'Actualités': 'news',
+	'Météo': 'weather',
+	'Sport': 'sports',
+	'Voyage': 'travel',
+	'Navigation': 'navigation',
+	'Références': 'reference',
+	'Développement': 'development',
+	'Général': 'general'
 };
 
 // Perceptually distinct palette — spread across hue wheel to avoid blue clustering
@@ -109,30 +143,53 @@ const CHART_PALETTE = [
 	'#5AC8FA' // Light Blue
 ];
 
-// Fixed aesthetic mappings for standard categories — each hue is deliberately distant
+// Fixed aesthetic mappings for standard categories keyed on stable i18n ids —
+// each hue is deliberately distant from the others on the colour wheel.
 const FIXED_CAT_COLORS = {
-	Productivité: '#0A84FF', // Blue
-	Développement: '#5E5CE6', // Indigo
-	'Réseaux sociaux': '#FF375F', // Pink-Red
-	Jeux: '#FF453A', // Deep Red
-	Divertissement: '#BF5AF2', // Purple
-	Utilitaires: '#64D2FF', // Sky Blue
-	Éducation: '#FF9F0A', // Orange
-	Business: '#FFD60A', // Yellow
-	Finance: '#30B0C7', // Teal
-	Design: '#E588F8', // Lavender
-	Photographie: '#FF6B35', // Burnt Orange
-	Vidéo: '#FF375F', // Coral
-	Musique: '#32D74B', // Green
-	'Santé & Forme': '#34C759', // Leaf Green
-	Actualités: '#F4A460', // Sandy
-	Météo: '#5AC8FA', // Light Blue
-	Voyage: '#00C7BE', // Cyan-Teal
-	Général: '#8E8E93' // Neutral Gray for uncategorized pieces
+	productivity: '#0A84FF',
+	development: '#5E5CE6',
+	social: '#FF375F',
+	games: '#FF453A',
+	entertainment: '#BF5AF2',
+	utility: '#64D2FF',
+	education: '#FF9F0A',
+	business: '#FFD60A',
+	finance: '#30B0C7',
+	graphics_design: '#E588F8',
+	photography: '#FF6B35',
+	video: '#FF375F',
+	music: '#32D74B',
+	health: '#34C759',
+	news: '#F4A460',
+	weather: '#5AC8FA',
+	travel: '#00C7BE',
+	general: '#8E8E93'
 };
 
+/**
+ * Resolves a category name to its stable i18n id.
+ * Accepts an English macOS category, a French legacy label, or an already-stable id.
+ * @param {string} catName
+ * @returns {string} stable id (falls back to 'utility').
+ */
+function categoryToId(catName) {
+	if (!catName) return 'utility';
+	// Direct English → id
+	if (CATEGORY_ID_MAP[catName]) return CATEGORY_ID_MAP[catName];
+	// French legacy label → id (backward compat with existing user categories)
+	if (_FRENCH_LEGACY_LABELS[catName]) return _FRENCH_LEGACY_LABELS[catName];
+	// Already a stable id?
+	if (FIXED_CAT_COLORS[catName]) return catName;
+	// Reverse cache populated by previous translateCategory calls
+	if (_labelToId[catName]) return _labelToId[catName];
+	return 'utility';
+}
+
 function translateCategory(catName) {
-	return MAC_CATEGORIES_FR[catName] || catName;
+	const id = categoryToId(catName);
+	const label = _t('app_category.' + id);
+	_labelToId[label] = id;
+	return label;
 }
 
 /**
@@ -153,7 +210,8 @@ function paletteIndex(str) {
 function getCategoryColor(catName, score) {
 	if (score > 0) return '#30D158';
 	if (score < 0) return '#FF453A';
-	if (FIXED_CAT_COLORS[catName]) return FIXED_CAT_COLORS[catName];
+	const id = categoryToId(catName);
+	if (FIXED_CAT_COLORS[id]) return FIXED_CAT_COLORS[id];
 	return CHART_PALETTE[paletteIndex(catName)];
 }
 
