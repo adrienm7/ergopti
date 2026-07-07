@@ -70,6 +70,7 @@ end
 --- @param callback function|nil Called with no arguments on completion.
 function M.send(text, opts, callback)
 	-- TODO(linux): wire up ydotool (uinput) for direct mode and xclip+xdotool for clipboard mode
+	if type(text) ~= "string" then text = tostring(text or "") end
 	local options = type(opts) == "table" and opts or {}
 	local mode    = type(options.mode) == "string" and options.mode or "auto"
 
