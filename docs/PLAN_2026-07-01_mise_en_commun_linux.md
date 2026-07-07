@@ -297,8 +297,22 @@ Chaque incrément = un commit conventionnel autonome + son test de régression
 daemon Linux) par le mainteneur.
 
 > **Suivi d'avancement.** Coche `[x]` au fur et à mesure qu'un incrément est
-> commité sur `dev` (ne pas pusher). Le hash de commit est noté entre
-> parenthèses. Statut au 2026-07-07 : **items 1-26 tous faits** ✅ (Palier 4 complet).
+> commité sur `dev` (ne pas pusher). Le hash de commit est noté entre parenthèses.
+>
+> ⚠️ **CORRECTION (2026-07-08) — les cases « fait » ci-dessous sont OPTIMISTES.**
+> Les 26 items ont été *écrits et committés*, mais un audit a montré que :
+> (1) la livraison a laissé **7 défauts sur les plateformes testables** (corrigés
+> depuis : commits `a4624a741`, `0bb95a26c`) ; (2) **le driver Linux ne tourne pas**
+> (pipeline de saisie mort — voir la todo ci-dessous) ; (3) plusieurs items sont
+> *incomplets* malgré leur case cochée — notamment **LNX-8 (item 26) est faussement
+> « fait »** : seuls les leaf helpers ont été extraits, le walk d'agrégation + le flush
+> SQL restent des copies byte-for-byte macOS↔AHK sans corpus.
+>
+> ➡ **La todo autoritative et à jour est désormais :**
+> [`TODO_2026-07-08_linux_parite_et_ssot.md`](TODO_2026-07-08_linux_parite_et_ssot.md)
+> (Priorité 0 = finir la mutualisation/SSoT ; Priorité 1 = rendre le daemon Linux
+> fonctionnel ; Priorité 2 = parité feature-by-feature). Suivre CE document, pas les
+> cases ci-dessous.
 
 **Palier 0 — Docs & data morte (risque ≈ nul).**
 - [x] 1. `docs`/`chore` : corriger en-têtes/renvois périmés (`DD-6` `ui_style.ahk`, `DD-7` `hotstrings/defaults.toml:52`, `DC-5` docstring keycodes, `UI-A5` docstring `host_bridge`). (`0d25a1aac`)
@@ -334,7 +348,7 @@ daemon Linux) par le mainteneur.
 - [x] 23. `feat(linux)` : host webview WebKitGTK + contrat d'enregistrement handlers (`LNX-3`/`UI-A4`), menu + éditeurs d'abord. 🖥️
 - [x] 24. `feat(linux)` : tray SNI/dbusmenu (depuis le manifeste) + tooltip natif cairo/GTK (depuis le payload partagé) + test de conformité des adapters (`LNX-7`). 🖥️
 - [x] 25. `feat(linux)` : bridge LLM natif réutilisant les modules Lua partagés + adapters (`LNX-6`). 🖥️
-- [x] 26. `feat(shared/linux)` : cœur d'agrégation keylogger pur en `_shared/lua/keylogger/` (helpers + batch/bursts/sessions/ngrams extraits, macOS délègue) (`LNX-8`). 🖥️
+- [~] 26. `feat(shared/linux)` : cœur d'agrégation keylogger pur en `_shared/lua/keylogger/` (`LNX-8`). 🖥️ — ⚠️ **INCOMPLET** : seuls les leaf helpers extraits ; le walk (`events.lua`/`keylogger_walker_events.ahk` ~500-620 lignes) + le flush SQL restent des copies byte-for-byte macOS↔AHK sans corpus. macOS ne `require` PAS les helpers partagés. → voir P0-G.1 de la nouvelle todo.
 
 ---
 
