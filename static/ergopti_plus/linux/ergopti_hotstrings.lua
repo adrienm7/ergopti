@@ -90,12 +90,20 @@ local loader        = require("modules.hotstrings.loader")
 local injector      = require("modules.hotstrings.injector")
 local dev_finder    = require("modules.hotstrings.device_finder")
 local metrics       = require("modules.keylogger.metrics_collector")
-local keyboard_hook = require("adapters.keyboard_hook")
-
--- Optional adapters (may fail to load if deps missing — daemon still runs).
+local keyboard_hook = require("adapters.keyboard_hook")	-- Optional adapters (may fail to load if deps missing — daemon still runs).
 local tray_menu = nil
 local ok_tray, tray_mod = pcall(require, "adapters.tray_menu")
 if ok_tray then tray_menu = tray_mod end
+
+-- Menu builder (builds rich submenus from daemon state).
+local menu_builder = nil
+local ok_menu, menu_mod = pcall(require, "modules.menu.menu_builder")
+if ok_menu then menu_builder = menu_mod end
+
+-- LLM prediction engine (optional — daemon runs without it).
+local prediction_engine = nil
+local ok_llm, llm_mod = pcall(require, "modules.llm.prediction_engine")
+if ok_llm then prediction_engine = llm_mod end
 
 
 -- =========================================
@@ -294,11 +302,36 @@ local function main()
 			end
 			engine:reset()
 		end
+
+		-- Feed the character to the LLM prediction engine.
+		if prediction_engine then
+			-- The engine buffer is internal — we pass the character and let
+			-- prediction_engine track its own context buffer.
+			pcall(function() prediction_engine.on_char(ch) end)
+		end
 	end
 
-	-- 8.6) Define the control-key callback.
+	-- 8.6) Initialise the LLM prediction engine if available.
+	if prediction_engine then
+		prediction_engine.init({
+			engine        = engine,
+			keyboard_hook = keyboard_hook,
+			triggers      = { "//", ";;", "--" },
+			max_context   = 2000,
+			auto_inject   = true,
+		})
+		Logger.info(LOG, "LLM prediction engine initialised.")
+	end
+
+	-- 8.7) Define the control-key callback.
 	local function on_control(key_name)
 		engine:reset()
+		-- Cancel any in-flight LLM prediction on Backspace or Escape.
+		if key_name == "backspace" or key_name == "escape" then
+			if prediction_engine then
+				pcall(function() prediction_engine.cancel() end)
+			end
+		end
 		Logger.debug(LOG, "Control key '%s' — buffer reset.", key_name)
 	end
 
@@ -320,10 +353,31 @@ local function main()
 	if opts.tray and tray_menu then
 		Logger.info(LOG, "Tray icon requested — starting.")
 		tray_menu.setIcon({ title = "Ergopti" })
-		tray_menu.setMenu({
-			{ title = "Ergopti " .. (opts.layout or "qwerty"), fn = function() end },
-			{ title = "Quitter", fn = function() keyboard_hook.stop() end },
-		})
+
+		if menu_builder then
+			-- Build the full rich menu from daemon state.
+			local menu_items = menu_builder.build({
+				_version  = "3.0.0",
+				engine    = engine,
+				mappings  = mappings,
+				layout    = opts.layout,
+				on_layout_change = function(new_layout)
+					Logger.info(LOG, "Layout change requested: %s (restart daemon to apply)", new_layout)
+				end,
+				metrics   = metrics,
+				llm       = prediction_engine,
+				dry_run   = opts.dry_run,
+				verbose   = opts.verbose,
+				on_quit   = function() keyboard_hook.stop() end,
+			})
+			tray_menu.setMenu(menu_items)
+		else
+			-- Fallback: minimal menu.
+			tray_menu.setMenu({
+				{ title = "Ergopti " .. (opts.layout or "qwerty"), fn = function() end },
+				{ title = "Quitter", fn = function() keyboard_hook.stop() end },
+			})
+		end
 	elseif opts.tray and not tray_menu then
 		Logger.warn(LOG, "Tray icon requested but tray_menu adapter unavailable (install yad).")
 	end
