@@ -62,14 +62,33 @@ function checkNegative(label, file, pattern) {
 
 console.log('\n=== Diagnostic UI Integrity Validation ===');
 
+// --- Shared Healthcheck Frontend Checks ---
+const SHARED_UI_DIR = 'static/ergopti_plus/_shared/ui/healthcheck';
+const SHARED_SCRIPT = SHARED_UI_DIR + '/script.js';
+
+check(
+    'Shared: script.js defines window.renderHealthcheck',
+    SHARED_SCRIPT,
+    /window\.renderHealthcheck\s*=\s*function/
+);
+
+check(
+    'Shared: style.css exists with .ok / .fail classes',
+    SHARED_UI_DIR + '/style.css',
+    /\.ok\{/
+);
+
+check(
+    'Shared: index.html exists and loads script.js',
+    SHARED_UI_DIR + '/index.html',
+    /script\.js/
+);
+
 // --- Hammerspoon (macOS) Checks ---
-// After the F2 split, healthcheck is ui/healthcheck/{init,core,helpers}.lua,
-// mirroring the Windows layout. The probe + window live in core.lua; the
-// state-gathering probes + HTML rendering live in helpers.lua. The former
-// "forward-declare then assign" idiom (and its shadowing foot-gun) is gone by
-// construction — helpers are direct table members on H, resolved at call time —
-// so the integrity invariant is now "the renderer/probe are exported on H AND
-// core actually wires them in", which is what these checks pin.
+// The HTML rendering now lives in _shared/ui/healthcheck/; helpers.lua
+// has only the state-gathering probes + format_uptime. core.lua loads the
+// shared frontend via ui_builder.build_injected_html() and injects the
+// snapshot as JSON.
 const HS_CORE = 'static/ergopti_plus/macos/ui/healthcheck/core.lua';
 const HS_HELPERS = 'static/ergopti_plus/macos/ui/healthcheck/helpers.lua';
 
@@ -86,27 +105,32 @@ check(
 );
 
 check(
-    'HS: snapshot_to_html renderer is defined on the helpers table',
-    HS_HELPERS,
-    /function H\.snapshot_to_html\(/
-);
-
-check(
     'HS: core wires the sys_info probe (H.sys_info)',
     HS_CORE,
     /H\.sys_info/
 );
 
 check(
-    'HS: core wires the snapshot renderer (H.snapshot_to_html)',
+    'HS: core uses shared healthcheck frontend (ui/healthcheck)',
     HS_CORE,
-    /H\.snapshot_to_html/
+    /ui\/healthcheck/
+);
+
+checkNegative(
+    'HS: snapshot_to_html renderer is REMOVED from helpers',
+    HS_HELPERS,
+    /function H\.snapshot_to_html\(/
+);
+
+checkNegative(
+    'HS: H.he HTML escaper is REMOVED from helpers',
+    HS_HELPERS,
+    /function H\.he\(/
 );
 
 // --- AutoHotkey (Windows) Checks ---
-// Windows healthcheck was moved lib/ → ui/healthcheck/{init,core,helpers}.ahk;
-// the probe + window + WebView2 host live in core.ahk.
 const AHK_FILE = 'static/ergopti_plus/windows/ui/healthcheck/core.ahk';
+const AHK_HELPERS = 'static/ergopti_plus/windows/ui/healthcheck/helpers.ahk';
 
 check(
     'AHK: has HealthCheck_ShowWindow export',
@@ -130,6 +154,30 @@ check(
     'AHK: has fallback to native Edit control',
     AHK_FILE,
     /_HealthCheck_AddFallbackEdit/
+);
+
+check(
+    'AHK: navigates to shared healthcheck frontend via vhost',
+    AHK_FILE,
+    /ui\/healthcheck\/index\.html/
+);
+
+checkNegative(
+    'AHK: _HealthCheck_SnapshotToHtml is REMOVED from helpers',
+    AHK_HELPERS,
+    /_HealthCheck_SnapshotToHtml\(/
+);
+
+checkNegative(
+    'AHK: _HealthCheck_HE is REMOVED from helpers',
+    AHK_HELPERS,
+    /_HealthCheck_HE\(/
+);
+
+checkNegative(
+    'AHK: _HealthCheck_Code is REMOVED from helpers',
+    AHK_HELPERS,
+    /_HealthCheck_Code\(/
 );
 
 console.log(`\nResults: ${total_pass} passed, ${total_fail} failed.`);

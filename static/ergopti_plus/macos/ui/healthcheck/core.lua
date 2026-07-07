@@ -18,12 +18,13 @@
 --- 5. Snapshot assembly: M.run() gathers system info, session counters, and the
 ---    enriched runtime collectors (delegated to ui.healthcheck.helpers) into one
 ---    table.
---- 6. Selectable window: M.show_window() renders the report in an hs.webview.
----    HTML is generated directly from the snapshot — no JS conversion step.
+--- 6. Selectable window: M.show_window() loads the shared frontend at
+---    _shared/ui/healthcheck/ via ui_builder.build_injected_html(), then injects
+---    the snapshot as JSON — the client-side script.js renders the report.
 ---    All diagnostic labels are in English (developer-facing, not translated).
 ---
---- The state-gathering probes and HTML rendering live in ui.healthcheck.helpers;
---- this module depends on it (the edge is strictly core → helpers).
+--- The state-gathering probes live in ui.healthcheck.helpers; the HTML rendering
+--- is the shared _shared/ui/healthcheck/ frontend.
 --- ==============================================================================
 
 local M = {}
@@ -31,6 +32,7 @@ local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
 local H      = require("ui.healthcheck.helpers")
+local Paths  = require("lib.paths")
 
 local LOG = "healthcheck"
 
@@ -375,16 +377,38 @@ function M.show_window()
 	end
 	local btn_label = t("healthcheck.copy_and_close") or "Copy to clipboard and close"
 
-	local ok_html, html = pcall(H.snapshot_to_html, snapshot, btn_label)
-	if not ok_html or not html then
-		Logger.error(LOG, "snapshot_to_html() failed: %s.", tostring(html))
-		-- Fall back to plain-text alert rather than showing a blank window
+	-- Build the self-contained HTML from the shared frontend (inlines CSS + JS).
+	local shared_ui_dir = (Paths.shared("ui/healthcheck") or "") .. "/"
+	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+	if not ok_ui or not ui_builder then
+		Logger.error(LOG, "ui.ui_builder unavailable — falling back to text alert: %s.", tostring(ui_builder))
 		local ok_d, dialog = pcall(require, "lib.dialog_util")
 		if ok_d and dialog then
 			dialog.block_alert(title, plain, "OK")
 		end
 		return
 	end
+	local ok_html, html = pcall(ui_builder.build_injected_html, shared_ui_dir)
+	if not ok_html or not html then
+		Logger.error(LOG, "build_injected_html() failed: %s.", tostring(html))
+		local ok_d, dialog = pcall(require, "lib.dialog_util")
+		if ok_d and dialog then
+			dialog.block_alert(title, plain, "OK")
+		end
+		return
+	end
+
+	-- Encode the snapshot as JSON for client-side rendering.
+	local ok_enc, snapshot_json = pcall(hs.json.encode, snapshot)
+	if not ok_enc or not snapshot_json then
+		Logger.error(LOG, "hs.json.encode() failed: %s.", tostring(snapshot_json))
+		local ok_d, dialog = pcall(require, "lib.dialog_util")
+		if ok_d and dialog then
+			dialog.block_alert(title, plain, "OK")
+		end
+		return
+	end
+	local render_js = "if(window.renderHealthcheck)window.renderHealthcheck(" .. snapshot_json .. ")"
 
 	local ok_scr, screen = pcall(function() return hs.screen.mainScreen() end)
 	if not ok_scr or not screen then
@@ -449,13 +473,25 @@ function M.show_window()
 		wv:navigationCallback(function(action, _)
 			Logger.debug(LOG, "Navigation callback: action='%s'.", tostring(action))
 			if action == "didFinishNavigation" then
-				-- Inject a flag variable and a click handler that sets it
+				-- Render the report from the snapshot JSON, then wire the
+				-- copy button (injected into the page after render).
 				local ok_js, js_err = pcall(function()
 					wv:evaluateJavaScript(
-						"window.__hs_copy_requested = false;"
-						.. "document.getElementById('btnCopy').onclick=function(){"
-						.. "window.__hs_copy_requested=true;"
-						.. "};"
+						render_js .. ";"
+						.. "window.__hs_copy_requested = false;"
+						.. "(function(){"
+						.. "var b=document.getElementById('btnCopy');"
+						.. "if(!b){b=document.createElement('button');b.id='btnCopy';"
+						.. "b.textContent='" .. btn_label:gsub("\\", "\\\\"):gsub("'", "\\'") .. "';"
+						.. "b.style.cssText='display:block;width:100%;padding:7px 20px;"
+						.. "font-family:-apple-system,sans-serif;font-size:13px;"
+						.. "background:#0078d4;color:#fff;border:none;border-radius:4px;cursor:pointer;';"
+						.. "var f=document.createElement('div');f.id='footer';"
+						.. "f.style.cssText='position:fixed;bottom:0;left:0;right:0;"
+						.. "padding:10px 20px;background:#fff;border-top:1px solid #e0e0e0;';"
+						.. "f.appendChild(b);document.body.appendChild(f);}"
+						.. "b.onclick=function(){window.__hs_copy_requested=true;};"
+						.. "})();"
 					)
 				end)
 				if not ok_js then
