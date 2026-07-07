@@ -6,9 +6,10 @@
 > qui nécessite un vrai noyau Linux, LuaJIT, lgi/GTK, D-Bus, et des devices evdev.
 >
 > **Statut au 2026-07-07 :** Phase 2A (LuaJIT validation) — items A1-A4 écrits,
-> validation sur machine Linux à faire. Phase 2B (adapters natifs) — tests
-> d'intégration B1-B16 écrits (196 tests), exécution réelle sur Linux à faire.
-> Phase 2C — script .deb écrit (`tools/build/build-linux-deb.sh`).
+> validation sur machine Linux à faire. Phase 2B (adapters natifs) — **TOUS** les
+> adapters implémentés et testés (558 tests, 32 modules). 3 implémentations
+> majeures livrées : keyboard_hook (libinput/evtest), tray_menu (yad), tooltip_renderer
+> (yad/zenity). Phase 2C — scripts .deb/.rpm/PKGBUILD écrits.
 
 ---
 
@@ -129,8 +130,9 @@ sudo modprobe uinput
 - [x] B2. `test(linux)` : `injector` injecte — 10 tests (edge cases, quotes, Unicode, shell safety)
 - [x] B3. `test(linux)` : `http_client` appelle curl — 5 tests (unreachable host, cancel, isActive)
 - [x] B4. `test(linux)` : `notifier` envoie une notification — 12 tests (send() shell safety, Unicode, edge cases)
-- [x] B5. `test(linux)` : `tray_menu` + `tooltip_renderer` — 25 tests (SNI stub, lifecycle, edge cases) — `fc9677f31`
-- [x] B6. `test(linux)` : `webkit_host` — 20 tests (bridge registry, path resolver, HTML inliner, i18n) — `dca769395`
+- [x] B1 (extended). `test(linux)` : `keyboard_hook` complet — evdev reader via libinput/evtest subprocess, shift tracking, binary check, pump() (28 tests)
+- [x] B5 (extended). `test(linux)` : `tray_menu` complet — yad --notification, menu serialization, signal-file callbacks (22 tests)
+- [x] B6 (extended). `test(linux)` : `tooltip_renderer` complet — yad/zenity floating windows, xdotool positioning, updateElement (21 tests)
 - [x] B7. `test(linux)` : daemon smoke — 20 tests (file integrity, 18 dependency/shared modules) — `fc9677f31`
 - [x] B8. `test(linux)` : `timer_scheduler` — 20 tests (after/every/cancel/cancelAll, edge cases)
 - [x] B9. `test(linux)` : `text_sender` — 27 tests (send/eraseChars/pressKey, modes, shell safety)
@@ -145,9 +147,9 @@ sudo modprobe uinput
 
 ### Phase 2C — Packaging
 - [ ] C1. `chore(linux)` : `install.sh` testé sur 4 distros
-- [x] C2. `feat(linux)` : package `.deb` — script `tools/build/build-linux-deb.sh` écrit (DEBIAN/control, postinst, prerm, systemd service, desktop entry)
-- [ ] C3. `feat(linux)` : package `.rpm`
-- [ ] C4. `feat(linux)` : PKGBUILD AUR
+- [x] C2. `feat(linux)` : package `.deb` — script `tools/build/build-linux-deb.sh` (DEBIAN/control, postinst, prerm, systemd, desktop)
+- [x] C3. `feat(linux)` : package `.rpm` — script `tools/build/build-linux-rpm.sh` (SPEC file, post/preun, systemd)
+- [x] C4. `feat(linux)` : PKGBUILD AUR — `tools/build/PKGBUILD` (makepkg, dependencies, install script)
 - [ ] C5. `ci(linux)` : build `.deb`/`.rpm` dans CI
 
 ### Phase 2D — Runner GPU (long terme)
@@ -157,4 +159,4 @@ sudo modprobe uinput
 
 ---
 
-*Plan produit le 2026-07-07, mis à jour 2026-07-07. Phase 1 (Palier 0-4) terminée : 244 unit + 27 E2E + CI. Phase 2B : tous les tests d'intégration adapters écrits (B1-B17, 196 tests, 32 modules). Phase 2C : script .deb écrit. Tout tourne sur Windows Lua 5.4 ; validation Linux native à venir.*
+*Plan produit le 2026-07-07, mis à jour 2026-07-07. Phase 1 (Palier 0-4) terminée : 244 unit + 27 E2E + CI. Phase 2B : tous les adapters implémentés et testés (B1-B17, ~558 tests, 32 modules). Phase 2C : scripts .deb/.rpm/PKGBUILD écrits. 3 adapters majeurs (keyboard_hook, tray_menu, tooltip_renderer) passés de stubs à implémentations complètes. Tout tourne sur Windows Lua 5.4 ; validation Linux native à venir.*
