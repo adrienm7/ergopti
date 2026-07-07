@@ -1,4 +1,4 @@
---- linux/lib/timings.lua
+--- lib/timings.lua
 
 --- ==============================================================================
 --- MODULE: Shared Timings Reader (Linux)

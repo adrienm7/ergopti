@@ -1,4 +1,4 @@
---- linux/lib/i18n.lua
+--- lib/i18n.lua
 
 --- ==============================================================================
 --- MODULE: i18n — Internationalisation (Linux)
