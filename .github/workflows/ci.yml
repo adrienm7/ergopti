@@ -16,7 +16,7 @@
 #   │  branch │ │  branch  │ │  branch  │
 #   │         │ │          │ │          │
 #   │ test-hs │ │ test-ahk │ │test-linux│
-#   │  e2e-hs │ │  e2e-ahk │ └──────────┘
+#   │  e2e-hs │ │  e2e-ahk │ │ e2e-linux│
 #   └────┬────┘ └────┬─────┘
 #        │           │           │
 #        └─────────┬─┘───────────┘
@@ -590,43 +590,84 @@ jobs:
   # ============================================
 
   # ─────────────────────────────────────────────────
-  # 4.1) Linux Lua driver tests
+  # 4.1) Linux Lua driver unit tests
   # ─────────────────────────────────────────────────
   test-linux:
     name: 'Linux · unit tests'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Install LuaJIT
-        run: sudo apt-get update -qq && sudo apt-get install -y luajit
+        # The test runner (tests/run.lua) uses LuaJIT. Test discovery falls
+        # back to io.popen("find") when lfs is unavailable — no luarocks needed.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y luajit
 
-      - name: Run Linux driver test suite
+      - name: Run Linux driver unit test suite
         working-directory: static/ergopti_plus/linux
-        run: luajit tests/run.lua
+        # Wrapped in the unified reporter: streams output unchanged, exits with the
+        # runner's code (CI gating preserved), and emits GitHub annotations + a JSON
+        # summary on failure. report.cjs lives at the repo root tools/.
+        run: node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua
 
   # ─────────────────────────────────────────────────
-  # 4.2) Gate: Linux driver fully green
+  # 4.2) Linux E2E — virtual-keyboard harness (stubbed, no real evdev/ytotool)
+  # ─────────────────────────────────────────────────
+  # This job runs on ubuntu-latest against the pure-Lua hotstring engine — no
+  # real evdev device, no ydotool injection. It is a corpus-driven replay of
+  # the engine's on_char() logic layer, not an OS-level end-to-end test.
+  e2e-linux:
+    name: 'Linux · E2E (virtual-keyboard, stubbed)'
+    runs-on: ubuntu-latest
+    needs: [test-linux]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LuaJIT
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y luajit
+
+      - name: Run virtual-keyboard E2E harness
+        # Exercises the hotstring engine against 8 hand-coded scenarios
+        # and all shared corpus vectors (vectors.json).
+        # Exit 0 = all pass, 1 = at least one failure.
+        working-directory: static/ergopti_plus/linux
+        run: luajit tests/e2e/run_e2e.lua
+        timeout-minutes: 5
+
+  # ─────────────────────────────────────────────────
+  # 4.3) Gate: Linux driver fully green
   # ─────────────────────────────────────────────────
   linux-ok:
     name: 'Linux · ✅ all green'
     runs-on: ubuntu-latest
-    needs: [test-linux]
+    needs: [test-linux, e2e-linux]
     if: always()
 
     steps:
       - name: Assert all Linux jobs passed
         run: |
-          if [[ "${{ needs.test-linux.result }}" == "failure" || \
-                "${{ needs.test-linux.result }}" == "cancelled" ]]; then
-              echo "Linux driver: test-linux failed."
+          failed=0
+          for job_result in "${{ needs.test-linux.result }}" "${{ needs.e2e-linux.result }}"; do
+              if [[ "$job_result" == "failure" || "$job_result" == "cancelled" ]]; then
+                  failed=1
+              fi
+          done
+          if [[ $failed -eq 1 ]]; then
+              echo "Linux driver: one or more jobs failed."
               echo "  test-linux : ${{ needs.test-linux.result }}"
+              echo "  e2e-linux  : ${{ needs.e2e-linux.result }}"
               exit 1
           fi
           echo "Linux driver: all jobs passed (or skipped)."
           echo "  test-linux : ${{ needs.test-linux.result }}"
+          echo "  e2e-linux  : ${{ needs.e2e-linux.result }}"
 
   # =============================================================
   # =============================================================
@@ -1085,7 +1126,7 @@ jobs:
             static/ergopti/windows/Ergopti_windows.exe
 
   # ─────────────────────────────────────────────────
-  # 6.3) Linux — XKB keyboard layouts
+  # 6.3) Linux — assemble driver + XKB layouts
   # ─────────────────────────────────────────────────
   build-linux:
     name: 'Release · Linux build'
@@ -1098,14 +1139,23 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install LuaJIT (for smoke test)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y luajit
+
+      - name: Assemble Linux driver bundle
+        shell: bash
+        run: bash tools/build/build-linux-driver.sh
+
       - name: Package latest XKB files
         shell: bash
         run: |
           set -euo pipefail
           latest_dir=$(ls -d static/ergopti/linux/v*_* | sort -V | tail -1)
           dir_name=$(basename "$latest_dir")
-          mkdir -p build/linux
-          (cd static/ergopti/linux && zip -r "../../../build/linux/Ergopti_xkb.zip" "$dir_name")
+          mkdir -p build/linux/xkb
+          (cd static/ergopti/linux && zip -r "../../../build/linux/xkb/Ergopti_xkb.zip" "$dir_name")
           echo "Packaged XKB: $dir_name → Ergopti_xkb.zip"
 
       - name: Upload Linux artifacts
@@ -1114,9 +1164,11 @@ jobs:
           name: assets-linux
           retention-days: 1
           path: |
-            build/linux/Ergopti_xkb.zip
-            static/ergopti_plus/kanata/kanata.kbd
-            static/ergopti_plus/linux/install.sh
+            build/linux/xkb/Ergopti_xkb.zip
+            build/linux/kanata.kbd
+            build/linux/install.sh
+            build/linux/bin/ergopti-hotstrings
+            build/linux/linux/ergopti_hotstrings.lua
 
   # ============================================================
   # ============================================================
