@@ -161,42 +161,15 @@ function M._resolve_word_bounds(ds, get_setting)
 end
 
 --- Resolves the appropriate system prompt, injecting live session values.
---- Reads min/max_words from hs.settings and the UI locale from lib.i18n so
---- the prompt always reflects the user's current preferences.
----
---- Supports both schemas:
----   - function ``system_multi(n)`` (legacy Lua callbacks)
----   - string template ``system_multi_template`` (JSON / AHK shape)
+--- Delegates the pure prompt-building algorithm to the shared
+--- Selector.resolve_system_prompt() (profile_selector.lua, DL-1), keeping only
+--- the macOS-specific glue: live min/max_words from hs.settings and the active
+--- UI locale from lib.i18n.
 ---
 --- @param profile table The active profile data.
 --- @param n number The number of predictions expected.
 --- @return string The resolved system prompt string.
 function M.resolve_system_prompt(profile, n)
-	local prompt = ""
-
-	if type(profile) ~= "table" then
-		prompt = BASIC_PROMPT_FALLBACK
-	elseif type(profile.raw_prompt) == "string" and profile.raw_prompt ~= "" then
-		prompt = profile.raw_prompt
-	elseif n == 1 then
-		prompt = type(profile.system_single) == "string"
-			and profile.system_single or BASIC_PROMPT_FALLBACK
-	else
-		-- Two-step build for the multi-template case so the user-facing system
-		-- prompt mirrors the AHK shape (system_single + template footer).
-		if type(profile.system_multi_template) == "string" and profile.system_multi_template ~= "" then
-			local base   = type(profile.system_single) == "string" and profile.system_single or ""
-			local footer = profile.system_multi_template:gsub("{n}", tostring(n))
-			prompt = (base ~= "" and (base .. "\n\n" .. footer) or footer)
-		elseif type(profile.system_multi) == "function" then
-			prompt = profile.system_multi(n)
-		elseif type(profile.system_multi) == "string" then
-			prompt = profile.system_multi
-		else
-			prompt = BASIC_PROMPT_FALLBACK
-		end
-	end
-
 	-- Lazy load Core to avoid circular dependency (init.lua requires profiles.lua).
 	local Core = require("modules.llm.init") or {}
 	local ds   = (Core and Core.DEFAULT_STATE) or {}
@@ -207,14 +180,33 @@ function M.resolve_system_prompt(profile, n)
 	local get_setting = (settings and settings.get) or function() return nil end
 	local min_w, max_w = M._resolve_word_bounds(ds, get_setting)
 
+	-- Inject the active UI locale so the model replies in the user's language.
+	local locale = i18n.get_locale() or Manifest.default_for("script.locale")
+
+	-- Delegate the pure algorithm to the shared selector (DL-1).
+	-- Convert max_w == 0 to "illimité" (the shared selector substitutes
+	-- whatever string it receives; the macOS convention for "unlimited" is
+	-- the French word rather than a literal 0).
+	local vars = {
+		n         = n,
+		min_words = tostring(min_w or ""),
+		max_words = (max_w and max_w > 0) and tostring(max_w) or "illimité",
+		language  = locale,
+		context   = "",  -- injected elsewhere by prompt_builder
+	}
+	local result = Selector.resolve_system_prompt(profile, vars)
+
+	if result and type(result.system) == "string" and result.system ~= "" then
+		-- The shared selector already substituted all placeholders.
+		return result.system
+	end
+
+	-- Fallback: use BASIC_PROMPT_FALLBACK and substitute placeholders manually.
+	-- This only runs when the profile is nil/malformed or has no prompt field,
+	-- matching the old behaviour before DL-1 delegation.
+	local prompt = BASIC_PROMPT_FALLBACK
 	prompt = prompt:gsub("{max_words}", (max_w and max_w > 0) and tostring(max_w) or "illimité")
 	prompt = prompt:gsub("{min_words}", tostring(min_w or ""))
-
-	-- Inject the active UI locale so the model replies in the user's language.
-	-- i18n is always loaded; its get_locale() returns the configured locale,
-	-- falling back to the manifest's script.locale default — the single source —
-	-- rather than a re-typed "fr" literal (rule 5.2).
-	local locale = i18n.get_locale() or Manifest.default_for("script.locale")
 	prompt = prompt:gsub("{language}", locale)
 
 	return prompt

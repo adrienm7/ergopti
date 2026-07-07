@@ -114,6 +114,15 @@ function getActiveProfile(profileId, userProfiles = []) {
 /**
  * Injects template variables into a profile's system prompt string.
  *
+ * Algorithm (must stay in sync with both drivers and profile_selector.lua):
+ *   1. null/undefined profile → { system: null }
+ *   2. raw_prompt non-empty → return it verbatim (raw mode, no substitution)
+ *   3. n === 1 → system_single (or null if absent)
+ *   4. n > 1 → system_single + "\n\n" + system_multi_template (footer pattern)
+ *      If no multi_template, falls back to system_single alone.
+ *   5. Substitutes {context}, {tail}, {min_words}, {max_words}, {n}, {language}
+ *      in a single replaceAll pass.
+ *
  * Supported placeholders (all optional — missing placeholders stay as-is):
  *   {context}    Full (possibly truncated) context forwarded to the LLM.
  *   {tail}       Last N words of the context (freshness reference window).
@@ -122,31 +131,46 @@ function getActiveProfile(profileId, userProfiles = []) {
  *   {n}          Number of predictions requested.
  *   {language}   Language hint (e.g. "fr", "en").
  *
- * @param {object} profile      The resolved profile object.
- * @param {object} vars         Variable values to inject.
- * @param {string} vars.context
- * @param {string} [vars.tail=""]
- * @param {number} [vars.min_words=1]
- * @param {number} [vars.max_words=5]
- * @param {number} [vars.n=1]
- * @param {string} [vars.language="fr"]
+ * @param {object|null} profile      The resolved profile object, or null.
+ * @param {object}      vars         Variable values to inject.
+ * @param {string}      vars.context
+ * @param {string}      [vars.tail=""]
+ * @param {number}      [vars.min_words=1]
+ * @param {number}      [vars.max_words=5]
+ * @param {number}      [vars.n=1]
+ * @param {string}      [vars.language="fr"]
  * @returns {{ system: string|null, is_batch: boolean }}
  *   system:   The injected system prompt string (null if the profile has none).
- *   is_batch: True when the profile uses batch mode (system_multi template).
+ *   is_batch: True when the profile uses batch mode with multi_template.
  */
 function resolveSystemPrompt(profile, vars = {}) {
 	if (!profile) return { system: null, is_batch: false };
 
 	const n = vars.n ?? 1;
-	const isBatch = profile.batch === true && n > 1 && !!profile.system_multi_template;
-	const template = isBatch ? profile.system_multi_template : (profile.system_single ?? null);
 
-	if (!template) return { system: null, is_batch: isBatch };
+	// raw_prompt short-circuit: verbatim, no substitution (matches both drivers)
+	if (typeof profile.raw_prompt === 'string' && profile.raw_prompt !== '') {
+		return { system: profile.raw_prompt, is_batch: false };
+	}
+
+	const isBatch = profile.batch === true && n > 1 && typeof profile.system_multi_template === 'string' && profile.system_multi_template !== '';
+
+	const base = typeof profile.system_single === 'string' ? profile.system_single : null;
+	if (!base) return { system: null, is_batch: isBatch };
+
+	let template;
+	if (isBatch) {
+		// Footer pattern matching both drivers: base + "\n\n" + footer{n}
+		const footer = profile.system_multi_template.replace(/\{n\}/g, String(n));
+		template = base + '\n\n' + footer;
+	} else {
+		template = base;
+	}
 
 	const context = vars.context ?? '';
 	const tail = vars.tail ?? '';
-	const minWords = vars.min_words ?? 1;
-	const maxWords = vars.max_words ?? 5;
+	const minWords = vars.min_words != null ? String(vars.min_words) : '1';
+	const maxWords = vars.max_words != null ? String(vars.max_words) : '5';
 	const language = vars.language ?? 'fr';
 
 	const system = template
@@ -229,7 +253,22 @@ function profileSelectorTestVectors() {
 			assert: { field: 'system', contains: 'en' }
 		},
 		{
-			id: 'batch_mode_uses_multi_template',
+			id: 'batch_footer_pattern',
+			description: 'Batch n>1 concatenates system_single + \\n\\n + footer{n}.',
+			call: 'resolveSystemPrompt',
+			args: [
+				{
+					id: 'batch_test',
+					batch: true,
+					system_single: 'BASE',
+					system_multi_template: 'FOOTER n={n}'
+				},
+				{ context: 'ctx', n: 5 }
+			],
+			assert: { field: 'system', contains: 'BASE\\n\\nFOOTER n=5' }
+		},
+		{
+			id: 'batch_mode_returns_is_batch_true',
 			description: 'Batch profile with n>1 returns is_batch=true.',
 			call: 'resolveSystemPrompt',
 			args: [
@@ -242,6 +281,16 @@ function profileSelectorTestVectors() {
 				{ context: 'test', n: 3 }
 			],
 			assert: { field: 'is_batch', value: true }
+		},
+		{
+			id: 'raw_prompt_short_circuit',
+			description: 'raw_prompt non-empty returns verbatim, no substitution, is_batch=false.',
+			call: 'resolveSystemPrompt',
+			args: [
+				{ id: 'raw', raw_prompt: 'JUST {context} VERBATIM', batch: false },
+				{ context: 'hello', n: 1 }
+			],
+			assert: { field: 'system', value: 'JUST {context} VERBATIM' }
 		},
 		{
 			id: 'null_profile_returns_null_system',

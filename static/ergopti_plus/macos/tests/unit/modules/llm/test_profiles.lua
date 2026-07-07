@@ -221,13 +221,14 @@ helpers.describe("Profiles.resolve_system_prompt", function()
 		helpers.assert_eq(prompt, "JUST CONTEXT")
 	end)
 
-	helpers.it("invokes system_multi when n > 1", function()
+	helpers.it("uses shared selector for multi-template n>1", function()
 		local profile = {
-			system_single = "ignored",
-			system_multi = function(n) return "MULTI " .. tostring(n) end,
+			system_single = "BASE",
+			system_multi_template = "FOOTER n={n}",
 		}
 		local prompt = Profiles.resolve_system_prompt(profile, 3)
-		helpers.assert_true(prompt:find("MULTI 3") ~= nil)
+		helpers.assert_true(prompt:find("BASE") ~= nil)
+		helpers.assert_true(prompt:find("FOOTER n=3") ~= nil)
 	end)
 
 	helpers.it("uses system_single when n = 1", function()
