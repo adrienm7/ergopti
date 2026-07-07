@@ -279,6 +279,36 @@ const PIPELINE = [
 				.join('\n');
 			return { ok, detail: ok ? undefined : detail || lines[lines.length - 1] || '' };
 		}
+	},
+
+	// -------------------------------------------------------
+	// Step 7: Assemble the Linux driver bundle and verify integrity.
+	// The build script runs on Linux (CI) or Windows (dev) — it skips
+	// engine/module smoke tests on non-Linux automatically.
+	// -------------------------------------------------------
+	{
+		name: 'build:linux — assemble driver bundle + integrity check',
+		run() {
+			// Run the bash script with --skip-smoke so only assembly + integrity
+			// are checked (smoke tests need a real Linux path layout).
+			const result = spawnSync('bash', [
+				'tools/build/build-linux-driver.sh',
+				'--skip-smoke'
+			], {
+				cwd: ROOT,
+				encoding: 'utf8',
+				shell: true,
+				timeout: 60000
+			});
+			const combined = (result.stdout || '') + (result.stderr || '');
+			// Extract integrity check line
+			const lines = combined.trim().split('\n').filter(Boolean);
+			const integrityLine = lines.find(l => l.includes('required files present')) || '';
+			const detail = result.status === 0
+				? undefined
+				: lines.filter(l => l.includes('MISSING:') || l.includes('ERROR:')).join('\n') || combined.slice(-200);
+			return { ok: result.status === 0, detail };
+		}
 	}
 ];
 
