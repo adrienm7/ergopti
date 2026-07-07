@@ -261,6 +261,15 @@ const PIPELINE = [
 	// the manifest does not define (section-prefix drift, removed feature, etc.).
 	// -------------------------------------------------------
 	{
+		name: 'test:kanata-defalias-parity — kanata.kbd timeouts match defaults.toml',
+		run() {
+			const { ok, stdout, stderr } = runNpmScript('test:kanata-defalias-parity');
+			const lines = (stdout + stderr).trim().split('\n').filter(Boolean);
+			const summary = lines[lines.length - 1] || '';
+			return { ok, detail: ok ? undefined : summary };
+		}
+	},
+	{
 		name: 'test:feature-read-sites — AHK Features[...] reads ⊆ manifest',
 		run() {
 			const { ok, stdout, stderr } = runNpmScript('test:feature-read-sites');
