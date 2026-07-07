@@ -85,12 +85,14 @@ local LOG = "ergopti_hotstrings"
 -- =========================================
 -- =========================================
 
-local engine_mod    = require("modules.hotstrings.engine")
-local loader        = require("modules.hotstrings.loader")
-local injector      = require("modules.hotstrings.injector")
-local dev_finder    = require("modules.hotstrings.device_finder")
-local metrics       = require("modules.keylogger.metrics_collector")
-local keyboard_hook = require("adapters.keyboard_hook")	-- Optional adapters (may fail to load if deps missing — daemon still runs).
+local engine_mod        = require("modules.hotstrings.engine")
+local hotstrings_config = require("modules.hotstrings.hotstrings_config")
+local injector          = require("modules.hotstrings.injector")
+local dev_finder        = require("modules.hotstrings.device_finder")
+local keylogger         = require("modules.keylogger.keylogger")
+local keyboard_hook     = require("adapters.keyboard_hook")
+
+-- Optional adapters (may fail to load if deps missing — daemon still runs).
 local tray_menu = nil
 local ok_tray, tray_mod = pcall(require, "adapters.tray_menu")
 if ok_tray then tray_menu = tray_mod end
@@ -104,6 +106,11 @@ if ok_menu then menu_builder = menu_mod end
 local prediction_engine = nil
 local ok_llm, llm_mod = pcall(require, "modules.llm.prediction_engine")
 if ok_llm then prediction_engine = llm_mod end
+
+-- Window info tracker (optional — provides app_id for keylogger per-app stats).
+local window_info = nil
+local ok_wi, wi_mod = pcall(require, "adapters.window_info")
+if ok_wi then window_info = wi_mod end
 
 
 -- =========================================
@@ -181,31 +188,36 @@ end
 -- =========================================
 -- =========================================
 
-local function resolve_toml_paths(config_path)
-	local root = config_path
-	if not root then
-		local fh = io.open(DEFAULT_CONFIG_DIR, "r")
-		if fh then
-			fh:close()
-			root = DEFAULT_CONFIG_DIR
-		end
+local function resolve_config_path(config_path)
+	if type(config_path) == "string" and config_path ~= "" then
+		return config_path
 	end
-	if not root then
-		local shared = SCRIPT_DIR .. "/../../_shared/modules/hotstrings"
-		local fh = io.open(shared, "r")
-		if fh then
-			fh:close()
-			root = shared
-		end
+	-- Check the XDG-compliant user config directory.
+	local fh = io.open(DEFAULT_CONFIG_DIR, "r")
+	if fh then
+		fh:close()
+		return DEFAULT_CONFIG_DIR
 	end
-	if not root then
-		Logger.warn(LOG, "No hotstring data directory found — no mappings loaded.")
-		return {}
+	-- Fall back to bundled shared hotstrings.
+	local shared = SCRIPT_DIR .. "/../../_shared/modules/hotstrings"
+	local fh2 = io.open(shared, "r")
+	if fh2 then
+		fh2:close()
+		return shared
 	end
-	if root:match("%.toml$") then
-		return { root }
+	return nil
+end
+
+--- Attempts the SIGHUP reload flow.  Called from a signal handler so it must
+--- be self-contained and not throw.
+local function on_sighup_reload()
+	Logger.info(LOG, "SIGHUP received — reloading hotstring config…")
+	local ok, count = pcall(function() return hotstrings_config.reload() end)
+	if ok then
+		Logger.success(LOG, "Hotstrings reloaded: %d mapping(s) active.", count or 0)
+	else
+		Logger.error(LOG, "Hotstrings reload failed: %s.", tostring(count))
 	end
-	return loader.find_toml_files(root)
 end
 
 
@@ -218,22 +230,27 @@ end
 local function install_signal_handlers()
 	local ok, signal = pcall(require, "posix.signal")
 	if not ok or not signal then
-		Logger.debug(LOG, "posix.signal unavailable — SIGINT/SIGTERM not intercepted.")
+		Logger.debug(LOG, "posix.signal unavailable — signal handlers not installed.")
 		return
 	end
 
-	local function on_signal(sig)
+	local function on_term(sig)
 		Logger.info(LOG, "Signal %d received — shutting down…", sig)
-		local stats = metrics.get_session_stats()
+		local stats = keylogger.get_session_stats()
 		Logger.info(LOG, "Session: %d keystroke(s), ~%d word(s), %ds.",
 			stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
+		keylogger.flush()
 		keyboard_hook.stop()
 		if tray_menu then tray_menu.destroy() end
 	end
 
-	pcall(signal.signal, signal.SIGINT,  on_signal)
-	pcall(signal.signal, signal.SIGTERM, on_signal)
-	Logger.debug(LOG, "Signal handlers installed.")
+	pcall(signal.signal, signal.SIGINT,  on_term)
+	pcall(signal.signal, signal.SIGTERM, on_term)
+
+	-- SIGHUP → hot reload.
+	pcall(signal.signal, signal.SIGHUP,  function(_) on_sighup_reload() end)
+
+	Logger.debug(LOG, "Signal handlers installed (INT, TERM, HUP).")
 end
 
 
@@ -257,17 +274,18 @@ local function main()
 		Logger.info(LOG, "Dry-run mode: matches will be logged but not injected.")
 	end
 
-	-- 8.1) Load hotstring mappings.
-	local toml_paths = resolve_toml_paths(opts.config)
-	Logger.info(LOG, "%d TOML file(s) to load.", #toml_paths)
-	local mappings = loader.load(toml_paths)
-
-	-- 8.2) Initialise the engine and feed it the mappings.
+	-- 8.1) Initialise the hotstring engine.
 	local engine = engine_mod.new()
-	engine:load_mappings(mappings)
 
-	-- 8.3) Initialise the metrics collector.
-	metrics.init({})
+	-- 8.2) Initialise hotstrings_config and load all mappings.
+	local config_path = resolve_config_path(opts.config)
+	hotstrings_config.init(engine, config_path)
+	local mapping_count = hotstrings_config.load_all()
+	Logger.info(LOG, "%d hotstring mapping(s) loaded (%d parse error(s)).",
+		mapping_count, hotstrings_config.parse_error_count())
+
+	-- 8.3) Initialise the full keylogger.
+	keylogger.init({})
 
 	-- 8.4) Resolve the input device.
 	local device = opts.device
@@ -284,7 +302,21 @@ local function main()
 	-- 8.5) Define the character callback.
 	local function on_char(ch)
 		local now_ms = math.floor(os.clock() * 1000)
-		metrics.on_keydown(ch, now_ms)
+
+		-- Detect current app for per-app keylogger stats.
+		local app_id = nil
+		if window_info and window_info.getActiveAppID then
+			app_id = window_info.getActiveAppID()
+		end
+
+		-- Check password suppression.
+		if keylogger.is_password_app(app_id) then
+			keylogger.suppress()
+		else
+			keylogger.unsuppress()
+		end
+
+		keylogger.on_keydown(ch, now_ms, app_id)
 
 		local terminator_consumed = terminators_mod.is_terminator(ch)
 		local result = engine:on_char(ch, { terminator_consumed = terminator_consumed })
@@ -305,8 +337,6 @@ local function main()
 
 		-- Feed the character to the LLM prediction engine.
 		if prediction_engine then
-			-- The engine buffer is internal — we pass the character and let
-			-- prediction_engine track its own context buffer.
 			pcall(function() prediction_engine.on_char(ch) end)
 		end
 	end
@@ -335,7 +365,7 @@ local function main()
 		Logger.debug(LOG, "Control key '%s' — buffer reset.", key_name)
 	end
 
-	-- 8.7) Start the keyboard hook adapter (pump-based, non-blocking start).
+	-- 8.8) Start the keyboard hook adapter.
 	keyboard_hook.start({
 		device = device,
 		layout = opts.layout,
@@ -349,30 +379,28 @@ local function main()
 		os.exit(1)
 	end
 
-	-- 8.8) Start the tray menu if requested and available.
+	-- 8.9) Start the tray menu if requested.
 	if opts.tray and tray_menu then
 		Logger.info(LOG, "Tray icon requested — starting.")
 		tray_menu.setIcon({ title = "Ergopti" })
 
 		if menu_builder then
-			-- Build the full rich menu from daemon state.
 			local menu_items = menu_builder.build({
-				_version  = "3.0.0",
-				engine    = engine,
-				mappings  = mappings,
-				layout    = opts.layout,
+				_version      = "3.0.0",
+				config        = hotstrings_config,
+				engine        = engine,
+				layout        = opts.layout,
 				on_layout_change = function(new_layout)
 					Logger.info(LOG, "Layout change requested: %s (restart daemon to apply)", new_layout)
 				end,
-				metrics   = metrics,
-				llm       = prediction_engine,
-				dry_run   = opts.dry_run,
-				verbose   = opts.verbose,
-				on_quit   = function() keyboard_hook.stop() end,
+				keylogger     = keylogger,
+				llm           = prediction_engine,
+				dry_run       = opts.dry_run,
+				verbose       = opts.verbose,
+				on_quit       = function() keyboard_hook.stop() end,
 			})
 			tray_menu.setMenu(menu_items)
 		else
-			-- Fallback: minimal menu.
 			tray_menu.setMenu({
 				{ title = "Ergopti " .. (opts.layout or "qwerty"), fn = function() end },
 				{ title = "Quitter", fn = function() keyboard_hook.stop() end },
@@ -382,17 +410,13 @@ local function main()
 		Logger.warn(LOG, "Tray icon requested but tray_menu adapter unavailable (install yad).")
 	end
 
-	-- 8.9) Install signal handlers (calls keyboard_hook.stop + tray_menu.destroy).
+	-- 8.10) Install signal handlers.
 	install_signal_handlers()
 
 	Logger.success(LOG, "Daemon ready (device=%s layout=%s mappings=%d dry_run=%s tray=%s).",
-		device, opts.layout, #mappings, tostring(opts.dry_run), tostring(opts.tray and tray_menu ~= nil))
+		device, opts.layout, mapping_count, tostring(opts.dry_run), tostring(opts.tray and tray_menu ~= nil))
 
-	-- 8.10) Pump-based event loop.
-	-- keyboard_hook.pump() blocks on pipe:read("*l") until input arrives.
-	-- tray_menu.pump() processes signal-file callbacks (fast, non-blocking).
-	-- Run tray_menu.pump() BEFORE keyboard_hook.pump() so menu clicks are
-	-- serviced between keystrokes.
+	-- 8.11) Pump-based event loop.
 	while keyboard_hook.isRunning() do
 		if tray_menu then
 			pcall(tray_menu.pump)
@@ -400,12 +424,13 @@ local function main()
 		pcall(keyboard_hook.pump)
 	end
 
-	-- 8.11) Clean exit.
+	-- 8.12) Clean exit.
 	if tray_menu then tray_menu.destroy() end
 
-	local stats = metrics.get_session_stats()
+	local stats = keylogger.get_session_stats()
 	Logger.info(LOG, "Session ended: %d keystroke(s), ~%d word(s), %ds.",
 		stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
+	keylogger.flush()
 	Logger.info(LOG, "Daemon exiting.")
 end
 
