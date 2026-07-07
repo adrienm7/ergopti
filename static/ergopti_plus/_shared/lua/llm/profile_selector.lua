@@ -191,6 +191,15 @@ end
 
 --- Injects template variables into a profile's system prompt string.
 ---
+--- Algorithm (must stay in sync with both drivers and ProfileSelector.js):
+---   1. nil/empty profile → { system = nil }
+---   2. raw_prompt non-empty → return it verbatim (raw mode, no placeholders)
+---   3. n == 1 → system_single (or nil if absent)
+---   4. n > 1 → system_single + "\n\n" + system_multi_template (footer pattern)
+---      If no multi_template, falls back to system_single alone.
+---   5. Substitutes {context}, {tail}, {min_words}, {max_words}, {n}, {language}
+---      in a single gsub pass.
+---
 --- Supported placeholders: {context}, {tail}, {min_words}, {max_words}, {n}, {language}.
 ---
 --- @param profile table|nil The resolved profile object.
@@ -203,19 +212,32 @@ function M.resolve_system_prompt(profile, vars)
 	vars = vars or {}
 
 	local n        = vars.n or 1
-	local is_batch = profile.batch == true and n > 1 and profile.system_multi_template ~= nil
-	local template = is_batch and profile.system_multi_template
-		or profile.system_single
-		or nil
 
-	if not template then
+	-- raw_prompt short-circuit: verbatim, no substitution (matches both drivers)
+	if type(profile.raw_prompt) == "string" and profile.raw_prompt ~= "" then
+		return { system = profile.raw_prompt, is_batch = false }
+	end
+
+	local is_batch = profile.batch == true and n > 1 and type(profile.system_multi_template) == "string" and profile.system_multi_template ~= ""
+
+	local base = type(profile.system_single) == "string" and profile.system_single or nil
+	if not base then
 		return { system = nil, is_batch = is_batch }
+	end
+
+	local template
+	if is_batch then
+		-- Footer pattern matching both drivers: base + "\n\n" + footer{n}
+		local footer = profile.system_multi_template:gsub("{n}", tostring(n))
+		template = base .. "\n\n" .. footer
+	else
+		template = base
 	end
 
 	local context  = tostring(vars.context   or "")
 	local tail     = tostring(vars.tail      or "")
-	local min_w    = tostring(vars.min_words or 1)
-	local max_w    = tostring(vars.max_words or 5)
+	local min_w    = tostring(vars.min_words ~= nil and vars.min_words or 1)
+	local max_w    = tostring(vars.max_words ~= nil and vars.max_words or 5)
 	local language = tostring(vars.language  or "fr")
 	local n_str    = tostring(n)
 
@@ -261,8 +283,8 @@ function M.test_vectors()
 			assert      = { field = "system", contains = "en" },
 		},
 		{
-			id          = "batch_mode_uses_multi_template",
-			description = "Batch profile with n>1 returns is_batch=true.",
+			id          = "batch_mode_uses_footer_pattern",
+			description = "Batch profile n>1 returns is_batch=true and uses base+\\n\\n+footer pattern.",
 			call        = "resolve_system_prompt",
 			profile     = {
 				id = "batch_test", batch = true,
@@ -271,6 +293,26 @@ function M.test_vectors()
 			},
 			vars   = { context = "test", n = 3 },
 			assert = { field = "is_batch", value = true },
+		},
+		{
+			id          = "batch_footer_contains_base_and_footer",
+			description = "Batch n>1 concatenates system_single + \\n\\n + footer{n}.",
+			call        = "resolve_system_prompt",
+			profile     = {
+				id = "batch_test", batch = true,
+				system_single = "BASE",
+				system_multi_template = "FOOTER n={n}",
+			},
+			vars   = { context = "ctx", n = 5 },
+			assert = { field = "system", contains = "BASE\\n\\nFOOTER n=5" },
+		},
+		{
+			id          = "raw_prompt_short_circuit",
+			description = "raw_prompt non-empty returns verbatim, no substitution, is_batch=false.",
+			call        = "resolve_system_prompt",
+			profile     = { id = "raw", raw_prompt = "JUST {context} VERBATIM", batch = false },
+			vars        = { context = "hello", n = 1 },
+			assert      = { field = "system", value = "JUST {context} VERBATIM" },
 		},
 		{
 			id          = "null_profile_returns_null_system",
