@@ -289,8 +289,6 @@ const PIPELINE = [
 	{
 		name: 'build:linux — assemble driver bundle + integrity check',
 		run() {
-			// Run the bash script with --skip-smoke so only assembly + integrity
-			// are checked (smoke tests need a real Linux path layout).
 			const result = spawnSync('bash', [
 				'tools/build/build-linux-driver.sh',
 				'--skip-smoke'
@@ -301,15 +299,24 @@ const PIPELINE = [
 				timeout: 60000
 			});
 			const combined = (result.stdout || '') + (result.stderr || '');
-			// Extract integrity check line
 			const lines = combined.trim().split('\n').filter(Boolean);
-			const integrityLine = lines.find(l => l.includes('required files present')) || '';
 			const detail = result.status === 0
 				? undefined
 				: lines.filter(l => l.includes('MISSING:') || l.includes('ERROR:')).join('\n') || combined.slice(-200);
 			return { ok: result.status === 0, detail };
 		}
-	}
+	},
+
+	// -------------------------------------------------------
+	// Step 8: Validate .deb package structure (no dpkg-deb needed).
+	// -------------------------------------------------------
+	// -------------------------------------------------------
+	// The build:deb and build:rpm steps run in CI on ubuntu-latest
+	// (see ci.yml jobs build-deb / build-rpm). They require a real
+	// driver bundle assembled from static/ source files, which the
+	// cross-platform build:linux step already produces. Local dev on
+	// Windows/macOS skips these — the CI gate is sufficient.
+	// -------------------------------------------------------
 ];
 
 // ==================================================

@@ -669,6 +669,50 @@ jobs:
           echo "  test-linux : ${{ needs.test-linux.result }}"
           echo "  e2e-linux  : ${{ needs.e2e-linux.result }}"
 
+  # ─────────────────────────────────────────────────
+  # 4.4) Validate .deb package structure
+  # ─────────────────────────────────────────────────
+  build-deb:
+    name: 'Linux · .deb structure'
+    runs-on: ubuntu-latest
+    needs: [linux-ok]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Assemble Linux driver bundle
+        run: bash tools/build/build-linux-driver.sh --skip-smoke
+
+      - name: Validate .deb package structure
+        run: bash tools/build/build-linux-deb.sh --skip-deb
+
+  # ─────────────────────────────────────────────────
+  # 4.5) Validate .rpm package structure
+  # ─────────────────────────────────────────────────
+  build-rpm:
+    name: 'Linux · .rpm structure'
+    runs-on: ubuntu-latest
+    needs: [linux-ok]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Assemble Linux driver bundle
+        run: bash tools/build/build-linux-driver.sh --skip-smoke
+
+      - name: Validate .rpm package structure
+        run: bash tools/build/build-linux-rpm.sh --skip-rpm
+
   # =============================================================
   # =============================================================
   # ======= 5/ Resolve release metadata (main + dev) ============

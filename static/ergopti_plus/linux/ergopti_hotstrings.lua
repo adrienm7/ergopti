@@ -4,36 +4,36 @@
 --- MODULE: Ergopti Hotstrings Daemon (Linux)
 --- DESCRIPTION:
 --- Entry point for the Linux hotstring daemon. Reads keyboard events from an
---- evdev device, matches the rolling typing buffer against loaded hotstring
---- definitions, and replays expansions via ydotool (uinput). The daemon is
---- entirely self-contained and runs outside of any display server dependency.
+--- evdev device via the keyboard_hook adapter (libinput/evtest subprocess),
+--- matches the rolling typing buffer against loaded hotstring definitions,
+--- and replays expansions via ydotool (uinput). Runs a pump-based event loop
+--- that also services the tray_menu signal-file callbacks.
 ---
 --- USAGE:
 ---   luajit ergopti_hotstrings.lua [OPTIONS]
 ---
 ---   --config  <path>   Path to a TOML config file or directory containing
 ---                       TOML hotstring files. Defaults to
----                       ~/.config/ergopti/hotstrings/ if that directory exists,
----                       then falls back to the _shared/modules/hotstrings/ tree shipped
----                       alongside the script.
+---                       ~/.config/ergopti/hotstrings/ if that directory exists.
 ---   --device  <path>   Evdev device to listen on (e.g. /dev/input/event3).
 ---                       When omitted, device_finder auto-selects the keyboard.
 ---   --layout  <name>   Keyboard layout for keycode mapping: "qwerty" or
 ---                       "azerty". Default: auto-detect from $XKBLAYOUT env var.
+---   --tray             Enable the tray icon (requires yad).
 ---   --dry-run          Log matches without injecting any keystrokes.
 ---   --verbose          Enable debug-level logging.
 ---   --help             Print usage and exit.
 ---
 --- FEATURES & RATIONALE:
---- 1. Zero-config startup: auto-detection of both the hotstring data directory
----    and the keyboard device means the daemon works out of the box on a
----    standard ergopti installation.
+--- 1. Pump-based event loop: keyboard_hook.pump() reads from the evdev subprocess
+---    pipe in batches of 50 lines; tray_menu.pump() reads the signal file for
+---    menu callbacks. Both are called on each iteration so tray menu interactions
+---    are serviced even when the user is typing rapidly.
 --- 2. Modular architecture: each concern (loading, matching, injection, input,
----    metrics) lives in its own module so individual pieces can be unit-tested
----    or swapped without touching this file.
+---    metrics, tray) lives in its own adapter/module so individual pieces can
+---    be unit-tested or swapped without touching this file.
 --- 3. Buffer reset on control keys: Backspace, Enter, and Tab clear the engine
----    buffer so stale prefixes from incomplete words never trigger expansions
----    unexpectedly.
+---    buffer so stale prefixes from incomplete words never trigger expansions.
 --- 4. Metrics collection: every keypress is forwarded to the metrics collector
 ---    so WPM and n-gram statistics accumulate for the full daemon session.
 --- ==============================================================================
@@ -54,7 +54,6 @@ local SCRIPT_DIR = (function()
 end)()
 
 -- Prepend the script directory and the shared Lua library to the search path.
--- Must be done before any require() so logger.shim and keymap.terminators resolve.
 local SHARED_LUA_DIR = SCRIPT_DIR .. "/../_shared/lua"
 package.path = SCRIPT_DIR .. "/?.lua;" ..
                SCRIPT_DIR .. "/modules/hotstrings/?.lua;" ..
@@ -65,23 +64,18 @@ package.path = SCRIPT_DIR .. "/?.lua;" ..
 
 -- =========================================
 -- =========================================
--- ======= 2/ Logger =======================
+-- ======= 2/ Logger & UTF-8 Shim ==========
 -- =========================================
 -- =========================================
 
 -- Install the pure-Lua utf8 compatibility shim BEFORE any shared module require.
--- LuaJIT 2.x does not bundle Lua 5.3's utf8 library, and shared modules
--- (terminators, text_utils, toml_codec) call utf8.* via pcall. The shim makes
--- those calls succeed instead of silently degrading to ASCII fallbacks (SLP-1).
+-- LuaJIT 2.x does not bundle Lua 5.3's utf8 library.
 local utf8_compat = require("compat.utf8")
 if utf8_compat.install() then
 	-- Installed — shared modules will now get real utf8 support.
 end
 
--- Use the canonical shared logger shim. It tries the shared logger core and
--- the macOS driver logger before falling back to plain print.
 local Logger = require("logger.shim")
-
 local LOG = "ergopti_hotstrings"
 
 
@@ -91,12 +85,17 @@ local LOG = "ergopti_hotstrings"
 -- =========================================
 -- =========================================
 
-local engine_mod  = require("modules.hotstrings.engine")
-local loader      = require("modules.hotstrings.loader")
-local injector    = require("modules.hotstrings.injector")
-local input_mod   = require("modules.hotstrings.input_reader")
-local dev_finder  = require("modules.hotstrings.device_finder")
-local metrics     = require("modules.keylogger.metrics_collector")
+local engine_mod    = require("modules.hotstrings.engine")
+local loader        = require("modules.hotstrings.loader")
+local injector      = require("modules.hotstrings.injector")
+local dev_finder    = require("modules.hotstrings.device_finder")
+local metrics       = require("modules.keylogger.metrics_collector")
+local keyboard_hook = require("adapters.keyboard_hook")
+
+-- Optional adapters (may fail to load if deps missing — daemon still runs).
+local tray_menu = nil
+local ok_tray, tray_mod = pcall(require, "adapters.tray_menu")
+if ok_tray then tray_menu = tray_mod end
 
 
 -- =========================================
@@ -108,17 +107,11 @@ local metrics     = require("modules.keylogger.metrics_collector")
 -- Default hotstring data location (XDG-compliant user config).
 local DEFAULT_CONFIG_DIR = (os.getenv("HOME") or "~") .. "/.config/ergopti/hotstrings"
 
--- Terminator catalogue: loaded from the shared module so Linux and macOS
--- recognise exactly the same set of terminator characters. The shared module
--- owns the single source of truth (TERMINATOR_DEFS) and exposes is_terminator()
--- as an O(1) lookup against its pre-built hash set. keymap.terminators ships
--- alongside this daemon, so a require failure is a broken install — we fail
--- loudly rather than silently degrade to a minimal {space . , newline} set that
--- would produce wrong expansions (rule 5.3/5.4, no behavioural fallback).
+-- Terminator catalogue: shared between Linux and macOS.
 local terminators_mod = (function()
 	local ok, mod = pcall(require, "keymap.terminators")
 	if ok and mod then return mod end
-	Logger.error(LOG, "shared keymap.terminators failed to load (%s) — cannot start: the terminator catalogue is the single source of truth.", tostring(mod))
+	Logger.error(LOG, "shared keymap.terminators failed to load (%s).", tostring(mod))
 	error("ergopti_plus: shared keymap.terminators is required but failed to load")
 end)()
 
@@ -129,10 +122,7 @@ end)()
 -- =========================================
 -- =========================================
 
---- Parses the command-line argument list (arg global) into an options table.
---- @return table  { config?, device?, layout?, dry_run, verbose, help }
 local function parse_args()
-	-- Auto-detect layout from $XKBLAYOUT env var; default to qwerty.
 	local default_layout = (os.getenv("XKBLAYOUT") or ""):lower()
 	if default_layout ~= "azerty" then default_layout = "qwerty" end
 
@@ -141,6 +131,7 @@ local function parse_args()
 		dry_run = false,
 		verbose = false,
 		help    = false,
+		tray    = false,
 	}
 	local i = 1
 	while i <= #arg do
@@ -148,6 +139,7 @@ local function parse_args()
 		if     a == "--help"    or a == "-h"  then opts.help    = true
 		elseif a == "--dry-run"               then opts.dry_run = true
 		elseif a == "--verbose" or a == "-v"  then opts.verbose = true
+		elseif a == "--tray"                  then opts.tray    = true
 		elseif a == "--config"  and arg[i+1]  then i = i + 1; opts.config = arg[i]
 		elseif a == "--device"  and arg[i+1]  then i = i + 1; opts.device = arg[i]
 		elseif a == "--layout"  and arg[i+1]  then i = i + 1; opts.layout = arg[i]
@@ -159,7 +151,6 @@ local function parse_args()
 	return opts
 end
 
---- Prints usage information to stdout (French UI text).
 local function print_usage()
 	print("Utilisation : luajit ergopti_hotstrings.lua [OPTIONS]")
 	print("")
@@ -169,6 +160,7 @@ local function print_usage()
 	print("                      Défaut : détection automatique.")
 	print("  --layout <nom>      Disposition clavier : qwerty | azerty.")
 	print("                      Défaut : variable $XKBLAYOUT, sinon qwerty.")
+	print("  --tray              Active l'icône de la barre système (nécessite yad).")
 	print("  --dry-run           Journalise les correspondances sans injecter.")
 	print("  --verbose           Active les messages de débogage.")
 	print("  --help              Afficher ce message.")
@@ -181,14 +173,8 @@ end
 -- =========================================
 -- =========================================
 
---- Resolves the list of TOML files to load from opts.config or the default
---- directory tree. Returns an empty table if nothing is found.
---- @param config_path string|nil  Value of --config, or nil.
---- @return table  Array of absolute .toml file paths.
 local function resolve_toml_paths(config_path)
 	local root = config_path
-
-	-- Fall back to ~/.config/ergopti/hotstrings/ if it exists.
 	if not root then
 		local fh = io.open(DEFAULT_CONFIG_DIR, "r")
 		if fh then
@@ -196,8 +182,6 @@ local function resolve_toml_paths(config_path)
 			root = DEFAULT_CONFIG_DIR
 		end
 	end
-
-	-- Last resort: the _shared/modules/hotstrings/ tree co-located with the script.
 	if not root then
 		local shared = SCRIPT_DIR .. "/../../_shared/modules/hotstrings"
 		local fh = io.open(shared, "r")
@@ -206,17 +190,13 @@ local function resolve_toml_paths(config_path)
 			root = shared
 		end
 	end
-
 	if not root then
 		Logger.warn(LOG, "No hotstring data directory found — no mappings loaded.")
 		return {}
 	end
-
-	-- If root is a single .toml file, wrap it in an array.
 	if root:match("%.toml$") then
 		return { root }
 	end
-
 	return loader.find_toml_files(root)
 end
 
@@ -227,11 +207,7 @@ end
 -- =========================================
 -- =========================================
 
---- Installs SIGINT / SIGTERM handlers that flush metrics and close the reader.
---- LuaJIT on Linux does not expose posix.signal directly; we use a pcall-guarded
---- attempt with the luaposix library and silently skip if it is absent.
---- @param reader table  The input_reader instance (has a :stop() method).
-local function install_signal_handlers(reader)
+local function install_signal_handlers()
 	local ok, signal = pcall(require, "posix.signal")
 	if not ok or not signal then
 		Logger.debug(LOG, "posix.signal unavailable — SIGINT/SIGTERM not intercepted.")
@@ -240,13 +216,11 @@ local function install_signal_handlers(reader)
 
 	local function on_signal(sig)
 		Logger.info(LOG, "Signal %d received — shutting down…", sig)
-
-		-- Log final session stats before exit.
 		local stats = metrics.get_session_stats()
 		Logger.info(LOG, "Session: %d keystroke(s), ~%d word(s), %ds.",
 			stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
-
-		reader:stop()
+		keyboard_hook.stop()
+		if tray_menu then tray_menu.destroy() end
 	end
 
 	pcall(signal.signal, signal.SIGINT,  on_signal)
@@ -261,7 +235,6 @@ end
 -- =========================================
 -- =========================================
 
---- Entry point — called at the bottom of the script.
 local function main()
 	local opts = parse_args()
 
@@ -276,20 +249,19 @@ local function main()
 		Logger.info(LOG, "Dry-run mode: matches will be logged but not injected.")
 	end
 
-	-- 7.1) Load hotstring mappings.
+	-- 8.1) Load hotstring mappings.
 	local toml_paths = resolve_toml_paths(opts.config)
 	Logger.info(LOG, "%d TOML file(s) to load.", #toml_paths)
-
 	local mappings = loader.load(toml_paths)
 
-	-- 7.2) Initialise the engine and feed it the mappings.
+	-- 8.2) Initialise the engine and feed it the mappings.
 	local engine = engine_mod.new()
 	engine:load_mappings(mappings)
 
-	-- 7.3) Initialise the metrics collector.
+	-- 8.3) Initialise the metrics collector.
 	metrics.init({})
 
-	-- 7.4) Resolve the input device.
+	-- 8.4) Resolve the input device.
 	local device = opts.device
 	if not device then
 		device = dev_finder.find_keyboard()
@@ -301,17 +273,12 @@ local function main()
 	end
 	Logger.info(LOG, "Using device: %s.", device)
 
-	-- 7.5) Define the character callback.
-	-- The buffer is updated on every character; matches are attempted on every
-	-- keypress. When a terminator is typed it is passed too (appearing at the
-	-- tail of the buffer) and terminator_consumed is set to true so the engine
-	-- adds 1 to the backspace count.
+	-- 8.5) Define the character callback.
 	local function on_char(ch)
 		local now_ms = math.floor(os.clock() * 1000)
 		metrics.on_keydown(ch, now_ms)
 
 		local terminator_consumed = terminators_mod.is_terminator(ch)
-
 		local result = engine:on_char(ch, { terminator_consumed = terminator_consumed })
 
 		if result then
@@ -325,33 +292,66 @@ local function main()
 			if not opts.dry_run then
 				injector.inject(result.backspace_count, result.replacement)
 			end
-			-- After injection the buffer state is stale; reset it.
 			engine:reset()
 		end
 	end
 
-	-- 7.6) Define the control-key callback (resets the buffer on structural keys).
+	-- 8.6) Define the control-key callback.
 	local function on_control(key_name)
-		-- Backspace, Enter, and Tab all break word context.
 		engine:reset()
 		Logger.debug(LOG, "Control key '%s' — buffer reset.", key_name)
 	end
 
-	-- 7.7) Create the input reader and install signal handlers.
-	local reader = input_mod.new(device, opts.layout, on_char, on_control)
-	install_signal_handlers(reader)
+	-- 8.7) Start the keyboard hook adapter (pump-based, non-blocking start).
+	keyboard_hook.start({
+		device = device,
+		layout = opts.layout,
+		onChar  = on_char,
+		onKey   = on_control,
+	})
 
-	Logger.success(LOG, "Daemon ready (device=%s layout=%s mappings=%d dry_run=%s).",
-		device, opts.layout, #mappings, tostring(opts.dry_run))
+	if not keyboard_hook.isRunning() then
+		Logger.error(LOG, "Keyboard hook failed to start — exiting.")
+		print("Erreur : impossible de démarrer le hook clavier.")
+		os.exit(1)
+	end
 
-	-- Blocking call — returns only when the device is closed or an error occurs.
-	reader:start()
+	-- 8.8) Start the tray menu if requested and available.
+	if opts.tray and tray_menu then
+		Logger.info(LOG, "Tray icon requested — starting.")
+		tray_menu.setIcon({ title = "Ergopti" })
+		tray_menu.setMenu({
+			{ title = "Ergopti " .. (opts.layout or "qwerty"), fn = function() end },
+			{ title = "Quitter", fn = function() keyboard_hook.stop() end },
+		})
+	elseif opts.tray and not tray_menu then
+		Logger.warn(LOG, "Tray icon requested but tray_menu adapter unavailable (install yad).")
+	end
 
-	-- Final metrics summary on clean exit.
+	-- 8.9) Install signal handlers (calls keyboard_hook.stop + tray_menu.destroy).
+	install_signal_handlers()
+
+	Logger.success(LOG, "Daemon ready (device=%s layout=%s mappings=%d dry_run=%s tray=%s).",
+		device, opts.layout, #mappings, tostring(opts.dry_run), tostring(opts.tray and tray_menu ~= nil))
+
+	-- 8.10) Pump-based event loop.
+	-- keyboard_hook.pump() blocks on pipe:read("*l") until input arrives.
+	-- tray_menu.pump() processes signal-file callbacks (fast, non-blocking).
+	-- Run tray_menu.pump() BEFORE keyboard_hook.pump() so menu clicks are
+	-- serviced between keystrokes.
+	while keyboard_hook.isRunning() do
+		if tray_menu then
+			pcall(tray_menu.pump)
+		end
+		pcall(keyboard_hook.pump)
+	end
+
+	-- 8.11) Clean exit.
+	if tray_menu then tray_menu.destroy() end
+
 	local stats = metrics.get_session_stats()
 	Logger.info(LOG, "Session ended: %d keystroke(s), ~%d word(s), %ds.",
 		stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
-
 	Logger.info(LOG, "Daemon exiting.")
 end
 
