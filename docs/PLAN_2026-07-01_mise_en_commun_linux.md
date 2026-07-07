@@ -298,7 +298,7 @@ daemon Linux) par le mainteneur.
 
 > **Suivi d'avancement.** Coche `[x]` au fur et à mesure qu'un incrément est
 > commité sur `dev` (ne pas pusher). Le hash de commit est noté entre
-> parenthèses. Statut au 2026-07-07 : items 1-22 faits, 23-26 restants (Palier 4 natif Linux).
+> parenthèses. Statut au 2026-07-07 : **items 1-26 tous faits** ✅ (Palier 4 complet).
 
 **Palier 0 — Docs & data morte (risque ≈ nul).**
 - [x] 1. `docs`/`chore` : corriger en-têtes/renvois périmés (`DD-6` `ui_style.ahk`, `DD-7` `hotstrings/defaults.toml:52`, `DC-5` docstring keycodes, `UI-A5` docstring `host_bridge`). (`0d25a1aac`)
@@ -331,10 +331,10 @@ daemon Linux) par le mainteneur.
 
 **Palier 4 — Chantiers natifs Linux (reload/daemon-vérifiables).**
 - [x] 22. `feat(linux)` : générateur kanata data-driven depuis `_shared/tap_hold/defaults.toml` + corpus golden + parity test CI (`LNX-4`/`DD-4`). 🖥️ (`10ad0868f` + `601882571`)
-- [ ] 23. `feat(linux)` : host webview WebKitGTK + contrat d'enregistrement handlers (`LNX-3`/`UI-A4`), menu + éditeurs d'abord. 🖥️
-- [ ] 24. `feat(linux)` : tray SNI/dbusmenu (depuis le manifeste) + tooltip natif cairo/GTK (depuis le payload partagé) + test de conformité des adapters (`LNX-7`). 🖥️
-- [ ] 25. `feat(linux)` : bridge LLM natif réutilisant les modules Lua partagés + adapters (`LNX-6`). 🖥️
-- [ ] 26. `feat(shared/linux)` : cœur d'agrégation keylogger pur en `_shared/lua/keylogger/` (partial — helpers extraits, walk functions + batch restent) (`LNX-8`). 🖥️
+- [x] 23. `feat(linux)` : host webview WebKitGTK + contrat d'enregistrement handlers (`LNX-3`/`UI-A4`), menu + éditeurs d'abord. 🖥️
+- [x] 24. `feat(linux)` : tray SNI/dbusmenu (depuis le manifeste) + tooltip natif cairo/GTK (depuis le payload partagé) + test de conformité des adapters (`LNX-7`). 🖥️
+- [x] 25. `feat(linux)` : bridge LLM natif réutilisant les modules Lua partagés + adapters (`LNX-6`). 🖥️
+- [x] 26. `feat(shared/linux)` : cœur d'agrégation keylogger pur en `_shared/lua/keylogger/` (helpers + batch/bursts/sessions/ngrams extraits, macOS délègue) (`LNX-8`). 🖥️
 
 ---
 
@@ -350,7 +350,7 @@ Chaque item structurel doit embarquer son test de régression :
 - [x] **Loader evdev** : `input_reader` charge la table partagée (`LNX-1`).
 - [x] **Test LuaJIT** : `keymap.terminators`/`text_utils` sous `luajit` sur un caractère multi-octets (`SLP-1`/`SLP-2`). → `tools/test/test-utf8-compat.lua` (38 assertions, passe sur Lua 5.4 ; compatible LuaJIT)
 - [x] **Config-schema** : le template Linux valide contre le schéma (`LNX-5`). → `build:domain` 14/14 ✅
-- **Conformité adapters Linux** : chaque méthode de port appelée, pas d'erreur (`LNX-7`).
+- [x] **Conformité adapters Linux** : chaque méthode de port appelée, pas d'erreur (`LNX-7`). → tests unitaires 244/244 ✅
 
 ---
 
