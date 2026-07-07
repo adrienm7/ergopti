@@ -61,12 +61,12 @@ local function locale_path(code)
 	local src = debug and debug.getinfo and debug.getinfo(1, "S")
 	if src and src.source then
 		local s = src.source
-		if s:sub(1, 1) == "@" then s = s:sub(2) end
-		local dir = s:match("^(.*[/\\])") or ""
-		-- dir is .../linux/lib/ → walk up 2 levels to get .../ergopti_plus/
-		local root = dir:gsub("[/\\]$", "")
-		root = root:gsub("[/\\][^/\\]+[/\\][^/\\]+$", "")
-		if root and root ~= dir then
+		-- Strip leading '@' (LuaJIT) or '=' (Lua 5.4 chunk marker)
+		if s:sub(1, 1) == "@" or s:sub(1, 1) == "=" then s = s:sub(2) end
+		s = s:gsub("\\", "/")
+		-- s is .../ergopti_plus/linux/lib/locale.lua — walk up 3 levels to .../ergopti_plus/
+		local root = s:match("^(.*)/[^/]+/[^/]+/[^/]+$")  -- strips /linux/lib/locale.lua
+		if root then
 			return root .. "/_shared/data/locales/" .. code .. ".json"
 		end
 	end
@@ -90,6 +90,8 @@ local function load_locale(code)
 	end
 	local raw = fh:read("*a")
 	fh:close()
+	-- Strip UTF-8 BOM (EF BB BF) — the pure-Lua JSON decoder rejects it
+	if raw:sub(1, 3) == "\239\187\191" then raw = raw:sub(4) end
 	if _json_decode then
 		local ok, data = pcall(_json_decode, raw)
 		if ok and type(data) == "table" then
