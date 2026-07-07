@@ -107,6 +107,37 @@ MenuAddItemWithLabel(MenuParent, V2Path, MenuTitle, MasterCategory) {
 	}
 }
 
+; Reads master_gates.hotstring_sub_categories from menu_manifest.json (MG-3).
+; Returns the hardcoded defaults when the manifest is unreadable.
+_MG_LoadHotstringSubCategories() {
+    global _SharedDir
+    Default := ["Autocorrection", "DistancesReduction", "SFBsReduction",
+        "Rolls", "MagicKey", "DynamicHotstrings", "Personal"]
+    FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
+    if !FileExist(FilePath) {
+        return Default
+    }
+    Content := ""
+    try Content := FileRead(FilePath, "UTF-8")
+    if (Content == "") {
+        return Default
+    }
+    Root := ""
+    try Root := JsonParse(Content)
+    if !(Root is Map) or !Root.Has("master_gates") {
+        return Default
+    }
+    Gates := Root["master_gates"]
+    if !(Gates is Map) or !Gates.Has("hotstring_sub_categories") {
+        return Default
+    }
+    Arr := Gates["hotstring_sub_categories"]
+    if !(Arr is Array) or Arr.Length == 0 {
+        return Default
+    }
+    return Arr
+}
+
 ; Resolve the master-toggle category for a given feature path. Sub-Maps
 ; under Shortcuts (AltGrLAlt / AltGrCapsLock / LAltCapsLock / Personal /
 ; ScriptControl) inherit the Shortcuts gate; every hotstrings sub-category
@@ -118,8 +149,9 @@ _MasterCategoryFor(FeatureCategoryPath) {
 	; Hotstrings master gates all hotstring sub-trees regardless of their
 	; top-level Features key (which is the legacy v1 layout — v2 nests
 	; everything under [hotstrings.*]).
-	for _, HotsCat in ["Autocorrection", "DistancesReduction", "SFBsReduction",
-		"Rolls", "MagicKey", "DynamicHotstrings"] {
+	; **Category list is single-sourced from menu_manifest.json
+	; master_gates.hotstring_sub_categories (MG-3).**
+	for _, HotsCat in _MG_LoadHotstringSubCategories() {
 		if (HotsCat == First) {
 			return "Hotstrings"
 		}

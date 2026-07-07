@@ -32,6 +32,12 @@
 
 ; Ordered list of physical keys exposed in the tap-hold tray submenu.
 ; Each entry: Map("id" => v2_key_id, "i18n" => group_i18n_key).
+;
+; **Canonical order mirrors _shared/modules/menu/menu_manifest.json
+; tap_hold_keys_catalog (MENU-4).** Entries restricted to platforms=["ahk"]
+; here; macOS-only keys (fn, spacebar, left_control, left_option, left_command,
+; right_command, right_option, return_or_enter, delete_or_backspace) live
+; only in the shared catalog and are filtered out by the AHK manifest reader.
 global _TH_KeyDefs := [
 	Map("id", "escape",       "i18n", "tap_hold.group.escape"),
 	Map("id", "tab",          "i18n", "tap_hold.group.tab"),
@@ -52,6 +58,8 @@ global _TH_KeyDefs := [
 ; Ordered hold options — value stored as hold_modifier or hold_layer in TOML.
 ; Each entry: Map("id" => storage_value, "kind" => "modifier"|"layer"|"none",
 ;                 "i18n" => label_i18n_key).
+; **Canonical list mirrors _shared/modules/menu/menu_manifest.json
+; hold_options (MENU-4).**
 global _TH_HoldOptions := [
 	Map("id", "",      "kind", "none",     "i18n", "tap_hold.hold.none"),
 	Map("id", "ctrl",  "kind", "modifier", "i18n", "tap_hold.hold.ctrl"),
