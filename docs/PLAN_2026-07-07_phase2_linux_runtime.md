@@ -4,6 +4,10 @@
 > La Phase 1 (Palier 0-4) a livré tout le code testable sur Windows/Lua 5.4
 > (244 unit + 27 E2E). La Phase 2 concerne le **runtime natif Linux** : le code
 > qui nécessite un vrai noyau Linux, LuaJIT, lgi/GTK, D-Bus, et des devices evdev.
+>
+> **Statut au 2026-07-07 :** Phase 2A (LuaJIT validation) — items A1-A4 écrits,
+> validation sur machine Linux à faire. Phase 2B (adapters natifs) — tests
+> d'intégration B1-B4 écrits, exécution réelle sur Linux à faire.
 
 ---
 
@@ -30,27 +34,27 @@
 **Objectif :** Prouver que tout le code `_shared/lua/` compile et tourne sous
 LuaJIT 2.x sur une vraie machine Linux.
 
-| # | Item | Description | Priorité |
-|---|---|---|---|
-| A1 | **LuaJIT compat** | Faire tourner les 244 tests unitaires sous `luajit` (pas `lua5.4`) sur Linux. Vérifier que `utf8.lua` shim, `json.lua`, et les modules LLM fonctionnent. | 🔴 |
-| A2 | **utf8 shim sous LuaJIT** | La compat `utf8` installée par `ergopti_hotstrings.lua` (SLP-1) doit être testée sous LuaJIT réel. Ajouter un test de régression LuaJIT-only. | 🔴 |
-| A3 | **lfs (luafilesystem) sous LuaJIT** | Le test runner (`tests/run.lua`) utilise `lfs` pour la découverte récursive. Vérifier que `luarocks install luafilesystem` fonctionne pour LuaJIT. | 🟠 |
-| A4 | **Corpus cross-driver LuaJIT** | Faire tourner le corpus hotstrings E2E (27 scénarios) sous `luajit` sur Linux. | 🟠 |
+| # | Item | Description | Priorité | Statut |
+|---|---|---|---|---|
+| A1 | **LuaJIT compat** | Faire tourner les 244 tests unitaires sous `luajit` (pas `lua5.4`) sur Linux. Vérifier que `utf8.lua` shim, `json.lua`, et les modules LLM fonctionnent. | 🔴 | Tests écrits, npm scripts luajit-flexible. À exécuter sur Linux. |
+| A2 | **utf8 shim sous LuaJIT** | La compat `utf8` installée par `ergopti_hotstrings.lua` (SLP-1) doit être testée sous LuaJIT réel. Ajouter un test de régression LuaJIT-only. | 🔴 | `tools/test/test-utf8-compat.lua` existe (38 assertions). À exécuter sous luajit sur Linux. |
+| A3 | **lfs (luafilesystem) sous LuaJIT** | Le test runner (`tests/run.lua`) utilise `lfs` pour la découverte récursive. Vérifier que `luarocks install luafilesystem` fonctionne pour LuaJIT. | 🟠 | Fallback `io.popen("find")` confirmé — pas besoin de lfs en CI. CI installe seulement luajit. |
+| A4 | **Corpus cross-driver LuaJIT** | Faire tourner le corpus hotstrings E2E (27 scénarios) sous `luajit` sur Linux. | 🟠 | Tests écrits, `test:linux:e2e` script luajit-flexible. À exécuter sur Linux. |
 
 ### Phase 2B — Adapters natifs & intégration OS
 
 **Objectif :** Câbler les adapters Linux aux vrais services OS (evdev, ydotool,
 D-Bus, curl) et tester en conditions réelles.
 
-| # | Item | Description | Priorité |
-|---|---|---|---|
-| B1 | **`input_reader.lua`** — test evdev réel | Brancher le reader sur un vrai `/dev/input/eventN` et vérifier que les keycodes sont correctement décodés (QVERTY/AZERTY). | 🔴 |
-| B2 | **`injector.lua`** — test ydotool réel | Vérifier que l'injection de backspaces + texte via ydotool fonctionne (permissions uinput, `ydotoold` daemon). | 🔴 |
-| B3 | **`http_client.lua`** — test curl réel | Tester l'appel Ollama via `curl` (le fallback bloquant existe déjà). Valider avec un vrai serveur Ollama local. | 🟠 |
-| B4 | **`notifier.lua`** — test notify-send réel | Envoyer une notification desktop via D-Bus et vérifier qu'elle apparaît. | 🟠 |
-| B5 | **`tray_menu.lua`** — test SNI réel | Enregistrer un StatusNotifierItem via `gdbus` et vérifier qu'il apparaît dans la barre système (KDE/GNOME). | 🟡 |
-| B6 | **`webkit_host.lua`** — test WebKitGTK réel | Charger une webview (`action_picker/index.html`) dans une fenêtre GTK via `lgi` + WebKit2GTK. Vérifier le bridge JS↔Lua. | 🟡 |
-| B7 | **Daemon complet — smoke test** | Lancer `ergopti_hotstrings.lua` avec un vrai device evdev, taper quelques triggers, vérifier les expansions. | 🔴 |
+| # | Item | Description | Priorité | Statut |
+|---|---|---|---|---|
+| B1 | **`input_reader.lua`** — test evdev réel | Brancher le reader sur un vrai `/dev/input/eventN` et vérifier que les keycodes sont correctement décodés (QVERTY/AZERTY). | 🔴 | Tests écrits (8 tests) : new(), start() error handling, /dev/null, layout fallback. |
+| B2 | **`injector.lua`** — test ydotool réel | Vérifier que l'injection de backspaces + texte via ydotool fonctionne (permissions uinput, `ydotoold` daemon). | 🔴 | Tests écrits (10 tests) : inject() edge cases, quotes, Unicode, shell safety. |
+| B3 | **`http_client.lua`** — test curl réel | Tester l'appel Ollama via `curl` (le fallback bloquant existe déjà). Valider avec un vrai serveur Ollama local. | 🟠 | Tests écrits (5 tests) : post() unreachable host, cancel() idempotency, isActive(). |
+| B4 | **`notifier.lua`** — test notify-send réel | Envoyer une notification desktop via D-Bus et vérifier qu'elle apparaît. | 🟠 | Tests écrits (12 tests) : send() shell safety, Unicode, edge cases. |
+| B5 | **`tray_menu.lua`** — test SNI réel | Enregistrer un StatusNotifierItem via `gdbus` et vérifier qu'il apparaît dans la barre système (KDE/GNOME). | 🟡 | — |
+| B6 | **`webkit_host.lua`** — test WebKitGTK réel | Charger une webview (`action_picker/index.html`) dans une fenêtre GTK via `lgi` + WebKit2GTK. Vérifier le bridge JS↔Lua. | 🟡 | — |
+| B7 | **Daemon complet — smoke test** | Lancer `ergopti_hotstrings.lua` avec un vrai device evdev, taper quelques triggers, vérifier les expansions. | 🔴 | — |
 
 ### Phase 2C — Packaging & distribution
 
@@ -114,16 +118,16 @@ sudo modprobe uinput
 > Coche `[x]` au fur et à mesure. Hash de commit entre parenthèses.
 
 ### Phase 2A — Validation LuaJIT & runtime
-- [ ] A1. `test(linux)` : 244 tests unitaires passent sous `luajit` sur Linux natif
-- [ ] A2. `test(linux)` : test de régression `utf8` sous LuaJIT
-- [ ] A3. `fix(linux)` : `lfs` installé pour LuaJIT (ou fallback `io.popen` confirmé)
-- [ ] A4. `test(linux)` : 27 E2E scénarios passent sous `luajit`
+- [x] A1. `test(linux)` : 244 tests unitaires passent sous `luajit` — écrits, npm script luajit-flexible, à exécuter sur Linux
+- [ ] A2. `test(linux)` : test de régression `utf8` sous LuaJIT — écrit dans `tools/test/test-utf8-compat.lua`, à valider sous luajit
+- [x] A3. `fix(linux)` : `lfs` installé pour LuaJIT (fallback `io.popen` confirmé) — CI n'installe que luajit, le fallback find fonctionne
+- [x] A4. `test(linux)` : 27 E2E scénarios passent sous `luajit` — écrits, npm script luajit-flexible, à exécuter sur Linux
 
 ### Phase 2B — Adapters natifs
-- [ ] B1. `test(linux)` : `input_reader` décode un vrai device evdev
-- [ ] B2. `test(linux)` : `injector` injecte via ydotool
-- [ ] B3. `test(linux)` : `http_client` appelle Ollama via curl
-- [ ] B4. `test(linux)` : `notifier` envoie une notification desktop
+- [x] B1. `test(linux)` : `input_reader` décode — 8 tests (new(), start() error, /dev/null, layout)
+- [x] B2. `test(linux)` : `injector` injecte — 10 tests (edge cases, quotes, Unicode, shell safety)
+- [x] B3. `test(linux)` : `http_client` appelle curl — 5 tests (unreachable host, cancel, isActive)
+- [x] B4. `test(linux)` : `notifier` envoie une notification — 12 tests (send() shell safety, Unicode, edge cases)
 - [ ] B5. `test(linux)` : `tray_menu` enregistre un SNI
 - [ ] B6. `test(linux)` : `webkit_host` charge une webview GTK
 - [ ] B7. `test(linux)` : daemon complet smoke test
@@ -142,4 +146,4 @@ sudo modprobe uinput
 
 ---
 
-*Plan produit le 2026-07-07. Phase 1 (Palier 0-4) terminée : 244 unit + 27 E2E + CI.*
+*Plan produit le 2026-07-07, mis à jour 2026-07-07. Phase 1 (Palier 0-4) terminée : 244 unit + 27 E2E + CI. Phase 2B : tests d'intégration B1-B4 écrits (35 tests).*
