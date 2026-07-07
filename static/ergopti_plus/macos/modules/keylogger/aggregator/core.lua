@@ -18,8 +18,9 @@ local utf8    = utf8
 local Logger  = require("lib.logger")
 local Paths   = require("lib.paths")
 local Timings = require("lib.timings")
-local KUtils  = require("keylogger.utils")
-local LOG     = "keylogger.aggregator"
+local KUtils    = require("keylogger.utils")
+local AggHelper = require("keylogger.aggregator_helpers")
+local LOG       = "keylogger.aggregator"
 
 local S = require("modules.keylogger.aggregator.state")
 
@@ -187,48 +188,14 @@ end
 -- ===================================
 -- ====================================
 
---- Reset / initialise the per-tick accumulator batch.
-local function reset_batch_impl()
-	S.agg_batch = {
-		app_day      = {},
-		ngram        = {
-			ngram_chars        = {},
-			ngram_bigrams      = {},
-			ngram_trigrams     = {},
-			ngram_quadgrams    = {},
-			ngram_pentagrams   = {},
-			ngram_hexagrams    = {},
-			ngram_heptagrams   = {},
-			ngram_words        = {},
-			ngram_word_bigrams = {},
-		},
-		kc_ngram     = {},
-		sc_ngram     = { ngram_shortcuts = {}, ngram_shortcut_bigrams = {} },
-		kc_hold      = {},
-		titles       = {},
-		hourly       = {},
-		hourly_min5  = {},
-		layouts      = {},
-		chars_class  = {},
-		errors       = {},
-		ergo         = {},
-		bursts       = {},
-		sessions     = {},
-		app_buckets  = {},
-		system_day   = {},
-		app_time     = {},
-		switches_to  = {},
-	}
-end
-
 --- Ensure S.agg_batch is ready; called lazily from walk functions.
 function M.ensure_batch()
-	if not S.agg_batch then reset_batch_impl() end
+	if not S.agg_batch then S.agg_batch = AggHelper.new_batch() end
 end
 
 --- Public reset used by M.init and by the log manager on day rollover.
 function M.reset_batch()
-	reset_batch_impl()
+	S.agg_batch = AggHelper.new_batch()
 end
 
 --- Return the ngram context table so the log manager can serialise it.
@@ -263,27 +230,14 @@ function M.gc(tbl, k, default)
 	return KUtils.gc(tbl, k, default)
 end
 
---- Cumulative bucket accumulator — adds `value` to every bucket ≥ `delay`.
---- @param target_map table Map of bucket_ms-string → count.
---- @param delay number Inter-keystroke delay in ms.
---- @param value number Amount to add.
+--- Delegates to the shared keylogger/aggregator_helpers module.
 function M.bucket_add(target_map, delay, value)
-	for _, t in ipairs(UI_PAUSE_BUCKETS_MS) do
-		if delay <= t then
-			local k = tostring(t)
-			target_map[k] = (target_map[k] or 0) + value
-		end
-	end
+	AggHelper.bucket_add(target_map, delay, value, UI_PAUSE_BUCKETS_MS)
 end
 
---- Burst length bucket label.
---- @param n number Burst character count.
---- @return string Bucket boundary as a string, or "500+".
+--- Delegates to the shared keylogger/aggregator_helpers module.
 function M.burst_length_bucket(n)
-	for _, b in ipairs(BURST_LENGTH_BUCKETS) do
-		if n <= b then return tostring(b) end
-	end
-	return "500+"
+	return AggHelper.burst_length_bucket(n, BURST_LENGTH_BUCKETS)
 end
 
 --- Delegates to the shared keylogger/utils module.
@@ -296,80 +250,25 @@ function M.pop_utf8(s)
 	return KUtils.pop_utf8(s)
 end
 
---- Get-or-create the n-gram context entry for an app.
---- @param app string Application name.
---- @return table Per-app context (n-gram state, burst/session cursors, etc.).
+--- Delegates to the shared keylogger/aggregator_helpers module.
 function M.get_app_ctx(app)
 	if not S.ngram_ctx then S.ngram_ctx = {} end
-	local c = S.ngram_ctx[app]
-	if not c then
-		c = {
-			p1 = nil, p2 = nil, p3 = nil, p4 = nil, p5 = nil, p6 = nil,
-			cur_word = "", word_err = false, hist = {},
-			prev_word = nil, prev_sc = nil,
-			recent_typing = {},
-			current_burst = nil, current_session = nil,
-			bs_run_len = 0, last_was_bs = false,
-			last_finger = nil, same_finger_run = 0, same_hand_run = 0,
-			last_char = nil,
-		}
-		S.ngram_ctx[app] = c
-	end
-	return c
+	return AggHelper.get_app_ctx(S.ngram_ctx, app)
 end
 
---- Bump a metric in the batch ngram dict.
---- @param table_name string Key in S.agg_batch.ngram.
---- @param key string Compound row key (date·app·token).
---- @param delay number Inter-keystroke delay in ms.
---- @param is_error boolean True if this is an error event.
---- @param synth_type string Synthetic type tag ("hotstring", "llm", "none", …).
+--- Delegates to the shared keylogger/aggregator_helpers module.
 function M.add_ngram_metric(table_name, key, delay, is_error, synth_type)
-	local tbl = S.agg_batch.ngram[table_name]
-	if not tbl then return end
-	local item = tbl[key]
-	if not item then
-		item = { c = 0, td = 0, cd = 0, e = 0, esrc = {} }
-		tbl[key] = item
-	end
-	if is_error then
-		item.e = item.e + 1
-		if synth_type and synth_type ~= "none" then
-			item.esrc[synth_type] = (item.esrc[synth_type] or 0) + 1
-		end
-	else
-		item.c = item.c + 1
-		if synth_type == "hotstring" or synth_type == "llm" or (synth_type and synth_type ~= "none") then
-			item.esrc[synth_type] = (item.esrc[synth_type] or 0) + 1
-		elseif delay > 0 then
-			item.td = item.td + delay
-			item.cd = item.cd + 1
-		end
-	end
+	AggHelper.add_ngram_metric(S.agg_batch, table_name, key, delay, is_error, synth_type)
 end
 
---- Store an n-gram tuple keyed by (date,app,token).
---- @param table_name string Key in S.agg_batch.ngram.
---- @param date_str string "YYYY-MM-DD".
---- @param app string Application name.
---- @param token string The n-gram token.
---- @param delay number Inter-keystroke delay in ms.
---- @param is_error boolean True if this is an error event.
---- @param synth_type string Synthetic type tag.
+--- Delegates to the shared keylogger/aggregator_helpers module.
 function M.push_ngram(table_name, date_str, app, token, delay, is_error, synth_type)
-	local key = date_str .. "\1" .. app .. "\1" .. token
-	M.add_ngram_metric(table_name, key, delay, is_error, synth_type)
+	AggHelper.push_ngram(S.agg_batch, table_name, date_str, app, token, delay, is_error, synth_type)
 end
 
---- Bump a per-app-day numeric counter on S.agg_batch.app_day.
---- @param date_str string "YYYY-MM-DD".
---- @param app string Application name.
---- @param field string Field name to increment.
---- @param value number Amount to add.
+--- Delegates to the shared keylogger/aggregator_helpers module.
 function M.bump_app_day(date_str, app, field, value)
-	local key = date_str .. "\1" .. app
-	local row = M.gc(S.agg_batch.app_day, key, { date = date_str, app = app })
-	row[field] = (row[field] or 0) + value
+	AggHelper.bump_app_day(S.agg_batch, date_str, app, field, value)
 end
 
 
@@ -382,50 +281,14 @@ end
 -- ==========================================
 -- ========================================
 
---- Finalise a burst object and merge it into the batch.
---- @param date_str string "YYYY-MM-DD".
---- @param app string Application name.
---- @param b table|nil Burst cursor, or nil if no burst was open.
+--- Delegates to the shared keylogger/aggregator_helpers module.
 function M.finalize_burst(date_str, app, b)
-	if not b or b.char_count <= 0 then return end
-	local key = date_str .. "\1" .. app
-	local r = M.gc(S.agg_batch.bursts, key, {
-		date = date_str, app = app,
-		count_total = 0, max_cpm = 0, max_chars = 0,
-		length_buckets = {}, inter_count = 0, inter_sum = 0, inter_sumsq = 0,
-	})
-	r.count_total = r.count_total + 1
-	if b.char_count > r.max_chars then r.max_chars = b.char_count end
-	if b.char_count >= MIN_BURST_FOR_CPM and b.sum_delays > 0 then
-		local cpm = b.char_count * 60000 / b.sum_delays
-		if cpm > r.max_cpm then r.max_cpm = cpm end
-	end
-	local k = M.burst_length_bucket(b.char_count)
-	r.length_buckets[k] = (r.length_buckets[k] or 0) + 1
-	r.inter_count = r.inter_count + math.max(0, b.char_count - 1)
-	r.inter_sum   = r.inter_sum   + b.sum_delays
-	r.inter_sumsq = r.inter_sumsq + b.sum_delays_sq
+	AggHelper.finalize_burst(S.agg_batch, date_str, app, b, MIN_BURST_FOR_CPM)
 end
 
---- Finalise a session object and merge it into the batch.
---- @param date_str string "YYYY-MM-DD".
---- @param app string Application name.
---- @param s table|nil Session cursor, or nil if no session was open.
+--- Delegates to the shared keylogger/aggregator_helpers module.
 function M.finalize_session(date_str, app, s)
-	if not s or s.char_count <= 0 then return end
-	local key = date_str .. "\1" .. app
-	local r = M.gc(S.agg_batch.sessions, key, {
-		date = date_str, app = app,
-		count_total = 0, longest_ms = 0, longest_chars = 0, total_active_ms = 0,
-		durations = {},
-	})
-	r.count_total = r.count_total + 1
-	if s.total_ms   > r.longest_ms    then r.longest_ms    = s.total_ms   end
-	if s.char_count > r.longest_chars then r.longest_chars = s.char_count end
-	r.total_active_ms = r.total_active_ms + s.total_ms
-	if #r.durations < SESSION_DURATIONS_CAP then
-		table.insert(r.durations, s.total_ms)
-	end
+	AggHelper.finalize_session(S.agg_batch, date_str, app, s, SESSION_DURATIONS_CAP)
 end
 
 return M
