@@ -3,7 +3,11 @@
 ; ==============================================================================
 ; MODULE: Healthcheck / Probe + Public API + Window
 ; DESCRIPTION:
-; Module-level counters, the adapter/port registry probe, the public API (HealthCheck_Run / RecordError / RecordWarn / FormatMarkdown / FormatPlain / Format) and the WebView2 report window.
+; Module-level counters, the adapter/port registry probe, the public API
+; (HealthCheck_Run / RecordError / RecordWarn / FormatMarkdown / FormatPlain /
+; Format) and the WebView2 report window. The report HTML is rendered by the
+; shared frontend _shared/ui/healthcheck/ (loaded via virtual host); the
+; snapshot is injected as JSON after navigation completes.
 ;
 ; Split out of the former lib/healthcheck.ahk (P5 refactor); see
 ; ui/healthcheck/init.ahk for the module overview. Functions and globals are
@@ -255,16 +259,36 @@ global _HC_MARGIN   := 12
 global _HC_BTN_H    := 32
 global _HC_BTN_PAD  := 8    ; vertical gap above and below the button row
 
+; Virtual host for the shared healthcheck frontend — maps _SharedDir so
+; relative assets (style.css, script.js, ../dom_utils.js) resolve over https.
+global HC_VHOST             := "ergopti.healthcheck"
+global HC_HOST_ACCESS_ALLOW := 1
+
+; WebView2 plumbing — subscription handles + snapshot JSON captured at open time.
+global _HC_Controller := unset
+global _HC_WebView    := unset
+global _HC_NavSub     := unset
+global _HC_SnapshotJs := ""
+
+; True once _HC_Reset() has torn the controller down — guards against
+; double-close (same SEH access-violation pattern as action_picker_webview.ahk).
+global _HC_ResetDone := false
+
 ; Opens a dedicated window displaying the healthcheck report.
-; Mirrors the updater changelog pane pattern exactly: synchronous WebView2.create,
-; Text control as host (same as RightPane in updater), Fill(), NavigateToString.
-; The button is a native AHK control placed below the WebView pane.
+; Loads the shared _shared/ui/healthcheck/ frontend via virtual host, injects
+; the snapshot as JSON after navigation, and renders client-side. The button
+; is a native AHK control placed below the WebView pane.
 ; Falls back to a selectable Edit + native button when WebView2 is unavailable.
 HealthCheck_ShowWindow() {
-	global _VendorDir, _HC_WIN_W, _HC_MARGIN, _HC_BTN_H, _HC_BTN_PAD
+	global _VendorDir, _SharedDir, _HC_WIN_W, _HC_MARGIN, _HC_BTN_H, _HC_BTN_PAD
+	global HC_VHOST, HC_HOST_ACCESS_ALLOW
+	global _HC_Controller, _HC_WebView, _HC_NavSub, _HC_SnapshotJs, _HC_ResetDone
 
 	Snapshot  := HealthCheck_Run()
 	PlainText := HealthCheck_FormatPlain(Snapshot)
+
+	; Close any previous singleton before opening a new one.
+	_HC_Close()
 
 	WinTitle := "ErgoptiPlus — " . t("menu.debug.healthcheck")
 	BtnLabel := t("healthcheck.copy_and_close")
@@ -298,9 +322,6 @@ HealthCheck_ShowWindow() {
 
 		WVC := 0
 		try {
-			; Parent to ContentCtl.Hwnd — identical to updater's RightPane.Hwnd pattern.
-			; Reuse the shared session environment (lib/webview_utils.ahk) so no
-			; second Chromium process boots and reopens are near-instant.
 			WVC := WebView2.create(ContentCtl.Hwnd, , WebView_SharedEnvironment(loader))
 			G.WVC := WVC
 		} catch as Err {
@@ -308,20 +329,30 @@ HealthCheck_ShowWindow() {
 		}
 
 		if WVC {
-			WV := WVC.CoreWebView2
+			global _HC_Controller := WVC
+			global _HC_WebView    := WVC.CoreWebView2
+			global _HC_ResetDone  := false
+
 			try {
-				s := WV.Settings
+				s := _HC_WebView.Settings
 				s.AreDevToolsEnabled              := false
 				s.AreDefaultContextMenusEnabled   := false
 				s.IsStatusBarEnabled              := false
 				s.AreBrowserAcceleratorKeysEnabled := false
 			}
-			; Defer Fill+NavigateToString so the message loop has painted the
-			; window and GetClientRect returns a valid non-zero rect.
-			Html := _HealthCheck_SnapshotToHtml(Snapshot, BtnLabel)
-			SetTimer(() => (WVC.Fill(), WV.NavigateToString(Html)), -50)
-			try LoggerDone("Healthcheck", "NavigateToString scheduled.")
-			; Button still copies plain-text even with WebView2 active.
+
+			; Build the renderHealthcheck(snapshot) call for injection after navigation.
+			_HC_SnapshotJs := "if(window.renderHealthcheck)window.renderHealthcheck(" . _HC_SnapshotToJson(Snapshot) . ")"
+
+			; Store the navigation subscription handle.
+			global _HC_NavSub := _HC_WebView.NavigationCompleted(_HC_OnNavigationCompleted)
+
+			; Map the virtual host BEFORE navigating.
+			try _HC_WebView.SetVirtualHostNameToFolderMapping(HC_VHOST, _SharedDir, HC_HOST_ACCESS_ALLOW)
+			try _HC_WebView.Navigate("https://" . HC_VHOST . "/ui/healthcheck/index.html?cb=" . A_TickCount)
+			try _HC_Controller.Fill()
+
+			try LoggerDone("Healthcheck", "Shared healthcheck frontend loaded via vhost.")
 			return
 		}
 		try LoggerWarn("Healthcheck", "WVC is falsy after create — falling back to Edit.")
@@ -340,9 +371,93 @@ _HealthCheck_AddFallbackEdit(G, HostCtl, Text) {
 }
 
 _HealthCheck_CloseGui(G) {
+	_HC_Reset()
 	if G.HasProp("WVC") && G.WVC
 		try G.WVC.Close()
 	try G.Destroy()
+}
+
+; ── WebView2 navigation + teardown helpers ──────────────────────────────────
+
+; Injects the snapshot JSON once the shared frontend has finished loading.
+_HC_OnNavigationCompleted(Handler, Args) {
+	SetTimer(_HC_PushSnapshot, -1)
+}
+
+_HC_PushSnapshot() {
+	global _HC_WebView, _HC_SnapshotJs
+	if !IsSet(_HC_WebView)
+		return
+	try _HC_WebView.ExecuteScriptAsync(_HC_SnapshotJs)
+}
+
+; Converts the AHK snapshot Map to a safe JSON string for JS injection.
+; Uses the same escaping as action_picker_webview.ahk's _ActPickWeb_JsStr.
+_HC_SnapshotToJson(Snapshot) {
+	; Walk the Map recursively and build a JSON string.
+	; We build manually to avoid depending on a JSON library.
+	return _HC_ValueToJson(Snapshot)
+}
+
+_HC_ValueToJson(Val) {
+	if !IsSet(Val)
+		return "null"
+	if (Val is String)
+		return _HC_JsStr(Val)
+	if (Val is Number)
+		return String(Val)
+	if (Val is Array) {
+		Parts := []
+		for _, Item in Val
+			Parts.Push(_HC_ValueToJson(Item))
+		return "[" . _HC_Join(Parts, ",") . "]"
+	}
+	if (Val is Map) {
+		Parts := []
+		for Key, Item in Val {
+			Parts.Push(_HC_JsStr(Key) . ":" . _HC_ValueToJson(Item))
+		}
+		return "{" . _HC_Join(Parts, ",") . "}"
+	}
+	return _HC_JsStr(String(Val))
+}
+
+_HC_JsStr(s) {
+	s := StrReplace(s, "\", "\\")
+	s := StrReplace(s, '"', '\"')
+	s := StrReplace(s, "`r", "\r")
+	s := StrReplace(s, "`n", "\n")
+	s := StrReplace(s, "`t", "\t")
+	return '"' . s . '"'
+}
+
+_HC_Join(Arr, Sep) {
+	Out := ""
+	for i, S in Arr
+		Out .= (i > 1 ? Sep : "") . S
+	return Out
+}
+
+_HC_Close() {
+	global _HC_Controller
+	_HC_Reset()
+}
+
+_HC_Reset() {
+	global _HC_Controller, _HC_WebView, _HC_NavSub, _HC_SnapshotJs, _HC_ResetDone
+
+	if _HC_ResetDone
+		return
+	_HC_ResetDone := true
+
+	try {
+		_HC_NavSub := unset
+		if IsSet(_HC_Controller)
+			_HC_Controller.Close()
+	}
+	_HC_Controller := unset
+	_HC_WebView    := unset
+	_HC_SnapshotJs := ""
 }
 
 ; Formats the snapshot as a plain-text string (fallback when WebView2 is absent).

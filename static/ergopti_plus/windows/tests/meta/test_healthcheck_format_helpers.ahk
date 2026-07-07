@@ -22,11 +22,3 @@ _THFH_FormatUptime() {
 	AssertEqual("1h 00m 05s", _HealthCheck_FormatUptime(3605), "3605s formats as 1h 00m 05s")
 }
 Test("healthcheck: _HealthCheck_FormatUptime renders h/m/s with zero-padding", _THFH_FormatUptime)
-
-_THFH_HtmlEscape() {
-	AssertEqual("A&amp;B", _HealthCheck_HE("A&B"), "ampersand is escaped")
-	AssertEqual("A&lt;B", _HealthCheck_HE("A<B"), "less-than is escaped")
-	AssertEqual("A&gt;B", _HealthCheck_HE("A>B"), "greater-than is escaped")
-	AssertEqual("A&quot;B", _HealthCheck_HE('A"B'), "double-quote is escaped")
-}
-Test("healthcheck: _HealthCheck_HE escapes HTML metacharacters", _THFH_HtmlEscape)

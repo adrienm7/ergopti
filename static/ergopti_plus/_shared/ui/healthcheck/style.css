@@ -1,0 +1,101 @@
+/* _shared/ui/healthcheck/style.css */
+
+/* ===========================================================================
+ * MODULE: Healthcheck Shared Styles
+ * DESCRIPTION:
+ * Single-source styles for the healthcheck diagnostic report, consumed by
+ * all three hosts (Windows WebView2, macOS WKWebView, Linux WebKit2GTK).
+ * Uses a system-font stack that resolves correctly on every platform.
+ * =========================================================================== */
+
+html, body {
+	margin: 0;
+	padding: 0;
+	height: 100%;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+	font-size: 13px;
+	color: #1a1a1a;
+	background: #fff;
+}
+
+#content {
+	padding: 16px 20px 70px;
+	overflow-x: hidden;
+	overflow-y: auto;
+	height: 100%;
+	box-sizing: border-box;
+	word-break: break-word;
+}
+
+h1 {
+	font-size: 1.25em;
+	margin: 0 0 .6em;
+}
+
+h2 {
+	font-size: 1.05em;
+	margin: 1.2em 0 .3em;
+	border-bottom: 1px solid #e0e0e0;
+	padding-bottom: .2em;
+	color: #333;
+}
+
+table {
+	border-collapse: collapse;
+	width: 100%;
+	margin: .4em 0 .8em;
+}
+
+th, td {
+	border: 1px solid #e0e0e0;
+	padding: .3em .65em;
+	text-align: left;
+}
+
+th {
+	background: #f6f6f6;
+	font-weight: 600;
+}
+
+td:first-child {
+	white-space: nowrap;
+	color: #555;
+	font-weight: 500;
+}
+
+ul {
+	margin: .3em 0 .3em 1.2em;
+	padding: 0;
+}
+
+li {
+	margin: .2em 0;
+}
+
+code {
+	background: #f3f3f3;
+	border-radius: 3px;
+	padding: .1em .35em;
+	font-family: 'SF Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
+	font-size: .88em;
+}
+
+pre {
+	background: #1e1e1e;
+	color: #d4d4d4;
+	border-radius: 4px;
+	padding: .7em 1em;
+	overflow-x: hidden;
+	white-space: pre-wrap;
+	word-break: break-all;
+	font-family: 'SF Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
+	font-size: .82em;
+	line-height: 1.45;
+}
+
+em {
+	font-style: italic;
+	color: #666;
+}
+
+.ok{color:#1a7f37;font-weight:600;}.fail{color:#cf222e;font-weight:600;}.unwired{color:#9a6700;font-weight:600;}
