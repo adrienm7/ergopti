@@ -1,12 +1,12 @@
---- tools/build/build-linux-deb.sh
----
---- Assembles a .deb package from the build/linux/ driver bundle.
---- Requires dpkg-deb (Linux only). The script is runnable on any platform
---- to validate structure, but dpkg-deb packaging requires Linux.
----
---- Usage:
----   bash tools/build/build-linux-deb.sh              # full build + .deb
----   bash tools/build/build-linux-deb.sh --skip-deb   # structure only (cross-platform)
+# tools/build/build-linux-deb.sh
+#
+# Assembles a .deb package from the build/linux/ driver bundle.
+# Requires dpkg-deb (Linux only). The script is runnable on any platform
+# to validate structure, but dpkg-deb packaging requires Linux.
+#
+# Usage:
+#   bash tools/build/build-linux-deb.sh              # full build + .deb
+#   bash tools/build/build-linux-deb.sh --skip-deb   # structure only (cross-platform)
 
 set -euo pipefail
 

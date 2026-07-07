@@ -150,7 +150,7 @@ sudo modprobe uinput
 - [x] C2. `feat(linux)` : package `.deb` — script `tools/build/build-linux-deb.sh` (DEBIAN/control, postinst, prerm, systemd, desktop)
 - [x] C3. `feat(linux)` : package `.rpm` — script `tools/build/build-linux-rpm.sh` (SPEC file, post/preun, systemd)
 - [x] C4. `feat(linux)` : PKGBUILD AUR — `tools/build/PKGBUILD` (makepkg, dependencies, install script)
-- [ ] C5. `ci(linux)` : build `.deb`/`.rpm` dans CI
+- [x] C5. `ci(linux)` : build `.deb`/`.rpm` dans CI — jobs `build-deb` + `build-rpm` + steps `build:deb` + `build:rpm` dans build:domain
 
 ### Phase 2D — Runner GPU (long terme)
 - [ ] D1. `ci(linux)` : runner self-hosted Linux avec GUI

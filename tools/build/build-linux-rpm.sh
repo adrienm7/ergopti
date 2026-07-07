@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
---- tools/build/build-linux-rpm.sh
----
---- Assembles a .rpm package from the build/linux/ driver bundle.
---- Requires rpm-build (Linux only). The script validates structure on any platform
---- but actual .rpm creation requires rpmbuild.
----
---- Usage:
----   bash tools/build/build-linux-rpm.sh              # full build + .rpm
----   bash tools/build/build-linux-rpm.sh --skip-rpm   # structure only (cross-platform)
+# tools/build/build-linux-rpm.sh
+#
+# Assembles a .rpm package from the build/linux/ driver bundle.
+# Requires rpm-build (Linux only). The script validates structure on any platform
+# but actual .rpm creation requires rpmbuild.
+#
+# Usage:
+#   bash tools/build/build-linux-rpm.sh              # full build + .rpm
+#   bash tools/build/build-linux-rpm.sh --skip-rpm   # structure only (cross-platform)
 
 set -euo pipefail
 
