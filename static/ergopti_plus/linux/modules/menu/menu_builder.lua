@@ -42,35 +42,34 @@ local function _build_header(ctx)
 	}
 end
 
---- Builds the hotstrings submenu from the loaded engine state.
---- @param engine table The hotstring engine instance (has get_groups? method).
---- @param mappings table The loaded mappings array.
+--- Builds the hotstrings submenu from hotstrings_config state.
+--- @param config table The hotstrings_config module (has get_groups, toggle_group, is_group_enabled, reload).
 --- @return table Array of menu items.
-local function _build_hotstrings(engine, mappings)
+local function _build_hotstrings(config)
 	local items = {}
-	if type(mappings) ~= "table" then return items end
-
-	-- Collect unique groups from mappings.
-	local groups = {}
-	for _, m in ipairs(mappings) do
-		if type(m.group) == "string" and m.group ~= "" then
-			groups[m.group] = (groups[m.group] or 0) + 1
-		end
+	if type(config) ~= "table" then
+		items[#items + 1] = { title = "(config non disponible)", fn = function() end, disabled = true }
+		return items
 	end
 
-	if next(groups) == nil then
+	local groups = {}
+	if type(config.get_groups) == "function" then
+		groups = config.get_groups() or {}
+	end
+
+	if #groups == 0 then
 		items[#items + 1] = { title = "(aucun groupe chargé)", fn = function() end, disabled = true }
 		return items
 	end
 
-	for group, count in pairs(groups) do
+	for _, group in ipairs(groups) do
 		local group_name = group
+		local is_enabled = config.is_group_enabled and config:is_group_enabled(group_name)
 		items[#items + 1] = {
-			title = group_name .. " (" .. count .. ")",
+			title = group_name .. (is_enabled and " ✓" or ""),
 			fn = function()
-				-- Placeholder: toggle group enable/disable.
-				-- Future: call engine:set_group_enabled(group_name, not enabled).
-				Logger.debug(LOG, "Toggle hotstring group: %s", group_name)
+				-- Toggle group enable/disable and reload.
+				if config.toggle_group then config:toggle_group(group_name) end
 			end,
 		}
 	end
@@ -80,8 +79,7 @@ local function _build_hotstrings(engine, mappings)
 	items[#items + 1] = {
 		title = "Recharger les hotstrings",
 		fn = function()
-			-- Placeholder: trigger a hotstring reload.
-			Logger.info(LOG, "Hotstring reload requested.")
+			if config.reload then config:reload() end
 		end,
 	}
 
@@ -150,31 +148,61 @@ local function _build_llm(llm_state)
 end
 
 --- Builds the metrics/keylogger submenu.
---- @param metrics table The metrics_collector module.
+--- @param keylogger table The keylogger module (has get_session_stats, get_wpm, get_app_stats, etc.).
 --- @return table Array of menu items.
-local function _build_metrics(metrics)
+local function _build_metrics(keylogger)
+	if type(keylogger) ~= "table" then
+		return {
+			{ title = "(métriques non disponibles)", fn = function() end, disabled = true },
+		}
+	end
+
 	return {
 		{
 			title = "Afficher les statistiques",
 			fn = function()
-				local stats = metrics.get_session_stats()
+				if type(keylogger.get_session_stats) ~= "function" then return end
+				local stats = keylogger.get_session_stats()
 				Logger.info(LOG, "Session: %d keystrokes, ~%d words, %ds.",
 					stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
 			end,
 		},
 		{
-			title = "Top 10 bigrammes",
+			title = "Afficher le WPM",
 			fn = function()
-				local ngrams = metrics.get_ngrams(10)
-				for _, ng in ipairs(ngrams) do
-					Logger.info(LOG, "  %s: %d", ng.gram, ng.count)
+				if type(keylogger.get_wpm) ~= "function" then return end
+				local wpm = keylogger.get_wpm()
+				Logger.info(LOG, "WPM actuel: %.1f", wpm)
+			end,
+		},
+		{
+			title = "Stats par application",
+			fn = function()
+				if type(keylogger.get_app_stats) ~= "function" then return end
+				local apps = keylogger.get_app_stats()
+				for app, stats in pairs(apps) do
+					Logger.info(LOG, "  %s: %d keystrokes", app, stats.keystrokes)
 				end
+			end,
+		},
+		{ title = "───────────────", fn = function() end, disabled = true },
+		{
+			title = "Suspendre le keylogger " .. (type(keylogger.is_suppressed) == "function" and keylogger.is_suppressed() and "✓" or ""),
+			fn = function()
+				if type(keylogger.is_suppressed) ~= "function" then return end
+				if keylogger.is_suppressed() then
+					keylogger.unsuppress()
+				else
+					keylogger.suppress()
+				end
+				Logger.info(LOG, "Keylogger suppression: %s", tostring(keylogger.is_suppressed()))
 			end,
 		},
 		{
 			title = "Réinitialiser la session",
 			fn = function()
-				metrics.reset_session()
+				if type(keylogger.reset_session) ~= "function" then return end
+				keylogger.reset_session()
 				Logger.info(LOG, "Metrics session reset.")
 			end,
 		},
@@ -233,13 +261,15 @@ end
 --- Builds the full tray menu item list from the daemon's current state.
 --- @param ctx table {
 ---   engine    table   Hotstring engine instance.
----   mappings  table   Loaded hotstring mappings array.
+---   config    table   Hotstrings_config module (new) — use this for group toggles.
+---   mappings  table   (legacy) Loaded hotstring mappings array — fallback if config absent.
 ---   layout    string  Current keyboard layout ("qwerty" or "azerty").
 ---   on_layout_change  function  Called with new layout name.
----   metrics   table   Metrics collector module.
+---   keylogger table   Keylogger module (new) — use this for metrics.
+---   metrics   table   (legacy) Metrics collector module — fallback if keylogger absent.
 ---   llm       table|nil  LLM prediction engine state (or nil).
----   dry_run   boolean  Dry-run mode flag (mutable reference).
----   verbose   boolean  Verbose flag (mutable reference).
+---   dry_run   boolean  Dry-run mode flag.
+---   verbose   boolean  Verbose flag.
 ---   on_quit   function  Called when Quit is selected.
 --- }
 --- @return table Flat array of { title, fn, disabled?, checked? } tables.
@@ -247,13 +277,19 @@ function M.build(ctx)
 	local ctx = type(ctx) == "table" and ctx or {}
 	local items = {}
 
+	-- Resolve new vs legacy fields.
+	local config    = ctx.config    -- hotstrings_config (preferred)
+	local keylogger = ctx.keylogger -- keylogger module (preferred)
+	local metrics   = ctx.metrics   -- legacy metrics_collector
+	local mappings  = ctx.mappings  -- legacy mappings array
+
 	-- Header.
 	local header = _build_header(ctx)
 	for _, item in ipairs(header) do items[#items + 1] = item end
 
-	-- Hotstrings section.
+	-- Hotstrings section — prefer config over raw mappings.
 	items[#items + 1] = { title = "Hotstrings ▼", fn = function() end, disabled = true }
-	local hs_items = _build_hotstrings(ctx.engine, ctx.mappings)
+	local hs_items = _build_hotstrings(config)
 	for _, item in ipairs(hs_items) do items[#items + 1] = item end
 
 	-- Separator.
@@ -275,9 +311,9 @@ function M.build(ctx)
 	-- Separator.
 	items[#items + 1] = { title = "", fn = function() end, disabled = true }
 
-	-- Metrics section.
+	-- Metrics section — prefer keylogger over legacy metrics.
 	items[#items + 1] = { title = "Métriques ▼", fn = function() end, disabled = true }
-	local metric_items = _build_metrics(ctx.metrics)
+	local metric_items = _build_metrics(keylogger or metrics)
 	for _, item in ipairs(metric_items) do items[#items + 1] = item end
 
 	-- Separator.
