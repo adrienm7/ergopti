@@ -19,18 +19,25 @@ local src = fh:read("*a") ; fh:close()
 -- Locate the didFinishNavigation branch.
 local nav_pos = src:find('"didFinishNavigation"', 1, true)
 helpers.assert_true(nav_pos ~= nil, 'healthcheck.lua must handle "didFinishNavigation" (lib-health-2)')
-local nav_body = src:sub(nav_pos, nav_pos + 1200)
 
--- Test 1: _stop_poll() must appear BEFORE the new _poll_timer assignment.
-local stop_pos      = nav_body:find("_stop_poll()", 1, true)
-local new_timer_pos = nav_body:find("hs.timer.new(", 1, true)
-helpers.assert_true(
-	stop_pos ~= nil,
-	"didFinishNavigation branch must call _stop_poll() before arming a new poll timer (lib-health-2)"
-)
+-- The poll timer is armed with the FIRST hs.timer.new(...) at or after the
+-- branch marker. Anchor to that call rather than a fixed-size character window:
+-- the window heuristic is brittle (any code inserted between the branch marker
+-- and the timer — e.g. the copy-button JS injection — silently pushes the
+-- _stop_poll() call out of range), whereas anchoring to the actual timer-arming
+-- site checks the real ordering invariant regardless of how much code precedes it.
+local new_timer_pos = src:find("hs.timer.new(", nav_pos, true)
 helpers.assert_true(
 	new_timer_pos ~= nil,
 	"didFinishNavigation branch must create a new poll timer with hs.timer.new (lib-health-2)"
+)
+
+-- _stop_poll() must appear between the branch marker and the timer arming, so a
+-- re-navigation stops the previous timer before creating a new one.
+local stop_pos = src:find("_stop_poll()", nav_pos, true)
+helpers.assert_true(
+	stop_pos ~= nil,
+	"didFinishNavigation branch must call _stop_poll() before arming a new poll timer (lib-health-2)"
 )
 helpers.assert_true(
 	stop_pos < new_timer_pos,

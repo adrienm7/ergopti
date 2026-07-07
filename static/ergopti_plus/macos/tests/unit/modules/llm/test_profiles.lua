@@ -222,7 +222,11 @@ helpers.describe("Profiles.resolve_system_prompt", function()
 	end)
 
 	helpers.it("uses shared selector for multi-template n>1", function()
+		-- The shared selector's batch/footer path requires batch = true (its
+		-- documented contract, matching the JS + Lua self-test vectors); the
+		-- macOS wrapper passes the profile through verbatim without synthesising it.
 		local profile = {
+			batch = true,
 			system_single = "BASE",
 			system_multi_template = "FOOTER n={n}",
 		}

@@ -304,7 +304,7 @@ function M.test_vectors()
 				system_multi_template = "FOOTER n={n}",
 			},
 			vars   = { context = "ctx", n = 5 },
-			assert = { field = "system", contains = "BASE\\n\\nFOOTER n=5" },
+			assert = { field = "system", contains = "BASE\n\nFOOTER n=5" },
 		},
 		{
 			id          = "raw_prompt_short_circuit",

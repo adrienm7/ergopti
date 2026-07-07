@@ -265,7 +265,7 @@ function profileSelectorTestVectors() {
 				},
 				{ context: 'ctx', n: 5 }
 			],
-			assert: { field: 'system', contains: 'BASE\\n\\nFOOTER n=5' }
+			assert: { field: 'system', contains: 'BASE\n\nFOOTER n=5' }
 		},
 		{
 			id: 'batch_mode_returns_is_batch_true',
