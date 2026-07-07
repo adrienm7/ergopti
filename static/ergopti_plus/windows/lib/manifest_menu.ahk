@@ -89,9 +89,11 @@ _MR_GetMenuDef(Key) {
 ; ==============================================
 ; ==============================================
 
-; Returns true when the entry has no ``platforms`` restriction, or when
-; "ahk" appears in its ``platforms`` array.
-_MR_IsForAhk(Entry) {
+; Returns true when the entry is visible on ``Platform``.
+; Driver-neutral: call as _MR_IsForPlatform(Entry, "ahk") for Windows,
+; _MR_IsForPlatform(Entry, "linux") for the future Linux driver.
+; An entry with no ``platforms`` restriction is visible on all platforms.
+_MR_IsForPlatform(Entry, Platform) {
 	if !(Entry is Map) or !Entry.Has("platforms") {
 		return true
 	}
@@ -100,11 +102,16 @@ _MR_IsForAhk(Entry) {
 		return true
 	}
 	for _, P in Plats {
-		if P == "ahk" {
+		if P == Platform {
 			return true
 		}
 	}
 	return false
+}
+
+; Legacy alias: Windows driver entry point.
+_MR_IsForAhk(Entry) {
+	return _MR_IsForPlatform(Entry, "ahk")
 }
 
 ; Safe map-get with a default value.

@@ -10,6 +10,28 @@
 // — both use the same WebKit JS API, so no third probe is needed for Linux.
 // String payloads bypass JSON.stringify so plain-string commands ('ready',
 // 'open_link', …) travel as-is.
+//
+// Handler name contract — every host MUST register a message handler for the
+// bridge name used by its webview app. These names are stable API:
+//
+//   action_picker_bridge      — _shared/ui/action_picker
+//   changelog_bridge          — _shared/ui/changelog
+//   dl_bridge                 — _shared/ui/download_window
+//   hsEditor                  — _shared/ui/hotstring_editor
+//   hotstrings_config_bridge  — _shared/ui/hotstrings_config_window
+//   hsOnboarding              — _shared/ui/onboarding
+//   hsPaths                   — _shared/ui/paths_editor
+//   hsPersonalInfo            — _shared/ui/personal_info_editor
+//   metrics_apps_bridge       — _shared/ui/metrics_apps
+//   model_browser_bridge      — _shared/ui/model_browser
+//   prompt_bridge             — _shared/ui/prompt_editor
+//   token_bridge              — _shared/ui/token_prompt
+//   healthcheck                — _shared/ui/healthcheck (future)
+//   personal_toml_editor       — _shared/ui/personal_toml_editor (future)
+//
+// Linux host (WebKit2GTK) MUST register each handler via
+// webkit_user_content_manager_register_script_message_handler() for the
+// corresponding bridge name before loading the webview.
 // ===========================================================================
 
 /**

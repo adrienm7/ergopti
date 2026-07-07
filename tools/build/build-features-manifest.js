@@ -33,8 +33,12 @@ const MANIFEST_PATH = shared('modules/features/manifest.toml');
 
 const OUT_AHK_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/windows/_generated');
 const OUT_HS_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/macos/_generated');
+const OUT_LINUX_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/linux/_generated');
 
-const PLATFORMS = ['ahk', 'hs'];
+// Ultimate fallback default: a feature that declares no 'platforms' at any
+// ancestor level inherits this list. When adding a new driver, this list must
+// match the platforms enum in _shared/modules/features/manifest.schema.json.
+const PLATFORMS = ['ahk', 'hs', 'linux'];
 
 // =================================================
 // =================================================
@@ -502,6 +506,11 @@ function main() {
 	writeOutput(
 		resolve(OUT_HS_DIR, 'config_template.toml'),
 		renderConfigTemplate(manifest, sections, features, 'hs')
+	);
+	// Linux outputs
+	writeOutput(
+		resolve(OUT_LINUX_DIR, 'config_template.toml'),
+		renderConfigTemplate(manifest, sections, features, 'linux')
 	);
 	console.log('Done.');
 }

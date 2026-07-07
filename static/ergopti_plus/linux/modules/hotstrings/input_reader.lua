@@ -76,11 +76,75 @@ local KEY_TAB        = 15
 
 -- =========================================
 -- =========================================
--- ======= 3/ Keycode Tables ===============
+-- ======= 3/ Keycode Tables (shared) =======
 -- =========================================
 -- =========================================
 
--- QWERTY unshifted keycode → character.
+-- Load the evdev keycode maps from the shared JSON (LNX-1). The loader returns
+-- the same LAYOUTS shape {qwerty={unshifted,shifted}, azerty=…} that was
+-- previously hardcoded inline. Fallback: if the shared file is unreadable (e.g.
+-- the daemon runs from a partial checkout), the hardcoded tables below are used.
+
+local LAYOUTS = nil
+
+local function _load_shared_layouts()
+	local ok_evdev, evdev = pcall(require, "keycodes.evdev")
+	if not ok_evdev or type(evdev) ~= "table" or type(evdev.load) ~= "function" then
+		return nil, "keycodes.evdev module unavailable"
+	end
+
+	-- The Linux daemon uses a vendored pure-Lua JSON decoder.
+	local ok_json, json_mod = pcall(require, "json")
+	local decode = (ok_json and json_mod and json_mod.decode) or nil
+	if not decode then
+		-- Fall back to a minimal JSON parser if no json module is available.
+		-- Uses load("return "..raw) which works for our trusted static data
+		-- (keycodes are plain strings/numbers; booleans/null not yet needed).
+		decode = function(raw)
+			local ok, val = pcall(function()
+				local f = assert(load("return " .. raw))
+				return f()
+			end)
+			if ok then return val end
+		end
+	end
+	if not decode then
+		return nil, "no JSON decoder available"
+	end
+
+	-- Resolve the _shared/ root explicitly: walk up from this file's location
+	-- (linux/modules/hotstrings/input_reader.lua) → three levels up gives the
+	-- repo root, then _shared/.  Passed to evdev.load so it never falls back to
+	-- the fragile debug.getinfo path (which breaks under LuaJIT).
+	local function shared_root()
+		local src = debug and debug.getinfo and debug.getinfo(1, "S")
+		if src and src.source then
+			local s = src.source
+			if s:sub(1, 1) == "@" then s = s:sub(2) end
+			local dir = s:match("^(.*[/\\])") or ""
+			-- dir is .../linux/modules/hotstrings/ → walk up 3 levels
+			local root = dir:gsub("[/\\]$", "")
+			root = root:gsub("[/\\][^/\\]+[/\\][^/\\]+[/\\][^/\\]+$", "")
+			if root and root ~= dir then
+				return root .. "/_shared/"
+			end
+		end
+		return nil
+	end
+
+	return evdev.load(decode, nil, shared_root)
+end
+
+-- Attempt the shared load once at module-init time.
+local _shared_layouts, _shared_err = _load_shared_layouts()
+if _shared_layouts then
+	LAYOUTS = _shared_layouts
+	Logger.info(LOG, "evdev keycode tables loaded from shared JSON.")
+else
+	Logger.warn(LOG, "shared evdev load failed (%s) — falling back to hardcoded tables.", _shared_err or "unknown")
+end
+
+-- QWERTY unshifted keycode → character (hardcoded fallback).
 -- Keycodes from input-event-codes.h KEY_* values.
 local QWERTY_UNSHIFTED = {
 	[2]  = "1", [3]  = "2", [4]  = "3", [5]  = "4", [6]  = "5",
@@ -143,10 +207,13 @@ local AZERTY_SHIFTED = {
 }
 
 -- Available layout tables, keyed by layout name.
-local LAYOUTS = {
-	qwerty = { unshifted = QWERTY_UNSHIFTED, shifted = QWERTY_SHIFTED },
-	azerty = { unshifted = AZERTY_UNSHIFTED, shifted = AZERTY_SHIFTED },
-}
+-- Prefer the shared JSON (LNX-1); fall back to the inline maps on failure.
+if not LAYOUTS then
+	LAYOUTS = {
+		qwerty = { unshifted = QWERTY_UNSHIFTED, shifted = QWERTY_SHIFTED },
+		azerty = { unshifted = AZERTY_UNSHIFTED, shifted = AZERTY_SHIFTED },
+	}
+end
 
 
 -- =========================================

@@ -27,7 +27,8 @@ local M = {}
 
 
 -- Default constant: 5 characters = 1 word (industry standard for WPM).
-local DEFAULT_CHARS_PER_WORD = 5
+-- Exported so Linux/Hammerspoon drivers can single-source it (DD-10).
+M.DEFAULT_CHARS_PER_WORD = 5
 
 
 
@@ -52,8 +53,8 @@ function M.compute_wpm_from_ring(ring, chars_per_word)
 	local elapsed_s = (ring[n] - ring[1]) / 1000.0
 	if elapsed_s <= 0 then return 0.0 end
 
-	local cpw = tonumber(chars_per_word) or DEFAULT_CHARS_PER_WORD
-	if cpw <= 0 then cpw = DEFAULT_CHARS_PER_WORD end
+	local cpw = tonumber(chars_per_word) or M.DEFAULT_CHARS_PER_WORD
+	if cpw <= 0 then cpw = M.DEFAULT_CHARS_PER_WORD end
 
 	-- Characters per second → words per minute.
 	local cps = (n - 1) / elapsed_s
@@ -72,8 +73,8 @@ function M.compute_wpm_from_events(total_chars, total_time_ms, chars_per_word)
 	if type(total_time_ms) ~= "number" or total_time_ms <= 0 then return 0.0 end
 	if type(total_chars)   ~= "number" or total_chars  <= 0 then return 0.0 end
 
-	local cpw = tonumber(chars_per_word) or DEFAULT_CHARS_PER_WORD
-	if cpw <= 0 then cpw = DEFAULT_CHARS_PER_WORD end
+	local cpw = tonumber(chars_per_word) or M.DEFAULT_CHARS_PER_WORD
+	if cpw <= 0 then cpw = M.DEFAULT_CHARS_PER_WORD end
 
 	return (total_chars / cpw) / (total_time_ms / 60000.0)
 end

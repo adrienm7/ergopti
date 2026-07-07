@@ -1,7 +1,8 @@
 --- lib/updater.lua
 ---
 --- Cross-driver updater engine (version compare, GitHub fetch, background poller).
---- Canonical algorithms: _shared/modules/updater/version.js
+--- Canonical version algorithms: _shared/modules/updater/version.js
+--- Shared pure version functions: _shared/lua/updater/version.lua
 
 local M = {}
 
@@ -12,6 +13,7 @@ local dialog     = require("lib.dialog_util")
 local Paths      = require("lib.paths")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
+local Version    = require("updater.version")
 local LOG        = "updater"
 
 -- Hardcoded fallback — mirrors defaults.json committed alongside. Keeps the
@@ -98,84 +100,32 @@ M.INTERVAL_PRESETS = INTERVAL_PRESETS
 -- ======= 1/ Version helpers =======
 -- ==================================
 
+-- Version comparison functions are delegated to the shared pure-Lua module
+-- _shared/lua/updater/version.lua, which mirrors the canonical JS algorithm
+-- in _shared/modules/updater/version.js. The macOS driver no longer owns its
+-- own copy of normalize_tag / parse_version / compare_versions / is_newer_version.
+
+--- Delegates to the shared pure-Lua version module.
 function M.normalize_tag(tag)
-	if type(tag) ~= "string" then return "" end
-	local t = tag:match("^%s*(.-)%s*$") or tag
-	if t:sub(1, 1):lower() == "v" then t = t:sub(2) end
-	return t
+	return Version.normalize_tag(tag)
 end
 
-local function parse_version(tag)
-	local norm = M.normalize_tag(tag)
-	local maj, min, pat, pre = norm:match("^(%d+)%.(%d+)%.(%d+)%-?(.*)$")
-	if not maj then return nil end
-	if pre == "" then pre = nil end
-	return {
-		major = tonumber(maj),
-		minor = tonumber(min),
-		patch = tonumber(pat),
-		prerelease = pre and (function()
-			local parts = {}
-			for part in pre:gmatch("[^%.]+") do table.insert(parts, part) end
-			return parts
-		end)() or nil,
-	}
-end
-
-local function compare_prerelease_id(a, b)
-	local a_num = a:match("^%d+$") ~= nil
-	local b_num = b:match("^%d+$") ~= nil
-	if a_num and b_num then
-		local ai, bi = tonumber(a), tonumber(b)
-		if ai > bi then return 1 end
-		if ai < bi then return -1 end
-		return 0
-	end
-	if a > b then return 1 end
-	if a < b then return -1 end
-	return 0
-end
-
-local function compare_prerelease(a, b)
-	if not a and not b then return 0 end
-	if not a and b then return 1 end
-	if a and not b then return -1 end
-	local len = math.max(#a, #b)
-	for i = 1, len do
-		local ai, bi = a[i], b[i]
-		if not ai then return -1 end
-		if not bi then return 1 end
-		local cmp = compare_prerelease_id(ai, bi)
-		if cmp ~= 0 then return cmp end
-	end
-	return 0
-end
-
---- @param a string
---- @param b string
---- @return integer 1 | -1 | 0
+--- Delegates to the shared pure-Lua version module. The shared module is pure
+--- (no Logger dependency) so non-semver diagnostic logging is restored here.
 function M.compare_versions(a, b)
-	local pa, pb = parse_version(a), parse_version(b)
-	if not pa or not pb then
-		local na, nb = M.normalize_tag(a), M.normalize_tag(b)
-		if na == nb then return 0 end
-		-- Non-semver fallback: lexicographic comparison is wrong for tags like
-		-- "10" vs "9". Treat ambiguous ordering as non-newer (fail-closed) and
-		-- warn so the issue is visible.
-		Logger.warn(LOG, "compare_versions: non-semver tags '%s'/'%s' — treating as equal.", na, nb)
-		return 0
+	local result = Version.compare_versions(a, b)
+	if result == 0 then
+		local na, nb = Version.normalize_tag(a), Version.normalize_tag(b)
+		if na ~= nb then
+			Logger.warn(LOG, "compare_versions: non-semver tags '%s'/'%s' — treating as equal.", na, nb)
+		end
 	end
-	if pa.major ~= pb.major then return pa.major > pb.major and 1 or -1 end
-	if pa.minor ~= pb.minor then return pa.minor > pb.minor and 1 or -1 end
-	if pa.patch ~= pb.patch then return pa.patch > pb.patch and 1 or -1 end
-	return compare_prerelease(pa.prerelease, pb.prerelease)
+	return result
 end
 
---- @param latest string
---- @param current string
---- @return boolean
+--- Delegates to the shared pure-Lua version module.
 function M.is_newer_version(latest, current)
-	return M.compare_versions(latest, current) > 0
+	return Version.is_newer_version(latest, current)
 end
 
 

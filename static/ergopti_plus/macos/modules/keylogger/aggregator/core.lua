@@ -18,6 +18,7 @@ local utf8    = utf8
 local Logger  = require("lib.logger")
 local Paths   = require("lib.paths")
 local Timings = require("lib.timings")
+local KUtils  = require("keylogger.utils")
 local LOG     = "keylogger.aggregator"
 
 local S = require("modules.keylogger.aggregator.state")
@@ -257,18 +258,9 @@ end
 -- ===============================
 -- ================================
 
---- Get-or-create a sub-table at `tbl[k]`.
---- @param tbl table Parent table.
---- @param k any Key to look up.
---- @param default table Default value if absent (shallow-copied reference).
---- @return table The existing or freshly-inserted sub-table.
+--- Delegates to the shared keylogger/utils module.
 function M.gc(tbl, k, default)
-	local v = tbl[k]
-	if not v then
-		v = default or {}
-		tbl[k] = v
-	end
-	return v
+	return KUtils.gc(tbl, k, default)
 end
 
 --- Cumulative bucket accumulator — adds `value` to every bucket ≥ `delay`.
@@ -294,32 +286,14 @@ function M.burst_length_bucket(n)
 	return "500+"
 end
 
---- UTF-8-aware character classifier.
---- @param c string A single (possibly multi-byte) character.
---- @return string One of "space", "digit", "letter", "punct", "other".
+--- Delegates to the shared keylogger/utils module.
 function M.char_class(c)
-	if not c or #c == 0 then return "other" end
-	if c == " " or c == "\t" or c == "\n" or c == "\194\160" or c == "\226\128\175" then
-		return "space"
-	end
-	local b = c:byte(1)
-	if b >= 48 and b <= 57 then return "digit" end
-	if (b >= 65 and b <= 90) or (b >= 97 and b <= 122) then return "letter" end
-	if b >= 0xC2 and b <= 0xCF then return "letter" end
-	if b >= 0xD0 and b <= 0xD7 then return "letter" end
-	if c:sub(1, 1) == "[" and c:sub(-1) == "]" then return "other" end
-	if c:match("^[%p<>=+%*/\\|%-]$") then return "punct" end
-	return "other"
+	return KUtils.char_class(c)
 end
 
---- Pop the last UTF-8 codepoint off a string.
---- @param s string Input string.
---- @return string String with last codepoint removed.
+--- Delegates to the shared keylogger/utils module.
 function M.pop_utf8(s)
-	if not s or #s == 0 then return s or "" end
-	local ok, off = pcall(utf8.offset, s, -1)
-	if not ok or not off then return s:sub(1, -2) end
-	return s:sub(1, off - 1)
+	return KUtils.pop_utf8(s)
 end
 
 --- Get-or-create the n-gram context entry for an app.
