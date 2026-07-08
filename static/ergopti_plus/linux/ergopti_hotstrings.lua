@@ -305,10 +305,14 @@ local function main()
 	local function on_char(ch)
 		local now_ms = math.floor(os.clock() * 1000)
 
-		-- Detect current app for per-app keylogger stats.
+		-- Detect current app for per-app keylogger stats. The window_info adapter
+		-- exposes getFocused() (a WindowInfo table) — there is no getActiveAppID, so
+		-- the old guard was always false and app_id always nil (per-app stats and
+		-- the password guard were both dead).
 		local app_id = nil
-		if window_info and window_info.getActiveAppID then
-			app_id = window_info.getActiveAppID()
+		if window_info and window_info.getFocused then
+			local wi = window_info.getFocused()
+			app_id = (type(wi) == "table" and wi.appId ~= "" and wi.appId) or nil
 		end
 
 		-- Check password suppression.
@@ -337,9 +341,12 @@ local function main()
 			engine:reset()
 		end
 
-		-- Feed the character to the LLM prediction engine.
+		-- Feed the character AND the current typing buffer to the LLM prediction
+		-- engine. Without the buffer arg, prediction_engine.on_char early-returns
+		-- (it needs the buffer to detect its trigger sequences) so the LLM never
+		-- predicted anything.
 		if prediction_engine then
-			pcall(function() prediction_engine.on_char(ch) end)
+			pcall(function() prediction_engine.on_char(ch, engine:current_buffer()) end)
 		end
 	end
 

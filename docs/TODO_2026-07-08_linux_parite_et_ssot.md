@@ -346,7 +346,7 @@ basse sévérité. Détail dans l'audit SSoT.)*
     (`_serialize_menu` exposé, appel direct — **rouge prouvé** : `attempt to get
     length of a nil value (global '_registry')`, vert après). Les tests `setMenu`
     existants ne l'attrapaient pas (sans yad, `_spawn_yad` sort avant `_serialize_menu`).
-- [ ] **P1.3 — bugs d'arguments de câblage daemon** (`linux/ergopti_hotstrings.lua`) :
+- [x] **P1.3 — bugs d'arguments de câblage daemon** (`linux/ergopti_hotstrings.lua`) :
   - `:340` `prediction_engine.on_char(ch)` sans l'arg `buffer` → `prediction_engine.lua:128-130`
     early-return → LLM ne prédit jamais. Passer le buffer.
   - `:308` `window_info.getActiveAppID()` — **méthode inexistante** (l'adaptateur
