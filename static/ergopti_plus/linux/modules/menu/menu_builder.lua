@@ -277,14 +277,86 @@ local function _build_kanata(_ctx)
 	}}
 end
 
---- Builds the gestures submenu (P2.11 — stub).
-local function _build_gestures(_ctx)
-	return { title = "🖐 Gestes", menu = {
-		{ title = "(non implémenté sur Linux)", fn = function() end, disabled = true },
-		{ title = i18n_safe("menu.gestures.trackpad", "Trackpad…"), fn = function()
-			Logger.info(LOG, "[stub] Trackpad gestures — P2.11 (libinput).")
-		end },
-	}}
+--- Builds the gestures submenu (P2.11).
+local function _build_gestures(ctx)
+	local ge = ctx.gestures
+	if not ge then
+		return { title = "🖐 Gestes", menu = {
+			{ title = "(gestures non disponible)", fn = function() end, disabled = true },
+		}}
+	end
+
+	local enabled = ge.is_enabled()
+	local items = {}
+
+	-- Master toggle.
+	items[#items + 1] = {
+		title = "Activé " .. (enabled and "✓" or ""),
+		fn = function()
+			ge.toggle()
+		end,
+	}
+	items[#items + 1] = { title = "-" }
+
+	-- Show a subset of commonly-configured gesture slots.
+	local quick_slots = {
+		{ slot = "swipe_3_left",  label = "← 3 doigts gauche" },
+		{ slot = "swipe_3_right", label = "→ 3 doigts droite" },
+		{ slot = "swipe_3_up",    label = "↑ 3 doigts haut" },
+		{ slot = "swipe_3_down",  label = "↓ 3 doigts bas" },
+		{ slot = "swipe_4_left",  label = "← 4 doigts gauche" },
+		{ slot = "swipe_4_right", label = "→ 4 doigts droite" },
+		{ slot = "tap_3",         label = "👆 Tap 3 doigts" },
+		{ slot = "tap_4",         label = "👆 Tap 4 doigts" },
+	}
+
+	for _, qs in ipairs(quick_slots) do
+		local action = ge.get_action(qs.slot) or "none"
+		local label = ge.get_action_label(action)
+		items[#items + 1] = {
+			title = qs.label .. " → " .. label,
+			fn = function()
+				-- Cycle through common actions for this slot.
+				local cur = ge.get_action(qs.slot) or "none"
+				local cycle = { "none", "ws_prev", "ws_next", "tab_prev", "tab_next", "vol_up", "vol_down" }
+				local found = false
+				for i, a in ipairs(cycle) do
+					if a == cur then
+						local next_a = cycle[i % #cycle + 1]
+						ge.set_action(qs.slot, next_a)
+						found = true
+						break
+					end
+				end
+				if not found then ge.set_action(qs.slot, "none") end
+			end,
+		}
+	end
+
+	items[#items + 1] = { title = "-" }
+
+	-- Reading state.
+	items[#items + 1] = {
+		title = "Lecture libinput: " .. (ge.is_reading() and "active" or "inactive"),
+		fn = function()
+			if ge.is_reading() then
+				ge.stop_reading()
+			else
+				ge.start_reading()
+			end
+		end,
+	}
+
+	-- Reset to defaults.
+	items[#items + 1] = {
+		title = "Réinitialiser les gestes",
+		fn = function()
+			ge.reset_defaults()
+			Logger.info(LOG, "Gestures reset to defaults.")
+		end,
+	}
+
+	return { title = "🖐 Gestes", menu = items }
 end
 
 --- Builds the apps submenu (placeholder for per-app configs).
