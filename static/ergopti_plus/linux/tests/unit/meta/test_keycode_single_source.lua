@@ -3,17 +3,20 @@
 --- ==============================================================================
 --- MODULE: Keycode Single-Source Regression Guard
 --- DESCRIPTION:
---- Verifies that keyboard_hook.lua no longer contains triplicated hardcoded
---- keycode→character layout tables. The single source is
+--- Verifies that NEITHER keyboard_hook.lua NOR input_reader.lua contains
+--- hardcoded keycode→character layout tables. The single source is
 --- _shared/data/keycodes/evdev.json, loaded by input_reader.lua and exposed
---- via M.resolve_char(). keyboard_hook must delegate to it, not re-declare.
+--- via M.resolve_char(). keyboard_hook must delegate to it; input_reader must
+--- NOT fall back to inline tables on load failure.
 ---
 --- ROOT CAUSE ENCODED:
 --- keyboard_hook.lua had three copies of the keycode layout data: (1) a dead
 --- _KEYCODE_MAP built by _build_keycode_map, (2) a full hardcoded layout table
 --- inside _resolve_char (~70 entries × 2 layouts), and (3) the live copy in
---- input_reader.lua (loaded from evdev.json). Any layout change required
---- editing all three; they had already diverged silently.
+--- input_reader.lua (loaded from evdev.json). Additionally, input_reader itself
+--- held a fourth copy as a "fallback" for when evdev.json failed to load —
+--- violating the fail-fast rule and silently masking a missing shared file.
+--- Any layout change required editing all copies; they had already diverged.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -81,6 +84,67 @@ end)
 -- ======= 2/ Behavioural: resolve_char matches evdev.json ==========
 -- ==================================================================
 -- ==================================================================
+
+
+
+
+
+-- ==================================================================
+-- ==================================================================
+-- ======= 1b/ Source-level: input_reader has no fallback tables =====
+-- ==================================================================
+-- ==================================================================
+
+helpers.describe("keycode single-source: input_reader has no hardcoded layout tables", function()
+	helpers.it("source contains no QWERTY_UNSHIFTED variable", function()
+		local fh = io.open(helpers.driver_root() .. "/modules/hotstrings/input_reader.lua", "r")
+		helpers.assert_true(fh ~= nil, "should open input_reader.lua")
+		local src = fh:read("*a")
+		fh:close()
+		helpers.assert_true(src:find("local QWERTY_UNSHIFTED", 1, true) == nil,
+			"QWERTY_UNSHIFTED must be removed — it was a hardcoded fallback duplicating evdev.json")
+	end)
+
+	helpers.it("source contains no QWERTY_SHIFTED variable", function()
+		local fh = io.open(helpers.driver_root() .. "/modules/hotstrings/input_reader.lua", "r")
+		helpers.assert_true(fh ~= nil, "should open input_reader.lua")
+		local src = fh:read("*a")
+		fh:close()
+		helpers.assert_true(src:find("local QWERTY_SHIFTED", 1, true) == nil,
+			"QWERTY_SHIFTED must be removed — it was a hardcoded fallback duplicating evdev.json")
+	end)
+
+	helpers.it("source contains no AZERTY_UNSHIFTED variable", function()
+		local fh = io.open(helpers.driver_root() .. "/modules/hotstrings/input_reader.lua", "r")
+		helpers.assert_true(fh ~= nil, "should open input_reader.lua")
+		local src = fh:read("*a")
+		fh:close()
+		helpers.assert_true(src:find("local AZERTY_UNSHIFTED", 1, true) == nil,
+			"AZERTY_UNSHIFTED must be removed — it was a hardcoded fallback duplicating evdev.json")
+	end)
+
+	helpers.it("source contains no AZERTY_SHIFTED variable", function()
+		local fh = io.open(helpers.driver_root() .. "/modules/hotstrings/input_reader.lua", "r")
+		helpers.assert_true(fh ~= nil, "should open input_reader.lua")
+		local src = fh:read("*a")
+		fh:close()
+		helpers.assert_true(src:find("local AZERTY_SHIFTED", 1, true) == nil,
+			"AZERTY_SHIFTED must be removed — it was a hardcoded fallback duplicating evdev.json")
+	end)
+
+	helpers.it("source asserts LAYOUTS is not nil (fail-fast guard)", function()
+		local fh = io.open(helpers.driver_root() .. "/modules/hotstrings/input_reader.lua", "r")
+		helpers.assert_true(fh ~= nil, "should open input_reader.lua")
+		local src = fh:read("*a")
+		fh:close()
+		helpers.assert_true(src:find("assert(LAYOUTS", 1, true) ~= nil,
+			"input_reader must assert(LAYOUTS ~= nil) — fail-fast, no silent fallback")
+	end)
+end)
+
+
+
+
 
 helpers.describe("keycode single-source: keyboard_hook resolves characters via input_reader (evdev.json)", function()
 	helpers.it("KEY_A (code 30) resolves to 'a' in qwerty", function()

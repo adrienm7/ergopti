@@ -81,9 +81,8 @@ local KEY_TAB        = 15
 -- =========================================
 
 -- Load the evdev keycode maps from the shared JSON (LNX-1). The loader returns
--- the same LAYOUTS shape {qwerty={unshifted,shifted}, azerty=…} that was
--- previously hardcoded inline. Fallback: if the shared file is unreadable (e.g.
--- the daemon runs from a partial checkout), the hardcoded tables below are used.
+-- the same LAYOUTS shape {qwerty={unshifted,shifted}, azerty=…}.
+-- This is the SINGLE source of truth — no hardcoded fallback (P0-E.1).
 
 local LAYOUTS = nil
 
@@ -135,85 +134,21 @@ local function _load_shared_layouts()
 	return evdev.load(decode, nil, shared_root)
 end
 
--- Attempt the shared load once at module-init time.
+-- Attempt the shared load once at module-init time. Fail-fast: no fallback.
 local _shared_layouts, _shared_err = _load_shared_layouts()
 if _shared_layouts then
 	LAYOUTS = _shared_layouts
 	Logger.info(LOG, "evdev keycode tables loaded from shared JSON.")
 else
-	Logger.warn(LOG, "shared evdev load failed (%s) — falling back to hardcoded tables.", _shared_err or "unknown")
+	Logger.error(LOG, "shared evdev load failed (%s) — keycode resolution will not work.", _shared_err or "unknown")
 end
 
--- QWERTY unshifted keycode → character (hardcoded fallback).
--- Keycodes from input-event-codes.h KEY_* values.
-local QWERTY_UNSHIFTED = {
-	[2]  = "1", [3]  = "2", [4]  = "3", [5]  = "4", [6]  = "5",
-	[7]  = "6", [8]  = "7", [9]  = "8", [10] = "9", [11] = "0",
-	[12] = "-", [13] = "=",
-	[16] = "q", [17] = "w", [18] = "e", [19] = "r", [20] = "t",
-	[21] = "y", [22] = "u", [23] = "i", [24] = "o", [25] = "p",
-	[26] = "[", [27] = "]",
-	[30] = "a", [31] = "s", [32] = "d", [33] = "f", [34] = "g",
-	[35] = "h", [36] = "j", [37] = "k", [38] = "l", [39] = ";",
-	[40] = "'",
-	[44] = "z", [45] = "x", [46] = "c", [47] = "v", [48] = "b",
-	[49] = "n", [50] = "m", [51] = ",", [52] = ".", [53] = "/",
-	[57] = " ",
-}
-
--- QWERTY shifted keycode → character.
-local QWERTY_SHIFTED = {
-	[2]  = "!", [3]  = "@", [4]  = "#", [5]  = "$", [6]  = "%",
-	[7]  = "^", [8]  = "&", [9]  = "*", [10] = "(", [11] = ")",
-	[12] = "_", [13] = "+",
-	[16] = "Q", [17] = "W", [18] = "E", [19] = "R", [20] = "T",
-	[21] = "Y", [22] = "U", [23] = "I", [24] = "O", [25] = "P",
-	[26] = "{", [27] = "}",
-	[30] = "A", [31] = "S", [32] = "D", [33] = "F", [34] = "G",
-	[35] = "H", [36] = "J", [37] = "K", [38] = "L", [39] = ":",
-	[40] = '"',
-	[44] = "Z", [45] = "X", [46] = "C", [47] = "V", [48] = "B",
-	[49] = "N", [50] = "M", [51] = "<", [52] = ">", [53] = "?",
-}
-
--- AZERTY unshifted (French keyboard layout).
--- Only rows that differ from QWERTY are listed; others fall through to QWERTY.
-local AZERTY_UNSHIFTED = {
-	[2]  = "&", [3]  = "\xc3\xa9", [4]  = '"',   [5]  = "'",  [6]  = "(",
-	[7]  = "-", [8]  = "\xc3\xa8", [9]  = "_",   [10] = "\xc3\xa7", [11] = "\xc3\xa0",
-	[12] = ")",  [13] = "=",
-	[16] = "a", [17] = "z", [18] = "e", [19] = "r", [20] = "t",
-	[21] = "y", [22] = "u", [23] = "i", [24] = "o", [25] = "p",
-	[30] = "q", [31] = "s", [32] = "d", [33] = "f", [34] = "g",
-	[35] = "h", [36] = "j", [37] = "k", [38] = "l", [39] = "m",
-	[40] = "\xc3\xb9",
-	[44] = "w", [45] = "x", [46] = "c", [47] = "v", [48] = "b",
-	[49] = "n", [50] = ",", [51] = ";", [52] = ":", [53] = "!",
-	[57] = " ",
-}
-
--- AZERTY shifted.
-local AZERTY_SHIFTED = {
-	[2]  = "1", [3]  = "2",  [4]  = "3", [5]  = "4", [6]  = "5",
-	[7]  = "6", [8]  = "7",  [9]  = "8", [10] = "9", [11] = "0",
-	[12] = "\xc2\xb0", [13] = "+",
-	[16] = "A", [17] = "Z", [18] = "E", [19] = "R", [20] = "T",
-	[21] = "Y", [22] = "U", [23] = "I", [24] = "O", [25] = "P",
-	[30] = "Q", [31] = "S", [32] = "D", [33] = "F", [34] = "G",
-	[35] = "H", [36] = "J", [37] = "K", [38] = "L", [39] = "M",
-	[40] = "%",
-	[44] = "W", [45] = "X", [46] = "C", [47] = "V", [48] = "B",
-	[49] = "N", [50] = "?", [51] = ".", [52] = "/", [53] = "\xc2\xa7",
-}
-
--- Available layout tables, keyed by layout name.
--- Prefer the shared JSON (LNX-1); fall back to the inline maps on failure.
-if not LAYOUTS then
-	LAYOUTS = {
-		qwerty = { unshifted = QWERTY_UNSHIFTED, shifted = QWERTY_SHIFTED },
-		azerty = { unshifted = AZERTY_UNSHIFTED, shifted = AZERTY_SHIFTED },
-	}
-end
+-- No hardcoded fallback keycode tables. The single source of truth is
+-- _shared/data/keycodes/evdev.json, loaded at module-init time via
+-- _load_shared_layouts(). If that load fails, the module errors out —
+-- keycode data MUST come from the shared source, never re-declared here.
+-- (P0-E.1: the inline tables were triplicates of evdev.json)
+assert(LAYOUTS ~= nil, "input_reader: evdev.json keycode tables failed to load — _shared/data/keycodes/evdev.json is the single source and must be readable")
 
 
 
