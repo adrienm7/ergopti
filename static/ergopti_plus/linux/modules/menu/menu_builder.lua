@@ -24,6 +24,9 @@ local M = {}
 local Logger = require("logger.shim")
 local LOG = "modules.menu.menu_builder"
 
+-- Single source of the driver version (never a re-typed literal).
+local Version = require("lib.version")
+
 
 -- =========================================
 -- =========================================
@@ -35,7 +38,10 @@ local LOG = "modules.menu.menu_builder"
 --- @param ctx table The build context (has _version field).
 --- @return table Array of menu items.
 local function _build_header(ctx)
-	local version = ctx._version or _VERSION or "3.0.0"
+	-- Prefer the version threaded through the build context; fall back to the
+	-- single source. (Never Lua's built-in _VERSION — that is the interpreter
+	-- version like "Lua 5.4", not the driver version.)
+	local version = ctx._version or Version.VERSION
 	return {
 		{ title = "Ergopti — v" .. version, fn = function() end, disabled = true },
 		{ title = "───────────────", fn = function() end, disabled = true },

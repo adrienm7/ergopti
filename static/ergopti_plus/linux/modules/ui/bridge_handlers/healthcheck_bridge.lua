@@ -12,6 +12,9 @@ M.bridge_name = "healthcheck"
 local Logger = require("logger.shim")
 local LOG = "bridge.healthcheck"
 
+-- Single source of the driver version (never a re-typed literal).
+local Version = require("lib.version")
+
 --- Builds the healthcheck data payload.
 --- @param state table Daemon state.
 --- @return table
@@ -76,7 +79,7 @@ local function _build_initial_payload(state)
 
 	return {
 		modules = modules,
-		version = "3.0.0",
+		version = Version.VERSION,
 		platform = "linux",
 		locale = "fr",
 	}

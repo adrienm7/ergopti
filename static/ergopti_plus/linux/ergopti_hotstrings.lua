@@ -76,6 +76,8 @@ if utf8_compat.install() then
 end
 
 local Logger = require("logger.shim")
+-- Single source of the driver version (never a re-typed literal).
+local Version = require("lib.version")
 local LOG = "ergopti_hotstrings"
 
 
@@ -386,7 +388,7 @@ local function main()
 
 		if menu_builder then
 			local menu_items = menu_builder.build({
-				_version      = "3.0.0",
+				_version      = Version.VERSION,
 				config        = hotstrings_config,
 				engine        = engine,
 				layout        = opts.layout,
