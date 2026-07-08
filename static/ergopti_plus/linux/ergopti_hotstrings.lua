@@ -112,6 +112,12 @@ local prediction_engine = nil
 local ok_llm, llm_mod = pcall(require, "modules.llm.prediction_engine")
 if ok_llm then prediction_engine = llm_mod end
 
+-- Dynamic hotstrings engine (optional — loads personal_info.toml, registers
+-- @-tag letter shortcuts and date expansion rules).
+local dyn_hotstrings = nil
+local ok_dh, dh_mod = pcall(require, "modules.dynamic_hotstrings.manager")
+if ok_dh then dyn_hotstrings = dh_mod end
+
 -- Window info tracker (optional — provides app_id for keylogger per-app stats).
 local window_info = nil
 local ok_wi, wi_mod = pcall(require, "adapters.window_info")
@@ -356,6 +362,21 @@ local function main()
 		if prediction_engine then
 			pcall(function() prediction_engine.on_char(ch, engine:current_buffer()) end)
 		end
+
+		-- Dynamic hotstrings: check if the trigger character just fired an
+		-- @-tag expansion (e.g. "@p★" → first name, "td★" → date).
+		-- Must run AFTER the static hotstring matcher so explicit triggers
+		-- take precedence over dynamic expansions.
+		if dyn_hotstrings and dyn_hotstrings.is_enabled() then
+			local ok_dh2, expanded = pcall(function()
+				return dyn_hotstrings.on_trigger(engine:current_buffer(), ch)
+			end)
+			if ok_dh2 and expanded then
+				-- Dynamic expansion consumed the trigger — reset the engine
+				-- buffer so the expansion text doesn't trigger further matches.
+				engine:reset()
+			end
+		end
 	end
 
 	-- 8.6) Initialise the LLM prediction engine if available.
@@ -368,6 +389,15 @@ local function main()
 			auto_inject   = true,
 		})
 		Logger.info(LOG, "LLM prediction engine initialised.")
+	end
+
+	-- 8.6a) Initialise dynamic hotstrings (@-tag expansions).
+	if dyn_hotstrings then
+		dyn_hotstrings.init({
+			trigger_char = "\\",  -- default magic key (backslash)
+		})
+		Logger.info(LOG, "Dynamic hotstrings initialised (%d rule(s)).",
+			dyn_hotstrings.get_rules_count())
 	end
 
 	-- 8.7) Define the control-key callback.
