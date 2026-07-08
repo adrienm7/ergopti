@@ -42,6 +42,35 @@ voir Priorité 1). Correctifs déjà appliqués (2 commits) :
 
 Suites au vert : **build:domain 15/15 · test:js 44/44 · macOS 2836/0 · Linux 678/0**.
 
+### Avancement session nuit 2026-07-08 (12 commits, `7b638466b`..`c831184bc`)
+
+**Priorité 0 (SSoT) — faits + gates :** P0-A (géométrie webview, macOS câblé au
+manifeste + gate ; Windows `WebViewHost` reporté), P0-B (LLM Linux → canoniques ;
+Windows keep_alive reporté), P0-C (linux_bridge ← prompt_builder), P0-D (timeout
+Ollama ← Timings), P0-E.2 (version), P0-F (buffer cap 64→256), P0-H (dups keylogger).
+**Priorité 1 (daemon Linux VIVANT) :** P1.1 (pipeline de saisie ressuscité —
+`ch` jamais assigné + 2 bugs latents), P1.2 (nil-globals, motif fermé), P1.3
+(app-id + buffer LLM), P1.4 (regex Ollama), P1.7 (`:`→`.`). Le daemon reçoit
+enfin les frappes → hotstrings/keylogger/LLM alimentés. Nouveaux gates JS :
+géométrie, LLM-defaults, version, buffer-cap. Suites : **test:js 48/48 · macOS
+green · Linux 686/0**.
+
+⚠️ **AHK OS-purity ratchet PRÉ-EXISTANT rouge** (découvert, PAS causé par cette
+session). Le vrai compte (répliqué déterministiquement) est **257** (DllCall=108
+COM=14 FileIO=135) vs baseline **256** figée le 2026-06-21 (110/19/127). Dérive
+des ~70 commits de fix AHK depuis. Mes éditions Windows (littéraux géométrie +
+buffer-cap, lignes `;`) ajoutent **0 token OS** — prouvé. À traiter par le
+mainteneur : router 1 appel OS vers `windows/adapters/` (intention « drive toward
+zero ») OU bumper la baseline à 257 avec note (permis par le ratchet). NB : la
+suite AHK est **exécutable ici** via `AutoHotkey64.exe run_all.ahk` (résultats
+dans `%TEMP%\ergopti_test_results.txt`), mais elle a une non-déterminisme documenté
+(silent-abort / FileRead flaky) : un run a affiché 2945/0, deux autres 2943/1.
+
+**Reste (pour l'exécuteur) :** P0-E.1 (dé-dup keycode, débloqué), P0-G.1-5/G.7
+(corpus de parité logique — gros, désormais vérifiables 2 côtés), P0-G.6 (skip,
+confirmation mainteneur), P0-B.1 Windows keep_alive, P1.5/P1.6 (boucle luv +
+vendoring, daemon-only), P2.1-P2.13 (features, majorité daemon-only).
+
 ✅ **Motif systémique FERMÉ.** Le bug « variable/`local function` utilisée avant sa
 définition → nil global » existait dans **3 fichiers** (menu_karabiner,
 `prediction_engine.lua`, `tray_menu.lua`) — **tous corrigés** (menu_karabiner en
