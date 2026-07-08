@@ -627,7 +627,7 @@ end
 --- Builds the about item.
 local function _build_about(_ctx)
 	return {
-		title = i18n_safe("menu.global.about", "ℹ À propos"),
+		title = i18n_safe("menu.about.title", "ℹ À propos"),
 		fn = function()
 			Logger.info(LOG, "Ergopti — ergonomic keyboard optimizer.")
 		end,
