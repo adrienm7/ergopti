@@ -266,6 +266,15 @@ function M.new()
 		Logger.debug(LOG, "Buffer reset.")
 	end
 
+	--- Returns the current rolling typing buffer as a UTF-8 string. The LLM
+	--- prediction engine detects its own trigger sequences in the same typing
+	--- context the hotstring matcher sees, so both work off this one buffer rather
+	--- than each keeping a separate copy.
+	--- @return string The concatenated codepoints currently in the buffer.
+	function engine:current_buffer()
+		return table.concat(_buf_cps)
+	end
+
 	return engine
 end
 
