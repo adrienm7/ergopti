@@ -140,12 +140,16 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 			line_count = line_count + 1
 			if _cancelled then break end
 
-			-- Ollama returns ndjson: one JSON object per line.
-			-- Extract "message":{"content":"hello"} → "hello"
-			local content = line:match('"content"%s*:%s*"(([^"\\]|\\")*)"')
+			-- Ollama returns ndjson: one JSON object per line. Delegate extraction
+			-- to the shared bridge, which JSON-decodes the line properly. The former
+			-- inline pattern used PCRE alternation ('|') — a literal in a Lua
+			-- pattern — so it matched nothing and streaming produced no text at all.
+			-- Ollama returns ndjson: one JSON object per line. Delegate extraction
+			-- to the shared bridge, which JSON-decodes the line properly. The former
+			-- inline pattern used PCRE alternation ('|') — a literal in a Lua
+			-- pattern — so it matched nothing and streaming produced no text at all.
+			local content = bridge_mod and bridge_mod.parse_stream_line(line)
 			if content then
-				-- Unescape JSON escapes.
-				content = content:gsub("\\n", "\n"):gsub("\\t", "\t"):gsub('\\"', '"'):gsub("\\\\", "\\")
 				full_text = full_text .. content
 				if on_chunk then pcall(on_chunk, content) end
 			end
