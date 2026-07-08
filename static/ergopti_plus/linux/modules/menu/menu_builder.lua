@@ -425,10 +425,21 @@ local function _build_gestures(ctx)
 	return { title = i18n_safe("menu.gestures.title", "🖐 Gestes"), menu = items }
 end
 
---- Builds the apps submenu (placeholder for per-app configs).
+--- Builds the apps submenu (per-app configs via webview).
 local function _build_apps(ctx)
 	return { title = i18n_safe("menu.apps.title", "📱 Apps"), menu = {
-		{ title = "(configuration par application)", fn = function() end, disabled = true },
+		{
+			title = i18n_safe("menu.apps.config_per_app", "Configurer les hotstrings par application"),
+			fn = function()
+				if ctx.webview then
+					ctx.webview.show("hotstrings_config_window")
+					Logger.info(LOG, "Opening hotstrings config window.")
+				else
+					Logger.info(LOG, "[stub] Webview manager not available — cannot open hotstrings config.")
+				end
+			end,
+		},
+		{ title = "-" },
 		{ title = "Ouvrir le dossier de config", fn = function()
 			if ctx.on_open_config then ctx.on_open_config() end
 		end },
