@@ -443,6 +443,15 @@ local function main()
 	-- 8.10) Install signal handlers.
 	install_signal_handlers()
 
+	-- 8.10a) Initialise i18n (loads persisted locale, enables ★ substitution).
+	local ok_i18n, i18n_mod = pcall(require, "lib.i18n")
+	if ok_i18n and i18n_mod then
+		i18n_mod.init()
+		i18n_mod.set_trigger_provider(function()
+			return "\\"  -- default magic key (backslash)
+		end)
+	end
+
 	Logger.success(LOG, "Daemon ready (device=%s layout=%s mappings=%d dry_run=%s tray=%s).",
 		device, opts.layout, mapping_count, tostring(opts.dry_run), tostring(opts.tray and tray_menu ~= nil))
 

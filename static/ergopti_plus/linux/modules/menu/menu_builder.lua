@@ -325,16 +325,43 @@ local function _build_global_actions(ctx)
 	}}
 end
 
---- Builds the language selector submenu (P2.10 — stub).
+--- Builds the language selector submenu (P2.10).
+--- Lists all available locales, marks the active one with a checkmark.
+--- Switching persists via i18n.set_locale() → storage adapter.
 local function _build_language(_ctx)
-	return { title = i18n_safe("menu.global.language", "🌐 Langue"), menu = {
-		{ title = "Français", fn = function()
-			Logger.info(LOG, "[stub] Switch locale to fr — P2.10.")
-		end },
-		{ title = "English", fn = function()
-			Logger.info(LOG, "[stub] Switch locale to en — P2.10.")
-		end },
-	}}
+	local items = {}
+
+	-- Try to load i18n for real locale list + switching.
+	local i18n = nil
+	local ok_i18n, i18n_mod = pcall(require, "lib.i18n")
+	if ok_i18n then i18n = i18n_mod end
+
+	if i18n then
+		local active = i18n.get_locale()
+		local locales = i18n.list_locales()
+		for _, code in ipairs(locales) do
+			local label = i18n.display_name(code) .. " (" .. code .. ")"
+			if code == active then label = label .. " ✓" end
+			local cap = code  -- capture for closure
+			items[#items + 1] = {
+				title = label,
+				fn = function()
+					i18n.set_locale(cap)
+					Logger.info(LOG, "Language set to %s (persisted).", cap)
+				end,
+			}
+		end
+	else
+		-- Fallback when i18n module is not loaded.
+		items[#items + 1] = { title = "Français", fn = function()
+			Logger.info(LOG, "[stub] Switch locale to fr.")
+		end }
+		items[#items + 1] = { title = "English", fn = function()
+			Logger.info(LOG, "[stub] Switch locale to en.")
+		end }
+	end
+
+	return { title = i18n_safe("menu.global.language", "🌐 Langue"), menu = items }
 end
 
 --- Builds the config folder launcher.
