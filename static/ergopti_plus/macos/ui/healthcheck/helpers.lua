@@ -29,8 +29,9 @@
 
 local H = {}
 
-local hs     = hs
-local Logger = require("lib.logger")
+local hs       = hs
+local Logger   = require("lib.logger")
+local Snapshot = require("healthcheck.snapshot")
 
 local LOG = "healthcheck"
 
@@ -387,20 +388,12 @@ end
 --- ==============================================
 
 --- Converts raw seconds to a human-readable uptime string (e.g. "2h 04m 37s").
+--- Delegates to the shared healthcheck.snapshot module so the format logic
+--- lives in exactly one place across all drivers
 --- @param sec number Elapsed seconds.
 --- @return string
 function H.format_uptime(sec)
-	sec = math.floor(sec or 0)
-	local h = math.floor(sec / 3600)
-	local m = math.floor((sec % 3600) / 60)
-	local s = sec % 60
-	if h > 0 then
-		return string.format("%dh %02dm %02ds", h, m, s)
-	elseif m > 0 then
-		return string.format("%dm %02ds", m, s)
-	else
-		return string.format("%ds", s)
-	end
+	return Snapshot.format_uptime(sec)
 end
 
 return H

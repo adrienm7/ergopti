@@ -1,0 +1,221 @@
+{
+  "description": "Golden vectors for the shared healthcheck snapshot logic (format_uptime, extract_recent_issues, count_issues, validate_snapshot). Consumed by macOS Lua and AHK corpus tests.",
+  "vectors": [
+    {
+      "id": "uptime_seconds",
+      "category": "format_uptime",
+      "input": { "sec": 45 },
+      "expected": "45s"
+    },
+    {
+      "id": "uptime_minutes",
+      "category": "format_uptime",
+      "input": { "sec": 125 },
+      "expected": "2m 05s"
+    },
+    {
+      "id": "uptime_hours",
+      "category": "format_uptime",
+      "input": { "sec": 3605 },
+      "expected": "1h 00m 05s"
+    },
+    {
+      "id": "uptime_large",
+      "category": "format_uptime",
+      "input": { "sec": 86399 },
+      "expected": "23h 59m 59s"
+    },
+    {
+      "id": "uptime_zero",
+      "category": "format_uptime",
+      "input": { "sec": 0 },
+      "expected": "0s"
+    },
+    {
+      "id": "uptime_nil",
+      "category": "format_uptime",
+      "input": { "sec": null },
+      "expected": "0s"
+    },
+    {
+      "id": "issues_empty",
+      "category": "extract_recent_issues",
+      "input": { "lines": [], "max_lines": 100 },
+      "expected": []
+    },
+    {
+      "id": "issues_no_match",
+      "category": "extract_recent_issues",
+      "input": {
+        "lines": [
+          "[INFO] Driver started",
+          "[DEBUG] Loading config",
+          "[DONE] Init complete"
+        ],
+        "max_lines": 100
+      },
+      "expected": []
+    },
+    {
+      "id": "issues_all_match",
+      "category": "extract_recent_issues",
+      "input": {
+        "lines": [
+          "[WARNING] Config override missing",
+          "[ERROR] Adapter load failed",
+          "[WARNING] Slow query detected"
+        ],
+        "max_lines": 100
+      },
+      "expected": [
+        "[WARNING] Config override missing",
+        "[ERROR] Adapter load failed",
+        "[WARNING] Slow query detected"
+      ]
+    },
+    {
+      "id": "issues_trimmed",
+      "category": "extract_recent_issues",
+      "input": {
+        "lines": [
+          "[INFO] Start",
+          "[WARNING] w1",
+          "[ERROR] e1",
+          "[WARNING] w2",
+          "[ERROR] e2",
+          "[WARNING] w3",
+          "[INFO] End"
+        ],
+        "max_lines": 3
+      },
+      "expected": [
+        "[WARNING] w2",
+        "[ERROR] e2",
+        "[WARNING] w3"
+      ],
+      "expected_count": 3
+    },
+    {
+      "id": "issues_max_lines_default",
+      "category": "extract_recent_issues",
+      "input": {
+        "lines": [
+          "[WARNING] only one"
+        ]
+      },
+      "expected": [
+        "[WARNING] only one"
+      ]
+    },
+    {
+      "id": "issues_nil_lines",
+      "category": "extract_recent_issues",
+      "input": { "lines": null, "max_lines": 100 },
+      "expected": []
+    },
+    {
+      "id": "count_no_issues",
+      "category": "count_issues",
+      "input": {
+        "lines": [
+          "[INFO] All good",
+          "[DEBUG] Debugging"
+        ]
+      },
+      "expected": { "warn_count": 0, "err_count": 0 }
+    },
+    {
+      "id": "count_mixed",
+      "category": "count_issues",
+      "input": {
+        "lines": [
+          "[WARNING] w1",
+          "[ERROR] e1",
+          "[INFO] info",
+          "[WARNING] w2",
+          "[ERROR] e2",
+          "[ERROR] e3"
+        ]
+      },
+      "expected": { "warn_count": 2, "err_count": 3 }
+    },
+    {
+      "id": "count_line_with_both_tags",
+      "category": "count_issues",
+      "input": {
+        "lines": [
+          "[WARNING] then [ERROR] in same line"
+        ]
+      },
+      "expected": { "warn_count": 1, "err_count": 1 }
+    },
+    {
+      "id": "count_nil",
+      "category": "count_issues",
+      "input": { "lines": null },
+      "expected": { "warn_count": 0, "err_count": 0 }
+    },
+    {
+      "id": "schema_all_present",
+      "category": "validate_snapshot",
+      "input": {
+        "snapshot": {
+          "version": "1.0.0",
+          "loaded_adapters": [],
+          "ports_validated": [],
+          "failed_adapters": [],
+          "last_error": "",
+          "uptime_sec": 0,
+          "warn_count": 0,
+          "err_count": 0,
+          "recent_issues": [],
+          "sys": {},
+          "pause_state": {},
+          "keylogger": {},
+          "llm": {},
+          "layout": {},
+          "hotstrings": {},
+          "logs": {},
+          "config": {}
+        }
+      },
+      "expected": { "ok": true, "missing": [] }
+    },
+    {
+      "id": "schema_missing_fields",
+      "category": "validate_snapshot",
+      "input": {
+        "snapshot": {
+          "version": "1.0.0",
+          "uptime_sec": 0
+        }
+      },
+      "expected": {
+        "ok": false,
+        "missing_contains": [
+          "loaded_adapters",
+          "ports_validated",
+          "failed_adapters",
+          "last_error",
+          "warn_count",
+          "err_count",
+          "recent_issues",
+          "sys",
+          "pause_state",
+          "keylogger",
+          "llm",
+          "layout",
+          "hotstrings",
+          "logs",
+          "config"
+        ]
+      }
+    },
+    {
+      "id": "schema_not_table",
+      "category": "validate_snapshot",
+      "input": { "snapshot": null },
+      "expected": { "ok": false, "missing_contains": ["(not a table)"] }
+    }
+  ]
+}
