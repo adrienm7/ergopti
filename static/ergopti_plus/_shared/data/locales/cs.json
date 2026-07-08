@@ -609,6 +609,7 @@
 	"menu.about.update_installing": "Instaluji…",
 	"menu.about.update_now": "Aktualizovat na {tag}",
 	"menu.apps.clone_desc": "Duplikovat libovolnou nainstalovanou aplikaci",
+	"menu.apps.config_per_app": "Configure hotstrings per application",
 	"menu.apps.encrypt_desc": "Šifrovat soubory a složky",
 	"menu.apps.no_apps": "Žádné aplikace nenalezeny",
 	"menu.apps.title": "🛠️ Aplikace",

@@ -609,6 +609,7 @@
 	"menu.about.update_installing": "Instalando…",
 	"menu.about.update_now": "Atualizar para {tag}",
 	"menu.apps.clone_desc": "Duplicar qualquer app instalado",
+	"menu.apps.config_per_app": "Configure hotstrings per application",
 	"menu.apps.encrypt_desc": "Criptografar arquivos e pastas",
 	"menu.apps.no_apps": "Nenhum aplicativo encontrado",
 	"menu.apps.title": "🛠️ Aplicativos",

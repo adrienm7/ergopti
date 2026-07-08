@@ -609,6 +609,7 @@
 	"menu.about.update_installing": "Installeren…",
 	"menu.about.update_now": "Bijwerken naar {tag}",
 	"menu.apps.clone_desc": "Elke geïnstalleerde app dupliceren",
+	"menu.apps.config_per_app": "Configure hotstrings per application",
 	"menu.apps.encrypt_desc": "Bestanden en mappen versleutelen",
 	"menu.apps.no_apps": "Geen toepassingen gevonden",
 	"menu.apps.title": "🛠️ Toepassingen",
