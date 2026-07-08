@@ -58,8 +58,10 @@
 
 ; Maximum buffer length. Anything older than the longest registered trigger
 ; is irrelevant for matching; we cap so memory and lookup cost stay bounded.
-; 64 chars matches the prefix watcher's HSE_MAX_BUFFER_LEN equivalent.
-global HSE_MAX_BUFFER_LEN := 64
+; Mirrors the shared cap _shared/lua/hotstring_engine/init.lua BUFFER_MAX_CHARS
+; (256) and the prefix watcher's _MAX_BUFFER_LEN; pinned equal by
+; tools/test/test-hotstring-buffer-cap-parity.cjs.
+global HSE_MAX_BUFFER_LEN := 256
 
 ; Word terminators: characters whose typing ends the current word and
 ; resets the buffer. The newline characters cover SendInput-injected

@@ -61,7 +61,11 @@ global _KLLastShownSuggestion := ""
 
 ; Configuration constants.
 global _MIN_PREFIX_LEN := 2
-global _MAX_BUFFER_LEN := 64    ; longest trigger we expect, with margin
+; Mirrors the shared cap _shared/lua/hotstring_engine/init.lua BUFFER_MAX_CHARS
+; (256) so a long trigger matches identically on all three drivers — Windows was
+; 64, which silently failed to match triggers of 65-256 chars that macOS/Linux
+; matched. Pinned equal by tools/test/test-hotstring-buffer-cap-parity.cjs.
+global _MAX_BUFFER_LEN := 256
 
 ; Per-keystroke tooltip renders are coalesced through this debounce window so the
 ; ~60 ms TooltipShow rebuild (Gui destroy + recreate + layered border + DWM, per

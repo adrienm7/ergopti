@@ -45,6 +45,7 @@
 		"test:ollama-port-single-source": "node ./tools/test/test-ollama-port-single-source.cjs",
 		"test:linux-llm-defaults-single-source": "node ./tools/test/test-linux-llm-defaults-single-source.cjs",
 		"test:linux-version-single-source": "node ./tools/test/test-linux-version-single-source.cjs",
+		"test:hotstring-buffer-cap-parity": "node ./tools/test/test-hotstring-buffer-cap-parity.cjs",
 		"test:macos-bundle-layout": "node ./tools/test/test-macos-bundle-layout.cjs",
 		"test:hs-editor-confirm": "node ./tools/test/test-hotstring-editor-confirm-wiring.cjs",
 		"test:webview-teardown": "node ./tools/test/test-webview-teardown-order.cjs",
