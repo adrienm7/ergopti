@@ -609,6 +609,7 @@
 	"menu.about.update_installing": "설치 중…",
 	"menu.about.update_now": "{tag}으로 업데이트",
 	"menu.apps.clone_desc": "설치된 앱 복제",
+	"menu.apps.config_per_app": "Configure hotstrings per application",
 	"menu.apps.encrypt_desc": "파일 및 폴더 암호화",
 	"menu.apps.no_apps": "응용 프로그램을 찾을 수 없습니다",
 	"menu.apps.title": "🛠️ 응용 프로그램",

@@ -609,6 +609,7 @@
 	"menu.about.update_installing": "Installerar…",
 	"menu.about.update_now": "Uppdatera till {tag}",
 	"menu.apps.clone_desc": "Duplicera alla installerade appar",
+	"menu.apps.config_per_app": "Configure hotstrings per application",
 	"menu.apps.encrypt_desc": "Kryptera filer och mappar",
 	"menu.apps.no_apps": "Inga applikationer hittades",
 	"menu.apps.title": "🛠️ Program",

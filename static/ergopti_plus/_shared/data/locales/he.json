@@ -609,6 +609,7 @@
 	"menu.about.update_installing": "מתקין…",
 	"menu.about.update_now": "עדכן ל-{tag}",
 	"menu.apps.clone_desc": "שכפל כל יישום מותקן",
+	"menu.apps.config_per_app": "Configure hotstrings per application",
 	"menu.apps.encrypt_desc": "הצפן קבצים ותיקיות",
 	"menu.apps.no_apps": "לא נמצאו יישומים",
 	"menu.apps.title": "🛠️ יישומים",

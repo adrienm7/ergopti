@@ -609,6 +609,7 @@
 	"menu.about.update_installing": "安装中…",
 	"menu.about.update_now": "更新至 {tag}",
 	"menu.apps.clone_desc": "复制任意已安装应用",
+	"menu.apps.config_per_app": "Configure hotstrings per application",
 	"menu.apps.encrypt_desc": "加密文件和文件夹",
 	"menu.apps.no_apps": "未找到应用程序",
 	"menu.apps.title": "🛠️ 应用程序",

@@ -609,6 +609,7 @@
 	"menu.about.update_installing": "جارٍ التثبيت…",
 	"menu.about.update_now": "تحديث إلى {tag}",
 	"menu.apps.clone_desc": "تكرار أي تطبيق مثبّت",
+	"menu.apps.config_per_app": "Configure hotstrings per application",
 	"menu.apps.encrypt_desc": "تشفير الملفات والمجلدات",
 	"menu.apps.no_apps": "لم يُعثر على تطبيقات",
 	"menu.apps.title": "🛠️ التطبيقات",

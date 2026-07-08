@@ -609,6 +609,7 @@
 	"menu.about.update_installing": "इंस्टॉल हो रहा है…",
 	"menu.about.update_now": "{tag} पर अपडेट करें",
 	"menu.apps.clone_desc": "किसी भी स्थापित ऐप्स को डुप्लिकेट करें",
+	"menu.apps.config_per_app": "Configure hotstrings per application",
 	"menu.apps.encrypt_desc": "फाइलों और फोल्डरों को एन्क्रिप्ट करें",
 	"menu.apps.no_apps": "कोई अनुप्रयोग नहीं मिला",
 	"menu.apps.title": "🛠️ एप्लिकेशन",

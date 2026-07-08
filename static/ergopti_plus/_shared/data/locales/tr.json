@@ -609,6 +609,7 @@
 	"menu.about.update_installing": "Yükleniyor…",
 	"menu.about.update_now": "{tag} sürümüne güncelle",
 	"menu.apps.clone_desc": "Yüklü herhangi bir uygulamayı çoğalt",
+	"menu.apps.config_per_app": "Configure hotstrings per application",
 	"menu.apps.encrypt_desc": "Dosya ve klasörleri şifrele",
 	"menu.apps.no_apps": "Uygulama bulunamadı",
 	"menu.apps.title": "🛠️ Uygulamalar",

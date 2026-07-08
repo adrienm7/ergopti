@@ -609,6 +609,7 @@
 	"menu.about.update_installing": "Встановлення…",
 	"menu.about.update_now": "Оновити до {tag}",
 	"menu.apps.clone_desc": "Дублювати будь-яку встановлену програму",
+	"menu.apps.config_per_app": "Configure hotstrings per application",
 	"menu.apps.encrypt_desc": "Зашифрувати файли та папки",
 	"menu.apps.no_apps": "Програми не знайдено",
 	"menu.apps.title": "🛠️ Програми",
