@@ -55,9 +55,10 @@ local CHARS_PER_WORD = Metrics.DEFAULT_CHARS_PER_WORD
 -- Default n-gram length (bigrams by default) — algorithmic bound, not a timing.
 local DEFAULT_NGRAM_SIZE = 2
 
--- Maximum entries stored in the rolling timestamp ring-buffer.
--- Caps memory at a fixed bound regardless of typing speed.
-local WPM_RING_CAPACITY = 2000
+-- Maximum entries stored in the rolling timestamp ring-buffer. Single-sourced
+-- from the shared keylogger metrics module so it cannot drift from the per-app
+-- ring cap in keylogger.lua.
+local WPM_RING_CAPACITY = Metrics.DEFAULT_WPM_RING_CAPACITY
 
 
 -- =========================================

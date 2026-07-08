@@ -26,6 +26,10 @@
 local M = {}
 
 local Logger   = require("logger.shim")
+-- WPM ring cap single-sourced from the shared keylogger metrics module so the
+-- per-app rings below never drift from the collector's global ring cap.
+local SharedMetrics    = require("keylogger.metrics")
+local WPM_RING_CAPACITY = SharedMetrics.DEFAULT_WPM_RING_CAPACITY
 -- Metrics collector is optional — keylogger falls back gracefully without it.
 local Metrics  = nil
 local ok_mc, mc_mod = pcall(require, "modules.keylogger.metrics_collector")
@@ -46,11 +50,26 @@ local _app_stats = {}
 -- Whether password-field suppression is active.
 local _suppressed = false
 
--- Apps considered password fields (case-insensitive match on appId substring).
-local _password_apps = {
+-- Base list of apps considered password fields (case-insensitive substring match
+-- on appId). Single source — the init reset below rebuilds from this instead of
+-- re-typing the same eight entries. NOTE: intentionally distinct from the AT-SPI
+-- adapter's secure_field_detector.SECURE_APP_IDS (exact WM_CLASS match, different
+-- list e.g. keepassxc); delegating this substring check to that adapter is a
+-- behaviour change deferred to TODO P0-H.2 (needs a security-detection review).
+local _DEFAULT_PASSWORD_APPS = {
 	"1password", "bitwarden", "keepass", "lastpass",
 	"gpg", "ssh-agent", "polkit", "sudo",
 }
+
+-- Returns a fresh shallow copy so per-init appends never mutate the base list.
+local function _default_password_apps()
+	local out = {}
+	for i = 1, #_DEFAULT_PASSWORD_APPS do out[i] = _DEFAULT_PASSWORD_APPS[i] end
+	return out
+end
+
+-- Active list (rebuilt on init when custom apps are supplied).
+local _password_apps = _default_password_apps()
 
 -- Base directory for log file persistence.
 local _log_dir = nil
@@ -82,7 +101,7 @@ function M.init(opts)
 
 	-- Custom password apps (reset then rebuild to avoid duplicates on re-init).
 	if type(options.password_apps) == "table" then
-		_password_apps = { "1password", "bitwarden", "keepass", "lastpass", "gpg", "ssh-agent", "polkit", "sudo" }
+		_password_apps = _default_password_apps()
 		for _, app in ipairs(options.password_apps) do
 			_password_apps[#_password_apps + 1] = app:lower()
 		end
@@ -149,8 +168,8 @@ function M.record_app_key(app_id, ch, timestamp_ms)
 	app.keystroke_count = app.keystroke_count + 1
 	app.wpm_ring[#app.wpm_ring + 1] = timestamp_ms
 
-	-- Prune ring (keep last 2000 entries).
-	while #app.wpm_ring > 2000 do
+	-- Prune ring (keep last WPM_RING_CAPACITY entries).
+	while #app.wpm_ring > WPM_RING_CAPACITY do
 		table.remove(app.wpm_ring, 1)
 	end
 end

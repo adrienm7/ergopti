@@ -30,6 +30,12 @@ local M = {}
 -- Exported so Linux/Hammerspoon drivers can single-source it (DD-10).
 M.DEFAULT_CHARS_PER_WORD = 5
 
+-- Maximum entries in a rolling WPM timestamp ring buffer. Caps memory at a fixed
+-- bound regardless of typing speed. Exported so every keylogger surface (the
+-- collector's global ring and the per-app rings) reads one value instead of a
+-- re-typed literal.
+M.DEFAULT_WPM_RING_CAPACITY = 2000
+
 
 
 
