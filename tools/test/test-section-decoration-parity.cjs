@@ -33,6 +33,7 @@ const FAIL_SYMBOL = '✗';
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const MACOS_ROOT = path.join(REPO_ROOT, 'static/ergopti_plus/macos');
 const I18N_KERNEL = path.join(MACOS_ROOT, 'lib/i18n.lua');
+const SHARED_LABELS = path.join(REPO_ROOT, 'static/ergopti_plus/_shared/lua/menu/labels.lua');
 
 let total_pass = 0;
 let total_fail = 0;
@@ -80,11 +81,18 @@ function collectLua(dir, acc) {
 
 console.log('\n=== Section-Title Decoration Parity & Single-Source ===');
 
-// 1. macOS kernel exists and carries the canonical decoration.
+// 1. Shared kernel: _shared/lua/menu/labels.lua carries the canonical
+//    decorate_section kernel. macOS i18n.lua delegates to it (P0-G.7).
 check(
-	'macOS: lib/i18n.lua defines M.decorate_section with the "— … —" kernel',
-	'static/ergopti_plus/macos/lib/i18n.lua',
+	'shared: menu/labels.lua defines decorate_section with the "— … —" kernel',
+	'static/ergopti_plus/_shared/lua/menu/labels.lua',
 	/function M\.decorate_section\(text\)[\s\S]*return "— " \.\. text \.\. " —"/
+);
+
+check(
+	'macOS: lib/i18n.lua M.decorate_section delegates to shared Labels.decorate_section',
+	'static/ergopti_plus/macos/lib/i18n.lua',
+	/function M\.decorate_section\(text\)[\s\S]*return Labels\.decorate_section\(text\)/
 );
 
 // 2. AHK kernel uses the identical decoration.
@@ -101,6 +109,7 @@ const INLINE_DECORATION = /"— "\s*\.\./;
 const isTest = (f) => /[\\/]tests[\\/]/.test(f);
 const offenders = collectLua(MACOS_ROOT, [])
 	.filter((f) => path.resolve(f) !== path.resolve(I18N_KERNEL))
+	.filter((f) => path.resolve(f) !== path.resolve(SHARED_LABELS))
 	.filter((f) => !isTest(f))
 	.filter((f) => INLINE_DECORATION.test(fs.readFileSync(f, 'utf8')));
 

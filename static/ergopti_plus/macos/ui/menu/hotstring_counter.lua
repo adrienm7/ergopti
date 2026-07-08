@@ -15,6 +15,7 @@ local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
 local LOG    = "hotstring_counter"
+local Labels = require("menu.labels")
 
 -- Per-file TOML entry counts, keyed by absolute path.
 -- Never cleared on toggle: TOML files do not change at runtime. The counts
@@ -48,13 +49,9 @@ end
 --- Formats a large number with space thousands separators (French style).
 --- @param n number The number to format.
 --- @return string Formatted string, e.g. "1 234 567".
+--- Delegates to the shared menu.labels module (P0-G.7).
 function M.fmt_grand(n)
-	local s = tostring(math.floor(n + 0.5)); local r = ""
-	for i = 1, #s do
-		if i > 1 and (#s - i + 1) % 3 == 0 then r = r .. " " end
-		r = r .. s:sub(i, i)
-	end
-	return r
+	return Labels.fmt_count(n)
 end
 
 

@@ -27,6 +27,7 @@ local Logger = require("lib.logger")
 local LOG    = "i18n"
 
 local locale_mod = require("lib.locale")
+local Labels     = require("menu.labels")
 
 
 
@@ -284,7 +285,7 @@ end
 --- @param text string Already-localized label.
 --- @return string Formatted as "— text —".
 function M.decorate_section(text)
-	return "— " .. text .. " —"
+	return Labels.decorate_section(text)
 end
 
 --- Wraps a translated string in section-title dashes for disabled menu headers.
