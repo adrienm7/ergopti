@@ -14,6 +14,7 @@ local Paths      = require("lib.paths")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
 local Version    = require("updater.version")
+local ReleaseParser = require("updater.release_parser")
 local LOG        = "updater"
 
 -- Hardcoded fallback — mirrors defaults.json committed alongside. Keeps the
@@ -164,56 +165,14 @@ function M.releases_page_url()
 	return string.format("https://github.com/%s/%s/releases", GH_OWNER, GH_REPO)
 end
 
-local function split_releases_array(json)
-	local out = {}
-	if type(json) ~= "string" or json == "" then return out end
-	local trimmed = json:match("^%s*(.*)$") or json
-	if trimmed:sub(1, 1) ~= "[" then return out end
-	local pos, depth, start = 2, 0, 0
-	local in_str, esc = false, false
-	while pos <= #trimmed do
-		local c = trimmed:sub(pos, pos)
-		if in_str then
-			if esc then esc = false
-			elseif c == "\\" then esc = true
-			elseif c == '"' then in_str = false end
-		elseif c == '"' then in_str = true
-		elseif c == "{" then
-			if depth == 0 then start = pos end
-			depth = depth + 1
-		elseif c == "}" then
-			depth = depth - 1
-			if depth == 0 and start > 0 then
-				table.insert(out, trimmed:sub(start, pos))
-				start = 0
-			end
-		end
-		pos = pos + 1
-	end
-	return out
-end
-
-local function parse_prerelease_flag(json)
-	return json:match('"prerelease"%s*:%s*true') ~= nil
-end
+-- split_releases_array and parse_prerelease_flag are now delegated to the
+-- shared release_parser module — see _shared/lua/updater/release_parser.lua
 
 --- Picks the highest-semver prerelease from a releases array JSON string.
 --- @param json string
 --- @return string
 function M.pick_latest_prerelease_json(json)
-	local chunks = split_releases_array(json)
-	local best_chunk, best_tag = "", ""
-	for _, chunk in ipairs(chunks) do
-		if parse_prerelease_flag(chunk) then
-			local tag = M.parse_tag(chunk)
-			if tag ~= "" and (best_tag == "" or M.compare_versions(tag, best_tag) > 0) then
-				best_tag = tag
-				best_chunk = chunk
-			end
-		end
-	end
-	if best_chunk ~= "" then return best_chunk end
-	return chunks[1] or json
+	return ReleaseParser.pick_latest_prerelease(json, M.compare_versions)
 end
 
 function M.unwrap_first_prerelease_json(json)
@@ -264,26 +223,15 @@ local function resolve_fetch_body(channel, status, body, response_headers)
 end
 
 function M.parse_tag(body)
-	if not body or body == "" then return "" end
-	return body:match('"tag_name"%s*:%s*"([^"]+)"') or ""
+	return ReleaseParser.parse_tag(body)
 end
 
 function M.parse_notes(body)
-	if not body or body == "" then return "" end
-	local raw = body:match('"body"%s*:%s*"(.-[^\\])"')
-	if not raw then return "" end
-	return raw:gsub("\\n", "\n"):gsub("\\r", ""):gsub('\\"', '"'):gsub("\\\\", "\\")
+	return ReleaseParser.parse_notes(body)
 end
 
 function M.parse_asset_url(body)
-	if not body or body == "" then return "" end
-	for obj in body:gmatch("%b{}") do
-		local name = obj:match('"name"%s*:%s*"([^"]+)"')
-		if name == ASSET_NAME then
-			return obj:match('"browser_download_url"%s*:%s*"([^"]+)"') or ""
-		end
-	end
-	return ""
+	return ReleaseParser.parse_asset_url(body, ASSET_NAME)
 end
 
 local function normalize_release_json(body, channel)

@@ -92,42 +92,10 @@ local function releases_page_url()
 	return Updater.releases_page_url()
 end
 
---- Parses the tag_name from a GitHub release JSON string.
---- @param body string Raw JSON
---- @return string tag or ""
-local function parse_tag(body)
-	if not body or body == "" then return "" end
-	return body:match('"tag_name"%s*:%s*"([^"]+)"') or ""
-end
-
---- Parses the release notes body from a GitHub release JSON string.
---- @param body string Raw JSON
---- @return string notes or ""
-local function parse_notes(body)
-	if not body or body == "" then return "" end
-	local raw = body:match('"body"%s*:%s*"(.-[^\\])"')
-	if not raw then return "" end
-	raw = raw:gsub("\\n", "\n"):gsub("\\r", ""):gsub('\\"', '"'):gsub("\\\\", "\\")
-	return raw
-end
-
---- Parses the browser_download_url for ASSET_NAME from a GitHub release JSON.
---- @param body string Raw JSON
---- @return string url or ""
-local function parse_asset_url(body)
-	if not body or body == "" then return "" end
-	-- Walk the assets array looking for the matching name field followed by
-	-- browser_download_url in the same object. Using a simple sequential scan
-	-- instead of full JSON parsing — assets objects are small and flat.
-	for obj in body:gmatch("%b{}") do
-		local name = obj:match('"name"%s*:%s*"([^"]+)"')
-		if name == ASSET_NAME then
-			local url = obj:match('"browser_download_url"%s*:%s*"([^"]+)"')
-			if url then return url end
-		end
-	end
-	return ""
-end
+-- parse_tag, parse_notes, and parse_asset_url were previously duplicated
+-- here as local functions. They are now delegated to the shared
+-- release_parser module via Updater.parse_tag / Updater.parse_notes /
+-- Updater.parse_asset_url — see _shared/lua/updater/release_parser.lua
 
 
 

@@ -552,6 +552,9 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 ; Healthcheck snapshot corpus -- tests _HealthCheck_FormatUptime and validates
 ; the golden vectors for the shared snapshot logic (format_uptime, issues, schema).
 #Include meta/test_corpus_healthcheck_snapshot.ahk
+; Updater release parser corpus -- tests Updater_ParseTagName / Updater_ParseBody /
+; _Updater_ParsePrerelease / _Updater_SplitReleasesArray against shared cross-driver vectors.
+#Include meta/test_corpus_updater_release_parser.ahk
 
 ; -- Audit finding regression tests (batch-wired) --
 #Include meta/test_activate_hotstrings_sleep_gate.ahk
