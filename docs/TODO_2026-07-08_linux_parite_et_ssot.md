@@ -151,11 +151,14 @@ Corriger côté Linux pour lire les canoniques.
   (fallback), `linux/adapters/keyboard_hook.lua:328-365` (copie complète, morte — voir
   P1.1), `_KEYCODE_MAP` `keyboard_hook.lua:182-207` (dup de `input_reader.lua:65-73`).
   Source unique = `_shared/data/keycodes/evdev.json` (déjà chargé par
-  `input_reader.lua:91-135`). Supprimer les copies mortes après P1.1.
-- [ ] **P0-E.2** Version `"3.0.0"` triplée : `linux/modules/menu/menu_builder.lua:38`,
-  `linux/modules/ui/bridge_handlers/healthcheck_bridge.lua:79` (ignore `ctx._version`),
-  `linux/ergopti_hotstrings.lua:389`. Source unique (util version partagée ou stamp
-  au build, comme `BUNDLE_VERSION` macOS/Windows).
+  `input_reader.lua:91-135`). **Bloqué sur P1.1** : les copies mortes de `keyboard_hook`
+  ne peuvent être supprimées qu'une fois le pipeline recâblé sur `input_reader`. À faire
+  **dans/après P1.1**.
+- [x] **P0-E.2** Version `"3.0.0"` : source unique **créée** `linux/lib/version.lua`
+  (`M.VERSION`, le pendant Linux de `BUNDLE_VERSION`). Les 3 sites la lisent
+  (`menu_builder`, `healthcheck_bridge`, `ergopti_hotstrings`). Bug latent corrigé au
+  passage : `menu_builder` retombait sur le `_VERSION` **built-in de Lua** (« Lua 5.4 »)
+  au lieu de la version du driver. Gate `test-linux-version-single-source.cjs`.
 
 ### P0-F — Cap buffer hotstring divergent *(Tier 2/3)*
 
