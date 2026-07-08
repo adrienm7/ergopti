@@ -1,0 +1,49 @@
+--- tests/unit/meta/test_keyboard_hook_pump.lua
+
+--- ==============================================================================
+--- MODULE: Keyboard Hook Input-Pipeline Regression Guard
+--- DESCRIPTION:
+--- Regression test for the dead input pipeline in adapters/keyboard_hook.lua.
+---
+--- ROOT CAUSE ENCODED (P1.1):
+--- _pump_one() ended with `if ch and _on_char then pcall(_on_char, ch)` but never
+--- assigned `ch` — _resolve_char() was never called. So no character ever reached
+--- on_char and the ENTIRE daemon was inert: hotstrings, keylogger and the LLM got
+--- zero keystrokes. The fix resolves the keycode (forward-declaring _resolve_char
+--- to avoid the same non-hoisted-local trap) before the modifier reset.
+---
+--- This drives one keydown event through the pump with a mocked pipe (no real
+--- evtest/libinput subprocess) and asserts the resolved character reaches on_char.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+
+
+
+
+-- ==================================================================
+-- ==================================================================
+-- ======= 1/ Behavioural: a keydown resolves and dispatches =========
+-- ==================================================================
+-- ==================================================================
+
+helpers.describe("keyboard_hook: a printable keydown resolves to a character and reaches on_char", function()
+	helpers.it("dispatches the resolved character for a KEY_A (code 30) keydown", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local received = {}
+		-- evtest keydown line: code 30 = KEY_A, value 1 = press.
+		local mock_pipe = { read = function() return "Event: code 30 (KEY_A), value 1" end }
+		kh._test_inject_and_pump(mock_pipe, function(ch) received[#received + 1] = ch end, true)
+		helpers.assert_true(#received == 1, "on_char must be called exactly once for a printable keydown")
+		helpers.assert_eq(received[1], "a", "on_char must receive the resolved character (code 30 = 'a' in qwerty)")
+	end)
+
+	helpers.it("does not dispatch on a key release (value 0)", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local received = {}
+		local mock_pipe = { read = function() return "Event: code 30 (KEY_A), value 0" end }
+		kh._test_inject_and_pump(mock_pipe, function(ch) received[#received + 1] = ch end, true)
+		helpers.assert_true(#received == 0, "on_char must not fire on a key release")
+	end)
+end)

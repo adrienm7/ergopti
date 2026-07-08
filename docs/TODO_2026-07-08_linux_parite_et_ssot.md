@@ -323,17 +323,23 @@ basse sévérité. Détail dans l'audit SSoT.)*
 > vérifiables par test unitaire (chargement de module + mock), pas besoin de Linux réel
 > sauf mention *daemon-only*.
 
-- [ ] **P1.1 — 🔴 CRITIQUE : pipeline de saisie mort.** `linux/adapters/keyboard_hook.lua:306`
-  fait `if ch and _on_char then pcall(_on_char, ch)` mais **`ch` n'est jamais
-  assigné** dans `_pump_one()` (236-311) ; le helper `_resolve_char(code)`
-  (`:319-373`) n'est **jamais appelé**. Aucun caractère n'atteint `on_char` → hotstrings,
-  keylogger, LLM reçoivent zéro entrée. **Fix** : soit assigner
-  `local ch = _resolve_char(ev.code)` avant `:306`, soit (préférable) câbler le reader
-  evdev **déjà complet et testé** `linux/modules/hotstrings/input_reader.lua`
-  (`M.new(...)` → `reader:start()`, ouvre `/dev/input/eventN`, décode, résout via
-  layout partagé, fire `on_char` `:354`) dans `linux/ergopti_hotstrings.lua:369` à la
-  place du `keyboard_hook` cassé. Puis dé-dupliquer (P0-E.1). Test : charger le daemon
-  avec un evdev mocké, injecter un event, asserter que `on_char` reçoit le caractère.
+- [x] **P1.1 — 🔴 CRITIQUE : pipeline de saisie mort — CORRIGÉ (option a).**
+  `_pump_one()` finissait par `if ch and _on_char` sans jamais assigner `ch`
+  (`_resolve_char` jamais appelé) → **zéro caractère** n'atteignait `on_char`, tout
+  le daemon était inerte. Fix : `local ch = _resolve_char(ev.code)` **+** 2 bugs
+  latents corrigés au passage : (1) `_resolve_char` (défini plus bas) était appelé
+  au-dessus de sa définition → **même piège nil-global** (forward-declaration
+  ajoutée) ; (2) le reset des modificateurs se faisait **avant** la résolution →
+  tout caractère shifté sortait non-shifté (résolution déplacée avant le reset).
+  Test comportemental `test_keyboard_hook_pump.lua` (pipe evdev mocké, event
+  injecté → `on_char` reçoit `"a"` ; rouge prouvé avant, vert après).
+  ⚠️ **Option (b) non retenue** (câbler `input_reader` à la place) : plus propre
+  (lecteur unique + tables keycode dé-dupliquées, cf. P0-E.1) mais c'est un
+  changement de **mécanisme d'entrée** (lecture directe `/dev/input` vs sous-process
+  evtest) *daemon-only*, non vérifiable ici. À évaluer sur vrai Linux — cela
+  **débloquerait P0-E.1** (avec l'option a, la table keycode de `keyboard_hook`
+  est désormais **vivante**, plus « morte » ; la dé-duplication vers
+  `_shared/data/keycodes/evdev.json` reste à faire, moins urgente).
 - [x] **P1.2 — nil-global (même classe que menu_karabiner) — CORRIGÉ.** Le motif
   systémique est **fermé** (menu_karabiner + ces 2 fichiers).
   - `prediction_engine.lua` : `_build_system_prompt` / `_build_user_context` étaient
