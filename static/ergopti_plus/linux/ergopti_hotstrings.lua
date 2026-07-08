@@ -123,6 +123,11 @@ local updater = nil
 local ok_up, up_mod = pcall(require, "modules.updater.manager")
 if ok_up then updater = up_mod end
 
+-- Gestures manager (optional — trackpad/mouse gesture recognition via libinput).
+local gestures = nil
+local ok_ge, ge_mod = pcall(require, "modules.gestures.manager")
+if ok_ge then gestures = ge_mod end
+
 -- Window info tracker (optional — provides app_id for keylogger per-app stats).
 local window_info = nil
 local ok_wi, wi_mod = pcall(require, "adapters.window_info")
@@ -459,9 +464,10 @@ local function main()
 				on_layout_change = function(new_layout)
 					Logger.info(LOG, "Layout change requested: %s (restart daemon to apply)", new_layout)
 				end,
-				keylogger     = keylogger,
-				llm           = prediction_engine,
-				updater       = updater,
+			keylogger     = keylogger,
+			llm           = prediction_engine,
+			gestures      = gestures,
+			updater       = updater,
 				dry_run       = opts.dry_run,
 				verbose       = opts.verbose,
 				on_quit       = function() keyboard_hook.stop() end,
@@ -504,7 +510,11 @@ local function main()
 		end)
 	end
 
-	-- 8.10b) Initialise the updater (background poller for GitHub releases).
+	-- 8.10c) Initialise the gestures manager (trackpad/mouse gesture recognition).
+	if gestures then
+		gestures.init({ enabled = false })
+		Logger.info(LOG, "Gestures manager initialised.")
+	end
 	if updater then
 		local on_available = function(release)
 			Logger.info(LOG, "Update available: %s — rebuilding menu.", release.tag)
