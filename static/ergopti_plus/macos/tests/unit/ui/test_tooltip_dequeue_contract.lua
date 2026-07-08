@@ -1,7 +1,13 @@
 --- tests/unit/ui/test_tooltip_dequeue_contract.lua
----
+
+--- ==============================================================================
+--- MODULE: Tooltip Dequeue Contract Test (macOS)
+--- DESCRIPTION:
 --- Validates the Hammerspoon stacked-tooltip dequeue logic against the canonical
---- test vectors defined in _shared/modules/tooltip/dequeue.js.
+--- test vectors defined in _shared/tests/corpus/tooltip/dequeue_vectors.json.
+--- Loads the shared JSON at require time so the vectors are always in sync
+--- with the cross-driver corpus (P0-G.5).
+--- ==============================================================================
 
 local helpers = require("tests.helpers")
 
@@ -16,39 +22,21 @@ local MS_OPTS = {
 	timeout_floor_sec = FLOOR,
 }
 
---- Hard-coded vectors mirroring dequeueTestVectors() from _shared/modules/tooltip/dequeue.js.
-local VECTORS = {
-	{
-		id = "mixed_1s_2s_stacked_destuck",
-		rows = {
-			{ id = "out1", durationSec = 1 },
-			{ id = "out2", durationSec = 2 },
-		},
-		expect_dequeue = true,
-		steps = {
-			{ at_ms = 0,    action = "stamp", expect_ids = { "out1", "out2" }, expiries = { out1 = 800, out2 = 1800 } },
-			{ at_ms = 500,  action = "prune", expect_ids = { "out1", "out2" } },
-			{ at_ms = 800,  action = "prune", expect_ids = { "out2" }, next_delay_ms = 1000 },
-			{ at_ms = 1800, action = "prune", expect_ids = {} },
-		},
-	},
-	{
-		id = "identical_durations_simple_path",
-		rows = {
-			{ id = "a", durationSec = 2 },
-			{ id = "b", durationSec = 2 },
-		},
-		expect_dequeue = false,
-	},
-	{
-		id = "single_positive_duration_simple_path",
-		rows = {
-			{ id = "finite", durationSec = 1 },
-			{ id = "infinite", durationSec = 0 },
-		},
-		expect_dequeue = false,
-	},
-}
+-- Load vectors from the shared JSON corpus — no more hardcoded VECTORS table.
+local function load_corpus_vectors()
+	local corpus_path = helpers.shared("tests/corpus/tooltip/dequeue_vectors.json")
+	local fh = io.open(corpus_path, "r")
+	if not fh then return nil, "cannot open dequeue corpus at " .. corpus_path end
+	local raw = fh:read("*a")
+	fh:close()
+	local ok, result = pcall(require("hs").json.decode, raw)
+	if not ok then return nil, "JSON parse error: " .. tostring(result) end
+	return result.vectors, nil
+end
+
+local VECTORS, corpus_err = load_corpus_vectors()
+helpers.assert_true(VECTORS ~= nil, "dequeue corpus load: " .. tostring(corpus_err))
+helpers.assert_true(#VECTORS >= 3, "dequeue corpus must have at least 3 vectors")
 
 local function ids_of(rows)
 	local out = {}
@@ -107,17 +95,18 @@ local function assert_same_ids(actual, expected, ctx)
 	end
 end
 
+-- Replay all corpus vectors.
 for _, vec in ipairs(VECTORS) do
 	local dequeue = Dequeue.should_use_dequeue_path(vec.rows, MS_OPTS)
-	helpers.assert_eq(dequeue, vec.expect_dequeue, vec.id .. " should_use_dequeue_path")
+	helpers.assert_eq(dequeue, vec.expectDequeue, vec.id .. " should_use_dequeue_path")
 
 	if vec.steps then
 		local stamped = nil
 		for _, step in ipairs(vec.steps) do
 			if step.action == "stamp" then
-				stamped = select(1, stamp_ms(vec.rows, step.at_ms))
-				assert_same_ids(ids_of(stamped), step.expect_ids, vec.id .. " stamp ids")
-				for id, exp_ms in pairs(step.expiries) do
+				stamped = select(1, stamp_ms(vec.rows, step.atMs))
+				assert_same_ids(ids_of(stamped), step.expectIds, vec.id .. " stamp ids")
+				for id, exp_ms in pairs(step.expectExpiries) do
 					for _, row in ipairs(stamped) do
 						if row.id == id then
 							helpers.assert_eq(row.expireMs, exp_ms, vec.id .. " expiry " .. id)
@@ -125,11 +114,11 @@ for _, vec in ipairs(VECTORS) do
 					end
 				end
 			elseif step.action == "prune" then
-				local remaining = prune_ms(stamped, step.at_ms)
-				assert_same_ids(ids_of(remaining), step.expect_ids, vec.id .. " prune @" .. step.at_ms)
-				if step.next_delay_ms then
-					helpers.assert_eq(next_delay_ms(remaining, step.at_ms), step.next_delay_ms,
-						vec.id .. " next delay @" .. step.at_ms)
+				local remaining = prune_ms(stamped, step.atMs)
+				assert_same_ids(ids_of(remaining), step.expectIds, vec.id .. " prune @" .. step.atMs)
+				if step.expectNextDelayMs then
+					helpers.assert_eq(next_delay_ms(remaining, step.atMs), step.expectNextDelayMs,
+						vec.id .. " next delay @" .. step.atMs)
 				end
 				stamped = remaining
 			end
