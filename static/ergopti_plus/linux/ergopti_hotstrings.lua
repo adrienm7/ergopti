@@ -143,6 +143,12 @@ local process_lifecycle = nil
 local ok_pl, pl_mod = pcall(require, "adapters.process_lifecycle")
 if ok_pl then process_lifecycle = pl_mod end
 
+-- WebView manager (optional — GTK/WebKit2GTK window creation for UI apps).
+-- Auto-inits on load (probes lgi); windows are created on demand via show().
+local webview_manager = nil
+local ok_wm, wm_mod = pcall(require, "modules.ui.webview_manager")
+if ok_wm then webview_manager = wm_mod end
+
 
 -- =========================================
 -- =========================================
@@ -478,26 +484,56 @@ local function main()
 				on_layout_change = function(new_layout)
 					Logger.info(LOG, "Layout change requested: %s (restart daemon to apply)", new_layout)
 				end,
-			keylogger     = keylogger,
-			llm           = prediction_engine,
-			gestures      = gestures,
-			shortcuts     = shortcuts,
-			updater       = updater,
-				dry_run       = opts.dry_run,
-				verbose       = opts.verbose,
-				on_quit       = function() keyboard_hook.stop() end,
-				on_open_config = function(dir)
-					local d = dir or config_dir
-					Logger.info(LOG, "Opening config folder: %s", d)
-					os.execute(string.format("xdg-open '%s' 2>/dev/null &", d:gsub("'", "'\\''")))
-				end,
-				on_open_logs = function()
-					local log_dir = os.getenv("HOME") .. "/.local/share/ergopti/logs"
-					os.execute(string.format("xdg-open '%s' 2>/dev/null &", log_dir:gsub("'", "'\\''")))
-				end,
-				on_healthcheck = function()
-					Logger.info(LOG, "[stub] Healthcheck — P2.2 (webview).")
-				end,
+		keylogger     = keylogger,
+		llm           = prediction_engine,
+		gestures      = gestures,
+		shortcuts     = shortcuts,
+		updater       = updater,
+		webview       = webview_manager,
+			dry_run       = opts.dry_run,
+			verbose       = opts.verbose,
+			on_quit       = function() keyboard_hook.stop() end,
+			on_open_config = function(dir)
+				local d = dir or config_dir
+				Logger.info(LOG, "Opening config folder: %s", d)
+				os.execute(string.format("xdg-open '%s' 2>/dev/null &", d:gsub("'", "'\\''")))
+			end,
+			on_open_logs = function()
+				local log_dir = os.getenv("HOME") .. "/.local/share/ergopti/logs"
+				os.execute(string.format("xdg-open '%s' 2>/dev/null &", log_dir:gsub("'", "'\\''")))
+			end,
+			on_healthcheck = function()
+				if webview_manager then
+					webview_manager.show("healthcheck")
+				else
+					Logger.info(LOG, "[stub] Healthcheck — webview manager not available.")
+				end
+			end,
+			on_show_setup_wizard = function()
+				if webview_manager then
+					webview_manager.show("onboarding")
+				else
+					Logger.info(LOG, "[stub] Setup wizard — webview manager not available.")
+				end
+			end,
+			on_enable_all = function()
+				if hotstrings_config.enable_all then
+					hotstrings_config.enable_all()
+					Logger.info(LOG, "All hotstring groups enabled.")
+				end
+			end,
+			on_disable_all = function()
+				if hotstrings_config.disable_all then
+					hotstrings_config.disable_all()
+					Logger.info(LOG, "All hotstring groups disabled.")
+				end
+			end,
+			on_set_log_level = function(lvl)
+				if Logger.set_level then
+					Logger.set_level(lvl)
+				end
+				Logger.info(LOG, "Log level set to %s.", lvl)
+			end,
 			}
 		end
 
@@ -536,6 +572,20 @@ local function main()
 		shortcuts.init({ enabled = false })
 		Logger.info(LOG, "Shortcuts manager initialised.")
 	end
+
+	-- 8.10e) Wire daemon state into the webview manager so bridge handlers
+	-- can query/control daemon modules (keylogger, LLM, config, engine).
+	if webview_manager then
+		webview_manager.set_daemon_state({
+			engine    = engine,
+			keylogger = keylogger,
+			config    = hotstrings_config,
+			llm       = prediction_engine,
+			layout    = opts.layout,
+		})
+		Logger.info(LOG, "WebView manager daemon state wired.")
+	end
+
 	if updater then
 		local on_available = function(release)
 			Logger.info(LOG, "Update available: %s — rebuilding menu.", release.tag)
