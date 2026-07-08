@@ -1,16 +1,20 @@
---- modules/ui/bridge_handlers/metrics_typing_bridge.lua
+--- modules/ui/bridge_handlers/metrics_apps_bridge.lua
 
 --- ==============================================================================
---- BRIDGE HANDLER: Metrics Typing Dashboard
---- Handles JS→Lua messages from _shared/ui/metrics_typing/.
+--- BRIDGE HANDLER: Metrics Apps Dashboard (per-app statistics)
+--- Handles JS->Lua messages from _shared/ui/metrics_apps/.
 --- Bridge name: "metrics_apps_bridge"
+---
+--- NOTE: This file replaces the formerly-named metrics_typing_bridge.lua
+--- so that the module name matches the _shared/ui/ app directory convention
+--- used by webview_manager._load_handler().
 --- ==============================================================================
 
 local M = {}
 M.bridge_name = "metrics_apps_bridge"
 
 local Logger = require("logger.shim")
-local LOG = "bridge.metrics_typing"
+local LOG = "bridge.metrics_apps"
 
 --- Builds the initial data payload for the metrics UI.
 --- @param state table Daemon state.
@@ -52,7 +56,7 @@ end
 function M.on_message(payload, state)
 	if type(payload) == "string" then
 		if payload == "ready" then
-			Logger.info(LOG, "Metrics typing UI ready.")
+			Logger.info(LOG, "Metrics apps UI ready.")
 			return _build_initial_payload(state)
 		end
 		if payload == "refresh" then
@@ -92,6 +96,15 @@ function M.on_message(payload, state)
 			state.keylogger:unsuppress()
 		end
 		return { suppressed = false }
+	end
+
+	if action == "app_detail" and payload.app_id then
+		-- Return deeper stats for a specific app.
+		if state.keylogger and type(state.keylogger.get_app_detail) == "function" then
+			local detail = state.keylogger:get_app_detail(payload.app_id)
+			return detail
+		end
+		return nil
 	end
 
 	Logger.debug(LOG, "Unknown action: %s", tostring(action))
