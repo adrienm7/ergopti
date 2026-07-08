@@ -19,6 +19,7 @@ local LOG        = "builder"
 local i18n       = require("lib.i18n")
 local HotCounter  = require("ui.menu.hotstring_counter")
 local CanvasBadge = require("ui.menu.canvas_badge")
+local Labels      = require("menu.labels")
 
 
 -- Single parsed representation of menu_manifest.json for the session.
@@ -484,10 +485,6 @@ function M.generate(ctx, menu_mods, actions)
 	-- Build log-level items first (needed only when "debug" id is dispatched).
 	local Logger_mod = require("lib.logger")
 	local active_level_name = "INFO"
-	local function log_level_emoji(lvl)
-		local emojis = { DEBUG = "🐛", INFO = "ℹ️", WARNING = "⚠️", ERROR = "❌" }
-		return emojis[lvl] or "📝"
-	end
 	local log_level_items = {}
 	for _, lvl in ipairs({ "DEBUG", "INFO", "WARNING", "ERROR" }) do
 		local lvl_num  = Logger_mod.LEVELS[lvl]
@@ -495,7 +492,7 @@ function M.generate(ctx, menu_mods, actions)
 		if is_active then active_level_name = lvl end
 		local lvl_capture = lvl
 		table.insert(log_level_items, {
-			title   = log_level_emoji(lvl) .. " " .. lvl,
+			title   = Labels.log_level_emoji(lvl) .. " " .. lvl,
 			checked = is_active,
 			fn      = function() actions.set_log_level(lvl_capture) end,
 		})
@@ -546,7 +543,7 @@ function M.generate(ctx, menu_mods, actions)
 				elseif did == "console" then
 					table.insert(debug_items, { title = i18n.get("menu.debug.console"), fn = actions.open_console })
 				elseif did == "log_level" then
-					local lbl = i18n.get("menu.debug.log_level") .. " : " .. log_level_emoji(active_level_name) .. " " .. active_level_name
+					local lbl = i18n.get("menu.debug.log_level") .. " : " .. Labels.log_level_emoji(active_level_name) .. " " .. active_level_name
 					table.insert(debug_items, { title = lbl, menu = log_level_items })
 				elseif did == "open_logs" then
 					table.insert(debug_items, { title = i18n.get("menu.debug.open_logs"), fn = actions.open_logs })
