@@ -20,18 +20,33 @@ local PromptBuilder = require("llm.prompt_builder")
 --- Default Ollama endpoint path for chat completions.
 M.OLLAMA_CHAT_PATH = "/api/chat"
 
---- Default host for Ollama (loopback).
+--- Default host for Ollama (loopback). Not in defaults.json (macOS/Windows bind
+--- loopback implicitly); this is the single Linux-side source, so profiles.lua
+--- and prediction_engine.lua must read it here rather than re-typing "localhost".
 M.OLLAMA_DEFAULT_HOST = "127.0.0.1"
 
---- Default port for Ollama.
+--- Default port for Ollama. Mirrors the cross-driver canonical
+--- _shared/modules/llm/defaults.json (llm_ollama_port) — pinned equal by
+--- tools/test/test-linux-llm-defaults-single-source.cjs so it cannot drift.
 M.OLLAMA_DEFAULT_PORT = 11434
 
 --- Minimum / maximum valid port numbers.
 M.OLLAMA_PORT_MIN = 1024
 M.OLLAMA_PORT_MAX = 65535
 
---- Default temperature when none is provided.
-M.DEFAULT_TEMPERATURE = 0.7
+--- Default generation temperature. Mirrors the cross-driver canonical
+--- defaults.json (llm_temperature = 0.1); was 0.7 here, a silent divergence from
+--- macOS/Windows. Pinned equal by the single-source gate.
+M.DEFAULT_TEMPERATURE = 0.1
+
+--- Default keep-alive window kept warm on the Ollama server. Mirrors the
+--- canonical defaults.json (llm_ollama_keep_alive). Pinned equal by the gate.
+M.DEFAULT_KEEP_ALIVE = "30m"
+
+--- Default rolling context window (characters of typing history sent as prompt
+--- context). Mirrors the canonical defaults.json (llm_context_length = 500) so the
+--- Linux prediction engine sends the same window as macOS/Windows (was 2000).
+M.DEFAULT_CONTEXT_LENGTH = 500
 
 --- Number of words from the buffer tail kept as rolling context window.
 M.CONTEXT_TAIL_WORDS = 5
@@ -269,7 +284,7 @@ function M.build_payload(buffer, config)
 		model      = model_name,
 		messages   = messages,
 		stream     = stream,
-		keep_alive = config.keep_alive or "30m",
+		keep_alive = config.keep_alive or M.DEFAULT_KEEP_ALIVE,
 		options    = {
 			temperature = temperature,
 			num_predict = max_tokens * num_preds,

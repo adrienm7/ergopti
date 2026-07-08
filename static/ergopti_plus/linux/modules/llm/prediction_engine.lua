@@ -29,6 +29,17 @@ local M = {}
 local Logger = require("logger.shim")
 local LOG = "modules.llm.prediction_engine"
 
+-- Shared LLM canonicals: Ollama port/host/temperature/context live once in
+-- _shared (mirrored from defaults.json) and max_tokens in prompt_builder, so the
+-- Linux engine never re-types a value that could drift from macOS/Windows.
+local HttpBridge = nil
+local ok_bridge, bridge_mod = pcall(require, "llm.linux_bridge")
+if ok_bridge then HttpBridge = bridge_mod end
+
+local PromptBuilder = nil
+local ok_pb, pb_mod = pcall(require, "llm.prompt_builder")
+if ok_pb then PromptBuilder = pb_mod end
+
 
 -- =========================================
 -- =========================================
@@ -74,8 +85,10 @@ local _predicted_text = ""
 -- Trigger patterns that activate prediction.
 local _triggers = { "//", ";;", "--" }
 
--- Maximum characters of context to send to the LLM.
-local _max_context_chars = 2000
+-- Maximum characters of context to send to the LLM. Single-sourced from the
+-- shared canonical (defaults.json llm_context_length via linux_bridge) so all
+-- three drivers send the same window; was a divergent 2000 here.
+local _max_context_chars = (HttpBridge and HttpBridge.DEFAULT_CONTEXT_LENGTH) or 500
 
 -- Whether to auto-inject predictions (false = just show tooltip).
 local _auto_inject = true
@@ -104,10 +117,11 @@ function M.init(opts)
 	if type(options.max_context) == "number" then _max_context_chars = options.max_context end
 	if options.auto_inject ~= nil then _auto_inject = options.auto_inject end
 
-	-- Initialise LLM profiles.
+	-- Initialise LLM profiles with the canonical Ollama port (defaults.json
+	-- llm_ollama_port via linux_bridge), never a re-typed literal.
 	local profiles = _get_profiles()
 	if profiles then
-		profiles.init({ port = 11434 })
+		profiles.init({ port = HttpBridge and HttpBridge.OLLAMA_DEFAULT_PORT })
 	end
 
 	Logger.success(LOG, "Prediction engine initialised (triggers=%d, max_context=%d, auto_inject=%s).",
@@ -168,7 +182,11 @@ function M.predict(context)
 	_predicting = true
 	_predicted_text = ""
 
-	local base_url = profiles and profiles.get_base_url() or "http://localhost:11434"
+	-- Prefer the profiles' resolved URL; fall back to the shared bridge's canonical
+	-- host/port builder (never a re-typed localhost:11434 literal).
+	local base_url = (profiles and profiles.get_base_url())
+		or (HttpBridge and HttpBridge.resolve_base_url())
+		or ""
 
 	-- Build the messages payload.
 	local system_prompt = _build_system_prompt()
@@ -185,7 +203,13 @@ function M.predict(context)
 		base_url,
 		model,
 		messages,
-		{ stream = true, temperature = 0.3, max_tokens = 200 },
+		{
+			stream      = true,
+			-- Canonical temperature (defaults.json llm_temperature) and max_tokens
+			-- (prompt_builder.DEFAULT_MAX_TOKENS) — were divergent 0.3 / 200 here.
+			temperature = (HttpBridge and HttpBridge.DEFAULT_TEMPERATURE) or 0.1,
+			max_tokens  = (PromptBuilder and PromptBuilder.DEFAULT_MAX_TOKENS) or 150,
+		},
 		-- on_chunk: inject each delta character immediately.
 		function(delta)
 			_predicted_text = _predicted_text .. delta

@@ -310,11 +310,15 @@ helpers.describe("llm.linux_bridge", function()
   -- ==========================================================================
 
   helpers.describe("constants", function()
-    helpers.it("exports expected constants", function()
+    helpers.it("exports expected constants (mirrored from the shared canonicals)", function()
       helpers.assert_eq(LB.OLLAMA_CHAT_PATH, "/api/chat")
       helpers.assert_eq(LB.OLLAMA_DEFAULT_HOST, "127.0.0.1")
-      helpers.assert_eq(LB.OLLAMA_DEFAULT_PORT, 11434)
-      helpers.assert_eq(LB.DEFAULT_TEMPERATURE, 0.7)
+      -- These mirror _shared/modules/llm/defaults.json; the JS gate
+      -- test-linux-llm-defaults-single-source pins them equal so they cannot drift.
+      helpers.assert_eq(LB.OLLAMA_DEFAULT_PORT, 11434)      -- llm_ollama_port
+      helpers.assert_eq(LB.DEFAULT_TEMPERATURE, 0.1)        -- llm_temperature (was a divergent 0.7)
+      helpers.assert_eq(LB.DEFAULT_KEEP_ALIVE, "30m")       -- llm_ollama_keep_alive
+      helpers.assert_eq(LB.DEFAULT_CONTEXT_LENGTH, 500)     -- llm_context_length (Linux was 2000)
       helpers.assert_eq(LB.CONTEXT_TAIL_WORDS, 5)
     end)
   end)

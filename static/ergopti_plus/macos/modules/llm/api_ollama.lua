@@ -169,7 +169,7 @@ function M.warmup(model_name)
 		model      = model_name,
 		messages   = { { role = "user", content = " " } },
 		stream     = false,
-		keep_alive = "30m",
+		keep_alive = ApiCommon.OLLAMA_KEEP_ALIVE,
 		options    = { num_predict = 1, temperature = 0 },
 	})
 	if not encoded then
@@ -370,7 +370,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
         messages   = messages,
         stream     = false,
         think      = false,
-        keep_alive = "30m",
+        keep_alive = ApiCommon.OLLAMA_KEEP_ALIVE,
         options    = build_options(temperature, num_predict_tokens, model_name, is_batch, line_mode),
     }
 
@@ -511,7 +511,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		messages   = messages,
 		stream     = true,
 		think      = false,
-		keep_alive = "30m",
+		keep_alive = ApiCommon.OLLAMA_KEEP_ALIVE,
 		options    = build_options(temperature, num_predict_tokens, model_name, is_batch, line_mode),
 	}
 
