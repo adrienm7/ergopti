@@ -216,6 +216,34 @@ if not LAYOUTS then
 end
 
 
+
+
+-- ========================================
+-- ===== 3.5) Public Layout Accessor =====
+-- ========================================
+
+--- Returns the loaded LAYOUTS table so other modules (e.g. keyboard_hook)
+--- can resolve keycodes → characters without re-loading evdev.json or
+--- re-declaring hardcoded layout maps.
+--- @return table The LAYOUTS table: {qwerty={unshifted,shifted}, …}.
+function M.get_layouts()
+	return LAYOUTS
+end
+
+--- Resolves a keycode to a character using the given layout and shift state.
+--- Returns nil for non-printable keycodes.
+--- @param code    integer Kernel keycode (input-event-codes.h KEY_* value).
+--- @param layout  string  Layout name ("qwerty" or "azerty").
+--- @param shifted boolean True if Shift is held.
+--- @return string|nil The resolved character, or nil.
+function M.resolve_char(code, layout, shifted)
+	local lt = LAYOUTS[layout] or LAYOUTS["qwerty"]
+	if not lt then return nil end
+	local table_to_use = shifted and lt.shifted or lt.unshifted
+	return table_to_use and table_to_use[code] or nil
+end
+
+
 -- =========================================
 -- =========================================
 -- ======= 4/ Struct Decoder ===============
