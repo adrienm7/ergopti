@@ -1,181 +1,49 @@
 --- lib/locale.lua
 
 --- ==============================================================================
---- MODULE: Locale
+--- MODULE: Locale (macOS)
 --- DESCRIPTION:
---- Loads UI string translations from a JSON locale file located at
---- ``static/locales/<locale>.json`` relative to the Hammerspoon config root.
---- Provides a single ``get(key)`` accessor so every module can retrieve a
---- translated description without knowing the locale or file path.
+--- Thin wrapper around _shared/lua/locale/core.lua. Injects macOS-specific
+--- dependencies (hs.json.decode, Paths.shared, Logger) and re-exports the
+--- shared surface. All locale logic lives in the shared module — this file
+--- only wires the platform layer (P0-G.4).
 ---
 --- FEATURES & RATIONALE:
---- 1. Shared source: the same JSON files are consumed by the AHK driver, making
----    ``static/locales/`` the single source of truth for all UI descriptions
----    regardless of the underlying OS driver.
---- 2. Lazy load: the file is read once on first ``get()`` call and cached.
---- 3. ★ substitution: the trigger-character placeholder ``★`` is replaced at
----    call time so the correct character is used even if the user has rebound it.
+--- 1. Shared source: the same JSON files are consumed by all 3 drivers.
+--- 2. Lazy load: the file is read once on first get() call and cached.
+--- 3. ★ substitution: the trigger-character placeholder is replaced at
+---    call time so the correct character is used even after rebinding.
 --- ==============================================================================
 
 local M = {}
 
-local Logger = require("lib.logger")
-local Paths  = require("lib.paths")
-local LOG    = "locale"
+local Logger  = require("lib.logger")
+local Paths   = require("lib.paths")
+local Core    = require("locale.core")
 
-local _strings     = nil   -- active locale strings
-local _strings_en  = nil   -- English fallback strings
-local _strings_fr  = nil   -- French second-fallback strings
-local _locale      = "fr"
-local _get_trigger = nil   -- injected by init.lua after keymap is ready
-
---- Returns true when the given path exists and is a readable file.
---- @param path string File path.
---- @return boolean
-local function file_exists(path)
-	if type(path) ~= "string" or path == "" then return false end
-	local f = io.open(path, "r")
-	if not f then return false end
-	f:close()
-	return true
-end
-
-
-
-
--- =====================================
--- =====================================
--- ======= 1/ Internal loader  =========
--- =====================================
--- =====================================
-
---- Resolves the absolute path to a locale JSON file (fail-fast).
---- Priority: module-relative > upward search > ERROR
---- Passes the first path that exists; logs ERROR and returns empty string if none found.
---- @param code string Locale code, e.g. ``"fr"``.
---- @return string Absolute path to the JSON file, or empty string if not found (ERROR logged).
-local function locale_path(code)
-	-- Resolve through the single shared-tree resolver. Paths.shared already
-	-- performs the dual-root upward walk (hs.configdir + module dir), so it
-	-- works in dev checkouts, packaged .app builds and ~/.hammerspoon symlinks.
-	local path = Paths.shared("data/locales/" .. code .. ".json")
-	if path and file_exists(path) then
-		Logger.debug(LOG, "locale_path('%s'): resolved via Paths.shared.", code)
-		return path
-	end
-
-	-- FAIL FAST: locale file not found — do not silently degrade.
-	Logger.error(LOG, "locale_path('%s'): file not found after all attempts (hs.configdir='%s').", code, hs.configdir or "nil")
-	return ""
-end
-
---- Loads a JSON locale file and returns a flat key→string table, or {}.
---- @param code string Locale code to load.
---- @return table
-local function load_locale(code)
-	local path = locale_path(code)
-	local ok, data = pcall(function()
-		local f = io.open(path, "r")
-		if not f then
-			Logger.error(LOG, "Locale file not found: '%s' (hs.configdir='%s').", path, hs.configdir or "nil")
-			return {}
+-- Wire the shared module at require-time so callers never call init().
+Core.init({
+	json_decode = hs.json.decode,
+	resolve_locale_path = function(code)
+		local path = Paths.shared("data/locales/" .. code .. ".json")
+		if path and path ~= "" then
+			-- Verify the file exists — fail-fast if not found
+			local f = io.open(path, "r")
+			if f then f:close(); return path end
 		end
-		local raw = f:read("*a")
-		f:close()
-		return hs.json.decode(raw) or {}
-	end)
-	if ok and type(data) == "table" then
-		Logger.debug(LOG, "Locale '%s' loaded (%d key(s)).", code, (function()
-			local n = 0; for _ in pairs(data) do n = n + 1 end; return n
-		end)())
-		return data
-	end
-	Logger.warn(LOG, "Failed to load locale '%s': %s.", code, tostring(data))
-	return {}
-end
+		Logger.error("locale", "locale_path('%s'): file not found.", code)
+		return ""
+	end,
+	log_debug = function(section, fmt, ...) Logger.debug(section, fmt, ...) end,
+	log_warn  = function(section, fmt, ...) Logger.warn(section, fmt, ...) end,
+	log_error = function(section, fmt, ...) Logger.error(section, fmt, ...) end,
+	strip_bom = false,  -- hs.json.decode handles BOM natively
+})
 
---- Ensures the active locale and both fallback locales are loaded.
-local function ensure_loaded()
-	if _strings then return end
-	_strings = load_locale(_locale)
-	-- Pre-load fallbacks so missing keys degrade gracefully
-	if _locale ~= "en" then
-		_strings_en = _strings_en or load_locale("en")
-	else
-		_strings_en = _strings
-	end
-	if _locale ~= "fr" then
-		_strings_fr = _strings_fr or load_locale("fr")
-	else
-		_strings_fr = _strings
-	end
-end
-
-
-
-
-
--- ============================
--- =============================
--- ======= 2/ Public API =======
--- =============================
--- ============================
-
---- Returns the translated string for the given dot-notation key,
---- with ``★`` substituted for the current trigger character.
---- Returns an empty string if the key is not found.
---- @param key string Dot-notation key, e.g. ``"dynamichotstrings.datefr"``.
---- @return string
-function M.get(key)
-	ensure_loaded()
-	-- Resolve with fallback chain: active locale → English → French
-	local s = _strings[key]
-	if type(s) ~= "string" or s == "" then
-		s = _strings_en and _strings_en[key]
-	end
-	if type(s) ~= "string" or s == "" then
-		s = _strings_fr and _strings_fr[key]
-	end
-	if type(s) ~= "string" then return "" end
-	if _get_trigger then
-		local ok, trigger = pcall(_get_trigger)
-		if ok and type(trigger) == "string" and trigger ~= "" then
-			-- Escape "%" in the replacement: gsub treats "%" as a capture
-			-- escape, so a user-chosen trigger of "%" would otherwise raise
-			-- "invalid use of '%' in replacement string" and crash menu builds.
-			s = (s:gsub("★", (trigger:gsub("%%", "%%%%"))))
-		end
-	end
-	return s
-end
-
---- Sets the trigger-character provider used for ``★`` substitution.
---- Call this once from init.lua after the keymap is ready.
---- @param fn function A zero-argument function returning the trigger string.
-function M.set_trigger_provider(fn)
-	if type(fn) == "function" then
-		_get_trigger = fn
-	end
-end
-
---- Switches the active locale and clears the string cache so the next
---- ``get()`` call reloads the correct JSON file.
---- @param code string A locale code, e.g. ``"en"``.
-function M.set_locale(code)
-	if type(code) ~= "string" or code == "" then return end
-	_locale     = code
-	_strings    = nil
-	-- Reset en/fr caches only if they were the previously active locale
-	-- (they stay loaded across locale switches to avoid redundant re-reads)
-	if code == "en" then _strings_en = nil end
-	if code == "fr" then _strings_fr = nil end
-end
-
---- Returns all loaded strings as a flat table (for inspection/testing).
---- @return table
-function M.all()
-	ensure_loaded()
-	return _strings
-end
+-- Re-export the shared surface.
+function M.get(key)                  return Core.get(key) end
+function M.set_trigger_provider(fn)  Core.set_trigger_provider(fn) end
+function M.set_locale(code)          Core.set_locale(code) end
+function M.all()                     return Core.all() end
 
 return M
