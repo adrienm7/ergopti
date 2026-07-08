@@ -283,12 +283,15 @@ local function _build_shortcuts(ctx)
 end
 
 --- Builds the Kanata submenu (Linux's Karabiner — P2.5).
---- Actions delegate to the kanata manager module if loaded.
-local function _build_kanata(_ctx)
-	-- Try to load the kanata manager for real actions.
-	local km = nil
-	local ok_km, km_mod = pcall(require, "modules.kanata.manager")
-	if ok_km then km = km_mod end
+--- Actions delegate to the kanata manager module passed via ctx.kanata.
+local function _build_kanata(ctx)
+	local km = ctx.kanata
+
+	-- Fallback: try direct require if not passed via context.
+	if not km then
+		local ok_km, km_mod = pcall(require, "modules.kanata.manager")
+		if ok_km then km = km_mod end
+	end
 
 	local running = km and km.is_running() or false
 
