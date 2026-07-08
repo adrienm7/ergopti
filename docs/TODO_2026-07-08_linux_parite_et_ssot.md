@@ -293,16 +293,18 @@ Corriger côté Linux pour lire les canoniques.
 
 ### P0-H — Duplications intra-Linux mineures *(Tier 3, à faire en passant)*
 
-- [ ] **P0-H.1** Cap ring WPM `2000` : `linux/modules/keylogger/metrics_collector.lua:60`
-  (`WPM_RING_CAPACITY`, nommé) vs `linux/modules/keylogger/keylogger.lua:153` (littéral
-  brut). Référencer la constante ; envisager hoist vers
+- [x] **P0-H.1** Cap ring WPM `2000` **hoisté** vers
   `_shared/lua/keylogger/metrics.lua` (`M.DEFAULT_WPM_RING_CAPACITY`, à côté de
-  `DEFAULT_CHARS_PER_WORD`).
-- [ ] **P0-H.2** Liste apps « champ sécurisé » définie 3× côté Linux, divergente :
-  `linux/modules/keylogger/keylogger.lua:50-53` **et** re-typée `:85`, + liste
-  divergente `linux/adapters/secure_field_detector.lua:41-52` (`keepass` vs
-  `keepassxc`…). Faire déléguer `keylogger.lua` à l'adaptateur. (Pas de partage
-  cross-driver : identifiants OS-spécifiques.)
+  `DEFAULT_CHARS_PER_WORD`). `metrics_collector.lua` et `keylogger.lua` le lisent
+  (plus de littéral brut).
+- [~] **P0-H.2** Liste apps « champ sécurisé ». **Fait** : la double définition
+  intra-fichier de `keylogger.lua` (base à `:54` re-typée à `:89`) est fusionnée en
+  une seule constante `_DEFAULT_PASSWORD_APPS` + helper de copie. **Reporté** : la
+  délégation à `secure_field_detector` — l'adaptateur fait un match **exact** sur
+  WM_CLASS avec une liste **différente** (`keepassxc` vs `keepass`) alors que
+  keylogger fait un match **substring** ; déléguer changerait la détection
+  password (sécurité) sans possibilité de test runtime ici. Commentaire de renvoi
+  ajouté dans le code. **À faire avec revue sécurité.**
 
 *(Exceptions ACCEPTÉES — ne PAS re-signaler : littéraux updater AHK sous drift-gate
 `test-updater-constants-single-source`; noms de modèles LLM par plateforme
