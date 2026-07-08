@@ -351,7 +351,7 @@ basse sévérité. Détail dans l'audit SSoT.)*
     early-return → LLM ne prédit jamais. Passer le buffer.
   - `:308` `window_info.getActiveAppID()` — **méthode inexistante** (l'adaptateur
     expose `getFocused`) → `app_id` toujours nil → stats par app + garde password vides.
-- [ ] **P1.4 — regex Ollama en syntaxe PCRE dans un motif Lua.** `linux/modules/llm/api_ollama.lua:138`
+- [x] **P1.4 — regex Ollama en syntaxe PCRE dans un motif Lua.** `linux/modules/llm/api_ollama.lua:138`
   `'"content"%s*:%s*"(([^"\\]|\\")*)"'` : `|` est un littéral en motif Lua → parse
   streaming cassé. Utiliser le `json` partagé / `_shared/lua/llm/parser.lua`.
 - [ ] **P1.5 — 🐧 boucle d'événements absente.** `linux/ergopti_hotstrings.lua:420-425`
