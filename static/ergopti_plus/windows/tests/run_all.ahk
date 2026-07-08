@@ -546,6 +546,9 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 ; TOML fuzz corpus -- exercises ParseTomlFile() against 50 adversarial inputs.
 ; Asserts the loader never crashes on any input (valid or invalid TOML).
 #Include meta/test_corpus_toml_fuzz.ahk
+; Keylogger aggregation corpus -- tests KLW_WalkTypingEntry / KLW_WalkAppSwitch /
+; KLW_WalkWindowSwitch / KLW_WalkSystemEvent against shared cross-driver vectors.
+#Include meta/test_corpus_keylogger_aggregation.ahk
 
 ; -- Audit finding regression tests (batch-wired) --
 #Include meta/test_activate_hotstrings_sleep_gate.ahk
