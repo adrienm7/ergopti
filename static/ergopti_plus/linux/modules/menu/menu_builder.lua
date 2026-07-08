@@ -204,19 +204,82 @@ local function _build_metrics(ctx)
 	}}
 end
 
---- Builds the shortcuts submenu (P2.7 — stub).
-local function _build_shortcuts(_ctx)
-	return { title = "⚙ Raccourcis", menu = {
-		{ title = "Wrap symbols " .. i18n_safe("menu.shortcuts.wrap_symbols", "…"), fn = function()
-			Logger.info(LOG, "[stub] Wrap symbols editor — requires keyboard grab (P2.7).")
-		end },
-		{ title = "CapsWord " .. i18n_safe("menu.shortcuts.capsword", "…"), fn = function()
-			Logger.info(LOG, "[stub] CapsWord config — requires keyboard grab (P2.7).")
-		end },
-		{ title = "Text manipulation " .. i18n_safe("menu.shortcuts.text_manip", "…"), fn = function()
-			Logger.info(LOG, "[stub] Text manipulation — requires keyboard grab (P2.7).")
-		end },
-	}}
+--- Builds the shortcuts submenu (P2.13).
+local function _build_shortcuts(ctx)
+	local sc = ctx.shortcuts
+	if not sc then
+		return { title = "⚙ Raccourcis", menu = {
+			{ title = "(shortcuts non disponible)", fn = function() end, disabled = true },
+		}}
+	end
+
+	local enabled = sc.is_enabled()
+	local caps_active = sc.is_caps_word_active()
+	local items = {}
+
+	-- Master toggle.
+	items[#items + 1] = {
+		title = "Activé " .. (enabled and "✓" or ""),
+		fn = function() sc.toggle() end,
+	}
+	items[#items + 1] = { title = "-" }
+
+	-- CapsWord toggle.
+	items[#items + 1] = {
+		title = "CapsWord " .. (caps_active and "✓" or ""),
+		fn = function()
+			sc.toggle_caps_word()
+			Logger.info(LOG, "CapsWord toggled: %s", tostring(sc.is_caps_word_active()))
+		end,
+	}
+
+	-- Text transforms (operate on current X11 selection).
+	items[#items + 1] = { title = "-" }
+	items[#items + 1] = {
+		title = "→ MAJUSCULES",
+		fn = function() sc.transform_uppercase() end,
+	}
+	items[#items + 1] = {
+		title = "→ minuscules",
+		fn = function() sc.transform_lowercase() end,
+	}
+	items[#items + 1] = {
+		title = "→ Title Case",
+		fn = function() sc.transform_titlecase() end,
+	}
+
+	items[#items + 1] = { title = "-" }
+
+	-- Selection helpers.
+	items[#items + 1] = {
+		title = "Sélectionner le mot",
+		fn = function() sc.select_word() end,
+	}
+	items[#items + 1] = {
+		title = "Sélectionner la ligne",
+		fn = function() sc.select_line() end,
+	}
+	items[#items + 1] = {
+		title = "Coller sans formatage",
+		fn = function() sc.paste_plain() end,
+	}
+
+	-- Wrap symbols submenu.
+	local wrap_items = {}
+	local wrap_pairs = sc.get_wrap_pairs()
+	for ch, pair in pairs(wrap_pairs) do
+		-- Only include opening chars to avoid duplicates.
+		if ch == pair.left then
+			local cap = ch
+			wrap_items[#wrap_items + 1] = {
+				title = ch .. " … " .. pair.right .. "  (" .. ch .. "texte" .. pair.right .. ")",
+				fn = function() sc.wrap_selection(pair.left, pair.right) end,
+			}
+		end
+	end
+	items[#items + 1] = { title = "Wrap symbols", menu = wrap_items }
+
+	return { title = "⚙ Raccourcis", menu = items }
 end
 
 --- Builds the Kanata submenu (Linux's Karabiner — P2.5).
