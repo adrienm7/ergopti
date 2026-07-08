@@ -25,6 +25,10 @@ local M = {}
 local Logger = require("logger.shim")
 local LOG = "modules.llm.api_ollama"
 
+-- HTTP request hard timeout comes from the shared timings registry so every
+-- driver's LLM call times out identically (no magic seconds literal here).
+local Timings = require("lib.timings")
+
 
 -- =========================================
 -- =========================================
@@ -112,9 +116,12 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 
 	-- Escape for shell.
 	local safe_body = json_body:gsub("'", "'\\''")
+	-- Hard timeout (seconds) from Timings [llm] request_timeout_ms — the single
+	-- cross-driver source for the LLM HTTP timeout, not a re-typed literal.
+	local timeout_s = math.floor(Timings.sec("llm", "request_timeout_ms"))
 	local cmd = string.format(
-		"curl -s --max-time 30 -X POST '%s' -H 'Content-Type: application/json' -d '%s' 2>/dev/null",
-		url:gsub("'", "'\\''"), safe_body)
+		"curl -s --max-time %d -X POST '%s' -H 'Content-Type: application/json' -d '%s' 2>/dev/null",
+		timeout_s, url:gsub("'", "'\\''"), safe_body)
 
 	Logger.debug(LOG, "chat() → %s (model=%s stream=%s)", url, model, tostring(stream))
 

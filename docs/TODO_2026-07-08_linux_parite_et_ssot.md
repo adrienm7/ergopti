@@ -135,11 +135,15 @@ Corriger côté Linux pour lire les canoniques.
 
 ### P0-D — Timeouts Linux non branchés sur le registre Timings *(Tier 2)*
 
-- [ ] **P0-D.1** curl `--max-time 30` (`linux/modules/llm/api_ollama.lua:116`) et
-  `DEFAULT_TIMEOUT_MS = 30000` (`linux/adapters/http_client.lua:38`) → lire
-  `Timings.sec("llm","request_timeout_ms")` (canon
-  `_shared/modules/timings/constants.toml [llm] request_timeout_ms = 30000`, déjà
-  lisible via `linux/lib/timings.lua`).
+- [x] **P0-D.1** curl `--max-time 30` (`linux/modules/llm/api_ollama.lua`) →
+  lit maintenant `Timings.sec("llm","request_timeout_ms")` (canon
+  `_shared/modules/timings/constants.toml [llm] request_timeout_ms = 30000`).
+  Gate étendu (forbid `--max-time 30` + exige `Timings.sec`). **Décision** :
+  `http_client.lua:38 DEFAULT_TIMEOUT_MS = 30000` **laissé tel quel** — c'est un
+  miroir du **port spec** `HttpClient.spec.js DEFAULT_TIMEOUT_MS` (commentaire
+  explicite), **identique à macOS `http_client.lua:58`**. Le router vers Timings
+  le ferait **diverger de macOS** (canon différent : le spec du port, pas le
+  registre timings). Deux canoniques distincts valant 30000 ; ne pas les confondre.
 
 ### P0-E — Tables keycode + version triplicées côté Linux *(Tier 2)*
 

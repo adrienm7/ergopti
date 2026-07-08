@@ -105,6 +105,17 @@ if (!macOllama.includes('ApiCommon.OLLAMA_KEEP_ALIVE')) {
 	errors.push('macos/modules/llm/api_ollama.lua: must read keep_alive from ApiCommon.OLLAMA_KEEP_ALIVE');
 }
 
+// ── 5. Linux Ollama request timeout must come from the timings registry (P0-D)
+// Scanned RAW (not comment-stripped): the literal lives in a shell string and
+// Lua's "--" comment marker would otherwise clip the max-time token.
+const linuxOllamaRaw = read('linux/modules/llm/api_ollama.lua');
+if (/--max-time 30\b/.test(linuxOllamaRaw)) {
+	errors.push('linux/modules/llm/api_ollama.lua: magic curl timeout literal — use Timings.sec("llm", "request_timeout_ms")');
+}
+if (!linuxOllamaRaw.includes('Timings.sec("llm", "request_timeout_ms")')) {
+	errors.push('linux/modules/llm/api_ollama.lua: must read the LLM request timeout from Timings.sec("llm", "request_timeout_ms")');
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] Linux LLM defaults are not single-sourced from the shared canonicals:\x1b[0m');
 	for (const e of errors) console.error('    ' + e);
