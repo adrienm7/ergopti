@@ -128,6 +128,11 @@ local gestures = nil
 local ok_ge, ge_mod = pcall(require, "modules.gestures.manager")
 if ok_ge then gestures = ge_mod end
 
+-- Shortcuts manager (optional — wrap symbols, CapsWord, text manipulation).
+local shortcuts = nil
+local ok_sc, sc_mod = pcall(require, "modules.shortcuts.manager")
+if ok_sc then shortcuts = sc_mod end
+
 -- Window info tracker (optional — provides app_id for keylogger per-app stats).
 local window_info = nil
 local ok_wi, wi_mod = pcall(require, "adapters.window_info")
@@ -327,6 +332,13 @@ local function main()
 
 	-- 8.5) Define the character callback.
 	local function on_char(ch)
+		-- CapsWord: process BEFORE the engine so the capitalized character
+		-- enters the buffer correctly (not as a duplicate after the original).
+		if shortcuts and shortcuts.is_enabled() and shortcuts.is_caps_word_active() then
+			local cap_ch = shortcuts.process_caps_word(ch)
+			if cap_ch then ch = cap_ch end
+		end
+
 		local now_ms = math.floor(os.clock() * 1000)
 
 		-- Detect current app for per-app keylogger stats. The window_info adapter
@@ -387,6 +399,8 @@ local function main()
 				engine:reset()
 			end
 		end
+
+
 	end
 
 	-- 8.6) Initialise the LLM prediction engine if available.
@@ -467,6 +481,7 @@ local function main()
 			keylogger     = keylogger,
 			llm           = prediction_engine,
 			gestures      = gestures,
+			shortcuts     = shortcuts,
 			updater       = updater,
 				dry_run       = opts.dry_run,
 				verbose       = opts.verbose,
@@ -514,6 +529,12 @@ local function main()
 	if gestures then
 		gestures.init({ enabled = false })
 		Logger.info(LOG, "Gestures manager initialised.")
+	end
+
+	-- 8.10d) Initialise the shortcuts manager (wrap symbols, CapsWord, text transforms).
+	if shortcuts then
+		shortcuts.init({ enabled = false })
+		Logger.info(LOG, "Shortcuts manager initialised.")
 	end
 	if updater then
 		local on_available = function(release)
