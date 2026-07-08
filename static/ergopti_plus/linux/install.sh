@@ -348,10 +348,38 @@ Environment=DISPLAY=:0
 WantedBy=graphical-session.target
 SERVICE
 
+	# kanata key-remapping daemon (tap-hold + layer switching)
+	# Runs alongside ergopti-hotstrings; reads the generated .kbd from
+	# ~/.config/kanata/ergopti.kbd (written by the kanata manager module).
+	cat > "${SYSTEMD_DIR}/kanata.service" << KANATA_SERVICE
+[Unit]
+Description=Kanata key remapping daemon (Ergopti)
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=${BIN_DIR}/kanata --quiet --cfg ${KANATA_CONFIG_DIR}/ergopti.kbd
+Restart=on-failure
+RestartSec=3s
+Nice=-10
+
+[Install]
+WantedBy=graphical-session.target
+KANATA_SERVICE
+
 	systemctl --user daemon-reload
 
 	systemctl --user enable  ergopti-hotstrings.service
 	systemctl --user restart ergopti-hotstrings.service
+
+	# Enable kanata if the binary was installed.
+	if [ -x "${BIN_DIR}/kanata" ]; then
+		systemctl --user enable  kanata.service
+		systemctl --user restart kanata.service
+		echo "  ✔  service kanata activé et démarré"
+	else
+		echo "  ⚠  kanata binaire absent — service créé mais non activé"
+	fi
 
 	echo "  ✔  service ergopti-hotstrings activé et démarré"
 fi
