@@ -55,16 +55,29 @@ enfin les frappes → hotstrings/keylogger/LLM alimentés. Nouveaux gates JS :
 géométrie, LLM-defaults, version, buffer-cap. Suites : **test:js 48/48 · macOS
 green · Linux 686/0**.
 
-⚠️ **AHK OS-purity ratchet PRÉ-EXISTANT rouge** (découvert, PAS causé par cette
-session). Le vrai compte (répliqué déterministiquement) est **257** (DllCall=108
-COM=14 FileIO=135) vs baseline **256** figée le 2026-06-21 (110/19/127). Dérive
-des ~70 commits de fix AHK depuis. Mes éditions Windows (littéraux géométrie +
-buffer-cap, lignes `;`) ajoutent **0 token OS** — prouvé. À traiter par le
-mainteneur : router 1 appel OS vers `windows/adapters/` (intention « drive toward
-zero ») OU bumper la baseline à 257 avec note (permis par le ratchet). NB : la
-suite AHK est **exécutable ici** via `AutoHotkey64.exe run_all.ahk` (résultats
-dans `%TEMP%\ergopti_test_results.txt`), mais elle a une non-déterminisme documenté
-(silent-abort / FileRead flaky) : un run a affiché 2945/0, deux autres 2943/1.
+✅ **AHK OS-purity ratchet RÉSOLU** (`a6b3c8720`, choix mainteneur : router 1
+appel). Le compte avait dérivé à **257** (baseline 256, figée 2026-06-21) sur les
+~70 commits de fix AHK — pas causé par la session nuit (éditions Windows = 0 token
+OS, prouvé). Corrigé en routant `LLM_LoadProfilesJSON` (`windows/modules/llm/
+profiles.ahk`) du `FileRead` direct vers l'adapter `FSRead` — exactement comme son
+jumeau `_LLM_LoadPresets(models.json)` le faisait déjà ; c'était le dernier loader
+LLM à court-circuiter l'adapter. Compte revenu à **256**, ratchet vert. Premier test
+comportemental de `LLM_LoadProfilesJSON` ajouté (lecture réelle via l'adapter +
+contrat fichier-absent). Suite AHK complète : **2946/0** vérifié. NB : la suite AHK
+est **exécutable ici** via Git Bash (`"/c/Program Files/AutoHotkey/v2/AutoHotkey64.exe"
+"<abs>/windows/tests/run_all.ahk"`) — résultats dans `%TEMP%\ergopti_test_results.txt`,
+dernière ligne `# N passed, M failed.`. **Ne pas** lancer via PowerShell `Start-Process`
+(exe GUI-subsystem → `FileAppend(x,"*")` lève « invalid handle » et avorte tout au
+6ᵉ marqueur). Non-déterminisme historique (silent-abort / FileRead flaky) documenté.
+
+ℹ️ **Hors-TODO, corrigé même session** (`d69e4c355`) : bug Karabiner/Hammerspoon
+signalé par le mainteneur — un chord touche1+touche2 fait de **touches modificatrices**
+(rcmd+lcmd « supprimer le mot ⌥⌫ ») ne produisait qu'un backspace. `build_chord_combo_rule`
+(`macos/modules/karabiner/generator.lua`) émettait le `from` KE sans `modifiers`, alors
+que la 1ʳᵉ touche du chord lève déjà son flag → KE refuse le match → chute sur le tap
+mono-touche (backspace nu). Ajout de `modifiers.optional={"any"}` (comme le fait déjà
+le builder tap/hold jumeau) sur une copie non-mutante ⇒ **toute la classe** des chords
+à modificateurs refonctionne. Tests de régression (branches sym./non-sym. + sortie ⌥⌫).
 
 **Reste (pour l'exécuteur) :** P0-E.1 (dé-dup keycode, débloqué), P0-G.1-5/G.7
 (corpus de parité logique — gros, désormais vérifiables 2 côtés), P0-G.6 (skip,
