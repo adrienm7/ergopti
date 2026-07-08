@@ -579,18 +579,34 @@ end
 local function build_chord_combo_rule(combo_def, combo_to, combo_action, combo_symmetric)
 	if #combo_to == 0 then return nil end
 
-	local from = combo_def.from
-	if combo_symmetric then
-		from = { simultaneous = combo_def.from.simultaneous }
-		if type(combo_def.from.simultaneous_options) == "table" then
-			local opts = {}
-			for k, v in pairs(combo_def.from.simultaneous_options) do
-				if k ~= "key_down_order" then opts[k] = v end
-			end
-			if next(opts) then from.simultaneous_options = opts end
+	-- Shallow-copy the combo's `from` so the shared MOD_COMBOS entry is never
+	-- mutated by the adjustments below.
+	local from = {}
+	for k, v in pairs(combo_def.from) do from[k] = v end
+
+	if combo_symmetric and type(from.simultaneous_options) == "table" then
+		-- Symmetric config: strip key_down_order so A+B and B+A match identically.
+		local opts = {}
+		for k, v in pairs(from.simultaneous_options) do
+			if k ~= "key_down_order" then opts[k] = v end
 		end
-		if combo_def.from.modifiers then from.modifiers = combo_def.from.modifiers end
+		from.simultaneous_options = next(opts) and opts or nil
 	end
+
+	-- KE gotcha: a `simultaneous` trigger made of MODIFIER keys (e.g. right_command
+	-- + left_command) raises those keys' own modifier flags the instant the first
+	-- key goes down. KE rejects any undeclared modifier by default, so without an
+	-- `optional: any` allowance the chord fails to match and silently falls through
+	-- to the single-key tap rule (left_command tap → a bare backspace), degrading
+	-- ⌥⌫ "delete word left" to one backspace. Allow any incidental modifier —
+	-- exactly what the tap/hold sibling rule already does — while preserving any
+	-- explicit modifiers the combo declared.
+	local modifiers = { optional = { "any" } }
+	if type(from.modifiers) == "table" then
+		for k, v in pairs(from.modifiers) do modifiers[k] = v end
+		modifiers.optional = { "any" }
+	end
+	from.modifiers = modifiers
 
 	local manip = { type = "basic", from = from, to = combo_to }
 	if combo_action.karabiner_to_after_key_up then

@@ -655,3 +655,100 @@ helpers.describe("Generator — same_output uses deep structural equality (karab
 	end)
 
 end)
+
+
+
+
+-- ==========================================================================================================
+-- ==========================================================================================================
+-- ======= 10/ chord rule permits incidental modifiers (rcmd+lcmd delete-word regression) ===================
+-- ==========================================================================================================
+-- ==========================================================================================================
+
+helpers.describe("Generator — simultaneous chord rule permits incidental modifiers (modifier-pair-chord-optional-any)", function()
+	-- Root cause: build_chord_combo_rule emitted the KE `from` straight from the
+	-- mod_combos entry, which carries a `simultaneous` set but NO `modifiers`. For a
+	-- chord built from MODIFIER keys (right_command + left_command), the first key
+	-- down already raises its command flag, and KE by default rejects any undeclared
+	-- modifier — so the chord failed to match and fell through to left_command's own
+	-- single-key tap rule (a bare backspace). Every sibling rule builder declares
+	-- `modifiers.optional = {"any"}` (the tap/hold combo path, and every layer_keys
+	-- rule); the chord path alone did not. The fix adds it so a modifier-pair chord
+	-- matches regardless of the flags its own keys raise, restoring ⌥⌫ (delete word
+	-- left) instead of a lone backspace.
+	local OPT_BACKSPACE = {
+		id           = "opt_backspace",
+		label        = "opt_backspace",
+		karabiner_to = { { key_code = "delete_or_backspace", modifiers = { "left_option" } } },
+	}
+	local RCMD_LCMD = {
+		id    = "rcmd_lcmd",
+		label = "Cmd droit + Cmd gauche",
+		from  = {
+			simultaneous         = { { key_code = "right_command" }, { key_code = "left_command" } },
+			simultaneous_options = { key_down_order = "strict" },
+		},
+	}
+
+	local function chord_manipulator(result)
+		for _, rule in ipairs(result.profiles[1].complex_modifications.rules) do
+			if type(rule.description) == "string" and rule.description:find("%[chord%]") then
+				return rule.manipulators[1]
+			end
+		end
+		return nil
+	end
+
+	local function optional_has_any(mods)
+		if type(mods) ~= "table" or type(mods.optional) ~= "table" then return false end
+		for _, v in ipairs(mods.optional) do
+			if v == "any" then return true end
+		end
+		return false
+	end
+
+	local function combo_state(overrides)
+		local base = { mod_combos_config = { rcmd_lcmd = { combo = "opt_backspace", tap = "none", hold = "none" } } }
+		if overrides then
+			for k, v in pairs(overrides) do base[k] = v end
+		end
+		return make_state(base)
+	end
+
+	helpers.it("emits a chord rule whose `from` allows any incidental modifier (optional: any)", function()
+		local result = Generator.build_karabiner_json(
+			combo_state(), { NONE_ACTION, OPT_BACKSPACE }, {}, { RCMD_LCMD }, {}, "/fake/data_dir/"
+		)
+		local m = chord_manipulator(result)
+		helpers.assert_true(m ~= nil, "a [chord] rule must be generated for the rcmd_lcmd combo slot")
+		helpers.assert_true(type(m.from.simultaneous) == "table", "chord `from` must keep its simultaneous set")
+		helpers.assert_true(type(m.from.modifiers) == "table",
+			"chord `from` must declare a modifiers block — without it KE rejects the chord once a modifier key raises its flag")
+		helpers.assert_true(optional_has_any(m.from.modifiers),
+			"chord from.modifiers.optional must contain 'any' so a modifier-pair chord (rcmd+lcmd) matches instead of falling through to a bare backspace")
+	end)
+
+	helpers.it("keeps option+backspace (delete word left) as the chord output, not a bare backspace", function()
+		-- Characterises that the OUTPUT was always correct — the bug was purely the
+		-- failed match, not a wrong `to`. Guards against a future regression that
+		-- strips the ⌥ modifier from the emitted event.
+		local result = Generator.build_karabiner_json(
+			combo_state(), { NONE_ACTION, OPT_BACKSPACE }, {}, { RCMD_LCMD }, {}, "/fake/data_dir/"
+		)
+		local m = chord_manipulator(result)
+		helpers.assert_true(m ~= nil and type(m.to) == "table" and m.to[1] ~= nil, "chord must carry a `to` output")
+		helpers.assert_eq(m.to[1].key_code, "delete_or_backspace", "chord output key must be delete_or_backspace")
+		helpers.assert_true(type(m.to[1].modifiers) == "table" and m.to[1].modifiers[1] == "left_option",
+			"chord output must carry left_option — the ⌥⌫ delete-word modifier that was being lost")
+	end)
+
+	helpers.it("permits incidental modifiers on the chord in symmetric mode too", function()
+		local result = Generator.build_karabiner_json(
+			combo_state({ combo_symmetric = true }), { NONE_ACTION, OPT_BACKSPACE }, {}, { RCMD_LCMD }, {}, "/fake/data_dir/"
+		)
+		local m = chord_manipulator(result)
+		helpers.assert_true(m ~= nil, "a [chord] rule must be generated in symmetric mode")
+		helpers.assert_true(optional_has_any(m.from.modifiers),
+			"symmetric chord from.modifiers.optional must also contain 'any'")
+	end)
+end)
