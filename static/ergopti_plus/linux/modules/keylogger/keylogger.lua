@@ -4,7 +4,7 @@
 --- MODULE: Full Keylogger (Linux)
 --- DESCRIPTION:
 --- Extends metrics_collector with app-level grouping, password-field detection,
---- JSON export, and file-based persistence. Wraps the existing metrics_collector
+--- JSON export, and SQLite-based persistence. Wraps the existing metrics_collector
 --- so the daemon has a single keylogger surface. Equivalent to the macOS/Windows
 --- keylogger modules (keylogger.lua / keylogger.ahk).
 ---
@@ -16,11 +16,12 @@
 ---    secure field, keystroke logging is suppressed (counts excluded from stats).
 --- 3. JSON export: export_session() returns a JSON-serializable snapshot of
 ---    all accumulated metrics — suitable for the shared healthcheck or WPM widget.
---- 4. File persistence: flush() writes the current session to a JSON log file
----    (~/.config/ergopti/logs/keystrokes_YYYY-MM-DD.json) so data survives
----    daemon restarts.
---- 5. Zero-dependency: pure Lua — JSON export uses string concatenation; file
----    persistence uses io.open. No SQLite or external libs required.
+--- 4. SQLite persistence (P2.8): flush() writes the current session into the
+---    canonical SQLite schema (_shared/data/db/schema.sql) via the sqlite_writer
+---    module (sqlite3 CLI wrapper). The shared metrics dashboard reads the same
+---    schema across macOS, Windows, and Linux.
+--- 5. Graceful degradation: when the sqlite3 binary is absent, flush() writes a
+---    JSON log file instead (~/.config/ergopti/logs/keystrokes_YYYY-MM-DD.json).
 --- ==============================================================================
 
 local M = {}
@@ -34,6 +35,11 @@ local WPM_RING_CAPACITY = SharedMetrics.DEFAULT_WPM_RING_CAPACITY
 local Metrics  = nil
 local ok_mc, mc_mod = pcall(require, "modules.keylogger.metrics_collector")
 if ok_mc then Metrics = mc_mod end
+
+-- SQLite writer — optional (falls back to JSON when sqlite3 CLI is absent).
+local SqliteWriter = nil
+local ok_sw, sw_mod = pcall(require, "modules.keylogger.sqlite_writer")
+if ok_sw then SqliteWriter = sw_mod end
 
 local LOG = "modules.keylogger.keylogger"
 
@@ -71,8 +77,14 @@ end
 -- Active list (rebuilt on init when custom apps are supplied).
 local _password_apps = _default_password_apps()
 
--- Base directory for log file persistence.
+-- Base directory for log file persistence (JSON fallback).
 local _log_dir = nil
+
+-- SQLite database path (primary persistence).
+local _sqlite_path = nil
+
+-- Device identifier for SQLite registration (derived from hostname).
+local _device_id = "linux-unknown"
 
 -- Session start timestamp for export.
 local _session_started_at = nil
@@ -95,9 +107,29 @@ function M.init(opts)
 	-- Initialise the underlying metrics collector if available.
 	if Metrics then Metrics.init({}) end
 
-	-- Set up log directory for persistence.
+	-- Set up log / SQLite directories for persistence.
 	local home = os.getenv("HOME") or "~"
+	local data_home = os.getenv("XDG_DATA_HOME") or (home .. "/.local/share")
 	_log_dir = options.log_dir or (home .. "/.config/ergopti/logs")
+	_sqlite_path = options.sqlite_path or (data_home .. "/ergopti/metrics.sqlite")
+
+	-- Derive device ID from hostname.
+	local hostname = "linux"
+	local fh_host = io.popen("hostname 2>/dev/null", "r")
+	if fh_host then
+		hostname = fh_host:read("*l") or "linux"
+		fh_host:close()
+	end
+	hostname = hostname:gsub("%s+", "")
+	_device_id = "linux-" .. hostname
+
+	-- Open the SQLite database (bootstraps schema on first run).
+	if SqliteWriter and SqliteWriter.open_db(_sqlite_path) then
+		SqliteWriter.register_device(_device_id, hostname, "linux", "", hostname)
+		Logger.info(LOG, "SQLite persistence active: %s", _sqlite_path)
+	else
+		Logger.info(LOG, "SQLite unavailable — JSON fallback active.")
+	end
 
 	-- Custom password apps (reset then rebuild to avoid duplicates on re-init).
 	if type(options.password_apps) == "table" then
@@ -267,18 +299,75 @@ function M.export_json()
 	return _to_json(data)
 end
 
---- Writes the current session stats to the log file.
---- File: ~/.config/ergopti/logs/keystrokes_YYYY-MM-DD.json
+--- Writes the current session stats to persistent storage.
+---
+--- Primary path (P2.8): SQLite — inserts session summary into the canonical
+--- events_typing table and upserts per-app aggregates + n-grams.
+---
+--- Fallback path: JSON log file (~/.config/ergopti/logs/keystrokes_YYYY-MM-DD.json)
+--- when the sqlite3 CLI is absent.
 function M.flush()
+	local date = os.date("%Y-%m-%d")
+	local now_iso = os.date("!%Y-%m-%d %H:%M:%S")
+	local stats = M.get_session_stats()
+	local wpm = M.get_wpm()
+
+	-- PRIMARY: SQLite persistence.
+	if SqliteWriter and SqliteWriter.is_available() then
+		-- 1. Insert a session summary row into events_typing.
+		local apps = M.get_app_stats()
+		local total_text = ""
+		for app_id, _ in pairs(apps) do
+			total_text = total_text .. app_id .. " "
+		end
+		SqliteWriter.insert_typing_events(_device_id, {
+			{
+				ts    = now_iso,
+				date  = date,
+				app   = "ergopti-session",
+				text  = string.format("session: %d keystrokes, %d words, %d ms, %.1f WPM",
+					stats.keystrokes, stats.words, stats.duration_ms, wpm),
+				wpm   = wpm,
+				events_json = M.export_json(),
+			},
+		})
+
+		-- 2. Upsert per-app daily aggregates.
+		for app_id, app_stats in pairs(apps) do
+			local app_name = app_id:match("^[^.]+") or app_id
+			SqliteWriter.upsert_app_day(_device_id, date, app_name, {
+				chars   = app_stats.keystrokes or 0,
+				time_ms = stats.duration_ms or 0,
+			})
+		end
+
+		-- 3. Upsert n-grams from the metrics collector.
+		local ngrams = M.get_ngrams(100)
+		if #ngrams > 0 then
+			local combined = {}
+			for _, entry in ipairs(ngrams) do
+				if entry.gram and entry.count then
+					combined[entry.gram] = entry.count
+				end
+			end
+			SqliteWriter.upsert_ngrams(_device_id, date, "ergopti-session", combined)
+		end
+
+		-- 4. Bump the revision counter so dashboards know new data exists.
+		SqliteWriter.bump_rev()
+
+		Logger.info(LOG, "Session flushed to SQLite: %s.", _sqlite_path)
+		return
+	end
+
+	-- FALLBACK: JSON log file.
 	if not _log_dir then
 		Logger.warn(LOG, "flush(): no log directory configured.")
 		return
 	end
 
-	-- Ensure the log directory exists.
 	os.execute(string.format("mkdir -p '%s' 2>/dev/null", _log_dir:gsub("'", "'\\''")))
 
-	local date = os.date("%Y-%m-%d")
 	local path = _log_dir .. "/keystrokes_" .. date .. ".json"
 
 	local fh = io.open(path, "w")
@@ -289,7 +378,7 @@ function M.flush()
 	fh:write(M.export_json(), "\n")
 	fh:close()
 
-	Logger.info(LOG, "Session flushed to %s.", path)
+	Logger.info(LOG, "Session flushed to JSON: %s.", path)
 end
 
 
