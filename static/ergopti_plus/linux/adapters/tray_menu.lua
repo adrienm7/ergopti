@@ -73,6 +73,14 @@ local function _check_yad()
 	return _yad_available
 end
 
+-- Callback registry (indexed by menu position) and the signal-file path, both
+-- read by _serialize_menu below. Declared BEFORE it: a `local` declared after its
+-- first use binds a nil GLOBAL in Lua (locals are not hoisted), so _serialize_menu
+-- would append to a nil table and crash the first setMenu
+-- (project-lua-closure-before-local-nil-global — same class as menu_karabiner).
+local _registry = {}
+local _signal_file = nil
+
 --- Serializes menu items into yad's --menu format.
 --- Format: "Title!bash -c 'cmd'!Title2!bash -c 'cmd2'"
 --- @param items table Array of { title, fn, checked?, disabled? }
@@ -105,12 +113,6 @@ local function _serialize_menu(items)
 	end
 	return table.concat(parts, "!")
 end
-
--- Registry of callback functions, indexed by menu position.
-local _registry = {}
-
--- Signal file path for menu callbacks.
-local _signal_file = nil
 
 
 --- Builds the full yad command line from current state.
@@ -267,5 +269,12 @@ function M.pump()
 	local fh2 = io.open(_signal_file, "w")
 	if fh2 then fh2:close() end
 end
+
+-- Exposed for the load-order regression test (test_tray_menu_serialize.lua).
+-- _serialize_menu reads the module-level _registry/_signal_file, which must be
+-- declared before it — calling it in isolation exercises that path without a
+-- real yad subprocess (which _spawn_yad skips entirely when yad is absent, the
+-- reason the nil-global bug slipped past the existing setMenu tests).
+M._serialize_menu = _serialize_menu
 
 return M

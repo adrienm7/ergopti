@@ -160,6 +160,15 @@ end
 -- =========================================
 -- =========================================
 
+-- Forward declarations. The prompt builders live in section 6 (below) but are
+-- called by M.predict here. Declaring the locals BEFORE predict means the later
+-- `function _build_system_prompt()` / `function _build_user_context()` assign to
+-- THESE locals; without it Lua (which does not hoist `local function`) would make
+-- predict resolve a nil GLOBAL and crash on first call
+-- (project-lua-closure-before-local-nil-global — same class as menu_karabiner).
+local _build_system_prompt
+local _build_user_context
+
 --- Starts a prediction from the given context buffer.
 --- @param context string The typing context (including the trigger).
 function M.predict(context)
@@ -265,7 +274,7 @@ end
 --- Builds the system prompt for the LLM.
 --- Delegates to the shared prompt_builder when available.
 --- @return string
-local function _build_system_prompt()
+function _build_system_prompt()
 	-- Try the shared prompt builder.
 	local ok, prompt_builder = pcall(require, "llm.prompt_builder")
 	if ok and prompt_builder and prompt_builder.resolve_system_prompt then
@@ -283,7 +292,7 @@ end
 --- Builds the user context from the typing buffer.
 --- @param context string The full typing buffer (may be long).
 --- @return string Truncated context suitable for the LLM.
-local function _build_user_context(context)
+function _build_user_context(context)
 	if #context <= _max_context_chars then return context end
 	-- Keep the last _max_context_chars characters (most relevant).
 	return context:sub(-_max_context_chars)

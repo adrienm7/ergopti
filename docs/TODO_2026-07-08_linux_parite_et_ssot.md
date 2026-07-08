@@ -42,12 +42,12 @@ voir Priorité 1). Correctifs déjà appliqués (2 commits) :
 
 Suites au vert : **build:domain 15/15 · test:js 44/44 · macOS 2836/0 · Linux 678/0**.
 
-⚠️ **Motif systémique détecté.** Le même bug « variable/`local function` utilisée
-avant sa définition → nil global » existe dans **3 fichiers** de la livraison
-(menu_karabiner corrigé ; `linux/modules/llm/prediction_engine.lua` et
-`linux/adapters/tray_menu.lua` restants — voir P1.2). Signe que le Lua livré n'a
-**jamais été exécuté**. Tout nouveau `.lua` doit être chargé au moins une fois
-(via son test unitaire) avant commit.
+✅ **Motif systémique FERMÉ.** Le bug « variable/`local function` utilisée avant sa
+définition → nil global » existait dans **3 fichiers** (menu_karabiner,
+`prediction_engine.lua`, `tray_menu.lua`) — **tous corrigés** (menu_karabiner en
+`a4624a741`, les 2 autres en P1.2 avec tests comportementaux rouge-avant/vert-après).
+Signe que le Lua livré n'avait **jamais été exécuté**. Règle maintenue : tout nouveau
+`.lua` doit être chargé **et son chemin exercé** (test unitaire) avant commit.
 
 ---
 
@@ -334,13 +334,18 @@ basse sévérité. Détail dans l'audit SSoT.)*
   layout partagé, fire `on_char` `:354`) dans `linux/ergopti_hotstrings.lua:369` à la
   place du `keyboard_hook` cassé. Puis dé-dupliquer (P0-E.1). Test : charger le daemon
   avec un evdev mocké, injecter un event, asserter que `on_char` reçoit le caractère.
-- [ ] **P1.2 — nil-global (même classe que menu_karabiner).** Déplacer les définitions
-  au-dessus de leurs usages + test de chargement par module :
-  - `linux/modules/llm/prediction_engine.lua:244,262` : `_build_system_prompt` /
-    `_build_user_context` (`local function`) définis **après** `M.predict` (`:151`)
-    qui les utilise (`:174-175`) → `predict()` plante.
-  - `linux/adapters/tray_menu.lua` : `_registry` (`:110`) et `_signal_file` (`:113`)
-    déclarés **après** `_serialize_menu` (`:94,:99`) qui les lit → erreur au 1ᵉʳ `setMenu`.
+- [x] **P1.2 — nil-global (même classe que menu_karabiner) — CORRIGÉ.** Le motif
+  systémique est **fermé** (menu_karabiner + ces 2 fichiers).
+  - `prediction_engine.lua` : `_build_system_prompt` / `_build_user_context` étaient
+    `local function` **après** `M.predict`. Fix par **forward-declaration** des 2
+    locaux au-dessus de predict. Test comportemental `test_prediction_engine_predict.lua`
+    (mock des backends, appelle `predict()` — **rouge prouvé** : `attempt to call a
+    nil value`, vert après).
+  - `tray_menu.lua` : `_registry`/`_signal_file` déclarés **après** `_serialize_menu`.
+    Fix : déclarations remontées au-dessus. Test `test_tray_menu_serialize.lua`
+    (`_serialize_menu` exposé, appel direct — **rouge prouvé** : `attempt to get
+    length of a nil value (global '_registry')`, vert après). Les tests `setMenu`
+    existants ne l'attrapaient pas (sans yad, `_spawn_yad` sort avant `_serialize_menu`).
 - [ ] **P1.3 — bugs d'arguments de câblage daemon** (`linux/ergopti_hotstrings.lua`) :
   - `:340` `prediction_engine.on_char(ch)` sans l'arg `buffer` → `prediction_engine.lua:128-130`
     early-return → LLM ne prédit jamais. Passer le buffer.
