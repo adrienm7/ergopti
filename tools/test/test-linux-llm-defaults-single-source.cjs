@@ -63,6 +63,17 @@ for (const [name, value, source] of bridgeChecks) {
 	}
 }
 
+// P0-C: the Lua-side canonicals (tail words, max_tokens) live in prompt_builder,
+// which linux_bridge already requires — it must read them, never re-type them.
+for (const ref of ['PromptBuilder.CONTEXT_TAIL_WORDS', 'PromptBuilder.DEFAULT_MAX_TOKENS']) {
+	if (!bridge.includes(ref)) {
+		errors.push(`linux_bridge.lua: must read ${ref} from prompt_builder (P0-C), not a re-typed literal`);
+	}
+}
+if (/M\.CONTEXT_TAIL_WORDS\s*=\s*\d/.test(bridge)) {
+	errors.push('linux_bridge.lua: CONTEXT_TAIL_WORDS re-typed as a literal — read PromptBuilder.CONTEXT_TAIL_WORDS');
+}
+
 // ── 2. prediction_engine must not re-type the old divergent literals ──────
 const pred = stripLua(read('linux/modules/llm/prediction_engine.lua'));
 const predForbidden = [

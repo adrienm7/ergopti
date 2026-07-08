@@ -128,7 +128,7 @@ Corriger côté Linux pour lire les canoniques.
 
 ### P0-C — Duplication interne au tree `_shared/` *(Tier 2)*
 
-- [ ] **P0-C.1** `linux_bridge.lua` redéfinit des constantes qu'il devrait lire de
+- [x] **P0-C.1** `linux_bridge.lua` redéfinit des constantes qu'il devrait lire de
   `prompt_builder` (qu'il `require` déjà, ligne 14) : `CONTEXT_TAIL_WORDS`
   (`linux_bridge.lua:37` vs canon `prompt_builder.lua:39`) et `DEFAULT_MAX_TOKENS`
   (`linux_bridge.lua:250` vs canon `prompt_builder.lua:42`). Utiliser `PromptBuilder.*`.
