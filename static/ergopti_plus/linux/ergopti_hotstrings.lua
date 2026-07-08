@@ -118,6 +118,11 @@ local dyn_hotstrings = nil
 local ok_dh, dh_mod = pcall(require, "modules.dynamic_hotstrings.manager")
 if ok_dh then dyn_hotstrings = dh_mod end
 
+-- Updater engine (optional — checks GitHub releases, downloads and installs updates).
+local updater = nil
+local ok_up, up_mod = pcall(require, "modules.updater.manager")
+if ok_up then updater = up_mod end
+
 -- Window info tracker (optional — provides app_id for keylogger per-app stats).
 local window_info = nil
 local ok_wi, wi_mod = pcall(require, "adapters.window_info")
@@ -431,9 +436,14 @@ local function main()
 		Logger.info(LOG, "Tray icon requested — starting.")
 		tray_menu.setIcon({ title = "Ergopti" })
 
-		if menu_builder then
-			local config_dir = resolve_config_path(opts.config) or DEFAULT_CONFIG_DIR
-			local menu_items = menu_builder.build({
+	if menu_builder then
+		local config_dir = resolve_config_path(opts.config) or DEFAULT_CONFIG_DIR
+
+		-- Build the menu context once; shared between the initial menu build
+		-- and the updater's on_available callback (which triggers a rebuild
+		-- so the menu label changes when an update is found).
+		local function _build_menu_ctx()
+			return {
 				_version      = Version.VERSION,
 				config        = hotstrings_config,
 				engine        = engine,
@@ -443,6 +453,7 @@ local function main()
 				end,
 				keylogger     = keylogger,
 				llm           = prediction_engine,
+				updater       = updater,
 				dry_run       = opts.dry_run,
 				verbose       = opts.verbose,
 				on_quit       = function() keyboard_hook.stop() end,
@@ -458,8 +469,11 @@ local function main()
 				on_healthcheck = function()
 					Logger.info(LOG, "[stub] Healthcheck — P2.2 (webview).")
 				end,
-			})
-			tray_menu.setMenu(menu_items)
+			}
+		end
+
+		local menu_items = menu_builder.build(_build_menu_ctx())
+		tray_menu.setMenu(menu_items)
 		else
 			tray_menu.setMenu({
 				{ title = "Ergopti " .. (opts.layout or "qwerty"), fn = function() end },
@@ -480,6 +494,18 @@ local function main()
 		i18n_mod.set_trigger_provider(function()
 			return "\\"  -- default magic key (backslash)
 		end)
+	end
+
+	-- 8.10b) Initialise the updater (background poller for GitHub releases).
+	if updater then
+		local on_available = function(release)
+			Logger.info(LOG, "Update available: %s — rebuilding menu.", release.tag)
+			-- Rebuild the tray menu so the update label changes.
+			if tray_menu and menu_builder then
+				tray_menu.setMenu(menu_builder.build(_build_menu_ctx()))
+			end
+		end
+		updater.init({ on_available = on_available })
 	end
 
 	Logger.success(LOG, "Daemon ready (device=%s layout=%s mappings=%d dry_run=%s tray=%s).",

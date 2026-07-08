@@ -387,6 +387,109 @@ local function _build_setup_wizard(ctx)
 	}
 end
 
+--- Builds the updater submenu (P2.9 — GitHub releases, channel switching, download).
+local function _build_updates(ctx)
+	local up = ctx.updater
+	if not up then
+		return { title = "🔄 Mises à jour", menu = {
+			{ title = "(updater non disponible)", fn = function() end, disabled = true },
+		}}
+	end
+
+	local channel = up.get_channel()
+	local version = up.current_version()
+	local items = {}
+
+	-- Header showing current version and channel.
+	items[#items + 1] = {
+		title = "v" .. version .. " (" .. channel .. ")",
+		fn = function() end,
+		disabled = true,
+	}
+	items[#items + 1] = { title = "-" }
+
+	-- Check for updates now.
+	items[#items + 1] = {
+		title = up.get_menu_label(),
+		fn = function()
+			local available = up.check_for_updates()
+			if available then
+				local rel = up.get_cached_release()
+				if rel then
+					Logger.info(LOG, "Update available: %s.", rel.tag)
+				end
+			else
+				Logger.info(LOG, "No update available (current: %s).", up.current_version())
+			end
+		end,
+	}
+
+	-- Download + install (only shown when an update is available).
+	local state = up.get_state()
+	if state == "available" then
+		local rel = up.get_cached_release()
+		if rel then
+			items[#items + 1] = {
+				title = "Télécharger et installer " .. rel.tag,
+				fn = function()
+					local archive = up.download_update()
+					if archive then
+						up.install_update(archive)
+					end
+				end,
+			}
+		end
+	end
+
+	items[#items + 1] = { title = "-" }
+
+	-- Channel switching.
+	items[#items + 1] = {
+		title = "Canal stable" .. (channel == "stable" and " ✓" or ""),
+		fn = function()
+			up.set_channel("stable")
+			Logger.info(LOG, "Update channel set to stable.")
+		end,
+	}
+	items[#items + 1] = {
+		title = "Canal dev (préversions)" .. (channel == "dev" and " ✓" or ""),
+		fn = function()
+			up.set_channel("dev")
+			Logger.info(LOG, "Update channel set to dev.")
+		end,
+	}
+
+	items[#items + 1] = { title = "-" }
+
+	-- Interval presets.
+	local current_interval = up.get_check_interval()
+	for _, preset in ipairs(up.INTERVAL_PRESETS) do
+		local is_current = (preset.seconds == current_interval)
+		items[#items + 1] = {
+			title = "Vérifier toutes les " .. preset.code .. (is_current and " ✓" or ""),
+			fn = function()
+				up.set_check_interval(preset.seconds)
+				up.stop_background_checks()
+				up.start_background_checks()
+			end,
+		}
+	end
+
+	items[#items + 1] = { title = "-" }
+
+	-- Open releases page.
+	items[#items + 1] = {
+		title = "Ouvrir la page des releases",
+		fn = function()
+			local url = up.releases_page_url()
+			Logger.info(LOG, "Opening releases page: %s", url)
+			os.execute(string.format("xdg-open '%s' 2>/dev/null &", url:gsub("'", "'\\''")))
+		end,
+	}
+
+	return { title = "🔄 Mises à jour", menu = items }
+end
+
 --- Builds the about item.
 local function _build_about(_ctx)
 	return {
@@ -523,6 +626,7 @@ function M.build(ctx)
 	items[#items + 1] = _build_kanata(ctx)
 	items[#items + 1] = _build_gestures(ctx)
 	items[#items + 1] = _build_apps(ctx)
+	items[#items + 1] = _build_updates(ctx)
 
 	-- ── Separator before system-level actions ──
 	items[#items + 1] = { title = "-" }
