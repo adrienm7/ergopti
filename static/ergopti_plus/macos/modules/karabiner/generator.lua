@@ -601,10 +601,38 @@ local function build_chord_combo_rule(combo_def, combo_to, combo_action, combo_s
 	-- ⌥⌫ "delete word left" to one backspace. Allow any incidental modifier —
 	-- exactly what the tap/hold sibling rule already does — while preserving any
 	-- explicit modifiers the combo declared.
+	--
+	-- `optional` alone only fixes MATCHING: KE passes optional modifiers THROUGH to
+	-- the output, so a chord's own held flags leak into the emitted event. For a
+	-- command-pair chord (right_command + left_command) whose output is ⌥⌫
+	-- (option+backspace), the leaked ⌘ turns it into ⌘⌥⌫ — and ⌘⌫
+	-- "delete-to-line-start" overrides ⌥⌫ "delete-word-left", so the chord does
+	-- nothing useful. Its right_command+left_option sibling escaped the bug only
+	-- because a leaked ⌘ is inert for ⌥⌦ "delete-word-right". Declare the chord's
+	-- OWN modifier keys as `mandatory` so KE CONSUMES their flags (removing them
+	-- from the output) — the very mechanism the k1_mandatory tap/hold path already
+	-- relies on — while `optional: any` still absorbs unrelated incidental flags.
+	local chord_mandatory = {}
+	if type(from.simultaneous) == "table" then
+		for _, sk in ipairs(from.simultaneous) do
+			if sk.key_code and ACTUAL_MODIFIER_KEY_CODES[sk.key_code] then
+				chord_mandatory[#chord_mandatory + 1] = sk.key_code
+			end
+		end
+	end
+
 	local modifiers = { optional = { "any" } }
+	if #chord_mandatory > 0 then
+		modifiers.mandatory = chord_mandatory
+	end
 	if type(from.modifiers) == "table" then
 		for k, v in pairs(from.modifiers) do modifiers[k] = v end
 		modifiers.optional = { "any" }
+		-- A combo that declares its own mandatory modifiers wins over the computed
+		-- set; otherwise keep the chord-key flags we just gathered.
+		if not from.modifiers.mandatory and #chord_mandatory > 0 then
+			modifiers.mandatory = chord_mandatory
+		end
 	end
 	from.modifiers = modifiers
 

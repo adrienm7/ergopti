@@ -751,4 +751,68 @@ helpers.describe("Generator — simultaneous chord rule permits incidental modif
 		helpers.assert_true(optional_has_any(m.from.modifiers),
 			"symmetric chord from.modifiers.optional must also contain 'any'")
 	end)
+
+	-- Regression (modifier-pair-chord-mandatory-consume): the previous fix made the
+	-- chord MATCH via optional:any, but KE passes optional modifiers THROUGH to the
+	-- output. A right_command+left_command chord whose output is ⌥⌫ then fires as
+	-- ⌘⌥⌫, and ⌘⌫ (delete-to-line-start) overrides ⌥⌫ (delete-word-left) — so
+	-- rcmd+lcmd did "nothing useful" while its rcmd+left_option sibling worked (a
+	-- leaked ⌘ is inert for ⌥⌦ delete-word-right). The chord's own modifier keys
+	-- must be declared mandatory so KE CONSUMES their flags.
+	local function mandatory_set(mods)
+		local set = {}
+		if type(mods) == "table" and type(mods.mandatory) == "table" then
+			for _, v in ipairs(mods.mandatory) do set[v] = true end
+		end
+		return set
+	end
+
+	helpers.it("consumes the chord's own command flags as mandatory so ⌘ cannot leak into ⌥⌫", function()
+		local result = Generator.build_karabiner_json(
+			combo_state(), { NONE_ACTION, OPT_BACKSPACE }, {}, { RCMD_LCMD }, {}, "/fake/data_dir/"
+		)
+		local m = chord_manipulator(result)
+		helpers.assert_true(m ~= nil, "a [chord] rule must be generated for the rcmd_lcmd combo slot")
+		local mand = mandatory_set(m.from.modifiers)
+		helpers.assert_true(mand.right_command == true,
+			"right_command must be mandatory (consumed) so the chord's ⌘ flag is removed from the ⌥⌫ output")
+		helpers.assert_true(mand.left_command == true,
+			"left_command must be mandatory (consumed) so the chord's ⌘ flag is removed from the ⌥⌫ output")
+		helpers.assert_true(optional_has_any(m.from.modifiers),
+			"optional:any must remain so unrelated incidental modifiers still match")
+	end)
+
+	helpers.it("consumes the mandatory flags in symmetric mode too", function()
+		local result = Generator.build_karabiner_json(
+			combo_state({ combo_symmetric = true }), { NONE_ACTION, OPT_BACKSPACE }, {}, { RCMD_LCMD }, {}, "/fake/data_dir/"
+		)
+		local m = chord_manipulator(result)
+		local mand = mandatory_set(m.from.modifiers)
+		helpers.assert_true(mand.right_command == true and mand.left_command == true,
+			"both command keys must be consumed as mandatory in symmetric mode")
+	end)
+
+	-- A chord built from NON-modifier keys raises no modifier flags, so nothing must
+	-- be declared mandatory — guarding against over-consumption that would require a
+	-- phantom modifier and break the match.
+	local RET_ESC = {
+		id    = "ret_esc",
+		label = "Entrée + Échap",
+		from  = {
+			simultaneous         = { { key_code = "return_or_enter" }, { key_code = "escape" } },
+			simultaneous_options = { key_down_order = "strict" },
+		},
+	}
+	helpers.it("adds NO mandatory modifiers for a chord of non-modifier keys", function()
+		local state  = make_state({ mod_combos_config = { ret_esc = { combo = "opt_backspace", tap = "none", hold = "none" } } })
+		local result = Generator.build_karabiner_json(
+			state, { NONE_ACTION, OPT_BACKSPACE }, {}, { RET_ESC }, {}, "/fake/data_dir/"
+		)
+		local m = chord_manipulator(result)
+		helpers.assert_true(m ~= nil, "a [chord] rule must be generated for the ret_esc combo slot")
+		helpers.assert_true(m.from.modifiers.mandatory == nil,
+			"a non-modifier-key chord must declare no mandatory modifiers")
+		helpers.assert_true(optional_has_any(m.from.modifiers),
+			"optional:any must still be present for a non-modifier-key chord")
+	end)
 end)
