@@ -231,6 +231,13 @@ local function _parse_evtest_line(line)
 	return nil
 end
 
+-- Forward declaration: _pump_one (below) resolves the typed character via
+-- _resolve_char, which is defined further down. Declaring the local here means
+-- _pump_one binds THIS local (assigned by the later `function _resolve_char`)
+-- instead of a nil global — Lua does not hoist `local function`
+-- (project-lua-closure-before-local-nil-global).
+local _resolve_char
+
 --- Pumps one line from the subprocess pipe and dispatches to callbacks.
 --- Returns true if more data is available, false if pipe is closed.
 local function _pump_one()
@@ -297,12 +304,19 @@ local function _pump_one()
 	end
 	if ev.name == "KEY_CAPSLOCK" then return true end
 
-	-- Reset modifier state on non-modifier keypress.
+	-- Resolve the typed character from the layout table using the CURRENT shift
+	-- state. Bug fix (P1.1): `ch` was never assigned here, so no character ever
+	-- reached on_char — hotstrings, keylogger and the LLM got zero input and the
+	-- whole daemon was inert. Also resolve BEFORE the modifier reset below, or
+	-- every shifted character would come out unshifted.
+	local ch = _resolve_char(ev.code)
+
+	-- Reset the one-shot modifier flags now this key has consumed them. Releases
+	-- are not forwarded, so shift/ctrl/alt clear on the next non-modifier key.
 	_shift_held = false
 	_ctrl_held = false
 	_alt_held = false
 
-	-- Resolve the character from the layout table.
 	if ch and _on_char then
 		pcall(_on_char, ch)
 	end
@@ -316,7 +330,7 @@ local _layout_shifted = nil
 
 --- Resolves a keycode to a character using the active layout.
 --- Returns nil for non-printable keys.
-local function _resolve_char(code)
+function _resolve_char(code)
 	-- Load layout tables from input_reader if not cached.
 	if not _layout_unshifted then
 		local ir = _get_input_reader()
@@ -489,6 +503,21 @@ end
 --- @return table { appId: string, windowTitle: string }
 function M.getContext()
 	return { appId = _context.appId, windowTitle = _context.windowTitle }
+end
+
+--- Test hook (test_keyboard_hook_pump.lua): injects a mock event pipe + on_char
+--- callback and pumps a single event, without a real evtest/libinput subprocess
+--- (which needs a Linux binary + device). Guards the input pipeline — that a
+--- printable keydown actually resolves to a character and reaches on_char.
+--- @param mock_pipe table   Object exposing read("*l") → one event line.
+--- @param on_char_cb function Called with the resolved character.
+--- @param intercept boolean  true = parse evtest lines, false = libinput lines.
+--- @return boolean The _pump_one return value.
+function M._test_inject_and_pump(mock_pipe, on_char_cb, intercept)
+	_pipe = mock_pipe
+	_on_char = on_char_cb
+	_intercept = intercept and true or false
+	return _pump_one()
 end
 
 return M
