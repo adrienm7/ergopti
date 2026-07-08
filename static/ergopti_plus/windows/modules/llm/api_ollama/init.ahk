@@ -27,6 +27,10 @@
 ; LLM_OLLAMA_BASE_URL is DERIVED from it; change both via LLM_Ollama_SetPort.
 global LLM_OLLAMA_PORT     := 0
 global LLM_OLLAMA_BASE_URL := "http://localhost:" . LLM_OLLAMA_PORT
+; Keep-alive duration sent in /api/chat payloads — canonical value lives in
+; _shared/modules/llm/defaults.json (llm_ollama_keep_alive). Sentinel "" —
+; sourced at boot from LLM_Defaults by LLM_Ollama_LoadDefaults().
+global LLM_OLLAMA_KEEP_ALIVE := ""
 ; Weak laptops running qwen3.5:0.8b on CPU can exceed 30 s per token batch.
 ; WinHTTP aborts the whole request when this fires — too low and the tooltip
 ; never appears despite Ollama still computing in the background.
@@ -64,9 +68,13 @@ LLMApiLoadTimings() {
 ; place. Mirrors LLMApiLoadTimings; called right after it in lib/boot.ahk, after
 ; LLM_Defaults_Load(). The per-user override is applied later by LLM_Menu_Init.
 LLM_Ollama_LoadDefaults() {
-	global LLM_Defaults
-	if IsSet(LLM_Defaults) and Type(LLM_Defaults) == "Map" and LLM_Defaults.Has("llm_ollama_port")
-		LLM_Ollama_SetPort(LLM_Defaults["llm_ollama_port"])
+	global LLM_Defaults, LLM_OLLAMA_KEEP_ALIVE
+	if IsSet(LLM_Defaults) and Type(LLM_Defaults) == "Map" {
+		if LLM_Defaults.Has("llm_ollama_port")
+			LLM_Ollama_SetPort(LLM_Defaults["llm_ollama_port"])
+		if LLM_Defaults.Has("llm_ollama_keep_alive")
+			LLM_OLLAMA_KEEP_ALIVE := LLM_Defaults["llm_ollama_keep_alive"]
+	}
 }
 
 ; Maximum number of in-flight async requests kept in the registry. Once we

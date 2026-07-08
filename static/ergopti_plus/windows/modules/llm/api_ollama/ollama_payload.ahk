@@ -117,7 +117,7 @@ LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, streaming :
 		. '"messages":[' msgs_json '],'
 		. '"stream":' stream_field ','
 		. '"think":false,'
-		. '"keep_alive":"30m",'
+		. '"keep_alive":"' (LLM_OLLAMA_KEEP_ALIVE != "" ? LLM_OLLAMA_KEEP_ALIVE : "30m") '",'
 		. '"options":{"temperature":' Format("{:g}", temperature)
 		. ',"num_predict":' num_predict
 		. ',"thinking_budget":0'
