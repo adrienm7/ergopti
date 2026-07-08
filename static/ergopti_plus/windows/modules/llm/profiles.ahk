@@ -140,8 +140,15 @@ LLM_ResolveSystemPrompt(profile, n, min_words, max_words, language := "en") {
 LLM_LoadProfilesJSON(path := "") {
 	if (path == "")
 		path := LLM_GetSharedPath("profiles.json")
+	; Read through the FileSystem adapter (FSRead) exactly like the sibling
+	; _LLM_LoadPresets(models.json) in models.ahk, so this domain module performs
+	; no direct file I/O of its own. FSRead returns false on any read error, which
+	; we treat as "no profiles available" — the same graceful-empty contract the
+	; previous try/FileRead had.
+	raw := FSRead(path)
+	if (raw == false)
+		return []
 	try {
-		raw := FileRead(path, "UTF-8")
 		parsed := JsonParse(raw)
 		if Type(parsed) != "Array"
 			return []

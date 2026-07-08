@@ -275,3 +275,44 @@ _LLMP_GetBasicPromptContainsLanguage() {
 	Assert(InStr(result, "{language}") > 0, "Basic prompt must contain {language} placeholder")
 }
 Test("LLM_GetBasicPrompt: contains {language} placeholder", _LLMP_GetBasicPromptContainsLanguage)
+
+
+
+
+; =============================================
+; =============================================
+; ======= 6/ LLM_LoadProfilesJSON =============
+; =============================================
+; =============================================
+
+; Coverage + regression guard for the FileSystem-adapter routing of the profiles
+; loader. LLM_LoadProfilesJSON was previously the ONLY profiles function with no
+; test — every other case feeds inline JSON to LLM_ParseProfilesJSON and never
+; touches the file-read path. After routing its read from a direct FileRead to
+; FSRead (the FileSystem adapter, matching _LLM_LoadPresets for models.json), this
+; exercises the real read+parse path against a temp file written through the same
+; adapter, so a future break in the adapter routing is caught.
+_LLMP_LoadProfilesReadsFileViaAdapter() {
+	tmp := A_Temp . "\ergopti_test_profiles_load.json"
+	try FSDelete(tmp)
+	FSWrite(tmp, '[{"id":"basic","label":"Basic","system_single":"hi","batch":false},{"id":"adv","label":"Adv","system_single":"yo","batch":true}]')
+	profiles := LLM_LoadProfilesJSON(tmp)
+	try FSDelete(tmp)
+	Assert(profiles is Array, "LLM_LoadProfilesJSON must return an Array")
+	AssertEqual(2, profiles.Length)
+	AssertEqual("basic", profiles[1]["id"])
+	AssertEqual("adv",   profiles[2]["id"])
+}
+Test("LLM_LoadProfilesJSON: reads a real file through the FileSystem adapter (FSRead) and parses it", _LLMP_LoadProfilesReadsFileViaAdapter)
+
+
+; A missing file must degrade to an empty array, never throw — the graceful-empty
+; contract preserved when moving from try/FileRead to FSRead's false-on-error return.
+_LLMP_LoadProfilesMissingFileReturnsEmpty() {
+	missing := A_Temp . "\ergopti_test_profiles_does_not_exist_zzz.json"
+	try FSDelete(missing)
+	profiles := LLM_LoadProfilesJSON(missing)
+	Assert(profiles is Array, "missing file must still yield an Array")
+	AssertEqual(0, profiles.Length)
+}
+Test("LLM_LoadProfilesJSON: missing file degrades to empty array (no throw)", _LLMP_LoadProfilesMissingFileReturnsEmpty)
