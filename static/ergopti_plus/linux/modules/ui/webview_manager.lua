@@ -8,9 +8,10 @@
 --- webkit_host.lua, and routes messages from the JS host_bridge.js to the
 --- appropriate bridge handler module.
 ---
---- This module is PURE LUA — the actual GTK/WebKit2GTK rendering requires
---- lgi/GObject introspection which is only available on Linux. All bridge
---- handler logic is testable on any platform.
+--- This module handles both the pure-Lua bridge routing (testable on any
+--- platform) AND the native GTK/WebKit2GTK window creation (requires lgi on
+--- Linux). When lgi is not available, all GTK operations gracefully no-op
+--- and bridge handler logic remains testable.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Bridge registry: each JS→Lua message handler name (from host_bridge.js)
@@ -31,6 +32,13 @@ local LOG = "modules.ui.webview_manager"
 -- webkit_host provides HTML building and bridge name registry.
 local webkit_host = require("ui.webkit_host")
 
+-- Optional JSON codec for manifest parsing and JS value conversion.
+local dkjson = nil
+pcall(function()
+	local ok, mod = pcall(require, "dkjson")
+	if ok then dkjson = mod end
+end)
+
 
 -- =========================================
 -- =========================================
@@ -47,6 +55,12 @@ local _daemon_state = {}
 -- Whether GTK/WebKit2GTK is available (lgi loaded successfully).
 local _gtk_available = false
 
+-- lgi library reference (stored after successful probe, used by GTK operations).
+local _lgi = nil
+
+-- Native GTK window references: { [app_name] = { window, webview } }
+local _gtk_windows = {}
+
 -- Try to load lgi for GTK/WebKit2GTK access (only available on Linux).
 local function _probe_gtk()
 	local ok, lgi = pcall(require, "lgi")
@@ -58,6 +72,7 @@ local function _probe_gtk()
 		Logger.debug(LOG, "lgi.WebKit2 not available — webview rendering disabled.")
 		return false
 	end
+	_lgi = lgi
 	Logger.success(LOG, "GTK/WebKit2GTK available via lgi — webview rendering enabled.")
 	return true
 end
@@ -257,42 +272,283 @@ end
 
 -- =========================================
 -- =========================================
--- ======= 6/ GTK-specific Operations ======
+-- ======= 6/ GTK-specific Helpers =========
+-- =========================================
+-- =========================================
+
+--- Converts a JSCore.Value to a Lua value (handles string, number, boolean, object).
+--- @param js_value any JSCore.Value from js_result:get_js_value().
+--- @return any Lua value.
+local function _js_value_to_lua(js_value)
+	if not js_value then return nil end
+	local ok, result = pcall(function()
+		if js_value:is_string() then
+			return js_value:to_string()
+		elseif js_value:is_number() then
+			return js_value:to_double()
+		elseif js_value:is_boolean() then
+			return js_value:to_boolean()
+		elseif js_value:is_null() or js_value:is_undefined() then
+			return nil
+		elseif js_value:is_object() then
+			-- Try JSON.stringify round-trip for objects.
+			local json_str = js_value:to_json(0)
+			if json_str and json_str ~= "" and dkjson then
+				local ok_json, parsed = pcall(dkjson.decode, json_str)
+				if ok_json then return parsed end
+			end
+			return nil
+		end
+		return js_value:to_string()  -- fallback
+	end)
+	if ok then return result end
+	return nil
+end
+
+--- Sends a Lua value back to JavaScript via webview:run_javascript().
+--- Uses a callback on window.__hostBridgeResponse if the JS side defines one.
+--- The string is base64-encoded to avoid escaping issues with quotes/newlines.
+--- @param webview WebKit2.WebView The target webview.
+--- @param bridge_name string The bridge handler name.
+--- @param value any Lua value to send (converted to JSON then base64).
+local function _send_response_to_js(webview, bridge_name, value)
+	if not webview or value == nil then return end
+	if not dkjson then return end
+	-- Encode the value as JSON, then base64 to avoid any escaping hazards.
+	local json_str = dkjson.encode(value)
+	if not json_str then return end
+	local b64 = require("compat.base64")
+	local encoded = b64 and b64.encode(json_str) or json_str:gsub("[^%w]", function(c)
+		return string.format("%%%02X", c:byte())
+	end)
+	local use_b64 = (b64 ~= nil)
+	local js_code = string.format(
+		[[if(window.__hostBridgeResponse)window.__hostBridgeResponse('%s',%s,'%s')]],
+		bridge_name, use_b64 and "true" or "false", encoded:gsub("'", "\\'")
+	)
+	pcall(function() webview:run_javascript(js_code, nil, nil, nil) end)
+end
+
+--- Reads per-app geometry from _shared/ui/apps.manifest.json.
+--- @param app_name string The app directory name.
+--- @return table { width, height, min_width, min_height }
+local function _read_app_geometry(app_name)
+	local defaults = { width = 800, height = 600, min_width = 400, min_height = 300 }
+	local root = _driver_root()
+	local manifest_path = root .. "/../_shared/ui/apps.manifest.json"
+	local fh = io.open(manifest_path, "r")
+	if not fh then
+		-- Try alternate path.
+		manifest_path = root .. "/../../_shared/ui/apps.manifest.json"
+		fh = io.open(manifest_path, "r")
+	end
+	if not fh then return defaults end
+	local raw = fh:read("*a")
+	fh:close()
+	if not raw or raw == "" or not dkjson then return defaults end
+	local ok_dec, manifest = pcall(dkjson.decode, raw)
+	if not ok_dec or not manifest or not manifest.apps then return defaults end
+	local app = manifest.apps[app_name]
+	if app then
+		return {
+			width      = app.width      or defaults.width,
+			height     = app.height     or defaults.height,
+			min_width  = app.min_width  or defaults.min_width,
+			min_height = app.min_height or defaults.min_height,
+		}
+	end
+	return defaults
+end
+
+--- Builds a human-readable window title from the app directory name.
+--- @param app_name string The app directory name.
+--- @return string
+local function _app_title(app_name)
+	local titles = {
+		action_picker           = "Action Picker",
+		changelog               = "Release Notes",
+		download_window         = "Download",
+		healthcheck             = "Diagnostic",
+		hotstrings_config_window = "Hotstrings Config",
+		hotstring_editor        = "Hotstring Editor",
+		metrics_apps            = "Metrics — Apps",
+		metrics_typing          = "Metrics — Typing",
+		model_browser           = "Model Browser",
+		onboarding              = "Setup Wizard",
+		paths_editor            = "Paths Editor",
+		personal_info_editor    = "Personal Info",
+		prompt_editor           = "Prompt Editor",
+		token_prompt            = "Token Settings",
+	}
+	return titles[app_name] or app_name:gsub("_", " "):gsub("(%a)([%w_]*)", function(a, b)
+		return a:upper() .. b:gsub("_", " ")
+	end)
+end
+
+
+-- =========================================
+-- ======= 7/ GTK Window Operations ========
 -- =========================================
 -- =========================================
 
 --- Creates a GTK WebKit2 window (Linux only, requires lgi).
+---
+--- Lifecycle: GTK window is created on demand via show(), tracked in _gtk_windows
+--- for focus/destroy operations. The window is NOT a child of the daemon — it runs
+--- its own GTK event loop iteration via GLib.idle_add or is driven by the daemon's
+--- luv event loop when available.
+---
 --- @param app_name string The app name.
 --- @param html string The HTML string to load.
 --- @param handler table|nil The bridge handler module.
 function M._create_gtk_window(app_name, html, handler)
-	if not _gtk_available then return end
-	-- The actual GTK window creation requires lgi.WebKit2 and is only
-	-- executable on a Linux machine with the proper GObject bindings.
-	-- This stub is here for the API contract; the real implementation
-	-- lives in a native entry point or a companion script.
-	Logger.info(LOG, "_create_gtk_window: stub — GTK window for '%s' would load %d bytes.",
-		app_name, #(html or ""))
+	if not _gtk_available or not _lgi then return end
+
+	local Gtk     = _lgi.Gtk
+	local WebKit2 = _lgi.WebKit2
+	local GLib    = _lgi.GLib
+
+	-- Read geometry from the single-source manifest.
+	local geometry = _read_app_geometry(app_name)
+
+	-- ── Create the GTK window ──
+	local window = Gtk.Window({
+		title            = "Ergopti — " .. _app_title(app_name),
+		default_width    = geometry.width,
+		default_height   = geometry.height,
+		window_position  = Gtk.WindowPosition.CENTER,
+		type             = Gtk.WindowType.TOPLEVEL,
+	})
+
+	-- Set minimum size if supported.
+	pcall(function()
+		window:set_size_request(geometry.min_width, geometry.min_height)
+	end)
+
+	-- ── UserContentManager: register all 14 bridge script-message handlers ──
+	local ucm = WebKit2.UserContentManager()
+	local bridge_names = webkit_host.get_bridge_names()
+
+	for _, bridge_name in ipairs(bridge_names) do
+		pcall(function()
+			ucm:register_script_message_handler(bridge_name)
+		end)
+	end
+
+	-- ── Connect script-message-received signals ──
+	-- lgi supports detailed GObject signals via table-of-callbacks assignment:
+	--   ucm.on_script_message_received = { [detail] = callback, ... }
+	-- Each bridge name maps to a closure that parses the JS value and dispatches
+	-- to M.route_message(), sending any response back to the webview.
+	local function handle_script_message(bridge_name, js_result)
+		local js_value = js_result:get_js_value()
+		local payload = _js_value_to_lua(js_value)
+		local response = M.route_message(bridge_name, payload)
+		if response ~= nil and _gtk_windows[app_name] and _gtk_windows[app_name].webview then
+			_send_response_to_js(_gtk_windows[app_name].webview, bridge_name, response)
+		end
+	end
+
+	local detailed_signals = {}
+	for _, bridge_name in ipairs(bridge_names) do
+		detailed_signals[bridge_name] = function(_manager, js_result)
+			handle_script_message(bridge_name, js_result)
+		end
+	end
+
+	local ok_sig = pcall(function()
+		ucm.on_script_message_received = detailed_signals
+	end)
+	if not ok_sig then
+		Logger.warn(LOG, "Detailed GObject signal connection failed for '%s' — " ..
+			"bridge handlers may not receive messages. Check lgi version.", app_name)
+	end
+
+	-- ── Create the WebView ──
+	local webview = WebKit2.WebView({
+		user_content_manager = ucm,
+		visible              = true,
+	})
+
+	-- Load the inline HTML (base_uri nil = no file:// origin).
+	webview:load_html(html, nil)
+
+	-- ── Window lifecycle: close → hide (don't destroy, allow re-show) ──
+	window.on_destroy = function()
+		Logger.debug(LOG, "GTK window '%s' destroyed.", app_name)
+		_gtk_windows[app_name] = nil
+		_windows[app_name] = nil
+	end
+
+	-- Use delete-event to hide instead of destroy (allows bring_to_front later).
+	window.on_delete_event = function()
+		Logger.debug(LOG, "GTK window '%s' delete-event — hiding.", app_name)
+		window:hide()
+		if _windows[app_name] then
+			_windows[app_name].visible = false
+		end
+		return true  -- stop other handlers (prevent destroy)
+	end
+
+	-- ── Assemble and show ──
+	window:add(webview)
+	window:show_all()
+
+	-- ── Track native references ──
+	_gtk_windows[app_name] = {
+		window  = window,
+		webview = webview,
+	}
+
+	Logger.success(LOG, "GTK window '%s' created (%dx%d).", app_name, geometry.width, geometry.height)
+
+	-- Pump GTK events: if the daemon has a luv event loop, integrate.
+	pcall(function()
+		local event_loop = require("adapters.event_loop")
+		if event_loop and event_loop.add_idle_handler then
+			event_loop.add_idle_handler(function()
+				if _gtk_windows[app_name] then
+					local ctx = GLib.MainContext.default()
+					if ctx then ctx:iteration(false) end
+				end
+			end)
+		end
+	end)
 end
 
 --- Destroys a GTK window (Linux only).
 --- @param app_name string The app name.
 function M._destroy_gtk_window(app_name)
-	if not _gtk_available then return end
-	Logger.info(LOG, "_destroy_gtk_window: stub — GTK window for '%s' would close.", app_name)
+	if not _gtk_available or not _lgi then return end
+	local wref = _gtk_windows[app_name]
+	if not wref or not wref.window then return end
+	pcall(function() wref.window:destroy() end)
+	_gtk_windows[app_name] = nil
+	Logger.debug(LOG, "GTK window '%s' destroyed.", app_name)
 end
 
---- Focuses a GTK window (Linux only).
+--- Focuses a GTK window, bringing it to the front (Linux only).
 --- @param app_name string The app name.
 function M._focus_gtk_window(app_name)
-	if not _gtk_available then return end
-	Logger.info(LOG, "_focus_gtk_window: stub — GTK window for '%s' would focus.", app_name)
+	if not _gtk_available or not _lgi then return end
+	local wref = _gtk_windows[app_name]
+	if not wref or not wref.window then
+		Logger.debug(LOG, "GTK window '%s' not found — cannot focus.", app_name)
+		return
+	end
+	pcall(function()
+		wref.window:present()
+		if not wref.window.visible then
+			wref.window:show_all()
+		end
+	end)
+	Logger.debug(LOG, "GTK window '%s' focused.", app_name)
 end
 
 
 -- =========================================
 -- =========================================
--- ======= 7/ Initialisation ===============
+-- ======= 8/ Initialisation ===============
 -- =========================================
 -- =========================================
 
