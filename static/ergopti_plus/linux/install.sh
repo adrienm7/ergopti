@@ -164,6 +164,56 @@ _check_or_install luajit    luajit          luajit          luajit
 _check_or_install ydotool   ydotool         ydotool         ydotool
 _check_or_install notify-send libnotify-bin libnotify       libnotify
 
+# Optional Lua libraries — the daemon degrades gracefully without them,
+# but the full feature set (async event loop, webview rendering, tray SNI,
+# signal handlers) requires these packages.
+echo ""
+echo "=== Dépendances Lua optionnelles (event loop, timers, webviews, signaux) ==="
+
+# Probe each Lua module individually via luajit -e 'require("<name>")'.
+# _check_or_install with 'lua' would only check the interpreter, not the lib.
+_lua_module_installed() {
+	local mod="$1"
+	luajit -e "require('${mod}')" >/dev/null 2>&1
+}
+
+_install_lua_pkgs() {
+	local mod="$1"
+	local pkg_apt="$2"
+	local pkg_dnf="$3"
+	local pkg_pacman="$4"
+
+	if _lua_module_installed "$mod"; then
+		echo "  ✔  ${mod} (Lua module) — déjà installé"
+		return 0
+	fi
+
+	echo "  →  ${mod} manquant — installation du paquet (${pkg_apt}/${pkg_dnf})…"
+	local pkg_mgr
+	pkg_mgr=$(_detect_pkg_manager)
+
+	case "$pkg_mgr" in
+		apt)     sudo apt-get install -y "$pkg_apt" ;;
+		dnf)     sudo dnf install -y "$pkg_dnf" ;;
+		pacman)  sudo pacman -Sy --noconfirm "$pkg_pacman" ;;
+		*)
+			echo "  ⚠  Gestionnaire de paquets inconnu — installez '${mod}' manuellement." >&2
+			return 1
+			;;
+	esac
+}
+
+_install_lua_pkgs luv    lua-luv        lua-luv        lua-luv
+_install_lua_pkgs lfs    lua-filesystem lua-filesystem lua-filesystem
+_install_lua_pkgs posix  lua-posix      lua-posix      lua-posix
+_install_lua_pkgs lgi    lua-lgi        lua-lgi        lua-lgi
+
+# lua-http uses the module name 'http' (not 'http' which collides). Store as lua-http.
+# Most distros ship lua-http; the module is require("http") at runtime.
+_install_lua_pkgs http   lua-http       lua-http       lua-http
+
+echo "  → Les dépendances Lua optionnelles sont installées si disponibles."
+
 
 # =================================
 # =================================

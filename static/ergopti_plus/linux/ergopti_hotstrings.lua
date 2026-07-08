@@ -99,6 +99,9 @@ local tray_menu = nil
 local ok_tray, tray_mod = pcall(require, "adapters.tray_menu")
 if ok_tray then tray_menu = tray_mod end
 
+-- Event loop adapter (luv when available, pump fallback otherwise).
+local event_loop = require("adapters.event_loop")
+
 -- Menu builder (builds rich submenus from daemon state).
 local menu_builder = nil
 local ok_menu, menu_mod = pcall(require, "modules.menu.menu_builder")
@@ -113,6 +116,11 @@ if ok_llm then prediction_engine = llm_mod end
 local window_info = nil
 local ok_wi, wi_mod = pcall(require, "adapters.window_info")
 if ok_wi then window_info = wi_mod end
+
+-- Process lifecycle tracker (optional — drives focus-change events on Linux).
+local process_lifecycle = nil
+local ok_pl, pl_mod = pcall(require, "adapters.process_lifecycle")
+if ok_pl then process_lifecycle = pl_mod end
 
 
 -- =========================================
@@ -425,15 +433,37 @@ local function main()
 	Logger.success(LOG, "Daemon ready (device=%s layout=%s mappings=%d dry_run=%s tray=%s).",
 		device, opts.layout, mapping_count, tostring(opts.dry_run), tostring(opts.tray and tray_menu ~= nil))
 
-	-- 8.11) Pump-based event loop.
-	while keyboard_hook.isRunning() do
-		if tray_menu then
-			pcall(tray_menu.pump)
-		end
-		pcall(keyboard_hook.pump)
+	-- 8.11) Start process lifecycle polling if the adapter loaded.
+	-- tick() drives focus-change and app-launch/quit detection at 250 ms
+	-- intervals; the event loop calls it periodically.
+	local tick_count = 0
+	if process_lifecycle then
+		process_lifecycle.start()
 	end
 
-	-- 8.12) Clean exit.
+	-- 8.12) Event loop — luv native when available, pump fallback otherwise.
+	-- The idle callback pumps the keyboard hook + tray menu;
+	-- the periodic callback drives process_lifecycle.tick().
+	event_loop.run({
+		onIdle = function()
+			if not keyboard_hook.isRunning() then
+				event_loop.stop()
+				return
+			end
+			if tray_menu then
+				pcall(tray_menu.pump)
+			end
+			pcall(keyboard_hook.pump)
+		end,
+		onPeriodic = process_lifecycle and function()
+			tick_count = tick_count + 1
+			pcall(process_lifecycle.tick, tick_count)
+		end or nil,
+		periodSec = 0.25,
+	})
+
+	-- 8.13) Clean exit.
+	if process_lifecycle then process_lifecycle.stop() end
 	if tray_menu then tray_menu.destroy() end
 
 	local stats = keylogger.get_session_stats()
