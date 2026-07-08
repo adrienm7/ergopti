@@ -162,12 +162,16 @@ Corriger côté Linux pour lire les canoniques.
 
 ### P0-F — Cap buffer hotstring divergent *(Tier 2/3)*
 
-- [ ] **P0-F.1** Cap du buffer glissant : shared Lua `_shared/lua/hotstring_engine/init.lua:56`
-  = `256` (macOS+Linux) ; Windows hardcode `64` dans **2** fichiers
-  (`windows/lib/hotstrings/hotstring_inputhook.ahk:64` `_MAX_BUFFER_LEN`,
-  `windows/lib/hotstrings/hotstring_engine_main.ahk:62` `HSE_MAX_BUFFER_LEN`, le
-  commentaire admet qu'ils doivent concorder). Décider la valeur correcte, single-sourcer
-  (canon `_shared`), + test de parité. (Intra-Windows : au minimum les 2 lire une constante.)
+- [x] **P0-F.1** Cap du buffer glissant unifié. **Décision : canon = 256** (valeur
+  `_shared/lua/hotstring_engine/init.lua BUFFER_MAX_CHARS`, déjà utilisée par
+  macOS+Linux). Windows convergé **vers le haut** `64 → 256` dans les 2 fichiers
+  (`hotstring_inputhook.ahk` `_MAX_BUFFER_LEN`, `hotstring_engine_main.ahk`
+  `HSE_MAX_BUFFER_LEN`). Direction **zéro régression** : un buffer plus long ne fait
+  qu'**ajouter** la capacité de matcher un trigger de 65-256 car. (que Windows ratait
+  silencieusement), sans casser les triggers courts. Gate de parité
+  `test-hotstring-buffer-cap-parity.cjs` (shared == les 2 miroirs Windows).
+  ⚠️ Si le mainteneur avait une raison perf pour `64`, inverser (mais réduire
+  macOS/Linux à 64 casserait les longs triggers → régression).
 
 ### P0-G — Logique métier dupliquée cross-driver (aucun module partagé NI corpus)
 
