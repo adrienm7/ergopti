@@ -168,45 +168,10 @@ end
 -- evtest output format (stderr, redirected to stdout via 2>&1):
 --   Event: time 123.456, type 1 (EV_KEY), code 30 (KEY_A), value 1
 
-local _KEYCODE_MAP = nil
-
---- Builds a reverse map: KEY_NAME → integer code from the input_reader tables.
-local function _build_keycode_map()
-	if _KEYCODE_MAP then return _KEYCODE_MAP end
-	local ir = _get_input_reader()
-	if not ir then return {} end
-
-	-- The input_reader doesn't export a key-name map directly, but we can
-	-- build one from the KEY_* constants it defines. Since those are local,
-	-- we replicate the ones we need for libinput/evtest parsing.
-	_KEYCODE_MAP = {
-		KEY_ESC = 1, KEY_1 = 2, KEY_2 = 3, KEY_3 = 4, KEY_4 = 5,
-		KEY_5 = 6, KEY_6 = 7, KEY_7 = 8, KEY_8 = 9, KEY_9 = 10,
-		KEY_0 = 11, KEY_MINUS = 12, KEY_EQUAL = 13,
-		KEY_BACKSPACE = 14, KEY_TAB = 15,
-		KEY_Q = 16, KEY_W = 17, KEY_E = 18, KEY_R = 19, KEY_T = 20,
-		KEY_Y = 21, KEY_U = 22, KEY_I = 23, KEY_O = 24, KEY_P = 25,
-		KEY_LEFTBRACE = 26, KEY_RIGHTBRACE = 27,
-		KEY_ENTER = 28, KEY_LEFTCTRL = 29,
-		KEY_A = 30, KEY_S = 31, KEY_D = 32, KEY_F = 33, KEY_G = 34,
-		KEY_H = 35, KEY_J = 36, KEY_K = 37, KEY_L = 38, KEY_SEMICOLON = 39,
-		KEY_APOSTROPHE = 40, KEY_GRAVE = 41,
-		KEY_LEFTSHIFT = 42, KEY_BACKSLASH = 43,
-		KEY_Z = 44, KEY_X = 45, KEY_C = 46, KEY_V = 47, KEY_B = 48,
-		KEY_N = 49, KEY_M = 50, KEY_COMMA = 51, KEY_DOT = 52, KEY_SLASH = 53,
-		KEY_RIGHTSHIFT = 54, KEY_KPASTERISK = 55,
-		KEY_LEFTALT = 56, KEY_SPACE = 57, KEY_CAPSLOCK = 58,
-		KEY_F1 = 59, KEY_F2 = 60, KEY_F3 = 61, KEY_F4 = 62,
-		KEY_F5 = 63, KEY_F6 = 64, KEY_F7 = 65, KEY_F8 = 66,
-		KEY_F9 = 67, KEY_F10 = 68, KEY_F11 = 87, KEY_F12 = 88,
-		KEY_RIGHTCTRL = 97, KEY_RIGHTALT = 100,
-		KEY_HOME = 102, KEY_UP = 103, KEY_PAGEUP = 104,
-		KEY_LEFT = 105, KEY_RIGHT = 106,
-		KEY_END = 107, KEY_DOWN = 108, KEY_PAGEDOWN = 109,
-		KEY_INSERT = 110, KEY_DELETE = 111,
-	}
-	return _KEYCODE_MAP
-end
+-- The KEY_NAME → integer code map and the hardcoded layout tables that used to
+-- live here were removed. The layout tables were triplicated copies of
+-- _shared/data/keycodes/evdev.json (already loaded by input_reader). Character
+-- resolution now delegates to input_reader.resolve_char() — single source
 
 --- Extracts the keycode from a libinput line.
 --- e.g. "event3  KEYBOARD_KEY  +1.234s  KEY_A (30) pressed" → 30
@@ -324,66 +289,14 @@ local function _pump_one()
 	return true
 end
 
--- Cached layout tables for character resolution.
-local _layout_unshifted = nil
-local _layout_shifted = nil
-
---- Resolves a keycode to a character using the active layout.
---- Returns nil for non-printable keys.
+--- Resolves a keycode to a character using the input_reader's layout tables
+--- (which are loaded from _shared/data/keycodes/evdev.json). Returns nil for
+--- non-printable keys. This replaces the triplicated hardcoded tables that
+--- were previously inlined here.
 function _resolve_char(code)
-	-- Load layout tables from input_reader if not cached.
-	if not _layout_unshifted then
-		local ir = _get_input_reader()
-		if not ir then return nil end
-
-		-- Access the LAYOUTS table from input_reader's module scope.
-		-- Since it's local, we rebuild a minimal table using the hardcoded fallbacks.
-		-- This is a pragmatic bridge until input_reader exports a public API.
-		local layouts = {
-			qwerty = {
-				unshifted = {
-					[2]="1",[3]="2",[4]="3",[5]="4",[6]="5",[7]="6",[8]="7",[9]="8",[10]="9",[11]="0",
-					[12]="-",[13]="=",[16]="q",[17]="w",[18]="e",[19]="r",[20]="t",
-					[21]="y",[22]="u",[23]="i",[24]="o",[25]="p",[26]="[",[27]="]",
-					[30]="a",[31]="s",[32]="d",[33]="f",[34]="g",[35]="h",[36]="j",[37]="k",[38]="l",
-					[39]=";",[40]="'",[44]="z",[45]="x",[46]="c",[47]="v",[48]="b",
-					[49]="n",[50]="m",[51]=",",[52]=".",[53]="/",[57]=" ",
-				},
-				shifted = {
-					[2]="!",[3]="@",[4]="#",[5]="$",[6]="%",[7]="^",[8]="&",[9]="*",[10]="(", [11]=")",
-					[12]="_",[13]="+",[16]="Q",[17]="W",[18]="E",[19]="R",[20]="T",
-					[21]="Y",[22]="U",[23]="I",[24]="O",[25]="P",[26]="{",[27]="}",
-					[30]="A",[31]="S",[32]="D",[33]="F",[34]="G",[35]="H",[36]="J",[37]="K",[38]="L",
-					[39]=":",[40]='"',[44]="Z",[45]="X",[46]="C",[47]="V",[48]="B",
-					[49]="N",[50]="M",[51]="<",[52]=">",[53]="?",[57]=" ",
-				}
-			},
-			azerty = {
-				unshifted = {
-					[2]="&",[3]="é",[4]='"',[5]="'",[6]="(",[7]="-",[8]="è",[9]="_",[10]="ç",[11]="à",
-					[12]=")",[13]="=",[16]="a",[17]="z",[18]="e",[19]="r",[20]="t",
-					[21]="y",[22]="u",[23]="i",[24]="o",[25]="p",
-					[30]="q",[31]="s",[32]="d",[33]="f",[34]="g",[35]="h",[36]="j",[37]="k",[38]="l",
-					[39]="m",[40]="ù",[44]="w",[45]="x",[46]="c",[47]="v",[48]="b",
-					[49]="n",[50]=",",[51]=";",[52]=":",[53]="!",[57]=" ",
-				},
-				shifted = {
-					[2]="1",[3]="2",[4]="3",[5]="4",[6]="5",[7]="6",[8]="7",[9]="8",[10]="9",[11]="0",
-					[12]="°",[13]="+",[16]="A",[17]="Z",[18]="E",[19]="R",[20]="T",
-					[21]="Y",[22]="U",[23]="I",[24]="O",[25]="P",
-					[30]="Q",[31]="S",[32]="D",[33]="F",[34]="G",[35]="H",[36]="J",[37]="K",[38]="L",
-					[39]="M",[40]="%",[44]="W",[45]="X",[46]="C",[47]="V",[48]="B",
-					[49]="N",[50]="?",[51]=".",[52]="/",[53]="§",[57]=" ",
-				}
-			}
-		}
-		local lt = layouts[_layout] or layouts["qwerty"]
-		_layout_unshifted = lt.unshifted
-		_layout_shifted = lt.shifted
-	end
-	-- Use shifted table when Shift is held; unshifted otherwise.
-	local table_to_use = _shift_held and _layout_shifted or _layout_unshifted
-	return table_to_use[code]
+	local ir = _get_input_reader()
+	if not ir or not ir.resolve_char then return nil end
+	return ir.resolve_char(code, _layout, _shift_held)
 end
 
 
