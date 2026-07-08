@@ -70,12 +70,15 @@ local function _build_hotstrings(config)
 
 	for _, group in ipairs(groups) do
 		local group_name = group
-		local is_enabled = config.is_group_enabled and config:is_group_enabled(group_name)
+		-- Flat function call (`.`, not `:`): hotstrings_config.is_group_enabled is
+		-- defined as `M.is_group_enabled(group_name)` with no self param, so `:`
+		-- would pass the config table as group_name and misread every group.
+		local is_enabled = config.is_group_enabled and config.is_group_enabled(group_name)
 		items[#items + 1] = {
 			title = group_name .. (is_enabled and " ✓" or ""),
 			fn = function()
 				-- Toggle group enable/disable and reload.
-				if config.toggle_group then config:toggle_group(group_name) end
+				if config.toggle_group then config.toggle_group(group_name) end
 			end,
 		}
 	end
@@ -85,7 +88,7 @@ local function _build_hotstrings(config)
 	items[#items + 1] = {
 		title = "Recharger les hotstrings",
 		fn = function()
-			if config.reload then config:reload() end
+			if config.reload then config.reload() end
 		end,
 	}
 

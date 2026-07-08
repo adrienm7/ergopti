@@ -367,7 +367,7 @@ basse sévérité. Détail dans l'audit SSoT.)*
   prévu). Tant qu'elles manquent, timers/signaux/webviews/tray SNI ne peuvent pas
   fonctionner même une fois câblés. Documenter l'install (script `install.sh` +
   paquets .deb/.rpm/AUR déjà présents — ajouter les deps).
-- [ ] **P1.7 — mismatch `:` vs `.`** `linux/modules/menu/menu_builder.lua:67,72`
+- [x] **P1.7 — mismatch `:` vs `.`** `linux/modules/menu/menu_builder.lua:67,72`
   appelle `config:is_group_enabled`/`config:toggle_group` (self implicite) mais les
   fonctions sont plates (`linux/modules/hotstrings/hotstrings_config.lua:179,188`).
 
