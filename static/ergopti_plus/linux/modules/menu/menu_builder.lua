@@ -438,14 +438,12 @@ local function _build_global_actions(ctx)
 		{
 			title = i18n_safe("menu.global.enable_all", "Activer tout"),
 			fn = function()
-				Logger.info(LOG, "[stub] enable_all — global hotstring toggle.")
 				if ctx.on_enable_all then ctx.on_enable_all() end
 			end,
 		},
 		{
 			title = i18n_safe("menu.global.disable_all", "Désactiver tout"),
 			fn = function()
-				Logger.info(LOG, "[stub] disable_all.")
 				if ctx.on_disable_all then ctx.on_disable_all() end
 			end,
 		},
@@ -453,7 +451,6 @@ local function _build_global_actions(ctx)
 		{
 			title = i18n_safe("menu.global.reset_defaults", "Réinitialiser"),
 			fn = function()
-				Logger.info(LOG, "[stub] reset_defaults.")
 				if ctx.on_reset_defaults then ctx.on_reset_defaults() end
 			end,
 		},
@@ -511,12 +508,11 @@ local function _build_config_folder(ctx)
 	}
 end
 
---- Builds the setup wizard launcher (P2.2 — stub).
+--- Builds the setup wizard launcher (P2.2 — opens WebKitGTK onboarding window).
 local function _build_setup_wizard(ctx)
 	return {
 		title = i18n_safe("menu.global.setup_wizard", "🧙 Assistant"),
 		fn = function()
-			Logger.info(LOG, "[stub] Setup wizard — P2.2 (webview).")
 			if ctx.on_show_setup_wizard then ctx.on_show_setup_wizard() end
 		end,
 	}
@@ -666,7 +662,6 @@ local function _build_debug(ctx)
 		level_items[#level_items + 1] = {
 			title = lvl,
 			fn = function()
-				Logger.info(LOG, "[stub] Set log level to %s.", lvl)
 				if ctx.on_set_log_level then ctx.on_set_log_level(lvl) end
 			end,
 		}
@@ -680,14 +675,12 @@ local function _build_debug(ctx)
 		{
 			title = i18n_safe("menu.debug.open_logs", "Ouvrir les logs"),
 			fn = function()
-				Logger.info(LOG, "[stub] Open logs folder.")
 				if ctx.on_open_logs then ctx.on_open_logs() end
 			end,
 		},
 		{
 			title = i18n_safe("menu.debug.healthcheck", "Diagnostic"),
 			fn = function()
-				Logger.info(LOG, "[stub] Healthcheck — P2.2 (webview).")
 				if ctx.on_healthcheck then ctx.on_healthcheck() end
 			end,
 		},
