@@ -49,7 +49,9 @@ M.DEFAULT_KEEP_ALIVE = "30m"
 M.DEFAULT_CONTEXT_LENGTH = 500
 
 --- Number of words from the buffer tail kept as rolling context window.
-M.CONTEXT_TAIL_WORDS = 5
+--- Single-sourced from the shared PromptBuilder (already required above) — it is
+--- the canonical for this value, so re-typing 5 here would let the two drift.
+M.CONTEXT_TAIL_WORDS = PromptBuilder.CONTEXT_TAIL_WORDS
 
 -- ============================================================================
 -- 2. Internal helpers
@@ -262,7 +264,7 @@ function M.build_payload(buffer, config)
 	config = config or {}
 	local system_prompt = config.system_prompt
 	local model_name    = config.model or "llama3.2"
-	local max_tokens    = config.max_tokens or 150
+	local max_tokens    = config.max_tokens or PromptBuilder.DEFAULT_MAX_TOKENS
 	local temperature   = config.temperature or M.DEFAULT_TEMPERATURE
 	local num_preds     = config.num_predictions or 1
 	local stream        = config.stream or false
