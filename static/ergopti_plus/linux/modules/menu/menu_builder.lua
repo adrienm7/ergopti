@@ -220,17 +220,60 @@ local function _build_shortcuts(_ctx)
 end
 
 --- Builds the Kanata submenu (Linux's Karabiner — P2.5).
+--- Actions delegate to the kanata manager module if loaded.
 local function _build_kanata(_ctx)
+	-- Try to load the kanata manager for real actions.
+	local km = nil
+	local ok_km, km_mod = pcall(require, "modules.kanata.manager")
+	if ok_km then km = km_mod end
+
+	local running = km and km.is_running() or false
+
 	return { title = "🎹 Kanata", menu = {
-		{ title = "Config tap-hold " .. i18n_safe("menu.kanata.tap_hold", "…"), fn = function()
-			Logger.info(LOG, "[stub] Kanata tap-hold config — P2.5.")
-		end },
-		{ title = "Générer le .kbd", fn = function()
-			Logger.info(LOG, "[stub] Kanata .kbd generation — P2.5.")
-		end },
-		{ title = "Redémarrer kanata", fn = function()
-			Logger.info(LOG, "[stub] Kanata restart — P2.5.")
-		end },
+		{
+			title = "Générer le .kbd",
+			fn = function()
+				if km then
+					if km.write_kbd() then
+						Logger.info(LOG, "Kanata .kbd generated.")
+					else
+						Logger.error(LOG, "Kanata .kbd generation failed.")
+					end
+				else
+					Logger.info(LOG, "[stub] Kanata manager not loaded.")
+				end
+			end,
+		},
+		{
+			title = "Démarrer kanata" .. (running and " ✓" or ""),
+			fn = function()
+				if km then
+					km.start()
+				else
+					Logger.info(LOG, "[stub] Kanata manager not loaded.")
+				end
+			end,
+		},
+		{
+			title = "Arrêter kanata",
+			fn = function()
+				if km then
+					km.stop()
+				else
+					Logger.info(LOG, "[stub] Kanata manager not loaded.")
+				end
+			end,
+		},
+		{
+			title = "Redémarrer kanata",
+			fn = function()
+				if km then
+					km.restart()
+				else
+					Logger.info(LOG, "[stub] Kanata manager not loaded.")
+				end
+			end,
+		},
 	}}
 end
 
