@@ -193,6 +193,7 @@ InstallSendNoOps()
 #Include unit/test_adapter_compliance_new.ahk
 #Include unit/test_feature_io_locator.ahk
 #Include meta/test_feature_io_impl_no_global.ahk
+#Include meta/test_isset_no_property_arg.ahk
 #Include unit/test_adapter_contract_vectors.ahk
 #Include unit/test_text_sender_modifiers.ahk
 #Include unit/test_timer_scheduler.ahk

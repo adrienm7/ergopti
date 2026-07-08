@@ -126,7 +126,12 @@ WebView_SweepStaleProfiles(prefix) {
 
 class WebViewHost {
     ; ── Static shared state ──────────────────────────────────────────────────
-    static _ManifestCache := unset
+    ; "" is the "manifest not loaded yet" sentinel; _LoadManifest replaces it
+    ; with a Map. Deliberately NOT ``unset``: _ManifestEntry reads the cache
+    ; unconditionally via ``is Map``, and reading an ``unset`` property throws a
+    ; PropertyError (see project-ahk-v2-static-unset-unreadable). A concrete
+    ; sentinel makes both the load-once guard and the ``is Map`` read safe.
+    static _ManifestCache := ""
     static _Instances      := Map()   ; AppId → WebViewHost (singleton tracking)
 
     ; ── Instance fields ──────────────────────────────────────────────────────
@@ -165,7 +170,10 @@ class WebViewHost {
     ; --------------------------------------------------------------------------
     static TryOpen(AppId, Opts) {
         ; ── Load manifest if not cached ──────────────────────────────────────
-        if !IsSet(WebViewHost._ManifestCache) {
+        ; The cache holds "" until loaded, then a Map. AHK v2 ``IsSet`` accepts
+        ; only a plain variable (never a property expression), so the not-loaded
+        ; state is tested against the concrete "" sentinel, not IsSet.
+        if (WebViewHost._ManifestCache == "") {
             WebViewHost._LoadManifest()
         }
 
@@ -395,7 +403,7 @@ class WebViewHost {
     ; ── Queue-based eval ─────────────────────────────────────────────────────
     ; Evaluates JS in the page, queuing until the page signals ready.
     Eval(Js) {
-        if (this.Ready && IsSet(this.WebView)) {
+        if (this.Ready && this.HasOwnProp("WebView")) {
             SetTimer(this._RunScript.Bind(Js), -1)
         } else {
             this.Queue.Push(Js)
@@ -405,7 +413,7 @@ class WebViewHost {
     }
 
     _RunScript(Js) {
-        if !IsSet(this.WebView)
+        if !this.HasOwnProp("WebView")
             return
         try this.WebView.ExecuteScriptAsync(Js)
     }
@@ -413,7 +421,7 @@ class WebViewHost {
     _FlushQueue() {
         this.Ready := true
         for _, Js in this.Queue {
-            if IsSet(this.WebView)
+            if this.HasOwnProp("WebView")
                 SetTimer(this._RunScript.Bind(Js), -1)
         }
         this.Queue := []
@@ -430,7 +438,7 @@ class WebViewHost {
     _OnResize(GuiObj, MinMax, Width, Height) {
         if (MinMax == -1)
             return
-        if IsSet(this.Controller)
+        if this.HasOwnProp("Controller")
             try this.Controller.Fill()
     }
 
@@ -464,7 +472,7 @@ class WebViewHost {
         try {
             this.MsgSub := unset
             this.NavSub := unset
-            if CloseController && IsSet(this.Controller)
+            if CloseController && this.HasOwnProp("Controller")
                 this.Controller.Close()
         }
         this.Controller := unset
