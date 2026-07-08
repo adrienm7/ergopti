@@ -385,15 +385,23 @@ local function main()
 	end
 
 	-- 8.6) Initialise the LLM prediction engine if available.
+	-- Use the shared canonical DEFAULT_CONTEXT_LENGTH from the linux_bridge
+	-- (mirrors _shared/modules/llm/defaults.json llm_context_length = 500)
+	-- so all three drivers send the same context window.
 	if prediction_engine then
+		local canonical_ctx = 500  -- defensive fallback
+		local ok_lb, lb = pcall(require, "llm.linux_bridge")
+		if ok_lb and lb and lb.DEFAULT_CONTEXT_LENGTH then
+			canonical_ctx = lb.DEFAULT_CONTEXT_LENGTH
+		end
 		prediction_engine.init({
 			engine        = engine,
 			keyboard_hook = keyboard_hook,
 			triggers      = { "//", ";;", "--" },
-			max_context   = 2000,
+			max_context   = canonical_ctx,
 			auto_inject   = true,
 		})
-		Logger.info(LOG, "LLM prediction engine initialised.")
+		Logger.info(LOG, "LLM prediction engine initialised (max_context=%d).", canonical_ctx)
 	end
 
 	-- 8.6a) Initialise dynamic hotstrings (@-tag expansions).

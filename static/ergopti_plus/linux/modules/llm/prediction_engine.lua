@@ -40,6 +40,10 @@ local PromptBuilder = nil
 local ok_pb, pb_mod = pcall(require, "llm.prompt_builder")
 if ok_pb then PromptBuilder = pb_mod end
 
+local ProfileSelector = nil
+local ok_ps, ps_mod = pcall(require, "llm.profile_selector")
+if ok_ps then ProfileSelector = ps_mod end
+
 
 -- =========================================
 -- =========================================
@@ -119,9 +123,14 @@ function M.init(opts)
 
 	-- Initialise LLM profiles with the canonical Ollama port (defaults.json
 	-- llm_ollama_port via linux_bridge), never a re-typed literal.
+	-- Then sync the engine's _enabled with the persisted profiles state so
+	-- the menu toggle and daemon restart use the same source of truth.
 	local profiles = _get_profiles()
 	if profiles then
 		profiles.init({ port = HttpBridge and HttpBridge.OLLAMA_DEFAULT_PORT })
+		if type(profiles.is_enabled) == "function" then
+			_enabled = profiles.is_enabled()
+		end
 	end
 
 	Logger.success(LOG, "Prediction engine initialised (triggers=%d, max_context=%d, auto_inject=%s).",
@@ -272,20 +281,34 @@ end
 -- =========================================
 
 --- Builds the system prompt for the LLM.
---- Delegates to the shared prompt_builder when available.
+--- Delegates to the shared PromptBuilder and ProfileSelector for template resolution.
 --- @return string
 function _build_system_prompt()
-	-- Try the shared prompt builder.
-	local ok, prompt_builder = pcall(require, "llm.prompt_builder")
-	if ok and prompt_builder and prompt_builder.resolve_system_prompt then
-		local prompt = prompt_builder.resolve_system_prompt("linux", "fr")
-		if type(prompt) == "string" and prompt ~= "" then return prompt end
+	-- Use the already-loaded shared PromptBuilder and ProfileSelector
+	-- (both loaded at module level).
+	if PromptBuilder and type(PromptBuilder.build_params) == "function" then
+		if ProfileSelector and type(ProfileSelector.get_active_profile) == "function" then
+			local profile = ProfileSelector.get_active_profile("basic")
+			if profile then
+				local resolved = ProfileSelector.resolve_system_prompt(profile, {
+					context    = "",
+					tail       = "",
+					min_words  = 1,
+					max_words  = 5,
+					n          = 1,
+					language   = "fr",
+				})
+				if resolved and type(resolved.system) == "string" and resolved.system ~= "" then
+					return resolved.system
+				end
+			end
+		end
 	end
 
 	-- Fallback: basic French completions prompt.
-	return [[Tu es un assistant de complétion de texte en français. 
-        Continue le texte de l'utilisateur de manière naturelle et concise. 
-        Ne répète pas le texte de l'utilisateur. 
+	return [[Tu es un assistant de complétion de texte en français.
+        Continue le texte de l'utilisateur de manière naturelle et concise.
+        Ne répète pas le texte de l'utilisateur.
         Réponds uniquement avec la suite du texte, sans préambule ni explication.]]
 end
 
@@ -311,6 +334,28 @@ function M.is_enabled()
 	return _enabled
 end
 
+--- Enables the prediction engine (delegates to profiles for persistence).
+function M.enable()
+	_enabled = true
+	local profiles = _get_profiles()
+	if profiles and type(profiles.enable) == "function" then
+		profiles.enable()
+	end
+	Logger.info(LOG, "Prediction engine enabled.")
+end
+
+--- Disables the prediction engine and cancels any in-flight prediction.
+--- Delegates to profiles for persistence.
+function M.disable()
+	_enabled = false
+	M.cancel()
+	local profiles = _get_profiles()
+	if profiles and type(profiles.disable) == "function" then
+		profiles.disable()
+	end
+	Logger.info(LOG, "Prediction engine disabled.")
+end
+
 --- Toggles the prediction engine on/off.
 function M.toggle()
 	_enabled = not _enabled
@@ -328,6 +373,81 @@ end
 --- @return table
 function M.get_triggers()
 	return _triggers
+end
+
+--- Delegates to profiles for model management (menu + bridge compatibility).
+--- @return table Array of model name strings.
+function M.get_models()
+	local profiles = _get_profiles()
+	if profiles and type(profiles.get_models) == "function" then
+		return profiles.get_models()
+	end
+	return {}
+end
+
+--- Delegates to profiles for current model name.
+--- @return string|nil
+function M.get_current_model()
+	local profiles = _get_profiles()
+	if profiles and type(profiles.get_current_model) == "function" then
+		return profiles.get_current_model()
+	end
+	return nil
+end
+
+--- Delegates to profiles for model selection.
+--- @param model_name string
+function M.set_model(model_name)
+	local profiles = _get_profiles()
+	if profiles and type(profiles.set_model) == "function" then
+		profiles.set_model(model_name)
+	end
+end
+
+--- Delegates to profiles for model refresh.
+function M.refresh_models()
+	local profiles = _get_profiles()
+	if profiles and type(profiles.refresh_models) == "function" then
+		profiles.refresh_models()
+	end
+end
+
+--- Returns the configured max tokens (delegates to PromptBuilder or defaults).
+--- @return number
+function M.get_max_tokens()
+	return (PromptBuilder and PromptBuilder.DEFAULT_MAX_TOKENS) or 150
+end
+
+--- Returns the configured temperature (from the shared bridge).
+--- @return number
+function M.get_temperature()
+	return (HttpBridge and HttpBridge.DEFAULT_TEMPERATURE) or 0.1
+end
+
+--- Returns the configured max context chars.
+--- @return number
+function M.get_max_context()
+	return _max_context_chars
+end
+
+--- Sets the max context chars for the LLM window.
+--- @param n number
+function M.set_max_context(n)
+	if type(n) == "number" and n > 0 then
+		_max_context_chars = n
+	end
+end
+
+--- Returns the configured stop sequences.
+--- @return table
+function M.get_stop_sequences()
+	return {}
+end
+
+--- Returns whether auto-inject is enabled.
+--- @return boolean
+function M.is_auto_inject()
+	return _auto_inject
 end
 
 return M
