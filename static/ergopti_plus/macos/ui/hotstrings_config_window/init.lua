@@ -54,8 +54,9 @@ local _config = {
 	extensions_dir = nil,
 }
 
-local WINDOW_WIDTH  = 720
-local WINDOW_HEIGHT = 640
+-- Window geometry is resolved at open time from the shared manifest
+-- (ui_builder.get_app_geometry → _shared/ui/apps.manifest.json, SSoT). No local
+-- width/height constant: hardcoding here is what caused the cross-driver drift.
 
 -- The global delay fallback (seconds) that applies when no TOML default is set.
 -- Mirrored from hotstrings_config GLOBAL_DEFAULT_DELAY — both must stay in sync.
@@ -752,8 +753,10 @@ function M.open()
 	_usercontent = uc
 	_usercontent:setCallback(on_message)
 
+	local geo = ui_builder.get_app_geometry("hotstrings_config_window")
+	if not geo then return end
 	_webview = ui_builder.show_webview({
-		frame        = ui_builder.get_centered_frame(WINDOW_WIDTH, WINDOW_HEIGHT),
+		frame        = ui_builder.get_centered_frame(geo.width, geo.height),
 		title        = i18n.get("hs_config.window_title"),
 		style_masks  = { "titled", "closable", "resizable", "utility" },
 		usercontent  = _usercontent,

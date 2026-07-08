@@ -36,8 +36,9 @@ local LOG = "prompt_editor"
 local _webview     = nil
 local _usercontent = nil
 
-local WINDOW_WIDTH  = 550
-local WINDOW_HEIGHT = 480
+-- Window geometry is resolved at open time from the shared manifest
+-- (ui_builder.get_app_geometry → _shared/ui/apps.manifest.json, SSoT). No local
+-- width/height constant: hardcoding here is what caused the cross-driver drift.
 
 -- The frontend (index.html / script.js / style.css) lives in the cross-driver
 -- _shared/ui/ tree so the Windows WebView2 host renders the identical UI; both
@@ -104,8 +105,10 @@ function M.open(existing, on_save)
 	end)
 
 	-- Request the webview creation/focus from the centralized UI builder
+	local geo = ui_builder.get_app_geometry("prompt_editor")
+	if not geo then return end
 	_webview = ui_builder.show_webview({
-		frame         = ui_builder.get_centered_frame(WINDOW_WIDTH, WINDOW_HEIGHT),
+		frame         = ui_builder.get_centered_frame(geo.width, geo.height),
 		title         = title_str,
 		style_masks   = {"titled", "closable", "utility"},
 		usercontent   = _usercontent,

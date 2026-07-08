@@ -368,8 +368,10 @@ function M.open(open_mode)
 	local window_style = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8) + (masks["miniaturizable"] or 4)
 
 	-- Request the webview creation/focus from the centralized UI builder
+	local geo = ui_builder.get_app_geometry("hotstring_editor")
+	if not geo then return end
 	_webview = ui_builder.show_webview({
-		frame       = ui_builder.get_centered_frame(760, 640),
+		frame       = ui_builder.get_centered_frame(geo.width, geo.height),
 		title       = i18n.get("editor.hotstrings.window_title"),
 		style_masks = window_style,
 		usercontent = _usercontent,

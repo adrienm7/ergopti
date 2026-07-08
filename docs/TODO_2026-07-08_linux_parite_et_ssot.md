@@ -65,13 +65,19 @@ reader Windows `WebViewHost` (`windows/lib/webview_utils.ahk:127-257`) n'est jam
 appelé ; macOS ne le référence pas ; Linux stub. Résultat : chaque taille définie
 3× et **9 ont déjà dérivé** (l'app a une taille différente macOS vs Windows).
 
-- [ ] **P0-A.1** Câbler macOS `ui_builder` (`macos/ui/ui_builder.lua`, factory
-  `M.show_webview`) pour lire la géométrie depuis `apps.manifest.json` **par id d'app**.
-- [ ] **P0-A.2** Câbler le host Windows : soit **activer** `WebViewHost`
-  (`windows/lib/webview_utils.ahk:127`) et le faire consommer par chaque host AHK,
-  soit le supprimer et lire le manifeste au point d'ouverture. Pas de reader mort.
-- [ ] **P0-A.3** Réconcilier les **9 dérives** sur la valeur manifeste (source de
-  vérité) :
+- [x] **P0-A.1** Câbler macOS `ui_builder` (`macos/ui/ui_builder.lua`,
+  `M.get_app_geometry(id)`) pour lire la géométrie depuis `apps.manifest.json`
+  **par id d'app** ; les 10 modules UI résolvent leur taille à l'ouverture (plus
+  aucun littéral macOS). Test lua `tests/unit/ui/test_ui_builder_geometry.lua`.
+- [~] **P0-A.2** Host Windows : **partiel**. Migration des 14 modules AHK vers
+  `WebViewHost` (`windows/lib/webview_utils.ahk:127`, qui lit déjà le manifeste)
+  **reportée** — trop risquée sans exécution AHK possible ici. À la place : la seule
+  dérive Windows (changelog) est corrigée et **toutes** les valeurs Windows sont
+  épinglées au manifeste par le gate P0-A.4 (rouge si un littéral dérive). Le reader
+  `WebViewHost` reste la cible de migration (pas supprimé : c'est la bonne archi).
+- [x] **P0-A.3** Réconcilier les **9 dérives** sur la valeur manifeste (source de
+  vérité) — 8 dérives macOS supprimées par câblage (P0-A.1), dérive Windows
+  changelog `h560→h580` corrigée :
 
   | App | Canonique (`apps.manifest.json`) | Windows | macOS (à corriger) |
   |---|---|---|---|
@@ -90,8 +96,9 @@ appelé ; macOS ne le référence pas ; Linux stub. Résultat : chaque taille d�
   dont le commentaire admet « matches the Hammerspoon proportions ») ; **action_picker**
   460×560 (`windows/ui/action_picker_webview.ahk:67-68` + `macos/ui/action_picker/init.lua:45-46`).
   **Ne PAS unifier** metrics_typing / metrics_apps (volontairement écran-relatifs).
-- [ ] **P0-A.4** Test : `tools/test/test-webview-geometry-single-source.cjs` — la
-  géométrie résolue de chaque driver == valeur manifeste (comme `test-priority-parity`).
+- [x] **P0-A.4** Test : `tools/test/test-webview-geometry-single-source.cjs` (dans
+  `run-js-suite`) — macOS défère à `get_app_geometry`, littéraux Windows == manifeste
+  (20 checks). Rouge prouvé sur dérive, vert après.
 
 ### P0-B — Sous-système LLM Linux qui contourne `_shared` *(Tier 1)*
 

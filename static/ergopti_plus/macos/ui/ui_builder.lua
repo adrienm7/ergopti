@@ -165,6 +165,59 @@ end
 -- ====================================
 -- ====================================
 
+-- Per-process cache of the parsed shared apps manifest (`apps` table keyed by
+-- app id). Read once from the shared tree; geometry never changes during a
+-- session, so a single decode per HS session is enough.
+local _apps_manifest_cache = nil
+
+--- Loads and caches the shared per-app geometry manifest.
+--- @return table|nil The `apps` table keyed by app id, or nil on failure.
+local function load_apps_manifest()
+	if _apps_manifest_cache ~= nil then
+		return _apps_manifest_cache
+	end
+	local path = Paths.shared("ui/apps.manifest.json") or ""
+	local ok_r, fh = pcall(io.open, path, "r")
+	if not ok_r or not fh then
+		Logger.error(LOG, "Cannot open apps.manifest.json at '%s'.", path)
+		return nil
+	end
+	local content = fh:read("*a")
+	fh:close()
+	local ok_j, data = pcall(hs.json.decode, content)
+	if not ok_j or type(data) ~= "table" or type(data.apps) ~= "table" then
+		Logger.error(LOG, "Failed to parse apps.manifest.json.")
+		return nil
+	end
+	_apps_manifest_cache = data.apps
+	return _apps_manifest_cache
+end
+
+--- Resolves the canonical geometry for a webview app from the shared manifest.
+--- Window geometry is defined exactly once in `_shared/ui/apps.manifest.json` so
+--- all three drivers open every window at the same size (SSoT). Callers MUST use
+--- this instead of hardcoding width/height. Fails loud (logs ERROR, returns nil)
+--- on an unknown id so a typo surfaces immediately rather than silently opening a
+--- mis-sized window; callers return early on nil (no hardcoded fallback, §5.4).
+--- @param app_id string The manifest key (e.g. "hotstring_editor").
+--- @return table|nil { width, height, min_width, min_height } or nil on miss.
+function M.get_app_geometry(app_id)
+	local apps = load_apps_manifest()
+	if type(apps) ~= "table" then return nil end
+	local entry = apps[app_id]
+	if type(entry) ~= "table" or type(entry.width) ~= "number" or type(entry.height) ~= "number" then
+		Logger.error(LOG, "No geometry for app id '%s' in apps.manifest.json.", tostring(app_id))
+		return nil
+	end
+	Logger.debug(LOG, "Geometry for '%s': %dx%d.", app_id, entry.width, entry.height)
+	return {
+		width      = entry.width,
+		height     = entry.height,
+		min_width  = entry.min_width or entry.width,
+		min_height = entry.min_height or entry.height,
+	}
+end
+
 --- Calculates a perfectly centered frame for a given width and height on the main screen.
 --- @param w number The desired width of the window.
 --- @param h number The desired height of the window.

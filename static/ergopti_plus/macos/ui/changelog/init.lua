@@ -35,9 +35,9 @@ local GH_REPO    = "ergopti"
 local GH_BASE    = string.format("https://api.github.com/repos/%s/%s/releases", GH_OWNER, GH_REPO)
 local UA_HEADER  = { ["User-Agent"] = "ErgoptiPlus-Changelog/1.0" }
 
--- Window dimensions — wide enough for two columns plus comfortable reading width.
-local WIN_W = 860
-local WIN_H = 580
+-- Window geometry is resolved at open time from the shared manifest
+-- (ui_builder.get_app_geometry → _shared/ui/apps.manifest.json, SSoT). No local
+-- width/height constant: hardcoding here is what caused the cross-driver drift.
 
 local _wv       = nil
 local _ucc      = nil
@@ -242,8 +242,10 @@ function M.open(opts)
 		return tag .. config_script
 	end, 1)
 
+	local geo = ui_builder.get_app_geometry("changelog")
+	if not geo then return end
 	_wv = ui_builder.show_webview({
-		frame             = ui_builder.get_centered_frame(WIN_W, WIN_H),
+		frame             = ui_builder.get_centered_frame(geo.width, geo.height),
 		title             = i18n.get("changelog_window.window_title"),
 		style_masks       = { "titled", "closable", "miniaturizable", "resizable" },
 		level             = hs.drawing.windowLevels.floating,
