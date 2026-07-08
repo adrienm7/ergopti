@@ -16,9 +16,12 @@
 --- _serialize_menu fixes it.
 ---
 --- The existing setMenu tests never caught this: on a box without yad, setMenu →
---- _spawn_yad returns early (no yad) and never reaches _serialize_menu. This test
---- calls the serializer directly (exposed as M._serialize_menu) so the callback
---- path always runs.
+--- _yad_launch returns early (no yad) and never reaches _yad_serialize_menu. This
+--- test calls the yad serializer directly (exposed as M._yad_serialize_menu) so
+--- the callback path always runs.
+---
+--- P2.1: renamed _serialize_menu → _yad_serialize_menu (SNI backend added a
+--- separate XML path; the yad path is now explicitly namespaced).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -33,17 +36,17 @@ local helpers = require("tests.helpers")
 -- ==================================================================
 -- ==================================================================
 
-helpers.describe("tray_menu._serialize_menu: registers item callbacks without a nil-global crash", function()
+helpers.describe("tray_menu._yad_serialize_menu: registers item callbacks without a nil-global crash", function()
 	helpers.it("serializes an item with a fn and emits its signal command", function()
 		local tray = helpers.load_module("adapters.tray_menu")
-		helpers.assert_true(type(tray._serialize_menu) == "function", "tray_menu must expose _serialize_menu")
-		local ok, result = pcall(tray._serialize_menu, {
+		helpers.assert_true(type(tray._yad_serialize_menu) == "function", "tray_menu must expose _yad_serialize_menu")
+		local ok, result = pcall(tray._yad_serialize_menu, {
 			{ title = "Quit", fn = function() end },
 			{ title = "Header", disabled = true },
 		})
-		helpers.assert_true(ok, "_serialize_menu must not crash on an item with a callback; got: " .. tostring(result))
-		helpers.assert_true(type(result) == "string" and #result > 0, "_serialize_menu must return a non-empty yad menu string")
-		-- The callback path (which reads _registry) must have run: it emits a
+		helpers.assert_true(ok, "_yad_serialize_menu must not crash on an item with a callback; got: " .. tostring(result))
+		helpers.assert_true(type(result) == "string" and #result > 0, "_yad_serialize_menu must return a non-empty yad menu string")
+		-- The callback path (which reads _yad_registry) must have run: it emits a
 		-- "MENU:<idx>" signal command for the item that carries a fn.
 		helpers.assert_true(result:find("MENU:", 1, true) ~= nil, "the callback item must produce a MENU: signal command")
 	end)

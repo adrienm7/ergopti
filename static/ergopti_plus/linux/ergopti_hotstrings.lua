@@ -402,6 +402,7 @@ local function main()
 		tray_menu.setIcon({ title = "Ergopti" })
 
 		if menu_builder then
+			local config_dir = resolve_config_path(opts.config) or DEFAULT_CONFIG_DIR
 			local menu_items = menu_builder.build({
 				_version      = Version.VERSION,
 				config        = hotstrings_config,
@@ -415,6 +416,18 @@ local function main()
 				dry_run       = opts.dry_run,
 				verbose       = opts.verbose,
 				on_quit       = function() keyboard_hook.stop() end,
+				on_open_config = function(dir)
+					local d = dir or config_dir
+					Logger.info(LOG, "Opening config folder: %s", d)
+					os.execute(string.format("xdg-open '%s' 2>/dev/null &", d:gsub("'", "'\\''")))
+				end,
+				on_open_logs = function()
+					local log_dir = os.getenv("HOME") .. "/.local/share/ergopti/logs"
+					os.execute(string.format("xdg-open '%s' 2>/dev/null &", log_dir:gsub("'", "'\\''")))
+				end,
+				on_healthcheck = function()
+					Logger.info(LOG, "[stub] Healthcheck — P2.2 (webview).")
+				end,
 			})
 			tray_menu.setMenu(menu_items)
 		else

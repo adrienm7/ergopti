@@ -49,14 +49,23 @@ helpers.describe("menu_builder: group toggles call hotstrings_config with the gr
 		helpers.assert_eq(enabled_args[1], "code", "is_group_enabled must receive the group name, not the config table")
 
 		-- Find the "code" group item and invoke its toggle callback.
+		-- P2.1: group items are now nested inside the Hotstrings submenu's
+		-- `menu` array (hierarchical SNI menus). Search recursively.
 		local toggled = false
-		for _, item in ipairs(items) do
-			if type(item.title) == "string" and item.title:find("code", 1, true) and type(item.fn) == "function" then
-				item.fn()
-				toggled = true
-				break
+		local function search(list)
+			for _, item in ipairs(list) do
+				if type(item.title) == "string" and item.title:find("code", 1, true) and type(item.fn) == "function" then
+					item.fn()
+					toggled = true
+					return
+				end
+				if type(item.menu) == "table" then
+					search(item.menu)
+					if toggled then return end
+				end
 			end
 		end
+		search(items)
 		helpers.assert_true(toggled, "the 'code' group item should be present with a toggle callback")
 		helpers.assert_eq(toggle_args[1], "code", "toggle_group must receive the group name, not the config table")
 	end)
