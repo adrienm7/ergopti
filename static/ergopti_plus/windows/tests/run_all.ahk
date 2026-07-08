@@ -203,6 +203,7 @@ InstallSendNoOps()
 #Include unit/test_tooltip_tint_contract.ahk
 #Include unit/test_tooltip_border_alpha.ahk
 #Include unit/test_tooltip_dequeue_regression.ahk
+#Include unit/test_tooltip_dequeue_contract.ahk
 #Include unit/test_llm_tooltip_grace.ahk
 #Include unit/test_llm_tooltip_render.ahk
 #Include unit/test_hotstring_engine.ahk
