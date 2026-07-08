@@ -173,6 +173,17 @@ end)
 -- =============================================
 -- =============================================
 
+-- Reset the shared state singleton before the init-guard tests — a prior
+-- test file (e.g. test_corpus_keylogger_aggregation) may have left
+-- S.initialized=true, which would make init() early-return and break these
+-- rejection assertions. load_with_stubs only reloads the top-level module,
+-- not the state sub-module, so the singleton persists across files
+local _S = require("modules.keylogger.aggregator.state")
+_S.initialized = false
+_S.agg_batch   = nil
+_S.ngram_ctx   = nil
+_S.device_id   = nil
+
 helpers.describe("aggregator — init", function()
 	helpers.it("rejects nil deps", function()
 		local a = helpers.load_with_stubs("modules.keylogger.aggregator")
