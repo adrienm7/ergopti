@@ -105,24 +105,25 @@ appelé ; macOS ne le référence pas ; Linux stub. Résultat : chaque taille d�
 Linux importe déjà `linux_bridge`/`defaults.json` mais re-hardcode des valeurs.
 Corriger côté Linux pour lire les canoniques.
 
-- [ ] **P0-B.1** `keep_alive = "30m"` **hardcodé dans les 3 drivers, aucun canonique**.
-  Créer le canonique (`_shared/modules/llm/inference.json` ou `defaults.json`
-  clé `llm_ollama_keep_alive`), lu par : macOS `modules/llm/api_ollama.lua:172,373,514`,
-  Windows `modules/llm/api_ollama/ollama_payload.ahk:120`, shared
-  `_shared/lua/llm/linux_bridge.lua:272`. Test single-source.
-- [ ] **P0-B.2** Port Ollama `11434` : canonique `defaults.json llm_ollama_port` (lu
+- [~] **P0-B.1** `keep_alive = "30m"` — canonique **créé** : `defaults.json`
+  clé `llm_ollama_keep_alive`. Lu par macOS (`api_common.lua` `M.OLLAMA_KEEP_ALIVE`
+  → `api_ollama.lua` ×3) et shared (`linux_bridge.lua` `M.DEFAULT_KEEP_ALIVE`,
+  pinné == canonique par le gate). **Reste** : Windows `ollama_payload.ahk:120`
+  (routage via un global seedé comme `LLM_OLLAMA_PORT` — reporté, AHK non testable
+  ici, valeur non-divergente donc zéro risque de drift en attendant).
+- [x] **P0-B.2** Port Ollama `11434` : canonique `defaults.json llm_ollama_port` (lu
   par macOS+Windows). Linux hardcode 4× : `linux/modules/llm/profiles.lua:69,74`
   (+ `localhost` au lieu de `127.0.0.1`), `linux/modules/llm/prediction_engine.lua:110,171`,
   UI `linux/modules/menu/menu_builder.lua:117`. Router via
   `HttpBridge.OLLAMA_DEFAULT_PORT`/`OLLAMA_DEFAULT_HOST` (déjà importé). Note :
   `_shared/lua/llm/linux_bridge.lua:24,27` duplique aussi host/port — les faire lire
   `defaults.json`.
-- [ ] **P0-B.3** Température : canonique `0.1` (`defaults.json llm_temperature`).
+- [x] **P0-B.3** Température : canonique `0.1` (`defaults.json llm_temperature`).
   Linux a **deux** valeurs divergentes : `prediction_engine.lua:188` = `0.3`,
   `linux_bridge.lua:34` = `0.7`. Réconcilier les deux au canonique.
-- [ ] **P0-B.4** Context length : canonique `500` (`defaults.json llm_context_length`).
+- [x] **P0-B.4** Context length : canonique `500` (`defaults.json llm_context_length`).
   Linux `prediction_engine.lua:78` = `2000`. Lire le canonique.
-- [ ] **P0-B.5** `max_tokens` : canonique `DEFAULT_MAX_TOKENS = 150`
+- [x] **P0-B.5** `max_tokens` : canonique `DEFAULT_MAX_TOKENS = 150`
   (`_shared/lua/llm/prompt_builder.lua:42`). Linux `prediction_engine.lua:188` = `200`.
 
 ### P0-C — Duplication interne au tree `_shared/` *(Tier 2)*

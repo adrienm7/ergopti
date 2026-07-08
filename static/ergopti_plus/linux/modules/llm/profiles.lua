@@ -66,12 +66,17 @@ local _base_url = nil
 ---              model string  Override default model.
 function M.init(opts)
 	local options = type(opts) == "table" and opts or {}
-	local port = type(options.port) == "number" and options.port or 11434
+	-- Canonical Ollama port/host come from the shared bridge (defaults.json
+	-- llm_ollama_port); the literals below are only the defensive fallback used
+	-- when the shared bridge itself failed to load, and they mirror the canonical.
+	local default_port = (HttpBridge and HttpBridge.OLLAMA_DEFAULT_PORT) or 11434
+	local default_host = (HttpBridge and HttpBridge.OLLAMA_DEFAULT_HOST) or "127.0.0.1"
+	local port = type(options.port) == "number" and options.port or default_port
 
 	if HttpBridge then
 		_base_url = HttpBridge.resolve_base_url(port)
 	else
-		_base_url = "http://localhost:" .. tostring(port)
+		_base_url = "http://" .. default_host .. ":" .. tostring(port)
 	end
 
 	_current_model = type(options.model) == "string" and options.model or nil

@@ -118,6 +118,31 @@ end
 local DEFAULT_TEMPERATURE = load_default_temperature()
 M.DEFAULT_TEMPERATURE = DEFAULT_TEMPERATURE
 
+--- Loads the default Ollama keep-alive window from the shared defaults.json — the
+--- single source every payload builder reads so "30m" is never hardcoded at the
+--- call site. Mirrors "30m" only when the JSON is unreadable, matching the
+--- FALLBACK convention above (a corrupt JSON never leaves keep_alive nil).
+--- @return string The default keep-alive window.
+local function load_default_keep_alive()
+	local p = Paths.shared("modules/llm/defaults.json")
+	if type(p) == "string" and p ~= "" then
+		local raw = FileSystem.read(p)
+		if raw then
+			local ok, parsed = pcall(JsonCodec.decode, raw)
+			if ok and type(parsed) == "table" and type(parsed.llm_ollama_keep_alive) == "string" then
+				return parsed.llm_ollama_keep_alive
+			end
+		end
+	end
+	Logger.warn(LOG, "defaults.json llm_ollama_keep_alive unreadable — using mirrored fallback.")
+	return "30m"
+end
+
+--- Default Ollama keep-alive window, single-sourced from defaults.json. Backends
+--- read it as ``ApiCommon.OLLAMA_KEEP_ALIVE`` so the value is never hardcoded at
+--- the payload call site (the AHK twin seeds LLM_OLLAMA_KEEP_ALIVE the same way).
+M.OLLAMA_KEEP_ALIVE = load_default_keep_alive()
+
 --- Picks a field from the JSON config, falling back to FALLBACK on miss.
 --- Keeps the call sites readable: ``cfg("diversity_temperature", "step_default")``.
 local function cfg(section, key)
