@@ -29,10 +29,11 @@
 
 local M = {}
 
-local hs     = hs
-local Logger = require("lib.logger")
-local H      = require("ui.healthcheck.helpers")
-local Paths  = require("lib.paths")
+local hs       = hs
+local Logger   = require("lib.logger")
+local H        = require("ui.healthcheck.helpers")
+local Paths    = require("lib.paths")
+local Snapshot = require("healthcheck.snapshot")
 
 local LOG = "healthcheck"
 
@@ -271,29 +272,13 @@ function M.run()
 	Logger.debug(LOG, "Uptime: %ds.", uptime_sec)
 
 	-- Collect recent WARNING/ERROR lines from the in-memory ring buffer
-	local recent_issues = {}
-	local warn_count    = 0
-	local err_count     = 0
-	local all_lines     = Logger.ring_buffer_snapshot()
+	local all_lines = Logger.ring_buffer_snapshot()
 	if not all_lines then
 		Logger.error(LOG, "Logger.ring_buffer_snapshot() returned nil — ring buffer unavailable.")
 		all_lines = {}
 	end
-	for _, line in ipairs(all_lines) do
-		if line:find("%[WARNING%]") or line:find("%[ERROR%]") then
-			table.insert(recent_issues, line)
-			if line:find("%[WARNING%]") then warn_count = warn_count + 1 end
-			if line:find("%[ERROR%]")   then err_count  = err_count  + 1 end
-		end
-	end
-	-- Keep only the last 100
-	if #recent_issues > 100 then
-		local trimmed = {}
-		for i = #recent_issues - 99, #recent_issues do
-			table.insert(trimmed, recent_issues[i])
-		end
-		recent_issues = trimmed
-	end
+	local warn_count, err_count = Snapshot.count_issues(all_lines)
+	local recent_issues         = Snapshot.extract_recent_issues(all_lines, 100)
 	Logger.debug(LOG, "Ring buffer: %d line(s), %d warning(s), %d error(s).",
 		#all_lines, warn_count, err_count)
 

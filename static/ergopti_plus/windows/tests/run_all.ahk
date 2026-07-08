@@ -549,6 +549,9 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 ; Keylogger aggregation corpus -- tests KLW_WalkTypingEntry / KLW_WalkAppSwitch /
 ; KLW_WalkWindowSwitch / KLW_WalkSystemEvent against shared cross-driver vectors.
 #Include meta/test_corpus_keylogger_aggregation.ahk
+; Healthcheck snapshot corpus -- tests _HealthCheck_FormatUptime and validates
+; the golden vectors for the shared snapshot logic (format_uptime, issues, schema).
+#Include meta/test_corpus_healthcheck_snapshot.ahk
 
 ; -- Audit finding regression tests (batch-wired) --
 #Include meta/test_activate_hotstrings_sleep_gate.ahk
