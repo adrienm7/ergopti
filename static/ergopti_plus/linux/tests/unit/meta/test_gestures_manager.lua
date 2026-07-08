@@ -223,7 +223,7 @@ helpers.describe("modules/gestures/manager.lua", function()
 
     local found = false
     for _, item in ipairs(items) do
-      if type(item) == "table" and item.title and item.title:find("Gestes") then
+      if type(item) == "table" and item.title and (item.title:find("Gestes") or item.title:find("gestures") or item.title:find("🖐")) then
         found = true
         helpers.assert_true(type(item.menu) == "table", "gestures should have a submenu")
         helpers.assert_true(#item.menu > 0, "gestures submenu should have items")
@@ -248,7 +248,7 @@ helpers.describe("modules/gestures/manager.lua", function()
 
     local found = false
     for _, item in ipairs(items) do
-      if type(item) == "table" and item.title and item.title:find("Gestes") then
+      if type(item) == "table" and item.title and (item.title:find("Gestes") or item.title:find("gestures") or item.title:find("🖐")) then
         found = true
         break
       end

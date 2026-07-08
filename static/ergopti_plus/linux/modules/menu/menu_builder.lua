@@ -75,7 +75,7 @@ local function _build_hotstrings(ctx)
 	local items = {}
 
 	if type(config) ~= "table" then
-		return { title = "⚡ Hotstrings", menu = {
+		return { title = i18n_safe("menu.hotstrings.title", "⚡ Hotstrings"), menu = {
 			{ title = "(config non disponible)", fn = function() end, disabled = true },
 		}}
 	end
@@ -108,14 +108,14 @@ local function _build_hotstrings(ctx)
 		end,
 	}
 
-	return { title = "⚡ Hotstrings", menu = items }
+	return { title = i18n_safe("menu.hotstrings.title", "⚡ Hotstrings"), menu = items }
 end
 
 --- Builds the AI / LLM submenu.
 local function _build_llm(ctx)
 	local llm = ctx.llm
 	if not llm then
-		return { title = "🤖 IA", menu = {
+		return { title = i18n_safe("menu.llm.title", "🤖 IA"), menu = {
 			{ title = "LLM non disponible", fn = function() end, disabled = true },
 			{ title = "(démarrer Ollama sur le port 11434)", fn = function() end, disabled = true },
 		}}
@@ -146,19 +146,19 @@ local function _build_llm(ctx)
 		end
 	end
 
-	return { title = "🤖 IA", menu = items }
+	return { title = i18n_safe("menu.llm.title", "🤖 IA"), menu = items }
 end
 
 --- Builds the metrics/keylogger submenu.
 local function _build_metrics(ctx)
 	local k = ctx.keylogger
 	if type(k) ~= "table" then
-		return { title = "📊 Métriques", menu = {
+		return { title = i18n_safe("menu.metrics.title", "📊 Métriques"), menu = {
 			{ title = "(métriques non disponibles)", fn = function() end, disabled = true },
 		}}
 	end
 
-	return { title = "📊 Métriques", menu = {
+	return { title = i18n_safe("menu.metrics.title", "📊 Métriques"), menu = {
 		{
 			title = "Statistiques de session",
 			fn = function()
@@ -208,7 +208,7 @@ end
 local function _build_shortcuts(ctx)
 	local sc = ctx.shortcuts
 	if not sc then
-		return { title = "⚙ Raccourcis", menu = {
+		return { title = i18n_safe("menu.shortcuts.title", "⚙ Raccourcis"), menu = {
 			{ title = "(shortcuts non disponible)", fn = function() end, disabled = true },
 		}}
 	end
@@ -279,7 +279,7 @@ local function _build_shortcuts(ctx)
 	end
 	items[#items + 1] = { title = "Wrap symbols", menu = wrap_items }
 
-	return { title = "⚙ Raccourcis", menu = items }
+	return { title = i18n_safe("menu.shortcuts.title", "⚙ Raccourcis"), menu = items }
 end
 
 --- Builds the Kanata submenu (Linux's Karabiner — P2.5).
@@ -295,7 +295,7 @@ local function _build_kanata(ctx)
 
 	local running = km and km.is_running() or false
 
-	return { title = "🎹 Kanata", menu = {
+	return { title = i18n_safe("menu.kanata.title", "🎹 Kanata"), menu = {
 		{
 			title = "Générer le .kbd",
 			fn = function()
@@ -347,7 +347,7 @@ end
 local function _build_gestures(ctx)
 	local ge = ctx.gestures
 	if not ge then
-		return { title = "🖐 Gestes", menu = {
+		return { title = i18n_safe("menu.gestures.title", "🖐 Gestes"), menu = {
 			{ title = "(gestures non disponible)", fn = function() end, disabled = true },
 		}}
 	end
@@ -422,12 +422,12 @@ local function _build_gestures(ctx)
 		end,
 	}
 
-	return { title = "🖐 Gestes", menu = items }
+	return { title = i18n_safe("menu.gestures.title", "🖐 Gestes"), menu = items }
 end
 
 --- Builds the apps submenu (placeholder for per-app configs).
 local function _build_apps(ctx)
-	return { title = "📱 Apps", menu = {
+	return { title = i18n_safe("menu.apps.title", "📱 Apps"), menu = {
 		{ title = "(configuration par application)", fn = function() end, disabled = true },
 		{ title = "Ouvrir le dossier de config", fn = function()
 			if ctx.on_open_config then ctx.on_open_config() end
@@ -525,7 +525,7 @@ end
 local function _build_updates(ctx)
 	local up = ctx.updater
 	if not up then
-		return { title = "🔄 Mises à jour", menu = {
+		return { title = i18n_safe("menu.updates.title", "🔄 Mises à jour"), menu = {
 			{ title = "(updater non disponible)", fn = function() end, disabled = true },
 		}}
 	end
@@ -621,13 +621,13 @@ local function _build_updates(ctx)
 		end,
 	}
 
-	return { title = "🔄 Mises à jour", menu = items }
+	return { title = i18n_safe("menu.updates.title", "🔄 Mises à jour"), menu = items }
 end
 
 --- Builds the about item.
 local function _build_about(_ctx)
 	return {
-		title = "ℹ À propos",
+		title = i18n_safe("menu.global.about", "ℹ À propos"),
 		fn = function()
 			Logger.info(LOG, "Ergopti — ergonomic keyboard optimizer.")
 		end,
@@ -637,7 +637,7 @@ end
 --- Builds the reload item.
 local function _build_reload(_ctx)
 	return {
-		title = "↺ Recharger",
+		title = i18n_safe("menu.global.reload", "↺ Recharger"),
 		fn = function()
 			Logger.info(LOG, "Reload requested — sending SIGHUP.")
 			-- SIGHUP triggers on_sighup_reload in the daemon (if posix.signal is available).
@@ -649,7 +649,7 @@ end
 --- Builds the quit item.
 local function _build_quit(ctx)
 	return {
-		title = "✕ Quitter",
+		title = i18n_safe("menu.global.quit", "✕ Quitter"),
 		fn = function()
 			Logger.info(LOG, "Quit requested via tray menu.")
 			if ctx.on_quit then ctx.on_quit() end
