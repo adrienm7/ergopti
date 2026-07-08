@@ -186,8 +186,12 @@ function M.open(current_info, save_callback)
 
 	local screen = hs.screen.mainScreen()
 	local sf     = screen and type(screen.frame) == "function" and screen:frame() or { w = 1440, h = 900 }
-	local win_w  = math.min(560, math.floor((sf.w or 1440) * 0.5))
-	local win_h  = math.min(720, math.floor((sf.h or 900) * 0.85))
+	-- Manifest is the SSoT max; clamp to a screen fraction so the window fits on
+	-- small displays. See _shared/ui/apps.manifest.json (personal_info_editor).
+	local geo    = ui_builder.get_app_geometry("personal_info_editor")
+	if not geo then return end
+	local win_w  = math.min(geo.width, math.floor((sf.w or 1440) * 0.5))
+	local win_h  = math.min(geo.height, math.floor((sf.h or 900) * 0.85))
 
 	_webview = ui_builder.show_webview({
 		frame         = ui_builder.get_centered_frame(win_w, win_h),

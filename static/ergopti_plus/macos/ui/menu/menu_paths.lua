@@ -549,8 +549,12 @@ function M.open_editor()
 
 	local screen  = hs.screen.mainScreen()
 	local sf      = screen and type(screen.frame) == "function" and screen:frame() or { h = 800 }
-	local win_h   = math.min(220, math.floor(sf.h * 0.35))
-	local win_w   = math.min(700, math.floor((sf.w or 1440) * 0.55))
+	-- Manifest is the SSoT max; clamp to a screen fraction so the window fits on
+	-- small displays. See _shared/ui/apps.manifest.json (paths_editor).
+	local geo     = ui_builder.get_app_geometry("paths_editor")
+	if not geo then return end
+	local win_h   = math.min(geo.height, math.floor(sf.h * 0.35))
+	local win_w   = math.min(geo.width, math.floor((sf.w or 1440) * 0.55))
 
 	_webview = ui_builder.show_webview({
 		frame       = ui_builder.get_centered_frame(win_w, win_h),

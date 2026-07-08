@@ -42,8 +42,9 @@ local LOG = "action_picker"
 local _webview     = nil
 local _usercontent = nil
 
-local WINDOW_WIDTH  = 460
-local WINDOW_HEIGHT = 560
+-- Window geometry is resolved at open time from the shared manifest
+-- (ui_builder.get_app_geometry → _shared/ui/apps.manifest.json, SSoT). No local
+-- width/height constant: hardcoding here is what caused the cross-driver drift.
 
 -- The frontend lives in the cross-driver _shared/ui/ tree (shared with the
 -- Windows WebView2 host); both drivers resolve it through Paths.shared.
@@ -117,8 +118,10 @@ function M.open(opts, on_confirm)
 		end
 	end)
 
+	local geo = ui_builder.get_app_geometry("action_picker")
+	if not geo then return end
 	_webview = ui_builder.show_webview({
-		frame         = ui_builder.get_centered_frame(WINDOW_WIDTH, WINDOW_HEIGHT),
+		frame         = ui_builder.get_centered_frame(geo.width, geo.height),
 		title         = opts.title or i18n.get("dialog.action_picker.label"),
 		style_masks   = { "titled", "closable", "utility" },
 		usercontent   = _usercontent,

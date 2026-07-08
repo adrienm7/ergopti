@@ -52,6 +52,7 @@ const CHECKS = [
 	{ name: 'shared TOML codec purity (no hard driver requires — loads on every Lua runtime)', cmd: 'node', args: ['tools/test/test-shared-toml-codec-purity.cjs'], repro: 'node tools/test/test-shared-toml-codec-purity.cjs' },
 	{ name: 'no fallback literals (LLM defaults read from JSON, never a deleted mirror)', cmd: 'node', args: ['tools/test/test-no-fallback-literals.cjs'], repro: 'node tools/test/test-no-fallback-literals.cjs' },
 	{ name: 'cross-driver manifest equivalence (resolved values identical across drivers)', cmd: 'node', args: ['tools/test/test-manifest-equivalence.cjs'], repro: 'node tools/test/test-manifest-equivalence.cjs' },
+	{ name: 'webview geometry single source (macOS defers to manifest; Windows literals match; P0-A)', cmd: 'node', args: ['tools/test/test-webview-geometry-single-source.cjs'], repro: 'node tools/test/test-webview-geometry-single-source.cjs' },
 	{ name: 'diagnostic UI integrity (macOS + Windows healthcheck render path)', cmd: 'node', args: ['tools/test/test-diagnostic-ui-integrity.cjs'], repro: 'node tools/test/test-diagnostic-ui-integrity.cjs' },
 	{ name: 'UI focus-fix regression (force-focus + no raw blockAlert)', cmd: 'node', args: ['tools/test/test-ui-focus-fix.cjs'], repro: 'node tools/test/test-ui-focus-fix.cjs' },
 	{ name: 'click-lock fix (non-consuming watcher + keystroke release, both drivers)', cmd: 'node', args: ['tools/test/test-click-lock-fix.cjs'], repro: 'node tools/test/test-click-lock-fix.cjs' },

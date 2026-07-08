@@ -236,8 +236,10 @@ function M.build(ctx)
 			.. "</body></html>"
 
 		local masks = hs.webview.windowMasks
+		local geo = ui_builder.get_app_geometry("token_prompt")
+		if not geo then return end
 		_wv = ui_builder.show_webview({
-			frame       = ui_builder.get_centered_frame(720, 155),
+			frame       = ui_builder.get_centered_frame(geo.width, geo.height),
 			title       = title,
 			style_masks = (masks["titled"] or 1) + (masks["closable"] or 2),
 			usercontent = uc,

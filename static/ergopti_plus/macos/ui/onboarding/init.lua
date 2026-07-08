@@ -591,8 +591,12 @@ function M.run(config_path)
 
 	local screen  = hs.screen.mainScreen()
 	local sf      = screen and type(screen.frame) == "function" and screen:frame() or { w = 1440, h = 900 }
-	local win_h   = math.min(520, math.floor(sf.h * 0.60))
-	local win_w   = math.min(460, math.floor(sf.w * 0.35))
+	-- Manifest is the SSoT max; clamp to a screen fraction so the window fits on
+	-- small displays. See _shared/ui/apps.manifest.json (onboarding).
+	local geo     = ui_builder.get_app_geometry("onboarding")
+	if not geo then return end
+	local win_h   = math.min(geo.height, math.floor(sf.h * 0.60))
+	local win_w   = math.min(geo.width, math.floor(sf.w * 0.35))
 
 	local masks       = hs.webview.windowMasks
 	local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2)

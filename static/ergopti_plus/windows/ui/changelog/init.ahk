@@ -122,13 +122,15 @@ _CLW_BuildWindow(Channel) {
 	g.MarginY   := 0
 
 	; Full-window placeholder that WebView2.Fill() will cover.
-	Placeholder := g.Add("Text", "x0 y0 w860 h560", "")
+	; Geometry mirrors _shared/ui/apps.manifest.json (changelog 860x580, SSoT);
+	; pinned by tools/test/test-webview-geometry-single-source.cjs.
+	Placeholder := g.Add("Text", "x0 y0 w860 h580", "")
 
 	g.OnEvent("Close",  _CLW_OnClose)
 	g.OnEvent("Escape", _CLW_OnClose)
 	g.OnEvent("Size",   _CLW_OnResize)
 
-	g.Show("w860 h560")
+	g.Show("w860 h580")
 	_CLW_Gui := g
 
 	; Spin up WebView2 now that the Hwnd is valid.

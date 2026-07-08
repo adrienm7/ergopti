@@ -28,10 +28,9 @@ local i18n       = require("lib.i18n")
 
 local LOG = "model_browser"
 
--- Window dimensions — wide enough for the full column set (name, family, params,
--- RAM, speed, type) without horizontal scrolling at the default catalogue width.
-local WIN_W = 880
-local WIN_H = 560
+-- Window geometry is resolved at open time from the shared manifest
+-- (ui_builder.get_app_geometry → _shared/ui/apps.manifest.json, SSoT). No local
+-- width/height constant: hardcoding here is what caused the cross-driver drift.
 
 local _wv        = nil
 local _ucc       = nil
@@ -236,8 +235,10 @@ function M.open(ctx)
 
 	local final_html = ui_builder.build_injected_html(ASSETS_DIR)
 
+	local geo = ui_builder.get_app_geometry("model_browser")
+	if not geo then return end
 	_wv = ui_builder.show_webview({
-		frame             = ui_builder.get_centered_frame(WIN_W, WIN_H),
+		frame             = ui_builder.get_centered_frame(geo.width, geo.height),
 		title             = i18n.get("model_browser.window_title"),
 		style_masks       = { "titled", "closable", "miniaturizable", "resizable" },
 		level             = hs.drawing.windowLevels.floating,
