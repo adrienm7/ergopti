@@ -60,7 +60,7 @@ local _base_url = nil
 -- =========================================
 -- =========================================
 
---- Initialises the profile state.
+--- Initialises the profile state, loading persisted settings from storage.
 --- @param opts table { port?, model? }
 ---              port  number  Ollama port (default 11434).
 ---              model string  Override default model.
@@ -79,11 +79,19 @@ function M.init(opts)
 		_base_url = "http://" .. default_host .. ":" .. tostring(port)
 	end
 
-	_current_model = type(options.model) == "string" and options.model or nil
-	_enabled = true
+	-- Load persisted model and enabled state from storage.
+	local ok_st, storage = pcall(require, "adapters.storage")
+	if ok_st and storage then
+		_current_model = type(options.model) == "string" and options.model
+			or storage.get("llm.model", nil)
+		_enabled = storage.get("llm.enabled", false)
+	else
+		_current_model = type(options.model) == "string" and options.model or nil
+		_enabled = false
+	end
 
-	Logger.info(LOG, "LLM profiles initialised (base_url=%s, model=%s).",
-		_base_url, _current_model or "(auto-detect)")
+	Logger.info(LOG, "LLM profiles initialised (base_url=%s, model=%s, enabled=%s).",
+		_base_url, _current_model or "(auto-detect)", tostring(_enabled))
 end
 
 
@@ -163,13 +171,17 @@ function M.get_current_model()
 	return _current_model
 end
 
---- Sets the current model and persists the choice.
+---- Sets the current model and persists the choice.
 --- @param model_name string Model name as reported by Ollama.
 function M.set_model(model_name)
 	if type(model_name) ~= "string" or model_name == "" then return end
 	_current_model = model_name
 	Logger.info(LOG, "Model set to: %s", model_name)
-	-- Persist to config (future: write to ~/.config/ergopti/llm.toml).
+	-- Persist via storage adapter so the choice survives restarts.
+	local ok_st, storage = pcall(require, "adapters.storage")
+	if ok_st and storage then
+		storage.set("llm.model", model_name)
+	end
 end
 
 
@@ -185,9 +197,27 @@ function M.is_enabled()
 	return _enabled
 end
 
---- Toggles the LLM feature on/off.
+--- Enables the LLM feature and persists.
+function M.enable()
+	_enabled = true
+	local ok_st, storage = pcall(require, "adapters.storage")
+	if ok_st and storage then storage.set("llm.enabled", true) end
+	Logger.info(LOG, "LLM enabled.")
+end
+
+--- Disables the LLM feature and persists.
+function M.disable()
+	_enabled = false
+	local ok_st, storage = pcall(require, "adapters.storage")
+	if ok_st and storage then storage.set("llm.enabled", false) end
+	Logger.info(LOG, "LLM disabled.")
+end
+
+--- Toggles the LLM feature on/off and persists.
 function M.toggle()
 	_enabled = not _enabled
+	local ok_st, storage = pcall(require, "adapters.storage")
+	if ok_st and storage then storage.set("llm.enabled", _enabled) end
 	Logger.info(LOG, "LLM toggled: %s", tostring(_enabled))
 end
 
