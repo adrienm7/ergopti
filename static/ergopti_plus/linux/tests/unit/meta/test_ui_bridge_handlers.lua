@@ -156,6 +156,18 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(type(result) == "table", "route_message should return a table")
       helpers.assert_true(type(result.results) == "table", "result.results should be a table")
     end)
+    -- Regression: the handler file was named personal_toml_editor.lua without
+    -- the "_bridge" suffix that _load_handler() requires, so route_message()
+    -- could never resolve it and silently returned nil. The file must be named
+    -- personal_toml_editor_bridge.lua for on-demand routing to succeed.
+    helpers.it("route_message loads the personal_toml_editor bridge on demand", function()
+      wm.set_daemon_state(build_mock_state())
+      local result = wm.route_message("personal_toml_editor", "ready")
+      helpers.assert_true(type(result) == "table",
+        "route_message must load and dispatch to the personal_toml_editor bridge")
+      helpers.assert_true(type(result.toml_content) == "string",
+        "personal_toml_editor payload must include toml_content")
+    end)
 
     -- GTK operations are exported (P2.2 — native window creation).
     helpers.it("exports _create_gtk_window", function()
@@ -702,7 +714,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("personal_toml_editor", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.personal_toml_editor")
+    local handler = helpers.load_module("modules.ui.bridge_handlers.personal_toml_editor_bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()

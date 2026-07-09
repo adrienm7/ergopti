@@ -1,4 +1,4 @@
---- modules/ui/bridge_handlers/personal_toml_editor.lua
+--- modules/ui/bridge_handlers/personal_toml_editor_bridge.lua
 
 --- ==============================================================================
 --- BRIDGE HANDLER: Personal Info TOML Editor
