@@ -31,8 +31,8 @@
 ;    which monitor the window's centroid falls in.
 ;
 ; IMPLEMENTATION NOTES:
-; All detection is polling-based at TOPO_TICK_MS (500 ms). This gives
-; < 500 ms event latency with near-zero CPU (one WinGetPos call per tick).
+; All detection is polling-based at TOPO_TICK_MS (1500 ms). This gives
+; low-latency event detection with near-zero CPU (one WinGetPos call per tick).
 ; Events are debounced: a transition must be stable for two consecutive
 ; ticks before being logged (prevents spurious events during drag).
 ; ==============================================================================

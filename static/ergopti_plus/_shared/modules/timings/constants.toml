@@ -348,16 +348,16 @@ auto_flush_idle_ms = 120000
 hook_flush_period_ms = 200
 
 # Hook context TTL — how long a context entry is kept before expiry.
-# AHK: keylogger_hook.ahk CONTEXT_TTL_MS.
-hook_context_ttl_ms = 500
+# AHK: keylogger_hook.ahk CONTEXT_TTL_MS (drift-gated to this value).
+hook_context_ttl_ms = 1000
 
 # Keylogger bridge poll fallback interval (HS kc_bridge without inotify).
 # HS: kc_bridge.lua POLL_FALLBACK_SEC.
 kc_bridge_poll_ms = 500
 
 # Window topology tick interval.
-# AHK: keylogger_window_topology.ahk TOPO_TICK_MS.
-topo_tick_ms = 500
+# AHK: keylogger_window_topology.ahk TOPO_TICK_MS (drift-gated to this value).
+topo_tick_ms = 1500
 
 # AV-state fast-poll tick.
 # AHK: keylogger_av_state.ahk AVSTATE_TICK_MS.
@@ -388,8 +388,8 @@ sensor_tick_ms = 60000
 mouse_scroll_burst_gap_ms = 400
 
 # Mouse: park-position check interval.
-# AHK: keylogger_mouse.ahk PARK_CHECK_MS.
-mouse_park_check_ms = 100
+# AHK: keylogger_mouse.ahk PARK_CHECK_MS (drift-gated to this value).
+mouse_park_check_ms = 250
 
 # Mouse: idle duration before the cursor is considered "parked".
 # AHK: keylogger_mouse.ahk PARK_IDLE_MS.
