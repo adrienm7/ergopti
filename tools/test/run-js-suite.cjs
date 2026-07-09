@@ -87,7 +87,8 @@ const CHECKS = [
 	{ name: 'shared test.format single source (inspect/deep_equal/fail_msg_for consumed from _shared, no local copies; P0 SSoT)', cmd: 'node', args: ['tools/test/test-shared-test-format.cjs'], repro: 'node tools/test/test-shared-test-format.cjs' },
 	{ name: 'file watchers constants single source (SCAN_MAX_DEPTH=16 + debounce=0.5s match across Linux + macOS lib/file_watchers.lua; P0 SSoT)', cmd: 'node', args: ['tools/test/test-file-watchers-constants-single-source.cjs'], repro: 'node tools/test/test-file-watchers-constants-single-source.cjs' },
 	{ name: 'format_toml CLI behavioral test (bare invocation exits 1 = usage; --preview sorts sections/keys + styles headers, file untouched)', cmd: 'node', args: ['tools/test/test-format-toml-importable.cjs'], repro: 'node tools/test/test-format-toml-importable.cjs' },
-	{ name: 'gesture slot-space single source (Linux derives from actions.toml [slots]; macOS literals + DEFAULT_GESTURES key-space pinned to it)', cmd: 'node', args: ['tools/test/test-gesture-slots-single-source.cjs'], repro: 'node tools/test/test-gesture-slots-single-source.cjs' }
+	{ name: 'gesture slot-space single source (Linux derives from actions.toml [slots]; macOS literals + DEFAULT_GESTURES key-space pinned to it)', cmd: 'node', args: ['tools/test/test-gesture-slots-single-source.cjs'], repro: 'node tools/test/test-gesture-slots-single-source.cjs' },
+	{ name: 'keylogger timing constants single source (CONTEXT_TTL_MS / PARK_CHECK_MS / TOPO_TICK_MS match the shared timing registry)', cmd: 'node', args: ['tools/test/test-keylogger-timings-single-source.cjs'], repro: 'node tools/test/test-keylogger-timings-single-source.cjs' }
 ];
 
 const SLOW_CHECKS = [
