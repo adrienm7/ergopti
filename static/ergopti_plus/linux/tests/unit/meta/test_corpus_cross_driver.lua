@@ -15,6 +15,10 @@
 --- 4. prompt_builder/vectors.json     — SKIP (PromptBuilder not wired on Linux)
 --- 5. security/keylogger vectors      — partially tested (pure-logic paths)
 --- 6. toml/fuzz_corpus.json           — tested (shared TOML codec)
+--- 7. locale/resolution_vectors.json  — SKIP (Linux resolves via lib/locale.lua)
+--- 8. tooltip/{layout,dequeue}         — SKIP (canonical layout math is JS)
+--- 9. updater/release_parser_vectors.json — tested (full replay in
+---    test_corpus_updater_release_parser.lua; parser used by manager.lua)
 ---
 --- RATIONALE:
 --- Even SKIP-marked vectors must be consumed (file loaded, vectors counted)
@@ -319,4 +323,112 @@ describe("Corpus: toml/fuzz_corpus.json", function()
 			assert_true(true, "crashes=" .. crashes .. "/" .. #fuzz_inputs .. " (all caught by pcall)")
 		end)
 	end
+end)
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 8/ Corpus 7 — Locale (SKIP) =======
+-- ===========================================
+-- ===========================================
+
+describe("Corpus: locale/resolution_vectors.json", function()
+	local path = corpus_root .. "/locale/resolution_vectors.json"
+
+	it("corpus file exists on disk", function()
+		assert_true(io.open(path, "r") ~= nil, "locale corpus must exist at: " .. path)
+	end)
+
+	local data = load_json_corpus(path)
+	local n    = data and vector_count(data) or 0
+
+	it("corpus loaded: " .. tostring(n) .. " vector(s) present", function()
+		assert_true(n ~= nil and n >= 1, "expected >=1 vectors in locale corpus")
+	end)
+
+	it("SKIP — Linux resolves locales via lib/locale.lua (shared cascade replay is a roadmap item)", function()
+		-- The shared locale.core cascade (active->en->fr with star substitution)
+		-- is pinned by the macOS consumer (test_corpus_locale_resolution.lua). The
+		-- Linux driver reads locale files through lib/locale.lua and does not yet
+		-- replay the shared cascade; ADR-006 compliance here means the corpus is
+		-- consumed (file loaded, vectors counted) with the gap tracked, not hidden.
+		assert_true(true, "skip acknowledged — shared locale.core replay is a roadmap item")
+	end)
+end)
+
+
+
+
+-- ============================================
+-- ============================================
+-- ======= 9/ Corpus 8 — Tooltip (SKIP) =======
+-- ============================================
+-- ============================================
+
+describe("Corpus: tooltip/{layout,dequeue}_vectors.json", function()
+	local layout_path  = corpus_root .. "/tooltip/layout_vectors.json"
+	local dequeue_path = corpus_root .. "/tooltip/dequeue_vectors.json"
+
+	it("layout corpus file exists on disk", function()
+		assert_true(io.open(layout_path, "r") ~= nil, "tooltip layout corpus must exist at: " .. layout_path)
+	end)
+
+	it("dequeue corpus file exists on disk", function()
+		assert_true(io.open(dequeue_path, "r") ~= nil, "tooltip dequeue corpus must exist at: " .. dequeue_path)
+	end)
+
+	local data = load_json_corpus(layout_path)
+	local n    = data and vector_count(data) or 0
+
+	it("layout corpus loaded: " .. tostring(n) .. " vector(s) present", function()
+		assert_true(n ~= nil and n >= 1, "expected >=1 vectors in tooltip layout corpus")
+	end)
+
+	it("SKIP — tooltip layout/dequeue math is canonically JS (_shared/modules/tooltip); Linux uses the GTK renderer", function()
+		-- The canonical layout + dequeue math lives in _shared/modules/tooltip/
+		-- (layout.js, dequeue.js) and is pinned by the macOS Lua clone
+		-- (test_tooltip_layout_corpus.lua) plus the AHK consumer. The Linux driver
+		-- renders tooltips through WebKit2GTK and has no Lua port of this math yet;
+		-- corpus consumed (files loaded, vectors counted) with the gap tracked.
+		assert_true(true, "skip acknowledged — Lua tooltip layout port is a roadmap item")
+	end)
+end)
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 10/ Corpus 9 — Updater (tested) =====
+-- =============================================
+-- =============================================
+
+describe("Corpus: updater/release_parser_vectors.json", function()
+	local path = corpus_root .. "/updater/release_parser_vectors.json"
+
+	it("corpus file exists on disk", function()
+		assert_true(io.open(path, "r") ~= nil, "updater corpus must exist at: " .. path)
+	end)
+
+	local data = load_json_corpus(path)
+	local n    = data and vector_count(data) or 0
+
+	it("corpus has at least 1 vector", function()
+		assert_true(n ~= nil and n >= 1, "expected >=1 updater vectors, got: " .. tostring(n))
+	end)
+
+	-- The shared updater.release_parser is loaded and every vector is replayed in
+	-- test_corpus_updater_release_parser.lua (the Linux updater calls this parser
+	-- in production via modules/updater/manager.lua). Here we only validate the
+	-- corpus is present and well-formed so the cross-driver contract is visible in
+	-- one place alongside the other corpora.
+	it("corpus vectors have expected shape (id + category fields)", function()
+		if type(data) ~= "table" or type(data.vectors) ~= "table" then return end
+		for _, v in ipairs(data.vectors) do
+			assert_true(type(v.id) == "string", "vector missing 'id' field")
+			assert_true(type(v.category) == "string", "vector " .. tostring(v.id) .. " missing 'category'")
+		end
+	end)
 end)
