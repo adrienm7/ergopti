@@ -5,7 +5,8 @@
 --- DESCRIPTION:
 --- Focused tests for the small, side-effect-free helpers exposed by the parser
 --- module: strip_thinking and split_blocks. The full process_prediction path is
---- exercised by tests/unit/modules/llm/test_parser.lua.
+--- pinned by the shared golden corpus in
+--- tests/unit/llm/test_process_prediction_vectors.lua.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
