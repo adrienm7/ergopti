@@ -269,6 +269,8 @@ end
 function M.write_kbd()
 	_resolve_paths()
 
+	Logger.start(LOG, "Writing kanata config…")
+
 	local kbd = M.generate_kbd()
 	if not kbd then
 		Logger.error(LOG, "write_kbd(): generation failed.")
@@ -314,6 +316,8 @@ function M.start()
 		Logger.debug(LOG, "start(): kanata already running (pid=%d).", _kanata_pid)
 		return true
 	end
+
+	Logger.start(LOG, "Starting kanata daemon…")
 
 	-- Check that kanata binary exists.
 	local ok_bin = os.execute("which kanata >/dev/null 2>&1")
