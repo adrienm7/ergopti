@@ -426,6 +426,11 @@ ReloadWithDefaultConfig(*) {
                 FileDelete(Path)
         }
     }
+    ; Write a minimal config so Onboarding_Run() skips the wizard on reload.
+    ; The user chose "reset defaults" — there is a separate "Setup wizard"
+    ; menu item for re-running the first-run flow. Without this placeholder
+    ; the deleted config.toml triggers Onboarding_Run unconditionally.
+    try FileAppend("[_meta]`nschema_version = 2`n", AhkDir . "config.toml", "UTF-8")
     Reload
 }
 
