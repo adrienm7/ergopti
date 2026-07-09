@@ -49,6 +49,9 @@ local _state = nil
 ---   .log_debug            function|nil (fmt, ...)
 ---   .log_warn             function|nil (fmt, ...)
 ---   .log_error            function|nil (fmt, ...)
+---   .read_file            function|nil  (path) → string|nil  Injected file reader for
+---                         tests — when present, io.open is bypassed entirely.
+---                         Return nil to signal a missing file.
 ---   .strip_bom            boolean  Strip UTF-8 BOM before JSON decode (default false)
 function M.init(opts)
 	if type(opts) ~= "table" then
@@ -77,6 +80,7 @@ function M.init(opts)
 		get_trigger = nil,
 		json_decode         = opts.json_decode,
 		resolve_locale_path = opts.resolve_locale_path,
+		read_file  = type(opts.read_file) == "function" and opts.read_file or nil,
 		strip_bom  = opts.strip_bom == true,
 		log_debug  = type(opts.log_debug)  == "function" and opts.log_debug  or nil,
 		log_warn   = type(opts.log_warn)   == "function" and opts.log_warn   or nil,
@@ -114,15 +118,26 @@ local function load_locale(code)
 		end
 		return {}
 	end
-	local fh = io.open(path, "r")
-	if not fh then
-		if _state.log_warn then
-			_state.log_warn("locale", "Locale file not found: %s.", path)
+	local raw
+	if _state.read_file then
+		raw = _state.read_file(path)
+		if raw == nil then
+			if _state.log_warn then
+				_state.log_warn("locale", "Locale file not found: %s.", path)
+			end
+			return {}
 		end
-		return {}
+	else
+		local fh = io.open(path, "r")
+		if not fh then
+			if _state.log_warn then
+				_state.log_warn("locale", "Locale file not found: %s.", path)
+			end
+			return {}
+		end
+		raw = fh:read("*a")
+		fh:close()
 	end
-	local raw = fh:read("*a")
-	fh:close()
 	if _state.strip_bom and raw:sub(1, 3) == "\239\187\191" then
 		raw = raw:sub(4)
 	end
