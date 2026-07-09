@@ -7,196 +7,137 @@
 ; expected AHK value. Pins the 3 AHK coercion sites against the shared corpus.
 ; ==============================================================================
 
-#Requires Autohotkey v2.0+
+#Requires AutoHotkey v2.0
 
-global _SharedDir := A_ScriptDir . "\..\..\_shared"
-global _TestResult := ""
-global _TestFailed := 0
 
-; Lightweight JSON parser for the coercion vectors.
-_TestParseCorpus(Path) {
-    if !FileExist(Path) {
-        _TestResult .= "FAIL: corpus file not found: " . Path . "`n"
-        _TestFailed += 1
-        return []
-    }
-    raw := ""
-    try raw := FileRead(Path, "UTF-8")
-    if (raw = "") {
-        _TestResult .= "FAIL: empty corpus: " . Path . "`n"
-        _TestFailed += 1
-        return []
-    }
-    ; Extract each vector object manually — the full dkjson dependency is
-    ; heavy; a simple line-by-line parser is sufficient for this flat corpus.
-    vectors := []
-    in_vector := false
-    current := Map()
-    current_key := ""
-    loop parse, raw, "`n", "`r" {
-        line := Trim(A_LoopField)
-        if (line = "{" && !in_vector) {
-            in_vector := true
-            current := Map()
-            continue
-        }
-        if (line = "}," or line = "}" && in_vector) {
-            if current.Has("input") {
-                vectors.Push(current)
-            }
-            in_vector := false
-            current := Map()
-            continue
-        }
-        if !in_vector
-            continue
-        ; Match "key": value, or "key": "value"
-        if RegExMatch(line, '"([^"]+)"\s*:\s*(.+)', &M) {
-            key := M[1]
-            val := Trim(M[2])
-            ; Strip trailing comma
-            if (SubStr(val, -1) = ",")
-                val := Trim(SubStr(val, 1, StrLen(val) - 1))
-            ; Boolean/number
-            if (val = "true") {
-                current[key] := true
-            } else if (val = "false") {
-                current[key] := false
-            } else {
-                ; Number?
-                if RegExMatch(val, "^-?\d+(\.\d+)?$") {
-                    current[key] := Number(val)
-                } else {
-                    ; String — strip surrounding quotes
-                    val := Trim(val, '"')
-                    ; Unescape JSON strings. Order matters (\n/\t before \\)
-                    ; so a JSON literal like "line1\\nline2" (backslash+n)
-                    ; doesn't have its \\ collapsed to \ then \n→newline.
-                    val := StrReplace(val, '\"', '"')
-                    val := StrReplace(val, "\n", "`n")
-                    val := StrReplace(val, "\t", "`t")
-                    val := StrReplace(val, "\\", "\")
-                    current[key] := val
-                }
-            }
-        }
-    }
-    return vectors
-}
+; ===================================================
+; ===================================================
+; ======= 1/ Corpus Loading =========================
+; ===================================================
+; ===================================================
 
-; Clone TomlCoerceValueExt from toml_config_loader.ahk — the real module
-; depends on the full driver init and can't load in the test harness.
-; This is a PINNED COPY, asserted identical by the JS drift gate.
-_TestTomlCoerceValueExt(Raw) {
-    Trimmed := Trim(Raw, " `t")
-    Lower := StrLower(Trimmed)
-    if (Lower = "true")
-        return 1
-    if (Lower = "false")
-        return 0
-    if RegExMatch(Trimmed, "^-?\d+$")
-        return Integer(Trimmed)
-    if RegExMatch(Trimmed, "^-?\d+\.\d+$")
-        return Float(Trimmed)
-    Q := Chr(34)
-    if (StrLen(Trimmed) >= 2 && SubStr(Trimmed, 1, 1) = Q
-        && SubStr(Trimmed, StrLen(Trimmed), 1) = Q) {
-        body := SubStr(Trimmed, 2, StrLen(Trimmed) - 2)
-        ; Single-pass unescape matching UnescapeTomlString from toml_loader.ahk
-        return _TestUnescape(body)
-    }
-    return Trimmed
-}
-
-_TestUnescape(s) {
-    if !InStr(s, "\")
-        return s
-    Result := ""
-    i := 1
-    n := StrLen(s)
-    while (i <= n) {
-        c := SubStr(s, i, 1)
-        if (c = "\" && i < n) {
-            nc := SubStr(s, i + 1, 1)
-            if (nc = "\") {
-                Result .= "\"
-            } else if (nc = '"') {
-                Result .= '"'
-            } else if (nc = "n") {
-                Result .= "`n"
-            } else if (nc = "t") {
-                Result .= "`t"
-            } else if (nc = "r") {
-                Result .= "`r"
-            } else {
-                Result .= nc
-            }
-            i += 2
-        } else {
-            Result .= c
-            i += 1
-        }
-    }
-    return Result
+_TomlCoercionCorpus_LoadCorpus() {
+	Path := A_ScriptDir . "\..\..\_shared\tests\corpus\toml\coercion_vectors.json"
+	if !FileExist(Path) {
+		return ""
+	}
+	Raw := FileRead(Path, "UTF-8")
+	return JsonParse(Raw)
 }
 
 
-; ==============================================================================
-; Main test runner
-; ==============================================================================
+; ===================================================
+; ===================================================
+; ======= 2/ Pinned Coercion Clone ==================
+; ===================================================
+; ===================================================
 
-_TestCorpusTotoCoercion() {
-    global _TestResult, _TestFailed
+; Clone of TomlCoerceValueExt from toml_config_loader.ahk.  The real module
+; depends on full driver init and cannot load in the test harness.  This
+; pinned copy is asserted identical by the JS drift gate.
 
-    CorpusPath := _SharedDir . "\tests\corpus\toml\coercion_vectors.json"
-    vectors := _TestParseCorpus(CorpusPath)
-
-    if (vectors.Length = 0) {
-        _TestResult .= "FAIL: no vectors parsed from corpus.`n"
-        _TestFailed += 1
-        return
-    }
-
-    for v in vectors {
-        if !v.Has("input") {
-            _TestResult .= "FAIL: vector missing 'input' field.`n"
-            _TestFailed += 1
-            continue
-        }
-        input := v["input"]
-        result := _TestTomlCoerceValueExt(input)
-
-        if v.Has("ahk") {
-            expected := v["ahk"]
-            ; Normalize boolean: corpus stores 1/0, coercion returns Integer 1/0
-            if (expected = true || expected = false || (expected is Integer && (expected = 1 || expected = 0))) {
-                ; Boolean comparison
-                expected_bool := (expected = true || expected = 1)
-                result_bool := (result = true || result = 1)
-                if (expected_bool != result_bool) {
-                    _TestResult .= "FAIL: coerce('" . input . "') boolean mismatch: got " . result . ", expected " . expected . "`n"
-                    _TestFailed += 1
-                }
-            } else if (expected is Number) {
-                if !(result is Number) || Abs(result - expected) > 0.0001 {
-                    _TestResult .= "FAIL: coerce('" . input . "') number mismatch: got " . result . ", expected " . expected . "`n"
-                    _TestFailed += 1
-                }
-            } else {
-                ; String comparison — AHK backtick escapes vs literal chars
-                expected_str := String(expected)
-                result_str := String(result)
-                if (expected_str != result_str) {
-                    _TestResult .= "FAIL: coerce('" . input . "') string mismatch: got '" . result_str . "', expected '" . expected_str . "'`n"
-                    _TestFailed += 1
-                }
-            }
-        }
-    }
-
-    if (_TestFailed = 0) {
-        _TestResult .= "OK: corpus TOML coercion — " . vectors.Length . " vector(s) passed.`n"
-    }
+_TomlCoercionCorpus_CoerceValueExt(Raw) {
+	Trimmed := Trim(Raw, " `t")
+	Lower := StrLower(Trimmed)
+	if (Lower = "true")
+		return 1
+	if (Lower = "false")
+		return 0
+	if RegExMatch(Trimmed, "^-?\d+$")
+		return Integer(Trimmed)
+	if RegExMatch(Trimmed, "^-?\d+\.\d+$")
+		return Float(Trimmed)
+	Q := Chr(34)
+	if (StrLen(Trimmed) >= 2 && SubStr(Trimmed, 1, 1) = Q
+		&& SubStr(Trimmed, StrLen(Trimmed), 1) = Q) {
+		body := SubStr(Trimmed, 2, StrLen(Trimmed) - 2)
+		return _TomlCoercionCorpus_Unescape(body)
+	}
+	return Trimmed
 }
 
-_TestCorpusTotoCoercion()
+_TomlCoercionCorpus_Unescape(s) {
+	if !InStr(s, "\")
+		return s
+	Result := ""
+	i := 1
+	n := StrLen(s)
+	while (i <= n) {
+		c := SubStr(s, i, 1)
+		if (c = "\" && i < n) {
+			nc := SubStr(s, i + 1, 1)
+			if (nc = "\") {
+				Result .= "\"
+			} else if (nc = '"') {
+				Result .= '"'
+			} else if (nc = "n") {
+				Result .= "`n"
+			} else if (nc = "t") {
+				Result .= "`t"
+			} else if (nc = "r") {
+				Result .= "`r"
+			} else {
+				Result .= nc
+			}
+			i += 2
+		} else {
+			Result .= c
+			i += 1
+		}
+	}
+	return Result
+}
+
+
+; ===================================================
+; ===================================================
+; ======= 3/ Corpus Coercion Tests ==================
+; ===================================================
+; ===================================================
+
+_TomlCoercionCorpus_RegisterTests() {
+	Data := _TomlCoercionCorpus_LoadCorpus()
+	if (Data = "") {
+		Test("[corpus:toml-coercion] corpus file exists", () => AssertTrue(false,
+			"Corpus file not found at _shared/tests/corpus/toml/coercion_vectors.json"))
+		return
+	}
+
+	Test("[corpus:toml-coercion] corpus has vectors array", () => {
+		AssertTrue(Data.Has("vectors"), "corpus must have 'vectors' key")
+		AssertTrue(Data["vectors"].Length >= 12, "corpus must have >= 12 vectors")
+	})
+
+	; Replay every vector through the coercion clone and compare against
+	; the expected 'ahk' field.
+	for Vec in Data["vectors"] {
+		Id := Vec.Has("id") ? Vec["id"] : "unknown"
+		Input := Vec.Has("input") ? Vec["input"] : ""
+
+		Test("[corpus:toml-coercion:" . Id . "] coercion matches expected", () => {
+			AssertTrue(Vec.Has("ahk"), "vector '" . Id . "' missing 'ahk' field")
+
+			Result := _TomlCoercionCorpus_CoerceValueExt(Input)
+			Expected := Vec["ahk"]
+
+			if (Expected = true || Expected = false) {
+				ExpectedBool := Expected = true
+				ResultBool := Result = true || Result = 1
+				AssertEqual(ResultBool, ExpectedBool,
+					"vector '" . Id . "': boolean mismatch for '" . Input . "'")
+			} else if (Expected is Number) {
+				AssertTrue(Result is Number,
+					"vector '" . Id . "': expected number, got " . Type(Result))
+				AssertTrue(Abs(Result - Expected) < 0.0001,
+					"vector '" . Id . "': number mismatch for '" . Input . "': got " . Result . ", expected " . Expected)
+			} else {
+				AssertEqual(String(Result), String(Expected),
+					"vector '" . Id . "': string mismatch for '" . Input . "'")
+			}
+		})
+	}
+}
+
+
+; Register the corpus tests so they execute during RunTests().
+_TomlCoercionCorpus_RegisterTests()
