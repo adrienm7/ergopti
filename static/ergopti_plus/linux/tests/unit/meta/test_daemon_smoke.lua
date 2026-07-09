@@ -42,6 +42,25 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
         )
       end
     end)
+
+    helpers.it("timestamps keystrokes with the monotonic wall clock, not the CPU clock", function()
+      -- The keylogger derives inter-keystroke delays (N-gram timing) from the
+      -- per-keystroke timestamp. It was built from os.clock() * 1000 — CPU time
+      -- on Linux — so every recorded delay was meaningless in the daemon. This
+      -- guard is RED before the fix (the old expression is present).
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
+      helpers.assert_true(fh ~= nil, "daemon file is readable")
+      local src = fh:read("*a"); fh:close()
+
+      helpers.assert_true(src:find('require("lib.monotonic")', 1, true) ~= nil,
+        "daemon must source its keystroke clock from lib.monotonic")
+      helpers.assert_true(src:find("Monotonic.now_ms()", 1, true) ~= nil,
+        "the per-keystroke timestamp must come from the monotonic wall clock")
+      helpers.assert_true(src:find("os.clock() * 1000", 1, true) == nil,
+        "the CPU-time keystroke timestamp must be gone — it corrupts every logged delay")
+    end)
   end)
 
   -- ==========================================================================
