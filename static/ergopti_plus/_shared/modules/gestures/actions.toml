@@ -17,6 +17,35 @@
 
 
 # ==============================================================================
+# Gesture slot key-space (single source of truth for the slot names)
+# ==============================================================================
+#
+# Both drivers (Linux modules/gestures/manager.lua and macOS
+# modules/gestures/init.lua) must build SINGLE_SLOTS / AXIS_SLOTS and the
+# DEFAULT_GESTURES key-space from these lists. The DEFAULT_GESTURES key-space is
+# exactly the union of single and axis. The default action VALUES stay
+# platform-specific and are intentionally not listed here.
+
+[slots]
+single = [
+	"tap_2", "tap_3", "tap_4", "tap_5",
+	"swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down",
+	"swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down",
+	"swipe_3_left", "swipe_3_right", "swipe_3_up", "swipe_3_down",
+	"swipe_3_left_up", "swipe_3_right_up", "swipe_3_left_down", "swipe_3_right_down",
+	"swipe_4_left", "swipe_4_right", "swipe_4_up", "swipe_4_down",
+	"swipe_4_left_up", "swipe_4_right_up", "swipe_4_left_down", "swipe_4_right_down",
+	"swipe_5_left", "swipe_5_right", "swipe_5_up", "swipe_5_down",
+	"swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down",
+]
+axis = [
+	"swipe_3_horiz",
+	"swipe_4_horiz",
+	"swipe_5_horiz",
+]
+
+
+# ==============================================================================
 # Axe actions (swipes continus / scalables)
 # ==============================================================================
 
