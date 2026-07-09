@@ -151,4 +151,53 @@ helpers.describe("dynamic hotstrings manager (P2.6)", function()
     end)
   end)
 
+  -- ==========================================================================
+  -- 6. Info field count (regression)
+  -- ==========================================================================
+
+  helpers.describe("info field count", function()
+
+    helpers.it("logs the real [info] field count, not # of a string-keyed table", function()
+      -- Write a personal_info.toml with two [info] fields so the parsed table is
+      -- string-keyed; the length operator (#) wrongly reports 0 on such a table
+      local tmp_dir   = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "/tmp"
+      local toml_path = tmp_dir:gsub("\\", "/") .. "/ergopti_dh_info_count.toml"
+      local fh = assert(io.open(toml_path, "w"))
+      fh:write('[info]\nfirst_name = "Adrien"\nlast_name = "Moyaux"\n')
+      fh:close()
+
+      -- Spy on the logger the manager holds (require returns the cached table) so
+      -- the exact field count reported by the init summary line is observable
+      local logger    = require("logger.shim")
+      local orig_info = logger.info
+      local captured  = {}
+      logger.info = function(_tag, fmt, ...)
+        local n = select("#", ...)
+        captured[#captured + 1] = (n > 0) and string.format(fmt, ...) or tostring(fmt)
+      end
+
+      local ok = pcall(function()
+        dh.init({ trigger_char = "\\", personal_info_path = toml_path })
+      end)
+
+      -- Restore the logger and delete the fixture BEFORE asserting so no state
+      -- leaks into later tests even when an assertion throws
+      logger.info = orig_info
+      os.remove(toml_path)
+
+      helpers.assert_true(ok, "init did not crash")
+
+      local summary = nil
+      for _, m in ipairs(captured) do
+        if m:find("Dynamic hotstrings initialised", 1, true) then summary = m end
+      end
+      helpers.assert_not_nil(summary, "init logged its summary line")
+      -- RED before the fix: "info=0 field(s)" (# of a string-keyed table is 0)
+      -- GREEN after the fix: "info=2 field(s)"
+      helpers.assert_contains(summary, "info=2 field(s)",
+        "init log reports the real [info] field count")
+    end)
+
+  end)
+
 end)
