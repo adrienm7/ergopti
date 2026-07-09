@@ -12,6 +12,9 @@ M.bridge_name = "model_browser_bridge"
 local Logger = require("logger.shim")
 local LOG = "bridge.model_browser"
 
+-- Read canonical Ollama defaults from the shared bridge (P0-B SSoT).
+local HttpBridge = require("llm.linux_bridge")
+
 --- Builds the initial model browser data payload.
 --- @param state table Daemon state.
 --- @return table
@@ -19,7 +22,7 @@ local function _build_initial_payload(state)
 	local models = {}
 	local current_model = ""
 	local provider = "ollama"
-	local provider_url = "http://localhost:11434"
+	local provider_url = "http://" .. (HttpBridge.OLLAMA_DEFAULT_HOST or "127.0.0.1") .. ":" .. (HttpBridge.OLLAMA_DEFAULT_PORT or 11434)
 
 	if state.llm then
 		if type(state.llm.get_models) == "function" then

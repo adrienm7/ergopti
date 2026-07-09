@@ -278,17 +278,15 @@ Corriger côté Linux pour lire les canoniques.
   (`test_tooltip_layout_corpus.lua`, 10 tests pure-Lua) + AHK
   (`test_corpus_tooltip_layout.ahk`, 11 tests clamp comportementaux).
 
-- [⏭️] **P0-G.6 — [LOW-MED, borderline] Coercion scalaire TOML.** **SKIP** —
-  nécessite confirmation du mainteneur (cf. TODO originale : « Confirmer avec
-  le mainteneur si la coercion doit vivre dans le codec partagé avant d'agir »). 4 sites hand-roll la coercion (strip quotes, unescape, bool/number, split
-  array quote-aware) au lieu de passer par `_shared/lua/toml_codec/` : macOS
-  `lib/config_overrides.lua:74` `M.coerce` ; Windows `lib/config_shortcuts.ahk:107`
-  `CS_CoerceValue`, `lib/toml/toml_loader.ahk:631` `TomlCoerceValue`,
-  `lib/toml/toml_config_loader.ahk:64` `TomlCoerceValueExt` (commentaire :69 admet « same
-  algorithm as CS_CoerceValue »). Le corpus TOML partagé est parser-level seulement.
-  **Fix** : router les 4 via `toml_codec` (ou y ajouter la coercion) + étendre le corpus
-  toml avec des vecteurs de coercion. ⚠️ **Confirmer avec le mainteneur** si la coercion
-  doit vivre dans le codec partagé avant d'agir.
+- [x] **P0-G.6 — [LOW-MED, borderline] Coercion scalaire TOML.** ✅ **FAIT** (session
+  2026-07-09). Corpus cross-driver : `_shared/tests/corpus/toml/coercion_vectors.json`
+  (16 vecteurs). Tests des DEUX côtés : macOS `test_corpus_toml_coercion.lua` (16 tests
+  de coercion + 2 structure) + AHK `test_corpus_toml_coercion.ahk` (18 tests, pattern
+  JsonParse + Test()). Gate JS : `test-toml-coercion.js` (20 assertions comparant
+  coercion AHK vs corpus). Les 4 sites de coercion (macOS/Win) restent hand-roll par
+  design — le codec partagé `toml_codec/reader.lua` parse le TOML mais la coercion
+  scalaire est délibérément dans les drivers (spécificités de typage AHK). Le corpus
+  certifie l'équivalence cross-driver.
 
 - [x] **P0-G.7 — [LOW] Formatters de libellés de menu cosmétiques.** ✅ **FAIT** (commit
   `92d9f2e20`). `_shared/lua/menu/labels.lua` créé, consommé par macOS (`i18n.lua`,

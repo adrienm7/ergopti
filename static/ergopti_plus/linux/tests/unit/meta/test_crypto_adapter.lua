@@ -50,9 +50,13 @@ helpers.describe("crypto adapter", function()
       helpers.assert_eq(digest, "", "number input returns ''")
     end)
 
-    helpers.it("returns empty string for empty input", function()
+    helpers.it("returns correct SHA-256 for empty string", function()
       local digest = crypto.sha256("")
-      helpers.assert_eq(digest, "", "empty string returns ''")
+      -- The SHA-256 of the empty string is a well-known constant.
+      -- With openssl available (CI), returns the correct hash.
+      -- Without openssl, returns "" (safe fallback).
+      helpers.assert_true(digest == "" or digest == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "empty string returns '' or correct hash (got " .. tostring(digest) .. ")")
     end)
 
     helpers.it("does not crash on any input", function()

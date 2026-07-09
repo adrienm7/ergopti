@@ -12,6 +12,9 @@ M.bridge_name = "changelog_bridge"
 local Logger = require("logger.shim")
 local LOG = "bridge.changelog"
 
+-- Read canonical version from the single-source module (P0-E.2 SSoT).
+local Version = require("lib.version")
+
 --- Builds the initial changelog data payload.
 --- @param state table Daemon state.
 --- @return table
@@ -36,7 +39,7 @@ local function _build_initial_payload(state)
 	return {
 		releases = releases,
 		repo_url = "https://github.com/adrienm7/ergopti/releases",
-		version = state._version or "3.0.0",
+		version = state._version or Version.VERSION,
 	}
 end
 
