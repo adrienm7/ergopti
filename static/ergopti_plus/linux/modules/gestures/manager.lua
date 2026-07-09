@@ -32,6 +32,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Timings = require("lib.timings")
 local Monotonic = require("lib.monotonic")
+local TomlCodec = require("toml_codec")
 local LOG = "modules.gestures.manager"
 
 -- Wall-clock source (seconds) for gesture tap/swipe timing. Defaults to the
@@ -46,70 +47,90 @@ local _now_sec = Monotonic.now_sec
 -- =========================================
 -- =========================================
 
---- Default gesture-to-action mapping (mirrors macOS DEFAULT_GESTURES).
---- Linux-appropriate defaults: 3-finger swipe → workspace nav, 4-finger → volume.
-M.DEFAULT_GESTURES = {
-	tap_2                = "none",
-	tap_3                = "left_click_toggle",
-	tap_4                = "app_window_previous",
-	tap_5                = "none",
+-- The gesture slot key-space (tap/swipe slot names) is the SINGLE SOURCE shared
+-- with the macOS driver, declared once in _shared/modules/gestures/actions.toml
+-- under [slots]. This driver derives SINGLE_SLOTS / AXIS_SLOTS and the
+-- DEFAULT_GESTURES key-space from that file at load time so the two drivers can
+-- never drift. Only the default action VALUES below stay Linux-specific.
+local ACTIONS_TOML_REL_PATH = "/_shared/modules/gestures/actions.toml"
+local UTF8_BOM = "\239\187\191"
 
-	swipe_3_horiz        = "none",
-	swipe_4_horiz        = "none",
-	swipe_5_horiz        = "none",
+--- Resolves the absolute path to the shared gesture actions TOML from this
+--- module's own location (…/linux/modules/gestures/manager.lua → …/_shared/…).
+--- @return string The absolute path, or "" when it cannot be resolved.
+local function resolve_actions_toml_path()
+	local src = debug and debug.getinfo and debug.getinfo(1, "S")
+	if src and src.source then
+		local s = src.source
+		if s:sub(1, 1) == "@" or s:sub(1, 1) == "=" then s = s:sub(2) end
+		s = s:gsub("\\", "/")
+		local root = s:match("^(.*)/[^/]+/[^/]+/[^/]+/[^/]+$")
+		if root then
+			return root .. ACTIONS_TOML_REL_PATH
+		end
+	end
+	return ""
+end
 
-	swipe_2_left         = "none",
-	swipe_2_right        = "none",
-	swipe_2_up           = "none",
-	swipe_2_down         = "none",
-	swipe_2_left_up      = "none",
-	swipe_2_right_up     = "none",
-	swipe_2_left_down    = "none",
-	swipe_2_right_down   = "none",
+--- Reads the ordered [slots].single / [slots].axis lists from the shared actions
+--- TOML. Fails loud with an ERROR log and returns empty lists on any
+--- resolve/read/parse failure — the slot-space is a shipped resource, so a
+--- failure is a broken install, never a reason to duplicate a hardcoded list.
+--- @return table, table The ordered single-slot and axis-slot name lists.
+local function load_slot_space()
+	local path = resolve_actions_toml_path()
+	if path == "" then
+		Logger.error(LOG, "Could not resolve the shared gesture actions TOML path — slot-space not loaded.")
+		return {}, {}
+	end
+	local fh = io.open(path, "r")
+	if not fh then
+		Logger.error(LOG, "Shared gesture actions TOML unreadable at '%s'.", path)
+		return {}, {}
+	end
+	local content = fh:read("*a")
+	fh:close()
+	if type(content) == "string" and content:sub(1, 3) == UTF8_BOM then
+		content = content:sub(4)
+	end
+	local ok, data = pcall(TomlCodec.decode, content)
+	if not ok or type(data) ~= "table" or type(data.slots) ~= "table" then
+		Logger.error(LOG, "Shared gesture actions TOML failed to parse — slot-space not loaded.")
+		return {}, {}
+	end
+	local single = type(data.slots.single) == "table" and data.slots.single or {}
+	local axis   = type(data.slots.axis) == "table"   and data.slots.axis   or {}
+	return single, axis
+end
 
-	swipe_3_left         = "ws_prev",
-	swipe_3_right        = "ws_next",
-	swipe_3_up           = "tab_prev",
-	swipe_3_down         = "tab_next",
-	swipe_3_left_up      = "none",
-	swipe_3_right_up     = "none",
-	swipe_3_left_down    = "none",
-	swipe_3_right_down   = "none",
+--- All single / axis gesture slots (derived from the shared [slots] section).
+M.SINGLE_SLOTS, M.AXIS_SLOTS = load_slot_space()
 
-	swipe_4_left         = "vol_down",
-	swipe_4_right        = "vol_up",
-	swipe_4_up           = "brightness_up",
-	swipe_4_down         = "brightness_down",
-	swipe_4_left_up      = "none",
-	swipe_4_right_up     = "none",
-	swipe_4_left_down    = "none",
-	swipe_4_right_down   = "none",
-
-	swipe_5_left         = "none",
-	swipe_5_right        = "none",
-	swipe_5_up           = "none",
-	swipe_5_down         = "none",
-	swipe_5_left_up      = "none",
-	swipe_5_right_up     = "none",
-	swipe_5_left_down    = "none",
-	swipe_5_right_down   = "none",
+--- Linux-specific default action VALUES. Every slot not listed defaults to
+--- "none". The KEY-SPACE comes from the shared TOML, never from these keys:
+--- 3-finger swipe → workspace nav, 4-finger swipe → volume/brightness.
+local DEFAULT_ACTIONS = {
+	tap_3         = "left_click_toggle",
+	tap_4         = "app_window_previous",
+	swipe_3_left  = "ws_prev",
+	swipe_3_right = "ws_next",
+	swipe_3_up    = "tab_prev",
+	swipe_3_down  = "tab_next",
+	swipe_4_left  = "vol_down",
+	swipe_4_right = "vol_up",
+	swipe_4_up    = "brightness_up",
+	swipe_4_down  = "brightness_down",
 }
 
---- All single gesture slots (for menu iteration).
-M.SINGLE_SLOTS = {
-	"tap_2", "tap_3", "tap_4", "tap_5",
-	"swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down",
-	"swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down",
-	"swipe_3_left", "swipe_3_right", "swipe_3_up", "swipe_3_down",
-	"swipe_3_left_up", "swipe_3_right_up", "swipe_3_left_down", "swipe_3_right_down",
-	"swipe_4_left", "swipe_4_right", "swipe_4_up", "swipe_4_down",
-	"swipe_4_left_up", "swipe_4_right_up", "swipe_4_left_down", "swipe_4_right_down",
-	"swipe_5_left", "swipe_5_right", "swipe_5_up", "swipe_5_down",
-	"swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down",
-}
-
---- Axis-based slots (continuous/swipe-in-any-horizontal-direction).
-M.AXIS_SLOTS = { "swipe_3_horiz", "swipe_4_horiz", "swipe_5_horiz" }
+--- Default gesture-to-action mapping. The key-space is the union of the derived
+--- single and axis slots; each value is the Linux default (or "none").
+M.DEFAULT_GESTURES = {}
+for _, slot in ipairs(M.SINGLE_SLOTS) do
+	M.DEFAULT_GESTURES[slot] = DEFAULT_ACTIONS[slot] or "none"
+end
+for _, slot in ipairs(M.AXIS_SLOTS) do
+	M.DEFAULT_GESTURES[slot] = DEFAULT_ACTIONS[slot] or "none"
+end
 
 -- =========================================
 -- =========================================

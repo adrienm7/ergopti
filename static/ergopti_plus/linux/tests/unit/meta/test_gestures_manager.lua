@@ -343,4 +343,64 @@ helpers.describe("modules/gestures/manager.lua", function()
     M.disable()
   end)
 
+  -- ==========================================================================
+  -- 11. Slot-space is derived from the shared actions.toml (single source)
+  -- ==========================================================================
+
+  helpers.it("derives SINGLE_SLOTS / AXIS_SLOTS from the shared actions.toml in order", function()
+    local codec = require("toml_codec")
+    local path = helpers.driver_root() .. "/../_shared/modules/gestures/actions.toml"
+    local fh = io.open(path, "r")
+    helpers.assert_true(fh ~= nil, "shared actions.toml must be readable")
+    local content = fh:read("*a"); fh:close()
+    local data = codec.decode(content)
+    helpers.assert_true(data ~= nil and type(data.slots) == "table",
+      "actions.toml must decode with a [slots] section")
+
+    local single, axis = data.slots.single, data.slots.axis
+    helpers.assert_true(#single > 0 and #axis > 0,
+      "the [slots] arrays must be non-empty — proves multi-line array decode works")
+
+    helpers.assert_eq(#M.SINGLE_SLOTS, #single, "derived SINGLE_SLOTS length must match the TOML")
+    for i = 1, #single do
+      helpers.assert_eq(M.SINGLE_SLOTS[i], single[i], "SINGLE_SLOTS must be derived in TOML order")
+    end
+    helpers.assert_eq(#M.AXIS_SLOTS, #axis, "derived AXIS_SLOTS length must match the TOML")
+    for i = 1, #axis do
+      helpers.assert_eq(M.AXIS_SLOTS[i], axis[i], "AXIS_SLOTS must be derived in TOML order")
+    end
+
+    -- DEFAULT_GESTURES key-space is exactly the union of single + axis.
+    local union, nunion = {}, 0
+    for _, s in ipairs(single) do if not union[s] then union[s] = true; nunion = nunion + 1 end end
+    for _, s in ipairs(axis) do if not union[s] then union[s] = true; nunion = nunion + 1 end end
+    local nkeys = 0
+    for k in pairs(M.DEFAULT_GESTURES) do
+      nkeys = nkeys + 1
+      helpers.assert_true(union[k] == true, "DEFAULT_GESTURES has a key outside the slot-space: " .. tostring(k))
+    end
+    helpers.assert_eq(nkeys, nunion, "DEFAULT_GESTURES key-space must equal single + axis")
+  end)
+
+  helpers.it("keeps the Linux-specific default action values", function()
+    -- The KEY-SPACE is derived, but the VALUES stay Linux-specific. Lock a few
+    -- so the override table cannot silently regress to all-"none".
+    helpers.assert_eq(M.DEFAULT_GESTURES.tap_3, "left_click_toggle", "tap_3 default preserved")
+    helpers.assert_eq(M.DEFAULT_GESTURES.swipe_3_left, "ws_prev", "swipe_3_left default preserved")
+    helpers.assert_eq(M.DEFAULT_GESTURES.swipe_4_up, "brightness_up", "swipe_4_up default preserved")
+    helpers.assert_eq(M.DEFAULT_GESTURES.tap_2, "none", "an unmapped slot defaults to none")
+  end)
+
+  helpers.it("does not hardcode the slot arrays (they are derived at load)", function()
+    local fh = io.open(helpers.driver_root() .. "/modules/gestures/manager.lua", "r")
+    helpers.assert_true(fh ~= nil, "manager source must be readable")
+    local src = fh:read("*a"); fh:close()
+    helpers.assert_true(src:find("load_slot_space(", 1, true) ~= nil,
+      "manager must derive the slot-space via load_slot_space()")
+    helpers.assert_true(src:find("_shared/modules/gestures/actions.toml", 1, true) ~= nil,
+      "manager must read the shared actions.toml")
+    helpers.assert_true(src:find("M.SINGLE_SLOTS = {", 1, true) == nil,
+      "SINGLE_SLOTS must be derived, not re-hardcoded as a literal array")
+  end)
+
 end)
