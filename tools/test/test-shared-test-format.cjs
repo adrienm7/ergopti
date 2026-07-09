@@ -142,6 +142,42 @@ for (const [driver, f] of [['linux', 'tests/helpers.lua'], ['macos', 'tests/help
 	}
 }
 
+// ---- 5. Banner alignment in _shared/lua/test/format.lua ----
+// ROOT CAUSE: the five major-section banners carried a right-hand "=" run that
+// did not equal the mandated 7 (e.g. "======= 1/ inspect() ==============" had
+// 14 on the right), and every border row above/below a title was a fixed 35
+// "=" wide instead of matching the title line's own length. Nothing caught it
+// because lint-conventions.js scans macos/ only, never _shared/lua/. This guard
+// fails on any unbalanced (leftEq != rightEq) or wrong-length border banner.
+{
+	const bannerLines = formatSrc.replace(/^﻿/, '').replace(/\r\n/g, '\n').split('\n');
+	const TITLE_RE = /^(;|---?) (=+) (.+?) (=+)$/;
+	const BORDER_RE = /^(;|---?) (=+)$/;
+	bannerLines.forEach((line, i) => {
+		const m = line.match(TITLE_RE);
+		if (!m) return;
+		const marker = m[1];
+		const prefix = marker + ' ';
+		const leftEq = m[2].length;
+		const title = m[3];
+		const rightEq = m[4].length;
+		const loc = `_shared/lua/test/format.lua:${i + 1}`;
+		if (leftEq !== rightEq) {
+			errors.push(`${loc}: banner "${title}" is unbalanced (${leftEq} left vs ${rightEq} right) — both sides must be 7`);
+			return;
+		}
+		const expectedLen = prefix.length + leftEq + 1 + title.length + 1 + rightEq;
+		for (const adj of [i - 1, i + 1]) {
+			if (adj < 0 || adj >= bannerLines.length) continue;
+			const bm = bannerLines[adj].match(BORDER_RE);
+			if (!bm || bm[1] !== marker) continue;
+			if (bannerLines[adj].length !== expectedLen) {
+				errors.push(`${loc}: border row (line ${adj + 1}) length ${bannerLines[adj].length} != title-line length ${expectedLen} for "${title}"`);
+			}
+		}
+	});
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] test.format is not single-sourced in _shared/lua/test/format.lua:\x1b[0m');
 	for (const e of errors) console.error('    ' + e);
