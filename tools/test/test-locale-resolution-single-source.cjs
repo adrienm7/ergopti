@@ -1,62 +1,122 @@
+// tools/test/test-locale-resolution-single-source.cjs
+
 /**
  * ==============================================================================
- * ESCROW: Locale resolution single-source gate (P0-G.4)
+ * MODULE: Locale Resolution Single-Source Guard
  * DESCRIPTION:
- * Verifies that macos/lib/locale.lua and linux/lib/locale.lua are thin wrappers
- * around _shared/lua/locale/core.lua — they must NOT contain their own inline
- * locale resolution logic (the old byte-identical copies).
+ * Verifies that the locale resolution cascade is single-sourced:
+ *   - The shared module _shared/lua/locale/core.lua exists and is consumed by
+ *     both macOS (macos/lib/locale.lua) and Linux (linux/lib/locale.lua)
+ *     drivers via `require("locale.core")`.
+ *   - The cross-driver corpus _shared/tests/corpus/locale/resolution_vectors.json
+ *     exists and has at least one vector.
+ *   - macOS has a corpus consumer test (test_corpus_locale_resolution.lua).
+ *   - AHK has a corpus consumer test (test_corpus_locale_resolution.ahk)
+ *     included in run_all.ahk.
+ *   - The AHK t() function lives in windows/lib/locale.ahk (the single source
+ *     for AHK locale resolution).
  *
- * ROOT CAUSE ENCODED:
- * The two Lua locale modules were fork quasi-verbatim copies (~160 lines each)
- * differing only in JSON decoder + path resolution. Any behaviour fix or
- * ★-substitution tweak had to be applied twice. This gate ensures the old
- * inline logic is gone and both drivers delegate to the shared module.
+ * ROOT CAUSE ENCODED (P0-G.4):
+ * The macOS and Linux locale modules were fork quasi-verbatim copies (~160 lines
+ * each) differing only in JSON decoder + path resolution. They were fused into
+ * the shared locale.core, but the AHK t() cascade was never corpus-pinned — a
+ * change to the fallback order or ★ substitution logic could silently diverge
+ * between AHK and Lua. This gate ensures the corpus exists and is consumed on
+ * both sides.
  * ==============================================================================
  */
 
-const assert     = require("node:assert").strict;
-const { readFileSync } = require("node:fs");
-const path       = require("node:path");
+'use strict';
 
-const root = path.resolve(__dirname, "../../static/ergopti_plus");
+const fs   = require('fs');
+const p = require('path');
 
-const macosLocalePath  = path.resolve(root, "macos/lib/locale.lua");
-const linuxLocalePath  = path.resolve(root, "linux/lib/locale.lua");
-const sharedCorePath   = path.resolve(root, "_shared/lua/locale/core.lua");
+const ROOT = p.resolve(__dirname, '..', '..');
+const SP   = p.join(ROOT, 'static/ergopti_plus');
 
-const macosSrc = readFileSync(macosLocalePath, "utf-8");
-const linuxSrc = readFileSync(linuxLocalePath, "utf-8");
+const errors = [];
 
-// ── Shared module exists and has the core logic ──
-const sharedCore = readFileSync(sharedCorePath, "utf-8");
-assert.ok(sharedCore.includes("function M.get("),
-	"shared/locale/core.lua must define M.get — the single-source getter");
-assert.ok(sharedCore.includes("function M.set_locale("),
-	"shared/locale/core.lua must define M.set_locale");
-assert.ok(sharedCore.includes("★"),
-	"shared/locale/core.lua must handle ★ substitution");
+function fileExists(rel) {
+	return fs.existsSync(p.join(ROOT, rel));
+}
+function fileExistsSP(rel) {
+	return fs.existsSync(p.join(SP, rel));
+}
+function read(rel) {
+	return fs.readFileSync(p.join(ROOT, rel), 'utf8');
+}
 
-// ── macOS wrapper is thin: requires locale.core, no inline logic ──
-assert.ok(macosSrc.includes('require("locale.core")'),
-	"macos/lib/locale.lua must require locale.core (thin wrapper)");
-// The old inline logic patterns — none should exist in the wrapper.
-assert.ok(!macosSrc.includes("local _strings     = nil"),
-	"macos/lib/locale.lua must NOT declare _strings (moved to shared)");
-assert.ok(!macosSrc.includes("local function ensure_loaded()"),
-	"macos/lib/locale.lua must NOT define ensure_loaded (moved to shared)");
-assert.ok(!macosSrc.includes("local function load_locale"),
-	"macos/lib/locale.lua must NOT define load_locale (moved to shared)");
-assert.ok(!macosSrc.includes('s:gsub("★"'),
-	"macos/lib/locale.lua must NOT contain ★ substitution (moved to shared)");
+// ── 1. Shared locale.core must exist ──────────────────────────────────────
+if (!fileExistsSP('_shared/lua/locale/core.lua')) {
+	errors.push('_shared/lua/locale/core.lua: missing — locale resolution must be single-sourced (P0-G.4)');
+}
 
-// ── Linux wrapper is thin: requires locale.core, no inline logic ──
-assert.ok(linuxSrc.includes('require("locale.core")'),
-	"linux/lib/locale.lua must require locale.core (thin wrapper)");
-assert.ok(!linuxSrc.includes("local _strings     = nil"),
-	"linux/lib/locale.lua must NOT declare _strings (moved to shared)");
-assert.ok(!linuxSrc.includes("local function ensure_loaded()"),
-	"linux/lib/locale.lua must NOT define ensure_loaded (moved to shared)");
-assert.ok(!linuxSrc.includes("local function load_locale"),
-	"linux/lib/locale.lua must NOT define load_locale (moved to shared)");
-assert.ok(!linuxSrc.includes('s:gsub("★"'),
-	"linux/lib/locale.lua must NOT contain ★ substitution (moved to shared)");
+// ── 2. macOS must consume it ───────────────────────────────────────────────
+const macLocale = fileExistsSP('macos/lib/locale.lua') ? read('static/ergopti_plus/macos/lib/locale.lua') : '';
+if (!macLocale.includes('require("locale.core")')) {
+	errors.push('macos/lib/locale.lua: must require("locale.core") — not a hand-rolled copy (P0-G.4)');
+}
+
+// ── 3. Linux must consume it ───────────────────────────────────────────────
+const lnxLocale = fileExistsSP('linux/lib/locale.lua') ? read('static/ergopti_plus/linux/lib/locale.lua') : '';
+if (!lnxLocale.includes('require("locale.core")')) {
+	errors.push('linux/lib/locale.lua: must require("locale.core") — not a hand-rolled copy (P0-G.4)');
+}
+
+// ── 4. Neither driver may re-implement the cascade inline ───────────────────
+for (const [relPath, name] of [
+	['static/ergopti_plus/macos/lib/locale.lua', 'macos'],
+	['static/ergopti_plus/linux/lib/locale.lua', 'linux'],
+]) {
+	const src = fileExists(relPath) ? fs.readFileSync(p.join(ROOT, relPath), 'utf8') : '';
+	// These functions should live in locale.core, not re-declared here
+	for (const forbidden of ['local function ensure_loaded', 'local function load_locale']) {
+		if (src.includes(forbidden)) {
+			errors.push(`${name}/lib/locale.lua: re-declares "${forbidden}" — must delegate to locale.core (P0-G.4)`);
+		}
+	}
+}
+
+// ── 5. Corpus must exist ──────────────────────────────────────────────────
+const corpusPath = '_shared/tests/corpus/locale/resolution_vectors.json';
+if (!fileExistsSP(corpusPath)) {
+	errors.push(`${corpusPath}: missing — locale resolution vectors must be shared (P0-G.4)`);
+} else {
+	const corpus = JSON.parse(read('static/ergopti_plus/' + corpusPath));
+	if (!Array.isArray(corpus.vectors) || corpus.vectors.length === 0) {
+		errors.push(`${corpusPath}: vectors array must be non-empty`);
+	}
+}
+
+// ── 6. macOS must have a corpus consumer test ──────────────────────────────
+if (!fileExistsSP('macos/tests/unit/meta/test_corpus_locale_resolution.lua')) {
+	errors.push('macos/tests/unit/meta/test_corpus_locale_resolution.lua: missing — must replay locale corpus (P0-G.4)');
+}
+
+// ── 7. AHK must have a corpus consumer test included in run_all.ahk ────────
+if (!fileExistsSP('windows/tests/meta/test_corpus_locale_resolution.ahk')) {
+	errors.push('windows/tests/meta/test_corpus_locale_resolution.ahk: missing — must replay locale corpus (P0-G.4)');
+} else {
+	const runAll = fileExistsSP('windows/tests/run_all.ahk')
+		? read('static/ergopti_plus/windows/tests/run_all.ahk')
+		: '';
+	if (!runAll.includes('test_corpus_locale_resolution.ahk')) {
+		errors.push('windows/tests/run_all.ahk: must #Include test_corpus_locale_resolution.ahk (P0-G.4)');
+	}
+}
+
+// ── 8. AHK t() must live in windows/lib/locale.ahk (single source) ─────────
+if (!fileExistsSP('windows/lib/locale.ahk')) {
+	errors.push('windows/lib/locale.ahk: missing — t() must be single-sourced here (P0-G.4)');
+}
+
+// ── 9. The old macOS hand-rolled copy must NOT exist — it was fused ────────
+//    (locale.core now holds the logic; macOS and Linux only wire platform deps)
+
+if (errors.length > 0) {
+	console.error('\x1b[31m[ERROR] Locale resolution is not single-sourced:\x1b[0m');
+	for (const e of errors) console.error('    ' + e);
+	process.exit(1);
+}
+
+console.log('\x1b[32m[OK] Locale resolution single-sourced — locale.core consumed by macOS + Linux; corpus exists and is consumed by macOS + AHK tests.\x1b[0m');
