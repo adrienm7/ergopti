@@ -56,14 +56,16 @@ _TtLayoutCorpus_RegisterStructureTests() {
 		return
 	}
 
-	Test("[corpus:tooltip-layout] corpus has vectors array", () => {
+	Test("[corpus:tooltip-layout] corpus has vectors array", () =>
+	{
 		AssertTrue(Data.Has("vectors"), "corpus must have 'vectors' key")
 		AssertTrue(Data["vectors"].Length > 0, "vectors must be non-empty")
 	})
 
 	for Vec in Data["vectors"] {
 		Id := Vec.Has("id") ? Vec["id"] : "unknown"
-		Test("[corpus:tooltip-layout:" . Id . "] vector has required fields", () => {
+		Test("[corpus:tooltip-layout:" . Id . "] vector has required fields", () =>
+		{
 			AssertTrue(Vec.Has("anchor"), "vector '" . Id . "' missing 'anchor'")
 			AssertTrue(Vec.Has("canvasSize"), "vector '" . Id . "' missing 'canvasSize'")
 			AssertTrue(Vec.Has("screenFrame"), "vector '" . Id . "' missing 'screenFrame'")
@@ -90,7 +92,8 @@ _TtLayoutCorpus_RegisterStructureTests() {
 ; so we cannot mock a synthetic 1920x1080 screen. Instead we verify the
 ; function is reachable and produces clamped output within the real screen.
 
-Test("[corpus:tooltip-layout] _TooltipClampToScreen is callable", () => {
+Test("[corpus:tooltip-layout] _TooltipClampToScreen is callable", () =>
+{
 	; Call the real clamp function with a small canvas at origin — should
 	; stay within the real screen bounds
 	Result := _TooltipClampToScreen(10, 10, 300, 80)
@@ -102,27 +105,31 @@ Test("[corpus:tooltip-layout] _TooltipClampToScreen is callable", () => {
 	AssertTrue(Result.Y < A_ScreenHeight, "Y must be within screen height")
 })
 
-Test("[corpus:tooltip-layout] _TooltipClampToScreen clamps negative coordinates", () => {
+Test("[corpus:tooltip-layout] _TooltipClampToScreen clamps negative coordinates", () =>
+{
 	; Feed negative coordinates — should be clamped to the margin
 	Result := _TooltipClampToScreen(-100, -100, 300, 80)
 	AssertTrue(Result.X >= 0, "negative X clamped to >= margin")
 	AssertTrue(Result.Y >= 0, "negative Y clamped to >= margin")
 })
 
-Test("[corpus:tooltip-layout] _TooltipClampToScreen clamps far-right coordinates", () => {
+Test("[corpus:tooltip-layout] _TooltipClampToScreen clamps far-right coordinates", () =>
+{
 	; Feed coordinates far to the right — should be clamped
 	Result := _TooltipClampToScreen(A_ScreenWidth + 1000, 100, 300, 80)
 	MaxX := A_ScreenWidth - 300 - 5  ; width - canvasW - margin
 	AssertTrue(Result.X <= MaxX, "far-right X clamped to <= screen width - canvasW - margin")
 })
 
-Test("[corpus:tooltip-layout] _TooltipClampToScreen clamps far-bottom coordinates", () => {
+Test("[corpus:tooltip-layout] _TooltipClampToScreen clamps far-bottom coordinates", () =>
+{
 	Result := _TooltipClampToScreen(100, A_ScreenHeight + 1000, 300, 80)
 	MaxY := A_ScreenHeight - 80 - 5  ; height - canvasH - margin
 	AssertTrue(Result.Y <= MaxY, "far-bottom Y clamped to <= screen height - canvasH - margin")
 })
 
-Test("[corpus:tooltip-layout] _TooltipClampToScreen: multiple calls produce consistent results", () => {
+Test("[corpus:tooltip-layout] _TooltipClampToScreen: multiple calls produce consistent results", () =>
+{
 	R1 := _TooltipClampToScreen(100, 100, 200, 50)
 	R2 := _TooltipClampToScreen(100, 100, 200, 50)
 	AssertEqual(R1.X, R2.X, "same input → same X")

@@ -103,7 +103,8 @@ _TomlCoercionCorpus_RegisterTests() {
 		return
 	}
 
-	Test("[corpus:toml-coercion] corpus has vectors array", () => {
+	Test("[corpus:toml-coercion] corpus has vectors array", () =>
+	{
 		AssertTrue(Data.Has("vectors"), "corpus must have 'vectors' key")
 		AssertTrue(Data["vectors"].Length >= 12, "corpus must have >= 12 vectors")
 	})
@@ -114,7 +115,8 @@ _TomlCoercionCorpus_RegisterTests() {
 		Id := Vec.Has("id") ? Vec["id"] : "unknown"
 		Input := Vec.Has("input") ? Vec["input"] : ""
 
-		Test("[corpus:toml-coercion:" . Id . "] coercion matches expected", () => {
+		Test("[corpus:toml-coercion:" . Id . "] coercion matches expected", () =>
+		{
 			AssertTrue(Vec.Has("ahk"), "vector '" . Id . "' missing 'ahk' field")
 
 			Result := _TomlCoercionCorpus_CoerceValueExt(Input)
