@@ -151,9 +151,14 @@ function M.init(opts)
 	Engine.register_date_rules(_trigger_char)
 	_rules_count = _rules_count + 3  -- td, dt, date
 
+	-- The parsed [info] table is string-keyed, so the length operator (#) always
+	-- reports 0; count its keys explicitly to log the real field total
+	local info_field_count = 0
+	for _ in pairs(_info) do info_field_count = info_field_count + 1 end
+
 	_enabled = _rules_count > 0
 	Logger.info(LOG, "Dynamic hotstrings initialised: %d rule(s), trigger='%s', info=%d field(s).",
-		_rules_count, _trigger_char, #_info)
+		_rules_count, _trigger_char, info_field_count)
 end
 
 --- Returns true when the module has been initialised and has active rules.
