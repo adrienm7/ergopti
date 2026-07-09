@@ -437,6 +437,47 @@ parse_key = function(raw)
 	return raw
 end
 
+--- Strip a trailing inline comment from a TOML line, honouring both
+--- double- and single-quoted regions so a '#' inside a string is kept.
+--- @param s string The raw line.
+--- @return string The line with any inline comment removed.
+local function strip_inline_comment(s)
+	local in_dbl, in_sgl, escape = false, false, false
+	for ci = 1, #s do
+		local c = s:sub(ci, ci)
+		if escape then escape = false
+		elseif c == "\\" and in_dbl then escape = true
+		elseif c == '"' and not in_sgl then in_dbl = not in_dbl
+		elseif c == "'" and not in_dbl then in_sgl = not in_sgl
+		elseif not in_dbl and not in_sgl and c == "#" then
+			return trim(s:sub(1, ci - 1))
+		end
+	end
+	return s
+end
+
+--- Advance the array-bracket nesting depth across a line fragment, honouring
+--- double-quoted strings so a '[' or ']' inside a string does not count. The
+--- state is threaded across the lines of a multi-line array so decode() knows
+--- when the array finally closes.
+--- @param s string The fragment to scan.
+--- @param depth number Bracket depth on entry.
+--- @param in_str boolean Whether we start inside a double-quoted string.
+--- @param escape boolean Whether the previous char was a backslash escape.
+--- @return number, boolean, boolean The depth, in_str and escape state on exit.
+local function scan_bracket_depth(s, depth, in_str, escape)
+	for i = 1, #s do
+		local c = s:sub(i, i)
+		if escape then escape = false
+		elseif c == "\\" and in_str then escape = true
+		elseif c == '"' then in_str = not in_str
+		elseif not in_str and c == "[" then depth = depth + 1
+		elseif not in_str and c == "]" then depth = depth - 1
+		end
+	end
+	return depth, in_str, escape
+end
+
 --- Decode a TOML body into a nested Lua table.
 --- Returns nil on any spec violation (duplicate keys, invalid syntax, etc.).
 --- @param content string The TOML source.
@@ -448,9 +489,34 @@ function M.decode(content)
 	local seen_keys = { [root] = {} }
 	-- Track which regular section paths have been declared (not array-of-tables)
 	local seen_sections = {}
+	-- Active multi-line array accumulator (nil when not inside one). TOML permits
+	-- an array value to span several lines; the decoder collects the fragments
+	-- until the brackets balance, then coerces the joined text as one array.
+	local pending = nil
 	if type(content) ~= "string" or content == "" then return root end
 	for line in (content .. "\n"):gmatch("([^\r\n]*)\r?\n") do
 		local trimmed = trim(line)
+
+		if pending then
+			-- Inside a multi-line array: append this line (comment-stripped) and
+			-- re-check whether the brackets have finally balanced.
+			local frag = strip_inline_comment(trimmed)
+			pending.parts[#pending.parts + 1] = frag
+			pending.depth, pending.in_str, pending.escape =
+				scan_bracket_depth(frag, pending.depth, pending.in_str, pending.escape)
+			if pending.depth <= 0 then
+				local v = coerce_value(table.concat(pending.parts, " "))
+				if v == PARSE_ERROR then return nil end
+				local sk = seen_keys[pending.target]
+				if not sk then sk = {}; seen_keys[pending.target] = sk end
+				if sk[pending.key] then return nil end
+				sk[pending.key] = true
+				pending.target[pending.key] = v
+				pending = nil
+			end
+			goto continue_decode
+		end
+
 		if trimmed == "" or trimmed:sub(1, 1) == "#" then
 			-- Comment / blank — skip
 
@@ -494,24 +560,10 @@ function M.decode(content)
 			if not seen_keys[current] then seen_keys[current] = {} end
 
 		else
-			-- Key-value line: strip inline comment before processing.
-			-- Track BOTH double-quoted and single-quoted regions so that a literal
-			-- string like key = 'hello # world' is not truncated at the '#'.
-			local trimmed_nc = trimmed
-			do
-				local in_dbl, in_sgl, escape = false, false, false
-				for ci = 1, #trimmed do
-					local c = trimmed:sub(ci, ci)
-					if escape then escape = false
-					elseif c == "\\" and in_dbl then escape = true
-					elseif c == '"' and not in_sgl then in_dbl = not in_dbl
-					elseif c == "'" and not in_dbl then in_sgl = not in_sgl
-					elseif not in_dbl and not in_sgl and c == "#" then
-						trimmed_nc = trim(trimmed:sub(1, ci - 1))
-						break
-					end
-				end
-			end
+			-- Key-value line: strip any inline comment first, honouring both
+			-- double- and single-quoted regions so a literal string like
+			-- key = 'hello # world' is not truncated at the '#'.
+			local trimmed_nc = strip_inline_comment(trimmed)
 			local key, raw = split_kv(trimmed_nc)
 			-- Line with no '=' (e.g., multi-line string continuation) — skip
 			if not key then goto continue_decode end
@@ -520,10 +572,27 @@ function M.decode(content)
 			-- Key with no value (raw is nil or empty after trimming)
 			local raw_trimmed = raw and trim(raw) or ""
 			if raw_trimmed == "" then return nil end
+			local parsed_key = parse_key(key)
+			-- Multi-line array: the value opens a '[' that does not balance on
+			-- this line. Defer coercion to the accumulator above, which joins the
+			-- continuation lines and coerces the whole array once it closes.
+			if raw_trimmed:sub(1, 1) == "[" then
+				local d, is, es = scan_bracket_depth(raw_trimmed, 0, false, false)
+				if d > 0 then
+					pending = {
+						key    = parsed_key,
+						target = current,
+						parts  = { raw_trimmed },
+						depth  = d,
+						in_str = is,
+						escape = es,
+					}
+					goto continue_decode
+				end
+			end
 			local v = coerce_value(raw_trimmed)
 			-- Propagate parse errors from coerce_value
 			if v == PARSE_ERROR then return nil end
-			local parsed_key = parse_key(key)
 			-- Duplicate key check within the current section
 			local sk = seen_keys[current]
 			if not sk then sk = {}; seen_keys[current] = sk end
@@ -533,6 +602,8 @@ function M.decode(content)
 		end
 		::continue_decode::
 	end
+	-- A multi-line array that never closes is malformed TOML.
+	if pending then return nil end
 	return root
 end
 
