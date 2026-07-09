@@ -75,7 +75,36 @@ helpers.describe("modules/shortcuts/manager.lua", function()
     helpers.assert_true(pairs["("] ~= nil, "has paren")
     helpers.assert_true(pairs['"'] ~= nil, "has double quote")
     helpers.assert_true(pairs["["] ~= nil, "has bracket")
-    helpers.assert_true(pairs["«"] ~= nil, "has guillemet")
+    -- The guillemet opener key carries a trailing space in the shared SSoT.
+    helpers.assert_true(pairs["« "] ~= nil, "has guillemet opener from the shared SSoT")
+  end)
+
+  -- Regression + SSoT guard: the wrap catalogue must be derived from the shared
+  -- JSON (_shared/modules/wrap_symbols/wrap_symbols.json), never hardcoded. Build
+  -- the expected flattened lookup straight from the canonical JSON and deep-equal
+  -- it against the module's catalogue, so any drift — or a revert to a hardcoded
+  -- subset — fails here.
+  helpers.it("wrap catalogue matches the shared wrap_symbols.json SSoT", function()
+    local json = require("json")
+    local path = helpers.driver_root() .. "/../_shared/modules/wrap_symbols/wrap_symbols.json"
+    local fh = assert(io.open(path, "r"), "shared wrap_symbols.json must be readable")
+    local raw = fh:read("*a")
+    fh:close()
+    local data = json.decode(raw)
+    helpers.assert_true(type(data) == "table" and type(data.groups) == "table",
+      "shared catalogue parses into groups")
+
+    local expected = {}
+    for _, group in ipairs(data.groups) do
+      for _, pair in ipairs(group.pairs or {}) do
+        expected[pair.left] = { left = pair.left, right = pair.right }
+        if pair.right ~= pair.left then
+          expected[pair.right] = { left = pair.left, right = pair.right }
+        end
+      end
+    end
+
+    helpers.assert_eq(M.get_wrap_pairs(), expected)
   end)
 
   -- ==========================================================================

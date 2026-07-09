@@ -35,26 +35,97 @@ local LOG = "modules.shortcuts.manager"
 -- =========================================
 -- =========================================
 
---- Canonical wrap-pair catalogue. Each entry maps a trigger character to
---- { left, right } wrapping symbols.
-local WRAP_PAIRS = {
-	["("] = { left = "(", right = ")" },
-	[")"] = { left = "(", right = ")" },
-	["["] = { left = "[", right = "]" },
-	["]"] = { left = "[", right = "]" },
-	["{"] = { left = "{", right = "}" },
-	["}"] = { left = "{", right = "}" },
-	["<"] = { left = "<", right = ">" },
-	[">"] = { left = "<", right = ">" },
-	['"'] = { left = '"', right = '"' },
-	["'"] = { left = "'", right = "'" },
-	["`"] = { left = "`", right = "`" },
-	["*"] = { left = "*", right = "*" },
-	["_"] = { left = "_", right = "_" },
-	["~"] = { left = "~", right = "~" },
-	["«"] = { left = "« ", right = " »" },
-	["»"] = { left = "« ", right = " »" },
-}
+-- Relative path (from static/ergopti_plus) to the shared wrap-symbol catalogue,
+-- the single source of truth shared with the AHK and macOS drivers — never
+-- hardcode the pair list here; edit the JSON so all 3 drivers stay in sync
+local WRAP_SYMBOLS_REL_PATH = "/_shared/modules/wrap_symbols/wrap_symbols.json"
+
+-- Leading UTF-8 BOM bytes; the pure-Lua JSON decoder rejects a byte-order mark
+local UTF8_BOM = "\239\187\191"
+
+--- Resolves the absolute path to the shared wrap-symbols catalogue by walking up
+--- from this file's location. manager.lua lives at
+--- linux/modules/shortcuts/manager.lua, so the 4 trailing path segments are
+--- stripped to reach static/ergopti_plus before descending into the shared tree.
+--- Mirrors the debug.getinfo path walk in lib/locale.lua.
+--- @return string Absolute catalogue path, or "" when the location is unresolvable.
+local function resolve_wrap_symbols_path()
+	local src = debug and debug.getinfo and debug.getinfo(1, "S")
+	if src and src.source then
+		local s = src.source
+		if s:sub(1, 1) == "@" or s:sub(1, 1) == "=" then s = s:sub(2) end
+		s = s:gsub("\\", "/")
+		local root = s:match("^(.*)/[^/]+/[^/]+/[^/]+/[^/]+$")
+		if root then
+			return root .. WRAP_SYMBOLS_REL_PATH
+		end
+	end
+	return ""
+end
+
+--- Reads the shared wrap-symbols JSON and flattens its ordered groups into the
+--- { [char] = { left, right } } lookup used at wrap time. Both the opening and
+--- the closing character of each pair are registered as keys so typing either one
+--- wraps the selection (mirrors the macOS driver's build loop). Fails loud with an
+--- ERROR log and returns an empty table on any resolve/read/parse failure.
+--- @return table The flattened wrap-pair lookup.
+local function load_wrap_pairs()
+	local lookup = {}
+
+	local ok_json, json = pcall(require, "json")
+	if not ok_json or type(json) ~= "table" or type(json.decode) ~= "function" then
+		Logger.error(LOG, "JSON decoder unavailable — wrap-symbol catalogue not loaded.")
+		return lookup
+	end
+
+	local path = resolve_wrap_symbols_path()
+	if path == "" then
+		Logger.error(LOG, "Could not resolve the shared wrap-symbols path — catalogue not loaded.")
+		return lookup
+	end
+
+	local fh = io.open(path, "r")
+	if not fh then
+		Logger.error(LOG, "Shared wrap-symbols catalogue unreadable at '%s'.", path)
+		return lookup
+	end
+	local content = fh:read("*a")
+	fh:close()
+
+	if type(content) == "string" and content:sub(1, 3) == UTF8_BOM then
+		content = content:sub(4)
+	end
+
+	local ok, data = pcall(json.decode, content)
+	if not ok or type(data) ~= "table" or type(data.groups) ~= "table" then
+		Logger.error(LOG, "Shared wrap-symbols catalogue failed to parse — catalogue not loaded.")
+		return lookup
+	end
+
+	for _, group in ipairs(data.groups) do
+		for _, pair in ipairs(group.pairs or {}) do
+			if type(pair) == "table"
+					and type(pair.left) == "string" and pair.left ~= ""
+					and type(pair.right) == "string" and pair.right ~= "" then
+				lookup[pair.left] = { left = pair.left, right = pair.right }
+				if pair.right ~= pair.left then
+					lookup[pair.right] = { left = pair.left, right = pair.right }
+				end
+			end
+		end
+	end
+
+	local count = 0
+	for _ in pairs(lookup) do count = count + 1 end
+	Logger.info(LOG, "Wrap-symbol catalogue loaded from shared SSoT (%d lookup key(s)).", count)
+
+	return lookup
+end
+
+--- Canonical wrap-pair catalogue, derived at require-time from the shared JSON
+--- single source of truth (never hardcoded here). Each entry maps a trigger
+--- character to its { left, right } wrapping symbols.
+local WRAP_PAIRS = load_wrap_pairs()
 
 --- Checks whether a character is a wrap-pair trigger.
 --- @param ch string Single character.
