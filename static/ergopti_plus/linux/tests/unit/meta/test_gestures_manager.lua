@@ -311,4 +311,36 @@ helpers.describe("modules/gestures/manager.lua", function()
     M.disable()
   end)
 
+  helpers.it("a slow near-stationary hold is not misclassified as a tap (wall clock, not CPU time)", function()
+    -- The bug: process_frame timed gestures with os.clock() (CPU time). In an
+    -- I/O-bound daemon CPU time barely advances, so a gesture held for seconds
+    -- reported elapsed ~= 0 and was wrongly fired as a tap. With an injected
+    -- wall clock a long hold exceeds the tap ceiling and must NOT fire.
+    local captured = {}
+    local real_execute = os.execute
+    os.execute = function(cmd) captured[#captured + 1] = cmd; return true end
+
+    local fake_t = 0
+    M.init({ now_sec = function() return fake_t end })
+    M.reset_defaults()
+    M.enable()
+    M.set_action("tap_3", "enter")
+
+    -- Three fingers down, essentially stationary, held for 2 s of wall time
+    -- (far beyond the tap ceiling), then lifted.
+    fake_t = 100.0
+    M.process_frame({ { x = 100, y = 100 }, { x = 100, y = 100 }, { x = 100, y = 100 } })
+    fake_t = 102.0
+    M.process_frame({ { x = 100, y = 100 }, { x = 100, y = 100 }, { x = 100, y = 100 } })
+    M.process_frame({})
+
+    os.execute = real_execute
+
+    helpers.assert_eq(#captured, 0,
+      "a 2 s near-stationary hold exceeds the tap ceiling and must not dispatch a tap")
+
+    M.reset_defaults()
+    M.disable()
+  end)
+
 end)
