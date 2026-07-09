@@ -18,7 +18,12 @@
 
 local M = {}
 
+-- Value formatting and stack-trace helpers shared with Linux (P0 SSoT).
+local fmt = require("test.format")
+M.inspect = fmt.inspect
 
+-- fail_msg closure: skip this helpers file when resolving test file:line.
+local _fail_msg = fmt.fail_msg_for("helpers[/\\\\]init%.lua$")
 
 
 -- ===================================
@@ -260,73 +265,6 @@ end
 -- ======= 3/ Assertions ============
 -- ==================================
 -- ==================================
-
---- Pretty-prints any Lua value into a single-line representation suitable for
---- error messages. Tables are expanded up to 3 levels deep; cycles are detected.
---- @param v     any   Value to format.
---- @param depth number Internal recursion counter (omit on first call).
---- @param seen  table  Cycle-detection set (omit on first call).
---- @return string Single-line representation.
-function M.inspect(v, depth, seen)
-	depth = depth or 0
-	if depth > 2 then return "{…}" end
-	if type(v) == "string" then
-		if #v > 120 then return string.format("%q", v:sub(1, 117) .. "...") end
-		return string.format("%q", v)
-	end
-	if type(v) == "number" then return tostring(v) end
-	if type(v) == "boolean" then return v and "true" or "false" end
-	if v == nil then return "nil" end
-	if type(v) == "function" then return "<function>" end
-	if type(v) == "userdata" then return "<userdata>" end
-	if type(v) ~= "table" then return tostring(v) end
-
-	seen = seen or {}
-	if seen[v] then return "[cyclic]" end
-	seen[v] = true
-
-	local parts = {}
-	local count = 0
-	for k, val in pairs(v) do
-		count = count + 1
-		if count > 20 then parts[#parts + 1] = "…"; break end
-		local key_fmt
-		if type(k) == "string" and k:match("^[%a_][%w_]*$") then
-			key_fmt = k
-		else
-			key_fmt = "[" .. M.inspect(k, depth + 1, seen) .. "]"
-		end
-		parts[#parts + 1] = key_fmt .. "=" .. M.inspect(val, depth + 1, seen)
-	end
-	seen[v] = nil
-	return "{" .. table.concat(parts, " ") .. "}"
-end
-
---- Resolves the caller's file:line from the debug stack — skipping helpers.lua
---- frames — so error messages point at the test, not the assertion helper.
---- @param level number Starting stack level (default 2).
---- @return string file:line pair, or "" if unresolvable.
-local function _caller_site(level)
-	level = level or 2
-	for lvl = level, level + 10 do
-		local info = debug.getinfo(lvl, "Sl")
-		if info and info.source then
-			local src = info.source:gsub("^@", "")
-			if not src:match("helpers[/\\]init%.lua$") then
-				local fname = src:match("([^/\\]+)$") or src
-				return fname .. ":" .. (info.currentline or "?")
-			end
-		end
-	end
-	return ""
-end
-
---- Prefixes a failure message with the test's file:line.
-local function _fail_msg(msg)
-	local site = _caller_site(3)
-	if site ~= "" then return site .. ": " .. msg end
-	return msg
-end
 
 --- Compares two values for deep equality.
 --- @param a any First value.
