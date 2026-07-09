@@ -86,6 +86,15 @@
       "expected": ""
     },
     {
+      "id": "asset_realistic_release_wanted_not_first",
+      "category": "parse_asset_url",
+      "input": {
+        "body": "{\"tag_name\":\"v2.1.0\",\"name\":\"Release 2.1.0\",\"author\":{\"login\":\"adrienm7\",\"name\":\"ci-bot\"},\"assets\":[{\"name\":\"checksums.txt\",\"browser_download_url\":\"https://github.com/x/y/releases/download/v2.1.0/checksums.txt\"},{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://github.com/x/y/releases/download/v2.1.0/ErgoptiPlus.app.zip\"}]}",
+        "asset_name": "ErgoptiPlus.app.zip"
+      },
+      "expected": "https://github.com/x/y/releases/download/v2.1.0/ErgoptiPlus.app.zip"
+    },
+    {
       "id": "prerelease_true",
       "category": "parse_prerelease_flag",
       "input": { "body": "{\"tag_name\":\"v2.0.0-dev.1\",\"prerelease\":true}" },
