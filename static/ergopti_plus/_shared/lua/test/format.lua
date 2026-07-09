@@ -129,7 +129,32 @@ end
 
 -- ===================================
 -- ===================================
--- ======= 4/ Public API =============
+-- ======= 4/ deep_equal() ===========
+-- ===================================
+-- ===================================
+
+--- Deep structural equality. Tables are compared key-by-key recursively;
+--- non-table values use `==`. Handles different key sets (checks both
+--- directions). Does NOT handle `__eq` metamethods (not needed for tests).
+--- @param a any First value.
+--- @param b any Second value.
+--- @return boolean true if structurally equal.
+local function _deep_equal(a, b)
+	if type(a) ~= type(b) then return false end
+	if type(a) ~= "table" then return a == b end
+	for k, v in pairs(a) do
+		if not _deep_equal(v, b[k]) then return false end
+	end
+	for k, v in pairs(b) do
+		if not _deep_equal(v, a[k]) then return false end
+	end
+	return true
+end
+
+
+-- ===================================
+-- ===================================
+-- ======= 5/ Public API =============
 -- ===================================
 -- ===================================
 
@@ -138,6 +163,10 @@ local M = {}
 --- Pretty-print a value. Public alias for _inspect.
 --- Usage: helpers.inspect(some_table)
 M.inspect = _inspect
+
+--- Deep structural equality.
+--- Usage: if helpers.deep_equal(a, b) then ... end
+M.deep_equal = _deep_equal
 
 --- Returns a fail_msg() closure bound to a specific skip_pattern.
 --- Usage in driver helpers:
