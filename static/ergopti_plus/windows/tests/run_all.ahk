@@ -559,6 +559,9 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 ; Locale resolution corpus -- tests t() cascade (active→en→fr→raw key) and ★
 ; substitution against shared cross-driver vectors (P0-G.4).
 #Include meta/test_corpus_locale_resolution.ahk
+; Tooltip layout corpus -- validates _TooltipClampToScreen against shared
+; cross-driver vectors (P0-G.5).
+#Include meta/test_corpus_tooltip_layout.ahk
 
 ; -- Audit finding regression tests (batch-wired) --
 #Include meta/test_activate_hotstrings_sleep_gate.ahk
