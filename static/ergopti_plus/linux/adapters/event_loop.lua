@@ -150,15 +150,27 @@ local function _run_pump(opts)
 	local periodSec  = tonumber(opts.periodSec) or 0.25
 
 	local last_tick = os.clock()
+	local iteration = 0
+
+	-- Iteration-based fallback for the periodic gate. When os.clock() returns
+	-- CPU-time (some Lua builds on CI) instead of wall-clock, the periodSec
+	-- condition never fires and onPeriodic is starved — the failing test
+	-- "onPeriodic exception is caught" relies on the callback being called at
+	-- least once. Derive from periodSec so a tiny test value (0.001 s) fires
+	-- on the very first idle tick while the default (0.25 s) fires every
+	-- ~250 ticks at ~1 ms each — proportional to the intended interval.
+	local PERIODIC_ITER_FALLBACK = math.max(1, math.ceil(periodSec * 1000))
 
 	while _running do
 		_safe_idle(onIdle)
+		iteration = iteration + 1
 
 		-- Drive the periodic callback when enough wall-clock has elapsed.
 		local now = os.clock()
-		if onPeriodic and (now - last_tick >= periodSec) then
+		if onPeriodic and (now - last_tick >= periodSec or iteration >= PERIODIC_ITER_FALLBACK) then
 			_safe_periodic(onPeriodic)
 			last_tick = now
+			iteration = 0
 		end
 
 		-- Yield the CPU for ~1 ms.  This drops usage from 100 % to < 1 %
