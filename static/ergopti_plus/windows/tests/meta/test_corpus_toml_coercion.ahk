@@ -95,51 +95,52 @@ _TomlCoercionCorpus_Unescape(s) {
 ; ===================================================
 ; ===================================================
 
-_TomlCoercionCorpus_RegisterTests() {
+; Named test functions are used instead of fat-arrow lambdas: a block-body fat
+; arrow (() => { ... }) is a v2.1-only construct that fails to parse under
+; #Requires v2.0, and a per-vector lambda would capture the loop variable by
+; reference — every lambda would see the LAST vector, silently testing only one.
+; A single function looping over all vectors sidesteps both, keeping per-vector
+; diagnostics via the id embedded in each assert message.
+
+_TomlCoercionCorpus_TestStructure() {
 	Data := _TomlCoercionCorpus_LoadCorpus()
 	if (Data = "") {
-		Test("[corpus:toml-coercion] corpus file exists", () => AssertTrue(false,
-			"Corpus file not found at _shared/tests/corpus/toml/coercion_vectors.json"))
+		AssertTrue(false, "Corpus file not found at _shared/tests/corpus/toml/coercion_vectors.json")
 		return
 	}
+	AssertTrue(Data.Has("vectors"), "corpus must have 'vectors' key")
+	AssertTrue(Data["vectors"].Length >= 12, "corpus must have >= 12 vectors")
+}
+Test("[corpus:toml-coercion] corpus has vectors array", _TomlCoercionCorpus_TestStructure)
 
-	Test("[corpus:toml-coercion] corpus has vectors array", () =>
-	{
-		AssertTrue(Data.Has("vectors"), "corpus must have 'vectors' key")
-		AssertTrue(Data["vectors"].Length >= 12, "corpus must have >= 12 vectors")
-	})
-
-	; Replay every vector through the coercion clone and compare against
-	; the expected 'ahk' field.
+_TomlCoercionCorpus_TestAllVectors() {
+	Data := _TomlCoercionCorpus_LoadCorpus()
+	if (Data = "" || !Data.Has("vectors")) {
+		AssertTrue(false, "Corpus not loadable with a vectors array")
+		return
+	}
 	for Vec in Data["vectors"] {
 		Id := Vec.Has("id") ? Vec["id"] : "unknown"
 		Input := Vec.Has("input") ? Vec["input"] : ""
+		AssertTrue(Vec.Has("ahk"), "vector '" . Id . "' missing 'ahk' field")
 
-		Test("[corpus:toml-coercion:" . Id . "] coercion matches expected", () =>
-		{
-			AssertTrue(Vec.Has("ahk"), "vector '" . Id . "' missing 'ahk' field")
+		Result := _TomlCoercionCorpus_CoerceValueExt(Input)
+		Expected := Vec["ahk"]
 
-			Result := _TomlCoercionCorpus_CoerceValueExt(Input)
-			Expected := Vec["ahk"]
-
-			if (Expected = true || Expected = false) {
-				ExpectedBool := Expected = true
-				ResultBool := Result = true || Result = 1
-				AssertEqual(ResultBool, ExpectedBool,
-					"vector '" . Id . "': boolean mismatch for '" . Input . "'")
-			} else if (Expected is Number) {
-				AssertTrue(Result is Number,
-					"vector '" . Id . "': expected number, got " . Type(Result))
-				AssertTrue(Abs(Result - Expected) < 0.0001,
-					"vector '" . Id . "': number mismatch for '" . Input . "': got " . Result . ", expected " . Expected)
-			} else {
-				AssertEqual(String(Result), String(Expected),
-					"vector '" . Id . "': string mismatch for '" . Input . "'")
-			}
-		})
+		if (Expected = true || Expected = false) {
+			ExpectedBool := Expected = true
+			ResultBool := Result = true || Result = 1
+			AssertEqual(ResultBool, ExpectedBool,
+				"vector '" . Id . "': boolean mismatch for '" . Input . "'")
+		} else if (Expected is Number) {
+			AssertTrue(Result is Number,
+				"vector '" . Id . "': expected number, got " . Type(Result))
+			AssertTrue(Abs(Result - Expected) < 0.0001,
+				"vector '" . Id . "': number mismatch for '" . Input . "': got " . Result . ", expected " . Expected)
+		} else {
+			AssertEqual(String(Result), String(Expected),
+				"vector '" . Id . "': string mismatch for '" . Input . "'")
+		}
 	}
 }
-
-
-; Register the corpus tests so they execute during RunTests().
-_TomlCoercionCorpus_RegisterTests()
+Test("[corpus:toml-coercion] all vectors coerce to expected AHK values", _TomlCoercionCorpus_TestAllVectors)

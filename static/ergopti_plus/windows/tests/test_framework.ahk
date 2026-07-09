@@ -135,7 +135,7 @@ _DescribeValue(V, Depth := 0) {
 		if (Depth > 1)
 			return "{…}"
 		if (V == "")
-			return """"
+			return '""'
 		if (V is Number or V is String) {
 			s := V . ""
 			if (StrLen(s) <= 200)
