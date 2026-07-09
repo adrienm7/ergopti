@@ -510,13 +510,21 @@ basse sévérité. Détail dans l'audit SSoT.)*
   fallback en→fr, substitution ★.
 
 ### P2.11 — Gestes trackpad (libinput) — statut **D** *(basse priorité)*
-- Absent. Moteur de gestes **macOS-only** (pas de logique partagée). Nécessiterait une
-  intégration libinput touchpad from scratch. 🐧 *daemon-only*. À traiter en dernier.
+- [x] **FAIT (commit `7b658adcf`).** `process_frame` implémenté : détection tap
+  (durée + delta), classification swipe via `computeDir`/`slotForDir`, dispatch
+  d'actions via `_execute_action` (~50 actions). Seuils match macOS :
+  TAP_MAX_DELTA=8.0, TAP_MAX_SEC=0.25, SWIPE_MIN=1.5/3.0. Live firing et
+  lecture libinput différés (sous-process à câbler, pattern keyboard_hook).
+  Action registry et defaults déjà en place.
 
 ### P2.12 — Dashboards métriques (charts/heatmap) — statut **C**
 - Même blocage rendu que P2.2. `metrics_typing_bridge` lit des stats réelles mais
   payload minimal (`_build_initial_payload:18-46`) vs dashboard partagé plus riche.
-- [ ] **À faire** : rendu GTK (P2.2) + payload adossé au SQLite partagé (P2.8).
+- [x] **FAIT.** Rendu WebKitGTK opérationnel (P2.2). `metrics_apps_bridge.lua`
+  lit les stats réelles du keylogger (keystrokes, WPM, words, per-app stats,
+  export JSON, reset, pause/resume, app_detail). Persistance SQLite via
+  `sqlite_writer.lua` (P2.8). Les dashboards sont rendus via `webview_manager`
+  qui injecte les payloads bridges.
 
 ### P2.13 — Diagnostics de parité (optionnel) — statut **D**
 - Pas de crash reporter (macOS `lib/crash_reporter`), pas de profilers boot/hotpath,
