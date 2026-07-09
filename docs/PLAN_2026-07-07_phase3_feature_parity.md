@@ -91,26 +91,26 @@ nécessite Linux.
 ## 2. Suivi d'avancement
 
 ### Tier 1 — Core features (testable sur Windows)
-- [ ] 1.1 Daemon CLI tests
-- [ ] 1.2 Menu système riche
-- [ ] 1.3 Hotstrings config
-- [ ] 1.4 Keylogger complet
-- [ ] 1.5 LLM prediction engine
+- [x] 1.1 Daemon CLI tests — 13 tests, échouent sur CI (infra, pas de device evdev)
+- [x] 1.2 Menu système riche — P2.1, tray SNI/dbusmenu natif (~400 lignes)
+- [x] 1.3 Hotstrings config — P2.3, chargement TOML + validation + live reload
+- [x] 1.4 Keylogger complet — P2.8, SQLite storage + password + per-app + WPM ring
+- [x] 1.5 LLM prediction engine — P2.3, profiles + prediction_engine + api_ollama
 
 ### Tier 2 — UI features (nécessite Linux pour valider)
-- [ ] 2.1 WebView runtime
-- [ ] 2.2 Onboarding wizard
-- [ ] 2.3 Hotstrings config window
-- [ ] 2.4 Action picker
-- [ ] 2.5 WPM widget
-- [ ] 2.6 Healthcheck
+- [x] 2.1 WebView runtime — P2.2, lgi/WebKit2GTK + bridge JS↔Lua + 14 handlers
+- [x] 2.2 Onboarding wizard — P2.3, shared HTML/CSS/JS + persistence TOML
+- [x] 2.3 Hotstrings config window — P2.3, bridge handlers câblés vers toml_codec
+- [x] 2.4 Action picker — bridge action_picker_bridge.lua, execute→log
+- [x] 2.5 WPM widget — P2.12, dashboards métriques via webview_manager
+- [x] 2.6 Healthcheck — P2.12, healthcheck_bridge fonctionnel
 
 ### Tier 3 — Features avancées (Linux + devices)
-- [ ] 3.1 Tap-hold detection
-- [ ] 3.2 Shortcuts/gestures
-- [ ] 3.3 Updater
-- [ ] 3.4 File watchers
-- [ ] 3.5 Crash reporter
+- [x] 3.1 Tap-hold detection — P2.5, kanata manager + génération .kbd + lifecycle
+- [x] 3.2 Shortcuts/gestures — P2.7 (shortcuts manager, CapsWord, wrap symbols) + P2.11 (gestures manager, action registry, swipe detection)
+- [x] 3.3 Updater — P2.9, GitHub Releases API + ETag + self-replace
+- [ ] 3.4 File watchers — inotify hot reload TOML (non fait, dernier item restant)
+- [x] 3.5 Crash reporter — P2.13, dump fichier horodaté + rotation 20 fichiers
 
 ---
 
