@@ -6,8 +6,8 @@
  * DESCRIPTION:
  * Generates `static/ergopti_plus/windows/_generated/llm_profiles_data.ahk` from
  * two shared JSON sources: `_shared/modules/llm/legacy_ids.json` (profile-ID
- * migration table, DL-2) and the "basic" profile's `system_single` prompt in
- * `_shared/modules/llm/profiles.json` (the ultimate fallback prompt, DL-3).
+ * migration table) and the "basic" profile's `system_single` prompt in
+ * `_shared/modules/llm/profiles.json` (the ultimate fallback prompt).
  *
  * FEATURES & RATIONALE:
  * 1. Single source of truth: both facts were previously hand-copied literals in
@@ -130,9 +130,9 @@ function buildAhkSource(legacyIds, basicPrompt) {
 	lines.push('; DESCRIPTION:');
 	lines.push('; Two small domain facts extracted from the shared LLM profile registry so the');
 	lines.push('; AHK driver never hand-maintains a copy that can drift from the JSON source:');
-	lines.push(';   LLM_LEGACY_IDS   — profile-ID migration table (DL-2).');
+	lines.push(';   LLM_LEGACY_IDS   — profile-ID migration table.');
 	lines.push(';   LLM_GetBasicPrompt() — the "basic" profile system prompt, used as the');
-	lines.push(';     resolver fallback when no profile-specific prompt is available (DL-3).');
+	lines.push(';     resolver fallback when no profile-specific prompt is available.');
 	lines.push('; ==============================================================================');
 	lines.push('');
 	lines.push('#Requires AutoHotkey v2.0');
@@ -142,7 +142,7 @@ function buildAhkSource(legacyIds, basicPrompt) {
 	lines.push('');
 	lines.push('');
 
-	lines.push(sectionBanner('1/ Legacy Profile ID Migration (DL-2)'));
+	lines.push(sectionBanner('1/ Legacy Profile ID Migration'));
 	lines.push('');
 	lines.push('; Renamed profile ids from earlier releases -> their current id.');
 	lines.push('global LLM_LEGACY_IDS := Map(');
@@ -158,7 +158,7 @@ function buildAhkSource(legacyIds, basicPrompt) {
 	lines.push('');
 	lines.push('');
 
-	lines.push(sectionBanner('2/ Basic Prompt Fallback (DL-3)'));
+	lines.push(sectionBanner('2/ Basic Prompt Fallback'));
 	lines.push('');
 	lines.push('; Returns the "basic" profile system prompt — the resolver fallback when a');
 	lines.push('; profile is missing or malformed. Sourced from profiles.json so it can never');

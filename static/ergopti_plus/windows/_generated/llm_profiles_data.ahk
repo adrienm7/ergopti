@@ -11,9 +11,9 @@
 ; DESCRIPTION:
 ; Two small domain facts extracted from the shared LLM profile registry so the
 ; AHK driver never hand-maintains a copy that can drift from the JSON source:
-;   LLM_LEGACY_IDS   — profile-ID migration table (DL-2).
+;   LLM_LEGACY_IDS   — profile-ID migration table.
 ;   LLM_GetBasicPrompt() — the "basic" profile system prompt, used as the
-;     resolver fallback when no profile-specific prompt is available (DL-3).
+;     resolver fallback when no profile-specific prompt is available.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -22,11 +22,11 @@
 
 
 
-; =====================================================
-; =====================================================
-; ======= 1/ Legacy Profile ID Migration (DL-2) =======
-; =====================================================
-; =====================================================
+; ==============================================
+; ==============================================
+; ======= 1/ Legacy Profile ID Migration =======
+; ==============================================
+; ==============================================
 
 ; Renamed profile ids from earlier releases -> their current id.
 global LLM_LEGACY_IDS := Map(
@@ -40,11 +40,11 @@ global LLM_LEGACY_IDS := Map(
 
 
 
-; ===============================================
-; ===============================================
-; ======= 2/ Basic Prompt Fallback (DL-3) =======
-; ===============================================
-; ===============================================
+; ========================================
+; ========================================
+; ======= 2/ Basic Prompt Fallback =======
+; ========================================
+; ========================================
 
 ; Returns the "basic" profile system prompt — the resolver fallback when a
 ; profile is missing or malformed. Sourced from profiles.json so it can never
