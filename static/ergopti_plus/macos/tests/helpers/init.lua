@@ -21,6 +21,7 @@ local M = {}
 -- Value formatting and stack-trace helpers shared with Linux (P0 SSoT).
 local fmt = require("test.format")
 M.inspect = fmt.inspect
+M.deep_equal = fmt.deep_equal
 
 -- fail_msg closure: skip this helpers file when resolving test file:line.
 local _fail_msg = fmt.fail_msg_for("helpers[/\\\\]init%.lua$")
@@ -266,17 +267,9 @@ end
 -- ==================================
 -- ==================================
 
---- Compares two values for deep equality.
---- @param a any First value.
---- @param b any Second value.
---- @return boolean True if structurally equal.
-function M.deep_equal(a, b)
-	if type(a) ~= type(b) then return false end
-	if type(a) ~= "table" then return a == b end
-	for k, v in pairs(a) do if not M.deep_equal(v, b[k]) then return false end end
-	for k, v in pairs(b) do if not M.deep_equal(v, a[k]) then return false end end
-	return true
-end
+--- Convenience aliases to the shared format module (P0 SSoT).
+--- deep_equal is used by assert_eq and is also available to test files.
+local deep_equal = fmt.deep_equal
 
 --- Asserts strict equality. Tables are pretty-printed in the error message
 --- so you see WHICH field differs, not an opaque `table: 0x...`.
@@ -284,7 +277,7 @@ end
 --- @param expected any        Expected value.
 --- @param msg      string|nil Optional context tag.
 function M.assert_eq(actual, expected, msg)
-	if not M.deep_equal(actual, expected) then
+	if not deep_equal(actual, expected) then
 		local label = msg or "assert_eq"
 		error(_fail_msg(string.format(
 			"%s:\n  expected: %s\n    actual: %s",
