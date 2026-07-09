@@ -19,6 +19,10 @@ local M = {}
 
 local Logger  = require("lib.logger")
 local Paths   = require("lib.paths")
+
+-- Always start from a clean locale.core — tests may have left mock state
+-- in the module cache (Core.init is idempotent and won't overwrite it).
+package.loaded["locale.core"] = nil
 local Core    = require("locale.core")
 
 -- Wire the shared module at require-time so callers never call init().

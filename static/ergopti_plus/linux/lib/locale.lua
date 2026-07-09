@@ -18,6 +18,10 @@
 local M = {}
 
 local Logger = require("logger.shim")
+
+-- Always start from a clean locale.core — tests may have left mock state
+-- in the module cache (Core.init is idempotent and won't overwrite it).
+package.loaded["locale.core"] = nil
 local Core   = require("locale.core")
 
 -- Resolve the JSON decoder (pcall-guarded — falls back to load("return…")).
