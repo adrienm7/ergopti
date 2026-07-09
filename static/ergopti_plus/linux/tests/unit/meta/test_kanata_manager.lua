@@ -134,4 +134,58 @@ helpers.describe("kanata manager (P2.5)", function()
     end)
   end)
 
+  -- ==========================================================================
+  -- 5. Lifecycle log pairing (source compliance)
+  -- ==========================================================================
+
+  helpers.describe("lifecycle log pairing", function()
+
+    -- Static source scan: the write_kbd()/start() SUCCESS lines are unreachable
+    -- in the headless suite (no kanata binary; the .kbd template resolves
+    -- off-tree), so a runtime spy cannot observe them — assert pairing on source.
+    local function read_manager_source()
+      local path = helpers.driver_root() .. "/modules/kanata/manager.lua"
+      local fh = assert(io.open(path, "r"), "cannot open manager.lua")
+      local content = fh:read("*a")
+      fh:close()
+      return content
+    end
+
+    helpers.it("emits no Logger.success without a preceding Logger.start", function()
+      local content = read_manager_source()
+      -- A top-level `function` header resets the per-function running balance so
+      -- each function is checked in isolation; success/done must never run ahead
+      -- of start/trace on their own lifecycle axis (lifecycle logs are paired).
+      local info_starts, info_success = 0, 0
+      local dbg_starts,  dbg_done     = 0, 0
+      local violations = {}
+      local lineno = 0
+      for line in (content .. "\n"):gmatch("([^\n]*)\n") do
+        lineno = lineno + 1
+        if line:match("^%s*function%s") or line:match("^%s*local%s+function%s") then
+          info_starts, info_success = 0, 0
+          dbg_starts,  dbg_done     = 0, 0
+        end
+        if line:find("Logger%.start%(")   then info_starts = info_starts + 1 end
+        if line:find("Logger%.trace%(")   then dbg_starts  = dbg_starts  + 1 end
+        if line:find("Logger%.success%(") then
+          info_success = info_success + 1
+          if info_success > info_starts then
+            violations[#violations + 1] =
+              "line " .. lineno .. ": Logger.success without a preceding Logger.start"
+          end
+        end
+        if line:find("Logger%.done%(") then
+          dbg_done = dbg_done + 1
+          if dbg_done > dbg_starts then
+            violations[#violations + 1] =
+              "line " .. lineno .. ": Logger.done without a preceding Logger.trace"
+          end
+        end
+      end
+      helpers.assert_eq(#violations, 0,
+        "orphaned lifecycle logs in manager.lua: " .. table.concat(violations, "; "))
+    end)
+  end)
+
 end)
