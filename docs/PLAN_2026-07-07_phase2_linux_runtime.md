@@ -121,7 +121,7 @@ sudo modprobe uinput
 
 ### Phase 2A — Validation LuaJIT & runtime
 - [x] A1. `test(linux)` : 244 tests unitaires passent sous `luajit` — écrits, npm script luajit-flexible, à exécuter sur Linux
-- [ ] A2. `test(linux)` : test de régression `utf8` sous LuaJIT — écrit dans `tools/test/test-utf8-compat.lua`, à valider sous luajit
+- [x] A2. `test(linux)` : test de régression `utf8` sous LuaJIT — écrit dans `tools/test/test-utf8-compat.lua`, validé localement (session 2026-07-09)
 - [x] A3. `fix(linux)` : `lfs` installé pour LuaJIT (fallback `io.popen` confirmé) — CI n'installe que luajit, le fallback find fonctionne
 - [x] A4. `test(linux)` : 27 E2E scénarios passent sous `luajit` — écrits, npm script luajit-flexible, à exécuter sur Linux
 
@@ -146,16 +146,16 @@ sudo modprobe uinput
 - [x] B17. `test(linux)` : `keyboard_hook` — 18 tests (lifecycle, callbacks, context, edge cases)
 
 ### Phase 2C — Packaging
-- [ ] C1. `chore(linux)` : `install.sh` testé sur 4 distros
+- [~] C1. `chore(linux)` : `install.sh` testé sur 4 distros — daemon-only, nécessite VMs/containers Ubuntu 22.04/24.04, Fedora 38+, Debian 12, Arch
 - [x] C2. `feat(linux)` : package `.deb` — script `tools/build/build-linux-deb.sh` (DEBIAN/control, postinst, prerm, systemd, desktop)
 - [x] C3. `feat(linux)` : package `.rpm` — script `tools/build/build-linux-rpm.sh` (SPEC file, post/preun, systemd)
 - [x] C4. `feat(linux)` : PKGBUILD AUR — `tools/build/PKGBUILD` (makepkg, dependencies, install script)
 - [x] C5. `ci(linux)` : build `.deb`/`.rpm` dans CI — jobs `build-deb` + `build-rpm` + steps `build:deb` + `build:rpm` dans build:domain
 
 ### Phase 2D — Runner GPU (long terme)
-- [ ] D1. `ci(linux)` : runner self-hosted Linux avec GUI
-- [ ] D2. `test(linux)` : E2E réel hotstrings + injection
-- [ ] D3. `test(linux)` : E2E réel webview GTK
+- [~] D1. `ci(linux)` : runner self-hosted Linux avec GUI — long terme, optionnel
+- [~] D2. `test(linux)` : E2E réel hotstrings + injection — long terme, nécessite GUI + evdev
+- [~] D3. `test(linux)` : E2E réel webview GTK — long terme, nécessite GUI + WebKit2GTK
 
 ---
 
