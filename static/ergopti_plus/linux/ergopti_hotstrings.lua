@@ -93,6 +93,7 @@ local injector          = require("modules.hotstrings.injector")
 local dev_finder        = require("modules.hotstrings.device_finder")
 local keylogger         = require("modules.keylogger.keylogger")
 local keyboard_hook     = require("adapters.keyboard_hook")
+local Monotonic         = require("lib.monotonic")
 
 -- Optional adapters (may fail to load if deps missing — daemon still runs).
 local tray_menu = nil
@@ -358,7 +359,10 @@ local function main()
 			if cap_ch then ch = cap_ch end
 		end
 
-		local now_ms = math.floor(os.clock() * 1000)
+		-- Monotonic wall clock: the keylogger derives real inter-keystroke delays
+		-- from this. The CPU clock barely advances between keystrokes on Linux, so
+		-- it would make every recorded delay meaningless.
+		local now_ms = math.floor(Monotonic.now_ms())
 
 		-- Detect current app for per-app keylogger stats. The window_info adapter
 		-- exposes getFocused() (a WindowInfo table) — there is no getActiveAppID, so
