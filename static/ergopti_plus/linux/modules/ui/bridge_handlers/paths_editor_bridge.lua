@@ -13,6 +13,9 @@ M.bridge_name = "hsPaths"
 local Logger = require("logger.shim")
 local LOG = "bridge.hsPaths"
 
+-- Read canonical version from the single-source module (P0-E.2 SSoT).
+local Version = require("lib.version")
+
 -- Lazy-loaded writer for config.toml persistence.
 local _writer = nil
 local function _get_writer()
@@ -48,7 +51,7 @@ local function _build_initial_payload(state)
 	return {
 		paths = paths,
 		platform = "linux",
-		version = state._version or "3.0.0",
+		version = state._version or Version.VERSION,
 	}
 end
 

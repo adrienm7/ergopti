@@ -90,7 +90,16 @@ for (const ref of ['HttpBridge', 'PromptBuilder']) {
 	if (!pred.includes(ref)) errors.push(`prediction_engine.lua: must reference ${ref} (defer to shared canonicals)`);
 }
 
-// ── 3. profiles must resolve port/host from the shared bridge ─────────────
+// ── 3. model_browser_bridge must not re-type localhost:11434 ─────────────
+const modelBrowser = stripLua(read('linux/modules/ui/bridge_handlers/model_browser_bridge.lua'));
+if (!modelBrowser.includes('HttpBridge.OLLAMA_DEFAULT_HOST') || !modelBrowser.includes('HttpBridge.OLLAMA_DEFAULT_PORT')) {
+	errors.push('model_browser_bridge.lua: must resolve Ollama URL via HttpBridge.OLLAMA_DEFAULT_HOST / OLLAMA_DEFAULT_PORT');
+}
+if (/localhost:11434/.test(modelBrowser)) {
+	errors.push('model_browser_bridge.lua: forbidden hardcoded URL — use HttpBridge constants');
+}
+
+// ── 4. profiles must resolve port/host from the shared bridge ─────────────
 const profiles = stripLua(read('linux/modules/llm/profiles.lua'));
 for (const ref of ['HttpBridge.OLLAMA_DEFAULT_PORT', 'HttpBridge.OLLAMA_DEFAULT_HOST']) {
 	if (!profiles.includes(ref)) errors.push(`profiles.lua: must resolve endpoint via ${ref}`);

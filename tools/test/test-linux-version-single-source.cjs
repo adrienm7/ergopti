@@ -53,6 +53,8 @@ const VERSION = m ? m[1] : null;
 const CONSUMERS = [
 	'modules/menu/menu_builder.lua',
 	'modules/ui/bridge_handlers/healthcheck_bridge.lua',
+	'modules/ui/bridge_handlers/changelog_bridge.lua',
+	'modules/ui/bridge_handlers/paths_editor_bridge.lua',
 	'ergopti_hotstrings.lua'
 ];
 for (const rel of CONSUMERS) {
