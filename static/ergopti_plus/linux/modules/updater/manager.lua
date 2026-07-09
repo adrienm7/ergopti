@@ -33,6 +33,7 @@ local M = {}
 local Logger    = require("logger.shim")
 local Version   = require("updater.version")
 local Parser    = require("updater.release_parser")
+local Json      = require("json")
 local Fs        = require("adapters.file_system")
 local ok_storage, Storage = pcall(require, "adapters.storage")
 if not ok_storage then Storage = nil end
@@ -50,9 +51,53 @@ local DriverVersion = require("lib.version")
 -- =========================================
 -- =========================================
 
--- GitHub repo coordinates (match macOS defaults.json).
-local GH_OWNER = "adrienm7"
-local GH_REPO  = "ergopti"
+-- Hardcoded fallback mirroring _shared/modules/updater/defaults.json — keeps
+-- the engine functional when the shared tree is unreachable (packaged edge-case)
+local _DEFAULTS_FALLBACK = {
+	github = { owner = "adrienm7", repo = "ergopti" },
+	timing = { default_check_interval_sec = 86400, boot_check_delay_sec = 30 },
+}
+
+--- Resolves the absolute path to _shared/modules/updater/defaults.json by
+--- walking up from this file's own location (linux/modules/updater/ up to the
+--- ergopti_plus root). cwd-independent so the daemon and test runner agree.
+--- @return string|nil Absolute path, or nil if it cannot be resolved.
+local function resolve_defaults_path()
+	local info = debug and debug.getinfo and debug.getinfo(1, "S")
+	if not (info and info.source) then return nil end
+	local s = info.source
+	if s:sub(1, 1) == "@" or s:sub(1, 1) == "=" then s = s:sub(2) end
+	s = s:gsub("\\", "/")
+	-- s is .../ergopti_plus/linux/modules/updater/manager.lua — strip 4 levels
+	local root = s:match("^(.*)/[^/]+/[^/]+/[^/]+/[^/]+$")
+	if not root then return nil end
+	return root .. "/_shared/modules/updater/defaults.json"
+end
+
+--- Loads the shared updater scalars from defaults.json. Falls back to
+--- _DEFAULTS_FALLBACK (with a warn) so a missing or corrupt JSON is never silent.
+--- @return table The parsed defaults, or the hardcoded fallback.
+local function load_updater_defaults()
+	local path = resolve_defaults_path()
+	if path then
+		local raw = Fs.read(path)
+		if raw then
+			local parsed = Json.decode(raw)
+			if type(parsed) == "table" then
+				Logger.debug(LOG, "Loaded updater defaults from %s.", path)
+				return parsed
+			end
+		end
+	end
+	Logger.warn(LOG, "defaults.json not readable — using hardcoded updater fallback.")
+	return _DEFAULTS_FALLBACK
+end
+
+local _defs = load_updater_defaults()
+
+-- GitHub repo coordinates (single source: _shared/modules/updater/defaults.json)
+local GH_OWNER = (_defs.github and _defs.github.owner) or _DEFAULTS_FALLBACK.github.owner
+local GH_REPO  = (_defs.github and _defs.github.repo)  or _DEFAULTS_FALLBACK.github.repo
 
 -- How many prerelease pages to fetch for the dev channel.
 local DEV_PAGE_SIZE = 10
@@ -79,11 +124,20 @@ M.INTERVAL_PRESETS = {
 -- Fallback asset name for Linux releases.
 local LINUX_ASSET_NAME = "ergopti_linux.tar.gz"
 
--- Default check interval (24h).
-local DEFAULT_INTERVAL_SEC = 86400
+-- Default check interval (single source: defaults.json timing)
+local DEFAULT_INTERVAL_SEC = (_defs.timing and _defs.timing.default_check_interval_sec)
+	or _DEFAULTS_FALLBACK.timing.default_check_interval_sec
 
--- Delay before the first boot check (30s).
-local BOOT_CHECK_DELAY_SEC = 30
+-- Delay before the first boot check (single source: defaults.json timing)
+local BOOT_CHECK_DELAY_SEC = (_defs.timing and _defs.timing.boot_check_delay_sec)
+	or _DEFAULTS_FALLBACK.timing.boot_check_delay_sec
+
+-- Exposed for testability — lets the drift/parity test assert the resolved
+-- values against the shared defaults.json without reaching into locals
+M.GH_OWNER             = GH_OWNER
+M.GH_REPO              = GH_REPO
+M.DEFAULT_INTERVAL_SEC = DEFAULT_INTERVAL_SEC
+M.BOOT_CHECK_DELAY_SEC = BOOT_CHECK_DELAY_SEC
 
 -- Path for the ETag cache (one per channel).
 local function etag_cache_path(channel)
