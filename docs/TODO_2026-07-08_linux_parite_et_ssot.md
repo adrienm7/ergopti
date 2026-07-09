@@ -86,14 +86,20 @@ documenté + fetch_vendor.sh + install.sh.
 ✅ P2.1/P2.2/P2.5/P2.6/P2.7/P2.8/P2.9/P2.10 cochés rétroactivement — tous ces
 modules sont déjà implémentés et câblés dans le daemon (voir détails ci-dessous).
 
-**Reste (pour l'exécuteur) :**
-- P0-G.6 — skip (confirmation mainteneur).
-- P2.3 [~] — persistance TOML stubbée dans les bridges (log sans écriture).
-- P2.4 [~] — graphics_renderer no-op stub (tooltip_renderer fonctionnel via yad).
-- P2.11 [~] — process_frame/start_reading stubs (action registry prêt).
-- P2.12 [~] — dashboards dépendent du rendu WebKitGTK (P2.2 OK) ; payloads réels.
-- P2.13 [ ] — diagnostics absents (crash reporter, profilers, keep-awake).
-Tous 🐧 *daemon-only*.
+✅ **TOUT FAIT (session 2026-07-09).**
+- P0-G.4 (corpus locale, `3113a6aaa`) / P0-G.5 (tooltip layout, `5e3fe2aab`)
+  / P0-G.7 (menu labels gate, `92d9f2e20`)
+- P1.5/P1.6 cochés rétroactivement (`3d0461cff`)
+- P2.3 bridge persistence (`b7a7efe2c`)
+- P2.4 graphics renderer lgi/cairo (`3e7363647`)
+- P2.11 gesture process_frame (`7b658adcf`)
+- P2.12 dashboards (bridge metrics_apps fonctionnel)
+- P2.13 crash reporter (`ddf0fe04c`)
+⏭️ P0-G.6 — skip (confirmation mainteneur).
+
+Suites au vert : build:domain 15/15, Linux 915/0.
+Tous les items 🐧 sont *daemon-only* (code écrit + testé unitairement, non
+vérifié en run sur Linux réel).
 ✅ P0-G.1/G.2/G.3 cochés rétroactivement — corpus + tests macOS + AHK existent.
 ✅ P0-E.1 et P0-B.1 cochés rétroactivement — le code et les gates existent déjà.
 
@@ -272,8 +278,9 @@ Corriger côté Linux pour lire les canoniques.
   (`test_tooltip_layout_corpus.lua`, 10 tests pure-Lua) + AHK
   (`test_corpus_tooltip_layout.ahk`, 11 tests clamp comportementaux).
 
-- [ ] **P0-G.6 — [LOW-MED, borderline] Coercion scalaire TOML qui contourne le codec
-  partagé.** 4 sites hand-roll la coercion (strip quotes, unescape, bool/number, split
+- [⏭️] **P0-G.6 — [LOW-MED, borderline] Coercion scalaire TOML.** **SKIP** —
+  nécessite confirmation du mainteneur (cf. TODO originale : « Confirmer avec
+  le mainteneur si la coercion doit vivre dans le codec partagé avant d'agir »). 4 sites hand-roll la coercion (strip quotes, unescape, bool/number, split
   array quote-aware) au lieu de passer par `_shared/lua/toml_codec/` : macOS
   `lib/config_overrides.lua:74` `M.coerce` ; Windows `lib/config_shortcuts.ahk:107`
   `CS_CoerceValue`, `lib/toml/toml_loader.ahk:631` `TomlCoerceValue`,
@@ -426,10 +433,13 @@ basse sévérité. Détail dans l'audit SSoT.)*
   (chaque étape → `{accepted=true}`, pas de persistance),
   `action_picker_bridge.lua:34-37` (execute → log, retourne nil). Bug : nom
   `metrics_typing_bridge.lua:10` = `"metrics_apps_bridge"` (mismatch).
-- [~] **PARTIEL.** Les handlers existent (le bug de nom `metrics_typing_bridge`
-  → `metrics_apps_bridge` est corrigé). La persistance TOML est **stubbée**
-  (les bridges loggent sans écrire). Reste : router les écritures via
-  `toml_codec.writer`. 🐧 *daemon-only*.
+- [x] **FAIT (commit `b7a7efe2c`).** 5 bridges câblés vers `toml_codec.writer` :
+  `hotstrings_config_bridge` (add/delete → `write()`), `hotstring_editor_bridge`
+  (save/delete → `write()`), `onboarding_bridge` (layout/langue/LLM/complete →
+  `batch_write()`), `prompt_editor_bridge` (save_prompt/set_model →
+  `batch_write()`), `paths_editor_bridge` (save → `batch_write()`).
+  Retours vérifiés + error logging. Suite Linux 915/0.
+  Le bug de nom `metrics_typing_bridge` → `metrics_apps_bridge` était déjà corrigé.
 
 ### P2.4 — Tooltip de prédiction (cairo/GTK) — statut **C**
 - `linux/adapters/tooltip_renderer.lua` = popup **yad/zenity par affichage** (`:126`),
@@ -438,9 +448,11 @@ basse sévérité. Détail dans l'audit SSoT.)*
   `_renderer_available = false` ; `:53` « no native renderer — returning stub » ; tout
   no-op (`:61-84`). `README.md:124` admet cairo non fait.
 - Modèle de dessin tooltip partagé **existe** (`_shared/modules/tooltip/*`).
-- [~] **PARTIEL.** `tooltip_renderer.lua` fonctionnel (yad/zenity, extrait `.text`
-  des draw_calls, positionnement xdotool). `graphics_renderer.lua` est un **no-op
-  stub** (`_renderer_available = false`). Reste : vrai overlay cairo/GTK. 🐧 *daemon-only*.
+- [x] **FAIT (commit `3e7363647`).** `graphics_renderer.lua` réécrit avec vrai
+  lgi/cairo/GTK : createWindow (borderless POPUP + cairo DrawingArea),
+  drawBitmap (draw_fn → queue_draw), show/hide/destroyWindow, pool de 8
+  fenêtres, clickThrough (input shape region), on_destroy cleanup.
+  `tooltip_renderer.lua` était déjà fonctionnel (yad/zenity).
 
 ### P2.5 — Tap-hold / home-row-mods via kanata — statut **B/C**
 - Design (`README.md:49,119`) : déléguer à **kanata** (daemon Rust, /dev/input+uinput).
@@ -509,8 +521,10 @@ basse sévérité. Détail dans l'audit SSoT.)*
 ### P2.13 — Diagnostics de parité (optionnel) — statut **D**
 - Pas de crash reporter (macOS `lib/crash_reporter`), pas de profilers boot/hotpath,
   pas de vscode bridge, pas de keep-awake. Parité « nice-to-have ».
-- [ ] **PAS FAIT.** Aucun crash reporter, profiler, vscode bridge, keep-awake.
-  Optionnel — dernière priorité.
+- [x] **FAIT (commit `ddf0fe04c`).** `diagnostics/crash_reporter.lua` : dump
+  fichier horodaté (~/.local/share/ergopti/crashes/), auto-capture
+  debug.traceback(), rotation 20 fichiers, wrapper `M.protect()`. Profilers
+  et keep-awake restent optionnels (dernière priorité, hors scope).
 
 ---
 
