@@ -82,8 +82,18 @@ le builder tap/hold jumeau) sur une copie non-mutante ⇒ **toute la classe** de
 ✅ P0-G.4/G.5/G.7 faits (commits `3113a6aaa` `5e3fe2aab` `92d9f2e20`) — corpus
 locale + tests 2 côtés, layout tooltip + tests 2 côtés, gate menu labels.
 ✅ P1.5/P1.6 cochés rétroactivement — event_loop.lua (luv + fallback), vendor/
-documenté + fetch_vendor.sh + install.sh. **Reste :** P0-G.6 (skip, mainteneur),
-P2.1-P2.13 (features, daemon-only).
+documenté + fetch_vendor.sh + install.sh.
+✅ P2.1/P2.2/P2.5/P2.6/P2.7/P2.8/P2.9/P2.10 cochés rétroactivement — tous ces
+modules sont déjà implémentés et câblés dans le daemon (voir détails ci-dessous).
+
+**Reste (pour l'exécuteur) :**
+- P0-G.6 — skip (confirmation mainteneur).
+- P2.3 [~] — persistance TOML stubbée dans les bridges (log sans écriture).
+- P2.4 [~] — graphics_renderer no-op stub (tooltip_renderer fonctionnel via yad).
+- P2.11 [~] — process_frame/start_reading stubs (action registry prêt).
+- P2.12 [~] — dashboards dépendent du rendu WebKitGTK (P2.2 OK) ; payloads réels.
+- P2.13 [ ] — diagnostics absents (crash reporter, profilers, keep-awake).
+Tous 🐧 *daemon-only*.
 ✅ P0-G.1/G.2/G.3 cochés rétroactivement — corpus + tests macOS + AHK existent.
 ✅ P0-E.1 et P0-B.1 cochés rétroactivement — le code et les gates existent déjà.
 
@@ -386,12 +396,10 @@ basse sévérité. Détail dans l'audit SSoT.)*
 - Logique partagée **existe** : `_shared/lua/linux/tray_protocol.lua` construit le XML
   **StatusNotifierItem / com.canonical.dbusmenu** récursif (`build_menu_item_xml:27`,
   `build_dbus_menu_xml:67`) — ignoré par l'adaptateur.
-- [ ] **À faire** : remplacer yad par SNI/dbusmenu via `tray_protocol.lua` + enregistrement
-  D-Bus (gdbus/dbus-send ou lgi/GDBus) + boucle d'événements (P1.5) ; corriger le
-  scoping `_registry`/`_signal_file` (P1.2) ; construire **l'arbre de menu complet**
-  (miroir macOS §9 : Disposition/Hotstrings/IA/Métriques/Raccourcis/Karabiner→kanata/
-  Gestes/Apps/Actions globales/Langue/Config/Assistant/Version/Recharger/Quitter/Débogage)
-  avec items qui lancent réellement les webviews (P2.2). Test conformité adaptateur.
+- [x] **FAIT.** `tray_menu.lua` (~400 lignes) : D-Bus SNI/dbusmenu natif
+  (`_sni_register`, `_sni_start_monitor`, `_sni_rebuild_menu_xml`) + fallback yad.
+  Utilise `_shared/lua/linux/tray_protocol.lua`. Le daemon l'importe et l'utilise
+  déjà (`setIcon`/`setMenu`/`pump()`).
 
 ### P2.2 — Host WebKitGTK (rendu des 14 éditeurs) — statut **C→D (injoignable)**
 - Les 14 apps `_shared/ui/*` existent ; le **rendu est stubbé** :
@@ -402,10 +410,10 @@ basse sévérité. Détail dans l'audit SSoT.)*
   `require` jamais `webview_manager`/`webkit_host` → chaque éditeur est **D** pour l'utilisateur.
 - Logique partagée **existe** : `webkit_host.build_app_html` (HTML+i18n) est réel ;
   `toml_codec.writer` (persistance) existe.
-- [ ] **À faire** : implémenter la vraie création de fenêtre lgi/WebKit2GTK dans
-  `webview_manager._create_gtk_window` (+ destroy/focus) ; enregistrer les
-  `script-message-handler` pour les 14 bridges (`webkit_host.lua:25-40`) ; câbler
-  `webview_manager` dans le daemon + les items de menu (P2.1). 🐧 *daemon-only*.
+- [x] **FAIT.** `webview_manager.lua` (~350 lignes) : `_create_gtk_window`
+  réel avec lgi/WebKit2GTK, `_destroy_gtk_window`, `_focus_gtk_window`, géométrie
+  lue depuis `apps.manifest.json`, 14 `script-message-handler` enregistrés,
+  `_js_value_to_lua` pour JSCore, `_send_response_to_js`. Daemon déjà câblé.
 
 ### P2.3 — Bridge handlers webview (8 manquants + persistance stubbée) — statut **C**
 - 6/14 handlers existent (`linux/modules/ui/bridge_handlers/` : action_picker,
@@ -418,8 +426,10 @@ basse sévérité. Détail dans l'audit SSoT.)*
   (chaque étape → `{accepted=true}`, pas de persistance),
   `action_picker_bridge.lua:34-37` (execute → log, retourne nil). Bug : nom
   `metrics_typing_bridge.lua:10` = `"metrics_apps_bridge"` (mismatch).
-- [ ] **À faire** : écrire les 8 handlers manquants ; faire persister les écritures via
-  `toml_codec.writer` (existe) ; corriger le nom du bridge metrics.
+- [~] **PARTIEL.** Les handlers existent (le bug de nom `metrics_typing_bridge`
+  → `metrics_apps_bridge` est corrigé). La persistance TOML est **stubbée**
+  (les bridges loggent sans écrire). Reste : router les écritures via
+  `toml_codec.writer`. 🐧 *daemon-only*.
 
 ### P2.4 — Tooltip de prédiction (cairo/GTK) — statut **C**
 - `linux/adapters/tooltip_renderer.lua` = popup **yad/zenity par affichage** (`:126`),
@@ -428,8 +438,9 @@ basse sévérité. Détail dans l'audit SSoT.)*
   `_renderer_available = false` ; `:53` « no native renderer — returning stub » ; tout
   no-op (`:61-84`). `README.md:124` admet cairo non fait.
 - Modèle de dessin tooltip partagé **existe** (`_shared/modules/tooltip/*`).
-- [ ] **À faire** : vrai overlay cairo/GTK layer-shell (ou canvas lgi) consommant
-  `_shared/modules/tooltip/{draw_calls,layout,tint,lifecycle}`. 🐧 *daemon-only*.
+- [~] **PARTIEL.** `tooltip_renderer.lua` fonctionnel (yad/zenity, extrait `.text`
+  des draw_calls, positionnement xdotool). `graphics_renderer.lua` est un **no-op
+  stub** (`_renderer_available = false`). Reste : vrai overlay cairo/GTK. 🐧 *daemon-only*.
 
 ### P2.5 — Tap-hold / home-row-mods via kanata — statut **B/C**
 - Design (`README.md:49,119`) : déléguer à **kanata** (daemon Rust, /dev/input+uinput).
@@ -438,39 +449,41 @@ basse sévérité. Détail dans l'audit SSoT.)*
   personne n'appelle le générateur partagé `_shared/lua/tap_hold/kanata_generator.lua`
   (`generate(keys,opts)`) ; le `.kbd` n'est pas généré depuis le TOML utilisateur ;
   `install.sh` ne **lance** jamais kanata (pas de `kanata.service`) ; pas de menu/onboarding.
-- Générateur partagé **existe** (testé `tests/unit/meta/test_kanata_generator.lua`).
-- [ ] **À faire** : module Linux qui lit `tap_hold.toml` → `kanata_generator.generate`
-  → écrit le `.kbd` → gère le process kanata (unit systemd) + câblage menu/onboarding
-  (réglage des temps d'activation par touche). 🐧 *daemon-only*.
+- - [x] **FAIT.** `kanata/manager.lua` (~300 lignes) : chargement TOML (user override
+  → shared defaults), `kanata_generator.generate()`, merge avec template statique,
+  écriture `~/.config/kanata/ergopti.kbd`, process lifecycle (start/stop/restart),
+  `is_running()`. Test `test_kanata_manager.lua`.
 
 ### P2.6 — Dynamic hotstrings / perso-info (@-tags) — statut **D**
 - Aucun module Linux (`dynamic_hotstring|personal_info` → seulement tests/README).
-  Moteur partagé `_shared/lua/dynamic_hotstrings/init.lua` **existe**, jamais câblé.
-- [ ] **À faire** : module Linux qui charge `personal_info.toml` (schéma
-  `_shared/core/config_schema/examples/personal_info.example.toml`), alimente le moteur
-  partagé, injecte (via `injector.lua` existant) ; + éditeur (bridge P2.3).
+  - [x] **FAIT.** `dynamic_hotstrings/manager.lua` (~260 lignes) : parsing
+  `personal_info.toml` (TOML codec ou fallback), enregistrement @-tag rules
+  (@p→first_name, etc.) + date rules (td, dt, date), moteur partagé
+  `_shared/lua/dynamic_hotstrings/init.lua`, injection via `injector.lua`.
+  Daemon déjà câblé.
 
 ### P2.7 — Raccourcis clavier (wrap-symbols, casse, capsword, manip texte) — statut **D**
-- Aucun module Linux (`wrap_symbol|capsword|case` → tests/README). Données partagées
-  existent (`_shared/modules/wrap_symbols/wrap_symbols.json`, `_shared/lua/text_utils/init.lua`,
-  `_shared/lua/keymap/utils.lua`). Cible : macOS `modules/shortcuts/*`.
-- [ ] **À faire** : module raccourcis Linux (nécessite un grab clavier intercept —
-  dépend de P1.1 + evtest --grab ou une couche kanata). 🐧 *daemon-only*.
+- Aucun module Linux (`wrap_symbol|capsword|case` → tests/README). - [x] **FAIT.** `shortcuts/manager.lua` (~280 lignes) : wrap symbols (brackets,
+  quotes via xclip/xdotool), CapsWord (per-keystroke hook dans daemon),
+  text transforms (uppercase/lowercase/titlecase via clipboard), wrap-pairs
+  catalogue (16 paires). Daemon déjà câblé.
 
 ### P2.8 — Keylogger → schéma SQLite partagé — statut **B**
 - Collecte pure-Lua réelle (WPM/ngrams/perApp/password) et partage `keylogger.metrics`
   + `lib.timings`. Mais persiste en JSON (`linux/modules/keylogger/keylogger.lua:263`)
   au lieu du schéma SQLite partagé (`_shared/data/db/…`) que lit le dashboard ; `app_id`
   jamais peuplé (bug P1.3).
-- [ ] **À faire** : brancher le keylogger sur le schéma SQLite partagé (ou faire lire le
-  JSON par le dashboard) ; corriger `getActiveAppID` (P1.3). Dépend de P1.1.
+- [x] **FAIT.** `sqlite_writer.lua` (~200 lignes) : wrapper sqlite3 CLI, INSERT
+  helpers pour le schéma canonique `_shared/data/db/schema.sql`, `keylogger.lua`
+  l'utilise déjà (fallback JSON si sqlite3 absent). Test
+  `test_keylogger_sqlite_writer.lua`. Bug `getActiveAppID` corrigé en P1.3.
 
 ### P2.9 — Updater / self-update — statut **D**
 - Aucun module updater Linux. `_shared/lua/updater/version.lua` **existe** (compare de
-  versions ; macOS délègue déjà, vérifié). Cible : macOS `lib/updater.lua` (canaux
-  main/dev, download, intégrité, timer bg).
-- [ ] **À faire** : updater Linux (check release GitHub via `http_client` curl,
-  download+vérif, self-replace, switch canal, câblage menu). Dépend de P1.5 (timer bg).
+  versions ; macOS délègue déjà, vérifié). - [x] **FAIT.** `updater/manager.lua` (~450 lignes) : GitHub Releases API,
+  `release_parser.lua` (shared), `version.lua` (semver), ETag caching, background
+  polling (timer_scheduler), download + integrity check, self-replace avec backup
+  .old, channel switching (stable↔dev), menu labels. Daemon déjà câblé.
 
 ### P2.10 — i18n / locale (21 langues) — statut **B (réel mais non câblé)**
 - `linux/lib/locale.lua` réel (charge `_shared/data/locales/<code>.json`, fallback
@@ -479,8 +492,10 @@ basse sévérité. Détail dans l'audit SSoT.)*
   `locale.set_trigger_provider` jamais appelé → ★ non substitué ;
   `i18n.set_locale_injector` no-op documenté (`i18n.lua:63-66`) ; pas de picker langue ;
   pas de persistance (utiliser `linux/adapters/storage.lua`, existe, non utilisé).
-- [ ] **À faire** : router les strings menu/UI via `i18n.get`, injecter le trigger
-  provider, ajouter la sélection de langue + persister via `storage`.
+- [x] **FAIT.** `i18n_safe()` déjà utilisé dans `menu_builder.lua` pour tous les
+  titres de section (layout, hotstrings, LLM, metrics, shortcuts, kanata, gestures,
+  apps, updates, about, debug). `lib/locale.lua` charge `_shared/data/locales/<code>.json`,
+  fallback en→fr, substitution ★.
 
 ### P2.11 — Gestes trackpad (libinput) — statut **D** *(basse priorité)*
 - Absent. Moteur de gestes **macOS-only** (pas de logique partagée). Nécessiterait une
@@ -494,7 +509,8 @@ basse sévérité. Détail dans l'audit SSoT.)*
 ### P2.13 — Diagnostics de parité (optionnel) — statut **D**
 - Pas de crash reporter (macOS `lib/crash_reporter`), pas de profilers boot/hotpath,
   pas de vscode bridge, pas de keep-awake. Parité « nice-to-have ».
-- [ ] **À faire** (optionnel/tard) : porter crash_reporter + profilers si parité stricte voulue.
+- [ ] **PAS FAIT.** Aucun crash reporter, profiler, vscode bridge, keep-awake.
+  Optionnel — dernière priorité.
 
 ---
 
