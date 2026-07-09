@@ -61,7 +61,15 @@ end
 function M.parse_asset_url(body, asset_name)
 	if not body or body == "" then return "" end
 	if not asset_name or asset_name == "" then return "" end
-	for obj in body:gmatch("%b{}") do
+	-- Isolate the "assets" array BEFORE iterating objects. On a real single-
+	-- release payload the outermost %b{} spans the ENTIRE release object, so
+	-- iterating `body` directly yields one chunk and `"name"` then matches the
+	-- release title, not any asset — the wanted asset is never found. Scoping to
+	-- the assets array makes each %b{} an individual asset, so its name and
+	-- browser_download_url come from the SAME object.
+	local assets = body:match('"assets"%s*:%s*(%b[])')
+	if not assets then return "" end
+	for obj in assets:gmatch("%b{}") do
 		local name = obj:match('"name"%s*:%s*"([^"]+)"')
 		if name == asset_name then
 			return obj:match('"browser_download_url"%s*:%s*"([^"]+)"') or ""
