@@ -43,7 +43,7 @@ HOTSTRING_FILES = [
     shared("modules/hotstrings", "magickey.toml"),
 ]
 
-_REPO_ROOT = Path(__file__).parent.parent.parent
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def section_display_name(section_key: str) -> str:
