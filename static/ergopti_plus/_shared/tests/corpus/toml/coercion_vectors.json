@@ -1,0 +1,118 @@
+{
+  "description": "TOML scalar coercion vectors. Each entry pairs a raw TOML literal (as it appears after the '=' sign) with the expected Lua and AHK coerced values. Used by the macOS and AHK corpus consumer tests to pin the 4 hand-rolled coercion sites against each other.",
+  "note": "Lua M.coerce uses SEQUENTIAL gsubs (\\\\->\\ first, then \\n->newline), which is buggy but matches production behavior. AHK UnescapeTomlString uses single-pass (correct). The 'lua' and 'ahk' expected values may differ where the sequential approach produces a different result.",
+  "vectors": [
+    {
+      "id": "bool-true",
+      "input": "true",
+      "lua": true,
+      "ahk": true,
+      "notes": "Boolean true"
+    },
+    {
+      "id": "bool-false",
+      "input": "false",
+      "lua": false,
+      "ahk": false,
+      "notes": "Boolean false"
+    },
+    {
+      "id": "int-positive",
+      "input": "42",
+      "lua": 42,
+      "ahk": 42,
+      "notes": "Positive integer"
+    },
+    {
+      "id": "int-negative",
+      "input": "-5",
+      "lua": -5,
+      "ahk": -5,
+      "notes": "Negative integer"
+    },
+    {
+      "id": "int-zero",
+      "input": "0",
+      "lua": 0,
+      "ahk": 0,
+      "notes": "Zero"
+    },
+    {
+      "id": "float-positive",
+      "input": "3.14",
+      "lua": 3.14,
+      "ahk": 3.14,
+      "notes": "Positive float"
+    },
+    {
+      "id": "float-negative",
+      "input": "-0.5",
+      "lua": -0.5,
+      "ahk": -0.5,
+      "notes": "Negative float"
+    },
+    {
+      "id": "quoted-plain",
+      "input": "\"hello\"",
+      "lua": "hello",
+      "ahk": "hello",
+      "notes": "Plain quoted string"
+    },
+    {
+      "id": "quoted-escaped-quote",
+      "input": "\"a \\\"quoted\\\" word\"",
+      "lua": "a \"quoted\" word",
+      "ahk": "a \"quoted\" word",
+      "notes": "Quoted string with escaped double-quotes"
+    },
+    {
+      "id": "quoted-escaped-newline",
+      "input": "\"line1\\\\nline2\"",
+      "lua": "line1\nline2",
+      "ahk": "line1\\nline2",
+      "notes": "Lua sequential gsubs: \\\\→\\ then \\n→newline. AHK single-pass: \\\\→\\ then n→n."
+    },
+    {
+      "id": "quoted-escaped-tab",
+      "input": "\"col1\\\\tcol2\"",
+      "lua": "col1\tcol2",
+      "ahk": "col1\\tcol2",
+      "notes": "Lua sequential gsubs: \\\\→\\ then \\t→tab. AHK single-pass: \\\\→\\ then t→t."
+    },
+    {
+      "id": "quoted-escaped-backslash",
+      "input": "\"path\\\\to\\\\file\"",
+      "lua": "path\to\\file",
+      "ahk": "path\\to\\file",
+      "notes": "Lua sequential gsubs: \\\\→\\ creates new \\t from \\to, then \\t→tab. Result: path<TAB>o\\file. AHK single-pass: \\\\→\\ then t→t. Result: path\\to\\file."
+    },
+    {
+      "id": "bare-string",
+      "input": "unquoted_value",
+      "lua": "unquoted_value",
+      "ahk": "unquoted_value",
+      "notes": "Bare string returned as-is"
+    },
+    {
+      "id": "string-with-spaces",
+      "input": "\"  spaced  \"",
+      "lua": "  spaced  ",
+      "ahk": "  spaced  ",
+      "notes": "Preserving leading/trailing spaces"
+    },
+    {
+      "id": "bool-case-insensitive-true",
+      "input": "True",
+      "lua": true,
+      "ahk": true,
+      "notes": "Case-insensitive true"
+    },
+    {
+      "id": "bool-case-insensitive-false",
+      "input": "FALSE",
+      "lua": false,
+      "ahk": false,
+      "notes": "Case-insensitive false"
+    }
+  ]
+}
