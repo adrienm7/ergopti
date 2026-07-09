@@ -5,11 +5,13 @@
  * MODULE: Gesture Slot-Space Single-Source Guard
  * DESCRIPTION:
  * The gesture slot key-space (tap/swipe slot names) is identical on every driver:
- * a gesture bound on one platform must name the same slot on the other. This gate
- * pins the Linux and macOS gesture managers to the single declared slot-space in
- * _shared/modules/gestures/actions.toml [slots] so the two lists can never drift.
- * It also asserts each driver's DEFAULT_GESTURES key-space equals single + axis;
- * only the mapped action VALUES are allowed to differ per platform (not checked).
+ * a gesture bound on one platform must name the same slot on the other. The single
+ * declared slot-space lives in _shared/modules/gestures/actions.toml [slots]. The
+ * Linux manager derives its lists from that file at runtime (this gate checks it
+ * reads the canonical file and never re-hardcodes them; the Linux Lua suite proves
+ * the derived lists match in order). macOS still hardcodes the lists, so this gate
+ * pins the macOS literals to the TOML and asserts its DEFAULT_GESTURES key-space
+ * equals single + axis; only the mapped action VALUES may differ per platform.
  * ==============================================================================
  */
 
@@ -57,25 +59,42 @@ try {
 		errors.push('actions.toml [slots] single/axis overlap or contain duplicates');
 	}
 
-	const drivers = [
-		{ name: 'linux', file: 'linux/modules/gestures/manager.lua' },
-		{ name: 'macos', file: 'macos/modules/gestures/init.lua' },
-	];
-	for (const d of drivers) {
-		const src = read(d.file);
-		if (!eqOrdered(luaSlotArray(src, 'SINGLE_SLOTS', d.file), single)) {
-			errors.push(d.name + ' SINGLE_SLOTS != actions.toml [slots].single');
+	// macOS still hardcodes the slot arrays (deriving them would need an
+	// unverifiable Hammerspoon reload), so its literals are pinned to the TOML.
+	{
+		const file = 'macos/modules/gestures/init.lua';
+		const src = read(file);
+		if (!eqOrdered(luaSlotArray(src, 'SINGLE_SLOTS', file), single)) {
+			errors.push('macos SINGLE_SLOTS != actions.toml [slots].single');
 		}
-		if (!eqOrdered(luaSlotArray(src, 'AXIS_SLOTS', d.file), axis)) {
-			errors.push(d.name + ' AXIS_SLOTS != actions.toml [slots].axis');
+		if (!eqOrdered(luaSlotArray(src, 'AXIS_SLOTS', file), axis)) {
+			errors.push('macos AXIS_SLOTS != actions.toml [slots].axis');
 		}
-		const keys = defaultKeys(src, d.file);
+		const keys = defaultKeys(src, file);
 		const keyset = new Set(keys);
-		if (keys.length !== keyset.size) errors.push(d.name + ' DEFAULT_GESTURES has duplicate keys');
+		if (keys.length !== keyset.size) errors.push('macos DEFAULT_GESTURES has duplicate keys');
 		const missing = [...union].filter((s) => !keyset.has(s));
 		const extra = [...keyset].filter((s) => !union.has(s));
-		if (missing.length) errors.push(d.name + ' DEFAULT_GESTURES missing slot(s): ' + missing.join(', '));
-		if (extra.length) errors.push(d.name + ' DEFAULT_GESTURES has unknown slot(s): ' + extra.join(', '));
+		if (missing.length) errors.push('macos DEFAULT_GESTURES missing slot(s): ' + missing.join(', '));
+		if (extra.length) errors.push('macos DEFAULT_GESTURES has unknown slot(s): ' + extra.join(', '));
+	}
+
+	// Linux derives the slot arrays from actions.toml at runtime (the shared
+	// codec now decodes multi-line arrays), so there is no literal to pin. Assert
+	// it reads the canonical file and never re-hardcodes the lists; the Linux Lua
+	// suite proves the derived lists equal the TOML in order.
+	{
+		const file = 'linux/modules/gestures/manager.lua';
+		const src = read(file);
+		if (!/load_slot_space\s*\(/.test(src)) {
+			errors.push('linux manager must derive the slot-space via load_slot_space()');
+		}
+		if (!src.includes('_shared/modules/gestures/actions.toml')) {
+			errors.push('linux manager must read the shared actions.toml');
+		}
+		if (/M\.SINGLE_SLOTS\s*=\s*\{\s*"/.test(src) || /M\.AXIS_SLOTS\s*=\s*\{\s*"/.test(src)) {
+			errors.push('linux manager re-hardcodes SINGLE_SLOTS/AXIS_SLOTS instead of deriving them');
+		}
 	}
 } catch (e) {
 	errors.push(e.message);
@@ -87,4 +106,4 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-console.log('\x1b[32m[OK] Gesture slot-space single source — Linux + macOS SINGLE_SLOTS/AXIS_SLOTS and DEFAULT_GESTURES key-space match actions.toml [slots].\x1b[0m');
+console.log('\x1b[32m[OK] Gesture slot-space single source — Linux derives from actions.toml [slots]; macOS literals + DEFAULT_GESTURES key-space match it.\x1b[0m');
