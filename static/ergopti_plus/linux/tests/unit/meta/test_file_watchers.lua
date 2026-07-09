@@ -215,7 +215,14 @@ helpers.describe("file_watchers", function()
 				write_file(dir .. "/hotstrings.toml")
 				local fw = helpers.load_module("lib.file_watchers")
 				local fired_count = 0
-				fw.start({ hotstrings_dir = dir, on_reload = function() fired_count = fired_count + 1 end })
+				-- Drive the debounce deadline through an injected wall clock so the
+				-- test is deterministic and independent of os.clock semantics.
+				local now_ms = 1000
+				fw.start({
+					hotstrings_dir = dir,
+					now_ms = function() return now_ms end,
+					on_reload = function() fired_count = fired_count + 1 end,
+				})
 
 				fw.pump()
 				helpers.assert_eq(fired_count, 0, "baseline pump must not fire")
@@ -225,7 +232,7 @@ helpers.describe("file_watchers", function()
 				fw.pump()
 				helpers.assert_eq(fired_count, 0, "deadline not yet passed — should not fire")
 
-				sleep_sec(0.6)
+				now_ms = now_ms + 600 -- advance the clock past the 500 ms deadline
 				fw.pump()
 				helpers.assert_eq(fired_count, 1, "should fire exactly once after deadline")
 
@@ -238,7 +245,12 @@ helpers.describe("file_watchers", function()
 				write_file(dir .. "/hotstrings.toml")
 				local fw = helpers.load_module("lib.file_watchers")
 				local fired_count = 0
-				fw.start({ hotstrings_dir = dir, on_reload = function() fired_count = fired_count + 1 end })
+				local now_ms = 1000
+				fw.start({
+					hotstrings_dir = dir,
+					now_ms = function() return now_ms end,
+					on_reload = function() fired_count = fired_count + 1 end,
+				})
 
 				fw.pump()
 				touch_file(dir .. "/hotstrings.toml")
@@ -250,7 +262,7 @@ helpers.describe("file_watchers", function()
 
 				helpers.assert_eq(fired_count, 0, "debounce extends deadline on each change")
 
-				sleep_sec(0.6)
+				now_ms = now_ms + 600 -- past the (repeatedly re-armed) deadline
 				fw.pump()
 				helpers.assert_eq(fired_count, 1, "debounce collapsed 3 changes into 1 callback")
 
@@ -472,4 +484,39 @@ helpers.describe("file_watchers", function()
 			helpers.assert_eq(fired, 0)
 		end)
 	end)
+end)
+
+
+-- ======================================================================
+-- 6. Debounce clock source (root-cause guard, runs in every environment)
+-- ======================================================================
+
+-- The behavioural timing tests above are stat-gated and skipped where stat(1)
+-- is unavailable. This source guard runs everywhere and encodes the root cause:
+-- the debounce deadline must be computed from a monotonic WALL clock, never
+-- os.clock(). On Linux os.clock() is CPU time, which barely advances in an
+-- I/O-bound daemon, so a deadline derived from it never lines up with real
+-- elapsed time and the reload either never fires or fires immediately.
+helpers.describe("file_watchers debounce clock source", function()
+
+	local function read_file(path)
+		local fh = io.open(path, "r")
+		if not fh then return "" end
+		local s = fh:read("*a")
+		fh:close()
+		return s
+	end
+
+	local src = read_file(helpers.driver_root() .. "/lib/file_watchers.lua")
+
+	helpers.it("computes the debounce deadline from the monotonic clock, not os.clock", function()
+		helpers.assert_true(src ~= "", "could not read lib/file_watchers.lua")
+		helpers.assert_true(src:find('require("lib.monotonic")', 1, true) ~= nil,
+			"file_watchers must source its clock from lib.monotonic")
+		helpers.assert_true(src:find("os.clock", 1, true) == nil,
+			"file_watchers must not use os.clock() — CPU time breaks the debounce on Linux")
+		helpers.assert_true(src:find("_now_ms()", 1, true) ~= nil,
+			"the debounce deadline must be set and checked through the injectable wall clock")
+	end)
+
 end)
