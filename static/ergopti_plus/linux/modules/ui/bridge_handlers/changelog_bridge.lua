@@ -12,7 +12,7 @@ M.bridge_name = "changelog_bridge"
 local Logger = require("logger.shim")
 local LOG = "bridge.changelog"
 
--- Read canonical version from the single-source module (P0-E.2 SSoT).
+-- Read canonical version from the single-source module (SSoT).
 local Version = require("lib.version")
 
 --- Builds the initial changelog data payload.

@@ -270,7 +270,7 @@ local function _pump_one()
 	if ev.name == "KEY_CAPSLOCK" then return true end
 
 	-- Resolve the typed character from the layout table using the CURRENT shift
-	-- state. Bug fix (P1.1): `ch` was never assigned here, so no character ever
+	-- state. A prior bug left `ch` unassigned here, so no character ever
 	-- reached on_char — hotstrings, keylogger and the LLM got zero input and the
 	-- whole daemon was inert. Also resolve BEFORE the modifier reset below, or
 	-- every shifted character would come out unshifted.

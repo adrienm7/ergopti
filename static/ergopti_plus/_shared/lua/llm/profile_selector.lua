@@ -100,7 +100,7 @@ function M.load_built_in_profiles()
 	return {}
 end
 
---- Loads the profile-id migration table from legacy_ids.json (DL-2). Returns
+--- Loads the profile-id migration table from legacy_ids.json. Returns
 --- an empty table (never nil) if the file cannot be read or parsed, so a
 --- missing/corrupt file degrades to "no migration" rather than throwing.
 --- @return table<string,string> legacy_ids Map of old profile id -> current id.

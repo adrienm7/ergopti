@@ -6,7 +6,7 @@
 --- Thin wrapper around _shared/lua/locale/core.lua. Injects macOS-specific
 --- dependencies (hs.json.decode, Paths.shared, Logger) and re-exports the
 --- shared surface. All locale logic lives in the shared module — this file
---- only wires the platform layer (P0-G.4).
+--- only wires the platform layer.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Shared source: the same JSON files are consumed by all 3 drivers.

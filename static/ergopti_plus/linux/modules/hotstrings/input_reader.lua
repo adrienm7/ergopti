@@ -82,7 +82,7 @@ local KEY_TAB        = 15
 
 -- Load the evdev keycode maps from the shared JSON (LNX-1). The loader returns
 -- the same LAYOUTS shape {qwerty={unshifted,shifted}, azerty=…}.
--- This is the SINGLE source of truth — no hardcoded fallback (P0-E.1).
+-- This is the SINGLE source of truth — no hardcoded fallback
 
 local LAYOUTS = nil
 
@@ -147,7 +147,7 @@ end
 -- _shared/data/keycodes/evdev.json, loaded at module-init time via
 -- _load_shared_layouts(). If that load fails, the module errors out —
 -- keycode data MUST come from the shared source, never re-declared here.
--- (P0-E.1: the inline tables were triplicates of evdev.json)
+-- The inline tables used to be triplicates of evdev.json
 assert(LAYOUTS ~= nil, "input_reader: evdev.json keycode tables failed to load — _shared/data/keycodes/evdev.json is the single source and must be readable")
 
 

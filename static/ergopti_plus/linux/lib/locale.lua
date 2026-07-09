@@ -6,7 +6,7 @@
 --- Thin wrapper around _shared/lua/locale/core.lua. Injects Linux-specific
 --- dependencies (vendored JSON decoder, debug.getinfo-based path walker,
 --- logger shim) and re-exports the shared surface. All locale logic lives in
---- the shared module — this file only wires the platform layer (P0-G.4).
+--- the shared module — this file only wires the platform layer.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Shared source: the same JSON files are consumed by all 3 drivers.
