@@ -31,7 +31,14 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Timings = require("lib.timings")
+local Monotonic = require("lib.monotonic")
 local LOG = "modules.gestures.manager"
+
+-- Wall-clock source (seconds) for gesture tap/swipe timing. Defaults to the
+-- monotonic clock and is injectable via M.init for tests. Deliberately NOT
+-- os.clock(): its CPU time barely advances in an I/O-bound daemon, so a gesture
+-- held for seconds would report elapsed ~= 0 and be misclassified as a tap.
+local _now_sec = Monotonic.now_sec
 
 -- =========================================
 -- =========================================
@@ -496,7 +503,7 @@ function M.process_frame(touches)
 	if type(touches) ~= "table" then return end
 
 	local n = #touches
-	local now = os.clock()
+	local now = _now_sec()
 
 	if n == 0 then
 		-- All fingers lifted — commit the gesture.
@@ -576,9 +583,14 @@ end
 -- =========================================
 
 --- Initialises the gestures module.
---- @param opts table|nil { enabled? }
+--- @param opts table|nil { enabled?, now_sec? } — now_sec injects a wall-clock
+---   source (seconds) for tests; production uses the monotonic clock.
 function M.init(opts)
 	opts = type(opts) == "table" and opts or {}
+
+	if type(opts.now_sec) == "function" then
+		_now_sec = opts.now_sec
+	end
 
 	if opts.enabled == true then
 		_enabled = true
