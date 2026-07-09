@@ -27,7 +27,7 @@ echo ""
 # ----------------------------------------------------------------------
 # 1. Ensure the driver bundle exists
 # ----------------------------------------------------------------------
-if [ ! -d "$BUILD_DIR" ] || [ ! -f "$BUILD_DIR/ergopti_hotstrings.lua" ]; then
+if [ ! -d "$BUILD_DIR" ] || [ ! -f "$BUILD_DIR/linux/ergopti_hotstrings.lua" ]; then
   echo "[ERR] Driver bundle not found at $BUILD_DIR"
   echo "      Run 'bash tools/build/build-linux-driver.sh' first."
   exit 1
@@ -51,16 +51,35 @@ mkdir -p "$DEB_ROOT/usr/lib/systemd/user"
 # 3. Copy driver files
 # ----------------------------------------------------------------------
 echo "Copying driver files..."
-cp -r "$BUILD_DIR"/*.lua "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
-cp -r "$BUILD_DIR"/modules "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
-cp -r "$BUILD_DIR"/adapters "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
-cp -r "$BUILD_DIR"/ui "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
-cp -r "$BUILD_DIR"/vendor "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
+cp -r "$BUILD_DIR"/linux/*.lua "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
+cp -r "$BUILD_DIR"/linux/modules "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
+cp -r "$BUILD_DIR"/linux/adapters "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
+cp -r "$BUILD_DIR"/linux/lib "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
+cp -r "$BUILD_DIR"/linux/ui "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
+cp -r "$BUILD_DIR"/linux/vendor "$DEB_ROOT/usr/lib/ergopti/" 2>/dev/null || true
 
-# Copy shared modules
-if [ -d "$PROJECT_ROOT/static/ergopti_plus/_shared/lua" ]; then
+# Copy shared modules (from _shared/lua in the assembled bundle)
+if [ -d "$BUILD_DIR/_shared/lua" ]; then
   mkdir -p "$DEB_ROOT/usr/lib/ergopti/_shared"
-  cp -r "$PROJECT_ROOT/static/ergopti_plus/_shared/lua" "$DEB_ROOT/usr/lib/ergopti/_shared/"
+  cp -r "$BUILD_DIR/_shared/lua" "$DEB_ROOT/usr/lib/ergopti/_shared/"
+fi
+
+# Copy shared data files (locales, keycodes — needed at runtime)
+if [ -d "$BUILD_DIR/_shared/data" ]; then
+  mkdir -p "$DEB_ROOT/usr/lib/ergopti/_shared"
+  cp -r "$BUILD_DIR/_shared/data" "$DEB_ROOT/usr/lib/ergopti/_shared/"
+fi
+
+# Copy shared modules config (timings/constants.toml, llm/defaults.json, etc.)
+if [ -d "$BUILD_DIR/_shared/modules" ]; then
+  mkdir -p "$DEB_ROOT/usr/lib/ergopti/_shared"
+  cp -r "$BUILD_DIR/_shared/modules" "$DEB_ROOT/usr/lib/ergopti/_shared/"
+fi
+
+# Copy shared UI files (host_bridge.js, i18n.js — needed by webkit_host)
+if [ -d "$BUILD_DIR/_shared/ui" ]; then
+  mkdir -p "$DEB_ROOT/usr/lib/ergopti/_shared"
+  cp -r "$BUILD_DIR/_shared/ui" "$DEB_ROOT/usr/lib/ergopti/_shared/"
 fi
 
 file_count=$(find "$DEB_ROOT/usr/lib/ergopti" -type f | wc -l)
@@ -72,6 +91,10 @@ echo "  $file_count files copied to /usr/lib/ergopti/"
 cat > "$DEB_ROOT/usr/bin/ergopti" << 'WRAPPER_EOF'
 #!/bin/bash
 # ergopti launcher — delegates to the LuaJIT driver.
+# Set LUA_PATH so all driver and shared modules resolve correctly.
+DRIVER_ROOT="/usr/lib/ergopti"
+SHARED_LUA="$DRIVER_ROOT/_shared/lua"
+export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;"
 exec luajit /usr/lib/ergopti/ergopti_hotstrings.lua "$@"
 WRAPPER_EOF
 chmod 755 "$DEB_ROOT/usr/bin/ergopti"
@@ -105,8 +128,8 @@ echo "  Icon placeholder: ergopti.png"
 # ----------------------------------------------------------------------
 # 7. Default config template
 # ----------------------------------------------------------------------
-if [ -f "$PROJECT_ROOT/static/ergopti_plus/linux/_generated/config_template.toml" ]; then
-  cp "$PROJECT_ROOT/static/ergopti_plus/linux/_generated/config_template.toml" \
+if [ -f "$BUILD_DIR/linux/_generated/config_template.toml" ]; then
+  cp "$BUILD_DIR/linux/_generated/config_template.toml" \
      "$DEB_ROOT/etc/ergopti/config.toml"
 else
   cat > "$DEB_ROOT/etc/ergopti/config.toml" << 'CONFIG_EOF'

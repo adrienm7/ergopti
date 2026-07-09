@@ -95,6 +95,7 @@ local function init_locale_with_vector(vec)
 	Core.init({
 		json_decode = make_json_decode(locales),
 		resolve_locale_path = make_path_resolver(locales),
+		read_file = function() return "" end,
 	})
 
 	-- Set the active locale
@@ -185,10 +186,11 @@ helpers.describe("locale resolution — additional regression edges", function()
 		-- Use a fresh init
 		package.loaded["locale.core"] = nil
 		local Core = require("locale.core")
-		local loc = { fr = { "menu.a" = "FR" }, en = { "menu.a" = "EN" } }
+		local loc = { fr = { ["menu.a"] = "FR" }, en = { ["menu.a"] = "EN" } }
 		Core.init({
 			json_decode = make_json_decode(loc),
 			resolve_locale_path = make_path_resolver(loc),
+			read_file = function() return "" end,
 		})
 		Core.set_trigger_provider(function() return nil end)
 
@@ -202,10 +204,11 @@ helpers.describe("locale resolution — additional regression edges", function()
 	helpers.it("set_locale rejects empty code", function()
 		package.loaded["locale.core"] = nil
 		local Core = require("locale.core")
-		local loc = { fr = { "menu.a" = "FR" } }
+		local loc = { fr = { ["menu.a"] = "FR" } }
 		Core.init({
 			json_decode = make_json_decode(loc),
 			resolve_locale_path = make_path_resolver(loc),
+			read_file = function() return "" end,
 		})
 		Core.set_trigger_provider(function() return nil end)
 		Core.set_locale("fr")
@@ -227,6 +230,7 @@ helpers.describe("locale resolution — additional regression edges", function()
 		Core.init({
 			json_decode = function() return {} end,
 			resolve_locale_path = function() return "" end,
+			read_file = function() return "" end,
 		})
 		helpers.assert_true(Core.is_initialised(), "initialised after init")
 	end)
@@ -234,20 +238,22 @@ helpers.describe("locale resolution — additional regression edges", function()
 	helpers.it("duplicate init is a no-op (idempotent)", function()
 		package.loaded["locale.core"] = nil
 		local Core = require("locale.core")
-		local loc = { fr = { "menu.a" = "first" } }
+		local loc = { fr = { ["menu.a"] = "first" } }
 		Core.init({
 			json_decode = make_json_decode(loc),
 			resolve_locale_path = make_path_resolver(loc),
+			read_file = function() return "" end,
 		})
 		Core.set_locale("fr")
 		Core.set_trigger_provider(function() return nil end)
 		helpers.assert_eq(Core.get("menu.a"), "first", "first init active")
 
 		-- Second init with different data should be ignored
-		local loc2 = { fr = { "menu.a" = "second" } }
+		local loc2 = { fr = { ["menu.a"] = "second" } }
 		Core.init({
 			json_decode = make_json_decode(loc2),
 			resolve_locale_path = make_path_resolver(loc2),
+			read_file = function() return "" end,
 		})
 		helpers.assert_eq(Core.get("menu.a"), "first", "second init ignored")
 	end)
@@ -255,10 +261,11 @@ helpers.describe("locale resolution — additional regression edges", function()
 	helpers.it("trigger provider that returns non-string (nil) leaves ★ unchanged", function()
 		package.loaded["locale.core"] = nil
 		local Core = require("locale.core")
-		local loc = { fr = { "star" = "★ test" } }
+		local loc = { fr = { ["star"] = "★ test" } }
 		Core.init({
 			json_decode = make_json_decode(loc),
 			resolve_locale_path = make_path_resolver(loc),
+			read_file = function() return "" end,
 		})
 		Core.set_locale("fr")
 		Core.set_trigger_provider(function() return nil end)
@@ -268,10 +275,11 @@ helpers.describe("locale resolution — additional regression edges", function()
 	helpers.it("trigger provider that returns empty string leaves ★ unchanged", function()
 		package.loaded["locale.core"] = nil
 		local Core = require("locale.core")
-		local loc = { fr = { "star" = "★ test" } }
+		local loc = { fr = { ["star"] = "★ test" } }
 		Core.init({
 			json_decode = make_json_decode(loc),
 			resolve_locale_path = make_path_resolver(loc),
+			read_file = function() return "" end,
 		})
 		Core.set_locale("fr")
 		Core.set_trigger_provider(function() return "" end)
@@ -288,6 +296,7 @@ helpers.describe("locale resolution — additional regression edges", function()
 		Core.init({
 			json_decode = make_json_decode(loc),
 			resolve_locale_path = make_path_resolver(loc),
+			read_file = function() return "" end,
 		})
 		Core.set_locale("fr")
 		Core.set_trigger_provider(function() return nil end)
