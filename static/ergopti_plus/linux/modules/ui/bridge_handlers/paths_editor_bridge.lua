@@ -4,6 +4,7 @@
 --- BRIDGE HANDLER: Paths / Config Editor
 --- Handles JS->Lua messages from _shared/ui/paths_editor/.
 --- Bridge name: "hsPaths"
+--- Persists path settings via batch_write to config.toml.
 --- ==============================================================================
 
 local M = {}
@@ -11,6 +12,21 @@ M.bridge_name = "hsPaths"
 
 local Logger = require("logger.shim")
 local LOG = "bridge.hsPaths"
+
+-- Lazy-loaded writer for config.toml persistence.
+local _writer = nil
+local function _get_writer()
+	if _writer then return _writer end
+	local ok, mod = pcall(require, "toml_codec.writer")
+	if ok and type(mod.batch_write) == "function" then _writer = mod end
+	return _writer
+end
+
+-- Path to the daemon config file.
+local function _config_path()
+	local home = os.getenv("HOME") or "/home/user"
+	return home .. "/.config/ergopti/config.toml"
+end
 
 --- Builds the initial paths data payload.
 --- @param state table Daemon state.
@@ -70,6 +86,17 @@ function M.on_message(payload, state)
 
 	if action == "save" and payload.key and payload.value then
 		Logger.info(LOG, "Save path setting: %s = %s", payload.key, tostring(payload.value))
+		local writer = _get_writer()
+		if writer then
+			local ok, err = writer.batch_write(_config_path(), {
+				{ section = "paths", key = payload.key, value = payload.value },
+			})
+			if ok then
+				Logger.success(LOG, "Path persisted: %s = %s", payload.key, tostring(payload.value))
+			else
+				Logger.error(LOG, "Failed to persist path: %s", tostring(err))
+			end
+		end
 		return { saved = true }
 	end
 

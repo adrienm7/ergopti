@@ -4,6 +4,8 @@
 --- BRIDGE HANDLER: Onboarding Wizard (first-run setup)
 --- Handles JS→Lua messages from _shared/ui/onboarding/.
 --- Bridge name: "hsOnboarding"
+--- Persists user choices (layout, locale, LLM) to ~/.config/ergopti/config.toml
+--- via the shared toml_codec.writer.batch_write().
 --- ==============================================================================
 
 local M = {}
@@ -11,6 +13,21 @@ M.bridge_name = "hsOnboarding"
 
 local Logger = require("logger.shim")
 local LOG = "bridge.onboarding"
+
+-- Lazy-loaded writer for config.toml persistence.
+local _writer = nil
+local function _get_writer()
+	if _writer then return _writer end
+	local ok, mod = pcall(require, "toml_codec.writer")
+	if ok and type(mod.batch_write) == "function" then _writer = mod end
+	return _writer
+end
+
+-- Path to the daemon config file.
+local function _config_path()
+	local home = os.getenv("HOME") or "/home/user"
+	return home .. "/.config/ergopti/config.toml"
+end
 
 -- Forward declarations.
 local _handle_init, _handle_layout, _handle_language, _handle_llm_setup, _handle_complete
@@ -27,11 +44,33 @@ end
 
 local function _handle_layout(data, _)
 	Logger.info(LOG, "Onboarding layout selected: %s", tostring(data.layout))
+	local writer = _get_writer()
+	if writer and data.layout then
+		local ok, err = writer.batch_write(_config_path(), {
+			{ section = "script", key = "layout", value = data.layout },
+		})
+		if ok then
+			Logger.success(LOG, "Layout persisted: %s", data.layout)
+		else
+			Logger.error(LOG, "Failed to persist layout: %s", tostring(err))
+		end
+	end
 	return { accepted = true }
 end
 
 local function _handle_language(data, _)
 	Logger.info(LOG, "Onboarding language selected: %s", tostring(data.locale))
+	local writer = _get_writer()
+	if writer and data.locale then
+		local ok, err = writer.batch_write(_config_path(), {
+			{ section = "script", key = "locale", value = data.locale },
+		})
+		if ok then
+			Logger.success(LOG, "Locale persisted: %s", data.locale)
+		else
+			Logger.error(LOG, "Failed to persist locale: %s", tostring(err))
+		end
+	end
 	return { accepted = true }
 end
 
@@ -41,11 +80,41 @@ local function _handle_llm_setup(data, state)
 	if state.llm and data.model and type(state.llm.set_model) == "function" then
 		pcall(state.llm.set_model, state.llm, data.model)
 	end
+	-- Persist LLM settings.
+	local writer = _get_writer()
+	if writer then
+		local updates = {}
+		if data.model then
+			updates[#updates + 1] = { section = "llm", key = "model", value = data.model }
+		end
+		if data.url then
+			updates[#updates + 1] = { section = "llm", key = "ollama_url", value = data.url }
+		end
+		if #updates > 0 then
+			local ok, err = writer.batch_write(_config_path(), updates)
+			if ok then
+				Logger.success(LOG, "LLM config persisted.")
+			else
+				Logger.error(LOG, "Failed to persist LLM config: %s", tostring(err))
+			end
+		end
+	end
 	return { accepted = true }
 end
 
 local function _handle_complete(data, _)
 	Logger.success(LOG, "Onboarding complete — daemon ready.")
+	local writer = _get_writer()
+	if writer then
+		local ok, err = writer.batch_write(_config_path(), {
+			{ section = "script", key = "onboarding_done", value = true },
+		})
+		if ok then
+			Logger.success(LOG, "Onboarding flag persisted.")
+		else
+			Logger.error(LOG, "Failed to persist onboarding flag: %s", tostring(err))
+		end
+	end
 	return { done = true }
 end
 
