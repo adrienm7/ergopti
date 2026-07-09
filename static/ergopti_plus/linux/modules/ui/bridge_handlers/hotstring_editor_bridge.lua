@@ -22,6 +22,56 @@ local function _get_writer()
 	return _writer
 end
 
+-- Lazy-loaded reader for merging into the existing on-disk set before writing.
+local _reader = nil
+local function _get_reader()
+	if _reader then return _reader end
+	local ok, mod = pcall(require, "toml_codec.reader")
+	if ok and type(mod) == "table" and type(mod.parse) == "function" then _reader = mod end
+	return _reader
+end
+
+--- Reads the group's TOML, applies `mutate` to its entry list, then writes the
+--- whole merged set back so a single-entry save/delete never clobbers the other
+--- hotstrings already stored in that group file.
+--- @param config_dir string Absolute hotstrings config directory.
+--- @param group      string Target group (the TOML file's basename).
+--- @param mutate     function Receives the section's entry list; edits it in place.
+--- @return boolean, string|nil True on success, or false and an error string.
+local function _persist_group(config_dir, group, mutate)
+	local reader = _get_reader()
+	local writer = _get_writer()
+	if not reader or not writer then return false, "toml_codec unavailable" end
+
+	local path = config_dir .. "/" .. group .. ".toml"
+
+	-- Read the current set so we merge into it; a missing file parses to an
+	-- empty structure, which is exactly a first-time save.
+	local ok_read, existing = pcall(reader.parse, path)
+	if not ok_read or type(existing) ~= "table" then
+		existing = { meta = {}, sections_order = {}, sections = {} }
+	end
+	existing.meta           = type(existing.meta) == "table" and existing.meta or {}
+	existing.sections_order = type(existing.sections_order) == "table" and existing.sections_order or {}
+	existing.sections       = type(existing.sections) == "table" and existing.sections or {}
+	if existing.meta.description == nil or existing.meta.description == "" then
+		existing.meta.description = group
+	end
+
+	-- Ensure the target section exists and is tracked in the write order.
+	local section = existing.sections[group]
+	if type(section) ~= "table" then
+		section = { description = group, entries = {} }
+		existing.sections[group] = section
+		existing.sections_order[#existing.sections_order + 1] = group
+	end
+	if type(section.entries) ~= "table" then section.entries = {} end
+
+	mutate(section.entries)
+
+	return writer.write(path, existing)
+end
+
 --- Builds the initial editor data payload.
 --- @param state table Daemon state.
 --- @return table
@@ -75,70 +125,62 @@ function M.on_message(payload, state)
 		Logger.info(LOG, "Save hotstring: %s -> %s (group=%s)",
 			payload.trigger, payload.replacement, group)
 
-		-- Persist the hotstring entry via the shared writer.
 		local config_dir = state.config and type(state.config.get_config_dir) == "function"
 			and state.config:get_config_dir() or nil
+		local saved = false
 		if config_dir then
-			local path = config_dir .. "/" .. group .. ".toml"
-			local writer = _get_writer()
-			if writer then
-				local data = {
-					sections_order = { group },
-					sections = {
-						[group] = {
-							description = group,
-							entries = {
-								{
-									trigger = payload.trigger,
-									output = payload.replacement,
-									is_word = payload.is_word ~= false,
-									auto_expand = payload.auto_expand == true,
-									is_case_sensitive = payload.is_case_sensitive == true,
-									final_result = payload.final_result == true,
-								}
-							}
-						}
-					},
-					meta = { description = group },
-				}
-				local ok, err = writer.write(path, data)
-				if ok then
-					Logger.success(LOG, "Hotstring saved to disk: %s", path)
-				else
-					Logger.error(LOG, "Failed to save hotstring: %s", tostring(err))
+			local entry = {
+				trigger           = payload.trigger,
+				output            = payload.replacement,
+				is_word           = payload.is_word ~= false,
+				auto_expand       = payload.auto_expand == true,
+				is_case_sensitive = payload.is_case_sensitive == true,
+				final_result      = payload.final_result == true,
+			}
+			local ok, err = _persist_group(config_dir, group, function(entries)
+				-- Upsert by trigger: re-saving an existing hotstring edits it in
+				-- place instead of appending a duplicate.
+				for i, e in ipairs(entries) do
+					if e.trigger == entry.trigger then entries[i] = entry return end
 				end
+				entries[#entries + 1] = entry
+			end)
+			saved = ok == true
+			if saved then
+				Logger.success(LOG, "Hotstring saved to disk: %s", payload.trigger)
+			else
+				Logger.error(LOG, "Failed to save hotstring: %s", tostring(err))
 			end
+		else
+			Logger.warn(LOG, "Save hotstring: no config directory — nothing persisted.")
 		end
-		return { saved = true }
+		return { saved = saved }
 	end
 
 	if action == "delete" and payload.trigger then
 		local group = payload.group or "default"
 		Logger.info(LOG, "Delete hotstring: %s (group=%s)", payload.trigger, group)
 
-		-- Remove entry from the group TOML (write empty entries for that section).
 		local config_dir = state.config and type(state.config.get_config_dir) == "function"
 			and state.config:get_config_dir() or nil
+		local deleted = false
 		if config_dir then
-			local path = config_dir .. "/" .. group .. ".toml"
-			local writer = _get_writer()
-			if writer then
-				local data = {
-					sections_order = { group },
-					sections = {
-						[group] = { description = group, entries = {} }
-					},
-					meta = { description = group },
-				}
-				local ok, err = writer.write(path, data)
-				if ok then
-					Logger.success(LOG, "Hotstring deleted from disk: %s", payload.trigger)
-				else
-					Logger.error(LOG, "Failed to delete hotstring: %s", tostring(err))
+			local ok, err = _persist_group(config_dir, group, function(entries)
+				-- Drop only the matching trigger; every sibling entry survives.
+				for i = #entries, 1, -1 do
+					if entries[i].trigger == payload.trigger then table.remove(entries, i) end
 				end
+			end)
+			deleted = ok == true
+			if deleted then
+				Logger.success(LOG, "Hotstring deleted from disk: %s", payload.trigger)
+			else
+				Logger.error(LOG, "Failed to delete hotstring: %s", tostring(err))
 			end
+		else
+			Logger.warn(LOG, "Delete hotstring: no config directory — nothing persisted.")
 		end
-		return { deleted = true }
+		return { deleted = deleted }
 	end
 
 	if action == "test" and payload.trigger then
