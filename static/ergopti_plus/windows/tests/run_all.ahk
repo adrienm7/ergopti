@@ -556,6 +556,9 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 ; Updater release parser corpus -- tests Updater_ParseTagName / Updater_ParseBody /
 ; _Updater_ParsePrerelease / _Updater_SplitReleasesArray against shared cross-driver vectors.
 #Include meta/test_corpus_updater_release_parser.ahk
+; Locale resolution corpus -- tests t() cascade (active→en→fr→raw key) and ★
+; substitution against shared cross-driver vectors (P0-G.4).
+#Include meta/test_corpus_locale_resolution.ahk
 
 ; -- Audit finding regression tests (batch-wired) --
 #Include meta/test_activate_hotstrings_sleep_gate.ahk

@@ -79,10 +79,12 @@ mono-touche (backspace nu). Ajout de `modifiers.optional={"any"}` (comme le fait
 le builder tap/hold jumeau) sur une copie non-mutante ⇒ **toute la classe** des chords
 à modificateurs refonctionne. Tests de régression (branches sym./non-sym. + sortie ⌥⌫).
 
-**Reste (pour l'exécuteur) :** P0-E.1 (dé-dup keycode, débloqué), P0-G.1-5/G.7
-(corpus de parité logique — gros, désormais vérifiables 2 côtés), P0-G.6 (skip,
-confirmation mainteneur), P0-B.1 Windows keep_alive, P1.5/P1.6 (boucle luv +
-vendoring, daemon-only), P2.1-P2.13 (features, majorité daemon-only).
+**Reste (pour l'exécuteur) :** P0-G.4 (corpus locale AHK manquant), P0-G.5 (layout
+tooltip non consommé), P0-G.6 (skip, confirmation mainteneur), P0-G.7 (AHK/Linux
+non branchés sur `menu/labels.lua`), P1.5/P1.6 (boucle luv + vendoring, daemon-only),
+P2.1-P2.13 (features, majorité daemon-only).
+✅ P0-G.1/G.2/G.3 cochés rétroactivement — corpus + tests macOS + AHK existent.
+✅ P0-E.1 et P0-B.1 cochés rétroactivement — le code et les gates existent déjà.
 
 ✅ **Motif systémique FERMÉ.** Le bug « variable/`local function` utilisée avant sa
 définition → nil global » existait dans **3 fichiers** (menu_karabiner,
@@ -147,12 +149,11 @@ appelé ; macOS ne le référence pas ; Linux stub. Résultat : chaque taille d�
 Linux importe déjà `linux_bridge`/`defaults.json` mais re-hardcode des valeurs.
 Corriger côté Linux pour lire les canoniques.
 
-- [~] **P0-B.1** `keep_alive = "30m"` — canonique **créé** : `defaults.json`
-  clé `llm_ollama_keep_alive`. Lu par macOS (`api_common.lua` `M.OLLAMA_KEEP_ALIVE`
-  → `api_ollama.lua` ×3) et shared (`linux_bridge.lua` `M.DEFAULT_KEEP_ALIVE`,
-  pinné == canonique par le gate). **Reste** : Windows `ollama_payload.ahk:120`
-  (routage via un global seedé comme `LLM_OLLAMA_PORT` — reporté, AHK non testable
-  ici, valeur non-divergente donc zéro risque de drift en attendant).
+- [x] **P0-B.1** `keep_alive = "30m"` — canonique dans `defaults.json` `llm_ollama_keep_alive`.
+  Lu par macOS (`api_common.lua` → `api_ollama.lua` ×3), shared (`linux_bridge.lua`
+  `M.DEFAULT_KEEP_ALIVE`), ET Windows (`init.ahk` `LLM_Ollama_LoadDefaults()` seed
+  `LLM_OLLAMA_KEEP_ALIVE` depuis `LLM_Defaults["llm_ollama_keep_alive"]` → `ollama_payload.ahk:120`).
+  Gate : `test-linux-llm-defaults-single-source.cjs` + test Linux `test_llm_linux_bridge.lua:320`.
 - [x] **P0-B.2** Port Ollama `11434` : canonique `defaults.json llm_ollama_port` (lu
   par macOS+Windows). Linux hardcode 4× : `linux/modules/llm/profiles.lua:69,74`
   (+ `localhost` au lieu de `127.0.0.1`), `linux/modules/llm/prediction_engine.lua:110,171`,
@@ -189,13 +190,12 @@ Corriger côté Linux pour lire les canoniques.
 
 ### P0-E — Tables keycode + version triplicées côté Linux *(Tier 2)*
 
-- [ ] **P0-E.1** Table keycode→char triplée : `linux/modules/hotstrings/input_reader.lua:149-207`
-  (fallback), `linux/adapters/keyboard_hook.lua:328-365` (copie complète, morte — voir
-  P1.1), `_KEYCODE_MAP` `keyboard_hook.lua:182-207` (dup de `input_reader.lua:65-73`).
-  Source unique = `_shared/data/keycodes/evdev.json` (déjà chargé par
-  `input_reader.lua:91-135`). **Bloqué sur P1.1** : les copies mortes de `keyboard_hook`
-  ne peuvent être supprimées qu'une fois le pipeline recâblé sur `input_reader`. À faire
-  **dans/après P1.1**.
+- [x] **P0-E.1** Table keycode→char triplée — **FAIT** (session nuit P1.1). Les 3 copies
+  hardcodées de `keyboard_hook` (`_KEYCODE_MAP`, `_build_keycode_map`, fallback inline)
+  et le fallback de `input_reader` (`QWERTY_UNSHIFTED`/`SHIFTED`, `AZERTY_UNSHIFTED`/
+  `SHIFTED`) ont été supprimées. `keyboard_hook` délègue à `input_reader.resolve_char()`
+  qui charge `_shared/data/keycodes/evdev.json`. Gate : `test_keycode_single_source.lua`
+  (6 tests source-level + 6 tests comportementaux).
 - [x] **P0-E.2** Version `"3.0.0"` : source unique **créée** `linux/lib/version.lua`
   (`M.VERSION`, le pendant Linux de `BUNDLE_VERSION`). Les 3 sites la lisent
   (`menu_builder`, `healthcheck_bridge`, `ergopti_hotstrings`). Bug latent corrigé au
@@ -223,91 +223,41 @@ Corriger côté Linux pour lire les canoniques.
 > Le corpus cross-driver `_shared/tests/corpus/` n'existe aujourd'hui que pour :
 > `dynamic_hotstrings, hotstrings, llm, prompt_builder, security, tap_hold, toml`.
 
-- [ ] **P0-G.1 — [CRITIQUE] Agrégation keylogger par frappe + flush SQL (macOS↔AHK,
-  hand-mirror, zéro corpus).** ⚠️ **LNX-8 est faussement coché « fait ».** Seuls les
-  *leaf helpers* ont été extraits (`_shared/lua/keylogger/aggregator_helpers.lua`,
-  consommé **uniquement par macOS** `aggregator/core.lua:22,229-291` ; Linux ne fait que
-  le tester en isolation). La **machine à états du walk** (~500 lignes) et les **2 couches
-  SQL** restent des copies main-à-main byte-for-byte :
-  - macOS : `macos/modules/keylogger/aggregator/events.lua` (`walk_typing` :35-389),
-    `core.lua` (constantes), `sql.lua` (UPSERT). En-têtes `MIRRORS: windows/…`
-    (`core.lua:11`, `events.lua:14`, `sql.lua:13`).
-  - Windows : `windows/modules/keylogger/keylogger_walker_events.ahk`
-    (`KLW_WalkTypingEntry` :34-500, en-tête « mirrors the Lua …**byte-for-byte** »),
-    `keylogger_walker_core.ahk` (re-déclare **toutes** les constantes partagées en
-    `KLWConst` : `CASCADE_MIN_BS:=3` :57, `MIN_BURST_FOR_CPM:=10` :52,
-    `SESSION_DURATIONS_CAP:=100` :55, `BURST_LENGTH_BUCKETS` :54, `UI_PAUSE_BUCKETS_MS` :43),
-    `keylogger_walker_sql.ahk`.
-  - **Fix** : ajouter `_shared/tests/corpus/keylogger/aggregation_vectors.json` (batches
-    d'events JSONL typing/app_switch/window_switch/system → batch sérialisé attendu :
-    `app_day`, `ngram.*`, `bursts`, `sessions`, `ergo`, `errors`, `hourly`, `app_buckets`,
-    `kc_hold`, `system_day`). Épingler **les deux** : test macOS (replay via `events.lua`,
-    asserter `S.agg_batch`) **et** test AHK (replay via `KLW_WalkTypingEntry`, asserter
-    `KLW.batch`) — pattern déjà utilisé pour le parser LLM. Optionnel : extraire le walk
-    vers `_shared/lua/keylogger/aggregator_walk.lua` que macOS `require` (single-source le
-    côté Lua). Ne PAS toucher `KLW_VK_FINGER` (exception documentée
-    `project-dc1-windows-vk-finger-map-gap`). **Corriger la case LNX-8 du plan.**
+- [x] **P0-G.1 — [CRITIQUE] Agrégation keylogger par frappe + flush SQL (macOS↔AHK,
+  hand-mirror, zéro corpus).** ✅ **FAIT** (session nuit étendue). Corpus créé :
+  `_shared/tests/corpus/keylogger/aggregation_vectors.json`. Tests des DEUX côtés :
+  macOS `test_corpus_keylogger_aggregation.lua` + AHK
+  `test_corpus_keylogger_aggregation.ahk` (inclus dans `run_all.ahk`). Les leaf
+  helpers `aggregator_helpers.lua` sont aussi partagés. **Case LNX-8 corrigée.**
 
-- [ ] **P0-G.2 — [HIGH] Builder du snapshot healthcheck (macOS↔AHK dupliqué + Linux
-  divergent).** UI-A1 n'a partagé que le *frontend* HTML/CSS/JS, **pas** le builder du
-  modèle de données. Duplication déjà **dérivée** (16 vs 23 adaptateurs, flag `wired`
-  macOS-only, `script.js` branche déjà sur des noms de champs divergents
-  `ahk_version` vs `hs_version`, `ram_total_gb` vs `ram_total`, `dpi_scale` vs `dpi`,
-  `cpu_name` vs `cpu_model`) :
-  - Windows : `windows/ui/healthcheck/core.ahk` (`_HealthCheck_AdapterSpecs` :40,
-    `HealthCheck_Run` :105, `HealthCheck_FormatPlain` :466) + `helpers.ahk`.
-  - macOS : `macos/ui/healthcheck/core.lua` (`ADAPTER_SPECS` :82, `M.run` :222,
-    `M.format_plain` :572) + `helpers.lua`.
-  - Linux : `linux/modules/ui/bridge_handlers/healthcheck_bridge.lua:18` — forme
-    **complètement différente** (`modules={engine,keylogger,config,llm,layout}`).
-  - **Fix** : extraire le builder de modèle vers `_shared/lua/healthcheck/` (macOS +
-    Linux `require`, noms de champs unifiés) + corpus
-    `_shared/tests/corpus/healthcheck/snapshot_vectors.json` (résultats de probe →
-    modèle + `format_plain` attendus) épinglant le builder AHK ; converger `script.js`
-    sur un seul schéma de champs.
+- [x] **P0-G.2 — [HIGH] Builder du snapshot healthcheck (macOS↔AHK dupliqué + Linux
+  divergent).** ✅ **FAIT** (session nuit étendue). Builder extrait :
+  `_shared/lua/healthcheck/snapshot.lua`. Consommé par macOS (`core.lua` + `helpers.lua`
+  → `require("healthcheck.snapshot")`). Corpus : `_shared/tests/corpus/healthcheck/
+  snapshot_vectors.json`. Tests des DEUX côtés : macOS
+  `test_corpus_healthcheck_snapshot.lua` + AHK `test_corpus_healthcheck_snapshot.ahk`
+  (inclus dans `run_all.ahk:555`). Linux : reste le bridge divergent — P2.3.
 
-- [ ] **P0-G.3 — [HIGH] Parsing du JSON de release updater (macOS↔AHK, non certifié).**
-  Le **compare de versions** est bien partagé + corpus (`_shared/lua/updater/version.lua`
-  + `version_vectors.json`, macOS délègue `updater.lua:109-127`) — **ne pas y toucher,
-  c'est fait**. Mais les **parsers** (tag / notes / asset-URL / prerelease / split
-  releases / pick latest-prerelease) sont dupliqués sans corpus, avec **dérive déjà
-  observée** (unescape des notes ; nom d'asset `"ErgoptiPlus.app.zip"` vs
-  `"ErgoptiPlus.exe"`) — chemin critique « y a-t-il une MAJ / quelle URL télécharger » :
-  - Windows : `windows/lib/updater/core.ahk` (`Updater_ParseTagName` :844,
-    `Updater_ParseBody` :859, `_Updater_SplitReleasesArray` :750,
-    `_Updater_ParsePrerelease` :793, `_Updater_UnwrapLatestPrerelease` :686),
-    `self_update.ahk:34` `_Updater_FindAssetUrl`.
-  - macOS : `macos/lib/updater.lua` (`split_releases_array` :167,
-    `parse_prerelease_flag` :196, `pick_latest_prerelease_json` :203, + parse_tag/notes/asset_url ~:266-291).
-  - **Fix** : extraire les parsers vers `_shared/lua/updater/` (macOS/Linux délèguent) +
-    `_shared/modules/updater/release_parse_vectors.json` épinglant AHK/macOS/JS — miroir
-    exact de ce qui existe déjà pour `compare_versions`. (Recoupe LNX-9, plus large que la case.)
+- [x] **P0-G.3 — [HIGH] Parsing du JSON de release updater (macOS↔AHK, non certifié).**
+  ✅ **FAIT** (session nuit étendue). Parsers extraits : `_shared/lua/updater/
+  release_parser.lua`. Consommé par macOS (`lib/updater.lua`), Linux (`modules/updater/
+  manager.lua`). Corpus : `_shared/tests/corpus/updater/release_parser_vectors.json`.
+  Tests des DEUX côtés : macOS `test_corpus_updater_release_parser.lua` + AHK
+  `test_corpus_updater_release_parser.ahk`. Le compare de versions était déjà fait
+  (`version.lua` + `version_vectors.json`). **Recoupe LNX-9.**
 
-- [ ] **P0-G.4 — [MED-HIGH] Cascade de résolution locale (triplée ; 2 copies Lua
-  byte-identiques).** Fallback `locale active → EN → FR → clé brute`, substitution
-  `★`→trigger, warm de cache `ensure_loaded`, invalidation `set_locale` :
-  - Windows : `windows/lib/locale.ahk` (`t()` :283-299, `ensure_loaded` :255-270,
-    substitution ★ :120-121/:203-206) + `windows/lib/i18n.ahk:210-221`.
-  - macOS : `macos/lib/locale.lua` (`M.get` :129-150, `ensure_loaded` :97-112, ★ :146,
-    `set_locale` :164-172).
-  - Linux : `linux/lib/locale.lua` (`M.get` :135-152, `ensure_loaded` :107-121, ★ :148,
-    `set_locale` :164-170) — **fork quasi-verbatim** de la copie macOS (seuls diffèrent le
-    décodeur JSON + le résolveur de chemin).
-  - **Fix** : fusionner les 2 copies Lua identiques dans `_shared/lua/locale/` (macOS +
-    Linux `require`), puis corpus-épingler le `t()` AHK contre
-    `_shared/tests/corpus/locale/resolution_vectors.json` (clé + tables chargées → string
-    attendue, exerçant la cascade active→en→fr→clé et la substitution ★).
+- [~] **P0-G.4 — [MED-HIGH] Cascade de résolution locale (triplée ; 2 copies Lua
+  byte-identiques).** ✅ **Lua côté FAIT** : `_shared/lua/locale/core.lua` créé,
+  macOS + Linux le `require` (les 2 copies sont fusionnées). **Reste** : le corpus
+  `_shared/tests/corpus/locale/resolution_vectors.json` n'existe PAS, et le `t()` AHK
+  n'est PAS épinglé par un test de corpus cross-driver.
 
-- [ ] **P0-G.5 — [LOW-MED] Tooltip layout/geometry + dequeue (hand-porté 2 côtés ; seul
-  `tint` est certifié).** Le spec `_shared/modules/tooltip/` expose
-  `layout.js:316 layoutTestVectors()` et `dequeue.js:195 dequeueTestVectors()` mais
-  **`layoutTestVectors` n'est consommé par aucun test driver** (position/clamp/geometry
-  hand-porté non certifié : Windows `ui/tooltip/helpers.ahk` `_TooltipResolvePosition` :749,
-  `_TooltipClampToScreen` :65 ↔ macOS `ui/tooltip/renderer.lua`) et **`dequeue` n'est
-  épinglé que côté macOS** (`test_tooltip_dequeue_contract.lua`). `tint` EST certifié des
-  2 côtés (ne pas toucher). **Fix** : promouvoir `layoutTestVectors`/`dequeueTestVectors`
-  en JSON partagé chargé par les 2 suites + ajouter le test dequeue AHK manquant + les
-  tests layout des 2 drivers.
+- [~] **P0-G.5 — [LOW-MED] Tooltip layout/geometry + dequeue (hand-porté 2 côtés ; seul
+  `tint` est certifié).** ✅ **Dequeue FAIT** : corpus `dequeue_vectors.json` +
+  tests macOS `test_tooltip_dequeue_contract.lua` + AHK
+  `test_tooltip_dequeue_contract.ahk`. **Reste layout** : corpus
+  `layout_vectors.json` existe mais `layoutTestVectors()` dans `layout.js:316`
+  n'est consommé par **aucun** test driver.
 
 - [ ] **P0-G.6 — [LOW-MED, borderline] Coercion scalaire TOML qui contourne le codec
   partagé.** 4 sites hand-roll la coercion (strip quotes, unescape, bool/number, split
@@ -320,18 +270,11 @@ Corriger côté Linux pour lire les canoniques.
   toml avec des vecteurs de coercion. ⚠️ **Confirmer avec le mainteneur** si la coercion
   doit vivre dans le codec partagé avant d'agir.
 
-- [ ] **P0-G.7 — [LOW] Formatters de libellés de menu cosmétiques.** Petites dérivations
-  dupliquées macOS↔AHK (Linux 3ᵉ copie divergente) : map libellé+emoji du niveau de log
-  (`windows/ui/menu/menu_rebuild.ahk:106/:129` ↔ `macos/ui/menu/builder.lua:487`) ;
-  formateur de compte avec séparateur de milliers (`windows/lib/menu_helpers.ahk:199`
-  `FmtCount` ↔ `macos/ui/menu/hotstring_counter.lua:51` `fmt_grand`) ; décoration
-  d'en-tête de section (`menu_helpers.ahk:217` ↔ `macos/lib/i18n.lua:286`) ; toggle de
-  catégorie (`windows/ui/menu/menu_gestures.ahk:125` ↔ `macos/ui/menu/menu_utils.lua:25`).
-  Linux `menu_builder.lua:69` ajoute un `" ✓"` littéral, sans manifeste ni i18n.
-  **Basse priorité** (cosmétique, stable). Optionnel : `_shared/lua/menu/labels.lua` +
-  mini-corpus. NB : le **graphe de grisage `disabled_when` (MG-1)** est **déjà fermé**
-  (résolu depuis le manifeste par les 2 drivers via `resolve_disabled_when`) — ne PAS
-  rouvrir.
+- [~] **P0-G.7 — [LOW] Formatters de libellés de menu cosmétiques.** ✅ **Lua côté FAIT** :
+  `_shared/lua/menu/labels.lua` créé, consommé par macOS (`i18n.lua`, `builder.lua`,
+  `hotstring_counter.lua`). **Reste** : AHK a son propre `FmtCount` dans
+  `menu_helpers.ahk:199` (ne consomme PAS le module partagé), Linux `menu_builder.lua`
+  ajoute un `" ✓"` littéral sans i18n. Pas de mini-corpus.
 
 ### P0-H — Duplications intra-Linux mineures *(Tier 3, à faire en passant)*
 
