@@ -50,6 +50,58 @@ helpers.describe("ui.bridge_handlers", function()
   end
 
   -- ==========================================================================
+  -- Spy reader/writer for the hotstring persistence handlers. The reader seeds
+  -- two sibling entries so a correct merge must preserve them; the writer
+  -- captures the payload and can be told to fail, so we can assert the handlers
+  -- propagate the real write result instead of hard-coding success.
+  -- ==========================================================================
+
+  local function make_spies(write_result, write_err)
+    local captured = {}
+    local reader = {
+      parse = function(_path)
+        return {
+          meta = { description = "english" },
+          sections_order = { "english" },
+          sections = {
+            english = {
+              description = "english",
+              entries = {
+                { trigger = "omw", output = "on my way", is_word = true,
+                  auto_expand = false, is_case_sensitive = false, final_result = false },
+                { trigger = "ty", output = "thank you", is_word = true,
+                  auto_expand = false, is_case_sensitive = false, final_result = false },
+              },
+            },
+          },
+        }
+      end,
+    }
+    local writer = {
+      write = function(path, data)
+        captured.path = path
+        captured.data = data
+        return write_result, write_err
+      end,
+    }
+    return reader, writer, captured
+  end
+
+  -- Injects the spies into package.loaded, loads the handler fresh so its lazy
+  -- _get_reader/_get_writer resolve to the spies, runs fn(handler), then restores.
+  local function with_spies(module_name, reader, writer, fn)
+    local prev_r = package.loaded["toml_codec.reader"]
+    local prev_w = package.loaded["toml_codec.writer"]
+    package.loaded["toml_codec.reader"] = reader
+    package.loaded["toml_codec.writer"] = writer
+    local handler = helpers.load_module(module_name)
+    local ok, err = pcall(fn, handler)
+    package.loaded["toml_codec.reader"] = prev_r
+    package.loaded["toml_codec.writer"] = prev_w
+    if not ok then error(err, 0) end
+  end
+
+  -- ==========================================================================
   -- 1. webview_manager
   -- ==========================================================================
 
@@ -372,15 +424,38 @@ helpers.describe("ui.bridge_handlers", function()
       local result = handler.on_message({ action = "reload" }, state)
       helpers.assert_true(type(result) == "table")
     end)
-    helpers.it("'add_hotstring' returns added", function()
-      local result = handler.on_message({ action = "add_hotstring", trigger = "btw", replacement = "by the way", group = "english" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.added)
+    helpers.it("'add_hotstring' merges into the existing group and reports the write result", function()
+      local reader, writer, captured = make_spies(true)
+      with_spies("modules.ui.bridge_handlers.hotstrings_config_bridge", reader, writer, function(h)
+        local result = h.on_message({ action = "add_hotstring", trigger = "btw", replacement = "by the way", group = "english" }, state)
+        helpers.assert_true(result.added, "a successful write must report added = true")
+        -- Root cause: a single-entry payload used to overwrite the whole group,
+        -- destroying the two seeded siblings. Merge must preserve them.
+        local entries = captured.data.sections.english.entries
+        helpers.assert_eq(#entries, 3, "merge must preserve the pre-existing siblings")
+        local triggers = {}
+        for _, e in ipairs(entries) do triggers[e.trigger] = true end
+        helpers.assert_true(triggers.omw and triggers.ty, "seeded 'omw'/'ty' must survive the add")
+        helpers.assert_true(triggers.btw, "the new 'btw' must be persisted")
+      end)
     end)
-    helpers.it("'delete_hotstring' returns deleted", function()
-      local result = handler.on_message({ action = "delete_hotstring", trigger = "btw" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.deleted)
+    helpers.it("'add_hotstring' reports failure when the write fails", function()
+      local reader, writer = make_spies(false, "disk full")
+      with_spies("modules.ui.bridge_handlers.hotstrings_config_bridge", reader, writer, function(h)
+        local result = h.on_message({ action = "add_hotstring", trigger = "btw", replacement = "by the way", group = "english" }, state)
+        helpers.assert_eq(result.added, false, "a failed write must not report success")
+      end)
+    end)
+    helpers.it("'delete_hotstring' removes only the target and keeps siblings", function()
+      local reader, writer, captured = make_spies(true)
+      with_spies("modules.ui.bridge_handlers.hotstrings_config_bridge", reader, writer, function(h)
+        local result = h.on_message({ action = "delete_hotstring", trigger = "omw", group = "english" }, state)
+        helpers.assert_true(result.deleted)
+        -- Root cause: delete used to write an empty entry list, wiping the group.
+        local entries = captured.data.sections.english.entries
+        helpers.assert_eq(#entries, 1, "only the target entry may be removed")
+        helpers.assert_eq(entries[1].trigger, "ty", "the sibling 'ty' must survive the delete")
+      end)
     end)
   end)
 
@@ -460,15 +535,35 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(type(result.groups) == "table")
       helpers.assert_true(type(result.hotstrings) == "table")
     end)
-    helpers.it("handles 'save' action", function()
-      local result = handler.on_message({ action = "save", trigger = "btw", replacement = "by the way", group = "english" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.saved)
+    helpers.it("'save' merges into the existing group and reports the write result", function()
+      local reader, writer, captured = make_spies(true)
+      with_spies("modules.ui.bridge_handlers.hotstring_editor_bridge", reader, writer, function(h)
+        local result = h.on_message({ action = "save", trigger = "btw", replacement = "by the way", group = "english" }, state)
+        helpers.assert_true(result.saved, "a successful write must report saved = true")
+        local entries = captured.data.sections.english.entries
+        helpers.assert_eq(#entries, 3, "merge must preserve the pre-existing siblings")
+        local triggers = {}
+        for _, e in ipairs(entries) do triggers[e.trigger] = true end
+        helpers.assert_true(triggers.omw and triggers.ty, "seeded 'omw'/'ty' must survive the save")
+        helpers.assert_true(triggers.btw, "the new 'btw' must be persisted")
+      end)
     end)
-    helpers.it("handles 'delete' action", function()
-      local result = handler.on_message({ action = "delete", trigger = "btw" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.deleted)
+    helpers.it("'save' reports failure when the write fails", function()
+      local reader, writer = make_spies(false, "disk full")
+      with_spies("modules.ui.bridge_handlers.hotstring_editor_bridge", reader, writer, function(h)
+        local result = h.on_message({ action = "save", trigger = "btw", replacement = "by the way", group = "english" }, state)
+        helpers.assert_eq(result.saved, false, "a failed write must not report success")
+      end)
+    end)
+    helpers.it("'delete' removes only the target and keeps siblings", function()
+      local reader, writer, captured = make_spies(true)
+      with_spies("modules.ui.bridge_handlers.hotstring_editor_bridge", reader, writer, function(h)
+        local result = h.on_message({ action = "delete", trigger = "omw", group = "english" }, state)
+        helpers.assert_true(result.deleted)
+        local entries = captured.data.sections.english.entries
+        helpers.assert_eq(#entries, 1, "only the target entry may be removed")
+        helpers.assert_eq(entries[1].trigger, "ty", "the sibling 'ty' must survive the delete")
+      end)
     end)
     helpers.it("handles 'duplicate' action", function()
       local result = handler.on_message({ action = "duplicate", trigger = "btw" }, state)
