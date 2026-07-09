@@ -24,6 +24,9 @@ local M = {}
 
 local Logger = require("logger.shim")
 
+-- Shared TOML decoder — this module owns no bespoke parser.
+local TomlCodec = require("toml_codec")
+
 local LOG = "modules.dynamic_hotstrings.manager"
 
 
@@ -46,8 +49,9 @@ local _letters      = {}           -- parsed [letters] map
 -- =========================================
 -- =========================================
 
---- Parses a simple TOML file and extracts [info] key=value pairs and
---- [letters] key=value pairs. Falls back to the full toml_codec when available.
+--- Decodes personal_info.toml via the shared toml_codec and returns the [info]
+--- and [letters] tables. All TOML parsing is delegated to the shared codec —
+--- this module owns no bespoke parser.
 --- @param path string Absolute path to personal_info.toml.
 --- @return table info, table letters
 local function _parse_personal_info_toml(path)
@@ -56,44 +60,13 @@ local function _parse_personal_info_toml(path)
 	local content = fh:read("*a")
 	fh:close()
 
-	-- Try the full toml_codec first (parses strings, not file paths).
-	local ok_toml, toml_codec = pcall(require, "toml_codec")
-	if ok_toml and toml_codec and type(toml_codec.parse) == "function" then
-		local ok, parsed = pcall(toml_codec.parse, content)
-		if ok and type(parsed) == "table" then
-			local info = (type(parsed.info) == "table") and parsed.info or {}
-			local letters = (type(parsed.letters) == "table") and parsed.letters or {}
-			return info, letters
-		end
-	end
+	-- Delegate all TOML parsing to the shared codec; decode returns nil on a
+	-- spec violation, in which case we surface empty tables rather than a crash.
+	local parsed = TomlCodec.decode(content)
+	if type(parsed) ~= "table" then return {}, {} end
 
-	-- Simple fallback parser.
-	local info = {}
-	local letters = {}
-	local current_section = nil
-
-	for line in content:gmatch("[^\n]+") do
-		line = line:gsub("#.*$", ""):gsub("^%s+", ""):gsub("%s+$", "")
-		if line == "" then goto continue end
-
-		local section = line:match("^%[([^%]]+)%]$")
-		if section then
-			current_section = section
-			goto continue
-		end
-
-		local k, v = line:match("^([%w_]+)%s*=%s*(.+)$")
-		if k and v and current_section then
-			v = v:gsub("^%s+", ""):gsub("%s+$", ""):gsub('^"', ""):gsub('"$', "")
-			if current_section == "info" then
-				info[k] = v
-			elseif current_section == "letters" then
-				letters[k] = v
-			end
-		end
-		::continue::
-	end
-
+	local info    = (type(parsed.info) == "table") and parsed.info or {}
+	local letters = (type(parsed.letters) == "table") and parsed.letters or {}
 	return info, letters
 end
 

@@ -27,6 +27,9 @@ local M = {}
 
 local Logger = require("logger.shim")
 
+-- Shared TOML decoder — this module owns no bespoke parser.
+local TomlCodec = require("toml_codec")
+
 local LOG = "modules.kanata.manager"
 
 
@@ -85,6 +88,41 @@ end
 -- =========================================
 -- =========================================
 
+--- Reads a TOML file and extracts the [tap_hold.keys.*] sections into the
+--- keys_config shape expected by kanata_generator.generate(). All TOML parsing
+--- is delegated to the shared toml_codec — this module owns no bespoke parser.
+--- @param path string Absolute path to the TOML file.
+--- @return table|nil keys_config, or nil when the file is absent, empty, or has no keys.
+local function _load_keys_from_toml(path)
+	local fh = io.open(path, "r")
+	if not fh then return nil end
+	local content = fh:read("*a")
+	fh:close()
+
+	-- decode returns nil on a spec violation; treat that as "no usable config"
+	-- so the caller falls through to the next source rather than crashing.
+	local parsed = TomlCodec.decode(content)
+	if type(parsed) ~= "table"
+		or type(parsed.tap_hold) ~= "table"
+		or type(parsed.tap_hold.keys) ~= "table" then
+		return nil
+	end
+
+	local keys = {}
+	for key_id, kc in pairs(parsed.tap_hold.keys) do
+		if type(kc) == "table" then
+			keys[key_id] = {
+				time_activation_seconds = kc.time_activation_seconds,
+				tap_action              = kc.tap_action,
+				hold_modifier           = kc.hold_modifier,
+				hold_layer              = kc.hold_layer,
+			}
+		end
+	end
+
+	return next(keys) and keys or nil
+end
+
 --- Loads tap-hold key config, preferring the user's TOML override over the
 --- shared defaults.toml. Returns keys_config in the shape expected by
 --- kanata_generator.generate().
@@ -102,104 +140,26 @@ local function _load_tap_hold_config()
 		defaults_path = "../../_shared/tap_hold/defaults.toml"
 	end
 
-	-- Try to load the TOML codec for proper parsing.
-	local toml_parse = nil
-	local ok_toml, toml_codec = pcall(require, "toml_codec")
-	if ok_toml and toml_codec and type(toml_codec.parse) == "function" then
-		toml_parse = toml_codec.parse
-	end
-
-	--- Parses a simple TOML subset: reads key-value pairs under specific [sections].
-	--- Used when the full toml_codec is not available (pure-Lua fallback).
-	local function parse_simple_toml(path)
-		local fh = io.open(path, "r")
-		if not fh then return nil end
-		local content = fh:read("*a")
-		fh:close()
-
-		local keys = {}
-		local current_section = nil
-		local current_key = nil
-
-		for line in content:gmatch("[^\n]+") do
-			line = line:gsub("#.*$", ""):gsub("^%s+", ""):gsub("%s+$", "")
-			if line == "" then goto continue end
-
-			-- Section header
-			local section = line:match("^%[([^%]]+)%]$")
-			if section then
-				current_section = section
-				current_key = nil
-				goto continue
-			end
-
-			-- Key-value pair
-			local k, v = line:match("^([%w_]+)%s*=%s*(.+)$")
-			if k and v and current_section then
-				v = v:gsub("^%s+", ""):gsub("%s+$", ""):gsub('^"', ""):gsub('"$', "")
-				if current_section:match("^tap_hold%.keys%.(.+)$") then
-					local key_id = current_section:match("^tap_hold%.keys%.(.+)$")
-					if not keys[key_id] then
-						keys[key_id] = {}
-					end
-					if k == "time_activation_seconds" then
-						keys[key_id].time_activation_seconds = tonumber(v)
-					elseif k == "tap_action" then
-						keys[key_id].tap_action = v
-					elseif k == "hold_modifier" then
-						keys[key_id].hold_modifier = v
-					elseif k == "hold_layer" then
-						keys[key_id].hold_layer = v
-					end
-				end
-			end
-			::continue::
-		end
-		return next(keys) and keys or nil
-	end
-
-	-- Load: user override → shared defaults
+	-- Load order: user override → shared defaults. The user's tap_hold.toml, when
+	-- present, fully replaces the defaults (no per-key merge), mirroring the other
+	-- drivers' "generated per-driver file is the complete config" semantic.
 	local keys = nil
 
-	-- 1. Try user TOML.
 	if _user_toml then
 		local fh = io.open(_user_toml, "r")
 		if fh then
-			local toml_content = fh:read("*a")
 			fh:close()
 			Logger.info(LOG, "Loading tap-hold config from user file: %s", _user_toml)
-			if toml_parse then
-				local ok, parsed = pcall(toml_parse, toml_content)
-				if ok then
-					-- Extract [tap_hold.keys.*] sections
-					keys = {}
-					if type(parsed.tap_hold) == "table" and type(parsed.tap_hold.keys) == "table" then
-						for key_id, kc in pairs(parsed.tap_hold.keys) do
-							if type(kc) == "table" then
-								keys[key_id] = {
-									time_activation_seconds = kc.time_activation_seconds,
-									tap_action = kc.tap_action,
-									hold_modifier = kc.hold_modifier,
-									hold_layer = kc.hold_layer,
-								}
-							end
-						end
-					end
-				end
-			end
-			if not keys then
-				keys = parse_simple_toml(_user_toml)
-			end
+			keys = _load_keys_from_toml(_user_toml)
 		end
 	end
 
-	-- 2. Fall back to shared defaults.
 	if not keys and defaults_path then
 		local fh = io.open(defaults_path, "r")
 		if fh then
 			fh:close()
 			Logger.info(LOG, "Loading tap-hold config from defaults: %s", defaults_path)
-			keys = parse_simple_toml(defaults_path)
+			keys = _load_keys_from_toml(defaults_path)
 		end
 	end
 
