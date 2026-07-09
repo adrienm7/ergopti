@@ -256,7 +256,7 @@ local function _fetch_releases(channel)
 	end
 
 	if status == 403 then
-		Logger.warn(LOG, "GitHub API rate limit (HTTP 403) for channel %s.")
+		Logger.warn(LOG, "GitHub API rate limit (HTTP 403) for channel %s.", channel)
 		return nil, 403
 	end
 
