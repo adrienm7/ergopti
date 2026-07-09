@@ -217,59 +217,54 @@ function M.releases_page_url()
 	return "https://github.com/" .. GH_OWNER .. "/" .. GH_REPO .. "/releases"
 end
 
---- Reads a cached ETag for a channel.
---- @param channel string
---- @return string|nil
-local function _read_etag(channel)
-	local path = etag_cache_path(channel)
-	local fh = io.open(path, "r")
-	if not fh then return nil end
-	local etag = fh:read("*l")
-	fh:close()
-	return etag and etag ~= "" and etag or nil
+--- Builds the curl argv for a conditional GitHub Releases GET on a channel.
+--- ETag handling is delegated to curl's native --etag-compare / --etag-save so
+--- the server's real ETag drives If-None-Match. The previous implementation
+--- stored a client-side timestamp as the ETag, which never matched the server
+--- value, so 304 Not Modified was never returned and every background check
+--- counted against the API rate limit.
+--- @param channel string "stable" | "dev".
+--- @return string cmd The full curl command with stderr suppressed.
+--- @return string etag_file The per-channel ETag cache path curl reads/writes.
+local function _build_fetch_command(channel)
+	local url       = M.release_api_url(channel)
+	local etag_file = etag_cache_path(channel)
+	local safe_url  = url:gsub("'", "'\\''")
+	local safe_etag = etag_file:gsub("'", "'\\''")
+
+	-- Only send If-None-Match once an ETag has been saved; --etag-compare on a
+	-- missing file errors on older curl builds, so the first run must skip it
+	local compare_flag = ""
+	if Fs.exists(etag_file) then
+		compare_flag = string.format(" --etag-compare '%s'", safe_etag)
+	end
+
+	-- -w '\n%{http_code}' appends a newline + HTTP status code at the end
+	return string.format(
+		"curl -s -w '\n%%{http_code}' -H 'Accept: application/vnd.github+json'" ..
+		" -H 'User-Agent: %s'%s --etag-save '%s' '%s' 2>/dev/null",
+		USER_AGENT, compare_flag, safe_etag, safe_url
+	), etag_file
 end
 
---- Writes an ETag value to the cache for a channel.
---- @param channel string
---- @param etag string
-local function _write_etag(channel, etag)
-	if type(etag) ~= "string" or etag == "" then return end
-	local path = etag_cache_path(channel)
-	-- Ensure cache directory exists.
-	local dir = path:match("^(.*)/[^/]+$")
-	if dir then os.execute("mkdir -p '" .. dir:gsub("'", "'\\''") .. "' 2>/dev/null") end
-	local fh = io.open(path, "w")
-	if fh then
-		fh:write(etag)
-		fh:close()
-	end
-end
+-- Exposed so unit tests can assert the constructed curl argv without a network
+M._build_fetch_command = _build_fetch_command
 
 --- Fetches the GitHub Releases API response via curl.
 --- Returns the raw body, or nil on error/304.
 --- @param channel string
 --- @return string|nil body, integer|nil http_status
 local function _fetch_releases(channel)
-	local url = M.release_api_url(channel)
-	local etag = _read_etag(channel)
+	local cmd, etag_file = _build_fetch_command(channel)
 
-	-- Build the curl command with ETag support.
-	local etag_flag = ""
-	if etag then
-		etag_flag = " -H 'If-None-Match: " .. etag:gsub("'", "'\\''") .. "'"
-	end
-
-	local safe_url = url:gsub("'", "'\\''")
-	-- -w '\n%{http_code}' appends a newline + HTTP status code at the end.
-	local cmd = string.format(
-		"curl -s -w '\n%%{http_code}' -H 'Accept: application/vnd.github+json'" ..
-		" -H 'User-Agent: %s'%s '%s' 2>/dev/null",
-		USER_AGENT, etag_flag, safe_url
-	)
+	-- curl --etag-save needs the cache directory to exist before it can persist
+	-- the server ETag on a 200 response
+	local dir = etag_file:match("^(.*)/[^/]+$")
+	if dir then os.execute("mkdir -p '" .. dir:gsub("'", "'\\''") .. "' 2>/dev/null") end
 
 	local pipe = io.popen(cmd)
 	if not pipe then
-		Logger.error(LOG, "curl popen failed for %s.", url)
+		Logger.error(LOG, "curl popen failed for channel %s.", channel)
 		return nil, 0
 	end
 
@@ -319,12 +314,8 @@ local function _fetch_releases(channel)
 		return nil, status
 	end
 
-	-- Cache the ETag from the response. We use timestamp-based invalidation
-	-- since we can't easily capture the ETag header with io.popen.
-	-- The cache is written with a short TTL (1h) so background checks at
-	-- 24h intervals effectively always get fresh data.
-	_write_etag(channel, os.date("!%Y-%m-%dT%H:%M:%SZ"))
-
+	-- curl --etag-save already persisted the server's real ETag for this 200
+	-- response, so the next check can replay it via --etag-compare and get 304
 	return body, 200
 end
 

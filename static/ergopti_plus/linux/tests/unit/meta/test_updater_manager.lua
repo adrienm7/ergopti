@@ -162,6 +162,27 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_true(ok, "check_for_updates should not error even without network")
 	end)
 
+	helpers.it("fetch command delegates ETag to curl, never a client-side timestamp", function()
+		-- Regression: the fetch command previously stored os.date(...) as the ETag,
+		-- so If-None-Match never matched the server value and 304 was never returned.
+		-- The command must instead let curl persist and replay the real server ETag
+		-- via --etag-save / --etag-compare.
+		helpers.assert_true(type(M._build_fetch_command) == "function",
+			"manager should expose _build_fetch_command for argv verification")
+		local cmd, etag_file = M._build_fetch_command("stable")
+		helpers.assert_true(type(cmd) == "string", "should return the curl command string")
+		helpers.assert_contains(cmd, "--etag-save",
+			"curl must persist the server ETag with --etag-save")
+		helpers.assert_contains(cmd, etag_file,
+			"curl must read/write the per-channel ETag cache file")
+		-- Root-cause guards: no hand-built If-None-Match header, and no ISO-8601
+		-- timestamp masquerading as an ETag value.
+		helpers.assert_true(cmd:find("If-None-Match", 1, true) == nil,
+			"must not hand-build an If-None-Match header — curl --etag-compare owns that")
+		helpers.assert_true(cmd:find("%d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%dZ") == nil,
+			"must not embed a timestamp as the ETag value")
+	end)
+
 	-- ========================================
 	-- ======= 2/ Menu Integration ============
 	-- ========================================
