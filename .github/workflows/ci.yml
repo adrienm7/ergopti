@@ -79,7 +79,7 @@ jobs:
           python-version: '3.12'
 
       - name: Check hotstring TOML files are sorted and formatted
-        run: python tools/dev/format_toml.py --hotstrings --all --check
+        run: python tools/format_toml.py --hotstrings --all --check
 
   # ─────────────────────────────────────────────────
   # 1.2) Domain build pipeline + drift detection
