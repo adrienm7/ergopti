@@ -109,7 +109,7 @@ nécessite Linux.
 - [x] 3.1 Tap-hold detection — P2.5, kanata manager + génération .kbd + lifecycle
 - [x] 3.2 Shortcuts/gestures — P2.7 (shortcuts manager, CapsWord, wrap symbols) + P2.11 (gestures manager, action registry, swipe detection)
 - [x] 3.3 Updater — P2.9, GitHub Releases API + ETag + self-replace
-- [ ] 3.4 File watchers — inotify hot reload TOML (non fait, dernier item restant)
+- [x] 3.4 File watchers — inotify hot reload TOML (P2.14, commit fbac663b0)
 - [x] 3.5 Crash reporter — P2.13, dump fichier horodaté + rotation 20 fichiers
 
 ---
