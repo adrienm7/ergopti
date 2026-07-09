@@ -31,6 +31,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Monotonic = require("lib.monotonic")
 local LOG = "file_watchers"
 
 
@@ -74,8 +75,14 @@ local _pump_entries = {}
 -- Callback invoked on debounced change detection.
 local _on_reload = nil
 
--- Debounce deadline: os.clock() absolute time after which the reload fires.
--- Set by _schedule_reload(); cleared after the callback fires.
+-- Wall-clock source (milliseconds) for the debounce deadline. Injectable via
+-- M.start for tests; defaults to the monotonic clock. Deliberately not the CPU
+-- clock: on Linux that barely advances in an I/O-bound daemon, so a deadline
+-- derived from it never lines up with real elapsed time.
+local _now_ms = Monotonic.now_ms
+
+-- Debounce deadline: monotonic wall-clock time (ms) after which the reload
+-- fires. Set by _schedule_reload(); cleared after the callback fires.
 local _reload_deadline = nil
 
 -- Debounce window in seconds.
@@ -183,13 +190,13 @@ end
 --- @param reason string Human-readable reason logged at debug level.
 local function _schedule_reload(reason)
 	Logger.debug(LOG, "Change detected (%s) — scheduling reload in %.1fs…", reason, _debounce_sec)
-	_reload_deadline = os.clock() + _debounce_sec
+	_reload_deadline = _now_ms() + _debounce_sec * 1000
 end
 
 --- Fires the reload callback if the deadline has passed. Called from M.pump().
 local function _check_deadline()
 	if not _reload_deadline then return end
-	if os.clock() < _reload_deadline then return end
+	if _now_ms() < _reload_deadline then return end
 	_reload_deadline = nil
 	Logger.info(LOG, "Debounced reload firing…")
 	if _on_reload then
@@ -402,12 +409,14 @@ end
 ---   .base_dir        string  Absolute path to the project root (for .lua watching).
 ---   .personal_dir    string  Absolute path to personal hotstrings (recursive .toml scan).
 ---   .on_reload       function()  Called after the debounce window when a change is detected.
+---   .now_ms          function() → number  Optional wall-clock source (ms) for tests.
 function M.start(opts)
 	opts = type(opts) == "table" and opts or {}
 	local hotstrings_dir = opts.hotstrings_dir
 	local base_dir       = opts.base_dir
 	local personal_dir   = opts.personal_dir or ""
 	_on_reload           = opts.on_reload
+	if type(opts.now_ms) == "function" then _now_ms = opts.now_ms end
 
 	if not hotstrings_dir and not base_dir and personal_dir == "" then
 		Logger.warn(LOG, "start() called with no directories to watch — no-op.")
