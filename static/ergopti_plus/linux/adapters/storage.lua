@@ -23,6 +23,11 @@ local M = {}
 
 local Logger = require("logger.shim")
 
+-- Shared pure-Lua JSON codec (single source of truth for all Lua drivers). The
+-- bespoke encoder/decoder this replaces silently flattened nested tables and
+-- dropped arrays on the decode path, corrupting any non-flat stored value
+local json = require("json")
+
 local LOG = "adapters.storage"
 
 
@@ -54,69 +59,7 @@ local _cache = nil   -- in-memory copy of the store; nil until first load
 
 -- ========================================
 -- ========================================
--- ======= 3/ Internal JSON Helpers =======
--- ========================================
--- ========================================
-
---- Minimal JSON encode for scalar values and flat tables.
---- Not a general JSON library — only handles the types that Storage needs.
---- @param v any
---- @return string
-local function _encode(v)
-	local t = type(v)
-	if t == "nil"     then return "null" end
-	if t == "boolean" then return v and "true" or "false" end
-	if t == "number"  then return tostring(v) end
-	if t == "string"  then
-		-- Escape backslash, double-quote, and control characters
-		local escaped = v:gsub('\\', '\\\\'):gsub('"', '\\"')
-			:gsub('\n', '\\n'):gsub('\r', '\\r'):gsub('\t', '\\t')
-		return '"' .. escaped .. '"'
-	end
-	if t == "table" then
-		local parts = {}
-		for k, val in pairs(v) do
-			parts[#parts + 1] = _encode(tostring(k)) .. ":" .. _encode(val)
-		end
-		return "{" .. table.concat(parts, ",") .. "}"
-	end
-	return "null"
-end
-
---- Minimal JSON decode for the flat-object format produced by _encode.
---- Only handles string/number/boolean/null values at the top-level object.
---- @param s string
---- @return table
-local function _decode(s)
-	if type(s) ~= "string" then return {} end
-	local obj = {}
-	-- Match "key":value pairs (string keys, any scalar value)
-	for key, val in s:gmatch('"([^"\\]-)"%s*:%s*([^,}]+)') do
-		val = val:match("^%s*(.-)%s*$")
-		if val == "null"  then obj[key] = nil
-		elseif val == "true"  then obj[key] = true
-		elseif val == "false" then obj[key] = false
-		else
-			local n = tonumber(val)
-			if n then
-				obj[key] = n
-			else
-				-- String value: strip surrounding quotes and unescape
-				local inner = val:match('^"(.*)"$')
-				if inner then
-					obj[key] = inner:gsub('\\"', '"'):gsub('\\n', '\n')
-						:gsub('\\r', '\r'):gsub('\\t', '\t'):gsub('\\\\', '\\')
-				end
-			end
-		end
-	end
-	return obj
-end
-
-
--- ========================================
--- ========================================
--- ======= 4/ Persistence Helpers =========
+-- ======= 3/ Persistence Helpers =========
 -- ========================================
 -- ========================================
 
@@ -126,7 +69,10 @@ local function _load()
 	if not fh then _cache = {} ; return end
 	local content = fh:read("*a")
 	fh:close()
-	_cache = _decode(content)
+	-- json.decode yields nil on an empty or corrupt file; fall back to an empty
+	-- store so a damaged JSON never wedges the cache into a permanent nil state
+	local decoded = json.decode(content)
+	_cache = (type(decoded) == "table") and decoded or {}
 end
 
 --- Persists _cache to disk atomically.
@@ -138,7 +84,7 @@ local function _flush()
 	local ok, err = pcall(function()
 		local fh = io.open(_TMP_PATH, "w")
 		if not fh then error("cannot open tmp file") end
-		fh:write(_encode(_cache))
+		fh:write(json.encode(_cache))
 		fh:close()
 		os.rename(_TMP_PATH, _STORE_PATH)
 	end)
@@ -159,13 +105,13 @@ end
 
 -- =========================================
 -- =========================================
--- ======= 5/ Adapter Methods ==============
+-- ======= 4/ Adapter Methods ==============
 -- =========================================
 -- =========================================
 
 --- Stores a value under the given key in the persistent store.
 --- @param key string
---- @param value any Scalar or flat table value.
+--- @param value any Scalar or nested table value.
 --- @return boolean True on success, false on error.
 function M.set(key, value)
 	_ensure_loaded()
