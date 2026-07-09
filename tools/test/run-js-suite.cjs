@@ -85,7 +85,8 @@ const CHECKS = [
 	{ name: 'tooltip corpus parity (JSON corpus matches JS layoutTestVectors + dequeueTestVectors; P0-G)', cmd: 'node', args: ['tools/test/test-tooltip-corpus-parity.cjs'], repro: 'node tools/test/test-tooltip-corpus-parity.cjs' },
 	{ name: 'TOML coercion parity (corpus cross-driver gate; P0-G)', cmd: 'node', args: ['tools/test/test-toml-coercion-parity.cjs'], repro: 'node tools/test/test-toml-coercion-parity.cjs' },
 	{ name: 'shared test.format single source (inspect/deep_equal/fail_msg_for consumed from _shared, no local copies; P0 SSoT)', cmd: 'node', args: ['tools/test/test-shared-test-format.cjs'], repro: 'node tools/test/test-shared-test-format.cjs' },
-	{ name: 'file watchers constants single source (SCAN_MAX_DEPTH=16 + debounce=0.5s match across Linux + macOS lib/file_watchers.lua; P0 SSoT)', cmd: 'node', args: ['tools/test/test-file-watchers-constants-single-source.cjs'], repro: 'node tools/test/test-file-watchers-constants-single-source.cjs' }
+	{ name: 'file watchers constants single source (SCAN_MAX_DEPTH=16 + debounce=0.5s match across Linux + macOS lib/file_watchers.lua; P0 SSoT)', cmd: 'node', args: ['tools/test/test-file-watchers-constants-single-source.cjs'], repro: 'node tools/test/test-file-watchers-constants-single-source.cjs' },
+	{ name: 'format_toml CLI behavioral test (bare invocation exits 1 = usage; --preview sorts sections/keys + styles headers, file untouched)', cmd: 'node', args: ['tools/test/test-format-toml-importable.cjs'], repro: 'node tools/test/test-format-toml-importable.cjs' }
 ];
 
 const SLOW_CHECKS = [
