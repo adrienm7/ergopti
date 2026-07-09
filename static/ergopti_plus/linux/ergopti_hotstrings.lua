@@ -155,6 +155,13 @@ local kanata = nil
 local ok_kan, kan_mod = pcall(require, "modules.kanata.manager")
 if ok_kan then kanata = kan_mod end
 
+-- File watchers (optional — inotify-based TOML/.lua hot reload).
+-- When luv is present, uses native inotify via luv.new_fs_event();
+-- otherwise falls back to mtime polling driven by the event loop.
+local file_watchers = nil
+local ok_fw, fw_mod = pcall(require, "lib.file_watchers")
+if ok_fw then file_watchers = fw_mod end
+
 
 -- =========================================
 -- =========================================
@@ -607,7 +614,30 @@ local function main()
 	Logger.success(LOG, "Daemon ready (device=%s layout=%s mappings=%d dry_run=%s tray=%s).",
 		device, opts.layout, mapping_count, tostring(opts.dry_run), tostring(opts.tray and tray_menu ~= nil))
 
-	-- 8.11) Start process lifecycle polling if the adapter loaded.
+	-- 8.11) Start file watchers (inotify-based TOML/.lua hot reload).
+	-- Watches the hotstrings config directory and the project .lua files.
+	-- When luv is available, uses native inotify; otherwise falls back
+	-- to mtime polling driven by the event loop's onPeriodic callback.
+	if file_watchers then
+		file_watchers.start({
+			hotstrings_dir = config_path,
+			base_dir       = SCRIPT_DIR,
+			personal_dir   = config_path,  -- personal TOMLs live alongside bundled ones
+			on_reload      = function()
+				Logger.info(LOG, "Config change detected — reloading hotstrings…")
+				local ok, count = pcall(function() return hotstrings_config.reload() end)
+				if ok then
+					Logger.success(LOG, "Hotstrings reloaded: %d mapping(s) active.", count or 0)
+				else
+					Logger.error(LOG, "Hotstrings reload failed: %s.", tostring(count))
+				end
+			end,
+		})
+		Logger.info(LOG, "File watchers armed (%s).",
+			file_watchers.has_inotify() and "inotify" or "mtime poll")
+	end
+
+	-- 8.12) Start process lifecycle polling if the adapter loaded.
 	-- tick() drives focus-change and app-launch/quit detection at 250 ms
 	-- intervals; the event loop calls it periodically.
 	local tick_count = 0
@@ -615,9 +645,23 @@ local function main()
 		process_lifecycle.start()
 	end
 
-	-- 8.12) Event loop — luv native when available, pump fallback otherwise.
+	-- 8.13) Event loop — luv native when available, pump fallback otherwise.
 	-- The idle callback pumps the keyboard hook + tray menu;
-	-- the periodic callback drives process_lifecycle.tick().
+	-- the periodic callback drives process_lifecycle.tick() and
+	-- file_watchers.pump() (deadline check + mtime polling).
+	local on_periodic = nil
+	if process_lifecycle or file_watchers then
+		on_periodic = function()
+			tick_count = tick_count + 1
+			if process_lifecycle then
+				pcall(process_lifecycle.tick, tick_count)
+			end
+			if file_watchers then
+				file_watchers.pump()
+			end
+		end
+	end
+
 	event_loop.run({
 		onIdle = function()
 			if not keyboard_hook.isRunning() then
@@ -629,14 +673,12 @@ local function main()
 			end
 			pcall(keyboard_hook.pump)
 		end,
-		onPeriodic = process_lifecycle and function()
-			tick_count = tick_count + 1
-			pcall(process_lifecycle.tick, tick_count)
-		end or nil,
+		onPeriodic = on_periodic,
 		periodSec = 0.25,
 	})
 
-	-- 8.13) Clean exit.
+	-- 8.14) Clean exit.
+	if file_watchers then file_watchers.stop() end
 	if process_lifecycle then process_lifecycle.stop() end
 	if tray_menu then tray_menu.destroy() end
 
