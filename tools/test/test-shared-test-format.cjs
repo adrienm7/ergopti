@@ -65,11 +65,11 @@ if (!formatSrc.includes('fail_msg_for')) {
 		errors.push('linux/tests/helpers.lua: must require("test.format")');
 	}
 
-	// Must re-export inspect and deep_equal
-	if (!code.includes('M.inspect = ') || !code.includes('fmt.inspect')) {
+	// Must re-export inspect and deep_equal (anchored, not substring match)
+	if (!/M\.inspect\s*=\s*fmt\.inspect\b/.test(code)) {
 		errors.push('linux/tests/helpers.lua: must set M.inspect = fmt.inspect');
 	}
-	if (!code.includes('M.deep_equal = ') || !code.includes('fmt.deep_equal')) {
+	if (!/M\.deep_equal\s*=\s*fmt\.deep_equal\b/.test(code)) {
 		errors.push('linux/tests/helpers.lua: must set M.deep_equal = fmt.deep_equal');
 	}
 
@@ -103,10 +103,10 @@ if (!formatSrc.includes('fail_msg_for')) {
 		errors.push('macos/tests/helpers/init.lua: must require("test.format")');
 	}
 
-	if (!code.includes('M.inspect = ') || !code.includes('fmt.inspect')) {
+	if (!/M\.inspect\s*=\s*fmt\.inspect\b/.test(code)) {
 		errors.push('macos/tests/helpers/init.lua: must set M.inspect = fmt.inspect');
 	}
-	if (!code.includes('M.deep_equal = ') || !code.includes('fmt.deep_equal')) {
+	if (!/M\.deep_equal\s*=\s*fmt\.deep_equal\b/.test(code)) {
 		errors.push('macos/tests/helpers/init.lua: must set M.deep_equal = fmt.deep_equal');
 	}
 
@@ -127,13 +127,19 @@ if (!formatSrc.includes('fail_msg_for')) {
 	}
 }
 
-// ── 4. Ratchet: forbid hardcoded "table: 0x" pattern (old tostring fallback) ─
+// ── 4. Ratchet: both assert_eq implementations must use inspect, not tostring ─
+// The old assert_eq used tostring() which produces opaque pointers like
+// "table: 0x1a2b3c". The new one uses M.inspect() for readable values.
 for (const [driver, f] of [['linux', 'tests/helpers.lua'], ['macos', 'tests/helpers/init.lua']]) {
 	const base = driver === 'linux' ? LINUX : MACOS;
 	const code = read(f, base);
-	// The old assert_eq used tostring() which produces opaque pointers.
-	// The new one uses M.inspect(). Verify the assert_eq function doesn't
-	// contain a tostring() call on the value (it should use inspect instead).
+	// assert_eq must call M.inspect for debug output, not raw tostring
+	const fnBody = code.match(/function\s+M\.assert_eq[^}]+end/ms);
+	if (fnBody && fnBody[0].includes('M.inspect(')) {
+		// Good: uses inspect for pretty-printing
+	} else if (fnBody && fnBody[0].includes('tostring(')) {
+		errors.push(`${driver}/${f}: assert_eq must use M.inspect(), not raw tostring()`);
+	}
 }
 
 if (errors.length > 0) {
