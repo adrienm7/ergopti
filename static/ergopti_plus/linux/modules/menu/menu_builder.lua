@@ -12,7 +12,7 @@
 ---   → separator → Global Actions → Language → Config Folder → Setup Wizard
 ---   → About → Reload → Quit → Debug
 ---
---- Items that depend on features not yet implemented on Linux (P2.2-P2.13)
+--- Items that depend on features not yet implemented on Linux
 --- are present as labelled stubs that log the action — they don't crash and
 --- they show the intended final shape.
 ---
@@ -204,7 +204,7 @@ local function _build_metrics(ctx)
 	}}
 end
 
---- Builds the shortcuts submenu (P2.13).
+--- Builds the shortcuts submenu.
 local function _build_shortcuts(ctx)
 	local sc = ctx.shortcuts
 	if not sc then
@@ -282,7 +282,7 @@ local function _build_shortcuts(ctx)
 	return { title = i18n_safe("menu.shortcuts.title", "⚙ Raccourcis"), menu = items }
 end
 
---- Builds the Kanata submenu (Linux's Karabiner — P2.5).
+--- Builds the Kanata submenu (Linux's Karabiner equivalent).
 --- Actions delegate to the kanata manager module passed via ctx.kanata.
 local function _build_kanata(ctx)
 	local km = ctx.kanata
@@ -343,7 +343,7 @@ local function _build_kanata(ctx)
 	}}
 end
 
---- Builds the gestures submenu (P2.11).
+--- Builds the gestures submenu.
 local function _build_gestures(ctx)
 	local ge = ctx.gestures
 	if not ge then
@@ -471,7 +471,7 @@ local function _build_global_actions(ctx)
 	}}
 end
 
---- Builds the language selector submenu (P2.10).
+--- Builds the language selector submenu.
 --- Lists all available locales, marks the active one with a checkmark.
 --- Switching persists via i18n.set_locale() → storage adapter.
 local function _build_language(_ctx)
@@ -522,7 +522,7 @@ local function _build_config_folder(ctx)
 	}
 end
 
---- Builds the setup wizard launcher (P2.2 — opens WebKitGTK onboarding window).
+--- Builds the setup wizard launcher (opens the WebKitGTK onboarding window).
 local function _build_setup_wizard(ctx)
 	return {
 		title = i18n_safe("menu.global.setup_wizard", "🧙 Assistant"),
@@ -532,7 +532,7 @@ local function _build_setup_wizard(ctx)
 	}
 end
 
---- Builds the updater submenu (P2.9 — GitHub releases, channel switching, download).
+--- Builds the updater submenu (GitHub releases, channel switching, download).
 local function _build_updates(ctx)
 	local up = ctx.updater
 	if not up then
@@ -709,7 +709,7 @@ end
 -- =========================================
 
 --- Returns a translated string if the i18n module is available, or the fallback.
---- Separated so the menu builder works before P2.10 (i18n wiring) is done.
+--- Separated so the menu builder works before the i18n wiring is done.
 --- @param key string i18n key
 --- @param fallback string Fallback text
 --- @return string

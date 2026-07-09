@@ -22,7 +22,7 @@
 --- 3. Minimal surface: only the tables that the Linux daemon populates are
 ---    wired (events_typing, ngram_chars, agg_app_day, devices, meta).
 ---    Additional tables (bursts, sessions, ergo, etc.) live in the schema but
----    are not populated until the keylogger-walker state machine (P0-G.1) is
+---    are not populated until the keylogger-walker state machine is
 ---    wired on Linux.
 --- 4. Graceful degradation: when the sqlite3 binary is absent, writer.is_available()
 ---    returns false and all write methods are silent no-ops — the daemon falls
@@ -243,7 +243,7 @@ end
 --- Inserts a batch of keystroke events into the events_typing table.
 --- Each event is a single keystroke row.
 ---
---- NOTE: the full keylogger-walker (P0-G.1) processes individual keystrokes into
+--- NOTE: the full keylogger-walker processes individual keystrokes into
 --- bursts, sessions, and ergo stats. Until that walker is wired on Linux, this
 --- method records a single summary row per flush cycle — enough for the
 --- dashboard to show daily totals and n-grams.

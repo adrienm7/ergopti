@@ -32,7 +32,7 @@ local LOG      = "llm.profiles"
 -- Ultimate degraded-mode text: used only if profiles.json cannot be read at
 -- all, so BASIC_PROMPT_FALLBACK below still has a value to fall back to. This
 -- is the single hand-maintained copy of the "basic" prompt on this driver —
--- everywhere else derives from profiles.json (DL-3).
+-- everywhere else derives from profiles.json
 local BASIC_PROMPT_EMERGENCY = [[You are an ultra-concise keyboard completion engine.
 User context: {context}
 
@@ -74,7 +74,7 @@ M.BUILTIN_PROFILES = LOADED_PROFILES
 
 -- Fallback prompt used when a profile object is malformed or missing a
 -- prompt field (M.resolve_system_prompt below). Derived from the "basic"
--- profile actually loaded from profiles.json (DL-3) so it can never drift
+-- profile actually loaded from profiles.json so it can never drift
 -- from the prompt the user sees when everything is working; only falls back
 -- to the hand-maintained emergency copy if profiles.json failed to load.
 local BASIC_PROMPT_FALLBACK = BASIC_PROMPT_EMERGENCY
@@ -99,7 +99,7 @@ end
 
 
 -- Migration table for IDs that were renamed in previous versions. Shared with
--- the AHK driver via _shared/modules/llm/legacy_ids.json (DL-2) — both
+-- the AHK driver via _shared/modules/llm/legacy_ids.json — both
 -- drivers had the identical mapping hand-copied, not "macOS driver history".
 local LEGACY_IDS = Selector.load_legacy_ids()
 
@@ -162,7 +162,7 @@ end
 
 --- Resolves the appropriate system prompt, injecting live session values.
 --- Delegates the pure prompt-building algorithm to the shared
---- Selector.resolve_system_prompt() (profile_selector.lua, DL-1), keeping only
+--- Selector.resolve_system_prompt() (profile_selector.lua), keeping only
 --- the macOS-specific glue: live min/max_words from hs.settings and the active
 --- UI locale from lib.i18n.
 ---
@@ -183,7 +183,7 @@ function M.resolve_system_prompt(profile, n)
 	-- Inject the active UI locale so the model replies in the user's language.
 	local locale = i18n.get_locale() or Manifest.default_for("script.locale")
 
-	-- Delegate the pure algorithm to the shared selector (DL-1).
+	-- Delegate the pure algorithm to the shared selector
 	-- Convert max_w == 0 to "illimité" (the shared selector substitutes
 	-- whatever string it receives; the macOS convention for "unlimited" is
 	-- the French word rather than a literal 0).
@@ -203,7 +203,7 @@ function M.resolve_system_prompt(profile, n)
 
 	-- Fallback: use BASIC_PROMPT_FALLBACK and substitute placeholders manually.
 	-- This only runs when the profile is nil/malformed or has no prompt field,
-	-- matching the old behaviour before DL-1 delegation.
+	-- matching the old behaviour before the selector delegation
 	local prompt = BASIC_PROMPT_FALLBACK
 	prompt = prompt:gsub("{max_words}", (max_w and max_w > 0) and tostring(max_w) or "illimité")
 	prompt = prompt:gsub("{min_words}", tostring(min_w or ""))

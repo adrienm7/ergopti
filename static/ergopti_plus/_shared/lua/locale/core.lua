@@ -18,7 +18,7 @@
 --- 1. Single source: the two Lua locale modules were fork quasi-verbatim copies
 ---    (~160 lines each) differing only in JSON decoder + path resolution.
 ---    Merged here so any behaviour fix or ★-substitution tweak applies to both
----    drivers immediately (P0-G.4).
+---    drivers immediately.
 --- 2. Lazy load: the file is read once on first get() call and cached.
 --- 3. ★ substitution: the trigger-character placeholder is replaced at call time
 ---    via an injectable provider so the correct char is used even after rebinding.

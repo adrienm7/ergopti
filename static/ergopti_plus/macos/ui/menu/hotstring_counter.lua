@@ -49,7 +49,7 @@ end
 --- Formats a large number with space thousands separators (French style).
 --- @param n number The number to format.
 --- @return string Formatted string, e.g. "1 234 567".
---- Delegates to the shared menu.labels module (P0-G.7).
+--- Delegates to the shared menu.labels module.
 function M.fmt_grand(n)
 	return Labels.fmt_count(n)
 end

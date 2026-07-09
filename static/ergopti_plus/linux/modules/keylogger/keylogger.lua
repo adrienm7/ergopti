@@ -16,7 +16,7 @@
 ---    secure field, keystroke logging is suppressed (counts excluded from stats).
 --- 3. JSON export: export_session() returns a JSON-serializable snapshot of
 ---    all accumulated metrics — suitable for the shared healthcheck or WPM widget.
---- 4. SQLite persistence (P2.8): flush() writes the current session into the
+--- 4. SQLite persistence: flush() writes the current session into the
 ---    canonical SQLite schema (_shared/data/db/schema.sql) via the sqlite_writer
 ---    module (sqlite3 CLI wrapper). The shared metrics dashboard reads the same
 ---    schema across macOS, Windows, and Linux.
@@ -61,7 +61,7 @@ local _suppressed = false
 -- re-typing the same eight entries. NOTE: intentionally distinct from the AT-SPI
 -- adapter's secure_field_detector.SECURE_APP_IDS (exact WM_CLASS match, different
 -- list e.g. keepassxc); delegating this substring check to that adapter is a
--- behaviour change deferred to TODO P0-H.2 (needs a security-detection review).
+-- Behaviour change deferred — needs a security-detection review
 local _DEFAULT_PASSWORD_APPS = {
 	"1password", "bitwarden", "keepass", "lastpass",
 	"gpg", "ssh-agent", "polkit", "sudo",
@@ -301,7 +301,7 @@ end
 
 --- Writes the current session stats to persistent storage.
 ---
---- Primary path (P2.8): SQLite — inserts session summary into the canonical
+--- Primary path: SQLite — inserts session summary into the canonical
 --- events_typing table and upserts per-app aggregates + n-grams.
 ---
 --- Fallback path: JSON log file (~/.config/ergopti/logs/keystrokes_YYYY-MM-DD.json)

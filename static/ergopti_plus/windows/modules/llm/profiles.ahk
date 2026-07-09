@@ -236,6 +236,6 @@ LLM_ParseProfileObject(obj) {
 	return m
 }
 
-; LLM_GetBasicPrompt() is provided by _generated/llm_profiles_data.ahk (DL-3) —
+; LLM_GetBasicPrompt() is provided by _generated/llm_profiles_data.ahk —
 ; generated from the "basic" profile's system_single in profiles.json so the
 ; fallback text can never drift from the profile it mirrors.
