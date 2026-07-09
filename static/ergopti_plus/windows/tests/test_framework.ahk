@@ -126,26 +126,66 @@ AssertThrows(Callback, Message := "expected exception") {
 	}
 }
 
-; Pretty-print a value for failure diagnostics. Falls back to ``Type``
-; for compound values where ``.` "" `` would just yield ``Map`` / ``Array``.
-_DescribeValue(V) {
+; Pretty-print a value for failure diagnostics. Shows the first few entries
+; of Map/Array so the failure log immediately shows what the collection
+; contains instead of just "Map(size=5)". Strings longer than 200 chars are
+; truncated. Nested Maps/Arrays are expanded one level deep.
+_DescribeValue(V, Depth := 0) {
 	try {
+		if (Depth > 1)
+			return "{…}"
+		if (V == "")
+			return """"
 		if (V is Number or V is String) {
-			return V . ""
-		}
-		if (V == "") {
-			return ""
+			s := V . ""
+			if (StrLen(s) <= 200)
+				return s
+			return SubStr(s, 1, 197) . "..."
 		}
 		if (Type(V) == "Map") {
-			return "Map(size=" . V.Count . ")"
+			parts := []
+			cnt := 0
+			for k, val in V {
+				cnt++
+				if (cnt > 6) {
+					parts.Push("…")
+					break
+				}
+				parts.Push(k . "=" . _DescribeValue(val, Depth + 1))
+			}
+			return "Map{" . _JoinParts(parts) . "}"
 		}
 		if (Type(V) == "Array") {
-			return "Array(length=" . V.Length . ")"
+			parts := []
+			max := Min(V.Length, 6)
+			for i in _Enumerate(V, max) {
+				parts.Push(_DescribeValue(V[i], Depth + 1))
+			}
+			if (V.Length > 6)
+				parts.Push("…")
+			return "[" . _JoinParts(parts) . "]"
 		}
 		return Type(V)
 	} catch {
 		return "?"
 	}
+}
+
+_JoinParts(parts) {
+	s := ""
+	for i, p in parts {
+		if (i > 1)
+			s .= " "
+		s .= p
+	}
+	return s
+}
+
+_Enumerate(arr, n) {
+	enum := []
+	Loop Min(arr.Length, n)
+		enum.Push(A_Index)
+	return enum
 }
 
 ; Reads the ENTIRE driver source — every .ahk under the windows/ root except the
@@ -401,6 +441,15 @@ _CopyTestResultsForCi() {
 	}
 }
 
+
+; ── Boot progress logging ──
+; Called from run_all.ahk between large #Include batches so CI can tail
+; the results file and see exactly which phase the runner is in. Writes
+; to both the CI-results file (for headless monitoring) and stdout.
+_LogBootProgress(msg) {
+	try FileAppend("# [boot] " . msg . "`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+	try FileAppend("# [boot] " . msg . "`r`n", "*")
+}
 
 ; --- Global UI mocks ---
 ; Prevent tests from deadlocking or halting the CI runner on headless Windows.

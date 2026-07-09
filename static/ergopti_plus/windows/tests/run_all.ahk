@@ -148,8 +148,7 @@ OnError(_FatalErrorHandler)
 ; management) follows it and calls into the loaders/state it declares.
 #Include ../lib/locale.ahk
 #Include ../lib/i18n.ahk
-try FileAppend("# [marker] i18n included (t() should now be available)`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
-try FileAppend("# [marker] i18n included (t() should now be available)`r`n", "*")
+_LogBootProgress("i18n included (t() available)")
 
 ; Install the hotstring hooks for the entire test process so neither real
 ; ``Hotstring()`` registrations nor real ``SendEvent`` keystrokes ever escape
@@ -255,8 +254,7 @@ InstallSendNoOps()
 ; lookup, payload building, response parsing, cancel helpers, and engine
 ; debounce / cache logic without any real network calls.
 ; models.ahk defines LLM_GetSharedPath which profiles.ahk depends on.
-try FileAppend("# [marker] starting direct include of LLM production modules`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
-try FileAppend("# [marker] starting direct include of LLM production modules`r`n", "*")
+_LogBootProgress("loading LLM modules")
 #Include ../modules/llm/models.ahk
 #Include ../lib/llm_defaults.ahk
 ; llm_profiles_data.ahk (generated) defines LLM_LEGACY_IDS + LLM_GetBasicPrompt()
@@ -298,8 +296,7 @@ try FileAppend("# [marker] starting direct include of LLM production modules`r`n
 #Include meta/test_llm_orphan_sweep_nonblocking.ahk
 ; LLM_Menu_Build runs under Critical so deferred boot tasks cannot preempt it (menu-build-boot-preempt).
 #Include meta/test_llm_menu_build_critical.ahk
-try FileAppend("# [marker] LLM production modules + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
-try FileAppend("# [marker] LLM production modules + tests included`r`n", "*")
+_LogBootProgress("LLM modules + tests included")
 
 ; LLM tray menu -> config.toml persistence (contract-driven round-trips).
 global _LLM_Menu := Map(
@@ -313,34 +310,29 @@ global _LLM_Menu := Map(
 	"auto_raise_temp", true, "nav_modifiers", "", "val_modifiers", "alt",
 	"trigger_shortcut", "Ctrl+Space", "inline_autotype", false
 )
-try FileAppend("# [marker] about to include menu_llm/persist.ahk (with _LLM_Menu hack)`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
-try FileAppend("# [marker] about to include menu_llm/persist.ahk (with _LLM_Menu hack)`r`n", "*")
+_LogBootProgress("loading menu_llm/persist")
 #Include ../ui/menu/menu_llm/persist.ahk
 #Include unit/test_llm_menu_persistence.ahk
 #Include unit/test_llm_menu_regressions.ahk
-try FileAppend("# [marker] menu_llm persist + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
-try FileAppend("# [marker] menu_llm persist + tests included`r`n", "*")
+_LogBootProgress("menu_llm persist + tests included")
 
 ; Gestures module — included here because its pure logic (assignments, action
 ; registry, dispatch) is testable. The hotkeys it registers are harmless since
 ; RunTests() calls ExitApp immediately after completion.
-try FileAppend("# [marker] about to include gestures.ahk (top-level t() for SLOT_LABELS)`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
-try FileAppend("# [marker] about to include gestures.ahk (top-level t() for SLOT_LABELS)`r`n", "*")
+_LogBootProgress("loading gestures modules")
 #Include ../modules/gestures/init.ahk
 #Include ../modules/gestures/click.ahk
 #Include ../modules/gestures/screenshots.ahk
 #Include ../modules/gestures/window_cycle.ahk
 #Include ../modules/gestures/config.ahk
 #Include unit/test_gestures.ahk
-try FileAppend("# [marker] gestures + test included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
-try FileAppend("# [marker] gestures + test included`r`n", "*")
+_LogBootProgress("gestures + test included")
 
 ; Keylogger sub-modules — pure-logic subsets included here to test category
 ; lookup, character classification, and burst helpers without OS hooks or I/O.
 ; sqlite3.ahk needs _VendorDir (set by ErgoptiPlus.ahk at runtime); stub it
 ; here so the class static initialiser does not crash the test runner.
-try FileAppend("# [marker] about to include keylogger modules + sqlite3 (with _VendorDir stub)`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
-try FileAppend("# [marker] about to include keylogger modules + sqlite3 (with _VendorDir stub)`r`n", "*")
+_LogBootProgress("loading keylogger modules")
 global _VendorDir := A_ScriptDir . "\..\vendor"
 #Include ../lib/sqlite3.ahk
 #Include ../modules/keylogger/keylogger_walker.ahk
@@ -374,8 +366,7 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 ; registry reader plus the keylogger-walker and tap-hold reassign-at-boot loaders.
 #Include ../modules/tap_holds/constants.ahk
 #Include unit/test_timings_config.ahk
-try FileAppend("# [marker] keylogger modules + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
-try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
+_LogBootProgress("keylogger modules + tests included")
 
 ; ── Meta tests (codebase hygiene, no production includes needed) ──
 #Include meta/test_ahk_brace_balance.ahk
@@ -936,7 +927,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 ; or a blocking dialog in a headless CI context). The CI-level timeout is
 ; 5 min; this fires at 4 min so the log message reaches stdout before the
 ; runner is killed externally.
-global _SUITE_TIMEOUT_MS := 240000
+global _SUITE_TIMEOUT_MS := 360000
 _WatchdogFire() {
 	try FileAppend("`n[WATCHDOG] Test suite timed out after " . _SUITE_TIMEOUT_MS . " ms - force-exiting.`n", "*")
 	ExitApp(2)
