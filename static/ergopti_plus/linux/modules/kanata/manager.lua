@@ -240,12 +240,19 @@ function M.generate_kbd()
 	-- Load tap-hold config.
 	local keys_config = _load_tap_hold_config()
 
-	-- Read the one-shot shift timeout from timings.
-	local one_shot_ms = 2000  -- fallback
+	-- Read the one-shot shift timeout from the canonical timings registry. No
+	-- hardcoded fallback: the value lives once in the shared registry, so a
+	-- missing registry or key is a broken install to surface loudly, not to mask
+	-- with a duplicated literal that would silently override the canonical value.
 	local ok_timings, Timings = pcall(require, "lib.timings")
-	if ok_timings and Timings and type(Timings.ms) == "function" then
-		local ms = Timings.ms("tap_hold", "one_shot_shift_timeout_ms")
-		if ms and ms > 0 then one_shot_ms = ms end
+	if not ok_timings or type(Timings) ~= "table" or type(Timings.ms) ~= "function" then
+		Logger.error(LOG, "Timings registry unavailable — cannot generate kanata config without the canonical one-shot timeout.")
+		return nil
+	end
+	local one_shot_ms = Timings.ms("tap_hold", "one_shot_shift_timeout_ms")
+	if not one_shot_ms or one_shot_ms <= 0 then
+		Logger.error(LOG, "'tap_hold.one_shot_shift_timeout_ms' missing from the timings registry — cannot generate kanata config.")
+		return nil
 	end
 
 	-- Generate the defalias block.

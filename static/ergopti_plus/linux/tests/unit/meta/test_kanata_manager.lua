@@ -70,6 +70,62 @@ helpers.describe("kanata manager (P2.5)", function()
   end)
 
   -- ==========================================================================
+  -- 2b. One-shot timeout is single-sourced (no hardcoded 2000 ms fallback)
+  -- ==========================================================================
+
+  helpers.describe("one-shot timeout single source", function()
+
+    -- The one-shot shift timeout must come only from the canonical timings
+    -- registry. A hardcoded fallback both duplicates the canonical value and
+    -- masks the fail-fast: a missing registry silently used 2000, hiding a
+    -- broken install. generate_kbd must instead fail loud (return nil).
+
+    helpers.it("emits the value from the timings registry, not a hardcoded 2000", function()
+      local real = require("lib.timings")
+      package.loaded["lib.timings"] = {
+        ms = function(cat, key)
+          if cat == "tap_hold" and key == "one_shot_shift_timeout_ms" then return 4242 end
+          return real.ms(cat, key)
+        end,
+        sec = real.sec,
+      }
+      local kbd = km.generate_kbd()
+      package.loaded["lib.timings"] = real
+      -- Only assert when a template was resolvable in this environment.
+      if kbd then
+        helpers.assert_true(kbd:find("4242", 1, true) ~= nil,
+          "the one-shot timeout in the generated defalias must come from the registry")
+      end
+    end)
+
+    helpers.it("fails loud (returns nil) when the canonical timeout is missing", function()
+      local real = require("lib.timings")
+      package.loaded["lib.timings"] = {
+        ms = function(cat, key)
+          if cat == "tap_hold" and key == "one_shot_shift_timeout_ms" then return nil end
+          return real.ms(cat, key)
+        end,
+        sec = real.sec,
+      }
+      local kbd = km.generate_kbd()
+      package.loaded["lib.timings"] = real
+      helpers.assert_true(kbd == nil,
+        "generate_kbd must return nil when the canonical one-shot timeout is missing — no hardcoded fallback")
+    end)
+
+    helpers.it("does not hardcode a one-shot fallback in the source", function()
+      local fh = io.open(helpers.driver_root() .. "/modules/kanata/manager.lua", "r")
+      helpers.assert_true(fh ~= nil, "manager source must be readable")
+      local src = fh:read("*a"); fh:close()
+      helpers.assert_true(src:find("one_shot_ms = 2000", 1, true) == nil,
+        "the hardcoded 2000 ms one-shot fallback must be gone")
+      helpers.assert_true(src:find('Timings.ms("tap_hold", "one_shot_shift_timeout_ms")', 1, true) ~= nil,
+        "the one-shot timeout must be read from the canonical timings registry")
+    end)
+
+  end)
+
+  -- ==========================================================================
   -- 3. Process lifecycle (without kanata binary — safe stubs)
   -- ==========================================================================
 
