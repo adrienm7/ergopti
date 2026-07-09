@@ -179,7 +179,11 @@ _Onboarding_TryWeb() {
 	; asset resolve through a real origin (see ONBOARDING_VHOST comment for why
 	; file:// is avoided). The frontend folder serves index.html/script.js/style.css;
 	; the static folder serves the flag PNGs + layout JPG injected as absolute URLs.
-	try _OnbWeb_WebView.SetVirtualHostNameToFolderMapping(ONBOARDING_VHOST, _SharedDir . "\ui\onboarding", WEBVIEW_HOST_ACCESS_ALLOW)
+		; Map the SHARED-UI parent folder (not just onboarding/) so relative paths
+	; like ../host_bridge.js resolve correctly inside the mapped origin. WebView2
+	; blocks any path that escapes the VHOST root — mapping the parent keeps
+	; every shared ui/ asset reachable without duplicating host_bridge.js.
+	try _OnbWeb_WebView.SetVirtualHostNameToFolderMapping(ONBOARDING_VHOST, _SharedDir . "\ui", WEBVIEW_HOST_ACCESS_ALLOW)
 	try _OnbWeb_WebView.SetVirtualHostNameToFolderMapping(ONBOARDING_VHOST_ASSETS, _StaticDir, WEBVIEW_HOST_ACCESS_ALLOW)
 
 	try _OnbWeb_WebView.Navigate(_OnbWeb_HtmlUrl())
@@ -590,7 +594,7 @@ _OnbWeb_LayoutImageUrl() {
 ; their own ?v= so an edited frontend is never served stale during development.
 _OnbWeb_HtmlUrl() {
 	global ONBOARDING_VHOST
-	return "https://" . ONBOARDING_VHOST . "/index.html?cb=" . A_TickCount
+	return "https://" . ONBOARDING_VHOST . "/onboarding/index.html?cb=" . A_TickCount
 }
 
 
