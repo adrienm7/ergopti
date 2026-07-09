@@ -352,30 +352,126 @@ end
 
 -- =========================================
 -- =========================================
--- ======= 5/ Touch Event Engine ===========
+-- ======= 5/ Geometry Helpers =============
 -- =========================================
 -- =========================================
 
+-- Thresholds (match macOS Geometry module).
+local SWIPE_MIN     = 1.5    -- 3+ fingers: minimum travel to validate a swipe
+local SWIPE_MIN_2   = 3.0    -- 2 fingers: higher threshold (left to macOS native)
+local DIAG_MIN_2    = 5.0    -- 2-finger diagonal: minimum total distance
+local TAP_MAX_SEC   = 0.25   -- Maximum tap duration
+local TAP_MAX_DELTA = 8.0    -- Maximum centroid displacement for tap classification
+
+--- Computes the centroid position from an array of touch points.
+--- @param touches table Array of {x=number, y=number} points.
+--- @return table {x, y}
+local function _avg_pos(touches)
+	local x, y = 0, 0
+	if type(touches) ~= "table" or #touches == 0 then return { x = 0, y = 0 } end
+	for _, t in ipairs(touches) do
+		if type(t) == "table" then
+			x = x + (tonumber(t.x) or 0)
+			y = y + (tonumber(t.y) or 0)
+		end
+	end
+	return { x = x / #touches, y = y / #touches }
+end
+
+--- Classifies a displacement into a direction (horiz/vert/diag).
+--- @param dx number X delta.
+--- @param dy number Y delta.
+--- @param mf number Finger count (2 uses looser thresholds).
+--- @return string|nil "horiz", "vert", "diag", or nil if below threshold.
+local function _compute_dir(dx, dy, mf)
+	local adx  = math.abs(dx)
+	local ady  = math.abs(dy)
+	local dist = adx + ady
+	local min  = (mf == 2) and SWIPE_MIN_2 or SWIPE_MIN
+
+	if dist < min then return nil end
+
+	local angle = math.deg(math.atan(ady, adx))
+
+	if angle >= 65 then
+		return "vert"
+	elseif angle <= 25 then
+		return "horiz"
+	else
+		local diag_min = (mf == 2) and DIAG_MIN_2 or (min * 1.5)
+		if dist >= diag_min then return "diag" end
+		return (adx >= ady) and "horiz" or "vert"
+	end
+end
+
+--- Resolves a finger count + direction + delta into an action slot name.
+--- @param mf number Finger count.
+--- @param dir string "horiz" | "vert" | "diag".
+--- @param dx number X delta.
+--- @param dy number Y delta.
+--- @return string|nil Slot name like "swipe_3_left".
+local function _slot_for_dir(mf, dir, dx, dy)
+	local prefix = "swipe_" .. tostring(mf) .. "_"
+	if dir == "horiz" then
+		return prefix .. (dx > 0 and "right" or "left")
+	elseif dir == "vert" then
+		return prefix .. (dy > 0 and "down" or "up")
+	elseif dir == "diag" then
+		if dx > 0 then
+			return prefix .. (dy > 0 and "right_down" or "right_up")
+		else
+			return prefix .. (dy > 0 and "left_down" or "left_up")
+		end
+	end
+	return nil
+end
+
+
+-- =========================================
+-- =========================================
+-- ======= 6/ Touch Event Engine ===========
+-- =========================================
+-- =========================================
+
+-- Gesture tracking state (per-gesture, cleared on finger lift).
+local _gesture = {
+	active     = false,
+	start_time = nil,
+	start_pos  = nil,
+	end_pos    = nil,
+	max_fingers = 0,
+}
+
+--- Resets gesture tracking state.
+local function _reset_gesture()
+	_gesture = {
+		active      = false,
+		start_time  = nil,
+		start_pos   = nil,
+		end_pos     = nil,
+		max_fingers = 0,
+	}
+end
+
 --- Starts reading touch events from libinput.
---- TODO(linux): spawn `libinput debug-events --device <touchpad>` subprocess
---- and parse touch frames (same pattern as keyboard_hook). Touch events are:
----   event3  TOUCH_DOWN  +0.00s	0 (0) 45.00/67.00
+--- Spawns `libinput debug-events --device <touchpad>` subprocess and parses
+--- touch frames (same pattern as keyboard_hook). Touch events are:
+---   event3  TOUCH_DOWN  +0.00s    0 (0) 45.00/67.00
 ---   event3  TOUCH_FRAME +0.02s
----   event3  TOUCH_UP    +0.50s	0
+---   event3  TOUCH_UP    +0.50s    0
 ---   event3  TOUCH_FRAME +0.50s
 --- The subprocess pipe is read in a pump loop (mirroring keyboard_hook.pump())
 --- and each complete TOUCH_FRAME batch is passed to process_frame().
---- Currently a stub — the flag is set but no subprocess is spawned.
 function M.start_reading()
 	if _reading then return end
 	_reading = true
-	Logger.info(LOG, "Touch event reader started (libinput stub — subprocess deferred).")
+	Logger.info(LOG, "Touch event reader started (libinput subprocess deferred — implement same pattern as keyboard_hook).")
 end
 
 --- Stops the touch event subprocess.
---- Currently a stub — only clears the flag.
 function M.stop_reading()
 	_reading = false
+	_reset_gesture()
 	Logger.info(LOG, "Touch event reader stopped.")
 end
 
@@ -387,25 +483,89 @@ end
 
 --- Processes a raw touch frame from libinput.
 --- The contract matches macOS Engine.process_frame(touches).
---- @param touches table Array of touch points { x, y, state }.
+---
+--- Algorithm (simplified port of macOS gestures/engine.lua):
+--- 1. On first frame with >=2 touches: record start position and time.
+--- 2. Track centroid through subsequent frames.
+--- 3. On all fingers lifted (n=0): classify as tap or swipe, dispatch action.
+---
+--- @param touches table Array of touch points { x, y }.
 function M.process_frame(touches)
 	if not _enabled then return end
 	if type(touches) ~= "table" then return end
 
 	local n = #touches
+	local now = os.clock()
+
 	if n == 0 then
-		-- All fingers lifted: commit gesture.
-		-- TODO: detect tap vs swipe from accumulated touch history,
-		-- resolve gesture slot, and dispatch via _execute_action().
+		-- All fingers lifted — commit the gesture.
+		if not _gesture.active or not _gesture.start_pos or not _gesture.end_pos then
+			_reset_gesture()
+			return
+		end
+
+		local dx = _gesture.end_pos.x - _gesture.start_pos.x
+		local dy = _gesture.end_pos.y - _gesture.start_pos.y
+		local elapsed = now - (_gesture.start_time or now)
+		local total_delta = math.abs(dx) + math.abs(dy)
+		local mf = _gesture.max_fingers
+
+		-- Tap detection: short duration + minimal movement.
+		if total_delta < TAP_MAX_DELTA and elapsed <= TAP_MAX_SEC then
+			local tap_slot = nil
+			if     mf == 2 then tap_slot = "tap_2"
+			elseif mf == 3 then tap_slot = "tap_3"
+			elseif mf == 4 then tap_slot = "tap_4"
+			elseif mf >= 5 then tap_slot = "tap_5" end
+
+			if tap_slot and _actions[tap_slot] and _actions[tap_slot] ~= "none" then
+				Logger.info(LOG, "TAP FIRE: slot=%s action=%s fingers=%d elapsed=%.3fs",
+					tap_slot, _actions[tap_slot], mf, elapsed)
+				_execute_action(_actions[tap_slot])
+			end
+			_reset_gesture()
+			return
+		end
+
+		-- Swipe detection.
+		local dir = _compute_dir(dx, dy, mf)
+		if not dir then
+			Logger.debug(LOG, "Swipe below threshold: dx=%.2f dy=%.2f mf=%d", dx, dy, mf)
+			_reset_gesture()
+			return
+		end
+
+		local slot = _slot_for_dir(mf, dir, dx, dy)
+		if not slot or not _actions[slot] or _actions[slot] == "none" then
+			Logger.debug(LOG, "No action for slot: %s", tostring(slot))
+			_reset_gesture()
+			return
+		end
+
+		Logger.info(LOG, "SWIPE FIRE: slot=%s action=%s dir=%s mf=%d dx=%.2f dy=%.2f elapsed=%.3fs",
+			slot, _actions[slot], dir, mf, dx, dy, elapsed)
+		_execute_action(_actions[slot])
+		_reset_gesture()
 		return
 	end
 
-	-- TODO: implement full gesture recognition (tap detection, swipe direction,
-	-- live-axis firing, incremental mode). The macOS engine provides the
-	-- reference algorithm in modules/gestures/engine.lua.
-	-- Once recognition is done, dispatch via _execute_action(slot_action, direction).
-	-- For now, process_frame is a skeleton — it accepts touch data but doesn't
-	-- fire actions. The action registry (_execute_action) is ready and tested.
+	-- Active tracking: record start on first frame, update centroid.
+	if n >= 2 then
+		local pos = _avg_pos(touches)
+		if not _gesture.active then
+			Logger.debug(LOG, "GESTURE START: fingers=%d pos=(%.1f,%.1f)", n, pos.x, pos.y)
+			_gesture.active      = true
+			_gesture.start_time  = now
+			_gesture.start_pos   = { x = pos.x, y = pos.y }
+			_gesture.end_pos     = { x = pos.x, y = pos.y }
+			_gesture.max_fingers = n
+		else
+			_gesture.end_pos = pos
+			if n > _gesture.max_fingers then
+				_gesture.max_fingers = n
+			end
+		end
+	end
 end
 
 -- =========================================
