@@ -30,6 +30,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Timings = require("lib.timings")
 local LOG = "modules.gestures.manager"
 
 -- =========================================
@@ -360,7 +361,7 @@ end
 local SWIPE_MIN     = 1.5    -- 3+ fingers: minimum travel to validate a swipe
 local SWIPE_MIN_2   = 3.0    -- 2 fingers: higher threshold (left to macOS native)
 local DIAG_MIN_2    = 5.0    -- 2-finger diagonal: minimum total distance
-local TAP_MAX_SEC   = 0.25   -- Maximum tap duration
+local TAP_MAX_SEC   = Timings.sec("gestures", "tap_max_ms")   -- Canonical tap ceiling (shared registry; was a drifted 0.25 literal)
 local TAP_MAX_DELTA = 8.0    -- Maximum centroid displacement for tap classification
 
 --- Computes the centroid position from an array of touch points.
