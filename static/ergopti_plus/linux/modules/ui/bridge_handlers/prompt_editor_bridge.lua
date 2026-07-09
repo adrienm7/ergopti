@@ -4,6 +4,7 @@
 --- BRIDGE HANDLER: LLM Prompt Editor
 --- Handles JS→Lua messages from _shared/ui/prompt_editor/.
 --- Bridge name: "prompt_bridge"
+--- Persists model selection via batch_write to config.toml.
 --- ==============================================================================
 
 local M = {}
@@ -11,6 +12,21 @@ M.bridge_name = "prompt_bridge"
 
 local Logger = require("logger.shim")
 local LOG = "bridge.prompt_editor"
+
+-- Lazy-loaded writer for config.toml persistence.
+local _writer = nil
+local function _get_writer()
+	if _writer then return _writer end
+	local ok, mod = pcall(require, "toml_codec.writer")
+	if ok and type(mod.batch_write) == "function" then _writer = mod end
+	return _writer
+end
+
+-- Path to the daemon config file.
+local function _config_path()
+	local home = os.getenv("HOME") or "/home/user"
+	return home .. "/.config/ergopti/config.toml"
+end
 
 --- Builds the initial data payload for the prompt editor UI.
 --- @param state table Daemon state.
@@ -72,6 +88,17 @@ function M.on_message(payload, state)
 
 	if action == "save_prompt" then
 		Logger.info(LOG, "Save prompt: %s", tostring(payload.title))
+		local writer = _get_writer()
+		if writer and payload.title then
+			local ok, err = writer.batch_write(_config_path(), {
+				{ section = "llm", key = "prompt", value = payload.title },
+			})
+			if ok then
+				Logger.success(LOG, "Prompt persisted: %s", payload.title)
+			else
+				Logger.error(LOG, "Failed to persist prompt: %s", tostring(err))
+			end
+		end
 		return { saved = true }
 	end
 
@@ -79,6 +106,17 @@ function M.on_message(payload, state)
 		Logger.info(LOG, "Set model: %s", payload.model)
 		if state.llm and type(state.llm.set_model) == "function" then
 			pcall(state.llm.set_model, state.llm, payload.model)
+		end
+		local writer = _get_writer()
+		if writer then
+			local ok, err = writer.batch_write(_config_path(), {
+				{ section = "llm", key = "model", value = payload.model },
+			})
+			if ok then
+				Logger.success(LOG, "Model persisted: %s", payload.model)
+			else
+				Logger.error(LOG, "Failed to persist model: %s", tostring(err))
+			end
 		end
 		return { model = payload.model }
 	end
