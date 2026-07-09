@@ -562,6 +562,8 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 ; Tooltip layout corpus -- validates _TooltipClampToScreen against shared
 ; cross-driver vectors (P0-G.5).
 #Include meta/test_corpus_tooltip_layout.ahk
+; TOML coercion corpus (P0-G.6)
+#Include meta/test_corpus_toml_coercion.ahk
 
 ; -- Audit finding regression tests (batch-wired) --
 #Include meta/test_activate_hotstrings_sleep_gate.ahk

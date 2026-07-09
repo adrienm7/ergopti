@@ -80,7 +80,8 @@ const CHECKS = [
 	{ name: 'P12.1 name parity (text_utils + action_picker + manifest_menu symmetric across drivers)', cmd: 'node', args: ['tools/test/test-p12-1-name-parity.cjs'], repro: 'node tools/test/test-p12-1-name-parity.cjs' },
 	{ name: 'P9.2 git-mv resilience (all path-pinned macOS tests point to existing files)', cmd: 'node', args: ['tools/test/test-git-mv-resilience.cjs'], repro: 'node tools/test/test-git-mv-resilience.cjs' },
 	{ name: 'keycode data single source (generated JS matches azerty.json, DC-1)', cmd: 'node', args: ['tools/test/test-keycode-data-js-parity.cjs'], repro: 'node tools/test/test-keycode-data-js-parity.cjs' },
-	{ name: 'tooltip corpus parity (JSON corpus matches JS layoutTestVectors + dequeueTestVectors; P0-G)', cmd: 'node', args: ['tools/test/test-tooltip-corpus-parity.cjs'], repro: 'node tools/test/test-tooltip-corpus-parity.cjs' }
+	{ name: 'tooltip corpus parity (JSON corpus matches JS layoutTestVectors + dequeueTestVectors; P0-G)', cmd: 'node', args: ['tools/test/test-tooltip-corpus-parity.cjs'], repro: 'node tools/test/test-tooltip-corpus-parity.cjs' },
+	{ name: 'TOML coercion parity (corpus cross-driver gate; P0-G)', cmd: 'node', args: ['tools/test/test-toml-coercion-parity.cjs'], repro: 'node tools/test/test-toml-coercion-parity.cjs' }
 ];
 
 const SLOW_CHECKS = [
