@@ -261,6 +261,73 @@ end
 -- ==================================
 -- ==================================
 
+--- Pretty-prints any Lua value into a single-line representation suitable for
+--- error messages. Tables are expanded up to 3 levels deep; cycles are detected.
+--- @param v     any   Value to format.
+--- @param depth number Internal recursion counter (omit on first call).
+--- @param seen  table  Cycle-detection set (omit on first call).
+--- @return string Single-line representation.
+function M.inspect(v, depth, seen)
+	depth = depth or 0
+	if depth > 2 then return "{…}" end
+	if type(v) == "string" then
+		if #v > 120 then return string.format("%q", v:sub(1, 117) .. "...") end
+		return string.format("%q", v)
+	end
+	if type(v) == "number" then return tostring(v) end
+	if type(v) == "boolean" then return v and "true" or "false" end
+	if v == nil then return "nil" end
+	if type(v) == "function" then return "<function>" end
+	if type(v) == "userdata" then return "<userdata>" end
+	if type(v) ~= "table" then return tostring(v) end
+
+	seen = seen or {}
+	if seen[v] then return "[cyclic]" end
+	seen[v] = true
+
+	local parts = {}
+	local count = 0
+	for k, val in pairs(v) do
+		count = count + 1
+		if count > 20 then parts[#parts + 1] = "…"; break end
+		local key_fmt
+		if type(k) == "string" and k:match("^[%a_][%w_]*$") then
+			key_fmt = k
+		else
+			key_fmt = "[" .. M.inspect(k, depth + 1, seen) .. "]"
+		end
+		parts[#parts + 1] = key_fmt .. "=" .. M.inspect(val, depth + 1, seen)
+	end
+	seen[v] = nil
+	return "{" .. table.concat(parts, " ") .. "}"
+end
+
+--- Resolves the caller's file:line from the debug stack — skipping helpers.lua
+--- frames — so error messages point at the test, not the assertion helper.
+--- @param level number Starting stack level (default 2).
+--- @return string file:line pair, or "" if unresolvable.
+local function _caller_site(level)
+	level = level or 2
+	for lvl = level, level + 10 do
+		local info = debug.getinfo(lvl, "Sl")
+		if info and info.source then
+			local src = info.source:gsub("^@", "")
+			if not src:match("helpers[/\\]init%.lua$") then
+				local fname = src:match("([^/\\]+)$") or src
+				return fname .. ":" .. (info.currentline or "?")
+			end
+		end
+	end
+	return ""
+end
+
+--- Prefixes a failure message with the test's file:line.
+local function _fail_msg(msg)
+	local site = _caller_site(3)
+	if site ~= "" then return site .. ": " .. msg end
+	return msg
+end
+
 --- Compares two values for deep equality.
 --- @param a any First value.
 --- @param b any Second value.
@@ -273,29 +340,82 @@ function M.deep_equal(a, b)
 	return true
 end
 
---- Asserts strict equality, printing a useful error on mismatch.
---- @param actual any Observed value.
---- @param expected any Expected value.
---- @param msg string|nil Optional context tag.
+--- Asserts strict equality. Tables are pretty-printed in the error message
+--- so you see WHICH field differs, not an opaque `table: 0x...`.
+--- @param actual   any        Observed value.
+--- @param expected any        Expected value.
+--- @param msg      string|nil Optional context tag.
 function M.assert_eq(actual, expected, msg)
 	if not M.deep_equal(actual, expected) then
-		error(string.format("%s: expected %s, got %s",
-			tostring(msg or "assert_eq"), tostring(expected), tostring(actual)), 2)
+		local label = msg or "assert_eq"
+		error(_fail_msg(string.format(
+			"%s:\n  expected: %s\n    actual: %s",
+			label, M.inspect(expected), M.inspect(actual))), 0)
 	end
 end
 
---- Asserts a boolean condition.
---- @param cond any Condition to test.
---- @param msg string|nil Optional context tag.
+--- Asserts a boolean condition. Shows the actual value on failure.
+--- @param cond any        Condition to test.
+--- @param msg  string|nil Optional context tag.
 function M.assert_true(cond, msg)
-	if not cond then error(tostring(msg or "expected truthy"), 2) end
+	if not cond then
+		error(_fail_msg(string.format("%s — actual: %s",
+			tostring(msg or "expected truthy"), M.inspect(cond))), 0)
+	end
 end
 
---- Asserts a value is nil.
---- @param v any Value to test.
+--- Asserts a value is nil. Shows the actual value on failure.
+--- @param v   any        Value to test.
 --- @param msg string|nil Optional context tag.
 function M.assert_nil(v, msg)
-	if v ~= nil then error(string.format("%s: expected nil, got %s", tostring(msg or "assert_nil"), tostring(v)), 2) end
+	if v ~= nil then
+		error(_fail_msg(string.format("%s: expected nil, got %s",
+			tostring(msg or "assert_nil"), M.inspect(v))), 0)
+	end
+end
+
+--- Asserts a value is NOT nil.
+--- @param v   any        Value to test.
+--- @param msg string|nil Optional context tag.
+function M.assert_not_nil(v, msg)
+	if v == nil then
+		error(_fail_msg(tostring(msg or "expected non-nil")), 0)
+	end
+end
+
+--- Asserts `haystack` contains substring `needle`.
+--- @param haystack string    String to search in.
+--- @param needle   string    Substring to find.
+--- @param msg      string|nil Optional context tag.
+function M.assert_contains(haystack, needle, msg)
+	if not haystack:find(needle, 1, true) then
+		error(_fail_msg(string.format("%s: %q not found in %s",
+			tostring(msg or "assert_contains"), needle, M.inspect(haystack))), 0)
+	end
+end
+
+--- Asserts a function throws an error when called.
+--- @param fn  function  0-arg callable expected to throw.
+--- @param msg string|nil Optional context tag.
+--- @return string The error message thrown (for further assertions).
+function M.assert_throws(fn, msg)
+	local ok, err = pcall(fn)
+	if ok then
+		error(_fail_msg(tostring(msg or "expected exception but none was thrown")), 0)
+	end
+	return err
+end
+
+--- Asserts `v` has type `expected_type` (e.g. "string", "table", "function").
+--- @param v             any    Value to check.
+--- @param expected_type string Lua type name.
+--- @param msg           string|nil Optional context tag.
+function M.assert_type(v, expected_type, msg)
+	local actual_type = type(v)
+	if actual_type ~= expected_type then
+		error(_fail_msg(string.format("%s: expected %s, got %s (%s)",
+			tostring(msg or "assert_type"), expected_type, actual_type, M.inspect(v))), 0)
+	end
 end
 
 
