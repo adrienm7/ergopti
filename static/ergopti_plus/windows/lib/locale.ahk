@@ -285,15 +285,20 @@ t(Key) {
 	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
 	if !_I18nCacheLoaded
 		_I18nEnsureActiveLoaded()
-	if _I18nCache.Has(Key)
+	; An empty-string value is treated as MISSING at every cascade level, so it
+	; falls through to the next locale instead of shadowing a real fallback. This
+	; matches the shared golden corpus (locale/resolution_vectors.json) and the
+	; macOS locale.core cascade — cross-driver parity (an untranslated "" entry
+	; must resolve to the fallback, not to an empty string).
+	if _I18nCache.Has(Key) and _I18nCache[Key] != ""
 		return _I18nCache[Key]
 	; Miss in the active locale → consult the fallbacks. They are warmed off the
 	; boot path (I18nWarmFallbacks); if a miss arrives first, load them once now.
 	if !_I18nFallbacksWarmed
 		_I18nEnsureFallbacksLoaded()
-	if _I18nCacheEnLoaded and _I18nCacheEn.Has(Key)
+	if _I18nCacheEnLoaded and _I18nCacheEn.Has(Key) and _I18nCacheEn[Key] != ""
 		return _I18nCacheEn[Key]
-	if _I18nCacheFrLoaded and _I18nCacheFr.Has(Key)
+	if _I18nCacheFrLoaded and _I18nCacheFr.Has(Key) and _I18nCacheFr[Key] != ""
 		return _I18nCacheFr[Key]
 	return Key
 }

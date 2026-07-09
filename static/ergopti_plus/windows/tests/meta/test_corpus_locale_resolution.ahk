@@ -144,32 +144,28 @@ _LclCorpus_RunVector(Vec) {
 	AssertEqual(Expected, Result, "t('" . Key . "'): expected '" . Expected . "', got '" . Result . "'")
 }
 
-_LclCorpus_RegisterAll() {
+; A single test replays EVERY vector. The previous per-vector fat-arrow lambdas
+; captured the loop variable by reference (all lambdas ran the LAST vector), and
+; the reset fired at REGISTRATION time rather than between runs — so the corpus
+; effectively tested a single vector. Looping inside one function runs every
+; vector; _LclCorpus_RunVector → PopulateCaches rebuilds the caches per vector so
+; each starts clean.
+_LclCorpus_TestAllVectors() {
 	Data := _LclCorpus_LoadCorpus()
 	if (Data = "") {
-		Test("locale resolution corpus: file exists", () => AssertTrue(false,
-			"Corpus file not found"))
+		AssertTrue(false, "Corpus file not found at _shared/tests/corpus/locale/resolution_vectors.json")
 		return
 	}
 	if !Data.Has("vectors") {
-		Test("locale resolution corpus: valid structure", () => AssertTrue(false,
-			"No 'vectors' key in corpus JSON"))
+		AssertTrue(false, "No 'vectors' key in corpus JSON")
 		return
 	}
-
 	for Vec in Data["vectors"] {
-		Id := Vec.Has("id") ? Vec["id"] : "unknown"
-		Desc := Vec.Has("description") ? Vec["description"] : Id
-		NameCopy := "[corpus:locale:" . Id . "] " . SubStr(Desc, 1, 50)
-		VecCopy := Vec
-
-		Test(NameCopy, () => _LclCorpus_RunVector(VecCopy))
-		; Reset globals so each test starts clean
-		_LclCorpus_ResetState()
+		_LclCorpus_RunVector(Vec)
 	}
+	_LclCorpus_ResetState()
 }
-
-_LclCorpus_RegisterAll()
+Test("[corpus:locale] all vectors resolve to expected golden values", _LclCorpus_TestAllVectors)
 
 
 
@@ -235,20 +231,15 @@ _LclCorpus_TestFallbackOrder() {
 	global _I18nFallbacksWarmed := true
 
 	Result := t("only.in.fr")
-	; Empty string in en → fall through to fr
-	; Actually AHK t() checks Has(Key) not value emptiness for the first check,
-	; but for the fallback path it checks the loaded map directly.
-	; The active cache (empty) misses → en cache has the key with "" → returns ""
-	; No! Actually looking at the t() code: it first checks _I18nCache.Has(Key),
-	; then the fallback path checks _I18nCacheEn.Has(Key) then returns _I18nCacheEn[Key].
-	; If the value is "" (empty), it returns "" — it does NOT fall through.
-	; This is a known difference from the Lua side (which treats "" as missing).
-	; The corpus vector "empty_string_value_is_treated_as_missing" covers this.
-	AssertEqual("from_fr", Result, "t() returns from fr when active cache has it only in fr")
+	; Active (zz) misses; en holds the key but its value is "" → treated as missing
+	; → fall through to fr. Empty-value-is-missing gives cross-driver parity with
+	; the Lua side and the shared golden corpus.
+	AssertEqual("from_fr", Result, "empty en value falls through to fr")
 }
 
-; Test: t() with empty string in active returns "" (does not fall through)
-Test("[locale:regression] t() returns empty string when key has empty value in active",
+; Test: an empty-string value in the active locale is treated as MISSING and
+; falls through to en — cross-driver parity with the golden corpus + macOS.
+Test("[locale:regression] t() treats an empty active value as missing and falls through to en",
 	() => _LclCorpus_TestEmptyValueInActive())
 
 _LclCorpus_TestEmptyValueInActive() {
@@ -261,6 +252,6 @@ _LclCorpus_TestEmptyValueInActive() {
 	global _I18nFallbacksWarmed := true
 
 	Result := t("empty.key")
-	; AHK t() returns the empty string because Has(Key) is true
-	AssertEqual("", Result, "t() returns empty string, does NOT fall through to en")
+	; Empty value in the active locale → missing → falls through to the en fallback.
+	AssertEqual("from_en", Result, "t() falls through to en when the active value is empty")
 }
