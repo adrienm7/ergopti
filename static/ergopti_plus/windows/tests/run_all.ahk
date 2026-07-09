@@ -906,6 +906,7 @@ _LogBootProgress("keylogger modules + tests included")
 ; GestureGetCyclableWindows TOCTOU guard (commit 7b701020d).
 #Include meta/test_window_adapters_catch.ahk
 #Include meta/test_onbweb_singleton_guard.ahk
+#Include meta/test_reset_config_writes_meta_placeholder.ahk
 #Include meta/test_webview_shared_env_reentrancy_guard.ahk
 ; AltTabMonitor bare-try-no-catch fix (F37) — sibling of the
 ; GestureGetCyclableWindows TOCTOU guard (commit 7b701020d).
