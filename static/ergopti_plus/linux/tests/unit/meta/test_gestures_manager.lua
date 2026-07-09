@@ -256,4 +256,59 @@ helpers.describe("modules/gestures/manager.lua", function()
     helpers.assert_true(found, "menu should contain a gestures stub when module absent")
   end)
 
+  -- ==========================================================================
+  -- 10. Full recognition pipeline (frame sequence -> slot -> action dispatch)
+  -- ==========================================================================
+
+  helpers.it("3-finger tap sequence resolves tap_3 and dispatches its action", function()
+    -- Stub os.execute so we observe WHICH command the pipeline dispatched. This
+    -- proves slot resolution + action dispatch, not merely no-crash (sections 7-8).
+    local captured = {}
+    local real_execute = os.execute
+    os.execute = function(cmd) captured[#captured + 1] = cmd; return true end
+
+    M.reset_defaults()
+    M.enable()
+    -- Bind a distinctive action so the captured command is unambiguous.
+    M.set_action("tap_3", "enter")  -- "enter" maps to `xdotool key Return`
+
+    -- Full gesture: three fingers down at one spot, then all lifted (n = 0).
+    M.process_frame({ { x = 100, y = 100 }, { x = 100, y = 100 }, { x = 100, y = 100 } })
+    M.process_frame({})
+
+    os.execute = real_execute  -- Restore before any assertion can abort the test.
+
+    helpers.assert_eq(#captured, 1, "exactly one action should fire for a single tap")
+    helpers.assert_contains(captured[1], "xdotool key Return",
+      "3-finger tap must resolve tap_3 and dispatch its bound action")
+
+    M.reset_defaults()
+    M.disable()
+  end)
+
+  helpers.it("3-finger swipe-left sequence resolves swipe_3_left and dispatches its action", function()
+    local captured = {}
+    local real_execute = os.execute
+    os.execute = function(cmd) captured[#captured + 1] = cmd; return true end
+
+    M.reset_defaults()
+    M.enable()
+    M.set_action("swipe_3_left", "escape")  -- "escape" maps to `xdotool key Escape`
+
+    -- Three fingers travel left far enough to beat both TAP_MAX_DELTA and SWIPE_MIN,
+    -- forcing the swipe branch (a tap requires travel below TAP_MAX_DELTA).
+    M.process_frame({ { x = 200, y = 100 }, { x = 200, y = 100 }, { x = 200, y = 100 } })
+    M.process_frame({ { x = 140, y = 100 }, { x = 140, y = 100 }, { x = 140, y = 100 } })
+    M.process_frame({})
+
+    os.execute = real_execute
+
+    helpers.assert_eq(#captured, 1, "exactly one action should fire for a single swipe")
+    helpers.assert_contains(captured[1], "xdotool key Escape",
+      "3-finger left swipe must resolve swipe_3_left and dispatch its bound action")
+
+    M.reset_defaults()
+    M.disable()
+  end)
+
 end)
