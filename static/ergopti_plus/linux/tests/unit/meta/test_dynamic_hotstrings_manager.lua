@@ -200,4 +200,72 @@ helpers.describe("dynamic hotstrings manager (P2.6)", function()
 
   end)
 
+  -- ==========================================================================
+  -- 7. @-tag personal-info concrete expansion values
+  -- ==========================================================================
+
+  helpers.describe("@-tag personal-info concrete expansion", function()
+
+    -- The on_trigger / preview cases above only assert a boolean / non-nil
+    -- shape, so a resolver wired to the wrong field, or a letters->info mapping
+    -- that silently dropped a key, would still pass them. These cases pin the
+    -- exact expanded value for an @-tag so such a regression turns the suite red.
+
+    -- Writes a temp personal_info.toml with known [info] + [letters] so init
+    -- registers @-tag rules whose resolvers return concrete values.
+    local function write_temp_toml()
+      local path = os.tmpname()
+      local fh = assert(io.open(path, "w"))
+      fh:write(table.concat({
+        "[info]",
+        'first_name = "Adrien"',
+        'last_name = "Moyaux"',
+        "",
+        "[letters]",
+        'p = "first_name"',
+        'n = "last_name"',
+        "",
+      }, "\n"))
+      fh:close()
+      return path
+    end
+
+    helpers.it("preview expands '@p' to the mapped first_name value", function()
+      local path = write_temp_toml()
+      dh.init({ trigger_char = "\\", personal_info_path = path })
+      dh.set_enabled(true)
+      -- Buffer ends with the trigger; preview strips it and previews "@p".
+      local p = dh.preview("@p\\")
+      helpers.assert_eq(p, "Adrien", "preview of '@p' must expand to first_name, not a placeholder")
+      os.remove(path)
+    end)
+
+    helpers.it("on_trigger injects the mapped last_name value for '@n'", function()
+      local path = write_temp_toml()
+      dh.init({ trigger_char = "\\", personal_info_path = path })
+      dh.set_enabled(true)
+
+      -- Capture the injection in-process instead of shelling out to ydotool
+      -- (absent on the test host) so the concrete expanded value is assertable.
+      local prev_injector = package.loaded["modules.hotstrings.injector"]
+      local captured = nil
+      package.loaded["modules.hotstrings.injector"] = {
+        inject = function(backspace_count, text)
+          captured = { backspace_count = backspace_count, text = text }
+        end,
+      }
+
+      local ok = dh.on_trigger("@n\\", "\\")
+
+      package.loaded["modules.hotstrings.injector"] = prev_injector
+      os.remove(path)
+
+      helpers.assert_true(ok == true, "on_trigger must report a successful expansion")
+      helpers.assert_not_nil(captured, "the injector must receive the expansion")
+      helpers.assert_eq(captured.text, "Moyaux", "on_trigger must inject last_name, not a placeholder")
+      helpers.assert_eq(captured.backspace_count, 3, "must erase '@n' (2) + trigger (1) = 3 chars")
+    end)
+
+  end)
+
 end)
