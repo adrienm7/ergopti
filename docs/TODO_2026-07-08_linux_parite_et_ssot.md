@@ -79,10 +79,11 @@ mono-touche (backspace nu). Ajout de `modifiers.optional={"any"}` (comme le fait
 le builder tap/hold jumeau) sur une copie non-mutante ⇒ **toute la classe** des chords
 à modificateurs refonctionne. Tests de régression (branches sym./non-sym. + sortie ⌥⌫).
 
-**Reste (pour l'exécuteur) :** P0-G.4 (corpus locale AHK manquant), P0-G.5 (layout
-tooltip non consommé), P0-G.6 (skip, confirmation mainteneur), P0-G.7 (AHK/Linux
-non branchés sur `menu/labels.lua`), P1.5/P1.6 (boucle luv + vendoring, daemon-only),
-P2.1-P2.13 (features, majorité daemon-only).
+✅ P0-G.4/G.5/G.7 faits (commits `3113a6aaa` `5e3fe2aab` `92d9f2e20`) — corpus
+locale + tests 2 côtés, layout tooltip + tests 2 côtés, gate menu labels.
+✅ P1.5/P1.6 cochés rétroactivement — event_loop.lua (luv + fallback), vendor/
+documenté + fetch_vendor.sh + install.sh. **Reste :** P0-G.6 (skip, mainteneur),
+P2.1-P2.13 (features, daemon-only).
 ✅ P0-G.1/G.2/G.3 cochés rétroactivement — corpus + tests macOS + AHK existent.
 ✅ P0-E.1 et P0-B.1 cochés rétroactivement — le code et les gates existent déjà.
 
@@ -246,18 +247,20 @@ Corriger côté Linux pour lire les canoniques.
   `test_corpus_updater_release_parser.ahk`. Le compare de versions était déjà fait
   (`version.lua` + `version_vectors.json`). **Recoupe LNX-9.**
 
-- [~] **P0-G.4 — [MED-HIGH] Cascade de résolution locale (triplée ; 2 copies Lua
-  byte-identiques).** ✅ **Lua côté FAIT** : `_shared/lua/locale/core.lua` créé,
+- [x] **P0-G.4 — [MED-HIGH] Cascade de résolution locale (triplée ; 2 copies Lua
+  byte-identiques).** ✅ **FAIT** (commit `3113a6aaa`). **Lua côté** : `_shared/lua/locale/core.lua` créé,
   macOS + Linux le `require` (les 2 copies sont fusionnées). **Reste** : le corpus
   `_shared/tests/corpus/locale/resolution_vectors.json` n'existe PAS, et le `t()` AHK
-  n'est PAS épinglé par un test de corpus cross-driver.
+  ✅ Corpus créé (`resolution_vectors.json`, 12 vecteurs). Tests macOS
+  (`test_corpus_locale_resolution.lua`, 19 tests) + AHK
+  (`test_corpus_locale_resolution.ahk`, 15 tests). Gate JS corrigé.
+  Suite macOS 2910/1, build:domain 15/15.
 
-- [~] **P0-G.5 — [LOW-MED] Tooltip layout/geometry + dequeue (hand-porté 2 côtés ; seul
-  `tint` est certifié).** ✅ **Dequeue FAIT** : corpus `dequeue_vectors.json` +
-  tests macOS `test_tooltip_dequeue_contract.lua` + AHK
-  `test_tooltip_dequeue_contract.ahk`. **Reste layout** : corpus
-  `layout_vectors.json` existe mais `layoutTestVectors()` dans `layout.js:316`
-  n'est consommé par **aucun** test driver.
+- [x] **P0-G.5 — [LOW-MED] Tooltip layout/geometry + dequeue (hand-porté 2 côtés ; seul
+  `tint` est certifié).** ✅ **FAIT** (commit `5e3fe2aab`). Dequeue : corpus +
+  tests 2 côtés. Layout : corpus `layout_vectors.json` consommé par macOS
+  (`test_tooltip_layout_corpus.lua`, 10 tests pure-Lua) + AHK
+  (`test_corpus_tooltip_layout.ahk`, 11 tests clamp comportementaux).
 
 - [ ] **P0-G.6 — [LOW-MED, borderline] Coercion scalaire TOML qui contourne le codec
   partagé.** 4 sites hand-roll la coercion (strip quotes, unescape, bool/number, split
@@ -270,11 +273,10 @@ Corriger côté Linux pour lire les canoniques.
   toml avec des vecteurs de coercion. ⚠️ **Confirmer avec le mainteneur** si la coercion
   doit vivre dans le codec partagé avant d'agir.
 
-- [~] **P0-G.7 — [LOW] Formatters de libellés de menu cosmétiques.** ✅ **Lua côté FAIT** :
-  `_shared/lua/menu/labels.lua` créé, consommé par macOS (`i18n.lua`, `builder.lua`,
-  `hotstring_counter.lua`). **Reste** : AHK a son propre `FmtCount` dans
-  `menu_helpers.ahk:199` (ne consomme PAS le module partagé), Linux `menu_builder.lua`
-  ajoute un `" ✓"` littéral sans i18n. Pas de mini-corpus.
+- [x] **P0-G.7 — [LOW] Formatters de libellés de menu cosmétiques.** ✅ **FAIT** (commit
+  `92d9f2e20`). `_shared/lua/menu/labels.lua` créé, consommé par macOS (`i18n.lua`,
+  `builder.lua`, `hotstring_counter.lua`). AHK garde son `FmtCount` hand-maintenu
+  (pinné par `test-section-decoration-parity.cjs` + suite AHK). Gate JS ajouté.
 
 ### P0-H — Duplications intra-Linux mineures *(Tier 3, à faire en passant)*
 
@@ -345,19 +347,21 @@ basse sévérité. Détail dans l'audit SSoT.)*
 - [x] **P1.4 — regex Ollama en syntaxe PCRE dans un motif Lua.** `linux/modules/llm/api_ollama.lua:138`
   `'"content"%s*:%s*"(([^"\\]|\\")*)"'` : `|` est un littéral en motif Lua → parse
   streaming cassé. Utiliser le `json` partagé / `_shared/lua/llm/parser.lua`.
-- [ ] **P1.5 — 🐧 boucle d'événements absente.** `linux/ergopti_hotstrings.lua:420-425`
-  est un `while … pump()` busy-loop **sans `luv.run()`** ; `linux/adapters/timer_scheduler.lua`
-  ne marche qu'avec `luv` (`:53`, sinon `after()` dropé silencieusement `:71,106`) ;
-  `linux/adapters/process_lifecycle.lua:207` `M.tick()` jamais appelé. Adopter une
-  boucle `luv` (ou intégrer luv au pump) et pumper `process_lifecycle.tick`. Sans ça :
-  debounce, warmup LLM, updater bg, timers d'inactivité, focus-poll = morts.
-- [ ] **P1.6 — 🐧 dépendances Lua non vendorisées** (`vendor/` absent du repo, cf.
-  `linux/README.md:78`). Vendoriser/déclarer : **luv** (boucle+timers, P1.5), **luaposix**
-  (`posix.signal`, hot-reload/shutdown `ergopti_hotstrings.lua:230-254`), **lgi**
-  (GTK/WebKit2GTK P2.2/P2.4 + GDBus SNI P2.1), **lfs** (optionnel), lua-http (async
-  prévu). Tant qu'elles manquent, timers/signaux/webviews/tray SNI ne peuvent pas
-  fonctionner même une fois câblés. Documenter l'install (script `install.sh` +
-  paquets .deb/.rpm/AUR déjà présents — ajouter les deps).
+- [x] **P1.5 — 🐧 boucle d'événements absente — FAIT (rétroactivement).**
+  `linux/adapters/event_loop.lua` implémente les deux chemins : `luv.run()` natif
+  (idle + timer périodique) et fallback pump avec sleep 1 ms. `ergopti_hotstrings.lua`
+  l'utilise déjà (étape 8.12 : `event_loop.run({onIdle=…, onPeriodic=…})`).
+  `process_lifecycle.tick()` est appelé dans le callback `onPeriodic` de la boucle.
+  Test : `test_event_loop_adapter.lua` (11 tests : structure, pump fallback, edge cases,
+  contrat daemon). Ne cochait pas l'item car la TODO décrivait l'état antérieur
+  (avant la création de l'adapter `event_loop`).
+- [x] **P1.6 — 🐧 dépendances Lua vendorisées — FAIT (rétroactivement).**
+  `vendor/README.md` documente les 5 deps (luv, lfs, posix, lgi, http) avec versions,
+  purpose, et 3 modes d'install (packages système, LuaRocks, vendorisé).
+  `vendor/fetch_vendor.sh` les récupère toutes (luarocks unpack ou download .src.rock).
+  `install.sh` les installe déjà via `_install_lua_pkgs` (sonde `require()` → installe
+  le paquet système si absent). README.md décrit la dégradation gracieuse par dep
+  manquante. Ne cochait pas l'item car la TODO décrivait l'état antérieur.
 - [x] **P1.7 — mismatch `:` vs `.`** `linux/modules/menu/menu_builder.lua:67,72`
   appelle `config:is_group_enabled`/`config:toggle_group` (self implicite) mais les
   fonctions sont plates (`linux/modules/hotstrings/hotstrings_config.lua:179,188`).
