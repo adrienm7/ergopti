@@ -198,4 +198,58 @@ helpers.describe("event_loop adapter", function()
     end)
   end)
 
+  -- ==========================================================================
+  -- 5. Idle handler registration — GTK/WebKit2GTK context pump
+  -- ==========================================================================
+
+  helpers.describe("idle handler registration (webview pump)", function()
+
+    helpers.it("exposes add_idle_handler so webview_manager can pump the GTK context", function()
+      helpers.assert_true(type(el.add_idle_handler) == "function",
+        "add_idle_handler is a function")
+    end)
+
+    helpers.it("pumps registered idle handlers every tick even under clock starvation", function()
+      -- Fresh module instance so no handler leaks in from or out to other tests.
+      local elx = helpers.load_module("adapters.event_loop")
+
+      -- Register the GTK-context pump BEFORE touching the clock: if the API is
+      -- missing (the pre-fix regression) this line raises and the frozen clock
+      -- below is never installed, so no state leaks into later tests.
+      local pumps = 0
+      elx.add_idle_handler(function() pumps = pumps + 1 end)
+
+      -- Freeze the wall clock so the periodSec gate can never advance. The ONLY
+      -- thing that can still drive the GTK context is the per-iteration idle
+      -- pump — this reproduces the CPU-time clock stall that would otherwise
+      -- freeze WebKit2GTK webviews; the handler must fire on every tick anyway.
+      local real_clock = os.clock
+      os.clock = function() return 42 end
+
+      local ticks = 0
+      local ok, err = pcall(function()
+        elx.run({
+          onIdle = function()
+            ticks = ticks + 1
+            if ticks >= 5 then elx.stop() end
+          end,
+          onPeriodic = function() end,   -- present but must stay starved
+          periodSec  = 1000,
+        })
+      end)
+
+      os.clock = real_clock  -- always restore, even if run() raised
+
+      helpers.assert_true(ok, "loop ran to completion without raising: " .. tostring(err))
+      helpers.assert_true(pumps >= 5,
+        string.format("idle handler pumped every tick despite frozen clock (got %d over %d ticks)", pumps, ticks))
+    end)
+
+    helpers.it("rejects a non-function handler (fail-fast) without crashing", function()
+      local elx = helpers.load_module("adapters.event_loop")
+      local ok = pcall(function() elx.add_idle_handler(42) end)
+      helpers.assert_true(ok, "add_idle_handler(non-function) is a safe no-op")
+    end)
+  end)
+
 end)

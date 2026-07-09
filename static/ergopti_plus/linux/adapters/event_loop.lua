@@ -51,6 +51,7 @@ M.HAS_LUV = (luv ~= nil)
 local _running    = false   -- Set by run(), cleared by stop() or on exit.
 local _idle_handle = nil    -- luv idle handle (only with luv).
 local _timer_handle = nil   -- luv timer handle for periodic callback (only with luv).
+local _idle_handlers = {}   -- Extra per-tick idle callbacks (e.g. GTK context pump).
 
 
 -- =========================================
@@ -67,6 +68,18 @@ local function _safe_idle(onIdle)
 	local ok, err = pcall(onIdle)
 	if not ok then
 		Logger.error(LOG, "onIdle callback raised: %s", tostring(err))
+	end
+end
+
+--- Runs every idle handler registered via M.add_idle_handler(). Each handler is
+--- wrapped in pcall so one raising handler (e.g. a GTK context that throws)
+--- never starves the others nor crashes the loop.
+local function _run_idle_handlers()
+	for i = 1, #_idle_handlers do
+		local ok, err = pcall(_idle_handlers[i])
+		if not ok then
+			Logger.error(LOG, "Idle handler #%d raised: %s", i, tostring(err))
+		end
 	end
 end
 
@@ -100,6 +113,7 @@ local function _run_luv(opts)
 			return
 		end
 		_safe_idle(onIdle)
+		_run_idle_handlers()
 	end)
 
 	-- Periodic timer: drives process_lifecycle.tick() at a fixed interval.
@@ -163,6 +177,7 @@ local function _run_pump(opts)
 
 	while _running do
 		_safe_idle(onIdle)
+		_run_idle_handlers()
 		iteration = iteration + 1
 
 		-- Drive the periodic callback when enough wall-clock has elapsed.
@@ -261,6 +276,21 @@ end
 --- @return boolean
 function M.isRunning()
 	return _running
+end
+
+--- Registers an idle handler invoked on every loop iteration, in addition to the
+--- primary onIdle callback. Used to pump secondary event sources — notably the
+--- GTK main context (g_main_context_iteration) that keeps WebKit2GTK webviews
+--- responsive. Fail-fast: a non-function argument is logged as an ERROR and
+--- ignored, never silently stored.
+--- @param fn function Callback invoked once per idle tick.
+function M.add_idle_handler(fn)
+	if type(fn) ~= "function" then
+		Logger.error(LOG, "add_idle_handler() requires a function — got %s; ignoring.", type(fn))
+		return
+	end
+	_idle_handlers[#_idle_handlers + 1] = fn
+	Logger.debug(LOG, "Idle handler registered (%d total).", #_idle_handlers)
 end
 
 return M
