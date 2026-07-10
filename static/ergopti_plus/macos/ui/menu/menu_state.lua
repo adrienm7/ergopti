@@ -223,7 +223,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			hs.timer.doAfter(KEYLOGGER_START_DELAY_SEC, function()
 				if type(kl.start) ~= "function" then return end
 				local _t_kl = hs.timer.secondsSinceEpoch()
-			pcall(kl.start, _shortcuts_ref)
+				try("keylogger.start", kl.start, _shortcuts_ref)
 				Logger.info(LOG, "Keylogger engine start (deferred): %.1f ms.",
 					(hs.timer.secondsSinceEpoch() - _t_kl) * 1000)
 			end)
