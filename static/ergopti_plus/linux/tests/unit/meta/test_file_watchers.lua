@@ -30,6 +30,19 @@ local function make_temp_dir()
 	return dir
 end
 
+--- lib.file_watchers._is_watched_lua() deliberately excludes any path under
+--- "/tmp/" (real .lua projects never live there; it is treated as OS noise).
+--- make_temp_dir() resolves to "/tmp/..." on CI (no TEMP/TMPDIR env var), so
+--- the base_dir-in-pump-mode test needs a directory OUTSIDE that prefix to
+--- exercise the per-file .lua watcher at all (file-watcher-tmp-prefix-filter-
+--- excludes-own-test-fixture).
+local function make_non_tmp_dir()
+	_dir_seq = _dir_seq + 1
+	local dir = "./ergopti_fw_nontmp_" .. os.time() .. "_" .. _dir_seq
+	os.execute("mkdir -p '" .. dir:gsub("'", "'\\''") .. "' 2>/dev/null")
+	return dir
+end
+
 local function write_file(path, content)
 	local fh = io.open(path, "w")
 	if fh then
@@ -271,7 +284,7 @@ helpers.describe("file_watchers", function()
 			end)
 
 			helpers.it("detects .lua file changes in base_dir", function()
-				local dir = make_temp_dir()
+				local dir = make_non_tmp_dir()
 				write_file(dir .. "/init.lua", "return {}")
 				local fw = helpers.load_module("lib.file_watchers")
 				local fired_count = 0
@@ -281,7 +294,7 @@ helpers.describe("file_watchers", function()
 				sleep_sec(0.1)
 				touch_file(dir .. "/init.lua")
 				fw.pump()
-				sleep_sec(0.6)
+				sleep_sec(1.0)
 				fw.pump()
 
 				fw.stop()
@@ -302,7 +315,7 @@ helpers.describe("file_watchers", function()
 				sleep_sec(0.1)
 				touch_file(sub .. "/personal.toml")
 				fw.pump()
-				sleep_sec(0.6)
+				sleep_sec(1.0)
 				fw.pump()
 
 				fw.stop()
@@ -351,7 +364,7 @@ helpers.describe("file_watchers", function()
 				sleep_sec(0.1)
 				touch_file(dir .. "/hotstrings.toml")
 				fw.pump()
-				sleep_sec(0.6)
+				sleep_sec(1.0)
 				fw.pump()
 				helpers.assert_true(fired, "callback must have been called")
 
@@ -362,7 +375,7 @@ helpers.describe("file_watchers", function()
 				sleep_sec(0.1)
 				touch_file(dir .. "/hotstrings.toml")
 				fw.pump()
-				sleep_sec(0.6)
+				sleep_sec(1.0)
 				fw.pump()
 				helpers.assert_true(fired2, "file_watchers still usable after callback crash")
 
@@ -424,7 +437,7 @@ helpers.describe("file_watchers", function()
 				sleep_sec(0.1)
 				touch_file(dir .. "/hotstrings.toml")
 				fw.pump()
-				sleep_sec(0.6)
+				sleep_sec(1.0)
 				fw.pump()
 				helpers.assert_eq(old_fired, 0, "old callback never fired")
 				helpers.assert_eq(new_fired, 1, "new callback fired exactly once")
