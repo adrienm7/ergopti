@@ -972,7 +972,7 @@ commit lui-même (§0.2), seulement ici dans le MD.
   - [x] #69 Windows privacy filter off-thread — ec7d1ad47 — test_metrics_focus_off_thread.ahk
   - [x] #72 macOS persistent today.log handle — 405c8b3a6 — rotation unit tests (couvert existant)
   - [x] #75 Linux cache app_id via process_lifecycle — ebe97ed94 — test_on_char_focus_no_subprocess.lua
-  - [ ] #73 macOS update_preview early-out guard (medium)
+  - [x] #73 macOS update_preview early-out guard — b1d18d74e — test_update_preview_early_out.lua (3 source-scan assertions)
   - [ ] #74 Linux injector non-blocking sleep (medium)
   - [ ] #76-#78 low (HookDispatcher Clone, HSE star-match alloc, engine buffer double-concat)
 - [x] **Bloc 4 — Fail-fast** 🟢 : #9 (macOS, prioritaire : config Karabiner corrompue = reset
