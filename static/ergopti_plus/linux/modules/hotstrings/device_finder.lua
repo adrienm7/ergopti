@@ -166,8 +166,9 @@ function M.find_keyboard()
 	local fallback  = nil   -- any EV_KEY device
 
 	for _, dev in ipairs(devices) do
-		-- Must have EV_KEY capability.
-		if (dev.ev_mask & EV_KEY_BIT) == 0 then goto next_dev end
+		-- Must have EV_KEY capability. LuaJIT has no native `&` bitwise operator
+		-- (that's Lua 5.3+), so the single-bit test is spelled out arithmetically.
+		if math.floor(dev.ev_mask / EV_KEY_BIT) % 2 == 0 then goto next_dev end
 
 		local path = event_path(dev)
 		if not path then goto next_dev end

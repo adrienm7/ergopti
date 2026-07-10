@@ -74,7 +74,11 @@ HealthCheck_RecordError(Msg) {
 	global _HealthCheckLastError, _HealthCheckErrCount
 	_HealthCheckLastError := Msg
 	_HealthCheckErrCount  += 1
-	try LoggerDebug("Healthcheck", "Last error recorded: {1}", Msg)
+	; Do NOT log here: this runs synchronously from inside _LoggerEmit() (via the
+	; ERROR/WARNING hook), so a recursive Logger* call re-enters _LoggerEmit mid-flight
+	; and clobbers the outer call's dedup key + ring cursor with this line instead
+	; (logger-reentrancy-corrupts-dedup-and-ring-cursor). The original error is
+	; already logged by the caller — this is a silent counter update only.
 }
 
 ; Increments the session warning counter (called by logger when it emits a WARNING).
