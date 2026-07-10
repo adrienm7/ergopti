@@ -61,11 +61,19 @@ local YDOTOOL_KEY_DELAY_MS = 12
 -- =========================================
 -- =========================================
 
+--- Test seam: when set, shell_run delegates to this function instead of os.execute.
+--- The function receives the raw shell command string and must return a boolean.
+--- Set via M._set_runner(fn); reset via M._reset_runner().
+local _test_runner = nil
+
 --- Runs a shell command, discarding stdout and stderr.
 --- Returns true on exit code 0, false otherwise.
 --- @param cmd string Shell command string.
 --- @return boolean
 local function shell_run(cmd)
+	if _test_runner then
+		return _test_runner(cmd)
+	end
 	local ok, result = pcall(function()
 		return os.execute(cmd .. " 2>/dev/null")
 	end)
@@ -124,6 +132,57 @@ end
 -- ======= 4/ Public API ===================
 -- =========================================
 -- =========================================
+
+--- Input queue: characters queued during an in-flight injection so they are
+--- replayed in order after the injection completes. Prevents physical keystrokes
+--- from interleaving with synthetic backspace+replacement events.
+local _input_queue = {}
+local _injecting = false
+
+--- Called by the daemon BEFORE inject() to signal that input should be queued.
+--- Resets the queue so stale characters from a prior injection cycle cannot leak in.
+function M._begin_injection()
+	_input_queue = {}
+	_injecting = true
+end
+
+--- Called by the daemon AFTER inject() completes. Returns any queued characters
+--- and clears the queue, so the daemon can replay them through the engine in
+--- arrival order.
+--- @return table List of characters queued during the injection.
+function M._end_injection()
+	_injecting = false
+	local drained = _input_queue
+	_input_queue = {}
+	return drained
+end
+
+--- Returns true while an injection is in flight.
+--- @return boolean
+function M._is_injecting()
+	return _injecting
+end
+
+--- Queues a single character that arrived during an in-flight injection.
+--- Safe to call when not injecting (no-op).
+--- @param ch string Single-character string to queue.
+function M._queue_char(ch)
+	if _injecting then
+		_input_queue[#_input_queue + 1] = ch
+	end
+end
+
+--- Replaces the low-level shell runner with a custom function (test seam).
+--- The function receives the raw shell command and must return a boolean.
+--- @param fn function|nil Custom runner; nil to use the default.
+function M._set_runner(fn)
+	_test_runner = fn
+end
+
+--- Restores the default (os.execute) shell runner.
+function M._reset_runner()
+	_test_runner = nil
+end
 
 --- Performs a hotstring injection: erases the trigger then types the replacement.
 ---
