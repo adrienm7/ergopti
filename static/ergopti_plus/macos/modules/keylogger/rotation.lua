@@ -59,6 +59,10 @@ local _today_log_date = nil
 --- Whether M.init has been called.
 local _initialized = false
 
+--- Persistent append handle for today.log — opened once in M.init() and reused
+--- across every M.append_log() call so the hot path never pays open()/close().
+local _log_handle = nil
+
 
 
 
@@ -148,13 +152,17 @@ function M.append_log(entry)
 	-- Collapse any embedded newlines so the file stays valid JSONL
 	str = str:gsub("\n", "")
 
-	local f, err = io.open(_paths.today_log_path, "a")
-	if not f then
-		Logger.error(LOG, "Cannot append to today.log at %s: %s.",
-			_paths.today_log_path, tostring(err))
+	-- Reopen if the handle was lost (e.g. external rotation deleted the file).
+	if not _log_handle then
+		_log_handle = io.open(_paths.today_log_path, "a")
+	end
+	if not _log_handle then
+		Logger.error(LOG, "Cannot append to today.log at %s.",
+			_paths.today_log_path)
 		return
 	end
-	f:write(str .. "\n"); f:close()
+	_log_handle:write(str .. "\n")
+	_log_handle:flush()
 end
 
 
@@ -236,6 +244,13 @@ function M.rollover(data_sql_path)
 	end
 
 	pcall(os.remove, _paths.today_log_path)
+	-- Close and nil the persistent handle so the next append_log reopens
+	-- against the fresh file. Without this, writes go to the old (now
+	-- unlinked) inode while the new today.log is a different file.
+	if _log_handle then
+		_log_handle:close()
+		_log_handle = nil
+	end
 	_today_log_offset = 0
 	_today_log_date   = new_date
 end
@@ -269,6 +284,15 @@ function M.init(deps)
 	_state = deps.state
 	_today_log_offset = deps.today_log_offset or 0
 	_today_log_date   = deps.today_log_date   or nil
+
+	-- Open a persistent append handle for today.log so the hot path never
+	-- pays the cost of open()/close() on every keystroke.
+	_log_handle = io.open(_paths.today_log_path, "a")
+	if not _log_handle then
+		Logger.error(LOG, "Cannot open today.log at %s for append — log writes will fail.",
+			_paths.today_log_path)
+	end
+
 	_initialized = true
 	Logger.success(LOG, "Initialized (offset=%d).", _today_log_offset)
 end

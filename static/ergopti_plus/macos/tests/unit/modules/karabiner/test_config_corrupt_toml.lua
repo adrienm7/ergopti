@@ -90,13 +90,13 @@ helpers.describe("Config.load_user_config — corrupt file vs absent (karabiner-
 
 	helpers.it("surfaces corruption with an ERROR and does NOT log misleading 'No user config found'", function()
 		reset_captured()
-		local orig_load = Config._load_toml_file
-		Config._load_toml_file = function(_path)
-			return nil, "parse_error"
-		end
+		-- Make decode return nil so the real _load_toml_file fails through
+		-- the decode path (rather than monkeypatching _load_toml_file directly).
+		local orig_decode = _toml_stub.decode
+		_toml_stub.decode = function(_raw) return nil end
 
-		local state = Config.load_user_config({}, {}, "/fake/corrupt_config.toml")
-		Config._load_toml_file = orig_load
+		local state = Config.load_user_config({}, {}, helpers.driver_root() .. "modules/karabiner/config.lua")
+		_toml_stub.decode = orig_decode
 
 		-- Must still return a usable default state (no crash).
 		helpers.assert_true(type(state) == "table", "must return a state table even on corrupt config")
@@ -110,16 +110,16 @@ helpers.describe("Config.load_user_config — corrupt file vs absent (karabiner-
 			)
 		end
 
-		-- Must emit an ERROR naming corruption.
+		-- Must emit an ERROR naming corruption via _load_toml_file.
 		local found = false
 		for _, entry in ipairs(captured) do
-			if entry.level == "error" and entry.msg:find("corrupt") then
+			if entry.level == "error" and entry.msg:find("Cannot parse") then
 				found = true
 				break
 			end
 		end
 		helpers.assert_true(found,
-			"corrupt file must emit Logger.error with 'corrupt' (RED before fix: silent fallback)")
+			"corrupt file must emit Logger.error with 'Cannot parse' from _load_toml_file (RED before fix: silent fallback)")
 	end)
 
 	helpers.it("handles genuine first-launch (absent file) with quiet INFO", function()
