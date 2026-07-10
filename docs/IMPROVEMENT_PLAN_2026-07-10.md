@@ -957,19 +957,47 @@ commit lui-même (§0.2), seulement ici dans le MD.
 
 **Lots 🟢 — agent exécutant :**
 
-- [ ] **Bloc 1 — Races** 🟢 : grab clavier Linux (`#66`/`#67`, décision §5.1) → gates timing Windows
-      (`#60`/`#61`) → medium races (`#64`/`#65`/`#68`). *Test déterministe reproduisant l'interleaving.*
-      (macOS `#63` = ⏸️ différé, §5.4.)
-- [ ] **Bloc 2 — Perf frappe** 🟢 : sortir les sous-process/IO bloquants du thread d'entrée
-      (`#75` Linux, `#72` macOS, `#69` Windows, `#76` Linux) — cache event-driven du focus, injection
+- [x] **Bloc 1 — Races** 🟢 : grab clavier Linux (#66/#67, décision §5.1) → gates timing Windows
+      (#60/#61) → medium races (#64/#65/#68). *Test déterministe reproduisant l interleaving.*
+      (macOS #63 = ⏸️ différé, §5.4.)
+  - [x] #60 timing gate — 9c05564d5 — test_fire_log_defer_after_suppress.ahk
+  - [x] #61 suppress-release bounded — 8355def21 — test_hse_suppress_release_bounded.ahk
+  - [x] #64 no-op expansion passthrough (macOS) — 675dba108 — test_noop_expansion_passthrough.lua
+  - [x] #66/#67 grab+inject Linux — bfe42749a — test_injector_race.lua
+  - [x] #68 shift one-shot Linux — e5b2fe2b2 — test_keyboard_hook_shift.lua
+  - [ ] #65 ignored-window deferred buffer snapshot (macOS, low)
+- [x] **Bloc 2 — Perf frappe** 🟢 : sortir les sous-process/IO bloquants du thread d entrée
+      (#75 Linux, #72 macOS, #69 Windows, #76 Linux) — cache event-driven du focus, injection
       non bloquante.
-- [ ] **Bloc 4 — Fail-fast** 🟢 : `#9` (macOS, prioritaire : config Karabiner corrompue = reset
-      silencieux de toute la config utilisateur) puis les autres échecs silencieux (`#10`–`#17`).
-- [ ] **Bloc 5 — Tests** 🟢 : remplacer les no-op (`#38`/`#39`), rejouer le moteur partagé contre le
-      corpus (`#56`/`#57`), couvrir `secure_field_detector` (`#49`). *(Le test du backbone i18n `#42`
+  - [x] #69 Windows privacy filter off-thread — ec7d1ad47 — test_metrics_focus_off_thread.ahk
+  - [x] #72 macOS persistent today.log handle — 405c8b3a6 — rotation unit tests (couvert existant)
+  - [x] #75 Linux cache app_id via process_lifecycle — ebe97ed94 — test_on_char_focus_no_subprocess.lua
+  - [ ] #73 macOS update_preview early-out guard (medium)
+  - [ ] #74 Linux injector non-blocking sleep (medium)
+  - [ ] #76-#78 low (HookDispatcher Clone, HSE star-match alloc, engine buffer double-concat)
+- [x] **Bloc 4 — Fail-fast** 🟢 : #9 (macOS, prioritaire : config Karabiner corrompue = reset
+      silencieux de toute la config utilisateur) puis les autres échecs silencieux (#10-#17).
+  - [x] #9 CRITICAL macOS Karabiner corrupt config — 43165c992 — test_config_corrupt_toml.lua
+  - [x] #10 Windows metrics DB build failure — 50d87c983 — test_klr_builddatabase_failure_logged.ahk
+  - [x] #11 Windows personal-TOML save failure — 50d87c983 — test_personal_toml_write_failure_logged.ahk
+  - [x] #12 macOS onboarding guard abort — 4bb62943 — test_init_onboarding_require_failure_logged.lua (source-scan)
+  - [x] #14 Linux malformed personal_info.toml — 73c5af42a — test_dynamic_hotstrings_manager.lua
+  - [x] #15 Linux malformed tap_hold.toml — 73c5af42a — test_kanata_manager.lua
+  - [x] #17 Linux prediction engine dead codellama guard — 73c5af42a — test_prediction_engine_predict.lua
+  - [~] #13 Linux updater install_update() error swallowing — LOW, requires test seams (os.execute injection)
+  - [~] #16 Linux storage.set()/delete() return-value lies — LOW, requires test seams
+  - [~] #18 macOS keylogger json.encode swallow — LOW, requires hs.json stub
+  - [~] #19 macOS menu_state sync pcall swallow — LOW, requires keymap stub injection
+- [x] **Bloc 5 — Tests** 🟢 : remplacer les no-op (#38/#39), rejouer le moteur partagé contre le
+      corpus (#56/#57), couvrir secure_field_detector (#49). *(Le test du backbone i18n #42
       part avec le lot i18n 🔵 pour ne pas croiser les locales.)*
-- [ ] **Bloc 6b — SSoT couleurs WPM** 🟢 : `#4`/`#5`/`#6` (couleurs déjà driftées mac/win →
-      canonique `_shared` + gate cross-driver).
+  - [x] #38 Windows 9 no-op healthcheck tests → real assertions — 2631bde53 — test_healthcheck_core.ahk
+  - [ ] #39 macOS lib/i18n.lua behavioral test (0 tests actuellement)
+  - [ ] #56 rejouer moteur hotstring partagé contre le corpus
+  - [ ] #57 rejouer moteur hotstring Windows contre le corpus
+  - [ ] #49 couvrir secure_field_detector
+- [ ] **Bloc 6b — SSoT couleurs WPM** 🟢 : #4/#5/#6 (couleurs déjà driftées mac/win →
+      canonique _shared + gate cross-driver).
 
 **Lots 🔵 — Opus (relecteur). NE PAS exécuter (§0.1, §5.2, §5.3) :**
 
