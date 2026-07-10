@@ -222,8 +222,20 @@ local function _pump_one()
 	local ev = _intercept and _parse_evtest_line(line) or _parse_libinput_line(line)
 	if not ev or not ev.value then return true end  -- skip non-key events and releases
 
-	-- Only forward keydown events (value == "down").
-	if ev.value ~= "down" then return true end
+	-- Process modifier key releases so shift/ctrl/alt state is tracked from
+	-- real key transitions, not treated as a per-key one-shot that force-resets
+	-- after every printable character. Without this, holding Shift across
+	-- multiple letters mis-cases all but the first character.
+	if ev.value ~= "down" then
+		if ev.name == "KEY_LEFTSHIFT" or ev.name == "KEY_RIGHTSHIFT" then
+			_shift_held = false
+		elseif ev.name == "KEY_LEFTCTRL" or ev.name == "KEY_RIGHTCTRL" then
+			_ctrl_held = false
+		elseif ev.name == "KEY_LEFTALT" or ev.name == "KEY_RIGHTALT" then
+			_alt_held = false
+		end
+		return true
+	end
 
 	-- Check if it's a control key that should be forwarded via on_key.
 	local control_keys = {
@@ -254,7 +266,11 @@ local function _pump_one()
 		return true
 	end
 
-	-- Skip modifier keys — track their state instead of forwarding.
+	-- Skip modifier keys — track their state from key transitions.
+	-- Shift/Ctrl/Alt held state is now maintained by processing both down
+	-- events (set true) and release events (set false) at the top of
+	-- _pump_one, so holding a modifier across multiple letters correctly
+	-- shifts all of them instead of only the first.
 	if ev.name == "KEY_LEFTSHIFT" or ev.name == "KEY_RIGHTSHIFT" then
 		_shift_held = true
 		return true
@@ -272,15 +288,10 @@ local function _pump_one()
 	-- Resolve the typed character from the layout table using the CURRENT shift
 	-- state. A prior bug left `ch` unassigned here, so no character ever
 	-- reached on_char — hotstrings, keylogger and the LLM got zero input and the
-	-- whole daemon was inert. Also resolve BEFORE the modifier reset below, or
-	-- every shifted character would come out unshifted.
+	-- whole daemon was inert. Shift state is now carried across multiple keys
+	-- (cleared only by the actual Shift release, processed above) so a held
+	-- Shift correctly capitalises every letter while held.
 	local ch = _resolve_char(ev.code)
-
-	-- Reset the one-shot modifier flags now this key has consumed them. Releases
-	-- are not forwarded, so shift/ctrl/alt clear on the next non-modifier key.
-	_shift_held = false
-	_ctrl_held = false
-	_alt_held = false
 
 	if ch and _on_char then
 		pcall(_on_char, ch)

@@ -275,3 +275,59 @@ _MIS_CheckDeadKeyReleasesCriticalBeforeWait() {
 }
 Test("meta input: DeadKey releases Critical before the blocking ih.Wait() and restores it after (F6 deadkey-wait-under-critical-stalls-pump)",
 	_MIS_CheckDeadKeyReleasesCriticalBeforeWait)
+
+
+
+
+; =====================================
+; =====================================
+; ======= 4/ Notepad non-atomic guard ==
+; =====================================
+; =====================================
+
+; Guards that the clipboard/SendInstant branch in HSE_DispatchMatch is gated
+; EXCLUSIVELY by an IsNotepadApp check (notepad.exe). This branch is deliberately
+; non-atomic (SendEvent backspaces + clipboard paste with Critical Off, because
+; SendInstant Sleeps). The comment at hotstring_dispatch.ahk:243-248 concedes
+; "a physical key typed mid-expansion can still interleave here" — the exact
+; interleave the atomic SendInput branch prevents. A future refactor that widens
+; this branch beyond Notepad would silently re-open the interleave bug for those
+; apps. This gate pins notepad.exe as the SOLE selector of the non-atomic path.
+_MIS_CheckNotepadIsSoleNonAtomicBranch() {
+	Body := _DriverFuncBody("HSE_DispatchMatch")
+	Assert(Body != "", "HSE_DispatchMatch(Spec, EndChar) must exist")
+
+	; The IsNotepadApp gate must exist.
+	IsNotepadPos := InStr(Body, "IsNotepadApp")
+	Assert(IsNotepadPos > 0,
+		"HSE_DispatchMatch must gate the non-atomic clipboard branch on IsNotepadApp")
+
+	; The non-atomic branch must reference notepad.exe.
+	NotepadExePos := InStr(Body, "notepad.exe")
+	Assert(NotepadExePos > 0,
+		"the IsNotepadApp check must be keyed on 'notepad.exe' — no other app must take the non-atomic path")
+
+	; The else branch (atomic path) must contain SendInput with Critical On.
+	ElsePos := InStr(Body, "} else {", , InStr(Body, "if IsNotepadApp"))
+	Assert(ElsePos > 0,
+		"HSE_DispatchMatch must have an else branch (atomic path) after the Notepad check")
+	ElseBlockStart := ElsePos
+	NextSectionEnd := InStr(Body, "HSE_ApplyExpansion", , ElseBlockStart)
+	ElseBlock := SubStr(Body, ElseBlockStart, (NextSectionEnd > 0 ? NextSectionEnd : StrLen(Body)) - ElseBlockStart)
+	Assert(InStr(ElseBlock, "SendInput") > 0,
+		"the atomic else branch must use SendInput (not SendEvent/SendInstant)")
+	Assert(InStr(ElseBlock, 'Critical("On")') > 0,
+		"the atomic else branch must enter Critical On before the SendInput burst")
+
+	; The if branch (Notepad) must release Critical Off before SendInstant.
+	IfBlockStart := InStr(Body, "if IsNotepadApp")
+	IfBlockEnd := InStr(Body, "} else {", , IfBlockStart)
+	IfBlock := SubStr(Body, IfBlockStart, IfBlockEnd - IfBlockStart)
+	Assert(InStr(IfBlock, 'Critical("Off")') > 0,
+		"the Notepad branch must release Critical Off — it Sleeps (clipboard), and Critical must not span a Sleep")
+	Assert(InStr(IfBlock, "SendInstant") > 0,
+		"the Notepad branch must use SendInstant (clipboard paste)")
+}
+
+Test("meta input: Notepad is the SOLE non-atomic dispatch branch (clipboard/SendInstant gate)",
+	_MIS_CheckNotepadIsSoleNonAtomicBranch)
