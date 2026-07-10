@@ -261,7 +261,10 @@ end
 local function _sql_json(v)
 	if v == nil then return "'{}'" end
 	local ok, encoded = pcall(json.encode, v)
-	if not ok then return "'{}'" end
+	if not ok then
+		Logger.warn(LOG, "_sql_json: json.encode failed (%s) — storing empty object.", tostring(encoded))
+		return "'{}'"
+	end
 	return _sql_str(encoded)
 end
 

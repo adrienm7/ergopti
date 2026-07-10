@@ -620,19 +620,53 @@ function M.install_update(archive_path)
 		return false
 	end
 	local err_output = pipe:read("*a")
-	pipe:close()
+	-- On Lua 5.4, pipe:close() returns (ok, exit_type, exit_code); on LuaJIT it
+	-- returns the same triple. 0/nil exit is success.
+	local tar_ok, _, tar_exit = pipe:close()
 
-	if err_output and err_output ~= "" and not err_output:match("^%s*$") then
-		Logger.warn(LOG, "Extract warnings: %s", err_output:gsub("\\n", " "):sub(1, 200))
-		-- Tar may produce warnings for permissions/ownership that are harmless.
+	-- Non-empty stderr that is NOT just whitespace → treat as hard failure.
+	-- Tar warnings (permissions, ownership) are harmless whitespace-only stderr.
+	local has_stderr = err_output and err_output ~= "" and not err_output:match("^%s*$")
+	if has_stderr or (tar_exit and tar_exit ~= 0) then
+		local detail = has_stderr and err_output:gsub("\n", " "):sub(1, 200)
+			or string.format("exit code %d", tar_exit or -1)
+		Logger.error(LOG, "Extract failed: %s", detail)
+		os.execute("rm -rf '" .. extract_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
+		_state = "idle"
+		return false
+	end
+
+	-- Guard: the extract dir must contain files after extraction.
+	local has_files = false
+	local ls = io.popen("ls -A '" .. extract_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
+	if ls then
+		local listing = ls:read("*a")
+		ls:close()
+		has_files = listing and listing ~= "" and not listing:match("^%s*$")
+	end
+	if not has_files then
+		Logger.error(LOG, "Extract produced no files in %s — archive may be empty or corrupt.", extract_dir)
+		os.execute("rm -rf '" .. extract_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
+		_state = "idle"
+		return false
 	end
 
 	-- Move old installation to .old backup, then move new files in place.
-	-- For safety, we copy files rather than replacing in-place.
 	local backup_dir = install_dir .. ".old"
 	os.execute("rm -rf '" .. backup_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-	os.execute("mv '" .. safe_dir .. "' '" .. backup_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-	os.execute("mv '" .. extract_dir:gsub("'", "'\\''") .. "' '" .. safe_dir .. "' 2>/dev/null")
+	local ok1 = os.execute("mv '" .. safe_dir .. "' '" .. backup_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
+	local ok2 = os.execute("mv '" .. extract_dir:gsub("'", "'\\''") .. "' '" .. safe_dir .. "' 2>/dev/null")
+
+	if not ok1 or not ok2 then
+		Logger.error(LOG, "Install failed — mv returned non-zero (ok1=%s, ok2=%s). Attempting rollback.", tostring(ok1), tostring(ok2))
+		-- Attempt rollback: if the first mv succeeded, the old install is in .old
+		if ok1 then
+			os.execute("mv '" .. backup_dir:gsub("'", "'\\''") .. "' '" .. safe_dir .. "' 2>/dev/null")
+		end
+		os.execute("rm -rf '" .. extract_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
+		_state = "idle"
+		return false
+	end
 
 	-- Clean up.
 	os.execute("rm -f '" .. safe_archive .. "' 2>/dev/null")
