@@ -352,6 +352,15 @@ local function main()
 
 	-- 8.5) Define the character callback.
 	local function on_char(ch)
+		-- If an injection is in flight, queue this character so it is replayed
+		-- after the synthetic backspace+replacement events complete. This
+		-- prevents physical keystrokes from interleaving with injected text
+		-- and corrupting the output (the "abcd"→"acd" class of race bug).
+		if injector._is_injecting() then
+			injector._queue_char(ch)
+			return
+		end
+
 		-- CapsWord: process BEFORE the engine so the capitalized character
 		-- enters the buffer correctly (not as a duplicate after the original).
 		if shortcuts and shortcuts.is_enabled() and shortcuts.is_caps_word_active() then
@@ -395,7 +404,17 @@ local function main()
 				result.backspace_count
 			)
 			if not opts.dry_run then
+				injector._begin_injection()
 				injector.inject(result.backspace_count, result.replacement)
+				-- Drain any physical characters that arrived during
+				-- injection and replay them through the engine so they
+				-- are re-injected in arrival order.
+				for _, queued_ch in ipairs(injector._end_injection()) do
+					local ok, err = pcall(on_char, queued_ch)
+					if not ok then
+						Logger.error(LOG, "Error replaying queued char '%s': %s", queued_ch, tostring(err))
+					end
+				end
 			end
 			engine:reset()
 		end
