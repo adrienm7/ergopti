@@ -68,7 +68,13 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'tests');
 //                     simulate_drain), plus test_api_mlx_discovery_generation_guard.lua,
 //                     test_menu_metrics_master_toggle_pause_gate.lua, and
 //                     test_menu_quit_karabiner_ownership.lua)
-const BASELINE = 153;
+//          153 → 156 (session 2026-07-10: three new source-scan tests added —
+//                     test_update_preview_early_out.lua (3 source assertions on
+//                     llm_bridge.lua), test_ignored_window_deferred_buffer_snapshot.lua
+//                     (3 source assertions on init.lua), test_injector_commands.lua
+//                     (2 new source assertions on injector.lua) — all are deliberate
+//                     source invariants backed by the audit plan's prescribed test)
+const BASELINE = 156;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read). None exists yet;
 // listed so that converting a test to such a helper drops it from the count.
