@@ -992,7 +992,7 @@ commit lui-même (§0.2), seulement ici dans le MD.
       corpus (#56/#57), couvrir secure_field_detector (#49). *(Le test du backbone i18n #42
       part avec le lot i18n 🔵 pour ne pas croiser les locales.)*
   - [x] #38 Windows 9 no-op healthcheck tests → real assertions — 2631bde53 — test_healthcheck_core.ahk
-  - [ ] #39 macOS lib/i18n.lua behavioral test (0 tests actuellement)
+  - [x] #39 macOS lib/i18n.lua behavioral test — 50a66e764 — test_i18n.lua (27 test cases, 7 describe blocks)
   - [ ] #56 rejouer moteur hotstring partagé contre le corpus
   - [ ] #57 rejouer moteur hotstring Windows contre le corpus
   - [ ] #49 couvrir secure_field_detector
