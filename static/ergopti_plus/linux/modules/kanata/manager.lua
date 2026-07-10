@@ -105,6 +105,7 @@ local function _load_keys_from_toml(path)
 	if type(parsed) ~= "table"
 		or type(parsed.tap_hold) ~= "table"
 		or type(parsed.tap_hold.keys) ~= "table" then
+		Logger.error(LOG, "tap_hold.toml at '%s' is malformed — refusing to silently fall back to defaults.", path)
 		return nil
 	end
 

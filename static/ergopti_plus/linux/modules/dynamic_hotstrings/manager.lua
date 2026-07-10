@@ -61,9 +61,12 @@ local function _parse_personal_info_toml(path)
 	fh:close()
 
 	-- Delegate all TOML parsing to the shared codec; decode returns nil on a
-	-- spec violation, in which case we surface empty tables rather than a crash.
+	-- spec violation.
 	local parsed = TomlCodec.decode(content)
-	if type(parsed) ~= "table" then return {}, {} end
+	if type(parsed) ~= "table" then
+		Logger.error(LOG, "personal_info.toml at '%s' is malformed — @-tag shortcuts disabled.", path)
+		return {}, {}
+	end
 
 	local info    = (type(parsed.info) == "table") and parsed.info or {}
 	local letters = (type(parsed.letters) == "table") and parsed.letters or {}
