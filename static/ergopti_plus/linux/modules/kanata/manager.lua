@@ -127,8 +127,10 @@ end
 --- Loads tap-hold key config, preferring the user's TOML override over the
 --- shared defaults.toml. Returns keys_config in the shape expected by
 --- kanata_generator.generate().
+--- @param user_toml_path string|nil Explicit user tap_hold.toml path (test seam);
+---   nil resolves the real ~/.config/ergopti/tap_hold.toml.
 --- @return table keys_config
-local function _load_tap_hold_config()
+local function _load_tap_hold_config(user_toml_path)
 	_resolve_paths()
 
 	-- Try the shared defaults.toml first (always present in the repo).
@@ -146,12 +148,20 @@ local function _load_tap_hold_config()
 	-- drivers' "generated per-driver file is the complete config" semantic.
 	local keys = nil
 
-	if _user_toml then
-		local fh = io.open(_user_toml, "r")
+	local user_toml = user_toml_path or _user_toml
+	if user_toml then
+		local fh = io.open(user_toml, "r")
 		if fh then
 			fh:close()
-			Logger.info(LOG, "Loading tap-hold config from user file: %s", _user_toml)
-			keys = _load_keys_from_toml(_user_toml)
+			Logger.info(LOG, "Loading tap-hold config from user file: %s", user_toml)
+			keys = _load_keys_from_toml(user_toml)
+			-- The user file exists but produced no usable keys (malformed, or valid
+			-- TOML with no [tap_hold.keys.*] sections). Warn loudly before silently
+			-- falling back to the shared defaults, so a broken user override is
+			-- visible rather than masquerading as a deliberate "use defaults".
+			if not keys then
+				Logger.warn(LOG, "User tap_hold.toml at '%s' is present but yielded no usable keys — ignoring it and falling back to shared defaults.", user_toml)
+			end
 		end
 	end
 
@@ -170,6 +180,17 @@ local function _load_tap_hold_config()
 	end
 
 	return keys
+end
+
+--- Test accessor: runs the tap-hold config loader in isolation, bypassing the
+--- template gate in generate_kbd(), so the suite can exercise the user-file
+--- fallback/fail-fast logging without a resolvable kanata.kbd template. The path
+--- argument points the loader at a temp fixture (test seam), avoiding a $HOME
+--- override or cross-platform nested-dir creation.
+--- @param user_toml_path string|nil Absolute path to a user tap_hold.toml fixture.
+--- @return table keys_config
+function M._load_tap_hold_config_for_test(user_toml_path)
+	return _load_tap_hold_config(user_toml_path)
 end
 
 

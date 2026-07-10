@@ -159,6 +159,67 @@ helpers.describe("kanata manager", function()
   end)
 
   -- ==========================================================================
+  -- 3b. Malformed / empty user tap_hold.toml fail-fast
+  -- ==========================================================================
+
+  helpers.describe("user tap_hold.toml fail-fast", function()
+
+    -- Writes `content` to a temp file, points the loader at it via the test seam,
+    -- runs the tap-hold config loader in isolation, and returns captured
+    -- error/warn messages. The seam avoids depending on $HOME or on creating
+    -- nested config dirs cross-platform, and bypasses generate_kbd()'s template
+    -- gate (the kanata.kbd template does not resolve in the headless suite).
+    local function load_with_user_toml(content)
+      local tmp_dir = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "/tmp"
+      local path    = tmp_dir:gsub("\\", "/") .. "/ergopti_kanata_user_taphold.toml"
+      local fh = assert(io.open(path, "w"))
+      fh:write(content)
+      fh:close()
+
+      local logger = require("logger.shim")
+      local orig_error, orig_warn = logger.error, logger.warn
+      local errors, warns = {}, {}
+      logger.error = function(_t, fmt, ...)
+        errors[#errors + 1] = (select("#", ...) > 0) and string.format(fmt, ...) or tostring(fmt)
+      end
+      logger.warn = function(_t, fmt, ...)
+        warns[#warns + 1] = (select("#", ...) > 0) and string.format(fmt, ...) or tostring(fmt)
+      end
+
+      pcall(function() km._load_tap_hold_config_for_test(path) end)
+
+      logger.error, logger.warn = orig_error, orig_warn
+      os.remove(path)
+      return errors, warns
+    end
+
+    local function any_contains(list, needle)
+      for _, m in ipairs(list) do
+        if m:find(needle, 1, true) then return true end
+      end
+      return false
+    end
+
+    helpers.it("logs Logger.error when the user tap_hold.toml is malformed", function()
+      -- Unterminated table header — the shared codec rejects it (decode → nil).
+      local errors = load_with_user_toml("[tap_hold.keys.a\ntap_action = \"a\"\n")
+      helpers.assert_true(any_contains(errors, "malformed"),
+        "a malformed user tap_hold.toml must log an ERROR")
+    end)
+
+    helpers.it("warns before falling back when the user tap_hold.toml is present but empty", function()
+      -- Valid TOML with a keys table but no key entries: parses fine, yields no
+      -- usable keys. Must warn that the user file was ignored — not silently drop.
+      local errors, warns = load_with_user_toml("[tap_hold.keys]\n")
+      helpers.assert_true(any_contains(warns, "present but yielded no usable keys"),
+        "a present-but-empty user tap_hold.toml must warn before falling back to defaults")
+      helpers.assert_true(not any_contains(errors, "malformed"),
+        "a valid-but-empty user file is not malformed — no malformed ERROR expected")
+    end)
+
+  end)
+
+  -- ==========================================================================
   -- 4. Menu builder integration
   -- ==========================================================================
 
