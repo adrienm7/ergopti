@@ -10,7 +10,7 @@
  *   - macOS consumes it via require("menu.labels") in i18n.lua,
  *     hotstring_counter.lua, and builder.lua.
  *
- * ROOT CAUSE ENCODED (P0-G.7):
+ * ROOT CAUSE ENCODED:
  * The log-level emoji map, count formatter, and section header decoration were
  * duplicated across macOS (Lua), Windows (AHK), and Linux (Lua). The Lua copies
  * were fused into _shared/lua/menu/labels.lua and macOS now reads from it.
@@ -39,12 +39,12 @@ function read(rel) {
 
 // ── 1. Shared labels.lua must exist ─────────────────────────────────────────
 if (!fileExistsSP('_shared/lua/menu/labels.lua')) {
-	errors.push('_shared/lua/menu/labels.lua: missing — menu label formatters must be single-sourced (P0-G.7)');
+	errors.push('_shared/lua/menu/labels.lua: missing — menu label formatters must be single-sourced');
 } else {
 	const src = read('static/ergopti_plus/_shared/lua/menu/labels.lua');
 	for (const fn of ['log_level_emoji', 'fmt_count', 'decorate_section']) {
 		if (!src.includes('function M.' + fn)) {
-			errors.push(`_shared/lua/menu/labels.lua: missing function M.${fn} (P0-G.7)`);
+			errors.push(`_shared/lua/menu/labels.lua: missing function M.${fn}`);
 		}
 	}
 }
@@ -57,7 +57,7 @@ for (const [file, name] of [
 ]) {
 	const src = fileExistsSP(file.replace('static/ergopti_plus/', '')) ? read(file) : '';
 	if (!src.includes('require("menu.labels")') && !src.includes("require('menu.labels')")) {
-		errors.push(`${name}: must require("menu.labels") (P0-G.7)`);
+		errors.push(`${name}: must require("menu.labels")`);
 	}
 }
 

@@ -17,8 +17,8 @@
  * A test that concatenates driver_root() with a quoted "(modules|lib|ui)/….lua"
  * path is location-pinned. This ratchet counts them and FAILS if the count rises
  * above the frozen baseline. Lower (never raise) the baseline as tests migrate
- * to behaviour assertions or a move-resilient symbol-keyed scan (REFACTOR_GUIDE
- * P9.2/P9.4). It is the test twin of the OS-purity ratchets and of the AHK
+ * to behaviour assertions or a move-resilient symbol-keyed scan (the
+ * move-resilience checks). It is the test twin of the OS-purity ratchets and of the AHK
  * pinned-read ratchet.
  * ==============================================================================
  */
@@ -34,7 +34,7 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'tests');
 // Frozen baseline — the current count of path-pinned source-reading macOS test
 // files. Drive toward zero by migrating each to a behaviour assertion or a
 // move-resilient helper; NEVER raise it to make a new test pass.
-// History: 134 → 133 (P10.4: one test converted to behaviour)
+// History: 134 → 133 (one test converted to behaviour)
 //          133 → 134 (H-1 regression: test_menu_state_keeps_script_control.lua §1 is a
 //                     deliberate source invariant; §2 provides the stronger behaviour
 //                     guarantee via spy — intentional, not accidental)

@@ -6,7 +6,7 @@
 ; Validates the AHK stacked-tooltip dequeue logic against the canonical test
 ; vectors defined in _shared/tests/corpus/tooltip/dequeue_vectors.json.
 ; Loads the shared JSON at registration time so the vectors are always in sync
-; with the cross-driver corpus (P0-G.5).
+; with the cross-driver corpus.
 ;
 ; Mirrors the macOS test_tooltip_dequeue_contract.lua, which replays the same
 ; vectors through the Hammerspoon dequeue module.

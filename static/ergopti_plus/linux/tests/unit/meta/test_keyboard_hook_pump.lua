@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Regression test for the dead input pipeline in adapters/keyboard_hook.lua.
 ---
---- ROOT CAUSE ENCODED (P1.1):
+--- ROOT CAUSE ENCODED:
 --- _pump_one() ended with `if ch and _on_char then pcall(_on_char, ch)` but never
 --- assigned `ch` — _resolve_char() was never called. So no character ever reached
 --- on_char and the ENTIRE daemon was inert: hotstrings, keylogger and the LLM got

@@ -11,7 +11,7 @@
 ---
 --- The macOS renderer (ui/tooltip/renderer.lua) implements this same math
 --- inline. This test pins the math against the shared vectors so any
---- divergence in clamping or positioning is caught immediately (P0-G.5).
+--- divergence in clamping or positioning is caught immediately.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")

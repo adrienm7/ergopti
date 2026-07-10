@@ -12,7 +12,7 @@
 ; CaretGetPos and UIA calls that cannot run headlessly — those are validated
 ; by the macOS Lua test against the shared pure-math clone. This test pins
 ; the AHK side by confirming the corpus is consumed and the clamp function
-; is functional (P0-G.5).
+; is functional.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

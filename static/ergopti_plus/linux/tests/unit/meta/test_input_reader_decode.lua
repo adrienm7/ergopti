@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_input_reader_decode.lua
 ---
---- Phase 2B — B1: Integration tests for input_reader's evdev binary decode
+--- Integration tests for input_reader's evdev binary decode.
 --- helpers and layout tables. The evdev struct parser (parse_event, decode_u16_le,
 --- decode_s32_le) and keycode lookup tables are pure functions testable on any OS.
 ---

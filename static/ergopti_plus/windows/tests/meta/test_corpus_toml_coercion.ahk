@@ -1,7 +1,7 @@
 ﻿; static/ergopti_plus/windows/tests/meta/test_corpus_toml_coercion.ahk
 
 ; ==============================================================================
-; CORPUS CONSUMER: TOML Scalar Coercion — AHK (P0-G.6)
+; CORPUS CONSUMER: TOML Scalar Coercion — AHK
 ; Reads _shared/tests/corpus/toml/coercion_vectors.json and replays each
 ; vector through TomlCoerceValueExt(), asserting the output matches the
 ; expected AHK value. Pins the 3 AHK coercion sites against the shared corpus.

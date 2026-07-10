@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_timer_scheduler_adapter.lua
 ---
---- Phase 2B — B8: Integration tests for the timer_scheduler adapter (luv stub).
+--- Integration tests for the timer_scheduler adapter (luv stub).
 --- Tests the full API surface (after/every/cancel/cancelAll) without requiring
 --- the luv library. On CI without luv, the stub path returns handles without
 --- actually scheduling timers — these tests verify the stub is safe.

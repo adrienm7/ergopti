@@ -3,9 +3,9 @@
 --- ==============================================================================
 --- MODULE: Engine current_buffer Accessor Test
 --- DESCRIPTION:
---- Guards the shared hotstring engine's current_buffer() accessor, added for P1.3.
+--- Guards the shared hotstring engine's current_buffer() accessor.
 ---
---- ROOT CAUSE ENCODED (P1.3):
+--- ROOT CAUSE ENCODED:
 --- The daemon fed the LLM prediction engine with prediction_engine.on_char(ch)
 --- and no buffer, so on_char early-returned (it needs the rolling typing buffer to
 --- detect its trigger sequences) and the LLM never predicted. The fix threads the

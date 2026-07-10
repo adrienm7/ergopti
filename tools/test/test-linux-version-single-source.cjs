@@ -8,7 +8,7 @@
  * (M.VERSION) — the counterpart to the macOS/Windows BUNDLE_VERSION stamp. Every
  * surface that shows a version reads it from there.
  *
- * ROOT CAUSE ENCODED (P0-E.2):
+ * ROOT CAUSE ENCODED:
  * The version "3.0.0" was hardcoded in three places (tray menu header,
  * healthcheck snapshot, daemon build context), so a release bump had to touch all
  * three and would silently drift if one was missed. One of them also fell back to

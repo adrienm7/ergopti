@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_keylogger_sqlite_writer.lua
 ---
---- Phase P2.8: Compliance tests for the Linux SQLite writer module.
+--- Compliance tests for the Linux SQLite writer module.
 --- Verifies the module API surface, graceful degradation when sqlite3 is absent,
 --- and the public methods do not crash.  Since sqlite3 CLI is not guaranteed
 --- on the maintainer's Windows machine (nor on CI), the database-path methods
@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local sw     = helpers.load_module("modules.keylogger.sqlite_writer")
 
-helpers.describe("sqlite_writer (P2.8)", function()
+helpers.describe("sqlite_writer", function()
 
   -- ==========================================================================
   -- 1. Module structure

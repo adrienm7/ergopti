@@ -68,7 +68,7 @@ local helpers = require("tests.helpers")
 
 -- --only <substr> / --only=<substr>: run only test cases whose name contains the
 -- substring, so a single behaviour can be re-run in isolation from a red message
--- (REFACTOR_GUIDE P9.5). arg is the global Lua args table.
+-- arg is the global Lua args table.
 local only_filter = nil
 if arg then
 	for i = 1, #arg do

@@ -2,7 +2,7 @@
 
 /**
  * ==============================================================================
- * MODULE: LLM legacy_ids + BASIC_PROMPT Single-Source Guard (DL-2 + DL-3)
+ * MODULE: LLM legacy_ids + BASIC_PROMPT Single-Source Guard
  * DESCRIPTION:
  * The profile-id migration table and the "basic" profile's fallback prompt
  * used to be hand-copied literals in both windows/modules/llm/profiles.ahk and
@@ -81,7 +81,7 @@ test(
 
 test('profiles.json has a "basic" profile with a non-empty system_single', !!(basicProfile && basicProfile.system_single));
 
-// --- DL-2: generated AHK legacy map matches legacy_ids.json exactly ---
+// --- Generated AHK legacy map matches legacy_ids.json exactly ---
 for (const [oldId, newId] of Object.entries(legacyIds)) {
 	const needle = `"${oldId}", "${newId}"`;
 	test(
@@ -91,7 +91,7 @@ for (const [oldId, newId] of Object.entries(legacyIds)) {
 	);
 }
 
-// --- DL-3: generated AHK basic prompt matches profiles.json exactly (AHK-escaped) ---
+// --- Generated AHK basic prompt matches profiles.json exactly (AHK-escaped) ---
 {
 	const ahkEscaped = basicProfile.system_single
 		.replace(/`/g, '``')

@@ -138,7 +138,7 @@ global Features := Map(
         "e_acute",  Map("enabled", true, "letter", "c"),
         "a_grave",  Map("enabled", true, "letter", "v"),
         ; Sub-Maps — 10 entries each (same key set as the v1 Maps).
-        ; Phase 4 migrated the individual reads in modules/shortcuts.ahk
+        ; A later refactor migrated the individual reads in modules/shortcuts.ahk
         ; (AltGrLAlt) and modules/tap_holds.ahk (LAltCapsLock); phase 10
         ; added AltGrCapsLock when the dispatcher was inlined.
         "alt_gr_caps_lock", Map(
@@ -178,7 +178,7 @@ global Features := Map(
             "tab",            false,
         ),
     ),
-    ; Phase 5 — modules/hotstrings.ahk + modules/keymap/layout.ahk read these gates
+    ; modules/hotstrings.ahk + modules/keymap/layout.ahk read these gates
     ; for hotstring registration and AltGr rolls. Each entry is a Map with
     ; at least an "enabled" key; the production loader pulls extra props
     ; (time_activation_seconds, pattern_max_length) from the manifest, but
@@ -270,7 +270,7 @@ global Features := Map(
             "code",           Map("enabled", true, "time_activation_seconds", 0.75),
         ),
     ),
-    ; Phase 6 — ui/tray_menu.ahk's LLM tray populator now reads from this
+    ; ui/tray_menu.ahk's LLM tray populator now reads from this
     ; nested map (instead of IniCacheGet) and flattens it back into the
     ; legacy _LlmSavedOpts shape that LLM_Menu_Init expects. Manifest
     ; defaults match production; tests don't fire the LLM menu but the

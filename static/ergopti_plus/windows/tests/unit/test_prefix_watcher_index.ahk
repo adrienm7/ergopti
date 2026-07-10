@@ -113,7 +113,7 @@ Test("prefix watcher: re-enabled section trigger is indexed again",
 ; ==============================================
 ; ==============================================
 
-; Phase 5: the live preview must surface the SAME winner the engine fires.
+; The live preview must surface the SAME winner the engine fires.
 ; _PrefixSortCandidates ranks colliding candidates by the engine tie-break
 ; (length > priority > registration order), so the first (non-dimmed) row is the
 ; real winner — not just the first-scanned category. Before this, a personal

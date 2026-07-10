@@ -1,0 +1,21 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Reject plan-item tokens in commit messages. The same convention that keeps
+# refactor/delivery plan refs out of source (see
+# tools/test/test-no-plan-refs-in-source.cjs) keeps them out of history: they are
+# meaningless to a future reader and rot as the plan they named disappears.
+#
+# Forbidden: P#.# / P#-X.#  (P2.5, P0-G.4), DL-#, REFACTOR_GUIDE, "Phase 2B",
+# "Phase P#". A bare "Phase N" is allowed (it may be a real algorithm step).
+MSG_FILE="$1"
+PATTERN='P[0-9]+(-[A-Z])?\.[0-9]+|DL-[0-9]+|REFACTOR_GUIDE|Phase 2B|Phase P[0-9]'
+
+# Ignore comment lines (git strips them from the final message anyway).
+if grep -vE '^\s*#' "$MSG_FILE" | grep -qE "$PATTERN"; then
+	echo "commit-msg: refusing plan-item reference(s) in the commit message:" >&2
+	grep -vE '^\s*#' "$MSG_FILE" | grep -nE "$PATTERN" >&2
+	echo "" >&2
+	echo "Reword the message to keep the rationale but drop the token." >&2
+	exit 1
+fi

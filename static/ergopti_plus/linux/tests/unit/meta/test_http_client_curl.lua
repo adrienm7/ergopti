@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_http_client_curl.lua
 ---
---- Phase 2B — B3: Integration tests for the http_client adapter's curl command
+--- Integration tests for the http_client adapter's curl command.
 --- construction, response parsing, and state management. The actual HTTP request
 --- requires a real Ollama server on Linux; these tests verify:
 ---   1. Module structure (post, cancel, isActive)

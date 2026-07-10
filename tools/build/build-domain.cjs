@@ -170,7 +170,7 @@ const PIPELINE = [
 		generated: ['static/ergopti_plus/windows/_generated/prompt_builder.ahk']
 	},
 	{
-		name: 'codegen:llm-profiles-data:ahk — regenerate llm_profiles_data.ahk (DL-2+DL-3)',
+		name: 'codegen:llm-profiles-data:ahk — regenerate llm_profiles_data.ahk',
 		run() {
 			const { ok, stderr } = runNpmScript('codegen:llm-profiles-data:ahk');
 			return { ok, detail: ok ? undefined : stderr };
@@ -208,7 +208,7 @@ const PIPELINE = [
 		}
 	},
 	{
-		name: 'test:llm-legacy-basic-prompt-single-source — DL-2+DL-3 parity',
+		name: 'test:llm-legacy-basic-prompt-single-source — legacy/basic-prompt parity',
 		run() {
 			const { ok, stdout, stderr } = runNpmScript('test:llm-legacy-basic-prompt-single-source');
 			const lines = (stdout + stderr).trim().split('\n').filter(Boolean);

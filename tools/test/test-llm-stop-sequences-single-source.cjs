@@ -2,7 +2,7 @@
 
 /**
  * ==============================================================================
- * MODULE: LLM Stop-Sequences Single-Source Gate (P10.2 D-3)
+ * MODULE: LLM Stop-Sequences Single-Source Gate
  * DESCRIPTION:
  * Ensures that the three backend files that previously hard-coded stop-token
  * arrays (windows api_ollama.ahk, macos api_ollama.lua, macos api_mlx_inference.lua)

@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Regression test for a broken streaming parser in modules/llm/api_ollama.lua.
 ---
---- ROOT CAUSE ENCODED (P1.4):
+--- ROOT CAUSE ENCODED:
 --- chat() extracted each ndjson chunk's text with the Lua pattern
 ---   "content"%s*:%s*"(([^"\\]|\\")*)"
 --- which uses PCRE alternation ('|'). Lua patterns have no alternation — '|' is a

@@ -191,7 +191,7 @@ end
 --- @param fn   function Test body.
 function M.it(name, fn)
 	-- --only <substr>: run only tests whose name contains the filter (plain
-	-- substring) so one behaviour can be re-run in isolation (REFACTOR_GUIDE P9.5).
+	-- substring) so one behaviour can be re-run in isolation.
 	if _only_filter and not string.find(name, _only_filter, 1, true) then return end
 	local ok, err = pcall(function()
 		if _before_each_fn then _before_each_fn() end

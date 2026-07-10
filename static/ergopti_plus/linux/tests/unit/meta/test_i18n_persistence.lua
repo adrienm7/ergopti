@@ -1,12 +1,12 @@
 --- tests/unit/meta/test_i18n_persistence.lua
 ---
---- Phase P2.10: Integration tests for i18n locale persistence and discovery.
+--- Integration tests for i18n locale persistence and discovery.
 --- Verifies that the i18n module loads, persists locale changes via storage,
 --- discovers available locale files, and exposes the expected API surface.
 
 local helpers = require("tests.helpers")
 
-helpers.describe("i18n persistence (P2.10)", function()
+helpers.describe("i18n persistence", function()
 
   -- ==========================================================================
   -- 1. Module structure

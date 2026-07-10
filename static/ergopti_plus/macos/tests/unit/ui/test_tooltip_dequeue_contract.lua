@@ -6,7 +6,7 @@
 --- Validates the Hammerspoon stacked-tooltip dequeue logic against the canonical
 --- test vectors defined in _shared/tests/corpus/tooltip/dequeue_vectors.json.
 --- Loads the shared JSON at require time so the vectors are always in sync
---- with the cross-driver corpus (P0-G.5).
+--- with the cross-driver corpus.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")

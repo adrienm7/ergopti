@@ -392,7 +392,7 @@ end
 function M.it(name, fn)
 	-- --only <substr>: run only tests whose name contains the filter (plain
 	-- substring, no Lua pattern magic) so one behaviour can be re-run in
-	-- isolation from a red message (REFACTOR_GUIDE P9.5).
+	-- isolation from a red message.
 	if _only_filter and not string.find(name, _only_filter, 1, true) then return end
 	local ok, err = pcall(function()
 		if _before_each_fn then _before_each_fn() end

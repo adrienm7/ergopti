@@ -1,6 +1,6 @@
 /**
  * ==============================================================================
- * ESCROW: Tooltip corpus structural validation gate (P0-G.5)
+ * ESCROW: Tooltip corpus structural validation gate
  * DESCRIPTION:
  * Validates that the shared JSON corpus files
  * (_shared/tests/corpus/tooltip/layout_vectors.json and dequeue_vectors.json)

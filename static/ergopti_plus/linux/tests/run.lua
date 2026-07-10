@@ -64,7 +64,7 @@ if ok_utf8 and compat_utf8 and compat_utf8.install then compat_utf8.install() en
 local helpers = require("tests.helpers")
 
 -- --only <substr> / --only=<substr>: run only test cases whose name contains the
--- substring, so a single behaviour can be re-run in isolation (REFACTOR_GUIDE P9.5).
+-- substring, so a single behaviour can be re-run in isolation.
 local only_filter = nil
 if arg then
 	for i = 1, #arg do

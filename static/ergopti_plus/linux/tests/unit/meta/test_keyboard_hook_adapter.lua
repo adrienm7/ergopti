@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_keyboard_hook_adapter.lua
 ---
---- Phase 2B — B1 (extended): Integration tests for the keyboard_hook adapter
+--- Integration tests for the keyboard_hook adapter.
 --- Now tests the full implementation: subprocess management, pump(), context
 --- tracking, event parsing, control key dispatch, dual mode (observe/intercept).
 ---

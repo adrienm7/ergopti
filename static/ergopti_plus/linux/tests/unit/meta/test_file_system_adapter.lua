@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_file_system_adapter.lua
 ---
---- Phase 2B — B11: Integration tests for the file_system adapter
+--- Integration tests for the file_system adapter.
 --- (lfs + io.open wrapper). Tests ALL methods (read/write/append/exists/delete)
 --- against the real filesystem — these tests work on Windows, macOS, and Linux
 --- because io.open is platform-agnostic.
