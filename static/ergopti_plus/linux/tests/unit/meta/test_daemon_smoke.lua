@@ -61,6 +61,30 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       helpers.assert_true(src:find("os.clock() * 1000", 1, true) == nil,
         "the CPU-time keystroke timestamp must be gone — it corrupts every logged delay")
     end)
+
+    helpers.it("declares the focused-app cache as an upvalue BEFORE on_char", function()
+      -- Regression: `local _cached_app_id` was declared AFTER `local function
+      -- on_char`, so on_char resolved the name to a never-assigned GLOBAL
+      -- (always nil) while the onFocusChange callback wrote a different local.
+      -- app_id reached keylogger.is_password_app() as nil, silently disabling
+      -- keystroke suppression inside password managers (a privacy regression).
+      -- The declaration must PRECEDE on_char so both capture the same upvalue.
+      -- RED if the declaration is moved back below on_char.
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
+      helpers.assert_true(fh ~= nil, "daemon file is readable")
+      local src = fh:read("*a"); fh:close()
+
+      local decl_pos = src:find("local _cached_app_id", 1, true)
+      local on_char_pos = src:find("local function on_char", 1, true)
+      helpers.assert_true(decl_pos ~= nil, "_cached_app_id must be declared in the daemon")
+      helpers.assert_true(on_char_pos ~= nil, "on_char must be defined in the daemon")
+      helpers.assert_true(decl_pos and on_char_pos and decl_pos < on_char_pos,
+        "_cached_app_id must be declared BEFORE on_char so on_char captures it as "
+        .. "an upvalue — otherwise it reads a nil global and password-app keystroke "
+        .. "suppression is silently disabled")
+    end)
   end)
 
   -- ==========================================================================
