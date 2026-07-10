@@ -39,7 +39,9 @@ helpers.describe("ignored-window deferred expansion snapshots CoreState.buffer",
 			"buf_snapshot must be captured before hs.timer.doAfter(0)")
 
 		-- The snapshot must be passed to the closure (appears in the IIFE argument list).
-		local iife_end = src:find("buf_snapshot%)", do_after, true)
+		-- Plain-text search (4th arg true), so the ")" must be literal, not the
+		-- pattern escape "%)" — the escape would only match if plain were false.
+		local iife_end = src:find("buf_snapshot)", do_after, true)
 		helpers.assert_true(iife_end ~= nil,
 			"buf_snapshot must be passed as an IIFE argument")
 	end)
