@@ -364,6 +364,17 @@ function M.update_preview(buf)
 		return
 	end
 
+	-- When LLM is off and both preview toggles are off, no tooltip can ever be
+	-- shown and no inactivity timer needs arming. The remaining work -- provider
+	-- iteration, star/tail bucket scans, row building -- is pure per-keystroke
+	-- waste on the latency-critical keymap tap. Providers are themselves gated
+	-- by is_autocorrect_preview_enabled, so they can't surface a tooltip either.
+	-- Reset predictions (clean up stale state) and return immediately.
+	if not llm_on and not is_star_preview_enabled and not is_autocorrect_preview_enabled then
+		M.reset_predictions()
+		return
+	end
+
 	local last_word = buf:match("([^%s]+)$")
 	if not last_word then
 		M.reset_predictions()
