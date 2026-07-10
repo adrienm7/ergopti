@@ -50,13 +50,19 @@ local COMBO_SYMMETRIC_DEFAULT           = Defaults.combo_symmetric
 --- @return table|nil Decoded table, or nil.
 local TomlCodec = require("lib.toml.codec")
 
---- Load a TOML user-config file. Returns a Lua table or nil if absent.
+--- Load a TOML user-config file.
+--- Returns the decoded table on success, nil when the file is genuinely absent,
+--- and nil,'parse_error' when the file exists but cannot be decoded as TOML
+--- (so callers can distinguish first-launch from corruption).
 function M._load_toml_file(path)
 	local fh = io.open(path, "r")
 	if not fh then return nil end
 	local raw = fh:read("*a"); fh:close()
 	local ok, data = pcall(TomlCodec.decode, raw)
-	if not ok or type(data) ~= "table" then return nil end
+	if not ok or type(data) ~= "table" then
+		Logger.error(LOG, "Cannot parse '%s' as TOML — refusing to silently reset user config.", path)
+		return nil, "parse_error"
+	end
 	return data
 end
 
@@ -239,9 +245,15 @@ end
 --- @param user_config_path string Absolute path to config_karabiner.toml.
 --- @return table Full state: {enabled, tap_hold_config, mod_combos_config, timeouts…}
 function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
-	local data = M._load_toml_file(user_config_path)
+	local data, err = M._load_toml_file(user_config_path)
 
 	if not data then
+		if err == "parse_error" then
+			-- File exists but is corrupt: surface loudly and keep the corrupt
+			-- file for recovery — do NOT overwrite it with defaults.
+			Logger.error(LOG, "User config at '%s' is corrupt — config NOT loaded, file preserved for recovery.", user_config_path)
+			return M.build_default_state(tap_hold_keys, mod_combos)
+		end
 		Logger.info(LOG, "No user config found — initializing from defaults.")
 		return M.build_default_state(tap_hold_keys, mod_combos)
 	end
