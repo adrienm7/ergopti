@@ -4,24 +4,98 @@
 > 7 dimensions × 3 drivers + une passe de vérification adversariale des findings critiques).
 > 78 findings : **2 critical, 21 high, 35 medium, 20 low**.
 > Chaque finding porte : où (fichier:ligne), le problème, le correctif concret, et le test de
-> non-régression à ajouter. On suivra ce document étape par étape — coche au fur et à mesure.
+> non-régression à ajouter.
+>
+> **Ce document est le brief d'exécution d'un agent.** Il se suffit à lui-même : décisions déjà
+> prises (§5), répartition des lots (§0.1), discipline anti-erreur (§0.2), commandes de vérif
+> exactes (§0.3), protocole de suivi par commit (§6). Le **relecteur final = l'agent Opus** :
+> tiens la checklist §6 à jour (SHA de commit + nom du test par item) pour que la relecture se
+> fasse commit par commit.
 
 ---
 
 ## 0. Mode d'emploi
 
-- **Règle §5.9** : chaque correctif embarque un test rouge-avant / vert-après dans la bonne suite
-  (AHK `windows/tests`, macOS `macos/tests`, Linux `linux/tests`, cross-cutting `tools/test/*.cjs`).
-- **Vérifier avant chaque commit** : `npm run build:domain`, `node tools/test/run-js-suite.cjs`,
-  `cd static/ergopti_plus/macos && lua tests/run.lua`, `cd static/ergopti_plus/linux && lua tests/run.lua`,
-  et la suite AHK via Git Bash (résultats dans `%TEMP%/ergopti_test_results.txt`).
-- **Ne rien pusher** sur `dev` (déclenche les GitHub Actions). Commits locaux uniquement.
-- Un même bug racine peut apparaître dans plusieurs findings (les races convergent sur *une* cause) —
-  regroupe-les au moment d'exécuter.
+### 0.1 Qui fait quoi (répartition des lots)
+
+| Lot | Responsable | Statut |
+|---|---|---|
+| Races (Linux #66/#67 grab + cluster medium), Perf, Fail-fast, Tests, SSoT couleurs WPM | 🟢 **Agent exécutant** | à faire |
+| **i18n** — router + traduire les 21 langues (§3.4, 20 findings) | 🔵 **Opus (relecteur)** | réservé — NE PAS exécuter |
+| **Structure** — shell_runner + renommages manager→init + relocalisation lib/ (§3.7, 4 findings) | 🔵 **Opus (relecteur)** | réservé — NE PAS exécuter |
+| Webview Windows (§4.1), câblage timings (§4.2), hardware Linux (§4.3), macOS #63 | ⏸️ **Différé** | en attente écran/machine |
+
+> 🔵 = le mainteneur a explicitement demandé que **lui/Opus** fasse ces deux lots (traductions et
+> renommages de structure demandent jugement et soin). **L'agent exécutant ne touche NI aux fichiers
+> de locale `_shared/data/locales/*.json`, NI à la structure des dossiers Linux** — il les laisse
+> intacts pour éviter les conflits de fusion. Si un finding 🟢 croise malgré tout un de ces fichiers,
+> il s'arrête et le note en §6 plutôt que de forcer.
+
+### 0.2 Discipline — anti-erreur (À LIRE avant le premier commit)
+
+- **Lire d'abord les règles canoniques du repo** — elles priment et ne se réinventent pas :
+  `.github/copilot-instructions.md` (langage, bannières, docstrings, **8 variantes de logger**,
+  pattern `M.init()` + `require_state`, §5.9) et `docs/PROJECT_MEMORY.md` (gotchas durement acquis).
+- **NE JAMAIS pusher.** Commits **locaux** sur `dev` uniquement. `git push` déclenche les GitHub
+  Actions (crédits du mainteneur). Aucun push, aucune PR, aucun `--force`, aucun `--no-verify`.
+- **Historique linéaire.** Jamais de merge commit. [Conventional Commits](https://www.conventionalcommits.org/) :
+  sujet impératif minuscule ≤ 72 char, sans point final ; le corps explique le *pourquoi*, pas le *quoi*.
+- **Un commit = un finding** (ou un cluster de cause racine serré). Chaque commit embarque son test §5.9.
+  C'est ce qui rend la relecture bisectable — voir le protocole §6.
+- **§5.9 obligatoire, PROUVÉ.** Test rouge-AVANT / vert-APRÈS dans la bonne suite, encodant la **cause
+  racine** (pas le symptôme). Prouver le rouge (muter/stasher le fix → le test échoue), puis le vert.
+  Un fix sans rouge-avant prouvé = incomplet.
+- **Aucune ref de plan dans le code/les commits.** Interdits : `P0-…`, `P2.5`, `DL-3`, `Phase 2B`,
+  `REFACTOR_GUIDE`, **et les IDs de finding de ce doc** (`#66`, `race:linux#66`…). Ils vivent **dans ce
+  MD uniquement**. Les gates `tools/test/test-no-plan-refs-in-source.cjs` + le hook `.husky/commit-msg`
+  les rejettent — décris le *comportement* corrigé, pas le numéro d'item.
+- **Aucun crédit LLM.** Jamais de `Co-Authored-By` ; ne jamais mentionner Claude/Copilot/agent dans
+  un commit ou le code.
+- **Encodage AHK.** `.ahk` = UTF-8 **BOM + CRLF**. Éditer via l'outil Edit (préserve l'encodage) ;
+  **jamais** `cat >>` / heredoc POSIX (casse l'encodage → parser AHK abort **silencieux** → tests
+  fantômes non déclarés = faux vert). Suite v2 = **ASCII-only**, glyphes non-ASCII via `Chr(0xNNNN)`.
+  Escape guillemet dans un littéral = `` `" `` (pas `""`, qui est de l'AHK v1).
+- **Après TOUT edit `.ahk`** : `npm run test:ahk-encoding` (attrape le BOM/CRLF cassé avant qu'il ne
+  devienne des tests fantômes).
+- **Suite AHK = Git Bash UNIQUEMENT**, exe appelé en direct avec `/ErrorStdOut`. **Jamais** via
+  PowerShell `Start-Process` ni stdout redirigé (l'exe GUI perd stdout → abort → faux vert).
+- **Réinitialiser `test_config.ini` après CHAQUE run AHK** (le run le mute) :
+  `git checkout -- static/ergopti_plus/windows/tests/test_config.ini`.
+- **Lancer les suites concernées AVANT chaque commit** (§0.3). Jamais commiter sur un rouge. Un même
+  bug racine peut couvrir plusieurs findings → regroupe-les.
+- **SSoT.** Zéro duplication cross-driver ; le canonique vit dans `_shared`. Duplication tolérée
+  **seulement** si un drift gate la verrouille.
+- **Code anglais, UI localisée.** Bannières respectées (section = 5 lignes vides + `=`×7 alignés ;
+  sous-section = 3 lignes vides + `=`×5). `npm run lint:conventions:strict` doit passer.
+
+### 0.3 Commandes de vérification (exactes)
+
+```bash
+# JS / domain / codegen (rapide — à lancer quasi systématiquement) :
+npm run build:domain                                    # attendre "15 passed, 0 failed"
+node tools/test/run-js-suite.cjs                        # attendre "All 60 JS check(s) passed."
+
+# macOS (Lua, stubs — pas de Hammerspoon requis) :
+cd static/ergopti_plus/macos && lua tests/run.lua       # attendre "[OK] All Lua unit tests passed."
+
+# Linux (Lua ; luajit si dispo, sinon lua5.4/lua) :
+cd static/ergopti_plus/linux && luajit tests/run.lua    # attendre "Failed tests:  0"
+
+# Windows (AHK) — GIT BASH UNIQUEMENT :
+AHK="C:/Program Files/AutoHotkey/v2.0.19/AutoHotkey64.exe"                    # adapter à la version installée
+"$AHK" /ErrorStdOut static/ergopti_plus/windows/tests/run_all.ahk --dry-run  # 1) le graphe #Include parse
+"$AHK" /ErrorStdOut static/ergopti_plus/windows/tests/run_all.ahk            # 2) suite complète (TAP)
+#   → chercher "not ok" dans la sortie ; ligne de résumé "# NNNN passed, 0 failed."
+git checkout -- static/ergopti_plus/windows/tests/test_config.ini            # 3) reset OBLIGATOIRE après run
+npm run test:ahk-encoding                                                    # 4) après tout edit .ahk
+```
+
+> Un même bug racine peut apparaître dans plusieurs findings (les races convergent sur *une* cause) —
+> regroupe-les au moment d'exécuter, un seul commit + un seul test déterministe.
 
 ---
 
-## 1. Déjà corrigé cette nuit (non pushé — 43 commits d'avance sur origin/dev)
+## 1. Déjà corrigé cette nuit (non pushé — commits locaux uniquement sur `dev`)
 
 | Commit | Correctif |
 |---|---|
@@ -40,6 +114,10 @@ Suites en fin de nuit : **Linux 1040/0 · macOS [OK] · AHK 2992/0 · JS 60/60 �
 ---
 
 ## 2. Résumé exécutif & ordre d'exécution recommandé
+
+> ⚠️ **Lots** : l'ordre ci-dessous est l'ordre d'impact *global*. Pour savoir qui exécute quoi,
+> l'autorité est §0.1 + §6. Rappel : **i18n (§3.4) et structure (§3.7) sont réservés à Opus** —
+> l'agent exécutant les saute.
 
 **Par dimension** : races 9 · perf 9 · fail-fast 11 · i18n 20 · tests 22 · SSoT 3 · structure 4.
 
@@ -839,40 +917,69 @@ complet (evdev → expansion). Non exécutable ici.
 
 ---
 
-## 5. Décisions mainteneur / questions à ton réveil
+## 5. Décisions mainteneur — ACTÉES (2026-07-10)
 
-1. **Fix des races (le plus important)** : sur Linux la vraie correction = **grab le clavier**
-   (EVIOCGRAB / intercept mode déjà à moitié câblé, `keyboard_hook.lua:129`) pour que le daemon possède
-   le flux de sortie et ré-injecte les frappes normales — sinon physique et synthétique se courent après.
-   C'est un **changement de comportement majeur** (le daemon devient intercepteur). OK pour partir sur le
-   mode grab par défaut ? (verdict adversarial : `race:linux#66` = confirmé, `#67` = même racine.)
-2. **macOS `race:macos#63`** : le fix propre = gate le filtre d'écho char sur le PID source, **mais**
-   il faut d'abord **confirmer empiriquement** quel `eventSourceUnixProcessID` portent les échos
-   `keyStrokes()` sur ta version macOS (le vérificateur insiste là-dessus avant tout changement).
-   Tu peux tester ça toi-même en 5 min ?
-3. **Structure** : renommer les `manager.lua` Linux en `init.lua`, relocaliser `crash_reporter`/`updater`
-   sous `lib/`, créer `linux/adapters/shell_runner.lua` — churn de renommage cross-fichiers. On y va ?
-4. **i18n** : je peux router les ~20 textes en dur vers `t()` sans risque, mais certaines clés locales
-   n'existent pas encore (il faudra les ajouter aux 21 JSON). Tu valides que j'ajoute les clés manquantes ?
-5. **Reste des décisions déjà en attente** (voir aussi `docs/TODO_2026-07-10.md` §6) : retrait du
-   fallback kanata (fait), source d'horloge daemon (fait), délégation password-apps (refusée à raison).
+Les 4 arbitrages ci-dessous sont **fermés**. Exécute selon ; ne les rouvre pas.
+
+1. **Fix des races Linux (`race:linux#66`/`#67`)** — ✅ **Grab clavier par défaut.** Le daemon passe
+   intercepteur (EVIOCGRAB ; socle déjà à moitié câblé `keyboard_hook.lua:129`) : il possède le flux de
+   sortie et ré-injecte les frappes normales. Changement de comportement **assumé** — c'est la vraie
+   correction. L'agent implémente le grab + ré-injection **et** un **test déterministe** reproduisant
+   l'interleaving dans un harnais simulé (source evdev factice + injecteur factice, assertion sur
+   l'ordre de sortie, sans hardware). La **validation hardware finale** reste §4.3 (différée).
+2. **i18n (§3.4)** — 🔵 **Réservé Opus.** Le mainteneur fait lui-même les traductions 21 langues.
+   L'agent exécutant **ne route pas** les textes en dur et **ne touche pas** aux locales. Lot Opus.
+3. **Structure (§3.7)** — 🔵 **Réservé Opus, tout d'un coup.** shell_runner + renommages manager→init
+   + relocalisation `crash_reporter`/`updater` sous `lib/`. Fait par Opus, **pas** l'agent exécutant.
+4. **Items non vérifiables sans machine/écran** — ⏸️ **Différés :** webview (§4.1), câblage timings
+   (§4.2), hardware Linux (§4.3), et **macOS `race:macos#63`** (le fix + son test sont **préparés mais
+   NON activés** tant que le mainteneur n'a pas confirmé empiriquement quel `eventSourceUnixProcessID`
+   portent les échos `keyStrokes()` — le vérificateur adversarial l'exige avant tout changement).
+
+**Décisions déjà closes (nuit précédente)** : retrait du fallback kanata (fait `f8df076a1`), source
+d'horloge daemon (fait `27c478ed3` / `418073847` / `366fa15fb`), délégation password-apps (**refusée à
+raison** — elle *réduirait* la couverture privacy — couverture verrouillée `2d5c614f1`).
 
 ---
 
-## 6. Comment on avance demain — checklist ordonnée
+## 6. Comment on avance — checklist + protocole de suivi
 
-- [ ] **Bloc 1 — Races** : grab clavier Linux (#66/#67) → confirmer PID macOS (#63) → gates timing
-      Windows (#60/#61) → medium races (#64/#65/#68). *Un test déterministe qui reproduit
-      l'interleaving par frappe.*
-- [ ] **Bloc 2 — Perf frappe** : sortir les sous-process/IO bloquants du thread d'entrée
-      (#75 Linux, #72 macOS, #69 Windows, #76 Linux) — cache event-driven du focus, injection non
-      bloquante.
-- [ ] **Bloc 3 — i18n** : menu tray Linux (#31/#32/#34/#35), bridges locale='fr' (#33), puis les
-      littéraux Windows/macOS (#18-#30). Ajouter les clés manquantes aux 21 locales + étendre le
-      gate i18n existant.
-- [ ] **Bloc 4 — Fail-fast** : #9 (macOS, prioritaire) puis les autres échecs silencieux.
-- [ ] **Bloc 5 — Tests** : remplacer les no-op (#38/#39), tester i18n (#42), rejouer le moteur
-      partagé contre le corpus (#56/#57), couvrir secure_field_detector (#49).
-- [ ] **Bloc 6 — SSoT/Structure** : shell_runner Linux (#0), manager→init (#2), taxonomie lib/ (#1),
-      couleurs WPM (#4/#5/#6).
-- [ ] **Bloc 7 — Scopé** : migration webview (§4.1), câblage timings (§4.2), vérif hardware (§4.3).
+**Protocole (agent exécutant).** À chaque item terminé : remplace `[ ]` par `[x]` et **annote la
+ligne** avec le SHA court du commit + le nom du/des test(s) ajouté(s). Ex :
+
+```
+[x] Bloc 1 — grab clavier Linux — a1b2c3d — test_keyboard_grab_ordering.lua
+```
+
+Un item = un commit. Item bloqué ou volontairement sauté : `[~]` + la raison en une ligne. C'est ce
+qui permet la relecture commit par commit — ne mets **jamais** l'ID de finding (`#66`) dans le
+commit lui-même (§0.2), seulement ici dans le MD.
+
+**Lots 🟢 — agent exécutant :**
+
+- [ ] **Bloc 1 — Races** 🟢 : grab clavier Linux (`#66`/`#67`, décision §5.1) → gates timing Windows
+      (`#60`/`#61`) → medium races (`#64`/`#65`/`#68`). *Test déterministe reproduisant l'interleaving.*
+      (macOS `#63` = ⏸️ différé, §5.4.)
+- [ ] **Bloc 2 — Perf frappe** 🟢 : sortir les sous-process/IO bloquants du thread d'entrée
+      (`#75` Linux, `#72` macOS, `#69` Windows, `#76` Linux) — cache event-driven du focus, injection
+      non bloquante.
+- [ ] **Bloc 4 — Fail-fast** 🟢 : `#9` (macOS, prioritaire : config Karabiner corrompue = reset
+      silencieux de toute la config utilisateur) puis les autres échecs silencieux (`#10`–`#17`).
+- [ ] **Bloc 5 — Tests** 🟢 : remplacer les no-op (`#38`/`#39`), rejouer le moteur partagé contre le
+      corpus (`#56`/`#57`), couvrir `secure_field_detector` (`#49`). *(Le test du backbone i18n `#42`
+      part avec le lot i18n 🔵 pour ne pas croiser les locales.)*
+- [ ] **Bloc 6b — SSoT couleurs WPM** 🟢 : `#4`/`#5`/`#6` (couleurs déjà driftées mac/win →
+      canonique `_shared` + gate cross-driver).
+
+**Lots 🔵 — Opus (relecteur). NE PAS exécuter (§0.1, §5.2, §5.3) :**
+
+- [ ] **Bloc 3 — i18n** 🔵 : menu tray Linux (`#31`/`#32`/`#34`/`#35`), bridges `locale='fr'` (`#33`),
+      littéraux Windows/macOS (`#18`–`#30`), backbone i18n testé (`#42`). Routage + traductions 21
+      langues + clés manquantes dans les 21 JSON. **Opus.**
+- [ ] **Bloc 6a — Structure** 🔵 : `shell_runner` Linux (`#0`), manager→init (`#2`), taxonomie `lib/`
+      (`#1`), `tap_holds`→`tap_hold` (`#3`). **Opus.**
+
+**Lots ⏸️ — différés (écran/machine, §5.4) :**
+
+- [ ] **Bloc 7** ⏸️ : migration webview (§4.1), câblage timings (§4.2), vérif hardware Linux (§4.3),
+      macOS `#63` (fix préparé, non activé sans confirmation PID).
