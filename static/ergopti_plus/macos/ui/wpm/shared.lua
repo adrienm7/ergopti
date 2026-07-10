@@ -27,9 +27,12 @@ local hs = hs
 -- =================================
 
 -- Fallback hex colors used when no TOML/override color is available.
+-- Canonical values sourced from _shared/modules/wpm_widget/constants.toml [colors]
+-- (bg_manual = "#0055cc", bg_ai = "#7a30b0"). Must stay byte-identical to the
+-- shared TOML — any drift is a live, visible colour mismatch vs Windows.
 local COLOR_FALLBACK = {
-	manual = "#007aff",
-	llm    = "#af52de",
+	manual = "#0055cc",
+	llm    = "#7a30b0",
 }
 
 -- Sources that must never color the widget — they are not hotstring groups backed
