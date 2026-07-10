@@ -403,6 +403,50 @@ helpers.describe("ui.bridge_handlers", function()
   end)
 
   -- ==========================================================================
+  -- 6b. Locale routing (i18n) — dashboards follow the persisted locale
+  -- ==========================================================================
+
+  helpers.describe("bridge locale routing (i18n)", function()
+
+    -- Stubs lib.i18n.get_locale, runs fn, then restores package.loaded so the
+    -- stub never leaks into later test files.
+    local function with_locale_module(mod, fn)
+      local prev = package.loaded["lib.i18n"]
+      package.loaded["lib.i18n"] = mod
+      local ok, err = pcall(fn)
+      package.loaded["lib.i18n"] = prev
+      if not ok then error(err, 0) end
+    end
+
+    helpers.it("healthcheck payload uses the persisted locale, not a hardcoded 'fr'", function()
+      local hc = helpers.load_module("modules.ui.bridge_handlers.healthcheck_bridge")
+      with_locale_module({ get_locale = function() return "de" end }, function()
+        local result = hc.on_message("ready", build_mock_state())
+        helpers.assert_eq(result.locale, "de",
+          "healthcheck must render in the user's locale (de), not the hardcoded 'fr'")
+      end)
+    end)
+
+    helpers.it("onboarding init uses the persisted locale, not a hardcoded 'fr'", function()
+      local ob = helpers.load_module("modules.ui.bridge_handlers.onboarding_bridge")
+      with_locale_module({ get_locale = function() return "de" end }, function()
+        local result = ob.on_message({ step = "init" }, build_mock_state())
+        helpers.assert_eq(result.current_locale, "de",
+          "onboarding must open in the user's locale (de), not the hardcoded 'fr'")
+      end)
+    end)
+
+    helpers.it("falls back to 'fr' when lib.i18n resolves no locale", function()
+      local hc = helpers.load_module("modules.ui.bridge_handlers.healthcheck_bridge")
+      with_locale_module({ get_locale = function() return nil end }, function()
+        local result = hc.on_message("ready", build_mock_state())
+        helpers.assert_eq(result.locale, "fr",
+          "must fall back to 'fr' when no locale resolves (fail-safe default)")
+      end)
+    end)
+  end)
+
+  -- ==========================================================================
   -- 7. hotstrings_config_bridge
   -- ==========================================================================
 
