@@ -373,15 +373,12 @@ local function main()
 		-- it would make every recorded delay meaningless.
 		local now_ms = math.floor(Monotonic.now_ms())
 
-		-- Detect current app for per-app keylogger stats. The window_info adapter
-		-- exposes getFocused() (a WindowInfo table) — there is no getActiveAppID, so
-		-- the old guard was always false and app_id always nil (per-app stats and
-		-- the password guard were both dead).
-		local app_id = nil
-		if window_info and window_info.getFocused then
-			local wi = window_info.getFocused()
-			app_id = (type(wi) == "table" and wi.appId ~= "" and wi.appId) or nil
-		end
+	-- Detect current app for per-app keylogger stats. Read from the
+	-- process_lifecycle focus cache (updated off the input path at 250 ms
+	-- intervals) so no subprocess is spawned on the keystroke thread.
+	-- Before this fix, window_info.getFocused() was called on every
+	-- keystroke, forking up to 5 subprocesses synchronously on the hot path.
+	local app_id = _cached_app_id
 
 		-- Check password suppression.
 		if keylogger.is_password_app(app_id) then
@@ -663,8 +660,14 @@ local function main()
 	-- 8.12) Start process lifecycle polling if the adapter loaded.
 	-- tick() drives focus-change and app-launch/quit detection at 250 ms
 	-- intervals; the event loop calls it periodically.
+	-- Cache the focused app_id off the input path so on_char never spawns
+	-- subprocesses on every keystroke.
+	local _cached_app_id = nil
 	local tick_count = 0
 	if process_lifecycle then
+		process_lifecycle.onFocusChange(function(appName, _windowTitle)
+			_cached_app_id = (type(appName) == "string" and appName ~= "" and appName) or nil
+		end)
 		process_lifecycle.start()
 	end
 
