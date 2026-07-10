@@ -280,11 +280,14 @@ function M.try_auto_expand(m, char_len, is_ignored)
 
 	local repl_text = eff_plain
 
-	-- No-op guard: skip when the plain-text expansion equals what was typed.
+	-- No-op guard: when the plain-text expansion equals what was typed,
+	-- signal pass-through so onKeyDownRaw does NOT consume the triggering
+	-- keystroke. The character must remain on screen — returning true would
+	-- suppress it even though nothing was injected (the dropped-char bug).
 	if repl_text == typed then
 		if m.final_result then _state.suppress_rescan() end
 		if not is_ignored and tooltip.hide_forced then tooltip.hide_forced() elseif not is_ignored and tooltip.hide then tooltip.hide() end
-		return true
+		return false
 	end
 
 	-- Compute how many backspaces and what to type, keeping common prefix chars.
@@ -384,14 +387,14 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 
 	local consume_term = _registry.terminator_is_consumed(chars)
 
-	-- No-op guard: skip when the plain-text expansion equals the trigger.
-	-- Compares plain_repl (not raw repl) so a mapping whose repl contains
-	-- emission tokens but resolves to the same plain text as its trigger
-	-- is correctly treated as a no-op — matches try_auto_expand's policy.
+	-- No-op guard: when the replacement equals the trigger, signal
+	-- pass-through so the terminating character is NOT consumed. It must
+	-- stay on screen — returning true would suppress it with nothing
+	-- injected (the dropped-terminator-chars bug).
 	if m.plain_repl == trigger then
 		if m.final_result then _state.suppress_rescan() end
 		if not is_ignored and tooltip.hide_forced then tooltip.hide_forced() elseif not is_ignored and tooltip.hide then tooltip.hide() end
-		return true
+		return false
 	end
 
 	-- Record a "suggestion shown" telemetry event for terminators that indicate
