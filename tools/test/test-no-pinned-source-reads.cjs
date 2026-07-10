@@ -36,10 +36,13 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'windows', 'tests');
 // Frozen baseline — the current count of location-pinned source-reading test
 // files. Drive toward zero by migrating each to a _Driver* helper; NEVER raise
 // it to make a new test pass.
-// History: 19 → 20 (session 2026-07-10: three source-scan tests added —
-//                     test_update_preview_early_out.lua, test_ignored_window_deferred_buffer_snapshot.lua,
-//                     test_injector_commands.lua extended with source assertions —
-//                     each is a deliberate source invariant backed by the audit plan's prescribed test)
+// History: 19 → 20 (session 2026-07-10: test_hse_suppress_release_bounded.ahk
+//                     added a raw FileRead of a driver source. This is an .ahk-only
+//                     ratchet, so only .ahk tests count here — the .lua source-scan
+//                     tests from the same session are tracked by the sibling
+//                     test-no-pinned-source-reads-lua.cjs, not here. Prefer migrating
+//                     test_hse_suppress_release_bounded.ahk to a _Driver* helper so
+//                     this baseline can return to 19.)
 const BASELINE = 20;
 
 const HELPER_RE = /_DriverSourceConcat|_DriverFuncBody|_DriverDirConcat/;
