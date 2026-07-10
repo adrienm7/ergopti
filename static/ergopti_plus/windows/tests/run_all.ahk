@@ -385,6 +385,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_personal_hotstring_seed.ahk
 #Include meta/test_personal_hotstring_new_section_seed.ahk
 #Include meta/test_personal_hotstring_cache_invalidation.ahk
+#Include meta/test_personal_toml_write_failure_logged.ahk
 #Include meta/test_personal_section_label_disambiguation_wired.ahk
 #Include meta/test_no_duplicate_defaults.ahk
 #Include meta/test_require_state_pattern.ahk
@@ -596,6 +597,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_kl_window_switch_pre_flush.ahk
 #Include meta/test_klpf_writeatomic_delete_window.ahk
 #Include meta/test_klr_builddatabase_debug_fileappend_hot.ahk
+#Include meta/test_klr_builddatabase_failure_logged.ahk
 #Include meta/test_klw_ctx_unbounded_hist_growth.ahk
 #Include meta/test_lalt_capslock_tap_min_duration.ahk
 #Include meta/test_llm_accept_cleanup_in_finally.ahk

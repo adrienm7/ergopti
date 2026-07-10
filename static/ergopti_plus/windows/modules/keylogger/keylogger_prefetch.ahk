@@ -87,6 +87,7 @@ KLPF_BuildAndWrite(which, metrics_dir, dbg := "", mode := "full") {
     db := KLR_BuildDatabase(metrics_dir)
     if !db {
         KLPF_DbgWrite(dbg, "FAIL: KLR_BuildDatabase returned 0")
+        try LoggerError("KLReader", "Metrics DB build failed (winsqlite3.dll/schema.sql/data.sql) — dashboard '{1}' shows no data.", which)
         return false
     }
     t_db := A_TickCount
