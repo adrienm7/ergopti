@@ -994,7 +994,7 @@ commit lui-même (§0.2), seulement ici dans le MD.
   - [x] #38 Windows 9 no-op healthcheck tests → real assertions — 2631bde53 — test_healthcheck_core.ahk
   - [x] #39 macOS lib/i18n.lua behavioral test — 50a66e764 — test_i18n.lua (27 test cases, 7 describe blocks)
   - [x] #56 rejouer moteur hotstring partagé contre le corpus — ea6a7f055 — test_corpus_hotstring_engine.lua (18/18 vectors replayed)
-  - [ ] #57 rejouer moteur hotstring Windows contre le corpus
+  - [x] #57 rejouer moteur hotstring Windows contre le corpus — 444897734 — test_corpus_hotstrings.ahk §5 (18 vectors + collision replay)
   - [x] #49 couvrir secure_field_detector — caf45b2fa — test_secure_field_detector.lua (macOS 20 tests + Linux 27 tests)
 - [x] **Bloc 6b — SSoT couleurs WPM** 🟢 : #4/#5/#6 (couleurs déjà driftées mac/win →
       canonique _shared + gate cross-driver).
