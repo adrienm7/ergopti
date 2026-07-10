@@ -47,12 +47,12 @@ _MetaCheckFireLogDeferAfterSuppress() {
 	; The fire-log drain (90 ms by default) MUST fire AFTER the suppress
 	; release (60 ms by default). If this invariant is inverted, the log drain
 	; runs inside the suppress window, stretches OnChar, and re-swallows keys
-	; typed right after a trigger — the exact "abcd"->"acd" bug.
+	; typed right after a trigger - the exact "abcd"->"acd" bug.
 	Assert(fireDefer > suppressRelease,
 		"HSE_FIRE_LOG_DEFER_MS (" . fireDefer . " ms) must be greater than "
-		. "HSE_SUPPRESS_RELEASE_DELAY_MS (" . suppressRelease . " ms) — "
+		. "HSE_SUPPRESS_RELEASE_DELAY_MS (" . suppressRelease . " ms) - "
 		. "the fire-log drain must fire AFTER the suppress release or the "
-		. "\"abcd\"->\"acd\" key-swallow bug returns")
+		. '"abcd"->"acd" key-swallow bug returns')
 }
 
 Test("meta fire-log defer: HSE_FIRE_LOG_DEFER_MS > HSE_SUPPRESS_RELEASE_DELAY_MS (abcd->acd key-swallow guard)",
