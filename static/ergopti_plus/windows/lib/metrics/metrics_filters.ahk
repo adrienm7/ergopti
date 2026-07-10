@@ -184,8 +184,18 @@ global MF_SYSTEM_AUTH_CLASSES := Map(
 
 ; Returns true when the keylogger should DROP the current event because
 ; one of the privacy filters matches the focused window.
+MF_StartFocusRefresh() {
+    ; Refresh the focus cache off the keystroke thread via a periodic timer
+    ; so WinGetTitle/WinGetProcessName (which send WM_GETTEXT and can block
+    ; on a busy/unresponsive foreground window) never land on the hot path.
+    ; The 50 ms interval matches the TTL the cache itself enforces.
+    SetTimer(MF_RefreshFocus, MF_FOCUS_TTL_MS)
+}
+
 MF_ShouldFilter() {
-    MF_RefreshFocus()
+    ; Focus cache is refreshed off-thread by the periodic timer started in
+    ; MF_StartFocusRefresh() — NEVER call MF_RefreshFocus() synchronously
+    ; here (it does blocking WinGet* calls that stall the keystroke hook).
     
     ; Capture the reference once so all subsequent property reads are
     ; consistent with each other even if a background refresh occurs.
