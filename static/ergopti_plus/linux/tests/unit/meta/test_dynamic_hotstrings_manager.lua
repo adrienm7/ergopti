@@ -268,4 +268,48 @@ helpers.describe("dynamic hotstrings manager", function()
 
   end)
 
+  -- ==========================================================================
+  -- 8. Malformed personal_info.toml fail-fast
+  -- ==========================================================================
+
+  helpers.describe("malformed personal_info.toml fail-fast", function()
+
+    -- Root cause: a syntactically invalid personal_info.toml used to be swallowed
+    -- silently — the @-tag shortcuts simply vanished with no log. init() must
+    -- instead surface the malformation loudly via Logger.error so the user knows
+    -- their file was rejected rather than silently ignored.
+    helpers.it("logs Logger.error when personal_info.toml is malformed", function()
+      local tmp_dir   = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "/tmp"
+      local toml_path = tmp_dir:gsub("\\", "/") .. "/ergopti_dh_malformed.toml"
+      local fh = assert(io.open(toml_path, "w"))
+      -- Unterminated table header — the shared toml_codec rejects it (decode → nil).
+      fh:write("[info\nfirst_name = \"Adrien\"\n")
+      fh:close()
+
+      local logger     = require("logger.shim")
+      local orig_error = logger.error
+      local errors     = {}
+      logger.error = function(_tag, fmt, ...)
+        errors[#errors + 1] = (select("#", ...) > 0) and string.format(fmt, ...) or tostring(fmt)
+      end
+
+      local ok = pcall(function()
+        dh.init({ trigger_char = "\\", personal_info_path = toml_path })
+      end)
+
+      -- Restore and clean up BEFORE asserting so nothing leaks on failure.
+      logger.error = orig_error
+      os.remove(toml_path)
+
+      helpers.assert_true(ok, "init must not crash on a malformed TOML")
+      local logged = false
+      for _, m in ipairs(errors) do
+        if m:find("malformed", 1, true) then logged = true end
+      end
+      helpers.assert_true(logged,
+        "init must log an ERROR mentioning the malformed personal_info.toml")
+    end)
+
+  end)
+
 end)
