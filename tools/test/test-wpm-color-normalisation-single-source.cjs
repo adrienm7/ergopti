@@ -2,23 +2,30 @@
 
 /**
  * ==============================================================================
- * MODULE: WPM Color Normalisation Golden-Vector Gate (#6)
+ * MODULE: WPM Color Normalisation Cross-Driver Drift Gate (#6)
  * DESCRIPTION:
  * The WPM widget re-projects hotstring/AI accent colours onto a fixed HSL
- * target (L=0.40, S=1.00) and darkens the unit strip. Both algorithms are
- * implemented twice — once in Lua (macOS wpm_widget.lua) and once in AHK
- * (Windows wpm_display.ahk / wpm_widget.ahk) — with NO shared canonical and
- * NO cross-driver vectors to catch drift.
+ * target (L=0.40, S=1.00) and darkens the unit strip by unit_strip_darken_factor
+ * (0.40). Both algorithms are implemented twice — once in Lua (macOS
+ * ui/wpm/wpm_widget.lua) and once in AHK (Windows ui/wpm/wpm_widget.ahk +
+ * wpm_display.ahk) — with the constants single-sourced in
+ * _shared/modules/wpm_widget/constants.toml but the rounding hand-written per
+ * driver.
  *
- * This test implements the reference algorithm ONCE in JS (matching the
- * shared Lua engine's semantics: floor for darken, floor(x+0.5) for HSL→RGB),
- * feeds a golden corpus of real-world accent colours through it, and hardcodes
- * the expected outputs. Either driver's implementation that disagrees with
- * these golden values has drifted and must be aligned.
+ * WHY THIS GATE EXISTS (and how it is NOT tautological):
+ * The previous version only ran a JS reference against golden values computed
+ * from that same JS reference — it never read the drivers, so a driver could
+ * drift freely and stay green. It also merely WARNED that the AHK darken
+ * (Round) and the Lua darken (math.floor, truncating) disagreed by ±1/255.
  *
- * The corpus covers the colour gamut: red, orange, yellow, green, cyan, blue,
- * purple, magenta, plus real Ergonis accent colours gleaned from hotstring
- * TOML files, plus edge cases (achromatic, 3-char shorthand invariance).
+ * This version does two things the old one did not:
+ *   1. CANONICAL: round-half-up (floor(x + 0.5) in Lua == Round() in AHK) is the
+ *      single agreed rounding for BOTH normalise and darken. The golden corpus
+ *      below is recomputed for that canonical and pins the reference spec.
+ *   2. REAL DRIFT CHECK: it reads the four actual driver call sites and asserts
+ *      each implements the canonical round-half-up rounding AND sources the
+ *      darken factor + HSL L/S from the shared constants — so a driver that
+ *      truncates, rounds differently, or hardcodes a literal turns this red.
  * ==============================================================================
  */
 
@@ -29,10 +36,10 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 
-// Shared TOML constants used by both drivers.
+// Shared TOML constants used by both drivers (canonical values).
 const WIDGET_HSL_L = 0.40;
 const WIDGET_HSL_S = 1.00;
-const UNIT_DARKEN   = 0.40;
+const UNIT_DARKEN  = 0.40;
 
 /**
  * Parse a 6-char hex colour ("#rrggbb" or "rrggbb") into {r,g,b} 0-255 ints.
@@ -65,9 +72,14 @@ function extractHue(rgb) {
 	return hue / 6;
 }
 
+/** Round-half-up, matching Lua math.floor(x + 0.5) and AHK Round() for x ≥ 0. */
+function roundHalfUp(x) {
+	return Math.floor(x + 0.5);
+}
+
 /**
  * HSL→RGB: re-project a hue onto the fixed widget L/S target.
- * Returns "#rrggbb". Matches the Lua _wpm_normalise_hex floor(x+0.5) rounding.
+ * Returns "#rrggbb". Round-half-up rounding (canonical, both drivers).
  */
 function normaliseHex(hex) {
 	const rgb = parseHex(hex);
@@ -90,70 +102,65 @@ function normaliseHex(hex) {
 	else if (h6 < 5) { r = X; g = 0; b = C; }
 	else             { r = C; g = 0; b = X; }
 
-	// floor(x+0.5) == Math.round for non-negative — matches Lua.
-	const nr = Math.max(0, Math.min(255, Math.floor((r + M) * 255 + 0.5)));
-	const ng = Math.max(0, Math.min(255, Math.floor((g + M) * 255 + 0.5)));
-	const nb = Math.max(0, Math.min(255, Math.floor((b + M) * 255 + 0.5)));
+	const nr = Math.max(0, Math.min(255, roundHalfUp((r + M) * 255)));
+	const ng = Math.max(0, Math.min(255, roundHalfUp((g + M) * 255)));
+	const nb = Math.max(0, Math.min(255, roundHalfUp((b + M) * 255)));
 
 	return '#' + [nr, ng, nb].map(v => v.toString(16).padStart(2, '0')).join('');
 }
 
 /**
  * Darken a hex colour by the UNIT_DARKEN factor (0.40).
- * Each RGB channel × factor, floored (matches Lua _wpm_darken_hex semantics).
+ * Each RGB channel × factor, round-half-up (canonical, both drivers).
  */
 function darkenHex(hex) {
 	const rgb = parseHex(hex);
 	if (!rgb) return null;
 
 	return '#' + [
-		Math.floor(rgb.r * UNIT_DARKEN),
-		Math.floor(rgb.g * UNIT_DARKEN),
-		Math.floor(rgb.b * UNIT_DARKEN),
+		Math.max(0, Math.min(255, roundHalfUp(rgb.r * UNIT_DARKEN))),
+		Math.max(0, Math.min(255, roundHalfUp(rgb.g * UNIT_DARKEN))),
+		Math.max(0, Math.min(255, roundHalfUp(rgb.b * UNIT_DARKEN))),
 	].map(v => v.toString(16).padStart(2, '0')).join('');
 }
 
 // ── Golden corpus ────────────────────────────────────────────────────────────
 // Each entry: input accent hex, expected normalized hex, expected darkened hex.
-// These are the authoritative expected outputs. Either driver must match these
-// exactly, or there is a cross-driver drift to fix.
-
-// WARNING: These golden values were computed by the JS reference implementation
-// and verified byte-for-byte. Do NOT hand-edit them — if a value changes, it
-// means the reference algorithm changed, and both drivers must be updated.
+// Computed by the reference above under the round-half-up canonical. They pin
+// the reference spec against accidental change — the real cross-driver check is
+// the source drift gate below.
 const GOLDEN = [
 	// Primary/secondary wheel — each a distinct hue.
 	{ input: '#ff0000', norm: '#cc0000', darken: '#660000' },  // red
 	{ input: '#ff8800', norm: '#cc6d00', darken: '#663600' },  // orange
-	{ input: '#ffcc00', norm: '#cca300', darken: '#665100' },  // yellow
-	{ input: '#00cc00', norm: '#00cc00', darken: '#005100' },  // green
-	{ input: '#00cccc', norm: '#00cccc', darken: '#005151' },  // cyan
-	{ input: '#0066ff', norm: '#0052cc', darken: '#002866' },  // blue
-	{ input: '#6600cc', norm: '#6600cc', darken: '#280051' },  // purple
-	{ input: '#cc00cc', norm: '#cc00cc', darken: '#510051' },  // magenta
+	{ input: '#ffcc00', norm: '#cca300', darken: '#665200' },  // yellow
+	{ input: '#00cc00', norm: '#00cc00', darken: '#005200' },  // green
+	{ input: '#00cccc', norm: '#00cccc', darken: '#005252' },  // cyan
+	{ input: '#0066ff', norm: '#0052cc', darken: '#002966' },  // blue
+	{ input: '#6600cc', norm: '#6600cc', darken: '#290052' },  // purple
+	{ input: '#cc00cc', norm: '#cc00cc', darken: '#520052' },  // magenta
 
 	// Real Ergonis hotstring group colours (from TOML _meta.color).
-	{ input: '#0055cc', norm: '#0055cc', darken: '#002251' },  // magickey blue
-	{ input: '#7a30b0', norm: '#7600cc', darken: '#301346' },  // AI purple
+	{ input: '#0055cc', norm: '#0055cc', darken: '#002252' },  // magickey blue
+	{ input: '#7a30b0', norm: '#7600cc', darken: '#311346' },  // AI purple
 	{ input: '#ff4444', norm: '#cc0000', darken: '#661b1b' },  // light red
 
 	// Achromatic / grey — normalise returns null (no hue), darken still works.
-	// These exercise the fallback path: the caller should pass a fallback hex.
 	{ input: '#888888', norm: null, darken: '#363636' },       // grey
-	{ input: '#cccccc', norm: null, darken: '#515151' },       // light grey
+	{ input: '#cccccc', norm: null, darken: '#525252' },       // light grey
 	{ input: '#ffffff', norm: null, darken: '#666666' },       // white
 
 	// Edge: case-normalisation (upper/lower/mixed).
 	{ input: '#FF8800', norm: '#cc6d00', darken: '#663600' },  // uppercase same as lowercase
-	{ input: '#00Cc00', norm: '#00cc00', darken: '#005100' },  // mixed case
+	{ input: '#00Cc00', norm: '#00cc00', darken: '#005200' },  // mixed case
 
 	// Real-world accents from tooltip/hotstring colour palettes.
 	{ input: '#e74c3c', norm: '#cc1300', darken: '#5c1e18' },  // warm red
-	{ input: '#2ecc71', norm: '#00cc57', darken: '#12512d' },  // emerald
-	{ input: '#3498db', norm: '#007acc', darken: '#143c57' },  // sky blue
+	{ input: '#2ecc71', norm: '#00cc57', darken: '#12522d' },  // emerald
+	{ input: '#3498db', norm: '#007acc', darken: '#153d58' },  // sky blue
 ];
 
-// ── Verify golden corpus ─────────────────────────────────────────────────────
+// ── Verify golden corpus (reference spec pin) ────────────────────────────────
 
 const errors = [];
 
@@ -163,23 +170,11 @@ for (let i = 0; i < GOLDEN.length; i++) {
 	const actualDark = darkenHex(g.input);
 
 	if (actualNorm !== g.norm) {
-		if (g.norm === null) {
-			// We expected null (achromatic) — verify the algorithm correctly
-			// returns null so the caller applies fallback.
-			if (actualNorm !== null) {
-				errors.push(
-					`Vector[${i}] "${g.input}": expected norm=null (achromatic), got "${actualNorm}". ` +
-					`Achromatic guard (delta≤0.001) missed an achromatic input.`
-				);
-			}
-		} else {
-			errors.push(
-				`Vector[${i}] "${g.input}": expected norm="${g.norm}", got "${actualNorm}". ` +
-				`Recalculate the golden expected value.`
-			);
-		}
+		errors.push(
+			`Vector[${i}] "${g.input}": expected norm=${g.norm === null ? 'null' : `"${g.norm}"`}, got ` +
+			`${actualNorm === null ? 'null' : `"${actualNorm}"`}. Recalculate the golden expected value.`
+		);
 	}
-
 	if (actualDark !== g.darken) {
 		errors.push(
 			`Vector[${i}] "${g.input}": expected darken="${g.darken}", got "${actualDark}". ` +
@@ -188,55 +183,131 @@ for (let i = 0; i < GOLDEN.length; i++) {
 	}
 }
 
-if (errors.length > 0) {
-	console.error('\x1b[31m[ERROR] WPM colour normalisation golden vectors do not match:\x1b[0m');
-	for (const e of errors) console.error('    ' + e);
-	process.exit(1);
+// ── Cross-driver SOURCE drift gate (the non-tautological core) ───────────────
+// Read the four real driver call sites and assert each implements the canonical
+// round-half-up rounding, and sources the darken factor + HSL L/S from the
+// shared constants.toml rather than a re-typed literal.
+
+const LUA_WIDGET  = 'static/ergopti_plus/macos/ui/wpm/wpm_widget.lua';
+const AHK_WIDGET  = 'static/ergopti_plus/windows/ui/wpm/wpm_widget.ahk';
+const AHK_DISPLAY = 'static/ergopti_plus/windows/ui/wpm/wpm_display.ahk';
+const AHK_CONFIG  = 'static/ergopti_plus/windows/ui/wpm/wpm_config.ahk';
+const SHARED_TOML = 'static/ergopti_plus/_shared/modules/wpm_widget/constants.toml';
+
+function readFile(rel) {
+	const p = path.join(ROOT, rel);
+	return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null;
 }
 
-// ── Cross-driver gate: verify AHK darken (Round) consistency ─────────────────
-// The AHK _WPMWidget_DarkenHex uses Round() while Lua uses math.floor().
-// For factor 0.40, the two can differ by ±1 on boundary values (e.g. 122×0.40).
-// This check alerts when they diverge so the maintainer can decide which to fix.
-
-function darkenRound(hex) {
-	const rgb = parseHex(hex);
-	if (!rgb) return null;
-	return '#' + [
-		Math.round(rgb.r * UNIT_DARKEN),
-		Math.round(rgb.g * UNIT_DARKEN),
-		Math.round(rgb.b * UNIT_DARKEN),
-	].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('');
+/**
+ * Slice the body of a function: from `startMarker` to the earliest boundary in
+ * `endMarkers` that follows it (or a generous cap if none is found). Bounds each
+ * function precisely so a long body's rounding is inside the slice and a
+ * neighbouring function's rounding never leaks in.
+ */
+function funcBody(src, startMarker, endMarkers) {
+	const i = src.indexOf(startMarker);
+	if (i < 0) return null;
+	let end = src.length;
+	for (const m of endMarkers) {
+		const j = src.indexOf(m, i + startMarker.length);
+		if (j >= 0 && j < end) end = j;
+	}
+	return src.slice(i, end);
 }
 
-const roundWarnings = [];
-for (const g of GOLDEN) {
-	const floorV = darkenHex(g.input);
-	const roundV = darkenRound(g.input);
-	if (floorV !== roundV) {
-		roundWarnings.push(
-			`"${g.input}" darken: floor="${floorV}" ≠ round="${roundV}". ` +
-			`AHK (Round) and Lua (floor) disagree — choose one canonical.`
+// (1) macOS Lua darken + normalise must round-half-up: floor(x + 0.5).
+const luaSrc = readFile(LUA_WIDGET);
+if (!luaSrc) {
+	errors.push(`missing driver source ${LUA_WIDGET}`);
+} else {
+	// normalise is defined before darken; bound each to the next 'local function'.
+	const normBody = funcBody(luaSrc, 'local function _wpm_normalise_hex', ['local function _wpm_darken_hex']);
+	if (!normBody) errors.push('could not locate _wpm_normalise_hex in wpm_widget.lua');
+	else if (!normBody.includes('+ 0.5)')) {
+		errors.push('Lua _wpm_normalise_hex must round-half-up (math.floor(x + 0.5)).');
+	}
+	const darkenBody = funcBody(luaSrc, 'local function _wpm_darken_hex', ['\nlocal function ', '\n\n\n']);
+	if (!darkenBody) errors.push('could not locate _wpm_darken_hex in wpm_widget.lua');
+	else if (!darkenBody.includes('+ 0.5)')) {
+		errors.push(
+			'Lua _wpm_darken_hex must round-half-up (math.floor(x + 0.5)). A bare ' +
+			'math.floor(x) truncates and drifts ±1/255 from the AHK Round() darken.'
+		);
+	}
+	if (!luaSrc.includes('unit_strip_darken_factor')) {
+		errors.push('Lua widget must read unit_strip_darken_factor from the shared constants, not a hardcoded 0.40.');
+	}
+	if (!luaSrc.includes('widget_hsl_l') || !luaSrc.includes('widget_hsl_s')) {
+		errors.push('Lua widget must read widget_hsl_l / widget_hsl_s from the shared constants.');
+	}
+}
+
+// (2) Windows AHK darken must use Round() (round-half-up), matching Lua.
+const ahkWidgetSrc = readFile(AHK_WIDGET);
+if (!ahkWidgetSrc) {
+	errors.push(`missing driver source ${AHK_WIDGET}`);
+} else {
+	const darkenBody = funcBody(ahkWidgetSrc, '_WPMWidget_DarkenHex(hex)', ['\n}']);
+	if (!darkenBody) errors.push('could not locate _WPMWidget_DarkenHex in wpm_widget.ahk');
+	else if (!/Round\(/.test(darkenBody)) {
+		errors.push(
+			'AHK _WPMWidget_DarkenHex must round-half-up (Round(...)). A Floor()/truncation ' +
+			'would drift ±1/255 from the Lua darken.'
 		);
 	}
 }
 
-console.log('\x1b[32m[OK] WPM colour normalisation — ' + GOLDEN.length + ' golden vectors verified.\x1b[0m');
-
-if (roundWarnings.length > 0) {
-	console.warn('\x1b[33m[WARN] AHK Round() vs Lua floor() darken divergence detected:\x1b[0m');
-	for (const w of roundWarnings) console.warn('    ' + w);
-	console.warn('\x1b[33m    → Not a hard failure yet, but investigate before the next driver release.\x1b[0m');
+// (3) Windows AHK normalise must use Round() (round-half-up), matching Lua.
+const ahkDisplaySrc = readFile(AHK_DISPLAY);
+if (!ahkDisplaySrc) {
+	errors.push(`missing driver source ${AHK_DISPLAY}`);
 } else {
-	console.log('\x1b[32m[OK] AHK Round() and Lua floor() darken are byte-identical for this corpus.\x1b[0m');
-}
-
-// ── Prevent golden corpus staleness — verify this file is referenced ─────────
-// Scan for the test file path in known consumers (CI config, run-js-suite).
-const ciPath = path.join(ROOT, '.github', 'workflows', 'ci.yml');
-if (fs.existsSync(ciPath)) {
-	const ciContent = fs.readFileSync(ciPath, 'utf8');
-	if (!ciContent.includes('test-wpm-color-normalisation')) {
-		console.warn('\x1b[33m[WARN] test-wpm-color-normalisation-single-source.cjs is not referenced in CI workflow.\x1b[0m');
+	const normBody = funcBody(ahkDisplaySrc, '_WPMWidget_NormaliseHex(', ['\n}']);
+	if (!normBody) errors.push('could not locate _WPMWidget_NormaliseHex in wpm_display.ahk');
+	else if (!/Round\(/.test(normBody)) {
+		errors.push('AHK _WPMWidget_NormaliseHex must round-half-up (Round(...)).');
 	}
 }
+
+// (4) Windows AHK config must read the darken factor + HSL target from constants.toml.
+const ahkConfigSrc = readFile(AHK_CONFIG);
+if (!ahkConfigSrc) {
+	errors.push(`missing driver source ${AHK_CONFIG}`);
+} else {
+	for (const key of ['unit_strip_darken_factor', 'widget_hsl_l', 'widget_hsl_s']) {
+		if (!ahkConfigSrc.includes(key)) {
+			errors.push(`AHK wpm_config must read ${key} from the shared constants.toml, not a re-typed literal.`);
+		}
+	}
+}
+
+// (5) The shared constants.toml holds the canonical values both drivers consume.
+const tomlSrc = readFile(SHARED_TOML);
+if (!tomlSrc) {
+	errors.push(`missing shared constants ${SHARED_TOML}`);
+} else {
+	const canon = [
+		['unit_strip_darken_factor', UNIT_DARKEN],
+		['widget_hsl_l', WIDGET_HSL_L],
+		['widget_hsl_s', WIDGET_HSL_S],
+	];
+	for (const [key, val] of canon) {
+		const m = tomlSrc.match(new RegExp('^\\s*' + key + '\\s*=\\s*([0-9.]+)', 'm'));
+		if (!m) errors.push(`shared constants.toml is missing ${key}`);
+		else if (Math.abs(parseFloat(m[1]) - val) > 1e-9) {
+			errors.push(`shared constants.toml ${key}=${m[1]} but the gate canonical is ${val}.`);
+		}
+	}
+}
+
+if (errors.length > 0) {
+	console.error('\x1b[31m[ERROR] WPM colour normalisation cross-driver drift:\x1b[0m');
+	for (const e of errors) console.error('    ' + e);
+	process.exit(1);
+}
+
+console.log(
+	'\x1b[32m[OK] WPM colour normalisation — ' + GOLDEN.length +
+	' golden vectors + both drivers round-half-up on shared constants.\x1b[0m'
+);

@@ -90,7 +90,8 @@ const CHECKS = [
 	{ name: 'gesture slot-space single source (Linux derives from actions.toml [slots]; macOS literals + DEFAULT_GESTURES key-space pinned to it)', cmd: 'node', args: ['tools/test/test-gesture-slots-single-source.cjs'], repro: 'node tools/test/test-gesture-slots-single-source.cjs' },
 	{ name: 'keylogger timing constants single source (CONTEXT_TTL_MS / PARK_CHECK_MS / TOPO_TICK_MS match the shared timing registry)', cmd: 'node', args: ['tools/test/test-keylogger-timings-single-source.cjs'], repro: 'node tools/test/test-keylogger-timings-single-source.cjs' },
 	{ name: 'no plan-item references in tracked source (refactor/delivery tokens purged; algorithmic Phase-N allowlisted)', cmd: 'node', args: ['tools/test/test-no-plan-refs-in-source.cjs'], repro: 'node tools/test/test-no-plan-refs-in-source.cjs' },
-	{ name: 'WPM widget constants single source (macOS COLOR_FALLBACK + AHK IniCache defaults pinned to shared TOML canonical)', cmd: 'node', args: ['tools/test/test-wpm-constants-single-source.cjs'], repro: 'node tools/test/test-wpm-constants-single-source.cjs' }
+	{ name: 'WPM widget constants single source (macOS COLOR_FALLBACK + AHK IniCache defaults pinned to shared TOML canonical)', cmd: 'node', args: ['tools/test/test-wpm-constants-single-source.cjs'], repro: 'node tools/test/test-wpm-constants-single-source.cjs' },
+	{ name: 'WPM colour normalisation cross-driver drift (both drivers round-half-up on shared HSL/darken constants; golden vectors)', cmd: 'node', args: ['tools/test/test-wpm-color-normalisation-single-source.cjs'], repro: 'node tools/test/test-wpm-color-normalisation-single-source.cjs' }
 ];
 
 const SLOW_CHECKS = [
