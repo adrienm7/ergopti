@@ -609,6 +609,10 @@ for _KbSlot, _KbAction in KeyboardShortcutAssignments {
 LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", _KbBoundCount)
 
 CS_Load()
+; Refresh the metrics focus cache off the keystroke thread via a periodic
+; timer so WinGetTitle/WinGetProcessName (which send WM_GETTEXT and can
+; block on a busy foreground window) never land on the hot path.
+MF_StartFocusRefresh()
 global _SaveFullConfigReady := true
 global _ParseExtTomlSectionsCache := Map()
 if MetricsShortcuts.enabled
