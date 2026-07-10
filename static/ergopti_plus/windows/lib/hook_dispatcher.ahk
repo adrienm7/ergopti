@@ -205,15 +205,19 @@ class HookDispatcher {
 			return
 		if !HookDispatcher._subscribers.Has(event_type)
 			return
-		; Iterate a SNAPSHOT, not the live array. A subscriber may Unregister
-		; itself synchronously from within its own callback (e.g. the gesture
-		; click-hold release calls HookDispatcher.Unregister from inside the
-		; dispatched handler). arr.RemoveAt() under a live `for` enumerator shifts
-		; the next, not-yet-visited peer into an already-passed slot, silently
-		; skipping it for this event (dispatch-skips-peer-on-self-unregister).
-		; Clone() is a shallow copy of references, so identity-based Unregister
-		; still mutates the live array while this loop stays stable.
-		for cb in HookDispatcher._subscribers[event_type].Clone() {
+		; Iterate the live array in REVERSE index order. A subscriber that
+		; Unregisters ITSELF from within its callback (the gesture click-hold
+		; release path) calls arr.RemoveAt, which shifts only elements at
+		; HIGHER indices — indices we have already visited in reverse order.
+		; This makes the self-Unregister case safe without the per-event
+		; Clone() heap allocation the old forward loop required.
+		; NOTE: only safe for SELF-Unregister. A callback that removes a
+		; PEER at a LOWER index during dispatch would still silently skip
+		; the removed peer (not exercised by any production caller — the
+		; gesture release is the sole self-Unregister consumer).
+		arr := HookDispatcher._subscribers[event_type]
+		loop arr.Length {
+			cb := arr[arr.Length - A_Index + 1]
 			try {
 				cb(args*)
 			} catch as e {

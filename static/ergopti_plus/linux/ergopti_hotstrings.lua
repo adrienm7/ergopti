@@ -420,22 +420,27 @@ local function main()
 		-- engine. Without the buffer arg, prediction_engine.on_char early-returns
 		-- (it needs the buffer to detect its trigger sequences) so the LLM never
 		-- predicted anything.
-		if prediction_engine then
-			pcall(function() prediction_engine.on_char(ch, engine:current_buffer()) end)
-		end
-
-		-- Dynamic hotstrings: check if the trigger character just fired an
-		-- @-tag expansion (e.g. "@p★" → first name, "td★" → date).
-		-- Must run AFTER the static hotstring matcher so explicit triggers
-		-- take precedence over dynamic expansions.
-		if dyn_hotstrings and dyn_hotstrings.is_enabled() then
-			local ok_dh2, expanded = pcall(function()
-				return dyn_hotstrings.on_trigger(engine:current_buffer(), ch)
-			end)
-			if ok_dh2 and expanded then
-				-- Dynamic expansion consumed the trigger — reset the engine
-				-- buffer so the expansion text doesn't trigger further matches.
-				engine:reset()
+		-- Materialise the buffer ONCE per keystroke and pass the same string to
+		-- both consumers — table.concat over up to 256 codepoints is O(buffer)
+		-- heap allocation, and the buffer does not change between the two calls.
+		if prediction_engine or (dyn_hotstrings and dyn_hotstrings.is_enabled()) then
+			local buf = engine:current_buffer()
+			if prediction_engine then
+				pcall(function() prediction_engine.on_char(ch, buf) end)
+			end
+			-- Dynamic hotstrings: check if the trigger character just fired an
+			-- @-tag expansion (e.g. "@p★" → first name, "td★" → date).
+			-- Must run AFTER the static hotstring matcher so explicit triggers
+			-- take precedence over dynamic expansions.
+			if dyn_hotstrings and dyn_hotstrings.is_enabled() then
+				local ok_dh2, expanded = pcall(function()
+					return dyn_hotstrings.on_trigger(buf, ch)
+				end)
+				if ok_dh2 and expanded then
+					-- Dynamic expansion consumed the trigger — reset the engine
+					-- buffer so the expansion text doesn't trigger further matches.
+					engine:reset()
+				end
 			end
 		end
 

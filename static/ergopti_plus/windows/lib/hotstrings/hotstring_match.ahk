@@ -118,31 +118,43 @@ HSE_FindMatchAtEnd(JustTypedChar) {
     ; one (the `Length <= BestMatch.Length` skip preserves the old "strictly
     ; longer wins, first-registered breaks ties" semantics). CS map is probed
     ; before CI, mirroring the old exact-char-bucket-before-lowercased ordering.
-    MaxSuffix := Min(BufLen, HSE_MaxStarTriggerLen)
-    loop MaxSuffix {
-        Suffix := SubStr(HSE_Buffer, -A_Index)
-        ; Case-sensitive triggers: exact suffix key.
-        if HSE_StarByTriggerCS.Has(Suffix) {
-            for _, Spec in HSE_StarByTriggerCS[Suffix] {
-                if !_HSE_Beats(Spec, BestMatch) {
-                    continue
-                }
-                if _HSE_WordBoundaryAllows(HSE_Buffer, Spec) {
-                    BestMatch := Spec
-                    BestEndChar := ""
+    ;
+    ; O(1) guards: skip the entire star path when neither index has entries
+    ; (common when no magic-key hotstrings are configured), and skip the CS
+    ; lookup when only CI triggers exist (the typical case — magic-key star
+    ; triggers are almost all case-insensitive).
+    HasCS := HSE_StarByTriggerCS.Count > 0
+    HasCI := HSE_StarByTriggerCI.Count > 0
+    ; No star triggers at all — skip the entire loop (SubStr + StrLower per suffix).
+    if HasCS or HasCI {
+        MaxSuffix := Min(BufLen, HSE_MaxStarTriggerLen)
+        loop MaxSuffix {
+            Suffix := SubStr(HSE_Buffer, -A_Index)
+            ; Case-sensitive triggers: exact suffix key.
+            if HasCS and HSE_StarByTriggerCS.Has(Suffix) {
+                for _, Spec in HSE_StarByTriggerCS[Suffix] {
+                    if !_HSE_Beats(Spec, BestMatch) {
+                        continue
+                    }
+                    if _HSE_WordBoundaryAllows(HSE_Buffer, Spec) {
+                        BestMatch := Spec
+                        BestEndChar := ""
+                    }
                 }
             }
-        }
-        ; Case-insensitive triggers: lowercased suffix key.
-        LowerSuffix := StrLower(Suffix)
-        if HSE_StarByTriggerCI.Has(LowerSuffix) {
-            for _, Spec in HSE_StarByTriggerCI[LowerSuffix] {
-                if !_HSE_Beats(Spec, BestMatch) {
-                    continue
-                }
-                if _HSE_WordBoundaryAllows(HSE_Buffer, Spec) {
-                    BestMatch := Spec
-                    BestEndChar := ""
+            ; Case-insensitive triggers: lowercased suffix key.
+            if HasCI {
+                LowerSuffix := StrLower(Suffix)
+                if HSE_StarByTriggerCI.Has(LowerSuffix) {
+                    for _, Spec in HSE_StarByTriggerCI[LowerSuffix] {
+                        if !_HSE_Beats(Spec, BestMatch) {
+                            continue
+                        }
+                        if _HSE_WordBoundaryAllows(HSE_Buffer, Spec) {
+                            BestMatch := Spec
+                            BestEndChar := ""
+                        }
+                    }
                 }
             }
         }
