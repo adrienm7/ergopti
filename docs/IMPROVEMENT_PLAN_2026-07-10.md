@@ -965,7 +965,7 @@ commit lui-même (§0.2), seulement ici dans le MD.
   - [x] #64 no-op expansion passthrough (macOS) — 675dba108 — test_noop_expansion_passthrough.lua
   - [x] #66/#67 grab+inject Linux — bfe42749a — test_injector_race.lua
   - [x] #68 shift one-shot Linux — e5b2fe2b2 — test_keyboard_hook_shift.lua
-  - [ ] #65 ignored-window deferred buffer snapshot (macOS, low)
+  - [x] #65 ignored-window deferred buffer snapshot — 2fcbfbd7e — init.lua (buf_snapshot + live restore + extra-chars reconciliation) + test_ignored_window_deferred_buffer_snapshot.lua
 - [x] **Bloc 2 — Perf frappe** 🟢 : sortir les sous-process/IO bloquants du thread d entrée
       (#75 Linux, #72 macOS, #69 Windows, #76 Linux) — cache event-driven du focus, injection
       non bloquante.
