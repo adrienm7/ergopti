@@ -267,12 +267,14 @@ end
 -- would fire touch callbacks and synthetic keys before the user consented).
 do
 	local ok_ob, onboarding_mod = pcall(require, "ui.onboarding")
-	if ok_ob and type(onboarding_mod) == "table" then
-		local cfg_path = menu_paths.get("ConfigTomlPath")
-		if onboarding_mod.should_run(cfg_path) then
-			onboarding_mod.run(cfg_path)
-			return
-		end
+	if not ok_ob or type(onboarding_mod) ~= "table" then
+		Logger.error(LOG, "ui.onboarding failed to load (%s) — first-launch guard cannot run; aborting boot to avoid arming input modules without consent.", tostring(onboarding_mod))
+		return
+	end
+	local cfg_path = menu_paths.get("ConfigTomlPath")
+	if onboarding_mod.should_run(cfg_path) then
+		onboarding_mod.run(cfg_path)
+		return
 	end
 end
 
