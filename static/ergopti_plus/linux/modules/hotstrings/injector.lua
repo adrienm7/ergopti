@@ -34,6 +34,11 @@ local Logger = require("logger.shim")
 
 local LOG = "modules.hotstrings.injector"
 
+-- Optional libuv binding — used for a CPU-yielding sleep (uv_sleep) on the
+-- inter-phase delay, so injection neither forks /bin/sleep nor busy-waits.
+local ok_luv, luv = pcall(require, "luv")
+if not ok_luv then luv = nil end
+
 
 -- =========================================
 -- =========================================
@@ -117,17 +122,22 @@ local function send_text(text)
 	end
 end
 
---- Sleeps for the given number of milliseconds in-process.
---- Uses os.clock() busy-wait instead of forking /bin/sleep — eliminates a
---- process spawn per injection from the single-threaded input path.
---- For the production daemon the inter-phase delay is 20 ms; a busy-wait of
---- that duration is negligible and avoids the scheduler noise + fork latency
---- of an os.execute("sleep …") call.
+--- Sleeps for the given number of milliseconds without forking or spinning.
+--- Prefers luv.sleep (libuv uv_sleep, a nanosleep that yields the core) so the
+--- single-threaded input path pays no /bin/sleep fork per injection. Falls back
+--- to a forked sleep only when luv is unavailable — that still yields the CPU.
+--- Never busy-waits on the standard CPU clock: on Linux it reports process CPU
+--- time, so spinning on it would burn a full core for the delay, not yield.
 --- @param ms integer Milliseconds to sleep.
 local function sleep_ms(ms)
 	if ms <= 0 then return end
-	local target = os.clock() + ms / 1000
-	while os.clock() < target do end
+	if luv and type(luv.sleep) == "function" then
+		luv.sleep(ms)
+		return
+	end
+	-- Fallback path (luv absent): fork /bin/sleep, which yields the CPU. Fractional
+	-- seconds are GNU coreutils syntax.
+	pcall(os.execute, string.format("sleep %.3f", ms / 1000))
 end
 
 
