@@ -866,16 +866,37 @@ local function onKeyDownRaw(e)
 	-- trigger matching vs. preview rebuild in the HotPath warning line.
 	local hot_dbg = Perf.is_enabled()
 	if is_ignored then
-		-- Capture all five upvalues read by run_trigger_checks/mapping_fires into a
-		-- closure at scheduling time — a second fast keystroke can overwrite them
-		-- before the deferred call runs, causing stale data to be used (H-19 fix)
-		hs.timer.doAfter(0, (function(chars, len, dt, mult, ign)
+		-- Capture all five upvalues AND the buffer snapshot into the closure
+		-- at scheduling time. A second fast keystroke can overwrite the
+		-- upvalues AND grow CoreState.buffer before the deferred call runs,
+		-- causing the expansion to splice the wrong buffer state (#65).
+		-- The snapshot is temporarily swapped in; if no expansion fires the
+		-- live buffer (which may have grown) is restored.
+		local buf_snapshot = CoreState.buffer
+		hs.timer.doAfter(0, (function(chars, len, dt, mult, ign, buf)
 			return function()
 				_tc_chars, _tc_char_len, _tc_dt, _tc_complex_mult, _tc_is_ignored
 					= chars, len, dt, mult, ign
-				run_trigger_checks()
+				local saved_buf = CoreState.buffer
+				CoreState.buffer = buf
+			local fired = run_trigger_checks()
+			-- When no expansion fired, restore the live buffer so chars
+			-- typed after the snapshot are not lost. When an expansion
+			-- DID fire, perform_text_replacement's buffer_action already
+			-- updated CoreState.buffer — append any chars typed after
+			-- the snapshot so they are not lost from the buffer (the
+			-- expansion only backspaces over the trigger on screen, so
+			-- later keystrokes remain visible and must stay tracked).
+			if not fired then
+				CoreState.buffer = saved_buf
+			else
+				local extra = saved_buf:sub(#buf + 1)
+				if extra ~= "" then
+					CoreState.buffer = CoreState.buffer .. extra
+				end
 			end
-		end)(_tc_chars, _tc_char_len, _tc_dt, _tc_complex_mult, _tc_is_ignored))
+			end
+		end)(_tc_chars, _tc_char_len, _tc_dt, _tc_complex_mult, _tc_is_ignored, buf_snapshot))
 	else
 		local ck0 = hot_dbg and HotPath.now() or nil
 		local fired = run_trigger_checks()
