@@ -104,6 +104,30 @@ helpers.describe("keylogger", function()
       helpers.assert_true(keylogger.is_password_app("Bitwarden"))
       helpers.assert_true(keylogger.is_password_app("org.keepass.KeePass"))
     end)
+    helpers.it("covers every privacy-critical app via substring match (coverage must never narrow)", function()
+      -- Privacy invariant: each of these MUST suppress keystroke logging. The
+      -- match is a broad, case-insensitive substring so credential managers,
+      -- their variants (keepass -> keepassxc/keepass2) and auth helpers all
+      -- qualify. A future refactor that delegates to an exact-match
+      -- secure_field_detector would silently stop matching these and leak
+      -- keystrokes — this guard makes that regression a hard test failure.
+      keylogger.init({})
+      local must_match = {
+        "1password", "1Password.exe", "bitwarden", "Bitwarden",
+        "keepass", "keepassxc", "keepass2", "org.keepassxc.KeePassXC",
+        "lastpass", "gpg", "gpg-agent", "ssh-agent", "polkit",
+        "polkit-gnome-authentication-agent-1", "sudo",
+      }
+      for _, app in ipairs(must_match) do
+        helpers.assert_true(keylogger.is_password_app(app),
+          "keystroke logging MUST be suppressed for the secure app: " .. app)
+      end
+    end)
+    helpers.it("matches case-insensitively so casing cannot leak keystrokes", function()
+      keylogger.init({})
+      helpers.assert_true(keylogger.is_password_app("KEEPASSXC"), "upper-case must still match")
+      helpers.assert_true(keylogger.is_password_app("KeePassXC"), "mixed-case must still match")
+    end)
     helpers.it("returns false for normal apps", function()
       keylogger.init({})
       helpers.assert_eq(keylogger.is_password_app("firefox"), false)

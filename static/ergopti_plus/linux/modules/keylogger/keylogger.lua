@@ -59,9 +59,12 @@ local _suppressed = false
 -- Base list of apps considered password fields (case-insensitive substring match
 -- on appId). Single source — the init reset below rebuilds from this instead of
 -- re-typing the same eight entries. NOTE: intentionally distinct from the AT-SPI
--- adapter's secure_field_detector.SECURE_APP_IDS (exact WM_CLASS match, different
--- list e.g. keepassxc); delegating this substring check to that adapter is a
--- Behaviour change deferred — needs a security-detection review
+-- adapter's secure_field_detector.SECURE_APP_IDS (exact WM_CLASS match, smaller
+-- list e.g. keepassxc). Delegating this substring check to that adapter is
+-- deferred: the adapter matches exactly, so delegation would NARROW coverage
+-- (dropping gpg/ssh-agent/polkit/sudo and every substring variant) and leak
+-- keystrokes — a privacy regression. The broad coverage is locked by the
+-- "coverage must never narrow" guard in tests/unit/meta/test_keylogger.lua.
 local _DEFAULT_PASSWORD_APPS = {
 	"1password", "bitwarden", "keepass", "lastpass",
 	"gpg", "ssh-agent", "polkit", "sudo",
