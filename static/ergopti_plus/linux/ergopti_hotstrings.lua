@@ -350,6 +350,12 @@ local function main()
 	end
 	Logger.info(LOG, "Using device: %s.", device)
 
+	-- Focused app id, cached off the input path by the process_lifecycle
+	-- onFocusChange callback (see 8.12). Declared BEFORE on_char so on_char
+	-- captures it as an upvalue — otherwise on_char would read a never-assigned
+	-- global that stays nil, silently disabling password-app suppression.
+	local _cached_app_id = nil
+
 	-- 8.5) Define the character callback.
 	local function on_char(ch)
 		-- If an injection is in flight, queue this character so it is replayed
@@ -373,12 +379,12 @@ local function main()
 		-- it would make every recorded delay meaningless.
 		local now_ms = math.floor(Monotonic.now_ms())
 
-	-- Detect current app for per-app keylogger stats. Read from the
-	-- process_lifecycle focus cache (updated off the input path at 250 ms
-	-- intervals) so no subprocess is spawned on the keystroke thread.
-	-- Before this fix, window_info.getFocused() was called on every
-	-- keystroke, forking up to 5 subprocesses synchronously on the hot path.
-	local app_id = _cached_app_id
+		-- Detect current app for per-app keylogger stats. Read from the
+		-- process_lifecycle focus cache (updated off the input path at 250 ms
+		-- intervals) so no subprocess is spawned on the keystroke thread. The
+		-- cache variable is an upvalue declared before on_char (getFocused()
+		-- used to be called here, forking up to 5 subprocesses per keystroke).
+		local app_id = _cached_app_id
 
 		-- Check password suppression.
 		if keylogger.is_password_app(app_id) then
@@ -665,9 +671,9 @@ local function main()
 	-- 8.12) Start process lifecycle polling if the adapter loaded.
 	-- tick() drives focus-change and app-launch/quit detection at 250 ms
 	-- intervals; the event loop calls it periodically.
-	-- Cache the focused app_id off the input path so on_char never spawns
-	-- subprocesses on every keystroke.
-	local _cached_app_id = nil
+	-- The focused app_id upvalue is declared above (before on_char so both
+	-- share it); the onFocusChange callback below keeps it current off the
+	-- input path so on_char never spawns subprocesses on every keystroke.
 	local tick_count = 0
 	if process_lifecycle then
 		process_lifecycle.onFocusChange(function(appName, _windowTitle)
