@@ -461,10 +461,14 @@ function M.start(opts)
 	end
 
 	-- ── 9.3) Project .lua files ──
-	-- Luv mode: directory-level fs_event with filename filter.
-	-- Pump mode: while we can't filter by file type from a dir-level
-	-- mtime change, the impact is low — .lua changes just log a message
-	-- (the daemon can't reload itself), and project changes are infrequent.
+	-- Luv mode: directory-level fs_event with filename filter — inotify fires
+	-- on in-place edits to files inside the watched directory even though the
+	-- directory's own mtime does not change for those edits.
+	-- Pump mode: a directory-level mtime poll only catches entry creation/
+	-- deletion/rename (the only changes that touch the directory's own
+	-- mtime), so an edit to an already-present .lua file would otherwise go
+	-- undetected. Add a per-file pump entry for each .lua file found at start
+	-- time, mirroring the hotstrings_dir per-file safety net above.
 	if base_dir and _is_dir(base_dir) then
 		if luv then
 			_arm_luv_watcher(base_dir, function(fname)
@@ -472,6 +476,12 @@ function M.start(opts)
 			end)
 		else
 			_add_pump_entry(base_dir, nil, true)
+			for _, fname in ipairs(_list_dir(base_dir)) do
+				local fpath = base_dir .. "/" .. fname
+				if _is_watched_lua(fpath) then
+					_add_pump_entry(fpath, function() return true end, false)
+				end
+			end
 		end
 		Logger.debug(LOG, "Base dir watched for .lua: %s", base_dir)
 	end
