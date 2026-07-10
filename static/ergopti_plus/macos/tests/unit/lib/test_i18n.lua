@@ -18,6 +18,9 @@
 local helpers = require("tests.helpers")
 
 -- Stub menu.labels before anything requires it — decorate_section is a pure wrapper.
+-- This module-scope stub is cleared at the end of the file (see the teardown block)
+-- so it does not leak into later test files that require the REAL menu.labels
+-- (test_log_level_emojis.lua and ui/menu/builder.lua both call log_level_emoji).
 local _labels_called = {}
 package.loaded["menu.labels"] = {
 	decorate_section = function(text)
@@ -106,13 +109,17 @@ helpers.describe("i18n: pure getters", function()
 		end
 	end)
 
-	helpers.it("get_sorted_locales() returns a sorted shallow copy", function()
+	helpers.it("get_sorted_locales() returns a copy ordered by localized name", function()
 		local i18n = load_i18n()
 		local sorted = i18n.get_sorted_locales()
 		helpers.assert_eq(#sorted, 21, "must return 21 entries")
-		-- Verify sorted: first Arabic (lowercase a), last Chinese (lowercase z)
-		helpers.assert_eq(sorted[1].code, "ar", "first sorted locale must be Arabic (ar)")
-		helpers.assert_eq(sorted[#sorted].code, "zh", "last sorted locale must be Chinese (zh)")
+		-- get_sorted_locales() sorts by localized name (a.name:lower() < b.name:lower()),
+		-- NOT by locale code. Assert that invariant directly so the test does not
+		-- depend on which specific locale sorts first/last under byte-wise lowercasing.
+		for i = 1, #sorted - 1 do
+			helpers.assert_true(sorted[i].name:lower() <= sorted[i + 1].name:lower(),
+				"locales must be ordered by lowercased name (violated at index " .. i .. ")")
+		end
 		-- Verify it is a copy: modifying sorted does not affect the original
 		sorted[1] = nil
 		helpers.assert_eq(#i18n.locales(), 21, "original LOCALES must be unaffected by mutation of sorted copy")
@@ -516,3 +523,13 @@ helpers.describe("i18n: decorate_section / section", function()
 		helpers.assert_eq(_labels_called[1], "Titre")
 	end)
 end)
+
+
+-- Teardown — the runner requires each test file once, in sequence, running its
+-- cases inline (helpers.describe/it execute immediately). Clearing the stubs this
+-- file installed forces the NEXT file to load the genuine modules: menu.labels
+-- (needed real by test_log_level_emojis.lua and ui/menu/builder.lua) and the
+-- stub-wired lib.i18n / lib.locale pair must not leak either.
+package.loaded["menu.labels"] = nil
+package.loaded["lib.locale"]  = nil
+package.loaded["lib.i18n"]    = nil
