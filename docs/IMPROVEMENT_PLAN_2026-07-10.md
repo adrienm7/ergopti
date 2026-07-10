@@ -996,8 +996,11 @@ commit lui-même (§0.2), seulement ici dans le MD.
   - [x] #56 rejouer moteur hotstring partagé contre le corpus — ea6a7f055 — test_corpus_hotstring_engine.lua (18/18 vectors replayed)
   - [ ] #57 rejouer moteur hotstring Windows contre le corpus
   - [x] #49 couvrir secure_field_detector — caf45b2fa — test_secure_field_detector.lua (macOS 20 tests + Linux 27 tests)
-- [ ] **Bloc 6b — SSoT couleurs WPM** 🟢 : #4/#5/#6 (couleurs déjà driftées mac/win →
+- [x] **Bloc 6b — SSoT couleurs WPM** 🟢 : #4/#5/#6 (couleurs déjà driftées mac/win →
       canonique _shared + gate cross-driver).
+  - [x] #4 aligner COLOR_FALLBACK macOS sur TOML — f0c565edd — shared.lua (#007aff→#0055cc, #af52de→#7a30b0)
+  - [x] #5 gate SSoT constante WPM — 80c3a5745 — test-wpm-constants-single-source.cjs (17 wpm_c + 2 tim_c + else-branch)
+  - [x] #6 gate SSoT normalisation couleur — 80c3a5745 — test-wpm-color-normalisation-single-source.cjs (19 golden vectors, 12 darken Round-vs-floor divergences flagged)
 
 **Lots 🔵 — Opus (relecteur). NE PAS exécuter (§0.1, §5.2, §5.3) :**
 
