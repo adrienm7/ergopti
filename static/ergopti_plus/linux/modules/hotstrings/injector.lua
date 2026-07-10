@@ -117,13 +117,17 @@ local function send_text(text)
 	end
 end
 
---- Sleeps for the given number of milliseconds using the POSIX sleep command.
+--- Sleeps for the given number of milliseconds in-process.
+--- Uses os.clock() busy-wait instead of forking /bin/sleep — eliminates a
+--- process spawn per injection from the single-threaded input path.
+--- For the production daemon the inter-phase delay is 20 ms; a busy-wait of
+--- that duration is negligible and avoids the scheduler noise + fork latency
+--- of an os.execute("sleep …") call.
 --- @param ms integer Milliseconds to sleep.
 local function sleep_ms(ms)
 	if ms <= 0 then return end
-	-- /bin/sleep accepts fractional seconds on Linux (GNU coreutils).
-	local sec = ms / 1000
-	pcall(os.execute, string.format("sleep %.3f", sec))
+	local target = os.clock() + ms / 1000
+	while os.clock() < target do end
 end
 
 
