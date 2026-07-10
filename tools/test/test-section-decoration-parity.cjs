@@ -82,7 +82,7 @@ function collectLua(dir, acc) {
 console.log('\n=== Section-Title Decoration Parity & Single-Source ===');
 
 // 1. Shared kernel: _shared/lua/menu/labels.lua carries the canonical
-//    decorate_section kernel. macOS i18n.lua delegates to it (P0-G.7).
+//    decorate_section kernel. macOS i18n.lua delegates to it.
 check(
 	'shared: menu/labels.lua defines decorate_section with the "— … —" kernel',
 	'static/ergopti_plus/_shared/lua/menu/labels.lua',

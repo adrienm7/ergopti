@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Regression test for a method-call mismatch in modules/menu/menu_builder.lua.
 ---
---- ROOT CAUSE ENCODED (P1.7):
+--- ROOT CAUSE ENCODED:
 --- The builder called config:is_group_enabled(group_name) / config:toggle_group(...)
 --- with `:` (implicit self), but hotstrings_config defines them flat —
 --- M.is_group_enabled(group_name) with no self param. So `:` passed the config
@@ -49,7 +49,7 @@ helpers.describe("menu_builder: group toggles call hotstrings_config with the gr
 		helpers.assert_eq(enabled_args[1], "code", "is_group_enabled must receive the group name, not the config table")
 
 		-- Find the "code" group item and invoke its toggle callback.
-		-- P2.1: group items are now nested inside the Hotstrings submenu's
+		-- Group items are now nested inside the Hotstrings submenu's
 		-- `menu` array (hierarchical SNI menus). Search recursively.
 		local toggled = false
 		local function search(list)

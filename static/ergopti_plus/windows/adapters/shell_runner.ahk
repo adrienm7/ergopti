@@ -22,7 +22,7 @@
 ; (exec / spawn + handle.start / handle.terminate) is intentionally identical so
 ; modules that need to be ported can rely on the same contract.
 ; ShellRunner is an OS-infrastructure helper, not a formal port contract — it has
-; no counterpart in _shared/core/ports/. See M6 in docs/REFACTOR_GUIDE.md.
+; no counterpart in _shared/core/ports/ — it wraps Windows-only process spawning.
 ; ==============================================================================
 
 

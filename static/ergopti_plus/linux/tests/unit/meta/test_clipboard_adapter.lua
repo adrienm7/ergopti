@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_clipboard_adapter.lua
 ---
---- Phase 2B — B14: Integration tests for the clipboard adapter
+--- Integration tests for the clipboard adapter.
 --- (xclip/xsel/wl-paste stubs). Tests the full API surface
 --- (read/write/save/restore) without requiring a real clipboard backend.
 ---

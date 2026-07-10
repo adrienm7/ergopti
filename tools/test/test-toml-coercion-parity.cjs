@@ -1,6 +1,6 @@
 // tools/test/test-toml-coercion-parity.cjs
 //
-// P0-G.6 — Drift gate: TOML scalar coercion cross-driver parity.
+// Drift gate: TOML scalar coercion cross-driver parity.
 // Asserts that:
 //   1. The shared corpus coercion_vectors.json exists and has >= 12 vectors.
 //   2. macOS test_corpus_toml_coercion.lua exists and opens the shared corpus.

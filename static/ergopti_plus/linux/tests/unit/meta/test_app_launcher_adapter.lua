@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_app_launcher_adapter.lua
 ---
---- Phase 2B — B16: Integration tests for the app_launcher adapter
+--- Integration tests for the app_launcher adapter.
 --- (nohup/pgrep stubs). Tests AL_Launch/AL_LaunchWithArgs/AL_IsRunning
 --- without requiring real processes.
 ---

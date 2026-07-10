@@ -35,7 +35,7 @@ const CHECKS = [
 	{ name: 'translation key consistency audit', cmd: 'node', args: ['tools/lint/audit-translations.cjs'], repro: 'node tools/lint/audit-translations.cjs' },
 	{ name: 'convention lint (banners, spacing, section headers — strict)', cmd: 'npm', args: ['run', '--silent', 'lint:conventions:strict'], repro: 'npm run lint:conventions:strict' },
 	{ name: 'lint banner-marker safety (no hardcoded-prefix corruption of "--"-marker Lua banners)', cmd: 'node', args: ['tools/test/test-lint-banner-marker-safety.cjs'], repro: 'node tools/test/test-lint-banner-marker-safety.cjs' },
-	{ name: 'LLM legacy_ids + BASIC_PROMPT single source (DL-2+DL-3)', cmd: 'node', args: ['tools/test/test-llm-legacy-basic-prompt-single-source.cjs'], repro: 'node tools/test/test-llm-legacy-basic-prompt-single-source.cjs' },
+	{ name: 'LLM legacy_ids + BASIC_PROMPT single source', cmd: 'node', args: ['tools/test/test-llm-legacy-basic-prompt-single-source.cjs'], repro: 'node tools/test/test-llm-legacy-basic-prompt-single-source.cjs' },
 	{ name: 'architecture diagram (ports resolve + architecture.md in sync)', cmd: 'node', args: ['tools/test/test-architecture-diagram.cjs'], repro: 'node tools/test/test-architecture-diagram.cjs' },
 	{ name: 'dev-tool paths (private-AHK workflow points at live paths)', cmd: 'node', args: ['tools/test/test-dev-tool-paths.cjs'], repro: 'node tools/test/test-dev-tool-paths.cjs' },
 	{ name: 'driver-doc paths (no stale static/drivers in docs)', cmd: 'node', args: ['tools/test/test-doc-paths.cjs'], repro: 'node tools/test/test-doc-paths.cjs' },
@@ -79,8 +79,8 @@ const CHECKS = [
 	{ name: 'window titles (Gui/windowTitle carry the "ErgoptiPlus" prefix)', cmd: 'node', args: ['tools/lint/audit-gui-titles.cjs'], repro: 'node tools/lint/audit-gui-titles.cjs' },
 	{ name: 'kanata defalias parity (kanata.kbd timeouts match defaults.toml + golden corpus)', cmd: 'node', args: ['tools/test/test-kanata-defalias-parity.cjs'], repro: 'node tools/test/test-kanata-defalias-parity.cjs' },
 	{ name: 'updater constants single source (owner/repo/timing literals match defaults.json)', cmd: 'node', args: ['tools/test/test-updater-constants-single-source.cjs'], repro: 'node tools/test/test-updater-constants-single-source.cjs' },
-	{ name: 'P12.1 name parity (text_utils + action_picker + manifest_menu symmetric across drivers)', cmd: 'node', args: ['tools/test/test-p12-1-name-parity.cjs'], repro: 'node tools/test/test-p12-1-name-parity.cjs' },
-	{ name: 'P9.2 git-mv resilience (all path-pinned macOS tests point to existing files)', cmd: 'node', args: ['tools/test/test-git-mv-resilience.cjs'], repro: 'node tools/test/test-git-mv-resilience.cjs' },
+	{ name: 'name parity (text_utils + action_picker + manifest_menu symmetric across drivers)', cmd: 'node', args: ['tools/test/test-name-parity.cjs'], repro: 'node tools/test/test-name-parity.cjs' },
+	{ name: 'git-mv resilience (all path-pinned macOS tests point to existing files)', cmd: 'node', args: ['tools/test/test-git-mv-resilience.cjs'], repro: 'node tools/test/test-git-mv-resilience.cjs' },
 	{ name: 'keycode data single source (generated JS matches azerty.json, DC-1)', cmd: 'node', args: ['tools/test/test-keycode-data-js-parity.cjs'], repro: 'node tools/test/test-keycode-data-js-parity.cjs' },
 	{ name: 'tooltip corpus parity (JSON corpus matches JS layoutTestVectors + dequeueTestVectors; P0-G)', cmd: 'node', args: ['tools/test/test-tooltip-corpus-parity.cjs'], repro: 'node tools/test/test-tooltip-corpus-parity.cjs' },
 	{ name: 'TOML coercion parity (corpus cross-driver gate; P0-G)', cmd: 'node', args: ['tools/test/test-toml-coercion-parity.cjs'], repro: 'node tools/test/test-toml-coercion-parity.cjs' },
@@ -88,7 +88,8 @@ const CHECKS = [
 	{ name: 'file watchers constants single source (SCAN_MAX_DEPTH=16 + debounce=0.5s match across Linux + macOS lib/file_watchers.lua; P0 SSoT)', cmd: 'node', args: ['tools/test/test-file-watchers-constants-single-source.cjs'], repro: 'node tools/test/test-file-watchers-constants-single-source.cjs' },
 	{ name: 'format_toml CLI behavioral test (bare invocation exits 1 = usage; --preview sorts sections/keys + styles headers, file untouched)', cmd: 'node', args: ['tools/test/test-format-toml-importable.cjs'], repro: 'node tools/test/test-format-toml-importable.cjs' },
 	{ name: 'gesture slot-space single source (Linux derives from actions.toml [slots]; macOS literals + DEFAULT_GESTURES key-space pinned to it)', cmd: 'node', args: ['tools/test/test-gesture-slots-single-source.cjs'], repro: 'node tools/test/test-gesture-slots-single-source.cjs' },
-	{ name: 'keylogger timing constants single source (CONTEXT_TTL_MS / PARK_CHECK_MS / TOPO_TICK_MS match the shared timing registry)', cmd: 'node', args: ['tools/test/test-keylogger-timings-single-source.cjs'], repro: 'node tools/test/test-keylogger-timings-single-source.cjs' }
+	{ name: 'keylogger timing constants single source (CONTEXT_TTL_MS / PARK_CHECK_MS / TOPO_TICK_MS match the shared timing registry)', cmd: 'node', args: ['tools/test/test-keylogger-timings-single-source.cjs'], repro: 'node tools/test/test-keylogger-timings-single-source.cjs' },
+	{ name: 'no plan-item references in tracked source (refactor/delivery tokens purged; algorithmic Phase-N allowlisted)', cmd: 'node', args: ['tools/test/test-no-plan-refs-in-source.cjs'], repro: 'node tools/test/test-no-plan-refs-in-source.cjs' }
 ];
 
 const SLOW_CHECKS = [

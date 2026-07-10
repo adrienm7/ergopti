@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_tray_menu_sni.lua
 ---
---- Phase P2.1: Compliance tests for the SNI/dbusmenu tray_menu backend.
+--- Compliance tests for the SNI/dbusmenu tray_menu backend.
 --- Verifies that the adapter exposes getBackend(), accepts hierarchical
 --- menu items (with `menu` sub-tables), and correctly dispatches callbacks
 --- via the pump mechanism.  These tests run without gdbus or yad — they
@@ -16,7 +16,7 @@
 local helpers = require("tests.helpers")
 local tray    = helpers.load_module("adapters.tray_menu")
 
-helpers.describe("tray_menu SNI compliance (P2.1)", function()
+helpers.describe("tray_menu SNI compliance", function()
 
   -- ==========================================================================
   -- 1. Module structure
@@ -218,7 +218,7 @@ helpers.describe("tray_menu SNI compliance (P2.1)", function()
       helpers.assert_true(title_str:find("Disposition", 1, true) or title_str:find("Layout", 1, true),
         "Layout section present")
       helpers.assert_true(title_str:find("Kanata", 1, true),
-        "Kanata section present (P2.5 stub)")
+        "Kanata section present (stub)")
       helpers.assert_true(title_str:find("Quitter", 1, true),
         "Quit item present")
       helpers.assert_true(title_str:find("Actions globales", 1, true) or title_str:find("Global", 1, true),

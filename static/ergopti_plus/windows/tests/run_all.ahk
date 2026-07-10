@@ -130,7 +130,7 @@ OnError(_FatalErrorHandler)
 #Include ../lib/config_io.ahk
 #Include ../ui/personal_toml_editor.ahk
 ; Pure helpers (no boot-time side effects) — CountDynamicSection is exercised
-; by the DL-4 corpus parity test.
+; by the dynamic-hotstrings corpus parity test.
 #Include ../lib/menu_helpers.ahk
 #Include ../modules/keymap/layout/layout_altgr.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
@@ -258,7 +258,7 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/llm/models.ahk
 #Include ../lib/llm_defaults.ahk
 ; llm_profiles_data.ahk (generated) defines LLM_LEGACY_IDS + LLM_GetBasicPrompt()
-; which profiles.ahk depends on — see DL-2/DL-3.
+; which profiles.ahk depends on — see the LLM legacy/basic-prompt single-source tests.
 #Include ../_generated/llm_profiles_data.ahk
 #Include ../modules/llm/profiles.ahk
 #Include unit/test_llm_profiles.ahk
@@ -548,12 +548,12 @@ _LogBootProgress("keylogger modules + tests included")
 ; _Updater_ParsePrerelease / _Updater_SplitReleasesArray against shared cross-driver vectors.
 #Include meta/test_corpus_updater_release_parser.ahk
 ; Locale resolution corpus -- tests t() cascade (active→en→fr→raw key) and ★
-; substitution against shared cross-driver vectors (P0-G.4).
+; substitution against shared cross-driver vectors.
 #Include meta/test_corpus_locale_resolution.ahk
 ; Tooltip layout corpus -- validates _TooltipClampToScreen against shared
-; cross-driver vectors (P0-G.5).
+; cross-driver vectors.
 #Include meta/test_corpus_tooltip_layout.ahk
-; TOML coercion corpus (P0-G.6)
+; TOML coercion corpus
 #Include meta/test_corpus_toml_coercion.ahk
 
 ; -- Audit finding regression tests (batch-wired) --

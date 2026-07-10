@@ -436,7 +436,7 @@ TestHSE_LongerBeatsHigherPriority() {
 Test("HSE longest match still wins over a shorter higher-priority trigger",
     TestHSE_LongerBeatsHigherPriority)
 
-; Phase 2 wiring: source-default priorities and the CreateHotstring -> HSE pass-
+; Source-default priorities and the CreateHotstring -> HSE pass-
 ; through. The ranking personal > package > common is the user-facing contract —
 ; personal hotstrings win an equal-length collision against a package, which wins
 ; against a bundled common trigger, with no manual tuning.
@@ -467,7 +467,7 @@ Test("HSE CreateHotstring forwards an explicit priority into the spec",
 
 ; Regression (2026-06-12): the hand loader (modules/hotstrings.ahk) calls the
 ; factories with NO options at all — e.g. CreateCaseSensitiveHotstrings("*", abbr, repl).
-; The Phase 3 priority resolve must guard IsSet(options) at the CALL SITE; an earlier
+; The priority resolve must guard IsSet(options) at the CALL SITE; an earlier
 ; version passed the unset ``options`` variable straight into the resolve helper, which
 ; threw UnsetError ("This parameter has not been assigned a value", options) at boot and
 ; crashed RegisterAllHotstrings. Reaching the assertions proves neither factory threw.
@@ -487,7 +487,7 @@ TestHSE_FactoriesNoOptionsNoCrash() {
 Test("HSE factories register with no options (no UnsetError) and default to common priority",
     TestHSE_FactoriesNoOptionsNoCrash)
 
-; Phase 3: generated loaders pass Category/Section but NO Priority. The factory must
+; Generated loaders pass Category/Section but NO Priority. The factory must
 ; fold in the section/file/source override cascade via HotstringsResolve so a user's
 ; per-section priority override reaches the ~3000 bundled hotstrings (previously they
 ; always landed at the common tier 10, ignoring the override).
@@ -523,7 +523,7 @@ TestHSE_NoExplicitPriorityResolvesOverrideCascade() {
     _HotstringsOverrides := Saved
     HotstringsResolveBumpGen()
 }
-Test("HSE no-explicit-priority registration honours the section override cascade (Phase 3)",
+Test("HSE no-explicit-priority registration honours the section override cascade",
     TestHSE_NoExplicitPriorityResolvesOverrideCascade)
 
 TestHSE_NonStarTriggerNeedsEndChar() {

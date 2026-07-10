@@ -13,7 +13,7 @@
 ; The macOS half lives in macos/tests/unit/meta/test_corpus_dynamic_hotstrings_prefix.lua
 ; and calls the shared Lua function directly — this file exists because AHK has
 ; no equivalent shared-module delegation and must be pinned against the corpus
-; instead (DL-4).
+; instead.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

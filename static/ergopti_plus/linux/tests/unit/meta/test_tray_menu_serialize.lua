@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Regression test for a nil-global crash in adapters/tray_menu.lua.
 ---
---- ROOT CAUSE ENCODED (P1.2):
+--- ROOT CAUSE ENCODED:
 --- _serialize_menu() reads the module-level _registry (and _signal_file) to
 --- register each menu item's callback, but those locals were declared BELOW
 --- _serialize_menu. Lua does not hoist locals, so inside _serialize_menu the name
@@ -20,7 +20,7 @@
 --- test calls the yad serializer directly (exposed as M._yad_serialize_menu) so
 --- the callback path always runs.
 ---
---- P2.1: renamed _serialize_menu → _yad_serialize_menu (SNI backend added a
+--- Renamed _serialize_menu → _yad_serialize_menu (SNI backend added a
 --- separate XML path; the yad path is now explicitly namespaced).
 --- ==============================================================================
 

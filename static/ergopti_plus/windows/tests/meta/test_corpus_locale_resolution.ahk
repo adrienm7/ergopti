@@ -11,7 +11,7 @@
 ;
 ; This pins the AHK t() cascade (active→en→fr→raw key) and ★ substitution
 ; against the same golden vectors as the macOS locale.core module, so any
-; divergence between the two implementations is caught immediately (P0-G.4).
+; divergence between the two implementations is caught immediately.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

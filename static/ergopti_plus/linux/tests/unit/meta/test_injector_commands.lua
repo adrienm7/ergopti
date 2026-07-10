@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_injector_commands.lua
 ---
---- Phase 2B — B2: Integration tests for the hotstring injector's shell command
+--- Integration tests for the hotstring injector's shell command.
 --- construction (ydotool key/type). The actual ydotool execution requires Linux
 --- + ydotoold daemon; these tests verify the command strings are well-formed
 --- and the injector API handles edge cases gracefully.

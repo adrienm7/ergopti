@@ -1,7 +1,7 @@
 --- tests/unit/meta/test_corpus_toml_coercion.lua
 
 --- ==============================================================================
---- CORPUS CONSUMER: TOML Scalar Coercion (P0-G.6)
+--- CORPUS CONSUMER: TOML Scalar Coercion
 --- Reads _shared/tests/corpus/toml/coercion_vectors.json and replays each
 --- vector through config_overrides.coerce(), asserting the output matches
 --- the expected Lua value.

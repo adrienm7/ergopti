@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_daemon_smoke.lua
 ---
---- Phase 2B — B7: Daemon smoke test. Validates the ergopti_hotstrings.lua
+--- Daemon smoke test. Validates the ergopti_hotstrings.lua
 --- entry point: CLI argument parsing, module loading, configuration resolution.
 ---
 --- These tests run the daemon as a subprocess (via io.popen) or load its

@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_notifier_commands.lua
 ---
---- Phase 2B — B4: Integration tests for the notifier adapter's notify-send
+--- Integration tests for the notifier adapter's notify-send.
 --- command construction and error handling. The actual D-Bus notification
 --- requires a Linux desktop with notification daemon; these tests verify:
 ---   1. send() with various title/body/kind combinations

@@ -2,7 +2,7 @@
 
 /**
  * ==============================================================================
- * MODULE: Git-Move Resilience Check (P9.2)
+ * MODULE: Git-Move Resilience Check
  * DESCRIPTION:
  * Proves that the existing path-pinned macOS test reads are not stale: every
  * hardcoded driver_root() .. "…/some.lua" path actually points to a file that
@@ -10,13 +10,13 @@
  * the test that pins it, this check fails immediately with an actionable list
  * of stale pins.
  *
- * RELATIONSHIP TO THE RATCHET (P9.1):
- * test-no-pinned-source-reads-lua.cjs (P9.1) is a MONOTONE gate — it prevents
+ * RELATIONSHIP TO THE NO-NEW-PINS RATCHET:
+ * test-no-pinned-source-reads-lua.cjs is a MONOTONE gate — it prevents
  * the count of path-pinned tests from rising above the frozen baseline. This
- * check (P9.2) is the VALIDITY gate — it prevents existing pins from silently
+ * check is the VALIDITY gate — it prevents existing pins from silently
  * decaying after a git mv / git rm. Together they guarantee:
- *   1. No new location-pinned tests are added (P9.1).
- *   2. Existing location-pinned tests always point to real files (P9.2).
+ *   1. No new location-pinned tests are added.
+ *   2. Existing location-pinned tests always point to real files.
  *
  * ROOT CAUSE ENCODED:
  * A path-pinned test opens a file it does not own. When that file moves, the
@@ -35,7 +35,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos');
 const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 
-// Same pattern as P9.1 — detects driver_root() .. "modules|lib|ui/….lua".
+// Same pattern as the no-new-pins ratchet — detects driver_root() .. "modules|lib|ui/….lua".
 const SOURCE_PATH_RE = /driver_root\(\)\s*\.\.\s*["']([^"'\n]*(?:modules|lib|ui)[\\/][^"'\n]*\.lua)["']/g;
 
 // Move-resilient helper pattern — if a test uses one of these, it is not pinned.
@@ -129,5 +129,5 @@ if (stale.length > 0) {
 }
 
 console.log(
-	`\x1b[32m[OK] All ${pinnedFiles.length} path-pinned macOS test file(s) point to existing source files (P9.2).\x1b[0m`
+	`\x1b[32m[OK] All ${pinnedFiles.length} path-pinned macOS test file(s) point to existing source files.\x1b[0m`
 );

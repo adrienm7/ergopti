@@ -11,7 +11,7 @@
 --- reference (rather than a driver-local reimplementation) proves the corpus
 --- itself is correct; the AHK half in
 --- windows/tests/meta/test_corpus_dynamic_hotstrings_prefix.ahk pins its own
---- reimplementation (CountDynamicSection) against the same corpus (DL-4).
+--- reimplementation (CountDynamicSection) against the same corpus.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")

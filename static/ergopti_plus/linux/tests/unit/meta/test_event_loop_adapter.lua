@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_event_loop_adapter.lua
 ---
---- Phase P1.5: Unit tests for the event_loop adapter (luv/pump dual-path).
+--- Unit tests for the event_loop adapter (luv/pump dual-path).
 --- Tests the full API surface (run/stop/isRunning/HAS_LUV) with mock callbacks
 --- so the adapter can be verified without luv or a real daemon.
 ---

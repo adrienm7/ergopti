@@ -11,7 +11,7 @@
 ---
 --- This pins the Lua locale.core cascade (active→en→fr) and ★ substitution
 --- against the same golden vectors as the AHK driver's t() function, so any
---- divergence between the two implementations is caught immediately (P0-G.4).
+--- divergence between the two implementations is caught immediately.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")

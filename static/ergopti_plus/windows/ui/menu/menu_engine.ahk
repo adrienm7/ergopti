@@ -218,7 +218,7 @@ MenuAddLetterPicker(MenuParent, V2Path, MasterCategory) {
 		MenuParent.Check(MenuTitle)
 	}
 
-	; Phase 7.5 (UX): grey out the picker when its master category gate is off.
+	; Grey out the picker when its master category gate is off (UX affordance).
 	if !IsCategoryGated(MasterCategory) {
 		try MenuParent.Disable(MenuTitle)
 	}

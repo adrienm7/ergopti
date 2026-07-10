@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_text_sender_adapter.lua
 ---
---- Phase 2B — B9: Integration tests for the text_sender adapter
+--- Integration tests for the text_sender adapter.
 --- (ydotool/xdotool/xclip stubs). Tests the full API surface
 --- (send/eraseChars/pressKey) without requiring ydotool or xdotool.
 ---

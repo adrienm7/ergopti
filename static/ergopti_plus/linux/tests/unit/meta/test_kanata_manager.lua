@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_kanata_manager.lua
 ---
---- Phase P2.5: Compliance tests for the kanata manager module.
+--- Compliance tests for the kanata manager module.
 --- Verifies the module API surface, .kbd generation (without kanata binary),
 --- and idempotent lifecycle methods. Since kanata is a daemon-only feature,
 --- the process start/stop methods are tested only for crash-freedom.
@@ -8,7 +8,7 @@
 local helpers = require("tests.helpers")
 local km      = helpers.load_module("modules.kanata.manager")
 
-helpers.describe("kanata manager (P2.5)", function()
+helpers.describe("kanata manager", function()
 
   -- ==========================================================================
   -- 1. Module structure

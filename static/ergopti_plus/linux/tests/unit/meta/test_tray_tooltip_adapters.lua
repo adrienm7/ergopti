@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_tray_tooltip_adapters.lua
 ---
---- Phase 2B — B5 (extended): Integration tests for tray_menu + tooltip_renderer
+--- Integration tests for tray_menu + tooltip_renderer.
 --- Now tests the full implementations: yad subprocess lifecycle, menu
 --- serialization, signal-file callbacks, tooltip positioning, backend detection,
 --- updateElement re-rendering.

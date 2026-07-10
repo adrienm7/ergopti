@@ -1,10 +1,10 @@
-// tools/test/test-p12-1-name-parity.cjs
+// tools/test/test-name-parity.cjs
 
 /**
  * ==============================================================================
- * MODULE: P12.1 Name-Parity Guard
+ * MODULE: Cross-Driver Name-Parity Guard
  * DESCRIPTION:
- * Regression guard ensuring the P12.1 symmetry renames stay in effect and
+ * Regression guard ensuring the cross-driver symmetry renames stay in effect and
  * cannot silently regress. Checks three invariants:
  *
  * 1. text_utils — windows/lib/text_utils.ahk mirrors macos/lib/text_utils.lua
@@ -16,7 +16,7 @@
  *    ensures it is never accidentally reverted or renamed).
  *
  * ROOT CAUSE ENCODED:
- * Before P12.1 the AHK driver used lib/string_utils.ahk while macOS used
+ * Earlier the AHK driver used lib/string_utils.ahk while macOS used
  * lib/text_utils.lua (backed by _shared/lua/text_utils/init.lua). The flat
  * ui/action_picker.ahk had no Windows-side folder structure unlike the macOS
  * ui/action_picker/init.lua. Both divergences made cross-driver navigation
@@ -53,7 +53,7 @@ function exists(rel) {
 
 // =====================================================================
 // =====================================================================
-// ======= 1/ text_utils parity (windows ↔ macos, §P12.1) =============
+// ======= 1/ text_utils parity (windows ↔ macos) =============
 // =====================================================================
 // =====================================================================
 
@@ -78,7 +78,7 @@ check(
 
 // =====================================================================
 // =====================================================================
-// ======= 2/ action_picker folder parity (windows ↔ macos, §P12.1) ===
+// ======= 2/ action_picker folder parity (windows ↔ macos) ===
 // =====================================================================
 // =====================================================================
 
@@ -103,7 +103,7 @@ check(
 
 // =====================================================================
 // =====================================================================
-// ======= 3/ manifest_menu renderer parity (windows ↔ macos, §P12.1) =
+// ======= 3/ manifest_menu renderer parity (windows ↔ macos) =
 // =====================================================================
 // =====================================================================
 
@@ -127,9 +127,9 @@ check(
 // =====================================================================
 
 if (failures === 0) {
-	console.log(`P12.1 name-parity: all ${8} symmetry invariant(s) hold.`);
+	console.log(`name-parity: all ${8} symmetry invariant(s) hold.`);
 	process.exit(0);
 } else {
-	console.error(`\nP12.1 name-parity: ${failures} invariant(s) violated — see above.`);
+	console.error(`\nname-parity: ${failures} invariant(s) violated — see above.`);
 	process.exit(1);
 }

@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Updater Constants Single-Source Tests
 ; DESCRIPTION:
-; Regression guard for P10.1 D-2: asserts that the runtime values of the AHK
+; Regression guard: asserts that the runtime values of the AHK
 ; updater constants agree with the canonical values committed in
 ; _shared/modules/updater/defaults.json. Tests check actual global values at
 ; run-time — NOT source text — so they catch both edit-without-update and

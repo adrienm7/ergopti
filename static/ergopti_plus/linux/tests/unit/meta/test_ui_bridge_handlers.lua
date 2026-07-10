@@ -169,7 +169,7 @@ helpers.describe("ui.bridge_handlers", function()
         "personal_toml_editor payload must include toml_content")
     end)
 
-    -- GTK operations are exported (P2.2 — native window creation).
+    -- GTK operations are exported (native window creation).
     helpers.it("exports _create_gtk_window", function()
       helpers.assert_true(type(wm._create_gtk_window) == "function")
     end)

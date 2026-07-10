@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Regression test for a nil-global crash in modules/llm/prediction_engine.lua.
 ---
---- ROOT CAUSE ENCODED (P1.2):
+--- ROOT CAUSE ENCODED:
 --- M.predict() called _build_system_prompt() / _build_user_context() which were
 --- defined as `local function`s BELOW predict. Lua does not hoist `local
 --- function`, so at the call site those names resolved to nil globals and

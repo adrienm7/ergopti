@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_window_info_adapter.lua
 ---
---- Phase 2B — B10: Integration tests for the window_info adapter
+--- Integration tests for the window_info adapter.
 --- (xdotool/swaymsg stub). Tests getFocused/getAll contract compliance
 --- without requiring a running X11 or Wayland server.
 ---

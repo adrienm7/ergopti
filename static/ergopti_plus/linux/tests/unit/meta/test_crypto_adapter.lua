@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_crypto_adapter.lua
 ---
---- Phase 2B — B15: Integration tests for the crypto adapter
+--- Integration tests for the crypto adapter.
 --- (openssl sha256 stub). Tests the sha256 contract without requiring
 --- openssl on the test machine.
 ---

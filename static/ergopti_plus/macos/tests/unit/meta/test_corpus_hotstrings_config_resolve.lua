@@ -8,7 +8,7 @@
 --- the macOS resolution cascade (modules.hotstrings.hotstrings_config's
 --- M.resolve) against it — proving delay/color/show_tooltip precedence
 --- (user_section > user_category > toml_section > toml_category) matches the
---- AHK driver bit for bit (DL-5). Priority and the AHK-only "_global" menu
+--- AHK driver bit for bit. Priority and the AHK-only "_global" menu
 --- delay tier are intentionally out of this corpus's scope — see the corpus
 --- file's own description.
 ---

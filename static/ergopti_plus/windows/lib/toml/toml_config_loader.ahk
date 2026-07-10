@@ -123,7 +123,7 @@ TomlCoerceValueExt(Raw) {
 ; top-level v1 ``Features`` Map keys; without the explicit parameter, the
 ; loader would walk those v1 entries and overwrite the inner
 ; ``{Enabled: True}`` object literals with plain booleans, breaking every
-; downstream ``.Enabled`` access (discovered the hard way during Phase 1
+; downstream ``.Enabled`` access (discovered the hard way during the
 ; of the sliced cut-over). During the cut-over production passes
 ; ``Features``; tests pass their isolated Map fixture.
 ApplyConfigToml(Features, FilePath) {

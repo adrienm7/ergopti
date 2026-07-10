@@ -105,7 +105,7 @@ global KeyboardShortcutAssignments := Map()
 ; ParseTomlFile / IniCacheGet / ResolveConfigPath are defined in lib/ini_helpers.ahk
 ; (included above) so the test runner can exercise them in isolation.
 
-; Category-level gating state (Phase 7.4 master-toggle refactor).
+; Category-level gating state (master-toggle refactor).
 ;
 ; The master toggle at the top of every category submenu ("Activer la
 ; disposition" / "Désactiver les raccourcis" / ...) used to flip every

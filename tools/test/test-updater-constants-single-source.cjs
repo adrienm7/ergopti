@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Updater Constants Single-Source Gate
  * DESCRIPTION:
- * Drift gate for P10.1 D-2: verifies that the owner/repo/timing literals in
+ * Drift gate: verifies that the owner/repo/timing literals in
  * windows/lib/updater/core.ahk and macos/lib/updater.lua agree with the
  * canonical values in _shared/modules/updater/defaults.json. A mismatch here
  * means someone edited a per-driver literal without updating the shared JSON
@@ -105,7 +105,7 @@ if (!ahkIntervalM) {
 
 const luaSrc = fs.readFileSync(LUA_UPDATER, "utf8");
 
-// After P10.1 the Lua file must read from defaults.json — the old bare literals
+// The Lua file must read from defaults.json — the old bare literals
 // ("adrienm7", "ergopti" as standalone local assignments) should be gone.
 // We look for the old pattern: `local GH_OWNER   = "adrienm7"` (not inside FALLBACK).
 const luaOldOwnerLiteral = /^local\s+GH_OWNER\s*=\s*"adrienm7"/m;

@@ -1,13 +1,13 @@
 --- tests/unit/meta/test_dynamic_hotstrings_manager.lua
 ---
---- Phase P2.6: Compliance tests for the Linux dynamic hotstrings manager.
+--- Compliance tests for the Linux dynamic hotstrings manager.
 --- Verifies module structure, init/rule registration (without personal_info.toml),
 --- on_trigger callback contract, and daemon integration.
 
 local helpers = require("tests.helpers")
 local dh      = helpers.load_module("modules.dynamic_hotstrings.manager")
 
-helpers.describe("dynamic hotstrings manager (P2.6)", function()
+helpers.describe("dynamic hotstrings manager", function()
 
   -- ==========================================================================
   -- 1. Module structure

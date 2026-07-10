@@ -1,6 +1,6 @@
 --- tests/unit/meta/test_mouse_control_adapter.lua
 ---
---- Phase 2B — B12: Integration tests for the mouse_control adapter
+--- Integration tests for the mouse_control adapter.
 --- (xdotool/xrandr stubs). Tests the full API surface without requiring
 --- a running X11 server.
 ---
