@@ -995,7 +995,7 @@ commit lui-même (§0.2), seulement ici dans le MD.
   - [x] #39 macOS lib/i18n.lua behavioral test — 50a66e764 — test_i18n.lua (27 test cases, 7 describe blocks)
   - [ ] #56 rejouer moteur hotstring partagé contre le corpus
   - [ ] #57 rejouer moteur hotstring Windows contre le corpus
-  - [ ] #49 couvrir secure_field_detector
+  - [x] #49 couvrir secure_field_detector — caf45b2fa — test_secure_field_detector.lua (macOS 20 tests + Linux 27 tests)
 - [ ] **Bloc 6b — SSoT couleurs WPM** 🟢 : #4/#5/#6 (couleurs déjà driftées mac/win →
       canonique _shared + gate cross-driver).
 
