@@ -68,12 +68,13 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'tests');
 //                     simulate_drain), plus test_api_mlx_discovery_generation_guard.lua,
 //                     test_menu_metrics_master_toggle_pause_gate.lua, and
 //                     test_menu_quit_karabiner_ownership.lua)
-//          153 → 156 (session 2026-07-10: three new source-scan tests added —
-//                     test_update_preview_early_out.lua (3 source assertions on
-//                     llm_bridge.lua), test_ignored_window_deferred_buffer_snapshot.lua
-//                     (3 source assertions on init.lua), test_injector_commands.lua
-//                     (2 new source assertions on injector.lua) — all are deliberate
-//                     source invariants backed by the audit plan's prescribed test)
+//          153 → 156 (session 2026-07-10: macOS source-scan tests added —
+//                     test_update_preview_early_out.lua (source assertions on
+//                     llm_bridge.lua) and test_ignored_window_deferred_buffer_snapshot.lua
+//                     (source assertions on init.lua). This ratchet scans macos/tests
+//                     ONLY: the .ahk source-scans go to test-no-pinned-source-reads.cjs
+//                     and Linux .lua source-scans (e.g. test_injector_commands.lua) are
+//                     not counted here at all.)
 const BASELINE = 156;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read). None exists yet;
