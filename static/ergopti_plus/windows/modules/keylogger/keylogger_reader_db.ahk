@@ -129,12 +129,14 @@ KLR_BuildDatabase(metrics_dir) {
     if !hmod {
         gle := DllCall("kernel32\GetLastError", "UInt")
         KLR_PrefetchDebug(logPath, "LoadLibrary FAILED, GetLastError=" . gle)
+        try LoggerError("KLReader", "Metrics DB build failed — winsqlite3.dll not loadable (GetLastError={1}). Dashboard shows no data.", gle)
         return 0
     }
     proc := DllCall("kernel32\GetProcAddress", "Ptr", hmod, "AStr", "sqlite3_libversion", "Ptr")
     KLR_PrefetchDebug(logPath, "GetProcAddress(libversion)=" . proc)
     if !proc {
         KLR_PrefetchDebug(logPath, "symbol not found - wrong DLL?")
+        try LoggerError("KLReader", "Metrics DB build failed — sqlite3_libversion symbol not found in winsqlite3.dll. Dashboard shows no data.")
         return 0
     }
     try {
@@ -143,6 +145,7 @@ KLR_BuildDatabase(metrics_dir) {
         KLR_PrefetchDebug(logPath, "pre-open libversion=" . ver)
     } catch as err {
         KLR_PrefetchDebug(logPath, "pre-open libversion FAILED: " . err.Message)
+        try LoggerError("KLReader", "Metrics DB build failed — sqlite3_libversion call failed ({1}). Dashboard shows no data.", err.Message)
         return 0
     }
     KLR_PrefetchDebug(logPath, "KLR opening :memory:")
@@ -163,11 +166,14 @@ KLR_BuildDatabase(metrics_dir) {
     }
     db := SQLite_Open(":memory:")
     KLR_PrefetchDebug(logPath, "KLR open returned db=" . db)
-    if !db
+    if !db {
+        try LoggerError("KLReader", "Metrics DB build failed — SQLite :memory: open returned null. Dashboard shows no data.")
         return 0
+    }
     KLR_PrefetchDebug(logPath, "KLR loading schema...")
     if !KLR_LoadSchema(db) {
         KLR_PrefetchDebug(logPath, "KLR schema load FAILED")
+        try LoggerError("KLReader", "Metrics DB build failed — schema.sql missing or invalid. Dashboard shows no data.")
         SQLite_Close(db)
         return 0
     }
