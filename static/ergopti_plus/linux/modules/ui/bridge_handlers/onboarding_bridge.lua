@@ -29,12 +29,26 @@ local function _config_path()
 	return home .. "/.config/ergopti/config.toml"
 end
 
+--- Resolves the active UI locale so the onboarding wizard opens in the user's
+--- language instead of a hardcoded 'fr'. Falls back to 'fr' only if lib.i18n
+--- truly fails to load or expose get_locale — a fail-safe default, not a silent
+--- override of the persisted locale.
+--- @return string Locale code (e.g. "de"), or "fr" on failure.
+local function _resolve_locale()
+	local ok, i18n = pcall(require, "lib.i18n")
+	if ok and type(i18n) == "table" and type(i18n.get_locale) == "function" then
+		local ok2, loc = pcall(i18n.get_locale)
+		if ok2 and type(loc) == "string" and loc ~= "" then return loc end
+	end
+	return "fr"
+end
+
 -- Forward declarations.
 local _handle_init, _handle_layout, _handle_language, _handle_llm_setup, _handle_complete
 
 local function _handle_init(state)
 	local layout = state.layout or "qwerty"
-	local locale = "fr"
+	local locale = _resolve_locale()
 	return {
 		current_layout = layout,
 		current_locale = locale,
