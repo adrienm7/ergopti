@@ -22,6 +22,20 @@ local LOG    = "menu_state"
 -- critical path; a sub-second gap of unlogged keystrokes after boot is harmless.
 local KEYLOGGER_START_DELAY_SEC = 0.5
 
+--- Calls fn(...) under pcall and logs a WARN when the call raises.
+--- Falls through silently on success — the existing code never checked the
+--- return value of the bare pcalls, so this preserves that contract.
+--- @param label string Human-readable description for the warning (e.g. "set_delay").
+--- @param fn function|nil The function to call. Silently skipped when nil/not-a-function.
+--- @param ... any Arguments forwarded to fn.
+local function try(label, fn, ...)
+	if type(fn) ~= "function" then return end
+	local ok, err = pcall(fn, ...)
+	if not ok then
+		Logger.warn(LOG, "sync_state_to_modules: %s failed — %s", label, tostring(err))
+	end
+end
+
 
 
 
@@ -57,9 +71,9 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 				for sec_name, sec_enabled in pairs(secs) do
 					local key = "hotstrings_section_" .. tostring(group_name) .. "_" .. tostring(sec_name)
 					if sec_enabled == false then
-						pcall(hs.settings.set, key, false)
+						try("hs.settings.set " .. key, hs.settings.set, key, false)
 					else
-						pcall(hs.settings.set, key, nil)
+						try("hs.settings.set " .. key, hs.settings.set, key, nil)
 					end
 				end
 			end
@@ -69,7 +83,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	-- Sync terminators
 	if type(saved.terminator_states) == "table" then
 		for key, enabled in pairs(saved.terminator_states) do
-			if keymap and type(keymap.set_terminator_enabled) == "function" then pcall(keymap.set_terminator_enabled, key, enabled) end
+			if keymap and type(keymap.set_terminator_enabled) == "function" then try("keymap.set_terminator_enabled", keymap.set_terminator_enabled, key, enabled) end
 		end
 	end
 
@@ -77,10 +91,9 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	if keymap and type(keymap.add_custom_terminator) == "function" then
 		for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
 			if type(ct) == "table" and ct.key and ct.char then
-				pcall(keymap.add_custom_terminator, ct.key, ct.char, ct.label or ct.char, ct.consume or false)
-				local enabled_ct = (type(state.terminator_states) == "table" and state.terminator_states[ct.key])
+				try("keymap.add_custom_terminator", keymap.add_custom_terminator, ct.key, ct.char, ct.label or ct.char, ct.consume or false)
 				if enabled_ct ~= nil and type(keymap.set_terminator_enabled) == "function" then
-					pcall(keymap.set_terminator_enabled, ct.key, enabled_ct)
+					try("keymap.set_terminator_enabled", keymap.set_terminator_enabled, ct.key, enabled_ct)
 				end
 			end
 		end
@@ -93,7 +106,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	--      this is the new authoritative source (TOML metadata + user override).
 	--   3. `keymap.DELAYS_DEFAULT[k]` — ultimate hardcoded fallback.
 	if type(state.expansion_delay) == "number" then
-		if keymap and type(keymap.set_base_delay) == "function" then pcall(keymap.set_base_delay, state.expansion_delay) end
+		if keymap and type(keymap.set_base_delay) == "function" then try("keymap.set_base_delay", keymap.set_base_delay, state.expansion_delay) end
 	end
 	if keymap and type(keymap.set_delay) == "function" then
 		local defs       = keymap.DELAYS_DEFAULT or {}
@@ -106,17 +119,17 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 				local r = hs_cfg.resolve(key_to_cat[k], nil)
 				if r and type(r.delay) == "number" then resolved = r.delay end
 			end
-			pcall(keymap.set_delay, k, state.delays[k] or resolved or default_val)
+			try("keymap.set_delay " .. k, keymap.set_delay, k, state.delays[k] or resolved or default_val)
 		end
 	end
 
 	-- Sync gestures
 	if gestures and type(saved.gesture_actions) == "table" then
 		for slot, action in pairs(saved.gesture_actions) do
-			if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, action) end
+			if type(gestures.set_action) == "function" then try("gestures.set_action", gestures.set_action, slot, action) end
 		end
 	end
-	if gestures and type(gestures.apply_all_overrides) == "function" then pcall(gestures.apply_all_overrides) end
+	if gestures and type(gestures.apply_all_overrides) == "function" then try("gestures.apply_all_overrides", gestures.apply_all_overrides) end
 
 	-- Sync keymap options
 	if keymap then
@@ -146,30 +159,30 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			{ fn = "set_llm_instant_on_word_end",         val = state.llm_instant_on_word_end },
 		}
 		for _, item in ipairs(map) do
-			if type(keymap[item.fn]) == "function" then pcall(keymap[item.fn], item.val) end
+			if type(keymap[item.fn]) == "function" then try("keymap." .. item.fn, keymap[item.fn], item.val) end
 		end
 	end
 
 	-- Sync editor options
-	if type(hotstring_editor.set_trigger_char) == "function"    then pcall(hotstring_editor.set_trigger_char, state.trigger_char) end
-	if type(hotstring_editor.set_default_section) == "function" then pcall(hotstring_editor.set_default_section, state.custom_default_section) end
-	if type(hotstring_editor.set_close_on_add) == "function"    then pcall(hotstring_editor.set_close_on_add, state.custom_close_on_add) end
+	if type(hotstring_editor.set_trigger_char) == "function"    then try("hotstring_editor.set_trigger_char", hotstring_editor.set_trigger_char, state.trigger_char) end
+	if type(hotstring_editor.set_default_section) == "function" then try("hotstring_editor.set_default_section", hotstring_editor.set_default_section, state.custom_default_section) end
+	if type(hotstring_editor.set_close_on_add) == "function"    then try("hotstring_editor.set_close_on_add", hotstring_editor.set_close_on_add, state.custom_close_on_add) end
 
 	-- Sync the dynamic-hotstrings RulesEngine's trigger char too — without this
 	-- it only ever sees the value captured once at boot, orphaning every
 	-- date/prefix rule from a magic-key change made via the menu (F-HIGH-8 fix).
 	local dyn_hot_mod = core_mods and core_mods.dyn_hot_mod
 	if dyn_hot_mod and type(dyn_hot_mod.set_trigger_char) == "function" then
-		pcall(dyn_hot_mod.set_trigger_char, state.trigger_char)
+		try("dyn_hot_mod.set_trigger_char", dyn_hot_mod.set_trigger_char, state.trigger_char)
 	end
 
 	local sc = state.custom_editor_shortcut
 	if sc == nil then
 		local def = { mods = {"ctrl"}, key = state.trigger_char }
 		state.custom_editor_shortcut = def
-		if type(hotstring_editor.set_shortcut) == "function" then pcall(hotstring_editor.set_shortcut, def.mods, def.key) end
+		if type(hotstring_editor.set_shortcut) == "function" then try("hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, def.mods, def.key) end
 	elseif type(sc) == "table" and type(sc.mods) == "table" and type(sc.key) == "string" then
-		if type(hotstring_editor.set_shortcut) == "function" then pcall(hotstring_editor.set_shortcut, sc.mods, sc.key) end
+		if type(hotstring_editor.set_shortcut) == "function" then try("hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, sc.mods, sc.key) end
 	end
 
 	if type(state.metrics_shortcut) == "table" then
@@ -184,22 +197,22 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	-- active once the tap is stable. 0.1s is enough — the event tap is live
 	-- well before 1s in practice; the original 1.0s was unnecessarily long.
 	hs.timer.doAfter(0.1, function()
-		if deps._metrics_hk and deps._metrics_hk[1] then pcall(function() deps._metrics_hk[1]:enable() end) end
-		if deps._apps_time_hk and deps._apps_time_hk[1] then pcall(function() deps._apps_time_hk[1]:enable() end) end
+		if deps._metrics_hk and deps._metrics_hk[1] then try("metrics_hotkey:enable", function() deps._metrics_hk[1]:enable() end) end
+		if deps._apps_time_hk and deps._apps_time_hk[1] then try("apps_time_hotkey:enable", function() deps._apps_time_hk[1]:enable() end) end
 	end)
 
 	-- Sync keylogger engine
 	local kl = core_mods.keylogger
 	if kl then
 		if type(kl.set_options) == "function" then
-			pcall(kl.set_options, {
+			try("keylogger.set_options", kl.set_options, {
 				encrypt     = state.keylogger_encrypt,
 				menubar     = state.keylogger_menubar_wpm,
 				float       = state.keylogger_float_wpm,
 				float_graph = state.keylogger_float_graph,
 			})
 		end
-		if type(kl.set_disabled_apps) == "function" then pcall(kl.set_disabled_apps, state.keylogger_disabled_apps or {}) end
+		if type(kl.set_disabled_apps) == "function" then try("keylogger.set_disabled_apps", kl.set_disabled_apps, state.keylogger_disabled_apps or {}) end
 		if state.keylogger_enabled then
 			-- Keylogger start is the single biggest boot cost (~1.3 s: SQLite open,
 			-- log-rotation offset replay, export setup). It only feeds typing
@@ -210,12 +223,12 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			hs.timer.doAfter(KEYLOGGER_START_DELAY_SEC, function()
 				if type(kl.start) ~= "function" then return end
 				local _t_kl = hs.timer.secondsSinceEpoch()
-				pcall(kl.start, _shortcuts_ref)
+			pcall(kl.start, _shortcuts_ref)
 				Logger.info(LOG, "Keylogger engine start (deferred): %.1f ms.",
 					(hs.timer.secondsSinceEpoch() - _t_kl) * 1000)
 			end)
 		else
-			if type(kl.stop) == "function" then pcall(kl.stop) end
+			if type(kl.stop) == "function" then try("keylogger.stop", kl.stop) end
 		end
 	end
 
@@ -223,38 +236,38 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	if keymap then
 		if state.keymap then
 			local _t_km = hs.timer.secondsSinceEpoch()
-			if type(keymap.start) == "function" then pcall(keymap.start) end
+			if type(keymap.start) == "function" then try("keymap.start", keymap.start) end
 			Logger.info(LOG, "Keymap engine start: %.1f ms.", (hs.timer.secondsSinceEpoch() - _t_km) * 1000)
 
 			-- Recover from a stale paused state when script control is not paused
 			local paused = core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.is_paused) == "function" and core_mods.shortcuts_mod.is_paused() or false
 			if not paused and type(keymap.is_processing_paused) == "function" and keymap.is_processing_paused() then
-				if type(keymap.resume_processing) == "function" then pcall(keymap.resume_processing) end
+				if type(keymap.resume_processing) == "function" then try("keymap.resume_processing", keymap.resume_processing) end
 			end
 		else
-			if type(keymap.stop) == "function" then pcall(keymap.stop) end
+			if type(keymap.stop) == "function" then try("keymap.stop", keymap.stop) end
 		end
 	end
 	if gestures then
 		if state.gestures then
-			if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end
+			if type(gestures.enable_all) == "function" then try("gestures.enable_all", gestures.enable_all) end
 		else
-			if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end
+			if type(gestures.disable_all) == "function" then try("gestures.disable_all", gestures.disable_all) end
 		end
 
 		-- Sync granular settings
 		if type(state.gesture_modes) == "table" then
 			for slot, mode in pairs(state.gesture_modes) do
-				if type(gestures.set_mode) == "function" then pcall(gestures.set_mode, slot, mode) end
+				if type(gestures.set_mode) == "function" then try("gestures.set_mode", gestures.set_mode, slot, mode) end
 			end
 		end
 		if type(state.gesture_sensitivities) == "table" then
 			for slot, sens in pairs(state.gesture_sensitivities) do
-				if type(gestures.set_sensitivity) == "function" then pcall(gestures.set_sensitivity, slot, sens) end
+				if type(gestures.set_sensitivity) == "function" then try("gestures.set_sensitivity", gestures.set_sensitivity, slot, sens) end
 			end
 		end
 		if state.gesture_space_wrap ~= nil then
-			if type(gestures.set_space_wrap) == "function" then pcall(gestures.set_space_wrap, state.gesture_space_wrap) end
+			if type(gestures.set_space_wrap) == "function" then try("gestures.set_space_wrap", gestures.set_space_wrap, state.gesture_space_wrap) end
 		end
 	end
 	-- Drive shortcuts with binding-only helpers so the script-control eventtap
@@ -262,16 +275,16 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	-- stop()/start() would kill the tap; pause_bindings/resume_bindings is safe.
 	if core_mods.shortcuts_mod then
 		if state.shortcuts then
-			if type(core_mods.shortcuts_mod.resume_bindings) == "function" then pcall(core_mods.shortcuts_mod.resume_bindings) end
+			if type(core_mods.shortcuts_mod.resume_bindings) == "function" then try("shortcuts.resume_bindings", core_mods.shortcuts_mod.resume_bindings) end
 		else
-			if type(core_mods.shortcuts_mod.pause_bindings) == "function" then pcall(core_mods.shortcuts_mod.pause_bindings) end
+			if type(core_mods.shortcuts_mod.pause_bindings) == "function" then try("shortcuts.pause_bindings", core_mods.shortcuts_mod.pause_bindings) end
 		end
 	end
 	if core_mods.dyn_hot_mod then
 		if state.personal_info then
-			if type(core_mods.dyn_hot_mod.enable) == "function" then pcall(core_mods.dyn_hot_mod.enable) end
+			if type(core_mods.dyn_hot_mod.enable) == "function" then try("dyn_hot.enable", core_mods.dyn_hot_mod.enable) end
 		else
-			if type(core_mods.dyn_hot_mod.disable) == "function" then pcall(core_mods.dyn_hot_mod.disable) end
+			if type(core_mods.dyn_hot_mod.disable) == "function" then try("dyn_hot.disable", core_mods.dyn_hot_mod.disable) end
 		end
 	end
 
@@ -290,9 +303,9 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		local _n_enable, _n_disable = 0, 0
 		for name, enabled in pairs(state.hotstrings) do
 			if enabled then
-				if type(keymap.enable_group) == "function" then pcall(keymap.enable_group, name); _n_enable = _n_enable + 1 end
+				if type(keymap.enable_group) == "function" then try("keymap.enable_group " .. name, keymap.enable_group, name); _n_enable = _n_enable + 1 end
 			else
-				if type(keymap.disable_group) == "function" then pcall(keymap.disable_group, name); _n_disable = _n_disable + 1 end
+				if type(keymap.disable_group) == "function" then try("keymap.disable_group " .. name, keymap.disable_group, name); _n_disable = _n_disable + 1 end
 			end
 		end
 		-- Timing surfaced so a regression to the disable+enable round-trip (which
@@ -304,7 +317,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	if core_mods.shortcuts_mod and type(saved) == "table" and type(saved.shortcut_keys) == "table" then
 		if type(core_mods.shortcuts_mod.enable) == "function" and type(core_mods.shortcuts_mod.disable) == "function" then
 			for id, enabled in pairs(saved.shortcut_keys) do
-				if enabled then pcall(core_mods.shortcuts_mod.enable, id) else pcall(core_mods.shortcuts_mod.disable, id) end
+				if enabled then try("shortcuts.enable", core_mods.shortcuts_mod.enable, id) else try("shortcuts.disable", core_mods.shortcuts_mod.disable, id) end
 			end
 		end
 	end
