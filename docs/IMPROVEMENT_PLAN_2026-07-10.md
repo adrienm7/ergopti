@@ -149,17 +149,23 @@ queue drainé est toujours vide. Les frappes physiques continuent d'atteindre l'
 l'effacement → **l'interleaving visuel persiste**. Le vrai fix (EVIOCGRAB + ré-injection de toutes
 les frappes) **reste à faire** et passe en différé-hardware (§4.3). Voir §6.
 
-### Tests §5.9 manquants pour des fix **corrects** (à ajouter — reste à faire)
-Ces fix sont corrects au niveau code mais **sans test de non-régression** (l'agent a marqué `[x]` en
-créditant parfois des tests inexistants ou préexistants sans rapport). À compléter :
-- [ ] `#13` updater : `os.execute` injectable forçant l'échec extract/mv → assert retour false + ERROR + pas de « installed ».
-- [ ] `#18` sqlite_writer : stub `json.encode` qui lève → assert `Logger.warn` + `{}` préservé.
-- [ ] `#14` dynamic_hotstrings : TOML invalide → assert `Logger.error` (le test crédité écrit un TOML **valide**).
-- [ ] `#15` kanata : `tap_hold.toml` malformé → assert `Logger.error` ; **+ implémenter** le part 2 (Logger.warn si fichier présent mais vide).
-- [ ] `#17` prediction_engine : profil sans modèle → assert `chat()` **non** appelé + « No model selected » (le test crédité stub un modèle valide).
-- [ ] `#12` onboarding : source-scan asserant le `Logger.error`+`return` après `pcall(require,"ui.onboarding")` avant `gestures.start()` (le test crédité n'existe pas).
-- [ ] `#72` today.log : spy `io.open` → assert ≤ 1 open sur N appends + 1 reopen sur rollover ; **+ finir** le finding (throttle du flush métriques par frappe, `init.lua:823-828`).
-- [ ] `#6` normalisation couleur WPM : le gate est **tautologique** (compare sa propre impl JS à des golden hardcodés, ne lit pas les drivers) — à refaire pour lire les vraies impls AHK/Lua, et trancher la divergence Round(AHK)/floor(Lua).
+### Tests §5.9 manquants pour des fix **corrects** — TOUS FAITS (passe 2, Opus 2026-07-10)
+Ces fix étaient corrects au niveau code mais **sans test de non-régression**. Tous ajoutés cette
+passe, chacun prouvé **rouge-avant** (mutation du fix → test rouge) / **vert-après** :
+- [x] `#13` updater : `os.execute`/`io.popen` stubés forçant l'échec du `mv extract→install` → assert `false` + ERROR + pas de « Update installed ». — `388018372` — test_updater_manager.lua
+- [x] `#18` sqlite_writer : `hs.json.encode` levé sur sentinelle → assert `Logger.warn` + littéral `'{}'` préservé. — `7a4ad61c3` — test_sqlite_writer_json_encode_failure.lua
+- [x] `#14` dynamic_hotstrings : TOML invalide (`[info` non terminé, rejeté par le codec) → assert `Logger.error` « malformed ». — `e65dc0052` — test_dynamic_hotstrings_manager.lua
+- [x] `#15` kanata : `tap_hold.toml` malformé → `Logger.error` ; **+ part 2 implémenté** (Logger.warn « present but yielded no usable keys » si fichier présent-mais-vide, avant le fallback defaults). Seam `_load_tap_hold_config_for_test`. — `8b4464610` — test_kanata_manager.lua
+- [x] `#17` prediction_engine : profil sans modèle (`get_current_model()=nil`) → `chat()` **non** appelé + warn « No model selected ». — `ae9eb6bb1` — test_prediction_engine_predict.lua
+- [x] `#12` onboarding : source-scan asserant `not ok_ob` + `Logger.error` + `return` entre `pcall(require,"ui.onboarding")` et `gestures.start()`. — `0756410b6` — test_init_onboarding_before_prestart.lua §2
+- [~] `#72` today.log : **part 1 fait** — spy `io.open` → 1 open sur N appends + 1 reopen sur rollover. — `615c0acfb` — test_rotation_persistent_handle.lua. **Part 2 (throttle du flush métriques par frappe, `keylogger/init.lua:823-828`) NON fait** : changement de comportement sur le tap actif couplé au webview, non validable à l'aveugle → **différé-hardware**.
+- [x] `#6` normalisation couleur WPM : gate refait — lit les **4 vrais sites drivers** (Lua `_wpm_darken_hex`/`_wpm_normalise_hex`, AHK `_WPMWidget_DarkenHex`/`_WPMWidget_NormaliseHex`) et vérifie l'arrondi + le sourcing des constantes partagées. Divergence **tranchée** : canonique = **round-half-up** (`floor(x+0.5)` == `Round()`), déjà utilisé par 3 des 4 sites ; le darken Lua (qui tronquait) est aligné. Gate **enregistré** dans run-js-suite.cjs (62 checks). Prouvé rouge (revert du darken Lua → drift détecté). — `1f3f24bae` — test-wpm-color-normalisation-single-source.cjs
+
+### Passe 2 (Opus, 2026-07-10) — bug grab + i18n + reste
+- [~] `#66/#67` grab : **plumbing ajouté, vrai fix toujours différé-hardware**. `keyboard_hook.get_mode()` exposé (+ invariant test, prouvé rouge) ; le site `keyboard_hook.start` du daemon documente que le grab-par-défaut exige un **pass-through raw-event sans perte** (ré-émission de TOUS les events : modifieurs, touches de contrôle, key-repeat, releases) à valider sur vrai evdev+ydotool. Le flip du défaut à l'aveugle rendrait le clavier inutilisable → conservé en observe. Le `test_injector_race.lua` (préexistant) verrouille la logique de queue. — `a174cbb68`
+- [x] `#33` i18n bridges : healthcheck + onboarding ne forcent plus `locale='fr'` — résolu via `lib.i18n.get_locale()` (fail-safe 'fr'). Tests stubent 'de' → payloads suivent. — `c1696e975` — test_ui_bridge_handlers.lua §6b
+- [ ] **i18n reste (§3.4, ~19 findings)** : la majorité exige d'**ajouter des clés + traduire dans 21 locales**. Les prétentions « clé existante » du plan sont peu fiables (ex. `menu.about.update_*` **n'existent pas**). Générer 84+ traductions à l'aveugle dans 21 langues (dont ar/cs/da/el…) = risque d'erreur silencieuse — **différé** (à faire avec relecture des traductions).
+- [ ] **Structure (§3.7)** : `manager→init` (~40 sites require), relocalisation `crash_reporter`/`updater` sous `lib/`, `shell_runner`, `tap_holds→tap_hold` (AHK non exécutable ici). Churn mécanique important pour un gain surtout cosmétique — **différé** (vérifiable via suite mais réservé « avec soin »).
 
 ### Compléments de finding partiellement traités (optionnels)
 - `#77` (HSE star-match) : les gardes O(1) ajoutés mais l'optimisation « tail minuscule incrémentale » (la vraie cause) non faite.
