@@ -114,8 +114,11 @@ local function _mtime(path)
 			end
 		end
 	end
-	-- Fallback: stat(1).
-	local fh = io.popen("stat -c %Y '" .. path:gsub("'", "'\\''") .. "' 2>/dev/null", "r")
+	-- Fallback: date -r (GNU date), which reports fractional seconds via %N.
+	-- `stat -c %Y` only has whole-second resolution, so two writes within the
+	-- same wall-clock second are indistinguishable and a real edit can be
+	-- missed entirely (file-watcher-mtime-subsecond-collision).
+	local fh = io.popen("date -r '" .. path:gsub("'", "'\\''") .. "' +%s.%N 2>/dev/null", "r")
 	if fh then
 		local out = fh:read("*a")
 		fh:close()
