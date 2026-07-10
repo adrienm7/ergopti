@@ -869,7 +869,7 @@ local function onKeyDownRaw(e)
 		-- Capture all five upvalues AND the buffer snapshot into the closure
 		-- at scheduling time. A second fast keystroke can overwrite the
 		-- upvalues AND grow CoreState.buffer before the deferred call runs,
-		-- causing the expansion to splice the wrong buffer state (#65).
+		-- causing the expansion to splice the wrong buffer state.
 		-- The snapshot is temporarily swapped in; if no expansion fires the
 		-- live buffer (which may have grown) is restored.
 		local buf_snapshot = CoreState.buffer
