@@ -199,6 +199,7 @@ InstallSendNoOps()
 #Include unit/test_hook_dispatcher.ahk
 #Include unit/test_logger.ahk
 #Include unit/test_logger_contract.ahk
+#Include unit/test_healthcheck_core.ahk
 #Include unit/test_tooltip_tint_contract.ahk
 #Include unit/test_tooltip_border_alpha.ahk
 #Include unit/test_tooltip_dequeue_regression.ahk
@@ -889,6 +890,7 @@ _LogBootProgress("keylogger modules + tests included")
 ; Healthcheck pure formatters (uptime / HTML-escape) — coverage preserved from
 ; the deleted P5-stale test_session_regressions orphan. helpers.ahk is
 ; headless-safe (function definitions only, no top-level side effects).
+#Include ../ui/healthcheck/core.ahk
 #Include ../ui/healthcheck/helpers.ahk
 #Include meta/test_healthcheck_format_helpers.ahk
 
