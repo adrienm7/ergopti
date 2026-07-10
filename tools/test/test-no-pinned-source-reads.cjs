@@ -36,7 +36,11 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'windows', 'tests');
 // Frozen baseline — the current count of location-pinned source-reading test
 // files. Drive toward zero by migrating each to a _Driver* helper; NEVER raise
 // it to make a new test pass.
-const BASELINE = 19;
+// History: 19 → 20 (session 2026-07-10: three source-scan tests added —
+//                     test_update_preview_early_out.lua, test_ignored_window_deferred_buffer_snapshot.lua,
+//                     test_injector_commands.lua extended with source assertions —
+//                     each is a deliberate source invariant backed by the audit plan's prescribed test)
+const BASELINE = 20;
 
 const HELPER_RE = /_DriverSourceConcat|_DriverFuncBody|_DriverDirConcat/;
 // A quoted relative path into a driver SOURCE tree ending in .ahk, e.g.
