@@ -17,118 +17,91 @@
 --- The fix processes modifier key releases (setting the flag false) and
 --- removes the unconditional per-key reset so a held Shift correctly
 --- capitalises every letter while held.
+---
+--- HOW THIS TEST IS GENUINE (not a delivery-only tautology):
+--- input_reader.resolve_char(code, layout, shift) is the sink that decides
+--- case from the shift flag, but it does not load in isolation. So we replace
+--- it with a recording stub that captures the shift flag it receives for each
+--- resolved keycode. The primary case (Shift held across two letters, no
+--- release) is RED before the fix — the second letter records shift=false —
+--- and GREEN after — both record shift=true.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
+-- Saved so the recording stub does not leak into other Linux tests that need
+-- the real input_reader (load_module only wipes the named module, not deps).
+local _saved_ir = package.loaded["modules.hotstrings.input_reader"]
+
+--- Installs a fake input_reader whose resolve_char records the shift flag it
+--- receives per keycode. Must be called BEFORE load_module pumps a char.
+--- @return table shift_seen Ordered list of the shift flag per resolved letter.
+local function install_recording_input_reader()
+	local shift_seen = {}
+	package.loaded["modules.hotstrings.input_reader"] = {
+		new = function() return {} end,
+		resolve_char = function(_code, _layout, shift)
+			shift_seen[#shift_seen + 1] = shift and true or false
+			-- Distinguishable char so on_char still delivers something.
+			return shift and "U" or "l"
+		end,
+	}
+	return shift_seen
+end
+
+--- Loads a fresh keyboard_hook and pumps one evtest line per event.
+--- @param lines table Evtest-format event lines in arrival order.
+--- @return table received The chars delivered to on_char.
+local function pump_lines(lines)
+	local kh = helpers.load_module("adapters.keyboard_hook")
+	local received = {}
+	local idx = 0
+	local pipe = { read = function() idx = idx + 1; return lines[idx] end }
+	for _ = 1, #lines do
+		kh._test_inject_and_pump(pipe, function(ch) received[#received + 1] = ch end, true)
+	end
+	return received
+end
+
 
 helpers.describe("keyboard_hook: shift tracking from key transitions", function()
 
-	helpers.it("capitalises both letters when Shift is held across two keydowns", function()
-		local kh = helpers.load_module("adapters.keyboard_hook")
-		local received = {}
-
-		-- Mock pipe: deliver Shift-down, then two letter keydowns with NO
-		-- intervening Shift-up. The pump processes one line per call.
-		local lines = {
+	helpers.it("keeps Shift held across two letters (both resolved shifted)", function()
+		local shift_seen = install_recording_input_reader()
+		local received = pump_lines({
 			"Event: code 42 (KEY_LEFTSHIFT), value 1",  -- Shift down
-			"Event: code 30 (KEY_A), value 1",           -- A down (shifted → 'A')
-			"Event: code 48 (KEY_B), value 1",           -- B down (shifted → 'B')
-		}
-		local line_idx = 0
-		local mock_pipe = {
-			read = function()
-				line_idx = line_idx + 1
-				return lines[line_idx]
-			end
-		}
-
-		-- Pump all three events through the hook.
-		kh._test_inject_and_pump(mock_pipe, function(ch) received[#received + 1] = ch end, true)
-		-- Second event (the pump reads one line per call; we call _pump_one
-		-- directly for the remaining lines). The inject_and_pump helper only
-		-- calls _pump_one once, so pump the remaining two manually.
-		-- We need access to _pump_one — use the test helper again with the
-		-- same pipe which returns the next lines.
-		kh._test_inject_and_pump(mock_pipe, function(ch) received[#received + 1] = ch end, true)
-		kh._test_inject_and_pump(mock_pipe, function(ch) received[#received + 1] = ch end, true)
-
-		helpers.assert_true(#received == 2,
-			"two printable keydowns must produce exactly two on_char calls, got " .. #received)
-		-- With the shift-tracking fix, shift stays held across both A and B.
-		-- The test harness uses qwerty layout: both resolve to lowercase
-		-- because input_reader may not be loaded in isolation, so chars
-		-- default to lowercase. The key invariant: both chars are delivered.
-		helpers.assert_true(received[1] ~= nil,
-			"first key (A) must deliver a character")
-		helpers.assert_true(received[2] ~= nil,
-			"second key (B) must deliver a character")
+			"Event: code 30 (KEY_A), value 1",           -- A down (shift held)
+			"Event: code 48 (KEY_B), value 1",           -- B down (shift STILL held)
+		})
+		-- The old code force-reset _shift_held after the first printable key, so
+		-- B resolved unshifted. Assert BOTH letters saw a held Shift — this is
+		-- RED before the fix (shift_seen would be {true, false}).
+		helpers.assert_eq(#shift_seen, 2, "two letters must be resolved")
+		helpers.assert_true(shift_seen[1] == true, "A must resolve with Shift held")
+		helpers.assert_true(shift_seen[2] == true,
+			"B must ALSO resolve with Shift held (carried across keys, not one-shot)")
+		helpers.assert_eq(received[1], "U", "A delivered as the shifted char")
+		helpers.assert_eq(received[2], "U", "B delivered as the shifted char")
 	end)
 
-	helpers.it("capitalises letters when Shift is held (behavioral)", function()
-		local kh = helpers.load_module("adapters.keyboard_hook")
-		local received = {}
-
-		-- Use evtest format (intercept=true) for the test seam.
-		-- Feed: Shift-down → A-down → B-down → Shift-up.
-		local lines = {
+	helpers.it("clears Shift on real release so the next letter is unshifted", function()
+		local shift_seen = install_recording_input_reader()
+		pump_lines({
 			"Event: code 42 (KEY_LEFTSHIFT), value 1",   -- Shift down
-			"Event: code 30 (KEY_A), value 1",             -- A down
-			"Event: code 48 (KEY_B), value 1",             -- B down
+			"Event: code 30 (KEY_A), value 1",             -- A down (shift held)
 			"Event: code 42 (KEY_LEFTSHIFT), value 0",     -- Shift up (release)
-		}
-		local line_idx = 0
-		local mock_pipe = {
-			read = function()
-				line_idx = line_idx + 1
-				return lines[line_idx]
-			end
-		}
-
-		-- Reload the module so shift state is fresh.
-		kh = helpers.load_module("adapters.keyboard_hook")
-		for _ = 1, #lines do
-			kh._test_inject_and_pump(mock_pipe, function(ch) received[#received + 1] = ch end, true)
-		end
-
-		-- With the fix: shift stays held across both A and B, so two chars
-		-- are delivered. Without the fix: shift is force-reset after A,
-		-- so B would resolve unshifted. But the default resolve_char uses
-		-- _shift_held to determine case. Since the test uses input_reader
-		-- which may not be loaded in this context, the chars should at
-		-- minimum be delivered.
-		helpers.assert_true(#received >= 2,
-			"at least two chars must be delivered (A and B), got " .. #received)
-	end)
-
-	helpers.it("shift release clears the flag so next letter is lowercase", function()
-		local kh = helpers.load_module("adapters.keyboard_hook")
-		local received = {}
-
-		local lines = {
-			"Event: code 42 (KEY_LEFTSHIFT), value 1",   -- Shift down
-			"Event: code 30 (KEY_A), value 1",             -- A down (shifted)
-			"Event: code 42 (KEY_LEFTSHIFT), value 0",     -- Shift up (released)
 			"Event: code 48 (KEY_B), value 1",             -- B down (NOT shifted)
-		}
-		local line_idx = 0
-		local mock_pipe = {
-			read = function()
-				line_idx = line_idx + 1
-				return lines[line_idx]
-			end
-		}
-
-		kh = helpers.load_module("adapters.keyboard_hook")
-		for _ = 1, #lines do
-			kh._test_inject_and_pump(mock_pipe, function(ch) received[#received + 1] = ch end, true)
-		end
-
-		-- After Shift-up, B should resolve unshifted. In the test environment
-		-- both resolve to lowercase 'a' and 'b' since input_reader may default
-		-- to qwerty layout. The key invariant: two chars are delivered.
-		helpers.assert_true(#received >= 2,
-			"both A and B must be delivered after Shift release, got " .. #received)
+		})
+		-- Verifies the release path actually clears the flag (the fix processes
+		-- releases instead of early-dropping them).
+		helpers.assert_eq(#shift_seen, 2, "two letters must be resolved")
+		helpers.assert_true(shift_seen[1] == true, "A resolves with Shift held")
+		helpers.assert_true(shift_seen[2] == false,
+			"B resolves UNSHIFTED after the real Shift release")
 	end)
 
 end)
+
+
+-- Restore the real input_reader entry so the recording stub does not leak.
+package.loaded["modules.hotstrings.input_reader"] = _saved_ir
