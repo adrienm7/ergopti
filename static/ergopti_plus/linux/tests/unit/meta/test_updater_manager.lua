@@ -184,6 +184,71 @@ helpers.describe("modules/updater/manager.lua", function()
 	end)
 
 	-- ========================================
+	-- ======= 1b/ install_update fail-fast ===
+	-- ========================================
+
+	helpers.it("install_update returns false and logs ERROR (no success) when the in-place move fails", function()
+		-- Root cause: install_update() used to report success even when the final
+		-- `mv extract -> install` step failed, leaving a bricked half-installed tree
+		-- while still telling the user the update landed. Force that mv to fail and
+		-- assert the function fails loud: returns false, logs an ERROR, and NEVER
+		-- logs the "Update installed" success line.
+		local tmp_dir = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "/tmp"
+		local archive = tmp_dir:gsub("\\", "/") .. "/ergopti_updater_fake_archive.tar.gz"
+		local afh = assert(io.open(archive, "w"))
+		afh:write("not-a-real-archive")
+		afh:close()
+
+		-- Replace os.execute / io.popen so no real shell runs: every step "succeeds"
+		-- EXCEPT the `mv <extract> -> <install>` move, which we force to fail. That
+		-- move is the only `mv` whose source is the _update_tmp dir and whose target
+		-- is the install dir (never the .old backup).
+		local real_execute = os.execute
+		local real_popen   = io.popen
+		os.execute = function(cmd)
+			if cmd:match("^mv ") and cmd:find("_update_tmp'", 1, true)
+				and not cmd:find(".old", 1, true) then
+				return nil, "exit", 1
+			end
+			return true, "exit", 0
+		end
+		io.popen = function(cmd)
+			-- ls: non-empty listing (extract produced files); tar: empty stderr = ok.
+			local payload = cmd:match("^ls ") and "payload\n" or ""
+			return {
+				read  = function() return payload end,
+				lines = function() return function() return nil end end,
+				close = function() return true, "exit", 0 end,
+			}
+		end
+
+		-- Spy the logger the module already holds (same cached table instance).
+		local logger = require("logger.shim")
+		local real_error, real_success = logger.error, logger.success
+		local errors, successes = {}, {}
+		logger.error = function(_t, fmt, ...)
+			errors[#errors + 1] = (select("#", ...) > 0) and string.format(fmt, ...) or tostring(fmt)
+		end
+		logger.success = function(_t, fmt, ...)
+			successes[#successes + 1] = (select("#", ...) > 0) and string.format(fmt, ...) or tostring(fmt)
+		end
+
+		local result = M.install_update(archive)
+
+		-- Restore everything BEFORE asserting so nothing leaks on a failure.
+		os.execute, io.popen = real_execute, real_popen
+		logger.error, logger.success = real_error, real_success
+		os.remove(archive)
+
+		helpers.assert_true(result == false,
+			"install_update must return false when the in-place move fails")
+		helpers.assert_true(#errors > 0,
+			"a failed install must log at least one ERROR")
+		helpers.assert_true(#successes == 0,
+			"install_update must NOT log 'Update installed' when the move failed")
+	end)
+
+	-- ========================================
 	-- ======= 2/ Menu Integration ============
 	-- ========================================
 
