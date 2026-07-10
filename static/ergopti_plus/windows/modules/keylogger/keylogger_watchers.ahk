@@ -162,7 +162,7 @@ KL_Watchers_OnKeystroke() {
         ; micro-idle or a session break, so the next app_switch / window_switch
         ; duration measures active-focus wall-clock only. Without this, an
         ; overnight or away gap (A_TickCount keeps advancing while asleep)
-        ; produced multi-hour garbage app_time_ms / titles.ms (#17). The advance
+        ; produced multi-hour garbage app_time_ms / titles.ms. The advance
         ; can never overshoot now: app_entered_at <= last, so +gap <= now.
         if (KLWatch.is_idle or gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
             KLHook.app_entered_at   += gap

@@ -1,7 +1,7 @@
 --- tests/unit/modules/keymap/test_update_preview_early_out.lua
 
 --- ==============================================================================
---- MODULE: Regression — update_preview early-out when everything is off (#73)
+--- MODULE: Regression — update_preview early-out when everything is off
 --- DESCRIPTION:
 --- update_preview runs full provider iteration, star-bucket scan, and autocorrect
 --- tail-bucket scan on every keystroke — even when LLM is disabled and both

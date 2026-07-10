@@ -1,7 +1,7 @@
 --- tests/unit/modules/keymap/test_ignored_window_deferred_buffer_snapshot.lua
 
 --- ==============================================================================
---- MODULE: Regression — ignored-window deferred expansion snapshots the buffer (#65)
+--- MODULE: Regression — ignored-window deferred expansion snapshots the buffer
 --- DESCRIPTION:
 --- The deferred ignored-window expansion path in onKeyDownRaw captured the five
 --- _tc_* upvalues into the doAfter(0) closure (H-19 fix), but still read
