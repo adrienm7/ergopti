@@ -974,7 +974,7 @@ commit lui-même (§0.2), seulement ici dans le MD.
   - [x] #75 Linux cache app_id via process_lifecycle — ebe97ed94 — test_on_char_focus_no_subprocess.lua
   - [x] #73 macOS update_preview early-out guard — b1d18d74e — test_update_preview_early_out.lua (3 source-scan assertions)
   - [x] #74 Linux injector non-blocking sleep — 2861470ae — injector.lua (os.clock busy-wait) + test_injector_commands.lua (source-scan)
-  - [ ] #76-#78 low (HookDispatcher Clone, HSE star-match alloc, engine buffer double-concat)
+  - [x] #76-#78 low — aece71450 — HookDispatcher reverse-index, HSE star-guards, engine buffer once-per-keystroke
 - [x] **Bloc 4 — Fail-fast** 🟢 : #9 (macOS, prioritaire : config Karabiner corrompue = reset
       silencieux de toute la config utilisateur) puis les autres échecs silencieux (#10-#17).
   - [x] #9 CRITICAL macOS Karabiner corrupt config — 43165c992 — test_config_corrupt_toml.lua
