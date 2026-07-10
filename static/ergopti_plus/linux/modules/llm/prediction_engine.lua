@@ -186,7 +186,7 @@ function M.predict(context)
 	local ollama = _get_ollama()
 	local profiles = _get_profiles()
 	local sender = _get_text_sender()
-	local model = profiles and profiles.get_current_model() or "codellama"
+	local model = profiles and profiles.get_current_model()
 
 	if not ollama then
 		Logger.warn(LOG, "predict(): Ollama API not available.")
