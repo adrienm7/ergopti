@@ -310,3 +310,116 @@ _CorpusHS_EveryCollisionVectorResolvesToExpectedWinner() {
 	}
 }
 Test("hotstring corpus  --  every collision vector resolves to the expected winner", _CorpusHS_EveryCollisionVectorResolvesToExpectedWinner)
+
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 5/ Engine replay — all single vectors ========
+; =====================================================
+; =====================================================
+
+; Replays every single vector from the vectors array through the REAL AHK engine
+; (HSE_Register + HSE_FeedChar). This is the behavioral counterpart to the
+; structural checks in sections 2-3: it verifies that the engine actually matches
+; or rejects each vector at runtime, not just that the arithmetic is correct.
+; The Linux shared-engine equivalent (test_corpus_hotstring_engine.lua) replays
+; the same vectors through require('hotstring_engine').
+;
+; For each vector:
+; 1. Register the trigger as a star-trigger with the appropriate flags (*/?/C).
+; 2. Feed each character of the buffer one at a time.
+; 3. Assert the final keystroke produces a match (or not) per expected.matched.
+; 4. For matched vectors: assert Spec.Length (+1 if terminator_consumed) equals
+;    expected.backspace_count.
+
+_CorpusHS_EveryVectorReplayedThroughEngine() {
+	Corpus := _CorpusHS_Parse()
+	if Corpus = "" {
+		return
+	}
+	Failures := 0
+	Total    := 0
+	for Vec in Corpus["vectors"] {
+		Total += 1
+		Id := Vec.Has("id") ? Vec["id"] : "?"
+		HSE_TestReset()
+
+		; Build flags: star trigger fires on the last trigger char.
+		; ? flag allows in-word matching; C flag requires exact case.
+		IsWord  := Vec.Has("is_word")  ? Vec["is_word"]  : true
+		IsCS    := Vec.Has("is_case_sensitive") and Vec["is_case_sensitive"] = true
+		Flags   := "*"
+		if not IsWord
+			Flags .= "?"
+		if IsCS
+			Flags .= "C"
+
+		HSE_Register(Flags, Vec["trigger"], () => 0,
+			Map("Repl", Vec.Has("replacement") ? Vec["replacement"] : ""))
+		HSE_FeedReset(true)
+
+		; Read the buffer and feed characters one at a time.
+		Buffer := Vec.Has("buffer") ? Vec["buffer"] : ""
+		Match  := ""
+		if Buffer != "" {
+			loop StrLen(Buffer) {
+				Match := HSE_FeedChar(SubStr(Buffer, A_Index, 1))
+			}
+		}
+
+		Expected := Vec["expected"]
+		ExpMatch := Expected.Has("matched") and Expected["matched"] = true
+
+		; 1. Verify matched vs not-matched.
+		if ExpMatch {
+			if Match = "" {
+				Failures += 1
+				FileAppend("  FAIL '" . Id . "': expected match, got none`n", "*")
+				continue
+			}
+			; 2. Verify trigger identity.
+			if Match.Trigger != Vec["trigger"] {
+				Failures += 1
+				FileAppend("  FAIL '" . Id . "': trigger mismatch '"
+					. Match.Trigger . "' vs '" . Vec["trigger"] . "'`n", "*")
+				continue
+			}
+			; 3. Verify replacement text.
+			if Vec.Has("replacement") and Match.Repl != Vec["replacement"] {
+				Failures += 1
+				FileAppend("  FAIL '" . Id . "': replacement mismatch '"
+					. Match.Repl . "' vs expected '" . Vec["replacement"] . "'`n", "*")
+				continue
+			}
+			; 4. Verify backspace count.
+			if Expected.Has("backspace_count") {
+				Consumed   := Vec.Has("terminator_consumed") and Vec["terminator_consumed"] = true
+				ExpectedBC := Match.Length + (Consumed ? 1 : 0)
+				if ExpectedBC != Expected["backspace_count"] {
+					Failures += 1
+					FileAppend("  FAIL '" . Id . "': backspace_count " . ExpectedBC
+						. " != expected " . Expected["backspace_count"] . "`n", "*")
+					continue
+				}
+			}
+		} else {
+			if Match != "" {
+				Failures += 1
+				FileAppend("  FAIL '" . Id . "': expected no match, got '"
+					. Match.Trigger . "'`n", "*")
+				continue
+			}
+		}
+	}
+
+	if Failures > 0 {
+		AssertTrue(false, "engine replay: " . Failures . "/" . Total . " vector(s) FAILED")
+	} else {
+		AssertTrue(Total > 0, "engine replay: no vectors loaded from corpus")
+		AssertEqual(0, Failures, "engine replay: all " . Total . " vector(s) passed")
+	}
+}
+Test("hotstring corpus  --  every single vector replayed through HSE_FeedChar matches expected", _CorpusHS_EveryVectorReplayedThroughEngine)
