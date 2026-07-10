@@ -298,8 +298,11 @@ local function _wpm_darken_hex(hex, factor, fallback_hex)
 	local b = tonumber(h:sub(5, 6), 16)
 	if not r or not g or not b then return fallback_hex end
 
+	-- Round-half-up (floor(x + 0.5)) is the single canonical rounding shared with
+	-- the AHK driver (Round()) and with _wpm_normalise_hex above, so the darkened
+	-- unit strip is byte-identical across drivers instead of drifting by ±1/255.
 	return string.format("#%02x%02x%02x",
-		math.floor(r * factor), math.floor(g * factor), math.floor(b * factor))
+		math.floor(r * factor + 0.5), math.floor(g * factor + 0.5), math.floor(b * factor + 0.5))
 end
 
 
