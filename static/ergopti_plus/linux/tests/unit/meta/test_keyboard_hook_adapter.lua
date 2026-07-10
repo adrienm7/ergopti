@@ -154,6 +154,17 @@ helpers.describe("keyboard_hook adapter", function()
   -- ==========================================================================
 
   helpers.describe("intercept mode", function()
+    helpers.it("exports get_mode", function()
+      helpers.assert_true(type(hook.get_mode) == "function", "get_mode is a function")
+    end)
+
+    helpers.it("defaults to observe mode before any start", function()
+      -- A freshly loaded hook has not grabbed the device. Race-free hotstring
+      -- replacement requires "intercept"; "observe" is the current safe default.
+      local fresh = helpers.load_module("adapters.keyboard_hook")
+      helpers.assert_eq(fresh.get_mode(), "observe", "default mode is observe (no grab)")
+    end)
+
     helpers.it("start with intercept=true does not crash", function()
       local ok = pcall(function()
         hook.start({ device = "/dev/null", intercept = true })
@@ -162,11 +173,27 @@ helpers.describe("keyboard_hook adapter", function()
       hook.stop()
     end)
 
+    helpers.it("get_mode reports intercept after start with intercept=true", function()
+      -- start() resolves the intercept flag before device resolution, so even a
+      -- failed launch on /dev/null records the requested capture mode.
+      pcall(function() hook.start({ device = "/dev/null", intercept = true }) end)
+      helpers.assert_eq(hook.get_mode(), "intercept",
+        "get_mode must report the requested grab/intercept mode")
+      hook.stop()
+    end)
+
     helpers.it("start with intercept=false does not crash", function()
       local ok = pcall(function()
         hook.start({ device = "/dev/null", intercept = false })
       end)
       helpers.assert_true(ok, "start with intercept=false does not crash")
+      hook.stop()
+    end)
+
+    helpers.it("get_mode reports observe after start with intercept=false", function()
+      pcall(function() hook.start({ device = "/dev/null", intercept = false }) end)
+      helpers.assert_eq(hook.get_mode(), "observe",
+        "get_mode must report observe when grab was not requested")
       hook.stop()
     end)
   end)
