@@ -136,15 +136,17 @@ local function utf8_char(...)
 		if type(cp) ~= "number" or cp < 0 then
 			error("bad argument #1 to 'char' (number expected, got " .. type(cp) .. ")")
 		end
+		-- LuaJIT has no native `//` floor-division operator (that's Lua 5.3+),
+		-- so integer division is spelled out via math.floor() for portability.
 		if cp < 0x80 then
 			buf[#buf + 1] = string.char(cp)
 		elseif cp < 0x800 then
-			buf[#buf + 1] = string.char(0xC0 + cp // 0x40, 0x80 + cp % 0x40)
+			buf[#buf + 1] = string.char(0xC0 + math.floor(cp / 0x40), 0x80 + cp % 0x40)
 		elseif cp < 0x10000 then
-			buf[#buf + 1] = string.char(0xE0 + cp // 0x1000, 0x80 + (cp // 0x40) % 0x40, 0x80 + cp % 0x40)
+			buf[#buf + 1] = string.char(0xE0 + math.floor(cp / 0x1000), 0x80 + math.floor(cp / 0x40) % 0x40, 0x80 + cp % 0x40)
 		elseif cp < 0x110000 then
-			buf[#buf + 1] = string.char(0xF0 + cp // 0x40000, 0x80 + (cp // 0x1000) % 0x40,
-				0x80 + (cp // 0x40) % 0x40, 0x80 + cp % 0x40)
+			buf[#buf + 1] = string.char(0xF0 + math.floor(cp / 0x40000), 0x80 + math.floor(cp / 0x1000) % 0x40,
+				0x80 + math.floor(cp / 0x40) % 0x40, 0x80 + cp % 0x40)
 		else
 			error("bad argument #1 to 'char' (value out of range)")
 		end

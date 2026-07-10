@@ -318,7 +318,7 @@ WritePersonalToml(Data) {
 
 	FileObj := FileOpen(FilePath, "w", "UTF-8-RAW")
 	if !FileObj {
-		try LoggerError("PersonalToml", "FileOpen('{1}') failed — personal hotstrings NOT saved.", FilePath)
+		try LoggerError("PersonalToml", "Could not open '{1}' for writing — personal hotstrings NOT saved.", FilePath)
 		return False
 	}
 	FileObj.Write(Content)
@@ -400,7 +400,7 @@ WritePersonalInfoToml(FilePath) {
 
 	FileObj := FileOpen(FilePath, "w", "UTF-8-RAW")
 	if !FileObj {
-		try LoggerError("PersonalToml", "FileOpen('{1}') failed — personal info NOT saved.", FilePath)
+		try LoggerError("PersonalToml", "Could not open '{1}' for writing — personal info NOT saved.", FilePath)
 		return False
 	}
 	FileObj.Write(Content)
