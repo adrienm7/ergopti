@@ -486,6 +486,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_prefix_render_deferred.ahk
 #Include meta/test_input_serialization.ahk
 #Include meta/test_fire_log_defer_after_suppress.ahk
+#Include meta/test_hse_suppress_release_bounded.ahk
 #Include meta/test_uia_wrap_suppress_latch.ahk
 #Include meta/test_near_miss_scan_bounded.ahk
 #Include meta/test_gesture_cycle_winevent_fence.ahk
