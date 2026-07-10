@@ -495,6 +495,19 @@ local function main()
 	end
 
 	-- 8.8) Start the keyboard hook adapter.
+	-- NOTE (hotstring race): this starts in OBSERVE mode (no `intercept`), so
+	-- libinput does NOT grab the device and physical keys reach the app directly.
+	-- During a match's erase-then-type injection, keys the user keeps typing can
+	-- therefore interleave with the synthetic backspace+replacement stream and
+	-- scramble the output (the "abcd"→"acd" corruption). The injector's queue
+	-- (_begin/_queue/_end_injection) only helps once the daemon OWNS the output
+	-- stream — i.e. in intercept mode (evtest --grab / EVIOCGRAB). Making grab the
+	-- default additionally requires lossless raw-event pass-through: re-emitting
+	-- EVERY physical event (modifiers, control keys, key-repeat and releases
+	-- included) through the single ydotool/uinput channel, else grabbing would
+	-- make all normal typing vanish. That pass-through must be validated on real
+	-- evdev+ydotool hardware, so observe mode is retained here until then; see
+	-- keyboard_hook.get_mode().
 	keyboard_hook.start({
 		device = device,
 		layout = opts.layout,

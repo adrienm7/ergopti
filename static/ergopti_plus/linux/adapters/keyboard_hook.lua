@@ -418,6 +418,24 @@ function M.isRunning()
 	return _running
 end
 
+--- Returns the active capture mode: "intercept" (evtest --grab / EVIOCGRAB,
+--- physical events suppressed from the desktop) or "observe" (libinput
+--- debug-events, non-consuming). The mode reflects the `intercept` opt passed to
+--- the most recent start(). Callers use this to decide whether hotstring
+--- replacement can safely own the output stream: replacement is only race-free
+--- in "intercept" mode, where physical keys never reach the app directly. In
+--- "observe" mode the daemon does NOT grab, so physical keys typed during an
+--- injection still reach the app and can interleave with the synthetic
+--- backspace+replacement stream (the "abcd"→"acd" corruption). Flipping the
+--- default to "intercept" additionally requires lossless raw-event pass-through
+--- (re-emitting EVERY physical event — modifiers, control keys, key-repeat and
+--- releases included — through the single ydotool/uinput channel), which must be
+--- validated on real evdev+ydotool hardware before it can become the default.
+--- @return string "intercept" | "observe"
+function M.get_mode()
+	return _intercept and "intercept" or "observe"
+end
+
 --- Re-reads the foreground application identity and caches it.
 function M.refreshContext()
 	_read_context()
