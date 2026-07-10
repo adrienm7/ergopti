@@ -249,9 +249,9 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 
 	if not data then
 		if err == "parse_error" then
-			-- File exists but is corrupt: surface loudly and keep the corrupt
-			-- file for recovery — do NOT overwrite it with defaults.
-			Logger.error(LOG, "User config at '%s' is corrupt — config NOT loaded, file preserved for recovery.", user_config_path)
+			-- File exists but is corrupt: _load_toml_file already logged the
+			-- error with the full path. Fall back to defaults so the driver can
+			-- run, but do NOT overwrite the corrupt file.
 			return M.build_default_state(tap_hold_keys, mod_combos)
 		end
 		Logger.info(LOG, "No user config found — initializing from defaults.")
