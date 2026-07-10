@@ -984,10 +984,10 @@ commit lui-même (§0.2), seulement ici dans le MD.
   - [x] #14 Linux malformed personal_info.toml — 73c5af42a — test_dynamic_hotstrings_manager.lua
   - [x] #15 Linux malformed tap_hold.toml — 73c5af42a — test_kanata_manager.lua
   - [x] #17 Linux prediction engine dead codellama guard — 73c5af42a — test_prediction_engine_predict.lua
-  - [~] #13 Linux updater install_update() error swallowing — LOW, requires test seams (os.execute injection)
-  - [~] #16 Linux storage.set()/delete() return-value lies — LOW, requires test seams
-  - [~] #18 macOS keylogger json.encode swallow — LOW, requires hs.json stub
-  - [~] #19 macOS menu_state sync pcall swallow — LOW, requires keymap stub injection
+- [x] #13 Linux install_update error swallowing — 1e3859ee5 — tar exit code + extract verification + os.execute capture + rollback
+- [~] #16 Linux storage.set()/delete() return-value lies — DEFERRED permanently (test seam required: storage flush failure injection)
+- [x] #18 macOS keylogger json.encode swallow — 1e3859ee5 — Logger.warn in _sql_json
+- [x] #19 macOS menu_state sync pcall swallow — 1e3859ee5 — try() helper wrapping all bare pcalls
 - [x] **Bloc 5 — Tests** 🟢 : remplacer les no-op (#38/#39), rejouer le moteur partagé contre le
       corpus (#56/#57), couvrir secure_field_detector (#49). *(Le test du backbone i18n #42
       part avec le lot i18n 🔵 pour ne pas croiser les locales.)*
