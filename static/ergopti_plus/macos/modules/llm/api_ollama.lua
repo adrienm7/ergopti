@@ -280,8 +280,21 @@ end
 
 -- Stop sequences from inference.json (single source — unified keys shared
 -- with all backends, eliminates per-backend drift; rationale in the JSON comment).
-local STOP_BATCH = ApiCommon.get_stop_sequences("batch")
-local STOP_LINE  = ApiCommon.get_stop_sequences("line")
+local FALLBACK_STOP_SEQUENCES = {
+	batch = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:" },
+	line  = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:", "\n\n", "===", "\n", "\r", "</", "Suite finale", "SUITE", "NEXT_WORDS:" },
+}
+
+local function get_stop_sequences(variant)
+	if type(ApiCommon.get_stop_sequences) == "function" then
+		local ok, seq = pcall(ApiCommon.get_stop_sequences, variant)
+		if ok and type(seq) == "table" then return seq end
+	end
+	return FALLBACK_STOP_SEQUENCES[variant] or {}
+end
+
+local STOP_BATCH = get_stop_sequences("batch")
+local STOP_LINE  = get_stop_sequences("line")
 
 --- Builds the options payload for the Ollama API (optimized for speed).
 --- @param temperature number The creativity parameter.
