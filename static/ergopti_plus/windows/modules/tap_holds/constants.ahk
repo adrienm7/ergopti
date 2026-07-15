@@ -90,6 +90,8 @@ _TapHoldFireAction(KeyId) {
 	; open_url, take_note, …) while « pause = tout éteint ».
 	if A_IsSuspended
 		return
+	if HookDispatcher.WasWheelRecently(TapHoldDuration(TapHold, KeyId) * 1100)
+		return
 	ActionId := TapHoldTapAction(TapHold, KeyId)
 	if GESTURE_ACTIONS.Has(ActionId) {
 		GESTURE_ACTIONS[ActionId].Fn.Call()
