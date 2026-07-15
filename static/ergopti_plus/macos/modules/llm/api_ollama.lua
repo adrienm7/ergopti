@@ -278,19 +278,15 @@ end
 -- ======================================
 -- ======================================
 
--- Stop sequences from inference.json (single source — unified keys shared
--- with all backends, eliminates per-backend drift; rationale in the JSON comment).
-local FALLBACK_STOP_SEQUENCES = {
-	batch = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:" },
-	line  = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:", "\n\n", "===", "\n", "\r", "</", "Suite finale", "SUITE", "NEXT_WORDS:" },
-}
-
+-- Stop sequences must come from inference.json via ApiCommon, with a defensive
+-- fallback to empty lists if the common module is unavailable in a test harness.
+-- This avoids hardcoding legacy literals here while preserving module load safety.
 local function get_stop_sequences(variant)
 	if type(ApiCommon.get_stop_sequences) == "function" then
 		local ok, seq = pcall(ApiCommon.get_stop_sequences, variant)
 		if ok and type(seq) == "table" then return seq end
 	end
-	return FALLBACK_STOP_SEQUENCES[variant] or {}
+	return {}
 end
 
 local STOP_BATCH = get_stop_sequences("batch")
