@@ -118,6 +118,11 @@ class HookDispatcher {
 	; Guards against double-Start().
 	static _started := false
 
+	; Last time the wheel moved while the user was interacting with a key.
+	; Used by tap-hold disambiguation: holding any key + scrolling should
+	; not be followed by a tap action when the key is released immediately.
+	static _last_wheel_tick := 0
+
 
 
 
@@ -284,9 +289,11 @@ class HookDispatcher {
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_MUP)
 	}
 	static _OnWheelUp(*) {
+		HookDispatcher._last_wheel_tick := A_TickCount
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WUP)
 	}
 	static _OnWheelDown(*) {
+		HookDispatcher._last_wheel_tick := A_TickCount
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WDN)
 	}
 	static _OnWheelRight(*) {
@@ -294,6 +301,18 @@ class HookDispatcher {
 	}
 	static _OnWheelLeft(*) {
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WLEFT)
+	}
+
+	; Return True while a wheel event happened very recently.
+	; This prevents accidental tap dispatch when a key is released directly
+	; after being held and used for scroll (e.g. Ctrl + wheel zoom).
+	static WasWheelRecently(ms := 180) {
+		return (A_TickCount - HookDispatcher._last_wheel_tick) <= ms
+	}
+
+	; Backward-compatible alias retained for modules still calling the old name.
+	static WasCtrlWheelRecently(ms := 180) {
+		return HookDispatcher.WasWheelRecently(ms)
 	}
 
 
