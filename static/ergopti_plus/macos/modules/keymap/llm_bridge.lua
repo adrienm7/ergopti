@@ -934,12 +934,18 @@ end
 
 -- Wire tooltip callbacks so the tooltip module can call back into the bridge.
 -- Closures ensure the functions are resolved at call time, not at bind time.
-tooltip.set_accept_callback(function(idx) M.apply_prediction(idx) end)
-tooltip.set_cancel_callback(function() M.reset_predictions() end)
+if type(tooltip.set_accept_callback) == "function" then
+	tooltip.set_accept_callback(function(idx) M.apply_prediction(idx) end)
+end
+if type(tooltip.set_cancel_callback) == "function" then
+	tooltip.set_cancel_callback(function() M.reset_predictions() end)
+end
 -- Create the persistent Escape trap the first time any tooltip appears.
 -- This guarantees the tap is inserted at HEAD after Raycast (or any other app) has
 -- already registered its own tap, so our Escape always takes priority while a tooltip
 -- is visible. The trap is never destroyed — tooltip.is_visible() drives its behaviour.
-tooltip.set_on_show_callback(arm_escape_trap)
+if type(tooltip.set_on_show_callback) == "function" then
+	tooltip.set_on_show_callback(arm_escape_trap)
+end
 
 return M
