@@ -567,46 +567,14 @@ platform = "ahk"
 [sg_actions.open_key_history]
 platform = "ahk"
 
-# --- Raccourcis Cmd (macOS) / Ctrl (Windows) ---
-# cmd_[a-z] et cmd_shift_[a-z] sont générés dynamiquement côté HS.
-# ctrl_[a-z] et ctrl_shift_[a-z] sont générés dynamiquement côté AHK.
-# Ces entrées ne sont pas listées ici car trop nombreuses (52 chacun) ;
-# les deux drivers les insèrent dans le picker après chargement du TOML.
+# --- Raccourcis modificateur + touche ---
+# La matrice exhaustive est déclarée une seule fois dans
+# modifier_chords.json. Chaque driver génère toutes les combinaisons non vides
+# de ses modificateurs natifs et les expose sous des libellés non traduits comme
+# « Ctrl + A ». Les identifiants internes ne doivent jamais être affichés.
 
-[sg_actions._cmd_placeholder]
-platform = "hs"
-is_header = true
-
-[sg_actions._cmd_shift_placeholder]
-platform = "hs"
-is_header = true
-
-[sg_actions._hs_ctrl_placeholder]
-platform = "hs"
-is_header = true
-
-[sg_actions._hs_ctrl_shift_placeholder]
-platform = "hs"
-is_header = true
-
-[sg_actions._hs_option_placeholder]
-platform = "hs"
-is_header = true
-
-[sg_actions._ctrl_placeholder]
-platform = "ahk"
-is_header = true
-
-[sg_actions._ctrl_shift_placeholder]
-platform = "ahk"
-is_header = true
-
-[sg_actions._win_placeholder]
-platform = "ahk"
-is_header = true
-
-[sg_actions._alt_placeholder]
-platform = "ahk"
+[sg_actions._modifier_chords_placeholder]
+platform = "all"
 is_header = true
 
 
@@ -705,23 +673,8 @@ items = [
     "sel_word_prev",
     "sel_word_next",
     "--",
-    "_cmd_placeholder",
-    "--",
-    "_cmd_shift_placeholder",
-    "--",
-    "_hs_ctrl_placeholder",
-    "--",
-    "_hs_ctrl_shift_placeholder",
-    "--",
-    "_hs_option_placeholder",
-    "--",
-    "_ctrl_placeholder",
-    "--",
-    "_ctrl_shift_placeholder",
-    "--",
-    "_win_placeholder",
-    "--",
-    "_alt_placeholder",
+    "#Raccourcis",
+    "_modifier_chords_placeholder",
     "--",
     "#grp_media",
     "##media",

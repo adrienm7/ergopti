@@ -403,6 +403,9 @@ global GESTURE_ACTIONS := Map(
 ; Falls back to the raw action name when the key is absent — labels are no
 ; longer hardcoded in GESTURE_ACTIONS, so the locale is the single source of truth.
 _GestureActionLabel(Name) {
+	global GESTURE_MODIFIER_ACTION_LABELS
+	if GESTURE_MODIFIER_ACTION_LABELS.Has(Name)
+		return GESTURE_MODIFIER_ACTION_LABELS[Name]
 	Key := "sg_actions." . Name
 	Translated := t(Key)
 	; t() returns the raw key when no translation is found — treat that as a miss
@@ -645,69 +648,75 @@ GesturePastePlain() {
     }
 }
 
-; Ctrl+lettre, Ctrl+Shift+lettre, Win+lettre, Alt+lettre — dynamiques (26 × 4 = 104).
-_GestureLetters := "abcdefghijklmnopqrstuvwxyz"
-loop StrLen(_GestureLetters) {
-    _L := SubStr(_GestureLetters, A_Index, 1)
-    _U := StrUpper(_L)
-    GESTURE_ACTIONS["ctrl_" . _L] := {
-        Label: "^ " . _U . " — Ctrl+" . _U,
-        Fn: ((_k) => (*) => GestureSendShortcut("^" . _k))(_L),
+; Modifier + key actions are generated from the cross-driver catalogue. This
+; replaces the former partial, AHK-only Ctrl/Alt/Win tables with every non-empty
+; combination of Ctrl, Shift, Alt and Win for every catalogue key.
+global GESTURE_MODIFIER_ACTION_LABELS := Map()
+global GESTURE_MODIFIER_ACTION_GROUPS := []
+
+_GestureJoin(Values, Separator) {
+    Result := ""
+    for Index, Value in Values
+        Result .= (Index = 1 ? "" : Separator) . Value
+    return Result
+}
+
+_GestureRegisterModifierChords() {
+    global GESTURE_ACTIONS, GESTURE_MODIFIER_ACTION_LABELS, GESTURE_MODIFIER_ACTION_GROUPS, _SharedDir
+
+    Path := _SharedDir . "\modules\gestures\modifier_chords.json"
+    Raw := FSRead(Path)
+    if (Raw = false) {
+        try LoggerWarn("gestures", "Cannot load shared modifier chords from '{1}'.", Path)
+        return
     }
-    GESTURE_ACTIONS["ctrl_shift_" . _L] := {
-        Label: "^⇧ " . _U . " — Ctrl+Shift+" . _U,
-        Fn: ((_k) => (*) => GestureSendShortcut("^+" . _k))(_L),
+    try Root := JsonParse(Raw)
+    catch as Err {
+        try LoggerWarn("gestures", "Cannot load shared modifier chords: {1}", Err.Message)
+        return
     }
-    GESTURE_ACTIONS["win_" . _L] := {
-        Label: "⊞ " . _U . " — Win+" . _U,
-        Fn: ((_k) => (*) => GestureSendShortcut("#" . _k))(_L),
-    }
-    GESTURE_ACTIONS["alt_" . _L] := {
-        Label: "⎇ " . _U . " — Alt+" . _U,
-        Fn: ((_k) => (*) => GestureSendShortcut("!" . _k))(_L),
+    if !(Root is Map) || !Root.Has("keys") || !Root.Has("platforms") || !Root["platforms"].Has("windows")
+        return
+    Platform := Root["platforms"]["windows"]
+    if !Platform.Has("modifiers") || !(Platform["modifiers"] is Array)
+        return
+
+    Modifiers := Platform["modifiers"]
+    Keys      := Root["keys"]
+    MaxMask   := (1 << Modifiers.Length) - 1
+    loop MaxMask {
+        Mask      := A_Index
+        IdParts   := []
+        LabelParts := []
+        Prefixes  := []
+        loop Modifiers.Length {
+            Bit := A_Index - 1
+            if !(Mask & (1 << Bit))
+                continue
+            Modifier := Modifiers[A_Index]
+            IdParts.Push(Modifier["id"])
+            LabelParts.Push(Modifier["label"])
+            Prefixes.Push(Modifier["ahk_prefix"])
+        }
+        IdPrefix := _GestureJoin(IdParts, "_")
+        LabelPrefix := _GestureJoin(LabelParts, " + ")
+        SendPrefix := _GestureJoin(Prefixes, "")
+        Group := { Label: LabelPrefix, Actions: [] }
+        for _, KeyDef in Keys {
+            KeyId   := KeyDef["id"]
+            KeyCode := KeyDef.Has("windows_key") ? KeyDef["windows_key"] : KeyId
+            ActionId := IdPrefix . "_" . KeyId
+            GESTURE_MODIFIER_ACTION_LABELS[ActionId] := LabelPrefix . " + " . KeyDef["label"]
+            Group.Actions.Push(ActionId)
+            GESTURE_ACTIONS[ActionId] := {
+                Fn: ((_keys) => (*) => GestureSendShortcut(_keys))(SendPrefix . KeyCode),
+            }
+        }
+        GESTURE_MODIFIER_ACTION_GROUPS.Push(Group)
     }
 }
 
-; Ctrl+chiffre, Win+chiffre, Alt+chiffre — dynamiques (10 × 3 = 30).
-loop 10 {
-    _D := SubStr("0123456789", A_Index, 1)
-    GESTURE_ACTIONS["ctrl_" . _D] := {
-        Label: "^ " . _D . " — Ctrl+" . _D,
-        Fn: ((_k) => (*) => GestureSendShortcut("^" . _k))(_D),
-    }
-    GESTURE_ACTIONS["win_" . _D] := {
-        Label: "⊞ " . _D . " — Win+" . _D,
-        Fn: ((_k) => (*) => GestureSendShortcut("#" . _k))(_D),
-    }
-    GESTURE_ACTIONS["alt_" . _D] := {
-        Label: "⎇ " . _D . " — Alt+" . _D,
-        Fn: ((_k) => (*) => GestureSendShortcut("!" . _k))(_D),
-    }
-}
-
-; Touches spéciales — ctrl_space, win_space, alt_space, etc.
-_GestureSpecialKeys := Map(
-    "space",  "{Space}",
-    "enter",  "{Enter}",
-    "period", ".",
-    "comma",  ",",
-    "sc029",  "SC029",
-)
-for _SName, _SCode in _GestureSpecialKeys {
-    _DisplayName := StrUpper(SubStr(_SName, 1, 1)) . SubStr(_SName, 2)
-    GESTURE_ACTIONS["ctrl_" . _SName] := {
-        Label: "^ " . _DisplayName . " — Ctrl+" . _DisplayName,
-        Fn: ((_k) => (*) => GestureSendShortcut("^" . _k))(_SCode),
-    }
-    GESTURE_ACTIONS["win_" . _SName] := {
-        Label: "⊞ " . _DisplayName . " — Win+" . _DisplayName,
-        Fn: ((_k) => (*) => GestureSendShortcut("#" . _k))(_SCode),
-    }
-    GESTURE_ACTIONS["alt_" . _SName] := {
-        Label: "⎇ " . _DisplayName . " — Alt+" . _DisplayName,
-        Fn: ((_k) => (*) => GestureSendShortcut("!" . _k))(_SCode),
-    }
-}
+_GestureRegisterModifierChords()
 
 ; Opens an arbitrary path in Notepad if it exists. Used by every "open user
 ; file" gesture so a fresh install with no personal_info.toml yet quietly
@@ -832,7 +841,7 @@ global GESTURE_AX_NAMES := []
 ; A run-once SetTimer(-1) fires ~1 ms after the auto-execute section finishes,
 ; well before initMenu runs, so the lists are always ready for the menu.
 _GestureLoadActionCatalog(*) {
-    global GESTURE_ACTION_NAMES, GESTURE_AX_NAMES, GESTURE_ACTIONS, _SharedDir, _GestureSpecialKeys
+    global GESTURE_ACTION_NAMES, GESTURE_AX_NAMES, GESTURE_ACTIONS, GESTURE_MODIFIER_ACTION_GROUPS, _SharedDir
 
     _SharedToml := _SharedDir . "\modules\gestures\actions.toml"
     _Toml       := ParseTomlFile(_SharedToml)
@@ -846,38 +855,16 @@ _GestureLoadActionCatalog(*) {
                 GESTURE_ACTION_NAMES.Push(_Item)
                 continue
             }
-            ; Placeholder keys expand into dynamic ctrl_*/win_*/alt_* blocks
+            ; The shared modifier-chord placeholder expands to the complete
+            ; platform-native matrix registered from modifier_chords.json.
             if (SubStr(_Item, 1, 1) = "_") {
-                if (_Item = "_ctrl_placeholder") {
-                    GESTURE_ACTION_NAMES.Push("#ctrl")
-                    loop 26
-                        GESTURE_ACTION_NAMES.Push("ctrl_" . SubStr("abcdefghijklmnopqrstuvwxyz", A_Index, 1))
-                    loop 10
-                        GESTURE_ACTION_NAMES.Push("ctrl_" . SubStr("0123456789", A_Index, 1))
-                    for _Sk, _ in _GestureSpecialKeys
-                        GESTURE_ACTION_NAMES.Push("ctrl_" . _Sk)
-                } else if (_Item = "_ctrl_shift_placeholder") {
-                    GESTURE_ACTION_NAMES.Push("#ctrl_shift")
-                    loop 26
-                        GESTURE_ACTION_NAMES.Push("ctrl_shift_" . SubStr("abcdefghijklmnopqrstuvwxyz", A_Index, 1))
-                } else if (_Item = "_win_placeholder") {
-                    GESTURE_ACTION_NAMES.Push("#win")
-                    loop 26
-                        GESTURE_ACTION_NAMES.Push("win_" . SubStr("abcdefghijklmnopqrstuvwxyz", A_Index, 1))
-                    loop 10
-                        GESTURE_ACTION_NAMES.Push("win_" . SubStr("0123456789", A_Index, 1))
-                    for _Sk, _ in _GestureSpecialKeys
-                        GESTURE_ACTION_NAMES.Push("win_" . _Sk)
-                } else if (_Item = "_alt_placeholder") {
-                    GESTURE_ACTION_NAMES.Push("#alt")
-                    loop 26
-                        GESTURE_ACTION_NAMES.Push("alt_" . SubStr("abcdefghijklmnopqrstuvwxyz", A_Index, 1))
-                    loop 10
-                        GESTURE_ACTION_NAMES.Push("alt_" . SubStr("0123456789", A_Index, 1))
-                    for _Sk, _ in _GestureSpecialKeys
-                        GESTURE_ACTION_NAMES.Push("alt_" . _Sk)
+                if (_Item = "_modifier_chords_placeholder") {
+                    for _, _Group in GESTURE_MODIFIER_ACTION_GROUPS {
+                        GESTURE_ACTION_NAMES.Push("##Raccourcis " . _Group.Label)
+                        for _, _ActionId in _Group.Actions
+                            GESTURE_ACTION_NAMES.Push(_ActionId)
+                    }
                 }
-                ; hs-only placeholders (_cmd_placeholder, _hs_ctrl_placeholder…) silently dropped
                 continue
             }
             ; Regular action — keep if platform is "all" or "ahk"

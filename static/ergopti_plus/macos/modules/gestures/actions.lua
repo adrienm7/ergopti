@@ -15,6 +15,7 @@ local Logger        = require("lib.logger")
 local Paths         = require("lib.paths")
 local Timings       = require("lib.timings")
 local i18n          = require("lib.i18n")
+local FileSystem    = require("adapters.file_system")
 local Click         = require("modules.gestures.actions_click")
 local LOG           = "gestures.actions"
 
@@ -147,11 +148,6 @@ local function spaceNav(goNext)
 		))
 	end)
 end
-
-local CMD_LETTERS = {
-	"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
-	"n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
-}
 
 -- Axis actions (prev / next)
 ax("tabs",       
@@ -457,65 +453,6 @@ end)
 -- Debug
 sg("open_console",                        function() pcall(hs.openConsole) end)
 
--- Cmd letter shortcuts
-for _, letter in ipairs(CMD_LETTERS) do
-	local upper = string.upper(letter)
-	sg("cmd_" .. letter,
-		"⌘ " .. upper .. " — Cmd+" .. upper,
-		function() pcall(hs.eventtap.keyStroke, {"cmd"}, letter) end)
-end
-
-for _, letter in ipairs(CMD_LETTERS) do
-	local upper = string.upper(letter)
-	sg("cmd_shift_" .. letter,
-		"⌘⇧ " .. upper .. " — Cmd+Shift+" .. upper,
-		function() pcall(hs.eventtap.keyStroke, {"cmd", "shift"}, letter) end)
-end
-
--- Ctrl letter shortcuts (macOS)
-for _, letter in ipairs(CMD_LETTERS) do
-	local upper = string.upper(letter)
-	sg("hs_ctrl_" .. letter,
-		"^ " .. upper .. " — Ctrl+" .. upper,
-		function() pcall(hs.eventtap.keyStroke, {"ctrl"}, letter) end)
-end
-
-for _, letter in ipairs(CMD_LETTERS) do
-	local upper = string.upper(letter)
-	sg("hs_ctrl_shift_" .. letter,
-		"^⇧ " .. upper .. " — Ctrl+Shift+" .. upper,
-		function() pcall(hs.eventtap.keyStroke, {"ctrl", "shift"}, letter) end)
-end
-
--- Option (alt) letter shortcuts (macOS)
-for _, letter in ipairs(CMD_LETTERS) do
-	local upper = string.upper(letter)
-	sg("hs_option_" .. letter,
-		"⌥ " .. upper .. " — Option+" .. upper,
-		function() pcall(hs.eventtap.keyStroke, {"alt"}, letter) end)
-end
-
--- Digit shortcuts: cmd_0..9, hs_ctrl_0..9, hs_option_0..9
-local DIGITS = {"0","1","2","3","4","5","6","7","8","9"}
-for _, d in ipairs(DIGITS) do
-	sg("cmd_"        .. d, "⌘ " .. d .. " — Cmd+"    .. d, function() pcall(hs.eventtap.keyStroke, {"cmd"},          d) end)
-	sg("hs_ctrl_"    .. d, "^ " .. d .. " — Ctrl+"   .. d, function() pcall(hs.eventtap.keyStroke, {"ctrl"},         d) end)
-	sg("hs_option_"  .. d, "⌥ " .. d .. " — Option+" .. d, function() pcall(hs.eventtap.keyStroke, {"alt"},          d) end)
-end
-
--- Special key shortcuts: space, enter, period, comma
-local HS_SPECIAL_KEYS = {
-	{id = "space",  key = "space",  label = "Espace"},
-	{id = "enter",  key = "return", label = i18n.get("common.key_enter")},
-	{id = "period", key = ".",      label = "Point"},
-	{id = "comma",  key = ",",      label = "Virgule"},
-}
-for _, sk in ipairs(HS_SPECIAL_KEYS) do
-	sg("cmd_"       .. sk.id, function() pcall(hs.eventtap.keyStroke, {"cmd"},  sk.key) end)
-	sg("hs_ctrl_"   .. sk.id, function() pcall(hs.eventtap.keyStroke, {"ctrl"}, sk.key) end)
-	sg("hs_option_" .. sk.id, function() pcall(hs.eventtap.keyStroke, {"alt"},  sk.key) end)
-end
-
 
 
 
@@ -669,6 +606,7 @@ local LABELS = {
 -- Path to the shared actions.toml, resolved through the single shared-tree
 -- resolver (Paths.shared) so the shared root lives in exactly one place.
 local _shared_toml = Paths.shared("modules/gestures/actions.toml")
+local _modifier_chords_json = Paths.shared("modules/gestures/modifier_chords.json")
 
 --- Parses the shared actions.toml using a lightweight line-by-line reader.
 --- Returns { sg_order = [...], ax_order = [...], sg_actions = {name={platform=...}}, ax_actions = {name={platform=...}} }
@@ -754,13 +692,75 @@ end
 
 local _shared = load_shared_actions(_shared_toml)
 
+-- Labels for modifier-key actions are intentionally kept outside i18n: the
+-- shared catalogue defines their exact, language-neutral display form (for
+-- example "Ctrl + A") for every driver.
+local MODIFIER_ACTION_LABELS = {}
+local MODIFIER_ACTION_GROUPS = {}
+
+local function load_modifier_chords(path)
+	local raw = FileSystem.read(path)
+	if not raw then
+		Logger.warn(LOG, "Shared modifier chords JSON not found: %s", tostring(path))
+		return nil
+	end
+	local ok_json, data = pcall(hs.json.decode, raw)
+	if not ok_json or type(data) ~= "table" then
+		Logger.warn(LOG, "Shared modifier chords JSON is invalid: %s", tostring(path))
+		return nil
+	end
+	return data
+end
+
+local function join(parts, separator)
+	return table.concat(parts, separator)
+end
+
+local function register_modifier_chords(catalogue)
+	local platform = catalogue and catalogue.platforms and catalogue.platforms.macos
+	local modifiers = platform and platform.modifiers
+	local keys = catalogue and catalogue.keys
+	if type(modifiers) ~= "table" or type(keys) ~= "table" then return end
+
+	local max_mask = (2 ^ #modifiers) - 1
+	for mask = 1, max_mask do
+		local ids, labels, native_mods = {}, {}, {}
+		for index, modifier in ipairs(modifiers) do
+			if math.floor(mask / (2 ^ (index - 1))) % 2 == 1 then
+				ids[#ids + 1] = modifier.id
+				labels[#labels + 1] = modifier.label
+				native_mods[#native_mods + 1] = modifier.hammerspoon
+			end
+		end
+		local id_prefix = join(ids, "_")
+		local label_prefix = join(labels, " + ")
+		local action_ids = {}
+		for _, key_def in ipairs(keys) do
+			local action_id = id_prefix .. "_" .. key_def.id
+			local action_label = label_prefix .. " + " .. key_def.label
+			local key = key_def.macos_key or key_def.id
+			local mods = {}
+			for index, modifier in ipairs(native_mods) do mods[index] = modifier end
+			MODIFIER_ACTION_LABELS[action_id] = action_label
+			action_ids[#action_ids + 1] = action_id
+			sg(action_id, function() pcall(hs.eventtap.keyStroke, mods, key) end)
+		end
+		MODIFIER_ACTION_GROUPS[#MODIFIER_ACTION_GROUPS + 1] = {
+			label = label_prefix,
+			actions = action_ids,
+		}
+	end
+end
+
+register_modifier_chords(load_modifier_chords(_modifier_chords_json))
+
 --- Builds a picker-order list from the shared TOML, keeping only entries
 --- matching the given platform ("hs") plus sentinels ("--", "#…").
---- Placeholder keys (_cmd_placeholder, _cmd_shift_placeholder) are replaced
---- inline with the dynamically-registered cmd_* / cmd_shift_* names.
+--- The modifier-chord placeholder is expanded from modifier_chords.json.
 local function build_sg_names(shared)
 	if not shared then
-		-- Fallback: keep previous hard-coded list intact via inline table
+		-- The shared action-order catalogue is unavailable: omit picker entries
+		-- rather than exposing an unsynchronised fallback list.
 		return nil
 	end
 	local out = {}
@@ -781,29 +781,13 @@ local function build_sg_names(shared)
 			local title      = (translated ~= i18n_key) and translated or key_suffix
 			title            = (title:gsub("^#+", ""))
 			out[#out + 1] = hashes .. title
-		elseif item == "_cmd_placeholder" then
-			out[#out + 1] = "#" .. (i18n.get("sg_actions.sg_order.header.cmd"):gsub("^#+", ""))
-			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "cmd_" .. l end
-			for d = 0, 9 do out[#out + 1] = "cmd_" .. d end
-			for _, sk in ipairs({"space","enter","period","comma"}) do out[#out + 1] = "cmd_" .. sk end
-		elseif item == "_cmd_shift_placeholder" then
-			out[#out + 1] = "#" .. (i18n.get("sg_actions.sg_order.header.cmd_shift"):gsub("^#+", ""))
-			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "cmd_shift_" .. l end
-		elseif item == "_hs_ctrl_placeholder" then
-			out[#out + 1] = "#" .. (i18n.get("sg_actions.sg_order.header.hs_ctrl"):gsub("^#+", ""))
-			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "hs_ctrl_" .. l end
-			for d = 0, 9 do out[#out + 1] = "hs_ctrl_" .. d end
-			for _, sk in ipairs({"space","enter","period","comma"}) do out[#out + 1] = "hs_ctrl_" .. sk end
-		elseif item == "_hs_ctrl_shift_placeholder" then
-			out[#out + 1] = "#" .. (i18n.get("sg_actions.sg_order.header.hs_ctrl_shift"):gsub("^#+", ""))
-			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "hs_ctrl_shift_" .. l end
-		elseif item == "_hs_option_placeholder" then
-			out[#out + 1] = "#" .. (i18n.get("sg_actions.sg_order.header.hs_option"):gsub("^#+", ""))
-			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "hs_option_" .. l end
-			for d = 0, 9 do out[#out + 1] = "hs_option_" .. d end
-			for _, sk in ipairs({"space","enter","period","comma"}) do out[#out + 1] = "hs_option_" .. sk end
+		elseif item == "_modifier_chords_placeholder" then
+			for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
+				out[#out + 1] = "##Raccourcis " .. group.label
+				for _, action_id in ipairs(group.actions) do out[#out + 1] = action_id end
+			end
 		elseif item:sub(1, 1) == "_" then
-			-- ahk-only placeholders (_ctrl_placeholder, _win_placeholder…): skip silently
+			-- Driver-specific placeholders are ignored deliberately.
 		else
 			local meta = shared.sg_actions[item]
 			local platform = meta and meta.platform or "all"
@@ -899,6 +883,7 @@ function M.get_label(name)
 		local s = i18n.get("sg_actions.none")
 		return (s ~= "sg_actions.none") and s or LABELS.none
 	end
+	if MODIFIER_ACTION_LABELS[name] then return MODIFIER_ACTION_LABELS[name] end
 	-- Prefer locale JSON so the label is translated for the active language
 	local key_sg = "sg_actions." .. name
 	local s = i18n.get(key_sg)

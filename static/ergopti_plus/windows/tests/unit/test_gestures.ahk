@@ -116,6 +116,26 @@ TestGestures_ActionsHaveProperties() {
 }
 Test("Gestures: every action has Label and Fn properties", TestGestures_ActionsHaveProperties)
 
+TestGestures_SharedModifierChordsAreRegisteredAndLabelled() {
+    global GESTURE_ACTION_NAMES
+    if (GESTURE_ACTION_NAMES.Length = 0)
+        _GestureLoadActionCatalog()
+    for Name in ["ctrl_a", "ctrl_alt_a", "ctrl_shift_alt_win_enter"]
+        AssertTrue(GESTURE_ACTIONS.Has(Name), "missing shared modifier action: " . Name)
+    AssertEqual("Ctrl + A", _GestureActionLabel("ctrl_a"), "Ctrl+A label must never expose the internal id")
+    AssertEqual("Ctrl + Alt + A", _GestureActionLabel("ctrl_alt_a"), "multi-modifier label must use the shared format")
+    AssertEqual("Ctrl + Shift + Alt + Win + Enter", _GestureActionLabel("ctrl_shift_alt_win_enter"), "full modifier matrix must include special keys")
+    HasShortcutsH1 := false
+    HasCtrlH2 := false
+    for Name in GESTURE_ACTION_NAMES {
+        HasShortcutsH1 := HasShortcutsH1 || (Name = "#Raccourcis")
+        HasCtrlH2 := HasCtrlH2 || (Name = "##Raccourcis Ctrl")
+    }
+    AssertTrue(HasShortcutsH1, "modifier actions must be under the Raccourcis H1")
+    AssertTrue(HasCtrlH2, "Ctrl actions must be under the Raccourcis Ctrl H2")
+}
+Test("Gestures: shared modifier chords are registered and labelled", TestGestures_SharedModifierChordsAreRegisteredAndLabelled)
+
 TestGestures_NoneReturnsZero() {
     Result := GESTURE_ACTIONS["none"].Fn()
     AssertEqual(0, Result, "none action should return 0")

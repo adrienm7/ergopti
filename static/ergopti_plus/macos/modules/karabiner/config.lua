@@ -25,6 +25,7 @@ local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
 local Layout = require("lib.layout")
+local Paths  = require("lib.paths")
 
 local Defaults = require("modules.karabiner.defaults")
 
@@ -82,6 +83,52 @@ local function load_json_file(path)
 	return data
 end
 
+--- Appends the full shared modifier × key matrix used by gesture and tap-hold
+--- action pickers. The labels come verbatim from the catalogue, so "Ctrl + A"
+--- never depends on the active UI language.
+local function append_shared_modifier_chords(actions)
+	local catalogue_path = Paths.shared("modules/gestures/modifier_chords.json")
+	if not catalogue_path then return end
+	local catalogue = load_json_file(catalogue_path)
+	local platform = catalogue and catalogue.platforms and catalogue.platforms.macos
+	local modifiers = platform and platform.modifiers
+	local keys = catalogue and catalogue.keys
+	if type(modifiers) ~= "table" or type(keys) ~= "table" then return end
+
+	local max_mask = (2 ^ #modifiers) - 1
+	for mask = 1, max_mask do
+		local ids, labels, karabiner_modifiers = {}, {}, {}
+		for index, modifier in ipairs(modifiers) do
+			if math.floor(mask / (2 ^ (index - 1))) % 2 == 1 then
+				ids[#ids + 1] = modifier.id
+				labels[#labels + 1] = modifier.label
+				karabiner_modifiers[#karabiner_modifiers + 1] = modifier.karabiner
+			end
+		end
+		local id_prefix = table.concat(ids, "_")
+		local label_prefix = table.concat(labels, " + ")
+		for _, key_def in ipairs(keys) do
+			local action = {
+				id = id_prefix .. "_" .. key_def.id,
+				short_label = label_prefix .. " + " .. key_def.label,
+				label = label_prefix .. " + " .. key_def.label,
+				category = "Keyboard shortcuts",
+				holdable = false,
+			}
+			if key_def.karabiner_key then
+				action.karabiner_to = {{
+					key_code = key_def.karabiner_key,
+					modifiers = karabiner_modifiers,
+				}}
+			else
+				action.logical_char = key_def.id
+				action.karabiner_modifiers = karabiner_modifiers
+			end
+			actions[#actions + 1] = action
+		end
+	end
+end
+
 --- Loads all action definitions from modules/karabiner/data/actions.json.
 --- Entries with a "logical_char" field have their "karabiner_to" resolved at load
 --- time via lib.layout, so the physical key_code always matches the current OS
@@ -94,6 +141,7 @@ function M.load_available_actions(actions_file)
 		Logger.error(LOG, "Cannot load actions — module will be non-functional.")
 		return nil
 	end
+	append_shared_modifier_chords(list)
 
 	-- Resolve layout-dependent actions: logical_char → physical key_code
 	for _, action in ipairs(list) do

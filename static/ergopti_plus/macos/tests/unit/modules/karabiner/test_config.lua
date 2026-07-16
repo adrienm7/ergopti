@@ -23,6 +23,22 @@ package.loaded["lib.toml.codec"] = _toml_stub
 local Config = helpers.load_with_stubs("modules.karabiner.config")
 
 
+helpers.describe("Config.load_available_actions: shared modifier chords", function()
+	helpers.it("adds all macOS modifier combinations with invariant labels", function()
+		local path = helpers.driver_root() .. "modules/karabiner/data/actions.json"
+		local actions = Config.load_available_actions(path)
+		local by_id = {}
+		for _, action in ipairs(actions) do by_id[action.id] = action end
+
+		helpers.assert_eq(by_id.ctrl_a.label, "Ctrl + A")
+		helpers.assert_eq(by_id.cmd_option_shift_enter.short_label, "Cmd + Option + Shift + Enter")
+		helpers.assert_eq(by_id.cmd_ctrl_option_shift_z.label, "Cmd + Ctrl + Option + Shift + Z")
+		helpers.assert_eq(by_id.cmd_option_shift_enter.karabiner_to[1].key_code, "return_or_enter")
+		helpers.assert_eq(#by_id.cmd_option_shift_enter.karabiner_to[1].modifiers, 3)
+	end)
+end)
+
+
 
 
 
