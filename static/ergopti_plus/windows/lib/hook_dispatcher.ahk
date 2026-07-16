@@ -77,6 +77,12 @@ class HookDispatcherConst {
 	static EVT_MS_WDN     := "mouse_wdn"
 	static EVT_MS_WRIGHT  := "mouse_wright"
 	static EVT_MS_WLEFT   := "mouse_wleft"
+
+	; WM_* constants used by OnMessage wheel interception.
+	; Added for touchpad / precision-touchpad scroll paths that bypass the
+	; classic hotkey hooks in some environments.
+	static WM_MOUSEWHEEL  := 0x020A
+	static WM_MOUSEHWHEEL := 0x020E
 }
 
 
@@ -114,13 +120,16 @@ class HookDispatcher {
 	static _hk_wdn    := false
 	static _hk_wright := false
 	static _hk_wleft  := false
+	static _wheel_msg_cb := false
+	static _last_wheel_msg_log_tick := 0
 
 	; Guards against double-Start().
 	static _started := false
 
 	; Last time the wheel moved while the user was interacting with a key.
-	; Used by tap-hold disambiguation: holding any key + scrolling should
-	; not be followed by a tap action when the key is released immediately.
+	; Updated via wheel hotkeys and WM_MOUSEWHEEL/WM_MOUSEHWHEEL so both classic
+	; mouse wheels and precision touchpad paths keep the tap-hold disambiguation
+	; guard in sync.
 	static _last_wheel_tick := 0
 
 
@@ -253,11 +262,15 @@ class HookDispatcher {
 
 	; Bound to IH.OnKeyDown — receives (ih, vk, sc) from AHK.
 	static _OnKeyDown(ih, vk, sc) {
+		if IsFunc("TapHoldTrackKeyDownByScancode")
+			TapHoldTrackKeyDownByScancode(vk, sc)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_DOWN, ih, vk, sc)
 	}
 
 	; Bound to IH.OnKeyUp — receives (ih, vk, sc) from AHK.
 	static _OnKeyUp(ih, vk, sc) {
+		if IsFunc("TapHoldTrackKeyUpByScancode")
+			TapHoldTrackKeyUpByScancode(vk, sc)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_UP, ih, vk, sc)
 	}
 
@@ -289,18 +302,57 @@ class HookDispatcher {
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_MUP)
 	}
 	static _OnWheelUp(*) {
+		if IsFunc("TapHoldTrackScrollCancel")
+			TapHoldTrackScrollCancel()
 		HookDispatcher._last_wheel_tick := A_TickCount
+		if LoggerIsDebugEnabled()
+			LoggerDebug("HookDispatcher", "Mouse wheel up hotkey at tick={1}.", HookDispatcher._last_wheel_tick)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WUP)
 	}
 	static _OnWheelDown(*) {
+		if IsFunc("TapHoldTrackScrollCancel")
+			TapHoldTrackScrollCancel()
 		HookDispatcher._last_wheel_tick := A_TickCount
+		if LoggerIsDebugEnabled()
+			LoggerDebug("HookDispatcher", "Mouse wheel down hotkey at tick={1}.", HookDispatcher._last_wheel_tick)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WDN)
 	}
 	static _OnWheelRight(*) {
+		if IsFunc("TapHoldTrackScrollCancel")
+			TapHoldTrackScrollCancel()
+		HookDispatcher._last_wheel_tick := A_TickCount
+		if LoggerIsDebugEnabled()
+			LoggerDebug("HookDispatcher", "Mouse wheel right hotkey at tick={1}.", HookDispatcher._last_wheel_tick)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WRIGHT)
 	}
 	static _OnWheelLeft(*) {
+		if IsFunc("TapHoldTrackScrollCancel")
+			TapHoldTrackScrollCancel()
+		HookDispatcher._last_wheel_tick := A_TickCount
+		if LoggerIsDebugEnabled()
+			LoggerDebug("HookDispatcher", "Mouse wheel left hotkey at tick={1}.", HookDispatcher._last_wheel_tick)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WLEFT)
+	}
+
+	; WM_MOUSEWHEEL / WM_MOUSEHWHEEL interception path (touchpad / precision
+	; touchpad devices). Updates `_last_wheel_tick` even when hotkey binding does
+	; not emit due OS/driver message variation.
+	static _OnWheelMessage(wparam, lparam, msg, hwnd) {
+		local delta := (wparam >> 16) & 0xFFFF
+		if (delta > 0x7FFF)
+			delta := delta - 0x10000
+		if IsFunc("TapHoldTrackScrollCancel")
+			TapHoldTrackScrollCancel()
+		HookDispatcher._last_wheel_tick := A_TickCount
+		if LoggerIsDebugEnabled() {
+			now := A_TickCount
+			if ((now - HookDispatcher._last_wheel_msg_log_tick) > 120) {
+				HookDispatcher._last_wheel_msg_log_tick := now
+				LoggerDebug("HookDispatcher", "Mouse/trackpad wheel message msg={1}, delta={2}, lparam={3}, hwnd={4}.",
+					msg, delta, lparam, hwnd)
+			}
+		}
+		return
 	}
 
 	; Return True while a wheel event happened very recently.
@@ -407,6 +459,19 @@ class HookDispatcher {
 		HookDispatcher._SafeHotkey("~WheelRight", HookDispatcher._hk_wright)
 		HookDispatcher._SafeHotkey("~WheelLeft",  HookDispatcher._hk_wleft)
 
+		; Trackpad / precision touchpad devices sometimes emit wheel messages that do not
+		; reach hotkey bindings consistently (especially with high-resolution scroll).
+		; Keep the message-path tap-hold guard alive by timestamping `_last_wheel_tick`
+		; directly on WM_MOUSEWHEEL / WM_MOUSEHWHEEL too.
+		try {
+			HookDispatcher._wheel_msg_cb := HookDispatcher._OnWheelMessage.Bind(HookDispatcher)
+			OnMessage(HookDispatcherConst.WM_MOUSEWHEEL, HookDispatcher._wheel_msg_cb)
+			OnMessage(HookDispatcherConst.WM_MOUSEHWHEEL, HookDispatcher._wheel_msg_cb)
+		} catch as e {
+			LoggerWarn("HookDispatcher", "Failed to register WM_MOUSEWHEEL message hook: {1}.", e.Message)
+			HookDispatcher._wheel_msg_cb := false
+		}
+
 		LoggerSuccess("HookDispatcher", "Unified hook dispatcher started ({1} event type(s) with subscribers).",
 			HookDispatcher._subscribers.Count)
 	}
@@ -453,6 +518,11 @@ class HookDispatcher {
 			try Hotkey("~WheelLeft",  HookDispatcher._hk_wleft,  "Off")
 		}
 
+		if HookDispatcher.HasOwnProp("_wheel_msg_cb") && HookDispatcher._wheel_msg_cb is Func {
+			try OnMessage(HookDispatcherConst.WM_MOUSEWHEEL, HookDispatcher._wheel_msg_cb, 0)
+			try OnMessage(HookDispatcherConst.WM_MOUSEHWHEEL, HookDispatcher._wheel_msg_cb, 0)
+		}
+
 		; Reset the hotkey references to false so a subsequent Start() rebinds
 		; cleanly rather than reusing stale BoundFuncs. false (not unset) keeps
 		; `_hk_ldown is Func` readable on a second Stop() with no live hotkeys.
@@ -466,6 +536,7 @@ class HookDispatcher {
 		HookDispatcher._hk_wdn    := false
 		HookDispatcher._hk_wright := false
 		HookDispatcher._hk_wleft  := false
+		HookDispatcher._wheel_msg_cb := false
 
 		; Clear the subscriber registry so a fresh Start() begins with an empty
 		; fan-out table. Without this a Stop()/Start() cycle would inherit the
