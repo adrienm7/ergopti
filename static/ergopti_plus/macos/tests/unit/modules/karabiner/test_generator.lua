@@ -816,3 +816,8 @@ helpers.describe("Generator — simultaneous chord rule permits incidental modif
 			"optional:any must still be present for a non-modifier-key chord")
 	end)
 end)
+
+-- This fixture is intentionally local to generator snapshots. Release it once
+-- those tests have run so test discovery order cannot make later modules read
+-- from the synthetic in-memory filesystem.
+package.loaded["adapters.file_system"] = nil

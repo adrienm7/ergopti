@@ -5,17 +5,15 @@
 ; DESCRIPTION:
 ; Static source guard for the space-altgr-double-raalt-down finding.
 ;
-; _SpaceHoldAltGr() used to send "{RAlt Down}" twice (once at the top, once
-; again concatenated with the captured char) but only one "{RAlt Up}". That
-; left an unbalanced Down/Up count: on layouts where a repeated Down is not
+; The legacy _SpaceHoldAltGr() used to send "{RAlt Down}" twice (once at the
+; top, once again concatenated with the captured char) but only one "{RAlt Up}".
+; That left an unbalanced Down/Up count: on layouts where a repeated Down is not
 ; idempotent the modifier stayed logically held after the single Up, leaking
-; AltGr onto the following keystrokes. It also double-applied the AltGr layer
-; to the captured (already-translated) char, producing the wrong glyph.
+; AltGr onto following keystrokes. The generic modifier handler supersedes it.
 ;
-; The fix keeps a balanced pair: exactly one "{RAlt Down}" and exactly one
-; "{RAlt Up}" per call, with the captured char sent plainly while RAlt is
-; already held. This test scans the function body and asserts that balance
-; so the redundant second Down can never silently return.
+; The generic handler now keeps exactly one TextPressKey Down/Up pair per call
+; for every modifier, including AltGr's RAlt mapping. This test scans that
+; single implementation so the redundant second Down can never return.
 ;
 ; This is a meta-static test (scans source text): modules/tap_holds/space.ahk
 ; registers SC039:: hotkeys at top level and is deliberately NOT #Included by
@@ -65,18 +63,17 @@ _SADRD_Count(Haystack, Needle) {
 ; ==================================================
 
 _SADRD_AltGrModifierBalanced() {
-	Src := _SADRD_ReadSource("modules/tap_holds/space.ahk")
-	Body := _DriverFuncBody("_SpaceHoldAltGr")
-	Assert(Body != "", "_SpaceHoldAltGr(captured) must exist in modules/tap_holds/space.ahk")
+	Body := _DriverFuncBody("_SpaceHoldWithModifier")
+	Assert(Body != "", "_SpaceHoldWithModifier(captured) must exist in modules/tap_holds/space.ahk")
 
-	Downs := _SADRD_Count(Body, "{RAlt Down}")
-	Ups := _SADRD_Count(Body, "{RAlt Up}")
+	Downs := _SADRD_Count(Body, 'TextPressKey(ModKey, "Down")')
+	Ups := _SADRD_Count(Body, 'TextPressKey(ModKey, "Up")')
 
 	AssertEqual(1, Downs,
-		"_SpaceHoldAltGr must send '{RAlt Down}' exactly once (the redundant second Down left AltGr stuck and double-translated the captured char) (space-altgr-double-raalt-down)")
+		"_SpaceHoldWithModifier must press its resolved modifier exactly once, including AltGr's RAlt mapping (space-altgr-double-raalt-down)")
 	AssertEqual(1, Ups,
-		"_SpaceHoldAltGr must release '{RAlt Up}' exactly once to balance the single Down (space-altgr-double-raalt-down)")
+		"_SpaceHoldWithModifier must release its resolved modifier exactly once (space-altgr-double-raalt-down)")
 	AssertEqual(Downs, Ups,
-		"_SpaceHoldAltGr must keep a balanced RAlt Down/Up count so the modifier is never left logically held (space-altgr-double-raalt-down)")
+		"_SpaceHoldWithModifier must keep a balanced modifier Down/Up count so AltGr is never left logically held (space-altgr-double-raalt-down)")
 }
-Test("tap_holds: _SpaceHoldAltGr keeps a balanced RAlt Down/Up pair (space-altgr-double-raalt-down)", _SADRD_AltGrModifierBalanced)
+Test("tap_holds: generic Space modifier path keeps AltGr's Down/Up pair balanced (space-altgr-double-raalt-down)", _SADRD_AltGrModifierBalanced)

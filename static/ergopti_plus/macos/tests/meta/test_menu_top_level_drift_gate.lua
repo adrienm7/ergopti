@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Menu Top-Level Drift Gate (macOS)
 --- DESCRIPTION:
---- Asserts that the menu_manifest.json top_level tail (from global_actions
---- onwards, filtered for the "hs" platform) matches the canonical ids the
+--- Asserts that the menu_manifest.json top_level tail (including the separator
+--- before global_actions, filtered for the "hs" platform) matches the canonical ids the
 --- dispatch loop in builder.lua's load_top_level_tail() handles.  Prevents
 --- silent drift between the shared manifest and the driver.
 ---
@@ -16,6 +16,7 @@ local DRIVER_ROOT = helpers.driver_root()
 
 -- Canonical ids in manifest order — macOS platform (suspend absent, karabiner not in tail)
 local CANONICAL_IDS = {
+	"---",
 	"global_actions",
 	"language",
 	"config_folder",
@@ -46,7 +47,7 @@ helpers.describe("menu drift gate (macOS): top_level tail matches canonical orde
 		fh:close()
 		local data = hs.json.decode(raw)
 
-		-- Locate global_actions
+		-- Locate global_actions and preserve the manifest-owned leading separator.
 		local tail_start = nil
 		for i, entry in ipairs(data.top_level) do
 			if type(entry) == "table" and entry.id == "global_actions" then
@@ -55,6 +56,9 @@ helpers.describe("menu drift gate (macOS): top_level tail matches canonical orde
 			end
 		end
 		helpers.assert_true(tail_start ~= nil, "top_level must contain a global_actions entry")
+		if tail_start > 1 and data.top_level[tail_start - 1].id == "---" then
+			tail_start = tail_start - 1
+		end
 
 		-- Collect hs-filtered tail
 		local hs_tail = {}
@@ -78,5 +82,16 @@ helpers.describe("menu drift gate (macOS): top_level tail matches canonical orde
 			helpers.assert_eq(hs_tail[i], expected,
 				"hs tail[" .. i .. "] = '" .. tostring(hs_tail[i]) .. "', expected '" .. expected .. "'")
 		end
+	end)
+
+	helpers.it("macOS loader keeps the separator immediately before global_actions", function()
+		local fh = io.open(DRIVER_ROOT .. "ui/menu/builder.lua", "r")
+		helpers.assert_true(fh ~= nil, "Cannot open builder.lua")
+		local source = fh:read("*a")
+		fh:close()
+		helpers.assert_true(source:find("previous.id == \"---\"", 1, true) ~= nil,
+			"load_top_level_tail must inspect the manifest entry before global_actions")
+		helpers.assert_true(source:find("tail_start = tail_start - 1", 1, true) ~= nil,
+			"load_top_level_tail must include the preceding separator in the rendered tail")
 	end)
 end)
