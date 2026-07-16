@@ -140,6 +140,11 @@ helpers.describe("modules/gestures/manager.lua", function()
     helpers.assert_true(type(label) == "string")
   end)
 
+  helpers.it("renders the complete shared modifier matrix with universal labels", function()
+    helpers.assert_eq(M.get_action_label("ctrl_a"), "Ctrl + A")
+    helpers.assert_eq(M.get_action_label("ctrl_alt_super_enter"), "Ctrl + Alt + Super + Enter")
+  end)
+
   helpers.it("get_action_names returns sorted list", function()
     local names = M.get_action_names()
     helpers.assert_true(type(names) == "table")

@@ -38,6 +38,6 @@ helpers.describe("gestures.actions: modifier+key actions post the expected keyst
 
 	helpers.it("cmd_a posts Cmd+a", function()        assert_single_keystroke("cmd_a", {"cmd"}, "a") end)
 	helpers.it("cmd_shift_a posts Cmd+Shift+a", function() assert_single_keystroke("cmd_shift_a", {"cmd", "shift"}, "a") end)
-	helpers.it("hs_ctrl_a posts Ctrl+a", function()   assert_single_keystroke("hs_ctrl_a", {"ctrl"}, "a") end)
-	helpers.it("hs_option_a posts Option/Alt+a", function() assert_single_keystroke("hs_option_a", {"alt"}, "a") end)
+	helpers.it("ctrl_a posts Ctrl+a", function()      assert_single_keystroke("ctrl_a", {"ctrl"}, "a") end)
+	helpers.it("option_a posts Option+a", function()  assert_single_keystroke("option_a", {"alt"}, "a") end)
 end)

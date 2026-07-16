@@ -151,6 +151,25 @@ helpers.describe("gestures.actions: get_label", function()
 	helpers.it("falls back to the id when unknown", function()
 		helpers.assert_eq(Actions.get_label("totally_not_a_real_id"), "totally_not_a_real_id")
 	end)
+
+	helpers.it("renders shared modifier chords with language-neutral labels", function()
+		helpers.assert_eq(Actions.get_label("ctrl_a"), "Ctrl + A")
+		helpers.assert_eq(Actions.get_label("cmd_option_shift_enter"), "Cmd + Option + Shift + Enter")
+	end)
+
+	helpers.it("includes every modifier chord in the gesture picker", function()
+		local function contains(items, needle)
+			for _, item in ipairs(items) do
+				if item == needle then return true end
+			end
+			return false
+		end
+		helpers.assert_true(contains(Actions.SG_NAMES, "ctrl_a"))
+		helpers.assert_true(contains(Actions.SG_NAMES, "cmd_ctrl_option_shift_z"))
+		helpers.assert_true(contains(Actions.SG_NAMES, "#Raccourcis"))
+		helpers.assert_true(contains(Actions.SG_NAMES, "##Raccourcis Ctrl"))
+		helpers.assert_true(contains(Actions.SG_NAMES, "##Raccourcis Cmd + Ctrl + Option + Shift"))
+	end)
 end)
 
 

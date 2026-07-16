@@ -182,6 +182,64 @@ local ACTION_LABELS = {
 	notification_center         = "🔔 Notifications",
 }
 
+-- Dynamic modifier-key actions use the same shared catalogue as Windows and
+-- macOS. Their labels are intentionally language-neutral (for example
+-- "Ctrl + A") and therefore bypass the locale layer entirely.
+local MODIFIER_ACTION_COMMANDS = {}
+
+local function load_modifier_chords()
+	local actions_path = resolve_actions_toml_path()
+	local path = actions_path:gsub("actions%.toml$", "modifier_chords.json")
+	if path == actions_path then return nil end
+	local fh = io.open(path, "r")
+	if not fh then
+		Logger.warn(LOG, "Shared modifier chords JSON unreadable at '%s'.", path)
+		return nil
+	end
+	local raw = fh:read("*a")
+	fh:close()
+	local ok_json, json = pcall(require, "json")
+	if not ok_json or type(json) ~= "table" or type(json.decode) ~= "function" then
+		Logger.warn(LOG, "JSON decoder unavailable — modifier chord actions skipped.")
+		return nil
+	end
+	local ok_decode, data = pcall(json.decode, raw)
+	if not ok_decode or type(data) ~= "table" then
+		Logger.warn(LOG, "Shared modifier chords JSON failed to parse.")
+		return nil
+	end
+	return data
+end
+
+local function register_modifier_chords(catalogue)
+	local platform = catalogue and catalogue.platforms and catalogue.platforms.linux
+	local modifiers = platform and platform.modifiers
+	local keys = catalogue and catalogue.keys
+	if type(modifiers) ~= "table" or type(keys) ~= "table" then return end
+
+	local max_mask = (2 ^ #modifiers) - 1
+	for mask = 1, max_mask do
+		local ids, labels, native_modifiers = {}, {}, {}
+		for index, modifier in ipairs(modifiers) do
+			if math.floor(mask / (2 ^ (index - 1))) % 2 == 1 then
+				ids[#ids + 1] = modifier.id
+				labels[#labels + 1] = modifier.label
+				native_modifiers[#native_modifiers + 1] = modifier.xdotool
+			end
+		end
+		local id_prefix = table.concat(ids, "_")
+		local label_prefix = table.concat(labels, " + ")
+		for _, key_def in ipairs(keys) do
+			local action_id = id_prefix .. "_" .. key_def.id
+			local key = key_def.linux_key or key_def.id
+			ACTION_LABELS[action_id] = label_prefix .. " + " .. key_def.label
+			MODIFIER_ACTION_COMMANDS[action_id] = table.concat(native_modifiers, "+") .. "+" .. key
+		end
+	end
+end
+
+register_modifier_chords(load_modifier_chords())
+
 --- Executes a gesture action via xdotool/ytool on Linux.
 --- @param action_name string The action identifier.
 --- @param go_next boolean|nil Direction for axis actions (true = next, false/nil = prev).
@@ -190,6 +248,12 @@ local function _execute_action(action_name, go_next)
 
 	local function _run(cmd)
 		pcall(function() os.execute(cmd .. " 2>/dev/null &") end)
+	end
+
+	local modifier_command = MODIFIER_ACTION_COMMANDS[action_name]
+	if modifier_command then
+		_run("xdotool key " .. modifier_command)
+		return
 	end
 
 	if action_name == "left_click_toggle" then

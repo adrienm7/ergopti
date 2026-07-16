@@ -67,7 +67,10 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false) {
             _apLvl := 0
             while (SubStr(_apName, _apLvl + 1, 1) = "#")
                 _apLvl++
-            _apHdr := t("sg_actions.sg_order.header." . SubStr(_apName, _apLvl + 1))
+            _apHeaderId := SubStr(_apName, _apLvl + 1)
+            _apHdr := t("sg_actions.sg_order.header." . _apHeaderId)
+            if (_apHdr = "sg_actions.sg_order.header." . _apHeaderId)
+                _apHdr := _apHeaderId
             ; The locale value carries a legacy "#" prefix — strip it so the level
             ; comes only from the catalogue marker, not the translated text.
             while (SubStr(_apHdr, 1, 1) = "#")
@@ -97,7 +100,10 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false) {
             local _hl := 0
             while (SubStr(ActionName, _hl + 1, 1) = "#")
                 _hl++
-            local TranslatedHeader := t("sg_actions.sg_order.header." . SubStr(ActionName, _hl + 1))
+            local HeaderId := SubStr(ActionName, _hl + 1)
+            local TranslatedHeader := t("sg_actions.sg_order.header." . HeaderId)
+            if (TranslatedHeader = "sg_actions.sg_order.header." . HeaderId)
+                TranslatedHeader := HeaderId
             while (SubStr(TranslatedHeader, 1, 1) = "#")
                 TranslatedHeader := SubStr(TranslatedHeader, 2)
             CurrentCat := TranslatedHeader
