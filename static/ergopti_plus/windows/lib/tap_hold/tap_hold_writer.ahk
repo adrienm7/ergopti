@@ -60,15 +60,36 @@ global _TH_KeyDefs := [
 ;                 "i18n" => label_i18n_key).
 ; **Canonical list mirrors _shared/modules/menu/menu_manifest.json
 ; hold_options (MENU-4).**
-global _TH_HoldOptions := [
-	Map("id", "",      "kind", "none",     "i18n", "tap_hold.hold.none"),
-	Map("id", "ctrl",  "kind", "modifier", "i18n", "tap_hold.hold.ctrl"),
-	Map("id", "shift", "kind", "modifier", "i18n", "tap_hold.hold.shift"),
-	Map("id", "alt",   "kind", "modifier", "i18n", "tap_hold.hold.alt"),
-	Map("id", "alt_gr","kind", "modifier", "i18n", "tap_hold.hold.alt_gr"),
-	Map("id", "win",   "kind", "modifier", "i18n", "tap_hold.hold.win"),
-	Map("id", "nav",   "kind", "layer",    "i18n", "tap_hold.hold.nav_layer"),
-]
+global _TH_HoldModifierIds := ["ctrl", "shift", "alt", "alt_gr", "win"]
+global _TH_HoldOptions := _TH_BuildHoldOptions()
+
+; Build the menu hold options once at startup: native-key sentinel, all
+; modifier combinations, and nav layer entry.
+_TH_BuildHoldOptions() {
+	Options := []
+	Options.Push(Map("id", "", "kind", "none", "i18n", "tap_hold.hold.none"))
+
+	ModifierCombos := []
+	_TH_EnumerateHoldModifierCombos("", 1, _TH_HoldModifierIds, ModifierCombos)
+	for _, ComboId in ModifierCombos {
+		Options.Push(Map("id", ComboId, "kind", "modifier", "i18n", ""))
+	}
+
+	Options.Push(Map("id", "nav", "kind", "layer", "i18n", "tap_hold.hold.nav_layer"))
+	return Options
+}
+
+; Recursively enumerate all non-empty combinations of `_TH_HoldModifierIds` with
+; deterministic order: single modifiers first, then longer ordered combinations.
+_TH_EnumerateHoldModifierCombos(Prefix, StartIndex, Modifiers, Out) {
+	Loop Modifiers.Length {
+		if (A_Index < StartIndex)
+			continue
+		ComboId := Prefix == "" ? Modifiers[A_Index] : (Prefix . "+" . Modifiers[A_Index])
+		Out.Push(ComboId)
+		_TH_EnumerateHoldModifierCombos(ComboId, A_Index + 1, Modifiers, Out)
+	}
+}
 
 ; i18n key for the "nothing / disable" tap action sentinel.
 global _TH_TapNoneI18n := "tap_hold.tap.none"
@@ -114,7 +135,7 @@ TapHoldCurrentHoldLabel(KeyId) {
 	HoldLayer := TapHoldHoldLayer(TapHold, KeyId)
 	for _, Opt in _TH_HoldOptions {
 		if (Opt["kind"] == "modifier" and Opt["id"] == HoldMod) {
-			return t(Opt["i18n"])
+			return _TH_HoldOptionLabel(HoldMod)
 		}
 		if (Opt["kind"] == "layer" and Opt["id"] == HoldLayer) {
 			return t(Opt["i18n"])
@@ -124,6 +145,35 @@ TapHoldCurrentHoldLabel(KeyId) {
 		}
 	}
 	return HoldMod != "" ? HoldMod : (HoldLayer != "" ? HoldLayer : t(_TH_HoldOptions[1]["i18n"]))
+}
+
+; Human label for a hold modifier identifier.
+; Built from base i18n keys when possible, then joined with ' + '.
+_TH_HoldOptionLabel(HoldId) {
+	if (HoldId == "") {
+		return t("tap_hold.hold.none")
+	}
+	Parts := StrSplit(HoldId, "+")
+	Out := []
+	for _, Part in Parts {
+		Clean := Trim(Part)
+		if (Clean == "") {
+			continue
+		}
+		Label := t("tap_hold.hold." . Clean)
+		if (InStr(Label, "tap_hold.hold.") > 0) {
+			Label := Clean
+		}
+		Out.Push(Label)
+	}
+	if (Out.Length == 0) {
+		return t("tap_hold.hold.none")
+	}
+	Result := ""
+	for Index, Label in Out {
+		Result .= (Index = 1 ? "" : " + ") . Label
+	}
+	return Result
 }
 
 ; Return true when the tap action for a key matches the given action id.

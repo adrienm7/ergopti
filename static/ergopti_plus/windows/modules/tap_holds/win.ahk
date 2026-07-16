@@ -47,6 +47,14 @@ _WinHoldModKey() {
 			_WinDispatch()
 		return
 	}
+	HoldGuardMs := TapHoldDuration(TapHold, "win") * 1100
+	if (HoldGuardMs < 250)
+		HoldGuardMs := 250
+	if (TapHoldShouldSuppressHold("win", HoldGuardMs)) {
+		if LoggerIsDebugEnabled()
+			LoggerDebug("TapHold", "Win hold suppressed after long press because wheel activity was detected.")
+		return
+	}
 	ModKey := _WinHoldModKey()
 	TextPressKey(ModKey, "Down")
 	try {

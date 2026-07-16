@@ -68,10 +68,11 @@ global _AHK_SendInput := (Keys) => SendInput(Keys)
 ; Maps the cross-platform modifier names from the spec to their AHK v2 prefix chars.
 _TextSenderModifierPrefix(ModName) {
 	switch ModName {
-		case "Ctrl", "ctrl":      return "^"
-		case "Shift", "shift":    return "+"
-		case "Alt", "alt":        return "!"
-		case "Cmd", "Win", "win": return "#"
+		case "Ctrl", "ctrl", "Lctrl", "lctrl", "Rctrl", "rctrl": return "^"
+		case "Shift", "shift", "Lshift", "lshift", "Rshift", "rshift": return "+"
+		case "Alt", "alt", "Lalt", "lalt", "Ralt", "ralt":       return "!"
+		case "Cmd", "Win", "win", "Lwin", "lwin", "Rwin", "rwin": return "#"
+		case "Blind", "blind":    return "{Blind}"
 		default:                  return ""
 	}
 }
@@ -102,6 +103,39 @@ _TextSenderModifierString(ModStr) {
 		Prefix .= P
 	}
 	return Blind . Prefix
+}
+
+; Normalizes a modifier name (string or alias) to an AHK key name.
+; Returns "" for unknown values so callers can skip them safely.
+_TextSenderNormalizeModifierKey(Token) {
+	switch Lower(Trim(Token)) {
+		case "ctrl", "lctrl", "rctrl":
+			return "Ctrl"
+		case "shift", "lshift", "rshift":
+			return "Shift"
+		case "alt", "lalt", "ralt":
+			return "Alt"
+		case "altgr":
+			return "RAlt"
+		case "win", "lwin", "rwin", "cmd":
+			return "LWin"
+		default:
+			return ""
+	}
+}
+
+; Builds the modifier down/up prefix set for SendInput from array input.
+; Useful for Space/one-shot style handlers that need to send the captured
+; character while modifiers are already pressed.
+_TextSenderModifierPrefixFromArray(Modifiers) {
+	Prefix := ""
+	for _, Token in Modifiers {
+		Norm := _TextSenderNormalizeModifierKey(Token)
+		if (Norm == "")
+			continue
+		Prefix .= _TextSenderModifierPrefix(Norm)
+	}
+	return Prefix
 }
 
 
@@ -296,6 +330,29 @@ TextPressKey(Key, Modifiers) {
 			return
 		}
 		_AHK_SendInput.Call("{" . Key . " " . Modifiers . "}")
+		return
+	}
+	if (Modifiers is Array) {
+		Mods := []
+		for _, Tok in Modifiers {
+			Norm := _TextSenderNormalizeModifierKey(Tok)
+			if (Norm == "") {
+				LoggerWarn("TextSender", "TextPressKey: unknown modifier token '{1}' in '{2}' modifier array — ignored.", Tok, Modifiers)
+				continue
+			}
+			Mods.Push(Norm)
+		}
+		if (Mods.Length == 0) {
+			LoggerWarn("TextSender", "TextPressKey: modifier array for key '{1}' is empty after normalization.", Key)
+			_AHK_SendInput.Call("{" . Key . "}")
+			return
+		}
+		if (Mods.Length == 1) {
+			_AHK_SendInput.Call("{" . Mods[1] . " " . Key . "}")
+			return
+		}
+		Prefix := _TextSenderModifierPrefixFromArray(Mods)
+		_AHK_SendInput.Call(Prefix . "{" . Key . "}")
 		return
 	}
 	Prefix := ""

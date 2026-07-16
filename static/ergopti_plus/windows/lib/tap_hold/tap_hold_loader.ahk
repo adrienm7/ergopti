@@ -341,18 +341,69 @@ TapHoldHoldLayer(TapHold, KeyId) {
 ; @param CtrlKeyName {String} AHK key name for the "ctrl" case. Defaults to
 ;        "LCtrl"; rctrl.ahk passes "RCtrl" so holding the physical Right Ctrl
 ;        key as its own "ctrl" hold modifier arms the right-side key.
-; @returns {String} An AHK key name suitable for TextPressKey, or "" when
-;        ModifierValue is unrecognized.
+; @returns {String|Array} An AHK key name, or array of AHK key names for
+;        hold modifier combinations, or "" when ModifierValue is invalid.
 ResolveHoldModifierKey(ModifierValue, FieldLabel, CtrlKeyName := "LCtrl") {
-	switch ModifierValue {
-		case "ctrl":   return CtrlKeyName
-		case "shift":  return "LShift"
-		case "alt":    return "LAlt"
-		case "alt_gr": return "RAlt"
-		case "win":    return "LWin"
-		default:
-			try LoggerWarn("TapHoldLoader", "Unrecognized hold_modifier '{1}' for tap-hold key '{2}' — check tap_hold.toml for a typo; no modifier will be armed (expected one of ctrl/shift/alt/alt_gr/win).",
-				ModifierValue, FieldLabel)
-			return ""
+	Raw := Trim(String(ModifierValue))
+	if (Raw == "") {
+		return ""
 	}
+
+	; Accept both legacy single token and combo forms, e.g. "ctrl",
+	; "ctrl+shift", or "Ctrl + Shift".
+	Normalized := StrReplace(Raw, " ", "+")
+	while (InStr(Normalized, "++") > 0) {
+		Normalized := StrReplace(Normalized, "++", "+")
+	}
+	Normalized := Trim(Normalized, "+")
+	Tokens := StrSplit(Normalized, "+")
+	if (Tokens.Length == 0) {
+		return ""
+	}
+
+	Resolved := []
+	Invalid := []
+	for _, Token in Tokens {
+		T := Trim(Lower(Token))
+		switch T {
+			case "ctrl", "lctrl":
+				Resolved.Push(CtrlKeyName)
+			case "shift", "lshift":
+				Resolved.Push("LShift")
+			case "alt", "lalt":
+				Resolved.Push("LAlt")
+			case "alt_gr", "altgr", "ralt":
+				Resolved.Push("RAlt")
+			case "win", "lwin":
+				Resolved.Push("LWin")
+			case "":
+				continue
+			default:
+				Invalid.Push(Token)
+		}
+	}
+
+	if (Invalid.Length > 0) {
+		try LoggerWarn("TapHoldLoader", "Unrecognized hold_modifier '{1}' for tap-hold key '{2}' — check tap_hold.toml for a typo; no modifier will be armed (expected one of ctrl/shift/alt/alt_gr/win).",
+			ModifierValue, FieldLabel)
+		return ""
+	}
+	if (Resolved.Length == 0) {
+		try LoggerWarn("TapHoldLoader", "No recognized hold_modifier in '{1}' for tap-hold key '{2}'.",
+			ModifierValue, FieldLabel)
+		return ""
+	}
+	if (Resolved.Length == 1) {
+		try LoggerDebug("TapHoldLoader", "Resolved hold_modifier '{1}' for tap-hold key '{2}' as '{3}'.",
+			ModifierValue, FieldLabel, Resolved[1])
+		return Resolved[1]
+	}
+
+	Label := ""
+	for _, Mod in Resolved {
+		Label .= (Label == "" ? "" : ",") . Mod
+	}
+	try LoggerDebug("TapHoldLoader", "Resolved hold_modifier '{1}' for tap-hold key '{2}' as [{3}].",
+		ModifierValue, FieldLabel, Label)
+	return Resolved
 }

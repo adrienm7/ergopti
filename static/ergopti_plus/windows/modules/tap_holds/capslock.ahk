@@ -132,6 +132,14 @@ SC03A:: {
 	}
 
 	ModKey := _CapsLockHoldModKey()
+	HoldGuardMs := TapHoldDuration(TapHold, "caps_lock") * 1100
+	if (HoldGuardMs < 250)
+		HoldGuardMs := 250
+	if (TapHoldShouldSuppressHold("caps_lock", HoldGuardMs)) {
+		if LoggerIsDebugEnabled()
+			LoggerDebug("TapHold", "CapsLock hold suppressed after long press because wheel activity was detected.")
+		return
+	}
 	TextPressKey(ModKey, "Down")
 	tap := KeyWait("CapsLock", "T" . TapHoldDuration(TapHold, "caps_lock"))
 	if tap {
@@ -168,6 +176,14 @@ $SC03A:: {
 	}
 
 	UpdateLastSentCharacter("CapsLock")
+	HoldGuardMs := TapHoldDuration(TapHold, "caps_lock") * 1100
+	if (HoldGuardMs < 250)
+		HoldGuardMs := 250
+	if (TapHoldShouldSuppressHold("caps_lock", HoldGuardMs)) {
+		if LoggerIsDebugEnabled()
+			LoggerDebug("TapHold", "CapsLock layer hold suppressed before activation because wheel activity was detected.")
+		return
+	}
 	ActivateLayer()
 	try {
 		KeyWait("CapsLock", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)

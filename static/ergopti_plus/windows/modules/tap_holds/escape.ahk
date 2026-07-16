@@ -47,6 +47,14 @@ _EscapeHoldModKey() {
 			_EscapeDispatch()
 		return
 	}
+	HoldGuardMs := TapHoldDuration(TapHold, "escape") * 1100
+	if (HoldGuardMs < 250)
+		HoldGuardMs := 250
+	if (TapHoldShouldSuppressHold("escape", HoldGuardMs)) {
+		if LoggerIsDebugEnabled()
+			LoggerDebug("TapHold", "Escape hold suppressed after long press because wheel activity was detected.")
+		return
+	}
 	ModKey := _EscapeHoldModKey()
 	TextPressKey(ModKey, "Down")
 	try {

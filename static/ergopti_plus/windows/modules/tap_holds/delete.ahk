@@ -50,6 +50,14 @@ _DeleteHoldModKey() {
 			_DeleteDispatch()
 		return
 	}
+	HoldGuardMs := TapHoldDuration(TapHold, "delete") * 1100
+	if (HoldGuardMs < 250)
+		HoldGuardMs := 250
+	if (TapHoldShouldSuppressHold("delete", HoldGuardMs)) {
+		if LoggerIsDebugEnabled()
+			LoggerDebug("TapHold", "Delete hold suppressed after long press because wheel activity was detected.")
+		return
+	}
 	ModKey := _DeleteHoldModKey()
 	TextPressKey(ModKey, "Down")
 	try {
