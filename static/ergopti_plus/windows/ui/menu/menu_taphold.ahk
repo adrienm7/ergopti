@@ -208,7 +208,12 @@ _BuildHoldPickerSubmenu(KeyId) {
 	global _TH_HoldOptions
 	PickerMenu := Menu()
 	for _, HoldOpt in _TH_HoldOptions {
-		Label    := t(HoldOpt["i18n"])
+		Label    := ""
+		if (HoldOpt["kind"] == "modifier" && HoldOpt["i18n"] == "") {
+			Label := _TH_HoldOptionLabel(HoldOpt["id"])
+		} else {
+			Label := t(HoldOpt["i18n"])
+		}
 		IsActive := IsTapHoldHoldActive(KeyId, HoldOpt)
 		RegisterMenuItem(PickerMenu, Label, _TH_MakeHoldFn(KeyId, HoldOpt))
 		if IsActive {
