@@ -108,7 +108,7 @@ _TextSenderModifierString(ModStr) {
 ; Normalizes a modifier name (string or alias) to an AHK key name.
 ; Returns "" for unknown values so callers can skip them safely.
 _TextSenderNormalizeModifierKey(Token) {
-	switch Lower(Trim(Token)) {
+	switch StrLower(Trim(Token)) {
 		case "ctrl", "lctrl", "rctrl":
 			return "Ctrl"
 		case "shift", "lshift", "rshift":
