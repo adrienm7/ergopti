@@ -319,7 +319,7 @@ try Updater_LoadCheckInterval()
 ; when the user has chosen "never" — those checks happen inside the helper.
 try Updater_StartBackgroundChecks()
 try Updater_InitTrayNotifyHandler()
-LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver…")
+LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver (pid={1}, script='{2}')…", A_Pid, A_ScriptName)
 ; Boot phase profiling — emits one INFO line per phase so a slow start can be
 ; diagnosed from the log alone (see lib/boot_profiler.ahk).
 BootProfile_Begin()

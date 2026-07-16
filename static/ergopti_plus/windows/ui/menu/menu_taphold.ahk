@@ -47,11 +47,13 @@ _BuildTapHoldsSubmenu() {
 
 ; Dynamic handler: reset-defaults action button.
 _TH_DynResetDefaults(M, _Cat) {
+	try LoggerInfo("TapHoldMenu", "Resetting all tap-hold overrides from defaults (script='{1}', pid={2}).", A_ScriptName, A_Pid)
 	RegisterMenuItem(M, t("tap_hold.reset_defaults"), _TH_ResetAllToDefaults)
 }
 
 ; Dynamic handler: disable-all action button.
 _TH_DynDisableAll(M, _Cat) {
+	try LoggerInfo("TapHoldMenu", "Disabling all tap-hold mappings (script='{1}', pid={2}).", A_ScriptName, A_Pid)
 	RegisterMenuItem(M, t("tap_hold.disable_all"), _TH_DisableAll)
 }
 
@@ -119,7 +121,7 @@ _TH_ResetAllToDefaults(*) {
 	} catch as Err {
 		try LoggerError("TapHoldMenu", "Could not delete tap_hold.toml: {1}.", Err.Message)
 	}
-	Reload
+	_TH_ReloadTapHoldMenu("reset_defaults", "")
 }
 
 ; Clear every configured key so all physical keys revert to their native OS
@@ -128,7 +130,7 @@ _TH_DisableAll(*) {
 	if IsSet(_TH_WriteTapHoldDisabled) {
 		try _TH_WriteTapHoldDisabled()
 	}
-	Reload()
+	_TH_ReloadTapHoldMenu("disable_all", "")
 }
 
 ; ---- Callback classes ---------------------------------------------------------
@@ -139,9 +141,10 @@ _TH_DisableAll(*) {
 class _TH_DisableFnObj {
 	KeyId := ""
 	Call(*) {
+		try LoggerInfo("TapHoldMenu", "Menu disable action requested for key '{1}' (pid={2}).", this.KeyId, A_Pid)
 		WriteTapHoldTap(this.KeyId, "")
 		WriteTapHoldHold(this.KeyId, _TH_NoneHoldOpt())
-		Reload
+		_TH_ReloadTapHoldMenu("key_disable", this.KeyId)
 	}
 }
 
@@ -153,6 +156,7 @@ class _TH_TapPickerFnObj {
 		; Current tap action at call time (not at menu-build time).
 		; "" means native (unconfigured) — pass as-is; ShowNative:=true adds the entry.
 		Current := IsSet(TapHold) ? TapHoldTapAction(TapHold, this.KeyId) : ""
+		try LoggerDebug("TapHoldMenu", "Opening tap picker for '{1}' (current='{2}').", this.KeyId, (Current == "" ? "<native>" : Current))
 		Title := t("tap_hold.picker.title_prefix") . this.KeyLabel
 		_KeyId := this.KeyId
 		ShowActionPicker(Title, Current, (Id) => _TH_ApplyTap(_KeyId, Id), true)
@@ -163,8 +167,11 @@ class _TH_HoldFnObj {
 	KeyId   := ""
 	HoldOpt := ""
 	Call(*) {
+		Kind := this.HoldOpt["kind"]
+		OptId := this.HoldOpt["id"]
+		try LoggerInfo("TapHoldMenu", "Hold picker selection for '{1}': kind='{2}', id='{3}' (pid={4}).", this.KeyId, Kind, OptId, A_Pid)
 		WriteTapHoldHold(this.KeyId, this.HoldOpt)
-		Reload
+		_TH_ReloadTapHoldMenu("hold_set", this.KeyId)
 	}
 }
 
@@ -187,8 +194,12 @@ _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl) {
 ; ActionId="" (from the "Natif" sentinel) clears the slot so the key passes through natively.
 ; ActionId="none" sets the absorb no-op action.
 _TH_ApplyTap(KeyId, ActionId) {
+	global TapHold
+	Current := IsSet(TapHold) ? TapHoldTapAction(TapHold, KeyId) : "<not_ready>"
+	try LoggerInfo("TapHoldMenu", "ApplyTap key='{1}' current='{2}' -> '{3}' (pid={4}).", KeyId,
+		(Current == "" ? "<native>" : Current), (ActionId == "" ? "<native>" : ActionId), A_Pid)
 	WriteTapHoldTap(KeyId, ActionId)
-	Reload
+	_TH_ReloadTapHoldMenu("tap_set", KeyId)
 }
 
 ; Build the hold picker submenu for a given key. Shows the fixed hold options
@@ -213,5 +224,14 @@ _TH_MakeHoldFn(KeyId, HoldOpt) {
 	obj.KeyId   := KeyId
 	obj.HoldOpt := HoldOpt
 	return ObjBindMethod(obj, "Call")
+}
+
+; Shared reload helper — keeps menu-triggered updates observable in debug logs.
+; We use it everywhere to avoid silent hot-reload with no trace when
+; diagnosing "second-instance" reports from users.
+_TH_ReloadTapHoldMenu(Reason, KeyId := "") {
+	try LoggerInfo("TapHoldMenu", "Reloading script after '{1}' on key '{2}' (pid={3}, script={4}).",
+		Reason, KeyId, A_Pid, A_ScriptName)
+	Reload()
 }
 

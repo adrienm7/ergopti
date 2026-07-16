@@ -40,25 +40,35 @@
 #HotIf TapHoldTapAction(TapHold, "left_shift") != "" and not LayerEnabled
 ~$SC02A::
 {
+	DurationSec := TapHoldDuration(TapHold, "left_shift")
 	; Bounded (unlike a bare KeyWait): a lost SC02A key-up (focus stolen by a
 	; UAC prompt, Suspend toggled mid-press) can never wedge this hotkey's
 	; tap/hold discrimination forever (hold-keywait-whole-class).
 	TimeBefore := A_TickCount
-	Released := KeyWait("SC02A", "T" . TapHoldDuration(TapHold, "left_shift"))
+	Released := KeyWait("SC02A", "T" . DurationSec)
 	TimeAfter := A_TickCount
-	tap := Released and ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "left_shift") * 1000)
+	ElapsedMs := TimeAfter - TimeBefore
+	GuardMs := DurationSec * 1000
+	tap := Released and (ElapsedMs <= GuardMs)
+	if LoggerIsDebugEnabled() {
+		LoggerDebug("TapHoldLShift", "LShift release candidate: released={1}, elapsed_ms={2}, guard_ms={3}, prior={4}, tap={5}.",
+			Released, ElapsedMs, GuardMs, A_PriorKey, tap)
+	}
 	if (
 		tap
-		and (TimeAfter - TimeBefore) >= TapMinDurationMs()
+		and ElapsedMs >= TapMinDurationMs()
 		and A_PriorKey == "LShift"
 	) { ; A_PriorKey allows fast shortcuts under the tap threshold without triggering the tap action mid-combo
 		_LShiftDispatch()
+	} else if (LoggerIsDebugEnabled()) {
+		LoggerDebug("TapHoldLShift", "LShift tap dispatch blocked after release on '{1}'.", A_PriorKey)
 	}
 }
 #HotIf
 
 ; Dispatch the configured tap action for LShift.
 _LShiftDispatch() {
+	try LoggerDebug("TapHoldDispatch", "LShift dispatch wrapper entered.")
 	_TapHoldFireAction("left_shift")
 }
 
@@ -80,25 +90,37 @@ _LShiftDispatch() {
 ~$SC01D::
 {
 	UpdateLastSentCharacter("LControl")
+	DurationSec := TapHoldDuration(TapHold, "left_ctrl")
+	CapsUp := KS_IsUp("SC03A") ; CapsLock must not be physically held
+	AltUp := KS_IsUp("SC038") ; LAlt must not be physically held
 	; Bounded (unlike a bare KeyWait): a lost SC01D key-up can never wedge
 	; this hotkey's tap/hold discrimination forever (hold-keywait-whole-class).
 	TimeBefore := A_TickCount
-	Released := KeyWait("SC01D", "T" . TapHoldDuration(TapHold, "left_ctrl"))
+	Released := KeyWait("SC01D", "T" . DurationSec)
 	TimeAfter := A_TickCount
-	tap := Released and ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "left_ctrl") * 1000)
+	ElapsedMs := TimeAfter - TimeBefore
+	GuardMs := DurationSec * 1000
+	tap := Released and (ElapsedMs <= GuardMs)
+	if LoggerIsDebugEnabled() {
+		LoggerDebug("TapHoldLCtrl", "LCtrl release candidate: released={1}, elapsed_ms={2}, guard_ms={3}, prior={4}, caps_up={5}, alt_up={6}, tap={7}.",
+			Released, ElapsedMs, GuardMs, A_PriorKey, CapsUp, AltUp, tap)
+	}
 	if (
 		tap
-		and (TimeAfter - TimeBefore) >= TapMinDurationMs()
+		and ElapsedMs >= TapMinDurationMs()
 		and A_PriorKey == "LControl"
-		and KS_IsUp("SC03A") ; CapsLock must not be physically held
-		and KS_IsUp("SC038") ; LAlt must not be physically held
+		and CapsUp ; CapsLock must not be physically held
+		and AltUp ; LAlt must not be physically held
 	) {
 		_LCtrlDispatch()
+	} else if (LoggerIsDebugEnabled()) {
+		LoggerDebug("TapHoldLCtrl", "LCtrl tap dispatch blocked after release on '{1}'.", A_PriorKey)
 	}
 }
 #HotIf
 
 ; Dispatch the configured tap action for LCtrl.
 _LCtrlDispatch() {
+	try LoggerDebug("TapHoldDispatch", "LCtrl dispatch wrapper entered.")
 	_TapHoldFireAction("left_ctrl")
 }

@@ -51,6 +51,7 @@ global TAPHOLD_DEFAULT_ACTIVATION_SECONDS := 0.2
 ; On missing or unreadable user file the defaults (if provided) are returned
 ; as-is so a fresh install still gets working defaults after first boot.
 LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
+	try LoggerDebug("TapHoldLoader", "LoadTapHoldToml start: user='{1}', defaults='{2}'.", FilePath, DefaultsFilePath)
 	Result := Map("keys", Map(), "layers", Map())
 	InheritDefaults := true
 
@@ -61,9 +62,14 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 	UserData := Map("keys", Map(), "layers", Map())
 	if FileExist(FilePath)
 		_TapHold_ParseFileInto(FilePath, UserData)
+	else
+		try LoggerDebug("TapHoldLoader", "No user tap-hold file found yet at '{1}'.", FilePath)
 
 	if UserData.Has("inherit_defaults")
 		InheritDefaults := !!UserData["inherit_defaults"]
+
+	try LoggerDebug("TapHoldLoader", "Parsed user tap-hold: {1} key(s), {2} layer(s), inherit_defaults={3}.",
+		UserData["keys"].Count, UserData["layers"].Count, InheritDefaults)
 
 	; Load shared defaults first when the caller supplies the path. Missing
 	; defaults file is non-fatal (logs a debug notice and continues).
@@ -74,6 +80,8 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 		} else {
 			try LoggerDebug("TapHoldLoader", "Shared defaults not found at '{1}' — skipping.", DefaultsFilePath)
 		}
+	} else if (DefaultsFilePath != "" and !InheritDefaults) {
+		try LoggerDebug("TapHoldLoader", "Skipping shared defaults load because inherit_defaults=false in user tap-hold file.")
 	}
 
 	if !FileExist(FilePath) {
@@ -103,6 +111,13 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 		for field, val in v
 			Result["keys"][k][field] := val
 	}
+
+	if UserData["keys"].Has("left_ctrl") {
+		try LoggerDebug("TapHoldLoader", "User override includes left_ctrl: tap_action='{1}', hold_modifier='{2}', hold_layer='{3}'.",
+			UserData["keys"]["left_ctrl"].Has("tap_action") ? (UserData["keys"]["left_ctrl"]["tap_action"] == "" ? "<native>" : UserData["keys"]["left_ctrl"]["tap_action"]) : "<unset>",
+			UserData["keys"]["left_ctrl"].Has("hold_modifier") ? UserData["keys"]["left_ctrl"]["hold_modifier"] : "<unset>",
+			UserData["keys"]["left_ctrl"].Has("hold_layer") ? UserData["keys"]["left_ctrl"]["hold_layer"] : "<unset>")
+	}
 	for k, v in UserData["layers"] {
 		if !Result["layers"].Has(k)
 			Result["layers"][k] := Map("mappings", Map())
@@ -116,6 +131,15 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 				Result["layers"][k][field] := val
 			}
 		}
+	}
+
+	if Result["keys"].Has("left_ctrl") {
+		LCfg := Result["keys"]["left_ctrl"]
+		try LoggerDebug("TapHoldLoader", "Resolved left_ctrl after merge: tap_action='{1}', hold_modifier='{2}', hold_layer='{3}', inherit_defaults={4}.",
+			LCfg.Has("tap_action") ? (LCfg["tap_action"] == "" ? "<native>" : LCfg["tap_action"]) : "<unset>",
+			LCfg.Has("hold_modifier") ? LCfg["hold_modifier"] : "<unset>",
+			LCfg.Has("hold_layer") ? LCfg["hold_layer"] : "<unset>",
+			InheritDefaults ? "true" : "false")
 	}
 
 	; Truncated-write sentinel: the user file exists yet the merged config has
