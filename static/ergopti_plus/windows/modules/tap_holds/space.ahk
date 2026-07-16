@@ -83,7 +83,7 @@ SpaceTapHold(HoldFn) {
 	; Skip modifier on empty capture — no phantom modifier on empty chord.
 	if (ih.Input != "" and ih.Input != " ")
 		HoldFn.Call(ih.Input)
-	KeyWait("SC039", "U T2")
+	KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 }
 
 SpaceTapHoldLayer() {

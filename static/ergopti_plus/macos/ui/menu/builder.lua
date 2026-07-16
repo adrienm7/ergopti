@@ -111,7 +111,8 @@ local function load_debug_menu()
 end
 
 
---- Loads the top_level tail (from "global_actions" onwards) from menu_manifest.json,
+--- Loads the top_level tail (including the separator immediately before
+--- "global_actions", when declared) from menu_manifest.json,
 --- filtered for the "hs" platform.
 --- Returns an empty array on failure and logs ERROR (fail-loud — no stale copy).
 --- @return table Array of {id} entries in display order.
@@ -132,6 +133,13 @@ local function load_top_level_tail()
 	if not tail_start then
 		Logger.error(LOG, "top_level has no 'global_actions' entry — tail will be empty.")
 		return {}
+	end
+	-- The shared manifest owns the visual boundary between feature menus and
+	-- system-wide actions. Preserve a separator directly before global_actions,
+	-- matching the Windows manifest loader and Linux menu builder.
+	local previous = tail_start > 1 and data.top_level[tail_start - 1] or nil
+	if type(previous) == "table" and previous.id == "---" then
+		tail_start = tail_start - 1
 	end
 	local result = {}
 	for i = tail_start, #data.top_level do
