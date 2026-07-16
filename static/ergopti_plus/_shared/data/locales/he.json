@@ -1688,7 +1688,7 @@
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "פעולת הקשה — ",
 	"tap_hold.reset_defaults": "אפס לערכי ברירת מחדל",
-	"tap_hold.tap.none": "מקורי",
+	"tap_hold.tap.none": "מקשים מקוריים",
 	"terminators.label_close_paren": ") : סוגריים סוגרים",
 	"terminators.label_enter": "⏎ : Enter",
 	"terminators.label_equal": "= : שווה",

@@ -1688,7 +1688,7 @@
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "タップ操作 — ",
 	"tap_hold.reset_defaults": "デフォルト値にリセット",
-	"tap_hold.tap.none": "ネイティブ",
+	"tap_hold.tap.none": "ネイティブキー",
 	"terminators.label_close_paren": ") : 閉じ括弧",
 	"terminators.label_enter": "⏎ : Enter",
 	"terminators.label_equal": "= : イコール",

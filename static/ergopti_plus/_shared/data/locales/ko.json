@@ -1688,7 +1688,7 @@
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "탭 동작 — ",
 	"tap_hold.reset_defaults": "기본값으로 재설정",
-	"tap_hold.tap.none": "기본",
+	"tap_hold.tap.none": "기본 키",
 	"terminators.label_close_paren": ") : 닫는 괄호",
 	"terminators.label_enter": "⏎ : Enter",
 	"terminators.label_equal": "= : 등호",

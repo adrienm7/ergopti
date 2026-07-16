@@ -1688,7 +1688,7 @@
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Tap-åtgärd — ",
 	"tap_hold.reset_defaults": "Återställ standardvärden",
-	"tap_hold.tap.none": "Nativ",
+	"tap_hold.tap.none": "Native key",
 	"terminators.label_close_paren": ") : Avslutande parentes",
 	"terminators.label_enter": "⏎ : Retur",
 	"terminators.label_equal": "= : Lika med",

@@ -1688,7 +1688,7 @@
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Dokunma eylemi — ",
 	"tap_hold.reset_defaults": "Varsayılan değerlere sıfırla",
-	"tap_hold.tap.none": "Yerel",
+	"tap_hold.tap.none": "Yerel tuş",
 	"terminators.label_close_paren": ") : Kapatan parantez",
 	"terminators.label_enter": "⏎ : Enter",
 	"terminators.label_equal": "= : Eşittir işareti",

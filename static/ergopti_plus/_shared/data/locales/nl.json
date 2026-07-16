@@ -1688,7 +1688,7 @@
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Tik-actie — ",
 	"tap_hold.reset_defaults": "Standaardwaarden herstellen",
-	"tap_hold.tap.none": "Natief",
+	"tap_hold.tap.none": "Native key",
 	"terminators.label_close_paren": ") : Sluitende haak",
 	"terminators.label_enter": "⏎ : Enter",
 	"terminators.label_equal": "= : Is gelijk aan",
