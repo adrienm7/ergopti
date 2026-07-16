@@ -99,6 +99,14 @@ SC00F Up:: TextPressKey("LAlt", "Up")
 #HotIf TapHoldTapAction(TapHold, "tab") != "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "tab") != "" and TapHoldTapAction(TapHold, "tab") != "" and not LayerEnabled
 $SC00F:: {
 	ModKey := _TabHoldModKey()
+	HoldGuardMs := TapHoldDuration(TapHold, "tab") * 1100
+	if (HoldGuardMs < 250)
+		HoldGuardMs := 250
+	if (TapHoldShouldSuppressHold("tab", HoldGuardMs)) {
+		if LoggerIsDebugEnabled()
+			LoggerDebug("TapHold", "Tab hold suppressed after long press because wheel activity was detected.")
+		return
+	}
 	TextPressKey(ModKey, "Down")
 	tap := KeyWait("SC00F", "T" . TapHoldDuration(TapHold, "tab"))
 	if tap {
@@ -128,6 +136,14 @@ $SC00F:: {
 	if tap {
 		if (A_PriorKey == "Tab")
 			_TabDispatch()
+		return
+	}
+	HoldGuardMs := TapHoldDuration(TapHold, "tab") * 1100
+	if (HoldGuardMs < 250)
+		HoldGuardMs := 250
+	if (TapHoldShouldSuppressHold("tab", HoldGuardMs)) {
+		if LoggerIsDebugEnabled()
+			LoggerDebug("TapHold", "Tab layer hold suppressed before activation because wheel activity was detected.")
 		return
 	}
 	ActivateLayer()

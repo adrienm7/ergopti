@@ -51,6 +51,14 @@ _BackspaceHoldModKey() {
 			_BackspaceDispatch()
 		return
 	}
+	HoldGuardMs := TapHoldDuration(TapHold, "backspace") * 1100
+	if (HoldGuardMs < 250)
+		HoldGuardMs := 250
+	if (TapHoldShouldSuppressHold("backspace", HoldGuardMs)) {
+		if LoggerIsDebugEnabled()
+			LoggerDebug("TapHold", "Backspace hold suppressed after long press because wheel activity was detected.")
+		return
+	}
 	ModKey := _BackspaceHoldModKey()
 	TextPressKey(ModKey, "Down")
 	try {

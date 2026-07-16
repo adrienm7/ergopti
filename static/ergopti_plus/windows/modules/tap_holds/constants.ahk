@@ -229,6 +229,19 @@ TapHoldShouldCancelTap(KeyId, GuardMs := 250) {
 	return ""
 }
 
+; Return true when a hold gesture should be blocked after the user has already
+; held the key. This is a hold-specific wrapper over TapHoldShouldCancelTap()
+; that keeps all cancel reasons and debug trail in one place.
+TapHoldShouldSuppressHold(KeyId, GuardMs := 250) {
+	global _TH_LastTapHoldCancelReason
+	CancelReason := TapHoldShouldCancelTap(KeyId, GuardMs)
+	if (CancelReason != "") {
+		try LoggerDebug("TapHoldTrack", "Hold suppressed for '{1}' ({2}, guard={3}ms).", KeyId, CancelReason, GuardMs)
+		return true
+	}
+	return false
+}
+
 ; Remove tracked state for a key once tap resolution has completed.
 TapHoldForgetTrackedKey(KeyId) {
 	global _TH_TapHoldTrackState

@@ -255,6 +255,14 @@ SC038::
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "backspace" and TapHoldHoldModifier(TapHold, "left_alt") != "" and not LayerEnabled
 $SC038:: {
 	ModKey := _LAltHoldModKey()
+	HoldGuardMs := TapHoldDuration(TapHold, "left_alt") * 1100
+	if (HoldGuardMs < 250)
+		HoldGuardMs := 250
+	if (TapHoldShouldSuppressHold("left_alt", HoldGuardMs)) {
+		if LoggerIsDebugEnabled()
+			LoggerDebug("TapHold", "LAlt (backspace) hold suppressed after long press because wheel activity was detected.")
+		return
+	}
 	TextPressKey(ModKey, "Down")
 	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
 	if tap {
@@ -291,6 +299,14 @@ $SC038:: {
 	if tap {
 		TextPressKey(ModKey, "Up")
 		_LAltDispatch()
+		return
+	}
+	HoldGuardMs := TapHoldDuration(TapHold, "left_alt") * 1100
+	if (HoldGuardMs < 250)
+		HoldGuardMs := 250
+	if (TapHoldShouldSuppressHold("left_alt", HoldGuardMs)) {
+		if LoggerIsDebugEnabled()
+			LoggerDebug("TapHold", "LAlt hold suppressed after long press because wheel activity was detected.")
 		return
 	}
 	; Bound the wait and release in a finally so a lost key-up or thrown Send can

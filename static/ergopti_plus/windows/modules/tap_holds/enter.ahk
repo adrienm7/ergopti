@@ -52,6 +52,14 @@ _EnterHoldModKey() {
 			_EnterDispatch()
 		return
 	}
+	HoldGuardMs := TapHoldDuration(TapHold, "enter") * 1100
+	if (HoldGuardMs < 250)
+		HoldGuardMs := 250
+	if (TapHoldShouldSuppressHold("enter", HoldGuardMs)) {
+		if LoggerIsDebugEnabled()
+			LoggerDebug("TapHold", "Enter hold suppressed after long press because wheel activity was detected.")
+		return
+	}
 	; Long press — arm modifier, stay armed until key-up.
 	ModKey := _EnterHoldModKey()
 	TextPressKey(ModKey, "Down")

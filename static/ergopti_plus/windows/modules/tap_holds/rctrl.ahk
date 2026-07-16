@@ -145,6 +145,14 @@ SC11D:: {
 #HotIf not _RCtrlIsSpecialTap() and TapHoldHoldModifier(TapHold, "right_ctrl") != "" and TapHoldTapAction(TapHold, "right_ctrl") != "" and not LayerEnabled
 $SC11D:: {
 	ModKey := _RCtrlHoldModKey()
+	HoldGuardMs := TapHoldDuration(TapHold, "right_ctrl") * 1100
+	if (HoldGuardMs < 250)
+		HoldGuardMs := 250
+	if (TapHoldShouldSuppressHold("right_ctrl", HoldGuardMs)) {
+		if LoggerIsDebugEnabled()
+			LoggerDebug("TapHold", "RCtrl hold suppressed after long press because wheel activity was detected.")
+		return
+	}
 	TextPressKey(ModKey, "Down")
 	tap := KeyWait("SC11D", "T" . TapHoldDuration(TapHold, "right_ctrl"))
 	if tap {
@@ -176,6 +184,14 @@ $SC11D:: {
 	if tap {
 		if (A_PriorKey == "RControl")
 			_RCtrlDispatch()
+		return
+	}
+	HoldGuardMs := TapHoldDuration(TapHold, "right_ctrl") * 1100
+	if (HoldGuardMs < 250)
+		HoldGuardMs := 250
+	if (TapHoldShouldSuppressHold("right_ctrl", HoldGuardMs)) {
+		if LoggerIsDebugEnabled()
+			LoggerDebug("TapHold", "RCtrl layer hold suppressed before activation because wheel activity was detected.")
 		return
 	}
 	ActivateLayer()

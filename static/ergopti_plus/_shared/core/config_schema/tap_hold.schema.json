@@ -49,7 +49,16 @@
 					"description": "Layer activated while held. Reference to a tap_hold.layers.<name> key."
 				},
 				"hold_modifier": {
-					"enum": ["ctrl", "shift", "alt", "alt_gr", "cmd", "win"]
+					"oneOf": [
+						{
+							"type": "string",
+							"enum": [""]
+						},
+						{
+							"type": "string",
+							"pattern": "^(?:$|(?:ctrl|shift|alt|alt_gr|win)(?:\\+(?:ctrl|shift|alt|alt_gr|win))*)$"
+						}
+					]
 				}
 			},
 

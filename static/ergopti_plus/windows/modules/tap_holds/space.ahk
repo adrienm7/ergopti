@@ -72,6 +72,14 @@ SpaceTapHold(HoldFn) {
 	; foreground app while the driver is paused (space-hold-inputhook-suspend-guard).
 	if A_IsSuspended
 		return
+	HoldGuardMs := TapHoldDuration(TapHold, "space") * 1100
+	if (HoldGuardMs < 250)
+		HoldGuardMs := 250
+	if (TapHoldShouldSuppressHold("space", HoldGuardMs)) {
+		if LoggerIsDebugEnabled()
+			LoggerDebug("TapHold", "Space hold suppressed because scroll activity was detected during hold window.")
+		return
+	}
 	; Skip modifier on empty capture — no phantom modifier on empty chord.
 	if (ih.Input != "" and ih.Input != " ")
 		HoldFn.Call(ih.Input)
@@ -142,68 +150,42 @@ _SpaceTap() {
     if IsSet(_ResetPrefixBuffer)
         try _ResetPrefixBuffer()
     UpdateLastSentCharacter(" ")
-    Critical(PrevCrit ? PrevCrit : "Off")
+	Critical(PrevCrit ? PrevCrit : "Off")
 }
 
-_SpaceHoldCtrl(captured) {
-	SendInput("{LCtrl Down}")
+_SpaceHoldModKey() {
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "space"), "space")
+}
+
+_SpaceHoldWithModifier(captured) {
+	ModKey := _SpaceHoldModKey()
+	if (ModKey == "") {
+		_SpaceTapOrDispatch()
+		return
+	}
+	TextPressKey(ModKey, "Down")
 	try {
 		if (captured != "" and captured != " ")
-			try SendInput("^" . RegExReplace(captured, "([!#^+{}])", "{$1}"))
+			_SpaceSendWithModifiers(captured, ModKey)
 		KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
-		SendInput("{LCtrl Up}")
+		TextPressKey(ModKey, "Up")
 	}
 }
 
-_SpaceHoldShift(captured) {
-	SendInput("{LShift Down}")
-	try {
-		; Send the captured key with Shift so the hold keystroke is not swallowed;
-		; skip space/empty to avoid a redundant Shift+Space on spurious captures
-		if (captured != "" and captured != " ")
-			try SendInput("+" . RegExReplace(captured, "([!#^+{}])", "{$1}"))
-		KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		SendInput("{LShift Up}")
+_SpaceSendWithModifiers(captured, modKey) {
+	Prefix := ""
+	if (modKey is Array) {
+		Prefix := _TextSenderModifierPrefixFromArray(modKey)
+	} else if (modKey is String) {
+		Prefix := _TextSenderModifierString(modKey)
 	}
-}
-
-_SpaceHoldAlt(captured) {
-	SendInput("{LAlt Down}")
-	try {
-		if (captured != "" and captured != " ")
-			try SendInput("!" . RegExReplace(captured, "([!#^+{}])", "{$1}"))
-		KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		SendInput("{LAlt Up}")
+	if (Prefix == "") {
+		if LoggerIsDebugEnabled()
+			LoggerDebug("TapHold", "No space hold prefix resolved for '{1}'. Falling back to raw key send.", modKey)
+		Prefix := ""
 	}
-}
-
-_SpaceHoldAltGr(captured) {
-	; RAlt is pressed once at the top and released once below — a balanced
-	; Down/Up pair. The captured char is sent while RAlt is already held, so
-	; it must NOT re-press the modifier (re-pressing RAlt while it is logically
-	; held would leak AltGr onto subsequent keystrokes)
-	SendInput("{RAlt Down}")
-	try {
-		if (captured != "" and captured != " ")
-			try SendInput(RegExReplace(captured, "([!#^+{}])", "{$1}"))
-		KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		SendInput("{RAlt Up}")
-	}
-}
-
-_SpaceHoldWin(captured) {
-	SendInput("{LWin Down}")
-	try {
-		if (captured != "" and captured != " ")
-			try SendInput("#" . RegExReplace(captured, "([!#^+{}])", "{$1}"))
-		KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		SendInput("{LWin Up}")
-	}
+	_AHK_SendInput.Call(Prefix . RegExReplace(captured, "([!#^+{}])", "{$1}"))
 }
 
 ; Tap-only (hold=none, tap action set to something other than space).
@@ -213,26 +195,10 @@ _SpaceHoldWin(captured) {
 SC039:: _SpaceDispatch()
 #HotIf
 
-#HotIf TapHoldHoldModifier(TapHold, "space") == "ctrl" and not LayerEnabled
-SC039:: SpaceTapHold(_SpaceHoldCtrl)
-#HotIf
-
 #HotIf TapHoldHoldLayer(TapHold, "space") == "nav" and not LayerEnabled
 SC039:: SpaceTapHoldLayer()
 #HotIf
 
-#HotIf TapHoldHoldModifier(TapHold, "space") == "shift" and not LayerEnabled
-SC039:: SpaceTapHold(_SpaceHoldShift)
-#HotIf
-
-#HotIf TapHoldHoldModifier(TapHold, "space") == "alt" and not LayerEnabled
-SC039:: SpaceTapHold(_SpaceHoldAlt)
-#HotIf
-
-#HotIf TapHoldHoldModifier(TapHold, "space") == "alt_gr" and not LayerEnabled
-SC039:: SpaceTapHold(_SpaceHoldAltGr)
-#HotIf
-
-#HotIf TapHoldHoldModifier(TapHold, "space") == "win" and not LayerEnabled
-SC039:: SpaceTapHold(_SpaceHoldWin)
+#HotIf TapHoldHoldModifier(TapHold, "space") != "" and not LayerEnabled
+SC039:: SpaceTapHold(_SpaceHoldWithModifier)
 #HotIf
