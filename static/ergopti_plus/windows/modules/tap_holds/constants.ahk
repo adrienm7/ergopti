@@ -121,6 +121,7 @@ global _TH_TapHoldScToKeyId := Map(
 ; Remember the latest wheel cancellation tick so we can expose the reason and
 ; keep a deterministic debug trail.
 global _TH_LastTapHoldWheelCancelTick := 0
+global _TH_LastTapHoldCancelReason := ""
 
 ; Register a key-down as "potential tap-hold candidate". The key is tracked with
 ; a per-key canceled-by-scroll flag so that scrolls while it is held cancel the
@@ -131,6 +132,7 @@ TapHoldTrackKeyDownByScancode(vk, sc) {
 	if (keyId == "")
 		return
 	now := A_TickCount
+	wasAlreadyDown := false
 	if !_TH_TapHoldTrackState.Has(keyId) {
 		_TH_TapHoldTrackState[keyId] := Map(
 			"down", false,
@@ -142,6 +144,7 @@ TapHoldTrackKeyDownByScancode(vk, sc) {
 		)
 	}
 	state := _TH_TapHoldTrackState[keyId]
+	wasAlreadyDown := state["down"]
 	state["down"] := true
 	state["down_at"] := now
 	state["canceled_by_scroll"] := false
@@ -149,8 +152,8 @@ TapHoldTrackKeyDownByScancode(vk, sc) {
 	state["last_sc"] := sc
 	state["last_seen"] := now
 	if LoggerIsDebugEnabled() {
-		LoggerDebug("TapHoldTrack", "Key down tracked for tap-hold: key='{1}', vk=0x{2:X}, sc={3}, tick={4}.",
-			keyId, vk, sc, now)
+		LoggerDebug("TapHoldTrack", "Key down tracked for tap-hold: key='{1}', vk=0x{2:X}, sc={3}, tick={4}, was_already_down={5}.",
+			keyId, vk, sc, now, wasAlreadyDown ? "true" : "false")
 	}
 }
 
@@ -176,38 +179,54 @@ TapHoldTrackScrollCancel() {
 	global _TH_TapHoldTrackState, _TH_LastTapHoldWheelCancelTick
 	_TH_LastTapHoldWheelCancelTick := A_TickCount
 	active := 0
+	activeList := ""
 	for keyId, state in _TH_TapHoldTrackState {
 		if (state.Has("down") and state["down"]) {
 			state["canceled_by_scroll"] := true
 			active++
+			activeList .= (active = 1 ? "" : ", ") . keyId
 		}
 	}
 	if LoggerIsDebugEnabled() {
 		if (active > 0) {
 			LoggerDebug("TapHoldTrack", "Wheel canceled {1} held tap-hold key(s), tick={2}.", active, _TH_LastTapHoldWheelCancelTick)
+			LoggerDebug("TapHoldTrack", "Wheel-cancelled key list: {1}.", activeList)
 		} else {
 			LoggerDebug("TapHoldTrack", "Wheel seen without active held tap-hold key, tick={1}.", _TH_LastTapHoldWheelCancelTick)
 		}
 	}
 }
 
-; Return true when this tap dispatch should be suppressed. Reasons are written
-; to CancelReason for traceability in debug logs.
-TapHoldShouldCancelTap(KeyId, GuardMs := 250, ByRef CancelReason := "") {
-	global _TH_TapHoldTrackState
-	CancelReason := ""
+; Return the cancellation reason for this tap dispatch, or "" when dispatch is allowed.
+; Keeping the reason as a return value lets us avoid ByRef quirks in AHK v2 and
+; keeps all call sites compatible with debug logging.
+TapHoldShouldCancelTap(KeyId, GuardMs := 250) {
+	global _TH_TapHoldTrackState, _TH_LastTapHoldCancelReason
+	_TH_LastTapHoldCancelReason := ""
 	if (_TH_TapHoldTrackState.Has(KeyId)) {
 		state := _TH_TapHoldTrackState[KeyId]
 		if (state.Has("canceled_by_scroll") && state["canceled_by_scroll"]) {
 			CancelReason := "trackpad/wheel during key hold"
-			return true
+			_TH_LastTapHoldCancelReason := CancelReason
+			if LoggerIsDebugEnabled() {
+				LoggerDebug("TapHoldTrack", "Tap canceled for '{1}' because key was already marked canceled while held.", KeyId)
+			}
+			return CancelReason
 		}
 	}
 	if HookDispatcher.WasWheelRecently(GuardMs) {
 		CancelReason := "wheel activity within " . GuardMs . "ms"
-		return true
+		_TH_LastTapHoldCancelReason := CancelReason
+		if LoggerIsDebugEnabled() {
+			LoggerDebug("TapHoldTrack", "Tap canceled for '{1}' due to recent wheel activity (guard={2}ms).", KeyId, GuardMs)
+		}
+		return CancelReason
 	}
-	return false
+	; Keep an explicit debug breadcrumb for no-cancel paths when detailed logs are on.
+	if LoggerIsDebugEnabled() {
+		LoggerDebug("TapHoldTrack", "No tap cancel needed for '{1}' (guard={2}ms).", KeyId, GuardMs)
+	}
+	return ""
 }
 
 ; Remove tracked state for a key once tap resolution has completed.
@@ -249,8 +268,8 @@ _TapHoldFireAction(KeyId) {
 		LimitMs := TapHoldDuration(TapHold, KeyId) * 1100
 		if (LimitMs < 250)
 			LimitMs := 250
-		CancelReason := ""
-		if (TapHoldShouldCancelTap(KeyId, LimitMs, CancelReason)) {
+		CancelReason := TapHoldShouldCancelTap(KeyId, LimitMs)
+		if (CancelReason != "") {
 			try LoggerDebug("TapHoldDispatch", "Dispatch blocked for '{1}' ({2}, guard={3}ms).", KeyId, CancelReason, LimitMs)
 			return
 		}
