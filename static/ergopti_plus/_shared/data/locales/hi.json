@@ -1681,7 +1681,7 @@
 	"tap_hold.hold.alt_gr": "AltGr",
 	"tap_hold.hold.ctrl": "Ctrl",
 	"tap_hold.hold.nav_layer": "Nav परत",
-	"tap_hold.hold.none": "नेटिव होल्ड",
+	"tap_hold.hold.none": "मूल कुंजी",
 	"tap_hold.hold.shift": "Shift",
 	"tap_hold.hold.win": "Win",
 	"tap_hold.picker.hold": "Hold → %s",

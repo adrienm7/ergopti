@@ -313,13 +313,29 @@ HotstringEngineInit()
 ; Initialise the logger now that the ini cache is built and ScriptInformation
 ; reflects user overrides — LoggerInit reads [Script] LogLevel from the ini.
 LoggerInit()
+bootPid := 0
+if IsSet(A_Pid) {
+    bootPid := A_Pid
+} else {
+    try bootPid := DllCall("GetCurrentProcessId", "UInt")
+}
+bootScriptName := IsSet(A_ScriptName) ? A_ScriptName : "ErgoptiPlus"
+if !IsSet(A_Pid) {
+    LoggerWarn("ErgoptiPlus", "A_Pid was not set during boot; using fallback pid={1}.", bootPid)
+}
+if !IsSet(A_ScriptName) && IsSet(A_ScriptFullPath) {
+    bootScriptName := A_ScriptFullPath
+}
+if !IsSet(A_ScriptName) {
+    LoggerWarn("ErgoptiPlus", "A_ScriptName was not set during boot; using fallback name='{1}'.", bootScriptName)
+}
 try Updater_LoadChannel()
 try Updater_LoadCheckInterval()
 ; Schedule the background update poller. No-op in dev / source mode, or
 ; when the user has chosen "never" — those checks happen inside the helper.
 try Updater_StartBackgroundChecks()
 try Updater_InitTrayNotifyHandler()
-LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver (pid={1}, script='{2}')…", A_Pid, A_ScriptName)
+LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver (pid={1}, script='{2}')…", bootPid, bootScriptName)
 ; Boot phase profiling — emits one INFO line per phase so a slow start can be
 ; diagnosed from the log alone (see lib/boot_profiler.ahk).
 BootProfile_Begin()
