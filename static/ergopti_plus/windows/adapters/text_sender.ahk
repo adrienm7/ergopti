@@ -329,6 +329,16 @@ TextPressKey(Key, Modifiers) {
 			LoggerError("TextSender", "TextPressKey: refusing to send '{1}' with an empty Key — caller must resolve the key name before calling.", Modifiers)
 			return
 		}
+		; Hold modifiers can now be a combo represented as an Array (e.g.
+		; ["LCtrl", "LShift"]) or a scalar key name for legacy paths.
+		if (IsObject(Key) and Type(Key) == "Array") {
+			for _, ModKey in Key {
+				if (ModKey == "")
+					continue
+				_AHK_SendInput.Call("{" . ModKey . " " . Modifiers . "}")
+			}
+			return
+		}
 		_AHK_SendInput.Call("{" . Key . " " . Modifiers . "}")
 		return
 	}
