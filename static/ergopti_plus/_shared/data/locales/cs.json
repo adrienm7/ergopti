@@ -1688,7 +1688,7 @@
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Akce při klepnutí — ",
 	"tap_hold.reset_defaults": "Obnovit výchozí hodnoty",
-	"tap_hold.tap.none": "Nativní",
+	"tap_hold.tap.none": "Nativní klávesa",
 	"terminators.label_close_paren": ") : Uzavírací závorka",
 	"terminators.label_enter": "⏎ : Enter",
 	"terminators.label_equal": "= : Rovná se",

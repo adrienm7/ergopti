@@ -1688,7 +1688,7 @@
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Acción al pulsar — ",
 	"tap_hold.reset_defaults": "Restablecer valores predeterminados",
-	"tap_hold.tap.none": "Nativo",
+	"tap_hold.tap.none": "Tecla nativa",
 	"terminators.label_close_paren": ") : Paréntesis de cierre",
 	"terminators.label_enter": "⏎ : Intro",
 	"terminators.label_equal": "= : Igual",

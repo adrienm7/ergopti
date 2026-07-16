@@ -1688,7 +1688,7 @@
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Tap action — ",
 	"tap_hold.reset_defaults": "Reset to default values",
-	"tap_hold.tap.none": "Native",
+	"tap_hold.tap.none": "Native key",
 	"terminators.label_close_paren": ") : Closing parenthesis",
 	"terminators.label_enter": "⏎ : Enter",
 	"terminators.label_equal": "= : Equal sign",

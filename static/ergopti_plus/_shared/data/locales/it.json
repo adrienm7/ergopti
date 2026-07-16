@@ -1688,7 +1688,7 @@
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Azione al tap — ",
 	"tap_hold.reset_defaults": "Ripristina valori predefiniti",
-	"tap_hold.tap.none": "Nativo",
+	"tap_hold.tap.none": "Tasto nativo",
 	"terminators.label_close_paren": ") : Parentesi chiusa",
 	"terminators.label_enter": "⏎ : Invio",
 	"terminators.label_equal": "= : Uguale",

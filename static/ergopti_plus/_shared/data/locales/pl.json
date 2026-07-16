@@ -1688,7 +1688,7 @@
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Akcja przy kliknięciu — ",
 	"tap_hold.reset_defaults": "Przywróć wartości domyślne",
-	"tap_hold.tap.none": "Natywny",
+	"tap_hold.tap.none": "Natywny klawisz",
 	"terminators.label_close_paren": ") : Nawias zamykający",
 	"terminators.label_enter": "⏎ : Enter",
 	"terminators.label_equal": "= : Znak równości",

@@ -1688,7 +1688,7 @@
 	"tap_hold.picker.tap": "Tap → %s",
 	"tap_hold.picker.title_prefix": "Tap-handling — ",
 	"tap_hold.reset_defaults": "Tilbakestill til standardverdier",
-	"tap_hold.tap.none": "Nativ",
+	"tap_hold.tap.none": "Native nøkkel",
 	"terminators.label_close_paren": ") : Avsluttende parentes",
 	"terminators.label_enter": "⏎ : Enter",
 	"terminators.label_equal": "= : Lik",
