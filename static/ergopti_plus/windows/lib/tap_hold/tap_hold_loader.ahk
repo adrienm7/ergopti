@@ -364,7 +364,9 @@ ResolveHoldModifierKey(ModifierValue, FieldLabel, CtrlKeyName := "LCtrl") {
 	Resolved := []
 	Invalid := []
 	for _, Token in Tokens {
-		T := Trim(Lower(Token))
+		if (Token == "")
+			continue
+		T := StrLower(Trim(Token))
 		switch T {
 			case "ctrl", "lctrl":
 				Resolved.Push(CtrlKeyName)
