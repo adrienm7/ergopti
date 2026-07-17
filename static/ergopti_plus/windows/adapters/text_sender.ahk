@@ -67,12 +67,12 @@ global _AHK_SendInput := (Keys) => SendInput(Keys)
 
 ; Maps the cross-platform modifier names from the spec to their AHK v2 prefix chars.
 _TextSenderModifierPrefix(ModName) {
-	switch ModName {
-		case "Ctrl", "ctrl", "Lctrl", "lctrl", "Rctrl", "rctrl": return "^"
-		case "Shift", "shift", "Lshift", "lshift", "Rshift", "rshift": return "+"
-		case "Alt", "alt", "Lalt", "lalt", "Ralt", "ralt":       return "!"
-		case "Cmd", "Win", "win", "Lwin", "lwin", "Rwin", "rwin": return "#"
-		case "Blind", "blind":    return "{Blind}"
+	switch StrLower(Trim(ModName)) {
+		case "ctrl", "lctrl", "rctrl": return "^"
+		case "shift", "lshift", "rshift": return "+"
+		case "alt", "lalt", "ralt":       return "!"
+		case "cmd", "win", "lwin", "rwin": return "#"
+		case "blind":    return "{Blind}"
 		default:                  return ""
 	}
 }
@@ -357,19 +357,15 @@ TextPressKey(Key, Modifiers) {
 			_AHK_SendInput.Call("{" . Key . "}")
 			return
 		}
-		if (Mods.Length == 1) {
-			_AHK_SendInput.Call("{" . Mods[1] . " " . Key . "}")
-			return
-		}
+		; A one-modifier array is still a regular shortcut.  `{Ctrl c}` is
+		; parsed as a single brace token by AHK rather than as Ctrl+C; use the
+		; same prefix form as multi-modifier arrays (`^+{Tab}`) for every size.
 		Prefix := _TextSenderModifierPrefixFromArray(Mods)
 		_AHK_SendInput.Call(Prefix . "{" . Key . "}")
 		return
 	}
 	Prefix := ""
-	if (Modifiers is Array) {
-		for ModStr in Modifiers
-			Prefix .= _TextSenderModifierPrefix(ModStr)
-	} else if (Modifiers is String) and (Modifiers != "") {
+	if (Modifiers is String) and (Modifiers != "") {
 		; AHK-style space-delimited modifier string ("Shift", "Ctrl Shift",
 		; "Blind", ...). Previously this fell through with Prefix "" and the bare
 		; key was emitted, silently dropping the modifier.
