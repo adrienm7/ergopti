@@ -4,12 +4,17 @@
 )
 
 ;; === Physical key source ===
+;; Pointer buttons and all wheel directions are transparent inputs on every
+;; layer. Kanata can then treat them like any other intervening input and force
+;; a pending tap-hold-press to its hold branch, preventing the tap output when
+;; a dual-role key was used for scrolling/clicking.
 (defsrc
     `           1           2           3           4           5                       6           7           8           9           0
     tab         q           w           e           r           t                       y           u           i           o           p           [
     caps        a           s           d           f           g                       h           j           k           l           ;           '
     lsft        <           z           x           c           v           b           n           m           ,           .           /           ]
     lctl                                lmet        lalt                   spc                      ralt        rctl                    rsft
+    mwu         mwd         mwl         mwr         mlft        mrgt                    mmid        mbck        mfwd
 )
 
 ;; === Default layer ===
@@ -19,6 +24,7 @@
     @cap        _           _           _           _           _                       _           _           _           _           _           _
     @lsft       _           _           _           _           _            _          _           _           _           _           _           @deadtrema
     @lctl                               _           @lalt                    _                      @ralt       @ossft                  _
+    _           _           _           _           _           _                       _           _           _
 )
 
 ;; === Navigation layer ===
@@ -28,6 +34,7 @@
     _           C-up        up          down        C-down      f2                      M-S-left    C-left      left        right       C-right     M-S-right
     _           S-A-up      A-up        A-down      S-A-down    _            _          M-up        home        M-left      M-right     end         _
     _                                   _           _                        _                      _           _                       _
+    _           _           _           _           _           _                       _           _           _
 )
 
 ;; ==================================

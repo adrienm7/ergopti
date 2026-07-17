@@ -110,19 +110,14 @@ SpaceTapHoldLayer() {
 
 ; Tap: send the configured tap action, or native Space if none / "space".
 _SpaceTapOrDispatch() {
-    local action := TapHoldTapAction(TapHold, "space")
-    if (action == "" or action == "space") {
-        _SpaceTap()
-        return
-    }
-    _SpaceDispatch()
+	_SpaceDispatch()
 }
 
 _SpaceDispatch() {
 	local action := TapHoldTapAction(TapHold, "space")
 	; "space" tap must go through _SpaceTap() to feed the hotstring engine.
 	if (action == "space" or action == "") {
-		_SpaceTap()
+		TapHoldDispatchTap("space", _SpaceTap)
 		return
 	}
 	_TapHoldFireAction("space")

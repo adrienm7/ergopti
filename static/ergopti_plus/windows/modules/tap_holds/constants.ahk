@@ -239,6 +239,7 @@ TapHoldTrackScrollCancel() {
 TapHoldShouldCancelTap(KeyId, GuardMs := 250) {
 	global _TH_TapHoldTrackState, _TH_LastTapHoldCancelReason
 	_TH_LastTapHoldCancelReason := ""
+	state := false
 	if (_TH_TapHoldTrackState.Has(KeyId)) {
 		state := _TH_TapHoldTrackState[KeyId]
 		if (state.Has("canceled_by_activity") && state["canceled_by_activity"]) {
@@ -252,7 +253,12 @@ TapHoldShouldCancelTap(KeyId, GuardMs := 250) {
 			return CancelReason
 		}
 	}
-	if HookDispatcher.WasWheelRecently(GuardMs) {
+	; The timestamp fallback is scoped to this physical press. A global
+	; "wheel happened recently" check suppressed valid isolated taps performed
+	; just after scrolling; only wheel activity at/after down_at is interruptive.
+	if (state is Map
+		and state.Has("down_at")
+		and HookDispatcher.WasWheelSince(state["down_at"], GuardMs)) {
 		CancelReason := "wheel activity within " . GuardMs . "ms"
 		_TH_LastTapHoldCancelReason := CancelReason
 		if LoggerIsDebugEnabled() {
@@ -301,20 +307,18 @@ TapHoldResolveKeyIdFromVkSc(vk, sc) {
 	return ""
 }
 
-; Fire the tap action configured for KeyId by delegating to GESTURE_ACTIONS.
-; This is the single dispatch point for all simple tap-hold keys — no per-action
-; switch needed. capslock.ahk and altgr.ahk keep their own dispatch because they
-; require Blind modifiers, UpdateLastSentCharacter, or CtrlActivated wrapping.
-_TapHoldFireAction(KeyId) {
-	global GESTURE_ACTIONS, TapHold
-	; Native Suspend() only disarms Hotkeys/Hotstrings, never a tap's dispatch
-	; call itself — a key release landing inside the tap threshold shortly
-	; after a pause toggle must not fire a configured action (script_reload,
-	; open_url, take_note, …) while « pause = tout éteint ».
+; Run any tap output through the single activity/suspend gate, then consume the
+; tracked physical press. Native taps (Space, Enter, Backspace, Escape, Delete)
+; must use this helper too; otherwise only GESTURE_ACTIONS-based taps are safe.
+; @param KeyId {String} Canonical tap-hold key id.
+; @param TapFn {Func} Zero-argument callback that emits the tap output.
+; @return {Boolean} True when TapFn ran, false when the tap was suppressed.
+TapHoldDispatchTap(KeyId, TapFn) {
+	global TapHold
 	try {
 		if A_IsSuspended {
 			try LoggerDebug("TapHoldDispatch", "Dispatch blocked for '{1}' because script is suspended.", KeyId)
-			return
+			return false
 		}
 		LimitMs := TapHoldDuration(TapHold, KeyId) * 1100
 		if (LimitMs < 250)
@@ -322,21 +326,35 @@ _TapHoldFireAction(KeyId) {
 		CancelReason := TapHoldShouldCancelTap(KeyId, LimitMs)
 		if (CancelReason != "") {
 			try LoggerDebug("TapHoldDispatch", "Dispatch blocked for '{1}' ({2}, guard={3}ms).", KeyId, CancelReason, LimitMs)
-			return
+			return false
 		}
-		ActionId := TapHoldTapAction(TapHold, KeyId)
-		if (ActionId == "") {
-			try LoggerDebug("TapHoldDispatch", "No tap action configured for '{1}' (native pass-through).", KeyId)
-			return
-		}
-		if !GESTURE_ACTIONS.Has(ActionId) {
-			try LoggerWarn("TapHoldDispatch", "Missing tap action '{1}' for '{2}'.", ActionId, KeyId)
-			return
-		}
-		try LoggerDebug("TapHoldDispatch", "Dispatching tap action '{1}' for '{2}'.", ActionId, KeyId)
-		GESTURE_ACTIONS[ActionId].Fn.Call()
+		TapFn.Call()
+		return true
 	}
 	finally {
 		TapHoldForgetTrackedKey(KeyId)
 	}
+}
+
+; Invoke the configured GESTURE_ACTIONS callback without applying guards. This
+; is deliberately separate so special native wrappers (CapsLock, etc.) can run
+; their complete output atomically inside TapHoldDispatchTap().
+_TapHoldInvokeConfiguredAction(KeyId) {
+	global GESTURE_ACTIONS, TapHold
+	ActionId := TapHoldTapAction(TapHold, KeyId)
+	if (ActionId == "") {
+		try LoggerDebug("TapHoldDispatch", "No tap action configured for '{1}' (native pass-through).", KeyId)
+		return
+	}
+	if !GESTURE_ACTIONS.Has(ActionId) {
+		try LoggerWarn("TapHoldDispatch", "Missing tap action '{1}' for '{2}'.", ActionId, KeyId)
+		return
+	}
+	try LoggerDebug("TapHoldDispatch", "Dispatching tap action '{1}' for '{2}'.", ActionId, KeyId)
+	GESTURE_ACTIONS[ActionId].Fn.Call()
+}
+
+; Fire the configured generic tap action through the shared gate.
+_TapHoldFireAction(KeyId) {
+	return TapHoldDispatchTap(KeyId, _TapHoldInvokeConfiguredAction.Bind(KeyId))
 }

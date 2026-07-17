@@ -270,6 +270,52 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 		end
 		helpers.assert_true(found_passthrough, "expected a passthrough rule for none/none slots")
 	end)
+
+	helpers.it("uses to_if_alone for every delayed tap-hold key, including Space and Enter", function()
+		-- Karabiner's to_if_alone contract cancels the tap when another key,
+		-- pointing button, or scroll-wheel event occurs before key-up. Cover the
+		-- complete macOS key catalogue here so this safety never becomes specific
+		-- to modifiers or to one configured action.
+		local ids = {
+			"escape", "tab", "caps_lock", "left_shift", "fn", "left_control",
+			"left_option", "left_command", "spacebar", "right_command",
+			"right_option", "right_shift", "return_or_enter", "delete_or_backspace",
+		}
+		local matrix_tap_action = {
+			id = "matrix_tap",
+			label = "Matrix tap",
+			karabiner_to = { { key_code = "f18" } },
+		}
+		local config, key_defs = {}, {}
+		for _, id in ipairs(ids) do
+			config[id] = { tap = "matrix_tap", hold = "none" }
+			key_defs[#key_defs + 1] = {
+				id = id,
+				label = "matrix:" .. id,
+				from = { key_code = id, modifiers = { optional = { "any" } } },
+			}
+		end
+
+		local result = Generator.build_karabiner_json(
+			make_state({ tap_hold_config = config }),
+			{NONE_ACTION, matrix_tap_action}, key_defs, {}, nil, "/fake/data_dir/"
+		)
+		local found = {}
+		for _, rule in ipairs(result.profiles[1].complex_modifications.rules) do
+			local id = type(rule.description) == "string"
+				and rule.description:match("matrix:([^:]+):") or nil
+			if id then
+				local manip = rule.manipulators and rule.manipulators[1]
+				helpers.assert_true(type(manip) == "table", "missing manipulator for " .. id)
+				helpers.assert_true(type(manip.to_if_alone) == "table" and #manip.to_if_alone > 0,
+					"tap output must stay in to_if_alone for pointer cancellation: " .. id)
+				found[id] = true
+			end
+		end
+		for _, id in ipairs(ids) do
+			helpers.assert_true(found[id] == true, "missing tap-hold matrix rule for " .. id)
+		end
+	end)
 end)
 
 

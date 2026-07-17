@@ -90,6 +90,29 @@ _DSG_SafeHotkeyGuardsRegistration() {
 }
 Test("HookDispatcher: _SafeHotkey guards each Hotkey registration (dispatcher-start-unguarded-hotkeys-leak-ih)", _DSG_SafeHotkeyGuardsRegistration)
 
+_DSG_MouseHotkeysMatchWithHeldModifiers() {
+	Src := _DriverDirConcat("lib")
+	StartSeg := _DSG_MethodBody(Src, "static Start() {")
+	StopSeg := _DSG_MethodBody(Src, "static Stop() {")
+	DQ := Chr(34)
+	MouseSpecs := [
+		"LButton", "LButton Up", "RButton", "RButton Up", "MButton", "MButton Up",
+		"XButton1", "XButton1 Up", "XButton2", "XButton2 Up",
+		"WheelUp", "WheelDown", "WheelRight", "WheelLeft"
+	]
+
+	Assert(StartSeg != "", "HookDispatcher.Start() must exist in hook_dispatcher.ahk")
+	Assert(StopSeg != "", "HookDispatcher.Stop() must exist in hook_dispatcher.ahk")
+	for MouseSpec in MouseSpecs {
+		WildcardSpec := "~*" . MouseSpec
+		Assert(InStr(StartSeg, "_SafeHotkey(" . DQ . WildcardSpec . DQ) > 0,
+			"Start() must register " . WildcardSpec . " so mouse activity is observed while a modifier is held (ctrl-wheel-delayed-cancel)")
+		Assert(InStr(StopSeg, "Hotkey(" . DQ . WildcardSpec . DQ) > 0,
+			"Stop() must disable the same wildcard mouse hotkey registered by Start(): " . WildcardSpec)
+	}
+}
+Test("HookDispatcher: mouse hotkeys use wildcard variants while modifiers are held (ctrl-wheel-delayed-cancel)", _DSG_MouseHotkeysMatchWithHeldModifiers)
+
 _DSG_IhInitializedToFalse() {
 	Src := _DriverDirConcat("lib")
 	; `unset` static properties raise PropertyError when read via `is` —

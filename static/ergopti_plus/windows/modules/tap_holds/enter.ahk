@@ -125,7 +125,7 @@ _EnterDispatch() {
 	local action := TapHoldTapAction(TapHold, "enter")
 	; No tap configured or tap = enter itself → native key behaviour.
 	if (action == "" or action == "enter") {
-		TextPressKey("Enter", [])
+		TapHoldDispatchTap("enter", TextPressKey.Bind("Enter", []))
 		return
 	}
 	_TapHoldFireAction("enter")
