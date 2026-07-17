@@ -120,7 +120,7 @@ _DeleteDispatch() {
 	local action := TapHoldTapAction(TapHold, "delete")
 	; No tap configured or tap = delete itself → native key behaviour.
 	if (action == "" or action == "delete") {
-		TextPressKey("Delete", [])
+		TapHoldDispatchTap("delete", TextPressKey.Bind("Delete", []))
 		return
 	}
 	_TapHoldFireAction("delete")

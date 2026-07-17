@@ -235,19 +235,29 @@ SC03A:: {
 ; CtrlActivated: true when LCtrl was physically held at key-down time — the
 ; tap action is then wrapped in LCtrl so Ctrl+CapsLock combos still work.
 _CapsLockDispatch(CtrlActivated) {
+	TapHoldDispatchTap("caps_lock", _CapsLockInvokeTap.Bind(CtrlActivated))
+}
+
+; Emit CapsLock's special tap variants after the shared activity gate has
+; accepted the physical press. Keep the optional Ctrl wrapper balanced even if
+; a configured action throws.
+_CapsLockInvokeTap(CtrlActivated) {
 	if CtrlActivated {
 		TextPressKey("LCtrl", "Down")
 	}
-	; Special cases that cannot be handled by GESTURE_ACTIONS.Fn.Call() directly.
-	local action := TapHoldTapAction(TapHold, "caps_lock")
-	if (action == "backspace") {
-		TextPressKey("BackSpace", "Blind")
-	} else if (action == "caps_lock" or action == "toggle_capslock") {
-		ToggleCapsLock()
-	} else {
-		_TapHoldFireAction("caps_lock")
-	}
-	if CtrlActivated {
-		TextPressKey("LCtrl", "Up")
+	try {
+		; Special cases that cannot be handled by GESTURE_ACTIONS.Fn.Call() directly.
+		local action := TapHoldTapAction(TapHold, "caps_lock")
+		if (action == "backspace") {
+			TextPressKey("BackSpace", "Blind")
+		} else if (action == "caps_lock" or action == "toggle_capslock") {
+			ToggleCapsLock()
+		} else {
+			_TapHoldInvokeConfiguredAction("caps_lock")
+		}
+	} finally {
+		if CtrlActivated {
+			TextPressKey("LCtrl", "Up")
+		}
 	}
 }

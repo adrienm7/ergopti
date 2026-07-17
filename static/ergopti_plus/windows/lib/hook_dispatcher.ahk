@@ -116,6 +116,10 @@ class HookDispatcher {
 	static _hk_rup    := false
 	static _hk_mdown  := false
 	static _hk_mup    := false
+	static _hk_x1down := false
+	static _hk_x1up   := false
+	static _hk_x2down := false
+	static _hk_x2up   := false
 	static _hk_wup    := false
 	static _hk_wdn    := false
 	static _hk_wright := false
@@ -270,6 +274,10 @@ class HookDispatcher {
 	; Bound to IH.OnKeyUp — receives (ih, vk, sc) from AHK.
 	static _OnKeyUp(ih, vk, sc) {
 		try TapHoldTrackKeyUpByScancode(vk, sc)
+		; A release is activity too: if another key was already held before the
+		; tap-hold candidate, releasing it during the candidate must prevent the
+		; candidate's tap output. The released tap-hold key excludes itself.
+		try TapHoldTrackOtherKeyActivityByScancode(vk, sc)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_UP, ih, vk, sc)
 	}
 
@@ -287,6 +295,7 @@ class HookDispatcher {
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_LDOWN)
 	}
 	static _OnLUp(*) {
+		HookDispatcher._CancelTapHoldActivity("mouse button release during hold")
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_LUP)
 	}
 	static _OnRDown(*) {
@@ -294,6 +303,7 @@ class HookDispatcher {
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_RDOWN)
 	}
 	static _OnRUp(*) {
+		HookDispatcher._CancelTapHoldActivity("mouse button release during hold")
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_RUP)
 	}
 	static _OnMDown(*) {
@@ -301,7 +311,20 @@ class HookDispatcher {
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_MDOWN)
 	}
 	static _OnMUp(*) {
+		HookDispatcher._CancelTapHoldActivity("mouse button release during hold")
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_MUP)
+	}
+	static _OnX1Down(*) {
+		HookDispatcher._CancelTapHoldActivity("extra mouse button during hold")
+	}
+	static _OnX1Up(*) {
+		HookDispatcher._CancelTapHoldActivity("extra mouse button release during hold")
+	}
+	static _OnX2Down(*) {
+		HookDispatcher._CancelTapHoldActivity("extra mouse button during hold")
+	}
+	static _OnX2Up(*) {
+		HookDispatcher._CancelTapHoldActivity("extra mouse button release during hold")
 	}
 	static _OnWheelUp(*) {
 		try TapHoldTrackScrollCancel()
@@ -356,14 +379,28 @@ class HookDispatcher {
 	; This prevents accidental tap dispatch when a key is released directly
 	; after being held and used for scroll (e.g. Ctrl + wheel zoom).
 	static WasWheelRecently(ms := 180) {
-		return (A_TickCount - HookDispatcher._last_wheel_tick) <= ms
+		if (HookDispatcher._last_wheel_tick <= 0)
+			return false
+		return ((A_TickCount - HookDispatcher._last_wheel_tick) & 0xFFFFFFFF) <= ms
+	}
+
+	; Return True only when the wheel event happened after a specific key-down
+	; and remains inside the release guard. This avoids suppressing a legitimate
+	; isolated tap merely because the user scrolled shortly before pressing it.
+	static WasWheelSince(start_tick, ms := 180) {
+		wheel_tick := HookDispatcher._last_wheel_tick
+		if (start_tick <= 0 || wheel_tick <= 0)
+			return false
+		wheel_after_start := (wheel_tick - start_tick) & 0xFFFFFFFF
+		wheel_age := (A_TickCount - wheel_tick) & 0xFFFFFFFF
+		return wheel_after_start > 0 && wheel_after_start < 0x80000000 && wheel_age <= ms
 	}
 
 	; Mouse-button activity is another tap-hold boundary. Wheel handlers use the
 	; stronger wheel-specific callback because they also update the recent-wheel
 	; timestamp and emit the scroll event.
-	static _CancelTapHoldActivity() {
-		try TapHoldTrackActivityCancel("", "mouse button during hold")
+	static _CancelTapHoldActivity(reason := "mouse button during hold") {
+		try TapHoldTrackActivityCancel("", reason)
 	}
 
 	; Backward-compatible alias retained for modules still calling the old name.
@@ -436,13 +473,20 @@ class HookDispatcher {
 		; ── Mouse Hotkeys ─────────────────────────────────────────────────────
 		; Bind once, store references so Stop() can disable them cleanly.
 		; The ~ prefix ensures the event is NOT consumed by AHK — the target
-		; application still receives the click/wheel event normally.
+		; application still receives the click/wheel event normally. The wildcard
+		; is required so activity is observed while Ctrl/Alt/Shift/Win is held;
+		; without it, Ctrl+wheel can be delivered only after Ctrl is released,
+		; which is too late to cancel Ctrl's pending tap action.
 		HookDispatcher._hk_ldown  := HookDispatcher._OnLDown.Bind(HookDispatcher)
 		HookDispatcher._hk_lup    := HookDispatcher._OnLUp.Bind(HookDispatcher)
 		HookDispatcher._hk_rdown  := HookDispatcher._OnRDown.Bind(HookDispatcher)
 		HookDispatcher._hk_rup    := HookDispatcher._OnRUp.Bind(HookDispatcher)
 		HookDispatcher._hk_mdown  := HookDispatcher._OnMDown.Bind(HookDispatcher)
 		HookDispatcher._hk_mup    := HookDispatcher._OnMUp.Bind(HookDispatcher)
+		HookDispatcher._hk_x1down := HookDispatcher._OnX1Down.Bind(HookDispatcher)
+		HookDispatcher._hk_x1up   := HookDispatcher._OnX1Up.Bind(HookDispatcher)
+		HookDispatcher._hk_x2down := HookDispatcher._OnX2Down.Bind(HookDispatcher)
+		HookDispatcher._hk_x2up   := HookDispatcher._OnX2Up.Bind(HookDispatcher)
 		HookDispatcher._hk_wup    := HookDispatcher._OnWheelUp.Bind(HookDispatcher)
 		HookDispatcher._hk_wdn    := HookDispatcher._OnWheelDown.Bind(HookDispatcher)
 		HookDispatcher._hk_wright := HookDispatcher._OnWheelRight.Bind(HookDispatcher)
@@ -452,16 +496,20 @@ class HookDispatcher {
 		; stack a single wheel/button registration can be rejected. Aborting the
 		; whole Start on one rejection would leave a live InputHook with _started
 		; mis-set; instead log a WARNING and keep the rest of the pipeline up.
-		HookDispatcher._SafeHotkey("~LButton",    HookDispatcher._hk_ldown)
-		HookDispatcher._SafeHotkey("~LButton Up", HookDispatcher._hk_lup)
-		HookDispatcher._SafeHotkey("~RButton",    HookDispatcher._hk_rdown)
-		HookDispatcher._SafeHotkey("~RButton Up", HookDispatcher._hk_rup)
-		HookDispatcher._SafeHotkey("~MButton",    HookDispatcher._hk_mdown)
-		HookDispatcher._SafeHotkey("~MButton Up", HookDispatcher._hk_mup)
-		HookDispatcher._SafeHotkey("~WheelUp",    HookDispatcher._hk_wup)
-		HookDispatcher._SafeHotkey("~WheelDown",  HookDispatcher._hk_wdn)
-		HookDispatcher._SafeHotkey("~WheelRight", HookDispatcher._hk_wright)
-		HookDispatcher._SafeHotkey("~WheelLeft",  HookDispatcher._hk_wleft)
+		HookDispatcher._SafeHotkey("~*LButton",    HookDispatcher._hk_ldown)
+		HookDispatcher._SafeHotkey("~*LButton Up", HookDispatcher._hk_lup)
+		HookDispatcher._SafeHotkey("~*RButton",    HookDispatcher._hk_rdown)
+		HookDispatcher._SafeHotkey("~*RButton Up", HookDispatcher._hk_rup)
+		HookDispatcher._SafeHotkey("~*MButton",    HookDispatcher._hk_mdown)
+		HookDispatcher._SafeHotkey("~*MButton Up", HookDispatcher._hk_mup)
+		HookDispatcher._SafeHotkey("~*XButton1",    HookDispatcher._hk_x1down)
+		HookDispatcher._SafeHotkey("~*XButton1 Up", HookDispatcher._hk_x1up)
+		HookDispatcher._SafeHotkey("~*XButton2",    HookDispatcher._hk_x2down)
+		HookDispatcher._SafeHotkey("~*XButton2 Up", HookDispatcher._hk_x2up)
+		HookDispatcher._SafeHotkey("~*WheelUp",    HookDispatcher._hk_wup)
+		HookDispatcher._SafeHotkey("~*WheelDown",  HookDispatcher._hk_wdn)
+		HookDispatcher._SafeHotkey("~*WheelRight", HookDispatcher._hk_wright)
+		HookDispatcher._SafeHotkey("~*WheelLeft",  HookDispatcher._hk_wleft)
 
 		; Trackpad / precision touchpad devices sometimes emit wheel messages that do not
 		; reach hotkey bindings consistently (especially with high-resolution scroll).
@@ -483,7 +531,7 @@ class HookDispatcher {
 	; Registers a single mouse Hotkey, logging a WARNING (instead of throwing) if
 	; the OS rejects it. Used by Start() so one unsupported mouse event cannot
 	; abort the whole start sequence and orphan the live InputHook.
-	; @param key_name {String} The Hotkey() key spec (e.g. "~WheelLeft").
+	; @param key_name {String} The Hotkey() key spec (e.g. "~*WheelLeft").
 	; @param callback_fn {Func} The bound handler to register.
 	static _SafeHotkey(key_name, callback_fn) {
 		try {
@@ -510,16 +558,20 @@ class HookDispatcher {
 
 		; Disable mouse Hotkeys
 		if HookDispatcher.HasOwnProp("_hk_ldown") && HookDispatcher._hk_ldown is Func {
-			try Hotkey("~LButton",    HookDispatcher._hk_ldown,  "Off")
-			try Hotkey("~LButton Up", HookDispatcher._hk_lup,    "Off")
-			try Hotkey("~RButton",    HookDispatcher._hk_rdown,  "Off")
-			try Hotkey("~RButton Up", HookDispatcher._hk_rup,    "Off")
-			try Hotkey("~MButton",    HookDispatcher._hk_mdown,  "Off")
-			try Hotkey("~MButton Up", HookDispatcher._hk_mup,    "Off")
-			try Hotkey("~WheelUp",    HookDispatcher._hk_wup,    "Off")
-			try Hotkey("~WheelDown",  HookDispatcher._hk_wdn,    "Off")
-			try Hotkey("~WheelRight", HookDispatcher._hk_wright, "Off")
-			try Hotkey("~WheelLeft",  HookDispatcher._hk_wleft,  "Off")
+			try Hotkey("~*LButton",    HookDispatcher._hk_ldown,  "Off")
+			try Hotkey("~*LButton Up", HookDispatcher._hk_lup,    "Off")
+			try Hotkey("~*RButton",    HookDispatcher._hk_rdown,  "Off")
+			try Hotkey("~*RButton Up", HookDispatcher._hk_rup,    "Off")
+			try Hotkey("~*MButton",    HookDispatcher._hk_mdown,  "Off")
+			try Hotkey("~*MButton Up", HookDispatcher._hk_mup,    "Off")
+			try Hotkey("~*XButton1",    HookDispatcher._hk_x1down, "Off")
+			try Hotkey("~*XButton1 Up", HookDispatcher._hk_x1up,   "Off")
+			try Hotkey("~*XButton2",    HookDispatcher._hk_x2down, "Off")
+			try Hotkey("~*XButton2 Up", HookDispatcher._hk_x2up,   "Off")
+			try Hotkey("~*WheelUp",    HookDispatcher._hk_wup,    "Off")
+			try Hotkey("~*WheelDown",  HookDispatcher._hk_wdn,    "Off")
+			try Hotkey("~*WheelRight", HookDispatcher._hk_wright, "Off")
+			try Hotkey("~*WheelLeft",  HookDispatcher._hk_wleft,  "Off")
 		}
 
 		if HookDispatcher.HasOwnProp("_wheel_msg_cb") && HookDispatcher._wheel_msg_cb is Func {
@@ -536,6 +588,10 @@ class HookDispatcher {
 		HookDispatcher._hk_rup    := false
 		HookDispatcher._hk_mdown  := false
 		HookDispatcher._hk_mup    := false
+		HookDispatcher._hk_x1down := false
+		HookDispatcher._hk_x1up   := false
+		HookDispatcher._hk_x2down := false
+		HookDispatcher._hk_x2up   := false
 		HookDispatcher._hk_wup    := false
 		HookDispatcher._hk_wdn    := false
 		HookDispatcher._hk_wright := false

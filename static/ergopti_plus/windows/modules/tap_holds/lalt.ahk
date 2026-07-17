@@ -126,9 +126,7 @@ SC038::
 	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
 	tap := ((Now - CharacterSentTime) <= TapHoldDuration(TapHold, "left_alt") * 1000)
 	if (tap and (Now - CharacterSentTime) >= TapMinDurationMs()) { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
-		if A_IsSuspended
-			return
-		LLM_Tooltip_FireTabOrAccept("")
+		TapHoldDispatchTap("left_alt", LLM_Tooltip_FireTabOrAccept.Bind(""))
 	}
 }
 
@@ -161,9 +159,7 @@ SC038::
 		; of Suspend state; only the AltTabMonitor() side effect is guarded —
 		; native Suspend() never disarms this hotkey's own KeyWait/dispatch.
 		TextPressKey("LAlt", "Up")
-		if A_IsSuspended
-			return
-		AltTabMonitor()
+		TapHoldDispatchTap("left_alt", AltTabMonitor)
 	} else {
 		; Bound the wait and release LAlt in a finally so a lost SC038 key-up (Alt+Tab
 		; focus steal, a UAC prompt, or Suspend toggled mid-press) can never latch Alt
@@ -220,10 +216,7 @@ SC038::
 			A_PriorKey == "LAlt" ; Prevents spurious BackSpace when layer key was actually used
 			and KS_IsUp("SC03A") ; Prevents spurious BackSpace on quick LAlt+CapsLock release
 		) {
-			BackSpaceActionWithModifiers := BackSpaceLogic()
-			if not BackSpaceActionWithModifiers {
-				TextPressKey("BackSpace", "")
-			}
+			TapHoldDispatchTap("left_alt", _LAltBackspaceTap)
 		}
 		return
 	}
@@ -267,10 +260,7 @@ $SC038:: {
 	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
 	if tap {
 		TextPressKey(ModKey, "Up")
-		BackSpaceActionWithModifiers := BackSpaceLogic()
-		if not BackSpaceActionWithModifiers {
-			TextPressKey("BackSpace", "")
-		}
+		TapHoldDispatchTap("left_alt", _LAltBackspaceTap)
 		return
 	}
 	; Bound the wait and release in a finally so a lost key-up or thrown Send can
@@ -369,6 +359,15 @@ SC038:: _LAltDispatch()
 
 _LAltDispatch() {
 	_TapHoldFireAction("left_alt")
+}
+
+; Backspace has modifier-aware special handling, but is still a tap output and
+; therefore runs inside TapHoldDispatchTap whenever LAlt has a hold behaviour.
+_LAltBackspaceTap() {
+	BackSpaceActionWithModifiers := BackSpaceLogic()
+	if not BackSpaceActionWithModifiers {
+		TextPressKey("BackSpace", "")
+	}
 }
 
 BackSpaceLogic() {

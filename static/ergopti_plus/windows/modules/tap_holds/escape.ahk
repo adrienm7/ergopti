@@ -117,7 +117,7 @@ _EscapeDispatch() {
 	local action := TapHoldTapAction(TapHold, "escape")
 	; No tap configured or tap = escape itself → native key behaviour.
 	if (action == "" or action == "escape") {
-		TextPressKey("Escape", [])
+		TapHoldDispatchTap("escape", TextPressKey.Bind("Escape", []))
 		return
 	}
 	_TapHoldFireAction("escape")
