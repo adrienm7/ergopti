@@ -148,10 +148,16 @@ TapHoldTrackKeyDownByScancode(vk, sc) {
 	state := _TH_TapHoldTrackState[keyId]
 	wasAlreadyDown := state["down"]
 	state["down"] := true
-	state["down_at"] := now
-	state["canceled_by_activity"] := false
-	state["canceled_by_scroll"] := false
-	state["cancel_reason"] := ""
+	; InputHook can report repeated key-down notifications while a key is held.
+	; They belong to the same physical tap-hold gesture: do not clear a wheel,
+	; chord, or mouse cancellation that was recorded between the first down and
+	; the eventual release.
+	if !wasAlreadyDown {
+		state["down_at"] := now
+		state["canceled_by_activity"] := false
+		state["canceled_by_scroll"] := false
+		state["cancel_reason"] := ""
+	}
 	state["last_vk"] := vk
 	state["last_sc"] := sc
 	state["last_seen"] := now

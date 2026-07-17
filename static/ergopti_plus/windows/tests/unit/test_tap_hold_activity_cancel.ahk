@@ -23,6 +23,7 @@ _THAC_TrackWheelThroughDispatcher() {
 	_THAC_ResetState()
 	HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; LCtrl down
 	HookDispatcher._OnWheelDown()             ; Ctrl+wheel zoom
+	HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; repeated LCtrl key-down while held
 	HookDispatcher._last_wheel_tick := 0      ; release is outside the recent-wheel window
 	HookDispatcher._OnKeyUp(0, 0xA2, 0x01D)   ; LCtrl up
 
@@ -30,6 +31,20 @@ _THAC_TrackWheelThroughDispatcher() {
 		"Ctrl+wheel must cancel the pending LCtrl tap before release dispatch")
 }
 Test("tap-hold: Ctrl+wheel cancels the tap action before Ctrl release (ctrl-wheel-no-paste)", _THAC_TrackWheelThroughDispatcher)
+
+_THAC_RepeatedKeyDownPreservesCancellation() {
+	_THAC_ResetState()
+	HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; LCtrl down
+	HookDispatcher._OnWheelDown()             ; cancellation boundary
+	HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; InputHook repeat while held
+
+	AssertTrue(_TH_TapHoldTrackState["left_ctrl"]["canceled_by_activity"],
+		"a repeated modifier key-down must not clear wheel cancellation")
+	HookDispatcher._OnKeyUp(0, 0xA2, 0x01D)
+	AssertTrue(TapHoldShouldCancelTap("left_ctrl", 500) != "",
+		"wheel cancellation must survive repeated modifier key-down notifications")
+}
+Test("tap-hold: repeated modifier key-downs preserve activity cancellation (ctrl-wheel-repeat-no-paste)", _THAC_RepeatedKeyDownPreservesCancellation)
 
 _THAC_TrackOtherKeyThroughDispatcher() {
 	_THAC_ResetState()
@@ -88,6 +103,7 @@ _THAC_WheelDoesNotFireConfiguredTapAction() {
 
 		HookDispatcher._OnKeyDown(0, 0xA2, 0x01D)
 		HookDispatcher._OnWheelDown()
+		HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; repeated key-down must not reset cancellation
 		HookDispatcher._last_wheel_tick := 0
 		HookDispatcher._OnKeyUp(0, 0xA2, 0x01D)
 		_TapHoldFireAction("left_ctrl")
