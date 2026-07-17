@@ -124,8 +124,8 @@ global _TH_LastTapHoldWheelCancelTick := 0
 global _TH_LastTapHoldCancelReason := ""
 
 ; Register a key-down as "potential tap-hold candidate". The key is tracked with
-; a per-key canceled-by-scroll flag so that scrolls while it is held cancel the
-; eventual tap emission on release.
+; a per-key canceled-by-activity flag so that a wheel, another key, or a mouse
+; button used while it is held cancels the eventual tap emission on release.
 TapHoldTrackKeyDownByScancode(vk, sc) {
 	global _TH_TapHoldTrackState, _TH_TapHoldScToKeyId, _TH_TapHoldVkToKeyId
 	keyId := TapHoldResolveKeyIdFromVkSc(vk, sc)
@@ -137,7 +137,9 @@ TapHoldTrackKeyDownByScancode(vk, sc) {
 		_TH_TapHoldTrackState[keyId] := Map(
 			"down", false,
 			"down_at", 0,
+			"canceled_by_activity", false,
 			"canceled_by_scroll", false,
+			"cancel_reason", "",
 			"last_vk", 0,
 			"last_sc", 0,
 			"last_seen", 0
@@ -147,7 +149,9 @@ TapHoldTrackKeyDownByScancode(vk, sc) {
 	wasAlreadyDown := state["down"]
 	state["down"] := true
 	state["down_at"] := now
+	state["canceled_by_activity"] := false
 	state["canceled_by_scroll"] := false
+	state["cancel_reason"] := ""
 	state["last_vk"] := vk
 	state["last_sc"] := sc
 	state["last_seen"] := now
@@ -157,8 +161,29 @@ TapHoldTrackKeyDownByScancode(vk, sc) {
 	}
 }
 
+; Mark every currently held tap-hold key except the key that caused the event.
+; This is the generic activity boundary for tap-hold disambiguation: Ctrl+C,
+; Ctrl+V, Ctrl+wheel, and mouse activity must all prevent Ctrl's tap action
+; from firing when Ctrl is released.
+TapHoldTrackActivityCancel(ExceptKeyId := "", Reason := "other input") {
+	global _TH_TapHoldTrackState
+	for keyId, state in _TH_TapHoldTrackState {
+		if (state.Has("down") and state["down"] and keyId != ExceptKeyId) {
+			state["canceled_by_activity"] := true
+			state["cancel_reason"] := Reason
+		}
+	}
+}
+
+; A keyboard activity event cancels other held tap-holds, but never cancels the
+; tap-hold key's own initial/repeated key-down event.
+TapHoldTrackOtherKeyActivityByScancode(vk, sc) {
+	keyId := TapHoldResolveKeyIdFromVkSc(vk, sc)
+	TapHoldTrackActivityCancel(keyId, "another key during hold")
+}
+
 ; Clear the track flag on key release. State is kept until dispatch so
-; _TapHoldFireAction can still read a "canceled_by_scroll" decision even
+; _TapHoldFireAction can still read a cancellation decision even
 ; for modules that dispatch after KeyWait completes.
 TapHoldTrackKeyUpByScancode(vk, sc) {
 	global _TH_TapHoldTrackState, _TH_TapHoldScToKeyId, _TH_TapHoldVkToKeyId
@@ -169,12 +194,15 @@ TapHoldTrackKeyUpByScancode(vk, sc) {
 	state["down"] := false
 	state["up_at"] := A_TickCount
 	if LoggerIsDebugEnabled() {
-		LoggerDebug("TapHoldTrack", "Key up tracked for tap-hold: key='{1}', canceled_by_scroll={2}, tick={3}.",
-			keyId, state["canceled_by_scroll"] ? "true" : "false", state["up_at"])
+		LoggerDebug("TapHoldTrack", "Key up tracked for tap-hold: key='{1}', canceled_by_activity={2}, reason='{3}', tick={4}.",
+			keyId, state.Has("canceled_by_activity") && state["canceled_by_activity"] ? "true" : "false",
+			state.Has("cancel_reason") ? state["cancel_reason"] : "", state["up_at"])
 	}
 }
 
-; Cancel all currently held tap-hold keys when a wheel event occurs.
+; Cancel all currently held tap-hold keys when a wheel event occurs. Keep the
+; wheel-specific field for diagnostics/backward compatibility, while the shared
+; activity flag is what prevents the tap dispatch.
 TapHoldTrackScrollCancel() {
 	global _TH_TapHoldTrackState, _TH_LastTapHoldWheelCancelTick
 	_TH_LastTapHoldWheelCancelTick := A_TickCount
@@ -182,7 +210,9 @@ TapHoldTrackScrollCancel() {
 	activeList := ""
 	for keyId, state in _TH_TapHoldTrackState {
 		if (state.Has("down") and state["down"]) {
+			state["canceled_by_activity"] := true
 			state["canceled_by_scroll"] := true
+			state["cancel_reason"] := "wheel/trackpad during hold"
 			active++
 			activeList .= (active = 1 ? "" : ", ") . keyId
 		}
@@ -205,8 +235,10 @@ TapHoldShouldCancelTap(KeyId, GuardMs := 250) {
 	_TH_LastTapHoldCancelReason := ""
 	if (_TH_TapHoldTrackState.Has(KeyId)) {
 		state := _TH_TapHoldTrackState[KeyId]
-		if (state.Has("canceled_by_scroll") && state["canceled_by_scroll"]) {
-			CancelReason := "trackpad/wheel during key hold"
+		if (state.Has("canceled_by_activity") && state["canceled_by_activity"]) {
+			CancelReason := state.Has("cancel_reason") && state["cancel_reason"] != ""
+				? state["cancel_reason"]
+				: "other input during key hold"
 			_TH_LastTapHoldCancelReason := CancelReason
 			if LoggerIsDebugEnabled() {
 				LoggerDebug("TapHoldTrack", "Tap canceled for '{1}' because key was already marked canceled while held.", KeyId)
