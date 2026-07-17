@@ -87,6 +87,23 @@ _TSM_ArrayFormStillWorks() {
 }
 Test("TextPressKey: array modifier form unchanged", _TSM_ArrayFormStillWorks)
 
+; A single modifier in array form is the form used by the tap actions
+; (copy/paste/cut/etc.).  It must use AHK's shortcut prefix syntax too:
+; `{Ctrl c}` is not Ctrl+C, while `^{c}` is.
+_TSM_SingleModifierArraysKeepShortcutPrefixes() {
+	AssertEqual("^{c}", _TSM_Capture("c", ["Ctrl"]),
+		"copy tap output must remain Ctrl+C")
+	AssertEqual("^{v}", _TSM_Capture("v", ["Ctrl"]),
+		"paste tap output must remain Ctrl+V")
+	AssertEqual("!{Tab}", _TSM_Capture("Tab", ["Alt"]),
+		"single Alt modifier must remain Alt+Tab")
+	AssertEqual("+{Tab}", _TSM_Capture("Tab", ["Shift"]),
+		"single Shift modifier must remain Shift+Tab")
+	AssertEqual("#{a}", _TSM_Capture("a", ["Win"]),
+		"single Win modifier must remain Win+A")
+}
+Test("TextPressKey: single modifier arrays emit valid shortcut prefixes", _TSM_SingleModifierArraysKeepShortcutPrefixes)
+
 _TSM_EmptyStringIsBareKey() {
 	AssertEqual("{Tab}", _TSM_Capture("Tab", ""),
 		"Empty modifier string must emit the bare key (the common correct-by-accident case)")
