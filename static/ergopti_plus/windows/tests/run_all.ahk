@@ -366,6 +366,7 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 ; include here (unlike most modules/). test_timings_config exercises the shared
 ; registry reader plus the keylogger-walker and tap-hold reassign-at-boot loaders.
 #Include ../modules/tap_holds/constants.ahk
+#Include unit/test_tap_hold_activity_cancel.ahk
 #Include unit/test_timings_config.ahk
 _LogBootProgress("keylogger modules + tests included")
 

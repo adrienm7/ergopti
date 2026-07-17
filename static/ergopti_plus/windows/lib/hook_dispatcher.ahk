@@ -131,9 +131,6 @@ class HookDispatcher {
 	; mouse wheels and precision touchpad paths keep the tap-hold disambiguation
 	; guard in sync.
 	static _last_wheel_tick := 0
-	; Cache for optional callback resolution (Func() lookups + missing symbols).
-	; Using the cache avoids repeated expensive try/catch from hot-path events.
-	static _optional_handler_cache := Map()
 
 
 
@@ -265,17 +262,14 @@ class HookDispatcher {
 
 	; Bound to IH.OnKeyDown — receives (ih, vk, sc) from AHK.
 	static _OnKeyDown(ih, vk, sc) {
-		DownCallback := HookDispatcher._GetOptionalHandler("TapHoldTrackKeyDownByScancode")
-		if (DownCallback)
-			DownCallback.Call(vk, sc)
+		try TapHoldTrackKeyDownByScancode(vk, sc)
+		try TapHoldTrackOtherKeyActivityByScancode(vk, sc)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_DOWN, ih, vk, sc)
 	}
 
 	; Bound to IH.OnKeyUp — receives (ih, vk, sc) from AHK.
 	static _OnKeyUp(ih, vk, sc) {
-		UpCallback := HookDispatcher._GetOptionalHandler("TapHoldTrackKeyUpByScancode")
-		if (UpCallback)
-			UpCallback.Call(vk, sc)
+		try TapHoldTrackKeyUpByScancode(vk, sc)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_UP, ih, vk, sc)
 	}
 
@@ -289,54 +283,49 @@ class HookDispatcher {
 	; =====================================================
 
 	static _OnLDown(*) {
+		HookDispatcher._CancelTapHoldActivity()
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_LDOWN)
 	}
 	static _OnLUp(*) {
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_LUP)
 	}
 	static _OnRDown(*) {
+		HookDispatcher._CancelTapHoldActivity()
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_RDOWN)
 	}
 	static _OnRUp(*) {
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_RUP)
 	}
 	static _OnMDown(*) {
+		HookDispatcher._CancelTapHoldActivity()
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_MDOWN)
 	}
 	static _OnMUp(*) {
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_MUP)
 	}
 	static _OnWheelUp(*) {
-		ScrollCancelCallback := HookDispatcher._GetOptionalHandler("TapHoldTrackScrollCancel")
-		if (ScrollCancelCallback)
-			ScrollCancelCallback.Call()
+		try TapHoldTrackScrollCancel()
 		HookDispatcher._last_wheel_tick := A_TickCount
 		if LoggerIsDebugEnabled()
 			LoggerDebug("HookDispatcher", "Mouse wheel up hotkey at tick={1}.", HookDispatcher._last_wheel_tick)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WUP)
 	}
 	static _OnWheelDown(*) {
-		ScrollCancelCallback := HookDispatcher._GetOptionalHandler("TapHoldTrackScrollCancel")
-		if (ScrollCancelCallback)
-			ScrollCancelCallback.Call()
+		try TapHoldTrackScrollCancel()
 		HookDispatcher._last_wheel_tick := A_TickCount
 		if LoggerIsDebugEnabled()
 			LoggerDebug("HookDispatcher", "Mouse wheel down hotkey at tick={1}.", HookDispatcher._last_wheel_tick)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WDN)
 	}
 	static _OnWheelRight(*) {
-		ScrollCancelCallback := HookDispatcher._GetOptionalHandler("TapHoldTrackScrollCancel")
-		if (ScrollCancelCallback)
-			ScrollCancelCallback.Call()
+		try TapHoldTrackScrollCancel()
 		HookDispatcher._last_wheel_tick := A_TickCount
 		if LoggerIsDebugEnabled()
 			LoggerDebug("HookDispatcher", "Mouse wheel right hotkey at tick={1}.", HookDispatcher._last_wheel_tick)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WRIGHT)
 	}
 	static _OnWheelLeft(*) {
-		ScrollCancelCallback := HookDispatcher._GetOptionalHandler("TapHoldTrackScrollCancel")
-		if (ScrollCancelCallback)
-			ScrollCancelCallback.Call()
+		try TapHoldTrackScrollCancel()
 		HookDispatcher._last_wheel_tick := A_TickCount
 		if LoggerIsDebugEnabled()
 			LoggerDebug("HookDispatcher", "Mouse wheel left hotkey at tick={1}.", HookDispatcher._last_wheel_tick)
@@ -350,9 +339,7 @@ class HookDispatcher {
 		local delta := (wparam >> 16) & 0xFFFF
 		if (delta > 0x7FFF)
 			delta := delta - 0x10000
-		ScrollCancelCallback := HookDispatcher._GetOptionalHandler("TapHoldTrackScrollCancel")
-		if (ScrollCancelCallback)
-			ScrollCancelCallback.Call()
+		try TapHoldTrackScrollCancel()
 		HookDispatcher._last_wheel_tick := A_TickCount
 		if LoggerIsDebugEnabled() {
 			now := A_TickCount
@@ -372,26 +359,11 @@ class HookDispatcher {
 		return (A_TickCount - HookDispatcher._last_wheel_tick) <= ms
 	}
 
-	; Resolve optional global handlers lazily, with a cache to avoid doing this
-	; on every hot-path event once resolution is known.
-	static _GetOptionalHandler(func_name) {
-		if (HookDispatcher._optional_handler_cache.Has(func_name)) {
-			return HookDispatcher._optional_handler_cache[func_name]
-		}
-		try {
-			Resolved := Func(func_name)
-			HookDispatcher._optional_handler_cache[func_name] := Resolved
-			if LoggerIsDebugEnabled() {
-				LoggerDebug("HookDispatcher", "Resolved optional hook callback '{1}'.", func_name)
-			}
-			return Resolved
-		} catch {
-			HookDispatcher._optional_handler_cache[func_name] := false
-			if LoggerIsDebugEnabled() {
-				LoggerDebug("HookDispatcher", "Optional hook callback '{1}' not available yet.", func_name)
-			}
-			return false
-		}
+	; Mouse-button activity is another tap-hold boundary. Wheel handlers use the
+	; stronger wheel-specific callback because they also update the recent-wheel
+	; timestamp and emit the scroll event.
+	static _CancelTapHoldActivity() {
+		try TapHoldTrackActivityCancel("", "mouse button during hold")
 	}
 
 	; Backward-compatible alias retained for modules still calling the old name.
