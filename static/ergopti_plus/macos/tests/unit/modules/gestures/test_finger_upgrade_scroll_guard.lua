@@ -15,11 +15,10 @@
 --- swipe_3_up/swipe_3_down.
 ---
 --- Fix: the fast-path is now skipped when `lockedDir` is set AND the incoming
---- finger count is active on that axis AND a live action has already fired
---- (liveAxisSign ~= nil). This means a stray 3rd finger mid-scroll (after the
---- 2-finger action already fired) goes through candidate confirmation, while a
---- genuine 3-finger gesture whose 3rd contact lands before any action fires
---- takes the fast-path immediately — keeping real 3-finger swipes instant.
+--- finger count is active on that axis. This also covers the default setup,
+--- where 2-finger slots are all `none` and therefore cannot set a live-fire
+--- marker before a stray 3rd finger arrives. A genuine 3-finger gesture whose
+--- contacts land before direction lock still takes the fast-path immediately.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -65,18 +64,6 @@ helpers.describe("gestures.engine — fast-path excludes active-axis count upgra
 			src:find("not new_count_active_on_locked_axis", 1, true) ~= nil,
 			"modules.gestures.engine: fast-path must be disabled when the incoming " ..
 			"finger count has active actions on the locked axis"
-		)
-	end)
-
-	helpers.it("guard also checks liveAxisSign to allow genuine 3-finger gestures", function()
-		local src = read_source("modules.gestures.engine")
-		-- The guard must additionally check liveAxisSign ~= nil so that a real
-		-- 3-finger gesture (3rd finger lands before any live fire) still takes
-		-- the fast-path and fires immediately without candidate-path delay.
-		helpers.assert_true(
-			src:find("liveAxisSign ~= nil", 1, true) ~= nil,
-			"modules.gestures.engine: new_count_active_on_locked_axis guard must " ..
-			"also require liveAxisSign ~= nil so genuine 3-finger swipes are instant"
 		)
 	end)
 
@@ -144,18 +131,14 @@ helpers.describe("gestures.engine — 3-finger upgrade blocked on vertical scrol
 
 		local Engine = require("modules.gestures.engine")
 
-		-- Stub state: 2-finger scroll with vertical actions on finger 3, but not
-		-- horizontal — mirrors the default gesture configuration.
+		-- Stub state mirrors the defaults: all 2-finger slots are inert, while
+		-- vertical 3-finger swipes change tabs.
 		local fired_slots = {}
-		-- swipe_2_down is active so the live-fire path triggers on 2-finger scroll
-		-- (setting liveAxisSign). The guard requires liveAxisSign ~= nil to block
-		-- the fast-path upgrade: without a prior live fire the 3rd finger would be
-		-- accepted immediately as a genuine 3-finger gesture (correct new behaviour).
 		local stub_state = {
 			enabled = true,
 			ga = {
 				swipe_2_up    = "none",
-				swipe_2_down  = "scroll_down", -- live action: sets liveAxisSign during scroll
+				swipe_2_down  = "none",
 				swipe_2_left  = "none",
 				swipe_2_right = "none",
 				swipe_3_up    = "tab_prev",    -- active: this must NOT fire on scroll
@@ -164,8 +147,8 @@ helpers.describe("gestures.engine — 3-finger upgrade blocked on vertical scrol
 				swipe_3_right = "word_next",
 				tap_2 = "none", tap_3 = "none", tap_4 = "none", tap_5 = "none",
 			},
-			modes         = { swipe_2_down = "x1", swipe_3_up = "x1", swipe_3_down = "x1" },
-			sensitivities = { swipe_2_down = 0.01, swipe_3_up = 3.5, swipe_3_down = 3.5 },
+			modes         = { swipe_3_up = "x1", swipe_3_down = "x1" },
+			sensitivities = { swipe_3_up = 3.5, swipe_3_down = 3.5 },
 		}
 
 		local stub_actions = {
@@ -181,17 +164,18 @@ helpers.describe("gestures.engine — 3-finger upgrade blocked on vertical scrol
 			return { absoluteVector = { position = { x = x, y = y } } }
 		end
 
-		-- Simulate: 2-finger downward scroll (vertical, lockedDir = "vert")
-		-- Frame 1: gesture starts with 2 fingers moving down
-		Engine.process_frame({ touch(0.5, 0.3), touch(0.5, 0.35) })
-		-- Frame 2: movement progresses down — enough to lock direction as "vert"
-		Engine.process_frame({ touch(0.5, 0.4), touch(0.5, 0.45) })
-		-- Frame 3: more movement (3.0+ units)
-		Engine.process_frame({ touch(0.5, 0.55), touch(0.5, 0.60) })
+		-- Simulate: 2-finger downward scroll (vertical, lockedDir = "vert").
+		-- Use real-sized coordinates so the 3-unit 2-finger threshold is crossed.
+		-- Frame 1: gesture starts with 2 fingers
+		Engine.process_frame({ touch(100, 100), touch(110, 100) })
+		-- Frame 2: movement is still below the lock threshold
+		Engine.process_frame({ touch(100, 102), touch(110, 102) })
+		-- Frame 3: movement locks the vertical direction
+		Engine.process_frame({ touch(100, 106), touch(110, 106) })
 		-- Frame 4: stray 3rd finger joins briefly (accidental contact)
-		Engine.process_frame({ touch(0.5, 0.55), touch(0.5, 0.60), touch(0.2, 0.8) })
+		Engine.process_frame({ touch(100, 106), touch(110, 106), touch(105, 106) })
 		-- Frame 5: stray finger lifts — back to 2 fingers
-		Engine.process_frame({ touch(0.5, 0.55), touch(0.5, 0.60) })
+		Engine.process_frame({ touch(100, 106), touch(110, 106) })
 		-- Frame 6: fingers lift — gesture ends
 		Engine.process_frame({})
 
