@@ -26,6 +26,7 @@
 ; times out, but short enough to avoid an indefinite wait if no key follows
 global SPACE_HOLD_INPUT_TIMEOUT_FACTOR := 15
 global _SpaceHoldInputHook := ""
+global _SpaceHoldOwnerReleased := false
 
 
 
@@ -58,6 +59,7 @@ global _SpaceHoldInputHook := ""
 ; SendInput bypasses the prefix-watcher InputHook.
 
 SpaceTapHold(HoldFn) {
+	global _SpaceHoldOwnerReleased
 	TimeoutSec := TapHoldDuration(TapHold, "space")
 	tap := KeyWait("SC039", "T" . TimeoutSec)
 	if tap {
@@ -66,6 +68,12 @@ SpaceTapHold(HoldFn) {
 	}
 	InputTimeoutSec := TimeoutSec * SPACE_HOLD_INPUT_TIMEOUT_FACTOR ; Proportional window — slow typist must not time out
     ih := InputHook("L1 T" . Round(InputTimeoutSec, 1))
+    ; The capture belongs to the physical Space hold.  End it as soon as the
+    ; owner is released instead of keeping a suppressing L1 hook alive for the
+    ; next printable key.
+    _SpaceHoldOwnerReleased := false
+    ih.KeyOpt("{SC039}", "+N")
+    ih.OnKeyUp := _SpaceHoldOnKeyUp
     global _SpaceHoldInputHook := ih
     try {
         ih.Start()
@@ -74,6 +82,8 @@ SpaceTapHold(HoldFn) {
         try ih.Stop()
         _SpaceHoldInputHook := ""
     }
+	if _SpaceHoldOwnerReleased
+		return
 	; A live InputHook bypasses native Suspend; if a pause arrived while Wait() was
 	; blocking, discard the capture so no phantom modified keystroke leaks into the
 	; foreground app while the driver is paused (space-hold-inputhook-suspend-guard).
@@ -91,6 +101,17 @@ SpaceTapHold(HoldFn) {
 	if (ih.Input != "" and ih.Input != " ")
 		HoldFn.Call(ih.Input)
 	KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+}
+
+; InputHook callbacks receive (hook, virtual-key, scan-code).  SC039 is the
+; physical owner of this transaction; stopping before the next key arrives
+; prevents the hook from swallowing that key after a completed Space hold.
+_SpaceHoldOnKeyUp(ih, vk, sc) {
+	global _SpaceHoldOwnerReleased
+	if (sc != 0x039)
+		return
+	_SpaceHoldOwnerReleased := true
+	try ih.Stop()
 }
 
 SpaceTapHoldLayer() {
