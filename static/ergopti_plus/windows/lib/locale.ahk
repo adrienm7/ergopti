@@ -193,7 +193,14 @@ _I18nLoadLocaleMap(JsonPath, MagicKey) {
 		return { Cache: Map(), Ok: false, Fast: false }
 	}
 	try {
-		Parsed := JsonParse(FileRead(JsonPath, "UTF-8"))
+		; FileRead keeps a UTF-8 BOM in some AHK builds.  Locale sources are
+		; allowed to carry one, so remove it before handing the document to the
+		; JSON parser.  Otherwise a cache miss after an update makes every key
+		; disappear until a manually regenerated .tsv cache exists.
+		RawJson := FileRead(JsonPath, "UTF-8")
+		if (StrLen(RawJson) && Ord(SubStr(RawJson, 1, 1)) = 0xFEFF)
+			RawJson := SubStr(RawJson, 2)
+		Parsed := JsonParse(RawJson)
 	} catch as err {
 		try LoggerWarn("i18n", "JSON parse error in '{1}': {2}", JsonPath, err.Message)
 		return { Cache: Map(), Ok: false, Fast: false }

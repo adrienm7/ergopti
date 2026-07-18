@@ -49,6 +49,24 @@ _LocaleListJsonFiles(Dir) {
 	return Files
 }
 
+Test_LocaleLoader_ParsesBomJsonAfterCacheMiss() {
+	FixturePath := A_Temp . "\\ergopti_locale_bom_" . A_TickCount . ".json"
+	FixtureTsv := RegExReplace(FixturePath, "\\.json$", ".tsv")
+	try {
+		; UTF-8-RAW deliberately preserves the leading BOM: this reproduces a
+		; fresh source file with no usable fast-cache.
+		FileAppend(Chr(0xFEFF) . '{"fixture.key":"loaded"}', FixturePath, "UTF-8-RAW")
+		Loaded := _I18nLoadLocaleMap(FixturePath, "★")
+		Assert(Loaded.Ok, "a BOM-prefixed locale source must load after a cache miss")
+		Assert(Loaded.Cache.Has("fixture.key"), "BOM-prefixed JSON must retain its key")
+		AssertEqual("loaded", Loaded.Cache["fixture.key"])
+	} finally {
+		try FileDelete(FixturePath)
+		try FileDelete(FixtureTsv)
+	}
+}
+Test("locale loader: parses UTF-8 BOM source after cache miss", Test_LocaleLoader_ParsesBomJsonAfterCacheMiss)
+
 
 
 
