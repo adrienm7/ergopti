@@ -204,7 +204,14 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	_TEXT_CLIPBOARD_GENERATION += 1
 	Generation := _TEXT_CLIPBOARD_GENERATION
 
-	CB_Write(Text)
+	; A failed write leaves the previous clipboard content intact. Never continue
+	; to ClipWait/^v in that state or the user receives unrelated stale text.
+	if !CB_Write(Text) {
+		LoggerError("TextSender", "TextSend: clipboard write failed - skipping paste to avoid injecting stale content.")
+		CB_RestoreAll(Saved)
+		_TextSenderInvokeCallback(Callback)
+		return
+	}
 
 	; Wait for the clipboard to actually hold our text before pasting. On timeout
 	; we MUST NOT paste — Ctrl+V would inject the previous clipboard content. Bail
@@ -285,6 +292,11 @@ TextSend(Text, Opts, Callback) {
 		; callers that depend on the callback being synchronised with injection completion
 		; are never notified before the paste actually lands.
 		Saved := CB_SaveAll()
+		if (Type(Saved) == "String" and Saved == "__CB_SAVE_ERROR__") {
+			LoggerError("TextSender", "TextSend: clipboard snapshot failed - skipping clipboard injection.")
+			_TextSenderInvokeCallback(Callback)
+			return
+		}
 		SetTimer(() => _TextSendClipboard(Text, Saved, Callback), -1)
 	} else {
 		; SendText uses the "Text" mode that bypasses hotkey triggers and sends
