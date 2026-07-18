@@ -1413,7 +1413,14 @@
 								return;
 							}
 						}
-						if (!payload || payload.type !== 'prefetch') return;
+						if (!payload) return;
+						if (payload.type === 'range_data') {
+							if (typeof window.receive_range_data === 'function') {
+								window.receive_range_data(payload.payload);
+							}
+							return;
+						}
+						if (payload.type !== 'prefetch') return;
 						push_count++;
 						processed_count++;
 						console.log(
