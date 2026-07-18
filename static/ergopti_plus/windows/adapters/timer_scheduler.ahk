@@ -129,15 +129,21 @@ TimerCancel(Handle) {
 	global _TIMER_ADAPTER_REGISTRY
 	if !(Handle is Map)
 		return
-	BoundFn := Handle.Has("Fn") ? Handle["Fn"] : 0
-	if BoundFn != 0
-		SetTimer(BoundFn, 0)
+        BoundFn := Handle.Has("Fn") ? Handle["Fn"] : 0
+        if BoundFn != 0 {
+                try SetTimer(BoundFn, 0)
+                catch as Err
+                        try LoggerWarn("TimerScheduler", "timer cancellation failed: {1}", Err.Message)
+        }
 	; Cancel any re-queued one-shot timer that was created during a suspend window.
 	; Without this, the re-queued timer has no reference and fires indefinitely after
 	; the original handle is cancelled.
 	RequeuedFn := Handle.Has("RequeuedFn") ? Handle["RequeuedFn"] : 0
-	if RequeuedFn != 0
-		SetTimer(RequeuedFn, 0)
+        if RequeuedFn != 0 {
+                try SetTimer(RequeuedFn, 0)
+                catch as Err
+                        try LoggerWarn("TimerScheduler", "re-queued timer cancellation failed: {1}", Err.Message)
+        }
 	Handle["Fired"] := true
 	Id := Handle.Has("Id") ? Handle["Id"] : 0
 	if Id != 0 and _TIMER_ADAPTER_REGISTRY.Has(Id)
@@ -192,8 +198,19 @@ _TimerAdapterMakeOneShot(Handle, Fn) {
 			; and cancel it if the caller cancels before the suspend window lifts.
 			requeued := _OneShot.Bind(BoundHandle, BoundFn)
 			BoundHandle["RequeuedFn"] := requeued
-			SetTimer(requeued, -500)
-			return
+                        try SetTimer(requeued, -500)
+                        catch as Err {
+                                ; A failed re-queue must become a terminal, visible
+                                ; state.  Leaving this handle live would advertise
+                                ; work that can never fire and later collide with a
+                                ; reused timer id.
+                                BoundHandle["Fired"] := true
+                                Id := BoundHandle.Has("Id") ? BoundHandle["Id"] : 0
+                                if Id != 0 and _TIMER_ADAPTER_REGISTRY.Has(Id)
+                                        _TIMER_ADAPTER_REGISTRY.Delete(Id)
+                                try LoggerError("TimerScheduler", "suspended one-shot re-queue failed: {1}", Err.Message)
+                        }
+                        return
 		}
 		; Clear any stored re-queue reference now that we are actually firing,
 		; so TimerCancel does not attempt a redundant SetTimer(fn, 0) call.

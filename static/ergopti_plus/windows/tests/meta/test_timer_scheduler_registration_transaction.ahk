@@ -13,3 +13,18 @@ _TSRT_RegistrationFollowsSuccessfulSchedule() {
 	}
 }
 Test("TimerScheduler: failed schedule cannot publish a live handle (timer-scheduler-registration-transaction)", _TSRT_RegistrationFollowsSuccessfulSchedule)
+
+_TSRT_CancelAndRequeueFailuresAreContained() {
+        CancelBody := _DriverFuncBody("TimerCancel")
+        OneShotBody := _DriverFuncBody("_TimerAdapterMakeOneShot")
+        Assert(CancelBody != "" && OneShotBody != "", "TimerCancel and one-shot wrapper must exist")
+        Assert(InStr(CancelBody, "try SetTimer(BoundFn, 0)") > 0
+                && InStr(CancelBody, "try SetTimer(RequeuedFn, 0)") > 0,
+                "TimerCancel must contain OS cancellation failures instead of throwing from a user cancellation path")
+        RequeuePos := InStr(OneShotBody, "SetTimer(requeued, -500)")
+        FiredPos := InStr(OneShotBody, 'BoundHandle["Fired"] := true', false, RequeuePos)
+        RegistryPos := InStr(OneShotBody, "_TIMER_ADAPTER_REGISTRY.Delete(Id)", false, RequeuePos)
+        Assert(RequeuePos > 0 and FiredPos > RequeuePos and RegistryPos > RequeuePos,
+                "a failed suspended re-queue must terminate and unpublish its handle, not leak a timer that can never fire")
+}
+Test("TimerScheduler: cancellation and suspended re-queue failures are transactional", _TSRT_CancelAndRequeueFailuresAreContained)
