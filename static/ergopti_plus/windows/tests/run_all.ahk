@@ -485,6 +485,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_wpm_widget_hidden_until_typed.ahk
 #Include meta/test_text_expansion_critical_path.ahk
 #Include meta/test_prefix_watcher_deferred.ahk
+#Include meta/test_hotstrings_ready_contract.ahk
 #Include meta/test_native_hotstrings_migrated.ahk
 #Include meta/test_i18n_fallback_deferred.ahk
 #Include unit/test_hse_conform_double_fire.ahk

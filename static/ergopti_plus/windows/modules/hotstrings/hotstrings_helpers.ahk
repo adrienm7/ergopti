@@ -20,10 +20,9 @@
 ; ==========================================================
 ; ==========================================================
 
-; Delay (ms) before the deferred emoji/symbol pass fires after boot. Long enough
-; that startup has settled and the user is very unlikely to have typed an
-; emoji/symbol trigger yet, short enough that the expansions are available within
-; a couple of seconds.
+; Retained for compatibility with live-rebuild callers. Boot no longer uses a
+; deferred emoji/symbol pass: ready is published only once all advertised triggers
+; and the preview index are available.
 global HS_DEFERRED_REGISTRATION_DELAY_MS := 1500
 
 ; Delay (ms) before warming the prefix-watcher PREVIEW index off the boot path.
@@ -49,11 +48,8 @@ _RegisterEmojisSymbolsSections() {
 	}
 }
 
-; Post-boot idle pass: registers the emoji + symbol categories that the boot
-; RegisterAllHotstrings(…, DeferHeavy := true) skipped, then rebuilds the
-; prefix-watcher index so the live preview includes them. Armed via a one-shot
-; SetTimer from ErgoptiPlus.ahk. Wrapped in try so a transient failure can never
-; crash the timer thread and leave the driver half-initialised.
+; Compatibility path for a live rebuild that deliberately queues registration.
+; Boot registers these sections synchronously before ready.
 RegisterEmojisSymbolsDeferred() {
 	global HSE_RegistryByGroup
 	if (IsSet(HSE_RegistryByGroup) and (HSE_RegistryByGroup.Has("emojis.emojis") or HSE_RegistryByGroup.Has("magickey.text_expansion_emojis")))

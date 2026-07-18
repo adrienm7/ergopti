@@ -747,16 +747,15 @@ BootProfile_Mark("Layout/shortcuts/tap-holds + AltGr registered")
 ; process stuck on the AltGr layer for the first keystrokes (transient
 ; « AltGr bloqué »). See _ReleasePhantomModifiers in lib/lifecycle.ahk.
 _ReleasePhantomModifiers()
-; DeferHeavy := true — skip ONLY the emoji/symbol categories on the critical boot
-; path (~3000 regs / ~410 ms); RegisterEmojisSymbolsDeferred (armed below) loads
-; them off-path a moment later and rebuilds the prefix-watcher index. The magic-key
-; text-expansion sections are the most-USED feature, so they register here ON the
-; critical path (DeferHeavy no longer skips them) — "ready" must mean the everyday
-; expansions already work. Only the preview index is warmed off-path (below).
-RegisterAllHotstrings(true)
-BootProfile_Mark("Hotstrings registered (HSE, emoji/symbol deferred)")
+; Ready is an output contract: every advertised trigger, including emoji/symbol
+; sections and its preview index, must exist before the driver publishes ready.
+; Deferring these ~3000 registrations after ready made a first emoji/symbol trigger
+; literal for seconds and allowed the timer to stall the first typing burst.
+RegisterAllHotstrings(false)
+BootProfile_Mark("Hotstrings registered (HSE complete)")
 HotstringPrefixWatcherInit()
-BootProfile_Mark("Prefix watcher index armed")
+HotstringPrefixWatcherRebuildIndex()
+BootProfile_Mark("Prefix watcher index complete")
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 _DriverReady := true
 
@@ -807,17 +806,9 @@ if !_LLM_Menu["enabled"]
 ; already parsed at boot). One JSON parse, only consulted on a missing key; a miss
 ; before this fires triggers a one-time lazy load inside t().
 SetTimer(I18nWarmFallbacks, -I18N_FALLBACK_WARM_DELAY_MS)
-; text_expansion now registers on the critical path (the most-used feature); the
-; prefix-watcher PREVIEW index is built ONCE, off-path, at the END of the deferred
-; emoji/symbol pass below (RegisterEmojisSymbolsDeferred → HotstringPrefixWatcherRebuildIndex).
-; A separate earlier "warm-up" SetTimer used to build it too, but it fired during peak
-; boot contention and before HotstringsResolve was warm for the emoji/symbol sections,
-; so its wall-clock was erratic (250 ms–6 s). Building only after the deferred pass —
-; once HotstringsResolve is memoised and the boot has settled — makes the single rebuild
-; reliably ~220 ms, at the cost of the preview tooltip appearing a few seconds into the
-; session instead of right after "ready" (hotstrings still FIRE immediately — the boot
-; HSE registration is unaffected; only the visual preview is deferred).
-SetTimer(RegisterEmojisSymbolsDeferred, -HS_DEFERRED_REGISTRATION_DELAY_MS)
+; Hotstrings and their preview index were completed before ready above. Do not arm a
+; duplicate post-ready registration timer: even a no-op timer can contend with the
+; first keystroke and must not define feature availability.
 if (MetricsShortcuts.enabled and WPMWidget.visible) {
 	; Graph mode: pre-create the GDI+ layered window + warm GDI+ in the quiet slot
 	; before the emoji pass, so its one-time DWM allocation is paid off the typing
