@@ -212,12 +212,15 @@ KLW_WalkTypingEntry(entry) {
                     if (ctx["recent_typing"].Length > 0)
                         trigger_evt := ctx["recent_typing"].Pop()
                     if (synth_type = "hotstring") {
-                        KLW_BumpAppDay(date_str, app, "hs_chars", -1)
+                        ; hs_chars is gross generated output. The UI subtracts
+                        ; hs_input_chars once, so decreasing both double-counts
+                        ; each deleted trigger character in live projections.
                         KLW_BumpAppDay(date_str, app, "hs_input_chars", 1)
                         if (trigger_evt is Map)
                             KLW_BumpInputBuckets(date_str, app, trigger_evt["delay"], "hs", app_day_key)
                     } else if (synth_type = "llm") {
-                        KLW_BumpAppDay(date_str, app, "llm_chars", -1)
+                        ; Keep the gross-output contract aligned with macOS,
+                        ; Linux and the Windows events_* database rebuild.
                         KLW_BumpAppDay(date_str, app, "llm_input_chars", 1)
                         if (trigger_evt is Map)
                             KLW_BumpInputBuckets(date_str, app, trigger_evt["delay"], "llm", app_day_key)

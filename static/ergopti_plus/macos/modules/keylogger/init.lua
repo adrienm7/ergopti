@@ -621,26 +621,32 @@ local function handle_key(event_obj)
 		if keycode == 51 then
 			-- Backspace: check if the next queued synthetic char is also a backspace
 			if #CoreState.synth_queue > 0 and CoreState.synth_queue[1].char == "[BS]" then
-				is_synthetic = true
-				synth_type   = CoreState.synth_queue[1].type
+				local next_synth = CoreState.synth_queue[1]
 				table.remove(CoreState.synth_queue, 1)
+				-- notify_synthetic has already written the logical replacement.
+				-- Drop the later OS echo so it cannot be counted twice.
+				if next_synth.discard then return end
+				is_synthetic = true
+				synth_type   = next_synth.type
 			end
 		else
 			if #CoreState.synth_queue > 0 then
 				local next_synth = CoreState.synth_queue[1]
 				if chars == next_synth.char then
 					-- Exact character match
+					table.remove(CoreState.synth_queue, 1)
+					if next_synth.discard then return end
 					is_synthetic = true
 					synth_type   = next_synth.type
-					table.remove(CoreState.synth_queue, 1)
 				elseif delay < SYNTH_MATCH_DELAY_MS then
 					-- Extremely fast keystroke — almost certainly synthetic even if char differs
-					is_synthetic = true
-					synth_type   = next_synth.type
 					-- Pop the queue even on a char-mismatch fast-path: without this pop the
 					-- head entry stays and re-matches every subsequent fast keystroke,
 					-- tagging all rapid typing as synthetic until a >500 ms gap clears it.
 					table.remove(CoreState.synth_queue, 1)
+					if next_synth.discard then return end
+					is_synthetic = true
+					synth_type   = next_synth.type
 				end
 			end
 		end
@@ -915,8 +921,9 @@ end
 --- @param source_type string Origin identifier ("hotstring", "llm", …).
 --- @param deletes number Backspaces issued before the synthetic text.
 --- @param source_variant string|nil Optional sub-type for UI rendering.
---- @param deleted_text string|nil The text that will be erased by the backspaces.
-function M.notify_synthetic(text, source_type, deletes, source_variant, deleted_text)
+--- @param physical_echo string|nil Text whose delayed physical key echoes must
+---   be discarded. Clipboard output intentionally passes an empty string.
+function M.notify_synthetic(text, source_type, deletes, source_variant, physical_echo)
 	-- When the keylogger is OFF there is no consumer for synth_queue (handle_key
 	-- returns at the is_enabled guard, so the idle-drain self-heal never runs).
 	-- Queuing here while disabled is pure leak/poison: the queue and the WPM window
@@ -926,12 +933,28 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, deleted_
 	-- log_hotstring / log_llm. Expander notifies unconditionally on every expansion.
 	if not CoreState.is_enabled then return end
 
+	-- A clipboard paste does not emit one keyDown per inserted character. Record
+	-- the logical replacement immediately, then discard only the later physical
+	-- echoes of direct key injection. This keeps clipboard hotstrings and LLM
+	-- completions in the same raw event format as typed synthetic output.
+	local function append_virtual(char)
+		table.insert(CoreState.buffer_events, {
+			char, 0,
+			{ s = true, st = source_type, c = false, ss = "none", r = char,
+				m = "", h = 0, d = 0, dk = false, cp = false, kc = nil },
+		})
+		if char ~= "[BS]" then
+			table.insert(CoreState.rich_chunks, { type = source_type, text = char })
+		end
+	end
+
 	Logger.debug(LOG, "Queuing synthetic text from '%s' (%d delete(s), %d char(s))…",
 		source_type, deletes or 0, text and (utf8.len(text) or #text) or 0)
 
 	if deletes and deletes > 0 then
 		for _ = 1, deletes do
-			table.insert(CoreState.synth_queue, { char = "[BS]", type = source_type })
+			append_virtual("[BS]")
+			table.insert(CoreState.synth_queue, { char = "[BS]", type = source_type, discard = true })
 		end
 		-- Mirror the backspaces in the effective WPM window
 		for _ = 1, deletes do
@@ -949,14 +972,14 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, deleted_
 		local ok_len, char_count = pcall(utf8.len, text)
 		if ok_len and char_count then
 			for _, code in utf8.codes(text) do
-				table.insert(CoreState.synth_queue, { char = utf8.char(code), type = source_type })
+				append_virtual(utf8.char(code))
 			end
 		else
 			-- Malformed UTF-8 — queue one opaque, non-validated entry rather than
 			-- raising and aborting the expansion mid-flight (which would leave the
 			-- synthetic-injection trackers desynced for every subsequent keystroke).
 			Logger.warn(LOG, "notify_synthetic: malformed UTF-8 in synthetic text — queuing an opaque fallback entry.")
-			table.insert(CoreState.synth_queue, { char = text, type = source_type })
+			append_virtual(text)
 			char_count = 1
 		end
 		-- Add timestamps for all synthetic chars so the WPM window reflects them
@@ -967,6 +990,28 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, deleted_
 		CoreState.session_last_active = now_ms
 		if CoreState.session_start_time == 0 then CoreState.session_start_time = now_ms end
 	end
+
+	-- Paste has no per-character echo. Direct injection does, so queue just its
+	-- physical echo events as discard markers; their logical counterparts above
+	-- have already been persisted once.
+	local echo_text = type(physical_echo) == "string" and physical_echo or text
+	if echo_text and echo_text ~= "" then
+		local ok_echo, echo_count = pcall(utf8.len, echo_text)
+		if ok_echo and echo_count then
+			for _, code in utf8.codes(echo_text) do
+				table.insert(CoreState.synth_queue, {
+					char = utf8.char(code), type = source_type, discard = true,
+				})
+			end
+		else
+			table.insert(CoreState.synth_queue, { char = echo_text, type = source_type, discard = true })
+		end
+	end
+
+	-- A pure Cmd+V insertion would otherwise remain buffered indefinitely: the
+	-- Cmd+V event is a shortcut, not a typing event, and its pasted characters
+	-- never reach handle_key. Flush before the expander re-seeds buffer_text.
+	if #CoreState.buffer_events > 0 then LogManager.flush_buffer() end
 
 	CoreState.last_source_type    = source_type
 	CoreState.last_source_variant = type(source_variant) == "string" and source_variant or source_type
@@ -1196,7 +1241,9 @@ end
 function M.log_llm_accepted(prediction_text, app_name, all_predictions, chosen_index, deletes, deleted_text)
 	if not CoreState.is_enabled then return end
 	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
-	LogManager.increment_manifest_stat(target_app, "llm_triggers")
+	-- The synthetic typing burst is the canonical trigger counter. A manifest
+	-- increment here used to be ignored by the whitelist and would double-count
+	-- now that clipboard output is represented in the synthetic raw event stream.
 	local net_saved = (utf8.len(prediction_text or "") or 0) - (deletes or 0)
 	LogManager.append_log({
 		type            = "llm_accepted",

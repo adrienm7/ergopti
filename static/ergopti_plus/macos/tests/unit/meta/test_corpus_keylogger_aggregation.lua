@@ -447,6 +447,27 @@ helpers.describe("keylogger aggregation corpus — vector replay", function()
 		helpers.assert_eq(row.llm_triggers, 1, "llm_triggers = 1")
 	end)
 
+	helpers.it("synthetic trigger deletes keep gross output so the UI subtracts input once", function()
+		if not corpus_root then return end
+		local vec = nil
+		for _, candidate in ipairs(corpus_root.vectors) do
+			if candidate.id == "synthetic_hotstring_backspace_keeps_gross_output" then
+				vec = candidate
+				break
+			end
+		end
+		helpers.assert_true(vec ~= nil, "gross-output regression vector missing")
+		setup_and_replay(vec)
+
+		local row = read_app_day_row("2024-06-01", "GrossHsApp")
+		helpers.assert_true(row ~= nil, "app_day row must exist")
+		helpers.assert_eq(row.chars, 3, "manual trigger remains three real chars")
+		helpers.assert_eq(row.hs_chars, 8, "hs_chars must be gross generated output")
+		helpers.assert_eq(row.hs_input_chars, 3, "deleted trigger is recorded separately")
+		helpers.assert_eq(row.hs_chars - row.hs_input_chars, 5,
+			"source-filtered UI must see the five-character net gain exactly once")
+	end)
+
 	helpers.it("typing_with_think_pause: pauses=1, think_time_ms=3000", function()
 		if not corpus_root then return end
 		local vec = corpus_root.vectors[6]

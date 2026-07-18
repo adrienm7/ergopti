@@ -157,7 +157,9 @@ function M.walk_typing(entry)
 					hr.es = hr.es + 1; m5.es = m5.es + 1
 					local trigger_evt = table.remove(ctx.recent_typing)
 					if synth_type == "hotstring" then
-						C.bump_app_day(date_str, app, "hs_chars", -1)
+						-- hs_chars is gross generated output. The UI subtracts this
+						-- separately recorded trigger input exactly once to obtain the
+						-- net gain; decrementing both here and there double-subtracted.
 						C.bump_app_day(date_str, app, "hs_input_chars", 1)
 						if trigger_evt and type(trigger_evt.delay) == "number" then
 							for _, t in ipairs(C.UI_PAUSE_BUCKETS_MS) do
@@ -173,7 +175,8 @@ function M.walk_typing(entry)
 							end
 						end
 					elseif synth_type == "llm" then
-						C.bump_app_day(date_str, app, "llm_chars", -1)
+						-- Keep the same gross-output contract as hotstrings and the
+						-- Linux/Windows persisted event rebuilds.
 						C.bump_app_day(date_str, app, "llm_input_chars", 1)
 						if trigger_evt and type(trigger_evt.delay) == "number" then
 							for _, t in ipairs(C.UI_PAUSE_BUCKETS_MS) do
