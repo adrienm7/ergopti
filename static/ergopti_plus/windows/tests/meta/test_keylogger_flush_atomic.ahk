@@ -14,10 +14,11 @@
 ;
 ; The fix uses an atomic snapshot: under Critical("On"), all fields are copied
 ; into local snap_* variables AND cleared in the same critical section. Only
-; after Critical("Off") is released does processing begin on the local copies.
+; after the caller's previous Critical state is restored does processing begin
+; on the local copies.
 ;
 ; This meta-static test verifies the pattern is present and ordered correctly so
-; a regression (splitting the snapshot from the reset, or moving Critical("Off")
+; a regression (splitting the snapshot from the reset, or restoring Critical
 ; before the reset) immediately fails CI.
 ; ==============================================================================
 
@@ -94,16 +95,17 @@ _KLFA_MouseFlushScrollCritical() {
 	Assert(InStr(Body, "KLMouse.scroll_ticks   := 0") > 0 or InStr(Body, "KLMouse.scroll_ticks := 0") > 0,
 		"KL_Mouse_FlushScroll must clear KLMouse.scroll_ticks inside the Critical section")
 
-	Assert(InStr(Body, "Critical(" . Chr(34) . "Off" . Chr(34) . ")") > 0,
-		"KL_Mouse_FlushScroll must release Critical after the atomic snapshot")
+        Assert(InStr(Body, "Critical(previous_critical)") > 0,
+                "KL_Mouse_FlushScroll must restore the caller's Critical state after the atomic snapshot")
 
 	Assert(InStr(Body, "MF_ShouldFilter") > 0,
 		"KL_Mouse_FlushScroll must still call MF_ShouldFilter after releasing Critical")
 
-	; Critical(Off) must come before MF_ShouldFilter so the lock is released before any yielding call
-	PosOff := InStr(Body, "Critical(" . Chr(34) . "Off" . Chr(34) . ")")
+        ; Restoring the prior Critical state must happen before MF_ShouldFilter,
+        ; which can yield the timer thread.
+        PosOff := InStr(Body, "Critical(previous_critical)")
 	PosMF  := InStr(Body, "MF_ShouldFilter")
 	Assert(PosOff < PosMF,
-		"Critical(Off) must appear before MF_ShouldFilter — the critical lock must be released before any call that can yield the thread")
+                "Critical restoration must appear before MF_ShouldFilter — the helper must not extend its own lock across a yielding call")
 }
 Test("keylogger: KL_Mouse_FlushScroll releases Critical before MF_ShouldFilter (keylogger-flush-race-condition)", _KLFA_MouseFlushScrollCritical)
