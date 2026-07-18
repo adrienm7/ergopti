@@ -36,6 +36,7 @@ local LOG = "adapters.process_lifecycle"
 local _focus_callbacks  = {}   -- list of focus-change callbacks
 local _launch_callbacks = {}   -- list of app-launch callbacks
 local _quit_callbacks   = {}   -- list of app-quit callbacks
+local _activate_callbacks = {} -- list of app-activation callbacks
 local _app_watcher      = nil  -- hs.application.watcher instance
 local _window_filter    = nil  -- hs.window.filter instance (focus changes)
 local _running          = false
@@ -79,6 +80,16 @@ function M.onAppQuit(callback)
 	_quit_callbacks[#_quit_callbacks + 1] = callback
 end
 
+--- Registers a callback for application activation with the native app object.
+--- @param callback function Called with (appName: string, appObject: userdata).
+function M.onAppActivate(callback)
+	if type(callback) ~= "function" then
+		Logger.warn(LOG, "onAppActivate(): argument is not a function â€” ignored.")
+		return
+	end
+	_activate_callbacks[#_activate_callbacks + 1] = callback
+end
+
 --- Returns identity information about the currently focused application window.
 --- @return table { appId: string, windowTitle: string } — fields are "" on error.
 function M.getForegroundApp()
@@ -111,7 +122,7 @@ function M.start()
 
 	-- Application watcher — launch and quit events
 	pcall(function()
-		_app_watcher = hs.application.watcher.new(function(app_name, event_type, _app_obj)
+		_app_watcher = hs.application.watcher.new(function(app_name, event_type, app_obj)
 			if event_type == hs.application.watcher.launched then
 				for _, cb in ipairs(_launch_callbacks) do
 					pcall(cb, app_name)
@@ -120,15 +131,20 @@ function M.start()
 				for _, cb in ipairs(_quit_callbacks) do
 					pcall(cb, app_name)
 				end
+			elseif event_type == hs.application.watcher.activated then
+				for _, cb in ipairs(_activate_callbacks) do
+					pcall(cb, app_name, app_obj)
+				end
 			end
 		end)
 		_app_watcher:start()
 	end)
 
 	-- Window filter — focus-change events
-	pcall(function()
-		_window_filter = hs.window.filter.new()
-		_window_filter:subscribe(hs.window.filter.windowFocused, function(win)
+	if #_focus_callbacks > 0 then
+		pcall(function()
+			_window_filter = hs.window.filter.new()
+			_window_filter:subscribe(hs.window.filter.windowFocused, function(win)
 			local app_name  = ""
 			local win_title = ""
 			local ok_app, app = pcall(function() return win:application() end)
@@ -141,8 +157,9 @@ function M.start()
 			for _, cb in ipairs(_focus_callbacks) do
 				pcall(cb, app_name, win_title)
 			end
+			end)
 		end)
-	end)
+	end
 
 	-- Only mark as running if at least one watcher was actually created.
 	-- If both pcalls failed (accessibility permission denied), leaving _running=true

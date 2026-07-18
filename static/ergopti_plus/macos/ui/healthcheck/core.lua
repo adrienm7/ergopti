@@ -84,7 +84,7 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.app_launcher",
 		contract = { "launch", "launchWithArgs", "isRunning" },
-		wired    = false,
+		wired    = true,
 	},
 	{
 		id       = "adapters.clipboard",
@@ -94,7 +94,7 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.crypto",
 		contract = { "sha256" },
-		wired    = false,
+		wired    = true,
 	},
 	{
 		id       = "adapters.file_system",
@@ -104,7 +104,7 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.graphics_renderer",
 		contract = { "createWindow", "destroyWindow", "drawBitmap", "show", "hide" },
-		wired    = false,
+		wired    = true,
 	},
 	{
 		id       = "adapters.http_client",
@@ -124,32 +124,32 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.keyboard_hook",
 		contract = { "start", "stop" },
-		wired    = false,
+		wired    = true,
 	},
 	{
 		id       = "adapters.mouse_control",
 		contract = { "setPos", "getPos" },
-		wired    = false,
+		wired    = true,
 	},
 	{
 		id       = "adapters.network_info",
 		contract = { "getSsidHash", "getSignalStrength", "isInternetReachable", "isVpnActive" },
-		wired    = false,
+		wired    = true,
 	},
 	{
 		id       = "adapters.notifier",
 		contract = { "send" },
-		wired    = false,
+		wired    = true,
 	},
 	{
 		id       = "adapters.process_lifecycle",
 		contract = { "start", "stop" },
-		wired    = false,
+		wired    = true,
 	},
 	{
 		id       = "adapters.secure_field_detector",
 		contract = { "isSecureField", "isSecureApp", "refresh" },
-		wired    = false,
+		wired    = true,
 	},
 	{
 		id       = "adapters.shell_runner",
@@ -164,7 +164,7 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.text_sender",
 		contract = { "send" },
-		wired    = false,
+		wired    = true,
 	},
 	{
 		id       = "adapters.timer_scheduler",
@@ -179,22 +179,22 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.tooltip_renderer",
 		contract = { "show", "hide" },
-		wired    = false,
+		wired    = true,
 	},
 	{
 		id       = "adapters.tray_menu",
 		contract = { "setIcon", "setMenu", "setTooltip", "destroy" },
-		wired    = false,
+		wired    = true,
 	},
 	{
 		id       = "adapters.window_info",
 		contract = { "getFocused", "getAll" },
-		wired    = false,
+		wired    = true,
 	},
 	{
 		id       = "adapters.window_manager",
 		contract = { "activate", "exists", "kill", "getList" },
-		wired    = false,
+		wired    = true,
 	},
 }
 

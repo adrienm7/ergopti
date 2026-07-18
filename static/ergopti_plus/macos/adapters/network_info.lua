@@ -30,6 +30,7 @@ local M = {}
 local hs          = hs
 local Logger      = require("lib.logger")
 local ShellRunner = require("adapters.shell_runner")
+local Crypto      = require("adapters.crypto")
 
 local LOG = "adapters.network_info"
 
@@ -56,19 +57,7 @@ local PING_TIMEOUT_SEC = 1
 --- @param s string Input string.
 --- @return string
 local function sha256_hex(s)
-	if type(s) ~= "string" or s == "" then return "" end
-	local ok, out = pcall(function()
-		-- POSIX single-quoting prevents shell injection and wrong digests on data
-		-- containing $, backticks or newlines (unlike Lua %q which uses "..." syntax)
-		local q = "'" .. s:gsub("'", "'\\''") .. "'"
-		local cmd = "printf '%s' " .. q .. " | openssl dgst -sha256 -hex 2>/dev/null"
-		return hs.execute(cmd)
-	end)
-	if not ok or type(out) ~= "string" then return "" end
-	-- Nil-check the match: openssl may not be available (returns empty stdout)
-	local digest = out:match("[0-9a-f]+%s*$")
-	if not digest then return "" end
-	return (digest:gsub("%s+", ""))
+	return Crypto.sha256(s)
 end
 
 
@@ -120,6 +109,7 @@ end
 -- (unreachable / no VPN) default until that refresh lands.
 local _cached_internet_reachable = false
 local _cached_vpn_active         = false
+local _has_internet_probe_result = false
 
 -- Guards against piling up a second in-flight probe while one is still
 -- running (e.g. isInternetReachable() polled faster than the ping timeout).
@@ -139,6 +129,7 @@ local function _refresh_internet_reachable()
 			_cached_internet_reachable = exit_code == 0
 				and type(stdout) == "string"
 				and stdout:find("1 packets received") ~= nil
+			_has_internet_probe_result = true
 			Logger.debug(LOG, "isInternetReachable() refreshed: %s", tostring(_cached_internet_reachable))
 		end)
 	local ok, err = pcall(function() handle.start() end)
@@ -182,6 +173,12 @@ end
 function M.isInternetReachable()
 	_refresh_internet_reachable()
 	return _cached_internet_reachable == true
+end
+
+--- Returns whether an asynchronous internet probe has completed at least once.
+--- @return boolean True after the cached reachability result is authoritative.
+function M.hasInternetProbeResult()
+	return _has_internet_probe_result == true
 end
 
 --- Returns whether at least one VPN adapter is currently up.

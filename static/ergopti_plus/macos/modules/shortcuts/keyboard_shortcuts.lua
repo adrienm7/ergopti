@@ -237,7 +237,7 @@ end
 --- Starts the keyboard shortcuts module: loads assignments and binds all active slots.
 function M.start()
 	if _started then
-		Logger.warn(LOG, "M.start() called more than once — ignoring duplicate call.")
+		Logger.debug(LOG, "M.start() called again after menu-state synchronization; bindings already active.")
 		return
 	end
 	Logger.start(LOG, "Starting keyboard shortcuts…")

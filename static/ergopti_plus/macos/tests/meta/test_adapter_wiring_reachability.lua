@@ -152,6 +152,13 @@ helpers.describe("meta: adapter wiring reachability (F-HIGH-10)", function()
 		helpers.assert_true(#specs > 0, "failed to parse any ADAPTER_SPECS entry from core.lua source")
 	end)
 
+	helpers.it("every adapter is reachable from a production feature", function()
+		for _, spec in ipairs(specs) do
+			helpers.assert_true(spec.wired,
+				string.format("%s must be wired; do not reintroduce dormant adapter ports", spec.id))
+		end
+	end)
+
 	-- Build a lookup of adapter name -> spec entry for the "every adapter has a
 	-- spec" and "every spec has an explicit wired field" checks below.
 	local spec_by_name = {}

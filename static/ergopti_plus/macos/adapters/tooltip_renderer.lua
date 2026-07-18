@@ -85,9 +85,17 @@ function M.show(payload)
 end
 
 --- Removes the tooltip from the screen immediately.
-function M.hide()
+--- @param opts table|nil { forced?: boolean } Bypass queued-row guards when requested.
+function M.hide(opts)
 	if not _ensure_deps() then return end
-	pcall(function() _tooltip.hide() end)
+	local forced = type(opts) == "table" and opts.forced == true
+	pcall(function()
+		if forced and type(_tooltip.hide_forced) == "function" then
+			_tooltip.hide_forced()
+		else
+			_tooltip.hide()
+		end
+	end)
 end
 
 --- Returns true if the tooltip is currently visible.

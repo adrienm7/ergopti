@@ -47,6 +47,15 @@ local function _ensure_menubar()
 	return _menubar
 end
 
+--- Adopts the application's existing menubar object instead of creating a second icon.
+--- @param menubar userdata|table A live hs.menubar object.
+--- @return boolean True when the object is retained by this adapter.
+function M.adopt(menubar)
+	if not menubar then return false end
+	_menubar = menubar
+	return true
+end
+
 
 -- =========================================
 -- =========================================

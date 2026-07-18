@@ -62,9 +62,9 @@ helpers.describe("shortcuts/keyboard_shortcuts.lua: double-start guard (shortcut
 
 	helpers.it("M.start() checks _started before rebinding hotkeys", function()
 		local src = read_source("modules/shortcuts/keyboard_shortcuts.lua")
-		-- The fix adds: if _started then Logger.warn(...) return end at the top of M.start()
+		-- The fix adds: if _started then Logger.debug(...) return end at the top of M.start()
 		helpers.assert_true(
-			src:match("if _started then[^\n]*\n[^\n]*warn") ~= nil,
+			src:match("if _started then[^\n]*\n[^\n]*debug") ~= nil,
 			"keyboard_shortcuts M.start() must guard against double-start by checking _started (shortcuts-watcher-leak)")
 	end)
 

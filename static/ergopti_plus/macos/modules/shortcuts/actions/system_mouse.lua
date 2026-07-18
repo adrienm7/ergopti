@@ -21,6 +21,7 @@ local hs            = hs
 local Logger        = require("lib.logger")
 local notifications = require("lib.notifications")
 local i18n          = require("lib.i18n")
+local MouseControl  = require("adapters.mouse_control")
 
 local LOG = "shortcuts.actions.system"
 
@@ -94,10 +95,10 @@ function M.teleport_mouse()
 	if not target then target = all[1] end
 
 	local f        = target:frame()
-	local ok_move  = pcall(hs.mouse.absolutePosition, {
-		x = f.x + math.floor(f.w / 2),
-		y = f.y + math.floor(f.h / 2),
-	})
+	local ok_move = MouseControl.setPos(
+		f.x + math.floor(f.w / 2),
+		f.y + math.floor(f.h / 2)
+	)
 
 	if ok_move then
 		Logger.info(LOG, "Mouse teleported to screen '%s'.", target:name() or "unknown")

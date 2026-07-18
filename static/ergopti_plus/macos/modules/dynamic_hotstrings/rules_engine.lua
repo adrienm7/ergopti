@@ -160,10 +160,10 @@ local function register_prefix_entries()
 	if not _km then
 		-- Personal data is present but the keymap is not wired yet. This happens
 		-- when inject_data() runs BEFORE start() (the production order), so the
-		-- registration is deferred to M.start(), which calls us again once _km is
-		-- set. Surface it so a genuinely missing wiring never fails silently — the
-		-- absence of phone/SSN/IBAN prefix hotstrings used to be invisible.
-		Logger.warn(LOG, "register_prefix_entries: personal data present but keymap not wired yet — deferring to M.start().")
+		-- Registration is deferred to M.start(), which calls us again once _km is
+		-- set. This is the normal production order; M.start() verifies the keymap
+		-- was actually wired before registering any prefix expansion.
+		Logger.debug(LOG, "Personal data received before keymap wiring; prefix registration deferred to M.start().")
 		return
 	end
 	Logger.debug(LOG, "Registering prefix-based dynamic hotstrings…")

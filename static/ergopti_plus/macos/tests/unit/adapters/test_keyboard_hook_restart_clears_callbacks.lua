@@ -75,7 +75,7 @@ local function make_eventtap_stub()
 			getCharacters = function() return char end,
 			getKeyCode    = function() return 0 end,
 		}
-		_handler(event)
+		return _handler(event)
 	end
 
 	--- Fires the current handler with a synthetic non-printable key event.
@@ -87,7 +87,7 @@ local function make_eventtap_stub()
 			getCharacters = function() return "" end,
 			getKeyCode    = function() return keycode or 53 end,
 		}
-		_handler(event)
+		return _handler(event)
 	end
 
 	return stub, fire_char, fire_key
@@ -217,4 +217,26 @@ helpers.describe("KeyboardHook restart — old onKey cleared when omitted on sec
 		)
 	end)
 
+end)
+
+helpers.describe("KeyboardHook raw event mode", function()
+	helpers.it("preserves an advanced handler's event types and consume decision", function()
+		local eventtap_stub, _fire_char, fire_key = make_eventtap_stub()
+		local M = helpers.load_with_stubs("adapters.keyboard_hook", {
+			eventtap = eventtap_stub,
+		})
+
+		local received = nil
+		M.start({
+			eventTypes = { 42 },
+			onEvent = function(event)
+				received = event
+				return true
+			end,
+		})
+
+		local consumed = fire_key(42)
+		helpers.assert_true(received ~= nil, "raw callback must receive the native event")
+		helpers.assert_true(consumed == true, "raw callback must retain its consume decision")
+	end)
 end)

@@ -410,7 +410,7 @@ function M.init(core_state, log_manager, tap_hold_config, available_actions)
 	if type(tap_hold_config) == "table" and type(available_actions) == "table" then
 		build_managed_output_set(tap_hold_config, available_actions)
 	else
-		Logger.warn(LOG, "No tap_hold_config or available_actions — suppression set empty.")
+		Logger.debug(LOG, "Tap/hold configuration is deferred; suppression set starts empty.")
 	end
 
 	-- Set _file_offset to current end so we ignore stale lines from a prior session
