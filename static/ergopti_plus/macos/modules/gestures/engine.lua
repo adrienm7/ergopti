@@ -234,9 +234,9 @@ end
 --- Executes an action by trying both single and axis variants.
 --- @param action string The action ID.
 --- @param sign number The direction sign (1 for next, -1 for prev).
-local function triggerAction(action, sign)
+local function triggerAction(action, sign, slot)
 	if not action or action == "none" then return end
-	pcall(function() _actions.execute_single(action) end)
+	pcall(function() _actions.execute_single(action, slot) end)
 	pcall(function() _actions.execute_axis(action, sign > 0) end)
 end
 
@@ -323,7 +323,7 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 			Logger.info(LOG, string.format("INCREMENTAL FIRE slot=%s axis=%s sd=%.2f sensitivity=%.2f targetSteps=%d prevSteps=%d diff=%d action=%s",
 				slot, axis, sd, sensitivity, targetSteps, gs.stepsCommitted, diff, tostring(action)))
 			for _ = 1, diff do
-				triggerAction(action, sd)
+				triggerAction(action, sd, slot)
 			end
 			gs.stepsCommitted = targetSteps
 			gs.liveAxisSign   = (sd > 0) and 1 or -1
@@ -371,7 +371,7 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 	Logger.info(LOG, "x1 LIVE FIRE slot=%s axis=%s sign=%d sd=%.2f reversal=%s prevSlot=%s action=%s",
 		slot, axis, sign, sd, tostring(is_reversal), tostring(gs.liveAxisSlot), tostring(action))
 
-	triggerAction(action, sign)
+	triggerAction(action, sign, slot)
 
 	-- Rebase after each live trigger so a quick direction reversal can fire promptly.
 	gs.liveAxisSign = sign
@@ -444,7 +444,7 @@ local function commitGesture(now)
 			if slot and _state.ga[slot] then
 				Logger.info(LOG, "TAP FIRE slot=%s action=%s elapsed=%.3fs fingers=%d",
 					slot, tostring(_state.ga[slot]), elapsed, mf)
-				_actions.execute_single(_state.ga[slot])
+				_actions.execute_single(_state.ga[slot], slot)
 			else
 				Logger.debug(LOG, "commitGesture: tap not fired (slot=%s, action=%s)",
 					tostring(slot), tostring(slot and _state.ga[slot]))
@@ -505,7 +505,7 @@ local function commitGesture(now)
 		if diff > 0 then
 			Logger.info(LOG, "COMMIT INCREMENTAL FIRE slot=%s action=%s diff=%d", slot, action, diff)
 			for _ = 1, diff do
-				triggerAction(action, sd)
+				triggerAction(action, sd, slot)
 			end
 		end
 		gs.stepsCommitted = targetSteps
@@ -530,7 +530,7 @@ local function commitGesture(now)
 		if math.abs(sd) >= SWIPE_MIN then
 			Logger.info(LOG, "COMMIT X1 FIRE slot=%s action=%s sign=%d sd=%.2f (prevLiveSlot=%s prevLiveSign=%s)",
 				slot, action, sign, sd, tostring(gs.liveAxisSlot), tostring(gs.liveAxisSign))
-			triggerAction(action, sd)
+			triggerAction(action, sd, slot)
 		else
 			Logger.warn(LOG, "commitGesture x1: BELOW THRESHOLD (|sd|=%.2f < SWIPE_MIN=%.2f) — not firing slot %s",
 				math.abs(sd), SWIPE_MIN, slot)

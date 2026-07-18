@@ -204,6 +204,77 @@ TestGestures_SaveAssignmentUpdatesMap() {
 }
 Test("Gestures: GestureSaveAssignment updates map", TestGestures_SaveAssignmentUpdatesMap)
 
+TestGestures_ParameterizedActionValuesAreBindingScoped() {
+    global GestureActionParameters
+
+    if (GESTURE_ACTION_PARAMETER_SPECS.Count = 0)
+        _GestureLoadActionCatalog()
+    AssertEqual("url", GestureActionParameterSpec("open_url"), "open_url parameter metadata")
+    AssertEqual("search_url", GestureActionParameterSpec("search_web"), "search_web parameter metadata")
+
+    OriginalParameters := GestureActionParameters
+    GestureActionParameters := Map()
+    try {
+        GestureActionParameters[GestureActionParameterKey("gesture__tap_3", "open_url")] := "https://one.example"
+        GestureActionParameters[GestureActionParameterKey("tap_hold__caps_lock", "open_url")] := "https://two.example"
+        AssertEqual("https://one.example", GestureGetActionParameter("gesture__tap_3", "open_url"), "gesture URL must remain isolated")
+        AssertEqual("https://two.example", GestureGetActionParameter("tap_hold__caps_lock", "open_url"), "tap-hold URL must remain isolated")
+        AssertTrue(InStr(GestureActionDisplayLabel("open_url", "gesture__tap_3"), "https://one.example") > 0,
+            "menu label must expose the configured URL")
+        AssertTrue(GestureValidateActionParameter("open_url", "https://valid.example/path"), "valid URL")
+        AssertFalse(GestureValidateActionParameter("open_url", "not-a-url"), "invalid URL rejected")
+        AssertTrue(GestureValidateActionParameter("search_web", "https://search.example/?q=%s"), "valid search template")
+        AssertFalse(GestureValidateActionParameter("search_web", "https://search.example/?q=%s&again=%s"), "duplicate search placeholder rejected")
+		AssertEqual("notes%20%26%20caf%C3%A9%3D2", GestureUrlEncode("notes & café=2"), "query text must be UTF-8 percent encoded")
+    } finally {
+        GestureActionParameters := OriginalParameters
+    }
+}
+Test("Gestures: parameterized action values are isolated and validated", TestGestures_ParameterizedActionValuesAreBindingScoped)
+
+TestGestures_ParameterizedActionValuesPersistToUserToml() {
+    global ConfigurationFile, GestureActionParameters, _IniCache
+
+    TempConfig := A_Temp . "\ergopti_gesture_action_parameters_test.toml"
+    try FileDelete(TempConfig)
+    try FileDelete(TempConfig . ".tmp")
+    OriginalConfig := ConfigurationFile
+    OriginalParameters := GestureActionParameters
+    OriginalIniCache := _IniCache
+    ConfigurationFile := TempConfig
+    GestureActionParameters := Map()
+    try {
+        GestureSetActionParameter("gesture__tap_3", "open_url", "https://saved.example/path")
+
+        ; Exercise a real search template too: % and & must survive TOML
+        ; serialization verbatim rather than becoming a generic/global setting.
+        SearchKey := GestureActionParameterKey("keyboard__cmd_k", "search_web")
+        SearchTemplate := "https://search.example/?q=%s&source=ergopti"
+        GestureSetActionParameter("keyboard__cmd_k", "search_web", SearchTemplate)
+        Parsed := ParseTomlFile(TempConfig)
+        AssertTrue(Parsed.Has("ahk.action_parameters"), "action parameter section must be persisted")
+        Key := GestureActionParameterKey("gesture__tap_3", "open_url")
+        AssertEqual("https://saved.example/path", Parsed["ahk.action_parameters"][Key], "exact URL must round-trip through TOML")
+		AssertEqual(SearchTemplate, Parsed["ahk.action_parameters"][SearchKey], "search template must round-trip through TOML")
+
+        ; A config reload must both restore the saved value and drop stale
+        ; in-memory values that are no longer in the user TOML.
+        GestureActionParameters := Map("stale__open_url", "https://stale.example")
+        _IniCache := Parsed
+        GesturesReadConfig()
+        AssertEqual("https://saved.example/path", GestureGetActionParameter("gesture__tap_3", "open_url"), "saved parameter must reload from TOML")
+		AssertEqual(SearchTemplate, GestureGetActionParameter("keyboard__cmd_k", "search_web"), "scoped search template must reload from TOML")
+        AssertFalse(GestureActionParameters.Has("stale__open_url"), "reload must not retain stale parameter values")
+    } finally {
+        ConfigurationFile := OriginalConfig
+        GestureActionParameters := OriginalParameters
+        _IniCache := OriginalIniCache
+        try FileDelete(TempConfig)
+        try FileDelete(TempConfig . ".tmp")
+    }
+}
+Test("Gestures: parameterized action values persist to the user TOML", TestGestures_ParameterizedActionValuesPersistToUserToml)
+
 TestGestures_DefaultAssignmentsReferenceValidActions() {
     for Slot in GESTURE_SLOTS {
         ActionName := GestureAssignments[Slot]

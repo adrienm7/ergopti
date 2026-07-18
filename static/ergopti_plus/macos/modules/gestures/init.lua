@@ -160,7 +160,10 @@ local CoreState = {
 	ga             = {},
 	modes          = {},
 	sensitivities  = {},
-	space_wrap     = true
+	space_wrap     = true,
+	-- Flat binding__action → parameter map. Keeping this separate from action
+	-- assignments prevents a URL selected for one gesture leaking into another.
+	action_params  = {},
 }
 
 -- Initialize active actions with defaults
@@ -433,6 +436,11 @@ M.AX_NAMES           = Actions.AX_NAMES
 M.SG_NAMES           = Actions.SG_NAMES
 M.get_sg_names       = Actions.get_sg_names
 M.get_action_label   = Actions.get_label
+M.get_action_parameter_spec = Actions.get_action_parameter_spec
+M.validate_action_parameter = Actions.validate_action_parameter
+M.get_action_parameter = Actions.get_action_parameter
+M.set_action_parameter = Actions.set_action_parameter
+M.get_all_action_parameters = Actions.get_all_action_parameters
 M.forceCleanup       = Actions.force_cleanup
 M.toggleRightClick   = Actions.toggle_right_click
 M.triggerLookup      = Actions.trigger_lookup

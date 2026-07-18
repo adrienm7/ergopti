@@ -20,13 +20,20 @@
 
 ; Reads gesture assignments from the v2 [ahk.gestures] section.
 GesturesReadConfig() {
-    global GestureAssignments, _IniCache
+    global GestureAssignments, GestureActionParameters, _IniCache
 
     for _, Slot in GESTURE_SLOTS {
         Value := IniCacheGet(_IniCache, "ahk.gestures", Slot)
         if (Value != "_") {
             GestureAssignments[Slot] := Value
         }
+    }
+    ; Rebuild this map on every read: a reload must reflect the user TOML
+    ; exactly and must not retain a value deleted from disk in this process.
+    GestureActionParameters := Map()
+    if _IniCache.Has("ahk.action_parameters") {
+        for BindingAction, Value in _IniCache["ahk.action_parameters"]
+            GestureActionParameters[BindingAction] := Value
     }
 }
 
@@ -36,6 +43,110 @@ GestureSaveAssignment(slot, action) {
 
     GestureAssignments[slot] := action
     TOML_Write(action, ConfigurationFile, "ahk.gestures", slot)
+}
+
+; Parameters are scoped to an action binding, so one gesture, tap-hold or
+; shortcut never overwrites the configured value of another binding.
+GestureBindingId(Scope, Slot) {
+    return Scope . "__" . Slot
+}
+
+GestureActionParameterKey(BindingId, ActionName) {
+    return BindingId . "__" . ActionName
+}
+
+GestureGetActionParameter(BindingId, ActionName) {
+    global GestureActionParameters
+    Key := GestureActionParameterKey(BindingId, ActionName)
+    return GestureActionParameters.Has(Key) ? GestureActionParameters[Key] : ""
+}
+
+GestureSetActionParameter(BindingId, ActionName, Value) {
+    global GestureActionParameters, ConfigurationFile
+    Key := GestureActionParameterKey(BindingId, ActionName)
+    GestureActionParameters[Key] := Value
+    TOML_Write(Value, ConfigurationFile, "ahk.action_parameters", Key)
+}
+
+GestureActionParameterSpec(ActionName) {
+    global GESTURE_ACTION_PARAMETER_SPECS
+    return GESTURE_ACTION_PARAMETER_SPECS.Has(ActionName) ? GESTURE_ACTION_PARAMETER_SPECS[ActionName] : ""
+}
+
+GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
+    Spec := GestureActionParameterSpec(ActionName)
+    Value := Trim(Value)
+    if (Spec = "")
+        return true
+    if !RegExMatch(Value, "i)^https?://[^\s]+$") {
+        ErrorText := "Saisissez une URL http:// ou https:// valide."
+        return false
+    }
+    PlaceholderAt := InStr(Value, "%s")
+    if (Spec = "search_url" && PlaceholderAt = 0) {
+        ErrorText := "L’URL de recherche doit contenir %s à l’emplacement de la requête."
+        return false
+    }
+    if (Spec = "search_url" && InStr(Value, "%s",, PlaceholderAt + 2) != 0) {
+        ErrorText := "L’URL de recherche doit contenir un seul emplacement %s."
+        return false
+    }
+    return true
+}
+
+; The native dialog is mandatory for every parameterized action assignment.
+; Cancel keeps the existing assignment unchanged.
+GestureEnsureActionParameter(BindingId, ActionName) {
+    Spec := GestureActionParameterSpec(ActionName)
+    if (Spec = "")
+        return true
+    Existing := GestureGetActionParameter(BindingId, ActionName)
+    Prompt := (Spec = "search_url")
+        ? "URL du moteur de recherche (incluez exactement un %s pour la requête) :"
+        : "Lien à ouvrir :"
+    loop {
+        Result := InputBox(Prompt, "Configurer " . _GestureActionLabel(ActionName), "w680 h160", Existing)
+        if (Result.Result != "OK")
+            return false
+        Value := Trim(Result.Value)
+        ErrorText := ""
+        if GestureValidateActionParameter(ActionName, Value, &ErrorText) {
+            GestureSetActionParameter(BindingId, ActionName, Value)
+            return true
+        }
+        MsgBox(ErrorText, "Valeur invalide", "Icon!")
+        Existing := Value
+    }
+}
+
+GestureActionDisplayLabel(ActionName, BindingId := "") {
+    Label := _GestureActionLabel(ActionName)
+    if (BindingId = "")
+        return Label
+    Value := GestureGetActionParameter(BindingId, ActionName)
+    return (Value != "") ? Label . " (" . Value . ")" : Label
+}
+
+; Preserve the zero-argument contract for ordinary actions (including user
+; extensions) while passing binding context only to actions that declare it.
+GestureInvokeAction(ActionName, BindingId := "") {
+    global GESTURE_ACTIONS
+    if !GESTURE_ACTIONS.Has(ActionName)
+        return
+    Fn := GESTURE_ACTIONS[ActionName].Fn
+    if (GestureActionParameterSpec(ActionName) != "")
+        return Fn.Call(BindingId)
+    return Fn.Call()
+}
+
+GestureSaveAllAssignments(ActionNameBySlot) {
+    global GestureAssignments, ConfigurationFile
+    Updates := []
+    for Slot, ActionName in ActionNameBySlot {
+        GestureAssignments[Slot] := ActionName
+        Updates.Push({ Section: "ahk.gestures", Key: Slot, Value: ActionName })
+    }
+    return TOML_BatchWrite(ConfigurationFile, Updates)
 }
 
 ; Writes a single REG_DWORD value via RegistryLib, counting failures.

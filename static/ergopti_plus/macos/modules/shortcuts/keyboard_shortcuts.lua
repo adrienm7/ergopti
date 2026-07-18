@@ -140,7 +140,7 @@ local function bind_slot(slot_id, action_id)
 	end
 	local ok, hk = pcall(hs.hotkey.bind, mods, key, function()
 		Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", slot_id, action_id)
-		pcall(GestActions.execute_single, action_id)
+		pcall(GestActions.execute_single, action_id, "keyboard__" .. slot_id)
 	end)
 	if ok and hk then
 		_hotkeys[slot_id] = hk

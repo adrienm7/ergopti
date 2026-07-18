@@ -129,6 +129,18 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			if type(gestures.set_action) == "function" then try("gestures.set_action", gestures.set_action, slot, action) end
 		end
 	end
+	if gestures and type(saved.gesture_action_parameters) == "table"
+		and type(gestures.set_action_parameter) == "function" then
+		for key, value in pairs(saved.gesture_action_parameters) do
+			local binding, action
+			if type(gestures.split_action_parameter_key) == "function" then
+				binding, action = gestures.split_action_parameter_key(key)
+			end
+			if binding and action then
+				try("gestures.set_action_parameter", gestures.set_action_parameter, binding, action, value)
+			end
+		end
+	end
 	if gestures and type(gestures.apply_all_overrides) == "function" then try("gestures.apply_all_overrides", gestures.apply_all_overrides) end
 
 	-- Sync keymap options

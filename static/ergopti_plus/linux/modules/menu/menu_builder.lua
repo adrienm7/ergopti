@@ -32,6 +32,25 @@ local LOG = "modules.menu.menu_builder"
 -- Single source of the driver version.
 local Version = require("lib.version")
 
+local function shell_quote(value)
+	return "'" .. tostring(value or ""):gsub("'", "'\\''") .. "'"
+end
+
+local function gesture_slot_label(slot)
+	local fingers, direction = tostring(slot):match("^swipe_(%d+)_(.+)$")
+	if fingers and direction then
+		local directions = {
+			left = "gauche", right = "droite", up = "haut", down = "bas",
+			up_left = "haut-gauche", up_right = "haut-droite",
+			down_left = "bas-gauche", down_right = "bas-droite",
+		}
+		return "Balayage " .. fingers .. " doigts vers " .. (directions[direction] or direction)
+	end
+	local tap_fingers = tostring(slot):match("^tap_(%d+)$")
+	if tap_fingers then return "Tap " .. tap_fingers .. " doigts" end
+	return tostring(slot)
+end
+
 
 -- =========================================
 -- =========================================
@@ -363,39 +382,70 @@ local function _build_gestures(ctx)
 		end,
 	}
 	items[#items + 1] = { title = "-" }
-
-	-- Show a subset of commonly-configured gesture slots.
-	local quick_slots = {
-		{ slot = "swipe_3_left",  label = "← 3 doigts gauche" },
-		{ slot = "swipe_3_right", label = "→ 3 doigts droite" },
-		{ slot = "swipe_3_up",    label = "↑ 3 doigts haut" },
-		{ slot = "swipe_3_down",  label = "↓ 3 doigts bas" },
-		{ slot = "swipe_4_left",  label = "← 4 doigts gauche" },
-		{ slot = "swipe_4_right", label = "→ 4 doigts droite" },
-		{ slot = "tap_3",         label = "👆 Tap 3 doigts" },
-		{ slot = "tap_4",         label = "👆 Tap 4 doigts" },
+	items[#items + 1] = {
+		title = "Réinitialiser les actions par défaut",
+		fn = function() ge.reset_defaults() end,
 	}
+	items[#items + 1] = {
+		title = "Tout mettre à vide",
+		fn = function() if ge.disable_all_actions then ge.disable_all_actions() end end,
+	}
+	items[#items + 1] = { title = "-" }
 
-	for _, qs in ipairs(quick_slots) do
-		local action = ge.get_action(qs.slot) or "none"
-		local label = ge.get_action_label(action)
+	local function prompt_parameter(slot, action, spec, prior)
+		if type(ctx.prompt_action_parameter) == "function" then
+			return ctx.prompt_action_parameter(slot, action, spec, prior)
+		end
+		local prompt = spec == "search_url"
+			and "URL de recherche (un seul %s pour la requête) :"
+			or "Lien à ouvrir :"
+		local command = "zenity --entry --title=" .. shell_quote("Configurer " .. (ge.get_action_label(action) or action))
+			.. " --text=" .. shell_quote(prompt) .. " --entry-text=" .. shell_quote(prior or "") .. " 2>/dev/null"
+		local pipe = io.popen(command, "r")
+		if not pipe then
+			Logger.error(LOG, "Zenity is unavailable: cannot configure %s for %s.", tostring(action), tostring(slot))
+			return nil
+		end
+		local value = pipe:read("*a") or ""
+		local ok = pipe:close()
+		if not ok then return nil end
+		return value:gsub("%s+$", "")
+	end
+
+	local function assign_action(slot, action)
+		local spec = ge.get_action_parameter_spec and ge.get_action_parameter_spec(action) or nil
+		if spec then
+			local prior = ge.get_action_parameter and ge.get_action_parameter(slot, action) or ""
+			local value = prompt_parameter(slot, action, spec, prior)
+			if value == nil then return end
+			if not ge.validate_action_parameter or not ge.validate_action_parameter(action, value) then
+				Logger.warn(LOG, "Invalid parameter for gesture '%s' action '%s'.", tostring(slot), tostring(action))
+				return
+			end
+			if not ge.set_action_parameter(slot, action, value) then return end
+		end
+		ge.set_action(slot, action)
+	end
+
+	-- Every known slot is configurable here. A partial quick list made
+	-- parameterized actions unreachable for the omitted gesture bindings.
+	local slots = {}
+	for slot in pairs(ge.DEFAULT_GESTURES or {}) do slots[#slots + 1] = slot end
+	table.sort(slots)
+	for _, slot in ipairs(slots) do
+		local action = ge.get_action(slot) or "none"
+		local label = ge.get_action_display_label and ge.get_action_display_label(slot) or ge.get_action_label(action)
+		local choices = {}
+		for _, option in ipairs(ge.get_action_names and ge.get_action_names() or { "none" }) do
+			local selected = option == action
+			choices[#choices + 1] = {
+				title = ge.get_action_label(option) .. (selected and " ✓" or ""),
+				fn = function() assign_action(slot, option) end,
+			}
+		end
 		items[#items + 1] = {
-			title = qs.label .. " → " .. label,
-			fn = function()
-				-- Cycle through common actions for this slot.
-				local cur = ge.get_action(qs.slot) or "none"
-				local cycle = { "none", "ws_prev", "ws_next", "tab_prev", "tab_next", "vol_up", "vol_down" }
-				local found = false
-				for i, a in ipairs(cycle) do
-					if a == cur then
-						local next_a = cycle[i % #cycle + 1]
-						ge.set_action(qs.slot, next_a)
-						found = true
-						break
-					end
-				end
-				if not found then ge.set_action(qs.slot, "none") end
-			end,
+			title = gesture_slot_label(slot) .. " → " .. label,
+			menu = choices,
 		}
 	end
 
@@ -410,15 +460,6 @@ local function _build_gestures(ctx)
 			else
 				ge.start_reading()
 			end
-		end,
-	}
-
-	-- Reset to defaults.
-	items[#items + 1] = {
-		title = "Réinitialiser les gestes",
-		fn = function()
-			ge.reset_defaults()
-			Logger.info(LOG, "Gestures reset to defaults.")
 		end,
 	}
 

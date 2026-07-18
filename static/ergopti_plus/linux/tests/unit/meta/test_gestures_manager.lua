@@ -7,6 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local TomlCodec = require("toml_codec")
 
 helpers.describe("modules/gestures/manager.lua", function()
 
@@ -124,6 +125,60 @@ helpers.describe("modules/gestures/manager.lua", function()
     M.reset_defaults()
     helpers.assert_eq(M.get_action("swipe_3_left"), "ws_prev")
   end)
+
+  helpers.it("keeps parameterized action values isolated per gesture binding", function()
+    helpers.assert_eq(M.get_action_parameter_spec("open_url"), "url")
+    helpers.assert_eq(M.get_action_parameter_spec("search_web"), "search_url")
+    helpers.assert_true(M.set_action_parameter("tap_3", "open_url", "https://one.example/path"))
+    helpers.assert_true(M.set_action_parameter("swipe_3_left", "open_url", "https://two.example/path"))
+		helpers.assert_eq(M.get_action_parameter("tap_3", "open_url"), "https://one.example/path")
+		helpers.assert_eq(M.get_action_parameter("swipe_3_left", "open_url"), "https://two.example/path")
+		local binding, action = M.split_action_parameter_key("keyboard__cmd_k__search_web")
+		helpers.assert_eq(binding, "keyboard__cmd_k", "scoped bindings must not be split at their first separator")
+		helpers.assert_eq(action, "search_web")
+		helpers.assert_eq(M.set_action_parameter("tap_3", "open_url", "not-a-url"), false)
+    helpers.assert_true(M.set_action_parameter("tap_3", "search_web", "https://search.example/?q=%s"))
+    helpers.assert_eq(M.set_action_parameter("tap_3", "search_web", "https://search.example/?q=%s&again=%s"), false)
+  end)
+
+	helpers.it("disable_all_actions clears every binding but not the master toggle", function()
+		M.enable()
+		M.disable_all_actions()
+    for slot in pairs(M.DEFAULT_GESTURES) do
+      helpers.assert_eq(M.get_action(slot), "none", "slot should be empty: " .. slot)
+    end
+    helpers.assert_true(M.is_enabled(), "clearing actions must not disable the gesture feature")
+		M.reset_defaults()
+		M.disable()
+	end)
+
+	helpers.it("persists parameters and assignments in the user TOML", function()
+		local tmp = os.tmpname()
+		pcall(os.remove, tmp)
+		local fh = io.open(tmp, "w")
+		helpers.assert_true(fh ~= nil, "must create a temporary user TOML")
+		fh:write("[linux.gestures]\n")
+		fh:write("tap_3 = \"none\"\n\n")
+		fh:write("[linux.action_parameters]\n")
+		fh:write("tap_3__open_url = \"https://restored.example\"\n")
+		fh:close()
+
+		M.init({ persist = true, config_path = tmp })
+		helpers.assert_eq(M.get_action("tap_3"), "none")
+		helpers.assert_eq(M.get_action_parameter("tap_3", "open_url"), "https://restored.example")
+		helpers.assert_true(M.set_action_parameter("tap_3", "open_url", "https://saved.example/path"))
+		M.set_action("tap_3", "open_url")
+
+		local out = io.open(tmp, "r")
+		helpers.assert_true(out ~= nil, "the user TOML must be writable")
+		local decoded = TomlCodec.decode(out:read("*a"))
+		out:close()
+		helpers.assert_eq(decoded.linux.gestures.tap_3, "open_url")
+		helpers.assert_eq(decoded.linux.action_parameters.tap_3__open_url, "https://saved.example/path")
+		M.reset_defaults()
+		pcall(os.remove, tmp)
+		M.init({ persist = false })
+	end)
 
   -- ==========================================================================
   -- 5. Action labels

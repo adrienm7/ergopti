@@ -269,7 +269,7 @@ GestureDispatch(slot) {
     }
 
     try {
-        GESTURE_ACTIONS[ActionName].Fn()
+		GestureInvokeAction(ActionName, GestureBindingId("gesture", slot))
         LoggerInfo("gestures", "Gesture {1} dispatched successfully.", slot)
     } catch as e {
         try LoggerError("gestures", "Gesture {1} action '{2}' threw: {3}.", slot, ActionName, e.Message)

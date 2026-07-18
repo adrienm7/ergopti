@@ -351,7 +351,7 @@ _TapHoldInvokeConfiguredAction(KeyId) {
 		return
 	}
 	try LoggerDebug("TapHoldDispatch", "Dispatching tap action '{1}' for '{2}'.", ActionId, KeyId)
-	GESTURE_ACTIONS[ActionId].Fn.Call()
+	GestureInvokeAction(ActionId, GestureBindingId("tap_hold", KeyId))
 }
 
 ; Fire the configured generic tap action through the shared gate.
