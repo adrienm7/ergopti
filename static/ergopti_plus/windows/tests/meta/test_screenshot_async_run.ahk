@@ -76,10 +76,9 @@ Test("Screenshot hotkey: async Run() used in SC029 block (screenshot-async-run)"
 ; F-H07: GestureCaptureRegion (window/fullscreen capture) used RunWait, blocking the
 ; keyboard hook thread for the whole PowerShell capture (~300-1500 ms) on every such
 ; screenshot gesture — the SC029 fix missed it. It must now use async Run. (The region
-; save GestureScreenshotRegion deliberately stays synchronous: it runs AFTER the user
-; finishes snipping — when they are not typing — and a synchronous RunWait is required so
-; its finally restores the clipboard before A_Clipboard is reused; that invariant is
-; guarded by test_screenshot_region_clipwait_clobber.ahk.)
+; Region saving used to be deliberately synchronous, but that blocked the hook thread for
+; up to the 30-second Snipping Tool selection plus a PowerShell process.  Its transaction
+; is now timer-driven; the hotkey must never contain either a long ClipWait or RunWait.
 _SAR_GestureCaptureNoRunWait() {
 	Body := _DriverFuncBody("GestureCaptureRegion")
 	Assert(Body != "", "GestureCaptureRegion(X,Y,W,H,Mode,Path) must exist")
@@ -89,3 +88,13 @@ _SAR_GestureCaptureNoRunWait() {
 		"GestureCaptureRegion must launch the capture via async Run()")
 }
 Test("Gesture screenshot: GestureCaptureRegion uses async Run, not RunWait (gesture-capture-async-run)", _SAR_GestureCaptureNoRunWait)
+
+_SAR_RegionCaptureNoBlockingWait() {
+        Body := _DriverFuncBody("GestureScreenshotRegion")
+        Assert(Body != "", "GestureScreenshotRegion(Mode) must exist")
+        Assert(InStr(Body, "RunWait") = 0, "region screenshot hotkey must not wait for PowerShell")
+        Assert(InStr(Body, "ClipWait(30") = 0, "region screenshot hotkey must not wait up to 30 seconds for user selection")
+        Assert(InStr(Body, "SetTimer(GestureRegionCapturePoll.Bind(Epoch)") > 0,
+                "region screenshot must hand selection tracking to an epoch-bound timer")
+}
+Test("Gesture screenshot: region save defers selection and PowerShell (gesture-region-async)", _SAR_RegionCaptureNoBlockingWait)
