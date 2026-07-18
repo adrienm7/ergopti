@@ -309,7 +309,7 @@ jobs:
               -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
           Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "C:\AutoHotkey" -Force
 
-      - name: Verify AHK source encoding (UTF-8 BOM + CRLF)
+      - name: Verify AHK source encoding (UTF-8 BOM + LF)
         # AHK v2 silently aborts mid-file on encoding drift — catch it
         # before it causes silent test failures with no error message.
         shell: pwsh
@@ -327,8 +327,8 @@ jobs:
               }
               $content = [System.IO.File]::ReadAllText(
                   $file.FullName, [System.Text.Encoding]::UTF8)
-              if (($content -replace "`r`n", "") -match "`n") {
-                  $failures += "BARE LF : $($file.FullName)"
+              if ($content -match "`r") {
+                  $failures += "CR BYTE : $($file.FullName)"
               }
           }
           if ($failures.Count -gt 0) {
@@ -494,10 +494,10 @@ jobs:
               Write-Error "run_e2e.ahk is missing UTF-8 BOM."; exit 1
           }
           $content = [System.IO.File]::ReadAllText($file, [System.Text.Encoding]::UTF8)
-          if (($content -replace "`r`n", "") -match "`n") {
-              Write-Error "run_e2e.ahk contains bare LF line endings."; exit 1
+          if ($content -match "`r") {
+              Write-Error "run_e2e.ahk contains CR line endings."; exit 1
           }
-          Write-Host "Encoding OK: UTF-8 BOM + CRLF."
+          Write-Host "Encoding OK: UTF-8 BOM + LF."
 
       - name: Build features manifest
         shell: pwsh

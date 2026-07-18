@@ -1,5 +1,5 @@
 // scripts/fix-ahk-encoding.cjs
-// One-time utility to add missing UTF-8 BOM and normalize CRLF on all .ahk files.
+// One-time utility to add missing UTF-8 BOM and normalize LF on all .ahk files.
 
 'use strict';
 
@@ -24,7 +24,7 @@ function collectAhkFiles(dir, results = []) {
 }
 
 let fixedBom = 0;
-let fixedCrlf = 0;
+let fixedLf = 0;
 let alreadyOk = 0;
 
 const files = collectAhkFiles(PROJECT_ROOT);
@@ -46,11 +46,11 @@ for (const filePath of files) {
 	const contentStart = hasBom ? 3 : 0; // after we already prepended BOM above, offset is 3
 	// Since we may have prepended BOM, re-derive: BOM is always first 3 bytes now
 	const content = data.slice(3).toString('binary');
-	const normalized = content.replace(/\r?\n/g, '\r\n');
+	const normalized = content.replace(/\r\n?/g, '\n');
 	if (normalized !== content) {
 		data = Buffer.concat([data.slice(0, 3), Buffer.from(normalized, 'binary')]);
 		changed = true;
-		fixedCrlf++;
+		fixedLf++;
 	}
 
 	if (changed) {
@@ -58,7 +58,7 @@ for (const filePath of files) {
 		const rel = path.relative(PROJECT_ROOT, filePath).replace(/\\/g, '/');
 		const tags = [];
 		if (!hasBom) tags.push('BOM added');
-		if (normalized !== content) tags.push('CRLF normalized');
+		if (normalized !== content) tags.push('LF normalized');
 		console.log(`  FIXED [${tags.join(', ')}]: ${rel}`);
 	} else {
 		alreadyOk++;
@@ -67,5 +67,5 @@ for (const filePath of files) {
 
 console.log('');
 console.log(
-	`Done. ${fixedBom} file(s) got BOM, ${fixedCrlf} file(s) got CRLF normalization, ${alreadyOk} already OK.`
+	`Done. ${fixedBom} file(s) got BOM, ${fixedLf} file(s) got LF normalization, ${alreadyOk} already OK.`
 );

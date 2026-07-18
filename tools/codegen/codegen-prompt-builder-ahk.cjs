@@ -361,7 +361,7 @@ function buildAhkSource() {
  */
 function writeWithBomCrlf(outPath, content) {
 	const BOM = Buffer.from([0xef, 0xbb, 0xbf]);
-	const normalized = content.replace(/\r?\n/g, '\r\n');
+	const normalized = content.replace(/\r\n?/g, '\n');
 	const body = Buffer.from(normalized, 'utf8');
 	const out = Buffer.concat([BOM, body]);
 	fs.mkdirSync(path.dirname(outPath), { recursive: true });

@@ -1312,7 +1312,7 @@ PROC HELLO:
       dBOX:(" ","Hello World"," ","continue",13)
     ELSEIF M%=%i
       REM Display copyright information ;-)
-      dBOX:("Info","(C) Klaus Müller 0196","FrankfurtMain, Germany","",13)
+      dBOX:("Info","(C) Klaus Mï¿½ller 0196","FrankfurtMain, Germany","",13)
     ENDIF
   UNTIL M%=%x
 ENDP

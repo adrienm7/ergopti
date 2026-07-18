@@ -1,4 +1,4 @@
-﻿---
+﻿﻿---
 title: "Projet – Modélisation GLM avec R"
 author: "Adrien Moyaux & Jonathan Munier"
 date: "Dimanche 5 juin 2022"

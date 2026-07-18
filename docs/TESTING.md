@@ -69,10 +69,8 @@ RUN="static/ergopti_plus/windows/tests/run_all.ahk"
   to stderr by `/ErrorStdOut` instead of popping a modal — use `--dry-run` first.
 - Output is TAP (`1..N`, `ok`/`not ok`). Search the output for `not ok` to find
   the failing assertion.
-- **Encoding foot-gun:** AHK v2 silently aborts mid-file on LF-only / missing-BOM
-  files, which shows up as fewer tests registered than expected. Always run
-  `npm run test:ahk-encoding` after editing any `.ahk`. Never write `.ahk` with
-  `cat >>`; keep test files ASCII-only and use `Chr(0xNNNN)` for non-ASCII glyphs.
+- **Encoding rule:** all repository text uses LF. `.ahk` files additionally require
+  a UTF-8 BOM. Always run `npm run test:ahk-encoding` after editing any `.ahk`.
 
 ---
 

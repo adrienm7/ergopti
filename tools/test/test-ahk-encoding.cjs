@@ -5,12 +5,12 @@
  * MODULE: AHK Encoding Guard
  * DESCRIPTION:
  * Validates that every .ahk file under static/ergopti_plus/windows/ is encoded
- * as UTF-8 with BOM and uses CRLF line endings.
+ * as UTF-8 with BOM and uses LF line endings.
  *
  * FEATURES & RATIONALE:
  * 1. BOM check: AHK v2 silently aborts mid-file when the UTF-8 BOM is absent.
- * 2. CRLF check: A bare LF in the source causes the parser to silently stop
- *    processing at the affected line, producing invisible test failures.
+ * 2. LF check: CR bytes are rejected so every source uses one line-ending
+ *    convention and no mixed-line-ending parser edge case can hide tests.
  * 3. Vendor exclusion: Third-party files under vendor/ are not maintained by
  *    this project and are excluded from the invariant.
  * ==============================================================================
@@ -81,13 +81,13 @@ function hasBom(buf) {
 }
 
 /**
- * Checks whether a file contains bare LF bytes (0x0A not preceded by CR 0x0D).
+ * Checks whether a file contains any CR byte (0x0D).
  * @param {Buffer} buf - Raw file contents.
- * @returns {boolean} True if at least one bare LF is found.
+ * @returns {boolean} True if at least one CR byte is found.
  */
-function hasBareLf(buf) {
+function hasCr(buf) {
 	for (let i = 0; i < buf.length; i++) {
-		if (buf[i] === 0x0a && (i === 0 || buf[i - 1] !== 0x0d)) {
+		if (buf[i] === 0x0d) {
 			return true;
 		}
 	}
@@ -129,8 +129,8 @@ function run() {
 			continue;
 		}
 
-		if (hasBareLf(buf)) {
-			violations.push(`  BARE LF      : ${rel}`);
+		if (hasCr(buf)) {
+			violations.push(`  CR BYTE      : ${rel}`);
 		}
 	}
 
@@ -143,13 +143,13 @@ function run() {
 		for (const v of violations) {
 			console.error(v);
 		}
-		console.error('\nAll .ahk source files must be UTF-8 with BOM and CRLF line endings.');
+		console.error('\nAll .ahk source files must be UTF-8 with BOM and LF line endings.');
 		console.error("To fix: open the file in VS Code, set encoding to 'UTF-8 with BOM' and");
-		console.error('line endings to CRLF, then save.\n');
+		console.error('line endings to LF, then save.\n');
 		process.exit(1);
 	}
 
-	console.log(`\nEncoding check passed — ${total} .ahk file(s) verified (UTF-8 BOM + CRLF).\n`);
+	console.log(`\nEncoding check passed — ${total} .ahk file(s) verified (UTF-8 BOM + LF).\n`);
 	process.exit(0);
 }
 
