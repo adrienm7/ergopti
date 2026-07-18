@@ -65,11 +65,59 @@ end)
 
 
 
--- ====================================================================================
+-- ========================================================================================
+-- ========================================================================================
+-- ======= 2/ Parameterized gesture values round-trip through user TOML ====================
+-- ========================================================================================
+-- ========================================================================================
+
+helpers.describe("preferences — parameterized gesture action TOML round-trip", function()
+
+	helpers.it("loads [gestures.action_parameters] without confusing values for action slots", function()
+		local tmp = os.tmpname()
+		pcall(os.remove, tmp)
+		local fh = io.open(tmp, "w")
+		helpers.assert_true(fh ~= nil, "must be able to write a temporary TOML file")
+		fh:write("[gestures]\ntap_3 = \"open_url\"\n\n")
+		fh:write("[gestures.action_parameters]\n")
+		fh:write("tap_3__open_url = \"https://saved.example/path\"\n")
+		fh:close()
+
+		local Prefs = helpers.load_with_stubs("ui.menu.preferences")
+		local flat = Prefs.load(tmp)
+		pcall(os.remove, tmp)
+
+		helpers.assert_eq(flat.gesture_actions.tap_3, "open_url")
+		helpers.assert_eq(flat.gesture_action_parameters.tap_3__open_url, "https://saved.example/path")
+		helpers.assert_true(flat.gesture_actions.action_parameters == nil,
+			"the parameter table must never be treated as a gesture action slot")
+
+		local fake_gestures = {
+			get_all_actions = function() return { tap_3 = "open_url" } end,
+			get_all_modes = function() return {} end,
+			get_all_sensitivities = function() return {} end,
+			get_all_action_parameters = function() return {
+				tap_3__open_url = "https://saved.example/path",
+			} end,
+			get_space_wrap = function() return true end,
+		}
+		Prefs.save(tmp, { hotstrings = {} }, {}, { gestures = fake_gestures })
+		local written = Prefs.load(tmp)
+		pcall(os.remove, tmp)
+		helpers.assert_eq(written.gesture_actions.tap_3, "open_url")
+		helpers.assert_eq(written.gesture_action_parameters.tap_3__open_url, "https://saved.example/path")
+	end)
+
+end)
+
+
+
+
+
+
+
+-- ======= 3/ save() uses explicit if/else for get_space_wrap (ui-menu-core-2) =======
 -- ===================================================================================
--- ======= 2/ save() uses explicit if/else for get_space_wrap (ui-menu-core-2) =======
--- ===================================================================================
--- ====================================================================================
 
 helpers.describe("preferences.save — gesture_space_wrap nil-vs-false guard (ui-menu-core-2 regression)", function()
 

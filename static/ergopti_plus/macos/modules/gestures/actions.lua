@@ -61,6 +61,18 @@ local function postKeyStroke(mods, key)
 	pcall(function() hs.eventtap.keyStroke(mods, key, 0) end)
 end
 
+local function url_encode_query(value)
+	value = tostring(value or "")
+	return (value:gsub("[^%w%-%._~]", function(char)
+		return string.format("%%%02X", string.byte(char))
+	end))
+end
+
+local function open_url(url)
+	if type(url) ~= "string" or url == "" then return end
+	pcall(function() hs.urlevent.openURL(url) end)
+end
+
 
 
 
@@ -394,6 +406,27 @@ sg("open_error_log",                   function()
 	hs.timer.doAfter(0, function() pcall(hs.execute, string.format("open %q", path)) end)
 end)
 
+-- Parameterized actions read their value from the binding that invoked them.
+-- They intentionally do not use a global fallback: every gesture/shortcut keeps
+-- the exact URL selected by the user in its own configuration entry.
+sg("open_url", function(binding)
+	local url = M.get_action_parameter(binding, "open_url")
+	if M.validate_action_parameter("open_url", url) then open_url(url) end
+end)
+sg("search_web", function(binding)
+	local template = M.get_action_parameter(binding, "search_web")
+	if not M.validate_action_parameter("search_web", template) then return end
+	local old_clipboard = hs.pasteboard and hs.pasteboard.getContents and hs.pasteboard.getContents() or nil
+	pcall(hs.eventtap.keyStroke, {"cmd"}, "c")
+	hs.timer.doAfter(0.08, function()
+		local selected = hs.pasteboard and hs.pasteboard.getContents and hs.pasteboard.getContents() or ""
+		if old_clipboard ~= nil and hs.pasteboard and hs.pasteboard.setContents then
+			pcall(hs.pasteboard.setContents, old_clipboard)
+		end
+		open_url((template:gsub("%%s", url_encode_query(selected))))
+	end)
+end)
+
 -- Script management
 sg("script_pause_toggle",     function()
 	local ok, sc = pcall(require, "modules.shortcuts.script_control")
@@ -692,6 +725,58 @@ end
 
 local _shared = load_shared_actions(_shared_toml)
 
+local function parameter_key(binding, action)
+	return tostring(binding or "") .. "__" .. tostring(action or "")
+end
+
+--- Split only on a recognised parameterized-action suffix. A binding itself
+--- may contain ``__`` (for example keyboard__cmd_k), so splitting at the
+--- first delimiter would restore the parameter under the wrong binding.
+function M.split_action_parameter_key(key)
+	if type(key) ~= "string" then return nil, nil end
+	for action, meta in pairs((_shared and _shared.sg_actions) or {}) do
+		if type(meta) == "table" and type(meta.parameter) == "string" then
+			local suffix = "__" .. action
+			if key:sub(-#suffix) == suffix then return key:sub(1, #key - #suffix), action end
+		end
+	end
+	return nil, nil
+end
+
+function M.get_action_parameter_spec(action)
+	local meta = _shared and _shared.sg_actions and _shared.sg_actions[action]
+	return meta and meta.parameter or nil
+end
+
+function M.validate_action_parameter(action, value)
+	local spec = M.get_action_parameter_spec(action)
+	if not spec then return true end
+	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
+	if spec == "search_url" then
+		local _, placeholders = value:gsub("%%s", "")
+		return placeholders == 1
+	end
+	return true
+end
+
+function M.get_action_parameter(binding, action)
+	if not _state or type(_state.action_params) ~= "table" then return "" end
+	return _state.action_params[parameter_key(binding, action)] or ""
+end
+
+function M.set_action_parameter(binding, action, value)
+	if not _state or not M.validate_action_parameter(action, value) then return false end
+	_state.action_params = _state.action_params or {}
+	_state.action_params[parameter_key(binding, action)] = value
+	return true
+end
+
+function M.get_all_action_parameters()
+	local out = {}
+	for key, value in pairs((_state and _state.action_params) or {}) do out[key] = value end
+	return out
+end
+
 -- Labels for modifier-key actions are intentionally kept outside i18n: the
 -- shared catalogue defines their exact, language-neutral display form (for
 -- example "Ctrl + A") for every driver.
@@ -897,7 +982,7 @@ function M.get_label(name)
 	return name
 end
 
-function M.execute_single(name)
+function M.execute_single(name, binding)
 	local s = SG[name]
 	if not s or type(s.fn) ~= "function" then return end
 	-- Any tap action (other than the click-toggle itself) must deactivate a held click
@@ -908,7 +993,7 @@ function M.execute_single(name)
 	-- Logger.pcall (not a bare pcall) so a throwing action leaves a trace: with
 	-- ~150+ registered closures dispatched here, a caught-then-dropped exception
 	-- would otherwise be completely invisible in the logs (gestures-actions-silent-pcall).
-	Logger.pcall(LOG, s.fn)
+	Logger.pcall(LOG, s.fn, binding)
 end
 
 function M.execute_axis(name, goNext)

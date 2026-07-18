@@ -393,6 +393,24 @@ function M.batch_write(path, updates)
 		return false, tostring(err2)
 	end
 	local ok_mv = os.rename(tmp_w, path)
+	-- POSIX replaces an existing destination atomically. Windows' C runtime does
+	-- not, which made a perfectly valid existing user config silently refuse all
+	-- updates when the Linux driver test/runtime was hosted there. Keep the old
+	-- file as a recoverable sibling while replacing it, then restore it if the
+	-- second move fails.
+	if not ok_mv and package.config:sub(1, 1) == "\\" then
+		local backup = path .. ".bak"
+		pcall(os.remove, backup)
+		local backed_up = os.rename(path, backup)
+		if backed_up then
+			ok_mv = os.rename(tmp_w, path)
+			if ok_mv then
+				pcall(os.remove, backup)
+			else
+				pcall(os.rename, backup, path)
+			end
+		end
+	end
 	if not ok_mv then
 		Logger.error(LOG, "batch_write: rename '%s' → '%s' failed.", tmp_w, path)
 		pcall(os.remove, tmp_w)

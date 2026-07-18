@@ -463,11 +463,13 @@ RunScriptShortcutAction(Slot) {
         SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
         return
     }
-    GESTURE_ACTIONS[Action].Fn.Call()
+    GestureInvokeAction(Action, GestureBindingId("script", Slot))
 }
 
 SetScriptShortcutAction(Slot, ActionName) {
     global ScriptShortcutAssignments, ConfigurationFile
+    if !GestureEnsureActionParameter(GestureBindingId("script", Slot), ActionName)
+        return
     ScriptShortcutAssignments[Slot] := ActionName
     TOML_Write(ActionName, ConfigurationFile, "ahk.shortcuts.script_control", Slot)
     Reload
@@ -478,7 +480,7 @@ BuildScriptShortcutsMenu() {
     SMenu := Menu()
     for Slot in SCRIPT_SHORTCUT_SLOTS {
         Current := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
-        CurrentLabel := GESTURE_ACTIONS.Has(Current) ? _GestureActionLabel(Current) : t("dialog.action_picker.disabled")
+        CurrentLabel := GESTURE_ACTIONS.Has(Current) ? GestureActionDisplayLabel(Current, GestureBindingId("script", Slot)) : t("dialog.action_picker.disabled")
         SlotLabel := t(SCRIPT_SHORTCUT_LABELS[Slot])
         RegisterMenuItem(SMenu, SlotLabel . " : " . CurrentLabel, ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id)))(Slot, SlotLabel))
     }
@@ -523,11 +525,13 @@ RunKeyboardShortcutAction(SlotId) {
     Action := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
     if (Action == "none" or !GESTURE_ACTIONS.Has(Action))
         return
-    GESTURE_ACTIONS[Action].Fn.Call()
+    GestureInvokeAction(Action, GestureBindingId("keyboard", SlotId))
 }
 
 SetKeyboardShortcutAction(SlotId, ActionName) {
     global KeyboardShortcutAssignments, ConfigurationFile
+    if !GestureEnsureActionParameter(GestureBindingId("keyboard", SlotId), ActionName)
+        return
     KeyboardShortcutAssignments[SlotId] := ActionName
     TOML_Write(ActionName, ConfigurationFile, "ahk.shortcuts.keyboard", SlotId)
     Reload
@@ -577,7 +581,7 @@ InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
             }
             if !IsExactPrefix or (Action == "none")
                 continue
-            ActionLabel := GESTURE_ACTIONS.Has(Action) ? _GestureActionLabel(Action) : Action
+            ActionLabel := GESTURE_ACTIONS.Has(Action) ? GestureActionDisplayLabel(Action, GestureBindingId("keyboard", Slot)) : Action
             RegisterMenuItem(GMenu, _FormatSlotLabel(Slot) . " : " . ActionLabel, ((_s) => (*) => ShowKeyboardShortcutPicker(_s))(Slot))
         }
         RegisterMenuItem(GMenu, AddLabel, ((_p) => (*) => ShowKeyboardSlotPicker(_p))(Prefix))

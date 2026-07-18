@@ -198,6 +198,8 @@ _TH_ApplyTap(KeyId, ActionId) {
 	Current := IsSet(TapHold) ? TapHoldTapAction(TapHold, KeyId) : "<not_ready>"
 	try LoggerInfo("TapHoldMenu", "ApplyTap key='{1}' current='{2}' -> '{3}' (pid={4}).", KeyId,
 		(Current == "" ? "<native>" : Current), (ActionId == "" ? "<native>" : ActionId), A_Pid)
+	if !GestureEnsureActionParameter(GestureBindingId("tap_hold", KeyId), ActionId)
+		return
 	WriteTapHoldTap(KeyId, ActionId)
 	_TH_ReloadTapHoldMenu("tap_set", KeyId)
 }

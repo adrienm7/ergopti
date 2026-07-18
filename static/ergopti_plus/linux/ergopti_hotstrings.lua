@@ -653,7 +653,7 @@ local function main()
 
 	-- 8.10c) Initialise the gestures manager (trackpad/mouse gesture recognition).
 	if gestures then
-		gestures.init({ enabled = false })
+		gestures.init({ enabled = false, persist = true })
 		Logger.info(LOG, "Gestures manager initialised.")
 	end
 

@@ -21,6 +21,8 @@ BuildGesturesMenu() {
 	DynHandlers := Map(
 		"auto_configure",     (M, C) => _GES_AutoConfigure(M, C),
 		"manual_tutorial",    (M, C) => _GES_ManualTutorial(M, C),
+		"disable_all",        (M, C) => _GES_DisableAll(M, C),
+		"restore_defaults",   (M, C) => _GES_RestoreDefaults(M, C),
 		"gesture_slots_ahk",  (M, C) => _GES_SlotsAhk(M, C),
 		"gesture_slots_2",    (M, C) => _GES_Slots2(M, C),
 		"gesture_slots_3",    (M, C) => _GES_Slots3(M, C),
@@ -46,6 +48,34 @@ _GES_ManualTutorial(M, _Cat) {
 	RegisterMenuItem(M, t("menu.gestures.manual_tutorial"), (*) => GestureShowManualTutorialDialog())
 }
 
+; These actions alter bindings only. They deliberately keep the master gesture
+; toggle intact, so an existing user choice to keep gestures off is respected.
+_GES_DisableAll(M, _Cat) {
+	RegisterMenuItem(M, t("menu.gestures.disable_all"), (*) => _GES_SetEverySlot("none"))
+}
+
+_GES_RestoreDefaults(M, _Cat) {
+	RegisterMenuItem(M, t("menu.gestures.restore_defaults"), (*) => _GES_RestoreFactoryDefaults())
+}
+
+_GES_SetEverySlot(ActionName) {
+	global GESTURE_SLOTS
+	Assignments := Map()
+	for _, Slot in GESTURE_SLOTS
+		Assignments[Slot] := ActionName
+	GestureSaveAllAssignments(Assignments)
+	Reload
+}
+
+_GES_RestoreFactoryDefaults() {
+	global GESTURE_SLOTS, GESTURE_FACTORY_DEFAULTS
+	Assignments := Map()
+	for _, Slot in GESTURE_SLOTS
+		Assignments[Slot] := GESTURE_FACTORY_DEFAULTS.Has(Slot) ? GESTURE_FACTORY_DEFAULTS[Slot] : "none"
+	GestureSaveAllAssignments(Assignments)
+	Reload
+}
+
 ; Dynamic handler: flat slot list for AHK (mirrors pre-refactor BuildGesturesMenu).
 ; Iterates GESTURE_SLOTS in order, inserting a separator before tap_4 as before.
 _GES_SlotsAhk(M, _Cat) {
@@ -58,7 +88,7 @@ _GES_SlotsAhk(M, _Cat) {
 		SlotLabel     := t("gesture.slots." . Slot)
 		CurrentAction := GestureAssignments.Has(Slot) ? GestureAssignments[Slot] : "none"
 		CurrentLabel  := GESTURE_ACTIONS.Has(CurrentAction)
-			? _GestureActionLabel(CurrentAction)
+			? GestureActionDisplayLabel(CurrentAction, GestureBindingId("gesture", Slot))
 			: t("dialog.action_picker.disabled")
 		EntryLabel := SlotLabel . " : " . CurrentLabel
 		RegisterMenuItem(M, EntryLabel, ((_s, _l) => (*) => ShowActionPicker(_l,
@@ -85,6 +115,8 @@ _GES_Slots5(M, _Cat) {
 
 ; Applies a new action to a gesture slot and reloads.
 SetGestureSlotAction(Slot, ActionName) {
+	if !GestureEnsureActionParameter(GestureBindingId("gesture", Slot), ActionName)
+		return
 	GestureSaveAssignment(Slot, ActionName)
 	Reload
 }

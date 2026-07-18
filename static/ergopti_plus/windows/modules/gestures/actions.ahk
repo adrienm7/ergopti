@@ -332,7 +332,7 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => SendFinalResult("#+t"),
     },
     "open_url", {
-        Fn: (*) => GestureOpenConfiguredURL(),
+        Fn: (BindingId := "") => GestureOpenConfiguredURL(BindingId),
     },
     "pick_color", {
         Fn: (*) => GesturePickColor(),
@@ -349,7 +349,7 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => SendFinalResult("{Home}({End}){Home}"),
     },
     "search_web", {
-        Fn: (*) => GestureSearchWeb(),
+        Fn: (BindingId := "") => GestureSearchWeb(BindingId),
     },
     "teleport_mouse", {
         Fn: (*) => GestureTeleportMouse(),
@@ -442,17 +442,13 @@ GestureScreenshotInstant() {
     TrayTip(StrReplace(t("notify.screenshot_saved_path"), "%s", FilePath), t("notify.screenshot_title"), "Iconi Mute")
 }
 
-GestureOpenConfiguredURL() {
-    global Features
-    URL := ""
-    if IsSet(Features) and Features.Has("shortcuts")
-        and Features["shortcuts"].Has("gpt")
-        and IsObject(Features["shortcuts"]["gpt"])
-        and Features["shortcuts"]["gpt"].Has("link") {
-        URL := Features["shortcuts"]["gpt"]["link"]
+GestureOpenConfiguredURL(BindingId := "") {
+    URL := GestureGetActionParameter(BindingId, "open_url")
+    ErrorText := ""
+    if !GestureValidateActionParameter("open_url", URL, &ErrorText) {
+        LoggerWarn("gestures", "open_url ignored for binding '{1}': {2}", BindingId, ErrorText)
+        return
     }
-    if (URL = "")
-        return  ; link comes from the manifest-backed Features map above (the SSoT); an empty link is a config bug, fail fast rather than mask it with a hardcoded fallback (rules 5.2/5.4)
     Run(URL)
 }
 
@@ -517,30 +513,35 @@ GestureTakeNote() {
 
 
 
-GestureSearchWeb() {
-    global Features
-    EngineURL   := "https://www.google.com"
-    EngineQuery := "https://www.google.com/search?q="
-    if IsSet(Features) and Features.Has("shortcuts")
-        and Features["shortcuts"].Has("search")
-        and IsObject(Features["shortcuts"]["search"]) {
-        S := Features["shortcuts"]["search"]
-        if S.Has("search_engine") and S["search_engine"] != ""
-            EngineURL := S["search_engine"]
-        if S.Has("search_engine_url_query") and S["search_engine_url_query"] != ""
-            EngineQuery := S["search_engine_url_query"]
+GestureSearchWeb(BindingId := "") {
+    EngineQuery := GestureGetActionParameter(BindingId, "search_web")
+    ErrorText := ""
+    if !GestureValidateActionParameter("search_web", EngineQuery, &ErrorText) {
+        LoggerWarn("gestures", "search_web ignored for binding '{1}': {2}", BindingId, ErrorText)
+        return
     }
     SelectedText := Trim(GetSelection())
-    if (SelectedText = "") {
-        Run(EngineURL)
-    } else {
-        SelectedText := StrReplace(SelectedText, "`r`n", " ")
-        SelectedText := StrReplace(SelectedText, "#", "%23")
-        SelectedText := StrReplace(SelectedText, "&", "%26")
-        SelectedText := StrReplace(SelectedText, "+", "%2b")
-        SelectedText := StrReplace(SelectedText, '"', "%22")
-        Run(EngineQuery . SelectedText)
+    SelectedText := StrReplace(SelectedText, "`r`n", " ")
+    Run(StrReplace(EngineQuery, "%s", GestureUrlEncode(SelectedText)))
+}
+
+; Encodes the selected Unicode text as an RFC 3986 query component. Partial
+; replacement (only '&', '+', …) corrupts spaces, accents and '=' in searches.
+GestureUrlEncode(Value) {
+    Bytes := Buffer(StrPut(Value, "UTF-8"))
+    StrPut(Value, Bytes, "UTF-8")
+    Encoded := ""
+    Loop Bytes.Size - 1 {
+        Byte := NumGet(Bytes, A_Index - 1, "UChar")
+        if ((Byte >= 0x41 && Byte <= 0x5A) || (Byte >= 0x61 && Byte <= 0x7A)
+            || (Byte >= 0x30 && Byte <= 0x39) || Byte = 0x2D || Byte = 0x2E
+            || Byte = 0x5F || Byte = 0x7E) {
+            Encoded .= Chr(Byte)
+        } else {
+            Encoded .= "%" . Format("{:02X}", Byte)
+        }
     }
+    return Encoded
 }
 
 GestureTeleportMouse() {
@@ -832,6 +833,8 @@ GestureEditPersonalShortcuts() {
 ; "#Titre" entries become non-selectable section headers.
 global GESTURE_ACTION_NAMES := []
 global GESTURE_AX_NAMES := []
+global GESTURE_ACTION_PARAMETER_SPECS := Map()
+global GestureActionParameters := Map()
 
 ; Populate GESTURE_ACTION_NAMES / GESTURE_AX_NAMES by parsing the shared
 ; cross-platform action registry (actions.toml). These lists are only needed
@@ -841,7 +844,11 @@ global GESTURE_AX_NAMES := []
 ; A run-once SetTimer(-1) fires ~1 ms after the auto-execute section finishes,
 ; well before initMenu runs, so the lists are always ready for the menu.
 _GestureLoadActionCatalog(*) {
-    global GESTURE_ACTION_NAMES, GESTURE_AX_NAMES, GESTURE_ACTIONS, GESTURE_MODIFIER_ACTION_GROUPS, _SharedDir
+    global GESTURE_ACTION_NAMES, GESTURE_AX_NAMES, GESTURE_ACTIONS, GESTURE_MODIFIER_ACTION_GROUPS, GESTURE_ACTION_PARAMETER_SPECS, _SharedDir
+
+    GESTURE_ACTION_NAMES := []
+    GESTURE_AX_NAMES := []
+    GESTURE_ACTION_PARAMETER_SPECS := Map()
 
     _SharedToml := _SharedDir . "\modules\gestures\actions.toml"
     _Toml       := ParseTomlFile(_SharedToml)
@@ -870,6 +877,8 @@ _GestureLoadActionCatalog(*) {
             ; Regular action — keep if platform is "all" or "ahk"
             _SecKey := "sg_actions." . _Item
             if _Toml.Has(_SecKey) {
+                if _Toml[_SecKey].Has("parameter")
+                    GESTURE_ACTION_PARAMETER_SPECS[_Item] := _Toml[_SecKey]["parameter"]
                 _Plat := _Toml[_SecKey].Has("platform") ? _Toml[_SecKey]["platform"] : "all"
                 if (_Plat = "all" || _Plat = "ahk")
                     GESTURE_ACTION_NAMES.Push(_Item)

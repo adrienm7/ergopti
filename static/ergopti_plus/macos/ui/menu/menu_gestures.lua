@@ -143,10 +143,40 @@ function M.build(ctx)
 			current = current or "none",
 			items   = build_items(names),
 		}, function(a)
-			if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, a) end
-			local conflict = type(gestures.on_action_changed) == "function" and gestures.on_action_changed(slot, a) or nil
-			ctx.save_prefs()
-			ctx.updateMenu()
+			local function apply_action()
+				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, a) end
+				local conflict = type(gestures.on_action_changed) == "function" and gestures.on_action_changed(slot, a) or nil
+				ctx.save_prefs()
+				ctx.updateMenu()
+				return conflict
+			end
+			local spec = type(gestures.get_action_parameter_spec) == "function" and gestures.get_action_parameter_spec(a) or nil
+			if spec then
+				hs.timer.doAfter(0.05, function()
+					local prior = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, a) or ""
+					local prompt = spec == "search_url"
+						and "URL de recherche, avec exactement un %s pour la requête :"
+						or "Lien à ouvrir :"
+					while true do
+						local button, value = dialog.text_prompt("Configurer " .. (gestures.get_action_label(a) or a), prompt, prior, "Enregistrer", "Annuler")
+						if button ~= "Enregistrer" then return end
+						if type(gestures.validate_action_parameter) == "function" and gestures.validate_action_parameter(a, value) then
+							pcall(gestures.set_action_parameter, slot, a, value)
+							local conflict = apply_action()
+							if type(conflict) == "table" then
+								hs.timer.doAfter(0.3, function()
+									pcall(dialog.block_alert, i18n.get("menu.gestures.conflict_title"), conflict.msg or "", i18n.get("menu.gestures.open_settings"), "OK", "warning")
+								end)
+							end
+							return
+						end
+						pcall(dialog.block_alert, "Valeur invalide", "Saisissez une URL http:// ou https:// valide." .. (spec == "search_url" and " L’URL doit contenir un seul %s." or ""), "OK", nil, "warning")
+						prior = value or prior
+					end
+				end)
+				return
+			end
+			local conflict = apply_action()
 			if type(conflict) == "table" then
 				hs.timer.doAfter(0.3, function()
 					local ok_c, clicked = pcall(dialog.block_alert,
@@ -171,6 +201,8 @@ function M.build(ctx)
 		local slotLbl   = slot_label(slot)
 		local actionLbl = type(gestures.get_action_label) == "function" and gestures.get_action_label(current)
 			or (current or "none")
+		local parameter = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, current) or ""
+		if parameter ~= "" then actionLbl = actionLbl .. " (" .. parameter .. ")" end
 
 		local names = type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
 

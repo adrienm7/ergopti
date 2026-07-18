@@ -125,7 +125,7 @@ TapHoldCurrentTapLabel(KeyId) {
 	if (TapAction == "") {
 		return t(_TH_TapNoneI18n)
 	}
-	return _GestureActionLabel(TapAction)
+	return GestureActionDisplayLabel(TapAction, GestureBindingId("tap_hold", KeyId))
 }
 
 ; Return the i18n-resolved short label for the current hold option of a key.

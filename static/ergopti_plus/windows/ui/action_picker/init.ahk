@@ -187,7 +187,7 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false) {
 ShowKeyboardShortcutPicker(SlotId) {
     global KeyboardShortcutAssignments
     Current := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
-    ShowActionPicker(t("dialog.keyboard_shortcut.title_prefix") . _GestureActionLabel(SlotId), Current, (Id) => SetKeyboardShortcutAction(SlotId, Id))
+    ShowActionPicker(t("dialog.keyboard_shortcut.title_prefix") . _FormatSlotLabel(SlotId), Current, (Id) => SetKeyboardShortcutAction(SlotId, Id))
 }
 
 FilePathsEditor(*) {

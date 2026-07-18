@@ -492,7 +492,10 @@ platform = "ahk"
 platform = "ahk"
 
 [sg_actions.open_url]
-platform = "ahk"
+platform = "all"
+# The parameter belongs to a binding (gesture, tap-hold or shortcut), never to
+# the action globally: two bindings may legitimately open two different URLs.
+parameter = "url"
 
 [sg_actions.pick_color]
 platform = "ahk"
@@ -507,7 +510,9 @@ platform = "ahk"
 platform = "ahk"
 
 [sg_actions.search_web]
-platform = "ahk"
+platform = "all"
+# URL template containing exactly one %s placeholder for the selected query.
+parameter = "search_url"
 
 [sg_actions.teleport_mouse]
 platform = "ahk"

@@ -139,6 +139,8 @@ local NESTED_KEY_MAP = {
 	gesture_actions          = { sec = "gestures",   merge_into_sec = true             },
 	gesture_modes            = { sec = "gestures",   key = "modes"                     },
 	gesture_sensitivities    = { sec = "gestures",   key = "sensitivities"             },
+	-- binding__action → value, e.g. tap_3__open_url = "https://…".
+	gesture_action_parameters = { sec = "gestures",  key = "action_parameters"         },
 	-- Hotstrings nested tables
 	hotstrings               = { sec = "hotstrings", key = "groups"                    },
 	section_states           = { sec = "hotstrings", key = "modules"                   },
@@ -450,6 +452,7 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 	existing.gesture_actions = (gestures and type(gestures.get_all_actions) == "function") and gestures.get_all_actions() or {}
 	existing.gesture_modes = (gestures and type(gestures.get_all_modes) == "function") and gestures.get_all_modes() or {}
 	existing.gesture_sensitivities = (gestures and type(gestures.get_all_sensitivities) == "function") and gestures.get_all_sensitivities() or {}
+	existing.gesture_action_parameters = (gestures and type(gestures.get_all_action_parameters) == "function") and gestures.get_all_action_parameters() or {}
 	-- Explicit if/else avoids the Lua nil-vs-false trap: `fn() or true` returns
 	-- true when fn() returns false, incorrectly overriding a disabled space-wrap.
 	if gestures and type(gestures.get_space_wrap) == "function" then
@@ -479,8 +482,24 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 	if not file_ok or not fh then return end
 	fh:write(encoded)
 	pcall(function() fh:close() end)
-	-- os.rename overwrites existing files on POSIX (Hammerspoon is macOS-only).
-	pcall(os.rename, tmp_path, prefs_file)
+	-- os.rename overwrites existing files on POSIX. The test host can be
+	-- Windows, whose C runtime refuses an overwrite, so retain the previous
+	-- file as a recoverable backup until the replacement succeeds.
+	local renamed_ok, renamed = pcall(os.rename, tmp_path, prefs_file)
+	if (not renamed_ok or not renamed) and package.config:sub(1, 1) == "\\" then
+		local backup = prefs_file .. ".bak"
+		pcall(os.remove, backup)
+		local moved_old = os.rename(prefs_file, backup)
+		if moved_old then
+			renamed_ok, renamed = pcall(os.rename, tmp_path, prefs_file)
+			if renamed_ok and renamed then
+				pcall(os.remove, backup)
+			else
+				pcall(os.rename, backup, prefs_file)
+			end
+		end
+	end
+	if not renamed_ok or not renamed then return end
 	
 	-- Reformat using centralized Python formatter for consistent styling
 	local _src = debug.getinfo(1, "S").source:sub(2)
@@ -498,7 +517,7 @@ function M.merge_saved_data(state, saved)
 
 	local exclude_keys = { 
 		section_states = true, gesture_actions = true, 
-		gesture_modes = true, gesture_sensitivities = true,
+		gesture_modes = true, gesture_sensitivities = true, gesture_action_parameters = true,
 		shortcut_keys = true, hotstrings = true, script_control_shortcuts = true 
 	}
 

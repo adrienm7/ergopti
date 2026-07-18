@@ -34,6 +34,8 @@ local Timings = require("lib.timings")
 local Monotonic = require("lib.monotonic")
 local TomlCodec = require("toml_codec")
 local LOG = "modules.gestures.manager"
+local _writer_ok, TomlWriter = pcall(require, "toml_codec.writer")
+if not _writer_ok then TomlWriter = nil end
 
 -- Wall-clock source (seconds) for gesture tap/swipe timing. Defaults to the
 -- monotonic clock and is injectable via M.init for tests. Deliberately NOT
@@ -103,8 +105,27 @@ local function load_slot_space()
 	return single, axis
 end
 
+--- Reads parameter metadata from the same shared catalogue as the picker, so
+--- future configurable actions do not require a Linux-specific allowlist.
+local function load_action_parameter_specs()
+	local path = resolve_actions_toml_path()
+	local fh = path ~= "" and io.open(path, "r") or nil
+	if not fh then return {} end
+	local content = fh:read("*a")
+	fh:close()
+	if content:sub(1, 3) == UTF8_BOM then content = content:sub(4) end
+	local ok, data = pcall(TomlCodec.decode, content)
+	if not ok or type(data) ~= "table" or type(data.sg_actions) ~= "table" then return {} end
+	local specs = {}
+	for name, meta in pairs(data.sg_actions) do
+		if type(meta) == "table" and type(meta.parameter) == "string" then specs[name] = meta.parameter end
+	end
+	return specs
+end
+
 --- All single / axis gesture slots (derived from the shared [slots] section).
 M.SINGLE_SLOTS, M.AXIS_SLOTS = load_slot_space()
+M.ACTION_PARAMETER_SPECS = load_action_parameter_specs()
 
 --- Linux-specific default action VALUES. Every slot not listed defaults to
 --- "none". The KEY-SPACE comes from the shared TOML, never from these keys:
@@ -140,6 +161,8 @@ end
 
 --- Linux action labels (fallback when i18n is absent).
 local ACTION_LABELS = {
+	open_url = "Ouvrir un lien",
+	search_web = "Rechercher sur le web",
 	none                        = "∅ Désactivé",
 	left_click_toggle           = "🖱 Clic gauche (maintien)",
 	right_click_toggle          = "🖱 Clic droit (maintien)",
@@ -243,7 +266,25 @@ register_modifier_chords(load_modifier_chords())
 --- Executes a gesture action via xdotool/ytool on Linux.
 --- @param action_name string The action identifier.
 --- @param go_next boolean|nil Direction for axis actions (true = next, false/nil = prev).
-local function _execute_action(action_name, go_next)
+local function shell_quote(value)
+	return "'" .. tostring(value or ""):gsub("'", "'\\''") .. "'"
+end
+
+local function url_encode_query(value)
+	return (tostring(value or ""):gsub("[^%w%-%._~]", function(char)
+		return string.format("%%%02X", string.byte(char))
+	end))
+end
+
+local function primary_selection()
+	local pipe = io.popen("xclip -o -selection primary 2>/dev/null", "r")
+	if not pipe then return "" end
+	local value = pipe:read("*a") or ""
+	pipe:close()
+	return value:gsub("%s+$", "")
+end
+
+local function _execute_action(action_name, go_next, binding)
 	if not action_name or action_name == "none" then return end
 
 	local function _run(cmd)
@@ -253,6 +294,18 @@ local function _execute_action(action_name, go_next)
 	local modifier_command = MODIFIER_ACTION_COMMANDS[action_name]
 	if modifier_command then
 		_run("xdotool key " .. modifier_command)
+		return
+	end
+
+	if action_name == "open_url" then
+		local url = M.get_action_parameter(binding, action_name)
+		if M.validate_action_parameter(action_name, url) then _run("xdg-open " .. shell_quote(url)) end
+		return
+	elseif action_name == "search_web" then
+		local template = M.get_action_parameter(binding, action_name)
+		if M.validate_action_parameter(action_name, template) then
+			_run("xdg-open " .. shell_quote((template:gsub("%%s", url_encode_query(primary_selection())))))
+		end
 		return
 	end
 
@@ -366,6 +419,9 @@ end
 -- =========================================
 
 local _enabled       = false
+local _action_params = {}   -- binding__action -> configured value
+local _config_path   = nil
+local _persist       = false
 local _actions       = {}   -- slot → action_name
 local _reading       = false -- touch event subprocess active
 
@@ -424,7 +480,66 @@ function M.set_action(slot, action_name)
 			tostring(action_name), tostring(slot))
 	end
 	_actions[slot] = action_name
+	M._persist_updates({ { section = "linux.gestures", key = slot, value = action_name } })
 	Logger.info(LOG, "Gesture '%s' → '%s'.", slot, tostring(action_name))
+end
+
+function M.get_action_parameter_spec(action_name)
+	return M.ACTION_PARAMETER_SPECS[action_name]
+end
+
+function M.validate_action_parameter(action_name, value)
+	local spec = M.get_action_parameter_spec(action_name)
+	if not spec then return true end
+	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
+	if spec == "search_url" then
+		local _, placeholders = value:gsub("%%s", "")
+		return placeholders == 1
+	end
+	return true
+end
+
+local function parameter_key(binding, action_name)
+	return tostring(binding or "") .. "__" .. tostring(action_name or "")
+end
+
+--- Splits a persisted binding__action key by the known action suffix, rather
+--- than the first delimiter. Bindings such as keyboard__ctrl_k therefore keep
+--- their scope intact when preferences are restored.
+function M.split_action_parameter_key(key)
+	if type(key) ~= "string" then return nil, nil end
+	for action_name in pairs(M.ACTION_PARAMETER_SPECS) do
+		local suffix = "__" .. action_name
+		if key:sub(-#suffix) == suffix then
+			return key:sub(1, #key - #suffix), action_name
+		end
+	end
+	return nil, nil
+end
+
+function M.get_action_parameter(binding, action_name)
+	return _action_params[parameter_key(binding, action_name)] or ""
+end
+
+function M.set_action_parameter(binding, action_name, value)
+	if not M.validate_action_parameter(action_name, value) then return false end
+	local key = parameter_key(binding, action_name)
+	_action_params[key] = value
+	M._persist_updates({ { section = "linux.action_parameters", key = key, value = value } })
+	return true
+end
+
+function M.get_all_action_parameters()
+	local copy = {}
+	for key, value in pairs(_action_params) do copy[key] = value end
+	return copy
+end
+
+function M.get_action_display_label(slot)
+	local action = M.get_action(slot) or "none"
+	local label = M.get_action_label(action)
+	local value = M.get_action_parameter(slot, action)
+	return value ~= "" and (label .. " (" .. value .. ")") or label
 end
 
 --- Returns all gesture actions.
@@ -437,10 +552,25 @@ end
 
 --- Resets all gesture actions to defaults.
 function M.reset_defaults()
+	local updates = {}
 	for k, v in pairs(M.DEFAULT_GESTURES) do
 		_actions[k] = v
+		updates[#updates + 1] = { section = "linux.gestures", key = k, value = v }
 	end
+	M._persist_updates(updates)
 	Logger.info(LOG, "Gestures reset to defaults.")
+end
+
+--- Replaces every gesture action by the empty no-op without changing the
+--- master enable flag.
+function M.disable_all_actions()
+	local updates = {}
+	for slot in pairs(M.DEFAULT_GESTURES) do
+		_actions[slot] = "none"
+		updates[#updates + 1] = { section = "linux.gestures", key = slot, value = "none" }
+	end
+	M._persist_updates(updates)
+	Logger.info(LOG, "Every gesture binding was set to none.")
 end
 
 -- =========================================
@@ -614,7 +744,7 @@ function M.process_frame(touches)
 			if tap_slot and _actions[tap_slot] and _actions[tap_slot] ~= "none" then
 				Logger.info(LOG, "TAP FIRE: slot=%s action=%s fingers=%d elapsed=%.3fs",
 					tap_slot, _actions[tap_slot], mf, elapsed)
-				_execute_action(_actions[tap_slot])
+				_execute_action(_actions[tap_slot], nil, tap_slot)
 			end
 			_reset_gesture()
 			return
@@ -637,7 +767,7 @@ function M.process_frame(touches)
 
 		Logger.info(LOG, "SWIPE FIRE: slot=%s action=%s dir=%s mf=%d dx=%.2f dy=%.2f elapsed=%.3fs",
 			slot, _actions[slot], dir, mf, dx, dy, elapsed)
-		_execute_action(_actions[slot])
+		_execute_action(_actions[slot], nil, slot)
 		_reset_gesture()
 		return
 	end
@@ -667,6 +797,35 @@ end
 -- =========================================
 -- =========================================
 
+function M._persist_updates(updates)
+	if not _persist or not TomlWriter or not _config_path or type(updates) ~= "table" or #updates == 0 then return true end
+	local ok, err = TomlWriter.batch_write(_config_path, updates)
+	if not ok then Logger.error(LOG, "Could not persist gesture configuration: %s", tostring(err)) end
+	return ok
+end
+
+local function load_user_config(path)
+	if type(path) ~= "string" or path == "" then return end
+	local fh = io.open(path, "r")
+	if not fh then return end
+	local content = fh:read("*a")
+	fh:close()
+	local ok, config = pcall(TomlCodec.decode, content)
+	local linux = ok and type(config) == "table" and config.linux or nil
+	if type(linux) ~= "table" then return end
+	if type(linux.gestures) == "table" then
+		for slot, action in pairs(linux.gestures) do
+			if M.DEFAULT_GESTURES[slot] and (action == "none" or ACTION_LABELS[action]) then _actions[slot] = action end
+		end
+	end
+	if type(linux.action_parameters) == "table" then
+		for key, value in pairs(linux.action_parameters) do
+			local binding, action = M.split_action_parameter_key(key)
+			if binding and action and M.validate_action_parameter(action, value) then _action_params[key] = value end
+		end
+	end
+end
+
 --- Initialises the gestures module.
 --- @param opts table|nil { enabled?, now_sec? } — now_sec injects a wall-clock
 ---   source (seconds) for tests; production uses the monotonic clock.
@@ -676,6 +835,9 @@ function M.init(opts)
 	if type(opts.now_sec) == "function" then
 		_now_sec = opts.now_sec
 	end
+	_config_path = opts.config_path or ((os.getenv("HOME") or "") .. "/.config/ergopti/config.toml")
+	_persist = opts.persist == true
+	if _persist then load_user_config(_config_path) end
 
 	if opts.enabled == true then
 		_enabled = true
