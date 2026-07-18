@@ -97,11 +97,13 @@ _SuspendPendingPoll() {
     _SuspendStateWatchdog()
 }
 Ergopti_OnSuspendEnter() {
-	global _SpaceHoldInputHook, _OneShotShiftInputHook
+	global _SpaceHoldInputHook, _OneShotShiftInputHook, _DeadKeyInputHook
 	if IsSet(_SpaceHoldInputHook) and IsObject(_SpaceHoldInputHook)
 		try _SpaceHoldInputHook.Stop()
 	if IsSet(_OneShotShiftInputHook) and IsObject(_OneShotShiftInputHook)
 		try _OneShotShiftInputHook.Stop()
+	if IsSet(_DeadKeyInputHook) and IsObject(_DeadKeyInputHook)
+		try _DeadKeyInputHook.Stop()
     try TooltipHide("Suspend", true)
     try LLM_Tooltip_Hide(true)
     try LLM_Engine_CancelTimer()

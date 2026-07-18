@@ -16,5 +16,6 @@ _OIH_AssertSuspendOwnedHook(FunctionName, HookName) {
 _OIH_SpaceAndOneShotHooksStopOnSuspend() {
 	_OIH_AssertSuspendOwnedHook("SpaceTapHold", "_SpaceHoldInputHook")
 	_OIH_AssertSuspendOwnedHook("OneShotShift", "_OneShotShiftInputHook")
+	_OIH_AssertSuspendOwnedHook("DeadKey", "_DeadKeyInputHook")
 }
-Test("lifecycle: owned Space and OneShotShift InputHooks stop on suspend (owned-inputhooks-suspend)", _OIH_SpaceAndOneShotHooksStopOnSuspend)
+Test("lifecycle: owned Space, OneShotShift, and DeadKey InputHooks stop on suspend (owned-inputhooks-suspend)", _OIH_SpaceAndOneShotHooksStopOnSuspend)
