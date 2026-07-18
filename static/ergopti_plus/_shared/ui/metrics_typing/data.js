@@ -3267,6 +3267,15 @@ function request_range_data(show_loader = true) {
 
 	// Slight delay so the UI renders the loader before the heavy decode starts
 	setTimeout(() => {
+		// Windows WebView2 can serve the exact selected range directly. Without
+		// this request, Windows retained the all-time first-paint n-grams after a
+		// date/app change and the spinner had no matching response to clear it.
+		if (window.chrome?.webview) {
+			try {
+				window.chrome.webview.postMessage(JSON.stringify({ action: 'range', ...req }));
+				return;
+			} catch (_) {}
+		}
 		// Linux has a real WebKit bridge (unlike the macOS polling path).
 		// Send the selected range directly so date/app changes refresh the
 		// n-gram tables instead of leaving the initial prefetch on screen.

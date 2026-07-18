@@ -360,10 +360,17 @@ KLWV_OnWebMessage(which, sender, args) {
             ; send the latest prefetch so the dashboard renders.
             KLWV_InjectI18n(which)
             KLWV_PushPrefetch(which)
-        case "request_refresh":
-            try KLPF_BuildAndWrite(which, KLWV.metrics_dir)
-            KLWV_PushPrefetch(which)
-        case "clear_cache":
+		case "request_refresh":
+			try KLPF_BuildAndWrite(which, KLWV.metrics_dir)
+			KLWV_PushPrefetch(which)
+		case "range":
+			; Keep date/app filtering off the WebMessageReceived stack. A range
+			; projection can be large enough that running it synchronously here
+			; prevents WebView2 from painting the loader and risks STA reentrancy.
+			query := KLWV_NormalizeRangeRequest(msg)
+			if query
+				SetTimer(KLWV_PushRangeData.Bind(which, query), -1)
+		case "clear_cache":
             ; Purge every layer of cache so the next rebuild is a full cold read:
             ; - KLPF_MANIFEST_CACHE: manifest projection (historical days)
             ; - KLPF_LAST_JSON:      in-memory JSON blob for the push path
@@ -381,6 +388,57 @@ KLWV_OnWebMessage(which, sender, args) {
             try KLPF_BuildAndWrite(which, KLWV.metrics_dir)
             KLWV_PushPrefetch(which)
     }
+}
+
+; Parse and validate the selected-range request emitted by metrics_typing/data.js.
+; Date strings are deliberately constrained before reaching KLR_DateFilter, and
+; only non-empty string app names make it into the SQLite IN clause.
+KLWV_NormalizeRangeRequest(msg) {
+    try query := KL_JsonDecode(msg)
+    catch
+        return 0
+    if !(query is Map)
+        return 0
+
+    start_date := query.Has("start_date") ? String(query["start_date"]) : ""
+    end_date := query.Has("end_date") ? String(query["end_date"]) : ""
+    if !KLWV_IsIsoDate(start_date) || !KLWV_IsIsoDate(end_date)
+        return 0
+    if (start_date != "" && end_date != "" && StrCompare(start_date, end_date) > 0)
+        return 0
+
+    apps := []
+    seen := Map()
+    if query.Has("apps") && query["apps"] is Array {
+        for _, app_name in query["apps"] {
+            if (Type(app_name) != "String" || app_name = "" || seen.Has(app_name))
+                continue
+            seen[app_name] := true
+            apps.Push(app_name)
+        }
+    }
+    return Map("start_date", start_date, "end_date", end_date, "apps", apps)
+}
+
+KLWV_IsIsoDate(value) {
+    return value = "" || RegExMatch(value, "^\\d{4}-\\d{2}-\\d{2}$")
+}
+
+; Project the n-grams for one selected date/app range from the warm in-memory DB.
+; KLR_NotifyIngest keeps this cache current; building it only on the initial
+; request avoids re-reading every data.sql file when the user changes a filter.
+KLWV_PushRangeData(which, query) {
+    if !KLWV.windows.Has(which) || !(query is Map)
+        return
+    if !KLRCache.db && KLWV.metrics_dir
+        try KLR_BuildDatabase(KLWV.metrics_dir)
+    db := KLRCache.db
+    if !db
+        return
+
+    range_data := KLR_ReadRangeSplitToday(db, query["start_date"], query["end_date"], query["apps"])
+    message := '{"type":"range_data","payload":' . KL_JsonEncode(range_data) . '}'
+    try KLWV.windows[which]["webview"].PostWebMessageAsString(message)
 }
 
 

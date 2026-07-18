@@ -84,6 +84,7 @@ const CHECKS = [
 	{ name: 'shared UI JavaScript syntax (every browser script parses before WebView injection)', cmd: 'node', args: ['tools/test/test-shared-ui-js-syntax.cjs'], repro: 'node tools/test/test-shared-ui-js-syntax.cjs' },
 	{ name: 'typing-speed source toggles (net expansion gain and filter semantics)', cmd: 'node', args: ['tools/test/test-metrics-speed-source-filters.cjs'], repro: 'node tools/test/test-metrics-speed-source-filters.cjs' },
 	{ name: 'Linux metrics SQLite bridge (persistent manifest + selected-range refresh)', cmd: 'node', args: ['tools/test/test-linux-metrics-sqlite-bridge.cjs'], repro: 'node tools/test/test-linux-metrics-sqlite-bridge.cjs' },
+	{ name: 'Windows metrics range bridge (native selected date/app refresh)', cmd: 'node', args: ['tools/test/test-windows-metrics-range-bridge.cjs'], repro: 'node tools/test/test-windows-metrics-range-bridge.cjs' },
 	{ name: 'keycode data single source (generated JS matches azerty.json, DC-1)', cmd: 'node', args: ['tools/test/test-keycode-data-js-parity.cjs'], repro: 'node tools/test/test-keycode-data-js-parity.cjs' },
 	{ name: 'tooltip corpus parity (JSON corpus matches JS layoutTestVectors + dequeueTestVectors; P0-G)', cmd: 'node', args: ['tools/test/test-tooltip-corpus-parity.cjs'], repro: 'node tools/test/test-tooltip-corpus-parity.cjs' },
 	{ name: 'TOML coercion parity (corpus cross-driver gate; P0-G)', cmd: 'node', args: ['tools/test/test-toml-coercion-parity.cjs'], repro: 'node tools/test/test-toml-coercion-parity.cjs' },
