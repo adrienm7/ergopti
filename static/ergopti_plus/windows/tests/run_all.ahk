@@ -652,6 +652,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_owned_inputhooks_suspend.ahk
 #Include meta/test_timer_scheduler_registration_transaction.ahk
 #Include meta/test_updater_finalize_nonblocking.ahk
+#Include meta/test_bundle_upgrade_transaction.ahk
 #Include meta/test_tab_accept_cancels_timer.ahk
 #Include meta/test_textsend_clipboard_thread.ahk
 #Include meta/test_tint_test_stale_constants_comment.ahk

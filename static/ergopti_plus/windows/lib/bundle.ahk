@@ -139,7 +139,13 @@ _Bundle_WriteMarker(BundleDir) {
 		FileAppend(BUNDLE_VERSION, MarkerPath, "UTF-8")
 	} catch as Err {
 		OutputDebug("[bundle] WriteMarker failed: " . Err.Message)
+		return false
 	}
+	return FileExist(MarkerPath)
+}
+
+_Bundle_VerifyStaging(StagingDir) {
+	return DirExist(StagingDir) and DirExist(StagingDir . "\static")
 }
 
 ; Runs PowerShell's Expand-Archive synchronously to unzip ``ZipPath`` into
@@ -197,10 +203,6 @@ Bundle_Init() {
 	if !DirExist(ParentDir) {
 		try DirCreate(ParentDir)
 	}
-	if !DirExist(BundleDir) {
-		try DirCreate(BundleDir)
-	}
-
 	; Skip if the marker matches the embedded version.
 	Existing := _Bundle_ReadMarker(BundleDir)
 	if (Existing != "" and Existing == BUNDLE_VERSION) {
@@ -208,13 +210,13 @@ Bundle_Init() {
 		return
 	}
 
-	; Wipe the previous bundle so orphan files from an older version do not
-	; survive into the new install. The marker, being inside this dir, also
-	; gets removed — Expand-Archive will repopulate everything from scratch.
-	if DirExist(BundleDir) {
-		try DirDelete(BundleDir, true)
-	}
-	try DirCreate(BundleDir)
+	; Extract into a sibling staging directory. The live bundle remains intact
+	; until the archive and marker have both been verified.
+	StagingDir := BundleDir . ".staging-" . A_TickCount
+	RollbackDir := BundleDir . ".rollback-" . A_TickCount
+	if DirExist(StagingDir)
+		try DirDelete(StagingDir, true)
+	try DirCreate(StagingDir)
 
 	; Write the zip out of the .exe into a temp location, then unzip it
 	; into BundleDir so static/ and vendor/ end up under it.
@@ -230,14 +232,37 @@ Bundle_Init() {
 		ExitApp(1)
 	}
 
-	if !_Bundle_Unzip(TmpZip, BundleDir) {
+	if !_Bundle_Unzip(TmpZip, StagingDir) {
 		try FileDelete(TmpZip)
+		try DirDelete(StagingDir, true)
 		MsgBox("Bundle extraction failed (Expand-Archive returned non-zero).",
 			"ErgoptiPlus", "Icon!")
 		ExitApp(1)
 	}
 
 	try FileDelete(TmpZip)
-	_Bundle_WriteMarker(BundleDir)
+	if !_Bundle_VerifyStaging(StagingDir) or !_Bundle_WriteMarker(StagingDir) {
+		try DirDelete(StagingDir, true)
+		MsgBox("Bundle extraction failed (staging verification).", "ErgoptiPlus", "Icon!")
+		ExitApp(1)
+	}
+	; Preserve the known-good runtime until the new tree has been fully staged.
+	if DirExist(BundleDir) {
+		try DirMove(BundleDir, RollbackDir, 0)
+		catch as Err {
+			try DirDelete(StagingDir, true)
+			MsgBox("Bundle extraction failed (could not preserve current bundle): " . Err.Message,
+				"ErgoptiPlus", "Icon!")
+			ExitApp(1)
+		}
+	}
+	try DirMove(StagingDir, BundleDir, 0)
+	catch as Err {
+		try DirMove(RollbackDir, BundleDir, 0)
+		MsgBox("Bundle extraction failed (commit): " . Err.Message, "ErgoptiPlus", "Icon!")
+		ExitApp(1)
+	}
+	if DirExist(RollbackDir)
+		try DirDelete(RollbackDir, true)
 	OutputDebug("[bundle] Extracted bundle version '" . BUNDLE_VERSION . "' to " . BundleDir)
 }
