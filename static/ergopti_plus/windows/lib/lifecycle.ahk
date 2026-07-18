@@ -23,6 +23,7 @@ ActivateEdit(*) {
 ; before every future suspend instead of leaving a THIRD un-drained sibling for
 ; the same latch bug to hide in (feedback_ahk_suspend_prefix_latch, F42).
 global SUSPEND_CUSTOM_COMBO_PREFIX_KEYS := ["SC138", "SC038"]
+global _SuspendPending := false
 
 ; Drains every registered custom-combination prefix key (see
 ; SUSPEND_CUSTOM_COMBO_PREFIX_KEYS) BEFORE a suspend flips. AHK prefix flags
@@ -34,7 +35,7 @@ global SUSPEND_CUSTOM_COMBO_PREFIX_KEYS := ["SC138", "SC038"]
 ; regression by bypassing the wait. Safe no-op when entering from suspended
 ; state, when a key's own feature gate is off (SC138 only arms as a prefix when
 ; the Kana fixup is active), or when the key is not physically held.
-_SuspendDrainPrefix() {
+_SuspendPrefixesAreClear() {
     global _ALTGR_KANA_FIXUP
     if A_IsSuspended
         return
@@ -45,8 +46,9 @@ _SuspendDrainPrefix() {
         if (PrefixKey = "SC138") and !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
             continue
         if GetKeyState(PrefixKey, "P")
-            KeyWait(PrefixKey, "T1")
+            return false
     }
+    return true
 }
 ; Releases every modifier + the SC138 (AltGr/Kana) prefix key to clear any
 ; OS-level phantom "down" state carried across a Reload. A Reload — the driver's
@@ -63,8 +65,35 @@ _ReleasePhantomModifiers() {
     Send("{Blind}{LCtrl up}{RCtrl up}{LAlt up}{RAlt up}{LShift up}{RShift up}{LWin up}{RWin up}{SC138 up}")
 }
 ToggleSuspend(*) {
-    _SuspendDrainPrefix()
-    Suspend(-1)
+    global _SuspendPending
+    if A_IsSuspended {
+        _SuspendPending := false
+        SetTimer(_SuspendPendingPoll, 0)
+        Suspend(0)
+        _SuspendStateWatchdog()
+        return
+    }
+    if _SuspendPrefixesAreClear() {
+        _SuspendPending := false
+        Suspend(1)
+        _SuspendStateWatchdog()
+        return
+    }
+    _SuspendPending := true
+    LoggerWarn("Lifecycle", "Suspend deferred until custom-combination prefix keys are released.")
+    SetTimer(_SuspendPendingPoll, 25)
+}
+_SuspendPendingPoll() {
+    global _SuspendPending
+    if !_SuspendPending or A_IsSuspended {
+        SetTimer(_SuspendPendingPoll, 0)
+        return
+    }
+    if !_SuspendPrefixesAreClear()
+        return
+    _SuspendPending := false
+    SetTimer(_SuspendPendingPoll, 0)
+    Suspend(1)
     _SuspendStateWatchdog()
 }
 Ergopti_OnSuspendEnter() {
