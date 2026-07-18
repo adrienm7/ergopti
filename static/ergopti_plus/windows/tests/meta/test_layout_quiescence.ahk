@@ -50,6 +50,11 @@ _T_LayoutPollReloadQuiescence() {
 	res := _ShouldReloadForHkl(200, &last, &pending, false, false, 0, 0, 100)
 	AssertEqual(res, false, "Active typing must not reload")
 
+	; Physical idle time can increase while a modifier remains held; an owned
+	; transaction must still veto reload so its matching Up is not lost.
+	res := _ShouldReloadForHkl(200, &last, &pending, false, false, 0, 0, 1000, true)
+	AssertEqual(res, false, "An active input transaction must block reload even after a long idle interval")
+
 	; Second poll, stable changed HKL, idle, nothing suppressed -> reload now.
 	res := _ShouldReloadForHkl(200, &last, &pending, false, false, 0, 0, 1000)
 	AssertEqual(res, true, "Stable changed HKL with full quiescence must reload")

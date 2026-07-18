@@ -850,8 +850,13 @@ CheckKeyboardLayoutChange() {
     curHkl := GetForegroundKeyboardLayout()
     hseSup := (IsSet(HSE_Suppressed)) ? HSE_Suppressed : 0
     pwSup := (IsSet(_PrefixWatcherSuppressed)) ? _PrefixWatcherSuppressed : 0
+	inputBusy := (IsSet(InDeadKeySequence) and InDeadKeySequence)
+		or (IsSet(_SpaceHoldInputHook) and IsObject(_SpaceHoldInputHook))
+		or (IsSet(_OneShotShiftInputHook) and IsObject(_OneShotShiftInputHook))
+		or (IsSet(_DeadKeyInputHook) and IsObject(_DeadKeyInputHook))
+		or GetKeyState("SC039", "P") or GetKeyState("SC038", "P") or GetKeyState("SC138", "P")
     
-    if _ShouldReloadForHkl(curHkl, &_LAST_KEYBOARD_HKL, &_PENDING_KEYBOARD_HKL, suspended, isBlacklisted, hseSup, pwSup, A_TimeIdlePhysical) {
+    if _ShouldReloadForHkl(curHkl, &_LAST_KEYBOARD_HKL, &_PENDING_KEYBOARD_HKL, suspended, isBlacklisted, hseSup, pwSup, A_TimeIdlePhysical, inputBusy) {
         Reload()
     }
 }

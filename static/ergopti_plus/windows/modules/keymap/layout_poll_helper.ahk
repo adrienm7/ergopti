@@ -36,7 +36,7 @@
 ; @param pwSuppressed  Prefix-watcher suppression depth (>0 means an expansion is in flight).
 ; @param idleMs        Physical idle time in ms (A_TimeIdlePhysical) — must clear the typing threshold.
 ; @returns True if the caller should Reload() now, false otherwise.
-_ShouldReloadForHkl(curHkl, &lastHkl, &pendingHkl, suspended, isBlacklisted, hseSuppressed, pwSuppressed, idleMs) {
+_ShouldReloadForHkl(curHkl, &lastHkl, &pendingHkl, suspended, isBlacklisted, hseSuppressed, pwSuppressed, idleMs, inputTransactionActive := false) {
 	; A paused driver or a blacklisted app must never auto-reload.
 	if suspended
 		return false
@@ -61,6 +61,8 @@ _ShouldReloadForHkl(curHkl, &lastHkl, &pendingHkl, suspended, isBlacklisted, hse
 	if (hseSuppressed > 0)
 		return false
 	if (pwSuppressed > 0)
+		return false
+	if inputTransactionActive
 		return false
 	lastHkl := curHkl
 	return true
