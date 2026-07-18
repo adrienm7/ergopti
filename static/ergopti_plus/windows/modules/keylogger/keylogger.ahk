@@ -543,25 +543,28 @@ KL_FlushBuffer() {
     ; Atomically snapshot and reset the shared buffer so that Critical InputHook
     ; callbacks (KL_Hook_OnChar) that fire between the snapshot and the reset
     ; go into the freshly cleared buffer and are never lost silently.
-    Critical("On")
-    snap_events  := Keylogger.buffer_events
-    snap_text    := Keylogger.buffer_text
-    snap_clicks  := Keylogger.session_clicks
-    snap_scrolls := Keylogger.session_scrolls
-    snap_dist    := Keylogger.mouse_distance
-    ; The delay of the first keystroke in the buffer is the inter-burst gap:
-    ; the time elapsed since the previous burst ended. The old stale per-snapshot
-    ; pause field (always 0, never updated) was producing null analytics.
-    snap_pause   := (snap_events.Length > 0) ? snap_events[1][2] : 0
-    Keylogger.buffer_events    := []
-    Keylogger.buffer_text      := ""
-    Keylogger.rich_chunks      := []
-    Keylogger.last_time        := 0
-    Keylogger.session_clicks   := 0
-    Keylogger.session_scrolls  := 0
-    Keylogger.mouse_distance   := 0
-    Keylogger.last_flush_time  := A_TickCount
-    Critical("Off")
+    previous_critical := Critical("On")
+    try {
+        snap_events  := Keylogger.buffer_events
+        snap_text    := Keylogger.buffer_text
+        snap_clicks  := Keylogger.session_clicks
+        snap_scrolls := Keylogger.session_scrolls
+        snap_dist    := Keylogger.mouse_distance
+        ; The delay of the first keystroke in the buffer is the inter-burst gap:
+        ; the time elapsed since the previous burst ended. The old stale per-snapshot
+        ; pause field (always 0, never updated) was producing null analytics.
+        snap_pause   := (snap_events.Length > 0) ? snap_events[1][2] : 0
+        Keylogger.buffer_events    := []
+        Keylogger.buffer_text      := ""
+        Keylogger.rich_chunks      := []
+        Keylogger.last_time        := 0
+        Keylogger.session_clicks   := 0
+        Keylogger.session_scrolls  := 0
+        Keylogger.mouse_distance   := 0
+        Keylogger.last_flush_time  := A_TickCount
+    } finally {
+        Critical(previous_critical)
+    }
 
     if (snap_events.Length = 0 && snap_clicks = 0 && snap_scrolls = 0)
         return
@@ -876,10 +879,13 @@ KL_IngestOnce(force := false) {
 	; keystroke hook cannot Push a new entry between our Length check and
 	; the := [] reset — without this, entries pushed after the Length check
 	; but before the clear are silently dropped, never reaching data.sql.
-	Critical("On")
-	pending_snapshot := Keylogger._pending_entries
-	Keylogger._pending_entries := []
-	Critical("Off")
+	previous_critical := Critical("On")
+	try {
+		pending_snapshot := Keylogger._pending_entries
+		Keylogger._pending_entries := []
+	} finally {
+		Critical(previous_critical)
+	}
 	
 	; Write pending events to disk now, off the hot path. Track the completed
 	; JSONL lines precisely: on a later data.sql failure, completed lines are
@@ -958,12 +964,15 @@ KL_IngestOnce(force := false) {
         ; re-queueing them too used to make the next retry insert them twice.
         pending_requeue_count := pending_snapshot.Length - pending_logged_count
         if (pending_requeue_count > 0) {
-            Critical("On")
-            loop pending_requeue_count {
-                snapshot_index := pending_logged_count + A_Index
-                Keylogger._pending_entries.InsertAt(A_Index, pending_snapshot[snapshot_index])
+            previous_critical := Critical("On")
+            try {
+                loop pending_requeue_count {
+                    snapshot_index := pending_logged_count + A_Index
+                    Keylogger._pending_entries.InsertAt(A_Index, pending_snapshot[snapshot_index])
+                }
+            } finally {
+                Critical(previous_critical)
             }
-            Critical("Off")
         }
         ; Leave today_log_offset alone so the next tick retries the same chunk.
         if Keylogger.HasProp("log") && IsObject(Keylogger.log)
