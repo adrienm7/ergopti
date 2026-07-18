@@ -18,21 +18,18 @@
 
 local M = {}
 
-local hs         = hs
-local keyStroke  = hs.eventtap.keyStroke
-local keyStrokes = hs.eventtap.keyStrokes
+local hs = hs
 
 local text_utils = require("lib.text_utils")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("lib.logger")
+local TextSender = require("adapters.text_sender")
+local TooltipRenderer = require("adapters.tooltip_renderer")
 local LOG        = "keymap.expander"
 
 -- Optional modules — loaded with pcall because they are not required for core expansion.
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
-
-local ok_tt, tooltip = pcall(require, "ui.tooltip")
-if not ok_tt then tooltip = { hide = function() end } end
 
 local _state    = nil  -- Shared CoreState injected via M.init().
 local _registry = nil  -- Registry module injected via M.init().
@@ -83,9 +80,9 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	if hs and hs.timer then
 		_state.last_synthetic_arm_time = hs.timer.secondsSinceEpoch()
 	end
-	if not is_ignored and tooltip.hide_forced then tooltip.hide_forced() elseif not is_ignored and tooltip.hide then tooltip.hide() end
+	if not is_ignored then TooltipRenderer.hide({ forced = true }) end
 
-	for _ = 1, deletes do keyStroke({}, "delete", 0) end
+	TextSender.eraseChars(deletes, 0)
 
 	local ok, emit_count, emitted_str = pcall(emit_action)
 	if not ok then
@@ -286,7 +283,7 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	-- suppress it even though nothing was injected (the dropped-char bug).
 	if repl_text == typed then
 		if m.final_result then _state.suppress_rescan() end
-		if not is_ignored and tooltip.hide_forced then tooltip.hide_forced() elseif not is_ignored and tooltip.hide then tooltip.hide() end
+		if not is_ignored then TooltipRenderer.hide({ forced = true }) end
 		return false
 	end
 
@@ -393,7 +390,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 	-- injected (the dropped-terminator-chars bug).
 	if m.plain_repl == trigger then
 		if m.final_result then _state.suppress_rescan() end
-		if not is_ignored and tooltip.hide_forced then tooltip.hide_forced() elseif not is_ignored and tooltip.hide then tooltip.hide() end
+		if not is_ignored then TooltipRenderer.hide({ forced = true }) end
 		return false
 	end
 
@@ -431,16 +428,16 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 				-- Re-type the terminator unless it should be consumed.
 				if not consume_term then
 					if chars == "\r" or chars == "\n" then
-						keyStroke({}, "return", 0)
+						TextSender.pressKey("return", nil, 0)
 						-- Track the re-typed terminator so expected_synthetic_chars
 						-- and notify_synthetic see it; without this the keylogger
 						-- flushes its buffer mid-expansion on the Enter/Tab echo.
 						s = s .. chars
 					elseif chars == "\t" then
-						keyStroke({}, "tab", 0)
+						TextSender.pressKey("tab", nil, 0)
 						s = s .. chars
 					else
-						keyStrokes(chars)
+						TextSender.send(chars, { mode = "direct" })
 						s = s .. chars
 					end
 					c = c + text_utils.utf8_len(chars)
@@ -525,12 +522,12 @@ function M.try_repeat_feature(chars, is_ignored)
 		return false
 	end
 
-	if not is_ignored and tooltip.hide_forced then tooltip.hide_forced() elseif not is_ignored and tooltip.hide then tooltip.hide() end
+	if not is_ignored then TooltipRenderer.hide({ forced = true }) end
 
 	-- In ignored windows, the magic key is already on screen and must be deleted.
 	if is_ignored then
 		_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + 1
-		keyStroke({}, "delete", 0)
+		TextSender.eraseChars(1, 0)
 	end
 
 	_state.expected_synthetic_chars = _state.expected_synthetic_chars .. last_char
@@ -543,7 +540,7 @@ function M.try_repeat_feature(chars, is_ignored)
 	if keylogger and type(keylogger.notify_synthetic) == "function" then
 		keylogger.notify_synthetic(last_char, "hotstring", is_ignored and 1 or 0, "repeat_key")
 	end
-	keyStrokes(last_char)
+	TextSender.send(last_char, { mode = "direct" })
 
 	-- Update the buffer: strip the magic key and append the repeated character.
 	-- magic_offset is already the byte start of the magic key — reuse it.

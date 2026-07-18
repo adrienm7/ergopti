@@ -34,13 +34,16 @@ local LOG = "adapters.app_launcher"
 
 --- Launches an application by its executable path or bundle name.
 --- @param app_path string Absolute path, bundle ID, or app name recognised by macOS.
+--- @return boolean True when Hammerspoon accepted the launch/focus request.
 function M.launch(app_path)
-	local ok, err = pcall(function()
-		hs.application.launchOrFocus(app_path)
+	local ok, result = pcall(function()
+		return hs.application.launchOrFocus(app_path)
 	end)
+	local err = result
 	if not ok then
 		Logger.error(LOG, "launch(): failed to launch %q — %s", tostring(app_path), tostring(err))
 	end
+	return result == true
 end
 
 --- Launches an application with command-line arguments via the macOS shell.

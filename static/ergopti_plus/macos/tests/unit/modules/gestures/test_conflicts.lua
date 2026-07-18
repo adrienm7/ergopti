@@ -61,6 +61,106 @@ helpers.describe("Conflicts.on_action_changed", function()
 	end)
 end)
 
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 2/ Current macOS Preferences =========
+-- =============================================
+-- =============================================
+
+--- Loads the conflict module with deterministic macOS preference output.
+--- @param defaults_output string Synthetic output from the defaults tool.
+--- @return table, table, table, function Module, warning entries, commands, cleanup.
+local function load_with_macos_preferences(defaults_output)
+	local warnings = {}
+	local commands = {}
+	package.loaded["modules.gestures.conflicts"] = nil
+	package.loaded["lib.logger"] = {
+		debug   = function() end,
+		info    = function() end,
+		warn    = function(_, message) table.insert(warnings, message) end,
+		error   = function(_, message) table.insert(warnings, message) end,
+		start   = function() end,
+		success = function() end,
+		trace   = function() end,
+		done    = function() end,
+	}
+	package.loaded["adapters.shell_runner"] = {
+		exec = function(command)
+			table.insert(commands, command)
+			return defaults_output
+		end,
+	}
+
+	local conflicts = helpers.load_with_stubs("modules.gestures.conflicts")
+	local function cleanup()
+		package.loaded["modules.gestures.conflicts"] = nil
+		package.loaded["lib.logger"] = nil
+		package.loaded["adapters.shell_runner"] = nil
+	end
+	return conflicts, warnings, commands, cleanup
+end
+
+helpers.describe("Conflicts current macOS preference checks", function()
+	helpers.it("suppresses a three-finger tap warning only when macOS reports it disabled", function()
+		local conflicts, warnings, commands, cleanup = load_with_macos_preferences([[
+{
+    TrackpadThreeFingerTapGesture = 0;
+    "com.apple.trackpad.threeFingerTapGesture" = 0;
+}
+]])
+		local warning = conflicts.on_action_changed("tap_3", "lookup")
+		helpers.assert_nil(warning, "disabled native three-finger tap must not show a warning")
+		helpers.assert_eq(#warnings, 0, "suppression must not emit a warning-level log")
+		helpers.assert_eq(#commands, 3, "all current Trackpad preference sources must be queried")
+		cleanup()
+	end)
+
+	helpers.it("keeps the warning when any current macOS source still enables the native gesture", function()
+		local conflicts, warnings, _commands, cleanup = load_with_macos_preferences([[
+{
+    TrackpadThreeFingerHorizSwipeGesture = 2;
+    com.apple.trackpad.threeFingerHorizSwipeGesture = 0;
+}
+]])
+		local warning = conflicts.on_action_changed("swipe_3_left", "word_prev")
+		helpers.assert_type(warning, "table", "an enabled native gesture remains a real conflict")
+		helpers.assert_eq(#warnings, 1, "the real conflict must remain visible in the diagnostics")
+		cleanup()
+	end)
+
+	helpers.it("does not warn at startup for blank gesture values", function()
+		local conflicts, warnings, _commands, cleanup = load_with_macos_preferences([[
+{
+    TrackpadThreeFingerVertSwipeGesture = 2;
+}
+]])
+		conflicts.apply_all_overrides({ swipe_3_up = "   ", swipe_3_down = "" })
+		helpers.assert_eq(#warnings, 0, "blank assignments must be treated as disabled gestures")
+		cleanup()
+	end)
+
+	helpers.it("suppresses every active startup warning whose native gesture is confirmed disabled", function()
+		local conflicts, warnings, _commands, cleanup = load_with_macos_preferences([[
+{
+    TrackpadThreeFingerTapGesture = 0;
+    TrackpadThreeFingerHorizSwipeGesture = 0;
+    TrackpadThreeFingerVertSwipeGesture = 0;
+}
+]])
+		conflicts.apply_all_overrides({
+			tap_3 = "left_click_toggle",
+			swipe_3_left = "word_prev",
+			swipe_3_up = "tab_prev",
+		})
+		helpers.assert_eq(#warnings, 0, "confirmed macOS opt-outs must leave the diagnostic clean")
+		cleanup()
+	end)
+end)
+
 helpers.describe("Conflicts — pause safety + diagnostic integration (encore plus)", function()
 	helpers.it("pause must keep on_action_changed pure with zero side effects (project_suspend_pause_invariant)", function()
 		-- Conflicts detector is read-only config check; must be callable under pause

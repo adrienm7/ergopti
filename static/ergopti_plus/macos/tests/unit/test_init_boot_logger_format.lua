@@ -29,10 +29,10 @@ helpers.assert_true(
 
 -- Test 2: The corrected %s format must appear in the hotstring fallback warning.
 -- Use plain search — the literal chars "%s" (percent + s) must appear in the format string.
-local has_correct_format = src:find("No shared hotstring groups in '%s'", 1, true) ~= nil
+local has_correct_format = src:find("Logger.info(LOG, \"No shared hotstring groups in '%s'", 1, true) ~= nil
 helpers.assert_true(
 	has_correct_format,
-	"init.lua must use '%%s' in the hotstring fallback Logger.warn call (init-boot-logger)"
+	"init.lua must use '%%s' in the informational hotstring fallback log (init-boot-logger)"
 )
 
 print("[PASS] test_init_boot_logger_format")

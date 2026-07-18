@@ -13,6 +13,8 @@ local dialog     = require("lib.dialog_util")
 local Paths      = require("lib.paths")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
+local NetworkInfo = require("adapters.network_info")
+local Notifier    = require("adapters.notifier")
 local Version    = require("updater.version")
 local ReleaseParser = require("updater.release_parser")
 local LOG        = "updater"
@@ -307,17 +309,16 @@ local function notify_new_version(tag, update_menu_fn)
 	if type(update_menu_fn) == "function" then pcall(update_menu_fn) end
 	local body = i18n.get("updater.tray_new_version_body"):gsub("{1}", tag)
 	local title = i18n.get("updater.tray_new_version_title")
-	pcall(function()
-		hs.notify.new({
-			title = title,
-			informativeText = body,
-			hasActionButton = false,
-		}):send()
-	end)
+	Notifier.send(title, { body = body, kind = "info" })
 end
 
 local function background_tick(channel, update_menu_fn)
 	if M.is_local_source() or _check_interval_sec <= 0 then return end
+	local reachable = NetworkInfo.isInternetReachable()
+	if NetworkInfo.hasInternetProbeResult() and not reachable then
+		Logger.debug(LOG, "Background check skipped: the current network probe reports no internet access.")
+		return
+	end
 	local current = M.current_version()
 	local url = M.release_api_url(channel)
 	-- Capture generation before the async call so a channel switch mid-flight

@@ -36,6 +36,8 @@ local LOG = "adapters.keyboard_hook"
 local _tap       = nil   -- hs.eventtap instance (nil when stopped)
 local _on_char   = nil   -- User callback for printable characters
 local _on_key    = nil   -- User callback for non-printable keys
+local _on_event  = nil   -- Optional raw event callback for advanced consumers
+local _last_options = nil
 local _context   = { appId = "", windowTitle = "" }
 
 
@@ -68,6 +70,10 @@ end
 --- @return function hs.eventtap handler function.
 local function _make_handler()
 	return function(event)
+		if _on_event then
+			local ok, consume = pcall(_on_event, event)
+			return ok and consume == true
+		end
 		local ok, char = pcall(function() return event:getCharacters() end)
 		-- Use utf8.len() instead of # (byte count) so multi-byte characters like
 		-- é, à, ñ are recognised as single printable codepoints (H3 audit fix).
@@ -110,7 +116,7 @@ end
 
 --- Starts the keyboard hook. Always stops and nils any existing tap (enabled
 --- or disabled) before creating a new one to prevent tap leaks (H5 audit fix).
---- @param opts table|nil { intercept?, onChar?, onKey? }
+--- @param opts table|nil { intercept?, onChar?, onKey?, onEvent?, eventTypes? }
 function M.start(opts)
 	-- Stop any existing tap (enabled or disabled) before creating a new one.
 	-- The old guard `if _tap and _tap:isEnabled()` left a disabled-but-allocated
@@ -124,13 +130,16 @@ function M.start(opts)
 	-- previous lifecycle survive a restart where the new caller omits them (M-12 audit fix)
 	_on_char = nil
 	_on_key  = nil
-	local options = type(opts) == "table" and opts or {}
+	_on_event = nil
+	local options = type(opts) == "table" and opts or _last_options or {}
+	if type(opts) == "table" then _last_options = opts end
 	if type(options.onChar) == "function" then _on_char = options.onChar end
 	if type(options.onKey)  == "function" then _on_key  = options.onKey  end
+	if type(options.onEvent) == "function" then _on_event = options.onEvent end
 
 	_read_context()
 
-	local event_types = {
+	local event_types = type(options.eventTypes) == "table" and options.eventTypes or {
 		hs.eventtap.event.types.keyDown,
 	}
 	local handler = _make_handler()

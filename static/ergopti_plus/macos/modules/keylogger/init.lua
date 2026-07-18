@@ -33,6 +33,8 @@ local LogManager     = require("modules.keylogger.log_manager")
 local ContextTracker = require("modules.keylogger.context_tracker")
 local KcBridge       = require("modules.keylogger.kc_bridge")
 local Watchers       = require("modules.keylogger.watchers")
+local ProcessLifecycle = require("adapters.process_lifecycle")
+local KeyboardHook   = require("adapters.keyboard_hook")
 local LOG            = "keylogger"
 
 
@@ -295,8 +297,8 @@ local _script_control       = nil
 local _idle_timer           = nil
 local _maintenance_timer    = nil
 local _tap_watchdog_timer   = nil
-local _app_watcher          = nil
 local _win_filter           = nil
+local _process_lifecycle_registered = false
 
 -- Browser apps whose intra-window focus/title changes warrant a private-mode
 -- re-check. The array feeds hs.window.filter.new(); the set gives O(1) lookup in
@@ -1277,28 +1279,17 @@ function M.start(script_control)
 	CoreState.recent_typing_eff  = {}
 	CoreState.recent_typing_phys = {}
 
-	-- Application watcher. The browser window-filter is created LAZILY on the first
+	-- Application lifecycle. The browser window-filter is created LAZILY on the first
 	-- browser activation (see ensure_browser_window_filter) so the keylogger never
 	-- pays hs.window.filter's whole-window-tree enumeration at start.
-	-- pcall-guarded: the watcher-registration call failing here would otherwise
-	-- abort M.start() outright, silently leaving app-switch tracking (and
-	-- therefore the AX observer attachment chain) permanently unattached.
-	if not _app_watcher then
-		local ok_watcher, watcher = pcall(hs.application.watcher.new, function(app_name, event_type, app_object)
-			if event_type == hs.application.watcher.activated and BROWSER_APP_SET[app_name] then
-				ensure_browser_window_filter()
-			end
-			ContextTracker.app_watcher_cb(app_name, event_type, app_object)
+	if not _process_lifecycle_registered then
+		ProcessLifecycle.onAppActivate(function(app_name, app_object)
+			if BROWSER_APP_SET[app_name] then ensure_browser_window_filter() end
+			ContextTracker.app_watcher_cb(app_name, hs.application.watcher.activated, app_object)
 		end)
-		if ok_watcher and watcher then
-			_app_watcher = watcher
-		else
-			Logger.error(LOG, "Failed to create application watcher: %s.", tostring(watcher))
-		end
+		_process_lifecycle_registered = true
 	end
-	if _app_watcher then
-		pcall(function() _app_watcher:start() end)
-	end
+	ProcessLifecycle.start()
 
 	-- Evaluate the current window's private status on the next tick (independent of
 	-- the lazy browser filter), keeping it off the synchronous start path.
@@ -1313,26 +1304,27 @@ function M.start(script_control)
 	Watchers.init_hardware_watchers()
 
 	-- Main event tap
-	if not _event_tap then
-		_event_tap = hs.eventtap.new({
+	KeyboardHook.start({
+		eventTypes = {
 			hs.eventtap.event.types.keyDown,
 			hs.eventtap.event.types.keyUp,
 			hs.eventtap.event.types.flagsChanged,
 			hs.eventtap.event.types.leftMouseDown,
 			hs.eventtap.event.types.rightMouseDown,
 			hs.eventtap.event.types.scrollWheel,
-		}, handle_key)
-	end
-	_event_tap:start()
+		},
+		onEvent = handle_key,
+	})
+	_event_tap = true
 
 	-- Tap watchdog: restarts the event tap if Hammerspoon silently disabled it
 	-- (can happen after a system wake, screen-saver unlock, or security prompt).
 	if not _tap_watchdog_timer then
 		_tap_watchdog_timer = hs.timer.new(TAP_WATCHDOG_INTERVAL_SEC, function()
 			if not CoreState.is_enabled then return end
-			if _event_tap and not _event_tap:isEnabled() then
+			if not KeyboardHook.isRunning() then
 				Logger.warn(LOG, "Keylogger event tap found disabled — restarting.")
-				pcall(function() _event_tap:start() end)
+				KeyboardHook.start()
 			end
 		end)
 	end
@@ -1377,9 +1369,10 @@ function M.stop()
 
 	CoreState.is_enabled = false
 	LogManager.flush_buffer()
+	ProcessLifecycle.stop()
 
-	if _event_tap            then _event_tap:stop();            _event_tap          = nil end
-	if _app_watcher          then _app_watcher:stop();          _app_watcher        = nil end
+	KeyboardHook.stop()
+	_event_tap = nil
 	if _caffeinate_watcher   then _caffeinate_watcher:stop();   _caffeinate_watcher = nil end
 	if _win_filter           then _win_filter:unsubscribeAll(); _win_filter         = nil end
 	if _idle_timer           then _idle_timer:stop();           _idle_timer         = nil end

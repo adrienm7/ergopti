@@ -27,6 +27,9 @@ local http          = hs.http
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
 local i18n          = require("lib.i18n")
+local AppLauncher   = require("adapters.app_launcher")
+local WindowInfo    = require("adapters.window_info")
+local WindowManager = require("adapters.window_manager")
 
 local LOG = "shortcuts.actions.apps"
 
@@ -124,8 +127,7 @@ local function launch_first_available(apps)
 			end
 		end
 
-		local ok_l, ok = pcall(hs.application.launchOrFocus, name)
-		if ok_l and ok then return true end
+		if WindowManager.activate(name) or AppLauncher.launch(name) then return true end
 	end
 
 	return false
@@ -263,9 +265,8 @@ end
 
 --- Opens macOS System Settings (falls back to System Preferences on older macOS).
 function M.open_settings()
-	local ok, launched = pcall(hs.application.launchOrFocus, "System Settings")
-	if not ok or not launched then
-		pcall(hs.application.launchOrFocus, "System Preferences")
+	if not AppLauncher.launch("System Settings") then
+		AppLauncher.launch("System Preferences")
 	end
 	center_frontmost_after(CENTER_DELAY_SEC)
 end
@@ -273,8 +274,11 @@ end
 --- In a file manager: copies the current path (Cmd+Opt+C).
 --- Elsewhere: copies the text selection and opens it as a URL or Google search.
 function M.copy_or_open_path()
-	local ok, front = pcall(hs.application.frontmostApplication)
-	local name      = (ok and front) and front:name() or ""
+	local name = WindowInfo.getFocused().appId
+	if name == "" then
+		local ok, front = pcall(hs.application.frontmostApplication)
+		name = (ok and front) and front:name() or ""
+	end
 
 	if is_finder_like(name) then
 		-- Try Finder's native "copy path" shortcut first

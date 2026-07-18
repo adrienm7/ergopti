@@ -27,6 +27,7 @@ local MenuPaths     = require("ui.menu.menu_paths")
 local MenuState     = require("ui.menu.menu_state")
 local MenuWatchers  = require("ui.menu.menu_watchers")
 local Updater       = require("lib.updater")
+local TrayMenu      = require("adapters.tray_menu")
 
 local LOG = "menu"
 local load_errors = {}
@@ -124,6 +125,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		Logger.error(LOG, "Failed to create hs.menubar object.")
 		return nil, nil
 	end
+	TrayMenu.adopt(myMenu)
 	Logger.info(LOG, "Menubar created successfully.")
 
 	local updateMenu
@@ -882,7 +884,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- so opening it is native-instant. Only meaningful once a tree exists.
 	push_static_menu = function()
 		if type(_cached_menu_items) ~= "table" then return end
-		pcall(function() myMenu:setMenu(_cached_menu_items) end)
+		TrayMenu.setMenu(_cached_menu_items)
 	end
 
 	local function rebuild_menu_cache()
@@ -926,7 +928,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- replaces this with a STATIC native menu (see below) and the callback is never
 	-- consulted again — every open is then instant.
 	pcall(function()
-		myMenu:setMenu(function()
+		TrayMenu.setMenu(function()
 			local paused_now = core_mods.shortcuts_mod
 				and type(core_mods.shortcuts_mod.is_paused) == "function"
 				and core_mods.shortcuts_mod.is_paused() or false

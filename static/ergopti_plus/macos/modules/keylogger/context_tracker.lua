@@ -22,6 +22,7 @@
 local hs     = hs
 local Logger = require("lib.logger")
 local i18n   = require("lib.i18n")
+local SecureFieldDetector = require("adapters.secure_field_detector")
 local LOG    = "keylogger.context_tracker"
 local M      = {}
 
@@ -345,8 +346,13 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 	_state.focus_pending_at  = now
 	_state.focus_pending_app = app_name
 
-	-- Reset secure field flag on every app switch to avoid false-positive suppression
-	_state.is_secure_field = false
+	-- Refresh the portable secure-field guard before attaching the richer AX
+	-- observer. This closes the short activation-to-observer gap for known vaults
+	-- and keeps the adapter as the single fallback for environments without AX
+	-- notifications.
+	SecureFieldDetector.refresh()
+	_state.is_secure_field = SecureFieldDetector.isSecureField()
+		or SecureFieldDetector.isSecureApp(app_name)
 
 	-- Reset per-switch window tracking
 	_last_win_title = nil

@@ -725,7 +725,7 @@ function M.start()
 				table.insert(types_to_watch, ev[name])
 				table.insert(added, name)
 			else
-				Logger.warn(LOG, "  primer event type '%s' is NOT in hs.eventtap.event.types (skipped)", name)
+				Logger.debug(LOG, "  primer event type '%s' is unavailable in this Hammerspoon version (skipped).", name)
 			end
 		end
 		Logger.info(LOG, "  primer subscribing to %d types: %s", #types_to_watch, table.concat(added, ", "))

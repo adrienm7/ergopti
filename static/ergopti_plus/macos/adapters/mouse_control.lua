@@ -34,10 +34,12 @@ local LOG = "adapters.mouse_control"
 --- Moves the mouse cursor to an absolute screen position.
 --- @param x number Horizontal coordinate in pixels.
 --- @param y number Vertical coordinate in pixels.
+--- @return boolean True when Hammerspoon accepted the position.
 function M.setPos(x, y)
-	pcall(function()
+	local ok = pcall(function()
 		hs.mouse.absolutePosition({ x = tonumber(x) or 0, y = tonumber(y) or 0 })
 	end)
+	return ok
 end
 
 --- Returns the current absolute cursor position.

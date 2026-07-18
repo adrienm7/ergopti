@@ -21,6 +21,7 @@ local keylogger  = require("modules.keylogger")
 local WPMShared  = require("ui.wpm.shared")
 local Logger     = require("lib.logger")
 local Paths      = require("lib.paths")
+local GraphicsRenderer = require("adapters.graphics_renderer")
 
 local LOG = "wpm_widget"
 
@@ -408,7 +409,15 @@ update_widget_body = function()
 		local bg_radius = 10
 
 		if not _canvas then
-			_canvas = hs.canvas.new({ x = target_x, y = target_y, w = canvas_width, h = canvas_height })
+			_canvas = GraphicsRenderer.createWindow({
+				x = target_x, y = target_y, w = canvas_width, h = canvas_height,
+				clickThrough = false, alwaysOnTop = false,
+			})
+			if _canvas == 0 then
+				_canvas = nil
+				Logger.error(LOG, "update_widget_body(): failed to allocate the widget canvas.")
+				return
+			end
 			_canvas:level(hs.drawing.windowLevels.cursor)
 			_canvas:behavior({ "canJoinAllSpaces", "stationary" })
 			-- Drag: mouseCallback fires on left-button down inside the canvas.

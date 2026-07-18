@@ -460,7 +460,7 @@ end
 
 if not has_common_hotstring_groups(configured_hotstrings_dir) and has_common_hotstring_groups(bundled_hotstrings_dir) then
 	hotstrings_dir = bundled_hotstrings_dir
-	Logger.warn(LOG, "No shared hotstring groups in '%s' — using bundled directory '%s'.",
+	Logger.info(LOG, "No shared hotstring groups in '%s' — using bundled directory '%s'.",
 		configured_hotstrings_dir, hotstrings_dir)
 end
 
