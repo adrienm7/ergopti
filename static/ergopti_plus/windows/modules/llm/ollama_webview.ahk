@@ -54,6 +54,10 @@ global _OllamaWV_Ready      := false   ; true once JS signals "ready"
 global _OllamaWV_Queue      := []      ; JS calls buffered before page ready
 global _OllamaWV_OnCancel   := unset
 global _OllamaWV_OnRetry    := unset
+; Every deferred WebView callback is bound to the window instance that armed it.
+; A close/reopen must never let an old auto-close, safety flush, or script timer
+; mutate the replacement window.
+global _OllamaWV_Epoch      := 0
 
 
 
@@ -146,17 +150,31 @@ OllamaWV_SetError(msg) {
  * @param {string}  msg        - Final message shown to the user.
  */
 OllamaWV_Done(is_success, msg := "") {
+	global _OllamaWV_Epoch
 	js_bool := is_success ? "true" : "false"
 	OllamaWV_EvalJS("done(" js_bool "," OllamaWV_JSStr(msg) ")")
-	if is_success
-		SetTimer(() => OllamaWV_Close(), -1800)
+	if is_success {
+		captured_epoch := _OllamaWV_Epoch
+		SetTimer(OllamaWV_CloseIfEpoch.Bind(captured_epoch), -1800)
+	}
+}
+
+; A terminal state belongs only to the WebView instance that displayed it.  An
+; anonymous OllamaWV_Close timer used to close a new window reopened within the
+; previous window's 1.8 s grace period.
+OllamaWV_CloseIfEpoch(captured_epoch, *) {
+	global _OllamaWV_Epoch
+	if (captured_epoch != _OllamaWV_Epoch)
+		return
+	OllamaWV_Close()
 }
 
 /**
  * Hides and destroys the window.
  */
 OllamaWV_Close() {
-	global _OllamaWV_Gui, _OllamaWV_Controller, _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_Udir, _OllamaWV_MsgSub
+	global _OllamaWV_Gui, _OllamaWV_Controller, _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_Udir, _OllamaWV_MsgSub, _OllamaWV_Epoch
+	_OllamaWV_Epoch += 1
 	_OllamaWV_Ready := false
 	_OllamaWV_Queue := []
 	; Release the subscription handle FIRST, while the controller is still
@@ -212,8 +230,10 @@ OllamaWV_IsAlive() {
  */
 OllamaWV_Create(kind, subtitle) {
 	global _OllamaWV_Gui, _OllamaWV_Controller, _OllamaWV_WebView, _OllamaWV_MsgSub
-	global _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_W, _OllamaWV_H, _OllamaWV_Margin
+	global _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_W, _OllamaWV_H, _OllamaWV_Margin, _OllamaWV_Epoch
 
+	_OllamaWV_Epoch += 1
+	captured_epoch := _OllamaWV_Epoch
 	_OllamaWV_Ready := false
 	_OllamaWV_Queue := []
 
@@ -228,7 +248,7 @@ OllamaWV_Create(kind, subtitle) {
 	g := Gui_Create("+AlwaysOnTop +Caption +MinimizeBox +Resize +ToolWindow -DPIScale", "IA")
 	g.MarginX := 0
 	g.MarginY := 0
-	g.OnEvent("Close", (*) => OllamaWV_Close())
+	g.OnEvent("Close", OllamaWV_CloseIfEpoch.Bind(captured_epoch))
 
 	; Position bottom-right, flush above the taskbar with a small margin.
 	; SPI_GETWORKAREA (48) always returns physical pixels.
@@ -308,7 +328,7 @@ OllamaWV_Create(kind, subtitle) {
 	; The "ready" message from JS triggers OllamaWV_OnWebMessage which
 	; flushes the queue. As a safety net, also flush after 2 s in case
 	; the message bridge misfires.
-	SetTimer(OllamaWV_FlushQueue, -2000)
+	SetTimer(OllamaWV_FlushQueue.Bind(captured_epoch), -2000)
 
 	; Queue the initial setKind so it fires once the page is ready
 	OllamaWV_EvalJS("setKind(" OllamaWV_JSStr(kind) "," OllamaWV_JSStr("") "," OllamaWV_JSStr(subtitle) ")")
@@ -387,7 +407,7 @@ OllamaWV_I18nApplyScript(locale_code) {
  * @param {string} js - JavaScript expression to evaluate.
  */
 OllamaWV_EvalJS(js) {
-	global _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue
+	global _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_Epoch
 	if !IsSet(_OllamaWV_WebView) {
 		_OllamaWV_Queue.Push(js)
 		return
@@ -401,7 +421,7 @@ OllamaWV_EvalJS(js) {
 	; it synchronously from inside the WebMessageReceived COM callback (as the
 	; "ready" handler does) re-enters the STA apartment and wedges further
 	; WebView2 message delivery.
-	SetTimer(OllamaWV_RunScript.Bind(js), -1)
+	SetTimer(OllamaWV_RunScript.Bind(_OllamaWV_Epoch, js), -1)
 }
 
 /**
@@ -411,8 +431,10 @@ OllamaWV_EvalJS(js) {
  * nested-message-loop wedge OllamaWV_EvalJS's deferral avoids.
  * @param {string} js - JavaScript expression to evaluate.
  */
-OllamaWV_RunScript(js) {
-	global _OllamaWV_WebView
+OllamaWV_RunScript(captured_epoch, js) {
+	global _OllamaWV_WebView, _OllamaWV_Epoch
+	if (captured_epoch != _OllamaWV_Epoch or A_IsSuspended)
+		return
 	if !IsSet(_OllamaWV_WebView)
 		return
 	try {
@@ -428,8 +450,12 @@ OllamaWV_RunScript(js) {
  * Also pushes the locale JSON at this point — after the DOM is ready —
  * so i18n_apply() can walk live DOM nodes instead of a not-yet-parsed tree.
  */
-OllamaWV_FlushQueue() {
-	global _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue, _I18nLocale
+OllamaWV_FlushQueue(captured_epoch := unset) {
+	global _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue, _I18nLocale, _OllamaWV_Epoch
+	if !IsSet(captured_epoch)
+		captured_epoch := _OllamaWV_Epoch
+	if (captured_epoch != _OllamaWV_Epoch or A_IsSuspended)
+		return
 	if !IsSet(_OllamaWV_WebView)
 		return
 	if _OllamaWV_Ready   ; Guard: flush must only run once
@@ -439,9 +465,9 @@ OllamaWV_FlushQueue() {
 	; OllamaWV_EvalJS) so none of these run re-entrantly inside the
 	; WebMessageReceived callback that typically triggers this flush.
 	i18n_js := OllamaWV_I18nApplyScript(_I18nLocale)
-	SetTimer(OllamaWV_RunScript.Bind(i18n_js), -1)
+	SetTimer(OllamaWV_RunScript.Bind(captured_epoch, i18n_js), -1)
 	for _, js in _OllamaWV_Queue
-		SetTimer(OllamaWV_RunScript.Bind(js), -1)
+		SetTimer(OllamaWV_RunScript.Bind(captured_epoch, js), -1)
 	_OllamaWV_Queue := []
 }
 
@@ -450,13 +476,15 @@ OllamaWV_FlushQueue() {
  * Handles "ready", "cancel", "retry", "expand".
  */
 OllamaWV_OnWebMessage(sender, args) {
-	global _OllamaWV_OnCancel, _OllamaWV_OnRetry
+	global _OllamaWV_OnCancel, _OllamaWV_OnRetry, _OllamaWV_WebView, _OllamaWV_Epoch
+	if A_IsSuspended or !IsSet(_OllamaWV_WebView) or !(sender == _OllamaWV_WebView)
+		return
 	msg := ""
 	try msg := args.TryGetWebMessageAsString()
 	LoggerInfo("LLM", "WebView message: '" msg "'.")
 	switch msg {
-		case "ready":
-			OllamaWV_FlushQueue()
+	case "ready":
+			OllamaWV_FlushQueue(_OllamaWV_Epoch)
 		case "cancel":
 			OllamaWV_Close()
 			if IsSet(_OllamaWV_OnCancel)
