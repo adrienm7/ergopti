@@ -32,31 +32,23 @@ global _WebView_SharedEnvCreating := false
 ; exactly one and it is reused forever), so it is leak-free by construction.
 global WEBVIEW_SHARED_UDIR := A_Temp . "\ergopti_wv_shared"
 
-; Poll cadence (ms) for a second caller waiting on an in-flight environment
-; boot. Short enough that the second WebView2 window does not feel stalled once
-; the first caller's CreateEnvironmentAsync resolves.
-global WEBVIEW_SHARED_ENV_WAIT_POLL_MS := 20
-
 ; Returns the shared WebView2 environment, booting it on first use.
 ; @param loader {String} Absolute path to WebView2Loader.dll.
 ; @returns {WebView2.Environment} The cached environment. Throws on boot failure,
 ;          so the caller's WebView2.create try/catch can degrade gracefully.
 WebView_SharedEnvironment(loader) {
-	global _WebView_SharedEnv, _WebView_SharedEnvCreating, WEBVIEW_SHARED_UDIR, WEBVIEW_SHARED_ENV_WAIT_POLL_MS
+	global _WebView_SharedEnv, _WebView_SharedEnvCreating, WEBVIEW_SHARED_UDIR
 	; Warm path -- reuse the already-running browser process.
 	if _WebView_SharedEnv
 		return _WebView_SharedEnv
 
-	; A second caller arriving while the first's await() below is pumping the
-	; message queue must wait for that boot to finish instead of racing it with
-	; its own CreateEnvironmentAsync against the same locked user-data folder.
+	; `await()` pumps the message queue. A re-entrant second caller therefore
+	; cannot wait here: its Sleep loop runs on AHK's only interpreter and prevents
+	; the first await from receiving the completion that would clear this flag.
+	; Fail this second open immediately so its normal native/unavailable fallback
+	; runs; the first owner publishes the shared environment when it completes.
 	if _WebView_SharedEnvCreating {
-		while _WebView_SharedEnvCreating
-			Sleep(WEBVIEW_SHARED_ENV_WAIT_POLL_MS)
-		if _WebView_SharedEnv
-			return _WebView_SharedEnv
-		; The first caller's boot failed -- fall through and attempt our own,
-		; exactly as if we had arrived first.
+		throw Error("WebView shared environment is still initializing")
 	}
 
 	_WebView_SharedEnvCreating := true
