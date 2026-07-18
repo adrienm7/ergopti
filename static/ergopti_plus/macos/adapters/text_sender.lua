@@ -127,8 +127,9 @@ end
 --- Emits count Backspace keystrokes synchronously.
 --- @param count integer Number of Backspace keystrokes to emit.
 --- @param delay number|nil Hammerspoon inter-key delay in seconds (defaults to 0).
-function M.eraseChars(count, delay)
+function M.eraseChars(count, ...)
 	if type(count) ~= "number" or count < 1 then return end
+	local delay = select(1, ...)
 	local key_delay = tonumber(delay) or 0
 	local ok, err = pcall(function()
 		for _ = 1, count do
@@ -144,8 +145,9 @@ end
 --- @param key       string   Key name (e.g. "return", "escape", "f1").
 --- @param modifiers table    Array of modifier names: "ctrl"|"shift"|"alt"|"cmd".
 --- @param delay     number|nil Hammerspoon inter-key delay in seconds (defaults to 0).
-function M.pressKey(key, modifiers, delay)
+function M.pressKey(key, modifiers, ...)
 	local mods = type(modifiers) == "table" and modifiers or {}
+	local delay = select(1, ...)
 	local key_delay = tonumber(delay) or 0
 	local ok, err = pcall(hs.eventtap.keyStroke, mods, key, key_delay)
 	if not ok then

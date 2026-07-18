@@ -258,6 +258,45 @@ function M.read_fixture(relative_path)
 	return body
 end
 
+--- Returns the concatenated production source containing an optional symbol.
+---
+--- Source-invariant tests must not name a production file: the implementation
+--- can be split or moved without turning a useful invariant into a path error.
+--- The scan deliberately excludes tests/ and works with the plain Lua runner on
+--- macOS, Linux CI, and Windows.
+--- @param symbol string|nil Optional literal to select relevant source files.
+--- @return string|nil Matching production Lua source, or nil when not found.
+function M.read_driver_source(symbol)
+	local root = M.driver_root()
+	local is_windows = package.config:sub(1, 1) == "\\"
+	local command
+	if is_windows then
+		command = 'dir /b /s "' .. root:gsub("/", "\\") .. '*.lua"'
+	else
+		command = 'find "' .. root:gsub('"', '\\"') .. '" -type f -name "*.lua"'
+	end
+
+	local pipe = io.popen(command, "r")
+	if not pipe then return nil end
+	local parts = {}
+	for path in pipe:lines() do
+		local normalized = path:gsub("\\", "/")
+		if not normalized:find("/tests/", 1, true) then
+			local fh = io.open(path, "r")
+			if fh then
+				local body = fh:read("*a")
+				fh:close()
+				if not symbol or body:find(symbol, 1, true) then
+					parts[#parts + 1] = body
+				end
+			end
+		end
+	end
+	pipe:close()
+	if #parts == 0 then return nil end
+	return table.concat(parts, "\n")
+end
+
 
 
 

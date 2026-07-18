@@ -63,28 +63,25 @@ helpers.describe("keylogger: tap-watchdog behavioral contract (C2)", function()
 			"watchdog callback must check CoreState.is_enabled to skip restart during pause/stop")
 	end)
 
-	helpers.it("watchdog callback detects disabled tap via _event_tap:isEnabled()", function()
+	helpers.it("watchdog callback detects a disabled tap through KeyboardHook", function()
 		local src = read_src()
 		local timer_start = src:find("_tap_watchdog_timer = hs.timer.new(TAP_WATCHDOG_INTERVAL_SEC,", 1, true)
 		helpers.assert_true(timer_start ~= nil, "tap_watchdog_timer block must exist")
 		local callback_window = src:sub(timer_start, timer_start + 300)
 		helpers.assert_true(
-			callback_window:find("_event_tap:isEnabled()", 1, true) ~= nil,
-			"watchdog callback must call `_event_tap:isEnabled()` to detect OS-disabled taps; "
+			callback_window:find("not KeyboardHook.isRunning()", 1, true) ~= nil,
+			"watchdog callback must ask KeyboardHook whether the tap is running; "
 			.. "without this check the watchdog cannot detect a silent kCGEventTapDisabledByTimeout")
 	end)
 
-	helpers.it("watchdog callback restarts the tap via pcall(_event_tap:start())", function()
+	helpers.it("watchdog callback restarts the tap through KeyboardHook", function()
 		local src = read_src()
 		local timer_start = src:find("_tap_watchdog_timer = hs.timer.new(TAP_WATCHDOG_INTERVAL_SEC,", 1, true)
 		helpers.assert_true(timer_start ~= nil, "tap_watchdog_timer block must exist")
 		local callback_window = src:sub(timer_start, timer_start + 400)
-		-- Must use pcall to avoid crashing the watchdog itself on a dead tap object
 		helpers.assert_true(
-			callback_window:find("pcall", 1, true) ~= nil and
-			callback_window:find("_event_tap:start()", 1, true) ~= nil,
-			"watchdog callback must call `_event_tap:start()` inside pcall "
-			.. "(a dead tap object raises an error; pcall prevents killing the watchdog itself)")
+			callback_window:find("KeyboardHook.start()", 1, true) ~= nil,
+			"watchdog callback must restart the disabled hook through KeyboardHook.start()")
 	end)
 
 	helpers.it("watchdog timer is stopped and cleared in M.stop()", function()

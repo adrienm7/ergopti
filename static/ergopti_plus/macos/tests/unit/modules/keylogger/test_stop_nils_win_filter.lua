@@ -56,11 +56,12 @@ helpers.describe("keylogger/init.lua: M.stop() nils watcher locals", function()
 			"M.stop() must nil _event_tap after stopping it")
 	end)
 
-	helpers.it("_app_watcher is nilled after stop() in M.stop()", function()
+	helpers.it("stops the app-activation lifecycle in M.stop()", function()
 		local src = strip_comments(read_source("modules/keylogger/init.lua"))
 		helpers.assert_true(
-			src:find("_app_watcher%s*=%s*nil") ~= nil,
-			"M.stop() must nil _app_watcher after stopping it")
+			src:find("ProcessLifecycle:stop%(%s*%)") ~= nil
+				or src:find("ProcessLifecycle%.stop%(%s*%)") ~= nil,
+			"M.stop() must stop the delegated app-activation lifecycle")
 	end)
 
 end)

@@ -10,14 +10,9 @@
 
 #Requires AutoHotkey v2.0
 
-_MATA_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
-}
-
 _MATA_MicroIdleDoesNotResetAppTime() {
-	Src := _MATA_ReadSource("modules/keylogger/keylogger_watchers.ahk")
+	Src := _DriverFuncBody("KL_Watchers_OnKeystroke")
+	Assert(Src != "", "KL_Watchers_OnKeystroke must exist")
 	Assert(!InStr(Src, "KLWatch.is_idle or gap >= KLWatchConst.SESSION_TIMEOUT_MS"),
 		"micro-idle must not reset app_entered_at: it under-counts reading and thinking time")
 	Assert(InStr(Src, "if (gap >= KLWatchConst.SESSION_TIMEOUT_MS)") > 0,
@@ -26,9 +21,12 @@ _MATA_MicroIdleDoesNotResetAppTime() {
 Test("metrics app time: micro-idle does not discard foreground duration", _MATA_MicroIdleDoesNotResetAppTime)
 
 _MATA_ManifestIncludesLiveForegroundInterval() {
-	Src := _MATA_ReadSource("modules/keylogger/keylogger_reader_manifest.ahk")
-	Assert(InStr(Src, "KLR_AddLiveForegroundTime(manifest, start_date, end_date)") > 0,
+	ReaderBody := _DriverFuncBody("KLR_ReadManifest")
+	Assert(ReaderBody != "", "KLR_ReadManifest must exist")
+	Assert(InStr(ReaderBody, "KLR_AddLiveForegroundTime(manifest, start_date, end_date)") > 0,
 		"manifest reader must add the still-open foreground interval")
+	Src := _DriverFuncBody("KLR_AddLiveForegroundTime")
+	Assert(Src != "", "KLR_AddLiveForegroundTime must exist")
 	Assert(InStr(Src, 'cell["app_time_ms"] += elapsed') > 0,
 		"live foreground duration must be projected into app_time_ms")
 	Assert(InStr(Src, "date_str < start_date") > 0 && InStr(Src, "date_str > end_date") > 0,

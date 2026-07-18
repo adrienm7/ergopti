@@ -124,10 +124,17 @@ end)
 -- ==========================================================================
 
 helpers.describe("adapters.network_info — sha256_hex nil-safety", function()
-	local NI
+local NI
+	local function load_network_info(overrides)
+		-- network_info captures Crypto at require time. Clear that dependency so
+		-- every scenario uses its own hs.execute override instead of a prior test's.
+		package.loaded["adapters.crypto"] = nil
+		package.loaded["adapters.shell_runner"] = nil
+		return helpers.load_with_stubs("adapters.network_info", overrides)
+	end
 
 	helpers.it("returns '' when openssl stdout is empty (no nil-index crash)", function()
-		NI = helpers.load_with_stubs("adapters.network_info", {
+		NI = load_network_info({
 			wifi = {
 				currentNetwork = function() return "MySSID" end,
 			},
@@ -144,7 +151,7 @@ helpers.describe("adapters.network_info — sha256_hex nil-safety", function()
 	end)
 
 	helpers.it("returns '' when openssl output has no hex pattern", function()
-		NI = helpers.load_with_stubs("adapters.network_info", {
+		NI = load_network_info({
 			wifi = { currentNetwork = function() return "TestNet" end },
 			execute = function(_) return "Error: openssl not found ZZZ\n" end,
 		})
@@ -156,7 +163,7 @@ helpers.describe("adapters.network_info — sha256_hex nil-safety", function()
 
 	helpers.it("returns the hash when openssl succeeds", function()
 		local hex = ("ab"):rep(32)  -- 64 hex chars
-		NI = helpers.load_with_stubs("adapters.network_info", {
+		NI = load_network_info({
 			wifi = { currentNetwork = function() return "GoodNet" end },
 			execute = function(_) return "(stdin)= " .. hex .. "\n" end,
 		})
