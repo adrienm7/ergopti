@@ -157,9 +157,10 @@ KLR_BuildDatabase(metrics_dir) {
         ; Only need to exec deltas; skip the libversion / schema loads.
         if !KLR_ApplyIncremental(KLRCache.db, md, logPath)
             return 0
-        ; Rebuild aggregates from events_* on every cycle — agg_* are no
-        ; longer stored in data.sql so they must be recomputed in memory.
-        KLR_ClearAggregates(KLRCache.db)
+        ; Re-project only the SQL-owned fields from the append-only raw
+        ; events.  Do not clear the tables here: walker-owned metrics (WPM,
+        ; ngrams, correction and ergonomic details) exist only in this cache
+        ; and are updated below from the incremental KLW batch.
         KLR_RebuildAggregates(KLRCache.db)
         KLR_InjectKlwBatch(KLRCache.db)
         return KLRCache.db
@@ -387,49 +388,49 @@ KLR_RebuildAggregates(db) {
 	; s=1 in the meta dict (index $[2]) and are excluded. `time_ms` is NOT
 	; written here: it stays walker-owned because the walker's capped
 	; inter-key logic is far more accurate than a naive json_each delta sum.
-	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, chars, pauses, think_time_ms) SELECT device_id, date, app, SUM((SELECT COUNT(*) FROM json_each(events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)), SUM(CASE WHEN pause_before_ms > 2000 THEN 1 ELSE 0 END), SUM(CASE WHEN pause_before_ms > 2000 THEN COALESCE(pause_before_ms,0) ELSE 0 END) FROM events_typing GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET chars=chars+excluded.chars, pauses=pauses+excluded.pauses, think_time_ms=think_time_ms+excluded.think_time_ms;")
+	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, chars, pauses, think_time_ms) SELECT device_id, date, app, SUM((SELECT COUNT(*) FROM json_each(events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)), SUM(CASE WHEN pause_before_ms > 2000 THEN 1 ELSE 0 END), SUM(CASE WHEN pause_before_ms > 2000 THEN COALESCE(pause_before_ms,0) ELSE 0 END) FROM events_typing GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET chars=excluded.chars, pauses=excluded.pauses, think_time_ms=excluded.think_time_ms;")
 
 	; agg_app_day — hotstring metrics from events_hotstring. `hs_chars` is the
 	; GROSS expander output (= net_saved_chars + trigger length = the full
 	; replacement length). The dashboard subtracts the trigger itself via
 	; hs_chars - hs_input_chars, so feeding the already-net net_saved_chars
 	; here would subtract the trigger twice and understate the savings.
-	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, hs_chars, hs_triggers, hs_input_chars) SELECT device_id, date, app, SUM(COALESCE(net_saved_chars,0) + LENGTH(COALESCE(trigger,''))), COUNT(*), SUM(LENGTH(COALESCE(trigger,''))) FROM events_hotstring WHERE kind = 'fired' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_chars=hs_chars+excluded.hs_chars, hs_triggers=hs_triggers+excluded.hs_triggers, hs_input_chars=hs_input_chars+excluded.hs_input_chars;")
+	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, hs_chars, hs_triggers, hs_input_chars) SELECT device_id, date, app, SUM(COALESCE(net_saved_chars,0) + LENGTH(COALESCE(trigger,''))), COUNT(*), SUM(LENGTH(COALESCE(trigger,''))) FROM events_hotstring WHERE kind = 'fired' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_chars=excluded.hs_chars, hs_triggers=excluded.hs_triggers, hs_input_chars=excluded.hs_input_chars;")
 	; agg_app_day — hotstring suggestion count (denominator for the acceptance rate KPI).
 	; fired / suggested are separate rows; we join them here rather than duplicating the
 	; fired INSERT above so each kind gets a clean COUNT(*).
-	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, hs_suggested) SELECT device_id, date, app, COUNT(*) FROM events_hotstring WHERE kind = 'suggested' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_suggested=hs_suggested+excluded.hs_suggested;")
+	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, hs_suggested) SELECT device_id, date, app, COUNT(*) FROM events_hotstring WHERE kind = 'suggested' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_suggested=excluded.hs_suggested;")
 	; agg_app_day — LLM suggestion count (denominator for the acceptance rate
 	; KPI), mirroring the hs_suggested rollup immediately above. events_llm
 	; was previously written to but never read anywhere (F19); this is the
 	; SQL-side half of wiring it up end-to-end.
-	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, llm_suggested) SELECT device_id, date, app, COUNT(*) FROM events_llm WHERE kind = 'suggested' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET llm_suggested=llm_suggested+excluded.llm_suggested;")
+	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, llm_suggested) SELECT device_id, date, app, COUNT(*) FROM events_llm WHERE kind = 'suggested' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET llm_suggested=excluded.llm_suggested;")
 
 	; agg_app_day — app foreground time from events_app_switch.
-	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, app_time_ms) SELECT device_id, date, prev_app, SUM(COALESCE(duration_ms,0)) FROM events_app_switch WHERE prev_app IS NOT NULL AND prev_app != '' GROUP BY device_id, date, prev_app ON CONFLICT(device_id, date, app) DO UPDATE SET app_time_ms=app_time_ms+excluded.app_time_ms;")
+	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, app_time_ms) SELECT device_id, date, prev_app, SUM(COALESCE(duration_ms,0)) FROM events_app_switch WHERE prev_app IS NOT NULL AND prev_app != '' GROUP BY device_id, date, prev_app ON CONFLICT(device_id, date, app) DO UPDATE SET app_time_ms=excluded.app_time_ms;")
 
 	; agg_app_day_hourly — keystrokes per hour from events_typing. Uses the
 	; same non-synthetic json_each keystroke count as `chars` above so the
 	; per-hour totals reconcile with the daily chars figure (LENGTH(text)
 	; would under-count and break that invariant). Only `c` is written here;
 	; the per-hour error columns (e/em/es/e_buckets) stay walker-owned.
-	try SQLite_Exec(db, "INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c) SELECT device_id, date, app, substr(ts,12,2) AS hour, SUM((SELECT COUNT(*) FROM json_each(events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)) FROM events_typing GROUP BY device_id, date, app, hour ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=c+excluded.c;")
+	try SQLite_Exec(db, "INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c) SELECT device_id, date, app, substr(ts,12,2) AS hour, SUM((SELECT COUNT(*) FROM json_each(events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)) FROM events_typing GROUP BY device_id, date, app, hour ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=excluded.c;")
 
 	; agg_app_day_hourly_min5 — keystrokes per 5-min slot from events_typing
 	; (same non-synthetic json_each count as the hourly rollup).
-	try SQLite_Exec(db, "INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c) SELECT device_id, date, app, substr(ts,12,2) || ':' || CASE WHEN (CAST(substr(ts,15,2) AS INTEGER)/5)*5 < 10 THEN '0' ELSE '' END || CAST((CAST(substr(ts,15,2) AS INTEGER)/5)*5 AS TEXT) AS slot, SUM((SELECT COUNT(*) FROM json_each(events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)) FROM events_typing GROUP BY device_id, date, app, slot ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=c+excluded.c;")
+	try SQLite_Exec(db, "INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c) SELECT device_id, date, app, substr(ts,12,2) || ':' || CASE WHEN (CAST(substr(ts,15,2) AS INTEGER)/5)*5 < 10 THEN '0' ELSE '' END || CAST((CAST(substr(ts,15,2) AS INTEGER)/5)*5 AS TEXT) AS slot, SUM((SELECT COUNT(*) FROM json_each(events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)) FROM events_typing GROUP BY device_id, date, app, slot ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=excluded.c;")
 
 	; agg_app_day_titles — window titles seen per app from events_window_switch.
-	try SQLite_Exec(db, "INSERT INTO agg_app_day_titles (device_id, date, app, title, c) SELECT device_id, date, app, next_title, COUNT(*) FROM events_window_switch WHERE next_title IS NOT NULL AND next_title != '' GROUP BY device_id, date, app, next_title ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=c+excluded.c;")
+	try SQLite_Exec(db, "INSERT INTO agg_app_day_titles (device_id, date, app, title, c) SELECT device_id, date, app, next_title, COUNT(*) FROM events_window_switch WHERE next_title IS NOT NULL AND next_title != '' GROUP BY device_id, date, app, next_title ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=excluded.c;")
 
 	; agg_app_day_switches_to — app switch destinations from events_app_switch.
 	; The real schema columns are (app_from, app_to, count); the former
 	; (app, switched_to, c) names did not exist, so this INSERT failed
 	; silently and the table was left walker-only. Now SQL owns it all-time.
-	try SQLite_Exec(db, "INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count) SELECT device_id, date, prev_app, next_app, COUNT(*) FROM events_app_switch WHERE prev_app IS NOT NULL AND next_app IS NOT NULL GROUP BY device_id, date, prev_app, next_app ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET count=count+excluded.count;")
+	try SQLite_Exec(db, "INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count) SELECT device_id, date, prev_app, next_app, COUNT(*) FROM events_app_switch WHERE prev_app IS NOT NULL AND next_app IS NOT NULL GROUP BY device_id, date, prev_app, next_app ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET count=excluded.count;")
 
 	; agg_system_day — system events (wifi, lock, sleep) from events_system.
-	try SQLite_Exec(db, "INSERT INTO agg_system_day (device_id, date, wifi_changes, locked_ms, sleep_ms, awake_ms) SELECT device_id, date, SUM(CASE WHEN action='wifi_change' THEN 1 ELSE 0 END), SUM(CASE WHEN action='lock' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='sleep' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='wake' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END) FROM events_system GROUP BY device_id, date ON CONFLICT(device_id, date) DO UPDATE SET wifi_changes=wifi_changes+excluded.wifi_changes, locked_ms=locked_ms+excluded.locked_ms, sleep_ms=sleep_ms+excluded.sleep_ms, awake_ms=awake_ms+excluded.awake_ms;")
+	try SQLite_Exec(db, "INSERT INTO agg_system_day (device_id, date, wifi_changes, locked_ms, sleep_ms, awake_ms) SELECT device_id, date, SUM(CASE WHEN action='wifi_change' THEN 1 ELSE 0 END), SUM(CASE WHEN action='lock' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='sleep' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='wake' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END) FROM events_system GROUP BY device_id, date ON CONFLICT(device_id, date) DO UPDATE SET wifi_changes=excluded.wifi_changes, locked_ms=excluded.locked_ms, sleep_ms=excluded.sleep_ms, awake_ms=excluded.awake_ms;")
 }
 
 ; Drain KLW.batch (the in-RAM walker accumulator) into the in-memory DB.

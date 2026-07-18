@@ -454,6 +454,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_updater_sync_winhttp_blocks.ahk
 #Include meta/test_sqlite_progress_yield.ahk
 #Include meta/test_agg_app_day_llm_suggested.ahk
+#Include meta/test_reader_preserves_walker_aggregates.ahk
 #Include meta/test_hotstring_check_constraint_widened.ahk
 #Include meta/test_logger_sync_warning.ahk
 #Include meta/test_keylogger_deferred_write.ahk
