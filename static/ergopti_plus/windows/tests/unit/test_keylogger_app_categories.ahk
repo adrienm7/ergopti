@@ -177,6 +177,11 @@ Test("KL_AppCat_Get: unseen app sets dirty flag", _KLAppCat_Get_NeverSeenAppSets
 
 ; Reset helper — clears all KLAppCat state so save tests start from a blank slate.
 _KLAppCatReset() {
+	; Every unknown-app lookup schedules this same bound callback.  Cancel it
+	; before replacing the fixture state so an earlier test cannot write a
+	; now-invalid path (or emit a delayed log) while the next test is asserting.
+	if KLAppCat.HasOwnProp("save_fn") && IsObject(KLAppCat.save_fn)
+		try SetTimer(KLAppCat.save_fn, 0)
 	KLAppCat.file_path  := ""
 	KLAppCat.categories := Map()
 	KLAppCat.dirty      := false
@@ -232,16 +237,23 @@ TestKLAppCat_SaveSucceedsWithMultipleAlphaKeys() {
 
 	Captured := []
 	LoggerSetTestSink((Line) => Captured.Push(Line))
-	KL_AppCat_Save()
-	LoggerClearTestSink()
+	try {
+		KL_AppCat_Save()
+	} finally {
+		LoggerClearTestSink()
+	}
 
-	AssertEqual(0, Captured.Length,
-		"KL_AppCat_Save must not log any error when sorting 2+ alphabetic app-name keys")
+	; The global runner has independent asynchronous diagnostics.  This test
+	; owns (and therefore filters on) only the KLAppCat tag: a delayed log from
+	; an unrelated subsystem must not make the sorting regression nondeterministic.
+	for , Line in Captured
+		AssertFalse(InStr(Line, "[KLAppCat]") > 0,
+			"KL_AppCat_Save must not log a KLAppCat error when sorting 2+ alphabetic app-name keys: " . Line)
 	AssertFalse(KLAppCat.dirty, "dirty must clear to false once the sorted-key save succeeds")
 	AssertTrue(FileExist(TmpPath) != "", "app_categories.json must actually be written to disk")
 
 	try FileDelete(TmpPath)
-	KLAppCat.dirty := false
+	_KLAppCatReset()
 }
 Test("keylogger_app_categories: save succeeds and logs no error with 2+ alphabetic app-name keys (KL_SortArray regression)",
 	TestKLAppCat_SaveSucceedsWithMultipleAlphaKeys)

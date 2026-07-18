@@ -79,7 +79,14 @@ helpers.describe("wpm_widget: mouseCallback reads live geometry across a graph-m
 					}
 				end,
 			},
-			canvas = { new = make_canvas_ctor(captured) },
+			canvas = {
+				new = make_canvas_ctor(captured),
+				-- The production adapter applies these constants before returning the
+				-- canvas. Keep this focused fixture contract-faithful rather than
+				-- accidentally relying on a canvas stub cached by an earlier test.
+				windowBehaviors = { canJoinAllSpaces = 0 },
+				windowLevels = { overlay = 0, floating = 0 },
+			},
 			timer = {
 				new = function(_interval, fn) return { start = function() end, stop = function() end, _fn = fn } end,
 				absoluteTime = function() return 0 end,

@@ -26,7 +26,11 @@ helpers.assert_true(
 -- Test 2: background_tick must capture local gen before asyncGet.
 local tick_pos = src:find("local function background_tick(", 1, true)
 helpers.assert_true(tick_pos ~= nil, "updater.lua must define background_tick (lib-update-02)")
-local tick_body = src:sub(tick_pos, tick_pos + 400)
+local async_pos = src:find("asyncGet", tick_pos, true)
+helpers.assert_true(async_pos ~= nil, "background_tick must call asyncGet (lib-update-02)")
+-- Read the actual pre-request region rather than a fixed character window:
+-- explanatory comments can grow without changing the generation invariant.
+local tick_body = src:sub(tick_pos, async_pos - 1)
 local has_gen_capture = tick_body:find("local gen = _poll_generation", 1, true) ~= nil
 helpers.assert_true(
 	has_gen_capture,
@@ -34,8 +38,6 @@ helpers.assert_true(
 )
 
 -- Test 3: the asyncGet callback must guard on gen ~= _poll_generation.
-local async_pos = src:find("asyncGet", tick_pos, true)
-helpers.assert_true(async_pos ~= nil, "background_tick must call asyncGet (lib-update-02)")
 local cb_body = src:sub(async_pos, async_pos + 500)
 local has_gen_check = cb_body:find("gen ~= _poll_generation", 1, true) ~= nil
 helpers.assert_true(
