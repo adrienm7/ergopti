@@ -857,7 +857,7 @@ function render_repetitions_kpi() {
 			`<div style="display:flex;align-items:center;gap:6px;">` +
 			`<span>${format_number(rep_pct.toFixed(1))}<span class="stat-unit">%</span></span>` +
 			`<span class="tooltip stat-inline-tooltip" style="color:var(--kpi-rep-color);">${INFO_SVG}` +
-			``<span class="tooltiptext">${_t('ui_typing.tooltip_rep_pct')}</span>` +
+			`<span class="tooltiptext">${_t('ui_typing.tooltip_rep_pct')}</span>` +
 			`</span></div>`;
 	}
 

@@ -23,6 +23,7 @@
 //   hsPaths                   — _shared/ui/paths_editor
 //   hsPersonalInfo            — _shared/ui/personal_info_editor
 //   metrics_apps_bridge       — _shared/ui/metrics_apps
+//   metrics_typing_bridge     — _shared/ui/metrics_typing
 //   model_browser_bridge      — _shared/ui/model_browser
 //   prompt_bridge             — _shared/ui/prompt_editor
 //   token_bridge              — _shared/ui/token_prompt
@@ -55,4 +56,22 @@ function makeHostBridge(name) {
 			console.error('[' + name + '] postMessage failed:', e);
 		}
 	};
+}
+
+/**
+ * Decodes a response emitted by the Linux WebKit host bridge.
+ * @param {boolean} isBase64 - Whether the payload was base64-encoded by the host.
+ * @param {string} payload - Encoded JSON response body.
+ * @returns {any|null} Parsed response, or null when the host payload is invalid.
+ */
+function decodeHostBridgeResponse(isBase64, payload) {
+	try {
+		const serialized = isBase64
+			? new TextDecoder().decode(Uint8Array.from(atob(payload), (char) => char.charCodeAt(0)))
+			: decodeURIComponent(payload);
+		return JSON.parse(serialized);
+	} catch (error) {
+		console.error("[host bridge] failed to decode native response:", error);
+		return null;
+	}
 }

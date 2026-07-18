@@ -921,6 +921,7 @@ _LogBootProgress("keylogger modules + tests included")
 ; GestureGetCyclableWindows TOCTOU guard (commit 7b701020d).
 #Include meta/test_alt_tab_monitor_catch.ahk
 #Include meta/test_metrics_shortcut_persist_guard.ahk
+#Include meta/test_metrics_app_time_accuracy.ahk
 #Include meta/test_toggle_category_all_features_atomic.ahk
 #Include meta/test_crypto_djb2_fallback_logged.ahk
 #Include meta/test_adapter_callback_swallow_logged.ahk

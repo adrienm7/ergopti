@@ -472,7 +472,7 @@ local function commitGesture(now)
 	-- of horizontal drift). Without this guard, we would fire a spurious third
 	-- action on the wrong axis on top of the legitimate live fires.
 	if gs.lockedDir and gs.lockedDir ~= dir then
-		Logger.warn(LOG, "commitGesture: dir=%s does not match gesture lockedDir=%s — skipping commit",
+		Logger.debug(LOG, "commitGesture: dir=%s does not match gesture lockedDir=%s — skipping commit",
 			dir, gs.lockedDir)
 		return
 	end

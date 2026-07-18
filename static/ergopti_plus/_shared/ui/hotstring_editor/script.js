@@ -1035,22 +1035,22 @@ function saveSec() {
 
 	if (edSec === null) {
 		if (!id) {
-			setFieldError(‘sec-id’, ‘sec-id-err’, _t(‘editor.hotstrings.err_id_required’) || ‘The identifier is required.’);
-			document.getElementById(‘sec-id’).focus();
+			setFieldError("sec-id", "sec-id-err", _t("editor.hotstrings.err_id_required") || "The identifier is required.");
+			document.getElementById("sec-id").focus();
 			return;
 		}
 		if (!/^[a-z0-9_]+$/.test(id)) {
 			setFieldError(
-				‘sec-id’,
-				‘sec-id-err’,
-				_t(‘editor.hotstrings.err_id_invalid’) || ‘Invalid identifier: lowercase letters, digits and underscores only.’
+				"sec-id",
+				"sec-id-err",
+				_t("editor.hotstrings.err_id_invalid") || "Invalid identifier: lowercase letters, digits and underscores only."
 			);
-			document.getElementById(‘sec-id’).focus();
+			document.getElementById("sec-id").focus();
 			return;
 		}
 		if (D.sections.some((s) => s.name === id)) {
-			setFieldError(‘sec-id’, ‘sec-id-err’, (_t(‘editor.hotstrings.err_id_exists’) || ‘« %s » already exists.’).replace(‘%s’, id));
-			document.getElementById(‘sec-id’).focus();
+			setFieldError("sec-id", "sec-id-err", (_t("editor.hotstrings.err_id_exists") || "« %s » already exists.").replace("%s", id));
+			document.getElementById("sec-id").focus();
 			return;
 		}
 		D.sections.push({ name: id, description: desc || id, entries: [], _exp: true });
@@ -1222,9 +1222,9 @@ function saveEntry(andNew) {
 		if (andNew) {
 			edEntry = { si: si, ei: null };
 			const secName = D.sections[si].description || D.sections[si].name;
-			document.getElementById(‘entry-modal-title’).textContent = (
-				_t(‘editor.hotstrings.add_entry_title’) || ‘Create a hotstring — Section « %s »’
-			).replace(‘%s’, secName);
+			document.getElementById("entry-modal-title").textContent = (
+				_t("editor.hotstrings.add_entry_title") || "Create a hotstring — Section « %s »"
+			).replace("%s", secName);
 			resetEntryForm();
 			setTimeout(() => document.getElementById('e-trig').focus(), 50);
 			return;

@@ -691,7 +691,19 @@ local function main()
 	if process_lifecycle then
 		process_lifecycle.onFocusChange(function(appName, _windowTitle)
 			_cached_app_id = (type(appName) == "string" and appName ~= "" and appName) or nil
+			if _cached_app_id then
+				keylogger.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
+			end
 		end)
+		-- start() seeds its change detector with the current window and therefore
+		-- does not emit an initial callback. Prime the keylogger explicitly so a
+		-- dashboard opened before the first application switch has an owner for
+		-- its foreground interval.
+		local foreground = process_lifecycle.getForegroundApp()
+		_cached_app_id = foreground and foreground.appId or nil
+		if type(_cached_app_id) == "string" and _cached_app_id ~= "" then
+			keylogger.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
+		end
 		process_lifecycle.start()
 	end
 

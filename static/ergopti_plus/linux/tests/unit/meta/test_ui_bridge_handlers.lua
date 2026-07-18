@@ -21,6 +21,18 @@ helpers.describe("ui.bridge_handlers", function()
         get_session_stats = function() return { keystrokes = 42, words = 8, duration_ms = 120000 } end,
         get_wpm           = function() return 35.5 end,
         get_app_stats     = function() return { firefox = { keystrokes = 20 }, code = { keystrokes = 22 } } end,
+        get_dashboard_payload = function()
+          return {
+            metrics_manifest = {
+              ["2026-07-18"] = {
+                firefox = { chars = 20, time = 3000, app_time_ms = 120000, category = "Unknown" },
+              },
+            },
+            app_icons = {},
+            _prefetch_data = { historical = {}, today = {} },
+            driver_meta = { os = "linux", heatmap_id = "kc" },
+          }
+        end,
         is_suppressed     = function() return false end,
         suppress          = function() end,
         unsuppress        = function() end,
@@ -286,23 +298,22 @@ helpers.describe("ui.bridge_handlers", function()
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "metrics_apps_bridge")
     end)
-    helpers.it("'ready' returns full stats", function()
+    helpers.it("'ready' returns the shared metrics manifest", function()
       local result = handler.on_message("ready", state)
       helpers.assert_true(type(result) == "table")
-      helpers.assert_eq(result.keystrokes, 42)
-      helpers.assert_eq(result.wpm, 35.5)
-      helpers.assert_eq(result.words, 8)
-      helpers.assert_true(type(result.apps) == "table")
+      helpers.assert_true(type(result.metrics_manifest) == "table")
+      helpers.assert_eq(result.metrics_manifest["2026-07-18"].firefox.app_time_ms, 120000)
+      helpers.assert_true(type(result.app_icons) == "table")
     end)
     helpers.it("'refresh' returns same payload", function()
       local result = handler.on_message("refresh", state)
       helpers.assert_true(type(result) == "table")
-      helpers.assert_eq(result.keystrokes, 42)
+      helpers.assert_eq(result.metrics_manifest["2026-07-18"].firefox.chars, 20)
     end)
     helpers.it("'reset' action works", function()
       local result = handler.on_message({ action = "reset" }, state)
       helpers.assert_true(type(result) == "table")
-      helpers.assert_eq(result.keystrokes, 42)  -- mock returns same value
+      helpers.assert_true(type(result.metrics_manifest) == "table")
     end)
     helpers.it("'pause' action works", function()
       local result = handler.on_message({ action = "pause" }, state)
@@ -316,13 +327,34 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("returns safe defaults when keylogger absent", function()
       local result = handler.on_message("ready", {})
-      helpers.assert_eq(result.keystrokes, 0)
-      helpers.assert_eq(result.wpm, 0)
+      helpers.assert_true(type(result.metrics_manifest) == "table")
+      helpers.assert_true(type(result.app_icons) == "table")
     end)
   end)
 
   -- ==========================================================================
-  -- 5. healthcheck_bridge
+  -- 5. metrics_typing_bridge
+  -- ===========================================================================
+
+  helpers.describe("metrics_typing_bridge", function()
+    local handler = helpers.load_module("modules.ui.bridge_handlers.metrics_typing_bridge")
+    local state = build_mock_state()
+
+    helpers.it("has correct bridge_name", function()
+      helpers.assert_eq(handler.bridge_name, "metrics_typing_bridge")
+    end)
+    helpers.it("returns the same shared metrics contract on ready", function()
+      local result = handler.on_message({ action = "ready" }, state)
+      helpers.assert_true(type(result.metrics_manifest) == "table")
+      helpers.assert_eq(result.metrics_manifest["2026-07-18"].firefox.chars, 20)
+    end)
+    helpers.it("returns nil for unknown actions", function()
+      helpers.assert_eq(handler.on_message("unknown", state), nil)
+    end)
+  end)
+
+  -- ===========================================================================
+  -- 6. healthcheck_bridge
   -- ==========================================================================
 
   helpers.describe("healthcheck_bridge", function()

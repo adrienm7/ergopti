@@ -35,4 +35,6 @@ for key in keys {
         throw Error('Hotkey("' . hk . '") failed: ' . e.Message, -1, e)
     }
 }
-FileAppend("test_script_altgr_hotkeys: OK`n", "*")
+; Do not write directly to stdout here: AutoHotkey64.exe is a GUI subsystem
+; binary, so the `*` descriptor is invalid in a headless run. The registered
+; assertions are reported by test_framework.ahk once all includes complete.

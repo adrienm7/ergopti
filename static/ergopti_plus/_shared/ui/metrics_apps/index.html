@@ -1216,6 +1216,25 @@
 					}
 				}
 
+				// WebKitGTK loads the same inline assets as macOS but has no
+				// Hammerspoon evaluateJavaScript injection. Its bridge response is
+				// therefore the source of truth for both the first paint and refreshes.
+				if (window.__ergopti_host === 'linux') {
+					const request_linux_refresh = () => {
+						try {
+							window.webkit.messageHandlers.metrics_apps_bridge.postMessage({ action: 'refresh' });
+						} catch (_) {}
+					};
+					window.__hostBridgeResponse = (bridge, isBase64, payload) => {
+						if (bridge !== 'metrics_apps_bridge') return;
+						const response = decodeHostBridgeResponse(isBase64, payload);
+						if (response) apply_prefetch(response);
+					};
+					request_linux_refresh();
+					window.setInterval(request_linux_refresh, 2000);
+					return;
+				}
+
 				if (window.chrome && window.chrome.webview) {
 					window.chrome.webview.addEventListener('message', (e) => {
 						let payload = e.data;

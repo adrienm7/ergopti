@@ -1082,7 +1082,10 @@ local WINFILTER_PREWARM_SEC = 1.0
 local function tap_watchdog()
 	local function revive(name, t)
 		if t and type(t.isEnabled) == "function" and not t:isEnabled() then
-			Logger.warn(LOG, "macOS disabled the %s event tap — re-enabling.", name)
+			-- The passive mouse tap only resets predictive state and its recovery never
+			-- interrupts typing, so reserve WARNING for the typing-critical taps
+			local recovery_logger = name == "mouse" and Logger.debug or Logger.warn
+			recovery_logger(LOG, "macOS disabled the %s event tap — re-enabling.", name)
 			pcall(function() t:start() end)
 		end
 	end

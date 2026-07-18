@@ -42,20 +42,29 @@ helpers.describe("lib.hotpath_profiler.log_if_slow", function()
 		reset_capture()
 		NS = 1000 * NS_PER_MS
 		local t0 = hot.now()
-		NS = t0 + 10 * NS_PER_MS          -- 10 ms elapsed (> 5 ms default)
+		NS = t0 + 25 * NS_PER_MS          -- 25 ms elapsed (> 20 ms default)
 		local elapsed = hot.log_if_slow("keydown", t0, "char=a")
 		helpers.assert_eq(#captured, 1, "one WARNING expected for a slow segment")
 		helpers.assert_eq(captured[1].args[1], "keydown")
-		helpers.assert_true(math.abs(captured[1].args[2] - 10) < 0.01, "logged elapsed ≈ 10 ms")
+		helpers.assert_true(math.abs(captured[1].args[2] - 25) < 0.01, "logged elapsed ≈ 25 ms")
 		helpers.assert_eq(captured[1].args[3], "char=a")
-		helpers.assert_true(math.abs(elapsed - 10) < 0.01, "returned elapsed ≈ 10 ms")
+		helpers.assert_true(math.abs(elapsed - 25) < 0.01, "returned elapsed ≈ 25 ms")
+	end)
+
+	helpers.it("stays silent for transient scheduler jitter below the default budget", function()
+		reset_capture()
+		NS = 1500 * NS_PER_MS
+		local t0 = hot.now()
+		NS = t0 + 14 * NS_PER_MS          -- 14 ms elapsed (< 20 ms default)
+		hot.log_if_slow("keydown", t0, "char=jitter")
+		helpers.assert_eq(#captured, 0, "14 ms scheduler jitter must not emit a WARNING")
 	end)
 
 	helpers.it("stays silent for a fast segment below the threshold", function()
 		reset_capture()
 		NS = 2000 * NS_PER_MS
 		local t0 = hot.now()
-		NS = t0 + 1 * NS_PER_MS            -- 1 ms elapsed (< 5 ms default)
+		NS = t0 + 1 * NS_PER_MS            -- 1 ms elapsed (< 20 ms default)
 		local elapsed = hot.log_if_slow("keydown", t0, "char=b")
 		helpers.assert_eq(#captured, 0, "no WARNING for a fast segment")
 		helpers.assert_true(math.abs(elapsed - 1) < 0.01, "still returns the measured duration")
@@ -69,7 +78,7 @@ helpers.describe("lib.hotpath_profiler.log_if_slow", function()
 		NS = t0 + 1 * NS_PER_MS            -- 1 ms now trips the 0.5 ms threshold
 		hot.log_if_slow("keydown", t0, "char=c")
 		helpers.assert_eq(#captured, 1, "1 ms must trip a 0.5 ms threshold")
-		hot.set_threshold_ms(5.0)          -- restore default for any later use
+		hot.set_threshold_ms(20.0)         -- restore default for any later use
 	end)
 end)
 

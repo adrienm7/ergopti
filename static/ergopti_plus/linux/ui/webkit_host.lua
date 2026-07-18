@@ -32,6 +32,7 @@ M.BRIDGE_NAMES = {
 	"hsPaths",
 	"hsPersonalInfo",
 	"metrics_apps_bridge",
+	"metrics_typing_bridge",
 	"model_browser_bridge",
 	"prompt_bridge",
 	"token_bridge",
@@ -238,6 +239,9 @@ function M.build_app_html(driver_root, app_name, active_locale)
 	local locales_dir = M.resolve_locales_dir(driver_root)
 	local i18n_script = M.build_i18n_boot_script(locales_dir, active_locale)
 	html = M.inject_i18n_boot(html, i18n_script)
+	html = html:gsub("(<head[^>]*>)", function(tag)
+		return tag .. '<script>window.__ergopti_host="linux";</script>'
+	end, 1)
 
 	return html
 end

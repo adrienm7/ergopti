@@ -288,6 +288,38 @@ local function load_disk_cache()
 	return data
 end
 
+--- Returns a shallow manifest copy augmented with the still-open foreground
+--- interval. Persisted aggregates close intervals on focus changes; mutating the
+--- cached projection here would add the same elapsed time again on every refresh.
+--- @param manifest table SQLite projection keyed by date then application.
+--- @return table Projection safe to send to the dashboard.
+local function with_live_active_app_duration(manifest)
+	local ok_tracker, tracker = pcall(require, "modules.keylogger.context_tracker")
+	if not ok_tracker or type(tracker.get_active_app_snapshot) ~= "function" then return manifest end
+	local ok_snapshot, snapshot = pcall(tracker.get_active_app_snapshot)
+	if not ok_snapshot or type(snapshot) ~= "table"
+		or type(snapshot.app) ~= "string" or type(snapshot.duration_ms) ~= "number"
+		or snapshot.duration_ms <= 0
+	then
+		return manifest
+	end
+
+	local date_str = os.date("%Y-%m-%d")
+	local projected = {}
+	for date_key, day_data in pairs(manifest) do projected[date_key] = day_data end
+	local original_day = manifest[date_str] or {}
+	local day_copy = {}
+	for app_name, app_data in pairs(original_day) do day_copy[app_name] = app_data end
+	projected[date_str] = day_copy
+
+	local original_app = original_day[snapshot.app] or {}
+	local app_copy = {}
+	for key, value in pairs(original_app) do app_copy[key] = value end
+	app_copy.app_time_ms = (tonumber(app_copy.app_time_ms) or 0) + snapshot.duration_ms
+	day_copy[snapshot.app] = app_copy
+	return projected
+end
+
 local function raise_now(wv, above_everything)
 	if not wv then return end
 	pcall(function() wv:show() end)
@@ -361,11 +393,12 @@ local function load_and_inject()
 		end
 	end
 
-	local manifest_json  = json.encode(manifest)
+	local cached_manifest_json = json.encode(manifest)
+	local manifest_json        = json.encode(with_live_active_app_duration(manifest))
 	local user_cats_json = json.encode(user_cats)
 	local app_icons_json = json.encode(app_icons)
 
-	save_disk_cache({ manifest = manifest_json, user_cats = user_cats_json, app_icons = app_icons_json })
+	save_disk_cache({ manifest = cached_manifest_json, user_cats = user_cats_json, app_icons = app_icons_json })
 
 	local function try_inject(remaining)
 		if not M._wv then return end

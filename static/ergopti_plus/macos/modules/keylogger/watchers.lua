@@ -243,6 +243,15 @@ function M.caffeinate_cb(event)
 			_state.passive_kind       = nil
 		end
 		_state.active_app_start = now
+		-- macOS can resume without an application-activated notification. The
+		-- foreground app must be re-primed or its post-wake interval is omitted
+		-- from app_time_ms until the next manual app switch
+		hs.timer.doAfter(0.05, function()
+			if not _state.active_app_name then
+				local ok, tracker = pcall(require, "modules.keylogger.context_tracker")
+				if ok and tracker then pcall(tracker.capture_frontmost_app) end
+			end
+		end)
 
 	elseif event == hs.caffeinate.watcher.screensDidLock then
 		LogManager.log_system_event("lock")
@@ -267,6 +276,14 @@ function M.caffeinate_cb(event)
 			_state.passive_kind       = nil
 		end
 		_state.active_app_start = now
+		-- Unlock has the same missing-activation edge case as wake. Re-prime
+		-- asynchronously so macOS has restored the foreground window first
+		hs.timer.doAfter(0.05, function()
+			if not _state.active_app_name then
+				local ok, tracker = pcall(require, "modules.keylogger.context_tracker")
+				if ok and tracker then pcall(tracker.capture_frontmost_app) end
+			end
+		end)
 	end
 end
 
