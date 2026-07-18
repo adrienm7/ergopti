@@ -105,9 +105,15 @@ Test("tap-holds: LAlt backspace hold-modifier release is bounded + in finally (h
 
 _HMRB_LAltGenericGuarded() {
 	Q := Chr(34)
-	_HMRB_AssertBounded("modules/tap_holds/lalt.ahk", "not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, " . Q . "left_alt" . Q . ")", "lalt.ahk 4.7")
+	Anchor := "not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, " . Q . "left_alt" . Q . ")"
+	_HMRB_AssertBounded("modules/tap_holds/lalt.ahk", Anchor, "lalt.ahk 4.7")
+	Body := _HMRB_Block(_HMRB_ReadSource("modules/tap_holds/lalt.ahk"), Anchor)
+	SuppressIdx := InStr(Body, "TapHoldShouldSuppressHold")
+	DownIdx := InStr(Body, "TextPressKey(ModKey, " . Q . "Down" . Q . ")")
+	Assert(SuppressIdx > 0 and DownIdx > SuppressIdx,
+		"lalt.ahk 4.7 must not acquire the synthetic modifier before its wheel-cancellation guard (lalt-generic-cancel-releases-modifier)")
 }
-Test("tap-holds: LAlt generic hold-modifier release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_LAltGenericGuarded)
+Test("tap-holds: LAlt generic hold-modifier release is bounded + cancellation precedes acquisition (lalt-generic-cancel-releases-modifier)", _HMRB_LAltGenericGuarded)
 
 _HMRB_RCtrlGenericGuarded() {
 	Q := Chr(34)

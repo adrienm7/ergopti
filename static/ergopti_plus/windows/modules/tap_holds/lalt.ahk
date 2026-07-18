@@ -284,10 +284,8 @@ $SC038:: {
 #HotIf not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, "left_alt") != "" and TapHoldTapAction(TapHold, "left_alt") != "" and not LayerEnabled
 $SC038:: {
 	ModKey := _LAltHoldModKey()
-	TextPressKey(ModKey, "Down")
 	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
 	if tap {
-		TextPressKey(ModKey, "Up")
 		_LAltDispatch()
 		return
 	}
@@ -299,6 +297,7 @@ $SC038:: {
 			LoggerDebug("TapHold", "LAlt hold suppressed after long press because wheel activity was detected.")
 		return
 	}
+	TextPressKey(ModKey, "Down")
 	; Bound the wait and release in a finally so a lost key-up or thrown Send can
 	; never latch the modifier Down (tap_holds/constants.ahk explains the cap)
 	try {
