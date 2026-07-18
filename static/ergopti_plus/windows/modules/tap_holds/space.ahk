@@ -25,6 +25,7 @@
 ; window — long enough that any realistic next keystroke lands before the hook
 ; times out, but short enough to avoid an indefinite wait if no key follows
 global SPACE_HOLD_INPUT_TIMEOUT_FACTOR := 15
+global _SpaceHoldInputHook := ""
 
 
 
@@ -64,9 +65,15 @@ SpaceTapHold(HoldFn) {
 		return
 	}
 	InputTimeoutSec := TimeoutSec * SPACE_HOLD_INPUT_TIMEOUT_FACTOR ; Proportional window — slow typist must not time out
-	ih := InputHook("L1 T" . Round(InputTimeoutSec, 1))
-	ih.Start()
-	ih.Wait()
+    ih := InputHook("L1 T" . Round(InputTimeoutSec, 1))
+    global _SpaceHoldInputHook := ih
+    try {
+        ih.Start()
+        ih.Wait()
+    } finally {
+        try ih.Stop()
+        _SpaceHoldInputHook := ""
+    }
 	; A live InputHook bypasses native Suspend; if a pause arrived while Wait() was
 	; blocking, discard the capture so no phantom modified keystroke leaks into the
 	; foreground app while the driver is paused (space-hold-inputhook-suspend-guard).
