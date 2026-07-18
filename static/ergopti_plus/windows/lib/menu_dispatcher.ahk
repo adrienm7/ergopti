@@ -92,6 +92,13 @@ global _MenuDispatchCallbacks := Map()
 ; detect whether AHK's own dispatcher beat the retry timer.
 global _MenuDispatchLastFire := Map()
 
+; Every rebuild advances the dispatcher epoch.  A fallback timer is bound to
+; the epoch and registration token it observed, never to a recyclable native
+; command ID alone.
+global _MenuDispatcherEpoch := 0
+global _MenuDispatchTokens := Map()
+global _MenuDispatchTokenCounter := 0
+
 ; Hard ceiling on retry delay (ms) — long enough for any reasonable AHK
 ; dispatch latency, short enough that the user doesn't perceive the
 ; recovered click as laggy. 60ms is sufficient: AHK always dispatches
@@ -123,9 +130,11 @@ global _MENU_RETRY_DELAY_MS := 60
 ; unbounded growth of both Maps when a rebuild shrinks the menu and never
 ; re-registers the dropped IDs.
 MenuDispatcher_Reset() {
-    global _MenuDispatchCallbacks, _MenuDispatchLastFire
+    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens
+    _MenuDispatcherEpoch += 1
     _MenuDispatchCallbacks := Map()
     _MenuDispatchLastFire  := Map()
+    _MenuDispatchTokens    := Map()
 }
 
 ; Per-menu prune for rebuilders that delete + repopulate a SINGLE menu in place
@@ -141,7 +150,7 @@ MenuDispatcher_Reset() {
 ; shrinks). Reuses freed IDs are still re-added by RegisterMenuItem during the
 ; same rebuild, so live items keep their tracking.
 MenuDispatcher_PruneMenu(MenuObj) {
-    global _MenuDispatchCallbacks, _MenuDispatchLastFire
+    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens
 
     ; Collect the IDs currently live in this menu's HMENU.
     LiveIds := Map()
@@ -199,6 +208,9 @@ MenuDispatcher_PruneMenu(MenuObj) {
         if _MenuDispatchLastFire.Has(Id) {
             _MenuDispatchLastFire.Delete(Id)
         }
+        if _MenuDispatchTokens.Has(Id) {
+            _MenuDispatchTokens.Delete(Id)
+        }
     }
     if (DeadIds.Length > 0) {
         try LoggerDebug("MenuDispatcher",
@@ -240,12 +252,12 @@ _MenuDispatchCollectLiveIds(HMENU, LiveSet, Seen) {
 ; its ID could not be discovered (in which case AHK's native dispatch is
 ; the only path — same behavior as before the bypass was installed).
 RegisterMenuItem(MenuObj, ItemName, Callback) {
-    global _MenuDispatchCallbacks, _MenuDispatchLastFire
+    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchTokenCounter
 
     ; To avoid the double-Add penalty (placeholder then replace), we use a
     ; mutable object to capture the ItemId AFTER the Add call, while the
     ; closure is already registered.
-    TrackedObj := { ItemId: 0, Callback: Callback }
+    TrackedObj := { ItemId: 0, Callback: Callback, Epoch: _MenuDispatcherEpoch, Token: 0 }
     Wrapper    := (Args*) => _TrackedDispatch(TrackedObj, Args*)
 
     try {
@@ -269,17 +281,23 @@ RegisterMenuItem(MenuObj, ItemName, Callback) {
 
     ; Update the mutable object so the already-registered closure knows its ID
     TrackedObj.ItemId := ItemId
+    _MenuDispatchTokenCounter += 1
+    TrackedObj.Token := _MenuDispatchTokenCounter
     _MenuDispatchCallbacks[ItemId] := Callback
     _MenuDispatchLastFire[ItemId]  := 0
+    _MenuDispatchTokens[ItemId]    := TrackedObj.Token
     return 1
 }
 
 _TrackedDispatch(TrackedObj, Args*) {
-    global _MenuDispatchLastFire
-    if (TrackedObj.ItemId) {
+    global _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens
+    if (TrackedObj.ItemId
+        and TrackedObj.Epoch = _MenuDispatcherEpoch
+        and _MenuDispatchTokens.Has(TrackedObj.ItemId)
+        and _MenuDispatchTokens[TrackedObj.ItemId] = TrackedObj.Token) {
         _MenuDispatchLastFire[TrackedObj.ItemId] := A_TickCount
+        TrackedObj.Callback.Call(Args*)
     }
-    TrackedObj.Callback.Call(Args*)
 }
 
 ; Variant for items added via ``Menu.Insert(BeforeItem, ItemName, Callback)``.
@@ -435,7 +453,7 @@ _FindUniqueMenuItemIdByName(MenuObj, ItemName) {
 ; SetTimer thread (which gets its own pseudo-thread slot, bypassing
 ; whatever saturation drops the WM_COMMAND callback).
 _OnMenuCommandWmCommand(wParam, lParam, msg, hwnd) {
-    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MENU_RETRY_DELAY_MS
+    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MENU_RETRY_DELAY_MS, _MenuDispatcherEpoch, _MenuDispatchTokens
 
     ItemId := wParam & 0xFFFF
     NotifyCode := (wParam >> 16) & 0xFFFF
@@ -448,9 +466,12 @@ _OnMenuCommandWmCommand(wParam, lParam, msg, hwnd) {
     if !_MenuDispatchCallbacks.Has(ItemId) {
         return
     }
+    if !_MenuDispatchTokens.Has(ItemId) {
+        return
+    }
     LastFire := _MenuDispatchLastFire.Has(ItemId) ? _MenuDispatchLastFire[ItemId] : 0
     ; Single-shot timer: negative ms = "fire once, auto-remove".
-    SetTimer(_DispatchIfMissed.Bind(ItemId, LastFire), -_MENU_RETRY_DELAY_MS)
+    SetTimer(_DispatchIfMissed.Bind(ItemId, LastFire, _MenuDispatcherEpoch, _MenuDispatchTokens[ItemId]), -_MENU_RETRY_DELAY_MS)
 }
 
 ; Fires after _MENU_RETRY_DELAY_MS. If LastFire hasn't moved since the
@@ -469,14 +490,25 @@ _OnMenuCommandWmCommand(wParam, lParam, msg, hwnd) {
 ; menu rebuild interleaved with two fast clicks), cosmetically benign
 ; (most callbacks are idempotent), and structurally unavoidable without a
 ; per-click sequence counter — a more invasive change deferred for now.
-_DispatchIfMissed(ItemId, ExpectedLastFire) {
-    global _MenuDispatchCallbacks, _MenuDispatchLastFire
+_DispatchIfMissed(ItemId, ExpectedLastFire, ExpectedEpoch := 0, ExpectedToken := 0) {
+    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens
     ; Critical is held only for the brief atomic gate — reading/updating state and
     ; extracting the callback reference. Releasing it before Callback.Call() is
     ; mandatory: holding Critical across an arbitrary menu action risks starving the
     ; keyboard hook thread past the LowLevelHooksTimeout (~300 ms), causing Windows
     ; to silently drop physical keystrokes.
     Critical "On"
+    ; A rebuild can recycle ItemId before this timer fires.  Require the exact
+    ; registration identity captured at WM_COMMAND time so an old retry can
+    ; neither invoke the newly registered callback nor duplicate a native fire.
+    if (ExpectedEpoch and ExpectedEpoch != _MenuDispatcherEpoch) {
+        Critical "Off"
+        return
+    }
+    if (ExpectedToken and (!_MenuDispatchTokens.Has(ItemId) or _MenuDispatchTokens[ItemId] != ExpectedToken)) {
+        Critical "Off"
+        return
+    }
     CurrentLastFire := _MenuDispatchLastFire.Has(ItemId) ? _MenuDispatchLastFire[ItemId] : 0
     if (CurrentLastFire != ExpectedLastFire) {
         Critical "Off"

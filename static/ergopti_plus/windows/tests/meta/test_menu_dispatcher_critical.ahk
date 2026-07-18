@@ -57,7 +57,7 @@ Test("menu_dispatcher: _DispatchIfMissed releases Critical before Callback.Call(
 _MDC_CriticalOffBeforeCallbackCall() {
 	Src := _MDC_ReadSource("lib/menu_dispatcher.ahk")
 	; Search from the declaration so we only look inside _DispatchIfMissed.
-	FuncPos := InStr(Src, "_DispatchIfMissed(ItemId, ExpectedLastFire) {")
+	FuncPos := InStr(Src, "_DispatchIfMissed(ItemId, ExpectedLastFire, ExpectedEpoch := 0, ExpectedToken := 0) {")
 	Assert(FuncPos > 0, "_DispatchIfMissed declaration must exist")
 	Tail    := SubStr(Src, FuncPos)
 	OffPos  := InStr(Tail, 'Critical "Off"')
