@@ -41,6 +41,11 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget) {
     Features := FeaturesTarget
     TapHold := TapHoldTarget
 
+    ; Validate the canonical manifest before touching either candidate.  A
+    ; malformed/missing manifest is a startup configuration error, not a reason
+    ; to silently run an unreviewed duplicate gate table.
+    SubGates := _MG_LoadSubCategories()
+
     ; Layout master
     if !IsCategoryGated("Layout") and Features.Has("layout") {
         for V2Id, _ in Features["layout"] {
@@ -89,10 +94,8 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget) {
     ; Skipped when the top gate is off (everything was already zeroed above).
     ;
     ; **Sub-category mapping is single-sourced from menu_manifest.json
-    ; master_gates.sub_categories (MG-3).** Defaults below are the fallback when
-    ; the manifest is unreadable at boot.
+    ; master_gates.sub_categories (MG-3).**
     if IsCategoryGated("Hotstrings") and Features.Has("hotstrings") {
-        SubGates := _MG_LoadSubCategories()
         for SubV1, SubV2 in SubGates {
             if !IsCategoryGated(SubV1) and Features["hotstrings"].Has(SubV2) {
                 for V2Id, V2Val in Features["hotstrings"][SubV2] {
@@ -125,38 +128,44 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget) {
 ; =============================================================
 ; ================================================================
 
-; Reads master_gates.sub_categories from menu_manifest.json. Falls back to the
-; hardcoded map when the manifest is unreadable.
-_MG_LoadSubCategories() {
+; Reads and validates hotstring_category_keys from menu_manifest.json.
+; The manifest is the sole behavioral definition: failure is explicit so a
+; candidate state can never be partially gated by a stale fallback table.
+_MG_LoadSubCategories(ManifestPath := "") {
     global _SharedDir
-    Default := Map(
-        "Autocorrection",     "autocorrection",
-        "DistancesReduction", "distances_reduction",
-        "SFBsReduction",      "sfbs_reduction",
-        "Rolls",              "rolls",
-        "MagicKey",           "magic_key"
-    )
-    FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
+    FilePath := ManifestPath != "" ? ManifestPath : _SharedDir . "\modules\menu\menu_manifest.json"
     if !FileExist(FilePath) {
-        return Default
+        throw Error("Master gate manifest is missing: " . FilePath)
     }
-    Content := ""
     try Content := FileRead(FilePath, "UTF-8")
+    catch as Err
+        throw Error("Master gate manifest cannot be read: " . Err.Message)
+    if (StrLen(Content) && Ord(SubStr(Content, 1, 1)) = 0xFEFF)
+        Content := SubStr(Content, 2)
     if (Content == "") {
-        return Default
+        throw Error("Master gate manifest is empty: " . FilePath)
     }
-    Root := ""
     try Root := JsonParse(Content)
-    if !(Root is Map) or !Root.Has("master_gates") {
-        return Default
+    catch as Err
+        throw Error("Master gate manifest is invalid JSON: " . Err.Message)
+    if !(Root is Map) or !Root.Has("hotstring_category_keys") {
+        throw Error("Master gate manifest lacks hotstring_category_keys.")
     }
-    Gates := Root["master_gates"]
-    if !(Gates is Map) or !Gates.Has("sub_categories") {
-        return Default
+    ; The generated manifest maps feature group → category label.  Gate
+    ; application needs the inverse label → feature group relation.
+    SourceCats := Root["hotstring_category_keys"]
+    if !(SourceCats is Map) {
+        throw Error("Master gate manifest has invalid hotstring_category_keys.")
     }
-    SubCats := Gates["sub_categories"]
+    SubCats := Map()
+    for FeatureGroup, GateName in SourceCats
+        SubCats[GateName] := FeatureGroup
     if !(SubCats is Map) or SubCats.Count == 0 {
-        return Default
+        throw Error("Master gate manifest has no hotstring category keys.")
+    }
+    for GateName, FeatureGroup in SubCats {
+        if (Type(GateName) != "String" || GateName == "" || Type(FeatureGroup) != "String" || FeatureGroup == "")
+            throw Error("Master gate manifest contains an invalid sub-category entry.")
     }
     return SubCats
 }

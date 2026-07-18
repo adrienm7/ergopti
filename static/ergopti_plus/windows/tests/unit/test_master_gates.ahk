@@ -105,3 +105,41 @@ TestMasterGates_RequiresExplicitTargets() {
 }
 Test("master gates: explicit target contract fails fast for invalid candidates",
 	TestMasterGates_RequiresExplicitTargets)
+
+TestMasterGates_InvalidManifestDoesNotMutateCandidate() {
+	global _SharedDir, CategoryEnabled
+	FixtureRoot := A_Temp . "\ergopti_master_gates_invalid_" . A_TickCount
+	FixturePath := FixtureRoot . "\modules\menu\menu_manifest.json"
+	SavedSharedDir := _SharedDir
+	HadHotstringsGate := CategoryEnabled.Has("Hotstrings")
+	SavedHotstringsGate := HadHotstringsGate ? CategoryEnabled["Hotstrings"] : ""
+	FeaturesCandidate := Map(
+		"layout", Map("enabled", true),
+		"hotstrings", Map("fixture", Map("entry", Map("enabled", true)))
+	)
+	TapHoldCandidate := Map("keys", Map("space", Map("tap", "space")))
+	try {
+		DirCreate(FixtureRoot . "\modules\menu")
+		FileAppend("{}", FixturePath, "UTF-8-RAW")
+		_SharedDir := FixtureRoot
+		CategoryEnabled["Hotstrings"] := true
+		Thrown := false
+		try ApplyMasterGatesToFeatures(FeaturesCandidate, TapHoldCandidate)
+		catch as Err
+			Thrown := InStr(Err.Message, "Master gate manifest") > 0
+		AssertTrue(Thrown, "an invalid canonical manifest must fail fast")
+		AssertTrue(FeaturesCandidate["layout"]["enabled"],
+			"manifest validation must not mutate a candidate Features map")
+		AssertTrue(TapHoldCandidate["keys"].Has("space"),
+			"manifest validation must not mutate a candidate TapHold map")
+	} finally {
+		_SharedDir := SavedSharedDir
+		if HadHotstringsGate
+			CategoryEnabled["Hotstrings"] := SavedHotstringsGate
+		else
+			CategoryEnabled.Delete("Hotstrings")
+		try DirDelete(FixtureRoot, true)
+	}
+}
+Test("master gates: invalid manifest fails before candidate mutation",
+	TestMasterGates_InvalidManifestDoesNotMutateCandidate)
