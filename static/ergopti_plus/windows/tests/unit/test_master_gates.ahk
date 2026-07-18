@@ -37,7 +37,7 @@ TestMasterGates_SubcatGateZerosOnlyItsFeatures() {
 			"rolls", Map("hc", Map("enabled", true))
 		)
 
-		ApplyMasterGatesToFeatures()
+		ApplyMasterGatesToFeatures(Features, TapHold)
 
 		AssertFalse(Features["hotstrings"]["autocorrection"]["errors"]["enabled"],
 			"a gated-off sub-category's sections are forced false")
@@ -75,7 +75,7 @@ TestMasterGates_SubcatGateOnLeavesFeatures() {
 			"autocorrection", Map("errors", Map("enabled", true), "accents", Map("enabled", false))
 		)
 
-		ApplyMasterGatesToFeatures()
+		ApplyMasterGatesToFeatures(Features, TapHold)
 
 		AssertTrue(Features["hotstrings"]["autocorrection"]["errors"]["enabled"],
 			"an enabled section stays enabled when the category gate is on")
@@ -94,3 +94,14 @@ TestMasterGates_SubcatGateOnLeavesFeatures() {
 }
 Test("master gates: a sub-category gate left on does not change section states",
 	TestMasterGates_SubcatGateOnLeavesFeatures)
+
+TestMasterGates_RequiresExplicitTargets() {
+	Thrown := false
+	try ApplyMasterGatesToFeatures("not-a-map", Map())
+	catch as Err
+		Thrown := InStr(Err.Message, "Features Map target") > 0
+	AssertTrue(Thrown,
+		"master gates must fail fast when a caller omits a concrete Features target instead of mutating an implicit global")
+}
+Test("master gates: explicit target contract fails fast for invalid candidates",
+	TestMasterGates_RequiresExplicitTargets)

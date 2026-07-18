@@ -199,7 +199,7 @@ _IsLiveHotstringCategory(Category) {
 }
 
 ToggleCategoryAllFeatures(Category, Value) {
-    global CategoryEnabled, ConfigurationFile, Features
+    global CategoryEnabled, ConfigurationFile, Features, TapHold
     Bool := (Value = true or Value = 1)
     if _IsLiveHotstringCategory(Category) {
         ; In-process: restore (ON) or snapshot (OFF) the category's sections, flip the
@@ -223,7 +223,7 @@ ToggleCategoryAllFeatures(Category, Value) {
             }
             CategoryEnabled[Category] := Bool
             TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
-            ApplyMasterGatesToFeatures()
+            ApplyMasterGatesToFeatures(Features, TapHold)
             RebuildHotstringsLive()
         } finally {
             Critical(_TcafCrit)

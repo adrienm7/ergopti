@@ -33,12 +33,13 @@
 ; category to ``false`` so #HotIf evaluations on Features short-circuit.
 ; The on-disk persistence is untouched — flipping the master back on +
 ; Reload restores the per-feature state from config.toml.
-ApplyMasterGatesToFeatures() {
-    global Features
-
-    if !IsSet(Features) {
-        return
-    }
+ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget) {
+    if !(FeaturesTarget is Map)
+        throw Error("ApplyMasterGatesToFeatures requires a Features Map target.")
+    if !(TapHoldTarget is Map)
+        throw Error("ApplyMasterGatesToFeatures requires a TapHold Map target.")
+    Features := FeaturesTarget
+    TapHold := TapHoldTarget
 
     ; Layout master
     if !IsCategoryGated("Layout") and Features.Has("layout") {
@@ -106,8 +107,7 @@ ApplyMasterGatesToFeatures() {
     ; TapHolds master — handled by tap_hold.toml loading; gating drops the
     ; TapHold["keys"] entries entirely so TapHoldIsConfigured returns false.
     if !IsCategoryGated("TapHolds") {
-        global TapHold
-        if IsSet(TapHold) and TapHold.Has("keys") {
+        if TapHold.Has("keys") {
             TapHold["keys"] := Map()
         }
     }
