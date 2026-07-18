@@ -598,7 +598,7 @@ _LLM_Engine_DispatchVariant(state) {
 		stream_fn.Call(temp,
 			(partial) => _LLM_Engine_OnStreamPartial(state_ref, this_slot_idx, partial),
 			(text, meta := "") => _LLM_Engine_OnVariantSuccess(state_ref, text, meta),
-			() => _LLM_Engine_OnVariantFail(state_ref))
+			(failure := "") => _LLM_Engine_OnVariantFail(state_ref, failure))
 		return
 	}
 
@@ -608,7 +608,7 @@ _LLM_Engine_DispatchVariant(state) {
 	; the API path silently zeroed those metrics in the keylogger event.
 	dispatch_fn.Call(temp,
 		(text, meta := "") => _LLM_Engine_OnVariantSuccess(state_ref, text, meta),
-		() => _LLM_Engine_OnVariantFail(state_ref))
+		(failure := "") => _LLM_Engine_OnVariantFail(state_ref, failure))
 }
 
 ; Per-token streaming callback: paints the partial text into its slot in
@@ -687,7 +687,7 @@ _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 	_LLM_Engine_DispatchVariant(state)
 }
 
-_LLM_Engine_OnVariantFail(state) {
+_LLM_Engine_OnVariantFail(state, failure := "") {
 	global _LLM_Engine
 	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
 	if (state["request_id"] != current_id) {
@@ -700,8 +700,13 @@ _LLM_Engine_OnVariantFail(state) {
 		state["streaming"] := false
 		try LoggerInfo("LLM", "Streaming failed — retrying via WinHTTP async.")
 	}
-	try LoggerWarn("LLM", "Variant {1}/{2} failed (model {3}).",
-		state["attempt_index"] - 1, state["max_attempts"], state["model"])
+	Reason := ""
+	if (failure is Map and failure.Has("message"))
+		Reason := failure["message"]
+	else if (Type(failure) == "String")
+		Reason := failure
+	try LoggerWarn("LLM", "Variant {1}/{2} failed (model {3}): {4}.",
+		state["attempt_index"] - 1, state["max_attempts"], state["model"], Reason)
 	; The variant didn't yield a usable result. ``attempt_index`` already
 	; advanced for the next attempt; the retry budget (max_attempts) caps
 	; how often we keep trying. No special retry-temperature step here —
