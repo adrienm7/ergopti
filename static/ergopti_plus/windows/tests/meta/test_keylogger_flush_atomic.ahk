@@ -58,13 +58,13 @@ _KLFA_FlushBufferCritical() {
 	Assert(InStr(Body, "snap_events") > 0,
 		"KL_FlushBuffer must snapshot buffer_events into snap_events before clearing (keylogger-flush-race-condition)")
 
-	Assert(InStr(Body, "Critical(" . Chr(34) . "Off" . Chr(34) . ")") > 0,
-		"KL_FlushBuffer must release Critical after the atomic snapshot")
+	Assert(InStr(Body, "Critical(previous_critical)") > 0,
+		"KL_FlushBuffer must restore the caller Critical state after the atomic snapshot")
 
 	; Ordering: Critical(On) must precede the snapshot, which must precede Critical(Off)
 	PosOn   := InStr(Body, "Critical(" . Chr(34) . "On" . Chr(34) . ")")
 	PosSnap := InStr(Body, "snap_events")
-	PosOff  := InStr(Body, "Critical(" . Chr(34) . "Off" . Chr(34) . ")")
+	PosOff  := InStr(Body, "Critical(previous_critical)")
 	Assert(PosOn < PosSnap,
 		"Critical(On) must appear before snap_events — snapshot must be taken inside the lock")
 	Assert(PosSnap < PosOff,

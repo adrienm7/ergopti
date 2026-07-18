@@ -870,7 +870,6 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_g5_updater_download.ahk
 #Include meta/test_key_state_dllcall_guards.ahk
 #Include meta/test_updater_loadchannel_try_wrap.ahk
-#Include meta/test_updater_pollasync_critical_restore.ahk
 #Include meta/test_crash_report_sysinfo_dedup.ahk
 #Include meta/test_logger_dedup_exit_flush.ahk
 #Include meta/test_shell_runner_boot_crash_and_quoting.ahk
