@@ -208,7 +208,7 @@ Inchangée. Modules externes appellent les mêmes fonctions :
 ```
 M.start(script_control) / M.stop()
 M.set_options / M.set_disabled_apps / M.set_*_filter_enabled
-M.notify_synthetic(text, source_type, deletes, source_variant, deleted_text)
+M.notify_synthetic(text, source_type, deletes, source_variant, physical_echo)
 M.get_live_stats() → { wpm, wpm_physical, source, source_variant, source_time }
 M.get_ngram_index() → vue read-only matérialisée à la volée depuis ngram_*
 M.log_hotstring / log_hotstring_suggested / log_hotstring_dismissed

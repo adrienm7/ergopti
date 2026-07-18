@@ -297,6 +297,15 @@ _KlgAggCorpus_RunVector(Vec) {
 		AssertEqual(2, KLW_GetMap(Row, "llm_chars", 0), "llm_chars = 2")
 		AssertEqual(1, KLW_GetMap(Row, "llm_triggers", 0), "llm_triggers = 1")
 	}
+	else if (Id = "synthetic_hotstring_backspace_keeps_gross_output") {
+		Row := _KlgAggCorpus_ReadAppDay("2024-06-01", "GrossHsApp")
+		AssertTrue(Row != "", "app_day row exists")
+		AssertEqual(3, KLW_GetMap(Row, "chars", 0), "manual trigger remains three real chars")
+		AssertEqual(8, KLW_GetMap(Row, "hs_chars", 0), "hs_chars is gross generated output")
+		AssertEqual(3, KLW_GetMap(Row, "hs_input_chars", 0), "deleted trigger is separate input")
+		AssertEqual(5, KLW_GetMap(Row, "hs_chars", 0) - KLW_GetMap(Row, "hs_input_chars", 0),
+			"the source-filtered UI sees the net gain once")
+	}
 	else if (Id = "typing_with_think_pause") {
 		Row := _KlgAggCorpus_ReadAppDay("2024-06-01", "PauseApp")
 		AssertTrue(Row != "", "app_day row exists")

@@ -64,7 +64,9 @@ end
 ---
 --- @param deletes number Number of backspaces to issue.
 --- @param emit_action function Called to type or paste the replacement text.
----   Must return (emitted_count: number, emitted_str: string).
+---   Must return (emitted_count: number, physical_echo: string,
+---   logical_text: string). The logical text includes clipboard-pasted output;
+---   physical_echo includes only OS key events that must be discarded.
 --- @param buffer_action function Called to sync _state.buffer after emission.
 --- @param is_final boolean When true, suppresses re-scanning after completion.
 --- @param is_ignored boolean When true, skips tooltip and LLM side-effects.
@@ -84,13 +86,17 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 
 	TextSender.eraseChars(deletes, 0)
 
-	local ok, emit_count, emitted_str = pcall(emit_action)
+	local ok, emit_count, emitted_str, logical_text = pcall(emit_action)
 	if not ok then
 		-- The emit failed — emitted_str contains the error message from pcall.
 		Logger.error(LOG, "emit_action failed: %s.", tostring(emit_count))
 		emitted_str = ""
+		logical_text = ""
 	end
 	emitted_str = emitted_str or ""
+	-- Keep extensions that still return the historical two values working. The
+	-- built-in clipboard emitter supplies an explicit logical value instead.
+	logical_text = logical_text or emitted_str
 
 	-- Track the emitted characters so the main event loop knows to skip them.
 	-- Guard against a nil field: the E2E stub state may not include this slot.
@@ -105,16 +111,17 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		_state.expected_synthetic_pastes = (_state.expected_synthetic_pastes or 0) + paste_ops
 	end
 
-	-- Guard: skip notify when nothing was actually injected (deletes=0 and emitted_str="")
+	-- Guard: skip notify when nothing was actually injected (deletes=0 and logical_text="")
 	-- to avoid a no-op synth_queue entry that would absorb the first real keystroke typed
 	-- immediately after a cancelled or empty expansion.
-	if (deletes > 0 or emitted_str ~= "") and keylogger and type(keylogger.notify_synthetic) == "function" then
+	if (deletes > 0 or logical_text ~= "") and keylogger and type(keylogger.notify_synthetic) == "function" then
 		-- pcall-wrapped like the neighboring buffer_action call below: a truncated
 		-- LLM completion cut mid-codepoint (French accents, curly quotes, em-dashes)
 		-- can reach notify_synthetic with malformed UTF-8, and its utf8.codes loop
 		-- would otherwise raise, aborting the expansion mid-flight and leaving the
 		-- synthetic-injection trackers desynced (F-HIGH-16 fix).
-		local ok_notify, notify_err = pcall(keylogger.notify_synthetic, emitted_str, source_type or "hotstring", deletes, source_variant)
+		local ok_notify, notify_err = pcall(keylogger.notify_synthetic,
+			logical_text, source_type or "hotstring", deletes, source_variant, emitted_str)
 		if not ok_notify then
 			Logger.error(LOG, "notify_synthetic failed: %s.", tostring(notify_err))
 		end
@@ -209,7 +216,8 @@ end
 --- @param m table The mapping entry.
 --- @param to_type string The text to emit when the replacement is plain.
 --- @return number emit_count The number of codepoints emitted.
---- @return string emitted_str The bytes actually pushed to the OS.
+--- @return string emitted_str The bytes that will echo as physical key events.
+--- @return string logical_text All text inserted, including clipboard output.
 local function emit_dispatch(m, to_type)
 	if m.plain_repl == m.repl then
 		return km_utils.emit_text(to_type)
@@ -423,7 +431,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		M.perform_text_replacement(
 			deletes,
 			function()
-				local c, s = emit_dispatch(m, to_type)
+				local c, s, logical = emit_dispatch(m, to_type)
 
 				-- Re-type the terminator unless it should be consumed.
 				if not consume_term then
@@ -433,16 +441,19 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 						-- and notify_synthetic see it; without this the keylogger
 						-- flushes its buffer mid-expansion on the Enter/Tab echo.
 						s = s .. chars
+						logical = logical .. chars
 					elseif chars == "\t" then
 						TextSender.pressKey("tab", nil, 0)
 						s = s .. chars
+						logical = logical .. chars
 					else
 						TextSender.send(chars, { mode = "direct" })
 						s = s .. chars
+						logical = logical .. chars
 					end
 					c = c + text_utils.utf8_len(chars)
 				end
-				return c, s
+				return c, s, logical
 			end,
 			function()
 				-- buf_start is a valid byte index into _state.buffer: the buffer

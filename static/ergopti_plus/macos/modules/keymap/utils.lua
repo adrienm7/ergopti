@@ -179,16 +179,19 @@ end
 --- each paste's Cmd+V has CLIPBOARD_PASTE_GAP_SEC to be consumed before the
 --- next setContents() call runs.
 --- @param tokens table The token list produced by tokens_from_repl().
---- @return number, string Total characters emitted and the keystroke portion only (paste chars excluded).
+--- @return number, string, string Total characters, the physical keystroke
+---   echo, and the logical text inserted. Clipboard text is deliberately absent
+---   from the physical echo, but remains in the logical text for telemetry.
 function M.emit_tokens(tokens)
 	if type(tokens) ~= "table" then
 		Logger.error(LOG, "emit_tokens: tokens must be a table (got %s).", type(tokens))
-		return 0, ""
+		return 0, "", ""
 	end
 
 	Logger.trace(LOG, "Emitting %d token(s)…", #tokens)
 	local count        = 0
 	local emitted_str  = ""
+	local logical_text = ""
 	-- Chain cursor: seconds from now at which the NEXT paste in this call is
 	-- allowed to mutate the clipboard. 0 means "fire immediately" (no prior
 	-- paste queued yet in this emit_tokens call).
@@ -202,6 +205,9 @@ function M.emit_tokens(tokens)
 			count = count + 1
 
 		elseif tok.kind == "text" then
+			-- Clipboard text has no per-character OS echo but is still part of
+			-- the logical replacement consumed by synthetic telemetry.
+			logical_text = logical_text .. tok.value
 			if M.should_paste(tok.value) then
 				local ok_l, tok_len = pcall(text_utils.utf8_len, tok.value)
 				count              = count + (ok_l and tok_len or 1)
@@ -229,16 +235,17 @@ function M.emit_tokens(tokens)
 	end
 
 	Logger.done(LOG, "%d token(s) emitted (%d char(s)).", #tokens, count)
-	return count, emitted_str
+	return count, emitted_str, logical_text
 end
 
 --- Emits a raw string directly, choosing between keystrokes and clipboard-paste.
 --- @param text string The text to emit.
---- @return number, string Characters emitted and the emitted string (empty on paste).
+--- @return number, string, string Characters emitted, the physical echo string
+---   (empty on paste), and the logical text inserted (always the supplied text).
 function M.emit_text(text)
 	if type(text) ~= "string" then
 		Logger.error(LOG, "emit_text: text must be a string (got %s).", type(text))
-		return 0, ""
+		return 0, "", ""
 	end
 
 	Logger.trace(LOG, "Emitting text ('%s')…", text)
@@ -253,13 +260,13 @@ function M.emit_text(text)
 		-- expansion prefix to be silently absorbed (paste-synthetic-chars-leak).
 		_paste_ops_pending = _paste_ops_pending + 1
 		local ok_l, l = pcall(text_utils.utf8_len, text)
-		return (ok_l and l or 1), ""
+		return (ok_l and l or 1), "", text
 	end
 
 	keyStrokes(text)
 	local ok, len = pcall(text_utils.utf8_len, text)
 	Logger.done(LOG, "Text emitted as keystrokes (%d char(s)).", ok and len or 1)
-	return (ok and len or 1), text
+	return (ok and len or 1), text, text
 end
 
 
