@@ -24,18 +24,18 @@ local Export = helpers.load_with_stubs("modules.keylogger.export")
 local BATCH = "\nBEGIN TRANSACTION;\nINSERT OR IGNORE INTO events VALUES (1);\nCOMMIT;\n"
 
 helpers.describe("export._last_complete_batch_offset finds the last whole batch", function()
-	helpers.it("returns the end of COMMIT for a single complete batch", function()
+	helpers.it("returns the newline after COMMIT for a single complete batch", function()
 		local off = Export._last_complete_batch_offset(BATCH)
 		helpers.assert_true(off > 0, "a complete batch must yield a boundary")
 		-- The applicable slice must end exactly at a COMMIT — never include an orphan.
-		helpers.assert_eq(BATCH:sub(off - 6, off), "COMMIT;")
+		helpers.assert_eq(BATCH:sub(off - 7, off), "COMMIT;\n")
 	end)
 
 	helpers.it("returns the LAST boundary across multiple complete batches", function()
 		local two = BATCH .. BATCH
 		local off = Export._last_complete_batch_offset(two)
-		helpers.assert_eq(off, #two - 1)  -- everything up to the final COMMIT; (before trailing \n)
-		helpers.assert_eq(two:sub(off - 6, off), "COMMIT;")
+		helpers.assert_eq(off, #two)  -- everything through the final terminator newline
+		helpers.assert_eq(two:sub(off - 7, off), "COMMIT;\n")
 	end)
 
 	helpers.it("ignores a trailing orphan batch (no COMMIT) — defers it", function()
@@ -44,13 +44,25 @@ helpers.describe("export._last_complete_batch_offset finds the last whole batch"
 		local off = Export._last_complete_batch_offset(torn)
 		-- Boundary must be at the FIRST batch's COMMIT, NOT the chunk length.
 		helpers.assert_true(off < #torn, "must not advance past the orphan trailing batch")
-		helpers.assert_eq(torn:sub(off - 6, off), "COMMIT;")
+		helpers.assert_eq(torn:sub(off - 7, off), "COMMIT;\n")
 		-- The slice we would apply contains NO orphan BEGIN beyond the boundary.
 		local applicable = torn:sub(1, off)
 		local _, last_begin = applicable:find("BEGIN TRANSACTION;.*", 1)
 		helpers.assert_true(select(2, applicable:gsub("BEGIN TRANSACTION;", "")) ==
 			select(2, applicable:gsub("COMMIT;", "")),
 			"every BEGIN in the applied slice must be matched by a COMMIT")
+	end)
+
+	helpers.it("does not mistake COMMIT inside a typed SQL string for a transaction boundary", function()
+		local torn = "\nBEGIN TRANSACTION;\nINSERT INTO events VALUES ('typed COMMIT; text');\n"
+		helpers.assert_eq(Export._last_complete_batch_offset(torn), 0,
+			"only a standalone COMMIT line may make a ledger suffix replayable")
+	end)
+
+	helpers.it("does not mistake COMMIT on a newline inside a typed multiline literal", function()
+		local torn = "\nBEGIN TRANSACTION;\nINSERT INTO events VALUES ('first line\nCOMMIT;\nlast line');\n"
+		helpers.assert_eq(Export._last_complete_batch_offset(torn), 0,
+			"a multiline typed value must not make a torn transaction replayable")
 	end)
 
 	helpers.it("returns 0 when there is no complete batch yet", function()

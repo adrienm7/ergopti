@@ -1389,12 +1389,7 @@ function M.start(script_control)
 
 	-- Bootstrap: capture the current app context and load/rebuild today's index
 	hs.timer.doAfter(0, function()
-		local current_app = hs.application.frontmostApplication()
-		if current_app then
-			CoreState.active_app_name  = current_app:title()
-			CoreState.active_app_start = hs.timer.absoluteTime() / 1000000
-			pcall(ContextTracker.update_ax_observer, current_app:pid())
-		end
+		pcall(ContextTracker.capture_frontmost_app)
 		Logger.success(LOG, "Keylogger engine started.")
 	end)
 
@@ -1415,6 +1410,9 @@ function M.stop()
 	Logger.start(LOG, "Stopping keylogger engine…")
 
 	CoreState.is_enabled = false
+	-- App-switch rows are normally created only on focus changes. Close the
+	-- currently open interval before shutdown so reloads do not erase it.
+	pcall(ContextTracker.close_active_app)
 	LogManager.flush_buffer()
 	ProcessLifecycle.stop()
 

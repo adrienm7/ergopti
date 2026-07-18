@@ -207,27 +207,51 @@ end
 --- @param chunk string Raw bytes read from a foreign data.sql past the watermark.
 --- @return integer Offset of the last complete batch (0 if none).
 function M._last_complete_batch_offset(chunk)
-	local last_commit, pos = 0, 1
-	while true do
-		local _, e = (chunk or ""):find("COMMIT;", pos, true)
-		if not e then break end
-		last_commit = e
-		pos = e + 1
+	chunk = chunk or ""
+	local last_commit, i, n = 0, 1, #chunk
+	local in_string, in_comment = false, false
+	while i <= n do
+		local ch = chunk:sub(i, i)
+		if in_comment then
+			if ch == "\n" then in_comment = false end
+		elseif in_string then
+			if ch == "'" then
+				-- SQLite represents a literal apostrophe by doubling it.
+				if chunk:sub(i + 1, i + 1) == "'" then i = i + 1
+				else in_string = false end
+			end
+		elseif ch == "-" and chunk:sub(i + 1, i + 1) == "-" then
+			in_comment = true
+			i = i + 1
+		elseif ch == "'" then
+			in_string = true
+		elseif ch == "\n" and chunk:sub(i + 1, i + 8) == "COMMIT;\n" then
+			-- The marker must be a SQL statement, not user text embedded in a
+			-- multi-line literal.  The lexical state above makes that distinction.
+			last_commit = i + 8
+			i = i + 8
+		end
+		i = i + 1
 	end
 	return last_commit
 end
 
 --- Runs from the ingest tick. Cheap when no foreign growth has occurred since
 --- the last call (just one fs.attributes() check per device folder).
-function M.sync_foreign_data_sql()
-	if not _require_init("sync_foreign_data_sql") then return end
+---@param on_applied fun(device_id:string):boolean|nil|nil Optional callback that
+--- rebuilds derived rows for a successfully imported device before its watermark
+--- advances. Returning false leaves the safe raw replay retryable next tick.
+---@return string[] Device ids whose raw batch and derived rebuild both completed.
+function M.sync_foreign_data_sql(on_applied)
+	if not _require_init("sync_foreign_data_sql") then return {} end
 	local db = _get_db and _get_db()
-	if not db then return end
+	if not db then return {} end
+	local synced_devices = {}
 
 	local md = _paths.metrics_dir
-	if not md or not fs.attributes(md) then return end
+	if not md or not fs.attributes(md) then return synced_devices end
 	local by_root = md .. "by_device/"
-	if not fs.attributes(by_root) then return end
+	if not fs.attributes(by_root) then return synced_devices end
 
 	for entry in fs.dir(by_root) do
 		if entry ~= "." and entry ~= ".." and entry ~= _device_id then
@@ -259,16 +283,21 @@ function M.sync_foreign_data_sql()
 					end
 				end
 
-				-- Look up the watermark for this device
-				local watermark = 0
+				-- Look up the watermark for this device.  A malformed/missing
+				-- device.json leaves no devices row; applying its ledger anyway would
+				-- rebuild it every tick because the watermark UPDATE affects zero rows.
+				local watermark, has_device_row = 0, false
 				for r in db:nrows(string.format(
 					"SELECT imported_data_sql_size FROM devices WHERE device_id='%s'",
 					entry:gsub("'", "''"))) do
+					has_device_row = true
 					watermark = tonumber(r.imported_data_sql_size) or 0
 				end
 
 				local sz = sql_attrs.size or 0
-				if sz > watermark then
+				if not has_device_row then
+					Logger.warn(LOG, "Foreign sync: skipping %s because device.json is invalid.", entry:sub(1, 8))
+				elseif sz > watermark then
 					local rfh = io.open(data_sql, "r")
 					if rfh then
 						rfh:seek("set", watermark)
@@ -297,13 +326,30 @@ function M.sync_foreign_data_sql()
 										error("foreign exec failed: " .. (db:errmsg() or "?"))
 									end
 								end)
-								if ok2 then
-									db:exec(string.format(
+							if ok2 then
+								local derived_ok = true
+								if type(on_applied) == "function" then
+									local callback_ok, callback_result = pcall(on_applied, entry)
+									derived_ok = callback_ok and callback_result ~= false
+									if not derived_ok then
+										Logger.warn(LOG, "Foreign sync: derived rebuild failed for %s; watermark deferred.",
+											entry:sub(1, 8))
+									end
+								end
+								if derived_ok then
+									local watermark_rc = db:exec(string.format(
 										"UPDATE devices SET imported_data_sql_size=%d, updated_at='%s' WHERE device_id='%s'",
 										applied_to, _now_ts():gsub("'", "''"), entry:gsub("'", "''")))
-									Logger.debug(LOG, "Foreign sync: applied %d byte(s) from device %s.",
-										applied_to - watermark, entry:sub(1, 8))
-								else
+									if watermark_rc == sqlite3.OK then
+										table.insert(synced_devices, entry)
+										Logger.debug(LOG, "Foreign sync: applied %d byte(s) from device %s.",
+											applied_to - watermark, entry:sub(1, 8))
+									else
+										Logger.warn(LOG, "Foreign sync: cannot advance watermark for %s: %s.",
+											entry:sub(1, 8), db:errmsg() or "?")
+									end
+								end
+							else
 									-- Defensively roll back any partial transaction the failed
 									-- exec opened so it cannot poison the local ingest BEGIN.
 									pcall(function() db:exec("ROLLBACK;") end)
@@ -317,6 +363,7 @@ function M.sync_foreign_data_sql()
 			end
 		end
 	end
+	return synced_devices
 end
 
 

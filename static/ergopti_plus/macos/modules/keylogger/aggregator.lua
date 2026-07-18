@@ -42,9 +42,12 @@ local Sql    = require("modules.keylogger.aggregator.sql")
 -- ===============================
 
 M.reset_batch    = C.reset_batch
+M.has_pending_batch = C.has_pending_batch
 M.get_ngram_ctx  = C.get_ngram_ctx
 M.set_ngram_ctx  = C.set_ngram_ctx
 M.reset_ngram_ctx = C.reset_ngram_ctx
+M.set_device_id  = C.set_device_id
+M.get_device_id  = C.get_device_id
 
 M.walk_typing       = Events.walk_typing
 M.walk_app_switch   = Events.walk_app_switch

@@ -87,7 +87,8 @@ helpers.describe("Sql.flush — successful rows are removed from the batch (F-ME
 
 		make_fake_db(function(_sql) return false end) -- every exec succeeds
 
-		Sql.flush()
+		local flushed = Sql.flush()
+		helpers.assert_true(flushed, "flush must confirm that no aggregate delta remains pending")
 
 		local key = "2024-01-01\1TestApp"
 		helpers.assert_nil(S.agg_batch.app_day[key],
@@ -118,7 +119,8 @@ helpers.describe("Sql.flush — failed rows survive into the next tick (F-MED-2)
 		-- Every agg_app_day INSERT fails (simulated locked/corrupt db).
 		make_fake_db(function(sql) return sql:find("INSERT INTO agg_app_day ", 1, true) ~= nil end)
 
-		Sql.flush()
+		local flushed = Sql.flush()
+		helpers.assert_eq(flushed, false, "flush must report pending rows when an aggregate UPSERT fails")
 
 		local key = "2024-02-02\1FailApp"
 		local row = S.agg_batch.app_day[key]

@@ -259,6 +259,65 @@ function M.get_active_app_snapshot()
 	}
 end
 
+--- Persist the foreground interval that is currently open, without creating a
+--- synthetic destination in the app-switch graph. This is used before the
+--- engine stops, so a Hammerspoon reload cannot discard the user's last
+--- uninterrupted work block.
+---@return boolean True when an interval was emitted.
+function M.close_active_app()
+	if not require_state("close_active_app") then return false end
+	if type(_state.active_app_name) ~= "string" or _state.active_app_name == ""
+		or type(_state.active_app_start) ~= "number"
+	then
+		return false
+	end
+	local now = hs.timer.absoluteTime() / 1000000
+	local duration_ms = math.max(0, math.floor(now - _state.active_app_start))
+	if duration_ms > 0 and type(_log_manager.log_app_switch) == "function" then
+		-- `next_app=nil` persists as SQL NULL, so aggregate switches_to is not
+		-- polluted with a fictitious "engine stopped" application.
+		_log_manager.log_app_switch(_state.active_app_name, nil, duration_ms)
+	end
+	_state.active_app_name  = nil
+	_state.active_app_start = nil
+	return duration_ms > 0
+end
+
+--- Split the currently open foreground interval at a local midnight boundary.
+--- App-switch rows are bucketed by their timestamp date, therefore carrying an
+--- interval across midnight without this split credits all of the previous day
+--- to the new one when the user next changes applications.
+---@param previous_date string Date being closed (YYYY-MM-DD).
+---@return boolean True when the previous day received a non-zero interval.
+function M.split_active_app_at_midnight(previous_date)
+	if not require_state("split_active_app_at_midnight") then return false end
+	if type(previous_date) ~= "string" or not previous_date:match("^%d%d%d%d%-%d%d%-%d%d$") then
+		return false
+	end
+	if type(_state.active_app_name) ~= "string" or _state.active_app_name == ""
+		or type(_state.active_app_start) ~= "number"
+	then
+		return false
+	end
+	local now = hs.timer.absoluteTime() / 1000000
+	local wall = os.date("*t")
+	local elapsed_today_ms = ((wall.hour * 3600) + (wall.min * 60) + wall.sec) * 1000
+	local total_elapsed_ms = math.max(0, math.floor(now - _state.active_app_start))
+	local previous_day_ms = math.max(0, total_elapsed_ms - elapsed_today_ms)
+	if previous_day_ms > 0 and type(_log_manager.log_app_switch) == "function" then
+		_log_manager.log_app_switch(
+			_state.active_app_name,
+			nil,
+			previous_day_ms,
+			previous_date .. " 23:59:59.999")
+	end
+	-- Keep tracking the same foreground app from this calendar day's boundary.
+	-- Maintenance can be delayed while Ergopti is paused: resetting to `now`
+	-- would silently drop every foreground minute since midnight in that case.
+	_state.active_app_start = now - elapsed_today_ms
+	return previous_day_ms > 0
+end
+
 --- Primes application tracking from the foreground application after a resume.
 --- Sleep and lock events deliberately close the former interval. macOS does not
 --- guarantee a new activation notification on wake, so explicitly restore the
@@ -271,9 +330,12 @@ function M.capture_frontmost_app()
 		Logger.debug(LOG, "capture_frontmost_app(): no foreground application available.")
 		return false
 	end
-	local ok_title, app_name = pcall(function() return app:title() end)
-	if not ok_title or type(app_name) ~= "string" or app_name == "" then
-		Logger.debug(LOG, "capture_frontmost_app(): foreground application has no usable title.")
+	-- hs.application:name() is the stable display-name API. `title()` describes
+	-- windows in other HS objects and is absent for some application instances,
+	-- which previously left the first post-resume interval untracked.
+	local ok_name, app_name = pcall(function() return app:name() end)
+	if not ok_name or type(app_name) ~= "string" or app_name == "" then
+		Logger.debug(LOG, "capture_frontmost_app(): foreground application has no usable name.")
 		return false
 	end
 	M.app_watcher_cb(app_name, hs.application.watcher.activated, app)

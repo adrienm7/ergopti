@@ -35,6 +35,8 @@ local LOG = "metrics_apps"
 
 M._wv             = nil
 M._app_icon_cache = {}
+--- True once the dashboard has subscribed to completed ingest cycles.
+M._ingest_listener_registered = false
 
 --- Cached projection — invalidated when the SQLite `meta.rev` advances.
 M._manifest_cache  = nil
@@ -507,6 +509,17 @@ function M.show()
 			Logger.info(LOG, "Apps time dashboard closed.")
 		end,
 	})
+
+	-- Keep an already-open app-time dashboard in sync with the SQLite revision.
+	-- Without this listener it only queried once at window creation, while the
+	-- typing dashboard refreshed after every ingest, leaving this UI stale.
+	if not M._ingest_listener_registered then
+		require("modules.keylogger.log_manager").on_ingest_done(function()
+			M.push_live_update()
+		end)
+		M._ingest_listener_registered = true
+		Logger.debug(LOG, "Post-ingest live-update listener registered.")
+	end
 
 	raise_now(M._wv, true)
 	hs.timer.doAfter(0.05, function() raise_now(M._wv, true) end)

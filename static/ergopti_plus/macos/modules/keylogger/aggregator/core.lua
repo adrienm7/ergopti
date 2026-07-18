@@ -198,6 +198,20 @@ function M.reset_batch()
 	S.agg_batch = AggHelper.new_batch()
 end
 
+--- True when any leaf delta remains after a flush attempt. Nested ngram maps
+--- keep empty table shells, so this intentionally walks to scalar leaves.
+---@return boolean
+function M.has_pending_batch()
+	local function has_value(value)
+		if type(value) ~= "table" then return true end
+		for _, child in pairs(value) do
+			if has_value(child) then return true end
+		end
+		return false
+	end
+	return type(S.agg_batch) == "table" and has_value(S.agg_batch)
+end
+
 --- Return the ngram context table so the log manager can serialise it.
 --- @return table The live S.ngram_ctx table (may be nil before first event).
 function M.get_ngram_ctx()
@@ -213,6 +227,23 @@ end
 --- Reset the ngram context (called on day rollover).
 function M.reset_ngram_ctx()
 	S.ngram_ctx = {}
+end
+
+--- Temporarily select the device partition written by flush(). Cache recovery
+--- replays one device at a time; keeping this setter here avoids duplicating
+--- the walker for foreign ledgers while preserving normal live ingestion.
+---@param device_id string
+function M.set_device_id(device_id)
+	if type(device_id) == "string" and device_id ~= "" then
+		S.device_id = device_id
+	end
+end
+
+--- Return the active aggregate partition. Exposed so cache recovery can restore
+--- the local device after a multi-device replay.
+---@return string|nil
+function M.get_device_id()
+	return S.device_id
 end
 
 

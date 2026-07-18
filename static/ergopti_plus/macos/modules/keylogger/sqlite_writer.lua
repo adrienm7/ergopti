@@ -166,6 +166,7 @@ function M.open_db()
 		{ "today_log_date",   ""   },
 		{ "ngram_ctx_json",   "{}" },
 		{ "local_data_sql_outbox", "" },
+		{ "aggregate_cache_revision", "0" },
 		{ "rev",              "0"  },
 	}) do
 		_db:exec(string.format(
