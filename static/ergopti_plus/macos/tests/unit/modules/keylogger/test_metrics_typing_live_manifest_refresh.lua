@@ -10,9 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local fh = assert(io.open(helpers.driver_root() .. "ui/metrics_typing/init.lua", "r"))
-local source = fh:read("*a")
-fh:close()
+local source = assert(helpers.read_driver_source("M._pending_full_refresh"))
 
 helpers.describe("metrics_typing: live manifest refresh", function()
 	helpers.it("coalesces a full projection reload instead of sending range data alone", function()

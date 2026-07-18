@@ -86,8 +86,9 @@ end
 
 --- Removes the tooltip from the screen immediately.
 --- @param opts table|nil { forced?: boolean } Bypass queued-row guards when requested.
-function M.hide(opts)
+function M.hide(...)
 	if not _ensure_deps() then return end
+	local opts = select(1, ...)
 	local forced = type(opts) == "table" and opts.forced == true
 	pcall(function()
 		if forced and type(_tooltip.hide_forced) == "function" then

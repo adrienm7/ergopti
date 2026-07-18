@@ -11,9 +11,8 @@ local helpers = require("tests.helpers")
 
 helpers.describe("keylogger: virtual synthetic telemetry for clipboard output", function()
 	local function source()
-		local fh = io.open(helpers.driver_root() .. "modules/keylogger/init.lua", "r")
-		helpers.assert_true(fh ~= nil, "cannot open keylogger/init.lua")
-		local text = fh:read("*a"); fh:close()
+		local text = helpers.read_driver_source("function M.notify_synthetic")
+		helpers.assert_not_nil(text, "cannot find keylogger synthetic telemetry source")
 		return text
 	end
 

@@ -126,6 +126,14 @@ local function start_real_keylogger()
 		app_watcher_cb         = function() end,
 		update_ax_observer     = function() end,
 	}
+	-- The production engine owns the raw event tap through KeyboardHook. Capture
+	-- its onEvent callback at that boundary rather than relying on the retired
+	-- direct hs.eventtap.new() ownership in keylogger/init.lua.
+	package.loaded["adapters.keyboard_hook"] = {
+		start = function(opts) captured_handle_key = opts and opts.onEvent end,
+		stop = function() end,
+		isRunning = function() return true end,
+	}
 
 	-- Force a fresh require of every sub-module that holds its own _state so a
 	-- prior scenario's M.init() cannot leak into this one (each is a singleton).

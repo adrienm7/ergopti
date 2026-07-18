@@ -10,9 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local fh = assert(io.open(helpers.driver_root() .. "ui/metrics_apps/init.lua", "r"))
-local source = fh:read("*a")
-fh:close()
+local source = assert(helpers.read_driver_source("M._ingest_listener_registered"))
 
 helpers.describe("metrics_apps: live SQLite refresh", function()
 	helpers.it("subscribes once to completed ingestion and refreshes the open window", function()

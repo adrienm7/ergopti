@@ -29,16 +29,14 @@ local helpers = require("tests.helpers")
 helpers.describe("gestures.init: suspend/resume axis (F-MED-5)", function()
 
 	local function read_init_source()
-		local f = io.open("modules/gestures/init.lua", "r")
-		helpers.assert_true(f ~= nil, "modules/gestures/init.lua must be readable")
-		local src = f:read("*a"); f:close()
+		local src = helpers.read_driver_source("function M.suspend")
+		helpers.assert_not_nil(src, "modules/gestures/init.lua must be readable")
 		return src
 	end
 
 	local function read_engine_source()
-		local f = io.open("modules/gestures/engine.lua", "r")
-		helpers.assert_true(f ~= nil, "modules/gestures/engine.lua must be readable")
-		local src = f:read("*a"); f:close()
+		local src = helpers.read_driver_source("triggerLiveAxisIfNeeded")
+		helpers.assert_not_nil(src, "modules/gestures/engine.lua must be readable")
 		return src
 	end
 

@@ -337,6 +337,7 @@ local function load_real_day_rollover_with_db(stall)
 			table.insert(exec_statements, sql)
 			return 0 -- sqlite3.OK stand-in; these are meta UPDATEs, not batch inserts
 		end,
+		nrows = function() return function() return nil end end,
 	}
 	package.loaded["modules.keylogger.sqlite_writer"].get_db = function() return fake_db end
 
