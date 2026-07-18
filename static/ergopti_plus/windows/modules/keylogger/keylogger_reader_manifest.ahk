@@ -48,7 +48,33 @@ KLR_ReadManifest(db, start_date := "", end_date := "") {
     KLR__SumTitles(db, manifest, where)
     KLR__SumHourly(db, manifest, where)
     KLR__SumHourlyMin5(db, manifest, where)
+    KLR_AddLiveForegroundTime(manifest, start_date, end_date)
     return manifest
+}
+
+; Adds the foreground interval that has not yet ended in an app_switch event.
+; Aggregates are persisted at focus changes, so without this projection-only
+; addition a dashboard opened during a long uninterrupted task reports zero
+; time for the current application until the user leaves it.
+KLR_AddLiveForegroundTime(manifest, start_date := "", end_date := "") {
+    if !(manifest is Map)
+        return
+    if (KLHook.prev_app = "" || KLHook.app_entered_at = 0)
+        return
+    now := A_TickCount
+    elapsed := (now - KLHook.app_entered_at) & 0xFFFFFFFF
+    if (elapsed <= 0)
+        return
+    ; A full abandoned session must not be rendered as foreground work.
+    if (KLHook.last_tick > 0 && ((now - KLHook.last_tick) & 0xFFFFFFFF) >= KLWatchConst.SESSION_TIMEOUT_MS)
+        return
+    date_str := A_YYYY . "-" . A_MM . "-" . A_DD
+    if (start_date != "" && date_str < start_date)
+        return
+    if (end_date != "" && date_str > end_date)
+        return
+    cell := KLR_GetCell(manifest, date_str, KLHook.prev_app)
+    cell["app_time_ms"] += elapsed
 }
 
 KLR_DateFilter(start_date, end_date) {

@@ -653,7 +653,7 @@ local function schedule_emergency_recycle()
 		return false
 	end
 	last_emergency_recycle = now
-	Logger.warn(LOG, "schedule_emergency_recycle: SCHEDULED in 20ms (first_frame=%s, watchers=%d)",
+	Logger.debug(LOG, "schedule_emergency_recycle: SCHEDULED in 20ms (first_frame=%s, watchers=%d)",
 		tostring(_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME), count_watchers())
 	hs.timer.doAfter(0.02, function()
 		if not CoreState.enabled then return end
@@ -661,7 +661,7 @@ local function schedule_emergency_recycle()
 			Logger.done(LOG, "Emergency recycle ABORTED — first frame arrived in the meantime.")
 			return
 		end
-		Logger.warn(LOG, "EMERGENCY RECYCLE executing now (primer caught gesture event before any frame)")
+		Logger.debug(LOG, "EMERGENCY RECYCLE executing now (primer caught gesture event before any frame)")
 		kickstart_hid()
 		recycle_watchers()
 	end)

@@ -85,6 +85,27 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
         .. "an upvalue — otherwise it reads a nil global and password-app keystroke "
         .. "suppression is silently disabled")
     end)
+
+    helpers.it("primes the current foreground app before lifecycle polling starts", function()
+      -- process_lifecycle.start() deliberately stores the current window as its
+      -- baseline, so it does not produce an initial focus-change callback. The
+      -- keylogger must be primed explicitly or the apps dashboard remains empty
+      -- until the user changes window for the first time.
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
+      helpers.assert_true(fh ~= nil, "daemon file is readable")
+      local src = fh:read("*a"); fh:close()
+
+      local prime_pos = src:find("process_lifecycle.getForegroundApp()", 1, true)
+      local start_pos = src:find("process_lifecycle.start()", 1, true)
+      helpers.assert_true(prime_pos ~= nil, "daemon must read the initial foreground app")
+      helpers.assert_true(start_pos ~= nil, "daemon must start lifecycle polling")
+      helpers.assert_true(prime_pos and start_pos and prime_pos < start_pos,
+        "initial foreground app must be attributed before lifecycle polling starts")
+      helpers.assert_true(src:find("keylogger.on_app_focus(_cached_app_id", prime_pos, true) ~= nil,
+        "initial foreground app must be forwarded to the keylogger")
+    end)
   end)
 
   -- ==========================================================================

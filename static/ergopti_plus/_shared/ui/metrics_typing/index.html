@@ -1242,6 +1242,7 @@
 		</div>
 
 		<!-- Load order matters: state/format first (no deps), then domain modules, then main -->
+		<script src="../host_bridge.js"></script>
 		<script src="../i18n.js"></script>
 		<script src="../dom_utils.js"></script>
 		<!-- Generated from _shared/data/keycodes/azerty.json (DC-1) — must load before state.js, which reads its KEYCODE_DATA global -->
@@ -1348,6 +1349,25 @@
 							console.error('apply_local_filters (manifest push) failed:', e);
 						}
 					}
+				}
+
+				// WebKitGTK cannot receive the macOS evaluateJavaScript injection and
+				// has no file-sidecar fallback. Request the shared prefetch envelope
+				// through its native bridge, then keep the dashboard live with polling.
+				if (window.__ergopti_host === 'linux') {
+					const request_linux_refresh = () => {
+						try {
+							window.webkit.messageHandlers.metrics_typing_bridge.postMessage({ action: 'refresh' });
+						} catch (_) {}
+					};
+					window.__hostBridgeResponse = (bridge, isBase64, payload) => {
+						if (bridge !== 'metrics_typing_bridge') return;
+						const response = decodeHostBridgeResponse(isBase64, payload);
+						if (response) apply_prefetch(response);
+					};
+					request_linux_refresh();
+					window.setInterval(request_linux_refresh, 2000);
+					return;
 				}
 
 				// WebView2 path (B niveau 2): the AHK host listens for

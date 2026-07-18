@@ -26,7 +26,7 @@ helpers.describe("ui.webkit_host", function()
       local expected = {
         "action_picker_bridge", "changelog_bridge", "dl_bridge",
         "hsEditor", "hotstrings_config_bridge", "hsOnboarding",
-        "hsPaths", "hsPersonalInfo", "metrics_apps_bridge",
+        "hsPaths", "hsPersonalInfo", "metrics_apps_bridge", "metrics_typing_bridge",
         "model_browser_bridge", "prompt_bridge", "token_bridge",
         "healthcheck", "personal_toml_editor",
       }
@@ -37,8 +37,8 @@ helpers.describe("ui.webkit_host", function()
       end
     end)
 
-    helpers.it("has exactly 14 bridges", function()
-      helpers.assert_eq(#WH.get_bridge_names(), 14)
+    helpers.it("has exactly 15 bridges", function()
+      helpers.assert_eq(#WH.get_bridge_names(), 15)
     end)
   end)
 
@@ -46,6 +46,7 @@ helpers.describe("ui.webkit_host", function()
     helpers.it("returns true for known bridges", function()
       helpers.assert_true(WH.is_valid_bridge("healthcheck"), "healthcheck valid")
       helpers.assert_true(WH.is_valid_bridge("metrics_apps_bridge"), "metrics valid")
+      helpers.assert_true(WH.is_valid_bridge("metrics_typing_bridge"), "typing metrics valid")
       helpers.assert_true(WH.is_valid_bridge("token_bridge"), "token valid")
     end)
 
@@ -246,6 +247,12 @@ helpers.describe("ui.webkit_host", function()
       local html = WH.build_app_html(DRIVER_ROOT, "action_picker", "en")
       helpers.assert_true(html:find('"en"'), "has en locale set")
       helpers.assert_true(html:find("__i18n_base"), "has i18n base")
+    end)
+
+    helpers.it("marks generated pages for the Linux host bridge", function()
+      local html = WH.build_app_html(DRIVER_ROOT, "metrics_apps", "fr")
+      helpers.assert_true(html:find('window.__ergopti_host="linux"', 1, true) ~= nil,
+        "metrics pages must select the Linux bridge instead of a file fetch")
     end)
   end)
 

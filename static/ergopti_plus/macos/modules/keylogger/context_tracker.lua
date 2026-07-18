@@ -240,6 +240,46 @@ end
 -- =============================================
 -- ==========================================
 
+--- Returns the unpersisted foreground duration for the active application.
+--- App-time events are normally committed only on a focus transition. The
+--- dashboard also needs the open interval so a long uninterrupted work block
+--- is visible before the user leaves that application.
+--- @return table|nil Snapshot { app, duration_ms }, or nil when no app is tracked.
+function M.get_active_app_snapshot()
+	if not require_state("get_active_app_snapshot") then return nil end
+	if type(_state.active_app_name) ~= "string" or _state.active_app_name == ""
+		or type(_state.active_app_start) ~= "number"
+	then
+		return nil
+	end
+	local now = hs.timer.absoluteTime() / 1000000
+	return {
+		app         = _state.active_app_name,
+		duration_ms = math.max(0, math.floor(now - _state.active_app_start)),
+	}
+end
+
+--- Primes application tracking from the foreground application after a resume.
+--- Sleep and lock events deliberately close the former interval. macOS does not
+--- guarantee a new activation notification on wake, so explicitly restore the
+--- currently focused application instead of leaving all subsequent time unowned.
+--- @return boolean True when a foreground application was captured.
+function M.capture_frontmost_app()
+	if not require_state("capture_frontmost_app") then return false end
+	local ok, app = pcall(hs.application.frontmostApplication)
+	if not ok or not app then
+		Logger.debug(LOG, "capture_frontmost_app(): no foreground application available.")
+		return false
+	end
+	local ok_title, app_name = pcall(function() return app:title() end)
+	if not ok_title or type(app_name) ~= "string" or app_name == "" then
+		Logger.debug(LOG, "capture_frontmost_app(): foreground application has no usable title.")
+		return false
+	end
+	M.app_watcher_cb(app_name, hs.application.watcher.activated, app)
+	return true
+end
+
 --- Checks whether the currently focused browser window is in private/incognito
 --- mode, and captures window fullscreen state and document file path.
 --- Called on every app switch and on browser window focus/title changes.

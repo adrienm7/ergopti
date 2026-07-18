@@ -169,7 +169,7 @@ local function deactivate_capsword()
 		_capsword_probe_watchdog = nil
 		if _capsword_check_pending then
 			_capsword_check_pending = false
-			Logger.warn(LOG, "CapsWord probe timed out — releasing lock (karabiner-capsword-lock-leak).")
+			Logger.debug(LOG, "CapsWord probe timed out — releasing lock (karabiner-capsword-lock-leak).")
 			pcall(function() task:terminate() end)
 		end
 	end)

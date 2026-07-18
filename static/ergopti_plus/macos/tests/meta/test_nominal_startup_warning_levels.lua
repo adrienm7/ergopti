@@ -67,4 +67,25 @@ helpers.describe("meta: nominal startup diagnostics stay warning-free", function
 		helpers.assert_true(source:find("Logger.debug(LOG, \"M.start() called again after menu-state synchronization", 1, true) ~= nil)
 		helpers.assert_true(source:find("M.start() called more than once", 1, true) == nil)
 	end)
+
+	helpers.it("automatic gesture recovery stays debug-only", function()
+		local source = read_source("modules/gestures/init.lua")
+		helpers.assert_true(source:find("Logger.debug(LOG, \"schedule_emergency_recycle: SCHEDULED", 1, true) ~= nil)
+		helpers.assert_true(source:find("Logger.debug(LOG, \"EMERGENCY RECYCLE executing now", 1, true) ~= nil)
+	end)
+
+	helpers.it("automatic CapsWord probe cleanup stays debug-only", function()
+		local source = read_source("modules/karabiner/watchers.lua")
+		helpers.assert_true(source:find("Logger.debug(LOG, \"CapsWord probe timed out", 1, true) ~= nil)
+	end)
+
+	helpers.it("gesture lift-off drift rejection stays debug-only", function()
+		local source = read_source("modules/gestures/engine.lua")
+		helpers.assert_true(source:find("Logger.debug(LOG, \"commitGesture: dir=%s does not match gesture lockedDir", 1, true) ~= nil)
+	end)
+
+	helpers.it("passive mouse-tap recovery does not pollute warnings", function()
+		local source = read_source("modules/keymap/init.lua")
+		helpers.assert_true(source:find("name == \"mouse\" and Logger.debug or Logger.warn", 1, true) ~= nil)
+	end)
 end)

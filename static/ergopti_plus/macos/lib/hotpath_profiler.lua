@@ -28,9 +28,9 @@ local Timer  = require("adapters.timer_scheduler")
 local LOG    = "HotPath"
 
 -- Keystrokes whose hot-path processing exceeds this many milliseconds are logged
--- at WARNING. 5 ms is below the threshold of perceptible single-keystroke lag yet
--- high enough that a healthy keystroke (sub-millisecond) never trips it.
-local DEFAULT_SLOW_MS = 5.0
+-- at WARNING. A 20 ms budget filters harmless one-off scheduler jitter while
+-- preserving a visible typing hitch as an actionable diagnostic.
+local DEFAULT_SLOW_MS = 20.0
 local _slow_ms        = DEFAULT_SLOW_MS
 
 -- Nanoseconds per millisecond — the conversion applied once per slow keystroke.

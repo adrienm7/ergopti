@@ -157,14 +157,12 @@ KL_Watchers_OnKeystroke() {
         ; Mask to 32-bit unsigned so the subtraction stays non-negative across
         ; the A_TickCount rollover at ~49.7 days uptime.
         gap := (now - last) & 0xFFFFFFFF
-        ; Exclude idle / away time from per-app focus durations. The app/title
-        ; focus-entry timestamps advance by any gap long enough to count as a
-        ; micro-idle or a session break, so the next app_switch / window_switch
-        ; duration measures active-focus wall-clock only. Without this, an
-        ; overnight or away gap (A_TickCount keeps advancing while asleep)
-        ; produced multi-hour garbage app_time_ms / titles.ms. The advance
-        ; can never overshoot now: app_entered_at <= last, so +gap <= now.
-        if (KLWatch.is_idle or gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
+        ; App time represents foreground screen time, not typing density. A
+        ; short reading/thinking pause must stay attributed to the focused app;
+        ; only a full session break is excluded to prevent overnight inflation.
+        ; The advance can never overshoot now: app_entered_at <= last, so
+        ; app_entered_at + gap <= now.
+        if (gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
             KLHook.app_entered_at   += gap
             KLHook.title_entered_at += gap
         }

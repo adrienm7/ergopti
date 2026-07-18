@@ -27,10 +27,13 @@
 local M = {}
 
 local Logger   = require("logger.shim")
+local Monotonic = require("lib.monotonic")
+local Timings   = require("lib.timings")
 -- WPM ring cap single-sourced from the shared keylogger metrics module so the
 -- per-app rings below never drift from the collector's global ring cap.
 local SharedMetrics    = require("keylogger.metrics")
 local WPM_RING_CAPACITY = SharedMetrics.DEFAULT_WPM_RING_CAPACITY
+local MAX_TYPING_INTERVAL_MS = Timings.ms("keylogger", "max_keystroke_delay_ms")
 -- Metrics collector is optional — keylogger falls back gracefully without it.
 local Metrics  = nil
 local ok_mc, mc_mod = pcall(require, "modules.keylogger.metrics_collector")
@@ -52,6 +55,12 @@ local LOG = "modules.keylogger.keylogger"
 
 -- Per-app accumulators: { [appId] = { keystroke_count, wpm_ring, char_window, ngrams } }
 local _app_stats = {}
+
+-- Foreground application accounting is independent of keystroke collection so
+-- the apps dashboard can represent focused reading, video calls, and coding
+-- pauses as well as text entry.
+local _focused_app_id         = nil
+local _focused_app_started_at = nil
 
 -- Whether password-field suppression is active.
 local _suppressed = false
@@ -94,6 +103,34 @@ local _session_started_at = nil
 
 -- Forward-declaration: _to_json is defined in section 8 but called from section 6.
 local _to_json
+
+--- Returns the per-app accumulator, creating an empty one when required.
+--- @param app_id string Focused application identifier.
+--- @param timestamp_ms number Timestamp used to seed the first-seen value.
+--- @return table Mutable per-app accumulator.
+local function ensure_app_stats(app_id, timestamp_ms)
+	local app = _app_stats[app_id]
+	if app then return app end
+	app = {
+		keystroke_count = 0,
+		wpm_ring         = {},
+		char_window      = {},
+		ngrams           = {},
+		first_seen       = timestamp_ms,
+		typing_time_ms   = 0,
+		last_key_at      = nil,
+		focus_time_ms    = 0,
+	}
+	_app_stats[app_id] = app
+	return app
+end
+
+--- Returns a stable display name without collapsing dotted desktop identifiers.
+--- @param app_id string Application identifier reported by the focus adapter.
+--- @return string Application name suitable for the shared metrics manifest.
+local function dashboard_app_name(app_id)
+	return tostring(app_id)
+end
 
 
 -- =========================================
@@ -188,17 +225,14 @@ end
 function M.record_app_key(app_id, ch, timestamp_ms)
 	if _suppressed then return end
 
-	local app = _app_stats[app_id]
-	if not app then
-		app = {
-			keystroke_count = 0,
-			wpm_ring = {},
-			char_window = {},
-			ngrams = {},
-			first_seen = timestamp_ms,
-		}
-		_app_stats[app_id] = app
+	local app = ensure_app_stats(app_id, timestamp_ms)
+	if type(app.last_key_at) == "number" then
+		local elapsed = timestamp_ms - app.last_key_at
+		if elapsed > 0 then
+			app.typing_time_ms = app.typing_time_ms + math.min(elapsed, MAX_TYPING_INTERVAL_MS)
+		end
 	end
+	app.last_key_at = timestamp_ms
 
 	app.keystroke_count = app.keystroke_count + 1
 	app.wpm_ring[#app.wpm_ring + 1] = timestamp_ms
@@ -209,17 +243,67 @@ function M.record_app_key(app_id, ch, timestamp_ms)
 	end
 end
 
+--- Records a foreground application transition from the process lifecycle port.
+--- @param app_id string|nil New focused application identifier.
+--- @param timestamp_ms number|nil Monotonic transition timestamp in milliseconds.
+function M.on_app_focus(app_id, timestamp_ms)
+	if type(app_id) ~= "string" or app_id == "" then return end
+	local now = type(timestamp_ms) == "number" and timestamp_ms or math.floor(Monotonic.now_ms())
+	if _focused_app_id == app_id then return end
+	if _focused_app_id and type(_focused_app_started_at) == "number" then
+		local elapsed = math.max(0, now - _focused_app_started_at)
+		local previous = ensure_app_stats(_focused_app_id, _focused_app_started_at)
+		previous.focus_time_ms = previous.focus_time_ms + elapsed
+	end
+	ensure_app_stats(app_id, now)
+	_focused_app_id         = app_id
+	_focused_app_started_at = now
+	Logger.debug(LOG, "Foreground application: %s.", app_id)
+end
+
 --- Returns per-app statistics.
 --- @return table { [appId] = { keystrokes, first_seen } }
 function M.get_app_stats()
 	local result = {}
+	local now = math.floor(Monotonic.now_ms())
 	for app_id, stats in pairs(_app_stats) do
+		local focus_time_ms = stats.focus_time_ms or 0
+		if app_id == _focused_app_id and type(_focused_app_started_at) == "number" then
+			focus_time_ms = focus_time_ms + math.max(0, now - _focused_app_started_at)
+		end
 		result[app_id] = {
 			keystrokes = stats.keystroke_count,
 			first_seen = stats.first_seen,
+			typing_time_ms = stats.typing_time_ms or 0,
+			focus_time_ms  = focus_time_ms,
 		}
 	end
 	return result
+end
+
+--- Builds the shared manifest/prefetch contract consumed by both metrics UIs.
+--- Linux has no historical aggregate reader yet, but this live projection keeps
+--- the dashboards accurate for the current session instead of rendering empty.
+--- @return table Metrics prefetch payload matching the macOS/Windows schema.
+function M.get_dashboard_payload()
+	local date_str = os.date("%Y-%m-%d")
+	local day = {}
+	for app_id, stats in pairs(M.get_app_stats()) do
+		local app_name = dashboard_app_name(app_id)
+		day[app_name] = {
+			chars       = stats.keystrokes or 0,
+			time        = stats.typing_time_ms or 0,
+			think_time  = 0,
+			app_time_ms = stats.focus_time_ms or 0,
+			category    = "Unknown",
+		}
+	end
+	return {
+		metrics_manifest = { [date_str] = day },
+		app_icons        = {},
+		_prefetch_data   = { historical = {}, today = {} },
+		driver_meta      = { os = "linux", heatmap_id = "kc" },
+	}
 end
 
 
@@ -420,6 +504,8 @@ end
 function M.reset_session()
 	if Metrics then Metrics.reset_session() end
 	_app_stats = {}
+	_focused_app_id         = nil
+	_focused_app_started_at = nil
 	_session_started_at = os.time() * 1000
 end
 

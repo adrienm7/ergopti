@@ -16,37 +16,27 @@ M.bridge_name = "metrics_apps_bridge"
 local Logger = require("logger.shim")
 local LOG = "bridge.metrics_apps"
 
---- Builds the initial data payload for the metrics UI.
+--- Builds the shared metrics payload expected by the browser dashboard.
 --- @param state table Daemon state.
 --- @return table
 local function _build_initial_payload(state)
-	if not state.keylogger then
-		return { keystrokes = 0, wpm = 0, words = 0, duration_ms = 0, apps = {} }
+	local keylogger = state.keylogger
+	if keylogger and type(keylogger.get_dashboard_payload) == "function" then
+		return keylogger.get_dashboard_payload()
 	end
-
-	local k = state.keylogger
-	local stats = { keystrokes = 0, words = 0, duration_ms = 0 }
-	local wpm = 0.0
-	local apps = {}
-
-	if type(k.get_session_stats) == "function" then
-		stats = k.get_session_stats(k)
-	end
-	if type(k.get_wpm) == "function" then
-		wpm = k.get_wpm(k)
-	end
-	if type(k.get_app_stats) == "function" then
-		apps = k.get_app_stats(k)
-	end
-
 	return {
-		keystrokes  = stats.keystrokes,
-		words       = stats.words,
-		wpm         = wpm,
-		duration_ms = stats.duration_ms,
-		apps        = apps,
-		suppressed  = type(k.is_suppressed) == "function" and k:is_suppressed() or false,
+		metrics_manifest = {},
+		app_icons        = {},
+		_prefetch_data   = { historical = {}, today = {} },
+		driver_meta      = { os = "linux", heatmap_id = "kc" },
 	}
+end
+
+--- Exposes the payload builder to the typing dashboard bridge.
+--- @param state table Daemon state.
+--- @return table Shared metrics payload.
+function M.build_payload(state)
+	return _build_initial_payload(state)
 end
 
 --- Handles an incoming JS message.
@@ -68,6 +58,9 @@ function M.on_message(payload, state)
 	if type(payload) ~= "table" then return nil end
 
 	local action = payload.action
+	if action == "ready" or action == "refresh" then
+		return _build_initial_payload(state)
+	end
 
 	if action == "reset" then
 		if state.keylogger and type(state.keylogger.reset_session) == "function" then
