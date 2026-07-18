@@ -170,3 +170,24 @@ _TSCT_RestoreGuardedByGeneration() {
 		"_TextSendRestoreClipboard must early-return (no-op) when a newer injection has advanced the generation")
 }
 Test("text_sender: deferred clipboard restore is generation-guarded (textsend-restore-timer-race)", _TSCT_RestoreGuardedByGeneration)
+
+; A generation check prevents stale restoration, but it does not preserve the
+; older requested output when two writes overlap. Clipboard sends therefore need
+; a FIFO whose session snapshot is taken only before the first request.
+_TSCT_ClipboardRequestsAreFifoSerialized() {
+	Src := _TSCT_ReadSource("adapters/text_sender.ahk")
+	TextBody := _TSCT_FuncBodyStripped(Src, "TextSend(Text, Opts, Callback) {")
+	StartBody := _TSCT_FuncBodyStripped(Src, "_TextSenderStartClipboard() {")
+	FinishBody := _TSCT_FuncBodyStripped(Src, "_TextSenderFinishClipboard() {")
+	Assert(InStr(Src, "_TEXT_CLIPBOARD_QUEUE := []") > 0 and InStr(Src, "_TEXT_CLIPBOARD_BUSY := false") > 0,
+		"clipboard TextSend must own an explicit FIFO and busy state; a generation counter alone drops superseded requested output")
+	Assert(InStr(TextBody, "_TEXT_CLIPBOARD_QUEUE.Push") > 0,
+		"TextSend must enqueue each clipboard request instead of starting competing workers")
+	Assert(InStr(TextBody, "!_TEXT_CLIPBOARD_BUSY and _TEXT_CLIPBOARD_QUEUE.Length = 0") > 0,
+		"TextSend must snapshot the user clipboard only at the start of an empty FIFO session")
+	Assert(InStr(StartBody, "_TEXT_CLIPBOARD_QUEUE.RemoveAt(1)") > 0 and InStr(StartBody, "_TEXT_CLIPBOARD_BUSY := true") > 0,
+		"the worker must claim one FIFO request before performing clipboard I/O")
+	Assert(InStr(FinishBody, "_TEXT_CLIPBOARD_BUSY := false") > 0 and InStr(FinishBody, "SetTimer(_TextSenderStartClipboard, -1)") > 0,
+		"only completion after the restore window may start the next clipboard request")
+}
+Test("text_sender: overlapping clipboard sends are serialized FIFO and retain the original clipboard snapshot (textsend-clipboard-output-drop)", _TSCT_ClipboardRequestsAreFifoSerialized)
