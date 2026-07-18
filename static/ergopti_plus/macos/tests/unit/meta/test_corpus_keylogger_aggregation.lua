@@ -43,6 +43,20 @@ end
 
 local corpus_root, corpus_err = read_corpus()
 
+--- Finds a corpus vector by its stable identifier instead of its array position.
+--- The corpus deliberately grows as regressions are found; positional lookups
+--- silently replay the wrong scenario after an insertion and can make a valid
+--- cross-walker assertion fail against unrelated data.
+--- @param id string
+--- @return table|nil
+local function vector_by_id(id)
+	if not corpus_root or type(corpus_root.vectors) ~= "table" then return nil end
+	for _, vector in ipairs(corpus_root.vectors) do
+		if vector.id == id then return vector end
+	end
+	return nil
+end
+
 
 
 
@@ -365,7 +379,7 @@ helpers.describe("keylogger aggregation corpus — vector replay", function()
 
 	helpers.it("simple_typing_3_chars: 3 chars, n-grams, hourly, char class", function()
 		if not corpus_root then return end
-		local vec = corpus_root.vectors[1]
+		local vec = vector_by_id("simple_typing_3_chars")
 		helpers.assert_true(vec ~= nil, "vector missing")
 		setup_and_replay(vec)
 
@@ -395,7 +409,7 @@ helpers.describe("keylogger aggregation corpus — vector replay", function()
 
 	helpers.it("typing_with_backspace: bs_total=1, cur_word='h'", function()
 		if not corpus_root then return end
-		local vec = corpus_root.vectors[2]
+		local vec = vector_by_id("typing_with_backspace")
 		helpers.assert_true(vec ~= nil, "vector missing")
 		setup_and_replay(vec)
 
@@ -415,7 +429,7 @@ helpers.describe("keylogger aggregation corpus — vector replay", function()
 
 	helpers.it("typing_with_word_boundary: cur_word='', prev_word='hi'", function()
 		if not corpus_root then return end
-		local vec = corpus_root.vectors[3]
+		local vec = vector_by_id("typing_with_word_boundary")
 		helpers.assert_true(vec ~= nil, "vector missing")
 		setup_and_replay(vec)
 
@@ -432,7 +446,7 @@ helpers.describe("keylogger aggregation corpus — vector replay", function()
 
 	helpers.it("synthetic_hotstring_trigger: hs_chars=2, hs_triggers=1", function()
 		if not corpus_root then return end
-		local vec = corpus_root.vectors[4]
+		local vec = vector_by_id("synthetic_hotstring_trigger")
 		helpers.assert_true(vec ~= nil, "vector missing")
 		setup_and_replay(vec)
 
@@ -445,7 +459,7 @@ helpers.describe("keylogger aggregation corpus — vector replay", function()
 
 	helpers.it("synthetic_llm_trigger: llm_chars=2, llm_triggers=1", function()
 		if not corpus_root then return end
-		local vec = corpus_root.vectors[5]
+		local vec = vector_by_id("synthetic_llm_trigger")
 		helpers.assert_true(vec ~= nil, "vector missing")
 		setup_and_replay(vec)
 
@@ -479,7 +493,7 @@ helpers.describe("keylogger aggregation corpus — vector replay", function()
 
 	helpers.it("typing_with_think_pause: pauses=1, think_time_ms=3000", function()
 		if not corpus_root then return end
-		local vec = corpus_root.vectors[6]
+		local vec = vector_by_id("typing_with_think_pause")
 		helpers.assert_true(vec ~= nil, "vector missing")
 		setup_and_replay(vec)
 
@@ -498,7 +512,7 @@ helpers.describe("keylogger aggregation corpus — vector replay", function()
 
 	helpers.it("app_switch_accumulates_duration: app_time=8000, switches_to=2", function()
 		if not corpus_root then return end
-		local vec = corpus_root.vectors[7]
+		local vec = vector_by_id("app_switch_accumulates_duration")
 		helpers.assert_true(vec ~= nil, "vector missing")
 		setup_and_replay(vec)
 
@@ -509,7 +523,7 @@ helpers.describe("keylogger aggregation corpus — vector replay", function()
 
 	helpers.it("window_switch_credits_title_ms: titles_ms=12000", function()
 		if not corpus_root then return end
-		local vec = corpus_root.vectors[8]
+		local vec = vector_by_id("window_switch_credits_title_ms")
 		helpers.assert_true(vec ~= nil, "vector missing")
 		setup_and_replay(vec)
 
@@ -519,7 +533,7 @@ helpers.describe("keylogger aggregation corpus — vector replay", function()
 
 	helpers.it("system_event_wifi_change: wifi_changes=2", function()
 		if not corpus_root then return end
-		local vec = corpus_root.vectors[9]
+		local vec = vector_by_id("system_event_wifi_change")
 		helpers.assert_true(vec ~= nil, "vector missing")
 		setup_and_replay(vec)
 
@@ -530,7 +544,7 @@ helpers.describe("keylogger aggregation corpus — vector replay", function()
 
 	helpers.it("system_event_modifier_hold: kc_hold count=2, sum=500, max=300", function()
 		if not corpus_root then return end
-		local vec = corpus_root.vectors[10]
+		local vec = vector_by_id("system_event_modifier_hold")
 		helpers.assert_true(vec ~= nil, "vector missing")
 		setup_and_replay(vec)
 
@@ -543,7 +557,7 @@ helpers.describe("keylogger aggregation corpus — vector replay", function()
 
 	helpers.it("system_event_manifest_increment_hs: hs_suggested=2", function()
 		if not corpus_root then return end
-		local vec = corpus_root.vectors[11]
+		local vec = vector_by_id("system_event_manifest_increment_hs")
 		helpers.assert_true(vec ~= nil, "vector missing")
 		setup_and_replay(vec)
 
@@ -554,7 +568,7 @@ helpers.describe("keylogger aggregation corpus — vector replay", function()
 
 	helpers.it("mixed_batch_typing_and_system: chars=1, ergo focus_sum=300", function()
 		if not corpus_root then return end
-		local vec = corpus_root.vectors[12]
+		local vec = vector_by_id("mixed_batch_typing_and_system")
 		helpers.assert_true(vec ~= nil, "vector missing")
 		setup_and_replay(vec)
 

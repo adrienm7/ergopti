@@ -74,11 +74,11 @@ Test("KLW.batch walk: finally { Critical(_crit_walk) } restore present (walker-b
 
 _WBCR_CriticalBeforeForLoop() {
 	block := _WBCR_FindIngestBlock(_WBCR_ReadSource())
-	posCrit := InStr(block, "Critical('On')")
+	posCrit := InStr(block, 'Critical("On")')
 	posFor  := InStr(block, "for _, entry in entries")
 	Assert(posCrit > 0 and posFor > 0,
 		"keylogger.ahk: both Critical guard and for-loop over entries must be present")
 	Assert(posCrit < posFor,
-		"keylogger.ahk: Critical('On') must appear before the for-loop over entries — not inside it")
+		"keylogger.ahk: Critical(\"On\") must appear before the for-loop over entries — not inside it")
 }
 Test("KLW.batch walk: Critical guard precedes for-loop over entries (walker-batch-critical)", _WBCR_CriticalBeforeForLoop)
