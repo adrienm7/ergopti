@@ -3,27 +3,25 @@
 ; ==============================================================================
 ; MODULE: Keylogger Ingest Failure Re-queue Meta Test
 ; DESCRIPTION:
-; Regression guard for HIGH-04: fix-ingest-failure-requeues-pending.
+; Regression guard for HIGH-04 plus the durable-JSONL duplicate retry case.
 ;
 ; KL_IngestOnce atomically snapshots and clears _pending_entries under Critical
 ; (lines 1349-1352 of keylogger.ahk) before the heavy SQL conversion and
 ; data.sql FileAppend. If FileAppend fails, the catch block used to log and
 ; return without re-queuing pending_snapshot onto _pending_entries.
 ;
-; On 64-bit hosts, KL_JsonDecode is a no-op, so today.log (the JSONL disk pass)
-; yields zero decodable entries. The next tick therefore also sees an empty
-; entries array, advances the offset, and returns — the events that were only
-; in pending_snapshot are gone forever with no error logged.
-;
-; The fix adds a Critical-guarded re-queue in the catch block:
-;   for i, e in pending_snapshot
-;       Keylogger._pending_entries.InsertAt(i, e)
-; Today_log_offset is left unchanged so the next tick retries the same chunk.
+; The original recovery put the ENTIRE pending snapshot back in RAM. But the
+; snapshot had already been appended to today.log before data.sql failed; the
+; unchanged offset then read those JSONL lines AND the re-queued copy, doubling
+; the next aggregate batch. The fix tracks the number of completed JSONL lines
+; and re-queues only the unwritten tail. Today_log_offset remains unchanged so
+; completed lines are retried exactly once from disk.
 ;
 ; This test asserts:
 ;   (a) The re-queue (InsertAt) appears inside the FileAppend catch block.
-;   (b) The re-queue is wrapped in Critical("On") / Critical("Off").
-;   (c) today_log_offset is NOT advanced inside the catch block.
+;   (b) It starts after pending_logged_count, not at the already logged head.
+;   (c) The re-queue is wrapped in Critical("On") / Critical("Off").
+;   (d) today_log_offset is NOT advanced inside the catch block.
 ;
 ; SCOPE: source introspection of modules/keylogger/keylogger.ahk.
 ; ==============================================================================
@@ -89,6 +87,10 @@ _IFR_CheckRequeueOnFailure() {
 	; The re-queue must reference pending_snapshot entries.
 	Assert(InStr(CatchBody, "pending_snapshot"),
 		"FileAppend catch block must reference pending_snapshot to re-queue the consumed entries")
+	Assert(InStr(CatchBody, "pending_logged_count"),
+		"FileAppend catch must distinguish JSONL-backed entries from the unwritten pending tail")
+	Assert(InStr(CatchBody, "snapshot_index := pending_logged_count + A_Index"),
+		"FileAppend catch must re-queue only entries that never reached today.log")
 
 	; (b) The re-queue must be wrapped in Critical to prevent a concurrent Push
 	;     from the keystroke hook from interleaving with the InsertAt.
@@ -104,5 +106,5 @@ _IFR_CheckRequeueOnFailure() {
 }
 
 
-Test("meta fix-ingest-failure-requeues-pending: FileAppend catch re-queues pending_snapshot onto _pending_entries",
+Test("meta fix-ingest-failure-requeues-pending: FileAppend catch re-queues only the pending tail not already durable in today.log",
 	_IFR_CheckRequeueOnFailure)

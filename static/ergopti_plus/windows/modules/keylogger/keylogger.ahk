@@ -881,18 +881,29 @@ KL_IngestOnce(force := false) {
 	Keylogger._pending_entries := []
 	Critical("Off")
 	
-	; Write pending events to disk now, off the hot path.
+	; Write pending events to disk now, off the hot path. Track the completed
+	; JSONL lines precisely: on a later data.sql failure, completed lines are
+	; already recoverable from the old offset and must NOT also be re-queued.
+	pending_logged_count := 0
 	if (pending_snapshot.Length > 0) {
 		fh := KL_OpenTodayFh()
 		if IsObject(fh) {
 			for _, e in pending_snapshot {
-				line := KL_JsonEncode(e)
-				line := StrReplace(line, "`n", "\n")
-				line := StrReplace(line, "`r", "")
-				fh.Write(line . "`n")
+				try {
+					line := KL_JsonEncode(e)
+					line := StrReplace(line, "`n", "\n")
+					line := StrReplace(line, "`r", "")
+					fh.Write(line . "`n")
+					pending_logged_count += 1
+				} catch as err {
+					if Keylogger.HasProp("log") && IsObject(Keylogger.log)
+						Keylogger.log.Error("Cannot append pending keylogger event to today.log: " . err.Message)
+					break
+				}
 			}
-			; Flush and advance new_offset so the next KL_ReadNewTodayLog
-			; ignores the lines we just wrote.
+			; Advance the success path past the JSONL lines just written. On an SQL
+			; failure the old offset is deliberately retained, so those same lines
+			; are read once from disk on the following tick.
 			try fh.Flush()
 			new_offset := fh.Pos
 		}
@@ -964,17 +975,21 @@ KL_IngestOnce(force := false) {
 
     try FileAppend(body, Keylogger.data_sql_path, "UTF-8")
     catch as err {
-        ; Re-queue consumed entries so the next tick retries them.
-        ; On 64-bit hosts KL_JsonDecode is a no-op, so today.log is not a
-        ; fallback — pending_snapshot is the ONLY source of these events in RAM
-        ; and must be preserved across a transient data.sql write failure.
-        Critical("On")
-        for i, e in pending_snapshot
-            Keylogger._pending_entries.InsertAt(i, e)
-        Critical("Off")
+        ; Only the tail that did NOT reach today.log needs to return to RAM.
+        ; Completed JSONL lines will be re-read from the unchanged old offset;
+        ; re-queueing them too used to make the next retry insert them twice.
+        pending_requeue_count := pending_snapshot.Length - pending_logged_count
+        if (pending_requeue_count > 0) {
+            Critical("On")
+            loop pending_requeue_count {
+                snapshot_index := pending_logged_count + A_Index
+                Keylogger._pending_entries.InsertAt(A_Index, pending_snapshot[snapshot_index])
+            }
+            Critical("Off")
+        }
         ; Leave today_log_offset alone so the next tick retries the same chunk.
         if Keylogger.HasProp("log") && IsObject(Keylogger.log)
-            Keylogger.log.Error("Cannot append to data.sql: " . err.Message . " — " . pending_snapshot.Length . " entry(ies) re-queued.")
+            Keylogger.log.Error("Cannot append to data.sql: " . err.Message . " — " . pending_requeue_count . " unwritten pending entry(ies) re-queued.")
         return
     }
     Keylogger.today_log_offset := new_offset
