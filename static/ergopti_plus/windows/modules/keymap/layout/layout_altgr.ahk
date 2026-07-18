@@ -265,6 +265,12 @@ AltGrShiftDispatch(SC, Table, *) {
         try LoggerWarn("LayoutAltGr",
             "Spurious AltGr dispatch (SC138 not physically held — prefix flag latched?): SC={1}, SC138 logical={2}, suspended={3}.",
             SC, GetKeyState("SC138"), A_IsSuspended)
+        ; AHK can retain the custom-combination prefix internally after Suspend
+        ; even though the key is physically up.  Never run an AltGr callback in
+        ; that state: doing so turns the next ordinary key into an unsolicited
+        ; layer character/action.  The original physical key event remains
+        ; available to the native/base path once this handler returns.
+        return
     }
     ; This dispatcher only runs on a real AltGr/Kana press — the HotIf in
     ; RegisterAltGrLayer guards every SC138 hotkey on IsRealAltGrPress().
