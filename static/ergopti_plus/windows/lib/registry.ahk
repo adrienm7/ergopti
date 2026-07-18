@@ -301,45 +301,29 @@ Reg_EnumSubKeys(keyPath) {
 ; Param keyPath - Full registry path to test.
 ; Returns boolean - True if the key exists.
 Reg_KeyExists(keyPath) {
-	; A key that holds only named values (no sub-keys, no (Default) value) is a
-	; perfectly valid existing key — the common case for an app settings key.
-	; Probe sub-keys and values independently; only the default-value RegRead is
-	; a last-resort fallback, so existence never hinges on a (Default) being set.
-	; ERROR_FILE_NOT_FOUND (2) / ERROR_PATH_NOT_FOUND (3) = key absent, the
-	; expected outcome of every negative probe below. The Win32 error code
-	; lands in OSError's Number property, not Extra (confirmed empirically:
-	; Extra is empty for RegDelete/RegRead/Reg-loop OSErrors) — the old
-	; `e.Extra` checks never matched, so EVERY absent-key probe fell through
-	; to the "unexpected error" LoggerWarn branch, spamming a warning on the
-	; ordinary, ubiquitous case of checking whether a key exists yet.
-	try {
-		Loop Reg, keyPath, "K" {
-			return true
-		}
-	} catch as e {
-		if (e.Number != 2 and e.Number != 3)
-			LoggerWarn("registry", "Reg_KeyExists sub-key probe error — {1}: {2}", keyPath, e.Message)
+	; Content probes cannot distinguish an empty-but-existing key from an absent
+	; one. Open the key itself with the minimum query right instead.
+	Slash := InStr(keyPath, "\")
+	RootName := (Slash > 0) ? SubStr(keyPath, 1, Slash - 1) : keyPath
+	SubKey := (Slash > 0) ? SubStr(keyPath, Slash + 1) : ""
+	Roots := Map("HKCU", 0x80000001, "HKEY_CURRENT_USER", 0x80000001,
+		"HKLM", 0x80000002, "HKEY_LOCAL_MACHINE", 0x80000002,
+		"HKCR", 0x80000000, "HKEY_CLASSES_ROOT", 0x80000000,
+		"HKU", 0x80000003, "HKEY_USERS", 0x80000003,
+		"HKCC", 0x80000005, "HKEY_CURRENT_CONFIG", 0x80000005)
+	if !Roots.Has(RootName) {
+		try LoggerWarn("registry", "Reg_KeyExists received an unknown registry root: {1}.", RootName)
 		return false
 	}
-	try {
-		Loop Reg, keyPath, "V" {
-			return true
-		}
-	} catch as e {
-		if (e.Number != 2 and e.Number != 3)
-			LoggerWarn("registry", "Reg_KeyExists value probe error — {1}: {2}", keyPath, e.Message)
-		return false
-	}
-	; No error thrown but neither sub-keys nor named values were found — the key
-	; exists but is empty. Use a direct RegRead of its (Default) value as a probe.
-	try {
-		RegRead(keyPath, "")
+	Handle := 0
+	Status := DllCall("Advapi32\RegOpenKeyExW", "Ptr", Roots[RootName], "WStr", SubKey,
+		"UInt", 0, "UInt", 0x0001, "PtrP", &Handle, "UInt") ; KEY_QUERY_VALUE
+	if (Status = 0) {
+		try DllCall("Advapi32\RegCloseKey", "Ptr", Handle, "UInt")
 		return true
-	} catch as e {
-		if (e.Number = 2 or e.Number = 3)
-			return false
-		; Any other error: key may exist but is inaccessible
-		LoggerWarn("registry", "Reg_KeyExists probe error — {1}: {2}", keyPath, e.Message)
-		return false
 	}
+	if (Status = 2 or Status = 3)
+		return false
+	try LoggerWarn("registry", "Reg_KeyExists open error {1} for {2}.", Status, keyPath)
+	return false
 }
