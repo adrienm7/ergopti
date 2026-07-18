@@ -302,14 +302,18 @@ function M.upsert_app_day(device_id, date, app, fields)
 	if #sets == 0 then return end
 
 	local sql = string.format(
-		"INSERT INTO agg_app_day (device_id, date, app, chars, time_ms) "
-		.. "VALUES ('%s','%s','%s',%d,%d) "
+		"INSERT INTO agg_app_day (device_id, date, app, chars, time_ms, app_time_ms, hs_chars, hs_triggers, hs_input_chars) "
+		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,%d,%d) "
 		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET %s;",
 		_sql_escape(device_id),
 		_sql_escape(date),
 		_sql_escape(app),
 		tonumber(fields.chars) or 0,
 		tonumber(fields.time_ms) or 0,
+		tonumber(fields.app_time_ms) or 0,
+		tonumber(fields.hs_chars) or 0,
+		tonumber(fields.hs_triggers) or 0,
+		tonumber(fields.hs_input_chars) or 0,
 		table.concat(sets, ", ")
 	)
 	_exec(sql)

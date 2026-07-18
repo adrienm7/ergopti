@@ -43,6 +43,7 @@ helpers.describe("keylogger", function()
       helpers.assert_true(type(keylogger.reset_session) == "function")
       helpers.assert_true(type(keylogger.get_app_stats) == "function")
       helpers.assert_true(type(keylogger.record_app_key) == "function")
+	  helpers.assert_true(type(keylogger.record_hotstring) == "function")
       helpers.assert_true(type(keylogger.on_app_focus) == "function")
       helpers.assert_true(type(keylogger.get_dashboard_payload) == "function")
     end)
@@ -266,6 +267,39 @@ helpers.describe("keylogger", function()
       helpers.assert_eq(day.firefox.time, 200)
       helpers.assert_eq(day.firefox.app_time_ms, 4000)
       helpers.assert_true(type(payload.app_icons) == "table")
+    end)
+
+    helpers.it("records hotstring output and its physical trigger separately", function()
+      keylogger.init({})
+      keylogger.reset_session()
+      keylogger.record_hotstring("firefox", "btw", "by the way", 1000)
+
+      local app = keylogger.get_app_stats().firefox
+      helpers.assert_eq(app.hs_chars, 10)
+      helpers.assert_eq(app.hs_input_chars, 3)
+      helpers.assert_eq(app.hs_triggers, 1)
+    end)
+
+    helpers.it("counts Unicode hotstrings by character rather than UTF-8 byte", function()
+      keylogger.init({})
+      keylogger.reset_session()
+      keylogger.record_hotstring("firefox", "é", "éclair", 1000)
+
+      local app = keylogger.get_app_stats().firefox
+      helpers.assert_eq(app.hs_chars, 6)
+      helpers.assert_eq(app.hs_input_chars, 1)
+      helpers.assert_eq(app.hs_triggers, 1)
+    end)
+
+    helpers.it("does not retain hotstring contents while password suppression is active", function()
+      keylogger.init({})
+      keylogger.reset_session()
+      keylogger.suppress()
+      keylogger.record_hotstring("firefox", "secret", "sensitive replacement", 1000)
+      keylogger.unsuppress()
+
+      helpers.assert_eq(keylogger.get_app_stats().firefox, nil,
+        "suppressed expansions must leave no per-app metric record")
     end)
   end)
 

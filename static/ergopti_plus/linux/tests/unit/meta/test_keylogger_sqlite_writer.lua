@@ -28,6 +28,22 @@ helpers.describe("sqlite_writer", function()
       helpers.assert_true(type(sw.bump_rev)          == "function", "bump_rev")
     end)
 
+    helpers.it("seeds every app-time and hotstring metric on the initial upsert", function()
+      local path = helpers.driver_root() .. "/modules/keylogger/sqlite_writer.lua"
+      local fh = assert(io.open(path, "r"))
+      local src = fh:read("*a"); fh:close()
+      helpers.assert_true(src:find("app_time_ms, hs_chars, hs_triggers, hs_input_chars", 1, true) ~= nil,
+        "initial INSERT must retain every field, not only the conflict-update path")
+    end)
+
+    helpers.it("preserves complete dotted application identifiers during flush", function()
+      local path = helpers.driver_root() .. "/modules/keylogger/keylogger.lua"
+      local fh = assert(io.open(path, "r"))
+      local src = fh:read("*a"); fh:close()
+      helpers.assert_true(src:find("local app_name = dashboard_app_name(app_id)", 1, true) ~= nil,
+        "SQLite aggregation must use the same full app ID as the dashboard")
+    end)
+
     helpers.it("is_available returns false when sqlite3 CLI is absent", function()
       -- On the maintainer's Windows machine and most CI, sqlite3 is absent.
       helpers.assert_true(type(sw.is_available()) == "boolean", "is_available returns boolean")

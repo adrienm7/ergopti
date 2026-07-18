@@ -62,6 +62,10 @@ local _app_stats = {}
 local _focused_app_id         = nil
 local _focused_app_started_at = nil
 
+-- Last persisted cumulative values by app. SQLite app-day rows are additive;
+-- flushing cumulative counters again would duplicate every earlier keypress.
+local _flushed_app_totals = {}
+
 -- Whether password-field suppression is active.
 local _suppressed = false
 
@@ -120,6 +124,9 @@ local function ensure_app_stats(app_id, timestamp_ms)
 		typing_time_ms   = 0,
 		last_key_at      = nil,
 		focus_time_ms    = 0,
+		hs_chars         = 0,
+		hs_triggers      = 0,
+		hs_input_chars   = 0,
 	}
 	_app_stats[app_id] = app
 	return app
@@ -243,6 +250,26 @@ function M.record_app_key(app_id, ch, timestamp_ms)
 	end
 end
 
+--- Records a completed static-hotstring expansion for metrics parity.
+--- The physical trigger remains part of manual input; the dashboard subtracts
+--- hs_input_chars from the generated output to calculate the net gain.
+--- @param app_id string Focused application identifier.
+--- @param trigger string Typed hotstring trigger.
+--- @param replacement string Generated replacement text.
+--- @param timestamp_ms number Event timestamp.
+function M.record_hotstring(app_id, trigger, replacement, timestamp_ms)
+	if _suppressed or type(app_id) ~= "string" or app_id == "" then return end
+	if type(replacement) ~= "string" or replacement == "" then return end
+	local function char_count(text)
+		local ok, count = pcall(utf8.len, text)
+		return ok and count or #text
+	end
+	local app = ensure_app_stats(app_id, timestamp_ms)
+	app.hs_chars       = app.hs_chars + char_count(replacement)
+	app.hs_triggers    = app.hs_triggers + 1
+	app.hs_input_chars = app.hs_input_chars + char_count(type(trigger) == "string" and trigger or "")
+end
+
 --- Records a foreground application transition from the process lifecycle port.
 --- @param app_id string|nil New focused application identifier.
 --- @param timestamp_ms number|nil Monotonic transition timestamp in milliseconds.
@@ -276,6 +303,9 @@ function M.get_app_stats()
 			first_seen = stats.first_seen,
 			typing_time_ms = stats.typing_time_ms or 0,
 			focus_time_ms  = focus_time_ms,
+			hs_chars       = stats.hs_chars or 0,
+			hs_triggers    = stats.hs_triggers or 0,
+			hs_input_chars = stats.hs_input_chars or 0,
 		}
 	end
 	return result
@@ -295,6 +325,9 @@ function M.get_dashboard_payload()
 			time        = stats.typing_time_ms or 0,
 			think_time  = 0,
 			app_time_ms = stats.focus_time_ms or 0,
+			hs_chars       = stats.hs_chars or 0,
+			hs_triggers    = stats.hs_triggers or 0,
+			hs_input_chars = stats.hs_input_chars or 0,
 			category    = "Unknown",
 		}
 	end
@@ -421,11 +454,28 @@ function M.flush()
 
 		-- 2. Upsert per-app daily aggregates.
 		for app_id, app_stats in pairs(apps) do
-			local app_name = app_id:match("^[^.]+") or app_id
-			SqliteWriter.upsert_app_day(_device_id, date, app_name, {
-				chars   = app_stats.keystrokes or 0,
-				time_ms = stats.duration_ms or 0,
-			})
+			-- The dashboard and both other drivers retain the complete desktop
+			-- identifier (for example org.mozilla.firefox). Truncating at the first
+			-- dot silently merged unrelated applications in the persisted database.
+			local app_name = dashboard_app_name(app_id)
+			local current = {
+				chars       = app_stats.keystrokes or 0,
+				time_ms     = app_stats.typing_time_ms or 0,
+				app_time_ms = app_stats.focus_time_ms or 0,
+				hs_chars    = app_stats.hs_chars or 0,
+				hs_triggers = app_stats.hs_triggers or 0,
+				hs_input_chars = app_stats.hs_input_chars or 0,
+			}
+			local previous = _flushed_app_totals[app_id] or {}
+			local delta = {}
+			local changed = false
+			for field, value in pairs(current) do
+				local increment = math.max(0, value - (previous[field] or 0))
+				delta[field] = increment
+				changed = changed or increment > 0
+			end
+			if changed then SqliteWriter.upsert_app_day(_device_id, date, app_name, delta) end
+			_flushed_app_totals[app_id] = current
 		end
 
 		-- 3. Upsert n-grams from the metrics collector.
@@ -506,6 +556,7 @@ function M.reset_session()
 	_app_stats = {}
 	_focused_app_id         = nil
 	_focused_app_started_at = nil
+	_flushed_app_totals     = {}
 	_session_started_at = os.time() * 1000
 end
 
