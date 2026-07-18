@@ -19,10 +19,10 @@ local LOG = "bridge.metrics_apps"
 --- Builds the shared metrics payload expected by the browser dashboard.
 --- @param state table Daemon state.
 --- @return table
-local function _build_initial_payload(state)
+local function _build_initial_payload(state, include_prefetch)
 	local keylogger = state.keylogger
 	if keylogger and type(keylogger.get_dashboard_payload) == "function" then
-		return keylogger.get_dashboard_payload()
+		return keylogger.get_dashboard_payload({ include_prefetch = include_prefetch ~= false })
 	end
 	return {
 		metrics_manifest = {},
@@ -36,7 +36,7 @@ end
 --- @param state table Daemon state.
 --- @return table Shared metrics payload.
 function M.build_payload(state)
-	return _build_initial_payload(state)
+	return _build_initial_payload(state, true)
 end
 
 --- Handles an incoming JS message.
@@ -47,10 +47,10 @@ function M.on_message(payload, state)
 	if type(payload) == "string" then
 		if payload == "ready" then
 			Logger.info(LOG, "Metrics apps UI ready.")
-			return _build_initial_payload(state)
+			return _build_initial_payload(state, true)
 		end
 		if payload == "refresh" then
-			return _build_initial_payload(state)
+			return _build_initial_payload(state, false)
 		end
 		return nil
 	end
@@ -59,14 +59,14 @@ function M.on_message(payload, state)
 
 	local action = payload.action
 	if action == "ready" or action == "refresh" then
-		return _build_initial_payload(state)
+		return _build_initial_payload(state, action == "ready")
 	end
 
 	if action == "reset" then
 		if state.keylogger and type(state.keylogger.reset_session) == "function" then
 			pcall(state.keylogger.reset_session, state.keylogger)
 		end
-		return _build_initial_payload(state)
+		return _build_initial_payload(state, true)
 	end
 
 	if action == "export" then

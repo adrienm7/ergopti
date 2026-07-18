@@ -192,6 +192,71 @@ helpers.describe("keylogger", function()
       local ok = pcall(function() keylogger.flush() end)
       helpers.assert_true(ok)
     end)
+
+    helpers.it("flushes one canonical raw batch and never replays it", function()
+      local calls = { typing = {}, hotstrings = {}, switches = {}, app_days = {}, ngrams = {} }
+      local fake_writer = {
+        open_db = function() return true end,
+        register_device = function() return true end,
+        is_available = function() return true end,
+        bump_rev = function() return true end,
+        insert_typing_events = function(_, events)
+          calls.typing[#calls.typing + 1] = events
+          return true
+        end,
+        insert_hotstring_events = function(_, events)
+          calls.hotstrings[#calls.hotstrings + 1] = events
+          return true
+        end,
+        insert_app_switch_events = function(_, events)
+          calls.switches[#calls.switches + 1] = events
+          return true
+        end,
+        upsert_app_day = function(_, _, _, fields)
+          calls.app_days[#calls.app_days + 1] = fields
+          return true
+        end,
+        upsert_ngrams = function(_, _, _, entries)
+          calls.ngrams[#calls.ngrams + 1] = entries
+          return true
+        end,
+      }
+      local writer_name = "modules.keylogger.sqlite_writer"
+      local logger_name = "modules.keylogger.keylogger"
+      local previous_writer = package.loaded[writer_name]
+      local previous_logger = package.loaded[logger_name]
+      package.loaded[writer_name] = fake_writer
+      package.loaded[logger_name] = nil
+      local ok, err = pcall(function()
+        local isolated = require(logger_name)
+        isolated.init({ sqlite_path = "/tmp/ergopti_keylogger_mock.sqlite" })
+        isolated.reset_session()
+        isolated.on_app_focus("org.mozilla.firefox", 1000)
+        isolated.on_keydown("a", 1100, "org.mozilla.firefox")
+        isolated.on_keydown("b", 1200, "org.mozilla.firefox")
+        isolated.record_hotstring("org.mozilla.firefox", "btw", "by the way", 1300, "test")
+        isolated.on_app_focus("code", 2000)
+        isolated.flush()
+
+        helpers.assert_eq(#calls.typing, 1)
+        helpers.assert_eq(calls.typing[1][1].app, "org.mozilla.firefox")
+        helpers.assert_eq(calls.typing[1][1].text, "ab")
+        helpers.assert_eq(#calls.hotstrings, 1)
+        helpers.assert_eq(calls.hotstrings[1][1].net_saved_chars, 7)
+        helpers.assert_eq(#calls.switches, 1)
+        helpers.assert_eq(calls.switches[1][1].duration_ms, 1000)
+        helpers.assert_true(#calls.app_days > 0)
+        helpers.assert_true(#calls.ngrams > 0)
+
+        isolated.flush()
+        helpers.assert_eq(#calls.typing, 1, "a second flush must not replay raw typing")
+        helpers.assert_eq(#calls.hotstrings, 1, "a second flush must not replay hotstrings")
+        helpers.assert_eq(#calls.switches, 1, "a second flush must not replay switches")
+      end)
+      package.loaded[writer_name] = previous_writer
+      package.loaded[logger_name] = previous_logger
+      if not ok then error(err, 0) end
+    end)
   end)
 
   -- ==========================================================================
@@ -300,6 +365,16 @@ helpers.describe("keylogger", function()
 
       helpers.assert_eq(keylogger.get_app_stats().firefox, nil,
         "suppressed expansions must leave no per-app metric record")
+    end)
+
+    helpers.it("keeps raw hotstring and foreground transitions pending for canonical persistence", function()
+      local path = helpers.driver_root() .. "/modules/keylogger/keylogger.lua"
+      local fh = assert(io.open(path, "r"))
+      local src = fh:read("*a"); fh:close()
+      helpers.assert_true(src:find("_pending_hotstring_events", 1, true) ~= nil)
+      helpers.assert_true(src:find("_pending_app_switch_events", 1, true) ~= nil)
+      helpers.assert_true(src:find("insert_hotstring_events", 1, true) ~= nil)
+      helpers.assert_true(src:find("insert_app_switch_events", 1, true) ~= nil)
     end)
   end)
 

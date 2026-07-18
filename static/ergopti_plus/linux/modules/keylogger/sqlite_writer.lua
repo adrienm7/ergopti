@@ -51,6 +51,10 @@ local _available = nil
 -- Whether the schema has been bootstrapped for the current db_path.
 local _bootstrapped = false
 
+-- Monotonic per-device event IDs. Stored in meta so a daemon restart cannot
+-- reuse an ID and silently overwrite a previously persisted raw event.
+local _next_event_id = nil
+
 
 -- =========================================
 -- =========================================
@@ -113,6 +117,45 @@ local function _exec(sql)
 	return true
 end
 
+--- Runs a scalar SELECT through the sqlite3 CLI.
+--- @param sql string Complete SELECT statement.
+--- @return string|nil First output line, or nil when the query fails.
+local function _query_scalar(sql)
+	if not _db_path or not _available then return nil end
+	local tmp = (os.tmpname and os.tmpname() or "/tmp/ergopti_sql_" .. tostring(os.time()))
+	os.remove(tmp)
+	local tmp_sql = tmp .. ".sql"
+	local fh = io.open(tmp_sql, "w")
+	if not fh then return nil end
+	fh:write(sql); fh:close()
+	local db_esc = _db_path:gsub("'", "'\\''")
+	local cmd = string.format("sqlite3 -noheader '%s' < '%s' 2>/dev/null", db_esc, tmp_sql:gsub("'", "'\\''"))
+	local pipe = io.popen(cmd, "r")
+	local value = pipe and pipe:read("*l") or nil
+	if pipe then pipe:close() end
+	os.remove(tmp_sql)
+	return value
+end
+
+--- Reserves consecutive event IDs transactionally within this writer process.
+--- @param count number Number of IDs required.
+--- @return number|nil First reserved ID.
+local function _reserve_event_ids(count)
+	count = math.max(1, math.floor(tonumber(count) or 1))
+	if not M.is_available() then return nil end
+	if not _next_event_id then
+		_exec("INSERT OR IGNORE INTO meta (key, value) VALUES ('linux_next_event_id', '1');")
+		_next_event_id = tonumber(_query_scalar("SELECT value FROM meta WHERE key = 'linux_next_event_id';")) or 1
+	end
+	local first = _next_event_id
+	_next_event_id = first + count
+	if not _exec(string.format("UPDATE meta SET value = '%d' WHERE key = 'linux_next_event_id';", _next_event_id)) then
+		_next_event_id = first
+		return nil
+	end
+	return first
+end
+
 --- Reads the canonical schema file from the _shared tree.
 --- @return string|nil Schema SQL, or nil on failure.
 local function _read_schema()
@@ -135,6 +178,33 @@ local function _read_schema()
 	local content = fh:read("*a")
 	fh:close()
 	return content
+end
+
+--- Upgrades databases created before Linux was accepted by devices.os.
+--- The raw event tables deliberately have no foreign keys, but registration
+--- must still succeed so the database remains portable across all three OSes.
+local function _ensure_linux_device_schema()
+	local current_sql = _query_scalar("SELECT sql FROM sqlite_master WHERE type='table' AND name='devices';") or ""
+	if current_sql:find("linux", 1, true) then return true end
+	return _exec([[
+BEGIN;
+ALTER TABLE devices RENAME TO devices_pre_linux;
+CREATE TABLE devices (
+  device_id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  os TEXT NOT NULL CHECK (os IN ('darwin','windows','linux')),
+  os_version TEXT,
+  host_signature TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  imported_data_sql_size INTEGER NOT NULL DEFAULT 0,
+  imported_data_sql_sha256 TEXT
+);
+INSERT INTO devices (device_id,name,os,os_version,host_signature,created_at,updated_at,imported_data_sql_size,imported_data_sql_sha256)
+SELECT device_id,name,os,os_version,host_signature,created_at,updated_at,imported_data_sql_size,imported_data_sql_sha256 FROM devices_pre_linux;
+DROP TABLE devices_pre_linux;
+COMMIT;
+]])
 end
 
 
@@ -163,6 +233,7 @@ function M.open_db(db_path)
 	if not _check_sqlite3() then return false end
 
 	_db_path = db_path
+	_next_event_id = nil
 
 	-- Ensure the parent directory exists.
 	local dir = db_path:match("^(.*)[/\\]") or "."
@@ -197,6 +268,11 @@ function M.open_db(db_path)
 
 		_bootstrapped = true
 	end
+	if not _ensure_linux_device_schema() then
+		Logger.error(LOG, "Unable to upgrade device registry for Linux support.")
+		_db_path = nil
+		return false
+	end
 
 	Logger.debug(LOG, "SQLite database open: %s", _db_path)
 	return true
@@ -206,6 +282,7 @@ end
 function M.close_db()
 	_db_path = nil
 	_bootstrapped = false
+	_next_event_id = nil
 	Logger.debug(LOG, "SQLite database closed.")
 end
 
@@ -213,6 +290,12 @@ end
 --- @return string|nil
 function M.get_db_path()
 	return _db_path
+end
+
+--- Returns the dashboard cache revision, or nil when no database is open.
+function M.get_revision()
+	if not M.is_available() then return nil end
+	return tonumber(_query_scalar("SELECT value FROM meta WHERE key = 'rev';"))
 end
 
 --- Registers (or updates) the current device in the devices table.
@@ -253,6 +336,8 @@ end
 function M.insert_typing_events(device_id, events)
 	if not M.is_available() then return end
 	if type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
 
 	local parts = {}
 	for i, ev in ipairs(events) do
@@ -267,20 +352,71 @@ function M.insert_typing_events(device_id, events)
 
 		parts[#parts + 1] = string.format(
 			"('%s',%d,'%s','%s','%s','%s','','',0,0,0,0,0,%d,0,0,0.0,'%s','','%s')",
-			_sql_escape(device_id), i, ts, date, app, title,
+			_sql_escape(device_id), first_id + i - 1, ts, date, app, title,
 			wpm, text, events_json
 		)
 	end
 
 	local sql = string.format(
-		"INSERT OR REPLACE INTO events_typing "
+		"INSERT OR IGNORE INTO events_typing "
 		.. "(device_id,id,ts,date,app,title,url,field_role,layout,document_path,"
 		.. "is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,"
 		.. "pause_before_ms,battery_level,audio_volume,wpm,text,rich_text,events_json) "
 		.. "VALUES %s;",
 		table.concat(parts, ",")
 	)
-	_exec(sql)
+	return _exec(sql)
+end
+
+--- Inserts canonical hotstring events matching the macOS/Windows table shape.
+--- @param device_id string Device identifier.
+--- @param events table Array of {ts,date,app,kind,trigger,replacement,h_type,net_saved_chars}.
+function M.insert_hotstring_events(device_id, events)
+	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local parts = {}
+	for i, ev in ipairs(events) do
+		parts[#parts + 1] = string.format(
+			"('%s',%d,'%s','%s','%s','%s','%s','%s','%s',%d)",
+			_sql_escape(device_id), first_id + i - 1,
+			_sql_escape(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
+			_sql_escape(ev.date or os.date("!%Y-%m-%d")),
+			_sql_escape(ev.app or "unknown"),
+			_sql_escape(ev.kind or "fired"),
+			_sql_escape(ev.trigger or ""),
+			_sql_escape(ev.replacement or ""),
+			_sql_escape(ev.h_type or "unknown"),
+			tonumber(ev.net_saved_chars) or 0
+		)
+	end
+	return _exec("INSERT OR IGNORE INTO events_hotstring "
+		.. "(device_id,id,ts,date,app,kind,trigger,replacement,h_type,net_saved_chars) VALUES "
+		.. table.concat(parts, ",") .. ";")
+end
+
+--- Inserts foreground transitions in the shared events_app_switch format.
+--- @param device_id string Device identifier.
+--- @param events table Array of {ts,date,prev_app,next_app,duration_ms}.
+function M.insert_app_switch_events(device_id, events)
+	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local parts = {}
+	for i, ev in ipairs(events) do
+		parts[#parts + 1] = string.format(
+			"('%s',%d,'%s','%s','%s','%s',%d)",
+			_sql_escape(device_id), first_id + i - 1,
+			_sql_escape(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
+			_sql_escape(ev.date or os.date("!%Y-%m-%d")),
+			_sql_escape(ev.prev_app or ""),
+			_sql_escape(ev.next_app or ""),
+			tonumber(ev.duration_ms) or 0
+		)
+	end
+	return _exec("INSERT OR IGNORE INTO events_app_switch "
+		.. "(device_id,id,ts,date,prev_app,next_app,duration_ms) VALUES "
+		.. table.concat(parts, ",") .. ";")
 end
 
 --- Upserts per-app daily aggregate counters into agg_app_day.
@@ -292,9 +428,13 @@ function M.upsert_app_day(device_id, date, app, fields)
 	if not M.is_available() then return end
 	if type(fields) ~= "table" then return end
 
+	local allowed = {
+		chars = true, time_ms = true, app_time_ms = true,
+		hs_chars = true, hs_triggers = true, hs_input_chars = true,
+	}
 	local sets = {}
 	for k, v in pairs(fields) do
-		if type(v) == "number" then
+		if allowed[k] and type(v) == "number" and v > 0 then
 			sets[#sets + 1] = string.format("%s = %s + %d",
 				_sql_escape(k), _sql_escape(k), v)
 		end
@@ -316,7 +456,7 @@ function M.upsert_app_day(device_id, date, app, fields)
 		tonumber(fields.hs_input_chars) or 0,
 		table.concat(sets, ", ")
 	)
-	_exec(sql)
+	return _exec(sql)
 end
 
 --- Inserts or upserts n-gram counts into the ngram_chars table.
@@ -349,13 +489,13 @@ function M.upsert_ngrams(device_id, date, app, ngrams)
 		.. "ON CONFLICT(device_id, date, app, token) DO UPDATE SET c = c + excluded.c;",
 		table.concat(parts, ",")
 	)
-	_exec(sql)
+	return _exec(sql)
 end
 
 --- Bumps the meta.rev counter so the view cache knows new data is available.
 function M.bump_rev()
 	if not M.is_available() then return end
-	_exec("UPDATE meta SET value = CAST(value AS INTEGER) + 1 WHERE key = 'rev';")
+	return _exec("UPDATE meta SET value = CAST(value AS INTEGER) + 1 WHERE key = 'rev';")
 end
 
 return M

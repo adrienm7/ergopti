@@ -24,7 +24,21 @@ function M.on_message(payload, state)
 	local action = type(payload) == "table" and payload.action or payload
 	if action == "ready" or action == "refresh" then
 		Logger.debug(LOG, "Typing metrics UI requested %s.", action)
+		if state.keylogger and type(state.keylogger.get_dashboard_payload) == "function" then
+			return state.keylogger.get_dashboard_payload({ include_prefetch = action == "ready" })
+		end
 		return AppsBridge.build_payload(state)
+	end
+	if action == "range" and type(payload) == "table" then
+		if state.keylogger and type(state.keylogger.get_range_payload) == "function" then
+			local range = state.keylogger.get_range_payload(payload.start_date, payload.end_date, payload.apps)
+			return {
+				metrics_manifest = state.keylogger.get_dashboard_payload({ include_prefetch = false }).metrics_manifest,
+				app_icons = {},
+				_prefetch_data = range,
+				driver_meta = { os = "linux", heatmap_id = "kc" },
+			}
+		end
 	end
 	return nil
 end

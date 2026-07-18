@@ -1365,7 +1365,11 @@
 						const response = decodeHostBridgeResponse(isBase64, payload);
 						if (response) apply_prefetch(response);
 					};
-					request_linux_refresh();
+					try {
+						window.webkit.messageHandlers.metrics_typing_bridge.postMessage({ action: 'ready' });
+					} catch (_) {
+						request_linux_refresh();
+					}
 					window.setInterval(request_linux_refresh, 2000);
 					return;
 				}

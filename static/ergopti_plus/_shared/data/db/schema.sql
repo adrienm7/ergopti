@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS meta (
 CREATE TABLE IF NOT EXISTS devices (
 	device_id                  TEXT PRIMARY KEY,
 	name                       TEXT NOT NULL,
-	os                         TEXT NOT NULL CHECK (os IN ('darwin','windows')),
+	os                         TEXT NOT NULL CHECK (os IN ('darwin','windows','linux')),
 	os_version                 TEXT,
 	host_signature             TEXT NOT NULL,
 	created_at                 TEXT NOT NULL,

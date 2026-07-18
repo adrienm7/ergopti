@@ -409,7 +409,7 @@ local function main()
 			if not opts.dry_run then
 				-- Keep the keylogger's aggregate contract aligned with macOS and
 				-- Windows: generated text and the physical trigger are distinct.
-				keylogger.record_hotstring(app_id, result.trigger, result.replacement, now_ms)
+				keylogger.record_hotstring(app_id, result.trigger, result.replacement, now_ms, result.group)
 				injector._begin_injection()
 				injector.inject(result.backspace_count, result.replacement)
 				-- Drain any physical characters that arrived during
@@ -442,10 +442,14 @@ local function main()
 			-- Must run AFTER the static hotstring matcher so explicit triggers
 			-- take precedence over dynamic expansions.
 			if dyn_hotstrings and dyn_hotstrings.is_enabled() then
-				local ok_dh2, expanded = pcall(function()
+				local ok_dh2, expanded, dynamic_event = pcall(function()
 					return dyn_hotstrings.on_trigger(buf, ch)
 				end)
 				if ok_dh2 and expanded then
+					if dynamic_event then
+						keylogger.record_hotstring(app_id, dynamic_event.trigger,
+							dynamic_event.replacement, now_ms, dynamic_event.h_type)
+					end
 					-- Dynamic expansion consumed the trigger — reset the engine
 					-- buffer so the expansion text doesn't trigger further matches.
 					engine:reset()

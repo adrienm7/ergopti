@@ -163,6 +163,7 @@ end
 --- @param trigger string The character that just triggered the check (the
 ---   magic key, typically "★" or "\\").
 --- @return boolean True if a dynamic expansion was performed.
+--- @return table|nil Canonical event details for a successful expansion.
 function M.on_trigger(buffer, trigger)
 	if not _enabled then return false end
 	if type(buffer) ~= "string" or buffer == "" then return false end
@@ -193,7 +194,11 @@ function M.on_trigger(buffer, trigger)
 	if ok_inj and injector and type(injector.inject) == "function" then
 		injector.inject(backspace_count, match.result)
 		Logger.info(LOG, "Dynamic expansion: '%s' → '%s'.", match.rule.suffix, match.result)
-		return true
+		return true, {
+			trigger = match.rule.suffix .. t,
+			replacement = match.result,
+			h_type = "dynamic",
+		}
 	end
 
 	Logger.warn(LOG, "Injector not available — expansion dropped: '%s'.", match.rule.suffix)

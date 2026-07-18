@@ -23,6 +23,8 @@ helpers.describe("sqlite_writer", function()
       helpers.assert_true(type(sw.get_db_path)       == "function", "get_db_path")
       helpers.assert_true(type(sw.register_device)   == "function", "register_device")
       helpers.assert_true(type(sw.insert_typing_events) == "function", "insert_typing_events")
+	  helpers.assert_true(type(sw.insert_hotstring_events) == "function", "insert_hotstring_events")
+	  helpers.assert_true(type(sw.insert_app_switch_events) == "function", "insert_app_switch_events")
       helpers.assert_true(type(sw.upsert_app_day)    == "function", "upsert_app_day")
       helpers.assert_true(type(sw.upsert_ngrams)     == "function", "upsert_ngrams")
       helpers.assert_true(type(sw.bump_rev)          == "function", "bump_rev")
@@ -42,6 +44,28 @@ helpers.describe("sqlite_writer", function()
       local src = fh:read("*a"); fh:close()
       helpers.assert_true(src:find("local app_name = dashboard_app_name(app_id)", 1, true) ~= nil,
         "SQLite aggregation must use the same full app ID as the dashboard")
+    end)
+
+    helpers.it("uses persistent IDs and non-destructive inserts for raw events", function()
+      local path = helpers.driver_root() .. "/modules/keylogger/sqlite_writer.lua"
+      local fh = assert(io.open(path, "r"))
+      local src = fh:read("*a"); fh:close()
+      helpers.assert_true(src:find("linux_next_event_id", 1, true) ~= nil,
+        "a restart-safe SQLite event sequence is required")
+      helpers.assert_true(src:find("INSERT OR IGNORE INTO events_typing", 1, true) ~= nil,
+        "raw typing rows must never be replaced on an ID collision")
+      helpers.assert_true(src:find("insert_hotstring_events", 1, true) ~= nil,
+        "Linux must write canonical events_hotstring rows")
+      helpers.assert_true(src:find("insert_app_switch_events", 1, true) ~= nil,
+        "Linux must write canonical events_app_switch rows")
+    end)
+
+    helpers.it("migrates the former device OS constraint to include Linux", function()
+      local path = helpers.driver_root() .. "/modules/keylogger/sqlite_writer.lua"
+      local fh = assert(io.open(path, "r"))
+      local src = fh:read("*a"); fh:close()
+      helpers.assert_true(src:find("_ensure_linux_device_schema", 1, true) ~= nil)
+      helpers.assert_true(src:find("'darwin','windows','linux'", 1, true) ~= nil)
     end)
 
     helpers.it("is_available returns false when sqlite3 CLI is absent", function()
