@@ -214,31 +214,33 @@ BuildTrayMenuDeferred() {
     ; only the warm cache — the Critical span then covers ONLY the pure Win32
     ; Menu.Add / RegisterMenuItem pass that must be one uninterrupted block.
     _HS_PreScanPersonal()
-    Critical("On")
-    ; Clear the dispatch bypass Maps BEFORE the InitSubMenus()/initMenu()
-    ; re-registration pass. AHK reuses freed menu-item IDs after Menu.Delete();
-    ; a stale entry left in the Maps could bind a reused ID to a different
-    ; item's callback and fire the WRONG action on a dropped-click retry (see
-    ; menu_dispatcher.ahk).
-    MenuDispatcher_Reset()
-    InitSubMenus()
-    ; Build everything EXCEPT the 21-locale language submenu (~219 ms of Win32 menu
-    ; registration + flag-icon loads). Forcing _DriverReady false makes initMenu
-    ; DEFER that submenu (its boot behaviour) so THIS post-ready build stays ~157 ms
-    ; instead of ~420 ms — small enough not to lag the first keystrokes after launch.
-    ; The language submenu is then armed on its own timer below, exactly as the
-    ; original boot path did, so it never piles onto this Critical section.
-    _SavedReady := _DriverReady
-    _DriverReady := false
-    ; Restore _DriverReady even if initMenu() throws (I/O error, parse failure…);
-    ; leaving it false permanently would silently block all async saves thereafter.
+    _MenuBuildCritical := Critical("On")
     try {
-        initMenu()
+        ; Clear the dispatch bypass Maps BEFORE the InitSubMenus()/initMenu()
+        ; re-registration pass. AHK reuses freed menu-item IDs after Menu.Delete();
+        ; a stale entry left in the Maps could bind a reused ID to a different
+        ; item's callback and fire the WRONG action on a dropped-click retry (see
+        ; menu_dispatcher.ahk).
+        MenuDispatcher_Reset()
+        InitSubMenus()
+        ; Build everything EXCEPT the 21-locale language submenu (~219 ms of Win32 menu
+        ; registration + flag-icon loads). Forcing _DriverReady false makes initMenu
+        ; DEFER that submenu (its boot behaviour) so THIS post-ready build stays ~157 ms
+        ; instead of ~420 ms — small enough not to lag the first keystrokes after launch.
+        ; The language submenu is then armed on its own timer below, exactly as the
+        ; original boot path did, so it never piles onto this Critical section.
+        _SavedReady := _DriverReady
+        _DriverReady := false
+        ; Restore _DriverReady even if initMenu() throws (I/O error, parse failure…);
+        ; leaving it false permanently would silently block all async saves thereafter.
+        try initMenu()
+        finally _DriverReady := _SavedReady
+        UpdateTrayIcon()
     } finally {
-        _DriverReady := _SavedReady
+        ; A failed submenu/menu build must never strand the low-level keyboard
+        ; hook in Critical mode for the rest of the session.
+        Critical(_MenuBuildCritical)
     }
-    UpdateTrayIcon()
-    Critical("Off")
     if _LangMenuBuildPending
         SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
     BootProfile_Mark("Tray menu built (deferred, off time-to-ready)")

@@ -9,8 +9,8 @@ Test_TextSenderDoesNotPasteAfterClipboardFailure() {
 		"clipboard injection must check CB_Write before issuing Ctrl+V")
 	Assert(InStr(Body, "skipping paste to avoid injecting stale content") > 0,
 		"failed clipboard writes must be diagnosable rather than silently pasting stale data")
-	Send := _DriverFuncBody("TextSend")
-	Assert(InStr(Send, 'Saved == "__CB_SAVE_ERROR__"') > 0,
+	SendBody := _DriverFuncBody("TextSend")
+	Assert(InStr(SendBody, 'Saved == "__CB_SAVE_ERROR__"') > 0,
 		"TextSend must reject a failed clipboard snapshot before scheduling injection")
 }
 

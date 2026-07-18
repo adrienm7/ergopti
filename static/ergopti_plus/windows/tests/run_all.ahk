@@ -486,6 +486,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_text_expansion_critical_path.ahk
 #Include meta/test_text_sender_clipboard_failure.ahk
 #Include meta/test_download_window_i18n_fallback.ahk
+#Include meta/test_tray_build_critical_restore.ahk
 #Include meta/test_prefix_watcher_deferred.ahk
 #Include meta/test_hotstrings_ready_contract.ahk
 #Include meta/test_native_hotstrings_migrated.ahk
