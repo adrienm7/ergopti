@@ -25,6 +25,11 @@
 ; ======================================
 ; ======================================
 
+; Explicitly own the tap-hold configuration API used by every sub-module below.
+; The aggregate driver includes this first already; normal #Include include-once
+; semantics preserve that order while modular validation resolves TapHoldDuration.
+#Include ../lib/tap_hold/tap_hold_loader.ahk
+
 #Include tap_holds/constants.ahk
 #Include tap_holds/one_shot_shift.ahk
 #Include tap_holds/capslock.ahk
