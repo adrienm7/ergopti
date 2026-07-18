@@ -1,3 +1,5 @@
+--- tests/meta/test_e2e_virtual_keyboard_isolation.lua
+---
 --- Regression: every virtual-keyboard E2E scenario must bind all emitters to
 --- its own fresh Hammerspoon stub. A cached TextSender keeps the previous
 --- scenario's hs.eventtap closures, which silently loses delete events and
