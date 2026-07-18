@@ -194,6 +194,13 @@ global HSE_StarByTriggerCS := Map()   ; exact trigger  → [Spec, …], CS trigg
 ; probe so the lookup never exceeds the longest trigger that could match.
 global HSE_MaxStarTriggerLen := 0
 
+; Non-star triggers use the same full-trigger indexes as star triggers.  End
+; character matching probes bounded suffix lengths instead of scanning a dense
+; last-character bucket on every word terminator.
+global HSE_EndByTriggerCI := Map()
+global HSE_EndByTriggerCS := Map()
+global HSE_MaxEndTriggerLen := 0
+
 ; Suppression flag. When true, FeedChar / FeedBackspace / FeedReset
 ; short-circuit. The dispatch loop sets it for the duration of the
 ; SendEvent burst so its own replacement output does not feed back into
@@ -368,6 +375,8 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
                 HSE_StarSpecs.Push(Spec)
                 _HSE_IndexStarPrefixes(Spec)
                 _HSE_IndexStarTrigger(Spec)
+            } else {
+                _HSE_IndexEndTrigger(Spec)
             }
         } finally {
             Critical(_HsCrit)
@@ -391,6 +400,7 @@ HSE_RegistryClear() {
     global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
     global HSE_RegistryByGroup, HSE_DisabledGroups, HSE_SeqCounter
     global HSE_StarByTriggerCI, HSE_StarByTriggerCS, HSE_MaxStarTriggerLen
+    global HSE_EndByTriggerCI, HSE_EndByTriggerCS, HSE_MaxEndTriggerLen
     HSE_RegistryByLastChar := Map()
     HSE_StarSpecs := []
     HSE_StarPrefixSetCI := Map()
@@ -398,6 +408,9 @@ HSE_RegistryClear() {
     HSE_StarByTriggerCI := Map()
     HSE_StarByTriggerCS := Map()
     HSE_MaxStarTriggerLen := 0
+    HSE_EndByTriggerCI := Map()
+    HSE_EndByTriggerCS := Map()
+    HSE_MaxEndTriggerLen := 0
     HSE_RegistryByGroup := Map()
     HSE_DisabledGroups := Map()
     HSE_SeqCounter := 0
@@ -509,6 +522,7 @@ HSE_DisableGroup(Group) {
             _HSE_IndexStarPrefixes(S)
         }
         _HSE_RebuildStarTriggerIndex()
+        _HSE_RebuildEndTriggerIndex()
     } finally {
         Critical(_DgCrit)
     }
@@ -560,6 +574,8 @@ HSE_EnableGroup(Group) {
                     _HSE_IndexStarPrefixes(Spec)
                     _HSE_IndexStarTrigger(Spec)
                 }
+            } else if !AlreadyIn {
+                _HSE_IndexEndTrigger(Spec)
             }
         }
     } finally {
