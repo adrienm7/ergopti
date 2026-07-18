@@ -747,6 +747,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_deps_check_epoch_guard.ahk
 #Include meta/test_updater_rebuild_resets_dispatcher.ahk
 #Include meta/test_capsword_reset_on_suspend.ahk
+#Include meta/test_capsword_space_release_timeout.ahk
 #Include meta/test_gesture_toggle_ui_errors_logged.ahk
 #Include meta/test_lalt_capslock_enabled_gate.ahk
 #Include meta/test_wpm_mousewatch_suspend_guard.ahk
