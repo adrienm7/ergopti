@@ -33,6 +33,12 @@ helpers.describe("ui.bridge_handlers", function()
             driver_meta = { os = "linux", heatmap_id = "kc" },
           }
         end,
+		get_range_payload = function(start_date, end_date, apps)
+			return {
+				historical = { c = { a = { c = 2, t = 0, e = 0, hs = 0, llm = 0, o = 0 } } },
+				today = { firefox = { c = { b = { c = 3, t = 0, e = 0, hs = 0, llm = 0, o = 0 } } } },
+			}
+		end,
         is_suppressed     = function() return false end,
         suppress          = function() end,
         unsuppress        = function() end,
@@ -350,6 +356,15 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("returns nil for unknown actions", function()
       helpers.assert_eq(handler.on_message("unknown", state), nil)
+    end)
+    helpers.it("returns a selected n-gram range over the native Linux bridge", function()
+      local result = handler.on_message({
+        action = "range", start_date = "2026-07-01", end_date = "2026-07-18", apps = { "firefox" },
+      }, state)
+      helpers.assert_true(type(result) == "table")
+      helpers.assert_eq(result._prefetch_data.historical.c.a.c, 2)
+      helpers.assert_eq(result._prefetch_data.today.firefox.c.b.c, 3)
+      helpers.assert_eq(result.metrics_manifest["2026-07-18"].firefox.chars, 20)
     end)
   end)
 

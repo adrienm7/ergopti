@@ -3267,6 +3267,18 @@ function request_range_data(show_loader = true) {
 
 	// Slight delay so the UI renders the loader before the heavy decode starts
 	setTimeout(() => {
+		// Linux has a real WebKit bridge (unlike the macOS polling path).
+		// Send the selected range directly so date/app changes refresh the
+		// n-gram tables instead of leaving the initial prefetch on screen.
+		if (
+			window.__ergopti_host === 'linux' &&
+			window.webkit?.messageHandlers?.metrics_typing_bridge
+		) {
+			try {
+				window.webkit.messageHandlers.metrics_typing_bridge.postMessage({ action: 'range', ...req });
+				return;
+			} catch (_) {}
+		}
 		window._lua_request = JSON.stringify(req);
 	}, 50);
 }

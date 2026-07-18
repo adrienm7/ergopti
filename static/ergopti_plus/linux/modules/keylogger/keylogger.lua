@@ -44,6 +44,10 @@ local SqliteWriter = nil
 local ok_sw, sw_mod = pcall(require, "modules.keylogger.sqlite_writer")
 if ok_sw then SqliteWriter = sw_mod end
 
+local SqliteReader = nil
+local ok_sr, sr_mod = pcall(require, "modules.keylogger.sqlite_reader")
+if ok_sr then SqliteReader = sr_mod end
+
 local LOG = "modules.keylogger.keylogger"
 
 
@@ -65,6 +69,18 @@ local _focused_app_started_at = nil
 -- Last persisted cumulative values by app. SQLite app-day rows are additive;
 -- flushing cumulative counters again would duplicate every earlier keypress.
 local _flushed_app_totals = {}
+
+-- Raw events remain the audit source of truth. They are buffered per app until
+-- flush, then written in the exact events_* tables used by macOS and Windows.
+local _pending_typing_events = {}
+local _pending_hotstring_events = {}
+local _pending_app_switch_events = {}
+local _flushed_app_ngrams = {}
+
+-- Persisted manifest cache keyed by SQLite's monotonic revision. The live
+-- delta is layered on a shallow copy, so an open dashboard avoids a CLI query
+-- every two seconds without ever serving stale keystrokes.
+local _manifest_cache = { revision = nil, manifest = nil }
 
 -- Whether password-field suppression is active.
 local _suppressed = false
@@ -107,6 +123,12 @@ local _session_started_at = nil
 
 -- Forward-declaration: _to_json is defined in section 8 but called from section 6.
 local _to_json
+
+local function char_count(text)
+	if type(text) ~= "string" then return 0 end
+	local ok, count = pcall(utf8.len, text)
+	return ok and count or #text
+end
 
 --- Returns the per-app accumulator, creating an empty one when required.
 --- @param app_id string Focused application identifier.
@@ -215,6 +237,20 @@ function M.on_keydown(ch, timestamp_ms, app_id)
 	-- Per-app tracking.
 	if type(app_id) == "string" and app_id ~= "" then
 		M.record_app_key(app_id, ch, timestamp_ms)
+		local pending = _pending_typing_events[app_id]
+		if not pending then
+			pending = { text = {}, events = {}, last_key_at = nil }
+			_pending_typing_events[app_id] = pending
+		end
+		local delay = 0
+		if type(pending.last_key_at) == "number" then
+			delay = math.max(0, math.min(timestamp_ms - pending.last_key_at, MAX_TYPING_INTERVAL_MS))
+		end
+		pending.last_key_at = timestamp_ms
+		pending.text[#pending.text + 1] = ch
+		-- [text, inter-key delay, metadata] is the portable events_json shape
+		-- consumed by the Windows database projector.
+		pending.events[#pending.events + 1] = { ch, delay, { s = 0 } }
 	end
 end
 
@@ -242,6 +278,9 @@ function M.record_app_key(app_id, ch, timestamp_ms)
 	app.last_key_at = timestamp_ms
 
 	app.keystroke_count = app.keystroke_count + 1
+	if type(ch) == "string" and ch ~= "" then
+		app.ngrams[ch] = (app.ngrams[ch] or 0) + 1
+	end
 	app.wpm_ring[#app.wpm_ring + 1] = timestamp_ms
 
 	-- Prune ring (keep last WPM_RING_CAPACITY entries).
@@ -257,17 +296,23 @@ end
 --- @param trigger string Typed hotstring trigger.
 --- @param replacement string Generated replacement text.
 --- @param timestamp_ms number Event timestamp.
-function M.record_hotstring(app_id, trigger, replacement, timestamp_ms)
+function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type)
 	if _suppressed or type(app_id) ~= "string" or app_id == "" then return end
 	if type(replacement) ~= "string" or replacement == "" then return end
-	local function char_count(text)
-		local ok, count = pcall(utf8.len, text)
-		return ok and count or #text
-	end
 	local app = ensure_app_stats(app_id, timestamp_ms)
 	app.hs_chars       = app.hs_chars + char_count(replacement)
 	app.hs_triggers    = app.hs_triggers + 1
 	app.hs_input_chars = app.hs_input_chars + char_count(type(trigger) == "string" and trigger or "")
+	_pending_hotstring_events[#_pending_hotstring_events + 1] = {
+		ts = os.date("!%Y-%m-%d %H:%M:%S"),
+		date = os.date("!%Y-%m-%d"),
+		app = dashboard_app_name(app_id),
+		kind = "fired",
+		trigger = trigger or "",
+		replacement = replacement,
+		h_type = h_type or "static",
+		net_saved_chars = char_count(replacement) - char_count(trigger),
+	}
 end
 
 --- Records a foreground application transition from the process lifecycle port.
@@ -281,6 +326,13 @@ function M.on_app_focus(app_id, timestamp_ms)
 		local elapsed = math.max(0, now - _focused_app_started_at)
 		local previous = ensure_app_stats(_focused_app_id, _focused_app_started_at)
 		previous.focus_time_ms = previous.focus_time_ms + elapsed
+		_pending_app_switch_events[#_pending_app_switch_events + 1] = {
+			ts = os.date("!%Y-%m-%d %H:%M:%S"),
+			date = os.date("!%Y-%m-%d"),
+			prev_app = dashboard_app_name(_focused_app_id),
+			next_app = dashboard_app_name(app_id),
+			duration_ms = elapsed,
+		}
 	end
 	ensure_app_stats(app_id, now)
 	_focused_app_id         = app_id
@@ -311,32 +363,104 @@ function M.get_app_stats()
 	return result
 end
 
---- Builds the shared manifest/prefetch contract consumed by both metrics UIs.
---- Linux has no historical aggregate reader yet, but this live projection keeps
---- the dashboards accurate for the current session instead of rendering empty.
---- @return table Metrics prefetch payload matching the macOS/Windows schema.
-function M.get_dashboard_payload()
-	local date_str = os.date("%Y-%m-%d")
-	local day = {}
+--- Adds current, not-yet-flushed counters to a persisted manifest entry.
+local function shallow_copy(source)
+	local result = {}
+	for key, value in pairs(source or {}) do result[key] = value end
+	return result
+end
+
+local function add_live_manifest_delta(manifest)
+	local today = os.date("%Y-%m-%d")
+	local result = shallow_copy(manifest)
+	result[today] = shallow_copy(manifest[today])
 	for app_id, stats in pairs(M.get_app_stats()) do
+		local previous = _flushed_app_totals[app_id] or {}
 		local app_name = dashboard_app_name(app_id)
-		day[app_name] = {
-			chars       = stats.keystrokes or 0,
-			time        = stats.typing_time_ms or 0,
-			think_time  = 0,
+		local entry = shallow_copy(result[today][app_name] or { category = "Unknown" })
+		local current = {
+			chars = stats.keystrokes or 0,
+			time = stats.typing_time_ms or 0,
 			app_time_ms = stats.focus_time_ms or 0,
-			hs_chars       = stats.hs_chars or 0,
-			hs_triggers    = stats.hs_triggers or 0,
+			hs_chars = stats.hs_chars or 0,
+			hs_triggers = stats.hs_triggers or 0,
 			hs_input_chars = stats.hs_input_chars or 0,
-			category    = "Unknown",
 		}
+		for field, value in pairs(current) do
+			local persisted_field = field == "time" and "time_ms" or field
+			entry[field] = (entry[field] or 0) + math.max(0, value - (previous[persisted_field] or 0))
+		end
+		entry.category = entry.category or "Unknown"
+		result[today][app_name] = entry
+	end
+	return result
+end
+
+local function persisted_manifest()
+	if not (SqliteWriter and SqliteWriter.is_available() and SqliteReader) then return {} end
+	local revision = SqliteWriter.get_revision and SqliteWriter.get_revision() or nil
+	if _manifest_cache.manifest and revision ~= nil and _manifest_cache.revision == revision then
+		return _manifest_cache.manifest
+	end
+	local fresh = SqliteReader.read_manifest(_sqlite_path)
+	_manifest_cache = { revision = revision, manifest = fresh }
+	return fresh
+end
+
+local function empty_ngrams()
+	return { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {} }
+end
+
+--- Adds only unflushed character n-grams to the per-app today projection.
+local function add_live_ngram_delta(today_payload)
+	for app_id, stats in pairs(_app_stats) do
+		local previous = _flushed_app_ngrams[app_id] or {}
+		local app_name = dashboard_app_name(app_id)
+		local target = today_payload[app_name] or empty_ngrams()
+		for token, count in pairs(stats.ngrams or {}) do
+			local delta = math.max(0, count - (previous[token] or 0))
+			if delta > 0 then
+				local item = target.c[token] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+				item.c = item.c + delta
+				target.c[token] = item
+			end
+		end
+		today_payload[app_name] = target
+	end
+	return today_payload
+end
+
+--- Builds the shared manifest/prefetch contract consumed by both metrics UIs.
+--- Historical rows come from SQLite; only the unflushed in-memory delta is
+--- layered on top, so refreshing a dashboard never double-counts a session.
+--- @return table Metrics prefetch payload matching the macOS/Windows schema.
+function M.get_dashboard_payload(opts)
+	local options = type(opts) == "table" and opts or {}
+	local manifest = add_live_manifest_delta(persisted_manifest())
+	local prefetch = nil
+	if options.include_prefetch ~= false then
+		prefetch = M.get_range_payload(nil, nil, nil)
 	end
 	return {
-		metrics_manifest = { [date_str] = day },
+		metrics_manifest = manifest,
 		app_icons        = {},
-		_prefetch_data   = { historical = {}, today = {} },
+		_prefetch_data   = prefetch,
 		driver_meta      = { os = "linux", heatmap_id = "kc" },
 	}
+end
+
+--- Returns n-grams for one UI-selected range without rebuilding the manifest.
+--- @param start_date string|nil Inclusive range start.
+--- @param end_date string|nil Inclusive range end.
+--- @param apps table|nil Selected application IDs.
+function M.get_range_payload(start_date, end_date, apps)
+	local payload = { historical = empty_ngrams(), today = {} }
+	if SqliteWriter and SqliteWriter.is_available() and SqliteReader then
+		payload = SqliteReader.read_range_split_today(_sqlite_path, start_date, end_date, apps)
+	end
+	payload.historical = payload.historical or empty_ngrams()
+	payload.today = payload.today or {}
+	return add_live_ngram_delta(payload.today)
 end
 
 
@@ -434,25 +558,36 @@ function M.flush()
 
 	-- PRIMARY: SQLite persistence.
 	if SqliteWriter and SqliteWriter.is_available() then
-		-- 1. Insert a session summary row into events_typing.
-		local apps = M.get_app_stats()
-		local total_text = ""
-		for app_id, _ in pairs(apps) do
-			total_text = total_text .. app_id .. " "
+		-- 1. Persist buffered physical key events before any aggregate. This is
+		-- the canonical, replayable source shared with the macOS/AHK drivers.
+		local typing_batch = {}
+		for app_id, pending in pairs(_pending_typing_events) do
+			if #pending.events > 0 then
+				local total_time_ms = 0
+				for _, event in ipairs(pending.events) do total_time_ms = total_time_ms + (event[2] or 0) end
+				typing_batch[#typing_batch + 1] = {
+					ts = now_iso, date = date, app = dashboard_app_name(app_id),
+					text = table.concat(pending.text),
+					wpm = SharedMetrics.compute_wpm_from_events(#pending.events, total_time_ms),
+					events_json = _to_json(pending.events),
+				}
+			end
 		end
-		SqliteWriter.insert_typing_events(_device_id, {
-			{
-				ts    = now_iso,
-				date  = date,
-				app   = "ergopti-session",
-				text  = string.format("session: %d keystrokes, %d words, %d ms, %.1f WPM",
-					stats.keystrokes, stats.words, stats.duration_ms, wpm),
-				wpm   = wpm,
-				events_json = M.export_json(),
-			},
-		})
+		if #typing_batch > 0 then
+			if not SqliteWriter.insert_typing_events(_device_id, typing_batch) then return end
+			_pending_typing_events = {}
+		end
+		if #_pending_hotstring_events > 0 then
+			if not SqliteWriter.insert_hotstring_events(_device_id, _pending_hotstring_events) then return end
+			_pending_hotstring_events = {}
+		end
+		if #_pending_app_switch_events > 0 then
+			if not SqliteWriter.insert_app_switch_events(_device_id, _pending_app_switch_events) then return end
+			_pending_app_switch_events = {}
+		end
 
-		-- 2. Upsert per-app daily aggregates.
+		-- 2. Upsert only new per-app daily aggregate values.
+		local apps = M.get_app_stats()
 		for app_id, app_stats in pairs(apps) do
 			-- The dashboard and both other drivers retain the complete desktop
 			-- identifier (for example org.mozilla.firefox). Truncating at the first
@@ -478,20 +613,26 @@ function M.flush()
 			_flushed_app_totals[app_id] = current
 		end
 
-		-- 3. Upsert n-grams from the metrics collector.
-		local ngrams = M.get_ngrams(100)
-		if #ngrams > 0 then
-			local combined = {}
-			for _, entry in ipairs(ngrams) do
-				if entry.gram and entry.count then
-					combined[entry.gram] = entry.count
-				end
+		-- 3. Persist per-app character n-grams as deltas. The old global top-N
+		-- snapshot replayed the same counts on every flush and made filters empty
+		-- because it lived under a synthetic app name.
+		for app_id, app_stats in pairs(_app_stats) do
+			local previous = _flushed_app_ngrams[app_id] or {}
+			local delta = {}
+			for token, count in pairs(app_stats.ngrams or {}) do
+				local increment = math.max(0, count - (previous[token] or 0))
+				if increment > 0 then delta[token] = increment end
 			end
-			SqliteWriter.upsert_ngrams(_device_id, date, "ergopti-session", combined)
+			if next(delta) ~= nil then
+				if not SqliteWriter.upsert_ngrams(_device_id, date, dashboard_app_name(app_id), delta) then return end
+			end
+			_flushed_app_ngrams[app_id] = {}
+			for token, count in pairs(app_stats.ngrams or {}) do _flushed_app_ngrams[app_id][token] = count end
 		end
 
 		-- 4. Bump the revision counter so dashboards know new data exists.
 		SqliteWriter.bump_rev()
+		_manifest_cache = { revision = nil, manifest = nil }
 
 		Logger.info(LOG, "Session flushed to SQLite: %s.", _sqlite_path)
 		return
@@ -557,6 +698,11 @@ function M.reset_session()
 	_focused_app_id         = nil
 	_focused_app_started_at = nil
 	_flushed_app_totals     = {}
+	_flushed_app_ngrams     = {}
+	_manifest_cache         = { revision = nil, manifest = nil }
+	_pending_typing_events  = {}
+	_pending_hotstring_events = {}
+	_pending_app_switch_events = {}
 	_session_started_at = os.time() * 1000
 end
 
