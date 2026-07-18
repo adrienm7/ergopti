@@ -51,8 +51,8 @@ _USBP_SelectionIsPolledInBackground() {
 	; 2. Verify GetUIASelection is now just a cache reader.
 	GetterBody := _DriverFuncBody("GetUIASelection")
 	Assert(GetterBody != "", "GetUIASelection must exist in modules/keymap/layout.ahk")
-	Assert(InStr(GetterBody, "return _UIA_SelectionCache") > 0,
-		"GetUIASelection must return the cached value immediately (uia-selection-blocks-keyboard-thread)")
+	Assert(InStr(GetterBody, "Snapshot := _UIA_SelectionCache") > 0,
+		"GetUIASelection must inspect the cached snapshot only (uia-selection-blocks-keyboard-thread)")
 	Assert(InStr(GetterBody, "UIA.GetFocusedElement()") == 0,
 		"GetUIASelection must NOT call UIA directly on the keyboard path (uia-selection-blocks-keyboard-thread)")
 

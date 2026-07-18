@@ -506,18 +506,22 @@ _UIA_NO_TP_TTL_MS     := 30000
 ; - the selection is all blank lines (caller usually wants to skip wrapping)
 ; - we are in an Electron app (VSCode etc.) where UIA TextPattern is unreliable
 ;
-global _UIA_SelectionCache := ""
+; A selection is a short-lived capability, not plain text.  Bind it to the
+; foreground window and capture time, then consume it once; otherwise a poll
+; can wrap text after focus/selection already changed.
+global _UIA_SelectionCache := 0
+global UIA_SELECTION_MAX_AGE_MS := 750
 global _UIA_SelectionPollTimer := unset
 
 ; Background timer to poll the current UIA selection. Moves the expensive
 ; COM round-trip off the synchronous keyboard path (uia-selection-blocks-keyboard-thread).
 _UIA_SelectionPollTick() {
-    global _UIA_SelectionCache, UIA, _UIA_NO_TP_CACHE, _UIA_NO_TP_TTL_MS
+	global _UIA_SelectionCache, UIA, _UIA_NO_TP_CACHE, _UIA_NO_TP_TTL_MS
     ; SetTimer bypasses native Suspend — a paused driver must do ZERO UIA work
     ; (« pause = tout éteint »): the 3-hop COM round-trip + unbounded GetText(-1)
     ; would keep firing every 500 ms on the keyboard thread while paused.
     if A_IsSuspended {
-        _UIA_SelectionCache := ""
+		_UIA_SelectionCache := 0
         return
     }
     ; The ONLY consumer of the cache is WrapTextIfSelected, gated on this flag.
@@ -525,7 +529,7 @@ _UIA_SelectionPollTick() {
     ; never pay the per-tick cost or the large-selection keyboard-thread stall
     ; risk (uia-poll-bypasses-suspend).
     if !Features["shortcuts"]["wrap_text_if_selected"] {
-        _UIA_SelectionCache := ""
+		_UIA_SelectionCache := 0
         return
     }
     if (!IsSet(UIA))
@@ -535,20 +539,20 @@ _UIA_SelectionPollTick() {
         ProcName := ""
         try ProcName := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
         if (ProcName == "" or ProcName == "Code.exe") {
-            _UIA_SelectionCache := ""
+			_UIA_SelectionCache := 0
             return
         }
 
         Now := A_TickCount
         if (_UIA_NO_TP_CACHE.Has(ProcName) and Now < _UIA_NO_TP_CACHE[ProcName]) {
-            _UIA_SelectionCache := ""
+			_UIA_SelectionCache := 0
             return
         }
 
         el := UIA.GetFocusedElement()
         if !el.IsTextPatternAvailable {
             _UIA_NO_TP_CACHE[ProcName] := Now + _UIA_NO_TP_TTL_MS
-            _UIA_SelectionCache := ""
+			_UIA_SelectionCache := 0
             return
         }
 
@@ -558,8 +562,13 @@ _UIA_SelectionPollTick() {
             Text := ranges[1].GetText(-1)
             ; Blank-only selections (newlines) are not meaningful to wrap
             if (Text != "" and !RegExMatch(Text, "^(\r\n|\r|\n)+$")) {
-                _UIA_SelectionCache := Text
-                return
+				_UIA_SelectionCache := {
+					Text: Text,
+					Hwnd: WinExist("A"),
+					CapturedAt: A_TickCount,
+					Consumed: false
+				}
+				return
             }
         }
     } catch as e {
@@ -569,7 +578,7 @@ _UIA_SelectionPollTick() {
         ; degrades to "no selection" below, which is the safe fallback.
         try LoggerWarn("Layout", "UIA selection probe failed: {1}.", e.Message)
     }
-    _UIA_SelectionCache := ""
+	_UIA_SelectionCache := 0
 }
 
 ; Start the background selection poll.
@@ -582,10 +591,26 @@ _UIA_StartSelectionPoll() {
 }
 _UIA_StartSelectionPoll()
 
-; Returns the cached UIA selection. Non-blocking (uia-selection-blocks-keyboard-thread).
+; Returns a current, single-use cached UIA selection. Non-blocking
+; (uia-selection-blocks-keyboard-thread). A stale/focus-mismatched snapshot is
+; discarded before it can erase and wrap unrelated text.
 GetUIASelection() {
-    global _UIA_SelectionCache
-    return _UIA_SelectionCache
+	global _UIA_SelectionCache, UIA_SELECTION_MAX_AGE_MS
+	Snapshot := _UIA_SelectionCache
+	if !IsObject(Snapshot)
+		return ""
+	if !(Snapshot.HasOwnProp("Text") and Snapshot.HasOwnProp("Hwnd")
+		and Snapshot.HasOwnProp("CapturedAt") and Snapshot.HasOwnProp("Consumed")) {
+		_UIA_SelectionCache := 0
+		return ""
+	}
+	Elapsed := A_TickCount - Snapshot.CapturedAt
+	if Snapshot.Consumed or Snapshot.Hwnd != WinExist("A") or Elapsed < 0 or Elapsed > UIA_SELECTION_MAX_AGE_MS {
+		_UIA_SelectionCache := 0
+		return ""
+	}
+	Snapshot.Consumed := true
+	return Snapshot.Text
 }
 
 WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
