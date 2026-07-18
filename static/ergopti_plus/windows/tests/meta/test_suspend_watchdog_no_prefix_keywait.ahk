@@ -68,16 +68,12 @@ _SWNPK_CountOccurrences(Hay, Needle) {
 ; "native Suspend() never disarms...", which the Pattern-1 hardening campaign
 ; added to a dozen sites and which is not a real call site.
 _SWNPK_OnlyCallSiteIsToggleSuspend() {
-	Src := _DriverSourceNoComments()
-	TotalSuspendParen := _SWNPK_CountOccurrences(Src, "Suspend(")
-	ToggleDecls       := _SWNPK_CountOccurrences(Src, "ToggleSuspend(")
-	RealCalls         := _SWNPK_CountOccurrences(Src, "Suspend(-1)")
-	; Every "Suspend(" must be accounted for as either the ToggleSuspend(
-	; declaration/reference or the single Suspend(-1) toggle call.
-	Assert(RealCalls = 1,
-		"There must be exactly ONE Suspend(-1) call (inside ToggleSuspend) — found " . RealCalls)
-	Assert(TotalSuspendParen = ToggleDecls + RealCalls,
-		"Every 'Suspend(' must be a ToggleSuspend( reference or the Suspend(-1) call — any other Suspend() call bypasses the SC138 prefix drain and can reintroduce the 'AltGr latched' bug")
+	Toggle := _DriverFuncBody("ToggleSuspend")
+	Poll := _DriverFuncBody("_SuspendPendingPoll")
+	Assert(InStr(Toggle, "Suspend(1)") > 0 and InStr(Poll, "Suspend(1)") > 0,
+		"The immediate and deferred suspend paths must both use explicit Suspend(1) after the prefix-clear protocol")
+	Assert(InStr(_DriverSourceNoComments(), "Suspend(-1)") = 0,
+		"Suspend must not toggle after a timed KeyWait because that can latch a held custom prefix")
 }
 Test("ErgoptiPlus: Suspend(-1) is the only suspend call site (suspend-watchdog-no-prefix-keywait)", _SWNPK_OnlyCallSiteIsToggleSuspend)
 
@@ -107,13 +103,12 @@ _SWNPK_ToggleDrainsBeforeSuspend() {
 	Src := _DriverSourceConcat()
 	Seg := _DriverFuncBody("ToggleSuspend")
 	Assert(Seg != "", "ToggleSuspend(*) must exist in ErgoptiPlus.ahk")
-	DrainPos   := InStr(Seg, "_SuspendDrainPrefix()")
-	SuspendPos := InStr(Seg, "Suspend(-1)")
-	Assert(DrainPos > 0,
-		"ToggleSuspend must drain the SC138 prefix via _SuspendDrainPrefix() before suspending")
-	Assert(SuspendPos > 0, "ToggleSuspend must contain the Suspend(-1) call")
-	Assert(DrainPos < SuspendPos,
-		"_SuspendDrainPrefix() must run BEFORE Suspend(-1) — the drain must complete before the flip latches the prefix flag")
+	ClearPos := InStr(Seg, "_SuspendPrefixesAreClear()")
+	SuspendPos := InStr(Seg, "Suspend(1)")
+	Assert(ClearPos > 0 and SuspendPos > ClearPos,
+		"ToggleSuspend must verify physical prefixes before the immediate Suspend(1) path")
+	Assert(InStr(Seg, "SetTimer(_SuspendPendingPoll, 25)") > 0,
+		"A held prefix must schedule the non-blocking pending-suspend poll instead of waiting on the tray thread")
 }
 Test("ErgoptiPlus: ToggleSuspend drains prefix before Suspend (suspend-watchdog-no-prefix-keywait)", _SWNPK_ToggleDrainsBeforeSuspend)
 
@@ -127,8 +122,8 @@ Test("ErgoptiPlus: ToggleSuspend drains prefix before Suspend (suspend-watchdog-
 ; drain call site.
 _SWNPK_DrainHelperWaitsEveryPrefix() {
 	Src := _DriverSourceConcat()
-	Seg := _DriverFuncBody("_SuspendDrainPrefix")
-	Assert(Seg != "", "_SuspendDrainPrefix() must exist in lib/lifecycle.ahk")
+	Seg := _DriverFuncBody("_SuspendPrefixesAreClear")
+	Assert(Seg != "", "_SuspendPrefixesAreClear() must exist in lib/lifecycle.ahk")
 	; Q is the ASCII double-quote (the linter bans the backtick-quote escape).
 	Q := Chr(34)
 	ListPos := InStr(Src, "SUSPEND_CUSTOM_COMBO_PREFIX_KEYS")
@@ -141,8 +136,8 @@ _SWNPK_DrainHelperWaitsEveryPrefix() {
 		"SUSPEND_CUSTOM_COMBO_PREFIX_KEYS must list SC038 (LAlt, 'SC038 & SC03A::' in base_modifier.ahk) — it has the identical unprotected prefix-latch exposure as SC138 (F42)")
 	Assert(InStr(Seg, "SUSPEND_CUSTOM_COMBO_PREFIX_KEYS") > 0,
 		"_SuspendDrainPrefix must iterate SUSPEND_CUSTOM_COMBO_PREFIX_KEYS, not hardcode a single key, so every listed prefix is drained")
-	Assert(InStr(Seg, "KeyWait(") > 0,
-		"_SuspendDrainPrefix must KeyWait on the physical prefix key to let it lift before suspending — synthetic events cannot clear the latched prefix flag")
+	Assert(InStr(Seg, "GetKeyState(PrefixKey, " . Q . "P" . Q . ")") > 0 and InStr(Seg, "KeyWait(") = 0,
+		"_SuspendPrefixesAreClear must test the physical prefix state without blocking the tray thread")
 }
 Test("lifecycle: _SuspendDrainPrefix drains every registered custom-combination prefix key, including SC038 (suspend-watchdog-no-prefix-keywait, F42)", _SWNPK_DrainHelperWaitsEveryPrefix)
 
