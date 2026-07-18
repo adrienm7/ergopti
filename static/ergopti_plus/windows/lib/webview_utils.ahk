@@ -137,6 +137,7 @@ class WebViewHost {
     ReadyFired := false   ; guards against double OnReady ("ready" msg + NavCompleted)
     Queue      := []
     ResetDone  := false
+    Epoch      := 0      ; invalidates deferred callbacks after close/reset
     SafetyTimer := 0      ; handle to the safety-flush timer, cancelled on teardown
     Opts       := unset
 
@@ -263,6 +264,7 @@ class WebViewHost {
     ; --------------------------------------------------------------------------
     _Build() {
         global _VendorDir, _SharedDir, _I18nLocale
+        this.Epoch += 1
 
         Opts  := this.Opts
         Title := Opts.Has("Title") ? Opts["Title"] : "ErgoptiPlus"
@@ -371,8 +373,14 @@ class WebViewHost {
             return
         if this.Opts.Has("OnMessage") {
             ; Defer out of the COM callback so handlers never run re-entrantly
-            SetTimer(this.Opts["OnMessage"].Bind(this, Payload), -1)
+            SetTimer(this._DispatchMessage.Bind(this.Epoch, Payload), -1)
         }
+    }
+
+    _DispatchMessage(CallbackEpoch, Payload) {
+        if A_IsSuspended || this.ResetDone || (CallbackEpoch != this.Epoch)
+            return
+        try this.Opts["OnMessage"](this, Payload)
     }
 
     ; ── NavigationCompleted callback ─────────────────────────────────────────
@@ -389,7 +397,13 @@ class WebViewHost {
             return
         this.ReadyFired := true
         if this.Opts.Has("OnReady")
-            SetTimer(this.Opts["OnReady"].Bind(this), -1)
+            SetTimer(this._DispatchReady.Bind(this.Epoch), -1)
+    }
+
+    _DispatchReady(CallbackEpoch) {
+        if A_IsSuspended || this.ResetDone || (CallbackEpoch != this.Epoch)
+            return
+        try this.Opts["OnReady"](this)
     }
 
     ; ── Queue-based eval ─────────────────────────────────────────────────────
@@ -457,6 +471,7 @@ class WebViewHost {
         if this.ResetDone
             return
         this.ResetDone := true
+        this.Epoch += 1
 
         ; Cancel the safety-flush timer so it never fires on a dead window
         try SetTimer(this.SafetyTimer, 0)
