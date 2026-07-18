@@ -163,6 +163,13 @@ local function make_vkb(trigger, replacement, opts)
 	package.loaded["modules.keymap.utils"]       = nil
 	package.loaded["modules.keymap.registry"]    = nil
 	package.loaded["modules.keymap.expander"]    = nil
+	-- Expander delegates deletion to TextSender. It captures `hs` at module
+	-- load time too, so it must be reloaded alongside the keymap modules. If it
+	-- remains cached, deletes are recorded by the preceding scenario's stub while
+	-- this scenario reads the fresh stub below, producing false output and
+	-- backspace counts after the first expansion.
+	package.loaded["adapters.text_sender"]        = nil
+	package.loaded["adapters.clipboard"]          = nil
 
 	-- One load_with_stubs call — establishes the canonical hs stub for this
 	-- scenario; all dependencies (registry, utils, terminators) cascade from
