@@ -113,7 +113,7 @@ function buildJsSource(keys) {
  * @param {string} content  Source text with bare LF newlines.
  */
 function writeWithCrlf(outPath, content) {
-	const normalized = content.replace(/\r?\n/g, '\r\n');
+	const normalized = content.replace(/\r\n?/g, '\n');
 	fs.mkdirSync(path.dirname(outPath), { recursive: true });
 	fs.writeFileSync(outPath, normalized, 'utf8');
 }

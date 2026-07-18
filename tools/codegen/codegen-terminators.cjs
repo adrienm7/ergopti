@@ -92,7 +92,7 @@ function writeFile(filePath, content) {
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
 	if (filePath.endsWith('.ahk')) {
 		// Enforce CRLF and prepend UTF-8 BOM (EF BB BF)
-		const crlf = content.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n');
+		const crlf = content.replace(/\r\n?/g, '\n');
 		const bom = Buffer.from([0xef, 0xbb, 0xbf]);
 		const body = Buffer.from(crlf, 'utf8');
 		fs.writeFileSync(filePath, Buffer.concat([bom, body]));
