@@ -482,6 +482,57 @@ local function _sq(s)
 	return "'" .. tostring(s):gsub("'", "''") .. "'"
 end
 
+local DATA_SQL_OUTBOX_KEY = "local_data_sql_outbox"
+
+--- Return the local-only ledger batch waiting to reach data.sql.
+--- This value must never be appended to data.sql itself: it is a cursor-local
+--- recovery record, not data to replay into a different device cache.
+local function _get_local_outbox(db)
+	for row in db:nrows("SELECT value FROM meta WHERE key=" .. _sq(DATA_SQL_OUTBOX_KEY)) do
+		return type(row.value) == "string" and row.value or ""
+	end
+	return ""
+end
+
+--- Clear the outbox only after its full batch has reached the append-only ledger.
+--- A failure after the write leaves an idempotent INSERT OR IGNORE batch to retry.
+local function _clear_local_outbox(db)
+	local ok, err = pcall(function()
+		db:exec("BEGIN TRANSACTION;")
+		local rc = db:exec("UPDATE meta SET value='' WHERE key=" .. _sq(DATA_SQL_OUTBOX_KEY) .. ";")
+		if rc ~= sqlite3.OK then error(db:errmsg() or "cannot clear data.sql outbox") end
+		db:exec("COMMIT;")
+	end)
+	if not ok then
+		pcall(function() db:exec("ROLLBACK;") end)
+		Logger.error(LOG, "Cannot clear committed data.sql outbox: %s.", tostring(err))
+		return false
+	end
+	return true
+end
+
+--- Flush a committed local batch before allocating any new event id.
+--- @return boolean True when no batch is pending or the pending batch is durable.
+local function _flush_local_data_sql_outbox(db)
+	local batch_text = _get_local_outbox(db)
+	if batch_text == "" then return true end
+
+	local f, ferr = io.open(_paths.data_sql_path, "a")
+	if not f then
+		Logger.error(LOG, "Cannot append pending data.sql outbox at %s: %s.",
+			_paths.data_sql_path, tostring(ferr))
+		return false
+	end
+	local write_ok, write_err = f:write(batch_text)
+	local close_ok, close_err = f:close()
+	if not write_ok or not close_ok then
+		Logger.error(LOG, "Cannot flush pending data.sql outbox: %s.",
+			tostring(write_err or close_err))
+		return false
+	end
+	return _clear_local_outbox(db)
+end
+
 --- Run one ingest cycle: pull new today.log entries, append SQL batch to
 --- data.sql, apply it to db.sqlite, update aggregate tables.
 function M.ingest_once()
@@ -489,6 +540,10 @@ function M.ingest_once()
 	if not db then return end
 
 	pcall(Export.sync_foreign_data_sql)
+	-- A previous cache transaction may have committed while data.sql was locked.
+	-- Drain that exact source batch first so a tmp-cache loss can never make it
+	-- invisible to sync/replay, and so we never allocate new ids for old JSONL.
+	if not _flush_local_data_sql_outbox(db) then return end
 
 	local entries, new_offset = Rotation.read_new_entries()
 	if #entries == 0 then return end
@@ -560,6 +615,15 @@ function M.ingest_once()
 				"UPDATE meta SET value=%s WHERE key='ngram_ctx_json';",
 				_sq(enc)))
 		end
+		-- Commit the canonical SQL batch alongside the cache changes.  If the
+		-- following append fails, this local durable outbox is replayed before
+		-- the next ingest instead of silently advancing past the source record.
+		local outbox_rc = db:exec(string.format(
+			"UPDATE meta SET value=%s WHERE key=%s;",
+			_sq(batch_text), _sq(DATA_SQL_OUTBOX_KEY)))
+		if outbox_rc ~= sqlite3.OK then
+			error("cannot persist data.sql outbox: " .. (db:errmsg() or "?"))
+		end
 		db:exec("COMMIT;")
 	end)
 	if not ok then
@@ -574,18 +638,14 @@ function M.ingest_once()
 	-- SQLite transaction committed — now safe to append to data.sql (the
 	-- source-of-truth SQL log). Writing here rather than before the COMMIT
 	-- ensures data.sql never contains statements that were not persisted.
-	local f, ferr = io.open(_paths.data_sql_path, "a")
-	if not f then
-		Logger.error(LOG, "Cannot append to data.sql at %s: %s.",
-			_paths.data_sql_path, tostring(ferr))
-		-- SQLite is already committed; continue so the offset advances and
-		-- the entries are not replayed. data.sql may be slightly behind, but
-		-- it can be reconstructed from the SQLite cache at any time.
-	else
-		f:write(batch_text); f:close()
-	end
-
 	Rotation.set_offset(new_offset, Rotation.get_date())
+	if not _flush_local_data_sql_outbox(db) then
+		-- The in-memory cursor must still advance: the committed outbox owns this
+		-- exact batch, while replaying today.log here would allocate new ids and
+		-- duplicate metrics in the cache.
+		Logger.warn(LOG, "Ingest committed but data.sql append is pending retry.")
+		return
+	end
 	Logger.debug(LOG, "Ingest cycle: %d entry(ies), offset now %d.", #entries, new_offset)
 
 	-- Notify live-update listeners — dashboard UIs use this to invalidate

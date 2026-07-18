@@ -165,6 +165,7 @@ function M.open_db()
 		{ "today_log_offset", "0"  },
 		{ "today_log_date",   ""   },
 		{ "ngram_ctx_json",   "{}" },
+		{ "local_data_sql_outbox", "" },
 		{ "rev",              "0"  },
 	}) do
 		_db:exec(string.format(
