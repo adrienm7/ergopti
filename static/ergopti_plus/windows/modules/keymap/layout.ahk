@@ -311,6 +311,7 @@ global DeadkeyMappingCurrency := Map(
 ; ============================
 
 global InDeadKeySequence := false
+global _DeadKeyInputHook := ""
 
 DeadKey(Mapping) {
 	global InDeadKeySequence
@@ -338,8 +339,14 @@ DeadKey(Mapping) {
 				"L1 T2",
 				"{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Ins}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
 			)
-			ih.Start()
-			ih.Wait()
+			global _DeadKeyInputHook := ih
+			try {
+				ih.Start()
+				ih.Wait()
+			} finally {
+				try ih.Stop()
+				_DeadKeyInputHook := ""
+			}
 		} finally {
 			Critical(_AtCrit)
 		}
