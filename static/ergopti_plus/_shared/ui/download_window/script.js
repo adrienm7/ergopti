@@ -204,9 +204,18 @@ function resetUI() {
 
 	const cancelBtn = document.getElementById('btn-cancel');
 	if (cancelBtn) {
-		cancelBtn.style.display = 'inline-block';
-		cancelBtn.disabled = false;
-		cancelBtn.textContent = _t('download_window.btn_cancel') || '🛑 Annuler';
+		const cancelLabel = _t('download_window.btn_cancel');
+		if (cancelLabel) {
+			cancelBtn.style.display = 'inline-block';
+			cancelBtn.disabled = false;
+			cancelBtn.textContent = cancelLabel;
+		} else {
+			// A locale failure must never display a hard-coded foreign-language
+			// action. Hide the unavailable control and keep the failure diagnosable.
+			cancelBtn.style.display = 'none';
+			cancelBtn.disabled = true;
+			console.error('Missing i18n key: download_window.btn_cancel');
+		}
 	}
 
 	const retryBtn = document.getElementById('btn-retry');
