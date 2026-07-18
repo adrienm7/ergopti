@@ -407,6 +407,9 @@ local function main()
 				result.backspace_count
 			)
 			if not opts.dry_run then
+				-- Keep the keylogger's aggregate contract aligned with macOS and
+				-- Windows: generated text and the physical trigger are distinct.
+				keylogger.record_hotstring(app_id, result.trigger, result.replacement, now_ms)
 				injector._begin_injection()
 				injector.inject(result.backspace_count, result.replacement)
 				-- Drain any physical characters that arrived during

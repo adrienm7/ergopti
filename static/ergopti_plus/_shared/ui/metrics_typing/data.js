@@ -291,8 +291,13 @@ function compute_manifest_metrics() {
 
 			// MPM/CPM: synthetic chars are added only when their toggle is active
 			// (the "+ Hotstrings"/"+ IA" buttons truly add to the manual baseline).
-			const mpm_hs = mpm_include_hs ? hs_chars_raw : 0;
-			const mpm_llm = mpm_include_llm ? llm_chars_raw : 0;
+			// Generated counters are gross output lengths. Removing their physical
+			// triggers before adding them prevents double counting and makes the
+			// source toggles reflect the real expansion gain.
+			const net_hs_chars = Math.max(0, hs_chars_raw - hs_input_raw);
+			const net_llm_chars = Math.max(0, llm_chars_raw - llm_input_raw);
+			const mpm_hs = mpm_include_hs ? net_hs_chars : 0;
+			const mpm_llm = mpm_include_llm ? net_llm_chars : 0;
 			const effective_wpm_chars = manual_chars + mpm_hs + mpm_llm;
 			// Volume displayed in the KPI text ("X touches tapées") — same logic
 			const table_hs = show_hs ? hs_chars_raw : 0;
@@ -489,11 +494,10 @@ function compute_manifest_metrics() {
  *                    inter-key delays would inflate every short burst.
  *                On long bursts this loses ≤ 1 % so it's invisible there.
  *   trigger    : a manual keystroke that was later consumed (deleted) by
- *                an HS or IA expansion. Both its char and its time must be
- *                excluded from the "pure manual" baseline, otherwise
- *                triggering an expansion would let the user "cheat" by
- *                getting credit for keys whose productivity is already
- *                accounted for by HS / IA.
+ *                an HS or IA expansion. It remains part of the baseline when
+ *                that source is hidden. When the source is shown, both its
+ *                char and timing are replaced by the expansion's net output,
+ *                so the toggle measures the actual productivity gain.
  *
  * Formula at a given pause threshold T (looked up in the buckets)
  * ────────────────────────────────────────────────────────────────
@@ -501,8 +505,8 @@ function compute_manifest_metrics() {
  *   active_trans  = credited_buckets[T]                ← #transitions ≤ T
  *   trig_time     = hs_input_time_buckets[T] + llm_input_time_buckets[T]
  *   trig_trans    = hs_input_credited_buckets[T] + llm_input_credited_buckets[T]
- *   pure_time     = active_time  - trig_time
- *   pure_trans    = active_trans - trig_trans
+ *   pure_time     = active_time  - visible_source_trigger_time
+ *   pure_trans    = active_trans - visible_source_trigger_trans
  *   add_HS  = show_hs  ? max(0, hs_chars  - hs_input_chars)  : 0
  *   add_IA  = show_llm ? max(0, llm_chars - llm_input_chars) : 0
  *   chars_total = pure_trans + add_HS + add_IA
@@ -574,7 +578,10 @@ function recompute_speed_kpi() {
 		const entry_time = app.time || 0;
 		if (entry_time > 0) {
 			totals.fallback_time_ms += entry_time;
-			totals.fallback_wpm_chars += manual_c + (show_hs ? hs_c : 0) + (show_llm ? llm_c : 0);
+			totals.fallback_wpm_chars +=
+				manual_c +
+				(show_hs ? Math.max(0, hs_c - (app.hs_input_chars || 0)) : 0) +
+				(show_llm ? Math.max(0, llm_c - (app.llm_input_chars || 0)) : 0);
 		}
 	};
 	manifest_dates.forEach((date_str) => {
@@ -595,10 +602,12 @@ function recompute_speed_kpi() {
 		});
 	}
 
-	const trig_time_ms = totals.trig_hs_time_ms + totals.trig_llm_time_ms;
-	const trig_trans = totals.trig_hs_trans + totals.trig_llm_trans;
-	const pure_time_ms = Math.max(0, totals.active_time_ms - trig_time_ms);
-	const pure_trans = Math.max(0, totals.active_trans - trig_trans);
+	const excluded_time_ms =
+		(show_hs ? totals.trig_hs_time_ms : 0) + (show_llm ? totals.trig_llm_time_ms : 0);
+	const excluded_trans =
+		(show_hs ? totals.trig_hs_trans : 0) + (show_llm ? totals.trig_llm_trans : 0);
+	const pure_time_ms = Math.max(0, totals.active_time_ms - excluded_time_ms);
+	const pure_trans = Math.max(0, totals.active_trans - excluded_trans);
 	const add_hs = show_hs ? Math.max(0, totals.hs_chars - totals.hs_input_chars) : 0;
 	const add_llm = show_llm ? Math.max(0, totals.llm_chars - totals.llm_input_chars) : 0;
 	const chars_total = pure_trans + add_hs + add_llm;
