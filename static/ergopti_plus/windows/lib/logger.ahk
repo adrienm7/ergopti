@@ -239,31 +239,49 @@ _LoggerFlush(ForceFlush := false) {
 	}
 
 	if (LOGGER_LOG_PATH != "" and Blob != "") {
+		MainWritten := false
 		if ForceFlush {
 			try {
 				f := FileOpen(LOGGER_LOG_PATH, "a", "UTF-8")
 				if f {
 					f.Write(Blob)
 					f.Close()  ; Close forces a flush of the underlying buffer.
+					MainWritten := true
 				}
 			}
 		} else {
-			try FileAppend(Blob, LOGGER_LOG_PATH, "UTF-8")
+			try {
+				FileAppend(Blob, LOGGER_LOG_PATH, "UTF-8")
+				MainWritten := true
+			}
 		}
+		if !MainWritten
+			_LoggerRequeue(Pending, [])
+	} else if Blob != "" {
+		_LoggerRequeue(Pending, [])
 	}
 
 	if (LOGGER_ERRORS_LOG_PATH != "" and BlobErr != "") {
+		ErrorsWritten := false
 		if ForceFlush {
 			try {
 				f := FileOpen(LOGGER_ERRORS_LOG_PATH, "a", "UTF-8")
 				if f {
 					f.Write(BlobErr)
 					f.Close()
+					ErrorsWritten := true
 				}
 			}
 		} else {
-			try FileAppend(BlobErr, LOGGER_ERRORS_LOG_PATH, "UTF-8")
+			try {
+				FileAppend(BlobErr, LOGGER_ERRORS_LOG_PATH, "UTF-8")
+				ErrorsWritten := true
+			}
 		}
+		if !ErrorsWritten
+			_LoggerRequeue([], PendingErr)
+	} else if BlobErr != "" {
+		_LoggerRequeue([], PendingErr)
 	}
 
 	; Drain per-sub-file queues with a single FileAppend each, same batch approach
@@ -284,6 +302,22 @@ _LoggerFlush(ForceFlush := false) {
 		}
 		if SubBlob != ""
 			try FileAppend(SubBlob, _LOGGER_SUB_PATHS[Name], "UTF-8")
+	}
+}
+
+; Restore a failed flush snapshot ahead of records logged while the sink write
+; was in flight. This preserves original order and makes the next periodic
+; flush retry the exact records rather than silently discarding diagnostics.
+_LoggerRequeue(Pending, PendingErr) {
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
+	local _crit := Critical("On")
+	try {
+		loop Pending.Length
+			_LOGGER_PENDING.InsertAt(1, Pending[Pending.Length - A_Index + 1])
+		loop PendingErr.Length
+			_LOGGER_PENDING_ERRORS.InsertAt(1, PendingErr[PendingErr.Length - A_Index + 1])
+	} finally {
+		Critical(_crit)
 	}
 }
 

@@ -66,6 +66,25 @@ _ResetLogger() {
 	_LoggerRefreshFastFlags()
 }
 
+TestLogger_FailedFlushRequeuesSnapshot() {
+	global _LOGGER_PENDING, LOGGER_LOG_PATH
+	_ResetLogger()
+	_LOGGER_PENDING.Push("retry-once")
+	LOGGER_LOG_PATH := "Z:\\ergopti_missing_sink\\driver.log"
+	_LoggerFlush()
+	AssertEqual(1, _LOGGER_PENDING.Length,
+		"a failed log write must restore its snapshot to the pending queue")
+	Path := A_Temp . "\\ergopti_logger_retry_" . A_TickCount . ".log"
+	try FileDelete(Path)
+	LOGGER_LOG_PATH := Path
+	_LoggerFlush()
+	Content := FileRead(Path, "UTF-8")
+	Assert(InStr(Content, "retry-once") > 0,
+		"the requeued record must be written exactly once when the sink recovers")
+	try FileDelete(Path)
+}
+Test("Logger: failed flush requeues the original snapshot for retry", TestLogger_FailedFlushRequeuesSnapshot)
+
 
 
 
