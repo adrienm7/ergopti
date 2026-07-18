@@ -50,6 +50,15 @@ global TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC := 0.2
 ; stale restore can never clobber a clipboard a newer injection just wrote.
 global _TEXT_CLIPBOARD_GENERATION := 0
 
+; Clipboard mode is a process-wide transaction, not an independently safe
+; per-call operation. A second TextSend used to supersede the first while it
+; was in ClipWait, silently dropping the first requested output. Queue every
+; clipboard payload and keep one original clipboard snapshot for the session.
+global _TEXT_CLIPBOARD_QUEUE := []
+global _TEXT_CLIPBOARD_BUSY := false
+global _TEXT_CLIPBOARD_SESSION_SAVED := false
+global TEXT_CLIPBOARD_NEXT_DELAY_MS := TEXT_CLIPBOARD_RESTORE_DELAY_MS + 20
+
 ; Injectable send primitives — point at the real AHK built-ins by default.
 ; The test runner replaces these globals with no-op lambdas so no keystroke
 ; ever reaches the OS during a dry run (mirrors the _SendHook pattern).
@@ -262,6 +271,38 @@ _TextSendRestoreClipboard(Saved, Generation) {
 	CB_RestoreAll(Saved)
 }
 
+; Starts exactly one queued clipboard transaction. The next request is not
+; started until the preceding restore window has elapsed, so its write cannot
+; replace a payload that has not yet been pasted by the foreground application.
+_TextSenderStartClipboard() {
+	global _TEXT_CLIPBOARD_QUEUE, _TEXT_CLIPBOARD_BUSY, _TEXT_CLIPBOARD_SESSION_SAVED
+	if _TEXT_CLIPBOARD_BUSY or (_TEXT_CLIPBOARD_QUEUE.Length = 0)
+		return
+	_TEXT_CLIPBOARD_BUSY := true
+	Request := _TEXT_CLIPBOARD_QUEUE.RemoveAt(1)
+	_TextSendClipboard(Request.Text, _TEXT_CLIPBOARD_SESSION_SAVED,
+		_TextSenderClipboardCompleted.Bind(Request.Callback))
+}
+
+; Called by _TextSendClipboard on every terminal path. It preserves the public
+; callback timing (after paste, or on a guarded bailout) while advancing the
+; FIFO only after the restore timer has had exclusive ownership of the clipboard.
+_TextSenderClipboardCompleted(Callback) {
+	global TEXT_CLIPBOARD_NEXT_DELAY_MS
+	_TextSenderInvokeCallback(Callback)
+	SetTimer(_TextSenderFinishClipboard, -TEXT_CLIPBOARD_NEXT_DELAY_MS)
+}
+
+_TextSenderFinishClipboard() {
+	global _TEXT_CLIPBOARD_QUEUE, _TEXT_CLIPBOARD_BUSY, _TEXT_CLIPBOARD_SESSION_SAVED
+	_TEXT_CLIPBOARD_BUSY := false
+	if (_TEXT_CLIPBOARD_QUEUE.Length = 0) {
+		_TEXT_CLIPBOARD_SESSION_SAVED := false
+		return
+	}
+	SetTimer(_TextSenderStartClipboard, -1)
+}
+
 ; Inserts text at the current insertion point.
 ; Uses the Clipboard port (CB_SaveAll / CB_Write / CB_RestoreAll) for the clipboard
 ; path so the interaction is mockable and the driver has one canonical clipboard
@@ -270,7 +311,7 @@ _TextSendRestoreClipboard(Saved, Generation) {
 ; @param Opts     {Map|0}    { mode?: "direct"|"clipboard"|"auto" }
 ; @param Callback {Func|0}   Called with no arguments on completion.
 TextSend(Text, Opts, Callback) {
-	global TEXT_CLIPBOARD_THRESHOLD
+	global TEXT_CLIPBOARD_THRESHOLD, _TEXT_CLIPBOARD_QUEUE, _TEXT_CLIPBOARD_BUSY, _TEXT_CLIPBOARD_SESSION_SAVED
 	Mode := "auto"
 	if (Opts is Map) and Opts.Has("mode") and Opts["mode"] != ""
 		Mode := Opts["mode"]
@@ -291,13 +332,20 @@ TextSend(Text, Opts, Callback) {
 		; Callback is passed into _TextSendClipboard and fired there after Ctrl+V, so
 		; callers that depend on the callback being synchronised with injection completion
 		; are never notified before the paste actually lands.
-		Saved := CB_SaveAll()
-		if (Type(Saved) == "String" and Saved == "__CB_SAVE_ERROR__") {
-			LoggerError("TextSender", "TextSend: clipboard snapshot failed - skipping clipboard injection.")
-			_TextSenderInvokeCallback(Callback)
-			return
+		; Capture only at the start of a FIFO session. A queued follow-up that
+		; snapshots after the first worker wrote its payload would restore the
+		; synthetic payload instead of the user's original clipboard.
+		if (!_TEXT_CLIPBOARD_BUSY and _TEXT_CLIPBOARD_QUEUE.Length = 0) {
+			Saved := CB_SaveAll()
+			if (Type(Saved) == "String" and Saved == "__CB_SAVE_ERROR__") {
+				LoggerError("TextSender", "TextSend: clipboard snapshot failed - skipping clipboard injection.")
+				_TextSenderInvokeCallback(Callback)
+				return
+			}
+			_TEXT_CLIPBOARD_SESSION_SAVED := Saved
 		}
-		SetTimer(() => _TextSendClipboard(Text, Saved, Callback), -1)
+		_TEXT_CLIPBOARD_QUEUE.Push({ Text: Text, Callback: Callback })
+		SetTimer(_TextSenderStartClipboard, -1)
 	} else {
 		; SendText uses the "Text" mode that bypasses hotkey triggers and sends
 		; Unicode characters as raw keystrokes — the safest injection path.
