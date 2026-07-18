@@ -96,8 +96,8 @@ _IFR_CheckRequeueOnFailure() {
 	;     from the keystroke hook from interleaving with the InsertAt.
 	Assert(InStr(CatchBody, 'Critical("On")'),
 		'FileAppend catch block must wrap the re-queue in Critical("On")')
-	Assert(InStr(CatchBody, 'Critical("Off")'),
-		'FileAppend catch block must wrap the re-queue in Critical("Off")')
+	Assert(InStr(CatchBody, "Critical(previous_critical)") > 0,
+		"FileAppend catch block must restore the caller Critical state after re-queueing")
 
 	; (c) today_log_offset must NOT be advanced in the catch block
 	;     (the next tick must retry the same chunk).

@@ -529,12 +529,9 @@ TestShortcuts_ToggleSuspendDrainsAltGrPrefixFirst() {
 	Body := _DriverFuncBody("ToggleSuspend")
 	Assert(Body != "", "ToggleSuspend must exist in lib/lifecycle.ahk")
 
-	DrainPos := InStr(Body, "_SuspendDrainPrefix()")
-	SuspendPos := InStr(Body, "Suspend(-1)")
-	Assert(DrainPos > 0, "ToggleSuspend must call _SuspendDrainPrefix() to release the AltGr/Kana prefix latch before toggling Suspend")
-	Assert(SuspendPos > 0, "ToggleSuspend must still call Suspend(-1)")
-	Assert(DrainPos < SuspendPos,
-		"ToggleSuspend must call _SuspendDrainPrefix() BEFORE Suspend(-1) -- draining after the toggle would not prevent the prefix from latching across the transition")
+	ClearPos := InStr(Body, "_SuspendPrefixesAreClear()")
+	Assert(ClearPos > 0 and InStr(Body, "SetTimer(_SuspendPendingPoll, 25)") > ClearPos,
+		"ToggleSuspend must defer Suspend until the physical AltGr/Kana prefix has released")
 }
 Test("Shortcuts/AltGr: ToggleSuspend drains the AltGr prefix latch before toggling Suspend (historical AltGr latch gotcha)",
 	TestShortcuts_ToggleSuspendDrainsAltGrPrefixFirst)
