@@ -48,10 +48,7 @@ GestureGetCyclableWindows(ProcessFilter := "") {
             }
             ; DWMWA_CLOAKED = 14 — windows on other virtual desktops
             ; Note: DwmGetWindowAttribute is Windows-only DWM API — no cross-platform port defined
-            Cloaked := 0
-            DllCall("dwmapi\DwmGetWindowAttribute", "Ptr", HWnd, "UInt", 14,
-                "Int*", &Cloaked, "UInt", 4)
-            if (Cloaked) {
+			if WMIsCloaked(HWnd) {
                 continue
             }
             if (ProcessFilter != "") {
@@ -152,7 +149,7 @@ _GestureUnhook(*) {
     try GestureReleaseLeftClick()
     try GestureReleaseRightClick()
     if (_GestureWinHook) {
-        DllCall("UnhookWinEvent", "Ptr", _GestureWinHook)
+		WMUnhookWinEvent(_GestureWinHook)
         _GestureWinHook := 0
     }
     if (_GestureCallbackPtr) {
@@ -225,22 +222,7 @@ GestureActivateWindow(HWnd) {
         if (WinGetMinMax("ahk_id " . HWnd) = -1) {
             WinRestore("ahk_id " . HWnd)
         }
-        ; Bypass Windows foreground-stealing protection: AttachThreadInput to
-        ; the current foreground window's thread, then SetForegroundWindow.
-        ForeHwnd := DllCall("GetForegroundWindow", "Ptr")
-        ForeThread := DllCall("GetWindowThreadProcessId", "Ptr", ForeHwnd, "Ptr", 0, "UInt")
-        TargThread := DllCall("GetWindowThreadProcessId", "Ptr", HWnd, "Ptr", 0, "UInt")
-        Attached := False
-        if (ForeThread && TargThread && ForeThread != TargThread) {
-            Attached := DllCall("AttachThreadInput", "UInt", ForeThread, "UInt", TargThread, "Int", True)
-        }
-        DllCall("BringWindowToTop", "Ptr", HWnd)
-        DllCall("SetForegroundWindow", "Ptr", HWnd)
-        WMActivate("ahk_id " . HWnd)
-        if (Attached) {
-            DllCall("AttachThreadInput", "UInt", ForeThread, "UInt", TargThread, "Int", False)
-        }
-        return True
+		return WMForceForeground(HWnd)
     } catch as e {
         LoggerWarn("gestures", "WinActivate failed for HWND {1}: {2}.", HWnd, e.Message)
         return False

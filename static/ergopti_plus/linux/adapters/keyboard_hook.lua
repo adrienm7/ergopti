@@ -244,7 +244,15 @@ local function _pump_one()
 	-- dead keys and shortcuts make that lossy).  Synthetic ydotool output is
 	-- produced by a different virtual device and therefore never reaches this
 	-- physical-device hook.
-	local physical_char = _resolve_char(ev.code)
+	-- A modifier is still a physical input event, but never a logical character.
+	-- Do not ask the layout resolver about it: a resolver/test stub may map its
+	-- numeric evdev code and create a phantom typed character before the
+	-- modifier branch below can return.
+	local is_modifier = ev.name == "KEY_LEFTSHIFT" or ev.name == "KEY_RIGHTSHIFT"
+		or ev.name == "KEY_LEFTCTRL" or ev.name == "KEY_RIGHTCTRL"
+		or ev.name == "KEY_LEFTALT" or ev.name == "KEY_RIGHTALT"
+	local physical_char = nil
+	if not is_modifier then physical_char = _resolve_char(ev.code) end
 	if _on_physical and type(ev.code) == "number" and ev.code > 0 then
 		pcall(_on_physical, ev.code, ev.name, physical_char)
 	end
