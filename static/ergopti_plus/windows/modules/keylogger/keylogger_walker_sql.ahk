@@ -84,10 +84,14 @@ KLW_SplitKey(k, n) {
 ; Returns the SQL text accumulated this tick (or "" when nothing to emit).
 ; Caller appends it to data.sql in the same write that contains the raw
 ; INSERT statements.
-KLW_BuildBatchSql() {
+; `device_id_lit` is optional for the live writer, which always uses the
+; current Keylogger device.  The cold-cache reader supplies the source device
+; explicitly while replaying shared raw events, so cross-device aggregates can
+; never be attributed to the Windows host that happened to open the dashboard.
+KLW_BuildBatchSql(device_id_lit := "") {
     if !KLW.batch.Has("app_day")
         return ""
-    d := Keylogger._device_id_lit
+    d := (device_id_lit != "") ? device_id_lit : Keylogger._device_id_lit
     out := ""
 
     ; agg_app_day — walker-owned columns ONLY. `time_ms` stays here because

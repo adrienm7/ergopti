@@ -929,31 +929,9 @@ KL_IngestOnce(force := false) {
     ; to SQL — which would silently lose events on 64-bit hosts where KL_JsonDecode
     ; is a no-op.
     statements := []
-    ; Protect KLW.batch from being reset by the live-push timer mid-walk.
-    ; The timer fires from an interrupt thread and would call KLW_ResetBatch(),
-    ; tearing a partially accumulated batch and producing incomplete UPSERT data.
-    ; Critical('On') saves the caller's prior Critical state before the walk loop.
-    local _crit_walk := Critical("On")
-    try {
-        for _, entry in entries {
-            for _, sql in KL_BuildInserts(entry)
-                statements.Push(sql)
-            ; Walk KLW aggregations (n-grams, bursts, sessions, …).
-            try {
-                t := entry["type"]
-                if (t = "typing") {
-                    KLW_WalkTypingEntry(entry)
-                } else if (t = "app_switch") {
-                    KLW_WalkAppSwitch(entry)
-                } else if (t = "window_switch") {
-                    KLW_WalkWindowSwitch(entry)
-                } else if (t = "system_event") {
-                    KLW_WalkSystemEvent(entry)
-                }
-            }
-        }
-    } finally {
-        Critical(_crit_walk)
+    for _, entry in entries {
+        for _, sql in KL_BuildInserts(entry)
+            statements.Push(sql)
     }
     ; KLW.batch is NOT flushed to data.sql here anymore. The walker keeps
     ; accumulating in RAM; KLR_InjectKlwBatch drains it into the in-memory
@@ -994,6 +972,35 @@ KL_IngestOnce(force := false) {
     }
     Keylogger.today_log_offset := new_offset
     KL_SaveState()
+
+    ; Walk only after the raw transaction reached data.sql.  Walking before
+    ; FileAppend meant a transient disk failure left the batch populated; the
+    ; retry then walked the very same entries a second time and doubled WPM,
+    ; n-grams and correction metrics even though the durable event stream had
+    ; exactly one copy.  The raw event log is now the single commit point for
+    ; both live and cold-cache metrics reconstruction.
+    ;
+    ; Protect KLW.batch from a live-push timer reset while this short loop is
+    ; running.  Critical() restores the caller's previous setting afterwards.
+    local _crit_walk := Critical("On")
+    try {
+        for _, entry in entries {
+            try {
+                t := entry["type"]
+                if (t = "typing") {
+                    KLW_WalkTypingEntry(entry)
+                } else if (t = "app_switch") {
+                    KLW_WalkAppSwitch(entry)
+                } else if (t = "window_switch") {
+                    KLW_WalkWindowSwitch(entry)
+                } else if (t = "system_event") {
+                    KLW_WalkSystemEvent(entry)
+                }
+            }
+        }
+    } finally {
+        Critical(_crit_walk)
+    }
 
     ; B niveau 2 hook: when the dashboard is hosted via WebView2, push
     ; the freshly-projected prefetch blob to the page so the user sees

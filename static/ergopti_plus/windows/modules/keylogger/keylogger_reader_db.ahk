@@ -36,6 +36,10 @@ class KLReadConst {
     ; of capture. 50_000 keeps the JSON under ~5 MB which Edge handles
     ; without breaking a sweat.
     static MAX_NGRAM_ROWS := 50000
+    ; Bound the transient walker batch during a cold reconstruction.  Raw
+    ; events remain the durable source of truth, while this cap keeps a large
+    ; multi-month history from creating one enormous AHK Map / SQL string.
+    static REPLAY_FLUSH_ENTRIES := 500
 }
 
 
@@ -207,11 +211,27 @@ KLR_BuildDatabase(metrics_dir) {
         try KLRCache.last_sizes[sql_path] := FileGetSize(sql_path)
     }
     KLRCache.db := db
-    ; Rebuild aggregates from events_* — agg_* are no longer persisted in
-    ; data.sql, so they must be computed in memory on every full load too.
+    ; Rebuild every derived table from durable events_* on a cold cache.  The
+    ; live walker deliberately no longer writes aggregate UPSERTs to data.sql
+    ; (they caused disproportionate file growth), so SQL-only rollups are not
+    ; enough after a restart: speed, corrections, ergonomics and n-grams must
+    ; be replayed from their raw event payloads too.
     KLR_ClearAggregates(db)
     KLR_RebuildAggregates(db)
-    KLR_InjectKlwBatch(db)
+    replayed := KLR_RebuildWalkerAggregates(db)
+    if (replayed < 0) {
+        KLR_ResetCache()
+        return 0
+    }
+    if (replayed > 0) {
+        ; KLUI flushes raw events before opening a dashboard.  Those same
+        ; events are therefore represented by the replay above; discarding the
+        ; live delta prevents a second warm refresh from adding them again.
+        KLW_ResetBatch()
+    } else {
+        ; First run with no durable raw events yet: expose the in-RAM delta.
+        KLR_InjectKlwBatch(db)
+    }
     return db
 }
 
@@ -356,18 +376,22 @@ KLR_ApplyIncremental(db, md, logPath) {
 ; can recalculate them cleanly from events_*.  Called once per refresh cycle
 ; before KLR_RebuildAggregates.
 ;
-; Ngram tables are intentionally NOT cleared here: their data comes from the
-; persisted data.sql file (loaded on open) and from KLW.batch injected by
-; KLR_InjectKlwBatch.  Clearing them would wipe historical ngram counts that
-; are never repopulated by KLR_RebuildAggregates, leaving statistics empty
-; until the next walker flush.
+; Every derived table is cleared only on a COLD cache build.  `data.sql`
+; contains durable raw events, not an authoritative aggregate cache; keeping
+; old ngram_* rows would make a new raw replay double-count them after a
+; restart.  The warm-cache branch deliberately does not call this function.
 KLR_ClearAggregates(db) {
 	for tbl in ["agg_app_day", "agg_app_day_buckets", "agg_app_day_burst",
 	            "agg_app_day_session", "agg_app_day_chars_class",
 	            "agg_app_day_errors", "agg_app_day_ergo", "agg_app_day_layouts",
 	            "agg_app_day_kc_hold", "agg_app_day_titles",
 	            "agg_app_day_hourly", "agg_app_day_hourly_min5",
-	            "agg_app_day_switches_to", "agg_system_day"]
+	            "agg_app_day_switches_to", "agg_system_day",
+	            "ngram_chars", "ngram_bigrams", "ngram_trigrams",
+	            "ngram_quadgrams", "ngram_pentagrams", "ngram_hexagrams",
+	            "ngram_heptagrams", "ngram_words", "ngram_word_bigrams",
+	            "ngram_shortcuts", "ngram_shortcut_bigrams", "ngram_keycodes",
+	            "ngram_scancodes"]
 		try SQLite_Exec(db, "DELETE FROM " . tbl . ";")
 }
 
@@ -376,8 +400,8 @@ KLR_ClearAggregates(db) {
 ; reader never depends on pre-computed aggregates being stored in the file.
 ; Tables that require character-level iteration or ring-buffer logic
 ; (chars_class, errors, ergo, burst, session, kc_hold, buckets, layouts,
-; all ngrams) are left empty here and populated by KLR_InjectKlwBatch
-; which drains the in-RAM KLW.batch accumulated by the ingest walker.
+; all ngrams) are rebuilt by KLR_RebuildWalkerAggregates on a cold cache, and
+; by KLR_InjectKlwBatch for subsequent live deltas.
 KLR_RebuildAggregates(db) {
 	; agg_app_day — core typing metrics from events_typing. `chars` is the
 	; manual KEYSTROKE count: one per non-synthetic events_json entry
@@ -431,6 +455,172 @@ KLR_RebuildAggregates(db) {
 
 	; agg_system_day — system events (wifi, lock, sleep) from events_system.
 	try SQLite_Exec(db, "INSERT INTO agg_system_day (device_id, date, wifi_changes, locked_ms, sleep_ms, awake_ms) SELECT device_id, date, SUM(CASE WHEN action='wifi_change' THEN 1 ELSE 0 END), SUM(CASE WHEN action='lock' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='sleep' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='wake' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END) FROM events_system GROUP BY device_id, date ON CONFLICT(device_id, date) DO UPDATE SET wifi_changes=excluded.wifi_changes, locked_ms=excluded.locked_ms, sleep_ms=excluded.sleep_ms, awake_ms=excluded.awake_ms;")
+}
+
+; =================================================================
+; ================================================================
+; ======= 5/ Durable walker reconstruction (cold cache) ==========
+; ================================================================
+; =================================================================
+
+; The Windows writer persists raw events only.  This keeps data.sql compact
+; and sync-friendly, but it means that the stateful walker-owned metrics cannot
+; be recovered by GROUP BY after a process restart.  Rebuild them here from the
+; canonical events_* rows.  Each source device gets its own walker context and
+; its own SQL device literal: n-gram continuity must not cross devices, and a
+; remote device must never be credited to the host opening the dashboard.
+;
+; Return the number of replayed raw rows, or -1 on an SQL/flush failure.  The
+; caller then retains the previous dashboard file rather than rendering a
+; partially rebuilt (and therefore misleading) metric set.
+global KLRReplay := Map()
+
+KLR_RebuildWalkerAggregates(db) {
+    global KLRReplay
+    if !db
+        return -1
+
+    ; Live capture keeps its current per-app context.  The replay uses the
+    ; same walker implementation, temporarily with a fresh context, then
+    ; restores the live state without leaking historic n-grams into new input.
+    saved_ctx := KLW.ctx
+    saved_batch := KLW.batch
+    replayed := 0
+    ok := true
+    try {
+        devices := SQLite_Query(db,
+            "SELECT DISTINCT device_id FROM ("
+            . "SELECT device_id FROM events_typing "
+            . "UNION SELECT device_id FROM events_window_switch "
+            . "UNION SELECT device_id FROM events_system"
+            . ") WHERE device_id IS NOT NULL AND device_id != '' ORDER BY device_id;")
+        for _, device_row in devices {
+            device_id := KLR_RowValue(device_row, "device_id", "")
+            if (device_id = "")
+                continue
+            KLW.ctx := Map()
+            KLW_ResetBatch()
+            KLRReplay := Map(
+                "db", db,
+                "device_lit", SQLite_Q(device_id),
+                "entries_since_flush", 0,
+                "replayed", 0,
+                "ok", true
+            )
+
+            device_where := " WHERE device_id=" . SQLite_Q(device_id)
+            typed_sql := "SELECT ts, app, title, layout, events_json FROM events_typing"
+                . device_where . " ORDER BY ts, id;"
+            window_sql := "SELECT ts, app, prev_title, next_title, duration_ms FROM events_window_switch"
+                . device_where . " ORDER BY ts, id;"
+            system_sql := "SELECT ts, action, metadata_json FROM events_system"
+                . device_where . " ORDER BY ts, id;"
+
+            if (SQLite_EachRow(db, typed_sql, Func("KLR_ReplayTypingRow")) < 0
+                    || SQLite_EachRow(db, window_sql, Func("KLR_ReplayWindowRow")) < 0
+                    || SQLite_EachRow(db, system_sql, Func("KLR_ReplaySystemRow")) < 0
+                    || !KLR_ReplayFlush()) {
+                ok := false
+                break
+            }
+            replayed += KLRReplay["replayed"]
+        }
+    } catch {
+        ok := false
+    } finally {
+        KLW.ctx := saved_ctx
+        KLW.batch := saved_batch
+        KLRReplay := Map()
+    }
+    return ok ? replayed : -1
+}
+
+; Pull a value from a SQLite row without allowing a missing nullable column to
+; abort the whole recovery.  All supplied defaults are intentionally neutral
+; values for the walker.
+KLR_RowValue(row, key, default := "") {
+    return (row is Map && row.Has(key)) ? row[key] : default
+}
+
+; Convert a durable typing row back to the exact entry shape the live walker
+; receives.  The hand-written JSON parser works on the shipped 64-bit AHK,
+; unlike the old ScriptControl path, so historical physical key metadata (`kc`
+; and `sk`) survives the round trip as well.
+KLR_TypingRowToEntry(row) {
+    events := KL_JsonDecode(KLR_RowValue(row, "events_json", ""))
+    if !(events is Array)
+        return 0
+    return Map(
+        "timestamp", KLR_RowValue(row, "ts", ""),
+        "app", KLR_RowValue(row, "app", "Unknown"),
+        "title", KLR_RowValue(row, "title", ""),
+        "layout", KLR_RowValue(row, "layout", ""),
+        "events", events
+    )
+}
+
+KLR_WindowRowToEntry(row) {
+    return Map(
+        "timestamp", KLR_RowValue(row, "ts", ""),
+        "app", KLR_RowValue(row, "app", "Unknown"),
+        "prev_title", KLR_RowValue(row, "prev_title", ""),
+        "next_title", KLR_RowValue(row, "next_title", ""),
+        "duration_ms", KLR_RowValue(row, "duration_ms", 0)
+    )
+}
+
+KLR_SystemRowToEntry(row) {
+    metadata := KL_JsonDecode(KLR_RowValue(row, "metadata_json", ""))
+    if !(metadata is Map)
+        metadata := Map()
+    metadata["timestamp"] := KLR_RowValue(row, "ts", "")
+    metadata["action"] := KLR_RowValue(row, "action", "")
+    return metadata
+}
+
+KLR_ReplayTypingRow(row) {
+    global KLRReplay
+    entry := KLR_TypingRowToEntry(row)
+    if !entry
+        return true                         ; malformed legacy payload: skip safely.
+    KLW_WalkTypingEntry(entry)
+    return KLR_ReplayCountAndMaybeFlush()
+}
+
+KLR_ReplayWindowRow(row) {
+    global KLRReplay
+    KLW_WalkWindowSwitch(KLR_WindowRowToEntry(row))
+    return KLR_ReplayCountAndMaybeFlush()
+}
+
+KLR_ReplaySystemRow(row) {
+    global KLRReplay
+    KLW_WalkSystemEvent(KLR_SystemRowToEntry(row))
+    return KLR_ReplayCountAndMaybeFlush()
+}
+
+KLR_ReplayCountAndMaybeFlush() {
+    global KLRReplay
+    KLRReplay["replayed"] += 1
+    KLRReplay["entries_since_flush"] += 1
+    if (KLRReplay["entries_since_flush"] < KLReadConst.REPLAY_FLUSH_ENTRIES)
+        return true
+    return KLR_ReplayFlush()
+}
+
+KLR_ReplayFlush() {
+    global KLRReplay
+    if !KLRReplay.Count
+        return false
+    sql := KLW_BuildBatchSql(KLRReplay["device_lit"])
+    KLRReplay["entries_since_flush"] := 0
+    if (sql = "")
+        return true
+    if !SQLite_Exec(KLRReplay["db"], "BEGIN TRANSACTION;`n" . sql . "`nCOMMIT;") {
+        KLRReplay["ok"] := false
+        return false
+    }
+    return true
 }
 
 ; Drain KLW.batch (the in-RAM walker accumulator) into the in-memory DB.
