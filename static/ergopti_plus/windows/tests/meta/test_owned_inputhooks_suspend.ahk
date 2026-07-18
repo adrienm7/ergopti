@@ -19,3 +19,17 @@ _OIH_SpaceAndOneShotHooksStopOnSuspend() {
 	_OIH_AssertSuspendOwnedHook("DeadKey", "_DeadKeyInputHook")
 }
 Test("lifecycle: owned Space, OneShotShift, and DeadKey InputHooks stop on suspend (owned-inputhooks-suspend)", _OIH_SpaceAndOneShotHooksStopOnSuspend)
+
+_OIH_SpaceOwnerReleaseStopsCaptureBeforeNextKey() {
+	Body := _DriverFuncBody("SpaceTapHold")
+	Assert(InStr(Body, 'ih.KeyOpt("{SC039}", "+N")') > 0,
+		"Space capture must receive its physical owner key-up")
+	Assert(InStr(Body, "ih.OnKeyUp := _SpaceHoldOnKeyUp") > 0,
+		"Space capture must bind an owner-release callback")
+	Assert(InStr(Body, "if _SpaceHoldOwnerReleased") > 0,
+		"Space capture must exit before dispatch after its owner was released")
+	Callback := _DriverFuncBody("_SpaceHoldOnKeyUp")
+	Assert(InStr(Callback, "ih.Stop()") > 0 and InStr(Callback, "_SpaceHoldOwnerReleased := true") > 0,
+		"Space owner key-up must stop the suppressing hook and mark the transaction closed")
+}
+Test("lifecycle: Space owner key-up terminates the suppressing capture", _OIH_SpaceOwnerReleaseStopsCaptureBeforeNextKey)
