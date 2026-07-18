@@ -309,6 +309,12 @@ TooltipShow(Items, DurationSec := 0) {
     global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC, _TOOLTIP_SAFETY_SEC
     global _TooltipDequeueItems, _TooltipDequeueActive, _TooltipLastItems
     _TooltipGeneration += 1
+    ; A rendering pass owns only the generation it created.  `_TooltipBuildGui`
+    ; and `_TooltipResolvePosition` can pump/re-enter through GUI/COM, so a newer
+    ; TooltipShow or TooltipHide may complete before this invocation resumes.
+    ; Never let the older invocation arm a timer, present, or clean up the newer
+    ; surface after that point.
+    RenderGeneration := _TooltipGeneration
     _TooltipLastItems := Items
 
     ; Timer already cancelled by TooltipHide("NewShow") above — this is a
@@ -319,17 +325,21 @@ TooltipShow(Items, DurationSec := 0) {
     try {
         _TooltipBuildGui(Items)
     } catch {
-        TooltipHide("BuildFail", true)
+        if (RenderGeneration == _TooltipGeneration)
+            TooltipHide("BuildFail", true)
         return
     }
     HotPath_LogIfSlow("Tooltip.Build", _hpBuild, Items.Length . " item(s)")
+    if (RenderGeneration != _TooltipGeneration)
+        return
 
     ; Cache in a local variable to prevent "Invalid index" crashes if a
     ; concurrent TooltipHide clears the global array during the
     ; _TooltipResolvePosition yield point.
     Rows := _TooltipRowGuis
     if (Rows.Length == 0) {
-        TooltipHide("NoRows", true)
+        if (RenderGeneration == _TooltipGeneration)
+            TooltipHide("NoRows", true)
         return
     }
 
@@ -338,6 +348,8 @@ TooltipShow(Items, DurationSec := 0) {
     _hpResolve := HotPath_Now()
     Pos := _TooltipResolvePosition()
     HotPath_LogIfSlow("Tooltip.ResolvePos", _hpResolve, "")
+    if (RenderGeneration != _TooltipGeneration)
+        return
     Row := Rows[1]
     ; Snapshot generation before present so any exception still arms the timer
     ; correctly and the ghost cannot outlive the safety deadline.
@@ -346,10 +358,13 @@ TooltipShow(Items, DurationSec := 0) {
     try {
         _TooltipPresentStack(Pos, Row, true)
     } catch {
-        TooltipHide("ShowFail", true)
+        if (RenderGeneration == _TooltipGeneration)
+            TooltipHide("ShowFail", true)
         return
     }
     HotPath_LogIfSlow("Tooltip.Present", _hpPresent, "")
+    if (RenderGeneration != _TooltipGeneration)
+        return
 
     ; Collect per-item durations. When items carry distinct non-zero durations,
     ; we run the dequeue path so each row gets its own lifetime. When all
@@ -625,7 +640,6 @@ TooltipRearmTimer() {
     if IsSet(LLM_Bridge_ScheduleAfterHotstring)
         try LLM_Bridge_ScheduleAfterHotstring(_TooltipLastItems)
 }
-
 
 
 
