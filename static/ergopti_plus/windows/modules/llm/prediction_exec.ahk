@@ -916,6 +916,12 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 			idx := Max(1, Min(active, slots.Length))
 			text := slots[idx]
 			if (text != "") {
+				; The request may have finished while the driver was suspended. Do
+				; not turn a stale final result into synthetic foreground input.
+				if A_IsSuspended {
+					try LoggerInfo("LLM", "Inline auto-type skipped while suspended.")
+					return
+				}
 				_LLM_Engine["inline_last_typed"] := text
 				; Mute the hotstring InputHook so the injected characters do
 				; not re-enter the engine and trigger false hotstring matches.

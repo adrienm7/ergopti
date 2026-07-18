@@ -613,6 +613,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_lalt_capslock_tap_min_duration.ahk
 #Include meta/test_llm_accept_cleanup_in_finally.ahk
 #Include meta/test_llm_failure_callback_arity.ahk
+#Include meta/test_llm_inline_autotype_suspend_guard.ahk
 #Include meta/test_llm_pointer_watch_not_stopped_on_suspend.ahk
 #Include meta/test_loader_toml_injection_readfile_hotpath.ahk
 #Include meta/test_lock_workstation_named_helper.ahk
