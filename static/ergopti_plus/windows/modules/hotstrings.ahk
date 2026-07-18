@@ -35,12 +35,10 @@
 ; restarting the script via Reload. Called once at boot from ErgoptiPlus.ahk
 ; right after the #Include, and again on every live hotstring toggle.
 ;
-; ``DeferHeavy`` is true ONLY for the boot pass: it skips the heaviest magic-key
-; categories (emojis + symbols, ~3000 registrations / ~410 ms) so they do not sit
-; on the critical boot path. ErgoptiPlus.ahk then arms a one-shot post-boot timer
-; (RegisterEmojisSymbolsDeferred) that registers them off the critical path and
-; rebuilds the prefix-watcher index. A live rebuild passes false → everything is
-; registered synchronously, exactly as before.
+; ``DeferHeavy`` remains for compatibility with explicit live callers. The boot
+; passes false: the driver may publish ready only after every advertised trigger
+; and its preview index are available. A live rebuild also passes false so it
+; atomically returns a complete registry.
 RegisterAllHotstrings(DeferHeavy := false) {
 	global Features, ScriptInformation, PersonalInformation, PersonalInformationLetters
 	global DeadkeyMappingCircumflex, SpaceAroundSymbols, PersonalInformationHotstrings
