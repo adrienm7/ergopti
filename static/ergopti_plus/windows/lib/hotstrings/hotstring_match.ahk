@@ -86,6 +86,8 @@ HSE_FindMatchAtEnd(JustTypedChar) {
     global HSE_Buffer, HSE_StartIsWordBoundary, HSE_RegistryByLastChar
     global HSE_WORD_TERMINATORS, HSE_LastEndChar, HSE_TypoNbspStripped
     global HSE_RebuildInProgress
+    global HSE_StarByTriggerCI, HSE_StarByTriggerCS, HSE_MaxStarTriggerLen
+    global HSE_EndByTriggerCI, HSE_EndByTriggerCS, HSE_MaxEndTriggerLen
 
     if HSE_RebuildInProgress {
         return ""
@@ -188,32 +190,21 @@ HSE_FindMatchAtEnd(JustTypedChar) {
             }
         }
         if ShouldMatch {
-            EffBodyLastChar := SubStr(EffBody, -1)
-            if (EffBodyLastChar != "") {
-                Buckets2 := _HSE_BucketsFor(EffBodyLastChar)
-                for _, Bucket in Buckets2 {
-                    for _, Spec in Bucket {
-                        if Spec.Star {
-                            continue
-                        }
-                        if !HSE_SuffixMatches(EffBody, Spec.Trigger, Spec.CaseSensitive) {
-                            continue
-                        }
-                        if !_HSE_WordBoundaryAllows(EffBody, Spec) {
-                            continue
-                        }
-                        ; Star-prefix priority: suppress the end-char match only when
-                        ; the just-typed end char can itself continue toward a star
-                        ; trigger (e.g. magic-key press after "ia" → yields to "ia★").
-                        ; Typing space after "ia" does NOT suppress because space is not
-                        ; the magic key and cannot reach "ia★".
-                        if _HSE_StarTriggerCoversBody(EffBody, Spec, JustTypedChar) {
-                            continue
-                        }
-                        if _HSE_EndCharBeats(Spec, BestMatch, BestEndChar != "") {
-                            BestMatch := Spec
-                            BestEndChar := JustTypedChar
-                        }
+            ; End-char matching is suffix equality just like star matching.
+            ; Probe the bounded set of buffer suffixes against full-trigger
+            ; indexes, rather than walking every same-tail candidate.
+            HasEndCS := HSE_EndByTriggerCS.Count > 0
+            HasEndCI := HSE_EndByTriggerCI.Count > 0
+            if HasEndCS or HasEndCI {
+                MaxSuffix := Min(StrLen(EffBody), HSE_MaxEndTriggerLen)
+                loop MaxSuffix {
+                    Suffix := SubStr(EffBody, -A_Index)
+                    if HasEndCS and HSE_EndByTriggerCS.Has(Suffix)
+                        _HSE_ConsiderEndSpecs(HSE_EndByTriggerCS[Suffix], EffBody, JustTypedChar, &BestMatch, &BestEndChar)
+                    if HasEndCI {
+                        LowerSuffix := StrLower(Suffix)
+                        if HSE_EndByTriggerCI.Has(LowerSuffix)
+                            _HSE_ConsiderEndSpecs(HSE_EndByTriggerCI[LowerSuffix], EffBody, JustTypedChar, &BestMatch, &BestEndChar)
                     }
                 }
             }
@@ -222,6 +213,19 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 
     HSE_LastEndChar := BestEndChar
     return BestMatch
+}
+
+_HSE_ConsiderEndSpecs(Specs, EffBody, JustTypedChar, &BestMatch, &BestEndChar) {
+    for _, Spec in Specs {
+        if !_HSE_WordBoundaryAllows(EffBody, Spec)
+            continue
+        if _HSE_StarTriggerCoversBody(EffBody, Spec, JustTypedChar)
+            continue
+        if _HSE_EndCharBeats(Spec, BestMatch, BestEndChar != "") {
+            BestMatch := Spec
+            BestEndChar := JustTypedChar
+        }
+    }
 }
 
 ; Return true when a registered star trigger would shadow the given end-char
@@ -318,6 +322,37 @@ _HSE_IndexStarTrigger(Spec) {
             HSE_StarByTriggerCI[Key] := []
         }
         HSE_StarByTriggerCI[Key].Push(Spec)
+    }
+}
+
+; Add one non-star trigger to its exact or lowercased full-trigger index.
+_HSE_IndexEndTrigger(Spec) {
+    global HSE_EndByTriggerCI, HSE_EndByTriggerCS, HSE_MaxEndTriggerLen
+    if (Spec.Length > HSE_MaxEndTriggerLen)
+        HSE_MaxEndTriggerLen := Spec.Length
+    if Spec.CaseSensitive {
+        if !HSE_EndByTriggerCS.Has(Spec.Trigger)
+            HSE_EndByTriggerCS[Spec.Trigger] := []
+        HSE_EndByTriggerCS[Spec.Trigger].Push(Spec)
+    } else {
+        Key := StrLower(Spec.Trigger)
+        if !HSE_EndByTriggerCI.Has(Key)
+            HSE_EndByTriggerCI[Key] := []
+        HSE_EndByTriggerCI[Key].Push(Spec)
+    }
+}
+
+; Rebuild the non-star full-trigger indexes from the live last-char registry.
+_HSE_RebuildEndTriggerIndex() {
+    global HSE_RegistryByLastChar, HSE_EndByTriggerCI, HSE_EndByTriggerCS, HSE_MaxEndTriggerLen
+    HSE_EndByTriggerCI := Map()
+    HSE_EndByTriggerCS := Map()
+    HSE_MaxEndTriggerLen := 0
+    for _, Bucket in HSE_RegistryByLastChar {
+        for _, Spec in Bucket {
+            if !Spec.Star
+                _HSE_IndexEndTrigger(Spec)
+        }
     }
 }
 
