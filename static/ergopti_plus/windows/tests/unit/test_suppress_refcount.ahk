@@ -59,11 +59,9 @@ Test("suppress: HSE_Suppress(false) on a zeroed counter stays at 0 (boolean-supp
 ; ====================================================
 
 _SRC_PWSuppressDepth() {
-	global _PrefixWatcherSuppressed, HSE_Suppressed
+	global _PrefixWatcherSuppressed
 	_PrefixWatcherSuppressed := 0
-	HSE_Suppressed := 0
 	PrefixWatcherSuppress(true)
-	; PrefixWatcherSuppress calls HSE_Suppress internally, so both counters advance.
 	Assert(_PrefixWatcherSuppressed > 0, "PrefixWatcherSuppress(true) must increment _PrefixWatcherSuppressed")
 	PrefixWatcherSuppress(true)
 	Assert(_PrefixWatcherSuppressed = 2, "Second PrefixWatcherSuppress(true) must increment to 2")
@@ -74,7 +72,6 @@ _SRC_PWSuppressDepth() {
 	Assert(_PrefixWatcherSuppressed = 0,
 		"After matching releases _PrefixWatcherSuppressed must reach 0 (boolean-suppression-released-early-on-overlapping-fires)")
 	_PrefixWatcherSuppressed := 0
-	HSE_Suppressed := 0
 }
 Test("suppress: PrefixWatcherSuppress uses depth counter — early release does not expose watcher (boolean-suppression-released-early-on-overlapping-fires)", _SRC_PWSuppressDepth)
 
