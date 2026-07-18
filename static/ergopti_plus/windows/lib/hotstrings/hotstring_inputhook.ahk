@@ -505,6 +505,11 @@ _OnPrefixChar(IH, Char) {
 		; Snapshot the active-pairs map once so the pair lookup is consistent
 		; with the membership check even if WrapSymbols_Rebuild() runs concurrently.
 		_ActivePairsSnap := WrapSymbols_GetActivePairs()
+		; A physical character after a selection has collapsed it, even when the
+		; UIA poll has not run again yet.  Preserve the snapshot only for the
+		; wrapping symbol itself; any other printable input invalidates it.
+		if (IsSet(_UIA_SelectionCache) and IsObject(_UIA_SelectionCache) and !_ActivePairsSnap.Has(Char))
+			_UIA_SelectionCache := 0
 		if _ActivePairsSnap.Has(Char) {
 			try {
 				UIASel := GetUIASelection()

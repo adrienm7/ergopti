@@ -471,6 +471,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_timer_scheduler_pause_guard.ahk
 #Include meta/test_keylogger_watchers_pause_guard.ahk
 #Include meta/test_uia_selection_background_poll.ahk
+#Include meta/test_uia_selection_snapshot.ahk
 #Include meta/test_remote_poll_deadline.ahk
 #Include meta/test_download_integrity_guard.ahk
 #Include meta/test_no_coauthor_in_commits.ahk
