@@ -86,10 +86,10 @@ TestConformDF_RepeatFiresWhenReleased() {
 Test("HSE conform: magic-key trigger expands on every fire, not just the first",
 	TestConformDF_RepeatFiresWhenReleased)
 
-; Angle 2 -- real deferred -60 ms release. After the first dispatch arms it, a
-; Sleep pumps the message loop so it fires; HSE_Suppressed must then be cleared.
+; Angle 2 -- real deferred -60 ms release. After the first dispatch arms the
+; prefix render guard, a Sleep pumps the message loop so it clears.
 TestConformDF_DeferredReleaseClearsSuppression() {
-	global HSE_Suppressed, HSE_Buffer
+	global _PrefixWatcherSuppressed, HSE_Buffer
 	ResetHotstringRecorders()
 	SimulateRegularApp()
 	HSE_TestReset()
@@ -98,14 +98,14 @@ TestConformDF_DeferredReleaseClearsSuppression() {
 
 	HSE_FeedReset(true)
 	_ConformDF_FireCtStar(Star)
-	Assert(HSE_Suppressed > 0, "dispatch must suppress feeds during the burst")
+	Assert(_PrefixWatcherSuppressed > 0, "dispatch must hold the prefix render guard during the burst")
 
 	; Pump the loop past HSE_SUPPRESS_RELEASE_DELAY_MS (60 ms) so the armed
 	; release timer actually runs. 500 ms gives ~8× headroom over the 60 ms
 	; timer — enough for CI schedulers with variable thread wake latency.
 
 	Sleep 500
-	Assert(HSE_Suppressed == 0, "suppression should be cleared after 60ms timer")
+	Assert(_PrefixWatcherSuppressed == 0, "prefix render guard should be cleared after 60ms timer")
 	
 	N := _Stub_RecordedSends.Length
 	B2 := _ConformDF_FireCtStar(Star)

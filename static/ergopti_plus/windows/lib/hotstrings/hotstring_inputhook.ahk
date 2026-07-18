@@ -273,10 +273,9 @@ _ResolveFireHType(Spec) {
 	return (Spec.HasOwnProp("Star") and Spec.Star) ? "star" : "endchar"
 }
 
-; Toggle the suppression flag. The hotstring engine wraps its send bursts
-; in ``PrefixWatcherSuppress(true)`` / ``PrefixWatcherSuppress(false)``
-; pairs (with a small SetTimer delay on the release) so the InputHook
-; ignores AHK-generated characters during the backspace+replacement burst.
+; Toggle the render/depth guard around an output transaction.  Synthetic
+; provenance is enforced by the InputHook's I1 input level, so this guard must
+; never suppress a physical character merely because it arrives near a send.
 ; The buffer reset is now done synchronously by HSE_DispatchMatch's finally
 ; block (via _ResetPrefixBuffer) before this deferred release fires, so we
 ; must NOT wipe _PrefixBuffer here — doing so would erase the first
@@ -287,12 +286,6 @@ PrefixWatcherSuppress(YesNo) {
 		_PrefixWatcherSuppressed += 1
 	else
 		_PrefixWatcherSuppressed := Max(0, _PrefixWatcherSuppressed - 1)
-	; Mirror the suppression into HSE so its parallel buffer stays aligned
-	; with the prefix watcher during send bursts. HSE_Suppress only
-	; flips the flag — the HSE buffer is NOT wiped here; HSE_DispatchMatch
-	; already called HSE_ApplyExpansion before deferring this release,
-	; so the buffer already reflects the post-expansion screen state.
-	HSE_Suppress(YesNo)
 }
 
 ; Enqueue a fired-hotstring metrics record and (once) arm the drain timer. O(1)
@@ -437,11 +430,11 @@ HotstringPrefixWatcherStop() {
 ; until HotstringPrefixWatcherStop is called.
 _StartInputHook() {
 	global _PrefixInputHook
-	; No I0 flag — injected keystrokes (tap-hold space, AltGr combos, etc.)
-	; must reach the watcher so the buffer resets on synthetic spaces. The
-	; HSE_Suppressed / _PrefixWatcherSuppressed guards in the callbacks filter
-	; out chars injected by the hotstring engine itself.
-	Hook := InputHook("V L0")
+	; I1 filters only low-level synthetic input (the driver's SendInput/Event
+	; bursts use the default SendLevel 0) while preserving every physical key.
+	; This is event provenance, unlike the former 60-ms time window that also
+	; discarded real typing after a hotstring expansion.
+	Hook := InputHook("V L0 I1")
 	Hook.KeyOpt("{All}", "+N")            ; notify OnKeyDown for every key
 	Hook.OnChar    := _OnPrefixCharProfiled
 	Hook.OnKeyDown := _OnPrefixKeyDown
@@ -474,16 +467,10 @@ _OnPrefixChar(IH, Char) {
 	; InputHook, so the HookDispatcher guard does not cover it.
 	if A_IsSuspended
 		return
-	if (_PrefixWatcherSuppressed or HSE_Suppressed) {
-		; A char reached the hook DURING a send-burst suppress window. Synthetic
-		; replacement chars are EXPECTED here (filtered out of the buffer by design);
-		; a PHYSICAL char landing here means the user typed inside the post-fire
-		; window — its buffer update is skipped (it still reaches the app via the
-		; Visible hook), the desync to inspect for "abcd"->"acd" reports. Debug-gated
-		; so this blind spot becomes visible without adding hot-path cost normally.
-		if LoggerIsDebugEnabled()
-			try LoggerDebug("HSEFire", "OnChar SUPPRESSED char='{1}' pwSup={2} hseSup={3}.",
-				Char, _PrefixWatcherSuppressed, HSE_Suppressed)
+	; I1 excludes this driver's synthetic output before OnChar.  Keep the HSE
+	; fallback guard for standalone/manual HSE suppression, but do not treat the
+	; prefix render guard as evidence that this physical character is synthetic.
+	if HSE_Suppressed {
 		return
 	}
 	; LLM predictions stay on even when the Hotstrings master gate is off.
@@ -687,12 +674,10 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	; private InputHook is fully silent during suspend.
 	if A_IsSuspended
 		return
-	; Same dual-flag guard as _OnPrefixChar — the BackSpace events the
-	; dispatcher fires via SendEvent reach this callback as VK 0x08 events.
-	; Without the HSE_Suppressed check the watcher would call
-	; _ResetPrefixBuffer() once per replayed BackSpace, which is harmless
-	; on its own but pairs with the OnChar pollution to produce ghosts.
-	if (_PrefixWatcherSuppressed or HSE_Suppressed) {
+	; Synthetic key events are rejected by InputHook I1.  Only an explicit
+	; engine-level suppression (used by standalone/manual callers) blocks a
+	; physical keydown from updating the buffer.
+	if HSE_Suppressed {
 		return
 	}
 	static ResetVKs := Map(
