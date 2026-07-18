@@ -79,6 +79,6 @@ _WBCR_CriticalBeforeForLoop() {
 	Assert(posCrit > 0 and posFor > 0,
 		"keylogger.ahk: both Critical guard and for-loop over entries must be present")
 	Assert(posCrit < posFor,
-		"keylogger.ahk: Critical(""On"") must appear before the for-loop over entries — not inside it")
+		"keylogger.ahk: Critical guard must appear before the for-loop over entries")
 }
 Test("KLW.batch walk: Critical guard precedes for-loop over entries (walker-batch-critical)", _WBCR_CriticalBeforeForLoop)
