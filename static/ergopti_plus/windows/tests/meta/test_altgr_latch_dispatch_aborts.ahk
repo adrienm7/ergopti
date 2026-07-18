@@ -99,4 +99,21 @@ _ALDA_IsPhysicalChecksSC138State() {
 }
 
 Test("script_altgr: _ScriptAltGrIsPhysical checks SC138 physical key state (altgr-latch-dispatch-aborts)",
-	_ALDA_IsPhysicalChecksSC138State)
+        _ALDA_IsPhysicalChecksSC138State)
+
+
+_ALDA_LayoutDispatchAbortsOnLatchedPrefix() {
+        Body := _DriverFuncBody("AltGrShiftDispatch")
+        Assert(Body != "", "AltGrShiftDispatch must be defined in modules/keymap/layout/layout_altgr.ahk")
+
+        GuardPos := InStr(Body, '!GetKeyState("SC138", "P")')
+        ReturnPos := InStr(Body, "return", false, GuardPos)
+        EntryPos := InStr(Body, "Entry := Table[SC]")
+        Assert(GuardPos > 0,
+                "AltGrShiftDispatch must verify SC138 is physically held before dispatching a layer callback")
+        Assert(ReturnPos > GuardPos and ReturnPos < EntryPos,
+                "a latched SC138 prefix must return before selecting Entry/Table callback — logging alone still emits a ghost AltGr output")
+}
+
+Test("layout_altgr: non-physical SC138 latch aborts before layer output (altgr-latch-dispatch-aborts)",
+        _ALDA_LayoutDispatchAbortsOnLatchedPrefix)
