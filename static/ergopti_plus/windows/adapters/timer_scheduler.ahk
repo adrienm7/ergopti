@@ -78,8 +78,13 @@ TimerAfter(DelaySec, Fn) {
 	BoundFn := _TimerAdapterMakeOneShot(Handle, Fn)
 	Handle["Fn"] := BoundFn
 	Handle["Interval"] := Ms
+	try SetTimer(BoundFn, Ms)
+	catch as Err {
+		Handle["Fired"] := true
+		try LoggerError("TimerScheduler", "one-shot schedule failed: {1}", Err.Message)
+		throw Err
+	}
 	_TIMER_ADAPTER_REGISTRY[Handle["Id"]] := Handle
-	SetTimer(BoundFn, Ms)
 	return Handle
 }
 
@@ -107,8 +112,13 @@ TimerEvery(IntervalSec, Fn) {
 	BoundFn := _TimerAdapterMakeRepeating(Handle, Fn)
 	Handle["Fn"] := BoundFn
 	Handle["Interval"] := Ms
+	try SetTimer(BoundFn, Ms)
+	catch as Err {
+		Handle["Fired"] := true
+		try LoggerError("TimerScheduler", "repeating schedule failed: {1}", Err.Message)
+		throw Err
+	}
 	_TIMER_ADAPTER_REGISTRY[Handle["Id"]] := Handle
-	SetTimer(BoundFn, Ms)
 	return Handle
 }
 
