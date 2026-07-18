@@ -2,12 +2,13 @@
 
 /**
  * ==============================================================================
- * MODULE: Windows scancode → HS keycode bridge
+ * MODULE: PC scancode → HS keycode bridge
  * DESCRIPTION:
  * The dashboard's heatmap geometry (KEY_POSITIONS, KEYCODE_DATA, SFB_COLUMNS)
  * is keyed by Hammerspoon keycodes — the macOS driver's native identifier.
- * The AHK driver captures hardware scancodes (set 1) instead. Rather than
- * forking the entire layout for Windows, we translate each scancode to its
+ * The Windows/AHK driver and Linux evdev hook capture hardware scancodes
+ * (the common PC set-1 positions) instead. Rather than forking the entire
+ * layout for PC keyboards, we translate each scancode to its
  * equivalent HS keycode at the data ingestion layer so the renderer keeps
  * working unchanged.
  *
@@ -16,8 +17,8 @@
  *    colour. Modifier identities differ (Ctrl/Alt/Win vs ⌃/⌥/⌘) but the
  *    PHYSICAL position is identical, so the same KEY_POSITIONS entry is
  *    reused with a relabel via WIN_KEYCODE_LABELS.
- * 2. No cross-driver leakage: the translator only kicks in when the
- *    incoming prefetch carries `driver_meta.os === "win"`. Mac payloads
+ * 2. No cross-driver leakage: the translator only kicks in for Windows and
+ *    Linux physical-scancode payloads. Mac payloads
  *    fall through untouched.
  * 3. Defensive: unknown scancodes (rare extended-key edge cases) are
  *    dropped instead of crashing the render pipeline.
@@ -30,7 +31,7 @@
 // =============================================
 // =============================================
 
-// Windows scancode set 1 → Hammerspoon keycode. Matches each physical key
+// PC scancode set 1 / Linux evdev code → Hammerspoon keycode. Matches each physical key
 // against the position the dashboard already knows about. Modifier and
 // arrow keys included so heatmap colouring lights up the same cell as on
 // macOS.
@@ -168,6 +169,10 @@ const WIN_KEYCODE_LABELS = {
 	125: '↓'
 };
 
+function is_pc_scancode_driver(driver_meta) {
+	return !!driver_meta && (driver_meta.os === 'win' || driver_meta.os === 'linux');
+}
+
 // ==============================================
 // ==============================================
 // ======= 3/ Public translation API =======
@@ -244,7 +249,7 @@ function translate_win_today(today) {
  */
 function build_keycode_layout_for_driver(driver_meta, ahk_layout) {
 	const base = typeof KEYCODE_NAMES === 'object' && KEYCODE_NAMES ? KEYCODE_NAMES : {};
-	if (!driver_meta || driver_meta.os !== 'win') return { ...base };
+	if (!is_pc_scancode_driver(driver_meta)) return { ...base };
 	const out = { ...base };
 	if (ahk_layout && typeof ahk_layout === 'object') {
 		Object.entries(ahk_layout).forEach(([sc_str, ch]) => {

@@ -220,6 +220,11 @@ helpers.describe("keylogger", function()
           calls.ngrams[#calls.ngrams + 1] = entries
           return true
         end,
+		upsert_scancodes = function(_, _, _, entries)
+		  calls.scancodes = calls.scancodes or {}
+		  calls.scancodes[#calls.scancodes + 1] = entries
+		  return true
+		end,
       }
       local writer_name = "modules.keylogger.sqlite_writer"
       local logger_name = "modules.keylogger.keylogger"
@@ -232,21 +237,33 @@ helpers.describe("keylogger", function()
         isolated.init({ sqlite_path = "/tmp/ergopti_keylogger_mock.sqlite" })
         isolated.reset_session()
         isolated.on_app_focus("org.mozilla.firefox", 1000)
-        isolated.on_keydown("a", 1100, "org.mozilla.firefox")
+		isolated.record_physical_key("org.mozilla.firefox", 30, 1100)
+        isolated.on_keydown("a", 1100, "org.mozilla.firefox", 30)
         isolated.on_keydown("b", 1200, "org.mozilla.firefox")
-        isolated.record_hotstring("org.mozilla.firefox", "btw", "by the way", 1300, "test")
+		isolated.record_hotstring("org.mozilla.firefox", "btw", "by the way", 1300, "test", 3)
+		isolated.record_synthetic_output("org.mozilla.firefox", "ok", "llm", 1350, 0, 2)
         isolated.on_app_focus("code", 2000)
         isolated.flush()
 
         helpers.assert_eq(#calls.typing, 1)
         helpers.assert_eq(calls.typing[1][1].app, "org.mozilla.firefox")
         helpers.assert_eq(calls.typing[1][1].text, "ab")
+		helpers.assert_true(calls.typing[1][1].events_json:find('"sk":30', 1, true) ~= nil,
+		  "portable manual events must retain the physical evdev scancode")
+		helpers.assert_true(calls.typing[1][1].events_json:find('"s":0', 1, true) == nil,
+		  "manual events must omit s:0 because Lua would treat numeric zero as synthetic")
+		helpers.assert_true(calls.typing[1][1].events_json:find('"st":"hotstring"', 1, true) ~= nil,
+		  "hotstring output must be persisted as tagged synthetic events")
+		helpers.assert_true(calls.typing[1][1].events_json:find('"st":"llm"', 1, true) ~= nil,
+		  "completed LLM output must use the same synthetic event format")
         helpers.assert_eq(#calls.hotstrings, 1)
         helpers.assert_eq(calls.hotstrings[1][1].net_saved_chars, 7)
         helpers.assert_eq(#calls.switches, 1)
         helpers.assert_eq(calls.switches[1][1].duration_ms, 1000)
         helpers.assert_true(#calls.app_days > 0)
         helpers.assert_true(#calls.ngrams > 0)
+		helpers.assert_eq(calls.scancodes[1][30], 1,
+		  "physical evdev counts must be persisted independently of logical output")
 
         isolated.flush()
         helpers.assert_eq(#calls.typing, 1, "a second flush must not replay raw typing")
@@ -344,6 +361,22 @@ helpers.describe("keylogger", function()
       helpers.assert_eq(app.hs_input_chars, 3)
       helpers.assert_eq(app.hs_triggers, 1)
     end)
+
+	helpers.it("projects physical scancodes and generated output into separate UI fields", function()
+		keylogger.init({})
+		keylogger.reset_session()
+		keylogger.record_physical_key("firefox", 30, 1000)
+		keylogger.on_keydown("a", 1000, "firefox", 30)
+		keylogger.record_hotstring("firefox", "btw", "by", 1100, "test", 3)
+		local range = keylogger.get_range_payload()
+		local today = range.today.firefox
+		helpers.assert_eq(today.sc_kb["30"].c, 1,
+			"physical heatmap must count the actual evdev key exactly once")
+		helpers.assert_eq(today.c.b.hs, 1,
+			"logical hotstring output must retain its source for the output view")
+		helpers.assert_eq(today.c.a.hs or 0, 0,
+			"manual output must not be misclassified as synthetic")
+	end)
 
     helpers.it("counts Unicode hotstrings by character rather than UTF-8 byte", function()
       keylogger.init({})

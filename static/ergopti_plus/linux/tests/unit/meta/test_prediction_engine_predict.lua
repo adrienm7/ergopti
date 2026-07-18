@@ -121,3 +121,66 @@ helpers.describe("prediction_engine.predict: 'no model selected' guard is not de
 			"predict() must warn 'No model selected' instead of falling back to a hardcoded model")
 	end)
 end)
+
+helpers.describe("prediction_engine: durable logical-output callback", function()
+	helpers.it("reports only a completed auto-injected prediction with its original app context", function()
+		local observed = nil
+		package.loaded["modules.llm.api_ollama"] = {
+			chat = function(_, _, _, _, on_chunk, on_done)
+				on_chunk(" suite")
+				on_done(" suite", nil)
+			end,
+			cancel = function() end,
+		}
+		package.loaded["modules.llm.profiles"] = {
+			init = function() end,
+			is_enabled = function() return true end,
+			get_current_model = function() return "test-model" end,
+			get_base_url = function() return "http://127.0.0.1:11434" end,
+		}
+		package.loaded["adapters.text_sender"] = { send = function() end, eraseChars = function() end }
+
+		local pe = helpers.load_module("modules.llm.prediction_engine")
+		pe.init({ auto_inject = true, on_output = function(text, context)
+			observed = { text = text, context = context }
+		end })
+		pe.predict("Bonjour //", { app_id = "firefox", input_chars = 2 })
+
+		package.loaded["modules.llm.api_ollama"] = nil
+		package.loaded["modules.llm.profiles"] = nil
+		package.loaded["adapters.text_sender"] = nil
+
+		helpers.assert_eq(observed.text, " suite")
+		helpers.assert_eq(observed.context.app_id, "firefox")
+		helpers.assert_eq(observed.context.input_chars, 2)
+	end)
+
+	helpers.it("does not report a failed streamed prediction as logical output", function()
+		local callback_count = 0
+		package.loaded["modules.llm.api_ollama"] = {
+			chat = function(_, _, _, _, on_chunk, on_done)
+				on_chunk("partial")
+				on_done("", "network error")
+			end,
+			cancel = function() end,
+		}
+		package.loaded["modules.llm.profiles"] = {
+			init = function() end,
+			is_enabled = function() return true end,
+			get_current_model = function() return "test-model" end,
+			get_base_url = function() return "http://127.0.0.1:11434" end,
+		}
+		package.loaded["adapters.text_sender"] = { send = function() end, eraseChars = function() end }
+
+		local pe = helpers.load_module("modules.llm.prediction_engine")
+		pe.init({ auto_inject = true, on_output = function() callback_count = callback_count + 1 end })
+		pe.predict("Bonjour //", { app_id = "firefox", input_chars = 2 })
+
+		package.loaded["modules.llm.api_ollama"] = nil
+		package.loaded["modules.llm.profiles"] = nil
+		package.loaded["adapters.text_sender"] = nil
+
+		helpers.assert_eq(callback_count, 0,
+			"erased failure fragments must not be written as synthetic output")
+	end)
+end)

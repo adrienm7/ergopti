@@ -30,7 +30,7 @@ helpers.describe("ui.bridge_handlers", function()
             },
             app_icons = {},
             _prefetch_data = { historical = {}, today = {} },
-            driver_meta = { os = "linux", heatmap_id = "kc" },
+            driver_meta = { os = "linux", heatmap_id = "sc_kb" },
           }
         end,
 		get_range_payload = function(start_date, end_date, apps)

@@ -179,7 +179,7 @@ end
 
 --- Queues a single character that arrived during an in-flight injection.
 --- Safe to call when not injecting (no-op).
---- @param ch string Single-character string to queue.
+--- @param ch string|table Character, or { char, scancode } preserving input metadata.
 function M._queue_char(ch)
 	if _injecting then
 		_input_queue[#_input_queue + 1] = ch

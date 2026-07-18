@@ -27,6 +27,7 @@ helpers.describe("sqlite_writer", function()
 	  helpers.assert_true(type(sw.insert_app_switch_events) == "function", "insert_app_switch_events")
       helpers.assert_true(type(sw.upsert_app_day)    == "function", "upsert_app_day")
       helpers.assert_true(type(sw.upsert_ngrams)     == "function", "upsert_ngrams")
+	  helpers.assert_true(type(sw.upsert_scancodes)  == "function", "upsert_scancodes")
       helpers.assert_true(type(sw.bump_rev)          == "function", "bump_rev")
     end)
 
@@ -37,6 +38,18 @@ helpers.describe("sqlite_writer", function()
       helpers.assert_true(src:find("app_time_ms, hs_chars, hs_triggers, hs_input_chars", 1, true) ~= nil,
         "initial INSERT must retain every field, not only the conflict-update path")
     end)
+
+	helpers.it("persists generated-output sources and physical scancodes independently", function()
+		local path = helpers.driver_root() .. "/modules/keylogger/sqlite_writer.lua"
+		local fh = assert(io.open(path, "r"))
+		local src = fh:read("*a"); fh:close()
+		helpers.assert_true(src:find("esrc_json = json_object", 1, true) ~= nil,
+			"source histogram must be merged across flushes instead of overwritten")
+		helpers.assert_true(src:find("'hotstring'", 1, true) ~= nil)
+		helpers.assert_true(src:find("'llm'", 1, true) ~= nil)
+		helpers.assert_true(src:find("INSERT INTO ngram_scancodes", 1, true) ~= nil,
+			"evdev hardware counts must be persisted in the canonical scancode table")
+	end)
 
     helpers.it("preserves complete dotted application identifiers during flush", function()
       local path = helpers.driver_root() .. "/modules/keylogger/keylogger.lua"
