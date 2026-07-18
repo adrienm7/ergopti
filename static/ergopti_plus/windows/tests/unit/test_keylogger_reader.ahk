@@ -415,3 +415,57 @@ _KLR_StashAppTypeJson_MultipleTypesUnderSameApp() {
 	AssertEqual('{"xy":2}', per_app["code.exe"]["bg"])
 }
 Test("KLR__StashAppTypeJson: multiple type codes stored under same app", _KLR_StashAppTypeJson_MultipleTypesUnderSameApp)
+
+
+
+
+; ==================================================================
+; ======= 10/ Durable walker replay row adapters ===================
+; ==================================================================
+
+_KLR_TypingRowToEntry_PreservesPhysicalMetadata() {
+	row := Map(
+		"ts", "2026-07-18 09:10:11",
+		"app", "Code.exe",
+		"title", "metrics test",
+		"layout", "fr-FR",
+		"events_json", '[["a",120,{"kc":65,"sk":30,"s":0}]]'
+	)
+	entry := KLR_TypingRowToEntry(row)
+	AssertTrue(entry is Map)
+	AssertEqual("Code.exe", entry["app"])
+	AssertEqual("2026-07-18 09:10:11", entry["timestamp"])
+	AssertTrue(entry["events"] is Array)
+	AssertEqual(30, entry["events"][1][3]["sk"])
+	AssertEqual(65, entry["events"][1][3]["kc"])
+}
+Test("KLR replay: typing row keeps physical keycode and scancode metadata", _KLR_TypingRowToEntry_PreservesPhysicalMetadata)
+
+_KLR_TypingRowToEntry_RejectsMalformedEvents() {
+	row := Map("ts", "2026-07-18 09:10:11", "events_json", "not json")
+	AssertEqual(0, KLR_TypingRowToEntry(row))
+}
+Test("KLR replay: malformed historical events_json is skipped safely", _KLR_TypingRowToEntry_RejectsMalformedEvents)
+
+_KLR_WindowRowToEntry_PreservesDuration() {
+	entry := KLR_WindowRowToEntry(Map(
+		"ts", "2026-07-18 09:10:11", "app", "Code.exe",
+		"prev_title", "old", "next_title", "new", "duration_ms", 2500
+	))
+	AssertEqual("old", entry["prev_title"])
+	AssertEqual("new", entry["next_title"])
+	AssertEqual(2500, entry["duration_ms"])
+}
+Test("KLR replay: window row keeps foreground-title duration", _KLR_WindowRowToEntry_PreservesDuration)
+
+_KLR_SystemRowToEntry_MergesMetadata() {
+	entry := KLR_SystemRowToEntry(Map(
+		"ts", "2026-07-18 09:10:11", "action", "modifier_hold",
+		"metadata_json", '{"keycode":162,"hold_ms":700,"app":"Code.exe"}'
+	))
+	AssertEqual("modifier_hold", entry["action"])
+	AssertEqual(162, entry["keycode"])
+	AssertEqual(700, entry["hold_ms"])
+	AssertEqual("Code.exe", entry["app"])
+}
+Test("KLR replay: system row restores modifier metadata", _KLR_SystemRowToEntry_MergesMetadata)
