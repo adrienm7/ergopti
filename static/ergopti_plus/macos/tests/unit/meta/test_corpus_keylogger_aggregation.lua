@@ -266,14 +266,15 @@ end
 --- @return table The aggregator module after replay (for reading state).
 local function setup_and_replay(vec)
 	-- Reload the aggregator module fresh for each vector
-	-- The implementation is split into core/events/state modules. Clear the
-	-- complete family so a prior vector cannot retain an old captured dependency
-	-- or state table through a cached child module.
-	for name in pairs(package.loaded) do
-		if type(name) == "string" and name:match("^modules%.keylogger%.aggregator") then
-			package.loaded[name] = nil
-		end
-	end
+	-- The implementation is split into core/events/state/sql modules. Clear each
+	-- known member explicitly: mutating package.loaded during pairs() is not a
+	-- portable invalidation strategy, and can leave an event walker capturing a
+	-- previous Core/State singleton under a different discovery order in CI.
+	package.loaded["modules.keylogger.aggregator"]       = nil
+	package.loaded["modules.keylogger.aggregator.core"]  = nil
+	package.loaded["modules.keylogger.aggregator.events"] = nil
+	package.loaded["modules.keylogger.aggregator.sql"]   = nil
+	package.loaded["modules.keylogger.aggregator.state"] = nil
 	package.loaded["modules.keylogger.sqlite_writer"] = {
 		get_db = function() return nil end,
 		init   = function() end,

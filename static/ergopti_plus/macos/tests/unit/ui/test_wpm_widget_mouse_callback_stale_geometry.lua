@@ -67,6 +67,9 @@ helpers.describe("wpm_widget: mouseCallback reads live geometry across a graph-m
 			-- every cycle, regardless of the idle-timer bookkeeping.
 			get_live_stats = function() return { wpm = 42 } end,
 		}
+		-- GraphicsRenderer captures `hs` at module load. Reload it under this
+		-- scenario's canvas constructor rather than reusing a prior test's adapter.
+		package.loaded["adapters.graphics_renderer"] = nil
 		local Widget = helpers.load_with_stubs("ui.wpm.wpm_widget", {
 			screen = {
 				mainScreen = function()
