@@ -515,11 +515,16 @@ class HookDispatcher {
 		; reach hotkey bindings consistently (especially with high-resolution scroll).
 		; Keep the message-path tap-hold guard alive by timestamping `_last_wheel_tick`
 		; directly on WM_MOUSEWHEEL / WM_MOUSEHWHEEL too.
+		WheelMessageCallback := HookDispatcher._OnWheelMessage.Bind(HookDispatcher)
 		try {
-			HookDispatcher._wheel_msg_cb := HookDispatcher._OnWheelMessage.Bind(HookDispatcher)
-			OnMessage(HookDispatcherConst.WM_MOUSEWHEEL, HookDispatcher._wheel_msg_cb)
-			OnMessage(HookDispatcherConst.WM_MOUSEHWHEEL, HookDispatcher._wheel_msg_cb)
+			OnMessage(HookDispatcherConst.WM_MOUSEWHEEL, WheelMessageCallback)
+			OnMessage(HookDispatcherConst.WM_MOUSEHWHEEL, WheelMessageCallback)
+			HookDispatcher._wheel_msg_cb := WheelMessageCallback
 		} catch as e {
+			; Either registration may have succeeded before the second one threw.
+			; Roll back with the local callback reference before publishing ownership.
+			try OnMessage(HookDispatcherConst.WM_MOUSEWHEEL, WheelMessageCallback, 0)
+			try OnMessage(HookDispatcherConst.WM_MOUSEHWHEEL, WheelMessageCallback, 0)
 			LoggerWarn("HookDispatcher", "Failed to register WM_MOUSEWHEEL message hook: {1}.", e.Message)
 			HookDispatcher._wheel_msg_cb := false
 		}
@@ -546,7 +551,11 @@ class HookDispatcher {
 	; ErgoptiPlus.ahk so the InputHook is released explicitly on a plain ExitApp,
 	; not just when Reload() tears the process down.
 	static Stop() {
-		if !HookDispatcher._started
+		; A failed or interrupted Start can own an InputHook before it publishes
+		; `_started`.  Never use readiness as the cleanup predicate: release every
+		; concrete resource that exists so partial startup cannot leak a hook.
+		if (!HookDispatcher._started and !(HookDispatcher._ih is InputHook)
+			and !(HookDispatcher.HasOwnProp("_wheel_msg_cb") and HookDispatcher._wheel_msg_cb is Func))
 			return
 		LoggerStart("HookDispatcher", "Stopping unified hook dispatcher…")
 
