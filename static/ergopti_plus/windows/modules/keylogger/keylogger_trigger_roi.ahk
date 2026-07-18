@@ -252,7 +252,8 @@ KL_Roi_ProcessWord(word) {
 ; map always falls back under the cap and the next word cannot immediately
 ; re-trigger another full scan (keeps the saturation guard amortised).
 KL_Roi_PruneWordCounts() {
-    Critical("On")
+    previous_critical := Critical("On")
+    try {
     ; Pass 1 — drop single-occurrence noise (the cheapest, most disposable words)
     prune := []
     for k, v in KLRoi.word_counts {
@@ -299,7 +300,9 @@ KL_Roi_PruneWordCounts() {
             i += 1
         }
     }
-    Critical("Off")
+    } finally {
+        Critical(previous_critical)
+    }
 }
 
 
@@ -327,11 +330,14 @@ KL_Roi_HalflifeTick() {
     now := A_TickCount
     threshold := KLRoiConst.HALFLIFE_WARN_DAYS * 86400000
     
-    Critical("On")
-    snapshot := Map()
-    for trig, last_tick in KLRoi.trigger_last_use
-        snapshot[trig] := last_tick
-    Critical("Off")
+    previous_critical := Critical("On")
+    try {
+        snapshot := Map()
+        for trig, last_tick in KLRoi.trigger_last_use
+            snapshot[trig] := last_tick
+    } finally {
+        Critical(previous_critical)
+    }
 
     for trig, last_tick in snapshot {
         ; Wrap-safe delta: A_TickCount overflows at ~49.7 days (~4,294,967,295 ms).

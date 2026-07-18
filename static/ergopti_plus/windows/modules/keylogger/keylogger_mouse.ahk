@@ -377,15 +377,20 @@ KL_Mouse_FlushScroll() {
     ; Snapshot and reset atomically before calling MF_ShouldFilter, which can
     ; yield the thread. Scrolls arriving during MF_ShouldFilter would otherwise
     ; be captured in the locals but then cleared, losing them silently.
-    Critical("On")
-    ticks   := KLMouse.scroll_ticks
-    h_ticks := KLMouse.scroll_h_ticks
-    start   := KLMouse.scroll_start
-    KLMouse.scroll_ticks   := 0
-    KLMouse.scroll_h_ticks := 0
-    KLMouse.scroll_start   := 0
-    KLMouse.scroll_last    := 0
-    Critical("Off")
+    previous_critical := Critical("On")
+    try {
+        ticks   := KLMouse.scroll_ticks
+        h_ticks := KLMouse.scroll_h_ticks
+        start   := KLMouse.scroll_start
+        KLMouse.scroll_ticks   := 0
+        KLMouse.scroll_h_ticks := 0
+        KLMouse.scroll_start   := 0
+        KLMouse.scroll_last    := 0
+    } finally {
+        ; This timer can run inside a keyboard-owned transaction. Restore its
+        ; prior setting rather than disabling the caller's serialization.
+        Critical(previous_critical)
+    }
 
     filtered := false
     try filtered := MF_ShouldFilter()
