@@ -385,6 +385,8 @@ class WebViewHost {
 
     ; ── NavigationCompleted callback ─────────────────────────────────────────
     _OnNavigationCompleted(Handler, Args) {
+        if A_IsSuspended || this.ResetDone
+            return
         this._FlushQueue()
         this._FireOnReady()
     }
@@ -434,6 +436,8 @@ class WebViewHost {
     }
 
     _SafetyFlush() {
+        if A_IsSuspended || this.ResetDone
+            return
         if (!this.Ready) {
             try LoggerWarn("WebViewHost", "{1}: page did not signal ready within timeout — flushing.", this.AppId)
             this._FlushQueue()
@@ -442,7 +446,7 @@ class WebViewHost {
 
     ; ── Window events ────────────────────────────────────────────────────────
     _OnResize(GuiObj, MinMax, Width, Height) {
-        if (MinMax == -1)
+        if A_IsSuspended || this.ResetDone || (MinMax == -1)
             return
         if this.HasOwnProp("Controller")
             try this.Controller.Fill()
