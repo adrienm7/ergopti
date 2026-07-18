@@ -34,22 +34,15 @@
 ; ===========================================================
 ; ===========================================================
 
-; Move-resilient: scan the keylogger module dir via the framework helper instead
-; of a pinned keylogger.ahk read. The "statements := []" marker is unique to
-; keylogger.ahk, so the block extractor below stays scoped to the ingest path.
+; Symbol-keyed source lookup keeps this guard coupled to the actual ingest
+; function rather than a nearby implementation detail whose position can move.
 _WBCR_ReadSource() {
-	return _DriverDirConcat("modules/keylogger")
+	return _DriverFuncBody("KL_IngestOnce")
 }
 
 
 _WBCR_FindIngestBlock(src) {
-	; Locate the walk-loop comment that anchors the Critical guard.
-	mark := "statements := []"
-	pos := InStr(src, mark)
-	if (!pos)
-		return ""
-	; Return the next 1200 chars — enough to cover the full try/finally block.
-	return SubStr(src, pos, 1200)
+	return src
 }
 
 

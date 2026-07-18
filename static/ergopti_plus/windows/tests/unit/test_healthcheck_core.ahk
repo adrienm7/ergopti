@@ -93,8 +93,13 @@ _TestHC_RunReflectsCounters() {
 		"warn_count must reflect recorded warnings")
 	Assert(Result["err_count"] >= 1,
 		"err_count must reflect recorded errors")
-	Assert(Result["last_error"] == "run-reflects-test",
-		"last_error must reflect the most recent RecordError message")
+	; HealthCheck_Run probes live adapters and may itself record a newer diagnostic.
+	; The snapshot must therefore mirror the current healthcheck state at the end
+	; of the probe, rather than assuming the pre-probe test message stays newest.
+	Assert(Result["last_error"] == _HealthCheckLastError,
+		"last_error must reflect the healthcheck state captured by HealthCheck_Run")
+	Assert(Result["last_error"] != "",
+		"last_error must include the recorded error or a newer probe diagnostic")
 }
 
 Test("HealthCheck: Run reflects recorded warnings, errors, and last error message",

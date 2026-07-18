@@ -32,11 +32,15 @@ _GCWF_AssertAsyncFence() {
 	Act := _DriverFuncBody("GestureActivateWindow")
 	Assert(Act != "", "GestureActivateWindow must exist")
 	RecPos := InStr(Act, "_GestureSelfActivated[HWnd]")
-	FgPos := InStr(Act, "SetForegroundWindow")
+	FgPos := InStr(Act, "WMForceForeground(HWnd)")
 	Assert(RecPos > 0,
 		"GestureActivateWindow must record the HWND in _GestureSelfActivated so the async WinEvent can be fenced (gesture-cycle-winevent-async-fence)")
-	Assert(FgPos > 0, "GestureActivateWindow must call SetForegroundWindow")
+	Assert(FgPos > 0, "GestureActivateWindow must delegate foreground activation through WMForceForeground")
 	Assert(RecPos < FgPos,
-		"GestureActivateWindow must record the self-activated HWND BEFORE SetForegroundWindow — the WinEvent may fire before the call returns (gesture-cycle-winevent-async-fence)")
+		"GestureActivateWindow must record the self-activated HWND BEFORE foreground activation — the WinEvent may fire before the call returns (gesture-cycle-winevent-async-fence)")
+	Force := _DriverFuncBody("WMForceForeground")
+	Assert(Force != "", "WMForceForeground must exist in the WindowManager adapter")
+	Assert(InStr(Force, "SetForegroundWindow") > 0,
+		"WMForceForeground must call SetForegroundWindow inside the WindowManager adapter")
 }
 Test("gestures: window-cycle fences its own async WinEvent via a self-activated HWND set (gesture-cycle-winevent-async-fence)", _GCWF_AssertAsyncFence)
