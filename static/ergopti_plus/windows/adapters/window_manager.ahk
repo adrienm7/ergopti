@@ -153,6 +153,53 @@ WMGetFocused() {
 	return Info
 }
 
+; Domain modules occasionally need a small amount of Win32-only behaviour that
+; has no cross-driver port equivalent. Keep it inside this adapter so gesture
+; code does not directly couple itself to DWM and foreground-thread APIs.
+WMIsCloaked(HWnd) {
+	try {
+		Cloaked := 0
+		DllCall("dwmapi\DwmGetWindowAttribute", "Ptr", HWnd, "UInt", 14,
+			"Int*", &Cloaked, "UInt", 4)
+		return Cloaked != 0
+	} catch {
+		return false
+	}
+}
+
+WMUnhookWinEvent(HookHandle) {
+	if !HookHandle
+		return true
+	try return DllCall("UnhookWinEvent", "Ptr", HookHandle) != 0
+	catch
+		return false
+}
+
+; Bypasses foreground-stealing protection before focusing an HWND. The thread
+; attachment is always released, including when an intermediate Win32 call
+; raises, so it cannot leak input attachment into subsequent UI interactions.
+WMForceForeground(HWnd) {
+	ForeThread := 0
+	TargThread := 0
+	Attached := false
+	try {
+		ForeHwnd := DllCall("GetForegroundWindow", "Ptr")
+		ForeThread := DllCall("GetWindowThreadProcessId", "Ptr", ForeHwnd, "Ptr", 0, "UInt")
+		TargThread := DllCall("GetWindowThreadProcessId", "Ptr", HWnd, "Ptr", 0, "UInt")
+		if (ForeThread && TargThread && ForeThread != TargThread)
+			Attached := DllCall("AttachThreadInput", "UInt", ForeThread, "UInt", TargThread, "Int", true)
+		DllCall("BringWindowToTop", "Ptr", HWnd)
+		DllCall("SetForegroundWindow", "Ptr", HWnd)
+		WMActivate(HWnd)
+		return true
+	} catch {
+		return false
+	} finally {
+		if Attached
+			try DllCall("AttachThreadInput", "UInt", ForeThread, "UInt", TargThread, "Int", false)
+	}
+}
+
 ; Port dispatch map (ADAPTER_WINDOW_MANAGER) — the single-source-of-truth contract
 ; surface, verified against _shared/core/ports/contracts.json by
 ; tools/test/test-port-compliance.cjs.
