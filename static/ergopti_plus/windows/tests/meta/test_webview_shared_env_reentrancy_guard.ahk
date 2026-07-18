@@ -56,7 +56,7 @@ _WSERG_AssertFlagSetBeforeAwait() {
 Test("webview_utils: creation guard is armed BEFORE CreateEnvironmentAsync/await, not just around it (webview-shared-env-reentrancy)",
 	_WSERG_AssertFlagSetBeforeAwait)
 
-_WSERG_AssertSecondCallerWaitsInsteadOfRacing() {
+_WSERG_AssertSecondCallerFailsFastInsteadOfDeadlocking() {
 	Body := _DriverFuncBody("WebView_SharedEnvironment")
 
 	GuardCheckPos := InStr(Body, "if _WebView_SharedEnvCreating")
@@ -65,16 +65,18 @@ _WSERG_AssertSecondCallerWaitsInsteadOfRacing() {
 
 	AwaitPos := InStr(Body, "CreateEnvironmentAsync(")
 	Assert(GuardCheckPos < AwaitPos,
-		"WebView_SharedEnvironment: the in-progress check must precede the CreateEnvironmentAsync(...) call so a second caller waits instead of racing it (webview-shared-env-reentrancy)")
+		"WebView_SharedEnvironment: the in-progress check must precede CreateEnvironmentAsync so a second caller cannot race it (webview-shared-env-reentrancy)")
 
-	; The wait loop must not fall straight through to a second dispatch -- it
-	; must actually block (Sleep) on the guard.
+	; A nested thread that sleeps here blocks the first await from receiving its
+	; completion. The second open must return through its existing fallback.
 	GuardBody := SubStr(Body, GuardCheckPos, AwaitPos - GuardCheckPos)
-	Assert(InStr(GuardBody, "Sleep(") > 0,
-		"WebView_SharedEnvironment's in-progress branch must poll (Sleep) until the first caller's boot finishes, not fall through to its own CreateEnvironmentAsync call (webview-shared-env-reentrancy)")
+	Assert(!InStr(GuardBody, "Sleep("),
+		"WebView_SharedEnvironment must not Sleep in a re-entrant creation branch (webview-shared-env-reentrancy)")
+	Assert(InStr(GuardBody, 'throw Error("WebView shared environment is still initializing")') > 0,
+		"a second opener must fail fast to its existing fallback rather than deadlock the first environment boot")
 }
-Test("webview_utils: a second caller waits on the in-progress guard instead of racing CreateEnvironmentAsync (webview-shared-env-reentrancy)",
-	_WSERG_AssertSecondCallerWaitsInsteadOfRacing)
+Test("webview_utils: a second caller fails fast instead of deadlocking shared-environment boot (webview-shared-env-reentrancy)",
+	_WSERG_AssertSecondCallerFailsFastInsteadOfDeadlocking)
 
 _WSERG_AssertGuardClearedInFinally() {
 	Body := _DriverFuncBody("WebView_SharedEnvironment")
