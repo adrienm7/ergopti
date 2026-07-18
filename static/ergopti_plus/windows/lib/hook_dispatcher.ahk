@@ -46,6 +46,12 @@
 
 #Requires AutoHotkey v2.0
 
+; Explicit dependency: this module logs registration and lifecycle events. The
+; main driver already includes logger.ahk first; #Include's normal include-once
+; behaviour keeps that order intact while standalone validation resolves
+; LoggerDebug instead of treating it as an uninitialised local callable.
+#Include logger.ahk
+
 
 
 
