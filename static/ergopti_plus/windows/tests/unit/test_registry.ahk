@@ -93,6 +93,18 @@ _Reg_KeyExistsMissingKey() {
 }
 Test("Reg_KeyExists: non-existent key returns false", _Reg_KeyExistsMissingKey)
 
+_Reg_KeyExistsEmptyKey() {
+	Path := "HKCU\Software\ErgoptiPlus_Test_Empty_" . A_TickCount
+	try {
+		RegWrite("temporary", "REG_SZ", Path, "value")
+		RegDelete(Path, "value")
+		AssertTrue(Reg_KeyExists(Path), "an empty but openable registry key must exist")
+	} finally {
+		try RegDelete(Path)
+	}
+}
+Test("Reg_KeyExists: empty registry key returns true", _Reg_KeyExistsEmptyKey)
+
 
 
 
