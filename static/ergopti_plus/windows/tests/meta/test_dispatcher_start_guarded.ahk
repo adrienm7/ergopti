@@ -147,3 +147,16 @@ _DSG_InputHookConstructionGuarded() {
 		"HookDispatcher.Start() must log at ERROR when InputHook construction fails, so a dead dispatcher is diagnosable instead of only surfacing via the global error handler (dispatcher-start-inputhook-unguarded)")
 }
 Test("HookDispatcher: Start()'s InputHook construction is guarded by try/catch with LoggerError on failure (dispatcher-start-inputhook-unguarded)", _DSG_InputHookConstructionGuarded)
+
+_DSG_PartialStartupCleanupUsesOwnedResources() {
+	Src := _DriverDirConcat("lib")
+	StopSeg := _DSG_MethodBody(Src, "static Stop() {")
+	StartSeg := _DSG_MethodBody(Src, "static Start() {")
+	Assert(InStr(StopSeg, "!(HookDispatcher._ih is InputHook)") > 0,
+		"Stop must inspect the owned InputHook even if _started was never published")
+	Assert(InStr(StartSeg, "WheelMessageCallback :=") > 0,
+		"wheel-message registration must retain a local callback until both registrations succeed")
+	Assert(InStr(StartSeg, "OnMessage(HookDispatcherConst.WM_MOUSEWHEEL, WheelMessageCallback, 0)") > 0,
+		"a partial WM_MOUSEWHEEL registration must be rolled back before ownership is cleared")
+}
+Test("HookDispatcher: partial startup resources are rolled back by ownership", _DSG_PartialStartupCleanupUsesOwnedResources)
