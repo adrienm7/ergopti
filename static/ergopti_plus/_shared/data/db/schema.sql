@@ -657,4 +657,5 @@ CREATE INDEX IF NOT EXISTS idx_view_cache_size  ON view_cache(size_bytes DESC);
 
 INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version',            '1');
 INSERT OR IGNORE INTO meta (key, value) VALUES ('last_applied_data_sql_off', '0');
+INSERT OR IGNORE INTO meta (key, value) VALUES ('aggregate_cache_revision',  '0');
 INSERT OR IGNORE INTO meta (key, value) VALUES ('rev',                       '0');

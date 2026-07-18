@@ -363,6 +363,7 @@ function M.flush()
 			i(row.passive_count), i(row.night_wake_count)))
 		if ok then S.agg_batch.system_day[key] = nil end
 	end
+	return not C.has_pending_batch()
 end
 
 return M

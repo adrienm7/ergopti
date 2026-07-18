@@ -188,6 +188,14 @@ function M.perform_maintenance()
 	local today = os.date("%Y-%m-%d")
 	if _current_day ~= today then
 		Logger.start(LOG, "Midnight rotation: archiving %s…", _current_day)
+		-- Credit the part of the current foreground interval that belongs to the
+		-- previous calendar day before the log is rotated. Without this split, a
+		-- user who stays in one app over midnight has all of that time assigned to
+		-- the day of their next app switch.
+		local ok_tracker, tracker = pcall(require, "modules.keylogger.context_tracker")
+		if ok_tracker and type(tracker.split_active_app_at_midnight) == "function" then
+			pcall(tracker.split_active_app_at_midnight, _current_day)
+		end
 		LogManager.flush_buffer()
 		-- New model: day_rollover drains today.log into data.sql + sqlite,
 		-- then deletes today.log. The in-memory today_idx / ngram context

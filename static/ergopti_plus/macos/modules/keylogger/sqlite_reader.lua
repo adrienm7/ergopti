@@ -82,6 +82,7 @@ local function _new_app_entry()
 		chars = 0, pauses = 0, time = 0, think_time = 0,
 		hs_chars = 0, llm_chars = 0,
 		hs_triggers = 0, llm_triggers = 0,
+		hs_suggested = 0, llm_suggested = 0,
 		hs_input_chars = 0, llm_input_chars = 0,
 		app_time_ms = 0,
 		category = nil,
@@ -173,6 +174,8 @@ function M.read_manifest(sqlite_path, start_date, end_date)
 			       SUM(llm_chars)        AS llm_chars,
 			       SUM(hs_triggers)      AS hs_triggers,
 			       SUM(llm_triggers)     AS llm_triggers,
+			       SUM(hs_suggested)     AS hs_suggested,
+			       SUM(llm_suggested)    AS llm_suggested,
 			       SUM(hs_input_chars)   AS hs_input_chars,
 			       SUM(llm_input_chars)  AS llm_input_chars,
 			       SUM(app_time_ms)      AS app_time_ms,
@@ -189,6 +192,8 @@ function M.read_manifest(sqlite_path, start_date, end_date)
 			a.llm_chars        = r.llm_chars or 0
 			a.hs_triggers      = r.hs_triggers or 0
 			a.llm_triggers     = r.llm_triggers or 0
+			a.hs_suggested     = r.hs_suggested or 0
+			a.llm_suggested    = r.llm_suggested or 0
 			a.hs_input_chars   = r.hs_input_chars or 0
 			a.llm_input_chars  = r.llm_input_chars or 0
 			a.app_time_ms      = r.app_time_ms or 0
@@ -564,6 +569,12 @@ end
 --- @return table { historical = {c=,…}, today = {app→{c=,…}} }.
 function M.read_range_split_today(sqlite_path, start_date, end_date, selected_apps)
 	local today_str = os.date("%Y-%m-%d")
+	-- `today` is a separate per-app projection for the live dashboard.  It must
+	-- only participate when the requested inclusive range actually covers today;
+	-- otherwise changing the date filter to a historical day leaks current keys
+	-- into the displayed totals.
+	local includes_today = (not start_date or start_date == "" or start_date <= today_str)
+		and (not end_date or end_date == "" or end_date >= today_str)
 	local hist_end  = end_date
 	if hist_end == nil or hist_end == "" or hist_end >= today_str then
 		hist_end = nil  -- caller wants "up to today"; we still split
@@ -577,9 +588,10 @@ function M.read_range_split_today(sqlite_path, start_date, end_date, selected_ap
 		(hist_end and hist_end < today_str) and hist_end or yesterday_str,
 		selected_apps)
 
-	-- Today: per-app ngram dict for each selected app.
+	-- Today: per-app ngram dict for each selected app, but never outside the
+	-- caller's requested date interval.
 	local today_idx = {}
-	local db = _open(sqlite_path)
+	local db = includes_today and _open(sqlite_path) or nil
 	if db then
 		local app_clause = ""
 		if selected_apps and #selected_apps > 0 then

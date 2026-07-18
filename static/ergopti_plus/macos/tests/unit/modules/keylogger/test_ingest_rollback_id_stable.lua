@@ -48,4 +48,24 @@ helpers.describe("keylogger: event-id counter is restorable + restored on rollba
 		helpers.assert_true(rollback_pos ~= nil and restore_pos > rollback_pos,
 			"the counter restore must happen on the rollback path (after ROLLBACK)")
 	end)
+
+	helpers.it("a failed aggregate flush rolls back and restores the walker context", function()
+		local path = helpers.driver_root() .. "modules/keylogger/log_manager.lua"
+		local fh = assert(io.open(path, "r"), "cannot open log_manager.lua")
+		local src = fh:read("*a"); fh:close()
+
+		local snapshot_pos = assert(src:find("local saved_ngram_ctx_json", 1, true),
+			"ingest must snapshot the mutable walker context before replaying JSONL")
+		local flush_pos = assert(src:find("local aggregates_flushed = Aggregator.flush()", 1, true),
+			"ingest must observe whether aggregate UPSERTs actually flushed")
+		local reject_pos = assert(src:find("if aggregates_flushed == false then", flush_pos, true),
+			"pending aggregate rows must abort the transaction instead of advancing the offset")
+		local reset_pos = assert(src:find("Aggregator.reset_batch()", reject_pos, true),
+			"rollback must drop the attempted batch before the unchanged JSONL is retried")
+		local restore_pos = assert(src:find("Aggregator.set_ngram_ctx(restored_ctx)", reset_pos, true),
+			"rollback must restore the pre-walk ngram context before retry")
+		helpers.assert_true(snapshot_pos < flush_pos and flush_pos < reject_pos
+			and reject_pos < reset_pos and reset_pos < restore_pos,
+			"aggregate failure handling must snapshot, reject, clear and restore in transaction order")
+	end)
 end)

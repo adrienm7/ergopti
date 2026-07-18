@@ -78,12 +78,10 @@ M._manifest_rev      = -1
 M._range_cache       = {}    -- cache_key → { historical, today }
 M._range_cache_rev   = -1
 
---- Set by push_live_update when a fresh ingest cycle completes.
---- The JS-side poller picks it up on its next tick (≤ 300 ms) and
---- re-fetches with the current query parameters.
-M._pending_ingest_notify = false
---- Last query parameters seen by the poller — replayed on notify.
+--- Last query parameters seen by the poller.
 M._last_query = nil
+--- Coalesces one full manifest refresh per completed ingest cycle.
+M._pending_full_refresh = false
 
 
 
@@ -298,6 +296,22 @@ local function load_and_inject()
 	try_inject(60)
 end
 
+--- Refresh just the manifest-backed UI state after an ingest. `process_manifest`
+--- preserves the current filters and requests their n-gram range again, avoiding
+--- load_and_inject()'s expensive all-app prefetch on every live update.
+local function refresh_live_manifest()
+	if not M._wv then return end
+	local manifest = read_manifest_cached()
+	if not M._wv then return end
+	local encoded_ok, manifest_json = pcall(json.encode, manifest)
+	if not encoded_ok then return end
+	pcall(function()
+		M._wv:evaluateJavaScript(string.format(
+			"window.metrics_manifest=%s;if(typeof window.process_manifest==='function'){window._prefetch_data=null;window.process_manifest();}",
+			manifest_json))
+	end)
+end
+
 local function prefill_from_disk_cache()
 	if not M._wv then return false end
 	local cached = load_disk_cache()
@@ -406,22 +420,6 @@ function M.show()
 			M._timer:stop(); M._timer = nil
 			return
 		end
-		-- When a fresh ingest just completed, invalidate the range cache
-		-- and replay the last known query so the dashboard updates within
-		-- one poll tick (≤ 300 ms) after the ingest — not waiting for the
-		-- JS to set a new _lua_request on the next user interaction.
-		if M._pending_ingest_notify and M._last_query then
-			M._pending_ingest_notify = false
-			M._range_cache     = {}
-			M._range_cache_rev = -1
-			local q = M._last_query
-			pcall(function()
-				local raw_data = fetch_range_cached(q.start_date, q.end_date, q.apps)
-				local js_cmd   = string.format("window.receive_range_data(%s)", json.encode(raw_data))
-				M._wv:evaluateJavaScript(js_cmd)
-			end)
-			return
-		end
 		pcall(function()
 			M._wv:evaluateJavaScript("window._lua_request", function(req)
 				if req and type(req) == "string" and req ~= "" and req ~= "null" then
@@ -452,14 +450,17 @@ function M.show()
 	Logger.success(LOG, "Typing metrics dashboard window opened.")
 end
 
---- Signals that a fresh ingest cycle just completed. The JS-side poller
---- will pick up the flag on its next tick (≤ 300 ms), invalidate the
---- range cache, and replay the last known query so the dashboard updates
---- in near-real time without waiting for the user to change a filter.
+--- Signals that a fresh ingest cycle just completed. Both the n-gram tables
+--- and the manifest-backed KPIs change, so refresh the manifest and replay the
+--- active range without recomputing the global all-app prefetch.
 function M.push_live_update(_unused)
-	if M._wv and M._last_query then
-		M._pending_ingest_notify = true
-		Logger.debug(LOG, "push_live_update: pending notify set.")
+	if M._wv and not M._pending_full_refresh then
+		M._pending_full_refresh = true
+		hs.timer.doAfter(0, function()
+			M._pending_full_refresh = false
+			if M._wv then refresh_live_manifest() end
+		end)
+		Logger.debug(LOG, "push_live_update: scheduled full manifest refresh.")
 	end
 end
 

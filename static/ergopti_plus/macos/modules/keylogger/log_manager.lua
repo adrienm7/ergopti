@@ -43,6 +43,7 @@ local timer   = require("hs.timer")
 local Logger  = require("lib.logger")
 local Timings = require("lib.timings")
 local i18n    = require("lib.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
+local FileSystem = require("adapters.file_system")
 local LOG     = "keylogger.log_manager"
 
 local SqliteWriter = require("modules.keylogger.sqlite_writer")
@@ -366,9 +367,16 @@ function M.flush_buffer()
 	_state.last_flush_time       = hs.timer.absoluteTime() / 1000000
 end
 
-function M.log_app_switch(prev_app, next_app, duration_ms)
+---@param prev_app string
+---@param next_app string|nil nil closes an interval without adding a switch edge.
+---@param duration_ms number
+---@param timestamp string|nil Optional timestamp for a midnight split.
+function M.log_app_switch(prev_app, next_app, duration_ms, timestamp)
 	if not _require_state("log_app_switch") then return end
-	M.append_log({ type = "app_switch", prev_app = prev_app, next_app = next_app, duration_ms = duration_ms })
+	M.append_log({
+		type = "app_switch", prev_app = prev_app, next_app = next_app,
+		duration_ms = duration_ms, timestamp = timestamp,
+	})
 end
 
 function M.log_system_event(event_type, metadata)
@@ -467,6 +475,12 @@ function M.on_ingest_done(fn)
 	table.insert(_ingest_listeners, fn)
 end
 
+local function _notify_ingest_listeners()
+	for _, fn in ipairs(_ingest_listeners) do
+		pcall(fn)
+	end
+end
+
 
 
 
@@ -483,6 +497,329 @@ local function _sq(s)
 end
 
 local DATA_SQL_OUTBOX_KEY = "local_data_sql_outbox"
+local REPLAY_FLUSH_EVENT_COUNT = 500
+local AGGREGATE_CACHE_REVISION = "1"
+-- Every table written by aggregator/sql.lua.  Replaying a device's canonical
+-- raw rows is additive, so its old derived partition must be cleared first.
+local DERIVED_DEVICE_TABLES = {
+	"agg_app_day", "agg_app_day_buckets", "agg_app_day_burst", "agg_app_day_session",
+	"agg_app_day_chars_class", "agg_app_day_errors", "agg_app_day_ergo",
+	"agg_app_day_layouts", "agg_app_day_kc_hold", "agg_app_day_titles",
+	"agg_app_day_hourly", "agg_app_day_hourly_min5", "agg_app_day_switches_to",
+	"agg_system_day",
+	"ngram_chars", "ngram_bigrams", "ngram_trigrams", "ngram_quadgrams",
+	"ngram_pentagrams", "ngram_hexagrams", "ngram_heptagrams", "ngram_words",
+	"ngram_word_bigrams", "ngram_shortcuts", "ngram_shortcut_bigrams",
+	"ngram_keycodes", "ngram_scancodes",
+}
+
+--- Returns the byte offset through the last complete transaction in a ledger.
+--- A torn append may end after BEGIN TRANSACTION; applying that suffix would
+--- leave the recovered cache in a transaction and poison the first live ingest.
+---@param ledger string
+---@return integer
+local function _last_complete_ledger_offset(ledger)
+	return Export._last_complete_batch_offset(ledger)
+end
+
+--- Derive the current today.log cursor from durable local ledger comments.
+--- data.sql records byte offsets for every successful ingest batch. Reusing the
+--- most recent offset after a tmp-cache loss prevents already-ledgered JSONL
+--- lines from being assigned fresh ids and counted a second time at next boot.
+---@param ledger string
+---@param complete_offset integer
+---@return table { offset: integer, date: string|nil }
+local function _local_ledger_replay_cursor(ledger, complete_offset)
+	local full_ledger = ledger or ""
+	local safe_ledger = full_ledger:sub(1, complete_offset or 0)
+	-- Day-rollover markers are deliberately written after the final transaction
+	-- (they are comments, not SQL statements). Preserve a complete trailing
+	-- marker so a newly-created today.log resumes at byte 0; reject any suffix
+	-- containing a partial BEGIN/INSERT batch, which is not yet durable.
+	local trailing = full_ledger:sub((complete_offset or 0) + 1)
+	if trailing:match("^%s*%-%- === day rollover .- %-%> %d%d%d%d%-%d%d%-%d%d ===%s*$") then
+		safe_ledger = safe_ledger .. trailing
+	end
+	local offset, date, segment_start = 0, nil, 1
+	local pos = 1
+	while true do
+		local _, e, next_date = safe_ledger:find(
+			"%-%- === day rollover .- %-%> (%d%d%d%d%-%d%d%-%d%d) ===", pos)
+		if not e then break end
+		date = next_date
+		segment_start = e + 1
+		pos = e + 1
+	end
+
+	pos = segment_start
+	while true do
+		local _, e, batch_ts, _, batch_end = safe_ledger:find(
+			"%-%- === ingest batch ([^%(]-) %(offset (%d+) %-%> (%d+),", pos)
+		if not e then break end
+		offset = tonumber(batch_end) or offset
+		if not date then date = batch_ts:match("(%d%d%d%d%-%d%d%-%d%d)") end
+		pos = e + 1
+	end
+	return { offset = offset, date = date }
+end
+
+-- Test seam for the restart/deduplication invariant above.
+M._local_ledger_replay_cursor = _local_ledger_replay_cursor
+
+--- Apply the durable portion of this device's ledger to a newly-created cache.
+---@param db userdata
+---@return boolean, table
+local function _replay_local_data_sql(db)
+	local empty_cursor = { offset = 0, date = nil }
+	local attrs = fs.attributes(_paths.data_sql_path)
+	if not attrs or (attrs.size or 0) == 0 then return true, empty_cursor end
+	local ledger = FileSystem.read(_paths.data_sql_path)
+	if type(ledger) ~= "string" then
+		Logger.error(LOG, "Cannot read local data.sql at %s for cache recovery.", _paths.data_sql_path)
+		return false, empty_cursor
+	end
+	local complete_offset = _last_complete_ledger_offset(ledger)
+	local cursor = _local_ledger_replay_cursor(ledger, complete_offset)
+	if complete_offset == 0 then return true, cursor end
+
+	local rc = db:exec(ledger:sub(1, complete_offset))
+	if rc ~= sqlite3.OK then
+		pcall(function() db:exec("ROLLBACK;") end)
+		Logger.error(LOG, "Local data.sql replay failed: %s.", db:errmsg() or "?")
+		return false, empty_cursor
+	end
+	Logger.done(LOG, "Replayed %d durable local-ledger byte(s).", complete_offset)
+	return true, cursor
+end
+
+--- Flush the current recovery walker batch atomically.
+---@param db userdata
+---@return boolean
+local function _flush_recovery_batch(db)
+	local begin_rc = db:exec("BEGIN TRANSACTION;")
+	if begin_rc ~= sqlite3.OK then
+		Logger.error(LOG, "Cannot begin aggregate recovery transaction: %s.", db:errmsg() or "?")
+		return false
+	end
+	local ok, flushed_or_err = pcall(Aggregator.flush)
+	if not ok or not flushed_or_err then
+		pcall(function() db:exec("ROLLBACK;") end)
+		Logger.error(LOG, "Aggregate recovery flush failed: %s.", tostring(flushed_or_err or "pending aggregate rows"))
+		return false
+	end
+	local commit_rc = db:exec("COMMIT;")
+	if commit_rc ~= sqlite3.OK then
+		pcall(function() db:exec("ROLLBACK;") end)
+		Logger.error(LOG, "Cannot commit aggregate recovery transaction: %s.", db:errmsg() or "?")
+		return false
+	end
+	Aggregator.reset_batch()
+	return true
+end
+
+--- Remove a single device partition before deterministic re-aggregation.
+---@param db userdata
+---@param device_id string
+---@return boolean
+local function _clear_derived_device_rows(db, device_id)
+	local begin_rc = db:exec("BEGIN TRANSACTION;")
+	if begin_rc ~= sqlite3.OK then return false end
+	local ok, err = pcall(function()
+		for _, table_name in ipairs(DERIVED_DEVICE_TABLES) do
+			local rc = db:exec("DELETE FROM " .. table_name .. " WHERE device_id=" .. _sq(device_id) .. ";")
+			if rc ~= sqlite3.OK then error(db:errmsg() or ("cannot clear " .. table_name)) end
+		end
+		local commit_rc = db:exec("COMMIT;")
+		if commit_rc ~= sqlite3.OK then error(db:errmsg() or "cannot commit derived cleanup") end
+	end)
+	if not ok then
+		pcall(function() db:exec("ROLLBACK;") end)
+		Logger.error(LOG, "Cannot clear derived rows for device %s: %s.", device_id:sub(1, 8), tostring(err))
+		return false
+	end
+	return true
+end
+
+--- Rebuild UI aggregate tables from canonical raw rows.  Passing device ids
+--- rebuilds only those partitions after a foreign ledger import; omitting it
+--- repairs the entire cache (first start or an aggregate-version migration).
+---@param db userdata
+---@param requested_device_ids string[]|nil
+---@return boolean
+local function _rebuild_aggregates_from_raw(db, requested_device_ids)
+	local device_ids = {}
+	local rebuilding_local = false
+	if type(requested_device_ids) == "table" then
+		local seen = {}
+		for _, device_id in ipairs(requested_device_ids) do
+			if type(device_id) == "string" and device_id ~= "" and not seen[device_id] then
+				seen[device_id] = true
+				table.insert(device_ids, device_id)
+				if device_id == _device_id then rebuilding_local = true end
+			end
+		end
+	else
+		local device_sql = [[SELECT DISTINCT device_id FROM (
+			SELECT device_id FROM events_typing UNION SELECT device_id FROM events_app_switch
+			UNION SELECT device_id FROM events_window_switch UNION SELECT device_id FROM events_system
+		) ORDER BY device_id;]]
+		local ok_devices, device_err = pcall(function()
+			for row in db:nrows(device_sql) do
+				if type(row.device_id) == "string" and row.device_id ~= "" then
+					table.insert(device_ids, row.device_id)
+				end
+			end
+		end)
+		if not ok_devices then
+			Logger.error(LOG, "Cannot enumerate raw devices for aggregate recovery: %s.", tostring(device_err))
+			return false
+		end
+		-- Leave the live local context selected at the end of a full recovery.
+		for i = #device_ids, 1, -1 do
+			if device_ids[i] == _device_id then
+				rebuilding_local = true
+				table.remove(device_ids, i)
+				table.insert(device_ids, _device_id)
+				break
+			end
+		end
+		if not rebuilding_local then table.insert(device_ids, _device_id); rebuilding_local = true end
+	end
+	if #device_ids == 0 then return true end
+
+	-- Foreign-only recovery must not inject the other device's n-gram continuity
+	-- into the next local typing event.
+	local saved_local_ctx = nil
+	if not rebuilding_local then
+		local ok_ctx, encoded = pcall(json.encode, Aggregator.get_ngram_ctx() or {})
+		if ok_ctx then saved_local_ctx = encoded end
+	end
+
+	for _, replay_device_id in ipairs(device_ids) do
+		if not _clear_derived_device_rows(db, replay_device_id) then return false end
+		Aggregator.set_device_id(replay_device_id)
+		Aggregator.reset_ngram_ctx()
+		Aggregator.reset_batch()
+		local processed = 0
+		local function flush_if_needed(force)
+			if processed == 0 or (not force and processed < REPLAY_FLUSH_EVENT_COUNT) then return true end
+			if not _flush_recovery_batch(db) then return false end
+			processed = 0
+			return true
+		end
+		local function walked()
+			processed = processed + 1
+			return flush_if_needed(false)
+		end
+		local quoted_device = _sq(replay_device_id)
+		local ok, replay_err = pcall(function()
+			for row in db:nrows("SELECT ts, app, title, layout, events_json FROM events_typing WHERE device_id=" .. quoted_device .. " ORDER BY ts, id") do
+				local decoded_ok, events = pcall(json.decode, row.events_json or "[]")
+				if decoded_ok and type(events) == "table" then
+					Aggregator.walk_typing({ timestamp=row.ts, app=row.app, title=row.title, layout=row.layout, events=events })
+					if not walked() then error("typing aggregate flush failed") end
+				end
+			end
+			for row in db:nrows("SELECT ts, prev_app, next_app, duration_ms FROM events_app_switch WHERE device_id=" .. quoted_device .. " ORDER BY ts, id") do
+				Aggregator.walk_app_switch({ timestamp=row.ts, prev_app=row.prev_app, next_app=row.next_app, duration_ms=row.duration_ms })
+				if not walked() then error("app-switch aggregate flush failed") end
+			end
+			for row in db:nrows("SELECT ts, app, prev_title, next_title, duration_ms FROM events_window_switch WHERE device_id=" .. quoted_device .. " ORDER BY ts, id") do
+				Aggregator.walk_window_switch({ timestamp=row.ts, app=row.app, prev_title=row.prev_title, next_title=row.next_title, duration_ms=row.duration_ms })
+				if not walked() then error("window-switch aggregate flush failed") end
+			end
+			for row in db:nrows("SELECT ts, action, metadata_json FROM events_system WHERE device_id=" .. quoted_device .. " ORDER BY ts, id") do
+				local entry = {}
+				local decoded_ok, metadata = pcall(json.decode, row.metadata_json or "{}")
+				if decoded_ok and type(metadata) == "table" then
+					for key, value in pairs(metadata) do entry[key] = value end
+				end
+				entry.timestamp, entry.action = row.ts, row.action
+				Aggregator.walk_system_event(entry)
+				if not walked() then error("system aggregate flush failed") end
+			end
+			if not flush_if_needed(true) then error("final aggregate flush failed") end
+		end)
+		if not ok then
+			Aggregator.set_device_id(_device_id)
+			Aggregator.reset_batch()
+			if saved_local_ctx then
+				local restored_ok, restored_ctx = pcall(json.decode, saved_local_ctx)
+				if restored_ok and type(restored_ctx) == "table" then Aggregator.set_ngram_ctx(restored_ctx)
+				else Aggregator.reset_ngram_ctx() end
+			else
+				Aggregator.reset_ngram_ctx()
+			end
+			Logger.error(LOG, "Aggregate recovery failed for device %s: %s.", replay_device_id:sub(1, 8), tostring(replay_err))
+			return false
+		end
+	end
+	Aggregator.set_device_id(_device_id)
+	if saved_local_ctx then
+		local restored_ok, restored_ctx = pcall(json.decode, saved_local_ctx)
+		if restored_ok and type(restored_ctx) == "table" then Aggregator.set_ngram_ctx(restored_ctx)
+		else Aggregator.reset_ngram_ctx() end
+	end
+	return true
+end
+
+--- Synchronise cache metadata after a successful fresh-cache recovery.
+---@param db userdata
+---@param cursor table
+local function _persist_recovery_state(db, cursor)
+	local max_id = 0
+	for row in db:nrows("SELECT MAX(id) AS max_id FROM ("
+		.. "SELECT id FROM events_typing WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_app_switch WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_window_switch WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_shortcut WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_system WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_hotstring WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_llm WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_session WHERE device_id=" .. _sq(_device_id)
+		.. ")") do
+		max_id = tonumber(row.max_id) or 0
+	end
+	SqliteWriter.set_next_event_id(max_id + 1)
+	SqliteWriter.persist_next_event_id()
+	db:exec(string.format("UPDATE meta SET value='%d' WHERE key='today_log_offset';", tonumber(cursor.offset) or 0))
+	db:exec("UPDATE meta SET value=" .. _sq(cursor.date or "") .. " WHERE key='today_log_date';")
+	local ok, context_json = pcall(json.encode, Aggregator.get_ngram_ctx() or {})
+	if ok then db:exec("UPDATE meta SET value=" .. _sq(context_json) .. " WHERE key='ngram_ctx_json';") end
+end
+
+--- Return the aggregate-cache compatibility marker from meta.
+---@param db userdata
+---@return string
+local function _aggregate_cache_revision(db)
+	for row in db:nrows("SELECT value FROM meta WHERE key='aggregate_cache_revision'") do
+		return tostring(row.value or "0")
+	end
+	return "0"
+end
+
+--- Mark a fully rebuilt derived cache and make every dashboard snapshot stale.
+---@param db userdata
+---@return boolean
+local function _mark_aggregate_cache_rebuilt(db)
+	local begin_rc = db:exec("BEGIN TRANSACTION;")
+	if begin_rc ~= sqlite3.OK then return false end
+	local ok, err = pcall(function()
+		local version_rc = db:exec("UPDATE meta SET value=" .. _sq(AGGREGATE_CACHE_REVISION)
+			.. " WHERE key='aggregate_cache_revision';")
+		if version_rc ~= sqlite3.OK then error(db:errmsg() or "cannot update aggregate cache revision") end
+		local rev_rc = db:exec("UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev';")
+		if rev_rc ~= sqlite3.OK then error(db:errmsg() or "cannot update metrics revision") end
+		local commit_rc = db:exec("COMMIT;")
+		if commit_rc ~= sqlite3.OK then error(db:errmsg() or "cannot commit aggregate cache revision") end
+	end)
+	if not ok then
+		pcall(function() db:exec("ROLLBACK;") end)
+		Logger.error(LOG, "Cannot mark aggregate cache rebuilt: %s.", tostring(err))
+		return false
+	end
+	return true
+end
 
 --- Return the local-only ledger batch waiting to reach data.sql.
 --- This value must never be appended to data.sql itself: it is a cursor-local
@@ -539,14 +876,25 @@ function M.ingest_once()
 	local db = SqliteWriter.get_db()
 	if not db then return end
 
-	pcall(Export.sync_foreign_data_sql)
+	local foreign_devices = {}
+	local foreign_ok, foreign_result = pcall(Export.sync_foreign_data_sql, function(device_id)
+		if not _rebuild_aggregates_from_raw(db, { device_id }) then return false end
+		return _mark_aggregate_cache_rebuilt(db)
+	end)
+	if foreign_ok and type(foreign_result) == "table" then foreign_devices = foreign_result end
 	-- A previous cache transaction may have committed while data.sql was locked.
 	-- Drain that exact source batch first so a tmp-cache loss can never make it
 	-- invisible to sync/replay, and so we never allocate new ids for old JSONL.
-	if not _flush_local_data_sql_outbox(db) then return end
+	if not _flush_local_data_sql_outbox(db) then
+		if #foreign_devices > 0 then _notify_ingest_listeners() end
+		return
+	end
 
 	local entries, new_offset = Rotation.read_new_entries()
-	if #entries == 0 then return end
+	if #entries == 0 then
+		if #foreign_devices > 0 then _notify_ingest_listeners() end
+		return
+	end
 
 	-- Snapshot the event-id counter BEFORE build_inserts allocates ids: if the
 	-- transaction below rolls back, the offset is not advanced and this exact batch
@@ -554,6 +902,12 @@ function M.ingest_once()
 	-- ids so INSERT OR IGNORE dedups them, rather than re-keying with fresh ids and
 	-- leaving a permanent id gap (which desyncs a data.sql peer replay).
 	local saved_event_id = SqliteWriter.get_next_event_id()
+	-- The walker mutates its n-gram/session context before aggregate UPSERTs are
+	-- committed. Keep a serialised snapshot so a failed aggregate transaction can
+	-- retry the same JSONL rows without double-counting their continuity state.
+	local saved_ngram_ctx_json = nil
+	local ctx_snapshot_ok, ctx_snapshot = pcall(json.encode, Aggregator.get_ngram_ctx() or {})
+	if ctx_snapshot_ok then saved_ngram_ctx_json = ctx_snapshot end
 
 	local statements = {}
 	for _, item in ipairs(entries) do
@@ -563,6 +917,7 @@ function M.ingest_once()
 	end
 	if #statements == 0 then
 		Rotation.set_offset(new_offset, Rotation.get_date())
+		if #foreign_devices > 0 then _notify_ingest_listeners() end
 		return
 	end
 
@@ -599,7 +954,10 @@ function M.ingest_once()
 				Aggregator.walk_system_event(item.entry)
 			end
 		end
-		Aggregator.flush()
+		local aggregates_flushed = Aggregator.flush()
+		if aggregates_flushed == false then
+			error("aggregate flush left pending rows")
+		end
 		db:exec(string.format(
 			"UPDATE meta SET value='%d' WHERE key='today_log_offset';", new_offset))
 		db:exec(string.format(
@@ -632,6 +990,17 @@ function M.ingest_once()
 		-- Undo the event-id allocations from the rolled-back build_inserts so the
 		-- next retry of this same (offset-unchanged) batch reuses identical ids.
 		SqliteWriter.set_next_event_id(saved_event_id)
+		Aggregator.reset_batch()
+		if saved_ngram_ctx_json then
+			local restored_ok, restored_ctx = pcall(json.decode, saved_ngram_ctx_json)
+			if restored_ok and type(restored_ctx) == "table" then
+				Aggregator.set_ngram_ctx(restored_ctx)
+			else
+				Aggregator.reset_ngram_ctx()
+			end
+		else
+			Aggregator.reset_ngram_ctx()
+		end
 		return
 	end
 
@@ -650,9 +1019,7 @@ function M.ingest_once()
 
 	-- Notify live-update listeners — dashboard UIs use this to invalidate
 	-- their caches immediately rather than waiting for the next JS poll.
-	for _, fn in ipairs(_ingest_listeners) do
-		pcall(fn)
-	end
+	_notify_ingest_listeners()
 end
 
 --- Day rollover handler. Drains remaining today.log then delegates to
@@ -695,9 +1062,18 @@ function M.day_rollover()
 		return false
 	end
 
+	-- The outbox lives in the disposable SQLite cache.  If its append-only
+	-- ledger write is still blocked, deleting today.log here would remove the
+	-- only durable source from which a fresh cache can recreate that batch.
+	-- Keep the old day intact and retry the append before a later rotation.
+	local db = SqliteWriter.get_db()
+	if db and not _flush_local_data_sql_outbox(db) then
+		Logger.warn(LOG, "day_rollover: local data.sql outbox is not durable â€” preserving today.log.")
+		return false
+	end
+
 	Rotation.rollover(_paths.data_sql_path)
 	Aggregator.reset_ngram_ctx()
-	local db = SqliteWriter.get_db()
 	if db then
 		db:exec("UPDATE meta SET value='0' WHERE key='today_log_offset';")
 		db:exec(string.format(
@@ -742,16 +1118,45 @@ function M.init(core_state)
 	_mkdir_p(_paths.tmpdir_dir)
 
 	_write_device_json(_device_obj)
+	local cache_was_fresh = fs.attributes(_paths.sqlite_path) == nil
 
 	-- Initialise submodules.
 	SqliteWriter.init({ paths = _paths, device_obj = _device_obj, device_id = _device_id })
 	Aggregator.init({ device_id = _device_id })
+	Export.init({ paths = _paths, device_id = _device_id, get_db = SqliteWriter.get_db })
 
 	if not SqliteWriter.open_db() then
 		Logger.error(LOG, "Cannot open db.sqlite — log manager will only write JSONL.")
 	else
-		-- Restore persisted counters and n-gram context from meta.
 		local db = SqliteWriter.get_db()
+		local recovery_cursor = nil
+		local recovery_ready = true
+		if cache_was_fresh and db then
+			local replay_ok, cursor = _replay_local_data_sql(db)
+			if replay_ok then recovery_cursor = cursor
+			else
+				recovery_ready = false
+				Logger.error(LOG, "Skipped aggregate recovery because local ledger replay failed.")
+			end
+		end
+		if db and recovery_ready
+			and (cache_was_fresh or _aggregate_cache_revision(db) ~= AGGREGATE_CACHE_REVISION) then
+			-- Foreign ledgers also carry raw rows only. Import them before the
+			-- deterministic aggregate walk so cross-device totals survive a normal
+			-- TMPDIR purge and older caches gain the missing foreign aggregates.
+			pcall(Export.sync_foreign_data_sql)
+			if _rebuild_aggregates_from_raw(db) then
+				if recovery_cursor then _persist_recovery_state(db, recovery_cursor) end
+				if _mark_aggregate_cache_rebuilt(db) then
+					Logger.success(LOG, "Rebuilt aggregate cache from durable raw ledgers.")
+				else
+					Logger.error(LOG, "Aggregate cache rebuild completed but could not be marked for reuse.")
+				end
+			else
+				Logger.error(LOG, "Aggregate cache recovery failed; raw events remain durable for retry.")
+			end
+		end
+		-- Restore persisted counters and n-gram context from meta.
 		if db then
 			local offset_val = 0
 			local date_val   = nil
@@ -775,8 +1180,6 @@ function M.init(core_state)
 	if not Rotation.get_offset then
 		Rotation.init({ paths = _paths, state = _state })
 	end
-
-	Export.init({ paths = _paths, device_id = _device_id, get_db = SqliteWriter.get_db })
 
 	-- Bootstrap data.sql header on first run.
 	if not fs.attributes(_paths.data_sql_path) then

@@ -57,4 +57,14 @@ helpers.describe("keylogger: data.sql outbox protects committed local events", f
 			"today.log must not be replayed with fresh ids after a failed ledger append"
 		)
 	end)
+
+	helpers.it("does not delete today.log at rollover while the temporary outbox is pending", function()
+		local source = read_source("modules/keylogger/log_manager.lua")
+		local flush_pos = assert(source:find("day_rollover: local data.sql outbox is not durable", 1, true))
+		local rollover_pos = assert(source:find("Rotation.rollover(_paths.data_sql_path)", flush_pos, true))
+		helpers.assert_true(
+			flush_pos < rollover_pos,
+			"day_rollover must retry the pending ledger append before it removes today.log"
+		)
+	end)
 end)
