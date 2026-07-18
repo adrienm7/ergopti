@@ -138,9 +138,15 @@ WriteFeatureV2(FeaturesMap, V2Path, Value, Prop := "") {
 	}
 	Node := Loc["v2_node"]
 	K := Loc["key"]
+	; Persistence is the commit point. Mutating the live Features Map first leaves
+	; an enabled-but-not-durable feature when the write fails (read-only disk,
+	; antivirus lock, interrupted profile sync).
+	if !TOML_Write(Value, ConfigurationFile, Loc["section"], K) {
+		try LoggerError("FeatureIO", "WriteFeatureV2: persistence failed for '{1}'.", V2Path)
+		return false
+	}
 	if (Type(Node) == "Map")
 		Node[K] := Value
-	TOML_Write(Value, ConfigurationFile, Loc["section"], K)
 	return true
 }
 
@@ -165,12 +171,16 @@ WriteFeatureBatchV2(FeaturesMap, Entries) {
 		}
 		Node := Loc["v2_node"]
 		K := Loc["key"]
-		if (Type(Node) == "Map")
-			Node[K] := Value
-		Updates.Push({ Section: Loc["section"], Key: K, Value: Value })
+		Updates.Push({ Section: Loc["section"], Key: K, Value: Value, Node: Node })
 	}
-	if (Updates.Length > 0)
-		TOML_BatchWrite(ConfigurationFile, Updates)
+	if (Updates.Length > 0 and !TOML_BatchWrite(ConfigurationFile, Updates)) {
+		try LoggerError("FeatureIO", "WriteFeatureBatchV2: persistence failed; live features were not changed.")
+		return 0
+	}
+	for _, Update in Updates {
+		if (Type(Update.Node) == "Map")
+			Update.Node[Update.Key] := Update.Value
+	}
 	return Updates.Length
 }
 
