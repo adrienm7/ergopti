@@ -45,8 +45,9 @@ local LOG = "adapters.keyboard_hook"
 local _pipe     = nil
 
 -- Callbacks set by the caller via M.start().
-local _on_char  = nil   -- function(char_string)
-local _on_key   = nil   -- function(key_name_string)
+local _on_char      = nil   -- function(char_string, evdev_scancode)
+local _on_key       = nil   -- function(key_name_string)
+local _on_physical  = nil   -- function(evdev_scancode, key_name, char_or_nil)
 
 -- Cached foreground window context (updated via refreshContext).
 local _context  = { appId = "", windowTitle = "" }
@@ -237,6 +238,17 @@ local function _pump_one()
 		return true
 	end
 
+	-- Preserve the evdev code before any character translation.  This is the
+	-- layout-independent physical key identity needed by the hardware heatmap;
+	-- it must never be inferred back from the produced character (AZERTY,
+	-- dead keys and shortcuts make that lossy).  Synthetic ydotool output is
+	-- produced by a different virtual device and therefore never reaches this
+	-- physical-device hook.
+	local physical_char = _resolve_char(ev.code)
+	if _on_physical and type(ev.code) == "number" and ev.code > 0 then
+		pcall(_on_physical, ev.code, ev.name, physical_char)
+	end
+
 	-- Check if it's a control key that should be forwarded via on_key.
 	local control_keys = {
 		KEY_BACKSPACE = "backspace",
@@ -291,10 +303,10 @@ local function _pump_one()
 	-- whole daemon was inert. Shift state is now carried across multiple keys
 	-- (cleared only by the actual Shift release, processed above) so a held
 	-- Shift correctly capitalises every letter while held.
-	local ch = _resolve_char(ev.code)
+	local ch = physical_char
 
 	if ch and _on_char then
-		pcall(_on_char, ch)
+		pcall(_on_char, ch, ev.code)
 	end
 
 	return true
@@ -355,11 +367,12 @@ end
 -- =========================================
 
 --- Starts the keyboard hook. Idempotent — safe to call while already running.
---- @param opts table|nil { intercept?, layout?, onChar?, onKey?, device? }
+--- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, device? }
 ---              intercept boolean   Grab the device (needs root). Default false.
 ---              layout    string    "qwerty" or "azerty". Default "qwerty".
----              onChar    function  Called with (char_string) for printable keys.
+---              onChar    function  Called with (char_string, evdev_scancode) for printable keys.
 ---              onKey     function  Called with (key_name) for control keys.
+---              onPhysical function  Called with (evdev_scancode, key_name, char_or_nil) for every physical keydown.
 ---              device    string    Override /dev/input/eventN path.
 function M.start(opts)
 	if _running then
@@ -370,6 +383,7 @@ function M.start(opts)
 	local options = type(opts) == "table" and opts or {}
 	if type(options.onChar) == "function" then _on_char = options.onChar end
 	if type(options.onKey)  == "function" then _on_key  = options.onKey  end
+	if type(options.onPhysical) == "function" then _on_physical = options.onPhysical end
 	if type(options.layout) == "string"  then _layout   = options.layout end
 	_intercept = options.intercept == true
 
@@ -452,12 +466,14 @@ end
 --- (which needs a Linux binary + device). Guards the input pipeline — that a
 --- printable keydown actually resolves to a character and reaches on_char.
 --- @param mock_pipe table   Object exposing read("*l") → one event line.
---- @param on_char_cb function Called with the resolved character.
+--- @param on_char_cb function Called with the resolved character and evdev code.
 --- @param intercept boolean  true = parse evtest lines, false = libinput lines.
+--- @param on_physical_cb function|nil Called with physical key metadata.
 --- @return boolean The _pump_one return value.
-function M._test_inject_and_pump(mock_pipe, on_char_cb, intercept)
+function M._test_inject_and_pump(mock_pipe, on_char_cb, intercept, on_physical_cb)
 	_pipe = mock_pipe
 	_on_char = on_char_cb
+	_on_physical = on_physical_cb
 	_intercept = intercept and true or false
 	return _pump_one()
 end

@@ -83,6 +83,11 @@ local _predicting = false
 local _engine = nil
 local _keyboard_hook = nil
 
+-- Optional durable-output observer. The daemon supplies this so only completed
+-- auto-injected text enters the keylogger; failed/cancelled streamed fragments
+-- are erased and must never become phantom logical keystrokes.
+local _on_output = nil
+
 -- Current prediction result (so we can backspace on cancel).
 local _predicted_text = ""
 
@@ -111,6 +116,7 @@ local _auto_inject = true
 ---   triggers        table|nil  Array of trigger strings (default {"//", ";;", "--"}).
 ---   max_context     number|nil  Max context chars (default 2000).
 ---   auto_inject     boolean|nil Inject predictions immediately (default true).
+---   on_output       function|nil Called with (completed_text, context) after a successful injection.
 --- }
 function M.init(opts)
 	local options = type(opts) == "table" and opts or {}
@@ -120,6 +126,7 @@ function M.init(opts)
 	if type(options.triggers) == "table" then _triggers = options.triggers end
 	if type(options.max_context) == "number" then _max_context_chars = options.max_context end
 	if options.auto_inject ~= nil then _auto_inject = options.auto_inject end
+	if type(options.on_output) == "function" then _on_output = options.on_output else _on_output = nil end
 
 	-- Initialise LLM profiles with the canonical Ollama port (defaults.json
 	-- llm_ollama_port via linux_bridge), never a re-typed literal.
@@ -148,7 +155,7 @@ end
 --- a trigger pattern and starts a prediction if so.
 --- @param ch       string  The character just typed.
 --- @param buffer   string  The current engine buffer content.
-function M.on_char(ch, buffer)
+function M.on_char(ch, buffer, output_context)
 	if not _enabled or _predicting then return end
 	if type(ch) ~= "string" or type(buffer) ~= "string" then return end
 
@@ -156,7 +163,10 @@ function M.on_char(ch, buffer)
 	for _, trigger in ipairs(_triggers) do
 		if buffer:sub(-#trigger) == trigger then
 			Logger.info(LOG, "Trigger '%s' detected — starting prediction.", trigger)
-			M.predict(buffer)
+			M.predict(buffer, {
+				app_id = type(output_context) == "table" and output_context.app_id or nil,
+				input_chars = #trigger,
+			})
 			break
 		end
 	end
@@ -180,7 +190,8 @@ local _build_user_context
 
 --- Starts a prediction from the given context buffer.
 --- @param context string The typing context (including the trigger).
-function M.predict(context)
+--- @param output_context table|nil App and trigger metadata captured at request start.
+function M.predict(context, output_context)
 	if _predicting then return end
 
 	local ollama = _get_ollama()
@@ -247,6 +258,12 @@ function M.predict(context)
 			else
 				Logger.info(LOG, "Prediction complete: %d chars → '%s'",
 					#full_text, full_text:sub(1, 80))
+				if _auto_inject and type(full_text) == "string" and full_text ~= "" and _on_output then
+					local ok_output, output_err = pcall(_on_output, full_text, output_context)
+					if not ok_output then
+						Logger.warn(LOG, "Prediction output observer failed: %s", tostring(output_err))
+					end
+				end
 			end
 			_predicted_text = ""
 		end

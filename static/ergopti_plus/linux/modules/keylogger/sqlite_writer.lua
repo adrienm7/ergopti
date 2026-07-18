@@ -20,7 +20,9 @@
 --- 2. Schema bootstrap: on first open, runs schema.sql through sqlite3 to
 ---    create all tables and initial meta rows.
 --- 3. Minimal surface: only the tables that the Linux daemon populates are
----    wired (events_typing, ngram_chars, agg_app_day, devices, meta).
+---    wired (events_typing, ngram_chars, ngram_scancodes, agg_app_day, devices,
+---    meta). Character rows carry a source histogram so generated output stays
+---    distinguishable from physical typing.
 ---    Additional tables (bursts, sessions, ergo, etc.) live in the schema but
 ---    are not populated until the keylogger-walker state machine is
 ---    wired on Linux.
@@ -431,6 +433,7 @@ function M.upsert_app_day(device_id, date, app, fields)
 	local allowed = {
 		chars = true, time_ms = true, app_time_ms = true,
 		hs_chars = true, hs_triggers = true, hs_input_chars = true,
+		llm_chars = true, llm_triggers = true, llm_input_chars = true,
 	}
 	local sets = {}
 	for k, v in pairs(fields) do
@@ -442,8 +445,8 @@ function M.upsert_app_day(device_id, date, app, fields)
 	if #sets == 0 then return end
 
 	local sql = string.format(
-		"INSERT INTO agg_app_day (device_id, date, app, chars, time_ms, app_time_ms, hs_chars, hs_triggers, hs_input_chars) "
-		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,%d,%d) "
+		"INSERT INTO agg_app_day (device_id, date, app, chars, time_ms, app_time_ms, hs_chars, hs_triggers, hs_input_chars, llm_chars, llm_triggers, llm_input_chars) "
+		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,%d,%d,%d,%d,%d) "
 		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET %s;",
 		_sql_escape(device_id),
 		_sql_escape(date),
@@ -454,6 +457,9 @@ function M.upsert_app_day(device_id, date, app, fields)
 		tonumber(fields.hs_chars) or 0,
 		tonumber(fields.hs_triggers) or 0,
 		tonumber(fields.hs_input_chars) or 0,
+		tonumber(fields.llm_chars) or 0,
+		tonumber(fields.llm_triggers) or 0,
+		tonumber(fields.llm_input_chars) or 0,
 		table.concat(sets, ", ")
 	)
 	return _exec(sql)
@@ -463,21 +469,32 @@ end
 --- @param device_id string Device identifier.
 --- @param date      string "YYYY-MM-DD".
 --- @param app       string Application name.
---- @param ngrams    table  { [token] = count } map.
+--- @param ngrams    table  { [token] = count|{c=count,sources={source=count}} } map.
 function M.upsert_ngrams(device_id, date, app, ngrams)
 	if not M.is_available() then return end
 	if type(ngrams) ~= "table" then return end
 
 	local parts = {}
-	for token, count in pairs(ngrams) do
+	for token, value in pairs(ngrams) do
+		local count = type(value) == "table" and value.c or value
+		local sources = type(value) == "table" and value.sources or nil
 		if type(count) == "number" and count > 0 then
+			local source_parts = {}
+			for source, source_count in pairs(sources or {}) do
+				if type(source) == "string" and type(source_count) == "number" and source_count > 0 then
+					source_parts[#source_parts + 1] = string.format('"%s":%d',
+						source:gsub('"', '\\"'), math.floor(source_count))
+				end
+			end
+			local source_json = "{" .. table.concat(source_parts, ",") .. "}"
 			parts[#parts + 1] = string.format(
-				"('%s','%s','%s','%s',%d,0,0,0,'{}')",
+				"('%s','%s','%s','%s',%d,0,0,0,'%s')",
 				_sql_escape(device_id),
 				_sql_escape(date),
 				_sql_escape(app),
 				_sql_escape(token),
-				math.floor(count)
+				math.floor(count),
+				_sql_escape(source_json)
 			)
 		end
 	end
@@ -486,10 +503,36 @@ function M.upsert_ngrams(device_id, date, app, ngrams)
 	local sql = string.format(
 		"INSERT INTO ngram_chars (device_id, date, app, token, c, td, cd, e, esrc_json) "
 		.. "VALUES %s "
-		.. "ON CONFLICT(device_id, date, app, token) DO UPDATE SET c = c + excluded.c;",
+		.. "ON CONFLICT(device_id, date, app, token) DO UPDATE SET "
+		.. "c = c + excluded.c, "
+		.. "esrc_json = json_object("
+		.. "'hotstring', COALESCE(json_extract(esrc_json, '$.hotstring'), 0) + COALESCE(json_extract(excluded.esrc_json, '$.hotstring'), 0), "
+		.. "'llm', COALESCE(json_extract(esrc_json, '$.llm'), 0) + COALESCE(json_extract(excluded.esrc_json, '$.llm'), 0), "
+		.. "'other', COALESCE(json_extract(esrc_json, '$.other'), 0) + COALESCE(json_extract(excluded.esrc_json, '$.other'), 0));",
 		table.concat(parts, ",")
 	)
 	return _exec(sql)
+end
+
+--- Upserts physical Linux evdev scancodes. This is intentionally distinct
+--- from ngram_chars: one key may emit different glyphs by layout/modifier, but
+--- the scancode is the invariant physical location used by the heatmap.
+--- @param scancodes table { [evdev_code] = count }.
+function M.upsert_scancodes(device_id, date, app, scancodes)
+	if not M.is_available() or type(scancodes) ~= "table" then return end
+	local parts = {}
+	for scancode, count in pairs(scancodes) do
+		local code = tonumber(scancode)
+		if code and code > 0 and type(count) == "number" and count > 0 then
+			parts[#parts + 1] = string.format("('%s','%s','%s',%d,%d)",
+				_sql_escape(device_id), _sql_escape(date), _sql_escape(app),
+				math.floor(code), math.floor(count))
+		end
+	end
+	if #parts == 0 then return true end
+	return _exec("INSERT INTO ngram_scancodes (device_id, date, app, scancode, c) VALUES "
+		.. table.concat(parts, ",")
+		.. " ON CONFLICT(device_id, date, app, scancode) DO UPDATE SET c = c + excluded.c;")
 end
 
 --- Bumps the meta.rev counter so the view cache knows new data is available.

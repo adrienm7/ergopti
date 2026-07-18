@@ -198,6 +198,7 @@ function M.on_trigger(buffer, trigger)
 			trigger = match.rule.suffix .. t,
 			replacement = match.result,
 			h_type = "dynamic",
+			backspace_count = backspace_count,
 		}
 	end
 

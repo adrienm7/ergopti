@@ -17,6 +17,7 @@ helpers.describe("keylogger sqlite_reader", function()
     helpers.assert_eq(type(manifest), "table")
     helpers.assert_eq(type(range.historical.c), "table")
     helpers.assert_eq(type(range.today), "table")
+	helpers.assert_eq(type(range.historical.sc_kb), "table")
   end)
 
   helpers.it("uses read-only JSON queries and the canonical aggregate tables", function()
@@ -26,6 +27,10 @@ helpers.describe("keylogger sqlite_reader", function()
     helpers.assert_true(src:find("sqlite3 -json", 1, true) ~= nil)
     helpers.assert_true(src:find("FROM agg_app_day", 1, true) ~= nil)
     helpers.assert_true(src:find("FROM ngram_chars", 1, true) ~= nil)
+	helpers.assert_true(src:find("FROM ngram_scancodes", 1, true) ~= nil,
+	  "reader must expose persisted hardware scancodes to the heatmap")
+	helpers.assert_true(src:find("source_count", 1, true) ~= nil,
+	  "reader must retain hotstring/LLM provenance instead of dropping esrc_json")
     helpers.assert_true(src:find("GROUP BY date, app", 1, true) ~= nil)
   end)
 end)

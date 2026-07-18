@@ -357,13 +357,13 @@ local function main()
 	local _cached_app_id = nil
 
 	-- 8.5) Define the character callback.
-	local function on_char(ch)
+	local function on_char(ch, scancode)
 		-- If an injection is in flight, queue this character so it is replayed
 		-- after the synthetic backspace+replacement events complete. This
 		-- prevents physical keystrokes from interleaving with injected text
 		-- and corrupting the output (the "abcd"→"acd" class of race bug).
 		if injector._is_injecting() then
-			injector._queue_char(ch)
+			injector._queue_char({ char = ch, scancode = scancode })
 			return
 		end
 
@@ -384,7 +384,7 @@ local function main()
 		-- intervals) so no subprocess is spawned on the keystroke thread. The
 		-- cache variable is an upvalue declared before on_char (getFocused()
 		-- used to be called here, forking up to 5 subprocesses per keystroke).
-		local app_id = _cached_app_id
+		local app_id = _cached_app_id or "Unknown"
 
 		-- Check password suppression.
 		if keylogger.is_password_app(app_id) then
@@ -393,7 +393,7 @@ local function main()
 			keylogger.unsuppress()
 		end
 
-		keylogger.on_keydown(ch, now_ms, app_id)
+		keylogger.on_keydown(ch, now_ms, app_id, scancode)
 
 		local terminator_consumed = terminators_mod.is_terminator(ch)
 		local result = engine:on_char(ch, { terminator_consumed = terminator_consumed })
@@ -409,14 +409,17 @@ local function main()
 			if not opts.dry_run then
 				-- Keep the keylogger's aggregate contract aligned with macOS and
 				-- Windows: generated text and the physical trigger are distinct.
-				keylogger.record_hotstring(app_id, result.trigger, result.replacement, now_ms, result.group)
+				keylogger.record_hotstring(app_id, result.trigger, result.replacement,
+					now_ms, result.group, result.backspace_count)
 				injector._begin_injection()
 				injector.inject(result.backspace_count, result.replacement)
 				-- Drain any physical characters that arrived during
 				-- injection and replay them through the engine so they
 				-- are re-injected in arrival order.
-				for _, queued_ch in ipairs(injector._end_injection()) do
-					local ok, err = pcall(on_char, queued_ch)
+				for _, queued in ipairs(injector._end_injection()) do
+					local queued_ch = type(queued) == "table" and queued.char or queued
+					local queued_scancode = type(queued) == "table" and queued.scancode or nil
+					local ok, err = pcall(on_char, queued_ch, queued_scancode)
 					if not ok then
 						Logger.error(LOG, "Error replaying queued char '%s': %s", queued_ch, tostring(err))
 					end
@@ -435,7 +438,7 @@ local function main()
 		if prediction_engine or (dyn_hotstrings and dyn_hotstrings.is_enabled()) then
 			local buf = engine:current_buffer()
 			if prediction_engine then
-				pcall(function() prediction_engine.on_char(ch, buf) end)
+				pcall(function() prediction_engine.on_char(ch, buf, { app_id = app_id }) end)
 			end
 			-- Dynamic hotstrings: check if the trigger character just fired an
 			-- @-tag expansion (e.g. "@p★" → first name, "td★" → date).
@@ -448,7 +451,8 @@ local function main()
 				if ok_dh2 and expanded then
 					if dynamic_event then
 						keylogger.record_hotstring(app_id, dynamic_event.trigger,
-							dynamic_event.replacement, now_ms, dynamic_event.h_type)
+							dynamic_event.replacement, now_ms, dynamic_event.h_type,
+							dynamic_event.backspace_count)
 					end
 					-- Dynamic expansion consumed the trigger — reset the engine
 					-- buffer so the expansion text doesn't trigger further matches.
@@ -458,6 +462,20 @@ local function main()
 		end
 
 
+	end
+
+	-- All physical keydowns, including modifiers and navigation keys, feed the
+	-- separate hardware heatmap. Character handling above records only printable
+	-- output, so this callback is the single place that prevents special keys
+	-- from disappearing and avoids a printable-key double count.
+	local function on_physical(scancode, _key_name, _char)
+		local app_id = _cached_app_id or "Unknown"
+		if keylogger.is_password_app(app_id) then
+			keylogger.suppress()
+		else
+			keylogger.unsuppress()
+		end
+		keylogger.record_physical_key(app_id, scancode, math.floor(Monotonic.now_ms()))
 	end
 
 	-- 8.6) Initialise the LLM prediction engine if available.
@@ -476,6 +494,12 @@ local function main()
 			triggers      = { "//", ";;", "--" },
 			max_context   = canonical_ctx,
 			auto_inject   = true,
+			on_output = function(text, context)
+				local output_app = type(context) == "table" and context.app_id or _cached_app_id
+				keylogger.record_synthetic_output(output_app, text, "llm",
+					math.floor(Monotonic.now_ms()), 0,
+					type(context) == "table" and context.input_chars or 0)
+			end,
 		})
 		Logger.info(LOG, "LLM prediction engine initialised (max_context=%d).", canonical_ctx)
 	end
@@ -520,6 +544,7 @@ local function main()
 		layout = opts.layout,
 		onChar  = on_char,
 		onKey   = on_control,
+		onPhysical = on_physical,
 	})
 
 	if not keyboard_hook.isRunning() then

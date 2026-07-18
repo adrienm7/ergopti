@@ -14,7 +14,7 @@ local Logger = require("logger.shim")
 local ok_json, Json = pcall(require, "json")
 local LOG = "modules.keylogger.sqlite_reader"
 
-local EMPTY_NGRAMS = { "c", "bg", "tg", "qg", "pg", "hx", "hp", "w", "sc", "sc_bg", "w_bg", "kc" }
+local EMPTY_NGRAMS = { "c", "bg", "tg", "qg", "pg", "hx", "hp", "w", "sc", "sc_bg", "w_bg", "kc", "sc_kb" }
 
 local function sql_quote(value)
 	return "'" .. tostring(value or ""):gsub("'", "''") .. "'"
@@ -119,21 +119,39 @@ local function empty_ngrams()
 	return out
 end
 
-local function merge_ngram(target, token, count)
+local function source_count(esrc_json, source)
+	if type(esrc_json) ~= "string" or esrc_json == "" then return 0 end
+	if ok_json then
+		local ok, decoded = pcall(Json.decode, esrc_json)
+		if ok and type(decoded) == "table" then return tonumber(decoded[source]) or 0 end
+	end
+	local raw = esrc_json:match('"' .. source .. '"%s*:%s*(%d+)')
+	return tonumber(raw) or 0
+end
+
+local function merge_ngram(target, token, count, esrc_json)
 	if type(token) ~= "string" or token == "" then return end
 	local item = target[token] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
 	item.c = item.c + (tonumber(count) or 0)
+	item.hs = item.hs + source_count(esrc_json, "hotstring")
+	item.llm = item.llm + source_count(esrc_json, "llm")
+	item.o = item.o + source_count(esrc_json, "other")
 	target[token] = item
 end
 
---- Reads character n-grams for a range. Linux currently emits the char table;
---- all absent richer tables are still present so the browser contract is stable.
+--- Reads character and physical-scancode n-grams for a range. Character source
+--- JSON is merged in Lua rather than selected with MIN()/MAX(): source counts
+--- are additive across dates and devices, just like the token count itself.
 function M.read_ngrams(sqlite_path, start_date, end_date, apps)
 	local out = empty_ngrams()
 	local rows = read_rows(sqlite_path, string.format(
-		"SELECT token, SUM(c) AS c FROM ngram_chars%s GROUP BY token;",
+		"SELECT token, c, esrc_json FROM ngram_chars%s;",
 		filters(start_date, end_date, apps)))
-	for _, row in ipairs(rows) do merge_ngram(out.c, row.token, row.c) end
+	for _, row in ipairs(rows) do merge_ngram(out.c, row.token, row.c, row.esrc_json) end
+	local sc_rows = read_rows(sqlite_path, string.format(
+		"SELECT scancode, SUM(c) AS c FROM ngram_scancodes%s GROUP BY scancode;",
+		filters(start_date, end_date, apps)))
+	for _, row in ipairs(sc_rows) do merge_ngram(out.sc_kb, tostring(row.scancode), row.c) end
 	return out
 end
 
@@ -145,11 +163,18 @@ function M.read_range_split_today(sqlite_path, start_date, end_date, apps)
 	local historical = M.read_ngrams(sqlite_path, start_date, historical_end, apps)
 	local today_by_app = {}
 	local rows = read_rows(sqlite_path, string.format(
-		"SELECT app, token, SUM(c) AS c FROM ngram_chars%s GROUP BY app, token;",
+		"SELECT app, token, c, esrc_json FROM ngram_chars%s;",
 		filters(today, today, apps)))
 	for _, row in ipairs(rows) do
 		today_by_app[row.app] = today_by_app[row.app] or empty_ngrams()
-		merge_ngram(today_by_app[row.app].c, row.token, row.c)
+		merge_ngram(today_by_app[row.app].c, row.token, row.c, row.esrc_json)
+	end
+	local sc_rows = read_rows(sqlite_path, string.format(
+		"SELECT app, scancode, SUM(c) AS c FROM ngram_scancodes%s GROUP BY app, scancode;",
+		filters(today, today, apps)))
+	for _, row in ipairs(sc_rows) do
+		today_by_app[row.app] = today_by_app[row.app] or empty_ngrams()
+		merge_ngram(today_by_app[row.app].sc_kb, tostring(row.scancode), row.c)
 	end
 	return { historical = historical, today = today_by_app }
 end

@@ -1286,7 +1286,7 @@
 					window.app_icons = blob.app_icons || {};
 					window.driver_meta = blob.driver_meta ||
 						window.driver_meta || { os: 'mac', heatmap_id: 'kc' };
-					// On Windows the dashboard renders against macOS-style
+					// PC-scancode drivers render against macOS-style
 					// HS keycodes — translate the labels (and the n-gram
 					// data, below) so the heatmap geometry stays unchanged.
 					window.keycode_layout =
@@ -1299,11 +1299,11 @@
 						const incoming = blob._prefetch_data || {};
 						let incoming_hist = incoming.historical || {};
 						let incoming_today = incoming.today || {};
-						// Windows driver: translate sc_kb → kc per app so
+						// PC-scancode drivers: translate sc_kb → kc per app so
 						// the renderer keeps reading the same field.
 						if (
 							window.driver_meta &&
-							window.driver_meta.os === 'win' &&
+							(window.driver_meta.os === 'win' || window.driver_meta.os === 'linux') &&
 							typeof window.translate_win_today === 'function'
 						) {
 							incoming_today = window.translate_win_today(incoming_today);

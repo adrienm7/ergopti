@@ -76,6 +76,8 @@ local _pending_typing_events = {}
 local _pending_hotstring_events = {}
 local _pending_app_switch_events = {}
 local _flushed_app_ngrams = {}
+local _flushed_app_scancodes = {}
+local _flushed_app_sources = {}
 
 -- Persisted manifest cache keyed by SQLite's monotonic revision. The live
 -- delta is layered on a shallow copy, so an open dashboard avoids a CLI query
@@ -149,6 +151,11 @@ local function ensure_app_stats(app_id, timestamp_ms)
 		hs_chars         = 0,
 		hs_triggers      = 0,
 		hs_input_chars   = 0,
+		llm_chars        = 0,
+		llm_triggers     = 0,
+		llm_input_chars  = 0,
+		physical_scancodes = {},
+		ngram_sources      = {},
 	}
 	_app_stats[app_id] = app
 	return app
@@ -226,7 +233,8 @@ end
 --- @param ch           string  The character typed.
 --- @param timestamp_ms number  Wall-clock timestamp in ms.
 --- @param app_id       string|nil  The focused app identifier (from window_info).
-function M.on_keydown(ch, timestamp_ms, app_id)
+--- @param scancode     number|nil  Physical evdev code captured at keydown.
+function M.on_keydown(ch, timestamp_ms, app_id, scancode)
 	if _suppressed then return end
 
 	-- Forward to the base metrics collector if available.
@@ -234,13 +242,16 @@ function M.on_keydown(ch, timestamp_ms, app_id)
 		Metrics.on_keydown(ch, timestamp_ms)
 	end
 
-	-- Per-app tracking.
-	if type(app_id) == "string" and app_id ~= "" then
-		M.record_app_key(app_id, ch, timestamp_ms)
-		local pending = _pending_typing_events[app_id]
+	-- Per-app tracking. Focus polling is asynchronous; use an explicit Unknown
+	-- bucket for the small startup/focus race rather than silently dropping a
+	-- real physical character and breaking the raw-event audit trail.
+	local resolved_app = (type(app_id) == "string" and app_id ~= "") and app_id or "Unknown"
+	if type(ch) == "string" and ch ~= "" then
+		M.record_app_key(resolved_app, ch, timestamp_ms)
+		local pending = _pending_typing_events[resolved_app]
 		if not pending then
 			pending = { text = {}, events = {}, last_key_at = nil }
-			_pending_typing_events[app_id] = pending
+			_pending_typing_events[resolved_app] = pending
 		end
 		local delay = 0
 		if type(pending.last_key_at) == "number" then
@@ -249,8 +260,14 @@ function M.on_keydown(ch, timestamp_ms, app_id)
 		pending.last_key_at = timestamp_ms
 		pending.text[#pending.text + 1] = ch
 		-- [text, inter-key delay, metadata] is the portable events_json shape
-		-- consumed by the Windows database projector.
-		pending.events[#pending.events + 1] = { ch, delay, { s = 0 } }
+		-- consumed by the macOS/Windows projectors. `sk` deliberately identifies
+		-- the physical source key; synthetic output never receives one.
+		-- Omit `s` for manual input. Lua treats numeric 0 as truthy, so emitting
+		-- { s = 0 } would be read as synthetic by the macOS portable-event walker.
+		-- This matches Windows/macOS: only synthetic entries carry s=1/true.
+		local meta = {}
+		if type(scancode) == "number" and scancode > 0 then meta.sk = math.floor(scancode) end
+		pending.events[#pending.events + 1] = { ch, delay, meta }
 	end
 end
 
@@ -289,6 +306,56 @@ function M.record_app_key(app_id, ch, timestamp_ms)
 	end
 end
 
+--- Records one physical evdev keydown for the layout-independent heatmap.
+--- This is intentionally separate from on_keydown(): control/modifier keys do
+--- not produce text output but are still genuine user presses. Callers must
+--- invoke it exactly once per device keydown, before printable output handling.
+--- @param app_id string|nil Focused application identifier.
+--- @param scancode number Linux evdev key code.
+--- @param timestamp_ms number Event time in ms.
+function M.record_physical_key(app_id, scancode, timestamp_ms)
+	if _suppressed then return end
+	if type(scancode) ~= "number" or scancode <= 0 then return end
+	local resolved_app = (type(app_id) == "string" and app_id ~= "") and app_id or "Unknown"
+	local app = ensure_app_stats(resolved_app, timestamp_ms)
+	local code = math.floor(scancode)
+	app.physical_scancodes[code] = (app.physical_scancodes[code] or 0) + 1
+end
+
+local function ensure_pending(app_id)
+	local pending = _pending_typing_events[app_id]
+	if pending then return pending end
+	pending = { text = {}, events = {}, last_key_at = nil }
+	_pending_typing_events[app_id] = pending
+	return pending
+end
+
+local function add_synthetic_ngram(app, char, source)
+	app.ngrams[char] = (app.ngrams[char] or 0) + 1
+	app.ngram_sources[char] = app.ngram_sources[char] or {}
+	app.ngram_sources[char][source] = (app.ngram_sources[char][source] or 0) + 1
+end
+
+local function append_synthetic_events(app_id, text, source, deletes)
+	local pending = ensure_pending(app_id)
+	for _ = 1, math.max(0, math.floor(tonumber(deletes) or 0)) do
+		pending.events[#pending.events + 1] = { "[BS]", 0, { s = 1, st = source } }
+		add_synthetic_ngram(_app_stats[app_id], "[BS]", source)
+	end
+	if type(text) ~= "string" or text == "" then return end
+	local ok, len = pcall(utf8.len, text)
+	if not ok or not len then
+		pending.events[#pending.events + 1] = { text, 0, { s = 1, st = source } }
+		add_synthetic_ngram(_app_stats[app_id], text, source)
+		return
+	end
+	for _, codepoint in utf8.codes(text) do
+		local char = utf8.char(codepoint)
+		pending.events[#pending.events + 1] = { char, 0, { s = 1, st = source } }
+		add_synthetic_ngram(_app_stats[app_id], char, source)
+	end
+end
+
 --- Records a completed static-hotstring expansion for metrics parity.
 --- The physical trigger remains part of manual input; the dashboard subtracts
 --- hs_input_chars from the generated output to calculate the net gain.
@@ -296,13 +363,15 @@ end
 --- @param trigger string Typed hotstring trigger.
 --- @param replacement string Generated replacement text.
 --- @param timestamp_ms number Event timestamp.
-function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type)
+function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, deletes)
 	if _suppressed or type(app_id) ~= "string" or app_id == "" then return end
 	if type(replacement) ~= "string" or replacement == "" then return end
 	local app = ensure_app_stats(app_id, timestamp_ms)
 	app.hs_chars       = app.hs_chars + char_count(replacement)
 	app.hs_triggers    = app.hs_triggers + 1
 	app.hs_input_chars = app.hs_input_chars + char_count(type(trigger) == "string" and trigger or "")
+	append_synthetic_events(app_id, replacement, "hotstring",
+		deletes ~= nil and deletes or char_count(type(trigger) == "string" and trigger or ""))
 	_pending_hotstring_events[#_pending_hotstring_events + 1] = {
 		ts = os.date("!%Y-%m-%d %H:%M:%S"),
 		date = os.date("!%Y-%m-%d"),
@@ -313,6 +382,23 @@ function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type)
 		h_type = h_type or "static",
 		net_saved_chars = char_count(replacement) - char_count(trigger),
 	}
+end
+
+--- Records successful automated output that is not a static hotstring (LLM,
+--- clipboard expansion, etc.) in the same portable event format. It is called
+--- only after the producer confirms success, so cancelled streamed output never
+--- appears as a false logical keystroke.
+function M.record_synthetic_output(app_id, text, source, timestamp_ms, deletes, input_chars)
+	if _suppressed or type(app_id) ~= "string" or app_id == "" then return end
+	if type(text) ~= "string" or text == "" then return end
+	local kind = type(source) == "string" and source or "other"
+	local app = ensure_app_stats(app_id, timestamp_ms)
+	if kind == "llm" then
+		app.llm_chars = app.llm_chars + char_count(text)
+		app.llm_triggers = app.llm_triggers + 1
+		app.llm_input_chars = app.llm_input_chars + math.max(0, math.floor(tonumber(input_chars) or 0))
+	end
+	append_synthetic_events(app_id, text, kind, deletes)
 end
 
 --- Records a foreground application transition from the process lifecycle port.
@@ -347,6 +433,8 @@ function M.get_app_stats()
 	local now = math.floor(Monotonic.now_ms())
 	for app_id, stats in pairs(_app_stats) do
 		local focus_time_ms = stats.focus_time_ms or 0
+		local physical_scancodes = {}
+		for code, count in pairs(stats.physical_scancodes or {}) do physical_scancodes[code] = count end
 		if app_id == _focused_app_id and type(_focused_app_started_at) == "number" then
 			focus_time_ms = focus_time_ms + math.max(0, now - _focused_app_started_at)
 		end
@@ -358,6 +446,10 @@ function M.get_app_stats()
 			hs_chars       = stats.hs_chars or 0,
 			hs_triggers    = stats.hs_triggers or 0,
 			hs_input_chars = stats.hs_input_chars or 0,
+			llm_chars = stats.llm_chars or 0,
+			llm_triggers = stats.llm_triggers or 0,
+			llm_input_chars = stats.llm_input_chars or 0,
+			physical_scancodes = physical_scancodes,
 		}
 	end
 	return result
@@ -385,6 +477,9 @@ local function add_live_manifest_delta(manifest)
 			hs_chars = stats.hs_chars or 0,
 			hs_triggers = stats.hs_triggers or 0,
 			hs_input_chars = stats.hs_input_chars or 0,
+			llm_chars = stats.llm_chars or 0,
+			llm_triggers = stats.llm_triggers or 0,
+			llm_input_chars = stats.llm_input_chars or 0,
 		}
 		for field, value in pairs(current) do
 			local persisted_field = field == "time" and "time_ms" or field
@@ -408,7 +503,7 @@ local function persisted_manifest()
 end
 
 local function empty_ngrams()
-	return { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {} }
+	return { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {}, sc_kb = {} }
 end
 
 --- Adds only unflushed character n-grams to the per-app today projection.
@@ -422,7 +517,28 @@ local function add_live_ngram_delta(today_payload)
 			if delta > 0 then
 				local item = target.c[token] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
 				item.c = item.c + delta
+				local source_delta = math.max(0,
+					((stats.ngram_sources[token] or {}).hotstring or 0)
+					- (((_flushed_app_sources[app_id] or {})[token] or {}).hotstring or 0))
+				local llm_delta = math.max(0,
+					((stats.ngram_sources[token] or {}).llm or 0)
+					- (((_flushed_app_sources[app_id] or {})[token] or {}).llm or 0))
+				local other_delta = math.max(0,
+					((stats.ngram_sources[token] or {}).other or 0)
+					- (((_flushed_app_sources[app_id] or {})[token] or {}).other or 0))
+				item.hs = (item.hs or 0) + source_delta
+				item.llm = (item.llm or 0) + llm_delta
+				item.o = (item.o or 0) + other_delta
 				target.c[token] = item
+			end
+		end
+		local flushed_scancodes = _flushed_app_scancodes[app_id] or {}
+		for scancode, count in pairs(stats.physical_scancodes or {}) do
+			local delta = math.max(0, count - (flushed_scancodes[scancode] or 0))
+			if delta > 0 then
+				local item = target.sc_kb[tostring(scancode)] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+				item.c = item.c + delta
+				target.sc_kb[tostring(scancode)] = item
 			end
 		end
 		today_payload[app_name] = target
@@ -445,7 +561,7 @@ function M.get_dashboard_payload(opts)
 		metrics_manifest = manifest,
 		app_icons        = {},
 		_prefetch_data   = prefetch,
-		driver_meta      = { os = "linux", heatmap_id = "kc" },
+		driver_meta      = { os = "linux", heatmap_id = "sc_kb" },
 	}
 end
 
@@ -460,7 +576,8 @@ function M.get_range_payload(start_date, end_date, apps)
 	end
 	payload.historical = payload.historical or empty_ngrams()
 	payload.today = payload.today or {}
-	return add_live_ngram_delta(payload.today)
+	payload.today = add_live_ngram_delta(payload.today)
+	return payload
 end
 
 
@@ -613,21 +730,49 @@ function M.flush()
 			_flushed_app_totals[app_id] = current
 		end
 
-		-- 3. Persist per-app character n-grams as deltas. The old global top-N
-		-- snapshot replayed the same counts on every flush and made filters empty
-		-- because it lived under a synthetic app name.
+		-- 3. Persist per-app character n-grams and their synthetic provenance as
+		-- deltas. The physical text and generated output share one portable char
+		-- stream, while esrc_json keeps their origin queryable for the UI.
 		for app_id, app_stats in pairs(_app_stats) do
 			local previous = _flushed_app_ngrams[app_id] or {}
+			local previous_sources = _flushed_app_sources[app_id] or {}
 			local delta = {}
 			for token, count in pairs(app_stats.ngrams or {}) do
 				local increment = math.max(0, count - (previous[token] or 0))
-				if increment > 0 then delta[token] = increment end
+				if increment > 0 then
+					local sources = {}
+					for source, source_count in pairs((app_stats.ngram_sources or {})[token] or {}) do
+						local persisted = ((previous_sources[token] or {})[source] or 0)
+						local source_increment = math.max(0, source_count - persisted)
+						if source_increment > 0 then sources[source] = source_increment end
+					end
+					delta[token] = { c = increment, sources = sources }
+				end
 			end
 			if next(delta) ~= nil then
 				if not SqliteWriter.upsert_ngrams(_device_id, date, dashboard_app_name(app_id), delta) then return end
 			end
 			_flushed_app_ngrams[app_id] = {}
 			for token, count in pairs(app_stats.ngrams or {}) do _flushed_app_ngrams[app_id][token] = count end
+			_flushed_app_sources[app_id] = {}
+			for token, sources in pairs(app_stats.ngram_sources or {}) do
+				_flushed_app_sources[app_id][token] = {}
+				for source, count in pairs(sources) do _flushed_app_sources[app_id][token][source] = count end
+			end
+
+			local previous_scancodes = _flushed_app_scancodes[app_id] or {}
+			local scancode_delta = {}
+			for scancode, count in pairs(app_stats.physical_scancodes or {}) do
+				local increment = math.max(0, count - (previous_scancodes[scancode] or 0))
+				if increment > 0 then scancode_delta[scancode] = increment end
+			end
+			if next(scancode_delta) ~= nil then
+				if not SqliteWriter.upsert_scancodes(_device_id, date, dashboard_app_name(app_id), scancode_delta) then return end
+			end
+			_flushed_app_scancodes[app_id] = {}
+			for scancode, count in pairs(app_stats.physical_scancodes or {}) do
+				_flushed_app_scancodes[app_id][scancode] = count
+			end
 		end
 
 		-- 4. Bump the revision counter so dashboards know new data exists.
@@ -699,6 +844,8 @@ function M.reset_session()
 	_focused_app_started_at = nil
 	_flushed_app_totals     = {}
 	_flushed_app_ngrams     = {}
+	_flushed_app_scancodes  = {}
+	_flushed_app_sources    = {}
 	_manifest_cache         = { revision = nil, manifest = nil }
 	_pending_typing_events  = {}
 	_pending_hotstring_events = {}

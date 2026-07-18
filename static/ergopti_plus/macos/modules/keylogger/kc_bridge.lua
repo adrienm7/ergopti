@@ -44,12 +44,8 @@ end
 -- when a burst of key presses writes many lines before the watcher fires.
 local MAX_DRAIN_LINES = 200
 
--- Size cap (bytes) past which drain_log reclaims disk by rewriting only the
--- already-consumed prefix away. Reclaiming on every drain-to-EOF (the old
--- behaviour) blind-truncated the whole file and wiped any line KE appended in the
--- close→reopen window — physical key presses lost from the heatmap. Reclaiming
--- only past this cap makes that window rare, and we preserve the unread tail.
-local KC_LOG_MAX_BYTES = 1024 * 1024  -- 1 MB
+-- The physical ledger remains append-only while this reader is active. A
+-- consumer cannot safely compact a file that Karabiner appends independently.
 
 -- Backup poller interval (seconds). hs.pathwatcher relies on FSEvents which can
 -- coalesce or miss rapid append-only writes on some macOS versions; a low-cost
@@ -272,30 +268,12 @@ local function drain_log()
 			drained, _drained_total)
 	end
 
-	-- Reclaim disk only once the log has grown past KC_LOG_MAX_BYTES AND we have
-	-- drained everything that existed at open time. The old code truncated on
-	-- EVERY drain that reached EOF with a blind whole-file io.open("w"), which
-	-- silently wiped any line KE appended in the close→reopen window — physical
-	-- key presses that vanished from the heatmap during fast bursts. Instead we
-	-- PRESERVE the unread tail: re-read whatever was appended past the drained
-	-- offset and rewrite only that, so a concurrent KE write survives the reclaim.
-	-- Gating on the cap makes the (now much smaller) tail-read→reopen window rare
-	-- rather than firing on every burst, and bounds growth to ~KC_LOG_MAX_BYTES.
-	if _file_offset >= file_size and file_size > KC_LOG_MAX_BYTES then
-		local fh_keep = io.open(KC_LOG_PATH, "r")
-		local tail = ""
-		if fh_keep then
-			fh_keep:seek("set", _file_offset)
-			tail = fh_keep:read("*a") or ""
-			fh_keep:close()
-		end
-		local fh_trunc = io.open(KC_LOG_PATH, "w")
-		if fh_trunc then
-			fh_trunc:write(tail)
-			fh_trunc:close()
-			_file_offset = #tail
-		end
-	end
+	-- This file is an append-only hand-off from an independent Karabiner shell
+	-- process. Any reader-side rewrite has an unavoidable tail-read-to-truncate
+	-- window in which a new physical key can be lost, even when the unread tail
+	-- is preserved. Keep the ledger append-only: its cursor gives O(new lines)
+	-- drains and exact accounting. Storage maintenance must be done by a writer
+	-- coordinated rotation, never by this consumer.
 end
 
 
