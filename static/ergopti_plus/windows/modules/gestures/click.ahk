@@ -39,48 +39,86 @@ global GestureKeyboardHook   := 0
 ; click means in the focused app, hence the broader naming over the
 ; previous "selection" wording.
 GestureToggleLeftClick() {
-    global GestureLeftClickHeld
+	global GestureLeftClickHeld, GestureRightClickHeld
 
-    if (GestureLeftClickHeld) {
-        GestureReleaseLeftClick()
-        return
-    }
+	if (GestureLeftClickHeld) {
+		GestureReleaseLeftClick()
+		return
+	}
 
-    LoggerDebug("gestures", "Enabling left-click hold mode…")
-    Click("Left", "Down")
-    GestureLeftClickHeld := True
-
-    ; Install a keyboard hook that releases the button on any key press
-    GestureStartKeyboardWatcher()
-    ; Subscribe via HookDispatcher so the shared ~LButton/~RButton handlers are
-    ; preserved; a bare Hotkey(…) call would replace the dispatcher's handlers.
-    ; A right-click stops the hold, and a one-finger tap (a physical left-click)
-    ; releases it too, so the next triple-tap re-engages a fresh left-click-down
-    ; instead of toggling the stale hold off.
-    HookDispatcher.Register("mouse_rdown", GestureReleaseLeftClick)
-    HookDispatcher.Register("mouse_ldown", GestureReleaseLeftClick)
-    LoggerInfo("gestures", "Left-click hold mode enabled.")
+	LoggerDebug("gestures", "Enabling left-click hold mode…")
+	PreviousCritical := Critical("On")
+	try {
+		; Prepare all fallible cleanup resources before the OS button is acquired
+		GestureStartKeyboardWatcher()
+		HookDispatcher.Register("mouse_rdown", GestureReleaseLeftClick)
+		HookDispatcher.Register("mouse_ldown", GestureReleaseLeftClick)
+		Click("Left", "Down")
+		GestureLeftClickHeld := True
+	} catch as e {
+		; A partial setup must never strand either a subscription or an OS button
+		try {
+			HookDispatcher.Unregister("mouse_rdown", GestureReleaseLeftClick)
+		} catch as cleanupError {
+			LoggerError("gestures", "Could not remove left-click right-button cleanup: {1}.", cleanupError.Message)
+		}
+		try {
+			HookDispatcher.Unregister("mouse_ldown", GestureReleaseLeftClick)
+		} catch as cleanupError {
+			LoggerError("gestures", "Could not remove left-click left-button cleanup: {1}.", cleanupError.Message)
+		}
+		try {
+			Click("Left", "Up")
+		} catch as cleanupError {
+			LoggerError("gestures", "Could not release left-click hold after setup failure: {1}.", cleanupError.Message)
+		}
+		GestureLeftClickHeld := False
+		if (!GestureRightClickHeld)
+			GestureStopKeyboardWatcher()
+		LoggerError("gestures", "Could not enable left-click hold mode: {1}.", e.Message)
+		return
+	} finally {
+		Critical(PreviousCritical)
+	}
+	LoggerInfo("gestures", "Left-click hold mode enabled.")
 }
 
 ; Releases the left mouse button if it is currently held by the toggle.
 GestureReleaseLeftClick(*) {
-    global GestureLeftClickHeld, GestureRightClickHeld
+	global GestureLeftClickHeld, GestureRightClickHeld
 
     if (!GestureLeftClickHeld) {
         return
     }
 
-    ; Unsubscribe via HookDispatcher — Hotkey(…, "Off") would disable the shared
-    ; ~LButton/~RButton handlers that the dispatcher registered.
-    HookDispatcher.Unregister("mouse_rdown", GestureReleaseLeftClick)
-    HookDispatcher.Unregister("mouse_ldown", GestureReleaseLeftClick)
-    LoggerDebug("gestures", "Disabling left-click hold mode…")
-    Click("Left", "Up")
-    GestureLeftClickHeld := False
-    ; Stop the shared watcher only if the right click is also released
-    if (!GestureRightClickHeld)
-        GestureStopKeyboardWatcher()
-    LoggerInfo("gestures", "Left-click hold mode disabled.")
+	PreviousCritical := Critical("On")
+	GestureLeftClickHeld := False
+	try {
+		; Unsubscribe via HookDispatcher — Hotkey(…, "Off") would disable the shared
+		; ~LButton/~RButton handlers that the dispatcher registered.
+		try {
+			HookDispatcher.Unregister("mouse_rdown", GestureReleaseLeftClick)
+		} catch as e {
+			LoggerError("gestures", "Could not remove left-click right-button cleanup: {1}.", e.Message)
+		}
+		try {
+			HookDispatcher.Unregister("mouse_ldown", GestureReleaseLeftClick)
+		} catch as e {
+			LoggerError("gestures", "Could not remove left-click left-button cleanup: {1}.", e.Message)
+		}
+		LoggerDebug("gestures", "Disabling left-click hold mode…")
+		try {
+			Click("Left", "Up")
+		} catch as e {
+			LoggerError("gestures", "Could not release left-click hold: {1}.", e.Message)
+		}
+	} finally {
+		; Stop the shared watcher only if the right click is also released
+		if (!GestureRightClickHeld)
+			GestureStopKeyboardWatcher()
+		Critical(PreviousCritical)
+	}
+	LoggerInfo("gestures", "Left-click hold mode disabled.")
 }
 
 ; Installs a low-level keyboard hook to detect any key press.
@@ -133,27 +171,48 @@ GestureOnKeyDown(ih, vk, sc) {
 
 ; Activates or deactivates a right-button-held mode. Mirrors GestureToggleLeftClick.
 GestureToggleRightClick() {
-    global GestureRightClickHeld
+	global GestureRightClickHeld, GestureLeftClickHeld
 
     if (GestureRightClickHeld) {
         GestureReleaseRightClick()
         return
-    }
+	}
 
-    LoggerDebug("gestures", "Enabling right-click hold mode…")
-    Click("Right", "Down")
-    GestureRightClickHeld := True
-
-    ; Install a keyboard hook that releases the button on any key press
-    GestureStartKeyboardWatcher()
-    ; Subscribe via HookDispatcher so the shared ~LButton/~RButton handlers are
-    ; preserved; a bare Hotkey(…) call would replace the dispatcher's handlers. A
-    ; physical right-click (the natural way to fire the held button) releases the hold
-    ; too, mirroring GestureToggleLeftClick's dual subscription so a right-hold can
-    ; never outlive a physical right-click (gesture-right-hold-tap-release).
-    HookDispatcher.Register("mouse_rdown", GestureReleaseRightClick)
-    HookDispatcher.Register("mouse_ldown", GestureReleaseRightClick)
-    LoggerInfo("gestures", "Right-click hold mode enabled.")
+	LoggerDebug("gestures", "Enabling right-click hold mode…")
+	PreviousCritical := Critical("On")
+	try {
+		; Prepare all fallible cleanup resources before the OS button is acquired
+		GestureStartKeyboardWatcher()
+		HookDispatcher.Register("mouse_rdown", GestureReleaseRightClick)
+		HookDispatcher.Register("mouse_ldown", GestureReleaseRightClick)
+		Click("Right", "Down")
+		GestureRightClickHeld := True
+	} catch as e {
+		; A partial setup must never strand either a subscription or an OS button
+		try {
+			HookDispatcher.Unregister("mouse_rdown", GestureReleaseRightClick)
+		} catch as cleanupError {
+			LoggerError("gestures", "Could not remove right-click right-button cleanup: {1}.", cleanupError.Message)
+		}
+		try {
+			HookDispatcher.Unregister("mouse_ldown", GestureReleaseRightClick)
+		} catch as cleanupError {
+			LoggerError("gestures", "Could not remove right-click left-button cleanup: {1}.", cleanupError.Message)
+		}
+		try {
+			Click("Right", "Up")
+		} catch as cleanupError {
+			LoggerError("gestures", "Could not release right-click hold after setup failure: {1}.", cleanupError.Message)
+		}
+		GestureRightClickHeld := False
+		if (!GestureLeftClickHeld)
+			GestureStopKeyboardWatcher()
+		LoggerError("gestures", "Could not enable right-click hold mode: {1}.", e.Message)
+		return
+	} finally {
+		Critical(PreviousCritical)
+	}
+	LoggerInfo("gestures", "Right-click hold mode enabled.")
 }
 
 ; Releases the right mouse button if it is currently held by the toggle.
@@ -164,15 +223,32 @@ GestureReleaseRightClick(*) {
         return
     }
 
-    ; Unsubscribe via HookDispatcher — Hotkey(…, "Off") would disable the shared
-    ; ~LButton/~RButton handlers that the dispatcher registered.
-    HookDispatcher.Unregister("mouse_rdown", GestureReleaseRightClick)
-    HookDispatcher.Unregister("mouse_ldown", GestureReleaseRightClick)
-    LoggerDebug("gestures", "Disabling right-click hold mode…")
-    Click("Right", "Up")
-    GestureRightClickHeld := False
-    ; Stop the shared watcher only if the left click is also released
-    if (!GestureLeftClickHeld)
-        GestureStopKeyboardWatcher()
-    LoggerInfo("gestures", "Right-click hold mode disabled.")
+	PreviousCritical := Critical("On")
+	GestureRightClickHeld := False
+	try {
+		; Unsubscribe via HookDispatcher — Hotkey(…, "Off") would disable the shared
+		; ~LButton/~RButton handlers that the dispatcher registered.
+		try {
+			HookDispatcher.Unregister("mouse_rdown", GestureReleaseRightClick)
+		} catch as e {
+			LoggerError("gestures", "Could not remove right-click right-button cleanup: {1}.", e.Message)
+		}
+		try {
+			HookDispatcher.Unregister("mouse_ldown", GestureReleaseRightClick)
+		} catch as e {
+			LoggerError("gestures", "Could not remove right-click left-button cleanup: {1}.", e.Message)
+		}
+		LoggerDebug("gestures", "Disabling right-click hold mode…")
+		try {
+			Click("Right", "Up")
+		} catch as e {
+			LoggerError("gestures", "Could not release right-click hold: {1}.", e.Message)
+		}
+	} finally {
+		; Stop the shared watcher only if the left click is also released
+		if (!GestureLeftClickHeld)
+			GestureStopKeyboardWatcher()
+		Critical(PreviousCritical)
+	}
+	LoggerInfo("gestures", "Right-click hold mode disabled.")
 }

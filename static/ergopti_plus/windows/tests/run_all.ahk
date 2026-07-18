@@ -740,6 +740,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_llm_accept_suppress_balance.ahk
 #Include meta/test_altgr_latch_dispatch_aborts.ahk
 #Include meta/test_gesture_click_hold_released_on_suspend.ahk
+#Include meta/test_gesture_click_hold_transaction.ahk
 #Include meta/test_walker_batch_drained_on_rollover_and_stop.ahk
 #Include meta/test_tap_hold_none_sentinel.ahk
 #Include meta/test_deps_check_epoch_guard.ahk
