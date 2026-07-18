@@ -329,7 +329,7 @@ WritePersonalToml(Data) {
 
 global _ReadPersonalInfoTomlCache := false
 
-; Read personal_info.toml and populate the global PersonalInformation Map.
+; Read personal_info.toml and atomically populate personal-info Maps.
 ; Format:
 ;   [info]
 ;   FirstName = "Adrien"
@@ -339,9 +339,10 @@ global _ReadPersonalInfoTomlCache := false
 ;   …
 ; Missing file is silently skipped (defaults remain).
 ReadPersonalInfoToml(FilePath) {
-	global PersonalInformation, _ReadPersonalInfoTomlCache
+	global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
 	if (_ReadPersonalInfoTomlCache != false) {
-		PersonalInformation := _ReadPersonalInfoTomlCache.Clone()
+		PersonalInformation := _ReadPersonalInfoTomlCache["info"].Clone()
+		PersonalInformationLetters := _ReadPersonalInfoTomlCache["letters"].Clone()
 		return
 	}
 
@@ -349,8 +350,16 @@ ReadPersonalInfoToml(FilePath) {
 		return
 	}
 
-	Q := Chr(34)
-	FileContent := StrReplace(FileRead(FilePath, "UTF-8"), "`r`n", "`n")
+	try {
+		FileContent := FileRead(FilePath, "UTF-8")
+	} catch as e {
+		LoggerError("hotstrings", "Could not read personal info TOML '{1}': {2}.", FilePath, e.Message)
+		return
+	}
+	NextInformation := PersonalInformation.Clone()
+	NextLetters := Map()
+	SawLetters := false
+	FileContent := StrReplace(FileContent, "`r`n", "`n")
 	FileContent := StrReplace(FileContent, "`r", "`n")
 	CurrentSection := ""
 
@@ -365,15 +374,37 @@ ReadPersonalInfoToml(FilePath) {
 			continue
 		}
 		; Key = "value" pair
-		if (CurrentSection == "info") and RegExMatch(Line, 'i)^(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', &KM) {
+		if RegExMatch(Line, 'i)^(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', &KM) {
 			Key := KM[1]
 			Val := UnescapeTomlString(KM[2])
-			if PersonalInformation.Has(Key) {
-				PersonalInformation[Key] := Val
+			if (CurrentSection == "info") {
+				if NextInformation.Has(Key)
+					NextInformation[Key] := Val
+			} else if (CurrentSection == "letters") {
+				SawLetters := true
+				if (StrLen(Key) != 1) {
+					LoggerWarn("hotstrings", "Ignoring personal-info letter alias '{1}' because it is not one character.", Key)
+					continue
+				}
+				if !NextInformation.Has(Val) {
+					LoggerWarn("hotstrings", "Ignoring personal-info letter alias '{1}' because '{2}' is not an info key.", Key, Val)
+					continue
+				}
+				if NextLetters.Has(Key) {
+					LoggerWarn("hotstrings", "Ignoring duplicate personal-info letter alias '{1}'.", Key)
+					continue
+				}
+				NextLetters[Key] := Val
 			}
 		}
 	}
-	_ReadPersonalInfoTomlCache := PersonalInformation.Clone()
+	PersonalInformation := NextInformation
+	if SawLetters
+		PersonalInformationLetters := NextLetters
+	_ReadPersonalInfoTomlCache := Map(
+		"info", PersonalInformation.Clone(),
+		"letters", PersonalInformationLetters.Clone()
+	)
 }
 
 ; Serialise PersonalInformation and PersonalInformationLetters to personal_info.toml.

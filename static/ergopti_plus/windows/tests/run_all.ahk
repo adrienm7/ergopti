@@ -234,6 +234,7 @@ InstallSendNoOps()
 #Include unit/test_window_utils.ahk
 #Include unit/test_text_utils.ahk
 #Include unit/test_registry.ahk
+#Include unit/test_personal_toml_io.ahk
 #Include unit/test_nav_layer_helpers.ahk
 #Include unit/test_updater.ahk
 #Include unit/test_updater_constants_single_source.ahk
