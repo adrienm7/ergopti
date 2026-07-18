@@ -15,6 +15,12 @@ Test_WebViewHostDeferredCallbacksHaveSessionOwnership() {
 	Reset := _DriverFuncBody("_Reset")
 	Assert(InStr(Reset, "this.Epoch += 1") > 0,
 		"closing/resetting a host must invalidate all queued callbacks")
+	Nav := _DriverFuncBody("_OnNavigationCompleted")
+	Safety := _DriverFuncBody("_SafetyFlush")
+	Assert(InStr(Nav, "A_IsSuspended || this.ResetDone") > 0,
+		"navigation completion must not revive a suspended or closed host")
+	Assert(InStr(Safety, "A_IsSuspended || this.ResetDone") > 0,
+		"the safety timer must not flush a suspended or closed host")
 }
 
 Test("webview host: deferred callbacks are session-owned and suspend-gated", Test_WebViewHostDeferredCallbacksHaveSessionOwnership)
