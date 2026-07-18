@@ -14,7 +14,8 @@ helpers.describe("context_tracker: active app snapshot", function()
 
 	helpers.it("returns the elapsed foreground duration for the current application", function()
 		local tracker = helpers.load_with_stubs("modules.keylogger.context_tracker", {
-			timer = { absoluteTime = function() return 7250000 end },
+			-- hs.timer.absoluteTime() is nanoseconds; the tracker converts it to ms.
+			timer = { absoluteTime = function() return 7250000000 end },
 		})
 		local state = { active_app_name = "Code", active_app_start = 1000 }
 		tracker.init(state, {})
@@ -26,7 +27,7 @@ helpers.describe("context_tracker: active app snapshot", function()
 
 	helpers.it("does not invent an interval without a tracked foreground application", function()
 		local tracker = helpers.load_with_stubs("modules.keylogger.context_tracker", {
-			timer = { absoluteTime = function() return 7250000 end },
+			timer = { absoluteTime = function() return 7250000000 end },
 		})
 		tracker.init({}, {})
 		helpers.assert_eq(tracker.get_active_app_snapshot(), nil)

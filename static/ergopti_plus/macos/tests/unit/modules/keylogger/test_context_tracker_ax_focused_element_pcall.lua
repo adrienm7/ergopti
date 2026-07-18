@@ -144,15 +144,27 @@ helpers.describe("context_tracker: source pins the AXFocusedUIElement pcall guar
 		)
 	end)
 
-	helpers.it("keylogger/init.lua wraps the application watcher registration in pcall", function()
-		local path = helpers.driver_root() .. "modules/keylogger/init.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open keylogger/init.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+	helpers.it("keylogger uses the guarded ProcessLifecycle application watcher", function()
+		local init_path = helpers.driver_root() .. "modules/keylogger/init.lua"
+		local init_fh = io.open(init_path, "r")
+		helpers.assert_true(init_fh ~= nil, "cannot open keylogger/init.lua at " .. tostring(init_path))
+		local init_src = init_fh:read("*a"); init_fh:close()
 
 		helpers.assert_true(
-			src:find("pcall(hs.application.watcher.new,", 1, true) ~= nil,
-			"hs.application.watcher.new registration must be pcall-wrapped"
+			init_src:find("ProcessLifecycle.onAppActivate", 1, true) ~= nil
+				and init_src:find("ProcessLifecycle.start()", 1, true) ~= nil,
+			"keylogger must register application activation through ProcessLifecycle"
+		)
+
+		local adapter_path = helpers.driver_root() .. "adapters/process_lifecycle.lua"
+		local adapter_fh = io.open(adapter_path, "r")
+		helpers.assert_true(adapter_fh ~= nil, "cannot open process_lifecycle.lua at " .. tostring(adapter_path))
+		local adapter_src = adapter_fh:read("*a"); adapter_fh:close()
+		local guard_pos = adapter_src:find("pcall(function()", 1, true)
+		local watcher_pos = adapter_src:find("_app_watcher = hs.application.watcher.new", 1, true)
+		helpers.assert_true(
+			guard_pos ~= nil and watcher_pos ~= nil and guard_pos < watcher_pos,
+			"ProcessLifecycle must create hs.application.watcher inside a pcall guard"
 		)
 	end)
 end)
