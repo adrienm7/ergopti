@@ -189,3 +189,21 @@ _FIL_PersonalSectionSeededSucceeds() {
 }
 Test("feature_io: WriteFeatureV2 succeeds after EnsurePersonalHotstringFeature seeds the section (personal-hotstring-live-toggle-seed)",
 	_FIL_PersonalSectionSeededSucceeds)
+
+_FIL_FailedPersistenceDoesNotPublishLiveState() {
+	global ConfigurationFile
+	OriginalPath := ConfigurationFile
+	Features := Map("layout", Map("ergopti_base", false))
+	; The parent is deliberately absent: TOML_BatchWrite must fail before its
+	; atomic FileMove, and the live candidate must remain untouched.
+	ConfigurationFile := A_Temp . "\ergopti_missing_parent_" . A_TickCount . "\config.toml"
+	try {
+		AssertFalse(WriteFeatureV2(Features, "layout.ergopti_base", true),
+			"a failed durable write must report failure")
+		AssertFalse(Features["layout"]["ergopti_base"],
+			"a failed durable write must not publish the live feature mutation")
+	} finally {
+		ConfigurationFile := OriginalPath
+	}
+}
+Test("feature_io: failed persistence does not publish a live feature mutation", _FIL_FailedPersistenceDoesNotPublishLiveState)
