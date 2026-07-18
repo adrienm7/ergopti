@@ -82,8 +82,12 @@ UpdateCapsLockLED() {
 SC039::
 {
 	TextPressKey("Space", [])
-	Keywait("SC039") ; Solves bug of 2 sent Spaces when exiting CapsWord with a Space
-	DisableCapsWord()
+	; A lost key-up must not leave CapsWord active forever after the visible space
+	try {
+		KeyWait("SC039", "T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		DisableCapsWord()
+	}
 }
 
 ; Big Enter key
