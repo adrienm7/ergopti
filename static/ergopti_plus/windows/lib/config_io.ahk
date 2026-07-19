@@ -280,8 +280,8 @@ ToggleCategoryAllSections(V1Cat, Enable) {
 HS_TogglePersonalAllSections(Enable) {
     global CategoryEnabled, ConfigurationFile, ScriptInformation, Features
     Bool := (Enable = true or Enable = 1)
-    PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
-    if (PersonalTomlPath == "" or !FileExist(PersonalTomlPath))
+    PersonalSectionsPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
+    if (PersonalSectionsPath == "" or !FileExist(PersonalSectionsPath))
         return
     if (Bool and (!CategoryEnabled.Has("Hotstrings") or !CategoryEnabled["Hotstrings"])) {
         CategoryEnabled["Hotstrings"] := true
@@ -492,13 +492,13 @@ _KeyboardSlotSendCode(SlotId) {
     if KEYBOARD_SHORTCUT_SEND_CODES.Has(SlotId)
         return KEYBOARD_SHORTCUT_SEND_CODES[SlotId]
     if SubStr(SlotId, 1, 10) = "ctrl_shift"
-        Mod := "^+"
+        ModifierPrefix := "^+"
     else if SubStr(SlotId, 1, 4) = "ctrl"
-        Mod := "^"
+        ModifierPrefix := "^"
     else if SubStr(SlotId, 1, 3) = "win"
-        Mod := "#"
+        ModifierPrefix := "#"
     else if SubStr(SlotId, 1, 3) = "alt"
-        Mod := "!"
+        ModifierPrefix := "!"
     else
         return ""
     if SubStr(SlotId, 1, 10) = "ctrl_shift"
@@ -506,7 +506,7 @@ _KeyboardSlotSendCode(SlotId) {
     else
         Suffix := SubStr(SlotId, InStr(SlotId, "_") + 1)
     static _SpecialMap := Map("space", "{Space}", "enter", "{Enter}", "period", ".", "comma", ",", "sc029", "SC029")
-    return _SpecialMap.Has(Suffix) ? Mod . _SpecialMap[Suffix] : Mod . Suffix
+    return _SpecialMap.Has(Suffix) ? ModifierPrefix . _SpecialMap[Suffix] : ModifierPrefix . Suffix
 }
 
 ReadKeyboardShortcutsConfig() {

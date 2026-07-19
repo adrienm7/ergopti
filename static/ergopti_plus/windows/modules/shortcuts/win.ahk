@@ -341,13 +341,13 @@ if Features["shortcuts"]["search"]["enabled"] {
         ; instead of throwing an OSError that escalates to the crash-report error net.
         if (FilePath and FileExist(SelectedText)) {
             try Run(SelectedText, , "Max")
-            catch as _e {
-                LoggerWarn("Search", "Could not open path '{1}': {2}.", SelectedText, _e.Message)
+            catch as SearchError {
+                LoggerWarn("Search", "Could not open path '{1}': {2}.", SelectedText, SearchError.Message)
             }
         } else if RegeditPath {
             try RegJump(SelectedText)
-            catch as _e {
-                LoggerWarn("Search", "Could not jump to registry path '{1}': {2}.", SelectedText, _e.Message)
+            catch as SearchError {
+                LoggerWarn("Search", "Could not jump to registry path '{1}': {2}.", SelectedText, SearchError.Message)
             }
         } else {
             ; Modify some characters that screw up the URL
@@ -359,23 +359,23 @@ if Features["shortcuts"]["search"]["enabled"] {
 
             if URLPath {
                 try Run(SelectedText)
-                catch as _e {
-                    LoggerWarn("Search", "Could not open URL '{1}': {2}.", SelectedText, _e.Message)
+                catch as SearchError {
+                    LoggerWarn("Search", "Could not open URL '{1}': {2}.", SelectedText, SearchError.Message)
                 }
             } else if (WebsitePath) {
                 try Run("https://" . SelectedText)
-                catch as _e {
-                    LoggerWarn("Search", "Could not open website '{1}': {2}.", SelectedText, _e.Message)
+                catch as SearchError {
+                    LoggerWarn("Search", "Could not open website '{1}': {2}.", SelectedText, SearchError.Message)
                 }
             } else if (SelectedText == "") { ; If nothing was copied
                 try Run(Features["shortcuts"]["search"]["search_engine"])
-                catch as _e {
-                    LoggerWarn("Search", "Could not open search engine: {1}.", _e.Message)
+                catch as SearchError {
+                    LoggerWarn("Search", "Could not open search engine: {1}.", SearchError.Message)
                 }
             } else {
                 try Run(Features["shortcuts"]["search"]["search_engine_url_query"] . SelectedText)
-                catch as _e {
-                    LoggerWarn("Search", "Could not open search URL: {1}.", _e.Message)
+                catch as SearchError {
+                    LoggerWarn("Search", "Could not open search URL: {1}.", SearchError.Message)
                 }
             }
         }

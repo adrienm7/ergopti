@@ -187,9 +187,9 @@ KL_GetMap(m, key, default := "") {
 }
 
 KL_BuildInserts(entry) {
-    t := entry["type"]
+    EventType := entry["type"]
     id := KL_AllocEventId()
-    switch t {
+    switch EventType {
         case "typing":              return [KL_BuildInsertTyping(entry, id)]
         case "app_switch":          return [KL_BuildInsertAppSwitch(entry, id)]
         case "window_switch":       return [KL_BuildInsertWindowSwitch(entry, id)]
@@ -198,7 +198,7 @@ KL_BuildInserts(entry) {
         case "hotstring":           return [KL_BuildInsertHotstring(entry, id, "fired")]
         case "hotstring_suggested": return [KL_BuildInsertHotstring(entry, id, "suggested")]
         case "hotstring_dismissed":          return [KL_BuildInsertHotstring(entry, id, "dismissed")]
-        case "hotstring_near_miss", "manual_typed_known_trigger":   return [KL_BuildInsertHotstring(entry, id, t)]
+        case "hotstring_near_miss", "manual_typed_known_trigger":   return [KL_BuildInsertHotstring(entry, id, EventType)]
         case "llm_generation":      return [KL_BuildInsertLlm(entry, id, "generation")]
         case "llm_suggested":       return [KL_BuildInsertLlm(entry, id, "suggested")]
         case "llm_dismissed":       return [KL_BuildInsertLlm(entry, id, "dismissed")]
@@ -227,7 +227,7 @@ KL_BuildInserts(entry) {
 
 KL_BuildInsertWindowTopoEvent(e, id) {
     ts   := e["timestamp"]
-    t    := e["type"]
+    EventType := e["type"]
     meta := Map()
     for k, v in e {
         if (k != "type" && k != "timestamp" && k != "app")
@@ -237,7 +237,7 @@ KL_BuildInsertWindowTopoEvent(e, id) {
         "INSERT OR IGNORE INTO events_window_topo (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
         Keylogger._device_id_lit, id,
         KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(t),
+        KL_SqlStr(EventType),
         KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
         KL_SqlJson(meta)
     )
@@ -262,7 +262,7 @@ KL_BuildInsertErgoEvent(e, id) {
 
 KL_BuildInsertMouseEvent(e, id) {
     ts   := e["timestamp"]
-    t    := e["type"]
+    EventType := e["type"]
     meta := Map()
     for k, v in e {
         if (k != "type" && k != "timestamp" && k != "app")
@@ -272,7 +272,7 @@ KL_BuildInsertMouseEvent(e, id) {
         "INSERT OR IGNORE INTO events_mouse (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
         Keylogger._device_id_lit, id,
         KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(t),
+        KL_SqlStr(EventType),
         KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
         KL_SqlJson(meta)
     )
@@ -280,7 +280,7 @@ KL_BuildInsertMouseEvent(e, id) {
 
 KL_BuildInsertAvEvent(e, id) {
     ts   := e["timestamp"]
-    t    := e["type"]
+    EventType := e["type"]
     meta := Map()
     for k, v in e {
         if (k != "type" && k != "timestamp" && k != "app")
@@ -290,7 +290,7 @@ KL_BuildInsertAvEvent(e, id) {
         "INSERT OR IGNORE INTO events_av (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
         Keylogger._device_id_lit, id,
         KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(t),
+        KL_SqlStr(EventType),
         KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
         KL_SqlJson(meta)
     )
@@ -298,7 +298,7 @@ KL_BuildInsertAvEvent(e, id) {
 
 KL_BuildInsertNetworkEvent(e, id) {
     ts   := e["timestamp"]
-    t    := e["type"]
+    EventType := e["type"]
     meta := Map()
     for k, v in e {
         if (k != "type" && k != "timestamp" && k != "app")
@@ -308,7 +308,7 @@ KL_BuildInsertNetworkEvent(e, id) {
         "INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
         Keylogger._device_id_lit, id,
         KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(t),
+        KL_SqlStr(EventType),
         KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
         KL_SqlJson(meta)
     )
@@ -316,7 +316,7 @@ KL_BuildInsertNetworkEvent(e, id) {
 
 KL_BuildInsertClipboardEvent(e, id) {
     ts   := e["timestamp"]
-    t    := e["type"]
+    EventType := e["type"]
     meta := Map()
     for k, v in e {
         if (k != "type" && k != "timestamp" && k != "app")
@@ -326,7 +326,7 @@ KL_BuildInsertClipboardEvent(e, id) {
         "INSERT OR IGNORE INTO events_clipboard (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
         Keylogger._device_id_lit, id,
         KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(t),
+        KL_SqlStr(EventType),
         KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
         KL_SqlJson(meta)
     )
@@ -334,7 +334,7 @@ KL_BuildInsertClipboardEvent(e, id) {
 
 KL_BuildInsertRoiEvent(e, id) {
     ts   := e["timestamp"]
-    t    := e["type"]
+    EventType := e["type"]
     meta := Map()
     for k, v in e {
         if (k != "type" && k != "timestamp" && k != "app")
@@ -344,7 +344,7 @@ KL_BuildInsertRoiEvent(e, id) {
         "INSERT OR IGNORE INTO events_roi (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
         Keylogger._device_id_lit, id,
         KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
-        KL_SqlStr(t),
+        KL_SqlStr(EventType),
         KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
         KL_SqlJson(meta)
     )

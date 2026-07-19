@@ -281,20 +281,20 @@ _HSE_IndexStarPrefixes(Spec) {
     ; trigger walks all its prefixes here). ``Set`` aliases the global Map by
     ; reference, so inserts below mutate the real index.
     if Spec.CaseSensitive {
-        T := Spec.Trigger
+        TriggerText := Spec.Trigger
         Set := HSE_StarPrefixSetCS
     } else {
-        T := StrLower(Spec.Trigger)
+        TriggerText := StrLower(Spec.Trigger)
         Set := HSE_StarPrefixSetCI
     }
     ; Build each successive prefix by appending one char rather than re-slicing
     ; from position 1 each iteration (the old SubStr(Trigger, 1, i) was O(len^2)
     ; in total characters copied per registration).
-    Len := StrLen(T)
+    Len := StrLen(TriggerText)
     Prefix := ""
     loop (Len - 1) {
-        Prefix .= SubStr(T, A_Index, 1)
-        NextChar := SubStr(T, A_Index + 1, 1)
+        Prefix .= SubStr(TriggerText, A_Index, 1)
+        NextChar := SubStr(TriggerText, A_Index + 1, 1)
         if !Set.Has(Prefix) {
             Set[Prefix] := Map()
         }

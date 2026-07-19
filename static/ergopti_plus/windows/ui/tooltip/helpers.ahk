@@ -67,23 +67,23 @@ _TooltipClampToScreen(X, Y, W, H) {
     ; (constants.toml [positioning].screen_margin = 5) that HS clamps with, so the
     ; Windows tooltip lands at the same on-screen position as Hammerspoon.
     static MARGIN := 5
-    L := 0, T := 0, R := A_ScreenWidth, B := A_ScreenHeight
+    L := 0, Top := 0, R := A_ScreenWidth, B := A_ScreenHeight
     try {
         found := false
         Loop MonitorGetCount() {
             MonitorGet(A_Index, &ml, &mt, &mr, &mb)
             if (X >= ml and X < mr and Y >= mt and Y < mb) {
-                MonitorGetWorkArea(A_Index, &L, &T, &R, &B)
+                MonitorGetWorkArea(A_Index, &L, &Top, &R, &B)
                 found := true
                 break
             }
         }
         if !found
-            MonitorGetWorkArea(MonitorGetPrimary(), &L, &T, &R, &B)
+            MonitorGetWorkArea(MonitorGetPrimary(), &L, &Top, &R, &B)
     }
     ; clamp(x, L+margin, R-W-margin); same for y — identical to the macOS renderer.
     X := Max(L + MARGIN, Min(X, R - W - MARGIN))
-    Y := Max(T + MARGIN, Min(Y, B - H - MARGIN))
+    Y := Max(Top + MARGIN, Min(Y, B - H - MARGIN))
     return { X: X, Y: Y }
 }
 
@@ -803,7 +803,6 @@ _TooltipResolvePosition() {
     try MouseGetPos(&Mx, &My)
     return { X: Mx, Y: My + _TOOLTIP_OFFSET_BELOW }
 }
-
 
 
 

@@ -366,8 +366,8 @@ ResolveHoldModifierKey(ModifierValue, FieldLabel, CtrlKeyName := "LCtrl") {
 	for _, Token in Tokens {
 		if (Token == "")
 			continue
-		T := StrLower(Trim(Token))
-		switch T {
+        NormalizedToken := StrLower(Trim(Token))
+        switch NormalizedToken {
 			case "ctrl", "lctrl":
 				Resolved.Push(CtrlKeyName)
 			case "shift", "lshift":
@@ -402,8 +402,8 @@ ResolveHoldModifierKey(ModifierValue, FieldLabel, CtrlKeyName := "LCtrl") {
 	}
 
 	Label := ""
-	for _, Mod in Resolved {
-		Label .= (Label == "" ? "" : ",") . Mod
+    for _, ResolvedModifier in Resolved {
+        Label .= (Label == "" ? "" : ",") . ResolvedModifier
 	}
 	try LoggerDebug("TapHoldLoader", "Resolved hold_modifier '{1}' for tap-hold key '{2}' as [{3}].",
 		ModifierValue, FieldLabel, Label)
