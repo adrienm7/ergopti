@@ -22,7 +22,8 @@ _TSC_Check() {
     Assert(InStr(Src, "SetTimer(GestureRegionCapturePoll.Bind(Epoch)") > 0, "region selection must be deferred to an epoch-bound timer")
     Assert(InStr(PollSrc, "ClipWait(0.001, 2)") > 0, "timer must probe for an image without a long ClipWait")
     Assert(InStr(FinishSrc, "A_Clipboard := State[") > 0, "cleanup must restore the snapshot")
-    Assert(InStr(FinishSrc, "_GestureRegionCapture[\"epoch\"] != Epoch") > 0, "stale callbacks must not restore a newer capture's clipboard")
+    Quote := Chr(34)
+    Assert(InStr(FinishSrc, "_GestureRegionCapture[" . Quote . "epoch" . Quote . "] != Epoch") > 0, "stale callbacks must not restore a newer capture's clipboard")
 }
 
 Test("Gestures: screenshot region preserves clipboard", _TSC_Check)
