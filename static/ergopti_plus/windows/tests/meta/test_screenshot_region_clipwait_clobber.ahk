@@ -20,6 +20,8 @@ _TSC_Check() {
     Src := _TSC_DriverFuncBody("GestureScreenshotRegion")
     PollSrc := _TSC_DriverFuncBody("GestureRegionCapturePoll")
     FinishSrc := _TSC_DriverFuncBody("GestureRegionCaptureFinish")
+	SequenceAdapterSrc := _TSC_DriverFuncBody("CB_GetSequenceNumber")
+	ImageAdapterSrc := _TSC_DriverFuncBody("CB_HasImage")
     Assert(Src != "", "GestureScreenshotRegion must exist in modules/gestures.ahk")
     Assert(PollSrc != "" && FinishSrc != "", "region saving must use explicit async poll and cleanup lifecycle")
     Assert(InStr(Src, "OldClip := ClipboardAll()") > 0, "region transaction must snapshot the clipboard before invoking Snipping Tool")
@@ -27,12 +29,16 @@ _TSC_Check() {
     Assert(InStr(Src, "SetTimer(GestureRegionCapturePoll.Bind(Epoch)") > 0, "region selection must be deferred to an epoch-bound timer")
     Assert(InStr(PollSrc, "if A_IsSuspended") > 0, "the deferred region poll must cancel rather than save while suspended")
     Assert(InStr(PollSrc, "ClipWait(0.001, 2)") > 0, "timer must probe for an image without a long ClipWait")
-	Assert(InStr(PollSrc, "GestureClipboardHasImage()") > 0,
-		"any-data ClipWait is insufficient: region capture must require an image clipboard format before starting a save")
-	Assert(InStr(PollSrc, 'State["clipboard_sequence"] := GestureClipboardSequence()') > 0,
+	Assert(InStr(PollSrc, "CB_HasImage()") > 0,
+		"any-data ClipWait is insufficient: region capture must require an image clipboard format before starting a save through the clipboard adapter")
+	Assert(InStr(PollSrc, 'State["clipboard_sequence"] := CB_GetSequenceNumber()') > 0,
 		"the accepted Snipping Tool image must publish the clipboard sequence owned by this transaction")
-	Assert(InStr(FinishSrc, "OwnedSequence != 0 && GestureClipboardSequence() = OwnedSequence") > 0,
+	Assert(InStr(FinishSrc, "OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence") > 0,
 		"cleanup must restore only if its transaction still owns the clipboard sequence, preserving a later user copy")
+	Assert(InStr(SequenceAdapterSrc, 'DllCall("GetClipboardSequenceNumber"') > 0,
+		"the clipboard adapter must own the Win32 clipboard sequence probe")
+	Assert(InStr(ImageAdapterSrc, "IsClipboardFormatAvailable") > 0,
+		"the clipboard adapter must own the Win32 image-format probe")
     Assert(InStr(FinishSrc, "A_Clipboard := State[") > 0, "owned cleanup must restore the snapshot")
     Quote := Chr(34)
     Assert(InStr(FinishSrc, "_GestureRegionCapture[" . Quote . "epoch" . Quote . "] != Epoch") > 0, "stale callbacks must not restore a newer capture's clipboard")

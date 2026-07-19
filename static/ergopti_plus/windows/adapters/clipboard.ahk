@@ -131,6 +131,24 @@ CB_RestoreAll(Saved) {
 	}
 }
 
+; Returns the Win32 clipboard change sequence. Consumers use it as an ownership
+; fence: a delayed restore must not overwrite content copied by the user after
+; the transaction released the clipboard. Zero is an unavailable/error sentinel.
+CB_GetSequenceNumber() {
+	try return DllCall("GetClipboardSequenceNumber", "UInt")
+	return 0
+}
+
+; True only when a bitmap/DIB clipboard format is available. This is deliberately
+; kept in the Clipboard adapter: a domain feature must not make raw Win32 calls
+; merely to distinguish a screenshot from a later text copy.
+CB_HasImage() {
+	try return DllCall("IsClipboardFormatAvailable", "UInt", 2)
+		|| DllCall("IsClipboardFormatAvailable", "UInt", 8)
+		|| DllCall("IsClipboardFormatAvailable", "UInt", 17)
+	return false
+}
+
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
@@ -142,4 +160,6 @@ global ADAPTER_CLIPBOARD := Map(
     "restore",     CB_Restore,
     "save_all",    CB_SaveAll,
     "restore_all", CB_RestoreAll,
+	"sequence_number", CB_GetSequenceNumber,
+	"has_image", CB_HasImage,
 )
