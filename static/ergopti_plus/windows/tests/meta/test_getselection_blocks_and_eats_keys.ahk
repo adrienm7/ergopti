@@ -5,15 +5,13 @@
 ; DESCRIPTION:
 ; Static source guard for the finding getselection-blocks-and-eats-keys.
 ;
-; GetSelection runs on the keyboard thread (case-conversion / web-search
-; chords). Before the fix it called ClipWait(2) and ignored the return value,
-; so a slow or unresponsive app stalled input for up to 2 s and a timed-out
-; capture was treated as a valid empty selection -- callers then pasted the
-; restored (stale) clipboard via SendInstant.
+; Selection capture runs from case-conversion, search, and gesture actions.
+; A synchronous ClipWait stalls the AHK input thread, so completion must be
+; polled asynchronously and stale callbacks must be cancelled on new input.
 ;
-; The fix (1) checks ClipWait's return and returns "" on a timeout so callers
-; no-op, and (2) lowers GET_SELECTION_TIMEOUT_SEC to a tight interactive
-; ceiling (0.5 s) so a non-responsive app cannot stall the keyboard thread.
+; The fix starts Ctrl+C then polls ClipWait(0, 1) from a timer. It captures the
+; foreground window, detects physical input, and invokes the continuation only
+; while that original context remains valid.
 ;
 ; This is a meta-static test: GetSelection touches the real clipboard
 ; (ClipboardAll / A_Clipboard / ClipWait), so a direct behavioral call is
@@ -48,54 +46,61 @@ _GSBlk_ReadSource(RelPath) {
 ; ==================================================
 ; ==================================================
 
-; GetSelection must check ClipWait's return and bail out (no stale paste) on
-; a timeout. Before the fix it called ClipWait(...) and ignored the result.
-_GSBlk_GetSelectionChecksClipWait() {
+; The public capture API must arm a timer rather than call blocking ClipWait.
+_GSBlk_GetSelectionIsTimerDriven() {
 	Src := _GSBlk_ReadSource("lib/hotstrings/hotstring_engine.ahk")
-	Seg := _DriverFuncBody("GetSelection")
-	Assert(Seg != "", "GetSelection() declaration must exist in hotstring_engine.ahk")
-	Assert(InStr(Seg, "!ClipWait(") > 0,
-		"GetSelection must check the ClipWait return value -- a timed-out copy must "
-		. "not be treated as a valid empty selection that triggers a stale paste")
-	Assert(InStr(Seg, "return " . Chr(34) . Chr(34)) > 0,
-		"GetSelection must return an empty string on a ClipWait timeout so callers no-op")
+	Seg := _DriverFuncBody("GetSelectionAsync")
+	Assert(Seg != "", "GetSelectionAsync() declaration must exist in hotstring_engine.ahk")
+	Assert(InStr(Seg, "SetTimer(Job[") > 0,
+		"GetSelectionAsync must arm a timer instead of waiting in the initiating input thread")
+	Assert(InStr(Seg, "ClipWait(") = 0,
+		"GetSelectionAsync must not call ClipWait synchronously; only the timer poll may make a zero-timeout probe")
 }
-Test("hotstring_engine: GetSelection checks ClipWait return and fails fast (getselection-blocks-and-eats-keys)",
-	_GSBlk_GetSelectionChecksClipWait)
+Test("hotstring_engine: selection capture is timer-driven (getselection-blocks-and-eats-keys)",
+	_GSBlk_GetSelectionIsTimerDriven)
 
-; The interactive ClipWait ceiling must be tight (< 1 s). A 2 s ceiling is a
-; large LowLevelHooksTimeout exposure window on the keyboard thread.
-_GSBlk_TimeoutIsTight() {
+; The poll must cancel a stale selection when the user moves on or changes
+; window, preventing delayed output from targeting a new selection.
+_GSBlk_PollCancelsStaleContexts() {
 	Src := _GSBlk_ReadSource("lib/hotstrings/hotstring_engine.ahk")
-	Assert(InStr(Src, "GET_SELECTION_TIMEOUT_SEC := 0.5") > 0,
-		"GET_SELECTION_TIMEOUT_SEC must be a tight interactive ceiling (0.5 s) so a "
-		. "non-responsive app cannot stall the keyboard thread for seconds")
+	Seg := _DriverFuncBody("_SelectionCapturePoll")
+	Assert(InStr(Seg, "A_TimeIdlePhysical") > 0 and InStr(Seg, "WinExist") > 0,
+		"selection poll must cancel delayed callbacks after physical input or a foreground-window change")
 }
-Test("hotstring_engine: GetSelection ClipWait timeout is a tight interactive ceiling (getselection-blocks-and-eats-keys)",
-	_GSBlk_TimeoutIsTight)
+Test("hotstring_engine: selection poll cancels stale contexts (getselection-blocks-and-eats-keys)",
+	_GSBlk_PollCancelsStaleContexts)
 
-; The four case-conversion chords must no-op on an empty/failed capture so a
-; ClipWait timeout cannot trigger a stale paste through SendInstant.
+; The four case-conversion actions must use async capture and their completion
+; functions must no-op on an empty/failed capture.
 _GSBlk_CaseChordsNoOpOnEmpty() {
 	WinSrc := _GSBlk_ReadSource("modules/shortcuts/win.ahk")
 	GestSrc := _DriverDirConcat("modules/gestures")
 	EmptyGuard := "if (Text = " . Chr(34) . Chr(34) . ")"
 
-	UpperSeg := _DriverFuncBody("ConvertToUppercase")
+	UpperSeg := _DriverFuncBody("_ConvertToUppercaseSelection")
 	Assert(InStr(UpperSeg, EmptyGuard) > 0,
 		"ConvertToUppercase must no-op on an empty selection (no stale SendInstant)")
 
-	TitleSeg := _DriverFuncBody("ConvertToTitleCase")
+	TitleSeg := _DriverFuncBody("_ConvertToTitleCaseSelection")
 	Assert(InStr(TitleSeg, EmptyGuard) > 0,
 		"ConvertToTitleCase must no-op on an empty selection (no stale SendInstant)")
 
-	GUpperSeg := _DriverFuncBody("GestureToggleUppercase")
+	GUpperSeg := _DriverFuncBody("_GestureToggleUppercaseSelection")
 	Assert(InStr(GUpperSeg, EmptyGuard) > 0,
 		"GestureToggleUppercase must no-op on an empty selection (no stale SendInstant)")
 
-	GTitleSeg := _DriverFuncBody("GestureToggleTitleCase")
+	GTitleSeg := _DriverFuncBody("_GestureToggleTitleCaseSelection")
 	Assert(InStr(GTitleSeg, EmptyGuard) > 0,
 		"GestureToggleTitleCase must no-op on an empty selection (no stale SendInstant)")
 }
-Test("hotstring_engine: case-conversion chords no-op on empty selection (getselection-blocks-and-eats-keys)",
+Test("hotstring_engine: async case-conversion callbacks no-op on empty selection (getselection-blocks-and-eats-keys)",
 	_GSBlk_CaseChordsNoOpOnEmpty)
+
+_GSBlk_SuspendCancelsPendingCapture() {
+	Seg := _DriverFuncBody("Ergopti_OnSuspendEnter")
+	Assert(Seg != "", "Ergopti_OnSuspendEnter() must exist in lifecycle.ahk")
+	Assert(InStr(Seg, "GetSelectionCancel()") > 0,
+		"suspend must cancel an in-flight clipboard selection capture so its timer cannot inject after pause")
+}
+Test("hotstring_engine: suspend cancels pending async selection capture (getselection-blocks-and-eats-keys)",
+	_GSBlk_SuspendCancelsPendingCapture)

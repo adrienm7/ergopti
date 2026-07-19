@@ -542,9 +542,18 @@ GestureSearchWeb(BindingId := "") {
         LoggerWarn("gestures", "search_web ignored for binding '{1}': {2}", BindingId, ErrorText)
         return
     }
-    SelectedText := Trim(GetSelection())
+    GetSelectionAsync((Text) => _GestureSearchWebSelectionReady(Text, EngineQuery))
+}
+
+_GestureSearchWebSelectionReady(Text, EngineQuery) {
+    SelectedText := Trim(Text)
+    if (SelectedText = "")
+        return
     SelectedText := StrReplace(SelectedText, "`r`n", " ")
-    Run(StrReplace(EngineQuery, "%s", GestureUrlEncode(SelectedText)))
+    try Run(StrReplace(EngineQuery, "%s", GestureUrlEncode(SelectedText)))
+    catch as Err {
+        try LoggerError("gestures", "search_web launch failed: {1}", Err.Message)
+    }
 }
 
 ; Encodes the selected Unicode text as an RFC 3986 query component. Partial
@@ -594,9 +603,12 @@ GestureTeleportMouse() {
 }
 
 GestureToggleUppercase() {
-    Text := GetSelection()
-    ; No-op on an empty/failed capture: GetSelection returns "" on a ClipWait
-    ; timeout, and pasting "" would only clobber the clipboard with a stale paste.
+    GetSelectionAsync(_GestureToggleUppercaseSelection)
+}
+
+_GestureToggleUppercaseSelection(Text) {
+    ; No-op on an empty/failed capture: async cancellation must never turn into
+    ; a stale SendInstant paste.
     if (Text = "")
         return
     try KL_MarkSynthetic("case-transform")
@@ -608,7 +620,10 @@ GestureToggleUppercase() {
 }
 
 GestureToggleTitleCase() {
-    Text := GetSelection()
+    GetSelectionAsync(_GestureToggleTitleCaseSelection)
+}
+
+_GestureToggleTitleCaseSelection(Text) {
     ; No-op on an empty/failed capture (see GestureToggleUppercase).
     if (Text = "")
         return

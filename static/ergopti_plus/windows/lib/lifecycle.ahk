@@ -98,6 +98,11 @@ _SuspendPendingPoll() {
 }
 Ergopti_OnSuspendEnter() {
 	global _SpaceHoldInputHook, _OneShotShiftInputHook, _DeadKeyInputHook
+	; A clipboard-selection poll is timer-driven, so native Suspend does not
+	; stop it. Cancel before any other teardown to restore the clipboard and
+	; prevent its callback from injecting after pause.
+	if IsSet(GetSelectionCancel)
+		try GetSelectionCancel()
 	if IsSet(_SpaceHoldInputHook) and IsObject(_SpaceHoldInputHook)
 		try _SpaceHoldInputHook.Stop()
 	if IsSet(_OneShotShiftInputHook) and IsObject(_OneShotShiftInputHook)

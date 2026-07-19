@@ -246,34 +246,141 @@ ActivateHotstrings() {
     }
 }
 
-GetSelection() {
-    ; Save/restore the user's clipboard around a Ctrl+C capture of the current selection.
-    ; Wrapped in try/finally so the clipboard is restored even on error/timeout.
-    OldClipboard := ClipboardAll()
-    Text := ""
+; Clipboard copy completion is asynchronous in many applications. Waiting in a
+; hotkey thread with ClipWait freezes every low-level hook dispatch behind it.
+; Keep one owned capture job and poll with a zero-timeout probe instead; callers
+; receive the text only while the original foreground context is still current.
+global _SelectionCaptureJob := false
+global _SelectionCaptureNextId := 0
+global SELECTION_CAPTURE_POLL_MS := 15
+global SELECTION_CAPTURE_INPUT_GRACE_MS := 20
+
+GetSelectionAsync(OnReady) {
+    global _SelectionCaptureJob, _SelectionCaptureNextId
+    global SELECTION_CAPTURE_POLL_MS
+
+    if A_IsSuspended
+        return false
+    if !IsObject(OnReady)
+        throw TypeError("GetSelectionAsync requires a callback object")
+
+    ; The newest user command owns the clipboard capture. Finishing the prior
+    ; job first stops its timer and restores its clipboard snapshot before the
+    ; new Ctrl+C clears the clipboard.
+    if IsObject(_SelectionCaptureJob)
+        _SelectionCaptureFinish(_SelectionCaptureJob, "", false, "superseded")
+
+    Job := Map(
+        "id", ++_SelectionCaptureNextId,
+        "callback", OnReady,
+        "started", A_TickCount,
+        "foreground", WinExist("A"),
+        "clipboard", "",
+        "clear_sequence", 0,
+        "timer", 0
+    )
     try {
+        Job["clipboard"] := ClipboardAll()
         A_Clipboard := ""
+        Job["clear_sequence"] := _SelectionClipboardSequence()
         SendEvent("^c")
-        ; Fail FAST: if the app never answered the Ctrl+C within the interactive
-        ; window, ClipWait returns 0. Treat that as "no selection" and return ""
-        ; so callers no-op — otherwise we would paste whatever stale content the
-        ; restored clipboard holds, duplicating old text on a timeout.
-        ; The second arg 1 makes ClipWait accept ANY clipboard format (images,
-        ; files, native objects), not just text. Without it, a selected image
-        ; causes ClipWait to time out after GET_SELECTION_TIMEOUT_SEC regardless
-        ; and freezes the UI for 500ms (getselection-clipwait-binary-freeze fix).
-        if !ClipWait(GET_SELECTION_TIMEOUT_SEC, 1) {
-            LoggerWarn("hotstring_engine",
-                "GetSelection: ClipWait timed out after {1}s; returning empty selection.",
-                GET_SELECTION_TIMEOUT_SEC)
-            return ""
-        }
-        Text := A_Clipboard
-    } finally {
-        A_Clipboard := OldClipboard
-        OldClipboard := ""
+        Job["timer"] := _SelectionCapturePoll.Bind(Job)
+        _SelectionCaptureJob := Job
+        SetTimer(Job["timer"], SELECTION_CAPTURE_POLL_MS)
+        return true
+    } catch as Err {
+        try A_Clipboard := Job["clipboard"]
+        Job["clipboard"] := ""
+        try LoggerError("hotstring_engine", "GetSelectionAsync could not start: {1}", Err.Message)
+        return false
     }
-    return Text
+}
+
+_SelectionCapturePoll(Job) {
+    global _SelectionCaptureJob, GET_SELECTION_TIMEOUT_SEC
+    global SELECTION_CAPTURE_INPUT_GRACE_MS
+
+    if !IsObject(_SelectionCaptureJob) || _SelectionCaptureJob["id"] != Job["id"]
+        return
+    Elapsed := A_TickCount - Job["started"]
+    if A_IsSuspended {
+        _SelectionCaptureFinish(Job, "", false, "suspended")
+        return
+    }
+    ; If a new physical action happened after the shortcut, never inject into
+    ; its potentially different selection. The small grace absorbs the key-up
+    ; events that complete the initiating chord.
+    if (Elapsed - A_TimeIdlePhysical > SELECTION_CAPTURE_INPUT_GRACE_MS) {
+        _SelectionCaptureFinish(Job, "", false, "superseded by input")
+        return
+    }
+    if (WinExist("A") != Job["foreground"]) {
+        _SelectionCaptureFinish(Job, "", false, "foreground changed")
+        return
+    }
+    ; Zero timeout is a probe, never a blocking wait. Accept every clipboard
+    ; format so an image selection resolves immediately to an empty text result.
+    if ClipWait(0, 1) {
+        _SelectionCaptureFinish(Job, A_Clipboard, true, "ready")
+        return
+    }
+    if (Elapsed >= Round(GET_SELECTION_TIMEOUT_SEC * 1000)) {
+        try LoggerWarn("hotstring_engine",
+            "GetSelectionAsync timed out after {1}s; returning no selection.",
+            GET_SELECTION_TIMEOUT_SEC)
+        _SelectionCaptureFinish(Job, "", false, "timeout")
+    }
+}
+
+_SelectionCaptureFinish(Job, Text, Deliver, Reason) {
+    global _SelectionCaptureJob
+
+    if !IsObject(_SelectionCaptureJob) || _SelectionCaptureJob["id"] != Job["id"]
+        return
+    SetTimer(Job["timer"], 0)
+    _SelectionCaptureJob := false
+
+    ; On a physical-input cancellation, preserve clipboard data which arrived
+    ; after our clear: it may be the user's own copy, and restoring the old
+    ; snapshot would silently destroy it. All normal completion paths restore
+    ; exactly the prior clipboard contents.
+    PreserveCurrent := (Reason == "superseded by input"
+        and _SelectionClipboardSequence() != Job["clear_sequence"])
+    if !PreserveCurrent {
+        try A_Clipboard := Job["clipboard"]
+        catch as Err {
+            try LoggerError("hotstring_engine", "GetSelectionAsync clipboard restore failed: {1}", Err.Message)
+        }
+    }
+    Job["clipboard"] := ""
+
+    if !Deliver || A_IsSuspended
+        return
+    try Job["callback"].Call(Text)
+    catch as Err {
+        try LoggerError("hotstring_engine", "GetSelectionAsync callback failed: {1}", Err.Message)
+    }
+}
+
+; Kept as a fail-closed compatibility seam. All user-triggered paths must use
+; GetSelectionAsync; a synchronous clipboard wait on the hook thread is unsafe.
+GetSelection() {
+    try LoggerError("hotstring_engine", "GetSelection() is synchronous-only and must not be used on an input path.")
+    return ""
+}
+
+GetSelectionCancel(*) {
+    global _SelectionCaptureJob
+    if IsObject(_SelectionCaptureJob)
+        _SelectionCaptureFinish(_SelectionCaptureJob, "", false, "cancelled")
+}
+
+_SelectionClipboardSequence() {
+    try return DllCall("GetClipboardSequenceNumber", "uint")
+    catch as Err {
+        try LoggerError("hotstring_engine", "GetClipboardSequenceNumber failed: {1}", Err.Message)
+        return 0
+    }
 }
 
 ; Set of Microsoft Office (and Teams) executable names.

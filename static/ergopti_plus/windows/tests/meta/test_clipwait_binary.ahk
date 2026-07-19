@@ -7,15 +7,13 @@
 ; finding in lib/hotstrings/hotstring_engine.ahk.
 ;
 ; ROOT CAUSE ENCODED:
-; GetSelection() called ClipWait(GET_SELECTION_TIMEOUT_SEC) without the second
-; argument. By default AHK ClipWait only resolves when the clipboard contains
-; TEXT. If the user had an image or native object selected, ClipWait would block
-; for the full timeout (500ms) before returning 0, freezing the keylogger and
-; UI for half a second on every GetSelection() call involving non-text content.
+; The asynchronous selection poll must accept binary clipboard formats. If it
+; waited for text only, an image/native selection would remain pending until the
+; deadline, instead of resolving promptly to an empty text result.
 ;
-; The fix: ClipWait(GET_SELECTION_TIMEOUT_SEC, 1) — the second arg 1 makes
-; ClipWait succeed immediately for ANY clipboard format, after which
-; A_Clipboard returns "" gracefully for non-text content.
+; The fix: ClipWait(0, 1) — a zero-timeout probe with mode 1 never blocks and
+; resolves immediately for ANY clipboard format, after which A_Clipboard
+; returns "" gracefully for non-text content.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -35,18 +33,16 @@ _CWB_ReadSource(RelPath) {
 	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
 }
 
-_CWB_ClipWaitAcceptsBinary() {
+_CWB_AsyncPollAcceptsBinaryWithoutWaiting() {
 	Src := _CWB_ReadSource("lib/hotstrings/hotstring_engine.ahk")
-	Body := _DriverFuncBody("GetSelection")
+	Body := _DriverFuncBody("_SelectionCapturePoll")
 
-	Assert(Body != "", "GetSelection() must exist in hotstring_engine.ahk")
+	Assert(Body != "", "_SelectionCapturePoll() must exist in hotstring_engine.ahk")
 
-	; The second arg (1) must be present to accept all clipboard formats
-	Assert(RegExMatch(Body, "ClipWait\([^,]+,\s*1\)") > 0,
-		"GetSelection() must call ClipWait(timeout, 1) to accept binary/image content without freezing (getselection-clipwait-binary-freeze)")
+	Assert(RegExMatch(Body, "ClipWait\(0,\s*1\)") > 0,
+		"_SelectionCapturePoll() must use ClipWait(0, 1): accept binary/image data without a blocking clipboard wait (getselection-clipwait-binary-freeze)")
 
-	; The single-arg form must be gone
-	Assert(!RegExMatch(Body, "ClipWait\(GET_SELECTION_TIMEOUT_SEC\)"),
-		"GetSelection() must NOT call ClipWait with only one argument — image content causes a 500ms freeze (getselection-clipwait-binary-freeze)")
+	Assert(InStr(Body, "ClipWait(GET_SELECTION_TIMEOUT_SEC") = 0,
+		"_SelectionCapturePoll() must not wait for the full selection deadline — image content must not freeze the input path")
 }
-Test("hotstring_engine: GetSelection ClipWait uses mode 1 for binary data (getselection-clipwait-binary-freeze)", _CWB_ClipWaitAcceptsBinary)
+Test("hotstring_engine: async selection poll accepts binary data without waiting (getselection-clipwait-binary-freeze)", _CWB_AsyncPollAcceptsBinaryWithoutWaiting)
