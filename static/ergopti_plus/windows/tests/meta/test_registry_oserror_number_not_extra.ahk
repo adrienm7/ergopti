@@ -44,8 +44,12 @@ _RONE_NoRemainingExtraChecks() {
 		Assert(Body != "", FuncName . " must exist in lib/registry.ahk")
 		Assert(InStr(Body, "e.Extra") = 0,
 			FuncName . " must not check e.Extra for the Win32 error code -- OSError's Extra property is empty for RegDelete/RegRead/Reg-loop errors; the real code is in e.Number")
-		Assert(InStr(Body, "e.Number") > 0,
-			FuncName . " must check e.Number instead of e.Extra to recognise ERROR_FILE_NOT_FOUND/ERROR_PATH_NOT_FOUND")
+		if (FuncName == "Reg_KeyExists")
+			Assert(InStr(Body, "Status = 2") > 0 && InStr(Body, "Status = 3") > 0,
+				"Reg_KeyExists must recognise ERROR_FILE_NOT_FOUND/ERROR_PATH_NOT_FOUND from RegOpenKeyExW status")
+		else
+			Assert(InStr(Body, "e.Number") > 0,
+				FuncName . " must check e.Number instead of e.Extra to recognise ERROR_FILE_NOT_FOUND/ERROR_PATH_NOT_FOUND")
 	}
 }
 Test("registry: Reg_DeleteValue/Reg_DeleteKey/Reg_KeyExists check e.Number, not e.Extra (registry-oserror-number-not-extra)",
