@@ -706,11 +706,14 @@ WPMWidget_Hide() {
 }
 
 WPMWidget_Toggle() {
+    TargetVisible := !WPMWidget.visible
+    if !WPMWidget_SaveVisible(TargetVisible)
+        return false
     if WPMWidget.visible
         WPMWidget_Hide()
     else
         WPMWidget_Show()
-    WPMWidget_SaveVisible()
+    return true
 }
 
 

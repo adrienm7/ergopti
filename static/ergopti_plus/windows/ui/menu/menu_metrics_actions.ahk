@@ -41,7 +41,8 @@ ToggleFilterSystemAuth(*) {
 ; from BuildMetricsMenu locals, so no global state is needed. ──────────────────
 
 _ToggleWpmWidget(menu, widget_lbl, colors_lbl, graph_lbl) {
-	WPMWidget_Toggle()
+    if !WPMWidget_Toggle()
+        return
 	try menu.ToggleCheck(widget_lbl)
 	if WPMWidget.visible {
 		try menu.Enable(colors_lbl)
@@ -53,17 +54,25 @@ _ToggleWpmWidget(menu, widget_lbl, colors_lbl, graph_lbl) {
 }
 
 _ToggleWpmWidgetColors(menu, label) {
-	WPMWidget.use_colors := !WPMWidget.use_colors
-	WPMWidget_SaveConfig()
-	try menu.ToggleCheck(label)
+    TargetColors := !WPMWidget.use_colors
+    if !WPMWidget_SaveConfig(TargetColors)
+        return
+    WPMWidget.use_colors := TargetColors
+    try menu.ToggleCheck(label)
 }
 
 _ToggleWpmWidgetGraph(menu, label) {
-	was_visible := WPMWidget.visible
-	; Rebuild the widget in the new mode — compact and graph use different Gui layouts.
-	if was_visible
-		WPMWidget_Hide()
-	WPMWidget.show_graph := !WPMWidget.show_graph
+    was_visible := WPMWidget.visible
+    TargetGraph := !WPMWidget.show_graph
+    ; Graph and its anchor form one persisted state. Commit the reset before
+    ; destroying the live surface, so a disk failure leaves the current widget
+    ; fully usable and its menu checkmark unchanged.
+    if !WPMWidget_SaveConfig(unset, TargetGraph, -1, -1)
+        return
+    ; Rebuild the widget in the new mode — compact and graph use different Gui layouts.
+    if was_visible
+        WPMWidget_Hide()
+    WPMWidget.show_graph := TargetGraph
 	; Destroy existing GUI so it is rebuilt in the correct layout on next show.
 	if WPMWidget._gui {
 		try WPMWidget._gui.Destroy()
@@ -76,10 +85,9 @@ _ToggleWpmWidgetGraph(menu, label) {
 		WPMWidget._graph_gui := false
 	}
 	; Reset saved position so default bottom-right is recalculated for new size.
-	WpmWidget.pos_x := -1
-	WpmWidget.pos_y := -1
-	WPMWidget_SaveConfig()
-	try menu.ToggleCheck(label)
+    WpmWidget.pos_x := -1
+    WpmWidget.pos_y := -1
+    try menu.ToggleCheck(label)
 	if was_visible
 		WPMWidget_Show()
 }
@@ -142,4 +150,3 @@ ToggleMetricsEnabled() {
 	MS_SaveToIni()
 	Reload
 }
-

@@ -287,11 +287,14 @@ WPMWidget_DragEnd(*) {
     gui_ref.GetPos(&fx, &fy)
     if WPMWidget.show_graph {
         ; bottom-right = graph top-left + graph size; compact top-left = bottom-right - compact size
-        WPMWidget.pos_x := fx + WPMWidgetConst.GRAPH_W - WPMWidgetConst.W
-        WPMWidget.pos_y := fy + WPMWidgetConst.GRAPH_H - WPMWidgetConst.H
+        NewX := fx + WPMWidgetConst.GRAPH_W - WPMWidgetConst.W
+        NewY := fy + WPMWidgetConst.GRAPH_H - WPMWidgetConst.H
     } else {
-        WPMWidget.pos_x := fx
-        WPMWidget.pos_y := fy
+        NewX := fx
+        NewY := fy
     }
-    WPMWidget_SavePosition()
+    if !WPMWidget_SavePosition(NewX, NewY)
+        return
+    WPMWidget.pos_x := NewX
+    WPMWidget.pos_y := NewY
 }
