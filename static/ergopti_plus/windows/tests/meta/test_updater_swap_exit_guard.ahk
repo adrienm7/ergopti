@@ -52,7 +52,7 @@ _TUSEG_CheckSwapExitGuard() {
 	; (b) An "if" check must separate Run( from ExitApp(0).
 	; Compute position of the last Run( before ExitApp(0) in the body and the
 	; first "if !_SwapLaunched" guard — the guard must appear between them.
-	RunPos    := InStr(Body, "Run('cmd /c")
+	RunPos    := InStr(Body, "Run(A_ComSpec")
 	ExitPos   := InStr(Body, "ExitApp(0)")
 	GuardPos  := InStr(Body, "if !_SwapLaunched")
 	Assert(RunPos > 0 && ExitPos > 0 && GuardPos > 0,

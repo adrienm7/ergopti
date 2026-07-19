@@ -1,27 +1,32 @@
 ﻿; tests/meta/test_updater_finalize_nonblocking.ahk
 #Requires AutoHotkey v2.0
 
-_UFNB_FinalizerDoesNotHoldCriticalAcrossIo() {
+_UFNB_FinalizerRunsNoStagingIo() {
 	Body := _DriverFuncBody("_Updater_PollDownloadAsync")
 	Assert(Body != "", "_Updater_PollDownloadAsync must exist")
 	Assert(InStr(Body, "Critical(") = 0,
-		"download finalization must not hold Critical across COM, file I/O, process launch, or Sleep (updater-finalize-nonblocking)")
-	Assert(InStr(Body, "Stream.SaveToFile") > 0 and InStr(Body, "FileAppend(BatLines") > 0 and InStr(Body, "Run(") > 0,
-		"the nonblocking guard must cover the real download finalization side effects")
+		"download finalization must not hold Critical across process hand-off (updater-finalize-nonblocking)")
+	for Forbidden in ["ADODB.Stream", "ResponseBody", "SaveToFile", "FileAppend(", "FileGetSize(", "FileDelete(", "Sleep("] {
+		Assert(InStr(Body, Forbidden) = 0,
+			"download completion must not perform " . Forbidden . " on the AHK hook thread (updater-finalize-nonblocking)")
+	}
+	Assert(InStr(Body, 'Stdout != "READY"') > 0 and InStr(Body, "Run(A_ComSpec") > 0,
+		"download completion must require worker readiness before the bounded swap hand-off")
 }
-Test("updater: download finalization performs I/O outside Critical (updater-finalize-nonblocking)", _UFNB_FinalizerDoesNotHoldCriticalAcrossIo)
+Test("updater: download completion keeps staging I/O out of the hook thread (updater-finalize-nonblocking)", _UFNB_FinalizerRunsNoStagingIo)
 
 _UFNB_DownloadGuardSpansFinalization() {
 	Body := _DriverFuncBody("_Updater_PollDownloadAsync")
-	ReadyPos := InStr(Body, "ready := Req.WaitForResponse(0)")
-	SavePos := InStr(Body, "Stream.SaveToFile")
-	SwapPos := InStr(Body, "Run('cmd /c")
-	FailureBranchPos := InStr(Body, "if (failed or Req.Status != 200)")
-	Assert(ReadyPos > 0 && SavePos > ReadyPos && SwapPos > SavePos,
-		"poll finalization must include persistence and swap launch after the response becomes ready")
-	PreFinalization := SubStr(Body, ReadyPos, FailureBranchPos - ReadyPos)
-	Assert(!InStr(PreFinalization, "_Updater_EndDownloadTransaction()"),
-		"download guard must not be released immediately after WaitForResponse; it must span response persistence")
+	StartBody := _DriverFuncBody("_Updater_StartStagingWorker")
+	Assert(StartBody != "", "_Updater_StartStagingWorker must exist")
+	SpawnPos := InStr(StartBody, "ShellRunner_Spawn")
+	Assert(SpawnPos > 0 and InStr(StartBody, "_UpdaterDownloadWorker.start()") > SpawnPos,
+		"the staging worker must be launched through the asynchronous ShellRunner adapter")
+	StartCallPos := InStr(StartBody, "_UpdaterDownloadWorker.start()")
+	EndPos := InStr(StartBody, "_Updater_EndDownloadTransaction()")
+	TimerPos := InStr(StartBody, "SetTimer(_Updater_MonitorStagingWorker")
+	Assert(StartCallPos > SpawnPos and EndPos > StartCallPos and TimerPos > EndPos,
+		"the download guard may release only on failed worker launch; a successful launch must arm monitoring and retain ownership until completion or cancellation")
 	Assert(InStr(Body, "_UpdaterDownloadInProgress := false") = 0,
 		"only _Updater_EndDownloadTransaction may release the updater guard, preventing an early duplicate install")
 }

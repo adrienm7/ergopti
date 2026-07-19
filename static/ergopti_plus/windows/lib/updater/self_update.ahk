@@ -237,6 +237,7 @@ _Updater_OnTrayMsg(wParam, lParam, msg, hwnd) {
 ; that could race Updater_DownloadAndInstall against the same staging file
 ; (updater-download-reentrancy).
 global _Updater_PromptGui := unset
+global _UpdaterDownloadWorker := 0
 
 ; Two-pane window: release tag/date on the left summary, full release notes
 ; on the right, with three buttons at the bottom: ``Update now`` (downloads
@@ -394,15 +395,13 @@ _Updater_ShowAvailableUpdateCallback(Json) {
 ; ===== 2.4) Download + swap (binary replacement) =====
 ; =====================================================
 
-; Downloads the release asset to a staging folder, writes a tiny swap batch,
-; spawns it detached and exits the current process. The batch waits for our
-; exe handle to release, moves the new exe over the current one, then
-; relaunches. Best-effort: surfaces a single localized error MsgBox on any
-; pre-exit failure so the user knows it didn't work.
+; Dispatches the whole staging transaction to a child process. AHK's one
+; interpreter thread is also the keyboard hook thread, so response-body COM,
+; disk persistence, integrity checks and batch creation must never run here.
+; This side only validates the request, launches/polls the worker and performs
+; the final non-blocking process hand-off after the worker reports READY.
 Updater_DownloadAndInstall(Release) {
 	global BUNDLE_RELEASE_ASSET
-	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
-	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS
 	global _UpdaterDownloadInProgress
 	; Re-entrancy guard: two independent "Update now" triggers (the TrayTip
 	; update prompt and the changelog's "Install this version" button, each
@@ -442,192 +441,133 @@ Updater_DownloadAndInstall(Release) {
 		return
 	}
 	StagingDir := LocalAppData . "\Ergopti\updates"
-	try DirCreate(StagingDir)
 	NewExe := StagingDir . "\ErgoptiPlus_new.exe"
 	SwapBat := StagingDir . "\swap_update.cmd"
 	CurrentExe := A_ScriptFullPath
-	try {
-		if FileExist(NewExe)
-			FileDelete(NewExe)
-	}
 	try LoggerStart("Updater", "Downloading update '{1}' from {2}…", Release.Tag, AssetUrl)
 
 	_UpdaterDownloadInProgress := true
 	try SetTimer((*) => _Updater_RebuildMenu(), -50)
-	
-	try {
-		Req := ComObject("WinHttp.WinHttpRequest.5.1")
-		Req.Open("GET", AssetUrl, true)  ; async mode
-		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
-		; Download phase: use the large download receive budget so a slow/metered link is
-		; not aborted at the 30 s API receive timeout (updater-download-receive-timeout).
-		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
-			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS)
-		Req.Send()
-	} catch as Err {
-		_Updater_EndDownloadTransaction()
-		try LoggerError("Updater", "Asset download dispatch failed: {1}.", Err.Message)
-		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
-		return
-	}
-	
-	_Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Release.Tag)
+	_Updater_StartStagingWorker(AssetUrl, NewExe, SwapBat, CurrentExe, Release.Tag)
 }
 
-_Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
-	global _UpdaterDownloadInProgress, UPDATER_ASYNC_POLL_MS
-	if A_IsSuspended {
-		try LoggerWarn("Updater", "Async download aborted: driver suspended mid-flight (G5 Guarantee).")
-		try Req.Abort()
-		_Updater_EndDownloadTransaction()
-		return
-	}
-	; Give the download up to 600 seconds to complete — slow connections on
-	; large releases need more headroom than the old 120-second ceiling allowed.
-	MaxPolls := 600000 / UPDATER_ASYNC_POLL_MS
-	ready := false
-	failed := false
-	try {
-		ready := Req.WaitForResponse(0)
-	} catch as Err {
-		failed := true
-		try LoggerDebug("Updater", "Async download failed: {1}.", Err.Message)
-	}
-	if (!failed and !ready) {
-		Polls += 1
-		if (Polls > MaxPolls) {
-			failed := true
-			try LoggerWarn("Updater", "Async download exceeded its poll budget — aborting.")
-		} else {
-			SetTimer(() => _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls), -UPDATER_ASYNC_POLL_MS)
-			return
-		}
-	}
-	
-	if (failed or Req.Status != 200) {
-		try LoggerError("Updater", "Asset download returned HTTP {1}.", failed ? "FAIL" : Req.Status)
-		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
-		_Updater_EndDownloadTransaction()
-		return
-	}
-	
-	try {
-		Stream := ComObject("ADODB.Stream")
-		Stream.Type := 1     ; adTypeBinary
-		Stream.Open()
-		Stream.Write(Req.ResponseBody)
-		Stream.SaveToFile(NewExe, 2)   ; adSaveCreateOverWrite
-		Stream.Close()
-	} catch as e {
-		try LoggerError("Updater", "Download failed: {1}.", e.Message)
-		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
-		_Updater_EndDownloadTransaction()
-		return
-	}
-	if !FileExist(NewExe) {
-		try LoggerError("Updater", "Download completed but file missing at '{1}'.", NewExe)
-		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
-		_Updater_EndDownloadTransaction()
-		return
-	}
-	; Partial-download guard: compare Content-Length to the actual saved size.
-	; A CDN truncation, network timeout, or error-page response would leave a
-	; file too small to be a valid exe. If sizes disagree, delete the partial
-	; file and abort — never swap a corrupted download into the production path.
-	ActualSize := 0
-	try ActualSize := FileGetSize(NewExe)
-	ContentLength := 0
-	try ContentLength := Integer(Req.GetResponseHeader("Content-Length"))
-	if (ContentLength > 0 and ActualSize != ContentLength) {
-		try LoggerError("Updater",
-			"Partial-download detected: Content-Length={1}, file={2} bytes — aborting.",
-			ContentLength, ActualSize)
-		try FileDelete(NewExe)
-		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
-		_Updater_EndDownloadTransaction()
-		return
-	}
-	if (ActualSize < UPDATER_MIN_EXE_SIZE_BYTES) {
-		try LoggerError("Updater",
-			"Downloaded file too small ({1} bytes < {2} minimum) — likely an error page, aborting.",
-			ActualSize, UPDATER_MIN_EXE_SIZE_BYTES)
-		try FileDelete(NewExe)
-		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
-		_Updater_EndDownloadTransaction()
-		return
-	}
-	try LoggerSuccess("Updater", "Update downloaded to '{1}'.", NewExe)
 
-	; Swap script: waits for the parent exe handle to release, replaces the
-	; binary, then relaunches it. Uses CMD (built-in, no PowerShell startup
-	; cost). ``timeout /t N /nobreak`` is the standard "sleep N seconds" idiom.
-	; The ``goto :eof`` at the end prevents the script from inheriting any
-	; lingering shell state.
-	; Single-quoted outer strings let us embed literal double quotes around
-	; the batch %VARS% without escape gymnastics. Each `r`n is concatenated
-	; from a double-quoted neighbour because escape sequences only resolve
-	; inside double-quoted AHK strings.
-	; The swap batch renames the current exe to .bak first, then moves the
-	; downloaded exe into its place.  If the move fails (e.g. different drive,
-	; permission error, or AV lock), the .bak is renamed back so the install
-	; does not end in a bricked, missing exe.  Only on success is the .bak
-	; deleted and the fresh binary relaunched.
-	BakExe := CurrentExe . ".bak"
-	BatLines := "@echo off`r`n"
-		. "setlocal`r`n"
-		. "set NEW_EXE=" . NewExe . "`r`n"
-		. "set CUR_EXE=" . CurrentExe . "`r`n"
-		. "set BAK_EXE=" . BakExe . "`r`n"
-		. "timeout /t 2 /nobreak >nul 2>&1`r`n"
-		. ":retry`r`n"
-		. 'rename "%CUR_EXE%" "' . SubStr(CurrentExe, InStr(CurrentExe, "\", false, -1) + 1) . '.bak" >nul 2>&1' . "`r`n"
-		. 'if exist "%CUR_EXE%" (' . "`r`n"
-		. "    timeout /t 1 /nobreak >nul 2>&1`r`n"
-		. "    goto retry`r`n"
-		. ")`r`n"
-		. 'move /y "%NEW_EXE%" "%CUR_EXE%" >nul 2>&1' . "`r`n"
-		. 'if not exist "%CUR_EXE%" (' . "`r`n"
-		. '    rename "%BAK_EXE%" "' . SubStr(CurrentExe, InStr(CurrentExe, "\", false, -1) + 1) . '" >nul 2>&1' . "`r`n"
-		. "    goto :eof`r`n"
-		. ")`r`n"
-		. 'del /q "%BAK_EXE%" >nul 2>&1' . "`r`n"
-		. 'start "" "%CUR_EXE%"' . "`r`n"
-		. "goto :eof`r`n"
-	try {
-		if FileExist(SwapBat)
-			FileDelete(SwapBat)
-		FileAppend(BatLines, SwapBat, "CP0")
-	} catch as e {
-		try LoggerError("Updater", "Could not write swap script: {1}.", e.Message)
-		MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
+; Starts an isolated PowerShell transaction. ShellRunner owns process polling,
+; preventing a slow CDN, antivirus scan or file flush from entering AHK's hook
+; dispatch loop.
+_Updater_StartStagingWorker(AssetUrl, NewExe, SwapBat, CurrentExe, Tag) {
+	global _UpdaterDownloadWorker, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS, UPDATER_MIN_EXE_SIZE_BYTES
+	Script := _Updater_BuildStagingWorkerScript()
+	_OnDone := (ExitCode, Stdout, Stderr) => _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapBat, CurrentExe, Tag)
+	_UpdaterDownloadWorker := ShellRunner_Spawn("powershell.exe",
+		["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", Script,
+			AssetUrl, NewExe, SwapBat, CurrentExe, UPDATER_MIN_EXE_SIZE_BYTES, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS], _OnDone)
+	if !_UpdaterDownloadWorker.start() {
+		_UpdaterDownloadWorker := 0
+		try LoggerError("Updater", "Could not launch the isolated update staging worker.")
+		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
 		_Updater_EndDownloadTransaction()
 		return
 	}
-	try LoggerInfo("Updater", "Launching swap script and exiting in 1s…")
-	; Run detached and hidden so the user does not see a black flash. Then
-	; ExitApp so our handle on the current exe drops and the swap can proceed.
-	; _SwapLaunched only flips true on an actual successful Run() — a bare
-	; unconditional ExitApp after a swallowed Run() failure (cmd.exe blocked by
-	; AppLocker/SRP/AV) would kill the driver with nothing left running and no
-	; swap process to relaunch it (AHK-19).
+	SetTimer(_Updater_MonitorStagingWorker, UPDATER_ASYNC_POLL_MS)
+}
+
+; Cancels the subprocess while native Suspend is active. ShellRunner deliberately
+; defers completion callbacks during Suspend, so this independent timer enforces
+; the stronger invariant that no network or staging I/O remains alive while paused.
+_Updater_MonitorStagingWorker(*) {
+	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker
+	if !_UpdaterDownloadInProgress {
+		SetTimer(_Updater_MonitorStagingWorker, 0)
+		return
+	}
+	if !A_IsSuspended
+		return
+	if IsObject(_UpdaterDownloadWorker) {
+		try _UpdaterDownloadWorker.terminate()
+	}
+	_UpdaterDownloadWorker := 0
+	SetTimer(_Updater_MonitorStagingWorker, 0)
+	try LoggerWarn("Updater", "Update staging aborted because the driver was suspended.")
+	_Updater_EndDownloadTransaction()
+}
+
+; The only staging completion callback running in AHK. The worker's READY
+; token means it has already persisted and verified the executable plus batch.
+_Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapBat, CurrentExe, Tag) {
+	global _UpdaterDownloadWorker
+	_UpdaterDownloadWorker := 0
+	SetTimer(_Updater_MonitorStagingWorker, 0)
+	if A_IsSuspended {
+		try LoggerWarn("Updater", "Update staging completion discarded while suspended.")
+		_Updater_EndDownloadTransaction()
+		return
+	}
+	if (ExitCode != 0 or Stdout != "READY") {
+		try LoggerError("Updater", "Update staging worker failed (exit {1}): {2}.", ExitCode, Stdout)
+		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+		_Updater_EndDownloadTransaction()
+		return
+	}
+	try LoggerSuccess("Updater", "Update downloaded and verified for '{1}'.", Tag)
 	_SwapLaunched := false
 	try {
-		Run('cmd /c "' . SwapBat . '"', , "Hide")
+		Run(A_ComSpec . ' /c "' . SwapBat . '"', , "Hide")
 		_SwapLaunched := true
-	} catch as e {
-		try LoggerError("Updater", "Swap script launch failed: {1}.", e.Message)
+	} catch as Err {
+		try LoggerError("Updater", "Swap script launch failed: {1}.", Err.Message)
 	}
 	if !_SwapLaunched {
 		MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
 		_Updater_EndDownloadTransaction()
 		return
 	}
-	; Reset the dedupe so a future user-driven check after a failure can
-	; re-prompt; the post-swap exe will set its own state from scratch.
 	global UPDATER_LAST_NOTIFIED_TAG := ""
-	; Tiny delay lets the spawned cmd actually start polling before we vanish.
-	Sleep(200)
 	ExitApp(0)
+}
+
+; Returns a self-contained worker script. Paths and URLs are passed as argv,
+; never interpolated into the script, so release metadata cannot alter commands.
+_Updater_BuildStagingWorkerScript() {
+	return 'param([string]$Url, [string]$NewExe, [string]$SwapBat, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs)' . "`n"
+		. '$ErrorActionPreference = "Stop"' . "`n"
+		. 'try {' . "`n"
+		. '  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $NewExe) | Out-Null' . "`n"
+		. '  Remove-Item -LiteralPath $NewExe -Force -ErrorAction SilentlyContinue' . "`n"
+		. '  Remove-Item -LiteralPath $SwapBat -Force -ErrorAction SilentlyContinue' . "`n"
+		. '  $Request = [System.Net.HttpWebRequest]::Create($Url)' . "`n"
+		. '  $Request.Method = "GET"' . "`n"
+		. '  $Request.UserAgent = "ErgoptiPlus-Updater/1.0"' . "`n"
+		. '  $Request.Timeout = $TimeoutMs' . "`n"
+		. '  $Request.ReadWriteTimeout = $TimeoutMs' . "`n"
+		. '  $Response = $Request.GetResponse()' . "`n"
+		. '  if ([int]$Response.StatusCode -ne 200) { throw ("HTTP " + [int]$Response.StatusCode) }' . "`n"
+		. '  $ExpectedSize = [int64]$Response.ContentLength' . "`n"
+		. '  $Input = $Response.GetResponseStream()' . "`n"
+		. '  $Output = [System.IO.File]::Open($NewExe, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)' . "`n"
+		. '  try { $Input.CopyTo($Output) } finally { $Output.Dispose(); $Input.Dispose(); $Response.Dispose() }' . "`n"
+		. '  $ActualSize = (Get-Item -LiteralPath $NewExe).Length' . "`n"
+		. '  if ($ExpectedSize -gt 0 -and $ActualSize -ne $ExpectedSize) { Remove-Item -LiteralPath $NewExe -Force; throw "Content-Length mismatch" }' . "`n"
+		. '  if ($ActualSize -lt $MinimumSize) { Remove-Item -LiteralPath $NewExe -Force; throw "Downloaded file is too small" }' . "`n"
+		. '  $Quote = [char]34' . "`n"
+		. '  $CurrentLeaf = Split-Path -Leaf $CurrentExe' . "`n"
+		. '  $BakExe = $CurrentExe + ".bak"' . "`n"
+		. '  $Batch = @(' . "`n"
+		. '    "@echo off", "setlocal DisableDelayedExpansion", ("set NEW_EXE=" + $NewExe), ("set CUR_EXE=" + $CurrentExe), ("set BAK_EXE=" + $BakExe),' . "`n"
+		. '    "timeout /t 2 /nobreak >nul 2>&1", ":retry", ("rename " + $Quote + "%CUR_EXE%" + $Quote + " " + $Quote + $CurrentLeaf + ".bak" + $Quote + " >nul 2>&1"),' . "`n"
+		. '    "if exist %CUR_EXE% (", "    timeout /t 1 /nobreak >nul 2>&1", "    goto retry", ")",' . "`n"
+		. '    ("move /y " + $Quote + "%NEW_EXE%" + $Quote + " " + $Quote + "%CUR_EXE%" + $Quote + " >nul 2>&1"),' . "`n"
+		. '    "if not exist %CUR_EXE% (", ("    rename " + $Quote + "%BAK_EXE%" + $Quote + " " + $Quote + $CurrentLeaf + $Quote + " >nul 2>&1"), "    goto :eof", ")",' . "`n"
+		. '    "del /q %BAK_EXE% >nul 2>&1", ("start " + $Quote + $Quote + " " + $Quote + "%CUR_EXE%" + $Quote), "goto :eof"' . "`n"
+		. '  ) -join [Environment]::NewLine' . "`n"
+		. '  [System.IO.File]::WriteAllText($SwapBat, $Batch, [System.Text.Encoding]::ASCII)' . "`n"
+		. '  Write-Output "READY"' . "`n"
+		. '  exit 0' . "`n"
+		. '} catch {' . "`n"
+		. '  try { if ($NewExe -and (Test-Path -LiteralPath $NewExe)) { Remove-Item -LiteralPath $NewExe -Force } } catch {}' . "`n"
+		. '  Write-Output ("ERR:" + $_.Exception.Message)' . "`n"
+		. '  exit 1' . "`n"
+		. '}'
 }
 
 ; The download guard spans HTTP polling, response persistence, integrity checks,

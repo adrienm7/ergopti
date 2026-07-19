@@ -48,8 +48,8 @@ _USBR_CheckNoBareDelete() {
 	Assert(Src != "", "lib/updater.ahk must be readable")
 
 	; Use the full parameter list to anchor on the definition, not the call site
-	Body := _DriverFuncBody("_Updater_PollDownloadAsync")
-	Assert(Body != "", "_Updater_PollDownloadAsync must be present in updater.ahk")
+	Body := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
+	Assert(Body != "", "_Updater_BuildStagingWorkerScript must be present in updater.ahk")
 
 	; Old risky delete-then-move must not be the swap pattern
 	Assert(!InStr(Body, 'del /q "%CUR_EXE%"'),
@@ -61,8 +61,8 @@ _USBR_CheckBakRenamePresent() {
 	Assert(Src != "", "lib/updater.ahk must be readable")
 
 	; Use the full parameter list to anchor on the definition, not the call site
-	Body := _DriverFuncBody("_Updater_PollDownloadAsync")
-	Assert(Body != "", "_Updater_PollDownloadAsync must be present in updater.ahk")
+	Body := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
+	Assert(Body != "", "_Updater_BuildStagingWorkerScript must be present in updater.ahk")
 
 	; Swap script must rename to .bak before the move
 	Assert(InStr(Body, ".bak"),
@@ -78,11 +78,11 @@ _USBR_CheckBakDeletedOnSuccess() {
 	Assert(Src != "", "lib/updater.ahk must be readable")
 
 	; Use the full parameter list to anchor on the definition, not the call site
-	Body := _DriverFuncBody("_Updater_PollDownloadAsync")
-	Assert(Body != "", "_Updater_PollDownloadAsync must be present in updater.ahk")
+	Body := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
+	Assert(Body != "", "_Updater_BuildStagingWorkerScript must be present in updater.ahk")
 
 	; The .bak must be deleted after a confirmed successful move
-	Assert(InStr(Body, 'del /q "%BAK_EXE%"'),
+	Assert(InStr(Body, "del /q %BAK_EXE%"),
 		"swap script must delete the .bak file after a confirmed successful move")
 }
 

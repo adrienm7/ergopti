@@ -166,27 +166,36 @@ Test("Updater: SetTimeouts never uses a 0 (infinite) resolve phase", _UpdaterTes
 ; Regression: the binary download path used to call Req.Send() with NO
 ; SetTimeouts at all -- fully unbounded, so a CDN stalling mid-transfer hung the
 ; main thread forever. Assert that Updater_DownloadAndInstall sets timeouts
-; before it sends. It is the last function in the file, so scanning from its
-; start to EOF stays within its body (its swap-batch string mixes single/double
-; quotes, which would defeat the brace-walker used by the FetchLatestJson test).
+; before it launches the isolated worker. The worker, rather than the keyboard
+; thread, owns the actual HTTP timeout and binary stream.
 _UpdaterTest_DownloadHasTimeout() {
-	Source := _DriverDirConcat("lib/updater")
-	FnStart := InStr(Source, "`nUpdater_DownloadAndInstall(")
-	if (FnStart == 0) {
-		AssertEqual("found", "missing", "Updater_DownloadAndInstall not found in updater.ahk")
-		return
-	}
-	Body := SubStr(Source, FnStart)
-	TimeoutPos := InStr(Body, "SetTimeouts")
-	SendPos    := InStr(Body, "Req.Send(")
-	AssertEqual(true, TimeoutPos > 0,
-		"Updater_DownloadAndInstall is missing SetTimeouts -- the binary download can hang the main thread")
-	if (TimeoutPos > 0 and SendPos > 0) {
-		AssertEqual(true, TimeoutPos < SendPos,
-			"SetTimeouts must be called before Req.Send() in Updater_DownloadAndInstall")
-	}
+	Dispatch := _DriverFuncBody("Updater_DownloadAndInstall")
+	Worker := _DriverFuncBody("_Updater_StartStagingWorker")
+	AssertEqual(true, InStr(Dispatch, "_Updater_StartStagingWorker(") > 0,
+		"Updater_DownloadAndInstall must dispatch the binary transaction to the isolated worker")
+	AssertEqual(true, InStr(Worker, "UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS") > 0,
+		"Updater staging worker must receive the finite download timeout")
+	AssertEqual(true, InStr(Worker, "ShellRunner_Spawn") > 0,
+		"Updater staging worker must use ShellRunner_Spawn so the hook thread never waits for HTTP")
 }
 Test("Updater: DownloadAndInstall has timeout guard (regression: unbounded binary download)", _UpdaterTest_DownloadHasTimeout)
+
+
+; The worker script is constructed at runtime, so a source-only scan cannot
+; catch an accidental AHK string-concatenation regression that drops its argv
+; contract or integrity checks before PowerShell is even launched.
+_UpdaterTest_StagingWorkerScriptContract() {
+	Script := _Updater_BuildStagingWorkerScript()
+	AssertEqual(true, InStr(Script, "param([string]$Url") > 0,
+		"Updater staging worker script must keep its URL argv contract")
+	AssertEqual(true, InStr(Script, "$Request.ReadWriteTimeout = $TimeoutMs") > 0,
+		"Updater staging worker script must apply a streaming timeout")
+	AssertEqual(true, InStr(Script, "$ActualSize -ne $ExpectedSize") > 0,
+		"Updater staging worker script must keep the truncated-download integrity check")
+	AssertEqual(true, InStr(Script, 'Write-Output "READY"') > 0,
+		"Updater staging worker script must emit the readiness token only after staging succeeds")
+}
+Test("Updater: staging worker runtime script retains its argv, timeout, integrity and readiness contract", _UpdaterTest_StagingWorkerScriptContract)
 
 
 ; Regression: the background poller MUST dispatch its GitHub query

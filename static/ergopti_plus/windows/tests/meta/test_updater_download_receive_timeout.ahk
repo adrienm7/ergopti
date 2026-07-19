@@ -21,10 +21,10 @@
 
 
 _UDRT_AssertDownloadReceiveBudget() {
-	Body := _DriverFuncBody("Updater_DownloadAndInstall")
-	Assert(Body != "", "Updater_DownloadAndInstall must exist")
-	Assert(InStr(Body, "UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS)") > 0,
-		"Updater_DownloadAndInstall's SetTimeouts must pass UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS as the receive slot, not the 30 s API receive timeout (updater-download-receive-timeout)")
+	Body := _DriverFuncBody("_Updater_StartStagingWorker")
+	Assert(Body != "", "_Updater_StartStagingWorker must exist")
+	Assert(InStr(Body, "UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS") > 0,
+		"_Updater_StartStagingWorker must pass the dedicated download timeout to the worker, not the 30 s API budget (updater-download-receive-timeout)")
 	SplitPath(A_ScriptDir, , &Root)
 	Core := FileRead(StrReplace(Root, "\", "/") . "/lib/updater/core.ahk")
 	m := ""
@@ -32,5 +32,8 @@ _UDRT_AssertDownloadReceiveBudget() {
 		"core.ahk must define UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS (updater-download-receive-timeout)")
 	Assert(Integer(m[1]) >= 600000,
 		"UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS must be >= the 600 s poll ceiling so the download is not aborted before the poll deadline (updater-download-receive-timeout)")
+	Worker := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
+	Assert(InStr(Worker, "$Request.ReadWriteTimeout = $TimeoutMs") > 0,
+		"the worker must apply the dedicated budget while streaming the binary")
 }
 Test("updater: download uses a dedicated large receive timeout, not the 30s API budget (updater-download-receive-timeout)", _UDRT_AssertDownloadReceiveBudget)
