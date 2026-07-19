@@ -290,6 +290,12 @@ _DriverDirConcat(RelDir) {
 	return Combined
 }
 
+; Export a callable reference for fragment tests. AHK's isolated #Warn pass
+; cannot resolve a global function supplied by the runner's preceding include;
+; fragment functions can declare this variable global without suppressing an
+; actual missing-helper failure at runtime.
+global _DriverDirConcatFn := _DriverDirConcat
+
 
 
 
