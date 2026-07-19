@@ -512,11 +512,20 @@ _UIA_NO_TP_TTL_MS     := 30000
 global _UIA_SelectionCache := 0
 global UIA_SELECTION_MAX_AGE_MS := 750
 global _UIA_SelectionPollTimer := unset
+; Never start a COM/UIA round-trip while the user is actively typing. The timer
+; shares AHK's only message thread with the keyboard hook; a probe is useful
+; only after a selection gesture has settled, not between successive keys.
+global UIA_SELECTION_IDLE_REQUIRED_MS := 250
+; TextPattern.GetText(-1) asks a provider for an unbounded document range. A
+; selection wrap is a convenience action, so cap the snapshot rather than let a
+; large document selection monopolise the keyboard/message thread.
+global UIA_SELECTION_MAX_TEXT_CHARS := 8192
 
 ; Background timer to poll the current UIA selection. Moves the expensive
 ; COM round-trip off the synchronous keyboard path (uia-selection-blocks-keyboard-thread).
 _UIA_SelectionPollTick() {
 	global _UIA_SelectionCache, UIA, _UIA_NO_TP_CACHE, _UIA_NO_TP_TTL_MS
+	global UIA_SELECTION_IDLE_REQUIRED_MS, UIA_SELECTION_MAX_TEXT_CHARS
     ; SetTimer bypasses native Suspend — a paused driver must do ZERO UIA work
     ; (« pause = tout éteint »): the 3-hop COM round-trip + unbounded GetText(-1)
     ; would keep firing every 500 ms on the keyboard thread while paused.
@@ -532,6 +541,11 @@ _UIA_SelectionPollTick() {
 		_UIA_SelectionCache := 0
         return
     }
+    ; Do not clear an existing short-lived snapshot here: a wrapping symbol can
+    ; be the very next physical key after the selection gesture. We simply skip
+    ; starting new COM work until the input stream has been quiet long enough.
+    if (A_TimeIdlePhysical < UIA_SELECTION_IDLE_REQUIRED_MS)
+        return
     if (!IsSet(UIA))
         return
 
@@ -559,7 +573,7 @@ _UIA_SelectionPollTick() {
         tp := el.GetPattern("Text")
         ranges := tp.GetSelection()
         if (ranges.Length > 0) {
-            Text := ranges[1].GetText(-1)
+            Text := ranges[1].GetText(UIA_SELECTION_MAX_TEXT_CHARS)
             ; Blank-only selections (newlines) are not meaningful to wrap
             if (Text != "" and !RegExMatch(Text, "^(\r\n|\r|\n)+$")) {
 				_UIA_SelectionCache := {

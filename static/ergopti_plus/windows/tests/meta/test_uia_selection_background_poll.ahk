@@ -77,6 +77,19 @@ _USBP_PollTickSuspendAndFeatureGated() {
 }
 Test("layout: UIA selection poll is gated by suspend + the wrap feature flag (uia-poll-bypasses-suspend)", _USBP_PollTickSuspendAndFeatureGated)
 
+; A timer still runs on AHK's sole message thread. It must not start a COM call
+; during active typing, and it must never request an unbounded TextPattern range.
+_USBP_PollTickIsIdleGatedAndBounded() {
+	TickBody := _DriverFuncBody("_UIA_SelectionPollTick")
+	Assert(InStr(TickBody, "A_TimeIdlePhysical < UIA_SELECTION_IDLE_REQUIRED_MS") > 0,
+		"_UIA_SelectionPollTick must skip new UIA COM work while physical input is active, so its timer cannot contend with keyboard dispatch")
+	Assert(InStr(TickBody, "GetText(UIA_SELECTION_MAX_TEXT_CHARS)") > 0,
+		"_UIA_SelectionPollTick must cap TextPattern.GetText so a document-sized selection cannot monopolise the AHK thread")
+	Assert(InStr(TickBody, "GetText(-1)") = 0,
+		"_UIA_SelectionPollTick must not request an unbounded UIA text range on the driver thread")
+}
+Test("layout: UIA selection poll waits for idle input and caps retrieved text (uia-selection-poll-budget)", _USBP_PollTickIsIdleGatedAndBounded)
+
 _USBP_SelectionCacheInitialized() {
 	Src := _USBP_ReadSource("modules/keymap/layout.ahk")
 	; An unset global causes return _UIA_SelectionCache inside GetUIASelection
