@@ -16,11 +16,19 @@ MagicKeyEditor(*) {
     GuiToShow.Add("Text", "w300", t("button.cancel") . " → Echap")
     GuiToShow.Show("Center")
     IH := InputHook("L1 I", "{Escape}")
+    GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
     IH.Start()
     IH.Wait()
-    GuiToShow.Destroy()
-    if (IH.EndReason = "Stopped" && IH.Input != "")
+    ; The Close event may already have destroyed the native window.
+    try GuiToShow.Destroy()
+    if (IH.EndReason = "Max" && IH.Input != "")
         ModifyMagicKey(0, IH.Input)
+}
+
+_MagicKeyEditorClose(IH, GuiToClose, *) {
+    ; Closing the dialog is cancellation. Stop its suppressive InputHook now
+    ; so the next user key cannot be consumed by an orphaned capture.
+    try IH.Stop()
 }
 
 ModifyMagicKey(gui, NewValue) {
