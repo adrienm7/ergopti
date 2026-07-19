@@ -64,3 +64,16 @@ _MetaCheckReachabilityNonBlocking() {
 
 Test("meta llm: Ollama reachability probe is non-blocking curl, not WinHTTP (ollama-reachability-winhttp-connect-blocks)",
 	_MetaCheckReachabilityNonBlocking)
+
+_MetaCheckInstallerDoesNotProbeWingetSynchronously() {
+	Body := _DriverFuncBody("LLM_Deps_RunInstaller")
+	Assert(Body != "", "LLM_Deps_RunInstaller must exist in ollama_deps_checker.ahk")
+	Assert(InStr(Body, "RunWait(") = 0,
+		"LLM_Deps_RunInstaller must not RunWait for 'where winget' on the menu thread; direct Run plus catch selects the browser fallback without freezing input")
+	Assert(InStr(Body, "winget install") > 0 and InStr(Body, "Run(") > 0,
+		"LLM_Deps_RunInstaller must launch winget asynchronously and preserve the automated installer path")
+	Assert(_DriverFuncBody("_LLM_Deps_HasWinget") = "",
+		"the synchronous _LLM_Deps_HasWinget helper must not be reintroduced")
+}
+Test("meta llm: installer launches winget without a synchronous availability probe (ollama-winget-menu-block)",
+	_MetaCheckInstallerDoesNotProbeWingetSynchronously)
