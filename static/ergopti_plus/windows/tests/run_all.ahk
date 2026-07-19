@@ -784,6 +784,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_layout_deadkey_endkey.ahk
 #Include meta/test_oneshotshift_endkeys.ahk
 #Include meta/test_magic_key_capture.ahk
+#Include meta/test_gesture_restart_nonblocking.ahk
 #Include meta/test_deadkey_unmapped_base_char.ahk
 #Include meta/test_savefullconfig_no_delete.ahk
 #Include meta/test_keylogger_scan_max_id_tail.ahk
