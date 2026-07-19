@@ -85,7 +85,12 @@ WPMWidget_LoadConfig(Cache) {
     raw_colors := IniCacheGet(Cache, "ahk.metrics", WPMWidgetConst.CFG_COLORS)
     raw_graph  := IniCacheGet(Cache, "ahk.metrics", WPMWidgetConst.CFG_GRAPH)
 
-    if (raw_x != "_" && raw_x != "" && IsInteger(raw_x)) {
+    ; Position is one atomic configuration value: accepting X while blindly
+    ; converting a malformed Y throws during boot after other input subsystems
+    ; are already live. Retain the class defaults unless BOTH coordinates are
+    ; explicitly present and integer-shaped.
+    if (raw_x != "_" && raw_x != "" && IsInteger(raw_x)
+        && raw_y != "_" && raw_y != "" && IsInteger(raw_y)) {
         MonitorGetWorkArea(, , , , &wb_check)
         saved_y := Integer(raw_y)
         ; Discard saved position if it places the widget below the work area —
