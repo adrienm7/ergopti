@@ -155,6 +155,11 @@ global _LLM_Menu := Map(
 	; Set when Ollama is ready but PrefixWatcher is not up yet; cleared when
 	; HotstringPrefixWatcherInit starts the bridge.
 	"bridge_pending",             false,
+	; Set when a deferred Ollama lifecycle callback lands while Suspend is
+	; active. Resume replays one bootstrap after every suspended producer has
+	; stopped, rather than allowing a dependency callback to rebuild the menu or
+	; start an InputHook-visible bridge during the pause.
+	"bootstrap_pending",          false,
 	; ── Remote API backend ──
 	; Persisted across reloads via SaveFullConfig (config.toml [LLM]
 	; subsection). The user adds an entry via "+ Add an API…" in the model

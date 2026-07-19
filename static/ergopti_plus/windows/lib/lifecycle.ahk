@@ -159,6 +159,11 @@ Ergopti_OnSuspendResume() {
     global _LLM_Bridge_Active
     if IsSet(_LLM_Bridge_Active) and _LLM_Bridge_Active
         try _LLM_PointerWatch_Start()
+    ; Deferred dependency callbacks are not allowed to rebuild the tray or
+    ; start the bridge while native Suspend is active. Replay the pending work
+    ; only after the resume transition has completed.
+    if IsSet(LLM_Menu_OnResume)
+        try LLM_Menu_OnResume()
 }
 _SuspendStateWatchdog() {
     global _LastSuspendState

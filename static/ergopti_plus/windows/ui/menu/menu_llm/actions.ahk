@@ -149,6 +149,13 @@ LLM_Menu_ToggleBool(key) {
  * @param {boolean} show_ui - True when the user explicitly clicked the toggle.
  */
 LLM_Menu_BootstrapOllama(show_ui := true) {
+	global _LLM_Menu
+	if A_IsSuspended {
+		_LLM_Menu["bootstrap_pending"] := true
+		LoggerDebug("LLM", "BootstrapOllama deferred while suspended.")
+		return
+	}
+	_LLM_Menu["bootstrap_pending"] := false
 	LoggerInfo("LLM", "BootstrapOllama fired — deps state: " LLM_Deps_GetState() " show_ui=" (show_ui ? "true" : "false") ".")
 	if LLM_Deps_IsReady() {
 		LoggerInfo("LLM", "Ollama already ready — starting bridge directly.")
@@ -394,6 +401,10 @@ LLM_Menu_OnAbout(*) {
  */
 LLM_Menu_TryStartBridge() {
 	global _LLM_Menu
+	if A_IsSuspended {
+		_LLM_Menu["bootstrap_pending"] := true
+		return
+	}
 	if !_LLM_Menu["enabled"] or !LLM_Deps_IsReady()
 		return
 	_LLM_Menu["bridge_pending"] := false
@@ -404,6 +415,10 @@ LLM_Menu_TryStartBridge() {
 
 LLM_Menu_StartBridge() {
 	global _LLM_Menu
+	if A_IsSuspended {
+		_LLM_Menu["bootstrap_pending"] := true
+		return
+	}
 	LLM_Menu_EnsureModelReady()
 	LLM_Bridge_Start(LLM_Menu_BuildOpts())
 	tag := LLM_ResolveOllamaTag(_LLM_Menu["model"])
@@ -510,6 +525,11 @@ LLM_Menu_BuildOpts() {
  */
 LLM_Menu_OnDepsReady() {
 	global _LLM_Menu
+	if A_IsSuspended {
+		_LLM_Menu["bootstrap_pending"] := true
+		LoggerDebug("LLM", "Deps-ready callback deferred while suspended.")
+		return
+	}
 	LoggerInfo("LLM", "Ollama ready — LLM enabled: {1}.",
 		_LLM_Menu["enabled"] ? "true" : "false")
 	LLM_Menu_Build()
@@ -534,6 +554,24 @@ LLM_Menu_OnDepsReady() {
  */
 LLM_Menu_OnDepsFailed(msg) {
 	global _LLM_Menu
+	if A_IsSuspended {
+		_LLM_Menu["bootstrap_pending"] := true
+		LoggerDebug("LLM", "Deps-failed callback deferred while suspended.")
+		return
+	}
 	_LLM_Menu["enabled"] := false
 	LLM_Menu_Build()
+}
+
+; Replays the suspended lifecycle work from the resume watchdog, after native
+; Suspend has released hotkeys. The one-shot avoids performing dependency work
+; inside the watchdog callback itself.
+LLM_Menu_OnResume() {
+	global _LLM_Menu
+	if A_IsSuspended or !_LLM_Menu["bootstrap_pending"]
+		return
+	_LLM_Menu["bootstrap_pending"] := false
+	if !_LLM_Menu["enabled"]
+		return
+	SetTimer(() => LLM_Menu_BootstrapOllama(false), -1)
 }
