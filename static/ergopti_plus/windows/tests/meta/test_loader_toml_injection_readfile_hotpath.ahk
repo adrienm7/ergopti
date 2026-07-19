@@ -84,8 +84,8 @@ _LTI_WriteTapHoldDisabledIsAtomic() {
 	Assert(Seg != "", "_TH_WriteTapHoldDisabled declaration must exist in tap_hold_writer.ahk")
 	Assert(InStr(Seg, "FileDelete(Path)") == 0,
 		"_TH_WriteTapHoldDisabled must NOT delete the live tap_hold.toml first (loader-toml-injection-readfile-hotpath)")
-	Assert(InStr(Seg, "FileMove(Tmp, Path, true)") > 0,
-		"_TH_WriteTapHoldDisabled must rename a staged temp file over the target with atomic FileMove(Tmp, Path, true)")
+	Assert(InStr(Seg, "_TH_WriteTapHoldToml(Candidate)") > 0,
+		"_TH_WriteTapHoldDisabled must delegate its immutable candidate to the single atomic FileMove writer")
 }
 Test("tap_hold_writer: _TH_WriteTapHoldDisabled uses atomic FileMove (loader-toml-injection-readfile-hotpath)", _LTI_WriteTapHoldDisabledIsAtomic)
 
