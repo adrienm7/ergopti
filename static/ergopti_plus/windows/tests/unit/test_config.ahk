@@ -93,6 +93,20 @@ TestCfg_GetSentinel() {
 }
 Test("IniCacheGet: default sentinel '_' is the documented marker", TestCfg_GetSentinel)
 
+TestCfg_GetMalformedSection() {
+	; A partially migrated or hand-edited config can temporarily contain a
+	; scalar at a section key. The accessor must return its documented missing
+	; sentinel rather than calling .Has() on that scalar and aborting startup.
+	C := Map("hotstrings", true)
+	AssertEqual("_", IniCacheGet(C, "hotstrings", "trigger_char"))
+}
+Test("IniCacheGet: malformed scalar section returns the missing sentinel", TestCfg_GetMalformedSection)
+
+TestCfg_GetMalformedCache() {
+	AssertEqual("fallback", IniCacheGet("not-a-cache", "hotstrings", "trigger_char", "fallback"))
+}
+Test("IniCacheGet: malformed cache returns the explicit default", TestCfg_GetMalformedCache)
+
 
 
 
