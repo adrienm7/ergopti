@@ -453,11 +453,18 @@ GestureOpenConfiguredURL(BindingId := "") {
 }
 
 GesturePickColor() {
-    MouseGetPos(&MouseX, &MouseY)
-    HexColor := PixelGetColor(MouseX, MouseY, "RGB")
-    HexColor := "#" . StrLower(SubStr(HexColor, 3))
-    A_Clipboard := HexColor
-    MsgBox(Format(t("shortcuts.color_picker_result"), HexColor, A_Clipboard), t("shortcuts.color_picker_title"))
+    ; Gesture callbacks share the driver's single message thread.  Do not let
+    ; a PixelGetColor/clipboard failure escape or a blocking dialog stall input.
+    try {
+        MouseGetPos(&MouseX, &MouseY)
+        HexColor := "#" . StrLower(SubStr(PixelGetColor(MouseX, MouseY, "RGB"), 3))
+        if !CB_Write(HexColor)
+            throw Error("clipboard write failed")
+        TrayTip(HexColor, "ErgoptiPlus", "Iconi Mute")
+    } catch as Err {
+        LoggerError("gestures", "GesturePickColor failed: {1}", Err.Message)
+        TrayTip("Color copy failed.", "ErgoptiPlus", "Iconx Mute")
+    }
 }
 
 GestureTakeNote() {
