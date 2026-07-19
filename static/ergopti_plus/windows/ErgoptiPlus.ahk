@@ -527,7 +527,9 @@ EnsurePersonalShortcutsFile(Path) {
                 DirCreate(Dir)
             }
             Template := IsSet(PERSONAL_SHORTCUTS_TEMPLATE) ? PERSONAL_SHORTCUTS_TEMPLATE : ""
-            FileAppend(Template, Path, "UTF-8-RAW")
+            ; Every generated AHK source must be UTF-8 with BOM and LF.
+            ; `UTF-8-RAW` silently creates a parser-risking BOM-less file.
+            FileAppend(Template, Path, "UTF-8")
             FileWasCreated := true
             try LoggerInfo("ErgoptiPlus", "Personal shortcuts file created from template at '{1}'.", Path)
         } catch as e {
@@ -549,11 +551,11 @@ EnsurePersonalShortcutsFile(Path) {
     }
     try DirCreate(StubDir)
     StubPath := StubDir . "\personal_shortcuts.ahk"
-    DesiredStub := "; Auto-generated forwarding stub — do not edit.`r`n"
-        . "; Forwards to the user's personal shortcuts file located at:`r`n"
-        . ";     " . Path . "`r`n"
-        . "; Edit that file (e.g. via the tray menu) rather than this stub.`r`n"
-        . "#Include *i " . Path . "`r`n"
+    DesiredStub := "; Auto-generated forwarding stub — do not edit.`n"
+        . "; Forwards to the user's personal shortcuts file located at:`n"
+        . ";     " . Path . "`n"
+        . "; Edit that file (e.g. via the tray menu) rather than this stub.`n"
+        . "#Include *i " . Path . "`n"
     Existing := ""
     if FileExist(StubPath) {
         try Existing := FileRead(StubPath, "UTF-8-RAW")
@@ -564,7 +566,7 @@ EnsurePersonalShortcutsFile(Path) {
             if FileExist(StubPath) {
                 FileDelete(StubPath)
             }
-            FileAppend(DesiredStub, StubPath, "UTF-8-RAW")
+            FileAppend(DesiredStub, StubPath, "UTF-8")
             try LoggerInfo("ErgoptiPlus", "Personal shortcuts forwarding stub refreshed at '{1}'.", StubPath)
         } catch as e {
             try LoggerWarn("ErgoptiPlus", "Could not write forwarding stub at '{1}': {2}.",
