@@ -36,10 +36,16 @@ if Features["shortcuts"]["paste_without_formatting"] {
     ; Deferred clipboard restore for PasteWithoutFormatting. Runs on a negative-delay
     ; SetTimer so the synthetic ^v has already consumed the coerced text before the
     ; user's original (possibly non-text) clipboard is put back.
-    _PasteWithoutFormattingRestore(OldClip) {
+    _PasteWithoutFormattingRestore(OldClip, OwnedSequence) {
         global _SEND_INSTANT_CLIP_BUSY
-        A_Clipboard := OldClip
-        _SEND_INSTANT_CLIP_BUSY := false
+        try {
+            ; Do not overwrite a copy made after our temporary plain-text
+            ; payload. The owner sequence is captured immediately after write.
+            if (OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence)
+                CB_RestoreAll(OldClip)
+        } finally {
+            _SEND_INSTANT_CLIP_BUSY := false
+        }
     }
 
     PasteWithoutFormatting(*) {
@@ -62,14 +68,26 @@ if Features["shortcuts"]["paste_without_formatting"] {
                 ; silently dropping any image/HTML/RTF the user may still want, so
                 ; we restore the original after the paste settles -- mirroring
                 ; GesturePastePlain's save/paste/deferred-restore guarantee.
-                _SEND_INSTANT_CLIP_BUSY := true
-                OldClip := ClipboardAll()
-                try {
-                    A_Clipboard := A_Clipboard
+                OldClip := CB_SaveAll()
+                if (Type(OldClip) == "String" && OldClip == "__CB_SAVE_ERROR__") {
+                    try LoggerWarn("shortcuts", "PasteWithoutFormatting: clipboard snapshot failed; using native paste.")
                     SendFinalResult("^v")
-                    SetTimer(_PasteWithoutFormattingRestore.Bind(OldClip), -SEND_INSTANT_PASTE_DELAY_MS)
+                    return
+                }
+                PlainText := CB_Read()
+                _SEND_INSTANT_CLIP_BUSY := true
+                OwnedSequence := 0
+                try {
+                    if !CB_Write(PlainText)
+                        throw Error("clipboard write failed")
+                    OwnedSequence := CB_GetSequenceNumber()
+                    if !OwnedSequence
+                        throw Error("clipboard sequence unavailable")
+                    SendFinalResult("^v")
+                    SetTimer(_PasteWithoutFormattingRestore.Bind(OldClip, OwnedSequence), -SEND_INSTANT_PASTE_DELAY_MS)
                 } catch as e {
-                    A_Clipboard := OldClip
+                    if (!OwnedSequence || CB_GetSequenceNumber() = OwnedSequence)
+                        CB_RestoreAll(OldClip)
                     _SEND_INSTANT_CLIP_BUSY := false
                     try LoggerError("shortcuts", "PasteWithoutFormatting threw during paste — clipboard and guard restored: {1}.", e.Message)
                 }

@@ -7,7 +7,7 @@
 ;
 ; PasteWithoutFormatting used to coerce A_Clipboard to plain text and then
 ; paste, permanently destroying the user's original rich clipboard content
-; (images, HTML, RTF). The fix snapshots the full clipboard via ClipboardAll()
+; (images, HTML, RTF). The fix snapshots the full clipboard via CB_SaveAll()
 ; before the coercion and schedules a deferred restore via SetTimer, exactly
 ; mirroring the pattern already used by GesturePastePlain.
 ;
@@ -47,8 +47,8 @@ _PWF_AssertSnapshot() {
 	Src := _PWF_ReadSource("modules/shortcuts/ctrl.ahk")
 	Body := _DriverFuncBody("PasteWithoutFormatting")
 	Assert(Body != "", "PasteWithoutFormatting(*) declaration must exist in ctrl.ahk")
-	Assert(InStr(Body, "ClipboardAll()") > 0,
-		"PasteWithoutFormatting must snapshot the full clipboard via ClipboardAll() before coercion (paste-without-formatting-no-restore)")
+	Assert(InStr(Body, "CB_SaveAll()") > 0,
+		"PasteWithoutFormatting must snapshot the full clipboard via CB_SaveAll() before coercion (paste-without-formatting-no-restore)")
 }
 Test("ctrl: PasteWithoutFormatting snapshots clipboard before coercion (paste-without-formatting-no-restore)", _PWF_AssertSnapshot)
 
@@ -73,7 +73,7 @@ _PWF_AssertClipBusyGuardChecked() {
 	Assert(GuardPos > 0,
 		"PasteWithoutFormatting must participate in the shared _SEND_INSTANT_CLIP_BUSY clipboard-reentrancy guard, matching GesturePastePlain (paste-without-formatting-clip-busy-race)")
 
-	SnapshotPos := InStr(Body, "ClipboardAll()")
+	SnapshotPos := InStr(Body, "CB_SaveAll()")
 	Assert(GuardPos < SnapshotPos,
 		"PasteWithoutFormatting must check _SEND_INSTANT_CLIP_BUSY BEFORE snapshotting/coercing the clipboard -- checking after the fact does not prevent the overlap race")
 }
