@@ -286,9 +286,9 @@ LLM_Bridge_ScheduleAfterHotstring(items) {
 		? Max(_LLM_MIN_TOOLTIP_DURATION_SEC, minDur)
 		: _LLM_INFINITE_TOOLTIP_SEC
 	delaySec := tooltipTimeout + _LLM_HOTSTRING_CHAIN_OFFSET_SEC
-	buffer := _LLM_Bridge_Buffer
+    BridgeBuffer := _LLM_Bridge_Buffer
 	try LoggerDebug("LLM", "Hotstring chain scheduled in {1:.3f}s.", delaySec)
-	LLM_Engine_StartTimer(delaySec, buffer)
+    LLM_Engine_StartTimer(delaySec, BridgeBuffer)
 }
 
 ; Returns true when char ``c`` is a word boundary — whitespace or common sentence/
@@ -463,7 +463,7 @@ LLM_Bridge_OnPointerActivity(reason := "?") {
 }
 
 _LLM_PointerWatch_Start() {
-	global _LLM_PointerWatch_Armed, _LLM_PointerWatch_MoveFn, _LLM_PointerWatch_ActivityFn
+    global _LLM_PointerWatch_Armed, _LLM_PointerWatch_MoveFn, _LLM_PointerWatch_ActivityFn, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY
 	if _LLM_PointerWatch_Armed
 		return
 	_LLM_PointerWatch_Armed := true
@@ -621,10 +621,10 @@ LLM_Bridge_OnAccept(text) {
 			try HSE_HardReset()
 		if IsSet(_ResetPrefixBuffer)
 			try _ResetPrefixBuffer()
-	} catch as _e {
+	} catch as AcceptError {
 		; TextSend threw before the callback could run — arm the finally release
 		_threw := true
-		throw _e
+		throw AcceptError
 	} finally {
 		; Release guards only when TextSend threw and never invoked the callback.
 		; On the success path (direct or clipboard) the callback owns the release.

@@ -150,6 +150,7 @@ GestureScreenshotFullscreen(Mode) {
 ; mode we additionally watch the clipboard for the resulting image and dump
 ; it to a timestamped PNG on disk.
 GestureScreenshotRegion(Mode) {
+    global _GestureRegionCapture, _GestureRegionCaptureEpoch
     if (Mode == "clipboard") {
         ; Snip & Sketch already places the image on the clipboard — nothing
         ; further to do. Fire-and-forget so the user can keep typing.
