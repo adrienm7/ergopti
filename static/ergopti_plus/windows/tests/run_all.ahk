@@ -999,6 +999,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_onboarding_gesture_msgbox_zorder.ahk
 #Include meta/test_ui_style_llm_tray_i18n.ahk
 #Include meta/test_ollama_webview_msgsub_retained.ahk
+#Include meta/test_open_downloads_catch.ahk
+#Include meta/test_takenote_winmaximize_guard.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
