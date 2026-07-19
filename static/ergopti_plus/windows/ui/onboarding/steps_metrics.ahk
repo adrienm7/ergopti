@@ -202,16 +202,15 @@ _Onboarding_StartGestureAuto(OnDone) {
     JobStem := A_Temp . "\ergopti_gesture_config_" . A_Pid . "_" . Epoch
     ScriptPath := JobStem . ".ps1"
     ResultPath := JobStem . ".result"
-    try FileDelete(ResultPath)
-    try FileAppend(_Onboarding_BuildGesturePsScript(ResultPath), ScriptPath, "UTF-8")
-    catch as err {
-        try LoggerError("Onboarding", "Could not write gesture PS script: {1}.", err.Message)
+    FSDelete(ResultPath)
+    if !FSWrite(ScriptPath, _Onboarding_BuildGesturePsScript(ResultPath)) {
+        try LoggerError("Onboarding", "Could not write gesture PS script.")
         return false
     }
     Pid := 0
     try Run('*RunAs powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . ScriptPath . '"', , "Hide", &Pid)
     catch as err {
-        try FileDelete(ScriptPath)
+        FSDelete(ScriptPath)
         try LoggerError("Onboarding", "Gesture auto-config launch failed: {1}.", err.Message)
         return false
     }
@@ -237,8 +236,8 @@ _Onboarding_PollGestureAuto(Epoch) {
     }
     Ok := _Onboarding_ReadGestureAutoResult(_OnboardingGestureJob["result"])
     Done := _OnboardingGestureJob["done"]
-    try FileDelete(_OnboardingGestureJob["script"])
-    try FileDelete(_OnboardingGestureJob["result"])
+    FSDelete(_OnboardingGestureJob["script"])
+    FSDelete(_OnboardingGestureJob["result"])
     _OnboardingGestureJob["pid"] := 0
     _OnboardingGestureJob["done"] := 0
     if IsObject(Done)
@@ -246,11 +245,12 @@ _Onboarding_PollGestureAuto(Epoch) {
 }
 
 _Onboarding_ReadGestureAutoResult(ResultPath) {
-    try Result := Trim(FileRead(ResultPath, "UTF-8"))
-    catch as err {
-        try LoggerError("Onboarding", "Gesture auto-config result missing: {1}.", err.Message)
+    Result := FSRead(ResultPath)
+    if (Result = false) {
+        try LoggerError("Onboarding", "Gesture auto-config result missing.")
         return false
     }
+    Result := Trim(Result)
     if (Result != "0") {
         try LoggerWarn("Onboarding", "Gesture auto-config returned invalid/failing result: {1}.", Result)
         return false
