@@ -51,13 +51,13 @@ _DMCFIO_PrescanWarmedBeforeCritical() {
 	Src := _DriverSourceConcat()
 	Seg := _DriverFuncBody("BuildTrayMenuDeferred")
 	Assert(Seg != "", "BuildTrayMenuDeferred() must exist in ErgoptiPlus.ahk")
-	; Match the EXECUTABLE sequence: the prescan call immediately followed (only
-	; whitespace/newlines between) by Critical(On). Matching the contiguous code
-	; lines side-steps the comment text that mentions both tokens out of order.
+	; Match the EXECUTABLE sequence: the prescan completes before the assignment
+	; that opens Critical. Matching code rather than surrounding comments keeps
+	; the file-I/O boundary meaningful even when Critical's prior state is saved.
 	; Q is the ASCII double-quote (the linter bans the backtick-quote escape).
 	Q := Chr(34)
-	Pattern := "_HS_PreScanPersonal\(\)\s+Critical\(" . Q . "On" . Q . "\)"
+	Pattern := "_HS_PreScanPersonal\(\)\s+_MenuBuildCritical\s*:=\s*Critical\(" . Q . "On" . Q . "\)"
 	Assert(RegExMatch(Seg, Pattern) > 0,
-		"_HS_PreScanPersonal() must run on the line immediately BEFORE Critical(On) in BuildTrayMenuDeferred — warming the prescan cache off-Critical keeps the unbounded personal-hotstrings file I/O out of the keyboard-hook starvation window")
+		"_HS_PreScanPersonal() must complete before BuildTrayMenuDeferred enters Critical — warming the prescan cache off-Critical keeps unbounded personal-hotstrings file I/O out of the keyboard-hook starvation window")
 }
 Test("ErgoptiPlus: BuildTrayMenuDeferred warms prescan before Critical (deferred-menu-critical-file-io)", _DMCFIO_PrescanWarmedBeforeCritical)
