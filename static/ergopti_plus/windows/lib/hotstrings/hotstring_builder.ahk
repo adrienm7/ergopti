@@ -197,9 +197,12 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
         }
         if isNotepad {
             ; Windows 11 Notepad mis-handles hotstrings (Windows bug, not AHK),
-            ; so we route replacement through the clipboard.
-            SendNewResult(BackSpaceSeq, False)
-            SendInstant(Replacement . EndChar)
+            ; so we route replacement through the clipboard. Keep the erase and
+            ; Ctrl+V in one SendInput transaction: a separate SendEvent erase lets
+            ; a physical key interleave before the clipboard paste.
+            _HsNotepadCritical := Critical("On")
+            try SendInstant(Replacement . EndChar, BackSpaceSeq)
+            finally Critical(_HsNotepadCritical)
         } else if FinalResult {
             SendFinalResult(BackSpaceSeq, False)
             SendFinalResult(Replacement, OnlyText)

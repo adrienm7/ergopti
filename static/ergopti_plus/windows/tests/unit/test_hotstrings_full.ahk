@@ -479,8 +479,8 @@ TestHH_NotepadFinalResultStillNotepad() {
     ; Even with FinalResult=true, the Notepad branch wins (it returns before
     ; the FinalResult check is reached).
     _TestCallHotstring("ab", "x", "!", true, true, 0)
-    AssertEqual("SendNewResult", _Stub_RecordedSends[1].fn)
-    AssertEqual("SendInstant", _Stub_RecordedSends[2].fn)
+    AssertEqual(1, _Stub_RecordedSends.Length)
+    AssertEqual("SendInstant", _Stub_RecordedSends[1].fn)
 }
 Test("HotstringHandler: Notepad branch overrides FinalResult and uses SendInstant",
     TestHH_NotepadFinalResultStillNotepad)
@@ -674,17 +674,17 @@ TestHH_NotepadPathSendCount() {
     ResetHotstringRecorders()
     SimulateNotepadActive()
     _TestCallHotstring("ab", "x", "!", true, false, 0)
-    ; Notepad path: BackSpace via SendNewResult + clipboard paste via SendInstant. 2 calls.
-    AssertEqual(2, _Stub_RecordedSends.Length)
+    ; Notepad path: erase prefix + clipboard paste are one SendInstant transaction.
+    AssertEqual(1, _Stub_RecordedSends.Length)
 }
-Test("HotstringHandler: Notepad branch issues exactly 2 sends", TestHH_NotepadPathSendCount)
+Test("HotstringHandler: Notepad branch issues one atomic send", TestHH_NotepadPathSendCount)
 
 TestHH_NotepadPathUsesSendInstant() {
     ResetHotstringRecorders()
     SimulateNotepadActive()
     _TestCallHotstring("ab", "x", "!", true, false, 0)
-    AssertEqual("SendNewResult", _Stub_RecordedSends[1].fn)
-    AssertEqual("SendInstant", _Stub_RecordedSends[2].fn)
+    AssertEqual(1, _Stub_RecordedSends.Length)
+    AssertEqual("SendInstant", _Stub_RecordedSends[1].fn)
 }
 Test("HotstringHandler: Notepad branch uses SendInstant for replacement+endchar",
     TestHH_NotepadPathUsesSendInstant)
@@ -693,8 +693,10 @@ TestHH_NotepadPathCombinesReplacementAndEndChar() {
     ResetHotstringRecorders()
     SimulateNotepadActive()
     _TestCallHotstring("ab", "REPL", "!", true, false, 0)
-    ; Notepad path concatenates Replacement . EndChar into a single SendInstant call.
-    AssertEqual("REPL!", _Stub_RecordedSends[2].args[1])
+    ; Notepad path concatenates Replacement . EndChar into one paste payload while
+    ; passing the erase sequence as SendInstant's atomic prefix.
+    AssertEqual("REPL!", _Stub_RecordedSends[1].args[1])
+    AssertEqual("{BackSpace 2}", _Stub_RecordedSends[1].args[2])
 }
 Test("HotstringHandler: Notepad branch concatenates Replacement and EndChar",
     TestHH_NotepadPathCombinesReplacementAndEndChar)
@@ -1043,8 +1045,8 @@ TestHH_NotepadAbbrWithUnicode() {
     SimulateNotepadActive()
     ; With Notepad + Unicode in abbr, BackSpace count must match StrLen("ab")
     _TestCallHotstring("ab", "★", "!", true, false, 0)
-    AssertEqual("{BackSpace 2}", _Stub_RecordedSends[1].args[1])
-    AssertContains(_Stub_RecordedSends[2].args[1], "★")
+    AssertEqual("{BackSpace 2}", _Stub_RecordedSends[1].args[2])
+    AssertContains(_Stub_RecordedSends[1].args[1], "★")
 }
 Test("HotstringHandler: Notepad path with Unicode replacement preserves character",
     TestHH_NotepadAbbrWithUnicode)
