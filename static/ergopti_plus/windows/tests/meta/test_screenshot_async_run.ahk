@@ -45,6 +45,15 @@ _SAR_FindScreenshotBlock(src) {
 	return SubStr(src, pos, 600)
 }
 
+; This test fragment is loaded through run_all.ahk, where test_framework.ahk
+; supplies _DriverDirConcat. Consume its exported callable reference so isolated
+; #Warn analysis does not mistake the cross-include function name for an unset
+; local variable. A missing framework helper still fails loudly at test runtime.
+_SAR_ShortcutsSource() {
+	global _DriverDirConcatFn
+	return _DriverDirConcatFn.Call("modules/shortcuts")
+}
+
 
 
 
@@ -55,7 +64,7 @@ _SAR_FindScreenshotBlock(src) {
 ; ==========================================================
 
 _SAR_NoRunWait() {
-	block := _SAR_FindScreenshotBlock(_DriverDirConcat("modules/shortcuts"))
+	block := _SAR_FindScreenshotBlock(_SAR_ShortcutsSource())
 	Assert(block != "",
 		"shortcuts/win.ahk: SC029 screenshot hotkey block must be present")
 	Assert(InStr(block, "RunWait") = 0,
@@ -65,7 +74,7 @@ Test("Screenshot hotkey: RunWait not used in SC029 block (screenshot-async-run)"
 
 
 _SAR_AsyncRunPresent() {
-	block := _SAR_FindScreenshotBlock(_DriverDirConcat("modules/shortcuts"))
+	block := _SAR_FindScreenshotBlock(_SAR_ShortcutsSource())
 	; Run( with an opening paren distinguishes the Run function from RunWait.
 	Assert(InStr(block, "Run(") > 0,
 		"shortcuts/win.ahk: SC029 must call Run() (async) instead of RunWait for the PowerShell capture process")
