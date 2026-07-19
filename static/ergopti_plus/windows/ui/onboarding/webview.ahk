@@ -431,10 +431,14 @@ _OnbWeb_Finish(answers) {
 	_ob_register_pending := false
 	_OB_ALTGR_PASSTHROUGH := false
 
-	; Close the WebView2 controller before the host window is torn down by the
-	; upcoming Reload (the WebView2 spec requires Controller.Close first).
-	_OnbWeb_Reset()
-	_Onboarding_Commit()
+	; Do not tear the wizard down until persistence succeeds. Otherwise a failed
+	; path/config write would discard the user's answers and leave no retry UI.
+	if _Onboarding_Commit() {
+		; Close the WebView2 controller before the host window is torn down by
+		; Reload (the WebView2 spec requires Controller.Close first).
+		_OnbWeb_Reset()
+		Reload
+	}
 }
 
 ; Runs the synchronous, elevated touchpad-gesture configuration (same registry

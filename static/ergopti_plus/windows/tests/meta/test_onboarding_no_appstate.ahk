@@ -65,6 +65,26 @@ _ONA_CommitUsesStrictCanonGlobal() {
 }
 Test("onboarding: _Onboarding_Commit uses _TOML_STRICT_CANON_IN_PROGRESS global (not AppState Map)", _ONA_CommitUsesStrictCanonGlobal)
 
+_ONA_CommitPublishesOnlyAfterPersistence() {
+        Seg := _DriverFuncBody("_Onboarding_Commit")
+        PathsWriter := _DriverFuncBody("_WritePathsToml")
+        NativeFinish := _DriverFuncBody("_Step5_Finish")
+        WebFinish := _DriverFuncBody("_OnbWeb_Finish")
+        Assert(InStr(Seg, "TOML_BatchWrite(CandidateConfig, updates)") > 0 && InStr(Seg, "PathRedirectRequired && !_WritePathsToml(CandidateDir)") > 0,
+                "onboarding must persist candidate config and paths redirect before it publishes globals")
+        Assert(InStr(Seg, "_ConfigDir := CandidateDir") > InStr(Seg, "TOML_BatchWrite(CandidateConfig, updates)"),
+                "onboarding must not publish _ConfigDir before the candidate config write succeeds")
+        Assert(InStr(Seg, "finally") > 0 && InStr(Seg, "_TOML_STRICT_CANON_IN_PROGRESS := PreviousStrictCanon") > 0,
+                "the strict-canonicalization guard must be restored on every commit outcome")
+        Assert(InStr(PathsWriter, "FileMove(TmpPath, _PathsFile, true)") > 0 && InStr(PathsWriter, "return false") > 0,
+                "paths.toml must be atomically replaced and report write failure")
+        Assert(InStr(NativeFinish, "if _Onboarding_Commit()") > 0 && InStr(NativeFinish, "Reload") > 0,
+                "native onboarding must reload only after a successful commit")
+        Assert(InStr(WebFinish, "if _Onboarding_Commit()") > 0 && InStr(WebFinish, "_OnbWeb_Reset()") > 0,
+                "WebView onboarding must retain its retry UI until commit success")
+}
+Test("onboarding: commit persists transactionally before publishing or reloading", _ONA_CommitPublishesOnlyAfterPersistence)
+
 
 
 

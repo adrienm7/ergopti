@@ -433,6 +433,8 @@ _Step5_Back(g, *) {
 
 _Step5_Finish(g, rYes, *) {
 	global _ob_gestures := (rYes.Value = 1)
-	_Onboarding_DestroyActive()
-	_Onboarding_Commit()
+	if _Onboarding_Commit() {
+		_Onboarding_DestroyActive()
+		Reload
+	}
 }
