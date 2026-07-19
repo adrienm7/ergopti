@@ -10,3 +10,19 @@ _UFNB_FinalizerDoesNotHoldCriticalAcrossIo() {
 		"the nonblocking guard must cover the real download finalization side effects")
 }
 Test("updater: download finalization performs I/O outside Critical (updater-finalize-nonblocking)", _UFNB_FinalizerDoesNotHoldCriticalAcrossIo)
+
+_UFNB_DownloadGuardSpansFinalization() {
+	Body := _DriverFuncBody("_Updater_PollDownloadAsync")
+	ReadyPos := InStr(Body, "ready := Req.WaitForResponse(0)")
+	SavePos := InStr(Body, "Stream.SaveToFile")
+	SwapPos := InStr(Body, "Run('cmd /c")
+	FailureBranchPos := InStr(Body, "if (failed or Req.Status != 200)")
+	Assert(ReadyPos > 0 && SavePos > ReadyPos && SwapPos > SavePos,
+		"poll finalization must include persistence and swap launch after the response becomes ready")
+	PreFinalization := SubStr(Body, ReadyPos, FailureBranchPos - ReadyPos)
+	Assert(!InStr(PreFinalization, "_Updater_EndDownloadTransaction()"),
+		"download guard must not be released immediately after WaitForResponse; it must span response persistence")
+	Assert(InStr(Body, "_UpdaterDownloadInProgress := false") = 0,
+		"only _Updater_EndDownloadTransaction may release the updater guard, preventing an early duplicate install")
+}
+Test("updater: download guard remains owned through finalization", _UFNB_DownloadGuardSpansFinalization)

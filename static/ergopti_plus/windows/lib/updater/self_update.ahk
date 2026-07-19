@@ -465,8 +465,7 @@ Updater_DownloadAndInstall(Release) {
 			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS)
 		Req.Send()
 	} catch as Err {
-		_UpdaterDownloadInProgress := false
-		try SetTimer((*) => _Updater_RebuildMenu(), -50)
+		_Updater_EndDownloadTransaction()
 		try LoggerError("Updater", "Asset download dispatch failed: {1}.", Err.Message)
 		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
 		return
@@ -480,8 +479,7 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 	if A_IsSuspended {
 		try LoggerWarn("Updater", "Async download aborted: driver suspended mid-flight (G5 Guarantee).")
 		try Req.Abort()
-		_UpdaterDownloadInProgress := false
-		try SetTimer((*) => _Updater_RebuildMenu(), -50)
+		_Updater_EndDownloadTransaction()
 		return
 	}
 	; Give the download up to 600 seconds to complete — slow connections on
@@ -506,12 +504,10 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 		}
 	}
 	
-	_UpdaterDownloadInProgress := false
-	try SetTimer((*) => _Updater_RebuildMenu(), -50)
-	
 	if (failed or Req.Status != 200) {
 		try LoggerError("Updater", "Asset download returned HTTP {1}.", failed ? "FAIL" : Req.Status)
 		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+		_Updater_EndDownloadTransaction()
 		return
 	}
 	
@@ -525,11 +521,13 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 	} catch as e {
 		try LoggerError("Updater", "Download failed: {1}.", e.Message)
 		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+		_Updater_EndDownloadTransaction()
 		return
 	}
 	if !FileExist(NewExe) {
 		try LoggerError("Updater", "Download completed but file missing at '{1}'.", NewExe)
 		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+		_Updater_EndDownloadTransaction()
 		return
 	}
 	; Partial-download guard: compare Content-Length to the actual saved size.
@@ -546,6 +544,7 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 			ContentLength, ActualSize)
 		try FileDelete(NewExe)
 		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+		_Updater_EndDownloadTransaction()
 		return
 	}
 	if (ActualSize < UPDATER_MIN_EXE_SIZE_BYTES) {
@@ -554,6 +553,7 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 			ActualSize, UPDATER_MIN_EXE_SIZE_BYTES)
 		try FileDelete(NewExe)
 		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+		_Updater_EndDownloadTransaction()
 		return
 	}
 	try LoggerSuccess("Updater", "Update downloaded to '{1}'.", NewExe)
@@ -600,6 +600,7 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 	} catch as e {
 		try LoggerError("Updater", "Could not write swap script: {1}.", e.Message)
 		MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
+		_Updater_EndDownloadTransaction()
 		return
 	}
 	try LoggerInfo("Updater", "Launching swap script and exiting in 1s…")
@@ -617,9 +618,8 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 		try LoggerError("Updater", "Swap script launch failed: {1}.", e.Message)
 	}
 	if !_SwapLaunched {
-		_UpdaterDownloadInProgress := false
-		try SetTimer((*) => _Updater_RebuildMenu(), -50)
 		MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
+		_Updater_EndDownloadTransaction()
 		return
 	}
 	; Reset the dedupe so a future user-driven check after a failure can
@@ -628,4 +628,14 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 	; Tiny delay lets the spawned cmd actually start polling before we vanish.
 	Sleep(200)
 	ExitApp(0)
+}
+
+; The download guard spans HTTP polling, response persistence, integrity checks,
+; swap-script creation, and the successful replacement hand-off. Releasing it
+; merely because WaitForResponse completed admits a second updater transaction
+; while both callbacks still target the same staging filenames.
+_Updater_EndDownloadTransaction() {
+	global _UpdaterDownloadInProgress
+	_UpdaterDownloadInProgress := false
+	try SetTimer((*) => _Updater_RebuildMenu(), -50)
 }
