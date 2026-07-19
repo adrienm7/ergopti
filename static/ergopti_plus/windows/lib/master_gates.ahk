@@ -17,7 +17,7 @@
 ; 2. TapHolds gets the same treatment via ``TapHold["keys"]`` — disabling
 ;    that master clears the keys Map so ``TapHoldIsConfigured`` returns false
 ;    for every physical key.
-; ==============================================================================
+; ============================================================================== 
 
 
 
@@ -38,24 +38,21 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget) {
         throw Error("ApplyMasterGatesToFeatures requires a Features Map target.")
     if !(TapHoldTarget is Map)
         throw Error("ApplyMasterGatesToFeatures requires a TapHold Map target.")
-    Features := FeaturesTarget
-    TapHold := TapHoldTarget
-
     ; Validate the canonical manifest before touching either candidate.  A
     ; malformed/missing manifest is a startup configuration error, not a reason
     ; to silently run an unreviewed duplicate gate table.
     SubGates := _MG_LoadSubCategories()
 
     ; Layout master
-    if !IsCategoryGated("Layout") and Features.Has("layout") {
-        for V2Id, _ in Features["layout"] {
-            Features["layout"][V2Id] := false
+    if !_MG_IsCategoryGated("Layout") and FeaturesTarget.Has("layout") {
+        for V2Id, _ in FeaturesTarget["layout"] {
+            FeaturesTarget["layout"][V2Id] := false
         }
     }
 
     ; Shortcuts master
-    if !IsCategoryGated("Shortcuts") and Features.Has("shortcuts") {
-        for V2Id, V2Val in Features["shortcuts"] {
+    if !_MG_IsCategoryGated("Shortcuts") and FeaturesTarget.Has("shortcuts") {
+        for V2Id, V2Val in FeaturesTarget["shortcuts"] {
             if (Type(V2Val) == "Map") {
                 ; Modélisation α + sub-Maps — flip ``enabled`` if present,
                 ; else flip every leaf bool entry.
@@ -67,14 +64,14 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget) {
                     }
                 }
             } else if (Type(V2Val) == "Integer" or V2Val == true or V2Val == false) {
-                Features["shortcuts"][V2Id] := false
+                FeaturesTarget["shortcuts"][V2Id] := false
             }
         }
     }
 
     ; Hotstrings master (includes Personal sub-category).
-    if !IsCategoryGated("Hotstrings") and Features.Has("hotstrings") {
-        for V2Cat, V2CatMap in Features["hotstrings"] {
+    if !_MG_IsCategoryGated("Hotstrings") and FeaturesTarget.Has("hotstrings") {
+        for V2Cat, V2CatMap in FeaturesTarget["hotstrings"] {
             if (Type(V2CatMap) != "Map") {
                 continue
             }
@@ -95,10 +92,10 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget) {
     ;
     ; **Sub-category mapping is single-sourced from menu_manifest.json
     ; master_gates.sub_categories (MG-3).**
-    if IsCategoryGated("Hotstrings") and Features.Has("hotstrings") {
+    if _MG_IsCategoryGated("Hotstrings") and FeaturesTarget.Has("hotstrings") {
         for SubV1, SubV2 in SubGates {
-            if !IsCategoryGated(SubV1) and Features["hotstrings"].Has(SubV2) {
-                for V2Id, V2Val in Features["hotstrings"][SubV2] {
+            if !_MG_IsCategoryGated(SubV1) and FeaturesTarget["hotstrings"].Has(SubV2) {
+                for V2Id, V2Val in FeaturesTarget["hotstrings"][SubV2] {
                     if (Type(V2Val) == "Map" and V2Val.Has("enabled")) {
                         V2Val["enabled"] := false
                     }
@@ -109,13 +106,23 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget) {
 
     ; TapHolds master — handled by tap_hold.toml loading; gating drops the
     ; TapHold["keys"] entries entirely so TapHoldIsConfigured returns false.
-    if !IsCategoryGated("TapHolds") {
-        if TapHold.Has("keys") {
-            TapHold["keys"] := Map()
+    if !_MG_IsCategoryGated("TapHolds") {
+        if TapHoldTarget.Has("keys") {
+            TapHoldTarget["keys"] := Map()
         }
     }
 
     try LoggerDebug("MasterGates", "ApplyMasterGatesToFeatures done.")
+}
+
+; Keep category-gate ownership in feature_state.ahk while avoiding an unbound
+; identifier when this module is syntax-validated by itself. Func() resolves
+; the dependency at call time, after the driver's normal include graph has
+; declared IsCategoryGated.
+_MG_IsCategoryGated(Category) {
+    try return Func("IsCategoryGated").Call(Category)
+    catch as Err
+        throw Error("Master gates require IsCategoryGated from feature_state.ahk: " . Err.Message)
 }
 
 
