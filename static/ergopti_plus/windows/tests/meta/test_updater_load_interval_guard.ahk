@@ -94,6 +94,8 @@ _ULIG_CheckIsNumberGuard() {
 	; The fallback on non-numeric input should use UPDATER_DEFAULT_INTERVAL.
 	Assert(InStr(Body, "UPDATER_DEFAULT_INTERVAL"),
 		"Updater_LoadCheckInterval must fall back to UPDATER_DEFAULT_INTERVAL on non-numeric input")
+	Assert(InStr(Body, "try seconds := Integer(raw + 0)") > 0 && InStr(Body, "out-of-range check_interval_seconds") > 0,
+		"numeric but out-of-range check_interval_seconds values must fail closed instead of aborting boot")
 }
 
 _ULIG_CheckCallSiteGuarded() {

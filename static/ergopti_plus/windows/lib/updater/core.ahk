@@ -213,7 +213,15 @@ Updater_LoadCheckInterval() {
 		UPDATER_CHECK_INTERVAL := UPDATER_DEFAULT_INTERVAL
 		return
 	}
-	seconds := Integer(raw + 0)
+	; IsNumber accepts magnitudes that can still overflow Integer(). Treat that
+	; malformed extreme exactly like other invalid persisted values, never let it
+	; abort the boot auto-execute path.
+	try seconds := Integer(raw + 0)
+	catch {
+		try LoggerWarn("Updater", "Ignoring out-of-range check_interval_seconds '{1}' — using default ({2} s).", raw, UPDATER_DEFAULT_INTERVAL)
+		UPDATER_CHECK_INTERVAL := UPDATER_DEFAULT_INTERVAL
+		return
+	}
 	if (seconds < 0)
 		seconds := 0
 	UPDATER_CHECK_INTERVAL := seconds
@@ -890,5 +898,4 @@ Updater_ParseBody(Json) {
 	}
 	return ""
 }
-
 
