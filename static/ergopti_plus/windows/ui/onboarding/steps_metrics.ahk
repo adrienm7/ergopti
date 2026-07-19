@@ -180,6 +180,47 @@ _Step5_OnRadioChange(regControls, statusLbl, isYes, *) {
 	}
 }
 
+global _OnboardingGestureJob := Map("epoch", 0, "pid", 0, "script", "", "done", 0)
+
+_Onboarding_StartGestureAuto(OnDone) {
+    global _OnboardingGestureJob
+    if (_OnboardingGestureJob["pid"] && ProcessExist(_OnboardingGestureJob["pid"]))
+        return false
+    Epoch := _OnboardingGestureJob["epoch"] + 1
+    ScriptPath := A_Temp . "\ergopti_gesture_config_" . Epoch . ".ps1"
+    try FileAppend(_Onboarding_BuildGesturePsScript(), ScriptPath, "UTF-8")
+    catch as err {
+        try LoggerError("Onboarding", "Could not write gesture PS script: {1}.", err.Message)
+        return false
+    }
+    Pid := 0
+    try Run('*RunAs powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . ScriptPath . '"', , "Hide", &Pid)
+    catch as err {
+        try FileDelete(ScriptPath)
+        try LoggerError("Onboarding", "Gesture auto-config launch failed: {1}.", err.Message)
+        return false
+    }
+    _OnboardingGestureJob := Map("epoch", Epoch, "pid", Pid, "script", ScriptPath, "done", OnDone)
+    SetTimer(_Onboarding_PollGestureAuto.Bind(Epoch), -100)
+    return true
+}
+
+_Onboarding_PollGestureAuto(Epoch) {
+    global _OnboardingGestureJob
+    if (_OnboardingGestureJob["epoch"] != Epoch || !_OnboardingGestureJob["pid"])
+        return
+    if ProcessExist(_OnboardingGestureJob["pid"]) {
+        SetTimer(_Onboarding_PollGestureAuto.Bind(Epoch), -100)
+        return
+    }
+    ExitCode := _SR_GetExitCode(_OnboardingGestureJob["pid"])
+    Done := _OnboardingGestureJob["done"]
+    try FileDelete(_OnboardingGestureJob["script"])
+    _OnboardingGestureJob["pid"] := 0
+    if IsObject(Done)
+        try Done.Call(ExitCode = 0)
+}
+
 _Step5_AutoRegister(statusLbl, *) {
 	; Run the gesture auto-configuration SYNCHRONOUSLY via PowerShell so the
 	; user sees a definitive red/green status the moment they click — no more
@@ -202,35 +243,8 @@ _Step5_AutoRegister(statusLbl, *) {
 	; with ``-File``, which sidesteps every shell-quoting question.
 	global _ob_register_pending := false  ; never defer anymore
 
-	ScriptPath := A_Temp . "\ergopti_gesture_config.ps1"
-	try {
-		if FileExist(ScriptPath)
-			FileDelete(ScriptPath)
-		FileAppend(_Onboarding_BuildGesturePsScript(), ScriptPath, "UTF-8")
-	} catch as e {
-		try LoggerError("onboarding", "Could not write gesture PS script to '{1}': {2}.", ScriptPath, e.Message)
+	if !_Onboarding_StartGestureAuto((ok) => _Step5_ShowGestureStatus(statusLbl, ok))
 		_Step5_ShowGestureStatus(statusLbl, false)
-		return
-	}
-
-	exitCode := -1
-	try {
-		exitCode := RunWait('*RunAs powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . ScriptPath . '"', , "Hide")
-	} catch as e {
-		try LoggerError("onboarding", "Gesture auto-config powershell threw: {1}.", e.Message)
-		exitCode := -1
-	}
-
-	; Clean up the temp script so the user doesn't accumulate junk in %TEMP%.
-	try FileDelete(ScriptPath)
-
-	if (exitCode == 0) {
-		try LoggerSuccess("onboarding", "Gesture auto-configuration succeeded.")
-		_Step5_ShowGestureStatus(statusLbl, true)
-	} else {
-		try LoggerWarn("onboarding", "Gesture auto-configuration failed (exitCode={1}).", exitCode)
-		_Step5_ShowGestureStatus(statusLbl, false)
-	}
 }
 
 ; Paints the status label red or green and makes it visible. Each call site
