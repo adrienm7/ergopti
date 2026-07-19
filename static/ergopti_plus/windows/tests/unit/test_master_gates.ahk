@@ -143,3 +143,15 @@ TestMasterGates_InvalidManifestDoesNotMutateCandidate() {
 }
 Test("master gates: invalid manifest fails before candidate mutation",
 	TestMasterGates_InvalidManifestDoesNotMutateCandidate)
+
+TestMasterGates_TargetNamesRemainExplicit() {
+	Body := _DriverFuncBody("ApplyMasterGatesToFeatures")
+	Assert(Body != "", "ApplyMasterGatesToFeatures must exist")
+	Assert(InStr(Body, "Features := FeaturesTarget") = 0
+		and InStr(Body, "TapHold := TapHoldTarget") = 0,
+		"master gate application must not shadow runtime globals with implicit local aliases")
+	Assert(InStr(Body, "FeaturesTarget.Has(") > 0 and InStr(Body, "TapHoldTarget.Has(") > 0,
+		"every gate mutation must visibly use its injected candidate target")
+}
+Test("master gates: application retains explicit candidate targets",
+	TestMasterGates_TargetNamesRemainExplicit)
