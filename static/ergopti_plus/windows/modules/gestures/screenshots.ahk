@@ -29,26 +29,6 @@ global GESTURE_REGION_CAPTURE_POLL_MS := 100
 global GESTURE_REGION_CAPTURE_TIMEOUT_MS := 30000
 global GESTURE_REGION_CAPTURE_SAVE_TIMEOUT_MS := 5000
 
-; Win32 clipboard formats accepted as a Snipping Tool image. ClipWait(..., 2)
-; only proves that *some* producer wrote data: plain text from a user copy is
-; not a completed screenshot and must never claim the capture transaction.
-global GESTURE_CLIPBOARD_CF_BITMAP := 2
-global GESTURE_CLIPBOARD_CF_DIB := 8
-global GESTURE_CLIPBOARD_CF_DIBV5 := 17
-
-GestureClipboardSequence() {
-    try return DllCall("GetClipboardSequenceNumber", "UInt")
-    return 0
-}
-
-GestureClipboardHasImage() {
-    global GESTURE_CLIPBOARD_CF_BITMAP, GESTURE_CLIPBOARD_CF_DIB, GESTURE_CLIPBOARD_CF_DIBV5
-    try return DllCall("IsClipboardFormatAvailable", "UInt", GESTURE_CLIPBOARD_CF_BITMAP)
-        || DllCall("IsClipboardFormatAvailable", "UInt", GESTURE_CLIPBOARD_CF_DIB)
-        || DllCall("IsClipboardFormatAvailable", "UInt", GESTURE_CLIPBOARD_CF_DIBV5)
-    return false
-}
-
 ; Returns the absolute path to the screenshots directory, creating it if missing.
 ; Mirrors Hammerspoon's convention: %USERPROFILE%\Pictures\screenshots\
 GestureScreenshotsDir() {
@@ -199,7 +179,7 @@ GestureScreenshotRegion(Mode) {
             "epoch", Epoch,
             "path", Path,
             "original_clipboard", OldClip,
-			"clipboard_sequence", GestureClipboardSequence(),
+			"clipboard_sequence", CB_GetSequenceNumber(),
             "selection_deadline", A_TickCount + GESTURE_REGION_CAPTURE_TIMEOUT_MS,
             "save_deadline", 0,
             "save_started", false)
@@ -230,14 +210,14 @@ GestureRegionCapturePoll(Epoch) {
             GestureRegionCaptureFinish(Epoch, "selection timeout")
             return
         }
-        if !ClipWait(0.001, 2) || !GestureClipboardHasImage() {
+		if !ClipWait(0.001, 2) || !CB_HasImage() {
             SetTimer(GestureRegionCapturePoll.Bind(Epoch), -GESTURE_REGION_CAPTURE_POLL_MS)
             return
         }
 		; We now own exactly the image sequence produced by Snipping Tool. A later
 		; user copy increments the sequence and prevents cleanup from restoring an
 		; obsolete snapshot over that newer clipboard content.
-		State["clipboard_sequence"] := GestureClipboardSequence()
+		State["clipboard_sequence"] := CB_GetSequenceNumber()
 
         EscapedPath := StrReplace(State["path"], "'", "''")
         PSScript :=
@@ -279,7 +259,7 @@ GestureRegionCaptureFinish(Epoch, Reason) {
     State := _GestureRegionCapture
     _GestureRegionCapture := false
 	OwnedSequence := State.Has("clipboard_sequence") ? State["clipboard_sequence"] : 0
-	if (OwnedSequence != 0 && GestureClipboardSequence() = OwnedSequence) {
+	if (OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence) {
 		try A_Clipboard := State["original_clipboard"]
 		catch as e
 			LoggerError("gestures", "Region screenshot clipboard restore failed ({1}): {2}.", Reason, e.Message)
