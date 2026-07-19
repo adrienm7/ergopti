@@ -109,7 +109,8 @@ global KEYBOARD_SHORTCUT_SEND_CODES := Map(
 )
 global KeyboardShortcutAssignments := Map()
 
-; ParseTomlFile / IniCacheGet / ResolveConfigPath are defined in lib/ini_helpers.ahk
+; ParseTomlFile / IniCacheGet / ResolveConfigPath are defined in
+; lib/toml/toml_helpers.ahk
 ; (included above) so the test runner can exercise them in isolation.
 
 ; Category-level gating state (master-toggle refactor).
@@ -198,21 +199,18 @@ ReadScriptConfig(Cache) {
     ; Paths are always derived from _ConfigDir at startup and are never persisted.
 }
 
-; IniCacheGet belongs to the configuration-loader boundary. Resolve it at call
-; time so this state-only module remains warning-clean when syntax-validated
-; outside the driver's full include graph, while preserving the one canonical
-; parser/cache implementation at runtime.
+; IniCacheGet belongs to the configuration-loader boundary.  It is included
+; before this module in ErgoptiPlus.ahk, so call it directly.  The former
+; function-object indirection can itself throw "Invalid base" at boot,
+; which hid a valid config behind a fatal startup error.
 _FeatureStateIniGet(Cache, Section, Key) {
-    try return Func("IniCacheGet").Call(Cache, Section, Key)
-    catch as Err
-        throw Error("feature_state requires IniCacheGet from the configuration loader: " . Err.Message)
+    return IniCacheGet(Cache, Section, Key)
 }
 
-; Category-key normalization is owned by config_io.ahk. Keep the state module
-; independent from that later include at parse time without creating a second
-; mapping that could drift from persisted configuration.
+; Category-key normalization is owned by config_io.ahk.  AHK resolves function
+; declarations across the complete #Include graph before executing auto-run
+; code, so the direct call remains valid although config_io.ahk appears later
+; in the source.  Keep one canonical mapping rather than duplicating it here.
 _FeatureStateCategoryKey(Category) {
-    try return Func("_CategoryEnabledKey").Call(Category)
-    catch as Err
-        throw Error("feature_state requires _CategoryEnabledKey from config_io.ahk: " . Err.Message)
+    return _CategoryEnabledKey(Category)
 }

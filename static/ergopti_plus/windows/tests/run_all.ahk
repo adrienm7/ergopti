@@ -226,6 +226,7 @@ InstallSendNoOps()
 #Include unit/test_layout_tables.ahk
 
 #Include unit/test_config.ahk
+#Include unit/test_feature_state_boot.ahk
 #Include unit/test_features_manifest.ahk
 #Include unit/test_config_io_feature_section_prefix.ahk
 #Include unit/test_hotstrings_full.ahk
