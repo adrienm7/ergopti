@@ -47,6 +47,10 @@ class KLWV {
     ; key is "typing" or "apps".
     static windows := Map()
 
+    ; Every open receives an ownership epoch. Timers and bridge callbacks bind
+    ; it so an old host cannot target a dashboard reopened under the same key.
+    static epoch := 0
+
     ; Last metrics_dir we built a prefetch for. Used by the ingest tick
     ; refresh path so callers don't have to re-pass the dir.
     static metrics_dir := ""
@@ -226,7 +230,8 @@ KLWV_Open(which, metrics_dir) {
     ; no-op and the bridge never actually subscribes. The subscription
     ; handle is stored in KLWV.windows[which] (not discarded) so AHK's
     ; refcounting does not __Delete it and unsubscribe near-immediately.
-    msg_sub := webview.WebMessageReceived(KLWV_OnWebMessage.Bind(which))
+    Epoch := ++KLWV.epoch
+    msg_sub := webview.WebMessageReceived(KLWV_OnWebMessage.Bind(which, Epoch))
 
     ; Inject i18n base URL and locale code before page scripts run so
     ; i18n.js can resolve locale files without relying on currentScript
@@ -254,18 +259,25 @@ KLWV_Open(which, metrics_dir) {
     ; own chrome.webview.postMessage('ready') races the subscription above
     ; (e.g. fires before AddScriptToExecuteOnDocumentCreated has run). 1.5 s
     ; is enough for a local file:// page + CDN-backed scripts to be ready.
-    SetTimer(KLWV_DelayedFirstPush.Bind(which), -1500)
-
     KLWV.windows[which] := Map(
         "which", which,
+		"epoch", Epoch,
         "gui", g,
         "controller", controller,
         "webview", webview,
         "udir", udir,
         "msg_sub", msg_sub
     )
+	SetTimer(KLWV_DelayedFirstPush.Bind(which, Epoch), -1500)
     KLWV_FitWebView(which)
     return true
+}
+
+KLWV_IsCurrent(which, Epoch := 0) {
+	if !KLWV.windows.Has(which)
+		return false
+	entry := KLWV.windows[which]
+	return (Epoch = 0 || (entry.Has("epoch") && entry["epoch"] = Epoch))
 }
 
 KLWV_IsAlive(entry) {
@@ -365,13 +377,18 @@ KLWV_OnGuiClose(which, *) {
 ; Receive a message posted by the page via chrome.webview.postMessage.
 ; The wrapper exposes the payload as a UTF-16 string; we treat it as a
 ; JSON command of the form {"action":"...", ...}.
-KLWV_OnWebMessage(which, sender, args) {
+KLWV_OnWebMessage(which, Epoch, sender, args) {
     global _ConfigDir, _AhkSubDir
     ; WebMessageReceived is a COM callback and therefore bypasses native
     ; Suspend. A paused dashboard must not rebuild caches, project SQL, or
     ; push UI state from a late Refresh/Clear/Range click.
     if A_IsSuspended
         return
+	if !KLWV_IsCurrent(which, Epoch)
+		return
+	entry := KLWV.windows[which]
+	if !entry.Has("webview") || !(sender == entry["webview"])
+		return
     log := _ConfigDir . _AhkSubDir . "logs\webview.log"
     msg := ""
     try msg := args.TryGetWebMessageAsString()
@@ -401,7 +418,7 @@ KLWV_OnWebMessage(which, sender, args) {
 			; prevents WebView2 from painting the loader and risks STA reentrancy.
 			query := KLWV_NormalizeRangeRequest(msg)
 			if query
-				SetTimer(KLWV_PushRangeData.Bind(which, query), -1)
+				SetTimer(KLWV_PushRangeData.Bind(which, Epoch, query), -1)
 		case "clear_cache":
             ; Purge every layer of cache so the next rebuild is a full cold read:
             ; - KLPF_MANIFEST_CACHE: manifest projection (historical days)
@@ -459,8 +476,8 @@ KLWV_IsIsoDate(value) {
 ; Project the n-grams for one selected date/app range from the warm in-memory DB.
 ; KLR_NotifyIngest keeps this cache current; building it only on the initial
 ; request avoids re-reading every data.sql file when the user changes a filter.
-KLWV_PushRangeData(which, query) {
-    if !KLWV.windows.Has(which) || !(query is Map)
+KLWV_PushRangeData(which, Epoch, query) {
+	if !KLWV_IsCurrent(which, Epoch) || !(query is Map)
         return
     if !KLRCache.db && KLWV.metrics_dir
         try KLR_BuildDatabase(KLWV.metrics_dir)
@@ -470,7 +487,9 @@ KLWV_PushRangeData(which, query) {
 
     range_data := KLR_ReadRangeSplitToday(db, query["start_date"], query["end_date"], query["apps"])
     message := '{"type":"range_data","payload":' . KL_JsonEncode(range_data) . '}'
-    try KLWV.windows[which]["webview"].PostWebMessageAsString(message)
+	if !KLWV_IsCurrent(which, Epoch)
+		return
+	try KLWV.windows[which]["webview"].PostWebMessageAsString(message)
 }
 
 
@@ -584,11 +603,11 @@ KLWV_MonitorFromPoint(x, y) {
     return 0
 }
 
-KLWV_DelayedFirstPush(which) {
+KLWV_DelayedFirstPush(which, Epoch) {
     global _ConfigDir, _AhkSubDir
     log := _ConfigDir . _AhkSubDir . "logs\webview.log"
     try FileAppend("[" . A_Now . "] DelayedFirstPush(" . which . "): fired, has_window=" . (KLWV.windows.Has(which) ? "1" : "0") . "`r`n", log, "UTF-8")
-    if !KLWV.windows.Has(which)
+	if !KLWV_IsCurrent(which, Epoch)
         return
     global KLPF_LAST_JSON
     ; Inject i18n first — must happen before any DB build which can block
@@ -607,11 +626,11 @@ KLWV_DelayedFirstPush(which) {
         KLWV.windows[which]["first_paint_done"] := true
     ; Phase 2 — full historical build in a deferred timer (2 s later).
     ; Provides the historical n-gram tables without blocking the first paint.
-    SetTimer(KLWV_DelayedFullBuild.Bind(which), -2000)
+	SetTimer(KLWV_DelayedFullBuild.Bind(which, Epoch), -2000)
 }
 
-KLWV_DelayedFullBuild(which) {
-    if !KLWV.windows.Has(which)
+KLWV_DelayedFullBuild(which, Epoch) {
+	if !KLWV_IsCurrent(which, Epoch)
         return
     if KLWV.metrics_dir
         try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , "full")
