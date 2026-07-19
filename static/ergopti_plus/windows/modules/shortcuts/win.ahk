@@ -42,7 +42,23 @@ if Features["shortcuts"]["screen"] {
 
 if Features["shortcuts"]["gpt"]["enabled"] {
     ; Win + G (GPT)
-    AddShortcut("#", "g", (*) => Run(Features["shortcuts"]["gpt"]["link"]))
+    AddShortcut("#", "g", LaunchGptShortcut)
+
+    LaunchGptShortcut(*) {
+        ; A configured URL is external input and Run() can throw (malformed URI,
+        ; policy denial, unavailable shell association).  This is a hook callback,
+        ; so fail locally with visible nonblocking feedback rather than escalating
+        ; through the global error handler and risking keyboard dispatch.
+        try {
+            Link := Features["shortcuts"]["gpt"]["link"]
+            if (Type(Link) != "String" or Trim(Link) = "")
+                throw Error("configured GPT link is empty or invalid")
+            Run(Link)
+        } catch as Err {
+            LoggerError("shortcuts", "LaunchGptShortcut failed: {1}", Err.Message)
+            try TrayTip("Could not open the configured GPT link.", "ErgoptiPlus", "Iconx Mute")
+        }
+    }
 }
 
 if Features["shortcuts"]["get_hex_value"] {
