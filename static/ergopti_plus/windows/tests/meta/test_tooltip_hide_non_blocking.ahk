@@ -54,6 +54,13 @@ _TTHNB_TooltipHideIsNonBlocking() {
 		"TooltipHide must not call ClipWait — it runs under the fire-path Critical and would freeze the keyboard hook")
 	Assert(InStr(Body, "MsgSleep") == 0,
 		"TooltipHide must not pump the message loop (MsgSleep) — it runs under the fire-path Critical")
+	Assert(InStr(Body, ".Destroy()") == 0 and InStr(Body, "GR_DestroyWindow") == 0,
+		"TooltipHide must hand GUI destruction to a deferred worker so DWM/GDI teardown cannot consume the keyboard-path Critical")
+	Assert(InStr(Body, "SetTimer(_TooltipDisposeRetired.Bind") > 0,
+		"TooltipHide must schedule deferred disposal after detaching the retired surface")
+	Dispose := _DriverFuncBody("_TooltipDisposeRetired")
+	Assert(Dispose != "" and InStr(Dispose, "RetiredBorder.Destroy()") > 0 and InStr(Dispose, "Row.Gui.Destroy()") > 0,
+		"the deferred tooltip disposer must own border and row GUI destruction")
 
 	; The invariant must be documented at the function so the constraint is not
 	; rediscovered the hard way by a maintainer adding an animation.
