@@ -67,7 +67,20 @@ _IsBenignUiaOrphanedPatternError(Exc) {
 }
 
 ErgoptiGlobalErrorHandler(Exc, Mode) {
-    global ERROR_NET_DEDUP_TTL_MS, ERROR_NET_DEDUP_CACHE_CAP
+    global ERROR_NET_DEDUP_TTL_MS, ERROR_NET_DEDUP_CACHE_CAP, _DriverBootPhase
+    ; Before the driver owns a fully started input pipeline, an uncaught error
+    ; is fatal. Suppressing it and returning to auto-execute leaves a process
+    ; resident with a partial set of hotkeys/hooks and no reliable recovery path.
+    ; Cleanup is best-effort because this handler also covers failures before
+    ; those modules are loaded; ExitApp is the only publication boundary here.
+    if (_DriverBootPhase != "ready") {
+        try LoggerError("ErgoptiPlus", "Fatal startup error during phase '{1}': {2}",
+            _DriverBootPhase, Exc.Message)
+        try KL_Stop()
+        try HookDispatcher.Stop()
+        ExitApp(1)
+        return true
+    }
     if _IsBenignUiaOrphanedPatternError(Exc) {
         ; Log at WARNING (not ERROR) and skip the crash-report prompt/toast — the
         ; originating call site already caught and handled the real error.

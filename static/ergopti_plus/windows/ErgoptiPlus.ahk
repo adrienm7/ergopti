@@ -36,6 +36,10 @@ try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
 global CapsWordEnabled := False
 global LayerEnabled := False
 global TapHold := Map("keys", Map(), "layers", Map())
+; The global error net must distinguish a recoverable callback fault from an
+; init fault. Before this reaches "ready", continuing would leave a resident
+; half-driver with a subset of hooks/menu state registered.
+global _DriverBootPhase := "starting"
 ; Registry for runtime-registered personal shortcuts (personal_shortcuts.ahk).
 ; Stores ordered names + per-name descriptions so the tray menu can render them.
 global _PersonalShortcutsRegistry := Map("__Order", [])
@@ -778,8 +782,9 @@ BootProfile_Mark("Hotstrings registered (HSE complete)")
 HotstringPrefixWatcherInit()
 HotstringPrefixWatcherRebuildIndex()
 BootProfile_Mark("Prefix watcher index complete")
-LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 _DriverReady := true
+_DriverBootPhase := "ready"
+LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 
 ; ── Deferred post-"ready" tasks ──────────────────────────────────────────────
 ; All the heavy off-critical-path work is armed HERE, after the driver is ready,
