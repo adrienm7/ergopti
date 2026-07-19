@@ -144,12 +144,19 @@ SendFinalResult(Text, OnlyText := False) {
     }
 }
 
-_SendInstant_RestoreClipboard(OldClip) {
+_SendInstant_RestoreClipboard(OldClip, OwnedSequence) {
 	global _SEND_INSTANT_CLIP_BUSY
-	A_Clipboard := OldClip
-	; Release the reentrancy guard only after the original clipboard is back,
-	; so the next SendInstant sees a quiescent clipboard before it dances again.
-	_SEND_INSTANT_CLIP_BUSY := false
+	try {
+		; A delayed restore owns exactly the payload sequence it wrote. A user copy
+		; (or another clipboard producer) after Ctrl+V must win over our stale
+		; snapshot instead of being silently overwritten by this timer.
+		if (OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence)
+			CB_RestoreAll(OldClip)
+	} finally {
+		; Release even when the clipboard is locked: a failed restore must not
+		; permanently force every later expansion onto the slow text path.
+		_SEND_INSTANT_CLIP_BUSY := false
+	}
 }
 
 SendInstant(Text, Prefix := "") {
@@ -173,17 +180,28 @@ SendInstant(Text, Prefix := "") {
 		SendInput(Prefix . "{Text}" . Text)
 		return
 	}
-	OldClipboard := ClipboardAll()
+	OldClipboard := CB_SaveAll()
+	if (Type(OldClipboard) == "String" && OldClipboard == "__CB_SAVE_ERROR__") {
+		try LoggerWarn("Hotstrings", "SendInstant: clipboard snapshot failed; expansion was not injected.")
+		return false
+	}
 	_SEND_INSTANT_CLIP_BUSY := true
 	try {
-		A_Clipboard := Text
+		if !CB_Write(Text)
+			throw Error("clipboard write failed")
+		OwnedSequence := CB_GetSequenceNumber()
+		if !OwnedSequence
+			throw Error("clipboard sequence unavailable")
 		; Prefix and Ctrl+V are one kernel injection transaction. Critical callers
 		; therefore cannot be interrupted after the erase but before the paste.
 		SendInput(Prefix . "^v")
-		SetTimer(_SendInstant_RestoreClipboard.Bind(OldClipboard), -SEND_INSTANT_PASTE_DELAY_MS)
-	} catch {
-		A_Clipboard := OldClipboard
+		SetTimer(_SendInstant_RestoreClipboard.Bind(OldClipboard, OwnedSequence), -SEND_INSTANT_PASTE_DELAY_MS)
+		return true
+	} catch as err {
+		try CB_RestoreAll(OldClipboard)
 		_SEND_INSTANT_CLIP_BUSY := false
+		try LoggerError("Hotstrings", "SendInstant: clipboard injection failed: {1}", err.Message)
+		return false
 	}
 }
 
