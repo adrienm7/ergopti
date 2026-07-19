@@ -119,6 +119,10 @@ class Keylogger {
     static next_event_id    := 1
     static today_log_offset := 0
     static today_log_date   := ""
+    ; Ownership latch for the multi-batch midnight transaction. It prevents
+    ; an ingest timer from starting a second rollover while the first one is
+    ; still draining/rotating yesterday's durable JSONL file.
+    static rollover_in_progress := false
 
     ; Per-flush typing buffer.
     static buffer_events    := []          ; Array of [char, delay_ms, meta_obj]
@@ -387,10 +391,12 @@ KL_SaveState() {
     ; KL_SaveState a few seconds later will retry on a fresh write.
     try {
         KL_WriteAtomic(Keylogger.state_json_path, KL_JsonEncode(s))
+        return true
     } catch as e {
         try LoggerWarn("Keylogger",
             "KL_SaveState: KL_WriteAtomic failed ('{1}') — will retry next tick.",
             e.Message)
+        return false
     }
 }
 
@@ -808,16 +814,9 @@ KL_LogSession(kind, duration_ms := unset) {
 ; ===============================
 
 KL_ReadNewTodayLog() {
-    today := KL_Today()
-    if (Keylogger.today_log_date != "" && Keylogger.today_log_date != today) {
-        Keylogger.today_log_date   := today
-        Keylogger.today_log_offset := 0
-    }
-    if (Keylogger.today_log_date = "")
-        Keylogger.today_log_date := today
-
     if !FileExist(Keylogger.today_log_path)
-        return [Keylogger.today_log_offset, []]
+        return Map("ok", true, "offset", Keylogger.today_log_offset,
+            "entries", [], "eof", true)
 
     ; Flush the writer's pending buffer so the reader sees every line that
     ; the hot path appended since the last tick — without this, in-flight
@@ -828,53 +827,75 @@ KL_ReadNewTodayLog() {
     }
 
     ; Read everything past current offset.
-    fh := FileOpen(Keylogger.today_log_path, "r", "UTF-8")
-    if !fh
-        return [Keylogger.today_log_offset, []]
-    fh.Seek(Keylogger.today_log_offset, 0)
+    fh := false
+    try {
+        fh := FileOpen(Keylogger.today_log_path, "r", "UTF-8")
+        if !fh
+            return Map("ok", false, "offset", Keylogger.today_log_offset,
+                "entries", [], "eof", false)
+        fh.Seek(Keylogger.today_log_offset, 0)
 
-    entries := []
-    lines   := 0
-    while (lines < KeylogConst.INGEST_BATCH_LINES && !fh.AtEOF) {
-        line := fh.ReadLine()
-        if (line = "")
-            continue
-        try {
-            entry := KL_JsonDecode(line)
-            if (entry is Map && entry.Has("type"))
-                entries.Push(entry)
-        } catch {
-            ; Malformed JSONL line — skip silently, do not crash the ingest loop
+        entries := []
+        lines   := 0
+        while (lines < KeylogConst.INGEST_BATCH_LINES && !fh.AtEOF) {
+            line := fh.ReadLine()
+            if (line = "")
+                continue
+            try {
+                entry := KL_JsonDecode(line)
+                if (entry is Map && entry.Has("type"))
+                    entries.Push(entry)
+            } catch {
+                ; Malformed JSONL line — skip silently, do not crash the ingest loop
+            }
+            lines += 1
         }
-        lines += 1
+        return Map("ok", true, "offset", fh.Pos, "entries", entries,
+            "eof", fh.AtEOF)
+    } catch as err {
+        if Keylogger.HasProp("log") && IsObject(Keylogger.log)
+            Keylogger.log.Error("Cannot read today.log for ingest: " . err.Message)
+        return Map("ok", false, "offset", Keylogger.today_log_offset,
+            "entries", [], "eof", false)
+    } finally {
+        if IsObject(fh)
+            try fh.Close()
     }
-    new_offset := fh.Pos
-    fh.Close()
-    return [new_offset, entries]
 }
 
-KL_IngestOnce(force := false) {
+KL_IngestOnce(force := false, rollover_owned := false) {
     if !Keylogger.initialized
-        return
+        return Map("ok", false, "eof", false, "reason", "not_initialized")
     ; Never run the ingest tick while the driver is paused. No new events
     ; are written during suspension (KL_AppendLog is guarded), so the tick
     ; would do redundant I/O; more importantly, running the heavy FileAppend
     ; + live-push while suspended violates the pause invariant.
     if A_IsSuspended && !Keylogger._shutting_down
-        return
+        return Map("ok", false, "eof", false, "reason", "suspended")
     ; Guard against running the heavy SQL/I/O path during a typing burst.
     ; Moved BEFORE the pending-entries drain so we never clear _pending_entries
     ; from RAM and then defer — that would leave entries on disk only, where
     ; KL_JsonDecode is a no-op on 64-bit and entries are silently lost.
     if (!force and IsSet(KLHook) and KLHook.last_tick != 0 and (A_TickCount - KLHook.last_tick) & 0xFFFFFFFF < KeylogConst.INGEST_IDLE_MS)
-        return
+        return Map("ok", true, "eof", false, "reason", "typing")
+
+    ; The ingest timer can beat the midnight timer. Only the rollover
+    ; transaction owns a date change: never reset the offset here, or the
+    ; next midnight pass will see today's date and skip rotation entirely.
+    if (!rollover_owned && Keylogger.today_log_date != "" && Keylogger.today_log_date != KL_Today())
+        return KL_DayRollover()
+    if (Keylogger.today_log_date = "")
+        Keylogger.today_log_date := KL_Today()
     ; Prefer the in-RAM queue when available — it sidesteps KL_JsonDecode
     ; entirely (COM ScriptControl is x86-only and silently empties Maps
     ; on 64-bit hosts). The JSONL pass is still used to drain anything
     ; that landed on disk while this process was not running.
-    pair := KL_ReadNewTodayLog()
-    new_offset := pair[1]
-    entries    := pair[2]
+    read_result := KL_ReadNewTodayLog()
+    if !read_result["ok"]
+        return Map("ok", false, "eof", false, "reason", "read_failed")
+    new_offset := read_result["offset"]
+    entries    := read_result["entries"]
+    source_eof := read_result["eof"]
 	; Atomically snapshot and clear _pending_entries under Critical so the
 	; keystroke hook cannot Push a new entry between our Length check and
 	; the := [] reset — without this, entries pushed after the Length check
@@ -922,10 +943,15 @@ KL_IngestOnce(force := false) {
 		; Still advance today_log_offset so the cold-replay window keeps
 		; shrinking even when no entries were decodable on disk.
 		if (new_offset != Keylogger.today_log_offset) {
+			old_offset := Keylogger.today_log_offset
 			Keylogger.today_log_offset := new_offset
-			KL_SaveState()
+			if !KL_SaveState() {
+				Keylogger.today_log_offset := old_offset
+				return Map("ok", false, "eof", false, "reason", "state_failed")
+			}
 		}
-		return
+		return Map("ok", true, "eof", source_eof,
+			"committed_offset", Keylogger.today_log_offset)
 	}
 
     ; Heavy part: SQL conversion and data.sql FileAppend.
@@ -944,9 +970,14 @@ KL_IngestOnce(force := false) {
     ; SQLite DB on every reader refresh cycle (every 5 s). This eliminates
     ; the 94% UPSERT bloat that was causing data.sql to grow ~140 MB/day.
     if (statements.Length = 0) {
+        old_offset := Keylogger.today_log_offset
         Keylogger.today_log_offset := new_offset
-        KL_SaveState()
-        return
+        if !KL_SaveState() {
+            Keylogger.today_log_offset := old_offset
+            return Map("ok", false, "eof", false, "reason", "state_failed")
+        }
+        return Map("ok", true, "eof", source_eof,
+            "committed_offset", Keylogger.today_log_offset)
     }
 
     body := "`n-- === ingest batch " . KL_NowTimestamp()
@@ -977,10 +1008,14 @@ KL_IngestOnce(force := false) {
         ; Leave today_log_offset alone so the next tick retries the same chunk.
         if Keylogger.HasProp("log") && IsObject(Keylogger.log)
             Keylogger.log.Error("Cannot append to data.sql: " . err.Message . " — " . pending_requeue_count . " unwritten pending entry(ies) re-queued.")
-        return
+        return Map("ok", false, "eof", false, "reason", "sql_failed")
     }
+    old_offset := Keylogger.today_log_offset
     Keylogger.today_log_offset := new_offset
-    KL_SaveState()
+    if !KL_SaveState() {
+        Keylogger.today_log_offset := old_offset
+        return Map("ok", false, "eof", false, "reason", "state_failed")
+    }
 
     ; Walk only after the raw transaction reached data.sql.  Walking before
     ; FileAppend meant a transient disk failure left the batch populated; the
@@ -1021,25 +1056,83 @@ KL_IngestOnce(force := false) {
     ; Deferred to the next ingest tick if the user typed recently.
     if (KLHook.last_tick = 0 || (A_TickCount - KLHook.last_tick) & 0xFFFFFFFF >= KeylogConst.INGEST_LIVE_PUSH_IDLE_MS)
         try KLWV_NotifyIngest()
+
+    return Map("ok", true, "eof", source_eof,
+        "committed_offset", Keylogger.today_log_offset)
 }
 
 KL_DayRollover() {
     if !Keylogger.initialized
-        return
-    ; Force a full ingest regardless of typing activity — we are about to delete
-    ; today.log, so any un-ingested lines must reach data.sql now or be lost.
-    KL_IngestOnce(true)
-    try FileAppend(
-        "`n-- === day rollover " . Keylogger.today_log_date . " -> " . KL_Today() . " ===`n",
-        Keylogger.data_sql_path, "UTF-8")
-    KL_CloseTodayFh()  ; release the handle before deleting.
-    try FileDelete(Keylogger.today_log_path)
-    Keylogger.today_log_offset := 0
-    Keylogger.today_log_date   := KL_Today()
-    ; A new day starts every walker context fresh. Yesterday's partial
-    ; word / streak / current_burst is meaningless at midnight.
-    try KLW_DayRolloverReset()
-    KL_SaveState()
+        return Map("ok", false, "reason", "not_initialized")
+    if Keylogger.rollover_in_progress
+        return Map("ok", false, "reason", "already_running")
+    if A_IsSuspended && !Keylogger._shutting_down
+        return Map("ok", false, "reason", "suspended")
+
+    Keylogger.rollover_in_progress := true
+    try {
+        old_date := Keylogger.today_log_date
+        new_date := KL_Today()
+        if (old_date = "") {
+            Keylogger.today_log_date := new_date
+            if !KL_SaveState()
+                return Map("ok", false, "reason", "state_failed")
+            return Map("ok", true, "reason", "initialised")
+        }
+        if (old_date = new_date)
+            return Map("ok", true, "reason", "already_current")
+
+        ; Force every bounded batch through the durable SQL + state commit.
+        ; The delete is unreachable until the reader reports EOF from a
+        ; successful ingest; a failed append/read/save leaves today.log intact.
+        loop {
+            ingest_result := KL_IngestOnce(true, true)
+            if !ingest_result["ok"]
+                return Map("ok", false, "reason", ingest_result["reason"])
+            if ingest_result["eof"]
+                break
+        }
+
+        try FileAppend(
+            "`n-- === day rollover " . old_date . " -> " . new_date . " ===`n",
+            Keylogger.data_sql_path, "UTF-8")
+        catch as err {
+            if Keylogger.HasProp("log") && IsObject(Keylogger.log)
+                Keylogger.log.Error("Cannot write day rollover marker: " . err.Message)
+            return Map("ok", false, "reason", "marker_failed")
+        }
+
+        KL_CloseTodayFh()  ; release the handle before deleting.
+        if FileExist(Keylogger.today_log_path) {
+            try FileDelete(Keylogger.today_log_path)
+            catch as err {
+                if Keylogger.HasProp("log") && IsObject(Keylogger.log)
+                    Keylogger.log.Error("Cannot delete rolled today.log: " . err.Message)
+                return Map("ok", false, "reason", "delete_failed")
+            }
+        }
+        if FileExist(Keylogger.today_log_path)
+            return Map("ok", false, "reason", "delete_failed")
+
+        ; Publish the new date only after durable data and deletion succeeded.
+        old_offset := Keylogger.today_log_offset
+        Keylogger.today_log_offset := 0
+        Keylogger.today_log_date   := new_date
+        if !KL_SaveState() {
+            ; The file is already rotated. Keep the old persisted epoch so a
+            ; later retry is conservative (no data loss), rather than claiming
+            ; a new day whose state was never durable.
+            Keylogger.today_log_offset := old_offset
+            Keylogger.today_log_date   := old_date
+            return Map("ok", false, "reason", "state_failed")
+        }
+        ; A new day starts every walker context fresh. Yesterday's partial
+        ; word / streak / current_burst is meaningless at midnight.
+        try KLW_DayRolloverReset()
+        return Map("ok", true, "reason", "rotated")
+    } finally {
+        Keylogger.rollover_in_progress := false
+    }
 }
 
 KL_MidnightCheck() {

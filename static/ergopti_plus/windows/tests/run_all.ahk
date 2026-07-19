@@ -795,6 +795,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_keylogger_hook_global_try.ahk
 #Include meta/test_keylogger_idle_defer_preserves_pending.ahk
 #Include meta/test_keylogger_rollover_force_ingest.ahk
+#Include meta/test_keylogger_rollover_transaction.ahk
 #Include meta/test_klnet_starter_deref.ahk
 #Include unit/test_audit_v4_fixes.ahk
 #Include unit/test_hotstrings_escape_braces.ahk
