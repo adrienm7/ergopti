@@ -485,6 +485,7 @@ TooltipHide(DbgTag := "?", Force := false) {
     global _TooltipGui, _TooltipRowGuis, _TooltipBorderGui
     global _TooltipShownHwnds, _TooltipShownBorderHwnds
     global _TooltipDequeueItems, _TooltipDequeueActive
+    global _TooltipGeneration, _TooltipTimerGeneration
     ; Diagnostic (debug-only): whenever an LLM loading/prediction tooltip is on
     ; screen, record WHO hid it. ``DbgTag`` names the caller — TimerFn (auto-hide),
     ; NewShow (a fresh TooltipShow superseded it), PollEmpty (dequeue), LLM
@@ -532,6 +533,10 @@ TooltipHide(DbgTag := "?", Force := false) {
     ; it — they would hide the post-expansion rows before their time.
     if (!Force and _TooltipDequeueActive)
         return
+    ; Hiding is a render transition too. Invalidate any renderer currently
+    ; waiting in UIA/GUI work before it can resume and resurrect this surface.
+    _TooltipGeneration += 1
+    _TooltipTimerGeneration := _TooltipGeneration
     SetTimer(_TooltipTimerFn, 0)
     _TooltipDequeueItems := 0
     _TooltipDequeueActive := false
@@ -640,7 +645,6 @@ TooltipRearmTimer() {
     if IsSet(LLM_Bridge_ScheduleAfterHotstring)
         try LLM_Bridge_ScheduleAfterHotstring(_TooltipLastItems)
 }
-
 
 
 
