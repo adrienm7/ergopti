@@ -93,13 +93,20 @@ KLWV_IsAvailable() {
 ; ==============================
 ; ===================================
 
-; Resolve the absolute file:// URL of a dashboard’s index.html.
-KLWV_AssetUrl(which) {
+; Resolve the local index.html of a dashboard before constructing its URL.
+; Callers need the path as a postcondition: a syntactically valid file:/// URL
+; for a missing asset only produces a blank WebView and loses the dashboard click.
+KLWV_AssetPath(which) {
     global _SharedDir
     base := _SharedDir . "\ui\metrics_" . which . "\index.html"
     loop files, base
         base := A_LoopFileFullPath
-    return "file:///" . StrReplace(base, "\", "/")
+    return base
+}
+
+; Resolve the absolute file:// URL of a dashboard’s index.html.
+KLWV_AssetUrl(which) {
+    return "file:///" . StrReplace(KLWV_AssetPath(which), "\", "/")
 }
 
 ; Resolve the absolute file:// URL of the shared locales directory.
@@ -132,6 +139,12 @@ KLWV_Open(which, metrics_dir) {
     }
     if KLWV.windows.Has(which) && KLWV_IsAlive(KLWV.windows[which])
         return true   ; Already open; caller should foreground via KLWV_Focus.
+
+    asset_path := KLWV_AssetPath(which)
+    if !FileExist(asset_path) {
+        try LoggerError("Keylogger", "KLWV_Open: dashboard asset is missing: '{1}'.", asset_path)
+        return false
+    }
 
     KLWV.metrics_dir := metrics_dir
 
@@ -240,6 +253,12 @@ KLWV_Open(which, metrics_dir) {
     locale_code := I18nGetLocale()
     seed_script := "window.__i18n_base='" . locales_url . "';window._i18n_locale='" . locale_code . "';"
     try webview.AddScriptToExecuteOnDocumentCreated(seed_script)
+    catch as err {
+        try LoggerError("Keylogger",
+            "KLWV_Open: WebView2 i18n bridge setup failed ('{1}') — dashboard cannot open.", err.Message)
+        KLWV_AbortOpen(g, controller, udir)
+        return false
+    }
     try FileAppend("[" . A_Now . "] i18n seed: base=" . locales_url . " locale=" . locale_code . "`r`n", log, "UTF-8")
 
     asset := KLWV_AssetUrl(which)
@@ -253,6 +272,8 @@ KLWV_Open(which, metrics_dir) {
         try LoggerWarn("Keylogger",
             "KLWV_Open: WebView2 navigate to '{1}' failed ('{2}').",
             asset, err.Message)
+        KLWV_AbortOpen(g, controller, udir)
+        return false
     }
     ; Belt-and-suspenders alongside the "ready" handshake wired above:
     ; push the freshest blob a beat after navigation too, in case the page's
@@ -271,6 +292,16 @@ KLWV_Open(which, metrics_dir) {
 	SetTimer(KLWV_DelayedFirstPush.Bind(which, Epoch), -1500)
     KLWV_FitWebView(which)
     return true
+}
+
+; Unwind an unpublished WebView setup transaction. No KLWV.windows entry exists
+; yet, so KLWV_Close cannot be used; releasing it here guarantees the caller can
+; safely choose the Edge fallback without leaking an invisible controller/profile.
+KLWV_AbortOpen(gui, controller, udir) {
+    try controller.Close()
+    try gui.Destroy()
+    if (udir != "")
+        SetTimer(KLWV_DeferredDirDelete.Bind(udir), -1000)
 }
 
 KLWV_IsCurrent(which, Epoch := 0) {

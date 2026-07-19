@@ -249,8 +249,13 @@ KLUI_ToggleDashboard(which, title) {
             KLWV_Close(which)
             return
         }
-        KLWV_Open(which, metrics_dir)
-        return
+        ; Availability only proves that the runtime/loader can be discovered.
+        ; Required setup (controller, asset mapping, bridge, navigation) can still
+        ; fail. Do not strand the user behind a blank unpublished WebView: fall
+        ; through exactly once to the proven Edge --app= fallback when Open fails.
+        if KLWV_Open(which, metrics_dir)
+            return
+        try LoggerWarn("Keylogger", "WebView dashboard open failed for '{1}' — using Edge fallback.", which)
     }
 
     ; Fallback: legacy Edge --app= launcher.

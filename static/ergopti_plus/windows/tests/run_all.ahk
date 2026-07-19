@@ -437,6 +437,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_spotlight_gdiplus_leak.ahk
 #Include meta/test_toml_batchwrite_atomic.ahk
 #Include meta/test_webview2_temp_leak.ahk
+#Include meta/test_keylogger_webview_fallback.ahk
 #Include meta/test_graphics_renderer_createwindow_catch.ahk
 #Include meta/test_ollama_webview_executescript_deferred.ahk
 #Include meta/test_ollama_webview_callback_epoch.ahk
