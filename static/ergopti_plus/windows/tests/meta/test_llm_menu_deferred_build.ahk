@@ -61,9 +61,10 @@ _MetaCheckLlmTrayDeferredBuild() {
 	try InitBody := FileRead(InitFile)
 	Assert(InitBody != "", "ui/menu/menu_llm/init.ahk must be readable")
 
-	; LLM_Menu_Init must place the (empty) entry itself …
-	Assert(InStr(InitBody, 'A_TrayMenu.Add(t("menu.llm.title"), _LLM_Menu_Handle)') > 0,
-		"LLM_Menu_Init must place the (empty) IA submenu in its canonical tray position")
+	; LLM_Menu_Init must place the (empty) entry itself. A root rebuild records
+	; this insertion in TrayMenuStage_Add and publishes it atomically afterwards.
+	Assert(InStr(InitBody, 'TrayMenuStage_Add(t("menu.llm.title"), _LLM_Menu_Handle)') > 0,
+		"LLM_Menu_Init must stage the (empty) IA submenu in its canonical tray position")
 
 	; … but must NOT build the menu synchronously — that is what blocked initMenu.
 	Assert(!InStr(InitBody, "LLM_Menu_Build("),
