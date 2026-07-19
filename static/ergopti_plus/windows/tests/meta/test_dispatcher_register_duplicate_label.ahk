@@ -15,7 +15,8 @@
 ; Insert path already guarded this via _FindUniqueMenuItemIdByName (degrade to native
 ; dispatch on >1 match); the Add path did not.
 ;
-; The fix resolves the id by unique name and returns 0 (native dispatch) on ambiguity.
+; The fix uses an O(1) appended-position fast path and falls back to a unique
+; name scan only when Menu.Add modified an existing duplicate label in place.
 ; Meta-static because menu_dispatcher.ahk installs an OnMessage WM_COMMAND hook at top
 ; level and cannot be #Included by the headless runner.
 ; ==============================================================================
@@ -26,9 +27,13 @@
 _RMDU_AssertUniqueIdDiscovery() {
 	Body := _DriverFuncBody("RegisterMenuItem")
 	Assert(Body != "", "RegisterMenuItem must exist")
+	Assert(InStr(Body, "CountBefore := _MenuItemCount(MenuObj)") > 0
+		and InStr(Body, "CountAfter := _MenuItemCount(MenuObj)") > 0,
+		"RegisterMenuItem must compare native counts around Menu.Add so a true append takes an O(1) ID fast path")
+	Assert(InStr(Body, "CountAfter = CountBefore + 1") > 0
+		and InStr(Body, "_MenuItemIdAtPosition(MenuObj, CountAfter - 1)") > 0,
+		"the append fast path must resolve exactly the newly appended position, not scan sibling labels")
 	Assert(InStr(Body, "_FindUniqueMenuItemIdByName(") > 0,
-		"RegisterMenuItem must resolve the item id by UNIQUE name match, not GetMenuItemCount-1 — Menu.Add modifies-in-place on a duplicate label so Count-1 mis-binds the dispatch bypass (menu-add-duplicate-label-misbind)")
-	Assert(!InStr(Body, "Count - 1") and !InStr(Body, "Count-1"),
-		"RegisterMenuItem must not discover the id via GetMenuItemID(.., Count - 1) (menu-add-duplicate-label-misbind)")
+		"duplicate-label in-place updates must retain the UNIQUE-name fallback instead of mis-binding Count-1")
 }
-Test("menu: RegisterMenuItem resolves item id by unique name, not Count-1 (menu-add-duplicate-label-misbind)", _RMDU_AssertUniqueIdDiscovery)
+Test("menu: RegisterMenuItem uses an append fast path with duplicate-safe fallback (menu-add-duplicate-label-misbind)", _RMDU_AssertUniqueIdDiscovery)
