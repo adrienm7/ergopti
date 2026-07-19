@@ -53,13 +53,8 @@
 ; =====================================
 
 _MetaCheckLlmTrayDeferredBuild() {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	InitFile := WindowsDir . "\ui\menu\menu_llm\init.ahk"
-	BootFile := WindowsDir . "\ErgoptiPlus.ahk"
-
-	InitBody := ""
-	try InitBody := FileRead(InitFile)
-	Assert(InitBody != "", "ui/menu/menu_llm/init.ahk must be readable")
+	InitBody := _DriverFuncBody("LLM_Menu_Init")
+	Assert(InitBody != "", "LLM_Menu_Init must be readable")
 
 	; LLM_Menu_Init must place the (empty) entry itself. A root rebuild records
 	; this insertion in TrayMenuStage_Add and publishes it atomically afterwards.
@@ -80,9 +75,8 @@ _MetaCheckLlmTrayDeferredBuild() {
 	; being disabled — NOT unconditionally (that blocked the boot thread on a cold
 	; /api/tags probe when ON) and NOT behind the race-prone _LLM_Menu_BuildPending
 	; flag (which was always false here, so the build never armed at all).
-	BootBody := ""
-	try BootBody := FileRead(BootFile)
-	Assert(BootBody != "", "ErgoptiPlus.ahk must be readable")
+	BootBody := _DriverSourceConcat()
+	Assert(BootBody != "", "driver source must be readable")
 	Assert(InStr(BootBody, "SetTimer(LLM_Menu_Build, -LLM_MENU_BUILD_DEFER_MS)") > 0,
 		"ErgoptiPlus.ahk boot tail must arm the deferred LLM_Menu_Build (for the OFF case)")
 	Assert(!InStr(BootBody, "_LLM_Menu_BuildPending"),
