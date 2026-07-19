@@ -422,7 +422,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_gesture_shared_lbutton.ahk
 #Include meta/test_gesture_left_hold_tap_release.ahk
 #Include meta/test_gesture_takenote_winwait.ahk
-#Include meta/test_takenote_winmaximize_guard.ahk
+#Include meta/test_takenote_hotpath_nonblocking.ahk
 #Include meta/test_gesture_takenote_winmaximize_guard.ahk
 #Include meta/test_gesture_get_cyclable_windows_catch.ahk
 #Include meta/test_open_downloads_nonblocking.ahk

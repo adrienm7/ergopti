@@ -86,7 +86,13 @@ if Features["shortcuts"]["take_note"]["enabled"] {
     ; Win + N (Note)
     AddShortcut("#", "n", TakeNote)
 
+    global _TakeNotePending := Map()
+    global _TakeNoteNextId := 0
+    global TAKE_NOTE_POLL_INTERVAL_MS := 50
+    global TAKE_NOTE_LAUNCH_TIMEOUT_MS := 7000
+
     TakeNote(*) {
+		global _TakeNotePending
         ; Determine the file name (with or without date)
         if (Features["shortcuts"]["take_note"]["dated_notes"]) {
             Date := FormatTime(, "dd_MM_yyyy")
@@ -98,43 +104,76 @@ if Features["shortcuts"]["take_note"]["enabled"] {
         ; Build the full file path
         FilePath := Features["shortcuts"]["take_note"]["destination_folder"] "\" FileName
 
-        ; Create the file if it doesn't exist yet
-        if not FileExist(FilePath) {
-            FileAppend("", FilePath)
-        }
-
-        ; Match the window title containing the file name. Save and restore the
-        ; global title match mode so other code paths are not impacted.
         PreviousTitleMatchMode := A_TitleMatchMode
         try {
+            ; Create the file before launching Notepad. File I/O and shell launch
+            ; can throw; contain both boundaries because this is a hotkey entry.
+            if not FileExist(FilePath)
+                FileAppend("", FilePath)
+
+            ; Never WinWait/WinWaitActive from the keyboard hotkey thread. Queue
+            ; a bounded poll that owns the later activation/maximise/newline work.
+            ; This preserves the original behaviour without delaying remapping
+            ; while a slow Notepad launch or window-manager transition completes.
             SetTitleMatchMode(2) ; Partial match
-            WinPattern := FileName
-
-            WindowAlreadyOpen := False
-            if WMExists(WinPattern) {
-                WindowAlreadyOpen := True
-                WMActivate(WinPattern)
-                NoteWindowIsActive := WinWaitActive(WinPattern, , 3)
-            } else {
+            WindowAlreadyOpen := WMExists(FileName)
+            JobId := _TakeNoteQueueFinalize(FileName, !WindowAlreadyOpen)
+            if !WindowAlreadyOpen {
                 Run('notepad.exe "' . FilePath . '"')
-                WinWait(FileName, , 7)
-                WMActivate(FileName)
-                NoteWindowIsActive := WinWaitActive(FileName, , 3)
             }
+        } catch as Err {
+			if IsSet(JobId) and _TakeNotePending.Has(JobId)
+				_TakeNotePending.Delete(JobId)
+            LoggerError("TakeNote", "TakeNote launch failed: {1}", Err.Message)
+            try TrayTip("Could not open the note file.", "ErgoptiPlus", "Iconx Mute")
+        } finally {
+            SetTitleMatchMode(PreviousTitleMatchMode)
+        }
+    }
 
-            ; WinWaitActive returns 0 (not a throw) on timeout, so a slow/blocked
-            ; Notepad launch must not fall through to a bare WinMaximize -- that
-            ; operates on the last-found-window and throws TargetError when the
-            ; wait never actually found one
-            if not NoteWindowIsActive {
-                LoggerWarn("TakeNote", "Notepad window '{1}' never became active -- skipping maximize.", WinPattern)
-            } else {
-                WinMaximize
-                Sleep(100)
-                if not WindowAlreadyOpen {
-                    SendFinalResult("^{End}{Enter}") ; Jump to the end of the file and start a new line
-                }
+    _TakeNoteQueueFinalize(WinPattern, AppendNewline) {
+        global _TakeNotePending, _TakeNoteNextId, TAKE_NOTE_POLL_INTERVAL_MS, TAKE_NOTE_LAUNCH_TIMEOUT_MS
+        JobId := ++_TakeNoteNextId
+        TimerFn := _TakeNotePoll.Bind(JobId)
+        _TakeNotePending[JobId] := Map(
+            "pattern", WinPattern,
+            "append_newline", AppendNewline,
+            "deadline", A_TickCount + TAKE_NOTE_LAUNCH_TIMEOUT_MS,
+            "timer", TimerFn
+        )
+        SetTimer(TimerFn, -TAKE_NOTE_POLL_INTERVAL_MS)
+		return JobId
+    }
+
+    _TakeNotePoll(JobId) {
+        global _TakeNotePending, TAKE_NOTE_POLL_INTERVAL_MS
+        if !_TakeNotePending.Has(JobId)
+            return
+        Job := _TakeNotePending[JobId]
+        if A_IsSuspended {
+            _TakeNotePending.Delete(JobId)
+            return
+        }
+        PreviousTitleMatchMode := A_TitleMatchMode
+        try {
+            SetTitleMatchMode(2)
+            if WMExists(Job["pattern"]) {
+                WMActivate(Job["pattern"])
+                WinMaximize(Job["pattern"])
+                if Job["append_newline"]
+                    SendFinalResult("^{End}{Enter}")
+                _TakeNotePending.Delete(JobId)
+                return
             }
+            if (A_TickCount >= Job["deadline"]) {
+                LoggerWarn("TakeNote", "Notepad window '{1}' did not appear before the bounded launch deadline.", Job["pattern"])
+                _TakeNotePending.Delete(JobId)
+                return
+            }
+            SetTimer(Job["timer"], -TAKE_NOTE_POLL_INTERVAL_MS)
+        } catch as Err {
+            _TakeNotePending.Delete(JobId)
+            LoggerError("TakeNote", "Deferred note-window finalization failed: {1}", Err.Message)
         } finally {
             SetTitleMatchMode(PreviousTitleMatchMode)
         }
