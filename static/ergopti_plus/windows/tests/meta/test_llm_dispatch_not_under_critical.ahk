@@ -67,6 +67,15 @@ _TLDNUC_CheckDispatchDeferred() {
 		"AHK-28: _LLM_Ollama_DoSpawn must contain Run( — the curl process launch must happen in the deferred helper, not under Critical")
 }
 
+_TLDNUC_CheckPredictionPreparationIsInterruptible() {
+	Body := _DriverFuncBody("LLM_Engine_FirePrediction")
+	Assert(Body != "", "LLM_Engine_FirePrediction must exist in modules/llm/prediction_exec.ahk")
+	Assert(InStr(Body, "Critical(") = 0,
+		"AHK-016: FirePrediction must not hold Critical across secure-field/window checks, profile/model loading, tooltip work, or backend dispatch; only an explicit tiny reservation helper may be critical")
+}
+
 
 Test("meta ahk-28: _LLM_Ollama_DispatchAsync defers FSWrite + Run() via SetTimer so blocking OS calls do not execute under Critical",
 	_TLDNUC_CheckDispatchDeferred)
+Test("meta ahk-016: LLM_Engine_FirePrediction keeps preparation and dispatch interruptible",
+	_TLDNUC_CheckPredictionPreparationIsInterruptible)

@@ -50,8 +50,6 @@ _LLM_Engine_CallTokenBudget(maxTokens, predsPerCall) {
  */
 LLM_Engine_FirePrediction(buffer) {
 	global _LLM_Engine
-	local _c := Critical("On")
-	try {
 	_LLM_Engine["timer_active"] := false
 
 	; A debounce timer armed just before the user paused must not fire an HTTP
@@ -395,9 +393,6 @@ LLM_Engine_FirePrediction(buffer) {
 	)
 	_LLM_Engine_ShowLoadingTooltip()
 	_LLM_Engine_DispatchVariant(state)
-	} finally {
-		Critical(_c)
-	}
 }
 
 ; Push footer/display state into the tooltip module before every paint.
