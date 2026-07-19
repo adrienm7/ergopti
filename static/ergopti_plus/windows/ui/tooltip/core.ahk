@@ -467,20 +467,17 @@ TooltipShow(Items, DurationSec := 0) {
 ;      compositor frames. Hiding the border first ensures the worst-case
 ;      interleave is « content alone » (correct rounded fill), never
 ;      « border alone » (empty outline floating over the editor).
-;   3. Destroy the Gui objects in the same order (border first, then rows).
-;   4. Defensive sweep through every tracked Hwnd in case a Gui.Destroy
-;      silently failed earlier — DestroyWindow on a stale handle is a
-;      harmless no-op so this is safe to run unconditionally.
+;   3. Hand Gui object destruction to a one-shot timer. DWM/GDI resource
+;      release is not allowed to extend the keyboard-path critical section.
 ;
 ; INVARIANT — MUST STAY NON-BLOCKING: the hotstring fire path reaches here under
 ; the Critical held by _OnPrefixChar (via HSE_DispatchMatch -> _ResetPrefixBuffer
 ; -> TooltipHide). Holding Critical across a Sleep/WinWait/ClipWait/MsgSleep would
 ; yield the thread and freeze the low-level keyboard hook for that duration,
-; dropping keys typed right after an expansion. Every teardown step here is a
-; synchronous Win32 call (DllCall / Gui.Destroy / SetTimer), never a blocking
-; wait. Do NOT add a fade-out, animation await, or any blocking call: defer such
-; work onto a SetTimer instead. The meta test test_tooltip_hide_non_blocking.ahk
-; pins this by rejecting any blocking token inside this body.
+; dropping keys typed right after an expansion. This function performs only the
+; immediate visual hide and state hand-off. Gui resource destruction is deferred
+; onto a one-shot timer. Do NOT add a fade-out, animation await, or any blocking
+; call here. The meta test test_tooltip_hide_non_blocking.ahk pins this contract.
 TooltipHide(DbgTag := "?", Force := false) {
     global _TooltipGui, _TooltipRowGuis, _TooltipBorderGui
     global _TooltipShownHwnds, _TooltipShownBorderHwnds
@@ -575,31 +572,34 @@ TooltipHide(DbgTag := "?", Force := false) {
         }
     }
 
-    ; Step 2 — release Gui resources: border first, then rows.
-    if _TooltipBorderGui {
-        try _TooltipBorderGui.Destroy()
-        _TooltipBorderGui := 0
-    }
-    for , Row in _TooltipRowGuis {
-        try Row.Gui.Destroy()
-    }
+    ; Detach ownership BEFORE scheduling destruction. A subsequent show receives
+    ; fresh globals and cannot be torn down by this old generation's worker.
+    RetiredBorder := _TooltipBorderGui
+    RetiredRows := _TooltipRowGuis
+    RetiredGeneration := _TooltipGeneration
+    _TooltipBorderGui := 0
     _TooltipGui := 0
     _TooltipRowGuis := []
-
-    ; Step 3 — defensive sweep. Any Hwnd whose Gui.Destroy() silently
-    ; failed in the past (Destroy sites are wrapped in `try` so a
-    ; transient Win32 error would have leaked the underlying window)
-    ; gets a last-chance kill here via the raw Win32 DestroyWindow.
-    ; Without this safety net, accumulated ghost tooltips would remain
-    ; visible on screen until the script reloads.
-    for , Hwnd in _TooltipShownBorderHwnds {
-        GR_DestroyWindow(Hwnd)
-    }
-    for , Hwnd in _TooltipShownHwnds {
-        GR_DestroyWindow(Hwnd)
-    }
     _TooltipShownHwnds := []
     _TooltipShownBorderHwnds := []
+    SetTimer(_TooltipDisposeRetired.Bind(RetiredBorder, RetiredRows, RetiredGeneration), -1)
+}
+
+; Releases hidden Gui objects after TooltipHide has returned to the keyboard
+; caller. The captured objects are never read from global ownership state, so a
+; newer render cannot be disposed by an older hide timer.
+_TooltipDisposeRetired(RetiredBorder, RetiredRows, RetiredGeneration) {
+    try {
+        if RetiredBorder
+            try RetiredBorder.Destroy()
+        if (RetiredRows is Array) {
+            for , Row in RetiredRows {
+                try Row.Gui.Destroy()
+            }
+        }
+    } catch as Err {
+        try LoggerWarn("Tooltip", "Deferred tooltip teardown failed for generation {1}: {2}.", RetiredGeneration, Err.Message)
+    }
 }
 
 ; Returns true when a hotstring-style tooltip (built by TooltipShow) is
@@ -645,6 +645,5 @@ TooltipRearmTimer() {
     if IsSet(LLM_Bridge_ScheduleAfterHotstring)
         try LLM_Bridge_ScheduleAfterHotstring(_TooltipLastItems)
 }
-
 
 
