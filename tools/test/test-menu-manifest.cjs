@@ -85,7 +85,7 @@ function loadLocaleKeys() {
 		// driver) — strip the leading BOM code point before parsing, the same
 		// fix as audit-translations.cjs already applies to these same files.
 		let raw = readFileSync(file, 'utf8');
-		if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
+		raw = raw.replace(/^\uFEFF+/, '');
 		keysByLocale[name] = new Set(Object.keys(JSON.parse(raw)));
 	}
 	return keysByLocale;
