@@ -418,28 +418,36 @@ _GestureActionLabel(Name) {
 ; --- Advanced system action implementations ---
 
 GestureScreenshotInstant() {
-    WinGetPos(&WX, &WY, &WW, &WH, "A")
-    if (WW = 0 or WH = 0) {
-        MsgBox(t("shortcuts.no_active_window"), t("shortcuts.screenshot_title"), "OK T3")
-        return
+    ; Gesture callbacks use the driver's message thread too.  Contain window,
+    ; filesystem, and shell errors and never present a modal dialog from here.
+    try {
+        WinGetPos(&WX, &WY, &WW, &WH, "A")
+        if (WW = 0 or WH = 0) {
+            try TrayTip(t("shortcuts.no_active_window"), t("shortcuts.screenshot_title"), "Iconx Mute")
+            return
+        }
+        PicsDir := EnvGet("USERPROFILE") . "\Pictures\screenshots"
+        if !DirExist(PicsDir)
+            DirCreate(PicsDir)
+        Timestamp := FormatTime(, "yyyy_MM_dd_HH") . "h" . FormatTime(, "mm") . "min" . FormatTime(, "ss") . "sec"
+        FilePath := PicsDir . "\screenshot_" . Timestamp . ".png"
+        ; Inline the capture code via -Command instead of writing a temp .ps1 file.
+        ; A fixed temp-file path caused a race condition: rapid successive calls had the
+        ; second PowerShell instance overwrite the file while the first was still reading it
+        ; (gesture-screenshot-tempfile-race). Inlining eliminates the shared-file bottleneck
+        ; and removes the need for FileDelete + FileAppend on the hotkey thread.
+        PsCode := "Add-Type -AssemblyName System.Drawing;"
+            . "$bmp=New-Object System.Drawing.Bitmap(" . WW . "," . WH . ");"
+            . "$g=[System.Drawing.Graphics]::FromImage($bmp);"
+            . "$g.CopyFromScreen(" . WX . "," . WY . ",0,0,$bmp.Size);"
+            . "$bmp.Save('" . FilePath . "');"
+            . "$g.Dispose();$bmp.Dispose()"
+        Run('powershell -NoProfile -NonInteractive -WindowStyle Hidden -Command "' . PsCode . '"',, "Hide")
+        try TrayTip(StrReplace(t("notify.screenshot_saved_path"), "%s", FilePath), t("notify.screenshot_title"), "Iconi Mute")
+    } catch as Err {
+        LoggerError("gestures", "GestureScreenshotInstant launch failed: {1}", Err.Message)
+        try TrayTip("Screenshot could not start.", "ErgoptiPlus", "Iconx Mute")
     }
-    PicsDir   := EnvGet("USERPROFILE") . "\Pictures\screenshots"
-    DirCreate(PicsDir)
-    Timestamp := FormatTime(, "yyyy_MM_dd_HH") . "h" . FormatTime(, "mm") . "min" . FormatTime(, "ss") . "sec"
-    FilePath  := PicsDir . "\screenshot_" . Timestamp . ".png"
-    ; Inline the capture code via -Command instead of writing a temp .ps1 file.
-    ; A fixed temp-file path caused a race condition: rapid successive calls had the
-    ; second PowerShell instance overwrite the file while the first was still reading it
-    ; (gesture-screenshot-tempfile-race). Inlining eliminates the shared-file bottleneck
-    ; and removes the need for FileDelete + FileAppend on the hotkey thread.
-    PsCode := "Add-Type -AssemblyName System.Drawing;"
-        . "$bmp=New-Object System.Drawing.Bitmap(" . WW . "," . WH . ");"
-        . "$g=[System.Drawing.Graphics]::FromImage($bmp);"
-        . "$g.CopyFromScreen(" . WX . "," . WY . ",0,0,$bmp.Size);"
-        . "$bmp.Save('" . FilePath . "');"
-        . "$g.Dispose();$bmp.Dispose()"
-    Run('powershell -NoProfile -NonInteractive -WindowStyle Hidden -Command "' . PsCode . '"',, "Hide")
-    TrayTip(StrReplace(t("notify.screenshot_saved_path"), "%s", FilePath), t("notify.screenshot_title"), "Iconi Mute")
 }
 
 GestureOpenConfiguredURL(BindingId := "") {
