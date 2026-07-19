@@ -203,15 +203,29 @@ KL_Clip_OnPaste() {
 
 KL_Clip_Start() {
     if KLClip.HasOwnProp("clip_handler") && IsObject(KLClip.clip_handler)
-        return
+        return true
 
-    KLClip.clip_handler := KL_Clip_OnChange
-    OnClipboardChange(KLClip.clip_handler)
-
-    ; Pass-through paste hotkeys — ``~`` ensures the paste still reaches
-    ; the active application unchanged.
-    Hotkey("~^v",         KL_Clip_OnPasteHK, "On")
-    Hotkey("~+Insert",    KL_Clip_OnPasteHK, "On")
+    ; Register the clipboard observer and both pass-through paste hotkeys as
+    ; one transaction.  A rejection after the first Hotkey used to leave a
+    ; half-live observer/hotkey set and an unhandled boot exception.
+    Handler := KL_Clip_OnChange
+    ClipboardRegistered := false
+    try {
+        OnClipboardChange(Handler)
+        ClipboardRegistered := true
+        ; ``~`` ensures the paste still reaches the active application unchanged.
+        Hotkey("~^v",      KL_Clip_OnPasteHK, "On")
+        Hotkey("~+Insert", KL_Clip_OnPasteHK, "On")
+        KLClip.clip_handler := Handler
+        return true
+    } catch as Err {
+        try Hotkey("~^v",      KL_Clip_OnPasteHK, "Off")
+        try Hotkey("~+Insert", KL_Clip_OnPasteHK, "Off")
+        if ClipboardRegistered
+            try OnClipboardChange(Handler, 0)
+        LoggerError("Keylogger", "Clipboard observer registration failed: {1}", Err.Message)
+        return false
+    }
 }
 
 KL_Clip_OnPasteHK(*) {
