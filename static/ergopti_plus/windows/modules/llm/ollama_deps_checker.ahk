@@ -283,24 +283,22 @@ LLM_Deps_RunInstaller(model, on_ready?, on_failed?) {
 	; even when the OS is otherwise saturated.
 	try ProcessSetPriority("High")
 
-	; Try winget first — runs the real Ollama installer with its native
-	; UI, so the user gets familiar progress and UAC prompts.
-	winget_available := _LLM_Deps_HasWinget()
-	LoggerInfo("LLM", "winget available: " (winget_available ? "yes" : "no") ".")
-	if winget_available {
-		LoggerInfo("LLM", "Handing off to winget install Ollama.Ollama (BelowNormal priority)…")
-		try {
-			; Launch winget directly so the captured PID is the real process
-			; tree root.  taskkill /F /T can then reach it on Cancel.
-			; We deliberately omit cmd /c start so the PID is not an ephemeral
-			; cmd wrapper that exits immediately and leaves winget detached.
-			global _LLM_Deps_InstallerPid
-			Run('winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements', , "Hide", &_LLM_Deps_InstallerPid)
-			LoggerInfo("LLM", "winget command launched (PID=" _LLM_Deps_InstallerPid ").")
-		} catch as err {
-			LoggerError("LLM", "winget launch failed: " err.Message ".")
-			winget_available := false
-		}
+	; Launch winget directly. A prior ``where winget`` RunWait blocked the menu
+	; action on AHK's sole thread just to answer this question. Run already gives
+	; us the authoritative result: success yields the installer PID; a missing
+	; command throws and immediately selects the browser fallback below.
+	winget_available := true
+	LoggerInfo("LLM", "Handing off to winget install Ollama.Ollama (BelowNormal priority)…")
+	try {
+		; Launch winget directly so the captured PID is the real process tree root.
+		; taskkill /F /T can then reach it on Cancel. We deliberately omit cmd /c
+		; start so the PID is not an ephemeral shell that leaves winget detached.
+		global _LLM_Deps_InstallerPid
+		Run('winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements', , "Hide", &_LLM_Deps_InstallerPid)
+		LoggerInfo("LLM", "winget command launched (PID=" _LLM_Deps_InstallerPid ").")
+	} catch as err {
+		LoggerInfo("LLM", "winget is unavailable; opening browser fallback: " err.Message ".")
+		winget_available := false
 	}
 
 	if !winget_available {
@@ -323,26 +321,6 @@ LLM_Deps_RunInstaller(model, on_ready?, on_failed?) {
 	global _LLM_Deps_PollStartTick := A_TickCount
 	_LLM_Deps_PollTimer := () => LLM_Deps_PollServerReady(on_ready?, on_failed?)
 	SetTimer(_LLM_Deps_PollTimer, 3000)
-}
-
-/**
- * Returns true when winget is on PATH. We use it to decide between the
- * automated install path and the browser fallback.
- *
- * Reads RunWait's return value — that IS the exit code. Previous
- * revision tested ``A_LastError`` instead, which is the LAST WINAPI
- * error set by any AHK call (often unrelated to the child process),
- * so the check effectively always returned the wrong answer and the
- * winget branch was either always or never taken depending on
- * preceding API noise.
- */
-_LLM_Deps_HasWinget() {
-	try {
-		exit_code := RunWait('cmd.exe /c where winget >nul 2>&1', , "Hide")
-		return exit_code == 0
-	} catch {
-		return false
-	}
 }
 
 /**
