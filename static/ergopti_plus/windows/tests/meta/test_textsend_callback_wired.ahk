@@ -52,9 +52,9 @@ _TTCW_CallbackForwarded() {
 	Src := _TTCW_StripLineComments(_TTCW_ReadSource("adapters/text_sender.ahk"))
 	Assert(Src != "", "adapters/text_sender.ahk must be readable")
 
-	; The SetTimer lambda must forward Callback as the third arg to _TextSendClipboard
-	Assert(InStr(Src, "_TextSendClipboard(Text, Saved, Callback)") > 0,
-		"The SetTimer lambda in TextSend must pass Callback as the third arg to _TextSendClipboard so the callback fires AFTER paste")
+	; The FIFO worker must bind each request callback into the completion bridge.
+	Assert(InStr(Src, "_TextSenderClipboardCompleted.Bind(Request.Callback)") > 0,
+		"the FIFO worker must bind the request callback into the clipboard completion bridge so it fires after paste")
 }
 Test("text_sender: Callback is forwarded into _TextSendClipboard (fires after paste, not before)", _TTCW_CallbackForwarded)
 
