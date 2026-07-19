@@ -7,7 +7,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 ## Contents
 
 - **Working conventions & feedback**
-  - [feedback-ahk-source-encoding](#feedback-ahk-source-encoding) — AHK v2 source files must be UTF-8 BOM + CRLF; encoding drift causes silent mid-file parse aborts that masquerade as missing tests
+  - [feedback-ahk-source-encoding](#feedback-ahk-source-encoding) — AHK v2 source files must be UTF-8 BOM + LF; encoding drift causes silent mid-file parse aborts that masquerade as missing tests
   - [feedback-ahk-suspend-prefix-latch](#feedback-ahk-suspend-prefix-latch) — AHK Kana custom-combination prefix latches across Suspend; fix at the source, synthetic key events can't clear it
   - [feedback_ahk_ui_syntax_validation](#feedback-ahk-ui-syntax-validation) — AHK UI files aren't in the headless test runner; how to syntax-check them locally on Windows
   - [Coding style and conventions for this project](#coding-style-and-conventions-for-this-project) — Style rules, architecture decisions, and what to avoid when writing code for this project
@@ -70,18 +70,18 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 
 ### feedback-ahk-source-encoding
 
-_AHK v2 source files must be UTF-8 BOM + CRLF; encoding drift causes silent mid-file parse aborts that masquerade as missing tests_
+_AHK v2 source files must be UTF-8 BOM + LF; encoding drift causes silent mid-file parse aborts that masquerade as missing tests_
 
 <sub>slug: `feedback_ahk_source_encoding`</sub>
 
-AHK v2's parser silently stops registering top-level statements partway through a source file when the file's encoding is inconsistent (LF appended into a CRLF/BOM file, missing BOM, mixed line endings). The headless test runner then plans `1..N` for only the first batch of `Test()` calls and reports green — passing tests are real, missing ones are silently dropped, and there is no error message anywhere.
+AHK v2's parser can silently stop registering top-level statements partway through a source file when the file's encoding is inconsistent (missing BOM or mixed line endings). The headless test runner then plans `1..N` for only the first batch of `Test()` calls and reports green — passing tests are real, missing ones are silently dropped, and there is no error message anywhere.
 
 **Why:** discovered 2026-05-22 during the v2 config-refactor test suite development. Initial drafting of `test_features_manifest_v2.ahk` showed only 5-7 of 33 tests registering despite all `Test()` calls being syntactically valid. Root cause: PowerShell file rewrites left mojibake (double-encoded UTF-8) and `cat >>` from bash appended LF lines into a CRLF/BOM file. The AHK v2 parser handled this by quietly truncating the file, not by raising an error.
 
 **How to apply:**
 
-- New `.ahk` files: the Write tool on Windows defaults to UTF-8 **without** BOM and LF-only, both wrong. After every Write of a new `.ahk` file, run a PowerShell conversion step before adding it to git: `$c = [IO.File]::ReadAllText($p); $c = $c -replace "\r\n","\n" -replace "\n","\r\n"; [IO.File]::WriteAllText($p, $c, (New-Object Text.UTF8Encoding $true))`. Then verify with the BOM + CRLF byte check.
-- Existing `.ahk` files: extend via the Edit tool (preserves encoding), NEVER via `cat >> file.ahk` from bash (it appends LF and corrupts the file).
+- New `.ahk` files: use UTF-8 **with** BOM and LF-only. After creating one, run `npm run test:ahk-encoding` before adding it to git.
+- Existing `.ahk` files: extend via the Edit tool (preserves encoding), NEVER via `cat >> file.ahk` from bash (it can bypass the repository encoding guard).
 - Non-ASCII in comments/strings is fine when encoding is clean. The v2 test suite (`test_features_manifest_v2.ahk`) stays ASCII-only as a defensive convention and accesses non-ASCII glyphs via `Chr(0xNNNN)` (e.g. `Chr(0x2605)` for the magic key star) so future encoding regressions cannot reintroduce the silent abort.
 - Diagnostic when a test file shows fewer test-results than its `Test()` count: run `file <path>` first, before debugging the test logic.
 
