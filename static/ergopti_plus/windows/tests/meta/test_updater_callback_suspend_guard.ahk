@@ -84,6 +84,15 @@ _UCSG_CheckFnHasSuspendGuard(FnDecl) {
 Test("meta updater-callback-suspend: _Updater_OneClickUpdateCallback guards A_IsSuspended",
 	() => _UCSG_CheckFnHasSuspendGuard("_Updater_OneClickUpdateCallback(Json, Current) {"))
 
+_UCSG_SuspendedOneClickFinalisesMenu() {
+	Body := _UCSG_FuncBody(_DriverDirConcat("lib/updater"), "_Updater_OneClickUpdateCallback(Json, Current) {")
+	RebuildPos := InStr(Body, "_Updater_RebuildMenu()")
+	SuspendPos := InStr(Body, "if A_IsSuspended")
+	Assert(RebuildPos > 0 && SuspendPos > RebuildPos,
+		"One-click updater callback must schedule tray reconciliation before its suspended-result return")
+}
+Test("meta updater-callback-suspend: suspended one-click callback reconciles tray state", _UCSG_SuspendedOneClickFinalisesMenu)
+
 Test("meta updater-callback-suspend: _Updater_ShowAvailableUpdateCallback guards A_IsSuspended",
 	() => _UCSG_CheckFnHasSuspendGuard("_Updater_ShowAvailableUpdateCallback(Json) {"))
 
