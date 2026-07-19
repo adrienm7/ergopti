@@ -801,6 +801,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_oneshotshift_endkeys.ahk
 #Include meta/test_magic_key_capture.ahk
 #Include meta/test_gesture_restart_nonblocking.ahk
+#Include meta/test_gpt_hotkey_run_guard.ahk
 #Include meta/test_menu_manifest_lifecycle_pair.ahk
 #Include meta/test_editor_persist_before_publish.ahk
 #Include meta/test_keylogger_webview_epoch.ahk
