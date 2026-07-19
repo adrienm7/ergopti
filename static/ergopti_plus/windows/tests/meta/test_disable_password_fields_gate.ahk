@@ -69,24 +69,39 @@ _DPFG_CheckFirePredictionGate() {
 
 _DPFG_CheckSFDClassGuard() {
 	; Move-resilient: find the function body across the whole driver source
-	Body := _DriverFuncBody("SFD_IsSecureField")
-	Assert(Body != "", "SFD_IsSecureField must be present in adapters/secure_field_detector.ahk")
+	Body := _DriverFuncBody("SFD_DetectNative")
+	Assert(Body != "", "SFD_DetectNative must be present in adapters/secure_field_detector.ahk")
 
 	; ES_PASSWORD bit test position
 	BitTestPos := InStr(Body, "0x20")
-	Assert(BitTestPos > 0, "SFD_IsSecureField must test ES_PASSWORD bit 0x20 (LOW-02)")
+	Assert(BitTestPos > 0, "SFD_DetectNative must test ES_PASSWORD bit 0x20 (LOW-02)")
 
 	; Class check must precede the bit test
 	ClassCheckPos := InStr(Body, "Edit")
 	Assert(ClassCheckPos > 0,
-		"SFD_IsSecureField must verify the focused control is an Edit class before testing ES_PASSWORD (LOW-02)")
+		"SFD_DetectNative must verify the focused control is an Edit class before testing ES_PASSWORD (LOW-02)")
 	Assert(ClassCheckPos < BitTestPos,
-		"Edit class guard must appear before ES_PASSWORD bit test in SFD_IsSecureField (LOW-02)")
+		"Edit class guard must appear before ES_PASSWORD bit test in SFD_DetectNative (LOW-02)")
+}
+
+_DPFG_CheckSfdUnknownFailsClosed() {
+	GateBody := _DriverFuncBody("SFD_IsSecureField")
+	UiaBody := _DriverFuncBody("SFD_ProbeFocusedUia")
+	Assert(InStr(GateBody, "SFD_DetectNative") > 0 and InStr(GateBody, "if !Conclusive") > 0,
+		"privacy gate must distinguish a native non-password verdict from an unknown focused control")
+	Assert(InStr(GateBody, "Secure := true") > 0 and InStr(GateBody, "SFD_ScheduleUiaProbe") > 0,
+		"an unknown focused control must fail closed and schedule UIA confirmation rather than leaking the first prediction")
+	Assert(InStr(UiaBody, "UIA.GetFocusedElement()") > 0 and InStr(UiaBody, "UIA.Property.IsPassword") > 0,
+		"deferred UIA confirmation must inspect the focused element IsPassword property for browser/Electron fields")
+	Assert(InStr(UiaBody, "if A_IsSuspended") > 0,
+		"deferred secure-field UIA work must be inert while the driver is suspended")
 }
 
 
 Test("meta fix-disable-password-fields-gate: LLM_Engine_FirePrediction checks disable_password_fields and calls SFD_IsSecureField",
 	_DPFG_CheckFirePredictionGate)
 
-Test("meta fix-sfd-class-guard: SFD_IsSecureField checks Edit class before ES_PASSWORD bit",
+Test("meta fix-sfd-class-guard: SFD_DetectNative checks Edit class before ES_PASSWORD bit",
 	_DPFG_CheckSFDClassGuard)
+Test("meta fix-disable-password-fields-gate: unknown focused controls fail closed until deferred UIA confirms them",
+	_DPFG_CheckSfdUnknownFailsClosed)
