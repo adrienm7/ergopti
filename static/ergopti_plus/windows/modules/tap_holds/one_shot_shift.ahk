@@ -67,6 +67,13 @@ OneShotShift() {
 
     if (ihvText.EndReason == "Timeout") {
         return
+    } else if (ihvText.EndReason == "EndKey") {
+        ; InputHook is suppressive by default. Backspace, Enter and Delete end
+        ; this one-shot capture, but they still belong to the user and must
+        ; reach the foreground application exactly once.
+        if (ihvText.EndKey != "")
+            SendNewResult("{" . ihvText.EndKey . "}", False, False)
+        return
     } else if SpecialCharacter != "" {
         if OneShotShiftEnabled {
             ActivateHotstrings()
