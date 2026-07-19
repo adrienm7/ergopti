@@ -4,7 +4,7 @@
 ; MODULE: KLR_BuildDatabase Failure Logging Guard
 ; DESCRIPTION:
 ; Guards that terminal failure branches in KLR_BuildDatabase and
-; KLPF_BuildAndWrite emit a real central-log ERROR, not just a DEBUG-gated
+; KLPF_BuildAndWriteToPath emit a real central-log ERROR, not just a DEBUG-gated
 ; sidecar KLR_PrefetchDebug entry. The module header explicitly promises
 ; "a missing schema.sql, an invalid data.sql, or an absent winsqlite3.dll
 ; all surface immediately as Logger.error." Before the fix, none of the
@@ -37,15 +37,15 @@ _MetaCheckKlrBuildDatabaseFailureLogged() {
 	Assert(InStr(AfterGetProc, "LoggerError") > 0,
 		"GetProcAddress failure branch must call LoggerError")
 
-	; KLPF_BuildAndWrite's if !db branch must also log.
-	PrefetchBody := _DriverFuncBody("KLPF_BuildAndWrite")
-	Assert(PrefetchBody != "", "KLPF_BuildAndWrite must exist in keylogger_prefetch.ahk")
+	; The worker invokes KLPF_BuildAndWriteToPath, so its if !db branch must log.
+	PrefetchBody := _DriverFuncBody("KLPF_BuildAndWriteToPath")
+	Assert(PrefetchBody != "", "KLPF_BuildAndWriteToPath must exist in keylogger_prefetch.ahk")
 	DbFailPos := InStr(PrefetchBody, "KLR_BuildDatabase returned 0")
-	Assert(DbFailPos > 0, "KLPF_BuildAndWrite must check KLR_BuildDatabase result")
+	Assert(DbFailPos > 0, "KLPF_BuildAndWriteToPath must check KLR_BuildDatabase result")
 	AfterDbFail := SubStr(PrefetchBody, DbFailPos, 500)
 	Assert(InStr(AfterDbFail, "LoggerError") > 0,
-		"KLPF_BuildAndWrite's if !db branch must call LoggerError")
+		"KLPF_BuildAndWriteToPath's if !db branch must call LoggerError")
 }
 
-Test("meta metrics DB: KLR_BuildDatabase + KLPF_BuildAndWrite failure branches log to central Logger",
+Test("meta metrics DB: KLR_BuildDatabase + KLPF_BuildAndWriteToPath failure branches log to central Logger",
 	_MetaCheckKlrBuildDatabaseFailureLogged)
