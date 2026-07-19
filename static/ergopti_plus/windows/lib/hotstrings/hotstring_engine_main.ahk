@@ -639,12 +639,12 @@ HSE_Size() {
 ; Returns the matching Spec object or "" when nothing matched. The
 ; associated end character is exposed via HSE_LastEndChar — empty for
 ; star triggers, the just-typed terminator for end-char-gated triggers.
-HSE_FeedChar(Char) {
+HSE_FeedChar(Char, IsPhysical := false) {
     global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN
     global HSE_LastMatch, HSE_LastEndChar, HSE_Suppressed
     HSE_LastMatch := ""
     HSE_LastEndChar := ""
-    if HSE_Suppressed or (Char == "") {
+    if ((HSE_Suppressed and !IsPhysical) or (Char == "")) {
         return ""
     }
 

@@ -470,9 +470,6 @@ _OnPrefixChar(IH, Char) {
 	; I1 excludes this driver's synthetic output before OnChar.  Keep the HSE
 	; fallback guard for standalone/manual HSE suppression, but do not treat the
 	; prefix render guard as evidence that this physical character is synthetic.
-	if HSE_Suppressed {
-		return
-	}
 	; LLM predictions stay on even when the Hotstrings master gate is off.
 	if (IsSet(LLM_Bridge_FeedCharIfActive))
 		LLM_Bridge_FeedCharIfActive(Char)
@@ -546,7 +543,7 @@ _OnPrefixChar(IH, Char) {
 		; trigger a STAR match (e.g. a personal ``,a → ja`` rule fires
 		; on the « a », not on the comma).
 		_HseFeedTick := HotPath_Now()
-		HSEMatch := HSE_FeedChar(Char)
+                HSEMatch := HSE_FeedChar(Char, true)
 		HotPath_LogIfSlow("HSE.FeedChar", _HseFeedTick, Char)
 		; When no registered hotstring matched, try the engine-level repeat
 		; fallback: <x><MagicKey> repeats <x> when x is at least the 2nd
