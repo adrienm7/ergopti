@@ -525,6 +525,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_updater_download_reentrancy_guard.ahk
 #Include meta/test_personal_load_once.ahk
 #Include meta/test_menu_llm_actions_include.ahk
+#Include meta/test_llm_menu_suspend_bootstrap.ahk
 #Include meta/test_llm_menu_disabled_greyed.ahk
 #Include meta/test_llm_menu_layout_shared.ahk
 ; MenuManifest_LoadTopLevelTail/LoadGlobalActions/LoadDebugMenu — needed so
