@@ -173,6 +173,22 @@ _TextSenderInvokeCallback(Callback, Ok := true, ErrorMessage := "") {
 	}
 }
 
+; Calls the injectable SendInput primitive without allowing an OS/injection
+; failure to escape from a keyboard-facing adapter method.  A thrown SendInput
+; in a timer callback otherwise skips the completion callback and leaves the
+; process-wide clipboard FIFO permanently busy; in a hold path it can also
+; strand a partially applied modifier transaction.
+_TextSenderSendInput(Keys, Operation := "SendInput") {
+	global _AHK_SendInput
+	try {
+		_AHK_SendInput.Call(Keys)
+		return true
+	} catch as Err {
+		LoggerError("TextSender", "{1} failed for '{2}': {3}", Operation, Keys, Err.Message)
+		return false
+	}
+}
+
 ; Performs the clipboard write / wait / paste / restore round-trip.
 ; Runs on a one-shot timer (off the keyboard thread) so the blocking ClipWait
 ; cannot starve the low-level keyboard hook. Bails loudly without pasting if the
@@ -250,7 +266,11 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 		return
 	}
 
-	_AHK_SendInput.Call("^v")
+	if !_TextSenderSendInput("^v", "clipboard paste") {
+		_TextSendRestoreClipboard(Saved, Generation, OwnedSequence)
+		_TextSenderInvokeCallback(Callback, false, "clipboard paste failed")
+		return
+	}
 
 	; Fire the completion callback now that the paste keystroke has been emitted.
 	; Placed before the restore timer so callers can inspect A_Clipboard while it
@@ -382,7 +402,9 @@ TextEraseChars(Count) {
 	if Count < 1
 		return
 	loop Count
-		_AHK_SendInput.Call("{Backspace}")
+		if !_TextSenderSendInput("{Backspace}", "erase character")
+			return false
+	return true
 }
 
 ; Emits a keystroke with optional modifiers, or a key-down/key-up event.
@@ -406,15 +428,28 @@ TextPressKey(Key, Modifiers) {
 		; Hold modifiers can now be a combo represented as an Array (e.g.
 		; ["LCtrl", "LShift"]) or a scalar key name for legacy paths.
 		if (IsObject(Key) and Type(Key) == "Array") {
+			SentKeys := []
 			for _, ModKey in Key {
 				if (ModKey == "")
 					continue
-				_AHK_SendInput.Call("{" . ModKey . " " . Modifiers . "}")
+				if !_TextSenderSendInput("{" . ModKey . " " . Modifiers . "}", "modifier " . Modifiers) {
+					; A failed multi-key Down must not leave the keys already sent
+					; logically held by the driver.  Release them in reverse order;
+					; each release is guarded/logged independently because the
+					; original injection provider may be transiently unavailable.
+					if (Modifiers == "Down") {
+						loop SentKeys.Length {
+							SentKey := SentKeys[SentKeys.Length - A_Index + 1]
+							_TextSenderSendInput("{" . SentKey . " Up}", "modifier rollback")
+						}
+					}
+					return false
+				}
+				SentKeys.Push(ModKey)
 			}
-			return
+			return true
 		}
-		_AHK_SendInput.Call("{" . Key . " " . Modifiers . "}")
-		return
+		return _TextSenderSendInput("{" . Key . " " . Modifiers . "}", "sustained key " . Modifiers)
 	}
 	if (Modifiers is Array) {
 		Mods := []
@@ -428,15 +463,13 @@ TextPressKey(Key, Modifiers) {
 		}
 		if (Mods.Length == 0) {
 			LoggerWarn("TextSender", "TextPressKey: modifier array for key '{1}' is empty after normalization.", Key)
-			_AHK_SendInput.Call("{" . Key . "}")
-			return
+			return _TextSenderSendInput("{" . Key . "}", "key press")
 		}
 		; A one-modifier array is still a regular shortcut.  `{Ctrl c}` is
 		; parsed as a single brace token by AHK rather than as Ctrl+C; use the
 		; same prefix form as multi-modifier arrays (`^+{Tab}`) for every size.
 		Prefix := _TextSenderModifierPrefixFromArray(Mods)
-		_AHK_SendInput.Call(Prefix . "{" . Key . "}")
-		return
+		return _TextSenderSendInput(Prefix . "{" . Key . "}", "modified key press")
 	}
 	Prefix := ""
 	if (Modifiers is String) and (Modifiers != "") {
@@ -445,7 +478,7 @@ TextPressKey(Key, Modifiers) {
 		; key was emitted, silently dropping the modifier.
 		Prefix := _TextSenderModifierString(Modifiers)
 	}
-	_AHK_SendInput.Call(Prefix . "{" . Key . "}")
+	return _TextSenderSendInput(Prefix . "{" . Key . "}", "key press")
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test

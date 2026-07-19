@@ -9,7 +9,7 @@ _TSCSO_ClipboardTransactionOwnsSequence() {
 	Body := _DriverFuncBody("_TextSendClipboard")
 	Assert(Body != "", "_TextSendClipboard must exist")
 	OwnedPos := InStr(Body, "OwnedSequence := CB_GetSequenceNumber()")
-	PastePos := InStr(Body, '_AHK_SendInput.Call("^v")')
+	PastePos := InStr(Body, '_TextSenderSendInput("^v", "clipboard paste")')
 	Assert(OwnedPos > 0 and PastePos > OwnedPos,
 		"clipboard injection must capture an ownership sequence before Ctrl+V")
 	RecheckPos := InStr(Body, "CB_GetSequenceNumber() != OwnedSequence")

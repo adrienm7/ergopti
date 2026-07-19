@@ -16,7 +16,7 @@
 ; text while it is still in flight.
 ;
 ; The fix adds, immediately after the ClipWait block and before
-; _AHK_SendInput.Call("^v"), a generation re-check:
+; _TextSenderSendInput("^v", "clipboard paste"), a generation re-check:
 ;
 ;   if (Generation != _TEXT_CLIPBOARD_GENERATION) {
 ;       CB_RestoreAll(Saved)
@@ -85,16 +85,16 @@ _TSCGR_CheckGenerationRecheck() {
 	; After ClipWait there must be a generation re-check before the paste.
 	ClipWaitPos  := InStr(Body, "ClipWait(")
 	RecheckPos   := InStr(Body, "Generation != _TEXT_CLIPBOARD_GENERATION", , Max(1, ClipWaitPos))
-	SendInputPos := InStr(Body, "_AHK_SendInput.Call")
+	SendInputPos := InStr(Body, '_TextSenderSendInput("^v", "clipboard paste")')
 
 	Assert(ClipWaitPos > 0, "_TextSendClipboard must call ClipWait()")
 	Assert(RecheckPos > 0,
 		"_TextSendClipboard must re-check generation after ClipWait (MED-01 fix)")
-	Assert(SendInputPos > 0, "_TextSendClipboard must call _AHK_SendInput.Call")
+	Assert(SendInputPos > 0, "_TextSendClipboard must send Ctrl+V through the guarded TextSender helper")
 
 	; Order: ClipWait < re-check < SendInput
 	Assert(ClipWaitPos < RecheckPos && RecheckPos < SendInputPos,
-		"Generation re-check must appear between ClipWait and _AHK_SendInput.Call in _TextSendClipboard (MED-01)")
+		"Generation re-check must appear between ClipWait and the guarded Ctrl+V send in _TextSendClipboard (MED-01)")
 
 	; The re-check block must restore only through the ownership-checked helper.
 	RecheckBlock := SubStr(Body, RecheckPos, SendInputPos - RecheckPos)

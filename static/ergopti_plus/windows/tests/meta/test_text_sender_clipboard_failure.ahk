@@ -4,9 +4,11 @@
 Test_TextSenderDoesNotPasteAfterClipboardFailure() {
 	Body := _DriverFuncBody("_TextSendClipboard")
 	WriteCheck := InStr(Body, "if !CB_Write(Text)")
-	Paste := InStr(Body, '_AHK_SendInput.Call("^v")')
+	Paste := InStr(Body, '_TextSenderSendInput("^v", "clipboard paste")')
 	Assert(WriteCheck > 0 and Paste > WriteCheck,
 		"clipboard injection must check CB_Write before issuing Ctrl+V")
+	Assert(InStr(Body, "if !_TextSenderSendInput") > 0,
+		"a failed Ctrl+V injection must take the explicit failure path instead of escaping the timer callback")
 	Assert(InStr(Body, "skipping paste to avoid injecting stale content") > 0,
 		"failed clipboard writes must be diagnosable rather than silently pasting stale data")
 	StartBody := _DriverFuncBody("_TextSenderStartClipboard")
