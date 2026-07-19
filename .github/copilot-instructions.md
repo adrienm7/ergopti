@@ -280,6 +280,7 @@ end
 - **Language:** Commit messages are always written in **English** (developer-facing, like logs).
 - **No co-author credits:** Never add `Co-Authored-By` trailers. Do not credit any LLM or tool in commit messages.
 - **Never add 'Co-authored-by: Copilot <copilot@github.com>' in commits or code. Remove if present.** Same for Claude or any other tool. The code is ours, the credit is ours, the responsibility is ours. Do not dilute that by giving a byline to an AI.
+- **Release branches — explicit push approval only:** Never run `git push` against `dev` or `main` unless the user explicitly asks to push that branch in the current conversation. Do not infer approval from a commit, passing tests, or a prior autonomous-work request. A push to either branch triggers CI and a release, so leave commits local until the user explicitly approves the push.
 - **Linear history:** The `main` and `dev` branches must always have a perfectly linear history. This means:
   - **Never use merge commits** (`git merge`) when integrating a feature or fix branch. Always use `git merge --squash` followed by a single conventional commit, or rebase the branch before merging.
   - **Squash on merge:** When a feature/fix branch is ready to land, squash all its commits into one clean conventional commit. The commit message must summarise the entire change set, not enumerate the squashed commits.
