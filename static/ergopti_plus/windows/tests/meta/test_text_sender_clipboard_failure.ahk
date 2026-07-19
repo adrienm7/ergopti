@@ -9,9 +9,9 @@ Test_TextSenderDoesNotPasteAfterClipboardFailure() {
 		"clipboard injection must check CB_Write before issuing Ctrl+V")
 	Assert(InStr(Body, "skipping paste to avoid injecting stale content") > 0,
 		"failed clipboard writes must be diagnosable rather than silently pasting stale data")
-	SendBody := _DriverFuncBody("TextSend")
-	Assert(InStr(SendBody, 'Saved == "__CB_SAVE_ERROR__"') > 0,
-		"TextSend must reject a failed clipboard snapshot before scheduling injection")
+	StartBody := _DriverFuncBody("_TextSenderStartClipboard")
+	Assert(InStr(StartBody, 'Saved == "__CB_SAVE_ERROR__"') > 0,
+		"the FIFO owner must reject a failed clipboard snapshot before scheduling injection")
 }
 
 Test("text sender: clipboard failures cannot paste stale content", Test_TextSenderDoesNotPasteAfterClipboardFailure)
