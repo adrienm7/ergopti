@@ -49,6 +49,20 @@ global _SR_PollRunning  := false
 global _SR_POLL_INTERVAL_MS := 100
 
 
+; ShellRunner is deliberately valid as an isolated adapter file.  The normal
+; driver includes logger.ahk before it, but direct /validate with #Warn must not
+; report LoggerError as an unassigned local.  Resolve the logger dynamically and
+; keep OutputDebug as a non-throwing diagnostic fallback for standalone use.
+_SR_LogError(FormatString, Args*) {
+	try {
+		LoggerFn := Func("LoggerError")
+		LoggerFn.Call("adapters.shell_runner", FormatString, Args*)
+	} catch as Err {
+		try OutputDebug("[adapters.shell_runner] " . Format(FormatString, Args*))
+	}
+}
+
+
 
 
 ; ===================================
@@ -86,7 +100,7 @@ ShellRunner_Exec(Cmd) {
 		; quote pair differs between a silent no-op and a working capture).
 		RunWait('cmd.exe /c "' . Cmd . ' > "' . TmpFile . '" 2>&1"', , "Hide")
 	} catch as Err {
-		LoggerError("adapters.shell_runner", "exec() failed for '{1}': {2}", Cmd, Err.Message)
+		_SR_LogError("exec() failed for '{1}': {2}", Cmd, Err.Message)
 		return ""
 	}
 
@@ -188,7 +202,7 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 			_SR_EnsurePoller()
 			return true
 		} catch as Err {
-			LoggerError("adapters.shell_runner", "spawn.start() failed for '{1}': {2}", Executable, Err.Message)
+			_SR_LogError("spawn.start() failed for '{1}': {2}", Executable, Err.Message)
 			; Clean up temp file if Run threw before creating the process.
 			try FileDelete(tmp_file)
 			return false
@@ -284,7 +298,7 @@ _SR_Poll() {
 			try {
 				task["OnDone"].Call(exit_code, stdout, "")
 			} catch as Err {
-				LoggerError("adapters.shell_runner", "on_done callback threw: {1}", Err.Message)
+				_SR_LogError("on_done callback threw: {1}", Err.Message)
 			}
 		}
 	}
