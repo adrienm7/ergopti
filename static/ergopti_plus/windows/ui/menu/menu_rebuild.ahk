@@ -24,37 +24,42 @@
 ; hotstring_live_toggle.ahk). Finally rebuilds the preview index and tray.
 RebuildHotstringsLive() {
 	try LoggerStart("Menu", "Rebuilding hotstrings in-process (live toggle)…")
-	try SetTimer(RegisterEmojisSymbolsDeferred, 0)
-	HSE_RebuildInProgress := true
 	try {
-		; Wrap clear + re-register in Critical so an InputHook OnChar callback
-		; cannot observe an empty or partially-populated registry mid-rebuild
-		_RblCrit := Critical("On")
+		try SetTimer(RegisterEmojisSymbolsDeferred, 0)
+		HSE_RebuildInProgress := true
 		try {
-			HSE_RegistryClear()
-			RegisterAllHotstrings()
+			; Wrap clear + re-register in Critical so an InputHook OnChar callback
+			; cannot observe an empty or partially-populated registry mid-rebuild
+			_RblCrit := Critical("On")
+			try {
+				HSE_RegistryClear()
+				RegisterAllHotstrings()
+			} finally {
+				Critical(_RblCrit)
+			}
 		} finally {
-			Critical(_RblCrit)
+			HSE_RebuildInProgress := false
 		}
-	} finally {
-		HSE_RebuildInProgress := false
+		; HardReset only after the registry is fully populated and the guard is
+		; cleared; skip when a send burst is in flight (HSE_Suppressed > 0) so we
+		; do not clobber a live expansion's buffer state. Pair with
+		; _ResetPrefixBuffer() — every other HSE_HardReset call site (LLM_Bridge_OnAccept,
+		; LLM_Engine_OnResults inline auto-type) does the same, and this was the sole
+		; production call site that omitted it, leaving the tooltip preview buffer
+		; desynced from the freshly rebuilt matching engine.
+		if HSE_Suppressed == 0 {
+			HSE_HardReset()
+			_ResetPrefixBuffer()
+		}
+		if IsSet(HotstringPrefixWatcherRebuildIndex) {
+			HotstringPrefixWatcherRebuildIndex()
+		}
+		RebuildTrayMenu()
+		try LoggerSuccess("Menu", "Hotstrings rebuilt in-process.")
+	} catch as e {
+		try LoggerError("Menu", "Hotstring live rebuild failed: {1}", e.Message)
+		throw e
 	}
-	; HardReset only after the registry is fully populated and the guard is
-	; cleared; skip when a send burst is in flight (HSE_Suppressed > 0) so we
-	; do not clobber a live expansion's buffer state. Pair with
-	; _ResetPrefixBuffer() — every other HSE_HardReset call site (LLM_Bridge_OnAccept,
-	; LLM_Engine_OnResults inline auto-type) does the same, and this was the sole
-	; production call site that omitted it, leaving the tooltip preview buffer
-	; desynced from the freshly rebuilt matching engine.
-	if HSE_Suppressed == 0 {
-		HSE_HardReset()
-		_ResetPrefixBuffer()
-	}
-	if IsSet(HotstringPrefixWatcherRebuildIndex) {
-		HotstringPrefixWatcherRebuildIndex()
-	}
-	RebuildTrayMenu()
-	try LoggerSuccess("Menu", "Hotstrings rebuilt in-process.")
 }
 
 ; Reconstructs the tray menu in place without a full process restart.

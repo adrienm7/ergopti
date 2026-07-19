@@ -419,10 +419,12 @@ _Onboarding_PreloadFromExistingConfig(ChosenDir) {
 		Cache := ParseTomlFile(CfgPath)
 	} catch as e {
 		try LoggerWarn("onboarding", "Could not parse existing config — wizard keeps defaults: {1}.", e.Message)
+		try LoggerDone("onboarding", "Wizard answer preload finished with parse fallback.")
 		return
 	}
 	if Type(Cache) != "Map" {
 		try LoggerWarn("onboarding", "Unexpected TOML cache type — wizard keeps defaults.")
+		try LoggerDone("onboarding", "Wizard answer preload finished with type fallback.")
 		return
 	}
 

@@ -118,6 +118,7 @@ MenuManifest_LoadHotstringGroups() {
 	try FileContent := FileRead(FilePath, "UTF-8")
 	if FileContent == "" {
 		try LoggerWarn("MenuManifest", "manifest is empty — using fallback lists.")
+		try LoggerDone("MenuManifest", "Hotstring groups fallback: manifest is empty.")
 		return _MM_BuildResult(_MM_FALLBACK_STANDARD, _MM_FALLBACK_ERGOPTI, _MM_FALLBACK_DYNAMIC)
 	}
 
@@ -127,6 +128,7 @@ MenuManifest_LoadHotstringGroups() {
 	try Root := JsonParse(FileContent)
 	if !(Root is Map) {
 		try LoggerWarn("MenuManifest", "manifest root is not a JSON object — using fallback lists.")
+		try LoggerDone("MenuManifest", "Hotstring groups fallback: manifest root is invalid.")
 		return _MM_BuildResult(_MM_FALLBACK_STANDARD, _MM_FALLBACK_ERGOPTI, _MM_FALLBACK_DYNAMIC)
 	}
 
@@ -134,12 +136,14 @@ MenuManifest_LoadHotstringGroups() {
 	CategoryKeysMap := _MM_MapGet(Root, "hotstring_category_keys")
 	if !(CategoryKeysMap is Map) {
 		try LoggerWarn("MenuManifest", "hotstring_category_keys block not found — using fallback lists.")
+		try LoggerDone("MenuManifest", "Hotstring groups fallback: category-key block is missing.")
 		return _MM_BuildResult(_MM_FALLBACK_STANDARD, _MM_FALLBACK_ERGOPTI, _MM_FALLBACK_DYNAMIC)
 	}
 
 	GroupsMap := _MM_MapGet(Root, "hotstring_groups")
 	if !(GroupsMap is Map) {
 		try LoggerWarn("MenuManifest", "hotstring_groups block not found — using fallback lists.")
+		try LoggerDone("MenuManifest", "Hotstring groups fallback: group block is missing.")
 		return _MM_BuildResult(_MM_FALLBACK_STANDARD, _MM_FALLBACK_ERGOPTI, _MM_FALLBACK_DYNAMIC)
 	}
 
