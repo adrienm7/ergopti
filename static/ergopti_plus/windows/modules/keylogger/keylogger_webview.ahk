@@ -508,17 +508,22 @@ KLWV_IsIsoDate(value) {
 ; KLR_NotifyIngest keeps this cache current; building it only on the initial
 ; request avoids re-reading every data.sql file when the user changes a filter.
 KLWV_PushRangeData(which, Epoch, query) {
-	if !KLWV_IsCurrent(which, Epoch) || !(query is Map)
+    if A_IsSuspended || !KLWV_IsCurrent(which, Epoch) || !(query is Map)
         return
-    if !KLRCache.db && KLWV.metrics_dir
-        try KLR_BuildDatabase(KLWV.metrics_dir)
-    db := KLRCache.db
-    if !db
-        return
+    try {
+        if !KLRCache.db && KLWV.metrics_dir
+            KLR_BuildDatabase(KLWV.metrics_dir)
+        db := KLRCache.db
+        if !db
+            return
 
-    range_data := KLR_ReadRangeSplitToday(db, query["start_date"], query["end_date"], query["apps"])
-    message := '{"type":"range_data","payload":' . KL_JsonEncode(range_data) . '}'
-	if !KLWV_IsCurrent(which, Epoch)
+        range_data := KLR_ReadRangeSplitToday(db, query["start_date"], query["end_date"], query["apps"])
+        message := '{"type":"range_data","payload":' . KL_JsonEncode(range_data) . '}'
+    } catch as err {
+        try LoggerError("Keylogger", "KLWV_PushRangeData: range projection failed for '{1}': {2}", which, err.Message)
+        return
+    }
+    if A_IsSuspended || !KLWV_IsCurrent(which, Epoch)
 		return
 	try KLWV.windows[which]["webview"].PostWebMessageAsString(message)
 }
@@ -557,7 +562,11 @@ KLWV_PushPrefetch(which) {
                 log, "UTF-8")
             return
         }
-        body := FileRead(path, "UTF-8")
+        try body := FileRead(path, "UTF-8")
+        catch as err {
+            try LoggerError("Keylogger", "KLWV_PushPrefetch: cannot read '{1}': {2}", path, err.Message)
+            return
+        }
     }
     if (body = "")
         return
@@ -638,7 +647,7 @@ KLWV_DelayedFirstPush(which, Epoch) {
     global _ConfigDir, _AhkSubDir
     log := _ConfigDir . _AhkSubDir . "logs\webview.log"
     try FileAppend("[" . A_Now . "] DelayedFirstPush(" . which . "): fired, has_window=" . (KLWV.windows.Has(which) ? "1" : "0") . "`r`n", log, "UTF-8")
-	if !KLWV_IsCurrent(which, Epoch)
+    if A_IsSuspended || !KLWV_IsCurrent(which, Epoch)
         return
     global KLPF_LAST_JSON
     ; Inject i18n first — must happen before any DB build which can block
@@ -661,11 +670,11 @@ KLWV_DelayedFirstPush(which, Epoch) {
 }
 
 KLWV_DelayedFullBuild(which, Epoch) {
-	if !KLWV_IsCurrent(which, Epoch)
+    if A_IsSuspended || !KLWV_IsCurrent(which, Epoch)
         return
     if KLWV.metrics_dir
         try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , "full")
-    if KLWV.windows.Has(which)
+    if !A_IsSuspended && KLWV_IsCurrent(which, Epoch)
         KLWV_PushPrefetch(which)
 }
 
