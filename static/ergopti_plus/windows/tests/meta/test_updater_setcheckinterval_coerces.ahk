@@ -74,3 +74,15 @@ _USCI_LogsOnRejection() {
 		"Updater_SetCheckInterval must LoggerWarn on a rejected value — fail loud, do not silently no-op (updater-setcheckinterval-type-guard-rejects-non-integer)")
 }
 Test("updater: Updater_SetCheckInterval logs a warning on rejection (updater-setcheckinterval-type-guard-rejects-non-integer)", _USCI_LogsOnRejection)
+
+_USCI_PersistsBeforePublishingTimerState() {
+	Seg := _DriverFuncBody("Updater_SetCheckInterval")
+	PersistAt := InStr(Seg, "if !TOML_Write(Seconds")
+	PublishAt := InStr(Seg, "UPDATER_CHECK_INTERVAL := Seconds")
+	StopAt := InStr(Seg, "Updater_StopBackgroundChecks()")
+	Assert(PersistAt > 0 && PublishAt > PersistAt && StopAt > PersistAt,
+		"Updater_SetCheckInterval must persist before publishing cadence or restarting timers")
+	Assert(InStr(Seg, "LoggerError") > PersistAt,
+		"a failed cadence write must fail loud and leave the current timer untouched")
+}
+Test("updater: interval persistence commits before state/timer publication", _USCI_PersistsBeforePublishingTimerState)

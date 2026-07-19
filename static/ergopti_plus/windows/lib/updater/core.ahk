@@ -166,8 +166,14 @@ Updater_SetChannel(Channel) {
 		MsgBox(t("updater.channel_switch_blocked_download"), t("updater.title_update"), "Icon!")
 		return
 	}
+	; Persist before publishing/reloading: TOML_Write deliberately converts I/O
+	; failures into false, so assigning first makes a menu click look accepted
+	; until the next boot silently restores the old channel.
+	if !TOML_Write(Channel, ConfigurationFile, UPDATER_INI_SECTION, UPDATER_INI_KEY) {
+		try LoggerError("Updater", "Could not persist update channel '{1}'; keeping '{2}'.", Channel, UPDATER_CHANNEL)
+		return
+	}
 	UPDATER_CHANNEL := Channel
-	TOML_Write(Channel, ConfigurationFile, UPDATER_INI_SECTION, UPDATER_INI_KEY)
 	; Cancel in-flight async checks and stop the focus/background timers before
 	; the restart so a late WinHTTP response or a queued poll timer cannot fire a
 	; callback against a half-torn-down state during the (non-instantaneous)
@@ -235,8 +241,13 @@ Updater_SetCheckInterval(Seconds) {
 		try LoggerWarn("Updater", "Ignoring negative check interval: {1}.", Seconds)
 		return
 	}
+	; As above, make persistence the commit point. Do not stop/restart the
+	; working timer or move the menu checkmark when the durable write failed.
+	if !TOML_Write(Seconds, ConfigurationFile, UPDATER_INI_SECTION, UPDATER_INI_INTERVAL_KEY) {
+		try LoggerError("Updater", "Could not persist background check interval {1} s; keeping {2} s.", Seconds, UPDATER_CHECK_INTERVAL)
+		return
+	}
 	UPDATER_CHECK_INTERVAL := Seconds
-	try TOML_Write(Seconds, ConfigurationFile, UPDATER_INI_SECTION, UPDATER_INI_INTERVAL_KEY)
 	try LoggerInfo("Updater", "Background check interval set to {1} s.", Seconds)
 	; Apply the new cadence immediately so the user does not have to reload.
 	Updater_StopBackgroundChecks()
@@ -879,6 +890,5 @@ Updater_ParseBody(Json) {
 	}
 	return ""
 }
-
 
 
