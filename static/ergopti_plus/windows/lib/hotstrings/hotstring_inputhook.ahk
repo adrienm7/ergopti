@@ -980,10 +980,10 @@ _PrefixSortCandidates(Candidates) {
 
 _LookupAndRender() {
 	global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN, _PREFIX_WORD_BOUNDARIES, ScriptInformation
-	Buffer := _PrefixBuffer
-	Len := StrLen(Buffer)
+	PrefixSnapshot := _PrefixBuffer
+	Len := StrLen(PrefixSnapshot)
 	if LoggerIsDebugEnabled()
-		LoggerDebug("PrefixWatcher", "DBG _LookupAndRender: buf='{1}' len={2} indexSize={3}.", Buffer, Len, _PrefixIndex.Count)
+		LoggerDebug("PrefixWatcher", "DBG _LookupAndRender: buf='{1}' len={2} indexSize={3}.", PrefixSnapshot, Len, _PrefixIndex.Count)
 	; Short buffers are only skipped when they have no entry in the index.
 	; A 1-char buffer may validly match a magic-key trigger body (e.g. "c"
 	; is the body of "c★"), so we let the lookup below decide — the early
@@ -1003,16 +1003,16 @@ _LookupAndRender() {
 	; last from the right — verified by direct probe, which is why ``a'ia``
 	; used to return ``a'ia`` (no terminator found) instead of ``ia``.
 	LastTermPos := 0
-	BufScanIdx := StrLen(Buffer)
+	BufScanIdx := StrLen(PrefixSnapshot)
 	while (BufScanIdx >= 1) {
-		ScanChar := SubStr(Buffer, BufScanIdx, 1)
+		ScanChar := SubStr(PrefixSnapshot, BufScanIdx, 1)
 		if (InStr(_PREFIX_WORD_BOUNDARIES, ScanChar) > 0) {
 			LastTermPos := BufScanIdx
 			break
 		}
 		BufScanIdx -= 1
 	}
-	SearchKey := (LastTermPos > 0) ? SubStr(Buffer, LastTermPos + 1) : Buffer
+	SearchKey := (LastTermPos > 0) ? SubStr(PrefixSnapshot, LastTermPos + 1) : PrefixSnapshot
 	if (SearchKey == "") {
 		TooltipHide("LookupKeyEmpty", true)
 		_NotifySuggestionDismissed()
@@ -1030,7 +1030,7 @@ _LookupAndRender() {
 	}
 	if LoggerIsDebugEnabled()
 		LoggerDebug("PrefixWatcher", "DBG prefix MATCH for '{1}' ({2} candidates).", SearchKey, _PrefixIndex[SearchKey].Length)
-	Buffer := SearchKey
+	PrefixSnapshot := SearchKey
 
 	; Collect candidates per group and lay them out as the user requested:
 	; end-char (↵) triggers FIRST (top), then magic-key (★) triggers below.
@@ -1047,7 +1047,7 @@ _LookupAndRender() {
 	; dimmed. Without this the non-dimmed preview was just the first-scanned trigger
 	; (category load order), which made a personal trigger that the engine fires show
 	; up dimmed beneath a common one it loses to.
-	Candidates := _PrefixSortCandidates(_PrefixIndex[Buffer])
+	Candidates := _PrefixSortCandidates(_PrefixIndex[PrefixSnapshot])
 	MK := ScriptInformation["MagicKey"]
 	EndItems := []
 	StarItems := []

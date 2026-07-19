@@ -193,24 +193,24 @@ _LLM_Parser_Tokenize(s) {
 	Loop Parse, s {
 		c := A_LoopField
 		if (c ~= "\s" or c = Chr(0x00A0) or c = Chr(0x202F))
-			t := 2
+			tokenType := 2
 		else if (c ~= "[\w']" or c = Chr(0x2019) or Ord(c) >= 128)
-			t := 1
+			tokenType := 1
 		else
-			t := 3
-		if (t = 3) {
+			tokenType := 3
+		if (tokenType = 3) {
 			if (current != "")
 				tokens.Push(current)
 			tokens.Push(c)
 			current := ""
 			current_type := 0
-		} else if (t = current_type) {
+		} else if (tokenType = current_type) {
 			current .= c
 		} else {
 			if (current != "")
 				tokens.Push(current)
 			current := c
-			current_type := t
+			current_type := tokenType
 		}
 	}
 	if (current != "")

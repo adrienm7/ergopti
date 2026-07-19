@@ -37,23 +37,23 @@ _Updater_FindAssetUrl(Json, AssetName) {
 	StartPos := Anchor.Pos + Anchor.Len - 1   ; position of the "[" itself
 	Len := StrLen(Json)
 	Depth := 0
-	InStr := false
+    InQuotedString := false
 	Esc := false
 	EndPos := 0
 	pos := StartPos
 	while (pos <= Len) {
 		c := SubStr(Json, pos, 1)
-		if InStr {
+        if InQuotedString {
 			if Esc {
 				Esc := false
 			} else if (c == "\") {
 				Esc := true
 			} else if (c == '"') {
-				InStr := false
+                InQuotedString := false
 			}
 		} else {
 			if (c == '"') {
-				InStr := true
+                InQuotedString := true
 			} else if (c == "[") {
 				Depth += 1
 			} else if (c == "]") {
