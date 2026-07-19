@@ -78,8 +78,8 @@ _MetaCheckInputSerialization() {
 
 	OnCharPos := InStr(W, "_OnPrefixChar(IH, Char) {")
 	Assert(OnCharPos > 0, "watcher must define _OnPrefixChar(IH, Char)")
-	FeedPos := InStr(W, "HSE_FeedChar(Char)", , OnCharPos)
-	Assert(FeedPos > 0, "_OnPrefixChar must call HSE_FeedChar(Char)")
+	FeedPos := InStr(W, "HSEMatch := HSE_FeedChar(Char, true)", , OnCharPos)
+	Assert(FeedPos > 0, "_OnPrefixChar must feed the physical Char through HSE_FeedChar with provenance")
 	OnCharCritPos := InStr(W, 'Critical("On")', , OnCharPos)
 	Assert(OnCharCritPos > 0 and OnCharCritPos < FeedPos,
 		"_OnPrefixChar must enter Critical On before HSE_FeedChar so the fire + expansion burst is uninterruptible")
