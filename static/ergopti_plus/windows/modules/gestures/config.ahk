@@ -163,7 +163,7 @@ GestureRegWriteDword(ValueName, Value, &ErrorsRef) {
 ; KeyParams (encoded as (VK<<16)|7), and resets the new-system *Action values
 ; to 65535 so the old KeyParams system takes precedence.
 ; Returns true on success, false if any registry write failed.
-GestureAutoConfigureRegistry() {
+GestureAutoConfigureRegistry(OnDone := 0) {
     global GESTURE_REG_PATH, GESTURE_REG_CUSTOM_VALUE
     global GESTURE_REG_ACTIONS, GESTURE_REG_KEY_PARAMS, GESTURE_REG_KEY_PARAMS_NAMES
     global GESTURE_REG_ENABLE_NAMES, GESTURE_REG_CUSTOM_TAP_NAMES
@@ -206,45 +206,118 @@ GestureAutoConfigureRegistry() {
     ; and ignores WM_SETTINGCHANGE — the only reliable way to apply changes
     ; without a logout is to disable then re-enable the touchpad PnP device,
     ; which is exactly what Windows Settings does internally on apply.
-    GestureRestartTouchpadDevice()
+    if !GestureRestartTouchpadDevice(OnDone) {
+        LoggerError("gestures", "Gesture registry values were written but the touchpad restart could not be started.")
+        return False
+    }
 
-    LoggerSuccess("gestures", "All gesture registry values written successfully.")
+    LoggerSuccess("gestures", "All gesture registry values written; touchpad restart is running asynchronously.")
     return True
 }
 
 ; Disables then re-enables the touchpad PnP device to force the gesture
 ; driver to reload its configuration from the registry. Requires admin
 ; elevation — triggers a UAC prompt via the *RunAs verb.
-GestureRestartTouchpadDevice() {
-    LoggerStart("gestures", "Restarting touchpad device to apply gesture config…")
+global _GestureRestartJob := Map("epoch", 0, "pid", 0, "script", "", "result", "", "done", 0)
 
-    ; Target the "Microsoft Input Configuration Device" — this is the HID
-    ; collection node that exposes the Precision Touchpad gesture surface
-    ; and reloads its config from the registry on enable. The parent I2C HID
-    ; node alone is not enough; we also toggle it as a fallback to cover
-    ; vendor variations.
-    PsCmd := "$ErrorActionPreference='Stop'; "
-        . "$devs = Get-PnpDevice -PresentOnly | Where-Object { "
-        . "$_.Class -eq 'HIDClass' -and ( "
-        . "$_.FriendlyName -match 'Input Configuration|I2C HID' "
-        . ") }; "
-        . "foreach ($d in $devs) { "
-        . "  Disable-PnpDevice -InstanceId $d.InstanceId -Confirm:`$false -ErrorAction SilentlyContinue "
-        . "}; "
-        . "Start-Sleep -Milliseconds 500; "
-        . "foreach ($d in $devs) { "
-        . "  Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:`$false -ErrorAction SilentlyContinue "
-        . "}"
+GestureRestartTouchpadDevice(OnDone := 0) {
+    global _GestureRestartJob
+    LoggerStart("gestures", "Restarting touchpad device to apply gesture config…")
+    if _GestureRestartJob["pid"] {
+        if ProcessExist(_GestureRestartJob["pid"]) {
+            LoggerError("gestures", "Touchpad restart is already running.")
+            return False
+        }
+        _GestureRestartPoll(_GestureRestartJob["epoch"])
+        if _GestureRestartJob["pid"] {
+            LoggerError("gestures", "Touchpad restart completion is pending.")
+            return False
+        }
+    }
+
+    Epoch := _GestureRestartJob["epoch"] + 1
+    JobStem := A_Temp . "\ergopti_touchpad_restart_" . A_Pid . "_" . Epoch
+    ScriptPath := JobStem . ".ps1"
+    ResultPath := JobStem . ".result"
+    try FileDelete(ResultPath)
+    try FileAppend(_GestureRestartBuildPsScript(ResultPath), ScriptPath, "UTF-8")
+    catch as err {
+        LoggerError("gestures", "Could not write touchpad restart worker: {1}.", err.Message)
+        return False
+    }
 
     try {
-        ; A UAC-approved PnP restart can take tens of seconds.  Launch it and
-        ; return to the message pump immediately: RunWait here stalls every
-        ; hook, timer, and tray callback on the single AHK thread.
-        Run('*RunAs powershell.exe -NoProfile -WindowStyle Hidden -Command "' . PsCmd . '"', , "Hide", &RestartPid)
-        LoggerSuccess("gestures", "Touchpad restart command launched (PID {1}).", RestartPid)
+        ; A UAC-approved PnP restart can take tens of seconds. The child writes
+        ; its own outcome, and the driver only polls it — no hook, timer, or
+        ; tray callback waits on the worker.
+        Run('*RunAs powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . ScriptPath . '"', , "Hide", &RestartPid)
     } catch as e {
+        try FileDelete(ScriptPath)
         LoggerError("gestures", "Failed to restart touchpad device: {1}.", e.Message)
+        return False
     }
+    _GestureRestartJob := Map("epoch", Epoch, "pid", RestartPid, "script", ScriptPath, "result", ResultPath, "done", OnDone)
+    SetTimer(_GestureRestartPoll.Bind(Epoch), -100)
+    LoggerSuccess("gestures", "Touchpad restart worker launched (PID {1}).", RestartPid)
+    return True
+}
+
+_GestureRestartPoll(Epoch) {
+    global _GestureRestartJob
+    if (_GestureRestartJob["epoch"] != Epoch || !_GestureRestartJob["pid"])
+        return
+    ; Suspend does not stop timers. Preserve the completion until the driver
+    ; resumes rather than presenting status or invoking a user callback while
+    ; suspended.
+    if A_IsSuspended {
+        SetTimer(_GestureRestartPoll.Bind(Epoch), -100)
+        return
+    }
+    if ProcessExist(_GestureRestartJob["pid"]) {
+        SetTimer(_GestureRestartPoll.Bind(Epoch), -100)
+        return
+    }
+    Ok := _GestureRestartReadResult(_GestureRestartJob["result"])
+    Done := _GestureRestartJob["done"]
+    try FileDelete(_GestureRestartJob["script"])
+    try FileDelete(_GestureRestartJob["result"])
+    _GestureRestartJob["pid"] := 0
+    _GestureRestartJob["done"] := 0
+    if Ok
+        LoggerSuccess("gestures", "Touchpad restart completed.")
+    else
+        LoggerError("gestures", "Touchpad restart failed or did not publish a result.")
+    if IsObject(Done)
+        try Done.Call(Ok)
+}
+
+_GestureRestartReadResult(ResultPath) {
+    try Result := Trim(FileRead(ResultPath, "UTF-8"))
+    catch as err {
+        try LoggerError("gestures", "Touchpad restart result missing: {1}.", err.Message)
+        return False
+    }
+    return (Result = "0")
+}
+
+_GestureRestartBuildPsScript(ResultPath) {
+    CRLF := "`r`n"
+    ResultLiteral := StrReplace(ResultPath, "'", "''")
+    S := "$ErrorActionPreference = 'Stop'" . CRLF
+    S .= "$ResultPath = '" . ResultLiteral . "'" . CRLF
+    S .= "$ErgoptiExitCode = 1" . CRLF
+    S .= "$disabled = @()" . CRLF
+    S .= "try {" . CRLF
+    S .= "  $devs = @(Get-PnpDevice -PresentOnly | Where-Object { $_.Class -eq 'HIDClass' -and $_.FriendlyName -match 'Input Configuration|I2C HID' })" . CRLF
+    S .= "  if ($devs.Count -eq 0) { throw 'No Precision Touchpad HID device found.' }" . CRLF
+    S .= "  foreach ($d in $devs) { Disable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop; $disabled += $d }" . CRLF
+    S .= "  Start-Sleep -Milliseconds 500" . CRLF
+    S .= "  foreach ($d in $devs) { Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop }" . CRLF
+    S .= "  $ErgoptiExitCode = 0" . CRLF
+    S .= "} catch {} finally { foreach ($d in $disabled) { try { Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop } catch {} } }" . CRLF
+    S .= "try { [System.IO.File]::WriteAllText($ResultPath, [string]$ErgoptiExitCode, [System.Text.Encoding]::ASCII) } catch { exit 1 }" . CRLF
+    S .= "exit $ErgoptiExitCode" . CRLF
+    return S
 }
 
 ; Build the body of the manual-setup tutorial. Shared by the tray menu and the
@@ -312,17 +385,25 @@ GestureOpenTouchpadSettings() {
 ; contain ``try`` (parser treats it as an identifier). Logs the lifecycle pair
 ; so a failure here is visible in the log.
 _DeferredGestureAutoConfigure(*) {
+    if A_IsSuspended {
+        SetTimer(_DeferredGestureAutoConfigure, -250)
+        return
+    }
     LoggerStart("gestures", "Running deferred touchpad auto-configuration…")
-    Ok := false
+    Started := false
     try {
-        Ok := GestureAutoConfigureRegistry()
+        Started := GestureAutoConfigureRegistry(_DeferredGestureAutoConfigureDone)
     } catch as e {
         LoggerError("gestures", "Deferred auto-configuration threw: {1}.", e.Message)
         return
     }
-    if Ok {
+    if !Started
+        LoggerError("gestures", "Deferred touchpad auto-configuration could not start — user can retry from the tray menu.")
+}
+
+_DeferredGestureAutoConfigureDone(Ok) {
+    if Ok
         LoggerSuccess("gestures", "Deferred touchpad auto-configuration completed.")
-    } else {
-        LoggerWarn("gestures", "Deferred touchpad auto-configuration reported failure — user can retry from the tray menu.")
-    }
+    else
+        LoggerError("gestures", "Deferred touchpad auto-configuration failed — user can retry from the tray menu.")
 }

@@ -12,14 +12,26 @@
 
 _GRN_GestureRestartDoesNotBlockDriverThread() {
     Body := _DriverFuncBody("GestureRestartTouchpadDevice")
+    Poll := _DriverFuncBody("_GestureRestartPoll")
+    Builder := _DriverFuncBody("_GestureRestartBuildPsScript")
 
-    Assert(Body != "", "GestureRestartTouchpadDevice() must exist")
+    Assert(Body != "" && Poll != "" && Builder != "", "touchpad restart worker helpers must exist")
     Assert(InStr(Body, "RunWait(") = 0,
         "GestureRestartTouchpadDevice must never RunWait for an elevated PnP restart on the driver thread")
     Assert(InStr(Body, "Run(") > 0 && InStr(Body, "&RestartPid") > 0,
         "GestureRestartTouchpadDevice must launch the restart asynchronously and retain its PID for diagnostics")
+    Assert(InStr(Body, "SetTimer(_GestureRestartPoll.Bind(Epoch)") > 0 && InStr(Body, "result") > 0,
+        "the launch must retain a worker-owned result and poll it asynchronously")
     Assert(InStr(Body, "*RunAs powershell.exe") > 0,
         "GestureRestartTouchpadDevice must preserve elevation for the PnP operation")
+    Assert(InStr(Poll, "A_IsSuspended") > 0 && InStr(Poll, "_GestureRestartReadResult") > 0,
+        "completion must wait across Suspend and consume only the worker-authored result")
+    Assert(InStr(Poll, "_SR_GetExitCode") = 0,
+        "a vanished process handle must fail closed rather than being reported as a successful restart")
+    Assert(InStr(Builder, "$ErgoptiExitCode = 1") > 0 && InStr(Builder, "WriteAllText") > 0 && InStr(Builder, "exit $ErgoptiExitCode") > 0,
+        "the elevated restart worker must publish its final success/failure before exiting")
+    Assert(InStr(Builder, "$disabled = @()") > 0 && InStr(Builder, "finally") > 0 && InStr(Builder, "Enable-PnpDevice") > 0,
+        "a failed PnP cycle must always re-enable every device that was already disabled")
 }
 
 Test("gestures: touchpad restart launches without blocking the AHK message pump",

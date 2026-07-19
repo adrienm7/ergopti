@@ -23,8 +23,21 @@ global SubMenus := Map()
 ; Runs the auto-configure — success is already indicated by the green status label in the UI,
 ; so only failures surface a blocking dialog (the user must know something went wrong).
 GestureAutoConfigureAction() {
-	Success := GestureAutoConfigureRegistry()
-	if (!Success) {
+	if A_IsSuspended {
+		try LoggerWarn("gestures", "Ignoring touchpad auto-configure while suspended.")
+		return
+	}
+	if !GestureAutoConfigureRegistry(_GestureAutoConfigureActionDone) {
+		MsgBox(
+			t("dialog.gestures.auto_configure_error"),
+			t("dialog.gestures.auto_configure_error_title"),
+			"Icon!"
+		)
+	}
+}
+
+_GestureAutoConfigureActionDone(Ok) {
+	if !Ok {
 		MsgBox(
 			t("dialog.gestures.auto_configure_error"),
 			t("dialog.gestures.auto_configure_error_title"),
