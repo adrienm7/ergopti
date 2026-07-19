@@ -13,8 +13,8 @@ _ScriptAltGrHookKey(KeyName) {
 _DummyHandler(*) {
 }
 
-opts := "I3 S"
-keys := [
+_ScriptAltGrValidationOptions := "I3 S"
+_ScriptAltGrValidationKeys := [
     "RAlt & Enter",
     "SC138 & SC01C",
     "RAlt & BackSpace",
@@ -26,13 +26,13 @@ keys := [
     "SC01C",
     "SC00E",
 ]
-for key in keys {
-    hk := _ScriptAltGrHookKey(key)
+for _ScriptAltGrValidationKey in _ScriptAltGrValidationKeys {
+    _ScriptAltGrValidationHotkey := _ScriptAltGrHookKey(_ScriptAltGrValidationKey)
     try {
-        Hotkey(hk, _DummyHandler, opts)
-        Hotkey(hk, "Off")
-    } catch as e {
-        throw Error('Hotkey("' . hk . '") failed: ' . e.Message, -1, e)
+        Hotkey(_ScriptAltGrValidationHotkey, _DummyHandler, _ScriptAltGrValidationOptions)
+        Hotkey(_ScriptAltGrValidationHotkey, "Off")
+    } catch as _ScriptAltGrValidationError {
+        throw Error('Hotkey("' . _ScriptAltGrValidationHotkey . '") failed: ' . _ScriptAltGrValidationError.Message, -1, _ScriptAltGrValidationError)
     }
 }
 ; Do not write directly to stdout here: AutoHotkey64.exe is a GUI subsystem

@@ -923,8 +923,8 @@ global GESTURE_FACTORY_DEFAULTS := Map(
 
 ; Current action assignments — read from config.toml or factory defaults.
 global GestureAssignments := Map()
-for _Slot, _Action in GESTURE_FACTORY_DEFAULTS
-    GestureAssignments[_Slot] := _Action
+for _GestureAssignmentSlot, _GestureAssignmentAction in GESTURE_FACTORY_DEFAULTS
+    GestureAssignments[_GestureAssignmentSlot] := _GestureAssignmentAction
 
 ; Window cycle tracker — ordered by manual user activation (most-recent first).
 ; _GestureCycling is set True while our own WinActivate runs so the WinEvent
