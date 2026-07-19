@@ -15,7 +15,7 @@ _KLWVE_OldTimersAndBridgeCallbacksCannotReachReplacement() {
     First := _DriverFuncBody("KLWV_DelayedFirstPush")
     Full := _DriverFuncBody("KLWV_DelayedFullBuild")
     Bridge := _DriverFuncBody("KLWV_OnWebMessage")
-    Range := _DriverFuncBody("KLWV_PushRangeData")
+    Range := _DriverFuncBody("KLWV_OnRangeBuildReady")
     Current := _DriverFuncBody("KLWV_IsCurrent")
 
     Assert(InStr(Open, "Epoch := ++KLWV.epoch") > 0,
@@ -32,9 +32,9 @@ _KLWVE_OldTimersAndBridgeCallbacksCannotReachReplacement() {
     Assert(InStr(Bridge, "KLWV_IsCurrent(which, Epoch)") > 0
             && InStr(Bridge, 'sender == entry["webview"]') > 0,
         "WebMessage callbacks must verify both epoch and controller identity")
-	Assert(InStr(Bridge, "KLWV_PushRangeData.Bind(which, Epoch, query)") > 0
+	Assert(InStr(Bridge, "KLPF_RequestRange(which, KLWV.metrics_dir, query, Epoch") > 0
 			&& InStr(Range, "KLWV_IsCurrent(which, Epoch)") > 0,
-		"range projection timer must capture and validate its originating dashboard epoch")
+		"range worker completion must capture and validate its originating dashboard epoch")
     Assert(InStr(Current, 'entry["epoch"] = Epoch') > 0,
         "KLWV_IsCurrent must compare against the live entry epoch")
 }

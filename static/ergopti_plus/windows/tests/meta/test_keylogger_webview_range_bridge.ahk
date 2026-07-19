@@ -16,8 +16,8 @@ _KLWVRange_CheckSelectedRangeBridge() {
     Assert(Body != "", "KLWV_OnWebMessage must exist in modules/keylogger/keylogger_webview.ahk")
     Assert(InStr(Body, 'case "range"') > 0,
         "KLWV_OnWebMessage must handle the metrics typing range action")
-    Assert(InStr(Body, "SetTimer(KLWV_PushRangeData.Bind") > 0,
-        "range projection must be deferred off the WebMessageReceived callback stack")
+    Assert(InStr(Body, "KLPF_RequestRange(") > 0,
+        "range projection must be delegated to a detached worker, never deferred onto the same AHK thread")
 
     NormalizeBody := _DriverFuncBody("KLWV_NormalizeRangeRequest")
     Assert(NormalizeBody != "", "KLWV_NormalizeRangeRequest must exist")
@@ -26,12 +26,13 @@ _KLWVRange_CheckSelectedRangeBridge() {
     Assert(InStr(NormalizeBody, "seen.Has(app_name)") > 0,
         "range requests must de-duplicate selected applications")
 
-    PushBody := _DriverFuncBody("KLWV_PushRangeData")
-    Assert(PushBody != "", "KLWV_PushRangeData must exist")
-    Assert(InStr(PushBody, "KLR_ReadRangeSplitToday") > 0,
-        "range bridge must query the selected date/app n-gram projection")
-    Assert(InStr(PushBody, '"type":"range_data"') > 0,
-        "range bridge must respond with a range_data message")
+    ReadyBody := _DriverFuncBody("KLWV_OnRangeBuildReady")
+    Assert(ReadyBody != "", "KLWV_OnRangeBuildReady must exist")
+    Assert(InStr(ReadyBody, "ExecuteScriptAsync") > 0
+            && InStr(ReadyBody, "window.receive_range_data") > 0,
+        "WebView must fetch and parse the staged range JSON in its own process")
+    Assert(InStr(ReadyBody, "FileRead") = 0,
+        "the AHK driver must not synchronously read a selected-range JSON payload")
 }
-Test("keylogger_webview: date/app range changes use a deferred native projection instead of retaining the initial all-time n-grams (metrics-range-bridge-stale-filter)",
+Test("keylogger_webview: date/app range changes use a detached projection instead of retaining the initial all-time n-grams (metrics-range-bridge-stale-filter)",
     _KLWVRange_CheckSelectedRangeBridge)

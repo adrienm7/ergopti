@@ -444,12 +444,13 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 			KLPF_RequestBuild(which, KLWV.metrics_dir, "full", Epoch,
 				KLWV_OnBuildReady.Bind(which, Epoch))
 		case "range":
-			; Keep date/app filtering off the WebMessageReceived stack. A range
-			; projection can be large enough that running it synchronously here
-			; prevents WebView2 from painting the loader and risks STA reentrancy.
+			; A selected-range projection can be large enough to stall the hook.
+			; Build it in a detached worker; the completion asks WebView to fetch
+			; the staged JSON directly, so AHK never decodes the large payload.
 			query := KLWV_NormalizeRangeRequest(msg)
 			if query
-				SetTimer(KLWV_PushRangeData.Bind(which, Epoch, query), -1)
+				KLPF_RequestRange(which, KLWV.metrics_dir, query, Epoch,
+					KLWV_OnRangeBuildReady.Bind(which, Epoch))
 		case "clear_cache":
             ; Purge every layer of cache so the next rebuild is a full cold read:
             ; - KLPF_MANIFEST_CACHE: manifest projection (historical days)
@@ -505,28 +506,26 @@ KLWV_IsIsoDate(value) {
     return value = "" || RegExMatch(value, "^\\d{4}-\\d{2}-\\d{2}$")
 }
 
-; Project the n-grams for one selected date/app range from the warm in-memory DB.
-; KLR_NotifyIngest keeps this cache current; building it only on the initial
-; request avoids re-reading every data.sql file when the user changes a filter.
-KLWV_PushRangeData(which, Epoch, query) {
-    if A_IsSuspended || !KLWV_IsCurrent(which, Epoch) || !(query is Map)
-        return
-    try {
-        if !KLRCache.db && KLWV.metrics_dir
-            KLR_BuildDatabase(KLWV.metrics_dir)
-        db := KLRCache.db
-        if !db
-            return
-
-        range_data := KLR_ReadRangeSplitToday(db, query["start_date"], query["end_date"], query["apps"])
-        message := '{"type":"range_data","payload":' . KL_JsonEncode(range_data) . '}'
-    } catch as err {
-        try LoggerError("Keylogger", "KLWV_PushRangeData: range projection failed for '{1}': {2}", which, err.Message)
+KLWV_OnRangeBuildReady(which, Epoch, stage, *) {
+    if A_IsSuspended || !KLWV_IsCurrent(which, Epoch) || !FileExist(stage) {
+        try FileDelete(stage)
         return
     }
-    if A_IsSuspended || !KLWV_IsCurrent(which, Epoch)
-		return
-	try KLWV.windows[which]["webview"].PostWebMessageAsString(message)
+    ; ``ExecuteScriptAsync`` is fire-and-forget: WebView performs the file read,
+    ; JSON parse and range render in its own process, not on the keyboard thread.
+    url := "file:///" . StrReplace(stage, "\", "/")
+    js := "fetch('" . url . "').then(r=>r.json()).then(p=>window.receive_range_data(p)).catch(()=>{});"
+    try KLWV.windows[which]["webview"].ExecuteScriptAsync(js)
+    catch as err {
+        try LoggerError("Keylogger", "KLWV_OnRangeBuildReady: range delivery failed for '{1}': {2}", which, err.Message)
+    }
+    ; Give the renderer ample time to open the file, then clean the private
+    ; staged result.  A late timer only removes this generation's unique path.
+    SetTimer(KLWV_DeleteRangeStage.Bind(stage), -60000)
+}
+
+KLWV_DeleteRangeStage(stage) {
+    try FileDelete(stage)
 }
 
 

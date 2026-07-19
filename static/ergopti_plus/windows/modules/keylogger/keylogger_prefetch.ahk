@@ -82,12 +82,7 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_ready := un
     if A_IsSuspended || (which != "typing" && which != "apps") || (metrics_dir = "")
         return false
 
-    if KLPFWorker.jobs.Has(which) {
-        previous := KLPFWorker.jobs[which]
-        try previous["handle"].terminate()
-        try FileDelete(previous["stage"])
-        KLPFWorker.jobs.Delete(which)
-    }
+    KLPF_CancelBuild(which)
 
     generation := ++KLPFWorker.generation
     stage := KLPF_PrefetchPath(which) . ".stage." . generation
@@ -110,6 +105,43 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_ready := un
         "epoch", epoch,
         "stage", stage,
         "handle", handle,
+        "kind", "prefetch",
+        "on_ready", IsSet(on_ready) ? on_ready : 0
+    )
+    return true
+}
+
+KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_ready := unset) {
+    global _ConfigDir
+    if A_IsSuspended || (which != "typing") || (metrics_dir = "") || !(query is Map)
+        return false
+    job_key := "range:" . which
+    KLPF_CancelBuild(job_key)
+    generation := ++KLPFWorker.generation
+    stage := A_Temp . "\ergopti_metrics_range_" . which . ".stage." . generation . ".json"
+    try FileDelete(stage)
+    apps_json := KL_JsonEncode(query["apps"])
+    executable := A_IsCompiled ? A_ScriptFullPath : A_AhkPath
+    args := A_IsCompiled
+        ? ["/force", "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir,
+            KLWConst.MAX_KEYSTROKE_DELAY_MS, KLWConst.THINK_PAUSE_MS, KLWConst.BURST_GAP_MS,
+            KLWConst.SESSION_GAP_MS, KLWConst.AUTO_REPEAT_MAX_DELAY_MS, KLWConst.HOLD_THRESHOLD_MS,
+            query["start_date"], query["end_date"], apps_json]
+        : ["/force", A_ScriptFullPath, "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir,
+            KLWConst.MAX_KEYSTROKE_DELAY_MS, KLWConst.THINK_PAUSE_MS, KLWConst.BURST_GAP_MS,
+            KLWConst.SESSION_GAP_MS, KLWConst.AUTO_REPEAT_MAX_DELAY_MS, KLWConst.HOLD_THRESHOLD_MS,
+            query["start_date"], query["end_date"], apps_json]
+    done := KLPF_OnWorkerDone.Bind(job_key, generation)
+    spawn := IsObject(KLPFWorker.spawn_fn) ? KLPFWorker.spawn_fn : ShellRunner_Spawn
+    handle := spawn.Call(executable, args, done)
+    if !handle.start()
+        return false
+    KLPFWorker.jobs[job_key] := Map(
+        "generation", generation,
+        "epoch", epoch,
+        "stage", stage,
+        "handle", handle,
+        "kind", "range",
         "on_ready", IsSet(on_ready) ? on_ready : 0
     )
     return true
@@ -135,6 +167,14 @@ KLPF_OnWorkerDone(which, generation, exit_code, stdout, stderr) {
     if A_IsSuspended || (exit_code != 0) || !FileExist(stage) {
         try FileDelete(stage)
         try LoggerWarn("KLReader", "Background metrics projection failed for '{1}' (exit={2}).", which, exit_code)
+        return
+    }
+    if (job["kind"] = "range") {
+        if IsObject(job["on_ready"]) {
+            try job["on_ready"].Call(SubStr(which, 7), job["epoch"], stage)
+        } else {
+            try FileDelete(stage)
+        }
         return
     }
     if !KLPF_MoveAtomic(stage, KLPF_PrefetchPath(which)) {
@@ -167,10 +207,20 @@ KLPF_WorkerMain() {
         KLWConst.SESSION_GAP_MS := Integer(A_Args[10])
         KLWConst.AUTO_REPEAT_MAX_DELAY_MS := Integer(A_Args[11])
         KLWConst.HOLD_THRESHOLD_MS := Integer(A_Args[12])
-        if (which != "typing" && which != "apps") || (mode != "full" && mode != "live" && mode != "manifest")
+        if (which != "typing" && which != "apps") || (mode != "full" && mode != "live" && mode != "manifest" && mode != "range")
             ExitApp(2)
-        if !KLPF_BuildAndWriteToPath(which, metrics_dir, stage, "", mode)
+        if (mode = "range") {
+            if (A_Args.Length < 15)
+                ExitApp(2)
+            apps := KL_JsonDecode(A_Args[15])
+            if !(apps is Array)
+                ExitApp(2)
+            db := KLR_BuildDatabase(metrics_dir)
+            if !db || !KLPF_WriteAtomic(stage, KL_JsonEncode(KLR_ReadRangeSplitToday(db, A_Args[13], A_Args[14], apps)))
+                ExitApp(1)
+        } else if !KLPF_BuildAndWriteToPath(which, metrics_dir, stage, "", mode) {
             ExitApp(1)
+        }
     } catch {
         try FileDelete(stage)
         ExitApp(1)

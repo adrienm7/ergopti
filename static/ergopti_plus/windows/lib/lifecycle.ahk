@@ -129,6 +129,7 @@ Ergopti_OnSuspendEnter() {
     ; than letting SQLite/JSON work continue throughout a paused driver.
     try KLPF_CancelBuild("typing")
     try KLPF_CancelBuild("apps")
+    try KLPF_CancelBuild("range:typing")
     try StopActivitySimulation()
     ; AHK-12: A gesture left/right click-hold (SendEvent "{LButton Down}") that
     ; was in progress when the user pauses the driver outlives the suspend because
