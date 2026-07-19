@@ -151,6 +151,8 @@ GestureScreenshotFullscreen(Mode) {
 ; it to a timestamped PNG on disk.
 GestureScreenshotRegion(Mode) {
     global _GestureRegionCapture, _GestureRegionCaptureEpoch
+    if A_IsSuspended
+        return
     if (Mode == "clipboard") {
         ; Snip & Sketch already places the image on the clipboard — nothing
         ; further to do. Fire-and-forget so the user can keep typing.
@@ -195,6 +197,10 @@ GestureRegionCapturePoll(Epoch) {
     global _GestureRegionCapture
     if !(_GestureRegionCapture is Map) || (_GestureRegionCapture["epoch"] != Epoch)
         return
+    if A_IsSuspended {
+        GestureRegionCaptureFinish(Epoch, "suspended")
+        return
+    }
 
     State := _GestureRegionCapture
     if !State["save_started"] {
