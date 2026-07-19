@@ -8,6 +8,10 @@
 
 #Requires AutoHotkey v2.0
 
+; This meta test is also parsed directly by the repository validation pass.
+; The normal include is deduplicated when run_all.ahk loaded the framework first.
+#Include ..\test_framework.ahk
+
 _TSC_Check() {
 	; Move-resilient: extract GestureScreenshotRegion()'s body by name via the
 	; framework helper instead of a pinned modules/gestures.ahk read. Scoping to the
