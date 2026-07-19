@@ -150,7 +150,7 @@ global CategoryEnabled := Map(
 ReadCategoryEnabled(Cache) {
     global CategoryEnabled
     for Category, _Default in CategoryEnabled {
-        Raw := IniCacheGet(Cache, "ahk.category_enabled", _CategoryEnabledKey(Category))
+        Raw := _FeatureStateIniGet(Cache, "ahk.category_enabled", _FeatureStateCategoryKey(Category))
         if (Raw == "_") {
             continue
         }
@@ -172,28 +172,47 @@ IsCategoryGated(Category) {
 
 ReadScriptConfig(Cache) {
     ; MagicKey lives in [hotstrings] trigger_char in the v2 TOML.
-    Raw := IniCacheGet(Cache, "hotstrings", "trigger_char")
+    Raw := _FeatureStateIniGet(Cache, "hotstrings", "trigger_char")
     if Raw != "_"
         ScriptInformation["MagicKey"] := Raw
     ; Source key for the J→★ remap — scancode and QWERTY character are stored
     ; separately so the remapping works regardless of the active OS layout.
-    RawScan := IniCacheGet(Cache, "hotstrings", "magic_key_source_scan")
+    RawScan := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source_scan")
     if RawScan != "_"
         ScriptInformation["MagicKeySourceScan"] := RawScan
-    RawChar := IniCacheGet(Cache, "hotstrings", "magic_key_source_char")
+    RawChar := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source_char")
     if RawChar != "_"
         ScriptInformation["MagicKeySourceChar"] := RawChar
     ; AltGr-as-Kana manual override. Default "auto" defers to the reverse
     ; VK_RMENU→SC probe in HotstringEngineInit(); "true" / "false" force the
     ; respective mode. Lives in [script] so the user can lock it once per
     ; machine if auto-detection misfires on an exotic layout.
-    RawKana := IniCacheGet(Cache, "script", "alt_gr_is_kana_remap")
+    RawKana := _FeatureStateIniGet(Cache, "script", "alt_gr_is_kana_remap")
     if RawKana != "_"
         ScriptInformation["AltGrIsKanaRemap"] := RawKana
     ; Restore the engine-level repeat-key toggle (defaults to enabled when absent).
     global HSE_RepeatEnabled
-    RawRepeat := IniCacheGet(Cache, "hotstrings", "repeat_key_enabled")
+    RawRepeat := _FeatureStateIniGet(Cache, "hotstrings", "repeat_key_enabled")
     if RawRepeat != "_"
         HSE_RepeatEnabled := (RawRepeat == "1" or RawRepeat == "true")
     ; Paths are always derived from _ConfigDir at startup and are never persisted.
+}
+
+; IniCacheGet belongs to the configuration-loader boundary. Resolve it at call
+; time so this state-only module remains warning-clean when syntax-validated
+; outside the driver's full include graph, while preserving the one canonical
+; parser/cache implementation at runtime.
+_FeatureStateIniGet(Cache, Section, Key) {
+    try return Func("IniCacheGet").Call(Cache, Section, Key)
+    catch as Err
+        throw Error("feature_state requires IniCacheGet from the configuration loader: " . Err.Message)
+}
+
+; Category-key normalization is owned by config_io.ahk. Keep the state module
+; independent from that later include at parse time without creating a second
+; mapping that could drift from persisted configuration.
+_FeatureStateCategoryKey(Category) {
+    try return Func("_CategoryEnabledKey").Call(Category)
+    catch as Err
+        throw Error("feature_state requires _CategoryEnabledKey from config_io.ahk: " . Err.Message)
 }
