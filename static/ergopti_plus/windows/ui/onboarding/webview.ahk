@@ -440,33 +440,12 @@ _OnbWeb_Finish(answers) {
 ; gestures identically. Scheduled out of the WebMessageReceived callback because
 ; the elevated RunWait blocks while the UAC prompt + touchpad cycle complete.
 _OnbWeb_RegisterGesturesAuto() {
-	ScriptPath := A_Temp . "\ergopti_gesture_config.ps1"
-	try {
-		if FileExist(ScriptPath)
-			FileDelete(ScriptPath)
-		FileAppend(_Onboarding_BuildGesturePsScript(), ScriptPath, "UTF-8")
-	} catch as e {
-		try LoggerError("Onboarding", "Could not write gesture PS script to '{1}': {2}.", ScriptPath, e.Message)
+	if !_Onboarding_StartGestureAuto(_OnbWeb_GestureAutoDone)
 		_OnbWeb_Eval("window.setGestureRegisterStatus(false)")
-		return
-	}
+}
 
-	try LoggerStart("Onboarding", "Auto-configuring touchpad gestures…")
-	exitCode := -1
-	try {
-		exitCode := RunWait('*RunAs powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . ScriptPath . '"', , "Hide")
-	} catch as e {
-		try LoggerError("Onboarding", "Gesture auto-config powershell threw: {1}.", e.Message)
-		exitCode := -1
-	}
-	try FileDelete(ScriptPath)
-
-	ok := (exitCode == 0)
-	if (ok) {
-		try LoggerSuccess("Onboarding", "Gesture auto-configuration succeeded.")
-	} else {
-		try LoggerWarn("Onboarding", "Gesture auto-configuration failed (exitCode={1}).", exitCode)
-	}
+_OnbWeb_GestureAutoDone(ok) {
+	try LoggerInfo("Onboarding", "Gesture auto-configuration completed (ok={1}).", ok ? "true" : "false")
 	_OnbWeb_Eval("window.setGestureRegisterStatus(" . (ok ? "true" : "false") . ")")
 }
 
