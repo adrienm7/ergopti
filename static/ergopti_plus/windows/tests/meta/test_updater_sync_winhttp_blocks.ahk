@@ -29,11 +29,10 @@ _USWB_AssertDownloadAndInstallAsync() {
 	Body := _USWB_FuncBodyStripped(Src, "Updater_DownloadAndInstall(Release) {")
 	Assert(Body != "", "Updater_DownloadAndInstall must exist in lib/updater.ahk")
 	
-	SyncReqIdx := InStr(Body, 'Req.Open("GET", AssetUrl, false)')
-	Assert(!SyncReqIdx, "Updater_DownloadAndInstall must not use synchronous WinHTTP Open (sync-winhttp-blocks-keyboard-on-user-check)")
-
-	AsyncReqIdx := InStr(Body, 'Req.Open("GET", AssetUrl, true)')
-	Assert(AsyncReqIdx > 0, "Updater_DownloadAndInstall must use async WinHTTP Open (sync-winhttp-blocks-keyboard-on-user-check)")
+	Assert(InStr(Body, "ComObject(") = 0 and InStr(Body, "Req.Open(") = 0,
+		"Updater_DownloadAndInstall must not create any WinHTTP object on the keyboard thread (sync-winhttp-blocks-keyboard-on-user-check)")
+	WorkerIdx := InStr(Body, "_Updater_StartStagingWorker(")
+	Assert(WorkerIdx > 0, "Updater_DownloadAndInstall must dispatch the isolated staging worker asynchronously (sync-winhttp-blocks-keyboard-on-user-check)")
 }
 
 _USWB_AssertShowAvailableUpdateAsync() {

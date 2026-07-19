@@ -175,7 +175,7 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 	; terminate() are defined as ordinary nested functions instead.
 	_SR_HandleStart(*) {
 		if started {
-			return
+			return true
 		}
 		started := true
 		try {
@@ -186,15 +186,21 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 				"OnDone",  IsSet(OnDone) ? OnDone : unset
 			)
 			_SR_EnsurePoller()
+			return true
 		} catch as Err {
 			LoggerError("adapters.shell_runner", "spawn.start() failed for '{1}': {2}", Executable, Err.Message)
 			; Clean up temp file if Run threw before creating the process.
 			try FileDelete(tmp_file)
+			return false
 		}
 	}
 
 	_SR_HandleTerminate(*) {
 		if pid != 0 {
+			; ShellRunner launches through cmd.exe for redirection. Killing only that
+			; shell can orphan a child PowerShell worker after Suspend, so terminate
+			; the complete process tree before the best-effort direct fallback.
+			try Run(A_ComSpec . " /c taskkill /pid " . pid . " /t /f >nul 2>&1", , "Hide")
 			try ProcessClose(pid)
 			pid := 0
 		}

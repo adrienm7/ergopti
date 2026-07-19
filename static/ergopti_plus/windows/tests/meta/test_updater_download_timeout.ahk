@@ -32,11 +32,10 @@
 ; ===========================================================
 ; ===========================================================
 
-; Returns the body of _Updater_PollDownloadAsync from the (now split) updater
-; module via the location-independent driver-source helper, anchored on the
-; column-0 definition so a call site cannot be mistaken for the body.
+; Returns the isolated worker body. The timeout must be owned by the worker,
+; otherwise an AHK poll ceiling could still leave a blocked network request alive.
 _UDTO_FindPollBlock() {
-	return _DriverFuncBody("_Updater_PollDownloadAsync")
+	return _DriverFuncBody("_Updater_BuildStagingWorkerScript")
 }
 
 
@@ -49,9 +48,10 @@ _UDTO_FindPollBlock() {
 ; ===========================================================
 
 _UDTO_600SecCeiling() {
-	block := _UDTO_FindPollBlock()
-	Assert(InStr(block, "600000") > 0,
-		"updater.ahk: _Updater_PollDownloadAsync must use 600000 ms as the download timeout ceiling")
+	SplitPath(A_ScriptDir, , &Root)
+	Core := FileRead(StrReplace(Root, "\", "/") . "/lib/updater/core.ahk")
+	Assert(InStr(Core, "UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS := 600000") > 0,
+		"core.ahk must retain the 600000 ms download timeout budget passed to the staging worker")
 }
 Test("Updater: download poll ceiling raised to 600000 ms (updater-download-timeout)", _UDTO_600SecCeiling)
 
@@ -59,8 +59,7 @@ Test("Updater: download poll ceiling raised to 600000 ms (updater-download-timeo
 _UDTO_No120SecCeiling() {
 	block := _UDTO_FindPollBlock()
 	; The MaxPolls expression must not still divide 120000.
-	posMax := InStr(block, "MaxPolls := 120000")
-	Assert(posMax = 0,
-		"updater.ahk: download timeout ceiling must not be 120000 ms — it was raised to 600000 ms")
+	Assert(InStr(block, "$Request.Timeout = $TimeoutMs") > 0 and InStr(block, "$Request.ReadWriteTimeout = $TimeoutMs") > 0,
+		"updater.ahk: worker must apply the supplied timeout to both connect and file-stream phases")
 }
-Test("Updater: 120000 ms ceiling removed from _Updater_PollDownloadAsync (updater-download-timeout)", _UDTO_No120SecCeiling)
+Test("Updater: worker applies the full timeout to every network phase (updater-download-timeout)", _UDTO_No120SecCeiling)

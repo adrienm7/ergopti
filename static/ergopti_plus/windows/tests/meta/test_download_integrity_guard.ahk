@@ -78,34 +78,28 @@ Test("updater: UPDATER_MIN_EXE_SIZE_BYTES constant declared (download-no-integri
 ; ===================================================
 
 _DIG_ContentLengthCheckPresent() {
-	Src := _DriverDirConcat("lib/updater")
-	; The install function is large; anchor on a unique string near the download path
-	Idx := InStr(Src, "ADODB.Stream")
-	Assert(Idx > 0, "Download via ADODB.Stream must exist in lib/updater.ahk")
-	; Look for the Content-Length guard in the 3000 chars following the stream write
-	Window := SubStr(Src, Idx, 3000)
-	Assert(InStr(Window, "Content-Length") > 0,
-		"Updater install path must check Content-Length response header to detect partial downloads (download-no-integrity-partial-safety)")
+	Worker := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
+	Assert(Worker != "", "The isolated staging worker must exist")
+	Assert(InStr(Worker, "$ExpectedSize = [int64]$Response.ContentLength") > 0,
+		"Worker must read Content-Length before accepting a downloaded executable (download-no-integrity-partial-safety)")
+	Assert(InStr(Worker, "$ActualSize -ne $ExpectedSize") > 0,
+		"Worker must reject a Content-Length mismatch before publishing the swap batch (download-no-integrity-partial-safety)")
 }
 Test("updater: install path reads Content-Length header to detect truncated downloads (download-no-integrity-partial-safety)", _DIG_ContentLengthCheckPresent)
 
 _DIG_MinSizeCheckPresent() {
-	Src := _DriverDirConcat("lib/updater")
-	Idx := InStr(Src, "ADODB.Stream")
-	Assert(Idx > 0, "Download via ADODB.Stream must exist in lib/updater.ahk")
-	Window := SubStr(Src, Idx, 3000)
-	Assert(InStr(Window, "UPDATER_MIN_EXE_SIZE_BYTES") > 0,
-		"Updater install path must reject downloads below UPDATER_MIN_EXE_SIZE_BYTES to guard against error-page responses (download-no-integrity-partial-safety)")
+	Start := _DriverFuncBody("_Updater_StartStagingWorker")
+	Worker := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
+	Assert(InStr(Start, "UPDATER_MIN_EXE_SIZE_BYTES") > 0 and InStr(Worker, "$ActualSize -lt $MinimumSize") > 0,
+		"Worker must reject downloads below UPDATER_MIN_EXE_SIZE_BYTES to guard against error-page responses (download-no-integrity-partial-safety)")
 }
 Test("updater: install path rejects downloads smaller than UPDATER_MIN_EXE_SIZE_BYTES (download-no-integrity-partial-safety)", _DIG_MinSizeCheckPresent)
 
 _DIG_PartialFileDeleted() {
-	Src := _DriverDirConcat("lib/updater")
-	Idx := InStr(Src, "Content-Length")
-	Assert(Idx > 0, "Content-Length guard must exist in lib/updater.ahk")
-	; After the Content-Length check, a FileDelete must appear before a MsgBox abort
-	Window := SubStr(Src, Idx, 1000)
-	Assert(InStr(Window, "FileDelete") > 0,
-		"Updater must delete the partial file on size mismatch — leaving it behind risks the swap script installing a corrupted binary (download-no-integrity-partial-safety)")
+	Worker := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
+	Mismatch := InStr(Worker, "$ActualSize -ne $ExpectedSize")
+	Remove := InStr(Worker, "Remove-Item -LiteralPath $NewExe -Force", false, Mismatch)
+	Assert(Mismatch > 0 and Remove > Mismatch,
+		"Worker must delete the partial file on size mismatch — leaving it behind risks the swap script installing a corrupted binary (download-no-integrity-partial-safety)")
 }
 Test("updater: partial download file is deleted before aborting install (download-no-integrity-partial-safety)", _DIG_PartialFileDeleted)

@@ -29,15 +29,12 @@ _UDRG_AssertReentrancyGuard() {
 	Assert(GuardIdx > 0,
 		"Updater_DownloadAndInstall must check _UpdaterDownloadInProgress before proceeding (updater-download-reentrancy)")
 
-	DirCreateIdx := InStr(Body, "DirCreate(StagingDir)")
-	Assert(DirCreateIdx > 0, "Updater_DownloadAndInstall must still create the staging dir")
-	Assert(GuardIdx < DirCreateIdx,
-		"The _UpdaterDownloadInProgress guard must run BEFORE DirCreate/Req.Open -- a guard placed after the staging dir is already created is too late (updater-download-reentrancy)")
-
-	ReqOpenIdx := InStr(Body, "Req.Open(")
-	Assert(ReqOpenIdx > 0, "Updater_DownloadAndInstall must still open the async WinHTTP request")
-	Assert(GuardIdx < ReqOpenIdx,
-		"The _UpdaterDownloadInProgress guard must run BEFORE Req.Open (updater-download-reentrancy)")
+	DispatchIdx := InStr(Body, "_Updater_StartStagingWorker(")
+	Assert(DispatchIdx > 0, "Updater_DownloadAndInstall must dispatch the isolated staging worker")
+	Assert(GuardIdx < DispatchIdx,
+		"The _UpdaterDownloadInProgress guard must run before worker dispatch, otherwise two update dialogs can stage the same target concurrently")
+	Assert(InStr(Body, "DirCreate(") = 0 and InStr(Body, "Req.Open(") = 0,
+		"Updater_DownloadAndInstall must not perform staging disk or HTTP work on the AHK thread")
 }
 Test("updater: Updater_DownloadAndInstall has a re-entrancy guard before any side effect (updater-download-reentrancy)", _UDRG_AssertReentrancyGuard)
 
