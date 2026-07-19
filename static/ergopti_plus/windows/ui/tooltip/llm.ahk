@@ -111,8 +111,16 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 		}
 	}
 
-	global _LLM_Tooltip_Loading, _LLM_Tooltip_ShownAt
-	_LLM_Tooltip_Loading := false
+    global _LLM_Tooltip_Loading, _LLM_Tooltip_ShownAt
+    global _TooltipGeneration, _TooltipTimerGeneration
+    ; Reserve ownership before touching the shared Gui. UIA position resolution
+    ; can pump messages; a later prediction/hide must make this invocation inert
+    ; rather than allowing it to present stale content afterward.
+    RenderGeneration := _TooltipGeneration + 1
+    _TooltipGeneration := RenderGeneration
+    _TooltipTimerGeneration := RenderGeneration
+    SetTimer(_TooltipTimerFn, 0)
+    _LLM_Tooltip_Loading := false
 	_LLM_Tooltip_Slots    := slots
 	_LLM_Tooltip_ActiveIdx := Max(1, Min(Integer(active), slots.Length))
 	_LLM_Tooltip_Visible  := true
@@ -139,23 +147,28 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 	; flag over a destroyed window, so a render error can never blank the surface
 	; without a trace again.
 	try {
-		_TooltipBuildGuiLlm(slots, _LLM_Tooltip_ActiveIdx)
-	} catch as _llm_build_err {
+        if !_TooltipBuildGuiLlm(slots, _LLM_Tooltip_ActiveIdx, RenderGeneration)
+            return
+    } catch as _llm_build_err {
 		try LoggerError("LLM.tt", "Prediction render failed — hiding cleanly: {1} | file={2} line={3}.",
 			_llm_build_err.Message,
 			(_llm_build_err.HasOwnProp("File") ? _llm_build_err.File : "?"),
 			(_llm_build_err.HasOwnProp("Line") ? _llm_build_err.Line : "?"))
-		LLM_TooltipHide()
-		return
-	}
+        if (RenderGeneration == _TooltipGeneration)
+            LLM_TooltipHide()
+        return
+    }
+
+    if (RenderGeneration != _TooltipGeneration)
+        return
 
 	; Arm the LLM-specific auto-hide timer. The duration mirrors the macOS
 	; llm_prediction delay: it defaults to UI_LLM_TIMEOUT_SEC (20 s) but is
 	; user-overridable from the hotstrings "Delays" submenu, stored as the
 	; "llm_prediction" delay override. Resolve it live so a change applies
 	; without a restart; fall back to the UI constant if the resolver is absent.
-	global _TooltipTimerGeneration, _TooltipGeneration, UI_LLM_TIMEOUT_SEC
-	_TooltipTimerGeneration := _TooltipGeneration
+    global UI_LLM_TIMEOUT_SEC
+    _TooltipTimerGeneration := RenderGeneration
 	llm_timeout_sec := UI_LLM_TIMEOUT_SEC
 	try {
 		_llm_ov := HotstringsResolve("llm_prediction", "")
@@ -609,7 +622,7 @@ _LLM_TooltipAppendFooter(G, &TotalH, TotalW, bgHex) {
 ; (orange). Inactive slots: full text in unsel_gray. Each slot is one row;
 ; within a row, segment coloring is achieved by multiple Text controls placed
 ; side-by-side (same Y, X incremented by measured segment width).
-_TooltipBuildGuiLlm(slots, active_idx) {
+_TooltipBuildGuiLlm(slots, active_idx, RenderGeneration) {
 	global _TooltipGui, _TooltipRowGuis
 	global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y
 	global _TOOLTIP_DEFAULT_BG_HEX, _TOOLTIP_SEP_COLOR_HEX, _TOOLTIP_LABEL_FONT_SIZE
@@ -817,32 +830,42 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 	row_bg_final := _TOOLTIP_DEFAULT_BG_HEX
 	_LLM_TooltipAppendFooter(G, &TotalH, TotalW, row_bg_final)
 
-	_TooltipGui := G
-	_TooltipRowGuis := [{ Gui: G, H: TotalH, W: TotalW, IsSep: false }]
-
-	; Show via the same path as TooltipShow.
-	global _TooltipGeneration, _TooltipShownHwnds, _TOOLTIP_HWND_TRACK_CAP, _TooltipTimerGeneration
-	_TooltipGeneration += 1
-	SetTimer(_TooltipTimerFn, 0)
+    ; A newer show/hide can take ownership while this renderer performs GUI
+    ; work. Do not publish this detached Gui into the shared surface afterward.
+    global _TooltipGeneration, _TooltipShownHwnds, _TOOLTIP_HWND_TRACK_CAP, _TooltipTimerGeneration
+    if (RenderGeneration != _TooltipGeneration) {
+        try G.Destroy()
+        return false
+    }
+    _TooltipGui := G
+    _TooltipRowGuis := [{ Gui: G, H: TotalH, W: TotalW, IsSep: false }]
 
 	; Cache in a local variable to prevent "Invalid index" crashes if a
 	; concurrent TooltipHide clears the global array during the
 	; _TooltipResolvePosition yield point.
-	Rows := _TooltipRowGuis
-	if (Rows.Length == 0) {
-		TooltipHide("LlmLateNoRows", true)
-		return
+    Rows := _TooltipRowGuis
+    if (Rows.Length == 0) {
+        if (RenderGeneration == _TooltipGeneration)
+            TooltipHide("LlmLateNoRows", true)
+        return false
 	}
 
 	; AHK-34: mirror core.ahk — UIA COM must be profiled on the LLM path too
 	_hpResolve := HotPath_Now()
-	Pos := _TooltipResolvePosition()
-	HotPath_LogIfSlow("Tooltip.ResolvePos", _hpResolve, "")
-	Row := Rows[1]
-	_TooltipTimerGeneration := _TooltipGeneration
-	try {
-		_TooltipPresentStack(Pos, Row, true)
-	} catch {
-		TooltipHide("LlmPresentFail", true)
-	}
+    Pos := _TooltipResolvePosition()
+    HotPath_LogIfSlow("Tooltip.ResolvePos", _hpResolve, "")
+    if (RenderGeneration != _TooltipGeneration)
+        return false
+    Row := Rows[1]
+    _TooltipTimerGeneration := RenderGeneration
+    try {
+        _TooltipPresentStack(Pos, Row, true)
+    } catch {
+        if (RenderGeneration == _TooltipGeneration)
+            TooltipHide("LlmPresentFail", true)
+        return false
+    }
+    if (RenderGeneration != _TooltipGeneration)
+        return false
+    return true
 }
