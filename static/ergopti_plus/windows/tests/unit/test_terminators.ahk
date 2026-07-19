@@ -35,8 +35,8 @@
 ; ============================================================
 
 ; True when the catalogue exposes a slot with the given key.
-_TermHasKey(T, Key) {
-    for D in T.all() {
+_TermHasKey(Terms, Key) {
+    for D in Terms.all() {
         if (D.Has("key") and D["key"] == Key)
             return true
     }
@@ -44,8 +44,8 @@ _TermHasKey(T, Key) {
 }
 
 ; True when any non-separator slot owns the given character.
-_TermCatalogueHasChar(T, Ch) {
-    for D in T.all() {
+_TermCatalogueHasChar(Terms, Ch) {
+    for D in Terms.all() {
         if (D.Has("type") and D["type"] == "separator")
             continue
         for C in D["chars"] {
@@ -66,43 +66,43 @@ _TermCatalogueHasChar(T, Ch) {
 ; ============================================================
 
 TestTerminators_Defaults() {
-    T := Terminators()
+    Terms := Terminators()
     ; Basic terminators ship ON: whitespace + sentence punctuation.
-    AssertTrue(T.isTerminator(" "),  "space is a terminator by default")
-    AssertFalse(T.isConsumed(" "),   "space is not consumed")
-    AssertTrue(T.isTerminator("`t"), "tab is a terminator by default")
-    AssertTrue(T.isTerminator("`r"), "enter (CR) is a terminator by default")
-    AssertTrue(T.isTerminator("."),  "period is a terminator by default (basic)")
-    AssertTrue(T.isTerminator(","),  "comma is a terminator by default (basic)")
-    AssertTrue(T.isTerminator(";"),  "semicolon is a terminator by default (basic)")
-    AssertTrue(T.isTerminator(":"),  "colon is a terminator by default (basic)")
-    AssertTrue(T.isTerminator("!"),  "exclamation is a terminator by default (basic)")
-    AssertTrue(T.isTerminator("?"),  "question is a terminator by default (basic)")
-    AssertFalse(T.isTerminator("x"), "an ordinary letter is never a terminator")
+    AssertTrue(Terms.isTerminator(" "),  "space is a terminator by default")
+    AssertFalse(Terms.isConsumed(" "),   "space is not consumed")
+    AssertTrue(Terms.isTerminator("`t"), "tab is a terminator by default")
+    AssertTrue(Terms.isTerminator("`r"), "enter (CR) is a terminator by default")
+    AssertTrue(Terms.isTerminator("."),  "period is a terminator by default (basic)")
+    AssertTrue(Terms.isTerminator(","),  "comma is a terminator by default (basic)")
+    AssertTrue(Terms.isTerminator(";"),  "semicolon is a terminator by default (basic)")
+    AssertTrue(Terms.isTerminator(":"),  "colon is a terminator by default (basic)")
+    AssertTrue(Terms.isTerminator("!"),  "exclamation is a terminator by default (basic)")
+    AssertTrue(Terms.isTerminator("?"),  "question is a terminator by default (basic)")
+    AssertFalse(Terms.isTerminator("x"), "an ordinary letter is never a terminator")
 }
 Test("Terminators: basic punctuation enabled by default", TestTerminators_Defaults)
 
 TestTerminators_MagicKeyConsumed() {
-    T := Terminators()
+    Terms := Terminators()
     Star := Chr(0x2605)   ; star
-    AssertTrue(T.isTerminator(Star), "magic key is a terminator by default")
-    AssertTrue(T.isConsumed(Star), "magic key is consumed (swallowed, not echoed)")
+    AssertTrue(Terms.isTerminator(Star), "magic key is a terminator by default")
+    AssertTrue(Terms.isConsumed(Star), "magic key is consumed (swallowed, not echoed)")
 }
 Test("Terminators: magic key enabled and consumed", TestTerminators_MagicKeyConsumed)
 
 TestTerminators_OptionsOffByDefault() {
-    T := Terminators()
+    Terms := Terminators()
     ; The catalogue offers many options, but only the basics ship on. These are
     ; available-but-off until the user toggles them in the menu.
-    AssertFalse(T.isTerminator(Chr(0x00A0)), "nbsp is off by default (an option)")
-    AssertFalse(T.isTerminator(Chr(0x202F)), "narrow nbsp is off by default (an option)")
-    AssertFalse(T.isTerminator(")"),         "closing paren is off by default (an option)")
-    AssertFalse(T.isTerminator("/"),         "slash is off by default (an option)")
-    AssertFalse(T.isTerminator("-"),         "dash is off by default (an option)")
-    AssertFalse(T.isEnabled("apostrophe_straight"), "straight apostrophe is off by default")
+    AssertFalse(Terms.isTerminator(Chr(0x00A0)), "nbsp is off by default (an option)")
+    AssertFalse(Terms.isTerminator(Chr(0x202F)), "narrow nbsp is off by default (an option)")
+    AssertFalse(Terms.isTerminator(")"),         "closing paren is off by default (an option)")
+    AssertFalse(Terms.isTerminator("/"),         "slash is off by default (an option)")
+    AssertFalse(Terms.isTerminator("-"),         "dash is off by default (an option)")
+    AssertFalse(Terms.isEnabled("apostrophe_straight"), "straight apostrophe is off by default")
     ; ...but they exist in the catalogue and resolve once enabled.
-    T.setEnabled("parenright", true)
-    AssertTrue(T.isTerminator(")"), "closing paren resolves once enabled")
+    Terms.setEnabled("parenright", true)
+    AssertTrue(Terms.isTerminator(")"), "closing paren resolves once enabled")
 }
 Test("Terminators: non-basic options are off by default", TestTerminators_OptionsOffByDefault)
 
@@ -116,30 +116,30 @@ Test("Terminators: non-basic options are off by default", TestTerminators_Option
 ; ============================================================
 
 TestTerminators_SupersetAdditionsPresent() {
-    T := Terminators()
+    Terms := Terminators()
     ; The ellipsis and semicolon slots were added when the two prior driver
     ; lists were merged into one catalogue - they MUST exist.
-    AssertTrue(_TermHasKey(T, "ellipsis"),  "ellipsis slot present in the catalogue")
-    AssertTrue(_TermHasKey(T, "semicolon"), "semicolon slot present in the catalogue")
+    AssertTrue(_TermHasKey(Terms, "ellipsis"),  "ellipsis slot present in the catalogue")
+    AssertTrue(_TermHasKey(Terms, "semicolon"), "semicolon slot present in the catalogue")
     ; Semicolon is basic punctuation -> on; ellipsis is a fancier option -> off.
-    AssertTrue(T.isEnabled("semicolon"), "semicolon enabled by default (basic punctuation)")
-    AssertFalse(T.isEnabled("ellipsis"), "ellipsis off by default (an option)")
+    AssertTrue(Terms.isEnabled("semicolon"), "semicolon enabled by default (basic punctuation)")
+    AssertFalse(Terms.isEnabled("ellipsis"), "ellipsis off by default (an option)")
     ; The ellipsis char resolves once the slot is enabled.
-    T.setEnabled("ellipsis", true)
-    AssertTrue(T.isTerminator(Chr(0x2026)), "ellipsis becomes a terminator once enabled")
+    Terms.setEnabled("ellipsis", true)
+    AssertTrue(Terms.isTerminator(Chr(0x2026)), "ellipsis becomes a terminator once enabled")
 }
 Test("Terminators: superset additions (ellipsis, semicolon) present", TestTerminators_SupersetAdditionsPresent)
 
 TestTerminators_ClosingDelimitersOnly() {
-    T := Terminators()
+    Terms := Terminators()
     ; Only the CLOSING delimiters end a word - the openings never do, so they
     ; must not appear anywhere in the catalogue.
     for OpenCh in ["(", "[", "{", "<"] {
-        AssertFalse(_TermCatalogueHasChar(T, OpenCh),
+        AssertFalse(_TermCatalogueHasChar(Terms, OpenCh),
             "opening delimiter must not be in the catalogue: " . OpenCh)
     }
     for CloseKey in ["parenright", "bracketright", "braceright", "anglebracketright"] {
-        AssertTrue(_TermHasKey(T, CloseKey), "closing delimiter slot present: " . CloseKey)
+        AssertTrue(_TermHasKey(Terms, CloseKey), "closing delimiter slot present: " . CloseKey)
     }
 }
 Test("Terminators: only closing delimiters are catalogued", TestTerminators_ClosingDelimitersOnly)
@@ -148,20 +148,20 @@ TestTerminators_MagicSlotKeyedStar() {
     ; The macOS registry's update_trigger_char and the codegen's updateMagicKey
     ; both target the magic slot by the key "star"; renaming it silently breaks
     ; magic-key retargeting on one driver.
-    T := Terminators()
-    AssertTrue(_TermHasKey(T, "star"), "magic key slot is keyed 'star'")
+    Terms := Terminators()
+    AssertTrue(_TermHasKey(Terms, "star"), "magic key slot is keyed 'star'")
 }
 Test("Terminators: magic slot keyed 'star'", TestTerminators_MagicSlotKeyedStar)
 
 TestTerminators_AllExposesSeparators() {
-    T := Terminators()
+    Terms := Terminators()
     SepCount := 0
-    for D in T.all() {
+    for D in Terms.all() {
         if (D.Has("type") and D["type"] == "separator")
             SepCount += 1
     }
     AssertTrue(SepCount >= 4, "catalogue carries separator dividers for the menus")
-    AssertTrue(T.all().Length > 5, "catalogue is non-trivial")
+    AssertTrue(Terms.all().Length > 5, "catalogue is non-trivial")
 }
 Test("Terminators: all() exposes separators and the full catalogue", TestTerminators_AllExposesSeparators)
 
@@ -175,31 +175,31 @@ Test("Terminators: all() exposes separators and the full catalogue", TestTermina
 ; ============================================================
 
 TestTerminators_EnableDisable() {
-    T := Terminators()
-    T.setEnabled("space", false)
-    AssertFalse(T.isTerminator(" "), "space disabled -> not a terminator")
-    AssertFalse(T.isEnabled("space"), "isEnabled mirrors the disabled state")
-    T.setEnabled("space", true)
-    AssertTrue(T.isTerminator(" "), "space re-enabled -> terminator again")
+    Terms := Terminators()
+    Terms.setEnabled("space", false)
+    AssertFalse(Terms.isTerminator(" "), "space disabled -> not a terminator")
+    AssertFalse(Terms.isEnabled("space"), "isEnabled mirrors the disabled state")
+    Terms.setEnabled("space", true)
+    AssertTrue(Terms.isTerminator(" "), "space re-enabled -> terminator again")
 }
 Test("Terminators: enable/disable round-trip", TestTerminators_EnableDisable)
 
 TestTerminators_UpdateMagicKey() {
-    T := Terminators()
+    Terms := Terminators()
     Section := Chr(0x00A7)   ; section sign, stand-in new magic key
-    T.updateMagicKey(Section)
-    AssertTrue(T.isTerminator(Section), "new magic-key char becomes a terminator")
-    AssertTrue(T.isConsumed(Section), "new magic-key char is consumed")
-    AssertFalse(T.isTerminator(Chr(0x2605)), "the old star is no longer a terminator")
+    Terms.updateMagicKey(Section)
+    AssertTrue(Terms.isTerminator(Section), "new magic-key char becomes a terminator")
+    AssertTrue(Terms.isConsumed(Section), "new magic-key char is consumed")
+    AssertFalse(Terms.isTerminator(Chr(0x2605)), "the old star is no longer a terminator")
 }
 Test("Terminators: updateMagicKey retargets the star slot", TestTerminators_UpdateMagicKey)
 
 TestTerminators_CustomLifecycle() {
-    T := Terminators()
-    T.addCustom("at_sign", ["@"], "@ custom", true)
-    AssertTrue(T.isTerminator("@"), "custom terminator is recognised")
-    AssertTrue(T.isConsumed("@"), "custom terminator honours its consumed flag")
-    AssertTrue(T.isEnabled("at_sign"), "custom terminator is enabled on add")
+    Terms := Terminators()
+    Terms.addCustom("at_sign", ["@"], "@ custom", true)
+    AssertTrue(Terms.isTerminator("@"), "custom terminator is recognised")
+    AssertTrue(Terms.isConsumed("@"), "custom terminator honours its consumed flag")
+    AssertTrue(Terms.isEnabled("at_sign"), "custom terminator is enabled on add")
 }
 Test("Terminators: addCustom registers a new slot", TestTerminators_CustomLifecycle)
 

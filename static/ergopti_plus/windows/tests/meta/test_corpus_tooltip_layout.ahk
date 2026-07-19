@@ -74,9 +74,9 @@ _TtLayoutCorpus_TestVectorFields() {
 		AssertTrue(Vec.Has("canvasSize"), "vector '" . Id . "' missing 'canvasSize'")
 		AssertTrue(Vec.Has("screenFrame"), "vector '" . Id . "' missing 'screenFrame'")
 		AssertTrue(Vec.Has("expected"), "vector '" . Id . "' missing 'expected'")
-		Exp := Vec["expected"]
-		AssertTrue(Exp.Has("x"), "vector '" . Id . "' expected missing 'x'")
-		AssertTrue(Exp.Has("y"), "vector '" . Id . "' expected missing 'y'")
+		Expected := Vec["expected"]
+		AssertTrue(Expected.Has("x"), "vector '" . Id . "' expected missing 'x'")
+		AssertTrue(Expected.Has("y"), "vector '" . Id . "' expected missing 'y'")
 	}
 }
 

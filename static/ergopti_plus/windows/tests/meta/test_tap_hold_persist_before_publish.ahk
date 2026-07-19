@@ -19,8 +19,8 @@ _THPPP_CandidateCommitsOnlyAfterWrite() {
         "disable-all must persist its candidate before publishing TapHold")
     Assert(InStr(DisabledBody, "TapHold[" . Chr(34) . "keys" . Chr(34) . "] := Map()") == 0,
         "disable-all must not clear the live TapHold map before persistence")
-    Menu := _DriverDirConcat("ui/menu")
-    Assert(InStr(Menu, "WriteTapHoldNative(this.KeyId)") > 0,
+	MenuSource := _DriverDirConcat("ui/menu")
+	Assert(InStr(MenuSource, "WriteTapHoldNative(this.KeyId)") > 0,
         "the Disable action must use the single-write native transaction")
     DisableAllBody := _DriverFuncBody("_TH_DisableAll")
     Assert(InStr(DisableAllBody, "if !_TH_WriteTapHoldDisabled()") > 0,

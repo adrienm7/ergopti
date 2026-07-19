@@ -193,14 +193,14 @@ Test("feature_io: WriteFeatureV2 succeeds after EnsurePersonalHotstringFeature s
 _FIL_FailedPersistenceDoesNotPublishLiveState() {
 	global ConfigurationFile
 	OriginalPath := ConfigurationFile
-	Features := Map("layout", Map("ergopti_base", false))
+	FeatureCandidate := Map("layout", Map("ergopti_base", false))
 	; The parent is deliberately absent: TOML_BatchWrite must fail before its
 	; atomic FileMove, and the live candidate must remain untouched.
 	ConfigurationFile := A_Temp . "\ergopti_missing_parent_" . A_TickCount . "\config.toml"
 	try {
-		AssertFalse(WriteFeatureV2(Features, "layout.ergopti_base", true),
+		AssertFalse(WriteFeatureV2(FeatureCandidate, "layout.ergopti_base", true),
 			"a failed durable write must report failure")
-		AssertFalse(Features["layout"]["ergopti_base"],
+		AssertFalse(FeatureCandidate["layout"]["ergopti_base"],
 			"a failed durable write must not publish the live feature mutation")
 	} finally {
 		ConfigurationFile := OriginalPath
