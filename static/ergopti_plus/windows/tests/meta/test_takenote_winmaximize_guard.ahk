@@ -6,19 +6,11 @@
 ; Regression guard for the "takenote-winmaximize-target-not-found" crash.
 ;
 ; ROOT CAUSE ENCODED:
-; TakeNote() (modules/shortcuts/win.ahk, bound to Win+N / #SC025) activates or
-; opens Notepad on the note file via WMExists/WMActivate/Run/WinWait/
-; WinWaitActive, then called a bare "WinMaximize" (operating on AHK's
-; "last found window"). WinWaitActive does not throw on timeout -- it returns
-; 0/false -- so a slow or blocked Notepad launch let execution fall through to
-; WinMaximize with no valid last-found-window, and WinMaximize threw
-; TargetError ("Target window not found."), escalating to the crash-report
-; error net for what should have been a silently-skippable timing race.
-;
-; The fix captures WinWaitActive's return value on both branches (window
-; already open / freshly launched) and only calls WinMaximize when the wait
-; actually succeeded; otherwise it logs a warning and skips the maximize
-; (and the post-maximize SendFinalResult) instead of throwing.
+; TakeNote() is bound to Win+N. The old inline WinWaitActive/WinMaximize path
+; could block the keyboard thread and eventually maximise AHK's last-found
+; window after a timed-out Notepad launch. The current design queues a bounded
+; poll; only that poll may maximise the explicit Notepad target, and it logs
+; then abandons a deadline expiry.
 ;
 ; WHY SOURCE INTROSPECTION, NOT LIVE INVOCATION:
 ; TakeNote() is explicitly banned from live invocation (it shells out to
@@ -45,42 +37,20 @@
 
 _TTNWMG_CheckWinMaximizeGuard() {
 	Body := _DriverFuncBody("TakeNote")
+	PollBody := _DriverFuncBody("_TakeNotePoll")
 	Assert(Body != "", "TakeNote must exist in modules/shortcuts/win.ahk")
+	Assert(PollBody != "", "_TakeNotePoll must own deferred Notepad finalization")
 
-	; Negative: a bare, unguarded "WinMaximize" statement (no preceding
-	; assignment capturing WinWaitActive's return value) must not reappear.
-	; The pre-fix body called WinWaitActive(...) as a standalone statement on
-	; both branches, then unconditionally called WinMaximize on the next
-	; non-blank line -- i.e. "WinWaitActive(...)" was NOT the right-hand side
-	; of an assignment anywhere in the body.
-	Assert(InStr(Body, ":= WinWaitActive(") > 0 or InStr(Body, ":=WinWaitActive(") > 0,
-		"TakeNote must capture WinWaitActive's return value (it returns 0 on timeout instead of throwing) -- calling it as a bare statement and falling through to WinMaximize regardless reintroduces the TargetError crash")
-
-	; Positive: WinMaximize itself must be reached only through a conditional
-	; that inspects the captured result, so a timeout skips it instead of
-	; throwing TargetError on a non-existent last-found-window.
-	MaximizeIdx := InStr(Body, "WinMaximize")
-	Assert(MaximizeIdx > 0, "TakeNote must still call WinMaximize on the success path")
-
-	BeforeMaximize := SubStr(Body, 1, MaximizeIdx - 1)
-	; The nearest preceding "if" before the WinMaximize call must test the
-	; captured wait-result variable (possibly negated), not be unconditional.
-	LastIfPos := 0
-	SearchPos := 1
-	loop {
-		Found := InStr(BeforeMaximize, "if ", , SearchPos)
-		if (Found = 0)
-			break
-		LastIfPos := Found
-		SearchPos := Found + 1
-	}
-	Assert(LastIfPos > 0, "WinMaximize must sit behind an 'if' that checks the WinWaitActive result -- an unconditional call reintroduces the TargetError crash on a timed-out wait")
-
-	GuardClause := SubStr(BeforeMaximize, LastIfPos)
-	Assert(InStr(GuardClause, "NoteWindowIsActive") > 0 or InStr(GuardClause, "WinWaitActive") > 0,
-		"The 'if' guarding WinMaximize must reference the captured WinWaitActive result, not an unrelated condition")
+	Assert(InStr(Body, "_TakeNoteQueueFinalize") > 0,
+		"TakeNote must queue Notepad finalization instead of waiting on the keyboard hotkey thread")
+	Assert(InStr(Body, "WinWait") = 0 && InStr(Body, "WinMaximize") = 0,
+		"TakeNote must not wait or maximise windows inline on the keyboard hotkey thread")
+	Assert(InStr(PollBody, 'if WMExists(Job["pattern"])') > 0,
+		"_TakeNotePoll must check that the explicit Notepad target exists before finalization")
+	Assert(InStr(PollBody, 'WinMaximize(Job["pattern"])') > 0,
+		"_TakeNotePoll must maximise the explicit Notepad target, never AHK's last-found window")
 }
-Test("shortcuts: TakeNote gates WinMaximize on the captured WinWaitActive result (no bare TargetError on timeout)",
+Test("shortcuts: TakeNote defers and targets WinMaximize safely (no last-found TargetError)",
 	_TTNWMG_CheckWinMaximizeGuard)
 
 
@@ -94,16 +64,12 @@ Test("shortcuts: TakeNote gates WinMaximize on the captured WinWaitActive result
 ; ============================================================================
 
 _TTNWMG_CheckTimeoutIsLogged() {
-	Body := _DriverFuncBody("TakeNote")
-	Assert(Body != "", "TakeNote must exist in modules/shortcuts/win.ahk")
-
-	; A timed-out wait must be observable (LoggerWarn or equivalent) rather
-	; than silently doing nothing -- a WARNING with no companion log line would
-	; leave the note-taking failure undiagnosable in production.
-	Assert(InStr(Body, "LoggerWarn(") > 0,
-		"TakeNote must log a warning when the Notepad window never becomes active, so a skipped maximize is diagnosable instead of silently vanishing")
+	PollBody := _DriverFuncBody("_TakeNotePoll")
+	Assert(PollBody != "", "_TakeNotePoll must exist in modules/shortcuts/win.ahk")
+	Assert(InStr(PollBody, "deadline") > 0 && InStr(PollBody, "LoggerWarn(") > 0,
+		"_TakeNotePoll must log and abandon a Notepad launch that exceeds the bounded deadline")
 }
-Test("shortcuts: TakeNote logs a warning when the Notepad window never becomes active",
+Test("shortcuts: TakeNote logs a warning when the bounded Notepad launch expires",
 	_TTNWMG_CheckTimeoutIsLogged)
 
 
