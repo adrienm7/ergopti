@@ -24,6 +24,10 @@
 		"Clipboard": {
 			"version": "1.0.0",
 			"methods": {
+				"has_image": {
+					"arity": 0,
+					"required": false
+				},
 				"read": {
 					"arity": 0,
 					"required": true
@@ -41,6 +45,10 @@
 					"required": true
 				},
 				"save_all": {
+					"arity": 0,
+					"required": false
+				},
+				"sequence_number": {
 					"arity": 0,
 					"required": false
 				},

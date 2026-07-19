@@ -70,7 +70,11 @@ const portContract = {
 		save: { arity: 0, required: true },
 		restore: { arity: 1, required: true },
 		save_all: { arity: 0, required: false },
-		restore_all: { arity: 1, required: false }
+		restore_all: { arity: 1, required: false },
+		// Windows-specific transaction helpers used by screenshot and text-send
+		// consumers. They are optional so non-Windows adapters remain conformant.
+		sequence_number: { arity: 0, required: false },
+		has_image: { arity: 0, required: false }
 	}
 };
 
