@@ -130,6 +130,14 @@ _MetaCheckInstalledTagsNonBlocking() {
 	Assert(GuardPos < WarmPos,
 		"the deps-ready guard must precede the synchronous cache warm so EnsureModelReady "
 		. "never blocks the boot thread on a dead-port /api/tags connect")
+
+	; (8) Model-browser open/filter runs in a GUI/input callback, so it must
+	; consume the same cache rather than reaching the synchronous list helper.
+	BrowserBody := _DriverFuncBody("_LLM_ModelBrowser_GetInstalledTags")
+	Assert(BrowserBody != "", "model_browser must define _LLM_ModelBrowser_GetInstalledTags()")
+	Assert(InStr(BrowserBody, "_LLM_GetInstalledTagsCached()") > 0
+			&& !InStr(BrowserBody, "LLM_OllamaListModels("),
+		"Model browser open/filter must use the installed-tags cache and never synchronously call /api/tags")
 }
 
 Test("meta llm: installed-tags menu probe is non-blocking (menu-build-sync-api-tags-freeze)",

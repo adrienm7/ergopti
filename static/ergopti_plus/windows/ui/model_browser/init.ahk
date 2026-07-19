@@ -128,10 +128,10 @@ _LLM_ModelBrowser_Build() {
 	; button needed. The hint label is dimmed to make the intent obvious.
 	g.Add("Text",, t("menu.llm.browse_models_filter"))
 	filter_edit := g.Add("Edit", "w560 vFilter")
-	; Debounce the refresh: ``RefreshRows`` reloads the installed-tag list
-	; via ``LLM_OllamaListModels()`` and re-runs the two-key sort over the
-	; full catalogue, both of which are expensive. Without debounce a
-	; fast typist locks the Gui mid-search. The timer reference is stored
+	; Debounce the refresh: it re-runs the two-key sort over the full catalogue.
+	; Installed tags are an in-memory snapshot; never probe Ollama from a GUI
+	; open/filter callback because its synchronous HTTP fallback can freeze input.
+	; The timer reference is stored
 	; on the Gui so SetTimer can cancel-by-identity across keystrokes.
 	g.FilterDebounce := () => _LLM_ModelBrowser_RefreshRows(g.ListView, filter_edit.Value)
 	filter_edit.OnEvent("Change", (*) => (
@@ -180,9 +180,8 @@ _LLM_ModelBrowser_RefreshRows(lv, filter := "") {
 	lv.Delete()
 	index := LLM_GetModelIndex()
 	; The catalogue is static, so every model is listed regardless of state; the
-	; installed badge needs Ollama, so skip its blocking /api/tags scan unless the
-	; daemon is confirmed ready (mirrors the WebView2 path — a down daemon would
-	; otherwise stall the row build while the feature is off).
+	; Installed status comes from the async-maintained cache. GUI open/filter must
+	; never perform live /api/tags I/O, even if the daemon was recently ready.
 	installed := Map()
 	if (IsSet(LLM_Deps_IsReady) and LLM_Deps_IsReady()) {
 		for tag in _LLM_ModelBrowser_GetInstalledTags()
@@ -280,23 +279,13 @@ _LLM_ModelBrowser_GuessFamily(name) {
 }
 
 /**
- * Returns the list of locally installed Ollama tags. Mirrors the helper
- * that ``LLM_Menu_BuildModelMenu`` already uses for the flat picker, but
- * tolerated to silent failure: when the daemon is not running we simply
- * mark every entry as "available" — refreshing later (or after a manual
- * install) will pick the change up.
- *
- * ``try`` MUST wrap the function call in a block-form with a ``catch``,
- * otherwise an exception inside LLM_OllamaListModels propagates up the
- * stack and tears down the Gui. The previous ``try return …`` shorthand
- * looked like it caught the error but actually didn't.
+ * Returns the asynchronously maintained installed-tag snapshot. A missing or
+ * stale snapshot is intentionally shown as "available" until the existing
+ * async menu probe refreshes it; opening or filtering a browser must never
+ * initiate synchronous HTTP on the AHK message/input thread.
  */
 _LLM_ModelBrowser_GetInstalledTags() {
-	try {
-		return LLM_OllamaListModels()
-	} catch {
-		return []
-	}
+	return _LLM_GetInstalledTagsCached()
 }
 
 
