@@ -285,10 +285,37 @@ KLWV_Close(which) {
     if !KLWV.windows.Has(which)
         return
     entry := KLWV.windows[which]
+    ; Remove the live lookup before releasing COM. Delayed timers and callbacks
+    ; resolve by ``which``; deleting this generation first makes every stale
+    ; callback inert instead of allowing it to target a just-reopened dashboard.
+    KLWV.windows.Delete(which)
+    udir := entry.Has("udir") ? entry["udir"] : ""
+    ; A subscription removes itself through the still-live controller. Releasing
+    ; it after Close() raises against an invalid COM pointer and leaks the sink.
+    if entry.Has("msg_sub")
+        entry.Delete("msg_sub")
     try entry["controller"].Close()
     try entry["gui"].Destroy()
-    try DirDelete(entry["udir"], true)
-    KLWV.windows.Delete(which)
+    ; Edge child processes commonly retain the profile lock briefly after
+    ; controller shutdown. Never synchronously sweep the profile on the UI
+    ; callback; retry a bounded deferred cleanup instead.
+    if (udir != "")
+        SetTimer(KLWV_DeferredDirDelete.Bind(udir), -1000)
+}
+
+KLWV_DeferredDirDelete(udir, attempts := 0) {
+    if !DirExist(udir)
+        return
+    try {
+        DirDelete(udir, true)
+        return
+    } catch as e {
+        if (attempts < 3) {
+            SetTimer(KLWV_DeferredDirDelete.Bind(udir, attempts + 1), -1000)
+            return
+        }
+        LoggerWarn("Keylogger", "Could not delete WebView profile '{1}' after retries: {2}", udir, e.Message)
+    }
 }
 
 KLWV_CloseAll() {
