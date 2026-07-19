@@ -19,7 +19,7 @@ const MANIFEST_PATH = shared('modules/menu/menu_manifest.json');
 
 // 1. Load the reference locale (English)
 const enLocalePath = path.join(LOCALES_DIR, 'en.json');
-const enLocale = JSON.parse(fs.readFileSync(enLocalePath, 'utf8').replace(/^\uFEFF/, ''));
+const enLocale = JSON.parse(fs.readFileSync(enLocalePath, 'utf8').replace(/^\uFEFF+/, ''));
 const availableKeys = new Set(Object.keys(enLocale));
 
 const missingKeys = new Map(); // key -> file[]
@@ -79,7 +79,7 @@ function auditFile(filePath) {
 }
 
 // Audit Menu Manifest
-const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8').replace(/^\uFEFF/, ''));
+const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8').replace(/^\uFEFF+/, ''));
 function auditManifest(obj) {
 	if (Array.isArray(obj)) {
 		obj.forEach(auditManifest);
