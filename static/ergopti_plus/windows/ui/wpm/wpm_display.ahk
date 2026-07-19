@@ -225,13 +225,18 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
     ; Guard the ring mutation so the WPMWidget_Calc enumeration (running on the
     ; tick timer) can never observe a half-grown array or a slot written mid-walk.
     ; The region has no Send/Sleep/blocking call, so Critical cannot starve the hook.
-    Critical("On")
-    if (WPMWidget._ring.Length < cap)
-        WPMWidget._ring.Push(entry)
-    else
-        WPMWidget._ring[head + 1] := entry
-    WPMWidget._ring_head := Mod(head + 1, cap)
-    Critical("Off")
+    RingCritical := Critical("On")
+    try {
+        if (WPMWidget._ring.Length < cap)
+            WPMWidget._ring.Push(entry)
+        else
+            WPMWidget._ring[head + 1] := entry
+        WPMWidget._ring_head := Mod(head + 1, cap)
+    } finally {
+        ; Preserve an outer injection transaction. Unconditionally switching
+        ; Critical off here would let the next hook callback interleave with it.
+        Critical(RingCritical)
+    }
     now_t := A_TickCount
     WPMWidget._last_tick     := now_t
     WPMWidget._last_input_ms := now_t
@@ -266,25 +271,28 @@ WPMWidget_Calc() {
     ; Walk the ring under Critical so a concurrent WPMWidget_Push (keyboard thread)
     ; cannot grow the array or overwrite a slot mid-enumeration — the loop sees a
     ; consistent snapshot. No Send/Sleep/blocking call here, so the hook is safe.
-    Critical("On")
-    for _, ev in WPMWidget._ring {
-        t := ev["t"]
-        ; Wrap-safe age check: skip events older than the rolling window
-        if (_WPMWidget_TickDelta(now, t) > WPMWidgetConst.WINDOW_MS)
-            continue
-        count++
-        if ev["hs"]
-            has_hs := true
-        if ev["ai"]
-            has_ai := true
-        if ev["ac"]
-            has_ac := true
-        if (t < earliest)
-            earliest := t
-        if (t > latest)
-            latest := t
+    RingCritical := Critical("On")
+    try {
+        for _, ev in WPMWidget._ring {
+            t := ev["t"]
+            ; Wrap-safe age check: skip events older than the rolling window
+            if (_WPMWidget_TickDelta(now, t) > WPMWidgetConst.WINDOW_MS)
+                continue
+            count++
+            if ev["hs"]
+                has_hs := true
+            if ev["ai"]
+                has_ai := true
+            if ev["ac"]
+                has_ac := true
+            if (t < earliest)
+                earliest := t
+            if (t > latest)
+                latest := t
+        }
+    } finally {
+        Critical(RingCritical)
     }
-    Critical("Off")
     if (count < 2)
         return Map("wpm", 0, "has_hs", has_hs, "has_ai", has_ai, "has_ac", has_ac)
     ; Use now as the right edge (mirrors Hammerspoon): as time passes after the
@@ -620,10 +628,13 @@ WPMWidget_PrewarmGraph() {
 ; before the widget surface is armed -- cannot trigger an immediate reveal: the
 ; widget must stay hidden until the user actually types after it is shown.
 _WPMWidget_ResetRolling() {
-    Critical("On")
-    WPMWidget._ring := []
-    WPMWidget._ring_head := 0
-    Critical("Off")
+    RingCritical := Critical("On")
+    try {
+        WPMWidget._ring := []
+        WPMWidget._ring_head := 0
+    } finally {
+        Critical(RingCritical)
+    }
     WPMWidget._graph_hist    := []
     WPMWidget._last_input_ms := 0
     WPMWidget._last_hs_tick  := 0

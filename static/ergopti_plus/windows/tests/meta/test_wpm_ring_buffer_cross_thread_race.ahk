@@ -11,7 +11,7 @@
 ; the keyboard thread can interrupt the tick between for-loop iterations and
 ; grow / overwrite the array, so the enumerator can observe an inconsistent
 ; slice. The fix brackets BOTH the ring mutation in WPMWidget_Push and the
-; enumeration in WPMWidget_Calc with Critical "On"/"Off" so each region runs
+; enumeration in WPMWidget_Calc with a saved/restored Critical state so each region runs
 ; atomically with respect to the other (the regions contain no Send/Sleep, so
 ; Critical cannot starve the hook).
 ;
@@ -38,10 +38,10 @@ _WpmRace_PushGuardsRingMutation() {
 	Assert(Seg != "", "WPMWidget_Push declaration must exist in ui/wpm/")
 	Assert(InStr(Seg, "_ring.Push") > 0,
 		"WPMWidget_Push must still own the ring-buffer Push mutation")
-	Assert(InStr(Seg, Chr(34) . "On" . Chr(34)) > 0 && InStr(Seg, "Critical") > 0,
+	Assert(InStr(Seg, "RingCritical := Critical") > 0,
 		"WPMWidget_Push must bracket its ring mutation with Critical so a concurrent WPMWidget_Calc enumeration cannot observe a half-grown or mid-overwritten array")
-	Assert(InStr(Seg, Chr(34) . "Off" . Chr(34)) > 0,
-		"WPMWidget_Push must release Critical (Critical Off) after the ring mutation so the hook is not held longer than the few non-blocking lines")
+	Assert(InStr(Seg, "finally") > 0 && InStr(Seg, "Critical(RingCritical)") > 0,
+		"WPMWidget_Push must restore the caller's Critical state in finally so it cannot split an outer injection transaction")
 }
 Test("wpm_widget: WPMWidget_Push brackets the ring mutation with Critical (wpm-ring-buffer-cross-thread-race)", _WpmRace_PushGuardsRingMutation)
 
@@ -50,9 +50,19 @@ _WpmRace_CalcGuardsEnumeration() {
 	Assert(Seg != "", "WPMWidget_Calc declaration must exist in ui/wpm/")
 	Assert(InStr(Seg, "for _, ev in WPMWidget._ring") > 0,
 		"WPMWidget_Calc must still enumerate the ring buffer")
-	Assert(InStr(Seg, "Critical") > 0 && InStr(Seg, Chr(34) . "On" . Chr(34)) > 0,
+	Assert(InStr(Seg, "RingCritical := Critical") > 0,
 		"WPMWidget_Calc must enter Critical before walking the ring so a concurrent WPMWidget_Push cannot grow or overwrite a slot mid-enumeration")
-	Assert(InStr(Seg, Chr(34) . "Off" . Chr(34)) > 0,
-		"WPMWidget_Calc must release Critical (Critical Off) after the ring walk")
+	Assert(InStr(Seg, "finally") > 0 && InStr(Seg, "Critical(RingCritical)") > 0,
+		"WPMWidget_Calc must restore the caller's Critical state in finally after the ring walk")
 }
 Test("wpm_widget: WPMWidget_Calc walks the ring under Critical (wpm-ring-buffer-cross-thread-race)", _WpmRace_CalcGuardsEnumeration)
+
+_WpmRace_ResetRestoresCallerCritical() {
+	Seg := _DriverFuncBody("_WPMWidget_ResetRolling")
+	Assert(Seg != "", "_WPMWidget_ResetRolling declaration must exist in ui/wpm/")
+	Assert(InStr(Seg, "RingCritical := Critical") > 0
+		&& InStr(Seg, "finally") > 0
+		&& InStr(Seg, "Critical(RingCritical)") > 0,
+		"_WPMWidget_ResetRolling must restore the caller's Critical state after replacing the shared ring")
+}
+Test("wpm_widget: reset preserves outer Critical transaction", _WpmRace_ResetRestoresCallerCritical)
