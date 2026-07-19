@@ -58,13 +58,10 @@ _RKVO_KeyExistsEnumeratesValues() {
 	Src := _RKVO_ReadSource("lib/registry.ahk")
 	Seg := _DriverFuncBody("Reg_KeyExists")
 	Assert(Seg != "", "Reg_KeyExists(keyPath) declaration must exist in lib/registry.ahk")
-	; The fix iterates named values so a value-only key (no sub-keys, no
-	; (Default) value) is reported as existing. Both forms of the directive are
-	; accepted to stay robust to quote style.
-	DoubleQuoted := InStr(Seg, "Loop Reg, keyPath, " . Chr(34) . "V" . Chr(34)) > 0
-	SingleQuoted := InStr(Seg, "Loop Reg, keyPath, 'V'") > 0
-	HasValueLoop := DoubleQuoted or SingleQuoted
-	Assert(HasValueLoop,
-		"Reg_KeyExists must enumerate values (Loop Reg, keyPath, V) - otherwise a key with only named values and no (Default) value is wrongly reported absent")
+	; Opening the key itself is stronger than enumerating its values: it also
+	; recognises an empty key. KEY_QUERY_VALUE is sufficient and avoids reading
+	; any user value merely to prove the container exists.
+	Assert(InStr(Seg, "RegOpenKeyExW") > 0 && InStr(Seg, "KEY_QUERY_VALUE") > 0,
+		"Reg_KeyExists must open the key itself with query access so value-only and empty keys both exist")
 }
 Test("registry: Reg_KeyExists enumerates values for value-only keys (reg-keyexists-false-negative-value-only-key)", _RKVO_KeyExistsEnumeratesValues)
