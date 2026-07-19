@@ -27,6 +27,21 @@ global _TooltipRowGuis := []
 global _TooltipGeneration := 0
 global _TooltipTimerGeneration := 0
 
+; Tooltip GUI creation and UIA positioning can take tens of milliseconds. The
+; prefix watcher calls TooltipShow on every character, so debounce render work
+; until typing is idle instead of running GDI/COM in the keyboard callback.
+global _TooltipPendingActive := false
+global _TooltipPendingItems := 0
+global _TooltipPendingDurationSec := 0
+global _TooltipPendingGeneration := 0
+global TOOLTIP_RENDER_DEBOUNCE_MS := 75
+
+; Reuse the non-caret anchor briefly for LLM refreshes and repeated preview
+; renders in controls without a native caret. The foreground HWND fence makes
+; this a position cache, never cross-window stale state.
+global _TooltipPositionCache := false
+global TOOLTIP_POSITION_CACHE_MS := 150
+
 ; Dequeue state — items that have per-row expiry deadlines. Canonical algorithm:
 ; _shared/modules/tooltip/dequeue.js (SPEC.md § 7.1). When rows carry distinct non-zero
 ; DurationSec values, TooltipShow stores the full item list here with absolute
@@ -65,6 +80,20 @@ _TooltipTimerFn() {
     ; subsequent tooltip from showing for that trigger).
     if IsSet(_ResetPrefixBuffer)
         try _ResetPrefixBuffer()
+}
+
+_TooltipDeferredShowFn() {
+    global _TooltipPendingActive, _TooltipPendingItems, _TooltipPendingDurationSec
+    if !_TooltipPendingActive
+        return
+    Items := _TooltipPendingItems
+    DurationSec := _TooltipPendingDurationSec
+    _TooltipPendingActive := false
+    _TooltipPendingItems := 0
+    _TooltipPendingDurationSec := 0
+    if A_IsSuspended
+        return
+    _TooltipShowNow(Items, DurationSec)
 }
 
 ; Dequeue poll timer — runs every 100 ms while a dequeue cycle is active.
@@ -267,6 +296,25 @@ global _TOOLTIP_SAFETY_SEC := 3.0
 ; The shortest DurationSec across all items drives the auto-hide timer
 ; (0 / omitted means "stay until TooltipHide()").
 TooltipShow(Items, DurationSec := 0) {
+    global _TooltipPendingActive, _TooltipPendingItems, _TooltipPendingDurationSec
+    global _TooltipPendingGeneration, TOOLTIP_RENDER_DEBOUNCE_MS
+
+    if A_IsSuspended {
+        TooltipHide("Suspend", true)
+        return
+    }
+    ; Each new keystroke supersedes the prior request. Negative SetTimer is a
+    ; one-shot debounce: continuous typing keeps the expensive GUI/UIA work off
+    ; the hot path, and the newest preview is rendered once the user pauses.
+    _TooltipPendingGeneration += 1
+    _TooltipPendingItems := Items
+    _TooltipPendingDurationSec := DurationSec
+    _TooltipPendingActive := true
+    SetTimer(_TooltipDeferredShowFn, -TOOLTIP_RENDER_DEBOUNCE_MS)
+}
+
+; Runs from the debounced timer, never directly from the prefix watcher.
+_TooltipShowNow(Items, DurationSec := 0) {
 
     ; While the script is suspended nothing may paint — « pause = AHK éteint ».
     ; The per-callback input guards normally prevent reaching here, but the
@@ -483,6 +531,8 @@ TooltipHide(DbgTag := "?", Force := false) {
     global _TooltipShownHwnds, _TooltipShownBorderHwnds
     global _TooltipDequeueItems, _TooltipDequeueActive
     global _TooltipGeneration, _TooltipTimerGeneration
+    global _TooltipPendingActive, _TooltipPendingItems, _TooltipPendingDurationSec
+    global _TooltipPendingGeneration
     ; Diagnostic (debug-only): whenever an LLM loading/prediction tooltip is on
     ; screen, record WHO hid it. ``DbgTag`` names the caller — TimerFn (auto-hide),
     ; NewShow (a fresh TooltipShow superseded it), PollEmpty (dequeue), LLM
@@ -530,6 +580,13 @@ TooltipHide(DbgTag := "?", Force := false) {
     ; it — they would hide the post-expansion rows before their time.
     if (!Force and _TooltipDequeueActive)
         return
+    ; A hide is authoritative over a queued preview. Stop the debounce before
+    ; tearing down the current surface so a stale timer cannot resurrect it.
+    _TooltipPendingGeneration += 1
+    _TooltipPendingActive := false
+    _TooltipPendingItems := 0
+    _TooltipPendingDurationSec := 0
+    SetTimer(_TooltipDeferredShowFn, 0)
     ; Hiding is a render transition too. Invalidate any renderer currently
     ; waiting in UIA/GUI work before it can resume and resurrect this surface.
     _TooltipGeneration += 1
@@ -645,5 +702,4 @@ TooltipRearmTimer() {
     if IsSet(LLM_Bridge_ScheduleAfterHotstring)
         try LLM_Bridge_ScheduleAfterHotstring(_TooltipLastItems)
 }
-
 

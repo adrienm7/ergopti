@@ -749,6 +749,7 @@ _TooltipMixTintHex(AccentHex) {
 _TooltipResolvePosition() {
     global _TOOLTIP_OFFSET_BELOW, _TOOLTIP_OFFSET_RIGHT
     global _TOOLTIP_MAX_CARET_HEIGHT_PX, _TOOLTIP_WINDOW_BOTTOM_INSET_PX
+    global _TooltipPositionCache, TOOLTIP_POSITION_CACHE_MS
 
     ; ----- 1. Native caret -----------------------------------------------
     Cx := 0
@@ -756,7 +757,17 @@ _TooltipResolvePosition() {
     GotCaret := false
     try GotCaret := CaretGetPos(&Cx, &Cy)
     if (GotCaret and (Cx != 0 or Cy != 0)) {
-        return { X: Cx + _TOOLTIP_OFFSET_RIGHT, Y: Cy + _TOOLTIP_OFFSET_BELOW }
+        return _TooltipCachePosition(WinExist("A"),
+            { X: Cx + _TOOLTIP_OFFSET_RIGHT, Y: Cy + _TOOLTIP_OFFSET_BELOW })
+    }
+
+    ActiveHwnd := WinExist("A")
+    if IsObject(_TooltipPositionCache) {
+        Age := A_TickCount - _TooltipPositionCache["tick"]
+        if (_TooltipPositionCache["hwnd"] == ActiveHwnd and Age >= 0
+            and Age <= TOOLTIP_POSITION_CACHE_MS) {
+            return { X: _TooltipPositionCache["x"], Y: _TooltipPositionCache["y"] }
+        }
     }
 
     ; ----- 2. UIA focused element bounding rectangle ---------------------
@@ -772,12 +783,14 @@ _TooltipResolvePosition() {
                 if (W > 0 and H > 0) {
                     if (H < _TOOLTIP_MAX_CARET_HEIGHT_PX) {
                         ; Caret-like: anchor under the rect's lower-left.
-                        return { X: Rect.l + _TOOLTIP_OFFSET_RIGHT,
-                            Y: Rect.b + _TOOLTIP_OFFSET_BELOW }
+                        return _TooltipCachePosition(ActiveHwnd,
+                            { X: Rect.l + _TOOLTIP_OFFSET_RIGHT,
+                                Y: Rect.b + _TOOLTIP_OFFSET_BELOW })
                     } else {
                         ; Input-box-like: anchor under the bottom centre.
-                        return { X: Rect.l + W // 2,
-                            Y: Rect.b + _TOOLTIP_OFFSET_BELOW }
+                        return _TooltipCachePosition(ActiveHwnd,
+                            { X: Rect.l + W // 2,
+                                Y: Rect.b + _TOOLTIP_OFFSET_BELOW })
                     }
                 }
             }
@@ -792,8 +805,9 @@ _TooltipResolvePosition() {
         Wh := 0
         WinGetPos(&Wx, &Wy, &Ww, &Wh, "A")
         if (Ww > 0 and Wh > 0) {
-            return { X: Wx + Ww // 2,
-                Y: Wy + Wh - _TOOLTIP_WINDOW_BOTTOM_INSET_PX }
+            return _TooltipCachePosition(ActiveHwnd,
+                { X: Wx + Ww // 2,
+                    Y: Wy + Wh - _TOOLTIP_WINDOW_BOTTOM_INSET_PX })
         }
     }
 
@@ -801,9 +815,20 @@ _TooltipResolvePosition() {
     Mx := 0
     My := 0
     try MouseGetPos(&Mx, &My)
-    return { X: Mx, Y: My + _TOOLTIP_OFFSET_BELOW }
+    return _TooltipCachePosition(ActiveHwnd,
+        { X: Mx, Y: My + _TOOLTIP_OFFSET_BELOW })
 }
 
+_TooltipCachePosition(Hwnd, Pos) {
+    global _TooltipPositionCache
+    _TooltipPositionCache := Map(
+        "hwnd", Hwnd,
+        "x", Pos.X,
+        "y", Pos.Y,
+        "tick", A_TickCount
+    )
+    return Pos
+}
 
 
 

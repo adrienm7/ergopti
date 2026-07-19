@@ -11,13 +11,13 @@
 ; but the ResolvePosition call sandwiched between them was not, so a slow
 ; UIA/COM resolve was invisible in HotPath slow-segment logs (G4 violation).
 ;
-; Fix (AHK-34): wrap the _TooltipResolvePosition() call in both call sites
-; (ui/tooltip/core.ahk: TooltipShow; ui/tooltip/llm.ahk: _TooltipBuildGuiLlm)
+; Fix (AHK-34): wrap the _TooltipResolvePosition() call in both render call sites
+; (ui/tooltip/core.ahk: _TooltipShowNow; ui/tooltip/llm.ahk: _TooltipBuildGuiLlm)
 ; with HotPath_Now()/HotPath_LogIfSlow("Tooltip.ResolvePos", ...) to match the
 ; existing Build/Present instrumentation.
 ;
 ; This test asserts (source introspection):
-;   TooltipShow and _TooltipBuildGuiLlm bodies must contain
+;   _TooltipShowNow and _TooltipBuildGuiLlm bodies must contain
 ;   HotPath_LogIfSlow with the "Tooltip.ResolvePos" label so the hottest
 ;   blocking call cannot silently drop off the profiler again.
 ; ===============================================================================
@@ -35,11 +35,11 @@
 ; ===================================================================
 
 _TTRPP_CheckResolvePosProfiled() {
-	; TooltipShow (core.ahk): the UIA COM segment must be in the HotPath
-	Body := _DriverFuncBody("TooltipShow")
-	Assert(Body != "", "TooltipShow() must exist in ui/tooltip/core.ahk")
+	; _TooltipShowNow (core.ahk): the UIA COM segment must be in the HotPath
+	Body := _DriverFuncBody("_TooltipShowNow")
+	Assert(Body != "", "_TooltipShowNow() must exist in ui/tooltip/core.ahk")
 	Assert(InStr(Body, "HotPath_LogIfSlow(" . Chr(0x22) . "Tooltip.ResolvePos" . Chr(0x22)) > 0,
-		"AHK-34: TooltipShow must wrap _TooltipResolvePosition() in a HotPath_LogIfSlow segment so a slow UIA/COM call surfaces in slow-segment logs (G4)")
+		"AHK-34: _TooltipShowNow must wrap _TooltipResolvePosition() in a HotPath_LogIfSlow segment so a slow UIA/COM call surfaces in slow-segment logs (G4)")
 
 	; _TooltipBuildGuiLlm (llm.ahk): the same gate for the LLM render path
 	Body := _DriverFuncBody("_TooltipBuildGuiLlm")
@@ -49,5 +49,5 @@ _TTRPP_CheckResolvePosProfiled() {
 }
 
 
-Test("meta ahk-34: _TooltipResolvePosition is profiled in both TooltipShow and _TooltipBuildGuiLlm so slow UIA/COM resolves surface in HotPath logs",
+Test("meta ahk-34: _TooltipResolvePosition is profiled in both tooltip renderers so slow UIA/COM resolves surface in HotPath logs",
 	_TTRPP_CheckResolvePosProfiled)
