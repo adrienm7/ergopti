@@ -32,6 +32,11 @@
 SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap directly
 RAlt:: ; Necessary to work on layouts like QWERTY
 {
+    ; On Kana/IME layouts the physical AltGr key is SC138. AHK can still
+    ; surface a virtual RAlt event for it, so leave ownership to the explicit
+    ; SC138 handler below instead of dispatching the same tap twice.
+    if (_ALTGR_KANA_FIXUP && GetKeyState("SC138", "P"))
+        return
     tap := KeyWait("RAlt", "T" . TapHoldDuration(TapHold, "alt_gr"))
     if (tap and (A_PriorKey == "RAlt" or A_PriorKey == "^")) {
         DisableCapsWord()
@@ -41,6 +46,23 @@ RAlt:: ; Necessary to work on layouts like QWERTY
 
 SC01D & ~SC138 Up::
 RAlt Up:: {
+    UpdateLastSentCharacter("")
+}
+#HotIf
+
+; Kana/IME physical AltGr is scan code 138, not the RAlt scan code used by
+; the standard layout handlers. Register it as a standalone tap-hold key and
+; keep it mutually exclusive with the virtual-RAlt path above.
+#HotIf _ALTGR_KANA_FIXUP and not LayerEnabled and not IsOnboardingActive() and TapHoldIsConfigured(TapHold, "alt_gr")
+SC138:: {
+    tap := KeyWait("SC138", "T" . TapHoldDuration(TapHold, "alt_gr"))
+    if (tap and A_PriorKey == "SC138") {
+        DisableCapsWord()
+        AltGrTapHoldDispatchV2()
+    }
+}
+
+SC138 Up:: {
     UpdateLastSentCharacter("")
 }
 #HotIf

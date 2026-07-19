@@ -80,8 +80,20 @@ SC039:: return ; Necessary to do this, otherwise Space keeps being sent while it
 SC01D & ~SC138:: ; RAlt
 RAlt:: ; RAlt on QWERTY
 {
+    ; Physical Kana AltGr is SC138 and has its own handler below. Do not let
+    ; a virtual RAlt alias emit a second Escape for one physical tap.
+    if (_ALTGR_KANA_FIXUP && GetKeyState("SC138", "P"))
+        return
     ActionLayer("{Escape " . AppState_GetNumberOfRepetitions() . "}")
 }
+
+#HotIf LayerEnabled and _ALTGR_KANA_FIXUP
+SC138:: {
+    ActionLayer("{Escape " . AppState_GetNumberOfRepetitions() . "}")
+}
+#HotIf
+
+#HotIf LayerEnabled
 
 ; === Number row ===
 SC002:: SetNumberOfRepetitions(1) ; On key 1

@@ -853,6 +853,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_personal_shortcuts_generator_encoding.ahk
 #Include meta/test_personal_shortcuts_reload_handoff.ahk
 #Include meta/test_altgr_detect_hkl_fallback.ahk
+#Include meta/test_altgr_kana_taphold_entry.ahk
 #Include meta/test_spotlight_gdiplus_free_library.ahk
 #Include meta/test_case_transform_synthetic_mark.ahk
 #Include meta/test_color_dropdown_recompute_index.ahk
