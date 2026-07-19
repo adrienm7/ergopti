@@ -110,11 +110,17 @@ Updater_OneClickUpdate(*) {
 _Updater_OneClickUpdateCallback(Json, Current) {
 	global UPDATER_LATEST_RELEASE, _UpdaterCheckInProgress
 	_UpdaterCheckInProgress := false
+	; Physical menu state must be reconciled even when the result is discarded
+	; during Suspend; otherwise the row remains permanently disabled as
+	; “checking” after resume.
+	try SetTimer((*) => _Updater_RebuildMenu(), -50)
 
 	; The fetch callback arrives on an AHK pseudo-thread that bypasses native
 	; Suspend. Skip all UI and install work while the script is paused.
-	if A_IsSuspended
+	if A_IsSuspended {
+		try LoggerInfo("Updater", "One-click check finalised while suspended; result discarded.")
 		return
+	}
 
 	if (Json == "") {
 		try LoggerWarn("Updater", "One-click check: network unreachable.")
@@ -495,7 +501,6 @@ _Updater_MarkdownToPlain(md) {
 	s := RegExReplace(s, "(?<!\w)_(.+?)_(?!\w)", "$1")
 	return s
 }
-
 
 
 
