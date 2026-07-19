@@ -674,9 +674,6 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	; Synthetic key events are rejected by InputHook I1.  Only an explicit
 	; engine-level suppression (used by standalone/manual callers) blocks a
 	; physical keydown from updating the buffer.
-	if HSE_Suppressed {
-		return
-	}
 	static ResetVKs := Map(
 		0x08, true,  ; VK_BACK
 		0x09, true,  ; VK_TAB
@@ -727,7 +724,7 @@ _OnPrefixKeyDown(IH, VK, SC) {
 		; so a Space whose char event was swallowed (e.g. layered on
 		; tap-hold) still flips the boundary flag.
 		if (VK == 0x08) {
-			HSE_FeedBackspace()
+                        HSE_FeedBackspace(true)
 			if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
 				LLM_Bridge_FeedKeyDownIfActive(VK)
 		} else if (VK == 0x09 or VK == 0x0D) {

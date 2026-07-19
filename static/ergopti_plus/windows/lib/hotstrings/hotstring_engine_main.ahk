@@ -666,9 +666,9 @@ HSE_FeedChar(Char, IsPhysical := false) {
 ; user has just deleted a character that lived to the LEFT of the buffer's
 ; start, into territory we never observed — we can no longer guarantee the
 ; new cursor position abuts a word boundary.
-HSE_FeedBackspace() {
+HSE_FeedBackspace(IsPhysical := false) {
     global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed
-    if HSE_Suppressed {
+    if HSE_Suppressed and !IsPhysical {
         return
     }
     if (HSE_Buffer != "") {
