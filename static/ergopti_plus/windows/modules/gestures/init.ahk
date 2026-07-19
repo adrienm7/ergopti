@@ -333,18 +333,16 @@ RawAutoConfig := IniCacheGet(_IniCache, "ahk.gestures", "auto_configure_on_next_
 if (RawAutoConfig == "1" or RawAutoConfig == "true") {
     LoggerStart("gestures", "Consuming auto_configure_on_next_start flag from onboarding…")
 
-    ; Clear the flag FIRST, before any blocking RunWait — the touchpad device
-    ; restart inside GestureAutoConfigureRegistry can cause the AHK process to
-    ; be killed mid-call (PnP cycling tears down the HID hook). If we clear
-    ; after, that kill leaves the flag set and the auto-relaunched script loops
-    ; forever, never reaching initMenu — user sees the default tray menu.
+    ; Clear the flag FIRST, before the asynchronous touchpad worker starts —
+    ; the PnP cycle can still kill the AHK process by tearing down the HID hook.
+    ; Clearing after launch would leave the flag set and the auto-relaunched
+    ; script could loop forever, never reaching initMenu.
     try TOML_BatchWrite(ConfigurationFile,
         [{ Section: "ahk.gestures", Key: "auto_configure_on_next_start", Value: false }])
 
-    ; Defer the actual registry + touchpad restart to a one-shot timer so the
-    ; rest of auto-execute (notably initMenu in ErgoptiPlus.ahk) finishes
-    ; building the tray BEFORE the UAC prompt + ~20s PowerShell call blocks
-    ; the message loop. 2s is enough for the auto-execute tail to settle.
+    ; Defer the registry write + worker launch until the auto-execute tail
+    ; (notably initMenu in ErgoptiPlus.ahk) has settled. The PnP operation then
+    ; runs in its own elevated process and is polled without blocking AHK.
     SetTimer(_DeferredGestureAutoConfigure, -2000)
 
     LoggerSuccess("gestures", "AutoConfigureOnNextStart flag cleared — touchpad config deferred to T+2s.")
