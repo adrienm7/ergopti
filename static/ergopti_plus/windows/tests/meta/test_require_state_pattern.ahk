@@ -75,7 +75,7 @@ _MetaRunRequireStateTestsV2() {
 		if (!IsStateful)
 			continue
 		ScannedCount++
-		HasGuard := (Body ~= "i)if\s*\(!_\w") or (Body ~= "i)if\s+!_\w")
+		HasGuard := (Body ~= "i)if\s*\(!_\w") or (Body ~= "i)if\s+!_\w") or (Body ~= "i)if\s+A_IsSuspended\b")
 		if (!HasGuard)
 			Violations.Push(Rel)
 	}
