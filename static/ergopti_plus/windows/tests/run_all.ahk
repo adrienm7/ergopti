@@ -674,6 +674,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_tint_test_stale_constants_comment.ahk
 #Include meta/test_tooltip_hide_non_blocking.ahk
 #Include meta/test_tooltip_teardown_on_keyboard_thread.ahk
+#Include meta/test_llm_bridge_deferred_hides.ahk
 #Include meta/test_topo_checkvirtualdesktop_stale_prev_hwnd.ahk
 #Include meta/test_traymenu_separator_addstandard.ahk
 #Include meta/test_traymenu_setmenu_raw_add.ahk

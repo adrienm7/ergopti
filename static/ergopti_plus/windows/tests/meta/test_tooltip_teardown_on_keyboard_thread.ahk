@@ -39,7 +39,15 @@ _TtkbOnCharDefersHide() {
 	Assert(Seg != "", "LLM_Bridge_OnChar(ch) declaration must exist in llm_bridge.ahk")
 	; The dismiss branch must hand the teardown to a fresh timer thread, not run
 	; it inline on the InputHook thread.
-	Assert(InStr(Seg, "SetTimer((*) => LLM_Tooltip_Hide(true), -1)") > 0,
-		"LLM_Bridge_OnChar must defer the dismiss teardown via SetTimer(..., -1) so DWM/GDI window destruction does not run on the InputHook thread and risk a dropped keystroke")
+	Assert(InStr(Seg, "LLM_Bridge_DeferTooltipHide(true)") > 0,
+		"LLM_Bridge_OnChar must defer the dismiss teardown so DWM/GDI window destruction does not run on the InputHook thread and risk a dropped keystroke")
+	Helper := _DriverFuncBody("LLM_Bridge_DeferTooltipHide")
+	Worker := _DriverFuncBody("_LLM_Bridge_DeferredTooltipHide")
+	Assert(Helper != "" and Worker != "", "LLM bridge deferred tooltip hide helper and worker must exist")
+	Assert(InStr(Helper, "Epoch := IsSet(_TooltipGeneration)") > 0
+		and InStr(Helper, "SetTimer(_LLM_Bridge_DeferredTooltipHide.Bind(Epoch, accepted), -1)") > 0,
+		"deferred tooltip teardown must capture the current generation before scheduling")
+	Assert(InStr(Worker, "Epoch != _TooltipGeneration") > 0,
+		"deferred tooltip teardown must discard a stale timer instead of hiding a newer prediction")
 }
 Test("LLM: LLM_Bridge_OnChar defers tooltip teardown off the hook thread (tooltip-teardown-on-keyboard-thread)", _TtkbOnCharDefersHide)
