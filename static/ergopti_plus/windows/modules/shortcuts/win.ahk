@@ -50,12 +50,19 @@ if Features["shortcuts"]["get_hex_value"] {
     AddShortcut("#", "x", GetHexValue)
 
     GetHexValue(*) {
-        MouseGetPos(&MouseX, &MouseY)
-        HexColor := PixelGetColor(MouseX, MouseY, "RGB")
-        HexColor := "#" StrLower(SubStr(HexColor, 3))
-        A_Clipboard := HexColor
-        Msgbox("La couleur sous le curseur est " HexColor "`nElle a été sauvegardée dans le presse-papiers : " A_Clipboard
-        )
+        ; This is a keyboard-hotkey callback: no blocking UI or unguarded desktop /
+        ; clipboard operation may keep the hook thread occupied.  TrayTip gives
+        ; the same visible result while returning control to the keyboard loop.
+        try {
+            MouseGetPos(&MouseX, &MouseY)
+            HexColor := "#" . StrLower(SubStr(PixelGetColor(MouseX, MouseY, "RGB"), 3))
+            if !CB_Write(HexColor)
+                throw Error("clipboard write failed")
+            TrayTip(HexColor, "ErgoptiPlus", "Iconi Mute")
+        } catch as Err {
+            LoggerError("shortcuts", "GetHexValue failed: {1}", Err.Message)
+            TrayTip("Color copy failed.", "ErgoptiPlus", "Iconx Mute")
+        }
     }
 }
 
