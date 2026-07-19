@@ -142,9 +142,8 @@ class _TH_DisableFnObj {
 	KeyId := ""
 	Call(*) {
 		try LoggerInfo("TapHoldMenu", "Menu disable action requested for key '{1}' (pid={2}).", this.KeyId, A_Pid)
-		WriteTapHoldTap(this.KeyId, "")
-		WriteTapHoldHold(this.KeyId, _TH_NoneHoldOpt())
-		_TH_ReloadTapHoldMenu("key_disable", this.KeyId)
+                if WriteTapHoldNative(this.KeyId)
+                        _TH_ReloadTapHoldMenu("key_disable", this.KeyId)
 	}
 }
 
@@ -170,8 +169,8 @@ class _TH_HoldFnObj {
 		Kind := this.HoldOpt["kind"]
 		OptId := this.HoldOpt["id"]
 		try LoggerInfo("TapHoldMenu", "Hold picker selection for '{1}': kind='{2}', id='{3}' (pid={4}).", this.KeyId, Kind, OptId, A_Pid)
-		WriteTapHoldHold(this.KeyId, this.HoldOpt)
-		_TH_ReloadTapHoldMenu("hold_set", this.KeyId)
+                if WriteTapHoldHold(this.KeyId, this.HoldOpt)
+                        _TH_ReloadTapHoldMenu("hold_set", this.KeyId)
 	}
 }
 
@@ -200,8 +199,8 @@ _TH_ApplyTap(KeyId, ActionId) {
 		(Current == "" ? "<native>" : Current), (ActionId == "" ? "<native>" : ActionId), A_Pid)
 	if !GestureEnsureActionParameter(GestureBindingId("tap_hold", KeyId), ActionId)
 		return
-	WriteTapHoldTap(KeyId, ActionId)
-	_TH_ReloadTapHoldMenu("tap_set", KeyId)
+        if WriteTapHoldTap(KeyId, ActionId)
+                _TH_ReloadTapHoldMenu("tap_set", KeyId)
 }
 
 ; Build the hold picker submenu for a given key. Shows the fixed hold options
@@ -241,4 +240,3 @@ _TH_ReloadTapHoldMenu(Reason, KeyId := "") {
 		Reason, KeyId, A_Pid, A_ScriptName)
 	Reload()
 }
-

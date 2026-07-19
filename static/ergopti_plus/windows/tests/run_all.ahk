@@ -839,6 +839,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_llm_parse_billions_null_guard.ahk
 #Include meta/test_toggle_capslock_calls_disable_capsword.ahk
 #Include meta/test_tap_hold_writer_inherit_defaults.ahk
+#Include meta/test_tap_hold_persist_before_publish.ahk
 #Include meta/test_llm_nav_loop_ten.ahk
 #Include meta/test_api_entries_persist_error_logged.ahk
 #Include meta/test_updater_callback_suspend_guard.ahk

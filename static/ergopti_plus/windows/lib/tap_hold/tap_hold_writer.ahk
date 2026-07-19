@@ -226,19 +226,20 @@ IsTapHoldHoldActive(KeyId, HoldOpt) {
 ; while still persisting an explicit per-key override (so shipped defaults do not
 ; leak back on reload).
 WriteTapHoldTap(KeyId, ActionId) {
-	global TapHold
+        global TapHold
 	if !IsSet(TapHold) {
 		try LoggerWarn("TapHoldWriter", "TapHold global unset — skipping WriteTapHoldTap.")
 		return
 	}
-	if !TapHold.Has("keys") {
-		TapHold["keys"] := Map()
-	}
+        Candidate := _TH_CloneData(TapHold)
+        if !Candidate.Has("keys") {
+                Candidate["keys"] := Map()
+        }
 
-	if !TapHold["keys"].Has(KeyId) {
-		TapHold["keys"][KeyId] := Map()
-	}
-	Entry := TapHold["keys"][KeyId]
+        if !Candidate["keys"].Has(KeyId) {
+                Candidate["keys"][KeyId] := Map()
+        }
+        Entry := Candidate["keys"][KeyId]
 	PrevTap      := Entry.Has("tap_action") ? (Entry["tap_action"] == "" ? "<native>" : Entry["tap_action"]) : "<unset>"
 	PrevHoldMod  := Entry.Has("hold_modifier") ? Entry["hold_modifier"] : "<unset>"
 	PrevHoldLay  := Entry.Has("hold_layer") ? Entry["hold_layer"] : "<unset>"
@@ -255,8 +256,11 @@ WriteTapHoldTap(KeyId, ActionId) {
 	NewTap := Entry["tap_action"] == "" ? "<native>" : Entry["tap_action"]
 	try LoggerDebug("TapHoldWriter", "WriteTapHoldTap applied: key='{1}', new_tap='{2}'.", KeyId, NewTap)
 
-	_TH_WriteTapHoldToml()
-	try LoggerDebug("TapHoldWriter", "Tap persisted: '{1}' -> '{2}'.", KeyId, NewTap)
+        if !_TH_WriteTapHoldToml(Candidate)
+                return false
+        TapHold := Candidate
+        try LoggerDebug("TapHoldWriter", "Tap persisted: '{1}' -> '{2}'.", KeyId, NewTap)
+        return true
 }
 
 ; Apply a new hold option for a key directly to TapHold + tap_hold.toml.
@@ -267,14 +271,15 @@ WriteTapHoldHold(KeyId, HoldOpt) {
 		try LoggerWarn("TapHoldWriter", "TapHold global unset — skipping WriteTapHoldHold.")
 		return
 	}
-	if !TapHold.Has("keys") {
-		TapHold["keys"] := Map()
+        Candidate := _TH_CloneData(TapHold)
+        if !Candidate.Has("keys") {
+                Candidate["keys"] := Map()
 	}
 
-	if !TapHold["keys"].Has(KeyId) {
-		TapHold["keys"][KeyId] := Map()
+        if !Candidate["keys"].Has(KeyId) {
+                Candidate["keys"][KeyId] := Map()
 	}
-	Entry := TapHold["keys"][KeyId]
+        Entry := Candidate["keys"][KeyId]
 	PrevHoldMod  := Entry.Has("hold_modifier") ? Entry["hold_modifier"] : "<unset>"
 	PrevHoldLay  := Entry.Has("hold_layer") ? Entry["hold_layer"] : "<unset>"
 	PrevTap      := Entry.Has("tap_action") ? (Entry["tap_action"] == "" ? "<native>" : Entry["tap_action"]) : "<unset>"
@@ -304,15 +309,42 @@ WriteTapHoldHold(KeyId, HoldOpt) {
 
 	; Remove the entry entirely when both tap and hold are now empty.
 	if (!Entry.Has("tap_action") and !Entry.Has("hold_modifier") and !Entry.Has("hold_layer")) {
-		TapHold["keys"].Delete(KeyId)
+                Candidate["keys"].Delete(KeyId)
 	}
 	NewHoldMod  := Entry.Has("hold_modifier") ? Entry["hold_modifier"] : "<unset>"
 	NewHoldLay  := Entry.Has("hold_layer") ? Entry["hold_layer"] : "<unset>"
 	NewTap      := Entry.Has("tap_action") ? (Entry["tap_action"] == "" ? "<native>" : Entry["tap_action"]) : "<unset>"
 	try LoggerDebug("TapHoldWriter", "WriteTapHoldHold applied: key='{1}', new_tap='{2}', new_hold_modifier='{3}', new_hold_layer='{4}'.", KeyId, NewTap, NewHoldMod, NewHoldLay)
 
-	_TH_WriteTapHoldToml()
-	try LoggerDebug("TapHoldWriter", "Hold persisted: '{1}' -> kind='{2}', id='{3}'.", KeyId, Kind, Id)
+        if !_TH_WriteTapHoldToml(Candidate)
+                return false
+        TapHold := Candidate
+        try LoggerDebug("TapHoldWriter", "Hold persisted: '{1}' -> kind='{2}', id='{3}'.", KeyId, Kind, Id)
+        return true
+}
+
+; Atomically switch one key back to native tap + no hold.  The tray's Disable
+; action used to call WriteTapHoldTap then WriteTapHoldHold, which could persist
+; only the first half if the second write failed.
+WriteTapHoldNative(KeyId) {
+        global TapHold
+        if !IsSet(TapHold)
+                return false
+        Candidate := _TH_CloneData(TapHold)
+        if !Candidate.Has("keys")
+                Candidate["keys"] := Map()
+        if !Candidate["keys"].Has(KeyId)
+                Candidate["keys"][KeyId] := Map()
+        Entry := Candidate["keys"][KeyId]
+        Entry["tap_action"] := ""
+        if Entry.Has("hold_modifier")
+                Entry.Delete("hold_modifier")
+        if Entry.Has("hold_layer")
+                Entry.Delete("hold_layer")
+        if !_TH_WriteTapHoldToml(Candidate)
+                return false
+        TapHold := Candidate
+        return true
 }
 
 
@@ -362,16 +394,18 @@ _TH_WriteTapHoldDisabled() {
 ; Rewrite ``<config>/autohotkey/tap_hold.toml`` from scratch from the current
 ; in-memory ``TapHold`` global. Preserves the ``layers`` block verbatim
 ; so any user-customised layer mappings survive a key-section write.
-_TH_WriteTapHoldToml() {
-	global TapHold, _ConfigDir, _AhkSubDir
+_TH_WriteTapHoldToml(Data := unset) {
+        global TapHold, _ConfigDir, _AhkSubDir
+        if !IsSet(Data)
+                Data := TapHold
 	if !IsSet(_ConfigDir) {
 		try LoggerWarn("TapHoldWriter", "_ConfigDir unset — cannot persist tap_hold.toml.")
 		return
 	}
 	Path := _ConfigDir . _AhkSubDir . "tap_hold.toml"
 	try LoggerDebug("TapHoldWriter", "Persisting tap-hold config to '{1}' (keys={2}, layers={3}, inherit_defaults={4}).",
-		Path, TapHold.Has("keys") ? TapHold["keys"].Count : 0, TapHold.Has("layers") ? TapHold["layers"].Count : 0,
-		TapHold.Has("inherit_defaults") ? (TapHold["inherit_defaults"] ? "true" : "false") : "unset")
+                Path, Data.Has("keys") ? Data["keys"].Count : 0, Data.Has("layers") ? Data["layers"].Count : 0,
+                Data.Has("inherit_defaults") ? (Data["inherit_defaults"] ? "true" : "false") : "unset")
 
 	Lines := []
 	Lines.Push("# Auto-generated by Ergopti+ tray-menu writes — hand edits stay safe outside")
@@ -382,15 +416,15 @@ _TH_WriteTapHoldToml() {
 
 	; Root [tap_hold] section — emit inherit_defaults when it is false so
 	; the loader does not re-merge shipped defaults on the next reload.
-	if TapHold.Has("inherit_defaults") and !TapHold["inherit_defaults"] {
+        if Data.Has("inherit_defaults") and !Data["inherit_defaults"] {
 		Lines.Push("[tap_hold]")
 		Lines.Push("inherit_defaults = false")
 		Lines.Push("")
 	}
 
 	; Keys section.
-	if TapHold.Has("keys") {
-		for KeyId, Entry in TapHold["keys"] {
+        if Data.Has("keys") {
+                for KeyId, Entry in Data["keys"] {
 			if !(IsObject(Entry) and Type(Entry) == "Map") {
 				continue
 			}
@@ -403,8 +437,8 @@ _TH_WriteTapHoldToml() {
 	}
 
 	; Layers section — emitted verbatim.
-	if TapHold.Has("layers") {
-		for LayerId, LayerData in TapHold["layers"] {
+        if Data.Has("layers") {
+                for LayerId, LayerData in Data["layers"] {
 			if !(IsObject(LayerData) and Type(LayerData) == "Map") {
 				continue
 			}
@@ -444,11 +478,29 @@ _TH_WriteTapHoldToml() {
 		FileAppend(Content, Tmp, "UTF-8-RAW")
 		FileMove(Tmp, Path, true)
 		try LoggerDebug("TapHoldWriter", "tap_hold.toml rewritten ({1} key(s)).",
-			TapHold.Has("keys") ? TapHold["keys"].Count : 0)
+                        Data.Has("keys") ? Data["keys"].Count : 0)
+                return true
 	} catch as Err {
 		try FileDelete(Tmp)
-		try LoggerError("TapHoldWriter", "Could not write tap_hold.toml: {1}.", Err.Message)
-	}
+                try LoggerError("TapHoldWriter", "Could not write tap_hold.toml: {1}.", Err.Message)
+                return false
+        }
+}
+
+_TH_CloneData(Value) {
+        if Value is Map {
+                Copy := Map()
+                for K, V in Value
+                        Copy[K] := _TH_CloneData(V)
+                return Copy
+        }
+        if Value is Array {
+                Copy := []
+                for _, V in Value
+                        Copy.Push(_TH_CloneData(V))
+                return Copy
+        }
+        return Value
 }
 
 
