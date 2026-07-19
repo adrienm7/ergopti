@@ -24,7 +24,9 @@ global _MET_STATE_GETTERS := Map(
 	"wpm_widget_visible", () => WPMWidget.visible,
 )
 
-; Build the « 📊 Métriques » submenu and attach it to the tray. The parent
+; Build the « 📊 Métriques » submenu. The caller publishes the completed tree
+; to the tray, so expensive renderer work never runs after the live root has
+; been cleared. The parent
 ; entry doubles as an ON/OFF toggle for the global keylogger feature: the
 ; checkmark reflects MetricsShortcuts.enabled, and clicking it triggers
 ; ToggleMetricsEnabled() with a confirmation dialog before turning ON.
@@ -63,7 +65,7 @@ BuildMetricsMenu() {
 	AddCategoryToggleItem(MetricsMenu,
 		t("menu.metrics.on"), t("menu.metrics.off"),
 		MetricsShortcuts.enabled, (*) => ToggleMetricsEnabled())
-	A_TrayMenu.Add(t("menu.metrics.title"), MetricsMenu)
+	return MetricsMenu
 }
 
 ; Dynamic handler: Show Typing button.
@@ -180,4 +182,3 @@ _MET_WpmWidgetReset(M, _Cat, Getters) {
 }
 
 ; ── Layout dynamic handlers ────────────────────────────────────────────────────
-

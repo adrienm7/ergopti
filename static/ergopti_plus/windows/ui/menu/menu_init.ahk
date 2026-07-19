@@ -74,14 +74,15 @@ initMenu() {
 	global SubMenus, A_TrayMenu, HotstringCategories
 	global _TrayTitleCache, _FmtCountCache, _I18nSortedLocalesCache
 	global _DriverReady, _LangMenuRef, _LangMenuBuildPending
+	TrayMenuStage_Begin()
+	try {
 	_TrayTitleCache := Map()
 	_FmtCountCache := Map()
 	_I18nSortedLocalesCache := false
 	_HS_InvalidateCaches()
 	MenuManifest_InvalidateCache()
 
-	A_TrayMenu.Delete()
-	BootProfile_Mark("MENU/initMenu: caches reset + tray cleared")
+	BootProfile_Mark("MENU/initMenu: caches reset + tray staged")
 
 	; Shortcuts submenu — built by MenuRenderer_Build("shortcuts_menu", …).
 	; The renderer handles the category toggle, feature toggles, separator
@@ -111,9 +112,9 @@ initMenu() {
 	}
 	LayoutGated := IsCategoryGated("Layout")
 	LayoutMenuTitle := t("menu.layout.title")
-	A_TrayMenu.Add(LayoutMenuTitle, LayoutMenu)
+	TrayMenuStage_Add(LayoutMenuTitle, LayoutMenu)
 	if LayoutGated {
-		A_TrayMenu.Check(LayoutMenuTitle)
+		TrayMenuStage_Check(LayoutMenuTitle)
 	}
 	BootProfile_Mark("MENU/initMenu: layout built+added")
 
@@ -144,9 +145,9 @@ initMenu() {
 	BootProfile_Mark("MENU/initMenu: hotstrings menu rendered")
 
 	HotstringsMenuTitle := t("menu.hotstrings.title") . " (" . FmtCount(_HS_ComputeGrandTotal()) . ")"
-	A_TrayMenu.Add(HotstringsMenuTitle, HotstringsMenu)
+	TrayMenuStage_Add(HotstringsMenuTitle, HotstringsMenu)
 	if HotstringsAllEnabled {
-		A_TrayMenu.Check(HotstringsMenuTitle)
+		TrayMenuStage_Check(HotstringsMenuTitle)
 	}
 	BootProfile_Mark("MENU/initMenu: hotstrings grandtotal+added")
 
@@ -174,29 +175,30 @@ initMenu() {
 	LLM_Menu_Init(_LlmSavedOpts)
 	BootProfile_Mark("MENU/initMenu: LLM tray init")
 
-	BuildMetricsMenu()
+	MetricsMenu := BuildMetricsMenu()
+	TrayMenuStage_Add(t("menu.metrics.title"), MetricsMenu)
 	if MetricsShortcuts.enabled {
-		A_TrayMenu.Check(t("menu.metrics.title"))
+		TrayMenuStage_Check(t("menu.metrics.title"))
 	}
 	BootProfile_Mark("MENU/initMenu: metrics menu")
 
 	if SubMenus.Has("Shortcuts") {
-		A_TrayMenu.Add(GetCategoryTitle("Shortcuts"), SubMenus["Shortcuts"])
+		TrayMenuStage_Add(GetCategoryTitle("Shortcuts"), SubMenus["Shortcuts"])
 		if ShortcutsGated {
-			A_TrayMenu.Check(GetCategoryTitle("Shortcuts"))
+			TrayMenuStage_Check(GetCategoryTitle("Shortcuts"))
 		}
 	}
 	if SubMenus.Has("TapHolds") {
-		A_TrayMenu.Add(GetCategoryTitle("TapHolds"), SubMenus["TapHolds"])
+		TrayMenuStage_Add(GetCategoryTitle("TapHolds"), SubMenus["TapHolds"])
 		if IsCategoryGated("TapHolds") {
-			A_TrayMenu.Check(GetCategoryTitle("TapHolds"))
+			TrayMenuStage_Check(GetCategoryTitle("TapHolds"))
 		}
 	}
 
 	GesturesMenu := BuildGesturesMenu()
-	A_TrayMenu.Add(GetCategoryTitle("Gestures"), GesturesMenu)
+	TrayMenuStage_Add(GetCategoryTitle("Gestures"), GesturesMenu)
 	if Features["gestures"]["enabled"] {
-		A_TrayMenu.Check(GetCategoryTitle("Gestures"))
+		TrayMenuStage_Check(GetCategoryTitle("Gestures"))
 	}
 
 	; ─── Tail (global_actions onwards): order driven by the shared manifest top_level.
@@ -204,6 +206,11 @@ initMenu() {
 	; live here; layout data comes from menu_manifest.json.
 	_MI_AppendTail()
 	BootProfile_Mark("MENU/initMenu: tail (global_actions…debug)")
+	TrayMenuStage_Publish()
+	} catch as e {
+		TrayMenuStage_Abort()
+		throw e
+	}
 }
 
 
@@ -218,13 +225,13 @@ _MI_AppendTail() {
 	for _, Entry in TailItems {
 		Id := Entry["id"]
 		if Id == "---" {
-			A_TrayMenu.Add()
+			TrayMenuStage_Add()
 		} else if Id == "global_actions" {
 			GlobalActionsMenu := _MI_BuildGlobalActionsMenu()
-			A_TrayMenu.Add(t("menu.global.title"), GlobalActionsMenu)
+			TrayMenuStage_Add(t("menu.global.title"), GlobalActionsMenu)
 		} else if Id == "language" {
 			LangMenu := Menu()
-			A_TrayMenu.Add(t("menu.global.language"), LangMenu)
+			TrayMenuStage_Add(t("menu.global.language"), LangMenu)
 			; The 21-locale language submenu costs ~156 ms on the first build.
 			; On the boot pass, defer it; on a live rebuild populate synchronously.
 			_LangMenuRef := LangMenu
@@ -234,24 +241,24 @@ _MI_AppendTail() {
 				; A disabled placeholder makes the deferred population visible as
 				; unavailable rather than accepting a click that cannot select a
 				; locale yet. BuildLanguageMenuDeferred atomically enables it.
-				A_TrayMenu.Disable(t("menu.global.language"))
+				TrayMenuStage_Disable(t("menu.global.language"))
 				_LangMenuBuildPending := true
 			}
 		} else if Id == "config_folder" {
-			RegisterMenuItem(A_TrayMenu, t("menu.global.config_folder"), FilePathsEditor)
+			TrayMenuStage_AddAction(t("menu.global.config_folder"), FilePathsEditor)
 		} else if Id == "setup_wizard" {
-			RegisterMenuItem(A_TrayMenu, t("menu.global.setup_wizard"), Onboarding_ShowFromMenu)
+			TrayMenuStage_AddAction(t("menu.global.setup_wizard"), Onboarding_ShowFromMenu)
 		} else if Id == "about" {
-			A_TrayMenu.Add(t("menu.about.title"), _MI_BuildAboutMenu())
+			TrayMenuStage_Add(t("menu.about.title"), _MI_BuildAboutMenu())
 		} else if Id == "suspend" {
 			MenuSuspend := t("menu.global.suspend")
-			RegisterMenuItem(A_TrayMenu, MenuSuspend, ToggleSuspend)
+			TrayMenuStage_AddAction(MenuSuspend, ToggleSuspend)
 		} else if Id == "reload" {
-			RegisterMenuItem(A_TrayMenu, t("menu.global.reload"), ActivateReload)
+			TrayMenuStage_AddAction(t("menu.global.reload"), ActivateReload)
 		} else if Id == "quit" {
-			RegisterMenuItem(A_TrayMenu, t("menu.global.quit"), ActivateExitApp)
+			TrayMenuStage_AddAction(t("menu.global.quit"), ActivateExitApp)
 		} else if Id == "debug" {
-			A_TrayMenu.Add(t("menu.debug.title"), _MI_BuildDebuggingMenu())
+			TrayMenuStage_Add(t("menu.debug.title"), _MI_BuildDebuggingMenu())
 		}
 	}
 }

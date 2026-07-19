@@ -207,11 +207,10 @@ Ergopti_OnShutdown(reason, code) {
     try OllamaWV_Close()
     return 0
 }
-; Build the full tray menu off the boot critical path (armed after "ready"). The
-; build runs under Critical so it is ONE uninterrupted pass — a tray click queued
-; during boot cannot pump the message loop mid-build and paint a half-built menu
-; (the documented "menu shows only the first items" bug). No Sleep inside, so it is
-; safe to hold Critical across it. UpdateTrayIcon runs last, once MenuSuspend exists.
+; Build the full tray menu off the boot critical path (armed after "ready").
+; initMenu stages every subtree while the old root remains live and enters
+; Critical only for the short root replacement. UpdateTrayIcon runs last, once
+; MenuSuspend exists.
 BuildTrayMenuDeferred() {
     global _DriverReady, _LangMenuBuildPending, LANG_MENU_DEFER_MS
     ; Same rationale for the bundled-extensions scan: it does DirExist/Loop Files/
@@ -229,21 +228,10 @@ BuildTrayMenuDeferred() {
     ; only the warm cache — the Critical span then covers ONLY the pure Win32
     ; Menu.Add / RegisterMenuItem pass that must be one uninterrupted block.
     _HS_PreScanPersonal()
-    _MenuBuildCritical := Critical("On")
-    try {
-        ; Clear the dispatch bypass Maps BEFORE the InitSubMenus()/initMenu()
-        ; re-registration pass. AHK reuses freed menu-item IDs after Menu.Delete();
-        ; a stale entry left in the Maps could bind a reused ID to a different
-        ; item's callback and fire the WRONG action on a dropped-click retry (see
-        ; menu_dispatcher.ahk).
-        MenuDispatcher_Reset()
-        InitSubMenus()
-        ; Build everything EXCEPT the 21-locale language submenu (~219 ms of Win32 menu
-        ; registration + flag-icon loads). Forcing _DriverReady false makes initMenu
-        ; DEFER that submenu (its boot behaviour) so THIS post-ready build stays ~157 ms
-        ; instead of ~420 ms — small enough not to lag the first keystrokes after launch.
-        ; The language submenu is then armed on its own timer below, exactly as the
-        ; original boot path did, so it never piles onto this Critical section.
+	try {
+		InitSubMenus()
+		; Build everything EXCEPT the 21-locale language submenu. Forcing
+		; _DriverReady false preserves the deferred language-menu behaviour.
         _SavedReady := _DriverReady
         _DriverReady := false
         ; Restore _DriverReady even if initMenu() throws (I/O error, parse failure…);
@@ -251,11 +239,9 @@ BuildTrayMenuDeferred() {
         try initMenu()
         finally _DriverReady := _SavedReady
         UpdateTrayIcon()
-    } finally {
-        ; A failed submenu/menu build must never strand the low-level keyboard
-        ; hook in Critical mode for the rest of the session.
-        Critical(_MenuBuildCritical)
-    }
+	} catch as e {
+		try LoggerError("TrayMenu", "Deferred tray-menu build failed: {1}", e.Message)
+	}
     if _LangMenuBuildPending
         SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
     BootProfile_Mark("Tray menu built (deferred, off time-to-ready)")
