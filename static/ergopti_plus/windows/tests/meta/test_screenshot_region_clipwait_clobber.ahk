@@ -27,7 +27,13 @@ _TSC_Check() {
     Assert(InStr(Src, "SetTimer(GestureRegionCapturePoll.Bind(Epoch)") > 0, "region selection must be deferred to an epoch-bound timer")
     Assert(InStr(PollSrc, "if A_IsSuspended") > 0, "the deferred region poll must cancel rather than save while suspended")
     Assert(InStr(PollSrc, "ClipWait(0.001, 2)") > 0, "timer must probe for an image without a long ClipWait")
-    Assert(InStr(FinishSrc, "A_Clipboard := State[") > 0, "cleanup must restore the snapshot")
+	Assert(InStr(PollSrc, "GestureClipboardHasImage()") > 0,
+		"any-data ClipWait is insufficient: region capture must require an image clipboard format before starting a save")
+	Assert(InStr(PollSrc, 'State["clipboard_sequence"] := GestureClipboardSequence()') > 0,
+		"the accepted Snipping Tool image must publish the clipboard sequence owned by this transaction")
+	Assert(InStr(FinishSrc, "OwnedSequence != 0 && GestureClipboardSequence() = OwnedSequence") > 0,
+		"cleanup must restore only if its transaction still owns the clipboard sequence, preserving a later user copy")
+    Assert(InStr(FinishSrc, "A_Clipboard := State[") > 0, "owned cleanup must restore the snapshot")
     Quote := Chr(34)
     Assert(InStr(FinishSrc, "_GestureRegionCapture[" . Quote . "epoch" . Quote . "] != Epoch") > 0, "stale callbacks must not restore a newer capture's clipboard")
 }
