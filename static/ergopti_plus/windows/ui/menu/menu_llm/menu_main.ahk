@@ -32,9 +32,9 @@
 
 /**
  * Builds (or rebuilds) the LLM submenu inside the tray.
- * Uses the persistent _LLM_Menu_Handle object: first call registers it in the
- * tray (position is determined by call order in initMenu); subsequent calls
- * delete all items and repopulate in place, so the entry never moves.
+ * Builds a detached Menu first, then replaces the tray entry in one short
+ * critical publication. The previously published submenu remains callable when
+ * an asynchronous dependency callback or a settings action requests a rebuild.
  */
 LLM_Menu_Build() {
 	global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray
@@ -42,28 +42,17 @@ LLM_Menu_Build() {
 	if _Building
 		return
 	_Building := true
-	; Run the whole build under Critical so deferred boot tasks (notably the multi-second
-	; emoji/symbol hotstring registration) cannot preempt the emit loop mid-flight and
-	; stretch a ~50 ms build into several seconds of wall-clock (menu-build-boot-preempt).
-	; Safe only because the build now holds NO blocking call: the prune is O(tray+tracked)
-	; and both the health and installed-tags probes are fire-and-forget curl children.
-	_crit := Critical("On")
+	; Never clear the published submenu before its replacement is complete. A menu
+	; build can be preempted by timers and callbacks; an in-place Delete() exposed
+	; an empty or partial LLM tree and silently dropped the user's next click.
+	OldHandle := _LLM_Menu_Handle
+	StagedHandle := Menu()
+	_LLM_Menu_Handle := StagedHandle
+	Published := false
 	try {
 	_t0 := A_TickCount
 	try LoggerInfo("LLM", "LLM_Menu_Build: building IA submenu (enabled={1}, inTray={2}).", _LLM_Menu["enabled"] ? "true" : "false", _LLM_Menu_InTray ? "true" : "false")
-	; Clear all existing items so we can repopulate in place.
-	try _LLM_Menu_Handle.Delete()
-	_tDelete := A_TickCount
-
-	; Prune the dispatch-bypass Maps for THIS menu's now-deleted items. This is a
-	; single-menu rebuild (not a full tray rebuild), so the global dispatch reset
-	; must NOT be used here — it would wipe the dispatch
-	; tracking of every OTHER live tray menu. Without this per-menu prune, the
-	; dead menu-item IDs from each rebuild accumulate in
-	; _MenuDispatchCallbacks / _MenuDispatchLastFire without bound across the
-	; very frequent LLM_Menu_Build() passes (settings tweaks, model pulls).
-	try MenuDispatcher_PruneMenu(_LLM_Menu_Handle)
-	_tPrune := A_TickCount
+	_tStaged := A_TickCount
 
 	; Enable / Disable toggle. The checked state MUST reflect
 	; ``_LLM_Menu["enabled"]`` alone — that's the user's intent. We keep a
@@ -123,10 +112,9 @@ LLM_Menu_Build() {
 	; (thinking-model info, the num-predictions reset, the inner separator) are
 	; emitted from inside _LLM_Menu_EmitRow at their anchor row.
 	_rows := _LLM_MenuLayout_Rows()
-	; Diagnostic breakdown of the pre-emit span — isolates the Win32 Delete, the
-	; dispatch-map prune (recursive tray walk), and the remaining setup/layout so a
-	; slow build is attributed to a specific step instead of guessed at.
-	try LoggerInfo("LLM", "LLM_Menu_Build: pre-emit timing — delete {1} ms, prune {2} ms, rest {3} ms.", _tDelete - _t0, _tPrune - _tDelete, A_TickCount - _tPrune)
+	; Diagnostic breakdown of the detached staging work. Publishing and pruning
+	; happen only after every row has been successfully constructed.
+	try LoggerInfo("LLM", "LLM_Menu_Build: pre-emit staging took {1} ms.", A_TickCount - _tStaged)
 	try LoggerInfo("LLM", "LLM_Menu_Build: emitting {1} settings row(s) from shared spec…", _rows.Length)
 	for _i, _row in _rows
 		_LLM_Menu_EmitRow(_row["id"], (_row["disabled_when_off"] ? _disabled : false), _llm_is_operational)
@@ -135,10 +123,19 @@ LLM_Menu_Build() {
 	_LLM_Menu_Handle.Add()  ; separator
 	RegisterMenuItem(_LLM_Menu_Handle, t("menu.llm.about"), LLM_Menu_OnAbout)
 
-	; Register in the system tray on first call only.
-	if !_LLM_Menu_InTray {
+	; Publish the completed subtree and retire obsolete dispatcher IDs in one
+	; short, non-preemptible commit. Building itself deliberately stays outside
+	; Critical so a slow menu cannot starve the keyboard hook.
+	_PublishCritical := Critical("On")
+	try {
 		A_TrayMenu.Add(t("menu.llm.title"), _LLM_Menu_Handle)
 		_LLM_Menu_InTray := true
+		Published := true
+		; Prune only after the tray points at the staged subtree. The whole-tray
+		; walk then retains every new ID and removes the old generation's IDs.
+		MenuDispatcher_PruneMenu(_LLM_Menu_Handle)
+	} finally {
+		Critical(_PublishCritical)
 	}
 
 	; Check the parent tray entry only when enabled AND Ollama is confirmed ready.
@@ -151,13 +148,15 @@ LLM_Menu_Build() {
 	}
 	try LoggerInfo("LLM", "LLM_Menu_Build: IA submenu built with {1} item(s) in {2}ms.", DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int"), A_TickCount - _t0)
 	} catch as e {
-		; Capture (and swallow) any build failure so it is visible in the log AND so a
-		; throw can no longer abort the build silently mid-way — at minimum the toggle
-		; and whatever rows were added before the throw stay in the menu.
+		; A failed staged build leaves the previous tree live. This is fail-closed
+		; for output: no menu action disappears merely because a new row failed.
+		if !Published {
+			_LLM_Menu_Handle := OldHandle
+			try StagedHandle.Delete()
+		}
 		try LoggerError("LLM", "LLM_Menu_Build FAILED: {1} ({2}:{3}).", e.Message, e.File, e.Line)
 	} finally {
 		_Building := false
-		Critical(_crit)
 	}
 }
 

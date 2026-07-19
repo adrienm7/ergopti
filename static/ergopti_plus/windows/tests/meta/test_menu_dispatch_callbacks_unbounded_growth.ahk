@@ -16,7 +16,7 @@
 ; A global reset cannot be used inside LLM_Menu_Build() - it would wipe the
 ; dispatch tracking of every OTHER live tray menu. The fix adds a per-menu
 ; prune, MenuDispatcher_PruneMenu(MenuObj), keyed off the live HMENU, and calls
-; it from LLM_Menu_Build() right after _LLM_Menu_Handle.Delete().
+; it from LLM_Menu_Build() after the staged submenu is published.
 ;
 ; This is a meta-static test because lib/menu_dispatcher.ahk installs an
 ; OnMessage(0x0111) hook at include time and the LLM tray menu modules register
@@ -90,7 +90,7 @@ _MDCUG_BuildCallsPrune() {
 	Seg := _DriverFuncBody("LLM_Menu_Build")
 	Assert(Seg != "", "LLM_Menu_Build() declaration must exist in menu_main.ahk")
 	Assert(InStr(Seg, "MenuDispatcher_PruneMenu(_LLM_Menu_Handle)") > 0,
-		"LLM_Menu_Build must call MenuDispatcher_PruneMenu(_LLM_Menu_Handle) after deleting its items - without it the dispatch Maps leak dead IDs across every rebuild")
+		"LLM_Menu_Build must prune obsolete dispatcher IDs after it publishes the staged subtree - without it the dispatch Maps leak dead IDs across every rebuild")
 	; The global reset must NOT appear here: this is a single-menu rebuild, and a
 	; global reset would wipe the dispatch tracking of every other live tray menu.
 	Assert(InStr(Seg, "MenuDispatcher_Reset(") == 0,
