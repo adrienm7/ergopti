@@ -21,7 +21,7 @@
  * 3. Shape parity: only `kc`, `finger`, and `home` (when true) are emitted —
  *    the same three fields the hand-written KEYCODE_DATA array carried;
  *    `qwerty`/`azerty`/`hand` are display/derivable fields state.js never used.
- * 4. Encoding: written as plain UTF-8 with CRLF line endings, no BOM — matching
+ * 4. Encoding: written as plain UTF-8 with LF line endings, no BOM — matching
  *    every sibling file already committed under `_shared/ui/metrics_typing/`.
  * ==============================================================================
  */
@@ -107,7 +107,7 @@ function buildJsSource(keys) {
 // ==================================================
 
 /**
- * Writes content to outPath with CRLF line endings and no BOM, matching every
+ * Writes content to outPath with LF line endings and no BOM, matching every
  * sibling file already committed under `_shared/ui/metrics_typing/`.
  * @param {string} outPath  Absolute path to the output file.
  * @param {string} content  Source text with bare LF newlines.

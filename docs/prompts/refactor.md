@@ -110,7 +110,7 @@ la toolchain de test/codegen est en Node sous `tools/`.
    déplace quelque chose **embarque son test** dans le même commit, encodant la
    *cause racine*, rouge avant / vert après. Le guide doit nommer ce test pour
    chaque étape.
-4. **Foot-gun encodage AHK.** Fichiers `.ahk` = **UTF-8 BOM + CRLF**. Éditer via
+4. **Foot-gun encodage AHK.** Fichiers `.ahk` = **UTF-8 BOM + LF**. Éditer via
    l'outil Edit, **jamais `cat >>`** (abort silencieux mi-fichier). Tests AHK
    **ASCII-only**, glyphes non-ASCII via `Chr(0xNNNN)`. Lancer `npm run test:ahk-encoding`
    après tout `.ahk` touché. Préserver l'**ordre des `#Include` / `#InputLevel`** et

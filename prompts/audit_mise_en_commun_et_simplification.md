@@ -52,7 +52,7 @@ existantes :
 | Parse/validate AHK | `& "C:\Program Files\AutoHotkey\v2.0.19\AutoHotkey64.exe" /validate ErgoptiPlus.ahk` (depuis `windows/`) | exit 0 = tout parse |
 | Suite AHK | `AutoHotkey64.exe tests\run_all.ahk` (TAP dans `%TEMP%\ergopti_test_results.txt`) | unitaires + meta |
 | Suite JS/CI | `npm run test:js` | drift gates, lint, parité, headers… |
-| Encodage AHK | `npm run test:ahk-encoding` | UTF-8 BOM + CRLF |
+| Encodage AHK | `npm run test:ahk-encoding` | UTF-8 BOM + LF |
 | Lint conventions | `npm run lint:conventions:strict` | bannières/sections/espacement |
 | Headers de fichier | `node tools/lint/audit-file-headers.cjs` | 1re ligne = chemin |
 | Suite macOS | `cd static/ergopti_plus/macos && lua tests/run.lua` | unitaires Lua |
