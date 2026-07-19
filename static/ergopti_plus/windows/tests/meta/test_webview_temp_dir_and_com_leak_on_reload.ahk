@@ -81,14 +81,24 @@ _WVRL_CloseReleasesEverything() {
 	Assert(Seg != "", "KLWV_Close(which) must exist in keylogger_webview.ahk")
 	; Releasing the COM controller is what stops the msedgewebview2.exe host and
 	; releases the lock on the per-launch profile dir.
+	SubReleasePos := InStr(Seg, 'entry.Delete("msg_sub")')
+	ClosePos := InStr(Seg, '["controller"].Close()')
+	Assert(SubReleasePos > 0 && ClosePos > SubReleasePos,
+		"KLWV_Close must release msg_sub before Controller.Close so its COM unsubscribe has a live controller")
 	Assert(InStr(Seg, '["controller"].Close()') > 0,
 		"KLWV_Close must Close() the WebView2 controller so the host process exits and unlocks the udir")
 	; Destroying the Gui frees the HWND the controller was parented to.
 	Assert(InStr(Seg, '["gui"].Destroy()') > 0,
 		"KLWV_Close must Destroy() the host Gui")
-	; Deleting the udir reclaims the multi-MB temp profile dir for this launch.
-	Assert(InStr(Seg, 'DirDelete(entry["udir"], true)') > 0,
-		"KLWV_Close must DirDelete the per-launch udir - otherwise reopening leaks a new ergopti_webview2_* dir each time")
+	; Deleting the udir reclaims the multi-MB temp profile dir for this launch,
+	; but must be deferred until Edge's child processes release their lock.
+	Assert(InStr(Seg, 'SetTimer(KLWV_DeferredDirDelete.Bind(udir), -1000)') > 0,
+		"KLWV_Close must defer profile deletion after Controller.Close rather than blocking/retrying inline")
+	Assert(InStr(Seg, 'DirDelete(entry["udir"], true)') = 0,
+		"KLWV_Close must not synchronously DirDelete a profile still locked by Edge")
+	Deferred := _DriverFuncBody("KLWV_DeferredDirDelete")
+	Assert(InStr(Deferred, "attempts < 3") > 0 && InStr(Deferred, "LoggerWarn") > 0,
+		"KLWV_DeferredDirDelete must use bounded retries and log terminal cleanup failure")
 }
 Test("keylogger: KLWV_Close releases controller, gui and udir (webview-temp-dir-and-com-leak-on-reload)", _WVRL_CloseReleasesEverything)
 

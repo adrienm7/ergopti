@@ -92,5 +92,17 @@ _TWTL_OllamaWVDeferredDelete() {
 		"OllamaWV_Close must call _OllamaWV_DeferredDirDelete via SetTimer (not DirDelete inline)")
 }
 
+_TWTL_KeyloggerWVDeferredDelete() {
+	Src := _TWTL_ReadSource("modules/keylogger/keylogger_webview.ahk")
+	Close := _DriverFuncBody("KLWV_Close")
+	Assert(InStr(Close, "KLWV_DeferredDirDelete") > 0,
+		"KLWV_Close must defer user-data cleanup until Edge releases its profile lock")
+	Assert(InStr(Close, 'DirDelete(entry["udir"], true)') = 0,
+		"KLWV_Close must not recursively delete the profile inline on the UI callback")
+	Assert(InStr(Src, "KLWV_DeferredDirDelete(udir, attempts := 0)") > 0,
+		"Keylogger WebView cleanup must expose a bounded deferred deletion helper")
+}
+
 Test("WebView2 hosts: sweep stale profiles and delete on close", _TWTL_AllHosts)
 Test("OllamaWV_Close: udir deletion is deferred via SetTimer to avoid Edge file lock race", _TWTL_OllamaWVDeferredDelete)
+Test("KLWV_Close: udir deletion is deferred via SetTimer to avoid Edge file lock race", _TWTL_KeyloggerWVDeferredDelete)
