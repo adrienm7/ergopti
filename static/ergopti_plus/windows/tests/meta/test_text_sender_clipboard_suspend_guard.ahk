@@ -38,8 +38,8 @@ _TSCSG_ClipboardHasSuspendGuardBeforeWrite() {
 	Assert(GuardPos < WritePos,
 		"_TextSendClipboard: the A_IsSuspended guard must appear BEFORE CB_Write — a guard placed after the write still overwrites the clipboard while paused")
 
-	PastePos := InStr(Body, '_AHK_SendInput.Call("^v")')
-	Assert(PastePos > 0, "_TextSendClipboard must still paste via _AHK_SendInput.Call")
+	PastePos := InStr(Body, '_TextSenderSendInput("^v", "clipboard paste")')
+	Assert(PastePos > 0, "_TextSendClipboard must still paste via the guarded TextSender helper")
 	Assert(GuardPos < PastePos,
 		"_TextSendClipboard: the A_IsSuspended guard must appear BEFORE the paste")
 }
