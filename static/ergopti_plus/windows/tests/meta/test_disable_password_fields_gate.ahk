@@ -97,6 +97,17 @@ _DPFG_CheckSfdUnknownFailsClosed() {
 		"deferred secure-field UIA work must be inert while the driver is suspended")
 }
 
+_DPFG_CallerFailureFailsClosed() {
+	Body := _DriverFuncBody("LLM_Engine_FirePrediction")
+	Assert(Body != "", "LLM_Engine_FirePrediction must exist")
+	GatePos := InStr(Body, "disable_password_fields")
+	Tail := SubStr(Body, GatePos)
+	DefaultPos := InStr(Tail, "IsPw := true")
+	TryPos := InStr(Tail, "try IsPw := SFD_IsSecureField()")
+	Assert(DefaultPos > 0 and TryPos > DefaultPos,
+		"the password-field caller must default IsPw to true before the detector try so a throwing adapter cannot leak LLM context")
+}
+
 
 Test("meta fix-disable-password-fields-gate: LLM_Engine_FirePrediction checks disable_password_fields and calls SFD_IsSecureField",
 	_DPFG_CheckFirePredictionGate)
@@ -105,3 +116,4 @@ Test("meta fix-sfd-class-guard: SFD_DetectNative checks Edit class before ES_PAS
 	_DPFG_CheckSFDClassGuard)
 Test("meta fix-disable-password-fields-gate: unknown focused controls fail closed until deferred UIA confirms them",
 	_DPFG_CheckSfdUnknownFailsClosed)
+Test("LLM privacy: a throwing secure-field adapter fails closed at the caller", _DPFG_CallerFailureFailsClosed)
