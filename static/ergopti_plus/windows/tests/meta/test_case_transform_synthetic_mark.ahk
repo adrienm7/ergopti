@@ -23,12 +23,11 @@
 ; ===================================================
 
 _CTSM_CheckGestures() {
-	; Move-resilient: pin the assertions to the GestureToggleUppercase body via
-	; the framework helper. KL_ClearSynthetic appears across several modules, so
-	; scanning a whole dir/tree would weaken this gestures-specific invariant;
-	; the function body keeps it tight (and is stronger than the old file scan).
-	Src := _DriverFuncBody("GestureToggleUppercase")
-	Assert(Src != "", "GestureToggleUppercase must exist")
+	; The initiating gesture only starts asynchronous selection capture. Pin the
+	; injection invariant to its completion callback, the sole place that can
+	; call SendInstant after the capture has validated its foreground context.
+	Src := _DriverFuncBody("_GestureToggleUppercaseSelection")
+	Assert(Src != "", "_GestureToggleUppercaseSelection must exist")
 
 	Assert(InStr(Src, 'KL_MarkSynthetic("case-transform")'),
 		"GestureToggleUppercase/TitleCase must call KL_MarkSynthetic before SendInstant")
@@ -37,8 +36,8 @@ _CTSM_CheckGestures() {
 }
 
 _CTSM_CheckWinShortcuts() {
-	Src := _DriverFuncBody("ConvertToTitleCase")
-	Assert(Src != "", "ConvertToTitleCase must exist")
+	Src := _DriverFuncBody("_ConvertToTitleCaseSelection")
+	Assert(Src != "", "_ConvertToTitleCaseSelection must exist")
 
 	Assert(InStr(Src, 'KL_MarkSynthetic("case-transform")'),
 		"ConvertToTitleCase/ConvertToUppercase must call KL_MarkSynthetic before SendInstant")
