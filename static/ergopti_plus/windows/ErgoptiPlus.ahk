@@ -594,7 +594,7 @@ try {
 ; never re-inits the Map after filling it.
 global _HSCategorySnapshot := Map()
 try _HSSnapshotAllCategories()
-ApplyMasterGatesToFeatures(Features, TapHold)
+ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated, LoggerDebug)
 
 #Include modules/gestures/init.ahk
 #Include modules/gestures/click.ahk

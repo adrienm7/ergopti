@@ -37,7 +37,7 @@ TestMasterGates_SubcatGateZerosOnlyItsFeatures() {
 			"rolls", Map("hc", Map("enabled", true))
 		)
 
-		ApplyMasterGatesToFeatures(Features, TapHold)
+		ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated)
 
 		AssertFalse(Features["hotstrings"]["autocorrection"]["errors"]["enabled"],
 			"a gated-off sub-category's sections are forced false")
@@ -75,7 +75,7 @@ TestMasterGates_SubcatGateOnLeavesFeatures() {
 			"autocorrection", Map("errors", Map("enabled", true), "accents", Map("enabled", false))
 		)
 
-		ApplyMasterGatesToFeatures(Features, TapHold)
+		ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated)
 
 		AssertTrue(Features["hotstrings"]["autocorrection"]["errors"]["enabled"],
 			"an enabled section stays enabled when the category gate is on")
@@ -97,7 +97,7 @@ Test("master gates: a sub-category gate left on does not change section states",
 
 TestMasterGates_RequiresExplicitTargets() {
 	Thrown := false
-	try ApplyMasterGatesToFeatures("not-a-map", Map())
+	try ApplyMasterGatesToFeatures("not-a-map", Map(), IsCategoryGated)
 	catch as Err
 		Thrown := InStr(Err.Message, "Features Map target") > 0
 	AssertTrue(Thrown,
@@ -105,6 +105,17 @@ TestMasterGates_RequiresExplicitTargets() {
 }
 Test("master gates: explicit target contract fails fast for invalid candidates",
 	TestMasterGates_RequiresExplicitTargets)
+
+TestMasterGates_RequiresCategoryGateCallback() {
+	global Features, TapHold
+	Thrown := false
+	try ApplyMasterGatesToFeatures(Features, TapHold, 0)
+	catch as Err
+		Thrown := InStr(Err.Message, "category-gate callback") > 0
+	AssertTrue(Thrown,
+		"master gates must fail fast instead of resolving an undeclared category-gate dependency dynamically")
+}
+Test("master gates: explicit category-gate callback contract fails fast", TestMasterGates_RequiresCategoryGateCallback)
 
 TestMasterGates_InvalidManifestDoesNotMutateCandidate() {
 	global _SharedDir, CategoryEnabled
@@ -124,7 +135,7 @@ TestMasterGates_InvalidManifestDoesNotMutateCandidate() {
 		_SharedDir := FixtureRoot
 		CategoryEnabled["Hotstrings"] := true
 		Thrown := false
-		try ApplyMasterGatesToFeatures(FeaturesCandidate, TapHoldCandidate)
+		try ApplyMasterGatesToFeatures(FeaturesCandidate, TapHoldCandidate, IsCategoryGated)
 		catch as Err
 			Thrown := InStr(Err.Message, "Master gate manifest") > 0
 		AssertTrue(Thrown, "an invalid canonical manifest must fail fast")
