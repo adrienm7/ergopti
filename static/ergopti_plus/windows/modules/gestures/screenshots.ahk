@@ -25,9 +25,12 @@
 ; harmless when the user starts a second capture before the first one completes.
 global _GestureRegionCapture := false
 global _GestureRegionCaptureEpoch := 0
+global _GestureDirectCaptures := Map()
+global _GestureDirectCaptureEpoch := 0
 global GESTURE_REGION_CAPTURE_POLL_MS := 100
 global GESTURE_REGION_CAPTURE_TIMEOUT_MS := 30000
 global GESTURE_REGION_CAPTURE_SAVE_TIMEOUT_MS := 5000
+global GESTURE_DIRECT_CAPTURE_TIMEOUT_MS := 5000
 
 ; Returns the absolute path to the screenshots directory, creating it if missing.
 ; Mirrors Hammerspoon's convention: %USERPROFILE%\Pictures\screenshots\
@@ -54,8 +57,12 @@ GestureScreenshotPath() {
 ;                        launched with -STA because Clipboard.SetImage
 ;                        requires the calling thread to be in single-
 ;                        threaded apartment state.
-; Returns True on success, False otherwise.
-GestureCaptureRegion(X, Y, W, H, Mode, Path := "") {
+; Starts a capture worker and reports completion through OnComplete(Ok, Reason).
+; A successful Run only proves that PowerShell started; callers must never report
+; a saved/copied screenshot before the worker exits and its intended postcondition
+; (file exists / new image clipboard sequence) is observed.
+GestureCaptureRegion(X, Y, W, H, Mode, Path := "", OnComplete := "") {
+	global _GestureDirectCaptures, _GestureDirectCaptureEpoch, GESTURE_DIRECT_CAPTURE_TIMEOUT_MS
     if (Mode == "save") {
         EscapedPath := StrReplace(Path, "'", "''")
         PSScript :=
@@ -78,18 +85,79 @@ GestureCaptureRegion(X, Y, W, H, Mode, Path := "") {
         ; -STA is required for Clipboard interop
         PSArgs := '-NoProfile -Sta -WindowStyle Hidden -Command "' . PSScript . '"'
     }
+    ClipboardSequence := (Mode == "clipboard") ? CB_GetSequenceNumber() : 0
     try {
-        ; Run async (NOT RunWait): the keyboard hook thread must return immediately — a
-        ; RunWait here froze every keystroke for the whole capture (~300-1500 ms cold) on
-        ; each window/fullscreen screenshot gesture (gesture-capture-async-run). The
-        ; PowerShell capture runs in its own process; fire-and-forget like the SC029 and
-        ; GestureScreenshotInstant siblings, so the save-mode success TrayTip is optimistic.
-        Run('powershell.exe ' . PSArgs, , "Hide")
-        return True
+        ; Run async (NOT RunWait): the keyboard hook thread must return immediately.
+        Run('powershell.exe ' . PSArgs, , "Hide", &Pid)
+        if !Pid
+            throw Error("PowerShell did not return a process id")
+		Epoch := ++_GestureDirectCaptureEpoch
+		_GestureDirectCaptures[Epoch] := Map(
+			"pid", Pid,
+			"mode", Mode,
+			"path", Path,
+			"clipboard_sequence", ClipboardSequence,
+			"deadline", A_TickCount + GESTURE_DIRECT_CAPTURE_TIMEOUT_MS,
+			"callback", OnComplete)
+		SetTimer(GestureDirectCapturePoll.Bind(Epoch), -GESTURE_REGION_CAPTURE_POLL_MS)
+		return true
     } catch as e {
         LoggerError("gestures", "Screenshot failed: {1}.", e.Message)
+		if IsObject(OnComplete) {
+			try OnComplete.Call(false, e.Message)
+			catch as CallbackError
+				LoggerError("gestures", "Screenshot launch-failure callback failed: {1}.", CallbackError.Message)
+		}
         return False
     }
+}
+
+GestureDirectCapturePoll(Epoch) {
+	global _GestureDirectCaptures
+	if !_GestureDirectCaptures.Has(Epoch)
+		return
+	State := _GestureDirectCaptures[Epoch]
+	if A_IsSuspended {
+		GestureDirectCaptureFinish(Epoch, false, "driver suspended")
+		return
+	}
+	if (ProcessExist(State["pid"]) and A_TickCount < State["deadline"]) {
+		SetTimer(GestureDirectCapturePoll.Bind(Epoch), -GESTURE_REGION_CAPTURE_POLL_MS)
+		return
+	}
+	if (State["mode"] == "save")
+		Ok := FileExist(State["path"]) != ""
+	else
+		Ok := (CB_GetSequenceNumber() != State["clipboard_sequence"] and CB_HasImage())
+	GestureDirectCaptureFinish(Epoch, Ok, Ok ? "" : "worker exited without the requested screenshot output")
+}
+
+GestureDirectCaptureFinish(Epoch, Ok, Reason := "") {
+	global _GestureDirectCaptures
+	if !_GestureDirectCaptures.Has(Epoch)
+		return
+	State := _GestureDirectCaptures[Epoch]
+	_GestureDirectCaptures.Delete(Epoch)
+	Callback := State["callback"]
+	if IsObject(Callback) {
+		try Callback.Call(Ok, Reason)
+		catch as e
+			LoggerError("gestures", "Screenshot completion callback failed: {1}.", e.Message)
+	}
+}
+
+GestureScreenshotComplete(Kind, Mode, Path, Ok, Reason := "") {
+	if !Ok {
+		LoggerError("gestures", "{1} screenshot failed: {2}.", Kind, Reason)
+		return
+	}
+	if (Mode == "save") {
+		LoggerSuccess("gestures", "{1} screenshot saved: '{2}'.", Kind, Path)
+		TrayTip(t("notify.screenshot_saved"), Path, "Iconi Mute")
+	} else {
+		LoggerSuccess("gestures", "{1} screenshot copied to clipboard.", Kind)
+		TrayTip(t("notify.screenshot_copied"), t("notify.clipboard"), "Iconi Mute")
+	}
 }
 
 ; Captures the active window (client + non-client area).
@@ -110,16 +178,10 @@ GestureScreenshotWindow(Mode) {
     if (Mode == "save") {
         Path := GestureScreenshotPath()
         LoggerStart("gestures", "Capturing window to '{1}'…", Path)
-        if GestureCaptureRegion(X, Y, W, H, "save", Path) {
-            LoggerSuccess("gestures", "Window screenshot saved: '{1}'.", Path)
-            TrayTip(t("notify.screenshot_saved"), Path, "Iconi Mute")
-        }
+		GestureCaptureRegion(X, Y, W, H, "save", Path, GestureScreenshotComplete.Bind("Window", "save", Path))
     } else {
         LoggerStart("gestures", "Capturing window to clipboard…")
-        if GestureCaptureRegion(X, Y, W, H, "clipboard") {
-            LoggerSuccess("gestures", "Window screenshot copied to clipboard.")
-            TrayTip(t("notify.screenshot_copied"), t("notify.clipboard"), "Iconi Mute")
-        }
+		GestureCaptureRegion(X, Y, W, H, "clipboard", "", GestureScreenshotComplete.Bind("Window", "clipboard", ""))
     }
 }
 
@@ -132,16 +194,10 @@ GestureScreenshotFullscreen(Mode) {
     if (Mode == "save") {
         Path := GestureScreenshotPath()
         LoggerStart("gestures", "Capturing fullscreen to '{1}'…", Path)
-        if GestureCaptureRegion(X, Y, W, H, "save", Path) {
-            LoggerSuccess("gestures", "Fullscreen screenshot saved: '{1}'.", Path)
-            TrayTip(t("notify.screenshot_saved"), Path, "Iconi Mute")
-        }
+		GestureCaptureRegion(X, Y, W, H, "save", Path, GestureScreenshotComplete.Bind("Fullscreen", "save", Path))
     } else {
         LoggerStart("gestures", "Capturing fullscreen to clipboard…")
-        if GestureCaptureRegion(X, Y, W, H, "clipboard") {
-            LoggerSuccess("gestures", "Fullscreen screenshot copied to clipboard.")
-            TrayTip(t("notify.screenshot_copied"), t("notify.clipboard"), "Iconi Mute")
-        }
+		GestureCaptureRegion(X, Y, W, H, "clipboard", "", GestureScreenshotComplete.Bind("Fullscreen", "clipboard", ""))
     }
 }
 
