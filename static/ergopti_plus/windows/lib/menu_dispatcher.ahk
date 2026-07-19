@@ -143,7 +143,7 @@ MenuDispatcher_Reset() {
 ; (e.g. LLM_Menu_Build), as opposed to a full tray rebuild that can call
 ; MenuDispatcher_Reset(). Call this right AFTER MenuObj.Delete(): the deleted
 ; items' IDs are gone from the live HMENU, so any _MenuDispatchCallbacks /
-; _MenuDispatchLastFire entry NOT in the current GetMenuItemID set for THIS
+; _MenuDispatchLastFire / retry-sequence entry NOT in the current GetMenuItemID set for THIS
 ; menu is dead and is dropped. A global reset cannot be used here because the
 ; other live menus (main tray, language submenu) keep their registered items
 ; and must retain their dispatch entries. Without this prune the two Maps grow
@@ -152,7 +152,7 @@ MenuDispatcher_Reset() {
 ; shrinks). Reuses freed IDs are still re-added by RegisterMenuItem during the
 ; same rebuild, so live items keep their tracking.
 MenuDispatcher_PruneMenu(MenuObj) {
-    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens
+    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens, _MenuDispatchClickSequences
 
     ; Collect the IDs currently live in this menu's HMENU.
     LiveIds := Map()
@@ -212,6 +212,9 @@ MenuDispatcher_PruneMenu(MenuObj) {
         }
         if _MenuDispatchTokens.Has(Id) {
             _MenuDispatchTokens.Delete(Id)
+        }
+        if _MenuDispatchClickSequences.Has(Id) {
+            _MenuDispatchClickSequences.Delete(Id)
         }
     }
     if (DeadIds.Length > 0) {
@@ -310,9 +313,12 @@ _TrackedDispatch(TrackedObj, Args*) {
 ; BeforeItem accepts AHK's standard syntax: "Nname" / "&n" / "Nn&" — see
 ; AHK 2.0 Menu.Insert docs.
 RegisterMenuItemInsert(MenuObj, BeforeItem, ItemName, Callback) {
-    global _MenuDispatchCallbacks, _MenuDispatchLastFire
+    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchTokenCounter
 
-    TrackedObj := { ItemId: 0, Callback: Callback }
+    ; Keep the same registration identity as RegisterMenuItem. _TrackedDispatch
+    ; atomically fences wrappers from obsolete menu generations; omitting either
+    ; field here made a click on an inserted item dereference a missing property.
+    TrackedObj := { ItemId: 0, Callback: Callback, Epoch: _MenuDispatcherEpoch, Token: 0 }
     Wrapper    := (Args*) => _TrackedDispatch(TrackedObj, Args*)
 
     try {
@@ -343,8 +349,11 @@ RegisterMenuItemInsert(MenuObj, BeforeItem, ItemName, Callback) {
 
     ; Update the mutable object so the already-registered closure knows its ID
     TrackedObj.ItemId := ItemId
+    _MenuDispatchTokenCounter += 1
+    TrackedObj.Token := _MenuDispatchTokenCounter
     _MenuDispatchCallbacks[ItemId] := Callback
     _MenuDispatchLastFire[ItemId]  := 0
+    _MenuDispatchTokens[ItemId]    := TrackedObj.Token
     return 1
 }
 
@@ -483,17 +492,9 @@ _OnMenuCommandWmCommand(wParam, lParam, msg, hwnd) {
 ; ourselves. The bypass dispatch also updates LastFire so a follow-on
 ; OnMessage retry for the same item won't double-fire.
 ;
-; Known limitation: the guard compares the EXPECTED LastFire (snapshot at
-; click time) against the CURRENT value. Two rapid clicks on DIFFERENT items
-; that share a recycled ItemId within the retry window can produce a scenario
-; where both clicks see the same CurrentLastFire==ExpectedLastFire==0 (the
-; second click resets LastFire to 0 via RegisterMenuItem before
-; _DispatchIfMissed fires for the first click). The net effect is a spurious
-; bypass dispatch for the second click: the callback runs once via AHK's
-; native path and once via _DispatchIfMissed. This is rare (requires a full
-; menu rebuild interleaved with two fast clicks), cosmetically benign
-; (most callbacks are idempotent), and structurally unavoidable without a
-; per-click sequence counter — a more invasive change deferred for now.
+; The epoch, token and per-item click sequence together fence stale retries:
+; a recycled native ID, a rebuilt menu, or a newer click can never make an
+; older timer dispatch the current callback.
 _DispatchIfMissed(ItemId, ExpectedLastFire, ExpectedEpoch := 0, ExpectedToken := 0, ExpectedClickSequence := 0) {
     global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchClickSequences
     ; Critical is held only for the brief atomic gate — reading/updating state and

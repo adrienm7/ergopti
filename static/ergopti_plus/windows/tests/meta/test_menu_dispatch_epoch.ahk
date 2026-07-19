@@ -6,6 +6,7 @@ Test_MenuDispatcher_StaleRetryRequiresRegistrationIdentity() {
 	CommandBody := _DriverFuncBody("_OnMenuCommandWmCommand")
 	RetryBody := _DriverFuncBody("_DispatchIfMissed")
 	TrackedBody := _DriverFuncBody("_TrackedDispatch")
+	InsertBody := _DriverFuncBody("RegisterMenuItemInsert")
 	Assert(InStr(CommandBody, "_MenuDispatcherEpoch") > 0 and InStr(CommandBody, "_MenuDispatchTokens") > 0,
 		"WM_COMMAND must capture the dispatcher epoch and registration token")
 	Assert(InStr(CommandBody, "_DispatchIfMissed.Bind(ItemId, LastFire, _MenuDispatcherEpoch, _MenuDispatchTokens[ItemId], ClickSequence)") > 0,
@@ -20,5 +21,10 @@ Test_MenuDispatcher_StaleRetryRequiresRegistrationIdentity() {
 		"an older retry must no-op after a newer click on the same native item ID")
 	Assert(InStr(TrackedBody, "TrackedObj.Epoch = _MenuDispatcherEpoch") > 0,
 		"a stale native callback must not mutate a newer registration")
+	Assert(InStr(InsertBody, "Epoch: _MenuDispatcherEpoch, Token: 0") > 0,
+		"inserted menu wrappers must initialize every identity field read by _TrackedDispatch")
+	Assert(InStr(InsertBody, "TrackedObj.Token := _MenuDispatchTokenCounter") > 0
+		and InStr(InsertBody, "_MenuDispatchTokens[ItemId]    := TrackedObj.Token") > 0,
+		"inserted menu items must publish their token before their callback can run")
 }
 Test("menu dispatcher: stale retry cannot cross a rebuild epoch", Test_MenuDispatcher_StaleRetryRequiresRegistrationIdentity)
