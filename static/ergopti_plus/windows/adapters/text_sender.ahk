@@ -163,11 +163,11 @@ _TextSenderModifierPrefixFromArray(Modifiers) {
 ; Callback cannot silently vanish — unlike a bare "try Callback()" with no
 ; catch, which swallows the exception with zero log trace.
 ; @param Callback {Func|0} Optional zero-arity completion callback.
-_TextSenderInvokeCallback(Callback) {
+_TextSenderInvokeCallback(Callback, Ok := true, ErrorMessage := "") {
 	if Callback = 0
 		return
 	try
-		Callback()
+		Callback(Ok, ErrorMessage)
 	catch as Err {
 		LoggerError("TextSender", "completion callback threw: {1}", Err.Message)
 	}
@@ -204,7 +204,7 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	; bail-out here that never invokes Callback leaked those guards forever,
 	; permanently suppressing normal hotstring/keylogger observation.
 	if A_IsSuspended {
-		_TextSenderInvokeCallback(Callback)
+		_TextSenderInvokeCallback(Callback, false, "driver suspended before clipboard injection")
 		return
 	}
 
@@ -218,7 +218,7 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	if !CB_Write(Text) {
 		LoggerError("TextSender", "TextSend: clipboard write failed - skipping paste to avoid injecting stale content.")
 		CB_RestoreAll(Saved)
-		_TextSenderInvokeCallback(Callback)
+		_TextSenderInvokeCallback(Callback, false, "clipboard write failed")
 		return
 	}
 
@@ -228,7 +228,7 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	if !ClipWait(TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC) {
 		LoggerError("TextSender", "TextSend: clipboard did not settle within {1}s - skipping paste to avoid injecting stale content.", TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC)
 		CB_RestoreAll(Saved)
-		_TextSenderInvokeCallback(Callback)
+		_TextSenderInvokeCallback(Callback, false, "clipboard did not settle")
 		return
 	}
 
@@ -236,7 +236,7 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	; blocked inside ClipWait; pasting now would clobber its content.
 	if (Generation != _TEXT_CLIPBOARD_GENERATION) {
 		CB_RestoreAll(Saved)
-		_TextSenderInvokeCallback(Callback)
+		_TextSenderInvokeCallback(Callback, false, "clipboard ownership superseded")
 		return
 	}
 
@@ -245,7 +245,7 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	; Fire the completion callback now that the paste keystroke has been emitted.
 	; Placed before the restore timer so callers can inspect A_Clipboard while it
 	; still holds the injected text, but after ^v so the paste is guaranteed to land.
-	_TextSenderInvokeCallback(Callback)
+	_TextSenderInvokeCallback(Callback, true)
 
 	; Restore after a short delay so the paste completes before we overwrite.
 	; The closure no-ops if a newer injection advanced the generation counter,
@@ -287,9 +287,9 @@ _TextSenderStartClipboard() {
 ; Called by _TextSendClipboard on every terminal path. It preserves the public
 ; callback timing (after paste, or on a guarded bailout) while advancing the
 ; FIFO only after the restore timer has had exclusive ownership of the clipboard.
-_TextSenderClipboardCompleted(Callback) {
+_TextSenderClipboardCompleted(Callback, Ok := true, ErrorMessage := "") {
 	global TEXT_CLIPBOARD_NEXT_DELAY_MS
-	_TextSenderInvokeCallback(Callback)
+	_TextSenderInvokeCallback(Callback, Ok, ErrorMessage)
 	SetTimer(_TextSenderFinishClipboard, -TEXT_CLIPBOARD_NEXT_DELAY_MS)
 }
 
@@ -339,7 +339,7 @@ TextSend(Text, Opts, Callback) {
 			Saved := CB_SaveAll()
 			if (Type(Saved) == "String" and Saved == "__CB_SAVE_ERROR__") {
 				LoggerError("TextSender", "TextSend: clipboard snapshot failed - skipping clipboard injection.")
-				_TextSenderInvokeCallback(Callback)
+				_TextSenderInvokeCallback(Callback, false, "clipboard snapshot failed")
 				return
 			}
 			_TEXT_CLIPBOARD_SESSION_SAVED := Saved
@@ -353,12 +353,16 @@ TextSend(Text, Opts, Callback) {
 		; other OS-level call in this file is defensively guarded) — currently
 		; masked by both production callers' own outer guards, but a contested
 		; low-level hook can still throw here.
+		Ok := true
+		ErrorMessage := ""
 		try
 			_AHK_SendText.Call(Text)
 		catch as Err {
 			LoggerError("TextSender", "TextSend: direct-mode SendText failed: {1}", Err.Message)
+			Ok := false
+			ErrorMessage := Err.Message
 		}
-		_TextSenderInvokeCallback(Callback)
+		_TextSenderInvokeCallback(Callback, Ok, ErrorMessage)
 	}
 }
 

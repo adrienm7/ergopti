@@ -64,12 +64,12 @@ _LAHS_AcceptSuppressesBefore() {
 Test("llm_bridge: LLM_Bridge_OnAccept calls PrefixWatcherSuppress to suppress hotstring observation during inject (llm-autotype-no-hse-suppress)", _LAHS_AcceptSuppressesBefore)
 
 _LAHS_AcceptResetsHSE() {
-	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
-	Assert(Body != "", "LLM_Bridge_OnAccept must exist in modules/keymap/llm_bridge.ahk")
-	Assert(InStr(Body, "HSE_HardReset") > 0,
-		"LLM_Bridge_OnAccept must call HSE_HardReset() after TextSend to clear the stale pre-prediction buffer")
+	Body := _DriverFuncBody("_LLM_Bridge_OnInjectComplete")
+	Assert(Body != "", "_LLM_Bridge_OnInjectComplete must exist in modules/keymap/llm_bridge.ahk")
+	Assert(InStr(Body, "if !Ok") > 0 && InStr(Body, "HSE_HardReset") > 0,
+		"LLM accept must reset HSE only from the successful TextSend completion, never before async output lands")
 }
-Test("llm_bridge: LLM_Bridge_OnAccept calls HSE_HardReset after TextSend to clear stale buffer (llm-autotype-no-hse-suppress)", _LAHS_AcceptResetsHSE)
+Test("llm_bridge: successful LLM inject completion resets HSE after output lands (llm-autotype-no-hse-suppress)", _LAHS_AcceptResetsHSE)
 
 
 
@@ -81,21 +81,17 @@ Test("llm_bridge: LLM_Bridge_OnAccept calls HSE_HardReset after TextSend to clea
 ; ===================================================
 
 _LAHS_InlineAutoTypeSuppresses() {
-	Src := _DriverDirConcat("modules/llm")
-	; Use the unique "inline_last_typed" assignment as anchor — it is the line
-	; immediately before the TextSend in the inline auto-type block.
-	Win := _LAHS_WindowStripped(Src, "inline_last_typed")
-	Assert(Win != "", "inline_last_typed must exist in modules/llm/prediction_engine.ahk")
-	Assert(InStr(Win, "PrefixWatcherSuppress") > 0,
+	Body := _DriverFuncBody("LLM_Engine_OnResults")
+	Assert(Body != "", "LLM_Engine_OnResults must exist in modules/llm/prediction_exec.ahk")
+	Assert(InStr(Body, "PrefixWatcherSuppress") > 0,
 		"LLM_Engine_OnResults inline auto-type must call PrefixWatcherSuppress to mute the hotstring InputHook before TextSend")
 }
 Test("prediction_engine: inline auto-type calls PrefixWatcherSuppress before TextSend (llm-autotype-no-hse-suppress)", _LAHS_InlineAutoTypeSuppresses)
 
 _LAHS_InlineAutoTypeResetsHSE() {
-	Src := _DriverDirConcat("modules/llm")
-	Win := _LAHS_WindowStripped(Src, "inline_last_typed")
-	Assert(Win != "", "inline_last_typed must exist in modules/llm/prediction_engine.ahk")
-	Assert(InStr(Win, "HSE_HardReset") > 0,
-		"LLM_Engine_OnResults inline auto-type must call HSE_HardReset() after TextSend to clear the stale pre-prediction buffer")
+	Body := _DriverFuncBody("LLM_Engine_OnInlineInjectComplete")
+	Assert(Body != "", "LLM_Engine_OnInlineInjectComplete must exist in modules/llm/prediction_exec.ahk")
+	Assert(InStr(Body, "if !Ok") > 0 && InStr(Body, "HSE_HardReset") > 0,
+		"inline auto-type must reset HSE only after successful output completion")
 }
-Test("prediction_engine: inline auto-type calls HSE_HardReset after TextSend (llm-autotype-no-hse-suppress)", _LAHS_InlineAutoTypeResetsHSE)
+Test("prediction_engine: successful inline output completion resets HSE (llm-autotype-no-hse-suppress)", _LAHS_InlineAutoTypeResetsHSE)

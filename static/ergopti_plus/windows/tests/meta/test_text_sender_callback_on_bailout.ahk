@@ -37,18 +37,20 @@ _TSCB_CheckBailoutInvokesCallback(Needle, Label) {
 
 	; The nearest "return" after the bail-out marker must be preceded by a
 	; Callback invocation within the same short window.
-	Window := SubStr(Body, BailPos, 200)
+	; The status-aware callback includes an explicit error string, so retain a
+	; sufficiently local but non-fragile window for the complete bail-out.
+	Window := SubStr(Body, BailPos, 450)
 	ReturnPos := InStr(Window, "return")
 	Assert(ReturnPos > 0, Label . ": bail-out must still return")
 
 	; Routed through _TextSenderInvokeCallback (bare-try-anti-pattern / F52b
 	; fix) instead of a raw "Callback()" call -- that helper is still the
 	; thing that ultimately calls Callback().
-	CallbackPos := InStr(Window, "_TextSenderInvokeCallback(Callback)")
+	CallbackPos := InStr(Window, "_TextSenderInvokeCallback(Callback")
 	Assert(CallbackPos > 0,
-		Label . ": _TextSendClipboard must invoke _TextSenderInvokeCallback(Callback) on this bail-out path -- otherwise a caller whose cleanup depends on the callback (e.g. llm_bridge.ahk's depth-counter guards) leaks forever")
+		Label . ": _TextSendClipboard must invoke the success-aware _TextSenderInvokeCallback on this bail-out path -- otherwise a caller whose cleanup depends on the callback (e.g. llm_bridge.ahk's depth-counter guards) leaks forever")
 	Assert(CallbackPos < ReturnPos,
-		Label . ": _TextSenderInvokeCallback(Callback) must be invoked BEFORE the return, not after")
+		Label . ": _TextSenderInvokeCallback must be invoked BEFORE the return, not after")
 }
 
 Test("text_sender: A_IsSuspended bail-out invokes Callback before returning (textsend-callback-leaked-on-bailout)",

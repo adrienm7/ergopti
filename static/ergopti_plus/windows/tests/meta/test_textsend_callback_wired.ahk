@@ -78,7 +78,7 @@ _TTCW_CallbackAfterPaste() {
 	; Routed through _TextSenderInvokeCallback (bare-try-anti-pattern /
 	; F52b fix) instead of a raw "Callback()" call — that helper is still the
 	; thing that ultimately calls Callback().
-	Assert(InStr(Body, "_TextSenderInvokeCallback(Callback)") > 0,
-		"_TextSendClipboard must call _TextSenderInvokeCallback(Callback) after the paste keystroke")
+	Assert(InStr(Body, "_TextSenderInvokeCallback(Callback") > 0,
+		"_TextSendClipboard must call the success-aware _TextSenderInvokeCallback after the paste keystroke")
 }
 Test("text_sender: _TextSendClipboard invokes Callback after Ctrl+V (not before)", _TTCW_CallbackAfterPaste)

@@ -907,11 +907,6 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 	; to roll back. Letting the variant complete first means one
 	; deterministic SendText burst with a known length.
 	if (is_final and _LLM_Engine.Has("inline_autotype") and _LLM_Engine["inline_autotype"]) {
-		; Delay (ms) before releasing the synthetic flag. The TextSend below is
-		; asynchronous — the injected characters reach the InputHook a few ms
-		; later; clearing inline would re-enable manual observation before the
-		; burst has passed through. Mirrors LLM_Bridge_OnAccept (rule 5.2).
-		static SYNTH_CLEAR_DELAY_MS := 80
 		if (slots.Length > 0) {
 			idx := Max(1, Min(active, slots.Length))
 			text := slots[idx]
@@ -922,7 +917,6 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 					try LoggerInfo("LLM", "Inline auto-type skipped while suspended.")
 					return
 				}
-				_LLM_Engine["inline_last_typed"] := text
 				; Mute the hotstring InputHook so the injected characters do
 				; not re-enter the engine and trigger false hotstring matches.
 				if IsSet(PrefixWatcherSuppress)
@@ -933,27 +927,10 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 				; Without it the model output is recorded as words the human
 				; typed (inflating WPM, polluting n-gram stats).
 				try KL_MarkSynthetic("llm")
-				try {
-					TextSend(text, 0, 0)
-					; Advance the rolling context buffer by the inserted text so the
-					; next keystroke predicts against what the document actually
-					; contains. Without this the engine's context desyncs from the
-					; document and the following prediction runs on stale context.
-					if IsSet(_LLM_Bridge_Buffer)
-						_LLM_Bridge_Buffer .= text
-					; Clear stale HSE and prefix buffers — cursor is now past the
-					; injected text, so accumulated context is no longer valid.
-					if IsSet(HSE_HardReset)
-						try HSE_HardReset()
-					if IsSet(_ResetPrefixBuffer)
-						try _ResetPrefixBuffer()
-				} finally {
-					if IsSet(PrefixWatcherSuppress)
-						SetTimer((*) => PrefixWatcherSuppress(false), -SYNTH_CLEAR_DELAY_MS)
-					; Deferred release so any characters still queued in the OS
-					; message loop are tagged synthetic before observation resumes.
-					SetTimer((*) => KL_ClearSynthetic(), -SYNTH_CLEAR_DELAY_MS)
-				}
+				; Completion is sender-owned: a clipboard-mode injection can return
+				; before Ctrl+V or fail after dispatch, so fixed-delay cleanup would
+				; release synthetic guards and commit context before visible output.
+				TextSend(text, 0, LLM_Engine_OnInlineInjectComplete.Bind(text))
 				; Don't fall through to the tooltip — inline mode owns
 				; the entire UI surface for this prediction.
 				return
@@ -989,6 +966,24 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 	LLM_Tooltip_Show(display_slots, active, is_final)
 	if is_final
 		try LLM_Tooltip_MarkChainComplete()
+}
+
+LLM_Engine_OnInlineInjectComplete(InjectedText, Ok := true, ErrorMessage := "") {
+	global _LLM_Engine, _LLM_Bridge_Buffer
+	try KL_ClearSynthetic()
+	if IsSet(PrefixWatcherSuppress)
+		try PrefixWatcherSuppress(false)
+	if !Ok {
+		try LoggerWarn("LLM", "Inline auto-type was not injected: {1}", ErrorMessage)
+		return
+	}
+	_LLM_Engine["inline_last_typed"] := InjectedText
+	if IsSet(_LLM_Bridge_Buffer)
+		_LLM_Bridge_Buffer .= InjectedText
+	if IsSet(HSE_HardReset)
+		try HSE_HardReset()
+	if IsSet(_ResetPrefixBuffer)
+		try _ResetPrefixBuffer()
 }
 
 _LLM_Engine_ResolveBackendLabel() {
