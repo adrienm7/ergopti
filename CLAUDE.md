@@ -4,6 +4,13 @@ All project rules (language, style, architecture, logging, code quality) are def
 
 @.github/copilot-instructions.md
 
+## Release branch safety
+
+Never run `git push` against `dev` or `main` unless the user explicitly asks
+to push that branch in the current conversation. A push to either branch
+triggers CI and a release; commits must therefore remain local until that
+approval is received.
+
 ## Project memory
 
 Accumulated engineering knowledge — hard-won gotchas, architectural invariants,
