@@ -702,6 +702,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_winorder_unbounded_and_cross_thread.ahk
 #Include meta/test_wpm_push_unguarded_debug_arg_build.ahk
 #Include meta/test_wpm_config_position_pair_validation.ahk
+#Include meta/test_wpm_persistence_transaction.ahk
 #Include meta/test_wpm_ring_buffer_cross_thread_race.ahk
 #Include unit/test_coalesced_job_callbacks_dropped.ahk
 #Include unit/test_count_regex_vs_entry_pattern_divergence.ahk

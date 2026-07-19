@@ -112,39 +112,60 @@ WPMWidget_LoadConfig(Cache) {
         WPMWidget.use_colors, WPMWidget.show_graph)
 }
 
-WPMWidget_SaveVisible() {
+_WPMWidget_SaveBatch(Updates, Operation) {
     global ConfigurationFile
-    val := WPMWidget.visible ? "1" : "0"
-    try TOML_BatchWrite(ConfigurationFile,
-        [{ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: val }])
+    try {
+        if TOML_BatchWrite(ConfigurationFile, Updates)
+            return true
+        LoggerError("WPMWidget", "Could not persist {1}; live widget state was not changed.", Operation)
+    } catch as err {
+        LoggerError("WPMWidget", "Could not persist {1}: {2}; live widget state was not changed.",
+            Operation, err.Message)
+    }
+    return false
 }
 
-WPMWidget_SavePosition() {
-    global ConfigurationFile
-    try TOML_BatchWrite(ConfigurationFile, [
-        { Section: "ahk.metrics", Key: WPMWidgetConst.CFG_X, Value: String(WPMWidget.pos_x) },
-        { Section: "ahk.metrics", Key: WPMWidgetConst.CFG_Y, Value: String(WPMWidget.pos_y) },
-    ])
+WPMWidget_SaveVisible(Visible := unset) {
+    TargetVisible := IsSet(Visible) ? !!Visible : WPMWidget.visible
+    return _WPMWidget_SaveBatch([
+        { Section: "ahk.metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: TargetVisible ? "1" : "0" },
+    ], "widget visibility")
+}
+
+WPMWidget_SavePosition(X := unset, Y := unset) {
+    TargetX := IsSet(X) ? X : WPMWidget.pos_x
+    TargetY := IsSet(Y) ? Y : WPMWidget.pos_y
+    return _WPMWidget_SaveBatch([
+        { Section: "ahk.metrics", Key: WPMWidgetConst.CFG_X, Value: String(TargetX) },
+        { Section: "ahk.metrics", Key: WPMWidgetConst.CFG_Y, Value: String(TargetY) },
+    ], "widget position")
 }
 
 ; Resets the widget to its default bottom-right position and saves it to config.
 WPMWidget_ResetPosition() {
     WPMWidget_DefaultPos(&def_x, &def_y)
+    if !WPMWidget_SavePosition(def_x, def_y)
+        return false
     WPMWidget.pos_x := def_x
     WPMWidget.pos_y := def_y
-    WPMWidget_SavePosition()
     if WPMWidget.visible {
         WPMWidget_ShowPos(&show_x, &show_y)
         gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
         if gui_ref
             try gui_ref.Move(show_x, show_y)
     }
+    return true
 }
 
-WPMWidget_SaveConfig() {
-    global ConfigurationFile
-    try TOML_BatchWrite(ConfigurationFile, [
-        { Section: "ahk.metrics", Key: WPMWidgetConst.CFG_COLORS, Value: WPMWidget.use_colors ? "1" : "0" },
-        { Section: "ahk.metrics", Key: WPMWidgetConst.CFG_GRAPH,  Value: WPMWidget.show_graph  ? "1" : "0" },
-    ])
+WPMWidget_SaveConfig(Colors := unset, Graph := unset, X := unset, Y := unset) {
+    TargetColors := IsSet(Colors) ? !!Colors : WPMWidget.use_colors
+    TargetGraph := IsSet(Graph) ? !!Graph : WPMWidget.show_graph
+    TargetX := IsSet(X) ? X : WPMWidget.pos_x
+    TargetY := IsSet(Y) ? Y : WPMWidget.pos_y
+    return _WPMWidget_SaveBatch([
+        { Section: "ahk.metrics", Key: WPMWidgetConst.CFG_COLORS, Value: TargetColors ? "1" : "0" },
+        { Section: "ahk.metrics", Key: WPMWidgetConst.CFG_GRAPH,  Value: TargetGraph  ? "1" : "0" },
+        { Section: "ahk.metrics", Key: WPMWidgetConst.CFG_X,      Value: String(TargetX) },
+        { Section: "ahk.metrics", Key: WPMWidgetConst.CFG_Y,      Value: String(TargetY) },
+    ], "widget display settings")
 }
