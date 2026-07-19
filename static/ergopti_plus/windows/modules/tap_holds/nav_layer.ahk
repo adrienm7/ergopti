@@ -56,7 +56,7 @@ SC03A:: {
     _LAltIsBackspaceLayer()
     and LayerEnabled
 )
-SC038:: TextPressKey("LAlt", "Up") ; Necessary to do this, otherwise multicursor trigger in VSCode when scrolling in the layer and then leaving it
+SC038:: TapHoldSyntheticKeyUp("LAlt") ; Necessary to do this, otherwise multicursor trigger in VSCode when scrolling in the layer and then leaving it
 #HotIf
 
 ; Fix when Space triggers the layer

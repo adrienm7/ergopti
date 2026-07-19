@@ -186,13 +186,13 @@ _SpaceHoldWithModifier(captured) {
 		_SpaceTapOrDispatch()
 		return
 	}
-	TextPressKey(ModKey, "Down")
+	TapHoldSyntheticKeyDown(ModKey)
 	try {
 		if (captured != "" and captured != " ")
 			_SpaceSendWithModifiers(captured, ModKey)
 		KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
-		TextPressKey(ModKey, "Up")
+		TapHoldSyntheticKeyUp(ModKey)
 	}
 }
 

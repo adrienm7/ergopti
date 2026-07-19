@@ -12,7 +12,7 @@ _SHEG_AssertSpaceHoldTryGuard() {
 	Assert(SendBody != "", "_SpaceSendWithModifiers must exist in space.ahk")
 	Assert(RegExMatch(HoldBody, "try\s*\{[\s\S]*_SpaceSendWithModifiers\(captured, ModKey\)") > 0,
 		"_SpaceHoldWithModifier must protect the dynamic send in a try block (space-hold-exception-guard)")
-	Assert(RegExMatch(HoldBody, "finally\s*\{[\s\S]*TextPressKey\(ModKey, " . Q . "Up" . Q . "\)") > 0,
+	Assert(RegExMatch(HoldBody, "finally\s*\{[\s\S]*TapHoldSyntheticKeyUp\(ModKey\)") > 0,
 		"_SpaceHoldWithModifier must always release its modifier in finally (space-hold-exception-guard)")
 	Assert(InStr(SendBody, 'RegExReplace(captured, "([!#^+{}])", "{$1}")') > 0,
 		"_SpaceSendWithModifiers must escape characters before SendInput (space-hold-exception-guard)")

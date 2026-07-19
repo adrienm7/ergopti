@@ -81,6 +81,11 @@ TapHoldsLoadTimings() {
 ; Track-tap-hold key state so a wheel/trackpad event can cancel a tap action.
 ; Key map intentionally only includes tap-hold keys exposed by Ergopti+.
 global _TH_TapHoldTrackState := Map()
+; Synthetic modifiers armed before a KeyWait must be released immediately when
+; Suspend occurs. Native Suspend disarms the next hotkey but does not stop the
+; already-running KeyWait pseudo-thread, so its normal finally can be seconds
+; too late and the synthetic modifier would alter physical input while paused.
+global _TH_SyntheticHeldKeys := Map()
 global _TH_TapHoldVkToKeyId := Map(
 	0x1B, "escape",
 	0x09, "tab",
@@ -279,11 +284,68 @@ TapHoldShouldCancelTap(KeyId, GuardMs := 250) {
 TapHoldShouldSuppressHold(KeyId, GuardMs := 250) {
 	global _TH_LastTapHoldCancelReason
 	CancelReason := TapHoldShouldCancelTap(KeyId, GuardMs)
+	; A KeyWait started before Suspend keeps its pseudo-thread alive even though
+	; native Suspend disarms the hotkey that started it.  Every generic
+	; hold-modifier branch calls this helper immediately before injecting its
+	; synthetic modifier, so make the suspension transition an explicit
+	; cancellation reason here rather than allowing a stale candidate to arm a
+	; modifier after the driver has promised to be inert.
+	if A_IsSuspended {
+		_TH_LastTapHoldCancelReason := "driver suspended during hold"
+		try LoggerDebug("TapHoldTrack", "Hold suppressed for '{1}' because the driver was suspended during its KeyWait.", KeyId)
+		return true
+	}
 	if (CancelReason != "") {
 		try LoggerDebug("TapHoldTrack", "Hold suppressed for '{1}' ({2}, guard={3}ms).", KeyId, CancelReason, GuardMs)
 		return true
 	}
 	return false
+}
+
+; Acquire/release synthetic keys whose lifetime crosses a KeyWait. Reference
+; counting keeps independently overlapping tap-hold branches from releasing a
+; key another branch still owns; the physical Send happens only on the 0->1 and
+; 1->0 transitions.
+TapHoldSyntheticKeyDown(Key) {
+	global _TH_SyntheticHeldKeys
+	if A_IsSuspended {
+		try LoggerDebug("TapHoldDispatch", "Not arming synthetic '{1}' while the driver is suspended.", Key)
+		return false
+	}
+	Count := _TH_SyntheticHeldKeys.Has(Key) ? _TH_SyntheticHeldKeys[Key] : 0
+	_TH_SyntheticHeldKeys[Key] := Count + 1
+	if (Count = 0)
+		TextPressKey(Key, "Down")
+	return true
+}
+
+TapHoldSyntheticKeyUp(Key) {
+	global _TH_SyntheticHeldKeys
+	if !_TH_SyntheticHeldKeys.Has(Key) {
+		; A suspend cleanup may already have released the key. Keep the ordinary
+		; finally path idempotent so it can still balance any direct Send failure.
+		TextPressKey(Key, "Up")
+		return true
+	}
+	Count := _TH_SyntheticHeldKeys[Key] - 1
+	if (Count > 0) {
+		_TH_SyntheticHeldKeys[Key] := Count
+		return true
+	}
+	_TH_SyntheticHeldKeys.Delete(Key)
+	TextPressKey(Key, "Up")
+	return true
+}
+
+TapHoldReleaseSyntheticKeys() {
+	global _TH_SyntheticHeldKeys
+	Keys := []
+	for Key in _TH_SyntheticHeldKeys
+		Keys.Push(Key)
+	_TH_SyntheticHeldKeys := Map()
+	for Key in Keys {
+		try TextPressKey(Key, "Up")
+	}
 }
 
 ; Remove tracked state for a key once tap resolution has completed.
