@@ -90,8 +90,8 @@ _TSCT_TextSendDefersClipboardWork() {
 		"TextSend must NOT call ClipWait inline - blocking the keyboard thread starves the low-level hook and drops keystrokes; defer the clipboard round-trip onto a timer")
 	Assert(InStr(Body, "SetTimer") > 0,
 		"TextSend clipboard branch must schedule the round-trip via SetTimer so the input-gating thread returns at once")
-	Assert(InStr(Body, "_TextSendClipboard") > 0,
-		"TextSend must delegate the clipboard round-trip to the deferred _TextSendClipboard helper")
+	Assert(InStr(Body, "_TextSenderStartClipboard") > 0,
+		"TextSend must delegate clipboard work to the deferred FIFO worker so the keyboard thread returns at once")
 }
 Test("text_sender: TextSend defers clipboard work off the keyboard thread (textsend-clipboard-blocks-and-races)", _TSCT_TextSendDefersClipboardWork)
 
@@ -187,6 +187,8 @@ _TSCT_ClipboardRequestsAreFifoSerialized() {
 		"TextSend must snapshot the user clipboard only at the start of an empty FIFO session")
 	Assert(InStr(StartBody, "_TEXT_CLIPBOARD_QUEUE.RemoveAt(1)") > 0 and InStr(StartBody, "_TEXT_CLIPBOARD_BUSY := true") > 0,
 		"the worker must claim one FIFO request before performing clipboard I/O")
+	Assert(InStr(StartBody, "_TextSendClipboard(Request.Text") > 0,
+		"only the FIFO worker may invoke the clipboard round-trip helper")
 	Assert(InStr(FinishBody, "_TEXT_CLIPBOARD_BUSY := false") > 0 and InStr(FinishBody, "SetTimer(_TextSenderStartClipboard, -1)") > 0,
 		"only completion after the restore window may start the next clipboard request")
 }
