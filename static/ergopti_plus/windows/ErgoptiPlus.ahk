@@ -577,6 +577,12 @@ EnsurePersonalShortcutsFile(Path) {
     if FileWasCreated or !StubMatches {
         try LoggerInfo("ErgoptiPlus", "Reloading to pick up freshly-written personal shortcuts chain.")
         Reload
+        ; Reload starts the replacement instance but returns to this
+        ; auto-execute thread. Continuing would register the old instance's
+        ; hooks/layout beside the replacement for one scheduling window.
+        ; Exit immediately: native input remains available until the new
+        ; process is ready, but there is never two owners of the keyboard.
+        ExitApp(0)
     }
 }
 
