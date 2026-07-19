@@ -546,7 +546,7 @@ KLWV_PushPrefetch(which) {
     log := _ConfigDir . _AhkSubDir . "logs\webview.log"
     if !KLWV.windows.Has(which) {
         try FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): no window`r`n", log, "UTF-8")
-        return
+        return false
     }
     ; Prefer the in-memory JSON cache populated by KLPF_BuildAndWrite —
     ; saves a 300 KB FileRead per push. Fall back to disk if the cache is
@@ -560,23 +560,26 @@ KLWV_PushPrefetch(which) {
         if !FileExist(path) {
             try FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): prefetch.json missing at " . path . "`r`n",
                 log, "UTF-8")
-            return
+            return false
         }
         try body := FileRead(path, "UTF-8")
         catch as err {
             try LoggerError("Keylogger", "KLWV_PushPrefetch: cannot read '{1}': {2}", path, err.Message)
-            return
+            return false
         }
     }
     if (body = "")
-        return
+        return false
     msg := '{"type":"prefetch","blob":' . body . '}'
     entry := KLWV.windows[which]
     try {
         entry["webview"].PostWebMessageAsString(msg)
         FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): pushed " . StrLen(msg) . " bytes`r`n", log, "UTF-8")
+        return true
     } catch as err {
         FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): FAIL " . err.Message . "`r`n", log, "UTF-8")
+        try LoggerError("Keylogger", "KLWV_PushPrefetch: dashboard delivery failed for '{1}': {2}", which, err.Message)
+        return false
     }
 }
 
@@ -660,13 +663,14 @@ KLWV_DelayedFirstPush(which, Epoch) {
     need_manifest_build := !IsSet(KLPF_LAST_JSON) || !KLPF_LAST_JSON.Has(which)
     if need_manifest_build && KLWV.metrics_dir && KLRCache.db
         try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , "manifest")
-    KLWV_PushPrefetch(which)
+    FirstPaintOk := KLWV_PushPrefetch(which)
     ; Mark first paint done so live ticks can fan out from now on.
-    if KLWV.windows.Has(which)
+    if FirstPaintOk && KLWV_IsCurrent(which, Epoch)
         KLWV.windows[which]["first_paint_done"] := true
     ; Phase 2 — full historical build in a deferred timer (2 s later).
     ; Provides the historical n-gram tables without blocking the first paint.
-	SetTimer(KLWV_DelayedFullBuild.Bind(which, Epoch), -2000)
+    if FirstPaintOk
+		SetTimer(KLWV_DelayedFullBuild.Bind(which, Epoch), -2000)
 }
 
 KLWV_DelayedFullBuild(which, Epoch) {
