@@ -98,3 +98,24 @@ _SAR_RegionCaptureNoBlockingWait() {
                 "region screenshot must hand selection tracking to an epoch-bound timer")
 }
 Test("Gesture screenshot: region save defers selection and PowerShell (gesture-region-async)", _SAR_RegionCaptureNoBlockingWait)
+
+_SAR_DirectCaptureConfirmsOutputBeforeSuccess() {
+	CaptureBody := _DriverFuncBody("GestureCaptureRegion")
+	PollBody := _DriverFuncBody("GestureDirectCapturePoll")
+	CompleteBody := _DriverFuncBody("GestureScreenshotComplete")
+	WindowBody := _DriverFuncBody("GestureScreenshotWindow")
+	Assert(InStr(CaptureBody, "Run(") > 0 and InStr(CaptureBody, "&Pid)") > 0
+		and InStr(CaptureBody, "_GestureDirectCaptures[Epoch]") > 0
+		and InStr(CaptureBody, "SetTimer(GestureDirectCapturePoll.Bind(Epoch)") > 0,
+		"direct screenshot capture must retain its worker identity and defer completion; a successful Run only proves process launch")
+	Assert(InStr(PollBody, 'ProcessExist(State["pid"])') > 0
+		and InStr(PollBody, 'FileExist(State["path"])') > 0
+		and InStr(PollBody, 'CB_GetSequenceNumber() != State["clipboard_sequence"]') > 0
+		and InStr(PollBody, "CB_HasImage()") > 0,
+		"completion must require a terminated worker plus a save-file or new image clipboard postcondition")
+	Assert(InStr(CompleteBody, "if !Ok") > 0 and InStr(CompleteBody, "LoggerSuccess") > 0,
+		"only the confirmed completion callback may emit screenshot success")
+	Assert(InStr(WindowBody, "LoggerSuccess") = 0,
+		"window screenshot action must not report success synchronously after starting PowerShell")
+}
+Test("Gesture screenshot: direct capture confirms output before success (screenshot-launch-is-not-success)", _SAR_DirectCaptureConfirmsOutputBeforeSuccess)
