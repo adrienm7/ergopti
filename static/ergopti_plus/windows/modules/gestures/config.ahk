@@ -237,8 +237,11 @@ GestureRestartTouchpadDevice() {
         . "}"
 
     try {
-        RunWait('*RunAs powershell.exe -NoProfile -WindowStyle Hidden -Command "' . PsCmd . '"', , "Hide")
-        LoggerSuccess("gestures", "Touchpad device restarted — driver reloaded.")
+        ; A UAC-approved PnP restart can take tens of seconds.  Launch it and
+        ; return to the message pump immediately: RunWait here stalls every
+        ; hook, timer, and tray callback on the single AHK thread.
+        Run('*RunAs powershell.exe -NoProfile -WindowStyle Hidden -Command "' . PsCmd . '"', , "Hide", &RestartPid)
+        LoggerSuccess("gestures", "Touchpad restart command launched (PID {1}).", RestartPid)
     } catch as e {
         LoggerError("gestures", "Failed to restart touchpad device: {1}.", e.Message)
     }
