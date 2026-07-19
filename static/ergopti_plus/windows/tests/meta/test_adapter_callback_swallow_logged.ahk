@@ -46,21 +46,21 @@ _MetaTextSenderNoBareCallbackSites() {
 
 	Occurrences := 0, SearchFrom := 1
 	loop {
-		Pos := InStr(Body1, "_TextSenderInvokeCallback(Callback)", , SearchFrom)
+		Pos := InStr(Body1, "_TextSenderInvokeCallback(Callback", , SearchFrom)
 		if !Pos
 			break
 		Occurrences++
 		SearchFrom := Pos + 1
 	}
 	Assert(Occurrences >= 4,
-		"_TextSendClipboard must call _TextSenderInvokeCallback(Callback) at all 4 of its bail-out/completion sites, got " . Occurrences)
+		"_TextSendClipboard must call the success-aware _TextSenderInvokeCallback at all 4 of its bail-out/completion sites, got " . Occurrences)
 
 	Body2 := _DriverFuncBody("TextSend")
 	Assert(Body2 != "", "TextSend must exist")
 	Assert(!InStr(Body2, "try Callback()"),
 		"TextSend's direct-mode branch must route its completion callback through _TextSenderInvokeCallback, not a bare try Callback()")
-	Assert(InStr(Body2, "_TextSenderInvokeCallback(Callback)") > 0,
-		"TextSend's direct-mode branch must call _TextSenderInvokeCallback(Callback)")
+	Assert(InStr(Body2, "_TextSenderInvokeCallback(Callback") > 0,
+		"TextSend's direct-mode branch must call the success-aware _TextSenderInvokeCallback")
 }
 Test("text_sender: no bare 'try Callback()' sites remain in _TextSendClipboard/TextSend", _MetaTextSenderNoBareCallbackSites)
 

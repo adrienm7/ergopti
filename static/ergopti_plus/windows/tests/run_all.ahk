@@ -788,6 +788,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_menu_manifest_lifecycle_pair.ahk
 #Include meta/test_editor_persist_before_publish.ahk
 #Include meta/test_keylogger_webview_epoch.ahk
+#Include unit/test_text_sender_completion_status.ahk
 #Include meta/test_deadkey_unmapped_base_char.ahk
 #Include meta/test_savefullconfig_no_delete.ahk
 #Include meta/test_keylogger_scan_max_id_tail.ahk

@@ -615,12 +615,6 @@ LLM_Bridge_OnAccept(text) {
 	_threw := false
 	try {
 		TextSend(text, 0, _InjectCallback)
-		; Clear the stale pre-prediction HSE and prefix buffers — the cursor is
-		; now past the injected text, so accumulated context is no longer valid.
-		if IsSet(HSE_HardReset)
-			try HSE_HardReset()
-		if IsSet(_ResetPrefixBuffer)
-			try _ResetPrefixBuffer()
 	} catch as AcceptError {
 		; TextSend threw before the callback could run — arm the finally release
 		_threw := true
@@ -634,24 +628,6 @@ LLM_Bridge_OnAccept(text) {
 				try PrefixWatcherSuppress(false)
 		}
 	}
-	_LLM_Bridge_Buffer .= text
-	; Audit event — pairs with the llm_suggested event the engine emitted
-	; when the tooltip first rendered. The pair lets a log tail compute
-	; "accepted / suggested" ratios per app / per model. We log the
-	; PROCESS NAME (not the window title) so per-app grouping is stable:
-	; window titles change as documents change (``Doc1 — Word``) but the
-	; process name (``WINWORD.EXE``) does not.
-	try {
-		app_name := ""
-		try app_name := WIGetFocused()["appId"]
-		slots := LLM_Tooltip_GetSlots()
-		idx   := LLM_Tooltip_GetActiveIdx()
-		KL_LogLlmAccepted(text, app_name, slots, idx)
-	}
-	; Pass accepted=true so the tooltip's own hide path doesn't also emit
-	; an ``llm_dismissed`` event — we'd double-count this suggestion as
-	; both accepted AND dismissed.
-	LLM_Tooltip_Hide(true)
 }
 
 ; Invoked by TextSend after all keystrokes for an accepted/injected prediction
@@ -659,10 +635,24 @@ LLM_Bridge_OnAccept(text) {
 ; suppression that were armed in LLM_Bridge_OnAccept before injection, and
 ; resyncs the LSC ring to the trailing characters of the injected text.
 ; @param {string} InjectedText - The prediction text that was injected.
-_LLM_Bridge_OnInjectComplete(InjectedText, *) {
+_LLM_Bridge_OnInjectComplete(InjectedText, Ok := true, ErrorMessage := "") {
 	try KL_ClearSynthetic()
 	if IsSet(PrefixWatcherSuppress)
 		try PrefixWatcherSuppress(false)
+	if !Ok {
+		try LoggerWarn("LLM", "Prediction acceptance was not injected: {1}", ErrorMessage)
+		return
+	}
+	global _LLM_Bridge_Buffer
+	; Commit every visible/UI state transition only after the matching sender has
+	; confirmed the paste/SendText operation. A long clipboard send returns from
+	; TextSend before Ctrl+V, so committing in OnAccept used to hide a suggestion
+	; and advance context even when the output was later cancelled or failed.
+	_LLM_Bridge_Buffer .= InjectedText
+	if IsSet(HSE_HardReset)
+		try HSE_HardReset()
+	if IsSet(_ResetPrefixBuffer)
+		try _ResetPrefixBuffer()
 	; Resync the last-sent-character ring so dead-key and ellipsis consumers
 	; see the prediction's tail rather than pre-prediction characters.
 	if IsSet(_LSCResetFrom) {
@@ -672,4 +662,12 @@ _LLM_Bridge_OnInjectComplete(InjectedText, *) {
 			Tail.Push(SubStr(InjectedText, StrLen(InjectedText) - N + A_Index, 1))
 		try _LSCResetFrom(Tail)
 	}
+	try {
+		app_name := ""
+		try app_name := WIGetFocused()["appId"]
+		slots := LLM_Tooltip_GetSlots()
+		idx := LLM_Tooltip_GetActiveIdx()
+		KL_LogLlmAccepted(InjectedText, app_name, slots, idx)
+	}
+	LLM_Tooltip_Hide(true)
 }

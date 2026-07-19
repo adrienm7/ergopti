@@ -4,7 +4,7 @@
 Test_LLMInlineAutotypeChecksSuspendBeforeTextSend() {
 	Body := _DriverFuncBody("LLM_Engine_OnResults")
 	SuspendPos := InStr(Body, "if A_IsSuspended")
-	TextSendPos := InStr(Body, "TextSend(text, 0, 0)")
+	TextSendPos := InStr(Body, "TextSend(text, 0, LLM_Engine_OnInlineInjectComplete.Bind(text))")
 	Assert(SuspendPos > 0 and TextSendPos > 0 and SuspendPos < TextSendPos,
 		"inline auto-type must reject a suspended result before TextSend")
 }

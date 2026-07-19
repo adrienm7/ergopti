@@ -103,6 +103,26 @@ _LICC_CheckNoFixedTimerForClear() {
 		"LLM_Bridge_OnAccept must not use a fixed SetTimer for KL_ClearSynthetic — use injection callback instead")
 }
 
+_LICC_OutputStateCommitsOnlyOnSuccessfulCompletion() {
+	Accept := _DriverFuncBody("LLM_Bridge_OnAccept")
+	Complete := _DriverFuncBody("_LLM_Bridge_OnInjectComplete")
+	Inline := _DriverFuncBody("LLM_Engine_OnResults")
+	InlineComplete := _DriverFuncBody("LLM_Engine_OnInlineInjectComplete")
+	Sender := _DriverFuncBody("_TextSenderInvokeCallback")
+
+	Assert(InStr(Accept, "_LLM_Bridge_Buffer .= text") = 0 && InStr(Accept, "LLM_Tooltip_Hide(true)") = 0,
+		"LLM_Bridge_OnAccept must not hide/commit state before an async TextSend completes")
+	Assert(InStr(Complete, "if !Ok") > 0 && InStr(Complete, "_LLM_Bridge_Buffer .= InjectedText") > 0
+			&& InStr(Complete, "LLM_Tooltip_Hide(true)") > 0,
+		"accepted prediction state must commit only in the successful sender completion branch")
+	Assert(InStr(Sender, "Callback(Ok, ErrorMessage)") > 0,
+		"TextSender callback contract must report whether output was actually injected")
+	Assert(InStr(Inline, "TextSend(text, 0, LLM_Engine_OnInlineInjectComplete.Bind(text))") > 0,
+		"inline auto-type must use sender completion instead of a fixed cleanup delay")
+	Assert(InStr(Inline, "SYNTH_CLEAR_DELAY_MS") = 0 && InStr(InlineComplete, "if !Ok") > 0,
+		"inline auto-type must release/commit from success-aware completion, never a fixed timer")
+}
+
 
 Test("meta llm-inject-callback: LLM_Bridge_OnAccept passes inject-complete callback to TextSend",
 	_LICC_CheckCallbackWired)
@@ -112,3 +132,5 @@ Test("meta llm-inject-callback: _LLM_Bridge_OnInjectComplete clears synthetic fl
 
 Test("meta llm-inject-callback: LLM_Bridge_OnAccept does not use fixed-delay SetTimer for KL_ClearSynthetic",
 	_LICC_CheckNoFixedTimerForClear)
+Test("meta llm-inject-callback: output state commits only after successful sender completion",
+	_LICC_OutputStateCommitsOnlyOnSuccessfulCompletion)
