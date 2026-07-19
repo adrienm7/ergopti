@@ -6,15 +6,16 @@ _HPSP_PhysicalInputBypassesSyntheticSuppress() {
     Engine := _DriverFuncBody("HSE_FeedChar")
     Backspace := _DriverFuncBody("HSE_FeedBackspace")
     Reset := _DriverFuncBody("HSE_FeedReset")
-    Hook := _DriverFuncBody("_OnPrefixChar")
+    CharHook := _DriverFuncBody("_OnPrefixChar")
+    KeyDownHook := _DriverFuncBody("_OnPrefixKeyDown")
     Assert(InStr(Engine, "IsPhysical := false") > 0, "HSE_FeedChar must carry explicit event provenance")
     Assert(InStr(Engine, "HSE_Suppressed and !IsPhysical") > 0, "synthetic suppression must not reject physical input")
-    Assert(InStr(Hook, "HSE_FeedChar(Char, true)") > 0, "InputHook must mark observed input physical")
+    Assert(InStr(CharHook, "HSE_FeedChar(Char, true)") > 0, "InputHook OnChar must mark observed input physical")
     Assert(InStr(Backspace, "IsPhysical := false") > 0 && InStr(Backspace, "HSE_Suppressed and !IsPhysical") > 0,
         "HSE_FeedBackspace must preserve physical backspaces during synthetic suppression")
-    Assert(InStr(Hook, "HSE_FeedBackspace(true)") > 0, "InputHook keydown must mark Backspace physical")
+    Assert(InStr(KeyDownHook, "HSE_FeedBackspace(true)") > 0, "InputHook keydown must mark Backspace physical")
     Assert(InStr(Reset, "IsPhysical := false") > 0 && InStr(Reset, "HSE_Suppressed and !IsPhysical") > 0,
         "HSE_FeedReset must preserve physical navigation resets during synthetic suppression")
-    Assert(InStr(Hook, "HSE_FeedReset(true, true)") > 0, "InputHook navigation resets must carry physical provenance")
+    Assert(InStr(KeyDownHook, "HSE_FeedReset(true, true)") > 0, "InputHook navigation resets must carry physical provenance")
 }
 Test("HSE: physical input bypasses synthetic suppression by provenance", _HPSP_PhysicalInputBypassesSyntheticSuppress)

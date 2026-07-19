@@ -7,8 +7,8 @@ Test_HSE_PhysicalInputIsNotDroppedByOutputGuard() {
 	Suppress := _DriverFuncBody("PrefixWatcherSuppress")
 	Assert(InStr(StartHook, 'InputHook("V L0 I1")') > 0,
 		"prefix watcher must use InputHook I1 to distinguish low-level synthetic output")
-	Assert(InStr(OnChar, "if HSE_Suppressed") > 0,
-		"OnChar may guard only explicit engine suppression")
+	Assert(InStr(OnChar, "HSE_FeedChar(Char, true)") > 0,
+		"OnChar must pass physical-event provenance to the engine instead of applying a time-based guard")
 	Assert(InStr(OnChar, "_PrefixWatcherSuppressed or HSE_Suppressed") == 0,
 		"a physical character must not be dropped by the time-based prefix guard")
 	Assert(InStr(Suppress, "HSE_Suppress(YesNo)") == 0,
