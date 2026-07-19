@@ -186,26 +186,28 @@ SendInstant(Text) {
 ; Commit any pending end-char hotstring before the next symbol is emitted.
 ; The space/backspace dance pokes the engine: the injected space round-trips
 ; through the prefix-watcher InputHook, fires any end-char-gated trigger, then
-; the backspace removes it. The Sleep gives the OS message loop time to deliver
-; the space's char event to the InputHook before the backspace lands.
+; the backspace removes it. SendEvent delivers the synthetic char during this
+; call; yielding with Sleep here let a physical key land between the two sends.
 ;
 ; That Sleep parks the keyboard dispatch thread for ACTIVATE_HOTSTRINGS_DELAY_MS
 ; on EVERY Shift French-punctuation key — a hot, default key set. Gate the whole
 ; dance on there actually being a pending abbreviation in the engine buffer: when
 ; HSE_Buffer is empty (the common case — punctuation typed at a word boundary or
 ; after a space) there is nothing to commit, so we skip the space/backspace pair
-; AND its blocking Sleep entirely. IsSet guards the load order: the engine buffer
+; AND its former blocking delay entirely. IsSet guards the load order: the engine buffer
 ; global lives in hotstring_engine_main.ahk, included alongside this file.
 ActivateHotstrings() {
-    ; Nothing to flush — no pending abbreviation, so skip the costly poke + Sleep.
+    ; Nothing to flush — no pending abbreviation, so skip the costly poke.
     if (IsSet(HSE_Buffer) and HSE_Buffer == "") {
         return
     }
-    SendNewResult(" ")
-    if !_SendHook {
-        Sleep(ACTIVATE_HOTSTRINGS_DELAY_MS)
+    previous_critical := Critical("On")
+    try {
+        SendNewResult(" ")
+        SendNewResult("{BackSpace}", False)
+    } finally {
+        Critical(previous_critical)
     }
-    SendNewResult("{BackSpace}", False)
 }
 
 GetSelection() {
