@@ -12,6 +12,13 @@
 ; reader functions (hoisted) stay available to their boot call sites.
 ; ==============================================================================
 
+; feature_state.ahk is syntax-validated on its own as well as included after
+; boot.ahk.  Do not dereference boot-owned path globals while constructing the
+; declaration: their empty standalone values are harmless and the real driver
+; has assigned both before this file executes.
+global _FeatureStateConfigDir := IsSet(_ConfigDir) ? _ConfigDir : ""
+global _FeatureStateAhkSubDir := IsSet(_AhkSubDir) ? _AhkSubDir : ""
+
 global ScriptInformation := Map(
     "MagicKey", "★",
     ; Scancode and QWERTY character of the physical key remapped to ★.
@@ -32,10 +39,10 @@ global ScriptInformation := Map(
     ; the folder can be safely shared with the Hammerspoon driver via cloud
     ; sync. Shared neutral files (hotstrings TOML, personal info) stay
     ; at the root of _ConfigDir.
-    "PersonalAhkPath", _ConfigDir . _AhkSubDir . "personal_shortcuts.ahk",
-    "PersonalTomlPath", _ConfigDir . "hotstrings\personal_hotstrings.toml",
-    "PersonalHotstringsDir", _ConfigDir . "hotstrings\",
-    "PersonalInfoTomlPath", _ConfigDir . "personal_info.toml",
+    "PersonalAhkPath", _FeatureStateConfigDir . _FeatureStateAhkSubDir . "personal_shortcuts.ahk",
+    "PersonalTomlPath", _FeatureStateConfigDir . "hotstrings\personal_hotstrings.toml",
+    "PersonalHotstringsDir", _FeatureStateConfigDir . "hotstrings\",
+    "PersonalInfoTomlPath", _FeatureStateConfigDir . "personal_info.toml",
 )
 
 ; Script-management hotkey slots. Each AltGr+key combo dispatches to an action
@@ -70,8 +77,8 @@ global SCRIPT_SHORTCUT_FALLBACKS := Map(
     "script_altgr_escape", "{Escape}",
 )
 global ScriptShortcutAssignments := Map()
-for _, _Slot in SCRIPT_SHORTCUT_SLOTS {
-    ScriptShortcutAssignments[_Slot] := SCRIPT_SHORTCUT_DEFAULTS[_Slot]
+for _FeatureStateIndex, _FeatureStateSlot in SCRIPT_SHORTCUT_SLOTS {
+    ScriptShortcutAssignments[_FeatureStateSlot] := SCRIPT_SHORTCUT_DEFAULTS[_FeatureStateSlot]
 }
 
 ; Configurable keyboard shortcuts — Ctrl/Win/Alt × a-z, 0-9 and special keys.
