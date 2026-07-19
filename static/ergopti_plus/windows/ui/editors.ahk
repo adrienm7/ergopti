@@ -31,13 +31,26 @@ _MagicKeyEditorClose(IH, GuiToClose, *) {
     try IH.Stop()
 }
 
+_EditorWriteToml(Value, Path, Section, Key) {
+    try {
+        if TOML_Write(Value, Path, Section, Key)
+            return true
+    } catch as e {
+        try LoggerError("Editors", "Could not persist {1}.{2}: {3}", Section, Key, e.Message)
+    }
+    try LoggerError("Editors", "Could not persist {1}.{2}; live state was left unchanged.", Section, Key)
+    MsgBox(t("onboarding.error.write_failed"), t("editor.hotstrings.save_error"), "Icon!")
+    return false
+}
+
 ModifyMagicKey(gui, NewValue) {
     global ScriptInformation, Features, ConfigurationFile
+    if !_EditorWriteToml(NewValue, ConfigurationFile, "hotstrings", "trigger_char")
+        return false
     ScriptInformation["MagicKey"] := NewValue
     if IsSet(Features) and Features.Has("hotstrings") {
         Features["hotstrings"]["trigger_char"] := NewValue
     }
-    TOML_Write(NewValue, ConfigurationFile, "hotstrings", "trigger_char")
     if (gui != 0)
         gui.Destroy()
     Reload
@@ -45,11 +58,13 @@ ModifyMagicKey(gui, NewValue) {
 
 ToggleRepeatKeyEnabled(*) {
     global HSE_RepeatEnabled, Features, ConfigurationFile
-    HSE_RepeatEnabled := !HSE_RepeatEnabled
+    Candidate := !HSE_RepeatEnabled
+    if !_EditorWriteToml(Candidate, ConfigurationFile, "hotstrings", "repeat_key_enabled")
+        return false
+    HSE_RepeatEnabled := Candidate
     if IsSet(Features) and Features.Has("hotstrings") {
         Features["hotstrings"]["repeat_key_enabled"] := HSE_RepeatEnabled
     }
-    TOML_Write(HSE_RepeatEnabled, ConfigurationFile, "hotstrings", "repeat_key_enabled")
     ; No Reload: the repeat key is a pure runtime flag the engine reads live
     ; (HSE_TryRepeatKey checks HSE_RepeatEnabled on every keystroke). Just
     ; rebuild the tray so the checkmark reflects the new state.
@@ -117,10 +132,11 @@ GPTLinkEditor(*) {
 
 ModifyLink(gui, NewValue) {
     global Features, ConfigurationFile
+    if !_EditorWriteToml(NewValue, ConfigurationFile, "ahk.shortcuts.gpt", "link")
+        return false
     if IsSet(Features) and Features.Has("shortcuts") and Features["shortcuts"].Has("gpt") {
         Features["shortcuts"]["gpt"]["link"] := NewValue
     }
-    TOML_Write(NewValue, ConfigurationFile, "ahk.shortcuts.gpt", "link")
     gui.Destroy()
     Reload
 }
