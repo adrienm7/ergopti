@@ -73,7 +73,11 @@ LLM_Engine_FirePrediction(buffer) {
 	; flag was stored from config but nothing ever consulted a detector at
 	; prediction time, so enabling it in the tray menu had no effect).
 	if (_LLM_Engine.Has("disable_password_fields") && _LLM_Engine["disable_password_fields"]) {
-		IsPw := false
+		; The adapter normally catches its own OS errors, but this keyboard-path
+		; caller must still fail closed if a future port implementation throws.
+		; Sending a password context is irreversible; suppressing one prediction
+		; until the next safe buffer is always the correct privacy outcome.
+		IsPw := true
 		try IsPw := SFD_IsSecureField()
 		if IsPw {
 			try LoggerInfo("LLM", "Prediction suppressed — password field detected.")
