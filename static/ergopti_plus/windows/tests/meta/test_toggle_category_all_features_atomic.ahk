@@ -51,7 +51,7 @@ _TCAF_LiveToggleIsAtomic() {
 	Assert(CritPos < RestorePos and CritPos < SnapshotPos,
 		"Critical must be entered BEFORE the first Features mutation (snapshot/restore), not just before the final rebuild")
 
-	GatesPos := InStr(Body, "ApplyMasterGatesToFeatures(Features, TapHold)")
+	GatesPos := InStr(Body, "ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated)")
 	Assert(GatesPos > 0, "ToggleCategoryAllFeatures must re-apply master gates before rebuilding")
 	Assert(CritPos < GatesPos,
 		"Critical must cover the ApplyMasterGatesToFeatures() step, not just the final RebuildHotstringsLive() call")

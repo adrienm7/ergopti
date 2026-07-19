@@ -33,25 +33,27 @@
 ; category to ``false`` so #HotIf evaluations on Features short-circuit.
 ; The on-disk persistence is untouched — flipping the master back on +
 ; Reload restores the per-feature state from config.toml.
-ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget) {
+ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDebugFn := 0) {
     if !(FeaturesTarget is Map)
         throw Error("ApplyMasterGatesToFeatures requires a Features Map target.")
     if !(TapHoldTarget is Map)
         throw Error("ApplyMasterGatesToFeatures requires a TapHold Map target.")
+    if !HasMethod(CategoryGateFn, "Call")
+        throw Error("ApplyMasterGatesToFeatures requires a category-gate callback.")
     ; Validate the canonical manifest before touching either candidate.  A
     ; malformed/missing manifest is a startup configuration error, not a reason
     ; to silently run an unreviewed duplicate gate table.
     SubGates := _MG_LoadSubCategories()
 
     ; Layout master
-    if !_MG_IsCategoryGated("Layout") and FeaturesTarget.Has("layout") {
+    if !CategoryGateFn.Call("Layout") and FeaturesTarget.Has("layout") {
         for V2Id, _ in FeaturesTarget["layout"] {
             FeaturesTarget["layout"][V2Id] := false
         }
     }
 
     ; Shortcuts master
-    if !_MG_IsCategoryGated("Shortcuts") and FeaturesTarget.Has("shortcuts") {
+    if !CategoryGateFn.Call("Shortcuts") and FeaturesTarget.Has("shortcuts") {
         for V2Id, V2Val in FeaturesTarget["shortcuts"] {
             if (Type(V2Val) == "Map") {
                 ; Modélisation α + sub-Maps — flip ``enabled`` if present,
@@ -70,7 +72,7 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget) {
     }
 
     ; Hotstrings master (includes Personal sub-category).
-    if !_MG_IsCategoryGated("Hotstrings") and FeaturesTarget.Has("hotstrings") {
+    if !CategoryGateFn.Call("Hotstrings") and FeaturesTarget.Has("hotstrings") {
         for V2Cat, V2CatMap in FeaturesTarget["hotstrings"] {
             if (Type(V2CatMap) != "Map") {
                 continue
@@ -92,9 +94,9 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget) {
     ;
     ; **Sub-category mapping is single-sourced from menu_manifest.json
     ; master_gates.sub_categories (MG-3).**
-    if _MG_IsCategoryGated("Hotstrings") and FeaturesTarget.Has("hotstrings") {
+    if CategoryGateFn.Call("Hotstrings") and FeaturesTarget.Has("hotstrings") {
         for SubV1, SubV2 in SubGates {
-            if !_MG_IsCategoryGated(SubV1) and FeaturesTarget["hotstrings"].Has(SubV2) {
+            if !CategoryGateFn.Call(SubV1) and FeaturesTarget["hotstrings"].Has(SubV2) {
                 for V2Id, V2Val in FeaturesTarget["hotstrings"][SubV2] {
                     if (Type(V2Val) == "Map" and V2Val.Has("enabled")) {
                         V2Val["enabled"] := false
@@ -106,23 +108,14 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget) {
 
     ; TapHolds master — handled by tap_hold.toml loading; gating drops the
     ; TapHold["keys"] entries entirely so TapHoldIsConfigured returns false.
-    if !_MG_IsCategoryGated("TapHolds") {
+    if !CategoryGateFn.Call("TapHolds") {
         if TapHoldTarget.Has("keys") {
             TapHoldTarget["keys"] := Map()
         }
     }
 
-    try LoggerDebug("MasterGates", "ApplyMasterGatesToFeatures done.")
-}
-
-; Keep category-gate ownership in feature_state.ahk while avoiding an unbound
-; identifier when this module is syntax-validated by itself. Func() resolves
-; the dependency at call time, after the driver's normal include graph has
-; declared IsCategoryGated.
-_MG_IsCategoryGated(Category) {
-    try return Func("IsCategoryGated").Call(Category)
-    catch as Err
-        throw Error("Master gates require IsCategoryGated from feature_state.ahk: " . Err.Message)
+    if HasMethod(LogDebugFn, "Call")
+        try LogDebugFn.Call("MasterGates", "ApplyMasterGatesToFeatures done.")
 }
 
 

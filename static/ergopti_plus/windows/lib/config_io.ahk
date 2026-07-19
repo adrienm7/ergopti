@@ -223,7 +223,7 @@ ToggleCategoryAllFeatures(Category, Value) {
             }
             CategoryEnabled[Category] := Bool
             TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
-            ApplyMasterGatesToFeatures(Features, TapHold)
+            ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated, LoggerDebug)
             RebuildHotstringsLive()
         } finally {
             Critical(_TcafCrit)
