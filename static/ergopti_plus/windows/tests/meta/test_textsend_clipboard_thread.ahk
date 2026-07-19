@@ -162,7 +162,7 @@ _TSCT_RestoreGuardedByGeneration() {
 	Assert(InStr(WriteBody, "_TEXT_CLIPBOARD_GENERATION += 1") > 0,
 		"_TextSendClipboard must bump the generation counter so each injection claims a unique slot")
 
-	RestoreBody := _TSCT_FuncBodyStripped(Src, "_TextSendRestoreClipboard(Saved, Generation) {")
+	RestoreBody := _TSCT_FuncBodyStripped(Src, "_TextSendRestoreClipboard(Saved, Generation, OwnedSequence) {")
 	Assert(RestoreBody != "", "_TextSendRestoreClipboard guard helper must exist")
 	Assert(InStr(RestoreBody, "_TEXT_CLIPBOARD_GENERATION") > 0,
 		"_TextSendRestoreClipboard must compare the captured generation against the current counter")
@@ -173,7 +173,7 @@ Test("text_sender: deferred clipboard restore is generation-guarded (textsend-re
 
 ; A generation check prevents stale restoration, but it does not preserve the
 ; older requested output when two writes overlap. Clipboard sends therefore need
-; a FIFO whose session snapshot is taken only before the first request.
+; a FIFO whose per-request snapshot is taken only after the request owns the head.
 _TSCT_ClipboardRequestsAreFifoSerialized() {
 	Src := _TSCT_ReadSource("adapters/text_sender.ahk")
 	TextBody := _TSCT_FuncBodyStripped(Src, "TextSend(Text, Opts, Callback) {")
@@ -183,13 +183,15 @@ _TSCT_ClipboardRequestsAreFifoSerialized() {
 		"clipboard TextSend must own an explicit FIFO and busy state; a generation counter alone drops superseded requested output")
 	Assert(InStr(TextBody, "_TEXT_CLIPBOARD_QUEUE.Push") > 0,
 		"TextSend must enqueue each clipboard request instead of starting competing workers")
-	Assert(InStr(TextBody, "!_TEXT_CLIPBOARD_BUSY and _TEXT_CLIPBOARD_QUEUE.Length = 0") > 0,
-		"TextSend must snapshot the user clipboard only at the start of an empty FIFO session")
+	Assert(InStr(TextBody, "CB_SaveAll()") == 0,
+		"TextSend must not snapshot on the keyboard caller; a user copy while queued would make that snapshot stale")
 	Assert(InStr(StartBody, "_TEXT_CLIPBOARD_QUEUE.RemoveAt(1)") > 0 and InStr(StartBody, "_TEXT_CLIPBOARD_BUSY := true") > 0,
 		"the worker must claim one FIFO request before performing clipboard I/O")
+	Assert(InStr(StartBody, "Saved := CB_SaveAll()") > 0,
+		"the FIFO owner must snapshot the user clipboard only after it owns the request")
 	Assert(InStr(StartBody, "_TextSendClipboard(Request.Text") > 0,
 		"only the FIFO worker may invoke the clipboard round-trip helper")
 	Assert(InStr(FinishBody, "_TEXT_CLIPBOARD_BUSY := false") > 0 and InStr(FinishBody, "SetTimer(_TextSenderStartClipboard, -1)") > 0,
 		"only completion after the restore window may start the next clipboard request")
 }
-Test("text_sender: overlapping clipboard sends are serialized FIFO and retain the original clipboard snapshot (textsend-clipboard-output-drop)", _TSCT_ClipboardRequestsAreFifoSerialized)
+Test("text_sender: overlapping clipboard sends are serialized FIFO with per-request snapshots (textsend-clipboard-output-drop)", _TSCT_ClipboardRequestsAreFifoSerialized)

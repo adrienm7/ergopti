@@ -60,20 +60,19 @@ _TSCA_FuncBodyStripped(Src, FuncDef) {
 ; ===================================================
 ; ===================================================
 
-; CB_SaveAll() is called synchronously in TextSend's clipboard branch (before
-; the timer fires) to capture the original clipboard before any write; the
-; pre-saved snapshot is then passed into the deferred _TextSendClipboard.
-; Scanning TextSend's body ensures the synchronous save is present.
+; CB_SaveAll() is called by the FIFO owner immediately before its write. This
+; preserves all formats without retaining a stale snapshot across an intervening
+; user copy while another clipboard request is queued.
 _TSCA_TextSendUsesSaveAll() {
 	Src := _TSCA_ReadSource("adapters/text_sender.ahk")
-	Body := _TSCA_FuncBodyStripped(Src, "TextSend(Text, Opts, Callback) {")
-	Assert(Body != "", "TextSend must exist in adapters/text_sender.ahk")
+	Body := _TSCA_FuncBodyStripped(Src, "_TextSenderStartClipboard() {")
+	Assert(Body != "", "_TextSenderStartClipboard must exist in adapters/text_sender.ahk")
 	Assert(!InStr(Body, "CB_Save()"),
-		"The clipboard branch must NOT call CB_Save() — it is text-only and destroys non-text clipboard content; use CB_SaveAll() instead")
+		"The FIFO clipboard owner must NOT call CB_Save() — it is text-only and destroys non-text clipboard content; use CB_SaveAll() instead")
 	Assert(InStr(Body, "CB_SaveAll()") > 0,
-		"The clipboard branch must call CB_SaveAll() to preserve all clipboard formats")
+		"The FIFO clipboard owner must call CB_SaveAll() to preserve all clipboard formats")
 }
-Test("text_sender: clipboard branch uses CB_SaveAll instead of CB_Save (textsend-clip-destroys-nontext)", _TSCA_TextSendUsesSaveAll)
+Test("text_sender: FIFO clipboard owner uses CB_SaveAll instead of CB_Save (textsend-clip-destroys-nontext)", _TSCA_TextSendUsesSaveAll)
 
 _TSCA_TextSendUsesRestoreAll() {
 	Src := _TSCA_ReadSource("adapters/text_sender.ahk")

@@ -53,10 +53,10 @@ global _TEXT_CLIPBOARD_GENERATION := 0
 ; Clipboard mode is a process-wide transaction, not an independently safe
 ; per-call operation. A second TextSend used to supersede the first while it
 ; was in ClipWait, silently dropping the first requested output. Queue every
-; clipboard payload and keep one original clipboard snapshot for the session.
+; clipboard payload. Each request captures its snapshot only when it owns the
+; FIFO head, so an intervening user copy is never restored to an older value.
 global _TEXT_CLIPBOARD_QUEUE := []
 global _TEXT_CLIPBOARD_BUSY := false
-global _TEXT_CLIPBOARD_SESSION_SAVED := false
 global TEXT_CLIPBOARD_NEXT_DELAY_MS := TEXT_CLIPBOARD_RESTORE_DELAY_MS + 20
 
 ; Injectable send primitives — point at the real AHK built-ins by default.
@@ -217,8 +217,13 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	; to ClipWait/^v in that state or the user receives unrelated stale text.
 	if !CB_Write(Text) {
 		LoggerError("TextSender", "TextSend: clipboard write failed - skipping paste to avoid injecting stale content.")
-		CB_RestoreAll(Saved)
 		_TextSenderInvokeCallback(Callback, false, "clipboard write failed")
+		return
+	}
+	OwnedSequence := CB_GetSequenceNumber()
+	if !OwnedSequence {
+		LoggerError("TextSender", "TextSend: clipboard sequence is unavailable - skipping paste because ownership cannot be proven.")
+		_TextSenderInvokeCallback(Callback, false, "clipboard ownership unavailable")
 		return
 	}
 
@@ -227,7 +232,7 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	; loudly and restore the saved snapshot instead of pasting blindly.
 	if !ClipWait(TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC) {
 		LoggerError("TextSender", "TextSend: clipboard did not settle within {1}s - skipping paste to avoid injecting stale content.", TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC)
-		CB_RestoreAll(Saved)
+		_TextSendRestoreClipboard(Saved, Generation, OwnedSequence)
 		_TextSenderInvokeCallback(Callback, false, "clipboard did not settle")
 		return
 	}
@@ -235,8 +240,13 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	; A newer injection may have taken over the clipboard slot while we were
 	; blocked inside ClipWait; pasting now would clobber its content.
 	if (Generation != _TEXT_CLIPBOARD_GENERATION) {
-		CB_RestoreAll(Saved)
+		_TextSendRestoreClipboard(Saved, Generation, OwnedSequence)
 		_TextSenderInvokeCallback(Callback, false, "clipboard ownership superseded")
+		return
+	}
+	if (CB_GetSequenceNumber() != OwnedSequence) {
+		LoggerWarn("TextSender", "TextSend: clipboard ownership changed before paste - skipping stale Ctrl+V.")
+		_TextSenderInvokeCallback(Callback, false, "clipboard ownership changed before paste")
 		return
 	}
 
@@ -252,7 +262,8 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	; so two rapid clipboard sends never let an earlier restore clobber the later.
 	SavedForTimer := Saved
 	GenerationForTimer := Generation
-	SetTimer(() => _TextSendRestoreClipboard(SavedForTimer, GenerationForTimer), -TEXT_CLIPBOARD_RESTORE_DELAY_MS)
+	OwnedSequenceForTimer := OwnedSequence
+	SetTimer(() => _TextSendRestoreClipboard(SavedForTimer, GenerationForTimer, OwnedSequenceForTimer), -TEXT_CLIPBOARD_RESTORE_DELAY_MS)
 }
 
 ; Restores a clipboard snapshot taken by _TextSendClipboard, but only if no newer
@@ -260,13 +271,18 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 ; stale restore can never overwrite a clipboard a later injection just populated.
 ; @param Saved      {ClipboardAll|String} Snapshot returned by CB_SaveAll().
 ; @param Generation {Integer}             Counter value captured at scheduling.
-_TextSendRestoreClipboard(Saved, Generation) {
+_TextSendRestoreClipboard(Saved, Generation, OwnedSequence) {
 	global _TEXT_CLIPBOARD_GENERATION
 	; Also a SetTimer callback — bypasses native Suspend() like its sibling
 	; above. Restoring the clipboard is harmless while paused (it undoes the
 	; write _TextSendClipboard already made before any pause could have
 	; started), so this still runs; only a NEW clipboard write is guarded.
 	if (Generation != _TEXT_CLIPBOARD_GENERATION)
+		return
+	; The user may have copied something after this request pasted. Restore only
+	; while this transaction still owns the exact clipboard sequence; otherwise
+	; any restore would silently overwrite the user's newer clipboard content.
+	if (!OwnedSequence or CB_GetSequenceNumber() != OwnedSequence)
 		return
 	CB_RestoreAll(Saved)
 }
@@ -275,12 +291,20 @@ _TextSendRestoreClipboard(Saved, Generation) {
 ; started until the preceding restore window has elapsed, so its write cannot
 ; replace a payload that has not yet been pasted by the foreground application.
 _TextSenderStartClipboard() {
-	global _TEXT_CLIPBOARD_QUEUE, _TEXT_CLIPBOARD_BUSY, _TEXT_CLIPBOARD_SESSION_SAVED
+	global _TEXT_CLIPBOARD_QUEUE, _TEXT_CLIPBOARD_BUSY
 	if _TEXT_CLIPBOARD_BUSY or (_TEXT_CLIPBOARD_QUEUE.Length = 0)
 		return
 	_TEXT_CLIPBOARD_BUSY := true
 	Request := _TEXT_CLIPBOARD_QUEUE.RemoveAt(1)
-	_TextSendClipboard(Request.Text, _TEXT_CLIPBOARD_SESSION_SAVED,
+	; Snapshot at FIFO ownership, not when the caller queued. A user copy made
+	; between queued requests is then the value restored after this request.
+	Saved := CB_SaveAll()
+	if (Type(Saved) == "String" and Saved == "__CB_SAVE_ERROR__") {
+		LoggerError("TextSender", "TextSend: clipboard snapshot failed - skipping clipboard injection.")
+		_TextSenderClipboardCompleted(Request.Callback, false, "clipboard snapshot failed")
+		return
+	}
+	_TextSendClipboard(Request.Text, Saved,
 		_TextSenderClipboardCompleted.Bind(Request.Callback))
 }
 
@@ -294,10 +318,9 @@ _TextSenderClipboardCompleted(Callback, Ok := true, ErrorMessage := "") {
 }
 
 _TextSenderFinishClipboard() {
-	global _TEXT_CLIPBOARD_QUEUE, _TEXT_CLIPBOARD_BUSY, _TEXT_CLIPBOARD_SESSION_SAVED
+	global _TEXT_CLIPBOARD_QUEUE, _TEXT_CLIPBOARD_BUSY
 	_TEXT_CLIPBOARD_BUSY := false
 	if (_TEXT_CLIPBOARD_QUEUE.Length = 0) {
-		_TEXT_CLIPBOARD_SESSION_SAVED := false
 		return
 	}
 	SetTimer(_TextSenderStartClipboard, -1)
@@ -311,7 +334,7 @@ _TextSenderFinishClipboard() {
 ; @param Opts     {Map|0}    { mode?: "direct"|"clipboard"|"auto" }
 ; @param Callback {Func|0}   Called with no arguments on completion.
 TextSend(Text, Opts, Callback) {
-	global TEXT_CLIPBOARD_THRESHOLD, _TEXT_CLIPBOARD_QUEUE, _TEXT_CLIPBOARD_BUSY, _TEXT_CLIPBOARD_SESSION_SAVED
+	global TEXT_CLIPBOARD_THRESHOLD, _TEXT_CLIPBOARD_QUEUE
 	Mode := "auto"
 	if (Opts is Map) and Opts.Has("mode") and Opts["mode"] != ""
 		Mode := Opts["mode"]
@@ -325,25 +348,12 @@ TextSend(Text, Opts, Callback) {
 		; onto a one-shot timer so it NEVER runs on the input-gating keyboard thread.
 		; Blocking there on ClipWait would starve the low-level hook and drop the
 		; user's next keystrokes; running it off-thread lets the hotkey return at once.
-		; CB_SaveAll() is called synchronously HERE (before the timer fires) so that
-		; two rapid TextSend calls cannot race: each captures its own clipboard state
-		; before either timer runs, eliminating the TOCTOU window where the second
-		; CB_SaveAll would snapshot the first injection's text instead of the original.
+		; CB_SaveAll() runs only after this request owns the FIFO head. Capturing on
+		; the keyboard caller would make its later restore clobber a user copy made
+		; while this request waited behind an earlier transaction.
 		; Callback is passed into _TextSendClipboard and fired there after Ctrl+V, so
 		; callers that depend on the callback being synchronised with injection completion
 		; are never notified before the paste actually lands.
-		; Capture only at the start of a FIFO session. A queued follow-up that
-		; snapshots after the first worker wrote its payload would restore the
-		; synthetic payload instead of the user's original clipboard.
-		if (!_TEXT_CLIPBOARD_BUSY and _TEXT_CLIPBOARD_QUEUE.Length = 0) {
-			Saved := CB_SaveAll()
-			if (Type(Saved) == "String" and Saved == "__CB_SAVE_ERROR__") {
-				LoggerError("TextSender", "TextSend: clipboard snapshot failed - skipping clipboard injection.")
-				_TextSenderInvokeCallback(Callback, false, "clipboard snapshot failed")
-				return
-			}
-			_TEXT_CLIPBOARD_SESSION_SAVED := Saved
-		}
 		_TEXT_CLIPBOARD_QUEUE.Push({ Text: Text, Callback: Callback })
 		SetTimer(_TextSenderStartClipboard, -1)
 	} else {

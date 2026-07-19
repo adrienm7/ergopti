@@ -96,10 +96,10 @@ _TSCGR_CheckGenerationRecheck() {
 	Assert(ClipWaitPos < RecheckPos && RecheckPos < SendInputPos,
 		"Generation re-check must appear between ClipWait and _AHK_SendInput.Call in _TextSendClipboard (MED-01)")
 
-	; The re-check block must restore the saved clipboard and return on mismatch.
+	; The re-check block must restore only through the ownership-checked helper.
 	RecheckBlock := SubStr(Body, RecheckPos, SendInputPos - RecheckPos)
-	Assert(InStr(RecheckBlock, "CB_RestoreAll(Saved)"),
-		"Generation mismatch branch in _TextSendClipboard must call CB_RestoreAll(Saved) before returning (MED-01)")
+	Assert(InStr(RecheckBlock, "_TextSendRestoreClipboard(Saved, Generation, OwnedSequence)"),
+		"Generation mismatch branch must route restoration through the sequence-checked helper before returning (MED-01)")
 }
 
 
