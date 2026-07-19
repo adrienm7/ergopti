@@ -76,7 +76,7 @@ _ONA_CommitPublishesOnlyAfterPersistence() {
                 "onboarding must not publish _ConfigDir before the candidate config write succeeds")
         Assert(InStr(Seg, "finally") > 0 && InStr(Seg, "_TOML_STRICT_CANON_IN_PROGRESS := PreviousStrictCanon") > 0,
                 "the strict-canonicalization guard must be restored on every commit outcome")
-        Assert(InStr(PathsWriter, "FileMove(TmpPath, _PathsFile, true)") > 0 && InStr(PathsWriter, "return false") > 0,
+        Assert(InStr(PathsWriter, "FSMove(TmpPath, _PathsFile, true)") > 0 && InStr(PathsWriter, "return false") > 0,
                 "paths.toml must be atomically replaced and report write failure")
         Assert(InStr(NativeFinish, "if _Onboarding_Commit()") > 0 && InStr(NativeFinish, "Reload") > 0,
                 "native onboarding must reload only after a successful commit")

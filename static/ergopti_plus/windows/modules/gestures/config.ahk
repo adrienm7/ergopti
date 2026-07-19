@@ -239,10 +239,9 @@ GestureRestartTouchpadDevice(OnDone := 0) {
     JobStem := A_Temp . "\ergopti_touchpad_restart_" . A_Pid . "_" . Epoch
     ScriptPath := JobStem . ".ps1"
     ResultPath := JobStem . ".result"
-    try FileDelete(ResultPath)
-    try FileAppend(_GestureRestartBuildPsScript(ResultPath), ScriptPath, "UTF-8")
-    catch as err {
-        LoggerError("gestures", "Could not write touchpad restart worker: {1}.", err.Message)
+    FSDelete(ResultPath)
+    if !FSWrite(ScriptPath, _GestureRestartBuildPsScript(ResultPath)) {
+        LoggerError("gestures", "Could not write touchpad restart worker.")
         return False
     }
 
@@ -252,7 +251,7 @@ GestureRestartTouchpadDevice(OnDone := 0) {
         ; tray callback waits on the worker.
         Run('*RunAs powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . ScriptPath . '"', , "Hide", &RestartPid)
     } catch as e {
-        try FileDelete(ScriptPath)
+        FSDelete(ScriptPath)
         LoggerError("gestures", "Failed to restart touchpad device: {1}.", e.Message)
         return False
     }
@@ -279,8 +278,8 @@ _GestureRestartPoll(Epoch) {
     }
     Ok := _GestureRestartReadResult(_GestureRestartJob["result"])
     Done := _GestureRestartJob["done"]
-    try FileDelete(_GestureRestartJob["script"])
-    try FileDelete(_GestureRestartJob["result"])
+    FSDelete(_GestureRestartJob["script"])
+    FSDelete(_GestureRestartJob["result"])
     _GestureRestartJob["pid"] := 0
     _GestureRestartJob["done"] := 0
     if Ok
@@ -292,11 +291,12 @@ _GestureRestartPoll(Epoch) {
 }
 
 _GestureRestartReadResult(ResultPath) {
-    try Result := Trim(FileRead(ResultPath, "UTF-8"))
-    catch as err {
-        try LoggerError("gestures", "Touchpad restart result missing: {1}.", err.Message)
+    Result := FSRead(ResultPath)
+    if (Result = false) {
+        try LoggerError("gestures", "Touchpad restart result missing.")
         return False
     }
+    Result := Trim(Result)
     return (Result = "0")
 }
 

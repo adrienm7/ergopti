@@ -120,6 +120,19 @@ FSDelete(Path) {
 	}
 }
 
+; Atomically replaces Destination with Source when both are on the same volume.
+; Kept in the adapter so domain modules never call FileMove directly.
+FSMove(Source, Destination, Overwrite := false) {
+        if !(Source is String) or Source = "" or !(Destination is String) or Destination = ""
+                return false
+        try {
+                FileMove(Source, Destination, Overwrite)
+                return true
+        } catch {
+                return false
+        }
+}
+
 ; Machine-readable contract map - consumed by the generic adapter compliance test
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
