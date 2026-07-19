@@ -449,7 +449,14 @@ GestureOpenConfiguredURL(BindingId := "") {
         LoggerWarn("gestures", "open_url ignored for binding '{1}': {2}", BindingId, ErrorText)
         return
     }
-    Run(URL)
+    ; URL validation proves shape, not launchability: shell associations and
+    ; policy may still reject it.  Keep that OS failure inside the gesture
+    ; callback so it cannot reach the keyboard driver's global error handler.
+    try Run(URL)
+    catch as Err {
+        LoggerError("gestures", "open_url launch failed for binding '{1}': {2}", BindingId, Err.Message)
+        try TrayTip("Could not open the configured URL.", "ErgoptiPlus", "Iconx Mute")
+    }
 }
 
 GesturePickColor() {
