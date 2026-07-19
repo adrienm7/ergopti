@@ -265,20 +265,24 @@ RegisterMenuItem(MenuObj, ItemName, Callback) {
     TrackedObj := { ItemId: 0, Callback: Callback, Epoch: _MenuDispatcherEpoch, Token: 0 }
     Wrapper    := (Args*) => _TrackedDispatch(TrackedObj, Args*)
 
+    ; A new label appends exactly one native item. Record the count on both sides
+    ; so the common path resolves its ID in O(1); only a duplicate-label update
+    ; keeps the count unchanged and needs the defensive unique-name scan.
+    CountBefore := _MenuItemCount(MenuObj)
     try {
         MenuObj.Add(ItemName, Wrapper)
     } catch {
         return 0  ; Add itself failed — bail out cleanly.
     }
-
-    ; Discover the ID by UNIQUE name match (NOT GetMenuItemCount-1): AHK Menu.Add with an
-    ; already-present ItemName MODIFIES the existing item in place and does NOT grow the
-    ; menu, so trusting Count-1 binds the dispatch bypass to whatever unrelated item sits
-    ; last. On a non-unique/unresolvable label _FindUniqueMenuItemIdByName returns 0;
-    ; degrade to AHK native dispatch (loud WARN) rather than mis-bind to the wrong id
-    ; (menu-add-duplicate-label-misbind). This is the same fail-soft policy already used
-    ; by RegisterMenuItemInsert.
-    ItemId := _FindUniqueMenuItemIdByName(MenuObj, ItemName)
+    CountAfter := _MenuItemCount(MenuObj)
+    ItemId := (CountBefore >= 0 and CountAfter = CountBefore + 1)
+        ? _MenuItemIdAtPosition(MenuObj, CountAfter - 1)
+        : 0
+    ; AHK Menu.Add with an already-present label modifies in place and does not
+    ; grow the menu. Fall back to a uniqueness-checked scan only for that rare
+    ; path; binding CountAfter-1 after an in-place update would target another row.
+    if (!ItemId)
+        ItemId := _FindUniqueMenuItemIdByName(MenuObj, ItemName)
     if (!ItemId) {
         try LoggerWarn("MenuDispatcher", "Ambiguous or unresolvable menu label '{1}' - degrading to native dispatch (no bypass).", ItemName)
         return 0
@@ -394,6 +398,19 @@ _MenuItemIdAtPosition(MenuObj, Index) {
         ; Menu.Handle may be unavailable — degrade to native dispatch.
     }
     return 0
+}
+
+; Returns the current item count, or -1 when the native handle cannot be read.
+; Kept separate from _MenuItemIdAtPosition so RegisterMenuItem can detect an
+; append without enumerating every sibling label.
+_MenuItemCount(MenuObj) {
+    try {
+        HMENU := MenuObj.Handle
+        if (!HMENU)
+            return -1
+        return DllCall("GetMenuItemCount", "ptr", HMENU, "int")
+    }
+    return -1
 }
 
 ; Walk a Menu's items and return the Win32 ItemId of the entry whose visible
