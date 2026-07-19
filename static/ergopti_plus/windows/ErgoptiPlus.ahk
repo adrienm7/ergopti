@@ -667,7 +667,13 @@ SetTimer(SaveFullConfig, -500)
 ; HookDispatcher.Stop() is called by Ergopti_OnShutdown (registered below via
 ; OnExit) — do NOT register a second anonymous OnExit lambda here; double-Stop
 ; can trigger a "hook already released" error on some AHK builds.
-HookDispatcher.Start()
+if !HookDispatcher.Start() {
+    ; The shared hook is the driver’s keyboard ownership boundary. Publishing
+    ; readiness without it would create a half-boot where menu/UI state looks
+    ; healthy but remaps and hook consumers silently never receive input.
+    LoggerError("ErgoptiPlus", "Startup aborted: unified keyboard hook could not start.")
+    ExitApp(1)
+}
 
 if MetricsShortcuts.enabled {
     LoggerDebug("Startup", "Metrics enabled — WPMWidget.visible={1}, show_graph={2}.",

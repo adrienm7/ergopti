@@ -429,7 +429,7 @@ class HookDispatcher {
 	static Start() {
 		if HookDispatcher._started {
 			LoggerWarn("HookDispatcher", "Start() called more than once — ignoring duplicate call.")
-			return
+			return true
 		}
 		LoggerStart("HookDispatcher", "Starting unified hook dispatcher…")
 
@@ -466,7 +466,7 @@ class HookDispatcher {
 				; out so _started stays false rather than proceeding with a dead
 				; or half-configured hook (fail-fast, §5.3).
 				LoggerError("HookDispatcher", "InputHook construction failed: {1} — hook-dependent features unavailable this session.", e.Message)
-				return
+				return false
 			}
 		}
 
@@ -537,6 +537,7 @@ class HookDispatcher {
 
 		LoggerSuccess("HookDispatcher", "Unified hook dispatcher started ({1} event type(s) with subscribers).",
 			HookDispatcher._subscribers.Count)
+		return true
 	}
 
 	; Registers a single mouse Hotkey, logging a WARNING (instead of throwing) if
