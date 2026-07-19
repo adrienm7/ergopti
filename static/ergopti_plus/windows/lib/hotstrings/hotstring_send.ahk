@@ -114,34 +114,48 @@ _MirrorRegistrationToHSE(TriggerSpec, Callback, Meta := unset) {
 ; emitted character — SubStr(Text, -1) on that sequence would record its
 ; trailing "}" instead of what actually landed on screen.
 SendNewResult(Text, OnlyText := True, UpdateRing := True) {
-    if _SendHook {
-        Hook := _SendHook
-        Hook("SendNewResult", Text, OnlyText)
-    } else {
-        if OnlyText {
-            SendEvent("{Text}" Text)
+    ; Every layout/hotstring callback reaches this primitive.  A failed OS send
+    ; must be contained here and must NOT advance the output ring: advancing it
+    ; after a failed injection corrupts deadkey/time-gated decisions as though
+    ; the character reached the foreground application.
+    try {
+        if _SendHook {
+            Hook := _SendHook
+            Hook("SendNewResult", Text, OnlyText)
         } else {
-            SendEvent(Text)
+            if OnlyText {
+                SendEvent("{Text}" Text)
+            } else {
+                SendEvent(Text)
+            }
         }
+    } catch as Err {
+        LoggerError("Hotstrings", "SendNewResult failed: {1}", Err.Message)
+        return false
     }
     if UpdateRing {
         UpdateLastSentCharacter(SubStr(Text, -1))
     }
+    return true
 }
 
 ; SendInput prevents other hotstrings/hotkeys from activating, so this is the
 ; "final" result — used when we do not want cascading expansion.
 SendFinalResult(Text, OnlyText := False) {
-    if _SendHook {
-        Hook := _SendHook
-        Hook("SendFinalResult", Text, OnlyText)
-        return
+    try {
+        if _SendHook {
+            Hook := _SendHook
+            Hook("SendFinalResult", Text, OnlyText)
+        } else if OnlyText {
+            SendInput("{Text}" Text)
+        } else {
+            SendInput(Text)
+        }
+    } catch as Err {
+        LoggerError("Hotstrings", "SendFinalResult failed: {1}", Err.Message)
+        return false
     }
-    if OnlyText {
-        SendInput("{Text}" Text)
-    } else {
-        SendInput(Text)
-    }
+    return true
 }
 
 _SendInstant_RestoreClipboard(OldClip, OwnedSequence) {
