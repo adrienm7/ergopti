@@ -34,6 +34,8 @@ _KLPFW_ReadWorkerContract() {
 	Assert(InStr(Worker, "KLPF_BuildAndWriteToPath") > 0
 			&& InStr(Worker, "ExitApp(0)") > 0,
 		"the worker must produce its own staged file then exit before normal driver boot")
+	Assert(InStr(Worker, "KLR_ReadRangeSplitToday") > 0,
+		"selected-range SQL projection must run inside the detached worker")
 
 	for _, body in [First, Full, NotifyBody, Bridge, Edge] {
 		Assert(InStr(body, "KLPF_BuildAndWrite(") = 0,
