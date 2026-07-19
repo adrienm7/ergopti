@@ -17,7 +17,7 @@ _KCR_AssertPreservesCallerCritical(FuncName, RequiredFragment) {
 	StartIdx := InStr(Body, "previous_critical := Critical(" . Chr(34) . "On" . Chr(34) . ")")
 	FinallyIdx := InStr(Body, "finally")
 	RestoreIdx := InStr(Body, "Critical(previous_critical)")
-	WorkIdx := InStr(Body, RequiredFragment)
+	WorkIdx := InStr(Body, RequiredFragment, , StartIdx)
 	Assert(StartIdx > 0 and FinallyIdx > StartIdx and RestoreIdx > FinallyIdx,
 		FuncName . " must restore the caller's Critical state in finally (keylogger-critical-restore)")
 	Assert(WorkIdx > StartIdx and WorkIdx < FinallyIdx,
