@@ -64,6 +64,14 @@ _LFOB_CheckFlushDrainsSubPending() {
 
 	Assert(InStr(Flush, "_LOGGER_SUB_PENDING"),
 		"_LoggerFlush must drain _LOGGER_SUB_PENDING to write batched fan-out lines")
+	Assert(InStr(Flush, "_LoggerRequeueSub(Name, Lines)"),
+		"a failed or unresolved sub-file sink must requeue its exact snapshot")
+	Assert(InStr(Flush, "SubWritten := false"),
+		"_LoggerFlush must acknowledge sub-file writes before dropping a batch")
+	Requeue := _DriverFuncBody("_LoggerRequeueSub")
+	Assert(Requeue != "", "_LoggerRequeueSub must exist for failed sub-file writes")
+	Assert(InStr(Requeue, "Restored.Push(Line)") && InStr(Requeue, "Critical("),
+		"sub-file retries must preserve order while synchronizing with new log entries")
 }
 
 

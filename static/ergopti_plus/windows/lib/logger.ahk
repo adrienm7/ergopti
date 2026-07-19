@@ -292,16 +292,25 @@ _LoggerFlush(ForceFlush := false) {
 		_LOGGER_SUB_PENDING := Map()
 	} finally {
 		Critical(_crit2)
-	}
-	for Name, Lines in SubSnap {
-		if !_LOGGER_SUB_PATHS.Has(Name)
-			continue
-		SubBlob := ""
-		for _, SLine in Lines {
-			SubBlob .= SLine . "`r`n"
-		}
-		if SubBlob != ""
-			try FileAppend(SubBlob, _LOGGER_SUB_PATHS[Name], "UTF-8")
+    }
+    for Name, Lines in SubSnap {
+            if !_LOGGER_SUB_PATHS.Has(Name) {
+                    _LoggerRequeueSub(Name, Lines)
+                    continue
+            }
+            SubBlob := ""
+            for _, SLine in Lines {
+                    SubBlob .= SLine . "`r`n"
+            }
+            if SubBlob == ""
+                    continue
+            SubWritten := false
+            try {
+                    FileAppend(SubBlob, _LOGGER_SUB_PATHS[Name], "UTF-8")
+                    SubWritten := true
+            }
+            if !SubWritten
+                    _LoggerRequeueSub(Name, Lines)
 	}
 }
 
@@ -625,6 +634,28 @@ _LoggerInitSubFiles(LogDir) {
                 try FileDelete(SubPath)
             }
         }
+    }
+}
+
+; Restore one failed sub-file snapshot ahead of entries emitted while its I/O
+; was in flight. A sub-file is an operator-facing diagnostic sink, not a
+; disposable view: losing it precisely when disk access fails hides recovery
+; evidence from the person investigating the incident.
+_LoggerRequeueSub(Name, Lines) {
+    global _LOGGER_SUB_PENDING
+    if (Lines.Length == 0)
+            return
+    local _crit := Critical("On")
+    try {
+            Current := _LOGGER_SUB_PENDING.Has(Name) ? _LOGGER_SUB_PENDING[Name] : []
+            Restored := []
+            for Index, Line in Lines
+                    Restored.Push(Line)
+            for Index, Line in Current
+                    Restored.Push(Line)
+            _LOGGER_SUB_PENDING[Name] := Restored
+    } finally {
+            Critical(_crit)
     }
 }
 
