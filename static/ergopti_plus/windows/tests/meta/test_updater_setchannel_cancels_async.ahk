@@ -63,3 +63,15 @@ _USCA_SetChannelCancelsAsyncBeforeReload() {
 		"Updater_StopBackgroundChecks() must run BEFORE Reload — cancelling after the restart begins would be too late (async-requests-not-cancelled-on-channel-reload)")
 }
 Test("updater: Updater_SetChannel cancels async checks before Reload (async-requests-not-cancelled-on-channel-reload)", _USCA_SetChannelCancelsAsyncBeforeReload)
+
+_USCA_PersistsBeforePublishingChannel() {
+	Seg := _DriverFuncBody("Updater_SetChannel")
+	PersistAt := InStr(Seg, "if !TOML_Write(Channel")
+	PublishAt := InStr(Seg, "UPDATER_CHANNEL := Channel")
+	ReloadAt := InStr(Seg, "Reload")
+	Assert(PersistAt > 0 && PublishAt > PersistAt && ReloadAt > PersistAt,
+		"Updater_SetChannel must persist before publishing a channel or reloading")
+	Assert(InStr(Seg, "LoggerError") > PersistAt,
+		"a failed channel write must be loud and retain the active channel")
+}
+Test("updater: channel persistence commits before state/reload publication", _USCA_PersistsBeforePublishingChannel)
