@@ -116,9 +116,9 @@ _HCSC_CountConsistency() {
 	for _, V in Data["vectors"] {
 		if V["category"] != "count_issues"
 			continue
-		Exp := V["expected"]
-		AssertTrue(Exp.Has("warn_count"), V["id"] . ": expected must have warn_count")
-		AssertTrue(Exp.Has("err_count"), V["id"] . ": expected must have err_count")
+		Expected := V["expected"]
+		AssertTrue(Expected.Has("warn_count"), V["id"] . ": expected must have warn_count")
+		AssertTrue(Expected.Has("err_count"), V["id"] . ": expected must have err_count")
 		; Recount from the input lines to verify the expected values
 		Lines := V["input"]["lines"]
 		if !(Lines is Array)
@@ -131,8 +131,8 @@ _HCSC_CountConsistency() {
 			if InStr(Line, "[ERROR]")
 				ErrCount += 1
 		}
-		AssertEqual(Exp["warn_count"], WarnCount, V["id"] . ": warn_count must match input lines")
-		AssertEqual(Exp["err_count"], ErrCount, V["id"] . ": err_count must match input lines")
+		AssertEqual(Expected["warn_count"], WarnCount, V["id"] . ": warn_count must match input lines")
+		AssertEqual(Expected["err_count"], ErrCount, V["id"] . ": err_count must match input lines")
 	}
 }
 Test("corpus:hc-snap: count_issues expected values match input line contents", _HCSC_CountConsistency)

@@ -294,10 +294,10 @@ _CorpusHS_EveryCollisionVectorResolvesToExpectedWinner() {
 				Map("group", Grp, "Priority", Prio, "Repl", Repl))
 		}
 		HSE_FeedReset(true)
-		Buffer := Vec["buffer"]
+		InputBuffer := Vec["buffer"]
 		Match  := ""
-		loop StrLen(Buffer) {
-			Match := HSE_FeedChar(SubStr(Buffer, A_Index, 1))
+		loop StrLen(InputBuffer) {
+			Match := HSE_FeedChar(SubStr(InputBuffer, A_Index, 1))
 		}
 		Expected := Vec["expected"]
 		if (Expected.Has("matched") and Expected["matched"] = true) {
@@ -362,11 +362,11 @@ _CorpusHS_EveryVectorReplayedThroughEngine() {
 		HSE_FeedReset(true)
 
 		; Read the buffer and feed characters one at a time.
-		Buffer := Vec.Has("buffer") ? Vec["buffer"] : ""
+		InputBuffer := Vec.Has("buffer") ? Vec["buffer"] : ""
 		Match  := ""
-		if Buffer != "" {
-			loop StrLen(Buffer) {
-				Match := HSE_FeedChar(SubStr(Buffer, A_Index, 1))
+		if InputBuffer != "" {
+			loop StrLen(InputBuffer) {
+				Match := HSE_FeedChar(SubStr(InputBuffer, A_Index, 1))
 			}
 		}
 

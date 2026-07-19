@@ -37,11 +37,11 @@ _UCIG_CheckInstallSelectedUsesCloseGui() {
 	; surrounding Gui-builder cannot produce a false pass/fail.
 	IdxNext := InStr(Body, "BtnSwitch.OnEvent(", , IdxAssign)
 	Assert(IdxNext > IdxAssign, "could not bound the InstallSelected closure for inspection")
-	Closure := SubStr(Body, IdxAssign, IdxNext - IdxAssign)
+	InstallSelectedBody := SubStr(Body, IdxAssign, IdxNext - IdxAssign)
 
-	Assert(InStr(Closure, "_Updater_CloseGui(G)") > 0,
+	Assert(InStr(InstallSelectedBody, "_Updater_CloseGui(G)") > 0,
 		"InstallSelected must close the window via _Updater_CloseGui(G), matching every other close path in lib/updater/changelog.ahk -- a bare G.Destroy() skips closing the WebView2 Controller first (updater-changelog-install-bare-destroy)")
-	Assert(InStr(Closure, "G.Destroy()") = 0,
+	Assert(InStr(InstallSelectedBody, "G.Destroy()") = 0,
 		"InstallSelected must not call the bare G.Destroy() -- it bypasses the _Updater_CloseGui helper that closes the WebView2 Controller before destroying the Gui (updater-changelog-install-bare-destroy)")
 }
 Test("updater changelog: InstallSelected closes via _Updater_CloseGui, not a bare G.Destroy() (updater-changelog-install-bare-destroy)",

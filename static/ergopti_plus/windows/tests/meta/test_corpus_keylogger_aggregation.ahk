@@ -239,7 +239,7 @@ _KlgAggCorpus_RegisterAll() {
 
 _KlgAggCorpus_RunVector(Vec) {
 	_KlgAggCorpus_SetupAndReplay(Vec)
-	Exp := Vec["expected"]
+	Expected := Vec["expected"]
 	Id := Vec["id"]
 
 	if (Id = "simple_typing_3_chars") {

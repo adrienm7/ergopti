@@ -157,8 +157,8 @@ _DescribeValue(V, Depth := 0) {
 		}
 		if (Type(V) == "Array") {
 			parts := []
-			max := Min(V.Length, 6)
-			for i in _Enumerate(V, max) {
+			maxItems := Min(V.Length, 6)
+			for i in _Enumerate(V, maxItems) {
 				parts.Push(_DescribeValue(V[i], Depth + 1))
 			}
 			if (V.Length > 6)

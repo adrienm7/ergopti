@@ -80,8 +80,8 @@ _DequeueContract_Stamp(Rows, NowMs) {
 _DequeueContract_Prune(Rows, NowMs) {
 	Remaining := []
 	for Row in Rows {
-		Exp := Row.Has("expireMs") ? Row["expireMs"] : 0
-		if (Exp = 0 or NowMs < Exp)
+		Expiry := Row.Has("expireMs") ? Row["expireMs"] : 0
+		if (Expiry = 0 or NowMs < Expiry)
 			Remaining.Push(Row)
 	}
 	return Remaining
@@ -91,10 +91,10 @@ _DequeueContract_Prune(Rows, NowMs) {
 _DequeueContract_NextDelayMs(Rows, NowMs) {
 	Earliest := 0
 	for Row in Rows {
-		Exp := Row.Has("expireMs") ? Row["expireMs"] : 0
-		if (Exp > 0 and NowMs < Exp) {
-			if (Earliest = 0 or Exp < Earliest)
-				Earliest := Exp
+		Expiry := Row.Has("expireMs") ? Row["expireMs"] : 0
+		if (Expiry > 0 and NowMs < Expiry) {
+			if (Earliest = 0 or Expiry < Earliest)
+				Earliest := Expiry
 		}
 	}
 	if (Earliest = 0)
