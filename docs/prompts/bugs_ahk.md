@@ -45,7 +45,7 @@ CATALOGUE DES CLASSES DE BUGS À CHASSER (spécifique AHK + ce codebase)
 - Tout appel OS (Send/SendInput, Hotkey, InputHook, WinHttp, COM, FileRead/FileOpen,
   RegRead) NON protégé par try/pcall : sur un driver clavier, une exception non gérée peut
   verrouiller le clavier. Vérifie la couverture du global OnError (crash_reporter).
-- Encodage source : tout .ahk doit être UTF-8 BOM + CRLF. Un mélange LF/BOM fait abandonner
+- Encodage source : tout .ahk doit être UTF-8 BOM + LF. Un mélange d'encodages ou de fins de ligne fait abandonner
   le parser EN SILENCE en milieu de fichier (du code disparaît, des tests ne s'enregistrent
   pas, aucun message). Signale tout fichier à l'encodage douteux.
 - Échappement v2 : `" (backtick-quote) pour un guillemet littéral, JAMAIS "" (syntaxe v1).

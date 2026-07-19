@@ -66,7 +66,7 @@ locally before opening a PR.
 | `npm run test:js`                  | Shared domain pipeline: port compliance, manifest/priority parity, translation audit, strict conventions, architecture diagram |
 | `npm run test:hs`                  | macOS (Hammerspoon / Lua) unit + meta suite — `static/ergopti_plus/macos/tests/run.lua` |
 | `npm run test:linux`              | Linux (LuaJIT) suite — `static/ergopti_plus/linux/tests/run.lua`      |
-| `npm run test:ahk-encoding`        | Verifies every `.ahk` file is UTF-8 **BOM + CRLF** (AHK v2 aborts silently on encoding drift) |
+| `npm run test:ahk-encoding`        | Verifies every `.ahk` file is UTF-8 **BOM + LF** (AHK v2 aborts silently on encoding drift) |
 | `npm run lint:conventions:strict`  | Banner alignment, spacing and section-header rules (the commit gate)  |
 
 The Windows AHK unit suite runs from
@@ -147,5 +147,5 @@ Managed by [Husky](https://typicode.github.io/husky/)
 | Step | Action                                                            | Why                                                                 |
 | ---- | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
 | 1    | Format staged hotstring TOML via `tools/dev/format_toml.py` and re-stage | Keeps the catalogue order canonical and diffs minimal               |
-| 2    | Fix AHK encoding (UTF-8 BOM + CRLF) on staged `.ahk` via `tools/deploy/fix-ahk-encoding.cjs` and re-stage | AHK v2 silently aborts mid-file on encoding drift → silent CI failures |
+| 2    | Fix AHK encoding (UTF-8 BOM + LF) on staged `.ahk` via `tools/deploy/fix-ahk-encoding.cjs` and re-stage | AHK v2 silently aborts mid-file on encoding drift → silent CI failures |
 | 3    | `node tools/lint/lint-conventions.js --fail-on-violations`       | Blocks the commit on any banner / spacing / section-header violation |
