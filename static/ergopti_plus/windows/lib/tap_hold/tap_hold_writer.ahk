@@ -361,34 +361,23 @@ WriteTapHoldNative(KeyId) {
 ; ``inherit_defaults = false`` the loader would re-merge shipped defaults on
 ; the next reload, undoing « Tout désactiver ».
 _TH_WriteTapHoldDisabled() {
-	global TapHold, _ConfigDir, _AhkSubDir
-	if IsSet(TapHold) {
-		TapHold["keys"] := Map()
-		TapHold["layers"] := Map()
-		TapHold["inherit_defaults"] := false
+	global TapHold
+	if !IsSet(TapHold) {
+		try LoggerWarn("TapHoldWriter", "TapHold global unset — cannot disable tap-holds.")
+		return false
 	}
-	if !IsSet(_ConfigDir) {
-		try LoggerWarn("TapHoldWriter", "_ConfigDir unset — cannot persist disabled tap_hold.toml.")
-		return
-	}
-	Path := _ConfigDir . _AhkSubDir . "tap_hold.toml"
-	Content := "# Cleared by Ergopti+ global disable — shipped defaults are not inherited.`r`n"
-		. "[tap_hold]`r`n"
-		. "inherit_defaults = false`r`n"
-	; Atomic write: stage the content in a sibling temp file, then rename over
-	; the target. FileMove with overwrite=true is atomic on NTFS, so a crash or
-	; power loss never leaves a half-written tap_hold.toml that the loader would
-	; misread as an empty (all-disabled) config.
-	Tmp := Path . ".tmp"
-	try {
-		if FileExist(Tmp)
-			FileDelete(Tmp)
-		FileAppend(Content, Tmp, "UTF-8-RAW")
-		FileMove(Tmp, Path, true)
-	} catch as Err {
-		try FileDelete(Tmp)
-		try LoggerError("TapHoldWriter", "Could not write disabled tap_hold.toml: {1}.", Err.Message)
-	}
+	; Never mutate the live map before the on-disk transaction succeeds.  A
+	; failed FileMove used to leave the running driver disabled while its next
+	; reload restored the old file, producing an unexplained state reversal.
+	Candidate := _TH_CloneData(TapHold)
+	Candidate["keys"] := Map()
+	Candidate["layers"] := Map()
+	Candidate["inherit_defaults"] := false
+	if !_TH_WriteTapHoldToml(Candidate)
+		return false
+	TapHold := Candidate
+	try LoggerInfo("TapHoldWriter", "All tap-hold mappings disabled and persisted.")
+	return true
 }
 
 ; Rewrite ``<config>/autohotkey/tap_hold.toml`` from scratch from the current

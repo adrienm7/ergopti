@@ -127,9 +127,12 @@ _TH_ResetAllToDefaults(*) {
 ; Clear every configured key so all physical keys revert to their native OS
 ; behaviour (no tap remapping, no hold remapping).
 _TH_DisableAll(*) {
-	if IsSet(_TH_WriteTapHoldDisabled) {
-		try _TH_WriteTapHoldDisabled()
+	if !IsSet(_TH_WriteTapHoldDisabled) {
+		try LoggerError("TapHoldMenu", "Disable-all unavailable: tap-hold writer is not loaded.")
+		return
 	}
+	if !_TH_WriteTapHoldDisabled()
+		return
 	_TH_ReloadTapHoldMenu("disable_all", "")
 }
 
