@@ -623,44 +623,14 @@ if Features["shortcuts"]["open_downloads"] {
             DownloadsPath := EnvGet("USERPROFILE") "\Downloads"
         }
 
-        ; Look for an existing Explorer window already showing Downloads.
-        ; Iterate every visible window of CabinetWClass / ExploreWClass and
-        ; compare its location bar URL -- reliable across localisations
-        ; (avoids matching "Téléchargements" vs "Downloads" titles).
+        ; This keyboard hotkey must never enumerate Shell.Application or wait
+        ; for Explorer: either COM boundary can block all remapping for seconds.
+        ; Explorer opens/reuses the resolved known path asynchronously itself.
         try {
-            for Win in ComObject("Shell.Application").Windows { ; COM window enumeration — not routable through AppLauncher port
-                try {
-                    LocalPath := DOMPathToFilesystem(Win.LocationURL)
-                    if (LocalPath != "" and StrLower(LocalPath) == StrLower(DownloadsPath)) {
-                        Hwnd := Win.HWND
-                        if WMExists("ahk_id " Hwnd) {
-                            WMActivate("ahk_id " Hwnd)
-                            WinShow("ahk_id " Hwnd)
-                            return
-                        }
-                    }
-                } catch as Err {
-                    ; A window closing mid-enumeration, or a COM property access
-                    ; on a stale Win reference, must not abort the whole scan --
-                    ; skip just this window and keep looking for Downloads.
-                    LoggerDebug("Search", "OpenDownloads: skipped a window during Explorer scan: {1}.", Err.Message)
-                    continue
-                }
-            }
+            Run('explorer.exe "' DownloadsPath '"')
         } catch as Err {
-            ; Shell.Application COM enumeration itself can fail (Explorer not
-            ; running, COM re-init race); fall through to opening a fresh
-            ; window below instead of letting the exception propagate.
-            LoggerWarn("Search", "OpenDownloads: Explorer window scan failed, opening a fresh window: {1}.", Err.Message)
-        }
-
-        ; No existing window -- open a fresh one and force it to the foreground.
-        ; We split executable and argument explicitly to avoid Explorer
-        ; misparsing a path containing accents (e.g. "Téléchargements")
-        ; as a drive letter.
-        Run('explorer.exe "' DownloadsPath '"')
-        if WinWait("ahk_class CabinetWClass", , 2) {
-            WMActivate("ahk_class CabinetWClass")
+            LoggerError("Shortcuts", "OpenDownloads failed for '{1}': {2}", DownloadsPath, Err.Message)
+            try TrayTip("Could not open Downloads.", "ErgoptiPlus", "Iconx Mute")
         }
     }
 
