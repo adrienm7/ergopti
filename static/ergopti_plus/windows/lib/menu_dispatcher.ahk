@@ -98,6 +98,7 @@ global _MenuDispatchLastFire := Map()
 global _MenuDispatcherEpoch := 0
 global _MenuDispatchTokens := Map()
 global _MenuDispatchTokenCounter := 0
+global _MenuDispatchClickSequences := Map()
 
 ; Hard ceiling on retry delay (ms) — long enough for any reasonable AHK
 ; dispatch latency, short enough that the user doesn't perceive the
@@ -130,11 +131,12 @@ global _MENU_RETRY_DELAY_MS := 60
 ; unbounded growth of both Maps when a rebuild shrinks the menu and never
 ; re-registers the dropped IDs.
 MenuDispatcher_Reset() {
-    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens
+    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchClickSequences
     _MenuDispatcherEpoch += 1
     _MenuDispatchCallbacks := Map()
     _MenuDispatchLastFire  := Map()
     _MenuDispatchTokens    := Map()
+    _MenuDispatchClickSequences := Map()
 }
 
 ; Per-menu prune for rebuilders that delete + repopulate a SINGLE menu in place
@@ -453,7 +455,7 @@ _FindUniqueMenuItemIdByName(MenuObj, ItemName) {
 ; SetTimer thread (which gets its own pseudo-thread slot, bypassing
 ; whatever saturation drops the WM_COMMAND callback).
 _OnMenuCommandWmCommand(wParam, lParam, msg, hwnd) {
-    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MENU_RETRY_DELAY_MS, _MenuDispatcherEpoch, _MenuDispatchTokens
+    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MENU_RETRY_DELAY_MS, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchClickSequences
 
     ItemId := wParam & 0xFFFF
     NotifyCode := (wParam >> 16) & 0xFFFF
@@ -470,8 +472,10 @@ _OnMenuCommandWmCommand(wParam, lParam, msg, hwnd) {
         return
     }
     LastFire := _MenuDispatchLastFire.Has(ItemId) ? _MenuDispatchLastFire[ItemId] : 0
+    ClickSequence := _MenuDispatchClickSequences.Has(ItemId) ? _MenuDispatchClickSequences[ItemId] + 1 : 1
+    _MenuDispatchClickSequences[ItemId] := ClickSequence
     ; Single-shot timer: negative ms = "fire once, auto-remove".
-    SetTimer(_DispatchIfMissed.Bind(ItemId, LastFire, _MenuDispatcherEpoch, _MenuDispatchTokens[ItemId]), -_MENU_RETRY_DELAY_MS)
+    SetTimer(_DispatchIfMissed.Bind(ItemId, LastFire, _MenuDispatcherEpoch, _MenuDispatchTokens[ItemId], ClickSequence), -_MENU_RETRY_DELAY_MS)
 }
 
 ; Fires after _MENU_RETRY_DELAY_MS. If LastFire hasn't moved since the
@@ -490,8 +494,8 @@ _OnMenuCommandWmCommand(wParam, lParam, msg, hwnd) {
 ; menu rebuild interleaved with two fast clicks), cosmetically benign
 ; (most callbacks are idempotent), and structurally unavoidable without a
 ; per-click sequence counter — a more invasive change deferred for now.
-_DispatchIfMissed(ItemId, ExpectedLastFire, ExpectedEpoch := 0, ExpectedToken := 0) {
-    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens
+_DispatchIfMissed(ItemId, ExpectedLastFire, ExpectedEpoch := 0, ExpectedToken := 0, ExpectedClickSequence := 0) {
+    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchClickSequences
     ; Critical is held only for the brief atomic gate — reading/updating state and
     ; extracting the callback reference. Releasing it before Callback.Call() is
     ; mandatory: holding Critical across an arbitrary menu action risks starving the
@@ -506,6 +510,10 @@ _DispatchIfMissed(ItemId, ExpectedLastFire, ExpectedEpoch := 0, ExpectedToken :=
         return
     }
     if (ExpectedToken and (!_MenuDispatchTokens.Has(ItemId) or _MenuDispatchTokens[ItemId] != ExpectedToken)) {
+        Critical "Off"
+        return
+    }
+    if (ExpectedClickSequence and (!_MenuDispatchClickSequences.Has(ItemId) or _MenuDispatchClickSequences[ItemId] != ExpectedClickSequence)) {
         Critical "Off"
         return
     }
