@@ -13,15 +13,13 @@
 ; context buffer, so the next prediction ran against stale context.
 ;
 ; The fix mirrors LLM_Bridge_OnAccept: KL_MarkSynthetic("llm") before TextSend,
-; a deferred KL_ClearSynthetic() after, and an append of the inserted text to
-; _LLM_Bridge_Buffer so the engine's context stays in sync with the document.
+; then commits the inserted text to _LLM_Bridge_Buffer only from the sender's
+; successful completion callback. A failed clipboard/direct injection must leave
+; the rolling context unchanged, because the document did not receive the text.
 ;
-; LLM_Engine_OnResults is in the run_all include graph; KL_MarkSynthetic /
-; KL_ClearSynthetic are stubbed (test_stubs.ahk, depth-counter on
-; Keylogger.synth_active) and TextSend is the no-op'd adapter, so this is a
-; headless-safe behavioural test. KL_ClearSynthetic is deferred via a negative
-; SetTimer, so it never fires synchronously during the call and the synthetic
-; depth stays incremented when we assert immediately after.
+; LLM_Engine_OnInlineInjectComplete is in the run_all include graph. Calling
+; that completion directly keeps this regression test headless-safe while still
+; exercising the causal state boundary: no output confirmation, no context commit.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -31,32 +29,27 @@
 
 ; ===================================================
 ; ===================================================
-; ======= 1/ Synthetic-tag + buffer-advance =========
+; ======= 1/ Sender-confirmed buffer advance =========
 ; ===================================================
 ; ===================================================
 
-_IANS_InlineMarksSyntheticAndAdvancesBuffer() {
+_IANS_InlineCompletionCommitsOnlySuccessfulOutput() {
 	global _LLM_Engine, _LLM_Bridge_Buffer
-	; The keylogger stub tracks synthetic depth via Keylogger.synth_active.
-	Keylogger.synth_active := 0
-	Keylogger.synth_type   := "none"
-	; Enable inline auto-type so LLM_Engine_OnResults takes the inject branch.
 	_LLM_Engine := Map("inline_autotype", true)
 	_LLM_Bridge_Buffer := "je voudrais "
 
-	LLM_Engine_OnResults(["vous remercier"], "je voudrais ", 1, true)
-
-	; (a) KL_MarkSynthetic("llm") must have run before TextSend. The deferred
-	; KL_ClearSynthetic has not fired yet (negative SetTimer), so the depth is
-	; still incremented and the source recorded.
-	Assert(Keylogger.synth_active >= 1,
-		"inline auto-type must call KL_MarkSynthetic before TextSend so model output is not counted as manual keystrokes")
-	AssertEqual("llm", Keylogger.synth_type,
-		"inline auto-type must tag the synthetic burst with the 'llm' source")
-
-	; (b) The rolling context buffer must be advanced by the inserted text so the
-	; next prediction sees what the document actually contains, not stale context.
+	LLM_Engine_OnInlineInjectComplete("vous remercier", true)
+	; A successful sender completion means the visible document contains text;
+	; only then may the next prediction consume it as context.
 	AssertEqual("je voudrais vous remercier", _LLM_Bridge_Buffer,
-		"inline auto-type must append the inserted text to _LLM_Bridge_Buffer to keep context in sync with the document")
+		"inline auto-type must append only sender-confirmed output to _LLM_Bridge_Buffer")
+	AssertEqual("vous remercier", _LLM_Engine["inline_last_typed"],
+		"inline auto-type must publish inline_last_typed only after sender success")
+
+	LLM_Engine_OnInlineInjectComplete(" qui echoue", false, "simulated sender failure")
+	AssertEqual("je voudrais vous remercier", _LLM_Bridge_Buffer,
+		"failed inline injection must not advance context with output absent from the document")
+	AssertEqual("vous remercier", _LLM_Engine["inline_last_typed"],
+		"failed inline injection must not replace the last confirmed output")
 }
-Test("prediction_engine: inline auto-type marks synthetic and advances buffer (inline-autotype-not-synthetic)", _IANS_InlineMarksSyntheticAndAdvancesBuffer)
+Test("prediction_engine: inline auto-type commits context only after sender success (inline-autotype-not-synthetic)", _IANS_InlineCompletionCommitsOnlySuccessfulOutput)
