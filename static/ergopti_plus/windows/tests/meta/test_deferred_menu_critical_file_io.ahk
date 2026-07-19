@@ -5,20 +5,9 @@
 ; DESCRIPTION:
 ; Static source guard for the "deferred-menu-critical-file-io" finding.
 ;
-; BuildTrayMenuDeferred takes Critical("On") around InitSubMenus()/initMenu().
-; Critical starves the message pump and the LL keyboard hook for its whole
-; duration. InitSubMenus calls _HS_PreScanPersonal, which recurses the personal-
-; hotstrings dir and parses every ext TOML — unbounded file I/O that can stall for
-; seconds on a cloud-synced config dir (OneDrive Files On-Demand) or a spun-down
-; drive, turning a one-time menu build into a multi-second keyboard freeze.
-;
-; The fix warms the prescan cache by calling _HS_PreScanPersonal() BEFORE
-; Critical("On"); the function is cache-guarded (idempotent once
-; _HS_PreScanPersonalCacheLoaded is set), so the under-Critical InitSubMenus call
-; hits only the warm cache. This test asserts the prescan call appears in the
-; function body and PRECEDES the Critical("On") that opens the starvation window —
-; a regression that moves the I/O back under Critical fails CI. Meta-static because
-; ErgoptiPlus.ahk registers every hotkey at load and cannot be #Included headless.
+; The root replacement now stages the complete menu and enters Critical only in
+; TrayMenuStage_Publish. This test prevents a regression that moves personal
+; hotstring I/O back into BuildTrayMenuDeferred's keyboard-hook starvation window.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -47,17 +36,13 @@ _DMCFIO_ReadSource(RelPath) {
 ; ==================================================
 ; ==================================================
 
-_DMCFIO_PrescanWarmedBeforeCritical() {
+_DMCFIO_PrescanRunsOutsideCritical() {
 	Src := _DriverSourceConcat()
 	Seg := _DriverFuncBody("BuildTrayMenuDeferred")
 	Assert(Seg != "", "BuildTrayMenuDeferred() must exist in ErgoptiPlus.ahk")
-	; Match the EXECUTABLE sequence: the prescan completes before the assignment
-	; that opens Critical. Matching code rather than surrounding comments keeps
-	; the file-I/O boundary meaningful even when Critical's prior state is saved.
-	; Q is the ASCII double-quote (the linter bans the backtick-quote escape).
-	Q := Chr(34)
-	Pattern := "_HS_PreScanPersonal\(\)\s+_MenuBuildCritical\s*:=\s*Critical\(" . Q . "On" . Q . "\)"
-	Assert(RegExMatch(Seg, Pattern) > 0,
-		"_HS_PreScanPersonal() must complete before BuildTrayMenuDeferred enters Critical — warming the prescan cache off-Critical keeps unbounded personal-hotstrings file I/O out of the keyboard-hook starvation window")
+	Assert(InStr(Seg, "_HS_PreScanPersonal()") > 0,
+		"BuildTrayMenuDeferred must warm the personal-hotstrings cache before staging the menu")
+	Assert(InStr(Seg, 'Critical("On")') = 0,
+		"BuildTrayMenuDeferred must not hold Critical across personal-hotstrings I/O; only TrayMenuStage_Publish may enter the short publication critical section")
 }
-Test("ErgoptiPlus: BuildTrayMenuDeferred warms prescan before Critical (deferred-menu-critical-file-io)", _DMCFIO_PrescanWarmedBeforeCritical)
+Test("ErgoptiPlus: BuildTrayMenuDeferred keeps personal prescan outside Critical (deferred-menu-critical-file-io)", _DMCFIO_PrescanRunsOutsideCritical)

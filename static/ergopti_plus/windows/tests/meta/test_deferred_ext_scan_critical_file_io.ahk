@@ -66,23 +66,18 @@ _DESC_StripComments(Body) {
 	return out
 }
 
-_DESC_PrescanWarmedBeforeCritical() {
+_DESC_PrescanRunsOutsideCritical() {
 	Src := _DriverSourceConcat()
 	Seg := _DESC_FuncBodyFlat(Src, "BuildTrayMenuDeferred() {")
 	Assert(Seg != "", "BuildTrayMenuDeferred() must exist in ErgoptiPlus.ahk")
 
-	; Strip comments so prose that mentions Critical("On") cannot fool the
-	; positional check — only executable code lines count.
+	; Strip comments so prose cannot fool the executable-code assertions.
 	Code := _DESC_StripComments(Seg)
-	Q := Chr(34)
-	CritPos := InStr(Code, "Critical(" . Q . "On" . Q . ")")
 	PreScanPos := InStr(Code, "_HS_PreScanExtensions()")
 	Assert(PreScanPos > 0,
 		"_HS_PreScanExtensions() must be called in BuildTrayMenuDeferred")
-	Assert(CritPos > 0,
-		'Critical("On") must be called in BuildTrayMenuDeferred')
-	Assert(PreScanPos < CritPos,
-		'_HS_PreScanExtensions() must run BEFORE Critical("On") in BuildTrayMenuDeferred — warming the extensions cache off-Critical keeps the file I/O out of the keyboard-hook starvation window (MEDIUM-03)')
+	Assert(InStr(Code, 'Critical("On")') = 0,
+		'BuildTrayMenuDeferred must not hold Critical around extension I/O; staging confines Critical to publication (MEDIUM-03)')
 }
 
 _DESC_ExtMenuDoesNoFileIO() {
@@ -98,5 +93,5 @@ _DESC_ExtMenuDoesNoFileIO() {
 		"_HS_Extensions must NOT FileRead(ManifestPath) — manifest parsing must happen in the off-Critical prescan (MEDIUM-03)")
 }
 
-Test("meta deferred-ext-scan: BuildTrayMenuDeferred warms extensions cache before Critical (MEDIUM-03)", _DESC_PrescanWarmedBeforeCritical)
+Test("meta deferred-ext-scan: BuildTrayMenuDeferred keeps extension scan outside Critical (MEDIUM-03)", _DESC_PrescanRunsOutsideCritical)
 Test("meta deferred-ext-scan: _HS_Extensions does no file I/O at menu-build time (MEDIUM-03)", _DESC_ExtMenuDoesNoFileIO)

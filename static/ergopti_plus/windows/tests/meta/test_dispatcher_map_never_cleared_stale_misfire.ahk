@@ -11,10 +11,10 @@
 ; a reused ID to a DIFFERENT item's callback; _DispatchIfMissed's 0 == 0
 ; double-fire guard then fires the WRONG action on a dropped-click retry.
 ;
-; The fix exposes MenuDispatcher_Reset() in lib/menu_dispatcher.ahk (clearing
-; both Maps) and calls it at the very start of BOTH rebuild entry points:
-; RebuildTrayMenu() in ui/tray_menu.ahk and BuildTrayMenuDeferred() in
-; ErgoptiPlus.ahk, BEFORE the InitSubMenus()/initMenu() re-registration pass.
+; The staged rebuild registers detached child menus before replacing the root,
+; so Reset() would erase their dispatcher entries. Publication instead advances
+; the retry epoch, attaches the staged tree, then prunes entries not reachable
+; from the new root.
 ;
 ; This is a meta-static test (scans source text) because menu_dispatcher.ahk
 ; calls _MenuDispatcherInit() at top level (registers an OnMessage WM_COMMAND
@@ -73,20 +73,22 @@ Test("menu_dispatcher: MenuDispatcher_Reset clears both dispatch Maps (dispatche
 ; ==================================================
 ; ==================================================
 
-_DMNCSM_RebuildTrayMenuCallsReset() {
+_DMNCSM_StagedPublicationRetiresOldIdsAfterAttach() {
 	Src := _DMNCSM_ReadSource("ui/tray_menu.ahk")
+	Seg := _DriverFuncBody("TrayMenuStage_Publish")
+	Assert(Seg != "", "TrayMenuStage_Publish() must exist in ui/tray_menu.ahk")
+	EpochPos := InStr(Seg, "MenuDispatcher_BeginReplacement()")
+	DeletePos := InStr(Seg, "A_TrayMenu.Delete()")
+	PrunePos := InStr(Seg, "MenuDispatcher_PruneMenu(A_TrayMenu)")
+	Assert(EpochPos > 0 and DeletePos > EpochPos and PrunePos > DeletePos,
+		"staged publication must invalidate old retry timers, replace the root, then prune unreachable IDs — clearing Maps before detached callbacks are published would silently drop clicks")
+}
+Test("tray_menu: staged publication retires old dispatcher IDs after attach (dispatcher-map-never-cleared-stale-misfire)", _DMNCSM_StagedPublicationRetiresOldIdsAfterAttach)
+
+_DMNCSM_RebuildUsesStagedInit() {
 	Seg := _DriverFuncBody("RebuildTrayMenu")
 	Assert(Seg != "", "RebuildTrayMenu() must exist in ui/tray_menu.ahk")
-	Assert(InStr(Seg, "MenuDispatcher_Reset()") > 0,
-		"RebuildTrayMenu must call MenuDispatcher_Reset() before re-registering items - otherwise stale reused IDs survive the rebuild and can misfire")
+	Assert(InStr(Seg, "A_TrayMenu.Delete()") = 0 and InStr(Seg, "initMenu()") > 0,
+		"RebuildTrayMenu must leave the live root intact until initMenu's staged publication succeeds")
 }
-Test("tray_menu: RebuildTrayMenu calls MenuDispatcher_Reset (dispatcher-map-never-cleared-stale-misfire)", _DMNCSM_RebuildTrayMenuCallsReset)
-
-_DMNCSM_DeferredBuildCallsReset() {
-	Src := _DriverSourceConcat()
-	Seg := _DriverFuncBody("BuildTrayMenuDeferred")
-	Assert(Seg != "", "BuildTrayMenuDeferred() must exist in ErgoptiPlus.ahk")
-	Assert(InStr(Seg, "MenuDispatcher_Reset()") > 0,
-		"BuildTrayMenuDeferred must call MenuDispatcher_Reset() before InitSubMenus()/initMenu() repopulate the dispatch Maps")
-}
-Test("ErgoptiPlus: BuildTrayMenuDeferred calls MenuDispatcher_Reset (dispatcher-map-never-cleared-stale-misfire)", _DMNCSM_DeferredBuildCallsReset)
+Test("tray_menu: RebuildTrayMenu delegates root replacement to staged init (dispatcher-map-never-cleared-stale-misfire)", _DMNCSM_RebuildUsesStagedInit)

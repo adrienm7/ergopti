@@ -124,8 +124,16 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; from here via a flag: initMenu() itself runs inside the deferred tray-build pass,
 	; so any flag set here would be read by the boot tail long before this line runs.
 	if !_LLM_Menu_InTray {
-		A_TrayMenu.Add(t("menu.llm.title"), _LLM_Menu_Handle)
+		; initMenu may be constructing a detached replacement tree. Record the
+		; root insertion in that transaction instead of exposing a half-built
+		; tray while the rest of the menu is rendered.
+		TrayMenuStage_Add(t("menu.llm.title"), _LLM_Menu_Handle)
 		_LLM_Menu_InTray := true
+	} else if IsObject(_TrayMenuStage) {
+		; A full root replacement removed the previous IA parent entry. The
+		; persistent submenu remains valid, but it must be attached to this new
+		; staged root even though it was already in the retired tray.
+		TrayMenuStage_Add(t("menu.llm.title"), _LLM_Menu_Handle)
 	}
 
 	; Bootstrap Ollama silently on reload when the feature was already enabled.

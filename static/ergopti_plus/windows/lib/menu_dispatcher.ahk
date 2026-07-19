@@ -139,6 +139,18 @@ MenuDispatcher_Reset() {
     _MenuDispatchClickSequences := Map()
 }
 
+; Advance the retry epoch before replacing the tray tree, without clearing the
+; registrations belonging to detached submenus that are about to be published.
+; A full Reset() is only safe before *any* new menu item has been registered;
+; staged rebuilds intentionally register their child menus while the old tray
+; remains live.  Clearing those Maps here would make every staged callback a
+; silent native-dispatch-only item after publication.
+MenuDispatcher_BeginReplacement() {
+    global _MenuDispatcherEpoch, _MenuDispatchClickSequences
+    _MenuDispatcherEpoch += 1
+    _MenuDispatchClickSequences := Map()
+}
+
 ; Per-menu prune for rebuilders that delete + repopulate a SINGLE menu in place
 ; (e.g. LLM_Menu_Build), as opposed to a full tray rebuild that can call
 ; MenuDispatcher_Reset(). Call this right AFTER MenuObj.Delete(): the deleted

@@ -14,6 +14,92 @@
 
 
 
+; A_TrayMenu is a read-only built-in object, so a replacement root cannot be
+; swapped in wholesale. Build every child Menu while the current root remains
+; usable, then record the small set of root mutations and apply them in one
+; Critical section. This prevents both the empty-menu click window and a long
+; Critical section around TOML, i18n, and renderer work.
+global _TrayMenuStage := false
+
+TrayMenuStage_Begin() {
+	global _TrayMenuStage
+	if IsObject(_TrayMenuStage)
+		throw Error("Tray-menu staging is already active")
+	_TrayMenuStage := []
+	return _TrayMenuStage
+}
+
+TrayMenuStage_Add(Label := "", Target := "") {
+	global _TrayMenuStage
+	if !IsObject(_TrayMenuStage) {
+		if (Label == "")
+			return A_TrayMenu.Add()
+		return A_TrayMenu.Add(Label, Target)
+	}
+	_TrayMenuStage.Push(Map("kind", "submenu", "label", Label, "target", Target))
+}
+
+TrayMenuStage_AddAction(Label, Callback) {
+	global _TrayMenuStage
+	if !IsObject(_TrayMenuStage)
+		return RegisterMenuItem(A_TrayMenu, Label, Callback)
+	_TrayMenuStage.Push(Map("kind", "action", "label", Label, "target", Callback))
+}
+
+TrayMenuStage_Check(Label) {
+	global _TrayMenuStage
+	if !IsObject(_TrayMenuStage)
+		return A_TrayMenu.Check(Label)
+	_TrayMenuStage.Push(Map("kind", "check", "label", Label))
+}
+
+TrayMenuStage_Disable(Label) {
+	global _TrayMenuStage
+	if !IsObject(_TrayMenuStage)
+		return A_TrayMenu.Disable(Label)
+	_TrayMenuStage.Push(Map("kind", "disable", "label", Label))
+}
+
+TrayMenuStage_Abort() {
+	global _TrayMenuStage
+	_TrayMenuStage := false
+}
+
+TrayMenuStage_Publish() {
+	global _TrayMenuStage
+	if !IsObject(_TrayMenuStage)
+		throw Error("Tray-menu publication requires an active stage")
+	Stage := _TrayMenuStage
+	_PublishCritical := Critical("On")
+	try {
+		; Invalidate retries for the retired tree, but retain dispatcher entries
+		; for detached child menus that were registered during staging.
+		MenuDispatcher_BeginReplacement()
+		A_TrayMenu.Delete()
+		for _, Entry in Stage {
+			switch Entry["kind"] {
+				case "submenu":
+					if (Entry["label"] == "")
+						A_TrayMenu.Add()
+					else
+						A_TrayMenu.Add(Entry["label"], Entry["target"])
+				case "action":
+					RegisterMenuItem(A_TrayMenu, Entry["label"], Entry["target"])
+				case "check":
+					A_TrayMenu.Check(Entry["label"])
+				case "disable":
+					A_TrayMenu.Disable(Entry["label"])
+			}
+		}
+		; The new subtrees are now reachable from the tray. One whole-tree walk
+		; drops only registrations left behind by the retired generation.
+		MenuDispatcher_PruneMenu(A_TrayMenu)
+	} finally {
+		_TrayMenuStage := false
+		Critical(_PublishCritical)
+	}
+}
+
 ; Re-run the hotstring registration in-process so a section toggle takes effect
 ; immediately, with no script Reload. Clears the HSE engine and its buffer, then
 ; re-runs RegisterAllHotstrings(): it re-evaluates every Features guard and
@@ -69,13 +155,6 @@ RebuildHotstringsLive() {
 ; state-changing toggles (layout, tap-holds, shortcuts) still call Reload().
 RebuildTrayMenu() {
 	global SubMenus
-	; Clear the dispatch bypass Maps BEFORE deleting + repopulating the menu.
-	; AHK reuses freed menu-item IDs after Menu.Delete(); a stale entry left in
-	; the Maps could bind a reused ID to a different item's callback and fire
-	; the WRONG action on a dropped-click retry (see menu_dispatcher.ahk).
-	MenuDispatcher_Reset()
-	A_TrayMenu.Delete()
-	SubMenus := Map()
 	; Force a fresh personal-hotstrings extension-tree scan on every explicit
 	; rebuild. Without this, _HS_PreScanPersonalCacheLoaded latches true after
 	; the first scan and a personal extension .toml added/edited mid-session

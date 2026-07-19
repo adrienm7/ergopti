@@ -7,20 +7,18 @@
 ;
 ; The updater fires SetTimer(-50) callbacks that rebuild the tray menu after a
 ; channel selection change or background check result. Prior to the fix, these
-; rebuilds called initMenu() directly without first calling MenuDispatcher_Reset().
-; The menu-item dispatch Maps (_MenuDispatchCallbacks, _MenuDispatchLastFire) were
-; never cleared, so reused item IDs from the new menu could fire the OLD callback
-; from a previous build — a silent misfire that sent the user to the wrong settings
-; screen or triggered the wrong install path.
+; rebuilds used a separate dispatcher-reset path. The staged root publication is
+; now the single owner of retry invalidation and stale-ID pruning; resetting here
+; would erase callbacks registered in detached child menus before they attach.
 ;
 ; The fix wraps all updater-originated menu rebuilds in _Updater_RebuildMenu(),
-; which calls MenuDispatcher_Reset() BEFORE initMenu(). This mirrors the same
-; reset already present in RebuildTrayMenu (menu_rebuild.ahk) for the non-updater
-; rebuild path.
+; which calls initMenu(), the single staged publication path used by every tray
+; rebuild.
 ;
 ; This test asserts:
 ;   1. _Updater_RebuildMenu is defined in the updater module.
-;   2. _Updater_RebuildMenu calls MenuDispatcher_Reset() before initMenu().
+;   2. _Updater_RebuildMenu delegates directly to staged initMenu() and does not
+;      perform an unsafe pre-stage dispatcher reset.
 ;   3. All SetTimer(-50) tray-rebuild calls in the updater go through
 ;      _Updater_RebuildMenu, not bare initMenu() calls.
 ;
@@ -61,23 +59,20 @@ Test("updater: _Updater_RebuildMenu wrapper is defined (updater-rebuild-resets-d
 	_URRD_RebuildMenuWrapperDefined)
 
 
-_URRD_RebuildMenuResetsDispatcherFirst() {
+_URRD_RebuildMenuUsesStagedPublisher() {
 	Body := _DriverFuncBody("_Updater_RebuildMenu")
 	Assert(Body != "", "_Updater_RebuildMenu must be defined — prerequisite for this test")
 
-	ResetPos  := InStr(Body, "MenuDispatcher_Reset()")
 	RebuildPos := InStr(Body, "initMenu()")
 
-	Assert(ResetPos > 0,
-		"_Updater_RebuildMenu must call MenuDispatcher_Reset() — without clearing the dispatch Maps, reused menu IDs from the new build fire the old callbacks from the previous build (AHK-15)")
 	Assert(RebuildPos > 0,
-		"_Updater_RebuildMenu must call initMenu() to actually rebuild the tray — prerequisite for the ordering check")
-	Assert(ResetPos < RebuildPos,
-		"MenuDispatcher_Reset() must be called BEFORE initMenu() in _Updater_RebuildMenu — the dispatch Maps must be empty before the new items register their callbacks")
+		"_Updater_RebuildMenu must call initMenu() so every updater rebuild uses staged publication")
+	Assert(InStr(Body, "MenuDispatcher_Reset()") = 0,
+		"_Updater_RebuildMenu must not clear dispatcher Maps before staged child menus publish; TrayMenuStage_Publish owns epoch invalidation and pruning")
 }
 
-Test("updater: _Updater_RebuildMenu calls MenuDispatcher_Reset before initMenu (updater-rebuild-resets-dispatcher)",
-	_URRD_RebuildMenuResetsDispatcherFirst)
+Test("updater: _Updater_RebuildMenu delegates to staged publication (updater-rebuild-resets-dispatcher)",
+	_URRD_RebuildMenuUsesStagedPublisher)
 
 
 _URRD_NoBareinitMenuInSetTimerCalls() {
@@ -89,7 +84,7 @@ _URRD_NoBareinitMenuInSetTimerCalls() {
 	; A direct SetTimer(...initMenu...) without going through the wrapper is a bug.
 	BarePattern := "SetTimer((*) => initMenu()"
 	Assert(!InStr(Src, BarePattern),
-		"updater must not call initMenu() directly via SetTimer — all tray rebuilds must go through _Updater_RebuildMenu() so MenuDispatcher_Reset() is always called first (AHK-15)")
+		"updater must not call initMenu() directly via SetTimer — all tray rebuilds must go through _Updater_RebuildMenu() so staged publication remains the single replacement path")
 }
 
 Test("updater: no bare initMenu() in SetTimer calls (updater-rebuild-resets-dispatcher)",

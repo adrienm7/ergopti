@@ -273,13 +273,11 @@ Updater_SetCheckInterval(Seconds) {
 ; ===== 1.3) Version helpers ==========
 ; ====================================
 
-; AHK-15: wrapper called from all updater SetTimer(-50) tray rebuild sites.
-; initMenu() deletes and rebuilds the tray menu but never calls
-; MenuDispatcher_Reset(), causing the dispatcher Map to accumulate stale IDs
-; with each rebuild — eventually a recycled ID could fire the wrong action.
-; Reset before rebuild mirrors the contract in RebuildTrayMenu (menu_rebuild.ahk).
+; Wrapper called from all updater SetTimer(-50) tray rebuild sites. initMenu()
+; now stages child menus before publishing the replacement root; it advances the
+; dispatcher epoch and prunes retired IDs at that publication point. Calling
+; MenuDispatcher_Reset() here would erase registrations made during staging.
 _Updater_RebuildMenu() {
-	try MenuDispatcher_Reset()
 	try initMenu()
 }
 
@@ -898,4 +896,3 @@ Updater_ParseBody(Json) {
 	}
 	return ""
 }
-
