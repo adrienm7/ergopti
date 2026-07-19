@@ -200,7 +200,7 @@ _OnMouseClickReset(*) {
 		; A click places the cursor at an unknown position, but the next
 		; keystroke will start a fresh run — treat it as a word boundary so
 		; is_word triggers (e.g. "c★ → c'est") fire immediately.
-		HSE_FeedReset(true)
+                                HSE_FeedReset(true, true)
 		_ResetPrefixBuffer()
 		if IsSet(LLM_Bridge_ResetPredictions)
 			LLM_Bridge_ResetPredictions()
@@ -709,7 +709,7 @@ _OnPrefixKeyDown(IH, VK, SC) {
 				; unknown amount, cursor lands somewhere we cannot
 				; observe. Wipe the buffer and refuse to assume a
 				; word boundary on its left.
-				HSE_FeedReset(false)
+                                HSE_FeedReset(false, true)
 				_ResetPrefixBuffer()
 				return
 			}
@@ -730,7 +730,7 @@ _OnPrefixKeyDown(IH, VK, SC) {
 		} else if (VK == 0x09 or VK == 0x0D) {
 			if (VK == 0x09 and IsSet(LLM_Tooltip_TryAcceptTab) and LLM_Tooltip_TryAcceptTab())
 				return
-			HSE_FeedReset(true)
+                        HSE_FeedReset(true, true)
 			; Flush the rolling LLM context on Tab (when no suggestion was
 			; accepted above) and Enter, mirroring the macOS reset_on_nav
 			; contract. Previously the Enter flush lived in an unreachable
@@ -742,7 +742,7 @@ _OnPrefixKeyDown(IH, VK, SC) {
 				or VK == 0x27 or VK == 0x28) {
 			; Arrow keys and Escape move the cursor to an unknown position,
 			; but the next typed run starts fresh — treat as word boundary.
-			HSE_FeedReset(true)
+                        HSE_FeedReset(true, true)
 			if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
 				LLM_Bridge_FeedKeyDownIfActive(VK)
 		}

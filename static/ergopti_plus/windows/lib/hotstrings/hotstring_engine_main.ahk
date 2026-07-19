@@ -686,9 +686,9 @@ HSE_FeedBackspace(IsPhysical := false) {
 ;   - false for destructive or content-replacing operations where the
 ;     buffer content to the left is completely unknown: Ctrl+X (cut),
 ;     Ctrl+V (paste), Ctrl+Z/Y (undo/redo), backspace on empty buffer.
-HSE_FeedReset(KnownTerminatorBefore := false) {
+HSE_FeedReset(KnownTerminatorBefore := false, IsPhysical := false) {
     global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed
-    if HSE_Suppressed {
+    if HSE_Suppressed and !IsPhysical {
         return
     }
     HSE_Buffer := ""
