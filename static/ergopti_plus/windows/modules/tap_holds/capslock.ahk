@@ -140,11 +140,11 @@ SC03A:: {
 			LoggerDebug("TapHold", "CapsLock hold suppressed after long press because wheel activity was detected.")
 		return
 	}
-	TextPressKey(ModKey, "Down")
+	TapHoldSyntheticKeyDown(ModKey)
 	tap := KeyWait("CapsLock", "T" . TapHoldDuration(TapHold, "caps_lock"))
 	if tap {
 		; Short press — release modifier then dispatch tap action.
-		TextPressKey(ModKey, "Up")
+		TapHoldSyntheticKeyUp(ModKey)
 		_CapsLockDispatch(CtrlActivated)
 		return
 	}
@@ -154,7 +154,7 @@ SC03A:: {
 	try {
 		KeyWait("CapsLock", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
-		TextPressKey(ModKey, "Up")
+		TapHoldSyntheticKeyUp(ModKey)
 	}
 }
 #HotIf
@@ -243,7 +243,7 @@ _CapsLockDispatch(CtrlActivated) {
 ; a configured action throws.
 _CapsLockInvokeTap(CtrlActivated) {
 	if CtrlActivated {
-		TextPressKey("LCtrl", "Down")
+		TapHoldSyntheticKeyDown("LCtrl")
 	}
 	try {
 		; Special cases that cannot be handled by GESTURE_ACTIONS.Fn.Call() directly.
@@ -257,7 +257,7 @@ _CapsLockInvokeTap(CtrlActivated) {
 		}
 	} finally {
 		if CtrlActivated {
-			TextPressKey("LCtrl", "Up")
+			TapHoldSyntheticKeyUp("LCtrl")
 		}
 	}
 }

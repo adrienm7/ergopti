@@ -56,11 +56,11 @@ _EscapeHoldModKey() {
 		return
 	}
 	ModKey := _EscapeHoldModKey()
-	TextPressKey(ModKey, "Down")
+	TapHoldSyntheticKeyDown(ModKey)
 	try {
 		KeyWait("Escape", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
-		TextPressKey(ModKey, "Up")
+		TapHoldSyntheticKeyUp(ModKey)
 	}
 }
 #HotIf

@@ -123,11 +123,11 @@ SC11D:: {
 	; NEVER latch. The wait is capped (U T<timeout>) so a lost SC11D key-up
 	; (focus stolen by a UAC prompt, Suspend toggled mid-press) cannot block the
 	; release forever and leave Shift stuck Down.
-	TextPressKey("LShift", "Down")
+	TapHoldSyntheticKeyDown("LShift")
 	try {
 		KeyWait("SC11D", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
-		TextPressKey("LShift", "Up")
+		TapHoldSyntheticKeyUp("LShift")
 	}
 }
 #HotIf
@@ -151,10 +151,10 @@ $SC11D:: {
 			LoggerDebug("TapHold", "RCtrl hold suppressed after long press because wheel activity was detected.")
 		return
 	}
-	TextPressKey(ModKey, "Down")
+	TapHoldSyntheticKeyDown(ModKey)
 	tap := KeyWait("SC11D", "T" . TapHoldDuration(TapHold, "right_ctrl"))
 	if tap {
-		TextPressKey(ModKey, "Up")
+		TapHoldSyntheticKeyUp(ModKey)
 		_RCtrlDispatch()
 		return
 	}
@@ -163,7 +163,7 @@ $SC11D:: {
 	try {
 		KeyWait("SC11D", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
-		TextPressKey(ModKey, "Up")
+		TapHoldSyntheticKeyUp(ModKey)
 	}
 }
 #HotIf

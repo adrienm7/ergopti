@@ -11,7 +11,7 @@
 ; idempotent the modifier stayed logically held after the single Up, leaking
 ; AltGr onto following keystrokes. The generic modifier handler supersedes it.
 ;
-; The generic handler now keeps exactly one TextPressKey Down/Up pair per call
+; The generic handler now keeps exactly one suspend-owned Down/Up pair per call
 ; for every modifier, including AltGr's RAlt mapping. This test scans that
 ; single implementation so the redundant second Down can never return.
 ;
@@ -66,13 +66,13 @@ _SADRD_AltGrModifierBalanced() {
 	Body := _DriverFuncBody("_SpaceHoldWithModifier")
 	Assert(Body != "", "_SpaceHoldWithModifier(captured) must exist in modules/tap_holds/space.ahk")
 
-	Downs := _SADRD_Count(Body, 'TextPressKey(ModKey, "Down")')
-	Ups := _SADRD_Count(Body, 'TextPressKey(ModKey, "Up")')
+	Downs := _SADRD_Count(Body, "TapHoldSyntheticKeyDown(ModKey)")
+	Ups := _SADRD_Count(Body, "TapHoldSyntheticKeyUp(ModKey)")
 
 	AssertEqual(1, Downs,
-		"_SpaceHoldWithModifier must press its resolved modifier exactly once, including AltGr's RAlt mapping (space-altgr-double-raalt-down)")
+		"_SpaceHoldWithModifier must acquire its resolved modifier exactly once through the suspend-owned helper, including AltGr's RAlt mapping (space-altgr-double-raalt-down)")
 	AssertEqual(1, Ups,
-		"_SpaceHoldWithModifier must release its resolved modifier exactly once (space-altgr-double-raalt-down)")
+		"_SpaceHoldWithModifier must release its resolved modifier exactly once through the suspend-owned helper (space-altgr-double-raalt-down)")
 	AssertEqual(Downs, Ups,
 		"_SpaceHoldWithModifier must keep a balanced modifier Down/Up count so AltGr is never left logically held (space-altgr-double-raalt-down)")
 }

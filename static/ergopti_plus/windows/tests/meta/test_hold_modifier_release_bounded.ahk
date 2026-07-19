@@ -109,7 +109,7 @@ _HMRB_LAltGenericGuarded() {
 	_HMRB_AssertBounded("modules/tap_holds/lalt.ahk", Anchor, "lalt.ahk 4.7")
 	Body := _HMRB_Block(_HMRB_ReadSource("modules/tap_holds/lalt.ahk"), Anchor)
 	SuppressIdx := InStr(Body, "TapHoldShouldSuppressHold")
-	DownIdx := InStr(Body, "TextPressKey(ModKey, " . Q . "Down" . Q . ")")
+	DownIdx := InStr(Body, "TapHoldSyntheticKeyDown(ModKey)")
 	Assert(SuppressIdx > 0 and DownIdx > SuppressIdx,
 		"lalt.ahk 4.7 must not acquire the synthetic modifier before its wheel-cancellation guard (lalt-generic-cancel-releases-modifier)")
 }

@@ -93,11 +93,11 @@ SC038:: {
 	; Arm LShift for the hold, then release it in a finally so it can NEVER latch.
 	; The wait is capped (U T<timeout>) so a lost SC038 key-up (focus stolen by a
 	; UAC prompt, Suspend toggled mid-press) cannot block the release forever.
-	TextPressKey("LShift", "Down")
+	TapHoldSyntheticKeyDown("LShift")
 	try {
 		KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
-		TextPressKey("LShift", "Up")
+		TapHoldSyntheticKeyUp("LShift")
 	}
 }
 #HotIf
@@ -152,13 +152,13 @@ if TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" {
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "alt_tab_monitor" and not LayerEnabled
 SC038::
 {
-	TextPressKey("LAlt", "Down")
+	TapHoldSyntheticKeyDown("LAlt")
 	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
 	if tap {
 		; The synthetic LAlt Down armed above must always be released regardless
 		; of Suspend state; only the AltTabMonitor() side effect is guarded —
 		; native Suspend() never disarms this hotkey's own KeyWait/dispatch.
-		TextPressKey("LAlt", "Up")
+		TapHoldSyntheticKeyUp("LAlt")
 		TapHoldDispatchTap("left_alt", AltTabMonitor)
 	} else {
 		; Bound the wait and release LAlt in a finally so a lost SC038 key-up (Alt+Tab
@@ -168,7 +168,7 @@ SC038::
 		try {
 			KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 		} finally {
-			TextPressKey("LAlt", "Up")
+			TapHoldSyntheticKeyUp("LAlt")
 		}
 	}
 }
@@ -256,10 +256,10 @@ $SC038:: {
 			LoggerDebug("TapHold", "LAlt (backspace) hold suppressed after long press because wheel activity was detected.")
 		return
 	}
-	TextPressKey(ModKey, "Down")
+	TapHoldSyntheticKeyDown(ModKey)
 	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
 	if tap {
-		TextPressKey(ModKey, "Up")
+		TapHoldSyntheticKeyUp(ModKey)
 		TapHoldDispatchTap("left_alt", _LAltBackspaceTap)
 		return
 	}
@@ -268,7 +268,7 @@ $SC038:: {
 	try {
 		KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
-		TextPressKey(ModKey, "Up")
+		TapHoldSyntheticKeyUp(ModKey)
 	}
 }
 #HotIf
@@ -297,13 +297,13 @@ $SC038:: {
 			LoggerDebug("TapHold", "LAlt hold suppressed after long press because wheel activity was detected.")
 		return
 	}
-	TextPressKey(ModKey, "Down")
+	TapHoldSyntheticKeyDown(ModKey)
 	; Bound the wait and release in a finally so a lost key-up or thrown Send can
 	; never latch the modifier Down (tap_holds/constants.ahk explains the cap)
 	try {
 		KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
-		TextPressKey(ModKey, "Up")
+		TapHoldSyntheticKeyUp(ModKey)
 	}
 }
 #HotIf

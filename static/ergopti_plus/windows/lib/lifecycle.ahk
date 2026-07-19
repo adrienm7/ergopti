@@ -136,9 +136,13 @@ Ergopti_OnSuspendEnter() {
     ; SetTimer callbacks bypass native Suspend — the button stays logically held
     ; until the next mouse event. Release both hold states unconditionally here so
     ; no synthetic button-down leaks into the suspended window ("pause = tout éteint").
-    try GestureReleaseLeftClick()
-    try GestureReleaseRightClick()
-    ; AHK-16: CapsWord keeps the hardware CapsLock LED lit (via UpdateCapsLockLED)
+	try GestureReleaseLeftClick()
+	try GestureReleaseRightClick()
+	; A tap-hold may have armed a synthetic modifier before entering KeyWait.
+	; Suspend does not cancel that pseudo-thread, so release its tracked keys
+	; immediately instead of waiting for the eventual physical key-up/finally.
+	try TapHoldReleaseSyntheticKeys()
+	; AHK-16: CapsWord keeps the hardware CapsLock LED lit (via UpdateCapsLockLED)
     ; and continues arming its mouse-cancel HookDispatcher listeners even when the
     ; driver is suspended — the LED misleads the user and the listeners fire through
     ; native Suspend. DisableCapsWord resets CapsWordEnabled, unregisters mouse

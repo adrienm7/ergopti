@@ -54,11 +54,11 @@ _OSLLS_AssertReleaseInFinally(Body, Where) {
 	; Build the release call literal without a hard-coded glyph so the ASCII-only
 	; rule holds; Chr(34) is the double-quote.
 	Q := Chr(34)
-	ReleaseCall := "TextPressKey(" . Q . "LShift" . Q . ", " . Q . "Up" . Q . ")"
+	ReleaseCall := "TapHoldSyntheticKeyUp(" . Q . "LShift" . Q . ")"
 	FinallyIdx := InStr(Body, "finally")
 	ReleaseIdx := InStr(Body, ReleaseCall)
 	Assert(FinallyIdx > 0, Where . " must wrap the LShift arm/release in a finally block so the Up can never be skipped (oneshotshift-lalt-lshift-stuck)")
-	Assert(ReleaseIdx > 0, Where . " must still release LShift via " . ReleaseCall)
+	Assert(ReleaseIdx > 0, Where . " must still release LShift via the suspend-owned synthetic-key release helper " . ReleaseCall)
 	Assert(ReleaseIdx > FinallyIdx, Where . " must place the LShift Up release INSIDE the finally block so a lost key-up or exception cannot leave Shift stuck Down")
 }
 

@@ -237,6 +237,7 @@ InstallSendNoOps()
 #Include unit/test_registry.ahk
 #Include unit/test_personal_toml_io.ahk
 #Include unit/test_nav_layer_helpers.ahk
+#Include meta/test_tap_hold_suspend_boundary.ahk
 #Include unit/test_updater.ahk
 #Include unit/test_updater_constants_single_source.ahk
 #Include meta/test_updater_load_interval_guard.ahk

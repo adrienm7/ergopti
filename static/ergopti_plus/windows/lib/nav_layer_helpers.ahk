@@ -40,6 +40,14 @@
 global NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL := 1000
 
 ActivateLayer() {
+	; A hold-layer KeyWait can outlive the hotkey that started it: Suspend only
+	; disarms future hotkeys, not an already-running pseudo-thread.  This is the
+	; common final activation boundary for every hold-layer variant, so reject a
+	; stale candidate here before mutating LayerEnabled or the CapsLock LED.
+	if A_IsSuspended {
+		try LoggerDebug("NavLayer", "Ignoring layer activation while the driver is suspended.")
+		return false
+	}
 	global LayerEnabled := True
 	; Bursts happen WHILE the layer is held active (rapid nav/scroll
 	; keystrokes fire back-to-back), so the ceiling must be RAISED on
@@ -47,6 +55,7 @@ ActivateLayer() {
 	A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
 	ResetNumberOfRepetitions()
 	UpdateCapsLockLED()
+	return true
 }
 
 DisableLayer() {
