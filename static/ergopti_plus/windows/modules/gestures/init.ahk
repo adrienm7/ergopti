@@ -145,9 +145,9 @@ global GESTURE_SLOTS := [
 
 ; Human-readable labels for each slot
 global GESTURE_SLOT_LABELS := Map()
-for _, _Slot in ["tap_3", "swipe_3_up", "swipe_3_down", "swipe_3_left", "swipe_3_right",
+for _GestureLabelIndex, _GestureLabelSlot in ["tap_3", "swipe_3_up", "swipe_3_down", "swipe_3_left", "swipe_3_right",
               "tap_4", "swipe_4_up", "swipe_4_down", "swipe_4_left", "swipe_4_right"] {
-    GESTURE_SLOT_LABELS[_Slot] := t("gesture.slots." . _Slot)
+    GESTURE_SLOT_LABELS[_GestureLabelSlot] := t("gesture.slots." . _GestureLabelSlot)
 }
 
 ; Shortcut labels for setup instructions

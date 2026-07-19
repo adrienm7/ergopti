@@ -275,9 +275,9 @@ _THAC_KeyRegistryMatchesMatrix() {
 }
 Test("tap-hold: full activity matrix covers every registered key", _THAC_KeyRegistryMatchesMatrix)
 
-for KeyCase in _THAC_AllKeyCases() {
-	Test("tap-hold: every pointer/key interrupt suppresses " . KeyCase.Id,
-		_THAC_AllInterruptsCancelOneKey.Bind(KeyCase))
-	Test("tap-hold: isolated and fresh presses still dispatch " . KeyCase.Id,
-		_THAC_IsolatedTapAndFreshPressRecover.Bind(KeyCase))
+for _THAC_RegisteredCase in _THAC_AllKeyCases() {
+	Test("tap-hold: every pointer/key interrupt suppresses " . _THAC_RegisteredCase.Id,
+		_THAC_AllInterruptsCancelOneKey.Bind(_THAC_RegisteredCase))
+	Test("tap-hold: isolated and fresh presses still dispatch " . _THAC_RegisteredCase.Id,
+		_THAC_IsolatedTapAndFreshPressRecover.Bind(_THAC_RegisteredCase))
 }
