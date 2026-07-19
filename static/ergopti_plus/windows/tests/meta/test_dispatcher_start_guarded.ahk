@@ -160,3 +160,16 @@ _DSG_PartialStartupCleanupUsesOwnedResources() {
 		"a partial WM_MOUSEWHEEL registration must be rolled back before ownership is cleared")
 }
 Test("HookDispatcher: partial startup resources are rolled back by ownership", _DSG_PartialStartupCleanupUsesOwnedResources)
+
+_DSG_BootDoesNotPublishReadyWithoutHook() {
+	DispatcherStart := _DSG_MethodBody(_DriverDirConcat("lib"), "static Start() {")
+	Main := _DriverDirConcat("")
+	Assert(InStr(DispatcherStart, "return false") > 0 && InStr(DispatcherStart, "return true") > 0,
+		"HookDispatcher.Start must return an explicit success state so boot can enforce its readiness contract")
+	StartPos := InStr(Main, "if !HookDispatcher.Start()")
+	ReadyPos := InStr(Main, 'LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")')
+	AbortPos := InStr(Main, "ExitApp(1)", , StartPos)
+	Assert(StartPos > 0 && AbortPos > StartPos && AbortPos < ReadyPos,
+		"ErgoptiPlus must abort before readiness when HookDispatcher.Start fails; a half-boot cannot own keyboard features")
+}
+Test("HookDispatcher: boot aborts instead of publishing ready after hook startup failure", _DSG_BootDoesNotPublishReadyWithoutHook)
