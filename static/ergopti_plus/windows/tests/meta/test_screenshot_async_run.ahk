@@ -41,8 +41,11 @@ _SAR_FindScreenshotBlock(src) {
 	pos := InStr(src, "SC029::")
 	if (!pos)
 		return ""
-	; Capture the block up to the closing #HotIf — roughly 500 chars.
-	return SubStr(src, pos, 600)
+	; Capture through the closing #HotIf.  This keeps the test coupled to the
+	; complete callback rather than a brittle character window: additional
+	; error handling must not become invisible to the regression guard.
+	endPos := InStr(src, "#HotIf", false, pos + StrLen("SC029::"))
+	return endPos ? SubStr(src, pos, endPos - pos) : ""
 }
 
 ; This test fragment is loaded through run_all.ahk, where test_framework.ahk
@@ -80,6 +83,19 @@ _SAR_AsyncRunPresent() {
 		"shortcuts/win.ahk: SC029 must call Run() (async) instead of RunWait for the PowerShell capture process")
 }
 Test("Screenshot hotkey: async Run() used in SC029 block (screenshot-async-run)", _SAR_AsyncRunPresent)
+
+_SAR_HotkeyBoundariesAreContained() {
+	block := _SAR_FindScreenshotBlock(_SAR_ShortcutsSource())
+	Assert(InStr(block, "try") > 0 && InStr(block, "catch as Err") > 0,
+		"SC029 must contain desktop, filesystem, and Run failures inside the hotkey callback")
+	Assert(InStr(block, "LoggerError") > 0,
+		"SC029 must log an OS launch failure rather than silently losing the screenshot action")
+	Assert(InStr(block, "MsgBox") = 0,
+		"SC029 must not open a modal dialog from the keyboard hotkey thread")
+	Assert(InStr(block, "TrayTip") > 0,
+		"SC029 must give nonblocking feedback for both unavailable windows and launch failures")
+}
+Test("Screenshot hotkey: SC029 contains OS failures and never blocks on a modal dialog", _SAR_HotkeyBoundariesAreContained)
 
 
 ; F-H07: GestureCaptureRegion (window/fullscreen capture) used RunWait, blocking the

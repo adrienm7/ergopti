@@ -585,17 +585,26 @@ _SC029_BuildPsCapture(WX, WY, WW, WH, FilePath) {
 #HotIf IsSet(Features) and Features["shortcuts"]["screen_instant"]
 ; SC029 (²/$ -- key left of 1) -- instant screenshot of the active window, saved to Pictures
 SC029:: {
-    WinGetPos(&WX, &WY, &WW, &WH, "A")
-    if (WW = 0 or WH = 0) {
-        MsgBox(t("shortcuts.no_active_window"), t("shortcuts.screenshot_title"), "OK T3")
-        return
+    ; Keep every desktop/filesystem/shell boundary contained: this is a raw
+    ; keyboard hotkey, so a modal error dialog or uncaught launch failure stalls
+    ; the same thread that dispatches remaps.
+    try {
+        WinGetPos(&WX, &WY, &WW, &WH, "A")
+        if (WW = 0 or WH = 0) {
+            try TrayTip(t("shortcuts.no_active_window"), t("shortcuts.screenshot_title"), "Iconx Mute")
+            return
+        }
+        PicsDir := EnvGet("USERPROFILE") . "\Pictures\screenshots"
+        if !DirExist(PicsDir)
+            DirCreate(PicsDir)
+        FilePath := PicsDir . "\screenshot_" . FormatTime(, "yyyy_MM_dd_HH_mm_ss") . ".png"
+        ; Run async — hook thread returns immediately, no keyboard blocking during capture.
+        Run('powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command "' . _SC029_BuildPsCapture(WX, WY, WW, WH, FilePath) . '"',, "Hide")
+        try TrayTip(StrReplace(t("notify.screenshot_saved_path"), "%s", FilePath), t("notify.screenshot_title"), "Iconi Mute")
+    } catch as Err {
+        LoggerError("shortcuts", "SC029 screenshot launch failed: {1}", Err.Message)
+        try TrayTip("Screenshot could not start.", "ErgoptiPlus", "Iconx Mute")
     }
-    PicsDir  := EnvGet("USERPROFILE") . "\Pictures\screenshots"
-    DirCreate(PicsDir)
-    FilePath := PicsDir . "\screenshot_" . FormatTime(, "yyyy_MM_dd_HH_mm_ss") . ".png"
-    ; Run async — hook thread returns immediately, no keyboard blocking during capture.
-    Run('powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command "' . _SC029_BuildPsCapture(WX, WY, WW, WH, FilePath) . '"',, "Hide")
-    try TrayTip(StrReplace(t("notify.screenshot_saved_path"), "%s", FilePath), t("notify.screenshot_title"), "Iconi Mute")
 }
 #HotIf
 
