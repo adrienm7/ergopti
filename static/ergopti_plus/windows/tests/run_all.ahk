@@ -337,10 +337,17 @@ _LogBootProgress("gestures + test included")
 ; here so the class static initialiser does not crash the test runner.
 _LogBootProgress("loading keylogger modules")
 global _VendorDir := A_ScriptDir . "\..\vendor"
+; keylogger_prefetch.ahk normally receives this from lib/boot.ahk.  The
+; headless runner loads only the pure worker protocol, so provide its explicit
+; config-root dependency without executing the full driver boot sequence.
+global _ConfigDir := A_Temp . "\ergopti_test_config\"
 #Include ../lib/sqlite3.ahk
 #Include ../modules/keylogger/keylogger_walker.ahk
 #Include ../modules/keylogger/keylogger_app_categories.ahk
 #Include ../modules/keylogger/keylogger_reader.ahk
+; The prefetch worker contains no top-level I/O. Including it here enables a
+; headless generation-fence test with a fake ShellRunner spawn handle.
+#Include ../modules/keylogger/keylogger_prefetch.ahk
 ; keylogger_clipboard.ahk defines _KL_Clip_CharCountFromByteSize + KLClipConst,
 ; both exercised functionally by meta/test_clipboard_ram_leak.ahk. It contains
 ; only class + function definitions at top level (the Hotkey()/OnClipboardChange
@@ -795,6 +802,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_editor_persist_before_publish.ahk
 #Include meta/test_keylogger_webview_epoch.ahk
 #Include meta/test_keylogger_webview_callback_fail_safe.ahk
+#Include meta/test_keylogger_prefetch_worker.ahk
 #Include meta/test_sendinstant_clipboard_sequence_ownership.ahk
 #Include meta/test_plain_paste_clipboard_sequence_ownership.ahk
 #Include meta/test_onboarding_gesture_registration_async.ahk

@@ -124,6 +124,11 @@ Ergopti_OnSuspendEnter() {
     ; Cancel in-flight background update checks so a stale async callback cannot
     ; surface a TrayTip or rebuild the menu while paused ("pause = tout éteint").
     try _Updater_CancelAsyncChecks()
+    ; A metrics projection can be a multi-second detached AHK process.  Native
+    ; Suspend only disarms hotkeys, so explicitly kill its process tree rather
+    ; than letting SQLite/JSON work continue throughout a paused driver.
+    try KLPF_CancelBuild("typing")
+    try KLPF_CancelBuild("apps")
     try StopActivitySimulation()
     ; AHK-12: A gesture left/right click-hold (SendEvent "{LButton Down}") that
     ; was in progress when the user pauses the driver outlives the suspend because
