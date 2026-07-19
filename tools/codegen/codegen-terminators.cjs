@@ -14,7 +14,7 @@
  * FEATURES & RATIONALE:
  * 1. Single source of truth: TERMINATOR_DEFS lives in the spec; both outputs
  *    are generated from it so catalogue drift between drivers is impossible.
- * 2. UTF-8 BOM + CRLF for AHK: AHK v2 silently aborts mid-file on encoding
+ * 2. UTF-8 BOM + LF for AHK: AHK v2 silently aborts mid-file on encoding
  *    drift; the writer enforces correct encoding at generation time.
  * 3. Pure codegen — no runtime dependency on the generated files; delete and
  *    re-run to reset both drivers to the canonical state.
@@ -84,17 +84,17 @@ function luaEscape(s) {
 
 /**
  * Writes content to a file, creating parent directories as needed.
- * For .ahk files enforces UTF-8 BOM + CRLF line endings.
+ * For .ahk files enforces UTF-8 BOM + LF line endings.
  * @param {string} filePath - Absolute path to write.
  * @param {string} content  - File content with LF line endings.
  */
 function writeFile(filePath, content) {
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
 	if (filePath.endsWith('.ahk')) {
-		// Enforce CRLF and prepend UTF-8 BOM (EF BB BF)
-		const crlf = content.replace(/\r\n?/g, '\n');
-		const bom = Buffer.from([0xef, 0xbb, 0xbf]);
-		const body = Buffer.from(crlf, 'utf8');
+             // Enforce LF and prepend UTF-8 BOM (EF BB BF)
+             const lf = content.replace(/\r\n?/g, '\n');
+             const bom = Buffer.from([0xef, 0xbb, 0xbf]);
+             const body = Buffer.from(lf, 'utf8');
 		fs.writeFileSync(filePath, Buffer.concat([bom, body]));
 	} else {
 		fs.writeFileSync(filePath, content, 'utf8');

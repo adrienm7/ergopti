@@ -6,6 +6,6 @@
 *.lua text eol=lf
 *.py text eol=lf
 
-# AHK v2 requires UTF-8 BOM + CRLF — enforce CRLF on all platforms so the
-# encoding invariant holds whether the file is checked out on Linux CI or Windows
+# AHK v2 source uses UTF-8 BOM + LF. Keep the parser invariant identical on
+# Windows and Linux CI, and reject mixed line endings in the encoding gate.
 *.ahk text eol=lf

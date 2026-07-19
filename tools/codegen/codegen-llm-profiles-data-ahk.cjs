@@ -17,7 +17,7 @@
  *    (Lua has no equivalent codegen step); AHK cannot do the same without a
  *    JSON parse on every profile lookup, so — per the plan — the AHK side gets
  *    build-time generation instead of runtime delegation.
- * 2. Encoding safety: output is written as UTF-8 BOM + CRLF, required by the
+ * 2. Encoding safety: output is written as UTF-8 BOM + LF, required by the
  *    AHK v2 parser (silent abort risk on mismatch).
  * ==============================================================================
  */
@@ -177,11 +177,11 @@ function buildAhkSource(legacyIds, basicPrompt) {
 // ==================================================
 
 /**
- * Writes content to outPath with UTF-8 BOM and CRLF line endings.
+ * Writes content to outPath with UTF-8 BOM and LF line endings.
  * @param {string} outPath  Absolute path to the output file.
  * @param {string} content  Source text with bare LF newlines.
  */
-function writeWithBomCrlf(outPath, content) {
+function writeWithBomLf(outPath, content) {
 	const BOM = Buffer.from([0xef, 0xbb, 0xbf]);
 	const normalized = content.replace(/\r\n?/g, '\n');
 	const body = Buffer.from(normalized, 'utf8');
@@ -205,7 +205,7 @@ function main() {
 	const legacyIds = loadLegacyIds();
 	const basicPrompt = loadBasicPrompt();
 	const source = buildAhkSource(legacyIds, basicPrompt);
-	writeWithBomCrlf(OUT_PATH, source);
+    writeWithBomLf(OUT_PATH, source);
 
 	const relOut = path.relative(ROOT, OUT_PATH);
 	console.log(`  Written: ${relOut}`);

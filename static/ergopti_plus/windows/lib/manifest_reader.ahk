@@ -25,9 +25,9 @@
 ;
 ; NOTE on AHK source encoding (discovered while writing the v2 test suite,
 ; 2026-05-22): the generated ``features_manifest.ahk`` is emitted by
-; ``scripts/build-features-manifest.js`` with UTF-8 BOM + CRLF — both are
+; ``tools/build/build-features-manifest.js`` with UTF-8 BOM + LF — both are
 ; required. AHK v2 silently aborts mid-file parsing on encoding drift
-; (LF-only, missing BOM, or LF mixed into a CRLF file), which surfaces as
+; (missing BOM or mixed line endings), which surfaces as
 ; mysterious partial test registration with no error message. If the
 ; manifest looks loaded but ``ManifestFeatures()`` returns a short array,
 ; check the generated file's encoding before debugging the codegen logic.

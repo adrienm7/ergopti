@@ -14,7 +14,7 @@
  * 2. AHK v2 idioms: uses Map for result objects, proper class syntax, and
  *    StrSplit / RegExReplace for string manipulation compatible with AHK's
  *    UTF-16 string model.
- * 3. Encoding safety: output is written as UTF-8 BOM + CRLF, required by the
+ * 3. Encoding safety: output is written as UTF-8 BOM + LF, required by the
  *    AHK v2 parser (silent abort risk on mismatch).
  * ==============================================================================
  */
@@ -355,11 +355,11 @@ function buildAhkSource() {
 // ==================================================
 
 /**
- * Writes content to outPath with UTF-8 BOM and CRLF line endings.
+ * Writes content to outPath with UTF-8 BOM and LF line endings.
  * @param {string} outPath  Absolute path to the output file.
  * @param {string} content  Source text with bare LF newlines.
  */
-function writeWithBomCrlf(outPath, content) {
+function writeWithBomLf(outPath, content) {
 	const BOM = Buffer.from([0xef, 0xbb, 0xbf]);
 	const normalized = content.replace(/\r\n?/g, '\n');
 	const body = Buffer.from(normalized, 'utf8');
@@ -381,7 +381,7 @@ function main() {
 	console.log('codegen:prompt-builder:ahk — generating PromptBuilder AHK adapter…');
 
 	const source = buildAhkSource();
-	writeWithBomCrlf(OUT_PATH, source);
+    writeWithBomLf(OUT_PATH, source);
 
 	const relOut = path.relative(ROOT, OUT_PATH);
 	console.log(`  Written: ${relOut}`);
