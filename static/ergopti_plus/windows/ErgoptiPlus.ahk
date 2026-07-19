@@ -251,6 +251,14 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include modules/keylogger/keylogger_prefetch.ahk
 #Include modules/keylogger/keylogger_webview.ahk
 #Include modules/keylogger/keylogger_ui.ahk
+
+; A detached prefetch worker shares these projection modules but must never run
+; the normal driver boot: no hooks, timers, tray, WebView, or config mutation.
+; It publishes one staged JSON file and exits; the live instance validates the
+; generation before atomically making that file visible to a dashboard.
+if KLPF_IsWorkerInvocation()
+    KLPF_WorkerMain()
+
 #Include _generated/prompt_builder.ahk
 #Include modules/llm/api_common.ahk
 #Include modules/llm/api_token_crypto.ahk

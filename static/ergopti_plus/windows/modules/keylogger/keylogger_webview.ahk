@@ -441,8 +441,8 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
             KLWV_InjectI18n(which)
             KLWV_PushPrefetch(which)
 		case "request_refresh":
-			try KLPF_BuildAndWrite(which, KLWV.metrics_dir)
-			KLWV_PushPrefetch(which)
+			KLPF_RequestBuild(which, KLWV.metrics_dir, "full", Epoch,
+				KLWV_OnBuildReady.Bind(which, Epoch))
 		case "range":
 			; Keep date/app filtering off the WebMessageReceived stack. A range
 			; projection can be large enough that running it synchronously here
@@ -464,9 +464,10 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
                 KLPF_LAST_JSON.Delete(which)
             try FileDelete(KLPF_PrefetchPath(which))
             try FileAppend("[" . A_Now . "] clear_cache(" . which . "): caches purged`r`n", log, "UTF-8")
-            ; Rebuild immediately so the dashboard gets fresh (possibly empty) data
-            try KLPF_BuildAndWrite(which, KLWV.metrics_dir)
-            KLWV_PushPrefetch(which)
+            ; Projection runs in a detached worker; a late pre-clear result is
+            ; fenced by the generation held by KLPF_RequestBuild.
+            KLPF_RequestBuild(which, KLWV.metrics_dir, "full", Epoch,
+                KLWV_OnBuildReady.Bind(which, Epoch))
     }
 }
 
@@ -656,13 +657,15 @@ KLWV_DelayedFirstPush(which, Epoch) {
     ; Inject i18n first — must happen before any DB build which can block
     ; for tens of seconds on a cold cache.
     KLWV_InjectI18n(which)
-    ; Only build if we have no cached blob yet. If KLRCache.db is 0 (cold
-    ; start, data.sql not yet loaded) we skip the build entirely to avoid
-    ; blocking the thread for minutes — the first live-tick will build and
-    ; push. If KLRCache.db is warm the manifest build takes ~50 ms.
+    ; Only build if we have no cached blob yet.  Even a cold cache is safe:
+    ; KLPF_RequestBuild starts a detached /force worker, never SQLite work on
+    ; this timer or the keyboard thread.
     need_manifest_build := !IsSet(KLPF_LAST_JSON) || !KLPF_LAST_JSON.Has(which)
-    if need_manifest_build && KLWV.metrics_dir && KLRCache.db
-        try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , "manifest")
+    if need_manifest_build && KLWV.metrics_dir {
+        KLPF_RequestBuild(which, KLWV.metrics_dir, "manifest", Epoch,
+            KLWV_OnFirstBuildReady.Bind(which, Epoch))
+        return
+    }
     FirstPaintOk := KLWV_PushPrefetch(which)
     ; Mark first paint done so live ticks can fan out from now on.
     if FirstPaintOk && KLWV_IsCurrent(which, Epoch)
@@ -677,9 +680,24 @@ KLWV_DelayedFullBuild(which, Epoch) {
     if A_IsSuspended || !KLWV_IsCurrent(which, Epoch)
         return
     if KLWV.metrics_dir
-        try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , "full")
-    if !A_IsSuspended && KLWV_IsCurrent(which, Epoch)
-        KLWV_PushPrefetch(which)
+        KLPF_RequestBuild(which, KLWV.metrics_dir, "full", Epoch,
+            KLWV_OnBuildReady.Bind(which, Epoch))
+}
+
+KLWV_OnFirstBuildReady(which, Epoch, *) {
+    if A_IsSuspended || !KLWV_IsCurrent(which, Epoch)
+        return
+    if !KLWV_PushPrefetch(which)
+        return
+    if KLWV_IsCurrent(which, Epoch)
+        KLWV.windows[which]["first_paint_done"] := true
+    SetTimer(KLWV_DelayedFullBuild.Bind(which, Epoch), -2000)
+}
+
+KLWV_OnBuildReady(which, Epoch, *) {
+    if A_IsSuspended || !KLWV_IsCurrent(which, Epoch)
+        return
+    KLWV_PushPrefetch(which)
 }
 
 ; Called by the ingest tick after data.sql has new rows. Rebuilds the
@@ -708,8 +726,8 @@ KLWV_NotifyIngest(mode := "live") {
         if !(entry is Map && entry.Has("first_paint_done") && entry["first_paint_done"])
             continue
         n += 1
-        try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , mode)
-        KLWV_PushPrefetch(which)
+        KLPF_RequestBuild(which, KLWV.metrics_dir, mode, entry["epoch"],
+            KLWV_OnBuildReady.Bind(which, entry["epoch"]))
     }
     if n
         try FileAppend("[" . A_Now . "] NotifyIngest(" . mode . ") fanned out to " . n . " window(s)`r`n", log, "UTF-8"

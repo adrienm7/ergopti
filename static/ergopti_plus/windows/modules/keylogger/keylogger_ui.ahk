@@ -46,6 +46,11 @@ class KLUI {
     ; Resolved file URLs to the shared HTML assets. Set lazily on first call.
     static typing_url := ""
     static apps_url := ""
+
+    ; Edge fallback launches only after its detached projection worker has
+    ; atomically published the sidecar.  This prevents a first open from
+    ; silently rendering an empty dashboard while the data is still building.
+    static pending := Map()
 }
 
 
@@ -121,22 +126,30 @@ KLUI_LaunchWindow(url, title) {
         which := "typing"
     else if InStr(url, "metrics_apps")
         which := "apps"
-    if (which != "") {
-        global _ConfigDir, _AhkSubDir
-        log_path := _ConfigDir . _AhkSubDir . "logs\prefetch.log"
-        try DirCreate(_ConfigDir . _AhkSubDir . "logs")
-        try FileAppend("[" . A_Now . "] KLUI calling KLPF_BuildAndWrite(" . which . ", " . _ConfigDir . "metrics)`r`n",
-            log_path, "UTF-8")
-        try {
-            KLPF_BuildAndWrite(which, _ConfigDir . "metrics", log_path)
-        } catch as err {
-            try FileAppend("[" . A_Now . "] KLUI caught: " . err.Message
-                . " | What=" . err.What
-                . " | File=" . err.File . ":" . err.Line
-                . " | Extra=" . err.Extra . "`r`n",
-                log_path, "UTF-8")
-        }
+    if (which = "")
+        return 0
+    global _ConfigDir
+    KLUI.pending[which] := true
+    if !KLPF_RequestBuild(which, _ConfigDir . "metrics", "full", 0,
+            KLUI_OnPrefetchReady.Bind(which, url, title)) {
+        KLUI.pending.Delete(which)
+        return 0
     }
+    return 0
+}
+
+KLUI_OnPrefetchReady(which, url, title, *) {
+    if !KLUI.pending.Has(which)
+        return
+    KLUI.pending.Delete(which)
+    pid := KLUI_LaunchEdge(url, title)
+    if (which = "typing")
+        KLUI.typing_pid := pid
+    else
+        KLUI.apps_pid := pid
+}
+
+KLUI_LaunchEdge(url, title) {
 
     edge := KLUI_FindMsedge()
     ; --app=URL launches a chromeless window pinned to URL. --user-data-dir
@@ -260,6 +273,11 @@ KLUI_ToggleDashboard(which, title) {
 
     ; Fallback: legacy Edge --app= launcher.
     if (which = "typing") {
+        if KLUI.pending.Has(which) {
+            KLPF_CancelBuild(which)
+            KLUI.pending.Delete(which)
+            return
+        }
         if KLUI_IsRunning(KLUI.typing_pid) {
             KLUI_KillWindow(KLUI.typing_pid)
             KLUI.typing_pid := 0
@@ -267,6 +285,11 @@ KLUI_ToggleDashboard(which, title) {
         }
         KLUI.typing_pid := KLUI_LaunchWindow(KLUI.typing_url, title)
     } else {
+        if KLUI.pending.Has(which) {
+            KLPF_CancelBuild(which)
+            KLUI.pending.Delete(which)
+            return
+        }
         if KLUI_IsRunning(KLUI.apps_pid) {
             KLUI_KillWindow(KLUI.apps_pid)
             KLUI.apps_pid := 0

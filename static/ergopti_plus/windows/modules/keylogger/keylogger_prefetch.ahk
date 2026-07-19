@@ -57,6 +57,127 @@ KLPF_PrefetchPath(which) {
     return A_Temp . "\ergopti_metrics_prefetch_" . which . ".json"
 }
 
+; Background projection protocol.  A projection is CPU/SQLite heavy enough to
+; exceed the keyboard hook timeout, so the foreground driver only starts a
+; disposable AHK worker and atomically publishes its finished staging file.
+; The monotonic generation is the ownership fence: a cancelled/late worker can
+; finish, but can never replace a newer dashboard result.
+class KLPFWorker {
+    static generation := 0
+    static jobs := Map()
+    ; Test seam: production leaves this at 0 and always uses ShellRunner.
+    static spawn_fn := 0
+}
+
+KLPF_IsWorkerInvocation() {
+    for _, arg in A_Args {
+        if (arg = "--keylogger-prefetch-worker")
+            return true
+    }
+    return false
+}
+
+KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_ready := unset) {
+    global _ConfigDir
+    if A_IsSuspended || (which != "typing" && which != "apps") || (metrics_dir = "")
+        return false
+
+    if KLPFWorker.jobs.Has(which) {
+        previous := KLPFWorker.jobs[which]
+        try previous["handle"].terminate()
+        try FileDelete(previous["stage"])
+        KLPFWorker.jobs.Delete(which)
+    }
+
+    generation := ++KLPFWorker.generation
+    stage := KLPF_PrefetchPath(which) . ".stage." . generation
+    try FileDelete(stage)
+    executable := A_IsCompiled ? A_ScriptFullPath : A_AhkPath
+    args := A_IsCompiled
+        ? ["/force", "--keylogger-prefetch-worker", which, metrics_dir, mode, stage, _ConfigDir,
+            KLWConst.MAX_KEYSTROKE_DELAY_MS, KLWConst.THINK_PAUSE_MS, KLWConst.BURST_GAP_MS,
+            KLWConst.SESSION_GAP_MS, KLWConst.AUTO_REPEAT_MAX_DELAY_MS, KLWConst.HOLD_THRESHOLD_MS]
+        : ["/force", A_ScriptFullPath, "--keylogger-prefetch-worker", which, metrics_dir, mode, stage, _ConfigDir,
+            KLWConst.MAX_KEYSTROKE_DELAY_MS, KLWConst.THINK_PAUSE_MS, KLWConst.BURST_GAP_MS,
+            KLWConst.SESSION_GAP_MS, KLWConst.AUTO_REPEAT_MAX_DELAY_MS, KLWConst.HOLD_THRESHOLD_MS]
+    done := KLPF_OnWorkerDone.Bind(which, generation)
+    spawn := IsObject(KLPFWorker.spawn_fn) ? KLPFWorker.spawn_fn : ShellRunner_Spawn
+    handle := spawn.Call(executable, args, done)
+    if !handle.start()
+        return false
+    KLPFWorker.jobs[which] := Map(
+        "generation", generation,
+        "epoch", epoch,
+        "stage", stage,
+        "handle", handle,
+        "on_ready", IsSet(on_ready) ? on_ready : 0
+    )
+    return true
+}
+
+KLPF_CancelBuild(which) {
+    if !KLPFWorker.jobs.Has(which)
+        return
+    job := KLPFWorker.jobs[which]
+    try job["handle"].terminate()
+    try FileDelete(job["stage"])
+    KLPFWorker.jobs.Delete(which)
+}
+
+KLPF_OnWorkerDone(which, generation, exit_code, stdout, stderr) {
+    if !KLPFWorker.jobs.Has(which)
+        return
+    job := KLPFWorker.jobs[which]
+    if (job["generation"] != generation)
+        return
+    KLPFWorker.jobs.Delete(which)
+    stage := job["stage"]
+    if A_IsSuspended || (exit_code != 0) || !FileExist(stage) {
+        try FileDelete(stage)
+        try LoggerWarn("KLReader", "Background metrics projection failed for '{1}' (exit={2}).", which, exit_code)
+        return
+    }
+    if !KLPF_MoveAtomic(stage, KLPF_PrefetchPath(which)) {
+        try FileDelete(stage)
+        try LoggerError("KLReader", "Background metrics projection could not publish '{1}'.", which)
+        return
+    }
+    if IsObject(job["on_ready"])
+        try job["on_ready"].Call(which, job["epoch"])
+}
+
+; Runs in the detached /force instance.  It exits before the normal boot block,
+; so it never registers a hook, hotkey, timer, tray menu, or WebView callback.
+KLPF_WorkerMain() {
+    if !KLPF_IsWorkerInvocation()
+        return false
+    if (A_Args.Length < 12)
+        ExitApp(2)
+    which := A_Args[2]
+    metrics_dir := A_Args[3]
+    mode := A_Args[4]
+    stage := A_Args[5]
+    global _ConfigDir, _AhkSubDir
+    _ConfigDir := A_Args[6]
+    _AhkSubDir := "autohotkey\"
+    try {
+        KLWConst.MAX_KEYSTROKE_DELAY_MS := Integer(A_Args[7])
+        KLWConst.THINK_PAUSE_MS := Integer(A_Args[8])
+        KLWConst.BURST_GAP_MS := Integer(A_Args[9])
+        KLWConst.SESSION_GAP_MS := Integer(A_Args[10])
+        KLWConst.AUTO_REPEAT_MAX_DELAY_MS := Integer(A_Args[11])
+        KLWConst.HOLD_THRESHOLD_MS := Integer(A_Args[12])
+        if (which != "typing" && which != "apps") || (mode != "full" && mode != "live" && mode != "manifest")
+            ExitApp(2)
+        if !KLPF_BuildAndWriteToPath(which, metrics_dir, stage, "", mode)
+            ExitApp(1)
+    } catch {
+        try FileDelete(stage)
+        ExitApp(1)
+    }
+    ExitApp(0)
+}
+
 
 
 
@@ -76,6 +197,10 @@ KLPF_PrefetchPath(which) {
 ;       so the dashboard’s KPI counters update near-instantly without
 ;       paying the ~2-3 s n-gram projection + ~1 s JSON encode cost.
 KLPF_BuildAndWrite(which, metrics_dir, dbg := "", mode := "full") {
+    return KLPF_BuildAndWriteToPath(which, metrics_dir, KLPF_PrefetchPath(which), dbg, mode)
+}
+
+KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full") {
     if (dbg = "") {
         global _ConfigDir, _AhkSubDir
         try DirCreate(_ConfigDir . _AhkSubDir . "logs")
@@ -134,7 +259,6 @@ KLPF_BuildAndWrite(which, metrics_dir, dbg := "", mode := "full") {
         KLPF_LAST_JSON := Map()
     KLPF_LAST_JSON[which] := json
 
-    path := KLPF_PrefetchPath(which)
     written := KLPF_WriteAtomic(path, json)
     t_write := A_TickCount
     KLPF_DbgWrite(dbg, "PERF write=" . (t_write - t_json) . "ms total=" . (t_write - t0) . "ms")
@@ -171,16 +295,23 @@ KLPF_WriteAtomic(path, content) {
     catch
         return false
 
-    if !DllCall("Kernel32\MoveFileExW", "Str", tmp, "Str", path,
-            "UInt", FLAGS, "Int") {
+    if !KLPF_MoveAtomic(tmp, path, FLAGS) {
         Sleep RETRY_DELAY_MS
-        if !DllCall("Kernel32\MoveFileExW", "Str", tmp, "Str", path,
-                "UInt", FLAGS, "Int") {
+        if !KLPF_MoveAtomic(tmp, path, FLAGS) {
             try FileDelete(tmp)
             return false
         }
     }
     return true
+}
+
+KLPF_MoveAtomic(source, destination, flags := unset) {
+    static MOVEFILE_REPLACE_EXISTING := 0x1
+    static MOVEFILE_WRITE_THROUGH := 0x8
+    if !IsSet(flags)
+        flags := MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+    return DllCall("Kernel32\MoveFileExW", "Str", source, "Str", destination,
+        "UInt", flags, "Int") != 0
 }
 
 

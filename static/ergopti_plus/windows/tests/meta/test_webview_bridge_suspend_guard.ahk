@@ -74,8 +74,8 @@ _WBSG_CheckKeyloggerGuard() {
 	Body := _DriverFuncBody("KLWV_OnWebMessage")
 	Assert(Body != "", "KLWV_OnWebMessage must exist in modules/keylogger/keylogger_webview.ahk")
 	SuspendPos := InStr(Body, "A_IsSuspended")
-	BuildPos := InStr(Body, "KLPF_BuildAndWrite(")
+	BuildPos := InStr(Body, "KLPF_RequestBuild(")
 	Assert(SuspendPos > 0 && BuildPos > SuspendPos,
-		"KLWV_OnWebMessage must reject suspended WebMessages before Refresh/Clear can rebuild keylogger projections")
+		"KLWV_OnWebMessage must reject suspended WebMessages before Refresh/Clear can launch keylogger projection workers")
 }
 Test("keylogger WebView: paused messages cannot rebuild metrics", _WBSG_CheckKeyloggerGuard)
