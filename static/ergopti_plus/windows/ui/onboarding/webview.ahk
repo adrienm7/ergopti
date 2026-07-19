@@ -69,6 +69,9 @@ global _OnbWeb_MsgSub      := unset
 ; _HsEdWeb_ResetDone for the crash this mirrors). The flag makes the second
 ; call a true no-op before that ComCall is ever reached.
 global _OnbWeb_ResetDone   := false
+; Each host controller gets a distinct epoch. Completion callbacks from an
+; elevated background job must never publish into a newer WebView2 session.
+global _OnbWeb_SessionEpoch := 0
 
 
 
@@ -98,7 +101,7 @@ _OnbWeb_Available() {
 ; Onboarding_Run park-loop and the standard close handling apply unchanged.
 _Onboarding_TryWeb() {
 	global _OnbWeb_Controller, _OnbWeb_WebView, _OnbWeb_Ready, _OnbWeb_Queue
-	global _OnbWeb_ResetDone
+	global _OnbWeb_ResetDone, _OnbWeb_SessionEpoch
 	global _ob_gui, _VendorDir, _SharedDir
 
 	if !_OnbWeb_Available() {
@@ -156,6 +159,7 @@ _Onboarding_TryWeb() {
 	}
 
 	_OnbWeb_WebView := _OnbWeb_Controller.CoreWebView2
+	_OnbWeb_SessionEpoch += 1
 	; This controller/webview pair is fresh — re-arm the Reset() guard so this
 	; session's close actually tears it down instead of short-circuiting on a
 	; flag left behind by an earlier _OnbWeb_Reset() call.
@@ -440,11 +444,22 @@ _OnbWeb_Finish(answers) {
 ; gestures identically. Scheduled out of the WebMessageReceived callback because
 ; the elevated RunWait blocks while the UAC prompt + touchpad cycle complete.
 _OnbWeb_RegisterGesturesAuto() {
-	if !_Onboarding_StartGestureAuto(_OnbWeb_GestureAutoDone)
+	global _OnbWeb_SessionEpoch
+	SessionEpoch := _OnbWeb_SessionEpoch
+	if !_Onboarding_StartGestureAuto(_OnbWeb_GestureAutoDone.Bind(SessionEpoch))
 		_OnbWeb_Eval("window.setGestureRegisterStatus(false)")
 }
 
-_OnbWeb_GestureAutoDone(ok) {
+_OnbWeb_GestureAutoDone(SessionEpoch, ok) {
+	global _OnbWeb_SessionEpoch
+	if (SessionEpoch != _OnbWeb_SessionEpoch) {
+		try LoggerWarn("Onboarding", "Dropping stale gesture auto-config completion (epoch={1}).", SessionEpoch)
+		return
+	}
+	if A_IsSuspended {
+		SetTimer(_OnbWeb_GestureAutoDone.Bind(SessionEpoch, ok), -100)
+		return
+	}
 	try LoggerInfo("Onboarding", "Gesture auto-configuration completed (ok={1}).", ok ? "true" : "false")
 	_OnbWeb_Eval("window.setGestureRegisterStatus(" . (ok ? "true" : "false") . ")")
 }
@@ -637,7 +652,7 @@ _OnbWeb_OnClose(*) {
 ; of touching the globals again.
 _OnbWeb_Reset() {
 	global _OnbWeb_Controller, _OnbWeb_WebView, _OnbWeb_Ready, _OnbWeb_Queue, _OnbWeb_MsgSub
-	global _OnbWeb_ResetDone
+	global _OnbWeb_ResetDone, _OnbWeb_SessionEpoch
 
 	; A prior Reset() already released remove_WebMessageReceived against this
 	; controller. Re-running the unset line below would call __Delete's bound
@@ -647,6 +662,7 @@ _OnbWeb_Reset() {
 	if _OnbWeb_ResetDone
 		return
 	_OnbWeb_ResetDone := true
+	_OnbWeb_SessionEpoch += 1
 
 	; The whole teardown runs under one try: a hard COM access violation can
 	; occur mid-sequence (e.g. if the controller was invalidated by the host Gui
