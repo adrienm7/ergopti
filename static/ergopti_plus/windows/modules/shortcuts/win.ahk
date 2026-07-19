@@ -359,12 +359,19 @@ if Features["shortcuts"]["search"]["enabled"] {
     AddShortcut("#", "s", Search)
 
     Search(*) {
-        SelectedText := Trim(GetSelection())
-        if WinActive("ahk_exe explorer.exe") {
+        SearchInExplorer := WinActive("ahk_exe explorer.exe") != 0
+        GetSelectionAsync((Text) => _SearchSelectionReady(Text, SearchInExplorer))
+    }
+
+    _SearchSelectionReady(Text, SearchInExplorer) {
+        SelectedText := Trim(Text)
+        if (SelectedText = "")
+            return
+        if SearchInExplorer {
             GetPath(SelectedText)
-        } else {
-            SearchPath(SelectedText)
+            return
         }
+        SearchPath(SelectedText)
     }
 
     SearchPath(SelectedText) {
@@ -515,9 +522,12 @@ if Features["shortcuts"]["title_case"] {
     AddShortcut("#", "w", ConvertToTitleCase)
 
     ConvertToTitleCase(*) {
-        Text := GetSelection()
-        ; No-op on an empty/failed capture: GetSelection returns "" on a ClipWait
-        ; timeout, and pasting "" would only clobber the clipboard with a stale paste.
+        GetSelectionAsync(_ConvertToTitleCaseSelection)
+    }
+
+    _ConvertToTitleCaseSelection(Text) {
+        ; No-op on an empty/failed capture: an async timeout/cancellation must
+        ; never turn into a stale SendInstant paste.
         if (Text = "")
             return
 
@@ -550,9 +560,12 @@ if Features["shortcuts"]["uppercase"] {
     AddShortcut("#", "u", ConvertToUppercase)
 
     ConvertToUppercase(*) {
-        Text := GetSelection()
-        ; No-op on an empty/failed capture: GetSelection returns "" on a ClipWait
-        ; timeout, and pasting "" would only clobber the clipboard with a stale paste.
+        GetSelectionAsync(_ConvertToUppercaseSelection)
+    }
+
+    _ConvertToUppercaseSelection(Text) {
+        ; No-op on an empty/failed capture: an async timeout/cancellation must
+        ; never turn into a stale SendInstant paste.
         if (Text = "")
             return
         ; Check if the selected text contains at least one lowercase letter
