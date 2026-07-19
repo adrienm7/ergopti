@@ -55,16 +55,15 @@ _MDC_CriticalReleasedBeforeCallback() {
 Test("menu_dispatcher: _DispatchIfMissed releases Critical before Callback.Call()", _MDC_CriticalReleasedBeforeCallback)
 
 _MDC_CriticalOffBeforeCallbackCall() {
-	Src := _MDC_ReadSource("lib/menu_dispatcher.ahk")
-	; Search from the declaration so we only look inside _DispatchIfMissed.
-	FuncPos := InStr(Src, "_DispatchIfMissed(ItemId, ExpectedLastFire, ExpectedEpoch := 0, ExpectedToken := 0) {")
-	Assert(FuncPos > 0, "_DispatchIfMissed declaration must exist")
-	Tail    := SubStr(Src, FuncPos)
-	OffPos  := InStr(Tail, 'Critical "Off"')
-	; Match the actual call statement, not a comment that mentions the function.
-	; "bypass_dispatch" appears only at the real Callback.Call site.
-	CallPos := InStr(Tail, "bypass_dispatch")
-	Assert(OffPos > 0 and CallPos > 0 and OffPos < CallPos,
+	Seg := _DriverFuncBody("_DispatchIfMissed")
+	Assert(Seg != "", "_DispatchIfMissed declaration must exist")
+	; The callback reference is extracted and its dispatch timestamp committed
+	; while Critical is on. The release associated with that commit, not an
+	; earlier stale-retry return, must occur before the real callback invocation.
+	CommitPos := InStr(Seg, "_MenuDispatchLastFire[ItemId] := A_TickCount")
+	CallPos := InStr(Seg, "Callback.Call(")
+	OffPos := InStr(Seg, 'Critical "Off"', , CommitPos)
+	Assert(CommitPos > 0 and OffPos > CommitPos and CallPos > OffPos,
 		"Critical Off must precede Callback.Call() in _DispatchIfMissed so the hook thread is never starved")
 }
 Test("menu_dispatcher: Critical Off appears before Callback.Call() in source order", _MDC_CriticalOffBeforeCallbackCall)
