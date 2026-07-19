@@ -311,6 +311,22 @@ _LLM_Bridge_IsWordEndTrigger(ch) {
 	return (prev != "" and !_LLM_Bridge_IsBoundaryChar(prev))
 }
 
+; Queue expensive layered-Gui teardown off a keyboard hook while preserving the
+; surface generation observed by the triggering action. Without this fence an
+; old OnChar timer can run after a fresh prediction has rendered and hide it.
+LLM_Bridge_DeferTooltipHide(accepted := false) {
+	global _TooltipGeneration
+	Epoch := IsSet(_TooltipGeneration) ? _TooltipGeneration : 0
+	SetTimer(_LLM_Bridge_DeferredTooltipHide.Bind(Epoch, accepted), -1)
+}
+
+_LLM_Bridge_DeferredTooltipHide(Epoch, accepted) {
+	global _TooltipGeneration
+	if (Epoch != 0 and (!IsSet(_TooltipGeneration) or Epoch != _TooltipGeneration))
+		return
+	LLM_Tooltip_Hide(accepted)
+}
+
 /**
  * Must be called from a hotkey or keyboard hook on every typed character.
  * Maintains the rolling context buffer and feeds it to the prediction engine.
@@ -351,7 +367,7 @@ LLM_Bridge_OnChar(ch) {
 			; expensive GDI/DWM work runs on a fresh thread once the hook returns
 			; (mirrors the auto-hide TimerFn, which already runs off-thread). Silent=true
 			; so no llm_dismissed event is emitted for this stale hide.
-			SetTimer((*) => LLM_Tooltip_Hide(true), -1)
+			LLM_Bridge_DeferTooltipHide(true)
 		}
 	}
 	global _LLM_Bridge_LastLogTick
@@ -387,7 +403,7 @@ LLM_Bridge_OnBackspace() {
 	if TooltipIsVisible()
 		return
 	if LLM_Tooltip_IsVisible()
-		LLM_Tooltip_Hide(true)
+		LLM_Bridge_DeferTooltipHide(true)
 	LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer)
 }
 
@@ -434,7 +450,7 @@ LLM_Bridge_ResetPredictions() {
 	LLM_Engine_StopGeneration()
 	if ((IsSet(LLM_Tooltip_IsVisible) && LLM_Tooltip_IsVisible())
 			or (IsSet(LLM_Tooltip_IsLoading) && LLM_Tooltip_IsLoading()))
-		LLM_Tooltip_Hide()
+		LLM_Bridge_DeferTooltipHide()
 }
 
 /**
@@ -669,5 +685,5 @@ _LLM_Bridge_OnInjectComplete(InjectedText, Ok := true, ErrorMessage := "") {
 		idx := LLM_Tooltip_GetActiveIdx()
 		KL_LogLlmAccepted(InjectedText, app_name, slots, idx)
 	}
-	LLM_Tooltip_Hide(true)
+	LLM_Bridge_DeferTooltipHide(true)
 }

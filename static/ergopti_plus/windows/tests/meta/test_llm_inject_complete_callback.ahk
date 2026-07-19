@@ -113,7 +113,7 @@ _LICC_OutputStateCommitsOnlyOnSuccessfulCompletion() {
 	Assert(InStr(Accept, "_LLM_Bridge_Buffer .= text") = 0 && InStr(Accept, "LLM_Tooltip_Hide(true)") = 0,
 		"LLM_Bridge_OnAccept must not hide/commit state before an async TextSend completes")
 	Assert(InStr(Complete, "if !Ok") > 0 && InStr(Complete, "_LLM_Bridge_Buffer .= InjectedText") > 0
-			&& InStr(Complete, "LLM_Tooltip_Hide(true)") > 0,
+			&& InStr(Complete, "LLM_Bridge_DeferTooltipHide(true)") > 0,
 		"accepted prediction state must commit only in the successful sender completion branch")
 	Assert(InStr(Sender, "Callback(Ok, ErrorMessage)") > 0,
 		"TextSender callback contract must report whether output was actually injected")
