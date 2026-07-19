@@ -340,6 +340,11 @@ KLWV_OnGuiClose(which, *) {
 ; JSON command of the form {"action":"...", ...}.
 KLWV_OnWebMessage(which, sender, args) {
     global _ConfigDir, _AhkSubDir
+    ; WebMessageReceived is a COM callback and therefore bypasses native
+    ; Suspend. A paused dashboard must not rebuild caches, project SQL, or
+    ; push UI state from a late Refresh/Clear/Range click.
+    if A_IsSuspended
+        return
     log := _ConfigDir . _AhkSubDir . "logs\webview.log"
     msg := ""
     try msg := args.TryGetWebMessageAsString()

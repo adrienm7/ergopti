@@ -69,3 +69,13 @@ _WBSG_CheckChangelogGuard() {
 }
 Test("changelog: _CLW_OnWebMessage guards A_IsSuspended before fetch mutates channel/network state (webview-bridge-suspend-guard)",
 	_WBSG_CheckChangelogGuard)
+
+_WBSG_CheckKeyloggerGuard() {
+	Body := _DriverFuncBody("KLWV_OnWebMessage")
+	Assert(Body != "", "KLWV_OnWebMessage must exist in modules/keylogger/keylogger_webview.ahk")
+	SuspendPos := InStr(Body, "A_IsSuspended")
+	BuildPos := InStr(Body, "KLPF_BuildAndWrite(")
+	Assert(SuspendPos > 0 && BuildPos > SuspendPos,
+		"KLWV_OnWebMessage must reject suspended WebMessages before Refresh/Clear can rebuild keylogger projections")
+}
+Test("keylogger WebView: paused messages cannot rebuild metrics", _WBSG_CheckKeyloggerGuard)
