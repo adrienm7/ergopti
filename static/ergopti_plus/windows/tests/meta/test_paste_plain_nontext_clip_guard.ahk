@@ -6,8 +6,8 @@
 ; Static source guard for finding paste-plain-destroys-nontext-clip.
 ;
 ; Both PasteWithoutFormatting (modules/shortcuts/ctrl.ahk) and GesturePastePlain
-; (modules/gestures.ahk) strip rich formatting with the documented idiom
-; A_Clipboard := A_Clipboard. A_Clipboard is text-only in AHK v2, so that
+; (modules/gestures.ahk) strip rich formatting by writing the text view through
+; CB_Write(PlainText). AHK's text view is text-only in AHK v2, so that
 ; round-trip DESTROYS a non-text clipboard payload (image / file list). The fix
 ; guards the self-assignment behind a CB_Read() != "" text-availability check so
 ; non-text content is left intact and pasted as-is.
@@ -50,11 +50,11 @@ _PPNC_PasteWithoutFormattingHasTextGuard() {
 	Src := _PPNC_ReadSource("modules/shortcuts/ctrl.ahk")
 	Seg := _DriverFuncBody("PasteWithoutFormatting")
 	Assert(Seg != "", "PasteWithoutFormatting(*) declaration must exist in modules/shortcuts/ctrl.ahk")
-	StripIdx := InStr(Seg, "A_Clipboard := A_Clipboard")
-	Assert(StripIdx > 0, "PasteWithoutFormatting must still strip rich formatting via A_Clipboard := A_Clipboard")
+	StripIdx := InStr(Seg, "CB_Write(PlainText)")
+	Assert(StripIdx > 0, "PasteWithoutFormatting must still strip rich formatting through CB_Write(PlainText)")
 	Before := SubStr(Seg, 1, StripIdx - 1)
 	Assert(InStr(Before, "CB_Read()") > 0,
-		"PasteWithoutFormatting must guard the A_Clipboard := A_Clipboard strip with a CB_Read() text-availability check -- otherwise it destroys a non-text clipboard payload")
+		"PasteWithoutFormatting must guard CB_Write(PlainText) with a CB_Read() text-availability check -- otherwise it destroys a non-text clipboard payload")
 }
 Test("ctrl: PasteWithoutFormatting guards strip on non-text clipboard (paste-plain-destroys-nontext-clip)", _PPNC_PasteWithoutFormattingHasTextGuard)
 
@@ -62,10 +62,10 @@ _PPNC_GesturePastePlainHasTextGuard() {
 	Src := _DriverDirConcat("modules/gestures")
 	Seg := _DriverFuncBody("GesturePastePlain")
 	Assert(Seg != "", "GesturePastePlain() declaration must exist in modules/gestures.ahk")
-	StripIdx := InStr(Seg, "A_Clipboard := A_Clipboard")
-	Assert(StripIdx > 0, "GesturePastePlain must still strip rich formatting via A_Clipboard := A_Clipboard")
+	StripIdx := InStr(Seg, "CB_Write(PlainText)")
+	Assert(StripIdx > 0, "GesturePastePlain must still strip rich formatting through CB_Write(PlainText)")
 	Before := SubStr(Seg, 1, StripIdx - 1)
 	Assert(InStr(Before, "CB_Read()") > 0,
-		"GesturePastePlain must guard the A_Clipboard := A_Clipboard strip with a CB_Read() text-availability check -- otherwise it destroys a non-text clipboard payload")
+		"GesturePastePlain must guard CB_Write(PlainText) with a CB_Read() text-availability check -- otherwise it destroys a non-text clipboard payload")
 }
 Test("gestures: GesturePastePlain guards strip on non-text clipboard (paste-plain-destroys-nontext-clip)", _PPNC_GesturePastePlainHasTextGuard)

@@ -8,13 +8,13 @@
 ; GesturePastePlain coerces the clipboard to plain text with the self-assign
 ; A_Clipboard := A_Clipboard before pasting. That round-trip keeps only the text
 ; form and silently drops any image/HTML/RTF the user may still want. The fix
-; snapshots the FULL clipboard with ClipboardAll() before the coercion and
+; snapshots the FULL clipboard through CB_SaveAll() before the coercion and
 ; restores it on a negative-delay SetTimer after the synthetic ^v has settled,
 ; mirroring SendInstant's save/paste/deferred-restore guarantee.
 ;
 ; This is a meta-static test (scans source text) because GesturePastePlain calls
 ; WinActive / SendFinalResult / mutates the clipboard and cannot be exercised on
-; the headless runner. If the ClipboardAll() snapshot or the deferred restore is
+; the headless runner. If the CB_SaveAll() snapshot or the deferred restore is
 ; removed, this test fails.
 ; ==============================================================================
 
@@ -44,8 +44,8 @@
 _GPCC_PastePlainSnapshotsFullClipboard() {
 	Seg := _DriverFuncBody("GesturePastePlain")
 	Assert(Seg != "", "GesturePastePlain() declaration must exist in gestures.ahk")
-	Assert(InStr(Seg, "ClipboardAll()") > 0,
-		"GesturePastePlain must snapshot the full clipboard with ClipboardAll() before coercing to plain text — the self-assign drops non-text formats the user may still want")
+	Assert(InStr(Seg, "CB_SaveAll()") > 0,
+		"GesturePastePlain must snapshot the full clipboard through CB_SaveAll() before coercing to plain text — the self-assign drops non-text formats the user may still want")
 }
 Test("gestures: GesturePastePlain snapshots full clipboard before coercion (gesturepickcolor-clipboard-clobber)", _GPCC_PastePlainSnapshotsFullClipboard)
 

@@ -604,10 +604,16 @@ GestureToggleTitleCase() {
 ; Deferred clipboard restore for GesturePastePlain. Runs on a negative-delay
 ; SetTimer so the synthetic ^v has already consumed the coerced text before the
 ; user's original (possibly non-text) clipboard is put back.
-_GesturePastePlainRestore(OldClip) {
+_GesturePastePlainRestore(OldClip, OwnedSequence) {
     global _SEND_INSTANT_CLIP_BUSY
-    A_Clipboard := OldClip
-    _SEND_INSTANT_CLIP_BUSY := false
+    try {
+        ; A user's later copy owns a different sequence and must survive this
+        ; deferred cleanup rather than being replaced with our old snapshot.
+        if (OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence)
+            CB_RestoreAll(OldClip)
+    } finally {
+        _SEND_INSTANT_CLIP_BUSY := false
+    }
 }
 
 GesturePastePlain() {
@@ -630,14 +636,26 @@ GesturePastePlain() {
             ; silently dropping any image/HTML/RTF the user may still want, so
             ; we restore the original after the paste settles -- mirroring
             ; SendInstant's save/paste/deferred-restore guarantee.
-            _SEND_INSTANT_CLIP_BUSY := true
-            OldClip := ClipboardAll()
-            try {
-                A_Clipboard := A_Clipboard
+            OldClip := CB_SaveAll()
+            if (Type(OldClip) == "String" && OldClip == "__CB_SAVE_ERROR__") {
+                try LoggerWarn("gestures", "GesturePastePlain: clipboard snapshot failed; using native paste.")
                 SendFinalResult("^v")
-                SetTimer(_GesturePastePlainRestore.Bind(OldClip), -SEND_INSTANT_PASTE_DELAY_MS)
+                return
+            }
+            PlainText := CB_Read()
+            _SEND_INSTANT_CLIP_BUSY := true
+            OwnedSequence := 0
+            try {
+                if !CB_Write(PlainText)
+                    throw Error("clipboard write failed")
+                OwnedSequence := CB_GetSequenceNumber()
+                if !OwnedSequence
+                    throw Error("clipboard sequence unavailable")
+                SendFinalResult("^v")
+                SetTimer(_GesturePastePlainRestore.Bind(OldClip, OwnedSequence), -SEND_INSTANT_PASTE_DELAY_MS)
             } catch as e {
-                A_Clipboard := OldClip
+                if (!OwnedSequence || CB_GetSequenceNumber() = OwnedSequence)
+                    CB_RestoreAll(OldClip)
                 _SEND_INSTANT_CLIP_BUSY := false
                 try LoggerError("gestures", "GesturePastePlain threw during paste — clipboard and guard restored: {1}.", e.Message)
             }
