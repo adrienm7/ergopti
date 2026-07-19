@@ -13,9 +13,9 @@ _TSC_Check() {
 	; framework helper instead of a pinned modules/gestures.ahk read. Scoping to the
 	; function (rather than the whole file) keeps the clipboard backup/restore
 	; assertions tied to the region-screenshot path they actually guard.
-    Src := _DriverFuncBody("GestureScreenshotRegion")
-    PollSrc := _DriverFuncBody("GestureRegionCapturePoll")
-    FinishSrc := _DriverFuncBody("GestureRegionCaptureFinish")
+    Src := _TSC_DriverFuncBody("GestureScreenshotRegion")
+    PollSrc := _TSC_DriverFuncBody("GestureRegionCapturePoll")
+    FinishSrc := _TSC_DriverFuncBody("GestureRegionCaptureFinish")
     Assert(Src != "", "GestureScreenshotRegion must exist in modules/gestures.ahk")
     Assert(PollSrc != "" && FinishSrc != "", "region saving must use explicit async poll and cleanup lifecycle")
     Assert(InStr(Src, "OldClip := ClipboardAll()") > 0, "region transaction must snapshot the clipboard before invoking Snipping Tool")
@@ -24,6 +24,42 @@ _TSC_Check() {
     Assert(InStr(FinishSrc, "A_Clipboard := State[") > 0, "cleanup must restore the snapshot")
     Quote := Chr(34)
     Assert(InStr(FinishSrc, "_GestureRegionCapture[" . Quote . "epoch" . Quote . "] != Epoch") > 0, "stale callbacks must not restore a newer capture's clipboard")
+}
+
+; Keep this regression test independent from the runner's private source-scan
+; helpers.  It must remain warning-free when parsed by itself as well as when
+; included by run_all.ahk.
+_TSC_DriverFuncBody(Name) {
+    SplitPath(A_ScriptDir, , &TestsDir)
+    SplitPath(TestsDir, , &Root)
+    Source := ""
+    Loop Files, Root . "\*.ahk", "FR" {
+        Path := StrReplace(A_LoopFileFullPath, "\", "/")
+        if (InStr(Path, "/tests/") or InStr(Path, "/vendor/") or InStr(Path, "/_generated/"))
+            continue
+        try Source .= "`n" . FileRead(A_LoopFileFullPath)
+    }
+    if !RegExMatch(Source, "m)^[ \t]*" . Name . "\([^\r\n]*\)\s*\{", &Match)
+        return ""
+    Start := Match.Pos
+    OpenBrace := InStr(Source, "{", , Start)
+    if (!OpenBrace)
+        return ""
+    Depth := 0
+    Position := OpenBrace
+    Length := StrLen(Source)
+    while (Position <= Length) {
+        Character := SubStr(Source, Position, 1)
+        if (Character == "{")
+            Depth += 1
+        else if (Character == "}") {
+            Depth -= 1
+            if (Depth == 0)
+                return SubStr(Source, Start, Position - Start + 1)
+        }
+        Position += 1
+    }
+    return ""
 }
 
 Test("Gestures: screenshot region preserves clipboard", _TSC_Check)
