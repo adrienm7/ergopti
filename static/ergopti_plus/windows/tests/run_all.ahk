@@ -817,6 +817,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_altgr_chord_debounce_per_slot.ahk
 #Include meta/test_roi_halflife_threshold_reachable.ahk
 #Include meta/test_hse_notepad_consumed_delimiter.ahk
+#Include meta/test_notepad_hotstring_atomic_burst.ahk
 #Include unit/test_llm_parser_dedup_stats.ahk
 #Include meta/test_paste_without_formatting_restore.ahk
 #Include meta/test_hold_layer_release_bounded.ahk

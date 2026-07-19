@@ -152,13 +152,15 @@ _SendInstant_RestoreClipboard(OldClip) {
 	_SEND_INSTANT_CLIP_BUSY := false
 }
 
-SendInstant(Text) {
-	; Function for sending immediately a big text without typing it letter by letter.
+SendInstant(Text, Prefix := "") {
+	; Sends a large text through the clipboard while keeping Prefix (typically the
+	; hotstring erase sequence) in the SAME SendInput burst as Ctrl+V. Splitting
+	; these two injections lets a physical key land between erase and paste.
 	; Uses try so the user's clipboard is restored even on error/crash.
 	global _SEND_INSTANT_CLIP_BUSY
 	if _SendHook {
 		Hook := _SendHook
-		Hook("SendInstant", Text)
+		Hook("SendInstant", Text, Prefix)
 		return
 	}
 	; Reentrancy guard: a previous SendInstant's deferred restore has not run
@@ -168,14 +170,16 @@ SendInstant(Text) {
 	; SendInput (not SendEvent) is used here to stay atomic and avoid interleaving
 	; with the InputHook, which processes SendEvent characters as physical input.
 	if _SEND_INSTANT_CLIP_BUSY {
-		SendInput("{Text}" Text)
+		SendInput(Prefix . "{Text}" . Text)
 		return
 	}
 	OldClipboard := ClipboardAll()
 	_SEND_INSTANT_CLIP_BUSY := true
 	try {
 		A_Clipboard := Text
-		SendInput("^v")
+		; Prefix and Ctrl+V are one kernel injection transaction. Critical callers
+		; therefore cannot be interrupted after the erase but before the paste.
+		SendInput(Prefix . "^v")
 		SetTimer(_SendInstant_RestoreClipboard.Bind(OldClipboard), -SEND_INSTANT_PASTE_DELAY_MS)
 	} catch {
 		A_Clipboard := OldClipboard

@@ -242,29 +242,18 @@ HSE_DispatchMatch(Spec, EndChar) {
 
         if IsNotepadApp {
             ; Windows-11 Notepad mis-handles SendInput-injected hotstrings, so the
-            ; replacement is routed through the clipboard. This is the ONE remaining
-            ; non-atomic path (SendEvent backspaces + a clipboard paste); a physical
-            ; key typed mid-expansion can still interleave here, but the atomic path
-            ; is unreliable in Notepad specifically, so the trade-off stands.
-            ; SendInstant Sleeps (paste-settle); a caller may have entered Critical
-            ; (_OnPrefixChar does), and Critical MUST NOT span a Sleep — it would
-            ; yield (breaking the guarantee) and freeze all input ~200 ms. Release
-            ; Critical for this branch and restore it after. No-op when the caller
-            ; was not Critical (the space tap-hold path).
+            ; replacement is routed through the clipboard. SendInstant accepts the
+            ; erase sequence as a prefix and injects it with Ctrl+V in one SendInput
+            ; burst, so no physical key can land between erase and paste.
             ; Mirror the atomic branch's consumed-delimiter guard so a space
             ; (or any other consumed end-char) is not re-injected after the
             ; clipboard paste — same contract as the SendInput path.
             EndCharEmitted := (EndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
-            _NpCrit := Critical("Off")
+            _NpCrit := Critical("On")
             try {
-                ; UpdateRing=false: BackSpaceSeq is a control sequence ("{BackSpace N}"),
-                ; not a real emitted character — letting SendNewResult record
-                ; SubStr(BackSpaceSeq, -1) ("}") into the last-sent-character ring
-                ; corrupts _LSC_RING and LastSentCharacterKeyTime. The real emitted
-                ; text is recorded explicitly below, after the paste, mirroring the
-                ; atomic branch's UpdateLastSentCharacter call.
-                SendNewResult(BackSpaceSeq, false, false)
-                SendInstant(Replacement . EndCharEmitted)
+                ; BackSpaceSeq is a control sequence, not emitted text. The actual
+                ; last character is recorded explicitly below after the atomic paste.
+                SendInstant(Replacement . EndCharEmitted, BackSpaceSeq)
             } finally {
                 Critical(_NpCrit)
             }

@@ -59,14 +59,11 @@ _HCER_AssertNotepadBranchDoesNotCorruptRing() {
 	Branch := _HCER_ExtractNotepadBranch(Src)
 	Assert(Branch != "", "HSE_DispatchMatch's Notepad branch (if IsNotepadApp) must exist")
 
-	; The pre-paste backspace is a control sequence ("{BackSpace N}"), not a real
-	; emitted character. SendNewResult's third arg (UpdateRing) must be false so
-	; SubStr(BackSpaceSeq, -1) — the sequence's trailing "}" — never reaches the
-	; last-sent-character ring (F8: notepad-clipboard-ring-corruption).
-	Assert(InStr(Branch, "SendNewResult(BackSpaceSeq, false, false)") > 0,
-		"Notepad branch must call SendNewResult(BackSpaceSeq, false, false) — UpdateRing=false — so the backspace control sequence never pollutes the last-sent-character ring (F8)")
-	Assert(!InStr(Branch, "SendNewResult(BackSpaceSeq, false)"),
-		"Notepad branch must NOT call the 2-arg SendNewResult(BackSpaceSeq, false) — that form lets SendNewResult record the backspace sequence's trailing char into the ring (F8)")
+    ; The erase is now part of SendInstant's one SendInput transaction. It must
+    ; never pass through SendNewResult, whose normal ring update would record the
+    ; control sequence's trailing "}" instead of a character visible in Notepad.
+    Assert(InStr(Branch, "SendNewResult(BackSpaceSeq") = 0,
+        "Notepad branch must not send BackSpaceSeq through SendNewResult; SendInstant owns the atomic erase+paste transaction (F8)")
 
 	; The REAL emitted text (the clipboard paste) must feed the ring explicitly,
 	; mirroring the atomic branch's UpdateLastSentCharacter(SubStr(EndCharPart ...))

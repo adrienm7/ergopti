@@ -15,9 +15,9 @@
 ;   into an in-flight expansion burst -> "trigger"+"bc" -> "outpubct". The fix is
 ;   to make the per-key remap (_RemapEmit), the watcher fire region (_OnPrefixChar
 ;   before HSE_FeedChar) and the dispatch's atomic send (HSE_DispatchMatch)
-;   uninterruptible via Critical, while the two Sleep-ing paths (the UIA wrap and
-;   the Notepad clipboard send) stay OUT of Critical (a Sleep would yield and break
-;   the guarantee). If a future edit drops any of those Critical calls, the
+;   uninterruptible via Critical. The Notepad clipboard path now uses one
+;   Prefix . "^v" SendInput burst, so it too stays under Critical; only genuine
+;   message-pumping waits (such as UIA selection) must release it. If a future edit drops any of those Critical calls, the
 ;   fast-typing reorder / expansion interleave silently returns: this test makes
 ;   that loud.
 ;
@@ -93,7 +93,7 @@ _MetaCheckInputSerialization() {
 	Assert(GuardPos > 0 and LookupPos > 0 and GuardPos < LookupPos,
 		"_PrefixRenderFlush must early-return while suppressed, before _LookupAndRender")
 
-	; --- Dispatch: atomic burst Critical; Notepad (Sleeps) releases Critical ---
+    ; --- Dispatch: every erase/output burst, including Notepad, is Critical ---
 	EngineFile := WindowsDir . "\lib\hotstrings\hotstring_engine_main.ahk"
 	EShim := ""
 	try EShim := FileRead(EngineFile)
@@ -106,8 +106,6 @@ _MetaCheckInputSerialization() {
 	Assert(DispPos > 0, "engine must define HSE_DispatchMatch(Spec, EndChar)")
 	Assert(InStr(E, 'Critical("On")', , DispPos) > 0,
 		"HSE_DispatchMatch atomic send must be wrapped in Critical On so non-OnChar callers (e.g. the Space tap-hold) serialize too")
-	Assert(InStr(E, 'Critical("Off")', , DispPos) > 0,
-		"HSE_DispatchMatch Notepad branch must release Critical Off -- it Sleeps (clipboard), and Critical must not span a Sleep")
 }
 
 Test("meta input: keystroke path is Critical-serialized (no fast-typing reorder / expansion interleave)",
@@ -281,31 +279,28 @@ Test("meta input: DeadKey releases Critical before the blocking ih.Wait() and re
 
 ; =====================================
 ; =====================================
-; ======= 4/ Notepad non-atomic guard ==
+; ======= 4/ Notepad atomic clipboard guard ==
 ; =====================================
 ; =====================================
 
-; Guards that the clipboard/SendInstant branch in HSE_DispatchMatch is gated
-; EXCLUSIVELY by an IsNotepadApp check (notepad.exe). This branch is deliberately
-; non-atomic (SendEvent backspaces + clipboard paste with Critical Off, because
-; SendInstant Sleeps). The comment at hotstring_dispatch.ahk:243-248 concedes
-; "a physical key typed mid-expansion can still interleave here" — the exact
-; interleave the atomic SendInput branch prevents. A future refactor that widens
-; this branch beyond Notepad would silently re-open the interleave bug for those
-; apps. This gate pins notepad.exe as the SOLE selector of the non-atomic path.
-_MIS_CheckNotepadIsSoleNonAtomicBranch() {
+; Guards that the clipboard/SendInstant compatibility branch is still selected only
+; for notepad.exe AND has the same atomicity as the regular path. The historical
+; branch released Critical, erased with SendEvent, then pasted separately; a
+; physical key could land in that gap. This test pins the Prefix . "^v" transaction
+; so a future compatibility edit cannot reintroduce the interleave.
+_MIS_CheckNotepadClipboardBranchIsAtomic() {
 	Body := _DriverFuncBody("HSE_DispatchMatch")
 	Assert(Body != "", "HSE_DispatchMatch(Spec, EndChar) must exist")
 
 	; The IsNotepadApp gate must exist.
 	IsNotepadPos := InStr(Body, "IsNotepadApp")
 	Assert(IsNotepadPos > 0,
-		"HSE_DispatchMatch must gate the non-atomic clipboard branch on IsNotepadApp")
+        "HSE_DispatchMatch must gate the Notepad clipboard branch on IsNotepadApp")
 
 	; The non-atomic branch must reference notepad.exe.
 	NotepadExePos := InStr(Body, "notepad.exe")
 	Assert(NotepadExePos > 0,
-		"the IsNotepadApp check must be keyed on 'notepad.exe' — no other app must take the non-atomic path")
+        "the IsNotepadApp check must be keyed on 'notepad.exe' — no other app must take the compatibility path")
 
 	; The else branch (atomic path) must contain SendInput with Critical On.
 	ElsePos := InStr(Body, "} else {", , InStr(Body, "if IsNotepadApp"))
@@ -319,15 +314,18 @@ _MIS_CheckNotepadIsSoleNonAtomicBranch() {
 	Assert(InStr(ElseBlock, 'Critical("On")') > 0,
 		"the atomic else branch must enter Critical On before the SendInput burst")
 
-	; The if branch (Notepad) must release Critical Off before SendInstant.
+    ; The Notepad branch must retain Critical and emit erase+paste through one
+    ; SendInstant transaction. No separate SendNewResult erase is permitted.
 	IfBlockStart := InStr(Body, "if IsNotepadApp")
 	IfBlockEnd := InStr(Body, "} else {", , IfBlockStart)
 	IfBlock := SubStr(Body, IfBlockStart, IfBlockEnd - IfBlockStart)
-	Assert(InStr(IfBlock, 'Critical("Off")') > 0,
-		"the Notepad branch must release Critical Off — it Sleeps (clipboard), and Critical must not span a Sleep")
-	Assert(InStr(IfBlock, "SendInstant") > 0,
-		"the Notepad branch must use SendInstant (clipboard paste)")
+    Assert(InStr(IfBlock, 'Critical("On")') > 0,
+        "the Notepad branch must retain Critical through its non-blocking clipboard injection")
+    Assert(InStr(IfBlock, "SendInstant(Replacement . EndCharEmitted, BackSpaceSeq)") > 0,
+        "the Notepad branch must send erase and clipboard paste as one SendInstant transaction")
+    Assert(InStr(IfBlock, "SendNewResult(BackSpaceSeq") = 0,
+        "the Notepad branch must not issue a separate SendEvent erase before the paste")
 }
 
-Test("meta input: Notepad is the SOLE non-atomic dispatch branch (clipboard/SendInstant gate)",
-	_MIS_CheckNotepadIsSoleNonAtomicBranch)
+Test("meta input: Notepad clipboard branch remains atomic (clipboard/SendInstant gate)",
+    _MIS_CheckNotepadClipboardBranchIsAtomic)
