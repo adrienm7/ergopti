@@ -180,15 +180,30 @@ _Step5_OnRadioChange(regControls, statusLbl, isYes, *) {
 	}
 }
 
-global _OnboardingGestureJob := Map("epoch", 0, "pid", 0, "script", "", "done", 0)
+; The elevated worker writes its own result before it exits. Polling a PID and
+; then asking OpenProcess for an exit code is racy: Windows may already have
+; released the process object, and _SR_GetExitCode deliberately returns 0 in
+; that case. A missing or malformed result is therefore a failure, never a
+; false success shown to the user.
+global _OnboardingGestureJob := Map("epoch", 0, "pid", 0, "script", "", "result", "", "done", 0)
 
 _Onboarding_StartGestureAuto(OnDone) {
     global _OnboardingGestureJob
-    if (_OnboardingGestureJob["pid"] && ProcessExist(_OnboardingGestureJob["pid"]))
-        return false
+    if _OnboardingGestureJob["pid"] {
+        if ProcessExist(_OnboardingGestureJob["pid"])
+            return false
+        ; A click can arrive after the process exited but before its one-shot
+        ; poll ran. Deliver that completed job before replacing its state.
+        _Onboarding_PollGestureAuto(_OnboardingGestureJob["epoch"])
+        if _OnboardingGestureJob["pid"]
+            return false
+    }
     Epoch := _OnboardingGestureJob["epoch"] + 1
-    ScriptPath := A_Temp . "\ergopti_gesture_config_" . Epoch . ".ps1"
-    try FileAppend(_Onboarding_BuildGesturePsScript(), ScriptPath, "UTF-8")
+    JobStem := A_Temp . "\ergopti_gesture_config_" . A_Pid . "_" . Epoch
+    ScriptPath := JobStem . ".ps1"
+    ResultPath := JobStem . ".result"
+    try FileDelete(ResultPath)
+    try FileAppend(_Onboarding_BuildGesturePsScript(ResultPath), ScriptPath, "UTF-8")
     catch as err {
         try LoggerError("Onboarding", "Could not write gesture PS script: {1}.", err.Message)
         return false
@@ -200,7 +215,7 @@ _Onboarding_StartGestureAuto(OnDone) {
         try LoggerError("Onboarding", "Gesture auto-config launch failed: {1}.", err.Message)
         return false
     }
-    _OnboardingGestureJob := Map("epoch", Epoch, "pid", Pid, "script", ScriptPath, "done", OnDone)
+    _OnboardingGestureJob := Map("epoch", Epoch, "pid", Pid, "script", ScriptPath, "result", ResultPath, "done", OnDone)
     SetTimer(_Onboarding_PollGestureAuto.Bind(Epoch), -100)
     return true
 }
@@ -209,16 +224,38 @@ _Onboarding_PollGestureAuto(Epoch) {
     global _OnboardingGestureJob
     if (_OnboardingGestureJob["epoch"] != Epoch || !_OnboardingGestureJob["pid"])
         return
+    ; Suspend does not stop timers. Do not mutate onboarding UI or invoke a
+    ; callback while the keyboard driver is suspended; retain the job until it
+    ; resumes instead.
+    if A_IsSuspended {
+        SetTimer(_Onboarding_PollGestureAuto.Bind(Epoch), -100)
+        return
+    }
     if ProcessExist(_OnboardingGestureJob["pid"]) {
         SetTimer(_Onboarding_PollGestureAuto.Bind(Epoch), -100)
         return
     }
-    ExitCode := _SR_GetExitCode(_OnboardingGestureJob["pid"])
+    Ok := _Onboarding_ReadGestureAutoResult(_OnboardingGestureJob["result"])
     Done := _OnboardingGestureJob["done"]
     try FileDelete(_OnboardingGestureJob["script"])
+    try FileDelete(_OnboardingGestureJob["result"])
     _OnboardingGestureJob["pid"] := 0
+    _OnboardingGestureJob["done"] := 0
     if IsObject(Done)
-        try Done.Call(ExitCode = 0)
+        try Done.Call(Ok)
+}
+
+_Onboarding_ReadGestureAutoResult(ResultPath) {
+    try Result := Trim(FileRead(ResultPath, "UTF-8"))
+    catch as err {
+        try LoggerError("Onboarding", "Gesture auto-config result missing: {1}.", err.Message)
+        return false
+    }
+    if (Result != "0") {
+        try LoggerWarn("Onboarding", "Gesture auto-config returned invalid/failing result: {1}.", Result)
+        return false
+    }
+    return true
 }
 
 _Step5_AutoRegister(statusLbl, *) {
@@ -295,7 +332,7 @@ _Step5_ShowGestureStatus(statusLbl, ok) {
 ; The returned text is a full .ps1 script (multi-line, comments allowed)
 ; written to a temp file by the caller — running it via ``-File`` avoids the
 ; argv-quoting issues that plagued the previous ``-Command`` inline variant.
-_Onboarding_BuildGesturePsScript() {
+_Onboarding_BuildGesturePsScript(ResultPath) {
 	; KeyParams encoding: (VK << 16) | 0x07 where 0x07 = Ctrl|Shift|Win.
 	; F1..F10 = 0x70..0x79. The script is assembled line-by-line instead of
 	; via a multi-line continuation section because the latter — combined
@@ -304,8 +341,11 @@ _Onboarding_BuildGesturePsScript() {
 	; section parser. Concatenating with explicit ``\`r\`n`` separators keeps
 	; the parser happy AND yields identical .ps1 content on disk.
 	CRLF := "`r`n"
+	ResultLiteral := StrReplace(ResultPath, "'", "''")
 	S := ""
 	S .= "$ErrorActionPreference = 'Stop'" . CRLF
+	S .= "$ResultPath = '" . ResultLiteral . "'" . CRLF
+	S .= "$ErgoptiExitCode = 1" . CRLF
 	S .= "$Reg = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad'" . CRLF
 	; Create the PrecisionTouchPad key if missing (machines that never had a
 	; precision touchpad driver loaded won't have it). Without this guard,
@@ -372,10 +412,11 @@ _Onboarding_BuildGesturePsScript() {
 	S .= "  foreach ($d in $devs) {" . CRLF
 	S .= "    Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction SilentlyContinue" . CRLF
 	S .= "  }" . CRLF
-	S .= "  exit 0" . CRLF
+	S .= "  $ErgoptiExitCode = 0" . CRLF
 	S .= "} catch {" . CRLF
-	S .= "  exit 1" . CRLF
 	S .= "}" . CRLF
+	S .= "try { [System.IO.File]::WriteAllText($ResultPath, [string]$ErgoptiExitCode, [System.Text.Encoding]::ASCII) } catch { exit 1 }" . CRLF
+	S .= "exit $ErgoptiExitCode" . CRLF
 	return S
 }
 
