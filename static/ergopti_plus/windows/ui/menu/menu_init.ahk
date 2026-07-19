@@ -48,11 +48,22 @@ _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
 ; one-shot SetTimer from ErgoptiPlus.ahk; the live-rebuild path populates inline.
 ; Wrapped in try so a transient failure can never crash the timer thread.
 BuildLanguageMenuDeferred() {
-	global _LangMenuRef, _LangMenuBuildPending
+	global A_TrayMenu, _LangMenuRef, _LangMenuBuildPending
 	try {
-		if (IsSet(_LangMenuRef) and _LangMenuRef)
-			I18nBuildLanguageMenu(_LangMenuRef)
-		_LangMenuBuildPending := false
+		; The placeholder submenu is disabled until this detached tree is ready.
+		; Filling the published Menu in place left a brief but real empty-menu
+		; click window during boot and language refreshes.
+		StagedMenu := Menu()
+		I18nBuildLanguageMenu(StagedMenu)
+		_PublishCritical := Critical("On")
+		try {
+			A_TrayMenu.Add(t("menu.global.language"), StagedMenu)
+			A_TrayMenu.Enable(t("menu.global.language"))
+			_LangMenuRef := StagedMenu
+			_LangMenuBuildPending := false
+		} finally {
+			Critical(_PublishCritical)
+		}
 	} catch as e {
 		try LoggerError("TrayMenu", "Deferred language-menu build failed: {1}", e.Message)
 	}
@@ -219,8 +230,13 @@ _MI_AppendTail() {
 			_LangMenuRef := LangMenu
 			if _DriverReady
 				I18nBuildLanguageMenu(LangMenu)
-			else
+			else {
+				; A disabled placeholder makes the deferred population visible as
+				; unavailable rather than accepting a click that cannot select a
+				; locale yet. BuildLanguageMenuDeferred atomically enables it.
+				A_TrayMenu.Disable(t("menu.global.language"))
 				_LangMenuBuildPending := true
+			}
 		} else if Id == "config_folder" {
 			RegisterMenuItem(A_TrayMenu, t("menu.global.config_folder"), FilePathsEditor)
 		} else if Id == "setup_wizard" {
@@ -334,4 +350,3 @@ _MI_BuildDebuggingMenu() {
 	}
 	return DebuggingMenu
 }
-
