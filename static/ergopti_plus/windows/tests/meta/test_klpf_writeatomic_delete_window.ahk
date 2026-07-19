@@ -65,15 +65,18 @@ _KWDW_NoDeleteThenMove() {
 }
 Test("keylogger: KLPF_WriteAtomic has no delete-then-move window (klpf-writeatomic-delete-window)", _KWDW_NoDeleteThenMove)
 
-; The function must publish via the same MoveFileExW atomic-swap primitive
-; KL_WriteAtomic uses (REPLACE_EXISTING | WRITE_THROUGH), not a FileMove.
+; The writer may delegate the syscall to a narrow helper, but its publish path
+; must still end in MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH), never FileMove.
 _KWDW_UsesAtomicSwap() {
-	Src := _KWDW_ReadSource("modules/keylogger/keylogger_prefetch.ahk")
-	Seg := _DriverFuncBody("KLPF_WriteAtomic")
-	Assert(Seg != "", "KLPF_WriteAtomic(path, content) declaration must exist in keylogger_prefetch.ahk")
-	Assert(InStr(Seg, "MoveFileExW") > 0,
-		"KLPF_WriteAtomic must publish the destination with MoveFileExW — the documented atomic directory-entry swap with no absent-file window")
-	Assert(InStr(Seg, "MOVEFILE_REPLACE_EXISTING") > 0,
-		"KLPF_WriteAtomic must pass MOVEFILE_REPLACE_EXISTING so the rename atomically replaces the existing prefetch file")
+	WriterBody := _DriverFuncBody("KLPF_WriteAtomic")
+	MoveBody := _DriverFuncBody("KLPF_MoveAtomic")
+	Assert(WriterBody != "", "KLPF_WriteAtomic(path, content) declaration must exist in keylogger_prefetch.ahk")
+	Assert(MoveBody != "", "KLPF_MoveAtomic(source, destination, flags) declaration must exist in keylogger_prefetch.ahk")
+	Assert(InStr(WriterBody, "KLPF_MoveAtomic(tmp, path, FLAGS)") > 0,
+		"KLPF_WriteAtomic must publish through KLPF_MoveAtomic, never a non-atomic fallback")
+	Assert(InStr(MoveBody, "MoveFileExW") > 0,
+		"KLPF_MoveAtomic must publish the destination with MoveFileExW — the documented atomic directory-entry swap with no absent-file window")
+	Assert(InStr(MoveBody, "MOVEFILE_REPLACE_EXISTING") > 0,
+		"KLPF_MoveAtomic must pass MOVEFILE_REPLACE_EXISTING so the rename atomically replaces the existing prefetch file")
 }
 Test("keylogger: KLPF_WriteAtomic publishes via MoveFileExW atomic swap (klpf-writeatomic-delete-window)", _KWDW_UsesAtomicSwap)
