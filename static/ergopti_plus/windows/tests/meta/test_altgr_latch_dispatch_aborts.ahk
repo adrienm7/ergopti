@@ -18,7 +18,7 @@
 ;
 ; This test asserts:
 ;   1. _ScriptAltGrDispatch calls _ScriptAltGrIsPhysical.
-;   2. A SendInput / return block appears in the function body BEFORE
+;   2. A guarded send / return block appears in the function body BEFORE
 ;      RunScriptShortcutAction (the abort-on-non-physical path).
 ;   3. The abort path sends the native key so the chord still produces the
 ;      expected character rather than silently dropping the keystroke.
@@ -67,20 +67,23 @@ _ALDA_AbortPathSendsNativeAndReturns() {
 	Body := _DriverFuncBody("_ScriptAltGrDispatch")
 	Assert(Body != "", "_ScriptAltGrDispatch must be defined — prerequisite for this test")
 
-	; On !_ScriptAltGrIsPhysical, the function must SendInput(NativeSend) and return
+	; On !_ScriptAltGrIsPhysical, the function must send NativeSend through the
+	; common guarded injection primitive and return
 	; before reaching RunScriptShortcutAction
 	IsPhysicalPos   := InStr(Body, "_ScriptAltGrIsPhysical")
-	SendNativePos   := InStr(Body, "SendInput(NativeSend)")
+	SendNativePos   := InStr(Body, "SendFinalResult(NativeSend)")
 	ActionPos       := InStr(Body, "RunScriptShortcutAction(Slot)")
 
 	Assert(IsPhysicalPos > 0,
 		"_ScriptAltGrIsPhysical must be present — prerequisite for the abort-path test")
 	Assert(SendNativePos > 0,
-		"_ScriptAltGrDispatch must call SendInput(NativeSend) in the non-physical abort path to pass the keystroke natively rather than silently dropping it")
+		"_ScriptAltGrDispatch must call SendFinalResult(NativeSend) in the non-physical abort path to pass the keystroke natively without an unguarded SendInput")
 	Assert(ActionPos > 0,
 		"_ScriptAltGrDispatch must still call RunScriptShortcutAction(Slot) on the physical path — the abort only applies to non-physical presses")
 	Assert(SendNativePos < ActionPos,
-		"SendInput(NativeSend) abort path must appear BEFORE RunScriptShortcutAction(Slot) in _ScriptAltGrDispatch — the abort must be able to fire without ever reaching the action call")
+		"SendFinalResult(NativeSend) abort path must appear BEFORE RunScriptShortcutAction(Slot) in _ScriptAltGrDispatch — the abort must be able to fire without ever reaching the action call")
+	Assert(InStr(Body, 'SendFinalResult("^!{" . CtrlAltSuffixKey . "}")') > 0,
+		"the Ctrl+Alt fallback must also use the guarded common send primitive")
 }
 
 Test("script_altgr: non-physical abort path appears before RunScriptShortcutAction (altgr-latch-dispatch-aborts)",

@@ -33,9 +33,9 @@ _ScriptAltGrDispatch(SuffixSC, Slot, NativeSend, CtrlAltSuffixKey) {
         return
     if !_ScriptAltGrIsPhysical(SuffixSC) {
         if InStr(A_ThisHotkey, "^!")
-            SendInput("^!{" . CtrlAltSuffixKey . "}")
+            SendFinalResult("^!{" . CtrlAltSuffixKey . "}")
         else
-            SendInput(NativeSend)
+            SendFinalResult(NativeSend)
         return
     }
     ; Run the action even while suspended: _RegisterScriptAltGrHotkeys registers
