@@ -97,6 +97,20 @@ _SAR_HotkeyBoundariesAreContained() {
 }
 Test("Screenshot hotkey: SC029 contains OS failures and never blocks on a modal dialog", _SAR_HotkeyBoundariesAreContained)
 
+_SAR_GestureInstantBoundariesAreContained() {
+	Body := _DriverFuncBody("GestureScreenshotInstant")
+	Assert(Body != "", "GestureScreenshotInstant must exist")
+	Assert(InStr(Body, "try") > 0 && InStr(Body, "catch as Err") > 0,
+		"GestureScreenshotInstant must contain desktop, filesystem, and Run failures")
+	Assert(InStr(Body, "LoggerError") > 0 && InStr(Body, "TrayTip") > 0,
+		"a failed instant gesture screenshot must be logged and reported non-modally")
+	Assert(InStr(Body, "MsgBox") = 0,
+		"GestureScreenshotInstant must not stall the driver's message thread with a modal dialog")
+	Assert(InStr(Body, "Run(") > 0 && InStr(Body, "RunWait") = 0,
+		"GestureScreenshotInstant must retain its asynchronous PowerShell worker")
+}
+Test("Gesture screenshot: instant capture contains OS failures and remains nonblocking", _SAR_GestureInstantBoundariesAreContained)
+
 
 ; F-H07: GestureCaptureRegion (window/fullscreen capture) used RunWait, blocking the
 ; keyboard hook thread for the whole PowerShell capture (~300-1500 ms) on every such
