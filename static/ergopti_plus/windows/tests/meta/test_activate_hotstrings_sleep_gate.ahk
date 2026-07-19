@@ -84,3 +84,18 @@ _AHSG_GuardReturnsEarly() {
 		"the gate must test HSE_Buffer for emptiness (== empty string) before returning")
 }
 Test("hotstring_engine: ActivateHotstrings early-returns on empty HSE_Buffer (activate-hotstrings-sleep-on-keyboard-thread)", _AHSG_GuardReturnsEarly)
+
+_AHSG_PokeIsAtomicWithoutSleep() {
+	Seg := _DriverFuncBody("ActivateHotstrings")
+	Assert(Seg != "", "ActivateHotstrings() declaration must exist")
+	Assert(!RegExMatch(Seg, "\bSleep\s*\("),
+		"ActivateHotstrings must not Sleep on the keyboard thread between its synthetic space and backspace")
+	OnPos := InStr(Seg, 'Critical("On")')
+	SpacePos := InStr(Seg, 'SendNewResult(" ")')
+	BackspacePos := InStr(Seg, 'SendNewResult("{BackSpace}", False)')
+	RestorePos := InStr(Seg, "Critical(previous_critical)")
+	Assert(OnPos > 0 && SpacePos > OnPos && BackspacePos > SpacePos && RestorePos > BackspacePos,
+		"ActivateHotstrings must keep the synthetic space/backspace pair inside a Critical transaction and restore the caller state afterwards")
+}
+
+Test("hotstring_engine: ActivateHotstrings emits the poke atomically without keyboard-thread Sleep", _AHSG_PokeIsAtomicWithoutSleep)
