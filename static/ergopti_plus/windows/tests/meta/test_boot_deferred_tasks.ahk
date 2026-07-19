@@ -23,6 +23,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include ..\test_framework.ahk
+
 
 
 
@@ -42,19 +44,34 @@ _MetaCheckBootDeferredTasks() {
 	try Body := FileRead(BootFile)
 	Assert(Body != "", "ErgoptiPlus.ahk must be readable for the deferred-tasks meta-test")
 
-	; ASCII substring of the ready marker (avoids the em-dash in the real log line).
-	ReadyPos := InStr(Body, "Driver fully initialised")
+	; Locate the executable ready log rather than its earlier explanatory comments.
+	; The exact call also keeps a future comment edit from moving this boundary.
+	ReadyMarker := "LoggerSuccess(" . Chr(34) . "ErgoptiPlus" . Chr(34) . ", "
+		. Chr(34) . "Driver fully initialised"
+	ReadyPos := InStr(Body, ReadyMarker)
 	Assert(ReadyPos > 0,
-		"ErgoptiPlus.ahk must log the 'Driver fully initialised' ready marker")
+		"ErgoptiPlus.ahk must execute the 'Driver fully initialised' ready log")
 
-	; Every heavy deferred task must be armed strictly AFTER the ready marker.
-	; InStr returns the FIRST occurrence, so Pos > ReadyPos proves NO occurrence
-	; sits before "ready" — exactly the regression we must prevent.
-	; NB: the prefix-watcher index build is no longer its own SetTimer — it runs at
-	; the end of RegisterEmojisSymbolsDeferred, so it is covered by that probe below.
+	; Emoji/symbol hotstrings are deliberately the exception to the deferred-task
+	; rule: they are part of the advertised input contract and must finish before
+	; ready.  A first trigger must never be literal because its registration timer
+	; has not run yet, nor may that timer contend with the user's first keystroke.
+	HotstringsPos := InStr(Body, "RegisterAllHotstrings(false)")
+	PrefixIndexPos := InStr(Body, "HotstringPrefixWatcherRebuildIndex()")
+	Assert(HotstringsPos > 0,
+		"ErgoptiPlus.ahk must register all hotstrings synchronously at boot")
+	Assert(PrefixIndexPos > HotstringsPos && PrefixIndexPos < ReadyPos,
+		"the prefix index must be rebuilt after synchronous hotstring registration and before ready")
+	Assert(HotstringsPos < ReadyPos,
+		"emoji/symbol hotstrings must finish registering before the driver reports ready")
+	Assert(InStr(Body, "SetTimer(RegisterEmojisSymbolsDeferred") = 0,
+		"the boot entrypoint must not arm a post-ready emoji/symbol registration timer")
+
+	; Every remaining heavy deferred task must be armed strictly AFTER the ready
+	; marker. InStr returns the FIRST occurrence, so Pos > ReadyPos proves NO
+	; occurrence sits before ready — exactly the regression we must prevent.
 	for _, Probe in [
 		"SetTimer(WPMWidget_Show",
-		"SetTimer(RegisterEmojisSymbolsDeferred",
 		"SetTimer(BuildLanguageMenuDeferred",
 		"SetTimer(I18nWarmFallbacks",
 		"SetTimer(LLM_Menu_Build" ] {
