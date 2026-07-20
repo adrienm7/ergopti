@@ -555,6 +555,11 @@ local function build_delay_item(karabiner, update_menu)
 				return
 			end
 			karabiner.set_tap_hold_timeout(math.floor(ms))
+			-- The setter only persists to the user config; without this the menu
+			-- would show the new threshold while typing kept the old one until an
+			-- unrelated click regenerated karabiner.json (every sibling item here
+			-- regenerates explicitly for exactly that reason).
+			pcall(karabiner.regenerate)
 			if update_menu then update_menu() end
 		end,
 	}
@@ -590,6 +595,10 @@ local function build_sticky_delay_item(karabiner, update_menu)
 				return
 			end
 			karabiner.set_sticky_timeout(math.floor(ms))
+			-- Same rationale as the tap/hold delay above: the setter persists but
+			-- never regenerates, so without this the new value only reaches the
+			-- keyboard on some later, unrelated click.
+			pcall(karabiner.regenerate)
 			if update_menu then update_menu() end
 		end,
 	}
