@@ -16,8 +16,10 @@
 ; (genuinely stuck), and the user-facing surface routes through the non-blocking
 ; NotifierSend tray notification instead of MsgBox. This test encodes both halves:
 ; the handler must call _ShouldReleaseModifier (no bare GetKeyState(...,"P")
-; release loop), and it must NOT surface the error via MsgBox. Meta-static because
-; ErgoptiPlus.ahk registers every hotkey at load and cannot be #Included headless.
+; release loop), and the RECOVERABLE (post-ready) path must NOT surface the error
+; via MsgBox. A pre-ready fatal-exit MsgBox before ExitApp(1) IS allowed (no input
+; pipeline is owned yet, F05). Meta-static because ErgoptiPlus.ahk registers every
+; hotkey at load and cannot be #Included headless.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -70,8 +72,16 @@ _GEHSS_HandlerSurfaceIsNonBlocking() {
 	Src := _DriverSourceConcat()
 	Seg := _DriverFuncBody("ErgoptiGlobalErrorHandler")
 	Assert(InStr(Seg, "NotifierSend(") > 0,
-		"ErgoptiGlobalErrorHandler must surface the error via the non-blocking NotifierSend tray notification")
-	Assert(InStr(Seg, "MsgBox(") = 0,
-		"ErgoptiGlobalErrorHandler must NOT use a blocking MsgBox — a modal dialog on the input thread starves the keyboard hook and drops the next keystrokes")
+		"ErgoptiGlobalErrorHandler must surface the recoverable error via the non-blocking NotifierSend tray notification")
+	; A blocking MsgBox is forbidden on the RECOVERABLE (post-ready) path — a modal
+	; there starves the keyboard hook and drops keystrokes. It IS allowed in the
+	; pre-ready fatal-exit branch (no input pipeline is owned yet and ExitApp(1)
+	; follows immediately, telling the user WHY the driver is exiting — F05), so
+	; scope the prohibition to everything from that fatal exit onward.
+	FatalExit := InStr(Seg, "ExitApp(1)")
+	Assert(FatalExit > 0, "ErgoptiGlobalErrorHandler must ExitApp(1) on the pre-ready fatal path")
+	Recoverable := SubStr(Seg, FatalExit)
+	Assert(InStr(Recoverable, "MsgBox(") = 0,
+		"the recoverable error path must NOT use a blocking MsgBox — a modal on the input thread starves the keyboard hook (a pre-ready fatal-exit MsgBox before ExitApp(1) is allowed)")
 }
 Test("ErgoptiPlus: error handler surfaces via NotifierSend not MsgBox (global-error-handler-sendevent-storm)", _GEHSS_HandlerSurfaceIsNonBlocking)
