@@ -1,0 +1,147 @@
+﻿; static/ergopti_plus/windows/tests/unit/test_logger_daily_rotation.ahk
+
+; ==============================================================================
+; MODULE: Logger Daily Rotation Tests
+; DESCRIPTION:
+; Regression guard for the "daily-rotating" log file that only ever rotated on
+; restart. LOGGER_LOG_PATH was built from FormatTime once inside LoggerInit, so
+; a driver left running across midnight kept appending to the file named for its
+; START date. Field evidence: ErgoptiPlus_2026-07-11.log held entries dated
+; 07-11 through 07-14.
+;
+; FEATURES & RATIONALE:
+; 1. Encodes the ROOT CAUSE, not the symptom: the assertion is that the flush
+;    path RE-RESOLVES the dated paths when the calendar date has moved, rather
+;    than that some file happens to carry today's name. A fix that merely
+;    renamed things would still fail this.
+; 2. Behavioural, not a source grep: it drives _LoggerFlush with a stale
+;    _LOGGER_PATH_DATE and inspects the resulting globals.
+; 3. Guards the second-order consequence too. _LoggerPurgeOldLogs ages files by
+;    the date in their NAME, so a stale name meant recent data was discarded
+;    early; the retention window must therefore be one shared constant.
+; 4. Hermetic: _ConfigDir is redirected into A_Temp for the duration so the
+;    rollover's purge can never touch the developer's real log directory.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+; ==========================================
+; ==========================================
+; ======= 1/ Test implementations ==========
+; ==========================================
+; ==========================================
+
+; Redirect the logger's directory resolution into a throwaway temp folder and
+; run ``Body`` there. Restores the previous globals unconditionally so a failing
+; assertion cannot leak the redirection into the rest of the suite.
+_LDR_WithTempConfigDir(Body) {
+	global _ConfigDir, _AhkSubDir, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
+
+	HadConfigDir := IsSet(_ConfigDir)
+	HadSubDir := IsSet(_AhkSubDir)
+	PrevConfigDir := HadConfigDir ? _ConfigDir : ""
+	PrevSubDir := HadSubDir ? _AhkSubDir : ""
+	PrevPath := LOGGER_LOG_PATH
+	PrevErrPath := LOGGER_ERRORS_LOG_PATH
+	PrevDate := _LOGGER_PATH_DATE
+
+	_ConfigDir := A_Temp . "\ergopti_logrotate_test\"
+	_AhkSubDir := "autohotkey\"
+	try {
+		Body()
+	} finally {
+		_ConfigDir := PrevConfigDir
+		_AhkSubDir := PrevSubDir
+		LOGGER_LOG_PATH := PrevPath
+		LOGGER_ERRORS_LOG_PATH := PrevErrPath
+		_LOGGER_PATH_DATE := PrevDate
+	}
+}
+
+; The core regression: a flush that happens after the calendar date has moved
+; must re-resolve both dated paths. Before the fix _LoggerFlush had no notion of
+; the date at all, so the stale path survived and every later entry was misfiled.
+_LDR_FlushRotatesOnDateChange() {
+	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
+
+	_LDR_WithTempConfigDir(() => _LDR_AssertRotation())
+}
+
+_LDR_AssertRotation() {
+	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
+
+	_LoggerResolveDatedPaths()
+	Today := FormatTime(, "yyyy-MM-dd")
+	Assert(InStr(LOGGER_LOG_PATH, Today) > 0,
+		"_LoggerResolveDatedPaths must build the main log path for today")
+	Assert(_LOGGER_PATH_DATE == Today,
+		"_LoggerResolveDatedPaths must record the date it resolved for")
+
+	; Simulate the driver having been started on an earlier day: the paths still
+	; point at that day's files, exactly as they did after a real overnight run.
+	StaleDate := "2000-01-01"
+	_LOGGER_PATH_DATE := StaleDate
+	LOGGER_LOG_PATH := A_Temp . "\ergopti_logrotate_test\autohotkey\logs\ErgoptiPlus_" . StaleDate . ".log"
+	LOGGER_ERRORS_LOG_PATH := A_Temp . "\ergopti_logrotate_test\autohotkey\logs\ErgoptiPlus_errors_" . StaleDate . ".log"
+
+	_LoggerFlush(false)
+
+	Assert(_LOGGER_PATH_DATE == Today,
+		"_LoggerFlush must re-resolve the dated paths once the calendar date has moved — otherwise the log keeps the start date forever")
+	Assert(InStr(LOGGER_LOG_PATH, Today) > 0,
+		"the main log path must carry today's date after a rollover flush")
+	Assert(InStr(LOGGER_ERRORS_LOG_PATH, Today) > 0,
+		"the errors-only log path must rotate together with the main log")
+	Assert(InStr(LOGGER_LOG_PATH, StaleDate) == 0,
+		"the stale start-date filename must not survive the rollover")
+}
+
+; A flush on the SAME day must not churn the paths. This pins the guard to a
+; date comparison rather than an unconditional re-resolve on every tick, which
+; would put a DirExist + FormatTime + two string builds on the flush path.
+_LDR_FlushIsStableWithinTheSameDay() {
+	_LDR_WithTempConfigDir(() => _LDR_AssertStability())
+}
+
+_LDR_AssertStability() {
+	global LOGGER_LOG_PATH, _LOGGER_PATH_DATE
+
+	_LoggerResolveDatedPaths()
+	Before := LOGGER_LOG_PATH
+	_LoggerFlush(false)
+	Assert(LOGGER_LOG_PATH == Before,
+		"_LoggerFlush must leave the paths untouched when the date has not changed")
+}
+
+; The rollover purge and the boot purge must share one retention constant. When
+; the two drifted apart, a rotation could apply a different window than boot and
+; silently delete more than intended.
+_LDR_RetentionIsSingleSourced() {
+	global LOGGER_RETENTION_DAYS
+
+	Assert(IsSet(LOGGER_RETENTION_DAYS),
+		"LOGGER_RETENTION_DAYS must exist as the single source of truth for the retention window")
+	Assert(LOGGER_RETENTION_DAYS > 0,
+		"LOGGER_RETENTION_DAYS must be a positive number of days")
+
+	Body := _DriverFuncBody("LoggerInit")
+	Assert(Body != "", "LoggerInit must exist in lib/logger.ahk")
+	Assert(RegExMatch(Body, "_LoggerPurgeOldLogs\([^)]*LOGGER_RETENTION_DAYS") > 0,
+		"LoggerInit must purge using LOGGER_RETENTION_DAYS, never a bare literal")
+
+	FlushBody := _DriverFuncBody("_LoggerFlush")
+	Assert(FlushBody != "", "_LoggerFlush must exist in lib/logger.ahk")
+	Assert(RegExMatch(FlushBody, "_LoggerPurgeOldLogs\([^)]*LOGGER_RETENTION_DAYS") > 0,
+		"the midnight rollover must purge using the same LOGGER_RETENTION_DAYS constant as boot")
+}
+
+
+Test("logger: a flush after midnight re-resolves the dated log paths",
+	_LDR_FlushRotatesOnDateChange)
+Test("logger: a flush within the same day leaves the log paths untouched",
+	_LDR_FlushIsStableWithinTheSameDay)
+Test("logger: boot and rollover purge share one retention constant",
+	_LDR_RetentionIsSingleSourced)

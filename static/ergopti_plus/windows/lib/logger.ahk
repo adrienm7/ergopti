@@ -82,6 +82,18 @@ global LOGGER_LOG_PATH := ""
 ; through thousands of normal lines in the unified log.
 global LOGGER_ERRORS_LOG_PATH := ""
 
+; Calendar date (yyyy-MM-dd) the two paths above were built for. The driver
+; commonly runs for days at a time, so resolving the dated filename once at
+; init would pin every later entry to the start date: entries would land in a
+; file named for the wrong day, and _LoggerPurgeOldLogs — which ages files by
+; the date in their NAME — would delete recent data early. _LoggerFlush
+; compares this against today and re-resolves on a change.
+global _LOGGER_PATH_DATE := ""
+
+; Retention window for dated log files, in days. Single source of truth: both
+; LoggerInit and the midnight rollover in _LoggerFlush purge with this value.
+global LOGGER_RETENTION_DAYS := 14
+
 ; In-memory ring buffer (Array) and write cursor (1-based index). RemoveAt is
 ; avoided to keep the hot path O(1) — we overwrite the oldest slot directly.
 global LOGGER_RING_BUFFER := []
@@ -149,24 +161,39 @@ global _LastErrTime := 0
 ; =============================
 ; ==================================================
 
-; Initialise the logger. Reads the minimum level from the ini and resolves the
-; log file path. Safe to call multiple times — later calls just refresh the
-; minimum level (e.g. after the user changes it via the menu).
-LoggerInit() {
-    global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL, ConfigurationFile
-    global _LOGGER_FLUSH_TIMER_STARTED, LOGGER_FLUSH_INTERVAL_MS, _ConfigDir, _AhkSubDir, _LOGGER_PENDING
+; Resolve the dated log-file paths for TODAY under <ConfigDir>/autohotkey/logs/,
+; creating the directory if needed, and record the date they were built for.
+; Resolves _ConfigDir at call time so any later override (paths.toml) is picked
+; up. Shared by LoggerInit and the midnight rollover in _LoggerFlush so the
+; filename format lives in exactly one place.
+; @returns {String} The resolved log directory, with a trailing backslash.
+_LoggerResolveDatedPaths() {
+    global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
+    global _ConfigDir, _AhkSubDir
 
-    ; Daily-rotating log file under <ConfigDir>/autohotkey/logs/. Resolves
-    ; _ConfigDir at call time so any later override (paths.toml) is picked up.
     LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
         ? _ConfigDir . _AhkSubDir . "logs\"
         : A_ScriptDir . "\logs\"
     if !DirExist(LogDir) {
         try DirCreate(LogDir)
     }
-    LOGGER_LOG_PATH := LogDir . "ErgoptiPlus_" . FormatTime(, "yyyy-MM-dd") . ".log"
-    LOGGER_ERRORS_LOG_PATH := LogDir . "ErgoptiPlus_errors_" . FormatTime(, "yyyy-MM-dd") . ".log"
-    _LoggerPurgeOldLogs(LogDir, 14)
+    Today := FormatTime(, "yyyy-MM-dd")
+    LOGGER_LOG_PATH := LogDir . "ErgoptiPlus_" . Today . ".log"
+    LOGGER_ERRORS_LOG_PATH := LogDir . "ErgoptiPlus_errors_" . Today . ".log"
+    _LOGGER_PATH_DATE := Today
+    return LogDir
+}
+
+; Initialise the logger. Reads the minimum level from the ini and resolves the
+; log file path. Safe to call multiple times — later calls just refresh the
+; minimum level (e.g. after the user changes it via the menu).
+LoggerInit() {
+    global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL, ConfigurationFile
+    global _LOGGER_FLUSH_TIMER_STARTED, LOGGER_FLUSH_INTERVAL_MS, _ConfigDir, _AhkSubDir, _LOGGER_PENDING
+    global LOGGER_RETENTION_DAYS
+
+    LogDir := _LoggerResolveDatedPaths()
+    _LoggerPurgeOldLogs(LogDir, LOGGER_RETENTION_DAYS)
     ; Load sub-file routing rules from _shared/modules/logger/sub_files.toml so adding a
     ; new topical log requires only a TOML edit, not a code change in both drivers.
     _LoggerLoadSubFilesToml(A_ScriptDir . "\")
@@ -215,6 +242,19 @@ LoggerInit() {
 _LoggerFlush(ForceFlush := false) {
 	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
 	global _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
+	global _LOGGER_PATH_DATE, LOGGER_RETENTION_DAYS
+
+	; Midnight rollover. The driver routinely stays up across several days, so
+	; without this the dated filename resolved at init would capture every later
+	; entry — misdating the log and making _LoggerPurgeOldLogs, which ages files
+	; by the date in their NAME, discard still-recent data. Cheap enough for the
+	; flush tick: one FormatTime and a string compare. Only the two dated paths
+	; move; the topical sub-files are undated and stay valid.
+	if (_LOGGER_PATH_DATE != "" and _LOGGER_PATH_DATE != FormatTime(, "yyyy-MM-dd")) {
+		RolledDir := _LoggerResolveDatedPaths()
+		_LoggerPurgeOldLogs(RolledDir, LOGGER_RETENTION_DAYS)
+	}
+
 	; Prevent the timer from re-entering while we swap-and-drain the pending queues.
 	; Without Critical, a hotkey or OnMessage callback fired mid-swap could push a
 	; line into the OLD array reference that we have already captured — losing it.

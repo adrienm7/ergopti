@@ -199,6 +199,7 @@ InstallSendNoOps()
 #Include unit/test_hook_dispatcher.ahk
 #Include unit/test_logger.ahk
 #Include unit/test_logger_contract.ahk
+#Include unit/test_logger_daily_rotation.ahk
 #Include unit/test_healthcheck_core.ahk
 #Include unit/test_tooltip_tint_contract.ahk
 #Include unit/test_tooltip_border_alpha.ahk
