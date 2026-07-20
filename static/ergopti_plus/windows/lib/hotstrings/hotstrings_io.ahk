@@ -140,6 +140,31 @@ HotstringsGetWordDelimiters() {
     return (_HotstringsWordDelimiters != "") ? _HotstringsWordDelimiters : HOTSTRINGS_DEFAULT_WORD_DELIMITERS
 }
 
+; Extra boundaries the PREVIEW anchors on but the engine does not treat as
+; hotstring terminators: a double quote can legitimately sit inside a trigger body.
+global HOTSTRINGS_PREVIEW_EXTRA_BOUNDARIES := Chr(0x22) . Chr(0x201C) . Chr(0x201D)
+
+; Recompute the prefix watcher's boundary set FROM the live engine terminator set.
+; SINGLE SOURCE OF TRUTH — every writer of HSE_WORD_TERMINATORS must call this.
+;
+; _PREFIX_WORD_BOUNDARIES used to be a top-level global initialised by
+; concatenating HSE_WORD_TERMINATORS at its own include position, i.e. a SNAPSHOT
+; of the compile-time constant. lib/boot.ahk then replaced HSE_WORD_TERMINATORS
+; with the catalogue-derived set and never recomputed the preview set, so the two
+; silently diverged: the tooltip anchored on a set containing the apostrophe while
+; the matcher did not, and every previewed apostrophe autocorrection (l'ame ->
+; l'âme) rendered a suggestion that could never fire. Deriving instead of
+; snapshotting removes the whole class.
+HotstringsRefreshPrefixBoundaries() {
+    global HSE_WORD_TERMINATORS, _PREFIX_WORD_BOUNDARIES, HOTSTRINGS_PREVIEW_EXTRA_BOUNDARIES
+    ; The prefix watcher is not loaded under every harness; a missing target is
+    ; not an error here, only a no-op.
+    if !IsSet(_PREFIX_WORD_BOUNDARIES)
+        return
+    _PREFIX_WORD_BOUNDARIES := HSE_WORD_TERMINATORS . HOTSTRINGS_PREVIEW_EXTRA_BOUNDARIES
+    try LoggerDebug("HotstringsConfig", "Preview boundaries refreshed ({1} char(s)).", StrLen(_PREFIX_WORD_BOUNDARIES))
+}
+
 ; Persist a new word-delimiter string to the [__global__] section of the
 ; override file and propagate it immediately into the live engine variable
 ; HSE_WORD_TERMINATORS so the change takes effect without a Reload.
@@ -151,11 +176,7 @@ HotstringsSetWordDelimiters(Delimiters) {
     ; updated set — mirrors the pattern used by HotstringsSetConsumedDelimiters.
     HSE_WORD_TERMINATORS := HotstringsGetWordDelimiters()
 
-    ; Also recompute the prefix watcher's boundary set (which includes quotes
-    ; not present in the engine set) if the module is loaded.
-    if IsSet(_PREFIX_WORD_BOUNDARIES) {
-        _PREFIX_WORD_BOUNDARIES := HSE_WORD_TERMINATORS . Chr(0x22) . Chr(0x201C) . Chr(0x201D)
-    }
+    HotstringsRefreshPrefixBoundaries()
 
     _SaveGlobalWordDelimiters(Delimiters)
 }

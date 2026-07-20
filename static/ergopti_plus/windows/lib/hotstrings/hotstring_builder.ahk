@@ -261,6 +261,27 @@ IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
     return False
 }
 
+; SINGLE SOURCE OF TRUTH for the TOML `is_case_sensitive` flag -> registrar
+; mapping. Generator semantics (documented at hotstring_registry.ahk:132):
+;   is_case_sensitive = not case_sensitive
+;   TRUE  -> register the literal trigger only          -> CreateHotstring
+;   FALSE -> register the whole cased family (conform)  -> CreateCaseSensitiveHotstrings
+;
+; Every loader MUST route through this instead of open-coding the branch. There
+; used to be four open-coded copies and two of them (LoadHotstringsSection and
+; LoadExtTomlFile) had drifted into the OPPOSITE meaning — so the same personal
+; or extension entry registered a different casing family depending on whether it
+; came from boot or from a live editor save, and the preview index disagreed with
+; the engine in both directions. Bundled categories always short-circuit into the
+; cache registrar, so only the two least-covered paths were affected.
+HSE_RegisterFromTomlFlags(IsCaseSensitive, Flags, Trigger, Output, Options) {
+    if IsCaseSensitive {
+        CreateHotstring(Flags, Trigger, Output, Options)
+        return
+    }
+    CreateCaseSensitiveHotstrings(Flags, Trigger, Output, Options)
+}
+
 CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset) {
     OnlyText := (IsSet(options) and options.Has("OnlyText")) ? options["OnlyText"] : True
     FinalResult := (IsSet(options) and options.Has("FinalResult")) ? options["FinalResult"] : False

@@ -211,6 +211,18 @@ HSE_FindMatchAtEnd(JustTypedChar) {
         }
     }
 
+    ; The NBSP strip is a property of the END-CHAR candidate that consumed it, but
+    ; it is recorded above during candidate DISCOVERY — before any winner is known.
+    ; When the star path wins (BestEndChar stays ""), no NBSP was consumed by the
+    ; match, yet HSE_DispatchMatch and HSE_ApplyExpansion both add +1 to the
+    ; BackSpace count for this flag. That extra BackSpace deletes a character the
+    ; user typed BEFORE the trigger (typing a b Ê Shift+comma emitted "aU," rather
+    ; than "abU,"), and because both the emit and the buffer apply the same +1 the
+    ; internal state stayed consistent with the corrupted screen — no desync to
+    ; raise the alarm. Make the flag describe the WINNER, at the one point where
+    ; the winner is known.
+    if (BestEndChar == "")
+        HSE_TypoNbspStripped := false
     HSE_LastEndChar := BestEndChar
     return BestMatch
 }
