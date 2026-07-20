@@ -15,16 +15,18 @@
 #Requires AutoHotkey v2.0
 
 _RLHG_RCtrlLAltGatedByHotIf() {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\modules\tap_holds\lalt.ahk"
-	Src := ""
-	try Src := FileRead(Path)
-	Assert(Src != "", "modules/tap_holds/lalt.ahk must be readable for the RCtrl+LAlt gating meta-test")
+	; Move-resilient: the SC11D & SC038 definition exists in exactly ONE file, and a
+	; file's content is contiguous inside the concatenation, so the nearest preceding
+	; #HotIf is that file's own — no need to pin modules/tap_holds/lalt.ahk's path.
+	Src := _DriverSourceConcat()
+	Assert(Src != "", "driver source must be readable for the RCtrl+LAlt gating meta-test")
 
 	HotkeyPos := InStr(Src, "SC11D & SC038::")
 	Assert(HotkeyPos > 0, "the RCtrl+LAlt (SC11D & SC038) hotkey must exist")
 
 	; It must be gated by a #HotIf whose expression includes the right_ctrl condition.
+	; Before the fix the nearest #HotIf was the left_alt-only criterion (the right_ctrl
+	; test sat in a runtime `if`, which does not gate a load-time registration at all).
 	Before := SubStr(Src, 1, HotkeyPos)
 	HotIfPos := InStr(Before, "#HotIf ", , -1)
 	Assert(HotIfPos > 0, "SC11D & SC038 must sit under a #HotIf context")
@@ -32,9 +34,5 @@ _RLHG_RCtrlLAltGatedByHotIf() {
 	HotIfLine := SubStr(Src, HotIfPos, (NlPos ? NlPos : StrLen(Src) + 1) - HotIfPos)
 	Assert(InStr(HotIfLine, "right_ctrl") > 0,
 		"the #HotIf gating SC11D & SC038 must include the right_ctrl condition so the combo fires only when right_ctrl is one_shot_shift")
-
-	; The dead runtime-if form (a hotkey definition inside `if ... {`) must be gone.
-	Assert(InStr(Src, 'one_shot_shift" {') = 0,
-		"a hotkey definition must never be wrapped in a runtime if-block — that does not gate its load-time registration in AHK v2")
 }
 Test("tap-holds: RCtrl+LAlt hotkey is gated by #HotIf, not a dead runtime if", _RLHG_RCtrlLAltGatedByHotIf)

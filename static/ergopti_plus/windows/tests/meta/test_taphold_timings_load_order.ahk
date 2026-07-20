@@ -17,11 +17,11 @@
 #Requires AutoHotkey v2.0
 
 _TTLO_ConstantsIncludedBeforeBoot() {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	EntryFile := WindowsDir . "\ErgoptiPlus.ahk"
-	Src := ""
-	try Src := FileRead(EntryFile)
-	Assert(Src != "", "ErgoptiPlus.ahk must be readable for the tap-hold timings load-order meta-test")
+	; Move-resilient: both #Include directives below exist in exactly ONE file
+	; (ErgoptiPlus.ahk), and a file's content is contiguous inside the concatenation,
+	; so their relative order is preserved without pinning the entry file's path.
+	Src := _DriverSourceConcat()
+	Assert(Src != "", "driver source must be readable for the tap-hold timings load-order meta-test")
 
 	ConstPos := InStr(Src, "#Include modules/tap_holds/constants.ahk")
 	BootPos := InStr(Src, "#Include lib/boot.ahk")
