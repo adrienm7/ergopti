@@ -13,6 +13,12 @@
 ; onboarding/*.ahk files is irrelevant.
 ; ==============================================================================
 
+; Success token the elevated PowerShell worker writes to its result file
+; ([string]$ErgoptiExitCode, 0 on success). Named because it is a NUMERIC
+; STRING: comparing the reader's String|false result against `false` makes AHK
+; v2 compare numerically, so "0" = false is TRUE and success reads as failure.
+global GESTURE_AUTO_SUCCESS_TOKEN := "0"
+
 
 
 
@@ -246,12 +252,18 @@ _Onboarding_PollGestureAuto(Epoch) {
 
 _Onboarding_ReadGestureAutoResult(ResultPath) {
     Result := FSRead(ResultPath)
-    if (Result = false) {
+    ; FSRead returns a String on success and the INTEGER false on failure. Never
+    ; compare the result against false: AHK v2 compares NUMERICALLY when one side
+    ; is a number and the other a numeric string, so the success token "0"
+    ; satisfies `Result = false` (0 = 0) and every successful registration was
+    ; swallowed as "result missing". `==` does not help — it is numeric-equal here
+    ; too. Type-checking is the only correct discriminator.
+    if !(Result is String) {
         try LoggerError("Onboarding", "Gesture auto-config result missing.")
         return false
     }
     Result := Trim(Result)
-    if (Result != "0") {
+    if (Result != GESTURE_AUTO_SUCCESS_TOKEN) {
         try LoggerWarn("Onboarding", "Gesture auto-config returned invalid/failing result: {1}.", Result)
         return false
     }
