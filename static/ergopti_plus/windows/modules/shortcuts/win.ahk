@@ -205,10 +205,15 @@ if Features["shortcuts"]["move"] {
         SimulateActivity(True)
         SetTimer(SimulateActivity, Random(AWAKE_TICK_MIN_MS, AWAKE_TICK_MAX_MS))
         ; Arm mouse-button cancel hooks
+        ; These arm the CANCELLATION paths — swallowing a failure silently would leave
+        ; keep-awake running with no way for the user to interrupt it (§5.3: never
+        ; swallow without at minimum a LoggerError).
         try {
             Hotkey("~*$LButton", AwakeCancelOnMouse, "On")
             Hotkey("~*$RButton", AwakeCancelOnMouse, "On")
             Hotkey("~*$MButton", AwakeCancelOnMouse, "On")
+        } catch as Err {
+            LoggerError("shortcuts", "Keep-awake mouse-cancel hook arming failed: {1}.", Err.Message)
         }
         ; Start a fast timer to instantly detect if the user moves the mouse
         SetTimer(AwakeCheckMouseMoved, 150)
@@ -218,6 +223,8 @@ if Features["shortcuts"]["move"] {
             AwakeInputHook.OnChar := AwakeCancelOnKeypress
             AwakeInputHook.OnKeyDown := AwakeCancelOnKeypress
             AwakeInputHook.Start()
+        } catch as Err {
+            LoggerError("shortcuts", "Keep-awake keypress-cancel InputHook arming failed: {1}.", Err.Message)
         }
         try TrayTip(t("keepawake.started"), t("keepawake.title"), "Iconi Mute")
     }

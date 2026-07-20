@@ -50,3 +50,21 @@ _KASNG_CheckGuardedNotification() {
 
 Test("shortcuts: StopActivitySimulation only notifies when keep-awake was actually running (keepawake-stop-notify-gate)",
 	_KASNG_CheckGuardedNotification)
+
+; F44 (audit 2026-07-20): StartActivitySimulation armed its two CANCELLATION paths
+; (mouse hotkeys, keypress InputHook) inside bare try blocks with no catch. A failure
+; was masked, leaving keep-awake running with no way for the user to interrupt it —
+; the exact "half-armed feature" shape §5.3 forbids swallowing.
+_KASNG_ArmingFailuresAreLogged() {
+	Body := _DriverFuncBody("StartActivitySimulation")
+	Assert(Body != "", "StartActivitySimulation must exist in modules/shortcuts/win.ahk")
+	Assert(InStr(Body, "Hotkey(") > 0 && InStr(Body, "InputHook(") > 0,
+		"StartActivitySimulation must arm both the mouse and keypress cancellation paths")
+	; Each OS-boundary arming block must report its failure rather than swallow it.
+	Assert(InStr(Body, "Keep-awake mouse-cancel hook arming failed") > 0,
+		"a failed mouse-cancel hook arming must be logged (§5.3), not swallowed by a bare try")
+	Assert(InStr(Body, "Keep-awake keypress-cancel InputHook arming failed") > 0,
+		"a failed keypress-cancel InputHook arming must be logged (§5.3), not swallowed by a bare try")
+}
+Test("shortcuts: keep-awake cancellation arming failures are logged, never swallowed",
+	_KASNG_ArmingFailuresAreLogged)
