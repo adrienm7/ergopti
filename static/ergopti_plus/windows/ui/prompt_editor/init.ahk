@@ -90,14 +90,14 @@ _PromptEdWeb_TryOpen(Existing) {
 	if !_PromptEdWeb_Available()
 		return false
 
-	; Singleton — bring the existing editor to the front.
-	if (_PromptEdWeb_Gui != 0) {
-		try WinActivate("ahk_id " . _PromptEdWeb_Gui.Hwnd)
-		return true
-	}
-
-	; Capture the open context. A new profile pre-fills the editor with the
-	; placeholder example (mirrors the macOS host); an edit reads system_single.
+	; Capture the open context FIRST. This used to sit below the singleton
+	; early-return, so re-opening the editor for a different profile while one was
+	; already open kept the OLD _PromptEdWeb_EditId — the window merely gained
+	; focus, still bound to the previous profile, and saving overwrote that one
+	; with what the user believed were the new profile's edits. Silent because the
+	; title bar was set at first open and never updated.
+	; A new profile pre-fills the editor with the placeholder example (mirrors the
+	; macOS host); an edit reads system_single.
 	IsEdit := IsObject(Existing)
 	_PromptEdWeb_IsEdit     := IsEdit
 	_PromptEdWeb_EditId     := (IsEdit && Existing.Has("id")) ? Existing["id"] : ""
@@ -106,6 +106,19 @@ _PromptEdWeb_TryOpen(Existing) {
 		? Existing["system_single"]
 		: t("prompt_editor.placeholder_prompt")
 	_PromptEdWeb_InitBatch  := (IsEdit && Existing.Has("batch") && Existing["batch"] == true)
+
+	; Singleton — re-point the existing editor at the newly captured context and
+	; bring it to the front, rather than silently ignoring the new request.
+	if (_PromptEdWeb_Gui != 0) {
+		try LoggerDebug("PromptEditor", "Re-using open editor for profile '{1}' (edit={2}).",
+			_PromptEdWeb_EditId, _PromptEdWeb_IsEdit ? "yes" : "no")
+		try _PromptEdWeb_Gui.Title := _PromptEdWeb_IsEdit
+			? t("prompt_editor.title_edit")
+			: t("prompt_editor.title_new")
+		try _PromptEdWeb_PushInit()
+		try WinActivate("ahk_id " . _PromptEdWeb_Gui.Hwnd)
+		return true
+	}
 
 	g := Gui("+Resize +MinSize480x360", _PromptEdWeb_IsEdit ? t("prompt_editor.title_edit") : t("prompt_editor.title_new"))
 	g.BackColor := "0x1e1e1e"
@@ -184,6 +197,13 @@ _PromptEdWeb_OnWebMessage(Handler, Args) {
 		return
 
 	Action := Payload.Has("action") ? Payload["action"] : ""
+	; WebMessageReceived is a COM callback: it bypasses native Suspend, which only
+	; disarms hotkeys. Without this a paused driver still lets a page click write
+	; config, re-register hotstrings or launch an elevated install.
+	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
+	; the SafetyFlush and leaves the page permanently un-initialised.
+	if (A_IsSuspended && Action != "ready")
+		return
 	if (Action == "cancel") {
 		SetTimer(_PromptEdWeb_Close, -1)
 	} else if (Action == "save") {

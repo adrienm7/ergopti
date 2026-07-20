@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "Todos los archivos personales (atajos, hotstrings…) se resuelven desde esta carpeta.",
 	"paths_editor.tag_default": "predeterminado",
 	"paths_editor.tag_modified": "modificado",
+	"paths_editor.save_failed": "No se pudo guardar la carpeta de configuración. El archivo puede ser de solo lectura o estar en uso por otro programa.",
+	"paths_editor.save_failed_title": "Error al guardar",
 	"personal_info.field_credit_card": "Tarjeta de crédito",
 	"personal_info.field_firstname": "Nombre",
 	"personal_info.field_phone_digits": "Teléfono (solo dígitos)",

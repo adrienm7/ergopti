@@ -236,6 +236,13 @@ _OnbWeb_OnWebMessage(Handler, Args) {
 		return
 
 	Action := Payload.Has("action") ? Payload["action"] : ""
+	; WebMessageReceived is a COM callback: it bypasses native Suspend, which only
+	; disarms hotkeys. Without this a paused driver still lets a page click write
+	; config, re-register hotstrings or launch an elevated install.
+	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
+	; the SafetyFlush and leaves the page permanently un-initialised.
+	if (A_IsSuspended && Action != "ready")
+		return
 	if (Action == "ready") {
 		_OnbWeb_FlushQueue()
 		_OnbWeb_InjectInitData()

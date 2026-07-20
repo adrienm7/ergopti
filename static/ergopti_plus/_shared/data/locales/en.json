@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "All personal files (shortcuts, hotstrings…) are resolved from this folder.",
 	"paths_editor.tag_default": "default",
 	"paths_editor.tag_modified": "modified",
+	"paths_editor.save_failed": "Could not save the configuration folder. The file may be read-only or in use by another program.",
+	"paths_editor.save_failed_title": "Save failed",
 	"personal_info.field_credit_card": "Credit card",
 	"personal_info.field_firstname": "First name",
 	"personal_info.field_phone_digits": "Phone (digits only)",

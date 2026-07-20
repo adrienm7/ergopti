@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "Všechny osobní soubory (zkratky, hotstring…) jsou načítány z této složky.",
 	"paths_editor.tag_default": "výchozí",
 	"paths_editor.tag_modified": "upraveno",
+	"paths_editor.save_failed": "Složku s konfigurací se nepodařilo uložit. Soubor může být jen pro čtení nebo jej používá jiný program.",
+	"paths_editor.save_failed_title": "Uložení selhalo",
 	"personal_info.field_credit_card": "Kreditní karta",
 	"personal_info.field_firstname": "Jméno",
 	"personal_info.field_phone_digits": "Telefon (pouze číslice)",

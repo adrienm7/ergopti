@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "כל הקבצים האישיים (קיצורים, hotstrings…) מתפענחים מתיקייה זו.",
 	"paths_editor.tag_default": "ברירת מחדל",
 	"paths_editor.tag_modified": "שונה",
+	"paths_editor.save_failed": "לא ניתן לשמור את תיקיית התצורה. ייתכן שהקובץ לקריאה בלבד או בשימוש בתוכנית אחרת.",
+	"paths_editor.save_failed_title": "השמירה נכשלה",
 	"personal_info.field_credit_card": "כרטיס אשראי",
 	"personal_info.field_firstname": "שם פרטי",
 	"personal_info.field_phone_digits": "טלפון (ספרות)",

@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "Alle personlige filer (genveje, hotstrings…) løses fra denne mappe.",
 	"paths_editor.tag_default": "standard",
 	"paths_editor.tag_modified": "ændret",
+	"paths_editor.save_failed": "Konfigurationsmappen kunne ikke gemmes. Filen er måske skrivebeskyttet eller i brug af et andet program.",
+	"paths_editor.save_failed_title": "Kunne ikke gemme",
 	"personal_info.field_credit_card": "Kreditkort",
 	"personal_info.field_firstname": "Fornavn",
 	"personal_info.field_phone_digits": "Telefon (cifre)",

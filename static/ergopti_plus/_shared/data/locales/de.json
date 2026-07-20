@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "Alle persönlichen Dateien (Shortcuts, Hotstrings…) werden aus diesem Ordner geladen.",
 	"paths_editor.tag_default": "Standard",
 	"paths_editor.tag_modified": "geändert",
+	"paths_editor.save_failed": "Der Konfigurationsordner konnte nicht gespeichert werden. Die Datei ist möglicherweise schreibgeschützt oder wird von einem anderen Programm verwendet.",
+	"paths_editor.save_failed_title": "Speichern fehlgeschlagen",
 	"personal_info.field_credit_card": "Kreditkarte",
 	"personal_info.field_firstname": "Vorname",
 	"personal_info.field_phone_digits": "Telefon (nur Ziffern)",

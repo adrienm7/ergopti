@@ -569,14 +569,30 @@ _LLM_MBW_OnWebMessage(Handler, Args) {
 	if (Action == "select_model") {
 		Name := Payload.Has("name") ? Payload["name"] : ""
 		if (Name != "") {
-			_LLM_MBW_OnClose()
-			try LLM_Menu_SetModel(Name)
+			; Defer the teardown out of this COM callback. _LLM_MBW_OnClose ->
+			; _LLM_MBW_Reset releases the WebMessageReceived subscription that is
+			; CURRENTLY DISPATCHING, then closes the controller and destroys the
+			; host Gui — all synchronously on the callback stack. That is the
+			; access-violation class ui/onboarding/webview.ahk documents and
+			; already solves with SetTimer(-1); it was never applied here, and this
+			; path runs on every successful use of the browser (double-click, Enter
+			; or the Use button). An SEH fault of this kind is uncatchable and
+			; surfaces as a random crash with no link to the click.
+			SetTimer(_LLM_MBW_ApplyModel.Bind(Name), -1)
 		}
 	} else if (Action == "open_url") {
 		Url := Payload.Has("url") ? Payload["url"] : ""
 		if (Url != "")
 			try Run(Url)
 	}
+}
+
+; Runs from a SetTimer(-1) hand-off, never on the WebMessageReceived stack, so
+; the subscription/controller/Gui teardown below cannot free objects that the
+; in-flight COM dispatch is still standing on.
+_LLM_MBW_ApplyModel(Name) {
+	_LLM_MBW_OnClose()
+	try LLM_Menu_SetModel(Name)
 }
 
 /**

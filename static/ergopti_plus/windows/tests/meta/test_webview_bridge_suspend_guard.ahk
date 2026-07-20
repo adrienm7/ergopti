@@ -36,10 +36,24 @@ _WBSG_CheckModelBrowserGuard() {
 	Assert(SuspendPos > 0,
 		"_LLM_MBW_OnWebMessage must check A_IsSuspended -- WebMessageReceived is a COM callback that bypasses native Suspend (webview-bridge-suspend-guard)")
 
-	CallPos := InStr(Body, "LLM_Menu_SetModel(")
-	Assert(CallPos > 0, "_LLM_MBW_OnWebMessage must still call LLM_Menu_SetModel(...) on a select_model action")
+	; The model application moved OUT of this handler in F-27: doing it inline
+	; released the WebMessageReceived subscription that was still dispatching and
+	; then destroyed the host window, an uncatchable access-violation class. The
+	; invariant is unchanged — a paused driver must not mutate the live LLM
+	; config/engine — so it is re-encoded across the handler AND its deferred
+	; continuation rather than dropped.
+	CallPos := InStr(Body, "_LLM_MBW_ApplyModel")
+	Assert(CallPos > 0,
+		"_LLM_MBW_OnWebMessage must still dispatch a select_model action, now via the deferred _LLM_MBW_ApplyModel hand-off")
 	Assert(SuspendPos < CallPos,
-		"_LLM_MBW_OnWebMessage: A_IsSuspended guard must precede the LLM_Menu_SetModel(...) call, otherwise a paused driver still mutates the live LLM config/engine (webview-bridge-suspend-guard)")
+		"_LLM_MBW_OnWebMessage: the A_IsSuspended guard must precede the select_model dispatch, otherwise a paused driver still mutates the live LLM config/engine (webview-bridge-suspend-guard)")
+
+	Apply := _DriverFuncBody("_LLM_MBW_ApplyModel")
+	Assert(Apply != "", "_LLM_MBW_ApplyModel must exist — it is where the select_model action now lands")
+	Assert(InStr(Apply, "LLM_Menu_SetModel(") > 0,
+		"_LLM_MBW_ApplyModel must call LLM_Menu_SetModel(...) — moving the call out of the COM callback must not lose it")
+	Assert(InStr(Apply, "_LLM_MBW_OnClose(") > 0,
+		"_LLM_MBW_ApplyModel must close the browser before applying the model, preserving the original ordering")
 }
 Test("model browser: _LLM_MBW_OnWebMessage guards A_IsSuspended before select_model mutates config/engine (webview-bridge-suspend-guard)",
 	_WBSG_CheckModelBrowserGuard)

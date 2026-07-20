@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "Усі особисті файли (ярлики, хотстринги…) завантажуються з цієї папки.",
 	"paths_editor.tag_default": "за замовчуванням",
 	"paths_editor.tag_modified": "змінено",
+	"paths_editor.save_failed": "Не вдалося зберегти теку конфігурації. Файл може бути лише для читання або використовуватися іншою програмою.",
+	"paths_editor.save_failed_title": "Помилка збереження",
 	"personal_info.field_credit_card": "Кредитна картка",
 	"personal_info.field_firstname": "Ім'я",
 	"personal_info.field_phone_digits": "Телефон (лише цифри)",

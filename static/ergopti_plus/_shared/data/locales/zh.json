@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "所有个人文件（快捷方式、热字符串…）均从此文件夹加载。",
 	"paths_editor.tag_default": "默认",
 	"paths_editor.tag_modified": "已修改",
+	"paths_editor.save_failed": "无法保存配置文件夹。文件可能为只读，或正被其他程序占用。",
+	"paths_editor.save_failed_title": "保存失败",
 	"personal_info.field_credit_card": "信用卡",
 	"personal_info.field_firstname": "名字",
 	"personal_info.field_phone_digits": "电话（仅数字）",

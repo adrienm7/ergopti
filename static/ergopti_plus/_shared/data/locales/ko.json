@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "모든 개인 파일(단축키, 핫스트링…)은 이 폴더에서 불러옵니다.",
 	"paths_editor.tag_default": "기본값",
 	"paths_editor.tag_modified": "수정됨",
+	"paths_editor.save_failed": "구성 폴더를 저장하지 못했습니다. 파일이 읽기 전용이거나 다른 프로그램에서 사용 중일 수 있습니다.",
+	"paths_editor.save_failed_title": "저장 실패",
 	"personal_info.field_credit_card": "신용카드",
 	"personal_info.field_firstname": "이름",
 	"personal_info.field_phone_digits": "전화번호 (숫자만)",

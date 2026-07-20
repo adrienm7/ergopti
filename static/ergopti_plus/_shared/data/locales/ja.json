@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "すべての個人ファイル（ショートカット、ホットストリング…）はこのフォルダーから解決されます。",
 	"paths_editor.tag_default": "デフォルト",
 	"paths_editor.tag_modified": "変更済み",
+	"paths_editor.save_failed": "設定フォルダーを保存できませんでした。ファイルが読み取り専用か、他のプログラムが使用中の可能性があります。",
+	"paths_editor.save_failed_title": "保存に失敗しました",
 	"personal_info.field_credit_card": "クレジットカード",
 	"personal_info.field_firstname": "名前",
 	"personal_info.field_phone_digits": "電話番号（数字のみ）",

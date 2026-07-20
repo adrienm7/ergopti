@@ -182,13 +182,26 @@ _HsEdWeb_OnWebMessage(Handler, Args) {
 		return
 
 	Action := Payload.Has("action") ? Payload["action"] : ""
+	; WebMessageReceived is a COM callback: it bypasses native Suspend, which only
+	; disarms hotkeys. Without this a paused driver still lets a page click write
+	; config, re-register hotstrings or launch an elevated install.
+	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
+	; the SafetyFlush and leaves the page permanently un-initialised.
+	if (A_IsSuspended && Action != "ready")
+		return
 	Data   := Payload.Has("data") ? Payload["data"] : Map()
+	; Defer out of the COM callback, like every sibling editor host already does
+	; (paths_editor, personal_info_editor, prompt_editor). `save` does file I/O
+	; plus an N-section live re-registration on the STA callback thread, and
+	; `close` tears the controller down from inside its own dispatch — the
+	; access-violation class documented in ui/onboarding/webview.ahk. This was the
+	; one host that still called them synchronously.
 	if (Action == "save") {
-		_HsEdWeb_Save(Data)
+		SetTimer(_HsEdWeb_Save.Bind(Data), -1)
 	} else if (Action == "save_pref") {
-		_HsEdWeb_SavePref(Data)
+		SetTimer(_HsEdWeb_SavePref.Bind(Data), -1)
 	} else if (Action == "close") {
-		_HsEdWeb_Close()
+		SetTimer(_HsEdWeb_Close, -1)
 	}
 	; window_focus is intentionally ignored on Windows (the native editor has no
 	; focus-driven behaviour to mirror).

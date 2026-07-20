@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "Tous les fichiers personnels (raccourcis, hotstrings…) sont résolus depuis ce dossier.",
 	"paths_editor.tag_default": "par défaut",
 	"paths_editor.tag_modified": "modifié",
+	"paths_editor.save_failed": "Impossible d’enregistrer le dossier de configuration. Le fichier est peut-être en lecture seule ou utilisé par un autre programme.",
+	"paths_editor.save_failed_title": "Échec de l’enregistrement",
 	"personal_info.field_credit_card": "Carte de crédit",
 	"personal_info.field_firstname": "Prénom",
 	"personal_info.field_phone_digits": "Téléphone (chiffres seuls)",

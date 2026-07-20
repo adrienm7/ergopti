@@ -146,6 +146,13 @@ _PathsEdWeb_OnWebMessage(Handler, Args) {
 		return
 
 	Action := Payload.Has("action") ? Payload["action"] : ""
+	; WebMessageReceived is a COM callback: it bypasses native Suspend, which only
+	; disarms hotkeys. Without this a paused driver still lets a page click write
+	; config, re-register hotstrings or launch an elevated install.
+	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
+	; the SafetyFlush and leaves the page permanently un-initialised.
+	if (A_IsSuspended && Action != "ready")
+		return
 	if (Action == "ready") {
 		SetTimer(_PathsEdWeb_PushInitData, -1)
 	} else if (Action == "browse") {
@@ -194,11 +201,21 @@ _PathsEdWeb_Save(ConfigDir) {
 		_PathsEdWeb_Close()
 		return
 	}
+	; Fail loudly. FileOpen was unprotected and `if f` had no else, so on a
+	; read-only or locked target the user's chosen directory was discarded, the
+	; log asserted the opposite, and the Reload() dropped them back into the OLD
+	; directory with no error anywhere — the change simply appeared not to happen.
 	try DirCreate(SubStr(_PathsFile, 1, InStr(_PathsFile, "\", , -1) - 1))
-	f := FileOpen(_PathsFile, "w", "UTF-8")
-	if f {
+	try {
+		f := FileOpen(_PathsFile, "w", "UTF-8")
+		if !IsObject(f)
+			throw Error("FileOpen returned no handle for '" . _PathsFile . "'.")
 		f.Write('# Custom paths' . "`r`n" . 'ConfigDirPath = "' . StrReplace(N, "\", "/") . '"' . "`r`n")
 		f.Close()
+	} catch as Err {
+		try LoggerError("PathsEditor", "Could not write '{1}': {2}.", _PathsFile, Err.Message)
+		try MsgBox(t("paths_editor.save_failed"), t("paths_editor.save_failed_title"), "Iconx")
+		return
 	}
 	try LoggerInfo("PathsEditor", "Applying new config directory and reloading…")
 	Reload()

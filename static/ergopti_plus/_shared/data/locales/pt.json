@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "Todos os ficheiros pessoais (atalhos, hotstrings…) são resolvidos a partir desta pasta.",
 	"paths_editor.tag_default": "padrão",
 	"paths_editor.tag_modified": "modificado",
+	"paths_editor.save_failed": "Não foi possível guardar a pasta de configuração. O ficheiro pode estar apenas para leitura ou em uso por outro programa.",
+	"paths_editor.save_failed_title": "Falha ao guardar",
 	"personal_info.field_credit_card": "Cartão de crédito",
 	"personal_info.field_firstname": "Nome próprio",
 	"personal_info.field_phone_digits": "Telefone (apenas dígitos)",

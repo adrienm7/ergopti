@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "Alla personliga filer (genvägar, hotstrings…) löses från denna mapp.",
 	"paths_editor.tag_default": "standard",
 	"paths_editor.tag_modified": "ändrad",
+	"paths_editor.save_failed": "Det gick inte att spara konfigurationsmappen. Filen kan vara skrivskyddad eller användas av ett annat program.",
+	"paths_editor.save_failed_title": "Det gick inte att spara",
 	"personal_info.field_credit_card": "Kreditkort",
 	"personal_info.field_firstname": "Förnamn",
 	"personal_info.field_phone_digits": "Telefon (siffror)",

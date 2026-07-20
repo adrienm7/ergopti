@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "Tüm kişisel dosyalar (kısayollar, hotstring'ler…) bu klasörden yüklenir.",
 	"paths_editor.tag_default": "varsayılan",
 	"paths_editor.tag_modified": "değiştirildi",
+	"paths_editor.save_failed": "Yapılandırma klasörü kaydedilemedi. Dosya salt okunur olabilir veya başka bir program tarafından kullanılıyor olabilir.",
+	"paths_editor.save_failed_title": "Kaydetme başarısız",
 	"personal_info.field_credit_card": "Kredi kartı",
 	"personal_info.field_firstname": "Ad",
 	"personal_info.field_phone_digits": "Telefon (yalnızca rakamlar)",
