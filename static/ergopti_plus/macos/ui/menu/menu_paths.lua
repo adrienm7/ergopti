@@ -105,11 +105,48 @@ local function config_dir()
 	return _default_config_dir or _base_dir or ""
 end
 
+--- Directories already ensured during this session. M.get("ConfigTomlPath") runs
+--- through file_in_driver_subdir on EVERY save_prefs() — i.e. on every menu
+--- toggle, on the run loop that services the typing event tap — and used to fork
+--- /bin/sh for a directory that exists from the first boot onwards. Remembering
+--- the hits keeps the steady state free of subprocesses entirely.
+local _ensured_dirs = {}
+
 --- Ensures a directory exists (idempotent), creating parents as needed.
+--- Memoised per session; prefers the in-process hs.fs API over a shell fork.
 --- @param path string Absolute path with trailing slash.
 local function ensure_dir(path)
 	if not path or path == "" then return end
-	pcall(hs.execute, string.format("mkdir -p %q", path))
+	if _ensured_dirs[path] then return end
+
+	-- hs.fs.mkdir creates a single level only, so walk the ancestors first to
+	-- reproduce "mkdir -p" without leaving the process.
+	local made = false
+	if hs.fs and type(hs.fs.mkdir) == "function" then
+		made = true
+		local prefix = path:match("^[/\\]") and path:sub(1, 1) or ""
+		local rest   = path:sub(#prefix + 1)
+		local current = prefix
+		for segment in rest:gmatch("[^/\\]+") do
+			current = current .. segment .. "/"
+			local ok_attr, attr = pcall(hs.fs.attributes, current)
+			if not (ok_attr and attr) then
+				local ok_mk = pcall(hs.fs.mkdir, current)
+				if not ok_mk then
+					made = false
+					break
+				end
+			end
+		end
+	end
+
+	-- Only fall back to the subprocess when the filesystem API is unavailable or
+	-- refused the create; the shell path stays correct but is no longer the norm.
+	if not made then
+		pcall(hs.execute, string.format("mkdir -p %q", path))
+	end
+
+	_ensured_dirs[path] = true
 end
 
 --- Returns the absolute path for a named personal file inside config_dir().
