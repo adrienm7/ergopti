@@ -117,12 +117,15 @@ _BuildShiftCapsTables() {
 ; the hotkey name AHK passes when invoking a hotkey callback. The callable is
 ; extracted to a local before the call to defeat any ``obj.method`` implicit
 ; first-arg passing that AHK applies for property-stored Funcs.
-; ``SerializeSymbols`` lets the CapsLock-layer registration opt into the same
-; Critical serialization the letter-fallback path below always gets: unlike
-; some ``SHIFT_SYMBOLS`` entries (e.g. ActivateHotstrings), no ``CAPSLOCK_SYMBOLS``
-; entry ever Sleeps, so wrapping only that path in Critical cannot introduce a
-; stall — it just closes the narrow interleaving window against neighbouring
-; remapped-letter emits (layer-dispatch-capslock-symbols-unserialized).
+; ``SerializeSymbols`` opts a layer registration into the same Critical
+; serialization the letter-fallback path below always gets. BOTH real layers now
+; pass true: no ``CAPSLOCK_SYMBOLS`` entry ever Sleeps, and the ``SHIFT_SYMBOLS``
+; exemption rested on a premise that has since rotted — ActivateHotstrings no longer
+; Sleeps (it runs under its own Critical) and the SC039 wrap path is Sleep-free too.
+; Leaving the Shift layer unserialized let a neighbouring remapped-letter emit
+; (itself Critical) preempt between the two SendNewResult halves of an NNBSP+symbol
+; pair, transposing or splitting it when typing fast — the same interleave class
+; already fixed for the letters (layer-dispatch-capslock-symbols-unserialized).
 LayerDispatch(SC, SymbolMap, SerializeSymbols := false, *) {
 	if SymbolMap.Has(SC) {
 		Cb := SymbolMap[SC]
@@ -134,7 +137,10 @@ LayerDispatch(SC, SymbolMap, SerializeSymbols := false, *) {
 				Critical(_AtCrit)
 			}
 		} else {
-			; No Critical here — SHIFT_SYMBOLS callbacks may Sleep (ActivateHotstrings)
+			; Unserialized fallback, kept only for callers that explicitly opt out.
+			; NOTE: the old "SHIFT_SYMBOLS callbacks may Sleep (ActivateHotstrings)"
+			; rationale is obsolete — ActivateHotstrings no longer Sleeps and runs under
+			; its own Critical, so both real layers now pass SerializeSymbols=true.
 			Cb()
 		}
 		return
@@ -176,12 +182,12 @@ RegisterShiftLayer() {
 	for SC in SHIFTED_LETTERS {
 		if (SkipDigitRow && _SHIFT_DIGIT_SCS.Has(SC))
 			continue
-		Hotkey("+" . SC, LayerDispatch.Bind(SC, SHIFT_SYMBOLS), "I2")
+		Hotkey("+" . SC, LayerDispatch.Bind(SC, SHIFT_SYMBOLS, true), "I2")
 	}
 	for SC in SHIFT_SYMBOLS {
 		; SC is guaranteed not to be in SHIFTED_LETTERS by table construction —
 		; the loops cover disjoint sets, so re-binding is impossible here.
-		Hotkey("+" . SC, LayerDispatch.Bind(SC, SHIFT_SYMBOLS), "I2")
+		Hotkey("+" . SC, LayerDispatch.Bind(SC, SHIFT_SYMBOLS, true), "I2")
 	}
 	HotIf()
 	try LoggerSuccess("LayoutShift", "Shift layer registered ({1} entries).",
