@@ -71,6 +71,12 @@ try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
 global CapsWordEnabled := False
 global LayerEnabled := False
 global TapHold := Map("keys", Map(), "layers", Map())
+; Read in FIRST position by a parse-time #HotIf (modules/tap_holds/altgr.ahk), which
+; can be evaluated during Bundle_Init's message-pumping RunWait — long before
+; lib/hotstrings/hotstring_engine.ahk's include position. Seed it here so that #HotIf
+; short-circuits to false instead of throwing; HotstringEngineInit() resolves the
+; real value (auto-probe + TOML override) later in boot.
+global _ALTGR_KANA_FIXUP := False
 ; The global error net must distinguish a recoverable callback fault from an
 ; init fault. Before this reaches "ready", continuing would leave a resident
 ; half-driver with a subset of hooks/menu state registered.
@@ -85,6 +91,18 @@ global _PersonalShortcutsRegistry := Map("__Order", [])
 global DriverPid := DllCall("GetCurrentProcessId", "UInt")
 #Include lib/manifest_reader.ahk
 #Include lib/feature_io.ahk
+
+; ===== Global error net — armed BEFORE the first message pump =====
+; Without this, any uncaught error pops an AHK dialog mid-keystroke and can leave
+; modifiers stuck down. We log and continue so one bad callback never locks the
+; keyboard. The handler must return true to consider the error "handled".
+; It MUST be armed here, above Bundle_Init(): that call shells out through RunWait,
+; which PUMPS MESSAGES, so a key pressed during the extraction can evaluate a
+; parse-time #HotIf and throw with no net at all. error_net.ahk has no dependency
+; that prevents loading it this early — its Logger calls are try-wrapped and function
+; definitions are hoisted across the whole #Include graph before auto-execute runs.
+#Include lib/error_net.ahk
+OnError(ErgoptiGlobalErrorHandler)
 
 ; In compiled mode the .exe ships an embedded zip of every runtime asset
 ; (hotstrings TOMLs, locales, icons, _shared tree, vendor DLLs). The bundle
@@ -129,16 +147,10 @@ global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 ; a plain SendNewResult via ``isSet(UIA)`` at the call site (see modules/keymap/layout.ahk).
 ; AHK v2 resolves #Include at parse time, so there is no true runtime lazy-load.
 
-; ===== Global error net =====
-; Without this, any uncaught error pops an AHK dialog mid-keystroke and can
-; leave modifiers stuck down. We log and continue so one bad callback never
-; locks the keyboard. The handler must return true to consider the error
-; "handled" (suppressing the default dialog).
-
-#Include lib/error_net.ahk
+; The global error net itself is armed far above, before Bundle_Init()'s
+; message-pumping RunWait — see the "Global error net" block there.
 #Include lib/personal_features.ahk
 #Include lib/menu_helpers.ahk
-OnError(ErgoptiGlobalErrorHandler)
 
 ; #Hotstring EndChars -()[]{}:;'"/\,.?!`n`s`t   ; Adds the no breaking spaces as hotstrings triggers
 A_MenuMaskKey := "vkff" ; Change the masking key to the void key

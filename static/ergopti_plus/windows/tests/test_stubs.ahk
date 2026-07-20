@@ -380,6 +380,12 @@ global _IniCache := Map()
 global InDeadKeySequence := false
 global LayerEnabled := false
 global CapsWordEnabled := false
+; Mirrors the ErgoptiPlus.ahk pre-pump block, which owns the seed for every global a
+; parse-time #HotIf reads (see LayerEnabled/CapsWordEnabled/TapHold above). It lives
+; there rather than in hotstring_engine.ahk because that file's include position sits
+; below the first message pump; the headless harness never loads ErgoptiPlus.ahk, so
+; it must seed the same sentinel here.
+global _ALTGR_KANA_FIXUP := false
 global OneShotShiftEnabled := false
 global NumberOfRepetitions := 1
 global ActivitySimulation := false
