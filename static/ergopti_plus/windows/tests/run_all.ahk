@@ -1014,6 +1014,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_rctrl_lalt_hotif_gated.ahk
 #Include meta/test_prefix_keydown_ctrl_backspace_reset.ahk
 #Include meta/test_prefix_index_rebuild_suspend_replay.ahk
+#Include meta/test_suspend_transition_serialized.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
