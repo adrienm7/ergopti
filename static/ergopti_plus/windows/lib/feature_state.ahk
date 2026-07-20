@@ -148,6 +148,15 @@ global CategoryEnabled := Map(
     "MagicKey",           true,
 )
 
+; Hotstring categories that deliberately have NO dedicated gate above: they follow the
+; Hotstrings master. The tray menu still queries them per category, so IsCategoryGated
+; answers with the master's state rather than logging schema drift. Single source of
+; truth for that pass-through — menu_engine.ahk previously open-coded the exclusion.
+global CATEGORY_FOLLOWS_HOTSTRINGS_MASTER := Map(
+    "DynamicHotstrings", true,
+    "Personal",          true,
+)
+
 ReadCategoryEnabled(Cache) {
     global CategoryEnabled
     for Category, _Default in CategoryEnabled {
@@ -163,11 +172,17 @@ ReadCategoryEnabled(Cache) {
 ; the mirrors (to apply gating when populating Features) and by the
 ; tray-menu rendering (to label the master toggle and parent menu).
 IsCategoryGated(Category) {
-    global CategoryEnabled
+    global CategoryEnabled, CATEGORY_FOLLOWS_HOTSTRINGS_MASTER
+    ; Categories that deliberately own NO gate and follow the Hotstrings master.
+    ; The tray menu legitimately asks about them per category, so answer with the
+    ; master's state instead of crying schema drift — that warning fired on every
+    ; menu build and every boot, drowning the must-investigate WARNING log.
+    if CATEGORY_FOLLOWS_HOTSTRINGS_MASTER.Has(Category)
+        return CategoryEnabled.Has("Hotstrings") ? CategoryEnabled["Hotstrings"] : true
     if !CategoryEnabled.Has(Category) {
         ; true here means the gate is ON (category ENABLED), not suspended — the old
-        ; "defaulting to gated" wording read as the opposite. An unknown category is
-        ; always schema drift between menu_manifest.json and CategoryEnabled.
+        ; "defaulting to gated" wording read as the opposite. A genuinely unknown
+        ; category IS schema drift between menu_manifest.json and CategoryEnabled.
         try LoggerWarn("MasterGates", "IsCategoryGated: unknown category '{1}' — treating as ENABLED (schema drift).", Category)
         return true
     }
