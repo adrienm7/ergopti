@@ -168,6 +168,14 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 			Value := ""
 			loop StrLen(Combo) {
 				ComboLetter := SubStr(Combo, A_Index, 1)
+				; The letters Map is user-editable (personal_info.toml [letters]); a
+				; missing alias must skip this optional convenience combo, not throw an
+				; UnsetItemError on the boot-critical registration thread. Mirror the
+				; Generate() guard and fail loud in the log (fail-soft, §5.3)
+				if !PersonalInformationHotstrings.Has(ComboLetter) {
+					LoggerWarn("hotstrings", "CreateHotstringComboAuto: letter '{1}' absent from personal-info map -- skipping combo '@{2}'.", ComboLetter, Combo)
+					return
+				}
 				Value := Value . EscapeSpecialChars(PersonalInformationHotstrings[ComboLetter]) . "{Tab}"
 			}
 			CreateHotstring("*", "@" . Combo . ScriptInformation["MagicKey"], Value, Map("OnlyText", False).Set(
