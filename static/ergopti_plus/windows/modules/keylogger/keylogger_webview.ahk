@@ -484,10 +484,17 @@ KLWV_NormalizeRangeRequest(msg) {
 
     start_date := query.Has("start_date") ? String(query["start_date"]) : ""
     end_date := query.Has("end_date") ? String(query["end_date"]) : ""
-    if !KLWV_IsIsoDate(start_date) || !KLWV_IsIsoDate(end_date)
+    ; Reject loudly: a bare 0 makes "malformed request" indistinguishable from
+    ; "no request", which is why the broken date pattern above silently killed
+    ; every range query with nothing in the log to point at it.
+    if !KLWV_IsIsoDate(start_date) || !KLWV_IsIsoDate(end_date) {
+        try LoggerWarn("Keylogger", "Range request rejected — non-ISO date(s) '{1}'…'{2}'.", start_date, end_date)
         return 0
-    if (start_date != "" && end_date != "" && StrCompare(start_date, end_date) > 0)
+    }
+    if (start_date != "" && end_date != "" && StrCompare(start_date, end_date) > 0) {
+        try LoggerWarn("Keylogger", "Range request rejected — start '{1}' is after end '{2}'.", start_date, end_date)
         return 0
+    }
 
     apps := []
     seen := Map()
@@ -502,8 +509,15 @@ KLWV_NormalizeRangeRequest(msg) {
     return Map("start_date", start_date, "end_date", end_date, "apps", apps)
 }
 
+; ISO-8601 calendar date, exactly YYYY-MM-DD. NOTE: AHK v2 escapes with a
+; BACKTICK, not a backslash — "\\d" reaches PCRE as a literal backslash plus a
+; literal "d", so the pattern only ever matched the text \dddd-\dd-\dd and no
+; real date could pass. Every dashboard range request was then rejected with a
+; bare 0 and dropped without a log.
+global KLWV_ISO_DATE_PATTERN := "^\d{4}-\d{2}-\d{2}$"
+
 KLWV_IsIsoDate(value) {
-    return value = "" || RegExMatch(value, "^\\d{4}-\\d{2}-\\d{2}$")
+    return value = "" || RegExMatch(value, KLWV_ISO_DATE_PATTERN)
 }
 
 KLWV_OnRangeBuildReady(which, Epoch, stage, *) {

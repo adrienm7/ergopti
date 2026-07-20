@@ -292,7 +292,14 @@ _SR_Poll() {
 			; Best-effort — missing temp file is not fatal.
 		}
 
-		_SR_ActiveTasks.Delete(task_id)
+		; Same AHK v2 semantic _SR_HandleTerminate guards against: Map.Delete()
+		; throws on a key that is not present. This poll iterates a .Clone()
+		; snapshot and yields inside the FileRead above, so a concurrent
+		; terminate() (the updater's 250 ms suspend monitor does exactly this)
+		; can drop the key mid-iteration. Unguarded, the throw escapes the timer
+		; callback and OnDone never fires for this task OR any later one in the loop.
+		if _SR_ActiveTasks.Has(task_id)
+			_SR_ActiveTasks.Delete(task_id)
 
 		if task.Has("OnDone") and IsObject(task["OnDone"]) {
 			try {

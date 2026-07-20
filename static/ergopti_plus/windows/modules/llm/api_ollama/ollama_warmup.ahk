@@ -133,7 +133,15 @@ LLM_Ollama_WarmupRetryTick() {
 
 LLM_OllamaCancelWarmupRetry(reset_backoff := false) {
 	global _LLM_Ollama_WarmupRetryFn, _LLM_Ollama_WarmupRetryIntervalMs, _LLM_Ollama_WarmupStartedTick
-		, _LLM_Ollama_IsReady, _LLM_Ollama_WarmupHttp
+		, _LLM_Ollama_IsReady, _LLM_Ollama_WarmupHttp, _LLM_Ollama_WarmupGeneration
+	; Invalidate every in-flight warmup callback. The generation counter was
+	; previously bumped ONLY on the start path, so the `gen != _LLM_Ollama_WarmupGeneration`
+	; guard in _LLM_Ollama_OnWarmupDone could never invalidate anything a cancel
+	; was meant to invalidate. That matters because the poll chain re-arms from an
+	; anonymous closure nobody holds a handle to: bumping the generation here is
+	; the ONLY way a cancel can stop a late response from setting _LLM_Ollama_IsReady
+	; and resetting the backoff ramp behind a driver the user just paused.
+	_LLM_Ollama_WarmupGeneration += 1
 	if (IsSet(_LLM_Ollama_WarmupRetryFn) && _LLM_Ollama_WarmupRetryFn) {
 		SetTimer(_LLM_Ollama_WarmupRetryFn, 0)
 		_LLM_Ollama_WarmupRetryFn := unset
