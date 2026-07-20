@@ -59,6 +59,11 @@ local KEYCODE_LLM_CHAIN = Keycodes.F16_LLM_CHAIN_SIGNAL
 
 local SPINNER_FPS = 6  -- Frames per second for the streaming progress spinner
 
+-- Hard floor on the requested prediction count. A configured 0 (or a fraction that
+-- floors to 0) would ask the backend for nothing at all and make the shared
+-- prompt_builder's diversity/greedy branches meaningless.
+local MIN_NUM_PREDICTIONS = 1
+
 -- ── Adaptive debounce ─────────────────────────────────────────────────────────
 -- Adjust the inactivity delay based on live WPM so the timer fires sooner
 -- when the user is thinking and later when they are actively typing.
@@ -198,7 +203,30 @@ function M.set_llm_enabled(enabled)
 		core_llm.set_runtime_llm_enabled(is_llm_enabled)
 	end
 	Logger.info(LOG, "LLM %s.", is_llm_enabled and "enabled" or "disabled")
-	if not is_llm_enabled then M.reset(); return end
+	if not is_llm_enabled then
+		M.reset()
+		-- Stop BOTH warmup drivers, exactly as script_control.pause_all() does.
+		-- M.reset() only stops the prediction timers and cancels streaming; it never
+		-- touches warmup. WarmupController's chain self-guards on _get_llm_enabled(),
+		-- but api_mlx's own 2s self-retry is gated solely on _warmup_stopped — so
+		-- without stop_warmup() it keeps POSTing after the user turned AI off and
+		-- fires the "server ready" notification while AI is disabled (M-3).
+		if type(WarmupController.stop) == "function" then
+			pcall(function() WarmupController.stop() end)
+		end
+		local ok_api, api = pcall(require, "modules.llm.api_mlx")
+		if ok_api and api and type(api.stop_warmup) == "function" then
+			pcall(function() api.stop_warmup() end)
+		end
+		return
+	end
+	-- Symmetric to the disable-side pair: resume_warmup() clears the
+	-- _warmup_stopped short-circuit BEFORE the controller re-arms, otherwise the
+	-- scheduled warmup would immediately self-discard in M.warmup()'s guard
+	local ok_api, api = pcall(require, "modules.llm.api_mlx")
+	if ok_api and api and type(api.resume_warmup) == "function" then
+		pcall(function() api.resume_warmup() end)
+	end
 	WarmupController.schedule_warmup_with_retry("set_llm_enabled")
 end
 
@@ -229,18 +257,29 @@ function M.set_llm_backend_name(label)
 end
 
 function M.set_llm_context_length(l)
-	context_window_chars = l
-	Logger.debug(LOG, "Context window: %s chars.", tostring(l))
+	-- Same coercion contract as set_llm_min_words below: this value reaches
+	-- `context_window_chars > 0` in the shared prompt_builder, which throws on a
+	-- string. config.toml / a half-written plist can deliver one, and neither
+	-- preferences.lua nor menu_state.lua coerces on the way in.
+	context_window_chars = tonumber(l) or LLM_DEFAULTS.llm_context_length
+	Logger.debug(LOG, "Context window: %s chars.", tostring(context_window_chars))
 end
 
 function M.set_llm_temperature(t)
-	temperature = t
-	Logger.debug(LOG, "Temperature: %s.", tostring(t))
+	-- Reaches `temperature <= GREEDY_TEMP_THRESHOLD` in the shared prompt_builder
+	-- on the single-prediction path, which throws on a string
+	temperature = tonumber(t) or LLM_DEFAULTS.llm_temperature
+	Logger.debug(LOG, "Temperature: %s.", tostring(temperature))
 end
 
 function M.set_llm_num_predictions(n)
-	num_predictions = n
-	Logger.debug(LOG, "Prediction count: %s.", tostring(n))
+	-- Reaches `num_predictions > 1` in the shared prompt_builder — on the DEFAULT
+	-- path, since llm_auto_raise_temp ships enabled — which throws on a string.
+	-- Floor + clamp because a fractional or zero count would also make
+	-- compute_temperature and the streaming batch logic behave nonsensically.
+	local coerced = tonumber(n) or LLM_DEFAULTS.llm_num_predictions
+	num_predictions = math.max(MIN_NUM_PREDICTIONS, math.floor(coerced))
+	Logger.debug(LOG, "Prediction count: %s.", tostring(num_predictions))
 end
 
 function M.set_llm_pred_indent(v)
@@ -329,7 +368,10 @@ end
 --- Updates the inactivity debounce interval on the canonical timer.
 --- Uses setDelay instead of recreating the timer to preserve the single-instance invariant.
 function M.set_llm_debounce(seconds)
-	inactivity_debounce_sec = seconds
+	-- Coerce for the same reason as the other numeric setters: the value is fed
+	-- straight to setDelay() and to the adaptive-debounce arithmetic, and a string
+	-- from config.toml would blow up inside the timer callback where nothing logs
+	inactivity_debounce_sec = tonumber(seconds) or LLM_DEFAULTS.llm_debounce
 	if _inactivity_timer then
 		_inactivity_timer:stop()
 		_inactivity_timer:setDelay(inactivity_debounce_sec)
@@ -540,8 +582,14 @@ function M.perform_check(force_trigger, profile_name)
 
 	local buffer = _state.buffer
 
-	-- Delegate prompt parameter building to PromptBuilder
-	local params, skip_reason, signature = PromptBuilder.build(buffer, {
+	-- Delegate prompt parameter building to PromptBuilder.
+	-- Guarded: perform_check is the body of the module-level debounce timer, and
+	-- hs.timer callbacks are pcall'd by Hammerspoon — a throw here would be routed
+	-- to the Hammerspoon Console and never reach lib/logger. The failure mode is
+	-- invisible and permanent: the health dot stays green, the backend stays
+	-- ready, and no prediction ever appears again for the session. Surfacing the
+	-- error through Logger.error makes it diagnosable from the unified log.
+	local build_ok, params, skip_reason, signature = pcall(PromptBuilder.build, buffer, {
 		temperature             = temperature,
 		max_words               = max_words,
 		min_words               = min_words,
@@ -549,6 +597,12 @@ function M.perform_check(force_trigger, profile_name)
 		auto_raise_temperature  = auto_raise_temperature,
 		context_window_chars    = context_window_chars,
 	}, last_buffer_signature, force_trigger)
+
+	if not build_ok then
+		-- On failure pcall returns (false, err); the error lands in `params`
+		Logger.error(LOG, "PromptBuilder.build raised — request aborted: %s", tostring(params))
+		return
+	end
 
 	if not params then
 		Logger.debug(LOG, "%s — LLM request skipped.", skip_reason or "unknown reason")
