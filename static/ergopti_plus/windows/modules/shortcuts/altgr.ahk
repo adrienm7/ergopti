@@ -69,7 +69,7 @@ AltGrLAltShortcut() {
     ; gracefully instead of throwing on the raw Map access below.
     if !IsSet(Features) or !Features.Has("shortcuts") or !Features["shortcuts"].Has("alt_gr_lalt")
         return
-    if Features["shortcuts"]["alt_gr_lalt"]["backspace"] {
+    if Features["shortcuts"]["alt_gr_lalt"].Get("backspace", false) {
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
             ; "Shift" + "AltGr" + "LAlt" = Ctrl + BackSpace (Can't use Ctrl because of AltGr = Ctrl + Alt)
@@ -77,11 +77,11 @@ AltGrLAltShortcut() {
         } else {
             TextPressKey("BackSpace", [])
         }
-    } else if Features["shortcuts"]["alt_gr_lalt"]["caps_lock"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"].Get("caps_lock", false) {
         ToggleCapsLock()
-    } else if Features["shortcuts"]["alt_gr_lalt"]["caps_word"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"].Get("caps_word", false) {
         ToggleCapsWord()
-    } else if Features["shortcuts"]["alt_gr_lalt"]["ctrl_backspace"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"].Get("ctrl_backspace", false) {
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
             ; "Shift" + "AltGr" + "LAlt" = BackSpace (Can't use Ctrl because of AltGr = Ctrl + Alt)
@@ -89,7 +89,7 @@ AltGrLAltShortcut() {
         } else {
             TextPressKey("BackSpace", ["Ctrl"])
         }
-    } else if Features["shortcuts"]["alt_gr_lalt"]["ctrl_delete"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"].Get("ctrl_delete", false) {
         ; "Shift" + "AltGr" + "LAlt" = Delete (Can't use Ctrl because of AltGr = Ctrl + Alt)
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
@@ -97,7 +97,7 @@ AltGrLAltShortcut() {
         } else {
             TextPressKey("Delete", ["Ctrl"])
         }
-    } else if Features["shortcuts"]["alt_gr_lalt"]["delete"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"].Get("delete", false) {
         ; "Shift" + "AltGr" + "LAlt" = Ctrl + Delete (Can't use Ctrl because of AltGr = Ctrl + Alt)
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
@@ -105,13 +105,13 @@ AltGrLAltShortcut() {
         } else {
             TextPressKey("Delete", [])
         }
-    } else if Features["shortcuts"]["alt_gr_lalt"]["enter"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"].Get("enter", false) {
         TextPressKey("Enter", [])
-    } else if Features["shortcuts"]["alt_gr_lalt"]["escape"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"].Get("escape", false) {
         TextPressKey("Escape", [])
-    } else if Features["shortcuts"]["alt_gr_lalt"]["one_shot_shift"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"].Get("one_shot_shift", false) {
         OneShotShift()
-    } else if Features["shortcuts"]["alt_gr_lalt"]["tab"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"].Get("tab", false) {
         TextPressKey("Tab", [])
     }
 }
@@ -135,25 +135,25 @@ AltGrCapsLockShortcut() {
     ; config must degrade gracefully instead of throwing on the raw Map access.
     if !IsSet(Features) or !Features.Has("shortcuts") or !Features["shortcuts"].Has("alt_gr_caps_lock")
         return
-    if Features["shortcuts"]["alt_gr_caps_lock"]["backspace"] {
+    if Features["shortcuts"]["alt_gr_caps_lock"].Get("backspace", false) {
         TextPressKey("BackSpace", [])
-    } else if Features["shortcuts"]["alt_gr_caps_lock"]["caps_lock"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"].Get("caps_lock", false) {
         ToggleCapsLock()
-    } else if Features["shortcuts"]["alt_gr_caps_lock"]["caps_word"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"].Get("caps_word", false) {
         ToggleCapsWord()
-    } else if Features["shortcuts"]["alt_gr_caps_lock"]["ctrl_backspace"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"].Get("ctrl_backspace", false) {
         TextPressKey("BackSpace", ["Ctrl"])
-    } else if Features["shortcuts"]["alt_gr_caps_lock"]["ctrl_delete"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"].Get("ctrl_delete", false) {
         TextPressKey("Delete", ["Ctrl"])
-    } else if Features["shortcuts"]["alt_gr_caps_lock"]["delete"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"].Get("delete", false) {
         TextPressKey("Delete", [])
-    } else if Features["shortcuts"]["alt_gr_caps_lock"]["enter"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"].Get("enter", false) {
         TextPressKey("Enter", [])
-    } else if Features["shortcuts"]["alt_gr_caps_lock"]["escape"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"].Get("escape", false) {
         TextPressKey("Escape", [])
-    } else if Features["shortcuts"]["alt_gr_caps_lock"]["one_shot_shift"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"].Get("one_shot_shift", false) {
         OneShotShift()
-    } else if Features["shortcuts"]["alt_gr_caps_lock"]["tab"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"].Get("tab", false) {
         TextPressKey("Tab", [])
     }
 }
