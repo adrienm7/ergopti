@@ -500,13 +500,6 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 		end
 	end
 	if not renamed_ok or not renamed then return end
-	
-	-- Reformat using centralized Python formatter for consistent styling
-	local _src = debug.getinfo(1, "S").source:sub(2)
-	local _script_dir = _src:match("^(.*[/\\])")
-	local _repo_root = _script_dir:gsub("static[/\\]drivers[/\\].*$", ""):gsub("[/\\]$", "")
-	local _format_script = _repo_root .. "/tools/format_toml.py"
-	pcall(os.execute, string.format("python3 '%s' '%s' 2>&1", _format_script, prefs_file))
 end
 
 --- Merges the saved disk state into the current memory state.
