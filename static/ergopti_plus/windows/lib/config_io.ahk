@@ -20,7 +20,15 @@ ToggleAllFeaturesOff(*) {
 }
 
 
-_GlobalClearAllBindings(&Updates) {
+; Clear every gesture, keyboard and script-control binding, appending the
+; matching TOML writes to the shared ``Updates`` accumulator.
+;
+; ``Updates`` is taken BY VALUE on purpose. It is an Array, so it already
+; mutates by reference, and the sibling walker _CollectFeatureFlipUpdates takes
+; the same accumulator the same way. Declaring it ByRef here made the one call
+; site (which passes the bare variable) raise a TypeError on every invocation of
+; "tout desactiver" — AHK v2 requires & at the call site for a ByRef parameter.
+_GlobalClearAllBindings(Updates) {
     global GestureAssignments, GESTURE_SLOTS, KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS, SCRIPT_SHORTCUT_SLOTS, ScriptShortcutAssignments, _IniCache
     for Slot in GESTURE_SLOTS {
         GestureAssignments[Slot] := "none"
