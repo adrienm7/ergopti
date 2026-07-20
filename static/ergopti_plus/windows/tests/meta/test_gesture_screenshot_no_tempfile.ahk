@@ -59,14 +59,25 @@ Test("gestures: GestureScreenshotInstant does not write a shared temp .ps1 file 
 ; ======================================================
 
 _GSNF_InlineCommand() {
+	; The instant capture no longer inlines PowerShell itself: it delegates to the
+	; hardened shared path GestureCaptureRegion (F23), which additionally escapes the
+	; save path and reports success only from the observed postcondition. The
+	; no-temp-file invariant therefore now lives in that shared implementation — assert
+	; it there, so it holds for EVERY capture path, not just the instant one.
 	Body := _DriverFuncBody("GestureScreenshotInstant")
-	Assert(Body != "", "GestureScreenshotInstant must exist in modules/gestures.ahk")
+	Assert(Body != "", "GestureScreenshotInstant must exist in modules/gestures/actions.ahk")
+	Assert(InStr(Body, "GestureCaptureRegion(") > 0,
+		"GestureScreenshotInstant must delegate to the shared hardened capture path")
 
-	Assert(InStr(Body, "-Command") > 0,
-		"GestureScreenshotInstant must inline PS code via -Command (gesture-screenshot-tempfile-race)")
+	Capture := _DriverFuncBody("GestureCaptureRegion")
+	Assert(Capture != "", "GestureCaptureRegion must exist in modules/gestures/screenshots.ahk")
+	Assert(InStr(Capture, "-Command") > 0,
+		"the shared capture must inline PS code via -Command, never a temp .ps1 (gesture-screenshot-tempfile-race)")
 
 	; Run (not RunWait) so successive calls do not block each other
-	Assert(InStr(Body, "Run(") > 0,
-		"GestureScreenshotInstant must use Run (not RunWait) to dispatch PS non-blocking")
+	Assert(InStr(Capture, "Run(") > 0,
+		"the shared capture must use Run (not RunWait) to dispatch PS non-blocking")
+	Assert(InStr(Capture, "RunWait") = 0,
+		"the shared capture must never RunWait — that would block the keyboard hook thread")
 }
 Test("gestures: GestureScreenshotInstant inlines PowerShell via -Command (gesture-screenshot-tempfile-race)", _GSNF_InlineCommand)

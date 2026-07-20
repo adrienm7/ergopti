@@ -106,8 +106,14 @@ _SAR_GestureInstantBoundariesAreContained() {
 		"a failed instant gesture screenshot must be logged and reported non-modally")
 	Assert(InStr(Body, "MsgBox") = 0,
 		"GestureScreenshotInstant must not stall the driver's message thread with a modal dialog")
-	Assert(InStr(Body, "Run(") > 0 && InStr(Body, "RunWait") = 0,
-		"GestureScreenshotInstant must retain its asynchronous PowerShell worker")
+	; The instant capture now delegates to the shared hardened path (F23) instead of
+	; launching its own worker, so the asynchronous-worker invariant is enforced on
+	; GestureCaptureRegion — pinned by the F-H07 test below. What must hold HERE is that
+	; the instant path goes through it and never spawns a blocking worker of its own.
+	Assert(InStr(Body, "GestureCaptureRegion(") > 0,
+		"GestureScreenshotInstant must dispatch through GestureCaptureRegion's asynchronous worker")
+	Assert(InStr(Body, "RunWait") = 0,
+		"GestureScreenshotInstant must never block the keyboard hook thread with RunWait")
 }
 Test("Gesture screenshot: instant capture contains OS failures and remains nonblocking", _SAR_GestureInstantBoundariesAreContained)
 

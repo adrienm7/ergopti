@@ -1020,6 +1020,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_tap_hold_synthetic_up_suspend_guard.ahk
 #Include meta/test_menu_delay_prompt_rebuild.ahk
 #Include meta/test_gesture_edit_shortcuts_no_reload.ahk
+#Include meta/test_gesture_screenshot_instant_completion.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
