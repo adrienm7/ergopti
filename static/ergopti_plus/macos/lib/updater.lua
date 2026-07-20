@@ -268,6 +268,18 @@ function M.get_check_interval()
 	return _check_interval_sec
 end
 
+--- Escapes a string so it is safe to use as the REPLACEMENT argument of gsub.
+--- Lua treats "%" specially on that side: "%1".."%9" are capture references,
+--- "%%" is a literal percent, and "%" followed by anything else RAISES
+--- "invalid use of %". Release tags come from the GitHub API and are therefore
+--- third-party-controlled, so they must never be interpolated into a template
+--- verbatim — a tag such as "v1.2%3" would otherwise throw out of the label build.
+--- @param s any The replacement text (coerced with tostring).
+--- @return string The text with every "%" doubled.
+local function escape_replacement(s)
+	return (tostring(s):gsub("%%", "%%%%"))
+end
+
 function M.get_update_menu_label()
 	if _update_state == "checking" then
 		return i18n.get("menu.about.update_checking")
@@ -276,7 +288,7 @@ function M.get_update_menu_label()
 		return i18n.get("menu.about.update_installing")
 	end
 	if _update_state == "available" and _cached_release then
-		return i18n.get("menu.about.update_now"):gsub("{tag}", _cached_release.tag)
+		return (i18n.get("menu.about.update_now"):gsub("{tag}", escape_replacement(_cached_release.tag)))
 	end
 	return i18n.get("menu.about.check_for_updates")
 end
