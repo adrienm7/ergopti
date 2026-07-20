@@ -146,6 +146,12 @@ class KLHook {
     static prev_title := ""
     static app_entered_at := 0
     static title_entered_at := 0
+    ; A_TickCount of the last SUSPENDED context tick, 0 while running. SetTimer
+    ; keeps firing under native Suspend, so the two watermarks above must be
+    ; advanced on every paused tick — otherwise the first refresh after resume
+    ; bills the ENTIRE pause to whichever app was focused when the user paused
+    ; (KLW_WalkAppSwitch adds duration_ms verbatim to app_time, with no clamp).
+    static suspend_tick := 0
 }
 
 
@@ -161,8 +167,26 @@ class KLHook {
 KL_Hook_RefreshContext(force := false) {
     ; Driven by SetTimer, which bypasses native Suspend — stay silent while
     ; the driver is paused so no app/title switch is observed or flushed.
-    if A_IsSuspended
+    ;
+    ; A bare return is not enough: the watermarks would freeze while wall-clock
+    ; keeps running, so the first refresh after resume emits an app_switch whose
+    ; duration spans the whole pause. KLW_WalkAppSwitch adds that value verbatim
+    ; to app_time with no upper clamp, so an overnight pause credited hours of
+    ; screen time to whichever app happened to be focused — landing on the RESUME
+    ; day. The gap compensation in KL_Watchers_OnKeystroke cannot help: it is
+    ; driven by the first post-resume KEYSTROKE, and this 250 ms timer always
+    ; fires first whenever the focused app changed during the pause.
+    if A_IsSuspended {
+        PausedNow := A_TickCount
+        if (KLHook.suspend_tick != 0) {
+            Elapsed := (PausedNow - KLHook.suspend_tick) & 0xFFFFFFFF
+            KLHook.app_entered_at   += Elapsed
+            KLHook.title_entered_at += Elapsed
+        }
+        KLHook.suspend_tick := PausedNow
         return
+    }
+    KLHook.suspend_tick := 0
     ; Guard against the timer firing before KL_Init() has completed — the
     ; KL_LogAppSwitch / KL_LogWindowSwitch calls below require an initialized
     ; keylogger instance; without this guard a fast startup race could crash

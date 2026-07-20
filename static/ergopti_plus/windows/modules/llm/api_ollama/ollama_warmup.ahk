@@ -113,10 +113,20 @@ LLM_OllamaScheduleWarmupRetry(model := "") {
 
 LLM_Ollama_WarmupRetryTick() {
 	global _LLM_Ollama_WarmupRetryIntervalMs, _LLM_Ollama_WarmupRetryModel, _LLM_Ollama_Async
+	global _LLM_Ollama_WarmupRetryFn
+	; TERMINAL condition: warmup succeeded, the chain is done.
+	if LLM_OllamaIsReady()
+		return
+	; Every OTHER early return below is TRANSIENT. This is a one-shot timer
+	; (negative period) whose only re-arm lives at the tail of
+	; LLM_OllamaScheduleWarmupRetry, so returning without re-arming ends the retry
+	; chain for the whole session — and one of those conditions (a prediction in
+	; flight) is the NORMAL state while the user types. Re-arm first, so only the
+	; terminal condition above and an explicit cancel can stop the chain.
+	if (IsSet(_LLM_Ollama_WarmupRetryFn) && _LLM_Ollama_WarmupRetryFn)
+		SetTimer(_LLM_Ollama_WarmupRetryFn, -_LLM_Ollama_WarmupRetryIntervalMs)
 	; Pause must silence every LLM background activity — no HTTP while suspended.
 	if A_IsSuspended
-		return
-	if LLM_OllamaIsReady()
 		return
 	; Do not stack warmups behind an in-flight prediction — Ollama is single-queue.
 	if (IsSet(_LLM_Ollama_Async) and _LLM_Ollama_Async.Count > 0)

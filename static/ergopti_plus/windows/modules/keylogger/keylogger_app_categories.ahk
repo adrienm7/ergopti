@@ -51,6 +51,12 @@
 class KLAppCatConst {
     static FILE_NAME := "app_categories.json"
 
+    ; Delay before re-attempting a deferred save that fired while the driver was
+    ; paused. Matches the original defer window: the write is not urgent, but it
+    ; must not be dropped — this one-shot is the only path that persists a newly
+    ; discovered app category.
+    static DEFERRED_SAVE_RETRY_MS := 5000
+
     ; Defaults shipped for the most common Windows apps. Keys are the
     ; lower-cased process name exactly as WinGetProcessName returns it.
     static DEFAULTS := Map(
@@ -239,12 +245,20 @@ KL_AppCat_Save() {
 ; batched into one write rather than one write per app.
 KL_AppCat_DeferredSave() {
     ; SetTimer callbacks bypass native Suspend() (only Hotkeys/Hotstrings are
-    ; disarmed). The data behind a pending write was already legitimately
-    ; collected before any pause, so skipping the write here just defers it
-    ; rather than losing it — KLAppCat.dirty stays true and the next tick
-    ; after resume persists it.
-    if A_IsSuspended
+    ; disarmed). Skipping the write while paused is right, but a bare return
+    ; LOSES it: this one-shot IS the only write path. Its sole other arm site,
+    ; KL_AppCat_Get, registers the app key BEFORE arming, so once the key exists
+    ; that branch is unreachable for the same app — and there is no periodic save
+    ; and no KL_AppCat_Stop. A pause landing inside the 5 s window therefore
+    ; stranded KLAppCat.dirty forever and the new app never reached the JSON.
+    ; Re-arm instead of dropping the tick.
+    if A_IsSuspended {
+        if KLAppCat.dirty {
+            try LoggerTrace("KLAppCat", "Deferred save re-armed — driver paused.")
+            try SetTimer(KLAppCat.save_fn, -KLAppCatConst.DEFERRED_SAVE_RETRY_MS)
+        }
         return
+    }
     if KLAppCat.dirty
         KL_AppCat_Save()
 }

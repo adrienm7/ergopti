@@ -1244,6 +1244,17 @@ KL_Init(metrics_dir) {
 KL_Stop() {
     if !Keylogger.initialized
         return
+    ; Raise the shutdown bypass BEFORE any teardown. Every *_Stop() below drains a
+    ; CLOSING lifecycle event (session_end, idle_end, vpn_disconnected,
+    ; screen_recording_end, the final roi_snapshot) through KL_AppendLog, whose
+    ; pause guard would otherwise discard them on a quit or reload issued while the
+    ; driver is paused — leaving events_session with a session_start and no
+    ; session_end, which poisons every active-time aggregate downstream. Reload is
+    ; the driver's standard apply-settings path, so this fired routinely. Setting
+    ; the flag only just before the trailing KL_FlushBuffer() protected the two
+    ; explicit flushes but none of the six module drains that carry most of the
+    ; shutdown write traffic.
+    Keylogger._shutting_down := true
     ; Release the keystroke hook FIRST so no late event lands in a
     ; buffer we are about to flush + serialise.
     try KL_Hook_Stop()
@@ -1261,10 +1272,8 @@ KL_Stop() {
         SetTimer(Keylogger._ingest_timer, 0)
     if Keylogger.HasProp("_midnight_timer")
         SetTimer(Keylogger._midnight_timer, 0)
-    ; Allow the final flush to proceed even when the driver is paused — without
-    ; this flag, KL_AppendLog and KL_IngestOnce would both bail on A_IsSuspended
-    ; and quit-while-paused would silently lose all buffered metrics.
-    Keylogger._shutting_down := true
+    ; _shutting_down was raised at the top of this function (see the comment
+    ; there) so the module drains above could emit their closing events too.
     KL_FlushBuffer()
     KL_IngestOnce()
     KL_SaveState()
