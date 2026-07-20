@@ -38,5 +38,18 @@ _BEBFR_ErrorNetExitsBeforeReady() {
         "fatal boot handling must release any started hook/keylogger before ExitApp(1)")
     Assert(Benign > ExitPos,
         "the fatal-before-ready guard must run before recoverable UIA-error suppression")
+
+    ; F05: a fatal fault before LoggerInit would ExitApp with the queued ERROR line
+    ; still in RAM (no log, no crash report, no dialog). The pre-ready branch must
+    ; force the log to disk AND tell the user, both AFTER the guard and BEFORE ExitApp.
+    FlushPos := InStr(Body, "_LoggerFlush(true)")
+    InitPos := InStr(Body, "LoggerInit()")
+    SurfacePos := InStr(Body, "MsgBox")
+    Assert(FlushPos > Guard && FlushPos < ExitPos,
+        "the fatal-before-ready branch must force a log flush (_LoggerFlush(true)) before ExitApp so the fatal line survives")
+    Assert(InitPos > Guard && InitPos < ExitPos,
+        "the branch must resolve a log path (LoggerInit) when none exists yet, before flushing")
+    Assert(SurfacePos > Guard && SurfacePos < ExitPos,
+        "a fatal boot exit must surface a user-visible message (MsgBox) so the driver never silently 'does nothing'")
 }
 Test("boot error net: startup faults clean up and exit instead of becoming half-driver", _BEBFR_ErrorNetExitsBeforeReady)
