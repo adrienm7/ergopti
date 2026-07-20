@@ -1141,9 +1141,16 @@ function M.stop()
 	-- reloads (watcher-leak-on-reload).
 	km_utils.stop()
 
-	-- Clear runtime hooks
-	CoreState.interceptors      = {}
-	CoreState.preview_providers = {}
+	-- CoreState.interceptors and CoreState.preview_providers are deliberately NOT
+	-- cleared here. Their only writers are M.register_interceptor and
+	-- M.register_preview_provider, called once at boot by dynamic_hotstrings;
+	-- M.start() restarts the taps, watchdog and prewarm but has no way to
+	-- re-register them. Wiping them on stop() therefore made a disable/enable
+	-- cycle ("Tout désactiver" then "Tout activer") permanently kill @-tag
+	-- expansion and the dynamic-hotstring preview until a full reload, while
+	-- static TOML hotstrings kept working — so the breakage looked arbitrary.
+	-- They are already inert while stopped: both are only consulted from
+	-- onKeyDownRaw, which cannot run once the tap is stopped.
 
 	Logger.success(LOG, "Keymap engine stopped.")
 end
