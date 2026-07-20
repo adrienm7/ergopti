@@ -704,10 +704,6 @@ for _KbSlot, _KbAction in KeyboardShortcutAssignments {
 LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", _KbBoundCount)
 
 CS_Load()
-; Refresh the metrics focus cache off the keystroke thread via a periodic
-; timer so WinGetTitle/WinGetProcessName (which send WM_GETTEXT and can
-; block on a busy foreground window) never land on the hot path.
-MF_StartFocusRefresh()
 global _SaveFullConfigReady := true
 global _ParseExtTomlSectionsCache := Map()
 if MetricsShortcuts.enabled
@@ -749,6 +745,13 @@ if !HookDispatcher.Start() {
 if MetricsShortcuts.enabled {
     LoggerDebug("Startup", "Metrics enabled — WPMWidget.visible={1}, show_graph={2}.",
         WPMWidget.visible, WPMWidget.show_graph)
+    ; Refresh the metrics focus cache off the keystroke thread via a periodic timer
+    ; so WinGetTitle/WinGetProcessName (which send WM_GETTEXT and can block on a
+    ; busy foreground window) never land on the hot path. Armed here — inside the
+    ; metrics gate and BEFORE KL_Init below — because the cache has exactly one
+    ; reader, MF_ShouldFilter, which the keylogger consults per event: with metrics
+    ; off the poll would issue blocking probes nobody reads.
+    MF_StartFocusRefresh()
     ; (The WebView2 widget cold-start is armed at the very END of boot — after
     ; "Driver fully initialised" — NOT here. A timer armed mid-boot fires ~its
     ; delay later, while the hotstring registration is still running, and AHK
