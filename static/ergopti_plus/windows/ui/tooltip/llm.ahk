@@ -194,9 +194,13 @@ LLM_TooltipShowLoading() {
 	_LLM_Tooltip_ShownAt := 0
 	label := (IsSet(t)) ? t("llm.generating") : "⏳ Génération en cours…"
 	accent := _TooltipResolveAccent("ai_loading")
-	TooltipShow([{ Text: label, ColorHex: accent, IsDimmed: false, DurationSec: 0 }], 0)
-	; TooltipShow arms a 3 s safety timer — cancel it so loading survives slow inference.
-	SetTimer(_TooltipTimerFn, 0)
+	; DurationSec 0 + ArmSafety false: the spinner must live until the prediction
+	; lands or LLM_TooltipHide runs — inference legitimately outlasts the 3 s
+	; _TOOLTIP_SAFETY_SEC deadline (Ollama cold start alone is granted 8 s).
+	; This MUST be an argument: rendering is deferred by TOOLTIP_RENDER_DEBOUNCE_MS,
+	; so cancelling _TooltipTimerFn here would run 75 ms before the timer is armed
+	; and silently do nothing, letting the spinner vanish mid-inference.
+	TooltipShow([{ Text: label, ColorHex: accent, IsDimmed: false, DurationSec: 0 }], 0, false)
 	global _TooltipDequeueActive
 	_TooltipDequeueActive := false
 	try LoggerDebug("LLM.tt", "SHOW loading (no auto-hide).")

@@ -35,6 +35,12 @@ global _TooltipPendingItems := 0
 global _TooltipPendingDurationSec := 0
 global _TooltipPendingGeneration := 0
 global TOOLTIP_RENDER_DEBOUNCE_MS := 75
+; Carries the caller's safety-deadline choice ACROSS the render debounce. A
+; caller that must outlive the 3 s auto-hide (the LLM spinner, whose inference
+; legitimately runs longer) cannot express that by cancelling _TooltipTimerFn
+; after TooltipShow returns: the timer is not armed until _TooltipPresentStack
+; runs, TOOLTIP_RENDER_DEBOUNCE_MS later, so such a cancel is a silent no-op.
+global _TooltipPendingArmSafety := true
 
 ; Reuse the non-caret anchor briefly for LLM refreshes and repeated preview
 ; renders in controls without a native caret. The foreground HWND fence makes
@@ -84,16 +90,19 @@ _TooltipTimerFn() {
 
 _TooltipDeferredShowFn() {
     global _TooltipPendingActive, _TooltipPendingItems, _TooltipPendingDurationSec
+    global _TooltipPendingArmSafety
     if !_TooltipPendingActive
         return
     Items := _TooltipPendingItems
     DurationSec := _TooltipPendingDurationSec
+    ArmSafety := _TooltipPendingArmSafety
     _TooltipPendingActive := false
     _TooltipPendingItems := 0
     _TooltipPendingDurationSec := 0
+    _TooltipPendingArmSafety := true
     if A_IsSuspended
         return
-    _TooltipShowNow(Items, DurationSec)
+    _TooltipShowNow(Items, DurationSec, ArmSafety)
 }
 
 ; Dequeue poll timer — runs every 100 ms while a dequeue cycle is active.
@@ -295,9 +304,13 @@ global _TOOLTIP_SAFETY_SEC := 3.0
 ;
 ; The shortest DurationSec across all items drives the auto-hide timer
 ; (0 / omitted means "stay until TooltipHide()").
-TooltipShow(Items, DurationSec := 0) {
+; ArmSafety=false opts this render out of the _TOOLTIP_SAFETY_SEC auto-hide
+; deadline. Pass it as an argument — never by cancelling _TooltipTimerFn after
+; this call returns: rendering is deferred by TOOLTIP_RENDER_DEBOUNCE_MS, so the
+; timer does not exist yet at that point and the cancel silently does nothing.
+TooltipShow(Items, DurationSec := 0, ArmSafety := true) {
     global _TooltipPendingActive, _TooltipPendingItems, _TooltipPendingDurationSec
-    global _TooltipPendingGeneration, TOOLTIP_RENDER_DEBOUNCE_MS
+    global _TooltipPendingGeneration, TOOLTIP_RENDER_DEBOUNCE_MS, _TooltipPendingArmSafety
 
     if A_IsSuspended {
         TooltipHide("Suspend", true)
@@ -309,12 +322,15 @@ TooltipShow(Items, DurationSec := 0) {
     _TooltipPendingGeneration += 1
     _TooltipPendingItems := Items
     _TooltipPendingDurationSec := DurationSec
+    _TooltipPendingArmSafety := ArmSafety
     _TooltipPendingActive := true
     SetTimer(_TooltipDeferredShowFn, -TOOLTIP_RENDER_DEBOUNCE_MS)
 }
 
 ; Runs from the debounced timer, never directly from the prefix watcher.
-_TooltipShowNow(Items, DurationSec := 0) {
+; ArmSafety is threaded from TooltipShow so a caller can opt out of the
+; _TOOLTIP_SAFETY_SEC auto-hide deadline across the debounce boundary.
+_TooltipShowNow(Items, DurationSec := 0, ArmSafety := true) {
 
     ; While the script is suspended nothing may paint — « pause = AHK éteint ».
     ; The per-callback input guards normally prevent reaching here, but the
@@ -404,7 +420,7 @@ _TooltipShowNow(Items, DurationSec := 0) {
     _TooltipTimerGeneration := _TooltipGeneration
     _hpPresent := HotPath_Now()
     try {
-        _TooltipPresentStack(Pos, Row, true)
+        _TooltipPresentStack(Pos, Row, ArmSafety)
     } catch {
         if (RenderGeneration == _TooltipGeneration)
             TooltipHide("ShowFail", true)

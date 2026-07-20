@@ -1023,6 +1023,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_gesture_screenshot_instant_completion.ahk
 #Include meta/test_live_rebuild_no_critical_io.ahk
 #Include meta/test_metrics_focus_refresh_suspend_guard.ahk
+#Include meta/test_llm_loading_tooltip_no_safety_deadline.ahk
 #Include meta/test_wrap_symbols_load_flush.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
