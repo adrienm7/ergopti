@@ -54,7 +54,22 @@ _THS_DeltaIsWrapSafe() {
 		"error cache delta must use 32-bit wrap mask to avoid 49-day suppression")
 }
 
+; F18 (audit 2026-07-20): a CONTAINED subscriber fault during the RegisterAllHotstrings
+; boot phase (_DriverBootPhase still "starting") escalated to ErgoptiGlobalErrorHandler,
+; whose pre-ready branch ExitApp(1)s the whole driver — so one bad keystroke mid-boot
+; killed the driver. The escalation must be gated on the ready phase.
+_THS_EscalationIsBootPhaseGated() {
+	Src := _DriverDirConcat("lib")
+	EscalateIdx := InStr(Src, "ErgoptiGlobalErrorHandler(e", true)
+	Assert(EscalateIdx > 0, "HookDispatcher catch must call ErgoptiGlobalErrorHandler(e, ...)")
+	Before := SubStr(Src, 1, EscalateIdx)
+	GateIdx := InStr(Before, '_DriverBootPhase == "ready"', , -1)
+	Assert(GateIdx > 0 && (EscalateIdx - GateIdx) < 250,
+		"the ErgoptiGlobalErrorHandler escalation must be gated on the ready boot phase so a contained subscriber fault during boot cannot re-enter the fatal pre-ready branch")
+}
+
 Test("HookDispatcher: logs swallowed subscriber exceptions", _THS_Check)
 Test("HookDispatcher: catch escalates to ErgoptiGlobalErrorHandler for modifier release", _THS_CheckModifierRelease)
 Test("hook_dispatcher: ErgoptiGlobalErrorHandler escalation is throttled (not per-keystroke)", _THS_EscalationIsThrottled)
 Test("hook_dispatcher: error cache delta uses 32-bit wrap mask", _THS_DeltaIsWrapSafe)
+Test("hook_dispatcher: subscriber-fault escalation is gated on the ready boot phase", _THS_EscalationIsBootPhaseGated)

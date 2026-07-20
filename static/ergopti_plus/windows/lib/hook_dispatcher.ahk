@@ -249,8 +249,10 @@ class HookDispatcher {
 				if (!_err_cache.Has(sig) || ((now - _err_cache[sig]) & 0xFFFFFFFF) > 60000) {
 					_err_cache[sig] := now
 					try LoggerWarn("HookDispatcher", "Subscriber for '{1}' threw: {2}.", event_type, e.Message)
-					; Escalate once per fault signature — releases stuck modifiers.
-					try ErgoptiGlobalErrorHandler(e, "Continue")
+					; Escalate (stuck-modifier release) only when ready — pre-ready this
+					; handler ExitApp(1)s, killing the driver over an already-contained fault.
+					if (IsSet(_DriverBootPhase) && _DriverBootPhase == "ready")
+						try ErgoptiGlobalErrorHandler(e, "Continue")
 				}
 			}
 		}
