@@ -462,7 +462,12 @@ TextPressKey(Key, Modifiers) {
 			Mods.Push(Norm)
 		}
 		if (Mods.Length == 0) {
-			LoggerWarn("TextSender", "TextPressKey: modifier array for key '{1}' is empty after normalization.", Key)
+			; An empty INPUT array is the shortcuts cluster's documented "no modifiers"
+			; convention — every dispatcher calls TextPressKey(Key, []) — so it is not an
+			; anomaly and must not spam the errors log. Warn only when a NON-empty array
+			; had all its tokens fail normalization, the case this guard was written for.
+			if (Modifiers.Length > 0)
+				LoggerWarn("TextSender", "TextPressKey: modifier array for key '{1}' is empty after normalization.", Key)
 			return _TextSenderSendInput("{" . Key . "}", "key press")
 		}
 		; A one-modifier array is still a regular shortcut.  `{Ctrl c}` is
