@@ -49,7 +49,7 @@ LAltCapsLockShortcut() {
     ; so malformed/missing config must degrade gracefully instead of throwing
     ; on the raw Map access below. Mirrors AltGrLAltShortcut/
     ; AltGrCapsLockShortcut in modules/shortcuts/altgr.ahk.
-    if !Features.Has("shortcuts") or !Features["shortcuts"].Has("lalt_caps_lock")
+    if !IsSet(Features) or !Features.Has("shortcuts") or !Features["shortcuts"].Has("lalt_caps_lock")
         return
     ; All ten possible actions are simple, no Shift inversion or modifier
     ; bracketing needed -- inline v2 if/else cascade (action table is the
