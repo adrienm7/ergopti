@@ -555,7 +555,7 @@ global SpaceAroundSymbols := (_SpaceAroundSymbolsNode.Has("enabled") and _SpaceA
 
 
 
-EnsurePersonalShortcutsFile(Path) {
+EnsurePersonalShortcutsFile(Path, AllowReload := true) {
     global PERSONAL_SHORTCUTS_TEMPLATE
     if (!IsSet(Path) or Type(Path) != "String" or Path == "") {
         try LoggerWarn("ErgoptiPlus", "EnsurePersonalShortcutsFile called with empty Path — skipping.")
@@ -617,6 +617,14 @@ EnsurePersonalShortcutsFile(Path) {
         }
     }
     if FileWasCreated or !StubMatches {
+        if !AllowReload {
+            ; A runtime caller (the "open personal shortcuts" gesture/menu) wants to open
+            ; the file for editing, NOT restart the driver mid-session — the freshly
+            ; written file is an empty template, so nothing needs re-including before the
+            ; user has even edited it. Their next Reload picks up the edits.
+            try LoggerInfo("ErgoptiPlus", "Personal shortcuts file/stub (re)created; skipping Reload (caller opted out).")
+            return
+        }
         try LoggerInfo("ErgoptiPlus", "Reloading to pick up freshly-written personal shortcuts chain.")
         Reload
         ; Reload starts the replacement instance but returns to this
