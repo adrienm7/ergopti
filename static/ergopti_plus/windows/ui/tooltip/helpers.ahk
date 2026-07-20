@@ -746,10 +746,59 @@ _TooltipMixTintHex(AccentHex) {
 ;
 ; All positioning maths happen in screen coordinates because the Gui is
 ; ``+AlwaysOnTop`` and uses absolute Show("xY yZ").
+; Has this process recently failed to answer a UIA probe? A hostile app costs a
+; full UIA timeout every time the position cache expires, so one failure buys a
+; quiet window rather than a repeating stall.
+_TooltipUiaProcessIsHostile(ProcName) {
+    global _TooltipUiaHostileCache
+    if (ProcName == "" or !_TooltipUiaHostileCache.Has(ProcName))
+        return false
+    if (A_TickCount < _TooltipUiaHostileCache[ProcName])
+        return true
+    _TooltipUiaHostileCache.Delete(ProcName)
+    return false
+}
+
+; Record that ``ProcName`` did not answer usefully, silencing UIA probes against
+; it for TOOLTIP_UIA_HOSTILE_TTL_MS. The map is keyed by process name and
+; entries expire, so it cannot grow without bound across a long session.
+_TooltipMarkUiaHostile(ProcName) {
+    global _TooltipUiaHostileCache, TOOLTIP_UIA_HOSTILE_TTL_MS
+    if (ProcName == "")
+        return
+    _TooltipUiaHostileCache[ProcName] := A_TickCount + TOOLTIP_UIA_HOSTILE_TTL_MS
+}
+
+; Bound UIA's own waits. The library ships Windows' defaults — 2000 ms
+; TransactionTimeout and 20000 ms ConnectionTimeout — so an unresponsive
+; foreground app can stall the driver's only message thread for seconds; the
+; worst measured stall, 2560 ms, is the 2000 ms default plus overhead. Both
+; properties are IUIAutomation2 vtable slots, hence the availability guard and
+; the per-assignment try: an older interface must not throw into the caller.
+; Idempotent — the static flag keeps this to one pair of ComCalls per session.
+_TooltipClampUiaTimeouts() {
+    global UIA_TRANSACTION_TIMEOUT_MS, UIA_CONNECTION_TIMEOUT_MS
+    static Clamped := false
+    if Clamped
+        return
+    Clamped := true
+    if !IsSet(UIA)
+        return
+    try {
+        if !UIA.IsIUIAutomation2Available
+            return
+    } catch {
+        return
+    }
+    try UIA.TransactionTimeout := UIA_TRANSACTION_TIMEOUT_MS
+    try UIA.ConnectionTimeout := UIA_CONNECTION_TIMEOUT_MS
+}
+
 _TooltipResolvePosition() {
     global _TOOLTIP_OFFSET_BELOW, _TOOLTIP_OFFSET_RIGHT
     global _TOOLTIP_MAX_CARET_HEIGHT_PX, _TOOLTIP_WINDOW_BOTTOM_INSET_PX
     global _TooltipPositionCache, TOOLTIP_POSITION_CACHE_MS
+    global TOOLTIP_UIA_IDLE_REQUIRED_MS
 
     ; ----- 1. Native caret -----------------------------------------------
     Cx := 0
@@ -771,8 +820,30 @@ _TooltipResolvePosition() {
     }
 
     ; ----- 2. UIA focused element bounding rectangle ---------------------
+    ; Three guards stand in front of the COM call, because it is a
+    ; cross-process round-trip on the one thread that also dispatches
+    ; keystrokes. Measured worst case before them: 2560 ms
+    ; ("[HotPath] Slow Tooltip.ResolvePos: 2560.32 ms", 2026-07-16), which is
+    ; UIA's own 2000 ms TransactionTimeout plus overhead.
+    ProcName := ""
+    try ProcName := WinGetProcessName("A")
+    ; (a) Never start the round-trip while the user is physically typing. The
+    ;     render debounce is a coalescing timer, not an idle gate — it only
+    ;     decides WHEN the deferred work runs, not whether a burst is still in
+    ;     flight. Mirrors UIA_SELECTION_IDLE_REQUIRED_MS in keymap/layout.ahk.
+    ; (b) Skip apps already known not to answer: one timeout buys a quiet
+    ;     window instead of paying the same stall every cache expiry.
+    UiaAllowed := (A_TimeIdlePhysical >= TOOLTIP_UIA_IDLE_REQUIRED_MS)
+        and !_TooltipUiaProcessIsHostile(ProcName)
+    ; (c) Bound the call itself. Deliberately lazy rather than at boot: the
+    ;     first touch of UIA initialises the COM object, so clamping at boot
+    ;     would move that cost onto the startup path. The two properties live
+    ;     on the UIA singleton, so setting them here bounds every call site in
+    ;     the driver, not just this one.
+    if UiaAllowed
+        _TooltipClampUiaTimeouts()
     try {
-        if IsSet(UIA) {
+        if (UiaAllowed and IsSet(UIA)) {
             Elem := UIA.GetFocusedElement()
             if Elem {
                 Rect := Elem.BoundingRectangle
@@ -794,7 +865,19 @@ _TooltipResolvePosition() {
                     }
                 }
             }
+            ; Reached only when UIA answered but gave nothing usable (no
+            ; focused element, or a zero-area rect). Treat that as "this app
+            ; does not do UIA" and stop asking for a while.
+            _TooltipMarkUiaHostile(ProcName)
         }
+    } catch as e {
+        ; A bare catch-less try here discarded the reason a probe failed, so a
+        ; UIA-hostile app was indistinguishable from a healthy one that simply
+        ; had no caret. Matches the uia-error-swallowed-silently precedent in
+        ; keymap/layout.ahk.
+        _TooltipMarkUiaHostile(ProcName)
+        try LoggerWarn("Tooltip", "UIA position probe failed for '{1}': {2}.",
+            ProcName, e.Message)
     }
 
     ; ----- 3. Active window frame ----------------------------------------

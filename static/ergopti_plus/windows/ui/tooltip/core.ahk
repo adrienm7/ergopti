@@ -56,6 +56,27 @@ global _TooltipPositionCache := false
 ; make it dead again.
 global TOOLTIP_POSITION_CACHE_MS := 600
 
+; Minimum physical-input idle before the UIA position probe may run. The render
+; debounce above is a COALESCING timer, not an idle gate: it decides when the
+; deferred render happens, not whether the user is still mid-burst, and the work
+; it defers runs on the one thread that dispatches keystrokes. Same value and
+; same reasoning as UIA_SELECTION_IDLE_REQUIRED_MS in modules/keymap/layout.ahk.
+global TOOLTIP_UIA_IDLE_REQUIRED_MS := 250
+
+; How long a process stays marked as not answering UIA usefully. Generous
+; re-probe window, mirroring _UIA_NO_TP_TTL_MS in modules/keymap/layout.ahk:
+; without it a UIA-hostile app pays a full timeout every cache expiry, forever.
+global TOOLTIP_UIA_HOSTILE_TTL_MS := 30000
+global _TooltipUiaHostileCache := Map()
+
+; Clamps for UIA's own waits, applied lazily on first probe. Windows defaults
+; are 2000 ms (transaction) and 20000 ms (connection); the library notes the
+; floor is around 50 ms. The worst stall measured on this driver — 2560 ms in
+; Tooltip.ResolvePos — is the 2000 ms default plus overhead, so bounding these
+; is what turns an unbounded cross-process wait into a bounded one.
+global UIA_TRANSACTION_TIMEOUT_MS := 120
+global UIA_CONNECTION_TIMEOUT_MS := 120
+
 ; Dequeue state — items that have per-row expiry deadlines. Canonical algorithm:
 ; _shared/modules/tooltip/dequeue.js (SPEC.md § 7.1). When rows carry distinct non-zero
 ; DurationSec values, TooltipShow stores the full item list here with absolute
