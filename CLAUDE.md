@@ -11,6 +11,12 @@ to push that branch in the current conversation. A push to either branch
 triggers CI and a release; commits must therefore remain local until that
 approval is received.
 
+## Skills
+
+Reusable procedures for recurring tasks (fixing a bug, editing AHK, auditing,
+committing) live in `.claude/skills/`. They are loaded on demand — see
+[AGENTS.md](AGENTS.md) for the index, which is shared with every other agent.
+
 ## Project memory
 
 Accumulated engineering knowledge — hard-won gotchas, architectural invariants,

@@ -1,0 +1,55 @@
+---
+name: logger
+description: Logging conventions and their enforcement — the eight variants, the mandatory start/success and trace/done pairing, message punctuation, and English-only text. Use when adding, changing or reviewing log statements in any driver.
+---
+
+# Logging
+
+The canonical reference is **`.github/copilot-instructions.md` §4** — the eight
+variants, the importance/lifecycle grid, when to use each, punctuation (`…` for
+in-progress, `.` for completed) and the English-only rule. Read it there; it is
+not duplicated here.
+
+This skill covers what §4 does not: how to get it right in practice, and how it
+is enforced.
+
+## Log extensively
+
+Under-logging is the default failure. Every meaningful state change, lifecycle
+event, decision and failure path gets a line. Future debugging depends on it —
+including yours, tomorrow, from a user's log file with no repro.
+
+Selection heuristic: *"would I need this line to diagnose a bug in production?"*
+Yes → `info` or above. Only useful during active development → `debug`/`trace`/`done`.
+High-frequency events (per keystroke, per frame) → `debug` only.
+
+## The pairing rule is enforced
+
+`start` ↔ `success` and `trace` ↔ `done` must always come in pairs. This is not
+cosmetic: **a `START` with no matching `SUCCESS` in a log is the primary signal
+of a silent failure**, and the whole convention exists to make that visible.
+
+`tests/meta/test_logger_pairing.ahk` checks this. An unpaired lifecycle call
+fails the suite.
+
+Practical consequence: if a function can return early between `start` and
+`success`, every early-return path needs its own terminal log — usually an
+`error` or `warn`, not a `success`.
+
+## Common mistakes
+
+- **Swallowing an error and logging nothing.** Violates §5.3. A bare `try … catch {}`
+  is never acceptable; at minimum log at `error`.
+- **`success` on a path that did not succeed.** A function that could not fulfil
+  its contract must say so via return value *and* log.
+- **Setters that do not log.** Every public setter logs its new value at `debug`
+  (§5.5) — this is what makes a boot log reconstruct the exact applied config.
+- **French log text.** Logs are developer-facing and always English; only UI
+  strings are French (see the `i18n` skill).
+- **A `start` whose `success` sits after a `return`.** Reads fine, never fires.
+
+## Throttling
+
+High-frequency error paths need a throttle (the hook dispatcher uses a 60 s
+per-label cache) or a single failing keystroke floods the log and buries the
+context you need. Throttle the *repeat*, never the first occurrence.
