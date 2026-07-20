@@ -128,6 +128,11 @@ Ergopti_OnSuspendEnter() {
     ; éteint" invariant). Re-armed from Ergopti_OnSuspendResume when the bridge
     ; is active.
     try _LLM_PointerWatch_Stop()
+    ; Disarm the 20 Hz metrics focus poll. Same class as the pointer watch above:
+    ; a repeating SetTimer bypasses native Suspend, and its WinGetTitle probe is a
+    ; blocking WM_GETTEXT round-trip against the foreground window. Re-armed from
+    ; Ergopti_OnSuspendResume when metrics are enabled.
+    try MF_StopFocusRefresh()
     ; Cancel in-flight background update checks so a stale async callback cannot
     ; surface a TrayTip or rebuild the menu while paused ("pause = tout éteint").
     try _Updater_CancelAsyncChecks()
@@ -193,6 +198,12 @@ Ergopti_OnSuspendResume() {
     global _LLM_Bridge_Active
     if IsSet(_LLM_Bridge_Active) and _LLM_Bridge_Active
         try _LLM_PointerWatch_Start()
+    ; Re-arm the metrics focus poll disarmed in Ergopti_OnSuspendEnter, gated on
+    ; the same feature flag that armed it at boot. Without this the cache would
+    ; stay frozen after the first pause and every metrics privacy filter would
+    ; read a stale foreground window for the rest of the session.
+    if IsSet(MetricsShortcuts) and MetricsShortcuts.enabled
+        try MF_StartFocusRefresh()
     ; Deferred dependency callbacks are not allowed to rebuild the tray or
     ; start the bridge while native Suspend is active. Replay the pending work
     ; only after the resume transition has completed.

@@ -112,6 +112,13 @@ class MetricsFocusCache {
 }
 
 MF_RefreshFocus() {
+    ; SetTimer callbacks bypass native Suspend, which only disarms hotkeys. Probing
+    ; the foreground window while paused violates « pause = tout éteint » and keeps
+    ; issuing blocking WM_GETTEXT round-trips 20x/second against whatever the user
+    ; focuses. The cache is TTL-based, so simply skipping the tick self-heals on the
+    ; first refresh after resume — nothing needs to be replayed.
+    if A_IsSuspended
+        return
     if (A_TickCount - (MetricsFocusCache.state.last_at) & 0xFFFFFFFF) < MF_FOCUS_TTL_MS
         return
     hwnd := 0
@@ -190,6 +197,15 @@ MF_StartFocusRefresh() {
     ; on a busy/unresponsive foreground window) never land on the hot path.
     ; The 50 ms interval matches the TTL the cache itself enforces.
     SetTimer(MF_RefreshFocus, MF_FOCUS_TTL_MS)
+    try LoggerTrace("MetricsFilters", "Focus-cache refresh started ({1} ms).", MF_FOCUS_TTL_MS)
+}
+
+; Disarm the focus-cache poll. Required because MF_RefreshFocus is a REPEATING
+; timer: without a cancel site it runs for the whole process lifetime, including
+; the entire pause, issuing blocking WM_GETTEXT probes the user believes are off.
+MF_StopFocusRefresh() {
+    SetTimer(MF_RefreshFocus, 0)
+    try LoggerDone("MetricsFilters", "Focus-cache refresh stopped.")
 }
 
 MF_ShouldFilter() {
