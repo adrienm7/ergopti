@@ -47,3 +47,19 @@ _MSNamed_EnterNoBraces() {
 	AssertEqual("#enter", MS_ToAhkSyntax("win+enter"), "enter must not be brace-wrapped")
 }
 Test("MS_ToAhkSyntax: enter key is not wrapped in Send-syntax braces", _MSNamed_EnterNoBraces)
+
+; An unrecognised modifier token used to be skipped, which still produced a
+; syntactically valid Hotkey() name — so Hotkey() succeeded, the binding was
+; persisted, and a typo silently bound a DIFFERENT key than the one displayed.
+; The docstring already promised "" on malformed input; the code did not honour
+; it. These cases pin the contract in both directions.
+_MSNamed_UnknownModifierRejected() {
+	AssertEqual("", MS_ToAhkSyntax("control+alt+m"),
+		"an unknown modifier token must reject the whole string, not degrade ^!m to !m")
+	AssertEqual("", MS_ToAhkSyntax("crtl+alt+m"),
+		"a typo'd modifier must reject rather than bind a different hotkey")
+	AssertEqual("^!m", MS_ToAhkSyntax("ctrl+alt+m"),
+		"valid input must still translate — guards against over-rejection")
+}
+Test("MS_ToAhkSyntax: an unrecognized modifier is rejected, not silently dropped",
+	_MSNamed_UnknownModifierRejected)

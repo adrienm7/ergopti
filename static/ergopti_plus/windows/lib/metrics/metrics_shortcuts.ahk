@@ -113,8 +113,19 @@ MS_ToAhkSyntax(human) {
     mods := ""
     Loop parts.Length - 1 {
         m := Trim(parts[A_Index])
-        if METRICS_MOD_MAP.Has(m)
-            mods .= METRICS_MOD_MAP[m]
+        ; An unrecognised modifier must reject the whole string, not be dropped.
+        ; Dropping it still yields a syntactically valid Hotkey() name, so
+        ; Hotkey() succeeds, MS_BindHotkey sees success and
+        ; MS_ShouldPersistShortcut persists it — and "control+alt+m" (a typo for
+        ; "ctrl") silently binds Alt+M instead. The user then sees their own
+        ; text echoed back as the active binding while a different key fires,
+        ; on this boot and every boot after, since MS_ApplyAll replays it.
+        if !METRICS_MOD_MAP.Has(m) {
+            try LoggerWarn("MetricsShortcuts",
+                "Rejected shortcut '{1}': unknown modifier '{2}'.", human, m)
+            return ""
+        }
+        mods .= METRICS_MOD_MAP[m]
     }
 
     ; Both single-char ("m") and named ("f1", "space", "enter") keys are valid
