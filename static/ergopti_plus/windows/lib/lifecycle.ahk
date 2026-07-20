@@ -18,7 +18,8 @@ ActivateEdit(*) {
 ; a "&" hotkey definition, e.g. "SC138 & SC01C::" in script_altgr_hotkeys.ahk or
 ; "SC038 & SC03A::" in modules/shortcuts/base_modifier.ahk). AHK's custom-
 ; combination prefix-down flag latches across Suspend() and cannot be cleared by
-; synthetic events -- see _SuspendDrainPrefix below. Single source of truth: add
+; synthetic events -- see _SuspendPrefixesAreClear / _SuspendPendingPoll below.
+; Single source of truth: add
 ; any NEW custom-combination prefix key here so it is drained automatically
 ; before every future suspend instead of leaving a THIRD un-drained sibling for
 ; the same latch bug to hide in (feedback_ahk_suspend_prefix_latch, F42).
@@ -60,7 +61,8 @@ _SuspendPrefixesAreClear() {
 ; harmless no-ops, and {Blind} stops AHK injecting its own modifier state. NOTE:
 ; this targets the OS phantom-modifier case ONLY — it does NOT clear AHK's
 ; internal custom-combination prefix latch (that is prevented at the source by
-; _SuspendDrainPrefix before a Suspend, the one transition that freezes it).
+; the _SuspendPrefixesAreClear / _SuspendPendingPoll gate before a Suspend, the one
+; transition that freezes it).
 _ReleasePhantomModifiers() {
     Send("{Blind}{LCtrl up}{RCtrl up}{LAlt up}{RAlt up}{LShift up}{RShift up}{LWin up}{RWin up}{SC138 up}")
 }
