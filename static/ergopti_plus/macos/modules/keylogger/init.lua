@@ -1402,6 +1402,20 @@ function M.start(script_control)
 	-- session that did not get flushed before exit.
 end
 
+--- Re-synchronises the cached app/secure-field context with reality.
+--- Called by script_control on resume: the context tracker's pause guard correctly
+--- suppresses everything while paused, which also means an app switch made DURING
+--- a pause never updated the cached context — and nothing else re-syncs it.
+--- @return boolean True when the context was re-synchronised.
+function M.resync_context()
+	local ok, res = pcall(ContextTracker.resync_context)
+	if not ok then
+		Logger.error(LOG, "resync_context() failed: %s.", tostring(res))
+		return false
+	end
+	return res == true
+end
+
 --- Halts all tracking, stops all timers and watchers, and flushes the buffer.
 --- Idempotent: calling it while not running is a no-op.
 function M.stop()

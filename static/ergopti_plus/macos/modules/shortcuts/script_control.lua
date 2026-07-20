@@ -278,6 +278,17 @@ local function resume_all()
 	if ok_wc and wc and type(wc.schedule_warmup_with_retry) == "function" then
 		pcall(function() wc.schedule_warmup_with_retry("script resume") end)
 	end
+	-- The context tracker is pause-gated at its entry points, so an app switch made
+	-- DURING the pause never updated the cached context and nothing else re-syncs it:
+	-- resuming in a different app left active_app_* and — critically — is_secure_field
+	-- pinned to whatever was frontmost when the pause began. Re-sync here rather than
+	-- weakening the pause guard, so « pause = tout éteint » still holds exactly.
+	-- Lazy require, like the two warmup drivers above: script_control is not wired to
+	-- the keylogger module and does not need to be for a one-shot resume call.
+	local ok_kl, kl = pcall(require, "modules.keylogger")
+	if ok_kl and kl and type(kl.resync_context) == "function" then
+		pcall(function() kl.resync_context() end)
+	end
 end
 
 --- Dispatches a configured action by its identifier.
