@@ -387,7 +387,7 @@ function M.update_preview(buf)
 	-- Collect all matching candidates: provider match first, then star, then
 	-- autocorrect. Both star and autocorrect are kept when both match the same
 	-- buffer so the stacked tooltip can show all options simultaneously.
-	local matches = {}   -- array of { repl, plain_repl, input, type, group }
+	local matches = {}   -- array of { repl, plain_repl, input, type, group, is_private }
 
 	-- Custom preview providers take precedence over the static mapping lookup.
 	for _, provider in ipairs(_state.preview_providers) do
@@ -399,6 +399,14 @@ function M.update_preview(buf)
 				input      = nil,
 				type       = "provider",
 				group      = nil,
+				-- Provider output is treated as private unconditionally. Both
+				-- registered providers resolve personal_info.toml content
+				-- (dynamic_hotstrings personal_info and rules_engine), and the
+				-- registration API carries no privacy metadata — so defaulting to
+				-- "withhold" is the only choice under which a future provider
+				-- cannot leak a secret into the 14-day log by omission. The cost
+				-- is a less detailed DEBUG line; nothing functional depends on it.
+				is_private = true,
 			}
 			break
 		end
@@ -446,6 +454,9 @@ function M.update_preview(buf)
 							input      = star_base,
 							type       = "star",
 							group      = mapping.group,
+							-- Carried so the DEBUG sink below can honour the same
+							-- privacy contract the expander applies (acc7946fc).
+							is_private = mapping.is_private,
 						}
 					end
 				end
@@ -491,6 +502,8 @@ function M.update_preview(buf)
 							input      = matched_input,
 							type       = "autocorrect",
 							group      = mapping.group,
+							-- Same privacy contract as the star bucket above.
+							is_private = mapping.is_private,
 						}
 					end
 				end
@@ -569,8 +582,19 @@ function M.update_preview(buf)
 				}
 			end
 
-			Logger.debug(LOG, "Hotstring '%s' → '%s' [%s].",
-				tostring(m.input), m.plain_repl, m.type)
+			-- Same privacy contract as the expander's two expansion sinks: a private
+			-- mapping's replacement AND its trigger are both secrets, and DEBUG is
+			-- the driver's default level, so this line would otherwise write
+			-- personal_info.toml content (phone, IBAN, SSN, card) into the 14-day log
+			-- on every preview keystroke. The preview TOOLTIP still renders the value
+			-- — showing the user their own data on their own screen is the feature —
+			-- it is only the persisted sink that must withhold it.
+			if m.is_private then
+				Logger.debug(LOG, "Hotstring preview: private mapping matched (content withheld) [%s].", m.type)
+			else
+				Logger.debug(LOG, "Hotstring '%s' → '%s' [%s].",
+					tostring(m.input), m.plain_repl, m.type)
+			end
 		end
 
 		local tooltip_timeout = min_timeout or INFINITE_TOOLTIP_SEC
