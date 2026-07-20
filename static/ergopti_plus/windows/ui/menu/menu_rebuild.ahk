@@ -112,17 +112,19 @@ RebuildHotstringsLive() {
 	try LoggerStart("Menu", "Rebuilding hotstrings in-process (live toggle)…")
 	try {
 		try SetTimer(RegisterEmojisSymbolsDeferred, 0)
+		; HSE_RebuildInProgress is the fence: HSE_FindMatchAtEnd returns no match while
+		; it is set, so an InputHook OnChar can never observe the empty or
+		; partially-populated registry — keystrokes simply pass through unexpanded for
+		; the duration of the rebuild. This is deliberately NOT wrapped in Critical:
+		; RegisterAllHotstrings is ~1.3 s of registration PLUS _HS_RegisterPersonal's
+		; directory enumeration and TOML reads, and holding Critical across all of that
+		; froze the keyboard for 1-2 s on every tray hotstring toggle (worse on
+		; cloud-synced dirs). The per-mutation Criticals inside
+		; HSE_Register/HSE_DisableGroup/HSE_EnableGroup still prevent torn reads.
 		HSE_RebuildInProgress := true
 		try {
-			; Wrap clear + re-register in Critical so an InputHook OnChar callback
-			; cannot observe an empty or partially-populated registry mid-rebuild
-			_RblCrit := Critical("On")
-			try {
-				HSE_RegistryClear()
-				RegisterAllHotstrings()
-			} finally {
-				Critical(_RblCrit)
-			}
+			HSE_RegistryClear()
+			RegisterAllHotstrings()
 		} finally {
 			HSE_RebuildInProgress := false
 		}
