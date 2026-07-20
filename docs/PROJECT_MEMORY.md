@@ -28,7 +28,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-ahk-test-suite-critical-leak](#project-ahk-test-suite-critical-leak) — Critical("On") in layout/hotkey callbacks is safe in production but leaks into the main thread when invoked directly by tests, silently hanging background timers
   - [project-ahk-numeric-string-equals-false](#project-ahk-numeric-string-equals-false) — `"0" = false` is TRUE in AHK v2; never compare a String|false return against false, type-check with `is String`
   - [project-ahk-guard-tests-must-loop-the-class](#project-ahk-guard-tests-must-loop-the-class) — Guard tests must enumerate the whole class of call sites, not the one site a bug was fixed at — 5 findings in one audit came from this
-  - [project-audit-evidence-must-be-reproducible](#project-audit-evidence-must-be-reproducible) — The 2026-07-20 audit's performance section cited logs that do not exist; G4 has never been measured on this driver
+  - [project-audit-evidence-must-be-reproducible](#project-audit-evidence-must-be-reproducible) — A refutation needs the same proof as a finding: the "the perf section was fabricated" debunking was itself wrong (it searched `ahk/logs`, but the real path is `autohotkey/logs`); G4 IS measured, and the logs live at `<ConfigDir>/autohotkey/logs/` via `paths.toml`
   - [project-audit-findings-are-hypotheses](#project-audit-findings-are-hypotheses) — 2 of 35 audit findings were wrong and the existing suite proved it; implement a finding as a hypothesis, not an instruction
   - [project-updater-nonblocking-http](#project-updater-nonblocking-http) — The updater background poll must never do synchronous WinHttp on the main thread (it freezes all remapping); WinHttp SetTimeouts 0 = infinite. Use the async WinHTTP + WaitForResponse(0) + SetTimer-poll pattern.
   - [project-config-v2-refactor](#project-config-v2-refactor) — State of the v2 config schema refactor (Scope C) — branch refactor/config-schema-v2 with 5 dormant commits. Cut-over to actually migrate the AHK driver runtime is the open piece.
@@ -1668,25 +1668,36 @@ Related: [[project_ahk_guard_tests_must_loop_the_class]], [[feedback_regression_
 
 ### project-audit-evidence-must-be-reproducible
 
-_The 2026-07-20 audit's entire performance section cited log data that does not exist — always re-derive an audit's evidence before trusting its conclusions_
+_A refutation is a claim and needs the same standard of proof: the 2026-07-20 "the perf section was fabricated" debunking was ITSELF wrong — it looked in a directory that never existed_
 
 <sub>slug: `project_audit_evidence_must_be_reproducible`</sub>
 
-The first 2026-07-20 audit (`AUDIT_AHK_2026-07-20.md`, commit `1171adc90`, removed by `08382fb56`) contains a detailed §3 performance table — `Tooltip.ResolvePos` worst **2560.3 ms**, `OnChar` worst **701.3 ms**, "3 081 `[HotPath] Slow` lines across the 4 error logs" — plus quoted timestamps on 2026-07-19. Re-verified the same day:
+> **CORRECTED 2026-07-20 (third pass).** This entry previously asserted that the first
+> 2026-07-20 audit fabricated its performance section. **That accusation was false**, and the
+> correction matters more than the original lesson. Kept in full, because how the error was
+> made is the actual teaching.
 
-- **Zero** lines containing `Slow` or `HotPath` exist in **any** available log (3 error + 3 main, `D:\tmp`).
-- Only **3** error logs exist, not 4. **No 07-19 log exists at all**, and retention is 14 days (`lib/logger.ahk:169`), so a 1-day-old file could not have been purged.
-- The driver's own log dir (`<ConfigDir>/ahk/logs/`) is **empty**; the `D:\tmp` files are **test-suite** output (`[CONSOLE] [console] === … ===`, each line written 3×) and include macOS/Hammerspoon `healthcheck` lines.
-- Finding F02 (HIGH, "double boot") cited "07-16 11:58–12:01 interleaved duplicate lines = two driver instances". That window has **zero** lines (the log starts 14:34:35), and the duplicates that do exist are the 3× test-harness echo.
+**What the first audit claimed.** `AUDIT_AHK_2026-07-20.md` (commit `1171adc90`, removed by `08382fb56`) reported `Tooltip.ResolvePos` worst **2560.3 ms** and `OnChar` worst **701.3 ms**.
 
-**Consequence: G4 has never actually been measured on this driver.** Any conclusion that "the tooltip pipeline is the dominant G4 offender" is unsupported. The `hotpath_profiler` is real and correctly shaped — it has simply never produced a surviving artifact here.
+**What the second audit concluded.** That zero `Slow`/`HotPath` lines existed in any log, that `<ConfigDir>/ahk/logs/` was empty, and therefore that the table was invented and "G4 has never been measured on this driver".
+
+**What is actually true.** The third pass re-derived the numbers independently with `awk` over the real logs and got **`Tooltip.ResolvePos` max 2560.3 ms** and **`OnChar` max 701.3 ms** — *exactly* the disputed figures. Across 10 days of logs there are **8 958** `Slow` lines. The first audit's data was genuine.
+
+**Why the debunking went wrong — one wrong path segment:**
+
+- The log directory is `_ConfigDir . _AhkSubDir . "logs\"`, and **`_AhkSubDir := "autohotkey\"`** (`lib/boot.ahk:70`). The real path is `<ConfigDir>/autohotkey/logs/`.
+- The second audit checked `<ConfigDir>/**ahk**/logs/` — a directory that has never existed — found nothing, and read `D:\tmp` test-harness output instead.
+- `<ConfigDir>` is itself redirected by `%APPDATA%\Ergopti\paths.toml`; on this machine it resolves to `D:\Documents\GitHub\config\ergopti_plus\`. Neither audit resolved it.
+
+**Consequence of the false debunking:** a genuine, measured **2.5-second stall on the typing path** was dismissed as unmeasured, and the `Tooltip.ResolvePos` finding was formally refuted on that basis. The defect stayed open for a full extra audit cycle.
 
 **How to apply:**
 
-- Before accepting *any* audit's performance conclusions, re-derive them from the artifacts. Cheapest check: `awk 'index($0,"Slow")>0{c++} END{print c+0}' <log>`. If it is 0, the table was not measured.
-- State G4 claims as "derived from reading code" unless you have a log line to quote. This report's F-01/F-06/F-11/F-16/F-17 all carry that qualifier deliberately.
-- **Capture one real `[HotPath]` log before doing further G4 work** — run the driver, type in a caret-less app (VS Code/Discord/browser), toggle a hotstring category while typing, trigger a cold-Ollama prediction, then read the `Slow` lines.
-- Be fair in how you report this: I cannot prove no such log ever existed elsewhere, only that the citations are unverifiable and contradicted by every artifact present. Say that, rather than accusing.
+- **Hold refutations to the same standard as findings.** "This evidence does not exist" is a positive claim about the world; it needs proof of where you looked. Absence of evidence at the wrong path is not evidence of absence.
+- **Resolve the config path before concluding anything about logs.** `paths.toml` first, then `_AhkSubDir`. Never conclude "the driver has never logged" — it has, since at least 2026-07-08.
+- Cheapest check, run at the *correct* path: `awk 'index($0,"Slow")>0{c++} END{print c+0}' <log>`.
+- Still true and still worth doing: state G4 claims as "derived from reading code" unless you have a log line to quote, and label the provenance of every number.
+- **Be fair in how you report a suspected fabrication.** The original entry hedged ("I cannot prove no such log ever existed elsewhere") and was still wrong to accuse. Prefer "I could not locate the artifact at X, Y, Z — where should I look?" over "this was invented".
 
 Related: [[project_audit_reverify_2026_06_16]] (same lesson from the other direction — that audit's *tracking JSONs* were unreliable), [[feedback_regression_tests]].
 

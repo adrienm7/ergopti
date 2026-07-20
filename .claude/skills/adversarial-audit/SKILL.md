@@ -50,25 +50,45 @@ A finding without a repro path is a hypothesis. Label it as one.
 
 **Re-derive every artifact you cite, from the artifact itself, before citing it.**
 
-The first 2026-07-20 audit shipped a full performance section — worst-case
-timings, a count of "3 081 `[HotPath] Slow` lines", quoted timestamps — that was
-entirely unreproducible. Zero lines containing `Slow` or `HotPath` exist in any
-log; the log quoted for a "double boot" window starts hours after that window.
-The numbers came from a sub-agent's report and were passed through as measured.
+The cautionary tale here is a **refutation that was wrong**, which is worse than
+the finding it killed. The second 2026-07-20 audit declared the first audit's
+performance section fabricated — "zero `Slow` lines exist in any log". A third
+pass re-derived the disputed figures independently and got them *exactly*:
+`Tooltip.ResolvePos` max 2560.3 ms, `OnChar` max 701.3 ms, 8 958 `Slow` lines
+across 10 days. The debunker had searched `<ConfigDir>/ahk/logs/` — a directory
+that never existed — instead of `<ConfigDir>/autohotkey/logs/`
+(`_AhkSubDir := "autohotkey\"`), and `<ConfigDir>` is itself redirected by
+`%APPDATA%\Ergopti\paths.toml`. A real 2.5-second stall on the typing path was
+dismissed as unmeasured and stayed open an extra cycle.
 
 Consequences to internalise:
 
+- **Hold refutations to the same standard as findings.** "This evidence does not
+  exist" is a positive claim about the world and needs proof of where you looked.
+  Absence of evidence at the wrong path is not evidence of absence.
+- **Resolve the config path before concluding anything about logs.** `paths.toml`
+  first, then the driver's subdirectory constant.
 - **Never present a sub-agent's or tool's output as measured evidence** without
   opening the artifact yourself. Aggregating an unverified claim launders it.
-- **Cheapest possible check first.** `awk 'index($0,"Slow")>0{c++} END{print c+0}' <log>`
-  — if it prints 0, there was no measurement.
+- **Cheapest possible check first**, run at the *correct* path:
+  `awk 'index($0,"Slow")>0{c++} END{print c+0}' <log>`.
+- **Be fair when you suspect fabrication.** Prefer "I could not locate the artifact
+  at X, Y, Z — where should I look?" over "this was invented".
 - **Label the provenance of every claim.** "Derived from reading the code" is a
   perfectly respectable basis for a finding. Dressing it up as a measurement is
   not. G4 in particular is unmeasured on this driver unless you have a log line
   to quote.
-- Where logs live: the driver writes to `<ConfigDir>/ahk/logs/`, with a dedicated
-  errors-only sink and 14-day retention. Files found elsewhere may be **test
+- Where logs live: `<ConfigDir>/autohotkey/logs/` — note the subdirectory is
+  `autohotkey`, not `ahk`, and `<ConfigDir>` is redirected by
+  `%APPDATA%\Ergopti\paths.toml` (on the maintainer's machine, to
+  `D:\Documents\GitHub\config\ergopti_plus\`). There is a dedicated errors-only
+  sink and 14-day retention. Getting this path wrong is precisely what produced
+  the false refutation above. Files found elsewhere (e.g. `D:\tmp`) may be **test
   harness output** rather than driver output — check before attributing them.
+- Caveat when dating events: the log **filename carries the date the driver
+  started, not the date of the entries** (the path is resolved once at init), so a
+  file named `..._07-11.log` can hold entries from the 14th. Read the line's own
+  timestamp; never date an event from the filename.
 
 ## Deliverable
 
