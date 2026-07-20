@@ -15,3 +15,22 @@ Test_HSE_PhysicalInputIsNotDroppedByOutputGuard() {
 		"the render guard must not suppress HSE physical input")
 }
 Test("HSE: physical input survives a nearby output transaction", Test_HSE_PhysicalInputIsNotDroppedByOutputGuard)
+
+; F46 (audit 2026-07-20): the suppress window exists to filter the engine's OWN
+; SendInput output, so a genuinely physical feed must declare itself with
+; IsPhysical=true. _SpaceTap fed its space without the flag (its space bypasses the
+; InputHook entirely), so a space tapped inside the ~60 ms post-expansion suppress
+; window was silently dropped from the buffer and the next trigger mis-framed. The
+; Ctrl+A reset in the prefix watcher had the same omission.
+_HSPIP_PhysicalFeedsDeclareProvenance() {
+	Tap := _DriverFuncBody("_SpaceTap")
+	Assert(Tap != "", "_SpaceTap must exist in modules/tap_holds/space.ahk")
+	Assert(InStr(Tap, 'HSE_FeedChar(" ", true)') > 0,
+		"_SpaceTap must feed its space as PHYSICAL (IsPhysical=true) so it survives the post-expansion suppress window")
+
+	KeyDown := _DriverFuncBody("_OnPrefixKeyDown")
+	Assert(KeyDown != "", "_OnPrefixKeyDown must exist")
+	Assert(InStr(KeyDown, "HSE_FeedReset(true, true)") > 0,
+		"the Ctrl+A branch must reset with IsPhysical=true so a real select-all inside the suppress window is honoured")
+}
+Test("HSE: physical feeds outside the InputHook declare IsPhysical", _HSPIP_PhysicalFeedsDeclareProvenance)
