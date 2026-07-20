@@ -157,6 +157,14 @@ Ergopti_OnSuspendEnter() {
     ; Reset OneShotShift so a shift armed just before suspension is not applied
     ; to the first keystroke after resume ("pause = tout éteint" invariant)
     global OneShotShiftEnabled := False
+    ; Wipe the hotstring engine buffer: suspend is a context-unknown boundary just
+    ; like a mouse click, Ctrl+V or Win+L. The on-screen text the buffer mirrors can
+    ; change completely while paused (the user clicks into another document), so a
+    ; surviving buffer would fire a stale trigger on the first post-resume terminator
+    ; and BackSpace into unrelated text. Mirrors RebuildHotstringsLive/_LockWorkstationEmit;
+    ; _ResetPrefixBuffer() on resume keeps the preview buffer paired with the engine.
+    if IsSet(HSE_HardReset)
+        try HSE_HardReset()
     global _LLM_Deps_PollTimer
     if IsSet(_LLM_Deps_PollTimer)
         try SetTimer(_LLM_Deps_PollTimer, 0)
