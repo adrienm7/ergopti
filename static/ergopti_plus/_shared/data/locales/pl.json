@@ -946,6 +946,7 @@
 	"menu.llm.api_prompt_provider": "Identyfikator dostawcy ({1}):",
 	"menu.llm.api_prompt_token": "Token / klucz API (ukryty):",
 	"menu.llm.api_prompt_url": "URL bazowy:",
+	"menu.llm.api_providers_unavailable": "Nie można załadować listy dostawców API, więc nie można dodać wpisu. Sprawdź, czy plik api_providers.json istnieje i jest poprawny.",
 	"menu.llm.api_remove_confirm_body": "Zapisany token API zostanie trwale usunięty.",
 	"menu.llm.api_remove_confirm_title": "Usunąć wpis API \"%s\"?",
 	"menu.llm.api_remove_entry": "Usuń wybrane API",

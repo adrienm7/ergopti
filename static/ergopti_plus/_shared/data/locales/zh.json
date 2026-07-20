@@ -946,6 +946,7 @@
 	"menu.llm.api_prompt_provider": "提供商 ID（{1}）：",
 	"menu.llm.api_prompt_token": "API 令牌 / 密钥（隐藏）：",
 	"menu.llm.api_prompt_url": "基础 URL：",
+	"menu.llm.api_providers_unavailable": "无法加载 API 提供商列表，因此无法添加 API 条目。请检查 api_providers.json 是否存在且有效。",
 	"menu.llm.api_remove_confirm_body": "已保存的 API 令牌将被永久删除。",
 	"menu.llm.api_remove_confirm_title": "删除 API 条目「%s」？",
 	"menu.llm.api_remove_entry": "删除所选 API",

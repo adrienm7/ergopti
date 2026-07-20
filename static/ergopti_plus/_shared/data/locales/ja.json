@@ -946,6 +946,7 @@
 	"menu.llm.api_prompt_provider": "プロバイダ ID（{1}）：",
 	"menu.llm.api_prompt_token": "API トークン / キー（非表示）：",
 	"menu.llm.api_prompt_url": "ベース URL：",
+	"menu.llm.api_providers_unavailable": "APIプロバイダー一覧を読み込めなかったため、APIエントリを追加できません。api_providers.json が存在し、有効であることを確認してください。",
 	"menu.llm.api_remove_confirm_body": "保存された API トークンは完全に削除されます。",
 	"menu.llm.api_remove_confirm_title": "API エントリ「%s」を削除しますか？",
 	"menu.llm.api_remove_entry": "選択した API を削除",

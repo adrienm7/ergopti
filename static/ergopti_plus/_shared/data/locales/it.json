@@ -946,6 +946,7 @@
 	"menu.llm.api_prompt_provider": "ID provider ({1}):",
 	"menu.llm.api_prompt_token": "Token / chiave API (nascosto):",
 	"menu.llm.api_prompt_url": "URL di base:",
+	"menu.llm.api_providers_unavailable": "Impossibile caricare l’elenco dei provider API, quindi non è possibile aggiungere alcuna voce. Verifica che api_providers.json sia presente e valido.",
 	"menu.llm.api_remove_confirm_body": "Il token API salvato verrà eliminato definitivamente.",
 	"menu.llm.api_remove_confirm_title": "Eliminare la voce API \"%s\"?",
 	"menu.llm.api_remove_entry": "Rimuovi l’API selezionata",

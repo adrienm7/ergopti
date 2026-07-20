@@ -946,6 +946,7 @@
 	"menu.llm.api_prompt_provider": "Sağlayıcı kimliği ({1}):",
 	"menu.llm.api_prompt_token": "API jetonu / anahtarı (gizli):",
 	"menu.llm.api_prompt_url": "Taban URL:",
+	"menu.llm.api_providers_unavailable": "API sağlayıcı listesi yüklenemedi, bu nedenle API girdisi eklenemiyor. api_providers.json dosyasının mevcut ve geçerli olduğunu kontrol edin.",
 	"menu.llm.api_remove_confirm_body": "Kayıtlı API tokenı kalıcı olarak silinecek.",
 	"menu.llm.api_remove_confirm_title": "API girişi \"%s\" silinsin mi?",
 	"menu.llm.api_remove_entry": "Seçili API'yi kaldır",

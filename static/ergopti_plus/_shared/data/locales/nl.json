@@ -946,6 +946,7 @@
 	"menu.llm.api_prompt_provider": "Provider-ID ({1}):",
 	"menu.llm.api_prompt_token": "API-token / sleutel (verborgen):",
 	"menu.llm.api_prompt_url": "Basis-URL:",
+	"menu.llm.api_providers_unavailable": "De lijst met API-providers kon niet worden geladen, dus er kan geen API-item worden toegevoegd. Controleer of api_providers.json aanwezig en geldig is.",
 	"menu.llm.api_remove_confirm_body": "Het opgeslagen API-token wordt permanent verwijderd.",
 	"menu.llm.api_remove_confirm_title": "API-vermelding \"%s\" verwijderen?",
 	"menu.llm.api_remove_entry": "Geselecteerde API verwijderen",

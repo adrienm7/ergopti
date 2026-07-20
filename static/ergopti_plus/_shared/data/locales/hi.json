@@ -946,6 +946,7 @@
 	"menu.llm.api_prompt_provider": "प्रदाता ID ({1}):",
 	"menu.llm.api_prompt_token": "API टोकन / कुंजी (छिपा):",
 	"menu.llm.api_prompt_url": "बेस URL:",
+	"menu.llm.api_providers_unavailable": "API प्रदाता सूची लोड नहीं हो सकी, इसलिए कोई API प्रविष्टि नहीं जोड़ी जा सकती। जाँचें कि api_providers.json मौजूद और वैध है।",
 	"menu.llm.api_remove_confirm_body": "सहेजा गया API टोकन स्थायी रूप से हटा दिया जाएगा।",
 	"menu.llm.api_remove_confirm_title": "API प्रविष्टि \"%s\" हटाएं?",
 	"menu.llm.api_remove_entry": "चयनित API हटाएँ",

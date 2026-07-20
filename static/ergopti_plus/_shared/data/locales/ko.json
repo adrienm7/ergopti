@@ -946,6 +946,7 @@
 	"menu.llm.api_prompt_provider": "공급자 ID({1}):",
 	"menu.llm.api_prompt_token": "API 토큰 / 키(숨김):",
 	"menu.llm.api_prompt_url": "기본 URL:",
+	"menu.llm.api_providers_unavailable": "API 공급자 목록을 불러오지 못해 API 항목을 추가할 수 없습니다. api_providers.json 파일이 있고 유효한지 확인하세요.",
 	"menu.llm.api_remove_confirm_body": "저장된 API 토큰이 영구적으로 삭제됩니다.",
 	"menu.llm.api_remove_confirm_title": "API 항목 \"%s\"을(를) 삭제하시겠습니까?",
 	"menu.llm.api_remove_entry": "선택한 API 제거",

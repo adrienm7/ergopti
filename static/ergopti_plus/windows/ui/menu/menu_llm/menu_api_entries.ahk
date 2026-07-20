@@ -143,6 +143,17 @@ _LLM_Menu_PromptApiEntry(EditId) {
 	provider_id := Trim(ib.Value)
 	if !LLM_API_PROVIDERS.Has(provider_id)
 		provider_id := "openai_compat"
+	; The coerced fallback is not guaranteed to exist: when api_providers.json is
+	; missing, corrupt or has a malformed entry, api_remote.ahk resets
+	; LLM_API_PROVIDERS to an empty Map — the backend is silently disabled but
+	; "api" is still offered in the menu. Indexing an empty Map THROWS in AHK v2,
+	; so this path crashed instead of explaining itself.
+	if !LLM_API_PROVIDERS.Has(provider_id) {
+		try LoggerError("LLM.menu",
+			"Cannot add an API entry: the provider catalogue is empty (api_providers.json failed to load).")
+		try MsgBox(t("menu.llm.api_providers_unavailable"), t("menu.llm.api_dialog_title"), "Iconx")
+		return
+	}
 	provider := LLM_API_PROVIDERS[provider_id]
 
 	; Step 3 — base URL (prefilled with the provider default).

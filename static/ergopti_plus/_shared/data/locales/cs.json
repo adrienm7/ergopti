@@ -946,6 +946,7 @@
 	"menu.llm.api_prompt_provider": "ID poskytovatele ({1}):",
 	"menu.llm.api_prompt_token": "Token / klíč API (skrytý):",
 	"menu.llm.api_prompt_url": "Základní URL:",
+	"menu.llm.api_providers_unavailable": "Seznam poskytovatelů API se nepodařilo načíst, takže nelze přidat žádnou položku. Zkontrolujte, zda soubor api_providers.json existuje a je platný.",
 	"menu.llm.api_remove_confirm_body": "Uložený API token bude trvale smazán.",
 	"menu.llm.api_remove_confirm_title": "Smazat záznam API „%s\"?",
 	"menu.llm.api_remove_entry": "Odebrat vybrané API",
