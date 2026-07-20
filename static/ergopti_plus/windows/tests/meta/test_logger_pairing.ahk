@@ -141,3 +141,19 @@ _MetaUpdaterUpToDateLogsSuccess() {
 		"the one-click up-to-date path must close its START with LoggerSuccess, not LoggerInfo (updater-up-to-date-pairing)")
 }
 Test("logger: updater one-click up-to-date path closes START with SUCCESS (updater-up-to-date-pairing)", _MetaUpdaterUpToDateLogsSuccess)
+
+; F34 (audit 2026-07-20): §4.4 — log messages are developer-facing and must be in
+; English. A French LoggerStart literal ("Enregistrement des hotkeys configurables…")
+; sat on the START half of an otherwise correctly paired START/SUCCESS lifecycle,
+; where the grep-based pairing audits key on English message patterns.
+_MetaLifecycleLogsAreEnglish() {
+	Src := _DriverSourceNoComments()
+	; A few unmistakably French tokens that only ever appear in prose, never in an
+	; identifier — cheap and specific enough to catch a regression without false hits.
+	for Token in ["Enregistrement des", "Chargement des", "Suppression des", "Démarrage du"] {
+		Assert(InStr(Src, 'Logger') > 0, "driver source must contain Logger calls")
+		Assert(InStr(Src, Token) = 0,
+			"log messages must be written in English (§4.4) — found French prose token: " . Token)
+	}
+}
+Test("logger: lifecycle log messages are written in English (§4.4)", _MetaLifecycleLogsAreEnglish)
