@@ -252,13 +252,15 @@ local function do_expand(combo)
 	local n_back = 1 + #combo
 	local parts  = resolve_combo(combo)
 	_replacing = true
-	-- `emitted` joins the fields with a tab for the human-readable fallback notify.
-	-- `echoed` is what the OS actually echoes as CHARACTER events: the field values
-	-- WITHOUT the inter-field tab (the tab is fired as a real Tab keyStroke, which
-	-- the keymap does not see as a literal \t — see the fallback comment below).
-	-- expected_synthetic_chars and CoreState.buffer must be armed with `echoed`,
-	-- NOT `emitted`: a \t in expected_synthetic_chars is never matched by the Tab
-	-- echo and desynced the buffer after every multi-field @-tag expansion.
+	-- Two DIFFERENT strings for two different trackers — see the emit callback's
+	-- return below.
+	-- `emitted` enumerates every keydown the OS will deliver back to us: the
+	-- field values PLUS the inter-field Tab, which is fired as a real keyStroke
+	-- and echoes as a "\t" character event exactly like the Tab terminator the
+	-- expander already tracks in try_terminator_expand.
+	-- `echoed` is the LOGICAL text: values only, no tab. A Tab moves focus to the
+	-- next field, it inserts nothing on screen, so this is what CoreState.buffer
+	-- and the keylogger's logical record must hold.
 	local emitted = table.concat(parts, "\t")
 	local echoed  = table.concat(parts, "")
 
@@ -279,9 +281,21 @@ local function do_expand(combo)
 						c = c + 1
 					end
 				end
-				-- Return the tab-free echo string so expected_synthetic_chars holds
-				-- exactly the codepoints the OS echoes (values only).
-				return c, echoed
+				-- (count, physical_echo, logical_text) per perform_text_replacement's
+				-- contract. physical_echo MUST enumerate every keydown the OS
+				-- delivers, tabs included: the keylogger's synth_queue pops one
+				-- entry per echo, and on a char mismatch inside its fast window it
+				-- pops ANYWAY (no non-destructive tolerance, unlike the keymap
+				-- tracker's 20 ms path, which declines without consuming). Omitting
+				-- the tabs left the queue N-1 entries short for N fields, so the
+				-- trailing characters of the payload found an empty queue and were
+				-- recorded as HUMAN keystrokes — buffer_text, rich_chunks, physical
+				-- WPM and the n-gram index. For an IBAN+SSN combo that is the tail
+				-- of the SSN. Nothing warned: the stale-queue self-heal only reports
+				-- LEFTOVER entries, and this queue was UNDER-filled.
+				-- logical_text stays tab-free so the buffer and the logged record
+				-- hold only what the fields actually inserted.
+				return c, emitted, echoed
 			end, "personal")
 		else
 			-- Fallback: emit raw keystrokes without inject_dynamic.
