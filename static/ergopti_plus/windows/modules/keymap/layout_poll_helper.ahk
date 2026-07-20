@@ -42,6 +42,16 @@ _ShouldReloadForHkl(curHkl, &lastHkl, &pendingHkl, suspended, isBlacklisted, hse
 		return false
 	if isBlacklisted
 		return false
+	; Adopt the first observed real layout as the baseline. lastHkl == 0 means the
+	; baseline is UNKNOWN (a tray-only / no-foreground boot — logon autostart or RDP
+	; reconnect, where GetForegroundKeyboardLayout() returns 0), NOT that we booted on
+	; layout 0. So the first non-zero layout we see is the baseline, never a switch to
+	; reload for — otherwise the driver spuriously Reload()s a few seconds after boot.
+	if (lastHkl == 0 && curHkl != 0) {
+		lastHkl := curHkl
+		pendingHkl := 0
+		return false
+	}
 	; No change from the last reloaded layout — clear any stale pending candidate and bail
 	if (curHkl == lastHkl) {
 		pendingHkl := 0
