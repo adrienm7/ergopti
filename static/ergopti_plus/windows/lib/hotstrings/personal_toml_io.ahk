@@ -552,10 +552,6 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
 			"Section", SectionName,
 			"Priority", EntryPriority,
 		)
-		if E["is_case_sensitive"] {
-			CreateHotstring(Flags, Trigger, Output, Options)
-		} else {
-			CreateCaseSensitiveHotstrings(Flags, Trigger, Output, Options)
-		}
+		HSE_RegisterFromTomlFlags(E["is_case_sensitive"], Flags, Trigger, Output, Options)
 	}
 }

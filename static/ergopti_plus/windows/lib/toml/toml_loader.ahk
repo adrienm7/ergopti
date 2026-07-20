@@ -373,11 +373,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
             Options["OnlyText"] := ExtraOptions["OnlyText"]
         }
 
-        if IsCaseSens {
-            CreateCaseSensitiveHotstrings(Flags, Trigger, Output, Options)
-        } else {
-            CreateHotstring(Flags, Trigger, Output, Options)
-        }
+        HSE_RegisterFromTomlFlags(IsCaseSens, Flags, Trigger, Output, Options)
         Loaded += 1
     }
     try LoggerDone("TomlLoader", "Section [{1}.{2}]: {3} entry(ies) loaded.",
@@ -450,11 +446,7 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
             and InStr(Trigger, ScriptInformation["MagicKey"]) > 0)
         EntryPriority := _ParseEntryPriority(Line, HSE_PRIORITY_PACKAGE)
         Options := Map("TimeActivationSeconds", 0, "FinalResult", FinalResult, "IsRepeat", IsRepeat, "Priority", EntryPriority)
-        if IsCaseSens {
-            CreateCaseSensitiveHotstrings(Flags, Trigger, Output, Options)
-        } else {
-            CreateHotstring(Flags, Trigger, Output, Options)
-        }
+        HSE_RegisterFromTomlFlags(IsCaseSens, Flags, Trigger, Output, Options)
         TotalLoaded += 1
     }
     try LoggerSuccess("TomlLoader", "Extension TOML '{1}': {2} entry(ies) loaded.", CategoryLabel, TotalLoaded)

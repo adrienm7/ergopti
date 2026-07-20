@@ -403,9 +403,6 @@ _HsCacheRegisterSection(LoaderKey, FeatureConfig, ExtraOptions, ResolvedPriority
 		if HasOnlyText
 			Opts["OnlyText"] := ExtraOptions["OnlyText"]
 		Trigger := StrReplace(Row[2], HS_CACHE_MARKER, MagicKey)
-		if Row[6]
-			CreateHotstring(Row[1], Trigger, Row[3], Opts)
-		else
-			CreateCaseSensitiveHotstrings(Row[1], Trigger, Row[3], Opts)
+		HSE_RegisterFromTomlFlags(Row[6], Row[1], Trigger, Row[3], Opts)
 	}
 }
