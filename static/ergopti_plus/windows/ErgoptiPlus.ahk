@@ -683,7 +683,7 @@ ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated, LoggerDebug)
 ReadScriptShortcutsConfig()
 ReadKeyboardShortcutsConfig()
 
-LoggerStart("KeyboardShortcuts", "Enregistrement des hotkeys configurables…")
+LoggerStart("KeyboardShortcuts", "Registering configurable keyboard hotkeys…")
 _KbBoundCount := 0
 for _KbSlot, _KbAction in KeyboardShortcutAssignments {
     if (_KbAction == "none")
