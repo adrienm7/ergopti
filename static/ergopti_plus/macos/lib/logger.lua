@@ -51,12 +51,19 @@ M.ERRORS_LOG_FILE = "/tmp/ErgoptiPlus_errors_boot.log"
 -- Log directory resolved after M.init_log_path(); used by sub-file fan-out.
 local _log_dir = "/tmp/"
 
--- Delay (seconds) after which the daily old-log purge runs. The purge spawns a
--- `find | while read … date … rm` pipeline (several subprocesses PER log file)
--- plus a per-sub-file `stat` — ~0.6 s of synchronous shell forks at boot when
--- run inline. It is pure housekeeping (deleting stale files), so it is scheduled
--- off the boot critical path; the freshly-resolved log file is already writable.
+-- Delay (seconds) after which the daily old-log purge runs. The purge is pure
+-- housekeeping (deleting stale files) and nothing downstream waits on it, so it
+-- stays off the boot critical path; the freshly-resolved log file is already
+-- writable by the time it runs.
 local LOG_PURGE_DELAY_SEC = 5.0
+
+-- Seconds in a calendar day — the unit in which the retention window is expressed.
+local SECONDS_PER_DAY = 86400
+
+-- Hour used when turning a YYYY-MM-DD filename back into an epoch timestamp.
+-- Anchoring at noon keeps the age comparison DST-safe: a ±1 h shift can never
+-- push a file across a day boundary the way a midnight anchor would.
+local PURGE_NOON_HOUR = 12
 
 -- Topical sub-files: lines whose rendered "[tag]" matches any pattern are
 -- fan-out here in addition to the main unified file. Sub-files are ephemeral
@@ -266,6 +273,25 @@ local _test_sink = nil
 -- =======================================
 -- =======================================
 
+-- File sink state — handle kept open for the life of the HS process to avoid
+-- open/close overhead. _last_log_date detects day rollovers; _last_log_path
+-- detects init_log_path() re-points after early-boot.
+--
+-- Declared HERE, above every function that touches them. A `local` declared
+-- textually BELOW a closure is not captured by it: the closure silently binds
+-- the nil global of the same name instead. While these lived down in section 3.1,
+-- init_log_path()'s "close the handle before re-pointing" block tested a nil
+-- global, so it never fired and assigned to globals — dead code that only looked
+-- alive, and that made _ensure_log_file()'s own re-point check look redundant.
+local _file_handle    = nil
+local _last_log_date  = nil
+local _last_log_path  = nil
+
+-- Forward declaration — implementation is in Section 3.2. Declared here for the
+-- same reason as the handles above: init_log_path() and _purge_old_logs() are
+-- defined before it and must reach the real dispatcher, not a nil global.
+local _log
+
 --- Configures the log file path under <config_dir>/hammerspoon/logs/ with
 --- daily rotation (ErgoptiPlus_YYYY-MM-DD.log) and purges files older than
 --- max_age_days. Best-effort: any I/O error is swallowed so a permission
@@ -298,24 +324,35 @@ function M.init_log_path(config_dir, max_age_days)
 	M.UNIFIED_LOG_FILE = log_dir .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
 	M.ERRORS_LOG_FILE = log_dir .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
 
+	-- Seed the routing table with the built-in list BEFORE probing the TOML: every
+	-- early-exit path below (unresolvable source, pattern miss, any throw) must
+	-- still leave a usable table behind, otherwise _write_to_file()'s fan-out loop
+	-- iterates nothing and all ten topical logs vanish without a single diagnostic.
+	SUB_LOG_NAMES = SUB_LOG_NAMES_FALLBACK
+
 	-- Load sub-file routing rules from _shared/modules/logger/sub_files.toml so adding a
 	-- new topical log requires only a TOML edit, not a code change in both drivers.
 	-- Derive the driver root from this file's own source path (lib/logger.lua → driver root).
-	pcall(function()
-		local src = debug.getinfo(1, "S").source
-		if src and src:sub(1, 1) == "@" then
-			local file_path = src:sub(2)
-			-- Strip "lib/logger.lua" (or similar) to get the driver root
-			local driver_root = file_path:match("^(.*[/\\])lib[/\\]logger%.lua$")
-			if driver_root then
-				_load_sub_files_toml(driver_root)
-			end
+	local ok_sub, sub_err = pcall(function()
+		local info = debug.getinfo(1, "S")
+		local src  = info and info.source
+		if type(src) ~= "string" or src:sub(1, 1) ~= "@" then
+			error("logger source path is unavailable (got " .. tostring(src) .. ")", 0)
 		end
+		-- Strip "lib/logger.lua" (or similar) to get the driver root
+		local driver_root = src:sub(2):match("^(.*[/\\])lib[/\\]logger%.lua$")
+		if not driver_root then
+			error("cannot derive the driver root from \"" .. src:sub(2) .. "\"", 0)
+		end
+		_load_sub_files_toml(driver_root)
 	end)
+	if not ok_sub then
+		_log("WARNING", "logger", "Sub-file routing fell back to the built-in list: %s", tostring(sub_err))
+	end
 
-	-- Old-log purge is pure housekeeping and shell-fork-heavy — defer it off the
-	-- boot critical path. The dated log file resolved just above is already
-	-- writable, so nothing downstream waits on the purge.
+	-- Old-log purge is pure housekeeping — defer it off the boot critical path.
+	-- The dated log file resolved just above is already writable, so nothing
+	-- downstream waits on the purge.
 	local hs_ref = rawget(_G, "hs")
 	if hs_ref and hs_ref.timer and type(hs_ref.timer.doAfter) == "function" then
 		hs_ref.timer.doAfter(LOG_PURGE_DELAY_SEC, function()
@@ -327,42 +364,96 @@ function M.init_log_path(config_dir, max_age_days)
 	end
 end
 
---- Deletes stale log files under `log_dir`. Split out of init_log_path() so it
---- can be deferred off the boot critical path (it spawns several subprocesses
---- per file) and exercised directly in tests. Two passes:
----   1. Main daily logs older than `max_age_days`, aged by the YYYY-MM-DD date in
----      the filename (not mtime) so moved/copied files age correctly.
----   2. Topical sub-files, which are ephemeral (today only) — any belonging to a
----      previous day are removed (they are a filtered view, not an archive).
+--- Deletes stale log files under `log_dir`. Split out of init_log_path() so it can
+--- be deferred off the boot critical path and exercised directly in tests. Two passes:
+---   1. Main daily logs — BOTH ErgoptiPlus_YYYY-MM-DD.log and the errors-only
+---      ErgoptiPlus_errors_YYYY-MM-DD.log — aged by the date carried in the
+---      FILENAME (not mtime) so moved or copied files still age correctly.
+---   2. Topical sub-files, which are ephemeral (today only) — any whose last
+---      modification is not today is removed (a filtered view, not an archive).
+---
+--- Spawns zero subprocesses. The previous implementation shelled out through the
+--- fully synchronous ShellRunner: one `find | while read` pipeline forking
+--- basename + sed + two `date` calls PER file, plus a `stat` per sub-file. Deferring
+--- it by a few seconds moved that off the boot path but not off the MAIN THREAD —
+--- it landed while the keystroke event tap was armed and the user was typing.
+--- That pipeline also never matched the errors sink: stripping the "ErgoptiPlus_"
+--- prefix from ErgoptiPlus_errors_2026-06-01.log yields "errors_2026-06-01", which
+--- `date -j -f %Y-%m-%d` cannot parse, so the comparison short-circuited and the
+--- errors file grew without bound. Everything needed is in the filename and in the
+--- filesystem attributes, so neither cost is necessary.
 --- @param log_dir string Absolute logs directory (trailing slash).
 --- @param max_age_days integer Retention window for the main daily logs.
 function M._purge_old_logs(log_dir, max_age_days)
 	if type(log_dir) ~= "string" or log_dir == "" then return end
 	max_age_days = max_age_days or 14
-	local ShellRunner = require("adapters.shell_runner")
 
-	ShellRunner.exec(string.format(
-		"find %q -name 'ErgoptiPlus_*.log' -type f | while read f; do"
-		.. " d=$(basename \"$f\" .log | sed 's/ErgoptiPlus_//'); "
-		.. " [ \"$(date -j -f '%%Y-%%m-%%d' \"$d\" '+%%s' 2>/dev/null)\" -lt"
-		.. " \"$(date -j -v-%dd '+%%s' 2>/dev/null)\" ] && rm -f \"$f\"; "
-		.. "done 2>/dev/null",
-		log_dir, max_age_days))
+	local hs_ref = rawget(_G, "hs")
+	local fs_ref = (type(hs_ref) == "table") and hs_ref.fs or nil
+	if type(fs_ref) ~= "table" or type(fs_ref.dir) ~= "function" then
+		_log("WARNING", "logger", "Filesystem port unavailable — old-log purge skipped.")
+		return
+	end
 
-	local today = os.date("%Y-%m-%d")
-	for _, sub in ipairs(SUB_LOG_NAMES) do
-		local sub_path = log_dir .. sub.name
-		-- Read the file's last-modified date via stat; delete if it differs from today
-		pcall(function()
-			local stat_out = ShellRunner.exec(string.format(
-				"stat -f '%%Sm' -t '%%Y-%%m-%%d' %q 2>/dev/null", sub_path))
-			if stat_out then
-				local file_date = stat_out:match("^(%d%d%d%d%-%d%d%-%d%d)")
-				if file_date and file_date ~= today then
-					os.remove(sub_path)
-				end
+	-- The directory listing throws (rather than returning nil) on an unreadable or
+	-- missing path, so both the call and the walk are protected.
+	local ok_dir, iter, dir_obj = pcall(fs_ref.dir, log_dir)
+	if not ok_dir or type(iter) ~= "function" then
+		_log("WARNING", "logger", "Cannot list \"%s\" — old-log purge skipped: %s", log_dir, tostring(iter))
+		return
+	end
+
+	local entries = {}
+	local ok_walk, walk_err = pcall(function()
+		for name in iter, dir_obj do
+			entries[#entries + 1] = name
+		end
+	end)
+	if not ok_walk then
+		_log("WARNING", "logger", "Log directory walk aborted for \"%s\": %s", log_dir, tostring(walk_err))
+	end
+
+	-- Exact-name set so the ephemeral sub-file pass is a single hash lookup.
+	local is_sub_file = {}
+	for _, sub in ipairs(SUB_LOG_NAMES) do is_sub_file[sub.name] = true end
+
+	local today   = os.date("%Y-%m-%d")
+	local cutoff  = os.time() - (max_age_days * SECONDS_PER_DAY)
+	local removed = 0
+
+	for _, name in ipairs(entries) do
+		-- The errors sink needs its OWN pattern: the main-log pattern anchors the
+		-- date immediately after "ErgoptiPlus_", so it can never match the "errors_"
+		-- infix. Missing that second pattern is exactly what let the errors file
+		-- escape every purge since the sink was introduced.
+		local year, month, day = name:match("^ErgoptiPlus_errors_(%d%d%d%d)%-(%d%d)%-(%d%d)%.log$")
+		if not year then
+			year, month, day = name:match("^ErgoptiPlus_(%d%d%d%d)%-(%d%d)%-(%d%d)%.log$")
+		end
+
+		if year then
+			local stamp = os.time({
+				year  = tonumber(year),
+				month = tonumber(month),
+				day   = tonumber(day),
+				hour  = PURGE_NOON_HOUR,
+			})
+			if stamp and stamp < cutoff then
+				os.remove(log_dir .. name)
+				removed = removed + 1
 			end
-		end)
+		elseif is_sub_file[name] then
+			local ok_attr, attrs = pcall(fs_ref.attributes, log_dir .. name)
+			if ok_attr and type(attrs) == "table" and attrs.modification
+				and os.date("%Y-%m-%d", attrs.modification) ~= today then
+				os.remove(log_dir .. name)
+				removed = removed + 1
+			end
+		end
+	end
+
+	if removed > 0 then
+		_log("INFO", "logger", "Old-log purge removed %d stale file(s).", removed)
 	end
 end
 
@@ -441,13 +532,6 @@ end
 -- ==================================
 -- ===== 3.1) File Sink Helpers =====
 -- ==================================
-
--- File sink state — handle kept open for the life of the HS process to avoid
--- open/close overhead. _last_log_date detects day rollovers; _last_log_path
--- detects init_log_path() re-points after early-boot.
-local _file_handle    = nil
-local _last_log_date  = nil
-local _last_log_path  = nil
 
 local function _matches_any(line, patterns)
 	for _, p in ipairs(patterns) do
@@ -568,7 +652,7 @@ end
 ---   false when it was filtered by level or suppressed by the dedup window. Callers
 ---   that mirror a line elsewhere (M.error → notification handler) must follow this
 ---   decision so a deduped line does not produce a side effect the log itself suppressed.
-local function _log(variant_key, module_name, msg, ...)
+_log = function(variant_key, module_name, msg, ...)
 	local variant = VARIANTS[variant_key]
 	if not variant or variant.level < M.current_level then return false end
 
@@ -818,54 +902,20 @@ end
 -- One-shot guard so the constructors are patched exactly once.
 local _capture_installed = false
 
--- Crash-report forwarding: an uncaught timer-callback error is a genuine runtime
--- crash. Forward it to the global crash reporter (wired by init.lua as
--- _G.ergopti_report_crash) so a report lands on disk — without this the reporter
--- module was unreachable dead code and a real crash left no artifact. Debounced
--- so a storm of errors in a fast timer cannot write hundreds of report files, and
--- re-entrancy-guarded so a failure WHILE building a report cannot recurse.
-local CRASH_REPORT_MIN_INTERVAL_SEC = 30
-local _last_crash_report_time = 0
-local _in_crash_report = false
-
---- Forwards an uncaught runtime error to the global crash reporter, if wired.
---- Best-effort: never throws, never recurses, never spams.
----
---- The actual reporter call is deferred via hs.timer.doAfter(0, ...) so it never
---- runs on the throwing callback's own stack frame. crash_reporter.prompt_user
---- ends in a SYNCHRONOUS hs.dialog.blockAlert; calling that inline from here
---- would freeze the whole run loop until a human dismisses a dialog, for ANY
---- recoverable error in ANY hs.timer callback across the driver (F-HIGH-20).
---- Deferring lets the guarded callback return immediately — the crash report
---- still happens, just off the hot path, one tick later.
---- @param err any The error value / traceback captured by the guard.
---- @param context string Where the error originated (e.g. "timer:doAfter").
-local function _forward_crash(err, context)
-	if _in_crash_report then return end
-	local reporter = rawget(_G, "ergopti_report_crash")
-	if type(reporter) ~= "function" then return end
-	local now = os.time()
-	if (now - _last_crash_report_time) < CRASH_REPORT_MIN_INTERVAL_SEC then return end
-	_last_crash_report_time = now
-
-	local hs_ref = rawget(_G, "hs")
-	local schedule = (type(hs_ref) == "table" and type(hs_ref.timer) == "table" and hs_ref.timer.doAfter) or nil
-	local function _run_reporter()
-		_in_crash_report = true
-		pcall(reporter, err, { driver = "hammerspoon", source = context })
-		_in_crash_report = false
-	end
-	if type(schedule) == "function" then
-		schedule(0, _run_reporter)
-	else
-		-- No hs.timer available (e.g. headless context) — best-effort inline call.
-		_run_reporter()
-	end
-end
-
 --- Wraps a timer callback so an uncaught error is logged WITH a traceback
 --- instead of vanishing into the Hammerspoon Console. hs.timer ignores callback
 --- return values, so discarding them here changes nothing.
+---
+--- The error goes to the log — including the errors-only sink, since ERROR lines
+--- are mirrored there — and NOWHERE else. It deliberately does not reach the crash
+--- reporter: a throw inside a timer callback is recoverable BY DEFINITION, the
+--- callback is abandoned and the run loop carries on, so the driver has already
+--- survived it. The reporter is reserved for genuine uncaught fatals
+--- (errors-only-log-sink), and reaching it from here would run the healthcheck's
+--- blocking probes and end in a modal dialog that stalls the main thread and its
+--- run loop until a human dismisses it — for an error nothing was broken by.
+--- Deferring that call by a run loop tick does not help: the freeze comes from the
+--- nested modal loop, not from the stack frame it was started on.
 --- @param fn function The user callback.
 --- @param kind string Timer family label, surfaced in the error line.
 --- @return function The guarded callback (or fn unchanged when not a function).
@@ -875,7 +925,6 @@ local function _guard_timer_cb(fn, kind)
 		local ok, err = xpcall(fn, debug.traceback, ...)
 		if not ok then
 			_log("ERROR", "runtime", "Uncaught error in hs.timer.%s callback: %s", kind, tostring(err))
-			_forward_crash(err, "timer:" .. kind)
 		end
 	end
 end
