@@ -941,6 +941,7 @@
 	"menu.llm.api_prompt_provider": "Provider id ({1}):",
 	"menu.llm.api_prompt_token": "API token / key (hidden):",
 	"menu.llm.api_prompt_url": "Base URL:",
+	"menu.llm.api_providers_unavailable": "The API provider list could not be loaded, so no API entry can be added. Check that api_providers.json is present and valid.",
 	"menu.llm.api_remove_confirm_body": "The saved API token will be permanently deleted.",
 	"menu.llm.api_remove_confirm_title": "Delete API entry \"%s\"?",
 	"menu.llm.api_remove_entry": "Remove selected API",

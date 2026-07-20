@@ -946,6 +946,7 @@
 	"menu.llm.api_prompt_provider": "Anbieter-ID ({1}):",
 	"menu.llm.api_prompt_token": "API-Token / Schlüssel (verborgen):",
 	"menu.llm.api_prompt_url": "Basis-URL:",
+	"menu.llm.api_providers_unavailable": "Die Liste der API-Anbieter konnte nicht geladen werden, daher kann kein API-Eintrag hinzugefügt werden. Prüfen Sie, ob api_providers.json vorhanden und gültig ist.",
 	"menu.llm.api_remove_confirm_body": "Das gespeicherte API-Token wird dauerhaft gelöscht.",
 	"menu.llm.api_remove_confirm_title": "API-Eintrag \"%s\" löschen?",
 	"menu.llm.api_remove_entry": "Ausgewählte API entfernen",

@@ -946,6 +946,7 @@
 	"menu.llm.api_prompt_provider": "Leverantörs-ID ({1}):",
 	"menu.llm.api_prompt_token": "API-token / nyckel (dold):",
 	"menu.llm.api_prompt_url": "Bas-URL:",
+	"menu.llm.api_providers_unavailable": "Listan över API-leverantörer kunde inte läsas in, så ingen API-post kan läggas till. Kontrollera att api_providers.json finns och är giltig.",
 	"menu.llm.api_remove_confirm_body": "Den sparade API-token kommer att tas bort permanent.",
 	"menu.llm.api_remove_confirm_title": "Ta bort API-post \"%s\"?",
 	"menu.llm.api_remove_entry": "Ta bort vald API",

@@ -946,6 +946,7 @@
 	"menu.llm.api_prompt_provider": "Udbyder-ID ({1}):",
 	"menu.llm.api_prompt_token": "API-token / nøgle (skjult):",
 	"menu.llm.api_prompt_url": "Basis-URL:",
+	"menu.llm.api_providers_unavailable": "Listen over API-udbydere kunne ikke indlæses, så der kan ikke tilføjes en API-post. Kontrollér, at api_providers.json findes og er gyldig.",
 	"menu.llm.api_remove_confirm_body": "Det gemte API-token slettes permanent.",
 	"menu.llm.api_remove_confirm_title": "Slet API-post \"%s\"?",
 	"menu.llm.api_remove_entry": "Fjern valgt API",

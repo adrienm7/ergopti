@@ -946,6 +946,7 @@
 	"menu.llm.api_prompt_provider": "معرّف المزوّد ({1}):",
 	"menu.llm.api_prompt_token": "رمز / مفتاح API (مخفي):",
 	"menu.llm.api_prompt_url": "عنوان URL الأساسي:",
+	"menu.llm.api_providers_unavailable": "تعذر تحميل قائمة مزودي واجهة برمجة التطبيقات، لذا لا يمكن إضافة أي إدخال. تحقق من وجود الملف api_providers.json وصحته.",
 	"menu.llm.api_remove_confirm_body": "سيتم حذف رمز API المحفوظ بشكل دائم.",
 	"menu.llm.api_remove_confirm_title": "حذف إدخال API \"%s\"؟",
 	"menu.llm.api_remove_entry": "إزالة API المحدّد",

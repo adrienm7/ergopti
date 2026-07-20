@@ -339,6 +339,13 @@ _FillFormFromSelection(LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCa
 	if !_PersonalEditorData["sections"].Has(_PersonalEditorSection) {
 		return
 	}
+	; The persisted default_section pointer can outlive its target (a section
+	; deleted in an earlier session), and AHK v2 THROWS on a missing Map key.
+	; Guarded exactly like the twin read in _FillFormFromSelection.
+	if !_PersonalEditorData["sections"].Has(_PersonalEditorSection) {
+		try LoggerWarn("PersonalEditor", "Section {1} no longer exists — ignoring the action.", _PersonalEditorSection)
+		return
+	}
 	Entries := _PersonalEditorData["sections"][_PersonalEditorSection]["entries"]
 	if Row > Entries.Length {
 		return
@@ -435,6 +442,13 @@ _AddEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, Ch
 		return
 	}
 	; Check for duplicate trigger in this section
+	; The persisted default_section pointer can outlive its target (a section
+	; deleted in an earlier session), and AHK v2 THROWS on a missing Map key.
+	; Guarded exactly like the twin read in _FillFormFromSelection.
+	if !_PersonalEditorData["sections"].Has(_PersonalEditorSection) {
+		try LoggerWarn("PersonalEditor", "Section {1} no longer exists — ignoring the action.", _PersonalEditorSection)
+		return
+	}
 	for E in _PersonalEditorData["sections"][_PersonalEditorSection]["entries"] {
 		if (E["trigger"] == TriggerVal) {
 			StatusText.Value := t("editor.hotstrings.err_duplicate")
@@ -464,6 +478,13 @@ _SaveEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, C
 		StatusText.Value := t("editor.hotstrings.err_trigger_required")
 		return
 	}
+	; The persisted default_section pointer can outlive its target (a section
+	; deleted in an earlier session), and AHK v2 THROWS on a missing Map key.
+	; Guarded exactly like the twin read in _FillFormFromSelection.
+	if !_PersonalEditorData["sections"].Has(_PersonalEditorSection) {
+		try LoggerWarn("PersonalEditor", "Section {1} no longer exists — ignoring the action.", _PersonalEditorSection)
+		return
+	}
 	Entries := _PersonalEditorData["sections"][_PersonalEditorSection]["entries"]
 	if Row > Entries.Length {
 		return
@@ -479,6 +500,13 @@ _DeleteEntry(W, LV, StatusText) {
 	Row := LV.GetNext(0)
 	if !Row {
 		StatusText.Value := t("editor.hotstrings.err_select_to_delete")
+		return
+	}
+	; The persisted default_section pointer can outlive its target (a section
+	; deleted in an earlier session), and AHK v2 THROWS on a missing Map key.
+	; Guarded exactly like the twin read in _FillFormFromSelection.
+	if !_PersonalEditorData["sections"].Has(_PersonalEditorSection) {
+		try LoggerWarn("PersonalEditor", "Section {1} no longer exists — ignoring the action.", _PersonalEditorSection)
 		return
 	}
 	Entries := _PersonalEditorData["sections"][_PersonalEditorSection]["entries"]
@@ -601,6 +629,14 @@ _DeleteSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoEx
 	_PersonalEditorData["sections"].Delete(_PersonalEditorSection)
 	WritePersonalToml(_PersonalEditorData)
 	_PersonalEditorSection := NewOrder.Length > 0 ? NewOrder[1] : ""
+	; Repoint the PERSISTED pointer too. Without this the deleted section stayed
+	; in [ahk.personal_editor] default_section; the next OpenPersonalEditor() with
+	; no explicit argument read that stale name, and because it is non-empty the
+	; sections_order[1] fallback was skipped — leaving _PersonalEditorSection set
+	; to a section that no longer exists. The dropdown silently fell back to item 1
+	; (Choose() fires no Change event) while the global stayed stale, so the next
+	; Add / Modify / Delete indexed a missing key and threw.
+	_EditorPrefSet("default_section", _PersonalEditorSection)
 	_RebuildDropdown(SectionDrop, _PersonalEditorData)
 	if (_PersonalEditorSection != "") {
 		_SelectDropDown(SectionDrop, _PersonalEditorSection)

@@ -946,6 +946,7 @@
 	"menu.llm.api_prompt_provider": "Идентификатор провайдера ({1}):",
 	"menu.llm.api_prompt_token": "Токен / ключ API (скрыто):",
 	"menu.llm.api_prompt_url": "Базовый URL:",
+	"menu.llm.api_providers_unavailable": "Не удалось загрузить список поставщиков API, поэтому запись API добавить нельзя. Убедитесь, что файл api_providers.json существует и корректен.",
 	"menu.llm.api_remove_confirm_body": "Сохранённый API-токен будет удалён без возможности восстановления.",
 	"menu.llm.api_remove_confirm_title": "Удалить запись API «%s»?",
 	"menu.llm.api_remove_entry": "Удалить выбранный API",

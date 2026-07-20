@@ -946,6 +946,7 @@
 	"menu.llm.api_prompt_provider": "Ідентифікатор постачальника ({1}):",
 	"menu.llm.api_prompt_token": "Токен / ключ API (прихований):",
 	"menu.llm.api_prompt_url": "Базова URL-адреса:",
+	"menu.llm.api_providers_unavailable": "Не вдалося завантажити список постачальників API, тому запис API додати неможливо. Переконайтеся, що файл api_providers.json існує та коректний.",
 	"menu.llm.api_remove_confirm_body": "Збережений API-токен буде остаточно видалено.",
 	"menu.llm.api_remove_confirm_title": "Видалити запис API «%s»?",
 	"menu.llm.api_remove_entry": "Видалити вибране API",

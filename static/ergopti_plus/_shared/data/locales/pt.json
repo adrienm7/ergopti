@@ -946,6 +946,7 @@
 	"menu.llm.api_prompt_provider": "Identificador do fornecedor ({1}):",
 	"menu.llm.api_prompt_token": "Token / chave da API (oculto):",
 	"menu.llm.api_prompt_url": "URL base:",
+	"menu.llm.api_providers_unavailable": "Não foi possível carregar a lista de fornecedores de API, por isso não é possível adicionar entradas. Verifique se api_providers.json existe e é válido.",
 	"menu.llm.api_remove_confirm_body": "O token API salvo será excluído permanentemente.",
 	"menu.llm.api_remove_confirm_title": "Excluir entrada da API \"%s\"?",
 	"menu.llm.api_remove_entry": "Remover a API seleccionada",

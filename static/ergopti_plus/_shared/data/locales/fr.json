@@ -941,6 +941,7 @@
 	"menu.llm.api_prompt_provider": "Identifiant fournisseur ({1}) :",
 	"menu.llm.api_prompt_token": "Clé / jeton d’API (masqué) :",
 	"menu.llm.api_prompt_url": "URL de base :",
+	"menu.llm.api_providers_unavailable": "La liste des fournisseurs d’API n’a pas pu être chargée ; aucune entrée d’API ne peut être ajoutée. Vérifiez que api_providers.json est présent et valide.",
 	"menu.llm.api_remove_confirm_body": "Le jeton API sauvegardé sera supprimé définitivement.",
 	"menu.llm.api_remove_confirm_title": "Supprimer l'entrée API « %s » ?",
 	"menu.llm.api_remove_entry": "Supprimer l’API sélectionnée",
