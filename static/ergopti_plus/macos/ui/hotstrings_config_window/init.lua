@@ -600,6 +600,34 @@ end
 --- @type function|nil
 M._on_config_changed = nil
 
+--- Pushes a freshly-resolved file-level delay into the running keymap engine.
+--- The override store this window writes is persistent, but the expansion hot path
+--- reads CoreState.DELAYS, which is populated at boot and afterwards written ONLY by
+--- keymap.set_delay. Without this call the edit is saved and the menubar redraws with
+--- the new number, yet the engine keeps enforcing the old threshold for the rest of
+--- the session — the menubar sibling (ui/menu/menu_hotstrings_management.lua) has
+--- always made this call; this window did not.
+--- Only file-level delays are covered: per-section delays live in
+--- CoreState.SECTION_DELAYS, which is rebuilt during hotstring registration rather
+--- than through a setter, so they already require a reload to take effect.
+--- @param category string The hotstring category whose file-level delay changed.
+local function push_delay_to_engine(category)
+	if type(category) ~= "string" or category == "" then return end
+	local ok, keymap = pcall(require, "modules.keymap")
+	if not ok or type(keymap) ~= "table" then return end
+	if type(keymap.set_delay) ~= "function" or type(keymap.DELAY_KEY_TO_CATEGORY) ~= "table" then return end
+
+	local resolved = hotstrings_config.resolve(category, nil)
+	if type(resolved) ~= "table" or type(resolved.delay) ~= "number" then return end
+
+	for key, cat in pairs(keymap.DELAY_KEY_TO_CATEGORY) do
+		if cat == category then
+			pcall(keymap.set_delay, key, resolved.delay)
+			return
+		end
+	end
+end
+
 --- Re-renders the page AND notifies the opener that the override store changed.
 --- The menubar bakes the resolved delay / colour and the "(default)" indicator
 --- into its item titles at BUILD time, so without an explicit refresh those rows
@@ -632,6 +660,9 @@ local function on_message(msg)
 			for _, s in ipairs(hotstrings_config.get_sections(c)) do
 				hotstrings_config.clear_override(c, s.name, nil)
 			end
+			-- Reset wipes file-level delays too, so the engine must be told each
+			-- category is back to its TOML default (same reason as set/clear_delay).
+			push_delay_to_engine(c)
 		end
 		commit_and_push()
 		return
@@ -703,8 +734,12 @@ local function on_message(msg)
 		-- Common built-in categories
 		if action == "set_delay" and type(body.ms) == "number" then
 			hotstrings_config.set_override(cat, sec, "delay", body.ms / 1000)
+			if sec == nil then push_delay_to_engine(cat) end
 		elseif action == "clear_delay" then
 			hotstrings_config.clear_override(cat, sec, "delay")
+			-- Clearing falls back to the TOML default, so re-resolve and push that
+			-- value rather than leaving the engine on the removed override.
+			if sec == nil then push_delay_to_engine(cat) end
 		elseif action == "set_color" and type(body.hex) == "string" and body.hex ~= "" then
 			hotstrings_config.set_override(cat, sec, "color", body.hex)
 		elseif action == "clear_color" then
