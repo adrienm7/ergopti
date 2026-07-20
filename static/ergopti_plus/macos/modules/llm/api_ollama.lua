@@ -90,6 +90,10 @@ local _active_stream_task = nil
 local _stream_generation  = 0
 -- Readiness flag: true once warmup has confirmed the model is loaded
 local _is_ready           = false
+-- Bumped by reset_ready(); a warmup callback that captured an older value describes
+-- a server/model that is no longer current and must discard itself. Mirrors the
+-- api_mlx _warmup_gen invariant (F-L4).
+local _warmup_gen         = 0
 
 --- Returns true when the backend has confirmed it can answer inference requests.
 --- @return boolean
@@ -105,7 +109,15 @@ end
 --- reset_endpoints() invariant: a fresh server/model deserves a fresh verdict (F-M8).
 function M.reset_ready()
 	_is_ready = false
-	Logger.debug(LOG, "Ollama readiness flag reset — next warmup must re-confirm.")
+	-- Clearing the flag alone is racy: an Ollama warmup POST triggers the actual
+	-- model load and can stay in flight for tens of seconds, so a response issued
+	-- against the PREVIOUS server can still land after this reset and flip
+	-- _is_ready back to true. warmup_controller.try_warmup then sees a ready
+	-- backend, logs "stopping retry chain" and terminates — no warmup ever runs
+	-- again for the session and every prediction goes to a dead server. Bumping
+	-- the generation makes those in-flight callbacks self-discard.
+	_warmup_gen = _warmup_gen + 1
+	Logger.debug(LOG, "Ollama readiness flag reset — next warmup must re-confirm (gen %d).", _warmup_gen)
 end
 
 -- Delay before launching Ollama after killing a stale instance (seconds)
@@ -176,11 +188,20 @@ function M.warmup(model_name)
 		Logger.error(LOG, "warmup: encode failed — %s", tostring(enc_err))
 		return
 	end
+	-- Snapshot the warmup generation: if reset_ready() bumps it while this POST is
+	-- in flight, the response describes a now-stale server/model and its callback
+	-- must not touch _is_ready (see reset_ready for the self-termination scenario).
+	local my_warmup_gen = _warmup_gen
 	_infer_client.post(
 		M.get_base_url() .. "/api/chat",
 		{ ["Content-Type"] = "application/json" },
 		encoded,
 		function(r)
+			if my_warmup_gen ~= _warmup_gen then
+				Logger.debug(LOG, "Discarding stale Ollama warmup response (gen %d != %d) — it describes a server/model that is no longer current.",
+					my_warmup_gen, _warmup_gen)
+				return
+			end
 			if r.status == 200 then
 				local became_ready = (_is_ready ~= true)
 				_is_ready = true
