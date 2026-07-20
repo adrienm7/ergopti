@@ -13,6 +13,7 @@ local dialog     = require("lib.dialog_util")
 local Paths      = require("lib.paths")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
+local text_utils = require("lib.text_utils")
 local NetworkInfo = require("adapters.network_info")
 local Notifier    = require("adapters.notifier")
 local Version    = require("updater.version")
@@ -276,9 +277,8 @@ end
 --- verbatim — a tag such as "v1.2%3" would otherwise throw out of the label build.
 --- @param s any The replacement text (coerced with tostring).
 --- @return string The text with every "%" doubled.
-local function escape_replacement(s)
-	return (tostring(s):gsub("%%", "%%%%"))
-end
+-- Single source of truth: lib.text_utils (shared with the other Lua drivers).
+local escape_replacement = text_utils.escape_gsub_replacement
 
 function M.get_update_menu_label()
 	if _update_state == "checking" then

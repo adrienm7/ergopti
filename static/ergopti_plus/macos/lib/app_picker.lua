@@ -15,6 +15,7 @@ local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
 local i18n   = require("lib.i18n")
+local text_utils = require("lib.text_utils")
 
 local LOG = "app_picker"
 
@@ -89,9 +90,8 @@ end
 --- into a template must go through here or the whole menu build throws.
 --- @param s any The replacement text (coerced with tostring).
 --- @return string The text with every "%" doubled.
-local function escape_replacement(s)
-	return (tostring(s):gsub("%%", "%%%%"))
-end
+-- Single source of truth: lib.text_utils (shared with the other Lua drivers).
+local escape_replacement = text_utils.escape_gsub_replacement
 
 --- Builds a standardized exclusion list submenu.
 --- @param current_apps table The current list of disabled apps.

@@ -15,6 +15,7 @@ local Logger        = require("lib.logger")
 local Paths         = require("lib.paths")
 local Timings       = require("lib.timings")
 local i18n          = require("lib.i18n")
+local text_utils    = require("lib.text_utils")
 local FileSystem    = require("adapters.file_system")
 local Click         = require("modules.gestures.actions_click")
 local LOG           = "gestures.actions"
@@ -433,7 +434,12 @@ sg("search_web", function(binding)
 		if old_clipboard ~= nil and hs.pasteboard and hs.pasteboard.setContents then
 			pcall(hs.pasteboard.setContents, old_clipboard)
 		end
-		open_url((template:gsub("%%s", url_encode_query(selected))))
+		-- url_encode_query returns percent-escapes, and this value lands on the
+		-- REPLACEMENT side of gsub where "%2" reads as capture reference #2. Any
+		-- selection containing a space encodes to "%20" and raised "invalid capture
+		-- index %2" — inside an hs.timer callback, so the error went to the HS
+		-- Console and never to the file logger, and the search silently never opened.
+		open_url((template:gsub("%%s", text_utils.escape_gsub_replacement(url_encode_query(selected)))))
 	end)
 end)
 
