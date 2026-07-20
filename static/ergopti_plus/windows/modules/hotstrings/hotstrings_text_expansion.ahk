@@ -101,7 +101,12 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 
 		GeneratePersonalInformationHotstrings(hotstrings, maxLen) {
 			keys := []
-			for _, k in hotstrings
+			; ``hotstrings`` is a Map keyed by the alias LETTER (n, t, …); the combo
+			; generator needs those keys, not the personal-data values. The 2-var Map
+			; enumerator binds (key, value), so iterate `k, _` and push the KEY -- a
+			; mechanical `for _, k` rewrite once seeded the values here and killed every
+			; @<letter> combo (a Map is not an Array)
+			for k, _ in hotstrings
 				keys.Push(k)
 			loop maxLen
 				Generate(keys, hotstrings, "", A_Index)
