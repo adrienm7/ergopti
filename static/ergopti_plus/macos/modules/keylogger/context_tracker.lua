@@ -370,7 +370,10 @@ function M.update_private_status()
 
 	if not win then return end
 
-	_state.is_fullscreen = win:isFullScreen()
+	-- hs.window:isFullScreen() returns nil for a window that does not expose the
+	-- attribute, and is_fullscreen feeds an INTEGER NOT NULL column — coerce to a
+	-- boolean here so a nil can never reach the writer in the first place.
+	_state.is_fullscreen = win:isFullScreen() == true
 
 	local title = win:title() or ""
 	local now   = hs.timer.absoluteTime() / 1000000

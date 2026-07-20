@@ -309,7 +309,13 @@ function _builders.typing(e, id)
 		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
 		_sql_str(e.app or "Unknown"), _sql_str(e.title), _sql_str(e.url),
 		_sql_str(e.field_role), _sql_str(e.layout), _sql_str(e.document_path),
-		_sql_num(e.is_fullscreen), _sql_num(e.in_meeting),
+		-- events_typing declares both columns INTEGER NOT NULL. _sql_num(nil) emits
+		-- the literal NULL, and the statement is INSERT OR IGNORE, so a nil here
+		-- does not raise — it silently discards the ENTIRE typing event. The three
+		-- siblings below always carried `or 0` for exactly this reason; these two
+		-- did not, and hs.window:isFullScreen() returns nil for any window that
+		-- does not expose the attribute.
+		_sql_num(e.is_fullscreen or false), _sql_num(e.in_meeting or false),
 		_sql_num(e.mouse_clicks or 0), _sql_num(e.mouse_scrolls or 0),
 		_sql_num(e.mouse_distance_px or 0), _sql_num(e.pause_before_ms),
 		_sql_num(e.battery_level), _sql_num(e.audio_volume), _sql_num(e.wpm),
@@ -329,7 +335,9 @@ function _builders.window_switch(e, id)
 		"INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms) VALUES (%s, %d, %s, %s, %s, %s, %s, %s);",
 		_sql_str(_device_id), id,
 		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(e.app), _sql_str(e.prev_title), _sql_str(e.next_title),
+		-- events_window_switch.app is TEXT NOT NULL; a nil would make INSERT OR
+		-- IGNORE drop the whole row. Same "Unknown" fallback the typing builder uses.
+		_sql_str(e.app or "Unknown"), _sql_str(e.prev_title), _sql_str(e.next_title),
 		_sql_num(e.duration_ms or 0))
 end
 
@@ -338,7 +346,9 @@ function _builders.shortcut(e, id)
 		"INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key) VALUES (%s, %d, %s, %s, %s, %s);",
 		_sql_str(_device_id), id,
 		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(e.app), _sql_str(e.key))
+		-- Both columns are TEXT NOT NULL. Losing the key name degrades one field;
+		-- emitting NULL loses the entire shortcut event to INSERT OR IGNORE.
+		_sql_str(e.app or "Unknown"), _sql_str(e.key or ""))
 end
 
 --- Build the events_system INSERT for an entry.
@@ -359,7 +369,12 @@ function _builders.system(e, id, action_override)
 		"INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES (%s, %d, %s, %s, %s, %s);",
 		_sql_str(_device_id), id,
 		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(action_override or e.action), _sql_json(meta))
+		-- The override covers the types that carry no `action` of their own, but a
+		-- bare "system_event" entry still relies on e.action being present — and the
+		-- column is NOT NULL, the exact swallow this function's docstring warns
+		-- about. Fall back to a sentinel so the event survives as an anomaly rather
+		-- than vanishing entirely.
+		_sql_str(action_override or e.action or "unknown"), _sql_json(meta))
 end
 
 function _builders.hotstring(e, id, kind)
