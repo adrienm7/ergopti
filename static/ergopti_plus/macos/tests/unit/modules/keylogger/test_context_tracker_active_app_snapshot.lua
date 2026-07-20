@@ -10,6 +10,10 @@
 
 local helpers = require("tests.helpers")
 
+--- The tracker now requires a pause predicate: its writers must be silent
+--- while the script is paused. These scenarios exercise the RUNNING state.
+local function NOT_PAUSED() return false end
+
 helpers.describe("context_tracker: active app snapshot", function()
 
 	helpers.it("returns the elapsed foreground duration for the current application", function()
@@ -18,7 +22,7 @@ helpers.describe("context_tracker: active app snapshot", function()
 			timer = { absoluteTime = function() return 7250000000 end },
 		})
 		local state = { active_app_name = "Code", active_app_start = 1000 }
-		tracker.init(state, {})
+		tracker.init(state, {}, NOT_PAUSED)
 
 		local snapshot = tracker.get_active_app_snapshot()
 		helpers.assert_eq(snapshot.app, "Code")
@@ -29,7 +33,7 @@ helpers.describe("context_tracker: active app snapshot", function()
 		local tracker = helpers.load_with_stubs("modules.keylogger.context_tracker", {
 			timer = { absoluteTime = function() return 7250000000 end },
 		})
-		tracker.init({}, {})
+		tracker.init({}, {}, NOT_PAUSED)
 		helpers.assert_eq(tracker.get_active_app_snapshot(), nil)
 	end)
 
@@ -43,7 +47,7 @@ helpers.describe("context_tracker: active app snapshot", function()
 			log_app_switch = function(prev_app, next_app, duration_ms, timestamp)
 				recorded = { prev_app, next_app, duration_ms, timestamp }
 			end,
-		})
+		}, NOT_PAUSED)
 
 		helpers.assert_true(tracker.close_active_app())
 		helpers.assert_eq(recorded[1], "Code")
@@ -62,7 +66,7 @@ helpers.describe("context_tracker: active app snapshot", function()
 			log_app_switch = function(prev_app, next_app, duration_ms, timestamp)
 				recorded = { prev_app, next_app, duration_ms, timestamp }
 			end,
-		})
+		}, NOT_PAUSED)
 
 		local real_date = os.date
 		local ok, err = pcall(function()
@@ -98,7 +102,7 @@ helpers.describe("context_tracker: active app snapshot", function()
 			},
 		})
 		local state = {}
-		tracker.init(state, {})
+		tracker.init(state, {}, NOT_PAUSED)
 
 		helpers.assert_true(tracker.capture_frontmost_app())
 		helpers.assert_eq(state.active_app_name, "Terminal")
