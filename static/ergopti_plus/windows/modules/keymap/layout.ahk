@@ -639,8 +639,14 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 	if (Features["shortcuts"]["wrap_text_if_selected"] and WrapSymbols_IsEnabled(LeftSymbol)) {
 		Selection := GetUIASelection()
 		if (Selection != "") {
-			; Send all the text instantly and without triggering hotstrings while typing it
-			SendInstant(LeftSymbol Selection RightSymbol)
+			; Send all the text instantly and without triggering hotstrings while typing
+			; it. SendInstant returns false when its clipboard path fails (another
+			; process holds the clipboard open mid-transaction) and emits nothing — so
+			; degrade to the bare symbol instead of swallowing the keystroke entirely
+			; (the selection is untouched in the app since ^v never fired, exactly like
+			; the no-selection path below).
+			if !SendInstant(LeftSymbol Selection RightSymbol)
+				SendNewResult(Symbol)
 			UpdateLastSentCharacter(Symbol)
 			return
 		}
