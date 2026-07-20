@@ -391,21 +391,29 @@ local build_kl_name_to_tis_id
 --- @return boolean true on success.
 local function set_input_source(localised_name, kl_name)
 	if hs.keycodes and type(hs.keycodes.setLayout) == "function" then
+		-- Both attempts bind `changed` — pcall's SECOND return, i.e. setLayout's
+		-- own result. setLayout returns a boolean and does NOT raise on an
+		-- unknown or unswitchable layout, so reading only pcall's status made
+		-- `ok` true on every call: the function returned success at the first
+		-- attempt, the kl_name retry and the TIS fallback below became dead
+		-- code, and a failed switch was affirmatively logged as a success.
 		-- Try the localised name first — this is what hs.keycodes expects
 		if type(localised_name) == "string" and localised_name ~= "" then
-			local ok = pcall(hs.keycodes.setLayout, localised_name)
-			if ok then
+			local ok, changed = pcall(hs.keycodes.setLayout, localised_name)
+			if ok and changed == true then
 				Logger.info(LOG, "Active layout switched to '%s' (hs.keycodes, localised).", localised_name)
 				return true
 			end
+			Logger.debug(LOG, "hs.keycodes declined the localised name '%s' — trying the next strategy…", localised_name)
 		end
 		-- Try the raw KeyboardLayout Name as a secondary candidate
 		if type(kl_name) == "string" and kl_name ~= "" and kl_name ~= localised_name then
-			local ok = pcall(hs.keycodes.setLayout, kl_name)
-			if ok then
+			local ok, changed = pcall(hs.keycodes.setLayout, kl_name)
+			if ok and changed == true then
 				Logger.info(LOG, "Active layout switched to '%s' (hs.keycodes, kl_name).", kl_name)
 				return true
 			end
+			Logger.debug(LOG, "hs.keycodes declined the kl_name '%s' — falling back to TIS…", kl_name)
 		end
 	end
 	-- Resolve the stable TIS ID for Ergopti variants via the installed bundle map,
