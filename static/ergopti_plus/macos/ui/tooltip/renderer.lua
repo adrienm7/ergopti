@@ -236,15 +236,20 @@ function M.render(blocks, state, start_watchers_callback)
 		local max_width = state.fixed_width or size_predictions.w
 		local is_combined_layout = false
 		local combined_styled = nil
+		-- Hoisted out of the layout decision below so the draw site can reuse it.
+		-- minimumTextSize is an ObjC text-layout call; the footer text and its
+		-- metrics do not change between the two points, so measuring twice simply
+		-- doubled the cost of every combined-layout render.
+		local size_combined = nil
 
 		if info_styled and hint_styled then
 			local separator_styled = hs.styledtext.new(space_divider .. combined_sep .. space_divider, { font = { name = Config.fonts.main, size = Config.sizes.hint }, color = Config.colors.sep })
 			combined_styled = hs.styledtext.new("") .. hint_styled .. separator_styled .. info_styled
 			combined_styled = combined_styled:setStyle({ paragraphStyle = { alignment = "center" } }, 1, #combined_styled)
 
-			local size_combined = M.canvas:minimumTextSize(3, combined_styled)
-			if size_combined.w <= max_width then 
-				is_combined_layout = true 
+			size_combined = M.canvas:minimumTextSize(3, combined_styled)
+			if size_combined.w <= max_width then
+				is_combined_layout = true
 			end
 		end
 
@@ -267,7 +272,6 @@ function M.render(blocks, state, start_watchers_callback)
 		end
 
 		if is_combined_layout then
-			local size_combined = M.canvas:minimumTextSize(3, combined_styled)
 			M.canvas[5].action = "fill"
 			M.canvas[5].text   = combined_styled
 			M.canvas[5].frame  = { x = 0, y = current_y, w = canvas_width, h = size_combined.h }

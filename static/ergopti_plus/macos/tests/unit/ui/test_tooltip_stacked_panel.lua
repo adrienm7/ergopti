@@ -145,3 +145,114 @@ helpers.describe("tooltip stacked panel: text measurement is memoized", function
 		helpers.assert_eq(sz.h, 5)
 	end)
 end)
+
+
+
+
+-- ==========================================================
+-- ==========================================================
+-- ======= 5/ M.render measures the combined footer once ====
+-- ==========================================================
+-- ==========================================================
+
+--- ROOT CAUSE ENCODED: M.render computed `size_combined` inside the layout
+--- DECISION block (does hint+info fit on one row?) and then DISCARDED it, only to
+--- recompute the identical value ~25 lines later at the draw site. Nothing between
+--- the two points changes element 3's text metrics, and is_combined_layout can
+--- only be true if the first block ran — so the second call was pure waste,
+--- doubling an ObjC text-layout call on every combined-layout render. This is the
+--- same cost the stacked renderer already memoises.
+---
+--- NOTE: the other raw minimumTextSize calls in M.render are deliberately NOT
+--- cached — prediction text is fresh on every render, so a cache would miss every
+--- time and only add overhead. Only this duplicate was genuinely wasted work.
+
+-- Distinctive markers so the combined footer measurement is identifiable purely
+-- from the text handed to minimumTextSize (it contains BOTH halves).
+local HINT_TEXT  = "HINTMARKER"
+local INFO_TEXT  = "INFOMARKER"
+local PREDS_TEXT = "PREDSMARKER"
+
+-- Wide enough that the combined row always "fits" and the combined layout wins.
+local FIXED_WIDTH_PX = 10000
+
+--- Builds a styledtext double that survives concatenation, `#` and :setStyle(),
+--- carrying its text along so the canvas double can report what was measured.
+--- @return table An hs.styledtext replacement exposing `new`.
+local function make_styledtext_stub()
+	local mt = {}
+	local function styled(text)
+		return setmetatable({ text = text }, mt)
+	end
+	mt.__index = {
+		-- render() re-centres the concatenated footer; the metrics are unaffected.
+		setStyle = function(self) return self end,
+	}
+	mt.__concat = function(a, b)
+		local at = (type(a) == "table" and a.text) or tostring(a)
+		local bt = (type(b) == "table" and b.text) or tostring(b)
+		return styled(at .. bt)
+	end
+	mt.__len = function(self) return #self.text end
+	return { new = function(text, _style) return styled(text or "") end }, styled
+end
+
+--- Builds a canvas double that tallies every minimumTextSize call by measured text.
+--- @return table canvas, table measurements Map of text -> call count.
+local function make_counting_canvas()
+	local measurements = {}
+	local canvas = {
+		minimumTextSize = function(_self, _index, styled_text)
+			local text = (type(styled_text) == "table" and styled_text.text) or tostring(styled_text)
+			measurements[text] = (measurements[text] or 0) + 1
+			return { w = #text, h = 10 }
+		end,
+		frame = function() end,
+		show  = function() end,
+	}
+	-- render() writes into elements 1..6 by index.
+	for i = 1, 7 do canvas[i] = {} end
+	return canvas, measurements
+end
+
+--- Returns the tally for the one measured string containing both footer halves.
+--- @param measurements table Map of text -> call count.
+--- @return integer count, string|nil the matched text
+local function combined_footer_calls(measurements)
+	for text, count in pairs(measurements) do
+		if text:find(HINT_TEXT, 1, true) and text:find(INFO_TEXT, 1, true) then
+			return count, text
+		end
+	end
+	return 0, nil
+end
+
+helpers.describe("tooltip render: the combined footer is measured exactly once", function()
+	helpers.it("does not measure the same combined row twice in one render", function()
+		package.loaded["ui.tooltip.config"] = nil
+		local styledtext_stub, styled = make_styledtext_stub()
+		local R = helpers.load_with_stubs("ui.tooltip.renderer", { styledtext = styledtext_stub })
+
+		local canvas, measurements = make_counting_canvas()
+		R.canvas = canvas
+
+		R.render(
+			{
+				preds   = styled(PREDS_TEXT),
+				hint_st = styled(HINT_TEXT),
+				info_st = styled(INFO_TEXT),
+			},
+			{ fixed_width = FIXED_WIDTH_PX, bg_color = { red = 0, green = 0, blue = 0 } },
+			nil
+		)
+
+		local count, matched = combined_footer_calls(measurements)
+		helpers.assert_not_nil(matched,
+			"the combined hint+info footer must have been measured — otherwise this "
+			.. "render never reached the combined layout and the test proves nothing")
+		helpers.assert_eq(count, 1,
+			"the combined footer must be measured ONCE per render; the layout decision "
+			.. "and the draw site share one measurement rather than each paying for an "
+			.. "ObjC text-layout call")
+	end)
+end)
