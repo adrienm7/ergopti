@@ -1121,3 +1121,25 @@ TestHSE_DisableGroupStopsSectionFiringSiblingSurvives() {
 }
 Test("HSE disabling a section group stops only that section, enabling restores it",
     TestHSE_DisableGroupStopsSectionFiringSiblingSurvives)
+
+; F36 (audit 2026-07-20): a raw callback is allowed to DECLINE (the E-circumflex
+; deadkey and ellipsis guards refuse in the wrong context) by returning a falsy effect
+; or {Bs:0, Ins:""}. _HSE_DispatchRawCallback swallowed that verdict and returned void,
+; so the caller could not tell a fire from a decline and logged every match as a fired
+; hotstring — inflating the hotstring counters and per-section stats with expansions
+; that never appeared on screen.
+TestHSE_DeclinedRawCallbackReportsNotFired() {
+    ; A callback that expands reports true; one that declines reports false.
+    Fired := HSE_DispatchMatch({ RawCallback: true, Callback: (EndChar) => ({ Bs: 0, Ins: "" }) }, "")
+    AssertEqual(false, Fired,
+        "a raw callback returning {Bs:0, Ins:''} declined — HSE_DispatchMatch must report false so no fire is logged")
+
+    Fired2 := HSE_DispatchMatch({ RawCallback: true, Callback: (EndChar) => ("") }, "")
+    AssertEqual(false, Fired2,
+        "a raw callback returning a falsy effect declined — HSE_DispatchMatch must report false")
+
+    AssertEqual(false, HSE_DispatchMatch("", ""),
+        "an empty spec is not a fire")
+}
+Test("HSE: a declined raw callback reports 'not fired' so it is never logged as an expansion",
+    TestHSE_DeclinedRawCallbackReportsNotFired)

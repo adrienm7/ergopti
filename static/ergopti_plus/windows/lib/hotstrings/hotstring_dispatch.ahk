@@ -64,8 +64,13 @@ global HSE_SUPPRESS_RELEASE_DELAY_MS := 60
 _HSE_DispatchRawCallback(Spec, EndChar) {
     global HSE_SUPPRESS_RELEASE_DELAY_MS, HSE_Buffer, HSE_MAX_BUFFER_LEN, HSE_StartIsWordBoundary
     if !(Spec.HasOwnProp("Callback") and Spec.Callback) {
-        return
+        return false
     }
+    ; Whether the callback actually expanded. A raw callback is allowed to DECLINE
+    ; (the E-circumflex deadkey and ellipsis guards refuse in the wrong context) by
+    ; returning a falsy effect or {Bs:0, Ins:""} — the caller must not then log a fire
+    ; or strip the preview buffer for an expansion the user never saw.
+    Fired := false
     ; Route through PrefixWatcherSuppress when available — it delegates to
     ; HSE_Suppress internally, so a SINGLE matched pair (true/false) keeps
     ; HSE_Suppressed balanced at depth 1. The direct HSE_Suppress(true) path is
@@ -89,6 +94,8 @@ _HSE_DispatchRawCallback(Spec, EndChar) {
             if (Bs != Effect.Bs)
                 try LoggerWarn("HSE", "Raw callback returned Bs={1} out of range [0,{2}] — clamped.", Effect.Bs, BufLen)
             Ins := Effect.HasOwnProp("Ins") ? Effect.Ins : ""
+            ; Deleted nothing AND inserted nothing == the callback declined.
+            Fired := (Bs > 0 or Ins != "")
             HSE_Buffer := (BufLen >= Bs ? SubStr(HSE_Buffer, 1, BufLen - Bs) : "") . Ins
             ; Mirror HSE_ApplyExpansion's cap so a future raw callback with a large
             ; Ins can never grow the buffer unbounded or drift the boundary flag.
@@ -111,26 +118,34 @@ _HSE_DispatchRawCallback(Spec, EndChar) {
         }
         SetTimer((*) => KL_ClearSynthetic(), -HSE_SUPPRESS_RELEASE_DELAY_MS)
     }
+    return Fired
 }
 
+; Returns TRUE when the match actually produced an expansion, FALSE when it declined
+; (no spec, a raw callback that refused, a time-activation timeout, or a mixed-case
+; conform verdict). Callers use this to decide whether a fire really happened: logging
+; a fire — or stripping the preview buffer — for a decline reports an expansion the
+; user never saw.
 HSE_DispatchMatch(Spec, EndChar) {
     global HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook, HSE_TypoNbspStripped, HSE_Buffer
     if (Spec == "") {
-        return
+        return false
     }
     ; Raw-callback specs (the natives migrated into the HSE: E-circumflex deadkey,
     ; "..." ellipsis) do all their own conditional, variable-length send/backspace;
     ; route them to _HSE_DispatchRawCallback so the engine never auto-strips a
     ; trigger the callback may have left in place.
     if (Spec.HasOwnProp("RawCallback") and Spec.RawCallback) {
-        _HSE_DispatchRawCallback(Spec, EndChar)
-        return
+        ; Propagate the callback's own verdict: it alone knows whether it expanded.
+        return _HSE_DispatchRawCallback(Spec, EndChar)
     }
     if !Spec.HasOwnProp("Replacement") {
+        Invoked := false
         if Spec.HasOwnProp("Callback") and Spec.Callback {
             try (Spec.Callback)(EndChar)
+            Invoked := true
         }
-        return
+        return Invoked
     }
 
     ; Time-activation gate: refuse to fire when the previous character
@@ -158,7 +173,7 @@ HSE_DispatchMatch(Spec, EndChar) {
             }
         }
         if IsTimeActivationExpired(PrevKey, Spec.TimeActivationSeconds) {
-            return
+            return false
         }
     }
 
@@ -182,7 +197,7 @@ HSE_DispatchMatch(Spec, EndChar) {
         ConformedRepl := _HSE_ConformReplacement(ResolvedRepl, TypedTrigger, Spec.Trigger,
             (Spec.HasOwnProp("ConformOneChar") and Spec.ConformOneChar), &DoFire)
         if !DoFire {
-            return
+            return false
         }
     }
 
@@ -338,4 +353,6 @@ HSE_DispatchMatch(Spec, EndChar) {
         ; — clearing inline would let trailing replacement keystrokes look manual.
         SetTimer((*) => KL_ClearSynthetic(), -HSE_SUPPRESS_RELEASE_DELAY_MS)
     }
+    ; Reached only when the replacement was actually emitted.
+    return true
 }

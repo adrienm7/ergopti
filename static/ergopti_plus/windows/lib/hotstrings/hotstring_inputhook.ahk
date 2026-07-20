@@ -567,7 +567,11 @@ _OnPrefixChar(IH, Char) {
 			; cannot fire reentrantly inside HSE_DispatchMatch's message pump.
 			_PrefixCancelRender()
 			_HseDispatchTick := HotPath_Now()
-			HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)
+			; A match is not necessarily a FIRE: a raw callback may decline (the
+			; E-circumflex deadkey and ellipsis guards refuse in the wrong context), and
+			; the time-activation / mixed-case gates bail too. HSE_DispatchMatch reports
+			; which happened so we do not log an expansion the user never saw.
+			_HseFired := HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)
 			HotPath_LogIfSlow("HSE.Dispatch", _HseDispatchTick, HSEMatch.Trigger)
 			; Log the fired hotstring. ``h_type`` is taken from the
 			; preceding suggestion when available (richest categorisation —
@@ -587,7 +591,11 @@ _OnPrefixChar(IH, Char) {
 			; KL_LogHotstring work runs off the keystroke path (see
 			; _HSE_QueueFireLog) so a disk/lookup spike can never stall the fire
 			; keystroke and stretch the suppress window into a key-swallow.
-			_HSE_QueueFireLog(HSEMatch.Trigger, HotstringRepl, HotstringHType, HotstringCategory, HotstringSection)
+			; Only a real expansion is a fire. A declined match must not reach the
+			; metrics/WPM pipeline as one — it inflated the hotstring counters and the
+			; per-section stats with expansions that never appeared on screen.
+			if _HseFired
+				_HSE_QueueFireLog(HSEMatch.Trigger, HotstringRepl, HotstringHType, HotstringCategory, HotstringSection)
 			; ── Sync the watcher buffer to the post-expansion screen state ──
 			; The naive "wipe to empty" used to drop the in-word context the
 			; user is still typing inside of. After a STAR fire (no end-char),
