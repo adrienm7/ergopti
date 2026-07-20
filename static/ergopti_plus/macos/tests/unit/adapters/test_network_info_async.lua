@@ -160,6 +160,67 @@ helpers.describe("NetworkInfo: async probe updates the cached result (F-LOW-8 be
 			"isVpnActive() must return false when the async ifconfig probe finds no utun interface")
 	end)
 
+	-- Regression (probe latch): _refresh_*() sets its in-flight flag BEFORE calling
+	-- handle.start(). The adapter only LOGS a launch failure — it never raises — so
+	-- pcall(handle.start) always reported success and the flag was never cleared.
+	-- Every later call then short-circuited on the in-flight guard, freezing
+	-- isInternetReachable() at false for the whole process lifetime even after the
+	-- network (and the ability to launch ping) came back.
+	helpers.it("a failed ping launch does not latch the probe — the next call retries", function()
+		-- First attempt: hs.task.new returns nil, so no subprocess is ever launched.
+		local NI = reload_network_info({
+			task = { new = function(_exe, _cb, _args) return nil end },
+		})
+
+		helpers.assert_true(NI.isInternetReachable() == false,
+			"a probe that never launched must report the safe default")
+		helpers.assert_true(NI.hasInternetProbeResult() == false,
+			"no probe result can exist when the launch failed")
+
+		-- Swap in a working task stub WITHOUT reloading the module, so the module
+		-- state (and therefore the in-flight latch) carries over from the failure.
+		local reachable_out = "1 packets transmitted, 1 packets received, 0% packet loss\n"
+		_G.hs.task = {
+			new = function(_exe, cb, _args)
+				return {
+					start     = function() if cb then cb(0, reachable_out, "") end return true end,
+					isRunning = function() return false end,
+					terminate = function() end,
+				}
+			end,
+		}
+
+		-- If the latch leaked, this call returns early on the in-flight guard and
+		-- the probe is never retried — the assertion below stays false forever.
+		local result = NI.isInternetReachable()
+		helpers.assert_true(NI.hasInternetProbeResult() == true,
+			"the probe must be RETRIED after a failed launch, not blocked by a latched in-flight flag")
+		helpers.assert_true(result == true,
+			"the retried probe must report the now-reachable network")
+	end)
+
+	helpers.it("a failed ifconfig launch does not latch the VPN probe — the next call retries", function()
+		local NI = reload_network_info({
+			task = { new = function(_exe, _cb, _args) return nil end },
+		})
+
+		helpers.assert_true(NI.isVpnActive() == false,
+			"a VPN probe that never launched must report the safe default")
+
+		_G.hs.task = {
+			new = function(_exe, cb, _args)
+				return {
+					start     = function() if cb then cb(0, "utun0: flags=8051<UP> mtu 1380\n", "") end return true end,
+					isRunning = function() return false end,
+					terminate = function() end,
+				}
+			end,
+		}
+
+		helpers.assert_true(NI.isVpnActive() == true,
+			"the VPN probe must be RETRIED after a failed launch, not blocked by a latched in-flight flag")
+	end)
+
 	helpers.it("never blocks: isInternetReachable() does not throw when hs.task.new fails", function()
 		local NI = reload_network_info({
 			task = { new = function(_, _, _) error("task creation failed") end },
