@@ -419,6 +419,15 @@ HSE_RegistryClear() {
 ; Return all active mappings whose trigger ends with TailChar, sorted
 ; longest-trigger-first (then GroupOrder ascending, then Seq ascending).
 ; Mirrors Registry.spec.js mappingsForTail(tailChar).
+;
+; CONTRACT ACCESSOR — NOT ON THE MATCH PATH. It has zero production callers; it
+; exists so the cross-driver Registry.spec.js contract stays exercised
+; (test_domain_registry.ahk, test_personal_toml_editor.ahk). HSE_FindMatchAtEnd
+; resolves matches through the by-trigger indexes and never consults
+; HSE_RegistryByLastChar, so the O(n^2) sort below is a test-time cost only —
+; the "registry size is small and this is called rarely" note used to read as a
+; statement about the hot path, which sent a performance reader here by mistake.
+; Its sibling _HSE_BucketsFor, which had no callers at all, was deleted.
 HSE_MappingsForTail(TailChar) {
     global HSE_RegistryByLastChar
     ; Collect from both the case-sensitive and case-insensitive buckets.
