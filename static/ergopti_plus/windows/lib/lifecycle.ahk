@@ -172,6 +172,15 @@ Ergopti_OnSuspendEnter() {
 Ergopti_OnSuspendResume() {
     if IsSet(_ResetPrefixBuffer)
         try _ResetPrefixBuffer()
+    ; Replay a prefix-index rebuild deferred because it was requested while
+    ; suspended (a live hotstring section toggle during pause), so the preview
+    ; index re-syncs with the engine registry instead of staying diverged.
+    global _PrefixIndexRebuildPending
+    if IsSet(_PrefixIndexRebuildPending) and _PrefixIndexRebuildPending {
+        _PrefixIndexRebuildPending := false
+        if IsSet(HotstringPrefixWatcherRebuildIndex)
+            try HotstringPrefixWatcherRebuildIndex()
+    }
     global _LLM_Deps_PollTimer, _LLM_Deps_Checking
     if IsSet(_LLM_Deps_PollTimer) and IsSet(_LLM_Deps_Checking) and _LLM_Deps_Checking
         try SetTimer(_LLM_Deps_PollTimer, 3000)

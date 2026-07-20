@@ -43,6 +43,12 @@ global _PrefixBuffer := ""
 ; it and so that the watcher can be reset / stopped at shutdown).
 global _PrefixInputHook := 0
 
+; Set when HotstringPrefixWatcherRebuildIndex is asked to rebuild while the driver
+; is suspended (a live section toggle during pause). The rebuild is deferred and
+; replayed by Ergopti_OnSuspendResume, mirroring LLM_Menu_OnResume — otherwise the
+; preview index stays permanently diverged from the engine after resume.
+global _PrefixIndexRebuildPending := false
+
 ; When True, OnChar / OnKeyDown callbacks short-circuit. Toggled by the
 ; hotstring engine while it is replaying characters via SendEvent so the
 ; InputHook does not mistake AHK's own output for fresh user input. After
@@ -336,7 +342,11 @@ HotstringPrefixWatcherRebuildIndex() {
 	; InputHook callbacks (_OnPrefixChar / _OnPrefixKeyDown) all early-return on
 	; A_IsSuspended. Mirror that here so a rebuild armed before Pause does not
 	; quietly churn the index while the user expects the watcher to be silent.
+	; Record the deferred request so Ergopti_OnSuspendResume can replay it — a live
+	; section toggle made during pause must not leave the preview index diverged from
+	; the engine after resume (deferred-replay pattern, like LLM_Menu_OnResume).
 	if A_IsSuspended {
+		global _PrefixIndexRebuildPending := true
 		return
 	}
 	; Build-then-swap so a concurrent OnChar preview lookup never observes an
