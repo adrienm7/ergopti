@@ -324,8 +324,16 @@ TapHoldSyntheticKeyDown(Key) {
 TapHoldSyntheticKeyUp(Key) {
 	global _TH_SyntheticHeldKeys
 	if !_TH_SyntheticHeldKeys.Has(Key) {
-		; A suspend cleanup may already have released the key. Keep the ordinary
-		; finally path idempotent so it can still balance any direct Send failure.
+		; A suspend cleanup (TapHoldReleaseSyntheticKeys) may already have released the
+		; key. Never inject a synthetic Up while suspended (« pause = tout éteint ») — it
+		; would land in a paused session and could clear a modifier the user is
+		; physically holding. Only re-balance an untracked key while the driver is live.
+		if A_IsSuspended {
+			try LoggerDebug("TapHoldDispatch", "Not releasing untracked synthetic '{1}' while the driver is suspended.", Key)
+			return true
+		}
+		; Keep the ordinary finally path idempotent so it can still balance any direct
+		; Send failure for a key that was armed but somehow lost from the map.
 		TextPressKey(Key, "Up")
 		return true
 	}
