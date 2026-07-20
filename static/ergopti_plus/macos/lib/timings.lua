@@ -50,12 +50,24 @@ local MS_PER_SEC = 1000
 --- malformed parse raises an error (fail fast — no driver-side fallbacks).
 --- @return table The parsed `sections` table ([section][key] = number).
 local function load_registry()
+	-- Guard the PATH first: Paths.shared() returns nil when the _shared/ tree is
+	-- unreachable, and TomlReader.parse(nil) short-circuits to an empty result. The
+	-- path would then be nil inside the message below, so the failure has to be
+	-- caught here — while it can still name the actual cause.
 	local toml_path = Paths.shared("modules/timings/constants.toml")
+	if type(toml_path) ~= "string" or toml_path == "" then
+		error("[timings] the _shared/ tree is unreachable — cannot locate modules/timings/constants.toml")
+	end
 
 	local parsed   = TomlReader.parse(toml_path)
 	local sections = (type(parsed) == "table") and parsed.sections or nil
-	if type(sections) ~= "table" then
-		error("[timings] _shared/modules/timings/constants.toml not readable: " .. toml_path)
+	-- Emptiness, not type, is the real signal: both of TomlReader.parse's failure
+	-- exits return a well-formed result whose `sections` is an empty table, so the
+	-- previous `type(sections) ~= "table"` test could never fire. A missing or
+	-- unreadable file silently produced an empty registry and boot died much later
+	-- with a misleading "missing section [ui]".
+	if type(sections) ~= "table" or next(sections) == nil then
+		error("[timings] constants.toml is missing or empty: " .. toml_path)
 	end
 	return sections
 end

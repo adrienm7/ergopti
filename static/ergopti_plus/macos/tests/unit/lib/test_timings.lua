@@ -52,9 +52,12 @@ local WIRED_MS = {
 
 
 
--- ============================================
--- ======= 1/ ms / sec accessors ==============
--- ============================================
+
+-- =====================================
+-- =====================================
+-- ======= 1/ ms / sec accessors =======
+-- =====================================
+-- =====================================
 
 helpers.describe("timings: ms / sec accessors", function()
 	helpers.it("ms returns the raw millisecond value", function()
@@ -81,9 +84,12 @@ end)
 
 
 
--- ==================================================
--- ======= 2/ Wired-module parity tripwire ==========
--- ==================================================
+
+-- ===============================================
+-- ===============================================
+-- ======= 2/ Wired-module parity tripwire =======
+-- ===============================================
+-- ===============================================
 
 helpers.describe("timings: wired-module parity", function()
 	for _, row in ipairs(WIRED_MS) do
@@ -93,4 +99,69 @@ helpers.describe("timings: wired-module parity", function()
 				"registry value for " .. section .. "." .. key)
 		end)
 	end
+end)
+
+
+
+
+
+-- =============================================================
+-- =============================================================
+-- ======= 3/ Registry load fails fast on an absent tree =======
+-- =============================================================
+-- =============================================================
+
+--- Regression: load_registry() used to test only `type(sections) ~= "table"`.
+--- TomlReader.parse NEVER returns a table without a `sections` field — both of its
+--- failure exits return an empty result whose `sections` is `{}` — so that error
+--- was dead code. Worse, Paths.shared() returns nil when the _shared/ tree is
+--- missing, and parse(nil) short-circuits, so the path interpolated into the
+--- message was itself nil. The registry silently loaded empty and boot died much
+--- later, elsewhere, with a misleading "missing section [ui]".
+helpers.describe("timings: registry load fail-fast", function()
+
+	--- Reloads lib.timings with lib.paths stubbed so shared() reports the tree as
+	--- unreachable, and returns whatever the module raised.
+	--- @return boolean,string The pcall status and the raised message.
+	local function reload_timings_without_shared_tree()
+		local saved_paths   = package.loaded["lib.paths"]
+		local saved_timings = package.loaded["lib.timings"]
+
+		package.loaded["lib.paths"] = {
+			shared          = function() return nil end,
+			shared_root     = function() return nil end,
+			shared_llm_path = function() return nil end,
+			find_from_configdir = function() return nil end,
+		}
+		package.loaded["lib.timings"] = nil
+
+		local ok, err = pcall(require, "lib.timings")
+
+		-- Restore the real modules so later suites are unaffected by this probe.
+		package.loaded["lib.timings"] = saved_timings
+		package.loaded["lib.paths"]   = saved_paths
+
+		return ok, tostring(err)
+	end
+
+	helpers.it("raises when the _shared/ tree is unreachable", function()
+		local ok, err = reload_timings_without_shared_tree()
+		helpers.assert_eq(false, ok,
+			"lib.timings must fail fast at load time when the shared tree is missing")
+		helpers.assert_true(err:find("_shared/", 1, true) ~= nil,
+			"the error must name the unreachable _shared/ tree, got: " .. err)
+	end)
+
+	helpers.it("does not report a misleading 'missing section' for an absent tree", function()
+		local _, err = reload_timings_without_shared_tree()
+		helpers.assert_true(err:find("missing section", 1, true) == nil,
+			"an unreachable tree must not masquerade as a missing TOML section, got: " .. err)
+	end)
+
+	helpers.it("does not raise a nil-concatenation error", function()
+		local _, err = reload_timings_without_shared_tree()
+		helpers.assert_true(err:find("concatenate", 1, true) == nil,
+			"the guard must fire before the nil path reaches the message, got: " .. err)
+	end)
+
 end)
