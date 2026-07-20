@@ -58,6 +58,19 @@ local _next_event_id = 1
 --- Whether M.init has been called.
 local _initialized = false
 
+--- events_system.action discriminator for a failed LLM generation.
+--- These two event types have no dedicated table. events_llm cannot host the
+--- failure because its `kind` column carries
+--- CHECK (kind IN ('generation','suggested','dismissed','accepted')) — a row
+--- with a fifth kind is SILENTLY dropped by INSERT OR IGNORE, which would
+--- reproduce the very data loss this builder exists to stop. events_system.action
+--- is a plain TEXT NOT NULL with no CHECK, so it stores the event durably today
+--- without a schema change or a migration for already-created databases.
+local ACTION_LLM_GENERATION_FAILED = "llm_generation_failed"
+
+--- events_system.action discriminator for a native macOS autocorrect substitution.
+local ACTION_SYS_AUTOCORRECT = "sys_autocorrect"
+
 
 
 
@@ -328,7 +341,14 @@ function _builders.shortcut(e, id)
 		_sql_str(e.app), _sql_str(e.key))
 end
 
-function _builders.system(e, id)
+--- Build the events_system INSERT for an entry.
+--- @param e table The decoded JSONL entry.
+--- @param id number The allocated event id.
+--- @param action_override string|nil Discriminator for event types that carry no
+---   `action` field of their own. events_system.action is NOT NULL, so an entry
+---   without one would be silently swallowed by INSERT OR IGNORE.
+--- @return string One SQL statement.
+function _builders.system(e, id, action_override)
 	local meta = {}
 	for k, v in pairs(e) do
 		if k ~= "type" and k ~= "timestamp" and k ~= "action" then
@@ -339,7 +359,7 @@ function _builders.system(e, id)
 		"INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES (%s, %d, %s, %s, %s, %s);",
 		_sql_str(_device_id), id,
 		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(e.action), _sql_json(meta))
+		_sql_str(action_override or e.action), _sql_json(meta))
 end
 
 function _builders.hotstring(e, id, kind)
@@ -376,9 +396,10 @@ end
 
 
 --- Translate a JSONL entry into 0+ INSERT statements (typed dispatch).
---- Returns an array of SQL strings. Unknown event types return an empty
---- array — they will re-appear on the next ingest if a future schema
---- handles them.
+--- Returns an array of SQL strings. An event type with no builder is DATA LOSS,
+--- never a deferral: ingest_once advances the today.log cursor past the line
+--- regardless of what this returns, and Rotation.rollover deletes today.log at
+--- the next day boundary, so the entry is gone forever.
 --- @param entry table The decoded JSONL event entry.
 --- @return table Array of SQL statement strings.
 function M.build_inserts(entry)
@@ -415,6 +436,10 @@ function M.build_inserts(entry)
 		return { _builders.llm(entry, _alloc_event_id(), "dismissed") }
 	elseif t == "llm_accepted" then
 		return { _builders.llm(entry, _alloc_event_id(), "accepted") }
+	elseif t == "llm_generation_failed" then
+		return { _builders.system(entry, _alloc_event_id(), ACTION_LLM_GENERATION_FAILED) }
+	elseif t == "sys_autocorrect" then
+		return { _builders.system(entry, _alloc_event_id(), ACTION_SYS_AUTOCORRECT) }
 	elseif t == "session_start" then
 		return { _builders.session(entry, _alloc_event_id(), "session_start") }
 	elseif t == "session_end" then
@@ -424,6 +449,12 @@ function M.build_inserts(entry)
 	elseif t == "idle_end" then
 		return { _builders.session(entry, _alloc_event_id(), "idle_end") }
 	end
+
+	-- An unhandled type is a producer/consumer contract break, not a no-op: the
+	-- caller has already committed to advancing past this line, so staying silent
+	-- here is exactly how llm_generation_failed events were written and then
+	-- discarded without a single trace in the logs.
+	Logger.warn(LOG, "build_inserts: no builder for event type '%s' — entry discarded.", tostring(t))
 	return {}
 end
 
