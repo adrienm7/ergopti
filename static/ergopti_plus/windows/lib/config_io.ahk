@@ -369,16 +369,26 @@ SaveFullConfig() {
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_Y,       Value: String(WPMWidget.pos_y) })
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_COLORS,  Value: WPMWidget.use_colors ? "1" : "0" })
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: WPMWidget.show_graph  ? "1" : "0" })
-    Updates.Push({ Section: "llm", Key: "onboarding_seen", Value: _LLM_Menu["onboarding_seen"] ? "1" : "0" })
-    _AppOverridesStr := ""
-    for _AppName, _AppProfileId in _LLM_Menu["app_profile_overrides"] {
-        if (_AppOverridesStr != "")
-            _AppOverridesStr .= ";"
-        _AppOverridesStr .= _AppName . "=" . _AppProfileId
+    ; The flat [llm] keys below round-trip through _LLM_Menu DIRECTLY (not via
+    ; Features), so the _LLM_Menu_SyncToFeatures gate above does not cover them. The
+    ; boot-armed SaveFullConfig timer fires ~0-100 ms after _DriverReady, while
+    ; LLM_Menu_Init runs seconds later at the end of the deferred menu build — so
+    ; without this dedicated gate the first flush writes module defaults
+    ; (onboarding_seen=0, empty overrides, default trigger_shortcut/ollama_port/…)
+    ; over the user's saved values. Skipping is safe: TOML_BatchWrite preserves keys
+    ; it does not re-collect, so the on-disk values survive until the menu has loaded.
+    if (IsSet(_LLM_Menu_Loaded) && _LLM_Menu_Loaded) {
+        Updates.Push({ Section: "llm", Key: "onboarding_seen", Value: _LLM_Menu["onboarding_seen"] ? "1" : "0" })
+        _AppOverridesStr := ""
+        for _AppName, _AppProfileId in _LLM_Menu["app_profile_overrides"] {
+            if (_AppOverridesStr != "")
+                _AppOverridesStr .= ";"
+            _AppOverridesStr .= _AppName . "=" . _AppProfileId
+        }
+        Updates.Push({ Section: "llm", Key: "app_profile_overrides", Value: _AppOverridesStr })
+        if IsSet(_LLM_Menu_AppendPersistedUpdates)
+            _LLM_Menu_AppendPersistedUpdates(Updates)
     }
-    Updates.Push({ Section: "llm", Key: "app_profile_overrides", Value: _AppOverridesStr })
-    if IsSet(_LLM_Menu_AppendPersistedUpdates)
-        _LLM_Menu_AppendPersistedUpdates(Updates)
     global CategoryEnabled
     if IsSet(CategoryEnabled) {
         for _CatName, _CatBool in CategoryEnabled
