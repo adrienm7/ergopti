@@ -95,9 +95,17 @@ function M.spawn(executable, args, on_done, on_chunk)
 			Logger.error(LOG, "spawn.start(): task was not created for %s", tostring(executable))
 			return false
 		end
-		local ok, err = pcall(function() _task:start() end)
+		-- The closure MUST return the value: hs.task:start() reports a refused launch
+		-- by RETURNING false, not by raising, so a pcall that only captures the raise
+		-- reported success for the most common real failure (missing or non-executable
+		-- binary) — exactly the case this function's contract exists to surface.
+		local ok, started = pcall(function() return _task:start() end)
 		if not ok then
-			Logger.error(LOG, "spawn.start(): hs.task:start() failed — %s", tostring(err))
+			Logger.error(LOG, "spawn.start(): hs.task:start() failed — %s", tostring(started))
+			return false
+		end
+		if not started then
+			Logger.error(LOG, "spawn.start(): hs.task:start() refused to launch %s", tostring(executable))
 			return false
 		end
 		return true
