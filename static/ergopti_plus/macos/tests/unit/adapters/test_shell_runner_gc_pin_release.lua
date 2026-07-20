@@ -180,10 +180,16 @@ helpers.describe("ShellRunner: GC pin release", function()
 	end)
 
 	helpers.it("handle.start() returns true on a successful launch", function()
+		-- The stub models the REAL hs.task:start(), which returns the task object on
+		-- success. It previously returned nil, which quietly required the
+		-- implementation to IGNORE the return value — cementing the very defect the
+		-- case below now covers.
 		local ShellRunner = helpers.load_with_stubs("adapters.shell_runner", {
 			task = {
 				new = function(_exe, _done_cb, _a3, _a4)
-					return { start = function() end, terminate = function() end }
+					local task = { terminate = function() end }
+					task.start = function(self) return self end
+					return task
 				end,
 			},
 		})
@@ -191,6 +197,27 @@ helpers.describe("ShellRunner: GC pin release", function()
 		local handle = ShellRunner.spawn("/bin/echo", { "hi" }, function() end)
 		helpers.assert_eq(true, handle.start(),
 			"start() must report true so a caller keeps its in-flight latch armed")
+	end)
+
+	-- Regression: hs.task:start() reports a refused launch by RETURNING false, not
+	-- by raising. _safe_start wrapped it in `pcall(function() _task:start() end)` —
+	-- a closure with no `return` — so the value was discarded and only a raise could
+	-- be detected. The most common real failure (missing or non-executable binary)
+	-- therefore reported SUCCESS, and callers such as network_info kept their
+	-- in-flight latch armed for the process lifetime.
+	helpers.it("handle.start() returns false when start() returns false without raising", function()
+		local ShellRunner = helpers.load_with_stubs("adapters.shell_runner", {
+			task = {
+				new = function(_exe, _done_cb, _a3, _a4)
+					return { start = function() return false end, terminate = function() end }
+				end,
+			},
+		})
+
+		local handle = ShellRunner.spawn("/usr/bin/curl", {}, function() end)
+		helpers.assert_eq(false, handle.start(),
+			"start() must report false when hs.task:start() returns false — it does not raise "
+			.. "on a refused launch, so a pcall that only catches a throw sees success")
 	end)
 
 	helpers.it("normal completion releases the GC pin and forwards (exit, out, err)", function()
