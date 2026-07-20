@@ -83,7 +83,12 @@ global _SendHook := 0
 ; TOML override (ScriptInformation["AltGrIsKanaRemap"]) that always wins.
 ; Caching the resolved bool at boot lets the hot path skip a Map lookup and
 ; a truthy test on every hotstring firing.
-global _ALTGR_KANA_FIXUP := False
+; The `global _ALTGR_KANA_FIXUP := False` initializer deliberately does NOT live
+; here: a parse-time #HotIf (modules/tap_holds/altgr.ahk) reads it in FIRST
+; position, and this file's include position is far below the first message pump,
+; so the global would still be unset when that #HotIf is evaluated. It is seeded in
+; the pre-pump block of ErgoptiPlus.ahk instead (single source, §5.2);
+; HotstringEngineInit() resolves the real value later.
 
 ; Win32 constants for MapVirtualKeyEx — see learn.microsoft.com/en-us/
 ; windows/win32/api/winuser/nf-winuser-mapvirtualkeyexw.

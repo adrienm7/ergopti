@@ -53,3 +53,29 @@ _BEBFR_ErrorNetExitsBeforeReady() {
         "a fatal boot exit must surface a user-visible message (MsgBox) so the driver never silently 'does nothing'")
 }
 Test("boot error net: startup faults clean up and exit instead of becoming half-driver", _BEBFR_ErrorNetExitsBeforeReady)
+
+; F14 (audit 2026-07-20): Bundle_Init() shells out through RunWait, which PUMPS
+; MESSAGES — a key pressed during the extraction can evaluate a parse-time #HotIf and
+; throw. OnError was armed ~45 lines BELOW that call, leaving the only early-boot
+; message pump completely unprotected; and _ALTGR_KANA_FIXUP (read in FIRST position
+; by the AltGr tap-hold #HotIf) was initialised at hotstring_engine.ahk's include
+; position, far below the pump. Both must precede Bundle_Init(). Read the entry file
+; directly and strip comments — several comments legitimately mention Bundle_Init().
+_BEBFR_ErrorNetArmedBeforeFirstPump() {
+    SplitPath(A_ScriptDir, , &WindowsDir)
+    Src := ""
+    try Src := FileRead(WindowsDir . "\ErgoptiPlus.ahk")
+    Assert(Src != "", "ErgoptiPlus.ahk must be readable for the first-pump meta-test")
+    Code := _StripFullLineComments(Src)
+
+    OnErrPos := InStr(Code, "OnError(ErgoptiGlobalErrorHandler)")
+    BundlePos := InStr(Code, "Bundle_Init()")
+    KanaPos := InStr(Code, "_ALTGR_KANA_FIXUP := False")
+    Assert(OnErrPos > 0 && BundlePos > 0, "ErgoptiPlus.ahk must arm OnError and call Bundle_Init()")
+    Assert(OnErrPos < BundlePos,
+        "the global error net must be armed BEFORE Bundle_Init's message-pumping RunWait, or a keypress during the extraction throws with no net at all")
+    Assert(KanaPos > 0 && KanaPos < BundlePos,
+        "_ALTGR_KANA_FIXUP must be seeded in the pre-pump block: a parse-time #HotIf reads it in first position and would throw during Bundle_Init's pump")
+}
+Test("boot error net: armed before the first message pump, with #HotIf globals seeded",
+    _BEBFR_ErrorNetArmedBeforeFirstPump)
