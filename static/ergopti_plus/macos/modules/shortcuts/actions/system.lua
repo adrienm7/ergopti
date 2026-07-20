@@ -37,6 +37,12 @@ local i18n          = require("lib.i18n")
 
 local LOG = "shortcuts.actions.system"
 
+-- Explicit inter-key delay for simulated keystrokes. hs.eventtap.keyStroke()
+-- defaults this argument to 200 000 us and implements it as a BLOCKING usleep on
+-- the main run loop, so an omitted delay stalls the loop that services the typing
+-- event tap — long enough for macOS to disable it (kCGEventTapDisabledByTimeout).
+local KEYSTROKE_NO_DELAY_US = 0
+
 local ok_gestures, gestures = pcall(require, "modules.gestures")
 if not ok_gestures then gestures = nil end
 
@@ -593,7 +599,10 @@ function M.bind_cmd_star(on_trigger)
 			pcall(on_trigger, table.concat(parts, "+"), app_name)
 		end
 
-		if #mods > 0 then hs.eventtap.keyStroke(mods, "s") end
+		-- Explicit delay: this runs INSIDE an eventtap callback, where keyStroke's
+		-- 200 000 us default usleep would stall the tap long enough for macOS to
+		-- disable it (kCGEventTapDisabledByTimeout), killing the shortcut entirely.
+		if #mods > 0 then hs.eventtap.keyStroke(mods, "s", KEYSTROKE_NO_DELAY_US) end
 		return true
 	end)
 	tap:start()

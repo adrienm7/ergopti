@@ -33,6 +33,12 @@ local WindowManager = require("adapters.window_manager")
 
 local LOG = "shortcuts.actions.apps"
 
+-- Explicit inter-key delay for simulated keystrokes. hs.eventtap.keyStroke()
+-- defaults this argument to 200 000 us and implements it as a BLOCKING usleep on
+-- the main run loop, so an omitted delay stalls the loop that services the typing
+-- event tap — long enough for macOS to disable it (kCGEventTapDisabledByTimeout).
+local KEYSTROKE_NO_DELAY_US = 0
+
 
 
 
@@ -282,7 +288,7 @@ function M.copy_or_open_path()
 
 	if is_finder_like(name) then
 		-- Try Finder's native "copy path" shortcut first
-		eventtap.keyStroke({"cmd", "alt"}, "c")
+		eventtap.keyStroke({"cmd", "alt"}, "c", KEYSTROKE_NO_DELAY_US)
 
 		timer.doAfter(FINDER_PATH_SETTLE_SEC, function()
 			local ok_p, p = pcall(pasteboard.getContents)
@@ -294,7 +300,7 @@ function M.copy_or_open_path()
 			-- Finder did not populate the clipboard — copy the selection instead
 			local prior = nil
 			pcall(function() prior = pasteboard.getContents(); pasteboard.clearContents() end)
-			eventtap.keyStroke({"cmd"}, "c")
+			eventtap.keyStroke({"cmd"}, "c", KEYSTROKE_NO_DELAY_US)
 
 			timer.doAfter(COPY_SETTLE_SEC, function()
 				local sel = nil
@@ -311,7 +317,7 @@ function M.copy_or_open_path()
 	-- Outside a file manager: copy selection and open or search
 	local prior = nil
 	pcall(function() prior = pasteboard.getContents(); pasteboard.clearContents() end)
-	eventtap.keyStroke({"cmd"}, "c")
+	eventtap.keyStroke({"cmd"}, "c", KEYSTROKE_NO_DELAY_US)
 
 	timer.doAfter(COPY_SETTLE_SEC, function()
 		local sel = nil

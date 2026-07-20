@@ -52,6 +52,12 @@ local CLIPBOARD_RESTORE_DELAY_S = Timings.sec("debounce", "clipboard_restore_ms"
 local PASTE_KEY      = "v"
 local PASTE_MODIFIER = { "cmd" }
 
+-- Explicit inter-key delay for the paste keystroke, matching the 0 default that
+-- M.eraseChars/M.pressKey already apply. Omitting the argument makes
+-- hs.eventtap.keyStroke() fall back to 200 000 us implemented as a BLOCKING usleep,
+-- stalling the run loop that services the typing event tap mid-injection.
+local PASTE_KEY_DELAY_US = 0
+
 -- Serialised clipboard save/restore state. Two clipboard sends within
 -- CLIPBOARD_RESTORE_DELAY_S of each other must NOT each save() — the second would
 -- capture the first's still-injected payload as "the user's clipboard" and both
@@ -103,7 +109,7 @@ function M.send(text, opts, callback)
 			end
 			local saved = _paste_saved_original  -- bind the correct value into the closure
 			Clipboard.write(text)
-			hs.eventtap.keyStroke(PASTE_MODIFIER, PASTE_KEY)
+			hs.eventtap.keyStroke(PASTE_MODIFIER, PASTE_KEY, PASTE_KEY_DELAY_US)
 			-- Restore after a short delay so the paste completes before we overwrite.
 			_paste_pending_timer = hs.timer.doAfter(CLIPBOARD_RESTORE_DELAY_S, function()
 				_paste_pending_timer  = nil

@@ -19,6 +19,13 @@ local FileSystem    = require("adapters.file_system")
 local Click         = require("modules.gestures.actions_click")
 local LOG           = "gestures.actions"
 
+-- Explicit inter-key delay for every simulated keystroke. hs.eventtap.keyStroke()
+-- defaults this argument to 200 000 us and implements it as a BLOCKING usleep on the
+-- main run loop, so an omitted delay stalls the loop that services the typing event
+-- tap — long enough for macOS to disable it (kCGEventTapDisabledByTimeout). Declared
+-- here, above every closure that captures it, so it is never bound as a nil global.
+local KEYSTROKE_NO_DELAY_US = 0
+
 local _state = nil
 
 --- Binds the global shared state reference.
@@ -55,10 +62,13 @@ local function sysKey(key)
 end
 
 --- Simulates a keystroke with optional modifiers.
+--- Always passes an explicit delay: hs.eventtap.keyStroke() otherwise falls back to
+--- its 200 000 us default, which it implements as a BLOCKING usleep on the main run
+--- loop — long enough for macOS to disable the typing event tap it stalls.
 --- @param mods table List of modifiers (e.g. {"cmd", "shift"}).
 --- @param key string The key code or character.
 local function postKeyStroke(mods, key)
-	pcall(function() hs.eventtap.keyStroke(mods, key, 0) end)
+	pcall(function() hs.eventtap.keyStroke(mods, key, KEYSTROKE_NO_DELAY_US) end)
 end
 
 local function url_encode_query(value)
@@ -107,7 +117,7 @@ local function switch_to_previous_application()
     if ok and kl and type(kl.switch_to_previous_app) == "function" then
         pcall(kl.switch_to_previous_app)
     else
-        pcall(hs.eventtap.keyStroke, {"cmd"}, "tab")
+        postKeyStroke({"cmd"}, "tab")
     end
 end
 
@@ -117,7 +127,7 @@ local function switch_to_previous_window_precise()
     if ok and kl and type(kl.switch_to_previous_window) == "function" then
         pcall(kl.switch_to_previous_window)
     else
-        pcall(hs.eventtap.keyStroke, {"cmd"}, "tab")
+        postKeyStroke({"cmd"}, "tab")
     end
 end
 
@@ -127,7 +137,7 @@ function M.trigger_lookup()
 	pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseDown, pos):post() end)
 	pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseUp, pos):post() end)
 	hs.timer.doAfter(0.05, function()
-		pcall(function() hs.eventtap.keyStroke({"cmd", "ctrl"}, "d") end)
+		postKeyStroke({"cmd", "ctrl"}, "d")
 	end)
 end
 
@@ -140,13 +150,13 @@ M.toggle_left_click       = Click.toggle_left_click
 M.is_right_click_held     = Click.is_right_click_held
 
 local function show_application_switcher_overlay()
-    pcall(hs.eventtap.keyStroke, {"cmd"}, "tab")
+    postKeyStroke({"cmd"}, "tab")
 end
 
 --- Navigates between windows of the current application.
 local function winNav(goNext)
 	local key = goNext and "`" or "~"
-	pcall(function() hs.eventtap.keyStroke({"cmd"}, key) end)
+	postKeyStroke({"cmd"}, key)
 end
 
 --- Navigates between macOS Spaces (Desktops).
@@ -163,8 +173,8 @@ end
 
 -- Axis actions (prev / next)
 ax("tabs",       
-	function() pcall(hs.eventtap.keyStroke, {"ctrl", "shift"}, "tab") end,
-	function() pcall(hs.eventtap.keyStroke, {"ctrl"}, "tab") end, true)
+	function() postKeyStroke({"ctrl", "shift"}, "tab") end,
+	function() postKeyStroke({"ctrl"}, "tab") end, true)
 
 ax("char",       
 	function() postKeyStroke({}, "left") end,
@@ -211,20 +221,20 @@ ax("tracks",
 	function() sysKey("NEXT") end)
 
 ax("lines",      
-	function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end) end,
-	function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end) end, true)
+	function() hs.timer.doAfter(0, function() postKeyStroke({"alt"}, "up") end) end,
+	function() hs.timer.doAfter(0, function() postKeyStroke({"alt"}, "down") end) end, true)
 
 ax("line_bounds",
-	function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "left") end) end,
-	function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "right") end) end)
+	function() hs.timer.doAfter(0, function() postKeyStroke({"cmd"}, "left") end) end,
+	function() hs.timer.doAfter(0, function() postKeyStroke({"cmd"}, "right") end) end)
 
 ax("paragraphs", 
-	function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end,
-	function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end, true)
+	function() postKeyStroke({"alt"}, "up") end,
+	function() postKeyStroke({"alt"}, "down") end, true)
 
 ax("document",   
-	function() pcall(hs.eventtap.keyStroke, {"cmd"}, "up") end,
-	function() pcall(hs.eventtap.keyStroke, {"cmd"}, "down") end)
+	function() postKeyStroke({"cmd"}, "up") end,
+	function() postKeyStroke({"cmd"}, "down") end)
 
 -- Single actions
 sg("none",                         function() end)
@@ -238,23 +248,23 @@ sg("app_previous",      switch_to_previous_application)
 sg("app_window_previous",  switch_to_previous_window_precise)
 
 -- Keys
-sg("enter",                           function() pcall(hs.eventtap.keyStroke, {}, "return") end)
-sg("tab",                                function() pcall(hs.eventtap.keyStroke, {}, "tab") end)
-sg("escape",                           function() pcall(hs.eventtap.keyStroke, {}, "escape") end)
-sg("backspace",               function() pcall(hs.eventtap.keyStroke, {}, "delete") end)
-sg("delete",                    function() pcall(hs.eventtap.keyStroke, {}, "forwarddelete") end)
+sg("enter",                           function() postKeyStroke({}, "return") end)
+sg("tab",                                function() postKeyStroke({}, "tab") end)
+sg("escape",                           function() postKeyStroke({}, "escape") end)
+sg("backspace",               function() postKeyStroke({}, "delete") end)
+sg("delete",                    function() postKeyStroke({}, "forwarddelete") end)
 
 -- Tabs
-sg("tab_new",                  function() pcall(hs.eventtap.keyStroke, {"cmd"}, "t") end)
-sg("tab_close",                function() pcall(hs.eventtap.keyStroke, {"cmd"}, "w") end)
-sg("tab_prev",              function() pcall(hs.eventtap.keyStroke, {"ctrl", "shift"}, "tab") end)
-sg("tab_next",                function() pcall(hs.eventtap.keyStroke, {"ctrl"}, "tab") end)
+sg("tab_new",                  function() postKeyStroke({"cmd"}, "t") end)
+sg("tab_close",                function() postKeyStroke({"cmd"}, "w") end)
+sg("tab_prev",              function() postKeyStroke({"ctrl", "shift"}, "tab") end)
+sg("tab_next",                function() postKeyStroke({"ctrl"}, "tab") end)
 
 -- Windows & Spaces
 sg("win_prev",            function() winNav(false) end)
 sg("win_next",              function() winNav(true) end)
-sg("close_window",         function() pcall(hs.eventtap.keyStroke, {"cmd"}, "w") end)
-sg("fullscreen",                 function() pcall(hs.eventtap.keyStroke, {"cmd", "ctrl"}, "f") end)
+sg("close_window",         function() postKeyStroke({"cmd"}, "w") end)
+sg("fullscreen",                 function() postKeyStroke({"cmd", "ctrl"}, "f") end)
 sg("snap_left",              function()
 	local win = hs.window.focusedWindow()
 	if win then pcall(function() win:moveToUnit(hs.layout.left50) end) end
@@ -285,14 +295,14 @@ end)
 -- Cursor movement
 sg("word_prev",                function() postKeyStroke({"alt"}, "left") end)
 sg("word_next",                  function() postKeyStroke({"alt"}, "right") end)
-sg("line_up",               function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end) end)
-sg("line_down",               function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end) end)
-sg("line_start",              function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "left") end) end)
-sg("line_end",                  function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "right") end) end)
-sg("para_prev",         function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end)
-sg("para_next",           function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end)
-sg("doc_start",            function() pcall(hs.eventtap.keyStroke, {"cmd"}, "up") end)
-sg("doc_end",                function() pcall(hs.eventtap.keyStroke, {"cmd"}, "down") end)
+sg("line_up",               function() hs.timer.doAfter(0, function() postKeyStroke({"alt"}, "up") end) end)
+sg("line_down",               function() hs.timer.doAfter(0, function() postKeyStroke({"alt"}, "down") end) end)
+sg("line_start",              function() hs.timer.doAfter(0, function() postKeyStroke({"cmd"}, "left") end) end)
+sg("line_end",                  function() hs.timer.doAfter(0, function() postKeyStroke({"cmd"}, "right") end) end)
+sg("para_prev",         function() postKeyStroke({"alt"}, "up") end)
+sg("para_next",           function() postKeyStroke({"alt"}, "down") end)
+sg("doc_start",            function() postKeyStroke({"cmd"}, "up") end)
+sg("doc_end",                function() postKeyStroke({"cmd"}, "down") end)
 
 -- Media
 sg("vol_up",                        function() sysKey("SOUND_UP") end)
@@ -417,7 +427,7 @@ sg("search_web", function(binding)
 	local template = M.get_action_parameter(binding, "search_web")
 	if not M.validate_action_parameter("search_web", template) then return end
 	local old_clipboard = hs.pasteboard and hs.pasteboard.getContents and hs.pasteboard.getContents() or nil
-	pcall(hs.eventtap.keyStroke, {"cmd"}, "c")
+	postKeyStroke({"cmd"}, "c")
 	hs.timer.doAfter(0.08, function()
 		local selected = hs.pasteboard and hs.pasteboard.getContents and hs.pasteboard.getContents() or ""
 		if old_clipboard ~= nil and hs.pasteboard and hs.pasteboard.setContents then
@@ -434,7 +444,7 @@ sg("script_pause_toggle",     function()
 end)
 sg("script_reload",                       function() pcall(hs.reload) end)
 sg("script_save_reload",      function()
-	pcall(hs.eventtap.keyStroke, {"cmd"}, "s")
+	postKeyStroke({"cmd"}, "s")
 	hs.timer.doAfter(0.3, function() pcall(hs.reload) end)
 end)
 sg("script_quit",                         function()
@@ -828,7 +838,7 @@ local function register_modifier_chords(catalogue)
 			for index, modifier in ipairs(native_mods) do mods[index] = modifier end
 			MODIFIER_ACTION_LABELS[action_id] = action_label
 			action_ids[#action_ids + 1] = action_id
-			sg(action_id, function() pcall(hs.eventtap.keyStroke, mods, key) end)
+			sg(action_id, function() postKeyStroke(mods, key) end)
 		end
 		MODIFIER_ACTION_GROUPS[#MODIFIER_ACTION_GROUPS + 1] = {
 			label = label_prefix,
