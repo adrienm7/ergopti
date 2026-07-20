@@ -27,6 +27,14 @@
 ; #HotIf evaluation so tray-menu changes take effect without a reload.
 _AnyShortcutEnabled(Group) {
     global Features
+    ; Reachable from a PARSE-TIME #HotIf (base_modifier.ahk SC038 & SC03A) that
+    ; arms before boot assigns Features (ErgoptiPlus.ahk pre-pump block seeds
+    ; TapHold/LayerEnabled/CapsWordEnabled but NOT Features). A bare .Has() on the
+    ; still-unset global throws UnsetError inside the #HotIf evaluator; pre-ready
+    ; the fatal error net escalates that to ExitApp(1). Guard the global itself
+    ; first so the criterion simply reads "disabled" until Features exists
+    if !IsSet(Features)
+        return false
     if !Features.Has("shortcuts") or !Features["shortcuts"].Has(Group) {
         return false
     }
@@ -59,7 +67,7 @@ AltGrLAltShortcut() {
     ; sub-map to exist -- but a direct call (or a future dispatch path that
     ; skips the #HotIf) against malformed/missing config must degrade
     ; gracefully instead of throwing on the raw Map access below.
-    if !Features.Has("shortcuts") or !Features["shortcuts"].Has("alt_gr_lalt")
+    if !IsSet(Features) or !Features.Has("shortcuts") or !Features["shortcuts"].Has("alt_gr_lalt")
         return
     if Features["shortcuts"]["alt_gr_lalt"]["backspace"] {
         OneShotShiftFix()
@@ -125,7 +133,7 @@ AltGrCapsLockShortcut() {
     ; Defense-in-depth: same guard as AltGrLAltShortcut -- the #HotIf normally
     ; ensures this sub-map exists, but a direct call against malformed/missing
     ; config must degrade gracefully instead of throwing on the raw Map access.
-    if !Features.Has("shortcuts") or !Features["shortcuts"].Has("alt_gr_caps_lock")
+    if !IsSet(Features) or !Features.Has("shortcuts") or !Features["shortcuts"].Has("alt_gr_caps_lock")
         return
     if Features["shortcuts"]["alt_gr_caps_lock"]["backspace"] {
         TextPressKey("BackSpace", [])

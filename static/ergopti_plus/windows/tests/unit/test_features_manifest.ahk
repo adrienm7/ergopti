@@ -690,3 +690,63 @@ TestFMv2_HotIfFeaturesHasIsSetGuard() {
 Test("#HotIf Features[]: all occurrences have IsSet(Features) guard",
 	TestFMv2_HotIfFeaturesHasIsSetGuard)
 
+
+
+; ==================================================================
+; ===== 7.1) #HotIf-reachable HELPERS must self-guard Features =====
+; ==================================================================
+
+; F01 (audit 2026-07-20): base_modifier.ahk's parse-time `SC038 & SC03A` #HotIf is
+; `_LAltKeepsBareModifierForCapsLockCombo() and _AnyShortcutEnabled("lalt_caps_lock")`.
+; The helper _AnyShortcutEnabled dereferenced the global Features with a bare .Has().
+; The #HotIf arms at parse time, but Features is assigned only later in auto-execute
+; (ErgoptiPlus.ahk pre-pump seeds TapHold/LayerEnabled/CapsWordEnabled but NOT
+; Features) -- and never at all on an aborted boot -- so a keypress in that window threw
+; UnsetError INSIDE the #HotIf evaluator and the fatal-before-ready error net escalated
+; it to ExitApp(1) (field crash_reports/2026-07-19T08-03-45Z.json + 3 signatures on
+; 07-16). The section-7 scan above only sees literal `#HotIf ...Features[...` lines, so
+; the helper indirection was invisible to it. Root-cause guard: every function reachable
+; from a #HotIf (via helper) OR from a direct tap-hold call that bypasses the #HotIf must
+; guard IsSet(Features) BEFORE its first Features dereference.
+
+; Returns { ok, reason }: whether FuncName guards IsSet(Features) before its first
+; `Features.`/`Features[` dereference (full-line comments already stripped by
+; _DriverFuncBody, so only real code positions are compared).
+_FMv2_FeaturesGuardedBeforeDeref(FuncName) {
+	Body := _DriverFuncBody(FuncName)
+	if (Body == "")
+		return { ok: false, reason: FuncName . ": function body not found in driver source" }
+	GuardPos := InStr(Body, "IsSet(Features)")
+	DerefPos := 0
+	for Needle in ["Features.", "Features["] {
+		p := InStr(Body, Needle)
+		if (p and (DerefPos == 0 or p < DerefPos))
+			DerefPos := p
+	}
+	if (DerefPos == 0)
+		return { ok: true, reason: "" }  ; no dereference -> nothing to guard
+	if (GuardPos == 0)
+		return { ok: false, reason: FuncName . ": dereferences Features with no IsSet(Features) guard" }
+	if (GuardPos > DerefPos)
+		return { ok: false, reason: FuncName . ": IsSet(Features) guard comes AFTER first Features dereference" }
+	return { ok: true, reason: "" }
+}
+
+TestFMv2_HotIfReachableFeaturesGuarded() {
+	; _AnyShortcutEnabled is the #HotIf criterion helper; the three *Shortcut
+	; dispatchers are also reachable by direct tap-hold calls that bypass the #HotIf
+	; (capslock.ahk / nav_layer.ahk), so all four can run before Features is assigned.
+	Funcs := ["_AnyShortcutEnabled", "AltGrLAltShortcut", "AltGrCapsLockShortcut", "LAltCapsLockShortcut"]
+	Violations := []
+	for FuncName in Funcs {
+		Res := _FMv2_FeaturesGuardedBeforeDeref(FuncName)
+		if !Res.ok
+			Violations.Push(Res.reason)
+	}
+	AssertEqual(0, Violations.Length,
+		"#HotIf-reachable Features deref without preceding IsSet guard: "
+		. (Violations.Length > 0 ? Violations[1] : ""))
+}
+Test("#HotIf-reachable helpers: Features guarded by IsSet before first deref",
+	TestFMv2_HotIfReachableFeaturesGuarded)
+
