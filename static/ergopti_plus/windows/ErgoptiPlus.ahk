@@ -23,10 +23,19 @@ global _DriverMutexHandle := DllCall("CreateMutexW", "Ptr", 0, "Int", 0, "Str", 
 if (_DriverMutexHandle) {
 	; Take ownership, waiting (bounded) for any previous owner to release it (exit).
 	; 0 = WAIT_OBJECT_0 (acquired), 0x80 = WAIT_ABANDONED (prior owner died holding it
-	; — also acquired), 0x102 = WAIT_TIMEOUT (another instance is still alive).
+	; — also acquired), 0x102 = WAIT_TIMEOUT (another instance is STILL ALIVE and owns it).
 	_DriverMutexWait := DllCall("WaitForSingleObject", "Ptr", _DriverMutexHandle, "UInt", DRIVER_MUTEX_WAIT_MS, "UInt")
-	if (_DriverMutexWait == 0x102)
-		try LoggerWarn("ErgoptiPlus", "Another instance still held the single-owner mutex after {1} ms; continuing best-effort (#SingleInstance Force backstop).", DRIVER_MUTEX_WAIT_MS)
+	if (_DriverMutexWait == 0x102) {
+		; A live owner remains, so #SingleInstance Force did NOT replace it — its
+		; replacement races when several instances are launched at once. YIELD: exit
+		; before registering a single hook. Continuing here (the previous behaviour)
+		; is exactly what let a rapid multi-launch put N keyboard hooks on one machine
+		; and hang it. Trade-off: if Force loses that race on a legitimate relaunch,
+		; the new instance yields and the OLD one keeps running (quit + relaunch to
+		; apply changes) — vastly preferable to N live hook owners.
+		try LoggerWarn("ErgoptiPlus", "Another instance owns the single-owner mutex after {1} ms; yielding without registering any hook.", DRIVER_MUTEX_WAIT_MS)
+		ExitApp(0)
+	}
 }
 
 ; Single source of truth for the driver's baseline (non-boosted) process
