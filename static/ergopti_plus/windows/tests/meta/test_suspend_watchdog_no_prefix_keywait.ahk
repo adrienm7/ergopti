@@ -9,9 +9,13 @@
 ; cannot be cleared by synthetic events — it must be drained (by waiting for the
 ; physical key to lift) BEFORE Suspend() flips. _SuspendStateWatchdog is only a
 ; state-change DETECTOR; it reacts AFTER the flip, too late to drain. So the
-; invariant is: every code path that triggers a suspend must drain the prefix
-; first, which today means the single Suspend(-1) call lives inside ToggleSuspend,
-; and ToggleSuspend drains the prefix via _SuspendDrainPrefix() before flipping.
+; invariant is: every code path that triggers a suspend must confirm the prefix is
+; physically released BEFORE flipping. Today ToggleSuspend checks
+; _SuspendPrefixesAreClear() and, when a prefix is still held, defers via the
+; non-blocking _SuspendPendingPoll() instead of blocking; the Suspend(1)/Suspend(0)
+; flips live inside those two functions only. (The earlier design used a blocking
+; drain helper and a Suspend(-1) toggle; those names no longer exist and the guard
+; below fails if they are ever resurrected.)
 ;
 ; This test encodes that invariant as source text:
 ;   1. The ONLY Suspend(...) call in the driver is the Suspend(-1) inside
@@ -174,3 +178,20 @@ _SWNPK_BootCallsRelease() {
 		"_ReleasePhantomModifiers() must be CALLED at boot, not only defined — found " . Calls . " occurrence(s) of the bare call token in the driver tree")
 }
 Test("ErgoptiPlus: boot calls _ReleasePhantomModifiers (suspend-watchdog-no-prefix-keywait)", _SWNPK_BootCallsRelease)
+
+; F38 (audit 2026-07-20): the KeyWait -> non-blocking-poll refactor updated the
+; assertions but left the module docstrings, comments and this test's prose naming
+; _SuspendDrainPrefix()/Suspend(-1) — functions that no longer exist. Documentation is
+; half of the single source of truth, so a resurrected old name (in code OR prose) now
+; fails here rather than quietly misleading the next reader.
+_SWNPK_NoStaleDrainNames() {
+	Src := _DriverSourceConcat()
+	Assert(InStr(Src, "_SuspendDrainPrefix") = 0,
+		"the removed _SuspendDrainPrefix name must not reappear — the current design is _SuspendPrefixesAreClear + _SuspendPendingPoll")
+	Assert(InStr(Src, "Suspend(-1)") = 0,
+		"the removed Suspend(-1) toggle must not reappear — ToggleSuspend flips explicitly via Suspend(1)/Suspend(0)")
+	Assert(InStr(Src, "_SuspendPrefixesAreClear") > 0 && InStr(Src, "_SuspendPendingPoll") > 0,
+		"the current non-blocking prefix gate (_SuspendPrefixesAreClear + _SuspendPendingPoll) must exist")
+}
+Test("suspend: the removed drain-prefix names never reappear (docs match the implementation)",
+	_SWNPK_NoStaleDrainNames)
