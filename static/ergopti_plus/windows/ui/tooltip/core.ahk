@@ -76,6 +76,13 @@ global _TooltipLastItems := 0
 ; distinct object that SetTimer treats as a different timer.
 _TooltipTimerFn() {
     global _TooltipGeneration, _TooltipTimerGeneration
+    ; SetTimer bypasses native Suspend, like both sibling timers in this file
+    ; already guard against. Firing while paused would call _ResetPrefixBuffer()
+    ; below and mutate hotstring-engine state behind a driver the user believes
+    ; is off — the suspend reactor has already hidden the tooltip and reset the
+    ; engine, so there is nothing left for this timer to do.
+    if A_IsSuspended
+        return
     if (_TooltipTimerGeneration != _TooltipGeneration)
         return
     TooltipHide("TimerFn", true)
