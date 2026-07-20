@@ -26,6 +26,12 @@ local Timings    = require("lib.timings")
 
 local LOG = "shortcuts.actions.text"
 
+-- Explicit inter-key delay for simulated keystrokes. hs.eventtap.keyStroke()
+-- defaults this argument to 200 000 us and implements it as a BLOCKING usleep on
+-- the main run loop, so an omitted delay stalls the loop that services the typing
+-- event tap — long enough for macOS to disable it (kCGEventTapDisabledByTimeout).
+local KEYSTROKE_NO_DELAY_US = 0
+
 
 
 
@@ -179,7 +185,7 @@ local function do_transform(transform_func)
 	Logger.trace(LOG, "Text transformation started…")
 	local prior = pasteboard.getContents()
 	pasteboard.clearContents()
-	eventtap.keyStroke({"cmd"}, "c")
+	eventtap.keyStroke({"cmd"}, "c", KEYSTROKE_NO_DELAY_US)
 
 	timer.doAfter(COPY_SETTLE_SEC, function()
 		local sel = pasteboard.getContents()
@@ -265,16 +271,16 @@ end
 
 --- Selects the entire current line (Cmd+Left, then Cmd+Shift+Right).
 function M.select_line()
-	eventtap.keyStroke({"cmd"}, "left")
-	eventtap.keyStroke({"cmd", "shift"}, "right")
+	eventtap.keyStroke({"cmd"}, "left", KEYSTROKE_NO_DELAY_US)
+	eventtap.keyStroke({"cmd", "shift"}, "right", KEYSTROKE_NO_DELAY_US)
 end
 
 --- Wraps the current line in parentheses.
 function M.surround_with_parens()
-	eventtap.keyStroke({"cmd"}, "left")
+	eventtap.keyStroke({"cmd"}, "left", KEYSTROKE_NO_DELAY_US)
 	hs.eventtap.keyStrokes("(")
 	timer.doAfter(0.04, function()
-		eventtap.keyStroke({"cmd"}, "right")
+		eventtap.keyStroke({"cmd"}, "right", KEYSTROKE_NO_DELAY_US)
 		hs.eventtap.keyStrokes(")")
 	end)
 end
@@ -298,8 +304,8 @@ end
 
 --- Selects the current word under the cursor (Alt+Right, then Alt+Shift+Left).
 function M.select_word()
-	eventtap.keyStroke({"alt"}, "right")
-	eventtap.keyStroke({"alt", "shift"}, "left")
+	eventtap.keyStroke({"alt"}, "right", KEYSTROKE_NO_DELAY_US)
+	eventtap.keyStroke({"alt", "shift"}, "left", KEYSTROKE_NO_DELAY_US)
 end
 
 --- Returns the AXSelectedText of the focused UI element, or nil if unavailable.
