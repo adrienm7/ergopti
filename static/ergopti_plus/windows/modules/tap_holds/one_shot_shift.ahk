@@ -67,12 +67,14 @@ OneShotShift() {
 
     if (ihvText.EndReason == "Timeout") {
         return
-    } else if (ihvText.EndReason == "EndKey") {
-        ; InputHook is suppressive by default. Backspace, Enter and Delete end
-        ; this one-shot capture, but they still belong to the user and must
-        ; reach the foreground application exactly once.
-        if (ihvText.EndKey != "")
-            SendNewResult("{" . ihvText.EndKey . "}", False, False)
+    } else if (ihvText.EndReason == "EndKey" and (ihvText.EndKey = "BackSpace" or ihvText.EndKey = "Enter" or ihvText.EndKey = "Delete")) {
+        ; InputHook is suppressive by default. Only the three KeyOpt("E") control
+        ; keys (Backspace, Enter, Delete) end this one-shot capture yet still belong
+        ; to the user and must reach the foreground app exactly once. The punctuation
+        ; end keys (= % $ . , ' space + magic key) are ALSO EndKey terminations, so
+        ; this branch must NOT swallow them — restricting it to the control keys lets
+        ; them fall through to the SpecialCharacter dispatch below
+        SendNewResult("{" . ihvText.EndKey . "}", False, False)
         return
     } else if SpecialCharacter != "" {
         if OneShotShiftEnabled {
