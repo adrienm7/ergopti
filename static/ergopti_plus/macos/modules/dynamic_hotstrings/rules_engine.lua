@@ -168,7 +168,14 @@ local function register_prefix_entries()
 	end
 	Logger.debug(LOG, "Registering prefix-based dynamic hotstrings…")
 
-	local opts = { is_word = false, auto_expand = true, is_case_sensitive = true }
+	-- is_private marks every mapping built from personal_info.toml as PII. The
+	-- interceptor path above already refuses to log its result; these prefix
+	-- mappings take the EXPANDER path instead, which logs trigger AND replacement
+	-- to the 14-day log and the metrics store by default. Both sides must stay
+	-- out: the trigger prefix is itself a fragment of the secret (the first 5
+	-- digits of the SSN, the first 6 chars of the IBAN), so redacting only the
+	-- replacement would still leak
+	local opts = { is_word = false, auto_expand = true, is_case_sensitive = true, is_private = true }
 
 	local phone  = type(_personal_data.phone_number) == "string" and _personal_data.phone_number or tostring(_personal_data.phone_number or "")
 	local fphone = type(_personal_data.phone_number_clean) == "string" and _personal_data.phone_number_clean or tostring(_personal_data.phone_number_clean or "")
@@ -227,7 +234,9 @@ local function register_prefix_entries()
 		if #iban_raw >= 6 then
 			local iban_raw_pfx    = iban_raw:sub(1, 6)
 			local iban_spaced_pfx = SharedEngine.spaced_prefix(iban, 6)
-			local opts_ci = { is_word = false, auto_expand = true, is_case_sensitive = false }
+			-- is_private for the same reason as `opts` above: the IBAN and its
+			-- 6-char prefix trigger are both secret
+			local opts_ci = { is_word = false, auto_expand = true, is_case_sensitive = false, is_private = true }
 			_km.add(iban_raw_pfx,    iban:gsub("%s+", ""), opts_ci)
 			if iban_spaced_pfx ~= iban_raw_pfx then
 				_km.add(iban_spaced_pfx, iban, opts_ci)
