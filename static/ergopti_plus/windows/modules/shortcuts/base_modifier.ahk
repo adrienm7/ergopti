@@ -54,25 +54,25 @@ LAltCapsLockShortcut() {
     ; All ten possible actions are simple, no Shift inversion or modifier
     ; bracketing needed -- inline v2 if/else cascade (action table is the
     ; SIMPLE_ACTIONS Map that used to live in lib/dispatchers.ahk).
-    if Features["shortcuts"]["lalt_caps_lock"]["backspace"] {
+    if Features["shortcuts"]["lalt_caps_lock"].Get("backspace", false) {
         TextPressKey("BackSpace", [])
-    } else if Features["shortcuts"]["lalt_caps_lock"]["caps_lock"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"].Get("caps_lock", false) {
         ToggleCapsLock()
-    } else if Features["shortcuts"]["lalt_caps_lock"]["caps_word"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"].Get("caps_word", false) {
         ToggleCapsWord()
-    } else if Features["shortcuts"]["lalt_caps_lock"]["ctrl_backspace"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"].Get("ctrl_backspace", false) {
         TextPressKey("BackSpace", ["Ctrl"])
-    } else if Features["shortcuts"]["lalt_caps_lock"]["ctrl_delete"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"].Get("ctrl_delete", false) {
         TextPressKey("Delete", ["Ctrl"])
-    } else if Features["shortcuts"]["lalt_caps_lock"]["delete"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"].Get("delete", false) {
         TextPressKey("Delete", [])
-    } else if Features["shortcuts"]["lalt_caps_lock"]["enter"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"].Get("enter", false) {
         TextPressKey("Enter", [])
-    } else if Features["shortcuts"]["lalt_caps_lock"]["escape"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"].Get("escape", false) {
         TextPressKey("Escape", [])
-    } else if Features["shortcuts"]["lalt_caps_lock"]["one_shot_shift"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"].Get("one_shot_shift", false) {
         OneShotShift()
-    } else if Features["shortcuts"]["lalt_caps_lock"]["tab"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"].Get("tab", false) {
         TextPressKey("Tab", [])
     }
 }

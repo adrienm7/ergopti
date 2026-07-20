@@ -772,3 +772,21 @@ TestFMv2_PersonalEditorHotkeyIsFeatureGated() {
 Test("layout: personal-editor Win hotkey is feature-gated, not unconditional",
 	TestFMv2_PersonalEditorHotkeyIsFeatureGated)
 
+; F43 (audit 2026-07-20): the three chord dispatchers guarded only the GROUP
+; (Features["shortcuts"].Has(group)) but then raw-indexed all ten action leaves. A
+; config missing a single action key therefore turned every chord press into an
+; UnsetItemError — post-ready that means an error-net toast and a crash report on each
+; press. Every leaf read must degrade per-key via .Get(id, false).
+TestFMv2_ShortcutDispatchersUseGuardedLeafReads() {
+	for FuncName in ["LAltCapsLockShortcut", "AltGrLAltShortcut", "AltGrCapsLockShortcut"] {
+		Body := _DriverFuncBody(FuncName)
+		Assert(Body != "", FuncName . " must exist in modules/shortcuts/")
+		Assert(RegExMatch(Body, 'Features\["shortcuts"\]\["\w+"\]\["') = 0,
+			FuncName . " must read action flags with .Get(id, false), never a raw leaf index — one missing action key otherwise throws on every chord press")
+		Assert(InStr(Body, '.Get("backspace", false)') > 0,
+			FuncName . " must still dispatch its action cascade through guarded reads")
+	}
+}
+Test("shortcuts: chord dispatchers read action flags with guarded .Get, not raw indexes",
+	TestFMv2_ShortcutDispatchersUseGuardedLeafReads)
+
