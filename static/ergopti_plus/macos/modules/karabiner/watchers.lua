@@ -69,6 +69,19 @@ local LAYOUT_POLL_SEC = Timings.sec("ui", "layout_poll_ms")
 local _layout_poll_timer = nil
 -- Guard so the async fallback poll never piles up concurrent `defaults` reads.
 local _layout_poll_pending = false
+-- Max time to wait for the async layout read before force-releasing the pending
+-- guard. ShellRunner.spawn() returns a handle UNCONDITIONALLY — when the task
+-- constructor failed, handle.start() only logs an error — and task:start() can
+-- itself return false under fork pressure. Neither is a throw, and in both cases
+-- the completion callback never fires, so without this watchdog
+-- _layout_poll_pending latches true and the guard short-circuits EVERY later tick
+-- for the rest of the session, silently killing the Sequoia layout-change poll.
+local LAYOUT_POLL_TIMEOUT_SEC = 5.0
+-- Watchdog handle declared ABOVE the poll body (closure-before-local rule): a
+-- `local` declared textually after a closure that uses it binds the nil GLOBAL,
+-- and the resulting error inside an async callback is swallowed to the
+-- Hammerspoon Console — never reaching lib/logger.
+local _layout_poll_watchdog = nil
 
 -- Previous hs.keycodes.inputSourceChanged callback saved before start_input_source_watcher
 -- installs its own, so stop_input_source_watcher can restore it instead of passing nil
@@ -330,8 +343,24 @@ function M.start_input_source_watcher(on_change)
 		-- already in flight so back-to-back ticks under load cannot pile up tasks.
 		if _layout_poll_pending then return end
 		_layout_poll_pending = true
+		-- Arm the watchdog alongside the guard so a read whose completion callback
+		-- never fires still releases it and the next tick can retry. Scheduled via
+		-- the TimerScheduler adapter (not raw hs.timer.doAfter) so this OS call is
+		-- attributed to the adapter boundary, mirroring the CapsWord probe watchdog.
+		if _layout_poll_watchdog then TimerScheduler.cancel(_layout_poll_watchdog) end
+		_layout_poll_watchdog = TimerScheduler.after(LAYOUT_POLL_TIMEOUT_SEC, function()
+			_layout_poll_watchdog = nil
+			if _layout_poll_pending then
+				_layout_poll_pending = false
+				Logger.warn(LOG, "Layout poll read timed out — releasing the guard so the next tick can retry.")
+			end
+		end)
 		read_layout_async(function(current)
 			_layout_poll_pending = false
+			if _layout_poll_watchdog then
+				TimerScheduler.cancel(_layout_poll_watchdog)
+				_layout_poll_watchdog = nil
+			end
 			if current and current ~= _last_known_layout then
 				Logger.info(LOG, "Layout poll detected change: '%s' → '%s'.",
 					tostring(_last_known_layout), current)
@@ -359,6 +388,13 @@ function M.stop_input_source_watcher()
 		pcall(function() _layout_poll_timer:stop() end)
 		_layout_poll_timer = nil
 	end
+	-- Cancel the in-flight read's watchdog too, so it cannot fire after the watcher
+	-- is gone and flip the guard on a module that is no longer polling.
+	if _layout_poll_watchdog then
+		TimerScheduler.cancel(_layout_poll_watchdog)
+		_layout_poll_watchdog = nil
+	end
+	_layout_poll_pending = false
 	Logger.done(LOG, "Input source watcher stopped.")
 end
 
