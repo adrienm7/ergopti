@@ -106,6 +106,24 @@ function M.resume_bindings()
 	KeyboardShortcuts.start()
 end
 
+--- Re-arms the layout-dependent hotkeys after a keyboard-layout change, so they
+--- track the new physical key positions (hs.hotkey.bind resolves key names to
+--- scancodes at bind time).
+--- Unlike the pause_bindings()/resume_bindings() pair, this NEVER changes whether
+--- the layer is running: it is a no-op when the bindings are stopped. That pair is
+--- a symmetric round-trip only when the layer was ON to begin with — used here it
+--- silently re-enabled every shortcut the user had switched off from the menu on
+--- each layout change, while the tray checkbox still displayed OFF. A caller that
+--- merely wants to rebind must not be able to resurrect a layer the user turned
+--- off, so the running/stopped decision stays exclusively with the menu and with
+--- script_control (which snapshots the state before pausing).
+function M.rebind_for_layout()
+	if not Bindings.is_started() then return end
+	Bindings.rebind()
+	KeyboardShortcuts.stop()
+	KeyboardShortcuts.start()
+end
+
 --- Returns true when the binding layer is active (started and not stopped).
 --- @return boolean
 function M.is_bindings_started()

@@ -362,22 +362,29 @@ helpers.describe("Karabiner layout-change must NOT kill the script-control event
 	-- revives it, so AltGr+Enter died on the FIRST layout switch (which the pause-layout
 	-- feature triggers on every pause). The handler must rebind via pause_bindings /
 	-- resume_bindings, which leave the keycode-based eventtap alive.
-	helpers.it("karabiner/init.lua rebinds via pause_bindings/resume_bindings, never shortcuts.stop/start", function()
+	helpers.it("karabiner/init.lua rebinds via rebind_for_layout, never shortcuts.stop/start", function()
 		local src_path = helpers.driver_root() .. "modules/karabiner/init.lua"
 		local fh = io.open(src_path, "r")
 		helpers.assert_true(fh ~= nil, "must be able to read karabiner/init.lua")
 		local src = fh:read("*a"); fh:close()
 
-		-- The layout-rebind path must use the binding-only helpers…
-		helpers.assert_true(src:find("shortcuts.pause_bindings", 1, true) ~= nil,
-			"layout rebind must call shortcuts.pause_bindings")
-		helpers.assert_true(src:find("shortcuts.resume_bindings", 1, true) ~= nil,
-			"layout rebind must call shortcuts.resume_bindings")
+		-- The layout-rebind path must use the binding-only helper…
+		helpers.assert_true(src:find("shortcuts.rebind_for_layout", 1, true) ~= nil,
+			"layout rebind must call shortcuts.rebind_for_layout")
 		-- …and must NEVER stop/start the whole shortcuts module (that kills script-control).
 		helpers.assert_true(src:find("pcall(shortcuts.stop)", 1, true) == nil,
 			"layout rebind must not pcall(shortcuts.stop) — it tears down the script-control eventtap")
 		helpers.assert_true(src:find("pcall(shortcuts.start)", 1, true) == nil,
 			"layout rebind must not pcall(shortcuts.start) — Bindings-only proxy never revives script-control")
+		-- Strengthened: the pause/resume round-trip this call site used to perform is
+		-- itself now forbidden here. It is symmetric ONLY when the layer was already
+		-- running, so on a layer the user had switched off from the menu it silently
+		-- re-enabled every shortcut (and its stop() leg killed keep-awake). The
+		-- replacement helper is a no-op on a stopped layer by contract.
+		helpers.assert_true(src:find("pcall(shortcuts.pause_bindings)", 1, true) == nil,
+			"layout rebind must not pcall(shortcuts.pause_bindings) — the round-trip resurrects a disabled layer")
+		helpers.assert_true(src:find("pcall(shortcuts.resume_bindings)", 1, true) == nil,
+			"layout rebind must not pcall(shortcuts.resume_bindings) — it re-enables shortcuts the user turned off")
 	end)
 end)
 
