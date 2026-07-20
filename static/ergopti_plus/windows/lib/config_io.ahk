@@ -207,13 +207,15 @@ ToggleCategoryAllFeatures(Category, Value) {
         ; snapshot-on-OFF preserves any live section toggles made while it was on.
         V2Cat := _CategoryEnabledKey(Category)
         try LoggerDebug("Menu", "Live category toggle: {1} -> {2}.", Category, Bool ? "ON" : "OFF")
-        ; Wrap the WHOLE mutation window (snapshot/restore -> gate flip -> master
-        ; gates -> engine rebuild) in Critical, not just the final rebuild step —
-        ; otherwise a keystroke landing between the snapshot/restore and
-        ; RebuildHotstringsLive() could observe transiently inconsistent Features/
-        ; TapHold state via a concurrent #HotIf/InputHook evaluation.
-        ; RebuildHotstringsLive() re-enters Critical internally; that is safe, it
-        ; just re-applies "On" and hands back to the level saved here.
+        ; Critical covers ONLY the in-memory mutation window (snapshot/restore ->
+        ; gate flip -> master gates), so a keystroke can never observe a torn
+        ; Features/TapHold state through a concurrent #HotIf/InputHook evaluation.
+        ; It is released BEFORE persistence and the engine rebuild: both do
+        ; unbounded file I/O, and holding Critical across that starves the
+        ; low-level keyboard hook past LowLevelHooksTimeout, which makes Windows
+        ; silently drop physical keystrokes. RebuildHotstringsLive() is
+        ; deliberately Critical-free for exactly this reason and fences the
+        ; matcher with HSE_RebuildInProgress instead.
         _TcafCrit := Critical("On")
         try {
             if Bool {
@@ -222,12 +224,14 @@ ToggleCategoryAllFeatures(Category, Value) {
                 _HSSnapshotCategory(V2Cat)
             }
             CategoryEnabled[Category] := Bool
-            TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
             ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated, LoggerDebug)
-            RebuildHotstringsLive()
         } finally {
             Critical(_TcafCrit)
         }
+        TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
+        LoggerStart("Menu", "Applying live category toggle for {1}…", Category)
+        RebuildHotstringsLive()
+        LoggerSuccess("Menu", "Live category toggle applied for {1}.", Category)
         return
     }
     CategoryEnabled[Category] := Bool

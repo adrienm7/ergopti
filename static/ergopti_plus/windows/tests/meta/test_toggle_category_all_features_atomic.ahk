@@ -14,10 +14,19 @@
 ;
 ; The fix widens the Critical("On") span to start right before the first
 ; Features mutation (_HSRestoreCategory / _HSSnapshotCategory) and to cover
-; the gate flip, TOML write, ApplyMasterGatesToFeatures() and the
-; RebuildHotstringsLive() call, released in a finally block — mirroring the
-; precedent set by HSE_DisableGroup's Critical wrap (see
+; the gate flip and ApplyMasterGatesToFeatures(), released in a finally block
+; — mirroring the precedent set by HSE_DisableGroup's Critical wrap (see
 ; test_hse_disable_group_atomic.ahk).
+;
+; UPPER BOUND (F-01, audit 2026-07-20 second pass): the Critical span must
+; STOP before TOML_Write + RebuildHotstringsLive(). F33 removed Critical from
+; RebuildHotstringsLive precisely because that span does ~1.3 s of
+; registration plus a recursive personal-hotstrings + extensions rescan, and
+; holding Critical across it starves the LL keyboard hook past
+; LowLevelHooksTimeout so Windows silently DROPS physical keystrokes. That
+; guarantee is TRANSITIVE, so F33's own test — which only asserts Critical is
+; absent from RebuildHotstringsLive's body — could not see this caller
+; re-wrapping the call from the outside. Both bounds are pinned here.
 ;
 ; Meta-static rather than behavioral: the synchronous headless harness cannot
 ; reproduce the cooperative-threading preemption this guards against, so the
@@ -64,5 +73,46 @@ _TCAF_LiveToggleIsAtomic() {
 		"ToggleCategoryAllFeatures must release Critical in a finally block so an exception mid-rebuild cannot leak Critical")
 	Assert(InStr(Body, "Critical(_TcafCrit)") > 0,
 		"ToggleCategoryAllFeatures must restore the prior Critical state after the mutation window (no leaked Critical)")
+
+	; F-01: the UPPER bound. Critical must be RELEASED before the rebuild.
+	RelPos := InStr(Body, "Critical(_TcafCrit)")
+	Assert(RelPos < RebuildPos,
+		"ToggleCategoryAllFeatures must RELEASE Critical before RebuildHotstringsLive(): that call re-runs RegisterAllHotstrings (~1.3 s) and, via RebuildTrayMenu -> _HS_InvalidatePersonalCache, a full recursive personal-hotstrings + extensions rescan. Holding Critical across it starves the LL keyboard hook past LowLevelHooksTimeout and Windows silently drops physical keystrokes (F33 regression, reintroduced by this caller)")
+
+	WritePos := InStr(Body, "TOML_Write(Bool, ConfigurationFile")
+	Assert(WritePos > 0, "ToggleCategoryAllFeatures must persist the category gate")
+	Assert(RelPos < WritePos,
+		"the TOML write is unbounded file I/O and must also sit OUTSIDE the Critical span")
 }
 Test("config_io: ToggleCategoryAllFeatures live-category branch is Critical-wrapped end to end (F39)", _TCAF_LiveToggleIsAtomic)
+
+
+
+
+; ==========================================================
+; ==========================================================
+; ======= 2/ No caller holds Critical across the rebuild ====
+; ==========================================================
+; ==========================================================
+
+; Root cause of F-01: F33 removed Critical from RebuildHotstringsLive, but the
+; guarantee is TRANSITIVE — any caller that holds Critical across the call
+; restores the freeze just as effectively. A test scoped to the callee's body
+; cannot see that, so assert it across every known call site instead.
+_TCAF_NoCallerHoldsCriticalAcrossRebuild() {
+	for _, Fn in ["ToggleCategoryAllFeatures", "_HS_TryLiveToggleV2", "ToggleAllHotstrings"] {
+		Body := _DriverFuncBody(Fn)
+		if (Body == "")
+			continue
+		RebuildPos := InStr(Body, "RebuildHotstringsLive()")
+		if (RebuildPos == 0)
+			continue
+		AcqPos := InStr(Body, 'Critical("On")')
+		if (AcqPos == 0 or AcqPos > RebuildPos)
+			continue
+		RelPos := InStr(Body, "Critical(_")
+		Assert(RelPos > 0 and RelPos < RebuildPos,
+			Fn . " acquires Critical before RebuildHotstringsLive() and must release it first — holding Critical across the rebuild starves the LL keyboard hook past LowLevelHooksTimeout, so Windows silently drops physical keystrokes")
+	}
+}
+Test("config_io: no caller holds Critical across RebuildHotstringsLive (F-01)", _TCAF_NoCallerHoldsCriticalAcrossRebuild)
