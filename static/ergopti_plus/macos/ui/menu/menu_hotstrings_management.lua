@@ -402,7 +402,17 @@ function M.build_management(ctx)
 		disabled = paused or nil,
 		fn       = not paused and function()
 			local ok, win = pcall(require, "ui.hotstrings_config_window")
-			if ok and win and type(win.open) == "function" then pcall(win.open) end
+			if not ok or not win or type(win.open) ~= "function" then return end
+			-- make_category_delay_item bakes the resolved delay and the
+			-- "(default)" indicator into its title at BUILD time, so an override
+			-- edited in the window leaves those rows showing pre-edit values and a
+			-- false default tag until something else rebuilds the menu. Hand the
+			-- window an explicit refresh channel so the two UIs cannot desync.
+			win._on_config_changed = function()
+				ctx.save_prefs()
+				ctx.updateMenu()
+			end
+			pcall(win.open)
 		end or nil,
 	})
 	table.insert(delay_menu, { title = "-" })
