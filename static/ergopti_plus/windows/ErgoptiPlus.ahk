@@ -192,6 +192,14 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/first_boot.ahk
 #Include lib/tap_hold/tap_hold_loader.ahk
 #Include lib/tap_hold/tap_hold_writer.ahk
+; Tap-hold timing constants must load HERE, before lib/boot.ahk calls
+; TapHoldsLoadTimings(): AHK v2 executes a file's top-level `global X := sentinel`
+; assignments at its #Include position, so if constants.ahk loaded at its natural
+; spot (inside modules/tap_holds.ahk, far below boot.ahk) the sentinel 0s would
+; re-clobber the registry values boot.ahk just loaded. #Include dedupes by path,
+; so the later include via modules/tap_holds.ahk is a no-op (mirrors the
+; DYN_HOTSTRINGS_DEFAULT_DELAY early-layer precedent).
+#Include modules/tap_holds/constants.ahk
 #Include lib/master_gates.ahk
 #Include lib/manifest_descriptions.ahk
 #Include lib/menu_dispatcher.ahk
