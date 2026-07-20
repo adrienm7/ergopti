@@ -273,6 +273,22 @@ end
 -- =============================
 -- =============================
 
+--- Releases every live hotkey/eventtap object and empties the registry.
+--- Extracted so the two callers cannot drift apart on how an object is torn
+--- down: M.stop() (a genuine subsystem shutdown) and M.rebind() (a layout
+--- re-arm). Only the former owns the subsystem-level state — see M.stop().
+local function release_hotkeys()
+	for name, v in pairs(hotkeys) do
+		if v and type(v.delete) == "function" then
+			pcall(function() v:delete() end)
+		elseif v and type(v.disable) == "function" then
+			pcall(function() v:disable() end)
+		end
+		Logger.debug(LOG, "Hotkey '%s' unbound.", name)
+	end
+	hotkeys = {}
+end
+
 --- Binds all configured hotkeys and starts background tasks.
 function M.start()
 	if started then
@@ -319,20 +335,41 @@ function M.stop()
 	end
 	Logger.start(LOG, "Stopping shortcuts bindings…")
 
+	-- Only a genuine shutdown owns the keep-awake teardown. Keep-awake is
+	-- subsystem-level state (jiggler timer + persistent banner the user armed for
+	-- a meeting), not a hotkey object, so a layout re-arm has no business
+	-- cancelling it. M.rebind() must NEVER reach this line — routing the layout
+	-- rebind through stop() is what silently killed keep-awake, and the laptop
+	-- slept, on every input-source change (shortcuts-rebind-kills-keep-awake).
 	sys_acts.stop_awake()
 
-	for name, v in pairs(hotkeys) do
-		if v and type(v.delete) == "function" then
-			pcall(function() v:delete() end)
-		elseif v and type(v.disable) == "function" then
-			pcall(function() v:disable() end)
-		end
-		Logger.debug(LOG, "Hotkey '%s' unbound.", name)
-	end
-
-	hotkeys = {}
+	release_hotkeys()
 	started = false
 	Logger.success(LOG, "Shortcuts bindings stopped.")
+end
+
+--- Re-creates every hotkey object in place, WITHOUT touching subsystem-level
+--- state. hs.hotkey.bind resolves key names to physical scancodes at bind time,
+--- so after a keyboard-layout change the live bindings still point at the old
+--- layout's positions and must be rebuilt.
+--- Deliberately not M.stop() followed by M.start(): stop() also tears down
+--- keep-awake, which a layout switch must leave running. Hotkeys the caller
+--- turned off via M.disable() stay off, because M.start() honours _disabled_set.
+function M.rebind()
+	if not started then
+		-- A rebind is meaningless on a stopped layer, and re-arming from here
+		-- would resurrect hotkeys the user deliberately turned off
+		-- (shortcuts-layout-rebind-reenables).
+		Logger.debug(LOG, "M.rebind() called when not started — nothing to re-arm.")
+		return
+	end
+	Logger.trace(LOG, "Rebinding shortcuts hotkeys…")
+	release_hotkeys()
+	-- Clear the flag so M.start() runs its bind loop instead of early-returning
+	-- on the duplicate-start guard.
+	started = false
+	M.start()
+	Logger.done(LOG, "Shortcuts hotkeys rebound.")
 end
 
 --- Returns true when bindings have been started and not yet stopped.

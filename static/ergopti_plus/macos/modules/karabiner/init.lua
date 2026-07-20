@@ -757,15 +757,19 @@ function M.init(file_system)
 			end
 			-- Rebuild Hammerspoon hotkeys so they track the new physical key positions.
 			-- hs.hotkey.bind resolves key names at bind time, so existing bindings point
-			-- at the old layout's scancodes until they are re-bound. Use pause_bindings/
-			-- resume_bindings — NOT shortcuts.stop()/start(): stop() also tears down the
+			-- at the old layout's scancodes until they are re-bound. Use the dedicated
+			-- rebind helper — NOT shortcuts.stop()/start(): stop() also tears down the
 			-- script-control eventtap (AltGr+Enter pause/resume) and start() is a
 			-- Bindings-only proxy that never revives it, so the un-pause shortcut would
-			-- die on the first layout switch. These helpers rebind the layout-dependent
+			-- die on the first layout switch. The helper rebinds the layout-dependent
 			-- hotkeys while leaving the keycode-based, layout-independent eventtap alive.
-			if type(shortcuts.pause_bindings) == "function" and type(shortcuts.resume_bindings) == "function" then
-				pcall(shortcuts.pause_bindings)
-				pcall(shortcuts.resume_bindings)
+			-- Nor the pause_bindings/resume_bindings pair it replaced: that round-trip is
+			-- symmetric only when the layer was ON, so it re-enabled every shortcut the
+			-- user had switched off from the menu (and killed keep-awake via stop()) on
+			-- each layout change — which the pause-layout feature triggers on every pause.
+			-- rebind_for_layout() is a no-op on a stopped layer by contract.
+			if type(shortcuts.rebind_for_layout) == "function" then
+				pcall(shortcuts.rebind_for_layout)
 				Logger.info(LOG, "Shortcuts rebound for layout '%s'.", layout_name)
 			end
 		end)
