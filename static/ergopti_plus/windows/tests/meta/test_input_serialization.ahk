@@ -123,11 +123,14 @@ Test("meta input: keystroke path is Critical-serialized (no fast-typing reorder 
 ; HIGH-01: LayerDispatch (Shift/CapsLock layer) re-emitted SHIFTED_LETTERS via
 ; SendNewResult with no Critical, so a second fast key could start its remap
 ; thread mid-send and reorder the output. The pure-letter emit path must now be
-; serialized with Critical("On"). The SHIFT_SYMBOLS callback branch (Cb() called
-; with SerializeSymbols=false) must stay OUT of Critical because those callbacks
-; may Sleep (ActivateHotstrings). The CAPSLOCK_SYMBOLS branch (SerializeSymbols=true)
-; is the exception: none of its callbacks ever Sleep, so it opts INTO Critical
-; serialization (layer-dispatch-capslock-symbols-unserialized).
+; serialized with Critical("On"). BOTH real layer registrations now pass
+; SerializeSymbols=true: the old "SHIFT_SYMBOLS callbacks may Sleep" exemption rested
+; on a premise that has since rotted — ActivateHotstrings no longer Sleeps and runs
+; under its own Critical. Leaving the Shift layer unserialized let a neighbouring
+; remapped-letter emit (itself Critical) preempt between the two halves of an
+; NNBSP+symbol pair and transpose them when typing fast (F28). The generic
+; unserialized else arm survives as an opt-out default and is still asserted to stay
+; out of Critical; the premise-guard below fails if a Sleep is ever reintroduced.
 _MIS_CheckLayerDispatchCritical() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
 	Src := ""
@@ -144,10 +147,10 @@ _MIS_CheckLayerDispatchCritical() {
 	Assert(CritPos < EmitPos,
 		"LayerDispatch must enter Critical(On) BEFORE SendNewResult(SHIFTED_LETTERS) so the letter emit serializes (HIGH-01)")
 
-	; The unserialized (SHIFT_SYMBOLS) callback branch — the "else" arm of the
-	; SerializeSymbols conditional — must NOT wrap its Cb() in Critical: those
-	; callbacks may Sleep (ActivateHotstrings) and a Sleep under Critical breaks
-	; the no-yield guarantee.
+	; The generic unserialized arm — the "else" of the SerializeSymbols conditional —
+	; is the opt-out default (no real layer uses it any more). It must stay OUT of
+	; Critical so a future opt-out caller whose callback DOES yield is never forced
+	; under a no-yield guarantee.
 	ElsePos := InStr(Body, "} else {")
 	Assert(ElsePos > 0 and ElsePos < EmitPos,
 		"LayerDispatch must have an else branch (SerializeSymbols=false) for the unserialized symbol callback")
@@ -157,7 +160,7 @@ _MIS_CheckLayerDispatchCritical() {
 	ElseBlockEnd := InStr(Body, "}", , ElseCbPos)
 	ElseBlock := SubStr(Body, ElsePos, ElseBlockEnd - ElsePos)
 	Assert(!InStr(ElseBlock, "Critical("),
-		"LayerDispatch's unserialized else branch must NOT wrap Cb() in Critical — SHIFT_SYMBOLS callbacks may Sleep (HIGH-01)")
+		"LayerDispatch's opt-out else branch must NOT wrap Cb() in Critical — it exists for callers whose callback may yield")
 
 	; The serialized (CAPSLOCK_SYMBOLS) branch — SerializeSymbols=true — must wrap
 	; its Cb() in Critical, since none of those callbacks ever Sleep
@@ -170,6 +173,22 @@ _MIS_CheckLayerDispatchCritical() {
 	Assert(IfSerCritPos > 0 and IfSerCbPos > 0 and IfSerCritPos < IfSerCbPos and IfSerCbPos < ElsePos,
 		"LayerDispatch's SerializeSymbols branch must enter Critical(On) BEFORE Cb() so CAPSLOCK_SYMBOLS "
 		. "callbacks serialize against neighbouring remapped-letter emits (layer-dispatch-capslock-symbols-unserialized)")
+
+	; F28: the Shift layer must OPT IN too. Leaving it unserialized let a neighbouring
+	; remapped-letter emit (itself Critical) preempt between the NNBSP and the symbol of
+	; a French punctuation pair, transposing or splitting them when typing fast.
+	Assert(InStr(Src, "LayerDispatch.Bind(SC, SHIFT_SYMBOLS, true)") > 0,
+		"RegisterShiftLayer must bind the Shift layer with SerializeSymbols=true so an NNBSP+symbol pair cannot be split by a neighbouring emit (F28)")
+	Assert(InStr(Src, "LayerDispatch.Bind(SC, SHIFT_SYMBOLS)") = 0,
+		"no Shift-layer binding may omit SerializeSymbols — an unserialized symbol emit re-opens the interleave window (F28)")
+
+	; Premise guard: serializing is only safe while those callbacks never yield. If a
+	; Sleep is ever reintroduced into ActivateHotstrings, this fails and forces the
+	; serialization decision to be revisited instead of silently breaking no-yield.
+	Activate := _DriverFuncBody("ActivateHotstrings")
+	Assert(Activate != "", "ActivateHotstrings must exist in lib/hotstrings/hotstring_send.ahk")
+	Assert(InStr(Activate, "Sleep(") = 0,
+		"ActivateHotstrings must not Sleep: the Shift layer now runs its callbacks under Critical, and a Sleep under Critical breaks the no-yield guarantee (revisit F28 if this changes)")
 }
 
 ; HIGH-01: AltGrShiftDispatch invoked its AltGr emit callback with no Critical,
