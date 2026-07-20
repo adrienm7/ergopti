@@ -431,19 +431,15 @@ GestureScreenshotInstant() {
             DirCreate(PicsDir)
         Timestamp := FormatTime(, "yyyy_MM_dd_HH") . "h" . FormatTime(, "mm") . "min" . FormatTime(, "ss") . "sec"
         FilePath := PicsDir . "\screenshot_" . Timestamp . ".png"
-        ; Inline the capture code via -Command instead of writing a temp .ps1 file.
-        ; A fixed temp-file path caused a race condition: rapid successive calls had the
-        ; second PowerShell instance overwrite the file while the first was still reading it
-        ; (gesture-screenshot-tempfile-race). Inlining eliminates the shared-file bottleneck
-        ; and removes the need for FileDelete + FileAppend on the hotkey thread.
-        PsCode := "Add-Type -AssemblyName System.Drawing;"
-            . "$bmp=New-Object System.Drawing.Bitmap(" . WW . "," . WH . ");"
-            . "$g=[System.Drawing.Graphics]::FromImage($bmp);"
-            . "$g.CopyFromScreen(" . WX . "," . WY . ",0,0,$bmp.Size);"
-            . "$bmp.Save('" . FilePath . "');"
-            . "$g.Dispose();$bmp.Dispose()"
-        Run('powershell -NoProfile -NonInteractive -WindowStyle Hidden -Command "' . PsCode . '"',, "Hide")
-        try TrayTip(StrReplace(t("notify.screenshot_saved_path"), "%s", FilePath), t("notify.screenshot_title"), "Iconi Mute")
+        ; Route through the hardened shared capture path instead of an inline
+        ; fire-and-forget PowerShell block. GestureCaptureRegion escapes the path for
+        ; PowerShell (a USERPROFILE containing an apostrophe used to break the inline
+        ; single-quoted save call and kill the worker silently), polls the postcondition
+        ; with a deadline, fails closed while suspended, and reports success ONLY once
+        ; the file actually exists — the old code announced "saved" before the worker
+        ; had even run, so a failed capture still claimed success.
+        LoggerStart("gestures", "Capturing screen to '{1}'…", FilePath)
+        GestureCaptureRegion(WX, WY, WW, WH, "save", FilePath, GestureScreenshotComplete.Bind("Instant", "save", FilePath))
     } catch as Err {
         LoggerError("gestures", "GestureScreenshotInstant launch failed: {1}", Err.Message)
         try TrayTip("Screenshot could not start.", "ErgoptiPlus", "Iconx Mute")
