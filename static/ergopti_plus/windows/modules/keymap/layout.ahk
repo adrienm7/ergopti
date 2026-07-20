@@ -526,6 +526,15 @@ global UIA_SELECTION_MAX_TEXT_CHARS := 8192
 _UIA_SelectionPollTick() {
 	global _UIA_SelectionCache, UIA, _UIA_NO_TP_CACHE, _UIA_NO_TP_TTL_MS
 	global UIA_SELECTION_IDLE_REQUIRED_MS, UIA_SELECTION_MAX_TEXT_CHARS
+	global _DriverBootPhase
+	; No UIA/COM work before the driver is ready. This timer is armed at include
+	; position, so without this gate it fires several times during the multi-second
+	; RegisterAllHotstrings boot phase — each tick doing out-of-proc STA COM round-trips
+	; that pump messages and preempt the auto-execute registration thread (the
+	; no-timers-armed-mid-boot policy). It also keeps the Features read below out of the
+	; pre-ready window, where a Map-shape drift would throw into the fatal error net.
+	if (IsSet(_DriverBootPhase) && _DriverBootPhase != "ready")
+		return
     ; SetTimer bypasses native Suspend — a paused driver must do ZERO UIA work
     ; (« pause = tout éteint »): the 3-hop COM round-trip + unbounded GetText(-1)
     ; would keep firing every 500 ms on the keyboard thread while paused.
@@ -537,7 +546,7 @@ _UIA_SelectionPollTick() {
     ; When the wrap feature is off, skip the COM round-trip entirely so non-users
     ; never pay the per-tick cost or the large-selection keyboard-thread stall
     ; risk (uia-poll-bypasses-suspend).
-    if !Features["shortcuts"]["wrap_text_if_selected"] {
+    if (!Features.Has("shortcuts") || !Features["shortcuts"].Has("wrap_text_if_selected") || !Features["shortcuts"]["wrap_text_if_selected"]) {
 		_UIA_SelectionCache := 0
         return
     }
