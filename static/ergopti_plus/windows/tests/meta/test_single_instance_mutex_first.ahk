@@ -40,6 +40,19 @@ _SIMF_MutexEstablishedBeforeHookAndPump() {
 		"the single-owner mutex must be acquired BEFORE Bundle_Init() (its RunWait pumps the first message loop), so exclusivity precedes the first message pump")
 	Assert(MutexPos < HookPos,
 		"the single-owner mutex must be acquired BEFORE HookDispatcher.Start(), so two instances never co-own the keyboard hook")
+
+	; Acquiring is not enough: when a LIVE owner remains (WAIT_TIMEOUT), the new
+	; instance must YIELD — exit before registering anything. The first version of this
+	; fix logged a warning and continued, which is precisely what let a rapid
+	; multi-launch put N keyboard hooks on one machine and hang it (#SingleInstance
+	; Force's replacement races when several instances start at once).
+	TimeoutPos := InStr(Code, "0x102")
+	Assert(TimeoutPos > 0, "the mutex gate must test for WAIT_TIMEOUT (0x102)")
+	ExitPos := InStr(Code, "ExitApp", , TimeoutPos)
+	Assert(ExitPos > TimeoutPos,
+		"on WAIT_TIMEOUT (a live owner remains) the instance must ExitApp and yield, never continue best-effort")
+	Assert(ExitPos < BundlePos && ExitPos < HookPos,
+		"the yield must happen BEFORE Bundle_Init and HookDispatcher.Start, so a yielding instance never registers a hook")
 }
 Test("boot: single-owner mutex is acquired before the message pump and hook registration",
 	_SIMF_MutexEstablishedBeforeHookAndPump)
