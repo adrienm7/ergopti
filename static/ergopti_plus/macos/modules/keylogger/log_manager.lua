@@ -1176,8 +1176,15 @@ function M.init(core_state)
 		end
 	end
 
-	-- Fallback init for Rotation when the DB path above didn't run.
-	if not Rotation.get_offset then
+	-- Rotation is normally initialised inside the SQLite branch above, which is
+	-- skipped entirely when db.sqlite cannot be opened. Without this fallback
+	-- Rotation._require_init rejects EVERY append_log, so not a single keystroke
+	-- reaches today.log — contradicting the JSONL-only contract logged above.
+	-- The previous probe (`not Rotation.get_offset`) was unreachable dead code:
+	-- the accessor is defined at require time and is always truthy, so the test
+	-- must interrogate the initialisation flag itself, never a function's existence.
+	if not Rotation.is_initialized() then
+		Logger.warn(LOG, "SQLite cache unavailable — initialising rotation for JSONL-only operation.")
 		Rotation.init({ paths = _paths, state = _state })
 	end
 

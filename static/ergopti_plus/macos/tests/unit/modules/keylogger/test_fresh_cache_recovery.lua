@@ -21,7 +21,8 @@ package.loaded["lib.timings"] = {
 }
 package.loaded["modules.keylogger.timestamp"] = { now_ts = function() return "2026-07-18 12:00:00.000" end }
 package.loaded["modules.keylogger.rotation"] = {
-	init = function() end, append_log = function() end, read_new_entries = function() return {}, 0 end,
+	init = function() end, is_initialized = function() return true end,
+	append_log = function() end, read_new_entries = function() return {}, 0 end,
 	get_offset = function() return 0 end, get_date = function() return "2026-07-18" end,
 	set_offset = function() end, rollover = function() end,
 }

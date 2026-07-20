@@ -186,6 +186,7 @@ local function load_real_day_rollover(stall)
 	local offset = 0
 	package.loaded["modules.keylogger.rotation"] = {
 		init = function() end,
+		is_initialized = function() return true end,
 		append_log = function() end,
 		read_new_entries = function()
 			if stall then
