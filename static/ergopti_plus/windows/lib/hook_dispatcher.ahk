@@ -267,6 +267,23 @@ class HookDispatcher {
 	; ==============================================
 	; ===========================================================
 
+	; Reports a tap-hold tracker fault WITHOUT logging per keystroke. The tracker calls
+	; below sit on the per-keystroke fan-out, so they were written as bare `try` — but a
+	; silently swallowed tracker fault degrades tap-hold disambiguation invisibly
+	; (§5.3: never swallow without at minimum a log). Throttle by signature exactly like
+	; Dispatch's _err_cache: one warning per fault signature per 60 s.
+	static _TrackFault(Label, e) {
+		static _track_err_cache := Map()
+		sig := Label . ":" . e.Message
+		now := A_TickCount
+		if (_track_err_cache.Count >= 256)
+			_track_err_cache.Clear()
+		if (!_track_err_cache.Has(sig) || ((now - _track_err_cache[sig]) & 0xFFFFFFFF) > 60000) {
+			_track_err_cache[sig] := now
+			try LoggerWarn("HookDispatcher", "Tap-hold tracker '{1}' threw: {2}.", Label, e.Message)
+		}
+	}
+
 	; Bound to IH.OnChar — receives (ih, char) from AHK.
 	static _OnChar(ih, char) {
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_CHAR, ih, char)
@@ -275,17 +292,25 @@ class HookDispatcher {
 	; Bound to IH.OnKeyDown — receives (ih, vk, sc) from AHK.
 	static _OnKeyDown(ih, vk, sc) {
 		try TapHoldTrackKeyDownByScancode(vk, sc)
+		catch as _thTrackErr
+			HookDispatcher._TrackFault("TapHoldTrackKeyDownByScancode", _thTrackErr)
 		try TapHoldTrackOtherKeyActivityByScancode(vk, sc)
+		catch as _thTrackErr
+			HookDispatcher._TrackFault("TapHoldTrackOtherKeyActivityByScancode", _thTrackErr)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_DOWN, ih, vk, sc)
 	}
 
 	; Bound to IH.OnKeyUp — receives (ih, vk, sc) from AHK.
 	static _OnKeyUp(ih, vk, sc) {
 		try TapHoldTrackKeyUpByScancode(vk, sc)
+		catch as _thTrackErr
+			HookDispatcher._TrackFault("TapHoldTrackKeyUpByScancode", _thTrackErr)
 		; A release is activity too: if another key was already held before the
 		; tap-hold candidate, releasing it during the candidate must prevent the
 		; candidate's tap output. The released tap-hold key excludes itself.
 		try TapHoldTrackOtherKeyActivityByScancode(vk, sc)
+		catch as _thTrackErr
+			HookDispatcher._TrackFault("TapHoldTrackOtherKeyActivityByScancode", _thTrackErr)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_UP, ih, vk, sc)
 	}
 
@@ -336,6 +361,8 @@ class HookDispatcher {
 	}
 	static _OnWheelUp(*) {
 		try TapHoldTrackScrollCancel()
+		catch as _thTrackErr
+			HookDispatcher._TrackFault("TapHoldTrackScrollCancel", _thTrackErr)
 		HookDispatcher._last_wheel_tick := A_TickCount
 		if LoggerIsDebugEnabled()
 			LoggerDebug("HookDispatcher", "Mouse wheel up hotkey at tick={1}.", HookDispatcher._last_wheel_tick)
@@ -343,6 +370,8 @@ class HookDispatcher {
 	}
 	static _OnWheelDown(*) {
 		try TapHoldTrackScrollCancel()
+		catch as _thTrackErr
+			HookDispatcher._TrackFault("TapHoldTrackScrollCancel", _thTrackErr)
 		HookDispatcher._last_wheel_tick := A_TickCount
 		if LoggerIsDebugEnabled()
 			LoggerDebug("HookDispatcher", "Mouse wheel down hotkey at tick={1}.", HookDispatcher._last_wheel_tick)
@@ -350,6 +379,8 @@ class HookDispatcher {
 	}
 	static _OnWheelRight(*) {
 		try TapHoldTrackScrollCancel()
+		catch as _thTrackErr
+			HookDispatcher._TrackFault("TapHoldTrackScrollCancel", _thTrackErr)
 		HookDispatcher._last_wheel_tick := A_TickCount
 		if LoggerIsDebugEnabled()
 			LoggerDebug("HookDispatcher", "Mouse wheel right hotkey at tick={1}.", HookDispatcher._last_wheel_tick)
@@ -357,6 +388,8 @@ class HookDispatcher {
 	}
 	static _OnWheelLeft(*) {
 		try TapHoldTrackScrollCancel()
+		catch as _thTrackErr
+			HookDispatcher._TrackFault("TapHoldTrackScrollCancel", _thTrackErr)
 		HookDispatcher._last_wheel_tick := A_TickCount
 		if LoggerIsDebugEnabled()
 			LoggerDebug("HookDispatcher", "Mouse wheel left hotkey at tick={1}.", HookDispatcher._last_wheel_tick)
@@ -371,6 +404,8 @@ class HookDispatcher {
 		if (delta > 0x7FFF)
 			delta := delta - 0x10000
 		try TapHoldTrackScrollCancel()
+		catch as _thTrackErr
+			HookDispatcher._TrackFault("TapHoldTrackScrollCancel", _thTrackErr)
 		HookDispatcher._last_wheel_tick := A_TickCount
 		if LoggerIsDebugEnabled() {
 			now := A_TickCount
@@ -409,6 +444,8 @@ class HookDispatcher {
 	; timestamp and emit the scroll event.
 	static _CancelTapHoldActivity(reason := "mouse button during hold") {
 		try TapHoldTrackActivityCancel("", reason)
+		catch as _thTrackErr
+			HookDispatcher._TrackFault("TapHoldTrackActivityCancel", _thTrackErr)
 	}
 
 	; Backward-compatible alias retained for modules still calling the old name.
