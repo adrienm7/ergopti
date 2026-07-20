@@ -104,17 +104,29 @@ KLWV_AssetPath(which) {
     return base
 }
 
-; Resolve the absolute file:// URL of a dashboard’s index.html.
+; Virtual host mapped onto _SharedDir. `file://` is an OPAQUE origin: Chromium
+; treats every file:// document as a unique security origin, and the
+; window.chrome.webview message channel does not reliably deliver from it —
+; postMessage returns undefined (so the page looks healthy) while nothing ever
+; arrives host-side. Every interactive control on the dashboard was therefore
+; dead: changing the date range or app filter posted a message that never landed,
+; and the loader spinner span forever. The ui/ hosts were all migrated to a
+; virtual host; these two modules/ hosts were missed.
+global KLWV_VHOST := "ergopti.metrics"        ; -> _SharedDir
+global KLWV_HOST_ACCESS_ALLOW := 1
+
+; Resolve the https:// URL of a dashboard's index.html, served from the virtual
+; host. Cache-busted: WebView2 caches virtual-host sub-resources by URL, so an
+; edited frontend would otherwise be served stale.
 KLWV_AssetUrl(which) {
-    return "file:///" . StrReplace(KLWV_AssetPath(which), "\", "/")
+    global KLWV_VHOST
+    return "https://" . KLWV_VHOST . "/ui/metrics_" . which . "/index.html?cb=" . A_TickCount
 }
 
-; Resolve the absolute file:// URL of the shared locales directory.
-; Matches the convention used by OllamaWV_LocalesUrl in ollama_webview.ahk.
+; Resolve the https:// URL of the shared locales directory, same virtual host.
 KLWV_LocalesUrl() {
-    global _SharedDir
-    base := _SharedDir . "\data\locales\"
-    return "file:///" . StrReplace(base, "\", "/")
+    global KLWV_VHOST
+    return "https://" . KLWV_VHOST . "/data/locales/"
 }
 
 
@@ -260,6 +272,17 @@ KLWV_Open(which, metrics_dir) {
         return false
     }
     try FileAppend("[" . A_Now . "] i18n seed: base=" . locales_url . " locale=" . locale_code . "`r`n", log, "UTF-8")
+
+    ; Map the virtual host BEFORE navigating — the mapping must exist when the
+    ; document is created or the https:// URL cannot resolve.
+    global KLWV_VHOST, KLWV_HOST_ACCESS_ALLOW, _SharedDir
+    try webview.SetVirtualHostNameToFolderMapping(KLWV_VHOST, _SharedDir, KLWV_HOST_ACCESS_ALLOW)
+    catch as err {
+        try LoggerError("Keylogger",
+            "KLWV_Open: virtual-host mapping failed ('{1}') — the JS bridge would be dead, aborting.", err.Message)
+        KLWV_AbortOpen(g, controller, udir)
+        return false
+    }
 
     asset := KLWV_AssetUrl(which)
     try FileAppend("[" . A_Now . "] navigating to " . asset . "`r`n", log, "UTF-8")

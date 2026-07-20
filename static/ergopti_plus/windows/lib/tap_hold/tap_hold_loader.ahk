@@ -33,6 +33,12 @@
 ; false). Single source for the former 0.2 literal that TapHoldDuration used to
 ; duplicate across its two return branches
 global TAPHOLD_DEFAULT_ACTIVATION_SECONDS := 0.2
+; Upper sanity bound for a hold threshold read from the user-editable
+; tap_hold.toml. A hold longer than this is certainly a typo (a stray unit, a
+; misplaced decimal point) rather than an intent, and the value is concatenated
+; straight into a KeyWait timeout — so anything past it is rejected at the
+; loader boundary instead of stalling a hotkey thread for minutes.
+global TAPHOLD_MAX_ACTIVATION_SECONDS := 10
 
 
 
@@ -289,7 +295,24 @@ TapHoldDuration(TapHold, KeyId) {
 		return TAPHOLD_DEFAULT_ACTIVATION_SECONDS
 	}
 	Entry := TapHold["keys"][KeyId]
-	return Entry.Has("time_activation_seconds") ? Entry["time_activation_seconds"] : TAPHOLD_DEFAULT_ACTIVATION_SECONDS
+	if !Entry.Has("time_activation_seconds")
+		return TAPHOLD_DEFAULT_ACTIVATION_SECONDS
+	Raw := Entry["time_activation_seconds"]
+	; Validate at the boundary (fail fast, copilot-instructions 5.3). This value
+	; comes verbatim from the user-editable tap_hold.toml and is concatenated into
+	; a KeyWait option string ("T" . value) at ~11 call sites. A non-numeric entry
+	; produced "Tabc", and KeyWait then THREW on the hook thread — after
+	; TapHoldSyntheticKeyDown had already armed a synthetic modifier and before its
+	; release, which is what made the modifier-latch window reachable at all. The
+	; throw was absorbed by the global error net, so the user only saw a tap-hold
+	; that intermittently did nothing, never a config error.
+	if (!IsNumber(Raw) or Raw <= 0 or Raw > TAPHOLD_MAX_ACTIVATION_SECONDS) {
+		try LoggerWarn("TapHoldLoader",
+			"Invalid time_activation_seconds '{1}' for tap-hold key '{2}' — falling back to {3}s.",
+			Raw, KeyId, TAPHOLD_DEFAULT_ACTIVATION_SECONDS)
+		return TAPHOLD_DEFAULT_ACTIVATION_SECONDS
+	}
+	return Raw
 }
 
 ; Return the configured hold modifier for ``KeyId`` (e.g. "ctrl", "shift",

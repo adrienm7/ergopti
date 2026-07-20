@@ -292,6 +292,14 @@ PrefixWatcherSuppress(YesNo) {
 		_PrefixWatcherSuppressed += 1
 	else
 		_PrefixWatcherSuppressed := Max(0, _PrefixWatcherSuppressed - 1)
+	; Deliberately does NOT call HSE_Suppress. The render guard and the engine's
+	; own suppression are separate on purpose: the engine window exists to filter
+	; its OWN SendInput output, and physical input declares itself with
+	; IsPhysical=true instead (F46). Delegating here would drop a physical
+	; character typed inside a nearby output transaction — pinned by
+	; tests/meta/test_hse_physical_input_provenance.ahk, which asserts this call
+	; is absent. Any comment elsewhere claiming this function holds both counters
+	; is stale; HSE_Suppressed is not part of this contract.
 }
 
 ; Enqueue a fired-hotstring metrics record and (once) arm the drain timer. O(1)
