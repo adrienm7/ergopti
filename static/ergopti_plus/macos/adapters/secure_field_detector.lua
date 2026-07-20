@@ -11,7 +11,9 @@
 --- FEATURES & RATIONALE:
 --- 1. AX role detection: macOS exposes AXSecureTextField for password inputs via
 ---    the Accessibility API; this is the most reliable signal available without
----    reading the actual field content.
+---    reading the actual field content. Both AXRole and AXSubrole are consulted
+---    because native AppKit controls carry the marker on the role while
+---    WebKit/Blink browsers carry it on the subrole of a plain AXTextField.
 --- 2. Known-app guard: some security apps never expose a secure role (e.g. vault
 ---    unlock screens rendered in WebKit); the hardcoded list provides a second
 ---    line of defence for those cases.
@@ -34,6 +36,11 @@ local LOG = "adapters.secure_field_detector"
 -- ======= 1/ Constants =======
 -- ============================
 -- ============================
+
+-- The AX value that marks a password input. Native AppKit controls expose it as
+-- the element's AXRole, while WebKit/Blink expose it as the AXSubrole of a plain
+-- AXTextField — so both attributes must be tested (see M.isSecureField).
+local SECURE_ROLE = "AXSecureTextField"
 
 -- Apps whose entire surface is considered sensitive regardless of AX role
 local SECURE_APP_IDS = {
@@ -61,6 +68,11 @@ local SECURE_APP_IDS = {
 -- Cached AXRole of the focused element, populated by refresh()
 local _cached_role = nil
 
+-- Cached AXSubrole of the focused element, populated by refresh(). Kept beside
+-- the role because Chromium-family browsers report a password input as
+-- AXRole = AXTextField with the secure marker demoted to the subrole.
+local _cached_subrole = nil
+
 
 
 
@@ -74,39 +86,52 @@ local _cached_role = nil
 --- Uses applicationElementForPID + AXFocusedUIElement — the only stable HS API for this.
 --- hs.axuielement.focusedElement() does not exist in Hammerspoon; accessing the focused
 --- element requires going through the application's accessibility tree (H2 audit fix).
---- Errors are silently ignored; _cached_role is set to nil on failure.
+--- Errors are silently ignored; both cached attributes are reset to nil on failure.
 function M.refresh()
+	-- Every early exit below must clear BOTH attributes: leaving a stale subrole
+	-- behind would keep reporting a password field long after focus moved away.
+	local function clear_cache()
+		_cached_role    = nil
+		_cached_subrole = nil
+	end
+
 	local ok, err = pcall(function()
 		if not (hs.axuielement and hs.axuielement.applicationElementForPID) then
-			_cached_role = nil
+			clear_cache()
 			return
 		end
 
 		local app = hs.application.frontmostApplication()
-		if not app then _cached_role = nil; return end
+		if not app then clear_cache(); return end
 
 		local pid    = app:pid()
 		local app_el = hs.axuielement.applicationElementForPID(pid)
-		if not app_el then _cached_role = nil; return end
+		if not app_el then clear_cache(); return end
 
 		local focused = app_el:attributeValue("AXFocusedUIElement")
 		if focused then
-			_cached_role = focused:attributeValue("AXRole")
+			_cached_role    = focused:attributeValue("AXRole")
+			_cached_subrole = focused:attributeValue("AXSubrole")
 		else
-			_cached_role = nil
+			clear_cache()
 		end
 	end)
 
 	if not ok then
 		Logger.debug(LOG, "refresh(): axuielement unavailable — %s", tostring(err))
-		_cached_role = nil
+		clear_cache()
 	end
 end
 
 --- Returns true if the currently focused element is a secure text field.
---- @return boolean True when the cached AXRole is "AXSecureTextField".
+--- Both attributes are tested because the two UI toolkits disagree on where the
+--- secure marker lives: native AppKit sets AXRole = AXSecureTextField, whereas
+--- WebKit/Blink report AXRole = AXTextField and demote the marker to AXSubrole.
+--- Testing the role alone therefore fails OPEN on every Chrome/Edge/Brave/Arc
+--- login form, letting the keylogger record the user's password characters.
+--- @return boolean True when either cached attribute is "AXSecureTextField".
 function M.isSecureField()
-	return _cached_role == "AXSecureTextField"
+	return _cached_role == SECURE_ROLE or _cached_subrole == SECURE_ROLE
 end
 
 --- Returns true if the given app ID belongs to a known security-sensitive app.

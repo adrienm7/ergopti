@@ -31,6 +31,35 @@ local function make_app_stub(extra)
 	return base
 end
 
+-- Helper: builds an axuielement stub whose focused element answers BOTH AXRole
+-- and AXSubrole, so the Chromium shape (role = AXTextField, subrole =
+-- AXSecureTextField) can be reproduced faithfully.
+-- @param role string|nil The AXRole to report on the focused element.
+-- @param subrole string|nil The AXSubrole to report on the focused element.
+local function make_ax_role_subrole_stub(role, subrole)
+	return {
+		axuielement = {
+			applicationElementForPID = function(_)
+				return {
+					attributeValue = function(_, attr)
+						if attr == "AXFocusedUIElement" then
+							return {
+								attributeValue = function(_, a)
+									if a == "AXRole"    then return role end
+									if a == "AXSubrole" then return subrole end
+									return nil
+								end,
+							}
+						end
+						return nil
+					end,
+				}
+			end,
+		},
+		application = make_app_stub(),
+	}
+end
+
 -- Helper: builds an axuielement stub that returns the given AXRole.
 -- @param role string|nil The AXRole to return, or nil for no focused element.
 local function make_ax_stub(role)
@@ -134,6 +163,82 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 		adapter.refresh()
 		helpers.assert_eq(true, adapter.isSecureField(),
 			"after AXSecureTextField role, isSecureField must be true")
+	end)
+
+	-- Regression: Chromium-family browsers (Chrome, Edge, Brave, Arc) surface
+	-- <input type="password"> as AXRole = AXTextField with the secure marker on
+	-- the AXSubrole. The adapter used to read AXRole only, so every browser login
+	-- form failed OPEN and the keylogger recorded the user's password characters.
+	helpers.it("isSecureField returns true for the Chromium shape (AXSubrole = AXSecureTextField)", function()
+		local adapter = helpers.load_with_stubs(
+			"adapters.secure_field_detector",
+			make_ax_role_subrole_stub("AXTextField", "AXSecureTextField"))
+
+		adapter.refresh()
+		helpers.assert_eq(true, adapter.isSecureField(),
+			"a browser password field (role AXTextField + subrole AXSecureTextField) must be detected as secure")
+	end)
+
+	helpers.it("isSecureField stays false for a non-secure subrole (no false positives)", function()
+		local adapter = helpers.load_with_stubs(
+			"adapters.secure_field_detector",
+			make_ax_role_subrole_stub("AXTextField", "AXSearchField"))
+
+		adapter.refresh()
+		helpers.assert_eq(false, adapter.isSecureField(),
+			"a search field must NOT be misreported as secure just because a subrole is read")
+	end)
+
+	helpers.it("isSecureField returns true for the native shape when no subrole is exposed", function()
+		local adapter = helpers.load_with_stubs(
+			"adapters.secure_field_detector",
+			make_ax_role_subrole_stub("AXSecureTextField", nil))
+
+		adapter.refresh()
+		helpers.assert_eq(true, adapter.isSecureField(),
+			"a native AppKit secure field must still be detected via AXRole alone")
+	end)
+
+	-- The subrole is cached alongside the role, so it must be cleared on the same
+	-- paths — a stale subrole would keep reporting a password field after focus moved.
+	helpers.it("a secure subrole is cleared once focus moves to a plain field", function()
+		local shapes = {
+			{ role = "AXTextField", subrole = "AXSecureTextField" },
+			{ role = "AXTextField", subrole = nil },
+		}
+		local call_count = 0
+
+		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+			axuielement = {
+				applicationElementForPID = function(_)
+					call_count = call_count + 1
+					local shape = shapes[call_count]
+					return {
+						attributeValue = function(_, attr)
+							if attr == "AXFocusedUIElement" then
+								return {
+									attributeValue = function(_, a)
+										if a == "AXRole"    then return shape.role end
+										if a == "AXSubrole" then return shape.subrole end
+										return nil
+									end,
+								}
+							end
+							return nil
+						end,
+					}
+				end,
+			},
+			application = make_app_stub(),
+		})
+
+		adapter.refresh()
+		helpers.assert_eq(true, adapter.isSecureField(),
+			"first refresh on a browser password field must report secure")
+
+		adapter.refresh()
+		helpers.assert_eq(false, adapter.isSecureField(),
+			"the cached subrole must be cleared when focus moves to a plain text field")
 	end)
 
 	helpers.it("isSecureField returns false when role is AXTextField (plain text)", function()
