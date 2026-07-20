@@ -99,6 +99,21 @@ _LDR_AssertRotation() {
 		"the stale start-date filename must not survive the rollover")
 }
 
+; The topical sub-files are the missed sibling of the same defect. Their paths
+; are undated, so they look immune — but they are documented as "today only"
+; and the check that truncates a previous day's file lives in
+; _LoggerInitSubFiles, which only ran at init. A rollover must re-run it, or a
+; driver up past midnight silently presents several days as today's.
+_LDR_RolloverAlsoRollsSubFiles() {
+	FlushBody := _DriverFuncBody("_LoggerFlush")
+	Assert(FlushBody != "", "_LoggerFlush must exist in lib/logger.ahk")
+
+	Found := RegExMatch(FlushBody,
+		"_LOGGER_PATH_DATE\s*!=\s*FormatTime[^}]*_LoggerInitSubFiles\(")
+	Assert(Found,
+		"the midnight rollover branch in _LoggerFlush must re-run _LoggerInitSubFiles, otherwise the topical sub-files keep accumulating a previous day's lines")
+}
+
 ; A flush on the SAME day must not churn the paths. This pins the guard to a
 ; date comparison rather than an unconditional re-resolve on every tick, which
 ; would put a DirExist + FormatTime + two string builds on the flush path.
@@ -145,3 +160,5 @@ Test("logger: a flush within the same day leaves the log paths untouched",
 	_LDR_FlushIsStableWithinTheSameDay)
 Test("logger: boot and rollover purge share one retention constant",
 	_LDR_RetentionIsSingleSourced)
+Test("logger: the midnight rollover also rolls the topical sub-files",
+	_LDR_RolloverAlsoRollsSubFiles)

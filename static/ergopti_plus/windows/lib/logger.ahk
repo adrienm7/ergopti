@@ -248,11 +248,18 @@ _LoggerFlush(ForceFlush := false) {
 	; without this the dated filename resolved at init would capture every later
 	; entry — misdating the log and making _LoggerPurgeOldLogs, which ages files
 	; by the date in their NAME, discard still-recent data. Cheap enough for the
-	; flush tick: one FormatTime and a string compare. Only the two dated paths
-	; move; the topical sub-files are undated and stay valid.
+	; flush tick: one FormatTime and a string compare.
+	;
+	; The topical sub-files ride along. Their paths are undated and stay valid,
+	; but they are documented as "today only" and are truncated by the
+	; day-change check inside _LoggerInitSubFiles — which, like the dated paths,
+	; only ever ran at init. Re-running it here is what actually makes them
+	; daily; without it a driver up past midnight accumulates several days in a
+	; file the operator reads as today's.
 	if (_LOGGER_PATH_DATE != "" and _LOGGER_PATH_DATE != FormatTime(, "yyyy-MM-dd")) {
 		RolledDir := _LoggerResolveDatedPaths()
 		_LoggerPurgeOldLogs(RolledDir, LOGGER_RETENTION_DAYS)
+		_LoggerInitSubFiles(RolledDir)
 	}
 
 	; Prevent the timer from re-entering while we swap-and-drain the pending queues.
