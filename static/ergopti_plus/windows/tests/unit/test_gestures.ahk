@@ -397,3 +397,30 @@ TestGestures_SwipeSlotsHaveEnableName() {
 }
 Test("Gestures: swipe slots map to direction-enable registry names",
     TestGestures_SwipeSlotsHaveEnableName)
+
+; F25 (audit 2026-07-20): GestureInvokeAction is the single choke point shared by all
+; three dispatchers (gesture, keyboard-shortcut slot, tap-hold), but only
+; GestureDispatch wrapped the call — so a throwing action reached via a shortcut slot
+; or a tap-hold propagated uncaught into the error net. Containment must live in the
+; shared invoker: a throwing action is logged and swallowed, never propagated.
+_GIA_ThrowHelper() {
+    throw Error("boom from a gesture action stub")
+}
+TestGestures_InvokeActionContainsThrows() {
+    global GESTURE_ACTIONS
+    Threw := false
+    GESTURE_ACTIONS["__test_throws"] := { Fn: (*) => _GIA_ThrowHelper() }
+    try {
+        try {
+            GestureInvokeAction("__test_throws")
+        } catch {
+            Threw := true
+        }
+    } finally {
+        GESTURE_ACTIONS.Delete("__test_throws")
+    }
+    AssertEqual(false, Threw,
+        "GestureInvokeAction must contain a throwing action (all three dispatchers share it), never propagate into the error net")
+}
+Test("Gestures: GestureInvokeAction contains a throwing action instead of propagating",
+    TestGestures_InvokeActionContainsThrows)

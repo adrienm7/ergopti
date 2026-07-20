@@ -134,9 +134,18 @@ GestureInvokeAction(ActionName, BindingId := "") {
     if !GESTURE_ACTIONS.Has(ActionName)
         return
     Fn := GESTURE_ACTIONS[ActionName].Fn
-    if (GestureActionParameterSpec(ActionName) != "")
-        return Fn.Call(BindingId)
-    return Fn.Call()
+    ; Containment lives HERE, at the single choke point all three dispatchers share
+    ; (gesture, keyboard-shortcut slot, tap-hold). Only GestureDispatch wrapped the
+    ; call, so a throwing action reached via a shortcut slot (RunKeyboardShortcutAction)
+    ; or a tap-hold (_TapHoldInvokeConfiguredAction) propagated uncaught into the error
+    ; net. Fail loud in the log, never rethrow (§5.3) — every dispatcher keeps working.
+    try {
+        if (GestureActionParameterSpec(ActionName) != "")
+            return Fn.Call(BindingId)
+        return Fn.Call()
+    } catch as e {
+        LoggerError("gestures", "Action '{1}' (binding '{2}') threw: {3}.", ActionName, BindingId, e.Message)
+    }
 }
 
 GestureSaveAllAssignments(ActionNameBySlot) {
