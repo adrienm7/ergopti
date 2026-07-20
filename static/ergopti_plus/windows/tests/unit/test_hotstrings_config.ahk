@@ -656,3 +656,18 @@ TestHotstringsConfig_SaveOverridesPreservesGlobalDelimiters() {
 		"[__global__] consumed_delimiters must survive a subsequent _SaveOverrides")
 }
 Test("hotstrings_config: _SaveOverrides preserves [__global__] delimiters", TestHotstringsConfig_SaveOverridesPreservesGlobalDelimiters)
+
+; F37 (audit 2026-07-20): the SAME [__global__] delimiter keys have two writers with
+; different escaping discipline — _SaveGlobalKey escapes, _SaveOverrides concatenated
+; raw. A delimiter containing a quote or backslash therefore produced malformed TOML,
+; and the next read silently reverted the user's whole delimiter set.
+TestHotstringsConfig_SaveOverridesEscapesGlobalDelimiters() {
+	Body := _DriverFuncBody("_SaveOverrides")
+	Assert(Body != "", "_SaveOverrides must exist in lib/hotstrings/hotstrings_io.ahk")
+	Assert(InStr(Body, "_EscapeTomlString(_HotstringsWordDelimiters)") > 0,
+		"_SaveOverrides must escape word_delimiters exactly like _SaveGlobalKey does")
+	Assert(InStr(Body, "_EscapeTomlString(_HotstringsConsumedDelimiters)") > 0,
+		"_SaveOverrides must escape consumed_delimiters exactly like _SaveGlobalKey does")
+}
+Test("hotstrings_config: _SaveOverrides escapes [__global__] delimiters (no silent revert)",
+	TestHotstringsConfig_SaveOverridesEscapesGlobalDelimiters)

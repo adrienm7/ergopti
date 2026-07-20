@@ -404,10 +404,14 @@ _SaveOverrides() {
     ; cross-driver word/consumed delimiter customisation.
     if (_HotstringsWordDelimiters != "" or _HotstringsConsumedDelimiters != "") {
         Out .= "[__global__]`n"
+        ; Escape exactly like _SaveGlobalKey does: these are the SAME [__global__]
+        ; keys written by two different writers, and concatenating raw here meant a
+        ; delimiter containing a quote or backslash produced malformed TOML — the next
+        ; read then silently reverted the user's whole delimiter set.
         if (_HotstringsWordDelimiters != "")
-            Out .= 'word_delimiters = "' . _HotstringsWordDelimiters . '"`n'
+            Out .= 'word_delimiters = "' . _EscapeTomlString(_HotstringsWordDelimiters) . '"`n'
         if (_HotstringsConsumedDelimiters != "")
-            Out .= 'consumed_delimiters = "' . _HotstringsConsumedDelimiters . '"`n'
+            Out .= 'consumed_delimiters = "' . _EscapeTomlString(_HotstringsConsumedDelimiters) . '"`n'
         Out .= "`n"
     }
 
