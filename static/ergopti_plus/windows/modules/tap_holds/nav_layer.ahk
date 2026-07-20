@@ -164,7 +164,14 @@ SC027:: ActionLayer("^{Right " . AppState_GetNumberOfRepetitions() . "}") ; Move
 SC028:: ActionLayer("#+{Right}") ; Move the window to the right screen
 
 ; === Bottom row ===
-SC031:: WinMaximize("A") ; Make the window fullscreen
+; Guarded: every other layer mapping goes through the send-based ActionLayer, but this
+; one calls a window-management API directly — WinMaximize throws TargetError when no
+; window is active (tray-only desktop, or the foreground window closing mid-press).
+SC031:: {
+	try WinMaximize("A") ; Make the window fullscreen
+	catch
+		try LoggerDebug("NavLayer", "WinMaximize skipped — no active window.")
+}
 SC032:: ActionLayer("{Home}") ; Go to the beginning of the line
 SC033:: ActionLayer("#{Left}") ; Move the window to the left of the current screen
 SC034:: ActionLayer("#{Right}") ; Move the window to the right of the current screen
