@@ -831,7 +831,13 @@ if Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
 ; Win + ★ opens the personal TOML hotstring editor.
 ; Registered at InputLevel 3 so it overrides the # + source-scan → "#<char>" binding
 ; that RemapKey installs at InputLevel 2 for the layout remapping.
+; Feature-gated like every neighbouring registration: without the #HotIf this stole an
+; OS Win+<key> combo even with every Ergopti feature disabled, so "all features off"
+; did not mean "no keyboard interception". The criterion is re-evaluated per press, so
+; a tray toggle applies without a reload.
+HotIf((*) => Features["hotstrings"]["magic_key"]["replace"]["enabled"])
 Hotkey("#" . ScriptInformation["MagicKeySourceScan"], (*) => OpenPersonalEditor(), "I3")
+HotIf()
 
 
 

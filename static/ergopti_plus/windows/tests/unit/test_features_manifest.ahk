@@ -750,3 +750,25 @@ TestFMv2_HotIfReachableFeaturesGuarded() {
 Test("#HotIf-reachable helpers: Features guarded by IsSet before first deref",
 	TestFMv2_HotIfReachableFeaturesGuarded)
 
+; F42 (audit 2026-07-20): the Win+<magic-key-source> hotkey that opens the personal
+; editor was registered with no #HotIf and outside the magic-key feature block, so it
+; stole an OS Win+<key> combo even with every Ergopti feature disabled — "all features
+; off" must mean no keyboard interception.
+TestFMv2_PersonalEditorHotkeyIsFeatureGated() {
+	SplitPath(A_ScriptDir, , &WindowsDir)
+	Src := ""
+	try Src := FileRead(WindowsDir . "\modules\keymap\layout.ahk")
+	Assert(Src != "", "modules/keymap/layout.ahk must be readable")
+	Code := _StripFullLineComments(Src)
+
+	HotkeyPos := InStr(Code, "OpenPersonalEditor()")
+	Assert(HotkeyPos > 0, "layout.ahk must register the personal-editor hotkey")
+	; A HotIf criterion must be established immediately before the registration.
+	Before := SubStr(Code, 1, HotkeyPos)
+	GatePos := InStr(Before, "HotIf(", , -1)
+	Assert(GatePos > 0 && (HotkeyPos - GatePos) < 400,
+		"the personal-editor Win hotkey must be registered under a HotIf feature criterion, so disabling the feature releases the OS Win combo")
+}
+Test("layout: personal-editor Win hotkey is feature-gated, not unconditional",
+	TestFMv2_PersonalEditorHotkeyIsFeatureGated)
+
