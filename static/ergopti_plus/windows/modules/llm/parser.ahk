@@ -451,6 +451,16 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 		nw := RegExReplace(nw, "^[\s\.…]+", "")
 		nw := RegExReplace(nw, "[\s\.…]+$", "")
 		nw := _LLM_Parser_EnforceWordLimits(nw, max_words)
+		; Cap tc the same way. Its capture is bounded only by line length, and it
+		; feeds _LLM_Parser_TokenDiffOps — an O(n^2) dynamic program whose per-cell
+		; body allocates a fresh char array twice and a full (n1+1)x(n2+1) matrix
+		; once. len1 is clamped downstream but len2 was not, so a model in a
+		; repetition loop could emit a multi-KB TAIL_CORRECTED line and stall the
+		; keystroke thread (the poll chain shares AHK's single thread with the
+		; keyboard hook). The crash firewall catches exceptions, not elapsed time,
+		; so this degraded to a hang with nothing logged. A correction can never
+		; legitimately exceed the prediction budget.
+		tc := _LLM_Parser_EnforceWordLimits(tc, max_words)
 		if (nw = "")
 			return ""
 		if (tc = "" and nw != "")
