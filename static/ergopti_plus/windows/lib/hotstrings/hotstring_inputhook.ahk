@@ -709,7 +709,9 @@ _OnPrefixKeyDown(IH, VK, SC) {
 			if (VK == 0x41) {
 				; Ctrl+A — select-all. The next typed char replaces the
 				; entire selection, landing at a fresh word-start.
-				HSE_FeedReset(true)
+				; IsPhysical=true so a real Ctrl+A landing inside the post-expansion
+				; suppress window is honoured instead of being filtered as engine output.
+				HSE_FeedReset(true, true)
 				_ResetPrefixBuffer()
 				return
 			}

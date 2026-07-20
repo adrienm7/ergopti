@@ -155,7 +155,11 @@ _SpaceTap() {
     PrevCrit := A_IsCritical
     Critical("On")
     global HSE_LastEndChar
-    HSEMatch := HSE_FeedChar(" ")
+    ; IsPhysical=true: this space came from a real key tap, not the engine's own
+    ; SendInput. Without the flag it is discarded whenever it lands inside the ~60 ms
+    ; post-expansion suppress window (which exists to filter the engine's output), so
+    ; the space silently never reaches the buffer and the next trigger mis-frames.
+    HSEMatch := HSE_FeedChar(" ", true)
     if (HSEMatch != "") {
         HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)
         HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
