@@ -35,6 +35,12 @@ local EXT_DIR       = os.getenv("HOME") .. "/.vscode/extensions/" .. EXT_ID .. "
 -- each stall the Hammerspoon main thread (vscode-bridge-blocking-ax-call).
 local _ax_frame_cache  = nil
 local _ax_frame_ts     = 0
+-- Validity is tracked separately from the cached VALUE because nil is a
+-- legitimate result (no focused element, or an editor frame too small to use).
+-- Keying freshness on `_ax_frame_cache ~= nil` therefore never cached a negative
+-- lookup, so the expensive round trip re-ran on every single call — exactly the
+-- case the cache exists to absorb.
+local _ax_frame_valid  = false
 local FRAME_CACHE_TTL_S = 0.2
 
 -- VSCode rendering constants for pixel math.
@@ -266,7 +272,9 @@ end
 --- @return table|nil The bounds frame table, or nil on error / empty editor.
 local function get_editor_ax_frame()
 	local now = hs.timer.secondsSinceEpoch()
-	if _ax_frame_cache ~= nil and (now - _ax_frame_ts) < FRAME_CACHE_TTL_S then
+	-- Gate on the validity flag, not on the cached value: a negative lookup is a
+	-- real result worth caching for the TTL just like a successful one.
+	if _ax_frame_valid and (now - _ax_frame_ts) < FRAME_CACHE_TTL_S then
 		return _ax_frame_cache
 	end
 	local ok, frame = pcall(function()
@@ -282,6 +290,9 @@ local function get_editor_ax_frame()
 	local result = ok and frame or nil
 	_ax_frame_cache = result
 	_ax_frame_ts    = now
+	-- The lookup completed, so the cache is authoritative for the next TTL window
+	-- whether the outcome was a frame or nil.
+	_ax_frame_valid = true
 	return result
 end
 
