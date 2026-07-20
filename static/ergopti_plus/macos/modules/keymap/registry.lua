@@ -451,8 +451,13 @@ function M.add(trigger, replacement, opts)
 	end
 
 	-- Substitute the canonical magic-key when a non-default trigger char is configured.
+	-- The key is user-configurable through the menu, which accepts any codepoint —
+	-- including "%", which Lua treats specially on the REPLACEMENT side of gsub and
+	-- which raises "invalid use of '%' in replacement string". Unescaped, choosing
+	-- "%" as the magic key made every add() throw during registration, so the driver
+	-- came back from the post-change reload with no hotstrings at all.
 	if _state.magic_key and _state.magic_key ~= "★" then
-		trigger = trigger:gsub("★", _state.magic_key)
+		trigger = trigger:gsub("★", text_utils.escape_gsub_replacement(_state.magic_key))
 	end
 
 	opts = type(opts) == "table" and opts or {}

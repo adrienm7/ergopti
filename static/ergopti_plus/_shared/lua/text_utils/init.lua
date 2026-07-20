@@ -505,6 +505,18 @@ function M.trig_title(s)
 	return results
 end
 
+--- Escapes a string so it is safe to use as the REPLACEMENT argument of gsub.
+--- Lua treats "%" specially on that side: "%1".."%9" are capture references, "%%"
+--- is a literal percent, and "%" followed by anything else RAISES "invalid use of
+--- '%' in replacement string". Any value that originates from the user or from a
+--- third party (an app name, the configurable magic key, a release tag) must go
+--- through here before being interpolated, or the whole call site throws.
+--- @param s any The replacement text (coerced with tostring).
+--- @return string The text with every "%" doubled.
+function M.escape_gsub_replacement(s)
+	return (tostring(s):gsub("%%", "%%%%"))
+end
+
 --- Safely converts a replacement string to uppercase.
 --- @param s string The string to convert.
 --- @return string The uppercase string.
