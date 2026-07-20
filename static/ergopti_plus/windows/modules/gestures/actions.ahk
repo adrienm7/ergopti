@@ -878,7 +878,11 @@ GestureSaveAndReload() {
 ; first use) before opening it in Notepad.
 GestureEditPersonalShortcuts() {
     Path := ScriptInformation["PersonalAhkPath"]
-    EnsurePersonalShortcutsFile(Path)
+    ; AllowReload=false: opening the file for editing must never restart the driver
+    ; (the unconditional Reload/ExitApp in EnsurePersonalShortcutsFile would kill this
+    ; process before the Run below, so the editor never opened when the file/stub was
+    ; freshly (re)created).
+    EnsurePersonalShortcutsFile(Path, false)
     Run('notepad.exe "' . Path . '"')
 }
 
