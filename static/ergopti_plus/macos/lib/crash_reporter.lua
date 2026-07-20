@@ -5,16 +5,17 @@
 --- DESCRIPTION:
 --- Automatic crash report builder and persistence layer for the Hammerspoon driver.
 --- When the global error handler fires, this module saves a full diagnostic report
---- to disk immediately — no confirmation step — and shows the user the file path.
---- No network calls are ever made.
+--- to disk immediately — no confirmation step — and notifies the user of the file
+--- path. No network calls are ever made.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Privacy-first: the report never contains keystrokes, personal data, or file
 ---    contents. The report mirrors what Debug > Diagnostic shows plus the full log
 ---    ring buffer, so one file is almost always enough to diagnose the crash.
---- 2. No confirmation: the old opt-in prompt added friction with zero privacy
----    benefit — the report is local-only and contains no PII. The user sees a
----    single dialog showing the path of the saved file.
+--- 2. No confirmation, no modal: the old opt-in prompt added friction with zero
+---    privacy benefit — the report is local-only and contains no PII. The outcome
+---    is announced with a non-blocking notification naming the saved file, because
+---    a modal alert would stall the main thread and every event tap with it.
 --- 3. Rich diagnostics: includes everything from the healthcheck (OS, HS version,
 ---    adapters, session counters) PLUS the full in-memory log ring buffer (up to
 ---    200 lines), the active window, and the stack trace.
@@ -275,30 +276,39 @@ function M.save(report)
 	return fname
 end
 
---- Saves the crash report immediately (no confirmation) then shows the user a
---- single dialog with the path of the saved file. If saving fails, shows an error.
+--- Saves the crash report immediately (no confirmation) then tells the user where
+--- it landed via a system notification. If saving fails, notifies about that instead.
 --- Safe to call from within an error handler — wrapped in pcall throughout.
+---
+--- The outcome is announced with a NON-BLOCKING notification, never a modal.
+--- A modal alert runs a nested run loop that stalls the main thread — and with it
+--- every event tap, timer and hotkey in the driver — until a human clicks it. A
+--- reporter that freezes the driver is worse than the failure it reports, and it
+--- would freeze it precisely when something has already gone wrong. The
+--- notification carries the same single piece of information: the report path.
 --- @param report table The report table returned by M.report().
 function M.prompt_user(report)
 	Logger.start(LOG, "Saving crash report…")
+
+	-- Required lazily: lib.notifications requires lib.logger, and crash_reporter is
+	-- itself reachable from the logger's error paths, so a top-level require would
+	-- tighten that cycle for a dependency only this one function needs.
+	local ok_notify, Notifications = pcall(require, "lib.notifications")
+	local can_notify = ok_notify and type(Notifications) == "table"
+		and type(Notifications.notify) == "function"
 
 	local path = M.save(report)
 
 	if path then
 		Logger.success(LOG, "Crash report saved at '%s'.", path)
-		-- Show only the path — no confirmation needed, report is local-only
-		local dialog = require("lib.dialog_util")
-		pcall(dialog.block_alert,
-			i18n.get("crash.report.saved_title"),
-			path,
-			i18n.get("button.ok"), "", "NSInformationalAlertStyle")
+		if can_notify then
+			pcall(Notifications.notify, i18n.get("crash.report.saved_title"), path, "info")
+		end
 	else
 		Logger.warn(LOG, "Crash report could not be saved.")
-		local dialog = require("lib.dialog_util")
-		pcall(dialog.block_alert,
-			i18n.get("crash.report.save_failed"),
-			"",
-			i18n.get("button.ok"), "", "NSCriticalAlertStyle")
+		if can_notify then
+			pcall(Notifications.notify, i18n.get("crash.report.save_failed"), "", "error")
+		end
 	end
 end
 
