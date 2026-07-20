@@ -19,9 +19,19 @@ _OSEK_OneShotShiftResendsEndKeys() {
     EndReasonPos := InStr(Body, 'ihvText.EndReason == "EndKey"')
     SendPos := InStr(Body, 'SendNewResult("{" . ihvText.EndKey . "}", False, False)')
     Assert(EndReasonPos > 0 && SendPos > EndReasonPos,
-        "OneShotShift must re-send a captured EndKey as one non-text control sequence after the InputHook returns")
-    Assert(InStr(Body, 'if (ihvText.EndKey != "")') > 0,
-        "OneShotShift must not emit an empty control sequence when InputHook reports no EndKey")
+        "OneShotShift must re-send a captured control EndKey as one non-text control sequence after the InputHook returns")
+
+    ; The raw re-emit branch must be RESTRICTED to the three KeyOpt("E") control
+    ; keys. The punctuation/magic end keys (= % $ . , ' space + magic key) are ALSO
+    ; EndKey terminations; if this branch catches them, every SpecialCharacter
+    ; mapping (. -> ' :', = -> masculine ordinal, etc.) becomes dead code. That is
+    ; exactly what commit 866341cb4 did until this restriction was added.
+    Segment := SubStr(Body, EndReasonPos, SendPos - EndReasonPos)
+    Assert(InStr(Segment, "BackSpace") > 0 && InStr(Segment, "Enter") > 0 && InStr(Segment, "Delete") > 0,
+        "the EndKey re-emit branch must be restricted to BackSpace/Enter/Delete so punctuation end keys fall through to the SpecialCharacter dispatch")
+
+    Assert(InStr(Body, 'SpecialCharacter != ""') > 0,
+        "OneShotShift must retain the SpecialCharacter dispatch reachable for punctuation/magic end keys")
 }
 
 Test("tap-holds: OneShotShift re-emits consumed Backspace/Enter/Delete end keys",
