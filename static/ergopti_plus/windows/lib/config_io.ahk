@@ -462,14 +462,35 @@ ResetScriptComboKeys(SuffixSC) {
         SendEvent("{SC138 Up}")
 }
 
+; The ONLY actions allowed to run while the driver is suspended. The script AltGr
+; chords keep a dedicated suspend-exempt hotkey set purely so script management stays
+; keyboard-reachable while paused (otherwise a user who paused from the tray has no
+; keyboard way back). Anything else the user assigns to those slots must obey
+; "pause = tout éteint" — single source of truth for that allowlist.
+global SCRIPT_SHORTCUT_SUSPEND_ALLOWED := Map(
+    "script_pause_toggle", true,
+    "script_reload", true,
+    "script_quit", true,
+    "open_personal_shortcuts", true,
+)
+
 RunScriptShortcutAction(Slot) {
     global ScriptShortcutAssignments, GESTURE_ACTIONS, SCRIPT_SHORTCUT_FALLBACKS
+    global SCRIPT_SHORTCUT_SUSPEND_ALLOWED
     Action := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
     if (Action == "none") {
         SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
         return
     }
     if !GESTURE_ACTIONS.Has(Action) {
+        SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
+        return
+    }
+    ; While suspended these chords stay armed ONLY for script management. Without this
+    ; scope check the exemption silently widened to whatever the user assigned, so a
+    ; paused driver still fired arbitrary gesture actions. Fall back to the slot's
+    ; native key instead, exactly like an unassigned slot.
+    if (A_IsSuspended and !SCRIPT_SHORTCUT_SUSPEND_ALLOWED.Has(Action)) {
         SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
         return
     }

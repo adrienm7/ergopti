@@ -80,3 +80,27 @@ Test("meta altgr-dispatch-suspend-guard: _ScriptAltGrDispatch runs the action ev
 	_ADSG_CheckActionAlwaysRuns)
 Test("meta altgr-dispatch-suspend-guard: suspended-state fallback hotkeys remain registered",
 	_ADSG_CheckSuspendedFallbackHotkeysStillRegistered)
+
+; F39 (audit 2026-07-20): the suspend exemption on these chords exists ONLY so script
+; management stays keyboard-reachable while paused. RunScriptShortcutAction forwarded
+; to GestureInvokeAction with no allowlist, so the exemption silently widened to
+; whatever the user assigned — a paused driver still fired arbitrary gesture actions,
+; breaking "pause = tout éteint".
+_ADSG_SuspendExemptionIsScopedToManagement() {
+	Body := _DriverFuncBody("RunScriptShortcutAction")
+	Assert(Body != "", "RunScriptShortcutAction must exist in lib/config_io.ahk")
+	GatePos := InStr(Body, "A_IsSuspended")
+	InvokePos := InStr(Body, "GestureInvokeAction(")
+	Assert(GatePos > 0 && InvokePos > GatePos,
+		"RunScriptShortcutAction must check A_IsSuspended BEFORE invoking the action, so a paused driver cannot run an arbitrary assignment")
+	Assert(InStr(Body, "SCRIPT_SHORTCUT_SUSPEND_ALLOWED") > 0,
+		"the suspended path must consult the script-management allowlist")
+
+	Allow := _DriverSourceConcat()
+	for Action in ["script_pause_toggle", "script_reload", "script_quit", "open_personal_shortcuts"] {
+		Assert(InStr(Allow, Chr(0x22) . Action . Chr(0x22) . ", true") > 0,
+			"the suspend allowlist must keep " . Action . " reachable from the keyboard while paused")
+	}
+}
+Test("meta altgr-dispatch-suspend-guard: the suspend exemption is scoped to script management",
+	_ADSG_SuspendExemptionIsScopedToManagement)
