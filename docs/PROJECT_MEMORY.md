@@ -19,6 +19,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [No co-author trailers (Copilot, Claude, bots)](#no-co-author-trailers-copilot-claude-bots) — Never add Co-Authored-By trailers to commits — including Copilot, Claude, github-actions[bot], or any LLM/tool credit
   - [feedback-no-push-dev](#feedback-no-push-dev) — Ne jamais pusher sur dev sans validation explicite — chaque commit sur dev déclenche la CI et crée une release
   - [feedback-regression-tests](#feedback-regression-tests) — Every user-requested bug fix must ship with a regression test that fails before / passes after the fix
+  - [feedback-local-gate-mirrors-ci](#feedback-local-gate-mirrors-ci) — The pre-push gate is four commands; `npm run test:js` (66 checks) is the umbrella CI gates on, and it silently no-ops unless `node_modules` is installed on a Node meeting the engine floor
   - [feedback-test-before-merge](#feedback-test-before-merge) — Never merge a cut-over slice into dev before the user has tested it live. Stay on the slice branch and wait for explicit validation.
   - [feedback-ui-must-be-i18n](#feedback-ui-must-be-i18n) — All user-facing UI text must go through the i18n system in 21 supported languages — never hardcode any UI string anywhere, including WebView UIs (metrics, download window, etc.).
 - **Project architecture & decisions**
@@ -344,6 +345,35 @@ For every bug the user asks me to fix, I MUST add a unit/regression test that en
 - Never delete or weaken a regression test to make a change pass; fix the change.
 
 Codified in `.github/copilot-instructions.md` §5.9 (the project rules doc that `CLAUDE.md` @-includes — so it covers project + Claude + Copilot). See [[project_hotstring_delay_architecture]].
+
+### feedback-local-gate-mirrors-ci
+
+_Green locally must mean green in CI: the local gate is four commands, and it is only trustworthy once `node_modules` is installed on a Node that satisfies the engine floor_
+
+<sub>slug: `feedback_local_gate_mirrors_ci`</sub>
+
+The full pre-push gate — run all four from the repo root, in this order:
+
+```bash
+npm run test:js            # 66 checks — the umbrella suite (tools/test/run-js-suite.cjs)
+npm run test:ahk-encoding  # every .ahk is UTF-8 BOM + LF
+AutoHotkey64.exe static/ergopti_plus/windows/tests/run_all.ahk       # 3212 unit/meta tests
+AutoHotkey64.exe static/ergopti_plus/windows/tests/e2e/run_e2e.ahk   # 5 E2E
+```
+
+`npm run test:js` is the one people skip, and it is the one that matters most: it is the **umbrella** that wraps the checks CI gates on but the AHK runner knows nothing about — the pinned-source-read ratchet, `lint:conventions:strict`, port compliance, priority parity, the translations audit, and `python tools/format_toml.py --hotstrings --all --check`. The AHK suite can be 3212/3212 green while `test:js` is red.
+
+**The prerequisite that silently voids the whole gate:** `test:js` needs `node_modules` installed. With it empty, 3 of the 66 checks die on `MODULE_NOT_FOUND` — which reads like "my environment can't run this" rather than "the gate did not run", so it gets waved through and real failures stay invisible. That is exactly how a ratchet violation reached CI on 2026-07-20 (run `29767112617`) after a fully green local AHK run.
+
+Installing is itself a trap here: `.npmrc` sets `engine-strict=true`, and `mute-stream@4.0.0` requires `node ^22.22.2 || ^24.15.0 || >=26.0.0`. CI pins `node-version: '22'`, which resolves to the latest 22.x and satisfies it; a local Node below that floor (e.g. v22.16.0) makes plain `npm ci` abort with `EBADENGINE`. `npm ci --engine-strict=false` unblocks the gate immediately; upgrading local Node to the latest 22.x is the actual fix.
+
+**Why:** the user's standing requirement is that a green local run predicts a green CI run ("assure toi de fix les tests locaux pour que dans le futur vert local=vert ci"). A gate that cannot run is worse than one that fails — a failure is visible, an un-runnable check is mistaken for a passing one.
+
+**How to apply:**
+
+- Run all four commands before pushing. If `test:js` reports fewer than 66 checks or any `MODULE_NOT_FOUND`, the gate did **not** run — fix the install first, do not interpret it as a pass.
+- New AHK tests must read driver source through `_DriverFuncBody` / `_DriverSourceConcat` / `_DriverDirConcat`, never a hardcoded `modules/…`, `lib/…` or `ui/….ahk` path. The ratchet in `tools/test/test-no-pinned-source-reads.cjs` fails the build when the count exceeds `BASELINE = 20`. **Never raise the baseline to make a change pass** — convert the test to a helper read (this is [[feedback_regression_tests]]' "never weaken a test" rule applied to the ratchet itself).
+- Two gotchas that cost several red runs: a **comment** containing a token a meta-test scans for (`Bundle_Init()`, `Features[`) shifts naive `InStr` position assertions — reword the comment or strip comments via `_StripFullLineComments`; and in AHK v2 the escape char is the **backtick**, so an embedded quote is `` `" `` — a stray `\"` aborts the parse mid-file and the runner exits with no results at all, which looks like "tests vanished", not "tests failed" (same failure signature as [[feedback_ahk_source_encoding]]).
 
 ### feedback-test-before-merge
 
