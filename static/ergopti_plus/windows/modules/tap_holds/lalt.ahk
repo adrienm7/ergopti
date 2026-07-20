@@ -131,12 +131,17 @@ SC038::
 }
 
 SC02A & SC038:: TextPressKey("Tab", "Shift") ; LShift held
-if TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" {
-	SC11D & SC038:: {
-		OneShotShiftFix()
-		TextPressKey("Tab", "Shift")
-	}
+; RCtrl+LAlt emits Shift+Tab only when right_ctrl IS the one-shot-shift key. A
+; runtime `if` around a `::` definition does NOT gate its registration in AHK v2
+; (hotkeys are load-time constructs), so the old `if` here was dead and the combo
+; fired for every config. The extra condition must live in the #HotIf, which is
+; re-evaluated live on each press so a tray change takes effect without a reload.
+#HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and not LayerEnabled and TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift"
+SC11D & SC038:: {
+	OneShotShiftFix()
+	TextPressKey("Tab", "Shift")
 }
+#HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and not LayerEnabled
 #SC038:: TextPressKey("Tab", "Win") ; Doesn't fire when SendInput is used
 !SC038:: TextPressKey("Tab", "Alt")
 #HotIf
