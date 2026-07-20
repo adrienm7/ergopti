@@ -62,3 +62,27 @@ _THSB_PreArmedSyntheticKeysAreSuspendOwned() {
 }
 Test("tap-holds: every pre-armed synthetic key is released by the suspend owner (tap-hold-suspend-boundary)",
 	_THSB_PreArmedSyntheticKeysAreSuspendOwned)
+
+; F45 (audit 2026-07-20): every nav-layer mapping routes through the send-based
+; ActionLayer except SC031, which called WinMaximize("A") directly with no try —
+; WinMaximize throws TargetError when no window is active (tray-only desktop, or the
+; foreground window closing mid-press), and layer handlers must not throw.
+_THSB_WindowVerbsAreGuarded() {
+	SplitPath(A_ScriptDir, , &WindowsDir)
+	Src := ""
+	try Src := FileRead(WindowsDir . "\modules\tap_holds\nav_layer.ahk")
+	Assert(Src != "", "modules/tap_holds/nav_layer.ahk must be readable")
+	Code := _StripFullLineComments(Src)
+	for Verb in ["WinMaximize(", "WinMinimize(", "WinRestore("] {
+		Pos := InStr(Code, Verb)
+		while (Pos > 0) {
+			; The statement must be guarded: a `try ` immediately precedes the call.
+			Before := SubStr(Code, Max(1, Pos - 6), Min(6, Pos - 1))
+			Assert(InStr(Before, "try ") > 0,
+				"every window-management call in the nav layer must be wrapped in try — " . Verb . " throws when no window is active")
+			Pos := InStr(Code, Verb, , Pos + 1)
+		}
+	}
+}
+Test("tap-holds: nav-layer window verbs are guarded against a missing active window",
+	_THSB_WindowVerbsAreGuarded)
