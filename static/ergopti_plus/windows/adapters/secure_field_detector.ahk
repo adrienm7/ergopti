@@ -148,6 +148,14 @@ SFD_ProbeFocusedUia(Hwnd) {
 		if !IsObject(Element)
 			throw Error("No focused UIA element")
 		Secure := Element.GetCurrentPropertyValue(UIA.Property.IsPassword) ? true : false
+	} catch as e {
+		; Fail-secure is the right BEHAVIOUR here and does not change, but the
+		; reason must not vanish: a catch-less try made "UIA is unavailable on
+		; this machine" indistinguishable from "this one target refused", so a
+		; permanently degraded detector looked exactly like a healthy one that
+		; keeps meeting elevated windows (conventions 5.3). DEBUG because an
+		; elevated or closing target is an expected, frequent outcome.
+		try LoggerDebug("SecureField", "UIA password probe failed: {1}.", e.Message)
 	}
 	SFD_CommitFieldVerdict(Hwnd, Secure)
 	if (SFD_FIELD_CACHE["pending_hwnd"] = Hwnd)
