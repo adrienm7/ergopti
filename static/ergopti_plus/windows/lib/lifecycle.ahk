@@ -19,11 +19,15 @@ ActivateEdit(*) {
 ; "SC038 & SC03A::" in modules/shortcuts/base_modifier.ahk). AHK's custom-
 ; combination prefix-down flag latches across Suspend() and cannot be cleared by
 ; synthetic events -- see _SuspendPrefixesAreClear / _SuspendPendingPoll below.
-; Single source of truth: add
-; any NEW custom-combination prefix key here so it is drained automatically
-; before every future suspend instead of leaving a THIRD un-drained sibling for
-; the same latch bug to hide in (feedback_ahk_suspend_prefix_latch, F42).
-global SUSPEND_CUSTOM_COMBO_PREFIX_KEYS := ["SC138", "SC038"]
+; Single source of truth: EVERY key used as the prefix of an "X & Y" custom
+; combination anywhere in the driver must appear here, so it is drained
+; automatically before every future suspend instead of leaving an un-drained
+; sibling for the same latch bug to hide in (feedback_ahk_suspend_prefix_latch,
+; F42, F-30). The list is hand-maintained, so
+; test_suspend_prefix_drain_covers_all_combos.ahk DERIVES the real prefix set
+; from driver source and fails when a newly introduced combination is missing.
+;   SC138 = AltGr/Kana   SC038 = LAlt   SC01D = LCtrl   SC02A = LShift   SC11D = RCtrl
+global SUSPEND_CUSTOM_COMBO_PREFIX_KEYS := ["SC138", "SC038", "SC01D", "SC02A", "SC11D"]
 global _SuspendPending := false
 
 ; Drains every registered custom-combination prefix key (see

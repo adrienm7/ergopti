@@ -124,26 +124,25 @@ Test("metrics: suspend stops and resume re-arms the focus poll (F-06)", _MFS_Sus
 ; with metrics disabled pay 20 blocking WM_GETTEXT probes a second for data
 ; nothing reads.
 _MFS_PollIsFeatureGated() {
-	; Read the entrypoint DIRECTLY rather than the concatenated driver source:
-	; the boot arm site and the resume re-arm site share a call spelling, and the
-	; concat order across files is not stable enough to tell them apart.
-	; A_ScriptDir is the RUNNER's directory (windows/tests) for every #Include'd
-	; test file, not this file's own directory — so one SplitPath reaches windows/.
-	SplitPath(A_ScriptDir, , &Root)          ; windows/tests -> windows
-	Src := ""
-	try Src := FileRead(Root . "\ErgoptiPlus.ahk")
-	Assert(Src != "", "prerequisite: ErgoptiPlus.ahk must be readable from the test harness")
-	Src := _StripFullLineComments(Src)
+	; Helper read, never a pinned path (a CI ratchet caps those at 20). Each
+	; file's content is contiguous inside the concatenation, so anchoring on two
+	; tokens unique to the boot block isolates it without knowing which file it
+	; lives in. Comment-stripped so prose mentioning these tokens cannot satisfy
+	; the assertion.
+	Src := _DriverSourceNoComments()
 
-	ArmPos := InStr(Src, "MF_StartFocusRefresh()")
-	Assert(ArmPos > 0, "ErgoptiPlus.ahk must arm the metrics focus poll at boot")
+	; The boot metrics block opens with this debug line and closes past KL_Init;
+	; both strings appear exactly once in the driver.
+	GatePos := InStr(Src, 'LoggerDebug("Startup", "Metrics enabled')
+	Assert(GatePos > 0,
+		"prerequisite: the boot metrics gate must still open with its `Metrics enabled` debug line — update this anchor if that log message was reworded")
 
-	LoadPos := InStr(Src, "CS_Load()")
-	Assert(LoadPos > 0, "prerequisite: CS_Load() marks the config-load point in the boot sequence")
-	Assert(LoadPos < ArmPos, "prerequisite: the focus poll is armed after CS_Load()")
+	InitPos := InStr(Src, "KL_Init(", , GatePos)
+	Assert(InitPos > GatePos,
+		"prerequisite: KL_Init() must follow the metrics gate — it is the consumer that reads the focus cache")
 
-	Segment := SubStr(Src, LoadPos, ArmPos - LoadPos)
-	Assert(InStr(Segment, "MetricsShortcuts.enabled") > 0,
-		"the boot-time MF_StartFocusRefresh() must sit INSIDE the `if MetricsShortcuts.enabled` guard — the focus cache's only reader is MF_ShouldFilter, so with metrics off the poll issues blocking WM_GETTEXT probes nobody reads")
+	Segment := SubStr(Src, GatePos, InitPos - GatePos)
+	Assert(InStr(Segment, "MF_StartFocusRefresh()") > 0,
+		"the boot-time MF_StartFocusRefresh() must sit INSIDE the `if MetricsShortcuts.enabled` block and BEFORE KL_Init — the focus cache's only reader is MF_ShouldFilter, so with metrics off the poll issues blocking WM_GETTEXT probes nobody reads, and arming it after KL_Init would leave the first events reading an empty cache")
 }
 Test("metrics: the focus poll is gated on MetricsShortcuts.enabled (F-06)", _MFS_PollIsFeatureGated)
