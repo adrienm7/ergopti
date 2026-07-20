@@ -104,8 +104,36 @@ CS_Read() {
     return out
 }
 
+; Truncate a value at the first '#' that sits OUTSIDE a quoted string, so an
+; inline TOML comment (metrics_enabled = false # off) does not become part of the
+; value. Quote/escape state is tracked from the raw character stream (same
+; discipline as the array tokenizer below), so a '#' inside a quoted value or an
+; escaped quote is preserved. Without this, "false # x" fell through to the bare-
+; string fallback and coerced to a TRUTHY string, inverting the user's opt-out.
+CS_StripInlineComment(s) {
+    in_str := false
+    escaped := false
+    loop parse, s {
+        c := A_LoopField
+        if escaped {
+            escaped := false
+        } else if (c = "\") {
+            escaped := true
+        } else if (c = '"') {
+            in_str := !in_str
+        } else if (!in_str && c = "#") {
+            return Trim(SubStr(s, 1, A_Index - 1))
+        }
+    }
+    return s
+}
+
 CS_CoerceValue(raw) {
     raw := Trim(raw)
+    ; Drop any inline comment first so `false # note` coerces to boolean false and
+    ; `[ "a" ] # note` is still recognised as an array (the trailing comment would
+    ; otherwise break the "]"-suffix check below and fall through to a bare string).
+    raw := Trim(CS_StripInlineComment(raw))
     if (raw = "")
         return ""
     ; Booleans.
