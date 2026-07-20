@@ -295,8 +295,20 @@ _WS_Load() {
                 continue
             }
             if (Line == "[disabled]" or Line == "[[disabled]]") {
+                ; Flush a pending custom entry first. This branch predates the flush
+                ; logic the [[custom]] and generic [ branches already perform, so a
+                ; [[custom]] block immediately followed by [[disabled]] silently lost
+                ; the user's wrap pair. It is masked today only because _WS_Save happens
+                ; to emit disabled blocks before custom ones — a hand-edited or
+                ; reordered file loses data.
+                if (InCustom and CurLeft != "") {
+                    R := (CurRight != "") ? CurRight : CurLeft
+                    _WS_Custom.Push(Map("left", CurLeft, "right", R))
+                }
                 InDisabled := true
                 InCustom   := false
+                CurLeft    := ""
+                CurRight   := ""
                 continue
             }
             if (Line == "[[custom]]") {
