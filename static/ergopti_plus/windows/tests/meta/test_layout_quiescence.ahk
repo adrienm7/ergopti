@@ -62,3 +62,21 @@ _T_LayoutPollReloadQuiescence() {
 }
 
 Test("ErgoptiPlus: _ShouldReloadForHkl enforces quiescence and debounce (layout-poll-blind-reload)", _T_LayoutPollReloadQuiescence)
+
+; F29 (audit 2026-07-20): a tray-only / no-foreground boot (logon autostart, RDP
+; reconnect) initialises lastHkl to 0 = baseline UNKNOWN. The first observed real
+; layout must be ADOPTED as the baseline, never treated as a switch — otherwise the
+; driver Reload()s ~2-3 s after boot with no real layout change.
+_T_LayoutPollBaselineAdoption() {
+	last := 0
+	pending := 0
+	; First poll after an unknown (0) baseline: adopt, never reload.
+	res := _ShouldReloadForHkl(0x040C0C0C, &last, &pending, false, false, 0, 0, 5000)
+	AssertEqual(res, false, "First real layout after an unknown (0) baseline must not reload")
+	AssertEqual(last, 0x040C0C0C, "The first real layout must be adopted as the baseline")
+	AssertEqual(pending, 0, "Adopting the baseline must clear any pending candidate")
+	; Second poll of the SAME layout with full quiescence must still not reload.
+	res := _ShouldReloadForHkl(0x040C0C0C, &last, &pending, false, false, 0, 0, 5000)
+	AssertEqual(res, false, "A confirmed same-as-baseline layout must never reload")
+}
+Test("ErgoptiPlus: _ShouldReloadForHkl adopts the first layout as baseline after an unknown (0) boot (spurious-reload)", _T_LayoutPollBaselineAdoption)
