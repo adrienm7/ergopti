@@ -532,9 +532,23 @@ _LLM_MBW_FlushQueue() {
 	_LLM_MBW_Queue := []
 }
 
+; Fallback when the page never signals `ready`. It MUST do exactly what the real
+; ready handler does. It previously flushed the queue but omitted
+; _LLM_MBW_InjectCatalogue(), while still latching _LLM_MBW_Ready — so no later
+; message could re-trigger the injection and the model table stayed permanently
+; EMPTY. Trivially reachable, because the suspend guard used to drop the `ready`
+; message outright.
 _LLM_MBW_SafetyFlush() {
-	if (!_LLM_MBW_Ready)
-		_LLM_MBW_FlushQueue()
+	if (_LLM_MBW_Ready)
+		return
+	_LLM_MBW_OnPageReady()
+}
+
+; The single definition of "the page is up" — shared by the real ready message
+; and by the safety flush, so the two can never drift apart again.
+_LLM_MBW_OnPageReady() {
+	_LLM_MBW_FlushQueue()
+	_LLM_MBW_InjectCatalogue()
 }
 
 /**
@@ -544,20 +558,22 @@ _LLM_MBW_SafetyFlush() {
  *   {"action":"open_url","url":"…"}          — open the model page in the browser
  */
 _LLM_MBW_OnWebMessage(Handler, Args) {
+	try Msg := Args.TryGetWebMessageAsString()
+	if !IsSet(Msg)
+		return
+
+	; `ready` is a page-lifecycle signal, not a user action: it must be honoured
+	; even while paused. Gating it here is what made the SafetyFlush path
+	; reachable, and that fallback then left the model table permanently empty.
+	if (Msg == "ready") {
+		_LLM_MBW_OnPageReady()
+		return
+	}
 	; WebMessageReceived is a COM callback that bypasses native Suspend, so
 	; without this guard a paused driver would still let select_model mutate
 	; the live LLM config/engine ("pause = tout éteint" invariant).
 	if A_IsSuspended
 		return
-	try Msg := Args.TryGetWebMessageAsString()
-	if !IsSet(Msg)
-		return
-
-	if (Msg == "ready") {
-		_LLM_MBW_FlushQueue()
-		_LLM_MBW_InjectCatalogue()
-		return
-	}
 
 	try Payload := JsonParse(Msg)
 	if !IsSet(Payload)
