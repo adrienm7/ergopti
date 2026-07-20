@@ -382,28 +382,6 @@ _HSE_RebuildStarTriggerIndex() {
 }
 
 
-; Return the bucket array(s) to scan for triggers ending in LookupChar.
-; Both the case-sensitive bucket (literal LookupChar) and the
-; case-insensitive bucket (lowercase LookupChar) are returned when they
-; differ — a CaseSensitive=false trigger stored under its lowercased
-; last char would otherwise never be probed for an uppercase keystroke.
-_HSE_BucketsFor(LookupChar) {
-    global HSE_RegistryByLastChar
-    Out := []
-    if HSE_RegistryByLastChar.Has(LookupChar) {
-        Out.Push(HSE_RegistryByLastChar[LookupChar])
-    }
-    LowerKey := StrLower(LookupChar)
-    ; !== is the strict inequality operator: AHK v2's loose != is
-    ; case-insensitive, so "U" != "u" is FALSE and the fallback bucket
-    ; would never be probed for case-insensitive triggers stored under
-    ; their lowercased last char.
-    if (LookupChar !== LowerKey) and HSE_RegistryByLastChar.Has(LowerKey) {
-        Out.Push(HSE_RegistryByLastChar[LowerKey])
-    }
-    return Out
-}
-
 ; Word-boundary gate. The char immediately preceding the matched suffix
 ; must be either absent (start of buffer — falls back to the
 ; HSE_StartIsWordBoundary flag) or a word terminator. ``Spec.InWord``
