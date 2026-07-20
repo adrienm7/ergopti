@@ -498,6 +498,57 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 	M.update_ax_observer(new_pid)
 end
 
+--- Re-synchronises the cached context with the app that is frontmost RIGHT NOW,
+--- without logging anything. Called on resume.
+---
+--- app_watcher_cb returns early while paused — correctly, since « pause = tout
+--- éteint » — but that early return also skips the pure state synchronisation that
+--- follows its single write: active_app_*, the synthetic queue, is_secure_field and
+--- the AX observer's target PID. Nothing re-syncs them afterwards, because
+--- resume_all() never touched this module and no fresh activation event fires when
+--- the user resumes in the app they already switched to while paused. The cached
+--- context therefore stayed pinned to whatever was frontmost when pause began.
+---
+--- The dangerous half is is_secure_field: pausing in an ordinary app, switching to
+--- a password manager, then resuming left it stale-false, so the first keystrokes
+--- typed in the vault were logged — and attributed to the wrong application.
+--- @return boolean True when the context was re-synchronised.
+function M.resync_context()
+	if not require_state("resync_context") then return false end
+
+	local app = hs.application.frontmostApplication()
+	if not app then return false end
+
+	local ok_name, app_name = pcall(function() return app:title() end)
+	if not ok_name or type(app_name) ~= "string" then return false end
+
+	local now = hs.timer.absoluteTime() / 1000000
+
+	-- A resume is a context boundary exactly like an app activation: a synthetic
+	-- echo suppressed before the pause must not mis-tag the first key after it.
+	_state.synth_queue       = {}
+	_state.active_app_name   = app_name
+	_state.active_app_start  = now
+	pcall(function() _state.active_app_bundle = app:bundleID() end)
+	pcall(function() _state.active_app_path   = app:path() end)
+	local ok_pid, new_pid = pcall(function() return app:pid() end)
+	if ok_pid then _state.active_app_pid = new_pid end
+
+	SecureFieldDetector.refresh()
+	_state.is_secure_field = SecureFieldDetector.isSecureField()
+		or SecureFieldDetector.isSecureApp(app_name)
+
+	_last_win_title = nil
+	_last_win_time  = now
+
+	M.update_private_status()
+	if ok_pid then M.update_ax_observer(new_pid) end
+
+	Logger.debug(LOG, "Context re-synchronised on resume (app '%s', secure=%s).",
+		app_name, tostring(_state.is_secure_field))
+	return true
+end
+
 
 
 
