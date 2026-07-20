@@ -140,3 +140,25 @@ _TSM_EmptyKeyUpIsRefused() {
 		"TextPressKey('', 'Up') must refuse to send for the same reason as the Down case")
 }
 Test("TextPressKey: empty Key with 'Up' is refused, not sent as '{ Up}'", _TSM_EmptyKeyUpIsRefused)
+
+; F16 (audit 2026-07-20): TextPressKey warned "modifier array is empty after
+; normalization" whenever Mods came out empty — but an empty INPUT array is the
+; shortcuts cluster's documented "no modifiers" convention (TextPressKey(Key, [])),
+; so every CapsWord Space/Enter and every backspace/delete/enter/escape/tab action
+; spammed the errors log (18x Enter + 2x Tab in one day's real logs). The warn must
+; fire only when a NON-empty array had all its tokens fail normalization. Behavioural
+; capture cannot see the (unstubbable) LoggerWarn, so assert the source guard.
+_TSM_EmptyInputArrayDoesNotWarn() {
+	Body := _DriverFuncBody("TextPressKey")
+	Assert(Body != "", "TextPressKey must exist in adapters/text_sender.ahk")
+	GuardPos := InStr(Body, "if (Modifiers.Length > 0)")
+	WarnPos := InStr(Body, "is empty after normalization")
+	Assert(WarnPos > 0, "TextPressKey must keep the empty-after-normalization diagnostic for genuinely invalid input")
+	Assert(GuardPos > 0 && GuardPos < WarnPos,
+		"the empty-after-normalization warning must be gated on Modifiers.Length > 0 so an empty input array (the no-modifiers convention) never logs a WARNING")
+	; The bare key must still be emitted for the empty-input case.
+	AssertEqual("{Enter}", _TSM_Capture("Enter", []),
+		"TextPressKey(Enter, []) must still send a bare {Enter}")
+}
+Test("TextPressKey: empty input array sends bare key without a WARNING (no errors-log storm)",
+	_TSM_EmptyInputArrayDoesNotWarn)
