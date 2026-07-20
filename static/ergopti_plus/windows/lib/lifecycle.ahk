@@ -199,14 +199,29 @@ Ergopti_OnSuspendResume() {
 }
 _SuspendStateWatchdog() {
     global _LastSuspendState
+    ; Serialize the transition. This runs both from a 500 ms repeating timer and
+    ; directly on each toggle; AHK pseudo-threads are interruptible, so a rapid
+    ; double-toggle could otherwise interrupt Ergopti_OnSuspendEnter's teardown with
+    ; Ergopti_OnSuspendResume, leaving a resumed driver half torn down. If a reactor
+    ; is already running, leave _LastSuspendState unchanged and return — the repeating
+    ; timer re-detects the (possibly reversed) state on its next tick and dispatches
+    ; the correct reactor once the current one has finished.
+    static _TransitionBusy := false
     if (A_IsSuspended == _LastSuspendState)
         return
-    _LastSuspendState := A_IsSuspended
-    UpdateTrayIcon()
-    if A_IsSuspended
-        Ergopti_OnSuspendEnter()
-    else
-        Ergopti_OnSuspendResume()
+    if _TransitionBusy
+        return
+    _TransitionBusy := true
+    try {
+        _LastSuspendState := A_IsSuspended
+        UpdateTrayIcon()
+        if A_IsSuspended
+            Ergopti_OnSuspendEnter()
+        else
+            Ergopti_OnSuspendResume()
+    } finally {
+        _TransitionBusy := false
+    }
 }
 ; Single global shutdown handler wired to OnExit (see the auto-execute section
 ; after the keylogger is started). AHK v2 Reload() and ExitApp() tear the process
