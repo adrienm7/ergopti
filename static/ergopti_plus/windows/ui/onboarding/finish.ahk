@@ -28,7 +28,7 @@
 ; structurally identical files.
 _WritePathsToml(NewDir) {
 	global _PathsFile, _DefaultConfigDir
-	TmpPath := _PathsFile . ".onboarding-" . A_Pid . ".tmp"
+	TmpPath := _PathsFile . ".onboarding-" . DriverPid . ".tmp"
 	try {
 		FSDelete(TmpPath)
 		DefaultDirFwd := StrReplace(IsSet(_DefaultConfigDir) ? _DefaultConfigDir : "", "\", "/")
