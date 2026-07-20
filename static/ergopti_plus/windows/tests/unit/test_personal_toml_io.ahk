@@ -52,3 +52,18 @@ _PTIO_LoadsLettersAtomically() {
 	}
 }
 Test("personal TOML: [letters] aliases load and cache atomically (personal-toml-letters-not-loaded)", _PTIO_LoadsLettersAtomically)
+
+; F06 (audit 2026-07-20): WritePersonalToml evicted only its own editor-model cache
+; (_ReadPersonalTomlCache), never the raw-content _TomlFileCache that the engine
+; loader and prefix-watcher read. So after an editor save, the next live rebuild
+; (any tray hotstring toggle -> RebuildHotstringsLive) re-read the stale boot-time
+; file content and silently reverted the saved edit. Source-scan the writer body
+; (a behavioural call would write to the real PersonalTomlPath) to assert it evicts
+; the reader-shared cache via _ParseTomlGroupConfig_InvalidatePath.
+_PTIO_WriteEvictsReaderSharedCache() {
+	Body := _DriverFuncBody("WritePersonalToml")
+	Assert(Body != "", "WritePersonalToml must exist in lib/hotstrings/personal_toml_io.ahk")
+	Assert(InStr(Body, "_ParseTomlGroupConfig_InvalidatePath") > 0,
+		"WritePersonalToml must evict the reader-shared _TomlFileCache (via _ParseTomlGroupConfig_InvalidatePath) so a live rebuild reads the saved edit, not the stale boot-time content")
+}
+Test("personal TOML: writer evicts the reader-shared raw-content cache (no silent revert)", _PTIO_WriteEvictsReaderSharedCache)

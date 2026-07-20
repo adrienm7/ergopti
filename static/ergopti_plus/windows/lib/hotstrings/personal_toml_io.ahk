@@ -259,6 +259,14 @@ WritePersonalToml(Data) {
 	_ReadPersonalTomlCache := false ; Invalidate
 	_HS_GrandTotalCache := -1
 	FilePath := PersonalTomlPath()
+	; The two lines above evict only this module's editor-model cache. The engine
+	; loader (LoadHotstringsSection) and the prefix-watcher read personal hotstrings
+	; through the raw-content _TomlFileCache, which they do NOT touch. Without this
+	; eviction the next live rebuild (any tray hotstring toggle -> RebuildHotstringsLive)
+	; re-reads the STALE boot-time file content and silently reverts the edit just
+	; saved to disk. Drop the reader-shared caches (raw content, group config, section
+	; counts, resolve memo) too so the on-disk truth wins on the next read.
+	try _ParseTomlGroupConfig_InvalidatePath(FilePath)
 	Q := Chr(34)
 	Lines := []
 
