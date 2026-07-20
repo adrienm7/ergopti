@@ -96,7 +96,16 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
     ; master_gates.sub_categories (MG-3).**
     if CategoryGateFn.Call("Hotstrings") and FeaturesTarget.Has("hotstrings") {
         for SubV1, SubV2 in SubGates {
-            if !CategoryGateFn.Call(SubV1) and FeaturesTarget["hotstrings"].Has(SubV2) {
+            ; Skip a sub-gate whose feature-group id has no matching key under
+            ; Features["hotstrings"] BEFORE probing the category gate. A manifest
+            ; sub-gate that drifted from the Features tree (e.g. dynamic_hotstrings,
+            ; which intentionally follows the Hotstrings master rather than a standalone
+            ; CategoryEnabled entry) is inert either way; probing it first calls
+            ; IsCategoryGated on an unknown category, which logged a spurious
+            ; "unknown category" WARNING on every single boot.
+            if !FeaturesTarget["hotstrings"].Has(SubV2)
+                continue
+            if !CategoryGateFn.Call(SubV1) {
                 for V2Id, V2Val in FeaturesTarget["hotstrings"][SubV2] {
                     if (Type(V2Val) == "Map" and V2Val.Has("enabled")) {
                         V2Val["enabled"] := false

@@ -165,7 +165,10 @@ ReadCategoryEnabled(Cache) {
 IsCategoryGated(Category) {
     global CategoryEnabled
     if !CategoryEnabled.Has(Category) {
-        try LoggerWarn("MasterGates", "IsCategoryGated: unknown category '{1}' — defaulting to gated.", Category)
+        ; true here means the gate is ON (category ENABLED), not suspended — the old
+        ; "defaulting to gated" wording read as the opposite. An unknown category is
+        ; always schema drift between menu_manifest.json and CategoryEnabled.
+        try LoggerWarn("MasterGates", "IsCategoryGated: unknown category '{1}' — treating as ENABLED (schema drift).", Category)
         return true
     }
     return CategoryEnabled[Category]
