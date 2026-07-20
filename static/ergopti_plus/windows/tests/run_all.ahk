@@ -899,6 +899,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_logger_fanout_batched.ahk
 #Include meta/test_crash_reporter_slash_precedence.ahk
 #Include meta/test_logger_flush_on_error.ahk
+#Include meta/test_atomic_write_unique_scratch.ahk
 #Include meta/test_hook_dispatcher_critical_save_restore.ahk
 #Include meta/test_hook_dispatcher_err_cache_cap.ahk
 #Include meta/test_walker_batch_critical.ahk
