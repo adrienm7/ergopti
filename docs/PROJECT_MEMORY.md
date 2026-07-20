@@ -67,6 +67,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - Further batch: tap_hold_loader (pause, defaults overlay, invalid TOML, inherit_defaults=false, accessor edges — 6+ new), toml_loader (unicode, caching, multiple escapes), karabiner config (pause, migration, empty inputs), i18n (pause safe load/t()), hotstrings_full (pause guard, section delay), config (pause+manifest). Total added across expansion: 40+ regression tests. Prioritize suspend/pause in every new path.
   - Latest additions in "ajoute le plus de tests possible" pass: reinforced config, added personal_info and terminators pause guards (HS), more i18n/hotstrings_full pause+delay, karabiner edges. ~10 additional tests. Goal achieved: broad coverage across tap_hold, toml, karabiner, i18n, hotstrings, config, personal, terminators + universal pause invariant.
   - Post-compaction "encore plus" / "encore plus de tests. le maximum possible..." wave (this session continuation after summary compaction): +25-32 new regression tests in one dense iteration for near-100% certainty. Key additions: test*shortcuts.ahk (+6 — closed the critical ZERO pause coverage gap on all dispatchers, AltGr prefix latch regression under pause/resume [[feedback-ahk-suspend-prefix-latch]], RegisterMenuItem safety + pause, 250+ volume, bad Features, idempotent transitions); test_hotstrings_config.ahk (+3 — pause gate on resolution, explicit section>group>default delay precedence regression, 150+ bad TOML under pause); test_logger_contract.ahk (+3 — pause + errors-sink survival for diagnostics, 300+ volume ERROR under pause, hard FS on errors sink no-crash); test_active_app_cache.ahk (+3 — pause blocks all cache-driven activation for shortcuts/gestures/hotstrings/widgets, 200+ volume under pause, bad/unicode exe resilience); deepened HS: llm/profiles (+2-3 volume + pause transitions), gestures/engine (+2 primer + pause + 200+ volume + reversal), keylogger/aggregator (+2 privacy+pause+rollover + FS/pcall), shortcuts/bindings (+3 pause + volume + bad ids), karabiner/generator (+2 pause + volume + bad), keymap/terminators (+2 pause + volume unicode), meta corpus_hotstrings (+2 pause + delay precedence). Also notes in require_state (shortcuts full, hotstrings_config, logger_contract) and port_adapter. All with explicit "project_suspend_pause_invariant", historical gotchas, and max edges (volume 100-300+, unicode, bad input, FS/pcall no-crash, rollover, dedup, re-init, idempotent pause, cache-driven safety). Banners clean on most; 1 minor whitespace on shortcuts (warn-only, tests fully registered and valid). Memory updated. Campaign total now well over 210+ new regression tests. These tests would have caught: silent AltGr latch dispatch after pause, wrong hotstring delay timing (DYN* early-load or section override), logger ERROR loss under pause (diagnostics broken), cache-driven shortcut/gesture fire while suspended, gesture primer stuck after touchdevice dormancy + pause, aggregator PII leak on pause+rollover, menu item drops, volume corruption in prediction/profiles/bindings, etc. Full suites (run_all.ahk + run.lua) + live hardware test (pause/resume, high volume typing/gestures/LLM, config reload, keylogger privacy) mandatory before any merge. User can request "encore plus" again — the loop continues until no obvious gaps remain in survey.
+  - [project-hs-partial-fixes-and-false-green-tests](#project-hs-partial-fixes-and-false-green-tests) — Three macOS fixes recorded as complete are partial; each is guarded by a test asserting the mechanism instead of the guarantee
   - [project-ahk-menu-dispatcher-error-swallow](#project-ahk-menu-dispatcher-error-swallow) — The menu dispatcher bypass must re-throw callback errors to maintain parity with AHK's native dispatch and the global OnError handler.
 
 ---
@@ -1848,3 +1849,69 @@ Related: [[project-ahk-v2-static-unset-unreadable]], [[project-ahk-suite-runnabl
 * **Cause**: app-switch aggregates only own intervals that have already ended. Without a projection-only addition for the current foreground app, opening the UI before the next switch necessarily omits that time. Windows additionally reset `app_entered_at` on every 30-second micro-idle, thereby measuring typing density instead of focused screen time. macOS had a malformed template literal in `metrics_typing/data.js`, which prevented `process_manifest` from being defined; Linux returned a session-summary shape while the shared UIs require `{metrics_manifest, app_icons}` and had no typing bridge.
 * **Invariant**: all three drivers must emit the same dashboard envelope, and the current app interval is added at **read/render** time only (never persisted/cached, or it will double-count). A micro-idle is still foreground time; only a real session timeout/lock/sleep ends the interval. Prime the foreground app after a lifecycle starts when its first callback is edge-triggered.
 * **Regression coverage**: shared browser scripts are parsed by `tools/test/test-shared-ui-js-syntax.cjs`; macOS tests the active-app snapshot; Linux tests the bridge contract, lifecycle prime, and per-app projection; Windows tests the micro-idle and live-manifest guards. Keep cross-driver UI fixes contract-based: a UI that merely loads but receives a different payload shape is still broken.
+
+### project-hs-partial-fixes-and-false-green-tests
+
+_Three macOS "fixes" recorded as complete are partial, and each is protected by a test that asserts the wrong thing — the test locks in the mechanism, not the guarantee_
+
+<sub>slug: `project_hs_partial_fixes_and_false_green_tests`</sub>
+
+Found by the 2026-07-20 Hammerspoon adversarial audit (`AUDIT_HAMMERSPOON_2026-07-20.md`).
+A green regression test is only worth what its assertion is worth, and three of ours assert a
+*mechanism* rather than the *user-visible guarantee* — so the fix regressed (or was never
+complete) while CI stayed green.
+
+- **Deferred log purge.** `[[project_hs_perf_profilers_and_case_conform]]` records the
+  synchronous log-purge shell pipeline as fixed by deferring it via
+  `hs.timer.doAfter(LOG_PURGE_DELAY_SEC=5)`. It was moved off the **boot path** but NOT off the
+  **main thread**: `ShellRunner.exec` is `pcall(hs.execute, …)`, fully synchronous. The blocking
+  work now lands 5 s after boot — when the keystroke tap IS armed and the user IS typing, which
+  is worse than at boot where it was invisible. `test_logger_deferred_purge.lua` asserts the
+  purge is *scheduled*, so the blocking call is invisible to CI. Correct assertion:
+  `#exec_log == 0`. The purge needs no subprocess at all — filename + `hs.fs.attributes` suffice.
+  The same pipeline also never purged the errors sink: `basename` leaves the `errors_` prefix, so
+  `date -j -f '%Y-%m-%d'` fails, `2>/dev/null` eats it and `&&` short-circuits.
+- **Crash report deferred off the hot path.** `test_crash_report_deferred_off_hot_path.lua`
+  states the problem correctly ("froze the whole run loop until a human dismissed a dialog, for
+  ANY recoverable Lua error") but the remedy was `hs.timer.doAfter(0, …)`. That leaves the
+  stack frame while staying on the **same main thread one tick later**; the freeze is
+  `hs.dialog.blockAlert`'s nested modal run loop, not the stack frame. `lib/dialog_util.lua:57-58`
+  already documents that modals block the runloop. Related: `_guard_timer_cb` routed EVERY
+  recoverable timer throw into the crash reporter, contradicting `[[errors_only_log_sink]]`.
+- **MLX warmup gated on disable.** `test_mlx_warmup_gated_on_disable.lua` is titled
+  "pause/**disable**" but only greps `script_control.lua` for `stop_warmup`. Whole-tree grep:
+  `stop_warmup` had exactly ONE production caller, the pause path.
+  `prediction_engine.set_llm_enabled(false)` never called it, so turning AI off left api_mlx's
+  2 s self-retry POSTing. Same shape: `test_ollama_ready_reset_on_switch.lua` asserted
+  `reset_ready` is *called* and never modelled the in-flight callback that undoes it.
+
+**How to apply:**
+
+- When writing a regression test for a "we made X non-blocking / deferred / gated" fix, assert
+  the **absence of the harmful operation** (zero shell execs, zero modal calls, zero POSTs after
+  the gate), never the presence of the scheduling call. `doAfter(0)` is not a thread hop.
+- A guard test scoped to ONE function's body misses the class — see
+  `[[project_ahk_guard_tests_must_loop_the_class]]`. The macOS twin of that lesson:
+  `test_pause_guard_position.lua` pinned the pause guard inside `keylogger.handle_key` only, so
+  `context_tracker`'s three ungated writers (window **titles**!) kept recording while paused,
+  invisible to 3 099 green tests.
+- **The dominant bug shape on this driver is the documented invariant with one missed sibling
+  site** — `[[project_ahk_invariant_incomplete_application]]` applies to macOS verbatim. The
+  audit's critical finding is the purest case: `rules_engine.lua` *states* that SSN/IBAN
+  plaintext must never reach the log and guards the interceptor path, while the prefix mappings
+  registered 100 lines below take the expander path, where no guard existed. When you find a
+  comment asserting an invariant, grep for every route that reaches the same sink.
+- Second shape: **a guard that tests the wrong thing.** `pcall` status read as a function's
+  return value (`hs.keycodes.setLayout` returns a boolean, it does not raise — so the whole TIS
+  fallback was dead code); a function's *existence* read as an *init flag*
+  (`if not Rotation.get_offset` is always false); `nil` used as both "no cache" and "cached
+  negative" (`vscode_bridge`). Grep for `local ok = pcall(` where the callee returns a status.
+
+Tooling note: the RTK proxy rewrites `git diff` into a summary, so `git diff > file.patch`
+produces a `--stat`, not an applicable patch. Use `rtk proxy git diff` when a real patch is needed.
+
+Also recorded: `~/.hammerspoon` and any `ErgoptiPlus_*.log` are absent on the Windows dev box, so
+**G4 cannot be measured there** — per `[[project_audit_evidence_must_be_reproducible]]`, label
+latency findings "derived from reading the code" and never quote a millisecond figure you did not
+observe. The macOS suite is 3 099/0 green, but only when run from `macos/`; from the repo root
+6 tests fail on a relative-path read.
