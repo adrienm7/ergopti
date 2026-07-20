@@ -147,6 +147,11 @@ _HS_PromptDefaultDelay() {
 		return
 	}
 	HotstringsSetOverride("_global", "", "delay", (Val + 0) / 1000)
+	; Persisting the override only bumps the resolve generation; delays are baked into
+	; each spec at REGISTRATION time (LoadHotstringsSection folds them into the spec
+	; meta), so re-register live — the same path a section toggle uses — or the new
+	; delay is silently ignored until the next Reload.
+	RebuildHotstringsLive()
 }
 
 ; Label for a per-category default-delay item ("<name> : <ms>[ (default)]").
@@ -182,6 +187,9 @@ _HS_PromptCategoryDelay(Cat, I18nKey, DefaultSec := "") {
 		return
 	}
 	HotstringsSetOverride(Cat, "", "delay", (Val + 0) / 1000)
+	; Re-register live (see _HS_PromptDefaultDelay) so the new per-category delay takes
+	; effect immediately instead of only after a Reload or an unrelated section toggle.
+	RebuildHotstringsLive()
 }
 
 ; Dynamic handler: word-expanders sub-menu, mirroring the terminators sub-menu.
