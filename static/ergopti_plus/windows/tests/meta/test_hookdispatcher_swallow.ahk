@@ -73,3 +73,32 @@ Test("HookDispatcher: catch escalates to ErgoptiGlobalErrorHandler for modifier 
 Test("hook_dispatcher: ErgoptiGlobalErrorHandler escalation is throttled (not per-keystroke)", _THS_EscalationIsThrottled)
 Test("hook_dispatcher: error cache delta uses 32-bit wrap mask", _THS_DeltaIsWrapSafe)
 Test("hook_dispatcher: subscriber-fault escalation is gated on the ready boot phase", _THS_EscalationIsBootPhaseGated)
+
+; F35 (audit 2026-07-20): every TapHoldTrack* call in the per-keystroke fan-out was a
+; bare `try` with no catch, so a broken tracker silently degraded tap-hold
+; disambiguation with nothing in the log (§5.3). They must report — but throttled,
+; since they run on every keystroke.
+_THS_TrackerFaultsAreReported() {
+	Src := _DriverDirConcat("lib")
+	Assert(InStr(Src, "static _TrackFault(") > 0,
+		"HookDispatcher must expose a throttled tracker-fault reporter")
+	; Every tracker call must be paired with exactly one fault report: count both.
+	TryCount := 0, Pos := 1
+	while (Pos := InStr(Src, "try TapHoldTrack", , Pos)) {
+		TryCount++
+		Pos += 16
+	}
+	ReportCount := 0, Pos := 1
+	while (Pos := InStr(Src, "HookDispatcher._TrackFault(", , Pos)) {
+		ReportCount++
+		Pos += 27
+	}
+	Assert(TryCount > 0, "the fan-out must still call the tap-hold trackers")
+	Assert(ReportCount == TryCount,
+		"every TapHoldTrack* call must be paired with a _TrackFault report — a silently swallowed tracker fault degrades tap-hold disambiguation invisibly (found "
+		. TryCount . " call(s) but " . ReportCount . " report(s))")
+	Assert(InStr(Src, '_TrackFault("TapHoldTrackKeyDownByScancode"') > 0,
+		"the key-down tracker fault must route through the throttled reporter")
+}
+Test("hook_dispatcher: tap-hold tracker faults are reported, not silently swallowed",
+	_THS_TrackerFaultsAreReported)
