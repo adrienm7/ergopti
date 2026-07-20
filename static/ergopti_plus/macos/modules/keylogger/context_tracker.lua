@@ -92,14 +92,26 @@ end
 --- immediately when a password field receives focus.
 --- @param element table The newly focused AX element (may be nil).
 local function update_secure_field_state(element)
+	-- The app-level guard must be OR-ed into EVERY assignment of is_secure_field.
+	-- The activation path (handle_app_switch) sets the flag to the union
+	-- isSecureField() or isSecureApp(), but this AX callback recomputed it from the
+	-- role/subrole axis alone and assigned unconditionally — so focusing any
+	-- non-secure element inside a known vault (its search box, a note field) flipped
+	-- the flag back to false and RESUMED logging inside the password manager. The
+	-- detector's own docstring calls the known-app list "a second line of defence"
+	-- for vaults that never expose a secure role; dropping it here defeated exactly
+	-- that. Fail-safe: false only when neither axis says secure.
+	local in_secure_app = SecureFieldDetector.isSecureApp(_state.active_app_name)
+
 	if not element then
-		_state.is_secure_field = false
+		_state.is_secure_field = in_secure_app
 		return
 	end
 	local ok_role,    role    = pcall(function() return element:attributeValue("AXRole") end)
 	local ok_subrole, subrole = pcall(function() return element:attributeValue("AXSubrole") end)
 	local is_secure = (ok_role    and role    == "AXSecureTextField")
 	               or (ok_subrole and subrole == "AXSecureTextField")
+	               or in_secure_app
 	if is_secure ~= _state.is_secure_field then
 		_state.is_secure_field = is_secure
 		if is_secure then
