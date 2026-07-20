@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "Alle personlige filer (snarveier, hotstrings…) løses fra denne mappen.",
 	"paths_editor.tag_default": "standard",
 	"paths_editor.tag_modified": "endret",
+	"paths_editor.save_failed": "Kunne ikke lagre konfigurasjonsmappen. Filen kan være skrivebeskyttet eller i bruk av et annet program.",
+	"paths_editor.save_failed_title": "Lagring mislyktes",
 	"personal_info.field_credit_card": "Kredittkort",
 	"personal_info.field_firstname": "Fornavn",
 	"personal_info.field_phone_digits": "Telefon (sifre)",

@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "सभी व्यक्तिगत फ़ाइलें (shortcuts, hotstrings…) इस फ़ोल्डर से हल की जाती हैं।",
 	"paths_editor.tag_default": "डिफ़ॉल्ट",
 	"paths_editor.tag_modified": "संशोधित",
+	"paths_editor.save_failed": "कॉन्फ़िगरेशन फ़ोल्डर सहेजा नहीं जा सका। फ़ाइल केवल-पढ़ने योग्य हो सकती है या किसी अन्य प्रोग्राम द्वारा उपयोग में हो सकती है।",
+	"paths_editor.save_failed_title": "सहेजना विफल",
 	"personal_info.field_credit_card": "क्रेडिट कार्ड",
 	"personal_info.field_firstname": "पहला नाम",
 	"personal_info.field_phone_digits": "फ़ोन (अंक)",

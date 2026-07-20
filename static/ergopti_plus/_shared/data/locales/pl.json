@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "Wszystkie pliki osobiste (skróty, hotstring'i…) są wczytywane z tego folderu.",
 	"paths_editor.tag_default": "domyślny",
 	"paths_editor.tag_modified": "zmieniono",
+	"paths_editor.save_failed": "Nie można zapisać folderu konfiguracji. Plik może być tylko do odczytu lub używany przez inny program.",
+	"paths_editor.save_failed_title": "Zapis nie powiódł się",
 	"personal_info.field_credit_card": "Karta kredytowa",
 	"personal_info.field_firstname": "Imię",
 	"personal_info.field_phone_digits": "Telefon (tylko cyfry)",

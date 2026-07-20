@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "Alle persoonlijke bestanden (snelkoppelingen, hotstrings…) worden opgelost vanuit deze map.",
 	"paths_editor.tag_default": "standaard",
 	"paths_editor.tag_modified": "gewijzigd",
+	"paths_editor.save_failed": "Kan de configuratiemap niet opslaan. Het bestand is mogelijk alleen-lezen of in gebruik door een ander programma.",
+	"paths_editor.save_failed_title": "Opslaan mislukt",
 	"personal_info.field_credit_card": "Creditcard",
 	"personal_info.field_firstname": "Voornaam",
 	"personal_info.field_phone_digits": "Telefoon (alleen cijfers)",

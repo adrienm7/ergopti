@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "Tutti i file personali (scorciatoie, hotstring…) vengono risolti da questa cartella.",
 	"paths_editor.tag_default": "predefinito",
 	"paths_editor.tag_modified": "modificato",
+	"paths_editor.save_failed": "Impossibile salvare la cartella di configurazione. Il file potrebbe essere di sola lettura o in uso da un altro programma.",
+	"paths_editor.save_failed_title": "Salvataggio non riuscito",
 	"personal_info.field_credit_card": "Carta di credito",
 	"personal_info.field_firstname": "Nome",
 	"personal_info.field_phone_digits": "Telefono (solo cifre)",

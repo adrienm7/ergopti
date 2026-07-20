@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "يتم تحميل جميع الملفات الشخصية (الاختصارات، السلاسل النصية…) من هذا المجلد.",
 	"paths_editor.tag_default": "افتراضي",
 	"paths_editor.tag_modified": "معدّل",
+	"paths_editor.save_failed": "تعذر حفظ مجلد الإعدادات. قد يكون الملف للقراءة فقط أو قيد الاستخدام من قبل برنامج آخر.",
+	"paths_editor.save_failed_title": "فشل الحفظ",
 	"personal_info.field_credit_card": "بطاقة ائتمان",
 	"personal_info.field_firstname": "الاسم الأول",
 	"personal_info.field_phone_digits": "الهاتف (أرقام فقط)",

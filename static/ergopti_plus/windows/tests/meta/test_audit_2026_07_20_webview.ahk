@@ -1,0 +1,129 @@
+﻿; static/ergopti_plus/windows/tests/meta/test_audit_2026_07_20_webview.ahk
+
+; ==============================================================================
+; MODULE: Audit 2026-07-20 (second pass) — WebView2 host findings
+; DESCRIPTION:
+; Guards for F-25, F-26, F-27, F-28 and F-29.
+;
+; The whole cluster has ONE mechanism behind it: lib/webview_utils.ahk defines a
+; WebViewHost factory that handles every documented gotcha correctly — and has
+; zero consumers. All 14 windows are hand-rolled copies, so each cross-cutting
+; guard was applied only to the sites its regression test happened to name.
+;
+; These tests are therefore written as CLASS LOOPS over every host, not as
+; assertions about the sites that were broken. That shape is the actual fix:
+; it makes the next hand-rolled window fail the suite instead of silently
+; inheriting the omission.
+;
+; F-25  Only 2 of 9 WebMessageReceived handlers guarded A_IsSuspended. COM
+;       callbacks bypass native Suspend, so a paused driver still let a page
+;       click write config, re-register hotstrings, or (onboarding) launch an
+;       elevated UAC driver install. The guard deliberately exempts `ready`:
+;       gating page-lifecycle signals is what strands the SafetyFlush and
+;       leaves a window permanently un-initialised.
+; F-26  _PromptEdWeb_TryOpen captured the open context BELOW its singleton
+;       early-return, so re-opening for a different profile kept the previous
+;       _PromptEdWeb_EditId and saving overwrote the WRONG profile.
+; F-27/ Teardown ran synchronously on the WebMessageReceived stack: the
+; F-28  subscription currently dispatching was released, then the controller
+;       closed and the Gui destroyed. Uncatchable SEH class; must be deferred
+;       via SetTimer(-1), as ui/onboarding/webview.ahk already documents.
+; F-29  _PathsEdWeb_Save left FileOpen unprotected with no else on `if f`, so a
+;       failed write was silent, the log claimed success, and Reload() dropped
+;       the user back into the old directory.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+; Every WebMessageReceived handler in the driver. Adding a new host without
+; adding it here is itself caught, by the count assertion below.
+_A0720WV_MessageHandlers() {
+	return ["_OnbWeb_OnWebMessage", "_HsEdWeb_OnWebMessage", "_HCWWeb_OnWebMessage"
+	      , "_PathsEdWeb_OnWebMessage", "_PiEdWeb_OnWebMessage", "_PromptEdWeb_OnWebMessage"
+	      , "_ActPickWeb_OnWebMessage", "_LLM_MBW_OnWebMessage", "KLWV_OnWebMessage"]
+}
+
+_A0720WV_EveryHandlerIsSuspendGuarded() {
+	Checked := 0
+	for _, Fn in _A0720WV_MessageHandlers() {
+		Body := _DriverFuncBody(Fn)
+		Assert(Body != "", Fn . " must exist — if a host was renamed, update this list rather than dropping the handler from the invariant")
+		Assert(InStr(Body, "A_IsSuspended") > 0,
+			Fn . " must gate on A_IsSuspended: WebMessageReceived is a COM callback and bypasses native Suspend, which only disarms hotkeys, so a paused driver would still let a page click write config, re-register hotstrings or launch an elevated install")
+		Checked += 1
+	}
+	Assert(Checked >= 9,
+		"every WebView2 message handler must be covered by this invariant — the cluster this guards exists precisely because each guard was applied only to the sites its test named")
+}
+Test("webview: every message handler honours the suspend invariant (F-25)",
+	_A0720WV_EveryHandlerIsSuspendGuarded)
+
+
+; The guard must not swallow page-lifecycle signals. Dropping `ready` is how the
+; model browser ended up with a permanently empty table (F-32's class).
+_A0720WV_ReadyIsNotGatedAway() {
+	for _, Fn in ["_OnbWeb_OnWebMessage", "_HCWWeb_OnWebMessage", "_PathsEdWeb_OnWebMessage"
+	            , "_PiEdWeb_OnWebMessage", "_ActPickWeb_OnWebMessage"] {
+		Body := _DriverFuncBody(Fn)
+		if (Body == "" or InStr(Body, "ready") = 0)
+			continue
+		Assert(RegExMatch(Body, 'A_IsSuspended\s*&&\s*Action\s*!=\s*"ready"') > 0,
+			Fn . " must exempt the `ready` page-lifecycle signal from its suspend guard — gating it strands the SafetyFlush and leaves the page permanently un-initialised, which is a different bug than the one the guard fixes")
+	}
+}
+Test("webview: the suspend guard exempts page-lifecycle signals (F-25)",
+	_A0720WV_ReadyIsNotGatedAway)
+
+
+_A0720WV_PromptEditorCapturesContextBeforeSingleton() {
+	Body := _DriverFuncBody("_PromptEdWeb_TryOpen")
+	Assert(Body != "", "_PromptEdWeb_TryOpen must exist in ui/prompt_editor/init.ahk")
+
+	CapturePos := InStr(Body, "_PromptEdWeb_EditId")
+	ActivatePos := InStr(Body, "WinActivate(")
+	Assert(CapturePos > 0 and ActivatePos > 0, "prerequisite: both the context capture and the singleton activate must be present")
+	Assert(CapturePos < ActivatePos,
+		"_PromptEdWeb_TryOpen must capture the open context BEFORE the singleton early-return — otherwise re-opening the editor for a different profile keeps the previous _PromptEdWeb_EditId, the window merely gains focus still bound to the old profile, and saving overwrites the WRONG profile with the new one's edits")
+}
+Test("prompt-editor: the singleton re-points at the new profile (F-26)",
+	_A0720WV_PromptEditorCapturesContextBeforeSingleton)
+
+
+; Class loop: no message handler may tear its own host down synchronously.
+_A0720WV_TeardownIsDeferredOutOfTheCallback() {
+	Cases := Map(
+		"_LLM_MBW_OnWebMessage", ["_LLM_MBW_OnClose(", "_LLM_MBW_Reset("],
+		"_HsEdWeb_OnWebMessage", ["_HsEdWeb_Close(", "_HsEdWeb_Save("]
+	)
+	for Fn, Forbidden in Cases {
+		Body := _DriverFuncBody(Fn)
+		Assert(Body != "", Fn . " must exist")
+		for _, Call in Forbidden {
+			Assert(InStr(Body, Call) = 0,
+				Fn . " must not call " . Call . " directly — it runs on the WebMessageReceived stack, where releasing the subscription currently dispatching and then closing the controller / destroying the Gui is an uncatchable access-violation class. Hand off with SetTimer(-1), as ui/onboarding/webview.ahk documents")
+		}
+		Assert(InStr(Body, "SetTimer(") > 0,
+			Fn . " must defer its side-effecting work out of the COM callback with SetTimer(-1)")
+	}
+}
+Test("webview: hosts never tear down from inside the COM callback (F-27, F-28)",
+	_A0720WV_TeardownIsDeferredOutOfTheCallback)
+
+
+_A0720WV_PathsEditorSurfacesWriteFailure() {
+	Body := _DriverFuncBody("_PathsEdWeb_Save")
+	Assert(Body != "", "_PathsEdWeb_Save must exist in ui/paths_editor/init.ahk")
+
+	Assert(InStr(Body, "LoggerError") > 0,
+		"_PathsEdWeb_Save must log an ERROR when the write fails — it was unprotected with no else on `if f`, so a read-only or locked target silently discarded the user's chosen directory while the log asserted success")
+
+	ErrPos := InStr(Body, "LoggerError")
+	ReloadPos := InStr(Body, "Reload()")
+	Assert(ReloadPos > 0, "prerequisite: the success path still reloads")
+	Assert(ErrPos < ReloadPos,
+		"the failure branch must return BEFORE Reload() — reloading after a failed write drops the user back into the OLD config directory with no error anywhere, so the change simply appears not to have happened")
+	Assert(InStr(Body, "catch") > 0,
+		"the FileOpen/Write/Close sequence must be wrapped in try/catch (fail fast, copilot-instructions 5.3)")
+}
+Test("paths-editor: a failed config-directory write is surfaced (F-29)",
+	_A0720WV_PathsEditorSurfacesWriteFailure)

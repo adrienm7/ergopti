@@ -1377,6 +1377,8 @@
 	"paths_editor.subtitle": "Все личные файлы (ярлыки, хотстринги…) загружаются из этой папки.",
 	"paths_editor.tag_default": "по умолчанию",
 	"paths_editor.tag_modified": "изменено",
+	"paths_editor.save_failed": "Не удалось сохранить папку конфигурации. Файл может быть только для чтения или использоваться другой программой.",
+	"paths_editor.save_failed_title": "Ошибка сохранения",
 	"personal_info.field_credit_card": "Кредитная карта",
 	"personal_info.field_firstname": "Имя",
 	"personal_info.field_phone_digits": "Телефон (только цифры)",
