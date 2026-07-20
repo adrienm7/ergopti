@@ -21,10 +21,12 @@
 
 ; The tap-hold timing constants below are sourced from the shared cross-driver
 ; registry (_shared/modules/timings/constants.toml [tap_hold]) by TapHoldsLoadTimings(),
-; called once at boot from the auto-execute body. They start at the sentinel 0
-; because AHK v2 runs global initializers BEFORE the auto-execute body, so the
-; registry is not yet loaded here; the reassign runs well before any tap-hold
-; hotkey can fire (those arm only when modules/tap_holds.ahk loads, far later).
+; called once at boot from lib/boot.ahk. They start at the sentinel 0 only as a
+; declaration placeholder. IMPORTANT: AHK v2 executes a file's top-level
+; `global X := ...` assignments at its #Include POSITION in the auto-execute flow,
+; NOT before it -- so this file MUST be included before lib/boot.ahk (ErgoptiPlus.ahk
+; does this explicitly in the early include manifest), otherwise these sentinel 0s
+; would run AFTER TapHoldsLoadTimings() and re-zero the loaded values on every boot.
 
 ; Minimum duration (ms) a tap must last to count as intentional -- filters
 ; spurious firings when another key is chord-pressed with LShift or LCtrl.
