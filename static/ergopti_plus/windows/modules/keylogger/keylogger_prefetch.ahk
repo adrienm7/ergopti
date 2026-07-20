@@ -319,6 +319,26 @@ KLPF_DbgWrite(path, line) {
     try FileAppend(line . "`r`n", path, "UTF-8")
 }
 
+; Reap scratch files stranded next to ``path`` by a run that was killed between
+; the staged write and the rename. Deliberately a local twin of keylogger.ahk's
+; _KL_ReapStaleTemps rather than a shared call: tests/run_all.ahk loads this
+; module WITHOUT keylogger.ahk, so a cross-file dependency would be a load-time
+; failure in the suite. The file already keeps its own MOVEFILE_* statics and
+; its own KLPF_MoveAtomic for the same reason.
+; @param path {String} Final destination path whose siblings are scanned.
+; @param MaxAgeMs {Integer} Minimum age, in ms, before a scratch file is reaped.
+_KLPF_ReapStaleTemps(path, MaxAgeMs) {
+    SplitPath(path, &Name, &Dir)
+    if (Dir = "" or Name = "")
+        return
+    try {
+        Loop Files, Dir . "\" . Name . ".*.tmp" {
+            if (DateDiff(A_Now, A_LoopFileTimeModified, "Seconds") * 1000 >= MaxAgeMs)
+                try FileDelete(A_LoopFileFullPath)
+        }
+    }
+}
+
 KLPF_WriteAtomic(path, content) {
     ; Publish the tmp file onto ``path`` with the same atomic-rename primitive
     ; KL_WriteAtomic (keylogger.ahk) uses: MoveFileExW(MOVEFILE_REPLACE_EXISTING
@@ -334,13 +354,25 @@ KLPF_WriteAtomic(path, content) {
     ; the dashboard, and we never want a BOM in the served blob. The function
     ; keeps its boolean contract — false leaves the previous prefetch file
     ; intact so the page degrades to old data rather than to an empty state.
+    ; Same per-invocation scratch name as KL_WriteAtomic, and for the same
+    ; reason: a fixed ``path . ".tmp"`` is a shared resource, and RETRY_DELAY_MS
+    ; below is a yield point that lets another thread enter, publish its own
+    ; staged file and consume the name out from under the sleeping caller. That
+    ; writer then renames a file that no longer exists, or two writers interleave
+    ; their FileAppend and publish spliced JSON to the dashboard.
     static MOVEFILE_REPLACE_EXISTING := 0x1
     static MOVEFILE_WRITE_THROUGH    := 0x8
     static FLAGS := MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
     static RETRY_DELAY_MS            := 50
+    ; Older than this, a scratch file can only be debris from a hard kill.
+    static STALE_TEMP_MS             := 60000
+    static WriteSeq := 0
 
-    tmp := path . ".tmp"
-    try FileDelete(tmp)
+    WriteSeq += 1
+    ; A_ScriptHwnd rather than a GetCurrentProcessId DllCall: unique per process
+    ; all the same, and it keeps the OS-call purity ratchet at its baseline.
+    tmp := path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
+    _KLPF_ReapStaleTemps(path, STALE_TEMP_MS)
     try FileAppend(content, tmp, "UTF-8-RAW")
     catch
         return false

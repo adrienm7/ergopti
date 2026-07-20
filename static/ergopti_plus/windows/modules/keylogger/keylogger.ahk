@@ -226,6 +226,27 @@ KL_MkdirP(path) {
     try DirCreate(path)
 }
 
+; Delete scratch files left next to ``path`` by a previous run that was killed
+; between FileAppend and the rename. The old fixed ``.tmp`` name self-cleaned
+; because every write reused it; per-invocation names do not, so debris is
+; reaped here instead. Only files older than ``MaxAgeMs`` are touched, which
+; makes it safe against a concurrent live writer — its scratch file is
+; milliseconds old. Best-effort throughout: this runs on the save path, and a
+; failure to tidy up must never take the save down with it.
+; @param path {String} Final destination path whose siblings are scanned.
+; @param MaxAgeMs {Integer} Minimum age, in ms, before a scratch file is reaped.
+_KL_ReapStaleTemps(path, MaxAgeMs) {
+    SplitPath(path, &Name, &Dir)
+    if (Dir = "" or Name = "")
+        return
+    try {
+        Loop Files, Dir . "\" . Name . ".*.tmp" {
+            if (DateDiff(A_Now, A_LoopFileTimeModified, "Seconds") * 1000 >= MaxAgeMs)
+                try FileDelete(A_LoopFileFullPath)
+        }
+    }
+}
+
 KL_WriteAtomic(path, content) {
     ; Write via .tmp + atomic rename so a crash mid-write cannot corrupt the
     ; final file. The previous implementation did FileDelete(path) + FileMove
@@ -240,12 +261,41 @@ KL_WriteAtomic(path, content) {
     ; window. We retry once on transient failure (AV briefly holds the file)
     ; before bubbling up; that is enough in practice to absorb scanner
     ; flakiness without masking real I/O errors.
+    ; The scratch name must be unique per invocation. It used to be a fixed
+    ; ``path . ".tmp"``, which made it a shared resource between every writer
+    ; of the same target — and there are several, on threads that interrupt one
+    ; another. KL_SaveState is reached from the ingest timer, from
+    ; KL_DayRollover and from KL_Stop (OnExit, which pre-empts a running timer),
+    ; and the ``Sleep 50`` retry below is a yield point that hands control to
+    ; exactly those threads. The losing interleaving is:
+    ;
+    ;   A: FileAppend(tmp) → MoveFileExW fails (AV lock) → Sleep 50 …yields…
+    ;   B: FileDelete(tmp) → FileAppend(tmp) → MoveFileExW succeeds, tmp gone
+    ;   A: wakes, retries MoveFileExW on a tmp that no longer exists → ERROR 2
+    ;
+    ; which is exactly what the field logs show: ERROR_FILE_NOT_FOUND (2) and
+    ; ERROR_SHARING_VIOLATION (32) from KL_SaveState, only on days with many
+    ; restarts. Worse than the noise, A and B could both hold the same tmp open
+    ; and interleave their FileAppend, renaming spliced JSON onto state.json.
+    ; A per-invocation name removes the shared resource outright.
     static MOVEFILE_REPLACE_EXISTING := 0x1
     static MOVEFILE_WRITE_THROUGH    := 0x8
     static FLAGS := MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+    ; A scratch file older than this can only be debris from a hard kill — a
+    ; live write completes in milliseconds — so it is safe to reap. Deliberately
+    ; generous so a genuinely slow AV-throttled write is never targeted.
+    static STALE_TEMP_MS := 60000
+    static WriteSeq := 0
 
-    tmp := path . ".tmp"
-    try FileDelete(tmp)
+    WriteSeq += 1
+    ; A_ScriptHwnd keeps the name unique across processes too: #SingleInstance
+    ; Force replaces an instance only at the END of the successor's load, so two
+    ; drivers can briefly be alive and writing the same metrics directory. It is
+    ; a built-in rather than a GetCurrentProcessId DllCall on purpose — the
+    ; OS-call purity ratchet (tests/meta/test_ahk_os_purity_ratchet.ahk) counts
+    ; direct OS calls outside adapters/, and this needs none.
+    tmp := path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
+    _KL_ReapStaleTemps(path, STALE_TEMP_MS)
     FileAppend(content, tmp, "UTF-8")
 
     if !DllCall("Kernel32\MoveFileExW", "Str", tmp, "Str", path,
