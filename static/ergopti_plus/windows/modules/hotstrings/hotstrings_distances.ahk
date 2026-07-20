@@ -224,13 +224,13 @@ _HS_RegisterDistancesAndRolls() {
 	if Features["hotstrings"]["sfbs_reduction"]["i_e_acute"]["enabled"] and Features["hotstrings"]["sfbs_reduction"]["bu"]["enabled"] {
 		CreateCaseSensitiveHotstrings(
 			; Fix éà★ ➜ ébu insteaf of iéé
-			"*?", "ié★", "ébu",
+			"*?", "ié" . ScriptInformation["MagicKey"], "ébu",
 			Map("TimeActivationSeconds", HotstringsResolve("sfbsreduction", "bu").Delay)
 		)
 	}
 	if Features["hotstrings"]["sfbs_reduction"]["bu"]["enabled"] {
 		CreateCaseSensitiveHotstrings(
-			"*?", "à★", "bu",
+			"*?", "à" . ScriptInformation["MagicKey"], "bu",
 			Map("TimeActivationSeconds", HotstringsResolve("sfbsreduction", "bu").Delay)
 		)
 		CreateCaseSensitiveHotstrings(

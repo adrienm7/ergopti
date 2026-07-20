@@ -58,3 +58,18 @@ _TDUDMK_DynamicMagicKeyUsed() {
 		'ShouldActivateDeadkey must read ScriptInformation["MagicKey"] instead of hardcoding the star glyph')
 }
 Test("hotstrings: ShouldActivateDeadkey reads MagicKey from ScriptInformation (not hardcoded)", _TDUDMK_DynamicMagicKeyUsed)
+
+; F41 (audit 2026-07-20): two SFB triggers in hotstrings_distances.ahk re-typed the
+; DEFAULT magic-key glyph as a literal instead of composing ScriptInformation["MagicKey"],
+; so with a custom trigger_char those expansions silently never fired. The glyph may
+; only reach a trigger through ScriptInformation (§5.2 — the key lives in one place).
+_TDUDMK_NoHardcodedMagicGlyphInTriggers() {
+	SplitPath(A_ScriptDir, , &WindowsDir)
+	Src := ""
+	try Src := FileRead(WindowsDir . "\modules\hotstrings\hotstrings_distances.ahk")
+	Assert(Src != "", "modules/hotstrings/hotstrings_distances.ahk must be readable")
+	Code := _StripFullLineComments(Src)
+	Assert(InStr(Code, Chr(0x2605)) = 0,
+		"no trigger may hardcode the magic-key glyph — compose it from ScriptInformation[MagicKey] so a custom trigger_char still fires (§5.2)")
+}
+Test("hotstrings: SFB triggers compose the magic key, never hardcode its glyph", _TDUDMK_NoHardcodedMagicGlyphInTriggers)
