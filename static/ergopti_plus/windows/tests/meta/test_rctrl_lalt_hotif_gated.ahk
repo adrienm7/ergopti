@@ -1,0 +1,40 @@
+﻿; tests/meta/test_rctrl_lalt_hotif_gated.ahk
+
+; ==============================================================================
+; MODULE: RCtrl+LAlt hotkey gated by #HotIf, not a dead runtime if
+; DESCRIPTION:
+; AHK v2 registers `::` hotkeys at LOAD time regardless of any enclosing runtime
+; control flow. modules/tap_holds/lalt.ahk wrapped the SC11D & SC038 (RCtrl+LAlt)
+; definition in `if TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" {`
+; — dead decoration: the hotkey registered unconditionally, so RCtrl+LAlt emitted
+; OneShotShiftFix()+Shift+Tab even when right_ctrl was not one_shot_shift. The
+; condition must live in the #HotIf (re-evaluated live per press), not a runtime if.
+; (F31, audit 2026-07-20.)
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+_RLHG_RCtrlLAltGatedByHotIf() {
+	SplitPath(A_ScriptDir, , &WindowsDir)
+	Path := WindowsDir . "\modules\tap_holds\lalt.ahk"
+	Src := ""
+	try Src := FileRead(Path)
+	Assert(Src != "", "modules/tap_holds/lalt.ahk must be readable for the RCtrl+LAlt gating meta-test")
+
+	HotkeyPos := InStr(Src, "SC11D & SC038::")
+	Assert(HotkeyPos > 0, "the RCtrl+LAlt (SC11D & SC038) hotkey must exist")
+
+	; It must be gated by a #HotIf whose expression includes the right_ctrl condition.
+	Before := SubStr(Src, 1, HotkeyPos)
+	HotIfPos := InStr(Before, "#HotIf ", , -1)
+	Assert(HotIfPos > 0, "SC11D & SC038 must sit under a #HotIf context")
+	NlPos := InStr(Src, "`n", , HotIfPos)
+	HotIfLine := SubStr(Src, HotIfPos, (NlPos ? NlPos : StrLen(Src) + 1) - HotIfPos)
+	Assert(InStr(HotIfLine, "right_ctrl") > 0,
+		"the #HotIf gating SC11D & SC038 must include the right_ctrl condition so the combo fires only when right_ctrl is one_shot_shift")
+
+	; The dead runtime-if form (a hotkey definition inside `if ... {`) must be gone.
+	Assert(InStr(Src, 'one_shot_shift" {') = 0,
+		"a hotkey definition must never be wrapped in a runtime if-block — that does not gate its load-time registration in AHK v2")
+}
+Test("tap-holds: RCtrl+LAlt hotkey is gated by #HotIf, not a dead runtime if", _RLHG_RCtrlLAltGatedByHotIf)
