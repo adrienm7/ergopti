@@ -3,6 +3,32 @@
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
 
+; --- Single-owner gate: establish exclusivity BEFORE any hook/log/message pump ---
+; #SingleInstance Force only replaces the previous instance at the END of THIS
+; script's load (~875-1460 ms parse), and terminating a hung/dialog-blocked old
+; instance is best-effort — so during a rapid double-launch two processes can
+; briefly co-own the keyboard hook and the log (observed in the field: interleaved
+; duplicate log lines for minutes, and a boot killed mid-registration with hotkeys
+; already armed). Acquire a named session-local mutex here — the first auto-execute
+; statement, before the Bundle_Init RunWait step pumps messages — and, when a
+; previous instance still owns it, WAIT a bounded time for it to exit before we register
+; anything. We never ExitApp on contention (that would fight #SingleInstance Force,
+; which wants THIS instance to win); the bounded wait plus the Force backstop keep a
+; single live hook/log owner in the common case. The handle is intentionally never
+; closed: the OS releases the mutex when this process exits, so a successor's wait
+; unblocks the instant we die.
+global DRIVER_MUTEX_NAME := "Local\ErgoptiPlusDriver"
+global DRIVER_MUTEX_WAIT_MS := 3000 ; max boot delay while a previous instance exits
+global _DriverMutexHandle := DllCall("CreateMutexW", "Ptr", 0, "Int", 0, "Str", DRIVER_MUTEX_NAME, "Ptr")
+if (_DriverMutexHandle) {
+	; Take ownership, waiting (bounded) for any previous owner to release it (exit).
+	; 0 = WAIT_OBJECT_0 (acquired), 0x80 = WAIT_ABANDONED (prior owner died holding it
+	; — also acquired), 0x102 = WAIT_TIMEOUT (another instance is still alive).
+	_DriverMutexWait := DllCall("WaitForSingleObject", "Ptr", _DriverMutexHandle, "UInt", DRIVER_MUTEX_WAIT_MS, "UInt")
+	if (_DriverMutexWait == 0x102)
+		try LoggerWarn("ErgoptiPlus", "Another instance still held the single-owner mutex after {1} ms; continuing best-effort (#SingleInstance Force backstop).", DRIVER_MUTEX_WAIT_MS)
+}
+
 ; Single source of truth for the driver's baseline (non-boosted) process
 ; priority class. Every restore site outside a transient boost — LLM_Menu_Init's
 ; defensive reset, LLM_Deps_Fail, LLM_Deps_Cancel, _LLM_Deps_OnPollProbeResult —
