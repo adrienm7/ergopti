@@ -132,10 +132,15 @@ local function _refresh_internet_reachable()
 			_has_internet_probe_result = true
 			Logger.debug(LOG, "isInternetReachable() refreshed: %s", tostring(_cached_internet_reachable))
 		end)
-	local ok, err = pcall(function() handle.start() end)
-	if not ok then
+	-- The adapter logs a launch failure but does not raise, so pcall alone always
+	-- reports success. Branching on the returned boolean too is what releases the
+	-- latch: otherwise a probe that never launched leaves _internet_probe_inflight
+	-- set forever and every later call short-circuits on the guard above, freezing
+	-- isInternetReachable() at false for the whole process lifetime.
+	local ok, started = pcall(function() return handle.start() end)
+	if not ok or started ~= true then
 		_internet_probe_inflight = false
-		Logger.error(LOG, "isInternetReachable(): failed to start async ping probe — %s", tostring(err))
+		Logger.error(LOG, "isInternetReachable(): failed to start async ping probe — %s", tostring(started))
 	end
 end
 
@@ -159,10 +164,13 @@ local function _refresh_vpn_active()
 			_cached_vpn_active = count > 0
 			Logger.debug(LOG, "isVpnActive() refreshed: %s", tostring(_cached_vpn_active))
 		end)
-	local ok, err = pcall(function() handle.start() end)
-	if not ok then
+	-- Same latch release as the ping probe above: a logged-only launch failure is
+	-- invisible to pcall, so _vpn_probe_inflight must also be cleared when the
+	-- adapter reports it did not start the subprocess.
+	local ok, started = pcall(function() return handle.start() end)
+	if not ok or started ~= true then
 		_vpn_probe_inflight = false
-		Logger.error(LOG, "isVpnActive(): failed to start async ifconfig probe — %s", tostring(err))
+		Logger.error(LOG, "isVpnActive(): failed to start async ifconfig probe — %s", tostring(started))
 	end
 end
 

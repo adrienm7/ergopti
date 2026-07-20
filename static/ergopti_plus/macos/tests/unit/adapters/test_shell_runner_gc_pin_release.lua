@@ -121,6 +121,78 @@ helpers.describe("ShellRunner: GC pin release", function()
 			"wrapped_on_done must not raise when _task was already cleared by terminate()")
 	end)
 
+	-- Regression: hs.task.new() RETURNS nil (it does not raise) when the launch
+	-- path is not an executable file, so pcall reported ok == true with a nil task
+	-- and spawn() ran `M._active_tasks[nil] = true` — a "table index is nil" throw
+	-- that escaped spawn() entirely, past every pcall in the function.
+	helpers.it("spawn() survives hs.task.new returning nil (no 'table index is nil')", function()
+		local ShellRunner = helpers.load_with_stubs("adapters.shell_runner", {
+			task = { new = function(_exe, _done_cb, _a3, _a4) return nil end },
+		})
+
+		local handle
+		local ok, err = pcall(function()
+			handle = ShellRunner.spawn("/nonexistent/binary", { "-x" }, function() end)
+		end)
+		helpers.assert_true(ok,
+			"spawn() must not raise when hs.task.new returns nil for a non-executable path: " .. tostring(err))
+
+		helpers.assert_true(ShellRunner._active_tasks[nil] == nil,
+			"a nil task must never be pinned in _active_tasks")
+
+		-- The handle must still honour its contract so callers need no nil checks.
+		helpers.assert_true(type(handle) == "table", "spawn() must still return a handle")
+		local ok_start = pcall(function() return handle.start() end)
+		helpers.assert_true(ok_start, "handle.start() must be safe to call when no task was created")
+		local ok_term = pcall(function() return handle.terminate() end)
+		helpers.assert_true(ok_term, "handle.terminate() must be safe to call when no task was created")
+	end)
+
+	-- Regression (latch release): _safe_start logs a launch failure but never
+	-- raises, so a consumer's pcall(handle.start) always reports success. Callers
+	-- such as network_info latch an "in flight" flag before starting and need the
+	-- return value to know the launch failed, or the flag stays set forever.
+	helpers.it("handle.start() returns false when no task was created", function()
+		local ShellRunner = helpers.load_with_stubs("adapters.shell_runner", {
+			task = { new = function(_exe, _done_cb, _a3, _a4) return nil end },
+		})
+
+		local handle = ShellRunner.spawn("/nonexistent/binary", {}, function() end)
+		helpers.assert_eq(false, handle.start(),
+			"start() must report false so a caller can release its in-flight latch")
+	end)
+
+	helpers.it("handle.start() returns false when the task refuses to start", function()
+		local ShellRunner = helpers.load_with_stubs("adapters.shell_runner", {
+			task = {
+				new = function(_exe, _done_cb, _a3, _a4)
+					return {
+						start     = function() error("launch refused by the OS") end,
+						terminate = function() end,
+					}
+				end,
+			},
+		})
+
+		local handle = ShellRunner.spawn("/usr/bin/curl", {}, function() end)
+		helpers.assert_eq(false, handle.start(),
+			"start() must report false when the underlying start throws")
+	end)
+
+	helpers.it("handle.start() returns true on a successful launch", function()
+		local ShellRunner = helpers.load_with_stubs("adapters.shell_runner", {
+			task = {
+				new = function(_exe, _done_cb, _a3, _a4)
+					return { start = function() end, terminate = function() end }
+				end,
+			},
+		})
+
+		local handle = ShellRunner.spawn("/bin/echo", { "hi" }, function() end)
+		helpers.assert_eq(true, handle.start(),
+			"start() must report true so a caller keeps its in-flight latch armed")
+	end)
+
 	helpers.it("normal completion releases the GC pin and forwards (exit, out, err)", function()
 		local captured_done, fake_task
 		local ShellRunner = helpers.load_with_stubs("adapters.shell_runner", {

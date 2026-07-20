@@ -63,14 +63,15 @@ end
 
 --- Spawns an async subprocess and returns an opaque handle.
 --- The handle exposes start() and terminate() — both are safe to call multiple
---- times and on a nil/dead task.
+--- times and on a nil/dead task. start() returns a boolean the caller must check
+--- when it latches an "in flight" flag, since a launch failure is only logged.
 ---
 --- @param executable string Absolute path to the binary (e.g. "/usr/bin/curl").
 --- @param args        table  Array of string arguments (no shell expansion).
 --- @param on_done     function|nil Completion callback: fn(exit_code, stdout, stderr).
 --- @param on_chunk    function|nil Streaming callback: fn(task, stdout_chunk, stderr_chunk).
 ---        When nil, the 3-argument hs.task.new() form is used (no streaming).
---- @return table Handle with start() and terminate() methods.
+--- @return table Handle with start() (returns boolean) and terminate() methods.
 function M.spawn(executable, args, on_done, on_chunk)
 	local handle = {}
 	local _task  = nil
@@ -84,21 +85,31 @@ function M.spawn(executable, args, on_done, on_chunk)
 		end
 	end
 
+	--- Starts the underlying task, reporting the outcome to the caller.
+	--- Callers that latch an "in flight" flag before calling this MUST branch on
+	--- the return value: this function never raises, so a logged-only failure is
+	--- invisible to pcall and would leave such a flag set for the process lifetime.
+	--- @return boolean True when the subprocess was started, false on any failure.
 	local function _safe_start()
 		if not _task then
 			Logger.error(LOG, "spawn.start(): task was not created for %s", tostring(executable))
-			return
+			return false
 		end
 		local ok, err = pcall(function() _task:start() end)
 		if not ok then
 			Logger.error(LOG, "spawn.start(): hs.task:start() failed — %s", tostring(err))
+			return false
 		end
+		return true
 	end
 
 	--- Forwards a callback's throw to the log + crash reporter, deferring the
-	--- reporter call off the current callback's stack frame (it ends in a
-	--- synchronous hs.dialog.blockAlert, which would freeze the run loop if
-	--- invoked inline from an hs.task completion/streaming callback).
+	--- reporter call off the current callback's stack frame so a long report build
+	--- never runs inline from an hs.task completion/streaming callback. This is now
+	--- the ONE live path into the reporter: the logger's timer guard deliberately
+	--- stops at the errors sink, because a timer-callback throw is recoverable and
+	--- crash_reports/ is reserved for genuine fatals. If this call ever disappears,
+	--- the reporter becomes unreachable dead code again (F-HIGH-5).
 	--- @param label string Identifies which callback threw, for the log line.
 	--- @param err any The error value captured by xpcall.
 	local function report_callback_throw(label, err)
@@ -162,8 +173,12 @@ function M.spawn(executable, args, on_done, on_chunk)
 		ok, task_or_err = pcall(hs.task.new, executable, wrapped_on_done, args)
 	end
 
-	if not ok then
-		Logger.error(LOG, "spawn(): hs.task.new('%s') failed — %s", tostring(executable), tostring(task_or_err))
+	-- A pcall SUCCESS is not proof a task exists: hs.task.new() RETURNS nil rather
+	-- than raising when the launch path is not an executable file. Without the nil
+	-- test the else branch below evaluates `M._active_tasks[nil] = true`, which
+	-- throws "table index is nil" straight out of spawn(), past every pcall here.
+	if not ok or task_or_err == nil then
+		Logger.error(LOG, "spawn(): hs.task.new('%s') returned no task — %s", tostring(executable), tostring(task_or_err))
 	else
 		_task = task_or_err
 		-- Pin the task in M._active_tasks so the GC cannot collect it while
@@ -171,7 +186,7 @@ function M.spawn(executable, args, on_done, on_chunk)
 		M._active_tasks[_task] = true
 	end
 
-	--- Starts the spawned subprocess.
+	--- Starts the spawned subprocess. Returns true on success, false on failure.
 	handle.start = _safe_start
 
 	--- Terminates the subprocess if it is still running. Idempotent.
