@@ -82,6 +82,16 @@ local function _require_init(func_name)
 	return true
 end
 
+--- Report whether M.init() has already completed.
+--- Callers MUST use this instead of probing for the presence of an accessor
+--- function (e.g. `not Rotation.get_offset`) to infer initialisation: every
+--- module function is defined at require time and is therefore truthy whether
+--- or not init ran, so such a probe is a constant that silently never fires.
+--- @return boolean True once M.init() has completed.
+function M.is_initialized()
+	return _initialized
+end
+
 --- Returns today's "YYYY-MM-DD" date string.
 local function _today()
 	return os.date("%Y-%m-%d")

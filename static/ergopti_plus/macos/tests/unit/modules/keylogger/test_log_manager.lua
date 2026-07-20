@@ -42,6 +42,8 @@ package.loaded["lib.i18n"] = {
 local _appended_entries = {}
 package.loaded["modules.keylogger.rotation"] = {
 	init           = function() end,
+	-- Mirrors the real module: log_manager asks the flag, never an accessor's existence
+	is_initialized = function() return true end,
 	append_log     = function(entry) table.insert(_appended_entries, entry) end,
 	read_new_entries = function() return {}, 0 end,
 	get_offset     = function() return 0 end,

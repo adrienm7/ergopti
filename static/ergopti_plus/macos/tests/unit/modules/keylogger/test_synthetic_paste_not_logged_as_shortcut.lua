@@ -39,7 +39,8 @@ local KU = helpers.load_with_stubs("modules.keymap.utils")
 --- @return table LogManager module instance, table appended-entries array.
 local function make_log_manager()
 	package.loaded["modules.keylogger.rotation"] = {
-		init = function() end, append_log = function(entry) end,
+		init = function() end, is_initialized = function() return true end,
+		append_log = function(entry) end,
 		read_new_entries = function() return {}, 0 end,
 		get_offset = function() return 0 end, get_date = function() return os.date("%Y-%m-%d") end,
 		set_offset = function() end, rollover = function() end,

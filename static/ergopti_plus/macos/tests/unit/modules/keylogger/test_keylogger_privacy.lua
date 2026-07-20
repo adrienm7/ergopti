@@ -76,6 +76,7 @@ local function start_real_keylogger()
 
 	package.loaded["modules.keylogger.rotation"] = {
 		init             = function() end,
+		is_initialized   = function() return true end,
 		append_log       = function(e) table.insert(appended_entries, e) end,
 		read_new_entries = function() return {}, 0 end,
 		get_offset       = function() return 0 end,
