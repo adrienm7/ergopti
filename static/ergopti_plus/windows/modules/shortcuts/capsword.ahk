@@ -13,10 +13,20 @@
 
 
 
-; Bound callback stored at module scope so Register/Unregister can use the same
-; object reference — HookDispatcher identity-compares on Unregister, so a new
-; .Bind() at unregister time would never match the registered one.
-_CapsWord_OnMouseDown := _CapsWord_HandleMouseDown.Bind()
+; Bound mouse-cancel callback, resolved through an accessor with a static
+; initializer instead of a top-level `global := .Bind()`. A module-scope
+; assignment executes only when auto-exec reaches this file's #Include position
+; (~700 ms into boot), but ToggleCapsWord/DisableCapsWord are reachable far
+; earlier — the default-enabled lalt_caps_lock.caps_word action fires from a
+; parse-time-armed hotkey once Features exists (~420 ms) — so the old global was
+; unset in that window and dereferencing it threw UnsetError -> ExitApp(1) via the
+; pre-ready error net. The static initializer runs on first call (any time after
+; parse) and returns the SAME object every call, so HookDispatcher's identity
+; compare on Unregister still matches the registered callback.
+_CapsWord_Callback() {
+	static Bound := _CapsWord_HandleMouseDown.Bind()
+	return Bound
+}
 
 _CapsWord_HandleMouseDown(*) {
 	if (GestureLeftClickHeld) {
@@ -43,11 +53,11 @@ ToggleCapsWord() {
 	if (CapsWordEnabled) {
 		; Arm mouse-click cancellation via HookDispatcher so the mouse events go
 		; through the unified fan-out rather than bypassing it with static hotkeys
-		HookDispatcher.Register(HookDispatcherConst.EVT_MS_LDOWN, _CapsWord_OnMouseDown)
-		HookDispatcher.Register(HookDispatcherConst.EVT_MS_RDOWN, _CapsWord_OnMouseDown)
+		HookDispatcher.Register(HookDispatcherConst.EVT_MS_LDOWN, _CapsWord_Callback())
+		HookDispatcher.Register(HookDispatcherConst.EVT_MS_RDOWN, _CapsWord_Callback())
 	} else {
-		HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_LDOWN, _CapsWord_OnMouseDown)
-		HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_RDOWN, _CapsWord_OnMouseDown)
+		HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_LDOWN, _CapsWord_Callback())
+		HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_RDOWN, _CapsWord_Callback())
 	}
 	UpdateCapsLockLED()
 }
@@ -57,8 +67,8 @@ DisableCapsWord() {
 	; Always unregister on deactivation — Unregister is a no-op if not registered,
 	; so calling it unconditionally is safe and prevents listener leaks on any
 	; deactivation path (Space, Enter, or mouse click triggering this directly)
-	HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_LDOWN, _CapsWord_OnMouseDown)
-	HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_RDOWN, _CapsWord_OnMouseDown)
+	HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_LDOWN, _CapsWord_Callback())
+	HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_RDOWN, _CapsWord_Callback())
 	UpdateCapsLockLED()
 }
 
