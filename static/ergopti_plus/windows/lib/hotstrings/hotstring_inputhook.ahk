@@ -703,12 +703,15 @@ _OnPrefixKeyDown(IH, VK, SC) {
 				_ResetPrefixBuffer()
 				return
 			}
-			if (VK == 0x58 or VK == 0x56 or VK == 0x5A or VK == 0x59) {
+			if (VK == 0x58 or VK == 0x56 or VK == 0x5A or VK == 0x59 or VK == 0x08) {
 				; Ctrl+X (cut) / Ctrl+V (paste) / Ctrl+Z (undo) /
-				; Ctrl+Y (redo) — document content rewritten by an
-				; unknown amount, cursor lands somewhere we cannot
-				; observe. Wipe the buffer and refuse to assume a
-				; word boundary on its left.
+				; Ctrl+Y (redo) / Ctrl+Backspace (delete-word) — document
+				; content rewritten by an unknown amount (a whole word for
+				; Ctrl+Backspace), cursor lands somewhere we cannot observe.
+				; Wipe the buffer and refuse to assume a word boundary on its
+				; left. Falling through to the plain VK==0x08 branch below would
+				; chop only ONE char, leaving the buffer ahead of the screen and
+				; later firing an expansion with backspaces into unrelated text.
                                 HSE_FeedReset(false, true)
 				_ResetPrefixBuffer()
 				return
