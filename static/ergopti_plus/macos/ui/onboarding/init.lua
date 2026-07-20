@@ -30,6 +30,9 @@ local LOG          = "onboarding"
 
 local SETTINGS_COMPLETED_KEY = "ergopti.onboarding.completed"
 
+-- MenuPaths.get() key that resolves <config_dir>/hammerspoon/config.toml.
+local CONFIG_TOML_PATH_KEY   = "ConfigTomlPath"
+
 -- Path to config.toml — set by M.run() before the wizard opens
 local _config_path  = nil
 
@@ -330,6 +333,29 @@ function M._answers_from_config(parsed)
 	}
 end
 
+--- Returns the config.toml path the wizard must write to, re-resolved through
+--- MenuPaths so a config-dir change made moments earlier is honoured. Pure apart
+--- from the injected resolver, so the retarget is testable without a webview.
+--- @param menu_paths table The ui.menu.menu_paths module (or a test double).
+--- @param fallback string Path to keep when the resolver yields nothing usable.
+--- @return string Absolute path to config.toml.
+function M._resolve_commit_path(menu_paths, fallback)
+	if type(menu_paths) ~= "table" or type(menu_paths.get) ~= "function" then
+		return fallback
+	end
+	local ok, resolved = pcall(menu_paths.get, CONFIG_TOML_PATH_KEY)
+	-- A resolver that throws or hands back anything but a usable path must never
+	-- redirect the write: keeping the fallback still lands the answers somewhere
+	-- readable, whereas an empty target would drop them on the floor.
+	if not ok or type(resolved) ~= "string" or resolved == "" then
+		return fallback
+	end
+	if resolved ~= fallback then
+		Logger.info(LOG, "Config write retargeted to '%s' (was '%s').", resolved, tostring(fallback))
+	end
+	return resolved
+end
+
 --- Closes the webview cleanly.
 local function close_webview()
 	if _webview then
@@ -353,7 +379,14 @@ local function commit(answers)
 		local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
 		if ok_mp and menu_paths and menu_paths.persist_config_dir_for_wizard then
 			local ok_persist, err = pcall(menu_paths.persist_config_dir_for_wizard, answers.config_dir)
-			if not ok_persist then
+			if ok_persist then
+				-- _config_path was captured in M.run() from the config dir as it
+				-- stood BEFORE the wizard ran; the persist above just moved the
+				-- resolver. Writing through the stale path would leave the NEW
+				-- directory without a config.toml, so should_run() fires again and
+				-- the wizard re-opens blank with every answer lost.
+				_config_path = M._resolve_commit_path(menu_paths, _config_path)
+			else
 				Logger.warn(LOG, "Failed to persist config dir override: %s.", tostring(err))
 			end
 		end
