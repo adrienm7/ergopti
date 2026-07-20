@@ -130,6 +130,11 @@ static/ergopti_plus/windows/debug*.ahk
 static/ergopti_plus/windows/debug*.txt
 static/ergopti_plus/windows/tests/debug*.txt
 static/ergopti_plus/scratch/
+# Scratch area the macOS test suite writes into. Several tests already document
+# it as gitignored (tests/unit/adapters/test_toml_cache.lua) and one leaves a
+# by_device/ tree behind, so without this entry a plain test run dirties the
+# working tree with untracked artefacts.
+static/ergopti_plus/macos/tests/scratch_test_dir/
 
 # Stryker mutation testing temporary directory
 .stryker-tmp/
