@@ -25,6 +25,9 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-ahk-menu-dispatcher-drop](#project-ahk-menu-dispatcher-drop) — AHK 2.0 silently drops ~30-50% of tray-menu clicks. FIXED via lib/menu_dispatcher.ahk — every actionable item must use RegisterMenuItem, never raw Menu.Add.
   - [project-ahk-invariant-incomplete-application](#project-ahk-invariant-incomplete-application) — Every AHK-driver hardening invariant (Critical-emit, suspend-guard, async-HTTP, RegisterMenuItem) is applied per-site; the recurring bug is the ONE missed sibling site or the guarantee defeated by indirection. Audit the whole class, not the documented site.
   - [project-ahk-test-suite-critical-leak](#project-ahk-test-suite-critical-leak) — Critical("On") in layout/hotkey callbacks is safe in production but leaks into the main thread when invoked directly by tests, silently hanging background timers
+  - [project-ahk-numeric-string-equals-false](#project-ahk-numeric-string-equals-false) — `"0" = false` is TRUE in AHK v2; never compare a String|false return against false, type-check with `is String`
+  - [project-ahk-guard-tests-must-loop-the-class](#project-ahk-guard-tests-must-loop-the-class) — Guard tests must enumerate the whole class of call sites, not the one site a bug was fixed at — 5 findings in one audit came from this
+  - [project-audit-evidence-must-be-reproducible](#project-audit-evidence-must-be-reproducible) — The 2026-07-20 audit's performance section cited logs that do not exist; G4 has never been measured on this driver
   - [project-updater-nonblocking-http](#project-updater-nonblocking-http) — The updater background poll must never do synchronous WinHttp on the main thread (it freezes all remapping); WinHttp SetTimeouts 0 = infinite. Use the async WinHTTP + WaitForResponse(0) + SetTimer-poll pattern.
   - [project-config-v2-refactor](#project-config-v2-refactor) — State of the v2 config schema refactor (Scope C) — branch refactor/config-schema-v2 with 5 dormant commits. Cut-over to actually migrate the AHK driver runtime is the open piece.
   - [project_debug_menu_sync](#project-debug-menu-sync) — Debug menu order is defined in _shared/modules/menu/menu_manifest.json debug_menu — both AHK and Lua drivers consume it
@@ -1563,6 +1566,74 @@ The adversarial AHK audit of 2026-06-19 (full report: `AUDIT_AHK_2026-06-19.md` 
 - `SetTimer(fn, -1)` does NOT offload to another thread (a real comment in `changelog_window.ahk` wrongly claimed it did); callbacks run on the single AHK pseudo-thread when the message loop yields — the same thread that remaps every keystroke. A synchronous network/COM/shell call inside a `SetTimer` callback freezes typing.
 
 Related: [[project_ahk_menu_dispatcher_drop]], [[project_updater_nonblocking_http]], [[project_suspend_pause_invariant]], [[project_lua_closure_before_local_nil_global]], [[feedback_regression_tests]].
+
+### project-ahk-numeric-string-equals-false
+
+_In AHK v2, `"0" = false` is **TRUE** — comparing a `String|false` return value against `false` silently swallows any numeric-string success token_
+
+<sub>slug: `project_ahk_numeric_string_equals_false`</sub>
+
+AHK v2's `=` (and `==`) compare **numerically** when one side is a number and the other is a numeric string. `false` is the integer `0`, so `"0" = false` evaluates to `0 = 0` → **true**. Trailing whitespace does not save you: `"0\r\n"` is still a numeric string.
+
+**Why:** found 2026-07-20 (audit F-23) in `ui/onboarding/steps_metrics.ahk:247-259`. `FSRead` returns `String` on success and the integer `false` on failure. The gesture auto-registration worker writes `"0"` as its **success** token, and the reader began with `if (Result = false) { LoggerError("… result missing"); return false }`. So every *successful* registration was reported as a failure — the UI painted red and told the user to register manually after it had already worked. The failure path was fine (`"1" = false` is false), so only the success case misreported, and the log said "result missing", pointing any debugger at file I/O rather than the comparison.
+
+The give-away was **internal contradiction**, needing no external artifact: line 249 rejected `"0"` as "file missing" while line 254 treated `"0"` as the success value. Two adjacent lines disagreeing about the same literal is the cheapest possible proof that one is wrong.
+
+**How to apply:**
+
+- Never compare a `String|false` result against `false`. Type-check instead: `if !(Result is String)`. Note `==` does **not** fix this — it is also numeric-equal here.
+- Extract sentinel tokens as named constants (§5.1) so the success value is greppable.
+- When auditing, treat two nearby comparisons against the same literal that imply opposite meanings as a confirmed defect, not a suspicion.
+
+Related: [[feedback_regression_tests]], [[project_ahk_v2_static_unset_unreadable]] (same family — an AHK v2 type/value semantic that reads as obviously-correct).
+
+### project-ahk-guard-tests-must-loop-the-class
+
+_A regression test that pins the single site a bug was fixed at will not survive the next refactor — five 2026-07-20 findings exist purely because a guard test named sites instead of enumerating the class_
+
+<sub>slug: `project_ahk_guard_tests_must_loop_the_class`</sub>
+
+This is the concrete, repeated failure mode behind [[project_ahk_invariant_incomplete_application]], and the second 2026-07-20 audit found five instances of it in one pass:
+
+- `test_live_rebuild_no_critical_io.ahk` asserts `InStr(Body, "Critical(") = 0` on **`RebuildHotstringsLive`'s body only**. `ToggleCategoryAllFeatures` (`lib/config_io.ahk:217`) wraps the *call* in `Critical("On")` from outside, restoring the exact 1-2 s keyboard freeze F33 removed — and the test stays green. The outer `Critical` is even justified by a comment ("RebuildHotstringsLive re-enters Critical internally; that is safe") that **F33 itself made false**.
+- `test_webview_bridge_suspend_guard.ahk` names 3 handlers; there are 9. The other 7 can mutate config — or run an elevated UAC driver install — while the driver is paused.
+- `test_webview_low_ram_native_fallback.ahk` names 5 hosts; there are 12.
+- `test_taphold_timings_load_order.ahk` pins the include-order invariant for 1 of 5 shared-constant loaders. All five are currently correct, so this is latent — but a re-zeroed 0 ms timing sentinel is a documented CPU-spin hazard.
+- `SUSPEND_CUSTOM_COMBO_PREFIX_KEYS` is a hand-maintained list of 2; the driver registers 5 custom-combination prefixes (`SC01D`, `SC02A`, `SC11D` are missing), so three can latch across `Suspend` — the « AltGr bloqué » class that synthetic key events cannot clear.
+
+**Why:** a fix is applied where the bug bit; the test is written to describe *that fix*. Both are locally correct. The invariant, however, is a property of a **class of call sites**, and nothing re-checks the class when a new sibling appears.
+
+**How to apply:**
+
+- Write guard tests as **loops over an enumerated set**, not assertions about one function body. Derive the set from source where possible (scan for `X & Y::` combination prefixes; enumerate `*_OnWebMessage` handlers) so a newly added sibling *joins the test automatically*.
+- For a **transitive** guarantee ("this must not run under `Critical`"), asserting the callee's body is necessary but never sufficient — assert it across every caller too.
+- When you fix a bug by removing something from a function, **grep the callers**: they may be re-adding it, and their justifying comment may have just become false.
+
+Related: [[project_ahk_invariant_incomplete_application]], [[feedback_regression_tests]], [[project_ahk_menu_dispatcher_drop]].
+
+### project-audit-evidence-must-be-reproducible
+
+_The 2026-07-20 audit's entire performance section cited log data that does not exist — always re-derive an audit's evidence before trusting its conclusions_
+
+<sub>slug: `project_audit_evidence_must_be_reproducible`</sub>
+
+The first 2026-07-20 audit (`AUDIT_AHK_2026-07-20.md`, commit `1171adc90`, removed by `08382fb56`) contains a detailed §3 performance table — `Tooltip.ResolvePos` worst **2560.3 ms**, `OnChar` worst **701.3 ms**, "3 081 `[HotPath] Slow` lines across the 4 error logs" — plus quoted timestamps on 2026-07-19. Re-verified the same day:
+
+- **Zero** lines containing `Slow` or `HotPath` exist in **any** available log (3 error + 3 main, `D:\tmp`).
+- Only **3** error logs exist, not 4. **No 07-19 log exists at all**, and retention is 14 days (`lib/logger.ahk:169`), so a 1-day-old file could not have been purged.
+- The driver's own log dir (`<ConfigDir>/ahk/logs/`) is **empty**; the `D:\tmp` files are **test-suite** output (`[CONSOLE] [console] === … ===`, each line written 3×) and include macOS/Hammerspoon `healthcheck` lines.
+- Finding F02 (HIGH, "double boot") cited "07-16 11:58–12:01 interleaved duplicate lines = two driver instances". That window has **zero** lines (the log starts 14:34:35), and the duplicates that do exist are the 3× test-harness echo.
+
+**Consequence: G4 has never actually been measured on this driver.** Any conclusion that "the tooltip pipeline is the dominant G4 offender" is unsupported. The `hotpath_profiler` is real and correctly shaped — it has simply never produced a surviving artifact here.
+
+**How to apply:**
+
+- Before accepting *any* audit's performance conclusions, re-derive them from the artifacts. Cheapest check: `awk 'index($0,"Slow")>0{c++} END{print c+0}' <log>`. If it is 0, the table was not measured.
+- State G4 claims as "derived from reading code" unless you have a log line to quote. This report's F-01/F-06/F-11/F-16/F-17 all carry that qualifier deliberately.
+- **Capture one real `[HotPath]` log before doing further G4 work** — run the driver, type in a caret-less app (VS Code/Discord/browser), toggle a hotstring category while typing, trigger a cold-Ollama prediction, then read the `Slow` lines.
+- Be fair in how you report this: I cannot prove no such log ever existed elsewhere, only that the citations are unverifiable and contradicted by every artifact present. Say that, rather than accusing.
+
+Related: [[project_audit_reverify_2026_06_16]] (same lesson from the other direction — that audit's *tracking JSONs* were unreliable), [[feedback_regression_tests]].
 
 ### project-ahk-test-suite-critical-leak
 
