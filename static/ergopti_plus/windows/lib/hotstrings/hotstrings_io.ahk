@@ -277,7 +277,25 @@ _SaveGlobalKey(KeyName, Value, _Unused := "") {
             NewContent .= "`n"
         }
     }
-    try FileOpen(Path, "w", "UTF-8").Write(NewContent)
+    ; Mirror _SaveOverrides: explicit Close so the buffer is flushed before any
+    ; reader sees the file, and a LOGGED failure with a boolean return so a
+    ; read-only or cloud-locked config cannot look like a successful save. The
+    ; in-memory value has already changed by the time we get here, so a bare
+    ; `try` with no catch (the previous form) meant every observable signal in the
+    ; session said "saved" while the setting silently reverted at next boot.
+    try {
+        FileHandle := FileOpen(Path, "w", "UTF-8")
+        if !IsObject(FileHandle)
+            throw Error("FileOpen returned no handle.")
+        FileHandle.Write(NewContent)
+        FileHandle.Close()
+    } catch as Err {
+        try LoggerError("HotstringsConfig",
+            "Failed to write [__global__] {1} to '{2}': {3}.", KeyName, Path, Err.Message)
+        return false
+    }
+    try LoggerDebug("HotstringsConfig", "[__global__] {1} written to '{2}'.", KeyName, Path)
+    return true
 }
 
 _EscapeTomlString(S) {

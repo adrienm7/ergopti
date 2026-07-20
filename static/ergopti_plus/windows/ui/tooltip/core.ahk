@@ -46,7 +46,15 @@ global _TooltipPendingArmSafety := true
 ; renders in controls without a native caret. The foreground HWND fence makes
 ; this a position cache, never cross-window stale state.
 global _TooltipPositionCache := false
-global TOOLTIP_POSITION_CACHE_MS := 150
+; MUST exceed the combined debounce that gates the preview path
+; (_PREFIX_RENDER_DEBOUNCE_MS 150 + TOOLTIP_RENDER_DEBOUNCE_MS 75 = ~225 ms).
+; At 150 ms the cache was ALWAYS past its expiry by the time it was consulted, so
+; it never hit on the path it exists for: every preview render in a caret-less
+; app (Electron/UWP/Chromium — exactly where CaretGetPos fails and UIA is
+; slowest) paid a fresh out-of-proc UIA COM round-trip. Pinned by
+; test_audit_2026_07_20_batch4.ahk so a future debounce change cannot silently
+; make it dead again.
+global TOOLTIP_POSITION_CACHE_MS := 600
 
 ; Dequeue state — items that have per-row expiry deadlines. Canonical algorithm:
 ; _shared/modules/tooltip/dequeue.js (SPEC.md § 7.1). When rows carry distinct non-zero
