@@ -106,6 +106,35 @@ HealthCheck_RecordWarn() {
 ;   "logs"            -> Map     unified + errors sink paths, ring info
 ;   "config"          -> Map     overrides count, high-level enabled counts, key paths
 ; @return {Map}
+; Run one collector defensively and return its value, or ``Fallback`` if it
+; throws.
+;
+; A healthcheck is most valuable exactly when the driver is unhealthy, and
+; several collectors read subsystem state that a crash has just left half-built.
+; Called bare, any one of them aborted the whole run — which is how two crashed
+; processes came to write an unpaired "Running healthcheck..." as their final
+; line and produce no crash report at all.
+;
+; Failures are reported at WARNING rather than swallowed, so the culprit is
+; named in the errors sink, and the trace/done pair brackets the call so a
+; collector that HANGS (rather than throws) leaves the last unpaired TRACE
+; pointing straight at it.
+; @param Name {String} Collector name, used in the log lines.
+; @param Collector {Func} Zero-argument collector to invoke.
+; @param Fallback {Any} Value substituted when the collector fails.
+; @return {Any} The collected value, or Fallback.
+_HealthCheck_Collect(Name, Collector, Fallback) {
+	try LoggerTrace("Healthcheck", "Collecting '{1}'…", Name)
+	Value := Fallback
+	try {
+		Value := Collector()
+	} catch as e {
+		try LoggerWarn("Healthcheck", "Collector '{1}' failed, field degraded: {2}.", Name, e.Message)
+	}
+	try LoggerDone("Healthcheck", "Collected '{1}'.", Name)
+	return Value
+}
+
 HealthCheck_Run() {
 	global _HealthCheckStartMs, _HealthCheckLastError, _HealthCheckWarnCount, _HealthCheckErrCount
 
@@ -115,7 +144,7 @@ HealthCheck_Run() {
 	Version := "local"
 	try Version := Updater_CurrentVersion()
 
-	Specs          := _HealthCheck_AdapterSpecs()
+	Specs          := _HealthCheck_Collect("adapter_specs", _HealthCheck_AdapterSpecs, Map())
 	LoadedAdapters := []
 	PortsValidated := []
 	FailedAdapters := []
@@ -138,8 +167,21 @@ HealthCheck_Run() {
 
 	UptimeSec := (A_TickCount - (_HealthCheckStartMs) & 0xFFFFFFFF) // 1000
 
-	; Collect the last 100 WARNING / ERROR lines from the ring buffer
-	RecentIssues := _HealthCheck_RecentIssues(100)
+	; Every collector below is hoisted out of the Map(...) constructor and run
+	; through _HealthCheck_Collect. Inside the constructor they were bare calls,
+	; so the first one to throw took the entire healthcheck — and with it the
+	; crash report it was being run to produce — down with it. _HealthCheck_SysInfo
+	; is the most exposed: it does a WMI ConnectServer, three RegRead calls and a
+	; git subprocess poll.
+	RecentIssues := _HealthCheck_Collect("recent_issues", () => _HealthCheck_RecentIssues(100), [])
+	Sys          := _HealthCheck_Collect("sys", _HealthCheck_SysInfo, Map())
+	PauseState   := _HealthCheck_Collect("pause_state", _HealthCheck_PauseState, Map())
+	KeyloggerSum := _HealthCheck_Collect("keylogger", _HealthCheck_KeyloggerSummary, Map())
+	LLMState     := _HealthCheck_Collect("llm", _HealthCheck_LLMState, Map())
+	LayoutState  := _HealthCheck_Collect("layout", _HealthCheck_LayoutState, Map())
+	HotstrState  := _HealthCheck_Collect("hotstrings", _HealthCheck_HotstringsState, Map())
+	LogsInfo     := _HealthCheck_Collect("logs", _HealthCheck_LogsInfo, Map())
+	ConfigSum    := _HealthCheck_Collect("config", _HealthCheck_ConfigSummary, Map())
 
 	Result := Map(
 		"version",         Version,
@@ -150,16 +192,16 @@ HealthCheck_Run() {
 		"uptime_sec",      UptimeSec,
 		"warn_count",      _HealthCheckWarnCount,
 		"err_count",       _HealthCheckErrCount,
-		"sys",             _HealthCheck_SysInfo(),
+		"sys",             Sys,
 		"recent_issues",   RecentIssues,
 		; Enriched (maximum completeness)
-		"pause_state",     _HealthCheck_PauseState(),
-		"keylogger",       _HealthCheck_KeyloggerSummary(),
-		"llm",             _HealthCheck_LLMState(),
-		"layout",          _HealthCheck_LayoutState(),
-		"hotstrings",      _HealthCheck_HotstringsState(),
-		"logs",            _HealthCheck_LogsInfo(),
-		"config",          _HealthCheck_ConfigSummary()
+		"pause_state",     PauseState,
+		"keylogger",       KeyloggerSum,
+		"llm",             LLMState,
+		"layout",          LayoutState,
+		"hotstrings",      HotstrState,
+		"logs",            LogsInfo,
+		"config",          ConfigSum
 	)
 
 	try LoggerSuccess("Healthcheck", "Healthcheck complete — {1} adapter(s) OK, {2} failed, uptime {3}s.",
