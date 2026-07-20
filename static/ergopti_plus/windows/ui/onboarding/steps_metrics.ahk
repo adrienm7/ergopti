@@ -199,7 +199,7 @@ _Onboarding_StartGestureAuto(OnDone) {
             return false
     }
     Epoch := _OnboardingGestureJob["epoch"] + 1
-    JobStem := A_Temp . "\ergopti_gesture_config_" . A_Pid . "_" . Epoch
+    JobStem := A_Temp . "\ergopti_gesture_config_" . DriverPid . "_" . Epoch
     ScriptPath := JobStem . ".ps1"
     ResultPath := JobStem . ".result"
     FSDelete(ResultPath)

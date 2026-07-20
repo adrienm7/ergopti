@@ -47,13 +47,13 @@ _BuildTapHoldsSubmenu() {
 
 ; Dynamic handler: reset-defaults action button.
 _TH_DynResetDefaults(M, _Cat) {
-	try LoggerInfo("TapHoldMenu", "Resetting all tap-hold overrides from defaults (script='{1}', pid={2}).", A_ScriptName, A_Pid)
+	try LoggerInfo("TapHoldMenu", "Resetting all tap-hold overrides from defaults (script='{1}', pid={2}).", A_ScriptName, DriverPid)
 	RegisterMenuItem(M, t("tap_hold.reset_defaults"), _TH_ResetAllToDefaults)
 }
 
 ; Dynamic handler: disable-all action button.
 _TH_DynDisableAll(M, _Cat) {
-	try LoggerInfo("TapHoldMenu", "Disabling all tap-hold mappings (script='{1}', pid={2}).", A_ScriptName, A_Pid)
+	try LoggerInfo("TapHoldMenu", "Disabling all tap-hold mappings (script='{1}', pid={2}).", A_ScriptName, DriverPid)
 	RegisterMenuItem(M, t("tap_hold.disable_all"), _TH_DisableAll)
 }
 
@@ -144,7 +144,7 @@ _TH_DisableAll(*) {
 class _TH_DisableFnObj {
 	KeyId := ""
 	Call(*) {
-		try LoggerInfo("TapHoldMenu", "Menu disable action requested for key '{1}' (pid={2}).", this.KeyId, A_Pid)
+		try LoggerInfo("TapHoldMenu", "Menu disable action requested for key '{1}' (pid={2}).", this.KeyId, DriverPid)
                 if WriteTapHoldNative(this.KeyId)
                         _TH_ReloadTapHoldMenu("key_disable", this.KeyId)
 	}
@@ -171,7 +171,7 @@ class _TH_HoldFnObj {
 	Call(*) {
 		Kind := this.HoldOpt["kind"]
 		OptId := this.HoldOpt["id"]
-		try LoggerInfo("TapHoldMenu", "Hold picker selection for '{1}': kind='{2}', id='{3}' (pid={4}).", this.KeyId, Kind, OptId, A_Pid)
+		try LoggerInfo("TapHoldMenu", "Hold picker selection for '{1}': kind='{2}', id='{3}' (pid={4}).", this.KeyId, Kind, OptId, DriverPid)
                 if WriteTapHoldHold(this.KeyId, this.HoldOpt)
                         _TH_ReloadTapHoldMenu("hold_set", this.KeyId)
 	}
@@ -199,7 +199,7 @@ _TH_ApplyTap(KeyId, ActionId) {
 	global TapHold
 	Current := IsSet(TapHold) ? TapHoldTapAction(TapHold, KeyId) : "<not_ready>"
 	try LoggerInfo("TapHoldMenu", "ApplyTap key='{1}' current='{2}' -> '{3}' (pid={4}).", KeyId,
-		(Current == "" ? "<native>" : Current), (ActionId == "" ? "<native>" : ActionId), A_Pid)
+		(Current == "" ? "<native>" : Current), (ActionId == "" ? "<native>" : ActionId), DriverPid)
 	if !GestureEnsureActionParameter(GestureBindingId("tap_hold", KeyId), ActionId)
 		return
         if WriteTapHoldTap(KeyId, ActionId)
@@ -240,6 +240,6 @@ _TH_MakeHoldFn(KeyId, HoldOpt) {
 ; diagnosing "second-instance" reports from users.
 _TH_ReloadTapHoldMenu(Reason, KeyId := "") {
 	try LoggerInfo("TapHoldMenu", "Reloading script after '{1}' on key '{2}' (pid={3}, script={4}).",
-		Reason, KeyId, A_Pid, A_ScriptName)
+		Reason, KeyId, DriverPid, A_ScriptName)
 	Reload()
 }

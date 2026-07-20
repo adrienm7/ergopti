@@ -12,8 +12,8 @@ _OGRA_NativeRegistrationIsAsync() {
         "native onboarding gesture registration must never block the AHK thread with RunWait")
     Assert(InStr(Start, "Run(") > 0 && InStr(Start, "&Pid") > 0 && InStr(Start, "SetTimer") > 0,
         "registration must launch asynchronously, retain its PID, and arm a completion poll")
-    Assert(InStr(Start, "result") > 0 && InStr(Start, "A_Pid") > 0,
-        "each worker must own a fresh result file, so an old successful status cannot be reused")
+    Assert(InStr(Start, "result") > 0 && InStr(Start, "DriverPid") > 0,
+        "each worker must own a fresh result file (DriverPid + epoch), so an old successful status cannot be reused")
     Assert(InStr(Poll, "ProcessExist") > 0 && InStr(Poll, "A_IsSuspended") > 0 && InStr(Poll, "_Onboarding_ReadGestureAutoResult") > 0,
         "completion must wait across Suspend and trust only the worker-authored result, never a racy PID exit-code lookup")
     Assert(InStr(Poll, "_SR_GetExitCode") = 0,

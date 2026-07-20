@@ -236,7 +236,7 @@ GestureRestartTouchpadDevice(OnDone := 0) {
     }
 
     Epoch := _GestureRestartJob["epoch"] + 1
-    JobStem := A_Temp . "\ergopti_touchpad_restart_" . A_Pid . "_" . Epoch
+    JobStem := A_Temp . "\ergopti_touchpad_restart_" . DriverPid . "_" . Epoch
     ScriptPath := JobStem . ".ps1"
     ResultPath := JobStem . ".result"
     FSDelete(ResultPath)

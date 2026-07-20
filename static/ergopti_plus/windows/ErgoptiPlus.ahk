@@ -43,6 +43,11 @@ global _DriverBootPhase := "starting"
 ; Registry for runtime-registered personal shortcuts (personal_shortcuts.ahk).
 ; Stores ordered names + per-name descriptions so the tray menu can render them.
 global _PersonalShortcutsRegistry := Map("__Order", [])
+; Single source of truth for this process's PID. A_Pid is NOT an AHK v2 built-in
+; (reading it throws UnsetError), so every log line and temp-file stem must use
+; this global. Assigned in the pre-pump block so it exists before the first
+; LoggerStart and before any parse-time-armed callback or deferred worker reads it.
+global DriverPid := DllCall("GetCurrentProcessId", "UInt")
 #Include lib/manifest_reader.ahk
 #Include lib/feature_io.ahk
 
@@ -325,16 +330,7 @@ HotstringEngineInit()
 ; Initialise the logger now that the ini cache is built and ScriptInformation
 ; reflects user overrides — LoggerInit reads [Script] LogLevel from the ini.
 LoggerInit()
-bootPid := 0
-if IsSet(A_Pid) {
-    bootPid := A_Pid
-} else {
-    try bootPid := DllCall("GetCurrentProcessId", "UInt")
-}
 bootScriptName := IsSet(A_ScriptName) ? A_ScriptName : "ErgoptiPlus"
-if !IsSet(A_Pid) {
-    LoggerWarn("ErgoptiPlus", "A_Pid was not set during boot; using fallback pid={1}.", bootPid)
-}
 if !IsSet(A_ScriptName) && IsSet(A_ScriptFullPath) {
     bootScriptName := A_ScriptFullPath
 }
@@ -347,7 +343,7 @@ try Updater_LoadCheckInterval()
 ; when the user has chosen "never" — those checks happen inside the helper.
 try Updater_StartBackgroundChecks()
 try Updater_InitTrayNotifyHandler()
-LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver (pid={1}, script='{2}')…", bootPid, bootScriptName)
+LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver (pid={1}, script='{2}')…", DriverPid, bootScriptName)
 ; Boot phase profiling — emits one INFO line per phase so a slow start can be
 ; diagnosed from the log alone (see lib/boot_profiler.ahk).
 BootProfile_Begin()

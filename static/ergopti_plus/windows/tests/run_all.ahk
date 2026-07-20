@@ -1003,6 +1003,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_takenote_winmaximize_guard.ahk
 #Include meta/test_personal_info_combo_generation.ahk
 #Include meta/test_personal_combo_letters_guard.ahk
+#Include meta/test_driver_pid_single_source.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
