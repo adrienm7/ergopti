@@ -81,6 +81,18 @@ end
 -- ================================
 -- ================================
 
+--- Escapes a string so it is safe to use as the REPLACEMENT argument of gsub.
+--- Lua treats "%" specially on that side: "%1".."%9" are capture references,
+--- "%%" is a literal percent, and "%" followed by anything else RAISES
+--- "invalid use of %". Application names are third-party-controlled (an app may
+--- legitimately be called "100% Orange Juice"), so every interpolation of one
+--- into a template must go through here or the whole menu build throws.
+--- @param s any The replacement text (coerced with tostring).
+--- @return string The text with every "%" doubled.
+local function escape_replacement(s)
+	return (tostring(s):gsub("%%", "%%%%"))
+end
+
 --- Builds a standardized exclusion list submenu.
 --- @param current_apps table The current list of disabled apps.
 --- @param on_change function Callback triggered when the list changes.
@@ -194,7 +206,7 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 				end
 			end
 			table.insert(menu, {
-				title = i18n.get("app_picker.exclude_current"):gsub("{app}", appName),
+				title = i18n.get("app_picker.exclude_current"):gsub("{app}", escape_replacement(appName)),
 				image = icon,
 				fn    = function()
 					local new_apps = {}
