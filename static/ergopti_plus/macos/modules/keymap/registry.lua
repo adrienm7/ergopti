@@ -437,7 +437,8 @@ end
 ---
 --- @param trigger string The sequence to monitor.
 --- @param replacement string The resulting expansion string.
---- @param opts table Optional flags: is_word, auto_expand, is_case_sensitive, final_result.
+--- @param opts table Optional flags: is_word, auto_expand, is_case_sensitive,
+---   final_result, is_private (trigger and replacement are secrets — never logged).
 function M.add(trigger, replacement, opts)
 	if not require_state("add") then return end
 	if type(trigger) ~= "string" or trigger == "" then
@@ -459,6 +460,11 @@ function M.add(trigger, replacement, opts)
 	local is_auto           = opts.auto_expand        == true
 	local is_case_sensitive = opts.is_case_sensitive  == true
 	local is_final          = opts.final_result       == true
+	-- Marks a mapping whose trigger AND replacement are user secrets (the
+	-- personal_info.toml phone / SSN / IBAN prefixes). The expander reads this
+	-- to suppress the keylogger call and the plaintext DEBUG line that would
+	-- otherwise copy both into the 14-day log and the exported metrics store
+	local is_private        = opts.is_private         == true
 	-- Owning section name (e.g. "comma_j"), threaded through so mapping_fires can
 	-- look up a per-section delay override. Generated aliases inherit it.
 	local section           = type(opts.section) == "string" and opts.section or nil
@@ -517,6 +523,7 @@ function M.add(trigger, replacement, opts)
 			-- being called on every keystroke in update_preview() and the expander
 			plain_repl   = plain_r,
 			is_word      = is_word,
+			is_private   = is_private,
 			section      = section,
 			auto         = a,
 			priority     = priority,

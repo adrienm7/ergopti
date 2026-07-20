@@ -326,10 +326,21 @@ function M.try_auto_expand(m, char_len, is_ignored)
 		m.group or nil
 	)
 
-	if keylogger and type(keylogger.log_hotstring) == "function" then
-		pcall(keylogger.log_hotstring, trigger, repl_text)
+	-- Private mappings carry PII sourced from personal_info.toml (phone, SSN,
+	-- IBAN). keylogger.log_hotstring writes trigger + replacement verbatim into
+	-- today.log, which ingest copies into events_hotstring and the export then
+	-- replicates to every other device; the DEBUG line below reaches the same
+	-- 14-day log because DEBUG is the driver's default level. Both sinks are
+	-- therefore skipped for private mappings — including the trigger, which is
+	-- itself a fragment of the secret. Non-private mappings are unaffected.
+	if m.is_private then
+		Logger.debug(LOG, "Auto-expand: private mapping fired (content withheld).")
+	else
+		if keylogger and type(keylogger.log_hotstring) == "function" then
+			pcall(keylogger.log_hotstring, trigger, repl_text)
+		end
+		Logger.debug(LOG, "Auto-expand: '%s' → '%s'.", typed, repl_text)
 	end
-	Logger.debug(LOG, "Auto-expand: '%s' → '%s'.", typed, repl_text)
 	return true
 end
 
@@ -402,11 +413,16 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		return false
 	end
 
-	-- Record a "suggestion shown" telemetry event for terminators that indicate
-	-- explicit user acceptance (e.g., ★ consumed as a deliberate trigger).
-	if keylogger and type(keylogger.log_hotstring_suggested) == "function" then
-		pcall(keylogger.log_hotstring_suggested)
-	end
+	-- No "suggestion shown" event is recorded here. llm_bridge.update_preview
+	-- already calls log_hotstring_suggested(nil, trigger, replacement, type) at
+	-- the moment the tooltip is actually rendered, which is the only point where
+	-- a suggestion was genuinely shown; the acceptance side is covered by
+	-- log_hotstring below. The call that used to sit here passed ZERO arguments
+	-- against a four-parameter signature, so it double-counted hs_suggested,
+	-- wrote nil-trigger rows into the per-trigger breakdown, and fired even in
+	-- ignored windows and with tooltips disabled — recording suggestions that
+	-- were never rendered, at the cost of two synchronous write+flush pairs
+	-- inside the HID callback.
 
 	local function do_expansion()
 		-- Use the precomputed plain_repl; tokens_from_repl() is only called below
@@ -468,10 +484,17 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 			m.group or nil
 		)
 
-		if keylogger and type(keylogger.log_hotstring) == "function" then
-			pcall(keylogger.log_hotstring, trigger, m.plain_repl)
+		-- Same privacy contract as try_auto_expand: a private mapping's trigger
+		-- and replacement are both secrets and must reach neither the keylogger
+		-- nor the log.
+		if m.is_private then
+			Logger.debug(LOG, "Terminator-expand: private mapping fired (content withheld).")
+		else
+			if keylogger and type(keylogger.log_hotstring) == "function" then
+				pcall(keylogger.log_hotstring, trigger, m.plain_repl)
+			end
+			Logger.debug(LOG, "Terminator-expand: '%s' → '%s'.", trigger, m.repl)
 		end
-		Logger.debug(LOG, "Terminator-expand: '%s' → '%s'.", trigger, m.repl)
 	end
 
 	-- Run synchronously: CGEventPost() is non-blocking so calling keyStroke()

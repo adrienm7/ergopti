@@ -248,7 +248,12 @@ function M.emit_text(text)
 		return 0, "", ""
 	end
 
-	Logger.trace(LOG, "Emitting text ('%s')…", text)
+	-- Log the payload's SIZE, never the payload. Every expansion funnels through
+	-- here — including personal_info's SSN / IBAN / phone expansions and LLM
+	-- completions — and DEBUG is the driver's default level, so echoing `text`
+	-- copied user secrets into a log retained 14 days. #text is a byte count
+	-- (free); a codepoint count would cost a utf8 scan on the hot path
+	Logger.trace(LOG, "Emitting text (%d byte(s))…", #text)
 
 	if M.should_paste(text) then
 		perform_paste(text)
