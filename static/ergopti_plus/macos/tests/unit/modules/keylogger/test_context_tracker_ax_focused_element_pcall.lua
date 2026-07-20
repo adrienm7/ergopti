@@ -20,6 +20,10 @@
 
 local helpers = require("tests.helpers")
 
+--- The tracker now requires a pause predicate: its writers must be silent
+--- while the script is paused. These scenarios exercise the RUNNING state.
+local function NOT_PAUSED() return false end
+
 package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
 
@@ -68,7 +72,7 @@ helpers.describe("context_tracker: update_ax_observer guards AXFocusedUIElement 
 		local CT = helpers.load_with_stubs("modules.keylogger.context_tracker", make_throwing_ax_overrides())
 
 		local core_state = {}
-		CT.init(core_state, {})
+		CT.init(core_state, {}, NOT_PAUSED)
 
 		local ok = pcall(CT.update_ax_observer, 12345)
 
@@ -106,7 +110,7 @@ helpers.describe("context_tracker: update_ax_observer guards AXFocusedUIElement 
 		local CT = helpers.load_with_stubs("modules.keylogger.context_tracker", hs_overrides)
 
 		local core_state = {}
-		CT.init(core_state, {})
+		CT.init(core_state, {}, NOT_PAUSED)
 
 		local ok = pcall(CT.update_ax_observer, 6789)
 

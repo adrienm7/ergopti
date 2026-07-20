@@ -1304,7 +1304,9 @@ function M.start(script_control)
 	if not _state then
 		_state = true
 		LogManager.init(CoreState)
-		ContextTracker.init(CoreState, LogManager)
+		-- The context tracker owns three OS watchers that pause does NOT tear down,
+		-- so it needs the same pause predicate as the watcher layer below.
+		ContextTracker.init(CoreState, LogManager, _is_paused)
 		-- The watcher layer needs the shared state and the pause predicate; both
 		-- are stable for the process lifetime, so a one-shot init is sufficient.
 		Watchers.init(CoreState, _is_paused)

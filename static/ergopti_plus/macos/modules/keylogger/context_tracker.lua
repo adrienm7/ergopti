@@ -29,6 +29,12 @@ local M      = {}
 local _state       = nil
 local _log_manager = nil
 
+--- Pause predicate injected by M.init(). The tracker's writers are driven by
+--- OS watchers (hs.window.filter, the app watcher, the AX observer) that are
+--- torn down only by keylogger.M.stop() — pause never calls it — so without
+--- this predicate a paused script keeps recording window and app activity.
+local _is_paused   = nil
+
 -- Tracks the last focused AX element so watchers can be removed on focus change
 local _last_focused_element = nil
 -- Tracks the last known AX text value to detect autocorrect jumps
@@ -64,7 +70,7 @@ end
 --- @param func_name string The calling function name for the error message.
 --- @return boolean False if state is not ready, true otherwise.
 local function require_state(func_name)
-	if not _state or not _log_manager then
+	if not _state or not _log_manager or not _is_paused then
 		Logger.error(LOG, "'%s' called before M.init() — dependencies not initialized.", func_name)
 		return false
 	end
@@ -117,6 +123,11 @@ end
 --- signals a native substitution; we flush the buffer and log the event.
 --- @param element table The AX element whose value changed.
 local function handle_ax_value_changed(element)
+	-- « pause = tout éteint »: a paused script records NOTHING
+	-- (project-suspend-pause-invariant). The AX observer survives pause because
+	-- only keylogger.M.stop() tears it down, so the gate has to live here.
+	if _is_paused() then return end
+
 	local ok, val = pcall(function() return element:attributeValue("AXValue") end)
 	if not (ok and type(val) == "string") then return end
 
@@ -347,6 +358,10 @@ end
 --- Called on every app switch and on browser window focus/title changes.
 function M.update_private_status()
 	if not require_state("update_private_status") then return end
+	-- « pause = tout éteint »: a paused script records NOTHING
+	-- (project-suspend-pause-invariant). Window TITLES are the most identifying
+	-- payload this module handles, and hs.window.filter keeps firing while paused.
+	if _is_paused() then return end
 
 	local win = hs.window.focusedWindow()
 	_state.is_private_window    = false
@@ -414,7 +429,11 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 		Logger.warn(LOG, "app_watcher_cb() received nil app_object for '%s'.", tostring(app_name))
 		return
 	end
-	if not _state or not _log_manager then return end  -- called before init — silently skip
+	if not _state or not _log_manager or not _is_paused then return end  -- called before init — silently skip
+	-- « pause = tout éteint »: a paused script records NOTHING
+	-- (project-suspend-pause-invariant). ProcessLifecycle.onAppActivate keeps
+	-- delivering activations while paused, so the gate has to live here.
+	if _is_paused() then return end
 
 	local now        = hs.timer.absoluteTime() / 1000000
 	local new_bundle = app_object:bundleID()
@@ -474,11 +493,16 @@ end
 -- ============================
 -- =============================
 
---- Initializes the context tracker with its two injected dependencies.
+--- Initializes the context tracker with its three injected dependencies.
 --- Must be called exactly once before any callbacks are registered.
+--- The pause predicate is mandatory: without it the tracker would keep writing
+--- app switches, window titles and autocorrect events while the script is
+--- paused, so a missing predicate makes the module non-functional by design
+--- rather than silently privacy-leaky.
 --- @param core_state table The shared state object from init.lua.
 --- @param log_manager_mod table The log manager module reference.
-function M.init(core_state, log_manager_mod)
+--- @param is_paused_fn function Predicate returning true while the script is paused.
+function M.init(core_state, log_manager_mod, is_paused_fn)
 	Logger.start(LOG, "Initializing context tracker…")
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): core_state must be a table — context tracker non-functional.")
@@ -488,12 +512,17 @@ function M.init(core_state, log_manager_mod)
 		Logger.error(LOG, "M.init(): log_manager_mod must be a table — context tracker non-functional.")
 		return
 	end
+	if type(is_paused_fn) ~= "function" then
+		Logger.error(LOG, "M.init(): is_paused_fn must be a function — context tracker non-functional.")
+		return
+	end
 	if _state then
 		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
 		return
 	end
 	_state       = core_state
 	_log_manager = log_manager_mod
+	_is_paused   = is_paused_fn
 	Logger.success(LOG, "Context tracker initialized.")
 end
 
