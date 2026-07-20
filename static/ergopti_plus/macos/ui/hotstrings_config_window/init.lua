@@ -595,6 +595,21 @@ local function push_state()
 	pcall(function() _webview:evaluateJavaScript("setData(" .. json .. ")") end)
 end
 
+--- Refresh callback injected by whoever opens this window (see M.open's caller in
+--- ui.menu.menu_hotstrings_management). Left nil when nothing needs notifying.
+--- @type function|nil
+M._on_config_changed = nil
+
+--- Re-renders the page AND notifies the opener that the override store changed.
+--- The menubar bakes the resolved delay / colour and the "(default)" indicator
+--- into its item titles at BUILD time, so without an explicit refresh those rows
+--- keep rendering pre-edit values and a now-false default tag for the rest of the
+--- session — the two UIs silently desync despite sharing one persistent store.
+local function commit_and_push()
+	push_state()
+	if type(M._on_config_changed) == "function" then pcall(M._on_config_changed) end
+end
+
 --- Dispatches a mutation message from the webview.
 --- Common categories go through hotstrings_config (user override file).
 --- Personal categories patch the TOML file directly.
@@ -618,7 +633,7 @@ local function on_message(msg)
 				hotstrings_config.clear_override(c, s.name, nil)
 			end
 		end
-		push_state()
+		commit_and_push()
 		return
 	end
 
@@ -632,7 +647,7 @@ local function on_message(msg)
 				hotstrings_config.clear_override(c, s.name, "color")
 			end
 		end
-		push_state()
+		commit_and_push()
 		return
 	end
 
@@ -707,8 +722,13 @@ local function on_message(msg)
 		end
 	end
 
-	push_state()
+	commit_and_push()
 end
+
+-- Bridge-handler test seam: on_message is the only entry point that mutates the
+-- override store, so the refresh contract is asserted by driving it directly
+-- rather than by standing up a webview.
+M._on_message = on_message
 
 
 
