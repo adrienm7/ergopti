@@ -36,8 +36,15 @@ end)
 -- seconds (banner disappeared after 2s), and the close path on auto-deactivation.
 -- Rules:
 --   1. toggle ON  → hs.alert.show called with math.huge duration
---   2. toggle OFF → hs.alert.closeAll called (banner closed unconditionally)
---   3. auto-deactivation → same; closeAll must be called regardless of show return value
+--   2. toggle OFF → the banner is closed (unconditionally)
+--   3. auto-deactivation → same, regardless of what show returned
+--
+-- The close MECHANISM is deliberately not asserted here beyond "the banner went
+-- away": closeAll used to dismiss every alert on screen, so the normal path now
+-- targets the stored id via closeSpecific and only the no-id path falls back to
+-- closeAll. These tests therefore count either call as "banner closed", which is
+-- the invariant they were written to protect. The collateral-dismissal guard
+-- itself lives in its own test below.
 helpers.describe("shortcuts.actions.system: keep_awake persistent alert", function()
 	-- Builds a fresh module instance with spied alert + timer stubs.
 	local function make_sys_with_alert_spy()
@@ -69,44 +76,73 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		helpers.assert_eq(on_call.duration, math.huge, "duration must be math.huge — not a fixed timeout")
 	end)
 
-	helpers.it("closes the banner via closeAll on manual toggle OFF", function()
+	helpers.it("closes the banner on manual toggle OFF", function()
 		package.loaded["lib.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 
-		local close_all_calls = 0
+		local close_calls = 0
 
 		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
 			alert = setmetatable({
 				show          = function() return "test-alert-uuid" end,
-				closeAll      = function() close_all_calls = close_all_calls + 1 end,
-				closeSpecific = function() end,
+				closeAll      = function() close_calls = close_calls + 1 end,
+				closeSpecific = function() close_calls = close_calls + 1 end,
 			}, { __call = function(_, _) end }),
 		})
 
 		sys.toggle_awake()   -- ON
-		local calls_before = close_all_calls
-		sys.toggle_awake()   -- OFF → closeAll must be called
-		helpers.assert_true(close_all_calls > calls_before, "closeAll must be called on toggle OFF")
+		local calls_before = close_calls
+		sys.toggle_awake()   -- OFF → the banner must be closed
+		helpers.assert_true(close_calls > calls_before, "the banner must be closed on toggle OFF")
 	end)
 
-	helpers.it("closes the banner via closeAll on stop_awake", function()
+	helpers.it("closes the banner on stop_awake", function()
+		package.loaded["lib.keycodes"] = nil
+		package.loaded["modules.shortcuts.actions.system"] = nil
+
+		local close_calls = 0
+
+		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
+			alert = setmetatable({
+				show          = function() return "test-alert-uuid" end,
+				closeAll      = function() close_calls = close_calls + 1 end,
+				closeSpecific = function() close_calls = close_calls + 1 end,
+			}, { __call = function(_, _) end }),
+		})
+
+		sys.toggle_awake()   -- ON
+		local calls_before = close_calls
+		sys.stop_awake()     -- direct stop (e.g. module shutdown)
+		helpers.assert_true(close_calls > calls_before, "the banner must be closed on stop_awake")
+	end)
+
+	-- Regression guard (shortcuts-awake-closes-all-alerts): closing OUR banner must
+	-- not dismiss unrelated alerts other modules put on screen. Whenever the show
+	-- call handed us an id, the close must target exactly that id and must never
+	-- reach closeAll, which is a screen-wide sweep.
+	helpers.it("closes only its own alert when an id was captured (never closeAll)", function()
 		package.loaded["lib.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 
 		local close_all_calls = 0
+		local closed_ids      = {}
 
 		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
 			alert = setmetatable({
 				show          = function() return "test-alert-uuid" end,
 				closeAll      = function() close_all_calls = close_all_calls + 1 end,
-				closeSpecific = function() end,
+				closeSpecific = function(id) closed_ids[#closed_ids + 1] = id end,
 			}, { __call = function(_, _) end }),
 		})
 
-		sys.toggle_awake()   -- ON
-		local calls_before = close_all_calls
-		sys.stop_awake()     -- direct stop (e.g. module shutdown)
-		helpers.assert_true(close_all_calls > calls_before, "closeAll must be called on stop_awake")
+		sys.toggle_awake()   -- ON  → id captured
+		sys.toggle_awake()   -- OFF → must close that id and nothing else
+
+		helpers.assert_eq(close_all_calls, 0,
+			"closeAll must NOT be called when an alert id is available — it dismisses every "
+			.. "on-screen alert, including unrelated ones from other modules")
+		helpers.assert_eq(closed_ids[#closed_ids], "test-alert-uuid",
+			"the close must target the stored keep-awake alert id")
 	end)
 
 	-- Regression guard: closeAll must be called even when hs.alert.show returns nil
@@ -145,9 +181,12 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		local clock = { now = 1000 }
 		hs.timer.secondsSinceEpoch = function() return clock.now end
 
+		-- Counts either close API: these tests assert the banner went away, not which
+		-- call removed it (the normal path targets the stored id via closeSpecific).
 		local close_all = { count = 0 }
-		hs.alert.closeAll = function() close_all.count = close_all.count + 1 end
-		hs.alert.show     = function() return "uuid" end
+		hs.alert.closeAll      = function() close_all.count = close_all.count + 1 end
+		hs.alert.closeSpecific = function() close_all.count = close_all.count + 1 end
+		hs.alert.show          = function() return "uuid" end
 
 		local captured = { cb = nil }
 		hs.eventtap.new = function(_types, cb)

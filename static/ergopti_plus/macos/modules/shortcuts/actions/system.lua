@@ -101,15 +101,36 @@ local awake_input_watcher = nil
 -- Handle returned by hs.alert.show so the persistent "active" banner can be
 -- dismissed precisely when keep-awake is disabled, without closing other alerts.
 local awake_alert_id = nil
+-- Whether a keep-awake banner is currently on screen. Tracked separately from
+-- awake_alert_id because the id is absent on builds where the show call returns
+-- nil — and the no-handle teardown below is a screen-wide sweep, so it must be
+-- reachable ONLY when one of our banners is genuinely up.
+local awake_alert_shown = false
 
--- Closes the persistent keep-awake banner. closeAll(0) is used rather than
--- closeSpecific because the banner is always the only long-lived alert, so we
--- never depend on the id — this works identically whether hs.alert.show returned
--- an id or nil on this Hammerspoon build. awake_alert_id is kept only so tests
--- can assert the activation captured a handle.
+-- Closes the persistent keep-awake banner. The previous closeAll(0) assumed our
+-- banner was the only long-lived alert on screen, which is not ours to assume:
+-- it dismissed EVERY visible alert, including ones other modules had just posted
+-- (shortcuts-awake-closes-all-alerts). Whenever the show call handed us a handle
+-- we therefore close that one precisely and leave every other alert alone.
+-- The closeAll fallback survives for the no-handle case only: some Hammerspoon
+-- builds return nil instead of an alert id, and without a handle closeSpecific
+-- cannot reach our banner — it would stay on screen forever, which is strictly
+-- worse than the collateral dismissal. That path is the one guarded by the
+-- "closeAll even when the alert id is nil" regression test, and it is gated on
+-- awake_alert_shown so a call made when no banner of ours is up (the defensive
+-- clear on the activation path) sweeps nothing.
 local function close_awake_alert()
-	awake_alert_id = nil
-	pcall(hs.alert.closeAll, 0)
+	local id    = awake_alert_id
+	local shown = awake_alert_shown
+	awake_alert_id    = nil
+	awake_alert_shown = false
+	if id ~= nil then
+		pcall(hs.alert.closeSpecific, id, 0)
+		return
+	end
+	if shown then
+		pcall(hs.alert.closeAll, 0)
+	end
 end
 
 -- Forward declaration required because schedule_awake_tick calls itself recursively
@@ -246,7 +267,8 @@ function M.toggle_awake()
 
 		Logger.info(LOG, "Keep-awake disabled.")
 		-- Close the persistent banner first, THEN show the transient "off" toast so
-		-- closeAll does not swallow the toast we just displayed.
+		-- the close cannot swallow the toast we just displayed (it still would on
+		-- the no-handle path, which falls back to closeAll).
 		close_awake_alert()
 		pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_off"), 2.0)
 	else
@@ -262,7 +284,12 @@ function M.toggle_awake()
 
 		close_awake_alert()
 		local _ok_alert, _alert_id = pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_on"), math.huge)
-		if _ok_alert then awake_alert_id = _alert_id end
+		if _ok_alert then
+			awake_alert_id    = _alert_id
+			-- Record that a banner is up even when the build gave us no id, so the
+			-- teardown can still reach it via the no-handle fallback.
+			awake_alert_shown = true
+		end
 
 		-- Record the current mouse position as the jitter origin
 		local ok_pos, pos = pcall(hs.mouse.absolutePosition)
@@ -497,7 +524,13 @@ function M.bind_layer_scroll()
 		end
 
 		local delta = event:getProperty(hs.eventtap.event.properties.scrollWheelEventDeltaAxis1)
-		if type(delta) ~= "number" then return false end
+		-- A zero delta is a scroll-PHASE event (phase began / phase ended / momentum
+		-- ended), which macOS brackets every gesture with — not actual movement.
+		-- Falling through would classify it as "down" (delta > 0 is false) while
+		-- math.max(1, …) manufactures a real repetition, so every upward scroll ended
+		-- one or more notches LOWER than it started (shortcuts-layer-scroll-zero-delta).
+		-- Returning false also lets the phase event pass through instead of consuming it.
+		if type(delta) ~= "number" or delta == 0 then return false end
 
 		local key  = delta > 0 and "SOUND_UP" or "SOUND_DOWN"
 		local reps = math.max(1, math.floor(math.abs(delta)))
