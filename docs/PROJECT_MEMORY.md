@@ -29,6 +29,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-ahk-numeric-string-equals-false](#project-ahk-numeric-string-equals-false) — `"0" = false` is TRUE in AHK v2; never compare a String|false return against false, type-check with `is String`
   - [project-ahk-guard-tests-must-loop-the-class](#project-ahk-guard-tests-must-loop-the-class) — Guard tests must enumerate the whole class of call sites, not the one site a bug was fixed at — 5 findings in one audit came from this
   - [project-audit-evidence-must-be-reproducible](#project-audit-evidence-must-be-reproducible) — The 2026-07-20 audit's performance section cited logs that do not exist; G4 has never been measured on this driver
+  - [project-audit-findings-are-hypotheses](#project-audit-findings-are-hypotheses) — 2 of 35 audit findings were wrong and the existing suite proved it; implement a finding as a hypothesis, not an instruction
   - [project-updater-nonblocking-http](#project-updater-nonblocking-http) — The updater background poll must never do synchronous WinHttp on the main thread (it freezes all remapping); WinHttp SetTimeouts 0 = infinite. Use the async WinHTTP + WaitForResponse(0) + SetTimer-poll pattern.
   - [project-config-v2-refactor](#project-config-v2-refactor) — State of the v2 config schema refactor (Scope C) — branch refactor/config-schema-v2 with 5 dormant commits. Cut-over to actually migrate the AHK driver runtime is the open piece.
   - [project_debug_menu_sync](#project-debug-menu-sync) — Debug menu order is defined in _shared/modules/menu/menu_manifest.json debug_menu — both AHK and Lua drivers consume it
@@ -1640,6 +1641,29 @@ This is the concrete, repeated failure mode behind [[project_ahk_invariant_incom
 - When you fix a bug by removing something from a function, **grep the callers**: they may be re-adding it, and their justifying comment may have just become false.
 
 Related: [[project_ahk_invariant_incomplete_application]], [[feedback_regression_tests]], [[project_ahk_menu_dispatcher_drop]].
+
+### project-audit-findings-are-hypotheses
+
+_Two findings from the 2026-07-20 second-pass audit were WRONG, and the existing test suite is what proved it — implement an audit finding as a hypothesis, not as an instruction_
+
+<sub>slug: `project_audit_findings_are_hypotheses`</sub>
+
+Of 35 findings implemented, **2 had to be reverted because a pre-existing regression test rejected them**, and both reverts were the correct outcome:
+
+- **F-14** proposed making `PrefixWatcherSuppress` delegate to `HSE_Suppress`, on the strength of four comments in `hotstring_dispatch.ahk` claiming it already does. `tests/meta/test_hse_physical_input_provenance.ahk:14` asserts the delegation is **absent**: the render guard and the engine suppression window are separate *by design*, because the engine window exists to filter the engine's own `SendInput` output while genuinely physical input declares itself with `IsPhysical=true` (F46). Delegating drops a physical character typed inside a nearby output transaction. **The comments were the bug, not the code.**
+- **F-16** proposed memoizing `_MG_LoadSubCategories`. `tests/unit/test_master_gates.ahk` requires an invalid canonical manifest to throw on *every* call; a cache returns the last good value instead. The finding also dissolved on its own once **F-01** removed the `Critical` span that made the re-read expensive — the cost was never inherent, only badly placed.
+
+**Why this matters:** an adversarial audit produces *plausible* defects. Plausibility is not correctness, and a long, well-argued finding is not more likely to be right than a short one — it is just more persuasive. The suite encodes decisions whose reasoning is no longer in anyone's head.
+
+**How to apply:**
+
+- Treat each finding as a hypothesis to be tested by implementing it, not a work order. Run the full suite after each fix, not at the end of a batch, so the rejection is attributable.
+- When an existing test goes red, the default assumption is that **your change is wrong** (`ship-fix` §5). Read what the test asserts and *why* before touching either side.
+- If a finding is genuinely refuted, record the refutation next to the code — the stale comments that caused F-14 are exactly what a future audit would flag again.
+- Fix findings in dependency order where possible: F-16 disappeared once F-01 landed. A cluster of findings often has one real root.
+- Two further audit claims were corrected during implementation because a positional source assertion matched inside the very code it was checking (the function already reset the flag on entry). When asserting "X appears after Y", search *from* Y's offset — see the `meta-test` skill.
+
+Related: [[project_ahk_guard_tests_must_loop_the_class]], [[feedback_regression_tests]], [[project_audit_evidence_must_be_reproducible]].
 
 ### project-audit-evidence-must-be-reproducible
 
