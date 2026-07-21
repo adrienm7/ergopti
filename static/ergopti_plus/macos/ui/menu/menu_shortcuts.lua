@@ -20,6 +20,7 @@ local shortcuts_mod = require("modules.shortcuts")
 local text_acts     = require("modules.shortcuts.actions.text")
 local i18n          = require("lib.i18n")
 local ManifestMenu  = require("lib.manifest_menu")
+local ShortcutUtils = require("ui.menu.shortcut_utils")
 local LOG           = "menu_shortcuts"
 
 
@@ -459,12 +460,34 @@ function M.build(ctx)
 						checked  = (current == act) or nil,
 						disabled = not enabled or paused or nil,
 						fn       = (enabled and not paused) and (function(a) return function()
-							state.script_control_shortcuts[keyname] = a
-							if type(script_control.set_shortcut_action) == "function" then
-								pcall(script_control.set_shortcut_action, keyname, a)
+							local function assign()
+								state.script_control_shortcuts[keyname] = a
+								if type(script_control.set_shortcut_action) == "function" then
+									pcall(script_control.set_shortcut_action, keyname, a)
+								end
+								ctx.save_prefs()
+								ctx.updateMenu()
 							end
-							ctx.save_prefs()
-							ctx.updateMenu()
+
+							-- open_url / search_web do nothing without their parameter:
+							-- the handler reads get_action_parameter(binding, action) and
+							-- silently returns when it is empty. Assigning one without
+							-- prompting handed the user a key that looked configured and
+							-- did nothing when pressed. Deferred like the gestures menu so
+							-- the modal opens after the menu has closed.
+							local gestures = ctx.gestures
+							local spec = gestures and type(gestures.get_action_parameter_spec) == "function"
+								and gestures.get_action_parameter_spec(a) or nil
+							if spec then
+								hs.timer.doAfter(0.05, function()
+									if ShortcutUtils.prompt_action_parameter(gestures, keyname, a, spec) then
+										assign()
+									end
+								end)
+								return
+							end
+
+							assign()
 						end end)(act) or nil,
 					})
 				end

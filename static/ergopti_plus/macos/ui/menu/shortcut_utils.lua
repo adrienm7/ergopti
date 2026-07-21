@@ -187,4 +187,59 @@ function M.prompt_shortcut(opts)
 	return false
 end
 
+
+
+
+
+-- ==============================================
+-- ==============================================
+-- ======= 5/ Parameterized Action Prompt =======
+-- ==============================================
+-- ==============================================
+
+--- Prompts for an action's required parameter and stores it against `binding`.
+---
+--- Some actions (open_url, search_web) carry no useful behaviour without a value:
+--- their handlers read get_action_parameter(binding, action) and silently do
+--- nothing when it is empty. Any menu that can assign such an action must collect
+--- the value first, or it hands the user a binding that looks configured and does
+--- nothing when pressed.
+---
+--- Parameters are keyed by (binding, action), so `binding` can be a gesture slot
+--- or a script-control key name — the storage does not care which.
+---
+--- @param gestures table The gestures actions module (parameter storage owner).
+--- @param binding string The binding the parameter belongs to.
+--- @param action string The action being configured.
+--- @param spec string The parameter spec ("search_url" or a plain link).
+--- @return boolean True when a valid value was stored, false when cancelled.
+function M.prompt_action_parameter(gestures, binding, action, spec)
+	if type(gestures) ~= "table" or type(spec) ~= "string" then return false end
+
+	local label  = (type(gestures.get_action_label) == "function" and gestures.get_action_label(action)) or action
+	local prior  = (type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(binding, action)) or ""
+	local prompt = spec == "search_url"
+		and "URL de recherche, avec exactement un %s pour la requête :"
+		or "Lien à ouvrir :"
+
+	-- Loop until the value validates or the user cancels: accepting an invalid one
+	-- would store a parameter the action's own validator later rejects, which is
+	-- the silent no-op this prompt exists to prevent.
+	while true do
+		local button, value = dialog.text_prompt(
+			"Configurer " .. label, prompt, prior, "Enregistrer", "Annuler")
+		if button ~= "Enregistrer" then return false end
+		if type(gestures.validate_action_parameter) == "function"
+			and gestures.validate_action_parameter(action, value) then
+			pcall(gestures.set_action_parameter, binding, action, value)
+			return true
+		end
+		pcall(dialog.block_alert, "Valeur invalide",
+			"Saisissez une URL http:// ou https:// valide."
+			.. (spec == "search_url" and " L’URL doit contenir un seul %s." or ""),
+			"OK", nil, "warning")
+		prior = value or prior
+	end
+end
+
 return M
