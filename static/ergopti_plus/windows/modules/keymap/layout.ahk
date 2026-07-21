@@ -416,7 +416,35 @@ AppState_TouchLastSentKey(Character) {
 _RemapEmit(SendStr, KeyChar, *) {
 	Critical("On")
 	SendEvent(SendStr)
-	UpdateLastSentCharacter(KeyChar)
+	if _EmitReachedScreen()
+		UpdateLastSentCharacter(KeyChar)
+}
+
+; False while a dead-key InputHook is armed. That hook runs with VisibleText at
+; its default (off), so it CONSUMES the character an emit just produced — the
+; character never reaches the screen, and DeadKey emits the composed result
+; instead once the hook stops.
+;
+; Measured, not assumed: a probe registered a hotkey exactly like the remap
+; hotkeys (InputLevel 2), armed an InputHook with DeadKey's own "L1 T2" shape,
+; and injected one key. The hotkey FIRED, the hook captured the character the
+; hotkey had emitted, and the focused edit control received nothing.
+;
+; Advancing the ring here therefore recorded a character the user never saw, and
+; DeadKey then pushed the composed character as well — two entries for one
+; visible character. Everything downstream that reads the ring as "what is on
+; screen" was consequently off by one during and just after a composition: the
+; roll handlers, the quote/hashtag guards and the time-gated hotstring lookups.
+;
+; This is the same rule SendNewResult already applies when its send throws — a
+; character that did not reach the application must not advance the ring. The
+; check is on the HOOK, not on InDeadKeySequence: DeadKey clears the hook before
+; emitting its own result but leaves the sequence flag set until afterwards, so
+; gating on the flag would suppress the push for the one character that IS
+; visible.
+_EmitReachedScreen() {
+	global _DeadKeyInputHook
+	return !IsSet(_DeadKeyInputHook) or _DeadKeyInputHook == ""
 }
 
 ; Win + remapped-L locks the workstation. Locking is a focus-destroying,
@@ -817,7 +845,10 @@ _DigitShiftSend(Symbol, *) {
 	; SendEvent {Text} bypasses the keyboard hook and sends the Unicode
 	; character directly, so the SC002–SC00B digit remaps never interfere.
 	SendEvent("{Text}" . Symbol)
-	UpdateLastSentCharacter(Symbol)
+	; Same rule as _RemapEmit: an armed dead-key hook eats this character, so it
+	; must not be recorded as having reached the screen.
+	if _EmitReachedScreen()
+		UpdateLastSentCharacter(Symbol)
 }
 
 ; Cannot be HotIf because the remapping is done with Hotkey function and cannot be undone afterwards.
