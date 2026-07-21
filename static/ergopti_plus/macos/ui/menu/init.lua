@@ -721,7 +721,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local function open_path_via_menu(key)
 		local p = MenuPaths.get(key)
 		if type(p) == "string" and p ~= "" then
-			pcall(hs.execute, string.format("open %q", p))
+			pcall(hs.execute, "open " .. text_utils.shell_quote(p))
 		end
 	end
 
@@ -769,7 +769,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		open_logs                 = function()
 			local dir = logs_dir()
-			pcall(hs.execute, string.format("mkdir -p %q && open %q", dir, dir))
+			pcall(hs.execute, "mkdir -p " .. text_utils.shell_quote(dir)
+				.. " && open " .. text_utils.shell_quote(dir))
 		end,
 		open_console              = function() pcall(hs.openConsole) end,
 		open_paths_editor         = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
@@ -795,21 +796,22 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		open_config               = function() open_path_via_menu("ConfigTomlPath") end,
 		open_logs_folder          = function()
 			local dir = logs_dir()
-			pcall(hs.execute, string.format("mkdir -p %q && open %q", dir, dir))
+			pcall(hs.execute, "mkdir -p " .. text_utils.shell_quote(dir)
+				.. " && open " .. text_utils.shell_quote(dir))
 		end,
 		open_today_log            = function()
 			local path = require("lib.logger").UNIFIED_LOG_FILE
 			if type(path) ~= "string" or path == "" then
 				path = logs_dir() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
 			end
-			pcall(hs.execute, string.format("open %q", path))
+			pcall(hs.execute, "open " .. text_utils.shell_quote(path))
 		end,
 		open_error_log            = function()
 			local path = require("lib.logger").ERRORS_LOG_FILE
 			if type(path) ~= "string" or path == "" then
 				path = logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
 			end
-			pcall(hs.execute, string.format("open %q", path))
+			pcall(hs.execute, "open " .. text_utils.shell_quote(path))
 		end,
 		show_setup_wizard         = function()
 			local ok, ob = pcall(require, "ui.onboarding")

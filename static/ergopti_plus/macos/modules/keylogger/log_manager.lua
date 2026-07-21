@@ -36,6 +36,7 @@ local M = {}
 
 local hs      = hs
 local fs      = require("hs.fs")
+local text_utils = require("lib.text_utils")
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 local timer   = require("hs.timer")
@@ -139,7 +140,7 @@ end
 
 --- mkdir -p equivalent.
 local function _mkdir_p(path)
-	pcall(hs.execute, string.format("mkdir -p %q", path))
+	pcall(hs.execute, "mkdir -p " .. text_utils.shell_quote(path))
 end
 
 --- Generates a UUID v4 (RFC 4122).

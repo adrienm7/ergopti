@@ -505,6 +505,20 @@ function M.trig_title(s)
 	return results
 end
 
+--- Quotes a value for POSIX sh, so it can be interpolated into a shell command.
+--- Lua's string.format("%q", …) escapes for a LUA LITERAL: it handles backslashes,
+--- quotes and newlines but leaves $, backticks and ! untouched — every one of which
+--- /bin/sh expands. Paths in this driver are user-configurable (the config
+--- directory is a setting), so %q-quoting them is a shell-injection hazard as well
+--- as simply wrong for any path containing those characters.
+--- Single quotes disable every expansion; an embedded quote is closed, escaped and
+--- reopened, the standard POSIX idiom.
+--- @param value any The value to quote (coerced with tostring).
+--- @return string The value wrapped in single quotes, safe for /bin/sh.
+function M.shell_quote(value)
+	return "'" .. tostring(value):gsub("'", "'\''") .. "'"
+end
+
 --- Escapes a string so it is safe to use as the REPLACEMENT argument of gsub.
 --- Lua treats "%" specially on that side: "%1".."%9" are capture references, "%%"
 --- is a literal percent, and "%" followed by anything else RAISES "invalid use of

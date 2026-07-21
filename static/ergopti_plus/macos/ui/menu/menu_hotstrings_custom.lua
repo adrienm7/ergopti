@@ -13,6 +13,7 @@
 local M = {}
 local hs     = hs
 local i18n   = require("lib.i18n")
+local text_utils = require("lib.text_utils")
 local dialog = require("lib.dialog_util")
 
 
@@ -122,7 +123,7 @@ end
 local function open_toml_path(path)
 	if type(path) ~= "string" or path == "" then return end
 	hs.timer.doAfter(0, function()
-		pcall(hs.execute, string.format("open %q", path))
+		pcall(hs.execute, "open " .. text_utils.shell_quote(path))
 	end)
 end
 

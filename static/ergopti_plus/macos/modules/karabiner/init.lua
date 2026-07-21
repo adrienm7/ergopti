@@ -114,6 +114,7 @@ M.MOD_COMBOS = {}
 local _wizard_ran_this_session  = false
 local _layout_rebuild_timer     = nil  -- Stored so rapid layout changes cancel the pending rebuild
 local _deferred_hotkeys_timer   = nil  -- Pending convenience-hotkey bind; cancelled by M.stop()
+local _kc_parent_ensured        = false -- metrics/ exists from the first regenerate onwards
 
 -- Builds the minimal karabiner.json deployed on pause: the same profile structure
 -- as normal but carrying only `rules` (an empty list = full native keyboard). KE's
@@ -534,8 +535,16 @@ function M.regenerate()
 	-- Ensure the parent directory of the KC physical log exists before Karabiner
 	-- starts writing to it via shell_command echo redirects
 	local kc_parent = Generator.KE_PHYSICAL_KC_LOG and Generator.KE_PHYSICAL_KC_LOG:match("^(.*)/[^/]+$")
-	if kc_parent then
-		pcall(hs.execute, string.format("mkdir -p %q", kc_parent))
+	if kc_parent and not _kc_parent_ensured then
+		-- POSIX single-quoting, not Lua's %q. %q escapes for a LUA literal — it leaves
+		-- $, backticks and ! untouched — so a config dir containing any of them was
+		-- interpolated straight into /bin/sh. The path is user-configurable, so this
+		-- is the same shell-quoting rule the generator applies 150 lines away, and the
+		-- generator's own regression test covers only that file. Memoised because this
+		-- runs on every regenerate: the directory does not stop existing.
+		local function sq(v) return "'" .. tostring(v):gsub("'", "'\''") .. "'" end
+		pcall(hs.execute, "mkdir -p " .. sq(kc_parent))
+		_kc_parent_ensured = true
 	end
 
 	local active_combos = 0

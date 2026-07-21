@@ -278,7 +278,7 @@ end
 local function download_async(url, dest, callback)
 	local parent = dest:match("^(.*/)") or ""
 	if parent ~= "" then
-		hs.execute(string.format("/bin/mkdir -p %q", parent))
+		hs.execute("/bin/mkdir -p " .. text_utils.shell_quote(parent))
 	end
 	local task
 	task = hs.task.new("/usr/bin/curl", function(rc, _, stderr)
@@ -329,7 +329,7 @@ end
 --- is non-fatal (the volume can be lazily released on reboot).
 --- @param mount_point string
 local function unmount_dmg(mount_point)
-	hs.execute(string.format("/usr/bin/hdiutil detach %q 2>/dev/null", mount_point))
+	hs.execute("/usr/bin/hdiutil detach " .. text_utils.shell_quote(mount_point) .. " 2>/dev/null")
 end
 
 --- Locates the .pkg sitting at the root of a mounted DMG. KE ships exactly
@@ -337,7 +337,7 @@ end
 --- @param mount_point string
 --- @return string|nil pkg_path
 local function find_pkg_in_volume(mount_point)
-	local out = hs.execute(string.format("/bin/ls %q 2>&1", mount_point))
+	local out = hs.execute("/bin/ls " .. text_utils.shell_quote(mount_point) .. " 2>&1")
 	if type(out) ~= "string" then return nil end
 	for line in out:gmatch("[^\n]+") do
 		if line:match("%.pkg$") then
@@ -511,7 +511,7 @@ end
 --- scripts grant TCC, so a deep-link is the closest we can get to one click.
 function M.open_input_monitoring_pane()
 	Logger.info(LOG, "Opening Input Monitoring pane…")
-	hs.execute(string.format("/usr/bin/open %q", URL_INPUT_MONITORING))
+	hs.execute("/usr/bin/open " .. text_utils.shell_quote(URL_INPUT_MONITORING))
 end
 
 --- Opens the System Settings pane where the user grants Accessibility
@@ -519,14 +519,14 @@ end
 --- Input Monitoring redundant); v15 and older required Input Monitoring.
 function M.open_accessibility_pane()
 	Logger.info(LOG, "Opening Accessibility pane…")
-	hs.execute(string.format("/usr/bin/open %q", URL_ACCESSIBILITY))
+	hs.execute("/usr/bin/open " .. text_utils.shell_quote(URL_ACCESSIBILITY))
 end
 
 --- Opens the System Extensions pane where the user must approve the
 --- Karabiner-DriverKit-VirtualHIDDevice extension on first install.
 function M.open_system_extensions_pane()
 	Logger.info(LOG, "Opening System Extensions pane…")
-	hs.execute(string.format("/usr/bin/open %q", URL_SYSTEM_EXTENSIONS))
+	hs.execute("/usr/bin/open " .. text_utils.shell_quote(URL_SYSTEM_EXTENSIONS))
 end
 
 

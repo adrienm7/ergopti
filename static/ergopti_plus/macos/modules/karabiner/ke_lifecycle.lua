@@ -30,6 +30,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local Timings = require("lib.timings")
 local Notifications = require("lib.notifications")
 local i18n   = require("lib.i18n")
@@ -153,7 +154,7 @@ local function write_total_reset_script(script_path)
 	end
 	f:write(KARABINER_KILL_TOTAL_SCRIPT)
 	f:close()
-	hs.execute(string.format("/bin/chmod 700 %q", script_path))
+	hs.execute("/bin/chmod 700 " .. text_utils.shell_quote(script_path))
 	return true
 end
 
@@ -165,8 +166,8 @@ function M.run_total_reset()
 	if not write_total_reset_script(script_path) then
 		return "Unable to create reset script", false
 	end
-	local out, ok = hs.execute(string.format("/bin/zsh %q 2>&1", script_path))
-	hs.execute(string.format("/bin/rm -f %q", script_path))
+	local out, ok = hs.execute("/bin/zsh " .. text_utils.shell_quote(script_path) .. " 2>&1")
+	hs.execute("/bin/rm -f " .. text_utils.shell_quote(script_path))
 	return out or "", ok == true
 end
 
@@ -189,7 +190,7 @@ function M.run_total_reset_async()
 		_last_async_reset_launch_ts = now
 		return string.format("Async reset launched (%s)", script_path), true
 	end
-	hs.execute(string.format("/bin/rm -f %q", script_path))
+	hs.execute("/bin/rm -f " .. text_utils.shell_quote(script_path))
 	return "Async reset launch failed", false
 end
 
@@ -216,7 +217,7 @@ function M.kill_async()
 	fh:write(KARABINER_KILL_CMD)
 	fh:write("\n/bin/rm -f \"$0\" 2>/dev/null\n")
 	fh:close()
-	hs.execute(string.format("/bin/chmod +x %q", script_path))
+	hs.execute("/bin/chmod +x " .. text_utils.shell_quote(script_path))
 	local cmd = string.format(
 		"/usr/bin/nohup /bin/sh %q >/tmp/ergopti_ke_kill_async.log 2>&1 </dev/null &",
 		script_path

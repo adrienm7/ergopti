@@ -23,6 +23,7 @@
 
 local hs            = hs
 local Logger        = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local i18n          = require("lib.i18n")
 local notifications = require("lib.notifications")
 local LOG           = "menu.keyboard_layout"
@@ -234,13 +235,18 @@ local function install_user(bundles_dir, bundle_name)
 	-- when it fails due to permission; the user will see an outdated entry in
 	-- the system folder but it won't conflict because macOS prefers the user
 	-- scope when both exist for the same bundle identifier).
-	hs.execute(string.format('rm -rf %q/Ergopti_v*.bundle', SYSTEM_LAYOUTS_DIR:gsub("/$", "")))
+	hs.execute("rm -rf " .. text_utils.shell_quote((SYSTEM_LAYOUTS_DIR:gsub("/$", ""))) .. "/Ergopti_v*.bundle")
+	-- Every path is POSIX-quoted: these come from the user-configurable layout
+	-- directories, and Lua's %q escapes for a LUA literal — it leaves $, backticks
+	-- and ! for /bin/sh to expand. The glob stays OUTSIDE the quotes so the shell
+	-- still expands it.
+	local sq = text_utils.shell_quote
 	local cmd = string.format(
-		'mkdir -p %q && rm -rf %q/Ergopti_v*.bundle && cp -R %q %q',
-		USER_LAYOUTS_DIR,
-		USER_LAYOUTS_DIR:gsub("/$", ""),
-		bundles_dir .. bundle_name,
-		USER_LAYOUTS_DIR
+		'mkdir -p %s && rm -rf %s/Ergopti_v*.bundle && cp -R %s %s',
+		sq(USER_LAYOUTS_DIR),
+		sq((USER_LAYOUTS_DIR:gsub("/$", ""))),
+		sq(bundles_dir .. bundle_name),
+		sq(USER_LAYOUTS_DIR)
 	)
 	local out, ok = hs.execute(cmd)
 	if ok then
@@ -264,7 +270,7 @@ local function install_system(bundles_dir, bundle_name)
 	Logger.start(LOG, "Installing %s into the system Keyboard Layouts folder (sudo)…", bundle_name)
 	-- Remove both the user copy (no privilege needed) and the old system copy
 	-- (done inside the privileged shell so both are cleaned atomically).
-	hs.execute(string.format('rm -rf %q/Ergopti_v*.bundle', USER_LAYOUTS_DIR:gsub("/$", "")))
+	hs.execute("rm -rf " .. text_utils.shell_quote((USER_LAYOUTS_DIR:gsub("/$", ""))) .. "/Ergopti_v*.bundle")
 	local shell_cmd = string.format(
 		"rm -rf '%sErgopti_v'*.bundle && cp -R '%s%s' '%s'",
 		SYSTEM_LAYOUTS_DIR, bundles_dir, bundle_name, SYSTEM_LAYOUTS_DIR
