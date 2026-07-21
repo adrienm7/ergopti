@@ -89,15 +89,15 @@ entrées. Un `ErgoptiPlus_2026-07-11.log` peut contenir des entrées du 14. Ne d
 
 À utiliser comme point de comparaison — re-dérive-la, ne la recopie pas aveuglément.
 
-| Segment | Count | Max ms | Mean ms | >100 ms |
-| --- | --- | --- | --- | --- |
-| `Tooltip.Present` | 2470 | 238.8 | 15.7 | 5 |
-| `OnChar` | 2018 | 701.3 | 18.6 | 35 |
-| `Tooltip.ResolvePos` | 1764 | **2560.3** | 18.1 | 41 |
-| `HSE.FeedChar` | 1426 | 700.8 | 19.5 | 26 |
-| `Tooltip.Build` | 842 | 295.8 | 13.9 | 5 |
-| `HSE.Dispatch` | 329 | 121.0 | 11.6 | 1 |
-| `Tooltip.BorderPixelLoop` | 109 | 224.5 | 12.4 | 2 |
+| Segment                   | Count | Max ms     | Mean ms | >100 ms |
+| ------------------------- | ----- | ---------- | ------- | ------- |
+| `Tooltip.Present`         | 2470  | 238.8      | 15.7    | 5       |
+| `OnChar`                  | 2018  | 701.3      | 18.6    | 35      |
+| `Tooltip.ResolvePos`      | 1764  | **2560.3** | 18.1    | 41      |
+| `HSE.FeedChar`            | 1426  | 700.8      | 19.5    | 26      |
+| `Tooltip.Build`           | 842   | 295.8      | 13.9    | 5       |
+| `HSE.Dispatch`            | 329   | 121.0      | 11.6    | 1       |
+| `Tooltip.BorderPixelLoop` | 109   | 224.5      | 12.4    | 2       |
 
 `OnChar` et `HSE.FeedChar` portent le même timestamp et la même durée : ce sont des segments
 IMBRIQUÉS qui mesurent le même blocage. Ne les additionne pas.
@@ -125,7 +125,7 @@ IMBRIQUÉS qui mesurent le même blocage. Ne les additionne pas.
 
 ---
 
-## 3. LES 4 GARANTIES À PROUVER
+## 3. LES 5 GARANTIES À PROUVER
 
 - **G1 — ROBUSTESSE.** Aucune action utilisateur, dans aucun état (normal / suspend / pause /
   switch de layout / reload de config / poll updater / cold-start / first-boot), ne lève une
@@ -136,9 +136,24 @@ IMBRIQUÉS qui mesurent le même blocage. Ne les additionne pas.
 - **G3 — PAS DE RACE.** Aucun bug d'ordonnancement entre producteurs asynchrones (hook clavier,
   InputHook, `SetTimer`, `OnMessage`, callbacks WinHttp, injection `SendInput`, reload de
   config). Toute mutation d'état partagé sur le hot path doit être atomique.
-- **G4 — PAS DE LAG.** Aucune action n'introduit de latence perceptible. Aucun appel bloquant
-  (shell, HTTP, `FileRead`, Registry, COM) sur le thread de frappe ou de menu.
-  **G4 se prouve avec les logs de la §1, jamais par raisonnement seul.**
+- **G4 — PAS DE LAG, ET DU PERF EN PLUS.** Deux obligations distinctes, la seconde est
+  souvent oubliée :
+  1. _Défensif_ — aucune action n'introduit de latence perceptible, aucun appel bloquant
+     (shell, HTTP, `FileRead`, Registry, COM) sur le thread de frappe ou de menu.
+  2. _Offensif_ — **tu dois AUSSI proposer des optimisations là où le code est simplement
+     lent, même sans bug.** Un chemin correct mais 10× plus lent que nécessaire est un
+     livrable attendu de cet audit, pas un hors-sujet. Vise en priorité : le hot path de
+     frappe (chaque µs y est multipliée par des milliers de frappes/jour), le boot, et le
+     rebuild du tooltip. Pour chaque proposition, donne le coût actuel mesuré ou l'ordre de
+     complexité, le coût visé, et ce qui pourrait casser.
+     **G4 se prouve avec les logs de la §1, jamais par raisonnement seul.** Une optimisation
+     proposée sans chiffre (log, `A_TickCount`, ou complexité asymptotique argumentée) est une
+     hypothèse — étiquette-la comme telle.
+- **G5 — LE TOOLTIP DIT LA VÉRITÉ.** Ce que le tooltip affiche DOIT être exactement ce que le
+  moteur de hotstrings produira si l'utilisateur presse la touche magique maintenant. Aucune
+  prédiction dupliquée qui puisse diverger du moteur. Voir la classe [G] : c'est le mode
+  d'échec le plus coûteux du repo côté UX, parce qu'il est invisible en test et que
+  l'utilisateur ne peut pas savoir que la suggestion mentait.
 
 ---
 
@@ -174,8 +189,8 @@ IMBRIQUÉS qui mesurent le même blocage. Ne les additionne pas.
   action qui « ne fait plus rien » après pause, ou une feature qui tourne encore sous pause,
   est un bug. Cherche aussi ce qui est démonté au suspend et JAMAIS remonté au resume : c'est
   une perte de feature définitive jusqu'au redémarrage.
-- **Latch des préfixes custom-combination à travers Suspend.** *(État vérifié au 2026-07-20 —
-  re-vérifie, cette zone bouge.)* L'implémentation actuelle n'est PLUS le `KeyWait("SC138","T1")`
+- **Latch des préfixes custom-combination à travers Suspend.** _(État vérifié au 2026-07-20 —
+  re-vérifie, cette zone bouge.)_ L'implémentation actuelle n'est PLUS le `KeyWait("SC138","T1")`
   bloquant décrit dans les vieilles docs : `lib/lifecycle.ahk` utilise un poll de suspend
   différé non bloquant (`_SuspendPendingPoll`, 25 ms) généralisé sur
   `SUSPEND_CUSTOM_COMBO_PREFIX_KEYS := ["SC138", "SC038", "SC01D", "SC02A", "SC11D"]`.
@@ -228,6 +243,30 @@ IMBRIQUÉS qui mesurent le même blocage. Ne les additionne pas.
   le buffer à chaque frappe est O(n) par caractère).
 - Allocation / recompilation de regex par frappe (ancre tes regex, cache les résultats).
 
+**Volet OFFENSIF — obligatoire, pas optionnel.** Les points ci-dessus cherchent des _bugs_ de
+lenteur. On te demande EN PLUS de livrer une section « optimisations proposées » même quand
+rien n'est cassé. Cherche activement :
+
+- **Travail répété par frappe qui pourrait être mémoïsé** : une résolution de config, un
+  `StrLower` sur tout le buffer, une reconstruction de Map, un `HotstringsResolve` non caché.
+  Le hot path de frappe est le seul endroit du repo où une micro-optimisation a un vrai retour.
+- **Travail fait à chaque frappe qui pourrait être fait une fois au boot** (ou à l'inverse :
+  travail au boot qui retarde le premier keystroke et pourrait être différé/paresseux).
+- **Structures de données mal choisies** : scan linéaire là où une Map par clé suffirait,
+  concaténation en boucle là où un tableau + `Join` serait linéaire, `Clone()` profond d'une
+  structure large sur un chemin chaud.
+- **Allocations évitables** : objets créés puis jetés à chaque frappe, buffers redimensionnés
+  au lieu d'être réutilisés.
+- **I/O qui pourrait être groupée ou différée** : écritures de métriques, flush de logs,
+  sauvegardes de config déclenchées plus souvent que nécessaire.
+- **Le tooltip** : c'est le composant le plus cher du driver. Chaque piste qui évite un
+  destroy/recreate de fenêtre est à chiffrer.
+
+Format attendu par proposition : _chemin concerné_ → _coût actuel (mesuré ou complexité)_ →
+_optimisation_ → _coût visé_ → _risque de régression_. Classe-les par gain × confiance.
+Une optimisation qui complexifie le code sans gain mesurable est un anti-livrable : ne la
+propose pas.
+
 ### [E] Intégrité de la machine à états
 
 - Construis la MATRICE état × action : { normal, suspend, pause, switch-layout, reload config,
@@ -257,6 +296,51 @@ Audite donc systématiquement les commits de fix récents (`git log`, `git show`
   inatteignable ?
 - Le test livré est-il scopé à UNE fonction alors que la garantie est transitive ? Si oui, le
   test est aveugle et la classe peut régresser en silence : **c'est un finding en soi.**
+
+### [G] Divergence tooltip ↔ moteur de hotstrings (G5) — **classe à haut rendement**
+
+Le tooltip et le moteur répondent à la même question — « qu'est-ce qui sortira si l'utilisateur
+presse la touche magique maintenant ? » — mais par deux chemins de code différents. Le tooltip
+se rend depuis `_PrefixBuffer` ; l'expansion se décide depuis `HSE_Buffer`. **Chaque fois que
+ces deux-là cessent de décrire le même texte, l'utilisateur voit un mensonge.** Trois
+divergences réelles ont été trouvées le 2026-07-21, toutes silencieuses, toutes shippées :
+
+1. **Jeux de caractères différents.** Le preview ancrait sur les terminateurs + les trois
+   guillemets doubles (une constante nommée `PREVIEW_EXTRA_BOUNDARIES`), le matcher gatait sur
+   les terminateurs seuls. Résultat : après un guillemet ouvrant, le tooltip proposait une
+   expansion que le moteur refusait — et le fallback de répétition, qui teste le MÊME jeu dans
+   le sens INVERSE, l'acceptait et doublait la lettre. Un seul caractère bloquait l'expansion
+   réelle et autorisait le fallback qui la remplaçait.
+2. **Backspace en sens opposé.** `VK_BACK` était dans `ResetVKs` → le buffer du preview était
+   VIDÉ, alors que `HSE_FeedBackspace` ne fait que décrémenter. Après une seule correction de
+   typo, le moteur pouvait encore expanser ce que le tooltip n'offrait plus.
+3. **Match refusé = buffer réécrit quand même.** Un match n'est pas un fire (gate temporelle,
+   gate de casse, callbacks raw qui déclinent). Le code le savait pour les métriques — il gate
+   sur `_HseFired` — mais la resynchronisation du buffer juste en dessous tournait sans
+   condition, réécrivant le preview avec un texte jamais tapé.
+
+Ce que tu dois chercher :
+
+- **Toute logique de prédiction dupliquée.** Si le tooltip calcule lui-même ce qui va sortir au
+  lieu de le demander au moteur, c'est un finding, même si les deux sont d'accord aujourd'hui.
+  Cherche la constante, le jeu de caractères, le seuil ou la règle de casse écrits deux fois.
+- **Tout cache** d'un jeu de caractères ou d'un index dérivé de l'état du moteur. Un cache
+  suppose que chaque écrivain de la source pensera à le rafraîchir — ce repo a démontré deux
+  fois que non. Préfère dériver à la lecture et dis-le.
+- **Chaque mutation de `_PrefixBuffer`** : y a-t-il une mutation correspondante de `HSE_Buffer`
+  qui la reflète ? Énumère-les côte à côte. Backspace, terminateur, fire, match refusé, reset
+  de navigation, suppression, cascade de roll : pour CHAQUE événement, les deux buffers
+  décrivent-ils encore le même écran ?
+- **Chaque gate appliquée d'un seul côté.** Si le moteur refuse pour une raison (temps, casse,
+  frontière de mot, suppression), le tooltip applique-t-il la même ? Et réciproquement.
+- **Le sens de la divergence.** Preview sans fire = mensonge visible (l'utilisateur presse et
+  n'obtient rien d'attendu). Fire sans preview = fonctionnalité invisible. Les deux comptent,
+  mais le premier est bien plus grave : rapporte-le en conséquence.
+
+Le fix attendu n'est jamais « corriger les deux côtés pour qu'ils soient d'accord » — c'est
+**supprimer le second chemin** pour qu'il n'y ait plus qu'une réponse possible. Un test qui
+compare les deux valeurs à l'exécution vaut mieux qu'un test qui vérifie qu'elles dérivent
+d'une source commune.
 
 ---
 
@@ -327,18 +411,30 @@ Structure :
 1. **Résumé exécutif** : nb de findings par sévérité, zones les plus fragiles, verdict global
    honnête. Indique ce que cette passe a fait que les précédentes n'avaient PAS fait.
 2. **Findings**, triés par sévérité. Pour CHAQUE finding : ID, titre, sévérité, confiance,
-   `fichier:ligne` ; garantie violée (G1/G2/G3/G4) ; séquence de repro ; cause racine + pourquoi
+   `fichier:ligne` ; garantie violée (G1/G2/G3/G4/G5) ; séquence de repro ; cause racine + pourquoi
    c'est silencieux ; fix proposé (respectant les conventions du repo) ; **TEST DE NON-RÉGRESSION**
    encodant la CAUSE RACINE (pas le symptôme), échouant AVANT / passant APRÈS, avec le fichier
    cible et l'assertion exacte.
 3. **Claims RÉFUTÉES** : ce que tu as investigué et rejeté, avec la raison. Évite à la passe
    suivante de refaire le travail.
-4. **PERFORMANCE** : segments lents réels avec extraits de log cités (§1), appels bloquants sur
-   le hot path, scans O(n) par frappe, coûts de boot. **Étiquette la provenance de chaque
-   chiffre** : mesuré (avec la ligne de log) ou déduit du code.
-5. **WATCH-LIST `PROJECT_MEMORY`** : pour chaque foot-gun connu — « fix toujours en place » /
+4. **PERFORMANCE — DEUX SOUS-SECTIONS OBLIGATOIRES.**
+   - _4a. Régressions / lenteurs constatées_ : segments lents réels avec extraits de log cités
+     (§1), appels bloquants sur le hot path, scans O(n) par frappe, coûts de boot.
+     **Étiquette la provenance de chaque chiffre** : mesuré (avec la ligne de log) ou déduit
+     du code.
+   - _4b. Optimisations proposées_ — **cette sous-section ne doit jamais être vide.** Même
+     quand rien n'est cassé, livre les pistes d'accélération classées par gain × confiance,
+     au format : chemin → coût actuel → optimisation → coût visé → risque. Si tu n'as vraiment
+     rien trouvé, dis explicitement où tu as cherché et pourquoi c'est déjà optimal — un
+     silence ici se lit comme « pas regardé ».
+5. **FIDÉLITÉ DU TOOLTIP (G5)** : le tableau des mutations de `_PrefixBuffer` face à celles de
+   `HSE_Buffer`, événement par événement (frappe, terminateur, backspace, fire, match refusé,
+   reset de navigation, cascade de roll). Pour chaque ligne : les deux buffers décrivent-ils
+   encore le même écran ? Toute case « non » est un finding G5. Liste aussi toute prédiction
+   dupliquée trouvée, même si les deux copies sont d'accord aujourd'hui.
+6. **WATCH-LIST `PROJECT_MEMORY`** : pour chaque foot-gun connu — « fix toujours en place » /
    « régressé » / « même classe trouvée ailleurs » / « doc dérivée du code ».
-6. **REGISTRE DE COUVERTURE** : tableau module × garantie, avec « audité-blanchi » / « finding » /
+7. **REGISTRE DE COUVERTURE** : tableau module × garantie, avec « audité-blanchi » / « finding » /
    « non couvert (pourquoi) » + le numéro de passe loop-until-dry où la zone est devenue dry.
 
 ---
