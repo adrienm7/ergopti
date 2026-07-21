@@ -69,6 +69,14 @@ local CLIPBOARD_PASTE_GAP_SEC = Timings.sec("debounce", "clipboard_paste_settle_
 -- event. Keeping it large means near-zero syscalls per keystroke in steady state.
 local IGNORED_WIN_TTL_SEC = 5.0
 
+-- Key tokens whose synthetic keydown carries a character back through
+-- getCharacters() ("return" -> CR, "tab" -> HT). They must appear in the physical
+-- echo or the keylogger's synth_queue runs one entry short per token and tags the
+-- replacement's tail as a human keystroke. Nav/escape tokens ({Left}, {Delete},
+-- {Esc}) produce no character and are deliberately absent — a string-typed echo
+-- cannot represent them.
+local KEY_ECHO_CHARS = { ["return"] = "\r", ["tab"] = "\t" }
+
 
 
 
@@ -224,6 +232,15 @@ function M.emit_tokens(tokens)
 			local key_value = tok.value  -- Bound per iteration for the deferred closure
 			emit_in_order(order_delay, function() keyStroke({}, key_value, 0) end)
 			count = count + 1
+
+			-- Character-producing keys echo back as real character keydowns, exactly
+			-- like the terminator re-type path. Without the echo the keylogger's
+			-- synth_queue is one entry short and tags that character as human input.
+			local echo = KEY_ECHO_CHARS[key_value]
+			if echo then
+				emitted_str  = emitted_str .. echo
+				logical_text = logical_text .. echo
+			end
 
 		elseif tok.kind == "text" then
 			-- Clipboard text has no per-character OS echo but is still part of
