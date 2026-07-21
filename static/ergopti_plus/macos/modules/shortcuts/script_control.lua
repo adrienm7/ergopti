@@ -232,8 +232,15 @@ local function pause_all()
 	elseif _gestures and type(_gestures.disable_all) == "function" then
 		pcall(function() _gestures.disable_all() end)
 	end
+	-- Deferred for the same reason schedule_pause_layout_switch is: pause_all() runs
+	-- SYNCHRONOUSLY inside the script-control eventtap callback, and karabiner.pause()
+	-- encodes and writes a 100 kB+ karabiner.json (plus a /bin/mkdir subprocess on the
+	-- fallback path). Blocking the tap that long lets macOS disable it with
+	-- kCGEventTapDisabledByTimeout — which kills AltGr+Enter itself, leaving the user
+	-- unable to un-pause. This is the last step of pause_all(), so deferring it
+	-- reorders nothing.
 	if _karabiner and type(_karabiner.pause) == "function" then
-		pcall(function() _karabiner.pause() end)
+		hs.timer.doAfter(0, function() pcall(function() _karabiner.pause() end) end)
 	end
 end
 
@@ -261,8 +268,12 @@ local function resume_all()
 			pcall(function() _gestures.enable_all() end)
 		end
 	end
+	-- Deferred for the same reason as the pause side, and more urgently: resume()
+	-- calls regenerate(), which rebuilds the FULL Ergopti config rather than the
+	-- reduced paused one, so it is the heavier of the two. Nothing below depends on
+	-- the redeploy having landed.
 	if _karabiner and type(_karabiner.resume) == "function" then
-		pcall(function() _karabiner.resume() end)
+		hs.timer.doAfter(0, function() pcall(function() _karabiner.resume() end) end)
 	end
 	-- Symmetric to the pause-side stop_warmup()/wc.stop() pair: re-arm both warmup
 	-- drivers. resume_warmup() clears the _warmup_stopped short-circuit so that
