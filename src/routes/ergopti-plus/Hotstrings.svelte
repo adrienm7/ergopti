@@ -17,10 +17,18 @@ FEATURES & RATIONALE:
 -->
 
 <script>
+	import DriverFrame from './DriverFrame.svelte';
+	import LiveSession from './LiveSession.svelte';
 	import { reveal } from './reveal.js';
 
-	/** @type {{categories: Array<{id: string, label: string, count: number, color: string, delaySec: number}>, total: number}} */
-	let { categories, total } = $props();
+	/**
+	 * @type {{
+	 *   categories: Array<{id: string, label: string, count: number, color: string, delaySec: number}>,
+	 *   total: number,
+	 *   geo: Record<string, {width: number, height: number}>
+	 * }}
+	 */
+	let { categories, total, geo } = $props();
 
 	// In-context example cards — universal families that work on ANY layout
 	// (they operate on the produced text, not the physical key).
@@ -89,6 +97,9 @@ FEATURES & RATIONALE:
 				à chaque mise à jour du site.
 			</p>
 		</header>
+
+		<!-- Real-sentence typing demo -->
+		<LiveSession />
 
 		<!-- Family catalog — one row per REAL category, measured at build -->
 		<div class="family-band" use:reveal>
@@ -178,6 +189,21 @@ FEATURES & RATIONALE:
 					{/each}
 				</ul>
 			</article>
+		</div>
+
+		<!-- The REAL editor window, embedded live -->
+		<div class="editor-block">
+			<h3 class="editor-title" use:reveal>Et voici la vraie fenêtre d’édition.</h3>
+			<p class="editor-lead" use:reveal>
+				Pas une capture d’écran : c’est la fenêtre d’édition du driver, servie depuis ses propres
+				fichiers et pilotée ici avec des données de démonstration. Sections pliables, recherche,
+				ajout en deux champs — chez vous, avec vos raccourcis.
+			</p>
+			<DriverFrame
+				id="hotstring_editor"
+				width={geo.hotstring_editor?.width ?? 960}
+				height={geo.hotstring_editor?.height ?? 640}
+			/>
 		</div>
 	</div>
 </section>
@@ -399,5 +425,27 @@ FEATURES & RATIONALE:
 		.family-delay {
 			display: none;
 		}
+	}
+
+	/* ─── Embedded editor window ────────────────────────────── */
+
+	.editor-block {
+		margin-top: clamp(28px, 4vw, 44px);
+	}
+
+	.editor-title {
+		font-size: 1.25rem;
+		font-weight: 700;
+		margin-bottom: 8px;
+		text-align: center;
+	}
+
+	.editor-lead {
+		color: var(--ink-soft);
+		font-size: 0.92rem;
+		line-height: 1.6;
+		margin: 0 auto 20px;
+		max-width: 640px;
+		text-align: center;
 	}
 </style>

@@ -17,6 +17,47 @@ FEATURES & RATIONALE:
 
 <script>
 	import { reveal } from './reveal.js';
+	import { ui } from './state.svelte.js';
+
+	/**
+	 * @type {{
+	 *   actionGroups: Array<{title: string, sections: Array<{title: string, actions: Array<{id: string, label: string, platform: string, axis: boolean}>}>}>
+	 * }}
+	 */
+	let { actionGroups } = $props();
+
+	// Map the page's OS toggle to the catalog's platform tags. Linux only
+	// gets the cross-platform entries (its gesture engine is still alpha).
+	let platformTag = $derived(
+		ui.osStyle === 'macos' ? 'hs' : ui.osStyle === 'windows' ? 'ahk' : null
+	);
+
+	/**
+	 * Keep only the actions available on the selected OS.
+	 * @param {Array<{platform: string}>} actions
+	 * @returns {Array<object>}
+	 */
+	function forPlatform(actions) {
+		return actions.filter(
+			(a) => a.platform === 'all' || (platformTag !== null && a.platform === platformTag)
+		);
+	}
+
+	// Same group → section structure as the driver's action picker, with
+	// empty sections and groups pruned after the platform filter.
+	let visibleGroups = $derived(
+		actionGroups
+			.map((g) => ({
+				title: g.title,
+				sections: g.sections
+					.map((s) => ({ title: s.title, actions: forPlatform(s.actions) }))
+					.filter((s) => s.actions.length > 0)
+			}))
+			.filter((g) => g.sections.length > 0)
+	);
+	let visibleCount = $derived(
+		visibleGroups.reduce((n, g) => n + g.sections.reduce((m, s) => m + s.actions.length, 0), 0)
+	);
 
 	// The 7 shared tap-hold keys — mirrors _shared/tap_hold/defaults.toml.
 	const tapHolds = [
@@ -108,9 +149,9 @@ FEATURES & RATIONALE:
 			<p class="kicker">Clavier augmenté</p>
 			<h2>Sept touches à double vie.</h2>
 			<p class="lead">
-				Un appui bref déclenche une action, un maintien conserve le rôle de modificateur. Sept
-				touches définies dans un seul fichier partagé par les trois drivers — délais réglables au
-				centième de seconde.
+				Un appui bref déclenche une action, un maintien conserve le rôle de modificateur. Les
+				mappings ci-dessous sont <strong>les défauts que nous livrons</strong> : chaque touche, chaque
+				action et chaque délai se changent depuis le menu — sans écrire une ligne de code.
 			</p>
 		</header>
 
@@ -164,6 +205,40 @@ FEATURES & RATIONALE:
 					<p>{@html p.body}</p>
 				</article>
 			{/each}
+		</div>
+
+		<!-- Shared action catalog, structured like the driver's picker and
+		     filtered by the page's OS toggle -->
+		<div class="actions-block">
+			<h3 class="actions-title" use:reveal>
+				{visibleCount} actions à assigner. À n’importe quelle touche ou geste.
+			</h3>
+			<p class="actions-lead" use:reveal>
+				Tap-holds, gestes trackpad et raccourcis piochent dans le même catalogue d’actions, défini
+				dans <strong>un seul fichier partagé par les trois drivers</strong>. Mêmes groupes, mêmes
+				sections que dans le sélecteur du driver — filtrés ici pour
+				<strong
+					>{ui.osStyle === 'macos' ? 'macOS' : ui.osStyle === 'linux' ? 'Linux' : 'Windows'}</strong
+				> ; changez d’OS en haut de page pour voir la différence.
+			</p>
+			<div class="actions-groups">
+				{#each visibleGroups as g, gi (g.title)}
+					<article class="ep-card actions-group" use:reveal={{ delay: (gi % 4) * 60 }}>
+						<h4 class="group-title">{g.title}</h4>
+						{#each g.sections as s (g.title + s.title)}
+							{#if s.title}<h5 class="section-title">{s.title}</h5>{/if}
+							<ul class="actions-cloud">
+								{#each s.actions as a (a.id)}
+									<li class="action-chip" class:axis={a.axis} title={a.id}>
+										{a.label}
+										{#if a.axis}<span class="axis-tag">axe</span>{/if}
+									</li>
+								{/each}
+							</ul>
+						{/each}
+					</article>
+				{/each}
+			</div>
 		</div>
 	</div>
 </section>
@@ -303,6 +378,88 @@ FEATURES & RATIONALE:
 		margin-bottom: 10px;
 	}
 
+	/* ─── Action catalog ────────────────────────────────────── */
+
+	.actions-block {
+		margin-top: clamp(28px, 4vw, 44px);
+	}
+
+	.actions-title {
+		font-size: 1.25rem;
+		font-weight: 700;
+		margin-bottom: 8px;
+		text-align: center;
+	}
+
+	.actions-lead {
+		color: var(--ink-soft);
+		font-size: 0.92rem;
+		line-height: 1.6;
+		margin: 0 auto 18px;
+		max-width: 660px;
+		text-align: center;
+	}
+
+	.actions-groups {
+		align-items: start;
+		display: grid;
+		gap: 14px;
+		grid-template-columns: repeat(2, 1fr);
+	}
+
+	.actions-group {
+		--accent: #fb8c00;
+	}
+
+	.group-title {
+		border-bottom: 1px solid var(--border);
+		font-size: 1rem;
+		font-weight: 700;
+		margin: 0 0 10px;
+		padding-bottom: 8px;
+	}
+
+	.section-title {
+		color: var(--ink-faint);
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		margin: 12px 0 7px;
+		text-transform: uppercase;
+	}
+
+	.actions-cloud {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		list-style: none;
+	}
+
+	.action-chip {
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		color: var(--ink-soft);
+		font-size: 0.8rem;
+		padding: 4px 12px;
+		transition: border-color 0.25s var(--ease);
+	}
+
+	.action-chip:hover {
+		border-color: rgba(251, 140, 0, 0.45);
+	}
+
+	.axis-tag {
+		background: rgba(251, 140, 0, 0.15);
+		border-radius: 999px;
+		color: #ffb45e;
+		font-size: 0.62rem;
+		font-weight: 700;
+		margin-left: 5px;
+		padding: 1px 6px;
+		text-transform: uppercase;
+	}
+
 	@media (max-width: 1100px) {
 		.tap-grid {
 			grid-template-columns: repeat(2, 1fr);
@@ -319,7 +476,8 @@ FEATURES & RATIONALE:
 
 	@media (max-width: 720px) {
 		.tap-grid,
-		.power-grid {
+		.power-grid,
+		.actions-groups {
 			grid-template-columns: 1fr;
 		}
 

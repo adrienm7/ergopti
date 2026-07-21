@@ -15,23 +15,64 @@ FEATURES & RATIONALE:
 -->
 
 <script>
+	import DriverFrame from './DriverFrame.svelte';
 	import { reveal } from './reveal.js';
 
-	const personalExamples = [
-		{ trig: 'np★', out: 'Adrien Moyaux', desc: 'Nom complet' },
-		{ trig: 'em★', out: 'adrien@exemple.fr', desc: 'E-mail' },
-		{ trig: 'tel★', out: '+33 6 12 34 56 78', desc: 'Téléphone' },
-		{ trig: 'sig★', out: 'Cordialement, Adrien', desc: 'Signature' },
-		{ trig: 'ad★', out: '15 rue Lafayette, Paris', desc: 'Adresse' },
-		{ trig: 'iban★', out: 'FR76 1234 5678 9012…', desc: 'IBAN' }
-	];
+	/** @type {{geo: Record<string, {width: number, height: number}>}} */
+	let { geo } = $props();
 
-	const dynamicExamples = [
-		{ trig: '@dt', out: '21/07/2026', desc: 'Date du jour' },
-		{ trig: '@dtL', out: '21 juillet 2026', desc: 'Date en lettres' },
-		{ trig: '@ph', out: '06 12 34 56 78', desc: 'Téléphone configuré' },
-		{ trig: '@np★', out: 'Moyaux ⇥ Adrien', desc: 'Remplissage de formulaire' }
-	];
+	// Live personal info — seeded with the demo values shown in the embedded
+	// window, then UPDATED IN REAL TIME as the visitor edits the real
+	// personal-info window below. Every example on this screen derives from
+	// these fields, which is exactly how the driver's dynamic hotstrings work.
+	let info = $state({
+		first_name: 'Adrien',
+		last_name: 'Moyaux',
+		email: 'adrien@exemple.fr',
+		phone: '+33 6 12 34 56 78',
+		address: '15 rue Lafayette, 75009 Paris',
+		iban: 'FR76 1234 5678 9012 3456 789'
+	});
+
+	/**
+	 * Receive live edits from the embedded personal-info window.
+	 * @param {Record<string, string>} fields
+	 */
+	function onInfoChange(fields) {
+		info = { ...info, ...fields };
+	}
+
+	const today = new Date();
+	const dateShort = today.toLocaleDateString('fr-FR');
+	const dateLong = today.toLocaleDateString('fr-FR', {
+		day: 'numeric',
+		month: 'long',
+		year: 'numeric'
+	});
+
+	let personalExamples = $derived([
+		{
+			trig: 'np★',
+			out: `${info.first_name} ${info.last_name}`.trim() || '…',
+			desc: 'Nom complet'
+		},
+		{ trig: 'em★', out: info.email || '…', desc: 'E-mail' },
+		{ trig: 'tel★', out: info.phone || '…', desc: 'Téléphone' },
+		{ trig: 'sig★', out: `Cordialement, ${info.first_name}`.trim(), desc: 'Signature' },
+		{ trig: 'ad★', out: info.address || '…', desc: 'Adresse' },
+		{ trig: 'iban★', out: info.iban || '…', desc: 'IBAN' }
+	]);
+
+	let dynamicExamples = $derived([
+		{ trig: '@dt', out: dateShort, desc: 'Date du jour' },
+		{ trig: '@dtL', out: dateLong, desc: 'Date en lettres' },
+		{ trig: '@ph', out: info.phone || '…', desc: 'Téléphone configuré' },
+		{
+			trig: '@np★',
+			out: `${info.last_name} ⇥ ${info.first_name}`.trim(),
+			desc: 'Remplissage de formulaire'
+		}
+	]);
 
 	const steps = [
 		'Sélectionnez un texte que vous tapez souvent.',
@@ -94,6 +135,22 @@ FEATURES & RATIONALE:
 					hotstrings dynamiques s’en servent automatiquement.
 				</p>
 			</article>
+		</div>
+
+		<!-- The REAL personal-info window, live-wired to the examples above -->
+		<div class="info-embed">
+			<p class="info-lead" use:reveal>
+				La fenêtre en question — la vraie. <strong>Modifiez un champ ci-dessous</strong> : les
+				exemples <code>np★</code>, <code>sig★</code>, <code>@np★</code>… au-dessus se réécrivent en
+				direct, exactement comme le feront vos expansions.
+			</p>
+			<DriverFrame
+				id="personal_info_editor"
+				width={geo.personal_info_editor?.width ?? 560}
+				height={geo.personal_info_editor?.height ?? 680}
+				displayHeight={480}
+				oninfochange={onInfoChange}
+			/>
 		</div>
 	</div>
 </section>
@@ -172,5 +229,16 @@ FEATURES & RATIONALE:
 		.personal-grid {
 			grid-template-columns: 1fr;
 		}
+	}
+
+	.info-embed {
+		margin-top: clamp(24px, 3.5vw, 36px);
+	}
+
+	.info-lead {
+		color: var(--ink-soft);
+		font-size: 0.92rem;
+		margin: 0 0 16px;
+		text-align: center;
 	}
 </style>

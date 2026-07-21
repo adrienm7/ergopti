@@ -4,8 +4,9 @@
 ==============================================================================
 MODULE: Ergopti+ Page — Live Session Demo
 DESCRIPTION:
-Animated "real sentence" demo: a full paragraph is typed with several
-expansions firing along the way, each previewed by the driver-style tooltip.
+Animated "real sentence" block: a full paragraph is typed with several
+expansions firing along the way, each previewed by the driver-style tooltip
+inline at the caret. Rendered as a sub-block of the Hotstrings section.
 
 FEATURES & RATIONALE:
 1. Context Beats Isolation: isolated "sx → sk" rows undersell the flow;
@@ -105,38 +106,36 @@ FEATURES & RATIONALE:
 	});
 </script>
 
-<section class="session">
-	<div class="ep-wrap ep-wrap--narrow">
-		<header class="section-head">
-			<p class="kicker">Au fil de la frappe</p>
-			<h2>Une vraie phrase, plusieurs expansions.</h2>
-			<p class="lead">
-				Voici ce qui se passe à l’écran quand vous tapez naturellement : les expansions s’enchaînent
-				sans jamais rompre le flux.
+<div class="session-block">
+	<div class="session-window ep-window os-{ui.osStyle}">
+		<WindowChrome title="message.txt" />
+		<div class="session-body">
+			<p class="session-line">
+				{sessionText}<span class="caret"></span>{#if sessionTooltip}<span
+						class="session-tooltip"
+						style="--tt: {sessionTooltip.color};"
+					>
+						<span class="tt-text">{sessionTooltip.text}</span>
+						<span class="tt-tag">{sessionTooltip.group}</span>
+					</span>{/if}
 			</p>
-		</header>
-
-		<div class="session-window ep-window os-{ui.osStyle}">
-			<WindowChrome title="message.txt" />
-			<div class="session-body">
-				<p class="session-line">
-					{sessionText}<span class="caret"></span>{#if sessionTooltip}<span
-							class="session-tooltip"
-							style="--tt: {sessionTooltip.color};"
-						>
-							<span class="tt-text">{sessionTooltip.text}</span>
-							<span class="tt-tag">{sessionTooltip.group}</span>
-						</span>{/if}
-				</p>
-			</div>
 		</div>
 	</div>
-</section>
+	<p class="session-caption">
+		Expansion en temps réel — une vraie phrase, plusieurs familles d’expansions, sans jamais rompre
+		le flux de frappe.
+	</p>
+</div>
 
 <style>
+	.session-block {
+		margin: 0 auto clamp(32px, 5vw, 52px);
+		max-width: 880px;
+	}
+
 	.session-body {
-		min-height: 170px;
-		padding: 26px 28px 30px;
+		min-height: 150px;
+		padding: 24px 26px 28px;
 		position: relative;
 	}
 
@@ -147,6 +146,13 @@ FEATURES & RATIONALE:
 		line-height: 1.75;
 		margin: 0;
 		text-align: left;
+	}
+
+	.session-caption {
+		color: var(--ink-faint);
+		font-size: 0.85rem;
+		margin: 12px 0 0;
+		text-align: center;
 	}
 
 	/* Inline in the text flow, right of the caret — mirrors the driver's
@@ -169,7 +175,7 @@ FEATURES & RATIONALE:
 	@keyframes tooltip-pop {
 		from {
 			opacity: 0;
-			transform: translateY(6px) scale(0.96);
+			transform: translateX(-6px) scale(0.96);
 		}
 		to {
 			opacity: 1;

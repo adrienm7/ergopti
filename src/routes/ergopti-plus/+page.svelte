@@ -11,10 +11,11 @@ style, GitHub release).
 
 FEATURES & RATIONALE:
 1. Data-Driven: every factual number (hotstrings, models, providers,
-   profiles, windows, locales) is measured at build time by +page.server.js
-   from the same files the drivers load at boot.
-2. Section Components: each section lives in its own component with scoped
-   styles; shared primitives come from ergopti-plus.css (namespaced .ep-*).
+   profiles, windows, locales, actions, bundled apps) is measured at build
+   time by +page.server.js from the same files the drivers load at boot.
+2. Dispatched Windows: the driver's real webview windows are embedded
+   inside the sections that discuss them (editor with the hotstrings,
+   catalog with the AI, changelog with the updater) via DriverFrame.
 ==============================================================================
 -->
 
@@ -29,19 +30,21 @@ FEATURES & RATIONALE:
 	import KpiStrip from './KpiStrip.svelte';
 	import StickyNav from './StickyNav.svelte';
 	import Promises from './Promises.svelte';
-	import LiveSession from './LiveSession.svelte';
 	import Hotstrings from './Hotstrings.svelte';
 	import PersonalHotstrings from './PersonalHotstrings.svelte';
 	import AiSection from './AiSection.svelte';
 	import KeyboardPower from './KeyboardPower.svelte';
 	import Trackpad from './Trackpad.svelte';
-	import DriverWindows from './DriverWindows.svelte';
+	import MetricsSection from './MetricsSection.svelte';
 	import Customization from './Customization.svelte';
 	import ErgoptiExclusives from './ErgoptiExclusives.svelte';
 	import Platforms from './Platforms.svelte';
 
 	// Populated at build time by +page.server.js from the driver's data files.
 	let { data } = $props();
+
+	// Window geometry lookup for the embedded driver frames.
+	const winGeo = Object.fromEntries(data.webviews.map((w) => [w.id, w]));
 
 	const kpis = [
 		{ value: data.hotstringTotal, suffix: '', label: 'hotstrings prêts à l’emploi' },
@@ -55,7 +58,7 @@ FEATURES & RATIONALE:
 		{ id: 'ia', label: 'IA' },
 		{ id: 'clavier', label: 'Clavier' },
 		{ id: 'trackpad', label: 'Trackpad' },
-		{ id: 'fenetres', label: 'Fenêtres' },
+		{ id: 'metriques', label: 'Métriques' },
 		{ id: 'personnalisation', label: 'Réglages' },
 		{ id: 'ergopti', label: 'Ergopti' },
 		{ id: 'telecharger', label: 'Télécharger' }
@@ -71,7 +74,7 @@ FEATURES & RATIONALE:
 	<title>Ergopti+ — la frappe augmentée, gratuite et locale</title>
 	<meta
 		name="description"
-		content="Ergopti+ transforme votre frappe en temps réel : {data.hotstringTotal} expansions et corrections, prédictions IA 100 % locales ({data.aiTotalModels} modèles), tap-holds, gestes trackpad. Gratuit et open-source, sur Windows et macOS (Linux en alpha)."
+		content="Ergopti+ transforme votre frappe en temps réel : {data.hotstringTotal} expansions et corrections, prédictions IA 100 % locales ({data.aiTotalModels} modèles), tap-holds, gestes trackpad, métriques de frappe. Gratuit et open-source, sur Windows et macOS (Linux en alpha)."
 	/>
 </svelte:head>
 
@@ -99,9 +102,8 @@ FEATURES & RATIONALE:
 			<KpiStrip items={kpis} />
 			<StickyNav items={navItems} />
 			<Promises />
-			<LiveSession />
-			<Hotstrings categories={data.hotstringCategories} total={data.hotstringTotal} />
-			<PersonalHotstrings />
+			<Hotstrings categories={data.hotstringCategories} total={data.hotstringTotal} geo={winGeo} />
+			<PersonalHotstrings geo={winGeo} />
 			<AiSection
 				catalog={data.aiProviders}
 				totals={{
@@ -113,13 +115,14 @@ FEATURES & RATIONALE:
 				apiProviders={data.apiProviders}
 				profiles={data.aiProfiles}
 				defaults={data.llmDefaults}
+				geo={winGeo}
 			/>
-			<KeyboardPower />
+			<KeyboardPower actionGroups={data.actionGroups} />
 			<Trackpad />
-			<DriverWindows webviews={data.webviews} />
-			<Customization />
+			<MetricsSection geo={winGeo} />
+			<Customization locales={data.locales} webviews={data.webviews} geo={winGeo} />
 			<ErgoptiExclusives />
-			<Platforms />
+			<Platforms macosApps={data.macosApps} />
 
 			<div class="ep-endspace"></div>
 		</div>
