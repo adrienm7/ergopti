@@ -874,6 +874,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_shell_runner_isolated_logger.ahk
 #Include meta/test_disable_password_fields_gate.ahk
 #Include meta/test_menu_dynamic_hotstrings_category_gate.ahk
+#Include meta/test_menu_master_category_cache.ahk
 #Include unit/test_storage_st_delete_contract.ahk
 #Include meta/test_boot_dircreate_guarded.ahk
 #Include meta/test_toml_render_bool_sentinel.ahk
