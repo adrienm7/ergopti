@@ -821,6 +821,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_keylogger_webview_callback_fail_safe.ahk
 #Include meta/test_keylogger_clipboard_registration_transaction.ahk
 #Include meta/test_keylogger_prefetch_worker.ahk
+#Include meta/test_sendinstant_clip_contention_guard.ahk
 #Include meta/test_sendinstant_clipboard_sequence_ownership.ahk
 #Include meta/test_plain_paste_clipboard_sequence_ownership.ahk
 #Include meta/test_onboarding_gesture_registration_async.ahk

@@ -549,8 +549,11 @@ _OnPrefixChar(IH, Char) {
 		; burst below — has fully completed. That guarantees the expansion is
 		; emitted IN FULL before any following keystroke (no interleave / lost key
 		; / "outpubct"). Set AFTER the UIA-wrap branch above (which Sleeps via
-		; SendInstant) so Critical never spans a Sleep; the only other Sleep on a
-		; fire is the Notepad clipboard path, which releases Critical itself.
+		; SendInstant) so Critical never spans a Sleep. The Notepad clipboard path
+		; does NOT release Critical — it takes its own on top (hotstring_dispatch)
+		; and holds it across the whole clipboard transaction, which is why that
+		; transaction is now gated on a contention probe rather than allowed to
+		; retry for #ClipboardTimeout with the keyboard hook starved behind it.
 		Critical("On")
 		if LoggerIsDebugEnabled()
 			LoggerDebug("PrefixWatcher", "DBG OnChar: char='{1}' prefixBuf='{2}' hseBuf='{3}' suppressed={4}/{5}.", Char, _PrefixBuffer, HSE_Buffer, _PrefixWatcherSuppressed, HSE_Suppressed)
