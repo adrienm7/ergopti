@@ -1,0 +1,545 @@
+/* src/routes/ergopti-plus/ergopti-plus.css */
+
+/**
+ * ==============================================================================
+ * MODULE: Ergopti+ Page — Design System
+ * DESCRIPTION:
+ * Shared tokens, global-leak resets and cross-section primitives for the
+ * Ergopti+ marketing page. Every selector is namespaced under .ep-root (or
+ * .ep-shell) so nothing leaks to the rest of the site.
+ *
+ * FEATURES & RATIONALE:
+ * 1. Leak Neutralization: the site's global CSS (justified paragraphs, purple
+ *    h2 gradient, cyan h3 pills, gradient-filled em/strong/i, kbd press-down
+ *    hover, AOS-stamped headings) is explicitly reset here so the page fully
+ *    owns its rendering.
+ * 2. One Card Recipe: the previous page had 8 near-identical card recipes;
+ *    this file defines a single .ep-card primitive driven by --accent.
+ * 3. Shared Breakpoint Scale: 1100 / 880 / 720 / 520 — nothing else.
+ * ==============================================================================
+ */
+
+/* =================================
+ * =================================
+ * ======= 1/ Shell & Tokens =======
+ * =================================
+ * ================================= */
+
+/* The page renders bare inside the layout (no sidebar), so the global
+ * #main-content { width: 72.5vw } left-shifts everything. id+class wins
+ * the specificity tie against the global id rule. */
+#main-content.ep-shell {
+	margin: 0 auto;
+	width: 100%;
+}
+
+/* Defeat spacing.css `main { width: clamp(...950px); padding: 3vw }` —
+ * sections manage their own width through .ep-wrap. */
+.ep-shell main.ep-main {
+	margin: 0;
+	max-width: none;
+	padding: 0;
+	width: 100%;
+}
+
+.ep-root {
+	/* Ink & surfaces */
+	--ink: #ffffff;
+	--ink-soft: rgba(255, 255, 255, 0.74);
+	--ink-faint: rgba(255, 255, 255, 0.52);
+	--surface: rgba(255, 255, 255, 0.04);
+	--surface-strong: rgba(255, 255, 255, 0.07);
+	--border: rgba(255, 255, 255, 0.1);
+	--border-strong: rgba(255, 255, 255, 0.18);
+
+	/* Brand accents (site palette) */
+	--accent-blue: rgb(49, 190, 255);
+	--accent-blue-deep: #3088ed;
+	--accent-cyan: #02c9db;
+
+	/* Tooltip family colors — mirror the driver's real tints */
+	--family-magic: #e53935;
+	--family-auto: #43a047;
+	--family-rolls: #1e88e5;
+	--family-personal: #8e8e93;
+	--family-ia: #ec407a;
+
+	/* Radius scale — ALL three tokens defined (the old page referenced
+	 * undefined --radius-sm/--radius-md and got square corners) */
+	--radius-sm: 10px;
+	--radius: 14px;
+	--radius-lg: 20px;
+
+	/* Motion */
+	--ease: cubic-bezier(0.4, 0, 0.2, 1);
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+	color: var(--ink);
+	font-feature-settings: 'cv11', 'ss01';
+	overflow-x: clip;
+}
+
+/* Content measure — every section constrains itself through this wrap */
+.ep-root .ep-wrap {
+	margin-inline: auto;
+	max-width: 1140px;
+	padding-inline: clamp(20px, 4vw, 48px);
+	width: 100%;
+}
+
+.ep-root .ep-wrap--narrow {
+	max-width: 880px;
+}
+
+.ep-root section {
+	padding-block: clamp(56px, 9vw, 120px) 0;
+	position: relative;
+}
+
+/* ==========================================
+ * ==========================================
+ * ======= 2/ Global-Leak Resets ============
+ * ==========================================
+ * ========================================== */
+
+/* typography.css justifies every p/ul/li — a direct rule beats inherited
+ * text-align:center, so "centered" headers rendered left-flush. */
+.ep-root p,
+.ep-root ul,
+.ep-root ol,
+.ep-root li {
+	text-align: left;
+}
+
+/* spacing.css adds margin-top:1rem to main ul li and margin-bottom:.5rem
+ * to all li — it destroyed every gap-based row list on this page. */
+.ep-root ul,
+.ep-root ol {
+	margin: 0;
+	padding: 0;
+}
+.ep-root li {
+	margin: 0;
+}
+
+/* titles.css turns h1/h2 into purple/white gradient fills with huge vh
+ * margins, and h3 into a cyan bordered pill. Reset all of it. */
+.ep-root h1,
+.ep-root h2,
+.ep-root h3,
+.ep-root h4 {
+	background: none;
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+	color: var(--ink);
+	margin: 0;
+	padding: 0;
+	text-align: left;
+	-webkit-text-fill-color: currentColor;
+	width: auto;
+}
+
+/* typography.css paints ALL i/em/strong with a transparent text-fill over
+ * a blue gradient — restore normal ink (icons get their own rule below). */
+.ep-root em,
+.ep-root strong {
+	background: none;
+	color: var(--ink);
+	-webkit-text-fill-color: currentColor;
+}
+.ep-root em {
+	font-style: normal;
+	font-weight: 600;
+}
+.ep-root strong {
+	font-weight: 700;
+}
+
+/* Icomoon icons: strip the global gradient fill and the fixed 1em block
+ * box so icons align with their text baseline and keep their own colors
+ * (icon-autohotkey is green by design). */
+.ep-root i[class^='icon-'],
+.ep-root i[class*=' icon-'] {
+	background: none;
+	color: currentColor;
+	height: auto;
+	-webkit-text-fill-color: currentColor;
+	width: auto;
+}
+
+/* buttons.css gives kbd a vw-scaled 3D ledge and a press-down :hover —
+ * charming in the keyboard visualizer, absurd in body copy. Own it fully. */
+.ep-root kbd {
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.06));
+	border: 1px solid var(--border-strong);
+	border-radius: 6px;
+	box-shadow:
+		inset 0 -2px 0 rgba(0, 0, 0, 0.35),
+		0 1px 2px rgba(0, 0, 0, 0.3);
+	color: var(--ink);
+	display: inline-block;
+	font-family: inherit;
+	font-size: 0.85em;
+	font-weight: 600;
+	line-height: 1.2;
+	margin: 0;
+	padding: 2px 7px 3px;
+	position: static;
+	vertical-align: baseline;
+}
+.ep-root kbd:hover,
+.ep-root kbd:active {
+	box-shadow:
+		inset 0 -2px 0 rgba(0, 0, 0, 0.35),
+		0 1px 2px rgba(0, 0, 0, 0.3);
+	top: auto;
+}
+
+/* Inline code chips */
+.ep-root code {
+	background: rgba(255, 255, 255, 0.08);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	color: var(--ink);
+	font-family: 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+	font-size: 0.88em;
+	padding: 1px 6px;
+	white-space: nowrap;
+}
+
+/* The layout stamps data-aos on every h2/h3 with mirror:true — headings
+ * would zoom and fade in BOTH scroll directions. Neutralize AOS inside
+ * the page; the page runs its own calmer reveal system instead. */
+.ep-root [data-aos] {
+	opacity: 1 !important;
+	pointer-events: auto !important;
+	transform: none !important;
+	transition: none !important;
+}
+
+/* =====================================
+ * =====================================
+ * ======= 3/ Reveal Animations ========
+ * =====================================
+ * ===================================== */
+
+.ep-root .reveal {
+	opacity: 0;
+	transform: translateY(26px);
+	transition:
+		opacity 0.7s var(--ease-out),
+		transform 0.7s var(--ease-out);
+	transition-delay: var(--reveal-delay, 0ms);
+}
+
+.ep-root .reveal.is-visible {
+	opacity: 1;
+	transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ep-root .reveal {
+		opacity: 1;
+		transform: none;
+		transition: none;
+	}
+}
+
+/* ====================================
+ * ====================================
+ * ======= 4/ Section Headers =========
+ * ====================================
+ * ==================================== */
+
+.ep-root .section-head {
+	margin: 0 auto clamp(32px, 5vw, 56px);
+	max-width: 720px;
+	text-align: center;
+}
+
+.ep-root .section-head .kicker {
+	color: var(--section-accent, var(--accent-blue));
+	font-size: 0.8rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	margin: 0 0 10px;
+	text-align: center;
+	text-transform: uppercase;
+}
+
+.ep-root .section-head h2 {
+	background: linear-gradient(180deg, #ffffff 30%, rgba(255, 255, 255, 0.62));
+	-webkit-background-clip: text;
+	background-clip: text;
+	font-size: clamp(1.75rem, 4vw, 2.75rem);
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	line-height: 1.08;
+	margin: 0 0 14px;
+	text-align: center;
+	-webkit-text-fill-color: transparent;
+	text-wrap: balance;
+}
+
+.ep-root .section-head .lead {
+	color: var(--ink-soft);
+	font-size: clamp(1rem, 1.35vw, 1.1rem);
+	line-height: 1.65;
+	margin: 0;
+	text-align: center;
+	text-wrap: pretty;
+}
+
+/* ==============================
+ * ==============================
+ * ======= 5/ Cards =============
+ * ==============================
+ * ============================== */
+
+.ep-root .ep-card {
+	--accent: var(--accent-blue);
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025));
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: clamp(18px, 2.6vw, 26px);
+	position: relative;
+	transition:
+		border-color 0.35s var(--ease),
+		transform 0.35s var(--ease),
+		box-shadow 0.35s var(--ease);
+}
+
+/* Hover only lifts cards inside grids explicitly marked interactive-ish;
+ * the accent is blended soft instead of the old raw full-saturation 1px. */
+.ep-root .ep-card--hover:hover {
+	border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+	box-shadow:
+		0 12px 40px -18px color-mix(in srgb, var(--accent) 35%, transparent),
+		0 2px 10px rgba(0, 0, 0, 0.25);
+	transform: translateY(-3px);
+}
+
+.ep-root .ep-card h3,
+.ep-root .ep-card h4 {
+	font-size: 1.05rem;
+	font-weight: 650;
+	margin: 0 0 8px;
+}
+
+.ep-root .ep-card p {
+	color: var(--ink-soft);
+	font-size: 0.95rem;
+	line-height: 1.6;
+	margin: 0;
+}
+
+/* ================================
+ * ================================
+ * ======= 6/ Buttons =============
+ * ================================
+ * ================================ */
+
+.ep-root .btn {
+	align-items: center;
+	border: 1px solid transparent;
+	border-radius: 999px;
+	cursor: pointer;
+	display: inline-flex;
+	font-size: 0.95rem;
+	font-weight: 600;
+	gap: 9px;
+	justify-content: center;
+	line-height: 1;
+	padding: 13px 24px;
+	text-decoration: none;
+	transition:
+		transform 0.25s var(--ease),
+		box-shadow 0.25s var(--ease),
+		background-color 0.25s var(--ease),
+		border-color 0.25s var(--ease);
+	white-space: nowrap;
+}
+
+.ep-root .btn:active {
+	transform: scale(0.98);
+}
+
+.ep-root .btn-primary {
+	background: linear-gradient(135deg, var(--accent-blue-deep), var(--accent-cyan));
+	box-shadow:
+		0 8px 28px -10px rgba(48, 136, 237, 0.65),
+		inset 0 1px 0 rgba(255, 255, 255, 0.25);
+	color: #fff;
+}
+
+.ep-root .btn-primary:hover {
+	box-shadow:
+		0 12px 36px -10px rgba(48, 136, 237, 0.85),
+		inset 0 1px 0 rgba(255, 255, 255, 0.25);
+	transform: translateY(-2px);
+}
+
+.ep-root .btn-secondary {
+	background: var(--surface);
+	border-color: var(--border-strong);
+	color: var(--ink);
+}
+
+.ep-root .btn-secondary:hover {
+	background: var(--surface-strong);
+	border-color: rgba(255, 255, 255, 0.3);
+	transform: translateY(-2px);
+}
+
+.ep-root .btn i[class^='icon-'] {
+	font-size: 1.1em;
+}
+
+/* =====================================
+ * =====================================
+ * ======= 7/ Window Chrome Kit ========
+ * =====================================
+ * ===================================== */
+
+.ep-root .ep-window {
+	background: rgba(10, 14, 26, 0.92);
+	border: 1px solid var(--border-strong);
+	box-shadow:
+		0 30px 80px -20px rgba(0, 0, 0, 0.6),
+		0 4px 20px rgba(0, 0, 0, 0.35);
+	overflow: hidden;
+}
+
+.ep-root .ep-window.os-macos {
+	border-radius: 12px;
+}
+
+.ep-root .ep-window.os-windows {
+	border-radius: 8px;
+}
+
+.ep-root .chrome {
+	align-items: center;
+	background: rgba(255, 255, 255, 0.05);
+	border-bottom: 1px solid var(--border);
+	display: flex;
+	gap: 10px;
+	min-height: 38px;
+	padding: 0 12px;
+}
+
+.ep-root .mac-dots {
+	display: inline-flex;
+	gap: 7px;
+}
+
+.ep-root .mac-dots .dot {
+	border-radius: 50%;
+	display: inline-block;
+	height: 11px;
+	width: 11px;
+}
+
+.ep-root .mac-dots .dot-r {
+	background: #ff5f57;
+}
+.ep-root .mac-dots .dot-y {
+	background: #febc2e;
+}
+.ep-root .mac-dots .dot-g {
+	background: #28c840;
+}
+
+.ep-root .chrome-title {
+	color: var(--ink-faint);
+	flex: 1;
+	font-family: 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+	font-size: 0.75rem;
+	overflow: hidden;
+	text-align: center;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.ep-root .chrome-title--win {
+	text-align: left;
+}
+
+.ep-root .chrome-spacer {
+	width: 47px;
+}
+
+.ep-root .win-buttons {
+	display: inline-flex;
+	gap: 2px;
+}
+
+/* Decorative only — no hover states, these are not real buttons */
+.ep-root .win-btn {
+	align-items: center;
+	color: var(--ink-faint);
+	display: inline-flex;
+	font-size: 0.65rem;
+	height: 26px;
+	justify-content: center;
+	width: 34px;
+}
+
+/* ============================================
+ * ============================================
+ * ======= 8/ Trigger → Output Rows ===========
+ * ============================================
+ * ============================================ */
+
+.ep-root .hs-key {
+	background: rgba(255, 255, 255, 0.09);
+	border: 1px solid var(--border-strong);
+	border-radius: 7px;
+	color: var(--ink);
+	font-family: 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+	font-size: 0.85rem;
+	font-weight: 600;
+	padding: 3px 9px;
+	white-space: nowrap;
+}
+
+.ep-root .hs-arrow {
+	color: var(--ink-faint);
+	flex-shrink: 0;
+}
+
+.ep-root .hs-out {
+	color: var(--ink);
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.ep-root .hs-desc {
+	color: var(--ink-faint);
+	font-size: 0.85rem;
+}
+
+/* Caret used by the typing demos */
+.ep-root .caret {
+	animation: ep-blink 1.05s steps(1) infinite;
+	background: var(--accent-blue);
+	border-radius: 1px;
+	display: inline-block;
+	height: 1.15em;
+	margin-left: 2px;
+	vertical-align: text-bottom;
+	width: 2px;
+}
+
+@keyframes ep-blink {
+	50% {
+		opacity: 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ep-root .caret {
+		animation: none;
+	}
+}
