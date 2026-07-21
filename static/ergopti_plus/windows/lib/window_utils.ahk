@@ -113,7 +113,19 @@ AltTabMonitor() {
 		}
 	}
 
-	if AppWindowsOnMonitorFiltered.Length > 0 {
-		WinActivate(AppWindowsOnMonitorFiltered[1])
+	; The enumeration above guards every WinGet* against a window closing
+	; mid-cycle, then this activation used the result one line outside that
+	; guard — so the same routine race, hitting the single window that survived
+	; filtering, threw TargetError and aborted the alt-tab instead of skipping.
+	; Skip-and-continue rather than a bare try: falling through to the next
+	; candidate means the user's alt-tab still does something useful.
+	for WindowId in AppWindowsOnMonitorFiltered {
+		try {
+			WinActivate(WindowId)
+			return
+		} catch as Err {
+			LoggerDebug("WindowUtils", "AltTabMonitor: activation target ahk_id {1} vanished: {2}.", WindowId, Err.Message)
+			continue
+		}
 	}
 }

@@ -49,3 +49,32 @@ _ATMC_CheckCatchPresentAndContinues() {
 }
 Test("window_utils: AltTabMonitor's per-window try has a catch that logs and continues (bare-try-anti-pattern)",
 	_ATMC_CheckCatchPresentAndContinues)
+
+; The activation is the OTHER half of the same race. The enumeration above
+; guards every WinGet* against a window closing mid-cycle, then the original
+; code called WinActivate on the survivor one line OUTSIDE that guard — so the
+; identical TOCTOU, landing on the one window that passed filtering, threw
+; TargetError and aborted the alt-tab. Guarding only the enumeration is the
+; documented "invariant applied per-site, one sibling missed" shape.
+_ATMC_ActivationIsGuardedToo() {
+	Body := _DriverFuncBody("AltTabMonitor")
+	Assert(Body != "", "AltTabMonitor must exist in lib/window_utils.ahk")
+
+	ActPos := InStr(Body, "WinActivate(")
+	Assert(ActPos > 0, "AltTabMonitor must still activate a window")
+
+	; Bounded look-back: only the statements immediately before the call can
+	; establish that it sits inside a try.
+	HeadStart := (ActPos > 200) ? ActPos - 200 : 1
+	Head := SubStr(Body, HeadStart, ActPos - HeadStart)
+	Assert(InStr(Head, "try {") > 0,
+		"AltTabMonitor: WinActivate must sit inside a try — the activation target can die between enumeration and activation, exactly like the windows the loop above already guards")
+
+	Tail := SubStr(Body, ActPos, 400)
+	Assert(InStr(Tail, "catch as") > 0,
+		"AltTabMonitor: the activation must have an explicit catch")
+	Assert(InStr(Tail, "continue") > 0,
+		"AltTabMonitor: a vanished activation target must fall through to the next candidate, not abort the cycle — the user's alt-tab should still do something useful")
+}
+Test("window_utils: AltTabMonitor guards the activation as well as the enumeration",
+	_ATMC_ActivationIsGuardedToo)
