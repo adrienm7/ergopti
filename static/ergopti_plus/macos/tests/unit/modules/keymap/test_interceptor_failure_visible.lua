@@ -40,10 +40,12 @@ local helpers = require("tests.helpers")
 --- Reads the keymap source once per assertion.
 --- @return string The keymap/init.lua source.
 local function keymap_source()
-	local path = helpers.driver_root() .. "modules/keymap/init.lua"
-	local fh = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "keymap/init.lua must be readable")
-	local src = fh:read("*a") ; fh:close()
+	-- Selected by a declaration unique to modules/keymap/init.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("function M.get_base_delay")
+	helpers.assert_true(src ~= nil, "modules/keymap/init.lua source must be locatable")
+	if not src then return end
 	return src
 end
 
