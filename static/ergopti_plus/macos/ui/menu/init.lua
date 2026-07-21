@@ -778,13 +778,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			local ok, ed = pcall(require, "ui.hotstring_editor")
 			if ok and type(ed.open) == "function" then pcall(ed.open) end
 		end,
+		-- Both overlays expose show(), never toggle(): the toggle guard below
+		-- always failed its type check, so these two entries were silent no-ops.
 		open_metrics_typing       = function()
 			local ok, m = pcall(require, "ui.metrics_typing")
-			if ok and type(m.toggle) == "function" then pcall(m.toggle) end
+			if ok and type(m.show) == "function" then pcall(m.show) end
 		end,
 		open_metrics_apps         = function()
 			local ok, m = pcall(require, "ui.metrics_apps")
-			if ok and type(m.toggle) == "function" then pcall(m.toggle) end
+			if ok and type(m.show) == "function" then pcall(m.show) end
 		end,
 		open_script_source        = function() pcall(hs.execute, string.format("open \"%sinit.lua\"", base_dir)) end,
 		open_personal_shortcuts   = function()

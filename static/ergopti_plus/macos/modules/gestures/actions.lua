@@ -112,24 +112,59 @@ local function sg(name, label_or_fn, fn_arg)
 	SG[name] = { fn = fn }
 end
 
---- Switch to the previous application in the MRU list.
-local function switch_to_previous_application()
-    local ok, kl = pcall(require, "modules.karabiner.ke_lifecycle")
-    if ok and kl and type(kl.switch_to_previous_app) == "function" then
-        pcall(kl.switch_to_previous_app)
-    else
-        postKeyStroke({"cmd"}, "tab")
-    end
+--- Resolves the driver's log directory, honouring a relocated config dir.
+--- Mirrors the resolver in ui/menu/init.lua so the gesture actions and the menu
+--- entries can never open two different folders. Falls back to hs.configdir,
+--- which is where the driver lives when the config dir has not been moved.
+--- @return string Absolute log directory, with a trailing slash.
+local function logs_dir()
+	local ok_mp, mp = pcall(require, "ui.menu.menu_paths")
+	local base = ok_mp and type(mp.get_config_dir) == "function" and mp.get_config_dir() or nil
+	if type(base) == "string" and base ~= "" then
+		if not base:match("[/\\]$") then base = base .. "/" end
+		return base .. "hammerspoon/logs/"
+	end
+	return hs.configdir .. "/logs/"
 end
 
---- Switch to the previous window precisely (same app or other).
+--- Calls `method` on a lazily required UI module, logging loudly on a miss.
+--- The plain `pcall(function() require(mod).method() end)` shape this replaces
+--- collapsed three distinct failures — module absent, method absent, method
+--- raised — into the same silent no-op, so four actions stayed dead through a
+--- module rename with nothing in the logs to say so.
+--- @param mod string Module name to require.
+--- @param method string Method to invoke on it.
+--- @param ... any Arguments forwarded to the method.
+local function invoke_ui(mod, method, ...)
+	local ok_mod, m = pcall(require, mod)
+	if not ok_mod or type(m) ~= "table" then
+		Logger.error(LOG, "Action target '%s' could not be required — gesture is a no-op.", mod)
+		return
+	end
+	if type(m[method]) ~= "function" then
+		Logger.error(LOG, "Action target '%s' has no '%s' function — gesture is a no-op.", mod, method)
+		return
+	end
+	local ok_call, err = pcall(m[method], ...)
+	if not ok_call then
+		Logger.error(LOG, "Action '%s.%s' raised: %s", mod, method, tostring(err))
+	end
+end
+
+--- Switch to the previous application in the MRU list.
+--- ke_lifecycle never exposed switch_to_previous_app, so the lazy-require branch
+--- that used to sit here was dead and the keystroke below was the only path ever
+--- taken. Removed rather than left as a shim, per the no-unused-fallback rule.
+local function switch_to_previous_application()
+	postKeyStroke({"cmd"}, "tab")
+end
+
+--- Switch to the previous window of the frontmost application.
+--- This used to share cmd+tab with switch_to_previous_application, so the
+--- "Prev. window" gesture silently performed an app switch. cmd+grave is the
+--- macOS binding that actually cycles windows within the front app.
 local function switch_to_previous_window_precise()
-    local ok, kl = pcall(require, "modules.karabiner.ke_lifecycle")
-    if ok and kl and type(kl.switch_to_previous_window) == "function" then
-        pcall(kl.switch_to_previous_window)
-    else
-        postKeyStroke({"cmd"}, "tab")
-    end
+	postKeyStroke({"cmd"}, "`")
 end
 
 --- Triggers a macOS system-wide dictionary lookup/definition.
@@ -390,10 +425,14 @@ sg("notification_center",          function()
 end)
 
 -- Applications and Stats
-sg("open_metrics_typing",            function() pcall(function() require("ui.metrics_overlay").toggle("typing") end) end)
-sg("open_metrics_apps",        function() pcall(function() require("ui.metrics_overlay").toggle("apps") end) end)
-sg("open_hotstrings_editor",    function() pcall(function() require("ui.hotstrings_editor").show() end) end)
-sg("open_paths_editor",            function() pcall(function() require("ui.paths_editor").show() end) end)
+-- These four target the same modules the menu dispatches to (ui/menu/init.lua),
+-- which is the reference for the real module names: the metrics overlays were
+-- never one "ui.metrics_overlay" module, the hotstring editor is singular, and
+-- the paths editor lives behind the menu_paths module rather than a UI module.
+sg("open_metrics_typing",            function() invoke_ui("ui.metrics_typing", "show") end)
+sg("open_metrics_apps",        function() invoke_ui("ui.metrics_apps", "show") end)
+sg("open_hotstrings_editor",    function() invoke_ui("ui.hotstring_editor", "open") end)
+sg("open_paths_editor",            function() invoke_ui("ui.menu.menu_paths", "open_editor") end)
 sg("open_script_source",               function()
 	-- Deferred so hs.execute never blocks the gesture frameCallback
 	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir)) end)
@@ -417,16 +456,13 @@ sg("open_config",                    function()
 	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir) .. "/config.toml") end)
 end)
 sg("open_logs_folder",                function()
-	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir) .. "/logs") end)
+	local dir = logs_dir()
+	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(dir)) end)
 end)
 sg("open_today_log",                   function()
 	-- Resolve the path synchronously (pure Lua), then open in a deferred shell call
 	local ok_p, path = pcall(function()
-		local ok_u, utils = pcall(require, "lib.utils")
-		if ok_u and type(utils.get_logs_dir) == "function" then
-			return utils.get_logs_dir() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
-		end
-		return hs.configdir .. "/logs/ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
+		return logs_dir() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
 	end)
 	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(path)) end)
 end)
@@ -437,11 +473,7 @@ sg("open_error_log",                   function()
 		if ok_l and type(Logger) == "table" and type(Logger.ERRORS_LOG_FILE) == "string" and Logger.ERRORS_LOG_FILE ~= "" then
 			return Logger.ERRORS_LOG_FILE
 		end
-		local ok_u, utils = pcall(require, "lib.utils")
-		if ok_u and type(utils.get_logs_dir) == "function" then
-			return utils.get_logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
-		end
-		return hs.configdir .. "/logs/ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
+		return logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
 	end)
 	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(path)) end)
 end)
