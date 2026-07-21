@@ -924,6 +924,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_crash_report_not_suppressed.ahk
 #Include meta/test_submenu_survives_publish.ahk
 #Include meta/test_keymap_hotpath_guards.ahk
+#Include meta/test_keymap_deadkey_emit_serialized.ahk
 #Include meta/test_hook_dispatcher_critical_save_restore.ahk
 #Include meta/test_hook_dispatcher_err_cache_cap.ahk
 #Include meta/test_walker_batch_critical.ahk

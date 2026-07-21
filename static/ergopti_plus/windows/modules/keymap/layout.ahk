@@ -837,16 +837,35 @@ if Features["layout"]["ergopti_base"] {
 	; rather than RemapKey, so they stay inline next to their state
 	; machine. Their *positions* are still listed in
 	; ErgoptiBaseLabels() so the heatmap can label them.
-	Hotkey(
-		"SC01B",
-		(*) => (InDeadKeySequence ? SendNewResult("¨") : DeadKey(DeadkeyMappingDiaresis)),
-		"I2"
-	)
-	Hotkey(
-		"SC02B",
-		(*) => (InDeadKeySequence ? SendNewResult("^") : DeadKey(DeadkeyMappingCircumflex)),
-		"I2"
-	)
+	Hotkey("SC01B", _DeadKeyDispatch.Bind("¨", DeadkeyMappingDiaresis), "I2")
+	Hotkey("SC02B", _DeadKeyDispatch.Bind("^", DeadkeyMappingCircumflex), "I2")
+}
+
+; Base-layer dead-key entry point. The chained-sequence branch emits, so it has
+; to serialize like every other emit in this file — otherwise a neighbouring
+; remapped key's SendEvent can interleave with it in the OS input queue and the
+; two characters come out transposed.
+;
+; The identical lambdas on the CapsLock layer already run under Critical, via
+; LayerDispatch's SerializeSymbols path — this base-layer pair was registered
+; with a raw Hotkey() and got none. Same callback, protected on one layer and
+; not the other, which is the shape of the invariant-applied-per-site bug this
+; codebase keeps hitting.
+;
+; Wrapping the DeadKey branch too is deliberate and matches the CapsLock path:
+; DeadKey releases Critical around its blocking InputHook wait and restores the
+; caller's level in a finally, so the composed emit that follows serializes
+; exactly as intended while the wait itself never stalls the message pump.
+_DeadKeyDispatch(BareChar, Mapping, *) {
+	_AtCrit := Critical("On")
+	try {
+		if InDeadKeySequence
+			SendNewResult(BareChar)
+		else
+			DeadKey(Mapping)
+	} finally {
+		Critical(_AtCrit)
+	}
 }
 
 if Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
