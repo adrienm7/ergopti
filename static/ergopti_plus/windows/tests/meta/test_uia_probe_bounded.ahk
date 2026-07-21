@@ -114,11 +114,35 @@ _UPB_SkippedProbeDoesNotPinCoarseAnchor() {
 	Body := _DriverFuncBody("_TooltipResolvePosition")
 	Assert(Body != "", "_TooltipResolvePosition() must exist")
 
-	IdlePos := InStr(Body, "A_TimeIdlePhysical")
-	UiaPos := InStr(Body, "UIA.GetFocusedElement")
-	Between := SubStr(Body, IdlePos, UiaPos - IdlePos)
-	Assert(InStr(Between, "_TooltipCachePosition") == 0,
-		"the idle-skip path must not write the position cache — a coarse anchor computed mid-burst would be pinned for the whole cache window")
+	; The reason for skipping has to be a value the fallback stages can read. A
+	; single UiaAllowed boolean folds "still mid-burst" together with "hostile
+	; app", and those two want opposite caching decisions.
+	Assert(InStr(Body, "UiaSkippedForIdle") > 0,
+		"_TooltipResolvePosition must distinguish a probe deferred for idle from one skipped because the app is hostile — the fallback stages cache in the second case and must not in the first")
+
+	; Everything from the window-frame stage onwards is a FALLBACK anchor. The
+	; earlier assertion only scanned between the idle check and the UIA call, a
+	; span that never contained a cache write in the first place, so it passed
+	; against the very code it was meant to forbid. Anchor on WinGetPos instead:
+	; it is real code (comments are stripped from the body) and it opens stage 3.
+	FallbackPos := InStr(Body, "WinGetPos(")
+	Assert(FallbackPos > 0, "_TooltipResolvePosition must still fall back to the active window frame")
+	Tail := SubStr(Body, FallbackPos)
+	Assert(InStr(Tail, "_TooltipCachePosition(") == 0,
+		"the fallback stages must not write the position cache directly — a coarse anchor computed while the probe was merely deferred would be pinned for the whole cache window and suppress the probe that would have found the caret")
+	Assert(InStr(Tail, "_TooltipCacheUnlessProbePending(") > 0,
+		"the fallback stages must route their anchor through _TooltipCacheUnlessProbePending so a deferred probe leaves the cache untouched")
+
+	; The converse must stay true: a native caret and a resolved UIA rect are real
+	; measurements, and caching them is what the cache exists for.
+	Head := SubStr(Body, 1, FallbackPos - 1)
+	Assert(InStr(Head, "_TooltipCachePosition(") > 0,
+		"the caret and UIA stages must keep caching unconditionally — they return a measured anchor, not a stand-in")
+
+	Guard := _DriverFuncBody("_TooltipCacheUnlessProbePending")
+	Assert(Guard != "", "_TooltipCacheUnlessProbePending() must exist in the driver source")
+	Assert(InStr(Guard, "_TooltipCachePosition(") > 0,
+		"_TooltipCacheUnlessProbePending must still cache when the probe was not deferred — otherwise a hostile app re-pays a UIA timeout on every cache expiry")
 }
 
 

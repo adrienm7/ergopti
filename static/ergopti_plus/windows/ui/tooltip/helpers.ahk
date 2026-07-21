@@ -833,7 +833,14 @@ _TooltipResolvePosition() {
     ;     flight. Mirrors UIA_SELECTION_IDLE_REQUIRED_MS in keymap/layout.ahk.
     ; (b) Skip apps already known not to answer: one timeout buys a quiet
     ;     window instead of paying the same stall every cache expiry.
-    UiaAllowed := (A_TimeIdlePhysical >= TOOLTIP_UIA_IDLE_REQUIRED_MS)
+    ; The two reasons for skipping the probe are NOT interchangeable downstream,
+    ; so they are kept apart. "Still mid-burst" is transient — the probe will run
+    ; within a couple of hundred milliseconds — whereas "hostile app" lasts
+    ; TOOLTIP_UIA_HOSTILE_TTL_MS. The fallback stages below cache their coarse
+    ; anchor in the first case only at the cost of suppressing the very probe that
+    ; would have produced a real caret anchor; see _TooltipCacheUnlessProbePending.
+    UiaSkippedForIdle := (A_TimeIdlePhysical < TOOLTIP_UIA_IDLE_REQUIRED_MS)
+    UiaAllowed := !UiaSkippedForIdle
         and !_TooltipUiaProcessIsHostile(ProcName)
     ; (c) Bound the call itself. Deliberately lazy rather than at boot: the
     ;     first touch of UIA initialises the COM object, so clamping at boot
@@ -888,9 +895,10 @@ _TooltipResolvePosition() {
         Wh := 0
         WinGetPos(&Wx, &Wy, &Ww, &Wh, "A")
         if (Ww > 0 and Wh > 0) {
-            return _TooltipCachePosition(ActiveHwnd,
+            return _TooltipCacheUnlessProbePending(ActiveHwnd,
                 { X: Wx + Ww // 2,
-                    Y: Wy + Wh - _TOOLTIP_WINDOW_BOTTOM_INSET_PX })
+                    Y: Wy + Wh - _TOOLTIP_WINDOW_BOTTOM_INSET_PX },
+                UiaSkippedForIdle)
         }
     }
 
@@ -898,8 +906,31 @@ _TooltipResolvePosition() {
     Mx := 0
     My := 0
     try MouseGetPos(&Mx, &My)
-    return _TooltipCachePosition(ActiveHwnd,
-        { X: Mx, Y: My + _TOOLTIP_OFFSET_BELOW })
+    return _TooltipCacheUnlessProbePending(ActiveHwnd,
+        { X: Mx, Y: My + _TOOLTIP_OFFSET_BELOW },
+        UiaSkippedForIdle)
+}
+
+; Pins a FALLBACK anchor in the position cache only when that anchor is the best
+; the driver can currently produce.
+;
+; Stages 3 and 4 are reached both when UIA genuinely had nothing to offer and
+; when its probe never ran because the user was still mid-burst. Those two cases
+; deserve opposite treatment. A hostile or silent app will not answer for
+; TOOLTIP_UIA_HOSTILE_TTL_MS, so caching the coarse anchor is exactly right —
+; it buys a quiet window instead of re-paying a timeout. But when the probe was
+; merely deferred for idle, the coarse anchor is a stand-in for a measurement
+; that has not been taken yet: caching it would serve it for the whole
+; TOOLTIP_POSITION_CACHE_MS window and suppress the probe that would have
+; produced the real caret anchor, so the preview would sit at the bottom of the
+; window instead of under the caret.
+;
+; Stages 1 and 2 deliberately do NOT route through here: a native caret and a
+; resolved UIA rect are real measurements and must be cached unconditionally.
+_TooltipCacheUnlessProbePending(Hwnd, Pos, ProbePending) {
+    if ProbePending
+        return Pos
+    return _TooltipCachePosition(Hwnd, Pos)
 }
 
 _TooltipCachePosition(Hwnd, Pos) {
