@@ -181,7 +181,26 @@ end
 --- re-selects the pasted text so repeated transforms work without re-selecting,
 --- and finally restores the original clipboard content.
 --- @param transform_func function Receives the selected text; returns the transformed string.
+-- The transform pipeline owns the clipboard for roughly half a second (copy →
+-- transform → paste → re-select → restore). A second press inside that window
+-- snapshots a clipboard the first run had already overwritten with its own
+-- intermediate value, and then "restores" that instead of the user's real
+-- clipboard — silently destroying it. Guarded with the in-flight-flag pattern
+-- already used by lib/ui_restore and api_mlx, including their hard timeout: a
+-- flag that could stick would block every later transform for the session.
+local _transform_in_flight = false
+local TRANSFORM_LOCK_TIMEOUT_SEC = 2.0
+
 local function do_transform(transform_func)
+	if _transform_in_flight then
+		Logger.debug(LOG, "Text transform ignored — a previous one still owns the clipboard.")
+		return
+	end
+	_transform_in_flight = true
+	-- Failsafe release: every early return below must not be able to strand the
+	-- flag, and neither may a callback that never fires.
+	timer.doAfter(TRANSFORM_LOCK_TIMEOUT_SEC, function() _transform_in_flight = false end)
+
 	Logger.trace(LOG, "Text transformation started…")
 	local prior = pasteboard.getContents()
 	pasteboard.clearContents()
