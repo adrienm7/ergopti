@@ -586,6 +586,18 @@ local function handle_key(event_obj)
 		local delay = CoreState.last_time > 0 and math.floor(now - CoreState.last_time) or 0
 		CoreState.last_time = now
 
+		-- flush_buffer() resets CoreState.last_time to 0, so the NEXT keystroke would
+		-- compute a delay of 0 and the entire inter-word gap would vanish from the
+		-- timing data. Every keystroke-driven flush below therefore re-seeds the
+		-- baseline to `now`. The metrics-webview flush at the end of this function
+		-- already did exactly this, with the same reasoning in its comment; the
+		-- Tab/Escape/Enter/F-key/nav/space/punctuation sites did not. Declared here,
+		-- above every call site, so no closure binds a nil global.
+		local function flush_keeping_baseline()
+			LogManager.flush_buffer()
+			CoreState.last_time = now
+		end
+
 		-- Self-heal: drain stale synthetic queue entries after a long idle.
 		-- An unmatched entry (from a suppressed expansion or a dropped keyDown)
 		-- would permanently tag the next real keystroke as synthetic (C5 audit fix).
@@ -732,13 +744,13 @@ local function handle_key(event_obj)
 			-- Tab: log as bracket marker and flush (cursor navigation — breaks N-gram context)
 			ev_entry = { "[TAB]", delay, meta }
 			table.insert(CoreState.buffer_events, ev_entry)
-			LogManager.flush_buffer()
+			flush_keeping_baseline()
 
 		elseif keycode == 53 then
 			-- Escape: log then flush (cancel/navigation action, breaks N-gram context)
 			ev_entry = { "[ESC]", delay, meta }
 			table.insert(CoreState.buffer_events, ev_entry)
-			LogManager.flush_buffer()
+			flush_keeping_baseline()
 
 		elseif keycode == 57 then
 			-- Capslock toggle: log the state change (does not flush — no context break)
@@ -758,20 +770,20 @@ local function handle_key(event_obj)
 				type = is_synthetic and synth_type or "text",
 				text = "\n",
 			})
-			LogManager.flush_buffer()
+			flush_keeping_baseline()
 
 		elseif F_KEY_CODES[keycode] then
 			-- F1–F12: log as bracket marker and flush (context-breaking navigation)
 			ev_entry = { "[" .. F_KEY_CODES[keycode] .. "]", delay, meta }
 			table.insert(CoreState.buffer_events, ev_entry)
-			LogManager.flush_buffer()
+			flush_keeping_baseline()
 
 		elseif NAV_KEY_CODES[keycode] then
 			-- Arrow keys and extended nav (Delete, Home, End, PageUp, PageDown): log as
 			-- bracket marker and flush — cursor moved, so N-gram context is broken
 			ev_entry = { "[" .. NAV_KEY_CODES[keycode] .. "]", delay, meta }
 			table.insert(CoreState.buffer_events, ev_entry)
-			LogManager.flush_buffer()
+			flush_keeping_baseline()
 
 		else
 			-- Normal character — a keylayout may map one physical key to a multi-codepoint
@@ -796,7 +808,7 @@ local function handle_key(event_obj)
 						text = sub_char,
 					})
 					if sub_char:match("[.?!]") or sub_char == " " then
-						LogManager.flush_buffer()
+						flush_keeping_baseline()
 					end
 					-- Track only the first sub-char event for keyup matching
 					if first then
@@ -817,7 +829,7 @@ local function handle_key(event_obj)
 				})
 				-- Flush on sentence-ending punctuation or space
 				if chars:match("[.?!]") or keycode == 49 then
-					LogManager.flush_buffer()
+					flush_keeping_baseline()
 				end
 			end
 		end
@@ -1408,6 +1420,13 @@ end
 --- a pause never updated the cached context — and nothing else re-syncs it.
 --- @return boolean True when the context was re-synchronised.
 function M.resync_context()
+	-- A modifier held across the pause never received its release: handle_key returns
+	-- at the pause guard, so the keyUp that would clear modifier_down_at never ran.
+	-- The stale down-timestamp would then be misread as a fresh press on the next
+	-- flagsChanged, inverting press/release and logging a hold that never happened.
+	-- An unmatched down carries no usable duration, so discard it — the same
+	-- reasoning the synth_queue clear applies at the other suppression sites.
+	CoreState.modifier_down_at = {}
 	local ok, res = pcall(ContextTracker.resync_context)
 	if not ok then
 		Logger.error(LOG, "resync_context() failed: %s.", tostring(res))
