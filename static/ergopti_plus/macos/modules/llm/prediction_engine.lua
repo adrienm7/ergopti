@@ -218,8 +218,28 @@ function M.set_llm_enabled(enabled)
 		if ok_api and api and type(api.stop_warmup) == "function" then
 			pcall(function() api.stop_warmup() end)
 		end
+		-- Ollama needs the same invalidation: its warmup POST triggers the model load
+		-- and can stay in flight for tens of seconds, so without this the response
+		-- lands after the gate closed, flips _is_ready and fires the "server ready"
+		-- notification while AI is off. Only the MLX leg was stopped (M-3's sibling).
+		local ok_ol, ollama = pcall(require, "modules.llm.api_ollama")
+		if ok_ol and ollama and type(ollama.stop_warmup) == "function" then
+			pcall(function() ollama.stop_warmup() end)
+		end
 		return
 	end
+	-- _warmup_stopped is owned by script_control.pause_all(); resume_all() clears it
+	-- and re-arms both drivers itself. Clearing it here would revive the 2 s POST loop
+	-- MID-PAUSE and fire the "server ready" notification while the driver is
+	-- suspended — the same violation this function fixes on the disable side. Read
+	-- through package.loaded rather than require() to avoid a circular dependency,
+	-- exactly as perform_check does.
+	local sc = package.loaded["modules.shortcuts.script_control"]
+	if sc and type(sc.is_paused) == "function" and sc.is_paused() then
+		Logger.debug(LOG, "set_llm_enabled(true) while paused — warmup stays parked until resume.")
+		return
+	end
+
 	-- Symmetric to the disable-side pair: resume_warmup() clears the
 	-- _warmup_stopped short-circuit BEFORE the controller re-arms, otherwise the
 	-- scheduled warmup would immediately self-discard in M.warmup()'s guard
