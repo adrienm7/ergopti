@@ -51,7 +51,7 @@ ouvert un cycle d'audit de plus.
 
 ## 1. OÙ SONT LES VRAIS LOGS
 
-*(Dérivé de la lecture de `lib/logger.lua`, pas d'une exécution — vérifie sur la machine cible.)*
+_(Dérivé de la lecture de `lib/logger.lua`, pas d'une exécution — vérifie sur la machine cible.)_
 
 Le driver écrit sous `<config_dir>/hammerspoon/logs/` (`lib/logger.lua:286`), avec :
 
@@ -101,7 +101,7 @@ Profils : `lib/hotpath_profiler.lua` (hot path), `lib/boot_profiler.lua` (boot),
 
 ---
 
-## 3. LES 4 GARANTIES À PROUVER
+## 3. LES 5 GARANTIES À PROUVER
 
 - **G1 — ROBUSTESSE.** Aucune action utilisateur, dans aucun état (normal / suspend / pause /
   switch de layout / reload / quit / cold-start LLM), ne lève d'erreur Lua non gérée ni ne
@@ -111,9 +111,22 @@ Profils : `lib/hotpath_profiler.lua` (hot path), `lib/boot_profiler.lua` (boot),
 - **G3 — PAS DE RACE.** Aucun bug d'ordonnancement entre producteurs asynchrones (`hs.eventtap`,
   `hs.timer`, `hs.task`/`ShellRunner`, watchers Karabiner, streaming LLM, les DEUX trackers
   d'injection synthétique).
-- **G4 — PAS DE LAG.** Aucune latence perceptible ; surtout, JAMAIS d'appel bloquant dans un
-  callback d'eventtap (cause un `kCGEventTapDisabledByTimeout` qui tue le tap).
-  **G4 se prouve avec les profils réels de la §1, jamais par raisonnement seul.**
+- **G4 — PAS DE LAG, ET DU PERF EN PLUS.** Deux obligations distinctes, la seconde est
+  souvent oubliée :
+  1. _Défensif_ — aucune latence perceptible ; surtout, JAMAIS d'appel bloquant dans un
+     callback d'eventtap (cause un `kCGEventTapDisabledByTimeout` qui tue le tap, donc une
+     violation G4 dégénère immédiatement en violation G1/G2 : le tap meurt et TOUT s'arrête).
+  2. _Offensif_ — **tu dois AUSSI proposer des optimisations là où le code est simplement
+     lent, même sans bug.** Un chemin correct mais 10× plus lent que nécessaire est un
+     livrable attendu, pas un hors-sujet. Priorité : le callback d'eventtap (chaque µs y est
+     multipliée par des milliers de frappes/jour ET compte dans le budget avant timeout du
+     tap), le boot Hammerspoon, et le rendu du tooltip (`hs.canvas`). Pour chaque proposition :
+     coût actuel mesuré ou complexité, coût visé, risque de régression.
+     **G4 se prouve avec les profils réels de la §1, jamais par raisonnement seul.** Une
+     optimisation proposée sans chiffre est une hypothèse — étiquette-la comme telle.
+- **G5 — LE TOOLTIP DIT LA VÉRITÉ.** Ce que le tooltip affiche DOIT être exactement ce que le
+  moteur de hotstrings produira si l'utilisateur presse la touche magique maintenant. Aucune
+  prédiction dupliquée qui puisse diverger du moteur. Voir la classe [G].
 
 ---
 
@@ -217,6 +230,45 @@ Audite donc les commits de fix récents (`git log`, `git show`) :
   inatteignable ?
 - Le test livré est-il scopé à UNE fonction alors que la garantie est transitive ? Si oui, le
   test est aveugle : **c'est un finding en soi.**
+
+### [G] Divergence tooltip ↔ moteur de hotstrings (G5) — **classe à haut rendement**
+
+Le tooltip et le moteur répondent à la même question — « qu'est-ce qui sortira si l'utilisateur
+presse la touche magique maintenant ? » — mais par deux chemins de code différents. **Chaque
+fois que ces deux-là cessent de décrire le même texte, l'utilisateur voit un mensonge.**
+
+Le driver AHK a shippé TROIS divergences de cette classe, toutes silencieuses, trouvées le
+2026-07-21. Le driver HS partage le même design (un buffer de preview + un buffer moteur) et
+une partie du canon (), donc **les mêmes questions se posent ici et les réponses ne
+sont PAS héritées** — vérifie-les côté Lua :
+
+1. **Jeux de caractères différents.** Côté AHK, le preview ancrait sur un jeu de frontières de
+   mot plus large que celui du matcher. Résultat : après un guillemet ouvrant, le tooltip
+   proposait une expansion que le moteur refusait — et le fallback de répétition, qui teste le
+   MÊME jeu dans le sens INVERSE, l'acceptait et doublait la lettre.
+2. **Backspace en sens opposé.** Le buffer de preview était VIDÉ alors que le moteur ne faisait
+   que décrémenter. Après une seule correction de typo, le moteur pouvait encore expanser ce
+   que le tooltip n'offrait plus.
+3. **Match refusé = buffer réécrit quand même.** Un match n'est pas un fire (gate temporelle,
+   gate de casse, callbacks qui déclinent). La resynchronisation du buffer tournait sans
+   condition, réécrivant le preview avec un texte jamais tapé.
+
+Ce que tu dois chercher côté Lua :
+
+- **Toute logique de prédiction dupliquée.** Si le tooltip calcule lui-même ce qui va sortir au
+  lieu de le demander au moteur, c'est un finding, même si les deux sont d'accord aujourd'hui.
+- **Tout cache** d'un jeu de caractères ou d'un index dérivé de l'état du moteur : un cache
+  suppose que chaque écrivain de la source pensera à le rafraîchir. Préfère dériver à la lecture.
+- **Chaque mutation du buffer de preview** : y a-t-il une mutation correspondante du buffer
+  moteur ? Énumère-les côte à côte (frappe, terminateur, backspace, fire, match refusé, reset
+  de navigation, cascade). Pour CHAQUE événement, les deux décrivent-ils le même écran ?
+- **Chaque gate appliquée d'un seul côté** (temps, casse, frontière de mot, suppression).
+- **La parité avec AHK.** Une divergence corrigée côté Windows mais pas côté macOS est un
+  finding : le canon `_shared/` et les corpus de vecteurs existent pour ça.
+
+Le fix attendu n'est jamais « corriger les deux côtés pour qu'ils soient d'accord » — c'est
+**supprimer le second chemin**. Un test qui compare les deux valeurs à l'exécution vaut mieux
+qu'un test qui vérifie qu'elles dérivent d'une source commune.
 
 ---
 

@@ -33,8 +33,8 @@ cible mesurable :
    en bout en < 1 journée**, et sait dire « telle feature vit ici, son défaut vient
    de là, son test est celui-là » **sans demander à personne**.
 2. **Diagnostic d'échec immédiat (priorité absolue).** Quand un test casse, le dev
-   sait en **< 5 minutes** *quel comportement* a régressé, *où* est le code fautif,
-   et *comment* le corriger — **uniquement** en lisant le nom + le message d'échec du
+   sait en **< 5 minutes** _quel comportement_ a régressé, _où_ est le code fautif,
+   et _comment_ le corriger — **uniquement** en lisant le nom + le message d'échec du
    test. **Aujourd'hui ce n'est pas le cas** : c'est le problème n°1 à résoudre.
 3. **Zéro duplication.** Aucune logique ni valeur par défaut dupliquée entre
    drivers ; les défauts vivent dans `_shared/` sauf si réellement spécifiques au
@@ -81,17 +81,17 @@ la toolchain de test/codegen est en Node sous `tools/`.
   « Structure cible (miroir 1:1) » et son « Harnais de vérification ».
 - **Mémoire projet** : `docs/PROJECT_MEMORY.md` encode les foot-guns et les décisions
   arrêtées. **Lis-la** : plusieurs « refactors évidents » y sont déjà prouvés
-  *non faisables* (ex. déplacer les helpers OS hors de `adapters/` casse le ratchet
+  _non faisables_ (ex. déplacer les helpers OS hors de `adapters/` casse le ratchet
   de pureté ; `adapters/` = couche d'isolation OS, pas « exactement 20 ports »).
   Ne re-propose pas ce qui y est déjà rejeté.
 
 **Les 3 douleurs réelles à instrumenter (confirme les chiffres) :**
 
-| Douleur | Signal mesuré (à reconfirmer) | Pourquoi ça fait mal |
-|---|---|---|
-| **Tests fragiles, illisibles à l'échec** | ~**206 / 411** fichiers `test_*.ahk` scannent le *source* (`_DriverSourceConcat`, `_DriverFuncBody`, `_DriverDirConcat`, `FileRead … .ahk`) pour asserter *où vit une fonction* | un refactor casse des dizaines de tests « introspection » ; à rouge ils disent « fonction X absente du fichier Y », **jamais** « le comportement Z est cassé » → diagnostic lent, refactor découragé |
-| **Defaults éparpillés** | `manifest.toml` couvre les *toggles*, mais des défauts non-toggle traînent : `windows/lib/llm_defaults.ahk`, `windows/lib/hotstrings/hotstrings_config.ahk`, `windows/lib/tap_hold/*`, et côté HS les tables `DEFAULT_STATE` dans `macos/modules/*/init.lua` | même valeur définie en 2+ endroits → divergence silencieuse driver vs driver |
-| **Gros fichiers fourre-tout** | côté AHK : `modules/gestures.ahk` (~2076 l.), `modules/keylogger/keylogger.ahk` (~1867) ; côté HS : `modules/llm/api_mlx.lua` (~1799), `ui/menu/menu_llm/models_manager_mlx.lua` (~1790), `ui/menu/menu_keyboard_layout.lua` (~1647), `modules/keylogger/init.lua` (~1583) | un fichier = trop de responsabilités → illisible, intestable unité par unité |
+| Douleur                                  | Signal mesuré (à reconfirmer)                                                                                                                                                                                                                                              | Pourquoi ça fait mal                                                                                                                                                                                 |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tests fragiles, illisibles à l'échec** | ~**206 / 411** fichiers `test_*.ahk` scannent le _source_ (`_DriverSourceConcat`, `_DriverFuncBody`, `_DriverDirConcat`, `FileRead … .ahk`) pour asserter _où vit une fonction_                                                                                            | un refactor casse des dizaines de tests « introspection » ; à rouge ils disent « fonction X absente du fichier Y », **jamais** « le comportement Z est cassé » → diagnostic lent, refactor découragé |
+| **Defaults éparpillés**                  | `manifest.toml` couvre les _toggles_, mais des défauts non-toggle traînent : `windows/lib/llm_defaults.ahk`, `windows/lib/hotstrings/hotstrings_config.ahk`, `windows/lib/tap_hold/*`, et côté HS les tables `DEFAULT_STATE` dans `macos/modules/*/init.lua`               | même valeur définie en 2+ endroits → divergence silencieuse driver vs driver                                                                                                                         |
+| **Gros fichiers fourre-tout**            | côté AHK : `modules/gestures.ahk` (~2076 l.), `modules/keylogger/keylogger.ahk` (~1867) ; côté HS : `modules/llm/api_mlx.lua` (~1799), `ui/menu/menu_llm/models_manager_mlx.lua` (~1790), `ui/menu/menu_keyboard_layout.lua` (~1647), `modules/keylogger/init.lua` (~1583) | un fichier = trop de responsabilités → illisible, intestable unité par unité                                                                                                                         |
 
 ---
 
@@ -106,9 +106,9 @@ la toolchain de test/codegen est en Node sous `tools/`.
    obligatoire pour tout texte utilisateur (21 langues), logger 8-variants avec
    paires lifecycle, **fail-fast** via `require_state`, **pas de magic numbers**,
    **SSoT des défauts**, pas de code mort / shim de compat.
-3. **Discipline de test de régression (§5.9).** *Chaque* étape qui corrige ou
+3. **Discipline de test de régression (§5.9).** _Chaque_ étape qui corrige ou
    déplace quelque chose **embarque son test** dans le même commit, encodant la
-   *cause racine*, rouge avant / vert après. Le guide doit nommer ce test pour
+   _cause racine_, rouge avant / vert après. Le guide doit nommer ce test pour
    chaque étape.
 4. **Foot-gun encodage AHK.** Fichiers `.ahk` = **UTF-8 BOM + LF**. Éditer via
    l'outil Edit, **jamais `cat >>`** (abort silencieux mi-fichier). Tests AHK
@@ -135,20 +135,20 @@ s'appuie pas sur un `path:line` ou un chiffre reproductible.
 
 - **Duplication de logique & de défauts.** Inventorie toute valeur par défaut hors
   `manifest.toml` (grep `default`, `DEFAULT_STATE`, `:= ` de constantes, tables de
-  config) dans `windows/` et `macos/`. Pour chacune : *quelle valeur, où (combien de
-  sites), devrait-elle vivre dans `_shared/` ou est-elle légitimement driver-specific ?*
+  config) dans `windows/` et `macos/`. Pour chacune : _quelle valeur, où (combien de
+  sites), devrait-elle vivre dans `_shared/` ou est-elle légitimement driver-specific ?_
 - **Asymétrie hs ↔ ahk.** Construis la **table de correspondance** `windows/` ↔
   `macos/` (par feature/module/fenêtre UI). Marque chaque divergence de
   chemin/découpage/nommage et dis dans quel sens converger.
 - **Gros fichiers.** Liste tout fichier de prod > ~400 lignes (`.ahk`, `.lua`),
   avec ses responsabilités distinctes → proposition de découpage **miroir** sur les
   deux drivers.
-- **Architecture de test (axe n°1).** Classe les tests en : *behavior/contract/
-  integration/e2e* vs *introspection* (scan de source / assertion d'emplacement).
+- **Architecture de test (axe n°1).** Classe les tests en : _behavior/contract/
+  integration/e2e_ vs _introspection_ (scan de source / assertion d'emplacement).
   Chiffre le ratio. Pour un échantillon de tests « introspection », montre le message
   d'échec réel et démontre qu'il **ne pointe pas** vers le comportement cassé.
 - **Ergonomie d'échec.** Pour chaque couche, lance volontairement un test au rouge
-  et capture ce que voit le dev. Est-ce qu'il a : le *comportement* attendu vs obtenu,
+  et capture ce que voit le dev. Est-ce qu'il a : le _comportement_ attendu vs obtenu,
   le `path:line` du code, et **la commande exacte pour rejouer ce seul test** ?
   (`tools/test/run-js-suite.cjs` le fait déjà côté JS — sers-t'en de référence.)
 - **Couplage / SOLID.** Repère les violations concrètes : fonctions à
@@ -172,14 +172,14 @@ opaque » en suite **où un rouge se corrige en minutes**. Exige :
   ouvrir le test.
 - **Découpler les tests de l'emplacement du code.** Les ~206 tests AHK
   « introspection » sont la cause directe de la douleur : propose de
-  (a) **convertir** ceux qui valident un *comportement* en tests behavior réels qui
+  (a) **convertir** ceux qui valident un _comportement_ en tests behavior réels qui
   appellent la fonction et vérifient la sortie ; (b) pour les invariants
-  *structurels* qu'on veut vraiment garder (ex. « tout appel OS vit dans `adapters/` »,
+  _structurels_ qu'on veut vraiment garder (ex. « tout appel OS vit dans `adapters/` »,
   « tout site `Features[...]` résout contre le manifeste »), les **centraliser en
   un seul test méta déclaratif** générique, au lieu de N assertions file-pinned qui
   cassent à chaque déplacement. Objectif chiffré : **réduire drastiquement** le ratio
-  introspection/behavior, et garantir qu'un *déplacement de fichier ne casse plus
-  aucun test*.
+  introspection/behavior, et garantir qu'un _déplacement de fichier ne casse plus
+  aucun test_.
 - **Carte test → source.** Le guide impose une convention où, depuis un test rouge,
   le module de prod responsable est **évident** (miroir de chemins
   `tests/unit/modules/<feature>/…` ↔ `modules/<feature>/…`, nommage 1:1). Documente-la.
@@ -199,9 +199,9 @@ opaque » en suite **où un rouge se corrige en minutes**. Exige :
 
 ### 4.2 Zéro duplication & **defaults dans `_shared/`**
 
-- **Inventaire → décision** pour chaque défaut : *manifeste* (toggle/valeur de
-  feature), *defaults `_shared/` dédié* (paramètres non-toggle partagés : timings
-  hotstrings, params LLM, délais tap-hold…), ou *driver-specific assumé* (justifié,
+- **Inventaire → décision** pour chaque défaut : _manifeste_ (toggle/valeur de
+  feature), _defaults `_shared/` dédié_ (paramètres non-toggle partagés : timings
+  hotstrings, params LLM, délais tap-hold…), ou _driver-specific assumé_ (justifié,
   ex. chemins OS, choix de modèle par plateforme via `default_per_platform`).
 - **Un mécanisme unique** de consommation : les drivers **lisent** le défaut
   partagé (codegen ou lecture TOML), **ne le re-déclarent jamais**. Tout fallback
@@ -251,8 +251,8 @@ l'action :
 
 ### 4.6 Lisibilité & onboarding
 
-- Chaque dossier de feature/fenêtre a un `README.md` court : *rôle, entrée, défaut
-  (→ SSoT), test associé*. Ajoute `windows/README.md` + `macos/README.md` (carte du
+- Chaque dossier de feature/fenêtre a un `README.md` court : _rôle, entrée, défaut
+  (→ SSoT), test associé_. Ajoute `windows/README.md` + `macos/README.md` (carte du
   driver) et un schéma « une feature, son trajet manifest → codegen → adapter → test ».
 - Nommage 1:1 cross-driver ; supprime les barrels/alias morts ; aucune abréviation
   obscure non documentée dans `docs/glossary.md`.
@@ -283,8 +283,8 @@ Génère **un seul** fichier markdown avec **exactement** ces sections, dans cet
      encode, cause racine).
    - **Vérification** : commandes exactes du harnais (dry-run / `test:js` / `test:hs`
      / encoding / drift) et critère de succès.
-   - **Diagnostic d'échec** : *si ce test casse plus tard, le dev lit quoi et corrige
-     où* — la garantie « < 5 min ».
+   - **Diagnostic d'échec** : _si ce test casse plus tard, le dev lit quoi et corrige
+     où_ — la garantie « < 5 min ».
    - **Rollback** et **blast radius** (faible/moyen/élevé).
 6. **`## Chantier testabilité (transversal, priorité 1)`** — la cible de §4.1
    détaillée : taxonomie de test, conversion des ~206 introspection-tests, test méta
@@ -347,5 +347,5 @@ Priorise : si tu dois couper, garde les étapes à fort gain / faible risque.
 - ❌ Éditer `_generated/` ou dupliquer un défaut « pour aller plus vite ».
 - ❌ Des pavés non scannables au lieu de tableaux/étapes compactes.
 
-**Avant de rendre**, relis la *Definition of Done* (§6) et coche chaque case. Si une
+**Avant de rendre**, relis la _Definition of Done_ (§6) et coche chaque case. Si une
 case ne peut pas être cochée, **corrige le guide** plutôt que de rendre incomplet.
