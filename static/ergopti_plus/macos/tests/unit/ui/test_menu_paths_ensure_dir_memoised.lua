@@ -44,17 +44,34 @@ local DRIVER_SUBDIR_KEY = "ConfigTomlPath"
 --- @return table menu_paths, table counters
 local function load_menu_paths(dirs_exist)
 	local counters = { shell = 0, mkdir = 0 }
+	-- STATEFUL, because the real filesystem is: once a create succeeds the path
+	-- exists and attributes() starts reporting it. A stub that kept answering
+	-- "missing" after a successful mkdir would require the memo to cache a create
+	-- that never happened — which is exactly the defect the sibling assertions here
+	-- forbid, so the stub has to model the success it claims to return.
+	local made = {}
 	local fs_stub = {
-		mkdir      = function() counters.mkdir = counters.mkdir + 1 ; return true end,
-		attributes = function()
+		mkdir      = function(path)
+			counters.mkdir = counters.mkdir + 1
+			made[tostring(path)] = true
+			return true
+		end,
+		attributes = function(path)
 			if dirs_exist then return { mode = "directory" } end
+			if made[tostring(path)] then return { mode = "directory" } end
 			return nil
 		end,
 		dir        = function() return function() return nil end end,
 	}
 	local menu_paths = helpers.load_with_stubs("ui.menu.menu_paths", {
 		fs      = fs_stub,
-		execute = function() counters.shell = counters.shell + 1 ; return "", true end,
+		execute = function(cmd)
+			counters.shell = counters.shell + 1
+			-- `mkdir -p %q` — mark the quoted path as created, like the real shell would.
+			local target = tostring(cmd):match('mkdir %-p "(.-)"')
+			if target then made[target] = true end
+			return "", true
+		end,
 	})
 	return menu_paths, counters
 end
@@ -138,11 +155,20 @@ end)
 helpers.describe("menu_paths falls back to the shell when hs.fs.mkdir is absent", function()
 	helpers.it("uses hs.execute once, and only once, without the filesystem API", function()
 		local counters = { shell = 0 }
+		-- The stub is STATEFUL: a real `mkdir -p` makes the directory exist, so
+		-- attributes() must start reporting it afterwards. A stub that reported the
+		-- path as missing forever would demand that a FAILED create be memoised —
+		-- which is the defect this suite's sibling case now forbids.
+		local created = false
 		local menu_paths = helpers.load_with_stubs("ui.menu.menu_paths", {
 			-- No mkdir field: emulates a host where the filesystem API is unavailable.
-			fs      = { attributes = function() return nil end,
+			fs      = { attributes = function() return created and {} or nil end,
 			            dir        = function() return function() return nil end end },
-			execute = function() counters.shell = counters.shell + 1 ; return "", true end,
+			execute = function()
+				counters.shell = counters.shell + 1
+				created = true
+				return "", true
+			end,
 		})
 
 		for _ = 1, RESOLUTION_COUNT do menu_paths.get(DRIVER_SUBDIR_KEY) end
@@ -150,5 +176,47 @@ helpers.describe("menu_paths falls back to the shell when hs.fs.mkdir is absent"
 		helpers.assert_eq(counters.shell, 1,
 			"the shell fallback must still create the directory, but the memo must "
 			.. "keep it to a single fork")
+	end)
+end)
+
+
+
+
+
+-- =====================================================
+-- =====================================================
+-- ======= 4/ A Refused Create Is Never Memoised =======
+-- =====================================================
+-- =====================================================
+
+helpers.describe("menu_paths retries a directory it could not create", function()
+	helpers.it("does not memoise a path whose creation was refused", function()
+		-- hs.fs.mkdir follows LuaFileSystem semantics: it RETURNS nil plus an error
+		-- and never raises, so reading the pcall STATUS reported success for a create
+		-- that never happened. The path was then memoised as ensured, and every later
+		-- resolution skipped it — leaving the config directory missing for the whole
+		-- session while every save silently no-opped.
+		--
+		-- Refusal is usually transient (volume still mounting, TCC not yet granted),
+		-- so the correct behaviour is to keep trying rather than to remember failure.
+		local attempts = 0
+		local menu_paths = helpers.load_with_stubs("ui.menu.menu_paths", {
+			fs = {
+				-- Refuses every create the way the real API does: nil + message.
+				mkdir      = function() attempts = attempts + 1 ; return nil, "permission denied" end,
+				attributes = function() return nil end,
+				dir        = function() return function() return nil end end,
+			},
+			execute = function() return "", true end,
+		})
+
+		menu_paths.get(DRIVER_SUBDIR_KEY)
+		local after_first = attempts
+		menu_paths.get(DRIVER_SUBDIR_KEY)
+
+		helpers.assert_true(attempts > after_first,
+			"a refused create must NOT be memoised — remembering it skips every later "
+			.. "attempt, so a directory that was merely unavailable for a moment stays "
+			.. "missing for the rest of the session")
 	end)
 end)
