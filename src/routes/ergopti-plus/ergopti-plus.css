@@ -27,17 +27,22 @@
 
 /* The page renders bare inside the layout (no sidebar), so the global
  * #main-content { width: 72.5vw } left-shifts everything. id+class wins
- * the specificity tie against the global id rule. */
+ * the specificity tie against the global id rule. overflow-x must be clip,
+ * not the global hidden: hidden makes the element a scroll container and
+ * position:sticky then sticks to IT instead of the viewport. */
 #main-content.ep-shell {
 	margin: 0 auto;
+	overflow-x: clip;
 	width: 100%;
 }
 
 /* Defeat spacing.css `main { width: clamp(...950px); padding: 3vw }` —
- * sections manage their own width through .ep-wrap. */
+ * sections manage their own width through .ep-wrap. Same overflow story
+ * as above: layout.css sets main { overflow-x: hidden }. */
 .ep-shell main.ep-main {
 	margin: 0;
 	max-width: none;
+	overflow-x: clip;
 	padding: 0;
 	width: 100%;
 }
@@ -94,6 +99,9 @@
 .ep-root section {
 	padding-block: clamp(56px, 9vw, 120px) 0;
 	position: relative;
+	/* Anchor jumps must clear the sticky section nav that sits below the
+	 * fixed header (html scroll-padding-top only accounts for the header) */
+	scroll-margin-top: 64px;
 }
 
 /* ==========================================
@@ -275,8 +283,11 @@
 	font-size: clamp(1.75rem, 4vw, 2.75rem);
 	font-weight: 700;
 	letter-spacing: -0.02em;
-	line-height: 1.08;
-	margin: 0 0 14px;
+	line-height: 1.12;
+	margin: 0 0 10px;
+	/* background-clip:text only paints inside the line boxes — without this
+	 * padding, descenders (g, p) fall outside and render transparent */
+	padding-bottom: 0.14em;
 	text-align: center;
 	-webkit-text-fill-color: transparent;
 	text-wrap: balance;
@@ -419,6 +430,15 @@
 	border-radius: 8px;
 }
 
+.ep-root .ep-window.os-linux {
+	border-radius: 12px 12px 8px 8px;
+}
+
+.ep-root .ep-window.os-linux .chrome {
+	background: rgba(255, 255, 255, 0.075);
+	min-height: 42px;
+}
+
 .ep-root .chrome {
 	align-items: center;
 	background: rgba(255, 255, 255, 0.05);
@@ -484,6 +504,38 @@
 	height: 26px;
 	justify-content: center;
 	width: 34px;
+}
+
+/* GNOME-style circular headerbar controls (decorative) */
+.ep-root .linux-controls {
+	display: inline-flex;
+	gap: 8px;
+}
+
+.ep-root .linux-btn {
+	align-items: center;
+	background: rgba(255, 255, 255, 0.1);
+	border-radius: 50%;
+	color: var(--ink-soft);
+	display: inline-flex;
+	font-size: 0.58rem;
+	height: 22px;
+	justify-content: center;
+	width: 22px;
+}
+
+/* Balances the right-side controls so the Linux title stays centered */
+.ep-root .chrome-spacer--linux {
+	width: 82px;
+}
+
+.ep-root .live-badge {
+	color: #28c840;
+	flex-shrink: 0;
+	font-size: 0.7rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
 }
 
 /* ============================================

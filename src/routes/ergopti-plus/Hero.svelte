@@ -20,6 +20,7 @@ FEATURES & RATIONALE:
 	import { onMount } from 'svelte';
 	import { fly } from 'svelte/transition';
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
+	import WindowChrome from './WindowChrome.svelte';
 	import { ui, setOS } from './state.svelte.js';
 
 	/** Milliseconds between two typed characters in the demo. */
@@ -104,6 +105,7 @@ FEATURES & RATIONALE:
 
 	let urlWindows = $derived(ui.release?.url('ErgoptiPlus.exe') ?? '#');
 	let urlMacos = $derived(ui.release?.url('ErgoptiPlus.app.zip') ?? '#');
+	let urlKanata = $derived(ui.release?.url('kanata.kbd') ?? '#');
 </script>
 
 <section class="hero" id="demo">
@@ -128,10 +130,20 @@ FEATURES & RATIONALE:
 			>
 				<i class="icon-appleinc"></i><span>macOS</span>
 			</button>
+			<button
+				type="button"
+				class={ui.osStyle === 'linux' ? 'os-btn active' : 'os-btn'}
+				onclick={() => setOS('linux')}
+				title="Afficher les fenêtres au style Linux (kanata + daemon Lua, alpha)"
+				aria-pressed={ui.osStyle === 'linux'}
+			>
+				<i class="icon-linux"></i><span>Linux</span>
+			</button>
 		</div>
 
 		<p class="eyebrow">
-			Frappe augmentée <span class="dot">•</span> Windows, macOS <span class="dot">•</span> 100 % local
+			Frappe augmentée <span class="dot">•</span> Windows, macOS, Linux
+			<span class="dot">•</span> 100 % local
 		</p>
 		<h1 class="hero-title">Tapez moins.<br /><span class="grad">Écrivez plus.</span></h1>
 		<p class="hero-sub">
@@ -145,6 +157,15 @@ FEATURES & RATIONALE:
 				<a class="btn btn-primary" href={urlMacos} download={!!ui.release}>
 					<i class="icon-appleinc"></i>
 					<span>Télécharger pour macOS</span>
+				</a>
+				<a class="btn btn-secondary" href={urlWindows} download={!!ui.release}>
+					<i class="icon-windows"></i>
+					<span>Windows</span>
+				</a>
+			{:else if ui.osStyle === 'linux'}
+				<a class="btn btn-primary" href={urlKanata} download={!!ui.release}>
+					<i class="icon-linux"></i>
+					<span>Télécharger pour Linux (alpha)</span>
 				</a>
 				<a class="btn btn-secondary" href={urlWindows} download={!!ui.release}>
 					<i class="icon-windows"></i>
@@ -169,24 +190,7 @@ FEATURES & RATIONALE:
 		<!-- Live typing demo — real window chrome, real family colors -->
 		<div class="demo-stage">
 			<div class="demo-window ep-window os-{ui.osStyle}" aria-hidden="true">
-				<div class="chrome">
-					{#if ui.osStyle === 'macos'}
-						<span class="mac-dots">
-							<span class="dot dot-r"></span>
-							<span class="dot dot-y"></span>
-							<span class="dot dot-g"></span>
-						</span>
-						<span class="chrome-title">~/notes/brouillon.md</span>
-						<span class="chrome-spacer"></span>
-					{:else}
-						<span class="chrome-title chrome-title--win">~/notes/brouillon.md</span>
-						<span class="win-buttons">
-							<span class="win-btn">─</span>
-							<span class="win-btn">▢</span>
-							<span class="win-btn">✕</span>
-						</span>
-					{/if}
-				</div>
+				<WindowChrome title="~/notes/brouillon.md" />
 				<div class="demo-viewport">
 					{#key demoIndex}
 						<div
@@ -196,10 +200,10 @@ FEATURES & RATIONALE:
 						>
 							<span class="demo-typed">{typed}</span><span class="caret"></span>
 							{#if phase === 'tooltip'}
-								<div class="demo-tooltip" style="--tt: {demos[demoIndex].color};">
+								<span class="demo-tooltip" style="--tt: {demos[demoIndex].color};">
 									<span class="tt-text">{demos[demoIndex].output}</span>
 									<span class="tt-tag">{demos[demoIndex].group}</span>
-								</div>
+								</span>
 							{/if}
 						</div>
 					{/key}
@@ -311,15 +315,19 @@ FEATURES & RATIONALE:
 		font-size: clamp(2.6rem, 7vw, 4.6rem);
 		font-weight: 800;
 		letter-spacing: -0.03em;
-		line-height: 1.02;
+		line-height: 1.06;
 		margin: 0 0 22px;
 		text-align: center;
 	}
 
+	/* inline-block + bottom padding keep descenders inside the painted
+	 * area — background-clip:text renders them transparent otherwise */
 	.hero-title .grad {
 		background: linear-gradient(92deg, #31beff 5%, #02c9db 55%, #7ee3ff 100%);
 		-webkit-background-clip: text;
 		background-clip: text;
+		display: inline-block;
+		padding-bottom: 0.1em;
 		-webkit-text-fill-color: transparent;
 	}
 
@@ -383,26 +391,28 @@ FEATURES & RATIONALE:
 		color: var(--ink);
 	}
 
+	/* Inline in the text flow, right of the caret — like the real driver
+	 * tooltip. Absolute placement below the line got clipped by the
+	 * window's bottom edge. */
 	.demo-tooltip {
 		align-items: center;
 		animation: tooltip-pop 0.22s var(--ease-out);
 		background: rgba(12, 16, 28, 0.97);
 		border: 1.5px solid var(--tt);
-		border-radius: 10px;
-		box-shadow: 0 10px 34px -8px color-mix(in srgb, var(--tt) 55%, transparent);
+		border-radius: 8px;
+		box-shadow: 0 6px 22px -6px color-mix(in srgb, var(--tt) 55%, transparent);
 		display: inline-flex;
-		gap: 10px;
-		left: 0;
-		padding: 8px 14px;
-		position: absolute;
-		top: calc(100% + 14px);
+		gap: 8px;
+		margin-left: 14px;
+		padding: 4px 10px;
+		vertical-align: middle;
 		white-space: nowrap;
 	}
 
 	@keyframes tooltip-pop {
 		from {
 			opacity: 0;
-			transform: translateY(6px) scale(0.96);
+			transform: translateX(-6px) scale(0.96);
 		}
 		to {
 			opacity: 1;
@@ -412,7 +422,7 @@ FEATURES & RATIONALE:
 
 	.tt-text {
 		color: var(--tt);
-		font-size: 1.05rem;
+		font-size: 0.95rem;
 		font-weight: 700;
 	}
 

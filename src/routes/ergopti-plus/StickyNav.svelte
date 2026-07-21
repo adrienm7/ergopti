@@ -57,11 +57,7 @@ FEATURES & RATIONALE:
 <nav class="sticky-nav" aria-label="Sections de la page">
 	<div class="nav-scroll" bind:this={navEl}>
 		{#each items as item}
-			<a
-				href="#{item.id}"
-				class:active={activeId === item.id}
-				class:cta={item.id === 'telecharger'}
-			>
+			<a href="#{item.id}" class:active={activeId === item.id}>
 				{item.label}
 			</a>
 		{/each}
@@ -117,17 +113,11 @@ FEATURES & RATIONALE:
 		color: var(--ink);
 	}
 
+	/* The single blue pill marks the section currently in view — no item
+	 * gets a permanent fill, or the scrollspy state becomes unreadable */
 	.nav-scroll a.active {
-		background: rgba(49, 190, 255, 0.14);
-		color: var(--ink);
-	}
-
-	.nav-scroll a.cta {
 		background: linear-gradient(135deg, var(--accent-blue-deep), var(--accent-cyan));
+		box-shadow: 0 4px 18px -6px rgba(48, 136, 237, 0.7);
 		color: #fff;
-	}
-
-	.nav-scroll a.cta:hover {
-		filter: brightness(1.1);
 	}
 </style>

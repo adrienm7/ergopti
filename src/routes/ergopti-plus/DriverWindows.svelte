@@ -21,7 +21,9 @@ FEATURES & RATIONALE:
 
 <script>
 	import { base } from '$app/paths';
+	import WindowChrome from './WindowChrome.svelte';
 	import { reveal } from './reveal.js';
+	import { ui } from './state.svelte.js';
 
 	/** Downscale threshold — frames narrower than this scale down to fit. */
 	const FRAME_DISPLAY_HEIGHT = 600;
@@ -58,15 +60,12 @@ FEATURES & RATIONALE:
 	];
 
 	let activeTab = $state('model_browser');
-	let frameWrap = $state(null);
-	let wrapWidth = $state(960);
 
 	let geometry = $derived(
 		Object.fromEntries(webviews.map((w) => [w.id, { width: w.width, height: w.height }]))
 	);
 	let active = $derived(tabs.find((t) => t.id === activeTab) ?? tabs[0]);
 	let nativeSize = $derived(geometry[activeTab] ?? { width: 900, height: 600 });
-	let scale = $derived(Math.min(1, wrapWidth / nativeSize.width));
 
 	// French display names for the full window list strip.
 	const windowNames = {
@@ -226,16 +225,6 @@ FEATURES & RATIONALE:
 			console.error('Injection dans la fenêtre du driver impossible :', e);
 		}
 	}
-
-	/** Track the frame container width to downscale windows on small screens. */
-	$effect(() => {
-		if (!frameWrap) return;
-		const ro = new ResizeObserver((entries) => {
-			for (const e of entries) wrapWidth = e.contentRect.width;
-		});
-		ro.observe(frameWrap);
-		return () => ro.disconnect();
-	});
 </script>
 
 <section class="windows" id="fenetres" style="--section-accent: var(--accent-cyan);">
@@ -267,27 +256,27 @@ FEATURES & RATIONALE:
 
 		<p class="win-blurb">{active.blurb}</p>
 
-		<div class="frame-shell ep-window os-macos" use:reveal>
-			<div class="chrome">
-				<span class="mac-dots">
-					<span class="dot dot-r"></span>
-					<span class="dot dot-y"></span>
-					<span class="dot dot-g"></span>
-				</span>
-				<span class="chrome-title"
-					>/ergopti_plus/_shared/ui/{activeTab}/ · {nativeSize.width}×{nativeSize.height}</span
-				>
-				<span class="live-badge">● live</span>
-			</div>
-			<div class="frame-wrap" bind:this={frameWrap} style="height: {FRAME_DISPLAY_HEIGHT}px;">
+		<!-- The shell hugs the window's native width so the iframe fills it
+		     edge to edge — no leftover gutter, narrow windows stay centered -->
+		<div
+			class="frame-shell ep-window os-{ui.osStyle}"
+			style="max-width: {nativeSize.width}px;"
+			use:reveal
+		>
+			<WindowChrome
+				title="/ergopti_plus/_shared/ui/{activeTab}/ · {nativeSize.width}×{nativeSize.height}"
+				live={true}
+			/>
+			<div
+				class="frame-wrap"
+				style="height: {Math.min(FRAME_DISPLAY_HEIGHT, nativeSize.height)}px;"
+			>
 				{#key activeTab}
 					<iframe
 						src="{base}/ergopti_plus/_shared/ui/{activeTab}/index.html"
 						title={active.label}
 						loading="lazy"
 						onload={onFrameLoad}
-						style="width: {nativeSize.width}px; height: {FRAME_DISPLAY_HEIGHT /
-							scale}px; transform: scale({scale});"
 					></iframe>
 				{/key}
 			</div>
@@ -360,15 +349,7 @@ FEATURES & RATIONALE:
 
 	.frame-shell {
 		margin: 0 auto;
-		max-width: 980px;
-	}
-
-	.live-badge {
-		color: #28c840;
-		font-size: 0.7rem;
-		font-weight: 700;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
+		width: 100%;
 	}
 
 	.frame-wrap {
@@ -380,7 +361,8 @@ FEATURES & RATIONALE:
 	.frame-wrap iframe {
 		border: 0;
 		display: block;
-		transform-origin: top left;
+		height: 100%;
+		width: 100%;
 	}
 
 	.win-all {
