@@ -668,6 +668,21 @@ local function read_wrap_ax_selection_cached()
 	return sel
 end
 
+--- Records that the cached selection has been consumed by a wrap, WITHOUT
+--- discarding the cache entry.
+---
+--- wrap_selection replaces the selection it was given, so the cached value is
+--- stale the instant a wrap fires. Within the TTL the next wrap key then re-wrapped
+--- text that was no longer selected: the keystroke was swallowed and the previous
+--- selection duplicated. Marking it as a fresh NEGATIVE (rather than clearing the
+--- validity flag) is deliberate — clearing would re-pay both AX calls on every
+--- subsequent wrap key and undo the negative-caching fix this file just received.
+local function mark_wrap_selection_consumed()
+	_wrap_ax_selection_cache = nil
+	_wrap_ax_selection_ts    = hs.timer.secondsSinceEpoch()
+	_wrap_ax_selection_valid = true
+end
+
 --- Starts a keyDown eventtap that wraps the current text selection with the typed symbol.
 --- When no text is selected (or the focused app hides its selection), the key event
 --- is passed through unchanged so the symbol is never swallowed.
@@ -705,6 +720,8 @@ function M.bind_wrap_text_if_selected(get_wrap_pairs)
 
 		if decision ~= "wrap" then return false end
 		text_acts.wrap_selection(sel, pair.left, pair.right)
+		-- The wrap just replaced that selection, so the cached copy is stale now.
+		mark_wrap_selection_consumed()
 		return true
 	end)
 	tap:start()
