@@ -963,7 +963,33 @@ KL_IngestOnce(force := false, rollover_owned := false) {
 	; already recoverable from the old offset and must NOT also be re-queued.
 	pending_logged_count := 0
 	if (pending_snapshot.Length > 0) {
-		fh := KL_OpenTodayFh()
+		; Opening today.log must honour the same failure transaction as the
+		; data.sql append below. FileOpen THROWS OSError in v2 — it never returns
+		; a falsy handle — so a bare call aborted the timer thread right here,
+		; after _pending_entries had already been snapshot-and-cleared above.
+		; pending_snapshot is a local, so those keystrokes were simply gone: no
+		; requeue, no offset rollback, and the global error net only logs and
+		; returns, it does not resume the aborted callback. Unlike the data.sql
+		; path there is no disk copy to recover from — KL_AppendLog pushes to
+		; _pending_entries only — so the snapshot is the sole copy.
+		fh := 0
+		try {
+			fh := KL_OpenTodayFh()
+		} catch as err {
+			; Nothing reached today.log, so the ENTIRE snapshot returns to RAM.
+			previous_critical := Critical("On")
+			try {
+				loop pending_snapshot.Length
+					Keylogger._pending_entries.InsertAt(A_Index, pending_snapshot[A_Index])
+			} finally {
+				Critical(previous_critical)
+			}
+			; Leave today_log_offset alone so the next tick retries the same chunk.
+			if Keylogger.HasProp("log") && IsObject(Keylogger.log)
+				Keylogger.log.Error("Cannot open today.log: " . err.Message . " — "
+					. pending_snapshot.Length . " pending entry(ies) re-queued.")
+			return Map("ok", false, "eof", false, "reason", "today_log_open_failed")
+		}
 		if IsObject(fh) {
 			for _, e in pending_snapshot {
 				try {
