@@ -15,6 +15,7 @@ FEATURES & RATIONALE:
 
 <script>
 	import { onMount } from 'svelte';
+	import WindowChrome from './WindowChrome.svelte';
 	import { ui } from './state.svelte.js';
 
 	/** Base per-character delay for literal text (jittered for realism). */
@@ -116,32 +117,17 @@ FEATURES & RATIONALE:
 		</header>
 
 		<div class="session-window ep-window os-{ui.osStyle}">
-			<div class="chrome">
-				{#if ui.osStyle === 'macos'}
-					<span class="mac-dots">
-						<span class="dot dot-r"></span>
-						<span class="dot dot-y"></span>
-						<span class="dot dot-g"></span>
-					</span>
-					<span class="chrome-title">message.txt</span>
-					<span class="chrome-spacer"></span>
-				{:else}
-					<span class="chrome-title chrome-title--win">message.txt</span>
-					<span class="win-buttons">
-						<span class="win-btn">─</span>
-						<span class="win-btn">▢</span>
-						<span class="win-btn">✕</span>
-					</span>
-				{/if}
-			</div>
+			<WindowChrome title="message.txt" />
 			<div class="session-body">
-				<p class="session-line">{sessionText}<span class="caret"></span></p>
-				{#if sessionTooltip}
-					<div class="session-tooltip" style="--tt: {sessionTooltip.color};">
-						<span class="tt-text">{sessionTooltip.text}</span>
-						<span class="tt-tag">{sessionTooltip.group}</span>
-					</div>
-				{/if}
+				<p class="session-line">
+					{sessionText}<span class="caret"></span>{#if sessionTooltip}<span
+							class="session-tooltip"
+							style="--tt: {sessionTooltip.color};"
+						>
+							<span class="tt-text">{sessionTooltip.text}</span>
+							<span class="tt-tag">{sessionTooltip.group}</span>
+						</span>{/if}
+				</p>
 			</div>
 		</div>
 	</div>
@@ -150,7 +136,7 @@ FEATURES & RATIONALE:
 <style>
 	.session-body {
 		min-height: 170px;
-		padding: 26px 28px 64px;
+		padding: 26px 28px 30px;
 		position: relative;
 	}
 
@@ -163,23 +149,21 @@ FEATURES & RATIONALE:
 		text-align: left;
 	}
 
-	/* Docked at the bottom of the window rather than floating over the
-	 * text — the old absolute right/bottom tooltip overlapped the sentence
-	 * as soon as it wrapped on mobile. */
+	/* Inline in the text flow, right of the caret — mirrors the driver's
+	 * real tooltip position and can never be clipped by the window edge */
 	.session-tooltip {
 		align-items: center;
 		animation: tooltip-pop 0.22s var(--ease-out);
 		background: rgba(12, 16, 28, 0.97);
 		border: 1.5px solid var(--tt);
-		border-radius: 9px;
-		bottom: 14px;
-		box-shadow: 0 10px 34px -8px color-mix(in srgb, var(--tt) 55%, transparent);
+		border-radius: 7px;
+		box-shadow: 0 6px 22px -6px color-mix(in srgb, var(--tt) 55%, transparent);
 		display: inline-flex;
-		gap: 10px;
-		left: 28px;
-		max-width: calc(100% - 56px);
-		padding: 7px 13px;
-		position: absolute;
+		gap: 8px;
+		margin-left: 10px;
+		max-width: 100%;
+		padding: 2px 9px;
+		vertical-align: middle;
 	}
 
 	@keyframes tooltip-pop {
@@ -195,7 +179,7 @@ FEATURES & RATIONALE:
 
 	.tt-text {
 		color: var(--tt);
-		font-size: 0.95rem;
+		font-size: 0.85rem;
 		font-weight: 700;
 		overflow: hidden;
 		text-overflow: ellipsis;

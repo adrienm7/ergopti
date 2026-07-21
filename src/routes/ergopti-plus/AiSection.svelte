@@ -20,6 +20,7 @@ FEATURES & RATIONALE:
 
 <script>
 	import { reveal } from './reveal.js';
+	import WindowChrome from './WindowChrome.svelte';
 	import { ui } from './state.svelte.js';
 
 	/**
@@ -88,24 +89,7 @@ FEATURES & RATIONALE:
 			</div>
 
 			<div class="ai-window ep-window os-{ui.osStyle}">
-				<div class="chrome">
-					{#if ui.osStyle === 'macos'}
-						<span class="mac-dots">
-							<span class="dot dot-r"></span>
-							<span class="dot dot-y"></span>
-							<span class="dot dot-g"></span>
-						</span>
-						<span class="chrome-title">~/inbox/brouillon.eml</span>
-						<span class="chrome-spacer"></span>
-					{:else}
-						<span class="chrome-title chrome-title--win">~/inbox/brouillon.eml</span>
-						<span class="win-buttons">
-							<span class="win-btn">─</span>
-							<span class="win-btn">▢</span>
-							<span class="win-btn">✕</span>
-						</span>
-					{/if}
-				</div>
+				<WindowChrome title="~/inbox/brouillon.eml" />
 
 				<div class="ai-body">
 					{#if activeMode === 'predict'}
@@ -501,15 +485,15 @@ FEATURES & RATIONALE:
 		margin-bottom: clamp(36px, 5vw, 56px);
 	}
 
+	/* Block layout, not flex: a flex h3 splits its text nodes into gapped
+	 * flex items, which broke the line around the inline model count */
 	.ai-step h3 {
-		align-items: center;
-		display: flex;
 		font-size: 1.25rem;
 		font-weight: 700;
-		gap: 12px;
-		justify-content: center;
-		margin-bottom: 20px;
+		margin: 0 auto 20px;
+		max-width: 700px;
 		text-align: center;
+		text-wrap: balance;
 	}
 
 	.step-badge {
@@ -519,11 +503,12 @@ FEATURES & RATIONALE:
 		border-radius: 50%;
 		color: #ff8ab5;
 		display: inline-flex;
-		flex-shrink: 0;
 		font-size: 0.85rem;
 		font-weight: 800;
 		height: 30px;
 		justify-content: center;
+		margin-right: 10px;
+		vertical-align: -0.4em;
 		width: 30px;
 	}
 
@@ -644,16 +629,23 @@ FEATURES & RATIONALE:
 
 	/* ─── Model catalog ─────────────────────────────────────── */
 
+	/* Flexbox, not a 3-col grid: the nowrap family line gives each cell a
+	 * large min-content width, and 1fr grid tracks refuse to shrink below
+	 * it — the third column ended up clipped in the margin. flex-basis +
+	 * min-width:0 lets cells shrink and the ellipsis do its job. */
 	.provider-grid {
-		display: grid;
+		display: flex;
+		flex-wrap: wrap;
 		gap: 10px;
-		grid-template-columns: repeat(3, 1fr);
 	}
 
 	.provider {
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
+		flex: 1 1 280px;
+		max-width: 100%;
+		min-width: 0;
 		padding: 13px 15px;
 		transition: border-color 0.25s var(--ease);
 	}

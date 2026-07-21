@@ -20,7 +20,7 @@
 const OS_STORAGE_KEY = 'ergoptiplus.osStyle';
 
 export const ui = $state({
-	/** @type {'windows'|'macos'} Chrome style applied to every mock window. */
+	/** @type {'windows'|'macos'|'linux'} Chrome style applied to every mock window. */
 	osStyle: 'windows',
 	/** @type {{tag: string, url: (name: string) => string | null} | null} */
 	release: null
@@ -29,19 +29,21 @@ export const ui = $state({
 /**
  * Detect the visitor's OS from the user agent (SSR-safe, defaults to
  * Windows which matches the majority audience).
- * @returns {'windows'|'macos'}
+ * @returns {'windows'|'macos'|'linux'}
  */
 export function detectOS() {
 	if (typeof navigator === 'undefined') return 'windows';
 	const ua = navigator.userAgent || '';
 	if (/mac/i.test(ua) && !/windows/i.test(ua)) return 'macos';
+	// Android UAs contain "Linux" — only desktop Linux gets the GNOME chrome.
+	if (/linux/i.test(ua) && !/android/i.test(ua)) return 'linux';
 	return 'windows';
 }
 
 /**
  * Set the OS chrome style and persist the explicit choice so it sticks
  * across visits.
- * @param {'windows'|'macos'} next
+ * @param {'windows'|'macos'|'linux'} next
  */
 export function setOS(next) {
 	ui.osStyle = next;
@@ -63,5 +65,6 @@ export function restoreOS() {
 	} catch (_) {
 		/* ignore */
 	}
-	ui.osStyle = stored === 'macos' || stored === 'windows' ? stored : detectOS();
+	ui.osStyle =
+		stored === 'macos' || stored === 'windows' || stored === 'linux' ? stored : detectOS();
 }

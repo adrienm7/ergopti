@@ -152,7 +152,11 @@ FEATURES & RATIONALE:
 				>
 					<i class="icon-appleinc"></i><span>macOS</span>
 				</a>
-				<a class="btn btn-secondary" href={urlKanata} download={!!ui.release}>
+				<a
+					class={ui.osStyle === 'linux' ? 'btn btn-primary' : 'btn btn-secondary'}
+					href={urlKanata}
+					download={!!ui.release}
+				>
 					<i class="icon-linux"></i><span>Linux <small>(alpha)</small></span>
 				</a>
 			</div>
@@ -331,6 +335,8 @@ FEATURES & RATIONALE:
 		font-weight: 800;
 		letter-spacing: -0.02em;
 		margin: 0 0 12px;
+		/* Keeps descenders inside the painted clip area */
+		padding-bottom: 0.12em;
 		position: relative;
 		text-align: center;
 		-webkit-text-fill-color: transparent;
