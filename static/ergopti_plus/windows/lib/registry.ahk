@@ -31,8 +31,6 @@
 ; ============================
 ; ============================
 
-; Sentinel returned by Reg_Read when the key or value is absent.
-global REG_NOT_FOUND := "__REG_NOT_FOUND__"
 
 
 

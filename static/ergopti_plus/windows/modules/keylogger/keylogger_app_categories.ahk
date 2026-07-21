@@ -296,7 +296,7 @@ KL_AppCat_Get(app_name) {
         KLAppCat.save_fn := KL_AppCat_DeferredSave.Bind()
     }
     ; Delay 5 s so a burst of new apps is batched into one file write
-    try SetTimer(KLAppCat.save_fn, -5000)
+    try SetTimer(KLAppCat.save_fn, -KLAppCatConst.DEFERRED_SAVE_RETRY_MS)
     return "unknown"
 }
 
