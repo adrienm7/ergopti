@@ -287,6 +287,15 @@ local _file_handle    = nil
 local _last_log_date  = nil
 local _last_log_path  = nil
 
+-- Per-sub-file calendar date, playing for the topical fan-out the role
+-- _last_log_date plays for the main handle: it records the date this process last
+-- wrote to each sub-file, so the first write of a new day truncates it instead of
+-- appending. Deciding this at write time is the only correct moment — the purge
+-- pass runs LOG_PURGE_DELAY_SEC after boot, by which point the fan-out has already
+-- stamped every active sub-file with today's mtime, so its "mtime is not today"
+-- test can never fire for the files that actually need resetting.
+local _sub_file_date  = {}
+
 -- Forward declaration — implementation is in Section 3.2. Declared here for the
 -- same reason as the handles above: init_log_path() and _purge_old_logs() are
 -- defined before it and must reach the real dispatcher, not a nil global.
@@ -586,6 +595,36 @@ end
 --- unexpected HS crash does not lose buffered entries. Failures are silent.
 --- @param stamp string Pre-built timestamp string.
 --- @param line string The line to write (without timestamp).
+--- Returns the io.open mode for a topical sub-file: "a" when it already carries
+--- today's lines, "w" when it must be reset for a new day. Decided once per
+--- sub-file per calendar date, then cached in _sub_file_date.
+---
+--- Applies the same mtime-is-today predicate as the purge pass, but evaluates it
+--- BEFORE the logger appends anything. Once the fan-out has written, mtime answers
+--- "did this process just log?" rather than "does this file hold only today?" —
+--- which is why the purge could never reset an active sub-file.
+--- @param path string Absolute sub-file path.
+--- @param today string Current date as YYYY-MM-DD.
+--- @return string Either "a" or "w".
+local function _sub_file_mode(path, today)
+	if _sub_file_date[path] == today then return "a" end
+	_sub_file_date[path] = today
+
+	local hs_ref = rawget(_G, "hs")
+	local fs_ref = (type(hs_ref) == "table") and hs_ref.fs or nil
+	if type(fs_ref) ~= "table" or type(fs_ref.attributes) ~= "function" then
+		-- Without a filesystem port the age is undecidable. Append rather than
+		-- truncate: keeping a stale line is recoverable, deleting today's is not.
+		return "a"
+	end
+
+	local ok_attr, attrs = pcall(fs_ref.attributes, path)
+	if not ok_attr or type(attrs) ~= "table" or not attrs.modification then
+		return "a"  -- File absent (nothing to reset) or unreadable — "a" creates it
+	end
+	return (os.date("%Y-%m-%d", attrs.modification) == today) and "a" or "w"
+end
+
 local function _write_to_file(stamp, line)
 	local full = stamp .. " " .. line .. "\n"
 	local fh = _ensure_log_file()
@@ -597,10 +636,12 @@ local function _write_to_file(stamp, line)
 	end
 	-- Fan-out to topical sub-files. Each is opened/closed per write so a crash
 	-- never leaves a stale handle. Cost is negligible vs. the operations logged.
+	local today = os.date("%Y-%m-%d")
 	for _, sub in ipairs(SUB_LOG_NAMES) do
 		if _matches_any(line, sub.patterns) then
 			pcall(function()
-				local f = io.open(_log_dir .. sub.name, "a")
+				local path = _log_dir .. sub.name
+				local f = io.open(path, _sub_file_mode(path, today))
 				if f then
 					f:write(full)
 					f:close()
