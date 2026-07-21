@@ -938,8 +938,15 @@ function M.handle_chain_signal(keyCode)
 	if keyCode ~= KEYCODE_LLM_CHAIN or not chain_pending then return false end
 	chain_pending = false
 	if _chain_trigger_timer then _chain_trigger_timer:stop() end
-	Logger.debug(LOG, "F16 received — triggering chained LLM.")
-	M.perform_check(true)
+	Logger.debug(LOG, "F16 received — scheduling chained LLM…")
+	-- Never run perform_check inline: this function is reached from the keymap
+	-- CGEventTap callback (llm_bridge.handle_llm_keys), and perform_check calls
+	-- AppFilter.is_blocked, which issues uncached cross-process Accessibility
+	-- queries. Stalling the tap risks kCGEventTapDisabledByTimeout, which kills
+	-- the keyboard until the tap is re-armed. Deferring by one run-loop tick makes
+	-- this path structurally identical to the CHAIN_FALLBACK_SEC timer that calls
+	-- the same function.
+	hs.timer.doAfter(0, function() M.perform_check(true) end)
 	return true
 end
 
