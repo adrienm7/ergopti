@@ -29,6 +29,9 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-ahk-test-suite-critical-leak](#project-ahk-test-suite-critical-leak) — Critical("On") in layout/hotkey callbacks is safe in production but leaks into the main thread when invoked directly by tests, silently hanging background timers
   - [project-ahk-numeric-string-equals-false](#project-ahk-numeric-string-equals-false) — `"0" = false` is TRUE in AHK v2; never compare a String|false return against false, type-check with `is String`
   - [project-ahk-keyword-as-variable-hangs-the-parser](#project-ahk-keyword-as-variable-hangs-the-parser) — naming a variable `Catch` (or any control-flow keyword) hangs AHK v2 with zero output and no error; bisect to a trivial probe when a run produces nothing at all
+  - [project-ahk-map-delete-raises-on-missing-key](#project-ahk-map-delete-raises-on-missing-key) — `Map.Delete(k)` THROWS when k is absent (unlike `.Has`-guarded reads); an unguarded reset was a fatal startup error, and `/validate` is not an AHK v2.0 flag — it silently RUNS the script
+  - [project-toml-cache-returns-real-booleans](#project-toml-cache-returns-real-booleans) — `IniCacheGet` hands back what `TOML_CoerceValue` produced, so a TOML `true` is a BOOLEAN; `StrLower(v) == "true"` is a legal always-false test that silently read every enabled setting as off
+  - [project-audit-2026-07-21-toml-onboarding](#project-audit-2026-07-21-toml-onboarding) — the last two never-read driver zones (`lib/toml/`, `ui/onboarding/`) audited and cleared: 16 candidates, 11 confirmed and all 11 fixed with regression tests
   - [project-ahk-guard-tests-must-loop-the-class](#project-ahk-guard-tests-must-loop-the-class) — Guard tests must enumerate the whole class of call sites, not the one site a bug was fixed at — 5 findings in one audit came from this
   - [project-audit-evidence-must-be-reproducible](#project-audit-evidence-must-be-reproducible) — A refutation needs the same proof as a finding: the "the perf section was fabricated" debunking was itself wrong (it searched `ahk/logs`, but the real path is `autohotkey/logs`); G4 IS measured, and the logs live at `<ConfigDir>/autohotkey/logs/` via `paths.toml`
   - [project-hs-audit-round2-2026-07-21](#project-hs-audit-round2-2026-07-21) — the second implementation pass: 51 of 78 open findings treated (24 fixed, 27 refuted/stale); the remaining 27 are listed there with an exact fix each
@@ -685,6 +688,53 @@ The "bypass AHK's dispatcher" fix is no longer pending — it ships as **`lib/me
 
 - [feedback-loader-target-explicit](feedback_loader_target_explicit.md) — different concern, same tray_menu.ahk neighborhood.
 - [project-config-v2-refactor](project_config_v2_refactor.md) — Phase 2 was wrongly suspected of causing this.
+
+### project-audit-2026-07-21-toml-onboarding
+
+_Closing the last coverage gap: `lib/toml/` and `ui/onboarding/` audited for the first time — 16 candidates, 11 confirmed, all 11 fixed_
+
+<sub>slug: `project_audit_2026_07_21_toml_onboarding`</sub>
+
+These two zones had never been read by any audit pass. 16 candidates were
+raised and each was adversarially verified by an independent agent instructed
+to refute it: **11 confirmed, 5 refuted**. All 11 are now fixed, each with a
+regression test that fails before its fix. The audit report was deleted after
+implementation, so this is the durable record.
+
+**Two severity corrections came out of the verification**, both worth keeping:
+
+- The "total config.toml loss" claim was refuted down to medium. Losing the
+  parse does NOT lose the file, because `TOML_RunStrictCanonicalization` runs
+  `SaveFullConfig` after every successful write and re-emits the entire
+  `Features` tree from memory. Durable loss is confined to what `Features` does
+  not hold, and only when canonicalization is skipped — i.e. boot-phase writes.
+- The wizard boolean bug was raised at critical and CONFIRMED at high after an
+  empirical reproduction, not just a code read. See
+  [[project_toml_cache_returns_real_booleans]].
+
+**The recurring shape, again:** of the 11, five were a sibling site missed when
+an invariant was applied — the WebView2 host had the correct boolean helper
+while the native host did not; one of three header parsers was fixed and two
+were not; the metrics consent path was wrong in both hosts. Every guard written
+here loops the class rather than pinning the reported site, per
+[[project_ahk_guard_tests_must_loop_the_class]].
+
+**Sentinel conflation** produced two more: `ONBOARDING_DEFAULT_MAGIC_KEY` was
+used as the "nothing chosen" test while also being a valid answer, and an empty
+config-folder field meant "use the default" to the step that stored it but
+"do nothing" to the step that committed it. Both silently rewrote user data.
+Track provenance explicitly; never infer "unset" from a value that is legal.
+
+**How to apply:**
+
+- The TOML parsers now share `TOML_StripInlineComment`; add new parsing there,
+  not in a fourth copy.
+- A failed read is signalled by `TOML_ReadFailed(Path)`, not by an empty result.
+  Any code that REWRITES a file from a parse must check it first.
+- `_Onboarding_ResetAnswers` owns the wizard reset; step renderers must stay
+  pure renderers, because the first page doubles as the Back target.
+
+---
 
 ### project-webview2-bridge-gotchas
 
@@ -1783,6 +1833,83 @@ The adversarial AHK audit of 2026-06-19 (full report: `AUDIT_AHK_2026-06-19.md` 
 - `SetTimer(fn, -1)` does NOT offload to another thread (a real comment in `changelog_window.ahk` wrongly claimed it did); callbacks run on the single AHK pseudo-thread when the message loop yields — the same thread that remaps every keystroke. A synchronous network/COM/shell call inside a `SetTimer` callback freezes typing.
 
 Related: [[project_ahk_menu_dispatcher_drop]], [[project_updater_nonblocking_http]], [[project_suspend_pause_invariant]], [[project_lua_closure_before_local_nil_global]], [[feedback_regression_tests]].
+
+### project-toml-cache-returns-real-booleans
+
+_A TOML `true` reaches the cache as an AHK boolean, not the string "true" — compare through `TomlCacheBool`, never `StrLower(v) == "true"`_
+
+<sub>slug: `project_toml_cache_returns_real_booleans`</sub>
+
+`ParseTomlFile` runs every value through `TOML_CoerceValue`, which maps the
+literals `true`/`false` to real AHK booleans. `IniCacheGet` then returns the
+stored value VERBATIM — unlike its sibling `TOML_Read`, it coerces nothing. So:
+
+```ahk
+v := IniCacheGet(Cache, "ahk.layout", "ergopti_base")  ; Integer 1, not "true"
+StrLower(v) == "true"    ; "1" vs "true" -> ALWAYS FALSE, never throws
+TomlCacheBool(Cache, "ahk.layout", "ergopti_base")     ; correct
+```
+
+The onboarding wizard carried this for as long as the native host existed:
+every saved `true` pre-filled as No, and Finish then wrote that `false` back
+over the user’s config, disabling the whole Ergopti emulation on a re-run.
+
+**Why it survived so long:** the bug is one-directional. TOML `false` coerces
+to `0`, which also compares false — so it was right by accident and never
+showed up as a spurious enable. And `tests/unit/test_config.ahk` builds its
+cache from string literals (`Map("S", Map("n", "42"))`), so it never observes
+what the real parser produces.
+
+**How to apply:**
+
+- Read TOML booleans out of a cache with `TomlCacheBool` (`lib/toml/toml_helpers.ahk`).
+- When testing a parser, feed it a real file — a hand-built Map tests your
+  assumption about the parser, not the parser.
+- Guarded by `tests/meta/test_onboarding_toml_bool_reads.ahk`, written for the
+  class: it fails if ANY host reimplements the string comparison.
+
+---
+
+### project-ahk-map-delete-raises-on-missing-key
+
+_`Map.Delete(k)` throws when the key is absent, and `/validate` is not an AHK v2.0 flag — it runs the script_
+
+<sub>slug: `project_ahk_map_delete_raises_on_missing_key`</sub>
+
+Two costs paid during the 2026-07-21 lib/toml + ui/onboarding pass.
+
+**`Map.Delete` is not `.Has`-tolerant.** Clearing a per-path flag with a bare
+`_TomlReadFailures.Delete(Path)` produced `FATAL STARTUP ERROR: Item has no
+value.` — the whole suite refused to load. Reads have a forgiving form
+(`.Get(k, default)`) and deletes do not, which makes the asymmetry easy to miss:
+
+```ahk
+if Cache.Has(Key)      ; required
+    Cache.Delete(Key)
+```
+
+**`/validate` does not exist in AHK v2.0** (it arrived in v2.1-alpha). Passing
+it to `AutoHotkey64.exe` does not syntax-check anything — the flag is ignored
+and the script is EXECUTED. Running it against `ErgoptiPlus.ahk` launched a
+second live driver from a worktree for two minutes before the timeout killed
+it. There is no load-only syntax check for v2.0; the honest check is the test
+suite, which catches load errors in anything `run_all.ahk` includes.
+
+**Corollary — GUI modules are not covered by that.** `ui/onboarding/*` is not
+included by `run_all.ahk`, so a real parse error there passes every
+source-introspection test. When editing those files, prefer constructs whose
+validity is not in doubt (hoist `global` declarations to the top of a function
+rather than relying on a mid-body declaration being legal).
+
+**How to apply:**
+
+- Guard every `Map.Delete` with `.Has()`.
+- Never pass `/validate` to AHK v2.0, and never run `ErgoptiPlus.ahk` from a
+  worktree to check it — it starts a real driver alongside the user’s.
+- Scratch `.ahk` probes outside `tests/` proved unrunnable in this environment
+  (they hang with no output); write the probe as a suite test instead.
+
+---
 
 ### project-ahk-keyword-as-variable-hangs-the-parser
 
