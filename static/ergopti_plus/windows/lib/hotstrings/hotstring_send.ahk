@@ -191,8 +191,27 @@ SendInstant(Text, Prefix := "") {
 	; SendInput (not SendEvent) is used here to stay atomic and avoid interleaving
 	; with the InputHook, which processes SendEvent characters as physical input.
 	if _SEND_INSTANT_CLIP_BUSY {
+		try LoggerDebug("Hotstrings", "SendInstant: a restore is still in flight; routing through the clipboard-free path.")
 		SendInput(Prefix . "{Text}" . Text)
-		return
+		; MUST report success: the text HAS been injected on this path. A bare
+		; return yields a falsy value, and WrapTextIfSelected treats falsy as
+		; "emitted nothing" and re-sends the bare symbol on top of the text that
+		; just landed.
+		return true
+	}
+	; The Notepad caller holds Critical across this whole call, so anything slow
+	; here starves the keyboard hook rather than merely delaying one expansion.
+	; CB_SaveAll snapshots EVERY format, and A_Clipboard retries for
+	; #ClipboardTimeout — a full second by default — when another process holds
+	; the clipboard open. A remote-desktop client, a clipboard manager or a
+	; freshly captured full-screen bitmap can therefore freeze the thread for
+	; ~1-2 s. Route those cases through the clipboard-free path instead: it
+	; renders slightly worse in Notepad, which is precisely the trade the
+	; reentrancy branch above already accepts.
+	if (CB_IsBusy() or CB_HasImage()) {
+		try LoggerDebug("Hotstrings", "SendInstant: clipboard is contended or holds a bitmap; routing through the clipboard-free path.")
+		SendInput(Prefix . "{Text}" . Text)
+		return true
 	}
 	OldClipboard := CB_SaveAll()
 	if (Type(OldClipboard) == "String" && OldClipboard == "__CB_SAVE_ERROR__") {

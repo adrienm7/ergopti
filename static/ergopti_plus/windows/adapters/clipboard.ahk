@@ -149,6 +149,28 @@ CB_HasImage() {
 	return false
 }
 
+; True when another process currently holds the clipboard open, i.e. reading or
+; writing it now would contend with that process.
+;
+; OpenClipboard is the only honest test for this: it returns 0 immediately when
+; someone else owns the handle, it does NOT wait. GetClipboardSequenceNumber
+; cannot answer the question at all — it is a monotonic counter of past changes
+; and says nothing about the current owner.
+;
+; The probe closes the clipboard again straight away when it succeeds. Leaving it
+; open would make THIS process the blocker, which is the exact failure the probe
+; exists to avoid.
+CB_IsBusy() {
+	Opened := 0
+	try Opened := DllCall("User32\OpenClipboard", "Ptr", 0, "Int")
+	catch
+		return true
+	if !Opened
+		return true
+	try DllCall("User32\CloseClipboard")
+	return false
+}
+
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
@@ -162,4 +184,5 @@ global ADAPTER_CLIPBOARD := Map(
     "restore_all", CB_RestoreAll,
 	"sequence_number", CB_GetSequenceNumber,
 	"has_image", CB_HasImage,
+	"is_busy", CB_IsBusy,
 )
