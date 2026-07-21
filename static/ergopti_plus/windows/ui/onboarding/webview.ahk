@@ -406,9 +406,9 @@ _OnbWeb_LoadExistingConfig(Dir) {
 	c := ParseTomlFile(path)
 	if !c.Count
 		return
-	saved := "{use_ergopti:" . (_OnbWeb_TomlBool(c, "ahk.layout", "ergopti_base") ? "true" : "false")
-		. ",use_metrics:" . (_OnbWeb_TomlBool(c, "ahk.metrics", "metrics_enabled") ? "true" : "false")
-		. ",use_gestures:" . (_OnbWeb_TomlBool(c, "ahk.gestures", "enabled") ? "true" : "false")
+	saved := "{use_ergopti:" . (TomlCacheBool(c, "ahk.layout", "ergopti_base") ? "true" : "false")
+		. ",use_metrics:" . (TomlCacheBool(c, "ahk.metrics", "metrics_enabled") ? "true" : "false")
+		. ",use_gestures:" . (TomlCacheBool(c, "ahk.gestures", "enabled") ? "true" : "false")
 	mk := IniCacheGet(c, "hotstrings", "trigger_char")
 	if (mk != "_" && mk != "")
 		saved .= ",magic_key:" . _OnbWeb_JsStr(mk)
@@ -610,13 +610,6 @@ _OnbWeb_HtmlUrl() {
 ; ======= 5/ Utilities ========
 ; =============================
 ; ==============================================================
-
-; Reads a TOML boolean via the IniCache, treating only an explicit "true"/"1"
-; as true. Missing keys ("_") and "false" both read as false.
-_OnbWeb_TomlBool(c, Section, Key) {
-	v := IniCacheGet(c, Section, Key)
-	return (v == "true" || v == "1" || v == true || v == 1)
-}
 
 ; Coerces a JSON-decoded value to a boolean — JsonParse may yield real
 ; booleans, 0/1, or the strings "true"/"false" depending on the parser.
