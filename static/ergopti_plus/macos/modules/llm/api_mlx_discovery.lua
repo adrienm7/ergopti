@@ -384,6 +384,17 @@ function M.discover(on_done)
 	local poll_timer       = nil
 	local poll_delay_sec   = DISCOVERY_POLL_INITIAL_SEC
 	local function do_poll()
+		-- Guard: a reset() since this cycle started makes this an ORPHANED chain.
+		-- Relying on _endpoint_probe_in_flight alone is not enough — a newer
+		-- discover() re-sets that flag to true, silently resurrecting this chain, and
+		-- both chains then contend for the single module-level _probe_client whose
+		-- adapter contract is one request at a time. Same generation guard this file
+		-- already applies to its three probe callbacks (F-MED-8).
+		if my_discovery_gen ~= _discovery_gen then
+			if poll_timer then TimerScheduler.cancel(poll_timer) end
+			poll_timer = nil
+			return
+		end
 		-- Guard: if discovery was reset externally (model switch) while the
 		-- timer was in flight, stop quietly without firing callbacks.
 		if not _endpoint_probe_in_flight then
@@ -418,6 +429,16 @@ function M.discover(on_done)
 			local status = (exit_code == 0) and 200 or -1
 			local body   = stdout or ""
 			Logger.debug(LOG, "Endpoint discovery: /v1/models -> HTTP %s.", tostring(status))
+			-- A curl already in flight when reset() ran belongs to a superseded cycle.
+			-- Letting it reach run_post_probes() would POST on the SHARED _probe_client
+			-- and cancel the live cycle's in-flight probe, whose callback then never
+			-- fires — and since finish_discovery() is the only writer that clears the
+			-- mutex, discovery deadlocks until the user switches model again.
+			if my_discovery_gen ~= _discovery_gen then
+				Logger.debug(LOG, "Endpoint discovery: stale poll result discarded (gen %d != %d).",
+					my_discovery_gen, _discovery_gen)
+				return
+			end
 			if not _endpoint_probe_in_flight then return end  -- reset externally
 			if status == 200 then
 				-- mlx_lm.server's /v1/models endpoint returns the LIST of models

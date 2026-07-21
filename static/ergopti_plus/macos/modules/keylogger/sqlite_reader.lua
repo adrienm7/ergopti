@@ -639,6 +639,51 @@ function M.read_range_split_today(sqlite_path, start_date, end_date, selected_ap
 				end
 			end)
 		end
+
+		-- Physical keycodes and shortcuts live OUTSIDE NGRAM_TYPE_TABLE, so the loop
+		-- above never touched them — but the keycode heatmap and both shortcut tabs
+		-- read today's slice from here. Without these three passes those views showed
+		-- only historical data and never moved while the user typed, which reads as
+		-- "the heatmap is broken" rather than as missing data. The historical branch
+		-- already covers all three; this is the today projection catching up (parity
+		-- with the Windows reader).
+		local function _today_bucket(app)
+			if not today_idx[app] then
+				today_idx[app] = { c={},bg={},tg={},qg={},pg={},hx={},hp={},w={},sc={},sc_bg={},w_bg={},kc={} }
+			end
+			return today_idx[app]
+		end
+
+		_safe_query("ngram_keycodes(today)", function()
+			for r in db:nrows(string.format([[
+				SELECT app, keycode, SUM(c) AS c FROM ngram_keycodes
+				WHERE date = %s %s GROUP BY app, keycode
+			]], _q(today_str), app_clause)) do
+				_today_bucket(r.app).kc[tostring(r.keycode)] =
+					{ c = r.c or 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+			end
+		end)
+
+		_safe_query("ngram_shortcuts(today)", function()
+			for r in db:nrows(string.format([[
+				SELECT app, token, SUM(c) AS c FROM ngram_shortcuts
+				WHERE date = %s %s GROUP BY app, token
+			]], _q(today_str), app_clause)) do
+				_today_bucket(r.app).sc[r.token] =
+					{ c = r.c or 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+			end
+		end)
+
+		_safe_query("ngram_shortcut_bigrams(today)", function()
+			for r in db:nrows(string.format([[
+				SELECT app, token, SUM(c) AS c FROM ngram_shortcut_bigrams
+				WHERE date = %s %s GROUP BY app, token
+			]], _q(today_str), app_clause)) do
+				_today_bucket(r.app).sc_bg[r.token] =
+					{ c = r.c or 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+			end
+		end)
+
 		db:close()
 	end
 
