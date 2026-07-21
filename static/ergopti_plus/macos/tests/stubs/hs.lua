@@ -590,7 +590,21 @@ M.menubar = { new = function() return {
 } end }
 M.image = { imageFromPath = function(_) return nil end, imageFromName = function(_) return nil end }
 M.task = { new = function(_, _) return { start = function() end, terminate = function() end } end }
-M.webview = { new = function() return {} end }
+-- usercontent is the JavaScript bridge every webview UI builds at module load
+-- time (ui/download_window, ui/model_browser, …). Omitting it made those modules
+-- unloadable under the harness, so their logic could only ever be source-guarded.
+M.webview = {
+	new = function() return {} end,
+	usercontent = {
+		new = function(_name)
+			return {
+				setCallback     = function(self) return self end,
+				injectScript    = function(self) return self end,
+				removeCallback  = function(self) return self end,
+			}
+		end,
+	},
+}
 M.distributednotifications = { new = function() return { start = function() end, stop = function() end } end }
 M.alert = setmetatable({
 	show = function() return "uuid" end,

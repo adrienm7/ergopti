@@ -43,6 +43,10 @@ local _ready     = false
 local _queued    = {}
 local _log_shown = false
 local _is_hiding = false
+-- Monotonic id of the current occupant of this shared window, bumped by M.show().
+-- Callers that arm a deferred hide capture it and re-check before hiding, so a
+-- late timer belonging to a finished operation cannot close a newer one.
+local _session   = 0
 local _kind      = nil      -- Active kind, if any (mlx_install, ollama_install, mlx_model, ollama_model)
 local _mode      = "download" -- "download" (model download) or "bootstrap" (engine install)
 
@@ -309,6 +313,16 @@ function M.is_active()
 	return _wv ~= nil
 end
 
+--- Identifies the current occupant of this shared, single-instance window.
+--- Bumped by every M.show(), so a caller that armed a deferred hide can check
+--- whether the window it meant to close is still the one on screen. Without this
+--- a deferred hide belonging to a finished operation closes whatever unrelated
+--- operation happens to own the window when the timer fires.
+--- @return number Monotonic session identifier.
+function M.session_id()
+	return _session
+end
+
 --- Brings the window to the front and focuses it.
 function M.focus()
 	if not _wv then return end
@@ -368,6 +382,8 @@ function M.show(opts)
 
     Logger.start(LOG, "Showing progress UI (kind=%s, mode=%s).", opts.kind, preset.mode)
 
+    -- New occupant: invalidate any deferred hide armed by the previous one.
+    _session = _session + 1
     _kind = opts.kind
     _mode = preset.mode
     _on_cancel  = type(opts.on_cancel)  == "function" and opts.on_cancel  or nil
