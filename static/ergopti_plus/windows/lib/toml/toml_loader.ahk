@@ -329,7 +329,10 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         if (Line == "" or SubStr(Line, 1, 1) == "#") {
             continue
         }
-        if RegExMatch(Line, "^\[+([^\[\]]+)\]+$", &SectionMatch) {
+        ; Comment cut first — this pattern is anchored, so a commented header
+        ; would not match, would fall through as a non-key line, and would leave
+        ; CurrentSection pointing at the PREVIOUS section.
+        if RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SectionMatch) {
             CurrentSection := StrLower(Trim(SectionMatch[1]))
             continue
         }
