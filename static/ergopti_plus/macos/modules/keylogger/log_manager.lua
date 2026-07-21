@@ -1226,7 +1226,24 @@ end
 --- unconditionally from keylogger M.start() so the ingest loop survives
 --- toggle OFF/ON without requiring a full re-initialization.
 function M.ensure_ingest_running()
-	if not _state or _ingest_timer then return end
+	if not _state then return end
+
+	-- Re-arm must be symmetric with M.stop(), which tears down BOTH the timer and
+	-- the SQLite cache. Restoring only the timer left the ingest tick running
+	-- against a closed database for the rest of the session, so toggling Metrics
+	-- OFF then ON permanently killed ingest and midnight rotation. keylogger.start()
+	-- latches on its own _state and never calls M.init() again, so this is the only
+	-- place the cache can be re-acquired after that toggle.
+	-- Safe to re-enter: open_db() is a no-op when a handle is already live.
+	if not SqliteWriter.get_db() then
+		if SqliteWriter.open_db() then
+			Logger.done(LOG, "SQLite cache re-opened after stop/start cycle.")
+		else
+			Logger.error(LOG, "Cannot re-open the SQLite cache after a stop/start cycle — ingest stays offline.")
+		end
+	end
+
+	if _ingest_timer then return end
 	_ingest_timer = timer.new(INGEST_TICK_SEC, function()
 		pcall(M.ingest_once)
 	end)
