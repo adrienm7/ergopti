@@ -117,11 +117,13 @@ end
 --- merely wants to rebind must not be able to resurrect a layer the user turned
 --- off, so the running/stopped decision stays exclusively with the menu and with
 --- script_control (which snapshots the state before pausing).
+--- @return boolean True when the layer was running and was actually re-armed.
 function M.rebind_for_layout()
-	if not Bindings.is_started() then return end
+	if not Bindings.is_started() then return false end
 	Bindings.rebind()
 	KeyboardShortcuts.stop()
 	KeyboardShortcuts.start()
+	return true
 end
 
 --- Returns true when the binding layer is active (started and not stopped).

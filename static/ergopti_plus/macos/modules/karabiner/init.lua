@@ -787,8 +787,16 @@ function M.init(file_system)
 			-- each layout change — which the pause-layout feature triggers on every pause.
 			-- rebind_for_layout() is a no-op on a stopped layer by contract.
 			if type(shortcuts.rebind_for_layout) == "function" then
-				pcall(shortcuts.rebind_for_layout)
-				Logger.info(LOG, "Shortcuts rebound for layout '%s'.", layout_name)
+				-- rebind_for_layout is a no-op on a stopped layer by contract, so the
+				-- INFO line claimed a rebind that had not happened every time the user
+				-- had shortcuts switched off — on every layout change, which the
+				-- pause-layout feature triggers on every pause. Branch on the outcome.
+				local ok_rb, rebound = pcall(shortcuts.rebind_for_layout)
+				if ok_rb and rebound then
+					Logger.info(LOG, "Shortcuts rebound for layout '%s'.", layout_name)
+				else
+					Logger.debug(LOG, "Shortcuts not rebound for layout '%s' — layer is stopped.", layout_name)
+				end
 			end
 		end)
 	end) end)  -- close the input-source callback, then the timed() wrapper

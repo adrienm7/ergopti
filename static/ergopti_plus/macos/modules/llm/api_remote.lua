@@ -773,7 +773,12 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 			end
 			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 			ApiCommon.log_prediction_summary(Logger, LOG, "batch", num_predictions, dedup_stats, #results)
-			if not is_batch and #results > 1 then
+			-- `is_batch` is true on every path that reaches here, so `not is_batch`
+			-- made this branch dead and the remote backend revealed all predictions at
+			-- once instead of one slot at a time. The sibling dispatchers guard on
+			-- `not streaming`, which is a tautology for a backend that never streams —
+			-- the equivalent condition here is simply "more than one result".
+			if #results > 1 then
 				local function reveal_next(idx)
 					if idx > #results then return end
 					local subset = {}
