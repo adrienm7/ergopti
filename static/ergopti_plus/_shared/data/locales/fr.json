@@ -130,6 +130,7 @@
 	"changelog_window.channel_stable": "Stable",
 	"changelog_window.error_network": "Impossible de charger les versions depuis GitHub.\nVérifiez votre connexion internet.",
 	"changelog_window.error_parse": "Impossible d’analyser la réponse GitHub.",
+	"changelog_window.error_rate_limited": "Impossible de charger les versions depuis GitHub.\nGitHub limite les requêtes — réessayez dans quelques minutes.",
 	"changelog_window.loading": "Chargement des versions…",
 	"changelog_window.no_notes": "(Aucune note de version disponible.)",
 	"changelog_window.no_releases": "Aucune version trouvée.",
