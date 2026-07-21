@@ -23,6 +23,7 @@
 local M = {}
 
 local Logger         = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
 local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
@@ -146,7 +147,7 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
 
 	local final_sys = system_prompt
 	if type(final_sys) == "string" then
-		final_sys = final_sys:gsub("%{n%}", tostring(num_predictions))
+		final_sys = final_sys:gsub("%{n%}", text_utils.escape_gsub_replacement(tostring(num_predictions)))
 	end
 
 	local user_prompt = ""
@@ -367,7 +368,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	-- Replicate message/endpoint building from post_and_parse
 	local final_sys = system_prompt
 	if type(final_sys) == "string" then
-		final_sys = final_sys:gsub("%{n%}", tostring(num_predictions))
+		final_sys = final_sys:gsub("%{n%}", text_utils.escape_gsub_replacement(tostring(num_predictions)))
 	end
 
 	local user_prompt = ""
