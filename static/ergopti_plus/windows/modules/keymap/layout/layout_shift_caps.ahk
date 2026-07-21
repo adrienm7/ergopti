@@ -121,7 +121,9 @@ _BuildShiftCapsTables() {
 ; serialization the letter-fallback path below always gets. BOTH real layers now
 ; pass true: no ``CAPSLOCK_SYMBOLS`` entry ever Sleeps, and the ``SHIFT_SYMBOLS``
 ; exemption rested on a premise that has since rotted — ActivateHotstrings no longer
-; Sleeps (it runs under its own Critical) and the SC039 wrap path is Sleep-free too.
+; Sleeps (it runs under its own Critical), and the SC039 wrap path is Sleep-free
+; too — though "Sleep-free" is not the same as "fast": WrapTextIfSelected makes a
+; synchronous clipboard snapshot and therefore releases Critical itself.
 ; Leaving the Shift layer unserialized let a neighbouring remapped-letter emit
 ; (itself Critical) preempt between the two SendNewResult halves of an NNBSP+symbol
 ; pair, transposing or splitting it when typing fast — the same interleave class
@@ -178,18 +180,24 @@ RegisterShiftLayer() {
 		&& Features["layout"]["direct_access_digits"]
 		&& IsSet(_OsLayoutDigitsAreShifted)
 		&& _OsLayoutDigitsAreShifted()
-	HotIf((*) => Features["layout"]["ergopti_base"])
-	for SC in SHIFTED_LETTERS {
-		if (SkipDigitRow && _SHIFT_DIGIT_SCS.Has(SC))
-			continue
-		Hotkey("+" . SC, LayerDispatch.Bind(SC, SHIFT_SYMBOLS, true), "I2")
+	; try/finally: HotIf sets a PROCESS-WIDE criterion, so a throw before the
+	; reset leaks it into every later Hotkey() call in the driver — silently
+	; gating unrelated layers behind this condition.
+	try {
+		HotIf((*) => Features["layout"]["ergopti_base"])
+		for SC in SHIFTED_LETTERS {
+			if (SkipDigitRow && _SHIFT_DIGIT_SCS.Has(SC))
+				continue
+			Hotkey("+" . SC, LayerDispatch.Bind(SC, SHIFT_SYMBOLS, true), "I2")
+		}
+		for SC in SHIFT_SYMBOLS {
+			; SC is guaranteed not to be in SHIFTED_LETTERS by table construction —
+			; the loops cover disjoint sets, so re-binding is impossible here.
+			Hotkey("+" . SC, LayerDispatch.Bind(SC, SHIFT_SYMBOLS, true), "I2")
+		}
+	} finally {
+		HotIf() ; Reset to no condition
 	}
-	for SC in SHIFT_SYMBOLS {
-		; SC is guaranteed not to be in SHIFTED_LETTERS by table construction —
-		; the loops cover disjoint sets, so re-binding is impossible here.
-		Hotkey("+" . SC, LayerDispatch.Bind(SC, SHIFT_SYMBOLS, true), "I2")
-	}
-	HotIf()
 	try LoggerSuccess("LayoutShift", "Shift layer registered ({1} entries).",
 		SHIFTED_LETTERS.Count + SHIFT_SYMBOLS.Count)
 }
