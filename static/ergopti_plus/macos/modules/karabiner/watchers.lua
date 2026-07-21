@@ -101,6 +101,13 @@ local CAPSWORD_PROBE_TIMEOUT_SEC = 1.5
 -- callback can cancel it and the watchdog callback can reach the pending flag.
 local _capsword_probe_watchdog = nil
 
+-- GC root for the CapsWord probe tasks. An hs.task that is not referenced from a
+-- GC root can be collected mid-run, which kills the subprocess and means its
+-- completion callback never fires — here that would leave KE with capsword=1 and
+-- the next spacebar would switch CapsLock back on. Canonical spelling recognised
+-- by tests/unit/meta/test_gc_retention.lua. Entries are released in the callbacks.
+local _active_tasks = {}
+
 -- App history cache for direct app-previous focus.
 local _current_bundle_id = nil
 local _previous_bundle_id = nil
@@ -131,7 +138,9 @@ local function deactivate_capsword()
 	_capsword_check_pending   = true
 
 	-- Async get: unblocks the main loop immediately; callback fires on completion
-	local task = hs.task.new(KARABINER_CLI, function(exit_code, stdout, _)
+	local task
+	task = hs.task.new(KARABINER_CLI, function(exit_code, stdout, _)
+		if task then _active_tasks[task] = nil end
 		_capsword_check_pending = false
 		if _capsword_probe_watchdog then
 			TimerScheduler.cancel(_capsword_probe_watchdog)
@@ -143,7 +152,9 @@ local function deactivate_capsword()
 
 		-- Clear the KE variable first so the engine does not re-activate CapsWord
 		-- when it sees the subsequent LED state change.
-		local inner_task = hs.task.new(KARABINER_CLI, function(_, _, _)
+		local inner_task
+		inner_task = hs.task.new(KARABINER_CLI, function(_, _, _)
+			if inner_task then _active_tasks[inner_task] = nil end
 			-- macOS sometimes re-displays the CapsLock indicator after a single
 			-- LED reset (race with the Karabiner virtual CapsLock state machine).
 			-- A second unconditional set 150 ms later ensures the indicator stays off.
@@ -151,8 +162,18 @@ local function deactivate_capsword()
 			hs.timer.doAfter(0.15, function() pcall(hs.hid.capslock.set, false) end)
 			Logger.done(LOG, "CapsWord deactivated via pointer event.")
 		end, {"--set-variable", "capsword", "0"})
-		-- Nil-check: hs.task.new() returns nil when the CLI binary is absent
-		if inner_task then inner_task:start() end
+		-- Nil-check: hs.task.new() returns nil when the CLI binary is absent.
+		-- Pin BEFORE start: this task clears KE's capsword variable, and if the GC
+		-- collects it mid-run the variable stays 1 and the next space re-enables
+		-- CapsLock. start() reports a refused launch by RETURNING false, so the pin
+		-- is released on that path too rather than leaking for the session.
+		if inner_task then
+			_active_tasks[inner_task] = true
+			if not inner_task:start() then
+				_active_tasks[inner_task] = nil
+				Logger.error(LOG, "CapsWord clear-variable task failed to start — KE may keep capsword=1.")
+			end
+		end
 
 		-- hs.eventtap.keyStroke does not work for CapsLock on macOS — CapsLock is
 		-- a flagsChanged event, not a regular keyDown/keyUp, so keyStroke fails
@@ -167,7 +188,9 @@ local function deactivate_capsword()
 	end
 	-- If task:start() returns false the callback never fires — release the lock so subsequent
 	-- pointer events are not permanently blocked (karabiner-capsword-lock-leak).
+	_active_tasks[task] = true
 	if not task:start() then
+		_active_tasks[task] = nil
 		_capsword_check_pending = false
 		Logger.error(LOG, "CapsWord check task failed to start (karabiner-capsword-lock-leak).")
 		return

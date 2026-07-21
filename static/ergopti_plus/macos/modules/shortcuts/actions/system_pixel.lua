@@ -23,6 +23,13 @@ local i18n          = require("lib.i18n")
 
 local LOG = "shortcuts.actions.system"
 
+-- GC root for live hs.task objects. A task not referenced from a GC root can be
+-- collected mid-run, which kills the subprocess so its completion callback never
+-- fires. Canonical spelling recognised by tests/unit/meta/test_gc_retention.lua;
+-- entries are released when the callback runs or the launch is refused.
+local _active_tasks = {}
+
+
 
 
 
@@ -107,9 +114,12 @@ end
 --- Launches the native macOS interactive screenshot tool and copies the result to the clipboard.
 function M.interactive_screenshot()
 	Logger.trace(LOG, "Interactive screenshot started…")
-	local ok, task = pcall(hs.task.new,
+	local task
+	local ok
+	ok, task = pcall(hs.task.new,
 		"/usr/sbin/screencapture",
 		function(exit_code, _, _)
+			if task then _active_tasks[task] = nil end
 			if exit_code == 0 then
 				notifications.notify(i18n.get("shortcuts.screenshot_copied"), nil, "success")
 				Logger.done(LOG, "Interactive screenshot completed.")
@@ -120,7 +130,14 @@ function M.interactive_screenshot()
 		{"-i", "-c"}
 	)
 	if ok and task then
-		task:start()
+		-- Interactive screencapture waits for the user to drag a selection, so this
+		-- is the longest-lived subprocess in the driver — precisely the one the GC
+		-- is most likely to collect before its callback fires.
+		_active_tasks[task] = true
+		if not task:start() then
+			_active_tasks[task] = nil
+			Logger.error(LOG, "Screenshot task failed to start.")
+		end
 	else
 		Logger.error(LOG, "Failed to create screenshot task.")
 	end

@@ -29,6 +29,13 @@ local Logger  = require("lib.logger")
 local Timings = require("lib.timings")
 local LOG     = "keylogger.watchers"
 
+-- GC root for live hs.task objects. A task not referenced from a GC root can be
+-- collected mid-run, which kills the subprocess so its completion callback never
+-- fires. Canonical spelling recognised by tests/unit/meta/test_gc_retention.lua;
+-- entries are released when the callback runs or the launch is refused.
+local _active_tasks = {}
+
+
 -- Timing thresholds come from the shared cross-driver registry
 -- (_shared/modules/timings/constants.toml [keylogger]) so the AHK and macOS
 -- keyloggers stay in sync; mirrored from keylogger/init.lua.
@@ -134,14 +141,22 @@ local function poll_system_load()
 	_last_system_load_poll_ms = now_ms
 
 	pcall(function()
-		hs.task.new("/usr/bin/top", function(_, stdout, _)
+		-- Declared before the closure so the callback can release its own pin
+		-- (closure-before-local rule) rather than binding a nil global.
+		local load_task
+		load_task = hs.task.new("/usr/bin/top", function(_, stdout, _)
+			if load_task then _active_tasks[load_task] = nil end
 			local cpu_user = stdout:match("CPU usage:%s*([%d%.]+)%%%s*user")
 			local mem_used = stdout:match("PhysMem:%s*([%d%.A-Z]+)%s+used")
 			LogManager.log_system_event("system_load", {
 				cpu_user_percent = tonumber(cpu_user),
 				mem_used         = mem_used,
 			})
-		end, { "-l", "1", "-n", "0" }):start()
+		end, { "-l", "1", "-n", "0" })
+		if load_task then
+			_active_tasks[load_task] = true
+			if not load_task:start() then _active_tasks[load_task] = nil end
+		end
 	end)
 end
 
