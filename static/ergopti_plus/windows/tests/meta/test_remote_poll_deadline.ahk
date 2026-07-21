@@ -66,10 +66,31 @@ _RPD_CancelAsyncAbortsHttp() {
 }
 Test("api_remote: LLM_RemoteCancelAsync calls .Abort() to kill the live WinHTTP request (remote-poll-no-deadline-cap)", _RPD_CancelAsyncAbortsHttp)
 
+; The invariant here is that a cancelled request is really ABORTED, not merely
+; flagged — a flag alone leaves the live request consuming bandwidth. That has
+; not changed. What changed is WHERE the abort happens: LLM_RemoteCancelAllAsync
+; is reached from the per-keystroke Critical, where a cross-apartment COM call
+; blocks the message pump and starves the keyboard hook, so the abort is now
+; handed to LLM_DeferCancelKills and executed on the next thread.
+;
+; The assertion therefore follows the whole chain instead of grepping one token
+; in one body. That is strictly stronger: the old form was satisfied by the
+; literal string alone and would have stayed green even if the collected object
+; were never actually aborted.
+;
+; LLM_RemoteCancelAsync (singular) deliberately keeps its inline abort — it is
+; not reached from the keystroke path, so it pays no Critical penalty.
 _RPD_CancelAllAbortsHttp() {
 	Body := _DriverFuncBody("LLM_RemoteCancelAllAsync")
 	Assert(Body != "", "LLM_RemoteCancelAllAsync must exist in modules/llm/api_remote.ahk")
-	Assert(InStr(Body, ".Abort()") > 0,
-		"LLM_RemoteCancelAllAsync must call .Abort() on each WinHTTP object — setting cancelled:=true alone leaves all live requests consuming bandwidth (remote-poll-no-deadline-cap)")
+	Assert(InStr(Body, 'entry["http"]') > 0,
+		"LLM_RemoteCancelAllAsync must still collect each live WinHTTP object — setting cancelled:=true alone leaves all live requests consuming bandwidth (remote-poll-no-deadline-cap)")
+	Assert(InStr(Body, "LLM_DeferCancelKills(") > 0,
+		"LLM_RemoteCancelAllAsync must hand the collected transports to LLM_DeferCancelKills — the abort must still happen, just not under the per-keystroke Critical")
+
+	Runner := _DriverFuncBody("_LLM_RunCancelKills")
+	Assert(Runner != "", "_LLM_RunCancelKills must exist — it is where the deferred abort actually runs")
+	Assert(InStr(Runner, ".Abort()") > 0,
+		"_LLM_RunCancelKills must call .Abort() on every collected WinHTTP object — deferring the abort must not become dropping it (remote-poll-no-deadline-cap)")
 }
 Test("api_remote: LLM_RemoteCancelAllAsync calls .Abort() to kill all live WinHTTP requests (remote-poll-no-deadline-cap)", _RPD_CancelAllAbortsHttp)

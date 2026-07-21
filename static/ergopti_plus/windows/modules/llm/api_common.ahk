@@ -452,3 +452,38 @@ LLM_ApiCommon_LogSummary(mode, requested, stats, kept_count) {
 	try LoggerDebug("LLMCommon", "Prediction summary [{1}]: requested={2}, candidates={3}, duplicates={4}, kept={5}.",
 		mode, requested, candidates, duplicates, kept_count)
 }
+
+/**
+ * Runs the OS/COM half of a cancellation off the calling thread.
+ *
+ * Every keystroke reaches LLM_Engine_OnKeystroke, which takes Critical and then
+ * cancels whatever is in flight. Critical suspends the message pump, so a
+ * TerminateProcess that does not return promptly — an anti-virus filter on the
+ * target, a WerFault dialog — starves the keyboard hook for exactly as long as
+ * it blocks. Flipping the cancelled flags is pure memory and must stay inside
+ * Critical, because the poll ticks read them; killing the transport is OS work
+ * and has no business being there.
+ *
+ * A negative SetTimer period runs the callback on a NEW thread once the current
+ * one finishes, i.e. after Critical has been restored. This is the same
+ * mechanism the spawn side already uses to keep Run() off the keystroke path.
+ *
+ * Kills MUST be a snapshot taken under Critical, never a live Map: the entries
+ * it refers to are mutated and deleted by the poll ticks that run in between.
+ *
+ * @param {Array} Kills - Array of Maps carrying "pid" and/or "http".
+ */
+LLM_DeferCancelKills(Kills) {
+	if (!IsObject(Kills) or Kills.Length == 0)
+		return
+	SetTimer(() => _LLM_RunCancelKills(Kills), -1)
+}
+
+_LLM_RunCancelKills(Kills) {
+	for _, K in Kills {
+		if (K.Has("pid") and K["pid"] > 0)
+			try ProcessClose(K["pid"])
+		if K.Has("http")
+			try K["http"].Abort()
+	}
+}
