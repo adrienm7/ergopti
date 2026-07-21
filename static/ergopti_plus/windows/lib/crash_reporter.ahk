@@ -105,18 +105,32 @@ CrashReport_Build(ErrorObj) {
 	; probes above via HealthCheck_Run — recomputing them here would double that
 	; blocking work on the crash handler's deferred timer (crash-report-sysinfo-dedup).
 	; Only fall back to a fresh probe if the healthcheck itself failed to produce one.
-	Sys := (HC != "" and HC.Has("sys")) ? HC["sys"] : _CrashReport_SysInfo()
+	; .Count > 0, not just .Has(). _HealthCheck_Collect substitutes an EMPTY Map
+	; when a collector throws, and the healthcheck result always carries the "sys"
+	; key — so testing presence alone made this fallback unreachable dead code,
+	; and every Sys[...] read below would then throw on the missing key. That
+	; would abort CrashReport_Build inside the error net's catch: logged, never
+	; reported. Which is precisely the failure the healthcheck's own degradation
+	; was added to prevent.
+	Sys := (HC != "" and HC.Has("sys") and HC["sys"].Count > 0) ? HC["sys"] : _CrashReport_SysInfo()
 	; Pull a few safe enriched fields from the live healthcheck for even richer crash reports (pause state, key logs paths, etc.)
-	try {
-		if (HC != "") {
-			if HC.Has("pause_state")
-				Sys["pause_at_crash"] := HC["pause_state"]["is_paused"] ? "paused" : "running"
-			if HC.Has("logs") {
-				Sys["errors_log_path"] := HC["logs"]["errors_today"]
-			}
+	; Each field is enriched independently and read with .Get. The outer keys
+	; were guarded but the INNER ones were not, and both lived in one try — so a
+	; degraded pause_state Map threw and silently took errors_log_path with it,
+	; into a bare catch that recorded nothing.
+	if (HC != "") {
+		try {
+			if (HC.Has("pause_state") and HC["pause_state"].Count > 0)
+				Sys["pause_at_crash"] := HC["pause_state"].Get("is_paused", false) ? "paused" : "running"
+		} catch as Err {
+			try LoggerDebug("CrashReporter", "Crash report enrichment 'pause_state' degraded: {1}.", Err.Message)
 		}
-	} catch {
-		; never let diagnostic enrichment break a crash report
+		try {
+			if (HC.Has("logs") and HC["logs"].Count > 0)
+				Sys["errors_log_path"] := HC["logs"].Get("errors_today", "")
+		} catch as Err {
+			try LoggerDebug("CrashReporter", "Crash report enrichment 'logs' degraded: {1}.", Err.Message)
+		}
 	}
 
 	; ── Uptime ────────────────────────────────────────────────────────────────
@@ -194,21 +208,21 @@ CrashReport_Build(ErrorObj) {
 		"error_line",           ErrorLine,
 		"stack_trace",          StackTrace,
 		; ── System environment (full, mirrors healthcheck) ──
-		"os_name",              Sys["os_name"],
-		"os_build",             Sys["os_build"],
-		"os_arch",              Sys["os_arch"],
-		"ahk_version",          Sys["ahk_version"],
-		"ahk_bitness",          Sys["ahk_bitness"],
-		"cpu_name",             Sys["cpu_name"],
-		"cpu_cores",            String(Sys["cpu_cores"]),
-		"ram_total_gb",         String(Sys["ram_total_gb"]),
-		"ram_free_gb",          String(Sys["ram_free_gb"]),
-		"screen_resolution",    Sys["screen_res"],
-		"dpi",                  String(Sys["dpi"]),
-		"dpi_scale",            String(Sys["dpi_scale"]),
-		"locale",               Sys["locale"],
+		"os_name",              Sys.Get("os_name", ""),
+		"os_build",             Sys.Get("os_build", ""),
+		"os_arch",              Sys.Get("os_arch", ""),
+		"ahk_version",          Sys.Get("ahk_version", ""),
+		"ahk_bitness",          Sys.Get("ahk_bitness", ""),
+		"cpu_name",             Sys.Get("cpu_name", ""),
+		"cpu_cores",            String(Sys.Get("cpu_cores", "")),
+		"ram_total_gb",         String(Sys.Get("ram_total_gb", "")),
+		"ram_free_gb",          String(Sys.Get("ram_free_gb", "")),
+		"screen_resolution",    Sys.Get("screen_res", ""),
+		"dpi",                  String(Sys.Get("dpi", "")),
+		"dpi_scale",            String(Sys.Get("dpi_scale", "")),
+		"locale",               Sys.Get("locale", ""),
 		"script_dir",           A_ScriptDir,
-		"git_hash",             Sys["git_hash"],
+		"git_hash",             Sys.Get("git_hash", ""),
 		"username_hash",        _CrashReport_FoldHash(A_UserName),
 		; ── Runtime context ──
 		"uptime_sec",           String(UptimeSec),
@@ -279,6 +293,10 @@ CrashReport_Save(Report) {
 ; single dialog with the path of the saved file. If saving fails, shows an error.
 ; Safe to call from within ErgoptiGlobalErrorHandler — all calls are guarded.
 ; @param Report {Map} The report Map returned by CrashReport_Build().
+; @returns {Boolean} True when a report file was actually written. The caller
+;          needs this: the error net throttles by fault signature, and a
+;          throttle recorded for a report that was never saved silences every
+;          recurrence for the whole TTL.
 CrashReport_PromptUser(Report) {
 	try LoggerStart("CrashReporter", "Saving crash report…")
 
@@ -288,10 +306,11 @@ CrashReport_PromptUser(Report) {
 		try LoggerSuccess("CrashReporter", "Crash report saved at '{1}'.", FilePath)
 		; Surface non-blocking — a modal MsgBox on the input thread starves the keyboard hook
 		try NotifierSend(FilePath, Map("title", t("crash.report.saved_title"), "level", "info"))
-	} else {
-		try LoggerWarn("CrashReporter", "Crash report could not be saved.")
-		try NotifierSend(t("crash.report.save_failed"), Map("title", t("crash.report.saved_title"), "level", "warning"))
+		return true
 	}
+	try LoggerWarn("CrashReporter", "Crash report could not be saved.")
+	try NotifierSend(t("crash.report.save_failed"), Map("title", t("crash.report.saved_title"), "level", "warning"))
+	return false
 }
 
 
