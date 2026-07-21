@@ -42,9 +42,13 @@ if not ok_kl then keylogger = nil end
 local _infer_client  = require("adapters.http_client").new()
 
 local _req_counter = 0
--- Exposed so the dispatch layer (api_mlx_fetch) reads the same flag this engine
--- uses, keeping the dedup default in exactly one place.
-M.DEDUPLICATION_ENABLED = false
+-- Read from the shared inference.json through ApiCommon, exactly as api_ollama and
+-- api_remote do, so the dedup default lives in ONE place across every backend.
+-- Hardcoding false here meant flipping the shared flag changed Ollama and remote
+-- behaviour while MLX silently ignored it — the single-source-of-truth rule broken
+-- by the one backend that redeclared the value. Exposed so the dispatch layer
+-- (api_mlx_fetch) receives the identical flag this engine uses.
+M.DEDUPLICATION_ENABLED = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
 local DEDUPLICATION_ENABLED = M.DEDUPLICATION_ENABLED
 -- MLX stream timeouts come from the shared cross-driver registry ([llm]).
 local STREAM_CONNECT_TIMEOUT_SEC = Timings.sec("llm", "stream_connect_timeout_ms") -- Fail fast if the MLX server does not accept the TCP connection
