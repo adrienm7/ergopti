@@ -695,9 +695,19 @@ local function onKeyDownRaw(e)
 
 	-- 3. Run custom interceptors registered by external modules.
 	local suppress_triggers = false
-	for _, interceptor in ipairs(CoreState.interceptors) do
+	for idx, interceptor in ipairs(CoreState.interceptors) do
 		local ok, result = pcall(interceptor, e, CoreState.buffer)
-		if ok then
+		if not ok then
+			-- The failure branch logged NOTHING, so a throwing interceptor silently
+			-- disabled whatever it implements — @-tag and date expansion both run from
+			-- here — with no trace anywhere. Reported once per interceptor rather than
+			-- per keystroke: this is the hot path and the fault is persistent.
+			if not _interceptor_error_logged[idx] then
+				_interceptor_error_logged[idx] = true
+				Logger.error(LOG, "Interceptor #%d raised — skipping it for this session: %s.",
+					idx, tostring(result))
+			end
+		else
 			if result == "consume"   then return true end
 			if result == "suppress"  then suppress_triggers = true; break end
 		end
@@ -1073,6 +1083,12 @@ mouse_tap = eventtap.new(
 -- the OS killed.
 local TAP_WATCHDOG_SEC = 5
 local _watchdog_timer  = nil
+-- Post-boot window-filter prewarm timer. Held so M.stop() can cancel it: a reload
+-- during the quiet window otherwise left it armed to fire into a torn-down engine.
+local _prewarm_timer   = nil
+-- One-shot per interceptor index, so a throwing interceptor is reported once
+-- instead of on every keystroke.
+local _interceptor_error_logged = {}
 
 -- Delay before prewarming the ignored-window watchers off the keystroke path.
 -- Short enough to almost always beat the user's first keystroke, long enough to
@@ -1119,7 +1135,9 @@ function M.start()
 	-- first keyDown it blocks the tap long enough for macOS to disable it. A short
 	-- timer pays the cost on the main loop during the quiet post-boot window so the
 	-- user's first keystroke is already warm.
-	hs.timer.doAfter(WINFILTER_PREWARM_SEC, function()
+	if _prewarm_timer then _prewarm_timer:stop() end
+	_prewarm_timer = hs.timer.doAfter(WINFILTER_PREWARM_SEC, function()
+		_prewarm_timer = nil
 		pcall(km_utils.prewarm_ignored_win_watchers)
 	end)
 
@@ -1130,6 +1148,9 @@ end
 function M.stop()
 	Logger.start(LOG, "Stopping keymap engine…")
 	if _watchdog_timer then _watchdog_timer:stop(); _watchdog_timer = nil end
+	-- Cancelled here, before km_utils.stop() below, so there is no window in which
+	-- the prewarm can fire into an engine that has already been torn down.
+	if _prewarm_timer then _prewarm_timer:stop(); _prewarm_timer = nil end
 	tap:stop()
 	shift_tap:stop()
 	mouse_tap:stop()
