@@ -6,8 +6,9 @@
 ; The process-wide uncaught-error handler armed via OnError() in the entry.
 ; Without it, any uncaught error pops a blocking AHK dialog mid-keystroke and
 ; can leave modifiers stuck down; this handler releases only genuinely-stuck
-; modifiers, logs the failure, offers an opt-in crash report, and surfaces a
-; non-blocking tray toast — so one bad callback never locks the keyboard.
+; modifiers, logs the failure, saves a crash report (no opt-in prompt — the
+; confirmation step was removed as friction), and surfaces a non-blocking tray
+; toast — so one bad callback never locks the keyboard.
 ; ==============================================================================
 
 
@@ -125,7 +126,13 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
     ; nothing is silently dropped from the logs — only the expensive deferred
     ; report + toast are throttled per fault signature.
     static _geh_dedup_map := Map()
-    Sig := Exc.Message . "@" . (Exc.HasProp("What") ? Exc.What : "") . ":" . (Exc.HasProp("Line") ? Exc.Line : "")
+    ; Every Exc read here is guarded, including Message. It is the only
+    ; unguarded property access left on this path, and a throw INSIDE the error
+    ; handler means no report, no toast, and AHK's default blocking dialog —
+    ; precisely the outcome this module exists to prevent. Type() also keeps the
+    ; signature meaningful when a non-Error value is thrown.
+    Sig := Type(Exc) . "|" . (Exc.HasProp("Message") ? Exc.Message : "")
+        . "@" . (Exc.HasProp("What") ? Exc.What : "") . ":" . (Exc.HasProp("Line") ? Exc.Line : "")
     Now := A_TickCount
     if (_geh_dedup_map.Count >= ERROR_NET_DEDUP_CACHE_CAP)
         _geh_dedup_map.Clear()
@@ -135,9 +142,14 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
     }
     _geh_dedup_map[Sig] := Now
 
-    ; Offer the user an opt-in crash report before surfacing the generic alert.
-    ; CrashReport_PromptUser is guarded internally so a failure here cannot
-    ; re-enter the error handler.
+    ; Save a crash report before surfacing the generic alert. There is no
+    ; opt-in prompt — CrashReport_PromptUser saves unconditionally and then
+    ; shows the path (the confirmation step was removed as friction).
+    ;
+    ; It is NOT guarded internally: CrashReport_Save is called unguarded there,
+    ; and the only thing stopping a failure re-entering this handler is the
+    ; try/catch in _ErgoptiDeferredCrashReport below. Do not remove that catch
+    ; on the strength of a comment claiming protection elsewhere.
     ; Defer the heavy crash-report collection OFF the input/dispatch thread. CrashReport_Build
     ; does WMI ConnectServer + RegRead + a git subprocess Sleep-poll + a full healthcheck —
     ; ~100-500 ms of blocking work. This handler can fire mid-keystroke (OnError, or
