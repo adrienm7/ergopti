@@ -653,6 +653,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_onboarding_no_appstate.ahk
 #Include meta/test_onboarding_toml_bool_reads.ahk
 #Include meta/test_onboarding_magic_key_sentinel.ahk
+#Include meta/test_onboarding_effective_config_dir.ahk
 #Include meta/test_numeric_prompt_throws_on_nonnumeric.ahk
 #Include meta/test_oneshotshift_lalt_lshift_stuck.ahk
 #Include meta/test_oneshotshift_suspend_guard.ahk

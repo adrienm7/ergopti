@@ -26,6 +26,21 @@
 ; the FilePathsEditor dialog (lib/onboarding-independent helper in
 ; ErgoptiPlus.ahk) so a wizard pass and a later edit-via-tray produce
 ; structurally identical files.
+; The config folder the wizard's answers will actually land in. _ConfigDir is
+; deliberately NOT updated until the commit succeeds, so any page rendered
+; after the folder step must resolve through here — reading _ConfigDir shows
+; the boot folder, which is how the keystroke-logging consent text ended up
+; naming a path that keystrokes were never going to be written to.
+_Onboarding_EffectiveConfigDir() {
+	global _ob_config_dir, _ConfigDir
+	Dir := (IsSet(_ob_config_dir) and _ob_config_dir != "")
+		? _ob_config_dir
+		: (IsSet(_ConfigDir) ? _ConfigDir : "")
+	if (Dir != "" and !RegExMatch(Dir, "\\$"))
+		Dir .= "\"
+	return Dir
+}
+
 _WritePathsToml(NewDir) {
 	global _PathsFile, _DefaultConfigDir
 	TmpPath := _PathsFile . ".onboarding-" . DriverPid . ".tmp"
@@ -63,8 +78,10 @@ _Onboarding_Commit() {
 	; the boot path resolver will then route ConfigurationFile to the
 	; new location on the upcoming Reload. We also rewrite the in-memory
 	; ``ConfigurationFile`` so the TOML_BatchWrite below lands in the
-	; right spot, not the stale default. An empty ``_ob_config_dir``
-	; means "keep the default" — paths.toml is left untouched.
+	; right spot, not the stale default. An empty ``_ob_config_dir`` means
+	; "use the OS default" — which is a REQUEST, not a no-op: when the driver
+	; is currently redirected elsewhere it has to be moved back and paths.toml
+	; rewritten, or the user's ask to leave that folder is silently dropped.
 	global _ob_config_dir, _ConfigDir, _DefaultConfigDir, _PathsFile, ConfigurationFile, _AhkSubDir
 	try {
 		CandidateDir := _ConfigDir
@@ -72,6 +89,13 @@ _Onboarding_Commit() {
 		PathRedirectRequired := false
 		if (IsSet(_ob_config_dir) and _ob_config_dir != "") {
 			CandidateDir := _ob_config_dir
+		} else if (IsSet(_DefaultConfigDir) and _DefaultConfigDir != "") {
+			; Empty field = "use the OS default". Resolving it here rather than
+			; skipping the block is what makes the request real: the comparison
+			; below then sees default != current and performs the move back.
+			CandidateDir := _DefaultConfigDir
+		}
+		if (CandidateDir != "") {
 			if !RegExMatch(CandidateDir, "\\$")
 				CandidateDir .= "\"
 			if (CandidateDir != _ConfigDir) {
