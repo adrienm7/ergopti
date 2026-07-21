@@ -27,11 +27,10 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "lib/logger.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("logger.lua not readable at: " .. src_path) end
-local src = fh:read("*a")
-fh:close()
+-- Selected by a declaration unique to the logger rather than by path, so
+-- splitting or moving the module cannot turn this invariant into a path error.
+local src = helpers.read_driver_source("local _file_handle")
+if not src then error("logger file-sink source not locatable via read_driver_source") end
 
 helpers.describe("logger — file-sink locals are declared above every user", function()
 	helpers.it("declares _file_handle before M.init_log_path, which mutates it", function()

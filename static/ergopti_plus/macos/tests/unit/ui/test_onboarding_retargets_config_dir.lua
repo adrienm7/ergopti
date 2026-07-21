@@ -141,10 +141,11 @@ helpers.describe("onboarding commit() honours the retarget", function()
 	-- source level: a future edit that drops the reassignment reintroduces the bug
 	-- with every unit test above still green.
 	helpers.it("assigns the re-resolved path before the config.toml write", function()
-		local path = helpers.driver_root() .. "ui/onboarding/init.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_not_nil(fh, "ui/onboarding/init.lua must be readable")
-		local src = fh:read("*a") ; fh:close()
+		-- _resolve_commit_path is unique to the onboarding module, so the scan
+		-- yields exactly one file and the assign_at < write_at ordering below
+		-- stays meaningful.
+		local src = helpers.read_driver_source("_resolve_commit_path")
+		helpers.assert_not_nil(src, "the onboarding commit source must be locatable")
 
 		local assign_at = src:find("_config_path%s*=%s*M%._resolve_commit_path")
 		helpers.assert_not_nil(assign_at,
