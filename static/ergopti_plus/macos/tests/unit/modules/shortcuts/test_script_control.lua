@@ -649,7 +649,16 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 		SC.stop()  -- release any tap from an earlier describe
 		SC.start(keymap_spy, shortcuts_spy, gestures_spy, karabiner_spy)
 
+		-- karabiner.pause()/resume() are deliberately deferred with
+		-- hs.timer.doAfter(0): pause_all/resume_all run synchronously inside the
+		-- script-control eventtap callback, and the karabiner redeploy writes a
+		-- 100 kB+ config (resume regenerates the full one), which would stall the tap
+		-- long enough for macOS to disable it — see
+		-- tests/meta/test_pause_path_defers_blocking_work.lua. The stub records timers
+		-- instead of running them, so the deferred work is flushed here. The
+		-- assertions themselves are unchanged: the calls must still happen.
 		SC.pause_all()
+		if hs.timer.__fire_all then hs.timer.__fire_all() end
 		helpers.assert_true((calls.km_pause or 0) >= 1, "pause must call keymap.pause_processing")
 		helpers.assert_true((calls.km_reset or 0) >= 1, "pause must call keymap.reset_predictions")
 		helpers.assert_true((calls.sc_pause or 0) >= 1, "pause must call shortcuts.pause_bindings")
@@ -657,6 +666,7 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 		helpers.assert_true((calls.k_pause or 0) >= 1, "pause must call karabiner.pause")
 
 		SC.resume_all()
+		if hs.timer.__fire_all then hs.timer.__fire_all() end
 		helpers.assert_true((calls.km_resume or 0) >= 1, "resume must call keymap.resume_processing")
 		helpers.assert_true((calls.sc_resume or 0) >= 1, "resume must restore shortcuts.resume_bindings (was running pre-pause)")
 		helpers.assert_true((calls.g_enable or 0) >= 1, "resume must restore gestures.enable_all (was enabled pre-pause)")
