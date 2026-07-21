@@ -27,6 +27,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-ahk-invariant-incomplete-application](#project-ahk-invariant-incomplete-application) — Every AHK-driver hardening invariant (Critical-emit, suspend-guard, async-HTTP, RegisterMenuItem) is applied per-site; the recurring bug is the ONE missed sibling site or the guarantee defeated by indirection. Audit the whole class, not the documented site.
   - [project-ahk-test-suite-critical-leak](#project-ahk-test-suite-critical-leak) — Critical("On") in layout/hotkey callbacks is safe in production but leaks into the main thread when invoked directly by tests, silently hanging background timers
   - [project-ahk-numeric-string-equals-false](#project-ahk-numeric-string-equals-false) — `"0" = false` is TRUE in AHK v2; never compare a String|false return against false, type-check with `is String`
+  - [project-ahk-keyword-as-variable-hangs-the-parser](#project-ahk-keyword-as-variable-hangs-the-parser) — naming a variable `Catch` (or any control-flow keyword) hangs AHK v2 with zero output and no error; bisect to a trivial probe when a run produces nothing at all
   - [project-ahk-guard-tests-must-loop-the-class](#project-ahk-guard-tests-must-loop-the-class) — Guard tests must enumerate the whole class of call sites, not the one site a bug was fixed at — 5 findings in one audit came from this
   - [project-audit-evidence-must-be-reproducible](#project-audit-evidence-must-be-reproducible) — A refutation needs the same proof as a finding: the "the perf section was fabricated" debunking was itself wrong (it searched `ahk/logs`, but the real path is `autohotkey/logs`); G4 IS measured, and the logs live at `<ConfigDir>/autohotkey/logs/` via `paths.toml`
   - [project-hs-audit-2026-07-21](#project-hs-audit-2026-07-21) — 13 macOS defects fixed (PII in logs, keystrokes logged inside a vault, silently discarded events); 78 findings remain OPEN and unverified — the backlog lives here because the audit md was deleted by design
@@ -1599,6 +1600,46 @@ The adversarial AHK audit of 2026-06-19 (full report: `AUDIT_AHK_2026-06-19.md` 
 - `SetTimer(fn, -1)` does NOT offload to another thread (a real comment in `changelog_window.ahk` wrongly claimed it did); callbacks run on the single AHK pseudo-thread when the message loop yields — the same thread that remaps every keystroke. A synchronous network/COM/shell call inside a `SetTimer` callback freezes typing.
 
 Related: [[project_ahk_menu_dispatcher_drop]], [[project_updater_nonblocking_http]], [[project_suspend_pause_invariant]], [[project_lua_closure_before_local_nil_global]], [[feedback_regression_tests]].
+
+### project-ahk-keyword-as-variable-hangs-the-parser
+
+_Naming a local `Catch` (or any control-flow keyword) makes AHK v2 hang with ZERO output — no syntax error, no dialog, no partial log_
+
+<sub>slug: `project_ahk_keyword_as_variable_hangs_the_parser`</sub>
+
+Found 2026-07-21 while writing a meta-test. The statement was ordinary:
+
+```ahk
+Catch := SubStr(Src, OpenPos, 1000)      ; hangs the whole test suite
+CatchWindow := SubStr(Src, OpenPos, 1000) ; fine
+```
+
+`catch` is a control-flow keyword in AHK v2. Assigning to a variable of that
+name does not raise a syntax error and does not open the usual error dialog —
+the interpreter simply never finishes. The suite produced **zero lines of
+output** and had to be killed by timeout, even under `/ErrorStdOut`.
+
+**Why this is expensive to diagnose:** every normal signal is absent. Zero
+output looks like a load-time failure, so you go hunting in the module you just
+edited (here, `keylogger.ahk`) — which in this case was not even included in
+`run_all.ahk`. `/ErrorStdOut` prints nothing, so it does not look like a parse
+error either. Redirected stdout is block-buffered, so the boot lines that would
+have localised the hang are lost with the killed process.
+
+**How to apply:**
+
+- Never name a variable after a keyword: `Catch`, `Try`, `Finally`, `Loop`,
+  `Until`, `Else`, `Return`, `Throw`, `Switch`, `Case`, `Break`, `Continue`,
+  `Static`, `Global`, `Local`. Prefer a qualified name — `CatchWindow`,
+  `CatchBody`, `LoopCount`.
+- **Bisect on zero output.** A hang with no output is a parser problem, not a
+  logic problem: reduce the new code to a trivial `Assert(true, "probe")` and
+  add it back in stages. Three suite runs beat any amount of re-reading.
+- Do not trust "zero output means it failed at load" — with block-buffered
+  redirection it only means the process died before the first flush.
+
+Related: [[project_ahk_numeric_string_equals_false]] (the other v2 foot-gun that
+fails silently rather than loudly), [[feedback_ahk_source_encoding]].
 
 ### project-ahk-numeric-string-equals-false
 
