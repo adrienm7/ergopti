@@ -779,6 +779,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_config_shortcuts_unescape_ordering.ahk
 #Include meta/test_gesture_selfactivated_bounded.ahk
 #Include meta/test_llm_api_no_entry_logged.ahk
+#Include meta/test_llm_cancel_not_under_critical.ahk
 #Include meta/test_llm_dispatch_not_under_critical.ahk
 #Include meta/test_dead_ps1_pipeline_absent.ahk
 #Include meta/test_deps_fail_restores_priority.ahk

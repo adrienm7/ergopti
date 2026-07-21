@@ -220,14 +220,19 @@ LLM_OllamaCancelStreams() {
 
 LLM_OllamaCancelAllAsync() {
 	global _LLM_Ollama_Async, _LLM_Ollama_Pending
+	; Flip the flags now — the poll ticks read them — but snapshot the pids and
+	; kill them off-thread: this runs under the per-keystroke Critical, where a
+	; blocking TerminateProcess starves the keyboard hook.
+	; The former entry.Has("http") branch was dead: _LLM_Ollama_Async entries are
+	; only ever created at one site, which carries no "http" key, and the whole
+	; WinHTTP path for Ollama is unreachable — the live transport is curl.
+	Kills := []
 	for _id, entry in _LLM_Ollama_Async {
 		entry["cancelled"] := true
-		if entry.Has("http") {
-			try entry["http"].Abort()
-		} else if entry.Has("pid") and entry["pid"] > 0 {
-			try ProcessClose(entry["pid"])
-		}
+		if (entry.Has("pid") and entry["pid"] > 0)
+			Kills.Push(Map("pid", entry["pid"]))
 	}
+	LLM_DeferCancelKills(Kills)
 	LLM_OllamaCancelStreams()
 	; Drop any coalesced-but-not-yet-dispatched job. Otherwise the already-armed
 	; poll tick discovers the cancelled in-flight entry, deletes it, and calls
@@ -781,9 +786,11 @@ LLM_OllamaCancelStream(handle) {
 	if (handle == "" or !IsObject(handle))
 		return
 	handle.Cancelled := true
-	if (handle.Pid > 0) {
-		try ProcessClose(handle.Pid)
-	}
+	; Deferred for the same reason as the async cancellation: this is reached from
+	; the per-keystroke Critical via LLM_OllamaCancelStreams, and killing the curl
+	; child is OS work that must not run with the message pump suspended.
+	if (handle.Pid > 0)
+		LLM_DeferCancelKills([Map("pid", handle.Pid)])
 }
 
 _LLM_Ollama_CleanupStreamFiles(handle) {

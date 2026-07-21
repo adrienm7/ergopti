@@ -269,16 +269,23 @@ LLM_RemoteCancelAsync(req_id) {
 
 LLM_RemoteCancelAllAsync() {
     global _LLM_Remote_Async
+    ; Flip the flags inline — the per-request poll ticks read them — but snapshot
+    ; the transports and release them off-thread. This is reached from the
+    ; per-keystroke Critical, where both a blocking TerminateProcess and a WinHTTP
+    ; Abort (a cross-apartment COM call) starve the keyboard hook while the
+    ; message pump is suspended. The poll tick still performs the temp-file
+    ; cleanup on its next iteration, exactly as before.
+    Kills := []
     for _id, entry in _LLM_Remote_Async {
         entry["cancelled"] := true
-        ; Release each live request now (curl child killed / WinHTTP aborted); the
-        ; per-request poll tick performs the temp-file cleanup on its next iteration.
         if (entry.Has("transport") and entry["transport"] == "curl") {
-            try ProcessClose(entry["pid"])
-        } else {
-            try entry["http"].Abort()
+            if entry.Has("pid")
+                Kills.Push(Map("pid", entry["pid"]))
+        } else if entry.Has("http") {
+            Kills.Push(Map("http", entry["http"]))
         }
     }
+    LLM_DeferCancelKills(Kills)
 }
 
 _LLMRemote_PollRequest(req_id) {
