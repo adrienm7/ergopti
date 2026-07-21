@@ -162,6 +162,35 @@ end
 
 --- Navigates between macOS Spaces (Desktops).
 local function spaceNav(goNext)
+	-- space_wrap is persisted, restored and exposed as a menu checkbox, but nothing
+	-- ever read it: the toggle looked functional and did nothing. macOS itself stops
+	-- at the first and last Space, so honouring the setting means suppressing the
+	-- navigation at the edge rather than asking the OS to wrap.
+	if _state and _state.space_wrap == false then
+		local ok_sp, spaces = pcall(require, "hs.spaces")
+		if ok_sp and spaces and type(spaces.spaceType) == "function" then
+			local ok_all, all = pcall(spaces.allSpaces)
+			local ok_cur, cur = pcall(spaces.focusedSpace)
+			if ok_all and ok_cur and type(all) == "table" and cur then
+				local screen_spaces
+				for _, list in pairs(all) do
+					for _, id in ipairs(list) do
+						if id == cur then screen_spaces = list break end
+					end
+					if screen_spaces then break end
+				end
+				if screen_spaces and #screen_spaces > 0 then
+					local at_edge = (goNext and screen_spaces[#screen_spaces] == cur)
+						or ((not goNext) and screen_spaces[1] == cur)
+					if at_edge then
+						Logger.debug(LOG, "Space navigation suppressed at the edge (space_wrap disabled).")
+						return
+					end
+				end
+			end
+		end
+	end
+
 	local key_code = goNext and 124 or 123 -- 124=Right, 123=Left
 	-- Deferred so the AppleScript call never blocks the gesture frameCallback
 	hs.timer.doAfter(0, function()
