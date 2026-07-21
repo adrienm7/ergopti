@@ -107,7 +107,6 @@ HSE_CONSUMED_DELIMITERS := HotstringsGetConsumedDelimiters()
 ; must be recomputed after that assignment. Its own include-position initialiser
 ; only ever saw the compile-time constant; without this call the preview and the
 ; matcher anchor on different sets and previewed expansions silently never fire.
-HotstringsRefreshPrefixBoundaries()
 TooltipDequeueInit()
 
 ; Arm the suspend watchdog so the pause reactor (Ergopti_OnSuspendEnter/Resume)
