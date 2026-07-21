@@ -558,6 +558,7 @@ _LogBootProgress("keylogger modules + tests included")
 ; ── Cross-driver corpus consumers ──
 #Include meta/test_corpus_hotstrings.ahk
 #Include meta/test_preview_matches_engine.ahk
+#Include meta/test_prefix_buffer_tracks_engine.ahk
 #Include meta/test_corpus_dynamic_hotstrings_prefix.ahk
 #Include meta/test_corpus_hotstrings_config_resolve.ahk
 #Include meta/test_corpus_tap_hold.ahk
