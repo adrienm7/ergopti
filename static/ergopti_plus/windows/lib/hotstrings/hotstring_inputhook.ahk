@@ -104,6 +104,50 @@ _PrefixWordBoundaries() {
     return _HSE_WordBoundarySet()
 }
 
+; Would the ENGINE actually fire this trigger right now? Asked of the engine's own
+; Spec and its own buffer, never re-derived here.
+;
+; The preview used to infer "am I at a word start?" from its own anchor — the
+; suffix after the last boundary character in _PrefixBuffer. That is a DIFFERENT
+; question from the one the engine answers, and it rests on a DIFFERENT buffer.
+; The two diverge after any expansion, because _PrefixBuffer is rebuilt by the
+; sync block below (strip + replacement + suffix truncation) while HSE_Buffer
+; keeps the real typed context. Measured case: typing "at" then the magic key
+; fired the repeat (t★ → tt); _PrefixBuffer became "tt" while HSE_Buffer still
+; ended "...att". The preview saw "tt" as word-initial and offered tt★ →
+; télétravail; the engine, holding "att", refused it. The user got a tooltip that
+; could not be validated — the tooltip lied about what the engine would do.
+;
+; Fails OPEN: a trigger the engine does not know is left visible rather than
+; silently dropped, so a registry gap degrades to the old behaviour instead of
+; emptying the tooltip.
+; @param Trigger The candidate trigger, exactly as registered.
+; @return true when the engine would fire it against its current buffer.
+_PreviewEngineWouldFire(Trigger) {
+    global HSE_RegistryByLastChar, HSE_Buffer
+    if (Trigger == "")
+        return false
+    LastChar := SubStr(Trigger, -1)
+    if (!IsSet(HSE_RegistryByLastChar) or !HSE_RegistryByLastChar.Has(LastChar))
+        return true
+    for _, Spec in HSE_RegistryByLastChar[LastChar] {
+        if (Spec.Trigger != Trigger)
+            continue
+        ; A star trigger is evaluated against the buffer as it will be ONE
+        ; keystroke from now — the magic key has not been typed yet at preview
+        ; time, but it is the trigger's last character, so appending it
+        ; reconstructs exactly what the engine will match against.
+        EvalBuf := HSE_Buffer
+        if (Spec.HasOwnProp("Star") and Spec.Star)
+            EvalBuf .= LastChar
+        CaseSensitive := (Spec.HasOwnProp("CaseSensitive") and Spec.CaseSensitive)
+        if !HSE_SuffixMatches(EvalBuf, Trigger, CaseSensitive)
+            return false
+        return _HSE_WordBoundaryAllows(EvalBuf, Spec)
+    }
+    return true
+}
+
 ; Categories scanned at boot. The order matches Hammerspoon's default load
 ; order so a tie on the prefix index returns the same first-match across
 ; both drivers.
@@ -1149,6 +1193,15 @@ _LookupAndRender() {
 	for _, Entry in Candidates {
 		Cfg := HotstringsResolve(Entry.Category, Entry.Section)
 		if !Cfg.ShowTooltip {
+			continue
+		}
+		; Only offer what the engine would actually fire. The SearchKey scan above
+		; decides WHICH candidates to consider; it is not a word-boundary verdict,
+		; and treating it as one is what let a mid-word "tt" be advertised as a
+		; word-initial trigger the engine then refused.
+		if !_PreviewEngineWouldFire(Entry.Trigger) {
+			if LoggerIsDebugEnabled()
+				LoggerDebug("PrefixWatcher", "DBG candidate '{1}' skipped — the engine would not fire it here.", Entry.Trigger)
 			continue
 		}
 		Color := (Cfg.Color != "") ? Cfg.Color : ""
