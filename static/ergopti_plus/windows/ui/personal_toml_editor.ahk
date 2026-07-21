@@ -336,12 +336,8 @@ _FillFormFromSelection(LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCa
 	if !Row {
 		return
 	}
-	if !_PersonalEditorData["sections"].Has(_PersonalEditorSection) {
-		return
-	}
 	; The persisted default_section pointer can outlive its target (a section
 	; deleted in an earlier session), and AHK v2 THROWS on a missing Map key.
-	; Guarded exactly like the twin read in _FillFormFromSelection.
 	if !_PersonalEditorData["sections"].Has(_PersonalEditorSection) {
 		try LoggerWarn("PersonalEditor", "Section {1} no longer exists — ignoring the action.", _PersonalEditorSection)
 		return
@@ -582,15 +578,34 @@ _NewSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, 
 	StatusText.Value := ""
 }
 
+; Guard every consumer of the _PersonalEditorSection pointer.
+;
+; "Selected" is two conditions, not one: the pointer must be non-empty AND still
+; name a live section. Checking only the first leaves the stale-pointer case
+; reachable — the persisted default_section can name a section deleted in an
+; earlier run, and a Map read on a missing key throws UnsetItemError rather than
+; returning empty. Callers that only tested for "" therefore guarded their read
+; and then threw on the very next write.
+; @param FuncName {String} Caller name, for the warning.
+; @return {Boolean} True when the pointer names a live section.
+_PersonalEditorRequireSection(FuncName) {
+	global _PersonalEditorData, _PersonalEditorSection
+	if (_PersonalEditorSection == "" or !IsSet(_PersonalEditorData)
+		or !_PersonalEditorData.Has("sections")
+		or !_PersonalEditorData["sections"].Has(_PersonalEditorSection)) {
+		try LoggerWarn("PersonalEditor",
+			"'{1}' called with no live section selected ('{2}').", FuncName, _PersonalEditorSection)
+		MsgBox(t("editor.hotstrings.err_no_section_selected"), t("editor.hotstrings.title_error"), "Icon!")
+		return false
+	}
+	return true
+}
+
 _RenameSection(W, SectionDrop) {
 	global _PersonalEditorData, _PersonalEditorSection
-	if (_PersonalEditorSection == "") {
-		MsgBox(t("editor.hotstrings.err_no_section_selected"), t("editor.hotstrings.title_error"), "Icon!")
+	if !_PersonalEditorRequireSection("_RenameSection")
 		return
-	}
-	OldDesc := _PersonalEditorData["sections"].Has(_PersonalEditorSection)
-		? _PersonalEditorData["sections"][_PersonalEditorSection]["description"]
-		: _PersonalEditorSection
+	OldDesc := _PersonalEditorData["sections"][_PersonalEditorSection]["description"]
 	Res := InputBox(Format(t("editor.hotstrings.rename_desc_prompt"), _PersonalEditorSection), t("editor.hotstrings.rename_title"),
 		"w300 h120", OldDesc)
 	if Res.Result != "OK" or Trim(Res.Value) == "" {
@@ -604,13 +619,9 @@ _RenameSection(W, SectionDrop) {
 
 _DeleteSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText) {
 	global _PersonalEditorData, _PersonalEditorSection
-	if (_PersonalEditorSection == "") {
-		MsgBox(t("editor.hotstrings.err_no_section_selected"), t("editor.hotstrings.title_error"), "Icon!")
+	if !_PersonalEditorRequireSection("_DeleteSection")
 		return
-	}
-	EntryCount := _PersonalEditorData["sections"].Has(_PersonalEditorSection)
-		? _PersonalEditorData["sections"][_PersonalEditorSection]["entries"].Length
-		: 0
+	EntryCount := _PersonalEditorData["sections"][_PersonalEditorSection]["entries"].Length
 	Confirm := MsgBox(
 		t("editor.hotstrings.btn_delete") . ' "' . _PersonalEditorSection . '" (' . EntryCount . ') ?',
 		t("editor.hotstrings.title_confirm"), "YesNo Icon?"
