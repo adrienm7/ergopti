@@ -2287,7 +2287,23 @@ than from the reported site:
   broken (in x1 mode "stopped firing" is indistinguishable from normal completion)
   and was replaced with a structural guard, stating why in the file.
 
-**STILL OPEN — 27 findings, each with a verified exact fix in hand.** These were
+**ROUND 3 UPDATE.** Ten more of those were implemented (menu_paths' pcall-status
+read, input_sources' osascript payload, the MLX dedup single-source, gestures
+space_wrap, the text-transform re-entrancy guard, the stale wrap-selection cache,
+the karabiner shell quoting, the blind karabiner-delay double, the missing
+hs.screen stub, and a 41-site POSIX shell-quoting sweep). Two of those again grew
+far beyond their finding: the shell-quoting guard, written for the class, found
+**41 sites across 15 files** where `%q` — which escapes for a Lua literal and
+leaves `$`, backticks and `!` for /bin/sh — was quoting a user-configurable path.
+
+Round 3 also produced two more cautionary results worth keeping. An automated
+regex rewrite CORRUPTED three multi-`%q` format strings by collapsing two
+arguments into one call; only reading the resulting lines caught it. And adding
+`require("lib.text_utils")` to `lib/logger.lua` broke **19 tests** through boot
+ordering — the logger is foundational and must not acquire dependencies, so it
+quotes inline instead.
+
+**STILL OPEN — the remainder of the list below, each with a verified exact fix in hand.** These were
 adjudicated CONFIRMED against current source but not implemented; treat them as
 specified work, not as hypotheses:
 
