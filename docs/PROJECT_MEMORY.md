@@ -2647,3 +2647,67 @@ repeat-key fallback. Hoisted to one shared `star_validated` local.
 
 Related: [[project_hs_audit_2026_07_21]], [[project_macos_eventtap_no_blocking]],
 [[project_ahk_guard_tests_must_loop_the_class]], [[feedback_regression_tests]].
+
+### project-perf-2026-07-21-implementation
+
+_The eight perf fixes that landed, the two suites that cover disjoint ground, and why the end-char tail cap was refused_
+
+<sub>slug: `project_perf_2026_07_21_implementation`</sub>
+
+The 2026-07-21 performance audit (`PERF_AHK_2026-07-21.md`) shipped **eight of its
+nine candidates**, one commit each, every one with a regression test verified red
+before / green after. Four things are worth more than the fixes themselves.
+
+**The biggest win was work whose result never changed.** `_MG_LoadHotstringSubCategories`
+re-read and re-decoded the 12.5 KB `menu_manifest.json` on every menu item —
+about a hundred times per build. A bench of the driver's own parser against the
+real file measures **44.3 ms per decode**, of which 43.9 ms is `JsonParse`
+(`lib/json.ahk` is a recursive-descent parser in AHK, ~4 µs/byte); `FileRead` is
+0.096 ms because the file is page-cached. That is ~4 s per boot AND per live
+rebuild. It was also **behaviour-neutral**: the manifest declares no
+`master_gates` key, so the helper always returned its hardcoded defaults. The
+boot profiler corroborates closely — 54 flat items × 44 ms ≈ 2.4 s against the
+1994 ms measured for that phase over 58 boots. **Lesson: when a phase cost scales
+with item count, suspect per-item I/O before suspecting the items.**
+
+**An adversarial verifier can be wrong in the confident direction.** The audit's
+verification pass dismissed the 38 ms/parse figure as "implausibly high, realistic
+is 2-5 ms" and demanded a re-bench before assigning priority. The re-bench proved
+the original figure right and slightly conservative. A refutation is a hypothesis
+too — re-derive it before acting on it.
+
+**The AHK runner and the JS gate cover DISJOINT ground.** Adding one name to an
+`ADAPTER_*` contract map left the AHK suite at a full 3380/3380 green while the
+cross-driver port contract was broken: port compliance is checked only by
+`test:js`. That map declares the port every driver must satisfy, so a
+Windows-only helper (`CB_IsBusy`) belongs in the adapter file but NOT in the map.
+This is what `.claude/skills/verify-change/SKILL.md` and
+`tools/test/verify-change.cjs` now automate — the tool derives the required gates
+from the changed files and refuses to let the choice be made from memory.
+
+**Two silent-failure classes are now checked mechanically**, because both produce
+a PASSING suite:
+- a test file that `run_all.ahk` does not `#Include` never runs;
+- `_DriverFuncBody("Name")` returns `""` for a name it cannot find, so every
+  absence assertion on it passes vacuously. AHK v2 sharpens this: a call to a
+  function that does not exist is **not** a load-time error — the name resolves as
+  a variable — and production call sites are usually wrapped in `try`, so a
+  half-finished rename gives a green test, no error and no log line. The check
+  caught one such test the same day it was written.
+
+**OPT-9b (per-tail cap on the end-char loop) was refused, deliberately.** It needs
+five synchronised sites; missing one yields a bound that is too short, i.e. **a
+hotstring that silently stops firing**. The gain is sub-µs against a 5 ms profiler
+threshold. The same mechanism on the hotter STAR loop had already been refuted for
+unmeasurable gain, so doing only the colder one would be incoherent. Do not
+re-raise it: correctness risk for zero measurable gain.
+
+**One latent bug found next door to a perf fix:** `SendInstant`'s
+`_SEND_INSTANT_CLIP_BUSY` branch injects the text and then returns bare, which is
+falsy, while `WrapTextIfSelected` (`layout.ahk`) reads falsy as "emitted nothing"
+and re-sends the bare symbol on top. The comment at that call site even asserted
+the opposite. When a fallback branch emits, it must report success.
+
+Related: [[project_audit_2026_07_21_open_items]],
+[[project_typing_latency_tooltip_coldstart]],
+[[project_ahk_guard_tests_must_loop_the_class]], [[feedback_regression_tests]].
