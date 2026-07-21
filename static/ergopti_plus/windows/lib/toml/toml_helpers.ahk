@@ -545,6 +545,25 @@ IniCacheGet(Cache, Section, Key, Default := "_") {
     return SectionCache[Key]
 }
 
+; Read a Section/Key from a parsed cache as a boolean. This exists because
+; ``IniCacheGet`` returns the stored value verbatim, and ``ParseTomlFile`` has
+; already run it through ``TOML_CoerceValue`` — so a TOML ``true`` arrives as a
+; real AHK boolean, NOT as the string "true". Comparing it with
+; ``StrLower(v) == "true"`` is a legal, non-throwing, always-false expression,
+; which is exactly how the onboarding wizard silently read every enabled
+; setting as disabled. Every caller that wants a boolean out of a cache must
+; come through here rather than rolling its own test.
+;
+; Accepts every shape the value can legitimately have on disk: a real boolean
+; from the parser, the 1/0 the driver's own writers have emitted, and the
+; literal strings from a hand-edited file. A missing key reads as false.
+TomlCacheBool(Cache, Section, Key) {
+    Value := IniCacheGet(Cache, Section, Key)
+    if (Value == true or Value == 1)
+        return true
+    return (Type(Value) == "String" and StrLower(Trim(Value)) == "true")
+}
+
 ; Resolve a configured path: trim whitespace, treat empty / underscore as
 ; "use the default", otherwise return the trimmed value.
 ResolveConfigPath(RawValue, DefaultPath) {

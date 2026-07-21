@@ -649,6 +649,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_ni_isvpnactive_missing_return.ahk
 #Include meta/test_no_onexit_keylogger_flush.ahk
 #Include meta/test_onboarding_no_appstate.ahk
+#Include meta/test_onboarding_toml_bool_reads.ahk
 #Include meta/test_numeric_prompt_throws_on_nonnumeric.ahk
 #Include meta/test_oneshotshift_lalt_lshift_stuck.ahk
 #Include meta/test_oneshotshift_suspend_guard.ahk

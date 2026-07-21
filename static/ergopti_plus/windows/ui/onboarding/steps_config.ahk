@@ -435,9 +435,9 @@ _Onboarding_PreloadFromExistingConfig(ChosenDir) {
 	LayoutAltGr := IniCacheGet(Cache, "ahk.layout", "ergopti_alt_gr")
 	LayoutPlus  := IniCacheGet(Cache, "ahk.layout", "ergopti_plus")
 	if (LayoutBase != "_" or LayoutAltGr != "_" or LayoutPlus != "_") {
-		_ob_layout := (StrLower(LayoutBase) == "true")
-			or (StrLower(LayoutAltGr) == "true")
-			or (StrLower(LayoutPlus) == "true")
+		_ob_layout := TomlCacheBool(Cache, "ahk.layout", "ergopti_base")
+			or TomlCacheBool(Cache, "ahk.layout", "ergopti_alt_gr")
+			or TomlCacheBool(Cache, "ahk.layout", "ergopti_plus")
 	}
 
 	; Magic key: TOML strings come in with surrounding quotes already stripped
@@ -447,15 +447,16 @@ _Onboarding_PreloadFromExistingConfig(ChosenDir) {
 		_ob_magic_key := MagicKey
 	}
 
-	; Metrics + gestures: boolean flags. ParseTomlFile preserves TOML's
-	; literal "true"/"false" strings so a case-insensitive compare suffices.
+	; Metrics + gestures: boolean flags. ParseTomlFile coerces TOML's `true` to a
+	; real AHK boolean, so these must go through TomlCacheBool — a string compare
+	; against "true" is always false and would read every enabled setting as off.
 	MetricsEnabled := IniCacheGet(Cache, "ahk.metrics", "metrics_enabled")
 	if (MetricsEnabled != "_") {
-		_ob_metrics := (StrLower(MetricsEnabled) == "true")
+		_ob_metrics := TomlCacheBool(Cache, "ahk.metrics", "metrics_enabled")
 	}
 	GesturesEnabled := IniCacheGet(Cache, "ahk.gestures", "enabled")
 	if (GesturesEnabled != "_") {
-		_ob_gestures := (StrLower(GesturesEnabled) == "true")
+		_ob_gestures := TomlCacheBool(Cache, "ahk.gestures", "enabled")
 	}
 
 	try LoggerDone("onboarding", "Wizard pre-loaded (layout={1}, magic='{2}', metrics={3}, gestures={4}).",
