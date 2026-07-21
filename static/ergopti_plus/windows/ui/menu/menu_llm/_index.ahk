@@ -78,6 +78,18 @@ _LLMMenuBuildIndentRange() {
     return out
 }
 
+; Physical-idle ceiling for the background Ollama health tick. Past it the tick
+; early-returns instead of spawning a curl.exe child every 10 s — 6 processes a
+; minute, 8640 a day — to refresh a dot nobody is looking at, which also keeps
+; the daemon and the network stack awake for nothing. 60 s is long enough that
+; a user pausing to read never loses the live dot, short enough that an
+; unattended machine goes quiet almost at once. Freshness is preserved from both
+; ends: the tray-build path forces past the gate so opening the menu always
+; re-pings, and the ordinary tick resumes within 10 s of the next physical input.
+; Deliberately NOT derived from TOOLTIP_UIA_IDLE_REQUIRED_MS — that one asks
+; "has the typing burst ended?" (a 250 ms floor), the opposite question.
+global LLM_HEALTH_PROBE_IDLE_MAX_MS := 60000
+
 
 
 

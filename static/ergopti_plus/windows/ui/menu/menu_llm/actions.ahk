@@ -226,13 +226,20 @@ LLM_Menu_SetModel(tag) {
 ; ``menu.llm.onboarding_*`` locale keys it consumed have been deleted from
 ; every locale.
 
-_LLM_Menu_FireHealthProbe() {
-	global _LLM_Menu
+; Force lets the tray-build path demand a refresh the idle gate cannot veto. It
+; is surgically limited to that gate: every other guard below still applies, and
+; the suspend guard deliberately sits ahead of it.
+_LLM_Menu_FireHealthProbe(Force := false) {
+	global _LLM_Menu, LLM_HEALTH_PROBE_IDLE_MAX_MS
+	; Edge trigger for the idle-gate log: an unattended machine must produce one
+	; line when it goes quiet and one when it wakes, not one line per 10 s tick
+	static _idle_gated := false
 	; Pause invariant: SetTimer callbacks bypass native Suspend, so this 10 s
 	; health tick keeps pinging Ollama (and can trigger a full tray rebuild)
 	; while the user believes the driver is fully paused. Mirror the guard used
 	; in hotstring_prefix_watcher.ahk / tooltip.ahk / keylogger so the probe is
-	; inert during suspend; the next unpaused tick refreshes the dot.
+	; inert during suspend; the next unpaused tick refreshes the dot. Force is
+	; powerless here — a paused driver stays silent whoever asks.
 	if A_IsSuspended
 		return
 	; Only probe Ollama for now. The API backend has its own readiness path
@@ -250,6 +257,27 @@ _LLM_Menu_FireHealthProbe() {
 	last := _LLM_Menu.Has("last_health_probe_tick") ? _LLM_Menu["last_health_probe_tick"] : 0
 	if (last > 0 and (now - last) < 3000)
 		return
+	; Idle gate, kept LAST so the caller-supplied bypass reaches only this guard
+	; and can never defeat the suspend, backend, enabled or throttle checks above.
+	; That ordering is load-bearing: _LLM_Menu_OnHealthProbeDone rebuilds the menu
+	; on a state flip, the rebuild re-enters here with Force, and only the 3 s
+	; throttle breaks the build → probe → flip → build loop.
+	; Every tick that gets past this point spawns a curl.exe child (see
+	; LLM_OllamaIsRunning_Async) plus its poll chain — 8640 a day on a machine
+	; nobody is sitting at. The tick stamp below is deliberately NOT written on
+	; the gated path, so the first tick after the user returns probes at once
+	; instead of serving out a stale throttle window.
+	if (!Force and A_TimeIdlePhysical > LLM_HEALTH_PROBE_IDLE_MAX_MS) {
+		if !_idle_gated {
+			_idle_gated := true
+			LoggerDebug("LLM", "Health probe idle-gated — no physical input for {1} ms (ceiling {2} ms).", A_TimeIdlePhysical, LLM_HEALTH_PROBE_IDLE_MAX_MS)
+		}
+		return
+	}
+	if _idle_gated {
+		_idle_gated := false
+		LoggerDebug("LLM", "Health probe resumed — physical input detected again.")
+	}
 	_LLM_Menu["last_health_probe_tick"] := now
 	try {
 		LLM_OllamaIsRunning_Async((reachable) => _LLM_Menu_OnHealthProbeDone(reachable))

@@ -260,7 +260,15 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational) {
 		; the submenu reads only the in-memory caches, never a synchronous /api/tags
 		; or reachability round-trip, so opening the tray can never freeze the thread.
 		model_menu := LLM_Menu_BuildModelMenu()
-		_LLM_Menu_FireHealthProbe()
+		; Force past the idle gate: this row is only painted while the tray menu is
+		; actually being built, i.e. for a user looking at it right now, so the dot
+		; must refresh even when A_TimeIdlePhysical claims the machine has been
+		; unattended. That counter only notices the tray click because AHK's mouse
+		; hook happens to be installed (nav_layer.ahk declares wheel hotkeys) — far
+		; too incidental a dependency to hang the on-demand refresh on. The 3 s
+		; throttle inside the helper is NOT bypassed, so a rebuild storm still costs
+		; a single ping.
+		_LLM_Menu_FireHealthProbe(true)
 		_LLM_Menu_FireInstalledTagsProbe()
 		last_status := _LLM_Menu.Has("last_health_status") ? _LLM_Menu["last_health_status"] : ""
 		health_dot := llm_is_operational
