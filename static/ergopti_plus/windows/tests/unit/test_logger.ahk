@@ -63,6 +63,11 @@ _ResetLogger() {
 	_LOGGER_DEDUP_LEVEL := ""
 	_LOGGER_DEDUP_COUNT := 0
 	_LastErrTime := 0
+	; Clear the requeue-cap casualty counter too: a truncation left by a prior
+	; test would otherwise make the next successful flush emit a stray summary
+	; line into this test's pending/ring assertions.
+	global _LOGGER_DROPPED_LINES
+	_LOGGER_DROPPED_LINES := 0
 	_LoggerRefreshFastFlags()
 }
 
@@ -84,6 +89,68 @@ TestLogger_FailedFlushRequeuesSnapshot() {
 	try FileDelete(Path)
 }
 Test("Logger: failed flush requeues the original snapshot for retry", TestLogger_FailedFlushRequeuesSnapshot)
+
+; A chronic sink failure — a full disk, exactly when the driver is logging the
+; errors that matter — used to grow the pending queue without bound: every
+; 500 ms tick re-stacked the whole snapshot plus the lines emitted meanwhile.
+; The cap turns that leak into a fixed cost. Two things have to hold, and the
+; second is the one that is easy to get backwards: the OLDEST lines must be the
+; casualties, because the requeue re-inserts at index 1 and the newest lines
+; describe whatever is breaking right now.
+TestLogger_RequeueIsCappedOldestFirst() {
+	global _LOGGER_PENDING, LOGGER_LOG_PATH, LOGGER_PENDING_CAP, _LOGGER_DROPPED_LINES
+	_ResetLogger()
+	Overflow := 25
+	; Distinct payloads: identical lines would make the ordering assertion below
+	; unfalsifiable, and would be collapsed by the dedup layer on any path that
+	; goes through _LoggerEmit.
+	loop LOGGER_PENDING_CAP + Overflow
+		_LOGGER_PENDING.Push("cap-line-" . A_Index)
+	LOGGER_LOG_PATH := "Z:\\ergopti_missing_sink\\driver.log"
+	_LoggerFlush()
+
+	AssertEqual(LOGGER_PENDING_CAP, _LOGGER_PENDING.Length,
+		"a requeue must not grow the pending queue past LOGGER_PENDING_CAP - an unbounded queue is a memory leak triggered by the very failure the driver is trying to report")
+	AssertEqual(Overflow, _LOGGER_DROPPED_LINES,
+		"every sacrificed line must be counted, so the truncation can be reported instead of being silent")
+	AssertEqual("cap-line-" . (Overflow + 1), _LOGGER_PENDING[1],
+		"the cap must drop the OLDEST lines - trimming from the back would keep stale history and throw away the newest diagnostics")
+	AssertEqual("cap-line-" . (LOGGER_PENDING_CAP + Overflow), _LOGGER_PENDING[_LOGGER_PENDING.Length],
+		"the newest line must survive the truncation")
+}
+Test("Logger: a requeue is capped and drops the oldest lines first", TestLogger_RequeueIsCappedOldestFirst)
+
+; The counter only means something if it is eventually reported. It must NOT be
+; reported while the sink is dead — that would push the report onto the very
+; queue that is overflowing — so the summary is emitted on the first flush that
+; actually writes.
+TestLogger_DroppedLinesAreReportedOnRecovery() {
+	global _LOGGER_PENDING, LOGGER_LOG_PATH, LOGGER_PENDING_CAP, _LOGGER_DROPPED_LINES
+	_ResetLogger()
+	Overflow := 3
+	loop LOGGER_PENDING_CAP + Overflow
+		_LOGGER_PENDING.Push("recover-line-" . A_Index)
+	LOGGER_LOG_PATH := "Z:\\ergopti_missing_sink\\driver.log"
+	_LoggerFlush()
+	AssertEqual(Overflow, _LOGGER_DROPPED_LINES,
+		"the failing flush must have truncated and counted before recovery is tested")
+
+	Path := A_Temp . "\\ergopti_logger_cap_" . A_TickCount . ".log"
+	try FileDelete(Path)
+	LOGGER_LOG_PATH := Path
+	_LoggerFlush()
+	AssertEqual(0, _LOGGER_DROPPED_LINES,
+		"the casualty counter must reset once the loss has been reported, so the summary is emitted once and not on every later flush")
+
+	; The summary is queued, not written inline: emitting it mid-flush must not
+	; re-enter _LoggerFlush. A second tick is what puts it on disk.
+	_LoggerFlush()
+	Content := FileRead(Path, "UTF-8")
+	Assert(InStr(Content, "pending lines dropped") > 0,
+		"the recovered sink must carry a summary of the truncation - a silent drop would leave a hole in the log with nothing saying why")
+	try FileDelete(Path)
+}
+Test("Logger: dropped lines are reported once the sink recovers", TestLogger_DroppedLinesAreReportedOnRecovery)
 
 
 
