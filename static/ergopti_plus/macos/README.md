@@ -43,5 +43,5 @@ Code is English, UI is French; tabs for indentation; EmmyLua docstrings; section
 banners and logging conventions are defined in
 [`../../../.github/copilot-instructions.md`](../../../.github/copilot-instructions.md).
 Hard-won gotchas live in
-[`../../../docs/PROJECT_MEMORY.md`](../../../docs/PROJECT_MEMORY.md); the
-convergence roadmap is [`../../../docs/REFACTOR_PLAN.md`](../../../docs/REFACTOR_PLAN.md).
+[`../../../docs/PROJECT_MEMORY.md`](../../../docs/PROJECT_MEMORY.md); work that is
+known but not done is in [`../../../TODO.md`](../../../TODO.md).
