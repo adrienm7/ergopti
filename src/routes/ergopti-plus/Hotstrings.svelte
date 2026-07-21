@@ -86,7 +86,7 @@ FEATURES & RATIONALE:
 	}
 </script>
 
-<section class="hotstrings" id="hotstrings" style="--section-accent: #43a047;">
+<section class="hotstrings" id="ep-hotstrings" style="--section-accent: #43a047;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Expansions en temps réel</p>

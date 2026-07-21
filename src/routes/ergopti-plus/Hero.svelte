@@ -108,7 +108,7 @@ FEATURES & RATIONALE:
 	let urlKanata = $derived(ui.release?.url('kanata.kbd') ?? '#');
 </script>
 
-<section class="hero" id="demo">
+<section class="hero" id="ep-demo">
 	<div class="hero-glow" aria-hidden="true"></div>
 	<div class="ep-wrap">
 		<div class="os-toggle" role="group" aria-label="Style des fenêtres">

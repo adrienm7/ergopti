@@ -83,7 +83,7 @@ FEATURES & RATIONALE:
 	];
 </script>
 
-<section class="exclusives" id="ergopti" style="--section-accent: #ffc107;">
+<section class="exclusives" id="ep-ergopti" style="--section-accent: #ffc107;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">⚡ Bonus disposition Ergopti</p>

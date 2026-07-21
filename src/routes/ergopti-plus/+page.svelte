@@ -54,14 +54,14 @@ FEATURES & RATIONALE:
 	];
 
 	const navItems = [
-		{ id: 'hotstrings', label: 'Hotstrings' },
-		{ id: 'ia', label: 'IA' },
-		{ id: 'clavier', label: 'Clavier' },
-		{ id: 'trackpad', label: 'Trackpad' },
-		{ id: 'metriques', label: 'Métriques' },
-		{ id: 'personnalisation', label: 'Réglages' },
-		{ id: 'ergopti', label: 'Ergopti' },
-		{ id: 'telecharger', label: 'Télécharger' }
+		{ id: 'ep-hotstrings', label: 'Hotstrings' },
+		{ id: 'ep-ia', label: 'IA' },
+		{ id: 'ep-clavier', label: 'Clavier' },
+		{ id: 'ep-trackpad', label: 'Trackpad' },
+		{ id: 'ep-metriques', label: 'Métriques' },
+		{ id: 'ep-personnalisation', label: 'Réglages' },
+		{ id: 'ep-ergopti', label: 'Ergopti' },
+		{ id: 'ep-telecharger', label: 'Télécharger' }
 	];
 
 	onMount(async () => {

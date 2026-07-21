@@ -62,7 +62,7 @@ FEATURES & RATIONALE:
 	let urlKanata = $derived(ui.release?.url('kanata.kbd') ?? '#');
 </script>
 
-<section class="platforms" id="telecharger" style="--section-accent: var(--accent-blue);">
+<section class="platforms" id="ep-telecharger" style="--section-accent: var(--accent-blue);">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Trois systèmes</p>

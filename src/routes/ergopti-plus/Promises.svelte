@@ -35,7 +35,7 @@ FEATURES & RATIONALE:
 	];
 </script>
 
-<section class="promises" id="promesses">
+<section class="promises" id="ep-promesses">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Trois promesses</p>

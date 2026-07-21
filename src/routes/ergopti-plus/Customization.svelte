@@ -90,7 +90,7 @@ FEATURES & RATIONALE:
 	];
 </script>
 
-<section class="custo" id="personnalisation" style="--section-accent: var(--accent-blue);">
+<section class="custo" id="ep-personnalisation" style="--section-accent: var(--accent-blue);">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Vous gardez la main</p>

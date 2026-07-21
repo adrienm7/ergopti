@@ -82,7 +82,7 @@ FEATURES & RATIONALE:
 	];
 </script>
 
-<section class="personal" id="perso-hotstrings" style="--section-accent: #8e8e93;">
+<section class="personal" id="ep-perso-hotstrings" style="--section-accent: #8e8e93;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Vos propres raccourcis</p>

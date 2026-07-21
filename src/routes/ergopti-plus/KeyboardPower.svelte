@@ -143,7 +143,7 @@ FEATURES & RATIONALE:
 	];
 </script>
 
-<section class="keyboard" id="clavier" style="--section-accent: #fb8c00;">
+<section class="keyboard" id="ep-clavier" style="--section-accent: #fb8c00;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Clavier augmenté</p>
