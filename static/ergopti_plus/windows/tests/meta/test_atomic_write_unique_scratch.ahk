@@ -44,11 +44,18 @@
 ; ================================================
 ; ===============================================
 
-; Every writer that stages to a sibling file and sleeps before retrying the
-; rename. Both entries were the same defect; they are checked together so the
-; invariant is pinned to the class, not to one function.
+; Every writer that stages to a sibling scratch file before publishing it over
+; the target. They are checked together so the invariant is pinned to the
+; class, not to whichever function the bug was last found in.
+;
+; The first two sleep between staging and renaming to ride out an AV lock, and
+; that sleep is the yield point. TOML_BatchWrite has no sleep, but it opens the
+; same hazard from the other end: it begins with an unconditional
+; ``FileDelete(tmp)``, which on a shared name destroys a concurrent writer's
+; live staging file. Its target is config.toml, and it is reached both from
+; menu actions and from timer-driven saves, so two writers really can overlap.
 _AWU_SleepRetryWriters() {
-	return ["KL_WriteAtomic", "KLPF_WriteAtomic"]
+	return ["KL_WriteAtomic", "KLPF_WriteAtomic", "TOML_BatchWrite"]
 }
 
 _AWU_ScratchNamesAreUnique() {
@@ -56,8 +63,10 @@ _AWU_ScratchNamesAreUnique() {
 		Body := _DriverFuncBody(Name)
 		Assert(Body != "", Name . "() must exist in the driver source")
 
-		; The exact defect: a scratch name built only from the destination.
-		Assert(RegExMatch(Body, 'tmp\s*:=\s*path\s*\.\s*"\.tmp"') == 0,
+		; The exact defect: a scratch name built only from the destination. The
+		; pattern is case-insensitive because the writers spell the destination
+		; variable differently (``path`` / ``Path``) and the defect is the same.
+		Assert(RegExMatch(Body, 'i)tmp\s*:=\s*path\s*\.\s*"\.tmp"') == 0,
 			Name . ' must not stage to a scratch name built only from the destination path — a constant name is shared between concurrent writers of the same target, and the Sleep retry in this function is the yield point that lets them collide')
 
 		; And the positive form, so deleting the fixed name is not enough: the
@@ -79,7 +88,8 @@ _AWU_ScratchNamesAreUnique() {
 ; accumulate in the metrics directory forever.
 _AWU_StaleScratchIsReaped() {
 	Reapers := Map("KL_WriteAtomic", "_KL_ReapStaleTemps",
-		"KLPF_WriteAtomic", "_KLPF_ReapStaleTemps")
+		"KLPF_WriteAtomic", "_KLPF_ReapStaleTemps",
+		"TOML_BatchWrite", "_TOML_ReapStaleTemps")
 	for Writer, Reaper in Reapers {
 		Body := _DriverFuncBody(Writer)
 		Assert(Body != "", Writer . "() must exist in the driver source")

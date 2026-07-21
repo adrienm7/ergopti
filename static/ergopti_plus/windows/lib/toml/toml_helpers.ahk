@@ -396,6 +396,22 @@ TOML_Write(Value, Path, Section, Key) {
 ; Apply every (Section, Key, Value) update in one read-modify-write cycle.
 ; Preserves keys we did not touch; sections appear in the original order
 ; followed by any newly introduced section. Returns true on success.
+; Delete scratch files left next to Path by a hard kill. Per-invocation names
+; no longer overwrite each other, so nothing self-cleans any more; the age
+; threshold is what keeps this a tidy-up rather than a new race — an
+; unconditional sweep would delete a concurrent writer's live staging file.
+_TOML_ReapStaleTemps(Path, MaxAgeMs) {
+    SplitPath(Path, &Name, &Dir)
+    if (Dir = "" or Name = "")
+        return
+    try {
+        Loop Files, Dir . "\" . Name . ".*.tmp" {
+            if (DateDiff(A_Now, A_LoopFileTimeModified, "Seconds") * 1000 >= MaxAgeMs)
+                try FileDelete(A_LoopFileFullPath)
+        }
+    }
+}
+
 TOML_BatchWrite(Path, Updates) {
     if (Updates.Length = 0)
         return true
@@ -484,7 +500,19 @@ TOML_BatchWrite(Path, Updates) {
             body .= TOML_RenderKey(k) . " = " . TOML_RenderValue(Sections[sec][k]) . "`n"
     }
 
-    tmp := Path . ".tmp"
+    ; Per-invocation scratch name. A fixed ``Path . ".tmp"`` made the staging
+    ; file a shared resource between every writer of the same target, and the
+    ; delete below is unconditional — so a save that interrupted another one
+    ; destroyed its live staging file, and whichever writer landed last decided
+    ; what the config ended up as. config.toml is written both from menu actions
+    ; and from timer-driven saves, so the two really can overlap. A_ScriptHwnd
+    ; rather than a GetCurrentProcessId DllCall: unique per process all the
+    ; same, and it keeps the OS-call purity ratchet at its baseline.
+    static STALE_TEMP_MS := 60000  ; Older than this, a scratch file is debris from a hard kill
+    static WriteSeq := 0
+    WriteSeq += 1
+    tmp := Path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
+    _TOML_ReapStaleTemps(Path, STALE_TEMP_MS)
     try FileDelete(tmp)
     try {
         f := FileOpen(tmp, "w", "UTF-8")
