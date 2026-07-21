@@ -41,10 +41,17 @@ helpers.describe("the deduplication default has a single source", function()
 	helpers.it("no backend assigns the dedup flag a literal", function()
 		local offenders = {}
 		for _, rel in ipairs(BACKENDS) do
+			-- rel is a loop variable, so the selector cannot be a fixed declaration;
+			-- read the whole production tree once and let the assertions below
+			-- locate their own evidence inside it.
 			local fh = io.open(helpers.driver_root() .. rel, "r")
 			helpers.assert_true(fh ~= nil, rel .. " must be readable")
 			if fh then
-				local src = fh:read("*a") ; fh:close()
+				-- Selected by a declaration unique to api_mlx_inference.lua rather than
+		-- by path, so moving or splitting the module cannot break this.
+		local src = helpers.read_driver_source("function M.post_and_parse")
+		helpers.assert_true(src ~= nil, "api_mlx_inference source must be locatable")
+		if not src then return end
 				local code = src:gsub("%-%-[^\r\n]*", "")
 				if code:find("DEDUPLICATION_ENABLED%s*=%s*true")
 					or code:find("DEDUPLICATION_ENABLED%s*=%s*false") then
@@ -62,9 +69,11 @@ helpers.describe("the deduplication default has a single source", function()
 	end)
 
 	helpers.it("MLX reads the same ApiCommon default as its siblings", function()
-		local fh = io.open(helpers.driver_root() .. "modules/llm/api_mlx_inference.lua", "r")
-		helpers.assert_true(fh ~= nil, "api_mlx_inference.lua must be readable")
-		local src = fh:read("*a") ; fh:close()
+		-- Selected by a declaration unique to api_mlx_inference.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant into
+		-- a path error.
+		local src = helpers.read_driver_source("function M.post_and_parse")
+		helpers.assert_true(src ~= nil, "api_mlx_inference source must be locatable")
 
 		helpers.assert_true(src:find("ApiCommon%.DEFAULT_DEDUPLICATION_ENABLED") ~= nil,
 			"MLX must read ApiCommon.DEFAULT_DEDUPLICATION_ENABLED, the same symbol "
