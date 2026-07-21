@@ -110,6 +110,23 @@ global _LOGGER_PENDING := []
 global _LOGGER_PENDING_ERRORS := []
 global _LOGGER_FLUSH_TIMER_STARTED := False
 
+; Hard ceiling on a pending queue, enforced only on the requeue path. A failed
+; FileAppend re-injects its whole snapshot ahead of the lines emitted meanwhile,
+; so a CHRONIC sink failure — a full disk, precisely when the driver is logging
+; the errors that matter — made every 500 ms tick re-stack everything plus the
+; new lines, with no bound over a 10 h session. 5000 lines is far more history
+; than a triage ever reads back (~1.5 MB per queue) and turns an unbounded leak
+; into a fixed cost. The nominal path is deliberately NOT capped: it drains on
+; every tick, and testing a length per emitted line would put a check on the
+; DEBUG hot path to guard a state that cannot occur while the timer runs.
+global LOGGER_PENDING_CAP := 5000
+
+; Lines sacrificed to the cap since the last successful write. Emitted as one
+; summary line once the sink recovers, so a truncation is never silent — the
+; counter exists to keep the loss fail-fast without logging while the sink is
+; dead (which would be the very recursion the cap is defending against).
+global _LOGGER_DROPPED_LINES := 0
+
 ; Sub-file fan-out: each entry maps a filename suffix to a list of tag substrings.
 ; Lines whose [Tag] matches any pattern are appended to that sub-file in addition
 ; to the main unified log. Sub-files are ephemeral (today only) — stale ones from
@@ -285,6 +302,10 @@ _LoggerFlush(ForceFlush := false) {
 		BlobErr .= Line . "`r`n"
 	}
 
+	; Declared out here on purpose: MainWritten lives inside the branch below, and
+	; reading an unassigned variable throws in AHK v2, so the recovery check at the
+	; end of this function needs its own flag that always exists.
+	WriteSucceeded := false
 	if (LOGGER_LOG_PATH != "" and Blob != "") {
 		MainWritten := false
 		if ForceFlush {
@@ -304,6 +325,8 @@ _LoggerFlush(ForceFlush := false) {
 		}
 		if !MainWritten
 			_LoggerRequeue(Pending, [])
+		else
+			WriteSucceeded := true
 	} else if Blob != "" {
 		_LoggerRequeue(Pending, [])
 	}
@@ -359,6 +382,49 @@ _LoggerFlush(ForceFlush := false) {
             if !SubWritten
                     _LoggerRequeueSub(Name, Lines)
 	}
+
+	; Report the truncation only once the sink is proven writable again. Emitting
+	; while it is dead would push the report onto the very queue that is
+	; overflowing; queuing it here means it goes out on the next tick.
+	if (WriteSucceeded and _LOGGER_DROPPED_LINES > 0)
+		_LoggerEmitDroppedSummary()
+}
+
+; One-line report of the lines the cap sacrificed, modelled on
+; _LoggerEmitDedupSummary: it bypasses _LoggerEmit, rebuilds the timestamp
+; itself, and pushes straight onto the ring, the queues and the fan-out. It must
+; NOT call _LoggerFlush — this runs FROM _LoggerFlush, so a forced re-entry
+; there would recurse.
+_LoggerEmitDroppedSummary() {
+	global LOGGER_SEVERITY, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_TEST_SINK
+	global _LOGGER_DROPPED_LINES, LOGGER_PENDING_CAP
+	Count := _LOGGER_DROPPED_LINES
+	_LOGGER_DROPPED_LINES := 0
+	Word := (Count == 1) ? "line" : "lines"
+	MsgLine := Format("[WARNING] [logger] {1} pending {2} dropped: a queue hit the {3}-line cap while the sink was failing.", Count, Word, LOGGER_PENDING_CAP)
+	Line := FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") . ":" . Format("{:03}", A_MSec) . " " . MsgLine
+	_LoggerPushRing(Line)
+	if _LOGGER_TEST_SINK != 0 {
+		try _LOGGER_TEST_SINK(Line)
+	}
+	_LOGGER_PENDING.Push(Line)
+	_LOGGER_PENDING_ERRORS.Push(Line)
+	_LoggerFanOut("logger", Line)
+}
+
+; Drops the OLDEST entries of Queue until it fits LOGGER_PENDING_CAP, counting
+; the casualties in _LOGGER_DROPPED_LINES. Truncating from the front is the
+; whole point: the requeue re-inserts its snapshot at index 1, so index 1 is the
+; oldest record and the newest diagnostics — the ones describing whatever is
+; breaking right now — live at the end. Popping from the back would keep the
+; stale history and throw away the evidence.
+_LoggerTrimQueueToCap(Queue) {
+	global LOGGER_PENDING_CAP, _LOGGER_DROPPED_LINES
+	Excess := Queue.Length - LOGGER_PENDING_CAP
+	if (Excess <= 0)
+		return
+	Queue.RemoveAt(1, Excess)
+	_LOGGER_DROPPED_LINES += Excess
 }
 
 ; Restore a failed flush snapshot ahead of records logged while the sink write
@@ -372,6 +438,11 @@ _LoggerRequeue(Pending, PendingErr) {
 			_LOGGER_PENDING.InsertAt(1, Pending[Pending.Length - A_Index + 1])
 		loop PendingErr.Length
 			_LOGGER_PENDING_ERRORS.InsertAt(1, PendingErr[PendingErr.Length - A_Index + 1])
+		; Both queues are capped here rather than at each call site: the four
+		; callers pass [] for the queue they do not own, so this is the single
+		; place every requeued line has to pass through.
+		_LoggerTrimQueueToCap(_LOGGER_PENDING)
+		_LoggerTrimQueueToCap(_LOGGER_PENDING_ERRORS)
 	} finally {
 		Critical(_crit)
 	}
@@ -700,6 +771,10 @@ _LoggerRequeueSub(Name, Lines) {
                     Restored.Push(Line)
             for Index, Line in Current
                     Restored.Push(Line)
+            ; _LOGGER_SUB_PENDING is a Map OF queues, one per sub-file, so the cap
+            ; has to apply per queue — capping the Map would bound the number of
+            ; sub-files, which is fixed anyway, and not their contents.
+            _LoggerTrimQueueToCap(Restored)
             _LOGGER_SUB_PENDING[Name] := Restored
     } finally {
             Critical(_crit)
