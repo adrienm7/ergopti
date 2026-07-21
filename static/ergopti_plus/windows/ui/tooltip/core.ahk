@@ -154,8 +154,6 @@ _TooltipDequeuePollFn() {
     ; items untouched; they are re-evaluated on resume or torn down by the watchdog.
     if A_IsSuspended
         return
-    static _PollCount := 0
-    _PollCount += 1
     if (_TooltipDequeueItems == 0 or !IsObject(_TooltipDequeueItems))
         return
     if (_TooltipTimerGeneration != _TooltipGeneration) {
