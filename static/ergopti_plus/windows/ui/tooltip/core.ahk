@@ -33,7 +33,6 @@ global _TooltipTimerGeneration := 0
 global _TooltipPendingActive := false
 global _TooltipPendingItems := 0
 global _TooltipPendingDurationSec := 0
-global _TooltipPendingGeneration := 0
 global TOOLTIP_RENDER_DEBOUNCE_MS := 75
 ; Carries the caller's safety-deadline choice ACROSS the render debounce. A
 ; caller that must outlive the 3 s auto-hide (the LLM spinner, whose inference
@@ -346,7 +345,7 @@ global _TOOLTIP_SAFETY_SEC := 3.0
 ; timer does not exist yet at that point and the cancel silently does nothing.
 TooltipShow(Items, DurationSec := 0, ArmSafety := true) {
     global _TooltipPendingActive, _TooltipPendingItems, _TooltipPendingDurationSec
-    global _TooltipPendingGeneration, TOOLTIP_RENDER_DEBOUNCE_MS, _TooltipPendingArmSafety
+    global TOOLTIP_RENDER_DEBOUNCE_MS, _TooltipPendingArmSafety
 
     if A_IsSuspended {
         TooltipHide("Suspend", true)
@@ -355,7 +354,6 @@ TooltipShow(Items, DurationSec := 0, ArmSafety := true) {
     ; Each new keystroke supersedes the prior request. Negative SetTimer is a
     ; one-shot debounce: continuous typing keeps the expensive GUI/UIA work off
     ; the hot path, and the newest preview is rendered once the user pauses.
-    _TooltipPendingGeneration += 1
     _TooltipPendingItems := Items
     _TooltipPendingDurationSec := DurationSec
     _TooltipPendingArmSafety := ArmSafety
@@ -584,7 +582,6 @@ TooltipHide(DbgTag := "?", Force := false) {
     global _TooltipDequeueItems, _TooltipDequeueActive
     global _TooltipGeneration, _TooltipTimerGeneration
     global _TooltipPendingActive, _TooltipPendingItems, _TooltipPendingDurationSec
-    global _TooltipPendingGeneration
     ; Diagnostic (debug-only): whenever an LLM loading/prediction tooltip is on
     ; screen, record WHO hid it. ``DbgTag`` names the caller — TimerFn (auto-hide),
     ; NewShow (a fresh TooltipShow superseded it), PollEmpty (dequeue), LLM
@@ -634,7 +631,6 @@ TooltipHide(DbgTag := "?", Force := false) {
         return
     ; A hide is authoritative over a queued preview. Stop the debounce before
     ; tearing down the current surface so a stale timer cannot resurrect it.
-    _TooltipPendingGeneration += 1
     _TooltipPendingActive := false
     _TooltipPendingItems := 0
     _TooltipPendingDurationSec := 0

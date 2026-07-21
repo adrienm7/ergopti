@@ -100,7 +100,15 @@ global _HSE_FireLogScheduled := false
 ; still anchors the SearchKey to the word after the quote. HSE does NOT treat
 ; double-quotes as hotstring terminators (they can appear inside trigger bodies),
 ; so this constant must stay separate from HSE_WORD_TERMINATORS.
-global _PREFIX_WORD_BOUNDARIES := HSE_WORD_TERMINATORS . Chr(0x22) . Chr(0x201C) . Chr(0x201D)
+; Deliberately EMPTY here: HotstringsRefreshPrefixBoundaries is the single
+; writer, and lib/boot.ahk calls it during boot, well before any keystroke
+; callback can read this. Spelling the boundary characters out a second time —
+; as this line used to — meant the initial value and every later refresh could
+; disagree about which characters end a word. Building it from
+; HOTSTRINGS_PREVIEW_EXTRA_BOUNDARIES directly is not an option either: that
+; constant lives in hotstrings_io.ahk, which loads AFTER this file, so the
+; reference is unassigned at auto-execute time and kills boot outright.
+global _PREFIX_WORD_BOUNDARIES := ""
 
 ; Categories scanned at boot. The order matches Hammerspoon's default load
 ; order so a tie on the prefix index returns the same first-match across

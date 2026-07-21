@@ -43,14 +43,14 @@
 ; ======================================
 
 ; Returns the current clipboard content as a plain string.
-; Non-text clipboard content (images, file lists) yields  — A_Clipboard
-; already coerces binary clipboard data to  automatically in AHK v2.
-; @return {String} Clipboard text, or  if empty or non-text.
+; Non-text clipboard content (images, file lists) yields "" — A_Clipboard
+; already coerces binary clipboard data to "" automatically in AHK v2.
+; @return {String} Clipboard text, or "" if empty or non-text.
 CB_Read() {
 	try {
 		return A_Clipboard
 	} catch {
-		return 
+		return ""
 	}
 }
 
