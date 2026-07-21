@@ -40,10 +40,10 @@ local helpers = require("tests.helpers")
 
 helpers.describe("a second text transform cannot start while one owns the clipboard", function()
 	helpers.it("guards the pipeline with an in-flight flag", function()
-		local path = helpers.driver_root() .. "modules/shortcuts/actions/text.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "text.lua must be readable")
-		local src = fh:read("*a") ; fh:close()
+		-- Selected by a declaration unique to modules/shortcuts/actions/text.lua rather than by path.
+		local src = helpers.read_driver_source("local function load_shared_groups")
+		helpers.assert_true(src ~= nil, "modules/shortcuts/actions/text.lua source must be locatable")
+		if not src then return end
 
 		helpers.assert_true(src:find("_transform_in_flight") ~= nil,
 			"do_transform must refuse re-entry: a second press inside the ~0.5 s window "
@@ -60,10 +60,10 @@ helpers.describe("a second text transform cannot start while one owns the clipbo
 	end)
 
 	helpers.it("arms a failsafe release so the flag cannot stick", function()
-		local path = helpers.driver_root() .. "modules/shortcuts/actions/text.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "text.lua must be readable")
-		local src = fh:read("*a") ; fh:close()
+		-- Selected by a declaration unique to modules/shortcuts/actions/text.lua rather than by path.
+		local src = helpers.read_driver_source("local function load_shared_groups")
+		helpers.assert_true(src ~= nil, "modules/shortcuts/actions/text.lua source must be locatable")
+		if not src then return end
 
 		helpers.assert_true(src:find("TRANSFORM_LOCK_TIMEOUT_SEC") ~= nil,
 			"the in-flight flag needs a hard timeout — api_mlx's warmup flag carries one "
@@ -84,10 +84,10 @@ end)
 
 helpers.describe("the wrap-text cache is invalidated once the selection is consumed", function()
 	helpers.it("marks the cached selection consumed after wrapping", function()
-		local path = helpers.driver_root() .. "modules/shortcuts/actions/system.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "system.lua must be readable")
-		local src = fh:read("*a") ; fh:close()
+		-- Selected by a declaration unique to modules/shortcuts/actions/system.lua rather than by path.
+		local src = helpers.read_driver_source("local function close_awake_alert")
+		helpers.assert_true(src ~= nil, "modules/shortcuts/actions/system.lua source must be locatable")
+		if not src then return end
 
 		helpers.assert_true(src:find("mark_wrap_selection_consumed") ~= nil,
 			"wrap_selection replaces the selection it was given, so the cached copy is "
@@ -102,10 +102,10 @@ helpers.describe("the wrap-text cache is invalidated once the selection is consu
 	end)
 
 	helpers.it("keeps the entry valid as a negative rather than clearing it", function()
-		local path = helpers.driver_root() .. "modules/shortcuts/actions/system.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "system.lua must be readable")
-		local src = fh:read("*a") ; fh:close()
+		-- Selected by a declaration unique to modules/shortcuts/actions/system.lua rather than by path.
+		local src = helpers.read_driver_source("local function close_awake_alert")
+		helpers.assert_true(src ~= nil, "modules/shortcuts/actions/system.lua source must be locatable")
+		if not src then return end
 
 		local at = src:find("local function mark_wrap_selection_consumed")
 		helpers.assert_true(at ~= nil, "the marker must be locatable")
