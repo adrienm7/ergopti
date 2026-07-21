@@ -82,9 +82,9 @@ end
 --- Works across all applications, not just browsers.
 --- @param front userdata|nil The frontmost hs.application.
 --- @return boolean True if a password/secure field has focus.
-local function is_secure_field_focused(front)
+local function is_secure_field_focused(front, resolve_focused)
 	if not front then return false end
-	local focused = get_focused_element(front)
+	local focused = resolve_focused()
 	if not focused then return false end
 	local ok_role, role    = pcall(function() return focused:attributeValue("AXRole") end)
 	local ok_sub,  subrole = pcall(function() return focused:attributeValue("AXSubrole") end)
@@ -102,12 +102,12 @@ end
 ---
 --- @param front userdata|nil The frontmost hs.application.
 --- @return boolean True if a URL-bar-type element has input focus.
-local function is_url_bar_focused(front)
+local function is_url_bar_focused(front, resolve_focused)
 	if not front then return false end
 	local bid = front:bundleID() or ""
 	if not BROWSER_BUNDLE_IDS[bid] then return false end
 
-	local focused = get_focused_element(front)
+	local focused = resolve_focused()
 	if not focused then return false end
 
 	local ok_role, role = pcall(function() return focused:attributeValue("AXRole") end)
@@ -182,11 +182,25 @@ function M.is_blocked(state, excluded_apps, url_bar_filter_enabled, secure_field
 
 	local front = get_focused_app()
 
-	if secure_field_filter_enabled and is_secure_field_focused(front) then
+	-- Both filters used to resolve the focused AX element independently, so a
+	-- browser with both enabled paid the cross-process round-trip TWICE per
+	-- keystroke — and this runs inside the keyDown eventtap, where cumulative AX
+	-- latency is what gets the tap disabled. Resolve at most once per call, and
+	-- lazily, so the combinations that pay nothing today still pay nothing.
+	local focused_cache, focused_resolved = nil, false
+	local function resolve_focused()
+		if not focused_resolved then
+			focused_resolved = true
+			focused_cache    = get_focused_element(front)
+		end
+		return focused_cache
+	end
+
+	if secure_field_filter_enabled and is_secure_field_focused(front, resolve_focused) then
 		Logger.debug(LOG, "Secure field focused — LLM request skipped.")
 		return true
 	end
-	if url_bar_filter_enabled and is_url_bar_focused(front) then
+	if url_bar_filter_enabled and is_url_bar_focused(front, resolve_focused) then
 		Logger.debug(LOG, "URL bar focused — LLM request skipped.")
 		return true
 	end
