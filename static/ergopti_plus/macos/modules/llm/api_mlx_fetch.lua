@@ -30,7 +30,7 @@ local LOG            = "llm.api_mlx"
 -- Retry policy comes from _shared/modules/llm/inference.json (see api_common.lua),
 -- read from the canonical source so the fan-out retry budget is never hardcoded
 -- or duplicated.
-local _RETRY_MAX_MULT = ApiCommon.get_retry_policy()
+local _RETRY_MAX_MULT, _RETRY_TEMP_STEP, _RETRY_EXTRA_TOKENS = ApiCommon.get_retry_policy()
 local RETRY_FAILED_PREDICTION_ENABLED        = (_RETRY_MAX_MULT or 0) > 1
 local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = _RETRY_MAX_MULT
 
@@ -236,8 +236,14 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 				end,
 				function()
 					if attempt < 2 then
-						local retry_tokens = tokens + 5
-						local retry_temp   = math.min(0.60, (tonumber(temp) or ApiCommon.DEFAULT_TEMPERATURE) + 0.10)
+						-- Same retry policy as api_ollama and api_remote: the step and the
+						-- extra-token budget come from the shared inference manifest rather
+						-- than from literals here, and the ceiling matches theirs. The old
+						-- hardcoded 0.60 cap meant a profile configured above it could never
+						-- raise temperature on a retry at all, so the retry re-sent an
+						-- effectively identical request and failed the same way.
+						local retry_tokens = tokens + _RETRY_EXTRA_TOKENS
+						local retry_temp   = math.min(1.30, (tonumber(temp) or ApiCommon.DEFAULT_TEMPERATURE) + _RETRY_TEMP_STEP)
 						Logger.debug(LOG, "[%s] Variant %d/%d quick chat retry: tokens=%d temp=%.2f",
 							model_name, variant_index, max_attempts, retry_tokens, retry_temp)
 						-- Retry does not stream partial updates (would overwrite the growing preview)
