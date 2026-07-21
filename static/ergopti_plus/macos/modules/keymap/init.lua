@@ -527,10 +527,20 @@ local function run_trigger_checks()
 		local ok, off = pcall(utf8.offset, chars, -1)
 		return (ok and off) and chars:sub(off) or chars
 	end)()
+	-- Pressing ★ is an explicit validation of whatever the tooltip is displaying,
+	-- so a star trigger must never lose to the typing-speed delay: the fallback for
+	-- a missed delay is try_repeat_feature below, which doubles the last letter —
+	-- the user asked for an expansion and would silently get "aa". The terminator
+	-- branch already bypasses the delay for exactly this reason; without the same
+	-- bypass here the tooltip (which applies no delay gate when it collects star
+	-- matches) and the engine disagree, and the disagreement is what reaches the
+	-- screen.
+	local star_validated = chars == CoreState.magic_key
+
 	local auto_bucket = Registry.mappings_for_tail(tail_chars)
 	if auto_bucket then
 		for _, m in ipairs(auto_bucket) do
-			if m.auto and mapping_fires(m)
+			if m.auto and ((star_validated and m.has_magic) or mapping_fires(m))
 				and Expander.try_auto_expand(m, char_len, is_ignored)
 			then
 				return true
@@ -557,7 +567,7 @@ local function run_trigger_checks()
 					-- When ★ is pressed, it is an explicit validation of the displayed
 					-- tooltip — bypass the typing-speed delay so a slow typist never
 					-- gets a repeat-key instead of the intended expansion.
-					local skip_delay = chars == CoreState.magic_key
+					local skip_delay = star_validated
 					for _, m in ipairs(term_bucket) do
 						if not m.auto and (skip_delay or mapping_fires(m))
 							and Expander.try_terminator_expand(m, chars, char_len, is_ignored)
