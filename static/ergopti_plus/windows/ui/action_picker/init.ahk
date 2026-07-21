@@ -213,12 +213,13 @@ FilePathsEditor(*) {
             W.Destroy()
             return
         }
-        try DirCreate(SubStr(_PathsFile, 1, InStr(_PathsFile, "\", , -1) - 1))
-        f := FileOpen(_PathsFile, "w", "UTF-8")
-        if f {
-            f.Write('# Custom paths' . "`r`n" . 'ConfigDirPath = "' . StrReplace(N, "\", "/") . '"' . "`r`n")
-            f.Close()
-        }
+        ; Shares the single hardened writer with the WebView2 editor. This used
+        ; to be a verbatim copy of that block from before it was hardened: an
+        ; unprotected FileOpen and an `if f` with no else, so a read-only or
+        ; locked target discarded the user's chosen directory in silence and the
+        ; Reload() below dropped them back into the OLD one with no error shown.
+        if !_PathsFile_Write(N)
+            return
         Reload()
     }
     W.Add("Button", "x162 y+10 w100 Default", t("button.ok")).OnEvent("Click", ConfirmPath)
