@@ -2,14 +2,14 @@
 #Requires AutoHotkey v2.0
 
 Test_WebViewHostDeferredCallbacksHaveSessionOwnership() {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Src := FileRead(WindowsDir . "\lib\webview_utils.ahk")
+	; Move-resilient: selected by content, not by path.
+	Src := _DriverDirConcat("lib")
 	Assert(InStr(Src, "Epoch      := 0") > 0,
 		"WebViewHost must keep an explicit callback-session epoch")
-	Assert(InStr(Src, "SetTimer(this._DispatchMessage.Bind(this.Epoch, Payload), -1)") > 0,
-		"deferred WebMessage callbacks must capture the creating host epoch")
-	Assert(InStr(Src, "SetTimer(this._DispatchReady.Bind(this.Epoch), -1)") > 0,
-		"deferred ready callbacks must capture the creating host epoch")
+	Assert(InStr(Src, "SetTimer(this._DispatchMessage.Bind(this, this.Epoch, Payload), -1)") > 0,
+		"deferred WebMessage callbacks must bind 'this' AND capture the creating host epoch — obj.Method returns an UNBOUND Func whose first parameter is the implicit this, so omitting it shifts every argument and the timer raises 'Missing a required parameter'")
+	Assert(InStr(Src, "SetTimer(this._DispatchReady.Bind(this, this.Epoch), -1)") > 0,
+		"deferred ready callbacks must bind 'this' AND capture the creating host epoch")
 	Assert(InStr(Src, "A_IsSuspended || this.ResetDone || (CallbackEpoch != this.Epoch)") > 0,
 		"deferred callbacks must reject suspend, close, and stale-session execution")
 	Reset := _DriverFuncBody("_Reset")

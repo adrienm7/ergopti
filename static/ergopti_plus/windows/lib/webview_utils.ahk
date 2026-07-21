@@ -138,7 +138,7 @@ class WebViewHost {
     Queue      := []
     ResetDone  := false
     Epoch      := 0      ; invalidates deferred callbacks after close/reset
-    SafetyTimer := 0      ; handle to the safety-flush timer, cancelled on teardown
+    SafetyTimer := 0      ; BoundFunc for the safety flush; cancelled on teardown
     Opts       := unset
 
     ; --------------------------------------------------------------------------
@@ -345,7 +345,12 @@ class WebViewHost {
         try this.Controller.Fill()
 
         ; ── Safety flush: if the page never posts "ready", flush after 2.5 s ─
-        this.SafetyTimer := SetTimer(this._SafetyFlush.Bind(this), -2500)
+        ; Keep the BoundFunc itself: SetTimer RETURNS an empty string, so
+        ; storing its return gave a "handle" that could never cancel anything —
+        ; and the teardown below silently called SetTimer("", 0) inside a bare
+        ; try. SetTimer keys on the callback object, so that is what to hold.
+        this.SafetyTimer := this._SafetyFlush.Bind(this)
+        SetTimer(this.SafetyTimer, -2500)
 
         try LoggerSuccess("WebViewHost", "{1} shown via WebView2.", this.AppId)
         return true
@@ -373,7 +378,7 @@ class WebViewHost {
             return
         if this.Opts.Has("OnMessage") {
             ; Defer out of the COM callback so handlers never run re-entrantly
-            SetTimer(this._DispatchMessage.Bind(this.Epoch, Payload), -1)
+            SetTimer(this._DispatchMessage.Bind(this, this.Epoch, Payload), -1)
         }
     }
 
@@ -399,7 +404,7 @@ class WebViewHost {
             return
         this.ReadyFired := true
         if this.Opts.Has("OnReady")
-            SetTimer(this._DispatchReady.Bind(this.Epoch), -1)
+            SetTimer(this._DispatchReady.Bind(this, this.Epoch), -1)
     }
 
     _DispatchReady(CallbackEpoch) {
@@ -412,7 +417,7 @@ class WebViewHost {
     ; Evaluates JS in the page, queuing until the page signals ready.
     Eval(Js) {
         if (this.Ready && this.HasOwnProp("WebView")) {
-            SetTimer(this._RunScript.Bind(Js), -1)
+            SetTimer(this._RunScript.Bind(this, Js), -1)
         } else {
             this.Queue.Push(Js)
             if (this.Queue.Length > 200)
@@ -430,7 +435,7 @@ class WebViewHost {
         this.Ready := true
         for _, Js in this.Queue {
             if this.HasOwnProp("WebView")
-                SetTimer(this._RunScript.Bind(Js), -1)
+                SetTimer(this._RunScript.Bind(this, Js), -1)
         }
         this.Queue := []
     }
@@ -477,8 +482,12 @@ class WebViewHost {
         this.ResetDone := true
         this.Epoch += 1
 
-        ; Cancel the safety-flush timer so it never fires on a dead window
-        try SetTimer(this.SafetyTimer, 0)
+        ; Cancel the safety-flush timer so it never fires on a dead window.
+        ; Guarded on the BoundFunc existing: passing the old empty-string
+        ; "handle" cancelled nothing and kept this host, its Gui and its Opts
+        ; graph alive for up to 2.5 s after Close().
+        if (this.SafetyTimer)
+            try SetTimer(this.SafetyTimer, 0)
 
         try {
             this.MsgSub := unset
