@@ -192,6 +192,10 @@ local function resetGS()
 		-- 4-finger swipe ends with one finger lifting before the others.
 		peakN          = 0,
 		peakNFirstSeen = nil,
+		-- Last frame the peak was still observed. Together with peakNFirstSeen this
+		-- gives the span the peak was actually HELD, which is what the commit-time
+		-- override tests — a single-frame spike must not win the commit slot.
+		peakNLastSeen  = nil,
 		-- Candidate spike confirmation state (joining)
 		candidateFingers = nil,
 		candidateSince   = nil,
@@ -407,8 +411,13 @@ local function commitGesture(now)
 	-- one finger lifting early (n drops from 4 to 3 before the candidate path
 	-- can confirm 4 as the new maxFingers). Without this, the commit would
 	-- fire the 3-finger action instead of the 4-finger one.
-	local mf           = gs.maxFingers
-	local peak_elapsed = now - (gs.peakNFirstSeen or now)
+	local mf = gs.maxFingers
+	-- HELD duration, not wall time since the peak was first seen. Measuring from
+	-- `now` meant a single-frame spike qualified as "sustained" purely because the
+	-- gesture continued afterwards: touch 4 fingers for one frame, hold 3 for
+	-- 200 ms, and the commit fired the 4-finger action. Only the span the peak was
+	-- actually observed over expresses intent.
+	local peak_elapsed = (gs.peakNLastSeen or gs.peakNFirstSeen or now) - (gs.peakNFirstSeen or now)
 	if gs.peakN and gs.peakN > mf and peak_elapsed >= PEAK_FINGERS_CONFIRM_MS then
 		Logger.info(LOG, "commitGesture: PEAK OVERRIDE — using peakN=%d (held %.3fs) over maxFingers=%d",
 			gs.peakN, peak_elapsed, mf)
@@ -600,6 +609,7 @@ function M.process_frame(touches)
 			gs.fingerCountChangedAt = now
 			gs.peakN          = n
 			gs.peakNFirstSeen = now
+			gs.peakNLastSeen  = now
 
 			gs.tentativeLifting       = false
 			gs.tentativeLiftingSince  = nil
@@ -612,6 +622,12 @@ function M.process_frame(touches)
 			if n > (gs.peakN or 0) then
 				gs.peakN = n
 				gs.peakNFirstSeen = now
+				gs.peakNLastSeen  = now
+			elseif n == gs.peakN then
+				-- Extend the held span only while the peak is still on the trackpad,
+				-- so the override measures a sustained hold rather than the age of a
+				-- momentary spike
+				gs.peakNLastSeen = now
 			end
 
 			-- StartPos Compensation: if finger count changed, the centroid (pos) jumps.
@@ -773,6 +789,7 @@ function M.process_frame(touches)
 					-- not influence the peak override for the fresh one).
 					gs.peakN          = n
 					gs.peakNFirstSeen = now
+					gs.peakNLastSeen  = now
 					return
 				end
 			end
