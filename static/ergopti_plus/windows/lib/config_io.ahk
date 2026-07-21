@@ -556,15 +556,39 @@ ReadKeyboardShortcutsConfig() {
     global KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS, _IniCache, GESTURE_ACTIONS
     for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS
         KeyboardShortcutAssignments[Slot] := Action
-    for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS {
+    ; Read EVERY persisted slot, not just the shipped defaults.
+    ;
+    ; The slot picker offers every modifier chord in GESTURE_ACTIONS — roughly
+    ; 600 of them — while KEYBOARD_SHORTCUT_DEFAULTS holds 15. Iterating only
+    ; the defaults meant a slot the user added (say win_b) was written to
+    ; config.toml by SetKeyboardShortcutAction, and then never read back on the
+    ; Reload that same function triggers: absent from KeyboardShortcutAssignments,
+    ; so no hotkey is registered and the entry vanishes from the menu too. The
+    ; value stays on disk, so nothing looks lost — the addition just appears not
+    ; to have taken.
+    ;
+    ; _GlobalClearAllBindings already walks _IniCache for exactly these
+    ; non-default slots, which is what shows this to be a drift between the
+    ; clear path and the read path rather than a deliberate restriction.
+    SlotsToRead := Map()
+    for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS
+        SlotsToRead[Slot] := true
+    if IsSet(_IniCache) and _IniCache.Has("ahk.shortcuts.keyboard") {
+        for Slot, _ in _IniCache["ahk.shortcuts.keyboard"]
+            SlotsToRead[Slot] := true
+    }
+
+    for Slot, _ in SlotsToRead {
         Value := IniCacheGet(_IniCache, "ahk.shortcuts.keyboard", Slot)
         if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
             KeyboardShortcutAssignments[Slot] := Value
         else if (Value != "_")
             ; Falling back to the shipped default is the right behaviour; doing
             ; it silently is not. The key then fires a DIFFERENT action than the
-            ; one the user configured, and nothing anywhere says why.
-            try LoggerWarn("Shortcuts", "Keyboard slot '{1}' has unknown action '{2}' — falling back to '{3}'.", Slot, Value, KeyboardShortcutAssignments[Slot])
+            ; one the user configured, and nothing anywhere says why. A slot with
+            ; no default resolves to "" here, which reads as "unassigned".
+            try LoggerWarn("Shortcuts", "Keyboard slot '{1}' has unknown action '{2}' — falling back to '{3}'.", Slot, Value,
+                KeyboardShortcutAssignments.Has(Slot) ? KeyboardShortcutAssignments[Slot] : "(none)")
     }
 }
 
