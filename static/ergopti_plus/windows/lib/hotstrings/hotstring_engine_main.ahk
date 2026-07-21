@@ -446,8 +446,7 @@ HSE_MappingsForTail(TailChar) {
     }
     ; Sort: longest trigger first, then Priority desc, then GroupOrder asc, then
     ; Seq asc. Priority slots in right after length so it mirrors the
-    ; HSE_FindMatchAtEnd tie-break exactly. Bubble sort is fine — registry size
-    ; is small and this is called rarely.
+    ; HSE_FindMatchAtEnd tie-break exactly.
     Len := Out.Length
     loop (Len - 1) {
         i := A_Index

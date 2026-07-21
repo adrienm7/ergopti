@@ -316,10 +316,12 @@ TestTL_LoadHotstringsBasic() {
 	if FileExist(TmpPath) {
 		FileDelete(TmpPath)
 	}
-	; Use is_case_sensitive=true + auto_expand=true (adds the * flag) so
-	; CreateCaseSensitiveHotstrings takes the conform fast path and registers
-	; exactly one spec — the explicit-variant path (auto_expand=false) registers
-	; three (lower/UPPER/Title) and would break the count assertion.
+	; is_case_sensitive = true routes to CreateHotstring, which registers the
+	; literal trigger ONLY — hence exactly one spec. (The flag's name is
+	; inverted relative to the registrar it selects; the mapping is documented
+	; once, at hotstring_builder.ahk's HotstringRegistrarFor.) The false branch
+	; registers the whole cased family instead, which
+	; TestTL_CaseSensitiveFlagSelectsRegistrar below pins directly.
 	Content := "[[greetings]]`r`n"
 	         . '"hi" = { output = "hello", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }`r`n'
 	FileAppend(Content, TmpPath, "UTF-8")
@@ -341,6 +343,40 @@ TestTL_LoadHotstringsBasic() {
 }
 Test("LoadHotstringsSection: registers one hotstring from a synthetic TOML file",
 	TestTL_LoadHotstringsBasic)
+
+; Behavioural counterpart to the source-scan guard on the is_case_sensitive
+; mapping. The flip changed real registration behaviour for personal and
+; extension entries, yet every test covering those loaders passed either way —
+; the only guard was a meta test asserting the branch's SHAPE, and an existing
+; unit test's comment documented the OLD meaning. This pins the observable
+; difference: which registrar runs, and how many specs it produces.
+TestTL_CaseSensitiveFlagSelectsRegistrar() {
+	TmpPath := A_ScriptDir . "\test_hstr_case.toml"
+	if FileExist(TmpPath) {
+		FileDelete(TmpPath)
+	}
+	; is_case_sensitive = FALSE -> CreateCaseSensitiveHotstrings -> the whole
+	; cased family (lower / UPPER / Title). auto_expand = false keeps the
+	; explicit-variant path, so the family is registered as three specs.
+	Content := "[[greetings]]`r`n"
+	         . '"hi" = { output = "hello", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`r`n'
+	FileAppend(Content, TmpPath, "UTF-8")
+
+	global ScriptInformation
+	OldPath := ScriptInformation["PersonalTomlPath"]
+	ScriptInformation["PersonalTomlPath"] := TmpPath
+
+	ResetHotstringRecorders()
+	LoadHotstringsSection("personal", "greetings", { TimeActivationSeconds: 0 })
+
+	AssertEqual(3, _Stub_HotstringRegistrations.Length,
+		"is_case_sensitive = false must route to CreateCaseSensitiveHotstrings and register the whole cased family — one spec here means the flag is selecting the literal-only registrar, i.e. the mapping has flipped back")
+
+	FileDelete(TmpPath)
+	ScriptInformation["PersonalTomlPath"] := OldPath
+}
+Test("LoadHotstringsSection: is_case_sensitive = false registers the cased family",
+	TestTL_CaseSensitiveFlagSelectsRegistrar)
 
 TestTL_LoadHotstringsMissingSection() {
 	TmpPath := A_ScriptDir . "\test_hstr_nosec.toml"

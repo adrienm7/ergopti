@@ -35,12 +35,37 @@
 
 #Requires AutoHotkey v2.0
 
-; Every WebMessageReceived handler in the driver. Adding a new host without
-; adding it here is itself caught, by the count assertion below.
+; Every WebMessageReceived handler in the driver, DERIVED from source.
+;
+; This was a hardcoded list of nine names guarded by "Checked >= 9" — an
+; assertion that can only ever compare the list against itself, so it was
+; tautological. It missed two of the eleven handlers actually registered, which
+; is the exact failure this whole file was written to prevent: an invariant
+; applied to the sites a list happens to name rather than to the class.
+;
+; Both registration spellings are matched: the direct
+; `.WebMessageReceived(Handler)` form and the `.Bind(...)` form KLWV uses.
 _A0720WV_MessageHandlers() {
-	return ["_OnbWeb_OnWebMessage", "_HsEdWeb_OnWebMessage", "_HCWWeb_OnWebMessage"
-	      , "_PathsEdWeb_OnWebMessage", "_PiEdWeb_OnWebMessage", "_PromptEdWeb_OnWebMessage"
-	      , "_ActPickWeb_OnWebMessage", "_LLM_MBW_OnWebMessage", "KLWV_OnWebMessage"]
+	Src := _DriverSourceNoComments()
+	Seen := Map()
+	Out := []
+	Pos := 1
+	while (Pos := RegExMatch(Src, "WebMessageReceived\(\s*([A-Za-z0-9_]+)", &m, Pos)) {
+		Name := m[1]
+		; lib/webview_utils.ahk's WebViewHost registers a BOUND METHOD
+		; (this._OnWebMessage.Bind(this)), which resolves to the token "this" and
+		; has no top-level function body to look up. That factory has zero
+		; consumers — every window is a hand-rolled copy, which is the whole
+		; reason this file exists — so skipping it loses no coverage.
+		if (Name = "this")
+			Name := ""
+		if (Name != "" and !Seen.Has(Name)) {
+			Seen[Name] := true
+			Out.Push(Name)
+		}
+		Pos += StrLen(m[0])
+	}
+	return Out
 }
 
 _A0720WV_EveryHandlerIsSuspendGuarded() {
@@ -52,8 +77,11 @@ _A0720WV_EveryHandlerIsSuspendGuarded() {
 			Fn . " must gate on A_IsSuspended: WebMessageReceived is a COM callback and bypasses native Suspend, which only disarms hotkeys, so a paused driver would still let a page click write config, re-register hotstrings or launch an elevated install")
 		Checked += 1
 	}
-	Assert(Checked >= 9,
-		"every WebView2 message handler must be covered by this invariant — the cluster this guards exists precisely because each guard was applied only to the sites its test named")
+	; A floor, not a tautology: the previous ">= 9" compared a hardcoded list
+	; against its own length and could never fail. Eleven handlers are registered
+	; today, so a drop below that means a host lost its registration.
+	Assert(Checked >= 11,
+		"every WebView2 message handler must be covered by this invariant (found " . Checked . ") — the cluster this guards exists precisely because each guard was applied only to the sites its test named")
 }
 Test("webview: every message handler honours the suspend invariant (F-25)",
 	_A0720WV_EveryHandlerIsSuspendGuarded)
