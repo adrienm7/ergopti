@@ -913,6 +913,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_dead_state_and_single_source.ahk
 #Include meta/test_discarded_config_is_reported.ahk
 #Include meta/test_sql_replay_is_idempotent.ahk
+#Include meta/test_keyboard_shortcut_slots_roundtrip.ahk
 #Include meta/test_hook_dispatcher_critical_save_restore.ahk
 #Include meta/test_hook_dispatcher_err_cache_cap.ahk
 #Include meta/test_walker_batch_critical.ahk
