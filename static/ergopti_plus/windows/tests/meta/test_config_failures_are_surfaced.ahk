@@ -150,3 +150,32 @@ _CFAS_BulkTogglesRecoverFromAFailedWrite() {
 }
 Test("meta config: a bulk toggle recovers when its write fails",
 	_CFAS_BulkTogglesRecoverFromAFailedWrite)
+
+; Three latent defects, each an inconsistency between two things that must
+; agree. None has a caller that reaches it today, which is precisely why they
+; would have surfaced as a puzzle rather than a regression.
+_CFAS_LatentContractsAreConsistent() {
+	; _HSCategorySnapshot is declared in ErgoptiPlus.ahk, not in lib/, so the
+	; headless harness does not load it. Guarding one global of a pair and not
+	; the other means the unguarded read throws before the guard can apply.
+	Body := _DriverFuncBody("_HSRestoreCategory")
+	Assert(Body != "", "_HSRestoreCategory() must exist")
+	Assert(InStr(Body, "IsSet(_HSCategorySnapshot)") > 0,
+		"_HSRestoreCategory must IsSet-guard _HSCategorySnapshot as well as Features — it is declared outside lib/, so reading it first throws under the headless harness")
+
+	; AltGr is Ctrl + right Alt. Without its own case it fell through to the
+	; default and returned "", dropping the modifier from the sent keystroke.
+	Prefix := _DriverFuncBody("_TextSenderModifierPrefix")
+	Assert(Prefix != "", "_TextSenderModifierPrefix() must exist")
+	Assert(InStr(Prefix, '"altgr"') > 0,
+		"the modifier-prefix map must handle altgr — the sibling name map normalises to it, and without a case here it silently returns an empty prefix")
+
+	; Every other path in this function returns a boolean, so a bare return
+	; would make a legitimate zero-count call read as a failure.
+	Erase := _DriverFuncBody("TextEraseChars")
+	Assert(Erase != "", "TextEraseChars() must exist")
+	Assert(RegExMatch(Erase, "Count\s*<\s*1\s*\r?\n\s*return\s+true") > 0,
+		"TextEraseChars must return true when asked to erase nothing — erasing zero characters succeeded, and a bare return yields the empty string against a boolean contract")
+}
+Test("meta contracts: three latent inconsistencies stay fixed",
+	_CFAS_LatentContractsAreConsistent)
