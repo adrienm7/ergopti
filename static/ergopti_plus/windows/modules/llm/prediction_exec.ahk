@@ -962,9 +962,14 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 	}
 
 	_LLM_Engine_ApplyTooltipDisplayOpts(slots.Length)
-	LLM_Tooltip_Show(display_slots, active, is_final)
+	; Freeze the chain timings BEFORE the final render, not after it. The render
+	; reads TtftMs / TtltMs synchronously while building the info bar, so this
+	; ordering shows the same durations in a single rebuild — where the previous
+	; order paid one full tooltip rebuild for the prediction and a second one whose
+	; only purpose was to print the duration onto it.
 	if is_final
-		try LLM_Tooltip_MarkChainComplete()
+		try LLM_Tooltip_MarkChainTimingOnly(A_TickCount)
+	LLM_Tooltip_Show(display_slots, active, is_final)
 }
 
 LLM_Engine_OnInlineInjectComplete(InjectedText, Ok := true, ErrorMessage := "") {

@@ -37,7 +37,7 @@ LLM_Tooltip_IsLoading()        => _MMP_Loading
 LLM_Tooltip_InGracePeriod()    => _MMP_InGrace
 LLM_Engine_IsBusy()            => false
 LLM_Engine_StopGeneration()    => ""
-LLM_Tooltip_MarkChainComplete() => ""
+LLM_Tooltip_MarkChainTimingOnly(NowTick) => ""
 LLM_Tooltip_Hide(accepted := false) {
 	global _MMP_HideHits
 	_MMP_HideHits += 1

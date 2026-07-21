@@ -81,8 +81,8 @@ LLM_Tooltip_SetChainStart() {
 	LLM_TooltipSetChainStart()
 }
 
-LLM_Tooltip_MarkChainComplete() {
-	LLM_TooltipMarkChainComplete()
+LLM_Tooltip_MarkChainTimingOnly(NowTick) {
+	LLM_TooltipMarkChainTimingOnly(NowTick)
 }
 
 LLM_Tooltip_Show(payload, active := 1, is_final := false) {

@@ -457,17 +457,38 @@ LLM_TooltipRefreshChainTiming() {
 	}
 }
 
-LLM_TooltipMarkChainComplete() {
-	global _LLM_Tooltip_Chain, _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx
+; Freezes the chain timings WITHOUT repainting. Callers invoke it just before the
+; render that should display those timings, so the info bar picks TTLT up on that
+; render instead of costing a second full rebuild.
+;
+; This is where AHK and macOS legitimately diverge. The Hammerspoon renderer's
+; set_timing() rewrites a single canvas element, so re-rendering after the fact is
+; nearly free there. AHK has no partial-update path: _TooltipBuildGuiLlm tears the
+; windows down and rebuilds them, measures every row, repaints the border DIB and
+; pushes a layered-window update. Doing that twice back to back — once for the
+; prediction, once only to print a duration — doubled the cost of the most visible
+; moment in the whole LLM flow.
+;
+; NowTick is supplied by the caller rather than read here so the instant that
+; counts as "chain finished" belongs to the caller, not to this helper.
+LLM_TooltipMarkChainTimingOnly(NowTick) {
+	global _LLM_Tooltip_Chain
 	if !_LLM_Tooltip_Chain.StartTick
 		return
-	final := _LLM_Tooltip_Chain.LastUpdateTick ? _LLM_Tooltip_Chain.LastUpdateTick : A_TickCount
+	final := _LLM_Tooltip_Chain.LastUpdateTick ? _LLM_Tooltip_Chain.LastUpdateTick : NowTick
 	_LLM_Tooltip_Chain.TtltMs := final - _LLM_Tooltip_Chain.StartTick
-	if !_LLM_Tooltip_Chain.TtftMs
+	if !_LLM_Tooltip_Chain.TtftMs {
 		_LLM_Tooltip_Chain.TtftMs := _LLM_Tooltip_Chain.TtltMs
-	; Re-render so the info bar picks up TTLT — mirrors HS set_timing().
-	if (_LLM_Tooltip_Visible and _LLM_Tooltip_Slots.Length > 0)
-		LLM_TooltipShow(_LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx, false)
+		; Claim the first-show slot as well, and do NOT drop this line. On the
+		; batch path every intermediate render is a placeholder, so LLM_TooltipShow
+		; bails into its loading branch before it ever refreshes the chain:
+		; FirstShowTick is still 0 at this point. The render that FOLLOWS this call
+		; would then take the first-show branch in LLM_TooltipRefreshChainTiming and
+		; overwrite TtftMs with a later value — printing an info bar whose TTFT is
+		; greater than the TTLT frozen here.
+		if !_LLM_Tooltip_Chain.FirstShowTick
+			_LLM_Tooltip_Chain.FirstShowTick := final
+	}
 }
 
 _LLM_TooltipResetChain() {
