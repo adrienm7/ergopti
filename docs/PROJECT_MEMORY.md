@@ -23,6 +23,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [feedback-test-before-merge](#feedback-test-before-merge) — Never merge a cut-over slice into dev before the user has tested it live. Stay on the slice branch and wait for explicit validation.
   - [feedback-ui-must-be-i18n](#feedback-ui-must-be-i18n) — All user-facing UI text must go through the i18n system in 21 supported languages — never hardcode any UI string anywhere, including WebView UIs (metrics, download window, etc.).
 - **Project architecture & decisions**
+  - [project-audit-2026-07-21-open-items](#project-audit-2026-07-21-open-items) — third-pass AHK audit: 42 confirmed / 26 refuted, what landed, and the 26 findings still open with their sites (the report md was deleted; this is the record)
   - [project-ahk-menu-dispatcher-drop](#project-ahk-menu-dispatcher-drop) — AHK 2.0 silently drops ~30-50% of tray-menu clicks. FIXED via lib/menu_dispatcher.ahk — every actionable item must use RegisterMenuItem, never raw Menu.Add.
   - [project-ahk-invariant-incomplete-application](#project-ahk-invariant-incomplete-application) — Every AHK-driver hardening invariant (Critical-emit, suspend-guard, async-HTTP, RegisterMenuItem) is applied per-site; the recurring bug is the ONE missed sibling site or the guarantee defeated by indirection. Audit the whole class, not the documented site.
   - [project-ahk-test-suite-critical-leak](#project-ahk-test-suite-critical-leak) — Critical("On") in layout/hotkey callbacks is safe in production but leaks into the main thread when invoked directly by tests, silently hanging background timers
@@ -444,6 +445,136 @@ In `lib/menu_dispatcher.ahk`, the `_DispatchIfMissed` bypass was wrapping the me
 ---
 
 ## Project architecture & decisions
+
+### project-audit-2026-07-21-open-items
+
+_Third-pass AHK audit: what landed, the 26 confirmed findings still open with their sites, and the 26 claims adversarially refuted so they are not re-raised_
+
+<sub>slug: `project_audit_2026_07_21_open_items`</sub>
+
+The 2026-07-21 pass ran the three inventories the two 2026-07-20 passes had
+recorded as NOT RUN, mined ten days of real driver logs for the first time, and
+re-audited the previous campaign's fixes for collateral. 59 candidates were
+raised, each adversarially verified by an independent agent instructed to refute
+it: **42 confirmed, 26 refuted**. The audit report was deleted after
+implementation, so this entry is the durable record.
+
+**Measured, not theorised.** The logs at `<ConfigDir>/autohotkey/logs/` yielded
+the driver's first real G4 numbers — see
+[[project_audit_evidence_must_be_reproducible]] for why two earlier passes never
+found them. Worst hot-path segments over ten days: `Tooltip.ResolvePos` max
+**2560 ms** (1764 slow events, 41 over 100 ms), `OnChar`/`HSE.FeedChar` max
+**701 ms** (nested — the same stall, do not double count), `Tooltip.Present` max
+239 ms. The 2560 ms is UIA's own 2000 ms `TransactionTimeout` default plus
+overhead, which the driver never set.
+
+**Landed (11 commits).** Log rotation now follows the calendar rather than the
+process lifetime; per-invocation scratch names for both sleep-retrying atomic
+writers; the ByRef/call-site mismatch that made "tout désactiver" throw on every
+use; UIA probe bounded, idle-gated and negative-cached; healthcheck collectors
+individually guarded so a crash still yields a report; unknown hotkey modifiers
+rejected instead of silently rebinding; the today.log open brought inside the
+HIGH-04 requeue transaction; the personal-editor section pointer proven live at
+every use; and the lifecycle-pairing gate made to actually assert.
+
+**Two lessons worth more than the fixes.** A guard test written from a LIST of
+sites rather than from the CLASS misses siblings by construction — the
+`.tmp`, UIA-probe and section-pointer findings were all "N of M sites migrated".
+And a test can occupy a name while asserting nothing: `test_logger_pairing.ahk`
+registered a `Test()` whose body was an empty function, so the one gate policing
+unpaired lifecycle logs was itself incapable of failing.
+
+#### Still open — 26 confirmed findings
+
+Verified real, not yet implemented. Severity is the post-verification value.
+
+**Medium**
+
+1. `lib/window_utils.ahk:117` — AltTabMonitor guards every `WinGet*` against the
+   window-closing race, then `WinActivate`s the same HWND one line outside the guard.
+2. `ui/changelog/init.ahk:347` — the changelog fetch returns silently on any
+   non-200 GitHub response; unpaired TRACE, no WARNING, and the user is shown a
+   wrong error message.
+3. `tests/meta/test_require_state_pattern.ahk` — vacuous: scans `modules/` only
+   (3 of 231 stateful-capable files; `lib/`, `ui/`, `adapters/` hold 145 it has
+   never looked at), its statefulness predicate matches only `:= false`/`:= unset`,
+   it accepts `if A_IsSuspended` as a state guard, and 8 of its 21 allowlist
+   entries point at files that no longer exist. Widening it will surface real
+   violations — fix the modules, do not re-widen the allowlist.
+4. `ErgoptiPlus.ahk:36` — the single-owner mutex yield warning is unwritable by
+   construction: it runs 138 lines before the logger's flag globals are assigned
+   and the bare `try` swallows the resulting UnsetError. This is why
+   multi-instance contention has been invisible to three audits.
+5. `modules/keylogger/keylogger.ahk:991` — a failed state save rolls
+   `today_log_offset` back after the batch already reached data.sql, so every
+   retry re-appends the same INSERT block.
+6. `lib/hotstrings/hotstring_builder.ahk:264` — the `is_case_sensitive` flip
+   changes real registration behaviour for personal and extension entries, but
+   every test covering those loaders passes either way, and an existing unit test
+   now documents the OLD mapping.
+7. `lib/hotstrings/personal_toml_io.ahk:327` — FileOpen's entire failure contract
+   is unreachable dead code (v2 FileOpen throws; it never returns falsy), and a
+   meta-test certifies the dead branch as working.
+
+**Low** — `ui/action_picker/init.ahk:217` (unguarded FileOpen, the sibling of an
+already-fixed twin); `modules/gestures/init.ahk:362` (unconditional
+"initialised — ready" SUCCESS over an unchecked `SetWinEventHook`, and no
+matching START); `keylogger_app_categories.ahk` (I/O-failure branch never re-arms
+its one-shot timer, so the comment promising a retry is false;
+`DEFERRED_SAVE_RETRY_MS` used at one site while the original keeps a hardcoded
+`-5000`); `lib/lifecycle.ahk` (deferred suspend has no timeout or bound;
+`ToggleSuspend` re-arms instead of cancelling while a suspend is pending, so the
+user cannot abort; the whole suspend/resume machine emits zero lifecycle
+logging); `ui/tooltip/core.ahk` (`_TooltipPendingGeneration` is write-only dead
+state); `modules/gestures` (a gesture bound to an unknown action id fires,
+produces nothing and logs nothing); `lib/config_io.ahk` (an unresolvable
+persisted shortcut is silently replaced by the shipped default);
+`lib/manifest_menu.ahk` (MenuRenderer_Build silently drops items with a missing
+handler id while every sibling branch logs); `lib/registry.ahk:35`
+(`REG_NOT_FOUND` is a documented-but-dead sentinel); `adapters/clipboard.ahk:53`
+(`CB_Read`'s error branch lost its `""` literal and three docstring sentences);
+`lib/hotstrings/hotstrings_io.ahk:143` (`HOTSTRINGS_PREVIEW_EXTRA_BOUNDARIES`
+bypassed by the initialiser it was extracted from); plus two test-shape items —
+the F-25 "class loop" is a hardcoded 9-name list with a tautological count
+assertion missing 2 of 11 live handlers, and `a77a72925` left the bubble-sort
+comment it claims to have corrected.
+
+#### Refuted — do NOT re-raise
+
+Each was investigated and rejected with evidence. The strongest ones:
+
+- **"Sub-logs neither roll at midnight nor are purged."** Sub-files are a strict
+  SUBSET of the dated main log, verified by line count (22 `[gestures` lines in
+  the main log, 22 in the sub-file; 44 vs 44 for `[LayoutShift`), so truncating
+  one destroys zero unique data. The purge regex not matching an undated name is
+  correct, not defective. Residue is cosmetic. *(A rollover call was nonetheless
+  added for policy consistency — it is not a data-integrity fix.)*
+- **"The driver never raises its process priority" / "`Slow HSE.FeedChar`
+  misattributes descheduling stalls."** Both contradicted by
+  `tests/meta/test_hotpath_priority_starvation.ahk`.
+- **"Single-owner mutex gate fails open — 11 instances booted in 8 s."** The boot
+  clustering correlates with heavy development days (19 boots on 07-16 with zero
+  errors), not with a production defect.
+- **"`KL_IngestOnce` has no reentrancy guard."** No test forbids a latch, but an
+  AHK timer cannot interrupt itself; the reachable interleavings come from
+  `OnExit`/rollover, which the atomic-scratch fix already addresses.
+- **"Six more missed siblings of the process-independent `.tmp` name."** The
+  other atomic writers have no yield between staging and rename, so the collision
+  window the fix closes does not exist there.
+- **"`CtrlAltDispatch` emits without Critical."** A naive `Critical("On")` there
+  would fail `test_layout_tables.ahk` plus the framework's Critical-leak check.
+- **"`_TooltipDequeueRebuild` has zero generation discipline."** Structurally
+  true, but no reachable interleaving produces a wrong result.
+- Also refuted: the CapsLock overlay bypassing `LayerDispatch`; the F-31 tap-hold
+  validator logging per keypress; `_SuspendPrefixesAreClear`'s falsy return;
+  `_DeferredGestureAutoConfigure` re-arming through suspend; the F-32
+  safety-flush divergence in the changelog host; `da0531f12`'s load-order guard
+  coverage; raising `TOOLTIP_POSITION_CACHE_MS` to 600 causing staleness.
+
+Related: [[project_ahk_guard_tests_must_loop_the_class]],
+[[project_ahk_invariant_incomplete_application]],
+[[project_audit_findings_are_hypotheses]],
+[[project_audit_evidence_must_be_reproducible]].
 
 ### project-typing-latency-tooltip-coldstart
 
