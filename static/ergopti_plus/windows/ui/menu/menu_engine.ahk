@@ -108,34 +108,34 @@ MenuAddItemWithLabel(MenuParent, V2Path, MenuTitle, MasterCategory) {
 }
 
 ; Reads master_gates.hotstring_sub_categories from menu_manifest.json (MG-3).
-; Returns the hardcoded defaults when the manifest is unreadable.
+; Returns the hardcoded defaults when the manifest declares no such override.
 _MG_LoadHotstringSubCategories() {
-    global _SharedDir
-    Default := ["Autocorrection", "DistancesReduction", "SFBsReduction",
-        "Rolls", "MagicKey", "DynamicHotstrings", "Personal"]
-    FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
-    if !FileExist(FilePath) {
-        return Default
-    }
-    Content := ""
-    try Content := FileRead(FilePath, "UTF-8")
-    if (Content == "") {
-        return Default
-    }
-    Root := ""
-    try Root := JsonParse(Content)
-    if !(Root is Map) or !Root.Has("master_gates") {
-        return Default
-    }
-    Gates := Root["master_gates"]
-    if !(Gates is Map) or !Gates.Has("hotstring_sub_categories") {
-        return Default
-    }
-    Arr := Gates["hotstring_sub_categories"]
-    if !(Arr is Array) or Arr.Length == 0 {
-        return Default
-    }
-    return Arr
+	Default := ["Autocorrection", "DistancesReduction", "SFBsReduction",
+		"Rolls", "MagicKey", "DynamicHotstrings", "Personal"]
+	; Reuse the menu subsystem's already-parsed, already-cached manifest root
+	; instead of decoding the file again. _MasterCategoryFor calls this once per
+	; menu item — around a hundred times per build — and a single decode of the
+	; 12.5 KB manifest benches at ~44 ms, so this was ~4 s of pure redundant work
+	; on every boot and every live menu rebuild.
+	;
+	; A failed load returns false and has ALREADY been logged as a WARNING by the
+	; accessor itself, so the guard below doubles as the read-failure fallback
+	; without swallowing the diagnostic. Failures are deliberately not cached
+	; there, so a transient error stays retryable. Do NOT log here: this runs
+	; ~100 times per build and would emit ~100 identical lines.
+	Root := _MR_GetManifestRoot()
+	if !(Root is Map) or !Root.Has("master_gates") {
+		return Default
+	}
+	Gates := Root["master_gates"]
+	if !(Gates is Map) or !Gates.Has("hotstring_sub_categories") {
+		return Default
+	}
+	Arr := Gates["hotstring_sub_categories"]
+	if !(Arr is Array) or Arr.Length == 0 {
+		return Default
+	}
+	return Arr
 }
 
 ; Resolve the master-toggle category for a given feature path. Sub-Maps
