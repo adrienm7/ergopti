@@ -73,12 +73,12 @@ end
 
 helpers.describe("pause/resume never do blocking work inline in the eventtap callback", function()
 	helpers.it("every blocking subsystem call in pause_all/resume_all is deferred", function()
-		local path = helpers.driver_root() .. "modules/shortcuts/script_control.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "script_control.lua must be readable at " .. path)
-		if not fh then return end
-		local src = fh:read("*a")
-		fh:close()
+		-- Selected by a declaration unique to script_control.lua rather than by
+		-- path: the invariant is about that function pair, not about where the
+		-- file currently lives.
+		local src = helpers.read_driver_source("local function pause_all()")
+		helpers.assert_true(src ~= nil, "the pause_all/resume_all source must be locatable")
+		if not src then return end
 
 		-- The premise: these really are reached from the tap callback.
 		helpers.assert_true(src:find("local function handle_key", 1, true) ~= nil,

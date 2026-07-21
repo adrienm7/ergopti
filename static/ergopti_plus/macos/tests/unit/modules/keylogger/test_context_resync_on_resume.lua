@@ -144,12 +144,9 @@ helpers.describe("context is re-synchronised on resume", function()
 	helpers.it("script_control.resume_all calls the keylogger resync", function()
 		-- The guarantee is transitive: resync_context existing is worthless unless the
 		-- resume path actually invokes it. Assert the wiring, not just the function.
-		local path = helpers.driver_root() .. "modules/shortcuts/script_control.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "script_control.lua must be readable")
-		if not fh then return end
-		local src = fh:read("*a")
-		fh:close()
+		local src = helpers.read_driver_source("local function resume_all()")
+		helpers.assert_true(src ~= nil, "the resume_all source must be locatable")
+		if not src then return end
 
 		local resume_at = src:find("local function resume_all", 1, true)
 		helpers.assert_true(resume_at ~= nil, "resume_all must be locatable")

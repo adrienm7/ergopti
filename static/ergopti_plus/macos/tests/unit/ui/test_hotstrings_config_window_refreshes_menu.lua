@@ -176,19 +176,28 @@ helpers.describe("the menubar wires its refresh callback at the open site", func
 	-- source level so a future edit that drops it reintroduces the desync with
 	-- every behavioural test above still green.
 	helpers.it("menu_hotstrings_management injects _on_config_changed before open", function()
-		local path = helpers.driver_root() .. "ui/menu/menu_hotstrings_management.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_not_nil(fh, "ui/menu/menu_hotstrings_management.lua must be readable")
-		local src = fh:read("*a") ; fh:close()
+		local src = helpers.read_driver_source("_on_config_changed")
+		helpers.assert_not_nil(src, "a config-changed wiring site must be locatable")
 
-		local wire_at = src:find("_on_config_changed%s*=")
-		helpers.assert_not_nil(wire_at,
-			"the config-window open site must inject a refresh callback")
-
-		local tail = src:sub(wire_at)
-		helpers.assert_contains(tail:sub(1, 400), "save_prefs",
-			"the callback must persist the change")
-		helpers.assert_contains(tail:sub(1, 400), "updateMenu",
-			"the callback must rebuild the menubar so baked-in titles are re-resolved")
+		-- Two production files assign _on_config_changed, so the scan returns
+		-- both. Check EVERY occurrence and require one to carry the wiring,
+		-- rather than inspecting whichever happens to come first — that is what
+		-- the assertion always meant, and it no longer depends on file order.
+		local found = false
+		local at = 1
+		while true do
+			local wire_at = src:find("_on_config_changed%s*=", at)
+			if not wire_at then break end
+			local window = src:sub(wire_at, wire_at + 400)
+			if window:find("save_prefs", 1, true) and window:find("updateMenu", 1, true) then
+				found = true
+				break
+			end
+			at = wire_at + 1
+		end
+		helpers.assert_true(found,
+			"the config-window open site must inject a refresh callback that persists "
+			.. "the change (save_prefs) and rebuilds the menubar (updateMenu) so "
+			.. "baked-in titles are re-resolved")
 	end)
 end)
