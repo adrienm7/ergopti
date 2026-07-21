@@ -352,6 +352,8 @@ if (RawAutoConfig == "1" or RawAutoConfig == "true") {
 ; Skipped in the headless test runner (_AHK_DRY_RUN is defined by run_all.ahk)
 ; because SetWinEventHook with OUTOFCONTEXT keeps a message-loop reference alive
 ; and prevents ExitApp from returning promptly in a console-less CI process.
+LoggerStart("gestures", "Initialising gestures module…")
+
 _GestureWinOrder   := []
 _GestureWinHook    := 0
 _GestureCallbackPtr := 0
@@ -368,6 +370,18 @@ if !IsSet(_AHK_DRY_RUN) {
         "UInt", 0,
         "UInt", 0x0000)           ; WINEVENT_OUTOFCONTEXT
     OnExit(_GestureUnhook)
+    ; SetWinEventHook returns 0 on failure. Unchecked, a failed hook left
+    ; window-order tracking silently dead while the line below still announced
+    ; the module ready — so window-cycle gestures did nothing, with no clue why.
+    if !_GestureWinHook
+        LoggerError("gestures", "SetWinEventHook failed — window-order tracking disabled; window-cycle gestures will not work.")
 }
 
-LoggerSuccess("gestures", "Gestures module initialised — ready.")
+; The readiness claim reports what was actually achieved rather than asserting
+; more than it knows. This is also the closing half of the pair opened above:
+; before, the module logged SUCCESS with no START at all, so an abort anywhere
+; in this file — including the unprotected CallbackCreate/DllCall — produced no
+; log line whatsoever, and "gestures failed" was indistinguishable from
+; "gestures was never reached".
+LoggerSuccess("gestures", "Gestures module initialised — ready (window hook: {1}).",
+    _GestureWinHook ? "active" : "unavailable")
