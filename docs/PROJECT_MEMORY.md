@@ -29,6 +29,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-ahk-numeric-string-equals-false](#project-ahk-numeric-string-equals-false) — `"0" = false` is TRUE in AHK v2; never compare a String|false return against false, type-check with `is String`
   - [project-ahk-guard-tests-must-loop-the-class](#project-ahk-guard-tests-must-loop-the-class) — Guard tests must enumerate the whole class of call sites, not the one site a bug was fixed at — 5 findings in one audit came from this
   - [project-audit-evidence-must-be-reproducible](#project-audit-evidence-must-be-reproducible) — A refutation needs the same proof as a finding: the "the perf section was fabricated" debunking was itself wrong (it searched `ahk/logs`, but the real path is `autohotkey/logs`); G4 IS measured, and the logs live at `<ConfigDir>/autohotkey/logs/` via `paths.toml`
+  - [project-hs-audit-2026-07-21](#project-hs-audit-2026-07-21) — 13 macOS defects fixed (PII in logs, keystrokes logged inside a vault, silently discarded events); 78 findings remain OPEN and unverified — the backlog lives here because the audit md was deleted by design
   - [project-audit-findings-are-hypotheses](#project-audit-findings-are-hypotheses) — 2 of 35 audit findings were wrong and the existing suite proved it; implement a finding as a hypothesis, not an instruction
   - [project-updater-nonblocking-http](#project-updater-nonblocking-http) — The updater background poll must never do synchronous WinHttp on the main thread (it freezes all remapping); WinHttp SetTimeouts 0 = infinite. Use the async WinHTTP + WaitForResponse(0) + SetTimer-poll pattern.
   - [project-config-v2-refactor](#project-config-v2-refactor) — State of the v2 config schema refactor (Scope C) — branch refactor/config-schema-v2 with 5 dormant commits. Cut-over to actually migrate the AHK driver runtime is the open piece.
@@ -1926,3 +1927,119 @@ Also recorded: `~/.hammerspoon` and any `ErgoptiPlus_*.log` are absent on the Wi
 latency findings "derived from reading the code" and never quote a millisecond figure you did not
 observe. The macOS suite is 3 099/0 green, but only when run from `macos/`; from the repo root
 6 tests fail on a relative-path read.
+
+
+
+
+### project-hs-audit-2026-07-21
+
+_Second adversarial pass on the Hammerspoon driver: 13 defects fixed, 78 findings left OPEN. The
+audit markdown was deleted by design, so this entry IS the record._
+
+<sub>slug: `project_hs_audit_2026_07_21`</sub>
+
+**Fixed and shipped** (each with a regression test that fails before / passes after; suite went
+3 228/478 → 3 251/488):
+
+- **PII reached the 14-day log on PREVIEW, not expansion.** Typing `@phone` logged the resolved
+  number before any expansion committed. `acc7946fc` had applied the withhold contract to the two
+  *expansion* sinks in `expander.lua` and stopped; the preview sink in `llm_bridge.lua` had no
+  guard, and the match records did not even carry `is_private`, so it could not have applied one.
+  Provider output is now withheld unconditionally — the registration API has no privacy metadata,
+  so withhold-by-default is the only shape under which a new provider cannot leak by omission.
+- **Keystrokes were logged inside password managers.** `is_secure_field` was written from two
+  sites that disagreed: the activation path used the union `isSecureField() or isSecureApp()`,
+  the AX focus callback recomputed from the role/subrole axis alone and assigned unconditionally.
+  Any focus change inside a vault re-enabled capture. Separately, the pause guard froze the
+  cached context, so pausing → switching to a vault → resuming left the flag stale-false; fixed
+  by re-syncing on **resume**, deliberately NOT by weakening the guard.
+- **Whole typing events silently discarded.** `_sql_num(nil)` emits `NULL`, the columns are
+  `NOT NULL`, and `INSERT OR IGNORE` swallows the violation. Writing the guard **class-wide**
+  immediately surfaced 4 more columns nobody had reported.
+- **`keyStroke` blocked the run loop 200 ms per call at 49 sites** (the argument defaults to a
+  blocking usleep). **`karabiner.pause/resume` deployed a 100 kB config inside the script-control
+  eventtap callback** — the tap carrying AltGr+Enter, the key needed to un-pause.
+- Also: unescaped gsub replacements (`%` magic key aborted all registration; `search_web` threw
+  for any selection with a space); `hs.task:start()`'s falsy return discarded; config-window
+  delay edits never reaching the engine; a dead synchronous `python3` fork on every save;
+  negative AX lookups never cached in the wrap-text tap.
+
+**OPEN — reported by audit agents, NOT verified by me. Treat as hypotheses**
+(`[[project_audit_findings_are_hypotheses]]`), 17 critical/high of 78 total:
+
+- **CRITICAL** (G2) `modules/llm/api_mlx_discovery.lua:384` — MLX endpoint discovery deadlocks permanently: reset() orphans a poll chain that resurrects on the shared _endpoint_probe_in_flight flag and kills the new chain's probe via the shared _probe_client
+- **HIGH** (G2) `adapters/secure_field_detector.lua:114` — Split the shared pcall in refresh(): a throwing AXSubrole read wipes an already-read secure AXRole
+- **HIGH** (G2) `modules/gestures/engine.lua:649` — A single transient extra finger contact latches gs.lifting for the rest of the gesture: the whole remainder of the swipe is silently dropped and the gesture mis-commits as tap_(N+1)
+- **HIGH** (G2) `modules/gestures/engine.lua:716` — gs.candidateFingers is never cleared when the finger count falls back to maxFingers, blocking every live fire for the remainder of the gesture
+- **HIGH** (G2) `modules/karabiner/init.lua:489` — M.regenerate() has no pause guard — the « pause = tout éteint » invariant is enforced at one call site inside the file while ~17 menu call sites redeploy the full Ergopti config mid-pause
+- **HIGH** (G2) `modules/karabiner/watchers.lua:146` — CapsWord's `--set-variable capsword 0` task is neither GC-rooted nor start()-checked — KE can be left with capsword=1 and the next spacebar turns CapsLock back ON
+- **HIGH** (G2) `modules/keylogger/aggregator/sql.lua:163` — macOS n-gram UPSERT overwrites esrc_json instead of merging it, so the hotstring/LLM source split for every n-gram reflects only the last 5 s ingest tick (invariant fixed on Windows AND Linux, forgotten on macOS)
+- **HIGH** (G2) `modules/keylogger/init.lua:820` — Every space and sentence-punctuation flush zeroes the inter-keystroke delay of the NEXT keystroke — ~1 keystroke in 6 is logged with delay 0
+- **HIGH** (G2) `modules/keylogger/kc_bridge.lua:413` — kc_bridge replays the entire Karabiner backlog written while metrics were switched OFF, on the next OFF->ON toggle — the exact failure F-MED-26 claims to prevent, missed on the stop/start path
+- **HIGH** (G2) `modules/keylogger/log_manager.lua:1228` — Toggling Metrics OFF then ON permanently kills SQLite ingest and midnight rotation for the rest of the session — close_db() has no matching re-open on the start path
+- **HIGH** (G2) `modules/keylogger/sqlite_reader.lua:606` — read_range_split_today omits ngram_keycodes / ngram_shortcuts / ngram_shortcut_bigrams from the today projection, so today's keycode heatmap and shortcuts tabs are always empty (both sibling drivers query them)
+- **HIGH** (G2) `modules/keymap/utils.lua:221` — emit_tokens emits every token after the 2nd paste-worthy segment BEFORE it — multi-segment hotstrings land scrambled on screen
+- **HIGH** (G4) `modules/llm/app_filter.lua:183` — app_filter runs 6–15 uncached synchronous AX round-trips INSIDE the keyDown eventtap callback on every accepted prediction (F16 chain path)
+- **HIGH** (G2) `modules/shortcuts/actions/system.lua:128` — close_awake_alert discards the closeSpecific pcall result, making the closeAll fallback unreachable — reverts f25be56f1 and leaks the keep-awake banner forever
+- **HIGH** (G2) `modules/shortcuts/actions/system.lua:683` — Wrap-text eventtap: a STALE positive AX cache re-wraps text that is no longer selected, swallowing the keystroke and duplicating the previous selection
+- **HIGH** (G2) `modules/shortcuts/script_control.lua:246` — Pause/resume loses the shortcuts preference: the tray "Raccourcis" toggle is the only top-level feature toggle not pause-gated, and resume_all() restores from a pause-time snapshot that a mid-pause toggle invalidates
+- **HIGH** (G2) `ui/onboarding/init.lua:409` — Surface a batch_write() that returns false — the retargeted commit write fails silently and reports success
+
+The remaining 61 are medium/low across `gestures/engine`, `llm/api_mlx_*`, `keylogger/aggregator`,
+`ui/menu_llm`, and `shortcuts/actions`. They were not transcribed individually — re-run the sweep
+to regenerate them rather than trusting a stale list.
+
+**REFUTED — do not re-raise these:**
+
+- **Logger date-rotation bug** (the standing suspicion in `bugs_hs.md`). *False for macOS.*
+  `_ensure_log_file()` re-points **both** `UNIFIED_LOG_FILE` and `ERRORS_LOG_FILE` on rollover,
+  and `_write_to_file` runs before both errors-sink opens, so the path is always fresh.
+  `test_logger_date_rollover.lua` already asserts it. **This is an AHK-only defect — do not port
+  the fix.**
+- **`gestures/actions.lua` AppleScript calls not deferred.** *False* — grep line numbers pointed
+  at the inner lines of closures already wrapped in `hs.timer.doAfter(0, …)`. A grep hit is not
+  a call site; open the file.
+- **WPM widget runs under pause.** *False* — suppression is indirect but real:
+  `on_pause_change` → `updateMenu()` → the metrics builder stops widget and menubar
+  (`menu_metrics.lua:155-159`).
+- **Closure-binds-nil-global (`[[project_lua_closure_before_local_nil_global]]`) is present.**
+  *False* — a mechanical scan of every non-test `.lua` found 3 file-scope candidates, all false
+  positives (`parsed.sections` is a field access; the others are `M.X = v` then `local X = M.X`).
+  Top nested candidates were function **parameters**. The class is clean; re-run the scanner
+  rather than re-reading by eye.
+- **`utf8` misuse.** *Cleared* — every `utf8.codes` loop is gated by a successful
+  `pcall(utf8.len, …)`, every `offset`/`len` result nil-checked.
+
+**How to apply:**
+
+- **Write the guard test class-wide from the start.** Every high-severity finding in this pass was
+  a sibling of an invariant the codebase already stated, documented and tested *somewhere else*.
+  Two of the fixes only exist because the guard enumerated the class: the NOT NULL scan found 4
+  extra columns, the gsub scan found `search_web`. This is
+  `[[project_ahk_guard_tests_must_loop_the_class]]` earning its keep again.
+- **Suspect the shipped test, not just the shipped code.** Three fixes came with tests
+  structurally blind to the damage. `shell_runner`'s stub returned `nil` where the real
+  `hs.task:start()` returns the task object — the stub *cemented* the defect its own test claimed
+  to lock out. The `hs` stub dropped `keyStroke`'s third argument, so no test could ever see it.
+  Fixing an unfaithful stub and adding the uncovered case **strengthens** a test; that is not the
+  same as weakening one.
+- **When a guard is deliberate, fix the other side.** `test_pause_guard_position.lua` pins the
+  pause guard's position on purpose. The context staleness was fixed with a resume-time re-sync,
+  leaving « pause = tout éteint » exactly as strict.
+- **G4 is still unmeasured on this driver.** `<config_dir>/hammerspoon/` has no `logs/` (and
+  `logs` is gitignored in the config repo); the driver has never run on the Windows dev box. The
+  AHK logs at `<config_dir>/autohotkey/logs/` are real and were re-derived independently
+  (`Tooltip.ResolvePos` 2560.32 ms, `OnChar` 701.27 ms, 8 958 `Slow` lines) — those belong to the
+  *other* driver. See `[[project_audit_evidence_must_be_reproducible]]`.
+- **loop-until-dry was NOT reached.** No zone got two consecutive clean passes; every open finding
+  is one pass deep. `lib/toml`, `lib/i18n`, the input adapters, `ui/menu_llm`, `ui/download_window`,
+  `ui/healthcheck`, `ui/metrics_*` and **`init.lua`'s boot order / shutdown callback** were never
+  swept at all. Silence in an audit report is not coverage.
+- **Subagents will write into your worktree unless told not to.** One created a probe test under
+  `tests/` mid-run and it polluted a live suite execution; "read-only" must name the whole repo,
+  not just "driver source".
+
+Related: [[project_ahk_guard_tests_must_loop_the_class]],
+[[project_audit_findings_are_hypotheses]], [[project_audit_evidence_must_be_reproducible]],
+[[project_macos_eventtap_no_blocking]], [[project_suspend_pause_invariant]],
+[[feedback_regression_tests]].
