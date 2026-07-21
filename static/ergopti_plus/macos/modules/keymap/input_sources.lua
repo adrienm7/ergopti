@@ -698,7 +698,14 @@ local function upgrade_active_list(legacy_active)
 	local script = table.concat(lines, "\n")
 	Logger.start(LOG, "Upgrading %d legacy Ergopti entry(ies) in the active input-source list…", #legacy_active)
 	local ok, out = run_osascript_isolated(script)
-	if ok then
+	-- osascript exits 0 even when findSource resolved nothing, so the status bit
+	-- reports success for a run that changed nothing. Bind the SCRIPT's own
+	-- "<disabled>/<enabled>" payload instead — the rule the two siblings in this
+	-- file already follow. Requiring enabled > 0 is the load-bearing part: a "1/0"
+	-- run disabled the legacy source WITHOUT enabling its replacement, leaving the
+	-- user with no Ergopti layout at all, which must never be reported as success.
+	local _disabled_n, enabled_n = tostring(out or ""):match("(%d+)%s*/%s*(%d+)")
+	if ok and tonumber(enabled_n or 0) and tonumber(enabled_n or 0) > 0 then
 		invalidate_active_layouts_cache()
 		Logger.success(LOG, "List upgrade applied (%s).", tostring(out))
 		return true

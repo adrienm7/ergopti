@@ -131,8 +131,11 @@ local function ensure_dir(path)
 			current = current .. segment .. "/"
 			local ok_attr, attr = pcall(hs.fs.attributes, current)
 			if not (ok_attr and attr) then
-				local ok_mk = pcall(hs.fs.mkdir, current)
-				if not ok_mk then
+				-- hs.fs.mkdir follows LuaFileSystem semantics: it RETURNS nil plus an
+				-- error and does not raise, so the pcall status alone reports success
+				-- for a create that never happened.
+				local ok_mk, created = pcall(hs.fs.mkdir, current)
+				if not ok_mk or not created then
 					made = false
 					break
 				end
@@ -146,7 +149,16 @@ local function ensure_dir(path)
 		pcall(hs.execute, string.format("mkdir -p %q", path))
 	end
 
-	_ensured_dirs[path] = true
+	-- Memoise only a directory that now genuinely exists. A refused create is
+	-- usually transient (volume still mounting, TCC access not yet granted), and
+	-- remembering the failure would skip every later attempt — leaving the config
+	-- directory missing for the whole session while every save silently no-ops.
+	local ok_final, final_attr = pcall(hs.fs.attributes, path)
+	if ok_final and final_attr then
+		_ensured_dirs[path] = true
+	else
+		Logger.warn(LOG, "Could not create '%s' — not memoised, will retry on next use.", path)
+	end
 end
 
 --- Returns the absolute path for a named personal file inside config_dir().
