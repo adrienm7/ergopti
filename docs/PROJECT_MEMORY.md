@@ -93,8 +93,26 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-hs-audit-round2-2026-07-21](#project-hs-audit-round2-2026-07-21) — Adjuger un backlog d'audit contre la source courante : un tiers etait faux ou perime
 - [project-hs-audit-round4-2026-07-21](#project-hs-audit-round4-2026-07-21)
 - [project-perf-2026-07-21-implementation](#project-perf-2026-07-21-implementation)
+- [feedback-stash-drop-by-index-trap](#feedback-stash-drop-by-index-trap) — Never compute a `stash@{n}` index from grep line numbers (1-based vs 0-based) and never match entries via the pretty list — capture the stash commit SHA at push time, restore with `git stash store`
 
 ## Working conventions & feedback
+
+### feedback-stash-drop-by-index-trap
+
+_Never compute a `stash@{n}` index from grep line numbers (1-based vs 0-based) and never match entries via the pretty list — capture the stash commit SHA at push time, restore with `git stash store`_
+
+<sub>slug: `feedback_stash_drop_by_index_trap`</sub>
+
+The shared-stash protocol (unique tag, apply by SHA, drop by re-found index) has two traps that combined into a near-miss on 2026-07-21: a `grep -n` line number is **1-based** while stash indices are **0-based**, so `git stash drop "stash@{$(… | grep -n tag | cut -d: -f1)}"` dropped the entry **below** the tagged one — another session's work. Worse, the local `git stash list` rendering (rtk proxy) strips the `WIP on <branch>:` prefix and shows `<base-sha> <base-subject>`, so what looks like "the SHA of the entry" in column one is the **base commit**, useless for `git stash store`.
+
+**Why:** the stash stack is shared across all worktrees and several agent sessions push entries concurrently; dropping a neighbour's entry silently destroys their parked work.
+
+**How to apply:**
+
+- Immediately after `git stash push -u -m "<tag>"`, capture the entry's true commit: `git rev-parse stash@{0}` — that SHA is the only reliable handle.
+- Drop by first printing `git stash list` and visually confirming which `stash@{n}` carries your tag; never derive `n` arithmetically from grep output.
+- Recovery if a foreign entry was dropped: its stash commit stays dangling — find it via `git fsck --unreachable --no-reflogs`, identify the 2-parent commit whose subject is `WIP on <branch>: <base-sha> <subject>`, then `git stash store -m "<that subject>" <sha>` puts it back.
+- `git log --stdin` does not work through the rtk git proxy — batch dangling-commit inspection with `xargs -n 150 git log --no-walk=unsorted` instead.
 ### feedback-ahk-source-encoding
 
 _AHK v2 source files must be UTF-8 BOM + LF; encoding drift causes silent mid-file parse aborts that masquerade as missing tests_
