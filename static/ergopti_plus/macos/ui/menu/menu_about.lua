@@ -23,6 +23,7 @@
 local M = {}
 local hs        = hs
 local Logger    = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local i18n      = require("lib.i18n")
 local dialog    = require("lib.dialog_util")
 local changelog = require("ui.changelog")
@@ -306,7 +307,7 @@ local function one_click_update(channel, update_menu_fn)
 			Logger.info(LOG, "One-click check: already up to date (%s).", current)
 			Updater.set_update_state("idle")
 			update_menu_fn()
-			local msg = i18n.get("menu.about.update.up_to_date"):gsub("{version}", current)
+			local msg = i18n.get("menu.about.update.up_to_date"):gsub("{version}", text_utils.escape_gsub_replacement(current))
 			dialog.block_alert(i18n.get("menu.about.changelog"), msg, i18n.get("button.ok"))
 			return
 		end

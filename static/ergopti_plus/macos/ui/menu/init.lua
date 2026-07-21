@@ -17,6 +17,7 @@ local hs               = hs
 local notifications    = require("lib.notifications")
 local hotstring_editor = require("ui.hotstring_editor")
 local Logger           = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local i18n             = require("lib.i18n")
 local ui_restore       = require("lib.ui_restore")
 
@@ -162,8 +163,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local function applyTriggerChar(text)
 		if type(text) ~= "string" then return text end
-		local safe_repl = tostring(state.trigger_char):gsub("%%", "%%%%")
-		return text:gsub("★", safe_repl)
+		-- Single source of truth for the escape (lib.text_utils) rather than a fourth
+		-- private copy of the same "%" doubling. Inlined at the use site so the
+		-- class guard can see the escape without having to trace a local.
+		return text:gsub("★", text_utils.escape_gsub_replacement(state.trigger_char))
 	end
 
 	local function update_icon(custom_text)

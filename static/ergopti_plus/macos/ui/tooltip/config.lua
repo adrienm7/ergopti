@@ -219,8 +219,14 @@ local function load_from_shared()
 
 	local toml_path = shared_path .. "/modules/tooltip/constants.toml"
 	local c = toml_reader.parse(toml_path)
-	if type(c) ~= "table" or type(c.sections) ~= "table" then
-		error("[tooltip/config] _shared/modules/tooltip/constants.toml not readable")
+	-- Emptiness, not type, is the real signal: TomlReader.parse returns a
+	-- well-formed but EMPTY result on both of its failure exits, so a type test can
+	-- never fire and an unreadable file was reported further down as a missing
+	-- [typography] section — sending the reader after a section that was never the
+	-- problem. Mirrors the emptiness check landed in lib/timings.lua, and names the
+	-- path so the message identifies the file that could not be read.
+	if type(c) ~= "table" or type(c.sections) ~= "table" or next(c.sections) == nil then
+		error("[tooltip/config] cannot read constants.toml (missing or empty): " .. tostring(toml_path))
 	end
 
 	local function require_key(section, key)

@@ -319,7 +319,10 @@ local function notify_new_version(tag, update_menu_fn)
 	Logger.info(LOG, "New release available: %s (current: %s).", tag, M.current_version())
 	_update_state = "available"
 	if type(update_menu_fn) == "function" then pcall(update_menu_fn) end
-	local body = i18n.get("updater.tray_new_version_body"):gsub("{1}", tag)
+	-- The tag lands on the REPLACEMENT side of gsub, where "%" is special and a
+	-- release such as "v2.1%-rc1" raises. The label builder above already escapes
+	-- for exactly this reason; this notification body was the site it missed.
+	local body = i18n.get("updater.tray_new_version_body"):gsub("{1}", escape_replacement(tag))
 	local title = i18n.get("updater.tray_new_version_title")
 	Notifier.send(title, { body = body, kind = "info" })
 end

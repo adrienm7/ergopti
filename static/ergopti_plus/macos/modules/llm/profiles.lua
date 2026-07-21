@@ -22,6 +22,7 @@
 local M = {}
 
 local Logger   = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local i18n     = require("lib.i18n")
 local Manifest = require("lib.manifest_reader")
 local Selector = require("llm.profile_selector")
@@ -207,7 +208,7 @@ function M.resolve_system_prompt(profile, n)
 	local prompt = BASIC_PROMPT_FALLBACK
 	prompt = prompt:gsub("{max_words}", (max_w and max_w > 0) and tostring(max_w) or "illimité")
 	prompt = prompt:gsub("{min_words}", tostring(min_w or ""))
-	prompt = prompt:gsub("{language}", locale)
+	prompt = prompt:gsub("{language}", text_utils.escape_gsub_replacement(locale))
 
 	return prompt
 end

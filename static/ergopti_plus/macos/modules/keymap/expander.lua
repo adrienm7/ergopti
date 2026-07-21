@@ -148,7 +148,16 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	-- deferral the synthetic chars trigger the preview watcher and call
 	-- hide_forced(), destroying the chained preview immediately (E2 audit fix).
 	if not is_ignored then
-		hs.timer.doAfter(0, function() _llm.update_preview(_state.buffer) end)
+		hs.timer.doAfter(0, function()
+			-- Deferring moved this call off the eventtap stack and onto a timer, where a
+			-- throw reaches only the HS Console and never the file logger. It is the one
+			-- update_preview call site of four still outside a pcall — the same guard the
+			-- notify_synthetic and buffer_action calls above already carry.
+			local ok, err = pcall(_llm.update_preview, _state.buffer)
+			if not ok then
+				Logger.error(LOG, "Deferred update_preview failed: %s.", tostring(err))
+			end
+		end)
 	end
 
 	if is_final then _state.suppress_rescan(1.0) end
