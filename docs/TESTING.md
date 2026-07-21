@@ -34,7 +34,7 @@ to reproduce that one check** plus the tail of its output. It bundles:
   run `npm run codegen` and commit the regenerated files.
 - `test:priority-parity`, `audit-translations`, `lint:conventions:strict`.
 
-Not in `test:js` (run on demand): `python tools/dev/format_toml.py --hotstrings
+Not in `test:js` (run on demand): `python tools/format_toml.py --hotstrings
 --all --check` (hotstring TOML formatting), `npm run test:properties`,
 `npm run test:mutation`.
 

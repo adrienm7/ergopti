@@ -91,7 +91,7 @@ drivers so a tweak applies to both with no risk of drift:
   drivers regenerate from the TOML; never edit or commit it
 
 Edit the `.toml` files directly. The pre-commit hook sorts and formats any
-staged hotstring TOML via `tools/dev/format_toml.py` so the on-disk order stays
+staged hotstring TOML via `tools/format_toml.py` so the on-disk order stays
 canonical. Codegen artifacts under each driver's `_generated/` directory are
 rebuilt by `npm run build:domain` (and `npm run build:manifest` for the feature
 manifest); CI fails the build if a generated file drifts from its source.
@@ -146,6 +146,6 @@ Managed by [Husky](https://typicode.github.io/husky/)
 
 | Step | Action                                                            | Why                                                                 |
 | ---- | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
-| 1    | Format staged hotstring TOML via `tools/dev/format_toml.py` and re-stage | Keeps the catalogue order canonical and diffs minimal               |
+| 1    | Format staged hotstring TOML via `tools/format_toml.py` and re-stage | Keeps the catalogue order canonical and diffs minimal               |
 | 2    | Fix AHK encoding (UTF-8 BOM + LF) on staged `.ahk` via `tools/deploy/fix-ahk-encoding.cjs` and re-stage | AHK v2 silently aborts mid-file on encoding drift → silent CI failures |
 | 3    | `node tools/lint/lint-conventions.js --fail-on-violations`       | Blocks the commit on any banner / spacing / section-header violation |

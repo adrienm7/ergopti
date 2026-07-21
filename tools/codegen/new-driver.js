@@ -43,7 +43,7 @@ const PORTS_DIR = path.join(DRIVERS_DIR, '_shared', 'ports');
 const DOMAIN_DIR = path.join(DRIVERS_DIR, '_shared', 'domain');
 
 /** Sub-directories every driver is expected to contain (canonical mirror layout:
- *  see "Structure cible" in docs/REFACTOR_PLAN.md). */
+ *  see the driver READMEs and docs/PROJECT_MEMORY.md). */
 const DRIVER_SUBDIRS = ['adapters', 'lib', 'modules', 'ui', 'data', '_generated', 'tests'];
 
 /** Supported target languages. */

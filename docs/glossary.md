@@ -34,7 +34,7 @@
 
 **Domain spec** — Fichier JavaScript dans `_shared/core/domain/` (ex. `HotstringMatcher.spec.js`) définissant le contrat comportemental cross-driver d'un composant. Exécuté par la suite JS pour certifier la parité des deux drivers.
 
-**Driver** — L'une des deux implémentations complètes d'ErgoptiPlus : `windows/` (AutoHotkey v2) ou `macos/` (Hammerspoon/Lua). Les deux partagent des données et des frontends via `_shared/`.
+**Driver** — L'une des trois implémentations complètes d'ErgoptiPlus : `windows/` (AutoHotkey v2), `macos/` (Hammerspoon/Lua) ou `linux/` (Lua/LuaJIT + kanata). Les trois partagent données et frontends via `_shared/`.
 
 **Dynamic hotstring** — Expansion calculée au moment de la frappe (date du jour, numéro de téléphone, NIR/IBAN depuis `personal_info.toml`) par opposition à un hotstring statique défini dans un fichier TOML.
 

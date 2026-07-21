@@ -13,16 +13,16 @@
 | From | To | Trigger | Guards / Required Actions |
 |---|---|---|---|
 | `BOOTING` | `ACTIVE` | Boot complete | Tray icon shown, hooks enabled, background checks scheduled. |
-| `ACTIVE` | `SUSPENDED` | `ToggleSuspend` / `Ergopti_OnSuspendEnter` | - Must cancel all timers (`LLM_Deps_PollTimer`, `_LLM_PointerWatch`, `_UpdaterAsyncRequests`).<br>- Must cancel `LLM_Ollama_WarmupRetryTick`.<br>- Any running background download (`_Updater_PollDownloadAsync`) MUST be aborted if caught mid-flight, to prevent mid-write completion while suspended. |
+| `ACTIVE` | `SUSPENDED` | `ToggleSuspend` / `Ergopti_OnSuspendEnter` | - Must cancel all timers (`_LLM_Deps_PollTimer`, `_LLM_PointerWatch_Stop`, `_UpdaterAsyncRequests`).<br>- Must cancel `LLM_Ollama_WarmupRetryTick`.<br>- A staging download caught mid-flight MUST be terminated, so nothing completes a write while the driver is supposed to be off. |
 | `SUSPENDED` | `ACTIVE` | `ToggleSuspend` / `Ergopti_OnSuspendResume` | - Restore tray icon.<br>- Re-arm pointer watchers.<br>- Resume polling timers. |
-| `ACTIVE` | `UPDATING` | `Updater_DownloadAndInstall` | - Mutex: `_UpdaterDownloadInProgress` flag prevents concurrent updates.<br>- Critical Section: The block that writes `Stream.SaveToFile` and calls `ExitApp` MUST be marked `Critical On` so that a `ToggleSuspend` hotkey cannot interrupt it mid-write. |
+| `ACTIVE` | `UPDATING` | `Updater_DownloadAndInstall` | - Mutex: `_UpdaterDownloadInProgress` flag prevents concurrent updates.<br>- The download is staged by a PowerShell child process (`_Updater_BuildStagingWorkerScript`); AHK only polls it and receives a READY token. No disk write happens on the AHK thread, so there is nothing here to make non-interruptible. |
 
 ## Invalid (Illegal) Transitions
 
 1. **`SUSPENDED` -> `UPDATING`**
-   *Why*: A background download polling timer (`_Updater_PollDownloadAsync`) bypassing `Suspend` could finish its download and call `ExitApp` while the user believes the driver is completely inactive ("tout éteint").
-   *Fix*: `_Updater_PollDownloadAsync` must begin with `if A_IsSuspended { try Req.Abort(), return }`.
+   *Why*: A polling timer bypassing `Suspend` could finish its download and call `ExitApp` while the user believes the driver is completely inactive ("tout éteint").
+   *Fix*: `_Updater_MonitorStagingWorker` begins with an `A_IsSuspended` check and terminates the child worker.
 
 2. **Interrupting `UPDATING` with `SUSPENDED`**
-   *Why*: If a hotkey invokes `ToggleSuspend` during the `Stream.Write` or `FileAppend` phases of the updater, the thread is interrupted, creating a race condition where the script is technically suspended but actively tearing down the driver to swap binaries.
-   *Fix*: The critical completion block in `_Updater_PollDownloadAsync` must be wrapped in `Critical On`.
+   *Why*: The obvious defence — making the completion block non-interruptible — is the WRONG one here, and this document used to prescribe it. Cancellation must stay possible: `Critical` on the monitor would prevent `Suspend` from terminating a staging worker that is already running, which is the very outcome the illegal transition above forbids.
+   *Fix*: keep the monitor interruptible and let it terminate the child. `tests/meta/test_g5_updater_download.ahk` pins exactly this — it asserts `A_IsSuspended`, asserts `.terminate()`, and asserts that `Critical(` is **absent**. Do not reintroduce it.
