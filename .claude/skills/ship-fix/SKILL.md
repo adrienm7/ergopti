@@ -32,9 +32,23 @@ pattern here is the ONE missed sibling site — audit the whole class.
 
 ## 3. Write the regression test
 
-It must **fail before the fix and pass after it**. Verify that by stashing the
-fix if there is any doubt; a test that passes against the unfixed code proves
-nothing.
+It must **fail before the fix and pass after it**. A test that passes against the
+unfixed code proves nothing, so prove it rather than assume it:
+
+```bash
+git stash push -- <the SOURCE files only, never the test>
+AutoHotkey64.exe tests/run_all.ahk --only "<slug from the test name>"   # expect exit 1
+git stash pop
+```
+
+Stash the source, never the test — stashing both proves nothing, and it is the
+easy mistake to make. Put a stable slug in the test name (`(perf-2026-07-21)`,
+`(llm-cancel-under-critical)`) so `--only` can replay exactly that case in
+seconds instead of the whole suite.
+
+Read the failure message when it goes red. If it fails for a reason other than
+the bug — a missing constant, a typo in a symbol name — the test is not yet
+encoding the root cause.
 
 Put it in the suite covering the affected layer:
 

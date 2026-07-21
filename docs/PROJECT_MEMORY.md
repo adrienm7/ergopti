@@ -65,7 +65,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-lua-nil-and-expr-is-nil](#project-lua-nil-and-expr-is-nil) — In Lua, `local x = cond and expr` yields **nil**, not false, when `cond` is nil — and `not nil` is `true`, so a "negative" gate silently inverts.
 - [project-ahk-invariant-incomplete-application](#project-ahk-invariant-incomplete-application) — Every AHK-driver hardening invariant is applied per call-site; the recurring bug is the one missed sibling site, or a guarantee defeated one call level down by indirection — audit the whole class, not the documented site.
 - [project-toml-cache-returns-real-booleans](#project-toml-cache-returns-real-booleans) — A TOML `true` reaches the cache as an AHK boolean, not the string "true" — compare through `TomlCacheBool`, never `StrLower(v) == "true"`
-- [project-ahk-map-delete-raises-on-missing-key](#project-ahk-map-delete-raises-on-missing-key) — `Map.Delete(k)` throws when the key is absent, and `/validate` is not an AHK v2.0 flag — it runs the script
+- [project-ahk-map-delete-raises-on-missing-key](#project-ahk-map-delete-raises-on-missing-key) — `Map.Delete(k)` throws when the key is absent, and `/validate` only syntax-checks when it PRECEDES the script path
 - [project-ahk-probing-synthetic-input](#project-ahk-probing-synthetic-input) — Two ways a synthetic-input probe silently measures nothing and reports a confident false negative
 - [project-ahk-keyword-as-variable-hangs-the-parser](#project-ahk-keyword-as-variable-hangs-the-parser) — Naming a local `Catch` (or any control-flow keyword) makes AHK v2 hang with ZERO output — no syntax error, no dialog, no partial log
 - [project-ahk-numeric-string-equals-false](#project-ahk-numeric-string-equals-false) — In AHK v2, `"0" = false` is **TRUE** — comparing a `String|false` return value against `false` silently swallows any numeric-string success token
@@ -125,7 +125,7 @@ AHK's custom-combination prefix-down flag is SEPARATE from `GetKeyState` and is 
 - **Menu/gesture pause → keyboard can't un-pause.** Toggling `Suspend` from a non-hook thread rebuilds the hook with the prefix un-armed, so the suspend-exempt script combos (AltGr+Enter/BackSpace/Delete/Escape) stop firing. **Fix:** also register the chords as plain **suffix** hotkeys gated on `HotIf((*) => A_IsSuspended and GetKeyState("SC138","P"))` — a suffix needs no prefix arming, never re-registers the prefix, and yields to the real combo when the prefix IS armed (no double-fire). Live in `lib/script_altgr_hotkeys.ahk`.
 - **Keyboard pause → « AltGr bloqué ».** A keyboard pause holds the prefix down through `Suspend(1)`; its physical release lands while the layer is disarmed, so the flag stays latched and the layer later dispatches with `GetKeyState("SC138")==0`. **Fix:** drain every registered prefix key BEFORE suspending — `_SuspendPrefixesAreClear()` in `lib/lifecycle.ahk`, driven by `SUSPEND_CUSTOM_COMBO_PREFIX_KEYS` so a future suspend path cannot bypass the wait. `AltGrShiftDispatch` keeps a permanent WARNING guard-rail for any dispatch with the prefix not physically held.
 
-**Never** reach for synthetic taps or Off→On re-registration. To syntax-check an edit, see [[feedback_ahk_ui_syntax_validation]] — and never `/validate`, which does not exist in AHK v2.0 and silently RUNS the script ([[project_ahk_map_delete_raises_on_missing_key]]). Related: [[project_suspend_pause_invariant]].
+**Never** reach for synthetic taps or Off→On re-registration. To syntax-check an edit, see [[feedback_ahk_ui_syntax_validation]] — and pass `/validate` BEFORE the script path, never after, or the script runs live ([[project_ahk_map_delete_raises_on_missing_key]]). Related: [[project_suspend_pause_invariant]].
 
 ### feedback_ahk_ui_syntax_validation
 
@@ -140,7 +140,7 @@ _Some AHK UI files are outside the headless test runner; how to syntax-check the
 1. **Ahk2Exe compile** (gold standard, == CI), at `C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe`. **Run it from PowerShell, never Git Bash** — MSYS path conversion rewrites `/in` `/out` `/base` into Windows paths (`/in` → `C:/Program Files/Git/in`) and the compile dies with "Unrecognised parameter". Ahk2Exe also **exits 0 on failure**, so verify the `.exe` was actually created.
 2. **Parse-only harness**: a throwaway `.ahk` with `ExitApp(0)` as its first auto-execute statement, then `#Include` the UI file. AHK parses the whole merged script before running anything, so a syntax error aborts at load while `ExitApp(0)` exits before any included top-level code runs. Launch via `Start-Process -FilePath AutoHotkey64.exe -ArgumentList @("/ErrorStdOut",$script) -Wait -PassThru -RedirectStandardError $err` — a plain `& AutoHotkey64.exe` captures neither exit code nor stderr, because it is a GUI-subsystem app that detaches.
 
-Never use `/validate`: it does not exist in AHK v2.0 and silently RUNS the script ([[project_ahk_map_delete_raises_on_missing_key]]). The headless runner writes its TAP report to `%TEMP%\ergopti_test_results.txt`, NOT stdout — read that file for pass/fail. See [[feedback_ahk_source_encoding]].
+`/validate` is a real headless syntax check, but ONLY when it precedes the script path — in final position it becomes a script argument and the script runs live ([[project_ahk_map_delete_raises_on_missing_key]]). The headless runner writes its TAP report to `%TEMP%\ergopti_test_results.txt`, NOT stdout — read that file for pass/fail. See [[feedback_ahk_source_encoding]].
 
 ### Coding style and conventions for this project
 
@@ -1336,7 +1336,7 @@ what the real parser produces.
 
 ### project-ahk-map-delete-raises-on-missing-key
 
-_`Map.Delete(k)` throws when the key is absent, and `/validate` is not an AHK v2.0 flag — it runs the script_
+_`Map.Delete(k)` throws when the key is absent, and `/validate` only syntax-checks when it PRECEDES the script path_
 
 <sub>slug: `project_ahk_map_delete_raises_on_missing_key`</sub>
 
@@ -1352,12 +1352,29 @@ if Cache.Has(Key)      ; required
     Cache.Delete(Key)
 ```
 
-**`/validate` does not exist in AHK v2.0** (it arrived in v2.1-alpha). Passing
-it to `AutoHotkey64.exe` does not syntax-check anything — the flag is ignored
-and the script is EXECUTED. Running it against `ErgoptiPlus.ahk` launched a
-second live driver from a worktree for two minutes before the timeout killed
-it. There is no load-only syntax check for v2.0; the honest check is the test
-suite, which catches load errors in anything `run_all.ahk` includes.
+**`/validate` works in v2.0 — but ONLY before the script path.** This entry has
+been wrong twice, in both directions, so it is now stated from an empirical
+re-derivation on v2.0.26 using an execution marker:
+
+```bash
+AutoHotkey64.exe /ErrorStdOut /validate <file>   # validates, does NOT run
+AutoHotkey64.exe /ErrorStdOut <file> /validate   # RUNS THE SCRIPT
+```
+
+Flag **before** the path is a real headless syntax check: a valid script exits 0
+silently, a broken one exits 2 and prints `<file> (2) : ==> Missing "` on stdout.
+Flag **after** the path is consumed as an ordinary script argument (`A_Args`),
+because AHK already took the path as the script — so the script starts live. That
+is what launched a second driver from a worktree for two minutes; the flag was
+never the problem, its position was.
+
+The earlier claim that the flag "does not exist in v2.0 and is ignored" was a
+wrong correction of a wrong original. **A refutation needs the same standard of
+proof as the claim it refutes** — four commands settled this one. See
+[[project_audit_findings_are_hypotheses]].
+
+The test suite remains the check that matters for anything `run_all.ahk`
+includes, because it catches load errors *and* behaviour.
 
 **Corollary — GUI modules are not covered by that.** `ui/onboarding/*` is not
 included by `run_all.ahk`, so a real parse error there passes every
@@ -1368,8 +1385,9 @@ rather than relying on a mid-body declaration being legal).
 **How to apply:**
 
 - Guard every `Map.Delete` with `.Has()`.
-- Never pass `/validate` to AHK v2.0, and never run `ErgoptiPlus.ahk` from a
-  worktree to check it — it starts a real driver alongside the user’s.
+- Pass `/validate` **before** the script path, never after; and never point
+  either form at `ErgoptiPlus.ahk` from a worktree — that starts a real driver
+  alongside the user's.
 - Scratch `.ahk` probes outside `tests/` proved unrunnable in this environment
   (they hang with no output); write the probe as a suite test instead.
 
