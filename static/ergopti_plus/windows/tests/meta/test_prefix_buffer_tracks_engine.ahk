@@ -159,9 +159,52 @@ _PBT_AppendGrowsAndBoundaryResets() {
 }
 
 
+
+; ROOT CAUSE ENCODED — 3. AN EXPANSION, DERIVED TWICE.
+; After a star fire the watcher rebuilt its buffer by replaying the edit itself:
+; strip (Spec.Length - 1), append the replacement, then truncate to the suffix
+; after the last boundary if that suffix was in the index. The engine had
+; ALREADY done the same edit on HSE_Buffer with a different arithmetic (strip
+; Spec.Length, because its buffer holds the magic key this one does not).
+;
+; Measured (driver DEBUG log, 2026-07-21 18:10:30): typing "at" then the magic
+; key fired the repeat t★ → tt and left _PrefixBuffer holding "tt" while
+; HSE_Buffer held "…att":
+;     OnChar: char='★' prefixBuf='at' hseBuf='…⚠️ at'
+;     FIRE trig='t★' bs=2 burst='{BackSpace 2}{Text}tt'
+;     _LookupAndRender: buf='tt'  ->  prefix MATCH for 'tt'
+; Two wrongs at once: "tt" was offered (a trigger the engine refuses mid-word),
+; and "att" → "attention" was never looked up at all, because a SearchKey
+; derived from "tt" cannot reach it. Typing "att" by hand showed the tooltip;
+; pressing at★ produced the same text on screen and no tooltip.
+_PBT_ExpansionSyncDerivesFromEngineBuffer() {
+	Body := _DriverFuncBody("_OnPrefixChar")
+	Assert(Body != "", "_OnPrefixChar() must exist — it owns the post-expansion sync")
+	Assert(InStr(Body, "_PrefixBuffer := HSE_Buffer") > 0,
+		"the post-expansion sync must take the engine buffer verbatim. Replaying the edit here "
+		. "means deriving one fact twice, with two arithmetics that already disagreed about "
+		. "whether the magic key is in the buffer")
+}
+
+; The old replay is gone, not merely bypassed: a second derivation left in place
+; is a second derivation that can be re-enabled by a well-meaning edit.
+_PBT_NoParallelExpansionArithmetic() {
+	Src := _DriverSourceNoComments()
+	Assert(InStr(Src, "HSEMatch.Length : 0) - 1") == 0,
+		"the watcher must not recompute a strip length from the match. The engine strips "
+		. "Spec.Length from a buffer that contains the magic key; this one used Length - 1 "
+		. "because its buffer does not — two rules for one edit")
+	Assert(InStr(Src, "_PrefixIndex.Has(Suffix)") == 0,
+		"the index-based truncation must not come back. It existed to stop a mis-derived "
+		. "buffer accumulating junk; it also discarded the left context _LookupAndRender "
+		. "needs to place a word boundary, which is what hid the 'att' suggestion")
+}
+
 Test("meta watcher: backspace shrinks the preview buffer", _PBT_BackspaceIsNotAResetKey)
 Test("meta watcher: backspace decrements by exactly one", _PBT_BackspaceDecrementsByOne)
 Test("meta watcher: VK_BACK is not a reset key", _PBT_ResetListExcludesBackspace)
 Test("meta watcher: a declined match takes the no-match path", _PBT_DeclinedMatchTakesTheNoMatchPath)
 Test("meta watcher: one path grows the preview buffer", _PBT_OneAppendPath)
 Test("meta watcher: the append path grows and resets correctly", _PBT_AppendGrowsAndBoundaryResets)
+Test("meta watcher: the expansion sync derives from the engine buffer", _PBT_ExpansionSyncDerivesFromEngineBuffer)
+Test("meta watcher: no parallel expansion arithmetic remains", _PBT_NoParallelExpansionArithmetic)

@@ -680,25 +680,33 @@ _OnPrefixChar(IH, Char) {
 			; pressed a terminator, the trigger fired, the cursor is now at
 			; a fresh word boundary. The old wipe behaviour is correct there.
 			if (HSE_LastEndChar == "") {
-				StripLen := (HSEMatch.HasOwnProp("Length") ? HSEMatch.Length : 0) - 1
-				if (StripLen > 0 and StrLen(_PrefixBuffer) >= StripLen) {
-					_PrefixBuffer := SubStr(_PrefixBuffer, 1, StrLen(_PrefixBuffer) - StripLen)
-				} else if (StripLen > 0) {
-					_PrefixBuffer := ""
-				}
-				if HSEMatch.HasOwnProp("Replacement") and Type(HSEMatch.Replacement) == "String" {
-					_PrefixBuffer .= HSEMatch.Replacement
-				}
+				; Take the engine's buffer verbatim instead of replaying the edit
+				; here with a second set of rules.
+				;
+				; HSE_FeedChar has ALREADY applied this expansion to HSE_Buffer:
+				; strip Spec.Length, append the replacement. Recomputing the same
+				; result from _PrefixBuffer needed a parallel arithmetic — and a
+				; different one, because this buffer does not hold the magic key the
+				; engine's does, hence the old Length-1. Two derivations of one fact
+				; is the shape that drifts, and it did.
+				;
+				; Measured (driver DEBUG log, 2026-07-21 18:10:30): typing "at" then
+				; the magic key fired the repeat t★ → tt and left this buffer holding
+				; "tt" while HSE_Buffer held "…att". Two consequences, both wrong:
+				; the preview offered "tt", a trigger the engine refuses mid-word;
+				; and the real "att" → "attention" was never even looked up, because
+				; the SearchKey computed from "tt" cannot reach it. Typing "att" by
+				; hand showed the tooltip, pressing at★ did not — same text on
+				; screen, different suggestion.
+				;
+				; The old index-based truncation is gone with it. It existed to stop
+				; a mis-derived buffer accumulating junk; with the buffer no longer
+				; mis-derived there is nothing to trim, and trimming would throw away
+				; the left context _LookupAndRender needs to place a word boundary.
+				_PrefixBuffer := HSE_Buffer
 				if (StrLen(_PrefixBuffer) > _MAX_BUFFER_LEN) {
 					_PrefixBuffer := SubStr(_PrefixBuffer, -_MAX_BUFFER_LEN)
 				}
-				; Trim the buffer to only the suffix that could be a live trigger
-				; prefix. The suffix after the last boundary is what _LookupAndRender
-				; would use as its SearchKey. If that SearchKey has no entry in the
-				; index the replacement is not a cascade seed — wipe to empty so the
-				; next keystroke starts fresh rather than accumulating "maism" etc.
-				Suffix := _SuffixAfterLastBoundary(_PrefixBuffer)
-				_PrefixBuffer := (Suffix != "" and _PrefixIndex.Has(Suffix)) ? Suffix : ""
 				; The roll/cascade injected new text into the buffer — check
 				; if it prefixes a registered trigger and show the tooltip
 				; immediately. This handles « p'★ → c'était »: the roll fires
