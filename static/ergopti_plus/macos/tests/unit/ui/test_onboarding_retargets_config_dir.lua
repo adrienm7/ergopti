@@ -151,7 +151,14 @@ helpers.describe("onboarding commit() honours the retarget", function()
 		helpers.assert_not_nil(assign_at,
 			"commit() must reassign _config_path from M._resolve_commit_path")
 
+		-- The write must go through _config_path. Two spellings satisfy that:
+		--   toml_writer.batch_write(_config_path, …)        -- direct
+		--   M._commit_write(toml_writer, _config_path, …)   -- via the extraction
+		-- The call moved into M._commit_write so a write that FAILS WITHOUT RAISING
+		-- can be detected (batch_write returns false, it does not throw); the path
+		-- argument, and the ordering asserted below, are unchanged.
 		local write_at = src:find("toml_writer%.batch_write%(_config_path")
+			or src:find("_commit_write%(toml_writer,%s*_config_path")
 		helpers.assert_not_nil(write_at, "commit() must write through _config_path")
 		helpers.assert_true(assign_at < write_at,
 			"the retarget must happen BEFORE the batch_write, or the write still "
