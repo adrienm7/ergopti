@@ -557,6 +557,40 @@ The class was dormant (zero production call sites; every window is a hand-rolled
 copy), which is why nothing caught it — and why the dead-code cleanup that
 deletes an unused module also deletes the evidence that it never worked.
 
+#### Open by decision — the submenu epoch fence
+
+**Confirmed, reproducible by reading, and deliberately NOT patched.** Recorded
+here so the next person does not repeat the analysis.
+
+`_TrackedDispatch` (`lib/menu_dispatcher.ahk`) fires a menu callback only when
+`TrackedObj.Epoch = _MenuDispatcherEpoch`. But `RebuildTrayMenu` registers submenu
+items via `InitSubMenus()` at epoch N, and `initMenu()` then reaches
+`TrayMenuStage_Publish` → `MenuDispatcher_BeginReplacement()`, which bumps to N+1
+and re-registers **only top-level actions**. Every item inside a child submenu is
+left at the old epoch, so its native dispatch is rejected.
+
+Those clicks still work — the 60 ms retry timer rescues them — but that means
+**every submenu click pays 60 ms and logs "AHK drop detected"**, which destroys
+the one diagnostic signal this module exists to produce: a real AHK drop is now
+indistinguishable from an epoch-fenced no-op.
+
+All three obvious fixes are closed, which is why it is left alone:
+
+1. **Re-stamp surviving registrations.** `MenuDispatcher_BeginReplacement` holds no
+   references to the `TrackedObj`s, so it cannot reach them. Adding a registry
+   changes their lifetime semantics.
+2. **Register submenus after the bump.** Closed: `initMenu()` reads `SubMenus` at
+   `ui/menu/menu_init.ahk` lines 95, 185 and 191, so `InitSubMenus()` must run
+   first.
+3. **Drop the epoch from the fence.** `tests/meta/test_menu_dispatch_epoch.ahk`
+   deliberately pins it ("a stale native callback must not mutate a newer
+   registration"). The token comparison on the next line does appear to carry
+   that guarantee alone — a replaced registration gets a new token — but this is
+   the tray menu, the most user-facing surface in the driver, and it cannot be
+   verified without interactive testing.
+
+**Whoever takes this needs to click through the tray, not just run the suite.**
+
 #### Refuted — do NOT re-raise
 
 Each was investigated and rejected with evidence. The strongest ones:
