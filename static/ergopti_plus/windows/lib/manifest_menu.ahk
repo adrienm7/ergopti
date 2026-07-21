@@ -184,6 +184,12 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 			if (Id != "" and DynamicHandlers is Map and DynamicHandlers.Has(Id)) {
 				(DynamicHandlers[Id])(Result, CategoryName)
 				ItemCount++
+			} else {
+				; Manifest/handler drift: the entry exists but nothing can render
+				; it, so the item simply vanishes from the menu. Every sibling
+				; branch reports, and the unknown-item-type fallback below has
+				; logged since it was written — this one was the exception.
+				try LoggerWarn("MenuRenderer", "No handler for action item '{1}' in '{2}' — skipped.", Id, ManifestKey)
 			}
 
 		} else if ItemType == "section_header" {
@@ -203,6 +209,8 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 			if (Id != "" and DynamicHandlers is Map and DynamicHandlers.Has(Id)) {
 				(DynamicHandlers[Id])(Result, CategoryName)
 				ItemCount++
+			} else {
+				try LoggerWarn("MenuRenderer", "No handler for dynamic item '{1}' in '{2}' — skipped.", Id, ManifestKey)
 			}
 
 		} else {

@@ -20,12 +20,22 @@
 
 ; Reads gesture assignments from the v2 [ahk.gestures] section.
 GesturesReadConfig() {
-    global GestureAssignments, GestureActionParameters, _IniCache
+    global GestureAssignments, GestureActionParameters, _IniCache, GESTURE_ACTIONS
 
     for _, Slot in GESTURE_SLOTS {
         Value := IniCacheGet(_IniCache, "ahk.gestures", Slot)
-        if (Value != "_") {
+        if (Value == "_")
+            continue
+        ; Validate exactly as the keyboard-shortcut sibling does. Without this,
+        ; an action id that no longer exists (renamed, or from a newer config)
+        ; loaded verbatim and was dispatched — where GestureInvokeAction's own
+        ; guard dropped it silently. The gesture fired, produced nothing, and
+        ; logged nothing, which is indistinguishable from the gesture not being
+        ; recognised at all.
+        if (Value == "none" or GESTURE_ACTIONS.Has(Value)) {
             GestureAssignments[Slot] := Value
+        } else {
+            try LoggerWarn("gestures", "Slot '{1}' is bound to unknown action '{2}' — keeping the default.", Slot, Value)
         }
     }
     ; Rebuild this map on every read: a reload must reflect the user TOML

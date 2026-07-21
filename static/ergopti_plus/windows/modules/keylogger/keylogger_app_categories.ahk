@@ -237,7 +237,14 @@ KL_AppCat_Save() {
         KLAppCat.dirty := false   ; Only clear once the atomic rename succeeded
     } catch as e {
         try LoggerError("KLAppCat", "Failed to persist app_categories.json: {1}", e.Message)
-        ; Leave dirty=true so KL_AppCat_DeferredSave retries on the next tick
+        ; dirty stays true, but that alone retries NOTHING: the deferred save is
+        ; a one-shot timer, and its only other arm site (KL_AppCat_Get) arms
+        ; BEFORE registering the app key, so once the key exists that path is
+        ; unreachable for the same app. Without re-arming here, a transient lock
+        ; lost the newly discovered category permanently. Guarded because
+        ; KL_AppCat_Reload can reach this before save_fn has ever been bound.
+        if (KLAppCat.HasOwnProp("save_fn") && IsObject(KLAppCat.save_fn))
+            try SetTimer(KLAppCat.save_fn, -KLAppCatConst.DEFERRED_SAVE_RETRY_MS)
     }
 }
 
