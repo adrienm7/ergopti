@@ -149,6 +149,10 @@ local schedule_awake_tick
 -- get_editor_ax_frame() TTL-cache pattern (shortcuts-wrap-ax-uncached).
 local _wrap_ax_selection_cache = nil
 local _wrap_ax_selection_ts    = 0
+-- Separate validity flag so a nil selection (nothing selected, or an app that hides
+-- AXSelectedText) is cached like any other result. Keying freshness on the value
+-- itself never cached a negative — see read_wrap_ax_selection_cached.
+local _wrap_ax_selection_valid = false
 local WRAP_AX_SELECTION_TTL_SEC = 0.2
 
 --- Posts a single no-op F18 key event (down + up) to register KEYBOARD activity
@@ -647,12 +651,20 @@ end
 --- @return string|nil The selected text, or nil when unavailable.
 local function read_wrap_ax_selection_cached()
 	local now = hs.timer.secondsSinceEpoch()
-	if _wrap_ax_selection_cache ~= nil and (now - _wrap_ax_selection_ts) < WRAP_AX_SELECTION_TTL_SEC then
+	-- Freshness is keyed on a separate validity flag, NOT on the cached value.
+	-- `_wrap_ax_selection_cache ~= nil` made a NEGATIVE result uncacheable, and nil
+	-- is the common result: nothing selected, or an app that hides AXSelectedText
+	-- (VS Code / Electron, where it is nil every time). Every wrap-symbol keystroke
+	-- therefore paid both synchronous cross-process AX calls inline on the
+	-- CGEventTap thread — precisely the cost this cache exists to avoid. Same defect
+	-- and same fix as lib/vscode_bridge.lua's _ax_frame_valid (3e403b254).
+	if _wrap_ax_selection_valid and (now - _wrap_ax_selection_ts) < WRAP_AX_SELECTION_TTL_SEC then
 		return _wrap_ax_selection_cache
 	end
 	local sel = text_acts.read_ax_selection()
 	_wrap_ax_selection_cache = sel
 	_wrap_ax_selection_ts    = now
+	_wrap_ax_selection_valid = true
 	return sel
 end
 
