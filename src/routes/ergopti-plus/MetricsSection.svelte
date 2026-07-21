@@ -169,8 +169,8 @@ FEATURES & RATIONALE:
 				/>
 			{/key}
 			<p class="dash-note" use:reveal>
-				Ces tableaux de bord sont vides ici — et c’est exactement le point : vos données ne quittent
-				jamais votre machine. Chez vous, ils se remplissent de VOTRE frappe.
+				Données de démonstration générées pour l’aperçu — chez vous, ces tableaux de bord se
+				remplissent de VOTRE frappe, et rien ne quitte jamais votre machine.
 			</p>
 		</div>
 

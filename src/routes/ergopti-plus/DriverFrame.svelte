@@ -41,6 +41,35 @@ FEATURES & RATIONALE:
 
 	let frameHeight = $derived(Math.min(displayHeight, height));
 
+	// The two dashboards support a bridge-less bootstrap: a "#prefetch=<url>"
+	// hash makes them load a data blob instead of waiting for a native host.
+	// The site ships synthetic demo blobs under /demo/ (see
+	// tools/dev/gen-demo-metrics.cjs) so the dashboards render populated.
+	let frameSrc = $derived(
+		id.startsWith('metrics_')
+			? `${base}/ergopti_plus/_shared/ui/${id}/index.html#prefetch=${base}/demo/${id}_prefetch.json`
+			: `${base}/ergopti_plus/_shared/ui/${id}/index.html`
+	);
+
+	// One shared fetch of the French locale strings for every embedded frame.
+	// Injected through the driver's own i18n_apply() BEFORE initData, so the
+	// windows never render their English _t() fallbacks. When the site gains
+	// its 21 locales, this is the exact hook that will follow the visitor's
+	// language.
+	/** @type {Promise<Record<string, string>> | null} */
+	let frStringsPromise = null;
+
+	/**
+	 * Fetch (once) the driver's French locale strings.
+	 * @returns {Promise<Record<string, string>>}
+	 */
+	function frStrings() {
+		frStringsPromise ??= fetch(`${base}/ergopti_plus/_shared/data/locales/fr.json`)
+			.then((r) => r.json())
+			.catch(() => ({}));
+		return frStringsPromise;
+	}
+
 	/**
 	 * Parse a "30.53B" / "350M" parameter string into billions.
 	 * @param {unknown} raw
@@ -63,6 +92,7 @@ FEATURES & RATIONALE:
 	 * @param {Window} win
 	 */
 	async function injectModelBrowser(win) {
+		win.i18n_apply?.(await frStrings());
 		const res = await fetch(`${base}/ergopti_plus/_shared/modules/llm/models.json`);
 		const catalog = await res.json();
 		const models = [];
@@ -98,7 +128,8 @@ FEATURES & RATIONALE:
 	 * initData() contract.
 	 * @param {Window} win
 	 */
-	function injectHotstringEditor(win) {
+	async function injectHotstringEditor(win) {
+		win.i18n_apply?.(await frStrings());
 		const entry = (trigger, output) => ({
 			trigger,
 			output,
@@ -144,13 +175,7 @@ FEATURES & RATIONALE:
 	 * @param {Window} win
 	 */
 	async function injectPersonalInfo(win) {
-		let strings = {};
-		try {
-			const res = await fetch(`${base}/ergopti_plus/_shared/data/locales/fr.json`);
-			strings = await res.json();
-		} catch (_) {
-			/* labels simply stay blank — the fields still render */
-		}
+		const strings = await frStrings();
 		win.initData?.({
 			strings,
 			fields: [
@@ -202,12 +227,7 @@ FEATURES & RATIONALE:
 <div class="frame-shell ep-window os-{ui.osStyle}" style="max-width: {width}px;" use:reveal>
 	<WindowChrome title="/ergopti_plus/_shared/ui/{id}/ · {width}×{height}" live={true} />
 	<div class="frame-wrap" style="height: {frameHeight}px;">
-		<iframe
-			src="{base}/ergopti_plus/_shared/ui/{id}/index.html"
-			title={id}
-			loading="lazy"
-			onload={onFrameLoad}
-		></iframe>
+		<iframe src={frameSrc} title={id} loading="lazy" onload={onFrameLoad}></iframe>
 	</div>
 </div>
 
