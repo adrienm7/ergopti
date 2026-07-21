@@ -23,12 +23,15 @@
 --- redeploy — larger than the layout switch — was the forgotten sibling.
 ---
 --- WHY A SOURCE GUARD:
---- The stall cannot be reproduced in the harness: the stub's hs.timer.doAfter runs
---- inline and no real event tap exists, so a behavioural test would pass either
---- way. What IS checkable, and what the bug actually was, is whether the call is
---- lexically wrapped in a deferral. This test asserts that for every known
---- blocking-capable subsystem call in both functions, so a future inline call fails
---- CI rather than shipping a tap that dies on the next pause.
+--- The stall itself cannot be reproduced in the harness — there is no real event
+--- tap and no real subprocess, so nothing can actually time out. The harness CAN
+--- observe the deferral (tests/stubs/hs.lua records timers and fires them on
+--- __fire_all, which is why the quiescence test in test_script_control.lua now
+--- flushes), but observing that a call happened eventually does not distinguish
+--- deferred from inline. What distinguishes them, and what the bug actually was, is
+--- whether the call is lexically wrapped in a deferral. This test asserts that for
+--- every known blocking-capable subsystem call in both functions, so a future
+--- inline call fails CI rather than shipping a tap that dies on the next pause.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
