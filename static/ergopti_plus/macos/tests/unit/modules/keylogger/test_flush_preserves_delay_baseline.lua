@@ -45,10 +45,12 @@ local KEYSTROKE_FLUSH_MARKERS = { "%[TAB%]", "%[ESC%]", "%[ENTER%]", "F_KEY_CODE
 
 helpers.describe("keystroke-driven flushes preserve the inter-key delay baseline", function()
 	helpers.it("declares the baseline-preserving flush helper", function()
-		local path = helpers.driver_root() .. "modules/keylogger/init.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "keylogger/init.lua must be readable")
-		local src = fh:read("*a") ; fh:close()
+		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function flush_keeping_baseline")
+		helpers.assert_true(src ~= nil, "modules/keylogger/init.lua source must be locatable")
+		if not src then return end
 
 		helpers.assert_true(src:find("local function flush_keeping_baseline") ~= nil,
 			"handle_key must route its flushes through a helper that re-seeds "
@@ -64,10 +66,12 @@ helpers.describe("keystroke-driven flushes preserve the inter-key delay baseline
 	end)
 
 	helpers.it("no keystroke-driven branch still calls flush_buffer directly", function()
-		local path = helpers.driver_root() .. "modules/keylogger/init.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "keylogger/init.lua must be readable")
-		local src = fh:read("*a") ; fh:close()
+		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function flush_keeping_baseline")
+		helpers.assert_true(src ~= nil, "modules/keylogger/init.lua source must be locatable")
+		if not src then return end
 
 		local offenders = {}
 		for _, marker in ipairs(KEYSTROKE_FLUSH_MARKERS) do
@@ -91,10 +95,12 @@ helpers.describe("keystroke-driven flushes preserve the inter-key delay baseline
 	end)
 
 	helpers.it("the space and punctuation branches re-seed too", function()
-		local path = helpers.driver_root() .. "modules/keylogger/init.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "keylogger/init.lua must be readable")
-		local src = fh:read("*a") ; fh:close()
+		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function flush_keeping_baseline")
+		helpers.assert_true(src ~= nil, "modules/keylogger/init.lua source must be locatable")
+		if not src then return end
 
 		-- These two are the highest-frequency flushes of all: every space, and every
 		-- sentence-ending punctuation mark.

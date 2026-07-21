@@ -39,10 +39,12 @@ local helpers = require("tests.helpers")
 
 helpers.describe("kc_bridge discards keystrokes appended while it was stopped", function()
 	helpers.it("re-syncs the file offset to EOF on start()", function()
-		local path = helpers.driver_root() .. "modules/keylogger/kc_bridge.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "kc_bridge.lua must be readable")
-		local src = fh:read("*a") ; fh:close()
+		-- Selected by a declaration unique to modules/keylogger/kc_bridge.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function ke_name_to_num")
+		helpers.assert_true(src ~= nil, "modules/keylogger/kc_bridge.lua source must be locatable")
+		if not src then return end
 
 		local start_at = src:find("function M%.start%(%)")
 		helpers.assert_true(start_at ~= nil, "M.start must be locatable")
@@ -63,10 +65,12 @@ helpers.describe("kc_bridge discards keystrokes appended while it was stopped", 
 	helpers.it("still reports how much was skipped", function()
 		-- Silently dropping data is its own problem: the skip must be visible in the
 		-- log so an unexpected gap in the metrics is explainable afterwards.
-		local path = helpers.driver_root() .. "modules/keylogger/kc_bridge.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "kc_bridge.lua must be readable")
-		local src = fh:read("*a") ; fh:close()
+		-- Selected by a declaration unique to modules/keylogger/kc_bridge.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function ke_name_to_num")
+		helpers.assert_true(src ~= nil, "modules/keylogger/kc_bridge.lua source must be locatable")
+		if not src then return end
 
 		helpers.assert_true(src:find("Skipping ", 1, true) ~= nil,
 			"the number of skipped bytes must be logged — a silent discard leaves an "

@@ -40,10 +40,12 @@ local helpers = require("tests.helpers")
 
 helpers.describe("n-gram UPSERT accumulates esrc_json across flush ticks", function()
 	helpers.it("does not assign excluded.esrc_json directly", function()
-		local path = helpers.driver_root() .. "modules/keylogger/aggregator/sql.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "aggregator/sql.lua must be readable")
-		local src = fh:read("*a") ; fh:close()
+		-- Selected by a declaration unique to modules/keylogger/aggregator/sql.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("esrc_merge_expr")
+		helpers.assert_true(src ~= nil, "modules/keylogger/aggregator/sql.lua source must be locatable")
+		if not src then return end
 
 		-- Match the CODE form specifically — the SQL fragment as it is concatenated
 		-- into the statement. The helper's own docstring quotes the old assignment in
@@ -57,10 +59,12 @@ helpers.describe("n-gram UPSERT accumulates esrc_json across flush ticks", funct
 	end)
 
 	helpers.it("builds a json_set merge that sums each source key", function()
-		local path = helpers.driver_root() .. "modules/keylogger/aggregator/sql.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "aggregator/sql.lua must be readable")
-		local src = fh:read("*a") ; fh:close()
+		-- Selected by a declaration unique to modules/keylogger/aggregator/sql.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("esrc_merge_expr")
+		helpers.assert_true(src ~= nil, "modules/keylogger/aggregator/sql.lua source must be locatable")
+		if not src then return end
 
 		helpers.assert_true(src:find("esrc_merge_expr") ~= nil,
 			"a merge-expression helper must exist, mirroring the Windows KLW_EsrcMergeExpr")
@@ -76,10 +80,12 @@ helpers.describe("n-gram UPSERT accumulates esrc_json across flush ticks", funct
 	helpers.it("degrades to the stored blob when the tick carries no source data", function()
 		-- An empty delta must leave the accumulated blob untouched rather than
 		-- writing '{}' over it.
-		local path = helpers.driver_root() .. "modules/keylogger/aggregator/sql.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "aggregator/sql.lua must be readable")
-		local src = fh:read("*a") ; fh:close()
+		-- Selected by a declaration unique to modules/keylogger/aggregator/sql.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("esrc_merge_expr")
+		helpers.assert_true(src ~= nil, "modules/keylogger/aggregator/sql.lua source must be locatable")
+		if not src then return end
 
 		local at = src:find("local function esrc_merge_expr")
 		helpers.assert_true(at ~= nil, "the helper must be locatable")

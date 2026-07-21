@@ -36,10 +36,12 @@ local helpers = require("tests.helpers")
 
 helpers.describe("api_remote progressive reveal is reachable", function()
 	helpers.it("does not gate the reveal on a condition that is always false", function()
-		local path = helpers.driver_root() .. "modules/llm/api_remote.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "api_remote.lua must be readable")
-		local src = fh:read("*a") ; fh:close()
+		-- Selected by a declaration unique to modules/llm/api_remote.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function load_api_providers")
+		helpers.assert_true(src ~= nil, "modules/llm/api_remote.lua source must be locatable")
+		if not src then return end
 
 		-- Strip comments: the fix explains the old condition in prose above the code.
 		local code = src:gsub("%-%-[^\r\n]*", "")
