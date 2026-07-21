@@ -33,7 +33,32 @@ if (_DriverMutexHandle) {
 		; and hang it. Trade-off: if Force loses that race on a legitimate relaunch,
 		; the new instance yields and the OLD one keeps running (quit + relaunch to
 		; apply changes) — vastly preferable to N live hook owners.
-		try LoggerWarn("ErgoptiPlus", "Another instance owns the single-owner mutex after {1} ms; yielding without registering any hook.", DRIVER_MUTEX_WAIT_MS)
+		; Written directly to disk, NOT through the logger. This runs as the
+		; second statement of the script: LoggerInit has not run, so
+		; LOGGER_LOG_PATH is empty and the logger's severity flags are unset —
+		; LoggerWarn would raise UnsetError, the bare `try` would swallow it, and
+		; the line would vanish. Then ExitApp fires immediately, so even a queued
+		; line would never be flushed. That is why multi-instance contention has
+		; been invisible to three audits: the one event that proves it happened
+		; was unwritable by construction.
+		;
+		; Calling LoggerInit() here instead would be worse. It runs
+		; _LoggerInitSubFiles, which DELETES any sub-file whose mtime is a
+		; previous day — so a yielding instance would destroy the LIVE owner's
+		; gestures/layout/tray sub-logs on its way out.
+		;
+		; A_AppData is a built-in needing no bootstrap, and A_AppData\Ergopti is
+		; already where paths.toml lives, so this sink is reachable before any
+		; path resolution and never collides with the live owner's log files.
+		try {
+			_YieldDir := A_AppData . "\Ergopti"
+			if !DirExist(_YieldDir)
+				DirCreate(_YieldDir)
+			FileAppend(FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss")
+				. " [WARNING] [ErgoptiPlus] Another instance owns the single-owner mutex after "
+				. DRIVER_MUTEX_WAIT_MS . " ms; yielding without registering any hook.`r`n",
+				_YieldDir . "\bootstrap.log", "UTF-8")
+		}
 		ExitApp(0)
 	}
 }
