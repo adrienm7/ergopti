@@ -184,5 +184,10 @@ global ADAPTER_CLIPBOARD := Map(
     "restore_all", CB_RestoreAll,
 	"sequence_number", CB_GetSequenceNumber,
 	"has_image", CB_HasImage,
-	"is_busy", CB_IsBusy,
 )
+; CB_IsBusy is deliberately absent from the contract map above. That map declares
+; the CROSS-DRIVER Clipboard port, and every name in it must exist in
+; _shared/core/ports/Clipboard.spec.js — adding one here would oblige the macOS
+; adapter to implement a contention probe that only the Windows Critical path
+; needs. It stays a Windows-local helper: still in the adapter, because a domain
+; module must not make raw Win32 calls itself, just not part of the port.
