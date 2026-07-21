@@ -110,9 +110,13 @@ ParseTomlFile(Path) {
 
         ; --- Continuation of a multi-line array ---
         if (PendingKey != "") {
-            ; Skip blank lines and comments inside a multi-line array
+            ; Drop any comment on this line before it is accumulated. Skipping
+            ; only whole-comment lines let a TRAILING comment on an element line
+            ; become part of the value, and it was then persisted as a real
+            ; array element on the next write.
+            Line := TOML_StripInlineComment(Line)
             Stripped := Trim(Line)
-            if (Stripped == "" or SubStr(Stripped, 1, 1) == "#") {
+            if (Stripped == "") {
                 continue
             }
             ; A section header while the array is still open means its closing ] was lost
@@ -157,8 +161,12 @@ ParseTomlFile(Path) {
 
         ; Section header [name] — skip [[table-array]] headers (hotstrings TOML)
         if (SubStr(Line, 1, 1) = "[") {
-            ; Strip leading/trailing brackets, ignoring double-bracket variant
-            inner := RegExReplace(Line, "^\[+|\]+$", "")
+            ; Cut any trailing comment FIRST: the closing-bracket anchor below
+            ; cannot match once a comment follows, so the comment would become
+            ; part of the section name and every later read of that section
+            ; would miss — then the next write re-wraps the garbage in brackets.
+            Header := TOML_StripInlineComment(Line)
+            inner := RegExReplace(Header, "^\[+|\]+$", "")
             Section := Trim(inner)
             if !Sections.Has(Section)
                 Sections[Section] := Map()
@@ -176,13 +184,9 @@ ParseTomlFile(Path) {
         if (Section = "")
             continue
 
-        ; Strip inline comments (# …) unless the value is a quoted string.
-        ; Must scan character-by-character to skip # inside quoted strings.
-        if (SubStr(val, 1, 1) != '"') {
-            hash_pos := InStr(val, "#")
-            if (hash_pos > 0)
-                val := Trim(SubStr(val, 1, hash_pos - 1))
-        }
+        ; Strip an inline comment, quote-aware so a hash inside the string
+        ; stays data and a hash after the closing quote is still a comment.
+        val := TOML_StripInlineComment(val)
 
         ; Detect opening of a multi-line array: value starts with [ but has no ]
         if (SubStr(val, 1, 1) = "[" && !InStr(val, "]")) {
@@ -197,6 +201,41 @@ ParseTomlFile(Path) {
         try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' reached EOF in [{2}] - the value is lost.", PendingKey, Section)
     _ParseTomlCache[Path] := Sections
     return Sections
+}
+
+; Cut a line at its first UNQUOTED ``#`` and trim what remains. This is the
+; character-by-character scan the parser's comment always promised and never
+; had: the old code skipped stripping entirely whenever a value began with a
+; quote, so a trailing comment on a quoted value survived into the value — and
+; because TOML_CoerceValue needs the LAST character to be a quote too, the
+; whole line tail then fell through as raw text and was persisted on the next
+; write. Both the header and the key/value paths route through here so the
+; three parsers cannot drift apart again.
+;
+; Only the double quote opens a string, because that is the only string form
+; TOML_CoerceValue understands. Tracking the apostrophe as well would break
+; every unquoted value that legitimately contains one. A backslash escapes the
+; next character, so an escaped quote does not end the string.
+TOML_StripInlineComment(Line) {
+    InQuote := false
+    Escaped := false
+    Loop Parse Line {
+        if (Escaped) {
+            Escaped := false
+            continue
+        }
+        if (A_LoopField == "\" && InQuote) {
+            Escaped := true
+            continue
+        }
+        if (A_LoopField == '"') {
+            InQuote := !InQuote
+            continue
+        }
+        if (!InQuote && A_LoopField == "#")
+            return Trim(SubStr(Line, 1, A_Index - 1))
+    }
+    return Trim(Line)
 }
 
 TOML_CoerceValue(raw) {

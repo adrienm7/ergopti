@@ -144,8 +144,12 @@ ApplyConfigToml(Features, FilePath) {
 		}
 
 		; Section header — capture the dotted path and decide whether to apply
-		; or skip its contents.
-		if RegExMatch(Line, "^\[([^\[\]]+)\]$", &SecMatch) {
+		; or skip its contents. The comment is cut first because this pattern is
+		; anchored: on a commented header it simply fails to match, the line
+		; falls through to the key parser, fails that too, and ``continue``
+		; leaves CurrentSection on the PREVIOUS section — so every key that
+		; follows is silently applied to the wrong section.
+		if RegExMatch(TOML_StripInlineComment(Line), "^\[([^\[\]]+)\]$", &SecMatch) {
 			Header := Trim(SecMatch[1])
 			SkippingForeign := false
 
