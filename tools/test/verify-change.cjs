@@ -166,7 +166,7 @@ const RULES = [
 	},
 	{
 		gate: 'js',
-		why: 'port compliance, single-source and parity checks live ONLY here — the AHK runner cannot see them',
+		why: 'port compliance, single-source and parity checks live ONLY here — and doc-paths, which validates every link a .md file carries',
 		match: (f) =>
 			f.includes('/adapters/') ||
 			f.includes('_shared/') ||
@@ -176,17 +176,21 @@ const RULES = [
 			f.endsWith('.toml') ||
 			f.endsWith('.js') ||
 			f.endsWith('.cjs') ||
-			f.endsWith('.svelte'),
+			f.endsWith('.svelte') ||
+			f.endsWith('.md'),
 	},
 	{
 		gate: 'hs',
 		why: 'the macOS driver changed',
-		match: (f) => f.startsWith('static/ergopti_plus/macos/'),
+		// Markdown under a driver tree is documentation, not driver code: it cannot
+		// break a Lua suite, and running one for a README edit trains people to
+		// ignore the tool's answer.
+		match: (f) => f.startsWith('static/ergopti_plus/macos/') && !f.endsWith('.md'),
 	},
 	{
 		gate: 'linux',
 		why: 'the Linux driver changed',
-		match: (f) => f.startsWith('static/ergopti_plus/linux/'),
+		match: (f) => f.startsWith('static/ergopti_plus/linux/') && !f.endsWith('.md'),
 	},
 ];
 
