@@ -94,14 +94,6 @@ global HSE_FIRE_LOG_DEFER_MS := 90
 global _HSE_FireLogQueue := []
 global _HSE_FireLogScheduled := false
 
-; Extended word-boundary set for tooltip lookup. Superset of HSE_WORD_TERMINATORS:
-; we add typographic double-quotes (U+201C " and U+201D ") and the straight
-; double-quote (U+0022 ") so that typing inside a quoted phrase (e.g. `cher"mais`)
-; still anchors the SearchKey to the word after the quote. HSE does NOT treat
-; double-quotes as hotstring TERMINATORS (they can appear inside trigger bodies),
-; but it does now treat them as word BOUNDARIES — this set and the matcher gate
-; hold the same value, which is what stops a previewed expansion the engine
-; would refuse.
 ; The preview boundary set. NOT a cached copy any more: it delegates to the
 ; matcher's own derivation so the tooltip and the engine cannot answer the
 ; word-boundary question differently. A cache here was tried twice — first a
@@ -614,6 +606,17 @@ _OnPrefixChar(IH, Char) {
 			; per-section stats with expansions that never appeared on screen.
 			if _HseFired
 				_HSE_QueueFireLog(HSEMatch.Trigger, HotstringRepl, HotstringHType, HotstringCategory, HotstringSection)
+			; The same rule the metrics pipeline above already follows, applied to
+			; the buffer: a match that did not FIRE changed nothing on screen. The
+			; trigger characters and the just-typed char are all still there, so
+			; rewriting the watcher buffer as though the replacement had been
+			; inserted made the tooltip describe text that does not exist — and
+			; every later lookup anchored on that fiction. Take the same path an
+			; outright no-match takes instead.
+			if !_HseFired {
+				_PrefixAppendTypedChar(Char)
+				return
+			}
 			; ── Sync the watcher buffer to the post-expansion screen state ──
 			; The naive "wipe to empty" used to drop the in-word context the
 			; user is still typing inside of. After a STAR fire (no end-char),
@@ -680,17 +683,7 @@ _OnPrefixChar(IH, Char) {
 		; non-final char — the nnbsp/nbsp + ';'/':' + vowel "J" triggers. We
 		; only reset the UI prefix buffer here; HSE_Buffer keeps the single
 		; terminator so such triggers still match on the next keystroke.
-		if InStr(_PrefixWordBoundaries(), Char) {
-			_ResetPrefixBuffer(false)
-			return
-		}
-		_PrefixBuffer .= Char
-		if (StrLen(_PrefixBuffer) > _MAX_BUFFER_LEN) {
-			_PrefixBuffer := SubStr(_PrefixBuffer, -_MAX_BUFFER_LEN)
-		}
-		if LoggerIsDebugEnabled()
-			LoggerDebug("PrefixWatcher", "DBG about to _LookupAndRender: buf='{1}' indexSize={2}.", _PrefixBuffer, _PrefixIndex.Count)
-		_PrefixScheduleRender()
+		_PrefixAppendTypedChar(Char)
 	} catch as Err {
 		LoggerError("PrefixWatcher", "OnChar error for char '{1}': {2}.", Char, Err.Message)
 	}
@@ -711,7 +704,8 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	; engine-level suppression (used by standalone/manual callers) blocks a
 	; physical keydown from updating the buffer.
 	static ResetVKs := Map(
-		0x08, true,  ; VK_BACK
+		; VK_BACK is deliberately ABSENT: backspace decrements both buffers
+		; rather than wiping the preview — see the VK == 0x08 branch below.
 		0x09, true,  ; VK_TAB
 		0x0D, true,  ; VK_RETURN
 		0x1B, true,  ; VK_ESCAPE
@@ -765,7 +759,15 @@ _OnPrefixKeyDown(IH, VK, SC) {
 		; so a Space whose char event was swallowed (e.g. layered on
 		; tap-hold) still flips the boundary flag.
 		if (VK == 0x08) {
-                        HSE_FeedBackspace(true)
+			HSE_FeedBackspace(true)
+			; The preview must shrink by exactly one character too. It used to be
+			; WIPED here (VK_BACK sat in ResetVKs) while the engine merely
+			; decremented — preserving in-word context is the whole point of
+			; HSE_FeedBackspace. So after a single backspace the engine would
+			; still fire a hotstring the tooltip had stopped offering: the same
+			; tooltip-versus-engine divergence as the boundary-set bug, skewed
+			; the other way.
+			_PrefixFeedBackspace()
 			if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
 				LLM_Bridge_FeedKeyDownIfActive(VK)
 		} else if (VK == 0x09 or VK == 0x0D) {
@@ -793,6 +795,56 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	} catch as Err {
 		LoggerError("PrefixWatcher", "OnKeyDown error for VK {1}: {2}.", VK, Err.Message)
 	}
+}
+
+; Shrink the watcher buffer by one character, mirroring HSE_FeedBackspace on the
+; engine side so the tooltip keeps describing the same text the matcher will
+; gate on. The tooltip is re-rendered from the shortened buffer rather than
+; merely hidden: after deleting a typo the user is usually back on a live
+; trigger prefix, and that suggestion should reappear.
+;
+; An empty buffer stays empty — there is nothing on screen to step back over,
+; and the engine's own buffer is equally unable to go negative.
+_PrefixFeedBackspace() {
+	global _PrefixBuffer
+	if (_PrefixBuffer == "") {
+		TooltipHide("Backspace", true)
+		_NotifySuggestionDismissed()
+		return
+	}
+	_PrefixBuffer := SubStr(_PrefixBuffer, 1, StrLen(_PrefixBuffer) - 1)
+	; The suggestion that was showing described the pre-backspace text, so it is
+	; stale the moment the character disappears. Drop it before re-rendering so a
+	; stale tooltip is never left standing if the new buffer matches nothing.
+	TooltipHide("Backspace", true)
+	_NotifySuggestionDismissed()
+	if (_PrefixBuffer != "")
+		_PrefixScheduleRender()
+}
+
+; Record a character that is now on screen into the watcher buffer. The ONE
+; place that grows the preview buffer, shared by the plain no-match path and by
+; a match that declined to fire — those two cases leave the screen in exactly
+; the same state, so they must leave the buffer in the same state too. Handling
+; them separately is how the declined case came to rewrite the buffer with a
+; replacement that was never typed.
+_PrefixAppendTypedChar(Char) {
+	global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixIndex
+	; A boundary character ends the word: nothing typed before it can still be a
+	; live trigger prefix. HSE_Buffer deliberately keeps the terminator (triggers
+	; may contain one as a non-final char); the preview only tracks the current
+	; word, so it starts fresh here.
+	if InStr(_PrefixWordBoundaries(), Char) {
+		_ResetPrefixBuffer(false)
+		return
+	}
+	_PrefixBuffer .= Char
+	if (StrLen(_PrefixBuffer) > _MAX_BUFFER_LEN) {
+		_PrefixBuffer := SubStr(_PrefixBuffer, -_MAX_BUFFER_LEN)
+	}
+	if LoggerIsDebugEnabled()
+		LoggerDebug("PrefixWatcher", "DBG about to _LookupAndRender: buf='{1}' indexSize={2}.", _PrefixBuffer, _PrefixIndex.Count)
+	_PrefixScheduleRender()
 }
 
 ; Return the suffix of Buf that follows the last word-boundary character.
