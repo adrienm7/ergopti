@@ -121,3 +121,32 @@ Test("meta config: both section toggles explain a refusal to act",
 	_CFAS_BothSectionTogglesReport)
 Test("meta config: the tap-hold disable failure is not swallowed",
 	_CFAS_TapHoldDisableIsNotSwallowed)
+
+; A bulk toggle mutates Features, CategoryEnabled and the WPMWidget fields in
+; MEMORY before it persists. If the write throws — the same locked or read-only
+; trigger as the reset path — memory and disk disagree, and the trailing Reload
+; that would have resynced them is skipped, so the tray goes on rendering a
+; state that was never saved. On the live-category path the engine rebuild is
+; skipped too, leaving memory, disk and the hotstring engine in three different
+; states.
+_CFAS_BulkTogglesRecoverFromAFailedWrite() {
+	for Name in ["ToggleAllFeatures", "ToggleCategoryAllFeatures"] {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", Name . "() must exist")
+
+		Assert(InStr(Body, "catch as") > 0,
+			Name . " must catch a failed persist — the in-memory flip has already happened by then, so an uncaught throw leaves memory and disk disagreeing")
+		Assert(InStr(Body, "LoggerError") > 0,
+			Name . " must report a failed persist")
+
+		; Reload is the recovery: it re-reads the config from disk and therefore
+		; discards the unpersisted flip. Without it the driver keeps running on
+		; state the user never saved.
+		CatchPos := InStr(Body, "catch as")
+		Recovery := SubStr(Body, CatchPos, 700)
+		Assert(InStr(Recovery, "Reload") > 0,
+			Name . " must Reload after a failed persist — re-reading disk is what discards the unpersisted mutation and puts the driver back in a state that matches what was saved")
+	}
+}
+Test("meta config: a bulk toggle recovers when its write fails",
+	_CFAS_BulkTogglesRecoverFromAFailedWrite)

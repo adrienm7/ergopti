@@ -163,6 +163,7 @@
 	"dialog.app_picker.running_count": "{n} aplicativo(s) em execução.",
 	"dialog.app_picker.stopped_suffix": " (parado)",
 	"dialog.app_picker.title": "Seleção de aplicativos",
+	"dialog.bulk_toggle.save_failed": "The change could not be saved to the configuration file.\nIt has been reverted. Close any app holding the file and try again.",
 	"dialog.config_folder.hint": "Todos os arquivos pessoais (personal_shortcuts.ahk, personal_hotstrings.toml…) serão buscados nesta pasta. Deixe vazio para usar a pasta padrão.",
 	"dialog.config_folder.label": "Caminho:",
 	"dialog.config_folder.select_title": "Selecionar pasta de configuração",

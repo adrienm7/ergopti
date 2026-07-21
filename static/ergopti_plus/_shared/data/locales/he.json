@@ -163,6 +163,7 @@
 	"dialog.app_picker.running_count": "{n} יישום(ים) רצים.",
 	"dialog.app_picker.stopped_suffix": " (מופסק)",
 	"dialog.app_picker.title": "בחירת יישומים",
+	"dialog.bulk_toggle.save_failed": "The change could not be saved to the configuration file.\nIt has been reverted. Close any app holding the file and try again.",
 	"dialog.config_folder.hint": "כל הקבצים האישיים (personal_shortcuts.ahk, personal_hotstrings.toml…) יחופשו בתיקייה זו. השאר ריק כדי להשתמש בתיקיית ברירת המחדל.",
 	"dialog.config_folder.label": "נתיב:",
 	"dialog.config_folder.select_title": "בחר תיקיית הגדרות",

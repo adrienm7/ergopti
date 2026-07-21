@@ -163,6 +163,7 @@
 	"dialog.app_picker.running_count": "{n} application(s) en cours.",
 	"dialog.app_picker.stopped_suffix": " (arrêté)",
 	"dialog.app_picker.title": "Sélection d'applications",
+	"dialog.bulk_toggle.save_failed": "La modification n'a pas pu être enregistrée dans le fichier de configuration.\nElle a été annulée. Fermez l'application qui retient le fichier puis réessayez.",
 	"dialog.config_folder.hint": "Tous les fichiers personnels (personal_shortcuts.ahk, personal_hotstrings.toml…) seront cherchés dans ce dossier. Laisser vide pour utiliser le dossier par défaut.",
 	"dialog.config_folder.label": "Chemin :",
 	"dialog.config_folder.select_title": "Sélectionner le dossier de configuration",

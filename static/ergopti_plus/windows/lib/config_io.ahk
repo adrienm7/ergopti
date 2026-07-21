@@ -113,7 +113,19 @@ ToggleAllFeatures(Value) {
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: Bool ? "1" : "0" })
     if !Bool
         _GlobalClearAllBindings(Updates)
-    TOML_BatchWrite(ConfigurationFile, Updates)
+    ; Everything above mutated MEMORY. If the write fails, memory and disk
+    ; disagree and the Reload below never runs, so the tray keeps rendering a
+    ; state that was never saved. Reload anyway on failure: it re-reads the
+    ; config from disk, which discards the unpersisted flip and puts the driver
+    ; back in a state that matches what the user can see on disk.
+    try {
+        TOML_BatchWrite(ConfigurationFile, Updates)
+    } catch as Err {
+        try LoggerError("Config", "Bulk feature toggle could not be saved: {1}", Err.Message)
+        try MsgBox(t("dialog.bulk_toggle.save_failed"), t("dialog.reset_defaults.failed_title"), "Iconx")
+        Reload
+        return
+    }
     if Bool {
         HsBatch := []
         for V2Path in _CollectAllHotstringsV2Paths()
@@ -244,14 +256,32 @@ ToggleCategoryAllFeatures(Category, Value) {
         } finally {
             Critical(_TcafCrit)
         }
-        TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
+        ; The in-memory flip above is already done. A failed write here would
+        ; otherwise skip the rebuild below too, leaving memory, disk and the live
+        ; engine in three different states.
+        try {
+            TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
+        } catch as Err {
+            try LoggerError("Config", "Category toggle for '{1}' could not be saved: {2}", Category, Err.Message)
+            try MsgBox(t("dialog.bulk_toggle.save_failed"), t("dialog.reset_defaults.failed_title"), "Iconx")
+            Reload
+            return
+        }
         LoggerStart("Menu", "Applying live category toggle for {1}…", Category)
         RebuildHotstringsLive()
         LoggerSuccess("Menu", "Live category toggle applied for {1}.", Category)
         return
     }
     CategoryEnabled[Category] := Bool
-    TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
+    ; Reload runs on both paths here, so a failed write self-corrects by
+    ; re-reading disk — but it must still be reported, or the toggle silently
+    ; reverts on the next start with no explanation.
+    try {
+        TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
+    } catch as Err {
+        try LoggerError("Config", "Category toggle for '{1}' could not be saved: {2}", Category, Err.Message)
+        try MsgBox(t("dialog.bulk_toggle.save_failed"), t("dialog.reset_defaults.failed_title"), "Iconx")
+    }
     Reload
 }
 
