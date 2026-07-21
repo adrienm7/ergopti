@@ -121,6 +121,17 @@ function M.reset_ready()
 	Logger.debug(LOG, "Ollama readiness flag reset — next warmup must re-confirm (gen %d).", _warmup_gen)
 end
 
+--- Invalidates any in-flight warmup POST so its response cannot flip _is_ready or
+--- fire the user-facing "server ready" notification after the LLM gate closed
+--- (pause, or set_llm_enabled(false)). Mirrors api_mlx.stop_warmup (M-3), but
+--- without a _warmup_stopped flag — Ollama has no self-rescheduling retry chain to
+--- short-circuit — and without clearing _is_ready, so a resume does not force a
+--- pointless re-warm when the weights really are loaded.
+function M.stop_warmup()
+	_warmup_gen = _warmup_gen + 1
+	Logger.debug(LOG, "stop_warmup() — gen bumped to %d, in-flight warmup invalidated.", _warmup_gen)
+end
+
 -- Delay before launching Ollama after killing a stale instance (seconds)
 local OLLAMA_KILL_SETTLE_SEC = 0.1
 
