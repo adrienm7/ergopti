@@ -31,6 +31,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-ahk-keyword-as-variable-hangs-the-parser](#project-ahk-keyword-as-variable-hangs-the-parser) — naming a variable `Catch` (or any control-flow keyword) hangs AHK v2 with zero output and no error; bisect to a trivial probe when a run produces nothing at all
   - [project-ahk-guard-tests-must-loop-the-class](#project-ahk-guard-tests-must-loop-the-class) — Guard tests must enumerate the whole class of call sites, not the one site a bug was fixed at — 5 findings in one audit came from this
   - [project-audit-evidence-must-be-reproducible](#project-audit-evidence-must-be-reproducible) — A refutation needs the same proof as a finding: the "the perf section was fabricated" debunking was itself wrong (it searched `ahk/logs`, but the real path is `autohotkey/logs`); G4 IS measured, and the logs live at `<ConfigDir>/autohotkey/logs/` via `paths.toml`
+  - [project-hs-audit-round2-2026-07-21](#project-hs-audit-round2-2026-07-21) — the second implementation pass: 51 of 78 open findings treated (24 fixed, 27 refuted/stale); the remaining 27 are listed there with an exact fix each
   - [project-hs-audit-2026-07-21](#project-hs-audit-2026-07-21) — 13 macOS defects fixed (PII in logs, keystrokes logged inside a vault, silently discarded events); 78 findings remain OPEN and unverified — the backlog lives here because the audit md was deleted by design
   - [project-audit-findings-are-hypotheses](#project-audit-findings-are-hypotheses) — 2 of 35 audit findings were wrong and the existing suite proved it; implement a finding as a hypothesis, not an instruction
   - [project-updater-nonblocking-http](#project-updater-nonblocking-http) — The updater background poll must never do synchronous WinHttp on the main thread (it freezes all remapping); WinHttp SetTimeouts 0 = infinite. Use the async WinHTTP + WaitForResponse(0) + SetTimer-poll pattern.
@@ -2191,3 +2192,134 @@ Related: [[project_ahk_guard_tests_must_loop_the_class]],
 [[project_audit_findings_are_hypotheses]], [[project_audit_evidence_must_be_reproducible]],
 [[project_macos_eventtap_no_blocking]], [[project_suspend_pause_invariant]],
 [[feedback_regression_tests]].
+
+
+
+
+
+### project-hs-audit-round2-2026-07-21
+
+_Second implementation pass on the 78 findings the first pass left open: 51 treated
+(24 fixed, 27 refuted or already fixed), 27 still open with an exact fix specified._
+
+<sub>slug: `project_hs_audit_round2_2026_07_21`</sub>
+
+**Method that made this tractable.** Every open finding was adjudicated against the
+CURRENT source by one agent per file, returning CONFIRMED (with quoted evidence, an
+exact minimal fix and a test plan), REFUTED (with the disproving code) or
+ALREADY_FIXED. Of 75 adjudicated: **53 confirmed, 16 refuted, 6 already fixed** —
+so nearly a third of the surviving backlog was wrong or stale, which is why
+implementing an audit list verbatim is a bad idea (`[[project_audit_findings_are_hypotheses]]`).
+
+**The adjudication is worth keeping.** Refuted with evidence, do not re-raise:
+`karabiner/watchers.lua:283` (start() return is checked by the latch owner),
+`shortcuts/actions/system.lua:134` (closeAll fallback IS reachable),
+`keymap/init.lua:868` (the is_ignored path is reachable),
+`log_manager.lua:1057` (the retry loop does terminate),
+`kc_bridge.lua:271` (the ledger is bounded elsewhere),
+`karabiner/onboarding.lua:544` (poll_until is already async),
+plus seven test-quality findings whose guards turned out to be adequate.
+
+**Classes that kept paying out.** Three fixes came from widening a guard rather
+than from the reported site:
+- The `hs.task` GC-pin guard was an ALLOWLIST of 8 files. Converting it to a
+  whole-tree scan found **5 unpinned files** nobody had reported, including the
+  interactive-screencapture task (the longest-lived subprocess in the driver) and
+  the CapsWord clear-variable task, whose loss leaves KE with capsword=1 so the
+  next space re-enables CapsLock.
+- The gsub-replacement escape guard, written class-wide, found **7 more sites**;
+  then its own pattern proved too narrow (bare identifiers only, missing
+  `tostring(err)`), and widening it found **7 more again** — including raw hdiutil
+  stderr. That class has now bitten four separate times.
+- The NOT NULL guard, written class-wide, found **4 more columns** in round one.
+  Writing the guard for the class, not the site, is the single highest-yield habit
+  in this repo.
+
+**Self-inflicted bugs caught by the discipline, worth remembering:**
+- A regex-driven fix rewrote `postKeyStroke`'s own body into infinite recursion;
+  caught only by reading the diff before committing.
+- Two files were left referencing a `_active_tasks` global that had never been
+  declared, because the script that added the declaration raised before writing.
+- A commit landed with a red test: the pre-commit hook lints but does NOT run the
+  suite. **Run `lua tests/run.lua` before every commit, not after.**
+- A first attempt at a behavioural gesture test could not discriminate fixed from
+  broken (in x1 mode "stopped firing" is indistinguishable from normal completion)
+  and was replaced with a structural guard, stating why in the file.
+
+**STILL OPEN — 27 findings, each with a verified exact fix in hand.** These were
+adjudicated CONFIRMED against current source but not implemented; treat them as
+specified work, not as hypotheses:
+
+- **HIGH** `modules/keylogger/sqlite_reader.lua:606` — read_range_split_today omits ngram_keycodes / ngram_shortcuts / ngram_shortcut_bigrams from the today projection, so tod
+  - *Fix:* Add the three missing today passes using the file's own `_safe_query` (F-MED-28) pattern — the same wrapper every other query loop in this file already uses — inside the existing `if db then` block, so no extra sqlite connection i…
+- **HIGH** `modules/llm/api_mlx_discovery.lua:384` — MLX endpoint discovery deadlocks: reset() orphans a poll chain that resurrects on the shared _endpoint_probe_in_flight f
+  - *Fix:* Smallest correct edit: give the poll phase the SAME `my_discovery_gen ~= _discovery_gen` guard this file already applies three times to its probe callbacks (the F-MED-8 pattern), so an orphaned chain self-terminates deterministica…
+- **HIGH** `modules/shortcuts/actions/system.lua:707` — Wrap-text eventtap: a stale positive AX selection cache re-wraps text that is no longer selected, swallowing the keystro
+  - *Fix:* Give the cache the invalidation hook the codebase already uses for TTL caches (a local `invalidate_*`-style helper next to the cache, as in modules/keymap/input_sources.lua:71 invalidate_active_layouts_cache and modules/keymap/uti…
+- **MEDIUM** `lib/logger.lua:446` — Ephemeral topical sub-file purge is inverted: it spares the files that grow and deletes only the idle ones
+  - *Fix:* Do not try to infer "contains only today" from mtime AFTER the logger has touched the file — evaluate the same predicate on the FIRST write of each new calendar date, which is the only moment mtime still answers that question. Thi…
+- **MEDIUM** `modules/gestures/actions.lua:364` — Four registered gesture/shortcut actions require modules that do not exist; the inner bare pcall hides the failure from 
+  - *Fix:* Point the four registrations at the real modules AND stop swallowing the failure. Use the lazy-require guard pattern this same file already uses for script_pause_toggle (actions.lua:447-450: `local ok, sc = pcall(require, …); if o…
+- **MEDIUM** `modules/gestures/engine.lua:412` — PEAK OVERRIDE confirms on wall time elapsed since the peak was first seen, not on how long the peak was held, so a one-f
+  - *Fix:* Record when the peak was last observed and measure the actual held duration, keeping the comparison line byte-identical so test_peak_override_regression.lua section 3 still passes, and using a timestamp rather than a frame counter…
+- **MEDIUM** `modules/karabiner/init.lua:538` — User-configurable config-dir path interpolated into a shell command with Lua %q instead of POSIX quoting, while the sibl
+  - *Fix:* Reuse the POSIX quoter the same feature already defines 150 lines away (generator.lua:385 `sq()`), and memoise it with the `_ensured_dirs` idea from menu_paths.lua. Add next to the other module-level flags near line 116: local _de…
+- **MEDIUM** `modules/karabiner/watchers.lua:351` — Layout-poll watchdog releases the guard but never terminates the abandoned read, turning a bounded one-shot failure into
+  - *Fix:* Give the poll ownership of the in-flight handle, mirroring watchers.lua:186. Assign the module local INSIDE read_layout_async, BEFORE start(), so a synchronously-completing handle (the shape used by test_layout_poll_lock_release.l…
+- **MEDIUM** `modules/keymap/input_sources.lua:701` — upgrade_active_list reports success from osascript's exit code, not the AppleScript's result
+  - *Fix:* Bind the AppleScript's own result, mirroring the two correct siblings in the same file (set_input_source:441 and enable_and_select_source:604 — the established payload-check pattern here). OLD (input_sources.lua:700-701): local ok…
+- **MEDIUM** `modules/keymap/utils.lua:215` — emit_tokens omits {Enter}/{Tab} key tokens from the physical echo, under-filling the keylogger synth_queue on every mult
+  - *Fix:* Mirror the terminator re-type path (expander.lua:454-464) and the personal_info emitter, using a named lookup so no magic literals appear inline. Add a constant to section 1 of modules/keymap/utils.lua, after IGNORED_WIN_TTL_SEC (…
+- **MEDIUM** `modules/llm/api_mlx_fetch.lua:240` — MLX sequential retry hardcodes its temperature policy and caps at 0.60, which LOWERS the retry below the failed variant'
+  - *Fix:* Adopt the pattern api_ollama.lua and api_remote.lua already use, verbatim. old text (api_mlx_fetch.lua:33): local _RETRY_MAX_MULT = ApiCommon.get_retry_policy() new text: local _RETRY_MAX_MULT, _RETRY_TEMP_STEP, _RETRY_EXTRA_TOKEN…
+- **MEDIUM** `modules/llm/api_mlx_inference.lua:46` — MLX hardcodes deduplication OFF instead of reading inference.json, so a sequential fetch stops early on duplicate varian
+  - *Fix:* Adopt the pattern already used by api_ollama.lua:75 and api_remote.lua:160 (read the flag from ApiCommon, which loads _shared/modules/llm/inference.json). ApiCommon is already required at line 27, so no new require is needed. Old …
+- **MEDIUM** `modules/llm/prediction_engine.lua:922` — handle_chain_signal runs perform_check synchronously inside the keymap CGEventTap, where AppFilter.is_blocked issues unc
+  - *Fix:* Defer with hs.timer.doAfter(0, …) — the exact pattern the codebase uses for the same hazard at script_control.lua:242 (`hs.timer.doAfter(0, function() pcall(function() _karabiner.pause() end) end)`) and menu_keyboard_layout.schedu…
+- **MEDIUM** `modules/shortcuts/actions/text.lua:184` — do_transform has no re-entrancy guard: two rapid case-toggle presses interleave and silently destroy the user's clipboar
+  - *Fix:* Apply the in-flight-flag pattern the codebase already uses twice — `_reload_in_flight` in lib/ui_restore.lua and `_warmup_in_flight` in modules/llm/api_mlx.lua:643 (which also arms a hard timeout precisely because the comment at :…
+- **MEDIUM** `modules/shortcuts/script_control.lua:253` — Pause/resume loses the shortcuts preference: the tray "Raccourcis" toggle is the only top-level feature toggle not pause
+  - *Fix:* Smallest correct edit, using the pattern the codebase already applies to the gestures master toggle (ui/menu/menu_gestures.lua:78-79) and to every other item in menu_shortcuts.lua. In ui/menu/menu_shortcuts.lua:331-335: OLD: local…
+- **MEDIUM** `static/ergopti_plus/macos/modules/llm/mlx_deps_checker.lua:515` — mlx_deps_checker arms an uncancellable 1.5 s auto-hide timer that destroys the SHARED download_window singleton — includ
+  - *Fix:* Two edits, mirroring the ownership re-validation the codebase already uses for deferred callbacks (the `_startup_check_generation` guard in ui/menu/menu_llm/startup_controller.lua:86, and the warm-up generation guard covered by te…
+- **MEDIUM** `tests/stubs/hs.lua:480` — tests/stubs/hs.lua has no hs.screen, so both render entry points abort at the anchor step inside their pcall and the ent
+  - *Fix:* Add an hs.screen module table to the '9/ Misc UI' section, following the exact pattern the stub already uses for every other hs submodule (a plain `M.<name> = { ... }` table of closures returning inspectable literals, e.g. M.windo…
+- **MEDIUM** `tests/unit/lib/test_timings.lua:147` — Cover the `next(sections) == nil` clause the fix is actually about — the shipped test never executes it
+  - *Fix:* Add a fourth case to the existing `timings: registry load fail-fast` describe, reusing the file's own save-stub-reload-restore helper pattern (`reload_timings_without_shared_tree`, test_timings.lua:126-145) but stubbing the READER…
+- **MEDIUM** `tests/unit/modules/gestures/test_actions.lua:60` — Parameterized-action test asserts only the accessor layer, leaving the set-then-execute guarantee untested
+  - *Fix:* Add an execution-level describe block to tests/unit/modules/gestures/test_actions.lua, following the behavioural pattern the repo already uses for exactly this problem in tests/unit/modules/gestures/test_actions_modifier_keystroke…
+- **MEDIUM** `tests/unit/modules/keymap/test_lifecycle_preserves_interceptors.lua:49` — Make the new lifecycle regression test replayable in isolation by also clearing package.loaded["ui.tooltip"]
+  - *Fix:* Follow the pattern the harness already uses for leaked partial stubs (tests/helpers/init.lua:117-142 clears lib.text_utils / lib.toml.codec / lib.timings for exactly this reason), and the pattern the sibling test uses (test_expand…
+- **MEDIUM** `tests/unit/ui/menu/test_karabiner_timeout_regenerates.lua:127` — Shipped regression test asserts call COUNTS, not the setter→regenerate ORDER it exists to protect — a swapped-order muta
+  - *Fix:* Make the double stateful so the assertion encodes the deployed value instead of the call count — the same technique the suite already uses in tests/unit/ui/menu/test_menu_karabiner_perf.lua, whose double stores timeouts rather tha…
+- **MEDIUM** `tests/unit/ui/test_onboarding_retargets_config_dir.lua:36` — Pin persist_config_dir_for_wizard → get("ConfigTomlPath") — the retarget test doubles away the half of the guarantee tha
+  - *Fix:* No production change — the code is correct today (verified by reading the full persist→config_dir→get chain above). Close the blind spot by appending a section 4 to tests/unit/ui/test_onboarding_retargets_config_dir.lua that drops…
+- **MEDIUM** `tests/unit/ui/test_tooltip_stacked_panel.lua:253` — The combined-footer regression test asserts only a call count, which the broken (re-shadowed size_combined) state satisf
+  - *Fix:* Assert the render OUTCOME alongside the count, using the same "assert observable state, not the call count" pattern the sibling regression test tests/unit/ui/test_tooltip_llm_is_visible_after_render_crash.lua already uses (it asse…
+- **MEDIUM** `ui/menu/menu_paths.lua:134` — Do not memoise a directory whose creation FAILED — pcall status is not hs.fs.mkdir's return value
+  - *Fix:* Two edits. Edit 1 — capture the actual return value (lines 134-135): OLD: local ok_mk = pcall(hs.fs.mkdir, current) if not ok_mk then NEW: local ok_mk, created = pcall(hs.fs.mkdir, current) if not ok_mk or not created then Edit 2 …
+- **MEDIUM** `ui/menu/menu_shortcuts.lua:454` — Script-control shortcut picker offers open_url / search_web but never prompts for the parameter, making both permanently
+  - *Fix:* Reuse the pattern the codebase already has at ui/menu/menu_gestures.lua:153-178 (the parameter-prompt-before-apply branch). Extract it into the EXISTING ui/menu/shortcut_utils.lua — that module already owns shortcut-related dialog…
+- **LOW** `modules/gestures/init.lua:478` — The gestures space_wrap setting is persisted, restored and exposed as a menu checkbox but is never read by any code path
+  - *Fix:* Implement the consumer rather than removing the setting. Removal would touch _shared manifest.toml, both regenerated files, menu_manifest.json, 21 locale files, menu_gestures.lua, preferences.lua and menu_state.lua, and would requ…
+- **LOW** `ui/tooltip/tooltip_llm.lua:878` — Sibling site forgotten: show_predictions re-measures the identical combined footer once per reserved slot
+  - *Fix:* Apply the hoist-and-reuse pattern already used in renderer.lua M.render (the hoisted `size_combined`, renderer.lua:239-243): measure the index-invariant footer on the first iteration and reuse it. (1) declare the memo before the l…
+
+**How to apply:**
+
+- Re-adjudicate before implementing any of the above: this branch changed several
+  of those files, so a cited line may have moved or the defect may already be gone.
+  Three of the 27 were already stale when this pass started.
+- Keep writing the guard for the CLASS. Every high-severity finding in both passes
+  was a sibling of an invariant the codebase had already stated and tested
+  somewhere else — `[[project_ahk_invariant_incomplete_application]]` is the
+  dominant shape on this driver, not an occasional one.
+- Suspect the shipped test as readily as the shipped code. Several fixes arrived
+  with tests structurally blind to the damage; fixing an unfaithful STUB and adding
+  the uncovered case strengthens a test and is not the same as weakening one.
+- Tell subagents "read-only" means the whole repository. Told only "do not edit
+  driver source", one wrote a probe test into `tests/` and polluted a live run.
+
+Related: [[project_hs_audit_2026_07_21]], [[project_ahk_guard_tests_must_loop_the_class]],
+[[project_audit_findings_are_hypotheses]], [[project_macos_eventtap_no_blocking]],
+[[project_suspend_pause_invariant]], [[feedback_regression_tests]].
