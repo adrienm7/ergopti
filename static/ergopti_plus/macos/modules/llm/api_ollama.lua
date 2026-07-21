@@ -8,6 +8,7 @@
 
 local M = {}
 local Logger  = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local Notifications = require("lib.notifications")
 local i18n    = require("lib.i18n")
 local Parser         = require("modules.llm.parser")
@@ -344,7 +345,7 @@ end
 local function build_request_context(system_prompt, full_text, tail_text, num_predictions, is_batch)
 	local final_sys = system_prompt
 	if type(final_sys) == "string" then
-		final_sys = final_sys:gsub("%{n%}", tostring(num_predictions))
+		final_sys = final_sys:gsub("%{n%}", text_utils.escape_gsub_replacement(tostring(num_predictions)))
 	end
 	local user_prompt = ""
 	if type(final_sys) == "string" and final_sys:find("PREFIX") and final_sys:find("TAIL") then

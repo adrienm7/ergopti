@@ -33,6 +33,7 @@
 local M = {}
 
 local Logger         = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local Timings        = require("lib.timings")
 local Paths          = require("lib.paths")
 local Profiles       = require("modules.llm.profiles")
@@ -605,7 +606,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 	-- otherwise pass the full context as-is.
 	local final_sys = system_prompt
 	if type(final_sys) == "string" then
-		final_sys = final_sys:gsub("%{n%}", tostring(num_predictions))
+		final_sys = final_sys:gsub("%{n%}", text_utils.escape_gsub_replacement(tostring(num_predictions)))
 	end
 	local user_prompt = ""
 	if type(final_sys) == "string" and final_sys:find("PREFIX") and final_sys:find("TAIL") then

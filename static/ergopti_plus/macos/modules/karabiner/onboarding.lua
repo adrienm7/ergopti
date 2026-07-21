@@ -36,6 +36,7 @@ local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
 local i18n   = require("lib.i18n")
+local text_utils = require("lib.text_utils")
 
 -- Optional dependency: only used to surface user-friendly notifications.
 -- Falls back to silent operation if the notifications lib is not present.
@@ -459,7 +460,12 @@ function M.install_karabiner_elements(callback)
 		mount_dmg_async(cache_path, function(ok_mount, mount_or_err)
 			if not ok_mount then
 				Logger.error(LOG, "Mount failed: %s.", mount_or_err)
-				callback(false, i18n.get("karabiner.onboarding.error.mount_failed"):gsub("{error}", tostring(mount_or_err)))
+				-- Parenthesised so gsub's second return (the match count) does not leak in
+				-- as callback's third argument, and escaped because the payload is raw
+				-- hdiutil stderr — a "%" in it would raise inside this async callback,
+				-- where the error reaches only the HS Console.
+				callback(false, (i18n.get("karabiner.onboarding.error.mount_failed")
+					:gsub("{error}", text_utils.escape_gsub_replacement(tostring(mount_or_err)))))
 				return
 			end
 			local mount_point = mount_or_err

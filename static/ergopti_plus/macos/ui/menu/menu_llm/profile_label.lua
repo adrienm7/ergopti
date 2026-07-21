@@ -50,7 +50,7 @@ function M.format(label, num_preds)
 	local n = tonumber(num_preds) or default_n
 	local s = (n > 1) and "s" or ""
 	-- Parenthesised so only the substituted string escapes (gsub also returns a count).
-	return (label:gsub("{n}", tostring(n)):gsub("{s}", text_utils.escape_gsub_replacement(s)))
+	return (label:gsub("{n}", text_utils.escape_gsub_replacement(tostring(n))):gsub("{s}", text_utils.escape_gsub_replacement(s)))
 end
 
 return M
