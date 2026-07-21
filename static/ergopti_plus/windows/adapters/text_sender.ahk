@@ -80,6 +80,11 @@ _TextSenderModifierPrefix(ModName) {
 		case "ctrl", "lctrl", "rctrl": return "^"
 		case "shift", "lshift", "rshift": return "+"
 		case "alt", "lalt", "ralt":       return "!"
+		; AltGr is Ctrl + right Alt, so it needs its own prefix: it previously fell
+		; through to default and returned "", dropping the modifier entirely. Kept
+		; separate from "ralt" on purpose — a caller asking for right Alt is not
+		; asking for AltGr, and changing that would alter existing behaviour.
+		case "altgr":                    return "<^>!"
 		case "cmd", "win", "lwin", "rwin": return "#"
 		case "blind":    return "{Blind}"
 		default:                  return ""
@@ -399,8 +404,11 @@ TextSend(Text, Opts, Callback) {
 ; Emits Count Backspace keystrokes synchronously.
 ; @param Count {Integer} Number of Backspace keystrokes to emit.
 TextEraseChars(Count) {
+	; Explicitly true: erasing nothing SUCCEEDED. A bare return yields "", and
+	; every other path here returns a boolean, so a caller testing the result
+	; would read a legitimate zero-count call as a failure.
 	if Count < 1
-		return
+		return true
 	loop Count
 		if !_TextSenderSendInput("{Backspace}", "erase character")
 			return false

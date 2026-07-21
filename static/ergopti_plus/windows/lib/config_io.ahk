@@ -205,7 +205,10 @@ _HSSnapshotAllCategories() {
 ; keeps its identity; each section entry is replaced with a fresh clone).
 _HSRestoreCategory(V2Cat) {
     global Features, _HSCategorySnapshot
-    if !(_HSCategorySnapshot.Has(V2Cat) and IsSet(Features)
+    ; IsSet on BOTH globals. _HSCategorySnapshot is declared in ErgoptiPlus.ahk,
+    ; which the headless test harness does not load, so reading it first threw an
+    ; unset error before the IsSet(Features) guard beside it could apply.
+    if !(IsSet(_HSCategorySnapshot) and _HSCategorySnapshot.Has(V2Cat) and IsSet(Features)
         and Features.Has("hotstrings") and Features["hotstrings"].Has(V2Cat)) {
         return
     }
