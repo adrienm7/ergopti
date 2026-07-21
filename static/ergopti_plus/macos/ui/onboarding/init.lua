@@ -333,6 +333,33 @@ function M._answers_from_config(parsed)
 	}
 end
 
+--- Writes the wizard's answers, distinguishing a RAISE from a returned failure.
+--- Extracted for the same reason as M._resolve_commit_path below: commit() is only
+--- reachable through the webview callback and ends in hs.reload(), so the outcome
+--- is untestable unless the write itself is injectable.
+---
+--- toml_codec's batch_write signals every I/O failure by RETURNING false plus a
+--- reason and NEVER raises. Wrapping it in a bare pcall whose closure dropped the
+--- return value therefore reported a failed write as a success: the wizard showed
+--- its "done" notification, marked onboarding complete in hs.settings, and reloaded
+--- with none of the user's answers on disk — the first-run choices were silently
+--- lost and the wizard never offered itself again.
+--- @param writer table The toml_writer module (or a test double).
+--- @param path string Absolute path to config.toml.
+--- @param updates table The key/value updates to persist.
+--- @return boolean ok True only when the file was actually written.
+--- @return string|nil err Failure reason, from either the raise or the return.
+function M._commit_write(writer, path, updates)
+	local ok, wrote, write_err = pcall(function()
+		return writer.batch_write(path, updates)
+	end)
+	if not ok then return false, tostring(wrote) end
+	-- nil is treated like false: a writer that returns nothing has not confirmed
+	-- the write, and this path must never assume success it was not told about.
+	if wrote ~= true then return false, tostring(write_err) end
+	return true
+end
+
 --- Returns the config.toml path the wizard must write to, re-resolved through
 --- MenuPaths so a config-dir change made moments earlier is honoured. Pure apart
 --- from the injected resolver, so the retarget is testable without a webview.
@@ -406,9 +433,7 @@ local function commit(answers)
 	i18n.set_locale_no_reload(locale)
 	pcall(i18n.persist_locale, locale)
 
-	local ok, err = pcall(function()
-		toml_writer.batch_write(_config_path, updates)
-	end)
+	local ok, err = M._commit_write(toml_writer, _config_path, updates)
 
 	if not ok then
 		Logger.error(LOG, "commit: toml_writer failed — %s.", tostring(err))
