@@ -324,13 +324,20 @@ WritePersonalToml(Data) {
 		Content .= L . "`r`n"
 	}
 
-	FileObj := FileOpen(FilePath, "w", "UTF-8-RAW")
-	if !FileObj {
-		try LoggerError("PersonalToml", "Could not open '{1}' for writing — personal hotstrings NOT saved.", FilePath)
+	; FileOpen THROWS OSError in v2 — it never returns a falsy handle — so the
+	; old `if !FileObj` guard was unreachable and the only real failure mode was
+	; unhandled: a locked or read-only target propagated out of this writer
+	; instead of returning False, and every caller that checks the result was
+	; bypassed entirely. Matches the already-correct siblings in
+	; lib/toml/toml_helpers.ahk and lib/hotstrings/hotstrings_io.ahk.
+	try {
+		FileObj := FileOpen(FilePath, "w", "UTF-8-RAW")
+		FileObj.Write(Content)
+		FileObj.Close()
+	} catch as Err {
+		try LoggerError("PersonalToml", "Could not write '{1}' — personal hotstrings NOT saved: {2}", FilePath, Err.Message)
 		return False
 	}
-	FileObj.Write(Content)
-	FileObj.Close()
 
 	return True
 }
@@ -437,13 +444,20 @@ WritePersonalInfoToml(FilePath) {
 		Content .= L . "`r`n"
 	}
 
-	FileObj := FileOpen(FilePath, "w", "UTF-8-RAW")
-	if !FileObj {
-		try LoggerError("PersonalToml", "Could not open '{1}' for writing — personal info NOT saved.", FilePath)
+	; FileOpen THROWS OSError in v2 — it never returns a falsy handle — so the
+	; old `if !FileObj` guard was unreachable and the only real failure mode was
+	; unhandled: a locked or read-only target propagated out of this writer
+	; instead of returning False, and every caller that checks the result was
+	; bypassed entirely. Matches the already-correct siblings in
+	; lib/toml/toml_helpers.ahk and lib/hotstrings/hotstrings_io.ahk.
+	try {
+		FileObj := FileOpen(FilePath, "w", "UTF-8-RAW")
+		FileObj.Write(Content)
+		FileObj.Close()
+	} catch as Err {
+		try LoggerError("PersonalToml", "Could not write '{1}' — personal info NOT saved: {2}", FilePath, Err.Message)
 		return False
 	}
-	FileObj.Write(Content)
-	FileObj.Close()
 
 	return True
 }
