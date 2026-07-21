@@ -478,7 +478,20 @@ function M.update_preview(buf)
 		if tail_bucket then
 			for _, mapping in ipairs(tail_bucket) do
 				local ga = group_active(mapping)
-				local c2 = not (mapping.is_word == false and mapping.auto == true)
+				-- Only offer a mapping some FUTURE keystroke can still fire.
+				--
+				-- update_preview is reached only when no expansion fired this
+				-- keystroke (keymap/init.lua). So seeing a complete `auto` trigger at
+				-- the buffer end means the engine already had its one chance and
+				-- declined — typically because mapping_fires' typing-speed gate
+				-- rejected it. Nothing can retry it either: the auto path matches on
+				-- the trigger's tail being the character just typed, and any further
+				-- keystroke pushes the trigger off the end of the buffer.
+				--
+				-- Such a row promised an expansion no keystroke could produce. A
+				-- non-auto mapping is different: it waits for a terminator, and ★
+				-- validates it with the delay bypassed — so it stays offerable.
+				local c2 = not mapping.auto
 				if ga and c2 then
 					-- Same single source of truth as the star bucket above. This
 					-- replaces a second, independent reimplementation of the engine's

@@ -853,6 +853,15 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 		local render_count = math.max(1, math.floor(reserved_slots > 0 and reserved_slots or active_count))
 		local calculated_max_width = 0
 
+		-- The footer (hint / info / combined) is index-invariant: assemble_blocks
+		-- derives it from display_count, nav_mod_str, info_bar and the chain
+		-- timings — never from current_index. minimumTextSize is an ObjC
+		-- text-layout call on the streaming hot path, so measure the footer once
+		-- and reuse it, as renderer.lua already does for its hoisted size_combined.
+		-- Only blocks.preds varies per slot (the highlighted row moves), so that
+		-- one stays inside the loop.
+		local width_hint_memo, width_info_memo, width_combined_memo
+
 		for i = 1, render_count do
 			local simulation_state = {}
 			for k, v in pairs(_state) do simulation_state[k] = v end
@@ -865,19 +874,25 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 
 			local blocks = assemble_blocks(simulation_state, render_count)
 			local width_predictions = Renderer.canvas:minimumTextSize(3, blocks.preds).w
-			local width_hint = blocks.hint_st and Renderer.canvas:minimumTextSize(3, blocks.hint_st).w or 0
-			local width_info = blocks.info_st and Renderer.canvas:minimumTextSize(3, blocks.info_st).w or 0
-			
+			if width_hint_memo == nil then
+				width_hint_memo = blocks.hint_st and Renderer.canvas:minimumTextSize(3, blocks.hint_st).w or 0
+				width_info_memo = blocks.info_st and Renderer.canvas:minimumTextSize(3, blocks.info_st).w or 0
+			end
+			local width_hint = width_hint_memo
+			local width_info = width_info_memo
+
 			local final_width = width_predictions
 			if blocks.info_st and blocks.hint_st then
-				local ui = Config.llm_ui
-				local space_divider = blocks.SP or ui.footer_space_divider
-				local combined_sep  = ui.footer_combined_sep
-				local separator_styled = hs.styledtext.new(space_divider .. combined_sep .. space_divider, { font = { name = Config.fonts.main, size = Config.sizes.hint } })
-				local combined_styled = hs.styledtext.new("") .. blocks.hint_st .. separator_styled .. blocks.info_st
-				local width_combined = Renderer.canvas:minimumTextSize(3, combined_styled).w
-				
-				if width_combined > width_predictions then final_width = math.max(width_predictions, width_hint, width_info) end
+				if width_combined_memo == nil then
+					local ui = Config.llm_ui
+					local space_divider = blocks.SP or ui.footer_space_divider
+					local combined_sep  = ui.footer_combined_sep
+					local separator_styled = hs.styledtext.new(space_divider .. combined_sep .. space_divider, { font = { name = Config.fonts.main, size = Config.sizes.hint } })
+					local combined_styled = hs.styledtext.new("") .. blocks.hint_st .. separator_styled .. blocks.info_st
+					width_combined_memo = Renderer.canvas:minimumTextSize(3, combined_styled).w
+				end
+
+				if width_combined_memo > width_predictions then final_width = math.max(width_predictions, width_hint, width_info) end
 			else
 				final_width = math.max(width_predictions, width_hint, width_info)
 			end

@@ -258,6 +258,42 @@ helpers.describe("the old preview rule really did disagree with the engine", fun
 	end)
 end)
 
+helpers.describe("the preview only offers what a future keystroke can still fire", function()
+	helpers.it("does not offer an auto mapping whose trigger is already complete", function()
+		-- The delay axis. update_preview is reached ONLY when no expansion fired
+		-- this keystroke (keymap/init.lua), so a complete `auto` trigger sitting at
+		-- the buffer end means the engine already declined it — typically because
+		-- mapping_fires' typing-speed gate rejected a slow typist. Nothing retries
+		-- it: the auto path matches on the trigger's tail being the character just
+		-- typed, and any further keystroke pushes the trigger off the end.
+		local src = helpers.read_driver_source("function M.update_preview")
+		helpers.assert_true(src ~= nil, "llm_bridge source must be locatable")
+		if not src then return end
+
+		local bucket_at = src:find("mappings_for_tail", 1, true)
+		helpers.assert_true(bucket_at ~= nil, "the autocorrect bucket walk must be locatable")
+		local window = src:sub(bucket_at, bucket_at + 1400)
+
+		helpers.assert_true(window:find("not mapping%.auto") ~= nil,
+			"the autocorrect preview must skip auto mappings. Offering one shows the user an "
+			.. "expansion that no keystroke can produce — the engine already refused it on the "
+			.. "keystroke that completed the trigger, and there is no second chance. This is "
+			.. "the delay axis: matching was unified first, but a row can still be unreachable "
+			.. "because of WHEN it was typed rather than WHAT was typed")
+	end)
+
+	helpers.it("still offers a terminator-driven mapping", function()
+		local src = helpers.read_driver_source("function M.update_preview")
+		if not src then return end
+
+		-- A non-auto mapping waits for a terminator, and ★ validates it with the
+		-- delay bypassed — so suppressing it would lose a row the user can act on.
+		helpers.assert_true(src:find("not mapping%.auto") ~= nil,
+			"the filter must be expressed as `not mapping.auto`, which keeps non-auto "
+			.. "mappings offerable rather than emptying the tooltip entirely")
+	end)
+end)
+
 helpers.describe("neither side reimplements the match decision", function()
 	helpers.it("the preview owns no word-boundary rule of its own", function()
 		-- Selected by a declaration unique to modules/keymap/llm_bridge.lua rather
