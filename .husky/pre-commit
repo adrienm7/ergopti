@@ -30,5 +30,22 @@ if [ -n "$STAGED_AHK" ]; then
     done
 fi
 
+# Location-pinned source reads in macOS tests — block them at the source rather
+# than discovering them later via the JS ratchet. A test that reads a driver file
+# through driver_root() .. "some/path.lua" breaks the moment that module is
+# renamed or split, turning a useful invariant into a path error. The fixer
+# converts the common shape automatically; it refuses, loudly, when the target
+# module has no declaration unique across the production tree, because
+# read_driver_source would then return several files concatenated and silently
+# change what a position-comparing assertion means.
+STAGED_LUA_TESTS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^static/ergopti_plus/macos/tests/.*\.lua$' || true)
+if [ -n "$STAGED_LUA_TESTS" ]; then
+    if ! node tools/lint/fix-pinned-source-reads.cjs; then
+        echo ""
+        echo "[pre-commit] Run 'npm run fix:pinned-reads' to convert them, then re-stage."
+        exit 1
+    fi
+fi
+
 # Lint coding conventions — blocks commit on any violation.
 node tools/lint/lint-conventions.js --fail-on-violations
