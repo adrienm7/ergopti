@@ -252,57 +252,86 @@ end
 --- @param char_len number UTF-8 length of the latest typed character.
 --- @param is_ignored boolean True when the current window suppresses LLM/tooltip.
 --- @return boolean True when the expansion fired.
+--- Decides whether `m` would expand against `buffer`, WITHOUT emitting anything.
+---
+--- This is the single source of truth for "will this hotstring fire?". The engine
+--- (try_auto_expand, below) and the tooltip preview (llm_bridge.update_preview)
+--- both call it, so what the tooltip promises and what the engine produces cannot
+--- disagree. They used to be two independent implementations and they diverged in
+--- four ways — most visibly at the buffer start, where the preview allowed any
+--- match while the engine consulted start_is_word_boundary and refused it.
+---
+--- Returns the EFFECTIVE plain replacement for this firing: conformed to the typed
+--- casing for a case_conform entry, the stored replacement otherwise. nil means
+--- the mapping does not fire, for any reason.
+--- @param m table The mapping entry.
+--- @param buffer string The buffer to evaluate against, as the engine will see it.
+--- @return string|nil eff_plain The plain replacement, or nil when it will not fire.
+--- @return string|nil typed The matched trigger text as typed, or nil.
+--- @return string|nil eff_repl The raw replacement (may carry {Token} directives).
+function M.would_fire(m, buffer)
+	if type(buffer) ~= "string" or type(m) ~= "table" then return nil end
+
+	local trigger = m.trigger
+	local tb      = m.trigger_bytes
+	if not tb or #buffer < tb then return nil end
+	local typed = buffer:sub(-tb)
+
+	local eff_repl, eff_plain
+	if m.case_conform then
+		if text_utils.trig_lower(typed) ~= trigger then return nil end
+		local conformed = text_utils.conform_replacement(m.plain_repl, typed, trigger)
+		-- nil means the typed case was mixed (not a clean lower/Title/UPPER), for
+		-- which no variant was ever registered: the hotstring must NOT fire.
+		if conformed == nil then return nil end
+		eff_repl, eff_plain = conformed, conformed
+	else
+		if typed ~= trigger then return nil end
+		eff_repl, eff_plain = m.repl, m.plain_repl
+	end
+
+	local tstart_byte = #buffer - tb + 1
+	if m.is_word and word_boundary_blocks(buffer, trigger, tstart_byte, _state and _state.start_is_word_boundary) then
+		return nil
+	end
+
+	-- A replacement identical to what was typed is a no-op: the engine passes the
+	-- keystroke through rather than expanding, so the preview must not offer it.
+	-- Reported as a distinct outcome because the engine still has cleanup to do
+	-- for it, while the preview treats it exactly like "no match".
+	if eff_plain == typed then return nil, typed, nil, true end
+
+	return eff_plain, typed, eff_repl, false
+end
+
 function M.try_auto_expand(m, char_len, is_ignored)
 	if not require_state("try_auto_expand") then return false end
 
 	local trigger = m.trigger
-	-- m.trigger_bytes is precomputed at load time. Case-mapping preserves the byte
-	-- length for every char in our charset (ASCII letters + French accents: a/A,
-	-- é/É, … are all same-width in UTF-8), so the byte index math below is valid for
-	-- a cased typed form just as it is for the lowercase canonical.
-	local tb = m.trigger_bytes
-	if #_state.buffer < tb then return false end
-	local typed = _state.buffer:sub(-tb)
 
-	-- Match + case resolution. A case-conform entry (registered lowercase-only,
-	-- standing in for the lower/Title/UPPER trio) matches case-INSENSITIVELY and
-	-- conforms its replacement to the typed casing at fire time; a normal entry
-	-- matches byte-for-byte (two strings equal byte-for-byte are UTF-8 equivalent,
-	-- so no utf8.* hops on the hot path). eff_repl/eff_plain are the EFFECTIVE
-	-- replacement for THIS firing — conformed for conform entries, stored otherwise.
-	local eff_repl, eff_plain
-	if m.case_conform then
-		if text_utils.trig_lower(typed) ~= trigger then return false end
-		local conformed = text_utils.conform_replacement(m.plain_repl, typed, trigger)
-		-- nil means the typed case was mixed (not a clean lower/Title/UPPER): the
-		-- old code registered no variant for it, so the hotstring must NOT fire.
-		if conformed == nil then return false end
-		eff_repl  = conformed   -- conform entries are plain text (gated at registration)
-		eff_plain = conformed
-	else
-		if typed ~= trigger then return false end
-		eff_repl  = m.repl
-		eff_plain = m.plain_repl
-	end
+	-- The whole match decision — length, case resolution, word boundary, no-op —
+	-- lives in M.would_fire, which the tooltip preview calls too. Keeping it in one
+	-- place is what guarantees the preview cannot promise an expansion this
+	-- function then declines to perform.
+	local eff_plain, typed, eff_repl, is_noop = M.would_fire(m, _state.buffer)
 
-	-- Word-boundary check (delegated to shared helper). tstart_byte is the
-	-- 1-based byte index where the trigger begins inside the buffer.
-	local tstart_byte = #_state.buffer - tb + 1
-	if m.is_word and word_boundary_blocks(_state.buffer, trigger, tstart_byte, _state.start_is_word_boundary) then
+	if not eff_plain then
+		-- No-op guard: when the plain-text expansion equals what was typed, signal
+		-- pass-through so onKeyDownRaw does NOT consume the triggering keystroke.
+		-- The character must remain on screen — returning true would suppress it
+		-- even though nothing was injected (the dropped-char bug).
+		if is_noop then
+			if m.final_result then _state.suppress_rescan() end
+			if not is_ignored then TooltipRenderer.hide({ forced = true }) end
+		end
 		return false
 	end
 
 	local repl_text = eff_plain
-
-	-- No-op guard: when the plain-text expansion equals what was typed,
-	-- signal pass-through so onKeyDownRaw does NOT consume the triggering
-	-- keystroke. The character must remain on screen — returning true would
-	-- suppress it even though nothing was injected (the dropped-char bug).
-	if repl_text == typed then
-		if m.final_result then _state.suppress_rescan() end
-		if not is_ignored then TooltipRenderer.hide({ forced = true }) end
-		return false
-	end
+	-- 1-based byte index where the matched trigger starts, used below to splice the
+	-- replacement into the buffer. Derived from the same trigger_bytes would_fire
+	-- matched on, so the two can never disagree about where the trigger began.
+	local tstart_byte = #_state.buffer - m.trigger_bytes + 1
 
 	-- Compute how many backspaces and what to type, keeping common prefix chars.
 	-- In an ignored window (char_len == 0) there is no "last char" to keep, so

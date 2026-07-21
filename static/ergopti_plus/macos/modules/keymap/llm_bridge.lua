@@ -175,20 +175,12 @@ end
 --- @param trigger string The hotstring trigger to match.
 --- @param is_word boolean When true, rejects matches preceded by a letter or "@".
 --- @return boolean
-local function ends_with_trigger(buffer, trigger, is_word)
-	if type(buffer) ~= "string" or type(trigger) ~= "string" or trigger == "" then return false end
-	if #buffer < #trigger or buffer:sub(-#trigger) ~= trigger then return false end
-	if is_word ~= true then return true end
-	local before      = buffer:sub(1, #buffer - #trigger)
-	if #before == 0 then return true end
-	-- Guard against malformed UTF-8: LuaJIT raises a C-level error on bad sequences
-	local ok_utf8, prev_offset = pcall(utf8.offset, before, -1)
-	if not ok_utf8 then prev_offset = nil end
-	local prev_char   = prev_offset and before:sub(prev_offset) or ""
-	-- Block when the character immediately before the trigger is a letter or "@".
-	if prev_char == "@" or text_utils.is_letter_char(prev_char) then return false end
-	return true
-end
+-- The preview's own copy of the word-boundary rule used to live here. It has been
+-- deleted rather than kept as a helper: it disagreed with the engine's
+-- word_boundary_blocks at the buffer start (this version allowed any match when
+-- nothing preceded the trigger; the engine consults start_is_word_boundary and
+-- refuses), and for separator-prefixed triggers. Both sides now call
+-- expander.would_fire, so there is one rule and nothing left to keep in sync.
 
 --- Returns true when the buffer ends with a word-boundary character that signals the
 --- user has completed a word: punctuation or whitespace (whitespace is already handled
@@ -438,19 +430,35 @@ function M.update_preview(buf)
 		-- matches the buffer end. The bucket is pre-sorted longest-first by the
 		-- registry, so the first collected match is the one the engine will
 		-- actually fire; the rest are alternatives shown dimmed + strikethrough.
+		-- The buffer the engine will actually match against once ★ is pressed. The
+		-- preview must ask about THAT buffer, not the current one, or it is
+		-- answering a different question than the engine will be asked.
+		local star_buf = buf .. (_state.magic_key or "")
+
 		local star_bucket = Registry.mappings_for_star_tail(buf_tail_char)
 		if star_bucket then
 			for _, mapping in ipairs(star_bucket) do
 				if group_active(mapping) then
 					local star_base = mapping.star_base
-					if star_base and star_base ~= ""
-						and ends_with_trigger(buf, star_base, mapping.is_word)
-						and mapping.plain_repl ~= star_base
+					-- Single source of truth: this is the very function
+					-- try_auto_expand calls to decide whether to fire and what to
+					-- emit. Re-deriving the answer here is what let the tooltip
+					-- promise expansions the engine then refused — most visibly at
+					-- the buffer start, where the old local check allowed any match
+					-- while the engine consulted start_is_word_boundary.
+					local eff_plain, _typed, eff_repl = expander.would_fire(mapping, star_buf)
+					if eff_plain and star_base and star_base ~= ""
+						-- Display-only filter: such a mapping expands to the base with
+						-- its last letter doubled, which is byte-identical to what the
+						-- repeat key produces. The row would be a duplicate of an
+						-- outcome the user already understands, and suppressing it
+						-- cannot make the tooltip disagree with the engine — the text
+						-- that reaches the screen is the same either way.
 						and not is_repetition_star(mapping, star_base)
 					then
 						matches[#matches + 1] = {
-							repl       = mapping.repl,
-							plain_repl = mapping.plain_repl,
+							repl       = eff_repl,
+							plain_repl = eff_plain,
 							input      = star_base,
 							type       = "star",
 							group      = mapping.group,
@@ -472,29 +480,11 @@ function M.update_preview(buf)
 				local ga = group_active(mapping)
 				local c2 = not (mapping.is_word == false and mapping.auto == true)
 				if ga and c2 then
-					-- A case-conform entry (registered lowercase-only) matches
-					-- case-insensitively; conform the previewed text to the typed
-					-- casing so the row mirrors exactly what the engine will emit.
-					-- Normal entries keep the byte-exact match + stored replacement.
-					local matched_input, matched_plain
-					if mapping.case_conform then
-						local tb = #mapping.trigger
-						if #buf >= tb then
-							local typed = buf:sub(-tb)
-							if text_utils.trig_lower(typed) == mapping.trigger
-								and ends_with_trigger(buf, typed, mapping.is_word) then
-								local conformed = text_utils.conform_replacement(mapping.plain_repl, typed, mapping.trigger)
-								if conformed and conformed ~= typed then
-									matched_input = typed
-									matched_plain = conformed
-								end
-							end
-						end
-					elseif ends_with_trigger(buf, mapping.trigger, mapping.is_word)
-						and mapping.plain_repl ~= mapping.trigger then
-						matched_input = mapping.trigger
-						matched_plain = mapping.plain_repl
-					end
+					-- Same single source of truth as the star bucket above. This
+					-- replaces a second, independent reimplementation of the engine's
+					-- case-conform resolution and word-boundary rules — the copy that
+					-- had to be kept in sync by hand and was not.
+					local matched_plain, matched_input = expander.would_fire(mapping, buf)
 					if matched_input then
 						matches[#matches + 1] = {
 							repl       = matched_plain,
