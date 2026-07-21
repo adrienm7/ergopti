@@ -25,6 +25,7 @@ restating their rules.
 
 | Skill | Read it when |
 | --- | --- |
+| `verify-change` | After ANY edit and before every commit — which gates cover what you touched |
 | `ship-fix` | Fixing any bug — root cause, regression test, local gate, commit |
 | `commit-and-push` | Before any commit or push — commit format, linear history, CI monitoring |
 | `ahk-driver` | Writing or editing `.ahk` files — the AutoHotkey v2 foot-guns that have bitten us |

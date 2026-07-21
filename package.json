@@ -54,6 +54,7 @@
 		"test:prompt-editor-bridge": "node ./tools/test/test-prompt-editor-bridge.cjs",
 		"test:action-picker-bridge": "node ./tools/test/test-action-picker-bridge.cjs",
 		"test:js": "node ./tools/test/run-js-suite.cjs",
+    "verify": "node ./tools/test/verify-change.cjs",
 		"test:hs": "cd static/ergopti_plus/macos && lua tests/run.lua",
 		"test:linux": "bash -c 'if command -v luajit >/dev/null 2>&1; then luajit tests/run.lua; elif command -v lua5.4 >/dev/null 2>&1; then lua5.4 tests/run.lua; elif command -v lua >/dev/null 2>&1; then lua tests/run.lua; else echo \"No Lua runtime found\" >&2; exit 1; fi' --",
 		"test:linux:e2e": "bash -c 'if command -v luajit >/dev/null 2>&1; then luajit tests/e2e/run_e2e.lua; elif command -v lua5.4 >/dev/null 2>&1; then lua5.4 tests/e2e/run_e2e.lua; elif command -v lua >/dev/null 2>&1; then lua tests/e2e/run_e2e.lua; else echo \"No Lua runtime found\" >&2; exit 1; fi' --",

@@ -93,10 +93,12 @@ Test("LLM tooltip: freezing the timings claims the first-show slot so TTFT canno
 ; =================================================
 
 _LMNR_FreezePrecedesFinalRender() {
-	Body := _DriverFuncBody("_LLM_Engine_RenderSlots")
-	if (Body == "")
-		Body := _DriverSourceNoComments()
-	Assert(Body != "", "the driver source must be readable")
+	; Scan the ENCLOSING function, not the whole driver: an ordering assertion
+	; made across the concatenated source compares the first occurrence of each
+	; token anywhere, which can land in unrelated files and quietly stop meaning
+	; what it says.
+	Body := _DriverFuncBody("LLM_Engine_OnResults")
+	Assert(Body != "", "LLM_Engine_OnResults() must exist in the driver source")
 
 	FreezePos := InStr(Body, "LLM_Tooltip_MarkChainTimingOnly(")
 	ShowPos := InStr(Body, "LLM_Tooltip_Show(display_slots")
