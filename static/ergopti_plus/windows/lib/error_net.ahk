@@ -144,7 +144,19 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
     ; HookDispatcher's per-subscriber catch), so running it inline froze the keyboard. Schedule
     ; it on a one-shot timer so the keystroke dispatch returns immediately; the cheap modifier
     ; release + LoggerError above stay synchronous (crash-build-offthread).
-    SetTimer(_ErgoptiDeferredCrashReport.Bind(Exc), -1)
+    ; Sig travels with the report so the throttle can be RELEASED when nothing
+    ; was written. Recording it above and never rolling it back meant one failed
+    ; save silenced the next ERROR_NET_DEDUP_TTL_MS of identical crashes — which
+    ; is how a repeatedly-throwing timer produces no reports at all.
+    ; ReleaseDedup is a closure over the static throttle map. The throttle has to
+    ; be recorded BEFORE the report is attempted — the handler must decide
+    ; whether to proceed before it can know the outcome — so without a way to
+    ; roll it back, one failed write silenced every recurrence of the same fault
+    ; for the whole TTL. That is the mechanism behind twelve uncaught errors
+    ; producing zero crash reports. A closure keeps the map a function static
+    ; rather than moving driver state into a global just to reach it.
+    ReleaseDedup := (*) => _geh_dedup_map.Delete(Sig)
+    SetTimer(_ErgoptiDeferredCrashReport.Bind(Exc, ReleaseDedup), -1)
     ; Surface the error via a NON-BLOCKING tray notification, not a modal MsgBox.
     ; A modal dialog on the input thread starves the keyboard hook — every key
     ; pressed while it is up is dropped or queued, turning an uncaught error into
@@ -157,11 +169,16 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 ; Builds the crash report and shows the opt-in prompt. Always invoked off the input
 ; thread via a one-shot SetTimer from ErgoptiGlobalErrorHandler, so its blocking
 ; WMI/RegRead/git/healthcheck work cannot starve the keyboard hook (crash-build-offthread).
-_ErgoptiDeferredCrashReport(Exc) {
+_ErgoptiDeferredCrashReport(Exc, ReleaseDedup := 0) {
 	try {
 		Report := CrashReport_Build(Exc)
-		CrashReport_PromptUser(Report)
+		; Release the throttle when nothing was actually written, so the next
+		; occurrence of this fault is reported instead of silently suppressed.
+		if (!CrashReport_PromptUser(Report) and ReleaseDedup)
+			try ReleaseDedup()
 	} catch as Err {
+		if ReleaseDedup
+			try ReleaseDedup()
 		; This IS the safety net — a bare try with no catch here means a
 		; failure inside the crash-reporting pipeline itself is completely
 		; silent, with no trace of either the original crash or this one.

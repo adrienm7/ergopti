@@ -283,8 +283,11 @@ RegisterMenuItem(MenuObj, ItemName, Callback) {
     CountBefore := _MenuItemCount(MenuObj)
     try {
         MenuObj.Add(ItemName, Wrapper)
-    } catch {
-        return 0  ; Add itself failed — bail out cleanly.
+    } catch as Err {
+        ; No caller checks this return — the item simply never appears. Without
+        ; a log the only symptom is a missing tray entry with no trace at all.
+        try LoggerError("MenuDispatcher", "Menu.Add failed for '{1}': {2}", ItemName, Err.Message)
+        return 0
     }
     CountAfter := _MenuItemCount(MenuObj)
     ItemId := (CountBefore >= 0 and CountAfter = CountBefore + 1)
@@ -339,7 +342,8 @@ RegisterMenuItemInsert(MenuObj, BeforeItem, ItemName, Callback) {
 
     try {
         MenuObj.Insert(BeforeItem, ItemName, Wrapper)
-    } catch {
+    } catch as Err {
+        try LoggerError("MenuDispatcher", "Menu.Insert failed for '{1}' before '{2}': {3}", ItemName, BeforeItem, Err.Message)
         return 0
     }
 
@@ -360,6 +364,10 @@ RegisterMenuItemInsert(MenuObj, BeforeItem, ItemName, Callback) {
         ItemId := _FindUniqueMenuItemIdByName(MenuObj, ItemName)
     }
     if (!ItemId) {
+        ; Degrades to native dispatch, which AHK drops 30-50% of the time — the
+        ; exact failure this module exists to prevent. Its sibling
+        ; RegisterMenuItem warns here; this path said nothing.
+        try LoggerWarn("MenuDispatcher", "Could not resolve an item id for '{1}' — falling back to native dispatch, which AHK drops intermittently.", ItemName)
         return 0
     }
 
