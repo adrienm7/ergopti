@@ -394,7 +394,7 @@ local function commitGesture(now)
 		tostring(gs.liveAxisSign), gs.stepsCommitted, now - (gs.startTime or now))
 
 	if not _state.enabled or _state.suspended or not gs.startPos or not gs.endPos then
-		Logger.warn(LOG, "commitGesture: SKIP (enabled=%s suspended=%s startPos=%s endPos=%s)",
+		Logger.debug(LOG, "commitGesture: SKIP (enabled=%s suspended=%s startPos=%s endPos=%s)",
 			tostring(_state.enabled), tostring(_state.suspended), sp, ep)
 		return
 	end
@@ -632,6 +632,21 @@ function M.process_frame(touches)
 			end
 			gs.lastN = n
 
+			-- Retire a pending spike candidate the moment the observed count stops
+			-- matching it: the spike did not persist, so there is nothing left to
+			-- confirm. The candidate was only ever cleared inside the n > maxFingers
+			-- branch, so once the count fell back the clearing path was unreachable and
+			-- the candidate stayed armed until finger-lift — keeping the live-fire gate
+			-- in triggerLiveAxisIfNeeded closed and silently swallowing the rest of the
+			-- gesture. Placed here so it covers all three count branches at once.
+			if gs.candidateFingers ~= nil and n ~= gs.candidateFingers then
+				Logger.debug(LOG, string.format("Finger spike candidate retired (candidate=%d, current=%d).",
+					gs.candidateFingers, n))
+				gs.candidateFingers = nil
+				gs.candidateSince   = nil
+				gs.candidateFrames  = 0
+			end
+
 			if n < gs.maxFingers then
 				-- Flickering / Drop Debouncing: don't commit to "lifting" (end of gesture)
 				-- too quickly. Fingers often lose contact for 50-150ms during swipes.
@@ -646,7 +661,23 @@ function M.process_frame(touches)
 						if not gs.lifting then
 							Logger.info(LOG, string.format("Confirmed finger drop: %d -> %d (frames=%d, %.3fs).", gs.maxFingers, n, gs.tentativeLiftingFrames, elapsed))
 						end
-						gs.lifting = true
+						if n >= 2 then
+							-- A confirmed drop to a still-multi-finger count is a finger-count
+							-- CHANGE, not the end of the gesture. maxFingers is otherwise never
+							-- demoted, so n stayed permanently below it: no branch could clear
+							-- lifting again and the whole remainder of the swipe was dropped,
+							-- then mis-committed as tap_(N+1). Same reset quintet the fast-path
+							-- join branch uses below.
+							gs.maxFingers           = n
+							gs.lifting              = false
+							gs.tentativeLifting     = false
+							gs.fingerCountChangedAt = now
+							gs.candidateFingers     = nil
+							gs.candidateSince       = nil
+							gs.candidateFrames      = 0
+						else
+							gs.lifting = true
+						end
 					end
 				end
 			elseif n > gs.maxFingers then
@@ -710,7 +741,7 @@ function M.process_frame(touches)
 						gs.candidateFingers = n
 						gs.candidateSince   = now
 						gs.candidateFrames  = 1
-						Logger.warn(LOG, string.format("Observed spurious finger spike, awaiting confirmation: %d → %d.", gs.maxFingers, n))
+						Logger.debug(LOG, string.format("Observed spurious finger spike, awaiting confirmation: %d → %d.", gs.maxFingers, n))
 					end
 				end
 			elseif n == gs.maxFingers then
