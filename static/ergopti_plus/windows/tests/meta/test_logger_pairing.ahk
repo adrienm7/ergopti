@@ -14,6 +14,21 @@
 
 #Requires AutoHotkey v2.0
 
+; Files whose lifecycle pair legitimately closes in ANOTHER file, which a
+; per-file count cannot see. Each entry is verified, not assumed — keep this
+; list minimal and justify every addition, because every entry is a place the
+; gate stops looking.
+;
+;   modules/gestures/actions.ahk — opens "Capturing screen to…" and hands the
+;   completion to GestureScreenshotComplete, which closes it at
+;   modules/gestures/screenshots.ahk:155 and :158. Genuinely asynchronous: the
+;   PowerShell worker must finish before success can be asserted, and the old
+;   code's bug was announcing success BEFORE the worker ran.
+_MetaLoggerPairingExempt(Rel) {
+	static Exempt := Map("modules/gestures/actions.ahk", true)
+	return Exempt.Has(Rel)
+}
+
 
 
 
@@ -78,6 +93,7 @@ _MetaRunLoggerPairingTests() {
 	SplitPath(A_ScriptDir, , &_DriverRootRaw)
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 	Imbalanced := 0
+	Report := ""
 
 	for Sub in ["lib", "modules", "ui"] {
 		for AbsPath in _MetaListAhkFilesLogger(StrReplace(DriverRoot . Sub, "/", "\")) {
@@ -94,20 +110,31 @@ _MetaRunLoggerPairingTests() {
 			NTrace   := _MetaCountPattern(Body, "LoggerTrace\(")
 			NDone    := _MetaCountPattern(Body, "LoggerDone\(")
 
+			if _MetaLoggerPairingExempt(Rel)
+				continue
+
 			if NStart > 0 and NSuccess = 0 {
 				Imbalanced++
-				OutputDebug("WARN: " . Rel . " has " . NStart . " LoggerStart but 0 LoggerSuccess")
+				Report .= (Report == "" ? "" : "; ") . Rel . " has " . NStart . " LoggerStart but 0 LoggerSuccess"
 			}
 			if NTrace > 0 and NDone = 0 {
 				Imbalanced++
-				OutputDebug("WARN: " . Rel . " has " . NTrace . " LoggerTrace but 0 LoggerDone")
+				Report .= (Report == "" ? "" : "; ") . Rel . " has " . NTrace . " LoggerTrace but 0 LoggerDone"
 			}
 		}
 	}
 
-	_MetaLoggerPairingResult() {
+	; The scan used to report through OutputDebug and register a Test whose body
+	; was EMPTY, so it could not fail — it occupied the name "logger pairing" in
+	; the suite while asserting nothing, which is worse than having no test at
+	; all: it deterred anyone from writing a real one. OutputDebug does not reach
+	; CI either, so the warnings went nowhere.
+	_MetaLoggerPairingAssert() {
+		Assert(Imbalanced == 0,
+			"unpaired lifecycle logs (a START with no reachable SUCCESS is this project's designated signal of a silent failure path): " . Report)
 	}
-	Test("meta logger pairing: scan complete (" . Imbalanced . " warnings)", _MetaLoggerPairingResult)
+	Test("meta logger pairing: no file opens a lifecycle pair it never closes",
+		_MetaLoggerPairingAssert)
 }
 
 _MetaRunLoggerPairingTests()

@@ -254,7 +254,10 @@ KL_AppCat_DeferredSave() {
     ; Re-arm instead of dropping the tick.
     if A_IsSuspended {
         if KLAppCat.dirty {
-            try LoggerTrace("KLAppCat", "Deferred save re-armed — driver paused.")
+            ; DEBUG, not TRACE: this is a status note about a re-arm, not the
+            ; start of an operation that completes here, so a lifecycle variant
+            ; would open a pair nothing in this path can ever close.
+            try LoggerDebug("KLAppCat", "Deferred save re-armed — driver paused.")
             try SetTimer(KLAppCat.save_fn, -KLAppCatConst.DEFERRED_SAVE_RETRY_MS)
         }
         return
