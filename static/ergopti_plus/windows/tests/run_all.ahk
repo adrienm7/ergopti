@@ -300,6 +300,7 @@ _LogBootProgress("loading LLM modules")
 ; Orphan temp-file sweep is bounded + off the Critical dispatch path (llm-orphan-sweep-temp-recursion).
 #Include meta/test_llm_orphan_sweep_nonblocking.ahk
 ; LLM_Menu_Build runs under Critical so deferred boot tasks cannot preempt it (menu-build-boot-preempt).
+#Include meta/test_llm_markchain_no_rerender.ahk
 #Include meta/test_llm_menu_build_critical.ahk
 _LogBootProgress("LLM modules + tests included")
 
