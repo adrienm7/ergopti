@@ -81,7 +81,7 @@ FEATURES & RATIONALE:
 	];
 </script>
 
-<section class="metrics" id="metriques" style="--section-accent: #00bfa5;">
+<section class="metrics" id="ep-metriques" style="--section-accent: #00bfa5;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Métriques de frappe</p>

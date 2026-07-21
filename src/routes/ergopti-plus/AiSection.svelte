@@ -60,7 +60,7 @@ FEATURES & RATIONALE:
 	};
 </script>
 
-<section class="ai" id="ia" style="--section-accent: var(--family-ia);">
+<section class="ai" id="ep-ia" style="--section-accent: var(--family-ia);">
 	<div class="ai-glow" aria-hidden="true"></div>
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>

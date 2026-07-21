@@ -57,7 +57,7 @@ FEATURES & RATIONALE:
 	];
 </script>
 
-<section class="trackpad" id="trackpad" style="--section-accent: #00bcd4;">
+<section class="trackpad" id="ep-trackpad" style="--section-accent: #00bcd4;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Gestes trackpad</p>
