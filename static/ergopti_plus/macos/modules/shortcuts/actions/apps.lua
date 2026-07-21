@@ -287,7 +287,14 @@ function M.copy_or_open_path()
 	end
 
 	if is_finder_like(name) then
-		-- Try Finder's native "copy path" shortcut first
+		-- Snapshot and CLEAR before asking Finder for the path. A non-empty clipboard
+		-- afterwards only proves Finder wrote something if it was empty beforehand —
+		-- without this, whatever the user had copied earlier was read back as "the
+		-- path", reported in the success notification, and the selection fallback
+		-- below became unreachable. The sibling branch already clears for exactly
+		-- this reason; this one did not.
+		local prior = nil
+		pcall(function() prior = pasteboard.getContents(); pasteboard.clearContents() end)
 		eventtap.keyStroke({"cmd", "alt"}, "c", KEYSTROKE_NO_DELAY_US)
 
 		timer.doAfter(FINDER_PATH_SETTLE_SEC, function()
@@ -298,8 +305,7 @@ function M.copy_or_open_path()
 			end
 
 			-- Finder did not populate the clipboard — copy the selection instead
-			local prior = nil
-			pcall(function() prior = pasteboard.getContents(); pasteboard.clearContents() end)
+			Logger.debug(LOG, "Finder did not write a path — falling back to copying the selection.")
 			eventtap.keyStroke({"cmd"}, "c", KEYSTROKE_NO_DELAY_US)
 
 			timer.doAfter(COPY_SETTLE_SEC, function()

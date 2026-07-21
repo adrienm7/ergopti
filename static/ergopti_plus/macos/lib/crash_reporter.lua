@@ -50,6 +50,16 @@ local CRASH_REPORTS_SUBDIR = "hammerspoon/crash_reports"
 -- File encoding for JSON output.
 local JSON_FILE_FLAGS = "w"
 
+-- Whether report() collects the healthcheck's SYSTEM probes. ui.healthcheck.run()
+-- forks seven synchronous subprocesses (sysctl, vm_stat, uname, git) through
+-- hs.execute, and report() is reached from an async callback on the SAME main run
+-- loop that dispatches the CGEventTaps — so a crash report stalled the typing tap
+-- for as long as those probes took. The genuinely valuable field, the in-memory
+-- ring buffer, is collected unconditionally below; the OS trivia is available on
+-- demand from Debug > Diagnostic, so it is opt-in per call via
+-- context.system_probes rather than paid for on every report.
+local COLLECT_SYSTEM_PROBES_DEFAULT = false
+
 
 
 
@@ -174,7 +184,12 @@ function M.report(err, context)
 	local adapters_failed = ""
 	local session_warnings = "0"
 	local session_errors   = "0"
-	local ok_hc, hc = pcall(require, "ui.healthcheck")
+	local collect_probes = COLLECT_SYSTEM_PROBES_DEFAULT
+	if type(context) == "table" and context.system_probes == true then
+		collect_probes = true
+	end
+	local ok_hc, hc = false, nil
+	if collect_probes then ok_hc, hc = pcall(require, "ui.healthcheck") end
 	if ok_hc and hc and type(hc.run) == "function" then
 		local ok_run, snap = pcall(hc.run)
 		if ok_run and type(snap) == "table" then
