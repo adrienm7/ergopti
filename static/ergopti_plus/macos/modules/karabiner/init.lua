@@ -488,6 +488,24 @@ end
 --- a failed or late re-prime after an unnecessary kill/relaunch cycle.
 function M.regenerate()
 	if not require_state("regenerate") then return end
+
+	-- « pause = tout éteint ». Deploying the full Ergopti config hands KE back every
+	-- remap the pause just removed, so ANY caller reaching here while paused
+	-- silently un-pauses the keyboard. The layout-change watcher below already
+	-- short-circuits for this reason and its comment states the rule generally —
+	-- but the guard lived at that ONE call site while ~29 others (every menu toggle
+	-- that regenerates: delays, tap-hold, sticky, layout, action edits) had none.
+	-- The invariant belongs in the function that performs the deploy.
+	--
+	-- Safe for the resume path: script_control clears _is_paused BEFORE calling
+	-- resume_all(), so M.resume() -> M.regenerate() passes this guard. A setting
+	-- changed while paused is therefore not lost — it lands on the resume rebuild.
+	local ok_sc, shortcuts = pcall(require, "modules.shortcuts")
+	if ok_sc and shortcuts and type(shortcuts.is_paused) == "function" and shortcuts.is_paused() then
+		Logger.info(LOG, "Regenerate skipped — script is paused (« pause = tout éteint »).")
+		return
+	end
+
 	Logger.start(LOG, "Regenerating Karabiner config…")
 
 	local ok_build, result = pcall(
