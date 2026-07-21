@@ -289,10 +289,6 @@ local function rebuild_tail_indexes()
 	_state.mappings_by_star_tail_char = star_idx
 end
 
--- Expose internal rebuild helpers so registry_groups.lua can call them when
--- purging a disabled group's entries from the live buckets (disable_group).
--- Passed to Groups.init() inside M.init() below.
-local _rebuild_callbacks = nil
 
 --- Sorts the mappings list: longest trigger first, then word-boundary, then insertion order.
 --- Longer triggers must be tested before shorter prefixes to prevent premature matches.
