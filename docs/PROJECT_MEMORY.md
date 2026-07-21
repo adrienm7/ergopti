@@ -501,13 +501,28 @@ Two outcomes are worth keeping, because they are decisions rather than fixes:
   batch is marked durable before it is. The invariant that makes the current
   behaviour benign is now pinned by `test_sql_replay_is_idempotent.ahk` rather
   than assumed.
-- **`require_state` is now a RATCHET at 38, not a clean gate.** The old test
-  scanned three files and could not fail; widened across `modules/`, `lib/`,
-  `adapters/` and `ui/` it surfaces 38 genuine violations among 77 stateful
-  files. Adding a guard changes behaviour (an early return on a path that
-  currently proceeds), so applying 38 mechanically would be reckless. The count
-  may only go DOWN. **This is the single largest remaining piece of debt in the
-  driver.**
+- **`require_state` is a DRIFT RATCHET at 27, and the count is not a defect
+  count.** The old test scanned three files and could not fail. Widened, it
+  first reported 38 — a number an earlier revision of this entry wrongly called
+  "38 genuine violations" and "the largest debt in the driver". Both claims were
+  false. Excluding UPPER_SNAKE constants brings it to 27, and spot-checking
+  those found no genuine conventions-5.8 violation among them: lazy caches
+  (`_TimingsCache`, `_ParseTomlCache`), self-initialising flags
+  (`_AltGrShortcutsRegistered`), lazily-created handles behind their own guards
+  (`_WebView_SharedEnv`), and one deliberate test seam (`_HotstringRegistrar`,
+  which defaults to 0 and whose consumers already branch on that).
+
+  The reason is architectural, and it is worth knowing before anyone tries
+  again: **conventions 5.8 describes the Lua / Hammerspoon module shape** — a
+  state table injected by `M.init()` with every public function gated by
+  require_state. The AHK driver is not built that way; it uses auto-execute
+  globals, lazy caches and explicit handle checks. A mechanical sweep adding
+  guards would put meaningless early returns into functions that need none —
+  `HotPath_Now()`, which runs on every keystroke, was among the files flagged.
+  So the ratchet stays as a drift detector: a NEW module introducing injected
+  state without a guard raises the count and fails, and a human then decides
+  whether it is a real violation or another cache. Do not "fix" the existing
+  entries by bolting guards onto them.
 
 The recurring lesson from the second campaign was that guard tests fail quietly.
 Four tests were found asserting nothing: one registered an empty function body,

@@ -25,19 +25,34 @@
 ; longer exist. They suppressed nothing, and hid the fact that their real
 ; successors were never re-triaged.
 ;
-; WHY A RATCHET RATHER THAN A CLEAN GATE. Widening all three axes surfaces 38
-; genuine violations. Adding a guard to a module is a BEHAVIOURAL change — it
-; introduces an early return on a path that currently proceeds — so applying 38
-; of them mechanically would be reckless. This adopts the shape the driver
-; already uses for comparable debt (test_ahk_os_purity_ratchet.ahk): count the
-; violations, fail when the count RISES, drive the baseline down over time.
+; WHAT THE NUMBER ACTUALLY MEANS — read this before acting on it.
 ;
-; That is deliberately NOT the same as re-widening the allowlist to silence
-; them. Every offender is enumerated in the failure message, and a newly added
-; stateful module with no guard fails immediately.
+; The count is NOT a defect count, and an earlier version of this file wrongly
+; said it was. It is a DRIFT DETECTOR: the number of production files holding
+; module-level mutable state that do not use the `if !_x` init-guard idiom.
 ;
-; NEVER raise the baseline to make a change pass. Lower is better; zero is the
-; target.
+; Spot-checking the flagged files found none of the sampled ones to be genuine
+; conventions-5.8 violations. They were lazy caches (_TimingsCache,
+; _ParseTomlCache, _TrayTitleCache), self-initialising flags
+; (_AltGrShortcutsRegistered, _LLM_AcceptInProgress), lazily-created handles
+; behind their own guards (_WebView_SharedEnv and its _Creating flag), and one
+; deliberate TEST SEAM (_HotstringRegistrar, which defaults to 0 and whose
+; consumers already branch on that).
+;
+; The underlying reason is architectural: conventions 5.8 describes the Lua /
+; Hammerspoon module shape — a state table injected by M.init(), with every
+; public function gated by require_state. The AHK driver is not built that way.
+; It uses auto-execute globals, lazy caches and explicit handle checks, so a
+; mechanical sweep adding require_state guards here would add meaningless early
+; returns to functions that need none — HotPath_Now(), which runs on every
+; keystroke, was among the files flagged.
+;
+; So this stays a ratchet, and the value is drift: a NEW module that introduces
+; injected state without a guard raises the count and fails here, at which point
+; a human decides whether it is a real violation or another cache. Do not
+; "fix" the existing entries by bolting guards onto them.
+;
+; NEVER raise the baseline to make a change pass.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -60,9 +75,9 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	"modules/keymap/layout.ahk", true
 )
 
-; Captured 2026-07-21 by this scanner's own first widened run. Drive it DOWN by
-; adding guards; never up. See the module header for why this is a ratchet.
-_REQUIRE_STATE_BASELINE := 38
+; Captured 2026-07-21 after excluding UPPER_SNAKE constants from the state
+; predicate. See the module header: this is a drift baseline, not a defect count.
+_REQUIRE_STATE_BASELINE := 27
 
 _MetaListAhkFilesGuardV2(Dir) {
 	Files := []
@@ -111,10 +126,14 @@ _MetaRunRequireStateTestsV2() {
 			if (_REQUIRE_STATE_ALLOWLIST.Has(Rel))
 				continue
 
-			; Any module-level underscore-prefixed global counts as state.
-			; Restricting this to false/unset hid every module holding a Map, an
-			; array, 0 or "".
-			IsStateful := (Body ~= "im)^global\s+_\w+\s*:=")
+			; Module-level MUTABLE state. Constants are UPPER_SNAKE by
+			; convention and are excluded: counting _HOTPATH_SLOW_MS or
+			; _HS_RELOAD_ONLY_GROUPS as "state needing an init guard" is what
+			; made the first widened count meaningless.
+			; Case-SENSITIVE on purpose — note the absence of the i flag. With it,
+			; [A-Z0-9_] also matches lowercase, so the lookahead swallows every
+			; name, the predicate never fires, and the scan silently reports 0/0.
+			IsStateful := (Body ~= "m)^global\s+_(?![A-Z0-9_]+\s*:=)\w+\s*:=")
 			if (!IsStateful)
 				continue
 			ScannedCount++
@@ -133,12 +152,16 @@ _MetaRunRequireStateTestsV2() {
 	ViolCount := Violations.Length
 	ScannedLabel := ScannedCount
 	_MetaGuardRatchet() {
-		Assert(ScannedLabel >= 60,
-			"the guard scan must reach the whole driver (only " . ScannedLabel . " stateful files seen) — it previously scanned 3 and was therefore incapable of failing")
+		; Non-vacuity floor. The original scan saw THREE files and could not
+		; fail; anything in this range proves it is still reaching the whole
+		; driver. Set below the current 59 so excluding a few more constants
+		; from the predicate does not trip it.
+		Assert(ScannedLabel >= 50,
+			"the guard scan must reach the whole driver (only " . ScannedLabel . " files with module-level state seen) — it previously scanned 3 and was therefore incapable of failing")
 		Assert(ViolCount <= _REQUIRE_STATE_BASELINE,
-			"unguarded stateful modules rose to " . ViolCount . " (baseline " . _REQUIRE_STATE_BASELINE . "). Add a require_state-style guard to the new module; do NOT raise the baseline and do NOT add it to the allowlist. Offenders: " . Offenders)
+			"files with unguarded module-level state rose to " . ViolCount . " (baseline " . _REQUIRE_STATE_BASELINE . "). This is a DRIFT signal, not a proven defect: check whether the new entry holds genuinely injected state (guard it) or is another lazy cache or flag (then it belongs in the allowlist WITH a reason). Do not raise the baseline. Offenders: " . Offenders)
 	}
-	Test("meta require_state: unguarded stateful modules do not increase (" . ViolCount . "/" . ScannedLabel . ")",
+	Test("meta require_state: module-level state without an init guard does not increase (" . ViolCount . "/" . ScannedLabel . ")",
 		_MetaGuardRatchet)
 }
 
