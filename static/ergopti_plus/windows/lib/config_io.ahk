@@ -52,8 +52,16 @@ _GlobalClearAllBindings(Updates) {
         ScriptShortcutAssignments[Slot] := "none"
         Updates.Push({ Section: "ahk.shortcuts.script_control", Key: Slot, Value: "none" })
     }
-    if IsSet(_TH_WriteTapHoldDisabled)
-        try _TH_WriteTapHoldDisabled()
+    if IsSet(_TH_WriteTapHoldDisabled) {
+        ; A bare try here meant "tout desactiver" reported success while the
+        ; tap-hold config could still say enabled on disk — the one write that
+        ; turns them off, discarded without a word.
+        try {
+            _TH_WriteTapHoldDisabled()
+        } catch as Err {
+            try LoggerError("Config", "Could not persist the tap-hold disable: {1}", Err.Message)
+        }
+    }
 }
 
 ; Recursively force every leaf under Node to Bool ("tout activer"/"tout
@@ -293,8 +301,13 @@ HS_TogglePersonalAllSections(Enable) {
     global CategoryEnabled, ConfigurationFile, ScriptInformation, Features
     Bool := (Enable = true or Enable = 1)
     PersonalSectionsPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
-    if (PersonalSectionsPath == "" or !FileExist(PersonalSectionsPath))
+    if (PersonalSectionsPath == "" or !FileExist(PersonalSectionsPath)) {
+        ; Reachable on a fresh install (no personal_hotstrings.toml yet) or after
+        ; relocating the config dir: the menu item does nothing and says nothing.
+        ; The sibling ToggleCategoryAllSections logs on the equivalent bail.
+        try LoggerWarn("Hotstrings", "Personal sections toggle ignored — no personal hotstrings file at '{1}'.", PersonalSectionsPath)
         return
+    }
     if (Bool and (!CategoryEnabled.Has("Hotstrings") or !CategoryEnabled["Hotstrings"])) {
         CategoryEnabled["Hotstrings"] := true
         TOML_Write(true, ConfigurationFile, "ahk.category_enabled", "hotstrings")
@@ -441,18 +454,39 @@ _CollectFeatureUpdates(Updates, SectionPath, Node) {
 ReloadWithDefaultConfig(*) {
     global _ConfigDir, _AhkSubDir
     AhkDir := _ConfigDir . _AhkSubDir
+    ; A bare try around the delete turned a locked or read-only config into a
+    ; silent no-op — and worse than a no-op: the FSAppend below then APPENDS a
+    ; second [_meta] section to the surviving file. The user asked for a reset
+    ; and got neither a reset nor an error. Editors, cloud-sync clients and the
+    ; read-only attribute all reach this.
+    Undeleted := ""
     for FileName in ["config.toml", "tap_hold.toml", "api_entries.json"] {
         Path := AhkDir . FileName
         try {
             if FileExist(Path)
                 FileDelete(Path)
+        } catch as Err {
+            Undeleted .= (Undeleted == "" ? "" : ", ") . FileName
+            try LoggerError("Config", "Reset to defaults: could not delete '{1}': {2}", Path, Err.Message)
         }
+    }
+    if (Undeleted != "") {
+        try MsgBox(Format(t("dialog.reset_defaults.failed"), Undeleted),
+            t("dialog.reset_defaults.failed_title"), "Iconx")
+        return
     }
     ; Write a minimal config so Onboarding_Run() skips the wizard on reload.
     ; The user chose "reset defaults" — there is a separate "Setup wizard"
     ; menu item for re-running the first-run flow. Without this placeholder
     ; the deleted config.toml triggers Onboarding_Run unconditionally.
-    FSAppend(AhkDir . "config.toml", "[_meta]`nschema_version = 2`n")
+    ; FSAppend REPORTS failure rather than throwing, so an ignored return is a
+    ; silent one. Without this placeholder the reload runs Onboarding_Run
+    ; unconditionally, which is not what "reset defaults" means.
+    if !FSAppend(AhkDir . "config.toml", "[_meta]`nschema_version = 2`n") {
+        try LoggerError("Config", "Reset to defaults: could not write the placeholder config; the setup wizard will run on reload.")
+        try MsgBox(t("dialog.reset_defaults.placeholder_failed"),
+            t("dialog.reset_defaults.failed_title"), "Icon!")
+    }
     Reload
 }
 
@@ -462,6 +496,13 @@ ReadScriptShortcutsConfig() {
         Value := IniCacheGet(_IniCache, "ahk.shortcuts.script_control", Slot)
         if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
             ScriptShortcutAssignments[Slot] := Value
+        else if (Value != "_")
+            ; Mirrors ReadKeyboardShortcutsConfig. An action retired by an
+            ; upgrade, or a hand-edited config, leaves the slot on its
+            ; compiled-in default — so AltGr+Enter fires a DIFFERENT action than
+            ; the one configured, with nothing in the log to explain it.
+            try LoggerWarn("Shortcuts", "Script slot '{1}' has unknown action '{2}' — falling back to '{3}'.", Slot, Value,
+                ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "(none)")
     }
 }
 
