@@ -83,6 +83,20 @@ SortArray(arr) {
 ; Parse result cache: keyed by file path, invalidated by TOML_BatchWrite.
 global _ParseTomlCache := Map()
 
+; Paths whose last parse could not READ the file, as opposed to reading an
+; empty one. ParseTomlFile must stay non-throwing, and an empty Map cannot
+; carry that distinction — so writers ask here before rebuilding a file from a
+; parse that never saw its contents. Set and cleared on every parse attempt.
+global _TomlReadFailures := Map()
+
+; True when the last ParseTomlFile for this path failed to read it. Callers
+; that REWRITE a file must check this: serializing a parse that read nothing
+; turns an unreadable config into an empty one.
+TOML_ReadFailed(Path) {
+    global _TomlReadFailures
+    return _TomlReadFailures.Has(Path)
+}
+
 ; Parse a TOML file into Map<Section, Map<Key, Value>>. Values are coerced
 ; to AHK booleans / integers / strings / arrays of strings — anything more
 ; exotic falls through as a raw string. Returns an empty Map when the file
@@ -90,14 +104,29 @@ global _ParseTomlCache := Map()
 ; ``FileExist``.
 ; Multi-line arrays ( key = [\n  "a",\n  "b"\n] ) are fully supported.
 ParseTomlFile(Path) {
-    global _ParseTomlCache
+    global _ParseTomlCache, _TomlReadFailures
     if _ParseTomlCache.Has(Path)
         return _ParseTomlCache[Path]
     Sections := Map()
+    ; Map.Delete raises on a missing key, so this must be guarded.
+    if _TomlReadFailures.Has(Path)
+        _TomlReadFailures.Delete(Path)
     if !FileExist(Path)
         return Sections
     Content := ""
-    try Content := FileRead(Path, "UTF-8")
+    try {
+        Content := FileRead(Path, "UTF-8")
+    } catch as Err {
+        ; Record the failure instead of throwing: the fuzz corpus requires this
+        ; function never to raise, and every preference read would otherwise be
+        ; able to abort startup. But an empty Map here is indistinguishable from
+        ; a genuinely empty file, and TOML_BatchWrite SEEDS ITS REWRITE from it
+        ; — so without this flag "I could not read your config" silently became
+        ; "your config was empty" and the next write persisted that as truth.
+        _TomlReadFailures[Path] := true
+        try LoggerError("TomlParse", "Cannot read '{1}': {2}. Reported as unreadable so writers refuse to rebuild from it.", Path, Err.Message)
+        return Sections
+    }
     if (Content = "")
         return Sections
 
@@ -372,6 +401,15 @@ TOML_BatchWrite(Path, Updates) {
         return true
 
     Cached := ParseTomlFile(Path)
+    ; Refuse to rebuild a file we could not read. Everything below serializes
+    ; ONLY what this parse returned and then moves the result over the original,
+    ; so proceeding on a failed read would replace the user's whole config with
+    ; the handful of keys in Updates. "I could not read it" must never be
+    ; allowed to mean "it was empty".
+    if TOML_ReadFailed(Path) {
+        try LoggerError("TomlWrite", "Refusing to write '{1}': the current contents could not be read, and rewriting from an unread file would discard every setting it holds.", Path)
+        return false
+    }
     ; Deep-copy the cached Map before mutating: ParseTomlFile returns the
     ; live cache object by reference, so mutating it directly would corrupt
     ; the cache on any write failure, leaving un-persisted values in memory.

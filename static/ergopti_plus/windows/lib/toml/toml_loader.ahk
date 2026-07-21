@@ -75,7 +75,18 @@ ReadTomlFile(FilePath) {
         return _TomlFileCache[FilePath]
     }
     Content := ""
-    try Content := FileRead(FilePath, "UTF-8")
+    try {
+        Content := FileRead(FilePath, "UTF-8")
+    } catch as Err {
+        ; Do NOT cache a failed read. Caching it made one transient lock at
+        ; boot — a sync client, the personal TOML editor, a backup scanner —
+        ; hide a whole hotstring file for the entire session: every consumer
+        ; saw zero entries and the load was still logged as done. Leaving the
+        ; path uncached lets the next caller retry.
+        if FileExist(FilePath)
+            try LoggerError("TomlLoader", "Cannot read '{1}': {2}. Treated as empty for this call; not cached so a later read retries.", FilePath, Err.Message)
+        return ""
+    }
     _TomlFileCache[FilePath] := Content
     return Content
 }
