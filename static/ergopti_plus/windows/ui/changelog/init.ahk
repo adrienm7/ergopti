@@ -186,7 +186,18 @@ _CLW_BuildWindow(Channel) {
 	; Navigate to the shared HTML file.
 	html_url := _CLW_HtmlUrl()
 	try LoggerStart("Changelog", "Navigating to {1}…", html_url)
-	try _CLW_WebView.Navigate(html_url)
+	NavOk := false
+	try {
+		_CLW_WebView.Navigate(html_url)
+		NavOk := true
+	} catch as e {
+		try LoggerError("Changelog", "Navigate failed for {1}: {2}.", html_url, e.Message)
+	}
+	; Close the pair on both paths. The START above had no reachable SUCCESS
+	; anywhere in this file, so a Navigate that threw — swallowed by the bare try
+	; it used to sit in — looked exactly like one still in flight, forever.
+	if NavOk
+		try LoggerSuccess("Changelog", "Navigation issued for {1}.", html_url)
 
 	; Fill the WebView2 to cover the entire window client area.
 	try _CLW_Controller.Fill()
