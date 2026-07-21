@@ -129,7 +129,17 @@ _Onboarding_PickDefaultMagicKey() {
 	return ";"
 }
 
+; True when the key has its own radio on the magic-key page. Only the custom
+; Edit needs this, and it is deliberately NOT a test for "did the user choose
+; something" — the default has a radio and is also a valid saved answer, so
+; conflating the two is what silently rewrote saved keys. Provenance lives in
+; _ob_magic_key_explicit; this answers a different question.
+_Onboarding_IsPrebakedMagicKey(Key) {
+	return (Key == ONBOARDING_DEFAULT_MAGIC_KEY or Key == "ù" or Key == ";")
+}
+
 _Onboarding_Step3() {
+	global _ob_magic_key, _ob_magic_key_explicit
 	g := Gui("+AlwaysOnTop", t("onboarding.welcome.title"))
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
@@ -166,8 +176,8 @@ _Onboarding_Step3() {
 	; placeholder value is ``*`` because the dedicated ASCII-star radio
 	; was retired (folded into this row) and ``*`` remains the canonical
 	; fallback when ★ does not render comfortably.
-	edInitial := (_ob_magic_key != "" and _ob_magic_key != ONBOARDING_DEFAULT_MAGIC_KEY
-		and _ob_magic_key != "ù" and _ob_magic_key != ";")
+	edInitial := (_ob_magic_key_explicit and _ob_magic_key != ""
+		and !_Onboarding_IsPrebakedMagicKey(_ob_magic_key))
 		? _ob_magic_key : "*"
 	edKey := g.AddEdit("w120 x40 y+4 vMagicKeyEdit", edInitial)
 
@@ -177,12 +187,16 @@ _Onboarding_Step3() {
 	; enough to pick a sensible default per the contract documented in
 	; _Onboarding_PickDefaultMagicKey.
 	default_key := _Onboarding_PickDefaultMagicKey()
-	current_key := (_ob_magic_key != "" and _ob_magic_key != ONBOARDING_DEFAULT_MAGIC_KEY)
+	; Provenance, not value: the default is itself a valid answer, so a saved
+	; one is indistinguishable from "nothing loaded" if we test the character.
+	current_key := (_ob_magic_key_explicit and _ob_magic_key != "")
 		? _ob_magic_key
 		: default_key
 	; Persist so Back/Next preserves the choice even when the user only
-	; navigated past this step without explicitly clicking a radio.
-	global _ob_magic_key := current_key
+	; navigated past this step without explicitly clicking a radio. Reaching
+	; this page is itself the confirmation, so the value is explicit from here.
+	_ob_magic_key := current_key
+	_ob_magic_key_explicit := true
 	switch current_key {
 		case "★": rBlackStar.Value := 1
 		case "ù": rUGrave.Value    := 1
@@ -233,6 +247,7 @@ _Step3_Back(g, *) {
 }
 
 _Step3_Next(g, rBlackStar, rUGrave, rSemi, rCustom, edKey, *) {
+	global _ob_magic_key, _ob_magic_key_explicit
 	val := ""
 	if (rBlackStar.Value = 1) {
 		val := "★"
@@ -251,6 +266,7 @@ _Step3_Next(g, rBlackStar, rUGrave, rSemi, rCustom, edKey, *) {
 	; step + the final TOML batch write see the same character.
 	if (val == "")
 		val := ONBOARDING_DEFAULT_MAGIC_KEY
-	global _ob_magic_key := val
+	_ob_magic_key := val
+	_ob_magic_key_explicit := true
 	_Onboarding_Navigate(_Onboarding_Step4)
 }

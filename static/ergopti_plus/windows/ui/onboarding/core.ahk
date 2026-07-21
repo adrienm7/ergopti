@@ -67,6 +67,11 @@ global ONBOARDING_DEFAULT_MAGIC_KEY := "★"
 global _ob_locale            := "en"
 global _ob_layout            := false
 global _ob_magic_key         := ONBOARDING_DEFAULT_MAGIC_KEY
+; Provenance for the answer above. The default IS a valid answer, so its value
+; can never tell us whether the user picked it or whether nothing was loaded
+; yet — that has to be tracked separately, or a saved default gets silently
+; replaced by the layout-derived fallback on the next page build.
+global _ob_magic_key_explicit := false
 global _ob_metrics           := false
 global _ob_gestures          := false
 ; Config folder choice. Initialised to the current _ConfigDir so a re-run via

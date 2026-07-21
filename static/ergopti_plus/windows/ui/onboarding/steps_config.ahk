@@ -31,8 +31,10 @@
 
 _Onboarding_Step1() {
 	global _StaticDir, _ob_layout, _ob_magic_key, _ob_metrics, _ob_gestures, _ob_register_pending
+	global _ob_magic_key_explicit
 	_ob_layout            := false
 	_ob_magic_key         := ONBOARDING_DEFAULT_MAGIC_KEY
+	_ob_magic_key_explicit := false
 	_ob_metrics           := false
 	_ob_gestures          := false
 	_ob_register_pending  := false
@@ -400,6 +402,7 @@ _StepConfigDir_Next(g, dirEdit, *) {
 ;                         config-dir step. Empty → no pre-fill (default path).
 _Onboarding_PreloadFromExistingConfig(ChosenDir) {
 	global _ob_layout, _ob_magic_key, _ob_metrics, _ob_gestures, _DefaultConfigDir
+	global _ob_magic_key_explicit
 	; Resolve the actual folder we're about to read from: empty input means
 	; "use the OS default", so we hydrate from that location too — this lets
 	; an existing first-run user re-open the wizard from the tray menu and
@@ -445,6 +448,7 @@ _Onboarding_PreloadFromExistingConfig(ChosenDir) {
 	MagicKey := IniCacheGet(Cache, "hotstrings", "trigger_char")
 	if (MagicKey != "_" and MagicKey != "") {
 		_ob_magic_key := MagicKey
+		_ob_magic_key_explicit := true
 	}
 
 	; Metrics + gestures: boolean flags. ParseTomlFile coerces TOML's `true` to a
