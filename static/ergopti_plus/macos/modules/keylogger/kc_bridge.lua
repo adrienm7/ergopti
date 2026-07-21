@@ -412,6 +412,27 @@ end
 --- keylogger M.start() so the bridge survives toggle OFF/ON.
 function M.start()
 	if not require_state("start") then return end
+
+	-- Re-sync the cursor to EOF, exactly as M.init() does above. M.stop() tears
+	-- down both drain triggers, so the offset cannot advance on its own while the
+	-- bridge is off — every physical key Karabiner appended during that window was
+	-- still pending, and the next drain replayed the whole backlog. Those events
+	-- were then stamped with the CURRENT time and attributed to the CURRENTLY
+	-- focused app, so switching Metrics off, working for an hour, and switching it
+	-- back on injected an hour of keystrokes into the wrong app at the wrong time.
+	-- Discarding is the only correct choice: the events were deliberately not
+	-- recorded, and their real timestamps and context are gone.
+	local fh_resync = io.open(KC_LOG_PATH, "r")
+	if fh_resync then
+		local eof = fh_resync:seek("end") or _file_offset
+		fh_resync:close()
+		if eof > _file_offset then
+			Logger.info(LOG, "Skipping %d byte(s) appended while the bridge was stopped.",
+				eof - _file_offset)
+		end
+		_file_offset = eof
+	end
+
 	_arm_watchers()
 	Logger.done(LOG, "KE bridge watchers ensured.")
 end
