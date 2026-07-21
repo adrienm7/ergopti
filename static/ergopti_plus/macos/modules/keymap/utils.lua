@@ -197,11 +197,32 @@ function M.emit_tokens(tokens)
 	-- paste queued yet in this emit_tokens call).
 	local next_paste_delay = 0
 
+	-- When the next token of ANY kind may be emitted. Stays 0 — i.e. everything
+	-- keeps firing inline — until a paste is actually DEFERRED. Only a deferred
+	-- paste creates an ordering hazard: an inline paste has already posted its
+	-- Cmd+V by the time the next token runs, and CGEvent delivery preserves post
+	-- order, so a following inline keystroke still lands after it. Chaining after
+	-- an inline paste too would add a settle gap to the common single-segment
+	-- expansion for no benefit.
+	local order_delay = 0
+
+	--- Emits inline when nothing is queued ahead, otherwise chains behind it.
+	--- Declared above the loop so the closures below capture it rather than a nil
+	--- global. Keys and short text reach the OS synchronously, so without this a
+	--- token following a deferred paste overtakes it and the replacement arrives
+	--- scrambled on screen.
+	--- @param delay number Seconds to wait, or <= 0 to fire inline.
+	--- @param fn function The emission to perform.
+	local function emit_in_order(delay, fn)
+		if delay <= 0 then fn() else hs.timer.doAfter(delay, fn) end
+	end
+
 	for _, tok in ipairs(tokens) do
 		if type(tok) ~= "table" then goto continue end
 
 		if tok.kind == "key" then
-			keyStroke({}, tok.value, 0)
+			local key_value = tok.value  -- Bound per iteration for the deferred closure
+			emit_in_order(order_delay, function() keyStroke({}, key_value, 0) end)
 			count = count + 1
 
 		elseif tok.kind == "text" then
@@ -213,18 +234,24 @@ function M.emit_tokens(tokens)
 				count              = count + (ok_l and tok_len or 1)
 				_paste_ops_pending = _paste_ops_pending + 1
 
-				if next_paste_delay <= 0 then
-					perform_paste(tok.value)
+				local paste_at    = next_paste_delay
+				local paste_value = tok.value  -- Bound per iteration for the deferred closure
+				if paste_at <= 0 then
+					perform_paste(paste_value)
 				else
 					Logger.debug(LOG, "Deferring paste of %d char(s) by %.2fs to avoid clipboard race.",
-						ok_l and tok_len or 1, next_paste_delay)
-					hs.timer.doAfter(next_paste_delay, function() perform_paste(tok.value) end)
+						ok_l and tok_len or 1, paste_at)
+					hs.timer.doAfter(paste_at, function() perform_paste(paste_value) end)
 				end
 				-- Every following paste-worthy token must wait at least one more
 				-- gap so two deferred pastes never collapse onto the same tick.
-				next_paste_delay = next_paste_delay + CLIPBOARD_PASTE_GAP_SEC
+				next_paste_delay = paste_at + CLIPBOARD_PASTE_GAP_SEC
+				-- A DEFERRED paste has not reached the OS yet, so every later token
+				-- must queue strictly behind it. An inline one needs no such fence.
+				if paste_at > 0 then order_delay = next_paste_delay end
 			else
-				keyStrokes(tok.value)
+				local text_value = tok.value  -- Bound per iteration for the deferred closure
+				emit_in_order(order_delay, function() keyStrokes(text_value) end)
 				local ok, len = pcall(text_utils.utf8_len, tok.value)
 				count       = count + (ok and len or 1)
 				emitted_str = emitted_str .. tok.value
