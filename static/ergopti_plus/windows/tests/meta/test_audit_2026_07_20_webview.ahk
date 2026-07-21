@@ -110,20 +110,41 @@ Test("webview: hosts never tear down from inside the COM callback (F-27, F-28)",
 	_A0720WV_TeardownIsDeferredOutOfTheCallback)
 
 
+; The guarantee is unchanged — a failed config-directory write must be surfaced,
+; and must not be followed by a Reload() that hides it. Only its LOCATION moved:
+; the write block was extracted into the shared _PathsFile_Write after an
+; unhardened verbatim TWIN was found in the action picker's ConfirmPath, still
+; carrying the original unprotected FileOpen. Scoping this assertion to one
+; function body was what let that twin exist unnoticed.
+;
+; So this now follows the guarantee transitively, and asserts strictly MORE than
+; before: the caller must branch on the writer's result and skip the reload, AND
+; the writer itself must catch and log. See also
+; tests/meta/test_paths_file_single_writer.ahk, which pins that exactly one
+; writer exists — re-duplicating the hardened block would satisfy this test but
+; fail that one.
 _A0720WV_PathsEditorSurfacesWriteFailure() {
 	Body := _DriverFuncBody("_PathsEdWeb_Save")
 	Assert(Body != "", "_PathsEdWeb_Save must exist in ui/paths_editor/init.ahk")
 
-	Assert(InStr(Body, "LoggerError") > 0,
-		"_PathsEdWeb_Save must log an ERROR when the write fails — it was unprotected with no else on `if f`, so a read-only or locked target silently discarded the user's chosen directory while the log asserted success")
+	GuardPos := InStr(Body, "if !_PathsFile_Write")
+	Assert(GuardPos > 0,
+		"_PathsEdWeb_Save must branch on the shared writer's result — a write that failed must not fall through")
 
-	ErrPos := InStr(Body, "LoggerError")
 	ReloadPos := InStr(Body, "Reload()")
 	Assert(ReloadPos > 0, "prerequisite: the success path still reloads")
-	Assert(ErrPos < ReloadPos,
+	Assert(GuardPos < ReloadPos,
 		"the failure branch must return BEFORE Reload() — reloading after a failed write drops the user back into the OLD config directory with no error anywhere, so the change simply appears not to have happened")
-	Assert(InStr(Body, "catch") > 0,
+
+	; The original assertions, re-pointed at the code that now performs the write.
+	Writer := _DriverFuncBody("_PathsFile_Write")
+	Assert(Writer != "", "_PathsFile_Write must exist — it is the single writer both editors call")
+	Assert(InStr(Writer, "LoggerError") > 0,
+		"the paths.toml writer must log an ERROR when the write fails — it was unprotected with no else on `if f`, so a read-only or locked target silently discarded the user's chosen directory while the log asserted success")
+	Assert(InStr(Writer, "catch") > 0,
 		"the FileOpen/Write/Close sequence must be wrapped in try/catch (fail fast, copilot-instructions 5.3)")
+	Assert(InStr(Writer, "return false") > 0,
+		"the writer must report failure to its callers, or the branch above cannot work")
 }
 Test("paths-editor: a failed config-directory write is surfaced (F-29)",
 	_A0720WV_PathsEditorSurfacesWriteFailure)

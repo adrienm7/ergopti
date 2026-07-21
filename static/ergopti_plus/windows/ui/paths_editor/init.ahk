@@ -205,9 +205,30 @@ _PathsEdWeb_Save(ConfigDir) {
 	; read-only or locked target the user's chosen directory was discarded, the
 	; log asserted the opposite, and the Reload() dropped them back into the OLD
 	; directory with no error anywhere — the change simply appeared not to happen.
+	if !_PathsFile_Write(N)
+		return
+	try LoggerInfo("PathsEditor", "Applying new config directory and reloading…")
+	Reload()
+}
+
+; Persist ``N`` as the configured directory in paths.toml. THE single writer.
+;
+; There used to be two copies of this block — this one, hardened, and a verbatim
+; unhardened twin in ui/action_picker/init.ahk's ConfirmPath, which still had the
+; original unprotected FileOpen and an `if f` with no else. The drift was the
+; real defect: hardening one copy left the other silently discarding the user's
+; chosen directory on a read-only or locked target, then Reload()ing them back
+; into the OLD directory with no error anywhere. Both callers now share this.
+; @param N {String} Target directory, backslash-separated and trailing-slashed.
+; @returns {Boolean} True when the file was written; false after reporting.
+_PathsFile_Write(N) {
+	global _PathsFile
 	try DirCreate(SubStr(_PathsFile, 1, InStr(_PathsFile, "\", , -1) - 1))
 	try {
 		f := FileOpen(_PathsFile, "w", "UTF-8")
+		; FileOpen throws in v2 rather than returning falsy, so this is belt and
+		; braces — but it also converts any future falsy return into a loud error
+		; instead of a skipped write.
 		if !IsObject(f)
 			throw Error("FileOpen returned no handle for '" . _PathsFile . "'.")
 		f.Write('# Custom paths' . "`r`n" . 'ConfigDirPath = "' . StrReplace(N, "\", "/") . '"' . "`r`n")
@@ -215,10 +236,9 @@ _PathsEdWeb_Save(ConfigDir) {
 	} catch as Err {
 		try LoggerError("PathsEditor", "Could not write '{1}': {2}.", _PathsFile, Err.Message)
 		try MsgBox(t("paths_editor.save_failed"), t("paths_editor.save_failed_title"), "Iconx")
-		return
+		return false
 	}
-	try LoggerInfo("PathsEditor", "Applying new config directory and reloading…")
-	Reload()
+	return true
 }
 
 
