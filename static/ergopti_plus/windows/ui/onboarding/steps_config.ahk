@@ -29,15 +29,26 @@
 ; ===== 4.1) Step 1 — Language selection =====
 ; ============================================
 
-_Onboarding_Step1() {
-	global _StaticDir, _ob_layout, _ob_magic_key, _ob_metrics, _ob_gestures, _ob_register_pending
+; Clear every collected answer. This belongs to the wizard's lifecycle, not to
+; a page: Step1 used to do it inline, but Step1 is also the Back target from
+; the config-folder step, so going back to fix the interface language wiped the
+; layout, magic-key and metrics answers the user had already given. Nothing
+; restored them — the existing-config preload returns early when there is no
+; config.toml, which is exactly the first-run case — so the wizard shipped a
+; config with those features off. Called once from each entry point.
+_Onboarding_ResetAnswers() {
+	global _ob_layout, _ob_magic_key, _ob_metrics, _ob_gestures, _ob_register_pending
 	global _ob_magic_key_explicit
-	_ob_layout            := false
-	_ob_magic_key         := ONBOARDING_DEFAULT_MAGIC_KEY
+	_ob_layout             := false
+	_ob_magic_key          := ONBOARDING_DEFAULT_MAGIC_KEY
 	_ob_magic_key_explicit := false
-	_ob_metrics           := false
-	_ob_gestures          := false
-	_ob_register_pending  := false
+	_ob_metrics            := false
+	_ob_gestures           := false
+	_ob_register_pending   := false
+}
+
+_Onboarding_Step1() {
+	global _StaticDir
 
 	; Sort the locale list alphabetically by Name so the wizard's language
 	; picker matches the tray menu's order (both use _I18nSortedLocales) —

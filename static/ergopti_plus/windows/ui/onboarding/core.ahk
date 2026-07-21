@@ -144,6 +144,10 @@ Onboarding_Run() {
 		return
 	}
 	global _OB_ALTGR_PASSTHROUGH := true
+	; Start from a clean slate. The reset lives here rather than in the first
+	; page because that page is also the Back target, and resetting on arrival
+	; discarded every answer given on the later steps.
+	_Onboarding_ResetAnswers()
 	; Prefer the shared WebView2 frontend (identical to the macOS wizard) when
 	; available; fall back to the native AHK pages otherwise. Both paths set the
 	; _ob_gui sentinel the park-loop below waits on.
@@ -171,7 +175,10 @@ Onboarding_Run() {
 Onboarding_ShowFromMenu(*) {
 	; Same web-first preference as first run; the native pages remain the
 	; fallback. _Onboarding_TryWeb shows its own window (setting _ob_gui), so on
-	; success there is nothing more to do here.
+	; success there is nothing more to do here. The answers are cleared here so
+	; a re-run does not inherit the previous run's, and so the first page can
+	; stay a pure renderer — it doubles as the Back target.
+	_Onboarding_ResetAnswers()
 	if !_Onboarding_TryWeb()
 		_Onboarding_Navigate(_Onboarding_Step1)
 }
