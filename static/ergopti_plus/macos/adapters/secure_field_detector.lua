@@ -110,8 +110,19 @@ function M.refresh()
 
 		local focused = app_el:attributeValue("AXFocusedUIElement")
 		if focused then
-			_cached_role    = focused:attributeValue("AXRole")
-			_cached_subrole = focused:attributeValue("AXSubrole")
+			-- Each attribute is read in its OWN pcall. Sharing the outer one meant a
+			-- throw on the SECOND read aborted the closure and sent control to the
+			-- handler below, which clears BOTH — discarding an "AXSecureTextField"
+			-- already stored by the first read. isSecureField() then returned false
+			-- for a genuine password field: it failed OPEN, the exact mode this
+			-- module's own docstring calls "letting the keylogger record the user's
+			-- password characters". AX reads throw on a dead or replaced element, so
+			-- one of the two failing is ordinary. Mirrors the per-attribute pcalls
+			-- keylogger/context_tracker.lua already uses for the same two reads.
+			local ok_role, role    = pcall(function() return focused:attributeValue("AXRole") end)
+			local ok_sub,  subrole = pcall(function() return focused:attributeValue("AXSubrole") end)
+			_cached_role    = ok_role and role    or nil
+			_cached_subrole = ok_sub  and subrole or nil
 		else
 			clear_cache()
 		end
