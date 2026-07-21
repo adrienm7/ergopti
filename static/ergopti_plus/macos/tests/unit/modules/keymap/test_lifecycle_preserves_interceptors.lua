@@ -53,6 +53,24 @@ local function load_keymap_capturing_taps()
 		end
 	end
 
+	-- Same reason, for the modules the keymap tree pulls in that do NOT match those
+	-- two prefixes. Earlier files in a full-suite run leave partial stubs of these
+	-- in package.loaded (the harness clears exactly this set at
+	-- tests/helpers/init.lua for the same hazard), and a partial ui.tooltip or
+	-- lib.text_utils makes this test fail for a reason that has nothing to do with
+	-- interceptor survival — which is what makes such a failure so expensive to
+	-- diagnose. Running this file alone would pass; the suite would not.
+	local to_wipe = {
+		"ui.tooltip",
+		"lib.text_utils",
+		"lib.logger",
+		"modules.keylogger",
+		"modules.hotstrings.hotstrings_config",
+	}
+	for _, name in ipairs(to_wipe) do
+		package.loaded[name] = nil
+	end
+
 	local base = require("tests.stubs.hs").eventtap
 	local taps = {}
 	local et = {}

@@ -227,6 +227,28 @@ local function combined_footer_calls(measurements)
 	return 0, nil
 end
 
+--- Collects every string render() wrote into the canvas elements, so a test can
+--- assert what was DRAWN rather than only what was measured.
+--- @param canvas table The counting canvas double.
+--- @return table Array of drawn strings.
+local function drawn_texts(canvas)
+	local out = {}
+	for i = 1, 7 do
+		local element = canvas[i]
+		if type(element) == "table" then
+			for _, value in pairs(element) do
+				-- Styled text doubles carry their content on .text; plain strings
+				-- are stored directly.
+				local text = (type(value) == "table" and type(value.text) == "string" and value.text)
+					or (type(value) == "string" and value)
+					or nil
+				if text then out[#out + 1] = text end
+			end
+		end
+	end
+	return out
+end
+
 helpers.describe("tooltip render: the combined footer is measured exactly once", function()
 	helpers.it("does not measure the same combined row twice in one render", function()
 		package.loaded["ui.tooltip.config"] = nil
@@ -254,5 +276,22 @@ helpers.describe("tooltip render: the combined footer is measured exactly once",
 			"the combined footer must be measured ONCE per render; the layout decision "
 			.. "and the draw site share one measurement rather than each paying for an "
 			.. "ObjC text-layout call")
+
+		-- Outcome, not just the tally. A render that measured the footer once and
+		-- then drew nothing — or drew a different string — satisfies the count
+		-- above while putting no footer on screen. Sharing a measurement is only
+		-- an optimisation if the thing measured is also the thing rendered.
+		local drawn = drawn_texts(canvas)
+		local footer_on_canvas = false
+		for _, text in ipairs(drawn) do
+			if text:find(HINT_TEXT, 1, true) and text:find(INFO_TEXT, 1, true) then
+				footer_on_canvas = true
+				break
+			end
+		end
+		helpers.assert_true(footer_on_canvas, string.format(
+			"the measured combined footer must also reach the canvas. Asserting only the "
+			.. "measurement count cannot tell a shared measurement apart from a render that "
+			.. "measured and then bailed. Drawn: %s", table.concat(drawn, " | ")))
 	end)
 end)
