@@ -71,9 +71,26 @@ local function make_karabiner()
 		get_simultaneous_threshold = function() return 50 end,
 		set_simultaneous_threshold = function() end,
 		open_gui               = function() end,
-		set_tap_hold_timeout   = function() calls.set_tap_hold = calls.set_tap_hold + 1 end,
-		set_sticky_timeout     = function() calls.set_sticky   = calls.set_sticky   + 1 end,
-		regenerate             = function() calls.regenerate   = calls.regenerate   + 1 end,
+		-- STATEFUL, not counting. The real contract is that karabiner.json ends up
+		-- carrying the value the user just typed, and that holds only because the
+		-- setter mutates _state BEFORE regenerate() reads it. Counters share no
+		-- state, so their assertions are invariant under swapping the two calls —
+		-- a mutant that regenerates from the PRE-EDIT value keeps them green.
+		-- Recording what regenerate() OBSERVES makes the order load-bearing.
+		set_tap_hold_timeout   = function(ms)
+			calls.set_tap_hold = calls.set_tap_hold + 1
+			calls.tap_hold_value = ms
+		end,
+		set_sticky_timeout     = function(ms)
+			calls.set_sticky = calls.set_sticky + 1
+			calls.sticky_value = ms
+		end,
+		regenerate             = function()
+			calls.regenerate = calls.regenerate + 1
+			-- Snapshot what a real generator would read at this instant.
+			calls.deployed_tap_hold = calls.tap_hold_value
+			calls.deployed_sticky   = calls.sticky_value
+		end,
 	}
 end
 
@@ -127,6 +144,12 @@ helpers.describe("karabiner delay pickers push the new value to the keyboard", f
 		helpers.assert_true(karabiner._calls.regenerate >= 1,
 			"set_tap_hold_timeout never regenerates on its own, so the menu item must — "
 			.. "otherwise typing keeps the OLD threshold while the label claims the new one")
+		-- The ORDER is the actual guarantee: regenerate() must observe the value the
+		-- setter just stored. Asserting only the two call counts passes just as
+		-- happily when the deploy runs FIRST and ships the pre-edit threshold.
+		helpers.assert_eq(karabiner._calls.deployed_tap_hold, karabiner._calls.tap_hold_value,
+			"regenerate() must run AFTER the setter, so the deployed config carries the "
+			.. "value the user just committed rather than the previous one")
 	end)
 
 	helpers.it("regenerates karabiner.json after the sticky delay is committed", function()
