@@ -22,6 +22,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local i18n   = require("lib.i18n")
 local Paths  = require("lib.paths")
 local LOG    = "menu_paths"
@@ -146,7 +147,7 @@ local function ensure_dir(path)
 	-- Only fall back to the subprocess when the filesystem API is unavailable or
 	-- refused the create; the shell path stays correct but is no longer the norm.
 	if not made then
-		pcall(hs.execute, string.format("mkdir -p %q", path))
+		pcall(hs.execute, "mkdir -p " .. text_utils.shell_quote(path))
 	end
 
 	-- Memoise only a directory that now genuinely exists. A refused create is

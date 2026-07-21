@@ -238,7 +238,8 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		-- hs.execute for synchronous cleanup: rm is fast and we are already
 		-- inside an async callback, so blocking here is fine; no GC risk.
 		os.remove(zip_path)
-		pcall(hs.execute, string.format("/bin/rm -rf %q %q", backup_app, tmp_dir))
+		pcall(hs.execute, "/bin/rm -rf " .. text_utils.shell_quote(backup_app)
+			.. " " .. text_utils.shell_quote(tmp_dir))
 
 		Logger.success(LOG, "Update installed at %s — reloading.", target)
 		Updater.clear_cached_release()

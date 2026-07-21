@@ -24,6 +24,7 @@ local M = {}
 
 local hs         = hs
 local fs         = require("hs.fs")
+local text_utils = require("lib.text_utils")
 local json       = require("hs.json")
 local ui_builder = require("ui.ui_builder")
 local Logger     = require("lib.logger")
@@ -123,7 +124,7 @@ local function load_categories()
 end
 
 local function save_categories(data)
-	os.execute(string.format("mkdir -p %q", CONFIG_DIR))
+	os.execute("mkdir -p " .. text_utils.shell_quote(CONFIG_DIR))
 	local f = io.open(CATEGORIES_FILE, "w")
 	if f then f:write(json.encode(data)); f:close() end
 end

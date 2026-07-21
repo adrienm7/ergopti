@@ -9,6 +9,7 @@
 local M = {}
 local hs            = hs
 local Logger        = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local dialog        = require("lib.dialog_util")
 local notifications = require("lib.notifications")
 local i18n          = require("lib.i18n")
@@ -73,7 +74,7 @@ M.DEFAULT_STATE = {
 local function open_toml_path(path)
 	if type(path) ~= "string" or path == "" then return end
 	hs.timer.doAfter(0, function()
-		pcall(hs.execute, string.format("open %q", path))
+		pcall(hs.execute, "open " .. text_utils.shell_quote(path))
 	end)
 end
 

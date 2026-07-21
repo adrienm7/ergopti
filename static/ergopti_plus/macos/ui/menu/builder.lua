@@ -14,6 +14,7 @@
 local M = {}
 local hs         = hs
 local Logger     = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local Paths      = require("lib.paths")
 local LOG        = "builder"
 local i18n       = require("lib.i18n")
@@ -410,7 +411,7 @@ function M.generate(ctx, menu_mods, actions)
 							fn    = (function(path)
 								return function()
 									hs.timer.doAfter(0, function()
-										pcall(hs.execute, string.format("open %q", path))
+										pcall(hs.execute, "open " .. text_utils.shell_quote(path))
 									end)
 								end
 							end)(f.path),

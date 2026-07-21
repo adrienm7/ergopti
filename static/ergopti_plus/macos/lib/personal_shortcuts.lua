@@ -29,6 +29,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local LOG    = "personal_shortcuts"
 
 
@@ -107,7 +108,7 @@ local function ensure_file(path)
 	-- ~/.config/ergopti_plus/ has just been created by MenuPaths.init.
 	local parent = path:match("^(.*[/\\])") or ""
 	if parent ~= "" then
-		pcall(hs.execute, string.format("mkdir -p %q", parent))
+		pcall(hs.execute, "mkdir -p " .. text_utils.shell_quote(parent))
 	end
 
 	local fw, err = io.open(path, "w")
@@ -149,7 +150,7 @@ function M.open()
 	local path = resolve_path()
 	ensure_file(path)
 	hs.timer.doAfter(0, function()
-		pcall(hs.execute, string.format("open %q", path))
+		pcall(hs.execute, "open " .. text_utils.shell_quote(path))
 	end)
 end
 

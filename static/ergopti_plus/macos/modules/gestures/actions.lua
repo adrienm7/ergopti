@@ -396,28 +396,28 @@ sg("open_hotstrings_editor",    function() pcall(function() require("ui.hotstrin
 sg("open_paths_editor",            function() pcall(function() require("ui.paths_editor").show() end) end)
 sg("open_script_source",               function()
 	-- Deferred so hs.execute never blocks the gesture frameCallback
-	hs.timer.doAfter(0, function() pcall(hs.execute, string.format("open %q", hs.configdir)) end)
+	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir)) end)
 end)
 sg("open_personal_shortcuts",     function()
-	hs.timer.doAfter(0, function() pcall(hs.execute, string.format("open %q/personal_shortcuts.toml", hs.configdir)) end)
+	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir) .. "/personal_shortcuts.toml") end)
 end)
 sg("open_personal_hotstrings",    function()
 	-- Resolve path eagerly (requires only Lua, no shell), then defer the shell open
 	local ok_mp, mp = pcall(require, "ui.menu.menu_paths")
 	local p = ok_mp and type(mp.get) == "function" and mp.get("PersonalTomlPath")
 	hs.timer.doAfter(0, function()
-		if p and p ~= "" then pcall(hs.execute, string.format("open %q", p))
-		else pcall(hs.execute, string.format("open %q/hotstrings/personal_hotstrings.toml", hs.configdir)) end
+		if p and p ~= "" then pcall(hs.execute, "open " .. text_utils.shell_quote(p))
+		else pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir) .. "/hotstrings/personal_hotstrings.toml") end
 	end)
 end)
 sg("open_personal_info",               function()
-	hs.timer.doAfter(0, function() pcall(hs.execute, string.format("open %q/personal_info.toml", hs.configdir)) end)
+	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir) .. "/personal_info.toml") end)
 end)
 sg("open_config",                    function()
-	hs.timer.doAfter(0, function() pcall(hs.execute, string.format("open %q/config.toml", hs.configdir)) end)
+	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir) .. "/config.toml") end)
 end)
 sg("open_logs_folder",                function()
-	hs.timer.doAfter(0, function() pcall(hs.execute, string.format("open %q/logs", hs.configdir)) end)
+	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir) .. "/logs") end)
 end)
 sg("open_today_log",                   function()
 	-- Resolve the path synchronously (pure Lua), then open in a deferred shell call
@@ -428,7 +428,7 @@ sg("open_today_log",                   function()
 		end
 		return hs.configdir .. "/logs/ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
 	end)
-	hs.timer.doAfter(0, function() pcall(hs.execute, string.format("open %q", path)) end)
+	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(path)) end)
 end)
 sg("open_error_log",                   function()
 	-- Resolve the path synchronously (pure Lua), then open in a deferred shell call
@@ -443,7 +443,7 @@ sg("open_error_log",                   function()
 		end
 		return hs.configdir .. "/logs/ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
 	end)
-	hs.timer.doAfter(0, function() pcall(hs.execute, string.format("open %q", path)) end)
+	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(path)) end)
 end)
 
 -- Parameterized actions read their value from the binding that invoked them.

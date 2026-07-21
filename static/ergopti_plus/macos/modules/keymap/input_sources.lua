@@ -22,6 +22,7 @@
 
 local hs      = hs
 local Logger  = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local install = require("modules.keymap.layout_install")
 local LOG     = "menu.keyboard_layout"
 
@@ -158,7 +159,7 @@ local function run_osascript_isolated(script)
 	if not fh then return false, nil end
 	fh:write(script)
 	fh:close()
-	local out, ok = hs.execute(string.format("/usr/bin/osascript %q", path))
+	local out, ok = hs.execute("/usr/bin/osascript " .. text_utils.shell_quote(path))
 	os.remove(path)
 	return ok and true or false, out
 end

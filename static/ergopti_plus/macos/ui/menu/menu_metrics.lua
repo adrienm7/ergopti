@@ -22,6 +22,7 @@
 local M = {}
 local hs = hs
 local fs = require("hs.fs")
+local text_utils = require("lib.text_utils")
 
 local AppPickerLib  = require("lib.app_picker")
 local dialog        = require("lib.dialog_util")
@@ -575,7 +576,7 @@ function M.build(ctx)
 			fn    = function()
 				local app_path = hs.configdir .. "/utils/encryptor/Encryptor.app"
 				if fs.attributes(app_path) then
-					hs.execute(string.format("open %q", app_path))
+					hs.execute("open " .. text_utils.shell_quote(app_path))
 				else
 					dialog.block_alert(
 						i18n.get("dialog.metrics.encryptor_error_title"),
