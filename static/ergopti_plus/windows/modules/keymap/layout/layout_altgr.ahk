@@ -304,31 +304,37 @@ RegisterAltGrLayer() {
     ; press without LCtrl held (Kana / custom layouts), and rejects the OS
     ; driver’s ghost SC138 prefix which arrives with LCtrl still held.
 
-    ; --- ErgoptiPlus overrides (registered first, lowest precedence) ---
-    HotIf((*) => Features["layout"]["ergopti_plus"] and IsRealAltGrPress())
-    for SC in ALTGR_PLUS_OVERRIDES {
-        Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_PLUS_OVERRIDES), "I2")
-    }
+    ; try/finally: HotIf sets a PROCESS-WIDE criterion, so a throw before the
+    ; reset leaks it into every later Hotkey() call in the driver — silently
+    ; gating unrelated layers behind this condition.
+    try {
+        ; --- ErgoptiPlus overrides (registered first, lowest precedence) ---
+        HotIf((*) => Features["layout"]["ergopti_plus"] and IsRealAltGrPress())
+        for SC in ALTGR_PLUS_OVERRIDES {
+            Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_PLUS_OVERRIDES), "I2")
+        }
 
-    ; --- ErgoptiAltGr Number row + Ctrl+Alt Numpad mappings ---
-    ; Note: ergopti_base is intentionally NOT required here — superscripts,
-    ; subscripts and the € sign are layout-independent and must work even when
-    ; the Ergopti keyboard emulation is off.
-    HotIf((*) => Features["layout"]["ergopti_alt_gr"] and IsRealAltGrPress())
-    for SC in ALTGR_NUMBER_ROW {
-        Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_NUMBER_ROW), "I2")
-    }
-    for SC, Combo in CTRL_ALT_NUMPAD {
-        Hotkey("^!" . SC, CtrlAltDispatch.Bind(Combo), "I2")
-    }
+        ; --- ErgoptiAltGr Number row + Ctrl+Alt Numpad mappings ---
+        ; Note: ergopti_base is intentionally NOT required here — superscripts,
+        ; subscripts and the € sign are layout-independent and must work even when
+        ; the Ergopti keyboard emulation is off.
+        HotIf((*) => Features["layout"]["ergopti_alt_gr"] and IsRealAltGrPress())
+        for SC in ALTGR_NUMBER_ROW {
+            Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_NUMBER_ROW), "I2")
+        }
+        for SC, Combo in CTRL_ALT_NUMPAD {
+            Hotkey("^!" . SC, CtrlAltDispatch.Bind(Combo), "I2")
+        }
 
-    ; --- ErgoptiAltGr base rows (registered last, highest precedence) ---
-    HotIf((*) => Features["layout"]["ergopti_alt_gr"] and IsRealAltGrPress())
-    for SC in ALTGR_BASE_ROWS {
-        Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_BASE_ROWS), "I2")
-    }
+        ; --- ErgoptiAltGr base rows (registered last, highest precedence) ---
+        HotIf((*) => Features["layout"]["ergopti_alt_gr"] and IsRealAltGrPress())
+        for SC in ALTGR_BASE_ROWS {
+            Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_BASE_ROWS), "I2")
+        }
 
-    HotIf() ; Reset to no condition
+    } finally {
+        HotIf() ; Reset to no condition
+    }
     try LoggerSuccess("LayoutAltGr", "AltGr layer registered ({1} entries).",
         ALTGR_PLUS_OVERRIDES.Count + ALTGR_NUMBER_ROW.Count + CTRL_ALT_NUMPAD.Count
         + ALTGR_BASE_ROWS.Count)

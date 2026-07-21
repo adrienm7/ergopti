@@ -533,7 +533,11 @@ _UIA_SelectionPollTick() {
 	; that pump messages and preempt the auto-execute registration thread (the
 	; no-timers-armed-mid-boot policy). It also keeps the Features read below out of the
 	; pre-ready window, where a Map-shape drift would throw into the fatal error net.
-	if (IsSet(_DriverBootPhase) && _DriverBootPhase != "ready")
+	; Fails CLOSED on an unset phase. The previous form passed through when
+	; _DriverBootPhase was unset, which is the opposite of the guarantee the
+	; comment above states. Not reachable in production — ErgoptiPlus.ahk seeds
+	; the phase before any include — but the polarity should match the claim.
+	if (!IsSet(_DriverBootPhase) || _DriverBootPhase != "ready")
 		return
     ; SetTimer bypasses native Suspend — a paused driver must do ZERO UIA work
     ; (« pause = tout éteint »): the 3-hop COM round-trip + unbounded GetText(-1)
@@ -645,19 +649,47 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 	; and closing keys. Symbols absent from the catalogue (^, -) are not user-
 	; configurable and therefore always wrap — WrapSymbols_IsEnabled returns true
 	; for any char that was never disabled.
-	if (Features["shortcuts"]["wrap_text_if_selected"] and WrapSymbols_IsEnabled(LeftSymbol)) {
-		Selection := GetUIASelection()
-		if (Selection != "") {
-			; Send all the text instantly and without triggering hotstrings while typing
-			; it. SendInstant returns false when its clipboard path fails (another
-			; process holds the clipboard open mid-transaction) and emits nothing — so
-			; degrade to the bare symbol instead of swallowing the keystroke entirely
-			; (the selection is untouched in the app since ^v never fired, exactly like
-			; the no-selection path below).
-			if !SendInstant(LeftSymbol Selection RightSymbol)
-				SendNewResult(Symbol)
-			UpdateLastSentCharacter(Symbol)
-			return
+	; .Has() guarded like its two siblings (hotstring_inputhook.ahk and the read
+	; at the top of this file). ManifestBuildFeaturesMap seeds every declared
+	; path, but it returns an empty Map when the manifest fails to load, and a
+	; raw read here would throw on the keystroke thread.
+	WrapEnabled := Features.Has("shortcuts")
+		and Features["shortcuts"].Has("wrap_text_if_selected")
+		and Features["shortcuts"]["wrap_text_if_selected"]
+	if (WrapEnabled and WrapSymbols_IsEnabled(LeftSymbol)) {
+		; Critical is RELEASED across the selection probe and the clipboard
+		; round-trip, then restored.
+		;
+		; This function is reached from AltGrShiftDispatch, which wraps every
+		; callback in Critical("On") — and 24 of the 34 ALTGR_BASE_ROWS entries
+		; plus SHIFT_SYMBOLS["SC039"] are binds of this function. CB_SaveAll() is
+		; ClipboardAll(): a synchronous, unbounded, all-formats snapshot. With a
+		; screenshot bitmap, large HTML/RTF or a file list on the clipboard — or
+		; another process holding it open — that blocks well past
+		; LowLevelHooksTimeout, at which point Windows silently DROPS every key
+		; typed during the window.
+		;
+		; Nothing here depends on holding Critical: SendInstant takes its
+		; atomicity from SendInput, which the OS batches as one injection, not
+		; from the caller's Critical. This is the same release-and-restore idiom
+		; DeadKey uses around its InputHook wait.
+		_WrapCrit := Critical("Off")
+		try {
+			Selection := GetUIASelection()
+			if (Selection != "") {
+				; Send all the text instantly and without triggering hotstrings while
+				; typing it. SendInstant returns false when its clipboard path fails
+				; (another process holds the clipboard open mid-transaction) and emits
+				; nothing — so degrade to the bare symbol instead of swallowing the
+				; keystroke entirely (the selection is untouched in the app since ^v
+				; never fired, exactly like the no-selection path below).
+				if !SendInstant(LeftSymbol Selection RightSymbol)
+					SendNewResult(Symbol)
+				UpdateLastSentCharacter(Symbol)
+				return
+			}
+		} finally {
+			Critical(_WrapCrit)
 		}
 	}
 	SendNewResult(Symbol) ; SendEvent({Text}) doesn't work everywhere, for example in Google Sheets
@@ -885,8 +917,11 @@ RegisterCapsLockLayer()
 ; AltGr/Kana behaviour during the first-run onboarding wizard.
 ; AltGr roll pure-emit serialization: the roll SendEvents share the per-key Critical
 ; contract (remap-emit-critical-uneven / HIGH-01) so a fast follow-up key cannot
-; interleave its remap SendEvent and reorder output. WrapTextIfSelected stays OUT of
-; Critical — it Sleeps (clipboard), and a Sleep under Critical breaks the no-yield guarantee.
+; interleave its remap SendEvent and reorder output. WrapTextIfSelected does NOT
+; stay out of Critical — AltGrShiftDispatch wraps every AltGr callback, and most
+; base-row entries bind it — so it releases Critical itself around its clipboard
+; round-trip. The old note here claimed the exemption came from a Sleep; there is
+; no Sleep any more, but ClipboardAll() blocks just as effectively.
 _RollEmitCritical(Text, Record := "") {
 	_AtCrit := Critical("On")
 	try {
