@@ -331,7 +331,14 @@ function M.build(ctx)
 	local item = {
 		title   = i18n.get("menu.shortcuts.title"),
 		checked = state.shortcuts or nil,
-		fn      = function()
+		-- Pause owns the bindings axis until resume: pause_all() snapshots
+		-- is_bindings_started() and resume_all() restores from that snapshot, so a
+		-- toggle made mid-pause is silently discarded at resume — and enabling would
+		-- bind every hotkey while « tout est éteint ». Gate it like the wrap-symbols
+		-- submenu above, which is pause-gated for exactly this reason. `checked` is
+		-- deliberately left alone: it must keep reporting the stored preference.
+		disabled = paused or nil,
+		fn       = (not paused) and function()
 			state.shortcuts = not state.shortcuts
 			-- Toggle ONLY the user-facing bindings + keyboard shortcuts. We must NOT
 			-- call shortcuts.start/stop here: stop() also tears down the script-control
