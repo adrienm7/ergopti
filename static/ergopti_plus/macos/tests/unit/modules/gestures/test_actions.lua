@@ -340,3 +340,75 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.pcall
 			"a throwing axis action must leave an ERROR-level Logger trace (gestures-actions-silent-pcall)")
 	end)
 end)
+
+
+
+
+-- ==================================================
+-- ==================================================
+-- ======= 5/ Parameterized Actions Execute =========
+-- ==================================================
+-- ==================================================
+
+--- The blocks above assert SG_NAMES membership and parameter STORAGE. Neither
+--- observes an action running, so an entry registered with a broken handler — or
+--- one whose parameter never reaches its handler — passes every one of them while
+--- doing nothing when the user triggers it. That silent no-op is precisely what
+--- made a script-control binding to "Ouvrir un lien" inert: the action was
+--- present, the label was right, and pressing the key did nothing.
+---
+--- Drives execute_single and asserts the observable side effect, mirroring
+--- test_actions_modifier_keystrokes.lua, which exists for the same reason.
+helpers.describe("gestures.actions: a parameterized action honours its binding", function()
+	--- Loads a FRESH actions module with its own state. M.init() warns and returns
+	--- early on a second call, so by the time a full-suite run reaches this block
+	--- the module is already initialised by an earlier file and init() here is a
+	--- no-op operating on that file's state. Reloading makes these cases
+	--- order-independent: they passed alone and failed in-suite without it.
+	--- @return table A freshly required actions module, initialised and empty.
+	local function fresh_actions()
+		package.loaded["modules.gestures.actions"] = nil
+		local A = helpers.load_with_stubs("modules.gestures.actions")
+		A.init({ action_params = {} })
+		return A
+	end
+
+	helpers.it("opens the URL stored for the binding that triggered it", function()
+		_G.hs.urlevent.__reset()
+		local Actions = fresh_actions()
+		helpers.assert_true(Actions.set_action_parameter("tap_3", "open_url", "https://one.example"))
+
+		Actions.execute_single("open_url", "tap_3")
+
+		helpers.assert_eq(#_G.hs.urlevent.__opened, 1,
+			"the action must open exactly one URL — zero means the parameter never reached "
+			.. "the handler and the binding is inert despite looking configured")
+		helpers.assert_eq(_G.hs.urlevent.__opened[1], "https://one.example",
+			"it must open the URL stored for THIS binding, not another binding's")
+	end)
+
+	helpers.it("opens nothing when the binding has no parameter", function()
+		_G.hs.urlevent.__reset()
+		local Actions = fresh_actions()
+
+		Actions.execute_single("open_url", "tap_4")
+
+		helpers.assert_eq(#_G.hs.urlevent.__opened, 0,
+			"with no parameter stored the handler must open nothing rather than a malformed "
+			.. "URL. This is the state a menu must never leave a binding in — which is why "
+			.. "the pickers prompt for the value before assigning the action")
+	end)
+
+	helpers.it("keeps two bindings of the same action independent", function()
+		_G.hs.urlevent.__reset()
+		local Actions = fresh_actions()
+		Actions.set_action_parameter("tap_3", "open_url", "https://one.example")
+		Actions.set_action_parameter("swipe_3_left", "open_url", "https://two.example")
+
+		Actions.execute_single("open_url", "swipe_3_left")
+
+		helpers.assert_eq(_G.hs.urlevent.__opened[1], "https://two.example",
+			"each binding carries its own URL; resolving the wrong one would send the user "
+			.. "to a link they configured somewhere else entirely")
+	end)
+end)

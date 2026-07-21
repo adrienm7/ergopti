@@ -569,7 +569,17 @@ M.pathwatcher = {
 	new = function(_, _) return { start = function(self) return self end, stop = function() end } end,
 }
 
-M.urlevent = { bind = function() end }
+-- openURL is recorded rather than dropped so a test can assert that an action
+-- which is SUPPOSED to open a link actually did — the difference between a
+-- working binding and a silent no-op is invisible to a stub that ignores it.
+M.urlevent = {
+	bind      = function() end,
+	__opened  = {},
+	openURL   = function(url)
+		table.insert(M.urlevent.__opened, tostring(url))
+	end,
+	__reset   = function() M.urlevent.__opened = {} end,
+}
 M.pasteboard = {
 	getContents  = function() return "" end,
 	setContents  = function(_) return true end,
