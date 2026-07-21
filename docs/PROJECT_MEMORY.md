@@ -29,6 +29,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-ahk-test-suite-critical-leak](#project-ahk-test-suite-critical-leak) — Critical("On") in layout/hotkey callbacks is safe in production but leaks into the main thread when invoked directly by tests, silently hanging background timers
   - [project-ahk-numeric-string-equals-false](#project-ahk-numeric-string-equals-false) — `"0" = false` is TRUE in AHK v2; never compare a String|false return against false, type-check with `is String`
   - [project-ahk-keyword-as-variable-hangs-the-parser](#project-ahk-keyword-as-variable-hangs-the-parser) — naming a variable `Catch` (or any control-flow keyword) hangs AHK v2 with zero output and no error; bisect to a trivial probe when a run produces nothing at all
+  - [project-ahk-probing-synthetic-input](#project-ahk-probing-synthetic-input) — a hotkey registered `I2` IGNORES synthetic input at SendLevel ≤ 2, and `SendLevel` is PER-THREAD — both silently make a probe measure nothing and report a false negative
   - [project-ahk-map-delete-raises-on-missing-key](#project-ahk-map-delete-raises-on-missing-key) — `Map.Delete(k)` THROWS when k is absent (unlike `.Has`-guarded reads); an unguarded reset was a fatal startup error, and `/validate` is not an AHK v2.0 flag — it silently RUNS the script
   - [project-toml-cache-returns-real-booleans](#project-toml-cache-returns-real-booleans) — `IniCacheGet` hands back what `TOML_CoerceValue` produced, so a TOML `true` is a BOOLEAN; `StrLower(v) == "true"` is a legal always-false test that silently read every enabled setting as off
   - [project-audit-2026-07-21-toml-onboarding](#project-audit-2026-07-21-toml-onboarding) — the last two never-read driver zones (`lib/toml/`, `ui/onboarding/`) audited and cleared: 16 candidates, 11 confirmed and all 11 fixed with regression tests
@@ -1908,6 +1909,42 @@ rather than relying on a mid-body declaration being legal).
   worktree to check it — it starts a real driver alongside the user’s.
 - Scratch `.ahk` probes outside `tests/` proved unrunnable in this environment
   (they hang with no output); write the probe as a suite test instead.
+
+---
+
+### project-ahk-probing-synthetic-input
+
+_Two ways a synthetic-input probe silently measures nothing and reports a confident false negative_
+
+<sub>slug: `project_ahk_probing_synthetic_input`</sub>
+
+Cost two wrong verdicts while settling audit finding F5 (does a remap hotkey
+fire during `DeadKey`'s `InputHook.Wait()`?). The probe twice reported
+`hotkey_fired=NO`, which would have REFUTED a real bug.
+
+**1. InputLevel vs SendLevel.** The driver registers its remap hotkeys with
+`Hotkey(sc, cb, "I2")` — `I2` is InputLevel 2. A hotkey at InputLevel N ignores
+synthetic input whose SendLevel is ≤ N. So a probe that copies the real
+registration must send at `SendLevel 3` or above, or its own key is invisible
+to its own hotkey.
+
+**2. `SendLevel` is per-thread.** Setting it in the auto-execute section does
+NOT carry into a `SetTimer` callback — that runs on a new thread. It has to be
+set inside the callback doing the send.
+
+Both failures look identical to the real negative result, which is what makes
+them dangerous: the probe runs, exits cleanly, and prints a confident verdict.
+
+**How to apply:**
+
+- Have the probe RECORD its own preconditions next to the verdict (`A_SendLevel`
+  at the moment of the send). A verdict without them is unreadable later.
+- Treat a negative result from a fresh probe as "probe unproven" until at least
+  one positive control has fired through the same path.
+- Related: AHK built-in function names are not usable as variables —
+  `Report := ""` is fine, `Log := ""` dies at load with "This Func cannot be
+  used as an output variable" (`Log()` is the natural-logarithm built-in), the
+  same family as [[project_ahk_keyword_as_variable_hangs_the_parser]].
 
 ---
 
