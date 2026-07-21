@@ -30,6 +30,11 @@ local Onboarding = helpers.load_with_stubs("ui.onboarding")
 local OLD_CONFIG_PATH = "/old/hammerspoon/config.toml"
 local NEW_CONFIG_PATH = "/new/hammerspoon/config.toml"
 
+-- The same two locations as directories, for the block that drives the real
+-- menu_paths module rather than a double.
+local OLD_DIR = "/old/"
+local NEW_DIR = "/new/"
+
 --- Builds a menu_paths double whose get() returns whatever the resolver yields.
 --- @param resolver function Called with the requested path key.
 --- @return table The menu_paths double.
@@ -163,5 +168,71 @@ helpers.describe("onboarding commit() honours the retarget", function()
 		helpers.assert_true(assign_at < write_at,
 			"the retarget must happen BEFORE the batch_write, or the write still "
 			.. "goes to the pre-wizard directory")
+	end)
+end)
+
+
+
+
+
+-- ===========================================================
+-- ===========================================================
+-- ======= 4/ The Real menu_paths Honours The Retarget =======
+-- ===========================================================
+-- ===========================================================
+
+--- Every block above drives a menu_paths DOUBLE whose get() returns whatever the
+--- test supplies. That proves the onboarding calls the retarget in the right
+--- order, but it assumes the real module actually honours it — and a double is
+--- free to agree with a resolver that reality would contradict. This block drops
+--- the double and drives the module itself, so the assumption is checked rather
+--- than asserted.
+helpers.describe("menu_paths really retargets after persist_config_dir_for_wizard", function()
+	--- Loads the real menu_paths with the filesystem side effects neutralised.
+	--- @return table
+	local function fresh_menu_paths()
+		package.loaded["ui.menu.menu_paths"] = nil
+		local MP = helpers.load_with_stubs("ui.menu.menu_paths", {
+			fs = {
+				-- Report every directory as already present so ensure_dir does no
+				-- work; the assertion is about the resolved path, not about mkdir.
+				attributes = function() return { mode = "directory" } end,
+				mkdir      = function() return true end,
+				currentDir = function() return "/" end,
+			},
+		})
+		MP.init(OLD_DIR, function() end)
+		return MP
+	end
+
+	helpers.it("resolves the new directory after the wizard persists it", function()
+		local MP = fresh_menu_paths()
+		-- Captured rather than asserted: what init() resolves to depends on the
+		-- host's paths.toml and default location, neither of which this case is
+		-- about. What matters is that the retarget MOVES it, so compare before
+		-- against after and require the move to have happened.
+		local before = MP.get_config_dir()
+		helpers.assert_true(before:find(NEW_DIR, 1, true) == nil,
+			"the module must not already resolve the target directory, or the assertion "
+			.. "below would hold without the retarget doing anything. Got: " .. before)
+
+		MP.persist_config_dir_for_wizard(NEW_DIR)
+
+		helpers.assert_true(MP.get_config_dir():find(NEW_DIR, 1, true) ~= nil, string.format(
+			"after persist_config_dir_for_wizard the module must resolve the directory the "
+			.. "user picked. The blocks above only prove onboarding CALLS this in the right "
+			.. "order; if the call did not actually move the resolver, the wizard would still "
+			.. "write config.toml into the pre-wizard directory and every one of those tests "
+			.. "would keep passing. Got: %s", MP.get_config_dir()))
+	end)
+
+	helpers.it("appends a trailing separator so path joins stay well-formed", function()
+		local MP = fresh_menu_paths()
+		MP.persist_config_dir_for_wizard((NEW_DIR:gsub("[/\\]$", "")))
+
+		helpers.assert_true(MP.get_config_dir():match("[/\\]$") ~= nil,
+			"a directory persisted without a trailing separator must gain one, or every "
+			.. "path built by concatenation silently becomes a sibling FILE name rather than "
+			.. "a child of the directory")
 	end)
 end)
