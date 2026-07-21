@@ -66,5 +66,15 @@
 	<string>This script needs access to administer this system to run.</string>
 	<key>OSAAppletShowStartupScreen</key>
 	<false/>
+	<!-- Single source of truth for the app's pitch: the website extracts this
+	     dict at build time (src/routes/ergopti-plus/+page.server.js), so the
+	     description shown online always matches the shipped bundle. -->
+	<key>ErgoptiDescription</key>
+	<dict>
+		<key>fr</key>
+		<string>Déposez un fichier sur l'icône : il est chiffré en AES-256 (extension .enc). Redéposez-le : il est déchiffré. Aucun réglage, rien à apprendre.</string>
+		<key>en</key>
+		<string>Drop a file on the icon: it is AES-256 encrypted (.enc extension). Drop it again: it is decrypted. No settings, nothing to learn.</string>
+	</dict>
 </dict>
 </plist>
