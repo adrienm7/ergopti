@@ -2120,10 +2120,12 @@ If the main thread becomes permanently `Critical`, AHK will **block all backgrou
 Related: [[project_ahk_invariant_incomplete_application]]
 
 ### [updater-download-suspend-guard] Garantie G5: background downloads bypass pause
-* **Symptom**: A background update download (_Updater_PollDownloadAsync) could finish and trigger a script restart while the driver was supposedly suspended.
-* **Cause**: _Updater_PollDownloadAsync relies on a SetTimer callback which bypasses A_IsSuspended. It would happily process Req.WaitForResponse(0), write the downloaded .exe to disk, and call ExitApp(0) to apply the update.
-* **Fix**: Added if A_IsSuspended at the top of _Updater_PollDownloadAsync to Req.Abort() the download if caught suspended mid-flight. Additionally wrapped the disk-write and ExitApp block in Critical "On" so a suspend hotkey cannot interrupt the thread during the final critical section.
-* **Regression Guard**: meta/test_g5_updater_download.ahk asserts that both the A_IsSuspended check and Critical "On" are present in the callback.
+* **Symptom**: A background update download could finish and trigger a script restart while the driver was supposedly suspended.
+* **Cause**: the download poller runs from a SetTimer callback, which bypasses A_IsSuspended.
+* **Fix**: the poller checks A_IsSuspended and terminates the download if caught mid-flight.
+* **ARCHITECTURE CHANGED — this entry used to describe the opposite of the current code, and was corrected on 2026-07-21.** Staging now runs in a PowerShell CHILD PROCESS (`_Updater_BuildStagingWorkerScript`); AHK only polls it via `_Updater_MonitorStagingWorker` and receives a READY token. `Req.WaitForResponse`, `Req.Abort` and `Stream.SaveToFile` no longer exist in the driver, and no disk write happens on the AHK thread.
+* **Do NOT add `Critical` to the monitor.** The old entry claimed the fix wrapped the disk-write block in `Critical "On"`; that is now exactly backwards. Cancellation must stay interruptible, or Suspend cannot terminate a staging worker that is already running — the very failure this guarantee exists to prevent.
+* **Regression Guard**: `meta/test_g5_updater_download.ahk` asserts the A_IsSuspended check, asserts `.terminate()`, and asserts that `Critical(` is **absent**. A doc that told you to add it (`docs/STATE_TRANSITION_MATRIX.md`) was corrected at the same time — it would have made a reader break a live test.
 
 ### [project-shared-tree-layout] _shared/ tree: 6-folder layout, SSOT-per-layer, and the bypass gotcha
 * **Layout** (`static/ergopti_plus/_shared/`, renamed from `shared/` and reorganised from ~20 top-level entries into 6):
