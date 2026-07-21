@@ -424,7 +424,7 @@ _OnbWeb_LoadExistingConfig(Dir) {
 ; tray "auto configure" action when ready.
 _OnbWeb_Finish(answers) {
 	global _ob_locale, _ob_config_dir, _ob_layout, _ob_magic_key, _ob_metrics, _ob_gestures
-	global _ob_register_pending, _OB_ALTGR_PASSTHROUGH
+	global _ob_register_pending, _OB_ALTGR_PASSTHROUGH, _ob_magic_key_explicit
 
 	if (answers.Has("locale") && answers["locale"] != "")
 		_ob_locale := answers["locale"]
@@ -435,6 +435,7 @@ _OnbWeb_Finish(answers) {
 	_ob_gestures := answers.Has("use_gestures") && _OnbWeb_Truthy(answers["use_gestures"])
 	if (answers.Has("magic_key") && answers["magic_key"] != "")
 		_ob_magic_key := answers["magic_key"]
+		_ob_magic_key_explicit := true
 	_ob_register_pending := false
 	_OB_ALTGR_PASSTHROUGH := false
 
