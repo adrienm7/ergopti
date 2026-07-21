@@ -157,6 +157,14 @@ _SuspendPendingPoll() {
 }
 Ergopti_OnSuspendEnter() {
 	global _SpaceHoldInputHook, _OneShotShiftInputHook, _DeadKeyInputHook
+	; The suspend/resume machine tears down a dozen subsystems that native
+	; Suspend does not touch — InputHooks, timers and OnMessage handlers all
+	; bypass it — and it emitted NOTHING. So "pause = tout éteint", the invariant
+	; the whole teardown exists to uphold, was unfalsifiable from a log: a
+	; feature still running while paused and a feature correctly stopped produced
+	; identical output. This pair makes the bracket searchable, and an ENTER with
+	; no matching entered line now marks a teardown that died halfway.
+	LoggerStart("Lifecycle", "Entering suspend…")
 	; A clipboard-selection poll is timer-driven, so native Suspend does not
 	; stop it. Cancel before any other teardown to restore the clipboard and
 	; prevent its callback from injecting after pause.
@@ -232,8 +240,10 @@ Ergopti_OnSuspendEnter() {
     global _LLM_Deps_PollTimer
     if IsSet(_LLM_Deps_PollTimer)
         try SetTimer(_LLM_Deps_PollTimer, 0)
+    LoggerSuccess("Lifecycle", "Suspend entered — all suspend-bypassing subsystems torn down.")
 }
 Ergopti_OnSuspendResume() {
+    LoggerStart("Lifecycle", "Resuming from suspend…")
     if IsSet(_ResetPrefixBuffer)
         try _ResetPrefixBuffer()
     ; Replay a prefix-index rebuild deferred because it was requested while
@@ -266,6 +276,7 @@ Ergopti_OnSuspendResume() {
     ; only after the resume transition has completed.
     if IsSet(LLM_Menu_OnResume)
         try LLM_Menu_OnResume()
+    LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
 }
 _SuspendStateWatchdog() {
     global _LastSuspendState
