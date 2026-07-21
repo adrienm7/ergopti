@@ -74,6 +74,13 @@ global HSE_MAX_BUFFER_LEN := 256
 ; pass once silently rewrote the ASCII apostrophe to a second U+2019, dropping
 ; U+0027 from the set — Chr() makes the codepoints explicit and tamper-proof.
 global HSE_WORD_TERMINATORS := " `t`r`n.,;:?!" . Chr(0x27) . Chr(0x2019)
+
+; Characters that OPEN a word without TERMINATING a trigger. Declared HERE,
+; next to the terminator set, because the matcher gate needs it at auto-execute
+; time — hotstrings_io.ahk loads later, so a reference to a constant defined
+; there would be unassigned at boot and kill the driver outright.
+global HOTSTRINGS_QUOTE_WORD_BOUNDARIES := Chr(0x22) . Chr(0x201C) . Chr(0x201D)
+
 ; Set to true during live registry rebuilds (RebuildHotstringsLive) to prevent
 ; the OnChar reader from accessing a cleared or partially repopulated index.
 ; Prevents Map-access crashes and incorrect partial matching (hse-registry-torn-read-vs-onmessage).
@@ -799,7 +806,7 @@ HSE_TryRepeatKey(MagicKey) {
     RepeatCharPos := BufLen - MkLen
     RepeatChar := SubStr(HSE_Buffer, RepeatCharPos, 1)
     ; Refuse to repeat whitespace or terminators.
-    if (RepeatChar == "" or InStr(HSE_WORD_TERMINATORS, RepeatChar) > 0) {
+    if (RepeatChar == "" or InStr(_HSE_WordBoundarySet(), RepeatChar) > 0) {
         return ""
     }
     ; The char before RepeatChar must exist and be a non-terminator — this ensures
@@ -811,7 +818,10 @@ HSE_TryRepeatKey(MagicKey) {
         return ""
     }
     PredChar := SubStr(HSE_Buffer, PredPos, 1)
-    if (InStr(HSE_WORD_TERMINATORS, PredChar) > 0) {
+    ; Boundary set, not terminator set: after an opening quote the char is the
+    ; FIRST letter of its word, so doubling it is meaningless and the real
+    ; expansion must be allowed to win instead.
+    if (InStr(_HSE_WordBoundarySet(), PredChar) > 0) {
         return ""
     }
     ; When PredChar sits at position 1 of the buffer (PredPos == 1) and the buffer

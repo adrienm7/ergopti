@@ -387,7 +387,12 @@ _HSE_RebuildStarTriggerIndex() {
 ; HSE_StartIsWordBoundary flag) or a word terminator. ``Spec.InWord``
 ; (the AHK ``?`` flag) bypasses the check entirely.
 _HSE_WordBoundaryAllows(Buf, Spec) {
-    global HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS
+    global HSE_StartIsWordBoundary
+    ; HSE_WORD_BOUNDARIES, not HSE_WORD_TERMINATORS. A quote does not terminate
+    ; a trigger body but it does open a word, and the preview anchors on exactly
+    ; this set — gating on the narrower terminator set is what made a quote-opened
+    ; word preview an expansion the engine then refused.
+    Boundaries := _HSE_WordBoundarySet()
     if Spec.InWord {
         ; Repeat triggers (x★ → xx) require that the char being repeated is at
         ; least the 2nd letter of the current word — i.e. the char immediately
@@ -401,16 +406,35 @@ _HSE_WordBoundaryAllows(Buf, Spec) {
                 return false
             }
             PredChar := SubStr(Buf, BeforeLen, 1)
-            return InStr(HSE_WORD_TERMINATORS, PredChar) == 0
+            ; Same set as the expansion branch below, tested in the opposite
+            ; direction — that is the point. A repeat needs the predecessor to
+            ; be mid-word; an expansion needs it to be a boundary. Reading two
+            ; DIFFERENT sets here let one character satisfy both at once, so a
+            ; quote blocked the expansion and licensed the doubling that
+            ; replaced it.
+            return InStr(Boundaries, PredChar) == 0
         }
         return true
     }
     BeforeLen := StrLen(Buf) - Spec.Length
     if (BeforeLen >= 1) {
         BeforeChar := SubStr(Buf, BeforeLen, 1)
-        return InStr(HSE_WORD_TERMINATORS, BeforeChar) > 0
+        return InStr(Boundaries, BeforeChar) > 0
     }
     return HSE_StartIsWordBoundary
+}
+
+; THE word-boundary set, DERIVED on every read rather than cached.
+; 
+; A cached copy is precisely how this bug happened: the preview held one snapshot
+; and the matcher another, and they drifted. Any cache here would need every
+; writer of HSE_WORD_TERMINATORS to remember to refresh it — and the test suite
+; proved that assumption false immediately, leaving a stale set behind that made
+; the matcher reject every word boundary. Deriving costs one short concatenation
+; and makes divergence structurally impossible.
+_HSE_WordBoundarySet() {
+    global HSE_WORD_TERMINATORS, HOTSTRINGS_QUOTE_WORD_BOUNDARIES
+    return HSE_WORD_TERMINATORS . HOTSTRINGS_QUOTE_WORD_BOUNDARIES
 }
 
 

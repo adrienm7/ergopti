@@ -98,17 +98,19 @@ global _HSE_FireLogScheduled := false
 ; we add typographic double-quotes (U+201C " and U+201D ") and the straight
 ; double-quote (U+0022 ") so that typing inside a quoted phrase (e.g. `cher"mais`)
 ; still anchors the SearchKey to the word after the quote. HSE does NOT treat
-; double-quotes as hotstring terminators (they can appear inside trigger bodies),
-; so this constant must stay separate from HSE_WORD_TERMINATORS.
-; Deliberately EMPTY here: HotstringsRefreshPrefixBoundaries is the single
-; writer, and lib/boot.ahk calls it during boot, well before any keystroke
-; callback can read this. Spelling the boundary characters out a second time —
-; as this line used to — meant the initial value and every later refresh could
-; disagree about which characters end a word. Building it from
-; HOTSTRINGS_PREVIEW_EXTRA_BOUNDARIES directly is not an option either: that
-; constant lives in hotstrings_io.ahk, which loads AFTER this file, so the
-; reference is unassigned at auto-execute time and kills boot outright.
-global _PREFIX_WORD_BOUNDARIES := ""
+; double-quotes as hotstring TERMINATORS (they can appear inside trigger bodies),
+; but it does now treat them as word BOUNDARIES — this set and the matcher gate
+; hold the same value, which is what stops a previewed expansion the engine
+; would refuse.
+; The preview boundary set. NOT a cached copy any more: it delegates to the
+; matcher's own derivation so the tooltip and the engine cannot answer the
+; word-boundary question differently. A cache here was tried twice — first a
+; compile-time snapshot, then a refreshed copy built from a WIDER expression
+; than the matcher used — and both drifted, each time producing suggestions the
+; engine then refused to fire.
+_PrefixWordBoundaries() {
+    return _HSE_WordBoundarySet()
+}
 
 ; Categories scanned at boot. The order matches Hammerspoon's default load
 ; order so a tie on the prefix index returns the same first-match across
@@ -678,7 +680,7 @@ _OnPrefixChar(IH, Char) {
 		; non-final char — the nnbsp/nbsp + ';'/':' + vowel "J" triggers. We
 		; only reset the UI prefix buffer here; HSE_Buffer keeps the single
 		; terminator so such triggers still match on the next keystroke.
-		if InStr(_PREFIX_WORD_BOUNDARIES, Char) {
+		if InStr(_PrefixWordBoundaries(), Char) {
 			_ResetPrefixBuffer(false)
 			return
 		}
@@ -794,14 +796,13 @@ _OnPrefixKeyDown(IH, VK, SC) {
 }
 
 ; Return the suffix of Buf that follows the last word-boundary character.
-; Uses _PREFIX_WORD_BOUNDARIES so the result is the same SearchKey that
+; Uses _PrefixWordBoundaries() so the result is the same SearchKey that
 ; _LookupAndRender would compute. Returns Buf unchanged when no boundary
 ; is present (the whole string is one word).
 _SuffixAfterLastBoundary(Buf) {
-	global _PREFIX_WORD_BOUNDARIES
 	Idx := StrLen(Buf)
 	while (Idx >= 1) {
-		if (InStr(_PREFIX_WORD_BOUNDARIES, SubStr(Buf, Idx, 1)) > 0) {
+		if (InStr(_PrefixWordBoundaries(), SubStr(Buf, Idx, 1)) > 0) {
 			return SubStr(Buf, Idx + 1)
 		}
 		Idx -= 1
@@ -932,7 +933,7 @@ KL_LogHotstringNearMiss(kind, trigger, replacement, h_type) {
 ; (apostrophes for French contractions, punctuation, …) even though the
 ; HSE engine itself fires those triggers correctly via suffix matching.
 ;
-; We slide a cursor across _PREFIX_WORD_BOUNDARIES to find the rightmost
+; We slide a cursor across _PrefixWordBoundaries() to find the rightmost
 ; boundary in the buffer; everything to its right is the effective "word
 ; under typing", and that is what we look up. When no boundary is present
 ; we fall back to the full buffer.
@@ -1018,7 +1019,7 @@ _PrefixSortCandidates(Candidates) {
 }
 
 _LookupAndRender() {
-	global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN, _PREFIX_WORD_BOUNDARIES, ScriptInformation
+	global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN, ScriptInformation
 	PrefixSnapshot := _PrefixBuffer
 	Len := StrLen(PrefixSnapshot)
 	if LoggerIsDebugEnabled()
@@ -1045,7 +1046,7 @@ _LookupAndRender() {
 	BufScanIdx := StrLen(PrefixSnapshot)
 	while (BufScanIdx >= 1) {
 		ScanChar := SubStr(PrefixSnapshot, BufScanIdx, 1)
-		if (InStr(_PREFIX_WORD_BOUNDARIES, ScanChar) > 0) {
+		if (InStr(_PrefixWordBoundaries(), ScanChar) > 0) {
 			LastTermPos := BufScanIdx
 			break
 		}

@@ -38,27 +38,28 @@
 #Requires AutoHotkey v2.0
 
 _A0720HS_PrefixBoundariesAreDerived() {
-	Body := _DriverFuncBody("HotstringsRefreshPrefixBoundaries")
-	Assert(Body != "",
-		"HotstringsRefreshPrefixBoundaries() must exist — the preview boundary set has to be DERIVED from the live HSE_WORD_TERMINATORS, never snapshotted at include position")
-	Assert(InStr(Body, "HSE_WORD_TERMINATORS") > 0 and InStr(Body, "_PREFIX_WORD_BOUNDARIES") > 0,
-		"HotstringsRefreshPrefixBoundaries() must recompute _PREFIX_WORD_BOUNDARIES from HSE_WORD_TERMINATORS")
+	; STRONGER than the original assertion, which required a refresh FUNCTION to
+	; recompute a cached preview global after every write to HSE_WORD_TERMINATORS.
+	; That contract depended on every writer remembering to call it, and a second
+	; divergence shipped anyway because the refresh derived from a WIDER expression
+	; than the matcher gated on. There is now no cache to refresh: the preview and
+	; the matcher both call _HSE_WordBoundarySet() on every read, which makes the
+	; original bug unrepresentable rather than merely guarded.
+	Assert(_DriverFuncBody("_HSE_WordBoundarySet") != "",
+		"_HSE_WordBoundarySet() must exist as the single word-boundary derivation")
 
-	; Every writer of HSE_WORD_TERMINATORS must refresh the derived set. Boot is
-	; the writer that originally broke the invariant.
-	Boot := _DriverDirConcat("lib")
-	Src := _StripFullLineComments(Boot)
-	AssignPos := InStr(Src, "HSE_WORD_TERMINATORS    := HotstringsGetWordDelimiters()")
-	Assert(AssignPos > 0,
-		"prerequisite: lib/boot.ahk must still replace HSE_WORD_TERMINATORS with the catalogue-derived set")
-	RefreshPos := InStr(Src, "HotstringsRefreshPrefixBoundaries()", , AssignPos)
-	Assert(RefreshPos > AssignPos,
-		"lib/boot.ahk must call HotstringsRefreshPrefixBoundaries() AFTER replacing HSE_WORD_TERMINATORS — otherwise the preview keeps the compile-time boundary set and previewed expansions silently never fire")
+	Src := _DriverSourceNoComments()
+	Assert(RegExMatch(Src, "globals+_PREFIX_WORD_BOUNDARIES") == 0,
+		"the preview boundary set must not be a cached global again — both cached forms shipped a divergence (a compile-time snapshot, then a refreshed copy built from a different expression), each rendering suggestions the engine refused to fire")
 
-	Setter := _DriverFuncBody("HotstringsSetWordDelimiters")
-	Assert(Setter != "", "HotstringsSetWordDelimiters must exist")
-	Assert(InStr(Setter, "HotstringsRefreshPrefixBoundaries()") > 0,
-		"HotstringsSetWordDelimiters must refresh through the shared helper rather than open-coding the concatenation — a second copy is how the two sets drifted in the first place")
+	PreviewFn := _DriverFuncBody("_PrefixWordBoundaries")
+	Assert(PreviewFn != "", "_PrefixWordBoundaries() must exist as the preview accessor")
+	Assert(InStr(PreviewFn, "_HSE_WordBoundarySet()") > 0,
+		"the preview accessor must delegate to the matcher derivation rather than compute its own")
+
+	; And the values must actually agree at runtime, not merely share a call.
+	Assert(_PrefixWordBoundaries() == _HSE_WordBoundarySet(),
+		"the preview and the matcher must answer the word-boundary question identically")
 }
 Test("hotstrings: the preview boundary set is derived, never snapshotted (F-02)",
 	_A0720HS_PrefixBoundariesAreDerived)

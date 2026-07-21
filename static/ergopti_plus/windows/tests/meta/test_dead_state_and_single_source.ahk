@@ -17,7 +17,7 @@
 ;   extracted into DEFERRED_SAVE_RETRY_MS but only one of its two arm sites was
 ;   migrated, leaving a bare -5000 that would not follow the constant. The
 ;   hotstring preview boundaries were extracted into
-;   HOTSTRINGS_PREVIEW_EXTRA_BOUNDARIES, but the initialiser it came from still
+;   HOTSTRINGS_QUOTE_WORD_BOUNDARIES, but the initialiser it came from still
 ;   spelled the characters out — so the initial value and every later refresh
 ;   could disagree about what counts as a word boundary.
 ;
@@ -86,20 +86,37 @@ _DSSS_DeferredSaveRetryIsSingleSourced() {
 _DSSS_PreviewBoundariesUseTheConstant() {
 	Src := _DriverSourceNoComments()
 
-	Assert(InStr(Src, "HOTSTRINGS_PREVIEW_EXTRA_BOUNDARIES :=") > 0,
+	Assert(InStr(Src, "HOTSTRINGS_QUOTE_WORD_BOUNDARIES :=") > 0,
 		"prerequisite: the extracted boundary constant must still be declared")
-	Assert(RegExMatch(Src, "_PREFIX_WORD_BOUNDARIES\s*:=\s*HSE_WORD_TERMINATORS\s*\.\s*Chr\(") == 0,
-		"the _PREFIX_WORD_BOUNDARIES initialiser must not respell the extra boundary characters — it must reuse HOTSTRINGS_PREVIEW_EXTRA_BOUNDARIES, or boot and refresh can disagree about which characters end a word")
-	; HotstringsRefreshPrefixBoundaries must be the ONLY writer. Referencing the
-	; constant directly in the initialiser is not an option: it is declared in
-	; hotstrings_io.ahk, which loads after hotstring_inputhook.ahk, so the
-	; reference is unassigned at auto-execute time and kills boot outright —
-	; verified by doing exactly that and watching the suite report
+	; Within the hotstrings layer the quote codepoints must be spelled exactly
+	; once — in the boundary constant. Respelling them recreates the original
+	; defect: two spellings drift, and the tooltip then anchors on a set the
+	; matcher does not gate on. Scoped to this layer because the keymap
+	; legitimately spells the same codepoint for the AltGr key that TYPES a
+	; curly quote, which has nothing to do with word boundaries.
+	HsSrc := _DriverDirConcat("lib/hotstrings")
+	Assert(HsSrc != "", "the hotstrings source must be readable")
+	Spellings := 0
+	Pos := 1
+	while (Pos := InStr(HsSrc, "Chr(0x201C)", false, Pos)) {
+		Spellings += 1
+		Pos += 1
+	}
+	Assert(Spellings == 1,
+		"the curly-quote boundary codepoint must be spelled exactly ONCE in lib/hotstrings (found " . Spellings . ") — a second spelling is how the preview and the matcher came to disagree about which characters open a word")
+
+	; One derivation, referenced by both consumers. The constant is declared in
+	; hotstring_engine_main.ahk rather than hotstrings_io.ahk on purpose: the
+	; matcher gate reads it at auto-execute time, and hotstrings_io.ahk loads
+	; later, so a reference there would be unassigned at boot and kill the driver
+	; outright — verified by doing exactly that and watching the suite report
 	; "FATAL STARTUP ERROR: This global variable has not been assigned a value."
-	Refresh := _DriverFuncBody("HotstringsRefreshPrefixBoundaries")
-	Assert(Refresh != "", "HotstringsRefreshPrefixBoundaries() must exist")
-	Assert(InStr(Refresh, "HOTSTRINGS_PREVIEW_EXTRA_BOUNDARIES") > 0,
-		"the single writer must build the boundary set from HOTSTRINGS_PREVIEW_EXTRA_BOUNDARIES")
+	Derive := _DriverFuncBody("_HSE_WordBoundarySet")
+	Assert(Derive != "", "_HSE_WordBoundarySet() must exist as the one derivation")
+	Assert(InStr(Derive, "HOTSTRINGS_QUOTE_WORD_BOUNDARIES") > 0,
+		"the one derivation must build the boundary set from HOTSTRINGS_QUOTE_WORD_BOUNDARIES")
+	Assert(InStr(Derive, "HSE_WORD_TERMINATORS") > 0,
+		"the one derivation must extend the LIVE terminator set, so a user delimiter override still takes effect")
 }
 
 ; CB_Read's catch returned with no value at all, and three docstring sentences
