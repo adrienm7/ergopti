@@ -164,4 +164,49 @@ helpers.describe("timings: registry load fail-fast", function()
 			"the guard must fire before the nil path reaches the message, got: " .. err)
 	end)
 
+	--- Reloads lib.timings with a READER that yields an empty registry, leaving
+	--- lib.paths real. The three cases above all trip the FIRST guard (the shared
+	--- tree is unreachable), so the second guard — a tree that resolves but whose
+	--- constants.toml is missing, unreadable or empty — was never exercised. That
+	--- is the guard the comment in lib/timings.lua says was added because
+	--- TomlReader.parse returns a well-formed result with empty `sections` on BOTH
+	--- of its failure exits, so the earlier type-only test could never fire.
+	--- @return boolean ok, string err
+	local function reload_timings_with_empty_registry()
+		local saved_reader  = package.loaded["lib.toml.reader"]
+		local saved_timings = package.loaded["lib.timings"]
+
+		-- Exactly what the real reader returns when the file is absent or malformed:
+		-- a well-formed table whose sections map is empty. Returning nil instead
+		-- would test a shape the production reader never produces.
+		package.loaded["lib.toml.reader"] = {
+			parse = function(_path) return { sections = {} } end,
+		}
+		package.loaded["lib.timings"] = nil
+
+		local ok, err = pcall(require, "lib.timings")
+
+		package.loaded["lib.timings"]     = saved_timings
+		package.loaded["lib.toml.reader"] = saved_reader
+
+		return ok, tostring(err)
+	end
+
+	helpers.it("raises when the registry resolves but parses empty", function()
+		local ok, err = reload_timings_with_empty_registry()
+		helpers.assert_eq(false, ok,
+			"a resolvable tree whose constants.toml is missing, unreadable or empty must "
+			.. "still fail fast at load time. An empty registry that boots successfully makes "
+			.. "every Timings.sec() call fall over later with a misleading 'missing section'")
+		helpers.assert_true(err:find("missing or empty", 1, true) ~= nil,
+			"the error must say the file is missing or empty, got: " .. err)
+	end)
+
+	helpers.it("names the path it could not read", function()
+		local _, err = reload_timings_with_empty_registry()
+		helpers.assert_true(err:find("constants.toml", 1, true) ~= nil,
+			"the error must name the file so the failure is actionable without a debugger, "
+			.. "got: " .. err)
+	end)
+
 end)
