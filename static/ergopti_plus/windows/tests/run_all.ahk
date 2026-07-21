@@ -908,6 +908,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_paths_file_single_writer.ahk
 #Include meta/test_changelog_fetch_status_logged.ahk
 #Include meta/test_mutex_yield_is_recorded.ahk
+#Include meta/test_suspend_deferral_bounded.ahk
+#Include meta/test_suspend_lifecycle_logged.ahk
 #Include meta/test_hook_dispatcher_critical_save_restore.ahk
 #Include meta/test_hook_dispatcher_err_cache_cap.ahk
 #Include meta/test_walker_batch_critical.ahk

@@ -30,6 +30,16 @@ ActivateEdit(*) {
 global SUSPEND_CUSTOM_COMBO_PREFIX_KEYS := ["SC138", "SC038", "SC01D", "SC02A", "SC11D"]
 global _SuspendPending := false
 
+; Wall-clock bound on the deferred suspend. The gate waits for a physically
+; held prefix key to lift, so a key that is stuck — or one the OS still reports
+; as down after a Reload — deferred the suspend FOREVER: the poll simply
+; returned every 25 ms and never gave up. Pausing is the user's escape hatch
+; from a misbehaving driver, so a gate that can silently swallow it is worse
+; than the latched prefix it exists to prevent. Widening the list from 2 to 5
+; keys made that state five times easier to reach.
+global SUSPEND_DEFER_TIMEOUT_MS := 2000
+global _SuspendPendingSince := 0
+
 ; Drains every registered custom-combination prefix key (see
 ; SUSPEND_CUSTOM_COMBO_PREFIX_KEYS) BEFORE a suspend flips. AHK prefix flags
 ; latch across Suspend and cannot be cleared by synthetic events — they must be
@@ -70,8 +80,33 @@ _SuspendPrefixesAreClear() {
 _ReleasePhantomModifiers() {
     Send("{Blind}{LCtrl up}{RCtrl up}{LAlt up}{RAlt up}{LShift up}{RShift up}{LWin up}{RWin up}{SC138 up}")
 }
+; Names the prefix keys currently holding the gate shut, for the timeout report.
+; Without this a wedged deferral says only "still waiting" — the user has no way
+; to know WHICH key to cycle, which is the one thing that would fix it.
+_SuspendHeldPrefixKeys() {
+    global _ALTGR_KANA_FIXUP
+    Held := ""
+    for PrefixKey in SUSPEND_CUSTOM_COMBO_PREFIX_KEYS {
+        if (PrefixKey = "SC138") and !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
+            continue
+        if GetKeyState(PrefixKey, "P")
+            Held .= (Held == "" ? "" : ", ") . PrefixKey
+    }
+    return Held == "" ? "(none)" : Held
+}
 ToggleSuspend(*) {
-    global _SuspendPending
+    global _SuspendPending, _SuspendPendingSince
+    ; A second press while a suspend is PENDING must cancel it. Without this
+    ; branch the press fell through and simply re-armed the deferral, so the
+    ; control the user reaches for to escape a wedged gate was the one control
+    ; that could not escape it — and once the key finally lifted they were
+    ; suspended against their intent, having asked twice to not be.
+    if (!A_IsSuspended and _SuspendPending) {
+        _SuspendPending := false
+        SetTimer(_SuspendPendingPoll, 0)
+        LoggerInfo("Lifecycle", "Pending suspend cancelled by a second toggle.")
+        return
+    }
     if A_IsSuspended {
         _SuspendPending := false
         SetTimer(_SuspendPendingPoll, 0)
@@ -86,17 +121,35 @@ ToggleSuspend(*) {
         return
     }
     _SuspendPending := true
-    LoggerWarn("Lifecycle", "Suspend deferred until custom-combination prefix keys are released.")
+    _SuspendPendingSince := A_TickCount
+    LoggerWarn("Lifecycle", "Suspend deferred until custom-combination prefix keys are released (held: {1}).",
+        _SuspendHeldPrefixKeys())
     SetTimer(_SuspendPendingPoll, 25)
 }
 _SuspendPendingPoll() {
-    global _SuspendPending
+    global _SuspendPending, _SuspendPendingSince
     if !_SuspendPending or A_IsSuspended {
         SetTimer(_SuspendPendingPoll, 0)
         return
     }
-    if !_SuspendPrefixesAreClear()
-        return
+    if !_SuspendPrefixesAreClear() {
+        ; Bounded. Past the deadline, try once to clear an OS-level phantom
+        ; latch — the common cause after a Reload landed on a held modifier —
+        ; and if the key is genuinely still down, suspend anyway and say so.
+        ; A latched prefix on one key is strictly better than a driver the user
+        ; cannot pause (fail loudly rather than hang silently, conventions 5.3).
+        if (((A_TickCount - _SuspendPendingSince) & 0xFFFFFFFF) < SUSPEND_DEFER_TIMEOUT_MS)
+            return
+        Held := _SuspendHeldPrefixKeys()
+        _ReleasePhantomModifiers()
+        if !_SuspendPrefixesAreClear() {
+            LoggerError("Lifecycle", "Suspend deferral timed out after {1} ms — prefix key(s) still held ({2}); suspending anyway. Cycle that key if a layer stays latched.",
+                SUSPEND_DEFER_TIMEOUT_MS, Held)
+        } else {
+            LoggerWarn("Lifecycle", "Suspend deferral cleared a phantom latch on {1} after {2} ms.",
+                Held, SUSPEND_DEFER_TIMEOUT_MS)
+        }
+    }
     _SuspendPending := false
     SetTimer(_SuspendPendingPoll, 0)
     Suspend(1)
