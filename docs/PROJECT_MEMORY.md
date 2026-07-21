@@ -35,6 +35,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-audit-2026-07-21-toml-onboarding](#project-audit-2026-07-21-toml-onboarding) — the last two never-read driver zones (`lib/toml/`, `ui/onboarding/`) audited and cleared: 16 candidates, 11 confirmed and all 11 fixed with regression tests
   - [project-ahk-guard-tests-must-loop-the-class](#project-ahk-guard-tests-must-loop-the-class) — Guard tests must enumerate the whole class of call sites, not the one site a bug was fixed at — 5 findings in one audit came from this
   - [project-audit-evidence-must-be-reproducible](#project-audit-evidence-must-be-reproducible) — A refutation needs the same proof as a finding: the "the perf section was fabricated" debunking was itself wrong (it searched `ahk/logs`, but the real path is `autohotkey/logs`); G4 IS measured, and the logs live at `<ConfigDir>/autohotkey/logs/` via `paths.toml`
+  - [project-hs-audit-round4-2026-07-21](#project-hs-audit-round4-2026-07-21) — backlog closed at 78/78; the tooltip and the hotstring engine had two independent "will this fire?" implementations that disagreed in four ways
   - [project-hs-audit-round2-2026-07-21](#project-hs-audit-round2-2026-07-21) — the second implementation pass: 51 of 78 open findings treated (24 fixed, 27 refuted/stale); the remaining 27 are listed there with an exact fix each
   - [project-hs-audit-2026-07-21](#project-hs-audit-2026-07-21) — 13 macOS defects fixed (PII in logs, keystrokes logged inside a vault, silently discarded events); 78 findings remain OPEN and unverified — the backlog lives here because the audit md was deleted by design
   - [project-audit-findings-are-hypotheses](#project-audit-findings-are-hypotheses) — 2 of 35 audit findings were wrong and the existing suite proved it; implement a finding as a hypothesis, not an instruction
@@ -2578,3 +2579,71 @@ specified work, not as hypotheses:
 Related: [[project_hs_audit_2026_07_21]], [[project_ahk_guard_tests_must_loop_the_class]],
 [[project_audit_findings_are_hypotheses]], [[project_macos_eventtap_no_blocking]],
 [[project_suspend_pause_invariant]], [[feedback_regression_tests]].
+
+
+
+
+### project-hs-audit-round4-2026-07-21
+
+Round 4 closed the Hammerspoon audit backlog: all 78 findings are now treated
+(53 confirmed and fixed, 16 refuted, 6 already fixed before the round began).
+17 commits, suite 3241 → 3356 green.
+
+**The tooltip/engine divergence was the round's real find.** A user report —
+"the tooltip shows an expansion, I press ★, and I get the last letter doubled" —
+turned out to be two independent implementations of "will this mapping fire?".
+`llm_bridge.ends_with_trigger` and `expander.word_boundary_blocks` disagreed in
+FOUR ways, in both directions:
+
+1. At the buffer start, the preview allowed any match; the engine consults
+   `start_is_word_boundary` and refuses. Tooltip promised, engine declined.
+2. Separator-prefixed triggers (`;e` → `Je`) are exempt from the boundary rule in
+   the engine; the preview applied it and hid rows for expansions that DO fire.
+   Engine emitted text the tooltip never showed.
+3. `case_conform` resolution existed in the preview's autocorrect bucket but not
+   its star bucket.
+4. The no-op guards compared different operands.
+
+Fixed by extracting `expander.would_fire(m, buffer)` as the single source of
+truth, derived from `try_auto_expand` (which now delegates to it, so the engine's
+semantics stayed authoritative). The preview calls the same function, and for a
+★ trigger asks about `buf .. magic_key` — the buffer the engine will actually
+see. The preview's private matcher was deleted, not kept as a helper.
+
+**Two axes, not one.** Unifying MATCHING left a second divergence: a row could be
+unreachable because of WHEN it was typed. `update_preview` runs only when no
+expansion fired, so a complete `auto` trigger at the buffer end means the engine
+already declined it and nothing can retry — the auto path matches on the
+trigger's tail being the character just typed. Those rows advertised expansions
+no keystroke could produce. Now gated on `not mapping.auto`.
+
+**★ is an explicit validation.** The terminator branch already bypassed the
+typing-speed delay for the magic key, with the rationale in its own comment. The
+auto branch — which OWNS `has_magic` triggers, since their tail codepoint IS ★ —
+never got the bypass, so a ★ trigger typed after a pause fell through to the
+repeat-key fallback. Hoisted to one shared `star_validated` local.
+
+**Lessons that cost something:**
+
+- **Never suppress `git stash pop` output.** `pop stash@{0} >/dev/null 2>&1`
+  hid a conflict; 15 files were committed carrying `<<<<<<<` markers. Caught only
+  because the NEXT command's test run failed to parse `lib/logger.lua`. The stash
+  stack is shared across worktrees — prefer copying files to the scratchpad and
+  `git checkout HEAD -- <path>` for red/green proofs.
+- **Encode the CLASS, not the site.** A whole-tree scan for unresolvable
+  `require()` targets found 6 dead references where the finding reported 4, and a
+  method-level scan found 4 more guarded calls to methods that do not exist —
+  including two in `ui/menu/init.lua` that nobody had reported.
+- **Bound a source-scan window at the variable's next rebind.** A fixed-width
+  window blamed `lib/ui_restore.lua` for a guard belonging to the next list entry
+  (its entries all name their module `m`). Shipping that would have "fixed"
+  correct code.
+- **Prose mentions of a symbol precede its call.** A source guard anchored on
+  `try_repeat_feature` matched the comment documenting the branch order, not the
+  call — anchor on the call form (`Expander.try_repeat_feature`).
+- **A test that passes alone can fail in-suite.** New gestures cases called
+  `Actions.init()`, which warns and returns early on a second call, so in a full
+  run they operated on an earlier file's state. Load a fresh module per case.
+
+Related: [[project_hs_audit_2026_07_21]], [[project_macos_eventtap_no_blocking]],
+[[project_ahk_guard_tests_must_loop_the_class]], [[feedback_regression_tests]].
