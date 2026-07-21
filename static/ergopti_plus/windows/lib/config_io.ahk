@@ -560,6 +560,11 @@ ReadKeyboardShortcutsConfig() {
         Value := IniCacheGet(_IniCache, "ahk.shortcuts.keyboard", Slot)
         if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
             KeyboardShortcutAssignments[Slot] := Value
+        else if (Value != "_")
+            ; Falling back to the shipped default is the right behaviour; doing
+            ; it silently is not. The key then fires a DIFFERENT action than the
+            ; one the user configured, and nothing anywhere says why.
+            try LoggerWarn("Shortcuts", "Keyboard slot '{1}' has unknown action '{2}' — falling back to '{3}'.", Slot, Value, KeyboardShortcutAssignments[Slot])
     }
 }
 
