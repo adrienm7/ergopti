@@ -531,6 +531,32 @@ a hardcoded list against its own length, and one scanned a directory that no
 longer held the code. A test that cannot fail is worse than no test, because it
 occupies the name and deters anyone from writing the real one.
 
+#### Fourth pass — three files no earlier pass had read
+
+`lib/config_io.ahk`, `lib/webview_utils.ahk` and `adapters/text_sender.ahk` were
+audited end-to-end on 2026-07-21 and yielded 11 further findings, all now
+implemented. Two are worth remembering beyond their fix:
+
+- **User-added keyboard shortcuts were lost by the reload that saved them.**
+  `ReadKeyboardShortcutsConfig` iterated only the 15 shipped defaults while the
+  picker offers ~600 chords, so an added slot was written to config.toml and
+  never read back — no hotkey, gone from the menu, value still on disk so
+  nothing looked lost. The tell was in the same file: `_GlobalClearAllBindings`
+  already walked the persisted section for exactly those non-default slots. When
+  two paths over the same data disagree about which keys exist, one of them is a
+  drift — look for the pair before assuming a restriction is deliberate.
+- **A guard test can pin a bug in place.** Every deferred callback in
+  `WebViewHost` was mis-bound (`obj.Method` returns an UNBOUND Func whose first
+  parameter is the implicit `this`; it does not auto-bind), and
+  `test_webview_host_callback_epoch.ahk` asserted the broken strings verbatim
+  without ever calling the methods. The suite certified the defect as correct.
+  Fixing such code REQUIRES correcting the assertion in the same commit — that
+  is correcting a wrong assertion, not weakening a test.
+
+The class was dormant (zero production call sites; every window is a hand-rolled
+copy), which is why nothing caught it — and why the dead-code cleanup that
+deletes an unused module also deletes the evidence that it never worked.
+
 #### Refuted — do NOT re-raise
 
 Each was investigated and rejected with evidence. The strongest ones:
