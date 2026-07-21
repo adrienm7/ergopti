@@ -134,10 +134,14 @@ CrashReport_Build(ErrorObj) {
 	}
 
 	; ── Uptime ────────────────────────────────────────────────────────────────
-	UptimeSec := 0
+	; -1, not 0: a genuine cold start reports 0, so an unset _HealthCheckStartMs
+	; reporting 0 too would hide the difference on the one artifact meant to
+	; explain what state the driver was in.
+	UptimeSec := -1
 	try {
 		global _HealthCheckStartMs
-		UptimeSec := (A_TickCount - (_HealthCheckStartMs) & 0xFFFFFFFF) // 1000
+		if IsSet(_HealthCheckStartMs)
+			UptimeSec := (A_TickCount - (_HealthCheckStartMs) & 0xFFFFFFFF) // 1000
 	}
 
 	; ── Active window context ─────────────────────────────────────────────────
@@ -165,10 +169,14 @@ CrashReport_Build(ErrorObj) {
 	ErrCount       := "0"
 	try {
 		if (HC != "") {
-			AdaptersOk     := _CrashReport_JoinArr(HC["ports_validated"])
-			AdaptersFailed := _CrashReport_JoinArr(HC["failed_adapters"])
-			WarnCount      := String(HC["warn_count"])
-			ErrCount       := String(HC["err_count"])
+			; .Get throughout: these come from the healthcheck, which degrades a
+			; failed collector to an empty Map. A raw read threw into a catch-less
+			; try, leaving ErrCount at "0" — indistinguishable from a genuine
+			; clean session, on a report written because something crashed.
+			AdaptersOk     := _CrashReport_JoinArr(HC.Get("ports_validated", []))
+			AdaptersFailed := _CrashReport_JoinArr(HC.Get("failed_adapters", []))
+			WarnCount      := String(HC.Get("warn_count", "unknown"))
+			ErrCount       := String(HC.Get("err_count", "unknown"))
 		}
 	}
 
@@ -245,7 +253,7 @@ CrashReport_Build(ErrorObj) {
 	return Report
 }
 
-; Writes a crash report Map to disk as a JSON file under ahk/crash_reports/.
+; Writes a crash report Map to disk as a JSON file under autohotkey/crash_reports/.
 ; Creates the directory on demand. Returns the file path on success, or "" on failure.
 ; @param Report {Map} The report Map returned by CrashReport_Build().
 ; @return {String} Absolute path to the written file, or "" on failure.
@@ -456,6 +464,17 @@ _CrashReport_ToJson(Report) {
 		Val := StrReplace(Val, "`r", "\r")
 		Val := StrReplace(Val, "`n", "\n")
 		Val := StrReplace(Val, "`t", "\t")
+		; Every OTHER C0 control character must be escaped too, or the report is
+		; a file no JSON parser will read — and this is the one artifact that
+		; exists to be read after a crash. error_msg, stack_trace and log_tail
+		; all carry text the driver did not author, so a stray 0x00-0x1F is not
+		; hypothetical enough to leave unhandled.
+		Loop 32 {
+			Code := A_Index - 1
+			if (Code = 9 or Code = 10 or Code = 13)
+				continue  ; already handled above
+			Val := StrReplace(Val, Chr(Code), Format("\u{:04x}", Code))
+		}
 		Parts.Push("  " . Q . Key . Q . ": " . Q . Val . Q)
 	}
 
