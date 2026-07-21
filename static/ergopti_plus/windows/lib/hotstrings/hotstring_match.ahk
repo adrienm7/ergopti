@@ -104,8 +104,18 @@ HSE_FindMatchAtEnd(JustTypedChar) {
     ; Trigger-body buffer for the end-char path (buffer minus the
     ; just-typed terminator). For the star path, we match against the
     ; full buffer.
-    BodyBuf := SubStr(HSE_Buffer, 1, BufLen - 1)
-    BodyLastChar := SubStr(BodyBuf, -1)
+    ;
+    ; Derived only when a terminator was typed: the END-CHAR block below is the
+    ; sole consumer of both slices, and it runs on terminators alone (~15-20 % of
+    ; keystrokes). Computing them up front made every other keystroke copy the
+    ; whole buffer — up to HSE_MAX_BUFFER_LEN characters — for nothing. The empty
+    ; sentinels keep the guard below readable without depending on #Warn VarUnset.
+    BodyBuf := ""
+    BodyLastChar := ""
+    if IsTerminator {
+        BodyBuf := SubStr(HSE_Buffer, 1, BufLen - 1)
+        BodyLastChar := SubStr(BodyBuf, -1)
+    }
 
     BestMatch := ""
     BestEndChar := ""
