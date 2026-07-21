@@ -53,10 +53,22 @@ helpers.describe("karabiner/watchers.lua: CapsWord lock release (karabiner-capsw
 
 	helpers.it("task is stored in a variable before calling :start()", function()
 		local src = strip_comments(read_source("modules/karabiner/watchers.lua"))
-		-- The fix assigns the outer hs.task.new result to a local variable
+		-- The handle must be captured in a local rather than left anonymous
+		-- (`hs.task.new(...):start()`), so the start()-failure branch can release the
+		-- pending lock. BOTH spellings satisfy that:
+		--   local task = hs.task.new(...)        -- original
+		--   local task ; task = hs.task.new(...) -- forward-declared
+		-- The forward-declared form became necessary when the task was added to a GC
+		-- root: its completion callback releases its own pin, so `task` has to exist
+		-- before the closure is built (the closure-before-local rule this repo
+		-- enforces elsewhere). Accepting both keeps the original intent intact.
+		local inline_form   = src:match("local task%s*=%s*hs%.task%.new") ~= nil
+		local declared_form = src:match("local task%s*\n") ~= nil
+			and src:match("\n%s*task%s*=%s*hs%.task%.new") ~= nil
 		helpers.assert_true(
-			src:match("local task%s*=%s*hs%.task%.new") ~= nil,
-			"deactivate_capsword must assign hs.task.new to a local `task` variable (karabiner-capsword-lock-leak)")
+			inline_form or declared_form,
+			"deactivate_capsword must capture hs.task.new in a local `task` variable, "
+			.. "inline or forward-declared (karabiner-capsword-lock-leak)")
 	end)
 
 	helpers.it("_capsword_check_pending is released when task:start() returns false", function()

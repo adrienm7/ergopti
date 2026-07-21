@@ -45,13 +45,84 @@ local function assert_gc_pinned(rel_path)
 	assert(src, (err or "missing") .. " — " .. rel_path)
 	if not src:find("hs%.task%.new", 1, false) then return end  -- file does not use hs.task; skip
 	local has_own_pin      = src:find("_active_tasks", 1, false) ~= nil
+		-- Any *_tasks GC-root table counts (e.g. _active_probe_tasks in
+		-- keymap/input_sources.lua) — the pin is what matters, not its exact name.
+		or src:find("_active_[%w_]*tasks") ~= nil
 	local has_delegated_pin = src:find("%.active_tasks") ~= nil
 		or src:find("active_tasks_gc_root", 1, false) ~= nil
-	assert(has_own_pin or has_delegated_pin,
+	-- A task awaited with waitUntilExit() is referenced by its local for the whole
+	-- (blocking) lifetime, so the GC can never reach it mid-run: no pin required.
+	local is_synchronous = src:find("waitUntilExit", 1, true) ~= nil
+	assert(has_own_pin or has_delegated_pin or is_synchronous,
 		rel_path .. ": uses hs.task.new but has no recognizable GC-root pin — "
 		.. "add M._active_tasks = {} (own root) or pin via deps.active_tasks / "
 		.. "active_tasks_gc_root (delegated root) before :start()")
 end
+
+--- Lists every driver .lua file, so the guard covers the whole CLASS instead of a
+--- hand-maintained allowlist. Seven files using hs.task.new were absent from that
+--- list and shipped unpinned for exactly that reason
+--- (project-ahk-guard-tests-must-loop-the-class).
+--- @return table Array of paths relative to the driver root.
+local function all_driver_sources()
+	local out = {}
+	local ok_lfs, lfs = pcall(require, "lfs")
+	if ok_lfs then
+		local function walk(dir, prefix)
+			for entry in lfs.dir(DRIVER_ROOT .. dir) do
+				if entry ~= "." and entry ~= ".." then
+					local rel  = prefix .. entry
+					local attr = lfs.attributes(DRIVER_ROOT .. rel)
+					if attr and attr.mode == "directory" then
+						walk(rel .. "/", rel .. "/")
+					elseif entry:match("%.lua$") then
+						out[#out + 1] = rel
+					end
+				end
+			end
+		end
+		for _, d in ipairs({ "adapters", "lib", "modules", "ui" }) do walk(d .. "/", d .. "/") end
+		return out
+	end
+
+	local sep = package.config:sub(1, 1)
+	local cmd = (sep == "\\")
+		and ('cmd /c dir /b /s /a-d "' .. DRIVER_ROOT:gsub("/", "\\") .. '*.lua"')
+		or ("find '" .. DRIVER_ROOT .. "' -type f -name '*.lua'")
+	local pipe = io.popen(cmd)
+	if not pipe then return out end
+	for line in pipe:lines() do
+		local norm = line:gsub("\\", "/"):gsub("%s+$", "")
+		local rel  = norm:gsub("^.*/macos/", "")
+		if rel:match("%.lua$")
+			and not rel:match("^tests/") and not rel:match("^vendor/") and not rel:match("^_generated/") then
+			out[#out + 1] = rel
+		end
+	end
+	pipe:close()
+	return out
+end
+
+helpers.describe("GC retention: EVERY driver source using hs.task.new is pinned", function()
+	helpers.it("no driver file calls hs.task.new without a GC-root pin", function()
+		local files = all_driver_sources()
+		helpers.assert_true(#files > 0,
+			"the source walk must find driver .lua files — an empty list would make this guard vacuous")
+
+		local offenders = {}
+		for _, rel in ipairs(files) do
+			local ok = pcall(assert_gc_pinned, rel)
+			if not ok then offenders[#offenders + 1] = rel end
+		end
+
+		helpers.assert_true(#offenders == 0, string.format(
+			"%d file(s) call hs.task.new with no GC-root pin. An unreferenced hs.task is "
+			.. "collected mid-run: the subprocess is killed and its completion callback never "
+			.. "fires, so whatever it was supposed to finish silently never happens. Add a "
+			.. "_active_tasks root, pin before :start(), release in the callback: %s",
+			#offenders, table.concat(offenders, ", ")))
+	end)
+end)
 
 helpers.describe("GC retention: hs.task pinning", function()
 

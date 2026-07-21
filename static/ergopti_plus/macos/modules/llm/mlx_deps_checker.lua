@@ -101,6 +101,14 @@ local _pending_callbacks = {}
 -- both write the same .venv directory.
 local _task_running = false
 
+-- GC root for the live bootstrap hs.task. The handle below is a FUNCTION-local, so
+-- it goes out of scope as soon as the spawning function returns while the
+-- subprocess is still running — an unreferenced hs.task can be collected mid-run,
+-- killing the install and dropping its completion callback. Canonical spelling
+-- recognised by tests/unit/meta/test_gc_retention.lua; released in the callback.
+local _active_tasks = {}
+
+
 
 
 
@@ -484,6 +492,7 @@ function M.check_and_install_deps(on_complete)
 	-- passing bash_cmd as the first argument so pty.spawn(sys.argv[1:]) receives ["/bin/bash", "-c", bash_cmd].
 	-- The signature is: hs.task.new(launchPath, completionCallback, streamingCallback, arguments)
 	task = hs.task.new("/usr/bin/python3", function(exit_code, stdout, stderr)
+		if task then _active_tasks[task] = nil end
 		-- Completion callback: fires when the process exits
 		local combined = (stdout or "") .. (stderr or "")
 		-- Clean up the temporary PTY wrapper script
@@ -550,7 +559,9 @@ function M.check_and_install_deps(on_complete)
 	-- Arm the reentrancy guard before task:start() so any callback that fires
 	-- synchronously (unlikely but possible) sees _task_running = true.
 	_task_running = true
+	if task then _active_tasks[task] = true end
 	if not pcall(function() task:start() end) then
+		if task then _active_tasks[task] = nil end
 		Logger.error(LOG, "Failed to start hs.task for MLX bootstrap script.")
 		_bootstrap_state = "failed"
 		_last_failure_message = i18n.get("mlx.deps_task_start_failed")

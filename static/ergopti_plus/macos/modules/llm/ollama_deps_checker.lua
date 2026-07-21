@@ -55,6 +55,14 @@ local _bootstrap_state      = "pending"
 local _last_failure_message = nil
 local _task_running         = false  -- reentrancy guard: prevents duplicate concurrent tasks
 
+-- GC root for the live bootstrap hs.task. The handle below is a FUNCTION-local, so
+-- it goes out of scope as soon as the spawning function returns while the
+-- subprocess is still running — an unreferenced hs.task can be collected mid-run,
+-- killing the install and dropping its completion callback. Canonical spelling
+-- recognised by tests/unit/meta/test_gc_retention.lua; released in the callback.
+local _active_tasks = {}
+
+
 
 
 
@@ -200,6 +208,7 @@ function M.check_and_install_deps()
 
 	local task
 	task = hs.task.new("/bin/bash", function(exit_code, stdout, stderr)
+		if task then _active_tasks[task] = nil end
 		_task_running = false
 		local combined = (stdout or "") .. (stderr or "")
 		forward_chunk(stdout or "")
@@ -245,7 +254,9 @@ function M.check_and_install_deps()
 	pcall(function() task:setStreamingCallback(make_streaming_handler()) end)
 
 	_task_running = true
+	if task then _active_tasks[task] = true end
 	if not pcall(function() task:start() end) then
+		if task then _active_tasks[task] = nil end
 		_task_running = false
 		Logger.error(LOG, "Failed to start hs.task for Ollama bootstrap script.")
 		_bootstrap_state = "failed"
