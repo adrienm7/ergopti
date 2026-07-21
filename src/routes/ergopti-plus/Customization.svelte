@@ -2,35 +2,65 @@
 
 <!--
 ==============================================================================
-MODULE: Ergopti+ Page — Customization & Trust
+MODULE: Ergopti+ Page — Customization, Comfort & Trust
 DESCRIPTION:
-Two arguments that close the deal: everything is configurable (335 toggles
-measured from the shared feature manifest) and everything is private (local,
-open-source, free, telemetry-free).
+Everything is configurable (335 toggles from the shared manifest), the app
+speaks the visitor's language (locale chips discovered at build time),
+updates itself from the menu (real changelog window embedded), pauses
+politely for guests, and respects privacy end to end.
 
 FEATURES & RATIONALE:
-1. Merged Section: the old page said "everything is configurable" three
-   times across three sections; one strong statement converts better.
+1. Automated Language List: the chips come from scanning the driver's
+   locales directory at build — adding a locale updates the page alone.
+2. Real Update Window: the changelog webview is embedded live next to the
+   updater pitch; it queries GitHub releases itself.
 ==============================================================================
 -->
 
 <script>
+	import DriverFrame from './DriverFrame.svelte';
 	import { reveal } from './reveal.js';
+
+	/**
+	 * @type {{
+	 *   locales: Array<{code: string, name: string}>,
+	 *   webviews: Array<{id: string, width: number, height: number}>,
+	 *   geo: Record<string, {width: number, height: number}>
+	 * }}
+	 */
+	let { locales, webviews, geo } = $props();
 
 	const settingChips = [
 		'Délais par famille',
 		'Couleurs des tooltips',
+		'Touches et actions des tap-holds',
+		'Raccourcis clavier',
 		'Apps ignorées',
-		'Pause globale',
 		'Rechargement à chaud',
 		'Chemins de config',
 		'Modèle et backend IA',
 		'Prompts personnalisés',
 		'Sensibilité des gestes',
-		'Délais des tap-holds',
-		'Raccourcis clavier',
-		'Widget WPM'
+		'Widget MPM'
 	];
+
+	// French display names for the full native-window list.
+	const windowNames = {
+		action_picker: 'Sélecteur d’actions',
+		changelog: 'Notes de version',
+		download_window: 'Téléchargements',
+		healthcheck: 'Diagnostic',
+		hotstring_editor: 'Éditeur de hotstrings',
+		hotstrings_config_window: 'Réglages hotstrings',
+		metrics_apps: 'Temps d’écran',
+		metrics_typing: 'Statistiques de frappe',
+		model_browser: 'Catalogue de modèles',
+		onboarding: 'Assistant de démarrage',
+		paths_editor: 'Dossier de config',
+		personal_info_editor: 'Infos personnelles',
+		prompt_editor: 'Éditeur de prompts',
+		token_prompt: 'Jeton HuggingFace'
+	};
 
 	const trust = [
 		{
@@ -64,11 +94,12 @@ FEATURES & RATIONALE:
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Vous gardez la main</p>
-			<h2>335 réglages. Zéro obligation.</h2>
+			<h2>335 réglages. Zéro obligation. Zéro code.</h2>
 			<p class="lead">
-				Chaque fonctionnalité de cette page est <strong>activable indépendamment</strong> depuis le menu
-				— généré automatiquement depuis un manifeste unique, pour que les trois drivers exposent exactement
-				les mêmes options. Une case ne vous convient pas ? Décochez-la.
+				Nous livrons de bons défauts — touches, délais, couleurs, raccourcis — mais
+				<strong>tout se change depuis le menu</strong>, sans écrire une ligne de code. Le menu est
+				généré depuis un manifeste unique, pour que les trois drivers exposent exactement les mêmes
+				options.
 			</p>
 		</header>
 
@@ -78,6 +109,71 @@ FEATURES & RATIONALE:
 			{/each}
 			<li class="chip chip--more">et 300 autres…</li>
 		</ul>
+
+		<!-- Comfort band: languages / guest pause -->
+		<div class="comfort-grid">
+			<article class="ep-card comfort-card comfort-card--wide" use:reveal>
+				<h3>🌍 Parle votre langue — {locales.length} au choix</h3>
+				<p>
+					Menus, fenêtres, assistants : toute l’interface est traduite. Liste découverte
+					automatiquement depuis les fichiers du driver, dans l’ordre de ses menus :
+				</p>
+				<ul class="lang-chips">
+					{#each locales as l}
+						<li class="lang-chip" title={l.code}>
+							<span class="lang-flag" aria-hidden="true">{l.flag}</span>{l.name}
+						</li>
+					{/each}
+				</ul>
+			</article>
+
+			<article class="ep-card comfort-card" use:reveal={{ delay: 60 }}>
+				<h3>⏯ La pause qui rend le PC prêtable</h3>
+				<p>
+					Un raccourci met tout en pause : le clavier redevient <strong>AZERTY</strong>, les
+					raccourcis redeviennent ceux de l’OS — passez votre machine à un collègue sans le
+					dérouter. Réactivez : la disposition Ergopti (si émulée), vos hotstrings et vos raccourcis
+					personnalisés reviennent instantanément.
+				</p>
+			</article>
+
+			<article class="ep-card comfort-card" use:reveal={{ delay: 120 }}>
+				<h3>🔄 Mise à jour depuis l’app</h3>
+				<p>
+					Le driver vérifie les nouvelles versions et se met à jour <strong>depuis le menu</strong>
+					— canal stable ou dev, notes de version intégrées. La fenêtre ci-dessous est la vraie : elle
+					interroge GitHub en direct.
+				</p>
+			</article>
+		</div>
+
+		<!-- Real changelog window, live from GitHub -->
+		<div class="changelog-embed">
+			<DriverFrame
+				id="changelog"
+				width={geo.changelog?.width ?? 860}
+				height={geo.changelog?.height ?? 580}
+				displayHeight={520}
+			/>
+		</div>
+
+		<!-- Native windows strip -->
+		<div class="win-all" use:reveal>
+			<p class="win-all-lead">
+				Le driver ouvre <strong>{webviews.length} fenêtres natives</strong> — réglages, éditeurs,
+				assistants, tableaux de bord. Chacune est une vraie fenêtre de votre système (WebView2 sur
+				Windows, WKWebView sur macOS, WebKitGTK sur Linux), mais toutes partagent
+				<strong>un seul et même code</strong> : même apparence, même comportement sur les trois OS. Liste
+				générée depuis le manifeste du driver :
+			</p>
+			<ul class="win-chips">
+				{#each webviews as w}
+					<li class="win-chip" title="{w.id} · {w.width}×{w.height}">
+						{windowNames[w.id] ?? w.id}
+					</li>
+				{/each}
+			</ul>
+		</div>
 
 		<div class="trust-grid">
 			{#each trust as t, i}
@@ -121,6 +217,84 @@ FEATURES & RATIONALE:
 		color: var(--ink-faint);
 	}
 
+	/* ─── Comfort band ──────────────────────────────────────── */
+
+	.comfort-grid {
+		display: grid;
+		gap: 16px;
+		grid-template-columns: repeat(2, 1fr);
+		margin-bottom: 18px;
+	}
+
+	.comfort-card h3 {
+		margin-bottom: 10px;
+	}
+
+	.comfort-card--wide {
+		grid-column: 1 / -1;
+	}
+
+	.lang-chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		list-style: none;
+		margin-top: 14px;
+	}
+
+	.lang-chip {
+		background: rgba(49, 190, 255, 0.08);
+		border: 1px solid rgba(49, 190, 255, 0.22);
+		border-radius: 999px;
+		color: var(--ink-soft);
+		font-size: 0.78rem;
+		font-weight: 600;
+		padding: 3px 10px;
+	}
+
+	.lang-flag {
+		margin-right: 5px;
+	}
+
+	.changelog-embed {
+		margin-bottom: clamp(30px, 4.5vw, 48px);
+	}
+
+	/* ─── Native windows strip ──────────────────────────────── */
+
+	.win-all {
+		margin-bottom: clamp(30px, 4.5vw, 48px);
+		text-align: center;
+	}
+
+	.win-all-lead {
+		color: var(--ink-soft);
+		font-size: 0.9rem;
+		line-height: 1.65;
+		margin: 0 auto 12px;
+		max-width: 760px;
+		text-align: center;
+	}
+
+	.win-chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 7px;
+		justify-content: center;
+		list-style: none;
+	}
+
+	.win-chip {
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		color: var(--ink-faint);
+		font-size: 0.78rem;
+		padding: 4px 12px;
+	}
+
+	/* ─── Trust ─────────────────────────────────────────────── */
+
 	.trust-grid {
 		display: grid;
 		gap: 16px;
@@ -134,6 +308,7 @@ FEATURES & RATIONALE:
 	}
 
 	@media (max-width: 880px) {
+		.comfort-grid,
 		.trust-grid {
 			grid-template-columns: 1fr;
 		}

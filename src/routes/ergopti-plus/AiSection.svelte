@@ -19,6 +19,7 @@ FEATURES & RATIONALE:
 -->
 
 <script>
+	import DriverFrame from './DriverFrame.svelte';
 	import { reveal } from './reveal.js';
 	import WindowChrome from './WindowChrome.svelte';
 	import { ui } from './state.svelte.js';
@@ -30,10 +31,11 @@ FEATURES & RATIONALE:
 	 *   range: {min: string, max: string},
 	 *   apiProviders: Array<{id: string, label: string, defaultModel: string}>,
 	 *   profiles: Array<{id: string, label: string, batch: boolean}>,
-	 *   defaults: {debounceMs: number, numPredictions: number, contextLength: number, ollamaPort: number, mlxPort: number}
+	 *   defaults: {debounceMs: number, numPredictions: number, contextLength: number, ollamaPort: number, mlxPort: number},
+	 *   geo: Record<string, {width: number, height: number}>
 	 * }}
 	 */
-	let { catalog, totals, range, apiProviders, profiles, defaults } = $props();
+	let { catalog, totals, range, apiProviders, profiles, defaults, geo } = $props();
 
 	// Tooltip mockup tabs — the three usage modes of the AI tooltip, using
 	// the driver's real color code (gray context, green corrections, orange
@@ -238,10 +240,7 @@ FEATURES & RATIONALE:
 
 		<!-- Step 2 — model catalog -->
 		<div class="ai-step" use:reveal>
-			<h3>
-				<span class="step-badge">2</span> Choisissez votre modèle parmi
-				<strong>{totals.models}</strong>
-			</h3>
+			<h3><span class="step-badge">2</span> Choisissez votre modèle parmi {totals.models}</h3>
 			<p class="step-lead">
 				Un catalogue curé de <strong>{totals.models} modèles open-weights</strong> issus de
 				<strong>{totals.providers} fournisseurs</strong>
@@ -262,6 +261,18 @@ FEATURES & RATIONALE:
 						</div>
 					</article>
 				{/each}
+			</div>
+			<div class="browser-embed">
+				<p class="step-lead">
+					Et voici la <strong>vraie fenêtre</strong> du navigateur de modèles, alimentée ici avec ce
+					même catalogue — triez, cherchez, comparez :
+				</p>
+				<DriverFrame
+					id="model_browser"
+					width={geo.model_browser?.width ?? 900}
+					height={geo.model_browser?.height ?? 580}
+					displayHeight={520}
+				/>
 			</div>
 			<p class="api-note">
 				Catalogue généré depuis <code>models.json</code> — le même fichier que lit le driver.
@@ -625,6 +636,10 @@ FEATURES & RATIONALE:
 		font-size: 0.78rem;
 		margin: 12px 0 0;
 		text-align: center;
+	}
+
+	.browser-embed {
+		margin-top: 22px;
 	}
 
 	/* ─── Model catalog ─────────────────────────────────────── */

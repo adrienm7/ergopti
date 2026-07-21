@@ -23,6 +23,9 @@ FEATURES & RATIONALE:
 	import { ui } from './state.svelte.js';
 	import { reveal } from './reveal.js';
 
+	/** @type {{macosApps: Array<{id: string, name: string, description: string}>}} */
+	let { macosApps } = $props();
+
 	// Verified against the source tree — see the per-row nuance labels.
 	// status: 'yes' | 'no' | text label rendered as-is.
 	const matrix = [
@@ -113,6 +116,49 @@ FEATURES & RATIONALE:
 			<span class="lg warn">α = implémenté, jamais testé en conditions réelles</span>
 			<span class="lg off">— = absent</span>
 		</p>
+
+		<!-- Per-OS bonuses -->
+		<div class="bonus-grid">
+			<article class="ep-card bonus-card" use:reveal>
+				<h3><i class="icon-windows bonus-icon"></i> En bonus sur Windows</h3>
+				<ul class="bonus-list">
+					<li>
+						<strong>Ergopti sans installation.</strong> Le driver peut <em>émuler</em> la disposition
+						Ergopti par-dessus votre layout actuel — aucun installateur, aucun droit admin. Idéal au
+						bureau ou sur un poste verrouillé.
+					</li>
+					<li>
+						<strong>Le meilleur d’Ergopti, même en AZERTY ou Bépo.</strong> Sans changer de
+						disposition, profitez de la couche de symboles AltGr d’Ergopti et des
+						<em>chiffres en accès direct</em> — deux des plus gros gains de la disposition, disponibles
+						partout.
+					</li>
+					<li>
+						<strong>Spotlight curseur.</strong> Un halo met votre curseur en évidence et repère les autres
+						écrans — parfait pour les présentations.
+					</li>
+				</ul>
+			</article>
+
+			<article class="ep-card bonus-card" use:reveal={{ delay: 90 }}>
+				<h3><i class="icon-appleinc bonus-icon"></i> En bonus sur macOS</h3>
+				<ul class="bonus-list">
+					{#each macosApps as app}
+						<li>
+							<strong>{app.name}.</strong>
+							{app.description}
+						</li>
+					{/each}
+					<li>
+						<strong>MLX et gestes complets.</strong> Inférence IA accélérée par Apple Silicon, et le
+						moteur de gestes intégral (36 emplacements + 3 axes continus).
+					</li>
+				</ul>
+				<p class="bonus-note">
+					Descriptions extraites automatiquement des applications embarquées dans le driver.
+				</p>
+			</article>
+		</div>
 
 		<aside class="linux-callout ep-card" use:reveal>
 			<h3>🐧 Vous utilisez Linux ? On vous cherche.</h3>
@@ -287,6 +333,59 @@ FEATURES & RATIONALE:
 	}
 	.lg.off {
 		color: rgba(255, 255, 255, 0.35);
+	}
+
+	/* ─── Per-OS bonuses ────────────────────────────────────── */
+
+	.bonus-grid {
+		display: grid;
+		gap: 16px;
+		grid-template-columns: repeat(2, 1fr);
+		margin-top: 26px;
+	}
+
+	.bonus-card h3 {
+		align-items: center;
+		display: flex;
+		gap: 10px;
+		margin-bottom: 12px;
+	}
+
+	.bonus-icon {
+		font-size: 1.15rem;
+	}
+
+	.bonus-card .icon-windows {
+		color: #31beff;
+	}
+
+	.bonus-card .icon-appleinc {
+		color: #e8e8ed;
+	}
+
+	.bonus-list {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		list-style: none;
+	}
+
+	.bonus-list li {
+		color: var(--ink-soft);
+		font-size: 0.92rem;
+		line-height: 1.6;
+	}
+
+	.bonus-note {
+		color: var(--ink-faint);
+		font-size: 0.78rem;
+		margin-top: 14px;
+	}
+
+	@media (max-width: 880px) {
+		.bonus-grid {
+			grid-template-columns: 1fr;
+		}
 	}
 
 	/* ─── Linux callout ─────────────────────────────────────── */
