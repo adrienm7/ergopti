@@ -108,3 +108,40 @@ _IFR_CheckRequeueOnFailure() {
 
 Test("meta fix-ingest-failure-requeues-pending: FileAppend catch re-queues only the pending tail not already durable in today.log",
 	_IFR_CheckRequeueOnFailure)
+
+
+; The same HIGH-04 transaction must cover the OTHER destructive-after-clear
+; call: opening today.log. FileOpen throws OSError in AHK v2 — it never returns
+; a falsy handle — so a bare `fh := KL_OpenTodayFh()` aborted the timer thread
+; after _pending_entries had already been snapshot-and-cleared, discarding the
+; local snapshot with no requeue and no offset rollback. Unlike the data.sql
+; path there is no disk copy to fall back on: KL_AppendLog pushes to
+; _pending_entries only, so the snapshot is the sole copy of those keystrokes.
+;
+; Scans the concatenated module source, matching the helper this file already
+; uses, rather than resolving one function body.
+_IFR_TodayLogOpenRequeues() {
+	Src := _DriverDirConcat("modules/keylogger")
+
+	OpenPos := InStr(Src, "fh := KL_OpenTodayFh()")
+	Assert(OpenPos > 0, "KL_IngestOnce must still open today.log via KL_OpenTodayFh()")
+
+	; Bounded windows on both sides: only the statements immediately around the
+	; call can establish that it is inside a try with a recovering catch.
+	HeadStart := (OpenPos > 120) ? OpenPos - 120 : 1
+	Head := SubStr(Src, HeadStart, OpenPos - HeadStart)
+	Assert(InStr(Head, "try {") > 0,
+		"KL_IngestOnce must open today.log inside a try - FileOpen throws OSError in v2 and would otherwise abort the tick after _pending_entries was already cleared")
+
+	CatchWindow := SubStr(Src, OpenPos, 1000)
+	Assert(InStr(CatchWindow, "catch as err") > 0,
+		"the today.log open must have an explicit catch")
+	Assert(InStr(CatchWindow, "InsertAt") > 0,
+		"the today.log open failure must re-queue the pending snapshot onto _pending_entries")
+	Assert(InStr(CatchWindow, "pending_snapshot") > 0,
+		"the re-queue must restore pending_snapshot, the only copy of those entries")
+	Assert(InStr(CatchWindow, "today_log_open_failed") > 0,
+		"the failure must return a distinct reason so the caller can tell it from a data.sql failure")
+}
+Test("meta ingest: a failed today.log open re-queues the whole pending snapshot",
+	_IFR_TodayLogOpenRequeues)
