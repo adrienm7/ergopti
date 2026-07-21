@@ -560,7 +560,7 @@ _OnbWeb_LocaleStringsExpr(Code) {
 	base := _OnbWeb_LocaleStringsJson(Code)
 	; Forward-slash the path to match the cross-platform locale text (macOS uses
 	; "/"), keeping the red warning block visually identical across drivers.
-	metricsPath := StrReplace((IsSet(_ConfigDir) ? _ConfigDir : "") . "metrics", "\", "/")
+	metricsPath := StrReplace(_Onboarding_EffectiveConfigDir() . "metrics", "\", "/")
 	tpl := _Onboarding_Translate(Code, "dialog.metrics.enable_warning")
 	warn := ""
 	if (tpl != "" && tpl != "dialog.metrics.enable_warning")

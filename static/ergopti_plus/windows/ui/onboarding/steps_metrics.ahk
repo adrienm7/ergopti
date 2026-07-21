@@ -59,7 +59,10 @@ _Onboarding_Step4() {
 	; matching that style on Windows keeps the displayed path consistent across
 	; both drivers and avoids the visual clutter of Windows backslashes inside
 	; the red warning block.
-	metrics_path := StrReplace(_ConfigDir . "metrics", "\", "/")
+	; Resolve the folder the user actually chose: _ConfigDir still holds the
+	; boot value here, so consent would otherwise be given against a path the
+	; keystrokes are never written to.
+	metrics_path := StrReplace(_Onboarding_EffectiveConfigDir() . "metrics", "\", "/")
 	warning := Format(t("dialog.metrics.enable_warning"), metrics_path)
 	; Warning: plain orange text between two horizontal rules — simpler and reliable.
 	g.AddText("xm y+10 w" ONBOARDING_WIN_W - 40 " 0x10")  ; SS_ETCHEDHORZ — top separator
