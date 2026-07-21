@@ -33,6 +33,24 @@ relative order and "nearest preceding `#HotIf`" assertions stay valid even after
 the file is moved or renamed. State that reasoning in a comment — it is not
 obvious to the next reader.
 
+## The same rule on macOS — and it is automated
+
+Lua tests use `helpers.read_driver_source(symbol)`, never
+`helpers.driver_root() .. "modules/foo/bar.lua"`. The twin ratchet is
+`tools/test/test-no-pinned-source-reads-lua.cjs`.
+
+You should not have to think about this: **the pre-commit hook blocks a staged
+Lua test that introduces a pinned read**, and `npm run fix:pinned-reads`
+converts it for you. `npm run lint:pinned-reads` surveys the whole tree.
+
+The one thing the fixer will not do for you is guess. `read_driver_source`
+returns *every* production file containing the symbol, concatenated — so a
+selector matching two files changes what a position-comparing assertion means,
+silently. The fixer therefore proves a candidate declaration is unique across
+the production tree before using it, and refuses when none is
+(`_on_config_changed` is assigned in two files — a real case). When it refuses,
+make the assertion order-independent first, then convert by hand.
+
 ## Trap 1 — comments shift your positions
 
 A **comment** containing the token you scan for silently breaks naive `InStr`
