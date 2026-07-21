@@ -130,6 +130,7 @@
 	"changelog_window.channel_stable": "Stable",
 	"changelog_window.error_network": "Unable to load releases from GitHub.\nCheck your internet connection.",
 	"changelog_window.error_parse": "Unable to parse GitHub response.",
+	"changelog_window.error_rate_limited": "Unable to load releases from GitHub.\nGitHub is limiting requests — please try again in a few minutes.",
 	"changelog_window.loading": "Loading releases…",
 	"changelog_window.no_notes": "(No release notes available.)",
 	"changelog_window.no_releases": "No releases found.",

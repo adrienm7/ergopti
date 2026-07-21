@@ -414,9 +414,11 @@ _CLW_PollFetch(Req, Channel, Polls) {
 	}
 
 	Json := ""
+	Status := 0
 	if !failed {
 		try {
-			if (Req.Status == 200)
+			Status := Req.Status
+			if (Status == 200)
 				Json := Req.ResponseText
 		} catch as Err {
 			try LoggerWarn("Changelog", "GitHub API response read failed: {1}.", Err.Message)
@@ -424,7 +426,19 @@ _CLW_PollFetch(Req, Channel, Polls) {
 	}
 
 	if (Json == "") {
-		ErrMsg := _CLW_JsStr(t("changelog_window.error_network"))
+		; Every non-200 used to leave through here in complete silence: the
+		; request had succeeded, so none of the catches above fired, and the
+		; status was tested but never captured. The user was shown a network
+		; error for what is most often a 403 rate-limit, and the log — which had
+		; opened a lifecycle line for this fetch — recorded nothing at all.
+		try LoggerWarn("Changelog", "GitHub API returned HTTP {1} — no releases injected (channel={2}).",
+			Status, Channel)
+		; A rate-limit is not an outage, and telling the user to check their
+		; connection sends them after the wrong problem.
+		ErrKey := (Status == 403 or Status == 429)
+			? "changelog_window.error_rate_limited"
+			: "changelog_window.error_network"
+		ErrMsg := _CLW_JsStr(t(ErrKey))
 		_CLW_Eval("injectError(" . ErrMsg . ")")
 		return
 	}
