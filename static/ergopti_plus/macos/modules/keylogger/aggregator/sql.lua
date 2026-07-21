@@ -60,6 +60,38 @@ local function json_lit(tbl)
 	return "'" .. (s:gsub("'", "''")) .. "'"
 end
 
+--- Builds a SQLite expression that MERGES the incoming esrc_json into the stored
+--- one by summing each source key, instead of replacing it.
+---
+--- item.esrc is a per-tick DELTA: the batch row is deleted after each successful
+--- flush, so `esrc_json=excluded.esrc_json` discarded every count accumulated by
+--- previous ticks. The n-gram's total `c` kept summing correctly while its
+--- hotstring/LLM/manual source split silently reflected only the last flush
+--- window, so the dashboard's "typed vs expanded" breakdown was wrong for every
+--- n-gram seen in more than one tick.
+---
+--- MIRRORS the Windows driver's KLW_EsrcMergeExpr (keylogger_walker_sql.ahk),
+--- which has carried this merge — and its own regression test — since it was
+--- fixed there.
+--- @param esrc table|nil The per-tick source-count delta.
+--- @return string A SQL expression usable as the esrc_json assignment.
+local function esrc_merge_expr(esrc)
+	if type(esrc) ~= "table" or next(esrc) == nil then
+		return "COALESCE(esrc_json,'{}')"
+	end
+	local parts = { "json_set(COALESCE(esrc_json,'{}')" }
+	for k in pairs(esrc) do
+		-- The result is spliced into a string.format template, so "%" must be
+		-- doubled as well as the SQL quote escaped.
+		local path = "$." .. tostring(k):gsub("'", "''"):gsub("%%", "%%%%")
+		parts[#parts + 1] = string.format(
+			",'%s',COALESCE(json_extract(esrc_json,'%s'),0)+COALESCE(json_extract(excluded.esrc_json,'%s'),0)",
+			path, path, path)
+	end
+	parts[#parts + 1] = ")"
+	return table.concat(parts)
+end
+
 local function sq(s)
 	return "'" .. tostring(s):gsub("'", "''") .. "'"
 end
@@ -160,7 +192,7 @@ function M.flush()
 				"INSERT INTO %s (device_id, date, app, token, c, td, cd, e, esrc_json) VALUES (%s,%s,%s,%s,%d,%d,%d,%d,%s) "
 				.. "ON CONFLICT(device_id, date, app, token) DO UPDATE SET "
 				.. "c=c+excluded.c, td=td+excluded.td, cd=cd+excluded.cd, e=e+excluded.e, "
-				.. "esrc_json=excluded.esrc_json",
+				.. "esrc_json=" .. esrc_merge_expr(item.esrc),
 				tbl_name, d, sq(date_str), sq(app), sq(token),
 				i(item.c), i(item.td), i(item.cd), i(item.e),
 				json_lit(item.esrc)))
