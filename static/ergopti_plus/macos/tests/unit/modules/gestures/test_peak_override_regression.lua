@@ -12,9 +12,15 @@
 --- intended 50 ms threshold — so a 4-finger swipe's peakN could be confirmed too
 --- early, raising the risk of false-positive finger-count overrides.
 ---
---- Fix: commitGesture now computes peak_elapsed = now - peakNFirstSeen and tests
---- peak_elapsed >= PEAK_FINGERS_CONFIRM_MS (0.05 s), making the confirmation
---- hardware-independent.
+--- Fix: commitGesture computes a peak_elapsed in SECONDS and tests it against
+--- PEAK_FINGERS_CONFIRM_MS (0.05 s), making the confirmation hardware-independent.
+---
+--- The cases below model that threshold comparison in isolation. What they do NOT
+--- pin is which two timestamps production subtracts: it first used
+--- (now - peakNFirstSeen), the peak's AGE, which grew with the rest of the gesture
+--- and let a one-frame spike confirm. That separate defect — and the switch to the
+--- peak's HELD span — is covered behaviourally by
+--- test_peak_override_needs_sustained_hold.lua.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
