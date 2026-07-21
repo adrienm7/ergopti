@@ -26,6 +26,7 @@ if not ok_kl then keylogger = nil end
 local SharedEngine = require("dynamic_hotstrings")
 
 local Logger = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local LOG    = "dynamic_hotstrings.rules"
 
 local ok_locale, locale = pcall(require, "lib.locale")
@@ -312,13 +313,13 @@ function M.start(keymap_module)
 	local function loc(key) return locale and locale.get(key) or "" end
 	local desc_datefr = loc("dynamichotstrings.datefr")
 	if desc_datefr == "" then desc_datefr = "dt" .. _trigger .. " inserts current date ({date})" end
-	desc_datefr = desc_datefr:gsub("{date}", dates.fr)
+	desc_datefr = desc_datefr:gsub("{date}", text_utils.escape_gsub_replacement(dates.fr))
 	local desc_datelongfr = loc("dynamichotstrings.datelongfr")
 	if desc_datelongfr == "" then desc_datelongfr = "date" .. _trigger .. " inserts long date ({date})" end
-	desc_datelongfr = desc_datelongfr:gsub("{date}", dates.long_fr)
+	desc_datelongfr = desc_datelongfr:gsub("{date}", text_utils.escape_gsub_replacement(dates.long_fr))
 	local desc_date = loc("dynamichotstrings.date")
 	if desc_date == "" then desc_date = "td" .. _trigger .. " inserts current date ({date})" end
-	desc_date = desc_date:gsub("{date}", dates.iso)
+	desc_date = desc_date:gsub("{date}", text_utils.escape_gsub_replacement(dates.iso))
 
 	-- Sections ordered identically to the AHK DynamicHotstrings feature map.
 	-- Prefix section counts start at 0; register_prefix_entries updates them with
