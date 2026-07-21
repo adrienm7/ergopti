@@ -492,6 +492,32 @@ M.canvas = {
 	windowBehaviors = setmetatable({}, { __index = function() return 0 end }),
 }
 
+-- Screen geometry for the tooltip anchor step. Without hs.screen every render
+-- path aborted at renderer.lua's `hs.screen.mainScreen():frame()` INSIDE M.render's
+-- pcall, so canvas:frame()/show() were never reached and any test asserting on a
+-- completed render was a false green (test_tooltip_stacked_panel could not see a
+-- crash at the draw site because the render never got that far).
+local STUB_SCREEN_W = 1920  -- Nominal test display width in points
+local STUB_SCREEN_H = 1080  -- Nominal test display height in points
+
+local function make_screen()
+	local screen = {}
+	function screen:frame()      return { x = 0, y = 0, w = STUB_SCREEN_W, h = STUB_SCREEN_H } end
+	function screen:fullFrame()  return { x = 0, y = 0, w = STUB_SCREEN_W, h = STUB_SCREEN_H } end
+	function screen:name()       return "StubDisplay" end
+	function screen:id()         return 1 end
+	-- The healthcheck collector probes currentMode(); its API contract test asserts
+	-- every probed symbol exists, so the stub must carry it too.
+	function screen:currentMode() return { w = STUB_SCREEN_W, h = STUB_SCREEN_H, scale = 2 } end
+	return screen
+end
+
+M.screen = {
+	mainScreen  = function() return make_screen() end,
+	primaryScreen = function() return make_screen() end,
+	allScreens  = function() return { make_screen() } end,
+}
+
 M.styledtext = { new = function(s, _) return s end }
 M.console = { printStyledtext = function(_) end }
 M.notify = {
