@@ -6,139 +6,141 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 
 ## Contents
 
-- **Working conventions & feedback**
-  - [feedback-ahk-source-encoding](#feedback-ahk-source-encoding) — AHK v2 source files must be UTF-8 BOM + LF; encoding drift causes silent mid-file parse aborts that masquerade as missing tests
-  - [feedback-ahk-suspend-prefix-latch](#feedback-ahk-suspend-prefix-latch) — AHK Kana custom-combination prefix latches across Suspend; fix at the source, synthetic key events can't clear it
-  - [feedback_ahk_ui_syntax_validation](#feedback-ahk-ui-syntax-validation) — AHK UI files aren't in the headless test runner; how to syntax-check them locally on Windows
-  - [Coding style and conventions for this project](#coding-style-and-conventions-for-this-project) — Style rules, architecture decisions, and what to avoid when writing code for this project
-  - [project-lua-closure-before-local-nil-global](#project-lua-closure-before-local-nil-global) — A `local` declared textually AFTER a closure that uses it is not captured: the closure binds the nil global, and an hs.task/ShellRunner pcall swallows the resulting error silently
-  - [feedback_commit_push](#feedback-commit-push) — Never push automatically — commit only after explicit ask, push only after explicit validation
-  - [feedback-proactive-memory](#feedback-proactive-memory) — Record non-obvious learnings in this file proactively at the end of every task, without being asked
-  - [feedback_fix_banners_tool](#feedback-fix-banners-tool) — npm run fix:banners auto-corrects all section banner alignment violations — run it before every commit instead of fixing manually
-  - [feedback-loader-target-explicit](#feedback-loader-target-explicit) — AHK loader/writer modules that mutate a shared Map (Features etc.) must take the target Map as an explicit parameter, never reach for it via `global`
-  - [No co-author trailers (Copilot, Claude, bots)](#no-co-author-trailers-copilot-claude-bots) — Never add Co-Authored-By trailers to commits — including Copilot, Claude, github-actions[bot], or any LLM/tool credit
-  - [feedback-no-push-dev](#feedback-no-push-dev) — Ne jamais pusher sur dev sans validation explicite — chaque commit sur dev déclenche la CI et crée une release
-  - [feedback-regression-tests](#feedback-regression-tests) — Every user-requested bug fix must ship with a regression test that fails before / passes after the fix
-  - [feedback-local-gate-mirrors-ci](#feedback-local-gate-mirrors-ci) — The pre-push gate is four commands; `npm run test:js` (66 checks) is the umbrella CI gates on, and it silently no-ops unless `node_modules` is installed on a Node meeting the engine floor
-  - [feedback-test-before-merge](#feedback-test-before-merge) — Never merge a cut-over slice into dev before the user has tested it live. Stay on the slice branch and wait for explicit validation.
-  - [feedback-ui-must-be-i18n](#feedback-ui-must-be-i18n) — All user-facing UI text must go through the i18n system in 21 supported languages — never hardcode any UI string anywhere, including WebView UIs (metrics, download window, etc.).
-- **Project architecture & decisions**
-  - [project-audit-2026-07-21-open-items](#project-audit-2026-07-21-open-items) — third-pass AHK audit: all 42 confirmed findings implemented, 26 claims refuted, and the two decisions taken instead of fixes (the report md was deleted; this is the record)
-  - [project-ahk-menu-dispatcher-drop](#project-ahk-menu-dispatcher-drop) — AHK 2.0 silently drops ~30-50% of tray-menu clicks. FIXED via lib/menu_dispatcher.ahk — every actionable item must use RegisterMenuItem, never raw Menu.Add.
-  - [project-ahk-invariant-incomplete-application](#project-ahk-invariant-incomplete-application) — Every AHK-driver hardening invariant (Critical-emit, suspend-guard, async-HTTP, RegisterMenuItem) is applied per-site; the recurring bug is the ONE missed sibling site or the guarantee defeated by indirection. Audit the whole class, not the documented site.
-  - [project-ahk-test-suite-critical-leak](#project-ahk-test-suite-critical-leak) — Critical("On") in layout/hotkey callbacks is safe in production but leaks into the main thread when invoked directly by tests, silently hanging background timers
-  - [project-ahk-numeric-string-equals-false](#project-ahk-numeric-string-equals-false) — `"0" = false` is TRUE in AHK v2; never compare a String|false return against false, type-check with `is String`
-  - [project-ahk-keyword-as-variable-hangs-the-parser](#project-ahk-keyword-as-variable-hangs-the-parser) — naming a variable `Catch` (or any control-flow keyword) hangs AHK v2 with zero output and no error; bisect to a trivial probe when a run produces nothing at all
-  - [project-ahk-probing-synthetic-input](#project-ahk-probing-synthetic-input) — a hotkey registered `I2` IGNORES synthetic input at SendLevel ≤ 2, and `SendLevel` is PER-THREAD — both silently make a probe measure nothing and report a false negative
-  - [project-ahk-map-delete-raises-on-missing-key](#project-ahk-map-delete-raises-on-missing-key) — `Map.Delete(k)` THROWS when k is absent (unlike `.Has`-guarded reads); an unguarded reset was a fatal startup error, and `/validate` is not an AHK v2.0 flag — it silently RUNS the script
-  - [project-toml-cache-returns-real-booleans](#project-toml-cache-returns-real-booleans) — `IniCacheGet` hands back what `TOML_CoerceValue` produced, so a TOML `true` is a BOOLEAN; `StrLower(v) == "true"` is a legal always-false test that silently read every enabled setting as off
-  - [project-audit-2026-07-21-toml-onboarding](#project-audit-2026-07-21-toml-onboarding) — the last two never-read driver zones (`lib/toml/`, `ui/onboarding/`) audited and cleared: 16 candidates, 11 confirmed and all 11 fixed with regression tests
-  - [project-ahk-guard-tests-must-loop-the-class](#project-ahk-guard-tests-must-loop-the-class) — Guard tests must enumerate the whole class of call sites, not the one site a bug was fixed at — 5 findings in one audit came from this
-  - [project-audit-evidence-must-be-reproducible](#project-audit-evidence-must-be-reproducible) — A refutation needs the same proof as a finding: the "the perf section was fabricated" debunking was itself wrong (it searched `ahk/logs`, but the real path is `autohotkey/logs`); G4 IS measured, and the logs live at `<ConfigDir>/autohotkey/logs/` via `paths.toml`
-  - [project-hs-audit-round4-2026-07-21](#project-hs-audit-round4-2026-07-21) — backlog closed at 78/78; the tooltip and the hotstring engine had two independent "will this fire?" implementations that disagreed in four ways
-  - [project-hs-audit-round2-2026-07-21](#project-hs-audit-round2-2026-07-21) — the second implementation pass: 51 of 78 open findings treated (24 fixed, 27 refuted/stale); the remaining 27 are listed there with an exact fix each
-  - [project-hs-audit-2026-07-21](#project-hs-audit-2026-07-21) — 13 macOS defects fixed (PII in logs, keystrokes logged inside a vault, silently discarded events); 78 findings remain OPEN and unverified — the backlog lives here because the audit md was deleted by design
-  - [project-audit-findings-are-hypotheses](#project-audit-findings-are-hypotheses) — 2 of 35 audit findings were wrong and the existing suite proved it; implement a finding as a hypothesis, not an instruction
-  - [project-updater-nonblocking-http](#project-updater-nonblocking-http) — The updater background poll must never do synchronous WinHttp on the main thread (it freezes all remapping); WinHttp SetTimeouts 0 = infinite. Use the async WinHTTP + WaitForResponse(0) + SetTimer-poll pattern.
-  - [project-config-v2-refactor](#project-config-v2-refactor) — State of the v2 config schema refactor (Scope C) — branch refactor/config-schema-v2 with 5 dormant commits. Cut-over to actually migrate the AHK driver runtime is the open piece.
-  - [project_debug_menu_sync](#project-debug-menu-sync) — Debug menu order is defined in _shared/modules/menu/menu_manifest.json debug_menu — both AHK and Lua drivers consume it
-  - [project_menu_manifest_macos_hotstrings_layout_gap](#project-menu-manifest-macos-hotstrings-layout-gap) — macOS never reads menu_manifest.json's hotstrings_menu/layout_menu keys (unlike gestures_menu/metrics_menu/shortcuts_menu, which ARE manifest-driven on both platforms) — a drift GATE exists, the actual migration does not
-  - [project-shared-tree-layout](#project-shared-tree-layout) — _shared/ is 6 folders (modules/core/data/lua/tests/ui); each layer resolves the shared root in ONE place (SSOT), but renames/moves still need call-site subpath edits — and several sites bypass the SSOT, so only the test suites catch them
-  - [project-gestures-reversal-detection](#project-gestures-reversal-detection) — How direction reversals are detected in the gestures engine (x1 vs incremental)
-  - [project-gestures-startup-design](#project-gestures-startup-design) — Design choices for the macOS gestures startup path — primer-as-wakeup-signal vs burst probes
-  - [project-hotstring-delay-architecture](#project-hotstring-delay-architecture) — Where hotstring expansion delays are configured, the cross-platform precedence, and the key gotchas
-  - [project-hotstring-engine-internals](#project-hotstring-engine-internals) — AHK prefix-watcher InputHook captures synthetic input; OnChar must feed each char once; AHK vs Hammerspoon word-boundary framing divergence is intentional
-  - [project-hotstring-live-rebuild](#project-hotstring-live-rebuild) — Hotstring section/category toggles apply in-process via a re-runnable RegisterAllHotstrings(); native-engine + layout-backed features under hotstrings.\* are the reload-only exceptions
-  - [project-typing-latency-tooltip-coldstart](#project-typing-latency-tooltip-coldstart) — Tooltip render + post-boot warm-up latency: the border alpha scan optimization, why tooltip window-reuse is rejected (AHK v2 can't remove Gui controls), and why deferred-registration chunking was reverted
-  - [project-hs-perf-profilers-and-case-conform](#project-hs-perf-profilers-and-case-conform) — macOS boot/hot-path profilers (via timer_scheduler adapter), the case-conform registration fast path (lowercase-only + fire-time conform, Unicode tail buckets), the menubar dirty-cache, the two dominant boot costs found + fixed (group disable/enable round-trip ~2 s; synchronous log-purge shell pipeline ~0.6 s deferred), and the escape-trap-on-first-show gotcha (Escape priority over Raycast — do not move to init)
-  - [project-tooltip-shared-style](#project-tooltip-shared-style) — Tooltip style is shared via _shared/modules/tooltip/constants.toml (per-driver alphas border_alpha_hs vs _ahk are intentionally different); the macOS stacked canvas rounds its colored rectangle with a SINGLE rounded panel background — NOT an hs.canvas clip element (clip rendered solid red on the user's build)
-  - [project-dc1-windows-vk-finger-map-gap](#project-dc1-windows-vk-finger-map-gap) — DC-1 single-sourced the JS + macOS finger maps from azerty.json; a 3rd hardcoded copy (Windows VK-code keyed) remains in keylogger_walker_core.ahk, deliberately left untouched
-  - [project-hs-script-quit-kills-karabiner](#project-hs-script-quit-kills-karabiner) — the script_quit action (rcmd+Escape) calls os.exit(), which BYPASSES the Hammerspoon shutdown callback, so it must call karabiner.kill() itself or KE keeps remapping the keyboard after HS is gone; conversely the shutdown callback must NOT kill KE on a reload (lib/reload_guard distinguishes reload from quit) or the grabber cascades down and the native "install Karabiner" prompt appears
-  - [project-hs-onboarding-config-schema](#project-hs-onboarding-config-schema) — the first-run wizard MUST write config.toml using the canonical HS schema (ui/menu/preferences.lua KEY_MAP: lowercase sections, clean `enabled` flags) — NOT AHK-style keys — or every wizard choice is silently dropped on the post-wizard reload; locale persists via hs.settings, not config.toml
-  - [Keymap module architecture and refactor decisions](#keymap-module-architecture-and-refactor-decisions) — Structure of the keymap module, where defaults live, which files do what
-  - [project-hs-synthetic-injection-choke-point](#project-hs-synthetic-injection-choke-point) — The macOS driver has TWO synthetic-keystroke trackers (keymap expected_synthetic_* + keylogger synth_queue); injectors that bypass perform_text_replacement desync them and can corrupt typed output — see AUDIT_HAMMERSPOON_BUGS.md
-  - [project-locale-parity-test](#project-locale-parity-test) — en.json is the canonical key set; the AHK meta-test test_locale_json_valid.ahk enforces parity in CI; check_locales.py --fix is the manual backfill tool
-  - [project-locale-fast-cache](#project-locale-fast-cache) — The Windows driver's locale .tsv is a gitignored self-healing fast-parse cache regenerated from the canonical .json on a miss/staleness; only .json is tracked, no committed duplication
-  - [project_metrics_pipeline_17](#project-metrics-pipeline-17) — AHK metrics pipeline — bug #17 CLOSED, follow-up bugs fixed
-  - [project-suspend-pause-invariant](#project-suspend-pause-invariant) — Pause must fully silence ALL features (no tooltip/LLM/keylogger/widget). AHK Suspend only disarms hotkeys — InputHooks/timers/OnMessage bypass it and need explicit A_IsSuspended guards.
-  - [project-macos-llm-runtime-enable-gate](#project-macos-llm-runtime-enable-gate) — macOS must not warm up or load an LLM model from profile/model restoration alone; warmup is allowed only after the runtime LLM gate is enabled
-  - [project-macos-eventtap-no-blocking](#project-macos-eventtap-no-blocking) — Never run blocking osascript/hs.execute inside an hs.eventtap callback — macOS disables the tap (kCGEventTapDisabledByTimeout) and AltGr+Enter dies. Defer with hs.timer.doAfter(0).
-  - [project-macos-script-control-tap-lifecycle](#project-macos-script-control-tap-lifecycle) — The script-control eventtap (AltGr+Enter/Backspace/Escape) must survive layout switches and pause. `shortcuts.start` is a Bindings-only proxy that kills it; the pause-layout switch fires the Karabiner input-source watcher that rebuilds mid-pause. Rebind via pause_bindings/resume_bindings and skip the rebuild while paused.
-  - [project-touchdevice-dormancy-is-kernel](#project-touchdevice-dormancy-is-kernel) — Definitive answer that macOS touchdevice subsystem CANNOT be activated before first physical touch — it is a kernel-driver gate
-  - [project-ui-dynamic-buttons](#project-ui-dynamic-buttons) — AHK UIs must use Gui_HarmoniseButtonWidths instead of hardcoded w-values; HS auto-sizes via CSS padding
-  - [errors-only-log-sink](#errors-only-log-sink) — Dedicated ErgoptiPlus*errors*\*.log (WARNING/ERROR only) + menu item; crash_reports remain for uncaught fatals only
-  - [project-hs-timer-callback-errors-invisible](#project-hs-timer-callback-errors-invisible) — Errors thrown in hs.timer/eventtap callbacks are swallowed to the HS Console, never the file logger; a test stub of a method production lacks masks the dangling call (the "vert mais aucune prédiction" bug)
-  - [project-macos-audit-2026-06-17-bugs](#project-macos-audit-2026-06-17-bugs) — Three macOS bugs fixed: LLM noise filter nil-vs-false Lua foot-gun, gesture peak confirmation was framerate-dependent (dead constant), synthetic-event reset race under OS load
-  - [broad-unit-test-regression-coverage](#broad-unit-test-regression-coverage) — Maximize Test()/helpers.it coverage for every feature (hotstrings, gestures, keylogger, layout, suspend/pause, menu, config, logger, etc.) in both AHK and HS to catch all regressions early. Every invariant and edge that has bitten us gets a permanent test.
-  - "Oui encore plus" ultra pass: +25+ additional tests across script_control (more pause idempotence/transitions, extras under pause), karabiner (pause gate on config), port_adapter meta (explicit suspend/pause purity + adapter notes + corpus coverage), corpus meta (pause/delay/reversal corpus notes + LLM under pause), tap_hold (more pause + bad TOML graceful), personal_toml (pause guard + bad entry), llm_profiles (pause no predict), keylogger_reader (pause privacy in reports), plus extra pause in gestures engine (more reversal + pause), keylogger privacy (agg under pause, PII on errors), llm prediction (pause on timeout, volume no degrade), hotstrings_full (more pause/synthetic/delay edges), shortcuts (more pause all dispatchers, menu no raw Add, bad features graceful). Total expansion now >80 new regression tests. The suite is now the strongest it's ever been — every feature has explicit pause/suspend guards + error/edge tests for critical invariants like project_suspend_pause_invariant, project_hotstring_delay_architecture, project_gestures_reversal_detection, keylogger privacy, menu dispatcher drops, AltGr prefix latch. Time makes the tests strictly more robust. Full suites + live test before any merge.
-  - Expansion added: pause/suspend guards (script_control, gestures engine/init, hotstring engine, keylogger, layout, shortcuts, LLM); reversal detection in gestures; delay edges; FS/pcall error paths; cross parity. Strategy: for any new hook/timer/dispatch/pause path, add test that would have caught the silent failure. Full suites mandatory before merge.
-  - Suite continued with additional tests in hotstrings_config (section delays, pause), keymap state (delays, pause), layout (AltGr prefix latch), LLM (errors), gestures init (set_action under pause), meta require_state (suspend notes). All banners fixed. This makes the test suite strictly stronger over time per feedback_regression_tests.
-  - Further batch: tap_hold_loader (pause, defaults overlay, invalid TOML, inherit_defaults=false, accessor edges — 6+ new), toml_loader (unicode, caching, multiple escapes), karabiner config (pause, migration, empty inputs), i18n (pause safe load/t()), hotstrings_full (pause guard, section delay), config (pause+manifest). Total added across expansion: 40+ regression tests. Prioritize suspend/pause in every new path.
-  - Latest additions in "ajoute le plus de tests possible" pass: reinforced config, added personal_info and terminators pause guards (HS), more i18n/hotstrings_full pause+delay, karabiner edges. ~10 additional tests. Goal achieved: broad coverage across tap_hold, toml, karabiner, i18n, hotstrings, config, personal, terminators + universal pause invariant.
-  - Post-compaction "encore plus" / "encore plus de tests. le maximum possible..." wave (this session continuation after summary compaction): +25-32 new regression tests in one dense iteration for near-100% certainty. Key additions: test*shortcuts.ahk (+6 — closed the critical ZERO pause coverage gap on all dispatchers, AltGr prefix latch regression under pause/resume [[feedback-ahk-suspend-prefix-latch]], RegisterMenuItem safety + pause, 250+ volume, bad Features, idempotent transitions); test_hotstrings_config.ahk (+3 — pause gate on resolution, explicit section>group>default delay precedence regression, 150+ bad TOML under pause); test_logger_contract.ahk (+3 — pause + errors-sink survival for diagnostics, 300+ volume ERROR under pause, hard FS on errors sink no-crash); test_active_app_cache.ahk (+3 — pause blocks all cache-driven activation for shortcuts/gestures/hotstrings/widgets, 200+ volume under pause, bad/unicode exe resilience); deepened HS: llm/profiles (+2-3 volume + pause transitions), gestures/engine (+2 primer + pause + 200+ volume + reversal), keylogger/aggregator (+2 privacy+pause+rollover + FS/pcall), shortcuts/bindings (+3 pause + volume + bad ids), karabiner/generator (+2 pause + volume + bad), keymap/terminators (+2 pause + volume unicode), meta corpus_hotstrings (+2 pause + delay precedence). Also notes in require_state (shortcuts full, hotstrings_config, logger_contract) and port_adapter. All with explicit "project_suspend_pause_invariant", historical gotchas, and max edges (volume 100-300+, unicode, bad input, FS/pcall no-crash, rollover, dedup, re-init, idempotent pause, cache-driven safety). Banners clean on most; 1 minor whitespace on shortcuts (warn-only, tests fully registered and valid). Memory updated. Campaign total now well over 210+ new regression tests. These tests would have caught: silent AltGr latch dispatch after pause, wrong hotstring delay timing (DYN* early-load or section override), logger ERROR loss under pause (diagnostics broken), cache-driven shortcut/gesture fire while suspended, gesture primer stuck after touchdevice dormancy + pause, aggregator PII leak on pause+rollover, menu item drops, volume corruption in prediction/profiles/bindings, etc. Full suites (run_all.ahk + run.lua) + live hardware test (pause/resume, high volume typing/gestures/LLM, config reload, keylogger privacy) mandatory before any merge. User can request "encore plus" again — the loop continues until no obvious gaps remain in survey.
-  - [project-hs-partial-fixes-and-false-green-tests](#project-hs-partial-fixes-and-false-green-tests) — Three macOS fixes recorded as complete are partial; each is guarded by a test asserting the mechanism instead of the guarantee
-  - [project-ahk-menu-dispatcher-error-swallow](#project-ahk-menu-dispatcher-error-swallow) — The menu dispatcher bypass must re-throw callback errors to maintain parity with AHK's native dispatch and the global OnError handler.
-
----
+- [feedback-ahk-source-encoding](#feedback-ahk-source-encoding) — AHK v2 source files must be UTF-8 BOM + LF; encoding drift causes silent mid-file parse aborts that masquerade as missing tests
+- [feedback-ahk-suspend-prefix-latch](#feedback-ahk-suspend-prefix-latch) — AHK custom-combination prefix flags latch across Suspend; fix at the source, synthetic key events cannot clear them
+- [feedback_ahk_ui_syntax_validation](#feedback_ahk_ui_syntax_validation) — Some AHK UI files are outside the headless test runner; how to syntax-check them locally on Windows
+- [Coding style and conventions for this project](#coding-style-and-conventions-for-this-project) — Style rules, architecture decisions, and what to avoid when writing code for this project
+- [project-lua-closure-before-local-nil-global](#project-lua-closure-before-local-nil-global) — A `local` declared textually AFTER a closure that uses it is not captured — the closure binds the nil global, and the hs.task/ShellRunner pcall swallows the resulting error silently
+- [project-hs-sentinel-key-misfire](#project-hs-sentinel-key-misfire) — F13/F14/F15 are real physical keys macOS can emit; using them as Karabiner synthetic sentinels without gating on the right-AltGr state fires `script_suspend`/`script_reload`/`script_quit` on a bare key press
+- [project-hs-purity-ratchet-counts-comments](#project-hs-purity-ratchet-counts-comments) — The `hs.*` purity ratchet counts the substring `hs.` everywhere — comments and string literals included — so a comment mentioning `hs.timer.new` increments the counter
+- [feedback_commit_push](#feedback_commit_push) — Never push automatically — commit freely, push only after an explicit ask in the current conversation
+- [feedback-proactive-memory](#feedback-proactive-memory) — Record non-obvious learnings in this file proactively at the end of every task, without being asked
+- [feedback_fix_banners_tool](#feedback_fix_banners_tool) — npm run fix:banners auto-corrects all section banner alignment violations — run it before every commit instead of fixing manually
+- [errors-only-log-sink](#errors-only-log-sink) — Dedicated daily ErgoptiPlus_errors_YYYY-MM-DD.log (WARNING + ERROR only); crash_reports/ strictly for uncaught fatal exceptions
+- [feedback-loader-target-explicit](#feedback-loader-target-explicit) — AHK loader/writer modules that mutate a shared Map (Features etc.) must take the target Map as an explicit parameter, never reach for it via `global`
+- [No co-author trailers (Copilot, Claude, bots)](#no-co-author-trailers-copilot-claude-bots) — Never add Co-Authored-By trailers — and never whitelist legacy ones to make a lint pass
+- [feedback-regression-tests](#feedback-regression-tests) — Every user-requested bug fix must ship with a regression test that fails before / passes after the fix
+- [feedback-local-gate-mirrors-ci](#feedback-local-gate-mirrors-ci) — Green locally must mean green in CI: the local gate is four commands, and it is only trustworthy once `node_modules` is installed on a Node satisfying the engine floor
+- [feedback-test-before-merge](#feedback-test-before-merge) — Never merge a slice into dev before the user has tested it live. Stay on the branch and wait for explicit validation.
+- [feedback-ui-must-be-i18n](#feedback-ui-must-be-i18n) — All user-facing UI text goes through the i18n system in 21 languages — never hardcode a UI string anywhere, WebView UIs included
+- [project-ahk-menu-dispatcher-error-swallow](#project-ahk-menu-dispatcher-error-swallow) — The menu-dispatcher bypass must re-throw callback errors — a local try/catch only destroys reporting
+- [project-audit-2026-07-21-open-items](#project-audit-2026-07-21-open-items) — Troisieme et quatrieme passes d'audit AHK : les pistes refutees a ne pas re-soulever, et deux decisions qui ne sont pas des correctifs
+- [project-typing-latency-tooltip-coldstart](#project-typing-latency-tooltip-coldstart) — Latence de frappe : pourquoi la reutilisation de fenetre tooltip est rejetee, pourquoi le chunking de l'enregistrement differe a ete reverte, et pourquoi WebView2 a quitte le chemin de frappe
+- [project-ahk-menu-dispatcher-drop](#project-ahk-menu-dispatcher-drop) — AHK 2.0 perd silencieusement ~30-50 % des clics du menu tray. Contourne par lib/menu_dispatcher.ahk — tout item actionnable doit passer par RegisterMenuItem, jamais par Menu.Add brut.
+- [project-audit-2026-07-21-toml-onboarding](#project-audit-2026-07-21-toml-onboarding) — Regles durables sorties de l'audit de `lib/toml/` et `ui/onboarding/` : ou parse-t-on, comment signale-t-on un echec de lecture, et le piege de la sentinelle
+- [project-webview2-bridge-gotchas](#project-webview2-bridge-gotchas) — Hosting a shared HTML/JS frontend in a WebView2 control (thqby `vendor/WebView2.ahk`) on Windows has FOUR distinct gotchas that each silently break the JS↔AHK bridge. The onboarding wizard (`ui/onboarding/webview.ahk`) hit all four in sequence; model_browser predates some of the fixes.
+- [project-config-v2-refactor](#project-config-v2-refactor) — La migration v1 → v2 est terminee ; ne restent que les gotchas transversaux qu'elle a mis au jour
+- [project_debug_menu_sync](#project_debug_menu_sync) — L'ordre du sous-menu Debug est defini une seule fois dans `_shared/modules/menu/menu_manifest.json` (cle `debug_menu`) ; les deux drivers le consomment
+- [project-menu-manifest-macos-hotstrings-layout-gap](#project-menu-manifest-macos-hotstrings-layout-gap) — macOS never reads menu_manifest.json's hotstrings_menu/layout_menu keys (unlike gestures_menu/metrics_menu/shortcuts_menu, which ARE manifest-driven on both platforms) — a drift gate exists, the actual migration does not
+- [project-gestures-reversal-detection](#project-gestures-reversal-detection) — Detection des inversions de direction dans le moteur de gestes (mode x1 vs incremental)
+- [project-gestures-startup-design](#project-gestures-startup-design) — Choix de conception du demarrage des gestes macOS — le primer sert de signal de reveil, PAS des burst probes
+- [project-hotstring-delay-architecture](#project-hotstring-delay-architecture) — Ou se configure le delai d'expansion des hotstrings, la precedence cross-driver, et les pieges
+- [project-hotstring-engine-internals](#project-hotstring-engine-internals) — OnChar doit alimenter chaque caractere une seule fois ; la divergence de cadrage des frontieres de mot AHK vs Hammerspoon est intentionnelle
+- [project-hs-perf-profilers-and-case-conform](#project-hs-perf-profilers-and-case-conform) — Profilers boot/hot-path macOS, chemin rapide case-conform, cache du menubar, snapshot TOML, et le piege Escape arme au premier affichage
+- [project-tooltip-shared-style](#project-tooltip-shared-style) — Tooltip visual style is shared across drivers via _shared/modules/tooltip/constants.toml; the macOS stacked canvas rounds its colored rows via an hs.canvas clip; per-driver alphas are intentionally different
+- [project-hs-script-quit-kills-karabiner](#project-hs-script-quit-kills-karabiner) — The quit shortcut os.exit()s and bypasses the shutdown callback, so it must kill Karabiner itself
+- [project-hs-onboarding-config-schema](#project-hs-onboarding-config-schema) — The first-run wizard must write the canonical HS config schema, and the "ready" notification was removed
+- [Keymap module architecture and refactor decisions](#keymap-module-architecture-and-refactor-decisions) — Ou vivent les defauts du module keymap, et pourquoi une seule place
+- [project-hs-synthetic-injection-choke-point](#project-hs-synthetic-injection-choke-point) — The macOS driver tracks self-emitted synthetic keystrokes in TWO independent places; any injector that bypasses the expander choke point desyncs them and can corrupt typed output
+- [project-locale-parity-test](#project-locale-parity-test) — en.json est le jeu de cles canonique ; le meta-test AHK test_locale_json_valid.ahk impose la parite en CI ; `tools/locale/check_locales.py --fix` est l'outil de backfill manuel
+- [project-locale-fast-cache](#project-locale-fast-cache) — Le `.tsv` de locale du driver Windows est un cache gitignore auto-reparateur regenere depuis le `.json` canonique ; seul le `.json` est versionne
+- [project_metrics_pipeline_17](#project_metrics_pipeline_17) — Architecture du pipeline metrics AHK — pourquoi AHK ne peut pas devenir pur-walker comme macOS
+- [project-hotstring-live-rebuild](#project-hotstring-live-rebuild) — Hotstring section/category toggles apply in-process (no Reload) by re-running RegisterAllHotstrings; native-engine + layout-backed features under hotstrings.\* are the reload-only exceptions
+- [project-hotstrings-self-healing-cache](#project-hotstrings-self-healing-cache) — Les hotstrings groupees ne sont plus de l'AHK genere et versionne : c'est un cache `.tsv` gitignore auto-reparateur reconstruit depuis les TOML au runtime, pour couper le parse au boot
+- [project-prefix-index-rebuild-cost-is-cold-disk](#project-prefix-index-rebuild-cost-is-cold-disk) — The prefix-watcher index rebuild's cost is the cold-disk TOML read, NOT parse CPU — build the index from the in-memory `_HS_CACHE_ROWS`, the same way HSE registration does.
+- [project-suspend-pause-invariant](#project-suspend-pause-invariant) — La pause doit TOUT taire (aucun tooltip/LLM/keylogger/widget). Le Suspend AHK ne desarme que les hotkeys — InputHooks, timers et OnMessage le contournent et exigent des gardes `A_IsSuspended` explicites.
+- [project-macos-llm-runtime-enable-gate](#project-macos-llm-runtime-enable-gate) — macOS must not warm up or load an LLM model from profile/model restoration alone; only the live runtime enable gate may authorize warmup side-effects.
+- [project-macos-eventtap-no-blocking](#project-macos-eventtap-no-blocking) — Never run blocking work (osascript / hs.execute subprocesses) synchronously inside an hs.eventtap callback — macOS disables the tap (kCGEventTapDisabledByTimeout) and the shortcut dies. Defer with hs.timer.doAfter(0, …).
+- [project-macos-script-control-tap-lifecycle](#project-macos-script-control-tap-lifecycle) — The script-control eventtap (AltGr+Enter/Backspace/Escape) is keycode-based and must survive layout switches AND pause — never restart it via `shortcuts.stop()`/`shortcuts.start()`, and never let a pause-driven layout switch regenerate the Karabiner config.
+- [project-touchdevice-dormancy-is-kernel](#project-touchdevice-dormancy-is-kernel) — Definitive answer that macOS touchdevice subsystem CANNOT be activated before first physical touch — it is a kernel-driver gate
+- [project-ui-dynamic-buttons](#project-ui-dynamic-buttons) — AHK UIs must use Gui_HarmoniseButtonWidths instead of hardcoded w-values; HS auto-sizes via CSS padding
+- [project-shifted-comma-case-variants](#project-shifted-comma-case-variants) — The "uppercase" form of a comma/apostrophe/period in case-variant generation MUST be nbsp/nnbsp + punctuation, NEVER a plain ASCII space — anchoring on nbsp is what keeps the ":D" emoji alive.
+- [project-ahk-v2-semicolon-in-string](#project-ahk-v2-semicolon-in-string) — AHK v2 treats ` ;` (space-then-semicolon) as a comment start even INSIDE a double-quoted string literal — a literal `;` in an AHK string causes a "Missing `"`" parse error.
+- [project-hs-timer-callback-errors-invisible](#project-hs-timer-callback-errors-invisible) — Hammerspoon swallows a throw inside an `hs.timer` callback — that silent-death class is now captured by `logger.install_runtime_error_capture()`, which must stay installed. The surviving trap is a test stub that defines a method production lacks.
+- [project-profile-label-placeholder-convention](#project-profile-label-placeholder-convention) — LLM profile labels in `_shared/data/locales/*.json` use **brace** placeholders `{n}`/`{s}` (count + plural-s), NOT printf `%d`/`%s` — the menu substitutes braces, so a printf token leaks verbatim into the UI.
+- [project-updater-nonblocking-http](#project-updater-nonblocking-http) — The updater background poll must never do synchronous WinHttp on the main thread (it freezes all keyboard remapping); WinHttp `SetTimeouts` treats 0 as infinite. Use the project's async WinHTTP + `WaitForResponse(0)` + `SetTimer`-poll pattern.
+- [project-audit-tracking-artifacts-are-unreliable](#project-audit-tracking-artifacts-are-unreliable) — An audit's own tracking JSONs and roadmap `[x]` checkboxes contradict each other and the source — ground truth is the code, located by SYMBOL, never by the line numbers in a finding.
+- [project-hs-adapter-contract-violations](#project-hs-adapter-contract-violations) — Four Hammerspoon API contract facts a plausible-looking call gets wrong — found dormant in the macOS adapters.
+- [project-ahk-v2-static-unset-unreadable](#project-ahk-v2-static-unset-unreadable) — In AHK v2, `static _prop := unset` leaves the property unreadable — accessing it with `is` or any read raises PropertyError. Use `false` (or another concrete value) as the "not yet set" sentinel.
+- [project-lua-nil-and-expr-is-nil](#project-lua-nil-and-expr-is-nil) — In Lua, `local x = cond and expr` yields **nil**, not false, when `cond` is nil — and `not nil` is `true`, so a "negative" gate silently inverts.
+- [project-ahk-invariant-incomplete-application](#project-ahk-invariant-incomplete-application) — Every AHK-driver hardening invariant is applied per call-site; the recurring bug is the one missed sibling site, or a guarantee defeated one call level down by indirection — audit the whole class, not the documented site.
+- [project-toml-cache-returns-real-booleans](#project-toml-cache-returns-real-booleans) — A TOML `true` reaches the cache as an AHK boolean, not the string "true" — compare through `TomlCacheBool`, never `StrLower(v) == "true"`
+- [project-ahk-map-delete-raises-on-missing-key](#project-ahk-map-delete-raises-on-missing-key) — `Map.Delete(k)` throws when the key is absent, and `/validate` is not an AHK v2.0 flag — it runs the script
+- [project-ahk-probing-synthetic-input](#project-ahk-probing-synthetic-input) — Two ways a synthetic-input probe silently measures nothing and reports a confident false negative
+- [project-ahk-keyword-as-variable-hangs-the-parser](#project-ahk-keyword-as-variable-hangs-the-parser) — Naming a local `Catch` (or any control-flow keyword) makes AHK v2 hang with ZERO output — no syntax error, no dialog, no partial log
+- [project-ahk-numeric-string-equals-false](#project-ahk-numeric-string-equals-false) — In AHK v2, `"0" = false` is **TRUE** — comparing a `String|false` return value against `false` silently swallows any numeric-string success token
+- [project-ahk-guard-tests-must-loop-the-class](#project-ahk-guard-tests-must-loop-the-class) — A regression test that pins the single site a bug was fixed at will not survive the next refactor — write guard tests as loops over a set enumerated from source.
+- [project-audit-findings-are-hypotheses](#project-audit-findings-are-hypotheses) — Two findings from the 2026-07-20 second-pass audit were WRONG, and the existing test suite is what proved it — implement an audit finding as a hypothesis, not as an instruction
+- [project-audit-evidence-must-be-reproducible](#project-audit-evidence-must-be-reproducible) — A refutation is a claim and needs the same standard of proof: the 2026-07-20 "the perf section was fabricated" debunking was ITSELF wrong — it looked in a directory that never existed
+- [project-ahk-test-suite-critical-leak](#project-ahk-test-suite-critical-leak) — `Critical("On")` in a layout/hotkey callback is safe in production but LEAKS into the main thread when a test invokes that function directly, silently freezing every background timer for the rest of the suite.
+- [[updater-download-suspend-guard] Garantie G5: background downloads bypass pause](#updater-download-suspend-guard-garantie-g5-background-downloads-bypass-pause)
+- [[project-shared-tree-layout] _shared/ tree : SSOT-par-couche, et le piege du contournement](#project-shared-tree-layout-_shared-tree-ssot-par-couche-et-le-piege-du-contournement)
+- [[project-macos-initlua-no-compile-coverage] Un fichier que le harness ne peut que *copier* a quand meme besoin d un controle de *parsing*](#project-macos-initlua-no-compile-coverage-un-fichier-que-le-harness-ne-peut-que-copier-a-quand-meme-besoin-d-un-controle-de-parsing)
+- [[project-hs-fs-dir-drops-state] `hs.fs.dir` renvoie (iterator, state) — et un stub laxiste a masque l etat perdu](#project-hs-fs-dir-drops-state-hsfsdir-renvoie-iterator-state-et-un-stub-laxiste-a-masque-l-etat-perdu)
+- [[project-healthcheck-stale-api] Une sonde gardee par `pcall`/`type` est INVISIBLE aux tests bases sur le crash](#project-healthcheck-stale-api-une-sonde-gardee-par-pcalltype-est-invisible-aux-tests-bases-sur-le-crash)
+- [[project-macos-split-module-stub-reload] Splitting a stateful macOS module out of its caller requires adding it to `load_with_stubs`' reload list](#project-macos-split-module-stub-reload-splitting-a-stateful-macos-module-out-of-its-caller-requires-adding-it-to-load_with_stubs-reload-list)
+- [[project-init-json-decode-of-toml] `pcall(hs.json.decode, …)` imprime quand meme l erreur native LuaSkin](#project-init-json-decode-of-toml-pcallhsjsondecode-imprime-quand-meme-l-erreur-native-luaskin)
+- [[project-macos-startup-winfilter-cost] Ne jamais creer un `hs.window.filter` sur un chemin de boot ou de premiere frappe](#project-macos-startup-winfilter-cost-ne-jamais-creer-un-hswindowfilter-sur-un-chemin-de-boot-ou-de-premiere-frappe)
+- [[project-category-gating-ahk-only] Category enable/disable gating (CategoryEnabled["Hotstrings"]…) is intentionally AHK-only](#project-category-gating-ahk-only-category-enabledisable-gating-categoryenabledhotstrings-is-intentionally-ahk-only)
+- [[project-macos-lib-namespace-shims] `lib.text_utils` est un shim de re-export load-bearing, pas de l indirection supprimable](#project-macos-lib-namespace-shims-libtext_utils-est-un-shim-de-re-export-load-bearing-pas-de-l-indirection-supprimable)
+- [[project-hs-audit-open-labels-are-stale] Les labels <<Open>> des audits archives sont non verifies — relire la source](#project-hs-audit-open-labels-are-stale-les-labels-open-des-audits-archives-sont-non-verifies-relire-la-source)
+- [[project-dc1-windows-vk-finger-map-gap] `KLW_VK_FINGER` est une 3e carte de doigts laissee expres, pas une regression](#project-dc1-windows-vk-finger-map-gap-klw_vk_finger-est-une-3e-carte-de-doigts-laissee-expres-pas-une-regression)
+- [[project-ahk-suite-runnable-here-plus-os-purity-ratchet-nondeterminism] La suite AHK EST executable sur cette machine — lire le resultat dans %TEMP%](#project-ahk-suite-runnable-here-plus-os-purity-ratchet-nondeterminism-la-suite-ahk-est-executable-sur-cette-machine-lire-le-resultat-dans-temp)
+- [[project-ahk-isset-requires-variable-load-crash] `IsSet(obj.prop)` is a LOAD-TIME crash in AHK v2 — and source-introspection tests can never catch it](#project-ahk-isset-requires-variable-load-crash-issetobjprop-is-a-load-time-crash-in-ahk-v2-and-source-introspection-tests-can-never-catch-it)
+- [[project-metrics-ui-live-foreground-contract] Un tableau de bord de metriques doit projeter l intervalle de premier plan encore ouvert](#project-metrics-ui-live-foreground-contract-un-tableau-de-bord-de-metriques-doit-projeter-l-intervalle-de-premier-plan-encore-ouvert)
+- [project-hs-partial-fixes-and-false-green-tests](#project-hs-partial-fixes-and-false-green-tests) — Three macOS "fixes" recorded as complete are partial, and each is protected by a test that asserts the wrong thing — the test locks in the mechanism, not the guarantee
+- [project-hs-audit-2026-07-21](#project-hs-audit-2026-07-21)
+- [project-hs-audit-round2-2026-07-21](#project-hs-audit-round2-2026-07-21) — Adjuger un backlog d'audit contre la source courante : un tiers etait faux ou perime
+- [project-hs-audit-round4-2026-07-21](#project-hs-audit-round4-2026-07-21)
+- [project-perf-2026-07-21-implementation](#project-perf-2026-07-21-implementation)
 
 ## Working conventions & feedback
-
 ### feedback-ahk-source-encoding
 
 _AHK v2 source files must be UTF-8 BOM + LF; encoding drift causes silent mid-file parse aborts that masquerade as missing tests_
 
 <sub>slug: `feedback_ahk_source_encoding`</sub>
 
-AHK v2's parser can silently stop registering top-level statements partway through a source file when the file's encoding is inconsistent (missing BOM or mixed line endings). The headless test runner then plans `1..N` for only the first batch of `Test()` calls and reports green — passing tests are real, missing ones are silently dropped, and there is no error message anywhere.
+AHK v2's parser silently stops registering top-level statements partway through a file whose encoding is inconsistent (missing BOM, or CR bytes). The headless runner then plans `1..N` for only the first batch of `Test()` calls and reports green: the tests that ran are real, the missing ones are dropped with no error anywhere.
 
-**Why:** discovered 2026-05-22 during the v2 config-refactor test suite development. Initial drafting of `test_features_manifest_v2.ahk` showed only 5-7 of 33 tests registering despite all `Test()` calls being syntactically valid. Root cause: PowerShell file rewrites left mojibake (double-encoded UTF-8) and `cat >>` from bash appended LF lines into a CRLF/BOM file. The AHK v2 parser handled this by quietly truncating the file, not by raising an error.
+**Why:** discovered 2026-05-22 — a PowerShell rewrite left mojibake and a `cat >>` from bash appended LF lines into a BOM/CRLF file. The parser truncated instead of raising.
 
 **How to apply:**
 
-- New `.ahk` files: use UTF-8 **with** BOM and LF-only. After creating one, run `npm run test:ahk-encoding` before adding it to git.
-- Existing `.ahk` files: extend via the Edit tool (preserves encoding), NEVER via `cat >> file.ahk` from bash (it can bypass the repository encoding guard).
-- Non-ASCII in comments/strings is fine when encoding is clean. The v2 test suite (`test_features_manifest_v2.ahk`) stays ASCII-only as a defensive convention and accesses non-ASCII glyphs via `Chr(0xNNNN)` (e.g. `Chr(0x2605)` for the magic key star) so future encoding regressions cannot reintroduce the silent abort.
-- Diagnostic when a test file shows fewer test-results than its `Test()` count: run `file <path>` first, before debugging the test logic.
+- Enforced by `npm run test:ahk-encoding` (`tools/test/test-ahk-encoding.cjs`: BOM required, CR bytes rejected). Run it before `git add`.
+- Extend existing `.ahk` files via the Edit tool (it preserves encoding), NEVER via `cat >> file.ahk`.
+- **Diagnostic:** a test file reporting fewer results than its `Test()` count is an encoding fault, not a logic fault — check the bytes before debugging the test.
+- Non-ASCII is fine once the encoding is clean; `Chr(0xNNNN)` is the defensive alternative in files that must stay ASCII.
 
-Also documented in:
-
-- `.github/copilot-instructions.md` — AHK language section (primary developer rule).
-- `static/drivers/autohotkey/tests/test_framework.ahk` — module header (visible to every test author).
-- `static/drivers/autohotkey/lib/manifest_reader.ahk` — module header (codegen output must match).
-
-Related rule (same context, AHK v2 string parsing): inside a double-quoted string, the escape for a literal double quote is `` `" `` (backtick + quote), NOT `""` (doubled quote — that was AHK v1 syntax). The IDE flags `""` as `Did you mean to use '\`"'?` but the silent-abort can mask this if it falls in a region the parser has already given up on.
+Related, same silent-abort signature: in AHK v2 the escape for a literal double quote is `` `" ``, not `""` (v1 syntax). See [[feedback_local_gate_mirrors_ci]].
 
 ### feedback-ahk-suspend-prefix-latch
 
-_AHK Kana custom-combination prefix latches across Suspend; fix at the source, synthetic key events can't clear it_
+_AHK custom-combination prefix flags latch across Suspend; fix at the source, synthetic key events cannot clear them_
 
 <sub>slug: `feedback_ahk_suspend_prefix_latch`</sub>
 
-Toggling AHK `Suspend()` around the ergopti_plus Kana `SC138` AltGr custom-combination prefix produces two distinct latch bugs. The working fixes are non-obvious — found live over ~5 iterations on branch fix/hs (commit 89c15093f, ErgoptiPlus.ahk + lib/layout/layout_altgr.ahk).
+AHK's custom-combination prefix-down flag is SEPARATE from `GetKeyState` and is cleared **only by a real physical key release processed by the live layer**. A synthetic `SendEvent("{SC138 Up}")` or a `{Down}{Up}` tap does NOT clear it (verified via logs), and re-registering the combos Off→On re-latches it. **You cannot clean it up on resume — only prevent it before the suspend flips.** Toggling `Suspend()` around the Kana `SC138` AltGr prefix produced two latch bugs, found live over ~5 iterations:
 
-- **Menu/gesture pause → keyboard can't un-pause.** Toggling `Suspend` from a non-hook thread rebuilds the keyboard hook with the `SC138 & X` prefix un-armed, so the suspend-exempt script combos (AltGr+Enter/BackSpace/Delete/Escape) stop firing. **Fix:** also register the chords as plain **suffix** hotkeys (`Hotkey("SC01C", …, "I2 S")`) gated on `HotIf(A_IsSuspended and GetKeyState("SC138","P"))`. A suffix needs no prefix arming, never re-registers the prefix (so it can't latch the Kana key), and yields to the real combo when the prefix IS armed (no double-fire).
-- **Keyboard pause → menu/gesture resume → « AltGr bloqué ».** A keyboard pause holds SC138 down through `Suspend(1)`; its physical release lands while the AltGr layer is disarmed, so AHK's internal prefix-down flag stays latched. On resume the layer dispatches with `GetKeyState("SC138")==0`.
+- **Menu/gesture pause → keyboard can't un-pause.** Toggling `Suspend` from a non-hook thread rebuilds the hook with the prefix un-armed, so the suspend-exempt script combos (AltGr+Enter/BackSpace/Delete/Escape) stop firing. **Fix:** also register the chords as plain **suffix** hotkeys gated on `HotIf((*) => A_IsSuspended and GetKeyState("SC138","P"))` — a suffix needs no prefix arming, never re-registers the prefix, and yields to the real combo when the prefix IS armed (no double-fire). Live in `lib/script_altgr_hotkeys.ahk`.
+- **Keyboard pause → « AltGr bloqué ».** A keyboard pause holds the prefix down through `Suspend(1)`; its physical release lands while the layer is disarmed, so the flag stays latched and the layer later dispatches with `GetKeyState("SC138")==0`. **Fix:** drain every registered prefix key BEFORE suspending — `_SuspendPrefixesAreClear()` in `lib/lifecycle.ahk`, driven by `SUSPEND_CUSTOM_COMBO_PREFIX_KEYS` so a future suspend path cannot bypass the wait. `AltGrShiftDispatch` keeps a permanent WARNING guard-rail for any dispatch with the prefix not physically held.
 
-**Why:** AHK's custom-combination prefix-down flag is SEPARATE from `GetKeyState` and is cleared **only by a real physical key release processed by the live layer**. A synthetic `SendEvent("{SC138 Up}")` or `{Down}{Up}` tap does NOT clear it (verified via logs), and re-registering the combos Off→On re-latches it. So you cannot clean it up on resume.
-
-**How to apply:** prevent at the source — in `ToggleSuspend`, before `Suspend(1)`, `KeyWait("SC138","T1")` when SC138 is physically held (keyboard pause). Never reach for synthetic taps or Off→On re-registration. A permanent WARNING guard-rail in `AltGrShiftDispatch` logs any dispatch with SC138 not physically held to catch regressions in ErgoptiPlus_layout.log. Use `AutoHotkey64.exe /ErrorStdOut /validate <script>` (exit 0 = clean) to syntax-check edits headlessly. Related: [[project_suspend_pause_invariant]].
+**Never** reach for synthetic taps or Off→On re-registration. To syntax-check an edit, see [[feedback_ahk_ui_syntax_validation]] — and never `/validate`, which does not exist in AHK v2.0 and silently RUNS the script ([[project_ahk_map_delete_raises_on_missing_key]]). Related: [[project_suspend_pause_invariant]].
 
 ### feedback_ahk_ui_syntax_validation
 
-_AHK UI files aren't in the headless test runner; how to syntax-check them locally on Windows_
+_Some AHK UI files are outside the headless test runner; how to syntax-check them locally on Windows_
 
 <sub>slug: `feedback_ahk_ui_syntax_validation`</sub>
 
-The AHK UI files `windows/ui/tray_menu.ahk` and `windows/lib/hotstrings/hotstrings_config_window.ahk` are NOT `#Include`d by the headless test runner `windows/tests/run_all.ahk` (it pulls in `lib/` + `adapters/` + `test_*` only). So a syntax error in those UI files is caught **only** by CI's `Compile ErgoptiPlus.ahk` step (Ahk2Exe), never by the AHK test suite or the CI dry-run warning check.
-
-**Why:** run_all deliberately avoids `modules/` and UI files that register hotkeys / build menus at top level (they'd block a clean exit).
+`run_all.ahk` includes most of `lib/`, `adapters/` and a growing subset of `modules/` + `ui/`, but it deliberately skips the files that register hotkeys or build menus at top level — notably `ui/tray_menu.ahk` and `ui/onboarding/*` (they would block a clean exit). A syntax error in those is caught **only** by CI's `Compile ErgoptiPlus.ahk` step (Ahk2Exe). Check what the runner actually includes before assuming a file is covered; the list drifts.
 
 **How to syntax-check them locally** (two ways, both gotcha-laden):
 
-1. **Ahk2Exe compile** (gold standard, == CI): `Ahk2Exe.exe` lives at `C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe`. **Run it from PowerShell, never Git Bash** — Git Bash's MSYS path conversion rewrites `/in` `/out` `/base` into Windows paths (`/in` → `C:/Program Files/Git/in`), so the compile fails with "Unrecognised parameter". `& $ahk2exe /in $in /out $out /base $base /silent`; Ahk2Exe exits 0 even on failure, so verify the `.exe` was actually created.
-2. **Parse-only harness**: a throwaway `.ahk` with `ExitApp(0)` as the first auto-execute statement, then `#Include` the UI file(s). AHK parses the whole merged script before running anything, so a syntax error aborts at load; the `ExitApp(0)` exits before any included top-level code runs (won't start the driver). Launch via `Start-Process -FilePath AutoHotkey64.exe -ArgumentList @("/ErrorStdOut",$script) -Wait -PassThru -RedirectStandardError $err` — plain `& AutoHotkey64.exe` does NOT capture the exit code or stderr because it's a GUI-subsystem app that detaches.
+1. **Ahk2Exe compile** (gold standard, == CI), at `C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe`. **Run it from PowerShell, never Git Bash** — MSYS path conversion rewrites `/in` `/out` `/base` into Windows paths (`/in` → `C:/Program Files/Git/in`) and the compile dies with "Unrecognised parameter". Ahk2Exe also **exits 0 on failure**, so verify the `.exe` was actually created.
+2. **Parse-only harness**: a throwaway `.ahk` with `ExitApp(0)` as its first auto-execute statement, then `#Include` the UI file. AHK parses the whole merged script before running anything, so a syntax error aborts at load while `ExitApp(0)` exits before any included top-level code runs. Launch via `Start-Process -FilePath AutoHotkey64.exe -ArgumentList @("/ErrorStdOut",$script) -Wait -PassThru -RedirectStandardError $err` — a plain `& AutoHotkey64.exe` captures neither exit code nor stderr, because it is a GUI-subsystem app that detaches.
 
-The headless test runner writes its TAP report to `%TEMP%\ergopti_test_results.txt` (NOT stdout) — read that file for pass/fail, not the AHK process stdout. See [[feedback_ahk_source_encoding]].
+Never use `/validate`: it does not exist in AHK v2.0 and silently RUNS the script ([[project_ahk_map_delete_raises_on_missing_key]]). The headless runner writes its TAP report to `%TEMP%\ergopti_test_results.txt`, NOT stdout — read that file for pass/fail. See [[feedback_ahk_source_encoding]].
 
 ### Coding style and conventions for this project
 
@@ -146,41 +148,29 @@ _Style rules, architecture decisions, and what to avoid when writing code for th
 
 <sub>slug: `feedback_coding_style`</sub>
 
-Follow `.github/copilot-instructions.md` strictly. Key rules:
+The conventions are **not** restated here on purpose — `.github/copilot-instructions.md` is the single normative source, and `CLAUDE.md` @-includes it, so it is already in context. Re-read it before writing code; a copy in this file would be the second source of truth to drift.
 
-- **Tabs** for indentation (never spaces).
-- **Section headers**: 5 blank lines before major sections, 3 before subsections. Exact `=` alignment required.
-- **File path comment** as very first line (e.g., `--- modules/keymap/init.lua`).
-- **Language**: code in English, user-facing text in French. Use typographic apostrophe `'` in UI text.
-- **Docstrings** end with `.` (formal sentences). Inline comments do NOT end with `.`.
-- **Logging**: use the 8-variant Logger system. Lifecycle pairs (start/success, trace/done) are mandatory — never an unpaired start/trace.
-- **Fail fast**: guard public functions with `require_state()`, log ERROR and return. No silent fallbacks.
-- **Single source of truth**: defaults live in exactly one module. Other modules read from the source, never re-declare.
-- **No magic numbers**: all constants named at file top.
-- **Setters log at DEBUG** with their new value.
+It covers: tabs; banner spacing (5 blank lines / major, 3 / minor) with exact `=` alignment; the file-path header line; code English / UI French; docstring vs inline-comment punctuation; the 8 Logger variants and mandatory `start`/`success`, `trace`/`done` pairing; fail-fast via `require_state()`; single-source defaults; no magic numbers; setters log at DEBUG; and §5.9 regression tests.
 
-**Why:** The user has an explicit copilot-instructions.md and consistently enforces these conventions.
-
-**How to apply:** Before writing any new code in this repo, re-read the instructions. When refactoring, prioritize removing duplicated defaults and silent error swallowing.
+**How to apply:** run `npm run fix:banners` rather than counting `=` by hand ([[feedback_fix_banners_tool]]). When refactoring, prioritise removing duplicated defaults and silent error swallowing — those are the two rules this codebase has actually broken.
 
 ### project-lua-closure-before-local-nil-global
 
-_A `local` declared textually AFTER a closure that uses it is not captured — the closure binds the nil global, and a pcall in the hs.task/ShellRunner wrapper swallows the resulting error silently_
+_A `local` declared textually AFTER a closure that uses it is not captured — the closure binds the nil global, and the hs.task/ShellRunner pcall swallows the resulting error silently_
 
 <sub>slug: `project_lua_closure_before_local_nil_global`</sub>
 
-In Lua, `local function f() ... uses x ... end` only captures `x` as an upvalue if `local x` appears **lexically before** the closure. If `local x` is declared *below* the closure, the reference inside `f` resolves to the global `_G.x` (nil), not the later local. This is a sharp foot-gun in async callbacks: the closure looks correct, but at call time the variable is nil.
+In Lua, `local function f() … uses x … end` captures `x` as an upvalue **only if `local x` appears lexically before the closure**. Declared below, the reference inside `f` resolves to the global `_G.x` (nil). The closure reads correctly; at call time the variable is nil.
 
-**Why:** found 2026-06-19 by the senior-audit workflow as the single `critical` finding (F1 in `AUDIT_HAMMERSPOON_2026-06-19.md`). In `modules/llm/api_ollama.lua`, the streaming `on_done` closure (declared ~line 555) calls `os.remove(tmp_path)` as its first statement, but the only `local tmp_path` is ~line 615 — below the closure. So `tmp_path` was the nil global, `os.remove(nil)` threw, and because `ShellRunner`/`hs.task` invoke the completion callback inside a `pcall`, the error was swallowed: the ENTIRE `on_done` body aborted on its first line on every stream completion. With `llm_streaming=true` by default, Ollama streaming predictions silently never appeared. The pre-existing regression test only grepped that the literal `os.remove(tmp_path)` string was present inside `on_done`, so it stayed green while the runtime value was nil — a false-green.
+**Why it is invisible:** found 2026-06-19 in `modules/llm/api_ollama.lua`. The streaming `on_done` closure called `os.remove(tmp_path)` as its first statement while the only `local tmp_path` sat below it — so `os.remove(nil)` threw and, because `ShellRunner`/`hs.task` invoke completion callbacks inside a `pcall`, the error was swallowed: the ENTIRE `on_done` body aborted on its first line on every stream completion. With `llm_streaming=true` by default, Ollama predictions silently never appeared. The pre-existing test only grepped that the literal `os.remove(tmp_path)` string was present inside `on_done` — green while the runtime value was nil. A textbook false-green.
 
 **How to apply:**
 
-- When a closure (especially an `hs.task`/`ShellRunner`/`hs.timer` callback) references a `local`, verify the `local` is declared ABOVE the closure. Hoist temp-file/state creation above the callbacks that consume it (mirror how `api_mlx.lua` is ordered).
-- Errors thrown inside `hs.task`/`hs.timer`/`hs.eventtap` callbacks are swallowed by their pcall wrapper to the HS Console, never the file logger — see [[project_hs_timer_callback_errors_invisible]]. A nil-global closure bug is therefore invisible at runtime; only careful reading or a behavioral test catches it.
-- Regression tests for this class must encode the ROOT CAUSE: assert the `local` declaration index is **before** the closure definition index in the source (`src:find("local tmp_path%s*=") < src:find("local function on_done(", 1, true)`), not merely that the using line exists. A string-grep that the call is present is a false-green.
-- **Specific pattern to watch in `hs.task` GC-pin management**: `local task = hs.task.new(... function() M._active_tasks[task] = nil end)` looks correct but binds nil. The fix is always the 2-line split: `local task; task = hs.task.new(...)` plus `if task then M._active_tasks[task] = nil end` inside the callback. Found in 9 additional sites in the 2026-06-20 audit: `modules/karabiner/onboarding.lua` (×4), `ui/menu/menu_apps.lua` (×1), `ui/menu/menu_llm/models_manager_mlx.lua` (×3), `ui/menu/menu_llm/models_manager_ollama.lua` (×1).
+- When a closure (`hs.task` / `ShellRunner` / `hs.timer` callback) references a `local`, verify the `local` is declared ABOVE it. Hoist temp-file and state creation above the callbacks that consume it.
+- **The `hs.task` GC-pin shape is the recurring trap:** `local task = hs.task.new(… function() M._active_tasks[task] = nil end)` looks right and binds nil. The fix is always the 2-line split — `local task; task = hs.task.new(…)` plus `if task then … end` inside the callback. Nine sites were fixed this way in one 2026-06-20 pass (karabiner/onboarding, menu_apps, both models_manager_*), so assume any new one is wrong until checked.
+- Regression tests must encode the ROOT CAUSE by comparing **source indices** (`src:find("local tmp_path") < src:find("local function on_done(", 1, true)`), never merely that the using line exists.
 
-Related: [[feedback_regression_tests]] (encode the root cause, not the symptom), [[project_hs_timer_callback_errors_invisible]] (why the throw was invisible), [[feedback_coding_style]] (fail-fast / no silent error swallowing).
+Related: [[feedback_regression_tests]], [[project_hs_timer_callback_errors_invisible]] (why the throw was invisible), [[feedback_coding_style]].
 
 ### project-hs-sentinel-key-misfire
 
@@ -203,42 +193,43 @@ Related: [[project_hs_timer_callback_errors_invisible]], [[project_lua_closure_b
 
 ### project-hs-purity-ratchet-counts-comments
 
-_The `hs.*` purity ratchet in `test_port_adapter_coverage.lua` counts the substring `hs.` everywhere in source files — including comments and string literals — so a comment that mentions `hs.timer.new` increments the counter_
+_The `hs.*` purity ratchet counts the substring `hs.` everywhere — comments and string literals included — so a comment mentioning `hs.timer.new` increments the counter_
 
 <sub>slug: `project_hs_purity_ratchet_counts_comments`</sub>
 
-The OS-purity ratchet (`tests/meta/test_port_adapter_coverage.lua`) counts occurrences of the literal substring `hs.` in all `.lua` files under `modules/` and `lib/` (excluding `adapters/`, `ui/`, and root `init.lua`). It then asserts the total is ≤ 950. The grep is a raw substring count, not an AST parse — it counts comments.
+`tests/meta/test_port_adapter_coverage.lua` counts occurrences of the literal substring `hs.` (and of `io.open`/`os.execute`) across `modules/` and `lib/`, excluding `adapters/`, `ui/` and root `init.lua`, then fails if the total rises above a baseline. It is a raw substring count, not an AST parse: **it counts comments and docstrings.** The test's own baseline comment says so and tracks a whole class of such false positives.
 
-**Consequence:** Writing a comment like `-- Formerly used hs.timer.new directly` adds 1 to the count. If the baseline is exactly 950 and you add such a comment, the ratchet fails. Conversely, if you reword a comment to avoid `hs.` (e.g., `-- Formerly used the timer scheduler directly`), the count drops and the baseline stays at 950 — but it feels wrong to hide how the API is referenced in comments.
+**Never quote the baseline numbers from memory — read `LUA_HS_BASELINE` / `LUA_IO_OS_BASELINE` in the test.** They move on almost every pass, and a stale number in prose sends people debugging a delta that does not exist.
 
 **How to apply:**
-- Keep comments in `modules/` and `lib/` neutral about `hs.*` calls when possible. Route the OS call through an adapter and mention the adapter in the comment, not the raw `hs.` API.
-- If a comment genuinely needs to reference the `hs.` API name (e.g., documenting a foot-gun), accept the ratchet increment and update the baseline in the test with a brief note.
-- Current baseline: `hs.*` count = 950, `io.open`/`os.execute` count = 70.
+- Prefer routing the OS call through an adapter and naming the *adapter* in the comment, not the raw `hs.` API.
+- If a comment genuinely must name the `hs.` API (documenting a foot-gun), accept the increment and bump the baseline with a note saying it is a comment, not a call. Verify with `git diff -- modules lib` that no real call site was added.
 
-**Corollary — `adapters/` is the OS-isolation layer, not "exactly the 20 ports".** A refactor that tries to make `macos/adapters/` mirror `windows/adapters/` at exactly the 20 contract ports by moving the non-port helpers (`shell_runner`, `toml_cache`, `json_codec`) into `lib/` is rejected by this ratchet: those helpers do shell-exec / file-I/O, so relocating them spikes the `io.open`/`os.execute` and `hs.*` counts outside `adapters/` (verified: 74 > 70 and 976 > 950). Do **not** weaken the baseline to permit it (§5.9). The correct mental model: `adapters/` holds the 20 ports **plus** any OS-touching infrastructure helper; cross-driver "adapter parity" means the 20 ports line up, not that the folder file counts match.
+**Corollary — `adapters/` is the OS-isolation layer, not "exactly the 20 ports".** A refactor making `macos/adapters/` mirror `windows/adapters/` at exactly the 20 contract ports, by moving the non-port helpers (`shell_runner`, `toml_cache`, `json_codec`) into `lib/`, is **rejected by this ratchet**: those helpers do shell-exec and file I/O, so relocating them spikes both counters outside `adapters/`. Do not weaken the baselines to permit it (§5.9). Cross-driver "adapter parity" means the 20 ports line up — not that the folders hold the same files.
 
 Related: [[project_lua_closure_before_local_nil_global]] (the audit where this was discovered).
 
----
-
 ### feedback_commit_push
 
-_Never push automatically — commit only after explicit ask, push only after explicit validation_
+_Never push automatically — commit freely, push only after an explicit ask in the current conversation_
 
 <sub>slug: `feedback_commit_push`</sub>
 
-**NEVER push without explicit user instruction.** `git push` is always blocked unless the user says "push" or equivalent in that turn.
+**`git push` is blocked unless the user says "push" / "pousse" / "merge" in that turn.** Commit freely after small autonomous changes, then stop. Never chain `&& git push`, never push in a follow-up step, and never infer approval from a green test run or from a prior "work autonomously" instruction.
 
-Commit freely after small autonomous changes, but stop there. Do NOT chain `&& git push` or run `git push` in a follow-up step.
+**Why, two independent reasons:**
 
-**Why:** User was burned by auto-pushes mid-session while code was in a broken/test state (hardcoded test HTML pushed to remote mid-debug).
+- The user was burned by auto-pushes mid-session while the code was in a broken/test state (hardcoded test HTML pushed to remote mid-debug).
+- Every push to `dev` or `main` triggers CI **and cuts a release**. Pushing each small fix pollutes the releases and burns CI. Commits must stay local until explicitly approved.
 
 **How to apply:**
 
-- After any commit: stop. Do not push. Wait for the user to say "push" or "pousse".
-- Step-by-step plan mode (user said "étape par étape, tu valides chacune"): also wait for explicit "ok"/"validé" before committing each step.
-- If unsure: commit is OK, push is never OK without explicit instruction.
+- After any commit: stop. Wait for an explicit push instruction.
+- Work on a feature/fix branch and commit locally as much as needed.
+- Step-by-step mode ("étape par étape, tu valides chacune"): also wait for an explicit "ok"/"validé" before committing each step.
+- If unsure: committing is fine, pushing never is.
+
+Also codified in `CLAUDE.md` (Release branch safety), `.github/copilot-instructions.md` §6, and the `commit-and-push` skill. Related: [[feedback_test_before_merge]] (the merge-to-dev step, which this entry does not cover).
 
 ### feedback-proactive-memory
 
@@ -263,38 +254,27 @@ _npm run fix:banners auto-corrects all section banner alignment violations — r
 
 <sub>slug: `feedback_fix_banners_tool`</sub>
 
-`npm run fix:banners` already exists in `package.json` and auto-corrects banner
-line lengths across the entire repo (`.lua` + `.ahk`).
+`npm run fix:banners` (wrapping `tools/lint/lint-conventions.js --fix-banners`) auto-corrects banner line lengths repo-wide across `.lua` and `.ahk`.
 
-It calls `node scripts/lint-conventions.js --fix-banners --warn-only`.
+**Why:** banner misalignment blocks `git commit` via the husky pre-commit hook, and fixing it by hand (counting `=` characters) is slow and error-prone.
 
-**Why:** Banner alignment violations block `git commit` via the pre-commit hook.
-Fixing them by hand (counting `=` chars) is slow and error-prone.
-
-**How to apply:** After creating or editing any `.lua` or `.ahk` file, run
-`npm run fix:banners` from the repo root before `git add / git commit`.
-Never fix banner lengths manually — the tool is definitive.
+**How to apply:** after creating or editing any `.lua` or `.ahk` file, run it from the repo root before `git add`. Never align banners manually — the tool is definitive.
 
 Related: [[feedback_coding_style]]
 
 ### errors-only-log-sink
 
-_Dedicated daily ErgoptiPlus_errors_YYYY-MM-DD.log (only WARNING + ERROR) + "Open error log" menu item; crash_reports/ strictly for uncaught fatal exceptions_
+_Dedicated daily ErgoptiPlus_errors_YYYY-MM-DD.log (WARNING + ERROR only); crash_reports/ strictly for uncaught fatal exceptions_
 
 <sub>slug: `errors_only_log_sink`</sub>
 
-Both drivers now write every `LoggerError`/`Logger.error` (and WARNING) line to a separate small daily log file under the driver-scoped `logs/` directory, using the same rotation + 14-day purge policy as the unified log. A matching "Open error log" (and sg_action) entry was added to the debug menu, driven from the single source `_shared/menu_manifest.json`.
+Both drivers mirror every WARNING/ERROR line into a small daily `ErgoptiPlus_errors_YYYY-MM-DD.log` beside the unified log, same rotation and 14-day purge. The "Open error log" menu item and its gesture-assignable action are canonical in `_shared/modules/menu/menu_manifest.json` — no per-driver duplication.
 
-**Why:** The unified daily log easily reaches thousands of lines. Users (and the maintainer) frequently want to see _only_ the error lines for triage. `crash_reports/` (rich per-incident JSON with full ring buffer + sysinfo) is intentionally kept for true uncaught crashes only; routing recoverable errors there would create noise and bloat.
+**Why:** the unified daily log reaches thousands of lines, and triage almost always wants only the error lines. **Routing recoverable errors into `crash_reports/` was considered and rejected** — those rich per-incident JSON dumps (full ring buffer + sysinfo) stay exclusively for true uncaught fatals (`ergopti_report_crash` on HS, global `OnError` on AHK); mixing recoverable errors in would drown the signal and bloat them.
 
-**How to apply:**
+**How to apply:** use `LoggerError` / `Logger.error` for any noteworthy failure even when execution continues — and when the user reports "it did something weird", open the errors file first.
 
-- Use `LoggerError` / `Logger.error` for anything that represents a noteworthy failure (even if execution continues).
-- The errors file is the recommended first artifact to look at when the user reports "it did something weird".
-- Crash reporter (the `ergopti_report_crash` path on HS, global `OnError` on AHK) stays exclusively for fatal unhandled exceptions.
-- Menu item and gesture-assignable action are canonical via the manifest (no per-driver duplication).
-
-Related: crash_reporter modules, lib/logger in both drivers, [[feedback_coding_style]] (logging conventions).
+Related: [[feedback_coding_style]] (logging conventions).
 
 ### feedback-loader-target-explicit
 
@@ -302,42 +282,28 @@ _AHK loader/writer modules that mutate a shared Map (Features etc.) must take th
 
 <sub>slug: `feedback_loader_target_explicit`</sub>
 
-Loader and writer modules in the AHK driver that mutate a shared in-memory structure (the `Features` Map, the `TapHold` Map, future v2/v3 globals) MUST take the target structure as an explicit function parameter. They must NOT use a `global Features` (or equivalent) declaration to reach into the global namespace.
+Any loader or writer that mutates a shared in-memory structure (the `Features` Map, the `TapHold` Map, any future global) MUST receive the target as an explicit function parameter — never a `global Features` declaration reaching into the global namespace.
 
-**Why:** discovered 2026-05-22 during Phase 1 of the v2 config-refactor cut-over. The v2 TOML loader (`ApplyConfigTomlV2`) was originally written with `global Features` because it was conceived as a successor to v1's `ApplyConfigToml` and the production wiring would eventually use only one `Features` global. But during the sliced migration period the v1 `Features` global stays the live target, while the v2 loader is meant to populate a separate `FeaturesV2` global. With the global reference baked in, the v2 loader silently clobbered v1 — the section names (`Layout`, `Shortcuts`, `TapHolds`, `Gestures`, `LLM`, `Metrics`, `Script`, `Hotstrings`) coincide between v1 PascalCase and v2 stripped-prefix forms, so the loader walked v1 entries and overwrote inner `{Enabled: True}` object literals with plain booleans. Every downstream `.Enabled` access crashed at tray-menu init.
+**Why:** discovered 2026-05-22 during a sliced config migration, and the failure mode generalises to every such migration. A "successor" loader written against `global Features` is correct only once the migration is finished; **during** the slicing, the old global is still the live target while the new loader is meant to populate a separate one. Because section names coincide between the two schemas, the new loader silently walked the old entries and overwrote `{Enabled: True}` object literals with plain booleans — every downstream `.Enabled` access then crashed at tray-menu init, far from the cause.
 
 **How to apply:**
 
-- Any function whose body mutates a Map passed by reference takes the Map as its first parameter: `ApplyConfigTomlV2(Features, FilePath)`, `LoadTapHoldToml(FilePath)` returning a new Map (no mutation = no parameter needed), `MirrorV1ToV2(SourceMap, TargetMap)`.
-- Read-only accessors can still use `global` (they only need to find the data, not change it).
-- Tests calling the loader supply their own fixture explicitly; production supplies the production global. Either is safe.
-- If you find an existing module that mutates a global, refactor it to take the parameter before adding new callers — incremental migrations are exactly when the global-reference assumption breaks.
+- A function that mutates a Map passed by reference takes it as its first parameter. A function that returns a fresh Map needs no such parameter — no mutation, no aliasing risk.
+- Read-only accessors may still use `global`: they locate data without changing it.
+- Tests pass their own fixture, production passes the production global; both are then safe.
+- If you find an existing module mutating a global, convert it to a parameter **before** adding a caller. Incremental migrations are exactly when the global-reference assumption breaks.
 
-Related: [[feedback-ahk-source-encoding]] — both were sharp foot-guns in the same v2 refactor; both surfaced as silent or cryptic failures with no error pointing at the root cause.
+Related: [[feedback_ahk_source_encoding]] — same refactor, same signature: a silent or cryptic failure with nothing pointing at the root cause.
 
 ### No co-author trailers (Copilot, Claude, bots)
 
-_Never add Co-Authored-By trailers to commits — including Copilot, Claude, github-actions[bot], or any LLM/tool credit_
+_Never add Co-Authored-By trailers — and never whitelist legacy ones to make a lint pass_
 
 <sub>slug: `feedback_no_coauthor`</sub>
 
-Never add `Co-Authored-By:` trailers to commit messages. This includes Copilot, Claude, github-actions[bot], and any other LLM/tool credit.
+No `Co-Authored-By:` trailers, ever — Copilot, Claude, github-actions[bot], any tool. Normative in `.github/copilot-instructions.md` §6; produce a bare conventional commit with no trailers.
 
-**Why:** Project convention in `.github/copilot-instructions.md` §6 explicitly forbids it ("No co-author credits: Never add Co-Authored-By trailers. Do not credit any LLM or tool in commit messages."). The user reaffirmed this strongly when I proposed to whitelist legacy Copilot trailers in a meta-test — they want NEW commits to remain clean and don't want me to soften the rule.
-
-**How to apply:** When writing commit messages (Bash heredoc, `git commit -m`, etc.), produce a bare conventional commit with no trailers. Do not whitelist bot trailers in lint/meta tests either — make the test scope only NEW commits (e.g., `origin/dev..HEAD`) so legacy history isn't flagged but future violations are caught.
-
-### feedback-no-push-dev
-
-_Ne jamais pusher sur dev sans validation explicite — chaque commit sur dev déclenche la CI et crée une release_
-
-<sub>slug: `feedback_no_push_dev`</sub>
-
-Ne pas pusher sur `dev` (ni `main`) sans que l'utilisateur ait explicitement demandé un push.
-
-**Why:** Chaque commit pushé sur `dev` déclenche la CI qui crée une release. Pousser à chaque petit fix pollue les releases et consomme inutilement la CI.
-
-**How to apply:** Travailler sur une branche feature/fix, committer localement autant que nécessaire, et ne pusher sur `dev` QUE quand l'utilisateur dit "push" ou "merge". Ne jamais enchaîner commit + push automatiquement sur `dev`.
+**The non-obvious part:** when a meta-test trips over legacy bot trailers already in the history, do **not** whitelist them. The user pushed back hard on that proposal: scope the check to NEW commits (`origin/dev..HEAD`) so history is not flagged but every future violation is. Softening a rule to make a check pass is the same anti-pattern as weakening a regression test ([[feedback_regression_tests]]).
 
 ### feedback-regression-tests
 
@@ -359,274 +325,166 @@ Codified in `.github/copilot-instructions.md` §5.9 (the project rules doc that 
 
 ### feedback-local-gate-mirrors-ci
 
-_Green locally must mean green in CI: the local gate is four commands, and it is only trustworthy once `node_modules` is installed on a Node that satisfies the engine floor_
+_Green locally must mean green in CI: the local gate is four commands, and it is only trustworthy once `node_modules` is installed on a Node satisfying the engine floor_
 
 <sub>slug: `feedback_local_gate_mirrors_ci`</sub>
 
-The full pre-push gate — run all four from the repo root, in this order:
+The full pre-push gate — all four, from the repo root:
 
 ```bash
-npm run test:js            # 66 checks — the umbrella suite (tools/test/run-js-suite.cjs)
+npm run test:js            # the umbrella suite (tools/test/run-js-suite.cjs)
 npm run test:ahk-encoding  # every .ahk is UTF-8 BOM + LF
-AutoHotkey64.exe static/ergopti_plus/windows/tests/run_all.ahk       # 3212 unit/meta tests
-AutoHotkey64.exe static/ergopti_plus/windows/tests/e2e/run_e2e.ahk   # 5 E2E
+AutoHotkey64.exe static/ergopti_plus/windows/tests/run_all.ahk       # unit + meta
+AutoHotkey64.exe static/ergopti_plus/windows/tests/e2e/run_e2e.ahk   # E2E
 ```
 
-`npm run test:js` is the one people skip, and it is the one that matters most: it is the **umbrella** that wraps the checks CI gates on but the AHK runner knows nothing about — the pinned-source-read ratchet, `lint:conventions:strict`, port compliance, priority parity, the translations audit, and `python tools/format_toml.py --hotstrings --all --check`. The AHK suite can be 3212/3212 green while `test:js` is red.
+`test:js` is the one people skip and the one that matters most: it is the **umbrella** wrapping the checks CI gates on but the AHK runner knows nothing about — the pinned-source-read ratchets, `lint:conventions:strict`, port compliance, priority parity, the translations audit, `format_toml`. The AHK suite can be fully green while `test:js` is red.
 
-**The prerequisite that silently voids the whole gate:** `test:js` needs `node_modules` installed. With it empty, 3 of the 66 checks die on `MODULE_NOT_FOUND` — which reads like "my environment can't run this" rather than "the gate did not run", so it gets waved through and real failures stay invisible. That is exactly how a ratchet violation reached CI on 2026-07-20 (run `29767112617`) after a fully green local AHK run.
+**The prerequisite that silently voids the whole gate:** `test:js` needs `node_modules`. Without it, several checks die on `MODULE_NOT_FOUND` — which reads like "my environment can't run this" rather than "the gate did not run", so it gets waved through and real failures stay invisible. That is exactly how a ratchet violation reached CI on 2026-07-20 (run `29767112617`) after a fully green local AHK run.
 
-Installing is itself a trap here: `.npmrc` sets `engine-strict=true`, and `mute-stream@4.0.0` requires `node ^22.22.2 || ^24.15.0 || >=26.0.0`. CI pins `node-version: '22'`, which resolves to the latest 22.x and satisfies it; a local Node below that floor (e.g. v22.16.0) makes plain `npm ci` abort with `EBADENGINE`. `npm ci --engine-strict=false` unblocks the gate immediately; upgrading local Node to the latest 22.x is the actual fix.
+Installing is itself a trap: `.npmrc` sets `engine-strict=true` and a transitive dep pins a recent Node minor. CI pins `node-version: '22'` (latest 22.x) and satisfies it; a local Node below that floor makes `npm ci` abort with `EBADENGINE`. `npm ci --engine-strict=false` unblocks the gate; upgrading local Node is the actual fix.
 
-**Why:** the user's standing requirement is that a green local run predicts a green CI run ("assure toi de fix les tests locaux pour que dans le futur vert local=vert ci"). A gate that cannot run is worse than one that fails — a failure is visible, an un-runnable check is mistaken for a passing one.
+**Why:** the standing requirement is that green local predicts green CI ("assure toi de fix les tests locaux pour que dans le futur vert local=vert ci"). **A gate that cannot run is worse than one that fails** — a failure is visible, an un-runnable check is mistaken for a pass.
 
 **How to apply:**
 
-- Run all four commands before pushing. If `test:js` reports fewer than 66 checks or any `MODULE_NOT_FOUND`, the gate did **not** run — fix the install first, do not interpret it as a pass.
-- New AHK tests must read driver source through `_DriverFuncBody` / `_DriverSourceConcat` / `_DriverDirConcat`, never a hardcoded `modules/…`, `lib/…` or `ui/….ahk` path. The ratchet in `tools/test/test-no-pinned-source-reads.cjs` fails the build when the count exceeds `BASELINE = 20`. **Never raise the baseline to make a change pass** — convert the test to a helper read (this is [[feedback_regression_tests]]' "never weaken a test" rule applied to the ratchet itself).
-- Two gotchas that cost several red runs: a **comment** containing a token a meta-test scans for (`Bundle_Init()`, `Features[`) shifts naive `InStr` position assertions — reword the comment or strip comments via `_StripFullLineComments`; and in AHK v2 the escape char is the **backtick**, so an embedded quote is `` `" `` — a stray `\"` aborts the parse mid-file and the runner exits with no results at all, which looks like "tests vanished", not "tests failed" (same failure signature as [[feedback_ahk_source_encoding]]).
+- Run all four before pushing. Any `MODULE_NOT_FOUND`, or a check count well below what the suite normally reports, means the gate did **not** run — fix the install, do not read it as a pass. (Do not memorise the exact count; it grows.)
+- New AHK tests must read driver source through `_DriverFuncBody` / `_DriverSourceConcat` / `_DriverDirConcat`, never a hardcoded `modules/…` or `lib/….ahk` path. `tools/test/test-no-pinned-source-reads.cjs` fails the build past its `BASELINE`. **Never raise the baseline to make a change pass** — convert the test to a helper read ([[feedback_regression_tests]] applied to the ratchet itself).
+- Two gotchas that cost several red runs: a **comment** containing a token a meta-test scans for shifts naive `InStr` position assertions — reword it or strip comments via `_StripFullLineComments`; and in AHK v2 an embedded quote is `` `" `` — a stray `\"` aborts the parse mid-file and the runner exits with no results at all, which looks like "tests vanished", not "tests failed" (same signature as [[feedback_ahk_source_encoding]]).
 
 ### feedback-test-before-merge
 
-_Never merge a cut-over slice into dev before the user has tested it live. Stay on the slice branch and wait for explicit validation._
+_Never merge a slice into dev before the user has tested it live. Stay on the branch and wait for explicit validation._
 
 <sub>slug: `feedback_test_before_merge`</sub>
 
-Never merge a cut-over slice into dev before the user has tested it live.
+**Why:** during a sliced cut-over the user tested each slice in live AHK use before merging; on one slice I merged to dev right after a green test run and got pushed back — « ne pas merge dans dev avant d'avoir testé ! ». The suite exercises pure logic: it cannot catch tray-menu UI regressions, hotkey state mismatches, or boot-time failures that only surface in a real session. Merging early puts unvalidated code on dev and forces a rewind.
 
-**Why:** During the v2 config cut-over (slices 1-6), the user repeatedly tested
-each slice in live AHK use before merging. On slice 6 I merged to dev immediately
-after running the test suite without waiting for the user's confirmation — the
-user pushed back ("ne pas merge dans dev avant d'avoir testé!"). The test suite
-exercises pure logic; it can't catch tray-menu UI regressions, hotkey state
-mismatches, or boot-time failures that only surface in a real session. Merging
-prematurely puts unvalidated code on dev and forces a rewind if something
-breaks.
+**How to apply:** when the user says « passe à la suite » or anything that merely sounds like "continue", default to **staying on the current branch** after committing. Say the slice is ready and ask them to test. Merge only on an explicit « ça marche » / « tu peux merger ». Same for deleting the branch — wait until after the merge.
 
-**How to apply:** When the user says "passe à la suite" or anything that sounds
-like "continue", default to staying on the current slice branch after committing.
-Do NOT merge to dev. Tell them the slice is ready on its branch and ask them to
-test before merging. Only merge after the user explicitly says it works in live
-use ("ça marche", "tout est bon", "tu peux merger", etc.). Same rule applies for
-deleting the slice branch — wait for the merge first.
-
-Related: [[feedback_commit_push]] (which covers auto-commit/push cadence on
-small changes, but is silent on the merge-to-dev step).
+Related: [[feedback_commit_push]], which covers the commit/push cadence but is silent on the merge step.
 
 ### feedback-ui-must-be-i18n
 
-_All user-facing UI text must go through the i18n system in 21 supported languages — never hardcode any UI string anywhere, including WebView UIs (metrics, download window, etc.)._
+_All user-facing UI text goes through the i18n system in 21 languages — never hardcode a UI string anywhere, WebView UIs included_
 
 <sub>slug: `feedback_ui_must_be_i18n`</sub>
 
-All user-facing text in the ergopti project must be served via the i18n system, in **all 21 supported languages** (ar, cs, da, de, en, es, fr, he, hi, it, ja, ko, nl, no, pl, pt, ru, sv, tr, uk, zh). Locale files live in [[reference-locales-files]] at `static/ergopti_plus/_shared/data/locales/<lang>.json`.
+Every user-facing string ships in **all 21 supported languages** (ar, cs, da, de, en, es, fr, he, hi, it, ja, ko, nl, no, pl, pt, ru, sv, tr, uk, zh). Locale files: `static/ergopti_plus/_shared/data/locales/<lang>.json`.
 
-**Why:** CLAUDE.md already mandates "UI is French, code is English" but in practice the project ships in 21 languages — French was just the dev-time default. Hardcoded French strings in `_shared/ui/metrics_typing/*.js`, `_shared/ui/download_window/*.js`, etc. break the multilingual contract and shame anyone who tries to use the app in another language.
+**Why — this overrides a naive reading of CLAUDE.md.** CLAUDE.md says "UI is French", but French was only the dev-time default: the project actually ships in 21 languages. Taking that line literally and hardcoding French breaks the multilingual contract for every other user.
 
 **How to apply:**
 
-- When adding or editing any user-facing UI code (Svelte component, WebView HTML/JS, tray menu label, dialog), the displayed text MUST come from the i18n system, not a string literal.
-- For WebView UIs: the JS i18n loader is at `_shared/ui/i18n.js`. Reference keys like `t("menu.hotstrings.autocorrection")`.
-- For AHK driver: use `t(key)` from [[lib-i18n-ahk]] (`static/drivers/autohotkey/lib/i18n.ahk`).
-- For Hammerspoon driver: use `t(key)` from [[lib-i18n-lua]] (`static/drivers/hammerspoon/lib/i18n.lua` + `lib/locale.lua`).
-- When adding a new key, add it to ALL 21 locale JSON files at the same time (machine-translation is acceptable as a first pass, but never leave a key missing from a locale — fallback chain is active→EN→FR but missing keys should still be filled).
-- Internal logs and developer-facing comments stay English per CLAUDE.md — this rule applies only to user-visible text.
+- Any user-facing text (Svelte component, WebView HTML/JS, tray label, dialog) comes from the i18n system, never a string literal.
+- WebView UIs: the JS loader is `_shared/ui/i18n.js`; markup uses `data-i18n` attributes, scripts use `t("menu.hotstrings.autocorrection")`.
+- Windows driver: `t(key)` from `static/ergopti_plus/windows/lib/i18n.ahk`. macOS driver: `t(key)` from `static/ergopti_plus/macos/lib/i18n.lua` (+ `lib/locale.lua`).
+- A new key goes into **all 21** files at once. Machine translation is an acceptable first pass; a missing key never is. The fallback chain (active→EN→FR) exists as a safety net, not a licence.
+- Internal logs and developer comments stay English per CLAUDE.md — this rule covers user-visible text only.
 
-**Backlog item:** [`_shared/ui/metrics_typing/data.js`, `table.js`, `charts.js`] and [`_shared/ui/download_window/*`] contain extensive hardcoded French. Needs extraction to i18n keys + translation to all 21 languages. Logged in the todo list as "[BACKLOG] i18n WebView extraction".
+Parity is enforced in CI against the canonical `en.json` — see [[project_locale_parity_test]].
 
 ### project-ahk-menu-dispatcher-error-swallow
 
-_The menu dispatcher bypass must re-throw callback errors to maintain parity with AHK's native dispatch and the global OnError handler_
+_The menu-dispatcher bypass must re-throw callback errors — a local try/catch only destroys reporting_
 
 <sub>slug: `project_ahk_menu_dispatcher_error_swallow`</sub>
 
-In `lib/menu_dispatcher.ahk`, the `_DispatchIfMissed` bypass was wrapping the menu callback invocation in a `try...catch` block that suppressed errors (logging them via `LoggerError` but swallowing them). This broke error reporting parity: if AHK dispatched a click and the callback crashed, the error propagated to the global `OnError` handler (triggering the crash reporter and user toast). If the bypass dispatched the *same* click and it crashed, the error was swallowed silently.
+In `lib/menu_dispatcher.ahk`, the `_DispatchIfMissed` bypass must let callback errors bubble to AHK's thread boundary (`throw Err` after logging), so a click dispatched by the bypass reports exactly like one dispatched natively.
 
-**Why:** The original implementation likely assumed that since the bypass ran on a `SetTimer` thread, a crash there would kill the timer or the script, so it tried to be defensive. But AHK v2's global `ErgoptiGlobalErrorHandler` prevents the script from crashing (it returns `true`) while surfacing the crash properly. Suppressing the error locally broke the `fail-fast` project instruction.
+**Why the defensive instinct is wrong here:** wrapping it looks prudent because the bypass runs on a `SetTimer` thread — but the global `ErgoptiGlobalErrorHandler` returns `true`, so a propagated error never kills the script; it just reaches the crash reporter and the user toast. Catching locally therefore buys no safety and silently deletes the only error report. Guarded by `tests/meta/test_menu_dispatch_error_propagation.ahk`.
 
-**How to apply:**
-- Re-throw the error `throw Err` after logging it, or remove the `try...catch` wrapper entirely, so the exception bubbles up to AHK's thread boundary and gets caught by the global `OnError` handler.
-- See the regression test `tests/meta/test_menu_dispatch_error_propagation.ahk`.
-
----
-
-## Project architecture & decisions
+Related: [[project_ahk_menu_dispatcher_drop]].
 
 ### project-audit-2026-07-21-open-items
 
-_Third-pass AHK audit: what landed, the 26 confirmed findings still open with their sites, and the 26 claims adversarially refuted so they are not re-raised_
+_Troisieme et quatrieme passes d'audit AHK : les pistes refutees a ne pas re-soulever, et deux decisions qui ne sont pas des correctifs_
 
 <sub>slug: `project_audit_2026_07_21_open_items`</sub>
 
-The 2026-07-21 pass ran the three inventories the two 2026-07-20 passes had
-recorded as NOT RUN, mined ten days of real driver logs for the first time, and
-re-audited the previous campaign's fixes for collateral. 59 candidates were
-raised, each adversarially verified by an independent agent instructed to refute
-it: **42 confirmed, 26 refuted**. The audit report was deleted after
-implementation, so this entry is the durable record.
+53 findings confirmes sur 2026-07-21 (trois passes + une quatrieme sur
+`lib/config_io.ahk`, `lib/webview_utils.ahk`, `adapters/text_sender.ahk`), tous
+implementes avec un test de regression encodant leur cause racine. Le rapport
+d'audit a ete supprime apres implementation ; seul ce qui n'est pas dans git
+survit ici.
 
-**Measured, not theorised.** The logs at `<ConfigDir>/autohotkey/logs/` yielded
-the driver's first real G4 numbers — see
-[[project_audit_evidence_must_be_reproducible]] for why two earlier passes never
-found them. Worst hot-path segments over ten days: `Tooltip.ResolvePos` max
-**2560 ms** (1764 slow events, 41 over 100 ms), `OnChar`/`HSE.FeedChar` max
-**701 ms** (nested — the same stall, do not double count), `Tooltip.Present` max
-239 ms. The 2560 ms is UIA's own 2000 ms `TransactionTimeout` default plus
-overhead, which the driver never set.
+**Mesurer avant de theoriser.** Les logs a `<ConfigDir>/autohotkey/logs/` ont
+donne les premiers vrais chiffres du driver : `Tooltip.ResolvePos` max 2560 ms —
+c'est le `TransactionTimeout` UIA de 2000 ms par defaut, que le driver ne fixait
+pas. Deux passes anterieures n'avaient jamais regarde ces logs, cf.
+[[project_audit_evidence_must_be_reproducible]].
 
-**Landed (11 commits).** Log rotation now follows the calendar rather than the
-process lifetime; per-invocation scratch names for both sleep-retrying atomic
-writers; the ByRef/call-site mismatch that made "tout désactiver" throw on every
-use; UIA probe bounded, idle-gated and negative-cached; healthcheck collectors
-individually guarded so a crash still yields a report; unknown hotkey modifiers
-rejected instead of silently rebinding; the today.log open brought inside the
-HIGH-04 requeue transaction; the personal-editor section pointer proven live at
-every use; and the lifecycle-pairing gate made to actually assert.
+**Deux decisions, pas des correctifs :**
 
-**Two lessons worth more than the fixes.** A guard test written from a LIST of
-sites rather than from the CLASS misses siblings by construction — the
-`.tmp`, UIA-probe and section-pointer findings were all "N of M sites migrated".
-And a test can occupy a name while asserting nothing: `test_logger_pairing.ahk`
-registered a `Test()` whose body was an empty function, so the one gate policing
-unpaired lifecycle logs was itself incapable of failing.
+- **Le rollback `today_log_offset` est laisse en place, deliberement.** Il
+  re-append un batch deja ecrit, mais chaque `events_*` est un `INSERT OR IGNORE`
+  sur une PK `(device_id, id)` : le doublon est jete a l'import — du poids de
+  fichier, pas de perte. Commiter l'etat avant `data.sql` echangerait ca contre
+  une vraie fenetre de crash ou un batch est marque durable avant de l'etre.
+  Invariant epingle par `test_sql_replay_is_idempotent.ahk`.
+- **`require_state` est un RATCHET DE DERIVE a 27, pas un compte de defauts.**
+  Les conventions 5.8 decrivent la forme des modules Lua/Hammerspoon (etat
+  injecte par `M.init()`, chaque fonction publique gardee). Le driver AHK n'est
+  pas bati ainsi : globals auto-execute, caches paresseux, checks de handle
+  explicites. Les 27 entrees sont des caches (`_TimingsCache`), des flags
+  auto-initialisants, des handles derriere leur propre garde, et une couture de
+  test (`_HotstringRegistrar`). **Ne pas « corriger » ces entrees en y boulonnant
+  des gardes** — une passe mecanique mettrait des early-returns vides dans
+  `HotPath_Now()`, appele a chaque frappe. Le ratchet ne sert qu'a faire echouer
+  un NOUVEAU module a etat injecte sans garde.
 
-#### All 42 confirmed findings are implemented
+**Le foot-gun recurrent : un test peut occuper un nom sans rien asserter.** Six
+tests ont ete trouves incapables d'echouer — un corps de fonction vide, un qui
+assertait l'absence d'un helper deja supprime, un qui comparait une liste codee
+en dur a sa propre longueur, un qui scannait un dossier vide, et un
+(`test_webview_host_callback_epoch.ahk`) qui epinglait verbatim des callbacks
+mal lies (`obj.Method` rend un Func NON lie dont le premier parametre est le
+`this` implicite) sans jamais les appeler : la suite certifiait le defaut. Un
+tel test est pire que pas de test. **Corriger ce code EXIGE de corriger
+l'assertion dans le meme commit** — c'est reparer une assertion fausse, pas
+affaiblir un test.
 
-The 26 that this entry originally listed as open were implemented on
-2026-07-21 in a second campaign of eleven commits, each with a regression test
-encoding its root cause. Nothing from that list remains outstanding.
+**Deux pieges de lecture confirmes empiriquement :**
 
-Two outcomes are worth keeping, because they are decisions rather than fixes:
+- Quand deux chemins sur la meme donnee sont en desaccord sur les cles qui
+  existent, l'un des deux derive — cherchez la paire avant de supposer qu'une
+  restriction est voulue. (`ReadKeyboardShortcutsConfig` n'iterait que les 15
+  defauts livres alors que le picker en offre ~600 ; `_GlobalClearAllBindings`,
+  dans le meme fichier, parcourait deja la section persistee.)
+- Le nettoyage de code mort qui supprime un module inutilise supprime aussi la
+  preuve qu'il n'a jamais fonctionne.
 
-- **The `today_log_offset` rollback was left in place, deliberately.** It does
-  re-append an already-written batch, but every `events_*` statement is
-  `INSERT OR IGNORE` against a `(device_id, id)` primary key, so the duplicate is
-  discarded at import — file bloat, not data loss. Reordering the write to commit
-  state before `data.sql` would trade that for a genuine crash window where a
-  batch is marked durable before it is. The invariant that makes the current
-  behaviour benign is now pinned by `test_sql_replay_is_idempotent.ahk` rather
-  than assumed.
-- **`require_state` is a DRIFT RATCHET at 27, and the count is not a defect
-  count.** The old test scanned three files and could not fail. Widened, it
-  first reported 38 — a number an earlier revision of this entry wrongly called
-  "38 genuine violations" and "the largest debt in the driver". Both claims were
-  false. Excluding UPPER_SNAKE constants brings it to 27, and spot-checking
-  those found no genuine conventions-5.8 violation among them: lazy caches
-  (`_TimingsCache`, `_ParseTomlCache`), self-initialising flags
-  (`_AltGrShortcutsRegistered`), lazily-created handles behind their own guards
-  (`_WebView_SharedEnv`), and one deliberate test seam (`_HotstringRegistrar`,
-  which defaults to 0 and whose consumers already branch on that).
+#### Refute — NE PAS re-soulever
 
-  The reason is architectural, and it is worth knowing before anyone tries
-  again: **conventions 5.8 describes the Lua / Hammerspoon module shape** — a
-  state table injected by `M.init()` with every public function gated by
-  require_state. The AHK driver is not built that way; it uses auto-execute
-  globals, lazy caches and explicit handle checks. A mechanical sweep adding
-  guards would put meaningless early returns into functions that need none —
-  `HotPath_Now()`, which runs on every keystroke, was among the files flagged.
-  So the ratchet stays as a drift detector: a NEW module introducing injected
-  state without a guard raises the count and fails, and a human then decides
-  whether it is a real violation or another cache. Do not "fix" the existing
-  entries by bolting guards onto them.
+Chacun a ete instruit puis rejete avec preuve :
 
-The recurring lesson from the second campaign was that guard tests fail quietly.
-Four tests were found asserting nothing: one registered an empty function body,
-one asserted the absence of a helper that had already been deleted, one compared
-a hardcoded list against its own length, and one scanned a directory that no
-longer held the code. A test that cannot fail is worse than no test, because it
-occupies the name and deters anyone from writing the real one.
-
-#### Fourth pass — three files no earlier pass had read
-
-`lib/config_io.ahk`, `lib/webview_utils.ahk` and `adapters/text_sender.ahk` were
-audited end-to-end on 2026-07-21 and yielded 11 further findings, all now
-implemented. Two are worth remembering beyond their fix:
-
-- **User-added keyboard shortcuts were lost by the reload that saved them.**
-  `ReadKeyboardShortcutsConfig` iterated only the 15 shipped defaults while the
-  picker offers ~600 chords, so an added slot was written to config.toml and
-  never read back — no hotkey, gone from the menu, value still on disk so
-  nothing looked lost. The tell was in the same file: `_GlobalClearAllBindings`
-  already walked the persisted section for exactly those non-default slots. When
-  two paths over the same data disagree about which keys exist, one of them is a
-  drift — look for the pair before assuming a restriction is deliberate.
-- **A guard test can pin a bug in place.** Every deferred callback in
-  `WebViewHost` was mis-bound (`obj.Method` returns an UNBOUND Func whose first
-  parameter is the implicit `this`; it does not auto-bind), and
-  `test_webview_host_callback_epoch.ahk` asserted the broken strings verbatim
-  without ever calling the methods. The suite certified the defect as correct.
-  Fixing such code REQUIRES correcting the assertion in the same commit — that
-  is correcting a wrong assertion, not weakening a test.
-
-The class was dormant (zero production call sites; every window is a hand-rolled
-copy), which is why nothing caught it — and why the dead-code cleanup that
-deletes an unused module also deletes the evidence that it never worked.
-
-#### Open by decision — the submenu epoch fence
-
-**Confirmed, reproducible by reading, and deliberately NOT patched.** Recorded
-here so the next person does not repeat the analysis.
-
-`_TrackedDispatch` (`lib/menu_dispatcher.ahk`) fires a menu callback only when
-`TrackedObj.Epoch = _MenuDispatcherEpoch`. But `RebuildTrayMenu` registers submenu
-items via `InitSubMenus()` at epoch N, and `initMenu()` then reaches
-`TrayMenuStage_Publish` → `MenuDispatcher_BeginReplacement()`, which bumps to N+1
-and re-registers **only top-level actions**. Every item inside a child submenu is
-left at the old epoch, so its native dispatch is rejected.
-
-Those clicks still work — the 60 ms retry timer rescues them — but that means
-**every submenu click pays 60 ms and logs "AHK drop detected"**, which destroys
-the one diagnostic signal this module exists to produce: a real AHK drop is now
-indistinguishable from an epoch-fenced no-op.
-
-All three obvious fixes are closed, which is why it is left alone:
-
-1. **Re-stamp surviving registrations.** `MenuDispatcher_BeginReplacement` holds no
-   references to the `TrackedObj`s, so it cannot reach them. Adding a registry
-   changes their lifetime semantics.
-2. **Register submenus after the bump.** Closed: `initMenu()` reads `SubMenus` at
-   `ui/menu/menu_init.ahk` lines 95, 185 and 191, so `InitSubMenus()` must run
-   first.
-3. **Drop the epoch from the fence.** `tests/meta/test_menu_dispatch_epoch.ahk`
-   deliberately pins it ("a stale native callback must not mutate a newer
-   registration"). The token comparison on the next line does appear to carry
-   that guarantee alone — a replaced registration gets a new token — but this is
-   the tray menu, the most user-facing surface in the driver, and it cannot be
-   verified without interactive testing.
-
-**Whoever takes this needs to click through the tray, not just run the suite.**
-
-#### Refuted — do NOT re-raise
-
-Each was investigated and rejected with evidence. The strongest ones:
-
-- **"Sub-logs neither roll at midnight nor are purged."** Sub-files are a strict
-  SUBSET of the dated main log, verified by line count (22 `[gestures` lines in
-  the main log, 22 in the sub-file; 44 vs 44 for `[LayoutShift`), so truncating
-  one destroys zero unique data. The purge regex not matching an undated name is
-  correct, not defective. Residue is cosmetic. *(A rollover call was nonetheless
-  added for policy consistency — it is not a data-integrity fix.)*
-- **"The driver never raises its process priority" / "`Slow HSE.FeedChar`
-  misattributes descheduling stalls."** Both contradicted by
-  `tests/meta/test_hotpath_priority_starvation.ahk`.
-- **"Single-owner mutex gate fails open — 11 instances booted in 8 s."** The boot
-  clustering correlates with heavy development days (19 boots on 07-16 with zero
-  errors), not with a production defect.
-- **"`KL_IngestOnce` has no reentrancy guard."** No test forbids a latch, but an
-  AHK timer cannot interrupt itself; the reachable interleavings come from
-  `OnExit`/rollover, which the atomic-scratch fix already addresses.
-- **"Six more missed siblings of the process-independent `.tmp` name."** The
-  other atomic writers have no yield between staging and rename, so the collision
-  window the fix closes does not exist there.
-- **"`CtrlAltDispatch` emits without Critical."** A naive `Critical("On")` there
-  would fail `test_layout_tables.ahk` plus the framework's Critical-leak check.
-- **"`_TooltipDequeueRebuild` has zero generation discipline."** Structurally
-  true, but no reachable interleaving produces a wrong result.
-- Also refuted: the CapsLock overlay bypassing `LayerDispatch`; the F-31 tap-hold
-  validator logging per keypress; `_SuspendPrefixesAreClear`'s falsy return;
-  `_DeferredGestureAutoConfigure` re-arming through suspend; the F-32
-  safety-flush divergence in the changelog host; `da0531f12`'s load-order guard
-  coverage; raising `TOOLTIP_POSITION_CACHE_MS` to 600 causing staleness.
+- **« Les sous-logs ne roulent pas a minuit et ne sont pas purges. »** Les
+  sous-fichiers sont un SOUS-ENSEMBLE strict du log principal date (verifie au
+  compte de lignes), donc en tronquer un ne detruit aucune donnee unique. Le
+  residu est cosmetique.
+- **« Le driver n'eleve jamais sa priorite de processus » / « `Slow
+  HSE.FeedChar` impute mal des stalls de descheduling. »** Les deux sont
+  contredits par `tests/meta/test_hotpath_priority_starvation.ahk`.
+- **« Le mutex single-owner s'ouvre — 11 instances en 8 s. »** Le clustering
+  correle avec les journees de dev intenses, pas avec un defaut de production.
+- **« `KL_IngestOnce` n'a pas de garde de reentrance. »** Un timer AHK ne peut
+  pas s'interrompre lui-meme ; les interleavings atteignables viennent de
+  `OnExit`/rollover, deja couverts par le scratch atomique.
+- **« Six autres freres du nom `.tmp` process-independant. »** Les autres
+  writers atomiques n'ont pas de yield entre staging et rename : la fenetre de
+  collision n'existe pas la.
+- **« `CtrlAltDispatch` emet sans Critical. »** Un `Critical("On")` naif y ferait
+  echouer `test_layout_tables.ahk` et le check de fuite Critical du framework.
+- **« `_TooltipDequeueRebuild` n'a aucune discipline de generation. »**
+  Structurellement vrai, mais aucun interleaving atteignable ne produit un
+  resultat faux.
+- Egalement refutes : l'overlay CapsLock contournant `LayerDispatch` ; le
+  validateur tap-hold F-31 loguant par appui ; le retour falsy de
+  `_SuspendPrefixesAreClear` ; `_DeferredGestureAutoConfigure` se re-armant a
+  travers suspend ; la divergence de safety-flush F-32 dans le host changelog ;
+  la couverture du garde d'ordre de chargement de `da0531f12` ; le passage de
+  `TOOLTIP_POSITION_CACHE_MS` a 600 causant de la peremption (il vaut bien 600
+  aujourd'hui, `ui/tooltip/core.ahk:56`).
 
 Related: [[project_ahk_guard_tests_must_loop_the_class]],
 [[project_ahk_invariant_incomplete_application]],
@@ -635,108 +493,147 @@ Related: [[project_ahk_guard_tests_must_loop_the_class]],
 
 ### project-typing-latency-tooltip-coldstart
 
-_Tooltip render + post-boot warm-up latency: the border alpha scan optimization, why tooltip window-reuse is rejected (AHK v2 can't remove Gui controls), and why deferred-registration chunking was reverted_
+_Latence de frappe : pourquoi la reutilisation de fenetre tooltip est rejetee, pourquoi le chunking de l'enregistrement differe a ete reverte, et pourquoi WebView2 a quitte le chemin de frappe_
 
 <sub>slug: `project_typing_latency_tooltip_coldstart`</sub>
 
-Findings from the runtime/typing-latency pass (2026-06-14). The `HotPath_LogIfSlow` profiler (`lib/hotpath_profiler.ahk`, QPC-based, logs only keystrokes/segments over 5 ms) is the lens — read the real `ErgoptiPlus_<date>.log` for `Slow <segment>: <ms>` lines before theorising. The recurring cost is the preview tooltip render (`Tooltip.Build` 5-7 ms + `Tooltip.Present` 11-40 ms, spiking to 62 ms), because the tooltip **destroys and recreates two top-level windows (content Gui + layered border) on every update** — the 150 ms `_PREFIX_RENDER_DEBOUNCE_MS` in `hotstring_prefix_watcher.ahk` is a workaround masking that cost.
+L'outil de mesure est `HotPath_LogIfSlow` (`lib/hotpath_profiler.ahk`, base QPC,
+ne logue que les segments > 5 ms) : **lisez les lignes `Slow <segment>: <ms>` du
+vrai `ErgoptiPlus_<date>.log` avant de theoriser.** Le cout recurrent est le
+rendu du tooltip de previsualisation, parce qu'il **detruit et recree deux
+fenetres top-level a chaque mise a jour** ; le debounce de 150 ms
+(`_PREFIX_RENDER_DEBOUNCE_MS`, `lib/hotstrings/hotstring_inputhook.ahk:82`) est
+un pansement sur ce cout, pas une solution.
 
-**Shipped:**
+Le scan alpha de bordure optimise vit dans `_TooltipFixBorderAlpha`
+(`ui/tooltip/helpers.ahk:443`) ; son invariant — « reecrire exactement les pixels
+que GDI a peints » — est verifie contre le rasteriseur reel, pas contre un
+modele, par `tests/unit/test_tooltip_border_alpha.ahk`.
 
-- **Border alpha scan** (`6b1e4e59c`): `_TooltipShowBorder` repaints a 32-bpp DIB and rewrites every GDI-RoundRect-painted pixel to premultiplied border alpha. Extracted into `_TooltipFixBorderAlpha(PixPtr, Wp, Hp, Diam, PremulPx)`, which scans ONLY the painted zones — the two horizontal edge rows (full width) + the left/right corner-column zones of the top/bottom bands + the two vertical edge columns of middle rows — instead of the full corner band. Cost drops from ~2·Diam·Wp to ~2·Wp + 4·Diam², biggest win on short 1-2 row previews (~4-6 ms/render saved; the 5-12 ms `Tooltip.BorderPixelLoop` warnings mostly fall under the 5 ms threshold). Pinned by `tests/test_tooltip_border_alpha.ahk`, which paints a REAL GDI RoundRect and asserts the optimized scan is byte-identical to a full O(Wp·Hp) reference across six geometries — the invariant ("rewrite exactly the pixels GDI painted") is verified against the rasterizer, not a model of it.
-  **Tried and REVERTED — do NOT re-attempt:**
+**Reverte — NE PAS re-tenter :**
 
-- **Chunking the deferred emoji/symbol registration** (`e7072a7c8`, reverted). The idea: register the ~3000-row emoji/symbol pass in 150-row chunks via a self-rescheduling `SetTimer(self, -1)` so the keystroke hook runs between chunks instead of through one ~547 ms blob. **It backfired badly.** A real boot log (cold WebView2, first launch post-reboot) showed the chunked pass take **+7969 ms wall-clock (~12× the blob)**: `SetTimer(-1)` hands control to the message loop between every chunk, and while WebView2 cold-starts (flooding the message queue) each chunk waits for the queue to drain, so the registration smears across the whole warm-up window — and now overlaps the WebView2 cold-start it used to finish _before_ (blob done ~T+2 s, WebView2 at T+2.5 s = no overlap; chunked ran to ~T+8 s = full overlap). The premise was also wrong: AHK threads are interruptible after a ~15 ms window, so a synchronous blob never froze typing for 547 ms — the logs never showed such a freeze. **Lesson:** don't `SetTimer`-yield a CPU loop into a message loop that another cold-start is hammering; keep the blob (it is interruptible and self-contained). The `_HsCacheRegisterSection` row-range plumbing and the chunk parity test were reverted with it.
+- **Chunker l'enregistrement differe emoji/symboles** (`e7072a7c8`, reverte).
+  L'idee : decouper la passe de ~3000 lignes en tranches via un `SetTimer(self,
+  -1)` auto-reprogramme. **Resultat : +7969 ms au wall-clock (~12x le bloc
+  monolithique)** sur un vrai boot a froid. `SetTimer(-1)` rend la main a la
+  boucle de messages entre chaque tranche ; pendant que WebView2 demarrait a
+  froid et saturait la file, chaque tranche attendait son drainage, etalant
+  l'enregistrement sur toute la fenetre de warm-up et le faisant CHEVAUCHER le
+  cold-start qu'il finissait avant. La premisse etait fausse aussi : les threads
+  AHK sont interruptibles apres ~15 ms, donc le bloc synchrone n'a jamais gele
+  la frappe. **Lecon : ne jamais `SetTimer`-yielder une boucle CPU dans une
+  boucle de messages qu'un autre cold-start martele.**
 
-**Shipped (later) — WPM graph widget rewritten from WebView2 to native GDI+:**
+**Rejete — ne pas re-tenter a la legere :**
 
-- A real boot log (cold WebView2, first launch after reboot) showed the WebView2 cold-start was FAR worse than an earlier warm-run estimate: a single keystroke's `HSE.Dispatch` hit **476 ms** (`OnChar` 485 ms) and `Tooltip.Build` 268 ms during the ~3-5 s msedgewebview2 cold-start — it starved the foreground app and every timer. The WPM graph (`lib/metrics/wpm_widget.ahk`, graph mode) was the only WebView2 consumer on the typing path, and it used a whole browser engine to draw a tiny sparkline. It was rewritten to render with **GDI+ into a per-pixel-alpha layered window** — the exact pattern `lib/spotlight.ahk` uses via the GraphicsRenderer adapter (`GR_DrawBitmap(hwnd, drawFn)` → `UpdateLayeredWindow`). Zero cold-start. Key pieces: `WPMWidget_EnsureGdip` (start GDI+ once, cache the font + centered string format for the process life — the graph re-renders every tick so per-call startup would be waste), `WPMWidget_DrawGraph` (rounded pill + filled/stroked sparkline clipped to the pill + centered WPM label, in LOGICAL coords with a per-render world-transform scale = dpi/96 so it matches the old DPI-scaled canvas 1:1), `WPMWidget_RenderGraph` (paints the still-hidden window then `GR_Show` reveals it — no flash). Show/hide simplified: both modes hide outright now (no WebView2 renderer to keep alive at alpha 0). GDI+ text on a layered window needs `GdipSetTextRenderingHint` = AntiAliasGridFit (4) so it carries alpha — plain GDI `TextOut` would render alpha-0 (invisible). Guarded by `tests/meta/test_wpm_widget_native_render.ahk` (no `WebView2.create`/`NavigateToString`/`ExecuteScriptAsync`/`CoreWebView2`/`_graph_wv`; must use `GdiplusStartup` + `GR_DrawBitmap`). Verified by a standalone GDI+ smoke render (pill + label + sparkline all produce correct-alpha pixels) and an Ahk2Exe compile of the whole driver (`wpm_widget.ahk` + `tray_menu.ahk` are NOT in run_all, so the compile is their only parse gate). WebView2.ahk stays included — `keylogger_webview` / `ollama_webview` still use it. Follow-up: the first appearance of the graph window cost a one-time ~110 ms `Tooltip.Present` blip (a concurrent tooltip's message pump absorbed the DWM allocation of the brand-new window). `WPMWidget_PrewarmGraph` (armed at `PREWARM_DELAY_MS` = 900 ms after ready, in the quiet slot after the deferred menu build and before the emoji pass, graph-mode + visible only) now pre-creates the window + starts GDI+ + runs one HIDDEN render (forcing the `UpdateLayeredWindow` surface allocation) off the typing path, leaving it hidden so the tick still reveals it only on real typing.
+- **Reutilisation de la fenetre tooltip** (garder le Gui de contenu + la bordure
+  vivants, muter a la mise a jour). Le docstring du module PRETEND deja « single
+  reused Gui… mutated on subsequent calls » : c'est aspirationnel, le code
+  detruit et recree. Trois blocages : (1) **AHK v2 ne sait pas retirer un
+  controle d'un Gui** — seulement `Gui.Destroy()` la fenetre entiere — donc la
+  reutilisation du contenu impose une reecriture avec pool de controles a etat ;
+  (2) les tests tooltip sont **logique/contrat uniquement** (arithmetique,
+  formatters, greps de source) et n'exercent PAS le cycle de vie reel des
+  fenetres, donc un tel refactor atterrirait sans filet dans le module au pire
+  historique de bugs ; (3) la reutilisation de la seule bordure heurte un **piege
+  de z-order** — une fenetre de contenu fraichement recreee passe au-dessus de la
+  bordure topmost plus ancienne et masque l'anneau. Gain marginal (~2-4 ms/rendu)
+  pour un vrai risque de regression.
+- **De-contentionner le cold-start WebView2 par des astuces de timing**
+  (idle-gating, delai fixe plus long, prechauffage). Le cold-start survit a une
+  pause de frappe, un delai fixe devine, et prechauffer regonfle le boot. Corrige
+  a la racine : le widget WPM a ete reecrit de WebView2 vers **GDI+ dans une
+  fenetre layered a alpha par pixel** (`ui/wpm/wpm_widget.ahk`, via
+  `GR_DrawBitmap` de `adapters/graphics_renderer.ahk`), supprimant le cold-start
+  au lieu de l'ordonnancer. Il etait le seul consommateur WebView2 sur le chemin
+  de frappe et utilisait un moteur de navigateur entier pour dessiner une
+  sparkline ; une frappe y atteignait **476 ms**. Garde par
+  `tests/meta/test_wpm_widget_native_render.ahk`.
 
-**Rejected — do NOT re-attempt lightly:**
+**Deux foot-guns a retenir :**
 
-- **Tooltip window-reuse** (keep the content Gui + border alive, mutate on update). The module docstring CLAIMS "single reused Gui… mutated on subsequent calls" but the code destroys+recreates every render — the claim is aspirational. Three blockers: (1) **AHK v2 cannot remove controls from a Gui** — only `Gui.Destroy()` the whole window — so content reuse needs a stateful control-pool rewrite (reuse by index, restyle/move/hide), high visual-regression risk in a module already full of dimmed-row / separator / LLM / dequeue edge cases; (2) the tooltip tests (`test_tooltip_*`, `test_llm_tooltip_*`) are **logic/contract-only** (arithmetic, formatters, FileRead source-greps) — they do NOT exercise the real window lifecycle, so a reuse refactor would land with no behavioral net in the module with the worst bug history ("clignote et part", "plein de tooltips", "border alone flash"); (3) border-only reuse hits a **z-order trap** — a freshly recreated content window lands above the reused (older) topmost border, hiding the ring. Marginal gain (~2-4 ms/render after the border-loop fix) for real regression risk → not worth it.
-- **WebView2 (WPM widget) cold-start de-contention via timing tricks** (idle-gating / longer fixed delay / pre-warm). Initially deferred (idle-gating only partially helps since the cold-start outlasts a typing pause; a fixed delay guesses; pre-warming re-inflates boot). A later cold-WebView2 log proved the contention was severe enough (476 ms keystroke latency) to fix at the root instead — see the GDI+ rewrite under "Shipped (later)" above, which removes the cold-start entirely rather than scheduling around it.
+- Le texte GDI+ sur une fenetre layered exige `GdipSetTextRenderingHint` =
+  AntiAliasGridFit (4) pour porter l'alpha ; un `TextOut` GDI simple rend en
+  alpha 0, donc invisible.
+- **L'adapter TimerScheduler arme de VRAIS timers OS meme sous test.** Tout test
+  qui arme un handle doit le declencher ou l'annuler, sinon le
+  `_TS_ResetRegistry` suivant doit le drainer — un one-shot fuite plus un
+  compteur d'ids remis a zero faisait qu'un handle mort evinçait le handle vivant
+  du test suivant. Fixe cote test ; regression deterministe dans
+  `_TSTest_StaleTimerCannotEvictLiveHandle`.
 
-**Two follow-up leftovers, investigated 2026-06-14 (multi-agent workflow, adversarially verified):**
-
-- **HSE dispatch spikes (78-90 ms, one 476 ms)** were **WebView2-induced contention, not inherent** — resolved by the GDI+ rewrite. Verified: a star magic-key expansion is one `Critical`-wrapped atomic `SendInput` burst (hotstring_engine_main.ahk ~1332/1347); analytics are deferred off the keystroke (`_HSE_QueueFireLog` → `SetTimer(_HSE_DrainFireLog, -90)`); the profiler times the WHOLE dispatch in wall-clock QPC, so a single-threaded block while WebView2 saturated the pump/GDI landed in the reported ms. The post-rewrite log shows the same `cdg★` trigger at 6.8-8.7 ms (worst all-session 14.1 ms). The 200 ms clipboard `SendInstant` path is **Notepad-only** (gated on window class, never fired in the log); the match path is a bounded by-trigger Map probe (NOT O(n) in the ~3000 emoji regs). **No hot-path change made** — only the existing `test_wpm_widget_native_render.ahk` guard prevents the WebView2 cause from returning.
-- **Flaky `TimerScheduler — cancelAll(): drains all live handles`** (expected 3, got 2, intermittent) — root cause: the adapter calls the REAL AHK `SetTimer` (never stubbed in the harness), and `_TSTest_AfterHandleFiredFalseInitially` arms `TimerAfter(0.001)` = `SetTimer(fn, -1)` then only asserts the flag and returns — leaking an overdue one-shot. `_TS_ResetRegistry` reset the id counter to 0 every test, so that leaked handle's id (1) was REUSED by a later test; when the leaked timer dispatched (on a framework stdout pump-yield), its `_OneShot` `Delete(1)` evicted the _current_ test's live id-1 handle → count 2. Fixed **test-side**: `_TS_ResetRegistry` now (a) disarms every armed handle's `Fn` via `SetTimer(Fn, 0)` before swapping the registry, and (b) no longer resets the id counter (monotonic ids → a stale `Delete` hits a defunct id, and `_OneShot` guards with `Has(Id)`). Deterministic regression test `_TSTest_StaleTimerCannotEvictLiveHandle` reproduces the collision by invoking a leaked handle's bound fn directly (no real-timer timing). **Lesson:** the TimerScheduler adapter arms REAL OS timers even under test — any test that arms a handle must fire or cancel it, or the next `_TS_ResetRegistry` must drain it.
-
-Related: [[feedback-ahk-source-encoding]] (the new `.ahk` files needed BOM+CRLF), [[feedback-regression-tests]] (the border win shipped with a real-GDI parity test), [[project-suspend-pause-invariant]] (the tooltip hot path checks `A_IsSuspended`).
+Related: [[feedback-ahk-source-encoding]], [[feedback-regression-tests]],
+[[project-suspend-pause-invariant]].
 
 ### project-ahk-menu-dispatcher-drop
 
-_AHK 2.0 silently drops ~30-50% of tray-menu clicks. FIXED via lib/menu_dispatcher.ahk — every actionable item must use RegisterMenuItem, never raw Menu.Add._
+_AHK 2.0 perd silencieusement ~30-50 % des clics du menu tray. Contourne par lib/menu_dispatcher.ahk — tout item actionnable doit passer par RegisterMenuItem, jamais par Menu.Add brut._
 
 <sub>slug: `project_ahk_menu_dispatcher_drop`</sub>
 
-ErgoptiPlus tray-menu items intermittently fail to fire their callback on click. Symptom: "menu closes, nothing happens" on a random ~30-50% of clicks. Root cause: AHK 2.0's internal `WM_COMMAND → menu-callback` dispatcher drops events silently (no log, no error). Windows delivers `WM_COMMAND` reliably — confirmed 2026-05-21 by logging `OnMessage(0x0111)`; it's AHK's dispatch that loses the click. Pre-existing, NOT a v2-refactor regression (`git revert e49aeb6b` still reproduced).
+Symptome : « le menu se ferme, rien ne se passe » sur ~30-50 % des clics au
+hasard. Cause racine : le dispatcher interne `WM_COMMAND → menu-callback` d'AHK
+2.0 perd des evenements silencieusement (aucun log, aucune erreur). Windows
+delivre `WM_COMMAND` de facon fiable — confirme en loguant `OnMessage(0x0111)` ;
+c'est la distribution AHK qui perd le clic. Pre-existant, ce n'est **pas** une
+regression du refactor v2.
 
-**Failed fixes** (do not retry): `SetTimer(-1)` deferral, `A_MaxThreads := 32`, `Critical` at callback entry. None helped.
+**Correctifs qui ne marchent PAS** (ne pas re-tenter) : deferrer via
+`SetTimer(-1)`, `A_MaxThreads := 32`, `Critical` a l'entree du callback.
 
-## RESOLVED — the bypass is built
+Le contournement est `lib/menu_dispatcher.ahk` : une Map globale de callbacks
+indexee par ItemId Win32 (decouvert post-`Menu.Add` via `Menu.Handle` +
+`GetMenuItemID`) et un handler `OnMessage(0x0111)` qui re-distribue depuis un
+thread `SetTimer` frais si le chemin natif n'a pas tire dans le delai de retry.
 
-The "bypass AHK's dispatcher" fix is no longer pending — it ships as **`lib/menu_dispatcher.ahk`**. It maintains a global `_MenuDispatchCallbacks` Map keyed by Win32 menu-item ID (discovered post-`Menu.Add` via `Menu.Handle` + `GetMenuItemID`), and an `OnMessage(0x0111)` handler that re-dispatches from a fresh `SetTimer` thread if AHK's native path hasn't fired within 150 ms (`_MenuDispatchLastFire` timestamp guards against double-fire).
+**La seule regle qui compte :**
 
-**How to apply — the one rule that matters:**
+- Tout item de menu portant un callback reellement actionnable DOIT etre ajoute
+  via `RegisterMenuItem(MenuObj, Label, Callback)` (ou `RegisterMenuItemInsert`
+  pour `.Insert`), **jamais** par `Menu.Add(Label, Callback)` brut.
+- `Menu.Add` brut n'est correct QUE pour : les separateurs (`Menu.Add()`), les
+  sous-menus conteneurs (`Menu.Add("Titre", SubMenuObj)`) et les en-tetes
+  desactives purement decoratifs. Voir le bloc « WHEN TO USE WHICH » dans
+  `menu_dispatcher.ahk`.
+- Ca marche sur des menus popup detaches fraichement crees (`Menu()`) avant leur
+  rattachement — `.Handle` cree le HMENU paresseusement.
+- Plus le sous-menu est profond, pire c'est : un sous-menu a 3 niveaux perdait
+  ~100 % de ses clics, bien au-dela de la moyenne de 30-50 %.
+- **Pour auditer :** grepper les appels `.Add(` qui passent un callback non
+  separateur / non sous-menu.
 
-- Every menu item with a real user-actionable callback MUST be added via `RegisterMenuItem(MenuObj, Label, Callback)` (or `RegisterMenuItemInsert` for `.Insert`), NEVER raw `Menu.Add(Label, Callback)`.
-- Raw `Menu.Add` is correct ONLY for: separators (`Menu.Add()`), container submenus (`Menu.Add("Title", SubMenuObj)`), and disabled display-only headers. See the "WHEN TO USE WHICH" block in menu_dispatcher.ahk.
-- It works on freshly-created detached popup menus (`Menu()`) before they're attached — `.Handle` lazily creates the HMENU. Proven by `BuildGesturesMenu` (GMenu) and `BuildScriptShortcutsMenu` (SMenu).
-
-**Last unmigrated site, now fixed (2026-06-02):** `BuildScriptShortcutsMenu()` in `ErgoptiPlus.ahk` (the « Raccourcis de gestion du script » items) still used raw `SMenu.Add` and dropped ~100% of clicks (deeply-nested 3-level submenu seems to drop far worse than the ~30-50% average) — the action picker never opened. Switched to `RegisterMenuItem(SMenu, ...)`. When auditing for this bug, grep for `\.Add(` calls that pass a non-separator/non-submenu callback.
-
-## Related
-
-- [feedback-loader-target-explicit](feedback_loader_target_explicit.md) — different concern, same tray_menu.ahk neighborhood.
-- [project-config-v2-refactor](project_config_v2_refactor.md) — Phase 2 was wrongly suspected of causing this.
+Related : [[feedback-loader-target-explicit]], [[project_config_v2_refactor]].
 
 ### project-audit-2026-07-21-toml-onboarding
 
-_Closing the last coverage gap: `lib/toml/` and `ui/onboarding/` audited for the first time — 16 candidates, 11 confirmed, all 11 fixed_
+_Regles durables sorties de l'audit de `lib/toml/` et `ui/onboarding/` : ou parse-t-on, comment signale-t-on un echec de lecture, et le piege de la sentinelle_
 
 <sub>slug: `project_audit_2026_07_21_toml_onboarding`</sub>
 
-These two zones had never been read by any audit pass. 16 candidates were
-raised and each was adversarially verified by an independent agent instructed
-to refute it: **11 confirmed, 5 refuted**. All 11 are now fixed, each with a
-regression test that fails before its fix. The audit report was deleted after
-implementation, so this is the durable record.
+**La conflation de sentinelle reecrit silencieusement les donnees
+utilisateur.** Deux bugs de la meme forme : `ONBOARDING_DEFAULT_MAGIC_KEY`
+servait de test « rien n'a ete choisi » alors que c'est aussi une reponse
+valide, et un champ de dossier de config vide voulait dire « prends le defaut »
+pour l'etape qui le stockait mais « ne fais rien » pour celle qui le validait.
+**Tracez la provenance explicitement ; ne deduisez jamais « non renseigne »
+d'une valeur legale.**
 
-**Two severity corrections came out of the verification**, both worth keeping:
+**Perdre le parse ne perd pas le fichier.** `TOML_RunStrictCanonicalization`
+lance `SaveFullConfig` apres chaque ecriture reussie et re-emet tout l'arbre
+`Features` depuis la memoire. La perte durable se limite a ce que `Features` ne
+contient pas, et seulement quand la canonicalisation est sautee — c'est-a-dire
+aux ecritures de la phase de boot.
 
-- The "total config.toml loss" claim was refuted down to medium. Losing the
-  parse does NOT lose the file, because `TOML_RunStrictCanonicalization` runs
-  `SaveFullConfig` after every successful write and re-emits the entire
-  `Features` tree from memory. Durable loss is confined to what `Features` does
-  not hold, and only when canonicalization is skipped — i.e. boot-phase writes.
-- The wizard boolean bug was raised at critical and CONFIRMED at high after an
-  empirical reproduction, not just a code read. See
-  [[project_toml_cache_returns_real_booleans]].
+**How to apply :**
 
-**The recurring shape, again:** of the 11, five were a sibling site missed when
-an invariant was applied — the WebView2 host had the correct boolean helper
-while the native host did not; one of three header parsers was fixed and two
-were not; the metrics consent path was wrong in both hosts. Every guard written
-here loops the class rather than pinning the reported site, per
-[[project_ahk_guard_tests_must_loop_the_class]].
-
-**Sentinel conflation** produced two more: `ONBOARDING_DEFAULT_MAGIC_KEY` was
-used as the "nothing chosen" test while also being a valid answer, and an empty
-config-folder field meant "use the default" to the step that stored it but
-"do nothing" to the step that committed it. Both silently rewrote user data.
-Track provenance explicitly; never infer "unset" from a value that is legal.
-
-**How to apply:**
-
-- The TOML parsers now share `TOML_StripInlineComment`; add new parsing there,
-  not in a fourth copy.
-- A failed read is signalled by `TOML_ReadFailed(Path)`, not by an empty result.
-  Any code that REWRITES a file from a parse must check it first.
-- `_Onboarding_ResetAnswers` owns the wizard reset; step renderers must stay
-  pure renderers, because the first page doubles as the Back target.
-
----
+- Les parseurs TOML partagent `TOML_StripInlineComment` (`lib/toml/toml_helpers.ahk`) ;
+  ajoutez-y le nouveau parsing, pas dans une quatrieme copie.
+- Un echec de lecture se signale par `TOML_ReadFailed(Path)`, **pas** par un
+  resultat vide. Tout code qui REECRIT un fichier a partir d'un parse doit le
+  verifier d'abord.
+- `_Onboarding_ResetAnswers` possede le reset du wizard ; les renderers d'etape
+  doivent rester de purs renderers, parce que la premiere page sert aussi de
+  cible au bouton Retour.
 
 ### project-webview2-bridge-gotchas
 
@@ -759,274 +656,43 @@ Symptom progression while bringing up the onboarding webview: blank gray panel �
 
 ### project-config-v2-refactor
 
-_State of the v2 config schema refactor (Scope C) — branch refactor/config-schema-v2 with 5 dormant commits. Cut-over to actually migrate the AHK driver runtime is the open piece._
+_La migration v1 → v2 est terminee ; ne restent que les gotchas transversaux qu'elle a mis au jour_
 
 <sub>slug: `project_config_v2_refactor`</sub>
 
-The user is mid-flight on the Scope C refactor — a clean-state rewrite of the Ergopti+ user configuration system, unifying it under a snake_case schema, a single shared features manifest, and a codegen pipeline.
+La config est unifiee sous `_shared/modules/features/manifest.toml` (snake_case, prefixes `ahk.`/`hs.`), lue par `lib/manifest_reader.ahk` / `macos/lib/manifest_reader.lua`. `ErgoptiPlus.ahk` construit `Features` via `ManifestBuildFeaturesMap()` ; les gates maitres vivent dans `lib/master_gates.ahk` (`CategoryEnabled`, separe des `.enabled` par feature, pour qu'un clic sur le maitre ne detruise pas les choix individuels). Le mapping historique v1→v2 est archive dans `_shared/modules/features/_migration_v1_to_v2.md`. Tous les helpers de miroir (`MirrorV1ToV2_*`, `lib/v1_v2_mirror.ahk`) ont ete supprimes au cut-over — ne pas les rechercher.
 
-**Why:** the v1 config had drifted into a messy state (AHK using PascalCase mixed with snake_case in the same `config.toml`, HS using snake_case-only, separate `features_config.ahk` hardcoded Map, hand-written TOML loaders that don't support nested sections). The refactor centralises every default in `_shared/modules/features/manifest.toml` and codegen-emits per-driver artifacts.
+**GOTCHA — AHK v2 execute les initialiseurs `global`/`static` AVANT le corps auto-exec.** Ordre verifie par sonde : `global X := f()` → `class.static := g()` → 1re instruction auto-exec → appel de fonction explicite. Un consommateur ne peut donc PAS sourcer une valeur depuis un reader de TOML partage dans son propre initialiseur `global` — le reader n'a pas encore tourne. **Pattern impose : declarer la constante a une sentinelle (`0` / `""`), puis un loader de reassignation** (`TapHoldsLoadTimings`, `KeyloggerWalkerLoadTimings`, `HotstringsConfigLoadSharedDefaults`) appele dans le corps auto-exec. Corollaire `#Include` : `modules/tap_holds/constants.ahk` est inclus TOT dans `ErgoptiPlus.ahk` (l.264-273) car un `#Include` a sa place naturelle re-ecraserait avec les sentinelles les valeurs que `boot.ahk` vient de charger ; `#Include` dedoublonne par chemin, donc l'inclusion tardive est un no-op. Meme classe que le precedent `DYN_HOTSTRINGS_DEFAULT_DELAY`.
 
-**How to apply:** when resuming work on this refactor, read in this order:
+**GOTCHA — le garde de purete macOS compte `hs.` dans les COMMENTAIRES et les litteraux de chaine.** `tests/meta/test_port_adapter_coverage.lua` compte les lignes matchant `hs%.` dans `macos/{modules,lib}` contre `LUA_HS_BASELINE`. Un chemin de manifeste (`"hs.hotstrings.expansion_delay"`), une docstring qui cite `hs.timer.doAfter`, ou meme `Paths.shared(` (qui contient litteralement `hs.s`) comptent comme des appels OS. Le commentaire du baseline documente cette classe de faux positifs — **relire ce commentaire avant de re-ancrer** : la cible reelle est zero appel OS, pas zero occurrence. Corollaire : `macos/lib/timings.lua` doit rester pur de tout `hs.`, meme en commentaire.
 
-1. `static/drivers/_shared/core/config_schema/SCHEMA.md` — design conventions (snake_case, modélisation α for hotstrings, `ahk.`/`hs.` prefixes).
-2. `static/drivers/_shared/modules/features/manifest.toml` — single source of truth, 302 features.
-3. `scripts/build-features-manifest.js` — codegen pipeline; run with `npm run build:manifest`.
-4. The three dormant AHK modules: `lib/first_boot.ahk`, `lib/manifest_reader.ahk`, `lib/toml/toml_loader_v2.ahk`.
+**Divergences de timings DELIBEREES sur macOS — ne pas « corriger ».** MLX `DISCOVERY_MAX_WAIT_SEC` = 180 s (vs 60 s au registre — chargements 8B lents, `api_mlx_discovery.lua`) et le menu `INSTALLED_CACHE_TTL` = 30 s (vs 2 s, `menu_llm/models_manager_mlx.lua`).
 
-**Branch state**: `refactor/config-schema-v2`, 9 commits ahead of dev as of 2026-05-22 (commits f3eeab2a → 112ef51a). All commits leave the AHK driver functional — the v2 wiring is not yet active.
+**Gotchas LLM.** (1) Le clamp `min(0.60, temp+0.10)` de `api_mlx.lua` est une escalade de TEMPERATURE au retry, PAS un plafond de tokens — ne pas le « reparer » comme une divergence de tokens. (2) `_shared/tests/corpus/prompt_builder/vectors.json` epingle deja `max_tokens` ET la courbe de temperature de diversite pour les deux drivers : l'etendre plutot que d'ecrire un nouveau corpus.
 
-**v2 pipeline test suite** at `static/drivers/autohotkey/tests/test_features_manifest_v2.ahk` (commit 210fc026, 34 tests passing): locks the manifest load + Map build + TOML override + coerce contract. Run via the existing `run_all.ahk` harness. Caveat: AHK v2 source files MUST be UTF-8 BOM + CRLF or the parser silently aborts mid-file — see [feedback-ahk-source-encoding](feedback_ahk_source_encoding.md) for the full rule.
+**Gate de fraicheur du codegen.** `npm run build:domain` regenere en place les generateurs byte-fidele puis verifie la derive via `git diff` : une source modifiee sans re-run, ou l'edition a la main d'un fichier genere, fait echouer la CI. Pour ajouter un generateur au gate : pousser une etape + ses sorties sur le tableau `PIPELINE` de `tools/build/build-domain.cjs`.
 
-**Big-bang cut-over attempt 2026-05-22 — surfaced a scope gap, did not ship**: a `general-purpose` agent (with the migration doc + tests as references) read the full surface area and stopped before executing, reporting that the migration doc's READ-path mapping does not cover three load-bearing WRITE/render-path systems that also depend on the v1 Features shape:
+**Schema de config.** `tools/test/test-config-schema.cjs` valide `config_template.toml` contre `_shared/core/config_schema/config.schema.json` (validateur JSON-Schema minimal maison, il n'y a pas d'ajv). Quand le manifeste gagne une cle de config, l'ajouter au schema ou ce test casse. Piege : un sous-schema strict dans un `allOf` avec `additionalProperties:false` rejette les proprietes freres — enumerer l'objet en entier.
 
-1. **`SaveFullConfig` + `_CollectFeatureUpdates`** in `ErgoptiPlus.ahk` (~lines 1433-1565) write the live Features Map back to `config.toml` using v1 section names (`Hotstrings.MagicKey`, `Layout`, `TapHolds`). Without a v2 writer, every tray-menu toggle would corrupt the config on save.
-2. **`ApplyTomlMetadataToFeatures` / `BootstrapPersonalFeatures` / `ApplyLocaleDescriptions` / `ApplyIndexTomlToDynamicHotstrings`** in `lib/toml/toml_loader.ahk` inject `Description`, `__Order`, and per-section metadata into Features at boot. They use `FoldAsciiLower` reverse-lookup against v1 PascalCase keys — would emit raw `enabled`/`time_activation_seconds` text in the tray menu.
-3. **`ui/tray_menu.ahk`** (1430 lines) reads `__Order` / `Description` and calls `TOML_Write(..., "Section", "Key")` on toggle — ~60 menu-relevant Features reads coupled to v1 shape.
-4. **Onboarding writes** (`_Onboarding_Commit`, ~line 1180) batch-write v1 sections.
+**Les timings de telemetrie du keylogger AHK ne sont DELIBEREMENT pas balayes.** Ces sous-modules (`keylogger_watchers/_hook/_network/_av_state/_sensors/_mouse/_trigger_roi/_clipboard/_window_topology/_ergonomics`) sont AHK-only (aucune contrepartie macOS → zero valeur de mutualisation) ET absents de `run_all.ahk`, donc un cablage reassign-at-boot serait invalidable en CI avec un risque de sentinelle 0 ms → CPU-spin. Trois sont de vraies divergences code↔registre qui demandent un arbitrage du mainteneur : `CONTEXT_TTL_MS` 1000≠500, `PARK_CHECK_MS` 250≠100, `TOPO_TICK_MS` 1500≠500.
 
-The agent's recommendation: fall back to migration doc approach (a) — sliced cut-over with a temporary compat shim — because (b) Big-Bang exceeds single-session reliable execution. **Useful artifact shipped**: `lib/tap_hold/tap_hold_loader.ahk` (dormant, commit 112ef51a, 149 lines) — the Phase 5 tap-hold loader module that was always going to be needed.
-
-**Next decision (open)**: extend the migration doc with the write/render-path mapping (Sections 11-14 covered reads + IniCacheGet but not config writes, tray-menu rendering, or onboarding writes), then retry approach (b); OR adopt approach (a) with a compat shim and slice; OR put the cut-over on the backlog and use the dormant modules + tests as the v2 foundation for a future session.
-
-**Phase 1 of sliced cut-over (option a) — landed and patched on 2026-05-22**: commits 9b75dad4 (wiring) + ccc09225 (fix). Branch now 11 commits ahead of dev.
-
-**Sharp foot-gun discovered during Phase 1** (`ccc09225`): the v2 TOML loader (`ApplyConfigTomlV2`) originally used `global Features` and so always clobbered whichever Map was bound to that global. Because v1 PascalCase section names (`Layout`, `Shortcuts`, `TapHolds`, `Gestures`, `LLM`, `Metrics`, `Script`, `Hotstrings`) coincidentally match top-level v1 Map keys, calling the loader at boot while v1 Features was still the live target walked into those entries and assigned `Features["Layout"]["ErgoptiBase"] := true` — overwriting the inner `{Enabled: True}` object literal with a plain bool. Every downstream `.Enabled` property access then crashed with `This value of type "Integer" has no property named "Enabled"` at tray-menu init.
-
-Fixed by making the target Map explicit: `ApplyConfigTomlV2(FeaturesMap, FilePath)`. Production calls `ApplyConfigTomlV2(FeaturesV2, ...)`; tests pass their isolated fixture. The v1 global is no longer reachable from the v2 loader and cannot be clobbered. Tests stayed 427/427. **Rule for any future loader/writer module that targets a Map**: take the target Map as an explicit parameter, never reach for it via `global`. This is now [[feedback-loader-target-explicit]].
-
-**Phase 2 — landed 2026-05-22**, commit `e49aeb6b`: migrated 14 read sites across `lib/layout/layout_altgr.ahk` (4), `lib/layout/layout_shift_caps.ahk` (2), `modules/layout.ahk` (6), `modules/keylogger/keylogger_prefetch.ahk` (2-guard chain) from `Features["Layout"][PascalCase].Enabled` to `FeaturesV2["layout"][snake_case]`. Tray menu (`tray_menu.ahk:801,807`) intentionally kept on v1 — it's the write path. New module `lib/v1_v2_mirror.ahk` houses `MirrorV1ToV2_Layout()` (one helper per phase, deleted in bulk at final cut-over); called right after `ApplyConfigTomlOverrides` in `ErgoptiPlus.ahk`. Pure derived view — divergence impossible since writes still go through v1 + Reload + mirror runs again at boot. Tests stayed 427/427. Branch now 16 commits ahead of dev.
-
-**Phase 3 — landed 2026-05-21**, commit `e4c86142`: migrated 27 read sites across `modules/gestures.ahk` (1 = master gate), `modules/layout.ahk` (1 = WrapTextIfSelected), `modules/shortcuts.ahk` (25 = 17 plain bools + 8 modélisation α reads for GPT/Search/TakeNote). New mirror helpers: `MirrorV1ToV2_Gestures()` (1 entry), `MirrorV1ToV2_Shortcuts()` (~25 entries — handles both plain-bool BoolPairs and AlphaPairs PropMap with .Enabled / .Letter / .Link / .DatedNotes / .DestinationFolder / .SearchEngine / .SearchEngineURLQuery). Tests stayed 427/427. Branch now 17 commits ahead of dev.
-
-**Deliberately deferred this phase (need dispatcher rewrite first)**: Shortcuts sub-Maps `AltGrLAlt` / `AltGrCapsLock` / `LAltCapsLock` (consumed by `RunFirstSimpleAction` / `HasAnyEnabled` in `lib/dispatchers.ahk` which iterate v1-shaped `{Cfg.Enabled}` objects). Also deferred: Letter pickers (EGrave/ECirc/EAcute/AGrave — couple to base-layer registration in `lib/layout/layout_ergopti.ahk:50-52`), Personal sub-Map (boot path dependency on `RegisterPersonalFeature`), Metrics (no v1 `Features["Metrics"]` reads exist — indirection via `MetricsShortcuts` global; migrate at final cut-over).
-
-**Phase 4 — landed 2026-05-21**, commit `262c3cb2`: migrated 17 individual `.Enabled` reads in the AltGrLAlt + LAltCapsLock sub-Map dispatch chains. Extended `MirrorV1ToV2_Shortcuts()` with a SubKeyMap (10 snake_case renames: backspace/caps_lock/caps_word/ctrl_backspace/ctrl_delete/delete/enter/escape/one_shot_shift/tab) and a SubMaps loop covering AltGrLAlt + LAltCapsLock (20 entries copied). AltGrCapsLock skipped this phase (no individual reads, only dispatcher calls). Branch now 18 commits ahead of dev. Tests stayed 427/427.
-
-**Dispatcher call sites still on v1** at `modules/shortcuts.ahk` lines 50, 97, 162, 176 — they pass v1-shaped sub-Maps to `RunFirstSimpleAction` / `HasAnyEnabled` in `lib/dispatchers.ahk`. Those helpers iterate `{Cfg.Enabled}` objects and need to be widened or replaced before their inputs can move to v2.
-
-**Phase 5 — landed 2026-05-21**, commit `644a415b`: migrated 62 read sites across `modules/hotstrings.ahk` (56) + `modules/layout.ahk` (3) + `lib/layout/layout_shift_caps.ahk` (1) + `ErgoptiPlus.ahk:712` (1 SpaceAroundSymbols init). New `MirrorV1ToV2_Hotstrings()` maps all 6 categories (Autocorrection / DistancesReduction / SFBsReduction / Rolls / MagicKey / DynamicHotstrings) — ~64 entries copied including the PatternMaxLength extra prop on TextExpansionPersonalInformation. Branch now 19 commits ahead of dev. Tests stayed 427/427.
-
-**Notable renames absorbed in Phase 5**: `SFBsReduction.IÉ -> sfbs_reduction.i_e_acute`, `DynamicHotstrings -> dynamic` (category itself renamed since "Hotstrings" was redundant inside `[hotstrings.*]`).
-
-**Still on v1 in modules/hotstrings.ahk**: the 34 `LoadHotstringsSection` calls pass the v1 Map entry as their 3rd arg. The helper in `lib/toml/toml_loader.ahk:131` reads `.TimeActivationSeconds` / `.HasOwnProp(...)` via object property access — widening it (or replacing it) is the next bottleneck before the Hotstrings cut-over can finish.
-
-**Phase 6 — landed 2026-05-21**, commit `db21e37b`: migrated the LLM tray populator in `ui/tray_menu.ahk` (~50 lines, 12 IniCacheGet calls) to read from the v2 nested `FeaturesV2["llm"]` Map. The 199 `_LLM_Tray[key]` read sites across `ui/tray_llm.ahk` + `modules/llm/*` are untouched — `_LLM_Tray` itself is still populated by `LLM_Tray_Init` from the same flat `saved_opts` shape, just sourced from a different upstream. New `MirrorV1ToV2_LLM()` reads each v1 flat `[LLM]` key from `_IniCache` and places it at its v2 nested path; notable rename `ctx_chars → llm.generation.context_length`; `model` lands at `llm.models.ollama` + `selected = "ollama"`. The `app_profile_overrides` and `onboarding_seen` v1 keys have no v2 declared counterpart (runtime state) so the populator keeps a direct IniCacheGet for those.
-
-**Menu dispatcher bypass — landed 2026-05-21**, commits `7006c3e5` + `d30fd6e0`: new `lib/menu_dispatcher.ahk` installs an `OnMessage(0x0111)` retry hook for the pre-existing AHK 2.0 callback-drop bug ([project-ahk-menu-dispatcher-drop](project_ahk_menu_dispatcher_drop.md)). `RegisterMenuItem` / `RegisterMenuItemInsert` discover the Win32 ItemId via `Menu.Handle` + `GetMenuItemID`, wrap the user callback to stamp a per-ItemId "last fire" timestamp, then OnMessage schedules a 150ms retry — if the timestamp hasn't moved by then AHK dropped the dispatch and the retry runs the callback from a fresh SetTimer thread. `A_MaxThreads` bumped 10 → 64 in ErgoptiPlus.ahk for retry-timer headroom. User-confirmed working. Currently wired into `MenuAddItem` (individual feature toggles) + `AddCategoryToggleItem` (master section toggles). Ad-hoc Menu.Add toggle callbacks in tray_menu.ahk (Metrics / Gestures / Hotstrings master) and tray_llm.ahk remain on AHK's native dispatch — bring into the bypass piecewise as drops become noticeable.
-
-**Phase 7 — landed 2026-05-21** (4 sub-phases, 4 commits):
-
-- **7.1** (`8a06b9a2`) — extended menu-dispatcher bypass to Metrics typing/apps toggles + Gestures auto-configure & per-slot pickers.
-- **7.2** (`7633514d`) — `LoadHotstringsSection` widened to accept v2 Maps via inline shape-detect + synthesise v1 object at the boundary; 33 call sites in `modules/hotstrings.ahk` migrated to pass `FeaturesV2["hotstrings"][<cat>][<entry>]`. ZERO residual `Features["Autocorrection"|...]` references in modules/hotstrings.ahk.
-- **7.3** (`5c3651ea`) — `MirrorV1ToV2_TapHold()` foundation: translates the v1 multi-variant `Features["TapHolds"][KEY][VARIANT].Enabled` shape into the v2 single-action `TapHold["keys"][<key>] = {tap_action, hold_modifier|hold_layer, time_activation_seconds}`. Mirror handles CapsLock / LAlt / AltGr / RCtrl / Space sub-Maps plus flat LShiftCopy / LCtrlPaste / TabAlt entries. **Read-site migration of the ~70 sites in `modules/tap_holds.ahk` is deferred** — the v1 branching pattern becomes a v2 switch on tap_action, non-mechanical and high-risk to batch through; future phase work.
-- **7.4** (`a670bd81`) — **master toggle behavior refactor** (UX fix for the pre-existing concern). New `CategoryEnabled` global gating Map separate from per-feature `.Enabled` flags; persisted in `[CategoryEnabled]` TOML section. `ToggleCategoryAllFeatures` and `ToggleAllHotstrings` now flip ONLY the master gate; per-feature choices stay preserved across master clicks. Every per-section mirror applies the gate when populating FeaturesV2 (`enabled := Gated and (V1.Enabled = true)`). Tray-menu parent checkmark + master toggle label read `IsCategoryGated`. Defaults all-true for fresh installs / no-touch users; old toggles persist their off state until user re-toggles individually.
-
-**Phase 8 candidate** — pick by impact/risk ratio:
-
-- **Hotstrings sub-categories** (~99 sites across `modules/hotstrings.ahk`, biggest fanout) — modélisation α with `TimeActivationSeconds` extra prop on most entries. Highest impact, also highest complexity. Note: the `LoadHotstringsSection` helper in `lib/toml/toml_loader.ahk:131` reads `FeatureConfig.TimeActivationSeconds` (v1 object access) — would need widening too, or keep passing the v1 object as third arg while only migrating the `if X.Enabled` gates (mixed v1/v2 in same statement).
-- **Dispatcher widening + Shortcuts sub-Map dispatchers** (AltGrCapsLock + the 4 call sites at lines 50/97/162/176) — needs adding a v2-aware variant of `RunFirstSimpleAction` / `HasAnyEnabled` OR widening the dispatchers to accept both shapes. Unlocks the final Shortcuts cleanup.
-- **LLM** — surface looks small (7 `IniCacheGet("LLM", ...)` in tray_menu.ahk) but the global `_LLM_Tray` Map populated by those calls has 199 read sites across `ui/tray_llm.ahk` etc. Migration approach: change the population loop to read from `FeaturesV2["llm"][...]` instead of IniCacheGet; no edits to the 199 read sites. Catch: user TOML has v1 flat `[LLM]` keys, v2 expects nested `[llm.models.ollama]` etc., so the mirror has to read v1 IniCacheGet values and flatten them into v2 sub-section paths.
-- **TapHolds** — biggest structural change (no longer in `Features`, moved to separate `TapHold` global from `tap_hold.toml`). Requires the dormant `lib/tap_hold/tap_hold_loader.ahk` (commit 112ef51a) to go live and a hand-written migration of `modules/tap_holds.ahk` (~70 sites — branchy logic, not mechanical).
-
-**Open piece — the cut-over (C4.5 + C4.6 + C5 + C7 + C8)**: replace the hardcoded `Features := Map(...)` in `lib/features_config.ahk` with a call to `ManifestBuildFeaturesMap()`, wire `EnsureUserConfigsExist()` + `ApplyConfigTomlV2()` into `ErgoptiPlus.ahk` boot, and migrate ~500-800 sites across 22 files from PascalCase to snake_case keys plus `.Property → ["key"]` access. Also: `TapHolds` is removed from Features in v2 (moved to a separate `tap_hold` table populated from `tap_hold.toml`), so sites reading `Features["TapHolds"][...]` need a different access pattern.
-
-**Mapping reference** is now committed at `static/drivers/_shared/modules/features/_migration_v1_to_v2.md` (commit 98c34833, 567 lines) — exhaustive v1 → v2 table covering every TOML section, Features path, access pattern, IniCacheGet call site, and a stepped cut-over checklist. Read this top-down before launching the cut-over agent.
-
-**Next decision** — approach for the cut-over: (a) 3 mini-cut-over commits with a temporary compat shim (driver bootable at each step, adds throwaway code), or (b) Big Bang Agent run with the migration document as reference (single sweep across all files, no intermediate boot, cleaner diff but riskier). User has not yet chosen.
-
-**Out-of-scope reminders**: no backward compatibility (clean state — users delete their old config.toml and the driver regenerates from templates at first boot), [[feedback-ui-must-be-i18n]] still applies to all new UI work.
-
-**Update (2026-06-13, A2): the AHK cut-over is DONE in production; macOS started.**
-`ErgoptiPlus.ahk` now has `global Features := ManifestBuildFeaturesMap()` (live), and
-`manifest_reader.ahk` is consumed pervasively (menu_renderer, tray_menu, toml_config_loader).
-The "dormant until cut-over" docstring in `manifest_reader.ahk` is stale.
-
-The macOS side had FOUR orphaned `_generated/*.lua` (zero runtime + zero test
-consumers). A2 resolved them:
-
-- **`expander.lua` / `registry.lua` / `shortcuts_bindings.lua` were deleted** (dead
-  code, with their `codegen-{expander,registry}-hs.cjs` / `codegen-shortcuts.cjs`
-  generators + npm scripts). They were a never-wired "hexagonal migration" — the
-  hand-written `modules/keymap/{registry,expander}.lua` diverged far past the
-  pure generated contract (TOML loading, `hs.settings`, priority cascade,
-  case-variant generation, i18n), so the generated adapters could never replace
-  them. **Update (audit 2026-06-26, GEN-1/2): the AHK `expander.ahk`/`registry.ahk`
-  were ALSO deleted.** The earlier "KEPT because TESTED" rationale was wrong: the
-  `test_domain_{registry,expander}.ahk` tests exercise the hand-written `HSE_*`
-  engine (`hotstring_engine_main.ahk`) against the shared `Registry.spec.js` /
-  `Expander.spec.js` contracts — NOT the generated classes, which were never
-  `#Include`'d or instantiated (grep-proven). So both drivers' generated
-  registry/expander ports are now gone, along with their codegen + npm scripts;
-  the `SubStr(-0)` regression guard was retargeted to the live engine.
-- **`features_manifest.lua` got a reader** — `macos/lib/manifest_reader.lua`
-  (counterpart of `manifest_reader.ahk`). `modules/keymap/init.lua` `DEFAULT_STATE`
-  now sources its hotstring/preview defaults via `Manifest.default_for("hs.hotstrings.<id>")`
-  / `"hotstrings.trigger_char"` (fail-fast on a missing path), so macOS keymap
-  defaults come from the same `_shared/modules/features/manifest.toml` single source as AHK.
-  The reader loads the manifest cwd-independently (`debug.getinfo` + `loadfile`),
-  not via `require`. Other macOS modules (gestures/llm/dynamic_hotstrings/keylogger)
-  still hold hand-written `DEFAULT_STATE` — wiring them is the follow-up (LLM layers
-  a runtime JSON, Karabiner has no manifest entries; both need hardware smoke-test).
-
-**Gotcha — `LUA_HS_BASELINE` counts `hs.` substrings, including manifest path
-literals.** `tests/meta/test_port_adapter_coverage.lua` guards against new `hs.*`
-OS calls by counting lines matching `hs%.` in `macos/{modules,lib}`. Manifest
-paths like `"hs.hotstrings.expansion_delay"` are STRING LITERALS, not OS calls,
-but the heuristic counts them. Wiring keymap added 5 such lines, so the baseline
-was re-anchored 900→905 with a comment. If you wire more modules to the manifest,
-expect to re-anchor again (the real drive-to-zero target is OS calls, not paths).
-
-**Update (2026-06-13, A3): shared timings registry now has dedicated readers on
-both drivers.** `_shared/modules/timings/constants.toml` (~80 ms constants, each naming the
-AHK + HS local it duplicated) is now read through a fail-fast reader on each side
-instead of ad-hoc per-consumer parsing:
-
-- `macos/lib/timings.lua` — `M.ms(section,key)` / `M.sec(section,key)` (ms/1000),
-  cwd-independent `debug.getinfo` load + throw on missing section/key. ZERO `hs.`
-  (it is in `lib/`, counted by the baseline — keep it pure, no `hs.` even in
-  comments). Wired: `keylogger/init.lua`, `llm/prediction_engine.lua`,
-  `gestures/engine.lua` (timing constants only — spatial gesture thresholds stay
-  local).
-- `windows/lib/timings/timings_config.ahk` — `TimingsLoadShared()` /
-  `TimingsGet()` / `TimingsGetSec()`, THROW on miss (CI-safe via run_all's
-  OnError, like the A4 hotstrings loader). Wired: `keylogger_walker.ahk`
-  (`KLWConst`) and `tap_holds/constants.ahk`.
-
-**Gotcha — AHK v2 runs static/global initializers BEFORE the auto-execute body.**
-Empirically verified with a probe: order is `global X := f()` → `class.static :=
-g()` → first auto-exec statement → explicit function call. So a consumer CANNOT
-source a value from a shared-TOML reader in its own `static`/`global` initializer
-— the reader has not loaded yet (its `TimingsLoadShared()` runs in the auto-exec
-body). **Pattern: declare the constant at sentinel `0`, then a reassign loader
-(`KeyloggerWalkerLoadTimings` / `TapHoldsLoadTimings`) sources it in the
-auto-exec body**, placed in `ErgoptiPlus.ahk` right after
-`HotstringsConfigLoadSharedDefaults()` — early enough to beat the keylogger hook
-and tap-hold hotkeys arming (both happen far later). Functions/classes are
-callable regardless of `#Include` position, so the loader can be called before
-the file that defines the consumer is textually included. This is the same
-boot-order class as the A4 hotstrings-defaults loader and the `DYN_HOTSTRINGS_DEFAULT_DELAY`
-early-config-layer gotcha. The broad remaining timing sites (other `keylogger_*.ahk`,
-keep-awake, gestures probe timers, UI/Karabiner timers, MLX/LLM warmup/discovery)
-are a follow-up needing per-module hardware smoke-test, same as the manifest-reader
-follow-up above.
-
-**Update (2026-06-13, A5): the AHK LLM backends now consume the shared
-PromptBuilder `max_tokens`.** The engine computed `params["max_tokens"]`
-(`max(15, max_words*6+10)`, default 150) and then **discarded it**, while
-`api_ollama.ahk` re-derived `num_predict := Max(24, Min(96, mw*4))` and
-`api_remote.ahk` hardcoded `256` in all three provider branches — macOS already
-threaded the value, so AHK was the incomplete side. Now `prediction_engine.ahk`
-threads `max_tokens` into `LLM_OllamaGenerate_Async/_Streaming` and
-`LLM_RemoteGenerate_Async`, and the payload builders serialize it verbatim
-(defaults 150 / 256 only for an out-of-range value). These are output **ceilings**
-rarely reached (generation stops at the stop-sequence/line boundary), so the
-practical effect is small — but the Windows caps did change, so it needs a
-live-model sanity check. **Gotchas for the next person:** (1) the `api_mlx.lua`
-`min(0.60, temp+0.10)` clamp is TEMPERATURE retry escalation, NOT a token limit —
-do not "fix" it as a token divergence. (2) The cross-driver
-`_shared/tests/corpus/prompt_builder/vectors.json` already pins `max_tokens` AND
-the diversity-temperature curve (greedy snap 0.15, auto-raise, cap 1.0) for both
-drivers — extend it rather than writing a new token corpus. (3) The AHK _batch_
-path still uses a single per-prediction cap, not macOS's `× num_predictions + N*5`
-scaling — a documented parity follow-up, not a regression.
-
-**Update (2026-06-13, A6): tooling/enforcement gates added.**
-
-- **Codegen freshness** is now part of `build:domain` (8 steps): it regenerates
-  the byte-faithful generators (`build:manifest`, `codegen:terminators`,
-  `codegen:expander:ahk`, `codegen:registry`) in place and drift-checks them via
-  `git diff` against HEAD, so a source change without a re-run, or a hand-edit of
-  a generated file, fails CI. To add a generator to the gate, push a step + its
-  outputs onto the `PIPELINE` array in `tools/build/build-domain.cjs`.
-- ⚠️ **FOOTGUN — do NOT run `npm run codegen:prompt-builder:ahk`.** That generator
-  (`codegen-prompt-builder-ahk.cjs`) uses constants `AQ='`"'`/`AQQ` and emits
-the backtick-quote escape even for string *delimiters*, producing invalid AHK
-(`` config.Has(`"max_words`") `` instead of `config.Has("max_words")`). The
-COMMITTED `windows/\_generated/prompt_builder.ahk`is correct (plain`"`), so
-re-running the generator CORRUPTS it. It is excluded from the freshness gate for
-this reason; the AHK PromptBuilder is currently effectively hand-maintained. Fix
-the generator's delimiter escaping (only intra-string quotes need `` `" ``)
-before re-enabling codegen for it. The cross-driver `prompt_builder/vectors.json`
-  corpus validates behaviour either way.
-- **Config schema** is now enforced: `tools/test/test-config-schema.cjs`
-  (`test:config-schema`, also a `build:domain` step) is a dependency-free minimal
-  JSON-Schema validator (there is no ajv) that checks the generated
-  `config_template.toml` against `_shared/core/config_schema/config.schema.json`. That
-  schema had drifted (it was consumed by zero tests) and was reconciled to the
-  manifest. When the manifest gains a config key, add it to the schema or this
-  fails. Watch the `allOf` + `additionalProperties:false` trap (a strict
-  sub-schema in an `allOf` rejects sibling properties — spell the object out).
-- **AHK shared-purity §4** (`test_port_adapter_coverage.ahk`) now HARD-FAILS on a
-  direct OS call in `_shared/**/*.js` (was warn-only). The scanner skips comments
-  and uses `\bhs\.`; shared JS is confirmed clean (the old matches were all
-  comments + a `months.` false positive).
-
-**Update (2026-06-13, follow-up pass): the A2–A6 follow-ups are closed; the
-boot-perf idle-pass landed; one item deliberately remains.** Landed: the prompt-builder generator fix (now gated), the
-A4 llm_prediction tint from `UI_AI_LOADING_HEX`, the A5 AHK batch token scaling,
-the A2 manifest-reader extension (keylogger/dynamic_hotstrings/gestures), the full
-**macOS timings sweep** (~38 constants → `lib/timings`), and the **AHK LLM backend
-timings** (`LLMApiLoadTimings`). Gotchas worth keeping:
-
-- **`lib/timings` typos fail fast at require-time** — the macOS suite catches a
-  wrong section/key because it loads the modules; this is the safety net that made
-  the macOS sweep safe to do in bulk.
-- **macOS hs.\* baseline is 906** now (the +1 over 905 is the
-  `hs.gestures.space_wrap` manifest PATH literal in gestures/init.lua — not an OS
-  call). Wiring more `hs.*`-prefixed manifest paths will need another re-anchor.
-- **Two intentional macOS local timing divergences** (NOT to "fix"): MLX
-  `DISCOVERY_MAX_WAIT` 180 s (vs registry 60 s — slow 8B loads) and the menu
-  `INSTALLED_CACHE_TTL` 30 s (vs 2 s).
-- **Boot-perf emoji/symbol idle-pass** (`a866b13fb`): boot
-  `RegisterAllHotstrings(…, DeferHeavy := true)` skips the emoji/symbol magic-key
-  categories (~3000 regs / ~410 ms); a one-shot post-boot `SetTimer`
-  (`RegisterEmojisSymbolsDeferred`, `HS_DEFERRED_REGISTRATION_DELAY_MS` = 1500)
-  registers them off-path + rebuilds the prefix-watcher index. Live rebuilds pass
-  `DeferHeavy=false` (synchronous, unchanged). Lives in `modules/hotstrings.ahk` +
-  `ErgoptiPlus.ahk` — NOT in the CI harness, so it needs a hardware boot smoke-test.
-  Nuance: deferred = registered last → a same-trigger/same-length/same-priority
-  collision would flip the tie-break (practically nil — distinct namespaces).
-- **The AHK keylogger telemetry timings are deliberately NOT swept.** Those
-  sub-modules (`keylogger_watchers/_hook/_network/_av_state/_sensors/_mouse/
-_trigger_roi/_clipboard/_window_topology/_ergonomics` + `keylogger.ahk`
-  `KeylogConst`) are AHK-only telemetry (no macOS counterpart → no mutualization
-  value) AND are **not in `run_all.ahk`**, so a reassign-at-boot wire would be
-  unverifiable in CI with a 0 ms-sentinel → CPU-spin hazard. Three are genuine
-  code↔registry divergences (`CONTEXT_TTL` 1000≠500, `PARK_CHECK` 250≠100,
-  `TOPO_TICK` 1500≠500) that need a maintainer call first. See TODO "Follow-up
-  pass" for the safe recipe (harness inclusion + batch loader + tripwire +
-  reconcile + hardware smoke-test).
+**Hors perimetre acquis** : pas de retrocompatibilite (etat propre — l'utilisateur supprime son ancien config.toml, le driver regenere depuis les templates au 1er boot). Voir [[feedback-loader-target-explicit]] pour la regle « un loader/writer prend son Map cible en parametre explicite, jamais via `global` », nee de ce refactor.
 
 ### project_debug_menu_sync
 
-_Debug menu order is defined in _shared/modules/menu/menu_manifest.json debug_menu — both AHK and Lua drivers consume it_
+_L'ordre du sous-menu Debug est defini une seule fois dans `_shared/modules/menu/menu_manifest.json` (cle `debug_menu`) ; les deux drivers le consomment_
 
 <sub>slug: `project_debug_menu_sync`</sub>
 
-The debug submenu order is the single source of truth in `_shared/menu_manifest.json` under the `debug_menu` key (an ordered array like `top_level`). Platform-specific items carry a `"platforms": ["ahk"]` or `"platforms": ["hs"]` field; entries without `platforms` appear on both.
+La cle `debug_menu` de `_shared/modules/menu/menu_manifest.json` est un tableau ordonne (comme `top_level`) et la SEULE source de verite pour l'ordre du sous-menu Debug. Les entrees specifiques a une plateforme portent `"platforms": ["ahk"]` ou `["hs"]` ; sans ce champ elles apparaissent sur les deux.
 
-**Canonical order** (as of 2026-05-29):
+**Consommateurs :** AHK `MenuManifest_LoadDebugMenu()` (`windows/lib/menu_manifest.ahk`, itere dans `ui/menu/menu_init.ahk`) ; Lua `load_debug_menu()` (`macos/ui/menu/builder.lua`).
 
-1. `window_spy`, `list_vars`, `key_history` — AHK only
-2. `console` — HS only
-3. `---`
-4. `log_level` — submenu
-5. `open_logs`
-6. `open_today_log`
-7. `---`
-8. `healthcheck`
+**Pourquoi :** le mainteneur exige que l'ordre des menus soit defini une seule fois dans `_shared/`, jamais duplique par plateforme. Ne pas recopier l'ordre ici ni ailleurs — lire le JSON.
 
-**Consumers:**
+**Comment appliquer :** pour reordonner ou ajouter une entree Debug, n'editer que `menu_manifest.json` ; les deux drivers la reprennent au prochain chargement.
 
-- AHK: `MenuManifest_LoadDebugMenu()` in `windows/lib/menu_manifest.ahk`, iterated in `windows/ui/tray_menu.ahk`
-- Lua: `load_debug_menu()` in `macos/ui/menu/builder.lua`
-
-**Why:** User requires that menu order be defined once in _shared/ — never duplicated per-platform.
-
-**How to apply:** To reorder or add debug menu items, only edit `menu_manifest.json`. Both drivers pick it up automatically at next load.
-
-See also [[project_menu_manifest_macos_hotstrings_layout_gap]] — the same SSOT manifest correctly drives `debug_menu` on both platforms, but `hotstrings_menu`/`layout_menu` are only consumed on Windows.
+Voir [[project_menu_manifest_macos_hotstrings_layout_gap]] — le meme manifeste pilote correctement `debug_menu` sur les deux plateformes, mais `hotstrings_menu`/`layout_menu` ne sont consommes que sous Windows.
 
 ### project-menu-manifest-macos-hotstrings-layout-gap
 
@@ -1046,125 +712,107 @@ See also [[project_debug_menu_sync]].
 
 ### project-gestures-reversal-detection
 
-_How direction reversals are detected in the gestures engine (x1 vs incremental)_
+_Detection des inversions de direction dans le moteur de gestes (mode x1 vs incremental)_
 
 <sub>slug: `project_gestures_reversal_detection`</sub>
 
-The gestures engine in [engine.lua](../../../../d:/Documents/GitHub/ergopti/static/drivers/hammerspoon/modules/gestures/engine.lua) handles two trigger modes that need different reversal logic.
+`static/ergopti_plus/macos/modules/gestures/engine.lua` gere deux modes de declenchement qui exigent une logique d'inversion DIFFERENTE. Ne pas les unifier.
 
-**Why:** A regression in commit `b1f1e5a2` and earlier designs blanket-returned in `commitGesture` whenever any live fire had happened. That caused 4-finger left-then-right swipes to lose the reversal: user swiped left (fires "space_prev"), reversed quickly to right, lifted before live trigger crossed `LIVE_AXIS_MIN`, and commit refused to fire "space_next".
+**Pourquoi :** une regression avait fait un `return` inconditionnel dans `commitGesture` des qu'un tir live avait eu lieu. Consequence : un swipe 4 doigts gauche-puis-droite perdait l'inversion — l'utilisateur swipe a gauche (tire `space_prev`), inverse vite a droite, leve avant que le declencheur live ne franchisse `LIVE_AXIS_MIN`, et le commit refusait de tirer `space_next`.
 
-**How to apply:**
+**Mode x1** (swipes espace/expose 4 doigts, swipes 2 doigts, vertical 5 doigts) : le commit tire la nouvelle direction si `sign(sd) != gs.liveAxisSign`. Ne bloquer QUE les doubles-tirs dans la meme direction.
 
-**x1 mode** (4-finger space/expose swipes, 2-finger swipes, 5-finger vertical): commit fires the new direction if `sign(sd) != gs.liveAxisSign`. Block only same-direction double-fires.
+**Mode incremental** (mot 3 doigts, fenetre 5 doigts) : suit `gs.lastFirePos` a chaque tir. A chaque nouvelle frame, si le mouvement depuis `lastFirePos` atteint `LIVE_AXIS_MIN` dans la direction opposee a `liveAxisSign`, rebaser `startPos` sur la position courante immediatement. Bien plus reactif que l'ancien repli `diff < 0`, qui obligeait a revenir jusqu'a l'origine.
 
-**Incremental mode** (3-finger word, 5-finger window): tracks `gs.lastFirePos` on every fire. On each new frame, if movement from `lastFirePos` is >= `LIVE_AXIS_MIN` units in the opposite direction of `liveAxisSign`, rebase `startPos` to current pos immediately. This is much more responsive than the old `diff < 0` fallback which required the user to come all the way back through the original origin.
+**Invariant :** les deux modes doivent initialiser `gs.lastFirePos = nil` dans `resetGS()` **ET** a l'ouverture d'un nouveau geste (branche `if not gs.active` de `process_frame`).
 
-Both modes must initialise `gs.lastFirePos = nil` in `resetGS()` AND at the start of a new gesture (in the `if not gs.active` branch of `process_frame`).
-
-See also [[project-gestures-startup-design]].
+Voir [[project-gestures-startup-design]].
 
 ### project-gestures-startup-design
 
-_Design choices for the macOS gestures startup path — primer-as-wakeup-signal vs burst probes_
+_Choix de conception du demarrage des gestes macOS — le primer sert de signal de reveil, PAS des burst probes_
 
 <sub>slug: `project_gestures_startup_design`</sub>
 
-The Hammerspoon gestures module (`static/drivers/hammerspoon/modules/gestures/`) historically struggled with a cold-start bug: at HS launch, the `hs._asm.undocumented.touchdevice` subscription was attached but received no frames until the user physically touched the trackpad. The user's first gesture was lost; gestures only became responsive ~10s later when the 20s discovery timer fired.
+Le module `static/ergopti_plus/macos/modules/gestures/` a longtemps souffert d'un bug de demarrage a froid : au lancement, l'abonnement `hs._asm.undocumented.touchdevice` etait attache mais ne recevait aucune frame tant que l'utilisateur n'avait pas touche le trackpad. Le premier geste etait perdu ; les gestes ne devenaient reactifs que ~10 s plus tard, au declenchement du timer de decouverte.
 
-**Why:** IOKit HID dispatch path isn't initialised at HS launch time. The watcher is technically "running" but the OS doesn't route frames to it.
+**Pourquoi :** le chemin de dispatch IOKit HID n'est pas initialise au lancement. Le watcher « tourne » techniquement, mais l'OS ne lui route aucune frame.
 
-**How to apply:** The current design (cc7abf51, May 2026) combines two mechanisms — do NOT regress to burst probes alone:
+**La conception actuelle combine DEUX mecanismes — ne pas regresser vers les burst probes seuls :**
 
-1. **Adaptive probe loop** in [init.lua](../../../../d:/Documents/GitHub/ergopti/static/drivers/hammerspoon/modules/gestures/init.lua): recycles watchers every 500ms until first frame, then switches to 20s health-check. Replaces the old fixed `STARTUP_BURST_DELAYS = {0.05, 0.15, ..., 4.5}` which exhausted too early.
+1. **Boucle de sonde adaptative** (`init.lua`) : recycle les watchers toutes les 500 ms jusqu'a la premiere frame, puis bascule sur un health-check a 20 s. Remplace l'ancien `STARTUP_BURST_DELAYS = {0.05, 0.15, …, 4.5}` fixe, qui s'epuisait trop tot.
 
-2. **Primer-as-wakeup-signal**: the `gesture_primer` eventtap (already subscribed to NSEventTypeGesture and friends to keep the OS gesture dispatch alive) now ALSO triggers an emergency recycle when it sees a gesture-class event before any touchdevice frame has been received. This means the user's first physical gesture _itself_ unblocks the pipeline, so the gesture is captured in flight rather than lost.
+2. **Primer comme signal de reveil** : l'eventtap `gesture_primer` (deja abonne a NSEventTypeGesture & co. pour garder le dispatch OS vivant) declenche AUSSI un recyclage d'urgence (`schedule_emergency_recycle`) s'il voit un evenement de classe geste avant toute frame touchdevice. Le premier geste physique de l'utilisateur debloque donc lui-meme le pipeline, et ce geste est capture en vol au lieu d'etre perdu. Un cooldown de 1 s (`EMERGENCY_RECYCLE_COOLDOWN`) evite plusieurs recyclages sur une rafale au premier contact.
 
-A 1s cooldown debounces the emergency recycle so a fast burst of gesture events at first contact doesn't trigger several recycles.
+Le primer gere aussi `tapDisabledByTimeout`/`tapDisabledByUserInput` en se reengageant, et s'abonne largement (`beginGesture`, `endGesture`, `swipe`, `magnify`, `rotate`, `directTouch`, `smartMagnify`) pour que l'arbre de dispatch s'initialise entierement.
 
-The primer also handles `tapDisabledByTimeout`/`tapDisabledByUserInput` by re-engaging itself, and subscribes to more types (`beginGesture`, `endGesture`, `swipe`, `magnify`, `rotate`, `directTouch`, `smartMagnify`) so the dispatch tree initialises fully.
-
-See also [[project-gestures-reversal-detection]].
+Voir [[project-gestures-reversal-detection]].
 
 ### project-hotstring-delay-architecture
 
-_Where hotstring expansion delays are configured, the cross-platform precedence, and the key gotchas_
+_Ou se configure le delai d'expansion des hotstrings, la precedence cross-driver, et les pieges_
 
 <sub>slug: `project_hotstring_delay_architecture`</sub>
 
-How the hotstring expansion-delay (TimeActivationSeconds / typing-speed gate) is configured across both drivers. Mapped 2026-06-04 building the per-section delay feature (comma_j → 5s). See [[project_hotstring_engine_internals]].
+Voir [[project_hotstring_engine_internals]].
 
-**Source of truth = the shared per-category TOML**, `static/ergopti_plus/_shared/modules/hotstrings/<category>.toml`:
+**Source de verite = le TOML partage par categorie**, `_shared/modules/hotstrings/<categorie>.toml` :
 
-- `[_meta] delay = <s>` — the group/category delay.
-- `[_meta.section_delays]` block (`<section> = <s>` lines) — per-section overrides, e.g. `comma_j = 5`.
-- NOT `features/manifest.toml`'s `time_activation_seconds` — that field is **test-only metadata** (only `test-manifest-equivalence.cjs` reads it); it does NOT drive the runtime delay. Don't edit it expecting an effect.
+- `[_meta] delay = <s>` — delai du groupe/categorie.
+- `[_meta.section_delays]` (lignes `<section> = <s>`) — surcharges par section, ex. `comma_j = 5`.
+- **PAS** `features/manifest.toml`'s `time_activation_seconds` : il est bien lu par `toml_loader.ahk`, mais immediatement ecrase par la cascade `HotstringsResolve` — l'editer n'a aucun effet runtime.
 
-**Precedence (both platforms, highest first):** user override → TOML section delay → TOML group delay → menu-set global default → hardcoded fallback.
+**Precedence (les deux plateformes, du plus fort au plus faible) :** surcharge utilisateur → delai de section TOML → delai de groupe TOML → defaut global regle au menu → fallback dur.
 
-**AHK:** `HotstringsResolve(cat, sec).Delay` resolves it: `UserSec → UserCat → TomlSec → TomlCat → _HotstringsOverrides["_global"].Delay → GLOBAL_DEFAULT_DELAY (0.75)`. The `_global` key is the **menu-set default expansion delay** (tray: Delays submenu → "default delay" item; persisted via `HotstringsSetOverride("_global","","delay",s)`). The AHK loader (`toml_loader.ahk` `ParseTomlGroupConfig`) reads `[_meta.sections.<name>]` AND `[_meta.section_delays]` into `Sections[x].Delay`. The AHK `Terminators` class in `_generated/terminators.ahk` is dormant (unused) — unrelated to this.
+**AHK :** `HotstringsResolve(cat, sec).Delay` resout la cascade ; la cle `_global` de `_HotstringsOverrides` est le defaut d'expansion regle au menu (Delais → « delai par defaut », persiste via `HotstringsSetOverride("_global","","delay",s)`). `ParseTomlGroupConfig` lit `[_meta.sections.<nom>]` ET `[_meta.section_delays]` dans `Sections[x].Delay`.
 
-**macOS (Hammerspoon):** per-GROUP `CoreState.DELAYS[group]` (seeded from hardcoded `DELAYS_DEFAULT` + user prefs) + per-section `CoreState.SECTION_DELAYS[section]` (loaded from the shared TOML's `[_meta.section_delays]` via the shared `toml_codec/reader.lua`, which handles `[_meta]`, `[_meta.sections]` inline lang-maps, `[_meta.sections.<name>]`, and `[_meta.section_delays]`). `mapping_fires` applies the precedence (a group delay differing from its default = a user override and wins over the section delay). Each mapping (incl. generated `;`/nbsp/nnbsp aliases) is tagged with `entry.section`. Section delays are folded into `WORD_TIMEOUT_SEC` (`recompute_word_timeout`) so a long window (5s) is not cut short by the inactivity wipe. macOS does NOT read the TOML group `[_meta] delay` (uses the hardcoded `DELAYS_DEFAULT`); only section delays come from the TOML.
+**macOS :** delai par GROUPE via `CoreState.DELAYS[group]`, par SECTION via `CoreState.SECTION_DELAYS[section]` (lu du TOML partage par `toml_codec/reader.lua`). `mapping_fires` applique la precedence (un delai de groupe different de son defaut = surcharge utilisateur, et gagne sur le delai de section). Les delais de section sont replies dans `WORD_TIMEOUT_SEC` (`recompute_word_timeout`) pour qu'une fenetre longue (5 s) ne soit pas coupee par l'effacement d'inactivite. macOS ne lit PAS le `[_meta] delay` de groupe (il utilise `DELAYS_DEFAULT`) ; seuls les delais de section viennent du TOML.
 
-**Cross-platform Delays-submenu parity (added 2026-06-04, branch `feat/comma-j-expansion`).** Both drivers' hotstrings "Delays" submenu now surfaces the same set of quick delay items: default expansion delay, ★ magic-key, autocorrection, AI-prediction timeout, and dynamic-hotstrings (HS also keeps it; AHK gained all of them). Key implementation facts:
+**Categories pseudo cote AHK.** `llm_prediction` et `dynamichotstrings` n'ont AUCUN TOML de categorie — `ParseTomlGroupConfig` renvoie silencieusement une config vide pour un fichier absent, donc ce sont des cles de surcharge pseudo-categorie : le defaut est une constante partagee, la surcharge est persistee via `HotstringsSetOverride("llm_prediction"|"dynamichotstrings", …)`. Cela evitait un plombage `_LLM_Tray` sur 6 fichiers et le risque d'enumeration lie a de faux TOML de categorie. Le timer du tooltip LLM resout la surcharge a chaud (effet immediat) ; les autres delais de categorie AHK ne s'appliquent qu'au redemarrage (le `TimeActivationSeconds` enregistre est lu au boot).
 
-- **★ + autocorrection** are real TOML-backed categories (`magickey.toml` `[_meta] delay = 2.0`, `autocorrection.toml` = 1.0). On macOS the quick item must read via `hotstrings_config.resolve(cat,nil).delay` and write via `set_override` + `set_delay` (NOT the `make_delay_item`/`state.delays` path, which is in-memory-only and would desync from the config window). AHK uses `HotstringsResolve`/`HotstringsSetOverride` — `_HS_CategoryDelayLabel`/`_HS_PromptCategoryDelay(cat, i18nKey, DefaultSec:="")` in `tray_menu.ahk`.
-- **AHK llm_prediction + dynamichotstrings have NO category TOML** — `ParseTomlGroupConfig` silently returns an empty cached config for a missing file (no log noise), so they're used as **pseudo-category override keys**: default is a code constant (`UI_LLM_TIMEOUT_SEC`=20s in `_shared/modules/tooltip/constants.toml`; `DYN_HOTSTRINGS_DEFAULT_DELAY`=2.0 in `modules/hotstrings.ahk`), override persisted via `HotstringsSetOverride("llm_prediction"/"dynamichotstrings",...)`. This avoided a 6-file `_LLM_Tray` plumbing route and the `build-hotstrings.cjs` enumeration risk of adding fake category TOMLs. The LLM tooltip timer (`lib/tooltip.ahk` ~1209) resolves the override live (applies without restart); AHK category-delay changes otherwise apply on restart (registered `TimeActivationSeconds` is read at startup).
-- **AHK dynamic phone/SSN/IBAN prefix hotstrings were rewritten from native `Hotstring()` to HSE `CreateHotstring`** so they honour `TimeActivationSeconds` (they had none). `_HotstringDispatch` calls a callable `Replacement`, so `(*) => SendFinalResult(V)` became `(*) => V` + `FinalResult:True`; `OnlyText:True` also fixed a latent `+33…` SendInput modifier-interpretation bug. The `@np` personal-info expansions were already HSE and left firing instantly (out of scope). `IsTimeActivationExpired` treats `<=0` as "no gate".
-- **i18n**: two NEW keys `menu.hotstrings.delay_magic_key` / `delay_autocorrection` added to all 21 locales (the existing `tooltip_magic`/`tooltip_autocorrect` are PREVIEW labels, not delay labels). Reused `tooltip_ai_acceptance` / `tooltip_autocompletion` for the AI/dynamic items. Locale files are UTF-8 **BOM + CRLF + tab + NOT globally sorted** — insert keys via targeted text insertion at the alphabetical position, never full reserialize (would rewrite all 2144 keys). `tools/locale/check_locales.py` points at a stale `tools/static/locales` path but the parity rule (every locale mirrors `en.json`) still holds.
-- **Test fixes (committed)**: `lib/locale.lua` Windows path-separator bug (forward-slash-only dirname regex dropped the `lib` segment when `package.searchpath` injected a backslash); two stale purity baselines re-anchored (852→862, 61→63) in `tests/meta/test_port_adapter_coverage.lua`.
+**Les trois fallbacks durs sont un fichier cross-driver.** `GLOBAL_DEFAULT_DELAY` (0.75 s), `GLOBAL_DEFAULT_COLOR` (#1e88e5), la baseline `personal` (#6e6e73) et `DYN_HOTSTRINGS_DEFAULT_DELAY` (2.0 s) vivent UNE SEULE FOIS dans `_shared/modules/hotstrings/defaults.toml` (`[colors]`, `[delays]`), lus au boot par les deux drivers avec un `require_key` fail-fast. Pieges d'implementation :
 
-All AI-timeout + dynamic-delay behaviour is AHK-side and **UI/runtime — NOT covered by the headless suite; needs live-testing on Windows**. Suites: macOS 1215/0, AHK 1052/0.
-
-All of the above lives on branch `feat/comma-j-expansion` (not yet merged to dev as of 2026-06-04).
-
-**The three hard fallbacks are now a shared cross-driver file (A4, 2026-06-13).** `GLOBAL_DEFAULT_DELAY` (0.75 s), `GLOBAL_DEFAULT_COLOR` (#1e88e5) and the `personal` baseline (#6e6e73) used to be duplicated literals in BOTH `windows/lib/hotstrings/hotstrings_config.ahk` and `macos/modules/hotstrings_config.lua` (each claiming "single source"). They now live ONCE in `static/ergopti_plus/_shared/modules/hotstrings/defaults.toml` (`[colors] global_default / personal`, `[delays] default_sec`) and are read at boot by both drivers with a fail-fast `require_key`, exactly like `_shared/modules/tooltip/constants.toml`. Key implementation gotchas:
-
-- **AHK uses an EXPLICIT loader, never a top-level auto-read.** `HotstringsConfigLoadSharedDefaults()` is called from `ErgoptiPlus.ahk` (before `HotstringsConfigInit` and the tray menu build — `initMenu` reads `GLOBAL_DEFAULT_DELAY`). It is NOT run at the `hotstrings_config.ahk` top level because `tests/test_hotstring_aggregation.ahk` sets `_SharedDir` _after_ its `#Include` of the file — a top-level read would throw at include time. This mirrors `ui_style.ahk`'s sentinel-then-loader pattern. The three globals start `""` / `Map()` sentinels.
-- **Fail-fast = THROW, not `MsgBox`+`ExitApp`.** A missing key throws an `Error`: in production the unhandled boot error surfaces the fatal dialog and exits (desired); in CI `run_all.ahk`'s `OnError` handler turns it into a `not ok 0` line (no hung modal). `MsgBox`+`ExitApp` would hang the headless runner. The macOS side `error()`s at require-time (re-required per test).
-- **`IniCacheGet`/`ParseTomlFile` return colors WITH the leading `#`** (the TOML stores `"#1e88e5"`); the loader strips+re-adds `#` to normalise. Don't double-prefix.
-- **Pre-existing trap unrelated to A4:** the focused dev runner `tests/run_hotstrings_config.ahk` reports ~14 failures (`_HSE_SourcePriority` "local variable has not been assigned a value") because it does NOT `#Include hotstring_engine_main.ahk`, which defines `_HSE_SourcePriority` — now called in the resolve priority cascade. **CI uses `run_all.ahk`, which includes it and is fully green (1372/0).** Use `run_all.ahk` to judge hotstrings_config changes, not the focused runner.
-- Out of A4 scope (still AHK-only literals): `llm_prediction #AD61FF` (no HS equivalent — mirrors tooltip `ai_loading_hex`) and `DYN_HOTSTRINGS_DEFAULT_DELAY 2.0`. Single-source tripwire tests on both drivers (`test_hotstrings_config.ahk` §SharedDefaults, `macos/.../unit/modules/test_hotstrings_defaults.lua`) assert the loaded values equal the file AND pin the canonical literals.
+- **AHK utilise un loader EXPLICITE, jamais une lecture au top-level.** `HotstringsConfigLoadSharedDefaults()` est appele depuis le boot (avant `HotstringsConfigInit` et avant la construction du tray, qui lit `GLOBAL_DEFAULT_DELAY`). Il n'est PAS au top-level de `hotstrings_config.ahk` parce que `tests/test_hotstring_aggregation.ahk` fixe `_SharedDir` APRES son `#Include` — une lecture au top-level leverait a l'inclusion. Les globales partent a des sentinelles `""` / `Map()`. Meme classe de boot-order que le gotcha AHK v2 de [[project_config_v2_refactor]].
+- **Fail-fast = THROW, pas `MsgBox`+`ExitApp`.** Une cle manquante leve une `Error` : en prod le boot non rattrape affiche le dialogue fatal et sort (voulu) ; en CI le `OnError` de `run_all.ahk` la transforme en `not ok 0`. Un `MsgBox` bloquerait le runner headless. Cote macOS c'est un `error()` au require.
+- **`IniCacheGet`/`ParseTomlFile` renvoient les couleurs AVEC le `#` de tete** ; le loader strip puis re-ajoute pour normaliser. Ne pas doubler le prefixe.
+- **Piege independant : le runner cible `tests/run_hotstrings_config.ahk` remonte ~14 echecs** (`_HSE_SourcePriority` « local variable has not been assigned a value ») parce qu'il n'inclut PAS `hotstring_engine_main.ahk`, qui definit ce symbole desormais appele dans la cascade de resolution. **Juger les changements hotstrings_config avec `run_all.ahk`, pas avec le runner cible.**
+- Des tests tripwire single-source des deux cotes (`test_hotstrings_config.ahk` §SharedDefaults, `macos/.../unit/modules/test_hotstrings_defaults.lua`) assertent que les valeurs chargees egalent le fichier ET epinglent les litteraux canoniques.
 
 ### project-hotstring-engine-internals
 
-_AHK prefix-watcher InputHook captures synthetic input; OnChar must feed each char once; AHK vs Hammerspoon word-boundary framing divergence is intentional_
+_OnChar doit alimenter chaque caractere une seule fois ; la divergence de cadrage des frontieres de mot AHK vs Hammerspoon est intentionnelle_
 
 <sub>slug: `project_hotstring_engine_internals`</sub>
 
-Hard-won internals of the ErgoptiPlus hotstring matching engine (Windows AHK + macOS Hammerspoon). Discovered 2026-06-04 while fixing the comma-layer/nnbsp + vowel → capital-J expansion.
+Internes durement acquis du moteur de correspondance des hotstrings (Windows AHK + macOS Hammerspoon).
 
-**AHK prefix watcher InputHook captures synthetic output.** The watcher's InputHook is created `InputHook("V L0")` — no `I0` flag — so it observes input injected by `SendEvent`/`SendInput` too (the comment says injected keystrokes must reach the watcher). Therefore `SendNewResult(...)` output flows back through `_OnPrefixChar` → `HSE_FeedChar` into `HSE_Buffer`. The whole `HSE_Suppressed` / `PrefixWatcherSuppress` machinery exists only to filter the engine's OWN expansion bursts so they don't re-feed. Do NOT assume `SendEvent` bypasses the watcher — it does not.
+**Provenance de l'entree synthetique.** Le prefix watcher est cree `InputHook("V L0 I1")` (`lib/hotstrings/hotstring_inputhook.ahk`) : `I1` filtre l'entree synthetique de bas niveau (les rafales `SendInput`/`SendEvent` du driver partent au SendLevel 0 par defaut) tout en preservant chaque touche physique. C'est un filtrage par PROVENANCE, qui a remplace une ancienne fenetre temporelle de 60 ms — laquelle jetait aussi la vraie frappe juste apres une expansion. La machinerie `HSE_Suppressed` / `PrefixWatcherSuppress` subsiste en complement (`hotstring_builder.ahk`) ; ne pas la supprimer en supposant que `I1` suffit seul.
 
-**OnChar must feed each char exactly once.** `_OnPrefixChar` feeds every char at the top (where end-char/star matches fire). A historical bug also re-fed word-terminators in the boundary branch, so `;`/`:` landed in `HSE_Buffer` twice (`nnbsp::e`), silently breaking any trigger that contains a terminator as a NON-final char (the J triggers). Fixed by removing the boundary-branch re-feed. macOS appends once in the init.lua keyDown loop and never had this bug. If you touch the boundary branch, never re-feed.
+**OnChar doit alimenter chaque caractere EXACTEMENT une fois.** `_OnPrefixChar` alimente chaque caractere en tete de fonction (la ou les correspondances end-char/star tirent). Un bug historique re-alimentait les terminateurs de mot dans la branche frontiere : `;`/`:` atterrissaient DEUX fois dans `HSE_Buffer`, cassant silencieusement tout declencheur contenant un terminateur comme caractere NON final. Corrige en retirant le re-feed de la branche frontiere. macOS n'ajoute qu'une fois dans la boucle keyDown de `init.lua` et n'a jamais eu ce bug. **Si tu touches a la branche frontiere, ne re-alimente jamais.**
 
-**`HSE_WORD_TERMINATORS`** (hotstring_engine_main.ahk) is the engine's base separator set; it is hand-maintained (NOT the codegen `_generated/terminators.*`, which is the user-configurable catalogue). Spell apostrophes as `Chr(0x27) . Chr(0x2019)` — a typography pass once silently rewrote the ASCII apostrophe to a second U+2019, dropping U+0027.
+**Le jeu de terminateurs est configurable a chaud.** `HSE_WORD_TERMINATORS` est assigne au boot depuis `HotstringsGetWordDelimiters()` (`lib/boot.ahk`) — surcharge utilisateur ou `HOTSTRINGS_DEFAULT_WORD_DELIMITERS` — et `HotstringsSetWordDelimiters` le remplace en vol sans Reload. Le litteral dans `hotstring_engine_main.ahk` n'est que la constante de compilation, ecrasee au boot ; y epeler les apostrophes `Chr(0x27) . Chr(0x2019)` (une passe de typographie a deja silencieusement reecrit l'apostrophe ASCII en un second U+2019, faisant disparaitre U+0027). Le jeu de frontieres du prefix watcher est DERIVE de `HSE_WORD_TERMINATORS` et doit etre recalcule apres toute reassignation, sinon l'apercu et le matcher s'ancrent sur des jeux differents et les expansions previsualisees ne tirent jamais.
 
-**Cross-platform word-boundary framing differs by design.** AHK uses a terminator-ALLOWLIST (`_HSE_WordBoundaryAllows`: fire only if the char before the trigger is in `HSE_WORD_TERMINATORS` or start-of-buffer). Hammerspoon uses a letter-DENYLIST (`word_boundary_blocks` → blocks if `text_utils.is_letter_char(prev)`; Lua `%w` = letters+digits, NOT underscore). They AGREE for all normal French input (space/punct/apostrophe → fire; letter/digit → block). They diverge ONLY for exotic preceding chars (hyphen, `_`, `(`, `/`): macOS fires, AHK blocks. This is low-impact and "best" is genuinely ambiguous — left intentionally unaligned. Don't "fix" it without a concrete user need. The comma→J bare `;` trigger is in-word on BOTH (AHK `*?C`; macOS via the leading-`;` skip in `word_boundary_blocks`) so the capital J is guaranteed in every context — bare `:` is deliberately NOT a trigger. See [[project_keymap_architecture]].
+**La divergence de cadrage des frontieres de mot est VOULUE — ne pas l'aligner sans besoin utilisateur concret.** AHK utilise une ALLOWLIST de terminateurs (`_HSE_WordBoundaryAllows` : tirer seulement si le caractere precedant le declencheur est dans `HSE_WORD_TERMINATORS`, ou en debut de buffer). Hammerspoon utilise une DENYLIST de lettres (`word_boundary_blocks` → bloque si `text_utils.is_letter_char(prev)` ; le `%w` de Lua = lettres+chiffres, PAS l'underscore). Les deux sont d'accord sur toute entree francaise normale (espace/ponctuation/apostrophe → tire ; lettre/chiffre → bloque). Ils ne divergent QUE sur des caracteres precedents exotiques (trait d'union, `_`, `(`, `/`) : macOS tire, AHK bloque. Impact faible et le « mieux » est genuinement ambigu. Le declencheur `;` nu de comma→J est intra-mot des DEUX cotes (AHK `*?C` ; macOS via le saut de `;` initial dans `word_boundary_blocks`), donc le J majuscule est garanti dans tous les contextes — `:` nu n'est deliberement PAS un declencheur.
 
-**Boot registration is pure HSE data-structure building — `_HotstringRegistrar` is 0 in production.** Discovered 2026-06-12 while profiling boot perf. ErgoptiPlus-managed hotstrings (the ~5400 generated + personal ones) register through HSE only: `CreateHotstring` → `_RegisterHotstring` → `_MirrorRegistrationToHSE` → `HSE_Register`. The native AHK `Hotstring()` is reached **only** when `_HotstringRegistrar` is non-zero, and nothing in production ever sets it (it stays at its default `0`; only the test harness swaps in a recorder via `InstallHotstringHooks`). The few genuinely-native hotstrings (Ê deadkey, `…`) call `Hotstring()` directly, not through this path. Consequence: the entire boot-time registration cost is reproducible **headless** with no keyboard hook — which is what `tests/bench_boot_hotstrings.ahk` exploits to bisect it (run via `AutoHotkey64.exe`; NOT a `test_` file, not in run_all, must stay UTF-8 BOM + CRLF per the encoding guard). Cold-run profile: magic-key text expansion dominates (~3100 star regs; star triggers pay `_HSE_IndexStarPrefixes`), then `autocorrection.accents`. The per-registration object/closure build is the floor — the only material lever left is doing fewer registrations at boot (defer/reduce), which changes time-to-availability and collision ordering, so it is a deliberate decision, not a micro-opt. See [[project_hotstring_live_rebuild]].
+**`_HotstringRegistrar` vaut 0 en production.** Les hotstrings gerees par ErgoptiPlus s'enregistrent uniquement via HSE (`CreateHotstring` → `_RegisterHotstring` → `_MirrorRegistrationToHSE` → `HSE_Register`). Le `Hotstring()` natif d'AHK n'est atteint que si `_HotstringRegistrar` est non nul, et rien en production ne le fixe (`lib/hotstrings/hotstring_engine.ahk` : `global _HotstringRegistrar := 0`) — seul le harnais de test y injecte un recorder via `InstallHotstringHooks`. Les rares hotstrings vraiment natives (deadkey Ê, `…`) appellent `Hotstring()` directement. **Consequence exploitable : tout le cout d'enregistrement au boot est reproductible en headless, sans hook clavier.**
+
+Voir [[project_hotstring_live_rebuild]], [[project_keymap_architecture]].
 
 ### project-hs-perf-profilers-and-case-conform
 
-_macOS boot/hot-path profilers, the case-conform registration fast path, the menubar cache, and the escape-trap-on-first-show gotcha_
+_Profilers boot/hot-path macOS, chemin rapide case-conform, cache du menubar, snapshot TOML, et le piege Escape arme au premier affichage_
 
 <sub>slug: `project_hs_perf_profilers_and_case_conform`</sub>
 
-Performance work on the Hammerspoon driver, 2026-06-16 (ports of AHK optimisations + instrumentation).
+**Profilers.** `lib/boot_profiler.lua` (`Boot.begin()` / `Boot.mark(phase)`) journalise `+delta ms (total ms)` par phase en INFO. `lib/hotpath_profiler.lua` (`HotPath.now()` / `HotPath.log_if_slow(label, t0, detail)`) n'emet un WARNING que si un segment depasse le seuil (5 ms par defaut) ; cable dans `keymap/init.lua` `onKeyDown` et `tooltip_llm.show_predictions`. **Les deux lisent l'horloge via `adapters.timer_scheduler` (`now()` / `now_ns()`), JAMAIS `hs.timer.*` directement** : le garde `tests/meta/test_port_adapter_coverage` compte les occurrences de `hs.` (y compris en commentaire) dans `modules/`+`lib/`. Les adapters sont exemptes ; tout nouveau code lib/modules doit router ses appels OS par eux.
 
-**Profilers (ported from AHK `lib/boot_profiler.ahk` + `lib/hotpath_profiler.ahk`).** `lib/boot_profiler.lua` (`Boot.begin()` / `Boot.mark(phase)`) logs per-phase `+delta ms (total ms)` at INFO; wired across `init.lua` (logger setup → core requires → path → LLM bootstrap → TOML discovery → groups registered → sort → menu/UI → watchers → boot complete). `lib/hotpath_profiler.lua` (`HotPath.now()` / `HotPath.log_if_slow(label, t0, detail)`) logs a WARNING only when a segment exceeds the threshold (default 5 ms); wired into `keymap/init.lua` `onKeyDown` (every keystroke) and `tooltip_llm.show_predictions`. BOTH read the clock through `adapters.timer_scheduler` (`now()` seconds, `now_ns()` nanoseconds) — NEVER `hs.timer.*` directly, because the `tests/meta/test_port_adapter_coverage` guard counts `hs.` occurrences (INCLUDING in comments) in `modules/`+`lib/` against a baseline. Adapters are exempt; new lib/modules code must route OS calls through them or the guard regresses.
+**Chemin rapide case-conform** (`registry.lua` + `expander.lua` + `text_utils.conform_replacement`). Un declencheur auto, insensible a la casse, texte simple, sans caractere shift-symbole (`, ' .`) et non termine par la touche magique est enregistre comme UNE entree minuscule (`m.case_conform = true`) au lieu du trio minuscule/Titre/MAJUSCULE ; `try_auto_expand` conforme la casse du remplacement au declencheur tape (casse mixte → `conform_replacement` renvoie nil → pas de tir, comportement identique a l'ancien sans variante). Les buckets de caractere final sont passes de `:lower()` ASCII a `text_utils.trig_lower` Unicode (enregistrement ET `mappings_for_tail`/`rebuild_tail_indexes`) pour qu'un « Ê » final majuscule tombe dans le bucket « ê » — REQUIS pour que les entrees conform matchent des declencheurs accentues capitalises. **Realite du gain :** concentre sur `autocorrection` (~316 conform, ~630 entrees evitees) ; `magickey` n'en profite quasiment pas car ~1587/2119 de ses entrees sont deliberement `is_case_sensitive = true`. L'estimation d'agent « diviser le corpus par deux » etait fausse. Regression : `tests/unit/modules/keymap/test_case_conform.lua`.
 
-**Case-conform fast path (`registry.lua` + `expander.lua` + `text_utils.conform_replacement`).** An auto, case-INsensitive, plain-text trigger with no shift-symbol char (`, ' .`) and not magic-key-terminated is registered as ONE lowercase entry (`m.case_conform = true`) instead of the lower/Title/UPPER trio; `try_auto_expand` conforms the replacement's case to the typed trigger at fire time (mixed case → `conform_replacement` returns nil → no fire, matching the old no-variant behaviour). The tail-char buckets switched from ASCII `:lower()` to Unicode `text_utils.trig_lower` (registration AND `mappings_for_tail`/`rebuild_tail_indexes`) so an accented UPPERCASE tail "Ê" resolves to the lowercase "ê" bucket — REQUIRED for conform entries to match capitalised accented triggers. The `llm_bridge` preview tail loop is conform-aware too. **Reality check:** the win is concentrated in `autocorrection` (~316 conform, ~630 entries avoided); `magickey` barely benefits because ~1587/2119 of its entries are deliberately `is_case_sensitive = true` (already single entries) — the agents' "halve the corpus" estimate was wrong. The dominant boot cost is TOML parsing (~0.5 s for the 5 main files in plain Lua), which the boot profiler now exposes; conform mainly shrinks the sort + bucket + memory. Regression coverage: `tests/unit/modules/keymap/test_case_conform.lua`.
+**Cache du menubar** (`ui/menu/init.lua`). L'arbre genere est mis en cache ; le callback `setMenu` renvoie le cache sauf si `_menu_dirty` ou si l'etat de pause a bascule. **Toute NOUVELLE mutation d'etat qui doit rafraichir le menu DOIT poser `_menu_dirty = true`** (passer par `updateMenu`/`save_prefs`). Apres l'amorcage, `rebuild_menu_cache()` pousse un menu natif STATIQUE (`push_static_menu()`) pour qu'AppKit reutilise un NSMenu preconstruit ; les changements d'etat le re-poussent via un `schedule_menu_refresh()` coalesce. **Le comportement du menu statique n'est pas testable unitairement** (le stub `hs.menubar` est un no-op) — verifier la latence d'ouverture sur un vrai Mac.
 
-**Menubar cache (`ui/menu/init.lua`).** `Builder.generate()` ran on EVERY click via the `setMenu` callback (the ~1 s open latency). Now the generated tree is cached; the callback returns the cache unless `_menu_dirty` (set by `updateMenu`/`save_prefs`) or the pause state flipped (cheap boolean check). The cache is pre-warmed off the boot path inside the existing `MENU_CACHE_PRIME_DELAY_SEC` timer (after the layout/apps/karabiner submenu caches warm), and `rebuild_menu_cache()` logs the build time. Any NEW state change that should refresh the menu MUST set `_menu_dirty = true` (route through `updateMenu`/`save_prefs`).
+**Cache snapshot TOML** (`adapters/toml_cache.lua` + hook dans `_shared/lua/toml_codec/reader.lua`). Le reader partage expose un hook PUR injecte — `M.set_cache_provider({load, store})` — et reste sans acces disque ; tout le travail filesystem/`hs` vit dans `adapters/` (repertoire EXEMPT des baselines du garde de purete). L'adapter serialise chaque table parsee en chunk Lua precompile charge par `loadfile` (~10× plus rapide que le parseur a la main). **L'invalidation est mtime ET taille ET une constante `CACHE_VERSION` : bumper `CACHE_VERSION` des que la forme de sortie de `reader.parse` change**, sinon un snapshot perime nourrit une structure incompatible. Toute incoherence/corruption est un miss silencieux qui retombe sur un parse normal, donc un fichier hotstrings edite n'est jamais servi perime. Cable dans `init.lua` AVANT tout `keymap.load_toml`. Regressions : `tests/unit/lib/test_toml_reader_cache_hook.lua` + `tests/unit/adapters/test_toml_cache.lua`.
 
-**Boot perf — two dominant costs found via the profiler (2026-06-16, second pass), both fixed.** (1) **Group disable+enable round-trip (~2 s).** `ui/menu/menu_state.lua` `sync_state_to_modules` restored saved hotstring-group state by calling `disable_group` THEN `enable_group` for every ENABLED group. At boot all groups are already enabled, so this purged + RE-PARSED each category TOML from disk and re-sorted all ~5355 mappings ~16× for zero net change — the bulk of the "Menu + UI + script control start" phase. Fix: apply only the delta — `enable_group` alone for wanted groups (it early-returns when already enabled), `disable_group` alone for unwanted ones (early-returns when already disabled). The registry's own guards make both no-ops cheap. A timing log (`Hotstring group sync: N enable / M disable in X ms`) now reports ~0 ms so a regression is obvious. Regression: `tests/unit/ui/menu/test_menu_state_group_sync.lua` (asserts an enabled group is never disabled first). (2) **Synchronous log-purge shell pipeline (~0.6 s).** `lib/logger.lua` `init_log_path` ran a `find | while read … date … rm` pipeline (several subprocess forks PER log file) + a per-sub-file `stat` inline on the boot critical path. It is pure housekeeping (deleting stale files), so it was split into `M._purge_old_logs(log_dir, max_age_days)` and deferred via `hs.timer.doAfter(LOG_PURGE_DELAY_SEC=5)`; the dated log file is already writable beforehand. Headless/no-timer falls back to inline so behaviour is unchanged. Regression: `tests/unit/lib/test_logger_deferred_purge.lua` (asserts no `find` runs synchronously). Finer boot sub-marks (`Path: …`, `UI: …`) + per-engine timing (`Keylogger engine start`, `Keymap engine start`) + a menu cache-hit/rebuild DEBUG line were added so the next log round attributes any remaining cost precisely. The hot path also gained Perf-gated sub-segment timing (`match=…ms preview=…ms`) appended to the slow-keystroke WARNING via `HotPath.elapsed_ms`.
-
-**Boot perf — third pass (2026-06-16): keylogger deferred, preview measurement memoized, menu made static.** (1) **Keylogger start deferred (~1.3 s).** Once the group round-trip was gone, `keylogger.start` (SQLite open + log-rotation offset replay + export setup) was the single biggest boot cost. It only feeds typing METRICS, so `menu_state.sync_state_to_modules` now starts it via `hs.timer.doAfter(KEYLOGGER_START_DELAY_SEC=0.5)` instead of inline — boot becomes interactive ~1.3 s sooner; a sub-second gap of unlogged keystrokes is harmless. Regression: the keylogger-defer test in `tests/unit/ui/menu/test_menu_state_group_sync.lua` (asserts start is scheduled, not called inline). (2) **Per-keystroke preview cost = `canvas:minimumTextSize` (8–34 ms).** The HotPath breakdown (`match=…ms preview=…ms`) showed trigger MATCHING is <0.3 ms; the cost is the tooltip render's `minimumTextSize` ObjC text-layout calls (once per row + once per trigger label, every keystroke a preview shows). `renderer.lua` now memoizes them via `_measure_styled(canvas, index, text, size_tag, style)` keyed by `"<size_tag>\0<text>"` (bounded at 4096) — the two labels (★/↵) hit the cache permanently and recurring previewed words hit it across re-renders. Regression: the memo tests in `tests/unit/ui/test_tooltip_stacked_panel.lua`. (3) **Menu open made instant via a STATIC native menu.** Even with the Lua tree cached, `myMenu:setMenu(callback)` makes Hammerspoon rebuild the NATIVE NSMenu from the returned table on EVERY click — the residual open latency. After the prewarm build primes the tree (`_menu_primed`), `rebuild_menu_cache()` now `push_static_menu()`s it as a static `setMenu(table)` so AppKit reuses one prebuilt NSMenu (instant opens). State changes re-push it via a coalesced `schedule_menu_refresh()` (`MENU_REFRESH_COALESCE_SEC`) instead of a per-click rebuild; the dynamic callback survives only as the COLD path for the ~2 s before priming. The static-menu behaviour is not unit-testable (the stub `hs.menubar` is a no-op) — verify open latency on a real Mac.
-
-**Boot perf — fourth pass (2026-06-16): TOML hotstring snapshot cache (~200 ms).** With the keylogger and group round-trip gone, the dominant remaining boot cost (`Hotstring groups registered` ~165–215 ms + part of `menu.start`'s delay-reading pass) is the shared TOML parser itself: `_shared/lua/toml_codec/reader.lua` walks every source byte by hand (`s:sub(j,j)` per char), which is slow in plain Lua for the ~5400-mapping bundled files. Fix: a disk **snapshot cache**. The reader gained a PURE injected hook — `M.set_cache_provider({load, store})`; on `parse(path)` it tries `load(path)` first (return the cached table, skip parsing) and after a real parse calls `store(path, result)`. The filesystem/`hs` work lives in `adapters/toml_cache.lua` (the `adapters/` dir is EXEMPT from the `test_port_adapter_coverage` hs.*/io.open baselines, so this added ZERO to either baseline and the shared reader stays filesystem-free). The adapter serialises each parsed table into a precompiled Lua chunk (`return {ver,mtime,size,data={...}}`) loaded via the C-level `loadfile` (~10× faster than the hand parser). **Invalidation is mtime AND size AND a `CACHE_VERSION` constant** (bump `CACHE_VERSION` whenever `reader.parse`'s output shape changes, or stale snapshots feed an incompatible structure) — any mismatch / missing / corrupt snapshot is a silent miss that falls back to a normal parse, so an edited hotstrings file is never served stale. Cache dir: `hs.configdir .. "/cache/toml_hotstrings"`; wired in `init.lua` right after the log-path setup, BEFORE any `keymap.load_toml`, so the first boot after a file change re-parses + refreshes the snapshot and every later boot (plus the same-boot delay-reading pass that re-parses the same files) hits it. The serialiser uses `string.format("%q", s)` for byte-exact strings incl. UTF-8, `math.type` to keep integer vs float, and handles nested array/map tables (the full `reader.parse` value space; no cycles/functions in TOML). Regression: `tests/unit/lib/test_toml_reader_cache_hook.lua` (hook honoured: hit short-circuits without reading the file, miss parses + stores, provider error falls through) + `tests/unit/adapters/test_toml_cache.lua` (round-trip deep-equality incl. lang-map descriptions / quote+newline+UTF-8 strings, and mtime/size staleness → miss). The serialize/loadfile path is real-Lua-testable; the only un-asserted part is real-Mac wall-clock — verify the `Hotstring groups registered` boot mark drops on the second boot after a clean cache.
-
-**GOTCHA — the LLM escape-trap is armed on FIRST tooltip show on purpose, do NOT move it to init.** `llm_bridge.arm_escape_trap` is wired via `tooltip.set_on_show_callback`, not `M.init()`. This is deliberate: the eventtap must be inserted at HEAD *after* Raycast (or any other app) has registered its own tap, so our Escape takes priority while a tooltip is visible. Arming it at boot would risk registering before those apps and losing Escape priority. The one-time `eventtap.new()` cost on first show is the accepted trade-off — do not "optimise" it to init.
+**GOTCHA — le piege Escape du LLM est arme au PREMIER affichage du tooltip, exprès ; ne pas le deplacer dans init.** `llm_bridge.arm_escape_trap` est cable via `tooltip.set_on_show_callback`, pas via `M.init()`. C'est deliberé : l'eventtap doit etre insere en TETE *apres* que Raycast (ou toute autre app) ait enregistre le sien, pour que notre Escape ait la priorite pendant qu'un tooltip est visible. L'armer au boot risquerait de s'enregistrer avant ces apps et de perdre la priorite Escape. Le cout unique de `eventtap.new()` au premier affichage est le compromis accepte — ne pas l'« optimiser » vers init.
 
 ### project-tooltip-shared-style
 
@@ -1200,35 +848,28 @@ The macOS onboarding wizard (`ui/onboarding/init.lua`) writes the user's first-r
 
 ### Keymap module architecture and refactor decisions
 
-_Structure of the keymap module, where defaults live, which files do what_
+_Ou vivent les defauts du module keymap, et pourquoi une seule place_
 
 <sub>slug: `project_keymap_architecture`</sub>
 
-## File map
+## Valeurs par defaut : source de verite unique
 
-- `modules/keymap/init.lua` — Main engine, CoreState, eventtap loop. Single source of truth for ALL keymap defaults via `M.DEFAULT_STATE` and `M.DELAYS_DEFAULT`.
-- `modules/keymap/registry.lua` — Hotstring DB, TOML/Lua file loading, group/section management, terminators.
-- `modules/keymap/utils.lua` — Text emission (keystrokes vs. clipboard paste), token parsing, LLM overlap solver, ignored-window cache.
-- `modules/keymap/expander.lua` — Auto-expand, terminator-expand, repeat-feature execution.
-- `modules/keymap/llm_bridge.lua` — Hotstring preview, prediction acceptance, LLM config forwarding.
-- `lib/text_utils.lua` — UTF-8 utilities, diff engine, case conversion. Stays in lib (also used by modules/llm/parser.lua).
-- `ui/menu/menu_hotstrings.lua` — Menu UI for hotstrings. Reads preview defaults from `keymap.DEFAULT_STATE`.
+- **Tous les defauts keymap** vivent dans `modules/keymap/init.lua` → `M.DEFAULT_STATE` et `M.DELAYS_DEFAULT`.
+- `ui/menu/menu_hotstrings.lua` lit `preview_star_enabled`, `preview_autocorrect_enabled`, `preview_ai_enabled`, `preview_colored_tooltips` depuis `keymap.DEFAULT_STATE` — ne les redeclare jamais.
+- `llm_bridge.lua` amorce ses drapeaux d'apercu locaux depuis la table `keymap_defaults` passee a `M.init()`.
 
-## Default values: single source of truth
+**Pourquoi :** le mainteneur exige que les valeurs par defaut soient definies a exactement UN endroit (le module keymap) et que le menu ne stocke que les surcharges utilisateur, jamais ses propres defauts pour un reglage possede par keymap.
 
-- **All keymap defaults** live in `modules/keymap/init.lua` → `M.DEFAULT_STATE` and `M.DELAYS_DEFAULT`.
-- `ui/menu/menu_hotstrings.lua` reads `preview_star_enabled`, `preview_autocorrect_enabled`, `preview_ai_enabled`, `preview_colored_tooltips` from `keymap.DEFAULT_STATE` — never re-declares them.
-- `llm_bridge.lua` seeds its local preview flags from the `keymap_defaults` table passed to `M.init()`.
+## Repartition des responsabilites
 
-**Why:** The user explicitly requires that default values be defined in exactly one place (the keymap module) and that the menu only stores user overrides, never its own hardcoded defaults for keymap-owned settings.
+- `modules/keymap/init.lua` — moteur principal, CoreState, boucle eventtap.
+- `registry.lua` (+ `registry_groups.lua`, `registry_index.lua`) — base des hotstrings, chargement TOML/Lua, gestion groupes/sections, terminateurs.
+- `utils.lua` — emission de texte (frappes vs collage presse-papier), parsing de tokens, solveur de recouvrement LLM, cache des fenetres ignorees.
+- `expander.lua` — auto-expansion, expansion par terminateur, execution de la fonction repeat.
+- `llm_bridge.lua` — apercu des hotstrings, acceptation de prediction, transmission de la config LLM.
+- `lib/text_utils.lua` — simple re-export de `_shared/lua/text_utils` ; toute modification des utilitaires UTF-8 / diff / casse se fait dans `_shared/`, pas ici.
 
-## Patterns to always apply
-
-- Every public function that uses `_state` starts with `if not require_state("func_name") then return end`.
-- No silent fallbacks for missing state — log an ERROR and return immediately.
-- Logger.start/success pairs for significant lifecycle actions (init, start, stop, load).
-- Logger.trace/done pairs for routine internal operations (emit, sort).
-- Setters log at DEBUG level.
+(Les conventions generales — `require_state`, aucun repli silencieux, paires `Logger.start`/`success` et `trace`/`done`, setters qui loggent — sont deja imposees par `.github/copilot-instructions.md` §4 et §5 ; ne pas les redupliquer ici.)
 
 ### project-hs-synthetic-injection-choke-point
 
@@ -1275,117 +916,59 @@ Related: [[project_keymap_architecture]], [[feedback_regression_tests]].
 
 ### project-locale-parity-test
 
-_en.json is the canonical key set; the AHK meta-test test_locale_json_valid.ahk enforces parity in CI; check_locales.py --fix is the manual backfill tool_
+_en.json est le jeu de cles canonique ; le meta-test AHK test_locale_json_valid.ahk impose la parite en CI ; `tools/locale/check_locales.py --fix` est l'outil de backfill manuel_
 
 <sub>slug: `project_locale_parity_test`</sub>
 
-`static/ergopti_plus/_shared/data/locales/en.json` is the canonical reference.
-Every other locale file must mirror its key set exactly — no missing, no extra.
+`static/ergopti_plus/_shared/data/locales/en.json` est la reference canonique. Tout autre fichier de locale doit refleter exactement son jeu de cles — aucune manquante, aucune en trop.
 
-**Why:** Stale keys (removed from EN but lingering in translations) and
-missing keys (added to EN but not yet translated) both ship as bugs.
-Parity is enforced in CI by the AHK meta-test
-`windows/tests/meta/test_locale_json_valid.ahk` (run by `run_all.ahk` in the
-`test-ahk` job), which ASSERTS that all 21 locales expose exactly `en.json`'s key
-set (currently 2208 keys). `tools/check_locales.py` is the manual developer tool
-that asserts the same parity locally and, via `--fix`, PRODUCES it. There is no
-`.github/workflows/test_locales.yml` — that workflow never existed.
+**Pourquoi :** les cles obsoletes (retirees d'EN mais restees dans les traductions) et les cles manquantes (ajoutees a EN mais pas encore traduites) partent toutes les deux en production comme des bugs.
 
-**How to apply:**
+La parite est imposee en CI par le meta-test AHK `windows/tests/meta/test_locale_json_valid.ahk` (execute par `run_all.ahk` dans le job `test-ahk`) : il construit l'union des cles de tous les locales et asserte que chaque fichier la contient integralement. Il verifie aussi que chaque fichier parse, que l'enveloppe `{…}` est intacte (un script d'insertion avait un jour retire le `{` ouvrant de tous les locales) et que `_meta.locale` / `_meta.flag` / `_meta.name` sont presents. `tools/locale/check_locales.py` est l'outil developpeur qui asserte la meme parite en local et, via `--fix`, la PRODUIT. Il n'y a pas de `.github/workflows/test_locales.yml` — ce workflow n'a jamais existe.
 
-- Add a key: insert it in en.json, then run
-  `python tools/check_locales.py --fix` to backfill every other locale
-  with the English value as a placeholder. Translators (or sub-agent
-  translation passes) update those placeholders later.
-- Remove a key: delete it from en.json, then `--fix` drops it from
-  every other locale.
-- The "Untranslated" column in the script output is informational only;
-  cognates and brand names legitimately share text with English so it
-  does NOT fail CI.
+**Comment appliquer :**
 
-Sibling memory: [[project-ui-dynamic-buttons]].
+- Ajouter une cle : l'inserer dans en.json, puis lancer `python tools/locale/check_locales.py --fix` pour la backfiller dans tous les autres locales avec la valeur anglaise en placeholder. Les traductions viennent ensuite.
+- Retirer une cle : la supprimer d'en.json, puis `--fix` la retire de tous les autres.
+- La colonne « Untranslated » de la sortie est purement informative : cognats et noms de marque partagent legitimement le texte anglais, elle ne fait donc PAS echouer la CI.
+
+Memoire soeur : [[project-locale-fast-cache]] (le cache `.tsv` de parsing rapide, une preoccupation distincte) et [[project-ui-dynamic-buttons]].
 
 ### project-locale-fast-cache
 
-_The Windows driver's locale .tsv is a gitignored self-healing cache regenerated from the canonical .json; only .json is tracked_
+_Le `.tsv` de locale du driver Windows est un cache gitignore auto-reparateur regenere depuis le `.json` canonique ; seul le `.json` est versionne_
 
 <sub>slug: `project_locale_fast_cache`</sub>
 
-`JsonParse` of a 2208-key locale costs ~180 ms on the boot critical path (the tray
-menu needs `t()`); parsing the flat `key<TAB>value` `.tsv` instead is ~16 ms
-(~×11). To keep that speed WITHOUT committing the same data twice, the `.tsv`
-files under `static/ergopti_plus/_shared/data/locales/` are a **gitignored, self-healing
-cache** owned end-to-end by `lib/i18n.ahk` (`_I18nLoadLocaleMap` /
-`_I18nWriteTsvCache`): on load it uses the `.tsv` when present AND at least as new
-as the `.json` (`FileGetTime "M"` compare in `_I18nTsvIsFresh`), otherwise it
-parses the `.json`, builds the map, and rewrites the `.tsv` for the next boot. The
-`.json` is the single tracked source of truth; consumers are Windows-only (nothing
-in macOS/web reads these).
+Le `JsonParse` d'un locale complet coute ~180 ms sur le chemin critique du boot (le tray a besoin de `t()`) ; parser a la place le `.tsv` plat `cle<TAB>valeur` coute ~16 ms. Pour garder cette vitesse SANS versionner deux fois la meme donnee, les `.tsv` sous `_shared/data/locales/` sont un **cache gitignore auto-reparateur** possede de bout en bout par `lib/locale.ahk` (`_I18nLoadLocaleMap` / `_I18nTsvIsFresh` / `_I18nWriteTsvCache`) : au chargement il utilise le `.tsv` s'il existe ET est au moins aussi recent que le `.json` (comparaison `FileGetTime "M"`), sinon il parse le `.json`, construit la map et reecrit le `.tsv` pour le boot suivant. Le `.json` est la seule source de verite versionnee ; les consommateurs sont Windows uniquement.
 
-**Why:** The maintainer's hard rule is no tracked duplication. The earlier design
-committed both `.json` and a codegen-generated `.tsv` (+ a node parity test +
-pre-commit guard) — the same data in git twice. The lazy cache removes the tracked
-`.tsv`, deletes the node codegen + parity infra, and makes the AHK driver the SOLE
-generator: one format on disk that cannot drift from its source (a stale `.tsv` is
-detected by mtime and rebuilt automatically).
+**Pourquoi :** la regle dure du mainteneur est **aucune duplication versionnee**. Le design precedent commitait a la fois le `.json` et un `.tsv` genere par codegen (+ un test de parite node + un garde pre-commit) — la meme donnee deux fois dans git. Le cache paresseux supprime le `.tsv` versionne, supprime le codegen node et l'infra de parite, et fait du driver AHK le SEUL generateur : un format sur disque qui ne peut pas deriver de sa source (un `.tsv` perime est detecte par mtime et reconstruit). **Ne pas re-proposer un `.tsv` genere et versionne.**
 
-**How to apply:**
+**Comment appliquer :**
 
-- Edit only the `.json`. The driver auto-regenerates the `.tsv` on the next boot
-  whenever it is missing OR older than the `.json` (one ~180 ms boot, then fast
-  again). Never commit a `.tsv` — `.gitignore` blocks it.
-- The cache stores values with the RAW `★` placeholder (MagicKey-independent); the
-  reader substitutes the configured MagicKey at parse time. The writer escapes
-  `\` → `\\`, CR → `\r`, LF → `\n` (backslash FIRST); the reader inverts in one
-  left-to-right scan. Keep writer/reader in lockstep — `test_i18n.ahk` pins the
-  round-trip, staleness-regeneration, raw-★, and fast-path-served-without-json
-  invariants.
-- A read-only install dir just means the write fails silently and every boot uses
-  the `.json` path (correct, slower) — the cache is strictly best-effort.
+- N'editer que le `.json`. Le driver regenere le `.tsv` au prochain boot des qu'il manque OU est plus vieux que le `.json` (un boot lent, puis rapide a nouveau). Ne jamais commiter un `.tsv` — `.gitignore` le bloque.
+- Le cache stocke les valeurs avec le placeholder `★` BRUT (independant de la MagicKey) ; le reader substitue la MagicKey configuree au parsing. Le writer echappe `\` → `\\`, CR → `\r`, LF → `\n` (**le backslash EN PREMIER**) ; le reader inverse en une seule passe de gauche a droite. Garder writer et reader en phase — `test_i18n.ahk` epingle l'aller-retour, la regeneration sur peremption, le `★` brut et le service par le chemin rapide sans `.json`.
+- Un repertoire d'installation en lecture seule signifie juste que l'ecriture echoue silencieusement et que chaque boot passe par le `.json` (correct, plus lent) — le cache est strictement best-effort.
 
-Sibling memory: [[project-locale-parity-test]] is the SEPARATE en.json key-set
-parity guard (`tools/check_locales.py`) — a different concern from this
-fast-parse cache.
+Memoire soeur : [[project-locale-parity-test]] est le garde de parite du jeu de cles d'en.json, une preoccupation distincte de ce cache.
 
 ### project_metrics_pipeline_17
 
-_AHK metrics pipeline — bug #17 CLOSED, follow-up bugs fixed_
+_Architecture du pipeline metrics AHK — pourquoi AHK ne peut pas devenir pur-walker comme macOS_
 
 <sub>slug: `project_metrics_pipeline_17`</sub>
 
-Bug #17 "metrics population" on Windows/AHK. Verified 2026-06-02 via a 5-agent mapping workflow + live DB inspection (`D:\Documents\GitHub\config\ergopti_plus\metrics\by_device\6b399146-3e75-fe4a-aab3-c1d0c68a2b19\compact_work.db`, query with `python` not python3).
+**Architecture (verifiee).** Les donnees du dashboard viennent du prefetch (`keylogger_prefetch.ahk` → `keylogger_reader*.ahk` `KLR_BuildDatabase` → manifeste JSON dans A_Temp). KLR charge le `data.sql` de TOUS les appareils (`events_*` all-time) dans une base `:memory:` en cache, puis a chaque cycle Clear→Rebuild→Inject : `KLR_ClearAggregates` efface `agg_*`/`ngram_*`, `KLR_RebuildAggregates` recalcule en SQL les agregats derivables depuis `events_*`, `KLR_InjectKlwBatch` draine le batch KLW vivant (recent uniquement).
 
-**Architecture (verified):** Dashboard data = prefetch (`keylogger_prefetch.ahk` KLPF*BuildAndWrite → `keylogger_reader.ahk` KLR_BuildDatabase → manifest JSON in A_Temp). KLR loads ALL devices' data.sql (all-time `events*_`) into a cached `:memory:` db, then every cycle Clear→Rebuild→Inject: KLR*ClearAggregates wipes agg*_/ngram*\*; KLR_RebuildAggregates recomputes SQL-derivable aggregates from events*\* (all-time); KLR_InjectKlwBatch drains the live KLW.batch (recent-only). AHK deliberately does NOT persist aggregates (anti-bloat, ~140MB/day) — that's why the SQL rebuild exists. `compact_work.db` is a separate launcher debug artifact, NOT the dashboard source. macOS (`macos/.../aggregator.lua`) is single-source (the walk owns ALL agg tables, persisted per tick) — the dashboard JS (`_shared/ui/metrics_typing/data.js`, `metrics_apps/script.js`) is written against macOS semantics.
+**Le point crucial : AHK ne persiste DELIBEREMENT pas les agregats** (anti-bloat, ~140 Mo/jour) — c'est precisement pour cela que le rebuild SQL existe. macOS (`macos/modules/keylogger/aggregator/`) est mono-source (le walk possede TOUTES les tables agg, persistees a chaque tick), et le JS du dashboard (`_shared/ui/metrics_typing/data.js`, `metrics_apps/script.js`) est ecrit contre la semantique macOS. **AHK ne peut pas passer pur-walker comme macOS sans reintroduire le bloat — ne pas « unifier » les deux dans ce sens.**
 
-**Convergent target:** SQL rebuild = single source for everything computable from events\_\*; walker = single source ONLY for char-level/ngram tables (ngrams, kc_hold, buckets, errors, ergo, chars_class, burst, session, layouts) + enrichment columns SQL can't compute. AHK can't go pure-walker like macOS without reintroducing the bloat.
+**Ligne de partage a respecter :** le rebuild SQL est la source unique de tout ce qui est calculable depuis `events_*` ; le walker est la source unique UNIQUEMENT des tables niveau caractere/ngram (ngrams, kc_hold, buckets, errors, ergo, chars_class, burst, session, layouts) et des colonnes d'enrichissement que SQL ne peut pas calculer. Une colonne ecrite des deux cotes = double comptage (c'etait la cause racine n°1 du bug #17).
 
-**STATUS: CLOSED (2026-06-02).** All bugs fixed and live-verified. Commits on `dev`, NOT pushed.
+**Pieges de diagnostic :** `compact_work.db` est un artefact de debug du lanceur, PAS la source du dashboard. Interroger la base avec `python` (pas `python3`).
 
-**Commits landed:**
+**Lacunes connues, non bloquantes :** `app_time` affiche d'anciennes donnees parasites pour les lignes `events_app_switch` anterieures au correctif d'idle (historique seulement) ; `chars` inclut les frappes `[BS]` — conforme a la semantique macOS, intentionnel.
 
-- `290ff0df4 fix(metrics): single-source AHK aggregation and tag synthetic input` — 7 files
-- `49c630d9f fix(lint): repair convention linter and realign surfaced banners`
-- `fix(metrics): wire reset button to AHK cache purge and fix empty-db first run` — 3 files
-- `fix(metrics): add hs_suggested to SQL rebuild and manifest projection` — 1 file
-
-**All root-cause bugs fixed:**
-
-1. Double-count (walker+SQL both writing agg scalars) → collapsed to single-source per column.
-2. chars semantics (LENGTH(text) vs keystroke count) → fixed via json_each non-synthetic count.
-3. hs_chars net→gross double-subtract → fixed: feed GROSS = SUM(net_saved+LENGTH(trigger)).
-4. switches_to schema bug (wrong col names, silent fail) → fixed col names.
-5. esrc lost (KLR_NewNgramItem hardcoded hs=0) → fixed with regex decode of esrc_json.
-6. hs_suggested missing → added INSERT COUNT(\*) WHERE kind='suggested' + manifest projection.
-7. Reset button no-op on Windows → fixed: JS postMessage + AHK clear_cache handler purges all 3 cache layers (KLPF_MANIFEST_CACHE, KLRCache, KLPF_LAST_JSON) + disk file.
-8. Empty dashboard on first run / after metrics folder delete → fixed: KLR_BuildDatabase early-return when by_device/ absent now runs KLR_RebuildAggregates+KLR_InjectKlwBatch before returning.
-
-**Known remaining gaps (non-blocking):**
-
-- app_time shows old garbage for pre-idle-fix events_app_switch rows (historical only, new data clean).
-- chars includes [BS] keystrokes — matches macOS semantics, intentional.
-- LLM path unused so llm_chars=0 and esrc llm attribution unverifiable until LLM is used.
-
-**Lint:** pre-commit husky hook runs `lint-conventions.js --fail-on-violations` and NOW BLOCKS on violations. Always `npm run fix:all` before committing.
+**Lint :** le hook husky pre-commit lance `lint-conventions.js --fail-on-violations` et BLOQUE en cas de violation. Toujours `npm run fix:all` avant de commiter.
 
 ### project-hotstring-live-rebuild
 
@@ -1410,15 +993,19 @@ Related: [[project_hotstring_engine_internals]] (the HSE InputHook the rebuild r
 
 ### project-hotstrings-self-healing-cache
 
-_The bundled hotstrings are NOT committed generated AHK any more — they are a gitignored, self-healing `.tsv` cache rebuilt from the TOML at runtime, to cut boot-time parse._
-
-The single biggest boot cost was invisible: AHK tokenises every `#Include`d source **before** it creates the tray icon, and the committed `generated_*.ahk` bundle was **~1 MB / ~2992 rows** of that — measured at **~470 ms of the ~470-660 ms "time-to-icon"** (the parse phase; pure file I/O for all 259 driver files is only ~35 ms, so compiling to `.exe` would NOT help — the cost is CPU tokenisation, not disk). `BootProfile_ProcessUptimeMs()` (GetProcessTimes creation FILETIME vs now) surfaces this pre-first-log phase as the first BootProfile line.
-
-Fix (mirrors the i18n locale `.tsv` pattern exactly): deleted the 6 `generated_*.ahk`, the node `build-hotstrings.cjs` AND the python `compile_hotstrings.py` codegens (+ the `build:hotstrings` npm script + the CI "Regenerate hotstrings_generated.ahk" step). `lib/hotstrings/hotstrings_cache.ahk` now owns it: `HotstringsCacheEnsure()` reads `_shared/modules/hotstrings/generated_hotstrings.tsv` (gitignored) when it is at least as new as every bundled TOML; otherwise it **rebuilds from the TOML once** (first launch or after a TOML edit) and rewrites it. It plugs into the SAME `_GENERATED_HOTSTRINGS` fast-path `LoadHotstringsSection` already consults (each cached `cat.sec` → a bound `_HsCacheRegisterSection`), so callers are unchanged. Rows are `[flags, trigger, output, finalResult, isRepeat, isCaseSens]`; the builder uses the **identical** line scan + `_HOTSTRING_ENTRY_PATTERN` + `UnescapeTomlString` + flag logic as the runtime TOML fallback, so it reproduces the old generated behaviour 1:1.
-
-Gotchas: (1) `isRepeat` was ALREADY always false in the old generated output — the generator compared the section to the literal `"repeatcorrections"` while the real section is `repeat_corrections` (underscore). Preserved verbatim (behaviour-preserving, NOT corrected). (2) The generated fast-path never set `Priority` in opts (the TOML fallback does) — the cache matches the generated path (no Priority). (3) New `.ahk` files MUST be UTF-8 **BOM** + CRLF or AHK silently aborts mid-file → the file's later functions go undefined → load error with no message in the headless harness (run `node tools/deploy/fix-ahk-encoding.cjs`). (4) The bundled-hotstring registration path had NO end-to-end suite coverage; `tests/test_hotstrings_cache.ahk` is now that net (build parity, lossless `.tsv` round-trip, escape/unescape of tab/CR/LF/backslash). First-launch (or post-edit) pays a one-time TOML parse; every later boot is the fast `.tsv` read.
+_Les hotstrings groupees ne sont plus de l'AHK genere et versionne : c'est un cache `.tsv` gitignore auto-reparateur reconstruit depuis les TOML au runtime, pour couper le parse au boot_
 
 <sub>slug: `project_hotstrings_self_healing_cache`</sub>
+
+Le plus gros cout de boot etait invisible : **AHK tokenise chaque source `#Include`ee AVANT de creer l'icone du tray**, et le bundle `generated_*.ahk` versionne pesait ~1 Mo / ~2992 lignes — mesure a ~470 ms des ~470-660 ms de « temps jusqu'a l'icone ». **Compiler en `.exe` n'aiderait PAS** : les I/O disque pour les 259 fichiers du driver ne font que ~35 ms, le cout est la tokenisation CPU. `BootProfile_ProcessUptimeMs()` (FILETIME de creation via GetProcessTimes vs maintenant) expose cette phase anterieure au premier log.
+
+Correctif (calque exactement sur le cache `.tsv` de locale, voir [[project-locale-fast-cache]]) : les 6 `generated_*.ahk`, le codegen node `build-hotstrings.cjs` ET le codegen python `compile_hotstrings.py` ont ete supprimes (+ le script npm `build:hotstrings` + l'etape CI de regeneration). `lib/hotstrings/hotstrings_cache.ahk` possede desormais le mecanisme : `HotstringsCacheEnsure()` lit `_shared/modules/hotstrings/generated_hotstrings.tsv` (gitignore) quand il est au moins aussi recent que chaque TOML groupe ; sinon il **reconstruit depuis les TOML une fois** (premier lancement ou apres edition) et le reecrit. Il se branche sur le MEME chemin rapide `_GENERATED_HOTSTRINGS` que `LoadHotstringsSection` consulte deja, donc les appelants sont inchanges. Lignes : `[flags, trigger, output, finalResult, isRepeat, isCaseSens]` ; le builder reutilise a l'identique le scan de lignes, `_HOTSTRING_ENTRY_PATTERN`, `UnescapeTomlString` et la logique de flags du repli TOML runtime, reproduisant donc l'ancien comportement genere 1:1.
+
+**Deux comportements preserves VERBATIM — ce ne sont pas des bugs a corriger :** (1) `isRepeat` etait DEJA toujours faux dans l'ancienne sortie generee, parce que le generateur comparait la section au litteral `"repeatcorrections"` alors que la vraie section est `repeat_corrections` (underscore) ; (2) le chemin rapide genere ne posait jamais `Priority` dans les options (le repli TOML, lui, le fait) — le cache s'aligne sur le chemin genere. Corriger l'un ou l'autre changerait le comportement en production.
+
+Le chemin d'enregistrement des hotstrings groupees n'avait AUCUNE couverture bout-en-bout ; `tests/unit/test_hotstrings_cache.ahk` est desormais ce filet (parite de construction, aller-retour `.tsv` sans perte, echappement de tab/CR/LF/backslash). Le premier lancement (ou celui qui suit une edition) paie un parse TOML unique ; chaque boot ulterieur est la lecture rapide du `.tsv`.
+
+Rappel encodage pour tout nouveau `.ahk` : UTF-8 **BOM** + LF, sinon AHK avorte silencieusement en cours de fichier — voir [[feedback-ahk-source-encoding]].
 
 ### project-prefix-index-rebuild-cost-is-cold-disk
 
@@ -1434,19 +1021,19 @@ Gotcha: the boot-tail warm-up has its OWN `SetTimer`, so it can race ahead of th
 
 ### project-suspend-pause-invariant
 
-_Pause must fully silence ALL features (no tooltip/LLM/keylogger/widget). AHK Suspend only disarms hotkeys — InputHooks/timers/OnMessage bypass it and need explicit A_IsSuspended guards._
+_La pause doit TOUT taire (aucun tooltip/LLM/keylogger/widget). Le Suspend AHK ne desarme que les hotkeys — InputHooks, timers et OnMessage le contournent et exigent des gardes `A_IsSuspended` explicites._
 
 <sub>slug: `project_suspend_pause_invariant`</sub>
 
-When the script is paused, ABSOLUTELY nothing may activate — no tooltip, no LLM prediction/HTTP, no keylogger recording, no WPM widget, no gesture action. User words: « comme ahk éteint donc absolument aucun tooltip ou autre truc ahk ne doit s'activer ». Fixed 2026-06-02.
+Quand le script est en pause, ABSOLUMENT rien ne doit s'activer — aucun tooltip, aucune prediction/HTTP LLM, aucun enregistrement keylogger, aucun widget WPM, aucune action de geste. Mots de l'utilisateur : « comme ahk éteint donc absolument aucun tooltip ou autre truc ahk ne doit s'activer ».
 
-**Why it's a trap:** native AHK `Suspend()` only disarms **Hotkeys/Hotstrings**. It does NOT touch `InputHook` callbacks, `SetTimer` callbacks, `OnMessage` handlers, or `SetWinEventHook` — all keep firing while `A_IsSuspended`. The whole ErgoptiPlus input pipeline is built on those, so pausing silenced remaps but left tooltips/LLM/keylogger fully live.
+**Pourquoi c'est un piege :** le `Suspend()` natif d'AHK ne desarme QUE les **Hotkeys/Hotstrings**. Il ne touche NI les callbacks `InputHook`, NI ceux de `SetTimer`, NI les handlers `OnMessage`, NI `SetWinEventHook` — tous continuent de tirer pendant `A_IsSuspended`. Or tout le pipeline d'entree d'ErgoptiPlus est bati sur ceux-la : la pause faisait taire les remaps mais laissait tooltips, LLM et keylogger pleinement vivants.
 
-**The invariant (AHK):** every InputHook/timer/OnMessage callback that produces an observable side effect MUST early-return on `A_IsSuspended`. Guards live at: `HookDispatcher.Dispatch` (hook_dispatcher.ahk — covers LLM bridge + keylogger watchers), `_OnPrefixChar`/`_OnPrefixKeyDown` (hotstring_prefix_watcher.ahk — its OWN InputHook, NOT via HookDispatcher), `KL_Hook_OnChar`/`KL_Hook_OnKeyDown` (keylogger_hook.ahk — own InputHook), `LLM_Engine_FirePrediction`, `TooltipShow`+`LLM_TooltipShow` (lib/tooltip.ahk render entries), `WPMWidget_Tick`, `GestureSimulateActivity`. **When you add any new hook/timer/tooltip path, add the guard or it leaks while paused.** Lower-priority keylogger timers (idle tick, mouse-park, roi half-life, session/power OnMessage) are NOT yet guarded — guard them too if total radio-silence is wanted.
+**L'invariant (AHK) :** tout callback InputHook / timer / OnMessage produisant un effet de bord observable DOIT sortir tot sur `A_IsSuspended`. Les gardes existent aujourd'hui dans `lib/hook_dispatcher.ahk` (couvre le pont LLM et les watchers keylogger), les InputHooks propres du prefix watcher et du keylogger, les points d'entree de rendu des tooltips, le moteur de prediction LLM, le widget WPM, la couche `adapters/` et `lib/lifecycle.ahk`. **La regle prospective compte plus que cette liste : quand tu ajoutes un hook, un timer ou un chemin de tooltip, ajoute la garde, sinon il fuit pendant la pause.** Les timers keylogger de basse priorite (tick d'inactivite, park souris, demi-vie roi, OnMessage session/power) ne sont pas encore gardes — les garder aussi si le silence radio total est voulu.
 
-**Central reactor:** `ToggleSuspend` (ErgoptiPlus.ahk) calls `Ergopti_OnSuspendEnter()` (force-hide both tooltips + `LLM_Engine_CancelTimer`) / `Ergopti_OnSuspendResume()` (`_ResetPrefixBuffer`). A 500 ms `_SuspendStateWatchdog` (global `_LastSuspendState`) replays the reactor for suspend transitions that bypass ToggleSuspend (native Pause, external trigger). The AltGr script combos are registered "S" suspend-exempt so the user can un-pause — see [[project-ahk-menu-dispatcher-drop]] neighbourhood and the Kana fixup [[feedback-ahk-source-encoding]] is unrelated.
+**Reacteur central :** `ToggleSuspend` (`lib/lifecycle.ahk`) appelle `Ergopti_OnSuspendEnter()` (masquage force des deux tooltips + annulation du timer LLM) / `Ergopti_OnSuspendResume()` (reinitialisation du buffer de prefixe). Un watchdog de 500 ms `_SuspendStateWatchdog` (globale `_LastSuspendState`, arme dans `lib/boot.ahk`) rejoue le reacteur pour les transitions qui contournent `ToggleSuspend` (Pause natif, declencheur externe). Les combos script AltGr sont enregistres « S » (exemptes de suspend) pour que l'utilisateur puisse sortir de la pause.
 
-**macOS parity:** pause is a soft multi-flag in `modules/shortcuts/script_control.lua` (`_is_paused`, `is_paused()`); the keymap eventtap early-returns on `CoreState.processing_paused` so the preview/hotstring path is already gated. Gaps closed for parity: `pause_all()` now calls `_keymap.reset_predictions()` + `ui.tooltip.hide_forced()`; gestures `triggerLiveAxisIfNeeded` gained `if not _state.enabled then return end`; `prediction_engine.perform_check` reads `package.loaded["modules.shortcuts.script_control"].is_paused()`. Background warmup HTTP + keylogger already check pause.
+**Parite macOS :** la pause est un multi-drapeau souple dans `modules/shortcuts/script_control.lua` (`_is_paused`, `is_paused()`) ; l'eventtap keymap sort tot sur `CoreState.processing_paused`, donc le chemin apercu/hotstring est deja bloque. Ecarts combles : `pause_all()` appelle `_keymap.reset_predictions()` + `ui.tooltip.hide_forced()` ; `triggerLiveAxisIfNeeded` des gestes a gagne `if not _state.enabled then return end` ; `prediction_engine.perform_check` lit `package.loaded["modules.shortcuts.script_control"].is_paused()`. Le warmup HTTP de fond et le keylogger verifiaient deja la pause.
 
 ### project-macos-llm-runtime-enable-gate
 
@@ -1476,17 +1063,19 @@ The script-control shortcut (AltGr+Enter → pause / resume) is an `hs.eventtap`
 
 ### project-macos-script-control-tap-lifecycle
 
-_The script-control eventtap (AltGr+Enter/Backspace/Escape) is keycode-based and must survive layout switches AND pause. Two traps killed it: `shortcuts.start` is a Bindings-only proxy (asymmetric with `shortcuts.stop`), and the pause-layout feature's layout switch fires the Karabiner input-source watcher which rebuilds everything._
+_The script-control eventtap (AltGr+Enter/Backspace/Escape) is keycode-based and must survive layout switches AND pause — never restart it via `shortcuts.stop()`/`shortcuts.start()`, and never let a pause-driven layout switch regenerate the Karabiner config._
 
 <sub>slug: `project_macos_script_control_tap_lifecycle`</sub>
 
-The macOS script-management shortcuts — AltGr (right_command / right_option) + Enter / Backspace / Escape → pause-toggle / reload / quit — are served by a single `hs.eventtap` in `modules/shortcuts/script_control.lua` (`handle_key`). It is keyed on **physical key codes** (Karabiner sentinels F13/F14/F15 + a right-cmd fallback), so it is **layout-independent** and must stay alive through layout switches and pause. Two non-obvious bugs stranded it (root-caused live on branch fix/hs, 2026-06-09/10).
+AltGr (right_command / right_option) + Enter / Backspace / Escape → pause-toggle / reload / quit are served by one `hs.eventtap` in `modules/shortcuts/script_control.lua` (`handle_key`), keyed on **physical key codes** (Karabiner sentinels F13/F14/F15 + a right-cmd fallback). It is layout-independent and is the one thing that must work in EVERY state (paused, mid-layout-switch, KE-off).
 
-**Trap 1 — `shortcuts.start` is a Bindings-only proxy.** `modules/shortcuts/init.lua` defines `M.stop()` as a function stopping all three sub-systems (`Bindings.stop()` + `ScriptControl.stop()` + `KeyboardShortcuts.stop()`), but `M.start` is just `= Bindings.start` (a proxy). So any `shortcuts.stop(); shortcuts.start()` round-trip **kills the script-control eventtap and never revives it** (only Bindings restart). The Karabiner input-source watcher did exactly this to re-bind layout-dependent hotkeys, so AltGr+Enter died on the first layout switch — and neither resume nor the menu button could bring it back (they only restart bindings). **Fix:** rebind layout-dependent hotkeys with `pause_bindings()` / `resume_bindings()` (Bindings + KeyboardShortcuts only) and leave the keycode-based eventtap untouched. Never call `shortcuts.stop()`/`shortcuts.start()` as a "rebind".
+**Trap 1 — `stop()`/`start()` is not a round-trip.** `shortcuts.stop()` stops all three sub-systems including ScriptControl; `shortcuts.start()` starts only Bindings + KeyboardShortcuts (ScriptControl has its own `start_script_control`). So a `stop(); start()` used as a "rebind" **kills the script-control eventtap and never revives it** — AltGr+Enter dies on the first layout switch and neither resume nor the menu button brings it back. **Rebind layout-dependent hotkeys with `pause_bindings()` / `resume_bindings()`** and leave the keycode-based eventtap untouched.
 
-**Trap 2 — the pause-layout feature triggers the input-source watcher.** When `layout_pause_switch_enabled` is on, every pause switches the macOS keyboard layout (e.g. Ergopti → French). That switch fires Karabiner's `start_input_source_watcher` callback, which `M.regenerate()`'d the **full** Ergopti config and re-armed the binding hotkeys — silently undoing the pause (full remapping back, user shortcuts live mid-pause), and (pre-Trap-1-fix) killing the eventtap. **Fix:** the watcher callback short-circuits on `script_control.is_paused()`, leaving the paused KE config in place (script-control rules only — all three slots, layout-independent key_codes). The eventual resume regenerates the full config for real.
+**Trap 2 — the pause-layout feature triggers the input-source watcher.** With `layout_pause_switch_enabled`, every pause switches the macOS layout, which fires Karabiner's `start_input_source_watcher`; that used to `regenerate()` the FULL Ergopti config and re-arm the binding hotkeys, silently undoing the pause (full remapping back, user shortcuts live mid-pause). The watcher callback now short-circuits on `script_control.is_paused()`, leaving the paused KE config (`Generator.build_paused_script_control_rules`, right_command + right_option × 3 slots) in place until the real resume regenerates it.
 
-**How to apply:** the script-control eventtap is the one thing that must work in EVERY state (paused, mid-layout-switch, KE-off). Anything that stops or rebinds shortcuts must preserve it. Note `GestActions.execute_single` deliberately has **no** pause guard, so reload/quit (AltGr+Backspace/Escape) fire even while paused — that is intended (lifecycle controls). The paused KE config comes from `Generator.build_paused_script_control_rules` (right_command + right_option × 3 slots). See [[project-macos-eventtap-no-blocking]] (the layout switch must also be deferred + non-blocking) and [[project-suspend-pause-invariant]].
+Note `GestActions.execute_single` deliberately has **no** pause guard, so reload/quit fire even while paused — that is intended (lifecycle controls).
+
+See [[project-macos-eventtap-no-blocking]], [[project-suspend-pause-invariant]].
 
 ### project-touchdevice-dormancy-is-kernel
 
@@ -1544,7 +1133,6 @@ just onboarding.
 
 Sibling memory: [[project-locale-parity-test]].
 
-- Latest "encore plus" wave (user repeated "encore plus" after diagnostic/healthcheck enrichment + previous massive test waves): +18-25+ new regression tests focused on making the enriched Diagnostic système (healthcheck) production-hardened + filling keylogger/llm/gestures/timer/shortcuts/meta gaps for near-100% certainty. AHK additions: 5+ new Test() in test_logger.ahk Healthcheck section (active_app cache state accurate under pause in diagnostic report; features manifest + timers/scheduler visible + pause-safe; gestures/LLM/layout collectors pcall-resilient + volume + pause with errors sink visibility + AltGr latch in layout section; keylogger aggregator/rollover data in diagnostic accurate under pause + high volume + privacy); +2 in test_active_app_cache.ahk (diagnostic sees clean cache under pause, no false activations; volume + pause + re-init + pcall WinEvent resilience for snapshot); +2 in test_shortcuts.ahk (AltGr prefix latch historical regression safe across pause/resume + diagnostic must report true latch state; all dispatchers incl. Win\*/menu pause silence + 150+ volume + bad Features + diagnostic safe); +3 in test_timer_scheduler.ahk (every() must be silent under pause + diagnostic can inspect; pcall-wrapped callback ERROR routes to dedicated errors sink under pause; high volume + pause transitions + re-init preserves diagnostic scheduler visibility). HS: new describe in test_aggregator.lua ("aggregator — diagnostic (healthcheck) integration + pause" — 4 its: pure under pause + diagnostic reads safe counts + errors sink; volume+pause+rollover+unicode keeps diagnostic keylogger summary correct/privacy-safe; privacy+FS/pcall under pause still surfaces errors sink to diagnostic; bad/unicode events resilient); new describe in test_conflicts.lua (3 its for pause safety + diagnostic); notes in llm/test_profiles.lua; port_adapter_coverage.ahk lists extended for full keylogger stack, llm stack, gestures conflicts/touchdevice, keymap expander/utils etc., karabiner ke_lifecycle, adapters/timer, active_app_cache, timer_scheduler, features_manifest + healthcheck as special always-available read-only surface for paused troubleshooting. All tests: explicit project_suspend_pause_invariant, historical gotchas (errors sink, AltGr in diagnostic layout, privacy in keylogger-to-diagnostic, pcall/FS), max edges (volume 150-200+, unicode, rollover, re-init, FS/pcall no-crash). Banners: final run clean ("lint-conventions: OK — no violations found"). Tails/greps verified registration. This wave (plus accumulated prior "encore plus" in session) brings the total new regression tests in the campaign well past 250-300. Would have caught: diagnostic returning stale active_app/features/timers/keylogger-agg/LLM-profile/karabiner-grabber/AltGr-latch data or hiding the clean errors sink when user (paused) runs "Diagnostic système" to debug; silent aggregator volume corruption or PII in the troubleshooting report; stuck gesture conflicts or ke lifecycle after suspend; timer pcall errors not visible in diagnostic; wrong LLM profile in healthcheck while suspended. Newly ultra-hardened: healthcheck collectors (active_app, features, timers, gestures/LLM/layout, keylogger agg/rollover) + full keylogger aggregator diagnostic view + conflicts + timer pcall/every + shortcuts dispatchers + historical AltGr + profiles resolve + karabiner lifecycle + meta port/require coverage. Full suites (windows/tests/run_all.ahk + macos/tests/run.lua) + live test (trigger Diagnostic while A_IsSuspended/paused, errors in sink, high volume keylogger/LLM/gestures/timers, pause/resume AltGr/hotstrings, rollover, bad states) mandatory. User can say "encore plus" again.
 
 ### project-shifted-comma-case-variants
 
@@ -1552,54 +1140,14 @@ _The "uppercase" form of a comma/apostrophe/period in case-variant generation MU
 
 <sub>slug: `project_shifted_comma_case_variants`</sub>
 
-Case-insensitive hotstrings whose trigger contains `,` / `'` / `.` auto-generate
-title/upper-case variants. On the Ergopti Shift layer those keys do NOT shift to
-an uppercase letter — they shift to a no-break-space-prefixed punctuation. Per
-**French typography the space TYPE differs**: Shift+comma emits `NNBSP(U+202F);`
-(narrow), Shift+period emits `NBSP(U+00A0):` (full), Shift+apostrophe emits
-`NNBSP?`. The deadkey path (¨+s / ¨+n) can also produce either no-break space.
+On the Ergopti Shift layer, `,` / `'` / `.` do not shift to a letter — they shift to a no-break-space-prefixed punctuation, and French typography makes the space TYPE differ. Keep two concerns apart:
 
-Two distinct concerns — keep them apart:
+- **Emission** (AHK ONLY — macOS input goes through Karabiner, not in this repo): `:` → NBSP (U+00A0), `;` / `!` / `?` → NNBSP (U+202F). Lives in `SHIFT_SYMBOLS`, `modules/keymap/layout/layout_shift_caps.ahk`.
+- **Matching** (both platforms): deliberately LENIENT — pair BOTH no-break spaces with BOTH `:` and `;`, so `DS` fires whichever one landed in the buffer. AHK: `_BuildUppercasedSymbols()` in `lib/hotstrings/hotstring_builder.ahk`. macOS: `M.UPPER_TRIGGERS` in `_shared/lua/text_utils/init.lua` (consumed by `trig_upper`/`trig_title`, which handle the symbol at ANY position).
 
-- **Emission** (AHK ONLY — macOS input goes through Karabiner, not in this repo):
-  the layout must emit the EXACT pairing above (`:`→NBSP, `;`/`!`/`?`→NNBSP).
-  Lives in `SHIFT_SYMBOLS` in `windows/lib/layout/layout_shift_caps.ahk`. Pinned
-  by `test_layout_tables.ahk` (Shift+period → NBSP+`:`, Shift+comma → NNBSP+`;`).
-- **Matching** (both platforms): the case-variant tables are deliberately
-  LENIENT — `DS` must come out regardless of WHICH no-break space precedes the
-  punctuation. So they pair BOTH no-break spaces with BOTH `:` and `;`.
+**Why a plain ASCII space is wrong on two counts:** (1) the nbsp-prefixed form typed via the layout never matched the space-prefixed trigger, so caps never produced `DS`; and (2) a bare `<space>:D` — the emoji typed after a normal word — DID match and got swallowed into `DS`. The user types the emoji with a plain space and the shifted comma with a no-break space; anchoring on nbsp/nnbsp is the ONLY thing separating them.
 
-The single source of truth for the matching tables:
-
-- **AHK**: `_BuildUppercasedSymbols()` in `windows/lib/hotstrings/hotstring_engine.ahk`.
-- **macOS**: `M.UPPER_TRIGGERS["," / "'" / "."]` in `_shared/lua/text_utils/init.lua`
-  (consumed by `trig_upper`/`trig_title`, which handle the symbol at ANY position
-  in the trigger — the comma-first alias block in `modules/keymap/registry.lua`
-  only covers comma-FIRST and is a redundant secondary path).
-
-**Why:** Both platforms originally used a plain ASCII space (`" :"`, `" ;"`,
-`" ?"`). That was wrong on two counts: (1) the nbsp/nnbsp-prefixed form typed via
-the layout never matched the space-prefixed trigger, so caps never produced `DS`;
-and (2) a bare `<space>:D` — the `:D` emoji typed after a normal word — DID match
-the space-prefixed trigger and got swallowed into `DS`. The user types the emoji
-as `<space>:` (plain space), the shifted comma as a no-break space — anchoring on
-nbsp/nnbsp is the ONLY thing that separates the two. A later fix corrected the
-EMISSION (Shift+period was wrongly emitting `NNBSP:`; French typography wants
-`NBSP:`) while keeping MATCHING lenient so `DS` fires for any no-break space.
-
-**How to apply:**
-
-- Never put a plain space in these symbol-shift tables. Use `Chr(0x202F)` /
-  `Chr(0xA0)` (AHK) or `"\226\128\175"` / `"\194\160"` (Lua).
-- Emission pairing (AHK layout): `:` → NBSP, `;` / `!` / `?` → NNBSP.
-- Matching tables stay lenient: comma → all four of `{nnbsp,nbsp} × {":",";"}`;
-  apostrophe → `{nnbsp,nbsp} × "?"`; period (macOS) → `{nnbsp,nbsp} × ":"`.
-- Regression tests pin all of it: emission (`test_layout_tables.ahk`), lenient
-  matching with correct casing AND plain-`<space>` never registered (emoji
-  safety). AHK: `test_hotstring_engine_main.ahk` (HSE comma-shift / plain-space
-  colon-D), `test_hotstring_engine.ahk`, `test_hotstrings_full.ahk` (variant
-  counts), `test_layout_tables.ahk` (emission). macOS:
-  `test_hotstring_registry_regressions.lua`.
+**How to apply:** never put a plain space in these tables — use `Chr(0x202F)` / `Chr(0xA0)` (AHK) or `"\226\128\175"` / `"\194\160"` (Lua). Pinned by `test_layout_tables.ahk` (emission), `test_hotstring_engine_main.ahk` + `test_hotstrings_full.ahk` (AHK matching + plain-space emoji safety), `test_hotstring_registry_regressions.lua` (macOS).
 
 ### project-ahk-v2-semicolon-in-string
 
@@ -1623,44 +1171,17 @@ em-dash `—` in a string literal also broke the parser the same way).
 
 ### project-hs-timer-callback-errors-invisible
 
-_A Lua error thrown inside an `hs.timer`/`hs.timer.delayed` callback is swallowed to the Hammerspoon Console and never reaches the file logger — so a crash on a timer-driven path is invisible in logs, and a unit-test stub that defines a method production lacks will mask the dangling call._
+_Hammerspoon swallows a throw inside an `hs.timer` callback — that silent-death class is now captured by `logger.install_runtime_error_capture()`, which must stay installed. The surviving trap is a test stub that defines a method production lacks._
 
 <sub>slug: `project_hs_timer_callback_errors_invisible`</sub>
 
-Hammerspoon runs timer callbacks under its own protected call. When the callback
-errors, Hammerspoon prints the traceback to its **Console** (and the
-`~/.hammerspoon` crash log), not through our `lib.logger`, which writes the file
-the user collects. The file log therefore shows everything up to the crash and
-nothing after, with no `[ERROR]` line — the path just stops mid-way.
+Hammerspoon runs timer callbacks under its own protected call and prints the traceback to its **Console**, not through `lib.logger` — so the collected file log used to just stop mid-path with no `[ERROR]`. This masked the « vert mais aucune prédiction » bug: `prediction_engine.perform_check` (fired by an `hs.timer.delayed`) called `StreamingHandler.ngram_predict`, a function the production `streaming_handler.lua` never implemented. Calling a `nil` field threw, the timer swallowed it, and the log showed `Request signature accepted` but never the dispatch `[START] LLM request`. **Worse, the unit test stubbed `ngram_predict`, so the suite stayed green while production crashed on every keystroke-driven request.**
 
-**Why:** This masked the "vert mais aucune prédiction" bug. The LLM prediction
-engine (`modules/llm/prediction_engine.lua` `perform_check`) is fired by
-`_inactivity_timer` (an `hs.timer.delayed`). It called
-`StreamingHandler.ngram_predict(buffer)` — a function the production
-`streaming_handler.lua` never implemented (a leftover from an extraction
-refactor). Calling a `nil` field threw, the timer swallowed it, and the file log
-showed `prompt_builder: Request signature accepted` (logged just before the
-crash) but never the dispatch `[START] LLM request — model:` — so the request
-died silently and no prediction ever appeared even with a green (backend-ready)
-health dot. Worse, the unit test stubbed `ngram_predict`, so the suite stayed
-green while production crashed on every keystroke-driven request. Fixed in commit
-`173b37390` by removing the dead n-gram block; the regression in
-`test_prediction_engine.lua` §8 now mirrors the real StreamingHandler surface
-(no `ngram_predict`) and asserts `perform_check` reaches `fetch_llm_prediction`.
+**Mitigation now in place:** `lib/logger.lua` `M.install_runtime_error_capture()` wraps `hs.timer.{doAfter,new,delayed.new}` callbacks in `xpcall` (logging ERROR + traceback) and tees `print()` into the file log. Do not remove it — and do not assume it covers eventtaps.
 
-**How to apply:**
+**Still on you — keep test stubs faithful to the real module's exported surface.** A stub that provides a method production doesn't have turns a hard crash into a green test. When stubbing a singleton (`StreamingHandler`, `PromptBuilder`, `AppFilter`, `ApiCommon`), mirror only the functions the real module actually exports, and add a regression that drives the real call path. `test_prediction_engine.lua` §8 asserts StreamingHandler exposes no `ngram_predict` and that `perform_check` reaches `fetch_llm_prediction`.
 
-- When a timer-/eventtap-driven feature "does nothing" with no error in the file
-  log, suspect a swallowed callback error: read the Hammerspoon **Console**
-  (Console.app / `hs.console`), not just the collected file log. A path that logs
-  its entry but none of its exit branches (no dispatch, no skip-reason) is the
-  tell.
-- Keep test stubs faithful to the **real module's exported surface**. A stub that
-  provides a method production doesn't have turns a hard crash into a green test.
-  When stubbing a singleton (`StreamingHandler`, `PromptBuilder`, `AppFilter`,
-  `ApiCommon`), mirror only the functions the real module actually exports — and
-  add a regression that drives the real call path so a dangling call fails loudly.
-- See [[feedback-regression-tests]].
+See [[feedback-regression-tests]].
 
 ### project-profile-label-placeholder-convention
 
@@ -1668,40 +1189,17 @@ _LLM profile labels in `_shared/data/locales/*.json` use **brace** placeholders 
 
 <sub>slug: `project_profile_label_placeholder_convention`</sub>
 
-The `llm.profile.batch_advanced.label` string carries a dynamic prediction count.
-Every consumer that renders it substitutes the **brace** placeholders `{n}`
-(count) and `{s}` (plural marker), mirroring the prompt-template convention
-(`{context}`, `{min_words}`, `{n}`): macOS via
-`ui/menu/menu_llm/profile_label.lua` `M.format` (the single source of truth, used
-by both `profiles_manager.lua` and `model_switcher.lua`), Windows via
-`LLM_Tray_GetProfileLabel` (`StrReplace` of `{n}`/`{s}`). Plain `i18n.get` /
-`t()` do **not** substitute — that is the caller's job.
+`llm.profile.batch_advanced.label` carries a dynamic prediction count. Every consumer substitutes the **brace** placeholders `{n}` (count) and `{s}` (plural marker), mirroring the prompt-template convention: macOS via `ui/menu/menu_llm/profile_label.lua` `M.format` (single source of truth, used by both `profiles_manager.lua` and `model_switcher.lua`), Windows via `LLM_Menu_GetProfileLabel` (`StrReplace` of `{n}`/`{s}`). Plain `i18n.get` / `t()` do **not** substitute — that is the caller's job.
 
-**Why:** The label shipped with printf `%d prédiction%s` tokens while the menu
-formatter only ever replaced `{n}`/`{s}`, so the user saw a literal
-`… avec %d prédiction%s` in the "Batch Avancé" entry. A parallel path
-(`model_switcher.lua`) used `string.format(label, n, s)` and rendered it
-correctly, which is exactly why the divergence survived — two consumers, two
-conventions, one locale string that could only satisfy one of them. Fixed by
-standardising all 21 locales on `{n}`/`{s}` and routing every macOS consumer
-through the one `ProfileLabel.format` helper.
+**Why the divergence survived:** the label shipped with printf `%d prédiction%s` while the menu formatter only replaced `{n}`/`{s}`, so the user saw a literal `%d` in the "Batch Avancé" entry. A parallel path (`model_switcher.lua`) used `string.format(label, n, s)` and rendered it correctly — **two consumers, two conventions, one locale string that could only satisfy one of them**, which is exactly why nobody noticed.
 
 **How to apply:**
 
-- A locale value rendered as a menu label must use `{…}` placeholders; reserve
-  printf `%d`/`%s` for strings passed straight to `string.format` / `t()` +
-  `Format()` (e.g. dialog bodies, `menu.profiles.profile_label_prefix` uses `%s`
-  and is `StrReplace`d on `%s`). Never mix the two for the same string.
-- Don't format a profile label inline — call `ProfileLabel.format` (macOS) so the
-  count fallback (`DEFAULT_STATE.llm_num_predictions`) stays single-sourced.
-- Guarded forever by `macos/tests/unit/lib/test_locale_profile_labels.lua` and
-  `macos/tests/unit/menu/test_profile_label.lua`, mirrored on Windows in
-  `windows/tests/test_llm_menu_regressions.ahk` §5: all 21 locales are scanned so
-  no profile label may carry `%d`/`%s`, and `batch_advanced` must keep `{n}`/`{s}`.
-- Related: built-in profile rows in the macOS LLM menu now select on a single
-  click (no "use this profile" sub-item), matching the AHK tray; cloning a
-  read-only built-in moved to a single "Clone active profile…" entry.
-- See [[project-locale-parity-test]], [[feedback-regression-tests]].
+- A locale value rendered as a menu label uses `{…}`; reserve printf `%d`/`%s` for strings passed straight to `string.format` / `Format()`. Never mix the two for the same string.
+- Don't format a profile label inline — call `ProfileLabel.format` (macOS) so the count fallback (`DEFAULT_STATE.llm_num_predictions`) stays single-sourced.
+- Guarded across all 21 locales by `macos/tests/unit/lib/test_locale_profile_labels.lua`, `macos/tests/unit/menu/test_profile_label.lua` and `windows/tests/unit/test_llm_menu_regressions.ahk`.
+
+See [[project-locale-parity-test]], [[feedback-regression-tests]].
 
 ### project-updater-nonblocking-http
 
@@ -1726,54 +1224,30 @@ Two distinct foot-guns, both surfaced by a user reporting a "freeze au démarrag
 
 See [[feedback-regression-tests]], [[project-ahk-menu-dispatcher-drop]].
 
-### project-audit-reverify-2026-06-16
+### project-audit-tracking-artifacts-are-unreliable
 
-_The 2026-06-14 audit's tracking JSONs and roadmap [x] checkboxes are UNRELIABLE — re-verified against source: 148/154 actually fixed, 11 real bugs remain (3 high)_
+_An audit's own tracking JSONs and roadmap `[x]` checkboxes contradict each other and the source — ground truth is the code, located by SYMBOL, never by the line numbers in a finding._
 
 <sub>slug: `project_audit_reverify_2026_06_16`</sub>
 
-Re-verification of the 170-finding audit (`docs/AUDIT_ergoptiplus_ahk_2026-06-14.md`) against the **current source** on 2026-06-16. Headline: the audit's machine-tracking is not trustworthy and must never be taken at face value.
+Re-verifying the 170-finding 2026-06-14 AHK audit: `_audit_status.json` showed 6/170 checked while `_verify_results.json` marked all 170 `status:"done"` — and several "done" entries' own `evidence` field said the fix was absent. **Line numbers in a finding's `files` array drift; symbol names do not.** (Those reports and tracking files have since been deleted and their findings fixed; only `tools/dev/_known_titles.txt` and `_reverify_payload.json` remain.)
 
-- **`tools/dev/_audit_status.json`, `_verify_results.json`, `_impl_results.json` and the roadmap `[x]` checkboxes contradict each other and the source.** `_audit_status.json` showed only 6/170 `checked:true` while `_verify_results.json` marked all 170 `status:"done"` — yet several "done" entries' own `evidence` field says the fix is absent ("still only does LoggerWarn on catch"). **Ground truth is the source code, located by symbol (function/var names), not by the stale line numbers in the finding `files` arrays (lines have drifted).**
-- **Actual state: 148/154 re-checked findings are genuinely fixed** (most with a regression test). Only **11 real issues remain**, fully detailed (symptom, file:line proof, fix, regression test) in the root report **`BUGS_RESTANTS_ergoptiplus_2026-06-16.md`**.
-- **3 HIGH still open**: (1) generic hold-modifier long-press uses an unbounded `KeyWait(..,"U")` with no `try/finally` (capslock/enter/lalt/rctrl) → a lost key-up latches Ctrl/Alt/Win down system-wide (the `one_shot_shift` paths were hardened by #77, the generic ones were missed); (2) `_LLM_Ollama_Pending` survives `LLM_OllamaCancelAllAsync` and re-dispatches curl+PII-temp-write after suspend; (3) AltGr rolls (`chevron_equal`/`hashtag_quote`/`paren_quote`/`bracket_quote`) are registered BEFORE `RegisterAltGrLayer()` so the "last-registered variant wins" rule makes them dead in the default config (swap the two calls at `modules/layout.ahk:862-863`).
-- **The expansion core is sound** re the user's "triggerabcd→outpuabtcd/outputbcd" fear: the main dispatch is one atomic `SendInput(Burst)` under `Critical` (`hotstring_engine_main.ahk:1375-1394`); suppression + synthetic-tag are depth counters. The only residual reorder path is `remap-emit-critical-uneven` (low): `$`/`%`/`=` number-row keys emit via the non-`Critical` `SendNewResult` and can transpose with the next remapped letter (`=a`→`a=`). The Notepad clipboard path is the one acknowledged non-atomic exception (by design).
-- **Caveat on the changelog finding (Bug 5):** the synchronous WinHTTP on `_Updater_OpenChangelogWindow` is a *deliberately accepted* trade-off — [[project-updater-nonblocking-http]] documents that user-initiated fetches (check-now / changelog / download) intentionally stay synchronous because the user is actively waiting on the click. It is listed as optional hardening, not an oversight.
+One durable structural fact worth keeping, against the recurring « triggerabcd → outpuabtcd » fear: the expansion core is sound. The main dispatch is one atomic `SendInput(Burst)` under `Critical` and suppression + synthetic-tag are depth counters, so a trigger cannot come out reordered. The Notepad clipboard path is the one acknowledged non-atomic exception, by design.
 
-**How to apply:** when resuming this audit, read the 11 remaining bugs from the root report; do NOT trust `tools/dev/_*` tracking files. The re-verified structured payload is `tools/dev/_reverify_payload.json`; the 170 known titles (for dedup) are `tools/dev/_known_titles.txt`. See [[feedback-regression-tests]], [[project-hotstring-engine-internals]], [[project-suspend-pause-invariant]], [[feedback-ahk-suspend-prefix-latch]].
+See [[project-audit-evidence-must-be-reproducible]], [[project-audit-findings-are-hypotheses]].
 
-### project-audit-hs-fixes-2026-06-16
+### project-hs-adapter-contract-violations
 
-_8 Hammerspoon macOS audit bugs fixed in one session (A3/A5/A6/C5/D3/D4/E1-E3/H2-H5), each with a regression test_
+_Four Hammerspoon API contract facts a plausible-looking call gets wrong — found dormant in the macOS adapters._
 
 <sub>slug: `project_audit_hs_fixes_2026_06_16`</sub>
 
-Fixed in order, each in its own commit on `dev`:
+- `hs.axuielement.focusedElement()` **does not exist** — use `applicationElementForPID(pid):attributeValue("AXFocusedUIElement")`.
+- `#char` is a BYTE count and silently rejects multi-byte characters — use `utf8.len()` via `pcall`.
+- `checkKeyboardModifiers()` only accepts canonical modifier names — normalise `LShift`/`RShift` → `shift` (`KEY_NORMALISATION` in `adapters/key_state.lua`) before querying.
+- `hs.eventtap`'s `start()` leaks a disabled-but-allocated tap — unconditionally stop and nil any existing tap before creating a new one.
 
-**A5** — `emit_text()` / `emit_tokens()` returned `(1, "")` on the paste path; the empty string left `expected_synthetic_chars` empty, so the Cmd+V echo reached the `flags.cmd` branch which unconditionally wiped the buffer. Fix: return `(utf8_len, text)` on paste; add an `expected_synthetic_chars` non-empty guard in the Cmd branch.
-
-**A6** — The 0.5 s stuck-counter reset in `onKeyDownRaw` could wipe `expected_synthetic_deletes / expected_synthetic_chars` just set by an in-flight expansion if the runloop lagged. Fix: `CoreState.last_synthetic_arm_time` field + both `arm_synthetic()` and `perform_text_replacement()` set it; the reset guard now also requires `(now - last_synthetic_arm_time) > 1.0`.
-
-**A3** — `dynamic_hotstrings/rules_engine.lua` deferred injection via `doAfter(0)`, creating a window where a real keystroke could interleave. Fix: emit synchronously inside the interceptor (CGEventPost is non-blocking); release `_is_injecting` immediately without a second timer.
-
-**C5** — `keylogger.synth_queue` was never drained on idle; a dropped synthetic `keyDown` left an unmatched entry that would permanently tag the next real keystroke as synthetic. Fix: drain after `delay > SYNTH_IDLE_DRAIN_MS (500 ms)` with a `Logger.warn`; also clear in `M.stop()`.
-
-**D3** — `prediction_engine.M.reset()` did not clear `chain_pending` or stop `_chain_trigger_timer`; a late-firing fallback could call `perform_check()` on stale state. Fix: clear `chain_pending = false` and stop/nil the timer at the very top of `M.reset()`, before any other teardown.
-
-**D4** — `streaming_handler.on_success()` reset `_consecutive_llm_failures = 0` before the stale-fetch-id guard. A stale success silently zeroed the counter. Fix: move the reset after the guard.
-
-**E1/E2/E3** — Three tooltip lifecycle bugs:
-- E1: stacked hotstring canvas survived LLM transitions; `hide_stacked()` was only called from `hide_forced()`. Added `pcall(Renderer.hide_stacked)` in `dismiss_silent()`, `show()`, and `show_loading()`.
-- E2: `update_preview()` inside `perform_text_replacement()` was synchronous, arming a keyDown watcher before synthetic echoes cleared; those echoes triggered `hide_forced()` and destroyed the chained preview. Fix: wrap in `hs.timer.doAfter(0, ...)` so all synthetic events are consumed first. The `test_expander.lua` assertion for update_preview now calls `hs.timer.__fire_all()` to flush the stub.
-- E3: `M.show()` did not stop an active dequeue cycle; a stale timer could overwrite the new content. Fix: call `stop_dequeue()` at the top of `M.show()`.
-
-**H2-H5** — Four dormant adapter contract violations:
-- H2: `hs.axuielement.focusedElement()` does not exist; use `applicationElementForPID(pid):attributeValue("AXFocusedUIElement")`.
-- H3: `#char` (byte count) rejects multi-byte chars; use `utf8.len()` via pcall.
-- H4: `checkKeyboardModifiers()` only accepts canonical names; add `KEY_NORMALISATION` map for LShift/RShift → shift etc.
-- H5: `start()` leaked a disabled-but-allocated tap; unconditionally stop and nil any existing tap before creating a new one.
-
-**Test coverage:** 8 new regression test files, 1 existing test file updated. Lua baseline bumped from 906 to 909 to account for 3 legitimate new `hs.timer` calls (A5/A6/E2). All 1639 Lua unit tests pass.
+(The eight 2026-06-16 macOS audit fixes this entry used to narrate — paste-path `emit_text` return value, the 0.5 s stuck-counter reset, `doAfter(0)` injection, `synth_queue` idle drain, `prediction_engine.reset` chain timer, stale-success failure counter, and three tooltip lifecycle bugs — all shipped with regression tests, which are now the living memory.)
 
 ### project-ahk-v2-static-unset-unreadable
 
@@ -1792,29 +1266,17 @@ Crash reported 2026-06-16 (`PropertyError: "This value of type 'Class' has no pr
 - If you must use `unset` (e.g., for optional parameters), guard reads with `HasOwnProp` + a manual `is`-safe nil check, never bare `obj._prop is SomeClass`.
 - Regression tests in `test_hook_dispatcher.ahk` section 4 encode the exact PropertyError path.
 
-### project-macos-audit-2026-06-17-bugs
+### project-lua-nil-and-expr-is-nil
 
-_Three silent bugs found in the macOS driver: LLM noise filter suppressed uppercase at doc-start, gesture peak confirmation was framerate-dependent, synthetic-event reset could race with delayed OS delivery_
+_In Lua, `local x = cond and expr` yields **nil**, not false, when `cond` is nil — and `not nil` is `true`, so a "negative" gate silently inverts._
 
 <sub>slug: `project_macos_audit_2026_06_17`</sub>
 
-Three bugs fixed in the macOS driver (commit on dev branch 2026-06-17):
+Found in `prediction_engine.is_noise_pred`: `local ends_sent = prev_char and prev_char:match(...)` returned **nil** whenever `prev_char` was nil (empty or whitespace-only buffer). `not nil` is `true`, so the uppercase-capital gate silently suppressed **every** prediction beginning with a capital at document start or after a whitespace-only buffer. Fix: `(prev_char == nil) or (prev_char:match(...))` — nil is now an implicit sentence boundary.
 
-**1. `prediction_engine.lua` — `is_noise_pred` uppercase filter at doc-start**
-`local ends_sent = prev_char and prev_char:match(...)` returns **nil** (not false) when `prev_char` is nil (empty or whitespace-only buffer). `not nil` is `true` in Lua, so the uppercase-capital gate silently suppressed all predictions beginning with a capital letter at document start or after whitespace-only buffers. Fix: `(prev_char == nil) or (prev_char:match(...))` — nil prev_char is now treated as an implicit sentence boundary.
-NRT: `tests/unit/modules/llm/test_noise_filter_regression.lua`.
+**How to apply:** whenever you write `local x = cond and expr`, decide explicitly what `cond == nil` must mean. If nil is possible, use `(cond ~= nil) and expr` or `cond == nil or (cond and expr)`. The `x:match(...)` shape is the usual carrier of this bug.
 
-**2. `gestures/engine.lua` — framerate-dependent peak confirmation (dead code)**
-`commitGesture` used `(gs.peakNFrames or 0) >= FINGER_CONFIRM_FRAMES` to decide whether to override `maxFingers` with the peak finger count. The constant `PEAK_FINGERS_CONFIRM_MS = 0.05` was defined but **never used** (dead code). At 120 Hz ProMotion, 4 frames ≈ 33 ms < 50 ms, so the confirmation fired too early. Fix: `local peak_elapsed = now - (gs.peakNFirstSeen or now)` compared against `PEAK_FINGERS_CONFIRM_MS`.
-NRT: `tests/unit/modules/gestures/test_peak_override_regression.lua`.
-
-**3. `keymap/init.lua` — synthetic-event reset could race with delayed OS delivery**
-The stuck-counter guard `if dt > 0.5 and arm_age > 1.0 then reset` discarded in-flight synthetic events if the OS delayed their delivery past 1 s. Under extreme OS load, the events would then arrive unfiltered and duplicate characters. Fix: skip the reset when events are still pending (`expected_synthetic_deletes > 0` or `expected_synthetic_chars != ""`), unless `arm_age > SYNTHETIC_STALE_SEC = 5.0 s` (cleanup for truly lost events).
-NRT: `tests/unit/modules/keymap/test_synthetic_reset_guard.lua`.
-
-**Why:** Lua `nil and expr` evaluates to `nil` (not `false`) — `not nil` is `true`. This is the same foot-gun as `prev_char:match(...)` in multiple places in the codebase.
-
-**How to apply:** When writing `local x = condition and expr`, always verify the `condition == nil` case. If nil is possible, use `(condition ~= nil) and expr` or `condition == nil or (condition and expr)` as appropriate.
+NRT: `tests/unit/modules/llm/test_noise_filter_regression.lua`. (Two sibling bugs found the same day — a framerate-dependent gesture peak confirmation using a frame count instead of `PEAK_FINGERS_CONFIRM_MS`, and a synthetic-event reset racing delayed OS delivery — are fixed and pinned by `test_peak_override_regression.lua` and `test_synthetic_reset_guard.lua`.)
 
 ### project-ahk-invariant-incomplete-application
 
@@ -2011,23 +1473,24 @@ Related: [[feedback_regression_tests]], [[project_ahk_v2_static_unset_unreadable
 
 ### project-ahk-guard-tests-must-loop-the-class
 
-_A regression test that pins the single site a bug was fixed at will not survive the next refactor — five 2026-07-20 findings exist purely because a guard test named sites instead of enumerating the class_
+_A regression test that pins the single site a bug was fixed at will not survive the next refactor — write guard tests as loops over a set enumerated from source._
 
 <sub>slug: `project_ahk_guard_tests_must_loop_the_class`</sub>
 
-This is the concrete, repeated failure mode behind [[project_ahk_invariant_incomplete_application]], and the second 2026-07-20 audit found five instances of it in one pass:
+This is the concrete, repeated failure mode behind [[project_ahk_invariant_incomplete_application]]. A fix is applied where the bug bit; the test is written to describe *that fix*. Both are locally correct. The invariant, however, is a property of a **class of call sites**, and nothing re-checks the class when a new sibling appears.
 
-- `test_live_rebuild_no_critical_io.ahk` asserts `InStr(Body, "Critical(") = 0` on **`RebuildHotstringsLive`'s body only**. `ToggleCategoryAllFeatures` (`lib/config_io.ahk:217`) wraps the *call* in `Critical("On")` from outside, restoring the exact 1-2 s keyboard freeze F33 removed — and the test stays green. The outer `Critical` is even justified by a comment ("RebuildHotstringsLive re-enters Critical internally; that is safe") that **F33 itself made false**.
-- `test_webview_bridge_suspend_guard.ahk` names 3 handlers; there are 9. The other 7 can mutate config — or run an elevated UAC driver install — while the driver is paused.
+**Still open in the suite today:**
+
+- `test_live_rebuild_no_critical_io.ahk` asserts `InStr(Body, "Critical(") = 0` on **`RebuildHotstringsLive`'s body only**. Any caller that wraps the *call* in `Critical("On")` from outside restores the 1-2 s keyboard freeze the fix removed, and the test stays green.
+- `test_webview_bridge_suspend_guard.ahk` names 3 `*_OnWebMessage` handlers; there are 9. The other 7 can mutate config — or run an elevated UAC driver install — while the driver is paused.
 - `test_webview_low_ram_native_fallback.ahk` names 5 hosts; there are 12.
-- `test_taphold_timings_load_order.ahk` pins the include-order invariant for 1 of 5 shared-constant loaders. All five are currently correct, so this is latent — but a re-zeroed 0 ms timing sentinel is a documented CPU-spin hazard.
-- `SUSPEND_CUSTOM_COMBO_PREFIX_KEYS` is a hand-maintained list of 2; the driver registers 5 custom-combination prefixes (`SC01D`, `SC02A`, `SC11D` are missing), so three can latch across `Suspend` — the « AltGr bloqué » class that synthetic key events cannot clear.
+- `test_taphold_timings_load_order.ahk` pins the include-order invariant for 1 of 5 shared-constant loaders.
 
-**Why:** a fix is applied where the bug bit; the test is written to describe *that fix*. Both are locally correct. The invariant, however, is a property of a **class of call sites**, and nothing re-checks the class when a new sibling appears.
+**The pattern to copy:** `SUSPEND_CUSTOM_COMBO_PREFIX_KEYS` (`lib/lifecycle.ahk`) is a hand-maintained list, so `test_suspend_prefix_drain_covers_all_combos.ahk` **derives the real prefix set from driver source** and fails when a newly introduced combination is missing.
 
 **How to apply:**
 
-- Write guard tests as **loops over an enumerated set**, not assertions about one function body. Derive the set from source where possible (scan for `X & Y::` combination prefixes; enumerate `*_OnWebMessage` handlers) so a newly added sibling *joins the test automatically*.
+- Derive the set from source where possible (scan for `X & Y::` combination prefixes; enumerate `*_OnWebMessage` handlers) so a newly added sibling *joins the test automatically*.
 - For a **transitive** guarantee ("this must not run under `Critical`"), asserting the callee's body is necessary but never sufficient — assert it across every caller too.
 - When you fix a bug by removing something from a function, **grep the callers**: they may be re-adding it, and their justifying comment may have just become false.
 
@@ -2093,29 +1556,27 @@ Related: [[project_audit_reverify_2026_06_16]] (same lesson from the other direc
 
 ### project-ahk-test-suite-critical-leak
 
-_Critical("On") in layout/hotkey callbacks is safe in production but leaks into the main thread when invoked directly by tests, silently hanging background timers_
+_`Critical("On")` in a layout/hotkey callback is safe in production but LEAKS into the main thread when a test invokes that function directly, silently freezing every background timer for the rest of the suite._
 
 <sub>slug: `project_ahk_test_suite_critical_leak`</sub>
 
-Ergopti uses a custom test framework (`test_framework.ahk`) for its AutoHotkey codebase, executing all tests sequentially within a single auto-execute thread.
+- **In production (hotkeys/timers):** AHK gives the callback its own pseudo-thread, so on return the previous thread's `Critical` setting is restored automatically. Safe.
+- **In tests (direct invocation):** `test_framework.ahk` runs every test sequentially on the **main auto-execute thread**. A test that calls e.g. `AltGrShiftDispatch` or `LayerDispatch` directly inherits its `Critical("On")` permanently.
 
-1. **In Production (Hotkeys/Timers):** Calling `Critical("On")` inside a hotkey or timer callback is perfectly safe. AHK creates a pseudo-thread for the callback, and when it returns, the previous thread resumes with its own `Critical` setting restored automatically.
-2. **In Tests (Direct Invocation):** The test framework runs sequentially on the **main auto-execute thread**. If a test directly invokes a function (e.g. `AltGrShiftDispatch` or `LayerDispatch`) that calls `Critical("On")` without manually restoring it, that `Critical` state permanently "leaks" into the main thread.
+**The consequence:** a permanently-`Critical` main thread **blocks all background timers** from firing for the remainder of the suite — even during `Sleep`. Every test that relies on `SetTimer` (hotstring engine suppression release, etc.) then silently hangs or fails, far from the real culprit.
 
-**The Consequence:**
-If the main thread becomes permanently `Critical`, AHK will **block all background timers** from firing for the remainder of the test suite (even during `Sleep` calls). Tests that rely on `SetTimer` (e.g., hotstring engine suppression releases) will silently hang or fail.
+**How to apply:** always acquire `Critical` with an explicit restore:
 
-**How to apply:**
-- Always wrap standalone `Critical("On")` acquisitions in functions in a `try...finally` block, explicitly restoring the previous state:
-  `utohotkey
-  _AtCrit := Critical("On")
-  try {
-      ; ... your critical code ...
-  } finally {
-      Critical(_AtCrit)
-  }
-  ``r
-- The test framework (`test_framework.ahk`) now includes a safety check that throws `Test LEAKED Critical: <TestName>` and resets the state to `0` if a test forgets to restore it, preventing cascading failures and quickly catching new occurrences.
+```autohotkey
+_AtCrit := Critical("On")
+try {
+	; … critical code …
+} finally {
+	Critical(_AtCrit)
+}
+```
+
+`test_framework.ahk` now throws `Test LEAKED Critical: <TestName>` and resets the state to `0` when a test forgets, so a new occurrence surfaces immediately instead of cascading.
 
 Related: [[project_ahk_invariant_incomplete_application]]
 
@@ -2127,55 +1588,29 @@ Related: [[project_ahk_invariant_incomplete_application]]
 * **Do NOT add `Critical` to the monitor.** The old entry claimed the fix wrapped the disk-write block in `Critical "On"`; that is now exactly backwards. Cancellation must stay interruptible, or Suspend cannot terminate a staging worker that is already running — the very failure this guarantee exists to prevent.
 * **Regression Guard**: `meta/test_g5_updater_download.ahk` asserts the A_IsSuspended check, asserts `.terminate()`, and asserts that `Critical(` is **absent**. A doc that told you to add it (`docs/STATE_TRANSITION_MATRIX.md`) was corrected at the same time — it would have made a reader break a live test.
 
-### [project-shared-tree-layout] _shared/ tree: 6-folder layout, SSOT-per-layer, and the bypass gotcha
-* **Layout** (`static/ergopti_plus/_shared/`, renamed from `shared/` and reorganised from ~20 top-level entries into 6):
-  * `modules/` — per-subsystem: `logger/ tooltip/ hotstrings/ llm/ updater/ wpm_widget/ timings/ features/` + `gestures/actions.toml`, `menu/menu_manifest.json`, `wrap_symbols/wrap_symbols.json`
-  * `core/` — `domain/ ports/ config_schema/` (the hexagonal contracts + JS domain specs)
-  * `data/` — `locales/ db/ keycodes/`
-  * `lua/`, `tests/`, `ui/` — unchanged
-* **SSOT per layer** — the `_shared` root is resolved in EXACTLY ONE place per consumer, so renaming the *tree* is a one-token edit there. The places: macOS runtime `macos/lib/paths.lua` (`find_from_configdir("_shared")` → `Paths.shared(rel)`); AHK runtime `_SharedDir` (`ErgoptiPlus.ahk` ~L51, all modules read it; logger.ahk has a relative fallback); macOS tests `macos/tests/helpers/init.lua` (`SHARED_REL` → `helpers.shared(rel)`); JS tooling `tools/lib/paths.cjs` (`SHARED_REL` → `shared()`/`sharedRel()`); Python tooling `tools/lib/paths.py`; Linux `linux/install.sh` (`SRC_SHARED`/`DEST_SHARED`); the bundle `tools/build/build_static_bundle.py` (`ASSET_TREES`); the macOS app `tools/build/build_macos_app.sh` (`drivers/_shared` — packaged layout, see [[project-config-v2-refactor]] sibling resolver note).
-* **The two-part cost of any future change:** (1) a *tree rename* (`_shared` → x) is the one-token-per-layer edit above; (2) an *internal move* (e.g. `llm/` → `modules/llm/`) is NOT covered by the SSOT — every call site that passes a shared-relative subpath (`shared("modules/llm/…")`, `_SharedDir . "\modules\llm\…"`, file-header/docstring paths) must change. Use an anchored, encoding-safe sweep (match the moved segment only right after `_shared/`, `${..._SHARED}/`, an SSOT opener `shared("`/`sharedRel("`/`.shared("`, or `_SharedDir . "\`), preserving UTF-8 BOM + CRLF on `.ahk`.
-* **Bypass gotcha — only the suites catch these.** Some sites resolve a shared path WITHOUT the SSOT and are invisible to an anchored sweep:
-  * pure `_shared/lua/` code that can't depend on the runtime resolver — `lua/llm/profile_selector.lua` hard-navigates `dir .. "/../../modules/llm/profiles.json"` from its own file location;
-  * AHK loaders that alias `_SharedDir` to a local — `lib/hotstrings/hotstrings_config.ahk` and `lib/timings/timings_config.ahk` do `Dir := _SharedDir` then `Dir . "\modules\hotstrings\…"`;
-  * test fixtures that build paths or temp dirs by hand (`test_freshness_*` creates `Base\modules\hotstrings`; `_ISRMM_ReadSharedSource("modules/hotstrings/…")`; `test_port_adapter_coverage` derives `SHARED_DIR .. "/core/ports"`).
-  * UI modules with their OWN path wrapper that pass a literal `_shared`-relative string — `ui/wpm/wpm_widget.lua`'s `resolve_shared_constants_path("wpm_widget/constants.toml")` was missed by the reorg (it never wrote `.shared(`/`_SharedDir` so no sweep saw it) and shipped on a branch as a boot ERROR (widget non-functional) — fixed to `"modules/wpm_widget/constants.toml"` / `"modules/timings/constants.toml"`. The AHK twin `WPMWidget_LoadSharedConst()` was correct (`_SharedDir . "\modules\wpm_widget\…"`).
-  After any move, run ALL suites — AHK `tests/run_all.ahk` (2317), macOS `lua tests/run.lua` (2233), Linux `luajit tests/run.lua` (37) — they exercise the real paths and are the only thing that surfaces these. A green anchored-sweep audit is necessary but NOT sufficient. **BUT the suite only catches a path break if the test actually asserts the file resolved** — the wpm_widget break slipped through because its test asserted only `WpmWidget ~= nil` (the module degrades gracefully on a missing file, so it loads either way). A path-resolution test MUST assert the resolver found a real file (or that NO "file not found" ERROR was logged at load), never just that the consuming module loaded.
-* **Outside-the-sweep configs:** root `.gitignore` (cache paths `_shared/data/locales/*.tsv`, `_shared/modules/hotstrings/generated_hotstrings.tsv`), `stryker.config.mjs` (`_shared/core/domain/*.spec.js`), and `package.json` live at the repo root — a sweep scoped to `static/tools/src/docs` misses them. The self-healing caches are gitignored at their `_shared` paths; if an ignore rule goes stale after a move the cache files silently become tracked.
+### [project-shared-tree-layout] _shared/ tree : SSOT-par-couche, et le piege du contournement
+* **Layout** (`static/ergopti_plus/_shared/`) : `modules/` (par sous-systeme) · `core/` (`domain/ ports/ config_schema/`) · `data/` (`locales/ db/ keycodes/`) · `lua/` · `tests/` · `ui/` · `tap_hold/`.
+* **SSOT par couche** — la racine `_shared` est resolue en EXACTEMENT UN endroit par consommateur, donc un *renommage du tree* est une edition d un seul token a chacun de ces endroits : runtime macOS `macos/lib/paths.lua` (`Paths.shared`), runtime AHK `_SharedDir` (`ErgoptiPlus.ahk`, fallback relatif dans logger.ahk), tests macOS `macos/tests/helpers/init.lua` (`SHARED_REL`), JS `tools/lib/paths.cjs`, Python `tools/lib/paths.py`, `linux/install.sh`, `tools/build/build_static_bundle.py`, `tools/build/build_macos_app.sh`.
+* **Un deplacement *interne* (ex. `llm/` → `modules/llm/`) n est PAS couvert par le SSOT** — chaque site qui passe un sous-chemin relatif a `_shared` doit changer. Sweep ancre sur `_shared/`, `shared("`, `sharedRel("`, `.shared("`, `_SharedDir . "\`, en preservant BOM UTF-8 + LF sur `.ahk`.
+* **Piege — les sites qu un sweep ancre ne peut pas voir :** du code `_shared/lua` qui navigue depuis sa propre position (`lua/llm/profile_selector.lua` → `dir .. "/../../modules/llm/profiles.json"`) ; des loaders AHK qui aliasent `_SharedDir` dans un local (`lib/timings/timings_config.ahk`) ; des fixtures de test qui construisent les chemins a la main ; des modules UI avec leur propre wrapper de chemin passant une chaine relative litterale (`ui/wpm/wpm_widget.lua` : `resolve_shared_constants_path("modules/wpm_widget/constants.toml")` — celui-la a shippe en ERROR au boot).
+* **Apres tout deplacement, lancer TOUTES les suites** (AHK `tests/run_all.ahk`, macOS `lua tests/run.lua`, Linux `luajit tests/run.lua`) : un audit de sweep vert est necessaire mais PAS suffisant. **MAIS une suite n attrape une rupture de chemin que si le test assert que le fichier a resolu** : la casse wpm_widget est passee parce que son test n assertait que `WpmWidget ~= nil`, et le module degrade proprement sur fichier manquant. Un test de resolution de chemin DOIT asserter que le resolveur a trouve un vrai fichier (ou qu aucune ERROR <<file not found>> n a ete loggee au load), jamais seulement que le module consommateur s est charge.
+* **Configs hors sweep :** `.gitignore` racine (chemins de cache `_shared` auto-regeneres), `stryker.config.mjs`, `package.json` — un sweep scope a `static/tools/src/docs` les rate ; une regle d ignore perimee rend silencieusement les caches suivis.
 
-Related: [[project_debug_menu_sync]], [[project-tooltip-shared-style]], [[project-locale-fast-cache]], [[feedback-ahk-source-encoding]], [[feedback_fix_banners_tool]]
+### [project-macos-initlua-no-compile-coverage] Un fichier que le harness ne peut que *copier* a quand meme besoin d un controle de *parsing*
+* macOS `init.lua` a shippe une erreur de syntaxe Lua dure (un `end` perdu) restee latente avec CI vert : la suite Lua charge les modules individuels via des stubs `hs` et **ne charge jamais `init.lua`** (l executer demande le runtime Hammerspoon vivant), et `build_macos_app.sh` ne fait que copier — donc rien n avait jamais *parse* le fichier de tete. L entree AHK n a pas ce trou (Ahk2Exe la compile en CI).
+* **Garde** : `macos/tests/meta/test_lua_sources_compile.lua` — `loadfile()` parse sans executer (pas de `hs`, pas de FS, pas d OS), la facon zero-dependance de verifier la syntaxe d un code que le harness ne peut pas lancer. init.lua exige sa **propre assertion nommee** : il est a la racine du driver, donc hors du scan groupe sur `lib/ modules/ ui/ adapters/` + `_shared/lua/`.
+* **Lecon** : un diff mecanique qui ajoute un niveau d imbrication est la facon classique de perdre le `end` fermant d un bloc — relancer un parseur, ne pas verifier l equilibrage a l oeil.
 
-### [project-macos-initlua-no-compile-coverage] init.lua had ZERO compile coverage — CI never parsed the HS entry point
-* **Symptom**: The Hammerspoon driver failed to boot with `init.lua:1050: 'end' expected (to close 'do' at line 818) near <eof>` — a hard Lua syntax error in the top-level orchestration file. It had been latent for **2 days** with CI fully green.
-* **Cause**: Commit `69c76e568` wrapped a directory scan in init.lua's File Watchers section inside a new `if … then … end`; the diff reused the surrounding `do` block's closing `end` to balance the new nesting and so **deleted the `end` that closed the `do`** opened at the top of the section. A pure mechanical diff hazard — adding one nesting level while the old closer gets visually re-attributed to the new block.
-* **The gap (why CI stayed green)**: The macOS Lua suite (`lua tests/run.lua`) loads individual modules through `hs` **stubs** and asserts behaviour — but it **never loads `init.lua`**, because *running* the entry point needs the live Hammerspoon runtime (real `hs.pathwatcher`, `hs.eventtap`, …). And `build_macos_app.sh` only **copies** files. So nothing — no test, no build step — ever even *parsed* the top-level file. (Asymmetry: the AHK entry `ErgoptiPlus.ahk` IS compiled in CI by the Ahk2Exe step, so only the macOS entry had this hole.)
-* **Fix**: Added the missing `end` to close the `do` block (init.lua, end of Section 7).
-* **Regression guard**: `macos/tests/meta/test_lua_sources_compile.lua` — `loadfile()` **parses without executing** (no `hs` runtime, no FS side effects, no OS access), so it is the zero-dependency way to syntax-check code a harness can't *run*. It asserts init.lua parses (a dedicated, named assertion — init.lua is at the driver root, so the bulk scan over `lib/ modules/ ui/ adapters/` + `_shared/lua/` does NOT include it) and that all 181 production sources parse. Runs inside the always-on macOS test job (`ci.yml` `lua5.4 tests/run.lua`). Verified red→green: fails with the exact `'end' expected` error on the broken file, passes after the fix.
-* **The lesson**: any top-level/orchestration file a test harness can only *copy* or cannot *run* still needs a *parse* check. `loadfile`/`luac -p` (Lua) and the Ahk2Exe compile gate (AHK) are how you get it. Mechanical diffs that add a nesting level are the classic way to lose a block's closing `end` — re-run a parser, don't eyeball brace balance.
+### [project-hs-fs-dir-drops-state] `hs.fs.dir` renvoie (iterator, state) — et un stub laxiste a masque l etat perdu
+* `hs.fs.dir(path)` renvoie **DEUX** valeurs : un iterateur ET un objet d **etat** de repertoire que l iterateur EXIGE comme premier argument (le vrai HS verifie une metatable userdata <<directory>>, sinon *"directory metatable expected, got nil"* des le premier pas). `local ok, it = pcall(hs.fs.dir, dir)` puis `for x in it do` ne capture que l iterateur et perd silencieusement l etat → crash au boot. Il LEVE aussi sur un repertoire absent/refuse, donc il faut un pcall en plus.
+* **La seule forme benie** : l expression iterateur directement dans un generic-for, a l interieur d une closure pcall'ee — `pcall(function() for name in hs.fs.dir(dir) do … end end)`. Centraliser en un helper `safe_dir_entries(dir)` par fichier.
+* **Pourquoi la CI l a rate (deux trous cumules, tous deux generalisables)** : (1) le stub `hs` renvoyait un iterateur unique et sans etat, donc le motif buggy <<marchait>> — **un stub doit modeler l arite de retour et l exigence d etat de la vraie API**, sinon il rend la CI verte par-dessus un crash garanti en production ; (2) un meta-test anterieur *imposait activement la forme buggy* (assertait `pcall(hs.fs.dir, …)` present et le generic-for nu absent) — **un garde-source qui impose une *orthographe* de code peut cimenter un bug ; asserter l invariant, pas la formulation**.
+* **Garde** : `macos/tests/meta/test_fs_dir_iterator_contract.lua` — par fichier assert `count(hs.fs.dir) == count("in hs.fs.dir(")`, assert le pcall de protection contre le throw, et epingle le stub a la forme fidele `(iterator, state)`. Le runtime d init.lua n est jamais execute par la suite, donc sa logique de boot n est atteignable QUE par des tests de contrat statiques sur la source.
 
-Related: [[feedback_regression_tests]], [[project-shared-tree-layout]], [[project-hs-timer-callback-errors-invisible]]
-
-### [project-hs-fs-dir-drops-state] hs.fs.dir returns (iterator, state) — capturing only the iterator crashes boot, and a lenient stub hid it
-* **Symptom**: The Hammerspoon driver crashed on boot — `init.lua:427: bad argument #1 to 'for iterator' (directory metatable expected, got nil)`. Visible in the HS console the instant the driver loaded; CI was green.
-* **Cause**: `hs.fs.dir(path)` returns **TWO** values — an iterator function AND a directory **state object** the iterator REQUIRES as its first argument (real Hammerspoon checks a "directory" userdata metatable, else aborts with *"directory metatable expected, got nil"* on the first step). The code did `local ok, it = pcall(hs.fs.dir, dir)` then `for x in it do`, which captures only the iterator and **silently drops the state object**. `init.lua` had this in 5 places (boot path) and `ui/hotstrings_config_window/init.lua` in 2 (config window).
-* **Why CI missed it — TWO compounding gaps**:
-  1. The hs test stub returned a **single, stateless** iterator (`dir = function(_) return function() return nil end end`). It needed no state, so the dropped-state pattern "worked" under test. A stub that doesn't model the real **multi-return / required-state** contract masks the entire bug class.
-  2. A prior meta test (`test_init_fsdir_pcall.lua`) actively **enforced the buggy shape**: it asserted `pcall(hs.fs.dir, …)` was present and the bare `for … in hs.fs.dir(…)` was absent. That test fixed trap 1 (hs.fs.dir THROWS on a missing/denied dir → wrap in pcall) but locked in trap 2. A source guard that mandates a brittle *code shape* can cement a bug; guards must assert the *invariant*, not a spelling.
-* **Fix**: iterate **inside** the pcall — `pcall(function() for name in hs.fs.dir(dir) do … end end)` — so the throw is caught AND hs.fs.dir's full multi-value return flows into the generic-for. Centralised in one `safe_dir_entries(dir)` helper per file (returns a names array). The only blessed shape anywhere is now the iterator expression directly in a generic-for: `for <vars> in hs.fs.dir(...) do`.
-* **Regression guards** (`macos/tests/meta/test_fs_dir_iterator_contract.lua`, replacing the misguided `test_init_fsdir_pcall.lua`):
-  * **Source contract** — scans init.lua + ui/ + modules/ + lib/ + adapters/ + _shared/lua/; per file asserts `count(hs.fs.dir) == count("in hs.fs.dir(")` (comments stripped), so any capture/`pcall(hs.fs.dir,…)`/assignment form fails. Verified red→green: reports `init.lua (5 references, 0 in a generic-for)` on the pre-fix code.
-  * **Throw protection** — asserts init.lua still wraps an hs.fs.dir loop in a pcall'd closure (preserves the original init-fsdir-pcall guarantee).
-  * **Stub fidelity** — the stub's `hs.fs.dir` now returns `(iterator, state)` and its iterator errors when called without the state (`make_fs_dir_iterator`, `__set_entries`/`__reset_entries` hooks). This upgrades the *whole* suite to catch dropped-state bugs and pins the stub so nobody reverts it to the lenient form. Making the default stub faithful broke **zero** existing tests (2233/0).
-* **The lesson**: a test stub must model the real API's **return arity and state requirements**, not a convenient simplification — a lenient stub turns CI green over a guaranteed production crash. And init.lua's runtime is never executed by the suite (needs live Hammerspoon), so its boot logic is only reachable by **static source-contract** tests; those must encode the *invariant* (state preserved + throw-safe), never a fragile required phrasing.
-
-Related: [[project-macos-initlua-no-compile-coverage]], [[feedback_regression_tests]], [[project-macos-eventtap-no-blocking]], [[project-hs-timer-callback-errors-invisible]]
-
-### [project-healthcheck-stale-api] Diagnostic collectors silently degraded — guarded probes hid renamed APIs from "does it crash?" tests
-* **Symptom**: The macOS diagnostic window (`ui/healthcheck/` — collectors in `helpers.lua`; was the monolithic `lib/healthcheck.lua` before the F2 split) showed `unknown`/`n/a` for almost every runtime field (LLM, layout, keylogger, hotstrings, log paths) and every boot/reload logged a wall of `[healthcheck] X is not a function` / `X unavailable` WARNINGs.
-* **Cause**: The collectors called functions that don't exist (renamed/never-implemented): `log_manager.get_paths()`, `aggregator.get_stats()`, `require("modules.keylogger.privacy")`, `llm.get_state()`, `layout.is_ergopti_base()`, `key_state.get_altgr/get_shift/get_caps()`, `terminators.count()/get_magic_key()`. Each was wrapped in a `type(x) ~= "function"` guard that logs a WARNING and falls back — so nothing crashed and a "does the module load?" test stayed green while the diagnostic was useless.
-* **Real APIs** (wired in the fix): log paths → `lib.logger.UNIFIED_LOG_FILE`/`ERRORS_LOG_FILE` (public constants, re-pointed by `init_log_path()`); WPM → `modules.keylogger.get_live_stats().wpm`; LLM → `get_runtime_llm_enabled()`/`get_backend()`/`get_active_profile()`; AltGr/Shift → `adapters.key_state.is_right_altgr_held()`/`isDown("shift")`; terminators → count `terminators.get_terminator_defs()`; magic key → `modules.keymap.get_trigger_char()`. No accessor exists for session event count, privacy-hit count, active-layout (`ergopti_base`), or capslock — those now report `n/a` WITHOUT probing a nonexistent function (`checkKeyboardModifiers` only exposes shift/ctrl/alt/cmd/fn).
-* **Regression guards** (`macos/tests/meta/test_healthcheck_api_contract.lua`): (1) a declarative CONTRACT table of every (module, function/constant) the collectors call, each asserted to exist on the REAL module; (2) a self-syncing test that runs `healthcheck.run()` against real modules and asserts no collector logged an `is not a function`/`unavailable` warning (excluding `hs.*` — the headless stub legitimately lacks `hs.processInfo`/`hs.screen`). Verified red→green: reverting one collector to `llm.get_state` makes (2) fail with the exact warning.
-* **The lesson**: a probe that is `pcall`/`type`-guarded to "degrade gracefully" is INVISIBLE to crash-based tests — it logs a warning and returns a fallback, so the suite is green while the feature is dead. Test the OUTCOME (the real value resolved / no degradation warning), not just "it didn't crash". A diagnostic that reads another module's API needs an explicit contract test, because nothing else exercises those exact calls.
+### [project-healthcheck-stale-api] Une sonde gardee par `pcall`/`type` est INVISIBLE aux tests bases sur le crash
+* La fenetre de diagnostic macOS (`ui/healthcheck/` — collecteurs dans `helpers.lua`) appelait une dizaine de fonctions renommees ou jamais implementees (`llm.get_state`, `log_manager.get_paths`, `layout.is_ergopti_base`, …). Chacune etait enveloppee dans un garde `type(x) ~= "function"` qui logge un WARNING et retombe sur un fallback — donc rien ne crashait, un test <<le module se charge-t-il ?>> restait vert, et tous les champs affichaient `unknown`/`n/a` pendant des mois.
+* **Lecon** : tester le RESULTAT (la vraie valeur resolue / aucun warning de degradation), pas seulement <<ca n a pas crashe>>. Un module qui lit l API d un *autre* module exige un test de contrat explicite, car rien d autre n exerce ces appels precis. La ou aucun accesseur n existe, rapporter `n/a` SANS sonder une fonction inexistante.
+* **Garde** : `macos/tests/meta/test_healthcheck_api_contract.lua` — (1) une table CONTRACT declarative de chaque (module, symbole) touche par les collecteurs, assertee contre le VRAI module ; (2) execute `healthcheck.run()` et assert qu aucun collecteur n a logge un warning `is not a function`/`unavailable` (hors `hs.*`, que le stub headless n a legitimement pas).
 
 ### [project-macos-split-module-stub-reload] Splitting a stateful macOS module out of its caller requires adding it to `load_with_stubs`' reload list
 * **Symptom**: after the F4 split extracted the async active-layout probe from `ui/menu/menu_keyboard_layout.lua` into `modules/keymap/input_sources.lua`, `test_menu_keyboard_layout_latency.lua` failed with "cache must hold the two probed layouts: expected 2, got 1" — the `hs.task` stub the test injected via `load_with_stubs("ui.menu.menu_keyboard_layout", {task=...})` never reached the relocated `refresh_active_layouts_async`.
@@ -2183,22 +1618,14 @@ Related: [[project-macos-initlua-no-compile-coverage]], [[feedback_regression_te
 * **The invariant**: when you split a stateful module (session caches, or anything that captures `hs`/`Logger` at load) out of a module that tests drive through `load_with_stubs`, add the new module(s) to the force-reload block in `tests/helpers/init.lua`. F4 added `modules.keymap.layout_install` + `modules.keymap.input_sources` there. Symptom of forgetting: a stub injected for the parent silently fails to reach the child, and a behavioural assertion sees stale/empty cache state.
 * **Related**: the `test_port_adapter_coverage.lua` `LUA_HS_BASELINE`/`LUA_IO_OS_BASELINE` ratchets scan only `macos/modules/` + `macos/lib/` — moving OS-calling code from `ui/` into `modules/` raises the count without adding any new OS call. Re-baseline with a "relocation, not new OS calls" comment (precedent: the init.lua → lib/personal_hotstrings bumps).
 
-### [project-init-json-decode-of-toml] init.lua JSON-decoded config.toml every boot (native LuaSkin error leaked through pcall)
-* **Symptom**: A native `LuaSkin: Error deserialising JSON: The data couldn't be read because it isn't in the correct format.` printed to the HS console on every boot, captured by the console tee as a `[CONSOLE] ERROR`, during the "TOML discovery" phase.
-* **Cause**: init.lua's legacy "Config Priming" block did `local config_file = menu_paths.get("ConfigTomlPath")` then `hs.json.decode(raw)` on it. `ConfigTomlPath` resolves to **config.toml** — the v2 config migrated from JSON to TOML — so it decoded TOML as JSON and failed every boot. The call was `pcall`-wrapped, so the Lua error was swallowed and the block was simply DEAD (its trigger-char + section-state restore now happens from config.toml via `menu_state`/`Preferences`). **`hs.json.decode` is native: it logs the LuaSkin console error even inside `pcall`** — pcall catches the Lua-level failure but the console line still fires.
-* **Fix**: removed the dead block (and the now-unused `config_file` local). `magic_key` keeps its `"★"` default; a custom value is restored from config.toml by `menu_state` at menu start (current behaviour — the block never worked).
-* **Regression guard** (`macos/tests/meta/test_config_not_json_decoded.lua`): asserts `ConfigTomlPath` ends in `.toml`, and that init.lua never binds it to a local that is `io.open`'d (the JSON-priming shape) — legit consumers (`config_overrides.apply`, `Preferences.load`, onboarding) take the path inline and parse it as TOML. Verified red→green.
-* **The lesson**: `pcall(hs.json.decode, …)` does NOT suppress the native deserialise-error console line — never feed non-JSON to it. After a config format migration, grep for stale readers of the old format pointed at the new file.
+### [project-init-json-decode-of-toml] `pcall(hs.json.decode, …)` imprime quand meme l erreur native LuaSkin
+* `hs.json.decode` est **natif** : lui donner du non-JSON logge `LuaSkin: Error deserialising JSON: …` dans la console HS (que le tee console remonte en `[CONSOLE] ERROR`) **meme a l interieur d un `pcall`** — pcall attrape l echec cote Lua, la ligne console part quand meme. init.lua JSON-decodait `config.toml` a chaque boot ainsi ; le pcall masquait que tout le bloc etait MORT, donc il a ete supprime plutot que repare.
+* **Lecon** : apres une migration de format de config, grepper les lecteurs restes sur l ANCIEN format mais pointes sur le nouveau fichier. Garde : `macos/tests/meta/test_config_not_json_decoded.lua`.
 
-Related: [[project-hs-fs-dir-drops-state]], [[project-macos-initlua-no-compile-coverage]], [[feedback_regression_tests]]
-
-### [project-macos-startup-winfilter-cost] hs.window.filter's first instantiation enumerates every window — keep it off boot paths
-* **Symptom**: After a reload the macOS driver felt slow to "settle" (the keylogger took several seconds; the HS console spammed `wfilter: <app> is STILL not registered`).
-* **Cause**: `hs.window.filter`'s FIRST instantiation makes Hammerspoon enumerate every window of every app — multi-second on a machine with many apps or a VPN (e.g. Cisco Secure Client never registers). The keylogger built its browser private-mode filter EAGERLY at engine start (`hs.timer.doAfter(0, … hs.window.filter.new(browsers) …)`), so the engine took seconds to become ready. (The keymap `is_ignored_window` cache also creates `hs.window.filter.default` — the global all-windows filter — on first keystroke.)
-* **Fix**: the keylogger browser filter is now created LAZILY on the first browser activation (`ensure_browser_window_filter`, gated by a `BROWSER_APP_SET[app_name]` check in the app-watcher). Per-app-switch private/incognito detection is unaffected — it runs via `ContextTracker.app_watcher_cb → update_private_status`, which uses `hs.window.focusedWindow()` directly and never needed the filter. Both window.filter creation sites now log their duration (`… (%.1f ms)`) so a slow first-keystroke / first-browser-focus is attributable.
-* **Also**: `gestures.start()`'s dependency pre-warm re-called `Actions.init()`/`Engine.init()` (already run at module load) — a guarded no-op that logged `M.init() called more than once` every boot; removed. (The keymap/shortcuts `M.start() called more than once` warnings are DIFFERENT and intentional: init.lua starts them early for availability, then `menu_state` re-applies the saved enabled/disabled preference idempotently — left as-is.)
-* **Regression guard** (`macos/tests/meta/test_startup_optimizations.lua`): asserts the keylogger instantiates `hs.window.filter` exactly once, in a lazy helper gated by a browser activation, never eagerly in a `doAfter(0)` at start; and that `Actions.init`/`Engine.init` are each called exactly once. Verified red→green (reintroducing the double-init fails the count assertion).
-* **The lesson**: never create an `hs.window.filter` on a boot/first-keystroke path — defer it to the first moment it's actually needed (scoped to the apps that need it), and check whether the dependent feature can read `hs.window.focusedWindow()` directly instead. The boot itself is ~1.2 s; the felt slowness was deferred window enumeration.
+### [project-macos-startup-winfilter-cost] Ne jamais creer un `hs.window.filter` sur un chemin de boot ou de premiere frappe
+* La PREMIERE instanciation de `hs.window.filter` fait enumerer a Hammerspoon toutes les fenetres de toutes les apps — plusieurs secondes sur une machine chargee ou avec un VPN (Cisco Secure Client ne s enregistre jamais et spamme `wfilter: <app> is STILL not registered`). Le keylogger construisait son filtre navigateur (mode prive) avidement au demarrage du moteur, qui mettait donc des secondes a etre pret ; le cache keymap `is_ignored_window` cree `hs.window.filter.default` a la premiere frappe.
+* **Motif de correction** : le creer PARESSEUSEMENT au premier moment ou il sert, scope aux apps concernees (`ensure_browser_window_filter`, garde par `BROWSER_APP_SET[app_name]` dans l app-watcher), et logger sa duree pour rendre la lenteur attribuable. Verifier d abord si la fonctionnalite dependante peut lire `hs.window.focusedWindow()` directement : la detection prive/incognito au changement d app n a jamais eu besoin du filtre.
+* Garde : `macos/tests/meta/test_startup_optimizations.lua`.
 
 ### [project-category-gating-ahk-only] Category enable/disable gating (CategoryEnabled["Hotstrings"]…) is intentionally AHK-only
 * The Windows driver gates whole feature categories (Hotstrings, Shortcuts, …) through PascalCase keys in the `CategoryEnabled` map, seeded from `manifest.toml`'s `[ahk.category_enabled]` section (`IsCategoryGated`/`_MasterCategoryFor`). The macOS driver has **no category-gating layer at all** — features toggle individually. So the PascalCase ids are NOT a leftover v2-migration debt and NOT a cross-driver parity gap: there is nothing on the macOS side to mirror.
@@ -2207,35 +1634,26 @@ Related: [[project-hs-fs-dir-drops-state]], [[project-macos-initlua-no-compile-c
 
 Related: [[project-hs-fs-dir-drops-state]], [[project-touchdevice-dormancy-is-kernel]], [[feedback_regression_tests]]
 
-### [project-macos-lib-namespace-shims] macОС lib.text_utils / lib.color_utils re-export shims are kept on purpose
-* `macos/lib/{text_utils,color_utils}.lua` are one-line identity re-exports (`return require("text_utils")` / `"color_utils"`) of the shared `_shared/lua/{text_utils,color_utils}` modules — no HS extension. They look like pure removable indirection (audit SS-3 first proposed deleting them).
-* **Why kept** (audit 2026-06-26, SS-3 re-examined against the code): the macОС test suite is keyed on the `lib.*` module path. Production keymap modules `require("lib.text_utils")` (utils/registry/init/llm_bridge/expander, + a pcall in dynamic_hotstrings) and ~15 tests install `package.loaded["lib.text_utils"] = <stub>` or `helpers.load_with_stubs("lib.text_utils")` to control the module the code-under-test sees. Deleting the shims + repointing production to the bare `text_utils`/`color_utils` name would make every stub key (`lib.text_utils`) stop matching the new `require("text_utils")` — silently bypassing stub interception — forcing a ~21-site rewrite of the test infrastructure for two one-line files. Net negative; the "7 sites, simple mechanical edit" estimate was wrong. (`lib.color_utils` has ZERO production requires — only tests load it.)
-* **How to apply**: treat `lib.text_utils` / `lib.color_utils` as the canonical macОС-local namespace for these shared utils — the same load-bearing role the audit kept for the `lib.toml_*` shims (SS-4). Do not "de-shim" them.
+### [project-macos-lib-namespace-shims] `lib.text_utils` est un shim de re-export load-bearing, pas de l indirection supprimable
+* `macos/lib/text_utils.lua` est un re-export identite d une ligne (`return require("text_utils")`) de `_shared/lua/text_utils`, sans aucune extension HS. Il ressemble a de l indirection purement supprimable (un audit a propose de le supprimer).
+* **Pourquoi il est garde** : la suite de tests macOS est indexee sur le chemin de module `lib.*`. ~30 modules de production font `require("lib.text_utils")` et ~12 fichiers de test installent `package.loaded["lib.text_utils"] = <stub>` ou `helpers.load_with_stubs("lib.text_utils")` pour controler ce que voit le code teste. De-shimmer vers le nom nu `text_utils` ferait cesser de matcher chaque cle de stub — contournant silencieusement l interception — pour un fichier d une ligne. Net negatif.
+* **Comment appliquer** : traiter `lib.text_utils` comme le namespace macOS-local canonique de cet utilitaire partage, meme role load-bearing que les shims `lib/toml/{codec,reader,writer}.lua`. Ne pas les <<de-shimmer>>. (Le jumeau `lib/color_utils.lua` n avait lui aucun require de production et A ete supprime — commit `f56e0a048` ; il n existe plus aucun module `color_utils` aujourd hui.)
 
-### [project-hs-audit-open-labels-are-stale] Archived AUDIT_HAMMERSPOON_*.md "Open" labels are stale — verify status in current code; the live bug is the missed sibling of a fixed invariant
-* **Context** (audit `AUDIT_HAMMERSPOON_2026-06-29.md` at repo root): the 23 findings in the archived `docs/archive/audits/AUDIT_HAMMERSPOON_2026-06-19/20.md` are all marked "Open", but those docs are point-in-time snapshots. Verified against the current branch, **~19 of 23 are already fixed in code** (all 9 closure-nil-global sites, F-CRIT-2, F-HIGH-1/2/3/5/6, F-MED-1..6, F-LOW-1/3/5, F-INFO-1/3). The REFACTOR_GUIDE "Track B done" refers to a *separate AHK audit* (`.ahk` files), not these macOS findings, so there is no consolidated macOS done-registry — status was only knowable by reading the source.
-* **The recurring live-bug shape**: the genuinely-open issues are almost all the **missed sibling** of an invariant fixed at its documented site (`project-ahk-invariant-incomplete-application` applied to macOS): the script-control-tap-lifecycle fix missed `menu_state.sync_state_to_modules` (panic tap destroyed by "Disable all"); F-CRIT-1's bare-press gate missed `Ctrl`+F13/F14/F15; F-MED-7's MLX teardown missed the menubar Quit path; F-HIGH-6's table.concat guard missed the hotstrings/metrics submenus; the LLM warmup gate missed `WarmupCtrl`/`models_selector`. The one true regression (F-LOW-4) was a sync→async migration that never `.start()`d the task, kept green by a string-grep false-green test.
-* **How to apply**: when re-auditing, treat archived "Open" labels as **unverified** — re-read the current source for each. Hunt the whole invariant *class* (every sibling call site), not the one documented location. For any runtime-invisible bug (swallowed `hs.task`/`ShellRunner` throw, closure-nil-global, dead config flag, never-`.start()`d task), the regression test MUST encode the root cause behaviorally — a grep that "the call string exists" is a false-green (it kept both the `os.remove(tmp_path)` and `read_layout_async` regressions green).
-* **Still-invisible class**: `lib/logger.install_runtime_error_capture()` wraps only `hs.timer` constructors + tees `print()`; `hs.task`/`ShellRunner` completion/stream callbacks swallow throws with a bare `pcall` and no `Logger.error` (`adapters/shell_runner.lua`, `http_client.lua`) — fixing that one adapter makes the entire async-callback bug family self-reporting.
+### [project-hs-audit-open-labels-are-stale] Les labels <<Open>> des audits archives sont non verifies — relire la source
+* Les constats de `docs/archive/audits/AUDIT_HAMMERSPOON_*.md` sont des instantanes a un instant t : une re-verification a trouve la grande majorite des constats macOS marques <<Open>> deja corriges dans le code. Il n existe pas de registre consolide des constats macOS clos (le <<Track B done>> du REFACTOR_GUIDE concerne un audit AHK distinct), donc le statut n est connaissable qu en lisant la source. En re-auditant, traiter chaque label <<Open>> archive comme **non verifie** — y compris ce paragraphe.
+* **La forme de bug vivante recurrente** : les vrais problemes ouverts sont presque toujours le **frere oublie** d un invariant corrige a son site documente (cf. [[project-ahk-invariant-incomplete-application]], qui s applique a macOS mot pour mot) — le correctif du cycle de vie du tap a rate `menu_state.sync_state_to_modules` ; le garde d appui simple a rate `Ctrl`+F13/F14/F15 ; le teardown MLX a rate le chemin Quit de la menubar ; le garde de warmup LLM a rate `WarmupCtrl`/`models_selector`. **Chasser toute la *classe* de l invariant, pas l unique site documente.**
+* Pour tout bug invisible au runtime (throw async avale, closure-nil-global, flag de config mort, tache jamais `.start()`ee), le test de regression DOIT encoder la cause racine de facon comportementale — un grep du type <<la chaine d appel existe>> est un faux-vert (il a garde deux regressions vertes).
+* **Classe encore invisible** : `lib/logger.install_runtime_error_capture()` n enveloppe que les constructeurs `hs.timer` et tee `print()`. `adapters/shell_runner.lua` a depuis ete corrige (xpcall + crash report), mais `adapters/http_client.lua` invoque toujours ses callbacks de completion sous un `pcall` nu sans `Logger.error` — les throws y sont silencieux. Corriger cet adaptateur rendrait auto-signalante toute la famille de bugs <<callback async>>.
 
-Related: [[project-lua-closure-before-local-nil-global]], [[project-hs-timer-callback-errors-invisible]], [[project-ahk-invariant-incomplete-application]], [[feedback_regression_tests]]
+### [project-dc1-windows-vk-finger-map-gap] `KLW_VK_FINGER` est une 3e carte de doigts laissee expres, pas une regression
+* `_shared/data/keycodes/azerty.json` est la carte doigt/main canonique. La copie JS (`_shared/ui/metrics_typing/state.js`) est desormais generee au build (verrouillee par `tools/test/test-keycode-data-js-parity.cjs`) et la copie macOS (`macos/modules/keylogger/aggregator/core.lua`) se derive au runtime depuis le JSON — aucune des deux ne peut plus deriver.
+* **La 3e copie reste volontairement** : `KLW_VK_FINGER` (`windows/modules/keylogger/keylogger_walker_core.ahk`) mappe des **codes de touche virtuels Windows** — un espace d identifiants totalement different — vers les memes identifiants de doigt, pour la detection AHK des series meme-doigt/meme-main. azerty.json n a aucun champ VK, et deriver a la main la correspondance `kc` macOS ↔ VK Windows risque de corrompre silencieusement les stats WPM/SFB : trop risque a faire par inspection sans clavier physique.
+* **Comment appliquer** : pour une vraie parite 3 drivers, ajouter D ABORD le champ VK a azerty.json et le verifier exhaustivement contre un log de frappes reelles capture touche par touche (pas par inspection), PUIS porter `KLW_VK_FINGER` pour qu il en derive. D ici la, c est un doublon connu et intentionnel.
 
-### [project-dc1-windows-vk-finger-map-gap] DC-1 single-sourced the JS + macOS finger maps from azerty.json — a 3rd hardcoded copy remains in the Windows/AHK keylogger
-* The finger/hand keycode map (`_shared/data/keycodes/azerty.json` = canon) previously had exactly 2 hand-copied duplicates: `_shared/ui/metrics_typing/state.js`'s `KEYCODE_DATA` and `macos/modules/keylogger/aggregator/core.lua`'s `KC_TO_FINGER`. Both are now derived from the shared JSON: JS via build-time codegen (`npm run codegen:keycode-data:js` → `_generated/keycode_data.js`, loaded via a `<script>` tag before `state.js`); Lua at runtime (`Paths.shared("data/keycodes/azerty.json")` + `hs.json.decode`, restricted to the same `CONTENT_KCS` subset as before, with a small hardcoded `FALLBACK_KC_TO_FINGER` only for I/O-failure degradation). A parity test (`tools/test/test-keycode-data-js-parity.cjs`) locks the JS side to azerty.json; the Lua side self-derives so there is nothing to drift.
-* **Gap NOT covered by this fix**: `windows/modules/keylogger/keylogger_walker_core.ahk:74-84` declares a 3rd hand-written finger map, `KLW_VK_FINGER` — an AHK `Map` from Windows **virtual-key codes** (not macOS `kc`) to the same finger identifiers, consumed by `keylogger_walker_events.ahk:383-404` for the AHK-side same-finger/same-hand streak detection. This is the functional Windows equivalent of macOS's `KC_TO_FINGER`, but keyed in a completely different identifier space.
-* **Why left out deliberately**: azerty.json has no Windows VK-code field today — adding one requires verifying the physical-key correspondence between macOS `kc` and Windows VK for every content key by hand (a wrong mapping silently corrupts WPM/SFB stats, high-risk for an LLM to get right without a physical keyboard to test against), which is materially riskier than the JS/Lua half and was never part of this task's ask.
-* **How to apply**: if a future task wants full 3-driver parity here, add the VK field to azerty.json first, verify it exhaustively (ideally against a captured real keystroke log per key, not by inspection), THEN port `KLW_VK_FINGER` to derive from it the same way `core.lua` now does. Until then, treat `KLW_VK_FINGER` as a known, intentionally-untouched hardcoded copy — not a regression.
-
-Related: [[project-shared-tree-layout]]
-
-### [project-ahk-suite-runnable-here-plus-os-purity-ratchet-nondeterminism] The AHK suite IS runnable on this Windows box (results in %TEMP%), but the OS-purity ratchet is non-deterministic and currently drifted red
-* **Capability (non-obvious)**: AutoHotkey v2 is installed at `C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe`. The full Windows/AHK test suite runs headlessly via `AutoHotkey64.exe run_all.ahk` (from `static/ergopti_plus/windows/tests`). `AutoHotkey64.exe` is a **GUI-subsystem** binary, so its `FileAppend(text, "*")` stdout does NOT reach a Git-Bash pipe — capture the TAP report from the file it also writes: **`%TEMP%\ergopti_test_results.txt`** (`C:\Users\admin\AppData\Local\Temp\ergopti_test_results.txt`); read its last line (`# N passed, M failed.`). ~4 min, watchdog at 240 s. This means Windows-side changes and cross-driver AHK parity corpora ARE verifiable here — not just "write + hope".
-* **Gotcha 1 — the OS-purity ratchet is non-deterministic**: `windows/tests/meta/test_ahk_os_purity_ratchet.ahk` counts DllCall/COM/FileIO lines across `windows/{modules,lib}` (excl. `adapters/`) with a per-file `try Src := FileRead(...)` that **swallows read failures** (`try` → `Src=""` → 0 tokens for that file). An intermittent FileRead flake silently under-counts, so the total varies run-to-run: observed 2945/0 once, 2943/1 twice on identical source. The suite total itself flickers (2945 vs 2944) — the documented silent-abort behaviour. Re-run before trusting a single AHK result.
-* **Gotcha 2 — the baseline is stale, the ratchet is genuinely red (pre-existing, not from the geometry/buffer-cap SSoT work of 2026-07-08)**: the deterministic true count (replicate with a node walk of the same dirs, skipping `;`-lines) is **257** (DllCall=108 COM=14 FileIO=135) vs `_AOPR_BASELINE := 256` captured 2026-06-21 (110/19/127). The distribution shifted from the maintainer's ~70 AHK fix commits since. To confirm a change is NOT the culprit: `git show <commit> -- <files> | grep '^+' | grep -E 'DllCall|ComObj|FileRead|FileOpen|...'` — geometry/literal/`;`-comment edits add zero tokens.
-* **How to apply**: fix per the ratchet's own rule — route one OS call into `windows/adapters/` (drive the count toward zero) OR bump the baseline to 257 **with an explicit note** (line 16 permits it for genuinely adapter-unworthy calls). Do NOT bump silently. When touching AHK, run the suite twice and read `%TEMP%\ergopti_test_results.txt`; a lone ratchet/total flake with token-neutral edits is the known non-determinism, not your regression.
-
-Related: [[project-config-v2-refactor]], [[project-dc1-windows-vk-finger-map-gap]]
-
+### [project-ahk-suite-runnable-here-plus-os-purity-ratchet-nondeterminism] La suite AHK EST executable sur cette machine — lire le resultat dans %TEMP%
+* **Capacite (non evidente)** : AutoHotkey v2 est installe a `C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe`. La suite Windows complete tourne headless via `AutoHotkey64.exe run_all.ahk` depuis `static/ergopti_plus/windows/tests`. Ce binaire est de **sous-systeme GUI**, donc son `FileAppend(text, "*")` n atteint jamais un pipe Git-Bash — lire le rapport TAP dans le fichier qu il ecrit aussi : `%TEMP%\ergopti_test_results.txt` (`TEST_RESULTS_CANONICAL`, `tests/test_framework.ahk`) ; la derniere ligne est `# N passed, M failed.`. ~4 min, watchdog a 240 s. Les changements cote Windows SONT verifiables ici — pas seulement <<ecrire et esperer>>.
+* **Piege — le ratchet de purete OS est non deterministe.** `windows/tests/meta/test_ahk_os_purity_ratchet.ahk` compte les lignes DllCall/COM/FileIO dans `windows/{modules,lib}` (`adapters/` exclu) avec un `try Src := FileRead(...)` par fichier qui **avale les echecs de lecture** (`Src=""` → 0 token pour ce fichier). Un flake intermittent sous-compte silencieusement, donc le total varie d une execution a l autre sur une source identique. Lancer la suite deux fois ; un ecart isole sur le ratchet ou le total avec des editions neutres en tokens est ce non-determinisme connu, pas ta regression.
+* **Comment appliquer** : avant de croire un run rouge, repliquer le compte de facon deterministe (parcours node des memes dossiers, lignes `;` ignorees, une ligne au plus une fois par categorie). Si le depassement de `_AOPR_BASELINE` est reel, corriger selon la regle du ratchet lui-meme : router un appel OS dans `windows/adapters/` (tirer le compte vers zero) OU relever le baseline **avec une note explicite** (le fichier l autorise pour les appels vraiment inadaptes a un adaptateur). Jamais de bump silencieux.
 
 ### [project-ahk-isset-requires-variable-load-crash] `IsSet(obj.prop)` is a LOAD-TIME crash in AHK v2 — and source-introspection tests can never catch it
 
@@ -2246,12 +1664,10 @@ Related: [[project-config-v2-refactor]], [[project-dc1-windows-vk-finger-map-gap
 
 Related: [[project-ahk-v2-static-unset-unreadable]], [[project-ahk-suite-runnable-here-plus-os-purity-ratchet-nondeterminism]]
 
-### [project-metrics-ui-live-foreground-contract] A metrics dashboard must project the still-open foreground interval
-
-* **Symptom (2026-07-18)**: the application-time dashboard could remain empty during a long uninterrupted task, or report only a fraction of a full workday. The typing dashboard could also remain blank on macOS when one browser script failed to parse; Linux exposed neither metrics UI through its WebKit bridge.
-* **Cause**: app-switch aggregates only own intervals that have already ended. Without a projection-only addition for the current foreground app, opening the UI before the next switch necessarily omits that time. Windows additionally reset `app_entered_at` on every 30-second micro-idle, thereby measuring typing density instead of focused screen time. macOS had a malformed template literal in `metrics_typing/data.js`, which prevented `process_manifest` from being defined; Linux returned a session-summary shape while the shared UIs require `{metrics_manifest, app_icons}` and had no typing bridge.
-* **Invariant**: all three drivers must emit the same dashboard envelope, and the current app interval is added at **read/render** time only (never persisted/cached, or it will double-count). A micro-idle is still foreground time; only a real session timeout/lock/sleep ends the interval. Prime the foreground app after a lifecycle starts when its first callback is edge-triggered.
-* **Regression coverage**: shared browser scripts are parsed by `tools/test/test-shared-ui-js-syntax.cjs`; macOS tests the active-app snapshot; Linux tests the bridge contract, lifecycle prime, and per-app projection; Windows tests the micro-idle and live-manifest guards. Keep cross-driver UI fixes contract-based: a UI that merely loads but receives a different payload shape is still broken.
+### [project-metrics-ui-live-foreground-contract] Un tableau de bord de metriques doit projeter l intervalle de premier plan encore ouvert
+* **Invariant** : l agregation par changement d app ne compte que les intervalles DEJA termines, donc ouvrir le tableau de bord avant le prochain changement omet forcement le temps de l app courante. L intervalle ouvert doit etre ajoute **uniquement au moment de la lecture/du rendu** — jamais persiste ni mis en cache, sinon il est compte deux fois. Amorcer l app de premier plan au demarrage d un cycle de vie, car son premier callback est declenche sur front.
+* **Un micro-idle reste du temps de premier plan.** Windows reinitialisait `app_entered_at` a chaque micro-idle de 30 s, ce qui mesure la densite de frappe et non le temps d ecran attentif. Seuls un vrai timeout de session, un verrouillage ou une mise en veille terminent l intervalle.
+* **Les trois drivers doivent emettre la meme enveloppe** (`{metrics_manifest, app_icons}`). Garder les correctifs UI cross-driver bases sur le contrat : une UI qui se *charge* mais recoit une forme de payload differente est toujours cassee. Couverture : `tools/test/test-shared-ui-js-syntax.cjs` parse les scripts navigateur partages (un template literal malforme a une fois tue silencieusement `process_manifest` sur macOS) ; Windows `test_metrics_app_time_accuracy.ahk` couvre le micro-idle et le manifest live ; Linux couvre le contrat du pont, l amorcage du cycle de vie et la projection par app.
 
 ### project-hs-partial-fixes-and-false-green-tests
 
@@ -2320,396 +1736,251 @@ observe. The macOS suite is 3 099/0 green, but only when run from `macos/`; from
 6 tests fail on a relative-path read.
 
 
-
-
 ### project-hs-audit-2026-07-21
 
-_Second adversarial pass on the Hammerspoon driver: 13 defects fixed, 78 findings left OPEN. The
-audit markdown was deleted by design, so this entry IS the record._
+_Premiere passe adverse sur le driver Hammerspoon. Le markdown d'audit a ete supprime par
+design : cette entree EST l'archive._
 
 <sub>slug: `project_hs_audit_2026_07_21`</sub>
 
-**Fixed and shipped** (each with a regression test that fails before / passes after; suite went
-3 228/478 → 3 251/488):
+13 defauts corriges. **Les 78 findings laisses OPEN par cette passe sont tous clos** — voir
+`[[project_hs_audit_round4_2026_07_21]]`. Ne rien re-implementer depuis une liste perimee
+(`[[project-hs-audit-open-labels-are-stale]]`).
 
-- **PII reached the 14-day log on PREVIEW, not expansion.** Typing `@phone` logged the resolved
-  number before any expansion committed. `acc7946fc` had applied the withhold contract to the two
-  *expansion* sinks in `expander.lua` and stopped; the preview sink in `llm_bridge.lua` had no
-  guard, and the match records did not even carry `is_private`, so it could not have applied one.
-  Provider output is now withheld unconditionally — the registration API has no privacy metadata,
-  so withhold-by-default is the only shape under which a new provider cannot leak by omission.
-- **Keystrokes were logged inside password managers.** `is_secure_field` was written from two
-  sites that disagreed: the activation path used the union `isSecureField() or isSecureApp()`,
-  the AX focus callback recomputed from the role/subrole axis alone and assigned unconditionally.
-  Any focus change inside a vault re-enabled capture. Separately, the pause guard froze the
-  cached context, so pausing → switching to a vault → resuming left the flag stale-false; fixed
-  by re-syncing on **resume**, deliberately NOT by weakening the guard.
-- **Whole typing events silently discarded.** `_sql_num(nil)` emits `NULL`, the columns are
-  `NOT NULL`, and `INSERT OR IGNORE` swallows the violation. Writing the guard **class-wide**
-  immediately surfaced 4 more columns nobody had reported.
-- **`keyStroke` blocked the run loop 200 ms per call at 49 sites** (the argument defaults to a
-  blocking usleep). **`karabiner.pause/resume` deployed a 100 kB config inside the script-control
-  eventtap callback** — the tap carrying AltGr+Enter, the key needed to un-pause.
-- Also: unescaped gsub replacements (`%` magic key aborted all registration; `search_web` threw
-  for any selection with a space); `hs.task:start()`'s falsy return discarded; config-window
-  delay edits never reaching the engine; a dead synchronous `python3` fork on every save;
-  negative AX lookups never cached in the wrap-text tap.
+**Formes de defauts a savoir reconnaitre** (toutes corrigees, chacune avec sa regression) :
+des PII atteignant le log 14 jours par le puits *preview* apres que le contrat de retenue
+ait ete applique aux deux puits d'*expansion* seulement — la sortie provider est desormais
+retenue **inconditionnellement**, parce que l'API d'enregistrement ne porte aucune
+metadonnee de confidentialite et que la retenue-par-defaut est la seule forme sous laquelle
+un futur provider ne peut pas fuiter par omission. `is_secure_field` ecrit depuis deux sites
+qui divergeaient, si bien que tout changement de focus dans un gestionnaire de mots de passe
+reactivait la capture. `_sql_num(nil)` -> `NULL` dans des colonnes `NOT NULL`, avale par
+`INSERT OR IGNORE`. L'argument par defaut de `keyStroke` bloquant la run loop 200 ms par
+appel sur 49 sites. `karabiner.pause/resume` deployant 100 kB de config a l'interieur de
+l'eventtap script-control — le tap qui porte precisement la touche necessaire pour depauser.
 
-**OPEN — reported by audit agents, NOT verified by me. Treat as hypotheses**
-(`[[project_audit_findings_are_hypotheses]]`), 17 critical/high of 78 total:
+**REFUTE — ne pas relever :**
 
-- **CRITICAL** (G2) `modules/llm/api_mlx_discovery.lua:384` — MLX endpoint discovery deadlocks permanently: reset() orphans a poll chain that resurrects on the shared _endpoint_probe_in_flight flag and kills the new chain's probe via the shared _probe_client
-- **HIGH** (G2) `adapters/secure_field_detector.lua:114` — Split the shared pcall in refresh(): a throwing AXSubrole read wipes an already-read secure AXRole
-- **HIGH** (G2) `modules/gestures/engine.lua:649` — A single transient extra finger contact latches gs.lifting for the rest of the gesture: the whole remainder of the swipe is silently dropped and the gesture mis-commits as tap_(N+1)
-- **HIGH** (G2) `modules/gestures/engine.lua:716` — gs.candidateFingers is never cleared when the finger count falls back to maxFingers, blocking every live fire for the remainder of the gesture
-- **HIGH** (G2) `modules/karabiner/init.lua:489` — M.regenerate() has no pause guard — the « pause = tout éteint » invariant is enforced at one call site inside the file while ~17 menu call sites redeploy the full Ergopti config mid-pause
-- **HIGH** (G2) `modules/karabiner/watchers.lua:146` — CapsWord's `--set-variable capsword 0` task is neither GC-rooted nor start()-checked — KE can be left with capsword=1 and the next spacebar turns CapsLock back ON
-- **HIGH** (G2) `modules/keylogger/aggregator/sql.lua:163` — macOS n-gram UPSERT overwrites esrc_json instead of merging it, so the hotstring/LLM source split for every n-gram reflects only the last 5 s ingest tick (invariant fixed on Windows AND Linux, forgotten on macOS)
-- **HIGH** (G2) `modules/keylogger/init.lua:820` — Every space and sentence-punctuation flush zeroes the inter-keystroke delay of the NEXT keystroke — ~1 keystroke in 6 is logged with delay 0
-- **HIGH** (G2) `modules/keylogger/kc_bridge.lua:413` — kc_bridge replays the entire Karabiner backlog written while metrics were switched OFF, on the next OFF->ON toggle — the exact failure F-MED-26 claims to prevent, missed on the stop/start path
-- **HIGH** (G2) `modules/keylogger/log_manager.lua:1228` — Toggling Metrics OFF then ON permanently kills SQLite ingest and midnight rotation for the rest of the session — close_db() has no matching re-open on the start path
-- **HIGH** (G2) `modules/keylogger/sqlite_reader.lua:606` — read_range_split_today omits ngram_keycodes / ngram_shortcuts / ngram_shortcut_bigrams from the today projection, so today's keycode heatmap and shortcuts tabs are always empty (both sibling drivers query them)
-- **HIGH** (G2) `modules/keymap/utils.lua:221` — emit_tokens emits every token after the 2nd paste-worthy segment BEFORE it — multi-segment hotstrings land scrambled on screen
-- **HIGH** (G4) `modules/llm/app_filter.lua:183` — app_filter runs 6–15 uncached synchronous AX round-trips INSIDE the keyDown eventtap callback on every accepted prediction (F16 chain path)
-- **HIGH** (G2) `modules/shortcuts/actions/system.lua:128` — close_awake_alert discards the closeSpecific pcall result, making the closeAll fallback unreachable — reverts f25be56f1 and leaks the keep-awake banner forever
-- **HIGH** (G2) `modules/shortcuts/actions/system.lua:683` — Wrap-text eventtap: a STALE positive AX cache re-wraps text that is no longer selected, swallowing the keystroke and duplicating the previous selection
-- **HIGH** (G2) `modules/shortcuts/script_control.lua:246` — Pause/resume loses the shortcuts preference: the tray "Raccourcis" toggle is the only top-level feature toggle not pause-gated, and resume_all() restores from a pause-time snapshot that a mid-pause toggle invalidates
-- **HIGH** (G2) `ui/onboarding/init.lua:409` — Surface a batch_write() that returns false — the retargeted commit write fails silently and reports success
+- **Bug de rotation par date du logger.** *Faux pour macOS* : `_ensure_log_file()` repointe
+  les DEUX `UNIFIED_LOG_FILE` et `ERRORS_LOG_FILE` au rollover, asserte par
+  `test_logger_date_rollover.lua`. **Defaut propre a AHK — ne pas porter le fix.**
+- **Appels AppleScript de `gestures/actions.lua` non differes.** *Faux* — le grep pointait
+  les lignes internes de closures deja enveloppees dans `hs.timer.doAfter(0, …)`. Un hit de
+  grep n'est pas un site d'appel : ouvrir le fichier.
+- **Le widget WPM tourne sous pause.** *Faux* — la suppression est indirecte mais reelle,
+  via `on_pause_change` -> `updateMenu()` -> le builder metrics.
+- **`[[project_lua_closure_before_local_nil_global]]` present sur macOS.** *Faux* — un scan
+  mecanique de tout `.lua` non-test n'a trouve que des faux positifs. Relancer le scanner
+  plutot que relire a l'oeil.
+- **Mauvais usage d'`utf8`.** *Blanchi* — chaque boucle `utf8.codes` est gardee par un
+  `pcall(utf8.len, …)` reussi.
 
-The remaining 61 are medium/low across `gestures/engine`, `llm/api_mlx_*`, `keylogger/aggregator`,
-`ui/menu_llm`, and `shortcuts/actions`. They were not transcribed individually — re-run the sweep
-to regenerate them rather than trusting a stale list.
+**Comment l'appliquer :**
 
-**REFUTED — do not re-raise these:**
+- **Ecrire le test de garde a l'echelle de la CLASSE des le depart.** Chaque finding de
+  severite haute etait le frere d'un invariant que la base affirmait et testait deja
+  ailleurs. Le scan NOT NULL a trouve 4 colonnes de plus, le scan gsub a trouve `search_web`.
+- **Suspecter le test livre autant que le code livre.** Le stub de `shell_runner` renvoyait
+  `nil` la ou `hs.task:start()` renvoie l'objet task — le stub *cimentait* le defaut que son
+  propre test pretendait verrouiller ; le stub `hs` perdait le 3e argument de `keyStroke`,
+  donc aucun test ne pouvait le voir. Reparer un stub infidele **renforce** un test : ce
+  n'est pas l'affaiblir.
+- **Quand une garde est deliberee, corriger l'autre cote.** La position de la garde de pause
+  est epinglee volontairement ; l'obsolescence du contexte a donc ete corrigee par une
+  re-synchro au resume, laissant « pause = tout eteint » aussi strict.
+- **G4 (latence) reste non mesuree sur ce driver** — il n'a jamais tourne sur le poste de
+  dev Windows et `<config_dir>/hammerspoon/` n'a pas de `logs/`. Les vrais logs sous
+  `<config_dir>/autohotkey/logs/` appartiennent a l'AUTRE driver. Ne jamais citer une
+  milliseconde non observee (`[[project_audit_evidence_must_be_reproducible]]`).
+- **loop-until-dry n'a PAS ete atteint.** `lib/toml`, `lib/i18n`, les adapters d'entree,
+  `ui/menu_llm`, `ui/download_window`, `ui/healthcheck`, `ui/metrics_*` et **l'ordre de boot
+  / le callback de shutdown d'`init.lua`** n'ont jamais ete balayes. Le silence d'un rapport
+  d'audit n'est pas de la couverture.
+- **Les subagents ecriront dans votre worktree sauf interdiction explicite.** « lecture
+  seule » doit nommer le depot entier, pas seulement « les sources du driver ».
 
-- **Logger date-rotation bug** (the standing suspicion in `bugs_hs.md`). *False for macOS.*
-  `_ensure_log_file()` re-points **both** `UNIFIED_LOG_FILE` and `ERRORS_LOG_FILE` on rollover,
-  and `_write_to_file` runs before both errors-sink opens, so the path is always fresh.
-  `test_logger_date_rollover.lua` already asserts it. **This is an AHK-only defect — do not port
-  the fix.**
-- **`gestures/actions.lua` AppleScript calls not deferred.** *False* — grep line numbers pointed
-  at the inner lines of closures already wrapped in `hs.timer.doAfter(0, …)`. A grep hit is not
-  a call site; open the file.
-- **WPM widget runs under pause.** *False* — suppression is indirect but real:
-  `on_pause_change` → `updateMenu()` → the metrics builder stops widget and menubar
-  (`menu_metrics.lua:155-159`).
-- **Closure-binds-nil-global (`[[project_lua_closure_before_local_nil_global]]`) is present.**
-  *False* — a mechanical scan of every non-test `.lua` found 3 file-scope candidates, all false
-  positives (`parsed.sections` is a field access; the others are `M.X = v` then `local X = M.X`).
-  Top nested candidates were function **parameters**. The class is clean; re-run the scanner
-  rather than re-reading by eye.
-- **`utf8` misuse.** *Cleared* — every `utf8.codes` loop is gated by a successful
-  `pcall(utf8.len, …)`, every `offset`/`len` result nil-checked.
-
-**How to apply:**
-
-- **Write the guard test class-wide from the start.** Every high-severity finding in this pass was
-  a sibling of an invariant the codebase already stated, documented and tested *somewhere else*.
-  Two of the fixes only exist because the guard enumerated the class: the NOT NULL scan found 4
-  extra columns, the gsub scan found `search_web`. This is
-  `[[project_ahk_guard_tests_must_loop_the_class]]` earning its keep again.
-- **Suspect the shipped test, not just the shipped code.** Three fixes came with tests
-  structurally blind to the damage. `shell_runner`'s stub returned `nil` where the real
-  `hs.task:start()` returns the task object — the stub *cemented* the defect its own test claimed
-  to lock out. The `hs` stub dropped `keyStroke`'s third argument, so no test could ever see it.
-  Fixing an unfaithful stub and adding the uncovered case **strengthens** a test; that is not the
-  same as weakening one.
-- **When a guard is deliberate, fix the other side.** `test_pause_guard_position.lua` pins the
-  pause guard's position on purpose. The context staleness was fixed with a resume-time re-sync,
-  leaving « pause = tout éteint » exactly as strict.
-- **G4 is still unmeasured on this driver.** `<config_dir>/hammerspoon/` has no `logs/` (and
-  `logs` is gitignored in the config repo); the driver has never run on the Windows dev box. The
-  AHK logs at `<config_dir>/autohotkey/logs/` are real and were re-derived independently
-  (`Tooltip.ResolvePos` 2560.32 ms, `OnChar` 701.27 ms, 8 958 `Slow` lines) — those belong to the
-  *other* driver. See `[[project_audit_evidence_must_be_reproducible]]`.
-- **loop-until-dry was NOT reached.** No zone got two consecutive clean passes; every open finding
-  is one pass deep. `lib/toml`, `lib/i18n`, the input adapters, `ui/menu_llm`, `ui/download_window`,
-  `ui/healthcheck`, `ui/metrics_*` and **`init.lua`'s boot order / shutdown callback** were never
-  swept at all. Silence in an audit report is not coverage.
-- **Subagents will write into your worktree unless told not to.** One created a probe test under
-  `tests/` mid-run and it polluted a live suite execution; "read-only" must name the whole repo,
-  not just "driver source".
-
-Related: [[project_ahk_guard_tests_must_loop_the_class]],
+Related: [[project_hs_audit_round4_2026_07_21]], [[project_ahk_guard_tests_must_loop_the_class]],
 [[project_audit_findings_are_hypotheses]], [[project_audit_evidence_must_be_reproducible]],
 [[project_macos_eventtap_no_blocking]], [[project_suspend_pause_invariant]],
 [[feedback_regression_tests]].
 
-
-
-
-
 ### project-hs-audit-round2-2026-07-21
 
-_Second implementation pass on the 78 findings the first pass left open: 51 treated
-(24 fixed, 27 refuted or already fixed), 27 still open with an exact fix specified._
+_Adjuger un backlog d'audit contre la source courante : un tiers etait faux ou perime_
 
 <sub>slug: `project_hs_audit_round2_2026_07_21`</sub>
 
-**Method that made this tractable.** Every open finding was adjudicated against the
-CURRENT source by one agent per file, returning CONFIRMED (with quoted evidence, an
-exact minimal fix and a test plan), REFUTED (with the disproving code) or
-ALREADY_FIXED. Of 75 adjudicated: **53 confirmed, 16 refuted, 6 already fixed** —
-so nearly a third of the surviving backlog was wrong or stale, which is why
-implementing an audit list verbatim is a bad idea (`[[project_audit_findings_are_hypotheses]]`).
+Les rondes 2-3 ont traite les 78 findings ouverts de `[[project_hs_audit_2026_07_21]]` ;
+la ronde 4 a clos le reste. **La liste « STILL OPEN » que portait cette entree est
+entierement implementee — rien ici n'est du travail en attente.**
 
-**The adjudication is worth keeping.** Refuted with evidence, do not re-raise:
-`karabiner/watchers.lua:283` (start() return is checked by the latch owner),
-`shortcuts/actions/system.lua:134` (closeAll fallback IS reachable),
-`keymap/init.lua:868` (the is_ignored path is reachable),
-`log_manager.lua:1057` (the retry loop does terminate),
-`kc_bridge.lua:271` (the ledger is bounded elsewhere),
-`karabiner/onboarding.lua:544` (poll_until is already async),
-plus seven test-quality findings whose guards turned out to be adequate.
+**Methode a reutiliser.** Chaque finding ouvert a ete adjuge contre la source COURANTE, un
+agent par fichier, rendant CONFIRMED (preuve citee + fix minimal exact + plan de test),
+REFUTED (avec le code qui infirme) ou ALREADY_FIXED. Sur 75 adjuges : **53 confirmes,
+16 refutes, 6 deja corriges** — pres d'un tiers du backlog etait faux ou perime, ce qui est
+precisement pourquoi implementer une liste d'audit au pied de la lettre est une mauvaise
+idee (`[[project_audit_findings_are_hypotheses]]`).
 
-**Classes that kept paying out.** Three fixes came from widening a guard rather
-than from the reported site:
-- The `hs.task` GC-pin guard was an ALLOWLIST of 8 files. Converting it to a
-  whole-tree scan found **5 unpinned files** nobody had reported, including the
-  interactive-screencapture task (the longest-lived subprocess in the driver) and
-  the CapsWord clear-variable task, whose loss leaves KE with capsword=1 so the
-  next space re-enables CapsLock.
-- The gsub-replacement escape guard, written class-wide, found **7 more sites**;
-  then its own pattern proved too narrow (bare identifiers only, missing
-  `tostring(err)`), and widening it found **7 more again** — including raw hdiutil
-  stderr. That class has now bitten four separate times.
-- The NOT NULL guard, written class-wide, found **4 more columns** in round one.
-  Writing the guard for the class, not the site, is the single highest-yield habit
-  in this repo.
+**Refute avec preuve — ne pas relever :** le retour de `start()` dans `karabiner/watchers.lua`
+(verifie par le proprietaire du verrou), le fallback closeAll de `shortcuts/actions/system.lua`
+(IL est atteignable), le chemin `is_ignored` de `keymap/init.lua` (atteignable), la boucle de
+retry de `log_manager.lua` (elle termine), le ledger de `kc_bridge.lua` (borne ailleurs),
+`poll_until` dans `karabiner/onboarding.lua` (deja async), plus sept findings sur la qualite
+des tests dont les gardes se sont averees adequates.
 
-**Self-inflicted bugs caught by the discipline, worth remembering:**
-- A regex-driven fix rewrote `postKeyStroke`'s own body into infinite recursion;
-  caught only by reading the diff before committing.
-- Two files were left referencing a `_active_tasks` global that had never been
-  declared, because the script that added the declaration raised before writing.
-- A commit landed with a red test: the pre-commit hook lints but does NOT run the
-  suite. **Run `lua tests/run.lua` before every commit, not after.**
-- A first attempt at a behavioural gesture test could not discriminate fixed from
-  broken (in x1 mode "stopped firing" is indistinguishable from normal completion)
-  and was replaced with a structural guard, stating why in the file.
+**Elargir une garde rapporte plus que poursuivre le site signale — ca a paye quatre fois :**
+la garde d'epinglage GC de `hs.task` etait une ALLOWLIST de 8 fichiers ; la convertir en scan
+de tout l'arbre a trouve 5 fichiers non epingles que personne n'avait signales. La garde
+d'echappement gsub en a trouve 7 de plus, puis son propre motif s'est revele trop etroit
+(identifiants nus seulement, ratant `tostring(err)`) et l'elargir en a trouve 7 encore. La
+garde de quoting shell a trouve **41 sites dans 15 fichiers** ou `%q` — qui echappe pour un
+litteral Lua et laisse `$`, backticks et `!` vivants pour /bin/sh — quotait un chemin
+configurable par l'utilisateur. La garde NOT NULL a trouve 4 colonnes de plus. Les quatre
+sont aujourd'hui des meta-tests permanents (`tests/meta/test_gsub_replacement_escaping.lua`,
+`test_shell_quoting_not_lua_q.lua`, `test_shell_runner_gc_protection.lua`,
+`tests/unit/modules/keylogger/test_build_inserts_never_nulls_not_null.lua`).
 
-**ROUND 3 UPDATE.** Ten more of those were implemented (menu_paths' pcall-status
-read, input_sources' osascript payload, the MLX dedup single-source, gestures
-space_wrap, the text-transform re-entrancy guard, the stale wrap-selection cache,
-the karabiner shell quoting, the blind karabiner-delay double, the missing
-hs.screen stub, and a 41-site POSIX shell-quoting sweep). Two of those again grew
-far beyond their finding: the shell-quoting guard, written for the class, found
-**41 sites across 15 files** where `%q` — which escapes for a Lua literal and
-leaves `$`, backticks and `!` for /bin/sh — was quoting a user-configurable path.
+**Bugs auto-infliges rattrapes par la discipline :**
 
-Round 3 also produced two more cautionary results worth keeping. An automated
-regex rewrite CORRUPTED three multi-`%q` format strings by collapsing two
-arguments into one call; only reading the resulting lines caught it. And adding
-`require("lib.text_utils")` to `lib/logger.lua` broke **19 tests** through boot
-ordering — the logger is foundational and must not acquire dependencies, so it
-quotes inline instead.
+- Une reecriture par regex a transforme le corps de `postKeyStroke` en recursion infinie, et
+  une autre a CORROMPU trois chaines de format multi-`%q` en fusionnant deux arguments en un
+  appel. **Relire le diff de toute reecriture scriptee avant de commiter.**
+- **Lancer `lua tests/run.lua` AVANT chaque commit, pas apres** — le hook pre-commit lint
+  mais ne lance PAS la suite. Un commit est parti rouge.
+- **`lib/logger.lua` ne doit acquerir aucune dependance.** Ajouter `require("lib.text_utils")`
+  a casse **19 tests** par ordre de boot ; le logger quote inline a la place (la raison est
+  desormais un commentaire au site d'appel).
+- Un test comportemental de gestures incapable de discriminer corrige de casse (en mode x1,
+  « a arrete de tirer » est indiscernable d'une completion normale) a ete remplace par une
+  garde structurelle, en disant pourquoi dans le fichier.
+- Dire aux subagents que « lecture seule » signifie le **depot entier**. A qui on avait dit
+  seulement « ne modifie pas les sources du driver », l'un a ecrit un test sonde dans
+  `tests/` et pollue une execution en cours.
 
-**STILL OPEN — the remainder of the list below, each with a verified exact fix in hand.** These were
-adjudicated CONFIRMED against current source but not implemented; treat them as
-specified work, not as hypotheses:
-
-- **HIGH** `modules/keylogger/sqlite_reader.lua:606` — read_range_split_today omits ngram_keycodes / ngram_shortcuts / ngram_shortcut_bigrams from the today projection, so tod
-  - *Fix:* Add the three missing today passes using the file's own `_safe_query` (F-MED-28) pattern — the same wrapper every other query loop in this file already uses — inside the existing `if db then` block, so no extra sqlite connection i…
-- **HIGH** `modules/llm/api_mlx_discovery.lua:384` — MLX endpoint discovery deadlocks: reset() orphans a poll chain that resurrects on the shared _endpoint_probe_in_flight f
-  - *Fix:* Smallest correct edit: give the poll phase the SAME `my_discovery_gen ~= _discovery_gen` guard this file already applies three times to its probe callbacks (the F-MED-8 pattern), so an orphaned chain self-terminates deterministica…
-- **HIGH** `modules/shortcuts/actions/system.lua:707` — Wrap-text eventtap: a stale positive AX selection cache re-wraps text that is no longer selected, swallowing the keystro
-  - *Fix:* Give the cache the invalidation hook the codebase already uses for TTL caches (a local `invalidate_*`-style helper next to the cache, as in modules/keymap/input_sources.lua:71 invalidate_active_layouts_cache and modules/keymap/uti…
-- **MEDIUM** `lib/logger.lua:446` — Ephemeral topical sub-file purge is inverted: it spares the files that grow and deletes only the idle ones
-  - *Fix:* Do not try to infer "contains only today" from mtime AFTER the logger has touched the file — evaluate the same predicate on the FIRST write of each new calendar date, which is the only moment mtime still answers that question. Thi…
-- **MEDIUM** `modules/gestures/actions.lua:364` — Four registered gesture/shortcut actions require modules that do not exist; the inner bare pcall hides the failure from 
-  - *Fix:* Point the four registrations at the real modules AND stop swallowing the failure. Use the lazy-require guard pattern this same file already uses for script_pause_toggle (actions.lua:447-450: `local ok, sc = pcall(require, …); if o…
-- **MEDIUM** `modules/gestures/engine.lua:412` — PEAK OVERRIDE confirms on wall time elapsed since the peak was first seen, not on how long the peak was held, so a one-f
-  - *Fix:* Record when the peak was last observed and measure the actual held duration, keeping the comparison line byte-identical so test_peak_override_regression.lua section 3 still passes, and using a timestamp rather than a frame counter…
-- **MEDIUM** `modules/karabiner/init.lua:538` — User-configurable config-dir path interpolated into a shell command with Lua %q instead of POSIX quoting, while the sibl
-  - *Fix:* Reuse the POSIX quoter the same feature already defines 150 lines away (generator.lua:385 `sq()`), and memoise it with the `_ensured_dirs` idea from menu_paths.lua. Add next to the other module-level flags near line 116: local _de…
-- **MEDIUM** `modules/karabiner/watchers.lua:351` — Layout-poll watchdog releases the guard but never terminates the abandoned read, turning a bounded one-shot failure into
-  - *Fix:* Give the poll ownership of the in-flight handle, mirroring watchers.lua:186. Assign the module local INSIDE read_layout_async, BEFORE start(), so a synchronously-completing handle (the shape used by test_layout_poll_lock_release.l…
-- **MEDIUM** `modules/keymap/input_sources.lua:701` — upgrade_active_list reports success from osascript's exit code, not the AppleScript's result
-  - *Fix:* Bind the AppleScript's own result, mirroring the two correct siblings in the same file (set_input_source:441 and enable_and_select_source:604 — the established payload-check pattern here). OLD (input_sources.lua:700-701): local ok…
-- **MEDIUM** `modules/keymap/utils.lua:215` — emit_tokens omits {Enter}/{Tab} key tokens from the physical echo, under-filling the keylogger synth_queue on every mult
-  - *Fix:* Mirror the terminator re-type path (expander.lua:454-464) and the personal_info emitter, using a named lookup so no magic literals appear inline. Add a constant to section 1 of modules/keymap/utils.lua, after IGNORED_WIN_TTL_SEC (…
-- **MEDIUM** `modules/llm/api_mlx_fetch.lua:240` — MLX sequential retry hardcodes its temperature policy and caps at 0.60, which LOWERS the retry below the failed variant'
-  - *Fix:* Adopt the pattern api_ollama.lua and api_remote.lua already use, verbatim. old text (api_mlx_fetch.lua:33): local _RETRY_MAX_MULT = ApiCommon.get_retry_policy() new text: local _RETRY_MAX_MULT, _RETRY_TEMP_STEP, _RETRY_EXTRA_TOKEN…
-- **MEDIUM** `modules/llm/api_mlx_inference.lua:46` — MLX hardcodes deduplication OFF instead of reading inference.json, so a sequential fetch stops early on duplicate varian
-  - *Fix:* Adopt the pattern already used by api_ollama.lua:75 and api_remote.lua:160 (read the flag from ApiCommon, which loads _shared/modules/llm/inference.json). ApiCommon is already required at line 27, so no new require is needed. Old …
-- **MEDIUM** `modules/llm/prediction_engine.lua:922` — handle_chain_signal runs perform_check synchronously inside the keymap CGEventTap, where AppFilter.is_blocked issues unc
-  - *Fix:* Defer with hs.timer.doAfter(0, …) — the exact pattern the codebase uses for the same hazard at script_control.lua:242 (`hs.timer.doAfter(0, function() pcall(function() _karabiner.pause() end) end)`) and menu_keyboard_layout.schedu…
-- **MEDIUM** `modules/shortcuts/actions/text.lua:184` — do_transform has no re-entrancy guard: two rapid case-toggle presses interleave and silently destroy the user's clipboar
-  - *Fix:* Apply the in-flight-flag pattern the codebase already uses twice — `_reload_in_flight` in lib/ui_restore.lua and `_warmup_in_flight` in modules/llm/api_mlx.lua:643 (which also arms a hard timeout precisely because the comment at :…
-- **MEDIUM** `modules/shortcuts/script_control.lua:253` — Pause/resume loses the shortcuts preference: the tray "Raccourcis" toggle is the only top-level feature toggle not pause
-  - *Fix:* Smallest correct edit, using the pattern the codebase already applies to the gestures master toggle (ui/menu/menu_gestures.lua:78-79) and to every other item in menu_shortcuts.lua. In ui/menu/menu_shortcuts.lua:331-335: OLD: local…
-- **MEDIUM** `static/ergopti_plus/macos/modules/llm/mlx_deps_checker.lua:515` — mlx_deps_checker arms an uncancellable 1.5 s auto-hide timer that destroys the SHARED download_window singleton — includ
-  - *Fix:* Two edits, mirroring the ownership re-validation the codebase already uses for deferred callbacks (the `_startup_check_generation` guard in ui/menu/menu_llm/startup_controller.lua:86, and the warm-up generation guard covered by te…
-- **MEDIUM** `tests/stubs/hs.lua:480` — tests/stubs/hs.lua has no hs.screen, so both render entry points abort at the anchor step inside their pcall and the ent
-  - *Fix:* Add an hs.screen module table to the '9/ Misc UI' section, following the exact pattern the stub already uses for every other hs submodule (a plain `M.<name> = { ... }` table of closures returning inspectable literals, e.g. M.windo…
-- **MEDIUM** `tests/unit/lib/test_timings.lua:147` — Cover the `next(sections) == nil` clause the fix is actually about — the shipped test never executes it
-  - *Fix:* Add a fourth case to the existing `timings: registry load fail-fast` describe, reusing the file's own save-stub-reload-restore helper pattern (`reload_timings_without_shared_tree`, test_timings.lua:126-145) but stubbing the READER…
-- **MEDIUM** `tests/unit/modules/gestures/test_actions.lua:60` — Parameterized-action test asserts only the accessor layer, leaving the set-then-execute guarantee untested
-  - *Fix:* Add an execution-level describe block to tests/unit/modules/gestures/test_actions.lua, following the behavioural pattern the repo already uses for exactly this problem in tests/unit/modules/gestures/test_actions_modifier_keystroke…
-- **MEDIUM** `tests/unit/modules/keymap/test_lifecycle_preserves_interceptors.lua:49` — Make the new lifecycle regression test replayable in isolation by also clearing package.loaded["ui.tooltip"]
-  - *Fix:* Follow the pattern the harness already uses for leaked partial stubs (tests/helpers/init.lua:117-142 clears lib.text_utils / lib.toml.codec / lib.timings for exactly this reason), and the pattern the sibling test uses (test_expand…
-- **MEDIUM** `tests/unit/ui/menu/test_karabiner_timeout_regenerates.lua:127` — Shipped regression test asserts call COUNTS, not the setter→regenerate ORDER it exists to protect — a swapped-order muta
-  - *Fix:* Make the double stateful so the assertion encodes the deployed value instead of the call count — the same technique the suite already uses in tests/unit/ui/menu/test_menu_karabiner_perf.lua, whose double stores timeouts rather tha…
-- **MEDIUM** `tests/unit/ui/test_onboarding_retargets_config_dir.lua:36` — Pin persist_config_dir_for_wizard → get("ConfigTomlPath") — the retarget test doubles away the half of the guarantee tha
-  - *Fix:* No production change — the code is correct today (verified by reading the full persist→config_dir→get chain above). Close the blind spot by appending a section 4 to tests/unit/ui/test_onboarding_retargets_config_dir.lua that drops…
-- **MEDIUM** `tests/unit/ui/test_tooltip_stacked_panel.lua:253` — The combined-footer regression test asserts only a call count, which the broken (re-shadowed size_combined) state satisf
-  - *Fix:* Assert the render OUTCOME alongside the count, using the same "assert observable state, not the call count" pattern the sibling regression test tests/unit/ui/test_tooltip_llm_is_visible_after_render_crash.lua already uses (it asse…
-- **MEDIUM** `ui/menu/menu_paths.lua:134` — Do not memoise a directory whose creation FAILED — pcall status is not hs.fs.mkdir's return value
-  - *Fix:* Two edits. Edit 1 — capture the actual return value (lines 134-135): OLD: local ok_mk = pcall(hs.fs.mkdir, current) if not ok_mk then NEW: local ok_mk, created = pcall(hs.fs.mkdir, current) if not ok_mk or not created then Edit 2 …
-- **MEDIUM** `ui/menu/menu_shortcuts.lua:454` — Script-control shortcut picker offers open_url / search_web but never prompts for the parameter, making both permanently
-  - *Fix:* Reuse the pattern the codebase already has at ui/menu/menu_gestures.lua:153-178 (the parameter-prompt-before-apply branch). Extract it into the EXISTING ui/menu/shortcut_utils.lua — that module already owns shortcut-related dialog…
-- **LOW** `modules/gestures/init.lua:478` — The gestures space_wrap setting is persisted, restored and exposed as a menu checkbox but is never read by any code path
-  - *Fix:* Implement the consumer rather than removing the setting. Removal would touch _shared manifest.toml, both regenerated files, menu_manifest.json, 21 locale files, menu_gestures.lua, preferences.lua and menu_state.lua, and would requ…
-- **LOW** `ui/tooltip/tooltip_llm.lua:878` — Sibling site forgotten: show_predictions re-measures the identical combined footer once per reserved slot
-  - *Fix:* Apply the hoist-and-reuse pattern already used in renderer.lua M.render (the hoisted `size_combined`, renderer.lua:239-243): measure the index-invariant footer on the first iteration and reuse it. (1) declare the memo before the l…
-
-**How to apply:**
-
-- Re-adjudicate before implementing any of the above: this branch changed several
-  of those files, so a cited line may have moved or the defect may already be gone.
-  Three of the 27 were already stale when this pass started.
-- Keep writing the guard for the CLASS. Every high-severity finding in both passes
-  was a sibling of an invariant the codebase had already stated and tested
-  somewhere else — `[[project_ahk_invariant_incomplete_application]]` is the
-  dominant shape on this driver, not an occasional one.
-- Suspect the shipped test as readily as the shipped code. Several fixes arrived
-  with tests structurally blind to the damage; fixing an unfaithful STUB and adding
-  the uncovered case strengthens a test and is not the same as weakening one.
-- Tell subagents "read-only" means the whole repository. Told only "do not edit
-  driver source", one wrote a probe test into `tests/` and polluted a live run.
-
-Related: [[project_hs_audit_2026_07_21]], [[project_ahk_guard_tests_must_loop_the_class]],
-[[project_audit_findings_are_hypotheses]], [[project_macos_eventtap_no_blocking]],
-[[project_suspend_pause_invariant]], [[feedback_regression_tests]].
-
-
-
+Related: [[project_hs_audit_2026_07_21]], [[project_hs_audit_round4_2026_07_21]],
+[[project_ahk_guard_tests_must_loop_the_class]], [[project_audit_findings_are_hypotheses]],
+[[feedback_regression_tests]].
 
 ### project-hs-audit-round4-2026-07-21
 
-Round 4 closed the Hammerspoon audit backlog: all 78 findings are now treated
-(53 confirmed and fixed, 16 refuted, 6 already fixed before the round began).
-17 commits, suite 3241 → 3356 green.
+_Deux implementations independantes de « est-ce que ce mapping va se declencher ? » avaient
+diverge de quatre facons — le fix a ete d'en supprimer une_
 
-**The tooltip/engine divergence was the round's real find.** A user report —
-"the tooltip shows an expansion, I press ★, and I get the last letter doubled" —
-turned out to be two independent implementations of "will this mapping fire?".
-`llm_bridge.ends_with_trigger` and `expander.word_boundary_blocks` disagreed in
-FOUR ways, in both directions:
+<sub>slug: `project_hs_audit_round4_2026_07_21`</sub>
 
-1. At the buffer start, the preview allowed any match; the engine consults
-   `start_is_word_boundary` and refuses. Tooltip promised, engine declined.
-2. Separator-prefixed triggers (`;e` → `Je`) are exempt from the boundary rule in
-   the engine; the preview applied it and hid rows for expansions that DO fire.
-   Engine emitted text the tooltip never showed.
-3. `case_conform` resolution existed in the preview's autocorrect bucket but not
-   its star bucket.
-4. The no-op guards compared different operands.
+La ronde 4 a clos le backlog d'audit Hammerspoon : les 78 findings traites (53 corriges,
+16 refutes, 6 deja corriges). Suite 3241 -> 3356 verte.
 
-Fixed by extracting `expander.would_fire(m, buffer)` as the single source of
-truth, derived from `try_auto_expand` (which now delegates to it, so the engine's
-semantics stayed authoritative). The preview calls the same function, and for a
-★ trigger asks about `buf .. magic_key` — the buffer the engine will actually
-see. The preview's private matcher was deleted, not kept as a helper.
+**La divergence tooltip/moteur fut la vraie trouvaille de la ronde.** Un rapport
+utilisateur — « le tooltip montre une expansion, j'appuie sur ★, et j'obtiens la derniere
+lettre doublee » — s'est revele etre deux implementations independantes de « est-ce que ce
+mapping va se declencher ? ». `llm_bridge.ends_with_trigger` et
+`expander.word_boundary_blocks` divergeaient de QUATRE facons, dans les **deux** sens : en
+debut de buffer le preview autorisait toute correspondance la ou le moteur consulte
+`start_is_word_boundary` et refuse (le tooltip promettait, le moteur declinait) ; les
+declencheurs prefixes d'un separateur (`;e` -> `Je`) sont exemptes de la regle de frontiere
+dans le moteur mais pas dans le preview (le moteur emettait du texte que le tooltip n'avait
+jamais montre) ; la resolution `case_conform` existait dans le seau autocorrect du preview
+mais pas dans son seau star ; et les gardes de no-op comparaient des operandes differents.
 
-**Two axes, not one.** Unifying MATCHING left a second divergence: a row could be
-unreachable because of WHEN it was typed. `update_preview` runs only when no
-expansion fired, so a complete `auto` trigger at the buffer end means the engine
-already declined it and nothing can retry — the auto path matches on the
-trigger's tail being the character just typed. Those rows advertised expansions
-no keystroke could produce. Now gated on `not mapping.auto`.
+Corrige en extrayant **`expander.would_fire(m, buffer)` comme source unique de verite**,
+derivee de `try_auto_expand` (qui lui delegue desormais, pour que la semantique du moteur
+reste faisant autorite). Le preview appelle la meme fonction, et pour un declencheur ★
+interroge `buf .. magic_key` — le buffer que le moteur verra reellement. **Le matcher prive
+du preview a ete supprime, pas conserve comme helper.**
 
-**★ is an explicit validation.** The terminator branch already bypassed the
-typing-speed delay for the magic key, with the rationale in its own comment. The
-auto branch — which OWNS `has_magic` triggers, since their tail codepoint IS ★ —
-never got the bypass, so a ★ trigger typed after a pause fell through to the
-repeat-key fallback. Hoisted to one shared `star_validated` local.
+**Deux axes, pas un.** Unifier le MATCHING a laisse une seconde divergence : une ligne
+pouvait etre inatteignable a cause du MOMENT ou elle avait ete tapee. `update_preview` ne
+tourne que si aucune expansion n'a tire ; donc un declencheur `auto` complet en fin de
+buffer signifie que le moteur l'a deja decline et que rien ne peut reessayer. Ces lignes
+annoncaient des expansions qu'aucune frappe ne pouvait produire ; desormais conditionnees
+par `not mapping.auto`.
 
-**Lessons that cost something:**
+**★ est une validation explicite.** La branche terminateur contournait deja le delai de
+vitesse de frappe pour la touche magique ; la branche auto — qui POSSEDE les declencheurs
+`has_magic`, puisque leur codepoint de queue EST ★ — n'avait jamais recu ce contournement,
+donc un declencheur ★ tape apres une pause retombait sur le fallback repeat-key. Hisse en un
+seul local `star_validated` partage.
 
-- **Never suppress `git stash pop` output.** `pop stash@{0} >/dev/null 2>&1`
-  hid a conflict; 15 files were committed carrying `<<<<<<<` markers. Caught only
-  because the NEXT command's test run failed to parse `lib/logger.lua`. The stash
-  stack is shared across worktrees — prefer copying files to the scratchpad and
-  `git checkout HEAD -- <path>` for red/green proofs.
-- **Encode the CLASS, not the site.** A whole-tree scan for unresolvable
-  `require()` targets found 6 dead references where the finding reported 4, and a
-  method-level scan found 4 more guarded calls to methods that do not exist —
-  including two in `ui/menu/init.lua` that nobody had reported.
-- **Bound a source-scan window at the variable's next rebind.** A fixed-width
-  window blamed `lib/ui_restore.lua` for a guard belonging to the next list entry
-  (its entries all name their module `m`). Shipping that would have "fixed"
-  correct code.
-- **Prose mentions of a symbol precede its call.** A source guard anchored on
-  `try_repeat_feature` matched the comment documenting the branch order, not the
-  call — anchor on the call form (`Expander.try_repeat_feature`).
-- **A test that passes alone can fail in-suite.** New gestures cases called
-  `Actions.init()`, which warns and returns early on a second call, so in a full
-  run they operated on an earlier file's state. Load a fresh module per case.
+**Lecons qui ont coute quelque chose :**
+
+- **Ne jamais supprimer la sortie de `git stash pop`.** `pop stash@{0} >/dev/null 2>&1` a
+  masque un conflit ; 15 fichiers ont ete commites en portant des marqueurs `<<<<<<<`,
+  rattrapes seulement parce que la commande suivante n'a pas su parser `lib/logger.lua`. La
+  pile de stash est partagee entre worktrees — preferer copier les fichiers vers le
+  scratchpad et `git checkout HEAD -- <path>` pour les preuves rouge/vert.
+- **Encoder la CLASSE, pas le site.** Un scan de tout l'arbre pour les cibles `require()`
+  non resolubles a trouve 6 references mortes la ou le finding en signalait 4, et un scan au
+  niveau methode en a trouve 4 de plus vers des methodes inexistantes.
+- **Borner une fenetre de scan de source au rebind suivant de la variable.** Une fenetre de
+  largeur fixe a impute a `lib/ui_restore.lua` une garde appartenant a l'entree de liste
+  suivante (toutes nomment leur module `m`). Livrer ca aurait « corrige » du code correct.
+- **Les mentions en prose d'un symbole precedent son appel.** Une garde ancree sur
+  `try_repeat_feature` matchait le commentaire documentant l'ordre des branches — ancrer sur
+  la forme d'appel (`Expander.try_repeat_feature`).
+- **Un test qui passe seul peut echouer en suite.** De nouveaux cas gestures appelaient
+  `Actions.init()`, qui warn et sort au deuxieme appel : en execution complete ils operaient
+  sur l'etat d'un fichier precedent. Charger un module frais par cas.
 
 Related: [[project_hs_audit_2026_07_21]], [[project_macos_eventtap_no_blocking]],
 [[project_ahk_guard_tests_must_loop_the_class]], [[feedback_regression_tests]].
 
 ### project-perf-2026-07-21-implementation
 
-_The eight perf fixes that landed, the two suites that cover disjoint ground, and why the end-char tail cap was refused_
+_Pourquoi l'I/O par item est le premier suspect de perf, pourquoi une refutation est aussi
+une hypothese, et pourquoi le cap de queue end-char a ete refuse_
 
 <sub>slug: `project_perf_2026_07_21_implementation`</sub>
 
-The 2026-07-21 performance audit (`PERF_AHK_2026-07-21.md`) shipped **eight of its
-nine candidates**, one commit each, every one with a regression test verified red
-before / green after. Four things are worth more than the fixes themselves.
+Huit des neuf candidats de l'audit perf AHK du 2026-07-21 ont ete livres, un commit chacun,
+chacun verifie rouge-avant / vert-apres. Les cinq lecons durables :
 
-**The biggest win was work whose result never changed.** `_MG_LoadHotstringSubCategories`
-re-read and re-decoded the 12.5 KB `menu_manifest.json` on every menu item —
-about a hundred times per build. A bench of the driver's own parser against the
-real file measures **44.3 ms per decode**, of which 43.9 ms is `JsonParse`
-(`lib/json.ahk` is a recursive-descent parser in AHK, ~4 µs/byte); `FileRead` is
-0.096 ms because the file is page-cached. That is ~4 s per boot AND per live
-rebuild. It was also **behaviour-neutral**: the manifest declares no
-`master_gates` key, so the helper always returned its hardcoded defaults. The
-boot profiler corroborates closely — 54 flat items × 44 ms ≈ 2.4 s against the
-1994 ms measured for that phase over 58 boots. **Lesson: when a phase cost scales
-with item count, suspect per-item I/O before suspecting the items.**
+**Quand le cout d'une phase croit avec le nombre d'items, suspecter l'I/O par item avant de
+suspecter les items.** `_MG_LoadHotstringSubCategories` relisait et redecodait les 12,5 ko de
+`menu_manifest.json` a chaque item de menu (~100x par construction). Le parser du driver
+lui-meme benche a **44,3 ms par decodage**, dont 43,9 ms de `JsonParse` — `lib/json.ahk` est
+un parser recursif-descendant en AHK a ~4 µs/octet — tandis que `FileRead` coute 0,096 ms
+parce que le fichier est en page-cache. Soit ~4 s par boot ET par reconstruction a chaud, et
+le tout **neutre en comportement** : le manifest ne declare aucune cle `master_gates`, donc
+le helper renvoyait toujours ses defauts codes en dur. Il lit desormais la racine partagee
+deja en cache via `_MR_GetManifestRoot()`, verrouille par
+`tests/meta/test_menu_master_category_cache.ahk`.
 
-**An adversarial verifier can be wrong in the confident direction.** The audit's
-verification pass dismissed the 38 ms/parse figure as "implausibly high, realistic
-is 2-5 ms" and demanded a re-bench before assigning priority. The re-bench proved
-the original figure right and slightly conservative. A refutation is a hypothesis
-too — re-derive it before acting on it.
+**Un verificateur adverse peut se tromper dans le sens confiant.** La passe de verification
+de l'audit a ecarte le chiffre de parsing comme « invraisemblablement eleve, le realiste est
+2-5 ms » et exige un re-bench avant d'assigner une priorite. Le re-bench a donne raison au
+chiffre initial, et l'a meme montre legerement conservateur. Une refutation est une
+hypothese elle aussi — la re-deriver avant d'agir dessus.
 
-**The AHK runner and the JS gate cover DISJOINT ground.** Adding one name to an
-`ADAPTER_*` contract map left the AHK suite at a full 3380/3380 green while the
-cross-driver port contract was broken: port compliance is checked only by
-`test:js`. That map declares the port every driver must satisfy, so a
-Windows-only helper (`CB_IsBusy`) belongs in the adapter file but NOT in the map.
-This is what `.claude/skills/verify-change/SKILL.md` and
-`tools/test/verify-change.cjs` now automate — the tool derives the required gates
-from the changed files and refuses to let the choice be made from memory.
+**Le runner AHK et le gate JS couvrent des terrains DISJOINTS.** Ajouter un seul nom a une
+contract map `ADAPTER_*` a laisse la suite AHK integralement verte alors que le contrat de
+port cross-driver etait casse : la conformite de port n'est verifiee que par `test:js`. Cette
+map declare le port que CHAQUE driver doit satisfaire, donc un helper propre a Windows
+(`CB_IsBusy`) a sa place dans le fichier adapter mais PAS dans la map. `.claude/skills/verify-change/`
+et `tools/test/verify-change.cjs` derivent maintenant les gates requis des fichiers modifies,
+pour que ce choix ne soit jamais fait de memoire.
 
-**Two silent-failure classes are now checked mechanically**, because both produce
-a PASSING suite:
-- a test file that `run_all.ahk` does not `#Include` never runs;
-- `_DriverFuncBody("Name")` returns `""` for a name it cannot find, so every
-  absence assertion on it passes vacuously. AHK v2 sharpens this: a call to a
-  function that does not exist is **not** a load-time error — the name resolves as
-  a variable — and production call sites are usually wrapped in `try`, so a
-  half-finished rename gives a green test, no error and no log line. The check
-  caught one such test the same day it was written.
+**Deux classes d'echec silencieux sont desormais verifiees mecaniquement**, parce que toutes
+deux produisent une suite QUI PASSE : un fichier de test que `run_all.ahk` n'`#Include` pas
+ne tourne jamais (`tests/meta/test_run_all_include_integrity.ahk`) ; et `_DriverFuncBody("Nom")`
+renvoie `""` pour un nom introuvable, donc toute assertion d'absence dessus passe a vide.
+AHK v2 aggrave la seconde : **appeler une fonction qui n'existe pas n'est pas une erreur au
+chargement** — le nom se resout comme une variable — et les sites d'appel en production sont
+generalement enveloppes dans `try`, donc un renommage a moitie fini donne un test vert, zero
+erreur et zero ligne de log.
 
-**OPT-9b (per-tail cap on the end-char loop) was refused, deliberately.** It needs
-five synchronised sites; missing one yields a bound that is too short, i.e. **a
-hotstring that silently stops firing**. The gain is sub-µs against a 5 ms profiler
-threshold. The same mechanism on the hotter STAR loop had already been refuted for
-unmeasurable gain, so doing only the colder one would be incoherent. Do not
-re-raise it: correctness risk for zero measurable gain.
+**OPT-9b (cap par queue sur la boucle end-char) a ete refuse, deliberement.** Il exige cinq
+sites synchronises ; en rater un donne une borne trop courte, c'est-a-dire **un hotstring qui
+cesse silencieusement de tirer**. Le gain est sub-µs contre un seuil de profiler a 5 ms, et
+le meme mecanisme sur la boucle STAR, plus chaude, avait deja ete refute pour gain non
+mesurable. Ne pas le relever : risque de correction pour zero gain mesurable.
 
-**One latent bug found next door to a perf fix:** `SendInstant`'s
-`_SEND_INSTANT_CLIP_BUSY` branch injects the text and then returns bare, which is
-falsy, while `WrapTextIfSelected` (`layout.ahk`) reads falsy as "emitted nothing"
-and re-sends the bare symbol on top. The comment at that call site even asserted
-the opposite. When a fallback branch emits, it must report success.
+**Quand une branche de repli emet, elle doit rapporter le succes.** La branche
+`_SEND_INSTANT_CLIP_BUSY` de `SendInstant` injectait le texte puis renvoyait nu (falsy),
+tandis que `WrapTextIfSelected` lit falsy comme « rien emis » et re-envoyait le symbole nu
+par-dessus. Le commentaire au site d'appel affirmait meme le contraire.
 
 Related: [[project_audit_2026_07_21_open_items]],
 [[project_typing_latency_tooltip_coldstart]],
 [[project_ahk_guard_tests_must_loop_the_class]], [[feedback_regression_tests]].
+
