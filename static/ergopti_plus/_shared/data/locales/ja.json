@@ -163,6 +163,7 @@
 	"dialog.app_picker.running_count": "{n}個のアプリケーションが実行中。",
 	"dialog.app_picker.stopped_suffix": "（停止中）",
 	"dialog.app_picker.title": "アプリケーション選択",
+	"dialog.bulk_toggle.save_failed": "The change could not be saved to the configuration file.\nIt has been reverted. Close any app holding the file and try again.",
 	"dialog.config_folder.hint": "すべての個人ファイル (personal_shortcuts.ahk, personal_hotstrings.toml…) はこのフォルダーで検索されます。デフォルトフォルダーを使用するには空白のままにしてください。",
 	"dialog.config_folder.label": "パス:",
 	"dialog.config_folder.select_title": "設定フォルダーを選択",

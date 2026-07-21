@@ -163,6 +163,7 @@
 	"dialog.app_picker.running_count": "{n}개 실행 중인 응용 프로그램.",
 	"dialog.app_picker.stopped_suffix": " (중지됨)",
 	"dialog.app_picker.title": "응용 프로그램 선택",
+	"dialog.bulk_toggle.save_failed": "The change could not be saved to the configuration file.\nIt has been reverted. Close any app holding the file and try again.",
 	"dialog.config_folder.hint": "모든 개인 파일 (personal_shortcuts.ahk, personal_hotstrings.toml…) 이 폴더에서 검색됩니다. 기본 폴더를 사용하려면 비워두세요.",
 	"dialog.config_folder.label": "경로:",
 	"dialog.config_folder.select_title": "설정 폴더 선택",

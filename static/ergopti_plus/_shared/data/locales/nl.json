@@ -163,6 +163,7 @@
 	"dialog.app_picker.running_count": "{n} actieve toepassing(en).",
 	"dialog.app_picker.stopped_suffix": " (gestopt)",
 	"dialog.app_picker.title": "Toepassingsselectie",
+	"dialog.bulk_toggle.save_failed": "The change could not be saved to the configuration file.\nIt has been reverted. Close any app holding the file and try again.",
 	"dialog.config_folder.hint": "Alle persoonlijke bestanden (personal_shortcuts.ahk, personal_hotstrings.toml…) worden gezocht in deze map. Leeg laten om de standaardmap te gebruiken.",
 	"dialog.config_folder.label": "Pad:",
 	"dialog.config_folder.select_title": "Configuratiemap selecteren",

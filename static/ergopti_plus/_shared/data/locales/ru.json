@@ -163,6 +163,7 @@
 	"dialog.app_picker.running_count": "{n} запущенных приложений.",
 	"dialog.app_picker.stopped_suffix": " (остановлено)",
 	"dialog.app_picker.title": "Выбор приложений",
+	"dialog.bulk_toggle.save_failed": "The change could not be saved to the configuration file.\nIt has been reverted. Close any app holding the file and try again.",
 	"dialog.config_folder.hint": "Все личные файлы (personal_shortcuts.ahk, personal_hotstrings.toml…) будут искаться в этой папке. Оставьте пустым для использования папки по умолчанию.",
 	"dialog.config_folder.label": "Путь:",
 	"dialog.config_folder.select_title": "Выберите папку конфигурации",

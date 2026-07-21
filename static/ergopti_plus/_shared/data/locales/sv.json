@@ -163,6 +163,7 @@
 	"dialog.app_picker.running_count": "{n} program som körs.",
 	"dialog.app_picker.stopped_suffix": " (stoppad)",
 	"dialog.app_picker.title": "Programurval",
+	"dialog.bulk_toggle.save_failed": "The change could not be saved to the configuration file.\nIt has been reverted. Close any app holding the file and try again.",
 	"dialog.config_folder.hint": "Alla personliga filer (personal_shortcuts.ahk, personal_hotstrings.toml…) söks i denna mapp. Lämna tom för att använda standardmappen.",
 	"dialog.config_folder.label": "Sökväg:",
 	"dialog.config_folder.select_title": "Välj konfigurationsmapp",

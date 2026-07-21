@@ -163,6 +163,7 @@
 	"dialog.app_picker.running_count": "{n} चल रहा है अनुप्रयोग।",
 	"dialog.app_picker.stopped_suffix": " (बंद)",
 	"dialog.app_picker.title": "अनुप्रयोग चयन",
+	"dialog.bulk_toggle.save_failed": "The change could not be saved to the configuration file.\nIt has been reverted. Close any app holding the file and try again.",
 	"dialog.config_folder.hint": "सभी व्यक्तिगत फ़ाइलें (personal_shortcuts.ahk, personal_hotstrings.toml…) इस फ़ोल्डर में खोजी जाएंगी। डिफ़ॉल्ट फ़ोल्डर का उपयोग करने के लिए खाली छोड़ें।",
 	"dialog.config_folder.label": "पथ:",
 	"dialog.config_folder.select_title": "कॉन्फ़िगरेशन फ़ोल्डर चुनें",

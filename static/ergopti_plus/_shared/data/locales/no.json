@@ -163,6 +163,7 @@
 	"dialog.app_picker.running_count": "{n} kjørende program(er).",
 	"dialog.app_picker.stopped_suffix": " (stoppet)",
 	"dialog.app_picker.title": "Programvalg",
+	"dialog.bulk_toggle.save_failed": "The change could not be saved to the configuration file.\nIt has been reverted. Close any app holding the file and try again.",
 	"dialog.config_folder.hint": "Alle personlige filer (personal_shortcuts.ahk, personal_hotstrings.toml…) blir søkt i denne mappen. La være tom for å bruke standardmappen.",
 	"dialog.config_folder.label": "Sti:",
 	"dialog.config_folder.select_title": "Velg konfigurasjonsmappe",

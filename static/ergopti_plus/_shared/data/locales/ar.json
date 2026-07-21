@@ -163,6 +163,7 @@
 	"dialog.app_picker.running_count": "{n} تطبيق(ات) قيد التشغيل.",
 	"dialog.app_picker.stopped_suffix": " (متوقف)",
 	"dialog.app_picker.title": "اختيار التطبيق",
+	"dialog.bulk_toggle.save_failed": "The change could not be saved to the configuration file.\nIt has been reverted. Close any app holding the file and try again.",
 	"dialog.config_folder.hint": "ستُبحث جميع الملفات الشخصية (personal_shortcuts.ahk، personal_hotstrings.toml…) في هذا المجلد. اتركه فارغًا لاستخدام المجلد الافتراضي.",
 	"dialog.config_folder.label": "المسار :",
 	"dialog.config_folder.select_title": "اختر مجلد الإعدادات",
