@@ -52,14 +52,19 @@ local function load_watchers_with_dead_spawn()
 	package.loaded["adapters.shell_runner"] = nil
 	package.loaded["adapters.timer_scheduler"] = nil
 
-	local ctx = { spawns = 0, watchdogs = {}, poll_cb = nil }
+	local ctx = { spawns = 0, terminates = 0, watchdogs = {}, poll_cb = nil }
 
 	package.loaded["adapters.shell_runner"] = {
 		spawn = function(_executable, _args, _on_done)
 			ctx.spawns = ctx.spawns + 1
 			-- Deliberately drop _on_done: this is precisely what the production
 			-- adapter yields when the task could not be created or started.
-			return { start = function() end, terminate = function() end }
+			-- terminate() is counted rather than ignored, so the test can tell
+			-- "stopped waiting for the read" apart from "reclaimed the read".
+			return {
+				start     = function() end,
+				terminate = function() ctx.terminates = ctx.terminates + 1 end,
+			}
 		end,
 		_active_tasks = {},
 	}
@@ -137,6 +142,41 @@ helpers.describe("karabiner.watchers: layout poll guard is released when the rea
 		helpers.assert_eq(ctx.spawns, 2,
 			"after the watchdog releases the guard the poll must resume — otherwise the "
 			.. "Sequoia layout-change fallback is dead for the rest of the session")
+	end)
+
+	helpers.it("terminates the abandoned read instead of only dropping the guard", function()
+		local _watchers, ctx = load_watchers_with_dead_spawn()
+
+		ctx.poll_cb()
+		helpers.assert_eq(ctx.spawns, 1, "the first tick must spawn a layout read")
+		helpers.assert_eq(ctx.terminates, 0, "nothing may be terminated while the read is in flight")
+
+		local watchdog = ctx.watchdogs[#ctx.watchdogs]
+		helpers.assert_true(watchdog ~= nil, "the poll must arm a watchdog for the in-flight read")
+		watchdog.fn()
+
+		helpers.assert_eq(ctx.terminates, 1,
+			"the watchdog must terminate the read it gave up on. Releasing only the guard "
+			.. "leaves the `defaults read` running AND pinned in ShellRunner._active_tasks — "
+			.. "the pin exists to stop the GC collecting a live task, so an abandoned one is "
+			.. "never reclaimed and every timeout leaks a process for the rest of the session")
+	end)
+
+	helpers.it("never terminates a read that already completed", function()
+		local _watchers, ctx = load_watchers_with_dead_spawn()
+
+		ctx.poll_cb()
+		local watchdog = ctx.watchdogs[#ctx.watchdogs]
+		helpers.assert_true(watchdog ~= nil, "a watchdog must be armed")
+
+		-- Two watchdog firings in a row: the second must find no handle to kill.
+		watchdog.fn()
+		watchdog.fn()
+
+		helpers.assert_eq(ctx.terminates, 1,
+			"the handle reference must be cleared as it is terminated, so a second watchdog "
+			.. "tick cannot terminate a handle twice — or, worse, kill the read a LATER tick "
+			.. "has since started")
 	end)
 
 	helpers.it("keeps recovering on every subsequent failure, not just the first", function()

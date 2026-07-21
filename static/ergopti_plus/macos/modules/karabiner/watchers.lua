@@ -83,6 +83,13 @@ local LAYOUT_POLL_TIMEOUT_SEC = 5.0
 -- Hammerspoon Console — never reaching lib/logger.
 local _layout_poll_watchdog = nil
 
+-- Handle of the in-flight layout read, so the watchdog can reclaim it. Without
+-- this the watchdog could only clear the guard: the abandoned `defaults read`
+-- stayed pinned in ShellRunner._active_tasks (the pin that stops the GC killing a
+-- live task), so every timeout leaked one process and its pin for the rest of the
+-- session. Declared above the poll body for the same closure-before-local reason.
+local _layout_poll_handle = nil
+
 -- Previous hs.keycodes.inputSourceChanged callback saved before start_input_source_watcher
 -- installs its own, so stop_input_source_watcher can restore it instead of passing nil
 -- (karabiner-input-source-changed-overwrite).
@@ -300,9 +307,15 @@ local function read_layout_async(callback)
 	local handle = ShellRunner.spawn("/usr/bin/defaults",
 		{ "read", "com.apple.HIToolbox", "AppleSelectedInputSources" },
 		function(exit_code, stdout, _)
+			-- Drop the ownership reference first: a handle that has completed must
+			-- never be terminated by a later watchdog tick.
+			_layout_poll_handle = nil
 			if exit_code ~= 0 then callback(nil); return end
 			callback(parse_layout_name(stdout))
 		end)
+	-- Published BEFORE start() so a handle that completes synchronously has already
+	-- cleared it in its callback and cannot be overwritten by a stale assignment.
+	_layout_poll_handle = handle
 	handle.start()
 end
 
@@ -375,7 +388,15 @@ function M.start_input_source_watcher(on_change)
 			_layout_poll_watchdog = nil
 			if _layout_poll_pending then
 				_layout_poll_pending = false
-				Logger.warn(LOG, "Layout poll read timed out — releasing the guard so the next tick can retry.")
+				-- Terminate the abandoned read, don't just stop waiting for it.
+				-- handle.terminate() releases the GC pin as well as killing the
+				-- process, so neither the subprocess nor its pin outlives the timeout.
+				if _layout_poll_handle then
+					local stale = _layout_poll_handle
+					_layout_poll_handle = nil
+					pcall(function() stale.terminate() end)
+				end
+				Logger.warn(LOG, "Layout poll read timed out — terminated the read and released the guard so the next tick can retry.")
 			end
 		end)
 		read_layout_async(function(current)
