@@ -23,7 +23,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [feedback-test-before-merge](#feedback-test-before-merge) — Never merge a cut-over slice into dev before the user has tested it live. Stay on the slice branch and wait for explicit validation.
   - [feedback-ui-must-be-i18n](#feedback-ui-must-be-i18n) — All user-facing UI text must go through the i18n system in 21 supported languages — never hardcode any UI string anywhere, including WebView UIs (metrics, download window, etc.).
 - **Project architecture & decisions**
-  - [project-audit-2026-07-21-open-items](#project-audit-2026-07-21-open-items) — third-pass AHK audit: 42 confirmed / 26 refuted, what landed, and the 26 findings still open with their sites (the report md was deleted; this is the record)
+  - [project-audit-2026-07-21-open-items](#project-audit-2026-07-21-open-items) — third-pass AHK audit: all 42 confirmed findings implemented, 26 claims refuted, and the two decisions taken instead of fixes (the report md was deleted; this is the record)
   - [project-ahk-menu-dispatcher-drop](#project-ahk-menu-dispatcher-drop) — AHK 2.0 silently drops ~30-50% of tray-menu clicks. FIXED via lib/menu_dispatcher.ahk — every actionable item must use RegisterMenuItem, never raw Menu.Add.
   - [project-ahk-invariant-incomplete-application](#project-ahk-invariant-incomplete-application) — Every AHK-driver hardening invariant (Critical-emit, suspend-guard, async-HTTP, RegisterMenuItem) is applied per-site; the recurring bug is the ONE missed sibling site or the guarantee defeated by indirection. Audit the whole class, not the documented site.
   - [project-ahk-test-suite-critical-leak](#project-ahk-test-suite-critical-leak) — Critical("On") in layout/hotkey callbacks is safe in production but leaks into the main thread when invoked directly by tests, silently hanging background timers
@@ -484,60 +484,36 @@ And a test can occupy a name while asserting nothing: `test_logger_pairing.ahk`
 registered a `Test()` whose body was an empty function, so the one gate policing
 unpaired lifecycle logs was itself incapable of failing.
 
-#### Still open — 26 confirmed findings
+#### All 42 confirmed findings are implemented
 
-Verified real, not yet implemented. Severity is the post-verification value.
+The 26 that this entry originally listed as open were implemented on
+2026-07-21 in a second campaign of eleven commits, each with a regression test
+encoding its root cause. Nothing from that list remains outstanding.
 
-**Medium**
+Two outcomes are worth keeping, because they are decisions rather than fixes:
 
-1. `lib/window_utils.ahk:117` — AltTabMonitor guards every `WinGet*` against the
-   window-closing race, then `WinActivate`s the same HWND one line outside the guard.
-2. `ui/changelog/init.ahk:347` — the changelog fetch returns silently on any
-   non-200 GitHub response; unpaired TRACE, no WARNING, and the user is shown a
-   wrong error message.
-3. `tests/meta/test_require_state_pattern.ahk` — vacuous: scans `modules/` only
-   (3 of 231 stateful-capable files; `lib/`, `ui/`, `adapters/` hold 145 it has
-   never looked at), its statefulness predicate matches only `:= false`/`:= unset`,
-   it accepts `if A_IsSuspended` as a state guard, and 8 of its 21 allowlist
-   entries point at files that no longer exist. Widening it will surface real
-   violations — fix the modules, do not re-widen the allowlist.
-4. `ErgoptiPlus.ahk:36` — the single-owner mutex yield warning is unwritable by
-   construction: it runs 138 lines before the logger's flag globals are assigned
-   and the bare `try` swallows the resulting UnsetError. This is why
-   multi-instance contention has been invisible to three audits.
-5. `modules/keylogger/keylogger.ahk:991` — a failed state save rolls
-   `today_log_offset` back after the batch already reached data.sql, so every
-   retry re-appends the same INSERT block.
-6. `lib/hotstrings/hotstring_builder.ahk:264` — the `is_case_sensitive` flip
-   changes real registration behaviour for personal and extension entries, but
-   every test covering those loaders passes either way, and an existing unit test
-   now documents the OLD mapping.
-7. `lib/hotstrings/personal_toml_io.ahk:327` — FileOpen's entire failure contract
-   is unreachable dead code (v2 FileOpen throws; it never returns falsy), and a
-   meta-test certifies the dead branch as working.
+- **The `today_log_offset` rollback was left in place, deliberately.** It does
+  re-append an already-written batch, but every `events_*` statement is
+  `INSERT OR IGNORE` against a `(device_id, id)` primary key, so the duplicate is
+  discarded at import — file bloat, not data loss. Reordering the write to commit
+  state before `data.sql` would trade that for a genuine crash window where a
+  batch is marked durable before it is. The invariant that makes the current
+  behaviour benign is now pinned by `test_sql_replay_is_idempotent.ahk` rather
+  than assumed.
+- **`require_state` is now a RATCHET at 38, not a clean gate.** The old test
+  scanned three files and could not fail; widened across `modules/`, `lib/`,
+  `adapters/` and `ui/` it surfaces 38 genuine violations among 77 stateful
+  files. Adding a guard changes behaviour (an early return on a path that
+  currently proceeds), so applying 38 mechanically would be reckless. The count
+  may only go DOWN. **This is the single largest remaining piece of debt in the
+  driver.**
 
-**Low** — `ui/action_picker/init.ahk:217` (unguarded FileOpen, the sibling of an
-already-fixed twin); `modules/gestures/init.ahk:362` (unconditional
-"initialised — ready" SUCCESS over an unchecked `SetWinEventHook`, and no
-matching START); `keylogger_app_categories.ahk` (I/O-failure branch never re-arms
-its one-shot timer, so the comment promising a retry is false;
-`DEFERRED_SAVE_RETRY_MS` used at one site while the original keeps a hardcoded
-`-5000`); `lib/lifecycle.ahk` (deferred suspend has no timeout or bound;
-`ToggleSuspend` re-arms instead of cancelling while a suspend is pending, so the
-user cannot abort; the whole suspend/resume machine emits zero lifecycle
-logging); `ui/tooltip/core.ahk` (`_TooltipPendingGeneration` is write-only dead
-state); `modules/gestures` (a gesture bound to an unknown action id fires,
-produces nothing and logs nothing); `lib/config_io.ahk` (an unresolvable
-persisted shortcut is silently replaced by the shipped default);
-`lib/manifest_menu.ahk` (MenuRenderer_Build silently drops items with a missing
-handler id while every sibling branch logs); `lib/registry.ahk:35`
-(`REG_NOT_FOUND` is a documented-but-dead sentinel); `adapters/clipboard.ahk:53`
-(`CB_Read`'s error branch lost its `""` literal and three docstring sentences);
-`lib/hotstrings/hotstrings_io.ahk:143` (`HOTSTRINGS_PREVIEW_EXTRA_BOUNDARIES`
-bypassed by the initialiser it was extracted from); plus two test-shape items —
-the F-25 "class loop" is a hardcoded 9-name list with a tautological count
-assertion missing 2 of 11 live handlers, and `a77a72925` left the bubble-sort
-comment it claims to have corrected.
+The recurring lesson from the second campaign was that guard tests fail quietly.
+Four tests were found asserting nothing: one registered an empty function body,
+one asserted the absence of a helper that had already been deleted, one compared
+a hardcoded list against its own length, and one scanned a directory that no
+longer held the code. A test that cannot fail is worse than no test, because it
+occupies the name and deters anyone from writing the real one.
 
 #### Refuted — do NOT re-raise
 
