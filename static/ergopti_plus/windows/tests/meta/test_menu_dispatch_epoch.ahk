@@ -19,8 +19,20 @@ Test_MenuDispatcher_StaleRetryRequiresRegistrationIdentity() {
 		"recycled native item IDs must be rejected when their token differs")
 	Assert(InStr(RetryBody, "_MenuDispatchClickSequences[ItemId] != ExpectedClickSequence") > 0,
 		"an older retry must no-op after a newer click on the same native item ID")
-	Assert(InStr(TrackedBody, "TrackedObj.Epoch = _MenuDispatcherEpoch") > 0,
-		"a stale native callback must not mutate a newer registration")
+	; The invariant is unchanged — a stale native callback must not mutate a
+	; newer registration — but it is enforced by TOKEN identity, not by the
+	; registration-time epoch. A replacement registration on the same native
+	; ItemId writes a new token, so a stale TrackedObj cannot match.
+	;
+	; The epoch was removed from THIS function because it contradicted the
+	; behaviour TrayMenuStage_Publish documents ("retain dispatcher entries for
+	; detached child menus"): submenu items are registered before the bump, so
+	; the epoch rejected their native dispatch and left every submenu click to
+	; the 60 ms retry, which logged a false "AHK drop detected" each time.
+	Assert(InStr(TrackedBody, "_MenuDispatchTokens[TrackedObj.ItemId] = TrackedObj.Token") > 0,
+		"a stale native callback must not mutate a newer registration — the token fence is what enforces this")
+	Assert(InStr(TrackedBody, "TrackedObj.Epoch = _MenuDispatcherEpoch") == 0,
+		"the registration-time epoch must NOT gate native dispatch: submenu items are registered before the publish bump, so it rejects them and silently downgrades every submenu click to the retry path")
 	Assert(InStr(InsertBody, "Epoch: _MenuDispatcherEpoch, Token: 0") > 0,
 		"inserted menu wrappers must initialize every identity field read by _TrackedDispatch")
 	Assert(InStr(InsertBody, "TrackedObj.Token := _MenuDispatchTokenCounter") > 0

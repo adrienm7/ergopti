@@ -315,8 +315,31 @@ RegisterMenuItem(MenuObj, ItemName, Callback) {
 
 _TrackedDispatch(TrackedObj, Args*) {
     global _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens
+    ; Fenced on ItemId + TOKEN. The registration-time epoch used to be part of
+    ; this test and had to come out, because it contradicted the intent
+    ; TrayMenuStage_Publish states in its own comment: "retain dispatcher entries
+    ; for detached child menus that were registered during staging".
+    ;
+    ; A_TrayMenu.Delete() clears only the TOP level. Child Menu objects survive a
+    ; publish with their native IDs and their token entries intact — deliberately,
+    ; which is why BeginReplacement does not clear the token maps. But every
+    ; submenu item is registered BEFORE the epoch bump (RebuildTrayMenu calls
+    ; InitSubMenus, then initMenu reaches Publish), and initMenu is also called
+    ; ALONE from the updater's tray refresh and from lifecycle. So those items sat
+    ; at the previous epoch and this guard rejected their native dispatch.
+    ;
+    ; They still fired — the 60 ms retry rescued them — so the symptom was not a
+    ; dead menu but a corrupted signal: every submenu click paid that delay and
+    ; logged "AHK drop detected", which is the one diagnostic this module exists
+    ; to produce. A real AHK drop became indistinguishable from an epoch-fenced
+    ; no-op.
+    ;
+    ; Token identity carries the staleness guarantee on its own: a replacement
+    ; registration on the same native ItemId writes a NEW token, so a stale
+    ; TrackedObj can never match. The epoch remains meaningful in
+    ; _DispatchIfMissed, where it is captured at CLICK time rather than at
+    ; registration time and correctly voids a retry that spans a rebuild.
     if (TrackedObj.ItemId
-        and TrackedObj.Epoch = _MenuDispatcherEpoch
         and _MenuDispatchTokens.Has(TrackedObj.ItemId)
         and _MenuDispatchTokens[TrackedObj.ItemId] = TrackedObj.Token) {
         _MenuDispatchLastFire[TrackedObj.ItemId] := A_TickCount
