@@ -22,6 +22,7 @@ FEATURES & RATIONALE:
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import WindowChrome from './WindowChrome.svelte';
 	import { ui, setOS } from './state.svelte.js';
+	import { t } from './i18n.svelte.js';
 
 	/** Milliseconds between two typed characters in the demo. */
 	const TYPE_INTERVAL_MS = 110;
@@ -116,10 +117,10 @@ FEATURES & RATIONALE:
 	// action is now a neutral, always-relevant in-page jump instead.
 	let primaryDownload = $derived(
 		ui.osStyle === 'macos'
-			? { url: urlMacos, icon: 'icon-appleinc', label: 'Télécharger pour macOS' }
+			? { url: urlMacos, icon: 'icon-appleinc', label: t('Télécharger pour macOS') }
 			: ui.osStyle === 'linux'
-				? { url: urlKanata, icon: 'icon-linux', label: 'Télécharger pour Linux (alpha)' }
-				: { url: urlWindows, icon: 'icon-windows', label: 'Télécharger pour Windows' }
+				? { url: urlKanata, icon: 'icon-linux', label: t('Télécharger pour Linux (alpha)') }
+				: { url: urlWindows, icon: 'icon-windows', label: t('Télécharger pour Windows') }
 	);
 </script>
 
@@ -132,7 +133,7 @@ FEATURES & RATIONALE:
 				type="button"
 				class={ui.osStyle === 'windows' ? 'os-btn active' : 'os-btn'}
 				onclick={() => setOS('windows')}
-				title="Afficher les fenêtres au style Windows (AutoHotkey)"
+				title={t('Afficher les fenêtres au style Windows (AutoHotkey)')}
 				aria-pressed={ui.osStyle === 'windows'}
 			>
 				<i class="icon-windows"></i><span>Windows</span>
@@ -141,7 +142,7 @@ FEATURES & RATIONALE:
 				type="button"
 				class={ui.osStyle === 'macos' ? 'os-btn active' : 'os-btn'}
 				onclick={() => setOS('macos')}
-				title="Afficher les fenêtres au style macOS (Hammerspoon)"
+				title={t('Afficher les fenêtres au style macOS (Hammerspoon)')}
 				aria-pressed={ui.osStyle === 'macos'}
 			>
 				<i class="icon-appleinc"></i><span>macOS</span>
@@ -150,7 +151,7 @@ FEATURES & RATIONALE:
 				type="button"
 				class={ui.osStyle === 'linux' ? 'os-btn active' : 'os-btn'}
 				onclick={() => setOS('linux')}
-				title="Afficher les fenêtres au style Linux (kanata + daemon Lua, alpha)"
+				title={t('Afficher les fenêtres au style Linux (kanata + daemon Lua, alpha)')}
 				aria-pressed={ui.osStyle === 'linux'}
 			>
 				<i class="icon-linux"></i><span>Linux</span>
@@ -158,20 +159,24 @@ FEATURES & RATIONALE:
 		</div>
 
 		<p class="eyebrow">
-			Frappe augmentée <span class="dot">•</span> Windows, macOS, Linux
-			<span class="dot">•</span> 100 % local
+			{t('Frappe augmentée')} <span class="dot">•</span> Windows, macOS, Linux
+			<span class="dot">•</span>
+			{t('100 % local')}
 		</p>
-		<h1 class="hero-title">Tapez moins.<br /><span class="grad">Écrivez plus.</span></h1>
+		<h1 class="hero-title">
+			{t('Tapez moins.')}<br /><span class="grad">{t('Écrivez plus.')}</span>
+		</h1>
 		<p class="hero-sub">
-			<ErgoptiPlus></ErgoptiPlus> transforme votre frappe en temps réel : expansions de texte, autocorrection,
-			prédictions IA locales, tap-holds, gestes trackpad. Pensé pour le français, l’anglais et le code
-			— <strong>gratuit et open-source</strong>.
+			<ErgoptiPlus></ErgoptiPlus>
+			{@html t(
+				'transforme votre frappe en temps réel : expansions de texte, autocorrection, prédictions IA locales, tap-holds, gestes trackpad. Pensé pour le français, l’anglais et le code — <strong>gratuit et open-source</strong>.'
+			)}
 		</p>
 
-		<ul class="hero-trust" aria-label="En bref">
-			<li><span class="ht-ico" aria-hidden="true">⚡</span> Frappe augmentée</li>
-			<li><span class="ht-ico" aria-hidden="true">🔒</span> 100 % local</li>
-			<li><span class="ht-ico" aria-hidden="true">⌨️</span> Toute disposition</li>
+		<ul class="hero-trust" aria-label={t('En bref')}>
+			<li><span class="ht-ico" aria-hidden="true">⚡</span> {t('Frappe augmentée')}</li>
+			<li><span class="ht-ico" aria-hidden="true">🔒</span> {t('100 % local')}</li>
+			<li><span class="ht-ico" aria-hidden="true">⌨️</span> {t('Toute disposition')}</li>
 		</ul>
 
 		<div class="hero-cta">
@@ -180,12 +185,12 @@ FEATURES & RATIONALE:
 				<span>{primaryDownload.label}</span>
 			</a>
 			<a class="btn btn-secondary" href="#ep-telecharger">
-				<span>Installation &amp; comparatif ↓</span>
+				<span>{t('Installation & comparatif ↓')}</span>
 			</a>
 		</div>
 		<p class="hero-meta">
 			{#if ui.release}<span class="hero-version">{ui.release.tag}</span> ·{/if}
-			Gratuit · Open-source · Aucun compte, aucune télémétrie
+			{t('Gratuit · Open-source · Aucun compte, aucune télémétrie')}
 		</p>
 
 		<!-- Live typing demo — real window chrome, real family colors -->
@@ -421,11 +426,11 @@ FEATURES & RATIONALE:
 	}
 
 	.hero-title {
-		font-size: clamp(2.6rem, 7vw, 4.6rem);
+		font-size: clamp(2rem, 5vw, 3.4rem);
 		font-weight: 800;
 		letter-spacing: -0.03em;
-		line-height: 1.06;
-		margin: 0 0 22px;
+		line-height: 1.08;
+		margin: 0 0 20px;
 		text-align: center;
 	}
 
@@ -456,10 +461,10 @@ FEATURES & RATIONALE:
 
 	.hero-sub {
 		color: var(--ink-soft);
-		font-size: clamp(1.02rem, 1.5vw, 1.2rem);
+		font-size: clamp(0.95rem, 1.2vw, 1.08rem);
 		line-height: 1.65;
-		margin: 0 auto 30px;
-		max-width: 640px;
+		margin: 0 auto 26px;
+		max-width: 600px;
 		text-align: center;
 		text-wrap: pretty;
 	}
