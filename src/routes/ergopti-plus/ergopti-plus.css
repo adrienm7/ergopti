@@ -257,6 +257,21 @@
 	}
 }
 
+/* Keyboard navigation: a clearly visible ring on every interactive element.
+ * :focus-visible only fires for keyboard focus, so mouse clicks stay clean.
+ * The outline follows each element's own border-radius (pills stay pills). */
+.ep-root :is(a, button, summary, [tabindex]):focus-visible {
+	outline: 2px solid var(--accent-cyan, #02c9db);
+	outline-offset: 3px;
+}
+
+/* Balanced line wrapping on every heading — no orphan word on its own line */
+.ep-root h2,
+.ep-root h3,
+.ep-root h4 {
+	text-wrap: balance;
+}
+
 /* ====================================
  * ====================================
  * ======= 4/ Section Headers =========
