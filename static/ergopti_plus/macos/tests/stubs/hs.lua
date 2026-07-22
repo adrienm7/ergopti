@@ -317,7 +317,25 @@ end
 M.fs = {
 	-- Returns (iterator, dirObject) like real Hammerspoon — see make_fs_dir_iterator.
 	dir = function(path) return make_fs_dir_iterator(FS_ENTRIES[path]) end,
-	attributes = function(_) return nil end,
+	-- Honest existence probe against the real filesystem: lib.paths walks the
+	-- repo with hs.fs.attributes to locate _shared/, and lib.timings/TomlReader
+	-- then read real repo files. A constant-nil stub only ever worked because
+	-- some earlier test file had cached those modules under a real-fs override —
+	-- a warm-cache accident the runner's per-file cold start deliberately ended
+	attributes = function(path)
+		if type(path) ~= "string" or path == "" then return nil end
+		local ok_lfs, lfs = pcall(require, "lfs")
+		if ok_lfs and lfs and lfs.attributes then return lfs.attributes(path) end
+		local fh = io.open(path, "r")
+		if fh then
+			fh:close()
+			return { mode = "file" }
+		end
+		-- os.rename(path, path) succeeds for existing directories, where
+		-- io.open fails — the cheapest portable directory probe without lfs
+		if os.rename(path, path) then return { mode = "directory" } end
+		return nil
+	end,
 	mkdir = function(_) return true end,
 	pathToAbsolute = function(p) return p end,
 	displayName = function(p) return p end,
