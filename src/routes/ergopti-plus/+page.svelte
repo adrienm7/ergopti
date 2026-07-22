@@ -39,6 +39,11 @@ FEATURES & RATIONALE:
 	import Customization from './Customization.svelte';
 	import ErgoptiExclusives from './ErgoptiExclusives.svelte';
 	import Platforms from './Platforms.svelte';
+	import Personas from './Personas.svelte';
+	import Privacy from './Privacy.svelte';
+	import Compare from './Compare.svelte';
+	import Steps from './Steps.svelte';
+	import Faq from './Faq.svelte';
 	import StickyCta from './StickyCta.svelte';
 
 	// Populated at build time by +page.server.js from the driver's data files.
@@ -55,14 +60,18 @@ FEATURES & RATIONALE:
 	];
 
 	const navItems = [
+		{ id: 'ep-pourqui', label: 'Pour qui ?' },
 		{ id: 'ep-hotstrings', label: 'Hotstrings' },
 		{ id: 'ep-ia', label: 'IA' },
 		{ id: 'ep-tapholds', label: 'Tap-Holds' },
 		{ id: 'ep-raccourcis', label: 'Raccourcis' },
 		{ id: 'ep-trackpad', label: 'Trackpad' },
 		{ id: 'ep-metriques', label: 'Métriques' },
+		{ id: 'ep-confidentialite', label: 'Vie privée' },
 		{ id: 'ep-personnalisation', label: 'Réglages' },
 		{ id: 'ep-ergopti', label: 'Déjà en Ergopti ?' },
+		{ id: 'ep-comparatif', label: 'Comparatif' },
+		{ id: 'ep-faq', label: 'FAQ' },
 		{ id: 'ep-telecharger', label: 'Télécharger' }
 	];
 
@@ -116,6 +125,7 @@ FEATURES & RATIONALE:
 			<KpiStrip items={kpis} />
 			<StickyNav items={navItems} />
 			<Promises />
+			<Personas />
 			<Hotstrings categories={data.hotstringCategories} total={data.hotstringTotal} geo={winGeo} />
 			<PersonalHotstrings geo={winGeo} />
 			<AiSection
@@ -134,8 +144,12 @@ FEATURES & RATIONALE:
 			<KeyboardPower actionGroups={data.actionGroups} />
 			<Trackpad />
 			<MetricsSection geo={winGeo} />
+			<Privacy />
 			<Customization locales={data.locales} webviews={data.webviews} geo={winGeo} />
 			<ErgoptiExclusives />
+			<Compare />
+			<Steps />
+			<Faq />
 			<Platforms macosApps={data.macosApps} />
 
 			<div class="ep-endspace"></div>
