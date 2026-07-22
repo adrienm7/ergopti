@@ -12,6 +12,11 @@ local helpers = require("tests.helpers")
 package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
 
+-- Earlier test files (karabiner layout polling) install a shell_runner stub
+-- without exec(); purge it so conflicts.lua captures the real adapter — the
+-- CI runner's file order differs from local and made this leak fatal there
+package.loaded["adapters.shell_runner"] = nil
+
 local Conflicts = helpers.load_with_stubs("modules.gestures.conflicts")
 
 
