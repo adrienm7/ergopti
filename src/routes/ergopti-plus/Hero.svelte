@@ -106,6 +106,18 @@ FEATURES & RATIONALE:
 	let urlWindows = $derived(ui.release?.url('ErgoptiPlus.exe') ?? '#');
 	let urlMacos = $derived(ui.release?.url('ErgoptiPlus.app.zip') ?? '#');
 	let urlKanata = $derived(ui.release?.url('kanata.kbd') ?? '#');
+
+	// A single download button, driven by the OS toggle. The previous layout
+	// showed a second *download* button for a different OS — so picking Linux
+	// still surfaced a "Windows" button, which read as a bug. The secondary
+	// action is now a neutral, always-relevant in-page jump instead.
+	let primaryDownload = $derived(
+		ui.osStyle === 'macos'
+			? { url: urlMacos, icon: 'icon-appleinc', label: 'Télécharger pour macOS' }
+			: ui.osStyle === 'linux'
+				? { url: urlKanata, icon: 'icon-linux', label: 'Télécharger pour Linux (alpha)' }
+				: { url: urlWindows, icon: 'icon-windows', label: 'Télécharger pour Windows' }
+	);
 </script>
 
 <section class="hero" id="ep-demo">
@@ -153,34 +165,13 @@ FEATURES & RATIONALE:
 		</p>
 
 		<div class="hero-cta">
-			{#if ui.osStyle === 'macos'}
-				<a class="btn btn-primary" href={urlMacos} download={!!ui.release}>
-					<i class="icon-appleinc"></i>
-					<span>Télécharger pour macOS</span>
-				</a>
-				<a class="btn btn-secondary" href={urlWindows} download={!!ui.release}>
-					<i class="icon-windows"></i>
-					<span>Windows</span>
-				</a>
-			{:else if ui.osStyle === 'linux'}
-				<a class="btn btn-primary" href={urlKanata} download={!!ui.release}>
-					<i class="icon-linux"></i>
-					<span>Télécharger pour Linux (alpha)</span>
-				</a>
-				<a class="btn btn-secondary" href={urlWindows} download={!!ui.release}>
-					<i class="icon-windows"></i>
-					<span>Windows</span>
-				</a>
-			{:else}
-				<a class="btn btn-primary" href={urlWindows} download={!!ui.release}>
-					<i class="icon-windows"></i>
-					<span>Télécharger pour Windows</span>
-				</a>
-				<a class="btn btn-secondary" href={urlMacos} download={!!ui.release}>
-					<i class="icon-appleinc"></i>
-					<span>macOS</span>
-				</a>
-			{/if}
+			<a class="btn btn-primary" href={primaryDownload.url} download={!!ui.release}>
+				<i class={primaryDownload.icon}></i>
+				<span>{primaryDownload.label}</span>
+			</a>
+			<a class="btn btn-secondary" href="#ep-telecharger">
+				<span>Installation &amp; comparatif ↓</span>
+			</a>
 		</div>
 		<p class="hero-meta">
 			{#if ui.release}<span class="hero-version">{ui.release.tag}</span> ·{/if}
