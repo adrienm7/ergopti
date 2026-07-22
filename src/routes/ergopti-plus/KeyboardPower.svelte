@@ -16,6 +16,7 @@ FEATURES & RATIONALE:
 -->
 
 <script>
+	import { countup } from './countup.js';
 	import { reveal } from './reveal.js';
 	import { ui } from './state.svelte.js';
 
@@ -275,7 +276,8 @@ FEATURES & RATIONALE:
 		     filtered by the page's OS toggle -->
 		<div class="actions-block">
 			<h3 class="actions-title" use:reveal>
-				{visibleCount} actions à assigner. À n’importe quelle touche ou geste.
+				<span use:countup={visibleCount}>{visibleCount}</span> actions à assigner. À n’importe quelle
+				touche ou geste.
 			</h3>
 			<p class="actions-lead" use:reveal>
 				Tap-holds, gestes trackpad et raccourcis piochent dans le même catalogue d’actions, défini

@@ -20,6 +20,7 @@ FEATURES & RATIONALE:
 
 <script>
 	import DriverFrame from './DriverFrame.svelte';
+	import { countup } from './countup.js';
 	import { reveal } from './reveal.js';
 	import WindowChrome from './WindowChrome.svelte';
 	import { ui } from './state.svelte.js';
@@ -245,7 +246,9 @@ FEATURES & RATIONALE:
 		<div class="ai-step" use:reveal>
 			<h3>
 				<span class="step-badge">2</span>
-				<span class="step-title">Choisissez votre modèle parmi {totals.models}</span>
+				<span class="step-title"
+				>Choisissez votre modèle parmi <span use:countup={totals.models}>{totals.models}</span></span
+			>
 			</h3>
 			<p class="step-lead">
 				Un catalogue curé de <strong>{totals.models} modèles open-weights</strong> issus de
