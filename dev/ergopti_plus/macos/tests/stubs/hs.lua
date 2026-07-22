@@ -314,6 +314,27 @@ local function make_fs_dir_iterator(entries)
 	return iterator, dir_object
 end
 
+-- Pure-Lua existence probe used when LuaFileSystem is unavailable (e.g. a
+-- Windows dev box without lfs). Exposed as hs.fs.__probe_no_lfs so a regression
+-- test can pin it directly on every OS.
+--   - Files: io.open succeeds everywhere.
+--   - Directories: io.open fails on Windows. os.rename(path, path) is a no-op
+--     SUCCESS for an existing entry on POSIX, but on Windows it FAILS because
+--     the target already exists — so accept any rename failure whose errno is
+--     not ENOENT (2 = "no such file"). errno is the third os.rename return and,
+--     unlike the message string, is NOT localized (critical on French Windows,
+--     where os.rename(dir, dir) previously left _shared/ undiscoverable).
+local function probe_fs_without_lfs(path)
+	local fh = io.open(path, "r")
+	if fh then
+		fh:close()
+		return { mode = "file" }
+	end
+	local ok, _, code = os.rename(path, path)
+	if ok or (code and code ~= 2) then return { mode = "directory" } end
+	return nil
+end
+
 M.fs = {
 	-- Returns (iterator, dirObject) like real Hammerspoon — see make_fs_dir_iterator.
 	dir = function(path) return make_fs_dir_iterator(FS_ENTRIES[path]) end,
@@ -326,16 +347,11 @@ M.fs = {
 		if type(path) ~= "string" or path == "" then return nil end
 		local ok_lfs, lfs = pcall(require, "lfs")
 		if ok_lfs and lfs and lfs.attributes then return lfs.attributes(path) end
-		local fh = io.open(path, "r")
-		if fh then
-			fh:close()
-			return { mode = "file" }
-		end
-		-- os.rename(path, path) succeeds for existing directories, where
-		-- io.open fails — the cheapest portable directory probe without lfs
-		if os.rename(path, path) then return { mode = "directory" } end
-		return nil
+		return probe_fs_without_lfs(path)
 	end,
+	-- Test hook: the lfs-free probe above, so a regression test can assert it
+	-- classifies an existing directory / file / missing path correctly on any OS.
+	__probe_no_lfs = probe_fs_without_lfs,
 	mkdir = function(_) return true end,
 	pathToAbsolute = function(p) return p end,
 	displayName = function(p) return p end,

@@ -265,37 +265,74 @@ def extract_active_params(
     return total_params
 
 
-def estimate_ram(total_params_str: str) -> Optional[float]:
-    """Estimates the required RAM in GB based on total parameters.
+# Quantised weights (Ollama's default Q4_K_M, and typical 4-bit MLX builds)
+# weigh about this many GB per billion parameters. Used ONLY to estimate a
+# download size when the live HuggingFace/Ollama lookup returned nothing.
+GB_PER_BILLION_Q4 = 0.55
+# A loaded model needs its quantised weights resident, PLUS KV-cache and
+# activations (~15 % at the small context this driver uses), PLUS a fixed
+# engine + OS overhead. RAM is derived from the DOWNLOAD size so the two can
+# never be mutually inconsistent — the previous estimate computed RAM straight
+# from the parameter count and produced RAM < download for MoE models.
+RAM_ACTIVATION_FACTOR = 1.15
+RAM_BASE_OVERHEAD_GB = 1.0
 
-    Provides a precise estimation without arbitrary tiers, optimized for
-    4-bit quantization and a very small context window.
+
+def parse_params_billions(params_str: Optional[str]) -> Optional[float]:
+    """Parses a parameter-count string into a float number of billions.
+
+    Handles "30.53B" / "3B" suffixes and the "8x7B" mixture-of-experts
+    shorthand (total ≈ experts × size × 0.85, accounting for shared layers).
 
     Args:
-            total_params_str: A string representing the total parameter count.
+            params_str: A parameter-count string such as "30.53B" or "8x7B".
 
     Returns:
-            The estimated required RAM in GB.
+            The parameter count in billions, or None if unparseable.
     """
-    if not total_params_str or total_params_str == "N/A":
+    if not params_str or params_str in ("N/A", "0.0B", "0B"):
         return None
-
+    lowered = params_str.lower().replace("b", "")
     try:
-        total_params_lower = total_params_str.lower().replace("b", "")
-        if "x" in total_params_lower:
-            parts = total_params_lower.split("x")
-            # MoE heuristic: total params is roughly 85% of experts * size due to shared layers
-            total_p = float(parts[0]) * float(parts[1]) * 0.85
-        else:
-            total_p = float(re.sub(r"[^\d.]", "", total_params_lower))
+        if "x" in lowered:
+            experts, size = lowered.split("x")
+            return float(experts) * float(size) * 0.85
+        return float(re.sub(r"[^\d.]", "", lowered))
     except ValueError:
         return None
 
-    # 4-bit weights = ~0.55 GB per billion parameters
-    # Inference engine overhead + small context = ~0.5 GB
-    ram_gb = (total_p * 0.55) + 0.5
 
-    return round(ram_gb, 1)
+def estimate_download_gb(params_str: Optional[str]) -> Optional[float]:
+    """Estimates the quantised download size in GB from the parameter count.
+
+    A fallback only: the real size comes from the HuggingFace/Ollama lookup and
+    is preferred whenever available. Filling this in stops a failed lookup from
+    leaving a blank disk figure in the menu.
+
+    Args:
+            params_str: A parameter-count string such as "7B" or "30.53B".
+
+    Returns:
+            The estimated download size in GB, or None if params are unknown.
+    """
+    billions = parse_params_billions(params_str)
+    if billions is None:
+        return None
+    return round(billions * GB_PER_BILLION_Q4, 2)
+
+
+def estimate_ram_gb(download_gb: Optional[float]) -> Optional[float]:
+    """Estimates required RAM in GB from the (real or estimated) download size.
+
+    Args:
+            download_gb: The model download size in GB.
+
+    Returns:
+            The estimated RAM in GB (always ≥ the download), or None if unknown.
+    """
+    if not download_gb or download_gb <= 0:
+        return None
+    return round(download_gb * RAM_ACTIVATION_FACTOR + RAM_BASE_OVERHEAD_GB, 1)
 
 
 def calculate_hardware_requirements(
@@ -303,17 +340,23 @@ def calculate_hardware_requirements(
 ) -> Dict[str, Optional[float]]:
     """Calculates unified hardware requirements.
 
+    The download size is the live-looked-up value when available, otherwise an
+    estimate from the parameter count (so a failed lookup no longer leaves a
+    blank). RAM is always derived from whichever download size is used, keeping
+    the two consistent (RAM ≥ download).
+
     Args:
-            download_gb: The size of the model download in GB.
+            download_gb: The looked-up download size in GB, or None.
             params_str: A string representing the total parameter count.
 
     Returns:
             A dictionary mapping hardware components to their GB requirements.
     """
-    dl_rounded = round(download_gb, 2) if download_gb else None
+    effective_dl = download_gb if download_gb else estimate_download_gb(params_str)
+    dl_rounded = round(effective_dl, 2) if effective_dl else None
     return {
         "download_gb": dl_rounded,
-        "ram_gb": estimate_ram(params_str),
+        "ram_gb": estimate_ram_gb(effective_dl),
     }
 
 

@@ -39,29 +39,32 @@ local Labels     = require("menu.labels")
 -- =============================================
 -- ==========================================
 
---- Ordered list of supported locales.
+--- Ordered list of supported locales, in the canonical language-menu order.
+--- That order is single-sourced from _shared/data/locale_order.json and pinned
+--- to this table by tools/test/test-locale-order-single-source.cjs — keep the
+--- rows in exactly that order and do not re-sort at runtime.
 local LOCALES = {
-	{ code = "ar", flag = "🇸🇦", name = "العربية"    },
-	{ code = "cs", flag = "🇨🇿", name = "Čeština"    },
 	{ code = "da", flag = "🇩🇰", name = "Dansk"       },
 	{ code = "de", flag = "🇩🇪", name = "Deutsch"     },
 	{ code = "en", flag = "🇬🇧", name = "English"     },
 	{ code = "es", flag = "🇪🇸", name = "Español"     },
 	{ code = "fr", flag = "🇫🇷", name = "Français"    },
-	{ code = "he", flag = "🇮🇱", name = "עברית"       },
-	{ code = "hi", flag = "🇮🇳", name = "हिन्दी"      },
 	{ code = "it", flag = "🇮🇹", name = "Italiano"    },
-	{ code = "ja", flag = "🇯🇵", name = "日本語"       },
-	{ code = "ko", flag = "🇰🇷", name = "한국어"       },
 	{ code = "nl", flag = "🇳🇱", name = "Nederlands"  },
 	{ code = "no", flag = "🇳🇴", name = "Norsk"        },
 	{ code = "pl", flag = "🇵🇱", name = "Polski"       },
 	{ code = "pt", flag = "🇧🇷", name = "Português"   },
-	{ code = "ru", flag = "🇷🇺", name = "Русский"      },
 	{ code = "sv", flag = "🇸🇪", name = "Svenska"      },
 	{ code = "tr", flag = "🇹🇷", name = "Türkçe"       },
+	{ code = "cs", flag = "🇨🇿", name = "Čeština"    },
+	{ code = "ru", flag = "🇷🇺", name = "Русский"      },
 	{ code = "uk", flag = "🇺🇦", name = "Українська"   },
+	{ code = "he", flag = "🇮🇱", name = "עברית"       },
+	{ code = "ar", flag = "🇸🇦", name = "العربية"    },
+	{ code = "hi", flag = "🇮🇳", name = "हिन्दी"      },
 	{ code = "zh", flag = "🇨🇳", name = "中文"          },
+	{ code = "ja", flag = "🇯🇵", name = "日本語"       },
+	{ code = "ko", flag = "🇰🇷", name = "한국어"       },
 }
 
 --- hs.settings key used to persist the locale between reloads.
@@ -227,22 +230,19 @@ function M.set_locale_no_reload(code)
 end
 
 
---- Returns a shallow copy of LOCALES sorted alphabetically by name
---- (case-insensitive). Acts as the single source of truth for display
---- order across every surface that lists locales — the menubar language
---- submenu, the onboarding wizard's step 1 list, etc. — so they all
---- agree on row ordering regardless of the declaration order above.
----
---- Lua's ``string.lower`` only folds ASCII bytes, which is intentional
---- here: it keeps non-Latin script names (Cyrillic, Hebrew, Arabic,
---- Devanagari, CJK, Hangul) at the tail of the list per their natural
---- UTF-8 byte order, instead of intermixing them with Latin names.
+--- Returns a shallow copy of LOCALES in canonical display order. LOCALES is
+--- already declared in that order (single-sourced from
+--- _shared/data/locale_order.json and pinned by the parity test), so this
+--- simply hands back a copy — every surface that lists locales (menubar
+--- language submenu, onboarding step 1, …) shares the one order and can
+--- never desync. The canonical order keeps Latin-script names first and the
+--- non-Latin scripts (Cyrillic, Hebrew, Arabic, Devanagari, CJK, Hangul) at
+--- the tail, matching their natural UTF-8 byte order.
 --- @return table[] List of ``{code, flag, name}`` tables.
 function M.get_sorted_locales()
-	local sorted = {}
-	for _, loc in ipairs(LOCALES) do sorted[#sorted + 1] = loc end
-	table.sort(sorted, function(a, b) return a.name:lower() < b.name:lower() end)
-	return sorted
+	local copy = {}
+	for _, loc in ipairs(LOCALES) do copy[#copy + 1] = loc end
+	return copy
 end
 
 --- Returns a list of hs.menu-compatible item tables for a language selector.
