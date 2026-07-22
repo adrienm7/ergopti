@@ -23,7 +23,9 @@ export const ui = $state({
 	/** @type {'windows'|'macos'|'linux'} Chrome style applied to every mock window. */
 	osStyle: 'windows',
 	/** @type {{tag: string, url: (name: string) => string | null} | null} */
-	release: null
+	release: null,
+	/** @type {{stars: number, license: string} | null} Live GitHub repo stats. */
+	repo: null
 });
 
 /**

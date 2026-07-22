@@ -100,7 +100,7 @@ FEATURES & RATIONALE:
 				<div class="preview-label">Vitesse moyenne</div>
 				<div class="preview-value">74 <span class="preview-unit">MPM</span></div>
 				<svg class="spark" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
-					<polyline points={sparkPoints(wpmSpark)} />
+					<polyline points={sparkPoints(wpmSpark)} pathLength="1" />
 				</svg>
 				<div class="preview-delta">+9 % ce mois-ci</div>
 			</div>
@@ -114,7 +114,7 @@ FEATURES & RATIONALE:
 					preserveAspectRatio="none"
 					aria-hidden="true"
 				>
-					<polyline points={sparkPoints(delegSpark)} />
+					<polyline points={sparkPoints(delegSpark)} pathLength="1" />
 				</svg>
 				<div class="preview-delta">+ Hotstrings · + IA</div>
 			</div>
@@ -122,8 +122,8 @@ FEATURES & RATIONALE:
 			<div class="preview-card preview-card--calendar">
 				<div class="preview-label">Activité — 26 semaines</div>
 				<div class="calendar" aria-hidden="true">
-					{#each calendar as level}
-						<span class="cell" data-level={level}></span>
+					{#each calendar as level, i}
+						<span class="cell" data-level={level} style="--i: {i};"></span>
 					{/each}
 				</div>
 			</div>
@@ -185,6 +185,27 @@ FEATURES & RATIONALE:
 				</p>
 			</header>
 			<LiveWpm />
+		</div>
+
+		<div class="deleg-compare ep-card" use:reveal>
+			<h3 class="dc-title">Combien de frappe déléguez-vous&nbsp;?</h3>
+			<div class="dc-row">
+				<span class="dc-label">À la main</span>
+				<div class="dc-track">
+					<span class="dc-seg dc-seg--manual" style="--w: 100%;">100 frappes</span>
+				</div>
+			</div>
+			<div class="dc-row">
+				<span class="dc-label">Avec Ergopti+</span>
+				<div class="dc-track">
+					<span class="dc-seg dc-seg--typed" style="--w: 60%;">60 tapées</span>
+					<span class="dc-seg dc-seg--deleg" style="--w: 40%;">40 déléguées</span>
+				</div>
+			</div>
+			<p class="dc-note">
+				Hotstrings et IA écrivent le reste — pour le même texte, bien moins de frappes. Proportions
+				illustratives ; les vôtres sont dans le tableau de bord.
+			</p>
 		</div>
 
 		<p class="metrics-privacy" use:reveal>
@@ -285,6 +306,42 @@ FEATURES & RATIONALE:
 		background: rgba(0, 191, 165, 0.9);
 	}
 
+	/* Scroll-linked entrance: the sparklines draw themselves and the calendar
+	 * fills cell-by-cell when the preview enters view. Guarded so both stay
+	 * fully visible without JS or under reduced motion. */
+	@media (prefers-reduced-motion: no-preference) {
+		.preview.is-visible .spark polyline {
+			animation: draw-spark 1.3s var(--ease-out) both;
+		}
+
+		.preview.is-visible .cell {
+			animation: cell-fade 0.5s ease both;
+			animation-delay: calc(var(--i, 0) * 3ms + 200ms);
+		}
+	}
+
+	@keyframes draw-spark {
+		from {
+			stroke-dasharray: 1;
+			stroke-dashoffset: 1;
+		}
+		to {
+			stroke-dasharray: 1;
+			stroke-dashoffset: 0;
+		}
+	}
+
+	@keyframes cell-fade {
+		from {
+			opacity: 0;
+			transform: scale(0.4);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+
 	.preview-note {
 		color: var(--ink-faint);
 		font-size: 0.8rem;
@@ -381,6 +438,91 @@ FEATURES & RATIONALE:
 		line-height: 1.6;
 		margin: 0 auto;
 		max-width: 620px;
+	}
+
+	/* ─── Delegated-typing before/after ─────────────────────── */
+
+	.deleg-compare {
+		--accent: #00bfa5;
+		margin: 26px auto 0;
+		max-width: 640px;
+	}
+
+	.dc-title {
+		font-size: 1.05rem;
+		margin-bottom: 14px;
+		text-align: center;
+	}
+
+	.dc-row {
+		align-items: center;
+		display: flex;
+		gap: 12px;
+		margin-bottom: 10px;
+	}
+
+	.dc-label {
+		color: var(--ink-faint);
+		flex-shrink: 0;
+		font-size: 0.82rem;
+		text-align: right;
+		width: 96px;
+	}
+
+	.dc-track {
+		background: rgba(255, 255, 255, 0.05);
+		border-radius: 8px;
+		display: flex;
+		flex: 1;
+		gap: 2px;
+		height: 34px;
+		overflow: hidden;
+	}
+
+	.dc-seg {
+		align-items: center;
+		color: var(--ink-soft);
+		display: flex;
+		font-size: 0.74rem;
+		font-weight: 700;
+		justify-content: center;
+		min-width: 0;
+		overflow: hidden;
+		white-space: nowrap;
+		width: var(--w);
+	}
+
+	.dc-seg--manual,
+	.dc-seg--typed {
+		background: rgba(255, 255, 255, 0.14);
+	}
+
+	.dc-seg--deleg {
+		background: linear-gradient(135deg, #00bfa5, #02c9db);
+		color: #04231f;
+	}
+
+	.dc-note {
+		color: var(--ink-faint);
+		font-size: 0.78rem;
+		margin: 8px 0 0;
+		text-align: center;
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.deleg-compare.is-visible .dc-seg {
+			animation: dc-grow 1s var(--ease-out) both;
+			animation-delay: 0.2s;
+		}
+	}
+
+	@keyframes dc-grow {
+		from {
+			width: 0;
+		}
+		to {
+			width: var(--w);
+		}
 	}
 
 	.metrics-privacy {
