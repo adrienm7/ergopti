@@ -1,101 +1,63 @@
+<div align="center">
+
+<img src="static/img/logo/logo_simple.svg" alt="Ergopti logo" width="90" />
+
 # Ergopti
 
-**An ergonomic keyboard layout optimised for French, English, and code.**
+**An ergonomic keyboard layout optimised for French, English and code —
+and Ergopti+, the free, 100 % local typing-automation suite that works on _any_ layout.**
 
-![Base layer](static/img/ergopti_visuel.jpg)
+[![CI](https://github.com/adrienm7/ergopti/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/adrienm7/ergopti/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/adrienm7/ergopti)](https://github.com/adrienm7/ergopti/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Website](https://img.shields.io/badge/website-ergopti.fr-31beff)](https://ergopti.fr)
 
-➜ **[ergopti.fr](https://ergopti.fr)** — interactive demo, full documentation, online emulator
+**[ergopti.fr](https://ergopti.fr)** — interactive demo, documentation, online emulator ·
+**[ergopti.fr/ergopti-plus](https://ergopti.fr/ergopti-plus)** — the Ergopti+ tour
+
+</div>
 
 ---
 
-## Overview
+## Table of contents
 
-Ergopti is an open-source keyboard layout designed to minimise finger travel and same-finger bigrams while remaining immediately usable — numbers stay on the top row, and the most common shortcuts (<kbd>Ctrl</kbd>+<kbd>A/C/V/X/Z</kbd>) are kept on the left side of the keyboard.
+- [The Ergopti layout](#the-ergopti-layout)
+- [The Ergopti+ suite](#the-ergopti-suite)
+- [Installation](#installation)
+  - [Install the layout](#install-the-layout)
+  - [Install Ergopti+](#install-ergopti)
+- [Try it in your browser](#try-it-in-your-browser)
+- [Repository layout](#repository-layout)
+- [Development](#development)
+  - [Website (SvelteKit)](#website-sveltekit)
+  - [Windows driver (AutoHotkey v2)](#windows-driver-autohotkey-v2)
+  - [macOS driver (Hammerspoon)](#macos-driver-hammerspoon)
+  - [Linux driver (alpha)](#linux-driver-alpha)
+  - [Tests and quality gates](#tests-and-quality-gates)
+- [CI and releases](#ci-and-releases)
+- [Website deployment](#website-deployment)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## The Ergopti layout
+
+An open-source keyboard layout designed to minimise finger travel and same-finger
+bigrams while remaining immediately usable — numbers stay on the top row, and the
+most common shortcuts (<kbd>Ctrl</kbd>+<kbd>A/C/V/X/Z</kbd>) stay on the left hand.
+
+![Base layer](static/img/ergopti_visuel.jpg)
 
 |                        |                                                                              |
 | ---------------------- | ---------------------------------------------------------------------------- |
 | **Languages**          | French · English · Code                                                      |
-| **Licence**            | MIT                                                                          |
-| **Platforms**          | macOS · Windows · Linux                                                      |
-| **Numbers**            | Direct access on top row                                                     |
+| **Platforms**          | Windows · macOS · Linux                                                      |
+| **Numbers**            | Direct access on the top row                                                 |
 | **AltGr layer**        | Programming symbols, logically placed                                        |
 | **Special characters** | Full French typographic support (accented capitals, ligatures, punctuation…) |
 
----
-
-## Install
-
-**→ Download the [latest release](https://github.com/adrienm7/ergopti/releases/latest)**
-
-### macOS — ErgoptiPlus.app
-
-The macOS release is a self-contained app that bundles Hammerspoon and Karabiner-Elements. No separate installs required.
-
-1. Download `ErgoptiPlus.app.zip` and unzip it.
-2. Move `Ergopti.app` to `/Applications`.
-3. Remove the quarantine flag (the app is not Apple-notarised yet):
-   ```bash
-   xattr -dr com.apple.quarantine /Applications/Ergopti.app
-   ```
-4. Launch the app. On first run, Karabiner-Elements will ask for a System Extension approval — this is required for key remapping.
-
-### Windows — ErgoptiPlus.exe
-
-The Windows release is a compiled AutoHotkey v2 executable. The AHK runtime is embedded; no separate installation needed.
-
-1. Download `ErgoptiPlus.exe`.
-2. Double-click to run. On first launch, resources are extracted to `%LOCALAPPDATA%\Ergopti`.
-
-### Linux
-
-The Linux driver (XKB) is served from the website. Follow the instructions at **[ergopti.fr/utilisation](https://ergopti.fr/utilisation)**.
-
----
-
-## Ergopti+
-
-Ergopti+ is the extended variant of the layout. It goes far beyond a simple key remapping — it is a complete typing automation layer that eliminates friction at every level.
-
-![Base layer +](static/img/ergopti_plus.jpg)
-
-### Repeat key <kbd>★</kbd>
-
-A dedicated repeat key eliminates double-letter awkwardness. Typing <kbd>el★e</kbd> produces `elle`; <kbd>★</kbd> always repeats the last character. No more same-finger rolls for doubles.
-
-### Abbreviation expansion
-
-The same <kbd>★</kbd> key doubles as an abbreviation trigger. Type a short code and press <kbd>★</kbd> to expand it — for example `pex★` → `par exemple`. Hundreds of built-in expansions, fully customisable.
-
-### SFB elimination
-
-All remaining same-finger bigrams are resolved via smart substitutions. For instance, pressing <kbd>,t</kbd> outputs `pt` — the layout silently routes around any uncomfortable finger combination.
-
-### Smart <kbd>q</kbd>
-
-The <kbd>q</kbd> key automatically outputs `qu` when followed by a vowel — covering the overwhelming majority of French usage — and outputs `q` in all other contexts. No extra keystrokes.
-
-### Tap-holds
-
-Keys have a secondary function when held. Tap for the letter, hold for a modifier, a layer switch, or a shortcut. Eliminates the need to reach for dedicated modifier keys in many situations.
-
-### Comfort rolls
-
-New rolling sequences are introduced to turn common bigrams into inward rolls. For example, <kbd>hc</kbd> outputs `wh`. These additions are chosen for frequency and ergonomic benefit, not arbitrary remapping.
-
-### And more
-
-- Navigation layer accessible from the home row
-- Local LLM integration (on macOS, via the bundled Ollama)
-- System tray icon with live status and toggle controls
-- Auto-update via Sparkle (macOS) / built-in updater (Windows)
-
-➜ Try the layout in the browser: **[ergopti.fr/utilisation#clavier_emulation](https://ergopti.fr/utilisation#clavier_emulation)**
-
----
-
-## Layers
-
-**AltGr layer** — programming symbols, logically grouped for memorability:
+**AltGr layer** — programming symbols grouped for memorability:
 
 ![AltGr layer](static/img/ergopti_altgr.jpg)
 
@@ -105,99 +67,217 @@ New rolling sequences are introduced to turn common bigrams into inward rolls. F
 
 ---
 
-## Website development
+## The Ergopti+ suite
 
-The project website runs on [SvelteKit](https://kit.svelte.dev/). The keyboard visualiser is built from scratch: a 16×7 grid of empty keys is filled from a JSON file according to the geometry, the active layer, and whether Ergopti+ is enabled.
+Ergopti+ is the companion software — a complete typing-automation layer that runs
+on **any** layout (AZERTY, QWERTY, Bépo, …). The Ergopti layout unlocks extra
+bonuses, but is entirely optional. Everything is **free, open-source, local-only,
+with no account and no telemetry**.
 
-### Setup
+![Base layer +](static/img/ergopti_plus.jpg)
+
+| Feature                  |                                                                                                                                              |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Hotstrings**           | ~3 000 ready-made corrections and expansions, plus your own — with the magic <kbd>★</kbd> key (`pex★` → `par exemple`, `el★e` → `elle`)      |
+| **Local AI predictions** | Sentence completion and correction via Ollama or MLX (Apple Silicon), 110-model curated catalogue; optional remote APIs with encrypted keys   |
+| **Tap-holds**            | 7 default dual-role keys (tap = action, hold = modifier) + a home-row navigation layer                                                        |
+| **Trackpad gestures**    | 36 gesture slots + 3 continuous axes on macOS (10 slots on Windows)                                                                           |
+| **Typing metrics**       | Local SQLite dashboards (WPM over time, delegated keystrokes, n-grams, heatmaps) + a floating live WPM widget                                 |
+| **Fully configurable**   | 335 settings, 21 interface languages, every feature optional and toggleable from the menu                                                     |
+
+The three drivers share a single source of truth (`static/ergopti_plus/_shared/`)
+for hotstrings, the LLM catalogue, locales, menus and webview UIs — so Windows,
+macOS and Linux behave the same by construction.
+
+---
+
+## Installation
+
+Ergopti (the layout) and Ergopti+ (the software) install independently — use
+either without the other, or both together for the maximum gain.
+
+### Install the layout
+
+Follow the per-OS instructions (installers, keylayout bundle, XKB files) at
+**[ergopti.fr/utilisation](https://ergopti.fr/utilisation)**.
+
+### Install Ergopti+
+
+**→ Download from the [latest release](https://github.com/adrienm7/ergopti/releases/latest)**
+
+**Windows — `ErgoptiPlus.exe`**
+
+A compiled AutoHotkey v2 executable; the AHK runtime is embedded, nothing else to
+install.
+
+1. Download `ErgoptiPlus.exe` and double-click it.
+2. On first launch, resources are extracted to `%LOCALAPPDATA%\Ergopti`.
+
+**macOS — `ErgoptiPlus.app.zip`**
+
+A self-contained app bundling Hammerspoon and Karabiner-Elements.
+
+1. Download `ErgoptiPlus.app.zip`, unzip, move the app to `/Applications`.
+2. Remove the quarantine flag (the app is not Apple-notarised yet):
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/Ergopti.app
+   ```
+3. Launch it. On first run, Karabiner-Elements asks for a System Extension
+   approval — required for key remapping.
+
+**Linux — alpha**
+
+The Linux driver (kanata + a Lua daemon) is feature-complete on paper but still
+looking for its first real-world testers. Grab `kanata.kbd` from the release and
+see [`static/ergopti_plus/linux/`](static/ergopti_plus/linux/) — feedback via
+[issues](https://github.com/adrienm7/ergopti/issues) is very welcome.
+
+---
+
+## Try it in your browser
+
+No install needed: **[ergopti.fr/utilisation#clavier_emulation](https://ergopti.fr/utilisation#clavier_emulation)**
+emulates the layout (including the Ergopti+ magic key) directly on the website.
+
+---
+
+## Repository layout
+
+```text
+src/                      SvelteKit website (ergopti.fr)
+static/ergopti_plus/      The Ergopti+ driver suite
+  windows/                AutoHotkey v2 driver (entry: ErgoptiPlus.ahk)
+  macos/                  Hammerspoon driver (entry: init.lua) + bundled apps
+  linux/                  Lua daemon + kanata integration (alpha)
+  _shared/                Cross-driver single source of truth
+                          (hotstrings TOML, LLM catalogue, locales, menus, webview UIs…)
+static/drivers/           Ergopti layout artefacts (keylayout, XKB, …)
+tools/                    Build, codegen, lint and test tooling
+docs/                     Engineering docs — start with docs/PROJECT_MEMORY.md
+```
+
+---
+
+## Development
+
+### Website (SvelteKit)
+
+Requires **Node 22.22+** (or 24.15+ / 26+).
 
 ```bash
 git clone https://github.com/adrienm7/ergopti.git
 cd ergopti
 npm install
+npm run dev            # dev server at http://localhost:5173
+npm run dev -- --open  # …and open the browser
+npm run build          # production build (static site)
+npm run preview        # preview the production build
 ```
 
-### Dev server
+The keyboard visualiser is built from scratch: a 16×7 grid of empty keys filled
+from JSON according to the geometry, the active layer, and whether Ergopti+ is
+enabled.
 
-```bash
-npm run dev          # start at http://localhost:5173
-npm run dev -- --open  # start and open in browser
+### Windows driver (AutoHotkey v2)
+
+Install [AutoHotkey v2](https://www.autohotkey.com/), then run the driver
+straight from the clone:
+
+```powershell
+AutoHotkey64.exe static\ergopti_plus\windows\ErgoptiPlus.ahk
 ```
 
-### Production build
+Source files are UTF-8 **with BOM** + LF — run `npm run test:ahk-encoding` after
+editing `.ahk` files.
 
-```bash
-npm run build
-npm run preview      # preview the production build locally
-```
+### macOS driver (Hammerspoon)
 
-Deploying to a specific host may require installing the matching SvelteKit adapter.
+To iterate on the macOS driver from this clone without rebuilding the app:
 
-## Hammerspoon driver — local dev (macOS)
-
-To iterate on the macOS driver from this clone without re-building the production app:
-
-1. Install stock [Hammerspoon](https://www.hammerspoon.org/) into `/Applications/Hammerspoon.app`.
+1. Install stock [Hammerspoon](https://www.hammerspoon.org/) into `/Applications`.
 2. From the repo root, run once:
+   ```bash
+   npm run install:hammerspoon
+   ```
+3. Launch Hammerspoon — the driver now boots from your local clone. After edits,
+   press <kbd>Cmd</kbd>+<kbd>Ctrl</kbd>+<kbd>R</kbd> to reload.
 
-```bash
-npm run install:hammerspoon
-# or directly: bash tools/dev/install-hammerspoon.sh
-```
+The installer is idempotent; any pre-existing `~/.hammerspoon/init.lua` is backed
+up first. **Don't run stock Hammerspoon and the bundled `ErgoptiPlus.app` at the
+same time** — they compete for the same event taps.
 
-3. Launch Hammerspoon (menubar icon appears). The driver now boots from your local clone.
+### Linux driver (alpha)
 
-After edits, press `Cmd+Ctrl+R` (the bootstrap binds it to `hs.reload()`) — or click "Reload Config" from the menubar.
+The daemon lives in [`static/ergopti_plus/linux/`](static/ergopti_plus/linux/)
+(entry: `ergopti_hotstrings.lua`, launcher: `bin/ergopti-hotstrings`) and pairs
+with [kanata](https://github.com/jtroo/kanata) for tap-holds. Read the header of
+the entry file before running — the driver is untested on real hardware.
 
-The installer is idempotent. Any pre-existing `~/.hammerspoon/init.lua` is backed up to `~/.hammerspoon/init.lua.backup.<timestamp>` before the new one is written; delete the new file and rename the backup to revert.
+### Tests and quality gates
 
-**Coexistence with the production app**: stock Hammerspoon (`org.hammerspoon.Hammerspoon`, reads `~/.hammerspoon/`) and the bundled `ErgoptiPlus.app` (`com.ergoptiplus.app`, reads its own `Contents/Resources/config/`) have isolated preferences and config directories. Launching one or the other selects which version of the driver runs — don't run both menubar icons at the same time (they would compete for the same OS-level event taps and hotkeys).
+| Suite                       | Command                                                             |
+| --------------------------- | ------------------------------------------------------------------- |
+| Site + cross-driver gates   | `npm run test:js`                                                   |
+| macOS driver (Lua)          | `cd static/ergopti_plus/macos && lua tests/run.lua`                 |
+| Windows driver (AHK)        | run `static/ergopti_plus/windows/tests/run_all.ahk` with AHK v2     |
+| Linux driver                | `npm run test:linux`                                                |
+
+House rules: every bug fix ships with a regression test, and the shared
+constants between drivers are pinned by single-source parity tests — see
+[docs/PROJECT_MEMORY.md](docs/PROJECT_MEMORY.md) for the accumulated engineering
+knowledge.
 
 ---
 
-## CI & Releases
+## CI and releases
 
-### Automated versioning
+Every push to `main` or `dev` runs the unified [`ci.yml`](.github/workflows/ci.yml)
+pipeline: validation gates (hotstrings, domain, JS, translations), the three
+driver suites, then — once everything is green — automated SemVer release builds
+for all platforms with an auto-generated changelog.
 
-Every push to `main` or `dev` runs the unified [`ci.yml`](.github/workflows/ci.yml) pipeline. Once every driver suite is green, its `resolve-release-meta` job calculates the next [SemVer](https://semver.org/) tag from the commit history; the build and publish jobs in the same run then produce the release.
+**Version bump** (from conventional commit types since the last tag):
 
-**Bump rules** (from conventional commit types since the last tag):
+| Condition                                          | Bump  |
+| -------------------------------------------------- | ----- |
+| Subject contains `BREAKING` or uses `!` (`feat!:`) | Major |
+| At least one `feat:` commit                        | Minor |
+| Only `fix:`, `perf:`, `refactor:`, …               | Patch |
 
-| Condition                                                          | Bump             |
-| ------------------------------------------------------------------ | ---------------- |
-| Any commit subject contains `BREAKING` or uses `!` (e.g. `feat!:`) | Major — `v1.0.0` |
-| At least one `feat:` commit                                        | Minor — `v0.7.0` |
-| Only `fix:`, `perf:`, `refactor:`, etc.                            | Patch — `v0.6.7` |
+**Channels:** `main` cuts stable releases (`v0.6.7`); `dev` cuts pre-releases
+(`v0.7.0-dev.{run}`); a commit message containing `alpha`/`beta` selects those
+channels.
 
-**Channel rules:**
+---
 
-| Condition                           | Tag format           | Release type                                                                                                 |
-| ----------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Any commit message contains `alpha` | `v0.6.7-alpha.{run}` | Pre-release                                                                                                  |
-| Any commit message contains `beta`  | `v0.6.7-beta.{run}`  | Pre-release                                                                                                  |
-| Branch is `dev` (default)           | `v0.6.0-dev.{run}`   | Pre-release — title shows delta vs last stable: `Ergopti v0.6.0-dev.42 — ✨ 3 feat, 🔧 2 fix (since v0.6.0)` |
-| Branch is `main`                    | `v0.6.7`             | **Stable release**                                                                                           |
+## Website deployment
 
-### Release builds
+[`deploy-site.yml`](.github/workflows/deploy-site.yml) publishes the site to
+GitHub Pages (branch mode, `gh-pages`) whenever site-relevant paths change:
 
-After `resolve-release-meta` computes the tag, the `build-macos`, `build-win` and `build-linux` jobs in [`ci.yml`](.github/workflows/ci.yml) build all platform artefacts in parallel — macOS app + Sparkle appcast, Windows AHK executable, Linux XKB bundle — then `finalize-release` creates the GitHub Release with all assets attached and an auto-generated changelog.
+| Branch | URL                                              |
+| ------ | ------------------------------------------------ |
+| `main` | [ergopti.fr](https://ergopti.fr)                 |
+| `dev`  | [ergopti.fr/dev/](https://ergopti.fr/dev/)       |
 
-### Changelog generation
+Each push rebuilds only the pushed branch's subdirectory, so the two stay
+independent.
 
-The changelog is generated by [`tools/build/build_changelog.py`](tools/build/build_changelog.py), invoked from `ci.yml`'s `finalize-release` job. It aggregates all commits since the previous tag, groups them by conventional commit type (Features → Fix → Performance → …), and formats each entry as **Scope: Subject** in bold for quick scanning.
+---
 
-### Test jobs
+## Contributing
 
-The separate per-driver workflows have been merged into the single
-[`ci.yml`](.github/workflows/ci.yml). Every push to `main` or `dev` (and every
-PR against them) runs the full pipeline — there are no path filters, so all
-suites fire on every change:
+Issues and PRs are welcome — in **English**, so everyone can collaborate.
 
-| Stage            | Jobs                                                                             | Runner           |
-| ---------------- | -------------------------------------------------------------------------------- | ---------------- |
-| Validation gates | `validate-hotstrings`, `validate-domain`, `validate-js`, `validate-translations` | Ubuntu           |
-| macOS driver     | `test-hs`, `e2e-hs`                                                               | Ubuntu (Lua 5.4) |
-| Windows driver   | `test-ahk`, `e2e-ahk`                                                             | Windows          |
-| Linux driver     | `test-linux`                                                                      | Ubuntu           |
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) (shared
+  agent/tooling index) first.
+- Commits follow [Conventional Commits](https://www.conventionalcommits.org/);
+  `main` and `dev` keep a **linear history** (squash, no merge commits).
+- Non-obvious lessons about the codebase belong in
+  [docs/PROJECT_MEMORY.md](docs/PROJECT_MEMORY.md) so they never evaporate.
 
-A release is cut only after all three driver branches are green.
+---
+
+## License
+
+[MIT](LICENSE) © Adrien MOYAUX
