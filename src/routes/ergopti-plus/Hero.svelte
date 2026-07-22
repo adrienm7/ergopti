@@ -164,6 +164,12 @@ FEATURES & RATIONALE:
 			— <strong>gratuit et open-source</strong>.
 		</p>
 
+		<ul class="hero-trust" aria-label="En bref">
+			<li><span class="ht-ico" aria-hidden="true">⚡</span> Frappe augmentée</li>
+			<li><span class="ht-ico" aria-hidden="true">🔒</span> 100 % local</li>
+			<li><span class="ht-ico" aria-hidden="true">⌨️</span> Toute disposition</li>
+		</ul>
+
 		<div class="hero-cta">
 			<a class="btn btn-primary" href={primaryDownload.url} download={!!ui.release}>
 				<i class={primaryDownload.icon}></i>
@@ -219,6 +225,10 @@ FEATURES & RATIONALE:
 				{/each}
 			</ul>
 		</div>
+
+		<a class="scroll-hint" href="#ep-hotstrings" aria-label="Découvrir les fonctionnalités">
+			<span class="scroll-chevron" aria-hidden="true"></span>
+		</a>
 	</div>
 </section>
 
@@ -230,20 +240,101 @@ FEATURES & RATIONALE:
 	}
 
 	.hero-glow {
-		background: radial-gradient(
-			ellipse at center,
-			rgba(49, 190, 255, 0.16) 0%,
-			rgba(49, 190, 255, 0) 65%
-		);
-		height: 640px;
+		/* A soft multi-blob mesh that slowly breathes — replaces the single
+		 * static glow for a calmer, more alive Apple-style backdrop. */
+		animation: hero-mesh 18s var(--ease, ease-in-out) infinite alternate;
+		background:
+			radial-gradient(40% 55% at 30% 32%, rgba(49, 190, 255, 0.2), transparent 70%),
+			radial-gradient(46% 56% at 72% 42%, rgba(2, 201, 219, 0.15), transparent 70%),
+			radial-gradient(52% 62% at 50% 78%, rgba(126, 227, 255, 0.11), transparent 72%);
+		filter: blur(8px);
+		height: 700px;
 		left: 50%;
 		max-width: 100vw;
 		pointer-events: none;
 		position: absolute;
-		top: -120px;
+		top: -150px;
 		transform: translateX(-50%);
-		width: min(960px, 100vw);
+		width: min(1020px, 100vw);
 		z-index: -1;
+	}
+
+	@keyframes hero-mesh {
+		from {
+			opacity: 0.82;
+			transform: translateX(-50%) scale(1);
+		}
+		to {
+			opacity: 1;
+			transform: translateX(-50%) scale(1.08) translateY(12px);
+		}
+	}
+
+	/* ─── Above-the-fold trust pills + scroll hint ──────────── */
+
+	.hero-trust {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px 22px;
+		justify-content: center;
+		list-style: none;
+		margin: 0 0 28px;
+		padding: 0;
+	}
+
+	.hero-trust li {
+		align-items: center;
+		color: var(--ink-soft);
+		display: inline-flex;
+		font-size: 0.9rem;
+		font-weight: 600;
+		gap: 7px;
+	}
+
+	.ht-ico {
+		font-size: 1.05rem;
+	}
+
+	.scroll-hint {
+		color: var(--ink-faint);
+		display: block;
+		height: 26px;
+		margin: clamp(30px, 5vw, 56px) auto 0;
+		width: 26px;
+	}
+
+	.scroll-hint:hover {
+		color: var(--ink);
+	}
+
+	.scroll-chevron {
+		animation: scroll-bounce 1.9s var(--ease, ease-in-out) infinite;
+		border-bottom: 2px solid currentColor;
+		border-right: 2px solid currentColor;
+		display: block;
+		height: 12px;
+		margin: 0 auto;
+		transform: rotate(45deg);
+		width: 12px;
+	}
+
+	@keyframes scroll-bounce {
+		0%,
+		100% {
+			opacity: 0.5;
+			transform: rotate(45deg) translate(0, 0);
+		}
+		50% {
+			opacity: 1;
+			transform: rotate(45deg) translate(4px, 4px);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.hero-glow,
+		.scroll-chevron {
+			animation: none;
+		}
 	}
 
 	/* ─── OS toggle ─────────────────────────────────────────── */

@@ -234,11 +234,14 @@
 
 .ep-root .reveal {
 	opacity: 0;
-	transform: translateY(26px);
+	/* Fade + rise + a barely-there scale — the subtle zoom reads as "settling
+	 * into place" and gives the page an Apple-like calm on scroll. */
+	transform: translateY(26px) scale(0.985);
 	transition:
 		opacity 0.7s var(--ease-out),
 		transform 0.7s var(--ease-out);
 	transition-delay: var(--reveal-delay, 0ms);
+	will-change: opacity, transform;
 }
 
 .ep-root .reveal.is-visible {

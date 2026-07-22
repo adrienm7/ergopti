@@ -26,6 +26,10 @@ FEATURES & RATIONALE:
 	let { items } = $props();
 
 	let activeId = $state('');
+	/** Read progress 0–100, reflecting how far down the page the visitor is. */
+	let progress = $state(0);
+	/** The active section's own accent colour, so the active pill matches it. */
+	let activeAccent = $state('');
 	let navEl;
 
 	onMount(() => {
@@ -40,12 +44,37 @@ FEATURES & RATIONALE:
 			{ rootMargin: SPY_ROOT_MARGIN }
 		);
 		sections.forEach((s) => io.observe(s));
-		return () => io.disconnect();
+
+		// Reading-progress bar — throttled to animation frames so the scroll
+		// handler never blocks the main thread.
+		let ticking = false;
+		const onScroll = () => {
+			if (ticking) return;
+			ticking = true;
+			requestAnimationFrame(() => {
+				const max = document.documentElement.scrollHeight - window.innerHeight;
+				progress = max > 0 ? Math.min(100, (window.scrollY / max) * 100) : 0;
+				ticking = false;
+			});
+		};
+		window.addEventListener('scroll', onScroll, { passive: true });
+		onScroll();
+
+		return () => {
+			io.disconnect();
+			window.removeEventListener('scroll', onScroll);
+		};
 	});
 
-	// Keep the active pill visible inside the horizontally-scrollable bar.
+	// Keep the active pill visible inside the horizontally-scrollable bar, and
+	// adopt the active section's accent colour for the pill fill.
 	$effect(() => {
 		if (!activeId || !navEl) return;
+		const section = document.getElementById(activeId);
+		if (section) {
+			const accent = getComputedStyle(section).getPropertyValue('--section-accent').trim();
+			if (accent) activeAccent = accent;
+		}
 		const pill = navEl.querySelector(`a[href="#${activeId}"]`);
 		if (!pill) return;
 		const { offsetLeft, offsetWidth } = pill;
@@ -54,7 +83,14 @@ FEATURES & RATIONALE:
 	});
 </script>
 
-<nav class="sticky-nav" aria-label="Sections de la page">
+<nav
+	class="sticky-nav"
+	aria-label="Sections de la page"
+	style="--active-accent: {activeAccent || 'var(--accent-blue-deep)'};"
+>
+	<div class="read-progress" aria-hidden="true">
+		<span style="width: {progress}%;"></span>
+	</div>
 	<div class="nav-scroll" bind:this={navEl}>
 		{#each items as item}
 			<a href="#{item.id}" class:active={activeId === item.id}>
@@ -66,13 +102,40 @@ FEATURES & RATIONALE:
 
 <style>
 	.sticky-nav {
+		align-items: center;
 		display: flex;
+		flex-direction: column;
+		gap: 8px;
 		justify-content: center;
 		margin-top: clamp(24px, 4vw, 40px);
 		padding-inline: 12px;
 		position: sticky;
 		top: calc(var(--header-height) + var(--banner-height) + 8px);
 		z-index: 60;
+	}
+
+	/* Thin reading-progress bar above the pill — its fill adopts the active
+	 * section's accent colour, tying the whole page's motion together. */
+	.read-progress {
+		background: rgba(255, 255, 255, 0.08);
+		border-radius: 2px;
+		height: 3px;
+		overflow: hidden;
+		width: min(420px, 78vw);
+	}
+
+	.read-progress span {
+		background: linear-gradient(
+			90deg,
+			var(--active-accent),
+			color-mix(in srgb, var(--active-accent) 55%, #fff)
+		);
+		border-radius: 2px;
+		display: block;
+		height: 100%;
+		transition:
+			width 0.15s linear,
+			background-color 0.4s var(--ease);
 	}
 
 	.nav-scroll {
@@ -116,8 +179,15 @@ FEATURES & RATIONALE:
 	/* The single blue pill marks the section currently in view — no item
 	 * gets a permanent fill, or the scrollspy state becomes unreadable */
 	.nav-scroll a.active {
-		background: linear-gradient(135deg, var(--accent-blue-deep), var(--accent-cyan));
-		box-shadow: 0 4px 18px -6px rgba(48, 136, 237, 0.7);
+		background: linear-gradient(
+			135deg,
+			var(--active-accent),
+			color-mix(in srgb, var(--active-accent) 55%, var(--accent-cyan))
+		);
+		box-shadow: 0 4px 18px -6px color-mix(in srgb, var(--active-accent) 70%, transparent);
 		color: #fff;
+		transition:
+			background-color 0.4s var(--ease),
+			box-shadow 0.4s var(--ease);
 	}
 </style>

@@ -41,6 +41,9 @@ FEATURES & RATIONALE:
 
 	let frameHeight = $derived(Math.min(displayHeight, height));
 
+	// Flips true on the iframe's load event so the skeleton shimmer can hide.
+	let loaded = $state(false);
+
 	// The two dashboards support a bridge-less bootstrap: a "#prefetch=<url>"
 	// hash makes them load a data blob instead of waiting for a native host.
 	// The site ships synthetic demo blobs under /demo/ (see
@@ -242,6 +245,7 @@ FEATURES & RATIONALE:
 	 */
 	function onFrameLoad(ev) {
 		const win = ev.currentTarget?.contentWindow;
+		loaded = true;
 		if (!win) return;
 		try {
 			if (id === 'model_browser') injectModelBrowser(win);
@@ -260,6 +264,9 @@ FEATURES & RATIONALE:
 <div class="frame-shell ep-window os-{ui.osStyle}" style="max-width: {width}px;" use:reveal>
 	<WindowChrome title="/ergopti_plus/_shared/ui/{id}/ · {width}×{height}" live={true} />
 	<div class="frame-wrap" style="height: {frameHeight}px;">
+		{#if !loaded}
+			<div class="frame-skeleton" aria-hidden="true"></div>
+		{/if}
 		<iframe src={frameSrc} title={id} loading="lazy" onload={onFrameLoad}></iframe>
 	</div>
 </div>
@@ -280,7 +287,43 @@ FEATURES & RATIONALE:
 		border: 0;
 		display: block;
 		height: 100%;
+		position: relative;
 		width: 100%;
+		z-index: 1;
+	}
+
+	/* Shimmer placeholder shown until the embedded window finishes loading —
+	 * a calmer first paint than a bare dark rectangle. */
+	.frame-skeleton {
+		background:
+			linear-gradient(
+				100deg,
+				transparent 20%,
+				rgba(255, 255, 255, 0.06) 40%,
+				rgba(255, 255, 255, 0.06) 60%,
+				transparent 80%
+			),
+			#101018;
+		background-size: 220% 100%;
+		inset: 0;
+		position: absolute;
+		z-index: 2;
+		animation: frame-shimmer 1.4s ease-in-out infinite;
+	}
+
+	@keyframes frame-shimmer {
+		from {
+			background-position: 120% 0;
+		}
+		to {
+			background-position: -120% 0;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.frame-skeleton {
+			animation: none;
+		}
 	}
 
 	@media (max-width: 720px) {
