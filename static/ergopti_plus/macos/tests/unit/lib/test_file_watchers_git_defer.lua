@@ -81,6 +81,10 @@ helpers.describe("lib/file_watchers — reload deferral during git pull (macos-r
 		helpers.assert_true(type(captured_fn) == "function", "a .lua change must schedule a reload")
 		helpers.assert_true(reloads == 0, "no reload before the debounce elapses")
 
+		-- Advance past the settle window so this test isolates the GIT hold (not the
+		-- quiescence hold): a lone .lua edit settles after EDIT_SETTLE_SEC.
+		clock = 1001
+
 		-- Debounce elapses while git is STILL writing the tree → must NOT reload.
 		git_busy = true
 		local fn1 = captured_fn

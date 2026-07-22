@@ -29,6 +29,7 @@ local notifications = require("lib.notifications")
 local ui_restore    = require("lib.ui_restore")
 local fs_dir        = require("lib.fs_dir")
 local git_status    = require("lib.git_status")
+local reload_gate   = require("reload_gate")
 
 local LOG = "file_watchers"
 
@@ -47,15 +48,15 @@ local SCAN_MAX_DEPTH = 16
 -- (ui/menu/init.lua BOOT_SUPPRESS_SEC) — the sibling this one was missing.
 local BOOT_SUPPRESS_SEC = 5
 
--- Max consecutive re-polls (each one 0.5 s debounce tick) with the git lock held
--- but NO new file activity, before the guard is bypassed. A real pull keeps
--- writing, which resets the counter (see schedule_reload), so this can only trip
--- on a STALE index.lock left by a crashed git — never on a genuine pull, however
--- long. Capped so such a stale lock cannot postpone auto-reload forever.
--- The debounce interval itself stays the bare literal 0.5 in hs.timer.doAfter
--- below — a cross-driver single-source gate pins it to Linux's _debounce_sec
+-- Max consecutive hold re-polls (each one 0.5 s tick) with NO new file activity,
+-- before the hold is bypassed. Real activity resets the counter (see note_change),
+-- so a genuine bulk write never trips it — only a quiet-but-stuck state (a STALE
+-- index.lock left by a crashed git) climbs toward it. Capped so such a stale lock
+-- cannot postpone auto-reload forever.
+-- The poll interval itself stays the bare literal 0.5 in hs.timer.doAfter below —
+-- a cross-driver single-source gate pins it to Linux's _debounce_sec
 -- (tools/test/test-file-watchers-constants-single-source.cjs).
-local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * 0.5s = 60s of a quiet-but-locked repo
+local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * 0.5s = 60s of a quiet-but-stuck repo
 
 
 
@@ -85,11 +86,21 @@ function M.start(ctx)
 	-- session's buffered events.
 	local suppress_until = hs.timer.secondsSinceEpoch() + BOOT_SUPPRESS_SEC
 
-	local reload_timer    = nil
-	-- Consecutive git-settle re-polls with the lock held but no new file activity;
-	-- reset to 0 by any real file event (schedule_reload) and by a fired reload,
-	-- capped by GIT_SETTLE_MAX_DEFERRALS so only a stale lock can wedge it.
-	local git_defer_count = 0
+	local reload_timer = nil
+	-- Consecutive hold re-polls with NO new file activity; reset to 0 by any real
+	-- file event (note_change) and by a fired reload, capped by
+	-- GIT_SETTLE_MAX_DEFERRALS so only a genuinely stuck state (a stale index.lock,
+	-- or an unending write stream) can ever bypass the hold.
+	local defer_count = 0
+	-- Distinct source paths changed since the current burst began, and the epoch
+	-- time (s) of the last change. Together they drive the adaptive settle: a lone
+	-- edit reloads after EDIT_SETTLE_SEC, but a BULK write — git pull, OneDrive /
+	-- Dropbox sync, rsync, mass save, any source that touches many files — is held
+	-- until activity has been quiet for BULK_SETTLE_SEC, so the reload never fires
+	-- mid-operation (macos-reload-during-git-pull).
+	local burst_paths     = {}
+	local burst_count     = 0
+	local last_change_sec = 0
 
 	-- ``fire_reload`` is forward-declared so the debounce timer closure can call it
 	-- while ``fire_reload`` itself re-arms through ``arm_timer``. The Lua
@@ -99,39 +110,58 @@ function M.start(ctx)
 
 	local function arm_timer(msg)
 		if reload_timer then reload_timer:stop() end
-		-- Bare literal 0.5: a cross-driver single-source gate pins this debounce
+		-- Bare literal 0.5: a cross-driver single-source gate pins this poll tick
 		-- to Linux's _debounce_sec (do not replace it with a named constant).
 		reload_timer = hs.timer.doAfter(0.5, function() fire_reload(msg) end)
 	end
 
-	local function schedule_reload(msg)
+	--- Records a batch of changed paths and (re)arms the settle poll.
+	--- @param msg string Notification message for the eventual reload.
+	--- @param changed table|nil Absolute paths that changed in this event.
+	local function note_change(msg, changed)
+		local now = hs.timer.secondsSinceEpoch()
 		-- Ignore the FSEvents batch macOS replays right after an hs.reload(): during
 		-- the boot window these are the previous session's changes, not a new edit.
-		if hs.timer.secondsSinceEpoch() < suppress_until then return end
-		-- A genuine file event resets the git-settle counter, so a long-running pull
-		-- that keeps writing never trips the stale-lock cap — only a lock held with
-		-- NO further activity climbs toward it.
-		git_defer_count = 0
+		if now < suppress_until then return end
+		if type(changed) == "table" then
+			for _, p in ipairs(changed) do
+				if not burst_paths[p] then
+					burst_paths[p] = true
+					burst_count = burst_count + 1
+				end
+			end
+		end
+		last_change_sec = now
+		-- Genuine activity resets the stuck-state counter, so an ongoing write never
+		-- bypasses the hold; only a quiet-but-stuck state climbs toward the cap.
+		defer_count = 0
 		arm_timer(msg)
 	end
 
 	fire_reload = function(msg)
-		-- Never reload while git is still rewriting the driver's own working tree.
-		-- A `git pull` run against a live driver rewrites init.lua and dozens of
-		-- required modules; firing hs.reload() mid-pull boots against a
-		-- half-updated, internally inconsistent tree, which errors during boot and
-		-- leaves Hammerspoon with no config AND no watchers armed — a dead,
-		-- must-relaunch state. Re-poll each 0.5 s debounce tick until git settles,
-		-- capped so a stale index.lock can never postpone the reload forever
-		-- (macos-reload-during-git-pull).
-		if git_defer_count < GIT_SETTLE_MAX_DEFERRALS and git_status.operation_in_progress(base_dir) then
-			git_defer_count = git_defer_count + 1
-			Logger.debug(LOG, "Reload held — git operation in progress on '%s' (%d/%d).",
-				base_dir, git_defer_count, GIT_SETTLE_MAX_DEFERRALS)
+		-- Hold the reload while the working tree is still being written FROM ANY
+		-- SOURCE, so hs.reload() never re-execs init.lua against a half-updated,
+		-- internally inconsistent tree (which errors during boot and, via repeated
+		-- reloads, cascades into the keyboard-freezing storm). Two signals:
+		--   1. Quiescence — a bulk write (git pull, cloud sync, rsync, mass save)
+		--      shows up as many distinct files; hold until BULK_SETTLE_SEC of quiet.
+		--   2. Git — a git operation holds .git/index.lock for the whole update, so
+		--      it is deferred exactly even if its file events pause partway through.
+		local elapsed = hs.timer.secondsSinceEpoch() - last_change_sec
+		local hold, why
+		if not reload_gate.is_settled(elapsed, burst_count) then
+			hold, why = true, "filesystem settling"
+		elseif git_status.operation_in_progress(base_dir) then
+			hold, why = true, "git operation in progress"
+		end
+		if hold and defer_count < GIT_SETTLE_MAX_DEFERRALS then
+			defer_count = defer_count + 1
+			Logger.debug(LOG, "Reload held (%s) on '%s' (%d/%d).", why, base_dir, defer_count, GIT_SETTLE_MAX_DEFERRALS)
 			arm_timer(msg)
 			return
 		end
-		git_defer_count = 0
+		-- Tree is settled and consistent: clear the burst and reload.
+		burst_paths, burst_count, defer_count = {}, 0, 0
 		ui_restore.defer_reload(function()
 			-- snapshot() is a safety net for any UI still open at reload time;
 			-- under normal deferral they are already closed so it saves nothing
@@ -149,12 +179,13 @@ function M.start(ctx)
 
 	-- Catches file creation, deletion, and renames in the hotstrings directory
 	local dir_watcher = hs.pathwatcher.new(hotstrings_dir, function(paths)
+		local hit = {}
 		for _, p in ipairs(paths) do
 			if p:match("%.toml$") or p:match("_index%.json$") or p:match("%.local_ahk_path$") then
-				schedule_reload(i18n.get("init.reload_hotstrings"))
-				return
+				hit[#hit + 1] = p
 			end
 		end
+		if #hit > 0 then note_change(i18n.get("init.reload_hotstrings"), hit) end
 	end)
 	dir_watcher:start()
 	table.insert(_G.script_watchers, dir_watcher)
@@ -184,12 +215,11 @@ function M.start(ctx)
 		visited[canonical] = true
 
 		local w = hs.pathwatcher.new(dir, function(paths)
+			local hit = {}
 			for _, p in ipairs(paths) do
-				if not p:match("^/tmp/") then
-					schedule_reload(i18n.get("init.reload_hotstrings"))
-					return
-				end
+				if not p:match("^/tmp/") then hit[#hit + 1] = p end
 			end
+			if #hit > 0 then note_change(i18n.get("init.reload_hotstrings"), hit) end
 		end)
 		w:start()
 		table.insert(_G.script_watchers, w)
@@ -202,8 +232,8 @@ function M.start(ctx)
 					if a.mode == "directory" then
 						watch_personal_hotstrings_dir(path, depth + 1)
 					elseif a.mode == "file" and fname:match("%.toml$") then
-						local fw = hs.pathwatcher.new(path, function()
-							schedule_reload(i18n.get("init.reload_hotstrings"))
+						local fw = hs.pathwatcher.new(path, function(paths)
+							note_change(i18n.get("init.reload_hotstrings"), paths)
 						end)
 						fw:start()
 						table.insert(_G.script_watchers, fw)
@@ -219,16 +249,17 @@ function M.start(ctx)
 	-- drive Hammerspoon runtime behavior and warrant a reload
 	Logger.debug(LOG, "Configuring file watchers for auto-reloading…")
 	local project_watcher = hs.pathwatcher.new(base_dir, function(paths)
+		local hit = {}
 		for _, p in ipairs(paths) do
-			-- Ignore temporary files (tokens, etc.)
-			if p:find("^/tmp/") or p:find("hs_hf_token_") or p:find("hs_hf_login_") then
-				return
+			-- Ignore temporary files (tokens, etc.); a batch may still carry a real
+			-- .lua change alongside them, so skip rather than abandon the batch.
+			if not (p:find("^/tmp/") or p:find("hs_hf_token_") or p:find("hs_hf_login_")) and p:match("%.lua$") then
+				hit[#hit + 1] = p
 			end
-			if p:match("%.lua$") then
-				Logger.debug(LOG, "Lua file change detected: %s", p)
-				schedule_reload(i18n.get("init.reload_script"))
-				return
-			end
+		end
+		if #hit > 0 then
+			Logger.debug(LOG, "Lua file change detected: %s (+%d more)", hit[1], #hit - 1)
+			note_change(i18n.get("init.reload_script"), hit)
 		end
 	end)
 	project_watcher:start()
@@ -243,8 +274,8 @@ function M.start(ctx)
 	-- Safety net for in-place edits that directory watchers may miss
 	for _, fname in ipairs(fs_dir.entries(hotstrings_dir)) do
 		if fname:match("%.toml$") or fname:match("_index%.json$") then
-			local w = hs.pathwatcher.new(hotstrings_dir .. fname, function()
-				schedule_reload(i18n.get("init.reload_hotstrings"))
+			local w = hs.pathwatcher.new(hotstrings_dir .. fname, function(paths)
+				note_change(i18n.get("init.reload_hotstrings"), paths)
 			end)
 			w:start()
 			table.insert(_G.script_watchers, w)

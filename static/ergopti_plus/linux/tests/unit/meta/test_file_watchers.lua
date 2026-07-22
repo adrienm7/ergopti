@@ -15,6 +15,7 @@
 --- resets between test cases.
 
 local helpers = require("tests.helpers")
+local reload_gate = require("reload_gate")
 
 -- ------------------------------------------------------------------
 -- Temp-directory helpers.  A sequence counter guarantees uniqueness
@@ -278,6 +279,45 @@ helpers.describe("file_watchers", function()
 				now_ms = now_ms + 600 -- past the (repeatedly re-armed) deadline
 				fw.pump()
 				helpers.assert_eq(fired_count, 1, "debounce collapsed 3 changes into 1 callback")
+
+				fw.stop()
+				rm_dir(dir)
+			end)
+
+			-- Regression: a BULK write (git pull, OneDrive/Dropbox sync, rsync, mass
+			-- save) touches many files with gaps a plain 0.5s debounce cannot bridge,
+			-- so the daemon would re-scan a half-written config. The adaptive settle
+			-- holds a many-file burst until the long bulk window of quiet
+			-- (macos-reload-during-git-pull).
+			helpers.it("holds a many-file bulk burst until the bulk settle window", function()
+				local dir = make_temp_dir()
+				local N = reload_gate.BULK_THRESHOLD + 5
+				for i = 1, N do write_file(dir .. "/g" .. i .. ".toml") end
+				local fw = helpers.load_module("lib.file_watchers")
+				local fired_count = 0
+				local now_ms = 1000
+				fw.start({
+					hotstrings_dir = dir,
+					now_ms = function() return now_ms end,
+					on_reload = function() fired_count = fired_count + 1 end,
+				})
+
+				fw.pump() -- baseline stat of every entry
+				sleep_sec(0.1)
+				for i = 1, N do touch_file(dir .. "/g" .. i .. ".toml") end
+				fw.pump() -- detects the bulk change, arms the settle
+				helpers.assert_eq(fired_count, 0, "not fired before the deadline")
+
+				-- Past the 500 ms poll but only the lone-edit window of quiet: a bulk
+				-- burst must STILL be held.
+				now_ms = now_ms + 600
+				fw.pump()
+				helpers.assert_eq(fired_count, 0, "a bulk burst must NOT fire after only the edit settle window")
+
+				-- Once the bulk-settle window of quiet has elapsed, it fires exactly once.
+				now_ms = now_ms + math.floor(reload_gate.BULK_SETTLE_SEC * 1000) + 100
+				fw.pump()
+				helpers.assert_eq(fired_count, 1, "the bulk write fires once settled")
 
 				fw.stop()
 				rm_dir(dir)

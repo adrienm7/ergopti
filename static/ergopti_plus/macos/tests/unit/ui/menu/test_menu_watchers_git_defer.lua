@@ -37,9 +37,10 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 			captured_cb = cb
 			return { start = function() end }
 		end }
+		local clock = 1000   -- drives hs.timer.secondsSinceEpoch()
 		hs.timer = {
 			doAfter = function(_s, fn) captured_fn = fn; return { stop = function() end } end,
-			secondsSinceEpoch = function() return 1000 end,
+			secondsSinceEpoch = function() return clock end,
 		}
 
 		-- ui_restore pass-through so the deferred reload runs when fired.
@@ -59,6 +60,10 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 		captured_cb({ "/fake/base/modules/foo.lua" })
 		helpers.assert_true(type(captured_fn) == "function", "a .lua change must schedule a reload")
 		helpers.assert_true(reloads == 0, "no reload before the debounce elapses")
+
+		-- Advance past the settle window so this isolates the GIT hold, not the
+		-- quiescence hold (a lone .lua edit settles after EDIT_SETTLE_SEC).
+		clock = 1001
 
 		-- Debounce elapses while git is STILL writing the tree → must NOT reload.
 		git_busy = true
