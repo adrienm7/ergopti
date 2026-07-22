@@ -359,10 +359,11 @@ function plistString(xml, key) {
 
 /**
  * List the extra .app bundles shipped with the macOS driver, with the pitch
- * each bundle carries in its own Info.plist (ErgoptiDescription dict).
+ * each bundle carries in its own Info.plist (ErgoptiDescription dict) and its
+ * icon inlined as SVG (the bundles ship a web-friendly AppIcon.svg).
  * Fully automated: drop a described .app into macos/apps/ and it appears on
  * the page at the next deploy.
- * @returns {Array<{id: string, name: string, description: string}>}
+ * @returns {Array<{id: string, name: string, description: string, icon: string|null}>}
  */
 function loadMacosApps() {
 	return readdirSync(MACOS_APPS_ROOT, { withFileTypes: true })
@@ -370,10 +371,23 @@ function loadMacosApps() {
 		.map((e) => {
 			const xml = readFileSync(resolve(MACOS_APPS_ROOT, e.name, 'Contents/Info.plist'), 'utf-8');
 			const descBlock = xml.match(/<key>ErgoptiDescription<\/key>\s*<dict>([\s\S]*?)<\/dict>/)?.[1];
+			// Inline the bundle's own icon; small hand-authored SVGs, so this
+			// stays cheap and needs no extra asset request or URL-encoding of
+			// the space-containing .app path.
+			let icon = null;
+			try {
+				icon = readFileSync(
+					resolve(MACOS_APPS_ROOT, e.name, 'Contents/Resources/AppIcon.svg'),
+					'utf-8'
+				).replace(/<\?xml[^>]*\?>\s*/, '');
+			} catch (_) {
+				/* No SVG icon shipped — the card falls back to a monogram. */
+			}
 			return {
 				id: e.name.replace(/\.app$/, ''),
 				name: plistString(xml, 'CFBundleDisplayName') || plistString(xml, 'CFBundleName') || e.name,
-				description: descBlock ? plistString(descBlock, 'fr') : ''
+				description: descBlock ? plistString(descBlock, 'fr') : '',
+				icon
 			};
 		})
 		.sort((a, b) => a.name.localeCompare(b.name, 'fr'));

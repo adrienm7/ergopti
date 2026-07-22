@@ -42,7 +42,7 @@ FEATURES & RATIONALE:
 		{ label: 'Widget WPM flottant', win: 'yes', mac: 'yes', linux: 'no' },
 		{ label: 'Menu complet (335 réglages, 21 langues)', win: 'yes', mac: 'yes', linux: 'alpha' },
 		{ label: 'Mises à jour automatiques', win: 'yes', mac: 'yes', linux: 'alpha' },
-		{ label: 'Spotlight curseur (présentations)', win: 'yes', mac: 'no', linux: 'no' }
+		{ label: 'Spotlight curseur (présentations)', win: 'yes', mac: 'yes', linux: 'no' }
 	];
 
 	/**
@@ -117,7 +117,7 @@ FEATURES & RATIONALE:
 			<span class="lg off">— = absent</span>
 		</p>
 
-		<!-- Per-OS bonuses -->
+		<!-- Per-OS bonuses (exclusive features that are not bundled apps) -->
 		<div class="bonus-grid">
 			<article class="ep-card bonus-card" use:reveal>
 				<h3><i class="icon-windows bonus-icon"></i> En bonus sur Windows</h3>
@@ -133,31 +133,48 @@ FEATURES & RATIONALE:
 						<em>chiffres en accès direct</em> — deux des plus gros gains de la disposition, disponibles
 						partout.
 					</li>
-					<li>
-						<strong>Spotlight curseur.</strong> Un halo met votre curseur en évidence et repère les autres
-						écrans — parfait pour les présentations.
-					</li>
 				</ul>
 			</article>
 
 			<article class="ep-card bonus-card" use:reveal={{ delay: 90 }}>
 				<h3><i class="icon-appleinc bonus-icon"></i> En bonus sur macOS</h3>
 				<ul class="bonus-list">
-					{#each macosApps as app}
-						<li>
-							<strong>{app.name}.</strong>
-							{app.description}
-						</li>
-					{/each}
 					<li>
-						<strong>MLX et gestes complets.</strong> Inférence IA accélérée par Apple Silicon, et le
-						moteur de gestes intégral (36 emplacements + 3 axes continus).
+						<strong>Backend MLX (Apple Silicon).</strong> Inférence IA locale accélérée par la puce Apple
+						— des prédictions plus rapides, toujours sans passer par le cloud.
+					</li>
+					<li>
+						<strong>Moteur de gestes intégral.</strong> 36 emplacements de gestes trackpad et 3 axes
+						continus, là où Windows en propose 10.
 					</li>
 				</ul>
-				<p class="bonus-note">
-					Descriptions extraites automatiquement des applications embarquées dans le driver.
-				</p>
 			</article>
+		</div>
+
+		<!-- macOS bundled apps — showcased with their real bundle icons -->
+		<div class="apps-showcase" use:reveal>
+			<h3 class="apps-title"><i class="icon-appleinc"></i> Applications macOS incluses</h3>
+			<p class="apps-lead">
+				Des utilitaires signés Ergopti, livrés directement dans le driver macOS — rien de plus à
+				installer.
+			</p>
+			<div class="apps-grid">
+				{#each macosApps as app, i (app.id)}
+					<article class="ep-card app-card" use:reveal={{ delay: (i % 3) * 70 }}>
+						<div class="app-icon" aria-hidden="true">
+							{#if app.icon}{@html app.icon}{:else}<span class="app-monogram">{app.name.charAt(0)}</span
+								>{/if}
+						</div>
+						<div class="app-text">
+							<h4>{app.name}</h4>
+							<p>{app.description}</p>
+						</div>
+					</article>
+				{/each}
+			</div>
+			<p class="apps-note">
+				Applications et descriptions extraites automatiquement des bundles embarqués dans le driver.
+			</p>
 		</div>
 
 		<aside class="linux-callout ep-card" use:reveal>
@@ -177,11 +194,11 @@ FEATURES & RATIONALE:
 		<!-- Final CTA -->
 		<div class="cta-card" use:reveal>
 			<div class="cta-glow" aria-hidden="true"></div>
-			<h2 class="cta-title">Prêt à taper moins ?</h2>
+			<p class="cta-eyebrow">Gratuit · Open-source · 100 % local</p>
+			<h2 class="cta-title">Prêt à taper moins&nbsp;?</h2>
 			<p class="cta-sub">
-				Téléchargez <ErgoptiPlus></ErgoptiPlus>{#if ui.release}&nbsp;<span class="cta-version"
-						>{ui.release.tag}</span
-					>{/if}, lancez-le, tapez <code>ct★</code>. Le reste suivra.
+				Installez <ErgoptiPlus></ErgoptiPlus>, lancez-le, tapez <code>ct★</code> — et regardez
+				<span class="cta-demo">c’était</span> s’écrire tout seul. Le reste suivra.
 			</p>
 			<div class="cta-buttons">
 				<a
@@ -206,10 +223,15 @@ FEATURES & RATIONALE:
 					<i class="icon-linux"></i><span>Linux <small>(alpha)</small></span>
 				</a>
 			</div>
+			<ul class="cta-trust" aria-label="Garanties">
+				{#if ui.release}<li class="cta-trust-version">{ui.release.tag}</li>{/if}
+				<li>Aucun compte</li>
+				<li>Aucune télémétrie</li>
+				<li>Désinstallation en un clic</li>
+			</ul>
 			<p class="cta-foot">
-				Gratuit · Open-source · Sans compte —
 				<a href="utilisation" class="cta-link"
-					>et installez la disposition Ergopti pour le combo complet →</a
+					>Vous tapez déjà en Ergopti&nbsp;? Installez la disposition pour le combo complet →</a
 				>
 			</p>
 		</div>
@@ -376,16 +398,96 @@ FEATURES & RATIONALE:
 		line-height: 1.6;
 	}
 
-	.bonus-note {
-		color: var(--ink-faint);
-		font-size: 0.78rem;
-		margin-top: 14px;
-	}
-
 	@media (max-width: 880px) {
 		.bonus-grid {
 			grid-template-columns: 1fr;
 		}
+	}
+
+	/* ─── macOS apps showcase ───────────────────────────────── */
+
+	.apps-showcase {
+		margin-top: 28px;
+	}
+
+	.apps-title {
+		align-items: center;
+		display: flex;
+		font-size: 1.1rem;
+		gap: 10px;
+		justify-content: center;
+	}
+
+	.apps-title .icon-appleinc {
+		color: #e8e8ed;
+	}
+
+	.apps-lead {
+		color: var(--ink-soft);
+		font-size: 0.9rem;
+		margin: 6px auto 18px;
+		max-width: 560px;
+		text-align: center;
+	}
+
+	.apps-grid {
+		display: grid;
+		gap: 14px;
+		grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+	}
+
+	.app-card {
+		align-items: center;
+		display: flex;
+		gap: 14px;
+		text-align: left;
+	}
+
+	.app-icon {
+		border-radius: 22%;
+		flex-shrink: 0;
+		height: 56px;
+		overflow: hidden;
+		width: 56px;
+	}
+
+	/* The inlined bundle SVG is injected via {@html}, so it escapes Svelte's
+	 * style scoping — reach it with :global to make it fill the icon slot. */
+	.app-icon :global(svg) {
+		display: block;
+		height: 100%;
+		width: 100%;
+	}
+
+	.app-monogram {
+		align-items: center;
+		background: linear-gradient(135deg, var(--accent-blue-deep), var(--accent-cyan));
+		color: #fff;
+		display: flex;
+		font-size: 1.5rem;
+		font-weight: 800;
+		height: 100%;
+		justify-content: center;
+		width: 100%;
+	}
+
+	.app-text h4 {
+		font-size: 1rem;
+		margin: 0 0 3px;
+	}
+
+	.app-text p {
+		color: var(--ink-soft);
+		font-size: 0.86rem;
+		line-height: 1.5;
+		margin: 0;
+	}
+
+	.apps-note {
+		color: var(--ink-faint);
+		font-size: 0.78rem;
+		margin: 16px 0 0;
+		text-align: center;
 	}
 
 	/* ─── Linux callout ─────────────────────────────────────── */
@@ -449,14 +551,64 @@ FEATURES & RATIONALE:
 		text-align: center;
 	}
 
-	.cta-version {
+	.cta-eyebrow {
+		color: var(--accent-blue);
+		font-size: 0.8rem;
+		font-weight: 700;
+		letter-spacing: 0.12em;
+		margin: 0 0 14px;
+		position: relative;
+		text-transform: uppercase;
+	}
+
+	/* The live-expansion word, tinted like the driver's magic-key family */
+	.cta-demo {
+		color: #ff6b68;
+		font-weight: 700;
+	}
+
+	.cta-trust {
+		align-items: center;
+		color: var(--ink-faint);
+		display: flex;
+		flex-wrap: wrap;
+		font-size: 0.82rem;
+		gap: 8px 18px;
+		justify-content: center;
+		list-style: none;
+		margin: 22px 0 0;
+		padding: 0;
+		position: relative;
+	}
+
+	.cta-trust li {
+		align-items: center;
+		display: flex;
+		gap: 6px;
+	}
+
+	/* Separator dot between trust items */
+	.cta-trust li:not(:first-child)::before {
+		background: var(--ink-faint);
+		border-radius: 50%;
+		content: '';
+		height: 3px;
+		opacity: 0.5;
+		width: 3px;
+	}
+
+	.cta-trust-version {
 		background: rgba(49, 190, 255, 0.12);
 		border: 1px solid rgba(49, 190, 255, 0.3);
 		border-radius: 999px;
 		color: var(--accent-blue);
-		font-size: 0.82rem;
-		font-weight: 600;
+		font-weight: 700;
 		padding: 2px 10px;
+	}
+
+	/* The version chip owns its spacing — no separator dot before it */
+	.cta-trust .cta-trust-version::before {
+		display: none;
 	}
 
 	.cta-buttons {
