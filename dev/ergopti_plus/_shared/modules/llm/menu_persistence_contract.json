@@ -1,0 +1,436 @@
+{
+	"description": "Canonical LLM tray/menu settings that must round-trip to config.toml. Run: python validate_menu_persistence_contract.py; AHK windows/tests/run_llm_menu_persistence.ahk; HS macos/tests/run.lua (test_llm_menu_persistence.lua). Add a row here for every new IA menu knob.",
+	"entries": [
+		{
+			"id": "enabled",
+			"ahk": {
+				"tray_key": "enabled",
+				"features": ["enabled"],
+				"section": "llm",
+				"key": "enabled",
+				"sample": false
+			},
+			"hs": { "flat_key": "llm_enabled", "section": "llm", "key": "enabled", "sample": false }
+		},
+		{
+			"id": "backend",
+			"ahk": {
+				"tray_key": "backend",
+				"features": ["models", "selected"],
+				"section": "llm.models",
+				"key": "selected",
+				"sample": "ollama"
+			},
+			"hs": {
+				"flat_key": "llm_backend",
+				"section": "llm",
+				"path": "models",
+				"key": "selected",
+				"sample": "ollama"
+			}
+		},
+		{
+			"id": "model_ollama",
+			"ahk": {
+				"tray_key": "model",
+				"features": ["models", "ollama"],
+				"section": "llm.models",
+				"key": "ollama",
+				"sample": "Qwen3.5-0.8B"
+			},
+			"hs": {
+				"flat_key": "llm_model_ollama",
+				"section": "llm",
+				"path": "models",
+				"key": "ollama",
+				"sample": "Qwen3.5-0.8B"
+			}
+		},
+		{
+			"id": "active_profile",
+			"ahk": {
+				"tray_key": "profile_id",
+				"features": ["profiles", "active"],
+				"section": "llm.profiles",
+				"key": "active",
+				"sample": "advanced"
+			},
+			"hs": {
+				"flat_key": "llm_active_profile",
+				"section": "llm",
+				"path": "profiles",
+				"key": "active",
+				"sample": "advanced"
+			}
+		},
+		{
+			"id": "num_predictions",
+			"ahk": {
+				"tray_key": "n_predictions",
+				"features": ["profiles", "num_predictions"],
+				"section": "llm.profiles",
+				"key": "num_predictions",
+				"sample": 2
+			},
+			"hs": {
+				"flat_key": "llm_num_predictions",
+				"section": "llm",
+				"path": "profiles",
+				"key": "num_predictions",
+				"sample": 2
+			}
+		},
+		{
+			"id": "auto_profile_for_model",
+			"ahk": {
+				"tray_key": "auto_profile_for_model",
+				"features": ["profiles", "auto_profile_for_model"],
+				"section": "llm.profiles",
+				"key": "auto_profile_for_model",
+				"sample": false
+			},
+			"hs": null
+		},
+		{
+			"id": "temperature",
+			"ahk": {
+				"tray_key": "temperature",
+				"features": ["generation", "temperature"],
+				"section": "llm.generation",
+				"key": "temperature",
+				"sample": "0.55",
+				"toml_number": true
+			},
+			"hs": {
+				"flat_key": "llm_temperature",
+				"section": "llm",
+				"path": "generation",
+				"key": "temperature",
+				"sample": 0.55
+			}
+		},
+		{
+			"id": "min_words",
+			"ahk": {
+				"tray_key": "min_words",
+				"features": ["generation", "min_words"],
+				"section": "llm.generation",
+				"key": "min_words",
+				"sample": 4
+			},
+			"hs": {
+				"flat_key": "llm_min_words",
+				"section": "llm",
+				"path": "generation",
+				"key": "min_words",
+				"sample": 4
+			}
+		},
+		{
+			"id": "max_words",
+			"ahk": {
+				"tray_key": "max_words",
+				"features": ["generation", "max_words"],
+				"section": "llm.generation",
+				"key": "max_words",
+				"sample": 20
+			},
+			"hs": {
+				"flat_key": "llm_max_words",
+				"section": "llm",
+				"path": "generation",
+				"key": "max_words",
+				"sample": 20
+			}
+		},
+		{
+			"id": "context_length",
+			"ahk": {
+				"tray_key": "ctx_chars",
+				"features": ["generation", "context_length"],
+				"section": "llm.generation",
+				"key": "context_length",
+				"sample": 800
+			},
+			"hs": {
+				"flat_key": "llm_context_length",
+				"section": "llm",
+				"path": "generation",
+				"key": "context_length",
+				"sample": 800
+			}
+		},
+		{
+			"id": "auto_raise_temp",
+			"ahk": {
+				"tray_key": "auto_raise_temp",
+				"features": ["generation", "auto_raise_temp"],
+				"section": "llm.generation",
+				"key": "auto_raise_temp",
+				"sample": false
+			},
+			"hs": {
+				"flat_key": "llm_auto_raise_temp",
+				"section": "llm",
+				"path": "generation",
+				"key": "auto_raise_temp",
+				"sample": false
+			}
+		},
+		{
+			"id": "reset_on_nav",
+			"ahk": {
+				"tray_key": "reset_on_nav",
+				"features": ["generation", "reset_on_nav"],
+				"section": "llm.generation",
+				"key": "reset_on_nav",
+				"sample": false
+			},
+			"hs": {
+				"flat_key": "llm_reset_on_nav",
+				"section": "llm",
+				"path": "generation",
+				"key": "reset_on_nav",
+				"sample": false
+			}
+		},
+		{
+			"id": "show_info_bar",
+			"ahk": {
+				"tray_key": "show_info_bar",
+				"features": ["display", "show_info_bar"],
+				"section": "llm.display",
+				"key": "show_info_bar",
+				"sample": false
+			},
+			"hs": {
+				"flat_key": "llm_show_info_bar",
+				"section": "llm",
+				"path": "display",
+				"key": "show_info_bar",
+				"sample": false
+			}
+		},
+		{
+			"id": "streaming",
+			"ahk": {
+				"tray_key": "streaming",
+				"features": ["display", "streaming"],
+				"section": "llm.display",
+				"key": "streaming",
+				"sample": false
+			},
+			"hs": {
+				"flat_key": "llm_streaming",
+				"section": "llm",
+				"path": "display",
+				"key": "streaming",
+				"sample": false
+			}
+		},
+		{
+			"id": "streaming_multi",
+			"ahk": {
+				"tray_key": "show_all_at_once",
+				"features": ["display", "streaming_multi"],
+				"section": "llm.display",
+				"key": "streaming_multi",
+				"sample": false
+			},
+			"hs": {
+				"flat_key": "llm_streaming_multi",
+				"section": "llm",
+				"path": "display",
+				"key": "streaming_multi",
+				"sample": false
+			}
+		},
+		{
+			"id": "pred_indent",
+			"ahk": {
+				"tray_key": "pred_indent",
+				"features": ["display", "pred_indent"],
+				"section": "llm.display",
+				"key": "pred_indent",
+				"sample": -2
+			},
+			"hs": {
+				"flat_key": "llm_pred_indent",
+				"section": "llm",
+				"path": "display",
+				"key": "pred_indent",
+				"sample": -2
+			}
+		},
+		{
+			"id": "debounce",
+			"ahk": {
+				"tray_key": "debounce_ms",
+				"features": ["trigger", "debounce_ms"],
+				"section": "llm.trigger",
+				"key": "debounce_ms",
+				"sample": 750
+			},
+			"hs": {
+				"flat_key": "llm_debounce",
+				"section": "llm",
+				"path": "trigger",
+				"key": "debounce",
+				"sample": 0.35
+			}
+		},
+		{
+			"id": "instant_on_word_end",
+			"ahk": {
+				"tray_key": "instant_on_word_end",
+				"features": ["trigger", "instant_on_word_end"],
+				"section": "llm.trigger",
+				"key": "instant_on_word_end",
+				"sample": false
+			},
+			"hs": {
+				"flat_key": "llm_instant_on_word_end",
+				"section": "llm",
+				"path": "trigger",
+				"key": "instant_on_word_end",
+				"sample": false
+			}
+		},
+		{
+			"id": "after_hotstring",
+			"ahk": {
+				"tray_key": "after_hotstring",
+				"features": ["trigger", "after_hotstring"],
+				"section": "llm.trigger",
+				"key": "after_hotstring",
+				"sample": false
+			},
+			"hs": {
+				"flat_key": "llm_after_hotstring",
+				"section": "llm",
+				"path": "trigger",
+				"key": "after_hotstring",
+				"sample": false
+			}
+		},
+		{
+			"id": "inline_autotype",
+			"ahk": {
+				"tray_key": "inline_autotype",
+				"features": ["trigger", "inline_autotype"],
+				"section": "llm.trigger",
+				"key": "inline_autotype",
+				"sample": true
+			},
+			"hs": null
+		},
+		{
+			"id": "url_bar_filter",
+			"ahk": {
+				"tray_key": "disable_url_bars",
+				"features": ["trigger", "url_bar_filter_enabled"],
+				"section": "llm.trigger",
+				"key": "url_bar_filter_enabled",
+				"sample": false
+			},
+			"hs": {
+				"flat_key": "llm_url_bar_filter_enabled",
+				"section": "llm",
+				"path": "trigger",
+				"key": "url_bar_filter_enabled",
+				"sample": false
+			}
+		},
+		{
+			"id": "secure_field_filter",
+			"ahk": {
+				"tray_key": "disable_password_fields",
+				"features": ["trigger", "secure_filter_enabled"],
+				"section": "llm.trigger",
+				"key": "secure_filter_enabled",
+				"sample": false
+			},
+			"hs": {
+				"flat_key": "llm_secure_field_filter_enabled",
+				"section": "llm",
+				"path": "trigger",
+				"key": "secure_filter_enabled",
+				"sample": false
+			}
+		},
+		{
+			"id": "val_modifiers",
+			"ahk": {
+				"tray_key": "val_modifiers",
+				"features": ["navigation", "val_modifiers"],
+				"section": "llm.navigation",
+				"key": "val_modifiers",
+				"sample": "alt,ctrl",
+				"toml_array": true
+			},
+			"hs": {
+				"flat_key": "llm_val_modifiers",
+				"section": "llm",
+				"path": "navigation",
+				"key": "val_modifiers",
+				"sample": ["alt", "ctrl"],
+				"toml_array": true
+			}
+		},
+		{
+			"id": "nav_modifiers",
+			"ahk": {
+				"tray_key": "nav_modifiers",
+				"persist": "extra",
+				"section": "llm.navigation",
+				"key": "nav_modifiers",
+				"sample": "ctrl",
+				"toml_array": true
+			},
+			"hs": {
+				"flat_key": "llm_nav_modifiers",
+				"persist": "nested",
+				"section": "llm",
+				"nested_key": "navigation.nav_modifiers",
+				"sample": ["ctrl"],
+				"toml_array": true
+			}
+		},
+		{
+			"id": "disabled_apps",
+			"ahk": {
+				"tray_key": "disabled_apps",
+				"persist": "extra",
+				"section": "llm.trigger",
+				"key": "disabled_apps",
+				"sample": ["notepad.exe"],
+				"toml_array": true
+			},
+			"hs": {
+				"flat_key": "llm_disabled_apps",
+				"persist": "nested",
+				"section": "llm",
+				"nested_key": "trigger.disabled_apps",
+				"sample": ["notepad.exe"],
+				"toml_array": true
+			}
+		},
+		{
+			"id": "trigger_shortcut",
+			"ahk": {
+				"tray_key": "trigger_shortcut",
+				"persist": "extra",
+				"section": "llm",
+				"key": "trigger_shortcut",
+				"sample": "Ctrl+Alt+P"
+			},
+			"hs": {
+				"flat_key": "llm_trigger_shortcut",
+				"section": "llm",
+				"path": "trigger",
+				"key": "shortcut",
+				"sample": { "mods": ["ctrl", "alt"], "key": "p" }
+			}
+		}
+	]
+}

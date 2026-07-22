@@ -1,0 +1,2296 @@
+_meta.flag	🇵🇱
+_meta.locale	pl
+_meta.name	Polski
+app_category.business	Biznes
+app_category.development	Narzędzia deweloperskie
+app_category.education	Edukacja
+app_category.entertainment	Rozrywka
+app_category.finance	Finanse
+app_category.games	Gry
+app_category.graphics_design	Grafika & Design
+app_category.health	Zdrowie & Sport
+app_category.lifestyle	Styl życia
+app_category.medical	Medycyna
+app_category.music	Muzyka
+app_category.navigation	Nawigacja
+app_category.news	Aktualności
+app_category.photography	Fotografia
+app_category.productivity	Produktywność
+app_category.reference	Encyklopedie
+app_category.social	Sieci społecznościowe
+app_category.sports	Sport
+app_category.travel	Podróże
+app_category.utility	Narzędzia
+app_category.video	Wideo
+app_category.weather	Pogoda
+app_picker.add_another_app	+ Dodaj inną aplikację…
+app_picker.exclude_current	Wyklucz {app} (bieżąca)
+app_picker.no_app_excluded	Brak aplikacji do wykluczenia
+app_picker.search_placeholder	Szukaj aplikacji…
+apps.cloner.btn_back	Wstecz
+apps.cloner.btn_browse	Przeglądaj…
+apps.cloner.btn_choose	Wybierz
+apps.cloner.btn_clone	Klonuj aplikację
+apps.cloner.btn_custom_icon	Niestandardowa
+apps.cloner.btn_native_clone	Klonuj aplikację natywną
+apps.cloner.btn_open_log	Otwórz log
+apps.cloner.btn_pwa_recommended	PWA (zalecane)
+apps.cloner.btn_pwa_webapp	Aplikacja webowa PWA
+apps.cloner.btn_tint_icon	Odcień koloru
+apps.cloner.btn_try_native	Spróbuj natywnie
+apps.cloner.btn_validate	Zatwierdź
+apps.cloner.lbl_progress_dock	Rejestrowanie w Dock…
+apps.cloner.lbl_progress_done	Gotowe
+apps.cloner.lbl_progress_icon	Generowanie ikony z odcieniem…
+apps.cloner.lbl_progress_prep	Przygotowanie ikony i bundle
+apps.cloner.lbl_progress_sign	Podpisywanie bundle ad-hoc…
+apps.cloner.lbl_progress_title	Tworzenie klona…
+apps.cloner.msg_bundle_missing	Błąd: brak ścieżki bundle. Uruchom aplikację normalnie.
+apps.cloner.title_clone_name	Nazwa klona
+apps.cloner.title_error	Tworzenie klona nie powiodło się
+apps.cloner.title_icon_style	Styl ikony
+apps.cloner.title_open_arg	Element do otwarcia przy uruchomieniu
+apps.cloner.title_pwa_mode	Tryb PWA?
+apps.cloner.title_pwa_recommended	Tryb PWA zalecany
+apps.cloner.title_pwa_url	URL PWA
+apps.cloner.title_summary	Podsumowanie
+apps.cloner.title_tint	Odcień koloru
+apps.cloner.title_url_path	URL lub ścieżka
+apps.encryptor.btn_overwrite	Nadpisz
+apps.encryptor.btn_reveal	Pokaż w Finderze
+apps.encryptor.err_decrypt_failed	Deszyfrowanie nie powiodło się. Błędne hasło lub uszkodzony plik?
+apps.encryptor.err_empty_password	Hasło nie może być puste.
+apps.encryptor.err_encrypt_failed	Szyfrowanie nie powiodło się.
+apps.encryptor.err_file_missing	Plik nie znaleziony.
+apps.encryptor.err_openssl_missing	openssl nie znaleziony. Zainstaluj Xcode Command Line Tools.
+apps.encryptor.err_password_mismatch	Hasła nie są zgodne.
+apps.encryptor.lbl_file	Plik:
+apps.encryptor.prompt_confirm	Potwierdź hasło:
+apps.encryptor.prompt_password	Hasło:
+apps.encryptor.success_decrypted	Plik odszyfrowany:
+apps.encryptor.success_encrypted	Plik zaszyfrowany:
+apps.encryptor.title_decrypt	Odszyfruj plik
+apps.encryptor.title_encrypt	Zaszyfruj plik
+apps.encryptor.warn_overwrite	Plik docelowy już istnieje. Nadpisać?
+autocorrection.accents	Automatyczna korekta akcentów
+autocorrection.caps	Automatyczna wielka litera na początku zdania
+autocorrection.errors	Korekta typowych literówek
+autocorrection.minus	Automatyczne wstawianie znaku minus
+autocorrection.minusapostrophe	Minus po apostrofie
+autocorrection.multiplepunctuationmarks	Wiele kropek → wielokropek (... = …)
+autocorrection.names	Korekta wielkości liter w nazwach własnych
+autocorrection.ou	Korekta ou / où
+autocorrection.suffixesachaining	Łączenie przyrostków z à
+autocorrection.typographicapostrophe	Typograficzny apostrof (prosty → zaokrąglony)
+ax_actions.brightness	☀ Jasność
+ax_actions.char	A Znaki
+ax_actions.char_sel	✎ A Zaznacz znaki
+ax_actions.desktops	▢ Pulpity
+ax_actions.document	📄 Dokument (początek/koniec)
+ax_actions.line_arrow	↕ Wiersze (strzałki)
+ax_actions.line_bounds	↔ Wiersz (początek/koniec)
+ax_actions.line_sel	✎ ↕ Zaznacz wiersze
+ax_actions.lines	↕ Wiersze (Alt)
+ax_actions.paragraphs	¶ Akapity
+ax_actions.spaces	▢ Obszary
+ax_actions.tabs	⧉ Karty
+ax_actions.tracks	♫ Utwory
+ax_actions.volume	🔊 Głośność
+ax_actions.windows	◱ Okna
+ax_actions.words	W Słowa
+ax_actions.words_sel	✎ W Zaznacz słowa
+button.activate	Włącz
+button.add	Dodaj
+button.cancel	Anuluj
+button.close	Zamknij
+button.confirm	Potwierdź
+button.decrypt	Odszyfruj
+button.delete	Usuń
+button.encrypt	Szyfruj
+button.ok	OK
+button.open_settings	Otwórz Ustawienia
+button.remove	Usuń
+button.retry	Spróbuj ponownie
+button.save	Zapisz
+category.autocorrection	Autokorekta
+category.distances_reduction	Redukcja odległości
+category.dynamic_hotstrings	Dynamiczne hotstring'i
+category.gestures	🖐️ Gesty
+category.layout	🌐 Układ klawiatury
+category.magic_key	Klawisz ★ i rozszerzanie tekstu
+category.personal	Osobiste hotstrings
+category.rolls	Rolki
+category.sfbs_reduction	Redukcja SFB
+category.shortcuts	🎯 Skróty
+category.tapholds	⌨️ Dotknięcie-Przytrzymanie
+changelog_window.badge_latest	latest
+changelog_window.badge_prerelease	pre-release
+changelog_window.channel_dev	Dev
+changelog_window.channel_stable	Stable
+changelog_window.error_network	Unable to load releases from GitHub.\nCheck your internet connection.
+changelog_window.error_parse	Unable to parse GitHub response.
+changelog_window.error_rate_limited	Unable to load releases from GitHub.\nGitHub is limiting requests — please try again in a few minutes.
+changelog_window.loading	Loading releases…
+changelog_window.no_notes	(No release notes available.)
+changelog_window.no_releases	No releases found.
+changelog_window.open_github	View on GitHub ↗
+changelog_window.retry	Retry
+changelog_window.window_title	Release Notes
+common.browse	Przeglądaj…
+common.cancel	Anuluj
+common.close	Zamknij
+common.delete	Usuń
+common.disabled	Wyłączony
+common.error_prefix	Błąd — 
+common.error_title	Błąd
+common.key_enter	Enter
+common.later	Później
+common.loading	Ładowanie…
+common.none	Brak
+common.ok	OK
+common.save	Zapisz
+common.saved	Zapisano ✓
+common.warning	Uwaga
+crash.report.save_failed	Nie można zapisać raportu awaryjnego
+crash.report.saved_title	Raport awarii zapisany
+dialog.action_picker.disabled	∅ Nic
+dialog.action_picker.label	Akcja:
+dialog.action_picker.no_results	Brak pasującej akcji
+dialog.action_picker.search	Szukaj akcji…
+dialog.app_picker.active_suffix	 (aktywna)
+dialog.app_picker.prompt	Wybierz aplikacje:
+dialog.app_picker.running_count	{n} działająca(-e) aplikacja(-e).
+dialog.app_picker.stopped_suffix	 (zatrzymana)
+dialog.app_picker.title	Wybór aplikacji
+dialog.bulk_toggle.save_failed	The change could not be saved to the configuration file.\nIt has been reverted. Close any app holding the file and try again.
+dialog.config_folder.hint	Wszystkie pliki osobiste (personal_shortcuts.ahk, personal_hotstrings.toml…) będą wyszukiwane w tym folderze. Pozostaw puste, aby użyć domyślnego folderu.
+dialog.config_folder.label	Ścieżka:
+dialog.config_folder.select_title	Wybierz folder konfiguracji
+dialog.config_folder.title	ErgoptiPlus — Folder konfiguracji
+dialog.enable_all.warning	⚠ OSTRZEŻENIE: Wszystkie funkcje zostały włączone, w tym niektóre domyślnie wyłączone.
+dialog.fatal_error.cannot_start	Ergopti+ nie może się uruchomić.
+dialog.fatal_error.toml_key_missing	Błąd krytyczny: _shared/modules/tooltip/constants.toml — brakujący lub nieprawidłowy klucz: [{1}] {2}
+dialog.fatal_error.toml_not_found	Błąd krytyczny: _shared/modules/tooltip/constants.toml nie znaleziono.
+dialog.gestures.auto_configure_error	Błąd zapisu do rejestru.\n\nSpróbuj uruchomić skrypt jako administrator,\nlub skonfiguruj ręcznie (patrz Instrukcje).
+dialog.gestures.auto_configure_error_title	ErgoptiPlus — Błąd
+dialog.gestures.auto_configure_success	Konfiguracja gestów zastosowana pomyślnie.\n\n10 gestów zostało skonfigurowanych w rejestrze Windows\n(Ctrl+Win+Shift+F1 do F10).\n\nMoże być wymagane wylogowanie/zalogowanie, aby\nWindows rozpoznał nowe skróty.
+dialog.gestures.auto_configure_title	ErgoptiPlus — Konfiguracja gestów
+dialog.gestures.warning_msg	⚠️ Ostrzeżenie: Włączenie gestów touchpada może kolidować z gestami systemowymi.\n\nAby uniknąć konfliktów, wyłącz następujące opcje macOS:\n\n• Gesty touchpada 2-palcowe: wyłącz przewijanie i przesuwanie, jeśli chcesz używać ich w Hammerspoon.\n• Gesty touchpada 3-palcowe do przesuwania okien i zaznaczania tekstu\n• Stuknięcie 3 palcami do wyszukiwania słów w słowniku\n• Poziome/pionowe przesunięcie 3 palcami do zmiany obszarów, App Exposé lub Mission Control\n• Poziome/pionowe przesunięcie 4 palcami do zmiany obszarów, App Exposé lub Mission Control\n\nWażne jest, aby wyłączyć gesty systemowe 4-palcowe w celu zdefiniowania gestów 5-palcowych. W przeciwnym razie macOS nie rozróżniałby ich i uniemożliwiałby działanie gestów 5-palcowych. Dlatego domyślne gesty 4-palcowe są przedefiniowane w module Gesty w celu przywrócenia funkcji systemowych bez konfliktów z gestami 5-palcowymi.
+dialog.gestures.warning_title	Ostrzeżenie o gestach
+dialog.gpt_link.title	Edytuj link otwierany przez Win + G
+dialog.hotstrings.consume_body	Czy znak wyzwalający powinien być pochłonięty (nie wpisywany) podczas rozszerzania?
+dialog.hotstrings.consume_checkbox	Pochłoń (nie wpisuj znaku ponownie)
+dialog.hotstrings.consume_no	Nie — wpisz znak
+dialog.hotstrings.consume_title	Zachowanie wyzwalacza
+dialog.hotstrings.consume_yes	Tak — pochłoń go
+dialog.hotstrings.delete_body	Czy na pewno chcesz usunąć ten niestandardowy rozszerzacz?
+dialog.hotstrings.delete_delimiter_body	Are you sure you want to delete this custom delimiter?
+dialog.hotstrings.delete_delimiter_title	Delete delimiter
+dialog.hotstrings.delete_title	Usuń rozszerzacz
+dialog.hotstrings.invalid_body	Wprowadź dokładnie jeden znak.
+dialog.hotstrings.invalid_title	Nieprawidłowe dane wejściowe
+dialog.hotstrings.new_delimiter_prompt	Znak separatora
+dialog.hotstrings.new_delimiter_title	New word delimiter
+dialog.hotstrings.new_prompt	Wprowadź znak wyzwalający (dokładnie jeden znak):
+dialog.hotstrings.new_title	Nowy rozszerzacz słów
+dialog.keyboard_shortcut.prompt	Wybierz kombinację klawiszy:
+dialog.keyboard_shortcut.title_prefix	Wybierz klawisz — 
+dialog.llm.delete_profile_prefix	Usuń "
+dialog.llm.delete_title	Usunąć model?
+dialog.llm.exclude_ok	Zapisz
+dialog.llm.exclude_prompt	Wybierz aplikacje, w których generowanie AI będzie wyłączone.
+dialog.magic_key.prompt	Nowa wartość (★ domyślnie):
+dialog.magic_key.title	Edytuj magiczny klawisz
+dialog.metrics.bad_password_warning	⚠️ Ostrzeżenie: Wykryto błąd odszyfrowania. Hasło może być nieprawidłowe.
+dialog.metrics.complete_label	Operacja zakończona.\n\nPliki przetworzone pomyślnie: %d\nWystąpione błędy: %d
+dialog.metrics.decrypt_confirm_body	Wszystkie zaszyfrowane logi zostaną przywrócone jako zwykły tekst na dysku.\n\nPotwierdzasz?
+dialog.metrics.decrypt_confirm_title	Dezaktywacja
+dialog.metrics.decrypt_key_prompt	Wprowadź klucz bezpieczeństwa wymagany do odszyfrowania:
+dialog.metrics.disable_confirm	Wyłączyć statystyki?\n\nKeylogger nie będzie już przechwytywać żadnych naciśnięć klawiszy. Już zarejestrowane dane są zachowane.
+dialog.metrics.enable_warning	OSTRZEŻENIE: Zamierzasz włączyć keylogger.\n\nRejestruje on naciśnięcia klawiszy z dokładnością do milisekundy. Logi są przechowywane lokalnie w:\n    {1}\n\nPola haseł są ignorowane automatycznie (filtr UIA), a zawartość klawiszy jest również odrzucana, gdy znajdujesz się w oknie przeglądania prywatnego/incognito. Mimo to pozostaje to keylogger — WSTRZYMAJ skrypt podczas wprowadzania wrażliwych danych poza tymi kontekstami.\n\nWłączyć?
+dialog.metrics.encrypt_confirm_body	Włączenie tej opcji zaszyfruje wszystkie istniejące logi, czyniąc je nieczytelne na dysku.\n\nPotwierdzasz?
+dialog.metrics.encrypt_confirm_title	Ochrona danych
+dialog.metrics.encrypt_key_prompt	Zdefiniuj klucz szyfrowania (domyślnie: numer seryjny Mac):
+dialog.metrics.encrypt_key_title	Klucz bezpieczeństwa
+dialog.metrics.encryptor_error_body	Aplikacja nie została znaleziona. Wygeneruj ją najpierw za pomocą skryptu Python.
+dialog.metrics.encryptor_error_title	Błąd
+dialog.metrics.exclude_ok	Zapisz
+dialog.metrics.exclude_prompt	Wybierz aplikacje, których naciśnięcia klawiszy nigdy nie będą rejestrowane przez keylogger.
+dialog.metrics.exclude_title	Wyklucz aplikacje — Statystyki
+dialog.metrics.progress_label	Przetwarzanie: %d / %d
+dialog.metrics.security_warning_body	⚠️  OSTRZEŻENIE: Statystyki i keylogger zostaną włączone.\n\nTen system rejestruje naciśnięcia klawiszy i aktywacje gestów touchpada.\n\n• Logi są przechowywane w folderze Hammerspoon\n• Pola haseł są automatycznie ignorowane\n• Zaleca się WSTRZYMANIE skryptu przy wprowadzaniu wrażliwych danych
+dialog.metrics.security_warning_title	⚠ Ostrzeżenie bezpieczeństwa — Statystyki
+dialog.metrics.title	📊 Statystyki
+dialog.path_copy.btn_backslash	&Ukośnik wsteczny (\\)
+dialog.path_copy.btn_quit	&Zamknij
+dialog.path_copy.msg_simple	Ścieżka\n%s\nzostała skopiowana do schowka.
+dialog.path_copy.msg_with_question	Ścieżka\n%s\nzostała skopiowana do schowka. \n\nCzy chcesz wersję z \\ zamiast / ?
+dialog.path_copy.title	Kopiuj ścieżkę
+dialog.personal_info.saved	Zaktualizowane dane:
+dialog.personal_info.title	Edytuj dane osobowe
+dialog.reset_defaults.failed	Could not reset: these files could not be deleted ({1}).\nClose any app holding them (editor, cloud sync) and try again.
+dialog.reset_defaults.failed_title	Reset failed
+dialog.reset_defaults.placeholder_failed	The configuration was reset, but the placeholder could not be written.\nThe setup wizard will run on the next start.
+dialog.shortcuts.chatgpt_prompt	URL otwierany przez Ctrl+G:
+dialog.shortcuts.chatgpt_title	URL ChatGPT
+dialog.shortcuts.wrap_symbol_close_prompt	Wprowadź symbol zamykający (pozostaw puste = symetryczny):
+dialog.shortcuts.wrap_symbol_close_title	Symbol zamykający
+dialog.shortcuts.wrap_symbol_invalid	Wprowadź dokładnie jeden znak.
+dialog.shortcuts.wrap_symbol_prompt	Wprowadź symbol otwierający (1 znak):
+dialog.shortcuts.wrap_symbol_title	Dodaj symbol obramowania
+distancesreduction.commafarletters	Przecinek + odległy klawisz (,è = z, ,é = …)
+distancesreduction.commaj	Przecinek + samogłoska → J (,a = ja, ,e = je…)
+distancesreduction.deadkeyecircumflex	Ê + litera → klawisz martwy (êo = ô, êa = â…)
+distancesreduction.ecircumflexe	Ê + E → Œ
+distancesreduction.qu	Q → QU przed samogłoską
+distancesreduction.spacearoundsymbols	Automatyczne spacje wokół symboli rolls
+distancesreduction.suffixesa	À + litera → przyrostek (às = -ement, àé = -ée…)
+download_window.btn_cancel	🛑 Anuluj
+download_window.btn_retry	🔄 Spróbuj ponownie pobrać
+download_window.btn_terminal	🖥 Terminal
+download_window.cancelling	Anulowanie…
+download_window.done_failed	Pobieranie nieudane
+download_window.done_success	✅ Gotowe
+download_window.error_unknown	Nieznany błąd.
+download_window.eta_label	⏳ Pozostały czas:
+download_window.file_count	📁 Pliki: %s
+download_window.kind_mlx_install	⚙️ Instalacja silnika IA (MLX)
+download_window.kind_mlx_model	📥 Pobieranie modelu MLX
+download_window.kind_ollama_install	⚙️ Instalacja silnika IA (Ollama)
+download_window.kind_ollama_model	📥 Pobieranie modelu Ollama
+download_window.preparing	Przygotowywanie…
+download_window.size_label	📦 Rozmiar: 
+download_window.speed_label	⚡ Prędkość: 
+download_window.starting	Uruchamianie…
+download_window.title	📥 Pobieranie w toku
+download_window.window_title	Postęp
+dynamichotstrings.date	td★ wstawia bieżącą datę ({date})
+dynamichotstrings.datefr	dt★ wstawia bieżącą datę ({date})
+dynamichotstrings.datelongfr	date★ wstawia pełną datę ({date})
+dynamichotstrings.group_label	Dynamiczne hotstring'i
+dynamichotstrings.ibanprefixes	Wpisanie pierwszych znaków numeru IBAN automatycznie go uzupełnia
+dynamichotstrings.phoneprefixes	Wpisanie pierwszych cyfr numeru telefonu automatycznie go uzupełnia
+dynamichotstrings.ssnprefixes	Wpisanie pierwszych cyfr numeru PESEL automatycznie go uzupełnia
+dynamichotstrings.textexpansionpersonalinformation	@np★ = Nazwisko ⇥ Imię — każda litera = pole (n=Nazwisko, p=Imię, e=Email…)
+editor.hotstrings.add_entry_title	Utwórz hotstring — Sekcja « %s »
+editor.hotstrings.btn_add	➕ Dodaj
+editor.hotstrings.btn_add_entry	＋ Add a hotstring
+editor.hotstrings.btn_add_section	＋ Sekcja
+editor.hotstrings.btn_delete	Usuń
+editor.hotstrings.btn_delete_entry	🗑 Usuń
+editor.hotstrings.btn_edit	💾 Edytuj
+editor.hotstrings.btn_new	Nowy…
+editor.hotstrings.btn_redefine	Redefine
+editor.hotstrings.btn_rename	Zmień nazwę…
+editor.hotstrings.btn_view_compact	Compact view
+editor.hotstrings.btn_view_expanded	Expanded view
+editor.hotstrings.bulk_move_placeholder	Przenieś do…
+editor.hotstrings.bulk_selected_one	selected
+editor.hotstrings.bulk_selected_other	selected
+editor.hotstrings.cb_auto	Automatyczne rozszerzanie
+editor.hotstrings.cb_case	Rozróżniaj wielkość liter
+editor.hotstrings.cb_final	Wynik końcowy
+editor.hotstrings.cb_word	Całe słowo
+editor.hotstrings.chk_case	Rozróżniaj wielkość liter
+editor.hotstrings.chk_close_after	Zamknij po
+editor.hotstrings.chk_final	Wynik końcowy
+editor.hotstrings.chk_word	Całe słowo
+editor.hotstrings.cmd_backspace	delete ←
+editor.hotstrings.cmd_delete	delete →
+editor.hotstrings.cmd_down	down
+editor.hotstrings.cmd_end	line end
+editor.hotstrings.cmd_enter	new line
+editor.hotstrings.cmd_escape	Escape
+editor.hotstrings.cmd_group_arrows	Arrows
+editor.hotstrings.cmd_group_edition	Edition
+editor.hotstrings.cmd_home	line start
+editor.hotstrings.cmd_left	left
+editor.hotstrings.cmd_right	right
+editor.hotstrings.cmd_tab	tab
+editor.hotstrings.cmd_up	up
+editor.hotstrings.col_auto	Auto
+editor.hotstrings.col_case	Wielk.
+editor.hotstrings.col_final	Końcowy
+editor.hotstrings.col_priority	Prio
+editor.hotstrings.col_result	Wynik
+editor.hotstrings.col_trigger	Wyzwalacz
+editor.hotstrings.col_word	Słowo
+editor.hotstrings.confirm_del_bulk	Usunąć %d zaznaczony(ch) element(ów)?
+editor.hotstrings.confirm_del_entry	Usunąć « %s »?
+editor.hotstrings.confirm_del_section	Usunąć « %s » i wszystkie jego hotstring'i?
+editor.hotstrings.desc_auto_off	Requires Space or Enter to expand (recommended for autocorrect).
+editor.hotstrings.desc_auto_on	Expands immediately (ideal for triggers ending with %s).
+editor.hotstrings.desc_case_off	The engine generates lowercase, Titlecase and UPPERCASE variants.
+editor.hotstrings.desc_case_on	Strictly distinguishes uppercase/lowercase.<br>Ex: <em>Btw</em> ≠ <em>btw</em>
+editor.hotstrings.desc_final_off	The result can trigger other hotstrings in cascade.
+editor.hotstrings.desc_final_on	The result will not be re-parsed as a trigger.
+editor.hotstrings.desc_prompt	Opis wyświetlany w menu dla tej sekcji:
+editor.hotstrings.desc_title	Opis
+editor.hotstrings.desc_word_off	Triggers anywhere, even inside a word.<br>Ex: will trigger inside <em>hotel</em>
+editor.hotstrings.desc_word_on	Only triggers when it matches a standalone word.<br>Ex: <em>tel</em>→telephone but not <em>hotel</em>
+editor.hotstrings.drag_handle_title	Drag
+editor.hotstrings.edit_entry_title	Edytuj hotstring — Sekcja « %s »
+editor.hotstrings.empty_hint	Nie zdefiniowano hotstring'ów. Kliknij + Sekcja, aby zacząć. ☰ przeciągnij, aby zmienić kolejność — kliknij tytuł, aby zmienić nazwę
+editor.hotstrings.entry_modal_title_new	Nowy hotstring
+editor.hotstrings.err_duplicate	⚠ Ten wyzwalacz już istnieje w tej sekcji.
+editor.hotstrings.err_id_exists	« %s » already exists.
+editor.hotstrings.err_id_invalid	Invalid identifier: lowercase letters, digits and underscores only.
+editor.hotstrings.err_id_required	The identifier is required.
+editor.hotstrings.err_no_section	⚠ Najpierw wybierz lub utwórz sekcję.
+editor.hotstrings.err_no_section_selected	Brak wybranej sekcji.
+editor.hotstrings.err_output_empty	The replacement is required.
+editor.hotstrings.err_section_exists	Ta sekcja już istnieje.
+editor.hotstrings.err_select_to_delete	⚠ Wybierz hotstring do usunięcia.
+editor.hotstrings.err_select_to_edit	⚠ Wybierz hotstring do edycji.
+editor.hotstrings.err_trigger_dup_msg	The trigger <strong>%s</strong> already exists in <em>%s</em>.<br><br>Do you really want to redefine it?
+editor.hotstrings.err_trigger_empty	The trigger is required.
+editor.hotstrings.err_trigger_required	⚠ Wyzwalacz i wynik są wymagane.
+editor.hotstrings.err_write	⚠ Błąd zapisu w personal_hotstrings.toml.
+editor.hotstrings.group_selected	Wybrany hotstring
+editor.hotstrings.kbd_help	↩ = nowa linia\n⌘ + ↩ = zapisz\n⇧ + ⌘ + ↩ = zapisz + nowy hotstring
+editor.hotstrings.label_result	Wynik:
+editor.hotstrings.label_section	Sekcja:
+editor.hotstrings.label_trigger	Wyzwalacz:
+editor.hotstrings.meta_desc	Osobiste hotstring'i
+editor.hotstrings.new_section_prompt	Nazwa nowej sekcji (identyfikator, bez spacji):
+editor.hotstrings.new_section_title	Nowa sekcja
+editor.hotstrings.no_section	(brak sekcji)
+editor.hotstrings.page_title	✏︎ Osobiste hotstring'i
+editor.hotstrings.priority_hint	puste = priorytet domyślny; wyższy wygrywa
+editor.hotstrings.priority_label	Priorytet
+editor.hotstrings.rename_desc_prompt	Nowy opis sekcji "{1}":
+editor.hotstrings.rename_title	Zmień nazwę
+editor.hotstrings.replacement_label	Zamiana
+editor.hotstrings.replacement_placeholder	np.: Cześć,↵Mam nadzieję, że wszystko u Ciebie dobrze.
+editor.hotstrings.save_error	Błąd zapisu
+editor.hotstrings.saved_prefix	✓ Zapisano — 
+editor.hotstrings.sec_desc_hint	(wyświetlany w menu)
+editor.hotstrings.sec_desc_label	Opis
+editor.hotstrings.sec_desc_placeholder	np.: Moje skróty
+editor.hotstrings.sec_id_hint	(tylko małe litery, cyfry i podkreślenia)
+editor.hotstrings.sec_id_label	Identyfikator
+editor.hotstrings.sec_id_placeholder	np.: moje_skróty
+editor.hotstrings.sec_modal_title_new	Nowa sekcja
+editor.hotstrings.sec_modal_title_rename	Rename section
+editor.hotstrings.special_cmds_summary	Polecenia specjalne — kliknij, aby wstawić
+editor.hotstrings.title_confirm	Potwierdzenie
+editor.hotstrings.title_error	Błąd
+editor.hotstrings.trig_hint_text	shown, stored as
+editor.hotstrings.trigger_label	Wyzwalacz
+editor.hotstrings.trigger_placeholder	np.: btw
+editor.hotstrings.window_title	Edytor osobistych hotstring'ów
+editor.personal_info.window_title	ErgoptiPlus — Dane osobowe
+ergopti.error_caught	ErgoptiPlus — przechwycono błąd wewnętrzny :
+ergopti.windowspy_not_found	Nie znaleziono WindowSpy.ahk w następującej lokalizacji : {1}
+ext.demo.gui_message	Cześć z rozszerzenia demonstracyjnego Ergopti!
+ext.demo.open_demo_gui	Otwórz interfejs demonstracyjny
+ext.demo.show_info	Pokaż informacje
+ext.demo.visit_docs	Odwiedź dokumentację
+gesture.setup.auto_configure	\nLub kliknij «Skonfiguruj automatycznie» w menu,\naby zapisać te skróty bezpośrednio w rejestrze.\n(Może być wymagane ponowne uruchomienie.)
+gesture.setup.for_each	Dla każdego gestu wybierz «Niestandardowy skrót»\ni wpisz wskazany skrót:\n\n
+gesture.setup.header	Konfiguracja gestów touchpada\n══════════════════════════════════\n\n
+gesture.setup.open_path	Otwórz: Ustawienia > Bluetooth i urządzenia > Touchpad\n         > Gesty zaawansowane\n\n
+gesture.setup.title	ErgoptiPlus — Gesty touchpada
+gesture.slots.swipe_2_down	Przesunięcie 2 palcami ↓
+gesture.slots.swipe_2_left	Przesunięcie 2 palcami ←
+gesture.slots.swipe_2_left_down	Przesunięcie 2 palcami ↙
+gesture.slots.swipe_2_left_up	Przesunięcie 2 palcami ↖
+gesture.slots.swipe_2_right	Przesunięcie 2 palcami →
+gesture.slots.swipe_2_right_down	Przesunięcie 2 palcami ↘
+gesture.slots.swipe_2_right_up	Przesunięcie 2 palcami ↗
+gesture.slots.swipe_2_up	Przesunięcie 2 palcami ↑
+gesture.slots.swipe_3_down	Przesunięcie 3 palcami ↓
+gesture.slots.swipe_3_left	Przesunięcie 3 palcami ←
+gesture.slots.swipe_3_left_down	Przesunięcie 3 palcami ↙
+gesture.slots.swipe_3_left_up	Przesunięcie 3 palcami ↖
+gesture.slots.swipe_3_right	Przesunięcie 3 palcami →
+gesture.slots.swipe_3_right_down	Przesunięcie 3 palcami ↘
+gesture.slots.swipe_3_right_up	Przesunięcie 3 palcami ↗
+gesture.slots.swipe_3_up	Przesunięcie 3 palcami ↑
+gesture.slots.swipe_4_down	Przesunięcie 4 palcami ↓
+gesture.slots.swipe_4_left	Przesunięcie 4 palcami ←
+gesture.slots.swipe_4_left_down	Przesunięcie 4 palcami ↙
+gesture.slots.swipe_4_left_up	Przesunięcie 4 palcami ↖
+gesture.slots.swipe_4_right	Przesunięcie 4 palcami →
+gesture.slots.swipe_4_right_down	Przesunięcie 4 palcami ↘
+gesture.slots.swipe_4_right_up	Przesunięcie 4 palcami ↗
+gesture.slots.swipe_4_up	Przesunięcie 4 palcami ↑
+gesture.slots.swipe_5_diag	Przesunięcie 5 palcami ↗↙
+gesture.slots.swipe_5_down	Przesunięcie 5 palcami ↓
+gesture.slots.swipe_5_horiz	Przesunięcie 5 palcami ↔
+gesture.slots.swipe_5_left	Przesunięcie 5 palcami ←
+gesture.slots.swipe_5_left_down	Przesunięcie 5 palcami ↙
+gesture.slots.swipe_5_left_up	Przesunięcie 5 palcami ↖
+gesture.slots.swipe_5_right	Przesunięcie 5 palcami →
+gesture.slots.swipe_5_right_down	Przesunięcie 5 palcami ↘
+gesture.slots.swipe_5_right_up	Przesunięcie 5 palcami ↗
+gesture.slots.swipe_5_up	Przesunięcie 5 palcami ↑
+gesture.slots.tap_2	Stuknięcie 2 palcami
+gesture.slots.tap_3	Stuknięcie 3 palcami
+gesture.slots.tap_4	Stuknięcie 4 palcami
+gesture.slots.tap_5	Stuknięcie 5 palcami
+gesture.touchpad_open.body	Strona Touchpad jest otwarta.\n\nPrzewiń w dół, a następnie kliknij\n«Gesty zaawansowane», aby uzyskać dostęp do skrótów.
+gestures.conflict_desc_swipe_2	Przeciągnięcie 2 palcami — Przewijanie, Strony, Mission Control
+gestures.conflict_desc_swipe_3_horiz	Przeciągnięcie 3 palcami lewo/prawo — Strony / Zmiana przestrzeni
+gestures.conflict_desc_swipe_3_vert	Przeciągnięcie 3 palcami góra/dół — Mission Control & App Exposé
+gestures.conflict_desc_swipe_4_horiz	Przeciągnięcie 4/5 palcami lewo/prawo — Zmiana przestrzeni
+gestures.conflict_desc_swipe_4_vert	Przeciągnięcie 4/5 palcami góra/dół — Mission Control & App Exposé
+gestures.conflict_desc_tap_3	Kliknięcie 3 palcami — Wyszukiwanie & wykrywanie danych
+gestures.conflict_dialog_line1	Ten gest może być obsługiwany przez macOS:
+gestures.conflict_dialog_line2	Jeśli tak, macOS i Hammerspoon zareagują jednocześnie:
+gestures.conflict_dialog_line3	Oba zachowania zostaną wyzwolone jednocześnie.
+gestures.conflict_dialog_line4	Jeśli nadal aktywny, wyłącz go tutaj:
+gestures.conflict_hint_swipe_2	Ustawienia systemowe › Trackpad\n→ Wyłącz gesty 2-palcowe, jeśli chcesz ich używać w Hammerspoon.
+gestures.conflict_hint_swipe_3_horiz	Ustawienia systemowe › Trackpad › Więcej gestów\n→ Wyłącz «Przesuwanie między stronami» i «Przełączanie przestrzeni»
+gestures.conflict_hint_swipe_3_vert	Ustawienia systemowe › Trackpad › Więcej gestów\n→ Wyłącz «Mission Control» i «App Exposé»
+gestures.conflict_hint_swipe_4_horiz	Ustawienia systemowe › Trackpad › Więcej gestów\n→ Wyłącz «Przełączanie przestrzeni»
+gestures.conflict_hint_swipe_4_vert	Ustawienia systemowe › Trackpad › Więcej gestów\n→ Wyłącz «Mission Control» i «App Exposé»
+gestures.conflict_hint_tap_3	Ustawienia systemowe › Trackpad › Wskazywanie i klikanie\n→ Wyłącz «Wyszukiwanie i wykrywanie danych»
+gestures.enabled	Gesty touchpada (wymaga konfiguracji Windows)
+healthcheck.copy_and_close	Skopiuj do schowka i zamknij
+hotstrings.custom_terminator	Niestandardowy
+hotstrings.custom_terminator_consumed	Niestandardowy (pochłonięty)
+hotstrings.shortcut_custom	Niestandardowy skrót
+hs_config.btn_all_gray	Wszystko szare
+hs_config.btn_all_grey	Wszystko szare
+hs_config.btn_close	Zamknij
+hs_config.btn_reset_all	Resetuj wszystko
+hs_config.btn_reset_default	Przywróć domyślne
+hs_config.cat_autocorrection	Autokorekta
+hs_config.cat_distances	Redukcja odległości
+hs_config.cat_magickey	Klawisz ★ i rozszerzenie
+hs_config.cat_personal	Osobiste hotstring'i
+hs_config.cat_rolls	Rolki
+hs_config.cat_sfbs	Redukcja SFB
+hs_config.category_prefix	Kategoria: 
+hs_config.color_blue	Niebieski
+hs_config.color_brown	Brązowy
+hs_config.color_cyan	Cyjan
+hs_config.color_gray	Szary
+hs_config.color_green	Zielony
+hs_config.color_indigo	Indygo
+hs_config.color_inherit	— dziedziczy domyślny —
+hs_config.color_lime	Limonkowy
+hs_config.color_orange	Pomarańczowy
+hs_config.color_pink	Różowy
+hs_config.color_purple	Fioletowy
+hs_config.color_red	Czerwony
+hs_config.color_turquoise	Turkusowy
+hs_config.color_yellow	Żółty
+hs_config.default_prefix	Domyślny: 
+hs_config.delim_space	Space
+hs_config.delim_tab	Tab
+hs_config.file_level	── Poziom pliku ──
+hs_config.file_level_short	(poziom pliku)
+hs_config.group_common	Wspólne
+hs_config.group_extensions	Rozszerzenia
+hs_config.group_personal	Osobiste
+hs_config.hint	Dostosuj według kategorii lub sekcji. Wszystkie zmiany są zapisywane natychmiast.
+hs_config.label_category	Kategoria:
+hs_config.label_color	Kolor
+hs_config.label_delay	Opóźnienie (ms)
+hs_config.label_file	Plik:
+hs_config.label_group	Grupa:
+hs_config.label_priority	Priorytet
+hs_config.label_section	Sekcja:
+hs_config.label_tooltip	Pokaż dymek
+hs_config.none	(brak)
+hs_config.notify_delimiters_saved	Word delimiters updated.
+hs_config.notify_reset_all	Opóźnienia i kolory zostały zresetowane.
+hs_config.override_active	nadpisanie aktywne
+hs_config.section_prefix	Sekcja: 
+hs_config.window_title	Opóźnienia i kolory hotstring'ów
+init.reload_files	Pliki zmodyfikowane — ponowne ładowanie…
+init.reload_hotstrings	Hotstring zmodyfikowane — ponowne ładowanie…
+init.reload_script	Skrypt zmodyfikowany — ponowne ładowanie…
+init.reload_title	Ponowne ładowanie
+karabiner.download_failed	Pobieranie nieudane: %s
+karabiner.downloading	Pobieranie Karabiner-Elements (~46 MB)…
+karabiner.install_error_body	Automatyczna instalacja nieudana: %s\n\nMożesz ręcznie pobrać Karabiner-Elements ze https://karabiner-elements.pqrs.org i ponownie uruchomić Hammerspoon.
+karabiner.install_error_title	Instalacja nieudana
+karabiner.install_failed	Instalacja nieudana: %s
+karabiner.installing	Instalowanie Karabiner-Elements (wymagane hasło administratora)…
+karabiner.lifecycle.unavailable	Karabiner-Elements niedostępny — sprawdź instalację.
+karabiner.onboarding.accessibility_body	Rozszerzenie systemowe jest aktywne, ale demon Karabiner nie działa. Karabiner-Elements v16+ wymaga uprawnienia „Dostępność” (starsze wersje proszą o „Monitorowanie wejścia”).\n\nKliknij „Otwórz Dostępność” i włącz Karabiner-Elements na liście. Jeśli wpis nie pojawi się, otwórz Karabiner-Elements raz z /Applications/, aby zarejestrował się w macOS.
+karabiner.onboarding.accessibility_title	Wymagana dostępność
+karabiner.onboarding.btn_install_now	Zainstaluj teraz
+karabiner.onboarding.btn_open_accessibility	Otwórz Dostępność
+karabiner.onboarding.btn_open_settings	Otwórz Ustawienia
+karabiner.onboarding.daemon_ready	Karabiner-Elements działa.
+karabiner.onboarding.daemon_timeout	Przekroczono czas oczekiwania na uruchomienie demona Karabiner.
+karabiner.onboarding.daemon_waiting	Oczekiwanie na uruchomienie demona Karabiner…
+karabiner.onboarding.error.manifest_unconfigured	Manifest nie jest skonfigurowany (obecne są symbole zastępcze TODO).
+karabiner.onboarding.error.mount_failed	Montowanie nie powiodło się: {error}
+karabiner.onboarding.ext_activated	Rozszerzenie systemowe aktywowane.
+karabiner.onboarding.ext_body	Karabiner-Elements jest zainstalowany, ale jego rozszerzenie systemowe (DriverKit virtual HID) nie jest jeszcze aktywne.\n\nKliknij „Otwórz Ustawienia” i włącz „Karabiner-DriverKit-VirtualHIDDevice” w sekcji Rozszerzenia systemowe.
+karabiner.onboarding.ext_timeout	Przekroczono czas oczekiwania na aktywację rozszerzenia systemowego.
+karabiner.onboarding.ext_title	Aktywuj rozszerzenie systemowe
+karabiner.onboarding.ext_waiting	Oczekiwanie na aktywację rozszerzenia systemowego…
+karabiner.onboarding.install_body_suffix	\n\nAplikacja zostanie pobrana z oficjalnego repozytorium (pqrs-org/Karabiner-Elements) i zainstalowana automatycznie. Zostanie poproszone o hasło administratora.
+karabiner.onboarding.missing.daemon_not_running	• Demon nie jest uruchomiony (Monitorowanie wejścia?)
+karabiner.onboarding.missing.grabber_absent	• Demon karabiner_grabber jest nieobecny
+karabiner.onboarding.missing.ke_not_installed	• Karabiner-Elements nie jest zainstalowany
+karabiner.onboarding.missing.sysext_not_activated	• Rozszerzenie systemowe (DriverKit) nie jest aktywowane
+karabiner.onboarding.missing_prefix	Brakujące elementy:\n
+karabiner.onboarding.required_title	Wymagana konfiguracja Karabiner-Elements
+karabiner.pkg_not_found	Nie znaleziono .pkg w DMG.
+karabiner.ready_body	Silnik Karabiner jest gotowy.
+karabiner.ready_title	Karabiner gotowy
+karabiner.sha_failed	Weryfikacja SHA-256 nieudana: %s
+keepawake.started	☕ Zapobieganie uśpieniu aktywne
+keepawake.stopped	☕ Zapobieganie uśpieniu wyłączone
+keepawake.title	Aktywność klawiatury
+keylogger.category_general	Ogólne
+keylogger.category_private	Przeglądanie prywatne
+keylogger.error_body	Nie można załadować interfejsu metryk.\n\nSprawdź ui/metrics_typing/init.lua.
+keylogger.error_title	Błąd Keyloggera
+keylogger_ui.app_metrics	Czas w aplikacjach
+keylogger_ui.launch_error	Nie można uruchomić pulpitu nawigacyjnego : {1}
+keylogger_ui.metrics_disabled	Metryki są wyłączone.
+keylogger_ui.metrics_disabled_body	Aby włączyć : ikona w zasobniku systemowym → 📊 Metryki → « ❌ Metryki wyłączone (kliknij, aby włączyć) ».
+keylogger_ui.metrics_title	📊 Metryki
+keylogger_ui.typing_metrics	Metryki pisania
+layout.ctrlmagicsave	Ctrl+★ wysyła Ctrl+S
+layout.directaccessdigits	Bezpośredni dostęp do cyfr w górnym wierszu
+layout.ergoptialtgr	Emuluj warstwę AltGr układu Ergopti
+layout.ergoptibase	Emuluj warstwę bazową układu Ergopti
+layout.ergoptiplus	Zastosuj drobne zmiany AltGr Ergopti➕
+llm.deps.browser_install_tip	Pobierz Ollama dla Windows ze strony otwartej w przeglądarce, uruchom instalator i wróć tutaj — połączenie zostanie wykryte automatycznie.
+llm.deps.done_success	✅ Ollama gotowy
+llm.deps.fail_server_not_responding	Instalator zakończył działanie, ale serwer Ollama nie odpowiada.
+llm.deps.fail_timeout	Przekroczono limit czasu oczekiwania na odpowiedź Ollama po instalacji.
+llm.deps.install_launching	Uruchamianie instalacji Ollama…
+llm.deps.install_launching_hotkey	Instalacja Ollama (uruchomiona skrótem)…
+llm.deps.tray_title	Ergopti — AI
+llm.generating	⏳ Generowanie…
+llm.profile.advanced.label	●●○ Zaawansowany — Korekta + Predykcja
+llm.profile.basic.label	●○○ Podstawowy — Prosta predykcja
+llm.profile.batch_advanced.label	●●● Batch Zaawansowany — 1 zaaw. żąd. z {n} predykcją{s}
+llm.profile.raw.label	○○○ Surowy — Brak promptu, tylko kontekst
+llm.server_mlx_ready_body	Serwer MLX jest gotowy.
+llm.server_ollama_ready_body	Serwer Ollama jest gotowy.
+llm.server_ready_title	LLM aktywny
+magickey.repeatcorrections	Klawisz ★ powtarza ostatnio wpisany znak
+magickey.replace	Przekształcenie klawisza J w klawisz ★
+magickey.textexpansion	Rozwinięcie tekstu: c★ = c'est, gt★ = j'étais, pex★ = par exemple…
+magickey.textexpansionauto	Automatyczne rozwinięcie bez ★: ju' = jusqu', ya = y'a…
+magickey.textexpansionemojis	Rozwinięcie emoji: voiture★ = 🚗, koala★ = 🐨…
+magickey.textexpansionsymbols	Rozwinięcie symboli: -->★ = ➜, (v)★ = ✓…
+magickey.textexpansionsymbolstypst	Symbole Typst: $eq.not$★ = ≠, $PP$★ = ℙ…
+menu.about.changelog	Historia zmian
+menu.about.channel_dev	Przedpremierowa (dev)
+menu.about.channel_local_source	✔  Lokalne źródło
+menu.about.channel_main	Stabilna (main)
+menu.about.channel_menu	Kanał aktualizacji
+menu.about.check_for_updates	Sprawdź aktualizacje
+menu.about.frequency.10m	Co 10 minut
+menu.about.frequency.12h	Co 12 godzin
+menu.about.frequency.1h	Co godzinę
+menu.about.frequency.1m	Co minutę
+menu.about.frequency.24h	Co 24 godziny
+menu.about.frequency.2d	Co 2 dni
+menu.about.frequency.2h	Co 2 godziny
+menu.about.frequency.3h	Co 3 godziny
+menu.about.frequency.5m	Co 5 minut
+menu.about.frequency.6h	Co 6 godzin
+menu.about.frequency.7d	Co 7 dni
+menu.about.frequency.never	Never
+menu.about.frequency_menu	Częstotliwość sprawdzania
+menu.about.install_update	Zainstaluj aktualizację…
+menu.about.open_releases_page	Otwórz stronę wersji — GitHub
+menu.about.title	Wersja / Aktualizacje
+menu.about.update.changelog_error	Nie można pobrać informacji o wydaniu z GitHub.
+menu.about.update.changelog_header	Informacje o wydaniu dla {tag}:\n\n{notes}\n\nOtworzyć na GitHub?
+menu.about.update.install_error	Instalacja aktualizacji nie powiodła się. Sprawdź dzienniki lub pobierz ręcznie ze strony wersji.
+menu.about.update.local_source	Uruchomiono z lokalnego źródła — sprawdzanie aktualizacji jest niedostępne.
+menu.about.update.network_error	Nie można połączyć się z GitHub.\nSprawdź połączenie z internetem i spróbuj ponownie.
+menu.about.update.new_version	Dostępna jest nowa wersja!\n\nBieżąca: {current}\nNajnowsza:  {latest}\n\nOtworzyć stronę wydań, aby pobrać?
+menu.about.update.no_asset	Archiwum aktualizacji nie zostało znalezione w tej wersji. Otwórz stronę wersji, aby pobrać ręcznie.
+menu.about.update.parse_error	Nie można odczytać tagu najnowszego wydania z GitHub.
+menu.about.update.up_to_date	ErgoptiPlus jest aktualny.\n\nBieżąca wersja: {version}
+menu.about.update_checking	Sprawdzanie…
+menu.about.update_downloading	Downloading…
+menu.about.update_installing	Instalowanie…
+menu.about.update_now	Zaktualizuj do {tag}
+menu.apps.clone_desc	Duplikuj dowolną zainstalowaną aplikację
+menu.apps.config_per_app	Configure hotstrings per application
+menu.apps.encrypt_desc	Szyfruj pliki i foldery
+menu.apps.no_apps	Nie znaleziono aplikacji
+menu.apps.title	🛠️ Aplikacje
+menu.builder.title	Ergopti+
+menu.builder.title_paused	Ergopti+ ⏸
+menu.debug.console	Konsola
+menu.debug.healthcheck	Diagnostyka systemu
+menu.debug.key_history	Historia klawiszy
+menu.debug.list_vars	Stan zmiennych
+menu.debug.log_level	Poziom logowania
+menu.debug.open_error_log	Open error log
+menu.debug.open_logs	Otwórz folder logów
+menu.debug.open_today_log	Otwórz dzisiejszy plik logów
+menu.debug.title	⚠ Debugowanie
+menu.debug.window_spy	Window Spy
+menu.extensions.empty	Żadne rozszerzenie nie jest zainstalowane
+menu.extensions.header	Rozszerzenia
+menu.gestures.action_disabled	∅ Disabled
+menu.gestures.action_prefix	Akcja: 
+menu.gestures.auto_configure	🔧 Automatyczna konfiguracja (rejestr)
+menu.gestures.change_action	Zmień akcję
+menu.gestures.circular_spaces	Okrągła nawigacja obszarów (1 ↔ N)
+menu.gestures.conflict_title	Konflikt gestów
+menu.gestures.default_sensitivity	(Ogólna domyślna)
+menu.gestures.disable_all	✕ Wyłącz wszystkie gesty
+menu.gestures.enabled	️ Gesty
+menu.gestures.manual_tutorial	📋 Ręczna konfiguracja krok po kroku
+menu.gestures.mode_incremental	Wysyłanie przyrostowe (odległość)
+menu.gestures.mode_prefix	Tryb: 
+menu.gestures.mode_single	Pojedyncza akcja (x1)
+menu.gestures.notify_title	Gesty
+menu.gestures.off	❌ Gesty wyłączone (kliknij, aby włączyć)
+menu.gestures.on	✅ Gesty włączone (kliknij, aby wyłączyć)
+menu.gestures.open_settings	Otwórz Ustawienia
+menu.gestures.open_touchpad	⚙ Otwórz ustawienia touchpada (potem „Zaawansowane gesty")
+menu.gestures.restore_defaults	↩ Przywróć domyślne
+menu.gestures.sensitivity_hint	(Mniejsza = bardziej czuła/reaktywna)
+menu.gestures.sensitivity_label	Odległość na akcję (Czułość):
+menu.gestures.sensitivity_prefix	Czułość: 
+menu.gestures.swipe_2_diag	Przesunięcie 2 palcami ↗↙
+menu.gestures.swipe_2_down	Przesunięcie 2 palcami ↓
+menu.gestures.swipe_2_left	Przesunięcie 2 palcami ←
+menu.gestures.swipe_2_left_down	Przesunięcie 2 palcami ↙
+menu.gestures.swipe_2_left_up	Przesunięcie 2 palcami ↖
+menu.gestures.swipe_2_right	Przesunięcie 2 palcami →
+menu.gestures.swipe_2_right_down	Przesunięcie 2 palcami ↘
+menu.gestures.swipe_2_right_up	Przesunięcie 2 palcami ↗
+menu.gestures.swipe_2_up	Przesunięcie 2 palcami ↑
+menu.gestures.swipe_3_diag	Przesunięcie 3 palcami ↗↙
+menu.gestures.swipe_3_down	Przesunięcie 3 palcami ↓
+menu.gestures.swipe_3_horiz	Przesunięcie 3 palcami ↔
+menu.gestures.swipe_3_left	Przesunięcie 3 palcami ←
+menu.gestures.swipe_3_left_down	Przesunięcie 3 palcami ↙
+menu.gestures.swipe_3_left_up	Przesunięcie 3 palcami ↖
+menu.gestures.swipe_3_right	Przesunięcie 3 palcami →
+menu.gestures.swipe_3_right_down	Przesunięcie 3 palcami ↘
+menu.gestures.swipe_3_right_up	Przesunięcie 3 palcami ↗
+menu.gestures.swipe_3_up	Przesunięcie 3 palcami ↑
+menu.gestures.swipe_4_diag	Przesunięcie 4 palcami ↗↙
+menu.gestures.swipe_4_down	Przesunięcie 4 palcami ↓
+menu.gestures.swipe_4_horiz	Przesunięcie 4 palcami ↔
+menu.gestures.swipe_4_left	Przesunięcie 4 palcami ←
+menu.gestures.swipe_4_left_down	Przesunięcie 4 palcami ↙
+menu.gestures.swipe_4_left_up	Przesunięcie 4 palcami ↖
+menu.gestures.swipe_4_right	Przesunięcie 4 palcami →
+menu.gestures.swipe_4_right_down	Przesunięcie 4 palcami ↘
+menu.gestures.swipe_4_right_up	Przesunięcie 4 palcami ↗
+menu.gestures.swipe_4_up	Przesunięcie 4 palcami ↑
+menu.gestures.swipe_5_diag	Przesunięcie 5 palcami ↗↙
+menu.gestures.swipe_5_down	Przesunięcie 5 palcami ↓
+menu.gestures.swipe_5_horiz	Przesunięcie 5 palcami ↔
+menu.gestures.swipe_5_left	Przesunięcie 5 palcami ←
+menu.gestures.swipe_5_left_down	Przesunięcie 5 palcami ↙
+menu.gestures.swipe_5_left_up	Przesunięcie 5 palcami ↖
+menu.gestures.swipe_5_right	Przesunięcie 5 palcami →
+menu.gestures.swipe_5_right_down	Przesunięcie 5 palcami ↘
+menu.gestures.swipe_5_right_up	Przesunięcie 5 palcami ↗
+menu.gestures.swipe_5_up	Przesunięcie 5 palcami ↑
+menu.gestures.tap_2	Stuknięcie 2 palcami
+menu.gestures.tap_3	Stuknięcie 3 palcami
+menu.gestures.tap_4	Stuknięcie 4 palcami
+menu.gestures.tap_5	Stuknięcie 5 palcami
+menu.gestures.title	🖐️ Gesty
+menu.global.config_folder	📂 Folder konfiguracji…
+menu.global.disable_all	☐ Wyłącz wszystkie funkcje
+menu.global.edit_shortcuts	  ↳ Edytuj osobiste skróty
+menu.global.enable_all	☑ Włącz wszystkie funkcje
+menu.global.language	🌐 Język
+menu.global.quit	⏹ Zakończ
+menu.global.reload	🔄 Przeładuj
+menu.global.reset_defaults	↺ Przywróć domyślne
+menu.global.setup_wizard	Kreator konfiguracji…
+menu.global.suspend	⏸︎ Wstrzymaj
+menu.global.title	Akcje globalne
+menu.hotstrings.add_custom	+ Dodaj niestandardowy rozszerzacz…
+menu.hotstrings.add_delimiter	+ Add custom delimiter…
+menu.hotstrings.category_off	❌ Wyłączona (kliknij, aby włączyć)
+menu.hotstrings.category_on	✅ Włączona (kliknij, aby wyłączyć)
+menu.hotstrings.check_all	☑ Zaznacz wszystko
+menu.hotstrings.close_on_add	Zamknij interfejs po dodaniu hotstring'a przez skrót
+menu.hotstrings.config_item	⚙️ Konfiguruj opóźnienia i kolory…
+menu.hotstrings.consumed	pochłonięty
+menu.hotstrings.consumed_suffix	(pochłonięty)
+menu.hotstrings.custom_label	Niestandardowy
+menu.hotstrings.default_category_prefix	Domyślna kategoria: 
+menu.hotstrings.default_none	Brak
+menu.hotstrings.delay_autocorrection	Opóźnienie autokorekty
+menu.hotstrings.delay_invalid_body	Wprowadź nieujemną liczbę całkowitą (milisekundy).
+menu.hotstrings.delay_invalid_title	Nieprawidłowa wartość
+menu.hotstrings.delay_magic_key	Opóźnienie magicznego klawisza ★
+menu.hotstrings.delay_prompt	Nowe opóźnienie w milisekundach (0 = brak opóźnienia):
+menu.hotstrings.delays_colors	Opóźnienia i kolory…
+menu.hotstrings.delete_delimiter	Delete this delimiter…
+menu.hotstrings.delete_expander	Usuń ten rozszerzacz…
+menu.hotstrings.disable_all	❌ Disable all
+menu.hotstrings.enable_all	✅ Enable all
+menu.hotstrings.header_common	Wspólne hotstring'i
+menu.hotstrings.header_common_count	Wspólne hotstring'i (%s)
+menu.hotstrings.header_ergopti	Układ Ergopti
+menu.hotstrings.header_ergopti_count	Układ Ergopti (%s)
+menu.hotstrings.header_personal_count	Moje hotstrings (%s)
+menu.hotstrings.infinite	∞
+menu.hotstrings.magic_key_prefix	Magiczny klawisz: 
+menu.hotstrings.magic_key_prompt	Nowa wartość (★ domyślnie):
+menu.hotstrings.magic_key_title	Edytuj magiczny klawisz
+menu.hotstrings.missing_value	(brak wartości)
+menu.hotstrings.notify_bubble_ai	Dymek AI
+menu.hotstrings.notify_bubble_autocorrect	Dymek Autokorekta
+menu.hotstrings.notify_bubble_colored	Kolorowe dymki
+menu.hotstrings.notify_bubble_star	Dymek ★
+menu.hotstrings.off	❌ Hotstring'i wyłączone (kliknij, aby włączyć)
+menu.hotstrings.on	✅ Hotstring'i włączone (kliknij, aby wyłączyć)
+menu.hotstrings.open_editor	Otwórz edytor hotstring'ów
+menu.hotstrings.open_file	Otwórz plik…
+menu.hotstrings.params	⚙️ Ustawienia hotstring'ów
+menu.hotstrings.personal_header	Moje hotstrings
+menu.hotstrings.preview_bubbles	Bąbelki podglądu
+menu.hotstrings.repeat_key_toggle	Klawisz ★ powtarza ostatnie naciśnięcie
+menu.hotstrings.reset_magic_key	   ↳ Resetuj (domyślnie: ★)
+menu.hotstrings.rolls.assign	#! ➜ :=
+menu.hotstrings.rolls.assign_arrow_equal_left	=$ ➜ <=
+menu.hotstrings.rolls.assign_arrow_equal_right	$= ➜ =>
+menu.hotstrings.rolls.assign_arrow_minus_left	?+ ➜ <-
+menu.hotstrings.rolls.assign_arrow_minus_right	+? ➜ ->
+menu.hotstrings.rolls.bracket_quote	[# ➜ ["
+menu.hotstrings.rolls.chevron_equal	= ➜ <=
+menu.hotstrings.rolls.chevron_greater	>% ➜ >=
+menu.hotstrings.rolls.chevron_less	<% ➜ <=
+menu.hotstrings.rolls.close_chevron_tag	<@ ➜ </
+menu.hotstrings.rolls.comment_close	"\\  ➜ */
+menu.hotstrings.rolls.comment_open	\\" ➜ /*
+menu.hotstrings.rolls.ct	P' ➜ CT
+menu.hotstrings.rolls.cx	CX ➜ CK
+menu.hotstrings.rolls.english_negation	NT' ➜ N'T
+menu.hotstrings.rolls.equal_string	[) ➜ = ""
+menu.hotstrings.rolls.ez	EÉ ➜ EZ
+menu.hotstrings.rolls.hashtag_close_bracket	#] ➜ "]
+menu.hotstrings.rolls.hashtag_open_bracket	#[ ➜ "[
+menu.hotstrings.rolls.hashtag_parenthesis	#( ➜ ")
+menu.hotstrings.rolls.hashtag_quote	#" ➜ "
+menu.hotstrings.rolls.hc	HC ➜ WH
+menu.hotstrings.rolls.left_arrow	=+ = ➜
+menu.hotstrings.rolls.not_equal	!# ➜ !=
+menu.hotstrings.rolls.paren_quote	(# ➜ ("
+menu.hotstrings.rolls.sx	SX ➜ SK
+menu.hotstrings.shortcut_default_ctrl	Ctrl + %s
+menu.hotstrings.shortcut_none	Brak skrótu
+menu.hotstrings.shortcut_prefix	Skrót: Win + 
+menu.hotstrings.shortcut_prompt	Format: mod+klawisz (np. ctrl+e)\nDostępne mod: cmd, alt, ctrl, shift\nZostaw puste, aby wyłączyć
+menu.hotstrings.title	⚡ Hotstring'i
+menu.hotstrings.tooltip_ai	Podgląd SI
+menu.hotstrings.tooltip_ai_acceptance	Opóźnienie akceptacji SI
+menu.hotstrings.tooltip_autocompletion	Opóźnienie autouzupełniania
+menu.hotstrings.tooltip_autocorrect	Podgląd autokorekty
+menu.hotstrings.tooltip_colored	Kolorowe podglądy
+menu.hotstrings.tooltip_default	Domyślne opóźnienie (wszystkie grupy)
+menu.hotstrings.tooltip_magic	★ Podgląd
+menu.hotstrings.uncheck_all	□ Odznacz wszystko
+menu.hotstrings.word_delimiters	Separatory wyrazów
+menu.hotstrings.word_expanders	Rozszerzacze
+menu.hs.gestures.modes	Tryb
+menu.hs.gestures.modes.swipe_2_down	Tryb — Przesunięcie 2 palcami ↓
+menu.hs.gestures.modes.swipe_2_left	Tryb — Przesunięcie 2 palcami ←
+menu.hs.gestures.modes.swipe_2_left_down	Tryb — Przesunięcie 2 palcami ↙
+menu.hs.gestures.modes.swipe_2_left_up	Tryb — Przesunięcie 2 palcami ↖
+menu.hs.gestures.modes.swipe_2_right	Tryb — Przesunięcie 2 palcami →
+menu.hs.gestures.modes.swipe_2_right_down	Tryb — Przesunięcie 2 palcami ↘
+menu.hs.gestures.modes.swipe_2_right_up	Tryb — Przesunięcie 2 palcami ↗
+menu.hs.gestures.modes.swipe_2_up	Tryb — Przesunięcie 2 palcami ↑
+menu.hs.gestures.modes.swipe_3_down	Tryb — Przesunięcie 3 palcami ↓
+menu.hs.gestures.modes.swipe_3_left	Tryb — Przesunięcie 3 palcami ←
+menu.hs.gestures.modes.swipe_3_left_down	Tryb — Przesunięcie 3 palcami ↙
+menu.hs.gestures.modes.swipe_3_left_up	Tryb — Przesunięcie 3 palcami ↖
+menu.hs.gestures.modes.swipe_3_right	Tryb — Przesunięcie 3 palcami →
+menu.hs.gestures.modes.swipe_3_right_down	Tryb — Przesunięcie 3 palcami ↘
+menu.hs.gestures.modes.swipe_3_right_up	Tryb — Przesunięcie 3 palcami ↗
+menu.hs.gestures.modes.swipe_3_up	Tryb — Przesunięcie 3 palcami ↑
+menu.hs.gestures.modes.swipe_4_down	Tryb — Przesunięcie 4 palcami ↓
+menu.hs.gestures.modes.swipe_4_left	Tryb — Przesunięcie 4 palcami ←
+menu.hs.gestures.modes.swipe_4_left_down	Tryb — Przesunięcie 4 palcami ↙
+menu.hs.gestures.modes.swipe_4_left_up	Tryb — Przesunięcie 4 palcami ↖
+menu.hs.gestures.modes.swipe_4_right	Tryb — Przesunięcie 4 palcami →
+menu.hs.gestures.modes.swipe_4_right_down	Tryb — Przesunięcie 4 palcami ↘
+menu.hs.gestures.modes.swipe_4_right_up	Tryb — Przesunięcie 4 palcami ↗
+menu.hs.gestures.modes.swipe_4_up	Tryb — Przesunięcie 4 palcami ↑
+menu.hs.gestures.modes.swipe_5_down	Tryb — Przesunięcie 5 palcami ↓
+menu.hs.gestures.modes.swipe_5_left	Tryb — Przesunięcie 5 palcami ←
+menu.hs.gestures.modes.swipe_5_left_down	Tryb — Przesunięcie 5 palcami ↙
+menu.hs.gestures.modes.swipe_5_left_up	Tryb — Przesunięcie 5 palcami ↖
+menu.hs.gestures.modes.swipe_5_right	Tryb — Przesunięcie 5 palcami →
+menu.hs.gestures.modes.swipe_5_right_down	Tryb — Przesunięcie 5 palcami ↘
+menu.hs.gestures.modes.swipe_5_right_up	Tryb — Przesunięcie 5 palcami ↗
+menu.hs.gestures.modes.swipe_5_up	Tryb — Przesunięcie 5 palcami ↑
+menu.hs.gestures.sensitivities	Czułość
+menu.hs.gestures.sensitivities.swipe_2_down	Czułość — Przesunięcie 2 palcami ↓
+menu.hs.gestures.sensitivities.swipe_2_left	Czułość — Przesunięcie 2 palcami ←
+menu.hs.gestures.sensitivities.swipe_2_left_down	Czułość — Przesunięcie 2 palcami ↙
+menu.hs.gestures.sensitivities.swipe_2_left_up	Czułość — Przesunięcie 2 palcami ↖
+menu.hs.gestures.sensitivities.swipe_2_right	Czułość — Przesunięcie 2 palcami →
+menu.hs.gestures.sensitivities.swipe_2_right_down	Czułość — Przesunięcie 2 palcami ↘
+menu.hs.gestures.sensitivities.swipe_2_right_up	Czułość — Przesunięcie 2 palcami ↗
+menu.hs.gestures.sensitivities.swipe_2_up	Czułość — Przesunięcie 2 palcami ↑
+menu.hs.gestures.sensitivities.swipe_3_down	Czułość — Przesunięcie 3 palcami ↓
+menu.hs.gestures.sensitivities.swipe_3_left	Czułość — Przesunięcie 3 palcami ←
+menu.hs.gestures.sensitivities.swipe_3_left_down	Czułość — Przesunięcie 3 palcami ↙
+menu.hs.gestures.sensitivities.swipe_3_left_up	Czułość — Przesunięcie 3 palcami ↖
+menu.hs.gestures.sensitivities.swipe_3_right	Czułość — Przesunięcie 3 palcami →
+menu.hs.gestures.sensitivities.swipe_3_right_down	Czułość — Przesunięcie 3 palcami ↘
+menu.hs.gestures.sensitivities.swipe_3_right_up	Czułość — Przesunięcie 3 palcami ↗
+menu.hs.gestures.sensitivities.swipe_3_up	Czułość — Przesunięcie 3 palcami ↑
+menu.hs.gestures.sensitivities.swipe_4_down	Czułość — Przesunięcie 4 palcami ↓
+menu.hs.gestures.sensitivities.swipe_4_left	Czułość — Przesunięcie 4 palcami ←
+menu.hs.gestures.sensitivities.swipe_4_left_down	Czułość — Przesunięcie 4 palcami ↙
+menu.hs.gestures.sensitivities.swipe_4_left_up	Czułość — Przesunięcie 4 palcami ↖
+menu.hs.gestures.sensitivities.swipe_4_right	Czułość — Przesunięcie 4 palcami →
+menu.hs.gestures.sensitivities.swipe_4_right_down	Czułość — Przesunięcie 4 palcami ↘
+menu.hs.gestures.sensitivities.swipe_4_right_up	Czułość — Przesunięcie 4 palcami ↗
+menu.hs.gestures.sensitivities.swipe_4_up	Czułość — Przesunięcie 4 palcami ↑
+menu.hs.gestures.sensitivities.swipe_5_down	Czułość — Przesunięcie 5 palcami ↓
+menu.hs.gestures.sensitivities.swipe_5_left	Czułość — Przesunięcie 5 palcami ←
+menu.hs.gestures.sensitivities.swipe_5_left_down	Czułość — Przesunięcie 5 palcami ↙
+menu.hs.gestures.sensitivities.swipe_5_left_up	Czułość — Przesunięcie 5 palcami ↖
+menu.hs.gestures.sensitivities.swipe_5_right	Czułość — Przesunięcie 5 palcami →
+menu.hs.gestures.sensitivities.swipe_5_right_down	Czułość — Przesunięcie 5 palcami ↘
+menu.hs.gestures.sensitivities.swipe_5_right_up	Czułość — Przesunięcie 5 palcami ↗
+menu.hs.gestures.sensitivities.swipe_5_up	Czułość — Przesunięcie 5 palcami ↑
+menu.kanata.title	🎹 Kanata
+menu.karabiner.clear_all	🧹 Wyczyść wszystko (tap/hold i skróty)
+menu.karabiner.combo_arrow	Kombo → %s
+menu.karabiner.copy_tap_to_combo	🔁 Skopiuj tap → combo dla klawiszy modyfikujących
+menu.karabiner.disabled_warning_1	⚠️  Menu wyłączone, ale Karabiner nadal działa.
+menu.karabiner.disabled_warning_2	      Przemapowania są zatem nadal aktywne.
+menu.karabiner.disabled_warning_3	      Aby zatrzymać wszystko: kliknij 🟢 powyżej,
+menu.karabiner.disabled_warning_4	      i usuń Karabiner z aplikacji startowych.
+menu.karabiner.header_shortcuts	Skróty modyfikatorów
+menu.karabiner.header_taps_holds	Dotknięcie / Przytrzymanie
+menu.karabiner.hold_arrow	Przytrzymanie → %s
+menu.karabiner.hold_colon	Przytrzymanie: %s
+menu.karabiner.key_tap_delay	Tap delay: %s
+menu.karabiner.key_tap_delay_dialog_prompt	Tap / hold delay for this key, in milliseconds\n(global: %d ms)
+menu.karabiner.key_tap_delay_dialog_title	Karabiner — Per-key tap delay
+menu.karabiner.key_tap_delay_set	Set a custom delay…
+menu.karabiner.key_tap_delay_use_global	Use global delay (%s)
+menu.karabiner.left_hand	Lewa ręka
+menu.karabiner.nothing_combo	Brak akcji (combo, dotknięcie i przytrzymanie)
+menu.karabiner.nothing_tap_hold	Brak akcji (dotknięcie i przytrzymanie)
+menu.karabiner.open_gui	Otwórz Karabiner-Elements
+menu.karabiner.restore_defaults	↩ Przywróć domyślne
+menu.karabiner.right_hand	Prawa ręka
+menu.karabiner.simultaneous_dialog_prompt	Maksymalne opóźnienie (milisekundy) między 1.\na 2. klawiszem skrótu, aby aktywować slot „Combo"\n(styl akordu: klawisze wciśnięte prawie jednocześnie).\n\n(domyślnie: %d ms)
+menu.karabiner.simultaneous_dialog_title	Karabiner — Opóźnienie aktywacji combo
+menu.karabiner.simultaneous_title	Opóźnienie aktywacji combo: %s
+menu.karabiner.start	▶ Uruchom Karabiner
+menu.karabiner.status_active	🟢 Karabiner aktywny
+menu.karabiner.status_inactive	🔴 Karabiner nieaktywny — kliknij, aby uruchomić ponownie
+menu.karabiner.status_no_daemon	🟡 Karabiner włączony — demon nie wykryty (czy KE jest zainstalowany?)
+menu.karabiner.status_not_primed	🟡 Karabiner włączony — reguły nie zastosowane (kliknij, aby zainicjować)
+menu.karabiner.status_priming	🔵 Karabiner — inicjalizacja w toku…
+menu.karabiner.sticky_dialog_prompt	Opóźnienie anulowania sticky (milisekundy)\nPo tym czasie bez naciśnięcia klawisza modyfikator one-shot zostaje anulowany.
+menu.karabiner.sticky_dialog_title	Karabiner — Opóźnienie sticky
+menu.karabiner.sticky_title	Opóźnienie modyfikatora sticky: %s
+menu.karabiner.stop	✕ Zamknij Karabiner
+menu.karabiner.symmetric	Symetryczne skróty (kolejność klawiszy niezależna)
+menu.karabiner.tap_arrow	Dotknięcie → %s
+menu.karabiner.tap_colon	Dotknięcie: %s
+menu.karabiner.tap_hold_dialog_prompt	Opóźnienie tap / hold w milisekundach\n(Domyślny Karabiner: %d ms)
+menu.karabiner.tap_hold_dialog_title	Karabiner — Opóźnienie tap / hold
+menu.karabiner.tap_hold_title	Opóźnienie tap / hold: %s
+menu.keyboard_layout.add_ergopti	➕ Dodaj Ergopti v%s do listy układów
+menu.keyboard_layout.open_system_prefs	Otwórz Preferencje systemowe → Klawiatura
+menu.layout.active_layouts	Aktywne układy
+menu.layout.add_fail	Dodawanie nie powiodło się — sprawdź konsolę.
+menu.layout.add_ok	%s dodany do listy.
+menu.layout.add_to_list	Dodaj Ergopti v%s do źródeł wejścia…
+menu.layout.already_added	✅ %s v%s — już dodany
+menu.layout.in_list	Wszystkie warianty Ergopti aktywne v%s ✅
+menu.layout.install_first	Najpierw zainstaluj pakiet
+menu.layout.install_version	%s Zainstaluj Ergopti (%s) v%s
+menu.layout.installed_system	Układ Ergopti zainstalowany (zakres systemu) ✅
+menu.layout.installed_user	Układ Ergopti zainstalowany (zakres użytkownika) ✅
+menu.layout.installed_version	Ergopti (%s) v%s — aktualny ✅
+menu.layout.layout_auto	— Bez zmian —
+menu.layout.layout_on_pause	Układ gdy skrypt wstrzymany
+menu.layout.layout_on_resume	Układ gdy skrypt aktywny
+menu.layout.logo_custom	Niestandardowa ikona
+menu.layout.logo_default	Domyślna ikona
+menu.layout.no_bundle	Nie znaleziono pakietu Ergopti
+menu.layout.off	❌ Układ wyłączony (kliknij, aby włączyć)
+menu.layout.on	✅ Układ włączony (kliknij, aby wyłączyć)
+menu.layout.open_prefs	Otwórz Ustawienia klawiatury…
+menu.layout.pause_layout_enabled	Zmień układ przy pauzie / wznowieniu
+menu.layout.pause_layout_section	Układ przy pauzie / wznowieniu
+menu.layout.replace	Przekształcenie klawisza w klawisz ★
+menu.layout.scope_system	system
+menu.layout.scope_user	użytkownik
+menu.layout.title	🌐 Układ klawiatury
+menu.layout.update_list	Uaktualnij aktywną listę v%s → v%s
+menu.layout.update_list_fail	Aktualizacja nie powiodła się — sprawdź konsolę.
+menu.layout.update_list_install_first	Uaktualnij aktywną listę do v%s (najpierw zainstaluj v%s)
+menu.layout.update_list_ok	Lista źródeł wejścia zaktualizowana.
+menu.layout.update_version	Zaktualizuj Ergopti (%s) v%s → v%s
+menu.llm.about	O Ergopti AI
+menu.llm.about_body	Ergopti AI — Inteligentne podpowiedzi klawiatury\nBackend: Ollama (lokalne)\nWersja: 1.0
+menu.llm.active_model_label	Aktywny model: 
+menu.llm.add_custom_model	Dodaj niestandardowy model
+menu.llm.add_model_entry	➕ Dodaj niestandardowy model…
+menu.llm.after_hotstring	Sugestia po wygaśnięciu bąbelka hotstring'a
+menu.llm.api_add_entry	+ Dodaj API…
+menu.llm.api_dialog_title	ErgoptiPlus — Punkt API
+menu.llm.api_edit_entry	Edytuj wybrane API…
+menu.llm.api_no_entry	Brak skonfigurowanego API
+menu.llm.api_prompt_model	Nazwa modelu:
+menu.llm.api_prompt_name	Nazwa (np. „Mój klucz OpenAI”):
+menu.llm.api_prompt_provider	Identyfikator dostawcy ({1}):
+menu.llm.api_prompt_token	Token / klucz API (ukryty):
+menu.llm.api_prompt_url	URL bazowy:
+menu.llm.api_providers_unavailable	Nie można załadować listy dostawców API, więc nie można dodać wpisu. Sprawdź, czy plik api_providers.json istnieje i jest poprawny.
+menu.llm.api_remove_confirm_body	Zapisany token API zostanie trwale usunięty.
+menu.llm.api_remove_confirm_title	Usunąć wpis API "%s"?
+menu.llm.api_remove_entry	Usuń wybrane API
+menu.llm.api_unreachable_body	"%s" nie odpowiedział — sprawdź token, URL i model.
+menu.llm.api_unreachable_title	Wpis API nieosiągalny
+menu.llm.api_validated_body	"%s" odpowiedział pomyślnie.
+menu.llm.api_validated_title	Wpis API gotowy
+menu.llm.arrows	Strzałki
+menu.llm.arrows_only	Tylko strzałki
+menu.llm.auto_raise_temp	  ↳ Automatycznie podnoś temperaturę (+0,1 na sugestię)
+menu.llm.backend_api_suffix	Zewnętrzny dostawca
+menu.llm.backend_default_model	↺ Domyślny model backendu (%s)
+menu.llm.backend_mlx_suffix	Zalecane (natywne Apple Silicon)
+menu.llm.backend_ollama_suffix	Standardowy
+menu.llm.backend_title	AI engine (Backend): 
+menu.llm.backend_unknown	Unknown
+menu.llm.browse_col_family	Rodzina
+menu.llm.browse_col_name	Nazwa
+menu.llm.browse_col_params	Parametry
+menu.llm.browse_col_ram	RAM
+menu.llm.browse_col_speed	Prędkość
+menu.llm.browse_col_status	Status
+menu.llm.browse_col_type	Typ
+menu.llm.browse_models_entry	🔍 Przeglądaj wszystkie modele…
+menu.llm.browse_models_filter	Filtr:
+menu.llm.browse_models_title	ErgoptiPlus — Modele LLM
+menu.llm.browse_pick	Wybierz ten model
+menu.llm.browse_status_available	⬇ Dostępne
+menu.llm.browse_status_installed	✅ Zainstalowany
+menu.llm.btn_download	Pobierz
+menu.llm.caps_header	MOŻLIWOŚCI
+menu.llm.context_length_label	Rozmiar kontekstu: %s ostatnich znaków
+menu.llm.context_length_prompt	Liczba poprzednich znaków do analizy:
+menu.llm.custom_model_title	Niestandardowy model
+menu.llm.debounce_label	Czas bezczynności przed sugestią: %s
+menu.llm.debounce_prompt	Opóźnienie bezczynności przed generowaniem (w ms, np. 600):
+menu.llm.delete_model_body	Czy naprawdę chcesz usunąć model "%s" z lokalnej pamięci podręcznej?
+menu.llm.delete_model_cache	🗑️ Usuń ten model z pamięci podręcznej
+menu.llm.delete_model_title	Usunąć model?
+menu.llm.digits	Cyfry
+menu.llm.digits_only	Tylko cyfry
+menu.llm.disable_password_fields	Wyłącz w polach hasła
+menu.llm.disable_url_bars	Wyłącz na paskach adresu przeglądarki
+menu.llm.disabled_in_label	Wyłączono w %d aplikacji%s
+menu.llm.disabled_in_prefix	Wyłączono w
+menu.llm.display_menu_title	Wyświetlanie
+menu.llm.download_failed	Pobieranie nie powiodło się
+menu.llm.download_model	⬇️ Pobierz ten model
+menu.llm.download_window_lost	Okno pobierania nie znalezione
+menu.llm.download_window_lost_body	Pobieranie nadal trwa w tle.
+menu.llm.empty_model_id	Pusty identyfikator — brak akcji.
+menu.llm.exclude_from_ai	Wyklucz z automatycznego generowania SI…
+menu.llm.generation_menu_title	Ustawienia generowania
+menu.llm.hf_token_label	🔑 Token HuggingFace: %s
+menu.llm.hf_token_set	✅ Skonfigurowany
+menu.llm.hf_token_unset	❌ Nie skonfigurowany
+menu.llm.hw_disk	Miejsce na dysku: %s GB
+menu.llm.hw_download	Pobieranie: %s GB
+menu.llm.hw_header	WYMAGANIA (%s)
+menu.llm.hw_ram	Pamięć (RAM): %s GB
+menu.llm.indent_label	Wcięcie wybranej sugestii
+menu.llm.indent_none	Bez wcięcia
+menu.llm.indent_space	spacja
+menu.llm.indent_spaces	spacje
+menu.llm.inline_autotype	✍️ Wpisywanie w miejscu (styl Copilot)
+menu.llm.instant_on_word_end	Natychmiastowa sugestia na końcu słowa
+menu.llm.launch_download_prompt	Czy chcesz rozpocząć pobieranie?
+menu.llm.max_words_label	Maks. słów na sugestię: %s
+menu.llm.max_words_prompt	Maksymalna liczba słów na sugestię (0 = bez limitu):
+menu.llm.min_words_label	Min. słów na sugestię: %s
+menu.llm.min_words_prompt	Minimalna liczba słów na sugestię:
+menu.llm.mlx_model_hint	Identyfikator HuggingFace dla modelu MLX, np.: mlx-community/Qwen2.5-3B-Instruct-4bit
+menu.llm.mlx_port_label	Port serwera MLX: %s
+menu.llm.mlx_port_prompt	Port lokalnego serwera MLX programu Ergopti (1024-65535). Domyślnie: %s.
+menu.llm.mlx_port_title	Port serwera MLX
+menu.llm.model_backend	Backend: %s
+menu.llm.model_change_title	Zmiana modelu
+menu.llm.model_date	Data aktualizacji: %s
+menu.llm.model_label	Model: %s
+menu.llm.model_params_active	Parametry (Aktywne): %s
+menu.llm.model_params_total	Parametry (Łącznie): %s
+menu.llm.model_source	Źródło: %s
+menu.llm.model_speed	Szacowana prędkość: %s tok/s
+menu.llm.model_tags	Tagi: %s
+menu.llm.model_type	Typ: %s
+menu.llm.my_models	🛠️ Moje modele
+menu.llm.nav_label	Nawiguj sugestie (↑/← i ↓/→)
+menu.llm.nav_menu_title	Nawigacja
+menu.llm.nav_modifiers_prompt	Klawisz(e) modyfikujący do nawigacji strzałkami (np. ctrl, alt — zostaw puste = tylko strzałki):
+menu.llm.no_model	Brak modelu (Wyłączony)
+menu.llm.no_model_none	Brak
+menu.llm.not_installed_body	Ten model nie jest jeszcze zainstalowany.
+menu.llm.num_predictions_label	Liczba sugestii: %s
+menu.llm.off	❌ AI wyłączone (kliknij, aby włączyć)
+menu.llm.ollama_model_hint	Identyfikator modelu Ollama, np.: qwen2.5:1.5b lub llama3.2:3b
+menu.llm.ollama_port_label	Port serwera Ollama: %s
+menu.llm.ollama_port_prompt	Port lokalnego serwera Ollama (1024-65535). Domyślnie: 11434.
+menu.llm.ollama_port_title	Port serwera Ollama
+menu.llm.on	✅ AI włączone (kliknij, aby wyłączyć)
+menu.llm.params_active	Parametry (Aktywne): 
+menu.llm.params_total	Parametry (Łącznie): 
+menu.llm.prediction_count_label	%d sugestia%s
+menu.llm.profile_already_ok_msg	Model: %s\n%s\n\nAktualny prompt:\n%s\n\nZalecany prompt:\n%s\n\nTen profil jest już odpowiedni dla tego modelu.
+menu.llm.profile_change_msg	Model: %s\n%s\n\nAktualny prompt:\n%s\n\nZalecany prompt:\n%s\n\nPotwierdź, aby zastosować zalecany prompt.
+menu.llm.profile_power_warning	⚠️  Mocny profil\n\nZalecany:  %s\nWybrany:  %s\n\nModel może nie być wystarczająco wydajny.
+menu.llm.remove_model_body	Czy chcesz usunąć niestandardowy model "%s" ze swojej listy? Model nie zostanie odinstalowany z systemu.
+menu.llm.remove_model_title	Usunąć ten model?
+menu.llm.remove_user_model	🗑️ Usuń z moich modeli
+menu.llm.reset_label	  ↳ Resetuj (domyślnie: %s)
+menu.llm.reset_on_nav	Wyczyść kontekst przy kliknięciu/nawigacji
+menu.llm.select_model	👉 Wybierz ten model
+menu.llm.shortcut_prompt	Format: mod+klawisz  (np. cmd+alt+p)\nDostępne mod: cmd, alt, ctrl, shift\nZostaw puste, aby wyłączyć
+menu.llm.show_all_at_once	Pokaż wszystkie sugestie jednocześnie (multi-predykcje)
+menu.llm.show_download_window	📥 Pobieranie w toku — Pokaż okno
+menu.llm.show_info_bar	Pokaż pasek informacji (model i latencja)
+menu.llm.show_streaming	Pokaż każdą sugestię strumieniowo (token po tokenie)
+menu.llm.specs_header	SPECYFIKACJE
+menu.llm.temperature_label	Temperatura (Kreatywność): %s
+menu.llm.temperature_prompt	Poziom kreatywności (0.0 = deterministyczny, 1.0 = kreatywny):
+menu.llm.thinking_model_info	  ↳ Info: Model myślący (ukryte rozumowanie)
+menu.llm.title	✨ Sztuczna inteligencja
+menu.llm.toggle_disable	Wyłącz sugestie AI
+menu.llm.toggle_enable	Włącz sugestie AI
+menu.llm.trigger_menu_title	Wyzwalanie SI
+menu.llm.trigger_shortcut_label	Skrót do ręcznego generowania: %s
+menu.llm.trigger_shortcut_title	Skrót generowania SI
+menu.llm.unlimited	Nieograniczony
+menu.llm.val_label	Wybierz sugestię nr (%s)
+menu.llm.val_modifiers_prompt	Klawisz(e) modyfikujący do wyboru numerem (np. ctrl, alt — zostaw puste = tylko cyfry):
+menu.llm.warning_install_ollama	📥 Zainstaluj Ollama teraz
+menu.metrics.colors_by_source	    ↳ Kolor według źródła wejścia
+menu.metrics.disabled_in_label	Wyłączono w %d aplikacji%s
+menu.metrics.encrypt_toggle	Szyfruj logi na dysku (Bezpieczeństwo)
+menu.metrics.exclude_apps	Wyklucz aplikacje z keyloggera…
+menu.metrics.filter_private	Ignoruj przeglądanie prywatne
+menu.metrics.filter_secure	Ignoruj pola hasła
+menu.metrics.filter_sysauth	Ignoruj okna uwierzytelniania systemowego
+menu.metrics.include_realtime	    ↳ Dołącz wykres w czasie rzeczywistym
+menu.metrics.off	❌ Statystyki wyłączone (kliknij, aby włączyć)
+menu.metrics.on	✅ Statystyki włączone (kliknij, aby wyłączyć)
+menu.metrics.open_encryptor	  ↳ Otwórz samodzielny szyfrarz…
+menu.metrics.privacy_header	FILTRY PRYWATNOŚCI
+menu.metrics.reset_wpm_position	    ↳ Zresetuj pozycję
+menu.metrics.shortcut_apps_title	Skrót czasu aplikacji
+menu.metrics.shortcut_item	    ↳ Skrót: %s
+menu.metrics.shortcut_none	Brak skrótu
+menu.metrics.shortcut_prefix	  ↳ Skrót: 
+menu.metrics.shortcut_prompt	Format: mod+klawisz (np. ctrl+m)\nZostaw puste, aby wyłączyć
+menu.metrics.shortcut_typing_title	Skrót statystyk pisania
+menu.metrics.show_apps	Pokaż czas na aplikację
+menu.metrics.show_typing	Pokaż statystyki pisania
+menu.metrics.show_wpm_menubar	WPM na pasku menu
+menu.metrics.show_wpm_widget	Pływający widget WPM
+menu.metrics.title	📊 Statystyki
+menu.metrics.wpm_unit	SPM
+menu.paths.menu_item	Folder konfiguracji…
+menu.paths.pick_prompt	Wybierz folder konfiguracji
+menu.paths.window_title	Folder konfiguracji
+menu.profiles.auto_detect	✨ Automatycznie wykryj najlepszy profil
+menu.profiles.clone_builtin	✏️ Sklonuj i edytuj ten profil…
+menu.profiles.copy_suffix	(kopia)
+menu.profiles.create_profile	Utwórz niestandardowy profil…
+menu.profiles.custom_profile_label	Niestandardowy profil
+menu.profiles.delete_confirm_body	Ten niestandardowy profil zostanie trwale usunięty.
+menu.profiles.delete_confirm_title	Usunąć "%s"?
+menu.profiles.delete_profile	🗑️ Usuń…
+menu.profiles.edit_profile	✏️ Edytuj…
+menu.profiles.header_custom_profiles	NIESTANDARDOWE PROFILE
+menu.profiles.header_default_profiles	DOMYŚLNE PROFILE
+menu.profiles.not_recommended	  ⚠️ Niezalecane (Thinking)
+menu.profiles.override_active_app_with_current	➕ Użyj bieżącego profilu dla aktywnej aplikacji
+menu.profiles.per_app_overrides	🪟 Profile na aplikację
+menu.profiles.profile_label_prefix	Profil: %s
+menu.profiles.prompt_label	Nazwa profilu:
+menu.profiles.prompt_system_single	Prompt systemowy (jedno generowanie):
+menu.profiles.recommended_profile	Zalecany profil
+menu.profiles.recommended_unavailable_body	Nie można zastosować automatycznego wykrywania w tym kontekście
+menu.profiles.recommended_unavailable_title	Zalecany profil niedostępny
+menu.profiles.shortcut_prefix	Skrót: %s
+menu.profiles.shortcut_prompt	Format: mod+klawisz  (np. cmd+shift+b)\nDostępne mod: cmd, alt, ctrl, shift\nZostaw puste, aby wyłączyć
+menu.profiles.shortcut_title	Skrót profilu
+menu.profiles.use_profile	Użyj tego profilu
+menu.reloading	Przeładowywanie…
+menu.reloading_files	Pliki zmienione — Przeładowywanie…
+menu.script_control.title	Kontrola skryptu
+menu.script_ready	Skrypt gotowy!
+menu.settings.context_length_title	Rozmiar kontekstu
+menu.settings.default_indicator	 (domyślny)
+menu.settings.delay_prompt	Wymagana przerwa w pisaniu (w ms) przed zapytaniem SI:\n\n(Pozostaw puste, aby zresetować: %s ms)\n(Wpisz "Never" lub -1, aby wyłączyć automatyczne generowanie)
+menu.settings.delay_title	Czas oczekiwania
+menu.settings.disabled	Wyłączony
+menu.settings.indent_space	 spacja
+menu.settings.indent_spaces	 spacje
+menu.settings.max_words_prompt	Maksymalna liczba słów na sugestię (0 = nieograniczona):
+menu.settings.max_words_title	Maks. słów na sugestię
+menu.settings.min_words_title	Min. słów na sugestię
+menu.settings.never	Nigdy
+menu.settings.no_modifier	Brak modyfikatora
+menu.settings.reset_instruction	\n\n(Zostaw puste, aby zresetować: %s)
+menu.settings.temperature_prompt	Poziom kreatywności (od 0,0 do 1,0):
+menu.settings.temperature_title	Temperatura
+menu.shortcuts.alt_add	[+ Dodaj skrót Alt+…]
+menu.shortcuts.alt_group	⎇ Skróty Alt
+menu.shortcuts.altgr_symbol	AltGr + symbol
+menu.shortcuts.chatgpt_url_item	   ↳ Edytuj URL ChatGPT…
+menu.shortcuts.ctrl_add	[+ Dodaj skrót Ctrl+…]
+menu.shortcuts.ctrl_group	^ Skróty Ctrl
+menu.shortcuts.ctrl_shift_add	[+ Dodaj skrót Ctrl+Shift+…]
+menu.shortcuts.ctrl_shift_group	^⇧ Skróty Ctrl+Shift
+menu.shortcuts.edit_personal_info	   ↳ Edytuj dane osobowe…
+menu.shortcuts.group_accented	Skróty dla liter z akcentem
+menu.shortcuts.group_modifiers	Kombinacje modyfikatorów
+menu.shortcuts.key_at_hash	@ / #
+menu.shortcuts.key_layer_scroll	Layer + Scroll
+menu.shortcuts.off	❌ Skróty wyłączone (kliknij, aby włączyć)
+menu.shortcuts.on	✅ Skróty włączone (kliknij, aby wyłączyć)
+menu.shortcuts.personal	Osobiste skróty
+menu.shortcuts.right_opt_back	Prawy Opt + ⌫ → %s
+menu.shortcuts.right_opt_escape	Prawy Opt + Esc → %s
+menu.shortcuts.right_opt_return	Prawy Opt + Return → %s
+menu.shortcuts.script_shortcuts	Skróty zarządzania skryptem
+menu.shortcuts.submenu_cmd	Skróty Cmd
+menu.shortcuts.submenu_ctrl	Skróty Ctrl
+menu.shortcuts.title	🎯 Skróty
+menu.shortcuts.win_add	[+ Dodaj skrót Win+…]
+menu.shortcuts.win_group	⊞ Skróty Win
+menu.shortcuts.wrap_group_angle	Nawiasy ostrokątne i ozdobne
+menu.shortcuts.wrap_group_braces	Poziome nawiasy klamrowe
+menu.shortcuts.wrap_group_brackets	Nawiasy okrągłe i kwadratowe
+menu.shortcuts.wrap_group_cjk	Nawiasy CJK
+menu.shortcuts.wrap_group_markdown	Wyróżnienie Markdown
+menu.shortcuts.wrap_group_other	Inne symbole
+menu.shortcuts.wrap_group_quotes	Cudzysłowy i apostrofy
+menu.shortcuts.wrap_symbols_add_custom	[+ Dodaj symbol…]
+menu.shortcuts.wrap_symbols_check_all	Zaznacz wszystko
+menu.shortcuts.wrap_symbols_custom_label	Niestandardowy
+menu.shortcuts.wrap_symbols_title	  ↳ Symbole otaczające zaznaczenie
+menu.shortcuts.wrap_symbols_uncheck_all	Odznacz wszystko
+menu.tapholds.off	❌ Dotknięcie-przytrzymanie wyłączone (kliknij, aby włączyć)
+menu.tapholds.on	✅ Dotknięcie-przytrzymanie włączone (kliknij, aby wyłączyć)
+menu.tapholds.title	⌨️ Dotknięcie-Przytrzymanie
+menu.updates.title	🔄 Updates
+metrics.shortcut_format_hint	Format : modyfikatory+klawisz  (np. : ctrl+alt+m)\nDostępne modyfikatory : ctrl, alt, shift, win\nZostaw puste, aby wyłączyć.
+metrics.shortcut_invalid_title	Nieprawidłowy skrót
+metrics.shortcut_prompt_title	Skrót — {1}
+metrics.shortcut_register_error	Nie można zarejestrować skrótu « {1} » : {2}
+metrics_apps.chooser_placeholder	Kategoria dla %s
+metrics_apps.general_category	Ogólne
+metrics_apps.new_category_create_subtext	Utwórz nową kategorię
+metrics_apps.new_category_item	+ Nowa kategoria…
+metrics_apps.new_category_prompt	Nazwa nowej kategorii dla %s:
+metrics_apps.new_category_title	Nowa kategoria
+metrics_apps.no_app_detected	Nie wykryto żadnej aplikacji.
+metrics_apps.rename_chooser_placeholder	Kategoria do zmiany nazwy
+metrics_apps.rename_item	✎ Zmień nazwę istniejącej kategorii…
+metrics_apps.rename_prompt	Nowa nazwa kategorii „%s":
+metrics_apps.rename_subtext	Wszystkie aplikacje w tej kategorii zostaną przemianowane
+metrics_apps.rename_title	Zmień nazwę
+metrics_apps.score_error	Wynik musi być między -2 a 2.
+metrics_apps.score_prompt	Wynik produktywności dla %s\n(-2 bardzo rozpraszający do 2 bardzo produktywny):
+metrics_apps.score_title	Wynik
+metrics_apps.title	Statystyki pisania
+metrics_apps.use_category_subtext	Użyj tej kategorii
+metrics_apps.window_title	Czas na aplikację
+mlx.deps_failed	Nieudane…
+mlx.deps_missing	Brakujące zależności MLX
+mlx.deps_missing_body	Automatyczny bootstrap trwa. Spróbuj ponownie za kilka minut.
+mlx.deps_preparing	Przygotowywanie…
+mlx.deps_pty_write_failed	Nie można zapisać pliku PTY wrapper.
+mlx.deps_step_bootstrap	Uruchamianie skryptu instalacyjnego…
+mlx.deps_step_python	Instalowanie Pythona…
+mlx.deps_step_ready	Silnik AI gotowy.
+mlx.deps_step_sync	Synchronizowanie zależności AI…
+mlx.deps_step_uv	Instalowanie uv…
+mlx.deps_step_venv	Tworzenie lokalnego virtualenv…
+mlx.deps_task_create_failed	Nie można utworzyć zadania hs.task.
+mlx.deps_task_start_failed	Nie można uruchomić zadania hs.task.
+mlx.download_cancelled	Anulowano
+mlx.download_cancelled_body	Pobieranie %s przerwane.
+mlx.download_failed	Błąd MLX
+mlx.download_failed_body	Sprawdź logi w oknie.
+mlx.download_interrupted	Pobieranie przerwane
+mlx.download_interrupted_body	Proces pobierania %s zatrzymał się podczas przeładowania.
+mlx.download_stalled	Pobieranie MLX zablokowane
+mlx.download_subtitle	Pobieranie wag z Hugging Face…
+mlx.download_title	Pobieranie modelu MLX
+mlx.hf_connected	HuggingFace połączony
+mlx.hf_connected_body	Token zapisany. Teraz możesz pobierać modele znacznie szybciej!
+mlx.hf_connection_failed	Połączenie z HuggingFace nie powiodło się
+mlx.hf_connection_failed_body	Połączenie nieudane. Sprawdź swój token.
+mlx.hf_login_title	Logowanie HuggingFace
+mlx.hf_page_opened	Strona modelu otwarta w przeglądarce
+mlx.init_subtitle	AI initialization in progress, please wait…
+mlx.init_title	Initializing the AI engine (MLX)
+mlx.install_subtitle	Przygotowywanie lokalnych zależności Pythona…
+mlx.install_title	Instalowanie silnika AI (MLX)
+mlx.launcher_failed	Uruchomienie MLX nieudane
+mlx.launcher_failed_body	Uruchamiacz nie powiódł się (kod %d).
+mlx.model_deleted	Usunięty (MLX)
+mlx.model_incompatible	Model %s nie jest kompatybilny z mlx-lm. Wybierz inny model.
+mlx.model_installed	Model MLX zainstalowany
+mlx.model_ready	%s jest gotowy!
+mlx.model_unavailable	Model MLX niedostępny
+mlx.model_unavailable_body	Model %s nie jest kompatybilny z MLX lub nie ma skonfigurowanego repozytorium MLX
+mlx.open_source_failed	Nie można otworzyć strony HuggingFace
+mlx.source_not_found	Źródło nie znalezione
+mlx.source_not_found_body	Nie znaleziono repozytorium MLX dla tego modelu
+mlx.token_corrected	Token poprawiony
+mlx.token_corrected_body	Użyto pełnego tokenu ze schowka
+mlx.token_detected	Token wykryty
+mlx.token_detected_body	Token pobrany ze schowka
+mlx.token_missing	Brak tokenu
+mlx.token_missing_body	Nie podano tokenu
+mlx.write_py_failed	Nie można zapisać skryptu Python do /tmp
+mlx.write_sh_failed	Nie można zapisać skryptu Bash do /tmp
+model_browser.col_family	Rodzina
+model_browser.col_name	Model
+model_browser.col_params	Parametry
+model_browser.col_ram	RAM
+model_browser.col_speed	Szybkość
+model_browser.col_status	Stan
+model_browser.col_type	Typ
+model_browser.count_label	{n} z {total} modeli
+model_browser.no_models	Żaden model nie pasuje do wyszukiwania.
+model_browser.search_placeholder	Szukaj modelu…
+model_browser.select_hint	Kliknij dwukrotnie model lub naciśnij Enter, aby go użyć.
+model_browser.status_available	Dostępny
+model_browser.status_installed	Zainstalowano
+model_browser.type_chat	Czat
+model_browser.type_completion	Uzupełnianie
+model_browser.use_button	Użyj
+model_browser.window_title	Katalog modeli
+notify.all_features_disabled	Wszystkie funkcje zostały wyłączone
+notify.all_features_enabled	Wszystkie funkcje zostały włączone
+notify.clipboard	Schowek
+notify.defaults_reset	Przywrócono domyślne — Przeładowywanie…
+notify.hotstrings	Hotstring'i
+notify.llm_disabled	🔴 WYŁĄCZONY
+notify.llm_enabled	🟢 WŁĄCZONY
+notify.llm_mlx_failures_body	Serwer MLX nie odpowiada. Sprawdź, czy model jest załadowany i serwer działa na porcie 8080.
+notify.llm_mlx_failures_title	Predykcje LLM — Powtarzające się błędy
+notify.llm_suggestions	Sugestie SI
+notify.personal_info	Dane osobowe
+notify.screenshot_copied	Zrzut ekranu skopiowany
+notify.screenshot_saved	Zrzut ekranu zapisany
+notify.screenshot_saved_path	Zapisano: %s
+notify.screenshot_title	Zrzut ekranu
+notify.script_control	Kontrola skryptu
+notify.word_expander_prefix	Rozszerzacz słów: %s
+ollama.cancelled_title	Anulowano
+ollama.daemon_fail	Nie można uruchomić demona Ollama.
+ollama.delete_error	Model: %s\n%s
+ollama.delete_fail_title	Usuwanie Ollama nie powiodło się
+ollama.deleted_title	Usunięto (Ollama)
+ollama.deps_failed	Nieudane…
+ollama.deps_step_checking	Sprawdzanie Ollama…
+ollama.deps_step_installing	Instalowanie Ollama…
+ollama.deps_step_ready	Serwer Ollama gotowy.
+ollama.deps_step_starting	Uruchamianie serwera Ollama…
+ollama.deps_task_create_failed	Nie można utworzyć zadania hs.task.
+ollama.deps_task_start_failed	Nie można uruchomić zadania hs.task.
+ollama.download_cancelled	Pobieranie Ollama anulowane
+ollama.download_error	Błąd pobierania %s
+ollama.download_subtitle	Pobieranie wag z Ollama Hub…
+ollama.download_title	Pobieranie modelu Ollama
+ollama.downloading	Pobieranie modelu Ollama…
+ollama.fail_title	Błąd Ollama
+ollama.install_subtitle	Przygotowywanie lokalnego serwera Ollama…
+ollama.install_title	Instalowanie silnika AI (Ollama)
+ollama.model_deleted	Model usunięty: %s
+ollama.model_installed_title	Model Ollama zainstalowany
+ollama.model_ready	%s jest gotowy!
+ollama.model_repair	Model wydaje się uszkodzony. Próba ponownego pobrania: %s
+ollama.model_repair_title	Naprawa modelu Ollama
+ollama.not_detected_body	Zainstaluj Ollama i spróbuj ponownie.
+ollama.not_detected_title	Ollama nie wykryte
+ollama.service_disconnected	Usługa Ollama przestała odpowiadać.
+ollama.service_ready	Usługa Ollama gotowa ✅
+ollama.service_stopped	Usługa Ollama zatrzymana. Uruchamianie…
+ollama.start_fail	Nie można uruchomić usługi.
+ollama.starting_service	Uruchamianie usługi Ollama (%s/%s)…
+ollama.starting_title	Uruchamianie Ollama
+ollama.upgrade_required_body	Zainstalowana wersja Ollama jest zbyt stara dla tego modelu. Zaktualizuj Ollama ręcznie.
+ollama.upgrade_required_title	Wymagana aktualizacja Ollama
+onboarding.back	← Wstecz
+onboarding.btn.cancel	Anuluj
+onboarding.btn.no	Nie
+onboarding.btn.ok	OK
+onboarding.btn.yes	Tak
+onboarding.done.body	Konfiguracja zapisana. Skrypt zostanie teraz ponownie załadowany.
+onboarding.done.title	Konfiguracja zakończona!
+onboarding.error.title	ErgoptiPlus — Błąd
+onboarding.error.write_failed	Nie udało się zapisać pliku konfiguracji.
+onboarding.finish	Zakończ ✓
+onboarding.gestures.desc	Włącza obsługę gestów touchpada — niestandardowe akcje wyzwalane przez przeciągnięcia, stuknięcia i szczypnięcia.
+onboarding.gestures.open_settings	Otwórz ustawienia touchpada
+onboarding.gestures.open_settings_hint	Otwiera Ustawienia → Bluetooth i urządzenia → Touchpad → Zaawansowane gesty. Każdy slot akceptuje skrót Ctrl + Win + Shift + F1..F10.
+onboarding.gestures.register_auto	Automatyczna konfiguracja
+onboarding.gestures.register_auto_hint	Automatycznie wypełnia wszystkie sloty gestów w Ustawieniach systemu Windows. Nie wymaga uprawnień administratora.
+onboarding.gestures.register_deferred	Gesty zostaną skonfigurowane przy następnym uruchomieniu.
+onboarding.gestures.register_failed	Automatyczna konfiguracja nie powiodła się. Użyj metody ręcznej poniżej.
+onboarding.gestures.register_manual	Metoda ręczna
+onboarding.gestures.register_manual_hint	Otwiera samouczek krok po kroku i skrót jednego kliknięcia do strony ustawień touchpada, dzięki czemu możesz ręcznie skonfigurować każdy gest.
+onboarding.gestures.register_section	Gesty muszą być skonfigurowane w Ustawieniach systemu Windows (Bluetooth i urządzenia → Touchpad → Zaawansowane gesty):
+onboarding.gestures.register_success	Gesty są teraz skonfigurowane w Ustawieniach systemu Windows.
+onboarding.gestures.title	ErgoptiPlus — Gesty
+onboarding.language.placeholder	Wybierz swój język…
+onboarding.layout.desc	Aktywuje emulację układu (warstwa bazowa + AltGr) i hotstring'i Ergopti.
+onboarding.layout.no	Użyj układu systemowego
+onboarding.layout.title	ErgoptiPlus — Emulacja klawiatury Ergopti
+onboarding.layout.yes	Emuluj układ Ergopti
+onboarding.magic_key.choose_freely	Dowolny znak może pełnić funkcję wyzwalacza — wystarczająco rzadki, by uniknąć fałszywych aktywacji, i wystarczająco dostępny, by pozostać praktycznym.
+onboarding.magic_key.desc	Znak wyzwalający hotstring'i.
+onboarding.magic_key.option_blackstar	★ — zalecane (dedykowany klawisz układu Ergopti)
+onboarding.magic_key.option_custom	Własne wejście
+onboarding.magic_key.option_semicolon	; — zalecane na QWERTY
+onboarding.magic_key.option_star	* — zalecane (działa na wszystkich układach)
+onboarding.magic_key.option_ugrave	ù — zalecane na AZERTY
+onboarding.magic_key.title	ErgoptiPlus — Magiczny klawisz
+onboarding.metrics.desc	Włącza zbieranie metryk pisania.\n\nCo śledzi ErgoptiPlus:\n• prędkość pisania (WPM) na sesję, na aplikację i w czasie;\n• najczęściej używane klawisze, słowa, n-gramy i obciążenie ergonomiczne;\n• naprzemienność rąk, obciążenie palców, bigramy tego samego palca;\n• czas spędzony w każdej aplikacji (styl RescueTime) z oceną produktywności;\n• trendy, mapy ciepła i szczegółowe dashboardy w oknie Metryki.
+onboarding.metrics.title	ErgoptiPlus — Statystyki pisania
+onboarding.next	Dalej →
+onboarding.no	Nie
+onboarding.warning_label	Uwaga
+onboarding.welcome.heading	Język
+onboarding.welcome.title	ErgoptiPlus — Konfiguracja
+onboarding.yes	Tak
+paths_editor.btn_browse	Przeglądaj…
+paths_editor.btn_cancel	Anuluj
+paths_editor.btn_reset	Przywróć domyślne
+paths_editor.btn_save	Zapisz i przeładuj
+paths_editor.heading	Folder konfiguracji
+paths_editor.label_config_dir	Folder konfiguracji
+paths_editor.save_failed	Nie można zapisać folderu konfiguracji. Plik może być tylko do odczytu lub używany przez inny program.
+paths_editor.save_failed_title	Zapis nie powiódł się
+paths_editor.subtitle	Wszystkie pliki osobiste (skróty, hotstring'i…) są wczytywane z tego folderu.
+paths_editor.tag_default	domyślny
+paths_editor.tag_modified	zmieniono
+personal_info.field_credit_card	Karta kredytowa
+personal_info.field_firstname	Imię
+personal_info.field_phone_digits	Telefon (tylko cyfry)
+personal_info.field_phone_formatted	Telefon (sformatowany)
+personal_info.field_ssn	Numer PESEL
+personal_info.saved_body	Możesz zamknąć tę kartę.
+personal_info.saved_title	✓ Zapisano
+profiles.created_title	Profil utworzony
+profiles.updated_title	Profil zaktualizowany
+prompt_editor.default_label	Profil niestandardowy
+prompt_editor.help_text	Blok {context} zostanie zastąpiony wybranym tekstem. Blok {n} zostanie zastąpiony liczbą predykcji. Formatowanie (Wsad): Poproś model o oddzielenie każdej sugestii znakiem ---.
+prompt_editor.insert_context	Wstaw blok {context}
+prompt_editor.insert_language	Wstaw blok {language}
+prompt_editor.insert_max_words	Wstaw blok {max_words}
+prompt_editor.insert_min_words	Wstaw blok {min_words}
+prompt_editor.insert_n	Wstaw blok {n}
+prompt_editor.label_mode	Tryb żądania
+prompt_editor.label_name	Nazwa profilu
+prompt_editor.label_prompt	Prompt systemowy
+prompt_editor.mode.batch	Wsadowy — predykcje w partiach (duże modele)
+prompt_editor.mode.parallel	Standardowy — równoległe predykcje
+prompt_editor.placeholder_prompt	Oto tekst, kontynuuj go: {context}
+prompt_editor.title_edit	Edytuj profil
+prompt_editor.title_new	Nowy profil
+script_control.paused	Skrypt wstrzymany
+script_control.resumed	Skrypt wznowiony
+sfbsreduction.bu	À + ★ → BU
+sfbsreduction.comma	Przecinek zmniejsza bigramy tego samego palca
+sfbsreduction.ecirc	Ê zmniejsza bigramy tego samego palca
+sfbsreduction.egrave	È zmniejsza bigramy tego samego palca
+sfbsreduction.ié	IE zmniejsza bigramy IE/EI
+sg_actions.activity_simulation	🖱 Symuluj aktywność (anti-sleep)
+sg_actions.alt_tab_monitor	Alt-Tab (monitor)
+sg_actions.app_expose	◱ Exposé aplikacji
+sg_actions.app_previous	⇥ ← Alt+Tab — Poprz. aplikacja
+sg_actions.app_switcher	⇥ Alt+Tab — Poprzednia aplikacja
+sg_actions.app_window_previous	⇥ ◱ ← Alt+Tab — Poprz. okno
+sg_actions.arrow_down	↓ Strzałka w dół
+sg_actions.arrow_left	← Strzałka w lewo
+sg_actions.arrow_right	→ Strzałka w prawo
+sg_actions.arrow_up	↑ Strzałka w górę
+sg_actions.backspace	⌫ Backspace
+sg_actions.brightness_down	☀ - Jasność -
+sg_actions.brightness_up	☀ + Jasność +
+sg_actions.caps_lock	⇪ CapsLock
+sg_actions.caps_word	⇪★ CapsWord
+sg_actions.close_window	◱ × Zamknij okno
+sg_actions.copy	⎘ Kopiuj
+sg_actions.ctrl_backspace	⌫ Ctrl+Backspace
+sg_actions.ctrl_delete	⌦ Ctrl+Delete
+sg_actions.cut	⎘ Wytnij
+sg_actions.delete	⌦ Delete
+sg_actions.desktop_close	▢ × Zamknij pulpit
+sg_actions.desktop_new	▢ + Nowy pulpit
+sg_actions.desktop_next	▢ → Następny pulpit
+sg_actions.desktop_prev	▢ ← Poprzedni pulpit
+sg_actions.doc_end	⤓ Koniec dokumentu
+sg_actions.doc_start	⤒ Początek dokumentu
+sg_actions.enter	↵ Enter
+sg_actions.escape	⎋ Escape
+sg_actions.find	🔍 Znajdź
+sg_actions.fullscreen	📺 Pełny ekran
+sg_actions.left_click_toggle	🖱 L Lewy przycisk (przytrzymaj)
+sg_actions.line_down	↕ ↓ Następny wiersz
+sg_actions.line_end	⇥ Koniec wiersza
+sg_actions.line_start	⇤ Początek wiersza
+sg_actions.line_up	↕ ↑ Poprzedni wiersz
+sg_actions.lock_screen	🔒 Zablokuj ekran
+sg_actions.lookup	🔍 Definicja słowa
+sg_actions.maximize	🔲 Maksymalizuj
+sg_actions.microsoft_bold	𝐁 Ctrl+B Microsoft (→ Ctrl+G)
+sg_actions.minimize_all	◱ Minimalizuj wszystkie
+sg_actions.mission_control	▢ Mission Control
+sg_actions.mute	🔇 Wycisz/Odcisz
+sg_actions.nav_back	← Wstecz (nawigacja)
+sg_actions.nav_forward	→ Dalej (nawigacja)
+sg_actions.none	∅ Nic
+sg_actions.notification_center	🔔 Powiadomienia
+sg_actions.ocr_screenshot	📷 Zrzut OCR (Win+Shift+T)
+sg_actions.one_shot_shift	⇧ OneShotShift
+sg_actions.open_config	⚙ Konfiguracja
+sg_actions.open_console	▤ Konsola
+sg_actions.open_error_log	📄 Error log
+sg_actions.open_hotstrings_editor	⌨ Edytor hotstring'ów
+sg_actions.open_key_history	Historia klawiszy
+sg_actions.open_list_vars	Stan zmiennych
+sg_actions.open_logs_folder	📁 Folder logów
+sg_actions.open_metrics_apps	📊 Statystyki aplikacji
+sg_actions.open_metrics_typing	📊 Statystyki pisania
+sg_actions.open_paths_editor	📂 Edytor ścieżek
+sg_actions.open_personal_hotstrings	👤 Osobiste hotstring'i
+sg_actions.open_personal_info	👤 Dane osobowe
+sg_actions.open_personal_shortcuts	👤 Plik osobistych skrótów
+sg_actions.open_script_source	🛠 Kod źródłowy
+sg_actions.open_today_log	📄 Dzisiejszy log
+sg_actions.open_url	🌐 Otwórz link (konfigurowalny)
+sg_actions.open_window_spy	Window Spy
+sg_actions.para_next	¶ ↓ Następny akapit
+sg_actions.para_prev	¶ ↑ Poprzedni akapit
+sg_actions.paste	⎘ Wklej
+sg_actions.paste_plain	⎘ Wklej bez formatowania
+sg_actions.pick_color	🎨 Kolor HEX pod kursorem
+sg_actions.redo	↪ Ponów
+sg_actions.right_click_toggle	🖱 P Prawy przycisk (przytrzymaj)
+sg_actions.screen_capture	📸 Selektywne przechwycenie (Win+Shift+S)
+sg_actions.screen_capture_instant	📸 Natychmiastowe przechwycenie (okno)
+sg_actions.screen_record	⏺ Nagrywanie ekranu
+sg_actions.screenshot_fullscreen_clipboard	📸 🖥 Kopiuj ekran
+sg_actions.screenshot_fullscreen_save	📸 🖥 Zapisz ekran
+sg_actions.screenshot_region_clipboard	📸 ⬚ Kopiuj region
+sg_actions.screenshot_region_save	📸 ⬚ Zapisz region
+sg_actions.screenshot_window_clipboard	📸 ⊞ Kopiuj okno
+sg_actions.screenshot_window_save	📸 ⊞ Zapisz okno
+sg_actions.script_pause_toggle	⏸/▶ Wstrzymaj / Wznów
+sg_actions.script_quit	✕ Zakończ
+sg_actions.script_reload	↻ Przeładuj
+sg_actions.script_save_reload	↻ Zapisz i przeładuj
+sg_actions.search_web	🔍 Szukaj w sieci (konfigurowalny)
+sg_actions.sel_down	✎ ↓ Zaznacz w dół
+sg_actions.sel_left	✎ ← Zaznacz w lewo
+sg_actions.sel_right	✎ → Zaznacz w prawo
+sg_actions.sel_up	✎ ↑ Zaznacz w górę
+sg_actions.sel_word_next	✎ W → Zaznacz nast. słowo
+sg_actions.sel_word_prev	✎ W ← Zaznacz poprz. słowo
+sg_actions.select_all	⬚ Zaznacz wszystko
+sg_actions.select_line	☰ Zaznacz wiersz
+sg_actions.sg_order.header.alt	#⎇ (Alt) skróty
+sg_actions.sg_order.header.cmd	#⌘ (Cmd) skróty
+sg_actions.sg_order.header.cmd_shift	#⌘⇧ (Cmd+Shift) skróty
+sg_actions.sg_order.header.ctrl	#^ (Ctrl) skróty
+sg_actions.sg_order.header.ctrl_shift	#^⇧ (Ctrl+Shift) skróty
+sg_actions.sg_order.header.cursor	#Kursor i tekst
+sg_actions.sg_order.header.debug	#Debugowanie
+sg_actions.sg_order.header.edition	#Edycja
+sg_actions.sg_order.header.files	#Pliki
+sg_actions.sg_order.header.grp_app	Ergopti
+sg_actions.sg_order.header.grp_input	Wejście
+sg_actions.sg_order.header.grp_media	Multimedia
+sg_actions.sg_order.header.grp_system	System
+sg_actions.sg_order.header.grp_text	Tekst
+sg_actions.sg_order.header.grp_windows	Okna i pulpity
+sg_actions.sg_order.header.hs_ctrl	#^ (Ctrl) skróty — macOS
+sg_actions.sg_order.header.hs_ctrl_shift	#^⇧ (Ctrl+Shift) skróty — macOS
+sg_actions.sg_order.header.hs_option	#⌥ (Option) skróty — macOS
+sg_actions.sg_order.header.keys	#Klawisze
+sg_actions.sg_order.header.media	#Multimedia
+sg_actions.sg_order.header.mouse_nav	#Mysz i nawigacja
+sg_actions.sg_order.header.navigation	#Nawigacja
+sg_actions.sg_order.header.screenshot	#Zrzuty ekranu
+sg_actions.sg_order.header.script	#Zarządzanie skryptem
+sg_actions.sg_order.header.selection	#Zaznaczanie tekstu
+sg_actions.sg_order.header.spaces	#Obszary / Pulpity
+sg_actions.sg_order.header.system	#System
+sg_actions.sg_order.header.system_actions	#Akcje systemowe
+sg_actions.sg_order.header.tabs	#Karty
+sg_actions.sg_order.header.tapholds	#Akcje Tap-Hold
+sg_actions.sg_order.header.ui	#Interfejs
+sg_actions.sg_order.header.win	#⊞ (Win) skróty
+sg_actions.sg_order.header.windows	#Okna
+sg_actions.snap_left	◧ ← Przyciągnij do lewej
+sg_actions.snap_right	◨ → Przyciągnij do prawej
+sg_actions.space	␣ Spacja
+sg_actions.space_next	▢ → Następny obszar
+sg_actions.space_prev	▢ ← Poprzedni obszar
+sg_actions.spotlight_mouse	🔦 Spotlight myszy
+sg_actions.surround_parens	() Otocz nawiasami
+sg_actions.tab	⇥ Tab
+sg_actions.tab_close	⧉ × Zamknij kartę
+sg_actions.tab_new	⧉ + Nowa karta
+sg_actions.tab_next	⧉ → Następna karta
+sg_actions.tab_prev	⧉ ← Poprzednia karta
+sg_actions.take_note	📝 Zrób notatkę
+sg_actions.task_view	▢ Widok zadań
+sg_actions.teleport_mouse	🖱 Teleportuj mysz
+sg_actions.titlecase_selection	Aa Tytuł
+sg_actions.toggle_capslock	⇪ Przełącz CapsLock
+sg_actions.track_next	⏭ Następny utwór
+sg_actions.track_play	⏯ Odtwórz/Wstrzymaj
+sg_actions.track_prev	⏮ Poprzedni utwór
+sg_actions.undo	↩ Cofnij
+sg_actions.uppercase_selection	AA Wielkie / małe litery
+sg_actions.vol_down	🔊 - Głośność -
+sg_actions.vol_up	🔊 + Głośność +
+sg_actions.win_app_next	◱ → Nast. okno (ta sama aplikacja)
+sg_actions.win_app_prev	◱ ← Poprz. okno (ta sama aplikacja)
+sg_actions.win_next	◱ → Następne okno
+sg_actions.win_prev	◱ ← Poprzednie okno
+sg_actions.word_next	W → Następne słowo
+sg_actions.word_prev	W ← Poprzednie słowo
+sg_labels.script_altgr_backspace	AltGr + ⌫
+sg_labels.script_altgr_delete	AltGr + ⌦
+sg_labels.script_altgr_enter	AltGr + Enter
+sg_labels.script_altgr_escape	AltGr + Esc
+shortcut_utils.format_hint	Użyj formatu mods+klawisz, na przykład cmd+shift+b
+shortcut_utils.format_invalid	Nieprawidłowy format
+shortcuts.agrave	Wszystkie skróty na klawiszu À odpowiadają tym z 
+shortcuts.altgrcapslock.backspace	"AltGr" + "CapsLock" = BackSpace
+shortcuts.altgrcapslock.capslock	"AltGr" + "CapsLock" = CapsLock
+shortcuts.altgrcapslock.capsword	"AltGr" + "CapsLock" = CapsWord
+shortcuts.altgrcapslock.ctrlbackspace	"AltGr" + "CapsLock" = Ctrl + BackSpace
+shortcuts.altgrcapslock.ctrldelete	"AltGr" + "CapsLock" = Ctrl + Delete
+shortcuts.altgrcapslock.delete	"AltGr" + "CapsLock" = Delete
+shortcuts.altgrcapslock.enter	"AltGr" + "CapsLock" = Enter
+shortcuts.altgrcapslock.escape	"AltGr" + "CapsLock" = Escape
+shortcuts.altgrcapslock.oneshotshift	"AltGr" + "CapsLock" = OneShotShift
+shortcuts.altgrcapslock.tab	"AltGr" + "CapsLock" = Tab
+shortcuts.altgrlalt.backspace	"AltGr" + "LAlt" = BackSpace
+shortcuts.altgrlalt.capslock	"AltGr" + "LAlt" = CapsLock
+shortcuts.altgrlalt.capsword	"AltGr" + "LAlt" = CapsWord
+shortcuts.altgrlalt.ctrlbackspace	"AltGr" + "LAlt" = Ctrl + BackSpace
+shortcuts.altgrlalt.ctrldelete	"AltGr" + "LAlt" = Ctrl + Delete
+shortcuts.altgrlalt.delete	"AltGr" + "LAlt" = Delete
+shortcuts.altgrlalt.enter	"AltGr" + "LAlt" = Enter
+shortcuts.altgrlalt.escape	"AltGr" + "LAlt" = Escape
+shortcuts.altgrlalt.oneshotshift	"AltGr" + "LAlt" = OneShotShift
+shortcuts.altgrlalt.tab	"AltGr" + "LAlt" = Tab
+shortcuts.color_copied	Kolor skopiowany: %s
+shortcuts.color_picker_result	Kolor pod kursorem to {1}.\n\nZostał zapisany do schowka : {2}
+shortcuts.color_picker_title	Kolor piksela
+shortcuts.copy_path_notif	Ścieżka skopiowana: %s
+shortcuts.eacute	Wszystkie skróty na klawiszu É odpowiadają tym z 
+shortcuts.ecirc	Wszystkie skróty na klawiszu Ê odpowiadają tym z 
+shortcuts.egrave	Wszystkie skróty na klawiszu È odpowiadają tym z 
+shortcuts.gethexvalue	Win + X (heX) = Skopiuj kolor HEX piksela pod kursorem do schowka
+shortcuts.gpt	Win + G(PT) = Otwórz ChatGPT (konfigurowalny URL)
+shortcuts.keep_awake_off	☕ Keep-awake wyłączony
+shortcuts.keep_awake_on	☕ Keep-awake aktywny — Ctrl+M, aby wyłączyć
+shortcuts.label_at_hash	Natychmiastowy zrzut ekranu
+shortcuts.label_cmd_shift_v	Wklej bez formatowania
+shortcuts.label_cmd_star	Cmd + S (zachowuje mod.)
+shortcuts.label_ctrl_a	Zaznacz wiersz
+shortcuts.label_ctrl_capslock	Przełącz CapsLock
+shortcuts.label_ctrl_d	Otwórz Pobrane
+shortcuts.label_ctrl_e	Otwórz Finder
+shortcuts.label_ctrl_g	Otwórz ChatGPT (URL ustawiony w menu)
+shortcuts.label_ctrl_h	Interaktywny zrzut ekranu do schowka
+shortcuts.label_ctrl_i	Otwórz Ustawienia
+shortcuts.label_ctrl_l	Zablokuj ekran
+shortcuts.label_ctrl_m	Zapobiegaj uśpieniu
+shortcuts.label_ctrl_o	Otocz wiersz nawiasami
+shortcuts.label_ctrl_p	Przełącz lustro / rozszerzony pulpit
+shortcuts.label_ctrl_period	Otwórz selektor emoji
+shortcuts.label_ctrl_quote	Podświetl mysz
+shortcuts.label_ctrl_s	Otwórz / Skopiuj Şcieżkę
+shortcuts.label_ctrl_t	Teleportuj mysz na inny monitor
+shortcuts.label_ctrl_u	Przełącz WIELKIE / małe litery
+shortcuts.label_ctrl_w	Przełącz Tytuł / małe litery
+shortcuts.label_ctrl_x	Skopiuj kolor hex piksela pod kursorem
+shortcuts.label_layer_scroll	Głośność
+shortcuts.label_wrap_text	Wpisanie symbolu otacza zaznaczenie
+shortcuts.laltcapslock.backspace	"LAlt" + "CapsLock" = BackSpace
+shortcuts.laltcapslock.capslock	"LAlt" + "CapsLock" = CapsLock
+shortcuts.laltcapslock.capsword	"LAlt" + "CapsLock" = CapsWord
+shortcuts.laltcapslock.ctrlbackspace	"LAlt" + "CapsLock" = Ctrl + BackSpace
+shortcuts.laltcapslock.ctrldelete	"LAlt" + "CapsLock" = Ctrl + Delete
+shortcuts.laltcapslock.delete	"LAlt" + "CapsLock" = Delete
+shortcuts.laltcapslock.enter	"LAlt" + "CapsLock" = Enter
+shortcuts.laltcapslock.escape	"LAlt" + "CapsLock" = Escape
+shortcuts.laltcapslock.oneshotshift	"LAlt" + "CapsLock" = OneShotShift
+shortcuts.laltcapslock.tab	"LAlt" + "CapsLock" = Tab
+shortcuts.microsoftbold	Ctrl + B pogrubia tekst w aplikacjach Microsoft (jak Ctrl + G)
+shortcuts.move	Win + M(ove) = Symuluj aktywność losowo poruszając myszą. Powtórz skrót lub przeładuj skrypt, aby zatrzymać
+shortcuts.no_active_window	Brak aktywnego okna
+shortcuts.no_other_monitor	Nie wykryto innego monitora
+shortcuts.opendownloads	Win + D(ownloads) = Otwórz folder Pobrane
+shortcuts.pixel_read_error	Nie można odczytać koloru piksela
+shortcuts.saved	Zapisano: %s
+shortcuts.screen	Win + H (screensHot) = Zrzut ekranu (uruchamia Win + Shift + S)
+shortcuts.screeninstant	Klawisz na lewo od 1 = Natychmiastowe przechwycenie aktywnego okna, zapisane w Obrazach ze znacznikiem czasu
+shortcuts.screenocr	Win + C (OCR) = Zrzut ekranu z wyodrębnianiem tekstu (Win + Shift + T)
+shortcuts.screenshot_copied	Zrzut ekranu skopiowany do schowka
+shortcuts.screenshot_title	Zrzut ekranu
+shortcuts.search	Win + S(earch) = Szukaj zaznaczenia w Internecie. W Eksploratorze kopiuje ścieżkę wybranego pliku
+shortcuts.shortcut_format_hint	Format: mod+klawisz (np. cmd+alt+p)\nDostępne mod: cmd, alt, ctrl, shift\nZostaw puste, aby wyłączyć
+shortcuts.shortcut_label	Skrót
+shortcuts.spotlightmouse	Win + ' = Podświetl mysz żółtym pierścieniem
+shortcuts.surroundwithparentheses	Win + O = Otocz wiersz nawiasami
+shortcuts.takenote	Win + N(ote) = Otwórz plik do robienia notatek
+shortcuts.teleportmouse	Win + T(eleport) = Teleportuj mysz do środka drugiego monitora (cyklicznie)
+shortcuts.titlecase	Win + W = Konwertuj na tytuł (pierwsza litera każdego słowa wielką literą)
+shortcuts.uppercase	Win + U(ppercase) = Przełącz zaznaczenie wielkie/małe litery
+shortcuts.wincapslock	Win + "CapsLock" = CapsLock
+startup.manifest_missing	Błąd uruchomienia: plik _generated/features_manifest.ahk jest nieobecny lub uszkodzony.\n\nUruchom `npm run build:manifest` z katalogu projektu i zrestartuj skrypt.
+startup.manifest_title	ErgoptiPlus — brak manifestu
+tap_hold.action.disable	Natywny klawisz
+tap_hold.disable_all	Wyłącz wszystko
+tap_hold.group.alt_gr	AltGr
+tap_hold.group.backspace	Backspace
+tap_hold.group.caps_lock	CapsLock
+tap_hold.group.delete	Delete
+tap_hold.group.enter	Enter
+tap_hold.group.escape	Escape
+tap_hold.group.left_alt	LAlt
+tap_hold.group.left_ctrl	LCtrl
+tap_hold.group.left_shift	LShift
+tap_hold.group.right_ctrl	RCtrl
+tap_hold.group.right_shift	RShift
+tap_hold.group.space	Spacja
+tap_hold.group.tab	Tab
+tap_hold.group.win	Win
+tap_hold.hold.alt	Alt
+tap_hold.hold.alt_gr	AltGr
+tap_hold.hold.ctrl	Ctrl
+tap_hold.hold.nav_layer	Warstwa nav.
+tap_hold.hold.none	Natywny klawisz
+tap_hold.hold.shift	Shift
+tap_hold.hold.win	Win
+tap_hold.picker.hold	Hold → %s
+tap_hold.picker.tap	Tap → %s
+tap_hold.picker.title_prefix	Akcja przy kliknięciu — 
+tap_hold.reset_defaults	Przywróć wartości domyślne
+tap_hold.tap.none	Natywny klawisz
+terminators.label_close_paren	) : Nawias zamykający
+terminators.label_enter	⏎ : Enter
+terminators.label_equal	= : Znak równości
+terminators.label_nbsp	⍽ : Twarda spacja
+terminators.label_nnbsp	⍽ : Wąska twarda spacja
+token_prompt.create_link	👉 Kliknij tutaj, aby go utworzyć
+token_prompt.instruction	Wklej swój token HuggingFace (hf_...), aby przyspieszyć pobieranie.
+token_prompt.label	Token HuggingFace:
+token_prompt.no_token	Nie masz tokenu?
+token_prompt.placeholder	hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx...
+token_prompt.title	🔐 Logowanie HuggingFace
+token_prompt.validate	Zatwierdź
+token_prompt.window_title	Logowanie HuggingFace
+ui_apps.axis_chars	Znaki
+ui_apps.axis_speed	Znaków / min skupienia
+ui_apps.boxplot_scale	Skala: 0 → {max}
+ui_apps.boxplot_tip	{n} sesji · mediana {med} (Q1 {q1}, Q3 {q3})
+ui_apps.btn_add_app	Sklasyfikuj aplikację…
+ui_apps.btn_close	Zamknij
+ui_apps.btn_compare	Porównaj ↔
+ui_apps.btn_count_awake	Licz keep-awake
+ui_apps.btn_mode_chars	Znaki
+ui_apps.btn_mode_time	Czas
+ui_apps.btn_refresh	Odśwież
+ui_apps.cat_edit_tooltip	Edytuj kategorię
+ui_apps.chart_active_ratio	Współczynnik aktywności na przestrzeni dni
+ui_apps.chart_activity_cal	Kalendarz aktywności (12 miesięcy toczących się)
+ui_apps.chart_annotated_strip	Opatrzona adnotacjami oś czasu
+ui_apps.chart_app_switches	Przełączenia aplikacji
+ui_apps.chart_burst_hist	Histogram burst
+ui_apps.chart_cat_evolution	Ewolucja kategorii
+ui_apps.chart_daily_evolution	Dzienna ewolucja
+ui_apps.chart_day_strip	Pasek dzienny
+ui_apps.chart_hour_weekday	Godzina × dzień tygodnia
+ui_apps.chart_prod_vs_dist	Produktywność vs rozproszenie
+ui_apps.chart_session_durations	Czas trwania sesji według aplikacji
+ui_apps.chart_speed_by_cat	Prędkość pisania według kategorii (CPM)
+ui_apps.chart_speed_by_hour	Prędkość pisania według godziny (CPM)
+ui_apps.chart_time_by_cat	Czas według kategorii
+ui_apps.chart_timeline	Ewolucja chronologiczna
+ui_apps.chart_title_day	Przebieg dnia
+ui_apps.chart_title_period	Przebieg okresu
+ui_apps.chart_top7	Top 7 aplikacji (Czas)
+ui_apps.chart_top8	Top 8 aplikacji: czas vs znaki
+ui_apps.chart_top_days	Główne dni
+ui_apps.chart_top_sessions	Główne sesje
+ui_apps.chart_top_switch_pairs	Główne pary przełączeń
+ui_apps.chart_top_windows	Główne okna
+ui_apps.chart_wake_sleep	Godziny wstania i snu (klawiatura)
+ui_apps.cmp_active_time	Czas aktywny
+ui_apps.cmp_chars	Znaki
+ui_apps.cmp_focus_time	Czas skupienia
+ui_apps.cmp_productivity	Produktywność
+ui_apps.cmp_sessions	Sesje
+ui_apps.cmp_switches	Przełączenia
+ui_apps.cmp_window	bieżący: {cur} ‹{period}› · poprzedni: {prev}
+ui_apps.col_app	Aplikacja
+ui_apps.col_app_name	Aplikacja
+ui_apps.col_category	Kategoria
+ui_apps.col_chars	Znaki
+ui_apps.col_day	Dzień
+ui_apps.col_density	Gęstość
+ui_apps.col_duration	Czas trwania
+ui_apps.col_focus	Skupienie
+ui_apps.col_focus_time	Czas skupienia
+ui_apps.col_from	Od
+ui_apps.col_hold	Przytrzymanie
+ui_apps.col_hs_pct	% HS
+ui_apps.col_latency	Latencja
+ui_apps.col_sessions	Sesje
+ui_apps.col_share	Udział
+ui_apps.col_switches	Przełączenia
+ui_apps.col_to	Do
+ui_apps.col_top_dests	Główne cele
+ui_apps.col_typing_pct	% Pisania
+ui_apps.col_window	Okno
+ui_apps.compare_title	Porównanie z poprzednim okresem
+ui_apps.detail_global_activity	Łączna zarejestrowana aktywność
+ui_apps.detail_productivity_score	Wynik obliczony na podstawie Twoich kategorii
+ui_apps.ds_active_ratio	Wskaźnik aktywności (%)
+ui_apps.ds_bursts	Serie
+ui_apps.ds_chars	Znaki
+ui_apps.ds_first_key	Pierwsze naciśnięcie
+ui_apps.ds_focus_h	Skupienie (h)
+ui_apps.ds_focus_time	Czas skupienia
+ui_apps.ds_last_key	Ostatnie naciśnięcie
+ui_apps.ds_speed	Prędkość (znaki / min skupienia)
+ui_apps.ds_switches	Przełączenia
+ui_apps.empty_activity	Brak zarejestrowanej aktywności w tym okresie.
+ui_apps.empty_app_switches	Brak przełączeń w tym okresie.
+ui_apps.empty_boxplot	Za mało sesji do narysowania boxplotu (≥ 4 na aplikację).
+ui_apps.empty_comparator	Wybierz określony okres, aby włączyć porównanie.
+ui_apps.empty_day	Nie wybrano dnia.
+ui_apps.empty_days	Brak zarejestrowanych dni.
+ui_apps.empty_period	Brak danych dla tego okresu.
+ui_apps.empty_sessions	Nie wykryto sesji.
+ui_apps.empty_switches	Brak przełączeń w tym okresie.
+ui_apps.empty_windows	Nie zagregowano jeszcze żadnego tytułu okna.
+ui_apps.goal_prompt	Dzienny cel w minutach aktywnego skupienia:
+ui_apps.goal_reached	Cel osiągnięty na dziś ✓
+ui_apps.goal_remaining	{pct}% pozostało do osiągnięcia celu
+ui_apps.h2_active_time	Czas aktywny
+ui_apps.h2_app_hopping	Skakanie między aplikacjami
+ui_apps.h2_autorepeat	Automatyczne powtarzanie
+ui_apps.h2_battery	Bateria
+ui_apps.h2_best_hour	Najlepsza godzina
+ui_apps.h2_burst_record	Rekord burst
+ui_apps.h2_context_volume	Wolumen kontekstu
+ui_apps.h2_daily_goal	Dzienny cel
+ui_apps.h2_density	Gęstość
+ui_apps.h2_depth	Śr. głębokość
+ui_apps.h2_dominant_cat	Dominująca kategoria
+ui_apps.h2_finger_streak	Seria palca
+ui_apps.h2_first_last	Pierwsza / ostatnia
+ui_apps.h2_focus_index	Indeks skupienia
+ui_apps.h2_focus_latency	Latencja skupienia
+ui_apps.h2_keep_awake	Utrzymanie czuwania
+ui_apps.h2_layouts	Wykryte układy
+ui_apps.h2_lock_vs_sleep	Blokada vs uśpienie
+ui_apps.h2_locks	Zdarzenia blokady
+ui_apps.h2_long_sessions	Długie sesje
+ui_apps.h2_longest_burst	Najdłuższy burst
+ui_apps.h2_longest_session	Najdłuższa sesja
+ui_apps.h2_max_cascade	Maksymalna kaskada
+ui_apps.h2_most_errors	Aplikacja z największą liczbą błędów
+ui_apps.h2_muted	Audio wyciszone
+ui_apps.h2_night_wakeups	Nocne wybudzenia
+ui_apps.h2_passive_system	System pasywny
+ui_apps.h2_pivot_app	Aplikacja pivot
+ui_apps.h2_productivity	Indeks produktywności
+ui_apps.h2_record_day	Dzień rekordowy
+ui_apps.h2_screen_time	Czas ekranu
+ui_apps.h2_session_record	Rekord sesji
+ui_apps.h2_sessions	Sesje
+ui_apps.h2_slowest_recovery	Najwolniejsze odzyskiwanie
+ui_apps.h2_spaces	Obszary
+ui_apps.h2_streak_chars	Seria znaków ≥ 1k
+ui_apps.h2_streak_focus	Seria skupienia ≥ 30 min
+ui_apps.h2_top_trio	Najlepsze trio
+ui_apps.h2_wifi_changes	Zmiany Wi-Fi
+ui_apps.kpi_app_days_90	dni z aplikacją ≥ 90 min
+ui_apps.kpi_app_switches	przełączeń aplikacji
+ui_apps.kpi_awake_excluded	wyłączone ze statystyk (wyłącznik off)
+ui_apps.kpi_awake_included	wliczone do statystyk
+ui_apps.kpi_best_hour_score	śr. wynik {score} (-2 do 2)
+ui_apps.kpi_bursts_count	na {n} seri(i/ach)
+ui_apps.kpi_car_per_min	znaki / min skupienia
+ui_apps.kpi_cascades_period	{n} kaskad(a/y) w okresie
+ui_apps.kpi_chars_in_a_row	znaków pod rząd
+ui_apps.kpi_day_best	w dniu {date}
+ui_apps.kpi_focus_taken	na {n} przejęć skupienia
+ui_apps.kpi_hopping_detail	przełączenia / min skupienia
+ui_apps.kpi_in_app	w {name}
+ui_apps.kpi_lock_sleep_cumul	{dur} łącznie
+ui_apps.kpi_lock_vs_sleep	blokada / uśpienie
+ui_apps.kpi_never_active	nigdy nieaktywne
+ui_apps.kpi_never_reached	nigdy nieosiągnięte
+ui_apps.kpi_night_wakes	wybudzenia między 0 a 6
+ui_apps.kpi_no_backslash_out	brak przełączenia wychodzącego
+ui_apps.kpi_no_burst	brak serii
+ui_apps.kpi_no_data	brak danych
+ui_apps.kpi_no_day_data	brak danych dziennych
+ui_apps.kpi_no_enough_errors	za mało błędów
+ui_apps.kpi_no_enough_typing	za mało pisania
+ui_apps.kpi_no_focus	za mało skupienia
+ui_apps.kpi_no_focus_tracked	nie śledzono skupienia
+ui_apps.kpi_no_keystrokes	brak naciśnięć w okresie
+ui_apps.kpi_no_layout	nie zapisano układu
+ui_apps.kpi_no_lock	nie wykryto blokady
+ui_apps.kpi_no_long_session	brak długiej sesji
+ui_apps.kpi_no_mobility	brak mobilności
+ui_apps.kpi_no_mute	nigdy nie wyciszone
+ui_apps.kpi_no_record	brak rekordu w okresie
+ui_apps.kpi_no_repeat	brak powtórzeń
+ui_apps.kpi_no_session	brak sesji
+ui_apps.kpi_no_switch	brak przełączeń
+ui_apps.kpi_not_measured	jeszcze nie zmierzone
+ui_apps.kpi_pct_focus_time	{pct}% czasu skupienia
+ui_apps.kpi_productive	produktywne {p}% · neutralne {n}% · rozpraszające {d}%
+ui_apps.kpi_session_mean	śr. {dur}
+ui_apps.kpi_sleep_intact	sen nienaruszony
+ui_apps.kpi_space_switches	Przełączenia Space
+ui_apps.kpi_streak_chars	kolejnych dni ≥ 1000 znaków
+ui_apps.kpi_streak_focus	kolejnych dni ≥ 30 min aktywności
+ui_apps.kpi_switches_between	między 2 przełączeniami ({n} przełączeń)
+ui_apps.kpi_top_layout	najczęstszy: {name}
+ui_apps.kpi_towards_apps	do {n} różnych aplikacji
+ui_apps.kpi_wifi_switches	przełączenia sieci
+ui_apps.label_categories	Kategorie:
+ui_apps.label_date	Dnia:
+ui_apps.label_days	Dni:
+ui_apps.label_period	Okres:
+ui_apps.lbl_switches	Przełączenia:
+ui_apps.lbl_top_wifi	Główne WiFi:
+ui_apps.lbl_unlocks	Odblokowania:
+ui_apps.loading_data	Ładowanie danych...
+ui_apps.modal_activity_hour	Aktywność według godziny
+ui_apps.modal_app_title	Aplikacja
+ui_apps.modal_backspace_pct	{pct}% znaków
+ui_apps.modal_chart_label	Znaki
+ui_apps.modal_density	{n} znaków/min
+ui_apps.modal_destinations	Miejsca docelowe
+ui_apps.modal_hs_ai	Hotstring'i i SI
+ui_apps.modal_hs_line	Hotstrings: {n} znaków ({pct}%)
+ui_apps.modal_layouts	Użyte układy
+ui_apps.modal_llm_line	AI: {n} znaków ({pct}%)
+ui_apps.modal_longest_session	najdłuższa {dur}
+ui_apps.modal_pct_focus	{pct}% skupienia
+ui_apps.modal_record_burst	Najlepsze CPM serii: {n}
+ui_apps.modal_record_cascade	Kaskady Backspace: {n}
+ui_apps.modal_record_session	Najdłuższa sesja: {dur}{chars}
+ui_apps.modal_records	Rekordy
+ui_apps.modal_total_chars	Łączna liczba wpisanych znaków: {n}
+ui_apps.opt_period.all	Wszystko
+ui_apps.opt_period.day	Dzień
+ui_apps.opt_period.month	Ostatnie 30 dni
+ui_apps.opt_period.week	Ostatnie 7 dni
+ui_apps.opt_period.year	Rok
+ui_apps.prod_negative	Rozproszenie
+ui_apps.prod_neutral	Neutralne
+ui_apps.prod_positive	Produktywne
+ui_apps.row_tooltip	Zobacz szczegóły {name}
+ui_apps.sub_speed_by_hour	znaki na minutę skupienia, w aktywnym okresie
+ui_apps.tab_apps	Aplikacje i wielozadaniowość
+ui_apps.tab_overview	Przegląd
+ui_apps.tab_system	System i rekordy
+ui_apps.tab_time	Czas i rytm
+ui_apps.tab_typing	Pisanie i produktywność
+ui_apps.tile_backspaces	Backspace
+ui_apps.tile_chars	Znaki
+ui_apps.tile_focus	Skupienie
+ui_apps.tile_focus_lat	Czas reakcji skupienia
+ui_apps.tile_sessions	Sesje
+ui_apps.tile_typing	Aktywne pisanie
+ui_apps.title	Śledzenie czasu aplikacji
+ui_typing.apps_all	Aplik. (Wszystkie)
+ui_typing.apps_none	Aplik. (Żadna)
+ui_typing.btn_apps_all	Aplikacje (Wszystkie)
+ui_typing.btn_case_sensitive	Rozróżniaj wielkość liter
+ui_typing.btn_doublings_excluded	Podwojenia wykluczone
+ui_typing.btn_doublings_included	Podwojenia uwzględnione
+ui_typing.btn_reset	Resetuj
+ui_typing.btn_restore_zoom	Resetuj zoom
+ui_typing.btn_toggle_hs_title	+ Hotstrings: dodaje znaki z hotstrings do statystyk. Wyłączone: tylko ręczne naciśnięcia.
+ui_typing.btn_toggle_llm_title	+ AI: dodaje znaki wygenerowane przez AI do statystyk. Wyłączone: tylko ręczne naciśnięcia.
+ui_typing.calendar_active_days	aktywne dni
+ui_typing.calendar_chars	znaków
+ui_typing.calendar_day_fri	Pt
+ui_typing.calendar_day_mon	Pon
+ui_typing.calendar_day_wed	Śr
+ui_typing.calendar_month_0	sty
+ui_typing.calendar_month_1	lut
+ui_typing.calendar_month_10	lis
+ui_typing.calendar_month_11	gru
+ui_typing.calendar_month_2	mar
+ui_typing.calendar_month_3	kwi
+ui_typing.calendar_month_4	maj
+ui_typing.calendar_month_5	cze
+ui_typing.calendar_month_6	lip
+ui_typing.calendar_month_7	sie
+ui_typing.calendar_month_8	wrz
+ui_typing.calendar_month_9	paź
+ui_typing.calendar_no_keystrokes	brak naciśnięć
+ui_typing.calendar_subtitle	Ostatnie 12 miesięcy
+ui_typing.calendar_title	Kalendarz aktywności
+ui_typing.charmix_digits	Digits
+ui_typing.charmix_letters	Letters
+ui_typing.charmix_other	Other
+ui_typing.charmix_punct	Punctuation
+ui_typing.charmix_spaces	Spaces
+ui_typing.chart_title_activity_5min	Aktywność (klawisze / 5 min)
+ui_typing.chart_title_precision_5min	Precyzja (%) — widok 5 min
+ui_typing.col_acc	Dokładność
+ui_typing.col_active_time	Czas aktywny
+ui_typing.col_app	Aplik.
+ui_typing.col_chars	Znaki
+ui_typing.col_freq	Wzgl. częstość ↕
+ui_typing.col_km	Km palca ↕
+ui_typing.col_occ	Wystąpienia ↕
+ui_typing.col_rep	Powtórzenia ↕
+ui_typing.col_seq	Sekwencja ↕
+ui_typing.col_time	Śr. czas (ms) ↕
+ui_typing.col_wpm	Ekwiwalent WPM
+ui_typing.cpm_mode_ai	z AI
+ui_typing.cpm_mode_hs	z HS
+ui_typing.cpm_mode_hs_ai	z HS + AI
+ui_typing.cpm_mode_manual	tylko ręczne naciśnięcia klawiszy
+ui_typing.cpm_unit_output_chars	znaki na ekranie
+ui_typing.cpm_unit_raw_chars	wpisane surowe znaki
+ui_typing.dataset_ai	SI
+ui_typing.dataset_hs	Hotstring'i
+ui_typing.dataset_manual	Ręcznie
+ui_typing.dataset_precision	Dokładność (%)
+ui_typing.dataset_speed	Prędkość
+ui_typing.dataset_touches_5min	Naciśnięcia / 5 min
+ui_typing.dataset_touches_h	Naciśnięcia/h
+ui_typing.day_0	Niedziela
+ui_typing.day_1	Poniedziałek
+ui_typing.day_2	Wtorek
+ui_typing.day_3	Środa
+ui_typing.day_4	Czwartek
+ui_typing.day_5	Piątek
+ui_typing.day_6	Sobota
+ui_typing.errors_no_data	Brak zarejestrowanych korekt w tym okresie.
+ui_typing.errors_table_bigram	Bigram
+ui_typing.errors_table_errors	Błędy
+ui_typing.errors_table_occ	Wystąpienia
+ui_typing.errors_table_rate	Wskaźnik
+ui_typing.finger.hand_l	L
+ui_typing.finger.hand_r	P
+ui_typing.finger.l_idx	Wskazujący P
+ui_typing.finger.l_mid	Środkowy P
+ui_typing.finger.l_pinky	Mały P
+ui_typing.finger.l_ring	Serdeczny P
+ui_typing.finger.l_thumb	Kciuk P
+ui_typing.finger.r_idx	Wskazujący L
+ui_typing.finger.r_mid	Środkowy L
+ui_typing.finger.r_pinky	Mały L
+ui_typing.finger.r_ring	Serdeczny L
+ui_typing.finger.r_thumb	Kciuk L
+ui_typing.h2_ai	Sztuczna inteligencja
+ui_typing.h2_app_activity	Aktywność według aplikacji
+ui_typing.h2_bigram_ergo	Ergonomia bigramów
+ui_typing.h2_char_mix	Skład znaków
+ui_typing.h2_doublings	Podwojenia
+ui_typing.h2_error_bigrams	Najczęściej korygowane bigramy
+ui_typing.h2_finger_dist	Odległość palca
+ui_typing.h2_health	Zdrowie i ergonomia
+ui_typing.h2_hs	Hotstring'i
+ui_typing.h2_hs_ai_prod	Produktywność HS / SI
+ui_typing.h2_lexicon	Leksykon
+ui_typing.h2_records	Rekordy osobiste
+ui_typing.h2_rhythm	Rytm i burst
+ui_typing.h2_sessions	Sesje
+ui_typing.h2_speed	Średnia prędkość
+ui_typing.h2_trigram_ergo	Ergonomia trigramów
+ui_typing.h3_activity_hourly	Aktywność (naciśnięcia/h)
+ui_typing.h3_keystroke_origin	Źródło naciśnięć klawiszy
+ui_typing.h3_precision	Dokładność (%)
+ui_typing.h3_precision_hourly	Dokładność (%) — widok godzinowy
+ui_typing.h3_speed	Prędkość (WPM)
+ui_typing.heatmap_day_fri	Pt
+ui_typing.heatmap_day_mon	Pon
+ui_typing.heatmap_day_sat	Sob
+ui_typing.heatmap_day_sun	Nd
+ui_typing.heatmap_day_thu	Czw
+ui_typing.heatmap_day_tue	Wt
+ui_typing.heatmap_day_wed	Śr
+ui_typing.heatmap_hour_chars_abbrev	zn.
+ui_typing.heatmap_hour_no_keystrokes	brak naciśnięć
+ui_typing.heatmap_hour_subtitle	w wybranym okresie
+ui_typing.heatmap_hour_title	Aktywność według godziny i dnia tygodnia
+ui_typing.heatmap_hour_total	znaków łącznie
+ui_typing.key_caps	Caps
+ui_typing.key_enter	Enter
+ui_typing.key_esc	Esc
+ui_typing.key_shift	Shift
+ui_typing.key_tab	Tab
+ui_typing.key_tip_avg_dur	Avg. dur.:
+ui_typing.key_tip_freq	Freq.:
+ui_typing.key_tip_freq_total	Total freq.:
+ui_typing.label_burst_length_dist	Burst length distribution
+ui_typing.label_charmix_dist	Distribution (%s characters)
+ui_typing.label_finger_load_dist	Cumulative load per finger — ideal distribution ≈ 12.5% each
+ui_typing.label_from	Od:
+ui_typing.label_to	Do:
+ui_typing.label_word_length_dist	Length distribution (frequency-weighted)
+ui_typing.lbl_accepted	Zaakceptowano
+ui_typing.lbl_active_ratio	Współczynnik aktywności
+ui_typing.lbl_activity	Aktywność
+ui_typing.lbl_ai_acceptance	Akceptacja SI
+ui_typing.lbl_avg_delay	Średnie opóźnienie
+ui_typing.lbl_avg_duration	Średni czas trwania
+ui_typing.lbl_avg_length	Średnia długość
+ui_typing.lbl_bad_redir	Błędne przkier.
+ui_typing.lbl_best_day	Najlepszy dzień
+ui_typing.lbl_cascades	Kaskady
+ui_typing.lbl_corrected_bigrams	Skorygowane bigramy
+ui_typing.lbl_digits	Cyfry
+ui_typing.lbl_doublings	podwojenia
+ui_typing.lbl_fastest_app	Najszybsza aplikacja
+ui_typing.lbl_focus_latency	Latencja skupienia → 1. klawisz
+ui_typing.lbl_frequent_pair	Częsta para
+ui_typing.lbl_hand_balance	Bilans L/P
+ui_typing.lbl_layouts_used	Używane układy
+ui_typing.lbl_letters	Litery
+ui_typing.lbl_long_sessions	Długie sesje
+ui_typing.lbl_longest_burst	Najdłuższy burst
+ui_typing.lbl_longest_chars	Najdłuższy (znaki)
+ui_typing.lbl_longest_session	Najdłuższa sesja
+ui_typing.lbl_longest_time	Najdłuższy (czas trwania)
+ui_typing.lbl_most_active_finger	Najbardziej aktywny palec
+ui_typing.lbl_others	Inne
+ui_typing.lbl_passive_time	Czas pasywny systemu
+ui_typing.lbl_punctuation	Interpunkcja
+ui_typing.lbl_recovery_time	Czas odzyskiwania
+ui_typing.lbl_redir	Przkier.
+ui_typing.lbl_regularity	Regularność (CV)
+ui_typing.lbl_roll_in	Rolka do wewnątrz
+ui_typing.lbl_roll_out	Rolka na zewnątrz
+ui_typing.lbl_same_finger_streak	Seria tego samego palca
+ui_typing.lbl_same_hand_streak	Seria tej samej ręki
+ui_typing.lbl_saved	Zapisano
+ui_typing.lbl_scissors	Nożyce
+ui_typing.lbl_sfbs_raw	Surowe SFB
+ui_typing.lbl_spaces	Spacje
+ui_typing.lbl_streak	Seria
+ui_typing.lbl_time_saved	Zaoszczędzony czas
+ui_typing.lbl_top_app	Najczęściej używana aplikacja
+ui_typing.lbl_top_mod_held	Najczęściej trzymany modyfikator
+ui_typing.lbl_top_word	Najczęściej używane słowo
+ui_typing.lbl_total	Łącznie
+ui_typing.lbl_total_active_time	Łączny czas aktywny
+ui_typing.lbl_total_bursts	Łączna liczba burst
+ui_typing.lbl_total_words	Łączna liczba słów
+ui_typing.lbl_unique_words	Unikalne słowa
+ui_typing.lbl_via_ai	Przez SI
+ui_typing.lbl_via_hotstrings	Przez hotstring'i
+ui_typing.lbl_via_magic_key	Przez klawisz ★
+ui_typing.lbl_worst_bigram	Najgorszy bigram
+ui_typing.loading	Obliczanie...
+ui_typing.loading_ellipsis	Obliczanie…
+ui_typing.modal_apply	Zamknij i zastosuj
+ui_typing.modal_check_all	Zaznacz wszystkie
+ui_typing.modal_search_app	Szukaj aplikacji...
+ui_typing.modal_select_apps	Wybierz aplikacje
+ui_typing.modal_uncheck_all	Odznacz wszystkie
+ui_typing.month_0	Sty.
+ui_typing.month_1	Lut.
+ui_typing.month_10	Lis.
+ui_typing.month_11	Gru.
+ui_typing.month_2	Mar.
+ui_typing.month_3	Kwi.
+ui_typing.month_4	Maj
+ui_typing.month_5	Cze.
+ui_typing.month_6	Lip.
+ui_typing.month_7	Sie.
+ui_typing.month_8	Wrz.
+ui_typing.month_9	Paź.
+ui_typing.no_app_found	Nie znaleziono aplikacji
+ui_typing.no_data	Brak danych
+ui_typing.not_found	Nie znaleziono
+ui_typing.opt_pause.1000	Przerwy > 1 s
+ui_typing.opt_pause.10000	Przerwy > 10 s
+ui_typing.opt_pause.2000	Przerwy > 2 s
+ui_typing.opt_pause.20000	Przerwy > 20 s
+ui_typing.opt_pause.3000	Przerwy > 3 s
+ui_typing.opt_pause.30000	Przerwy > 30 s
+ui_typing.opt_pause.5000	Przerwy > 5 s
+ui_typing.opt_pause.60000	Przerwy > 1 min
+ui_typing.opt_pause.99999999	Bez filtru
+ui_typing.opt_quick_range.	Okres…
+ui_typing.opt_quick_range.3m	Ostatnie 3 miesiące
+ui_typing.opt_quick_range.6m	Ostatnie 6 miesięcy
+ui_typing.opt_quick_range.all	Wszystko
+ui_typing.opt_quick_range.last_hour	Ostatnia godzina
+ui_typing.opt_quick_range.month	Ten miesiąc
+ui_typing.opt_quick_range.today	Dzisiaj
+ui_typing.opt_quick_range.week	Ten tydzień
+ui_typing.opt_quick_range.year	Ten rok
+ui_typing.page_loading	Ładowanie interfejsu...
+ui_typing.pinch_hint	Ściśnij (touchpad), aby powiększyć.
+ui_typing.precision_no_filter	bez filtra
+ui_typing.rep_doublings	podwojenia
+ui_typing.rep_no_data	Brak podwojeń
+ui_typing.rep_table_bigram	Bigram
+ui_typing.rep_table_manual	Ręcznie
+ui_typing.rep_table_total	Łącznie
+ui_typing.rep_table_via_star	Przez ★
+ui_typing.search_close	Zamknij (Esc)
+ui_typing.search_label	Szukaj na stronie
+ui_typing.search_next	Następny (Enter)
+ui_typing.search_placeholder	Szukaj…
+ui_typing.search_prev	Poprzedni (Shift+Enter)
+ui_typing.sfb_avoided	uniknięte via HS
+ui_typing.sfb_avoided_none	0 uniknięte via HS
+ui_typing.sfb_no_data	Brak SFBs
+ui_typing.sfb_raw_count	surowe SFBs
+ui_typing.sfb_table_finger	Palec
+ui_typing.sfb_table_hand	Ręka
+ui_typing.sfb_table_pair	Para
+ui_typing.signal_equilibre	Balanced
+ui_typing.signal_surveille	Monitored
+ui_typing.signal_vigilance	Alert
+ui_typing.tab_bigrams	Bigramy
+ui_typing.tab_chars	Znaki
+ui_typing.tab_heptagrams	Heptagramy
+ui_typing.tab_hexagrams	Heksagramy
+ui_typing.tab_keycodes	Kody klawiszy
+ui_typing.tab_modifiers	Modyfikatory
+ui_typing.tab_pentagrams	Pentagramy
+ui_typing.tab_quadgrams	Tetragramy
+ui_typing.tab_shortcut_bigrams	Bigramy skrótów
+ui_typing.tab_shortcut_pentagrams	Pentagramy skrótów
+ui_typing.tab_shortcut_quadgrams	Tetragramy skrótów
+ui_typing.tab_shortcut_trigrams	Trigramy skrótów
+ui_typing.tab_shortcuts	Skróty
+ui_typing.tab_trigrams	Trigramy
+ui_typing.tab_word_bigrams	Bigramy słów
+ui_typing.tab_word_pentagrams	Pentagramy słów
+ui_typing.tab_word_quadgrams	Tetragramy słów
+ui_typing.tab_word_trigrams	Trigramy słów
+ui_typing.tab_words	Słowa
+ui_typing.table_mode_mixed	mieszany
+ui_typing.table_mode_output	wyjście ekranowe
+ui_typing.table_mode_raw	surowe naciśnięcia klawiszy
+ui_typing.title	Statystyki pisania
+ui_typing.title_hand_balance	Równowaga naciśnięć między lewą a prawą ręką. 50/50 = idealna równowaga.
+ui_typing.title_net_hs	Różnica netto między wpisanymi a wygenerowanymi znakami
+ui_typing.title_net_llm	Różnica netto między usuniętymi a wygenerowanymi znakami
+ui_typing.title_pause_threshold	Próg pauzy: pauzy powyżej tej wartości są wykluczone z czasu aktywnego przy obliczaniu WPM.
+ui_typing.title_quick_range	Szybki zakres
+ui_typing.title_rep_total	Łączna liczba podwojeń w okresie
+ui_typing.title_rep_via_star	Udział podwojeń wygenerowanych przez klawisz ★ (hotstring powtórzeń). Niezerowy tylko w trybie + Hotstrings.
+ui_typing.title_top_finger	Palec, który pokonał największą odległość w okresie
+ui_typing.tooltip_apps	<strong>Fastest app :</strong> highest average CPM across apps with ≥ 200 characters typed (below this threshold you'd catch apps used for 2 seconds).<br><br><strong>Frequent pair :</strong> the two apps you switch between most often, in both directions. Indicates your typical workflow (editor ↔ browser, doc ↔ chat…).
+ui_typing.tooltip_charmix	<strong>Categories :</strong> each manual character typed is classified Lua-side into one of five categories — Latin letters (including common accented), digits, punctuation and symbols, spaces (including NBSP / NNBSP / tab / return), and other (non-Latin characters, special keylogger markers).<br><br><strong>Indication :</strong> code-heavy = lots of punctuation and digits; prose-heavy = mostly letters and spaces; chat = a mix of everything.
+ui_typing.tooltip_col_acc	Precyzja: Procent przypadków, gdy ta sekwencja została wpisana poprawnie bez Backspace.
+ui_typing.tooltip_col_mpm	Słów na minutę: szacunkowa prędkość, gdyby ten fragment był wpisywany w pętli (1 słowo = 5 klawiszy). Liczy WYŁĄCZNIE rzeczywiste naciśnięcia użytkownika.
+ui_typing.tooltip_cpm_formula	<strong>Wzór:</strong> CPM = przejścia × 60000 / czas aktywny.<br><strong>Tryb:</strong> {mode}.<br><br>Licznik: {pure_trans} przejść ręcznych (≤ {thresh})<br>{add_hs}{add_llm}= {chars_total} zaliczonych znaków<br><br>WPM = CPM / 5.
+ui_typing.tooltip_cpm_hs_chars	dodanych znaków (wyjście HS − wyzwalacz)
+ui_typing.tooltip_cpm_llm_chars	dodanych znaków (wyjście AI − wyzwalacz)
+ui_typing.tooltip_cpm_simple	Znaków na minutę (domyślnie z HS + AI).
+ui_typing.tooltip_ergo_bigram	<strong>SHB / SHU :</strong> same-hand bigrams / their share of total bigrams.<br><strong>Inward roll :</strong> pinky toward index. The most comfortable.<br><strong>Outward roll :</strong> index toward pinky.<br><strong>LSB :</strong> Lateral Stretch Bigram — one of the two fingers extends at least 1.5 columns from its rest position.<br><strong>Scissors :</strong> SHB crossing ≥ 2 rows with the shorter finger going down (e.g. pinky low + middle high).
+ui_typing.tooltip_ergo_trigram	<strong>SFS :</strong> Same-Finger Skipgram — an SFB with a different-finger key in between (e.g. EAD).<br><strong>SKS :</strong> Same-Key Skipgram — the same key in positions 1 and 3 (e.g. ELE).<br><strong>Redirect :</strong> three keys on the same hand with a change of direction (pinky→middle→ring = peak). Uncomfortable.<br><strong>Bad redir. :</strong> redirect where none of the three fingers is the index. Among the worst possible sequences on a keyboard.
+ui_typing.tooltip_errors	<strong>Reading :</strong> bigrams (two consecutive keys) ranked by <em>error rate</em> = number of times the 2nd key was erased by a backspace, divided by total occurrences.<br><br><strong>Filter :</strong> only bigrams appearing ≥ 5 times in the period are shown, to avoid statistical noise from rare sequences.<br><br><strong>Cascades :</strong> runs of ≥ 3 consecutive backspaces (major correction: a word or sentence erased). The counter separates this signal from one-off errors.<br><br><strong>Recovery time :</strong> average delay between a backspace and the next key. The longer it is, the more the correction breaks your mental flow.
+ui_typing.tooltip_lexical	<strong>Richness :</strong> unique words ÷ total words. The higher, the more varied the vocabulary. A literary text will be around 40–60 %, chat or code much lower.<br><br><strong>Average length :</strong> frequency-weighted mean — this is the length of the word you type "on average", not the median dictionary length.<br><br><strong>Filter :</strong> words shorter than 2 characters are ignored (they are almost always tokenisation artefacts from punctuation splitting).
+ui_typing.tooltip_mpm	Słów na minutę (rzeczywiste słowa ze słownika).
+ui_typing.tooltip_precision_formula	<strong>Wzór:</strong> precyzja = poprawne / łącznie.<br>Błędy: naciśnięcia Backspace wkrótce po naciśnięciu klawisza (≤ {thresh}).
+ui_typing.tooltip_records	<strong>Scope :</strong> records are computed over <em>the entire</em> database — they do not follow the UI date filter (otherwise the record disappears when you zoom in). The app filter still applies.<br><br><strong>Streak :</strong> longest consecutive series of days with at least one keystroke. Missing a day resets the counter to zero.
+ui_typing.tooltip_rep_pct	Share of bigrams that are doublings (e.g. «aa», «ll»). Reflects the active source mode — compare "Without Ergopti+" and "+ Hotstrings" to see if the ★ key is being used.
+ui_typing.tooltip_rhythm	<strong>Burst :</strong> typing stretch with no gap > 1 s between two keys.<br><br><strong>Peak CPM :</strong> best CPM observed on a burst of at least 10 characters. The threshold excludes fleeting non-representative sprints.<br><br><strong>Regularity (CV) :</strong> coefficient of variation = standard deviation ÷ mean. 0 = perfect metronome, > 0.6 = very irregular.
+ui_typing.tooltip_roi	<strong>Characters saved :</strong> net output of HS / AI expansions, i.e. characters added on screen minus those that triggered the expansion (and were therefore typed manually).<br><br><strong>Time saved :</strong> characters saved × average pace (manual active time ÷ number of manual keystrokes) over the same period. This is an honest lower bound: it is what you would have taken to type them yourself.<br><br><strong>AI acceptance :</strong> share of AI suggestions displayed that were accepted by the user.
+ui_typing.tooltip_sessions	<strong>Session :</strong> typing block with no gap > 5 min between two consecutive keystrokes. Detected keylogger-side, so independent of the UI pause filter.<br><br><strong>Total active time :</strong> sum of all session durations — i.e. the time actually spent typing, ignoring pauses > 5 min.<br><br><strong>Longest (chars) :</strong> may refer to a different session from the longest in duration — e.g. a long slow session vs. a short ultra-fast one.
+ui_typing.tooltip_sfb_pct	Share of manual bigrams typed by the same finger. Excluding hotstrings — this KPI measures the raw physical difficulty of the layout.
+ui_typing.tooltip_sfb_rate	Rate: nb SFBs / nb key occurrences
+ui_typing.tooltip_wellness	<strong>Global signal :</strong> red "Alert" if ≥ 2 sessions over 90 min or a finger streak ≥ 8; orange "Monitored" if ≥ 1 long session or finger streak ≥ 6 or hand streak ≥ 12; green "Balanced" otherwise.<br><br><strong>Active ratio :</strong> time actually spent typing ÷ time the app was in focus. Low = you read a lot, which reduces typing load but also signals chronic input/output imbalance.<br><br><strong>Finger / hand streak :</strong> longest run of consecutive keys on the same finger or same hand. Beyond 5 (finger) or 12 (hand), the load is no longer distributed.<br><br><strong>Long sessions :</strong> sessions ≥ 90 min without a break. The clinical threshold beyond which RSI risk increases significantly.
+ui_typing.unit_activations	aktywacje
+ui_typing.unit_active_apps	aktywne aplikacje
+ui_typing.unit_chars_saved	zaoszczędzone znaki
+ui_typing.unit_cpm	ZPM
+ui_typing.unit_cpm_burst	CPM szczyt (burst)
+ui_typing.unit_cpm_record	rekord CPM
+ui_typing.unit_global_rate	% wskaźnik globalny
+ui_typing.unit_keyspressed	wciśnięte klawisze
+ui_typing.unit_keystrokes	naciśnięcia klawiszy
+ui_typing.unit_km	km
+ui_typing.unit_mpm	MPM
+ui_typing.unit_richness	% bogactwo
+ui_typing.unit_sessions	sesje
+ui_typing.unit_triggers	triggers
+ui_typing.unit_words_typed	words typed in total
+updater.changelog_channel_label	Kanał:
+updater.changelog_empty	(Brak informacji o zmianach dla tego kanału.)
+updater.changelog_install	Zainstaluj tę wersję
+updater.changelog_install_current	Bieżąca wersja
+updater.changelog_local_source_note	Tryb źródła lokalnego — zmiany kanału nie są zapisywane.
+updater.changelog_release_notes	Lista zmian dla {1}:\n\n{2}\n\nOtworzyć na GitHubie?
+updater.changelog_select_release	Wybór wersji :
+updater.changelog_switch_to_dev	Przełącz na kanał wersji wstępnej (dev)
+updater.changelog_switch_to_main	Przełącz na stabilny kanał (main)
+updater.changelog_truncated	\n…(skrócono)
+updater.changelog_unreachable	Nie udało się pobrać informacji o wydaniu z GitHuba.
+updater.channel_dev_suffix	 (kanał wstępny)
+updater.channel_local_source_suffix	 (źródło lokalne — nie kompilacja wydania)
+updater.channel_main_suffix	 (kanał stabilny)
+updater.channel_switch_blocked_download	Trwa pobieranie aktualizacji. Poczekaj, aż się zakończy (lub uruchom ponownie aplikację), zanim zmienisz kanał.
+updater.checking	Sprawdzanie aktualizacji w kanale „{1}”…\n(Może to potrwać kilka sekund.)
+updater.close	Zamknij
+updater.install_error	Nie udało się zainstalować aktualizacji. Szczegóły znajdziesz w logach.
+updater.install_error_download	Pobieranie pakietu aktualizacji nie powiodło się. Sprawdź połączenie internetowe i spróbuj ponownie.
+updater.install_error_no_asset	Ta wersja nie zawiera pliku wykonywalnego dla Windows. Otwórz stronę wydania, aby pobrać ręcznie.
+updater.install_local_source	Uruchamianie z lokalnego źródła — automatyczna instalacja jest dostępna tylko dla wersji release.
+updater.local_source	Działa ze źródła lokalnego — sprawdzanie aktualizacji jest dostępne tylko dla kompilacji wydania.
+updater.new_version	Dostępna jest nowa wersja!\n\nBieżąca: {1}\nNajnowsza: {2}\n\nOtworzyć stronę wydań, aby pobrać?
+updater.no_connection	Nie udało się połączyć z GitHubem. Sprawdź połączenie internetowe i spróbuj ponownie.
+updater.open_on_github	Otwórz na GitHubie
+updater.parse_failed	Nie udało się odczytać znacznika najnowszego wydania z GitHuba.
+updater.title_changelog	ErgoptiPlus — Lista zmian
+updater.title_update	ErgoptiPlus — Aktualizacja
+updater.title_update_available	ErgoptiPlus — Dostępna aktualizacja
+updater.title_version	ErgoptiPlus — Wersja
+updater.tray_new_version_body	Wersja {1} jest gotowa do instalacji. Kliknij pozycję „Install update" w menu w obszarze powiadomień.
+updater.tray_new_version_title	ErgoptiPlus — Aktualizacja dostępna
+updater.up_to_date	ErgoptiPlus jest aktualny.\n\nBieżąca wersja: {1}
+updater.update_dialog_changelog	Nowości:
+updater.update_dialog_header	Aktualizacja dostępna — {1}
+updater.update_dialog_install	Zainstaluj aktualizację
+updater.update_dialog_later	Później
+updater.update_dialog_open	Otwórz na GitHubie
+updater.update_dialog_title	ErgoptiPlus — Instalacja aktualizacji
+updater.version_message	ErgoptiPlus {1}{2}\n\nOtworzyć stronę wydań na GitHubie?
+vscode.reload_required	Przeładuj VSCode (Cmd+Shift+P > Reload Window), aby aktywować rozszerzenie pisania

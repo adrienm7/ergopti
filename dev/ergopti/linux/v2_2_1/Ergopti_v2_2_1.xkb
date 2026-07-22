@@ -1,0 +1,68 @@
+partial alphanumeric_keys
+xkb_symbols "Ergopti_v2_2_1" {
+
+	name[Group1] = "Français — Ergopti v2.2.1";
+
+	include "latin"
+
+        // Space bar
+        key <SPCE> { type[group1] = "SEVEN_LEVEL_KEY", [space, space, minus, minus, space, underscore, fiveeighths] }; //     - -   _ " - "
+
+        // Digits
+        key <TLDE> { type[group1] = "SEVEN_LEVEL_KEY", [dollar, dollar, fivesixths, fivesixths, dollar, EuroSign, dead_currency] }; // $ $ " €" " €" $ € ¤
+        key <AE01> { type[group1] = "SEVEN_LEVEL_KEY", [1, 1, 1, 1, 1, onesuperior, U2081] }; // 1 1 1 1 1 ¹ ₁
+        key <AE02> { type[group1] = "SEVEN_LEVEL_KEY", [2, 2, 2, 2, 2, twosuperior, U2082] }; // 2 2 2 2 2 ² ₂
+        key <AE03> { type[group1] = "SEVEN_LEVEL_KEY", [3, 3, 3, 3, 3, threesuperior, U2083] }; // 3 3 3 3 3 ³ ₃
+        key <AE04> { type[group1] = "SEVEN_LEVEL_KEY", [4, 4, 4, 4, 4, U2074, U2084] }; // 4 4 4 4 4 ⁴ ₄
+        key <AE05> { type[group1] = "SEVEN_LEVEL_KEY", [5, 5, 5, 5, 5, U2075, U2085] }; // 5 5 5 5 5 ⁵ ₅
+        key <AE06> { type[group1] = "SEVEN_LEVEL_KEY", [6, 6, 6, 6, 6, U2076, U2086] }; // 6 6 6 6 6 ⁶ ₆
+        key <AE07> { type[group1] = "SEVEN_LEVEL_KEY", [7, 7, 7, 7, 7, U2077, U2087] }; // 7 7 7 7 7 ⁷ ₇
+        key <AE08> { type[group1] = "SEVEN_LEVEL_KEY", [8, 8, 8, 8, 8, U2078, U2088] }; // 8 8 8 8 8 ⁸ ₈
+        key <AE09> { type[group1] = "SEVEN_LEVEL_KEY", [9, 9, 9, 9, 9, U2079, U2089] }; // 9 9 9 9 9 ⁹ ₉
+        key <AE10> { type[group1] = "SEVEN_LEVEL_KEY", [0, 0, 0, 0, 0, U2070, U2080] }; // 0 0 0 0 0 ⁰ ₀
+        key <AE11> { type[group1] = "SEVEN_LEVEL_KEY", [percent, percent, fourfifths, fourfifths, minus, U2030, U2031] }; // % % " %" " %" - ‰ ‱
+        key <AE12> { type[group1] = "SEVEN_LEVEL_KEY", [equal, equal, masculine, masculine, plus, degree, ordfeminine] }; // = = º º + ° ª
+
+        // Letters — Row 1/3
+        key <AD01> { type[group1] = "SEVEN_LEVEL_KEY", [egrave, Egrave, Egrave, egrave, z, grave, doublelowquotemark] }; // è È È è z ` „
+        key <AD02> { type[group1] = "SEVEN_LEVEL_KEY", [y, Y, Y, y, y, at, EuroSign] }; // y Y Y y y @ €
+        key <AD03> { type[group1] = "SEVEN_LEVEL_KEY", [o, O, O, o, o, oe, OE] }; // o O O o o œ Œ
+        key <AD04> { type[group1] = "SEVEN_LEVEL_KEY", [w, W, W, w, w, ugrave, Ugrave] }; // w W W w w ù Ù
+        key <AD05> { type[group1] = "SEVEN_LEVEL_KEY", [b, B, B, b, b, guillemotleft, leftdoublequotemark] }; // b B B b b "« " “
+        key <AD06> { type[group1] = "SEVEN_LEVEL_KEY", [f, F, F, f, f, guillemotright, rightdoublequotemark] }; // f F F f f " »" ”
+        key <AD07> { type[group1] = "SEVEN_LEVEL_KEY", [g, G, G, g, g, asciitilde, U2248] }; // g G G g g ~ ≈
+        key <AD08> { type[group1] = "SEVEN_LEVEL_KEY", [h, H, H, h, h, numbersign, percent] }; // h H H h h # %
+        key <AD09> { type[group1] = "SEVEN_LEVEL_KEY", [c, C, C, c, c, ccedilla, Ccedilla] }; // c C C c c ç Ç
+        key <AD10> { type[group1] = "SEVEN_LEVEL_KEY", [x, X, X, x, x, asterisk, multiply] }; // x X X x x * ×
+        key <AD11> { type[group1] = "SEVEN_LEVEL_KEY", [z, Z, Z, z, z, percent, U2030] }; // z Z Z z z % ‰
+        key <AD12> { type[group1] = "SEVEN_LEVEL_KEY", [dead_diaeresis, dead_diaeresis, underscore, underscore, diaeresis, minus, U2605] }; // ¨ ¨ _ _ ¨ - ★
+
+        // Letters — Row 2/3
+        key <AC01> { type[group1] = "SEVEN_LEVEL_KEY", [a, A, A, a, a, less, lessthanequal] }; // a A A a a < ≤
+        key <AC02> { type[group1] = "SEVEN_LEVEL_KEY", [i, I, I, i, i, greater, greaterthanequal] }; // i I I i i > ≥
+        key <AC03> { type[group1] = "SEVEN_LEVEL_KEY", [e, E, E, e, e, braceleft, uparrow] }; // e E E e e { ᵉ
+        key <AC04> { type[group1] = "SEVEN_LEVEL_KEY", [u, U, U, u, u, braceright, mu] }; // u U U u u } µ
+        key <AC05> { type[group1] = "SEVEN_LEVEL_KEY", [period, period, oneeighth, oneeighth, period, colon, periodcentered] }; // . . " :" " :" . : ·
+        key <AC06> { type[group1] = "SEVEN_LEVEL_KEY", [v, V, V, v, v, bar, brokenbar] }; // v V V v v | ¦
+        key <AC07> { type[group1] = "SEVEN_LEVEL_KEY", [s, S, S, s, s, parenleft, emdash] }; // s S S s s ( —
+        key <AC08> { type[group1] = "SEVEN_LEVEL_KEY", [n, N, N, n, n, parenright, endash] }; // n N N n n ) –
+        key <AC09> { type[group1] = "SEVEN_LEVEL_KEY", [t, T, T, t, t, bracketleft, dead_diaeresis] }; // t T T t t [ ¨
+        key <AC10> { type[group1] = "SEVEN_LEVEL_KEY", [r, R, R, r, r, bracketright, infinity] }; // r R R r r ] ℝ
+        key <AC11> { type[group1] = "SEVEN_LEVEL_KEY", [q, Q, Q, q, q, rightsinglequotemark, dead_currency] }; // q Q Q q q ’ ¤
+        key <BKSL> { type[group1] = "SEVEN_LEVEL_KEY", [dead_circumflex, dead_circumflex, onefifth, onefifth, asciicircum, exclam, exclamdown] }; // ^ ^ " !" " !" ^ ! ¡
+
+        // Letters — Row 3/3
+        key <LSGT> { type[group1] = "SEVEN_LEVEL_KEY", [ecircumflex, Ecircumflex, Ecircumflex, ecircumflex, x, asciicircum, dead_circumflex] }; // ê Ê Ê ê x ^ ^
+        key <AB01> { type[group1] = "SEVEN_LEVEL_KEY", [eacute, Eacute, Eacute, eacute, c, slash, division] }; // é É É é c / ÷
+        key <AB02> { type[group1] = "SEVEN_LEVEL_KEY", [agrave, Agrave, Agrave, agrave, v, backslash, downarrow] }; // à À À à v \ ᵢ
+        key <AB03> { type[group1] = "SEVEN_LEVEL_KEY", [j, J, J, j, j, quotedbl, j] }; // j J J j j " j
+        key <AB04> { type[group1] = "SEVEN_LEVEL_KEY", [comma, comma, onesixth, onesixth, comma, semicolon, ellipsis] }; // , , " ;" " ;" , ; …
+        key <AB05> { type[group1] = "SEVEN_LEVEL_KEY", [k, K, K, k, k, ellipsis, plus] }; // k K K k k … +
+        key <AB06> { type[group1] = "SEVEN_LEVEL_KEY", [m, M, M, m, m, ampersand, U2212] }; // m M M m m & −
+        key <AB07> { type[group1] = "SEVEN_LEVEL_KEY", [d, D, D, d, d, dollar, section] }; // d D D d d $ §
+        key <AB08> { type[group1] = "SEVEN_LEVEL_KEY", [l, L, L, l, l, equal, notequal] }; // l L L l l = ≠
+        key <AB09> { type[group1] = "SEVEN_LEVEL_KEY", [p, P, P, p, p, plus, plusminus] }; // p P P p p + ±
+        key <AB10> { type[group1] = "SEVEN_LEVEL_KEY", [apostrophe, apostrophe, onethird, onethird, apostrophe, question, questiondown] }; // ' ' " ?" " ?" ' ? ¿
+
+	include "level3(ralt_switch)"
+};

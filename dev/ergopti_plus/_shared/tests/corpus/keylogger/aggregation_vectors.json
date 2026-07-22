@@ -1,0 +1,219 @@
+{
+	"_description": "Cross-driver keylogger aggregation corpus. Each vector is a batch of JSONL-style events (typing, app_switch, window_switch, system_event) replayed through the walker (macOS events.lua walk_typing / AHK KLW_WalkTypingEntry). The expected object pinpoints the resulting batch state so both drivers produce identical aggregation output.",
+	"vectors": [
+		{
+			"id": "simple_typing_3_chars",
+			"description": "Three consecutive keystrokes in a single typing entry",
+			"events": [
+				{ "type": "typing", "app": "TestApp", "timestamp": "2024-06-01 10:00:00.000", "events": [
+					{ "char": "a", "delay": 100, "meta": {} },
+					{ "char": "b", "delay": 120, "meta": {} },
+					{ "char": "c", "delay": 110, "meta": {} }
+				]}
+			],
+			"expected": {
+				"app_day": {
+					"2024-06-01\u0001TestApp": { "chars": 3, "time_ms": 330, "pauses": 0, "think_time_ms": 0 }
+				},
+				"ngram_chars_count": 3,
+				"ngram_bigrams_count": 2,
+				"ngram_trigrams_count": 1,
+				"hourly_c": 3,
+				"chars_class_letter": 3,
+				"last_p1": "c"
+			}
+		},
+		{
+			"id": "typing_with_backspace",
+			"description": "Type 'he' then backspace removes 'e' from cur_word",
+			"events": [
+				{ "type": "typing", "app": "BSApp", "timestamp": "2024-06-01 10:00:00.000", "events": [
+					{ "char": "h", "delay": 150, "meta": {} },
+					{ "char": "e", "delay": 130, "meta": {} },
+					{ "char": "[BS]", "delay": 200, "meta": {} }
+				]}
+			],
+			"expected": {
+			"app_day": {
+				"2024-06-01\u0001BSApp": { "chars": 3, "time_ms": 480 }
+			},
+				"errors_bs_total": 1,
+				"last_cur_word": "h",
+				"last_p1": "[BS]"
+			}
+		},
+		{
+			"id": "typing_with_word_boundary",
+			"description": "Type 'hi' then space — space is a separator, cur_word resets, prev_word set",
+			"events": [
+				{ "type": "typing", "app": "WordApp", "timestamp": "2024-06-01 11:00:00.000", "events": [
+					{ "char": "h", "delay": 100, "meta": {} },
+					{ "char": "i", "delay": 100, "meta": {} },
+					{ "char": " ", "delay": 150, "meta": {} }
+				]}
+			],
+			"expected": {
+				"app_day": {
+					"2024-06-01\u0001WordApp": { "chars": 3, "time_ms": 350 }
+				},
+				"last_cur_word": "",
+				"last_prev_word": "hi",
+				"chars_class_space": 1,
+				"chars_class_letter": 2
+			}
+		},
+		{
+			"id": "synthetic_hotstring_trigger",
+			"description": "A synthetic hotstring expansion event is counted as hs_chars + hs_triggers",
+			"events": [
+				{ "type": "typing", "app": "HsApp", "timestamp": "2024-06-01 12:00:00.000", "events": [
+					{ "char": "a", "delay": 100, "meta": {} },
+					{ "char": "x", "delay": 50, "meta": { "s": true, "st": "hotstring" } },
+					{ "char": "y", "delay": 50, "meta": { "s": true, "st": "hotstring" } }
+				]}
+			],
+			"expected": {
+				"app_day": {
+					"2024-06-01\u0001HsApp": { "chars": 1, "hs_chars": 2, "hs_triggers": 1 }
+				},
+				"hourly_c": 1
+			}
+		},
+		{
+			"id": "synthetic_llm_trigger",
+			"description": "A synthetic LLM prediction event is counted as llm_chars + llm_triggers",
+			"events": [
+				{ "type": "typing", "app": "LlmApp", "timestamp": "2024-06-01 13:00:00.000", "events": [
+					{ "char": "a", "delay": 100, "meta": {} },
+					{ "char": "x", "delay": 50, "meta": { "s": true, "st": "llm" } },
+					{ "char": "y", "delay": 50, "meta": { "s": true, "st": "llm" } }
+				]}
+			],
+			"expected": {
+				"app_day": {
+					"2024-06-01\u0001LlmApp": { "chars": 1, "llm_chars": 2, "llm_triggers": 1 }
+				},
+				"hourly_c": 1
+			}
+		},
+		{
+			"id": "typing_with_think_pause",
+			"description": "A delay > think_pause_ms but < max_keystroke_delay_ms counts as a think pause without breaking n-grams",
+			"events": [
+				{ "type": "typing", "app": "PauseApp", "timestamp": "2024-06-01 14:00:00.000", "events": [
+					{ "char": "a", "delay": 100, "meta": {} },
+					{ "char": "b", "delay": 100, "meta": {} },
+					{ "char": "c", "delay": 3000, "meta": {} }
+				]}
+			],
+			"expected": {
+				"app_day": {
+					"2024-06-01\u0001PauseApp": { "chars": 3, "pauses": 1, "think_time_ms": 3000, "time_ms": 200 }
+				},
+				"last_p1": "c",
+				"last_cur_word": "abc"
+			}
+		},
+		{
+			"id": "app_switch_accumulates_duration",
+			"description": "An app_switch event credits app_time for the previous app",
+			"events": [
+				{ "type": "app_switch", "prev_app": "AppA", "next_app": "AppB", "timestamp": "2024-06-01 15:00:00.000", "duration_ms": 5000 },
+				{ "type": "app_switch", "prev_app": "AppA", "next_app": "AppC", "timestamp": "2024-06-01 15:00:05.000", "duration_ms": 3000 }
+			],
+			"expected": {
+				"app_time_count": 1,
+				"app_time_ms_total": 8000,
+				"switches_to_count": 2
+			}
+		},
+		{
+			"id": "window_switch_credits_title_ms",
+			"description": "A window_switch event credits title focus time",
+			"events": [
+				{ "type": "window_switch", "app": "TestApp", "prev_title": "Window1", "timestamp": "2024-06-01 16:00:00.000", "duration_ms": 12000 }
+			],
+			"expected": {
+				"titles_count": 1,
+				"titles_ms_total": 12000
+			}
+		},
+		{
+			"id": "system_event_wifi_change",
+			"description": "A wifi_change system event increments wifi_changes",
+			"events": [
+				{ "type": "system_event", "action": "wifi_change", "timestamp": "2024-06-01 08:00:00.000" },
+				{ "type": "system_event", "action": "wifi_change", "timestamp": "2024-06-01 08:01:00.000" }
+			],
+			"expected": {
+				"system_day_wifi_changes": 2
+			}
+		},
+		{
+			"id": "system_event_modifier_hold",
+			"description": "A modifier_hold event accumulates kc_hold stats",
+			"events": [
+				{ "type": "system_event", "action": "modifier_hold", "keycode": 56, "app": "TestApp", "hold_ms": 300, "timestamp": "2024-06-01 09:00:00.000" },
+				{ "type": "system_event", "action": "modifier_hold", "keycode": 56, "app": "TestApp", "hold_ms": 200, "timestamp": "2024-06-01 09:00:01.000" }
+			],
+			"expected": {
+				"kc_hold_count": 2,
+				"kc_hold_sum_ms": 500,
+				"kc_hold_max_ms": 300
+			}
+		},
+		{
+			"id": "system_event_manifest_increment_hs",
+			"description": "A manifest_increment for hs_suggested accumulates into app_day",
+			"events": [
+				{ "type": "system_event", "action": "manifest_increment", "stat": "hs_suggested", "amount": 1, "app": "TestApp", "timestamp": "2024-06-01 10:00:00.000" },
+				{ "type": "system_event", "action": "manifest_increment", "stat": "hs_suggested", "amount": 1, "app": "TestApp", "timestamp": "2024-06-01 10:00:01.000" }
+			],
+			"expected": {
+				"app_day_hs_suggested": 2
+			}
+		},
+		{
+			"id": "synthetic_hotstring_backspace_keeps_gross_output",
+			"description": "Synthetic trigger backspaces populate input separately without reducing gross hotstring output",
+			"events": [
+				{ "type": "typing", "app": "GrossHsApp", "timestamp": "2024-06-01 13:30:00.000", "events": [
+					{ "char": "b", "delay": 100, "meta": {} },
+					{ "char": "t", "delay": 80, "meta": {} },
+					{ "char": "w", "delay": 80, "meta": {} },
+					{ "char": "[BS]", "delay": 0, "meta": { "s": true, "st": "hotstring" } },
+					{ "char": "[BS]", "delay": 0, "meta": { "s": true, "st": "hotstring" } },
+					{ "char": "[BS]", "delay": 0, "meta": { "s": true, "st": "hotstring" } },
+					{ "char": "e", "delay": 0, "meta": { "s": true, "st": "hotstring" } },
+					{ "char": "x", "delay": 0, "meta": { "s": true, "st": "hotstring" } },
+					{ "char": "p", "delay": 0, "meta": { "s": true, "st": "hotstring" } },
+					{ "char": "a", "delay": 0, "meta": { "s": true, "st": "hotstring" } },
+					{ "char": "n", "delay": 0, "meta": { "s": true, "st": "hotstring" } },
+					{ "char": "d", "delay": 0, "meta": { "s": true, "st": "hotstring" } },
+					{ "char": "e", "delay": 0, "meta": { "s": true, "st": "hotstring" } },
+					{ "char": "d", "delay": 0, "meta": { "s": true, "st": "hotstring" } }
+				]}
+			],
+			"expected": {
+				"app_day": {
+					"2024-06-01\u0001GrossHsApp": { "chars": 3, "hs_chars": 8, "hs_input_chars": 3, "hs_triggers": 1 }
+				}
+			}
+		},
+		{
+			"id": "mixed_batch_typing_and_system",
+			"description": "A batch combining typing + system events exercises cross-walker shared ergo row",
+			"events": [
+				{ "type": "typing", "app": "MixedApp", "timestamp": "2024-07-02 09:00:00.000", "events": [
+					{ "char": "a", "delay": 100, "meta": {} }
+				]},
+				{ "type": "system_event", "action": "focus_first_key", "app": "MixedApp", "latency_ms": 300, "timestamp": "2024-07-02 09:00:01.000" }
+			],
+			"expected": {
+				"app_day_chars": 1,
+				"ergo_focus_sum_ms": 300,
+				"ergo_focus_count": 1
+			}
+		}
+	]
+}

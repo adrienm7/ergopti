@@ -1,0 +1,2296 @@
+_meta.flag	🇳🇴
+_meta.locale	no
+_meta.name	Norsk
+app_category.business	Forretning
+app_category.development	Utvikling
+app_category.education	Utdanning
+app_category.entertainment	Underholdning
+app_category.finance	Økonomi
+app_category.games	Spill
+app_category.graphics_design	Grafikk & design
+app_category.health	Helse & Sport
+app_category.lifestyle	Livsstil
+app_category.medical	Medisinsk
+app_category.music	Musikk
+app_category.navigation	Navigasjon
+app_category.news	Nyheter
+app_category.photography	Fotografi
+app_category.productivity	Produktivitet
+app_category.reference	Referanse
+app_category.social	Sosiale medier
+app_category.sports	Sport
+app_category.travel	Reise
+app_category.utility	Verktøy
+app_category.video	Video
+app_category.weather	Vær
+app_picker.add_another_app	+ Legg til et annet program…
+app_picker.exclude_current	Utelat {app} (gjeldende)
+app_picker.no_app_excluded	Ingen apper å ekskludere
+app_picker.search_placeholder	Søk etter en app…
+apps.cloner.btn_back	Tilbake
+apps.cloner.btn_browse	Bla gjennom…
+apps.cloner.btn_choose	Velg
+apps.cloner.btn_clone	Klon app
+apps.cloner.btn_custom_icon	Egendefinert
+apps.cloner.btn_native_clone	Klon nativ app
+apps.cloner.btn_open_log	Åpne logg
+apps.cloner.btn_pwa_recommended	PWA (anbefalt)
+apps.cloner.btn_pwa_webapp	PWA nettapp
+apps.cloner.btn_tint_icon	Fargetone
+apps.cloner.btn_try_native	Prøv nativt
+apps.cloner.btn_validate	Valider
+apps.cloner.lbl_progress_dock	Registrerer i Dock…
+apps.cloner.lbl_progress_done	Ferdig
+apps.cloner.lbl_progress_icon	Genererer tonet ikon…
+apps.cloner.lbl_progress_prep	Forbereder ikon og bundle
+apps.cloner.lbl_progress_sign	Ad-hoc signering av bundle…
+apps.cloner.lbl_progress_title	Oppretter klon…
+apps.cloner.msg_bundle_missing	Feil: bundle-sti mangler. Start appen normalt.
+apps.cloner.title_clone_name	Klonnavn
+apps.cloner.title_error	Oppretting av klon mislyktes
+apps.cloner.title_icon_style	Ikonstil
+apps.cloner.title_open_arg	Element å åpne ved oppstart
+apps.cloner.title_pwa_mode	PWA-modus?
+apps.cloner.title_pwa_recommended	PWA-modus anbefalt
+apps.cloner.title_pwa_url	PWA-URL
+apps.cloner.title_summary	Oversikt
+apps.cloner.title_tint	Fargetone
+apps.cloner.title_url_path	URL eller sti
+apps.encryptor.btn_overwrite	Overskriv
+apps.encryptor.btn_reveal	Vis i Finder
+apps.encryptor.err_decrypt_failed	Dekryptering mislyktes. Feil passord eller skadet fil?
+apps.encryptor.err_empty_password	Passordet kan ikke være tomt.
+apps.encryptor.err_encrypt_failed	Kryptering mislyktes.
+apps.encryptor.err_file_missing	Filen ble ikke funnet.
+apps.encryptor.err_openssl_missing	openssl ikke funnet. Installer Xcode Command Line Tools.
+apps.encryptor.err_password_mismatch	Passordene stemmer ikke overens.
+apps.encryptor.lbl_file	Fil:
+apps.encryptor.prompt_confirm	Bekreft passord:
+apps.encryptor.prompt_password	Passord:
+apps.encryptor.success_decrypted	Fil dekryptert:
+apps.encryptor.success_encrypted	Fil kryptert:
+apps.encryptor.title_decrypt	Dekrypter fil
+apps.encryptor.title_encrypt	Krypter fil
+apps.encryptor.warn_overwrite	En destinasjonsfil finnes allerede. Overskriv?
+autocorrection.accents	Automatisk aksenkorreksjon
+autocorrection.caps	Automatisk stor forbokstav i setning
+autocorrection.errors	Korrigering av vanlige skrivefeil
+autocorrection.minus	Automatisk innsetting av minustegn
+autocorrection.minusapostrophe	Minus etterfulgt av apostrof
+autocorrection.multiplepunctuationmarks	Flere punktum → ellipse (... = …)
+autocorrection.names	Korrigering av store bokstaver i egennavn
+autocorrection.ou	ou / où korrigering
+autocorrection.suffixesachaining	Sammenkobling av suffikser med à
+autocorrection.typographicapostrophe	Typografisk apostrof (rett → buet)
+ax_actions.brightness	☀ Lysstyrke
+ax_actions.char	A Tegn
+ax_actions.char_sel	✎ A Valgte tegn
+ax_actions.desktops	▢ Skrivebord
+ax_actions.document	📄 Dokument (start/slutt)
+ax_actions.line_arrow	↕ Linjer (Piler)
+ax_actions.line_bounds	↔ Linje (start/slutt)
+ax_actions.line_sel	✎ ↕ Valgte linjer
+ax_actions.lines	↕ Linjer (Alt)
+ax_actions.paragraphs	¶ Avsnitt
+ax_actions.spaces	▢ Spaces
+ax_actions.tabs	⧉ Faner
+ax_actions.tracks	♫ Spor
+ax_actions.volume	🔊 Volum
+ax_actions.windows	◱ Vinduer
+ax_actions.words	W Ord
+ax_actions.words_sel	✎ W Valgte ord
+button.activate	Aktiver
+button.add	Legg til
+button.cancel	Avbryt
+button.close	Lukk
+button.confirm	Bekreft
+button.decrypt	Dekrypter
+button.delete	Slett
+button.encrypt	Krypter
+button.ok	OK
+button.open_settings	Åpne innstillinger
+button.remove	Fjern
+button.retry	Prøv igjen
+button.save	Lagre
+category.autocorrection	Autokorrektur
+category.distances_reduction	Avstandsreduksjon
+category.dynamic_hotstrings	Dynamiske hotstrings
+category.gestures	🖐️ Gester
+category.layout	🌐 Tastaturoppsett
+category.magic_key	★ tast og tekstutvidelse
+category.personal	Personlige hotstrings
+category.rolls	Ruller
+category.sfbs_reduction	SFB-reduksjon
+category.shortcuts	🎯 Snarveier
+category.tapholds	⌨️ Tap-Holds
+changelog_window.badge_latest	latest
+changelog_window.badge_prerelease	pre-release
+changelog_window.channel_dev	Dev
+changelog_window.channel_stable	Stable
+changelog_window.error_network	Unable to load releases from GitHub.\nCheck your internet connection.
+changelog_window.error_parse	Unable to parse GitHub response.
+changelog_window.error_rate_limited	Unable to load releases from GitHub.\nGitHub is limiting requests — please try again in a few minutes.
+changelog_window.loading	Loading releases…
+changelog_window.no_notes	(No release notes available.)
+changelog_window.no_releases	No releases found.
+changelog_window.open_github	View on GitHub ↗
+changelog_window.retry	Retry
+changelog_window.window_title	Release Notes
+common.browse	Bla gjennom…
+common.cancel	Avbryt
+common.close	Lukk
+common.delete	Slett
+common.disabled	Deaktivert
+common.error_prefix	Feil — 
+common.error_title	Feil
+common.key_enter	Enter
+common.later	Senere
+common.loading	Laster…
+common.none	Ingen
+common.ok	OK
+common.save	Lagre
+common.saved	Lagret ✓
+common.warning	Advarsel
+crash.report.save_failed	Krasjrapporten kunne ikke lagres
+crash.report.saved_title	Krassjrapport lagret
+dialog.action_picker.disabled	∅ Ingenting
+dialog.action_picker.label	Handling:
+dialog.action_picker.no_results	Ingen samsvarende handling
+dialog.action_picker.search	Søk etter en handling…
+dialog.app_picker.active_suffix	 (aktiv)
+dialog.app_picker.prompt	Velg programmer:
+dialog.app_picker.running_count	{n} kjørende program(er).
+dialog.app_picker.stopped_suffix	 (stoppet)
+dialog.app_picker.title	Programvalg
+dialog.bulk_toggle.save_failed	The change could not be saved to the configuration file.\nIt has been reverted. Close any app holding the file and try again.
+dialog.config_folder.hint	Alle personlige filer (personal_shortcuts.ahk, personal_hotstrings.toml…) blir søkt i denne mappen. La være tom for å bruke standardmappen.
+dialog.config_folder.label	Sti:
+dialog.config_folder.select_title	Velg konfigurasjonsmappe
+dialog.config_folder.title	ErgoptiPlus — Konfigurasjonsmappe
+dialog.enable_all.warning	⚠ ADVARSEL: Alle funksjoner er aktivert, inkludert noen som er deaktivert som standard.
+dialog.fatal_error.cannot_start	Ergopti+ kan ikke starte.
+dialog.fatal_error.toml_key_missing	Fatal feil: _shared/modules/tooltip/constants.toml — manglende eller ugyldig nøkkel: [{1}] {2}
+dialog.fatal_error.toml_not_found	Fatal feil: _shared/modules/tooltip/constants.toml ikke funnet.
+dialog.gestures.auto_configure_error	Feil ved skriving til registeret.\n\nForsøk å kjøre skriptet som administrator,\neller konfigurer manuelt (se Instruksjoner).
+dialog.gestures.auto_configure_error_title	ErgoptiPlus — Feil
+dialog.gestures.auto_configure_success	Gesterkonfigurasjonen ble brukt.\n\nDe 10 gestene er konfigurert i Windows-registeret\n(Ctrl+Win+Shift+F1 til F10).\n\nEn av/pålogging kan være nødvendig for\nat Windows skal hente de nye snarveiene.
+dialog.gestures.auto_configure_title	ErgoptiPlus — Gesterkonfigurasjonen
+dialog.gestures.warning_msg	⚠️ Advarsel: Aktivering av trackpad-gester kan forstyrre systemgester.\n\nFor å unngå konflikter, deaktiver følgende macOS-alternativer:\n\n• 2-fingers trackpad-gester: deaktiver scroll og swipe hvis du vil bruke dem i Hammerspoon.\n• 3-fingers trackpad-gester for å flytte vinduer og velge tekst\n• 3-fingers tap for å slå opp ord i ordbok\n• 3-fingers horisontal/vertikal swipe for å bytte mellom rom, aktivere App Exposé eller Mission Control\n• 4-fingers horisontal/vertikal swipe for å bytte mellom rom, aktivere App Exposé eller Mission Control\n\nDet er viktig å deaktivere 4-fingers systemgester for å definere 5-fingers gester. Ellers ville ikke macOS skille mellom dem og ville forhindre 5-fingers gester fra å fungere. Derfor er standard 4-fingers gester omdefinert i Gester-modulen for å gjenopprette systemfunksjoner uten konflikt med 5-fingers gester.
+dialog.gestures.warning_title	Gesteradvarsel
+dialog.gpt_link.title	Rediger lenke åpnet av Win + G
+dialog.hotstrings.consume_body	Skal utløsertegnet forbrukes (ikke skrives) under utvidelse?
+dialog.hotstrings.consume_checkbox	Consume (do not retype the character)
+dialog.hotstrings.consume_no	Nei — skriv tegnet
+dialog.hotstrings.consume_title	Utløseratferd
+dialog.hotstrings.consume_yes	Ja — forbruk det
+dialog.hotstrings.delete_body	Er du sikker på at du vil slette denne egendefinerte ekspanderen?
+dialog.hotstrings.delete_delimiter_body	Are you sure you want to delete this custom delimiter?
+dialog.hotstrings.delete_delimiter_title	Delete delimiter
+dialog.hotstrings.delete_title	Slett ekspander
+dialog.hotstrings.invalid_body	Vennligst skriv inn nøyaktig ett tegn.
+dialog.hotstrings.invalid_title	Ugyldig input
+dialog.hotstrings.new_delimiter_prompt	Skilletegn
+dialog.hotstrings.new_delimiter_title	New word delimiter
+dialog.hotstrings.new_prompt	Skriv inn utløsertegnet (nøyaktig ett tegn):
+dialog.hotstrings.new_title	Ny ordekspander
+dialog.keyboard_shortcut.prompt	Velg tastaturkombinasjon:
+dialog.keyboard_shortcut.title_prefix	Velg en tast — 
+dialog.llm.delete_profile_prefix	Slett "
+dialog.llm.delete_title	Slett modell?
+dialog.llm.exclude_ok	Lagre
+dialog.llm.exclude_prompt	Velg programmene der AI-generering vil være deaktivert.
+dialog.magic_key.prompt	Ny verdi (★ som standard):
+dialog.magic_key.title	Rediger magisk tast
+dialog.metrics.bad_password_warning	⚠️ Advarsel: Dekrypteringsfeil oppdaget. Passordet kan være feil.
+dialog.metrics.complete_label	Operasjonen er fullført.\n\nFiler behandlet med suksess: %d\nFeil oppstod: %d
+dialog.metrics.decrypt_confirm_body	Alle dine krypterte logger blir gjenopprettet som klartekst på disk.\n\nBekreft?
+dialog.metrics.decrypt_confirm_title	Deaktivering
+dialog.metrics.decrypt_key_prompt	Skriv inn sikkerhetsnøkkelen som kreves for dekryptering:
+dialog.metrics.disable_confirm	Deaktiver metrikker?\n\nTastaturloggeren vil ikke lenger registrere noen tastetrykk. Allerede registrerte data blir bevart.
+dialog.metrics.enable_warning	ADVARSEL: Du er i ferd med å aktivere keyloggeren.\n\nDen registrerer tastetrykkene dine på millisekundet. Loggene lagres lokalt under:\n    {1}\n\nPassordfelt ignoreres automatisk (UIA-filter), og tasteinnholdet forkastes også mens du befinner deg i et privat/inkognito nettleservindu. Likevel forblir dette en keylogger — sett skriptet på PAUSE når du legger inn sensitive data utenfor disse kontekstene.\n\nAktivere?
+dialog.metrics.encrypt_confirm_body	Aktivering av dette vil kryptere alle dine eksisterende logger slik at de blir ulestbare på disk.\n\nBekreft?
+dialog.metrics.encrypt_confirm_title	Datavern
+dialog.metrics.encrypt_key_prompt	Definer krypteringsnøkkelen (standard: Mac-serienummer):
+dialog.metrics.encrypt_key_title	Sikkerhetsnøkkel
+dialog.metrics.encryptor_error_body	Programmet ble ikke funnet. Vennligst generer det først ved hjelp av Python-skriptet.
+dialog.metrics.encryptor_error_title	Feil
+dialog.metrics.exclude_ok	Lagre
+dialog.metrics.exclude_prompt	Velg programmene hvis tastetrykk aldri skal logges av tastaturloggeren.
+dialog.metrics.exclude_title	Ekskluder programmer — Metrikker
+dialog.metrics.progress_label	Behandler: %d / %d
+dialog.metrics.security_warning_body	⚠️  ADVARSEL: Metrikker og tastaturlogg er i ferd med å aktiveres.\n\nDette systemet registrerer dine tastetrykk og trackpad-gesteraktiverin.\n\n• Logger lagres i Hammerspoon-mappen\n• Passordsfelt ignoreres automatisk\n• Det anbefales å PAUSE skriptet når du skriver inn sensitiv data
+dialog.metrics.security_warning_title	⚠ Sikkerhetsadvarsel — Metrikker
+dialog.metrics.title	📊 Metrikker
+dialog.path_copy.btn_backslash	&Omvendt skråstrek (\\)
+dialog.path_copy.btn_quit	&Avslutt
+dialog.path_copy.msg_simple	Stien\n%s\ner kopiert til utklippstavlen.
+dialog.path_copy.msg_with_question	Stien\n%s\ner kopiert til utklippstavlen.\n\nVil du ha versjonen med \\ i stedet for / ?
+dialog.path_copy.title	Kopier sti
+dialog.personal_info.saved	Oppdaterte detaljer:
+dialog.personal_info.title	Rediger personlige opplysninger
+dialog.reset_defaults.failed	Could not reset: these files could not be deleted ({1}).\nClose any app holding them (editor, cloud sync) and try again.
+dialog.reset_defaults.failed_title	Reset failed
+dialog.reset_defaults.placeholder_failed	The configuration was reset, but the placeholder could not be written.\nThe setup wizard will run on the next start.
+dialog.shortcuts.chatgpt_prompt	URL åpnet av Ctrl+G:
+dialog.shortcuts.chatgpt_title	ChatGPT-URL
+dialog.shortcuts.wrap_symbol_close_prompt	Angi det avsluttende symbolet (la stå tomt = symmetrisk):
+dialog.shortcuts.wrap_symbol_close_title	Avsluttende symbol
+dialog.shortcuts.wrap_symbol_invalid	Angi nøyaktig ett tegn.
+dialog.shortcuts.wrap_symbol_prompt	Angi et åpningssymbol (1 tegn):
+dialog.shortcuts.wrap_symbol_title	Legg til et omsluttende symbol
+distancesreduction.commafarletters	Komma + fjern tast (,è = z, ,é = …)
+distancesreduction.commaj	Komma + vokal → J (,a = ja, ,e = je…)
+distancesreduction.deadkeyecircumflex	Ê + bokstav → dødtast (êo = ô, êa = â…)
+distancesreduction.ecircumflexe	Ê + E → Œ
+distancesreduction.qu	Q → QU foran vokal
+distancesreduction.spacearoundsymbols	Automatiske mellomrom rundt roll-symboler
+distancesreduction.suffixesa	À + bokstav → suffiks (às = -ement, àé = -ée…)
+download_window.btn_cancel	🛑 Avbryt
+download_window.btn_retry	🔄 Prøv nedlastning igjen
+download_window.btn_terminal	🖥 Terminal
+download_window.cancelling	Avbryter…
+download_window.done_failed	Nedlastning mislyktes
+download_window.done_success	✅ Ferdig
+download_window.error_unknown	Ukjent feil.
+download_window.eta_label	⏳ Gjenstående tid:
+download_window.file_count	📁 Filer: %s
+download_window.kind_mlx_install	⚙️ AI-motorinstallasjon (MLX)
+download_window.kind_mlx_model	📥 MLX-modellnedlastning
+download_window.kind_ollama_install	⚙️ AI-motorinstallasjon (Ollama)
+download_window.kind_ollama_model	📥 Ollama-modellnedlastning
+download_window.preparing	Forbereder…
+download_window.size_label	📦 Størrelse: 
+download_window.speed_label	⚡ Hastighet: 
+download_window.starting	Starter…
+download_window.title	📥 Nedlasting pågår
+download_window.window_title	Progresjon
+dynamichotstrings.date	Dato
+dynamichotstrings.datefr	Dato (fr)
+dynamichotstrings.datelongfr	Dato (lang)
+dynamichotstrings.group_label	Dynamiske hotstrings
+dynamichotstrings.ibanprefixes	IBAN-prefikser
+dynamichotstrings.phoneprefixes	Telefonprefikser
+dynamichotstrings.ssnprefixes	SSN-prefikser
+dynamichotstrings.textexpansionpersonalinformation	@np★ = Etternavn ⇥ Fornavn — hver bokstav = et felt (n=Etternavn, p=Fornavn, e=E-post…)
+editor.hotstrings.add_entry_title	Opprett hotstring — Seksjon « %s »
+editor.hotstrings.btn_add	➕ Legg til
+editor.hotstrings.btn_add_entry	＋ Add a hotstring
+editor.hotstrings.btn_add_section	＋ Seksjon
+editor.hotstrings.btn_delete	Slett
+editor.hotstrings.btn_delete_entry	🗑 Slett
+editor.hotstrings.btn_edit	💾 Rediger
+editor.hotstrings.btn_new	Ny…
+editor.hotstrings.btn_redefine	Redefine
+editor.hotstrings.btn_rename	Endre navn…
+editor.hotstrings.btn_view_compact	Compact view
+editor.hotstrings.btn_view_expanded	Expanded view
+editor.hotstrings.bulk_move_placeholder	Flytt til…
+editor.hotstrings.bulk_selected_one	selected
+editor.hotstrings.bulk_selected_other	selected
+editor.hotstrings.cb_auto	Auto-ekspandér
+editor.hotstrings.cb_case	Skiller mellom store og små bokstaver
+editor.hotstrings.cb_final	Sluttresultat
+editor.hotstrings.cb_word	Helt ord
+editor.hotstrings.chk_case	Skiller mellom store og små bokstaver
+editor.hotstrings.chk_close_after	Lukk etter
+editor.hotstrings.chk_final	Sluttresultat
+editor.hotstrings.chk_word	Helt ord
+editor.hotstrings.cmd_backspace	delete ←
+editor.hotstrings.cmd_delete	delete →
+editor.hotstrings.cmd_down	down
+editor.hotstrings.cmd_end	line end
+editor.hotstrings.cmd_enter	new line
+editor.hotstrings.cmd_escape	Escape
+editor.hotstrings.cmd_group_arrows	Arrows
+editor.hotstrings.cmd_group_edition	Edition
+editor.hotstrings.cmd_home	line start
+editor.hotstrings.cmd_left	left
+editor.hotstrings.cmd_right	right
+editor.hotstrings.cmd_tab	tab
+editor.hotstrings.cmd_up	up
+editor.hotstrings.col_auto	Auto
+editor.hotstrings.col_case	Versaler
+editor.hotstrings.col_final	Endelig
+editor.hotstrings.col_priority	Prio
+editor.hotstrings.col_result	Resultat
+editor.hotstrings.col_trigger	Utløser
+editor.hotstrings.col_word	Ord
+editor.hotstrings.confirm_del_bulk	Slett %d valgte element(er)?
+editor.hotstrings.confirm_del_entry	Slett « %s »?
+editor.hotstrings.confirm_del_section	Slett « %s » og alle dens hotstrings?
+editor.hotstrings.desc_auto_off	Requires Space or Enter to expand (recommended for autocorrect).
+editor.hotstrings.desc_auto_on	Expands immediately (ideal for triggers ending with %s).
+editor.hotstrings.desc_case_off	The engine generates lowercase, Titlecase and UPPERCASE variants.
+editor.hotstrings.desc_case_on	Strictly distinguishes uppercase/lowercase.<br>Ex: <em>Btw</em> ≠ <em>btw</em>
+editor.hotstrings.desc_final_off	The result can trigger other hotstrings in cascade.
+editor.hotstrings.desc_final_on	The result will not be re-parsed as a trigger.
+editor.hotstrings.desc_prompt	Beskrivelse som vises i menyen for denne delen:
+editor.hotstrings.desc_title	Beskrivelse
+editor.hotstrings.desc_word_off	Triggers anywhere, even inside a word.<br>Ex: will trigger inside <em>hotel</em>
+editor.hotstrings.desc_word_on	Only triggers when it matches a standalone word.<br>Ex: <em>tel</em>→telephone but not <em>hotel</em>
+editor.hotstrings.drag_handle_title	Drag
+editor.hotstrings.edit_entry_title	Rediger en hotstring — Del « %s »
+editor.hotstrings.empty_hint	Ingen hotstrings definert. Klikk + Seksjon for å komme i gang. ☰ dra for å omorganisere — klikk tittelen for å endre navn
+editor.hotstrings.entry_modal_title_new	Ny hotstring
+editor.hotstrings.err_duplicate	⚠ Denne utløseren finnes allerede i denne delen.
+editor.hotstrings.err_id_exists	« %s » already exists.
+editor.hotstrings.err_id_invalid	Invalid identifier: lowercase letters, digits and underscores only.
+editor.hotstrings.err_id_required	The identifier is required.
+editor.hotstrings.err_no_section	⚠ Velg eller opprett en del først.
+editor.hotstrings.err_no_section_selected	Ingen del valgt.
+editor.hotstrings.err_output_empty	The replacement is required.
+editor.hotstrings.err_section_exists	Denne delen finnes allerede.
+editor.hotstrings.err_select_to_delete	⚠ Velg en hotstring for å slette.
+editor.hotstrings.err_select_to_edit	⚠ Velg en hotstring for å redigere.
+editor.hotstrings.err_trigger_dup_msg	The trigger <strong>%s</strong> already exists in <em>%s</em>.<br><br>Do you really want to redefine it?
+editor.hotstrings.err_trigger_empty	The trigger is required.
+editor.hotstrings.err_trigger_required	⚠ Utløser og resultat er obligatorisk.
+editor.hotstrings.err_write	⚠ Skrivefeil i personal_hotstrings.toml.
+editor.hotstrings.group_selected	Valgt hotstring
+editor.hotstrings.kbd_help	↩ = ny linje\n⌘ + ↩ = lagre\n⇧ + ⌘ + ↩ = lagre + ny hotstring
+editor.hotstrings.label_result	Resultat:
+editor.hotstrings.label_section	Del:
+editor.hotstrings.label_trigger	Utløser:
+editor.hotstrings.meta_desc	Personlige hotstrings
+editor.hotstrings.new_section_prompt	Navn på ny del (identifikator, ingen mellomrom):
+editor.hotstrings.new_section_title	Ny del
+editor.hotstrings.no_section	(ingen del)
+editor.hotstrings.page_title	✏︎ Personlige hotstrings
+editor.hotstrings.priority_hint	tom = standardprioritet; høyere vinner
+editor.hotstrings.priority_label	Prioritet
+editor.hotstrings.rename_desc_prompt	Ny beskrivelse for del "{1}":
+editor.hotstrings.rename_title	Gi nytt navn
+editor.hotstrings.replacement_label	Erstatning
+editor.hotstrings.replacement_placeholder	f.eks.: Hallo,↵jeg håper det går bra.
+editor.hotstrings.save_error	Lagringsfeil
+editor.hotstrings.saved_prefix	✓ Lagret — 
+editor.hotstrings.sec_desc_hint	(vises i menyen)
+editor.hotstrings.sec_desc_label	Beskrivelse
+editor.hotstrings.sec_desc_placeholder	f.eks.: Mine forkortelser
+editor.hotstrings.sec_id_hint	(kun små bokstaver, tall og understreker)
+editor.hotstrings.sec_id_label	Identifikator
+editor.hotstrings.sec_id_placeholder	f.eks.: mine_forkort
+editor.hotstrings.sec_modal_title_new	Ny del
+editor.hotstrings.sec_modal_title_rename	Rename section
+editor.hotstrings.special_cmds_summary	Spesielle kommandoer — klikk for å sette inn
+editor.hotstrings.title_confirm	Bekreftelse
+editor.hotstrings.title_error	Feil
+editor.hotstrings.trig_hint_text	shown, stored as
+editor.hotstrings.trigger_label	Utløser
+editor.hotstrings.trigger_placeholder	f.eks.: btw
+editor.hotstrings.window_title	Personlig hotstrings-redigerer
+editor.personal_info.window_title	ErgoptiPlus — Personlig informasjon
+ergopti.error_caught	ErgoptiPlus — intern feil fanget:
+ergopti.windowspy_not_found	WindowSpy.ahk ble ikke funnet på følgende sted: {1}
+ext.demo.gui_message	Hei fra Ergopti-demoutvidelsen!
+ext.demo.open_demo_gui	Åpne demogrensesnitt
+ext.demo.show_info	Vis informasjon
+ext.demo.visit_docs	Besøk dokumentasjon
+gesture.setup.auto_configure	\nEllers klikk "Auto-configure" i menyen\nfor å skrive disse snarveiene direkte inn i registeret.\n(En omstart kan være nødvendig.)
+gesture.setup.for_each	For hver bevegelse, velg "Custom shortcut"\nog skriv inn snarveien som vises:\n\n
+gesture.setup.header	Konfigurasjon av touchpad-bevegelse\n════════════════════════════════════\n\n
+gesture.setup.open_path	Åpne: Innstillinger > Bluetooth og enheter > Touchpad\n         > Avanserte bevegelser\n\n
+gesture.setup.title	ErgoptiPlus — Touchpad-bevegelser
+gesture.slots.swipe_2_down	2-finger-sveip ↓
+gesture.slots.swipe_2_left	2-finger-sveip ←
+gesture.slots.swipe_2_left_down	2-finger-sveip ↙
+gesture.slots.swipe_2_left_up	2-finger-sveip ↖
+gesture.slots.swipe_2_right	2-finger-sveip →
+gesture.slots.swipe_2_right_down	2-finger-sveip ↘
+gesture.slots.swipe_2_right_up	2-finger-sveip ↗
+gesture.slots.swipe_2_up	2-finger-sveip ↑
+gesture.slots.swipe_3_down	3-finger-sveip ↓
+gesture.slots.swipe_3_left	3-finger-sveip ←
+gesture.slots.swipe_3_left_down	3-finger-sveip ↙
+gesture.slots.swipe_3_left_up	3-finger-sveip ↖
+gesture.slots.swipe_3_right	3-finger-sveip →
+gesture.slots.swipe_3_right_down	3-finger-sveip ↘
+gesture.slots.swipe_3_right_up	3-finger-sveip ↗
+gesture.slots.swipe_3_up	3-finger-sveip ↑
+gesture.slots.swipe_4_down	4-finger-sveip ↓
+gesture.slots.swipe_4_left	4-finger-sveip ←
+gesture.slots.swipe_4_left_down	4-finger-sveip ↙
+gesture.slots.swipe_4_left_up	4-finger-sveip ↖
+gesture.slots.swipe_4_right	4-finger-sveip →
+gesture.slots.swipe_4_right_down	4-finger-sveip ↘
+gesture.slots.swipe_4_right_up	4-finger-sveip ↗
+gesture.slots.swipe_4_up	4-finger-sveip ↑
+gesture.slots.swipe_5_diag	5-finger-sveip ↗↙
+gesture.slots.swipe_5_down	5-finger-sveip ↓
+gesture.slots.swipe_5_horiz	5-finger-sveip ↔
+gesture.slots.swipe_5_left	5-finger-sveip ←
+gesture.slots.swipe_5_left_down	5-finger-sveip ↙
+gesture.slots.swipe_5_left_up	5-finger-sveip ↖
+gesture.slots.swipe_5_right	5-finger-sveip →
+gesture.slots.swipe_5_right_down	5-finger-sveip ↘
+gesture.slots.swipe_5_right_up	5-finger-sveip ↗
+gesture.slots.swipe_5_up	5-finger-sveip ↑
+gesture.slots.tap_2	2-finger-trykk
+gesture.slots.tap_3	3-finger-trykk
+gesture.slots.tap_4	4-finger-trykk
+gesture.slots.tap_5	5-finger-trykk
+gesture.touchpad_open.body	Touchpad-siden er åpen.\n\nScroll ned, og klikk deretter\n"Avanserte bevegelser" for å få tilgang til snarveiene.
+gestures.conflict_desc_swipe_2	2-finger-sveip — Rulling, sider, Mission Control
+gestures.conflict_desc_swipe_3_horiz	3-finger-sveip venstre/høyre — Sider / Bytt mellom områder
+gestures.conflict_desc_swipe_3_vert	3-finger-sveip opp/ned — Mission Control & App Exposé
+gestures.conflict_desc_swipe_4_horiz	4/5-finger-sveip venstre/høyre — Bytt mellom områder
+gestures.conflict_desc_swipe_4_vert	4/5-finger-sveip opp/ned — Mission Control & App Exposé
+gestures.conflict_desc_tap_3	3-finger-trykk — Oppslåing og datadetektorer
+gestures.conflict_dialog_line1	Denne bevegelsen kan håndteres av macOS:
+gestures.conflict_dialog_line2	I så fall vil macOS og Hammerspoon reagere samtidig:
+gestures.conflict_dialog_line3	Begge handlingene vil bli utløst samtidig.
+gestures.conflict_dialog_line4	Hvis den fortsatt er aktiv, deaktiver den her:
+gestures.conflict_hint_swipe_2	Systeminnstillinger › Trackpad\n→ Avmerk 2-finger-bevegelser hvis du vil bruke dem i Hammerspoon.
+gestures.conflict_hint_swipe_3_horiz	Systeminnstillinger › Trackpad › Flere bevegelser\n→ Avmerk "Sveip mellom sider" og "Bytt mellom områder"
+gestures.conflict_hint_swipe_3_vert	Systeminnstillinger › Trackpad › Flere bevegelser\n→ Avmerk "Mission Control" og "App Exposé"
+gestures.conflict_hint_swipe_4_horiz	Systeminnstillinger › Trackpad › Flere bevegelser\n→ Avmerk "Bytt mellom områder"
+gestures.conflict_hint_swipe_4_vert	Systeminnstillinger › Trackpad › Flere bevegelser\n→ Avmerk "Mission Control" og "App Exposé"
+gestures.conflict_hint_tap_3	Systeminnstillinger › Trackpad › Peker og klikking\n→ Avmerk "Oppslåing og datadetektorer"
+gestures.enabled	Touchpad-bevegelser (krever Windows-konfigurasjon)
+healthcheck.copy_and_close	Kopier til utklippstavle og lukk
+hotstrings.custom_terminator	Egendefinert
+hotstrings.custom_terminator_consumed	Egendefinert (konsumert)
+hotstrings.shortcut_custom	Egendefinert snarvei
+hs_config.btn_all_gray	Alt grått
+hs_config.btn_all_grey	Alt grått
+hs_config.btn_close	Lukk
+hs_config.btn_reset_all	Tilbakestill alle
+hs_config.btn_reset_default	Gjenopprett standard
+hs_config.cat_autocorrection	Autokorrektur
+hs_config.cat_distances	Avstandsreduksjon
+hs_config.cat_magickey	★ tast og utvidelse
+hs_config.cat_personal	Personlige hotstrings
+hs_config.cat_rolls	Ruller
+hs_config.cat_sfbs	SFB-reduksjon
+hs_config.category_prefix	Kategori: 
+hs_config.color_blue	Blå
+hs_config.color_brown	Brun
+hs_config.color_cyan	Cyan
+hs_config.color_gray	Grå
+hs_config.color_green	Grønn
+hs_config.color_indigo	Indigo
+hs_config.color_inherit	— arver standard —
+hs_config.color_lime	Limegrønn
+hs_config.color_orange	Oransje
+hs_config.color_pink	Rosa
+hs_config.color_purple	Lilla
+hs_config.color_red	Rød
+hs_config.color_turquoise	Turkis
+hs_config.color_yellow	Gul
+hs_config.default_prefix	Standard: 
+hs_config.delim_space	Space
+hs_config.delim_tab	Tab
+hs_config.file_level	── Filnivå ──
+hs_config.file_level_short	(filnivå)
+hs_config.group_common	Felles
+hs_config.group_extensions	Utvidelser
+hs_config.group_personal	Personlig
+hs_config.hint	Juster etter kategori eller del. Alle endringer lagres umiddelbart.
+hs_config.label_category	Kategori:
+hs_config.label_color	Farge
+hs_config.label_delay	Forsinkelse (ms)
+hs_config.label_file	Fil:
+hs_config.label_group	Gruppe:
+hs_config.label_priority	Prioritet
+hs_config.label_section	Del:
+hs_config.label_tooltip	Vis verktøytips
+hs_config.none	(ingen)
+hs_config.notify_delimiters_saved	Word delimiters updated.
+hs_config.notify_reset_all	Forsinkelser og farger er tilbakestilt.
+hs_config.override_active	overstyring aktiv
+hs_config.section_prefix	Del: 
+hs_config.window_title	Hotstring-forsinkelser og farger
+init.reload_files	Filer endret — laster på nytt…
+init.reload_hotstrings	Hotstrings endret — laster på nytt…
+init.reload_script	Skript endret — laster på nytt…
+init.reload_title	Laster på nytt
+karabiner.download_failed	Nedlasting mislyktes: %s
+karabiner.downloading	Laster ned Karabiner-Elements (~46 MB)…
+karabiner.install_error_body	Automatisk installasjon mislyktes: %s\n\nDu kan manuelt laste ned Karabiner-Elements fra https://karabiner-elements.pqrs.org og gjenstart Hammerspoon.
+karabiner.install_error_title	Installasjon mislyktes
+karabiner.install_failed	Installasjon mislyktes: %s
+karabiner.installing	Installerer Karabiner-Elements (administratorpassord kreves)…
+karabiner.lifecycle.unavailable	Karabiner-Elements er ikke tilgjengelig — sjekk installasjonen.
+karabiner.onboarding.accessibility_body	Systemutvidelsen er aktivert, men Karabiner-nissen kjører ikke. Karabiner-Elements v16+ krever "Accessibility"-tillatelse (eldre versjoner spør om "Input Monitoring" i stedet).\n\nKlikk "Open Accessibility", og aktiver deretter Karabiner-Elements i listen. Hvis oppføringen ikke vises, åpne Karabiner-Elements én gang fra /Applications/ slik at den registreres med macOS.
+karabiner.onboarding.accessibility_title	Accessibility-tillatelse påkrevd
+karabiner.onboarding.btn_install_now	Installer nå
+karabiner.onboarding.btn_open_accessibility	Åpne Accessibility
+karabiner.onboarding.btn_open_settings	Åpne innstillinger
+karabiner.onboarding.daemon_ready	Karabiner-Elements er operativ.
+karabiner.onboarding.daemon_timeout	Tidsavbrudd ved venting på at Karabiner-daemon skal starte.
+karabiner.onboarding.daemon_waiting	Venter på at Karabiner-daemon skal starte…
+karabiner.onboarding.error.manifest_unconfigured	Manifest er ikke konfigurert (TODO-plassholdere er til stede).
+karabiner.onboarding.error.mount_failed	Montering mislyktes: {error}
+karabiner.onboarding.ext_activated	Systemutvidelse aktivert.
+karabiner.onboarding.ext_body	Karabiner-Elements er installert, men systemutvidelsen (DriverKit virtuell HID) er ikke aktivert ennå.\n\nKlikk «Åpne innstillinger», og aktiver deretter «Karabiner-DriverKit-VirtualHIDDevice» under Systemutvidelser.
+karabiner.onboarding.ext_timeout	Tidsavbrudd ved venting på aktivering av systemutvidelse.
+karabiner.onboarding.ext_title	Aktiver systemutvidelse
+karabiner.onboarding.ext_waiting	Venter på aktivering av systemutvidelse…
+karabiner.onboarding.install_body_suffix	\n\nApplikasjonen lastes ned fra det offisielle lageret (pqrs-org/Karabiner-Elements) og installeres automatisk. Administratorpassordet vil bli etterspurt.
+karabiner.onboarding.missing.daemon_not_running	• Daemonen kjører ikke (Inndataovervåking?)
+karabiner.onboarding.missing.grabber_absent	• karabiner_grabber-daemonen mangler
+karabiner.onboarding.missing.ke_not_installed	• Karabiner-Elements er ikke installert
+karabiner.onboarding.missing.sysext_not_activated	• Systemutvidelsen (DriverKit) er ikke aktivert
+karabiner.onboarding.missing_prefix	Manglende elementer:\n
+karabiner.onboarding.required_title	Karabiner-Elements-oppsett kreves
+karabiner.pkg_not_found	Ingen .pkg funnet i DMG.
+karabiner.ready_body	Karabiner-motoren er klar.
+karabiner.ready_title	Karabiner klar
+karabiner.sha_failed	SHA-256-verifisering mislyktes: %s
+keepawake.started	☕ Aktiv desktop (holder systemet våkent)
+keepawake.stopped	☕ Aktiv desktop deaktivert
+keepawake.title	Tastaturaktivitet
+keylogger.category_general	Generelt
+keylogger.category_private	Privat nettlesing
+keylogger.error_body	Kunne ikke laste inn metrics-grensesnittet.\n\nSjekk ui/metrics_typing/init.lua.
+keylogger.error_title	Keylogger-feil
+keylogger_ui.app_metrics	Tid i apper
+keylogger_ui.launch_error	Kunne ikke starte dashbordet: {1}
+keylogger_ui.metrics_disabled	Målinger er deaktivert.
+keylogger_ui.metrics_disabled_body	For å aktivere: systemstatiusikon → 📊 Målinger
+keylogger_ui.metrics_title	📊 Målinger
+keylogger_ui.typing_metrics	Skrivemålinger
+layout.ctrlmagicsave	Ctrl+★ sender Ctrl+S
+layout.directaccessdigits	Direkte siffer-tilgang på toppraden
+layout.ergoptialtgr	Emulér AltGr-laget til Ergopti-layoutet
+layout.ergoptibase	Emulér grunnlaget til Ergopti-layoutet
+layout.ergoptiplus	Bruk de mindre AltGr-endringene fra Ergopti➕
+llm.deps.browser_install_tip	Last ned Ollama for Windows fra siden som åpnet seg i nettleseren, kjør installasjonsprogrammet og kom tilbake — tilkoblingen oppdages automatisk.
+llm.deps.done_success	✅ Ollama klar
+llm.deps.fail_server_not_responding	Installasjonsprogrammet er ferdig, men Ollama-serveren svarer ikke.
+llm.deps.fail_timeout	Tidsavbrudd under ventetid på svar fra Ollama etter installasjon.
+llm.deps.install_launching	Starter Ollama-installasjon…
+llm.deps.install_launching_hotkey	Ollama-installasjon (utløst av snarvei)…
+llm.deps.tray_title	Ergopti — AI
+llm.generating	⏳ Genererer…
+llm.profile.advanced.label	●●○ Avansert — Rettelse + Forutsigelse
+llm.profile.basic.label	●○○ Grunnleggende — Enkel forutsigelse
+llm.profile.batch_advanced.label	●●● Batch avansert — 1 avansert forespørsel med {n} forutsigelse{s}
+llm.profile.raw.label	○○○ Rå — Ingen prompt, kun kontekst
+llm.server_mlx_ready_body	MLX-serveren er klar.
+llm.server_ollama_ready_body	Ollama-serveren er klar.
+llm.server_ready_title	LLM aktiv
+magickey.repeatcorrections	★-tasten gjentar det sist tastede tegnet
+magickey.replace	Gjøre J-tasten om til ★-tasten
+magickey.textexpansion	Tekstutvidelse: c★ = c'est, gt★ = j'étais, pex★ = par exemple…
+magickey.textexpansionauto	Automatisk utvidelse uten ★: ju' = jusqu', ya = y'a…
+magickey.textexpansionemojis	Emoji-utvidelse: voiture★ = 🚗, koala★ = 🐨…
+magickey.textexpansionsymbols	Symbolsutvidelse: -->★ = ➜, (v)★ = ✓…
+magickey.textexpansionsymbolstypst	Typst-symboler: $eq.not$★ = ≠, $PP$★ = ℙ…
+menu.about.changelog	Endringslogg
+menu.about.channel_dev	Forhåndsversjon (dev)
+menu.about.channel_local_source	✔  Lokal kilde
+menu.about.channel_main	Stabil (main)
+menu.about.channel_menu	Oppdateringskanal
+menu.about.check_for_updates	Se etter oppdateringer
+menu.about.frequency.10m	Hvert 10. minutt
+menu.about.frequency.12h	Hver 12. time
+menu.about.frequency.1h	Hver time
+menu.about.frequency.1m	Hvert minutt
+menu.about.frequency.24h	Hver 24. time
+menu.about.frequency.2d	Hver 2. dag
+menu.about.frequency.2h	Hver 2. time
+menu.about.frequency.3h	Hver 3. time
+menu.about.frequency.5m	Hvert 5. minutt
+menu.about.frequency.6h	Hver 6. time
+menu.about.frequency.7d	Hver 7. dag
+menu.about.frequency.never	Never
+menu.about.frequency_menu	Sjekkfrekvens
+menu.about.install_update	Installer oppdatering…
+menu.about.open_releases_page	Åpne versjonssiden — GitHub
+menu.about.title	Versjon / Oppdateringer
+menu.about.update.changelog_error	Kunne ikke hente utgivelsesinformasjon fra GitHub.
+menu.about.update.changelog_header	Utgivelsesnotater for {tag}:\n\n{notes}\n\nÅpne på GitHub?
+menu.about.update.install_error	Installasjonen av oppdateringen mislyktes. Sjekk loggene eller last ned manuelt fra utgivelsessiden.
+menu.about.update.local_source	Kjører fra lokal kilde — søk etter oppdateringer er ikke tilgjengelig.
+menu.about.update.network_error	Kunne ikke nå GitHub.\nSjekk internettforbindelsen din og prøv igjen.
+menu.about.update.new_version	En ny versjon er tilgjengelig!\n\nGjeldende: {current}\nSiste:  {latest}\n\nÅpne utgivelsessiden for å laste ned?
+menu.about.update.no_asset	Oppdateringsarkivet ble ikke funnet i denne utgivelsen. Åpne utgivelsessiden for å laste ned manuelt.
+menu.about.update.parse_error	Kunne ikke lese den nyeste versjons-taggen fra GitHub.
+menu.about.update.up_to_date	ErgoptiPlus er oppdatert.\n\nGjeldende versjon: {version}
+menu.about.update_checking	Kontrollerer…
+menu.about.update_downloading	Downloading…
+menu.about.update_installing	Installerer…
+menu.about.update_now	Oppdater til {tag}
+menu.apps.clone_desc	Dupliser enhver installert app
+menu.apps.config_per_app	Configure hotstrings per application
+menu.apps.encrypt_desc	Krypter filer og mapper
+menu.apps.no_apps	Ingen applikasjoner funnet
+menu.apps.title	🛠️ Programmer
+menu.builder.title	Ergopti+
+menu.builder.title_paused	Ergopti+ ⏸
+menu.debug.console	Konsoll
+menu.debug.healthcheck	Systemsjekk
+menu.debug.key_history	Tastehistorikk
+menu.debug.list_vars	Variabeltilstand
+menu.debug.log_level	Loggnivå
+menu.debug.open_error_log	Open error log
+menu.debug.open_logs	Åpne loggmappe
+menu.debug.open_today_log	Åpne dagens loggfil
+menu.debug.title	⚠ Feilsøking
+menu.debug.window_spy	Window Spy
+menu.extensions.empty	Ingen utvidelse installert
+menu.extensions.header	Utvidelser
+menu.gestures.action_disabled	∅ Disabled
+menu.gestures.action_prefix	Handling: 
+menu.gestures.auto_configure	🔧 Automatisk konfigurasjon (register)
+menu.gestures.change_action	Endre handling
+menu.gestures.circular_spaces	Sirkulær Spaces-navigering (1 ↔ N)
+menu.gestures.conflict_title	Gestkonflikk
+menu.gestures.default_sensitivity	(Generelt standard)
+menu.gestures.disable_all	✕ Deaktiver alle gester
+menu.gestures.enabled	️ Gester
+menu.gestures.manual_tutorial	📋 Manuell oppsettsveiledning
+menu.gestures.mode_incremental	Inkrementell sending (avstand)
+menu.gestures.mode_prefix	Modus: 
+menu.gestures.mode_single	Enkel handling (x1)
+menu.gestures.notify_title	Gester
+menu.gestures.off	❌ Gester deaktivert (klikk for å aktivere)
+menu.gestures.on	✅ Gester aktivert (klikk for å deaktivere)
+menu.gestures.open_settings	Åpne innstillinger
+menu.gestures.open_touchpad	⚙ Åpne Trackpad-innstillinger (deretter "Avanserte gester")
+menu.gestures.restore_defaults	↩ Gjenopprett standarder
+menu.gestures.sensitivity_hint	(Mindre = mer følsom/responsiv)
+menu.gestures.sensitivity_label	Avstand per handling (Følsomhet):
+menu.gestures.sensitivity_prefix	Følsomhet: 
+menu.gestures.swipe_2_diag	2-finger-sveip ↗↙
+menu.gestures.swipe_2_down	2-finger-sveip ↓
+menu.gestures.swipe_2_left	2-finger-sveip ←
+menu.gestures.swipe_2_left_down	2-finger-sveip ↙
+menu.gestures.swipe_2_left_up	2-finger-sveip ↖
+menu.gestures.swipe_2_right	2-finger-sveip →
+menu.gestures.swipe_2_right_down	2-finger-sveip ↘
+menu.gestures.swipe_2_right_up	2-finger-sveip ↗
+menu.gestures.swipe_2_up	2-finger-sveip ↑
+menu.gestures.swipe_3_diag	3-finger-sveip ↗↙
+menu.gestures.swipe_3_down	3-finger-sveip ↓
+menu.gestures.swipe_3_horiz	3-finger-sveip ↔
+menu.gestures.swipe_3_left	3-finger-sveip ←
+menu.gestures.swipe_3_left_down	3-finger-sveip ↙
+menu.gestures.swipe_3_left_up	3-finger-sveip ↖
+menu.gestures.swipe_3_right	3-finger-sveip →
+menu.gestures.swipe_3_right_down	3-finger-sveip ↘
+menu.gestures.swipe_3_right_up	3-finger-sveip ↗
+menu.gestures.swipe_3_up	3-finger-sveip ↑
+menu.gestures.swipe_4_diag	4-finger-sveip ↗↙
+menu.gestures.swipe_4_down	4-finger-sveip ↓
+menu.gestures.swipe_4_horiz	4-finger-sveip ↔
+menu.gestures.swipe_4_left	4-finger-sveip ←
+menu.gestures.swipe_4_left_down	4-finger-sveip ↙
+menu.gestures.swipe_4_left_up	4-finger-sveip ↖
+menu.gestures.swipe_4_right	4-finger-sveip →
+menu.gestures.swipe_4_right_down	4-finger-sveip ↘
+menu.gestures.swipe_4_right_up	4-finger-sveip ↗
+menu.gestures.swipe_4_up	4-finger-sveip ↑
+menu.gestures.swipe_5_diag	5-finger-sveip ↗↙
+menu.gestures.swipe_5_down	5-finger-sveip ↓
+menu.gestures.swipe_5_horiz	5-finger-sveip ↔
+menu.gestures.swipe_5_left	5-finger-sveip ←
+menu.gestures.swipe_5_left_down	5-finger-sveip ↙
+menu.gestures.swipe_5_left_up	5-finger-sveip ↖
+menu.gestures.swipe_5_right	5-finger-sveip →
+menu.gestures.swipe_5_right_down	5-finger-sveip ↘
+menu.gestures.swipe_5_right_up	5-finger-sveip ↗
+menu.gestures.swipe_5_up	5-finger-sveip ↑
+menu.gestures.tap_2	2-finger-trykk
+menu.gestures.tap_3	3-finger-trykk
+menu.gestures.tap_4	4-finger-trykk
+menu.gestures.tap_5	5-finger-trykk
+menu.gestures.title	🖐️ Gester
+menu.global.config_folder	📂 Konfigurasjonsmappe…
+menu.global.disable_all	☐ Deaktiver alle funksjoner
+menu.global.edit_shortcuts	  ↳ Rediger personlige snarveier
+menu.global.enable_all	☑ Aktiver alle funksjoner
+menu.global.language	🌐 Språk
+menu.global.quit	⏹ Avslutt
+menu.global.reload	🔄 Oppdater
+menu.global.reset_defaults	↺ Tilbakestill til standard
+menu.global.setup_wizard	Oppsettprogrammet…
+menu.global.suspend	⏸︎ Pause
+menu.global.title	Globale handlinger
+menu.hotstrings.add_custom	+ Legg til en egendefinert stutsing…
+menu.hotstrings.add_delimiter	+ Add custom delimiter…
+menu.hotstrings.category_off	❌ Deaktivert (klikk for å aktivere)
+menu.hotstrings.category_on	✅ Aktivert (klikk for å deaktivere)
+menu.hotstrings.check_all	☑ Velg alle
+menu.hotstrings.close_on_add	Lukk grensesnittet etter at en hotstring er lagt til via snarvei
+menu.hotstrings.config_item	⚙️ Konfigurer forsinkelser og farger…
+menu.hotstrings.consumed	forbrukt
+menu.hotstrings.consumed_suffix	(forbrukt)
+menu.hotstrings.custom_label	Egendefinert
+menu.hotstrings.default_category_prefix	Standardkategori: 
+menu.hotstrings.default_none	Ingen
+menu.hotstrings.delay_autocorrection	Autokorrektur-forsinkelse
+menu.hotstrings.delay_invalid_body	Vennligst skriv inn et ikke-negativt heltall (millisekunder).
+menu.hotstrings.delay_invalid_title	Ugyldig verdi
+menu.hotstrings.delay_magic_key	Forsinkelse for magisk tast ★
+menu.hotstrings.delay_prompt	Ny forsinkelse i millisekunder (0 = ingen forsinkelse):
+menu.hotstrings.delays_colors	Forsinkelser og farger…
+menu.hotstrings.delete_delimiter	Delete this delimiter…
+menu.hotstrings.delete_expander	Slett denne stutsingen…
+menu.hotstrings.disable_all	❌ Disable all
+menu.hotstrings.enable_all	✅ Enable all
+menu.hotstrings.header_common	Vanlige hotstrings
+menu.hotstrings.header_common_count	Vanlige hotstrings (%s)
+menu.hotstrings.header_ergopti	Ergopti-layout
+menu.hotstrings.header_ergopti_count	Ergopti-layout (%s)
+menu.hotstrings.header_personal_count	Mine hotstrings (%s)
+menu.hotstrings.infinite	∞
+menu.hotstrings.magic_key_prefix	Magisk nøkkel: 
+menu.hotstrings.magic_key_prompt	Ny verdi (★ som standard):
+menu.hotstrings.magic_key_title	Rediger magisk nøkkel
+menu.hotstrings.missing_value	(manglende verdi)
+menu.hotstrings.notify_bubble_ai	AI-boble
+menu.hotstrings.notify_bubble_autocorrect	Autokorrektur-boble
+menu.hotstrings.notify_bubble_colored	Fargede bobler
+menu.hotstrings.notify_bubble_star	Boble ★
+menu.hotstrings.off	❌ Hotstrings deaktivert (klikk for å aktivere)
+menu.hotstrings.on	✅ Hotstrings aktivert (klikk for å deaktivere)
+menu.hotstrings.open_editor	Åpne hotstring-editor
+menu.hotstrings.open_file	Åpne fil…
+menu.hotstrings.params	⚙️ Hotstring-innstillinger
+menu.hotstrings.personal_header	Mine hotstrings
+menu.hotstrings.preview_bubbles	Forhåndsvis bobler
+menu.hotstrings.repeat_key_toggle	★-tasten gjentar siste tastetrykk
+menu.hotstrings.reset_magic_key	   ↳ Tilbakestill (standard: ★)
+menu.hotstrings.rolls.assign	#! ➜ :=
+menu.hotstrings.rolls.assign_arrow_equal_left	=$ ➜ <=
+menu.hotstrings.rolls.assign_arrow_equal_right	$= ➜ =>
+menu.hotstrings.rolls.assign_arrow_minus_left	?+ ➜ <-
+menu.hotstrings.rolls.assign_arrow_minus_right	+? ➜ ->
+menu.hotstrings.rolls.bracket_quote	[# ➜ ["
+menu.hotstrings.rolls.chevron_equal	= ➜ <=
+menu.hotstrings.rolls.chevron_greater	>% ➜ >=
+menu.hotstrings.rolls.chevron_less	<% ➜ <=
+menu.hotstrings.rolls.close_chevron_tag	<@ ➜ </
+menu.hotstrings.rolls.comment_close	"\\  ➜ */
+menu.hotstrings.rolls.comment_open	\\" ➜ /*
+menu.hotstrings.rolls.ct	P' ➜ CT
+menu.hotstrings.rolls.cx	CX ➜ CK
+menu.hotstrings.rolls.english_negation	NT' ➜ N'T
+menu.hotstrings.rolls.equal_string	[) ➜ = ""
+menu.hotstrings.rolls.ez	EÉ ➜ EZ
+menu.hotstrings.rolls.hashtag_close_bracket	#] ➜ "]
+menu.hotstrings.rolls.hashtag_open_bracket	#[ ➜ "[
+menu.hotstrings.rolls.hashtag_parenthesis	#( ➜ ")
+menu.hotstrings.rolls.hashtag_quote	#" ➜ "
+menu.hotstrings.rolls.hc	HC ➜ WH
+menu.hotstrings.rolls.left_arrow	=+ = ➜
+menu.hotstrings.rolls.not_equal	!# ➜ !=
+menu.hotstrings.rolls.paren_quote	(# ➜ ("
+menu.hotstrings.rolls.sx	SX ➜ SK
+menu.hotstrings.shortcut_default_ctrl	Ctrl + %s
+menu.hotstrings.shortcut_none	Ingen snarvei
+menu.hotstrings.shortcut_prefix	Snarvei: Win + 
+menu.hotstrings.shortcut_prompt	Format: mods+key (f.eks. ctrl+e)\nTilgjengelige mods: cmd, alt, ctrl, shift\nLa stå tomt for å deaktivere
+menu.hotstrings.title	⚡ Hotstrings
+menu.hotstrings.tooltip_ai	AI-forhåndsvisning
+menu.hotstrings.tooltip_ai_acceptance	Forsinkelse for AI-godkjenning
+menu.hotstrings.tooltip_autocompletion	Autofullføring-forsinkelse
+menu.hotstrings.tooltip_autocorrect	Autokorrektur-forhåndsvisning
+menu.hotstrings.tooltip_colored	Fargede forhåndsvisninger
+menu.hotstrings.tooltip_default	Standardforsinkelse (alle grupper)
+menu.hotstrings.tooltip_magic	★ Forhåndsvisning
+menu.hotstrings.uncheck_all	□ Fjern alle valg
+menu.hotstrings.word_delimiters	Word delimiters
+menu.hotstrings.word_expanders	Stutsinger
+menu.hs.gestures.modes	Modus
+menu.hs.gestures.modes.swipe_2_down	Modus — 2-finger-sveip ↓
+menu.hs.gestures.modes.swipe_2_left	Modus — 2-finger-sveip ←
+menu.hs.gestures.modes.swipe_2_left_down	Modus — 2-finger-sveip ↙
+menu.hs.gestures.modes.swipe_2_left_up	Modus — 2-finger-sveip ↖
+menu.hs.gestures.modes.swipe_2_right	Modus — 2-finger-sveip →
+menu.hs.gestures.modes.swipe_2_right_down	Modus — 2-finger-sveip ↘
+menu.hs.gestures.modes.swipe_2_right_up	Modus — 2-finger-sveip ↗
+menu.hs.gestures.modes.swipe_2_up	Modus — 2-finger-sveip ↑
+menu.hs.gestures.modes.swipe_3_down	Modus — 3-finger-sveip ↓
+menu.hs.gestures.modes.swipe_3_left	Modus — 3-finger-sveip ←
+menu.hs.gestures.modes.swipe_3_left_down	Modus — 3-finger-sveip ↙
+menu.hs.gestures.modes.swipe_3_left_up	Modus — 3-finger-sveip ↖
+menu.hs.gestures.modes.swipe_3_right	Modus — 3-finger-sveip →
+menu.hs.gestures.modes.swipe_3_right_down	Modus — 3-finger-sveip ↘
+menu.hs.gestures.modes.swipe_3_right_up	Modus — 3-finger-sveip ↗
+menu.hs.gestures.modes.swipe_3_up	Modus — 3-finger-sveip ↑
+menu.hs.gestures.modes.swipe_4_down	Modus — 4-finger-sveip ↓
+menu.hs.gestures.modes.swipe_4_left	Modus — 4-finger-sveip ←
+menu.hs.gestures.modes.swipe_4_left_down	Modus — 4-finger-sveip ↙
+menu.hs.gestures.modes.swipe_4_left_up	Modus — 4-finger-sveip ↖
+menu.hs.gestures.modes.swipe_4_right	Modus — 4-finger-sveip →
+menu.hs.gestures.modes.swipe_4_right_down	Modus — 4-finger-sveip ↘
+menu.hs.gestures.modes.swipe_4_right_up	Modus — 4-finger-sveip ↗
+menu.hs.gestures.modes.swipe_4_up	Modus — 4-finger-sveip ↑
+menu.hs.gestures.modes.swipe_5_down	Modus — 5-finger-sveip ↓
+menu.hs.gestures.modes.swipe_5_left	Modus — 5-finger-sveip ←
+menu.hs.gestures.modes.swipe_5_left_down	Modus — 5-finger-sveip ↙
+menu.hs.gestures.modes.swipe_5_left_up	Modus — 5-finger-sveip ↖
+menu.hs.gestures.modes.swipe_5_right	Modus — 5-finger-sveip →
+menu.hs.gestures.modes.swipe_5_right_down	Modus — 5-finger-sveip ↘
+menu.hs.gestures.modes.swipe_5_right_up	Modus — 5-finger-sveip ↗
+menu.hs.gestures.modes.swipe_5_up	Modus — 5-finger-sveip ↑
+menu.hs.gestures.sensitivities	Følsomhet
+menu.hs.gestures.sensitivities.swipe_2_down	Følsomhet — 2-finger-sveip ↓
+menu.hs.gestures.sensitivities.swipe_2_left	Følsomhet — 2-finger-sveip ←
+menu.hs.gestures.sensitivities.swipe_2_left_down	Følsomhet — 2-finger-sveip ↙
+menu.hs.gestures.sensitivities.swipe_2_left_up	Følsomhet — 2-finger-sveip ↖
+menu.hs.gestures.sensitivities.swipe_2_right	Følsomhet — 2-finger-sveip →
+menu.hs.gestures.sensitivities.swipe_2_right_down	Følsomhet — 2-finger-sveip ↘
+menu.hs.gestures.sensitivities.swipe_2_right_up	Følsomhet — 2-finger-sveip ↗
+menu.hs.gestures.sensitivities.swipe_2_up	Følsomhet — 2-finger-sveip ↑
+menu.hs.gestures.sensitivities.swipe_3_down	Følsomhet — 3-finger-sveip ↓
+menu.hs.gestures.sensitivities.swipe_3_left	Følsomhet — 3-finger-sveip ←
+menu.hs.gestures.sensitivities.swipe_3_left_down	Følsomhet — 3-finger-sveip ↙
+menu.hs.gestures.sensitivities.swipe_3_left_up	Følsomhet — 3-finger-sveip ↖
+menu.hs.gestures.sensitivities.swipe_3_right	Følsomhet — 3-finger-sveip →
+menu.hs.gestures.sensitivities.swipe_3_right_down	Følsomhet — 3-finger-sveip ↘
+menu.hs.gestures.sensitivities.swipe_3_right_up	Følsomhet — 3-finger-sveip ↗
+menu.hs.gestures.sensitivities.swipe_3_up	Følsomhet — 3-finger-sveip ↑
+menu.hs.gestures.sensitivities.swipe_4_down	Følsomhet — 4-finger-sveip ↓
+menu.hs.gestures.sensitivities.swipe_4_left	Følsomhet — 4-finger-sveip ←
+menu.hs.gestures.sensitivities.swipe_4_left_down	Følsomhet — 4-finger-sveip ↙
+menu.hs.gestures.sensitivities.swipe_4_left_up	Følsomhet — 4-finger-sveip ↖
+menu.hs.gestures.sensitivities.swipe_4_right	Følsomhet — 4-finger-sveip →
+menu.hs.gestures.sensitivities.swipe_4_right_down	Følsomhet — 4-finger-sveip ↘
+menu.hs.gestures.sensitivities.swipe_4_right_up	Følsomhet — 4-finger-sveip ↗
+menu.hs.gestures.sensitivities.swipe_4_up	Følsomhet — 4-finger-sveip ↑
+menu.hs.gestures.sensitivities.swipe_5_down	Følsomhet — 5-finger-sveip ↓
+menu.hs.gestures.sensitivities.swipe_5_left	Følsomhet — 5-finger-sveip ←
+menu.hs.gestures.sensitivities.swipe_5_left_down	Følsomhet — 5-finger-sveip ↙
+menu.hs.gestures.sensitivities.swipe_5_left_up	Følsomhet — 5-finger-sveip ↖
+menu.hs.gestures.sensitivities.swipe_5_right	Følsomhet — 5-finger-sveip →
+menu.hs.gestures.sensitivities.swipe_5_right_down	Følsomhet — 5-finger-sveip ↘
+menu.hs.gestures.sensitivities.swipe_5_right_up	Følsomhet — 5-finger-sveip ↗
+menu.hs.gestures.sensitivities.swipe_5_up	Følsomhet — 5-finger-sveip ↑
+menu.kanata.title	🎹 Kanata
+menu.karabiner.clear_all	🧹 Fjern alt (tapp/hold og snarveier)
+menu.karabiner.combo_arrow	Kombo → %s
+menu.karabiner.copy_tap_to_combo	🔁 Kopier tap → combo for modifikatortaster
+menu.karabiner.disabled_warning_1	⚠️  Meny deaktivert, men Karabiner kjører fortsatt.
+menu.karabiner.disabled_warning_2	      Omkartlegginger er derfor fortsatt aktive.
+menu.karabiner.disabled_warning_3	      For å stoppe alt: klikk 🟢 ovenfor,
+menu.karabiner.disabled_warning_4	      og fjern Karabiner fra oppstarts-apper.
+menu.karabiner.header_shortcuts	Modifikatorsnarveier
+menu.karabiner.header_taps_holds	Tap / Hold
+menu.karabiner.hold_arrow	Hold → %s
+menu.karabiner.hold_colon	Hold: %s
+menu.karabiner.key_tap_delay	Tap delay: %s
+menu.karabiner.key_tap_delay_dialog_prompt	Tap / hold delay for this key, in milliseconds\n(global: %d ms)
+menu.karabiner.key_tap_delay_dialog_title	Karabiner — Per-key tap delay
+menu.karabiner.key_tap_delay_set	Set a custom delay…
+menu.karabiner.key_tap_delay_use_global	Use global delay (%s)
+menu.karabiner.left_hand	Venstre hånd
+menu.karabiner.nothing_combo	Ingen handling (combo, tapp og hold)
+menu.karabiner.nothing_tap_hold	Ingen handling (tapp og hold)
+menu.karabiner.open_gui	Åpne Karabiner-Elements
+menu.karabiner.restore_defaults	↩ Gjenopprett standarder
+menu.karabiner.right_hand	Høyre hånd
+menu.karabiner.simultaneous_dialog_prompt	Maksimal forsinkelse (millisekunder) mellom 1. og 2. tast\nfor en snarvei for å utløse «Combo»-slotten\n(akkordstil: taster trykket ned nesten samtidig).\n\n(standard: %d ms)
+menu.karabiner.simultaneous_dialog_title	Karabiner — Combo-aktiveringsforsinkesel
+menu.karabiner.simultaneous_title	Combo-aktiveringsforsinkesel: %s
+menu.karabiner.start	▶ Start Karabiner
+menu.karabiner.status_active	🟢 Karabiner aktiv
+menu.karabiner.status_inactive	🔴 Karabiner inaktiv — klikk for å starte på nytt
+menu.karabiner.status_no_daemon	🟡 Karabiner aktivert — daemon ikke oppdaget (KE installert?)
+menu.karabiner.status_not_primed	🟡 Karabiner aktivert — regler ikke brukt (klikk for å prøve)
+menu.karabiner.status_priming	🔵 Karabiner — oppstarting i gang…
+menu.karabiner.sticky_dialog_prompt	Forsinkelse for oppheving av sticky (millisekunder)\nEtter denne varigheten uten tastetilslag avbrytes one-shot-modifikatoren.
+menu.karabiner.sticky_dialog_title	Karabiner — Sticky-forsinkelse
+menu.karabiner.sticky_title	Sticky modifier-forsinkelse: %s
+menu.karabiner.stop	✕ Avslutt Karabiner
+menu.karabiner.symmetric	Symmetriske snarveier (tastetilordning uavhengig)
+menu.karabiner.tap_arrow	Tap → %s
+menu.karabiner.tap_colon	Trykk: %s
+menu.karabiner.tap_hold_dialog_prompt	Trykk / hold-forsinkelse i millisekunder\n(Karabiner standard: %d ms)
+menu.karabiner.tap_hold_dialog_title	Karabiner — Trykk / hold-forsinkelse
+menu.karabiner.tap_hold_title	Trykk / hold-forsinkelse: %s
+menu.keyboard_layout.add_ergopti	➕ Legg til Ergopti v%s i oppsettsliste
+menu.keyboard_layout.open_system_prefs	Åpne Systeminnstillinger → Tastatur
+menu.layout.active_layouts	Aktive oppsett
+menu.layout.add_fail	Tillegging mislyktes — se konsoll.
+menu.layout.add_ok	%s lagt til listen.
+menu.layout.add_to_list	Legg til Ergopti v%s i inndatakilder…
+menu.layout.already_added	✅ %s v%s — allerede lagt til
+menu.layout.in_list	Alle Ergopti-varianter aktive v%s ✅
+menu.layout.install_first	Installer pakken først
+menu.layout.install_version	%s Installer Ergopti (%s) v%s
+menu.layout.installed_system	Ergopti-oppsett installert (systemomfang) ✅
+menu.layout.installed_user	Ergopti-oppsett installert (brukeromfang) ✅
+menu.layout.installed_version	Ergopti (%s) v%s — oppdatert ✅
+menu.layout.layout_auto	— Ingen endring —
+menu.layout.layout_on_pause	Layout når skriptet er satt på pause
+menu.layout.layout_on_resume	Layout når skriptet er aktivt
+menu.layout.logo_custom	Tilpasset ikon
+menu.layout.logo_default	Standardikon
+menu.layout.no_bundle	Ingen Ergopti-pakke funnet
+menu.layout.off	❌ Oppsett deaktivert (klikk for å aktivere)
+menu.layout.on	✅ Oppsett aktivert (klikk for å deaktivere)
+menu.layout.open_prefs	Åpne tastaturinnstillinger…
+menu.layout.pause_layout_enabled	Bytt layout ved pause / gjenopptakelse
+menu.layout.pause_layout_section	Layout ved pause / gjenopptakelse
+menu.layout.replace	Gjøre en tast om til ★-tasten
+menu.layout.scope_system	system
+menu.layout.scope_user	bruker
+menu.layout.title	🌐 Tastaturoppsett
+menu.layout.update_list	Oppgrader aktiv liste v%s → v%s
+menu.layout.update_list_fail	Oppdatering mislyktes — se konsoll.
+menu.layout.update_list_install_first	Oppgrader aktiv liste til v%s (installer v%s først)
+menu.layout.update_list_ok	Inndatakildenliste oppdatert.
+menu.layout.update_version	Oppgrader Ergopti (%s) v%s → v%s
+menu.llm.about	Om Ergopti AI
+menu.llm.about_body	Ergopti AI — Smarte tastaturforslag\nBackend: Ollama (lokal)\nVersjon: 1.0
+menu.llm.active_model_label	Aktiv modell: 
+menu.llm.add_custom_model	Legg til en tilpasset modell
+menu.llm.add_model_entry	➕ Legg til en tilpasset modell…
+menu.llm.after_hotstring	Forslag etter at hotstring-boble utløper
+menu.llm.api_add_entry	+ Legg til API…
+menu.llm.api_dialog_title	ErgoptiPlus — API-endepunkt
+menu.llm.api_edit_entry	Rediger valgt API…
+menu.llm.api_no_entry	Ingen API-endepunkt konfigurert
+menu.llm.api_prompt_model	Modellnavn:
+menu.llm.api_prompt_name	Navn (f.eks. 'Min OpenAI-nøkkel'):
+menu.llm.api_prompt_provider	Leverandør-ID ({1}):
+menu.llm.api_prompt_token	API-token / nøkkel (skjult):
+menu.llm.api_prompt_url	Base-URL:
+menu.llm.api_providers_unavailable	Listen over API-leverandører kunne ikke lastes, så ingen API-oppføring kan legges til. Kontroller at api_providers.json finnes og er gyldig.
+menu.llm.api_remove_confirm_body	Lagret API-token blir slettet permanent.
+menu.llm.api_remove_confirm_title	Slett API-oppføring "%s"?
+menu.llm.api_remove_entry	Fjern valgt API
+menu.llm.api_unreachable_body	"%s" svarte ikke — sjekk token, URL og modell.
+menu.llm.api_unreachable_title	API-oppføring kan ikke nås
+menu.llm.api_validated_body	"%s" svarte vellykket.
+menu.llm.api_validated_title	API-oppføring klar
+menu.llm.arrows	Piler
+menu.llm.arrows_only	Bare piler
+menu.llm.auto_raise_temp	  ↳ Øk temperatur automatisk (+0.1 per forslag)
+menu.llm.backend_api_suffix	Ekstern leverandør
+menu.llm.backend_default_model	↺ Standardmodell for backend (%s)
+menu.llm.backend_mlx_suffix	Anbefalt (Apple Silicon native)
+menu.llm.backend_ollama_suffix	Standard
+menu.llm.backend_title	AI engine (Backend): 
+menu.llm.backend_unknown	Unknown
+menu.llm.browse_col_family	Familie
+menu.llm.browse_col_name	Navn
+menu.llm.browse_col_params	Parametere
+menu.llm.browse_col_ram	RAM
+menu.llm.browse_col_speed	Hastighet
+menu.llm.browse_col_status	Status
+menu.llm.browse_col_type	Type
+menu.llm.browse_models_entry	🔍 Bla gjennom alle modeller…
+menu.llm.browse_models_filter	Filter:
+menu.llm.browse_models_title	ErgoptiPlus — LLM-modeller
+menu.llm.browse_pick	Velg denne modellen
+menu.llm.browse_status_available	⬇ Tilgjengelig
+menu.llm.browse_status_installed	✅ Installert
+menu.llm.btn_download	Last ned
+menu.llm.caps_header	MULIGHETER
+menu.llm.context_length_label	Kontekststørrelse: %s siste tegn
+menu.llm.context_length_prompt	Antall foregående tegn til analyse:
+menu.llm.custom_model_title	Tilpasset modell
+menu.llm.debounce_label	Idle-tid før forslag: %s
+menu.llm.debounce_prompt	Inaktivitetsforsinkelse før generering (i ms, f.eks. 600):
+menu.llm.delete_model_body	Vil du virkelig slette modellen "%s" fra det lokale hurtigminnet?
+menu.llm.delete_model_cache	🗑️ Slett denne modellen fra hurtigminne
+menu.llm.delete_model_title	Slette modellen?
+menu.llm.digits	Sifre
+menu.llm.digits_only	Bare sifre
+menu.llm.disable_password_fields	Deaktiver i passordfelter
+menu.llm.disable_url_bars	Deaktiver i nettleseradresselinjer
+menu.llm.disabled_in_label	Deaktivert i %d program%s
+menu.llm.disabled_in_prefix	Deaktivert i
+menu.llm.display_menu_title	Visning
+menu.llm.download_failed	Nedlasting mislyktes
+menu.llm.download_model	⬇️ Last ned denne modellen
+menu.llm.download_window_lost	Nedlastingsvindu ikke funnet
+menu.llm.download_window_lost_body	Nedlastingen kjører fortsatt i bakgrunnen.
+menu.llm.empty_model_id	Tom identifikator — ingen handling.
+menu.llm.exclude_from_ai	Ekskluder fra automatisk AI-generering…
+menu.llm.generation_menu_title	Genereringsinnstillinger
+menu.llm.hf_token_label	🔑 HuggingFace-token: %s
+menu.llm.hf_token_set	✅ Konfigurert
+menu.llm.hf_token_unset	❌ Ikke konfigurert
+menu.llm.hw_disk	Diskplass: %s GB
+menu.llm.hw_download	Nedlasting: %s GB
+menu.llm.hw_header	KRAV (%s)
+menu.llm.hw_ram	Minne (RAM): %s GB
+menu.llm.indent_label	Innrykk for det valgte forslaget
+menu.llm.indent_none	Ingen innrykk
+menu.llm.indent_space	mellomrom
+menu.llm.indent_spaces	mellomrom
+menu.llm.inline_autotype	✍️ Inline auto-skriving (Copilot-stil)
+menu.llm.instant_on_word_end	Øyeblikkelig forslag ved ordslutting
+menu.llm.launch_download_prompt	Vil du starte nedlastingen?
+menu.llm.max_words_label	Maks ord per forslag: %s
+menu.llm.max_words_prompt	Maksimalt antall ord per forslag (0 = ubegrenset):
+menu.llm.min_words_label	Min ord per forslag: %s
+menu.llm.min_words_prompt	Minimalt antall ord per forslag:
+menu.llm.mlx_model_hint	HuggingFace-identifikator for MLX-modellen, f.eks.: mlx-community/Qwen2.5-3B-Instruct-4bit
+menu.llm.mlx_port_label	MLX-serverport: %s
+menu.llm.mlx_port_prompt	Port for Ergoptis lokale MLX-server (1024-65535). Standard: %s.
+menu.llm.mlx_port_title	MLX-serverport
+menu.llm.model_backend	Backend: %s
+menu.llm.model_change_title	Modellendring
+menu.llm.model_date	Oppdateringsdato: %s
+menu.llm.model_label	Modell: %s
+menu.llm.model_params_active	Parametere (Aktive): %s
+menu.llm.model_params_total	Parametere (Totalt): %s
+menu.llm.model_source	Kilde: %s
+menu.llm.model_speed	Estimert hastighet: %s tok/s
+menu.llm.model_tags	Tagger: %s
+menu.llm.model_type	Type: %s
+menu.llm.my_models	🛠️ Mine modeller
+menu.llm.nav_label	Naviger forslag (↑/← og ↓/→)
+menu.llm.nav_menu_title	Navigasjon
+menu.llm.nav_modifiers_prompt	Modifikatortast(er) for navigasjon med piler (f.eks. ctrl, alt — la stå tomt = bare piler):
+menu.llm.no_model	Ingen modell (Deaktivert)
+menu.llm.no_model_none	Ingen
+menu.llm.not_installed_body	Denne modellen er ikke installert ennå.
+menu.llm.num_predictions_label	Antall forslag: %s
+menu.llm.off	❌ AI deaktivert (klikk for å aktivere)
+menu.llm.ollama_model_hint	Ollama-modellidentifikator, f.eks.: qwen2.5:1.5b eller llama3.2:3b
+menu.llm.ollama_port_label	Ollama-serverport: %s
+menu.llm.ollama_port_prompt	Port for den lokale Ollama-serveren (1024-65535). Standard: 11434.
+menu.llm.ollama_port_title	Ollama-serverport
+menu.llm.on	✅ AI aktivert (klikk for å deaktivere)
+menu.llm.params_active	Parametere (Aktive): 
+menu.llm.params_total	Parametere (Totalt): 
+menu.llm.prediction_count_label	%d forslag%s
+menu.llm.profile_already_ok_msg	Modell: %s\n%s\n\nNåværende prompt:\n%s\n\nAnbefalt prompt:\n%s\n\nDenne profilen er allerede egnet for denne modellen.
+menu.llm.profile_change_msg	Modell: %s\n%s\n\nNåværende prompt:\n%s\n\nAnbefalt prompt:\n%s\n\nBekreft for å bruke den anbefalte prompten.
+menu.llm.profile_power_warning	⚠️  Kraftig profil\n\nAnbefalt:  %s\nValgt:  %s\n\nModellen er kanskje ikke kraftig nok.
+menu.llm.remove_model_body	Vil du fjerne den tilpassede modellen "%s" fra listen din? Modellen vil ikke bli avinstallert fra systemet.
+menu.llm.remove_model_title	Fjerne denne modellen?
+menu.llm.remove_user_model	🗑️ Fjern fra mine modeller
+menu.llm.reset_label	  ↳ Tilbakestill (standard: %s)
+menu.llm.reset_on_nav	Fjern kontekst ved klikk/navigering
+menu.llm.select_model	👉 Velg denne modellen
+menu.llm.shortcut_prompt	Format: mods+key  (f.eks cmd+alt+p)\nTilgjengelige mods: cmd, alt, ctrl, shift\nLat feltet stå tomt for å deaktivere
+menu.llm.show_all_at_once	Vis alle forslag samtidig (multi-predictions)
+menu.llm.show_download_window	📥 Nedlasting i gang — Vis vindu
+menu.llm.show_info_bar	Vis infobar (modell og latens)
+menu.llm.show_streaming	Vis hvert forslag som streaming (token for token)
+menu.llm.specs_header	SPESIFIKASJONER
+menu.llm.temperature_label	Temperatur (Kreativitet): %s
+menu.llm.temperature_prompt	Kreativitetsnivå (0.0 = deterministisk, 1.0 = kreativ):
+menu.llm.thinking_model_info	  ↳ Info: Tenkemodell (skjult resonnering)
+menu.llm.title	✨ Kunstig intelligens
+menu.llm.toggle_disable	Deaktiver AI-forslag
+menu.llm.toggle_enable	Aktiver AI-forslag
+menu.llm.trigger_menu_title	AI-utløser
+menu.llm.trigger_shortcut_label	Snarvei for manuell generering: %s
+menu.llm.trigger_shortcut_title	AI-genereringssnarvei
+menu.llm.unlimited	Ubegrenset
+menu.llm.val_label	Velg forslag nr. (%s)
+menu.llm.val_modifiers_prompt	Modifikatortast(er) for valg med tall (f.eks. ctrl, alt — la stå tomt = bare tall):
+menu.llm.warning_install_ollama	📥 Installer Ollama nå
+menu.metrics.colors_by_source	    ↳ Farge etter inndatakilde
+menu.metrics.disabled_in_label	Deaktivert i %d program%s
+menu.metrics.encrypt_toggle	Krypter logger på disk (sikkerhet)
+menu.metrics.exclude_apps	Ekskluder programmer fra tastetillogging…
+menu.metrics.filter_private	Ignorer privat surfing
+menu.metrics.filter_secure	Ignorer passordfelter
+menu.metrics.filter_sysauth	Ignorer systemautentiseringsdialager
+menu.metrics.include_realtime	    ↳ Inkluder sanntidsgraf
+menu.metrics.off	❌ Metrikker deaktivert (klikk for å aktivere)
+menu.metrics.on	✅ Metrikker aktivert (klikk for å deaktivere)
+menu.metrics.open_encryptor	  ↳ Åpne frittstående kryptering…
+menu.metrics.privacy_header	PERSONVERNFILTER
+menu.metrics.reset_wpm_position	    ↳ Tilbakestill posisjon
+menu.metrics.shortcut_apps_title	Snarvei for programtid
+menu.metrics.shortcut_item	    ↳ Snarvei: %s
+menu.metrics.shortcut_none	Ingen snarvei
+menu.metrics.shortcut_prefix	  ↳ Snarvei: 
+menu.metrics.shortcut_prompt	Format: mods+key (f.eks ctrl+m)\nLat feltet stå tomt for å deaktivere
+menu.metrics.shortcut_typing_title	Snarvei for skrivemetriker
+menu.metrics.show_apps	Vis tid per program
+menu.metrics.show_typing	Vis skrivemetriker
+menu.metrics.show_wpm_menubar	WPM i menylinjen
+menu.metrics.show_wpm_widget	Flytende WPM-widget
+menu.metrics.title	📊 Metrikker
+menu.metrics.wpm_unit	OPM
+menu.paths.menu_item	Konfigurasjonsmappe…
+menu.paths.pick_prompt	Velg konfigurasjonsmappe
+menu.paths.window_title	Konfigurasjonsmappe
+menu.profiles.auto_detect	✨ Oppdag automatisk den beste profilen
+menu.profiles.clone_builtin	✏️ Klon og rediger denne profilen…
+menu.profiles.copy_suffix	(kopi)
+menu.profiles.create_profile	Opprett en egendefinert profil…
+menu.profiles.custom_profile_label	Egendefinert profil
+menu.profiles.delete_confirm_body	Denne egendefinerte profilen vil bli permanent slettet.
+menu.profiles.delete_confirm_title	Slette «%s»?
+menu.profiles.delete_profile	🗑️ Slett…
+menu.profiles.edit_profile	✏️ Rediger…
+menu.profiles.header_custom_profiles	EGENDEFINERTE PROFILER
+menu.profiles.header_default_profiles	STANDARDPROFILER
+menu.profiles.not_recommended	  ⚠️ Ikke anbefalt (Thinking)
+menu.profiles.override_active_app_with_current	➕ Bruk gjeldende profil for aktiv app
+menu.profiles.per_app_overrides	🪟 Profil per app
+menu.profiles.profile_label_prefix	Profil: %s
+menu.profiles.prompt_label	Profilnavn:
+menu.profiles.prompt_system_single	Systemprompt (enkelt generering):
+menu.profiles.recommended_profile	Anbefalt profil
+menu.profiles.recommended_unavailable_body	Kan ikke bruke automatisk gjenkjenning i denne konteksten
+menu.profiles.recommended_unavailable_title	Anbefalt profil utilgjengelig
+menu.profiles.shortcut_prefix	Snarvei: %s
+menu.profiles.shortcut_prompt	Format: mods+key  (f.eks. cmd+shift+b)\nTilgjengelige mods: cmd, alt, ctrl, shift\nLa stå tomt for å deaktivere
+menu.profiles.shortcut_title	Profilsnarvei
+menu.profiles.use_profile	Bruk denne profilen
+menu.reloading	Laster inn på nytt…
+menu.reloading_files	Filer endret — Laster inn på nytt…
+menu.script_control.title	Skriptkontroll
+menu.script_ready	Skript klar!
+menu.settings.context_length_title	Kontekststørrelse
+menu.settings.default_indicator	 (standard)
+menu.settings.delay_prompt	Nødvendig pausering (i ms) før AI spørres:\n\n(La stå tomt for å nullstille: %s ms)\n(Skriv "Never" eller -1 for å deaktivere auto-generering)
+menu.settings.delay_title	Ventetid
+menu.settings.disabled	Deaktivert
+menu.settings.indent_space	 mellomrom
+menu.settings.indent_spaces	 mellomrom
+menu.settings.max_words_prompt	Maksimalt antall ord å beholde per forslag (0 = ubegrenset):
+menu.settings.max_words_title	Maks ord per forslag
+menu.settings.min_words_title	Min ord per forslag
+menu.settings.never	Aldri
+menu.settings.no_modifier	Ingen modifiserer
+menu.settings.reset_instruction	\n\n(La stå tomt for å nullstille: %s)
+menu.settings.temperature_prompt	Kreativitetsnivå (fra 0.0 til 1.0):
+menu.settings.temperature_title	Temperatur
+menu.shortcuts.alt_add	[+ Legg til en Alt+… snarvei]
+menu.shortcuts.alt_group	⎇ Alt-snarveier
+menu.shortcuts.altgr_symbol	AltGr + symbol
+menu.shortcuts.chatgpt_url_item	   ↳ Rediger ChatGPT-URL…
+menu.shortcuts.ctrl_add	[+ Legg til en Ctrl+… snarvei]
+menu.shortcuts.ctrl_group	^ Ctrl-snarveier
+menu.shortcuts.ctrl_shift_add	[+ Legg til en Ctrl+Shift+… snarvei]
+menu.shortcuts.ctrl_shift_group	^⇧ Ctrl+Shift-snarveier
+menu.shortcuts.edit_personal_info	   ↳ Rediger personlig info…
+menu.shortcuts.group_accented	Snarveier for bokstaver med aksentmerkinger
+menu.shortcuts.group_modifiers	Modifiseringkombinasjoner
+menu.shortcuts.key_at_hash	@ / #
+menu.shortcuts.key_layer_scroll	Layer + Scroll
+menu.shortcuts.off	❌ Snarveier deaktivert (klikk for å aktivere)
+menu.shortcuts.on	✅ Snarveier aktivert (klikk for å deaktivere)
+menu.shortcuts.personal	Personlige snarveier
+menu.shortcuts.right_opt_back	Høyre Opt + ⌫ → %s
+menu.shortcuts.right_opt_escape	Høyre Opt + Esc → %s
+menu.shortcuts.right_opt_return	Høyre Opt + Enter → %s
+menu.shortcuts.script_shortcuts	Skriptbehandlingssnarveier
+menu.shortcuts.submenu_cmd	Cmd-snarveier
+menu.shortcuts.submenu_ctrl	Ctrl-snarveier
+menu.shortcuts.title	🎯 Snarveier
+menu.shortcuts.win_add	[+ Legg til en Win+… snarvei]
+menu.shortcuts.win_group	⊞ Win-snarveier
+menu.shortcuts.wrap_group_angle	Vinkel- og ornamentparenteser
+menu.shortcuts.wrap_group_braces	Vannrette klammeparenteser
+menu.shortcuts.wrap_group_brackets	Parenteser og klammer
+menu.shortcuts.wrap_group_cjk	CJK-parenteser
+menu.shortcuts.wrap_group_markdown	Markdown-utheving
+menu.shortcuts.wrap_group_other	Andre symboler
+menu.shortcuts.wrap_group_quotes	Anførselstegn og apostrofer
+menu.shortcuts.wrap_symbols_add_custom	[+ Legg til et symbol…]
+menu.shortcuts.wrap_symbols_check_all	Merk alle
+menu.shortcuts.wrap_symbols_custom_label	Tilpasset
+menu.shortcuts.wrap_symbols_title	  ↳ Symboler som omkranser valget
+menu.shortcuts.wrap_symbols_uncheck_all	Fjern alle markeringer
+menu.tapholds.off	❌ Tap-holds deaktivert (klikk for å aktivere)
+menu.tapholds.on	✅ Tap-holds aktivert (klikk for å deaktivere)
+menu.tapholds.title	⌨️ Tap-Holds
+menu.updates.title	🔄 Updates
+metrics.shortcut_format_hint	Format: mods+tast  (f.eks. ctrl+alt+m)\nTilgjengelige mods: ctrl, alt, shift, win\nLa stå tomt for å deaktivere.
+metrics.shortcut_invalid_title	Ugyldig snarvei
+metrics.shortcut_prompt_title	Snarvei — {1}
+metrics.shortcut_register_error	Snarveien « {1} » kunne ikke registreres: {2}
+metrics_apps.chooser_placeholder	Kategori for %s
+metrics_apps.general_category	Generelt
+metrics_apps.new_category_create_subtext	Opprett en ny kategori
+metrics_apps.new_category_item	+ Ny kategori…
+metrics_apps.new_category_prompt	Navn på den nye kategorien for %s:
+metrics_apps.new_category_title	Ny kategori
+metrics_apps.no_app_detected	Ingen applikasjon kunne oppklares.
+metrics_apps.rename_chooser_placeholder	Kategori som skal gis nytt navn
+metrics_apps.rename_item	✎ Gi nytt navn til en eksisterende kategori…
+metrics_apps.rename_prompt	Nytt navn for kategorien «%s»:
+metrics_apps.rename_subtext	Alle apper i denne kategorien vil få nytt navn
+metrics_apps.rename_title	Gi nytt navn
+metrics_apps.score_error	Poengsum må være mellom -2 og 2.
+metrics_apps.score_prompt	Produktivitetspoengsum for %s\n(-2 veldig distraherende til 2 veldig produktiv):
+metrics_apps.score_title	Poengsum
+metrics_apps.title	Skrivemetrikk
+metrics_apps.use_category_subtext	Bruk denne kategorien
+metrics_apps.window_title	Tid per applikasjon
+mlx.deps_failed	Mislyktes…
+mlx.deps_missing	MLX-avhengigheter mangler
+mlx.deps_missing_body	Automatisk bootstrap er i gang. Prøv igjen om noen få minutter.
+mlx.deps_preparing	Forbereder…
+mlx.deps_pty_write_failed	Kunne ikke skrive PTY-wrapperfil.
+mlx.deps_step_bootstrap	Kjører installasjonsskript…
+mlx.deps_step_python	Installerer Python…
+mlx.deps_step_ready	AI-motor klar.
+mlx.deps_step_sync	Synkroniserer AI-avhengigheter…
+mlx.deps_step_uv	Installerer uv…
+mlx.deps_step_venv	Oppretter lokal virtualenv…
+mlx.deps_task_create_failed	Kunne ikke opprette hs.task.
+mlx.deps_task_start_failed	Kunne ikke starte hs.task.
+mlx.download_cancelled	Avbrutt
+mlx.download_cancelled_body	Nedlasting av %s avbrutt.
+mlx.download_failed	MLX mislyktes
+mlx.download_failed_body	Kontroller loggene i vinduet.
+mlx.download_interrupted	Nedlasting avbrutt
+mlx.download_interrupted_body	Nedlastingsprosessen for %s stoppet under ominnlasting.
+mlx.download_stalled	MLX-nedlasting stoppet
+mlx.download_subtitle	Henter vekter fra Hugging Face…
+mlx.download_title	Laster ned MLX-modell
+mlx.hf_connected	HuggingFace tilkoblet
+mlx.hf_connected_body	Token lagret. Du kan nå laste ned modeller mye raskere!
+mlx.hf_connection_failed	HuggingFace-tilkobling mislyktes
+mlx.hf_connection_failed_body	Tilkoblingen mislyktes. Kontroller tokenet ditt.
+mlx.hf_login_title	HuggingFace-pålogging
+mlx.hf_page_opened	Modellside åpnet i nettleseren din
+mlx.init_subtitle	AI initialization in progress, please wait…
+mlx.init_title	Initializing the AI engine (MLX)
+mlx.install_subtitle	Forbereder lokale Python-avhengigheter…
+mlx.install_title	Installerer AI-motor (MLX)
+mlx.launcher_failed	MLX-lansering mislyktes
+mlx.launcher_failed_body	Lanseren mislyktes (kode %d).
+mlx.model_deleted	Slettet (MLX)
+mlx.model_incompatible	Modell %s er ikke kompatibel med mlx-lm. Velg en annen modell.
+mlx.model_installed	MLX-modell installert
+mlx.model_ready	%s er klar!
+mlx.model_unavailable	MLX-modell utilgjengelig
+mlx.model_unavailable_body	Modell %s er ikke MLX-kompatibel eller har ikke MLX-repository konfigurert
+mlx.open_source_failed	Kunne ikke åpne HuggingFace-side
+mlx.source_not_found	Kilde ikke funnet
+mlx.source_not_found_body	Ingen MLX-repository funnet for denne modellen
+mlx.token_corrected	Token korrigert
+mlx.token_corrected_body	Det fullstendige utklippstavle-tokenet ble brukt
+mlx.token_detected	Token oppdaget
+mlx.token_detected_body	Token hentet fra utklippstavle
+mlx.token_missing	Token mangler
+mlx.token_missing_body	Ingen token angitt
+mlx.write_py_failed	Kunne ikke skrive Python-skript til /tmp
+mlx.write_sh_failed	Kunne ikke skrive Bash-skript til /tmp
+model_browser.col_family	Familie
+model_browser.col_name	Modell
+model_browser.col_params	Parametere
+model_browser.col_ram	RAM
+model_browser.col_speed	Hastighet
+model_browser.col_status	Status
+model_browser.col_type	Type
+model_browser.count_label	{n} av {total} modeller
+model_browser.no_models	Ingen modell samsvarer med søket ditt.
+model_browser.search_placeholder	Søk etter en modell…
+model_browser.select_hint	Dobbeltklikk på en modell eller trykk Enter for å bruke den.
+model_browser.status_available	Tilgjengelig
+model_browser.status_installed	Installert
+model_browser.type_chat	Chat
+model_browser.type_completion	Fullføring
+model_browser.use_button	Bruk
+model_browser.window_title	Modellkatalog
+notify.all_features_disabled	Alle funksjoner har blitt deaktivert
+notify.all_features_enabled	Alle funksjoner har blitt aktivert
+notify.clipboard	Utklippstavle
+notify.defaults_reset	Standarder nullstilt — Laster inn på nytt…
+notify.hotstrings	Hotstrings
+notify.llm_disabled	🔴 DEAKTIVERT
+notify.llm_enabled	🟢 AKTIVERT
+notify.llm_mlx_failures_body	MLX-serveren svarer ikke. Kontroller at modellen er lastet og serveren kjører på port 8080.
+notify.llm_mlx_failures_title	LLM-spådommer — Gjentatte feil
+notify.llm_suggestions	AI-forslag
+notify.personal_info	Personlig informasjon
+notify.screenshot_copied	Skjermbilde kopiert
+notify.screenshot_saved	Skjermbilde lagret
+notify.screenshot_saved_path	Lagret: %s
+notify.screenshot_title	Skjermbilde
+notify.script_control	Skriptkontroll
+notify.word_expander_prefix	Ordutvidelse: %s
+ollama.cancelled_title	Avbrutt
+ollama.daemon_fail	Kunne ikke starte Ollama-daemon.
+ollama.delete_error	Modell: %s\n%s
+ollama.delete_fail_title	Ollama-sletting mislyktes
+ollama.deleted_title	Slettet (Ollama)
+ollama.deps_failed	Mislyktes…
+ollama.deps_step_checking	Kontrollerer Ollama…
+ollama.deps_step_installing	Installerer Ollama…
+ollama.deps_step_ready	Ollama-server klar.
+ollama.deps_step_starting	Starter Ollama-server…
+ollama.deps_task_create_failed	Kunne ikke opprette hs.task.
+ollama.deps_task_start_failed	Kunne ikke starte hs.task.
+ollama.download_cancelled	Ollama-nedlasting avbrutt
+ollama.download_error	Nedlastingsfeil for %s
+ollama.download_subtitle	Henter vekter fra Ollama Hub…
+ollama.download_title	Laster ned Ollama-modell
+ollama.downloading	Laster ned Ollama-modell…
+ollama.fail_title	Ollama-feil
+ollama.install_subtitle	Forbereder lokal Ollama-server…
+ollama.install_title	Installerer AI-motor (Ollama)
+ollama.model_deleted	Modell slettet: %s
+ollama.model_installed_title	Ollama-modell installert
+ollama.model_ready	%s er klar!
+ollama.model_repair	Modellen ser ødelagt ut. Forsøker på nytt: %s
+ollama.model_repair_title	Reparerer Ollama-modell
+ollama.not_detected_body	Installer Ollama og prøv igjen.
+ollama.not_detected_title	Ollama ikke oppdaget
+ollama.service_disconnected	Ollama-tjenesten svarer ikke.
+ollama.service_ready	Ollama-tjeneste klar ✅
+ollama.service_stopped	Ollama-tjeneste stoppet. Starter…
+ollama.start_fail	Kunne ikke starte tjeneste.
+ollama.starting_service	Starter Ollama-tjeneste (%s/%s)…
+ollama.starting_title	Starter Ollama
+ollama.upgrade_required_body	Den installerte Ollama-versjonen er for gammel for denne modellen. Oppdater Ollama manuelt.
+ollama.upgrade_required_title	Ollama-oppdatering påkrevd
+onboarding.back	← Tilbake
+onboarding.btn.cancel	Avbryt
+onboarding.btn.no	Nei
+onboarding.btn.ok	OK
+onboarding.btn.yes	Ja
+onboarding.done.body	Konfigurasjon lagret. Skriptet lastes inn på nytt nå.
+onboarding.done.title	Oppsett fullført!
+onboarding.error.title	ErgoptiPlus — Feil
+onboarding.error.write_failed	Kunne ikke skrive konfigurasjonsfil.
+onboarding.finish	Fullfør ✓
+onboarding.gestures.desc	Aktiverer støtte for touchpad-bevegelser — egendefinerte handlinger utløst av sveip, trykk og klyp.
+onboarding.gestures.open_settings	Åpne touchpad-innstillinger
+onboarding.gestures.open_settings_hint	Åpner Innstillinger → Bluetooth og enheter → Touchpad → Avanserte bevegelser. Hvert spor godtar en snarvei Ctrl + Win + Shift + F1..F10.
+onboarding.gestures.register_auto	Automatisk konfigurasjon
+onboarding.gestures.register_auto_hint	Fyller automatisk inn alle bevegelsessporter i Windows-innstillinger for deg. Krever ikke administratorrettigheter.
+onboarding.gestures.register_deferred	Bevegelser konfigureres ved neste oppstart.
+onboarding.gestures.register_failed	Automatisk konfigurasjon mislyktes. Bruk den manuelle metoden nedenfor.
+onboarding.gestures.register_manual	Manuell metode
+onboarding.gestures.register_manual_hint	Åpner en steg-for-steg-veiledning og en snarvei med ett klikk til touchpad-innstillingssiden slik at du kan koble til hvert bevegelse manuelt.
+onboarding.gestures.register_section	Bevegelser må konfigureres i Windows-innstillinger (Bluetooth og enheter → Touchpad → Avanserte bevegelser):
+onboarding.gestures.register_success	Bevegelser er nå konfigurert i Windows-innstillinger.
+onboarding.gestures.title	ErgoptiPlus — Gester
+onboarding.language.placeholder	Velg ditt språk…
+onboarding.layout.desc	Aktiverer layoutemulering (basislag + AltGr) og Ergopti-hotstrings.
+onboarding.layout.no	Bruk systemlayout
+onboarding.layout.title	ErgoptiPlus — Ergopti-tastaturemulering
+onboarding.layout.yes	Emuler Ergopti-layout
+onboarding.magic_key.choose_freely	Ethvert tegn kan fungere som utløser — sjeldent nok til å unngå falske positive, lett nok å nå.
+onboarding.magic_key.desc	Tegn som utløser hotstrings.
+onboarding.magic_key.option_blackstar	★ — anbefalt (egen tast på Ergopti-oppsettet)
+onboarding.magic_key.option_custom	Tilpasset inndata
+onboarding.magic_key.option_semicolon	; — anbefales på QWERTY
+onboarding.magic_key.option_star	* — anbefalt (fungerer på alle oppsett)
+onboarding.magic_key.option_ugrave	ù — anbefales på AZERTY
+onboarding.magic_key.title	ErgoptiPlus — Magisk tast
+onboarding.metrics.desc	Aktiverer innsamling av skrivemålinger.\n\nHva ErgoptiPlus sporer:\n• skrivehastighet (WPM) per økt, per app og over tid;\n• mest brukte taster, ord, n-grams og ergonomisk belastning;\n• håndveksling, fingerbelastning og bigrammer for samme finger;\n• tid brukt per applikasjon (RescueTime-stil) med produktivitetsscore;\n• trender, varmekart og detaljerte dashbord i Metrics-vinduet.
+onboarding.metrics.title	ErgoptiPlus — Skrivemetrikk
+onboarding.next	Neste →
+onboarding.no	Nei
+onboarding.warning_label	Advarsel
+onboarding.welcome.heading	Språk
+onboarding.welcome.title	ErgoptiPlus — Oppsett
+onboarding.yes	Ja
+paths_editor.btn_browse	Bla gjennom…
+paths_editor.btn_cancel	Avbryt
+paths_editor.btn_reset	Tilbakestill til standard
+paths_editor.btn_save	Lagre og last på nytt
+paths_editor.heading	Konfigurasjonsmappe
+paths_editor.label_config_dir	Konfigurasjonsmappe
+paths_editor.save_failed	Kunne ikke lagre konfigurasjonsmappen. Filen kan være skrivebeskyttet eller i bruk av et annet program.
+paths_editor.save_failed_title	Lagring mislyktes
+paths_editor.subtitle	Alle personlige filer (snarveier, hotstrings…) løses fra denne mappen.
+paths_editor.tag_default	standard
+paths_editor.tag_modified	endret
+personal_info.field_credit_card	Kredittkort
+personal_info.field_firstname	Fornavn
+personal_info.field_phone_digits	Telefon (sifre)
+personal_info.field_phone_formatted	Telefon (formatert)
+personal_info.field_ssn	Personnummer
+personal_info.saved_body	Du kan lukke denne fanen.
+personal_info.saved_title	✓ Lagret
+profiles.created_title	Profil opprettet
+profiles.updated_title	Profil oppdatert
+prompt_editor.default_label	Egendefinert profil
+prompt_editor.help_text	Blokken {context} vil bli erstattet med den valgte teksten. Blokken {n} vil bli erstattet med antall prediksjoner. Formatering (Batch): Be modellen om å skille hver forslag med ---.
+prompt_editor.insert_context	Sett inn {context}-blokk
+prompt_editor.insert_language	Sett inn {language}-blokk
+prompt_editor.insert_max_words	Sett inn {max_words}-blokk
+prompt_editor.insert_min_words	Sett inn {min_words}-blokk
+prompt_editor.insert_n	Sett inn {n}-blokk
+prompt_editor.label_mode	Forespørselsmodus
+prompt_editor.label_name	Profilnavn
+prompt_editor.label_prompt	Systemprompt
+prompt_editor.mode.batch	Battet — prediksjoner i serier (store modeller)
+prompt_editor.mode.parallel	Standard — parallelle prediksjoner
+prompt_editor.placeholder_prompt	Her er en tekst, fortsett den: {context}
+prompt_editor.title_edit	Rediger profil
+prompt_editor.title_new	Ny profil
+script_control.paused	Satt på pause
+script_control.resumed	Skript gjenopptatt
+sfbsreduction.bu	À + ★ → BU
+sfbsreduction.comma	Komma reduserer bigrammer for samme finger
+sfbsreduction.ecirc	Ê reduserer bigrammer for samme finger
+sfbsreduction.egrave	È reduserer bigrammer for samme finger
+sfbsreduction.ié	IE reduserer IE/EI-bigrammer
+sg_actions.activity_simulation	🖱 Simuler aktivitet (anti-søvn)
+sg_actions.alt_tab_monitor	Alt-Tab (skjerm)
+sg_actions.app_expose	◱ App Exposé
+sg_actions.app_previous	⇥ ← Alt+Tab — Forrige app
+sg_actions.app_switcher	⇥ Alt+Tab — Forrige app
+sg_actions.app_window_previous	⇥ ◱ ← Alt+Tab — Forrige vindu
+sg_actions.arrow_down	↓ Pil ned
+sg_actions.arrow_left	← Pil venstre
+sg_actions.arrow_right	→ Pil høyre
+sg_actions.arrow_up	↑ Pil opp
+sg_actions.backspace	⌫ Slett bakover
+sg_actions.brightness_down	☀ - Lysstyrke -
+sg_actions.brightness_up	☀ + Lysstyrke +
+sg_actions.caps_lock	⇪ CapsLock
+sg_actions.caps_word	⇪★ CapsWord
+sg_actions.close_window	◱ × Lukk vindu
+sg_actions.copy	⎘ Kopier
+sg_actions.ctrl_backspace	⌫ Ctrl+Tilbake
+sg_actions.ctrl_delete	⌦ Ctrl+Delete
+sg_actions.cut	⎘ Klipp ut
+sg_actions.delete	⌦ Slett
+sg_actions.desktop_close	▢ × Lukk skrivebord
+sg_actions.desktop_new	▢ + Nytt skrivebord
+sg_actions.desktop_next	▢ → Neste skrivebord
+sg_actions.desktop_prev	▢ ← Forrige skrivebord
+sg_actions.doc_end	⤓ Dokumentslutt
+sg_actions.doc_start	⤒ Dokumentstart
+sg_actions.enter	↵ Enter
+sg_actions.escape	⎋ ESC
+sg_actions.find	🔍 Søk
+sg_actions.fullscreen	📺 Fullskjerm
+sg_actions.left_click_toggle	🖱 V Venstre klikk (hold)
+sg_actions.line_down	↕ ↓ Neste linje
+sg_actions.line_end	⇥ Linjesluttt
+sg_actions.line_start	⇤ Linjestart
+sg_actions.line_up	↕ ↑ Forrige linje
+sg_actions.lock_screen	🔒 Lås skjerm
+sg_actions.lookup	🔍 Ordefinisjon
+sg_actions.maximize	🔲 Maksimer
+sg_actions.microsoft_bold	𝐁 Ctrl+B Microsoft (→ Ctrl+G)
+sg_actions.minimize_all	◱ Minimer alt
+sg_actions.mission_control	▢ Mission Control
+sg_actions.mute	🔇 Demp/Av demping
+sg_actions.nav_back	← Tilbake (navigering)
+sg_actions.nav_forward	→ Fremover (navigering)
+sg_actions.none	∅ Ingenting
+sg_actions.notification_center	🔔 Varslinger
+sg_actions.ocr_screenshot	📷 OCR-skjermbilde (Win+Shift+T)
+sg_actions.one_shot_shift	⇧ OneShotShift
+sg_actions.open_config	⚙ Konfigurasjon
+sg_actions.open_console	▤ Konsoll
+sg_actions.open_error_log	📄 Error log
+sg_actions.open_hotstrings_editor	⌨ Hotstrings-redigeringsprogram
+sg_actions.open_key_history	Tasterhistorikk
+sg_actions.open_list_vars	Variabeltilstand
+sg_actions.open_logs_folder	📁 Loggmappe
+sg_actions.open_metrics_apps	📊 App-statistikk
+sg_actions.open_metrics_typing	📊 Skrivestatistikk
+sg_actions.open_paths_editor	📂 Banebehandling
+sg_actions.open_personal_hotstrings	👤 Personlige hotstrings
+sg_actions.open_personal_info	👤 Personlig informasjon
+sg_actions.open_personal_shortcuts	👤 Fil med personlige snarveier
+sg_actions.open_script_source	🛠 Kildekode
+sg_actions.open_today_log	📄 Dagens logg
+sg_actions.open_url	🌐 Åpne en lenke (konfigurerbar)
+sg_actions.open_window_spy	Window Spy
+sg_actions.para_next	¶ ↓ Neste avsnitt
+sg_actions.para_prev	¶ ↑ Forrige avsnitt
+sg_actions.paste	⎘ Lim inn
+sg_actions.paste_plain	⎘ Lim inn uten formatering
+sg_actions.pick_color	🎨 HEX-farge under markør
+sg_actions.redo	↪ Gjør om
+sg_actions.right_click_toggle	🖱 H Høyre klikk (hold)
+sg_actions.screen_capture	📸 Selektiv opptak (Win+Shift+S)
+sg_actions.screen_capture_instant	📸 Øyeblikkelig opptak (vindu)
+sg_actions.screen_record	⏺ Skjermopptak
+sg_actions.screenshot_fullscreen_clipboard	📸 🖥 Kopier skjerm
+sg_actions.screenshot_fullscreen_save	📸 🖥 Lagre skjerm
+sg_actions.screenshot_region_clipboard	📸 ⬚ Kopier område
+sg_actions.screenshot_region_save	📸 ⬚ Lagre område
+sg_actions.screenshot_window_clipboard	📸 ⊞ Kopier vindu
+sg_actions.screenshot_window_save	📸 ⊞ Lagre vindu
+sg_actions.script_pause_toggle	⏸/▶ Pause / Gjenoppta
+sg_actions.script_quit	✕ Avslutt
+sg_actions.script_reload	↻ Last på nytt
+sg_actions.script_save_reload	↻ Lagre og last på nytt
+sg_actions.search_web	🔍 Websøk (konfigurerbar)
+sg_actions.sel_down	✎ ↓ Velg ned
+sg_actions.sel_left	✎ ← Velg venstre
+sg_actions.sel_right	✎ → Velg høyre
+sg_actions.sel_up	✎ ↑ Velg opp
+sg_actions.sel_word_next	✎ W → Velg neste ord
+sg_actions.sel_word_prev	✎ W ← Velg forrige ord
+sg_actions.select_all	⬚ Velg alt
+sg_actions.select_line	☰ Velg linje
+sg_actions.sg_order.header.alt	#⎇ (Alt) snarveier
+sg_actions.sg_order.header.cmd	#⌘ (Cmd) snarveier
+sg_actions.sg_order.header.cmd_shift	#⌘⇧ (Cmd+Shift) snarveier
+sg_actions.sg_order.header.ctrl	#^ (Ctrl) snarveier
+sg_actions.sg_order.header.ctrl_shift	#^⇧ (Ctrl+Shift) snarveier
+sg_actions.sg_order.header.cursor	#Markør og tekst
+sg_actions.sg_order.header.debug	#Debug
+sg_actions.sg_order.header.edition	#Redigering
+sg_actions.sg_order.header.files	#Filer
+sg_actions.sg_order.header.grp_app	Ergopti
+sg_actions.sg_order.header.grp_input	Inndata
+sg_actions.sg_order.header.grp_media	Medier
+sg_actions.sg_order.header.grp_system	System
+sg_actions.sg_order.header.grp_text	Tekst
+sg_actions.sg_order.header.grp_windows	Vinduer og områder
+sg_actions.sg_order.header.hs_ctrl	#^ (Ctrl) snarveier — macOS
+sg_actions.sg_order.header.hs_ctrl_shift	#^⇧ (Ctrl+Shift) snarveier — macOS
+sg_actions.sg_order.header.hs_option	#⌥ (Option) snarveier — macOS
+sg_actions.sg_order.header.keys	#Taster
+sg_actions.sg_order.header.media	#Medier
+sg_actions.sg_order.header.mouse_nav	#Mus og navigasjon
+sg_actions.sg_order.header.navigation	#Navigasjon
+sg_actions.sg_order.header.screenshot	#Skjermbilder
+sg_actions.sg_order.header.script	#Skriptstyring
+sg_actions.sg_order.header.selection	#Tekstvalg
+sg_actions.sg_order.header.spaces	#Spaces / Skrivebord
+sg_actions.sg_order.header.system	#System
+sg_actions.sg_order.header.system_actions	#Systemhandlinger
+sg_actions.sg_order.header.tabs	#Faner
+sg_actions.sg_order.header.tapholds	#Tap-Hold-handlinger
+sg_actions.sg_order.header.ui	#Grensesnitt
+sg_actions.sg_order.header.win	#⊞ (Win) snarveier
+sg_actions.sg_order.header.windows	#Vinduer
+sg_actions.snap_left	◧ ← Snap venstre
+sg_actions.snap_right	◨ → Snap høyre
+sg_actions.space	␣ Mellomrom
+sg_actions.space_next	▢ → Neste Space
+sg_actions.space_prev	▢ ← Forrige Space
+sg_actions.spotlight_mouse	🔦 Musespotlight
+sg_actions.surround_parens	() Omgi med parenteser
+sg_actions.tab	⇥ Tab
+sg_actions.tab_close	⧉ × Lukk fane
+sg_actions.tab_new	⧉ + Ny fane
+sg_actions.tab_next	⧉ → Neste fane
+sg_actions.tab_prev	⧉ ← Forrige fane
+sg_actions.take_note	📝 Skriv notat
+sg_actions.task_view	▢ Oppgavevisning
+sg_actions.teleport_mouse	🖱 Teleporter mus
+sg_actions.titlecase_selection	Aa Tittelformat
+sg_actions.toggle_capslock	⇪ Veksle Caps Lock
+sg_actions.track_next	⏭ Neste spor
+sg_actions.track_play	⏯ Spill av/Pause
+sg_actions.track_prev	⏮ Forrige spor
+sg_actions.undo	↩ Angre
+sg_actions.uppercase_selection	AA Store/små bokstaver
+sg_actions.vol_down	🔊 - Volum -
+sg_actions.vol_up	🔊 + Volum +
+sg_actions.win_app_next	◱ → Neste vindu (samme app)
+sg_actions.win_app_prev	◱ ← Forrige vindu (samme app)
+sg_actions.win_next	◱ → Neste vindu
+sg_actions.win_prev	◱ ← Forrige vindu
+sg_actions.word_next	W → Neste ord
+sg_actions.word_prev	W ← Forrige ord
+sg_labels.script_altgr_backspace	AltGr + ⌫
+sg_labels.script_altgr_delete	AltGr + ⌦
+sg_labels.script_altgr_enter	AltGr + Enter
+sg_labels.script_altgr_escape	AltGr + Esc
+shortcut_utils.format_hint	Bruk formatet mods+tast, f.eks. cmd+shift+b
+shortcut_utils.format_invalid	Ugyldig format
+shortcuts.agrave	Alle snarveier på À-tasten tilsvarer de for 
+shortcuts.altgrcapslock.backspace	"AltGr" + "CapsLock" = BackSpace
+shortcuts.altgrcapslock.capslock	"AltGr" + "CapsLock" = CapsLock
+shortcuts.altgrcapslock.capsword	"AltGr" + "CapsLock" = CapsWord
+shortcuts.altgrcapslock.ctrlbackspace	"AltGr" + "CapsLock" = Ctrl + BackSpace
+shortcuts.altgrcapslock.ctrldelete	"AltGr" + "CapsLock" = Ctrl + Delete
+shortcuts.altgrcapslock.delete	"AltGr" + "CapsLock" = Delete
+shortcuts.altgrcapslock.enter	"AltGr" + "Caps Lock" = Enter
+shortcuts.altgrcapslock.escape	"AltGr" + "Caps Lock" = Escape
+shortcuts.altgrcapslock.oneshotshift	"AltGr" + "CapsLock" = OneShotShift
+shortcuts.altgrcapslock.tab	"AltGr" + "CapsLock" = Tab
+shortcuts.altgrlalt.backspace	"AltGr" + "LAlt" = BackSpace
+shortcuts.altgrlalt.capslock	"AltGr" + "LAlt" = CapsLock
+shortcuts.altgrlalt.capsword	"AltGr" + "LAlt" = CapsWord
+shortcuts.altgrlalt.ctrlbackspace	"AltGr" + "LAlt" = Ctrl + BackSpace
+shortcuts.altgrlalt.ctrldelete	"AltGr" + "LAlt" = Ctrl + Delete
+shortcuts.altgrlalt.delete	"AltGr" + "LAlt" = Delete
+shortcuts.altgrlalt.enter	"AltGr" + "LAlt" = Enter
+shortcuts.altgrlalt.escape	"AltGr" + "LAlt" = Escape
+shortcuts.altgrlalt.oneshotshift	"AltGr" + "LAlt" = OneShotShift
+shortcuts.altgrlalt.tab	"AltGr" + "LAlt" = Tab
+shortcuts.color_copied	Farge kopiert: %s
+shortcuts.color_picker_result	Fargen under markøren er {1}.\n\nDen er kopiert til utklippstavlen.
+shortcuts.color_picker_title	Pikselfarve
+shortcuts.copy_path_notif	Sti kopiert: %s
+shortcuts.eacute	Alle snarveier på É-tasten tilsvarer de for 
+shortcuts.ecirc	Alle snarveier på Ê-tasten tilsvarer de for 
+shortcuts.egrave	Alle snarveier på È-tasten tilsvarer de for 
+shortcuts.gethexvalue	Win + X (heX) = Kopier HEX-fargen på pikselen under markøren til utklippstavlen
+shortcuts.gpt	Win + G(PT) = Åpne ChatGPT (konfigurerbar URL)
+shortcuts.keep_awake_off	☕ Hold våken — inaktiv
+shortcuts.keep_awake_on	☕ Hold våken — aktiv — Ctrl+M for å deaktivere
+shortcuts.label_at_hash	Øyeblikkelig skjermbilde
+shortcuts.label_cmd_shift_v	Lim inn uten formatering
+shortcuts.label_cmd_star	Cmd + S (bevarer modifikatorer)
+shortcuts.label_ctrl_a	Velg linje
+shortcuts.label_ctrl_capslock	Veksle Caps Lock
+shortcuts.label_ctrl_d	Åpne Downloads
+shortcuts.label_ctrl_e	Åpne Finder
+shortcuts.label_ctrl_g	Åpne ChatGPT (URL satt i meny)
+shortcuts.label_ctrl_h	Interaktivt skjermbilde til utklippstavlen
+shortcuts.label_ctrl_i	Åpne innstillinger
+shortcuts.label_ctrl_l	Lås skjermen
+shortcuts.label_ctrl_m	Anti-søvn
+shortcuts.label_ctrl_o	Omgi linje med parenteser
+shortcuts.label_ctrl_p	Veksle speilkopi / utvidet skjerm
+shortcuts.label_ctrl_period	Åpne emoji-velger
+shortcuts.label_ctrl_quote	Musespotlight
+shortcuts.label_ctrl_s	Åpne / Kopier sti
+shortcuts.label_ctrl_t	Teleporter mus til annen monitor
+shortcuts.label_ctrl_u	Veksle STORE BOKSTAVER / små bokstaver
+shortcuts.label_ctrl_w	Veksle tittelformat / små bokstaver
+shortcuts.label_ctrl_x	Kopier heks-farge på piksel under markør
+shortcuts.label_layer_scroll	Volum
+shortcuts.label_wrap_text	Tastering av symbol omgir merkingen
+shortcuts.laltcapslock.backspace	"LAlt" + "CapsLock" = BackSpace
+shortcuts.laltcapslock.capslock	"LAlt" + "CapsLock" = CapsLock
+shortcuts.laltcapslock.capsword	"LAlt" + "CapsLock" = CapsWord
+shortcuts.laltcapslock.ctrlbackspace	"LAlt" + "CapsLock" = Ctrl + BackSpace
+shortcuts.laltcapslock.ctrldelete	"LAlt" + "CapsLock" = Ctrl + Delete
+shortcuts.laltcapslock.delete	"LAlt" + "CapsLock" = Delete
+shortcuts.laltcapslock.enter	"LAlt" + "Caps Lock" = Enter
+shortcuts.laltcapslock.escape	"LAlt" + "Caps Lock" = Escape
+shortcuts.laltcapslock.oneshotshift	"LAlt" + "CapsLock" = OneShotShift
+shortcuts.laltcapslock.tab	"LAlt" + "CapsLock" = Tab
+shortcuts.microsoftbold	Ctrl + B gjør tekst feit i Microsoft-programmer (som Ctrl + G)
+shortcuts.move	Win + M(ove) = Simuler aktivitet ved å flytte musen tilfeldig. Gjenta snarveien eller last scriptet på nytt for å stoppe
+shortcuts.no_active_window	Ingen aktivt vindu
+shortcuts.no_other_monitor	Ingen annen skjerm funnet
+shortcuts.opendownloads	Win + D(ownloads) = Åpne Downloads-mappen
+shortcuts.pixel_read_error	Kan ikke lese pikselfargen
+shortcuts.saved	Lagret: %s
+shortcuts.screen	Win + H (screensHot) = Skjermbilde (utløser Win + Shift + S)
+shortcuts.screeninstant	Tast til venstre for 1 = Øyeblikkelig skjermbilde av aktivt vindu, lagret i Bilder med tidsstempel
+shortcuts.screenocr	Win + C (OCR) = Skjermbilde med tekstutdrag (Win + Shift + T)
+shortcuts.screenshot_copied	Skjermbilde kopiert til utklippstavle
+shortcuts.screenshot_title	Skjermbilde
+shortcuts.search	Win + S(earch) = Søk merkingen på internett. I Explorer kopierer den filstien for den valgte filen
+shortcuts.shortcut_format_hint	Format: mods+key (f.eks cmd+alt+p)\nTilgjengelige mods: cmd, alt, ctrl, shift\nLa stå tomt for å deaktivere
+shortcuts.shortcut_label	Snarvei
+shortcuts.spotlightmouse	Win + ' = Fremhev musen med en gul ring
+shortcuts.surroundwithparentheses	Win + O = Omgi linjen med parenteser
+shortcuts.takenote	Win + N(ote) = Åpne en fil for å ta notater
+shortcuts.teleportmouse	Win + T(eleport) = Teleporter musen til sentrum av den andre monitoren (syklisk)
+shortcuts.titlecase	Win + W = Konverter til tittelformat (stavelse med stor bokstav i begynnelsen av hvert ord)
+shortcuts.uppercase	Win + U(ppercase) = Veksle merkingen mellom store/små bokstaver
+shortcuts.wincapslock	Win + "CapsLock" = CapsLock
+startup.manifest_missing	Oppstartsfeil: filen _generated/features_manifest.ahk mangler eller er skadet.\n\nKjør `npm run build:manifest` fra prosjektmappen og start skriptet på nytt.
+startup.manifest_title	ErgoptiPlus — manifest mangler
+tap_hold.action.disable	Native nøkkel
+tap_hold.disable_all	Deaktiver alle
+tap_hold.group.alt_gr	AltGr
+tap_hold.group.backspace	Slett
+tap_hold.group.caps_lock	CapsLock
+tap_hold.group.delete	Delete
+tap_hold.group.enter	Enter
+tap_hold.group.escape	Escape
+tap_hold.group.left_alt	LAlt
+tap_hold.group.left_ctrl	LCtrl
+tap_hold.group.left_shift	LShift
+tap_hold.group.right_ctrl	RCtrl
+tap_hold.group.right_shift	RShift
+tap_hold.group.space	Mellomrom
+tap_hold.group.tab	Tab
+tap_hold.group.win	Win
+tap_hold.hold.alt	Alt
+tap_hold.hold.alt_gr	AltGr
+tap_hold.hold.ctrl	Ctrl
+tap_hold.hold.nav_layer	Nav-lag
+tap_hold.hold.none	Native nøkkel
+tap_hold.hold.shift	Shift
+tap_hold.hold.win	Win
+tap_hold.picker.hold	Hold → %s
+tap_hold.picker.tap	Tap → %s
+tap_hold.picker.title_prefix	Tap-handling — 
+tap_hold.reset_defaults	Tilbakestill til standardverdier
+tap_hold.tap.none	Native nøkkel
+terminators.label_close_paren	) : Avsluttende parentes
+terminators.label_enter	⏎ : Enter
+terminators.label_equal	= : Lik
+terminators.label_nbsp	⍽ : Hardt mellomrom
+terminators.label_nnbsp	⍽ : Smalt hardt mellomrom
+token_prompt.create_link	👉 Klikk her for å opprette en
+token_prompt.instruction	Lim inn HuggingFace-tokenet ditt (hf_...) for å øke hastigheten på nedlastinger.
+token_prompt.label	HuggingFace-token:
+token_prompt.no_token	Har du ikke et token?
+token_prompt.placeholder	hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx...
+token_prompt.title	🔐 HuggingFace-pålogging
+token_prompt.validate	Validér
+token_prompt.window_title	HuggingFace-pålogging
+ui_apps.axis_chars	Tegn
+ui_apps.axis_speed	Tegn / fokus min
+ui_apps.boxplot_scale	Skala: 0 → {max}
+ui_apps.boxplot_tip	{n} sesjoner · median {med} (Q1 {q1}, Q3 {q3})
+ui_apps.btn_add_app	Klassifiser en app…
+ui_apps.btn_close	Lukk
+ui_apps.btn_compare	Sammenlign ↔
+ui_apps.btn_count_awake	Tell holdt-våken
+ui_apps.btn_mode_chars	Tegn
+ui_apps.btn_mode_time	Tid
+ui_apps.btn_refresh	Oppdater
+ui_apps.cat_edit_tooltip	Rediger kategori
+ui_apps.chart_active_ratio	Aktivitetsforhold over dager
+ui_apps.chart_activity_cal	Aktivitetskalender (siste 12 måneder)
+ui_apps.chart_annotated_strip	Annotert tidslinje
+ui_apps.chart_app_switches	App-bytte
+ui_apps.chart_burst_hist	Burst-histogram
+ui_apps.chart_cat_evolution	Kategoriutvikling
+ui_apps.chart_daily_evolution	Daglig utvikling
+ui_apps.chart_day_strip	Dagsstrip
+ui_apps.chart_hour_weekday	Time × ukedag
+ui_apps.chart_prod_vs_dist	Produktivt vs distrahering
+ui_apps.chart_session_durations	Sesjonsvarighet etter app
+ui_apps.chart_speed_by_cat	Skrivehastighet etter kategori (CPM)
+ui_apps.chart_speed_by_hour	Skrivehastighet per time (CPM)
+ui_apps.chart_time_by_cat	Tid etter kategori
+ui_apps.chart_timeline	Kronologisk utvikling
+ui_apps.chart_title_day	Dagens utvikling
+ui_apps.chart_title_period	Periodens utvikling
+ui_apps.chart_top7	De 7 beste applikasjonene (tid)
+ui_apps.chart_top8	De 8 beste apper: tid vs tegn
+ui_apps.chart_top_days	Beste dager
+ui_apps.chart_top_sessions	Toppøkter
+ui_apps.chart_top_switch_pairs	Mest brukte bytting-par
+ui_apps.chart_top_windows	Beste vinduer
+ui_apps.chart_wake_sleep	Våkne- og sovtider (tastatur)
+ui_apps.cmp_active_time	Aktiv tid
+ui_apps.cmp_chars	Tegn
+ui_apps.cmp_focus_time	Fokustid
+ui_apps.cmp_productivity	Produktivitet
+ui_apps.cmp_sessions	Økter
+ui_apps.cmp_switches	Bytter
+ui_apps.cmp_window	nåværende: {cur} ‹{period}› · forrige: {prev}
+ui_apps.col_app	Program
+ui_apps.col_app_name	Program
+ui_apps.col_category	Kategori
+ui_apps.col_chars	Tegn
+ui_apps.col_day	Dag
+ui_apps.col_density	Tetthet
+ui_apps.col_duration	Varighet
+ui_apps.col_focus	Fokus
+ui_apps.col_focus_time	Fokustid
+ui_apps.col_from	Fra
+ui_apps.col_hold	Hold
+ui_apps.col_hs_pct	% HS
+ui_apps.col_latency	Latens
+ui_apps.col_sessions	Økter
+ui_apps.col_share	Andel
+ui_apps.col_switches	Bytter
+ui_apps.col_to	Til
+ui_apps.col_top_dests	Beste destinasjoner
+ui_apps.col_typing_pct	Skriveprosent
+ui_apps.col_window	Vindu
+ui_apps.compare_title	Sammenligning med forrige periode
+ui_apps.detail_global_activity	Total registrert aktivitet
+ui_apps.detail_productivity_score	Poengsum beregnet fra dine kategorier
+ui_apps.ds_active_ratio	Aktiv forhold (%)
+ui_apps.ds_bursts	Bursts
+ui_apps.ds_chars	Tegn
+ui_apps.ds_first_key	Første tastetilslag
+ui_apps.ds_focus_h	Fokus (t)
+ui_apps.ds_focus_time	Fokustid
+ui_apps.ds_last_key	Siste tastetilslag
+ui_apps.ds_speed	Hastighet (tegn / fokusmin)
+ui_apps.ds_switches	Bytter
+ui_apps.empty_activity	Ingen aktivitet registrert for denne perioden.
+ui_apps.empty_app_switches	Ingen bytter i denne perioden.
+ui_apps.empty_boxplot	Ikke nok økter for å tegne et boxplot (≥ 4 per app).
+ui_apps.empty_comparator	Velg en avgrenset periode for å aktivere sammenligning.
+ui_apps.empty_day	Ingen dag valgt.
+ui_apps.empty_days	Ingen dag registrert.
+ui_apps.empty_period	Ingen data for denne perioden.
+ui_apps.empty_sessions	Ingen økt oppdaget.
+ui_apps.empty_switches	Ingen bytter i denne perioden.
+ui_apps.empty_windows	Ingen vindustittel aggregert ennå.
+ui_apps.goal_prompt	Daglig mål i aktiv fokustid (minutter):
+ui_apps.goal_reached	Mål nådd i dag ✓
+ui_apps.goal_remaining	{pct}% igjen for å nå mål
+ui_apps.h2_active_time	Aktiv tid
+ui_apps.h2_app_hopping	App-hopping
+ui_apps.h2_autorepeat	Auto-repetisjon
+ui_apps.h2_battery	Batteri
+ui_apps.h2_best_hour	Beste time
+ui_apps.h2_burst_record	Burst-rekord
+ui_apps.h2_context_volume	Kontekstvolum
+ui_apps.h2_daily_goal	Daglig mål
+ui_apps.h2_density	Tetthet
+ui_apps.h2_depth	Gjensnittlig dybde
+ui_apps.h2_dominant_cat	Dominerende kategori
+ui_apps.h2_finger_streak	Fingrstripe
+ui_apps.h2_first_last	Første / siste
+ui_apps.h2_focus_index	Fokusindeks
+ui_apps.h2_focus_latency	Fokuslatens
+ui_apps.h2_keep_awake	Hold våken
+ui_apps.h2_layouts	Layouter sett
+ui_apps.h2_lock_vs_sleep	Lås vs søvn
+ui_apps.h2_locks	Låshendelser
+ui_apps.h2_long_sessions	Lange økter
+ui_apps.h2_longest_burst	Lengste burst
+ui_apps.h2_longest_session	Lengste økt
+ui_apps.h2_max_cascade	Maks kaskade
+ui_apps.h2_most_errors	App med mest feil
+ui_apps.h2_muted	Lyd stille
+ui_apps.h2_night_wakeups	Nattlige oppvakninger
+ui_apps.h2_passive_system	System passiv
+ui_apps.h2_pivot_app	Pivotapp
+ui_apps.h2_productivity	Produktivitetsindeks
+ui_apps.h2_record_day	Rekorddag
+ui_apps.h2_screen_time	Skjermtid
+ui_apps.h2_session_record	Øktrekord
+ui_apps.h2_sessions	Økter
+ui_apps.h2_slowest_recovery	Tregeste gjenoppretting
+ui_apps.h2_spaces	Spaces
+ui_apps.h2_streak_chars	Serie tegn ≥ 1k
+ui_apps.h2_streak_focus	Serie fokus ≥ 30 min
+ui_apps.h2_top_trio	Topp-trio
+ui_apps.h2_wifi_changes	Wi-Fi-endringer
+ui_apps.kpi_app_days_90	app-dager ≥ 90 min
+ui_apps.kpi_app_switches	appbytter
+ui_apps.kpi_awake_excluded	ekskludert fra statistikk (slå av)
+ui_apps.kpi_awake_included	inkludert i statistikk
+ui_apps.kpi_best_hour_score	gjensnittlig poengsum {score} (-2 til 2)
+ui_apps.kpi_bursts_count	over {n} burst(s)
+ui_apps.kpi_car_per_min	tegn / fokusmin
+ui_apps.kpi_cascades_period	{n} kaskade(r) i periode
+ui_apps.kpi_chars_in_a_row	tegn på rad
+ui_apps.kpi_day_best	på {date}
+ui_apps.kpi_focus_taken	over {n} fokusgrep
+ui_apps.kpi_hopping_detail	bytter / fokusmin
+ui_apps.kpi_in_app	i {name}
+ui_apps.kpi_lock_sleep_cumul	{dur} kumulativ
+ui_apps.kpi_lock_vs_sleep	lås / søvn
+ui_apps.kpi_never_active	aldri aktivert
+ui_apps.kpi_never_reached	aldri nådd
+ui_apps.kpi_night_wakes	oppvakninger mellom 0 og 6
+ui_apps.kpi_no_backslash_out	ingen utgående bytting
+ui_apps.kpi_no_burst	ingen burst
+ui_apps.kpi_no_data	ingen data
+ui_apps.kpi_no_day_data	ingen data per dag
+ui_apps.kpi_no_enough_errors	ikke nok feil
+ui_apps.kpi_no_enough_typing	ikke nok skriving
+ui_apps.kpi_no_focus	ikke nok fokus
+ui_apps.kpi_no_focus_tracked	ingen fokus spurt
+ui_apps.kpi_no_keystrokes	ingen tastetilslag i periode
+ui_apps.kpi_no_layout	ingen layout registrert
+ui_apps.kpi_no_lock	ingen lås oppdaget
+ui_apps.kpi_no_long_session	ingen lang økt
+ui_apps.kpi_no_mobility	ingen mobilitet
+ui_apps.kpi_no_mute	aldri dempet
+ui_apps.kpi_no_record	ingen registrering i periode
+ui_apps.kpi_no_repeat	ingen repetisjon
+ui_apps.kpi_no_session	ingen økt
+ui_apps.kpi_no_switch	ingen bytting
+ui_apps.kpi_not_measured	ikke målt ennå
+ui_apps.kpi_pct_focus_time	{pct}% av fokustiden
+ui_apps.kpi_productive	produktiv {p}% · nøytral {n}% · distraherende {d}%
+ui_apps.kpi_session_mean	gjensnitt {dur}
+ui_apps.kpi_sleep_intact	søvn intakt
+ui_apps.kpi_space_switches	Space-bytter
+ui_apps.kpi_streak_chars	påfølgende dager ≥ 1000 tegn
+ui_apps.kpi_streak_focus	påfølgende dager ≥ 30 min aktiv
+ui_apps.kpi_switches_between	mellom 2 bytter ({n} bytter)
+ui_apps.kpi_top_layout	topp: {name}
+ui_apps.kpi_towards_apps	mot {n} distinkte apper
+ui_apps.kpi_wifi_switches	nettverksbytter
+ui_apps.label_categories	Kategorier:
+ui_apps.label_date	På:
+ui_apps.label_days	Dager:
+ui_apps.label_period	Periode:
+ui_apps.lbl_switches	Bytter:
+ui_apps.lbl_top_wifi	Topp Wi-Fi:
+ui_apps.lbl_unlocks	Opplåsinger:
+ui_apps.loading_data	Laster inn data...
+ui_apps.modal_activity_hour	Aktivitet per time
+ui_apps.modal_app_title	Program
+ui_apps.modal_backspace_pct	{pct}% av tegn
+ui_apps.modal_chart_label	Tegn
+ui_apps.modal_density	{n} tegn/min
+ui_apps.modal_destinations	Destinasjoner
+ui_apps.modal_hs_ai	Hotstrings & KI
+ui_apps.modal_hs_line	Hotstrings: {n} tegn ({pct}%)
+ui_apps.modal_layouts	Layouter brukt
+ui_apps.modal_llm_line	AI: {n} tegn ({pct}%)
+ui_apps.modal_longest_session	lengste {dur}
+ui_apps.modal_pct_focus	{pct}% fokus
+ui_apps.modal_record_burst	Beste burst CPM: {n}
+ui_apps.modal_record_cascade	Backspace-kaskader: {n}
+ui_apps.modal_record_session	Lengste økt: {dur}{chars}
+ui_apps.modal_records	Rekorder
+ui_apps.modal_total_chars	Totalt antall tegn: {n}
+ui_apps.opt_period.all	Alt
+ui_apps.opt_period.day	Dag
+ui_apps.opt_period.month	Siste 30 dager
+ui_apps.opt_period.week	Siste 7 dager
+ui_apps.opt_period.year	År
+ui_apps.prod_negative	Distraksjon
+ui_apps.prod_neutral	Nøytral
+ui_apps.prod_positive	Produktiv
+ui_apps.row_tooltip	Vis detaljer for {name}
+ui_apps.sub_speed_by_hour	tegn per fokusminutt, over den aktive perioden
+ui_apps.tab_apps	Apper & multitasking
+ui_apps.tab_overview	Oversikt
+ui_apps.tab_system	System og rekorder
+ui_apps.tab_time	Tid og rytme
+ui_apps.tab_typing	Skriving og produktivitet
+ui_apps.tile_backspaces	Backspace-trykk
+ui_apps.tile_chars	Tegn
+ui_apps.tile_focus	Fokus
+ui_apps.tile_focus_lat	Fokusforsinkelse
+ui_apps.tile_sessions	Økter
+ui_apps.tile_typing	Aktiv skriving
+ui_apps.title	App-tidssporer
+ui_typing.apps_all	Apper (Alle)
+ui_typing.apps_none	Apper (Ingen)
+ui_typing.btn_apps_all	Apper (Alt)
+ui_typing.btn_case_sensitive	Skiller mellom store og små bokstaver
+ui_typing.btn_doublings_excluded	Dooblinger ekskludert
+ui_typing.btn_doublings_included	Dooblinger inkludert
+ui_typing.btn_reset	Tilbakestill
+ui_typing.btn_restore_zoom	Tilbakestill zoom
+ui_typing.btn_toggle_hs_title	+ Hotstrings: legger hotstring-tegn til statistikk. Deaktivert: kun manuelle tastetrykk.
+ui_typing.btn_toggle_llm_title	+ AI: legger AI-genererte tegn til statistikk. Deaktivert: kun manuelle tastetrykk.
+ui_typing.calendar_active_days	aktive dager
+ui_typing.calendar_chars	tegn
+ui_typing.calendar_day_fri	Fre
+ui_typing.calendar_day_mon	Man
+ui_typing.calendar_day_wed	Ons
+ui_typing.calendar_month_0	jan
+ui_typing.calendar_month_1	feb
+ui_typing.calendar_month_10	nov
+ui_typing.calendar_month_11	Des
+ui_typing.calendar_month_2	mar
+ui_typing.calendar_month_3	apr
+ui_typing.calendar_month_4	Mai
+ui_typing.calendar_month_5	jun
+ui_typing.calendar_month_6	jul
+ui_typing.calendar_month_7	aug
+ui_typing.calendar_month_8	sep
+ui_typing.calendar_month_9	Okt
+ui_typing.calendar_no_keystrokes	ingen tastetrykk
+ui_typing.calendar_subtitle	Siste 12 måneder
+ui_typing.calendar_title	Aktivitetskalender
+ui_typing.charmix_digits	Digits
+ui_typing.charmix_letters	Letters
+ui_typing.charmix_other	Other
+ui_typing.charmix_punct	Punctuation
+ui_typing.charmix_spaces	Spaces
+ui_typing.chart_title_activity_5min	Aktivitet (taster / 5 min)
+ui_typing.chart_title_precision_5min	Presisjon (%) — 5 min-visning
+ui_typing.col_acc	Nøyaktighet
+ui_typing.col_active_time	Aktiv tid
+ui_typing.col_app	App
+ui_typing.col_chars	Tegn
+ui_typing.col_freq	Relativ frekvens ↕
+ui_typing.col_km	Finger-km ↕
+ui_typing.col_occ	Forekomster ↕
+ui_typing.col_rep	Gjentakelser ↕
+ui_typing.col_seq	Sekvens ↕
+ui_typing.col_time	Gjennomsn. tid (ms) ↕
+ui_typing.col_wpm	WPM tilsvarende
+ui_typing.cpm_mode_ai	med AI
+ui_typing.cpm_mode_hs	med HS
+ui_typing.cpm_mode_hs_ai	med HS + AI
+ui_typing.cpm_mode_manual	kun manuelle tastetrykk
+ui_typing.cpm_unit_output_chars	tegn på skjermen
+ui_typing.cpm_unit_raw_chars	rå tegn skrevet
+ui_typing.dataset_ai	KI
+ui_typing.dataset_hs	Hotstrings
+ui_typing.dataset_manual	Manuell
+ui_typing.dataset_precision	Nøyaktighet (%)
+ui_typing.dataset_speed	Hastighet
+ui_typing.dataset_touches_5min	Tastetrykk / 5 min
+ui_typing.dataset_touches_h	Tastetrykk/t
+ui_typing.day_0	Søndag
+ui_typing.day_1	Mandag
+ui_typing.day_2	Tirsdag
+ui_typing.day_3	Onsdag
+ui_typing.day_4	Torsdag
+ui_typing.day_5	Fredag
+ui_typing.day_6	Lørdag
+ui_typing.errors_no_data	Ingen rettinger registrert for denne perioden.
+ui_typing.errors_table_bigram	Bigramm
+ui_typing.errors_table_errors	Feil
+ui_typing.errors_table_occ	Forekomster
+ui_typing.errors_table_rate	Andel
+ui_typing.finger.hand_l	V
+ui_typing.finger.hand_r	H
+ui_typing.finger.l_idx	Pekefinger V
+ui_typing.finger.l_mid	Langfinger V
+ui_typing.finger.l_pinky	Lillefinger V
+ui_typing.finger.l_ring	Ringfinger V
+ui_typing.finger.l_thumb	Tommel V
+ui_typing.finger.r_idx	Pekefinger H
+ui_typing.finger.r_mid	Langfinger H
+ui_typing.finger.r_pinky	Lillefinger H
+ui_typing.finger.r_ring	Ringfinger H
+ui_typing.finger.r_thumb	Tommel H
+ui_typing.h2_ai	Kunstig intelligens
+ui_typing.h2_app_activity	Aktivitet etter app
+ui_typing.h2_bigram_ergo	Bigramm-ergonomi
+ui_typing.h2_char_mix	Tegn-blandingen
+ui_typing.h2_doublings	Dooblinger
+ui_typing.h2_error_bigrams	Mest rettede bigrammer
+ui_typing.h2_finger_dist	Fingeravstand
+ui_typing.h2_health	Helse og ergonomi
+ui_typing.h2_hs	Hotstrings
+ui_typing.h2_hs_ai_prod	HS / AI-produktivitet
+ui_typing.h2_lexicon	Leksikon
+ui_typing.h2_records	Personlige rekorder
+ui_typing.h2_rhythm	Rytme og bursts
+ui_typing.h2_sessions	Økter
+ui_typing.h2_speed	Gjennomsnittlig hastighet
+ui_typing.h2_trigram_ergo	Trigramm-ergonomi
+ui_typing.h3_activity_hourly	Aktivitet (tastetrykk/t)
+ui_typing.h3_keystroke_origin	Opprinnelsen til tastetrykk
+ui_typing.h3_precision	Nøyaktighet (%)
+ui_typing.h3_precision_hourly	Nøyaktighet (%) – timevisning
+ui_typing.h3_speed	Hastighet (WPM)
+ui_typing.heatmap_day_fri	Fre
+ui_typing.heatmap_day_mon	Man
+ui_typing.heatmap_day_sat	Lør
+ui_typing.heatmap_day_sun	Søn
+ui_typing.heatmap_day_thu	Tor
+ui_typing.heatmap_day_tue	Tir
+ui_typing.heatmap_day_wed	Ons
+ui_typing.heatmap_hour_chars_abbrev	tegn
+ui_typing.heatmap_hour_no_keystrokes	ingen tastetrykk
+ui_typing.heatmap_hour_subtitle	over den valgte perioden
+ui_typing.heatmap_hour_title	Aktivitet etter time og ukedag
+ui_typing.heatmap_hour_total	tegn totalt
+ui_typing.key_caps	Caps
+ui_typing.key_enter	Enter
+ui_typing.key_esc	Esc
+ui_typing.key_shift	Shift
+ui_typing.key_tab	Tab
+ui_typing.key_tip_avg_dur	Avg. dur.:
+ui_typing.key_tip_freq	Freq.:
+ui_typing.key_tip_freq_total	Total freq.:
+ui_typing.label_burst_length_dist	Burst length distribution
+ui_typing.label_charmix_dist	Distribution (%s characters)
+ui_typing.label_finger_load_dist	Cumulative load per finger — ideal distribution ≈ 12.5% each
+ui_typing.label_from	Fra:
+ui_typing.label_to	Til:
+ui_typing.label_word_length_dist	Length distribution (frequency-weighted)
+ui_typing.lbl_accepted	Godtatt
+ui_typing.lbl_active_ratio	Aktivitetsprosent
+ui_typing.lbl_activity	Aktivitet
+ui_typing.lbl_ai_acceptance	AI-aksept
+ui_typing.lbl_avg_delay	Gjennomsnittlig forsinkelse
+ui_typing.lbl_avg_duration	Gjennomsnittlig varighet
+ui_typing.lbl_avg_length	Gjennomsnittlig lengde
+ui_typing.lbl_bad_redir	Dårlig omdirigering
+ui_typing.lbl_best_day	Beste dag
+ui_typing.lbl_cascades	Kaskader
+ui_typing.lbl_corrected_bigrams	Rettede bigrammer
+ui_typing.lbl_digits	Sifre
+ui_typing.lbl_doublings	dobling
+ui_typing.lbl_fastest_app	Raskeste app
+ui_typing.lbl_focus_latency	Fokus → 1. tastetrykk-forsinkelse
+ui_typing.lbl_frequent_pair	Hyppig par
+ui_typing.lbl_hand_balance	V/H-balanse
+ui_typing.lbl_layouts_used	Layouter brukt
+ui_typing.lbl_letters	Bokstaver
+ui_typing.lbl_long_sessions	Lange økter
+ui_typing.lbl_longest_burst	Lengste burst
+ui_typing.lbl_longest_chars	Lengste (tegn)
+ui_typing.lbl_longest_session	Lengste økt
+ui_typing.lbl_longest_time	Lengste (varighet)
+ui_typing.lbl_most_active_finger	Mest aktiv finger
+ui_typing.lbl_others	Annet
+ui_typing.lbl_passive_time	Passiv systemtid
+ui_typing.lbl_punctuation	Tegnsetting
+ui_typing.lbl_recovery_time	Gjennopprettingstid
+ui_typing.lbl_redir	Omdir.
+ui_typing.lbl_regularity	Regularitet (CV)
+ui_typing.lbl_roll_in	Innoverroll
+ui_typing.lbl_roll_out	Utoverroll
+ui_typing.lbl_same_finger_streak	Samme-finger-sekvens
+ui_typing.lbl_same_hand_streak	Samme-hånd-sekvens
+ui_typing.lbl_saved	Lagret
+ui_typing.lbl_scissors	Saks
+ui_typing.lbl_sfbs_raw	Rå SFB-er
+ui_typing.lbl_spaces	Mellomrom
+ui_typing.lbl_streak	Serie
+ui_typing.lbl_time_saved	Tid spart
+ui_typing.lbl_top_app	Mest brukt app
+ui_typing.lbl_top_mod_held	Mest holdt modifikatortast
+ui_typing.lbl_top_word	Mest brukt ord
+ui_typing.lbl_total	Totalt
+ui_typing.lbl_total_active_time	Total aktiv tid
+ui_typing.lbl_total_bursts	Totale bursts
+ui_typing.lbl_total_words	Totalt antall ord
+ui_typing.lbl_unique_words	Unike ord
+ui_typing.lbl_via_ai	Via KI
+ui_typing.lbl_via_hotstrings	Via hotstrings
+ui_typing.lbl_via_magic_key	Via ★-tast
+ui_typing.lbl_worst_bigram	Dårligste bigrammr
+ui_typing.loading	Beregner...
+ui_typing.loading_ellipsis	Beregner…
+ui_typing.modal_apply	Lukk og bruk
+ui_typing.modal_check_all	Velg alle
+ui_typing.modal_search_app	Søk i app...
+ui_typing.modal_select_apps	Velg applikasjoner
+ui_typing.modal_uncheck_all	Fjern alle
+ui_typing.month_0	jan.
+ui_typing.month_1	feb.
+ui_typing.month_10	nov.
+ui_typing.month_11	des.
+ui_typing.month_2	mar.
+ui_typing.month_3	apr.
+ui_typing.month_4	mai
+ui_typing.month_5	jun.
+ui_typing.month_6	jul.
+ui_typing.month_7	aug.
+ui_typing.month_8	sep.
+ui_typing.month_9	okt.
+ui_typing.no_app_found	Ingen applikasjon funnet
+ui_typing.no_data	Ingen data
+ui_typing.not_found	Ikke funnet
+ui_typing.opt_pause.1000	Pauser > 1 s
+ui_typing.opt_pause.10000	Pauser > 10 s
+ui_typing.opt_pause.2000	Pauser > 2 s
+ui_typing.opt_pause.20000	Pauser > 20 s
+ui_typing.opt_pause.3000	Pauser > 3 s
+ui_typing.opt_pause.30000	Pauser > 30 s
+ui_typing.opt_pause.5000	Pauser > 5 s
+ui_typing.opt_pause.60000	Pauser > 1 min
+ui_typing.opt_pause.99999999	Ingen filter
+ui_typing.opt_quick_range.	Periode…
+ui_typing.opt_quick_range.3m	Siste 3 måneder
+ui_typing.opt_quick_range.6m	Siste 6 måneder
+ui_typing.opt_quick_range.all	Alt
+ui_typing.opt_quick_range.last_hour	Siste time
+ui_typing.opt_quick_range.month	Denne måneden
+ui_typing.opt_quick_range.today	I dag
+ui_typing.opt_quick_range.week	Denne uken
+ui_typing.opt_quick_range.year	Dette året
+ui_typing.page_loading	Laster grensesnitt...
+ui_typing.pinch_hint	Klips (trackpad) for å zoome.
+ui_typing.precision_no_filter	ingen filter
+ui_typing.rep_doublings	duplikeringer
+ui_typing.rep_no_data	Ingen duplikeringer
+ui_typing.rep_table_bigram	Bigramm
+ui_typing.rep_table_manual	Manuell
+ui_typing.rep_table_total	Totalt
+ui_typing.rep_table_via_star	Via ★
+ui_typing.search_close	Lukk (ESC)
+ui_typing.search_label	Søk på siden
+ui_typing.search_next	Neste (Enter)
+ui_typing.search_placeholder	Søk…
+ui_typing.search_prev	Forrige (Shift+Enter)
+ui_typing.sfb_avoided	unngått via HS
+ui_typing.sfb_avoided_none	0 unngått via HS
+ui_typing.sfb_no_data	Ingen SFB-er
+ui_typing.sfb_raw_count	rå SFB-er
+ui_typing.sfb_table_finger	Finger
+ui_typing.sfb_table_hand	Hånd
+ui_typing.sfb_table_pair	Par
+ui_typing.signal_equilibre	Balanced
+ui_typing.signal_surveille	Monitored
+ui_typing.signal_vigilance	Alert
+ui_typing.tab_bigrams	Bigrammer
+ui_typing.tab_chars	Tegn
+ui_typing.tab_heptagrams	Heptagrammer
+ui_typing.tab_hexagrams	Heksagrammer
+ui_typing.tab_keycodes	Keycodes
+ui_typing.tab_modifiers	Modifikatortaster
+ui_typing.tab_pentagrams	Pentagrammer
+ui_typing.tab_quadgrams	Kvadgrammer
+ui_typing.tab_shortcut_bigrams	Snarveisbigrammer
+ui_typing.tab_shortcut_pentagrams	Snarvei-pentagrammer
+ui_typing.tab_shortcut_quadgrams	Snarvei-kvadgrammer
+ui_typing.tab_shortcut_trigrams	Snarvei-trigrammer
+ui_typing.tab_shortcuts	Snarveier
+ui_typing.tab_trigrams	Trigrammer
+ui_typing.tab_word_bigrams	Ord-bigrammer
+ui_typing.tab_word_pentagrams	Ord-pentagrammer
+ui_typing.tab_word_quadgrams	Ord-kvadgrammer
+ui_typing.tab_word_trigrams	Ord-trigrammer
+ui_typing.tab_words	Ord
+ui_typing.table_mode_mixed	blandet
+ui_typing.table_mode_output	skjermutgang
+ui_typing.table_mode_raw	råe tastetrykk
+ui_typing.title	Skrivemetrikker
+ui_typing.title_hand_balance	Balanse mellom taster fra venstre og høyre hånd. 50/50 = perfekt balanse.
+ui_typing.title_net_hs	Netto differanse mellom skrevne og genererte tegn
+ui_typing.title_net_llm	Netto differanse mellom slettede og genererte tegn
+ui_typing.title_pause_threshold	Pausegrense: pauser over denne verdien er ekskludert fra aktiv tid for WPM-beregning.
+ui_typing.title_quick_range	Rask periode
+ui_typing.title_rep_total	Totalt antall duplikeringer i perioden
+ui_typing.title_rep_via_star	Andel duplikeringer generert av ★-tasten (repetisjon hotstring). Kun ikke-null i + Hotstrings-modus.
+ui_typing.title_top_finger	Fingeren som reiste lengst avstand i perioden
+ui_typing.tooltip_apps	<strong>Fastest app :</strong> highest average CPM across apps with ≥ 200 characters typed (below this threshold you'd catch apps used for 2 seconds).<br><br><strong>Frequent pair :</strong> the two apps you switch between most often, in both directions. Indicates your typical workflow (editor ↔ browser, doc ↔ chat…).
+ui_typing.tooltip_charmix	<strong>Categories :</strong> each manual character typed is classified Lua-side into one of five categories — Latin letters (including common accented), digits, punctuation and symbols, spaces (including NBSP / NNBSP / tab / return), and other (non-Latin characters, special keylogger markers).<br><br><strong>Indication :</strong> code-heavy = lots of punctuation and digits; prose-heavy = mostly letters and spaces; chat = a mix of everything.
+ui_typing.tooltip_col_acc	Presisjon: Prosent av ganger denne sekvensen ble skrevet riktig uten Backspace.
+ui_typing.tooltip_col_mpm	Ord per minutt: estimert hastighet hvis du skrev dette fragmentet i en løkke (1 ord = 5 taster). Teller KUN dine faktiske tastetrykk.
+ui_typing.tooltip_cpm_formula	<strong>Formel:</strong> CPM = overganger × 60000 / aktiv tid.<br><strong>Modus:</strong> {mode}.<br><br>Teller: {pure_trans} manuelle overganger (≤ {thresh})<br>{add_hs}{add_llm}= {chars_total} krediterte tegn<br><br>WPM = CPM / 5.
+ui_typing.tooltip_cpm_hs_chars	tegn lagt til (HS-utgang − trigger)
+ui_typing.tooltip_cpm_llm_chars	tegn lagt til (AI-utgang − trigger)
+ui_typing.tooltip_cpm_simple	Tegn per minutt (med HS + AI som standard).
+ui_typing.tooltip_ergo_bigram	<strong>SHB / SHU :</strong> same-hand bigrams / their share of total bigrams.<br><strong>Inward roll :</strong> pinky toward index. The most comfortable.<br><strong>Outward roll :</strong> index toward pinky.<br><strong>LSB :</strong> Lateral Stretch Bigram — one of the two fingers extends at least 1.5 columns from its rest position.<br><strong>Scissors :</strong> SHB crossing ≥ 2 rows with the shorter finger going down (e.g. pinky low + middle high).
+ui_typing.tooltip_ergo_trigram	<strong>SFS :</strong> Same-Finger Skipgram — an SFB with a different-finger key in between (e.g. EAD).<br><strong>SKS :</strong> Same-Key Skipgram — the same key in positions 1 and 3 (e.g. ELE).<br><strong>Redirect :</strong> three keys on the same hand with a change of direction (pinky→middle→ring = peak). Uncomfortable.<br><strong>Bad redir. :</strong> redirect where none of the three fingers is the index. Among the worst possible sequences on a keyboard.
+ui_typing.tooltip_errors	<strong>Reading :</strong> bigrams (two consecutive keys) ranked by <em>error rate</em> = number of times the 2nd key was erased by a backspace, divided by total occurrences.<br><br><strong>Filter :</strong> only bigrams appearing ≥ 5 times in the period are shown, to avoid statistical noise from rare sequences.<br><br><strong>Cascades :</strong> runs of ≥ 3 consecutive backspaces (major correction: a word or sentence erased). The counter separates this signal from one-off errors.<br><br><strong>Recovery time :</strong> average delay between a backspace and the next key. The longer it is, the more the correction breaks your mental flow.
+ui_typing.tooltip_lexical	<strong>Richness :</strong> unique words ÷ total words. The higher, the more varied the vocabulary. A literary text will be around 40–60 %, chat or code much lower.<br><br><strong>Average length :</strong> frequency-weighted mean — this is the length of the word you type "on average", not the median dictionary length.<br><br><strong>Filter :</strong> words shorter than 2 characters are ignored (they are almost always tokenisation artefacts from punctuation splitting).
+ui_typing.tooltip_mpm	Ord per minutt (ordbok-ord).
+ui_typing.tooltip_precision_formula	<strong>Formel:</strong> presisjon = korrekt / totalt.<br>Feil: backspaces kort tid etter et tastetrykk (≤ {thresh}).
+ui_typing.tooltip_records	<strong>Scope :</strong> records are computed over <em>the entire</em> database — they do not follow the UI date filter (otherwise the record disappears when you zoom in). The app filter still applies.<br><br><strong>Streak :</strong> longest consecutive series of days with at least one keystroke. Missing a day resets the counter to zero.
+ui_typing.tooltip_rep_pct	Share of bigrams that are doublings (e.g. «aa», «ll»). Reflects the active source mode — compare "Without Ergopti+" and "+ Hotstrings" to see if the ★ key is being used.
+ui_typing.tooltip_rhythm	<strong>Burst :</strong> typing stretch with no gap > 1 s between two keys.<br><br><strong>Peak CPM :</strong> best CPM observed on a burst of at least 10 characters. The threshold excludes fleeting non-representative sprints.<br><br><strong>Regularity (CV) :</strong> coefficient of variation = standard deviation ÷ mean. 0 = perfect metronome, > 0.6 = very irregular.
+ui_typing.tooltip_roi	<strong>Characters saved :</strong> net output of HS / AI expansions, i.e. characters added on screen minus those that triggered the expansion (and were therefore typed manually).<br><br><strong>Time saved :</strong> characters saved × average pace (manual active time ÷ number of manual keystrokes) over the same period. This is an honest lower bound: it is what you would have taken to type them yourself.<br><br><strong>AI acceptance :</strong> share of AI suggestions displayed that were accepted by the user.
+ui_typing.tooltip_sessions	<strong>Session :</strong> typing block with no gap > 5 min between two consecutive keystrokes. Detected keylogger-side, so independent of the UI pause filter.<br><br><strong>Total active time :</strong> sum of all session durations — i.e. the time actually spent typing, ignoring pauses > 5 min.<br><br><strong>Longest (chars) :</strong> may refer to a different session from the longest in duration — e.g. a long slow session vs. a short ultra-fast one.
+ui_typing.tooltip_sfb_pct	Share of manual bigrams typed by the same finger. Excluding hotstrings — this KPI measures the raw physical difficulty of the layout.
+ui_typing.tooltip_sfb_rate	Rate: nb SFBs / nb key occurrences
+ui_typing.tooltip_wellness	<strong>Global signal :</strong> red "Alert" if ≥ 2 sessions over 90 min or a finger streak ≥ 8; orange "Monitored" if ≥ 1 long session or finger streak ≥ 6 or hand streak ≥ 12; green "Balanced" otherwise.<br><br><strong>Active ratio :</strong> time actually spent typing ÷ time the app was in focus. Low = you read a lot, which reduces typing load but also signals chronic input/output imbalance.<br><br><strong>Finger / hand streak :</strong> longest run of consecutive keys on the same finger or same hand. Beyond 5 (finger) or 12 (hand), the load is no longer distributed.<br><br><strong>Long sessions :</strong> sessions ≥ 90 min without a break. The clinical threshold beyond which RSI risk increases significantly.
+ui_typing.unit_activations	aktiveringer
+ui_typing.unit_active_apps	aktive apper
+ui_typing.unit_chars_saved	tegn lagret
+ui_typing.unit_cpm	TPM
+ui_typing.unit_cpm_burst	CPM-topp (burst)
+ui_typing.unit_cpm_record	CPM-rekord
+ui_typing.unit_global_rate	% global andel
+ui_typing.unit_keyspressed	taster trykket
+ui_typing.unit_keystrokes	tastetrykk
+ui_typing.unit_km	km
+ui_typing.unit_mpm	OPM
+ui_typing.unit_richness	% rikdom
+ui_typing.unit_sessions	økter
+ui_typing.unit_triggers	triggers
+ui_typing.unit_words_typed	words typed in total
+updater.changelog_channel_label	Kanal:
+updater.changelog_empty	(Ingen versjonsmerknader tilgjengelig for denne kanalen.)
+updater.changelog_install	Installer denne versjonen
+updater.changelog_install_current	Gjeldende versjon
+updater.changelog_local_source_note	Lokal kildemodus — kanalendringer lagres ikke.
+updater.changelog_release_notes	Versjonsmerknader for {1}:\n\n{2}\n\nÅpne på GitHub?
+updater.changelog_select_release	Versjonsvalg :
+updater.changelog_switch_to_dev	Bytt til forhåndsversjonskanal (dev)
+updater.changelog_switch_to_main	Bytt til stabil kanal (main)
+updater.changelog_truncated	\n…(forkortet)
+updater.changelog_unreachable	Kunne ikke hente utgivelsesinformasjon fra GitHub.
+updater.channel_dev_suffix	 (forhåndskanal)
+updater.channel_local_source_suffix	 (lokal kilde — ikke et utgivelsesbygg)
+updater.channel_main_suffix	 (stabil kanal)
+updater.channel_switch_blocked_download	En oppdatering lastes ned nå. Vent til den er ferdig (eller start appen på nytt) før du bytter kanal.
+updater.checking	Leter etter oppdateringer i kanalen «{1}»…\n(Dette kan ta noen sekunder.)
+updater.close	Lukk
+updater.install_error	Oppdateringen kunne ikke installeres. Se loggene for detaljer.
+updater.install_error_download	Nedlasting av oppdateringspakken mislyktes. Sjekk internettforbindelsen og prøv igjen.
+updater.install_error_no_asset	Denne utgivelsen inneholder ingen Windows-kjørbar fil. Åpne utgivelsessiden for å laste ned manuelt.
+updater.install_local_source	Kjører fra lokal kilde — automatisk installasjon er kun tilgjengelig for release-bygg.
+updater.local_source	Kjører fra lokal kilde — oppdateringssjekk er bare tilgjengelig for utgivelsesbygg.
+updater.new_version	En ny versjon er tilgjengelig!\n\nNåværende: {1}\nSiste: {2}\n\nÅpne utgivelsessiden for å laste ned?
+updater.no_connection	Kunne ikke nå GitHub. Sjekk internettforbindelsen og prøv igjen.
+updater.open_on_github	Åpne på GitHub
+updater.parse_failed	Kunne ikke lese taggen for siste versjon fra GitHub.
+updater.title_changelog	ErgoptiPlus — Versjonsmerknader
+updater.title_update	ErgoptiPlus — Oppdatering
+updater.title_update_available	ErgoptiPlus — Oppdatering tilgjengelig
+updater.title_version	ErgoptiPlus — Versjon
+updater.tray_new_version_body	Versjon {1} er klar til å installeres. Klikk på «Install update»-elementet i systemstatusfelt-menyen.
+updater.tray_new_version_title	ErgoptiPlus — Oppdatering tilgjengelig
+updater.up_to_date	ErgoptiPlus er oppdatert.\n\nNåværende versjon: {1}
+updater.update_dialog_changelog	Nyheter:
+updater.update_dialog_header	Oppdatering tilgjengelig — {1}
+updater.update_dialog_install	Installer oppdatering
+updater.update_dialog_later	Senere
+updater.update_dialog_open	Åpne på GitHub
+updater.update_dialog_title	ErgoptiPlus — Installer oppdatering
+updater.version_message	ErgoptiPlus {1}{2}\n\nÅpne utgivelsessiden på GitHub?
+vscode.reload_required	Last inn VSCode på nytt (Cmd+Shift+P > Reload Window) for å aktivere skriveutvidelsen

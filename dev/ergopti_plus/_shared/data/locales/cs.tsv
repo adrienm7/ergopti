@@ -1,0 +1,2296 @@
+_meta.flag	🇨🇿
+_meta.locale	cs
+_meta.name	Čeština
+app_category.business	Práce
+app_category.development	Vývojářské nástroje
+app_category.education	Vzdělávání
+app_category.entertainment	Zábava
+app_category.finance	Finance
+app_category.games	Hry
+app_category.graphics_design	Grafika & Design
+app_category.health	Zdraví & Sport
+app_category.lifestyle	Životní styl
+app_category.medical	Medicína
+app_category.music	Hudba
+app_category.navigation	Navigace
+app_category.news	Zprávy
+app_category.photography	Fotografie
+app_category.productivity	Produktivita
+app_category.reference	Encyklopedie
+app_category.social	Sociální sítě
+app_category.sports	Sport
+app_category.travel	Cestování
+app_category.utility	Nástroje
+app_category.video	Video
+app_category.weather	Počasí
+app_picker.add_another_app	+ Přidat další aplikaci…
+app_picker.exclude_current	Vyloučit {app} (aktuální)
+app_picker.no_app_excluded	Žádná aplikace k vyloučení
+app_picker.search_placeholder	Hledat aplikaci…
+apps.cloner.btn_back	Zpět
+apps.cloner.btn_browse	Procházet…
+apps.cloner.btn_choose	Vybrat
+apps.cloner.btn_clone	Klonovat aplikaci
+apps.cloner.btn_custom_icon	Vlastní
+apps.cloner.btn_native_clone	Klonovat nativní aplikaci
+apps.cloner.btn_open_log	Otevřít log
+apps.cloner.btn_pwa_recommended	PWA (doporučeno)
+apps.cloner.btn_pwa_webapp	PWA webová aplikace
+apps.cloner.btn_tint_icon	Barevný nádech
+apps.cloner.btn_try_native	Zkusit nativní
+apps.cloner.btn_validate	Potvrdit
+apps.cloner.lbl_progress_dock	Registrace v Docku…
+apps.cloner.lbl_progress_done	Hotovo
+apps.cloner.lbl_progress_icon	Generování ikony s nádechem…
+apps.cloner.lbl_progress_prep	Příprava ikony a bundle
+apps.cloner.lbl_progress_sign	Ad-hoc podepisování bundle…
+apps.cloner.lbl_progress_title	Vytváření klonu…
+apps.cloner.msg_bundle_missing	Chyba: chybí cesta k bundle. Spusťte aplikaci normálně.
+apps.cloner.title_clone_name	Název klonu
+apps.cloner.title_error	Vytvoření klonu selhalo
+apps.cloner.title_icon_style	Styl ikony
+apps.cloner.title_open_arg	Položka k otevření při spuštění
+apps.cloner.title_pwa_mode	Režim PWA?
+apps.cloner.title_pwa_recommended	Doporučen režim PWA
+apps.cloner.title_pwa_url	URL adresa PWA
+apps.cloner.title_summary	Souhrn
+apps.cloner.title_tint	Barevný nádech
+apps.cloner.title_url_path	URL nebo cesta
+apps.encryptor.btn_overwrite	Přepsat
+apps.encryptor.btn_reveal	Zobrazit ve Finderu
+apps.encryptor.err_decrypt_failed	Dešifrování selhalo. Špatné heslo nebo poškozený soubor?
+apps.encryptor.err_empty_password	Heslo nesmí být prázdné.
+apps.encryptor.err_encrypt_failed	Šifrování selhalo.
+apps.encryptor.err_file_missing	Soubor nenalezen.
+apps.encryptor.err_openssl_missing	openssl nenalezen. Nainstalujte Xcode Command Line Tools.
+apps.encryptor.err_password_mismatch	Hesla se neshodují.
+apps.encryptor.lbl_file	Soubor:
+apps.encryptor.prompt_confirm	Potvrdit heslo:
+apps.encryptor.prompt_password	Heslo:
+apps.encryptor.success_decrypted	Soubor dešifrován:
+apps.encryptor.success_encrypted	Soubor zašifrován:
+apps.encryptor.title_decrypt	Dešifrovat soubor
+apps.encryptor.title_encrypt	Zašifrovat soubor
+apps.encryptor.warn_overwrite	Cílový soubor již existuje. Přepsat?
+autocorrection.accents	Automatická oprava přízvuků
+autocorrection.caps	Automatické velké písmeno na začátku věty
+autocorrection.errors	Oprava běžných překlepů
+autocorrection.minus	Automatické vkládání znaménka minus
+autocorrection.minusapostrophe	Minus následovaný apostrofem
+autocorrection.multiplepunctuationmarks	Více teček → výpustka (... = …)
+autocorrection.names	Oprava velikosti písmen ve vlastních jménech
+autocorrection.ou	Oprava ou / où
+autocorrection.suffixesachaining	Řetězení přípon s à
+autocorrection.typographicapostrophe	Typografický apostrof (přímý → kulatý)
+ax_actions.brightness	☀ Jas
+ax_actions.char	A Znaky
+ax_actions.char_sel	✎ A Výběr znaků
+ax_actions.desktops	▢ Pracovní plochy
+ax_actions.document	📄 Dokument (začátek/konec)
+ax_actions.line_arrow	↕ Řádky (šipky)
+ax_actions.line_bounds	↔ Řádek (začátek/konec)
+ax_actions.line_sel	✎ ↕ Výběr řádků
+ax_actions.lines	↕ Řádky (Alt)
+ax_actions.paragraphs	¶ Odstavce
+ax_actions.spaces	▢ Plochy
+ax_actions.tabs	⧉ Karty
+ax_actions.tracks	♫ Skladby
+ax_actions.volume	🔊 Hlasitost
+ax_actions.windows	◱ Okna
+ax_actions.words	W Slova
+ax_actions.words_sel	✎ W Výběr slov
+button.activate	Aktivovat
+button.add	Přidat
+button.cancel	Zrušit
+button.close	Zavřít
+button.confirm	Potvrdit
+button.decrypt	Dešifrovat
+button.delete	Smazat
+button.encrypt	Šifrovat
+button.ok	OK
+button.open_settings	Otevřít nastavení
+button.remove	Odebrat
+button.retry	Opakovat
+button.save	Uložit
+category.autocorrection	Automatická oprava
+category.distances_reduction	Zkrácení vzdálenosti
+category.dynamic_hotstrings	Dynamické hotstring
+category.gestures	🖐️ Gesta
+category.layout	🌐 Rozložení klávesnice
+category.magic_key	Klávesa ★ a expanze textu
+category.personal	Osobní hotstrings
+category.rolls	Rolovací pohyby
+category.sfbs_reduction	Zkrácení SFB
+category.shortcuts	🎯 Zkratky
+category.tapholds	⌨️ Klepnutí-Přidržení
+changelog_window.badge_latest	latest
+changelog_window.badge_prerelease	pre-release
+changelog_window.channel_dev	Dev
+changelog_window.channel_stable	Stable
+changelog_window.error_network	Unable to load releases from GitHub.\nCheck your internet connection.
+changelog_window.error_parse	Unable to parse GitHub response.
+changelog_window.error_rate_limited	Unable to load releases from GitHub.\nGitHub is limiting requests — please try again in a few minutes.
+changelog_window.loading	Loading releases…
+changelog_window.no_notes	(No release notes available.)
+changelog_window.no_releases	No releases found.
+changelog_window.open_github	View on GitHub ↗
+changelog_window.retry	Retry
+changelog_window.window_title	Release Notes
+common.browse	Procházet…
+common.cancel	Zrušit
+common.close	Zavřít
+common.delete	Smazat
+common.disabled	Zakázáno
+common.error_prefix	Chyba — 
+common.error_title	Chyba
+common.key_enter	Enter
+common.later	Později
+common.loading	Načítám…
+common.none	Žádný
+common.ok	OK
+common.save	Uložit
+common.saved	Uloženo ✓
+common.warning	Upozornění
+crash.report.save_failed	Zprávu o pádu se nepodařilo uložit
+crash.report.saved_title	Hlášení pádu uloženo
+dialog.action_picker.disabled	∅ Nic
+dialog.action_picker.label	Akce:
+dialog.action_picker.no_results	Žádná odpovídající akce
+dialog.action_picker.search	Hledat akci…
+dialog.app_picker.active_suffix	 (aktivní)
+dialog.app_picker.prompt	Vyberte aplikace:
+dialog.app_picker.running_count	{n} spuštěná/spuštěných aplikace/í.
+dialog.app_picker.stopped_suffix	 (zastaveno)
+dialog.app_picker.title	Výběr aplikace
+dialog.bulk_toggle.save_failed	The change could not be saved to the configuration file.\nIt has been reverted. Close any app holding the file and try again.
+dialog.config_folder.hint	Všechny osobní soubory (personal_shortcuts.ahk, personal_hotstrings.toml…) budou hledány v této složce. Ponechte prázdné pro použití výchozí složky.
+dialog.config_folder.label	Cesta:
+dialog.config_folder.select_title	Vybrat konfigurační složku
+dialog.config_folder.title	ErgoptiPlus — Konfigurační složka
+dialog.enable_all.warning	⚠ UPOZORNĚNÍ: Všechny funkce byly povoleny, včetně některých ve výchozím nastavení zakázaných.
+dialog.fatal_error.cannot_start	Ergopti+ se nemůže spustit.
+dialog.fatal_error.toml_key_missing	Kritická chyba: _shared/modules/tooltip/constants.toml — chybějící nebo neplatný klíč: [{1}] {2}
+dialog.fatal_error.toml_not_found	Kritická chyba: _shared/modules/tooltip/constants.toml nenalezeno.
+dialog.gestures.auto_configure_error	Chyba při zápisu do registru.\n\nZkuste spustit skript jako správce,\nnebo konfigurujte ručně (viz Pokyny).
+dialog.gestures.auto_configure_error_title	ErgoptiPlus — Chyba
+dialog.gestures.auto_configure_success	Konfigurace gest úspěšně použita.\n\nVšech 10 gest bylo nakonfigurováno v registru Windows\n(Ctrl+Win+Shift+F1 až F10).\n\nMůže být nutné se odhlásit / přihlásit, aby\nWindows zachytily nové zkratky.
+dialog.gestures.auto_configure_title	ErgoptiPlus — Konfigurace gest
+dialog.gestures.warning_msg	⚠️ Upozornění: Povolení gest touchpadu může narušit systémová gesta.\n\nAby nedocházelo ke konfliktům, deaktivujte v macOS tyto možnosti:\n\n• Gesta touchpadu 2 prsty: zakažte posouvání a přejíždění, pokud je chcete používat v Hammerspoon.\n• Gesta touchpadu 3 prsty pro přesouvání oken a výběr textu\n• Klepnutí 3 prsty pro vyhledání slov ve slovníku\n• Horizontální/vertikální přejetí 3 prsty pro přepínání ploch, aktivaci App Exposé nebo Mission Control\n• Horizontální/vertikální přejetí 4 prsty pro přepínání ploch, aktivaci App Exposé nebo Mission Control\n\nJe důležité zakázat systémová gesta 4 prsty, abyste mohli definovat gesta 5 prsty. Jinak by macOS nerozlišovalo mezi nimi a zabránilo by gestům 5 prsty fungovat. Proto jsou výchozí gesta 4 prsty přetvořena v modulu Gesta, aby obnovila systémové funkce bez konfliktu s gesty 5 prsty.
+dialog.gestures.warning_title	Upozornění gesta
+dialog.gpt_link.title	Upravit odkaz otevřený pomocí Win + G
+dialog.hotstrings.consume_body	Má být spouštěcí znak spotřebován (nezapsán) při expanzi?
+dialog.hotstrings.consume_checkbox	Spotřebovat (nezadávat znak znovu)
+dialog.hotstrings.consume_no	Ne — zapsat znak
+dialog.hotstrings.consume_title	Chování spouštěče
+dialog.hotstrings.consume_yes	Ano — spotřebovat ho
+dialog.hotstrings.delete_body	Opravdu chcete smazat tento vlastní expandér?
+dialog.hotstrings.delete_delimiter_body	Are you sure you want to delete this custom delimiter?
+dialog.hotstrings.delete_delimiter_title	Delete delimiter
+dialog.hotstrings.delete_title	Smazat expandér
+dialog.hotstrings.invalid_body	Zadejte přesně jeden znak.
+dialog.hotstrings.invalid_title	Neplatný vstup
+dialog.hotstrings.new_delimiter_prompt	Oddělovací znak
+dialog.hotstrings.new_delimiter_title	New word delimiter
+dialog.hotstrings.new_prompt	Zadejte spouštěcí znak (přesně jeden znak):
+dialog.hotstrings.new_title	Nový expandér slov
+dialog.keyboard_shortcut.prompt	Vyberte kombinaci kláves:
+dialog.keyboard_shortcut.title_prefix	Vybrat klávesu — 
+dialog.llm.delete_profile_prefix	Smazat "
+dialog.llm.delete_title	Smazat model?
+dialog.llm.exclude_ok	Uložit
+dialog.llm.exclude_prompt	Vyberte aplikace, ve kterých bude generování AI zakázáno.
+dialog.magic_key.prompt	Nová hodnota (★ výchozí):
+dialog.magic_key.title	Upravit kouzelnou klávesu
+dialog.metrics.bad_password_warning	⚠️ Upozornění: Detekováno selhání dešifrování. Heslo může být nesprávné.
+dialog.metrics.complete_label	Operace dokončena.\n\nÚspěšně zpracované soubory: %d\nChyby: %d
+dialog.metrics.decrypt_confirm_body	Všechny vaše zašifrované záznamy budou obnoveny jako prostý text na disku.\n\nPotvrdit?
+dialog.metrics.decrypt_confirm_title	Deaktivace
+dialog.metrics.decrypt_key_prompt	Zadejte bezpečnostní klíč potřebný pro dešifrování:
+dialog.metrics.disable_confirm	Zakázat metriky?\n\nKlavesový záznam přestane zachycovat stisky kláves. Již zaznamenaná data jsou zachována.
+dialog.metrics.enable_warning	VAROVÁNÍ: Chystáte se aktivovat keylogger.\n\nZaznamenává vaše stisknutí kláves s přesností na milisekundy. Záznamy se ukládají lokálně do:\n    {1}\n\nPole pro hesla jsou automaticky ignorována (filtr UIA) a obsah kláves je rovněž vypouštěn, když se nacházíte v okně anonymního/soukromého prohlížení. Přesto jde stále o keylogger — během zadávání citlivých údajů mimo tyto kontexty skript POZASTAVTE.\n\nAktivovat?
+dialog.metrics.encrypt_confirm_body	Povolením se všechny vaše stávající záznamy zašifrují, takže nebudou čitelné na disku.\n\nPotvrdit?
+dialog.metrics.encrypt_confirm_title	Ochrana dat
+dialog.metrics.encrypt_key_prompt	Definujte šifrovací klíč (výchozí: sériové číslo Macu):
+dialog.metrics.encrypt_key_title	Bezpečnostní klíč
+dialog.metrics.encryptor_error_body	Aplikace nebyla nalezena. Nejprve ji vygenerujte pomocí skriptu Python.
+dialog.metrics.encryptor_error_title	Chyba
+dialog.metrics.exclude_ok	Uložit
+dialog.metrics.exclude_prompt	Vyberte aplikace, jejichž stisky kláves nebudou nikdy zaznamenány.
+dialog.metrics.exclude_title	Vyloučit aplikace — Metriky
+dialog.metrics.progress_label	Zpracovávám: %d / %d
+dialog.metrics.security_warning_body	⚠️  UPOZORNĚNÍ: Metriky a klávesový záznam budou brzy povoleny.\n\nTento systém zaznamenává vaše stisky kláves a aktivace gest touchpadu.\n\n• Záznamy jsou uloženy ve složce Hammerspoon\n• Pole pro hesla jsou automaticky ignorována\n• Doporučuje se POZASTAVIT skript při zadávání citlivých údajů
+dialog.metrics.security_warning_title	⚠ Bezpečnostní upozornění — Metriky
+dialog.metrics.title	📊 Metriky
+dialog.path_copy.btn_backslash	&Zpětné lomítko (\\)
+dialog.path_copy.btn_quit	&Zavřít
+dialog.path_copy.msg_simple	Cesta\n%s\nbyla zkopírována do schránky.
+dialog.path_copy.msg_with_question	Cesta\n%s\nbyla zkopírována do schránky. \n\nChcete verzi s \\ místo / ?
+dialog.path_copy.title	Kopírovat cestu
+dialog.personal_info.saved	Aktualizované údaje:
+dialog.personal_info.title	Upravit osobní údaje
+dialog.reset_defaults.failed	Could not reset: these files could not be deleted ({1}).\nClose any app holding them (editor, cloud sync) and try again.
+dialog.reset_defaults.failed_title	Reset failed
+dialog.reset_defaults.placeholder_failed	The configuration was reset, but the placeholder could not be written.\nThe setup wizard will run on the next start.
+dialog.shortcuts.chatgpt_prompt	URL otevřená pomocí Ctrl+G:
+dialog.shortcuts.chatgpt_title	URL ChatGPT
+dialog.shortcuts.wrap_symbol_close_prompt	Zadejte uzavírací symbol (prázdné = symetrické):
+dialog.shortcuts.wrap_symbol_close_title	Uzavírací symbol
+dialog.shortcuts.wrap_symbol_invalid	Zadejte přesně jeden znak.
+dialog.shortcuts.wrap_symbol_prompt	Zadejte otevírací symbol (1 znak):
+dialog.shortcuts.wrap_symbol_title	Přidat ohraničující symbol
+distancesreduction.commafarletters	Čárka + vzdálená klávesa (,è = z, ,é = …)
+distancesreduction.commaj	Čárka + samohláska → J (,a = ja, ,e = je…)
+distancesreduction.deadkeyecircumflex	Ê + písmeno → mrtvá klávesa (êo = ô, êa = â…)
+distancesreduction.ecircumflexe	Ê + E → Œ
+distancesreduction.qu	Q → QU před samohláskou
+distancesreduction.spacearoundsymbols	Automatické mezery kolem symbolů rolls
+distancesreduction.suffixesa	À + písmeno → přípona (às = -ement, àé = -ée…)
+download_window.btn_cancel	🛑 Zrušit
+download_window.btn_retry	🔄 Opakovat stahování
+download_window.btn_terminal	🖥 Terminál
+download_window.cancelling	Rušení…
+download_window.done_failed	Stahování selhalo
+download_window.done_success	✅ Hotovo
+download_window.error_unknown	Neznámá chyba.
+download_window.eta_label	⏳ Zbývající čas:
+download_window.file_count	📁 Soubory: %s
+download_window.kind_mlx_install	⚙️ Instalace AI enginu (MLX)
+download_window.kind_mlx_model	📥 Stahování modelu MLX
+download_window.kind_ollama_install	⚙️ Instalace AI enginu (Ollama)
+download_window.kind_ollama_model	📥 Stahování modelu Ollama
+download_window.preparing	Připravuji…
+download_window.size_label	📦 Velikost: 
+download_window.speed_label	⚡ Rychlost: 
+download_window.starting	Spouštím…
+download_window.title	📥 Stahování probíhá
+download_window.window_title	Průběh
+dynamichotstrings.date	td★ vloží aktuální datum ({date})
+dynamichotstrings.datefr	dt★ vloží aktuální datum ({date})
+dynamichotstrings.datelongfr	date★ vloží dlouhé datum ({date})
+dynamichotstrings.group_label	Dynamické hotstrings
+dynamichotstrings.ibanprefixes	Zadání prvních znaků IBAN jej automaticky doplní
+dynamichotstrings.phoneprefixes	Zadání prvních číslic telefonu jej automaticky doplní
+dynamichotstrings.ssnprefixes	Zadání prvních číslic rodného čísla jej automaticky doplní
+dynamichotstrings.textexpansionpersonalinformation	@np★ = Příjmení ⇥ Jméno — každé písmeno = pole (n=Příjmení, p=Jméno, e=Email…)
+editor.hotstrings.add_entry_title	Vytvořit hotstring — Sekce « %s »
+editor.hotstrings.btn_add	➕ Přidat
+editor.hotstrings.btn_add_entry	＋ Add a hotstring
+editor.hotstrings.btn_add_section	＋ Sekce
+editor.hotstrings.btn_delete	Smazat
+editor.hotstrings.btn_delete_entry	🗑 Smazat
+editor.hotstrings.btn_edit	💾 Upravit
+editor.hotstrings.btn_new	Nová…
+editor.hotstrings.btn_redefine	Redefine
+editor.hotstrings.btn_rename	Přejmenovat…
+editor.hotstrings.btn_view_compact	Compact view
+editor.hotstrings.btn_view_expanded	Expanded view
+editor.hotstrings.bulk_move_placeholder	Přesunout do…
+editor.hotstrings.bulk_selected_one	selected
+editor.hotstrings.bulk_selected_other	selected
+editor.hotstrings.cb_auto	Automatická expanze
+editor.hotstrings.cb_case	Rozlišovat velká/malá
+editor.hotstrings.cb_final	Finální výsledek
+editor.hotstrings.cb_word	Celé slovo
+editor.hotstrings.chk_case	Rozlišovat velká/malá
+editor.hotstrings.chk_close_after	Zavřít po
+editor.hotstrings.chk_final	Finální výsledek
+editor.hotstrings.chk_word	Celé slovo
+editor.hotstrings.cmd_backspace	delete ←
+editor.hotstrings.cmd_delete	delete →
+editor.hotstrings.cmd_down	down
+editor.hotstrings.cmd_end	line end
+editor.hotstrings.cmd_enter	new line
+editor.hotstrings.cmd_escape	Escape
+editor.hotstrings.cmd_group_arrows	Arrows
+editor.hotstrings.cmd_group_edition	Edition
+editor.hotstrings.cmd_home	line start
+editor.hotstrings.cmd_left	left
+editor.hotstrings.cmd_right	right
+editor.hotstrings.cmd_tab	tab
+editor.hotstrings.cmd_up	up
+editor.hotstrings.col_auto	Auto
+editor.hotstrings.col_case	Rozlišovat
+editor.hotstrings.col_final	Finální
+editor.hotstrings.col_priority	Prio
+editor.hotstrings.col_result	Výsledek
+editor.hotstrings.col_trigger	Spouštěč
+editor.hotstrings.col_word	Slovo
+editor.hotstrings.confirm_del_bulk	Smazat %d vybranou/é položku/položky?
+editor.hotstrings.confirm_del_entry	Smazat « %s »?
+editor.hotstrings.confirm_del_section	Smazat « %s » a všechny jeho hotstring?
+editor.hotstrings.desc_auto_off	Requires Space or Enter to expand (recommended for autocorrect).
+editor.hotstrings.desc_auto_on	Expands immediately (ideal for triggers ending with %s).
+editor.hotstrings.desc_case_off	The engine generates lowercase, Titlecase and UPPERCASE variants.
+editor.hotstrings.desc_case_on	Strictly distinguishes uppercase/lowercase.<br>Ex: <em>Btw</em> ≠ <em>btw</em>
+editor.hotstrings.desc_final_off	The result can trigger other hotstrings in cascade.
+editor.hotstrings.desc_final_on	The result will not be re-parsed as a trigger.
+editor.hotstrings.desc_prompt	Popis zobrazený v nabídce pro tuto sekci:
+editor.hotstrings.desc_title	Popis
+editor.hotstrings.desc_word_off	Triggers anywhere, even inside a word.<br>Ex: will trigger inside <em>hotel</em>
+editor.hotstrings.desc_word_on	Only triggers when it matches a standalone word.<br>Ex: <em>tel</em>→telephone but not <em>hotel</em>
+editor.hotstrings.drag_handle_title	Drag
+editor.hotstrings.edit_entry_title	Upravit hotstring — Sekce « %s »
+editor.hotstrings.empty_hint	Žádné hotstring nejsou definovány. Klikněte na + Sekce pro začátek. ☰ přetáhnout pro přeřazení — klikněte na název pro přejmenování
+editor.hotstrings.entry_modal_title_new	Nový hotstring
+editor.hotstrings.err_duplicate	⚠ Tento spouštěč již v této sekci existuje.
+editor.hotstrings.err_id_exists	« %s » already exists.
+editor.hotstrings.err_id_invalid	Invalid identifier: lowercase letters, digits and underscores only.
+editor.hotstrings.err_id_required	The identifier is required.
+editor.hotstrings.err_no_section	⚠ Nejprve vyberte nebo vytvořte sekci.
+editor.hotstrings.err_no_section_selected	Žádná sekce není vybrána.
+editor.hotstrings.err_output_empty	The replacement is required.
+editor.hotstrings.err_section_exists	Tato sekce již existuje.
+editor.hotstrings.err_select_to_delete	⚠ Vyberte hotstring ke smazání.
+editor.hotstrings.err_select_to_edit	⚠ Vyberte hotstring k úpravě.
+editor.hotstrings.err_trigger_dup_msg	The trigger <strong>%s</strong> already exists in <em>%s</em>.<br><br>Do you really want to redefine it?
+editor.hotstrings.err_trigger_empty	The trigger is required.
+editor.hotstrings.err_trigger_required	⚠ Spouštěč a výsledek jsou povinné.
+editor.hotstrings.err_write	⚠ Chyba zápisu do personal_hotstrings.toml.
+editor.hotstrings.group_selected	Vybraný hotstring
+editor.hotstrings.kbd_help	↩ = nový řádek\n⌘ + ↩ = uložit\n⇧ + ⌘ + ↩ = uložit + nový hotstring
+editor.hotstrings.label_result	Výsledek:
+editor.hotstrings.label_section	Sekce:
+editor.hotstrings.label_trigger	Spouštěč:
+editor.hotstrings.meta_desc	Osobní hotstring
+editor.hotstrings.new_section_prompt	Název nové sekce (identifikátor, bez mezer):
+editor.hotstrings.new_section_title	Nová sekce
+editor.hotstrings.no_section	(žádná sekce)
+editor.hotstrings.page_title	✏︎ Osobní hotstring
+editor.hotstrings.priority_hint	prázdné = výchozí priorita; vyšší vyhrává
+editor.hotstrings.priority_label	Priorita
+editor.hotstrings.rename_desc_prompt	Nový popis oddílu "{1}":
+editor.hotstrings.rename_title	Přejmenovat
+editor.hotstrings.replacement_label	Náhrada
+editor.hotstrings.replacement_placeholder	např.: Dobrý den,↵Doufám, že se vám daří dobře.
+editor.hotstrings.save_error	Chyba uložení
+editor.hotstrings.saved_prefix	✓ Uloženo — 
+editor.hotstrings.sec_desc_hint	(zobrazeno v nabídce)
+editor.hotstrings.sec_desc_label	Popis
+editor.hotstrings.sec_desc_placeholder	např.: Moje zkratky
+editor.hotstrings.sec_id_hint	(pouze malá písmena, číslice a podtržítka)
+editor.hotstrings.sec_id_label	Identifikátor
+editor.hotstrings.sec_id_placeholder	např.: moje_zkratky
+editor.hotstrings.sec_modal_title_new	Nová sekce
+editor.hotstrings.sec_modal_title_rename	Rename section
+editor.hotstrings.special_cmds_summary	Speciální příkazy — kliknutím vložte
+editor.hotstrings.title_confirm	Potvrzení
+editor.hotstrings.title_error	Chyba
+editor.hotstrings.trig_hint_text	shown, stored as
+editor.hotstrings.trigger_label	Spouštěč
+editor.hotstrings.trigger_placeholder	např.: mimochodem
+editor.hotstrings.window_title	Editor osobních hotstring
+editor.personal_info.window_title	ErgoptiPlus — Osobní informace
+ergopti.error_caught	ErgoptiPlus — zachycena interní chyba :
+ergopti.windowspy_not_found	WindowSpy.ahk nebyl nalezen na následující cestě : {1}
+ext.demo.gui_message	Ahoj z ukázkového rozšíření Ergopti!
+ext.demo.open_demo_gui	Otevřít ukázkové rozhraní
+ext.demo.show_info	Zobrazit informace
+ext.demo.visit_docs	Navštívit dokumentaci
+gesture.setup.auto_configure	\nNebo klikněte na „Automaticky nakonfigurovat" v nabídce\na zapiste tyto zkratky přímo do registru.\n(Může být nutný restart.)
+gesture.setup.for_each	Pro každé gesto vyberte „Vlastní klávesová zkratka"\na zadejte zobrazenou zkratku:\n\n
+gesture.setup.header	Konfigurace gest touchpadu\n══════════════════════════════════\n\n
+gesture.setup.open_path	Otevřít: Nastavení > Bluetooth a zařízení > Touchpad\n         > Rozšířená gesta\n\n
+gesture.setup.title	ErgoptiPlus — Gesta touchpadu
+gesture.slots.swipe_2_down	Přejetí 2 prsty ↓
+gesture.slots.swipe_2_left	Přejetí 2 prsty ←
+gesture.slots.swipe_2_left_down	Přejetí 2 prsty ↙
+gesture.slots.swipe_2_left_up	Přejetí 2 prsty ↖
+gesture.slots.swipe_2_right	Přejetí 2 prsty →
+gesture.slots.swipe_2_right_down	Přejetí 2 prsty ↘
+gesture.slots.swipe_2_right_up	Přejetí 2 prsty ↗
+gesture.slots.swipe_2_up	Přejetí 2 prsty ↑
+gesture.slots.swipe_3_down	Přejetí 3 prsty ↓
+gesture.slots.swipe_3_left	Přejetí 3 prsty ←
+gesture.slots.swipe_3_left_down	Přejetí 3 prsty ↙
+gesture.slots.swipe_3_left_up	Přejetí 3 prsty ↖
+gesture.slots.swipe_3_right	Přejetí 3 prsty →
+gesture.slots.swipe_3_right_down	Přejetí 3 prsty ↘
+gesture.slots.swipe_3_right_up	Přejetí 3 prsty ↗
+gesture.slots.swipe_3_up	Přejetí 3 prsty ↑
+gesture.slots.swipe_4_down	Přejetí 4 prsty ↓
+gesture.slots.swipe_4_left	Přejetí 4 prsty ←
+gesture.slots.swipe_4_left_down	Přejetí 4 prsty ↙
+gesture.slots.swipe_4_left_up	Přejetí 4 prsty ↖
+gesture.slots.swipe_4_right	Přejetí 4 prsty →
+gesture.slots.swipe_4_right_down	Přejetí 4 prsty ↘
+gesture.slots.swipe_4_right_up	Přejetí 4 prsty ↗
+gesture.slots.swipe_4_up	Přejetí 4 prsty ↑
+gesture.slots.swipe_5_diag	Přejetí 5 prsty ↗↙
+gesture.slots.swipe_5_down	Přejetí 5 prsty ↓
+gesture.slots.swipe_5_horiz	Přejetí 5 prsty ↔
+gesture.slots.swipe_5_left	Přejetí 5 prsty ←
+gesture.slots.swipe_5_left_down	Přejetí 5 prsty ↙
+gesture.slots.swipe_5_left_up	Přejetí 5 prsty ↖
+gesture.slots.swipe_5_right	Přejetí 5 prsty →
+gesture.slots.swipe_5_right_down	Přejetí 5 prsty ↘
+gesture.slots.swipe_5_right_up	Přejetí 5 prsty ↗
+gesture.slots.swipe_5_up	Přejetí 5 prsty ↑
+gesture.slots.tap_2	Klepnutí 2 prsty
+gesture.slots.tap_3	Klepnutí 3 prsty
+gesture.slots.tap_4	Klepnutí 4 prsty
+gesture.slots.tap_5	Klepnutí 5 prsty
+gesture.touchpad_open.body	Stránka Touchpad je otevřena.\n\nPosuňte se dolů, pak klikněte na\n„Rozšířená gesta" pro přístup ke zkratkám.
+gestures.conflict_desc_swipe_2	Přejetí 2 prsty — Posouvání, Stránky, Mission Control
+gestures.conflict_desc_swipe_3_horiz	Přejetí 3 prsty vlevo/vpravo — Stránky / Přepínání ploch
+gestures.conflict_desc_swipe_3_vert	Přejetí 3 prsty nahoru/dolů — Mission Control & App Exposé
+gestures.conflict_desc_swipe_4_horiz	Přejetí 4/5 prsty vlevo/vpravo — Přepínání ploch
+gestures.conflict_desc_swipe_4_vert	Přejetí 4/5 prsty nahoru/dolů — Mission Control & App Exposé
+gestures.conflict_desc_tap_3	Klepnutí 3 prsty — Vyhledávání & detektory dat
+gestures.conflict_dialog_line1	Toto gesto může zpracovávat macOS:
+gestures.conflict_dialog_line2	Pokud ano, macOS i Hammerspoon zareagují zároveň:
+gestures.conflict_dialog_line3	Obě akce budou spuštěny současně.
+gestures.conflict_dialog_line4	Pokud je stále aktivní, deaktivujte ho zde:
+gestures.conflict_hint_swipe_2	Systémová nastavení › Trackpad\n→ Zakázat gesta 2 prsty, pokud je chcete používat v Hammerspoonu.
+gestures.conflict_hint_swipe_3_horiz	Systémová nastavení › Trackpad › Další gesta\n→ Zakázat «Listovat mezi stránkami» a «Přepínat plochy»
+gestures.conflict_hint_swipe_3_vert	Systémová nastavení › Trackpad › Další gesta\n→ Zakázat «Mission Control» a «App Exposé»
+gestures.conflict_hint_swipe_4_horiz	Systémová nastavení › Trackpad › Další gesta\n→ Zakázat «Přepínat plochy»
+gestures.conflict_hint_swipe_4_vert	Systémová nastavení › Trackpad › Další gesta\n→ Zakázat «Mission Control» a «App Exposé»
+gestures.conflict_hint_tap_3	Systémová nastavení › Trackpad › Ukázat a kliknout\n→ Zakázat «Vyhledávání a detektory dat»
+gestures.enabled	Gesta touchpadu (vyžaduje konfiguraci Windows)
+healthcheck.copy_and_close	Zkopírovat do schránky a zavřít
+hotstrings.custom_terminator	Vlastní
+hotstrings.custom_terminator_consumed	Vlastní (spotřebováno)
+hotstrings.shortcut_custom	Vlastní zkratka
+hs_config.btn_all_gray	Vše šedé
+hs_config.btn_all_grey	Vše šedé
+hs_config.btn_close	Zavřít
+hs_config.btn_reset_all	Resetovat vše
+hs_config.btn_reset_default	Obnovit výchozí
+hs_config.cat_autocorrection	Automatická oprava
+hs_config.cat_distances	Zkrácení vzdálenosti
+hs_config.cat_magickey	Klávesa ★ a expanze
+hs_config.cat_personal	Osobní hotstring
+hs_config.cat_rolls	Rolovací pohyby
+hs_config.cat_sfbs	Zkrácení SFB
+hs_config.category_prefix	Kategorie: 
+hs_config.color_blue	Modrá
+hs_config.color_brown	Hnědá
+hs_config.color_cyan	Azurová
+hs_config.color_gray	Šedá
+hs_config.color_green	Zelená
+hs_config.color_indigo	Indigová
+hs_config.color_inherit	— dědí výchozí —
+hs_config.color_lime	Limetková
+hs_config.color_orange	Oranžová
+hs_config.color_pink	Růžová
+hs_config.color_purple	Fialová
+hs_config.color_red	Červená
+hs_config.color_turquoise	Tyrkysová
+hs_config.color_yellow	Žlutá
+hs_config.default_prefix	Výchozí: 
+hs_config.delim_space	Space
+hs_config.delim_tab	Tab
+hs_config.file_level	── Úroveň souboru ──
+hs_config.file_level_short	(úroveň souboru)
+hs_config.group_common	Společné
+hs_config.group_extensions	Rozšíření
+hs_config.group_personal	Osobní
+hs_config.hint	Upravit podle kategorie nebo sekce. Všechny změny jsou uloženy okamžitě.
+hs_config.label_category	Kategorie:
+hs_config.label_color	Barva
+hs_config.label_delay	Zpoždění (ms)
+hs_config.label_file	Soubor:
+hs_config.label_group	Skupina:
+hs_config.label_priority	Priorita
+hs_config.label_section	Sekce:
+hs_config.label_tooltip	Zobrazit nápovědu
+hs_config.none	(žádná)
+hs_config.notify_delimiters_saved	Word delimiters updated.
+hs_config.notify_reset_all	Zpoždění a barvy byly resetovány.
+hs_config.override_active	přepsání aktivní
+hs_config.section_prefix	Sekce: 
+hs_config.window_title	Zpoždění a barvy hotstring
+init.reload_files	Soubory změny — znovu načítám…
+init.reload_hotstrings	Hotstrings změny — znovu načítám…
+init.reload_script	Skript změněn — znovu načítám…
+init.reload_title	Opětovné načítání
+karabiner.download_failed	Stahování selhalo: %s
+karabiner.downloading	Stahování Karabiner-Elements (~46 MB)…
+karabiner.install_error_body	Automatická instalace selhala: %s\n\nMůžete ručně stáhnout Karabiner-Elements z https://karabiner-elements.pqrs.org a restartovat Hammerspoon.
+karabiner.install_error_title	Instalace selhala
+karabiner.install_failed	Instalace selhala: %s
+karabiner.installing	Instalace Karabiner-Elements (vyžadováno heslo správce)…
+karabiner.lifecycle.unavailable	Karabiner-Elements není dostupný — zkontrolujte instalaci.
+karabiner.onboarding.accessibility_body	Systémové rozšíření je aktivní, ale démon Karabiner neběží. Karabiner-Elements v16+ vyžaduje oprávnění „Usnadnění přístupu“ (starší verze žádají o „Monitorování vstupu“).\n\nKlikněte na „Otevřít usnadnění přístupu“ a povolte Karabiner-Elements v seznamu. Pokud se položka nezobrazí, otevřete Karabiner-Elements jednou z /Applications/, aby se zaregistroval v macOS.
+karabiner.onboarding.accessibility_title	Vyžadováno usnadnění přístupu
+karabiner.onboarding.btn_install_now	Instalovat nyní
+karabiner.onboarding.btn_open_accessibility	Otevřít usnadnění přístupu
+karabiner.onboarding.btn_open_settings	Otevřít nastavení
+karabiner.onboarding.daemon_ready	Karabiner-Elements je funkční.
+karabiner.onboarding.daemon_timeout	Vypršel čas čekání na spuštění daemona Karabiner.
+karabiner.onboarding.daemon_waiting	Čekám na spuštění daemona Karabiner…
+karabiner.onboarding.error.manifest_unconfigured	Manifest není nakonfigurován (přítomny zástupné hodnoty TODO).
+karabiner.onboarding.error.mount_failed	Připojení selhalo: {error}
+karabiner.onboarding.ext_activated	Systémové rozšíření aktivováno.
+karabiner.onboarding.ext_body	Karabiner-Elements je nainstalován, ale jeho systémové rozšíření (DriverKit virtual HID) ještě není aktivní.\n\nKlikněte na „Otevřít nastavení“ a povolte „Karabiner-DriverKit-VirtualHIDDevice“ v části Systémová rozšíření.
+karabiner.onboarding.ext_timeout	Vypršel čas čekání na aktivaci systémového rozšíření.
+karabiner.onboarding.ext_title	Aktivovat systémové rozšíření
+karabiner.onboarding.ext_waiting	Čekám na aktivaci systémového rozšíření…
+karabiner.onboarding.install_body_suffix	\n\nAplikace bude stažena z oficiálního repozitáře (pqrs-org/Karabiner-Elements) a automaticky nainstalována. Bude vyžádáno heslo správce.
+karabiner.onboarding.missing.daemon_not_running	• Démon není spuštěn (Monitorování vstupu?)
+karabiner.onboarding.missing.grabber_absent	• Démon karabiner_grabber chybí
+karabiner.onboarding.missing.ke_not_installed	• Karabiner-Elements není nainstalován
+karabiner.onboarding.missing.sysext_not_activated	• Systémové rozšíření (DriverKit) není aktivováno
+karabiner.onboarding.missing_prefix	Chybějící prvky:\n
+karabiner.onboarding.required_title	Vyžadována konfigurace Karabiner-Elements
+karabiner.pkg_not_found	V DMG nebyl nalezen žádný .pkg.
+karabiner.ready_body	Engine Karabiner je připraven.
+karabiner.ready_title	Karabiner připraven
+karabiner.sha_failed	Ověření SHA-256 selhalo: %s
+keepawake.started	☕ Proti spánku aktivní
+keepawake.stopped	☕ Proti spánku deaktivováno
+keepawake.title	Aktivita klávesnice
+keylogger.category_general	Obecné
+keylogger.category_private	Soukromé prohlížení
+keylogger.error_body	Nepodařilo se načíst rozhraní metrik.\n\nZkontrolujte ui/metrics_typing/init.lua.
+keylogger.error_title	Chyba Keyloggeru
+keylogger_ui.app_metrics	Čas v aplikacích
+keylogger_ui.launch_error	Nelze spustit přehled : {1}
+keylogger_ui.metrics_disabled	Metriky jsou deaktivovány.
+keylogger_ui.metrics_disabled_body	Pro aktivaci : ikona v oznamovací oblasti → 📊 Metriky → « ❌ Metriky deaktivovány (klikněte pro aktivaci) ».
+keylogger_ui.metrics_title	📊 Metriky
+keylogger_ui.typing_metrics	Metriky psaní
+layout.ctrlmagicsave	Ctrl+★ odesílá Ctrl+S
+layout.directaccessdigits	Přímý přístup k číslicím na horní řadě
+layout.ergoptialtgr	Emulovat vrstvu AltGr rozložení Ergopti
+layout.ergoptibase	Emulovat základní vrstvu rozložení Ergopti
+layout.ergoptiplus	Použít drobné změny AltGr pro Ergopti➕
+llm.deps.browser_install_tip	Stáhněte si Ollama pro Windows ze stránky otevřené v prohlížeči, spusťte instalátor a vraťte se sem — připojení bude detekováno automaticky.
+llm.deps.done_success	✅ Ollama připraven
+llm.deps.fail_server_not_responding	Instalátor skončil, ale server Ollama neodpovíí.
+llm.deps.fail_timeout	Vypršel časový limit čekání na odezvu Ollama po instalaci.
+llm.deps.install_launching	Spouštění instalace Ollama…
+llm.deps.install_launching_hotkey	Instalace Ollama (spuštěna zkratkou)…
+llm.deps.tray_title	Ergopti — AI
+llm.generating	⏳ Generuji…
+llm.profile.advanced.label	●●○ Pokročilý — Oprava + Predikce
+llm.profile.basic.label	●○○ Základní — Jednoduchá predikce
+llm.profile.batch_advanced.label	●●● Batch Pokročilý — 1 pokročilý dotaz s {n} predikcemi{s}
+llm.profile.raw.label	○○○ Surový — Žádný prompt, jen kontext
+llm.server_mlx_ready_body	Server MLX je připraven.
+llm.server_ollama_ready_body	Server Ollama je připraven.
+llm.server_ready_title	LLM aktivní
+magickey.repeatcorrections	Klávesa ★ opakuje poslední napsaný znak
+magickey.replace	Přeměna klávesy J na klávesu ★
+magickey.textexpansion	Rozvinutí textu: c★ = c'est, gt★ = j'étais, pex★ = par exemple…
+magickey.textexpansionauto	Automatické rozvinutí bez ★: ju' = jusqu', ya = y'a…
+magickey.textexpansionemojis	Rozvinutí emoji: voiture★ = 🚗, koala★ = 🐨…
+magickey.textexpansionsymbols	Rozvinutí symbolů: -->★ = ➜, (v)★ = ✓…
+magickey.textexpansionsymbolstypst	Symboly Typst: $eq.not$★ = ≠, $PP$★ = ℙ…
+menu.about.changelog	Přehled změn
+menu.about.channel_dev	Předběžná verze (dev)
+menu.about.channel_local_source	✔  Místní zdroj
+menu.about.channel_main	Stabilní (main)
+menu.about.channel_menu	Aktualizační kanál
+menu.about.check_for_updates	Zkontrolovat aktualizace
+menu.about.frequency.10m	Každých 10 minut
+menu.about.frequency.12h	Každých 12 hodin
+menu.about.frequency.1h	Každou hodinu
+menu.about.frequency.1m	Každou minutu
+menu.about.frequency.24h	Každých 24 hodin
+menu.about.frequency.2d	Každé 2 dny
+menu.about.frequency.2h	Každé 2 hodiny
+menu.about.frequency.3h	Každé 3 hodiny
+menu.about.frequency.5m	Každých 5 minut
+menu.about.frequency.6h	Každých 6 hodin
+menu.about.frequency.7d	Každých 7 dnů
+menu.about.frequency.never	Never
+menu.about.frequency_menu	Frekvence kontroly
+menu.about.install_update	Nainstalovat aktualizaci…
+menu.about.open_releases_page	Otevřít stránku verzí — GitHub
+menu.about.title	Verze / Aktualizace
+menu.about.update.changelog_error	Nepodařilo se získat informace o vydání z GitHubu.
+menu.about.update.changelog_header	Poznámky k vydání pro {tag}:\n\n{notes}\n\nOtevřít na GitHubu?
+menu.about.update.install_error	Instalace aktualizace se nezdařila. Zkontrolujte protokoly nebo stáhněte ručně ze stránky verzí.
+menu.about.update.local_source	Spuštěno z lokálního zdroje — kontrola aktualizací není dostupná.
+menu.about.update.network_error	Nelze se připojit k serveru GitHub.\nZkontrolujte připojení k internetu a zkuste to znovu.
+menu.about.update.new_version	Je dostupná nová verze!\n\nAktuální: {current}\nNejnovější:  {latest}\n\nOtevřít stránku vydání ke stažení?
+menu.about.update.no_asset	Archiv aktualizace nebyl v tomto vydání nalezen. Otevřete stránku verzí pro ruční stažení.
+menu.about.update.parse_error	Nepodařilo se načíst značku nejnovějšího vydání z GitHubu.
+menu.about.update.up_to_date	ErgoptiPlus je aktuální.\n\nAktuální verze: {version}
+menu.about.update_checking	Kontroluji…
+menu.about.update_downloading	Downloading…
+menu.about.update_installing	Instaluji…
+menu.about.update_now	Aktualizovat na {tag}
+menu.apps.clone_desc	Duplikovat libovolnou nainstalovanou aplikaci
+menu.apps.config_per_app	Configure hotstrings per application
+menu.apps.encrypt_desc	Šifrovat soubory a složky
+menu.apps.no_apps	Žádné aplikace nenalezeny
+menu.apps.title	🛠️ Aplikace
+menu.builder.title	Ergopti+
+menu.builder.title_paused	Ergopti+ ⏸
+menu.debug.console	Konzole
+menu.debug.healthcheck	Kontrola stavu
+menu.debug.key_history	Historie kláves
+menu.debug.list_vars	Stav proměnných
+menu.debug.log_level	Úroveň logu
+menu.debug.open_error_log	Open error log
+menu.debug.open_logs	Otevřít složku protokolů
+menu.debug.open_today_log	Otevřít dnešní soubor protokolu
+menu.debug.title	⚠ Ladění
+menu.debug.window_spy	Sledování okna
+menu.extensions.empty	Žádné rozšíření není nainstalováno
+menu.extensions.header	Rozšíření
+menu.gestures.action_disabled	∅ Disabled
+menu.gestures.action_prefix	Akce: 
+menu.gestures.auto_configure	🔧 Automatická konfigurace (registr)
+menu.gestures.change_action	Změnit akci
+menu.gestures.circular_spaces	Kruhová navigace Spaces (1 ↔ N)
+menu.gestures.conflict_title	Konflikt gest
+menu.gestures.default_sensitivity	(Obecné výchozí)
+menu.gestures.disable_all	✕ Zakázat všechna gesta
+menu.gestures.enabled	️ Gesta
+menu.gestures.manual_tutorial	📋 Manuální návod k nastavení
+menu.gestures.mode_incremental	Inkrementální odeslání (vzdálenost)
+menu.gestures.mode_prefix	Režim: 
+menu.gestures.mode_single	Jednoduchá akce (x1)
+menu.gestures.notify_title	Gesta
+menu.gestures.off	❌ Gesta zakázána (kliknutím povolíte)
+menu.gestures.on	✅ Gesta povolena (kliknutím zakážete)
+menu.gestures.open_settings	Otevřít nastavení
+menu.gestures.open_touchpad	⚙ Otevřít nastavení touchpadu (pak "Pokročilá gesta")
+menu.gestures.restore_defaults	↩ Obnovit výchozí nastavení
+menu.gestures.sensitivity_hint	(Menší = citlivější/reaktivnější)
+menu.gestures.sensitivity_label	Vzdálenost na akci (Citlivost):
+menu.gestures.sensitivity_prefix	Citlivost: 
+menu.gestures.swipe_2_diag	Přejetí 2 prsty ↗↙
+menu.gestures.swipe_2_down	Přejetí 2 prsty ↓
+menu.gestures.swipe_2_left	Přejetí 2 prsty ←
+menu.gestures.swipe_2_left_down	Přejetí 2 prsty ↙
+menu.gestures.swipe_2_left_up	Přejetí 2 prsty ↖
+menu.gestures.swipe_2_right	Přejetí 2 prsty →
+menu.gestures.swipe_2_right_down	Přejetí 2 prsty ↘
+menu.gestures.swipe_2_right_up	Přejetí 2 prsty ↗
+menu.gestures.swipe_2_up	Přejetí 2 prsty ↑
+menu.gestures.swipe_3_diag	Přejetí 3 prsty ↗↙
+menu.gestures.swipe_3_down	Přejetí 3 prsty ↓
+menu.gestures.swipe_3_horiz	Přejetí 3 prsty ↔
+menu.gestures.swipe_3_left	Přejetí 3 prsty ←
+menu.gestures.swipe_3_left_down	Přejetí 3 prsty ↙
+menu.gestures.swipe_3_left_up	Přejetí 3 prsty ↖
+menu.gestures.swipe_3_right	Přejetí 3 prsty →
+menu.gestures.swipe_3_right_down	Přejetí 3 prsty ↘
+menu.gestures.swipe_3_right_up	Přejetí 3 prsty ↗
+menu.gestures.swipe_3_up	Přejetí 3 prsty ↑
+menu.gestures.swipe_4_diag	Přejetí 4 prsty ↗↙
+menu.gestures.swipe_4_down	Přejetí 4 prsty ↓
+menu.gestures.swipe_4_horiz	Přejetí 4 prsty ↔
+menu.gestures.swipe_4_left	Přejetí 4 prsty ←
+menu.gestures.swipe_4_left_down	Přejetí 4 prsty ↙
+menu.gestures.swipe_4_left_up	Přejetí 4 prsty ↖
+menu.gestures.swipe_4_right	Přejetí 4 prsty →
+menu.gestures.swipe_4_right_down	Přejetí 4 prsty ↘
+menu.gestures.swipe_4_right_up	Přejetí 4 prsty ↗
+menu.gestures.swipe_4_up	Přejetí 4 prsty ↑
+menu.gestures.swipe_5_diag	Přejetí 5 prsty ↗↙
+menu.gestures.swipe_5_down	Přejetí 5 prsty ↓
+menu.gestures.swipe_5_horiz	Přejetí 5 prsty ↔
+menu.gestures.swipe_5_left	Přejetí 5 prsty ←
+menu.gestures.swipe_5_left_down	Přejetí 5 prsty ↙
+menu.gestures.swipe_5_left_up	Přejetí 5 prsty ↖
+menu.gestures.swipe_5_right	Přejetí 5 prsty →
+menu.gestures.swipe_5_right_down	Přejetí 5 prsty ↘
+menu.gestures.swipe_5_right_up	Přejetí 5 prsty ↗
+menu.gestures.swipe_5_up	Přejetí 5 prsty ↑
+menu.gestures.tap_2	Klepnutí 2 prsty
+menu.gestures.tap_3	Klepnutí 3 prsty
+menu.gestures.tap_4	Klepnutí 4 prsty
+menu.gestures.tap_5	Klepnutí 5 prsty
+menu.gestures.title	🖐️ Gesta
+menu.global.config_folder	📂 Konfigurační složka…
+menu.global.disable_all	☐ Zakázat všechny funkce
+menu.global.edit_shortcuts	  ↳ Upravit osobní zkratky
+menu.global.enable_all	☑ Povolit všechny funkce
+menu.global.language	🌐 Jazyk
+menu.global.quit	⏹ Ukončit
+menu.global.reload	🔄 Znovu načíst
+menu.global.reset_defaults	↺ Obnovit výchozí nastavení
+menu.global.setup_wizard	Průvodce nastavením…
+menu.global.suspend	⏸︎ Pozastavit
+menu.global.title	Globální akce
+menu.hotstrings.add_custom	+ Přidat vlastní expandér…
+menu.hotstrings.add_delimiter	+ Add custom delimiter…
+menu.hotstrings.category_off	❌ Deaktivováno (kliknutím aktivujete)
+menu.hotstrings.category_on	✅ Aktivováno (kliknutím deaktivujete)
+menu.hotstrings.check_all	☑ Vybrat vše
+menu.hotstrings.close_on_add	Zavřít UI po přidání hotstringu přes zkratku
+menu.hotstrings.config_item	⚙️ Konfigurovat zpoždění a barvy…
+menu.hotstrings.consumed	spotřebováno
+menu.hotstrings.consumed_suffix	(spotřebováno)
+menu.hotstrings.custom_label	Vlastní
+menu.hotstrings.default_category_prefix	Výchozí kategorie: 
+menu.hotstrings.default_none	Žádná
+menu.hotstrings.delay_autocorrection	Zpoždění automatické opravy
+menu.hotstrings.delay_invalid_body	Zadejte nezáporné celé číslo (milisekundy).
+menu.hotstrings.delay_invalid_title	Neplatná hodnota
+menu.hotstrings.delay_magic_key	Zpoždění kouzelné klávesy ★
+menu.hotstrings.delay_prompt	Nové zpoždění v milisekundách (0 = bez zpoždění):
+menu.hotstrings.delays_colors	Zpoždění a barvy…
+menu.hotstrings.delete_delimiter	Delete this delimiter…
+menu.hotstrings.delete_expander	Smazat tento expandér…
+menu.hotstrings.disable_all	❌ Disable all
+menu.hotstrings.enable_all	✅ Enable all
+menu.hotstrings.header_common	Společné hotstring
+menu.hotstrings.header_common_count	Společné hotstring (%s)
+menu.hotstrings.header_ergopti	Rozložení Ergopti
+menu.hotstrings.header_ergopti_count	Rozložení Ergopti (%s)
+menu.hotstrings.header_personal_count	Moje hotstrings (%s)
+menu.hotstrings.infinite	∞
+menu.hotstrings.magic_key_prefix	Kouzelná klávesa: 
+menu.hotstrings.magic_key_prompt	Nová hodnota (★ výchozí):
+menu.hotstrings.magic_key_title	Upravit kouzelnou klávesu
+menu.hotstrings.missing_value	(chybí hodnota)
+menu.hotstrings.notify_bubble_ai	Bublina AI
+menu.hotstrings.notify_bubble_autocorrect	Bublina Autokorekce
+menu.hotstrings.notify_bubble_colored	Barevné bubliny
+menu.hotstrings.notify_bubble_star	Bublina ★
+menu.hotstrings.off	❌ Hotstring zakázány (kliknutím povolíte)
+menu.hotstrings.on	✅ Hotstring povoleny (kliknutím zakážete)
+menu.hotstrings.open_editor	Otevřít editor hotstring
+menu.hotstrings.open_file	Otevřít soubor…
+menu.hotstrings.params	⚙️ Nastavení hotstring
+menu.hotstrings.personal_header	Moje hotstrings
+menu.hotstrings.preview_bubbles	Náhledové bubliny
+menu.hotstrings.repeat_key_toggle	Klávesa ★ opakuje poslední stisk
+menu.hotstrings.reset_magic_key	   ↳ Obnovit (výchozí: ★)
+menu.hotstrings.rolls.assign	#! ➜ :=
+menu.hotstrings.rolls.assign_arrow_equal_left	=$ ➜ <=
+menu.hotstrings.rolls.assign_arrow_equal_right	$= ➜ =>
+menu.hotstrings.rolls.assign_arrow_minus_left	?+ ➜ <-
+menu.hotstrings.rolls.assign_arrow_minus_right	+? ➜ ->
+menu.hotstrings.rolls.bracket_quote	[# ➜ ["
+menu.hotstrings.rolls.chevron_equal	= ➜ <=
+menu.hotstrings.rolls.chevron_greater	>% ➜ >=
+menu.hotstrings.rolls.chevron_less	<% ➜ <=
+menu.hotstrings.rolls.close_chevron_tag	<@ ➜ </
+menu.hotstrings.rolls.comment_close	"\\  ➜ */
+menu.hotstrings.rolls.comment_open	\\" ➜ /*
+menu.hotstrings.rolls.ct	P' ➜ CT
+menu.hotstrings.rolls.cx	CX ➜ CK
+menu.hotstrings.rolls.english_negation	NT' ➜ N'T
+menu.hotstrings.rolls.equal_string	[) ➜ = ""
+menu.hotstrings.rolls.ez	EÉ ➜ EZ
+menu.hotstrings.rolls.hashtag_close_bracket	#] ➜ "]
+menu.hotstrings.rolls.hashtag_open_bracket	#[ ➜ "[
+menu.hotstrings.rolls.hashtag_parenthesis	#( ➜ ")
+menu.hotstrings.rolls.hashtag_quote	#" ➜ "
+menu.hotstrings.rolls.hc	HC ➜ WH
+menu.hotstrings.rolls.left_arrow	=+ = ➜
+menu.hotstrings.rolls.not_equal	!# ➜ !=
+menu.hotstrings.rolls.paren_quote	(# ➜ ("
+menu.hotstrings.rolls.sx	SX ➜ SK
+menu.hotstrings.shortcut_default_ctrl	Ctrl + %s
+menu.hotstrings.shortcut_none	Žádná zkratka
+menu.hotstrings.shortcut_prefix	Zkratka: Win + 
+menu.hotstrings.shortcut_prompt	Formát: modifikátory+klávesa (např. ctrl+e)\nDostupné modifikátory: cmd, alt, ctrl, shift\nPonechte prázdné pro deaktivaci
+menu.hotstrings.title	⚡ Hotstring
+menu.hotstrings.tooltip_ai	Náhled AI
+menu.hotstrings.tooltip_ai_acceptance	Zpoždění přijetí AI
+menu.hotstrings.tooltip_autocompletion	Zpoždění automatického doplňování
+menu.hotstrings.tooltip_autocorrect	Náhled automatické opravy
+menu.hotstrings.tooltip_colored	Barevné náhledy
+menu.hotstrings.tooltip_default	Výchozí zpoždění (všechny skupiny)
+menu.hotstrings.tooltip_magic	★ Náhled
+menu.hotstrings.uncheck_all	□ Zrušit výběr
+menu.hotstrings.word_delimiters	Oddělovače slov
+menu.hotstrings.word_expanders	Expandéry
+menu.hs.gestures.modes	Režim
+menu.hs.gestures.modes.swipe_2_down	Režim — Přejetí 2 prsty ↓
+menu.hs.gestures.modes.swipe_2_left	Režim — Přejetí 2 prsty ←
+menu.hs.gestures.modes.swipe_2_left_down	Režim — Přejetí 2 prsty ↙
+menu.hs.gestures.modes.swipe_2_left_up	Režim — Přejetí 2 prsty ↖
+menu.hs.gestures.modes.swipe_2_right	Režim — Přejetí 2 prsty →
+menu.hs.gestures.modes.swipe_2_right_down	Režim — Přejetí 2 prsty ↘
+menu.hs.gestures.modes.swipe_2_right_up	Režim — Přejetí 2 prsty ↗
+menu.hs.gestures.modes.swipe_2_up	Režim — Přejetí 2 prsty ↑
+menu.hs.gestures.modes.swipe_3_down	Režim — Přejetí 3 prsty ↓
+menu.hs.gestures.modes.swipe_3_left	Režim — Přejetí 3 prsty ←
+menu.hs.gestures.modes.swipe_3_left_down	Režim — Přejetí 3 prsty ↙
+menu.hs.gestures.modes.swipe_3_left_up	Režim — Přejetí 3 prsty ↖
+menu.hs.gestures.modes.swipe_3_right	Režim — Přejetí 3 prsty →
+menu.hs.gestures.modes.swipe_3_right_down	Režim — Přejetí 3 prsty ↘
+menu.hs.gestures.modes.swipe_3_right_up	Režim — Přejetí 3 prsty ↗
+menu.hs.gestures.modes.swipe_3_up	Režim — Přejetí 3 prsty ↑
+menu.hs.gestures.modes.swipe_4_down	Režim — Přejetí 4 prsty ↓
+menu.hs.gestures.modes.swipe_4_left	Režim — Přejetí 4 prsty ←
+menu.hs.gestures.modes.swipe_4_left_down	Režim — Přejetí 4 prsty ↙
+menu.hs.gestures.modes.swipe_4_left_up	Režim — Přejetí 4 prsty ↖
+menu.hs.gestures.modes.swipe_4_right	Režim — Přejetí 4 prsty →
+menu.hs.gestures.modes.swipe_4_right_down	Režim — Přejetí 4 prsty ↘
+menu.hs.gestures.modes.swipe_4_right_up	Režim — Přejetí 4 prsty ↗
+menu.hs.gestures.modes.swipe_4_up	Režim — Přejetí 4 prsty ↑
+menu.hs.gestures.modes.swipe_5_down	Režim — Přejetí 5 prsty ↓
+menu.hs.gestures.modes.swipe_5_left	Režim — Přejetí 5 prsty ←
+menu.hs.gestures.modes.swipe_5_left_down	Režim — Přejetí 5 prsty ↙
+menu.hs.gestures.modes.swipe_5_left_up	Režim — Přejetí 5 prsty ↖
+menu.hs.gestures.modes.swipe_5_right	Režim — Přejetí 5 prsty →
+menu.hs.gestures.modes.swipe_5_right_down	Režim — Přejetí 5 prsty ↘
+menu.hs.gestures.modes.swipe_5_right_up	Režim — Přejetí 5 prsty ↗
+menu.hs.gestures.modes.swipe_5_up	Režim — Přejetí 5 prsty ↑
+menu.hs.gestures.sensitivities	Citlivost
+menu.hs.gestures.sensitivities.swipe_2_down	Citlivost — Přejetí 2 prsty ↓
+menu.hs.gestures.sensitivities.swipe_2_left	Citlivost — Přejetí 2 prsty ←
+menu.hs.gestures.sensitivities.swipe_2_left_down	Citlivost — Přejetí 2 prsty ↙
+menu.hs.gestures.sensitivities.swipe_2_left_up	Citlivost — Přejetí 2 prsty ↖
+menu.hs.gestures.sensitivities.swipe_2_right	Citlivost — Přejetí 2 prsty →
+menu.hs.gestures.sensitivities.swipe_2_right_down	Citlivost — Přejetí 2 prsty ↘
+menu.hs.gestures.sensitivities.swipe_2_right_up	Citlivost — Přejetí 2 prsty ↗
+menu.hs.gestures.sensitivities.swipe_2_up	Citlivost — Přejetí 2 prsty ↑
+menu.hs.gestures.sensitivities.swipe_3_down	Citlivost — Přejetí 3 prsty ↓
+menu.hs.gestures.sensitivities.swipe_3_left	Citlivost — Přejetí 3 prsty ←
+menu.hs.gestures.sensitivities.swipe_3_left_down	Citlivost — Přejetí 3 prsty ↙
+menu.hs.gestures.sensitivities.swipe_3_left_up	Citlivost — Přejetí 3 prsty ↖
+menu.hs.gestures.sensitivities.swipe_3_right	Citlivost — Přejetí 3 prsty →
+menu.hs.gestures.sensitivities.swipe_3_right_down	Citlivost — Přejetí 3 prsty ↘
+menu.hs.gestures.sensitivities.swipe_3_right_up	Citlivost — Přejetí 3 prsty ↗
+menu.hs.gestures.sensitivities.swipe_3_up	Citlivost — Přejetí 3 prsty ↑
+menu.hs.gestures.sensitivities.swipe_4_down	Citlivost — Přejetí 4 prsty ↓
+menu.hs.gestures.sensitivities.swipe_4_left	Citlivost — Přejetí 4 prsty ←
+menu.hs.gestures.sensitivities.swipe_4_left_down	Citlivost — Přejetí 4 prsty ↙
+menu.hs.gestures.sensitivities.swipe_4_left_up	Citlivost — Přejetí 4 prsty ↖
+menu.hs.gestures.sensitivities.swipe_4_right	Citlivost — Přejetí 4 prsty →
+menu.hs.gestures.sensitivities.swipe_4_right_down	Citlivost — Přejetí 4 prsty ↘
+menu.hs.gestures.sensitivities.swipe_4_right_up	Citlivost — Přejetí 4 prsty ↗
+menu.hs.gestures.sensitivities.swipe_4_up	Citlivost — Přejetí 4 prsty ↑
+menu.hs.gestures.sensitivities.swipe_5_down	Citlivost — Přejetí 5 prsty ↓
+menu.hs.gestures.sensitivities.swipe_5_left	Citlivost — Přejetí 5 prsty ←
+menu.hs.gestures.sensitivities.swipe_5_left_down	Citlivost — Přejetí 5 prsty ↙
+menu.hs.gestures.sensitivities.swipe_5_left_up	Citlivost — Přejetí 5 prsty ↖
+menu.hs.gestures.sensitivities.swipe_5_right	Citlivost — Přejetí 5 prsty →
+menu.hs.gestures.sensitivities.swipe_5_right_down	Citlivost — Přejetí 5 prsty ↘
+menu.hs.gestures.sensitivities.swipe_5_right_up	Citlivost — Přejetí 5 prsty ↗
+menu.hs.gestures.sensitivities.swipe_5_up	Citlivost — Přejetí 5 prsty ↑
+menu.kanata.title	🎹 Kanata
+menu.karabiner.clear_all	🧹 Vymazat vše (klepnutí/přidržení a zkratky)
+menu.karabiner.combo_arrow	Kombo → %s
+menu.karabiner.copy_tap_to_combo	🔁 Zkopírovat tap → combo pro modifikátory
+menu.karabiner.disabled_warning_1	⚠️  Nabídka zakázána, ale Karabiner stále běží.
+menu.karabiner.disabled_warning_2	      Přemapování jsou proto stále aktivní.
+menu.karabiner.disabled_warning_3	      Pro zastavení všeho: klikněte na 🟢 výše,
+menu.karabiner.disabled_warning_4	      a odeberte Karabiner ze spouštěcích aplikací.
+menu.karabiner.header_shortcuts	Zkratky modifikátorů
+menu.karabiner.header_taps_holds	Klepnutí / Přidržení
+menu.karabiner.hold_arrow	Přidržení → %s
+menu.karabiner.hold_colon	Přidržení: %s
+menu.karabiner.key_tap_delay	Tap delay: %s
+menu.karabiner.key_tap_delay_dialog_prompt	Tap / hold delay for this key, in milliseconds\n(global: %d ms)
+menu.karabiner.key_tap_delay_dialog_title	Karabiner — Per-key tap delay
+menu.karabiner.key_tap_delay_set	Set a custom delay…
+menu.karabiner.key_tap_delay_use_global	Use global delay (%s)
+menu.karabiner.left_hand	Levá ruka
+menu.karabiner.nothing_combo	Žádná akce (kombo, klepnutí a přidržení)
+menu.karabiner.nothing_tap_hold	Žádná akce (klepnutí a přidržení)
+menu.karabiner.open_gui	Otevřít Karabiner-Elements
+menu.karabiner.restore_defaults	↩ Obnovit výchozí nastavení
+menu.karabiner.right_hand	Pravá ruka
+menu.karabiner.simultaneous_dialog_prompt	Maximální zpoždění (milisekundy) mezi 1.\na 2. klávesou zkratky pro aktivaci slotu "Kombo"\n(akordový styl: klávesy stisknuty téměř současně).\n\n(výchozí: %d ms)
+menu.karabiner.simultaneous_dialog_title	Karabiner — Zpoždění aktivace komba
+menu.karabiner.simultaneous_title	Zpoždění aktivace komba: %s
+menu.karabiner.start	▶ Spustit Karabiner
+menu.karabiner.status_active	🟢 Karabiner aktivní
+menu.karabiner.status_inactive	🔴 Karabiner neaktivní — klikněte pro restart
+menu.karabiner.status_no_daemon	🟡 Karabiner povolen — démon nebyl detekován (je KE nainstalován?)
+menu.karabiner.status_not_primed	🟡 Karabiner povolen — pravidla nejsou aplikována (klikněte pro primování)
+menu.karabiner.status_priming	🔵 Karabiner — primování probíhá…
+menu.karabiner.sticky_dialog_prompt	Zpoždění zrušení pevného modifikátoru (milisekundy)\nPo uplynutí této doby bez stisku klávesy se jednocestný modifikátor zruší.
+menu.karabiner.sticky_dialog_title	Karabiner — Zpoždění pevného modifikátoru
+menu.karabiner.sticky_title	Zpoždění pevného modifikátoru: %s
+menu.karabiner.stop	✕ Ukončit Karabiner
+menu.karabiner.symmetric	Symetrické zkratky (pořadí kláves nezávislé)
+menu.karabiner.tap_arrow	Klepnutí → %s
+menu.karabiner.tap_colon	Klepnutí: %s
+menu.karabiner.tap_hold_dialog_prompt	Zpoždění klepnutí / přidržení v milisekundách\n(Výchozí Karabiner: %d ms)
+menu.karabiner.tap_hold_dialog_title	Karabiner — Zpoždění klepnutí / přidržení
+menu.karabiner.tap_hold_title	Zpoždění klepnutí / přidržení: %s
+menu.keyboard_layout.add_ergopti	➕ Přidat Ergopti v%s do seznamu rozložení
+menu.keyboard_layout.open_system_prefs	Otevřít Systémové předvolby → Klávesnice
+menu.layout.active_layouts	Aktivní rozložení
+menu.layout.add_fail	Přidání selhalo — viz konzole.
+menu.layout.add_ok	%s přidáno do seznamu.
+menu.layout.add_to_list	Přidat Ergopti v%s ke zdrojům vstupu…
+menu.layout.already_added	✅ %s v%s — již přidáno
+menu.layout.in_list	Všechny varianty Ergopti aktivní v%s ✅
+menu.layout.install_first	Nejprve nainstalujte balíček
+menu.layout.install_version	%s Nainstalovat Ergopti (%s) v%s
+menu.layout.installed_system	Rozložení Ergopti nainstalováno (systémový rozsah) ✅
+menu.layout.installed_user	Rozložení Ergopti nainstalováno (uživatelský rozsah) ✅
+menu.layout.installed_version	Ergopti (%s) v%s — aktuální ✅
+menu.layout.layout_auto	— Beze změny —
+menu.layout.layout_on_pause	Rozložení když skript pozastaven
+menu.layout.layout_on_resume	Rozložení když skript aktivní
+menu.layout.logo_custom	Vlastní ikona
+menu.layout.logo_default	Výchozí ikona
+menu.layout.no_bundle	Žádný balíček Ergopti nenalezen
+menu.layout.off	❌ Rozložení zakázáno (kliknutím povolíte)
+menu.layout.on	✅ Rozložení povoleno (kliknutím zakážete)
+menu.layout.open_prefs	Otevřít Nastavení klávesnice…
+menu.layout.pause_layout_enabled	Přepínat rozložení při pozastavení / obnovení
+menu.layout.pause_layout_section	Rozložení při pozastavení / obnovení
+menu.layout.replace	Přeměna klávesy na klávesu ★
+menu.layout.scope_system	systém
+menu.layout.scope_user	uživatel
+menu.layout.title	🌐 Rozložení klávesnice
+menu.layout.update_list	Upgradovat aktivní seznam v%s → v%s
+menu.layout.update_list_fail	Aktualizace selhala — viz konzole.
+menu.layout.update_list_install_first	Upgradovat aktivní seznam na v%s (nejprve nainstalujte v%s)
+menu.layout.update_list_ok	Seznam zdrojů vstupu aktualizován.
+menu.layout.update_version	Aktualizovat Ergopti (%s) v%s → v%s
+menu.llm.about	O aplikaci Ergopti AI
+menu.llm.about_body	Ergopti AI — Chytrá klávesnicová napovídání\nBackend: Ollama (lokálně)\nVerze: 1.0
+menu.llm.active_model_label	Aktivní model: 
+menu.llm.add_custom_model	Přidat vlastní model
+menu.llm.add_model_entry	➕ Přidat vlastní model…
+menu.llm.after_hotstring	Návrh po expiraci bubliny hotstringu
+menu.llm.api_add_entry	+ Přidat API…
+menu.llm.api_dialog_title	ErgoptiPlus — koncový bod API
+menu.llm.api_edit_entry	Upravit vybrané API…
+menu.llm.api_no_entry	Žádný API endpoint není nastaven
+menu.llm.api_prompt_model	Název modelu:
+menu.llm.api_prompt_name	Název (např. „Můj klíč OpenAI“):
+menu.llm.api_prompt_provider	ID poskytovatele ({1}):
+menu.llm.api_prompt_token	Token / klíč API (skrytý):
+menu.llm.api_prompt_url	Základní URL:
+menu.llm.api_providers_unavailable	Seznam poskytovatelů API se nepodařilo načíst, takže nelze přidat žádnou položku. Zkontrolujte, zda soubor api_providers.json existuje a je platný.
+menu.llm.api_remove_confirm_body	Uložený API token bude trvale smazán.
+menu.llm.api_remove_confirm_title	Smazat záznam API „%s"?
+menu.llm.api_remove_entry	Odebrat vybrané API
+menu.llm.api_unreachable_body	„%s" neodpověděl — zkontrolujte token, URL a model.
+menu.llm.api_unreachable_title	Záznam API nedosažitelný
+menu.llm.api_validated_body	„%s" úspěšně odpověděl.
+menu.llm.api_validated_title	Záznam API připraven
+menu.llm.arrows	Šipky
+menu.llm.arrows_only	Pouze šipky
+menu.llm.auto_raise_temp	  ↳ Automaticky zvýšit teplotu (+0,1 na návrh)
+menu.llm.backend_api_suffix	Vzdálený poskytovatel
+menu.llm.backend_default_model	↺ Výchozí model backendu (%s)
+menu.llm.backend_mlx_suffix	Doporučeno (nativní Apple Silicon)
+menu.llm.backend_ollama_suffix	Standardní
+menu.llm.backend_title	AI engine (Backend): 
+menu.llm.backend_unknown	Unknown
+menu.llm.browse_col_family	Rodina
+menu.llm.browse_col_name	Název
+menu.llm.browse_col_params	Parametry
+menu.llm.browse_col_ram	RAM
+menu.llm.browse_col_speed	Rychlost
+menu.llm.browse_col_status	Stav
+menu.llm.browse_col_type	Typ
+menu.llm.browse_models_entry	🔍 Procházet všechny modely…
+menu.llm.browse_models_filter	Filtr:
+menu.llm.browse_models_title	ErgoptiPlus — Modely LLM
+menu.llm.browse_pick	Vybrat tento model
+menu.llm.browse_status_available	⬇ Dostupné
+menu.llm.browse_status_installed	✅ Nainstalováno
+menu.llm.btn_download	Stáhnout
+menu.llm.caps_header	MOŽNOSTI
+menu.llm.context_length_label	Velikost kontextu: %s posledních znaků
+menu.llm.context_length_prompt	Počet předcházejících znaků k analýze:
+menu.llm.custom_model_title	Vlastní model
+menu.llm.debounce_label	Čas nečinnosti před návrhem: %s
+menu.llm.debounce_prompt	Prodleva nečinnosti před generováním (v ms, např. 600):
+menu.llm.delete_model_body	Opravdu chcete smazat model "%s" z lokální mezipaměti?
+menu.llm.delete_model_cache	🗑️ Smazat tento model z mezipaměti
+menu.llm.delete_model_title	Smazat model?
+menu.llm.digits	Číslice
+menu.llm.digits_only	Pouze číslice
+menu.llm.disable_password_fields	Zakázat v polích pro hesla
+menu.llm.disable_url_bars	Zakázat v adresních řádcích prohlížeče
+menu.llm.disabled_in_label	Zakázáno v %d aplikaci/aplikacích
+menu.llm.disabled_in_prefix	Zakázáno v
+menu.llm.display_menu_title	Zobrazení
+menu.llm.download_failed	Stahování se nezdařilo
+menu.llm.download_model	⬇️ Stáhnout tento model
+menu.llm.download_window_lost	Okno stahování nenalezeno
+menu.llm.download_window_lost_body	Stahování stále probíhá na pozadí.
+menu.llm.empty_model_id	Prázdný identifikátor — žádná akce.
+menu.llm.exclude_from_ai	Vyloučit z automatického generování AI…
+menu.llm.generation_menu_title	Nastavení generování
+menu.llm.hf_token_label	🔑 Token HuggingFace: %s
+menu.llm.hf_token_set	✅ Nakonfigurováno
+menu.llm.hf_token_unset	❌ Není nakonfigurováno
+menu.llm.hw_disk	Místo na disku: %s GB
+menu.llm.hw_download	Stažení: %s GB
+menu.llm.hw_header	POŽADAVKY (%s)
+menu.llm.hw_ram	Paměť (RAM): %s GB
+menu.llm.indent_label	Odsazení vybraného návrhu
+menu.llm.indent_none	Bez odsazení
+menu.llm.indent_space	mezera
+menu.llm.indent_spaces	mezery
+menu.llm.inline_autotype	✍️ Inline auto-psaní (styl Copilot)
+menu.llm.instant_on_word_end	Okamžitý návrh na konci slova
+menu.llm.launch_download_prompt	Chcete spustit stahování?
+menu.llm.max_words_label	Max. slov na návrh: %s
+menu.llm.max_words_prompt	Maximální počet slov na návrh (0 = neomezeno):
+menu.llm.min_words_label	Min. slov na návrh: %s
+menu.llm.min_words_prompt	Minimální počet slov na návrh:
+menu.llm.mlx_model_hint	Identifikátor HuggingFace pro model MLX, např.: mlx-community/Qwen2.5-3B-Instruct-4bit
+menu.llm.mlx_port_label	Port serveru MLX: %s
+menu.llm.mlx_port_prompt	Port místního serveru MLX aplikace Ergopti (1024-65535). Výchozí: %s.
+menu.llm.mlx_port_title	Port serveru MLX
+menu.llm.model_backend	Backend: %s
+menu.llm.model_change_title	Změna modelu
+menu.llm.model_date	Datum aktualizace: %s
+menu.llm.model_label	Model: %s
+menu.llm.model_params_active	Parametry (aktivní): %s
+menu.llm.model_params_total	Parametry (celkem): %s
+menu.llm.model_source	Zdroj: %s
+menu.llm.model_speed	Odhadovaná rychlost: %s tok/s
+menu.llm.model_tags	Štítky: %s
+menu.llm.model_type	Typ: %s
+menu.llm.my_models	🛠️ Moje modely
+menu.llm.nav_label	Navigovat návrhy (↑/← a ↓/→)
+menu.llm.nav_menu_title	Navigace
+menu.llm.nav_modifiers_prompt	Modifikační klávesa(y) pro navigaci šipkami (např. ctrl, alt — ponechte prázdné = pouze šipky):
+menu.llm.no_model	Žádný model (Zakázáno)
+menu.llm.no_model_none	Žádný
+menu.llm.not_installed_body	Tento model zatím není nainstalován.
+menu.llm.num_predictions_label	Počet návrhů: %s
+menu.llm.off	❌ AI deaktivováno (kliknutím aktivujete)
+menu.llm.ollama_model_hint	Identifikátor modelu Ollama, např.: qwen2.5:1.5b nebo llama3.2:3b
+menu.llm.ollama_port_label	Port serveru Ollama: %s
+menu.llm.ollama_port_prompt	Port místního serveru Ollama (1024-65535). Výchozí: 11434.
+menu.llm.ollama_port_title	Port serveru Ollama
+menu.llm.on	✅ AI aktivováno (kliknutím deaktivujete)
+menu.llm.params_active	Parametry (aktivní): 
+menu.llm.params_total	Parametry (celkem): 
+menu.llm.prediction_count_label	%d návrh%s
+menu.llm.profile_already_ok_msg	Model: %s\n%s\n\nAktuální výzva:\n%s\n\nDoporučená výzva:\n%s\n\nTento profil je již vhodný pro tento model.
+menu.llm.profile_change_msg	Model: %s\n%s\n\nAktuální výzva:\n%s\n\nDoporučená výzva:\n%s\n\nPotvrďte pro použití doporučené výzvy.
+menu.llm.profile_power_warning	⚠️  Výkonný profil\n\nDoporučeno:  %s\nVybráno:  %s\n\nModel nemusí být dostatečně výkonný.
+menu.llm.remove_model_body	Chcete odebrat vlastní model "%s" ze svého seznamu? Model nebude ze systému odinstalován.
+menu.llm.remove_model_title	Odebrat tento model?
+menu.llm.remove_user_model	🗑️ Odebrat z mých modelů
+menu.llm.reset_label	  ↳ Resetovat (výchozí: %s)
+menu.llm.reset_on_nav	Vymazat kontext při kliknutí/navigaci
+menu.llm.select_model	👉 Vybrat tento model
+menu.llm.shortcut_prompt	Formát: modifikátory+klávesa  (např. cmd+alt+p)\nDostupné modifikátory: cmd, alt, ctrl, shift\nPonechte prázdné pro deaktivaci
+menu.llm.show_all_at_once	Zobrazit všechny návrhy najednou (více předpovědí)
+menu.llm.show_download_window	📥 Stahování probíhá — Zobrazit okno
+menu.llm.show_info_bar	Zobrazit informační panel (model a latence)
+menu.llm.show_streaming	Zobrazovat každý návrh v proudu (token po tokenu)
+menu.llm.specs_header	SPECIFIKACE
+menu.llm.temperature_label	Teplota (Kreativita): %s
+menu.llm.temperature_prompt	Úroveň kreativity (0.0 = deterministická, 1.0 = kreativní):
+menu.llm.thinking_model_info	  ↳ Info: Model myšlení (skryté uvažování)
+menu.llm.title	✨ Umělá inteligence
+menu.llm.toggle_disable	Vypnout návrhy AI
+menu.llm.toggle_enable	Zapnout návrhy AI
+menu.llm.trigger_menu_title	Spouštění AI
+menu.llm.trigger_shortcut_label	Zkratka pro ruční generování: %s
+menu.llm.trigger_shortcut_title	Zkratka generování AI
+menu.llm.unlimited	Neomezeno
+menu.llm.val_label	Vybrat návrh č. (%s)
+menu.llm.val_modifiers_prompt	Modifikační klávesa(y) pro výběr číslem (např. ctrl, alt — ponechte prázdné = pouze čísla):
+menu.llm.warning_install_ollama	📥 Nainstalovat Ollama nyní
+menu.metrics.colors_by_source	    ↳ Barva dle zdroje vstupu
+menu.metrics.disabled_in_label	Zakázáno v %d aplikaci/aplikacích
+menu.metrics.encrypt_toggle	Šifrovat záznamy na disku (Zabezpečení)
+menu.metrics.exclude_apps	Vyloučit aplikace z klávesového záznamu…
+menu.metrics.filter_private	Ignorovat soukromé prohlížení
+menu.metrics.filter_secure	Ignorovat pole pro hesla
+menu.metrics.filter_sysauth	Ignorovat systémová ověřovací dialogová okna
+menu.metrics.include_realtime	    ↳ Zahrnout graf v reálném čase
+menu.metrics.off	❌ Metriky zakázány (kliknutím povolíte)
+menu.metrics.on	✅ Metriky povoleny (kliknutím zakážete)
+menu.metrics.open_encryptor	  ↳ Otevřít samostatný šifrátor…
+menu.metrics.privacy_header	FILTRY OCHRANY SOUKROMÍ
+menu.metrics.reset_wpm_position	    ↳ Resetovat pozici
+menu.metrics.shortcut_apps_title	Zkratka času aplikací
+menu.metrics.shortcut_item	    ↳ Zkratka: %s
+menu.metrics.shortcut_none	Žádná zkratka
+menu.metrics.shortcut_prefix	  ↳ Zkratka: 
+menu.metrics.shortcut_prompt	Formát: modifikátory+klávesa (např. ctrl+m)\nPonechte prázdné pro deaktivaci
+menu.metrics.shortcut_typing_title	Zkratka metrik psaní
+menu.metrics.show_apps	Zobrazit čas na aplikaci
+menu.metrics.show_typing	Zobrazit metriky psaní
+menu.metrics.show_wpm_menubar	WPM v panelu nabídek
+menu.metrics.show_wpm_widget	Plovoucí widget WPM
+menu.metrics.title	📊 Metriky
+menu.metrics.wpm_unit	SPM
+menu.paths.menu_item	Konfigurační složka…
+menu.paths.pick_prompt	Vyberte konfigurační složku
+menu.paths.window_title	Konfigurační složka
+menu.profiles.auto_detect	✨ Automaticky detekovat nejlepší profil
+menu.profiles.clone_builtin	✏️ Klonovat a upravit tento profil…
+menu.profiles.copy_suffix	(kopie)
+menu.profiles.create_profile	Vytvořit vlastní profil…
+menu.profiles.custom_profile_label	Vlastní profil
+menu.profiles.delete_confirm_body	Tento vlastní profil bude trvale smazán.
+menu.profiles.delete_confirm_title	Smazat "%s"?
+menu.profiles.delete_profile	🗑️ Smazat…
+menu.profiles.edit_profile	✏️ Upravit…
+menu.profiles.header_custom_profiles	VLASTNÍ PROFILY
+menu.profiles.header_default_profiles	VÝCHOZÍ PROFILY
+menu.profiles.not_recommended	  ⚠️ Nedoporučeno (myšlení)
+menu.profiles.override_active_app_with_current	➕ Použít aktuální profil pro aktivní aplikaci
+menu.profiles.per_app_overrides	🪟 Profily podle aplikace
+menu.profiles.profile_label_prefix	Profil: %s
+menu.profiles.prompt_label	Název profilu:
+menu.profiles.prompt_system_single	Systémový prompt (jedno generování):
+menu.profiles.recommended_profile	Doporučený profil
+menu.profiles.recommended_unavailable_body	V tomto kontextu nelze použít automatickou detekci
+menu.profiles.recommended_unavailable_title	Doporučený profil není k dispozici
+menu.profiles.shortcut_prefix	Zkratka: %s
+menu.profiles.shortcut_prompt	Formát: modifikátory+klávesa  (např. cmd+shift+b)\nDostupné modifikátory: cmd, alt, ctrl, shift\nPonechte prázdné pro deaktivaci
+menu.profiles.shortcut_title	Zkratka profilu
+menu.profiles.use_profile	Použít tento profil
+menu.reloading	Načítám znovu…
+menu.reloading_files	Soubory změněny — Načítám znovu…
+menu.script_control.title	Správa skriptu
+menu.script_ready	Skript připraven!
+menu.settings.context_length_title	Velikost kontextu
+menu.settings.default_indicator	 (výchozí)
+menu.settings.delay_prompt	Požadovaná pauza psaní (v ms) před dotazem na AI:\n\n(Ponechte prázdné pro reset: %s ms)\n(Zadejte "Nikdy" nebo -1 pro deaktivaci automatického generování)
+menu.settings.delay_title	Čekací doba
+menu.settings.disabled	Zakázáno
+menu.settings.indent_space	 mezera
+menu.settings.indent_spaces	 mezery
+menu.settings.max_words_prompt	Maximální počet slov na návrh (0 = neomezeno):
+menu.settings.max_words_title	Max. slov na návrh
+menu.settings.min_words_title	Min. slov na návrh
+menu.settings.never	Nikdy
+menu.settings.no_modifier	Žádný modifikátor
+menu.settings.reset_instruction	\n\n(Ponechte prázdné pro reset: %s)
+menu.settings.temperature_prompt	Úroveň kreativity (od 0,0 do 1,0):
+menu.settings.temperature_title	Teplota
+menu.shortcuts.alt_add	[+ Přidat zkratku Alt+…]
+menu.shortcuts.alt_group	⎇ Zkratky Alt
+menu.shortcuts.altgr_symbol	AltGr + symbol
+menu.shortcuts.chatgpt_url_item	   ↳ Upravit URL ChatGPT…
+menu.shortcuts.ctrl_add	[+ Přidat zkratku Ctrl+…]
+menu.shortcuts.ctrl_group	^ Zkratky Ctrl
+menu.shortcuts.ctrl_shift_add	[+ Přidat zkratku Ctrl+Shift+…]
+menu.shortcuts.ctrl_shift_group	^⇧ Zkratky Ctrl+Shift
+menu.shortcuts.edit_personal_info	   ↳ Upravit osobní informace…
+menu.shortcuts.group_accented	Zkratky pro písmena s diakritikou
+menu.shortcuts.group_modifiers	Kombinace modifikátorů
+menu.shortcuts.key_at_hash	@ / #
+menu.shortcuts.key_layer_scroll	Layer + Scroll
+menu.shortcuts.off	❌ Zkratky zakázány (kliknutím povolíte)
+menu.shortcuts.on	✅ Zkratky povoleny (kliknutím zakážete)
+menu.shortcuts.personal	Osobní zkratky
+menu.shortcuts.right_opt_back	Pravý Opt + ⌫ → %s
+menu.shortcuts.right_opt_escape	Pravý Opt + Esc → %s
+menu.shortcuts.right_opt_return	Pravý Opt + Return → %s
+menu.shortcuts.script_shortcuts	Zkratky správy skriptu
+menu.shortcuts.submenu_cmd	Zkratky Cmd
+menu.shortcuts.submenu_ctrl	Zkratky Ctrl
+menu.shortcuts.title	🎯 Zkratky
+menu.shortcuts.win_add	[+ Přidat zkratku Win+…]
+menu.shortcuts.win_group	⊞ Zkratky Win
+menu.shortcuts.wrap_group_angle	Špičaté a ozdobné závorky
+menu.shortcuts.wrap_group_braces	Vodorovné složené závorky
+menu.shortcuts.wrap_group_brackets	Závorky a hranaté závorky
+menu.shortcuts.wrap_group_cjk	Závorky CJK
+menu.shortcuts.wrap_group_markdown	Zvýraznění Markdown
+menu.shortcuts.wrap_group_other	Ostatní symboly
+menu.shortcuts.wrap_group_quotes	Uvozovky a apostrofy
+menu.shortcuts.wrap_symbols_add_custom	[+ Přidat symbol…]
+menu.shortcuts.wrap_symbols_check_all	Zaškrtnout vše
+menu.shortcuts.wrap_symbols_custom_label	Vlastní
+menu.shortcuts.wrap_symbols_title	  ↳ Symboly ohraničující výběr
+menu.shortcuts.wrap_symbols_uncheck_all	Odškrtnout vše
+menu.tapholds.off	❌ Klepnutí-přidržení zakázáno (kliknutím povolíte)
+menu.tapholds.on	✅ Klepnutí-přidržení povoleno (kliknutím zakážete)
+menu.tapholds.title	⌨️ Klepnutí-Přidržení
+menu.updates.title	🔄 Updates
+metrics.shortcut_format_hint	Formát : modifikátory+klávesa  (např. : ctrl+alt+m)\nDostupné modifikátory : ctrl, alt, shift, win\nNechte prázdné pro deaktivaci.
+metrics.shortcut_invalid_title	Neplatná zkratka
+metrics.shortcut_prompt_title	Zkratka — {1}
+metrics.shortcut_register_error	Zkratku « {1} » se nepodařilo zaregistrovat : {2}
+metrics_apps.chooser_placeholder	Kategorie pro %s
+metrics_apps.general_category	Obecné
+metrics_apps.new_category_create_subtext	Vytvořit novou kategorii
+metrics_apps.new_category_item	+ Nová kategorie…
+metrics_apps.new_category_prompt	Název nové kategorie pro %s:
+metrics_apps.new_category_title	Nová kategorie
+metrics_apps.no_app_detected	Nepodařilo se zjistit žádnou aplikaci.
+metrics_apps.rename_chooser_placeholder	Kategorie k přejmenování
+metrics_apps.rename_item	✎ Přejmenovat existující kategorii…
+metrics_apps.rename_prompt	Nový název pro kategorii „%s":
+metrics_apps.rename_subtext	Všechny aplikace v této kategorii budou přejmenovány
+metrics_apps.rename_title	Přejmenovat
+metrics_apps.score_error	Skóre musí být mezi -2 a 2.
+metrics_apps.score_prompt	Skóre produktivity pro %s\n(-2 velmi rušivé až 2 velmi produktivní):
+metrics_apps.score_title	Score
+metrics_apps.title	Metriky psaní
+metrics_apps.use_category_subtext	Použít tuto kategorii
+metrics_apps.window_title	Čas v aplikaci
+mlx.deps_failed	Selhalo…
+mlx.deps_missing	Chybějící závislosti MLX
+mlx.deps_missing_body	Automatický bootstrap probíhá. Zkuste to prosím za několik minut.
+mlx.deps_preparing	Příprava…
+mlx.deps_pty_write_failed	Nepodařilo se zapsat soubor PTY wrapper.
+mlx.deps_step_bootstrap	Spouštím instalační skript…
+mlx.deps_step_python	Instalace Pythonu…
+mlx.deps_step_ready	AI engine připraven.
+mlx.deps_step_sync	Synchronizace závislostí AI…
+mlx.deps_step_uv	Instalace uv…
+mlx.deps_step_venv	Vytváření lokálního virtualenv…
+mlx.deps_task_create_failed	Nelze vytvořit úlohu hs.task.
+mlx.deps_task_start_failed	Nelze spustit úlohu hs.task.
+mlx.download_cancelled	Zrušeno
+mlx.download_cancelled_body	Stahování %s přerušeno.
+mlx.download_failed	Selhání MLX
+mlx.download_failed_body	Zkontrolujte protokoly v okně.
+mlx.download_interrupted	Stahování přerušeno
+mlx.download_interrupted_body	Proces stahování %s se zastavil během opětovného načítání.
+mlx.download_stalled	Stahování MLX zablokováno
+mlx.download_subtitle	Načítání vah z Hugging Face…
+mlx.download_title	Stahování modelu MLX
+mlx.hf_connected	HuggingFace připojen
+mlx.hf_connected_body	Token uložen. Nyní můžete stahovat modely mnohem rychleji!
+mlx.hf_connection_failed	Připojení k HuggingFace selhalo
+mlx.hf_connection_failed_body	Připojení selhalo. Zkontrolujte svůj token.
+mlx.hf_login_title	Přihlášení HuggingFace
+mlx.hf_page_opened	Stránka modelu otevřena v prohlížeči
+mlx.init_subtitle	AI initialization in progress, please wait…
+mlx.init_title	Initializing the AI engine (MLX)
+mlx.install_subtitle	Příprava lokálních závislostí Pythonu…
+mlx.install_title	Instalace AI enginu (MLX)
+mlx.launcher_failed	Spuštění MLX selhalo
+mlx.launcher_failed_body	Spouštěč selhal (kód %d).
+mlx.model_deleted	Odstraněno (MLX)
+mlx.model_incompatible	Model %s není kompatibilní s mlx-lm. Zvolte jiný model.
+mlx.model_installed	Model MLX nainstalován
+mlx.model_ready	%s je připraven!
+mlx.model_unavailable	Model MLX není dostupný
+mlx.model_unavailable_body	Model %s není kompatibilní s MLX nebo nemá nakonfigurované úložiště MLX
+mlx.open_source_failed	Nelze otevřít stránku HuggingFace
+mlx.source_not_found	Zdroj nenalezen
+mlx.source_not_found_body	Pro tento model nebylo nalezeno žádné úložiště MLX
+mlx.token_corrected	Token opraven
+mlx.token_corrected_body	Byl použit úplný token ze schránky
+mlx.token_detected	Token zjištěn
+mlx.token_detected_body	Token načten ze schránky
+mlx.token_missing	Chybějící token
+mlx.token_missing_body	Nebyl zadán žádný token
+mlx.write_py_failed	Nelze zapsat skript Python do /tmp
+mlx.write_sh_failed	Nelze zapsat skript Bash do /tmp
+model_browser.col_family	Rodina
+model_browser.col_name	Model
+model_browser.col_params	Parametry
+model_browser.col_ram	RAM
+model_browser.col_speed	Rychlost
+model_browser.col_status	Stav
+model_browser.col_type	Typ
+model_browser.count_label	{n} z {total} modelů
+model_browser.no_models	Vašemu hledání neodpovídá žádný model.
+model_browser.search_placeholder	Hledat model…
+model_browser.select_hint	Dvakrát klikněte na model nebo jej použijte stisknutím klávesy Enter.
+model_browser.status_available	Dostupné
+model_browser.status_installed	Nainstalováno
+model_browser.type_chat	Chat
+model_browser.type_completion	Doplňování
+model_browser.use_button	Použít
+model_browser.window_title	Katalog modelů
+notify.all_features_disabled	Všechny funkce byly zakázány
+notify.all_features_enabled	Všechny funkce byly povoleny
+notify.clipboard	Schránka
+notify.defaults_reset	Výchozí nastavení obnoveno — Načítám znovu…
+notify.hotstrings	Hotstring
+notify.llm_disabled	🔴 ZAKÁZÁNO
+notify.llm_enabled	🟢 POVOLENO
+notify.llm_mlx_failures_body	Server MLX neodpovídá. Zkontrolujte, zda je model načten a server běží na portu 8080.
+notify.llm_mlx_failures_title	Předpovědi LLM — Opakující se selhání
+notify.llm_suggestions	Návrhy AI
+notify.personal_info	Osobní informace
+notify.screenshot_copied	Snímek zkopírován
+notify.screenshot_saved	Snímek uložen
+notify.screenshot_saved_path	Uloženo: %s
+notify.screenshot_title	Snímek obrazovky
+notify.script_control	Správa skriptu
+notify.word_expander_prefix	Expandér slov: %s
+ollama.cancelled_title	Zrušeno
+ollama.daemon_fail	Nelze spustit démona Ollama.
+ollama.delete_error	Model: %s\n%s
+ollama.delete_fail_title	Smazání Ollama se nezdařilo
+ollama.deleted_title	Smazáno (Ollama)
+ollama.deps_failed	Selhalo…
+ollama.deps_step_checking	Kontrola Ollama…
+ollama.deps_step_installing	Instalace Ollama…
+ollama.deps_step_ready	Server Ollama připraven.
+ollama.deps_step_starting	Spouštění serveru Ollama…
+ollama.deps_task_create_failed	Nelze vytvořit úlohu hs.task.
+ollama.deps_task_start_failed	Nelze spustit úlohu hs.task.
+ollama.download_cancelled	Stahování Ollama zrušeno
+ollama.download_error	Chyba stahování %s
+ollama.download_subtitle	Načítání vah z Ollama Hub…
+ollama.download_title	Stahování modelu Ollama
+ollama.downloading	Stahování modelu Ollama…
+ollama.fail_title	Chyba Ollama
+ollama.install_subtitle	Příprava lokálního serveru Ollama…
+ollama.install_title	Instalace AI enginu (Ollama)
+ollama.model_deleted	Model smazán: %s
+ollama.model_installed_title	Model Ollama nainstalován
+ollama.model_ready	%s je připraven!
+ollama.model_repair	Model se zdá poškozený. Pokus o opětovné stažení: %s
+ollama.model_repair_title	Oprava modelu Ollama
+ollama.not_detected_body	Nainstalujte Ollama a zkuste to znovu.
+ollama.not_detected_title	Ollama nenalezeno
+ollama.service_disconnected	Služba Ollama přestala reagovat.
+ollama.service_ready	Služba Ollama připravena ✅
+ollama.service_stopped	Služba Ollama zastavena. Spouštění…
+ollama.start_fail	Nelze spustit službu.
+ollama.starting_service	Spouštění služby Ollama (%s/%s)…
+ollama.starting_title	Spouštění Ollama
+ollama.upgrade_required_body	Nainstalovaná verze Ollama je pro tento model příliš stará. Aktualizujte Ollama ručně.
+ollama.upgrade_required_title	Vyžadována aktualizace Ollama
+onboarding.back	← Zpět
+onboarding.btn.cancel	Zrušit
+onboarding.btn.no	Ne
+onboarding.btn.ok	OK
+onboarding.btn.yes	Ano
+onboarding.done.body	Konfigurace uložena. Skript se nyní znovu načte.
+onboarding.done.title	Nastavení dokončeno!
+onboarding.error.title	ErgoptiPlus — Chyba
+onboarding.error.write_failed	Nepodařilo se zapsat konfigurační soubor.
+onboarding.finish	Dokončit ✓
+onboarding.gestures.desc	Povoluje podporu gest touchpadu — vlastní akce spouštěné přejetím, klepnutím a přiblížením.
+onboarding.gestures.open_settings	Otevřít nastavení touchpadu
+onboarding.gestures.open_settings_hint	Otevře Nastavení → Bluetooth a zařízení → Touchpad → Pokročilá gesta. Každý slot přijímá zkratku Ctrl + Win + Shift + F1..F10.
+onboarding.gestures.register_auto	Automatická konfigurace
+onboarding.gestures.register_auto_hint	Automaticky vyplní všechny sloty gest v Nastavení Windows za vás. Nevyžaduje oprávnění správce.
+onboarding.gestures.register_deferred	Gesta budou nakonfigurována při příštím spuštění.
+onboarding.gestures.register_failed	Automatická konfigurace selhala. Použijte prosím ruční metodu níže.
+onboarding.gestures.register_manual	Ruční metoda
+onboarding.gestures.register_manual_hint	Otevře průvodce krok za krokem a zkratku na jedno kliknutí na stránku nastavení touchpadu, abyste mohli každé gesto nastavit ručně.
+onboarding.gestures.register_section	Gesta musí být nakonfigurována v Nastavení Windows (Bluetooth a zařízení → Touchpad → Pokročilá gesta):
+onboarding.gestures.register_success	Gesta jsou nyní nakonfigurována v Nastavení Windows.
+onboarding.gestures.title	ErgoptiPlus — Gesta
+onboarding.language.placeholder	Vyberte jazyk…
+onboarding.layout.desc	Aktivuje emulaci rozvržení (základní vrstva + AltGr) a hotřetězce Ergopti.
+onboarding.layout.no	Použít systémové rozložení
+onboarding.layout.title	ErgoptiPlus — Emulace klávesnice Ergopti
+onboarding.layout.yes	Emulovat rozložení Ergopti
+onboarding.magic_key.choose_freely	Jako spoušť může sloužit libovolný znak — dostatečně vzácný, aby nedocházelo k falešným aktivacím, a snadno dosažitelný.
+onboarding.magic_key.desc	Znak, který spouští hotřetězce.
+onboarding.magic_key.option_blackstar	★ — doporučeno (vyhrazená klávesa na klávesnici Ergopti)
+onboarding.magic_key.option_custom	Vlastní vstup
+onboarding.magic_key.option_semicolon	; — doporučeno na QWERTY
+onboarding.magic_key.option_star	* — doporučeno (funguje na všech rozvrženích)
+onboarding.magic_key.option_ugrave	ù — doporučeno na AZERTY
+onboarding.magic_key.title	ErgoptiPlus — Kouzelná klávesa
+onboarding.metrics.desc	Povoluje shromažďování metrik psaní.\n\nCo ErgoptiPlus sleduje:\n• rychlost psaní (WPM) za sezení, za aplikaci a v čase;\n• nejpoužívanější klávesy, slova, n-gramy a ergonomickou zátěž;\n• střídání rukou, zatížení prstů a bigramy stejného prstu;\n• čas strávený v každé aplikaci (ve stylu RescueTime) s hodnocením produktivity;\n• trendy, heatmapy a podrobné řídicí panely v okně Metriky.
+onboarding.metrics.title	ErgoptiPlus — Metriky psaní
+onboarding.next	Další →
+onboarding.no	Ne
+onboarding.warning_label	Upozornění
+onboarding.welcome.heading	Jazyk
+onboarding.welcome.title	ErgoptiPlus — Nastavení
+onboarding.yes	Ano
+paths_editor.btn_browse	Procházet…
+paths_editor.btn_cancel	Zrušit
+paths_editor.btn_reset	Obnovit výchozí
+paths_editor.btn_save	Uložit a znovu načíst
+paths_editor.heading	Konfigurační složka
+paths_editor.label_config_dir	Konfigurační složka
+paths_editor.save_failed	Složku s konfigurací se nepodařilo uložit. Soubor může být jen pro čtení nebo jej používá jiný program.
+paths_editor.save_failed_title	Uložení selhalo
+paths_editor.subtitle	Všechny osobní soubory (zkratky, hotstring…) jsou načítány z této složky.
+paths_editor.tag_default	výchozí
+paths_editor.tag_modified	upraveno
+personal_info.field_credit_card	Kreditní karta
+personal_info.field_firstname	Jméno
+personal_info.field_phone_digits	Telefon (pouze číslice)
+personal_info.field_phone_formatted	Telefon (formátovaný)
+personal_info.field_ssn	Rodné číslo
+personal_info.saved_body	Tuto kartu můžete zavřít.
+personal_info.saved_title	✓ Uloženo
+profiles.created_title	Profil vytvořen
+profiles.updated_title	Profil aktualizován
+prompt_editor.default_label	Vlastní profil
+prompt_editor.help_text	Blok {context} bude nahrazen vybraným textem. Blok {n} bude nahrazen počtem předpovědí. Formátování (dávka): Požádejte model, aby odděloval každý návrh pomocí ---.
+prompt_editor.insert_context	Vložit blok {context}
+prompt_editor.insert_language	Vložit blok {language}
+prompt_editor.insert_max_words	Vložit blok {max_words}
+prompt_editor.insert_min_words	Vložit blok {min_words}
+prompt_editor.insert_n	Vložit blok {n}
+prompt_editor.label_mode	Režim požadavku
+prompt_editor.label_name	Název profilu
+prompt_editor.label_prompt	Systémová výzva
+prompt_editor.mode.batch	Dávkový — předpovědi v dávkách (velké modely)
+prompt_editor.mode.parallel	Standardní — paralelní předpovědi
+prompt_editor.placeholder_prompt	Zde je text, pokračujte v něm: {context}
+prompt_editor.title_edit	Upravit profil
+prompt_editor.title_new	Nový profil
+script_control.paused	Skript pozastaven
+script_control.resumed	Skript obnoven
+sfbsreduction.bu	À + ★ → BU
+sfbsreduction.comma	Čárka snižuje bigramy stejného prstu
+sfbsreduction.ecirc	Ê snižuje bigramy stejného prstu
+sfbsreduction.egrave	È snižuje bigramy stejného prstu
+sfbsreduction.ié	IE snižuje bigramy IE/EI
+sg_actions.activity_simulation	🖱 Simulovat aktivitu (proti spánku)
+sg_actions.alt_tab_monitor	Alt-Tab (monitor)
+sg_actions.app_expose	◱ Přehled oken aplikace
+sg_actions.app_previous	⇥ ← Alt+Tab — Předch. aplikace
+sg_actions.app_switcher	⇥ Alt+Tab — Předchozí aplikace
+sg_actions.app_window_previous	⇥ ◱ ← Alt+Tab — Předch. okno
+sg_actions.arrow_down	↓ Šipka dolů
+sg_actions.arrow_left	← Šipka vlevo
+sg_actions.arrow_right	→ Šipka vpravo
+sg_actions.arrow_up	↑ Šipka nahoru
+sg_actions.backspace	⌫ Backspace
+sg_actions.brightness_down	☀ - Jas -
+sg_actions.brightness_up	☀ + Jas +
+sg_actions.caps_lock	⇪ CapsLock
+sg_actions.caps_word	⇪★ CapsWord
+sg_actions.close_window	◱ × Zavřít okno
+sg_actions.copy	⎘ Kopírovat
+sg_actions.ctrl_backspace	⌫ Ctrl+Backspace
+sg_actions.ctrl_delete	⌦ Ctrl+Delete
+sg_actions.cut	⎘ Vyjmout
+sg_actions.delete	⌦ Delete
+sg_actions.desktop_close	▢ × Zavřít pracovní plochu
+sg_actions.desktop_new	▢ + Nová pracovní plocha
+sg_actions.desktop_next	▢ → Další pracovní plocha
+sg_actions.desktop_prev	▢ ← Předchozí pracovní plocha
+sg_actions.doc_end	⤓ Konec dokumentu
+sg_actions.doc_start	⤒ Začátek dokumentu
+sg_actions.enter	↵ Enter
+sg_actions.escape	⎋ Escape
+sg_actions.find	🔍 Najít
+sg_actions.fullscreen	📺 Celá obrazovka
+sg_actions.left_click_toggle	🖱 L Levé kliknutí (přidržení)
+sg_actions.line_down	↕ ↓ Další řádek
+sg_actions.line_end	⇥ Konec řádku
+sg_actions.line_start	⇤ Začátek řádku
+sg_actions.line_up	↕ ↑ Předchozí řádek
+sg_actions.lock_screen	🔒 Uzamknout obrazovku
+sg_actions.lookup	🔍 Definice slova
+sg_actions.maximize	🔲 Maximalizovat
+sg_actions.microsoft_bold	𝐁 Ctrl+B Microsoft (→ Ctrl+G)
+sg_actions.minimize_all	◱ Minimalizovat vše
+sg_actions.mission_control	▢ Mission Control
+sg_actions.mute	🔇 Ztlumit/Odtlumit
+sg_actions.nav_back	← Zpět (navigace)
+sg_actions.nav_forward	→ Vpřed (navigace)
+sg_actions.none	∅ Nic
+sg_actions.notification_center	🔔 Oznámení
+sg_actions.ocr_screenshot	📷 Snímek OCR (Win+Shift+T)
+sg_actions.one_shot_shift	⇧ OneShotShift
+sg_actions.open_config	⚙ Konfigurace
+sg_actions.open_console	▤ Konzole
+sg_actions.open_error_log	📄 Error log
+sg_actions.open_hotstrings_editor	⌨ Editor hotstring
+sg_actions.open_key_history	Historie kláves
+sg_actions.open_list_vars	Stav proměnných
+sg_actions.open_logs_folder	📁 Složka protokolů
+sg_actions.open_metrics_apps	📊 Statistiky aplikací
+sg_actions.open_metrics_typing	📊 Statistiky psaní
+sg_actions.open_paths_editor	📂 Editor cest
+sg_actions.open_personal_hotstrings	👤 Osobní hotstring
+sg_actions.open_personal_info	👤 Osobní informace
+sg_actions.open_personal_shortcuts	👤 Soubor osobních zkratek
+sg_actions.open_script_source	🛠 Zdrojový kód
+sg_actions.open_today_log	📄 Dnešní protokol
+sg_actions.open_url	🌐 Otevřít odkaz (konfigurovatelný)
+sg_actions.open_window_spy	Sledování okna
+sg_actions.para_next	¶ ↓ Další odstavec
+sg_actions.para_prev	¶ ↑ Předchozí odstavec
+sg_actions.paste	⎘ Vložit
+sg_actions.paste_plain	⎘ Vložit bez formátování
+sg_actions.pick_color	🎨 HEX barva pod kurzorem
+sg_actions.redo	↪ Znovu
+sg_actions.right_click_toggle	🖱 R Pravé kliknutí (přidržení)
+sg_actions.screen_capture	📸 Výběrový snímek (Win+Shift+S)
+sg_actions.screen_capture_instant	📸 Okamžitý snímek (okno)
+sg_actions.screen_record	⏺ Záznam obrazovky
+sg_actions.screenshot_fullscreen_clipboard	📸 🖥 Kopírovat obrazovku
+sg_actions.screenshot_fullscreen_save	📸 🖥 Uložit obrazovku
+sg_actions.screenshot_region_clipboard	📸 ⬚ Kopírovat oblast
+sg_actions.screenshot_region_save	📸 ⬚ Uložit oblast
+sg_actions.screenshot_window_clipboard	📸 ⊞ Kopírovat okno
+sg_actions.screenshot_window_save	📸 ⊞ Uložit okno
+sg_actions.script_pause_toggle	⏸/▶ Pozastavit / Obnovit
+sg_actions.script_quit	✕ Ukončit
+sg_actions.script_reload	↻ Znovu načíst
+sg_actions.script_save_reload	↻ Uložit a znovu načíst
+sg_actions.search_web	🔍 Webové vyhledávání (konfigurovatelné)
+sg_actions.sel_down	✎ ↓ Vybrat dolů
+sg_actions.sel_left	✎ ← Vybrat vlevo
+sg_actions.sel_right	✎ → Vybrat vpravo
+sg_actions.sel_up	✎ ↑ Vybrat nahoru
+sg_actions.sel_word_next	✎ W → Vybrat další slovo
+sg_actions.sel_word_prev	✎ W ← Vybrat předch. slovo
+sg_actions.select_all	⬚ Vybrat vše
+sg_actions.select_line	☰ Vybrat řádek
+sg_actions.sg_order.header.alt	#⎇ (Alt) zkratky
+sg_actions.sg_order.header.cmd	#⌘ (Cmd) zkratky
+sg_actions.sg_order.header.cmd_shift	#⌘⇧ (Cmd+Shift) zkratky
+sg_actions.sg_order.header.ctrl	#^ (Ctrl) zkratky
+sg_actions.sg_order.header.ctrl_shift	#^⇧ (Ctrl+Shift) zkratky
+sg_actions.sg_order.header.cursor	#Kurzor a text
+sg_actions.sg_order.header.debug	#Ladění
+sg_actions.sg_order.header.edition	#Úpravy
+sg_actions.sg_order.header.files	#Soubory
+sg_actions.sg_order.header.grp_app	Ergopti
+sg_actions.sg_order.header.grp_input	Vstup
+sg_actions.sg_order.header.grp_media	Média
+sg_actions.sg_order.header.grp_system	Systém
+sg_actions.sg_order.header.grp_text	Text
+sg_actions.sg_order.header.grp_windows	Okna a plochy
+sg_actions.sg_order.header.hs_ctrl	#^ (Ctrl) zkratky — macOS
+sg_actions.sg_order.header.hs_ctrl_shift	#^⇧ (Ctrl+Shift) zkratky — macOS
+sg_actions.sg_order.header.hs_option	#⌥ (Option) zkratky — macOS
+sg_actions.sg_order.header.keys	#Klávesy
+sg_actions.sg_order.header.media	#Média
+sg_actions.sg_order.header.mouse_nav	#Myš a navigace
+sg_actions.sg_order.header.navigation	#Navigace
+sg_actions.sg_order.header.screenshot	#Snímky obrazovky
+sg_actions.sg_order.header.script	#Správa skriptu
+sg_actions.sg_order.header.selection	#Výběr textu
+sg_actions.sg_order.header.spaces	#Plochy / Pracovní plochy
+sg_actions.sg_order.header.system	#Systém
+sg_actions.sg_order.header.system_actions	#Systémové akce
+sg_actions.sg_order.header.tabs	#Karty
+sg_actions.sg_order.header.tapholds	#Akce Tap-Hold
+sg_actions.sg_order.header.ui	#Rozhraní
+sg_actions.sg_order.header.win	#⊞ (Win) zkratky
+sg_actions.sg_order.header.windows	#Okna
+sg_actions.snap_left	◧ ← Přichytit vlevo
+sg_actions.snap_right	◨ → Přichytit vpravo
+sg_actions.space	␣ Mezera
+sg_actions.space_next	▢ → Další plocha
+sg_actions.space_prev	▢ ← Předchozí plocha
+sg_actions.spotlight_mouse	🔦 Zvýraznění myši
+sg_actions.surround_parens	() Obalit závorkami
+sg_actions.tab	⇥ Tab
+sg_actions.tab_close	⧉ × Zavřít kartu
+sg_actions.tab_new	⧉ + Nová karta
+sg_actions.tab_next	⧉ → Další karta
+sg_actions.tab_prev	⧉ ← Předchozí karta
+sg_actions.take_note	📝 Poznámka
+sg_actions.task_view	▢ Zobrazení úloh
+sg_actions.teleport_mouse	🖱 Přesunout myš
+sg_actions.titlecase_selection	Aa Formát názvu
+sg_actions.toggle_capslock	⇪ Přepnout CapsLock
+sg_actions.track_next	⏭ Další skladba
+sg_actions.track_play	⏯ Přehrát/Pozastavit
+sg_actions.track_prev	⏮ Předchozí skladba
+sg_actions.undo	↩ Zpět
+sg_actions.uppercase_selection	AA Velká / malá písmena
+sg_actions.vol_down	🔊 - Hlasitost -
+sg_actions.vol_up	🔊 + Hlasitost +
+sg_actions.win_app_next	◱ → Další okno (stejná aplikace)
+sg_actions.win_app_prev	◱ ← Předch. okno (stejná aplikace)
+sg_actions.win_next	◱ → Další okno
+sg_actions.win_prev	◱ ← Předchozí okno
+sg_actions.word_next	W → Další slovo
+sg_actions.word_prev	W ← Předchozí slovo
+sg_labels.script_altgr_backspace	AltGr + ⌫
+sg_labels.script_altgr_delete	AltGr + ⌦
+sg_labels.script_altgr_enter	AltGr + Enter
+sg_labels.script_altgr_escape	AltGr + Esc
+shortcut_utils.format_hint	Použijte formát mods+klávesa, například cmd+shift+b
+shortcut_utils.format_invalid	Neplatný formát
+shortcuts.agrave	Všechny zkratky na klávese À odpovídají zkratkám 
+shortcuts.altgrcapslock.backspace	"AltGr" + "CapsLock" = Backspace
+shortcuts.altgrcapslock.capslock	"AltGr" + "CapsLock" = CapsLock
+shortcuts.altgrcapslock.capsword	"AltGr" + "CapsLock" = CapsWord
+shortcuts.altgrcapslock.ctrlbackspace	"AltGr" + "CapsLock" = Ctrl + Backspace
+shortcuts.altgrcapslock.ctrldelete	"AltGr" + "CapsLock" = Ctrl + Delete
+shortcuts.altgrcapslock.delete	"AltGr" + "CapsLock" = Delete
+shortcuts.altgrcapslock.enter	"AltGr" + "CapsLock" = Enter
+shortcuts.altgrcapslock.escape	"AltGr" + "CapsLock" = Escape
+shortcuts.altgrcapslock.oneshotshift	"AltGr" + "CapsLock" = OneShotShift
+shortcuts.altgrcapslock.tab	"AltGr" + "CapsLock" = Tab
+shortcuts.altgrlalt.backspace	"AltGr" + "LAlt" = Backspace
+shortcuts.altgrlalt.capslock	"AltGr" + "LAlt" = CapsLock
+shortcuts.altgrlalt.capsword	"AltGr" + "LAlt" = CapsWord
+shortcuts.altgrlalt.ctrlbackspace	"AltGr" + "LAlt" = Ctrl + Backspace
+shortcuts.altgrlalt.ctrldelete	"AltGr" + "LAlt" = Ctrl + Delete
+shortcuts.altgrlalt.delete	"AltGr" + "LAlt" = Delete
+shortcuts.altgrlalt.enter	"AltGr" + "LAlt" = Enter
+shortcuts.altgrlalt.escape	"AltGr" + "LAlt" = Escape
+shortcuts.altgrlalt.oneshotshift	"AltGr" + "LAlt" = OneShotShift
+shortcuts.altgrlalt.tab	"AltGr" + "LAlt" = Tab
+shortcuts.color_copied	Barva zkopírována: %s
+shortcuts.color_picker_result	Barva pod kurzorem je {1}.\n\nByla uložena do schránky : {2}
+shortcuts.color_picker_title	Barva pixelu
+shortcuts.copy_path_notif	Cesta zkopírována: %s
+shortcuts.eacute	Všechny zkratky na klávese É odpovídají zkratkám 
+shortcuts.ecirc	Všechny zkratky na klávese Ê odpovídají zkratkám 
+shortcuts.egrave	Všechny zkratky na klávese È odpovídají zkratkám 
+shortcuts.gethexvalue	Win + X (heX) = Zkopírovat HEX barvu pixelu pod kurzorem do schránky
+shortcuts.gpt	Win + G(PT) = Otevřít ChatGPT (konfigurovatelná URL)
+shortcuts.keep_awake_off	☕ Keep-awake deaktivován
+shortcuts.keep_awake_on	☕ Keep-awake aktivní — Ctrl+M pro deaktivaci
+shortcuts.label_at_hash	Okamžitý snímek obrazovky
+shortcuts.label_cmd_shift_v	Vložit bez formátování
+shortcuts.label_cmd_star	Cmd + S (zachovává mod.)
+shortcuts.label_ctrl_a	Vybrat řádek
+shortcuts.label_ctrl_capslock	Přepnout CapsLock
+shortcuts.label_ctrl_d	Otevřít Stažené soubory
+shortcuts.label_ctrl_e	Otevřít Finder
+shortcuts.label_ctrl_g	Otevřít ChatGPT (URL nastavena v menu)
+shortcuts.label_ctrl_h	Interaktivní snímek do schránky
+shortcuts.label_ctrl_i	Otevřít Nastavení
+shortcuts.label_ctrl_l	Zamknout obrazovku
+shortcuts.label_ctrl_m	Zabránit uspání
+shortcuts.label_ctrl_o	Obklopit řádek závorkami
+shortcuts.label_ctrl_p	Přepnout zrcadlení / rozšířenou plochu
+shortcuts.label_ctrl_period	Otevřít výběr emoji
+shortcuts.label_ctrl_quote	Zvýraznit myš
+shortcuts.label_ctrl_s	Otevřít / Zkopírovat cestu
+shortcuts.label_ctrl_t	Přesunout myš na jiný monitor
+shortcuts.label_ctrl_u	Přepnout VELKÁ / malá písm.
+shortcuts.label_ctrl_w	Přepnout Titulká / malá písm.
+shortcuts.label_ctrl_x	Zkopírovat hex barvu pixelu pod kurzorem
+shortcuts.label_layer_scroll	Hlasitost
+shortcuts.label_wrap_text	Psaní symbolu obklopuje výběr
+shortcuts.laltcapslock.backspace	"LAlt" + "CapsLock" = Backspace
+shortcuts.laltcapslock.capslock	"LAlt" + "CapsLock" = CapsLock
+shortcuts.laltcapslock.capsword	"LAlt" + "CapsLock" = CapsWord
+shortcuts.laltcapslock.ctrlbackspace	"LAlt" + "CapsLock" = Ctrl + Backspace
+shortcuts.laltcapslock.ctrldelete	"LAlt" + "CapsLock" = Ctrl + Delete
+shortcuts.laltcapslock.delete	"LAlt" + "CapsLock" = Delete
+shortcuts.laltcapslock.enter	"LAlt" + "CapsLock" = Enter
+shortcuts.laltcapslock.escape	"LAlt" + "CapsLock" = Escape
+shortcuts.laltcapslock.oneshotshift	"LAlt" + "CapsLock" = OneShotShift
+shortcuts.laltcapslock.tab	"LAlt" + "CapsLock" = Tab
+shortcuts.microsoftbold	Ctrl + B tučně v aplikacích Microsoft (jako Ctrl + G)
+shortcuts.move	Win + M(ove) = Simulovat aktivitu náhodným pohybem myši. Zkratku opakujte nebo skript znovu načtěte pro zastavení
+shortcuts.no_active_window	Žádné aktivní okno
+shortcuts.no_other_monitor	Žádný jiný monitor nebyl nalezen
+shortcuts.opendownloads	Win + D(ownloads) = Otevřít složku Stažené soubory
+shortcuts.pixel_read_error	Nelze přečíst barvu pixelu
+shortcuts.saved	Uloženo: %s
+shortcuts.screen	Win + H (screensHot) = Snímek obrazovky (spustí Win + Shift + S)
+shortcuts.screeninstant	Klávesa vlevo od 1 = Okamžitý snímek aktivního okna, uložený v Obrázcích s časovým razítkem
+shortcuts.screenocr	Win + C (OCR) = Snímek obrazovky s extrakcí textu (Win + Shift + T)
+shortcuts.screenshot_copied	Snímek obrazovky zkopírován do schránky
+shortcuts.screenshot_title	Snímek obrazovky
+shortcuts.search	Win + S(earch) = Hledat výběr na internetu. V Průzkumníku zkopíruje cestu k vybranému souboru
+shortcuts.shortcut_format_hint	Formát: modifikátory+klávesa (např. cmd+alt+p)\nDostupné modifikátory: cmd, alt, ctrl, shift\nPonechte prázdné pro deaktivaci
+shortcuts.shortcut_label	Zkratka
+shortcuts.spotlightmouse	Win + ' = Zvýraznit myš žlutým kroužkem
+shortcuts.surroundwithparentheses	Win + O = Obalit řádek závorkami
+shortcuts.takenote	Win + N(ote) = Otevřít soubor pro poznámky
+shortcuts.teleportmouse	Win + T(eleport) = Přesunout myš na střed druhého monitoru (cyklicky)
+shortcuts.titlecase	Win + W = Převést na formát názvu (velké první písmeno každého slova)
+shortcuts.uppercase	Win + U(ppercase) = Přepnout výběr velká/malá písmena
+shortcuts.wincapslock	Win + "CapsLock" = CapsLock
+startup.manifest_missing	Chyba při spuštění: soubor _generated/features_manifest.ahk chybí nebo je poškozen.\n\nSpusťte `npm run build:manifest` z adresáře projektu a skript restartujte.
+startup.manifest_title	ErgoptiPlus — manifest chybí
+tap_hold.action.disable	Nativní klávesa
+tap_hold.disable_all	Zakázat vše
+tap_hold.group.alt_gr	AltGr
+tap_hold.group.backspace	Backspace
+tap_hold.group.caps_lock	CapsLock
+tap_hold.group.delete	Delete
+tap_hold.group.enter	Enter
+tap_hold.group.escape	Escape
+tap_hold.group.left_alt	LAlt
+tap_hold.group.left_ctrl	LCtrl
+tap_hold.group.left_shift	LShift
+tap_hold.group.right_ctrl	RCtrl
+tap_hold.group.right_shift	RShift
+tap_hold.group.space	Mezerník
+tap_hold.group.tab	Tab
+tap_hold.group.win	Win
+tap_hold.hold.alt	Alt
+tap_hold.hold.alt_gr	AltGr
+tap_hold.hold.ctrl	Ctrl
+tap_hold.hold.nav_layer	Vrstva nav.
+tap_hold.hold.none	Nativní klávesa
+tap_hold.hold.shift	Shift
+tap_hold.hold.win	Win
+tap_hold.picker.hold	Hold → %s
+tap_hold.picker.tap	Tap → %s
+tap_hold.picker.title_prefix	Akce při klepnutí — 
+tap_hold.reset_defaults	Obnovit výchozí hodnoty
+tap_hold.tap.none	Nativní klávesa
+terminators.label_close_paren	) : Uzavírací závorka
+terminators.label_enter	⏎ : Enter
+terminators.label_equal	= : Rovná se
+terminators.label_nbsp	⍽ : Nezalomitelná mezera
+terminators.label_nnbsp	⍽ : Úzká nezalomitelná mezera
+token_prompt.create_link	👉 Klikněte zde pro vytvoření
+token_prompt.instruction	Vložte svůj token HuggingFace (hf_...) pro urychlení stahování.
+token_prompt.label	Token HuggingFace:
+token_prompt.no_token	Nemáte token?
+token_prompt.placeholder	hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx...
+token_prompt.title	🔐 Přihlášení HuggingFace
+token_prompt.validate	Ověřit
+token_prompt.window_title	Přihlášení HuggingFace
+ui_apps.axis_chars	Znaky
+ui_apps.axis_speed	Znaky / min. soustředění
+ui_apps.boxplot_scale	Měřítko: 0 → {max}
+ui_apps.boxplot_tip	{n} relací · medián {med} (Q1 {q1}, Q3 {q3})
+ui_apps.btn_add_app	Zařadit aplikaci…
+ui_apps.btn_close	Zavřít
+ui_apps.btn_compare	Porovnat ↔
+ui_apps.btn_count_awake	Počítat keep-awake
+ui_apps.btn_mode_chars	Znaky
+ui_apps.btn_mode_time	Čas
+ui_apps.btn_refresh	Obnovit
+ui_apps.cat_edit_tooltip	Upravit kategorii
+ui_apps.chart_active_ratio	Poměr aktivity v průběhu dní
+ui_apps.chart_activity_cal	Kalendář aktivity (posledních 12 měsíců)
+ui_apps.chart_annotated_strip	Anotovaná časová osa
+ui_apps.chart_app_switches	Přepínání aplikací
+ui_apps.chart_burst_hist	Histogram výbuchů
+ui_apps.chart_cat_evolution	Vývoj kategorií
+ui_apps.chart_daily_evolution	Denní vývoj
+ui_apps.chart_day_strip	Denní pruh
+ui_apps.chart_hour_weekday	Hodina × den v týdnu
+ui_apps.chart_prod_vs_dist	Produktivní vs. rozptylující
+ui_apps.chart_session_durations	Délky sezení podle aplikace
+ui_apps.chart_speed_by_cat	Rychlost psaní podle kategorie (ZPM)
+ui_apps.chart_speed_by_hour	Rychlost psaní podle hodiny (ZPM)
+ui_apps.chart_time_by_cat	Čas podle kategorie
+ui_apps.chart_timeline	Chronologický vývoj
+ui_apps.chart_title_day	Vývoj během dne
+ui_apps.chart_title_period	Vývoj během období
+ui_apps.chart_top7	Top 7 aplikací (čas)
+ui_apps.chart_top8	Top 8 aplikací: čas vs. znaky
+ui_apps.chart_top_days	Nejlepší dny
+ui_apps.chart_top_sessions	Nejlepší sezení
+ui_apps.chart_top_switch_pairs	Nejlepší páry přepnutí
+ui_apps.chart_top_windows	Nejlepší okna
+ui_apps.chart_wake_sleep	Časy probuzení a spánku (klávesnice)
+ui_apps.cmp_active_time	Aktivní čas
+ui_apps.cmp_chars	Znaky
+ui_apps.cmp_focus_time	Čas soustředění
+ui_apps.cmp_productivity	Produktivita
+ui_apps.cmp_sessions	Relace
+ui_apps.cmp_switches	Přepnutí
+ui_apps.cmp_window	aktuální: {cur} ‹{period}› · předchozí: {prev}
+ui_apps.col_app	Aplikace
+ui_apps.col_app_name	Aplikace
+ui_apps.col_category	Kategorie
+ui_apps.col_chars	Znaky
+ui_apps.col_day	Den
+ui_apps.col_density	Hustota
+ui_apps.col_duration	Trvání
+ui_apps.col_focus	Soustředění
+ui_apps.col_focus_time	Čas soustředění
+ui_apps.col_from	Od
+ui_apps.col_hold	Přidržení
+ui_apps.col_hs_pct	% HS
+ui_apps.col_latency	Latence
+ui_apps.col_sessions	Sezení
+ui_apps.col_share	Podíl
+ui_apps.col_switches	Přepnutí
+ui_apps.col_to	Do
+ui_apps.col_top_dests	Nejlepší cíle
+ui_apps.col_typing_pct	% psaní
+ui_apps.col_window	Okno
+ui_apps.compare_title	Srovnání s předchozím obdobím
+ui_apps.detail_global_activity	Celková zaznamenaná aktivita
+ui_apps.detail_productivity_score	Skóre vypočítané z vašich kategorií
+ui_apps.ds_active_ratio	Podíl aktivity (%)
+ui_apps.ds_bursts	Úseky
+ui_apps.ds_chars	Znaky
+ui_apps.ds_first_key	První stisk klávesy
+ui_apps.ds_focus_h	Soustředění (h)
+ui_apps.ds_focus_time	Čas soustředění
+ui_apps.ds_last_key	Poslední stisk klávesy
+ui_apps.ds_speed	Rychlost (znaky / min. soustředění)
+ui_apps.ds_switches	Přepnutí
+ui_apps.empty_activity	Pro toto období nebyla zaznamenána žádná aktivita.
+ui_apps.empty_app_switches	V tomto období nedošlo k žádnému přepnutí.
+ui_apps.empty_boxplot	Nedostatek relací pro vykreslení krabicového grafu (≥ 4 na aplikaci).
+ui_apps.empty_comparator	Pro porovnání zvolte ohraničené období.
+ui_apps.empty_day	Žádný den není vybrán.
+ui_apps.empty_days	Žádný zaznamenaný den.
+ui_apps.empty_period	Žádná data pro toto období.
+ui_apps.empty_sessions	Nebyla detekována žádná relace.
+ui_apps.empty_switches	V tomto období nedošlo k žádným přepnutím.
+ui_apps.empty_windows	Zatím nebyl agregován žádný název okna.
+ui_apps.goal_prompt	Denní cíl v minutách aktivního soustředění:
+ui_apps.goal_reached	Dnes splněn cíl ✓
+ui_apps.goal_remaining	{pct}% zbývá ke splnění cíle
+ui_apps.h2_active_time	Aktivní čas
+ui_apps.h2_app_hopping	Přeskakování aplikací
+ui_apps.h2_autorepeat	Automatické opakování
+ui_apps.h2_battery	Baterie
+ui_apps.h2_best_hour	Nejlepší hodina
+ui_apps.h2_burst_record	Rekord výbuchu
+ui_apps.h2_context_volume	Objem kontextu
+ui_apps.h2_daily_goal	Denní cíl
+ui_apps.h2_density	Hustota
+ui_apps.h2_depth	Průměrná hloubka
+ui_apps.h2_dominant_cat	Dominantní kategorie
+ui_apps.h2_finger_streak	Série prstu
+ui_apps.h2_first_last	První / poslední
+ui_apps.h2_focus_index	Index soustředění
+ui_apps.h2_focus_latency	Latence soustředění
+ui_apps.h2_keep_awake	Udržení bdělosti
+ui_apps.h2_layouts	Použitá rozložení
+ui_apps.h2_lock_vs_sleep	Uzamčení vs. spánek
+ui_apps.h2_locks	Události uzamčení
+ui_apps.h2_long_sessions	Dlouhá sezení
+ui_apps.h2_longest_burst	Nejdelší výbuch
+ui_apps.h2_longest_session	Nejdelší sezení
+ui_apps.h2_max_cascade	Maximální kaskáda
+ui_apps.h2_most_errors	Aplikace s nejvíce chybami
+ui_apps.h2_muted	Ztlumený zvuk
+ui_apps.h2_night_wakeups	Noční probuzení
+ui_apps.h2_passive_system	Systémová pasivita
+ui_apps.h2_pivot_app	Klíčová aplikace
+ui_apps.h2_productivity	Index produktivity
+ui_apps.h2_record_day	Rekordní den
+ui_apps.h2_screen_time	Čas na obrazovce
+ui_apps.h2_session_record	Rekord sezení
+ui_apps.h2_sessions	Sezení
+ui_apps.h2_slowest_recovery	Nejpomalejší zotavení
+ui_apps.h2_spaces	Plochy
+ui_apps.h2_streak_chars	Série znaků ≥ 1k
+ui_apps.h2_streak_focus	Série soustředění ≥ 30 min
+ui_apps.h2_top_trio	Top trojice
+ui_apps.h2_wifi_changes	Změny Wi-Fi
+ui_apps.kpi_app_days_90	dnů aplikace ≥ 90 min.
+ui_apps.kpi_app_switches	přepnutí aplikací
+ui_apps.kpi_awake_excluded	vyloučeno ze statistik (přepínač vypnut)
+ui_apps.kpi_awake_included	zahrnuto do statistik
+ui_apps.kpi_best_hour_score	průměrné skóre {score} (-2 až 2)
+ui_apps.kpi_bursts_count	během {n} úseků
+ui_apps.kpi_car_per_min	znaky / min. soustředění
+ui_apps.kpi_cascades_period	{n} kaskád v období
+ui_apps.kpi_chars_in_a_row	znaků v řadě
+ui_apps.kpi_day_best	dne {date}
+ui_apps.kpi_focus_taken	při {n} převzetích soustředění
+ui_apps.kpi_hopping_detail	přepnutí / min. soustředění
+ui_apps.kpi_in_app	v {name}
+ui_apps.kpi_lock_sleep_cumul	{dur} celkově
+ui_apps.kpi_lock_vs_sleep	uzamčení / spánek
+ui_apps.kpi_never_active	nikdy aktivováno
+ui_apps.kpi_never_reached	nikdy dosaženo
+ui_apps.kpi_night_wakes	probuzení mezi 0 a 6 h
+ui_apps.kpi_no_backslash_out	žádné odchozí přepnutí
+ui_apps.kpi_no_burst	žádný úsek
+ui_apps.kpi_no_data	žádná data
+ui_apps.kpi_no_day_data	žádná data podle dne
+ui_apps.kpi_no_enough_errors	nedostatek chyb
+ui_apps.kpi_no_enough_typing	nedostatek psaní
+ui_apps.kpi_no_focus	nedostatek soustředění
+ui_apps.kpi_no_focus_tracked	žádné sledované soustředění
+ui_apps.kpi_no_keystrokes	žádné stisky kláves v období
+ui_apps.kpi_no_layout	žádné zaznamenané rozložení
+ui_apps.kpi_no_lock	nedetekováno žádné uzamčení
+ui_apps.kpi_no_long_session	žádná dlouhá relace
+ui_apps.kpi_no_mobility	žádná mobilita
+ui_apps.kpi_no_mute	nikdy ztlumeno
+ui_apps.kpi_no_record	žádný rekord v období
+ui_apps.kpi_no_repeat	žádné opakování
+ui_apps.kpi_no_session	žádná relace
+ui_apps.kpi_no_switch	žádné přepnutí
+ui_apps.kpi_not_measured	zatím neměřeno
+ui_apps.kpi_pct_focus_time	{pct}% času soustředění
+ui_apps.kpi_productive	produktivní {p}% · neutrální {n}% · rozptýlení {d}%
+ui_apps.kpi_session_mean	prům. {dur}
+ui_apps.kpi_sleep_intact	spánek nedotčen
+ui_apps.kpi_space_switches	přepnutí klávesou mezerník
+ui_apps.kpi_streak_chars	po sobě jdoucí dny ≥ 1000 znaků
+ui_apps.kpi_streak_focus	po sobě jdoucí dny ≥ 30 min. aktivity
+ui_apps.kpi_switches_between	mezi 2 přepnutími ({n} přepnutí)
+ui_apps.kpi_top_layout	nejčastější: {name}
+ui_apps.kpi_towards_apps	k {n} odlišným aplikacím
+ui_apps.kpi_wifi_switches	přepnutí sítě
+ui_apps.label_categories	Kategorie:
+ui_apps.label_date	Dne:
+ui_apps.label_days	Dny:
+ui_apps.label_period	Období:
+ui_apps.lbl_switches	Přepnutí:
+ui_apps.lbl_top_wifi	Nejlepší WiFi:
+ui_apps.lbl_unlocks	Odemčení:
+ui_apps.loading_data	Načítám data...
+ui_apps.modal_activity_hour	Aktivita podle hodiny
+ui_apps.modal_app_title	Aplikace
+ui_apps.modal_backspace_pct	{pct}% znaků
+ui_apps.modal_chart_label	Znaky
+ui_apps.modal_density	{n} znaků/min.
+ui_apps.modal_destinations	Cíle
+ui_apps.modal_hs_ai	Hotstring a AI
+ui_apps.modal_hs_line	Hotstrings: {n} znaků ({pct}%)
+ui_apps.modal_layouts	Použitá rozložení
+ui_apps.modal_llm_line	AI: {n} znaků ({pct}%)
+ui_apps.modal_longest_session	nejdelší {dur}
+ui_apps.modal_pct_focus	{pct}% soustředění
+ui_apps.modal_record_burst	Nejlepší úsek CPM: {n}
+ui_apps.modal_record_cascade	Kaskády Backspace: {n}
+ui_apps.modal_record_session	Nejdelší relace: {dur}{chars}
+ui_apps.modal_records	Záznamy
+ui_apps.modal_total_chars	Celkem napsaných znaků: {n}
+ui_apps.opt_period.all	Vše
+ui_apps.opt_period.day	Den
+ui_apps.opt_period.month	Posledních 30 dní
+ui_apps.opt_period.week	Posledních 7 dní
+ui_apps.opt_period.year	Rok
+ui_apps.prod_negative	Rozptýlení
+ui_apps.prod_neutral	Neutrální
+ui_apps.prod_positive	Produktivní
+ui_apps.row_tooltip	Zobrazit podrobnosti {name}
+ui_apps.sub_speed_by_hour	znaky za minutu soustředění v aktivním období
+ui_apps.tab_apps	Aplikace a multitasking
+ui_apps.tab_overview	Přehled
+ui_apps.tab_system	Systém a záznamy
+ui_apps.tab_time	Čas a rytmus
+ui_apps.tab_typing	Psaní a produktivita
+ui_apps.tile_backspaces	Backspace
+ui_apps.tile_chars	Znaky
+ui_apps.tile_focus	Soustředění
+ui_apps.tile_focus_lat	Latence soustředění
+ui_apps.tile_sessions	Relace
+ui_apps.tile_typing	Aktivní psaní
+ui_apps.title	Sledování času v aplikacích
+ui_typing.apps_all	Aplik. (Vše)
+ui_typing.apps_none	Aplik. (Žádná)
+ui_typing.btn_apps_all	Aplikace (vše)
+ui_typing.btn_case_sensitive	Rozlišovat malá/velká
+ui_typing.btn_doublings_excluded	Zdvojení vyloučena
+ui_typing.btn_doublings_included	Zdvojení zahrnuta
+ui_typing.btn_reset	Resetovat
+ui_typing.btn_restore_zoom	Obnovit zoom
+ui_typing.btn_toggle_hs_title	+ Hotstrings: do statistik přidává znaky z hotstrings. Vypnuto: pouze ruční stisky kláves.
+ui_typing.btn_toggle_llm_title	+ AI: do statistik přidává znaky generované umělou inteligencí. Vypnuto: pouze ruční stisky kláves.
+ui_typing.calendar_active_days	aktivní dny
+ui_typing.calendar_chars	znaků
+ui_typing.calendar_day_fri	Pá
+ui_typing.calendar_day_mon	Po
+ui_typing.calendar_day_wed	St
+ui_typing.calendar_month_0	led
+ui_typing.calendar_month_1	úno
+ui_typing.calendar_month_10	lis
+ui_typing.calendar_month_11	pro
+ui_typing.calendar_month_2	bře
+ui_typing.calendar_month_3	dub
+ui_typing.calendar_month_4	kvě
+ui_typing.calendar_month_5	čvn
+ui_typing.calendar_month_6	čvc
+ui_typing.calendar_month_7	srp
+ui_typing.calendar_month_8	zář
+ui_typing.calendar_month_9	říj
+ui_typing.calendar_no_keystrokes	žádné stisknutí kláves
+ui_typing.calendar_subtitle	Posledních 12 měsíců
+ui_typing.calendar_title	Kalendář aktivity
+ui_typing.charmix_digits	Digits
+ui_typing.charmix_letters	Letters
+ui_typing.charmix_other	Other
+ui_typing.charmix_punct	Punctuation
+ui_typing.charmix_spaces	Spaces
+ui_typing.chart_title_activity_5min	Aktivita (klávesy / 5 min)
+ui_typing.chart_title_precision_5min	Přesnost (%) — pohled 5 min
+ui_typing.col_acc	Přesnost
+ui_typing.col_active_time	Aktivní čas
+ui_typing.col_app	Aplik.
+ui_typing.col_chars	Znaky
+ui_typing.col_freq	Relativní frekvence ↕
+ui_typing.col_km	Km prstu ↕
+ui_typing.col_occ	Výskyty ↕
+ui_typing.col_rep	Opakování ↕
+ui_typing.col_seq	Sekvence ↕
+ui_typing.col_time	Průměrný čas (ms) ↕
+ui_typing.col_wpm	Ekvivalent SPM
+ui_typing.cpm_mode_ai	s AI
+ui_typing.cpm_mode_hs	s HS
+ui_typing.cpm_mode_hs_ai	s HS + AI
+ui_typing.cpm_mode_manual	pouze manuální stisknutí kláves
+ui_typing.cpm_unit_output_chars	znaky na obrazovce
+ui_typing.cpm_unit_raw_chars	napsané surové znaky
+ui_typing.dataset_ai	AI
+ui_typing.dataset_hs	Hotstring
+ui_typing.dataset_manual	Ruční
+ui_typing.dataset_precision	Přesnost (%)
+ui_typing.dataset_speed	Rychlost
+ui_typing.dataset_touches_5min	Stisky / 5 min
+ui_typing.dataset_touches_h	Stisky/h
+ui_typing.day_0	Neděle
+ui_typing.day_1	Pondělí
+ui_typing.day_2	Úterý
+ui_typing.day_3	Středa
+ui_typing.day_4	Čtvrtek
+ui_typing.day_5	Pátek
+ui_typing.day_6	Sobota
+ui_typing.errors_no_data	Žádné opravy za toto období.
+ui_typing.errors_table_bigram	Bigram
+ui_typing.errors_table_errors	Chyby
+ui_typing.errors_table_occ	Výskyty
+ui_typing.errors_table_rate	Míra
+ui_typing.finger.hand_l	L
+ui_typing.finger.hand_r	P
+ui_typing.finger.l_idx	Ukazováček P
+ui_typing.finger.l_mid	Prostředník P
+ui_typing.finger.l_pinky	Malíček P
+ui_typing.finger.l_ring	Prsteník P
+ui_typing.finger.l_thumb	Palec P
+ui_typing.finger.r_idx	Ukazováček L
+ui_typing.finger.r_mid	Prostředník L
+ui_typing.finger.r_pinky	Malíček L
+ui_typing.finger.r_ring	Prsteník L
+ui_typing.finger.r_thumb	Palec L
+ui_typing.h2_ai	Umělá inteligence
+ui_typing.h2_app_activity	Aktivita podle aplikace
+ui_typing.h2_bigram_ergo	Ergonomie bigramů
+ui_typing.h2_char_mix	Složení znaků
+ui_typing.h2_doublings	Zdvojení
+ui_typing.h2_error_bigrams	Nejopravovanější bigramy
+ui_typing.h2_finger_dist	Vzdálenost prstu
+ui_typing.h2_health	Zdraví a ergonomie
+ui_typing.h2_hs	Hotstring
+ui_typing.h2_hs_ai_prod	Produktivita HS / AI
+ui_typing.h2_lexicon	Lexikón
+ui_typing.h2_records	Osobní rekordy
+ui_typing.h2_rhythm	Rytmus a výbuchy
+ui_typing.h2_sessions	Sezení
+ui_typing.h2_speed	Průměrná rychlost
+ui_typing.h2_trigram_ergo	Ergonomie trigramů
+ui_typing.h3_activity_hourly	Aktivita (stisky/h)
+ui_typing.h3_keystroke_origin	Původ stisku
+ui_typing.h3_precision	Přesnost (%)
+ui_typing.h3_precision_hourly	Přesnost (%) — hodinový pohled
+ui_typing.h3_speed	Rychlost (SPM)
+ui_typing.heatmap_day_fri	Pá
+ui_typing.heatmap_day_mon	Po
+ui_typing.heatmap_day_sat	So
+ui_typing.heatmap_day_sun	Ne
+ui_typing.heatmap_day_thu	Čt
+ui_typing.heatmap_day_tue	Út
+ui_typing.heatmap_day_wed	St
+ui_typing.heatmap_hour_chars_abbrev	zn.
+ui_typing.heatmap_hour_no_keystrokes	žádné stisknutí kláves
+ui_typing.heatmap_hour_subtitle	za vybrané období
+ui_typing.heatmap_hour_title	Aktivita podle hodiny a dne v týdnu
+ui_typing.heatmap_hour_total	znaků celkem
+ui_typing.key_caps	Caps
+ui_typing.key_enter	Enter
+ui_typing.key_esc	Esc
+ui_typing.key_shift	Shift
+ui_typing.key_tab	Tab
+ui_typing.key_tip_avg_dur	Avg. dur.:
+ui_typing.key_tip_freq	Freq.:
+ui_typing.key_tip_freq_total	Total freq.:
+ui_typing.label_burst_length_dist	Burst length distribution
+ui_typing.label_charmix_dist	Distribution (%s characters)
+ui_typing.label_finger_load_dist	Cumulative load per finger — ideal distribution ≈ 12.5% each
+ui_typing.label_from	Od:
+ui_typing.label_to	Do:
+ui_typing.label_word_length_dist	Length distribution (frequency-weighted)
+ui_typing.lbl_accepted	Přijato
+ui_typing.lbl_active_ratio	Poměr aktivity
+ui_typing.lbl_activity	Aktivita
+ui_typing.lbl_ai_acceptance	Přijetí AI
+ui_typing.lbl_avg_delay	Průměrné zpoždění
+ui_typing.lbl_avg_duration	Průměrná délka
+ui_typing.lbl_avg_length	Průměrná délka
+ui_typing.lbl_bad_redir	Špatné přesměr.
+ui_typing.lbl_best_day	Nejlepší den
+ui_typing.lbl_cascades	Kaskády
+ui_typing.lbl_corrected_bigrams	Opravené bigramy
+ui_typing.lbl_digits	Číslice
+ui_typing.lbl_doublings	zdvojení
+ui_typing.lbl_fastest_app	Nejrychlejší aplikace
+ui_typing.lbl_focus_latency	Latence soustředění → 1. klávesa
+ui_typing.lbl_frequent_pair	Častý pár
+ui_typing.lbl_hand_balance	Rovnováha L/P
+ui_typing.lbl_layouts_used	Použitá rozložení
+ui_typing.lbl_letters	Písmena
+ui_typing.lbl_long_sessions	Dlouhá sezení
+ui_typing.lbl_longest_burst	Nejdelší výbuch
+ui_typing.lbl_longest_chars	Nejdelší (znaky)
+ui_typing.lbl_longest_session	Nejdelší sezení
+ui_typing.lbl_longest_time	Nejdelší (trvání)
+ui_typing.lbl_most_active_finger	Nejaktivnější prst
+ui_typing.lbl_others	Ostatní
+ui_typing.lbl_passive_time	Systémový pasivní čas
+ui_typing.lbl_punctuation	Interpunkce
+ui_typing.lbl_recovery_time	Čas zotavení
+ui_typing.lbl_redir	Přesměr.
+ui_typing.lbl_regularity	Pravidelnost (CV)
+ui_typing.lbl_roll_in	Vnitřní roll
+ui_typing.lbl_roll_out	Vnější roll
+ui_typing.lbl_same_finger_streak	Série stejného prstu
+ui_typing.lbl_same_hand_streak	Série stejné ruky
+ui_typing.lbl_saved	Uloženo
+ui_typing.lbl_scissors	Nůžky
+ui_typing.lbl_sfbs_raw	Hrubé SFB
+ui_typing.lbl_spaces	Mezery
+ui_typing.lbl_streak	Série
+ui_typing.lbl_time_saved	Ušetřený čas
+ui_typing.lbl_top_app	Nejpoužívanější aplikace
+ui_typing.lbl_top_mod_held	Nejdéle držený modifikátor
+ui_typing.lbl_top_word	Nejpoužívanější slovo
+ui_typing.lbl_total	Celkem
+ui_typing.lbl_total_active_time	Celkový aktivní čas
+ui_typing.lbl_total_bursts	Celkem výbuchů
+ui_typing.lbl_total_words	Celkem slov
+ui_typing.lbl_unique_words	Unikátní slova
+ui_typing.lbl_via_ai	Přes AI
+ui_typing.lbl_via_hotstrings	Přes hotstring
+ui_typing.lbl_via_magic_key	Přes klávesu ★
+ui_typing.lbl_worst_bigram	Nejhorší bigram
+ui_typing.loading	Počítám...
+ui_typing.loading_ellipsis	Počítám…
+ui_typing.modal_apply	Zavřít a použít
+ui_typing.modal_check_all	Zaškrtnout vše
+ui_typing.modal_search_app	Hledat aplikaci...
+ui_typing.modal_select_apps	Vybrat aplikace
+ui_typing.modal_uncheck_all	Odškrtnout vše
+ui_typing.month_0	Led.
+ui_typing.month_1	Úno.
+ui_typing.month_10	Lis.
+ui_typing.month_11	Pro.
+ui_typing.month_2	Bře.
+ui_typing.month_3	Dub.
+ui_typing.month_4	Kvě.
+ui_typing.month_5	Čer.
+ui_typing.month_6	Čvc.
+ui_typing.month_7	Srp.
+ui_typing.month_8	Zář.
+ui_typing.month_9	Říj.
+ui_typing.no_app_found	Žádná aplikace nenalezena
+ui_typing.no_data	Žádná data
+ui_typing.not_found	Nenalezeno
+ui_typing.opt_pause.1000	Přestávky > 1 s
+ui_typing.opt_pause.10000	Přestávky > 10 s
+ui_typing.opt_pause.2000	Přestávky > 2 s
+ui_typing.opt_pause.20000	Přestávky > 20 s
+ui_typing.opt_pause.3000	Přestávky > 3 s
+ui_typing.opt_pause.30000	Přestávky > 30 s
+ui_typing.opt_pause.5000	Přestávky > 5 s
+ui_typing.opt_pause.60000	Přestávky > 1 min
+ui_typing.opt_pause.99999999	Bez filtru
+ui_typing.opt_quick_range.	Období…
+ui_typing.opt_quick_range.3m	Poslední 3 měsíce
+ui_typing.opt_quick_range.6m	Posledních 6 měsíců
+ui_typing.opt_quick_range.all	Vše
+ui_typing.opt_quick_range.last_hour	Poslední hodina
+ui_typing.opt_quick_range.month	Tento měsíc
+ui_typing.opt_quick_range.today	Dnes
+ui_typing.opt_quick_range.week	Tento týden
+ui_typing.opt_quick_range.year	Tento rok
+ui_typing.page_loading	Načítám rozhraní...
+ui_typing.pinch_hint	Sevřít (touchpad) pro zoom.
+ui_typing.precision_no_filter	bez filtru
+ui_typing.rep_doublings	zdvojení
+ui_typing.rep_no_data	Žádná zdvojení
+ui_typing.rep_table_bigram	Bigram
+ui_typing.rep_table_manual	Manuální
+ui_typing.rep_table_total	Celkem
+ui_typing.rep_table_via_star	Přes ★
+ui_typing.search_close	Zavřít (Esc)
+ui_typing.search_label	Hledat na stránce
+ui_typing.search_next	Další (Enter)
+ui_typing.search_placeholder	Hledat…
+ui_typing.search_prev	Předchozí (Shift+Enter)
+ui_typing.sfb_avoided	vyhnuto via HS
+ui_typing.sfb_avoided_none	0 vyhnuto via HS
+ui_typing.sfb_no_data	Žádné SFBs
+ui_typing.sfb_raw_count	surové SFBs
+ui_typing.sfb_table_finger	Prst
+ui_typing.sfb_table_hand	Ruka
+ui_typing.sfb_table_pair	Pár
+ui_typing.signal_equilibre	Balanced
+ui_typing.signal_surveille	Monitored
+ui_typing.signal_vigilance	Alert
+ui_typing.tab_bigrams	Bigramy
+ui_typing.tab_chars	Znaky
+ui_typing.tab_heptagrams	Sedmagramy
+ui_typing.tab_hexagrams	Šestagramy
+ui_typing.tab_keycodes	Kódy kláves
+ui_typing.tab_modifiers	Modifikátory
+ui_typing.tab_pentagrams	Pětagramy
+ui_typing.tab_quadgrams	Čtyřgramy
+ui_typing.tab_shortcut_bigrams	Zkratkové bigramy
+ui_typing.tab_shortcut_pentagrams	Zkratkové pětagramy
+ui_typing.tab_shortcut_quadgrams	Zkratkové čtyřgramy
+ui_typing.tab_shortcut_trigrams	Zkratkové trigramy
+ui_typing.tab_shortcuts	Zkratky
+ui_typing.tab_trigrams	Trigramy
+ui_typing.tab_word_bigrams	Slovní bigramy
+ui_typing.tab_word_pentagrams	Slovní pětagramy
+ui_typing.tab_word_quadgrams	Slovní čtyřgramy
+ui_typing.tab_word_trigrams	Slovní trigramy
+ui_typing.tab_words	Slova
+ui_typing.table_mode_mixed	smíšený
+ui_typing.table_mode_output	výstup obrazovky
+ui_typing.table_mode_raw	surová stisknutí kláves
+ui_typing.title	Metriky psaní
+ui_typing.title_hand_balance	Vyvážení stisků kláves mezi levou a pravou rukou. 50/50 = dokonalá rovnováha.
+ui_typing.title_net_hs	Čistý rozdíl mezi napsanými a vygenerovanými znaky
+ui_typing.title_net_llm	Čistý rozdíl mezi smazanými a vygenerovanými znaky
+ui_typing.title_pause_threshold	Práh přestávky: přestávky překračující tuto hodnotu jsou vyloučeny z aktivního času při výpočtu WPM.
+ui_typing.title_quick_range	Rychlý rozsah
+ui_typing.title_rep_total	Celkový počet zdvojení během období
+ui_typing.title_rep_via_star	Podíl zdvojení vygenerovaných klávesou ★ (hotstring pro opakování). Nenulový pouze v režimu + Hotstrings.
+ui_typing.title_top_finger	Prst, který za období urazil největší vzdálenost
+ui_typing.tooltip_apps	<strong>Fastest app :</strong> highest average CPM across apps with ≥ 200 characters typed (below this threshold you'd catch apps used for 2 seconds).<br><br><strong>Frequent pair :</strong> the two apps you switch between most often, in both directions. Indicates your typical workflow (editor ↔ browser, doc ↔ chat…).
+ui_typing.tooltip_charmix	<strong>Categories :</strong> each manual character typed is classified Lua-side into one of five categories — Latin letters (including common accented), digits, punctuation and symbols, spaces (including NBSP / NNBSP / tab / return), and other (non-Latin characters, special keylogger markers).<br><br><strong>Indication :</strong> code-heavy = lots of punctuation and digits; prose-heavy = mostly letters and spaces; chat = a mix of everything.
+ui_typing.tooltip_col_acc	Přesnost: procento případů, kdy byla tato sekvence napsána správně bez použití Backspace.
+ui_typing.tooltip_col_mpm	Slova za minutu: odhadovaná rychlost, pokud byste tento fragment psali ve smyčce (1 slovo = 5 kláves). Počítají se POUZE skutečné stisky kláves.
+ui_typing.tooltip_cpm_formula	<strong>Vzorec:</strong> CPM = přechody × 60000 / aktivní čas.<br><strong>Režim:</strong> {mode}.<br><br>Čitatel: {pure_trans} manuálních přechodů (≤ {thresh})<br>{add_hs}{add_llm}= {chars_total} započtených znaků<br><br>WPM = CPM / 5.
+ui_typing.tooltip_cpm_hs_chars	přidané znaky (výstup HS − spouštěč)
+ui_typing.tooltip_cpm_llm_chars	přidané znaky (výstup AI − spouštěč)
+ui_typing.tooltip_cpm_simple	Znaky za minutu (ve výchozím nastavení s HS + AI).
+ui_typing.tooltip_ergo_bigram	<strong>SHB / SHU :</strong> same-hand bigrams / their share of total bigrams.<br><strong>Inward roll :</strong> pinky toward index. The most comfortable.<br><strong>Outward roll :</strong> index toward pinky.<br><strong>LSB :</strong> Lateral Stretch Bigram — one of the two fingers extends at least 1.5 columns from its rest position.<br><strong>Scissors :</strong> SHB crossing ≥ 2 rows with the shorter finger going down (e.g. pinky low + middle high).
+ui_typing.tooltip_ergo_trigram	<strong>SFS :</strong> Same-Finger Skipgram — an SFB with a different-finger key in between (e.g. EAD).<br><strong>SKS :</strong> Same-Key Skipgram — the same key in positions 1 and 3 (e.g. ELE).<br><strong>Redirect :</strong> three keys on the same hand with a change of direction (pinky→middle→ring = peak). Uncomfortable.<br><strong>Bad redir. :</strong> redirect where none of the three fingers is the index. Among the worst possible sequences on a keyboard.
+ui_typing.tooltip_errors	<strong>Reading :</strong> bigrams (two consecutive keys) ranked by <em>error rate</em> = number of times the 2nd key was erased by a backspace, divided by total occurrences.<br><br><strong>Filter :</strong> only bigrams appearing ≥ 5 times in the period are shown, to avoid statistical noise from rare sequences.<br><br><strong>Cascades :</strong> runs of ≥ 3 consecutive backspaces (major correction: a word or sentence erased). The counter separates this signal from one-off errors.<br><br><strong>Recovery time :</strong> average delay between a backspace and the next key. The longer it is, the more the correction breaks your mental flow.
+ui_typing.tooltip_lexical	<strong>Richness :</strong> unique words ÷ total words. The higher, the more varied the vocabulary. A literary text will be around 40–60 %, chat or code much lower.<br><br><strong>Average length :</strong> frequency-weighted mean — this is the length of the word you type "on average", not the median dictionary length.<br><br><strong>Filter :</strong> words shorter than 2 characters are ignored (they are almost always tokenisation artefacts from punctuation splitting).
+ui_typing.tooltip_mpm	Slova za minutu (skutečná slova ze slovníku).
+ui_typing.tooltip_precision_formula	<strong>Vzorec:</strong> přesnost = správné / celkem.<br>Chyby: stisky Backspace krátce po stisku klávesy (≤ {thresh}).
+ui_typing.tooltip_records	<strong>Scope :</strong> records are computed over <em>the entire</em> database — they do not follow the UI date filter (otherwise the record disappears when you zoom in). The app filter still applies.<br><br><strong>Streak :</strong> longest consecutive series of days with at least one keystroke. Missing a day resets the counter to zero.
+ui_typing.tooltip_rep_pct	Share of bigrams that are doublings (e.g. «aa», «ll»). Reflects the active source mode — compare "Without Ergopti+" and "+ Hotstrings" to see if the ★ key is being used.
+ui_typing.tooltip_rhythm	<strong>Burst :</strong> typing stretch with no gap > 1 s between two keys.<br><br><strong>Peak CPM :</strong> best CPM observed on a burst of at least 10 characters. The threshold excludes fleeting non-representative sprints.<br><br><strong>Regularity (CV) :</strong> coefficient of variation = standard deviation ÷ mean. 0 = perfect metronome, > 0.6 = very irregular.
+ui_typing.tooltip_roi	<strong>Characters saved :</strong> net output of HS / AI expansions, i.e. characters added on screen minus those that triggered the expansion (and were therefore typed manually).<br><br><strong>Time saved :</strong> characters saved × average pace (manual active time ÷ number of manual keystrokes) over the same period. This is an honest lower bound: it is what you would have taken to type them yourself.<br><br><strong>AI acceptance :</strong> share of AI suggestions displayed that were accepted by the user.
+ui_typing.tooltip_sessions	<strong>Session :</strong> typing block with no gap > 5 min between two consecutive keystrokes. Detected keylogger-side, so independent of the UI pause filter.<br><br><strong>Total active time :</strong> sum of all session durations — i.e. the time actually spent typing, ignoring pauses > 5 min.<br><br><strong>Longest (chars) :</strong> may refer to a different session from the longest in duration — e.g. a long slow session vs. a short ultra-fast one.
+ui_typing.tooltip_sfb_pct	Share of manual bigrams typed by the same finger. Excluding hotstrings — this KPI measures the raw physical difficulty of the layout.
+ui_typing.tooltip_sfb_rate	Rate: nb SFBs / nb key occurrences
+ui_typing.tooltip_wellness	<strong>Global signal :</strong> red "Alert" if ≥ 2 sessions over 90 min or a finger streak ≥ 8; orange "Monitored" if ≥ 1 long session or finger streak ≥ 6 or hand streak ≥ 12; green "Balanced" otherwise.<br><br><strong>Active ratio :</strong> time actually spent typing ÷ time the app was in focus. Low = you read a lot, which reduces typing load but also signals chronic input/output imbalance.<br><br><strong>Finger / hand streak :</strong> longest run of consecutive keys on the same finger or same hand. Beyond 5 (finger) or 12 (hand), the load is no longer distributed.<br><br><strong>Long sessions :</strong> sessions ≥ 90 min without a break. The clinical threshold beyond which RSI risk increases significantly.
+ui_typing.unit_activations	aktivace
+ui_typing.unit_active_apps	aktivní aplikace
+ui_typing.unit_chars_saved	uložené znaky
+ui_typing.unit_cpm	ZPM
+ui_typing.unit_cpm_burst	ZPM vrchol (výbuch)
+ui_typing.unit_cpm_record	ZPM rekord
+ui_typing.unit_global_rate	% celková míra
+ui_typing.unit_keyspressed	stisknuté klávesy
+ui_typing.unit_keystrokes	stisky kláves
+ui_typing.unit_km	km
+ui_typing.unit_mpm	S/M
+ui_typing.unit_richness	% bohatost
+ui_typing.unit_sessions	sezení
+ui_typing.unit_triggers	triggers
+ui_typing.unit_words_typed	words typed in total
+updater.changelog_channel_label	Kanál:
+updater.changelog_empty	(Pro tento kanál nejsou k dispozici žádné poznámky k verzi.)
+updater.changelog_install	Nainstalovat tuto verzi
+updater.changelog_install_current	Aktuální verze
+updater.changelog_local_source_note	Lokální zdrojový režim — změny kanálu nejsou uloženy.
+updater.changelog_release_notes	Poznámky k verzi {1}:\n\n{2}\n\nOtevřít na GitHubu?
+updater.changelog_select_release	Výběr verze :
+updater.changelog_switch_to_dev	Přepnout na kanál předběžné verze (dev)
+updater.changelog_switch_to_main	Přepnout na stabilní kanál (main)
+updater.changelog_truncated	\n…(zkráceno)
+updater.changelog_unreachable	Nepodařilo se získat informace o vydání z GitHubu.
+updater.channel_dev_suffix	 (předběžný kanál)
+updater.channel_local_source_suffix	 (lokální zdroj — není to vydané sestavení)
+updater.channel_main_suffix	 (stabilní kanál)
+updater.channel_switch_blocked_download	Právě probíhá stahování aktualizace. Počkejte, až skončí (nebo aplikaci restartujte), než změníte kanál.
+updater.checking	Hledám aktualizace v kanálu „{1}“…\n(Operace může trvat několik sekund.)
+updater.close	Zavřít
+updater.install_error	Nelze nainstalovat aktualizaci. Podrobnosti najdete v logu.
+updater.install_error_download	Stažení aktualizačního balíčku selhalo. Zkontrolujte připojení k internetu a zkuste to znovu.
+updater.install_error_no_asset	Toto vydání neobsahuje spustitelný soubor pro Windows. Otevřete stránku vydání pro ruční stažení.
+updater.install_local_source	Spuštěno z lokálního zdroje — automatická instalace je dostupná pouze pro release sestavení.
+updater.local_source	Běží z lokálního zdroje — kontrola aktualizací je k dispozici jen pro vydané sestavení.
+updater.new_version	Je k dispozici nová verze!\n\nAktuální: {1}\nNejnovější: {2}\n\nOtevřít stránku vydání ke stažení?
+updater.no_connection	Nepodařilo se připojit k GitHubu. Zkontrolujte připojení k internetu a zkuste to znovu.
+updater.open_on_github	Otevřít na GitHubu
+updater.parse_failed	Nepodařilo se zpracovat značku nejnovějšího vydání z GitHubu.
+updater.title_changelog	ErgoptiPlus — Seznam změn
+updater.title_update	ErgoptiPlus — Aktualizace
+updater.title_update_available	ErgoptiPlus — Je k dispozici aktualizace
+updater.title_version	ErgoptiPlus — Verze
+updater.tray_new_version_body	Verze {1} je připravena k instalaci. Klikněte na položku „Install update" v nabídce v oznamovací oblasti.
+updater.tray_new_version_title	ErgoptiPlus — Aktualizace k dispozici
+updater.up_to_date	ErgoptiPlus je aktuální.\n\nAktuální verze: {1}
+updater.update_dialog_changelog	Novinky:
+updater.update_dialog_header	Aktualizace k dispozici — {1}
+updater.update_dialog_install	Nainstalovat aktualizaci
+updater.update_dialog_later	Později
+updater.update_dialog_open	Otevřít na GitHubu
+updater.update_dialog_title	ErgoptiPlus — Instalace aktualizace
+updater.version_message	ErgoptiPlus {1}{2}\n\nOtevřít stránku vydání na GitHubu?
+vscode.reload_required	Přenačtěte VSCode (Cmd+Shift+P > Reload Window) pro aktivaci rozšíření psaní

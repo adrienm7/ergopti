@@ -1,0 +1,3313 @@
+# _shared/modules/features/manifest.toml
+# Single source of truth for every Ergopti+ feature toggle and its default value.
+#
+# Consumers:
+#   1. The first-boot config generator: each driver renders the appropriate
+#      subset of this manifest into ``config/ergopti_plus/<driver>/config.toml``.
+#   2. The tray-menu renderer: each driver walks this manifest to build the
+#      hierarchical menu tree (labels via ``description_key`` resolved against
+#      ``static/locales/<locale>.json``).
+#   3. The Svelte docs site (future): can generate a feature-matrix table from
+#      this manifest at build time.
+#
+# Format:
+#
+#   [sections.<path>]           Section metadata (description, platforms, order).
+#       description_key         Required. i18n key for the menu label.
+#       platforms               Optional. ["ahk","hs"] by default. Filters which
+#                               drivers see the section.
+#       subsections             Optional. Ordered list of child section names;
+#                               drives the menu render order.
+#
+#   [[features.<path>]]         Feature entry inside section <path>. Order
+#                               within the array is preserved in the menu AND
+#                               in the generated config.toml.
+#       id                      Required. Last segment of the feature key.
+#       default                 Required (unless default_per_platform is set).
+#                               Primitive (bool/number/string/array) OR table
+#                               (e.g. { enabled = true, ... }).
+#                               - Primitive default → emit ``id = value`` inside
+#                                 the parent section [<path>].
+#                               - Table default     → emit a sub-section
+#                                 [<path>.<id>] containing each key=value.
+#       default_per_platform    Optional. Inline table like { ahk = X, hs = Y }.
+#                               Overrides ``default`` for the current platform.
+#                               Use only when defaults legitimately differ
+#                               between drivers (e.g. LLM model choice).
+#       type                    Optional. Hints for UI rendering: "boolean",
+#                               "enum", "string", "number", "action", "feature".
+#       enum_values             Required if type = "enum".
+#       description_key         Required. i18n key for the menu label.
+#       platforms               Optional. Defaults to the parent section's
+#                               ``platforms`` value if absent.
+#
+# Examples:
+#   [[features.script]]
+#   id = "locale"
+#   default = "fr"
+#   type = "string"
+#   description_key = "menu.script.locale"
+#   → generates: ``[script] locale = "fr"`` in config.toml
+#
+#   [[features.hotstrings.autocorrection]]
+#   id = "accents"
+#   default = { enabled = true, time_activation_seconds = 0.5 }
+#   type = "feature"
+#   description_key = "menu.hotstrings.autocorrection.accents"
+#   → generates: ``[hotstrings.autocorrection.accents] enabled = true; time_activation_seconds = 0.5``
+
+
+
+
+
+# ================================
+# ================================
+# ======= 1. Manifest meta =======
+# ================================
+# ================================
+
+[manifest]
+version = "2.0.0"
+config_schema = "https://ergopti.com/schema/config.schema.json"
+
+
+
+
+
+# ===========================
+# ===========================
+# ======= 2. Sections =======
+# ===========================
+# ===========================
+
+[sections]
+order = ["script", "hotstrings", "llm", "metrics", "shortcuts", "ahk", "hs"]
+
+
+
+# ======================
+# ===== 2.1 script =====
+# ======================
+
+[sections.script]
+description_key = "menu.script"
+platforms = ["ahk", "hs"]
+
+
+
+# ==========================
+# ===== 2.2 hotstrings =====
+# ==========================
+
+[sections.hotstrings]
+description_key = "menu.hotstrings"
+platforms = ["ahk", "hs"]
+subsections = ["autocorrection", "distances_reduction", "sfbs_reduction", "rolls", "magic_key", "dynamic", "personal"]
+
+[sections.hotstrings.autocorrection]
+description_key = "menu.hotstrings.autocorrection"
+platforms = ["ahk", "hs"]
+
+[sections.hotstrings.distances_reduction]
+description_key = "menu.hotstrings.distances_reduction"
+platforms = ["ahk", "hs"]
+
+[sections.hotstrings.sfbs_reduction]
+description_key = "menu.hotstrings.sfbs_reduction"
+platforms = ["ahk", "hs"]
+
+[sections.hotstrings.rolls]
+description_key = "menu.hotstrings.rolls"
+platforms = ["ahk", "hs"]
+
+[sections.hotstrings.magic_key]
+description_key = "menu.hotstrings.magic_key"
+platforms = ["ahk", "hs"]
+
+[sections.hotstrings.dynamic]
+description_key = "menu.hotstrings.dynamic"
+platforms = ["ahk", "hs"]
+
+[sections.hotstrings.personal]
+description_key = "menu.hotstrings.personal"
+platforms = ["ahk", "hs"]
+
+
+
+# ===================
+# ===== 2.3 llm =====
+# ===================
+
+[sections.llm]
+description_key = "menu.llm"
+platforms = ["ahk", "hs"]
+subsections = ["display", "generation", "models", "profiles", "trigger", "navigation"]
+
+[sections.llm.display]
+description_key = "menu.llm.display"
+platforms = ["ahk", "hs"]
+
+[sections.llm.generation]
+description_key = "menu.llm.generation"
+platforms = ["ahk", "hs"]
+
+[sections.llm.models]
+description_key = "menu.llm.models"
+platforms = ["ahk", "hs"]
+
+[sections.llm.profiles]
+description_key = "menu.llm.profiles"
+platforms = ["ahk", "hs"]
+
+[sections.llm.trigger]
+description_key = "menu.llm.trigger"
+platforms = ["ahk", "hs"]
+
+[sections.llm.navigation]
+description_key = "menu.llm.navigation"
+platforms = ["ahk", "hs"]
+
+
+
+# =======================
+# ===== 2.4 metrics =====
+# =======================
+
+[sections.metrics]
+description_key = "menu.metrics"
+platforms = ["ahk", "hs"]
+
+
+
+# =========================
+# ===== 2.5 shortcuts =====
+# =========================
+
+[sections.shortcuts]
+description_key = "menu.shortcuts"
+platforms = ["ahk", "hs"]
+
+
+
+# =====================
+# ===== 2.6 ahk.* =====
+# =====================
+
+[sections.ahk]
+description_key = "menu.ahk"
+platforms = ["ahk"]
+subsections = ["category_enabled", "layout", "shortcuts", "gestures", "metrics"]
+
+[sections.ahk.category_enabled]
+description_key = "menu.ahk.category_enabled"
+platforms = ["ahk"]
+
+[sections.ahk.layout]
+description_key = "menu.layout"
+platforms = ["ahk"]
+
+[sections.ahk.shortcuts]
+description_key = "menu.ahk.shortcuts"
+platforms = ["ahk"]
+subsections = ["alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control"]
+
+[sections.ahk.shortcuts.alt_gr_caps_lock]
+description_key = "menu.ahk.shortcuts.alt_gr_caps_lock"
+platforms = ["ahk"]
+
+[sections.ahk.shortcuts.alt_gr_lalt]
+description_key = "menu.ahk.shortcuts.alt_gr_lalt"
+platforms = ["ahk"]
+
+[sections.ahk.shortcuts.keyboard]
+description_key = "menu.ahk.shortcuts.keyboard"
+platforms = ["ahk"]
+
+[sections.ahk.shortcuts.lalt_caps_lock]
+description_key = "menu.ahk.shortcuts.lalt_caps_lock"
+platforms = ["ahk"]
+
+[sections.ahk.shortcuts.personal]
+description_key = "menu.ahk.shortcuts.personal"
+platforms = ["ahk"]
+
+[sections.ahk.shortcuts.script_control]
+description_key = "menu.ahk.shortcuts.script_control"
+platforms = ["ahk"]
+
+[sections.ahk.gestures]
+description_key = "menu.gestures"
+platforms = ["ahk"]
+
+[sections.ahk.metrics]
+description_key = "menu.ahk.metrics"
+platforms = ["ahk"]
+
+
+
+# ====================
+# ===== 2.7 hs.* =====
+# ====================
+
+[sections.hs]
+description_key = "menu.hs"
+platforms = ["hs"]
+subsections = ["gestures", "hotstrings"]
+
+[sections.hs.gestures]
+description_key = "menu.gestures"
+platforms = ["hs"]
+subsections = ["modes", "sensitivities"]
+
+[sections.hs.gestures.modes]
+description_key = "menu.hs.gestures.modes"
+platforms = ["hs"]
+
+[sections.hs.gestures.sensitivities]
+description_key = "menu.hs.gestures.sensitivities"
+platforms = ["hs"]
+
+[sections.hs.hotstrings]
+description_key = "menu.hs.hotstrings"
+platforms = ["hs"]
+
+
+
+
+
+# ===========================
+# ===========================
+# ======= 3. Features =======
+# ===========================
+# ===========================
+
+
+
+# ======================
+# ===== 3.1 script =====
+# ======================
+
+[[features.script]]
+id = "locale"
+default = "fr"
+type = "string"
+description_key = "menu.script.locale"
+
+[[features.script]]
+id = "log_level"
+default = "INFO"
+type = "enum"
+enum_values = ["DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR"]
+description_key = "menu.script.log_level"
+
+[[features.script]]
+id = "alt_gr_is_kana_remap"
+default = "auto"
+type = "enum"
+enum_values = ["auto", true, false]
+description_key = "menu.script.alt_gr_is_kana_remap"
+platforms = ["ahk"]
+
+
+
+# ==========================
+# ===== 3.2 hotstrings =====
+# ==========================
+
+[[features.hotstrings]]
+id = "trigger_char"
+default = "★"
+type = "string"
+description_key = "menu.hotstrings.trigger_char"
+
+[[features.hotstrings]]
+id = "repeat_key_enabled"
+default = true
+type = "boolean"
+description_key = "menu.hotstrings.repeat_key_enabled"
+platforms = ["ahk"]
+
+
+
+# ===========================================
+# ===== 3.2.1 hotstrings.autocorrection =====
+# ===========================================
+
+[[features.hotstrings.autocorrection]]
+id = "accents"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.accents"
+
+[[features.hotstrings.autocorrection]]
+id = "caps"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.caps"
+
+[[features.hotstrings.autocorrection]]
+id = "errors"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.errors"
+
+[[features.hotstrings.autocorrection]]
+id = "minus"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.minus"
+
+[[features.hotstrings.autocorrection]]
+id = "minus_apostrophe"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.minus_apostrophe"
+
+[[features.hotstrings.autocorrection]]
+id = "multiple_punctuation_marks"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.multiple_punctuation_marks"
+
+[[features.hotstrings.autocorrection]]
+id = "names"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.names"
+
+[[features.hotstrings.autocorrection]]
+id = "ou"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.ou"
+
+[[features.hotstrings.autocorrection]]
+id = "suffixes_a_chaining"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.suffixes_a_chaining"
+
+[[features.hotstrings.autocorrection]]
+id = "typographic_apostrophe"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.typographic_apostrophe"
+
+
+
+# ================================================
+# ===== 3.2.2 hotstrings.distances_reduction =====
+# ================================================
+
+[[features.hotstrings.distances_reduction]]
+id = "qu"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.distances_reduction.qu"
+
+[[features.hotstrings.distances_reduction]]
+id = "suffixes_a"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.distances_reduction.suffixes_a"
+
+[[features.hotstrings.distances_reduction]]
+id = "comma_j"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.distances_reduction.comma_j"
+
+[[features.hotstrings.distances_reduction]]
+id = "comma_far_letters"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.distances_reduction.comma_far_letters"
+
+[[features.hotstrings.distances_reduction]]
+id = "dead_key_e_circumflex"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.distances_reduction.dead_key_e_circumflex"
+
+[[features.hotstrings.distances_reduction]]
+id = "e_circumflex_e"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.distances_reduction.e_circumflex_e"
+
+[[features.hotstrings.distances_reduction]]
+id = "space_around_symbols"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.distances_reduction.space_around_symbols"
+
+
+
+# ===========================================
+# ===== 3.2.3 hotstrings.sfbs_reduction =====
+# ===========================================
+
+[[features.hotstrings.sfbs_reduction]]
+id = "comma"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.sfbs_reduction.comma"
+
+[[features.hotstrings.sfbs_reduction]]
+id = "e_circ"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.sfbs_reduction.e_circ"
+
+[[features.hotstrings.sfbs_reduction]]
+id = "e_grave"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.sfbs_reduction.e_grave"
+
+[[features.hotstrings.sfbs_reduction]]
+id = "bu"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.sfbs_reduction.bu"
+
+[[features.hotstrings.sfbs_reduction]]
+id = "i_e_acute"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.sfbs_reduction.i_e_acute"
+
+
+
+# ==================================
+# ===== 3.2.4 hotstrings.rolls =====
+# ==================================
+
+[[features.hotstrings.rolls]]
+id = "hc"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.rolls.hc"
+
+[[features.hotstrings.rolls]]
+id = "sx"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.rolls.sx"
+
+[[features.hotstrings.rolls]]
+id = "cx"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.rolls.cx"
+
+[[features.hotstrings.rolls]]
+id = "ct"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.rolls.ct"
+
+[[features.hotstrings.rolls]]
+id = "ez"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.rolls.ez"
+
+[[features.hotstrings.rolls]]
+id = "assign"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.rolls.assign"
+
+[[features.hotstrings.rolls]]
+id = "assign_arrow_equal_left"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.rolls.assign_arrow_equal_left"
+
+[[features.hotstrings.rolls]]
+id = "assign_arrow_equal_right"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.rolls.assign_arrow_equal_right"
+
+[[features.hotstrings.rolls]]
+id = "assign_arrow_minus_left"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.rolls.assign_arrow_minus_left"
+
+[[features.hotstrings.rolls]]
+id = "assign_arrow_minus_right"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.rolls.assign_arrow_minus_right"
+
+[[features.hotstrings.rolls]]
+id = "bracket_quote"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.rolls.bracket_quote"
+
+[[features.hotstrings.rolls]]
+id = "chevron_equal"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.rolls.chevron_equal"
+
+[[features.hotstrings.rolls]]
+id = "chevron_greater"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.rolls.chevron_greater"
+
+[[features.hotstrings.rolls]]
+id = "chevron_less"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.rolls.chevron_less"
+
+[[features.hotstrings.rolls]]
+id = "close_chevron_tag"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.rolls.close_chevron_tag"
+
+[[features.hotstrings.rolls]]
+id = "comment_close"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.rolls.comment_close"
+
+[[features.hotstrings.rolls]]
+id = "comment_open"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.rolls.comment_open"
+
+[[features.hotstrings.rolls]]
+id = "english_negation"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.rolls.english_negation"
+
+[[features.hotstrings.rolls]]
+id = "equal_string"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.rolls.equal_string"
+
+[[features.hotstrings.rolls]]
+id = "hashtag_close_bracket"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.rolls.hashtag_close_bracket"
+
+[[features.hotstrings.rolls]]
+id = "hashtag_open_bracket"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.rolls.hashtag_open_bracket"
+
+[[features.hotstrings.rolls]]
+id = "hashtag_parenthesis"
+default = { enabled = true, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.rolls.hashtag_parenthesis"
+
+[[features.hotstrings.rolls]]
+id = "hashtag_quote"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.rolls.hashtag_quote"
+
+[[features.hotstrings.rolls]]
+id = "left_arrow"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.rolls.left_arrow"
+
+[[features.hotstrings.rolls]]
+id = "not_equal"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.rolls.not_equal"
+
+[[features.hotstrings.rolls]]
+id = "paren_quote"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.rolls.paren_quote"
+
+
+
+# ======================================
+# ===== 3.2.5 hotstrings.magic_key =====
+# ======================================
+
+[[features.hotstrings.magic_key]]
+id = "replace"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.magic_key.replace"
+
+[[features.hotstrings.magic_key]]
+id = "repeat_corrections"
+default = { enabled = true, time_activation_seconds = 2.0 }
+type = "feature"
+description_key = "menu.hotstrings.magic_key.repeat_corrections"
+
+[[features.hotstrings.magic_key]]
+id = "text_expansion"
+default = { enabled = true, time_activation_seconds = 2.0 }
+type = "feature"
+description_key = "menu.hotstrings.magic_key.text_expansion"
+
+[[features.hotstrings.magic_key]]
+id = "text_expansion_auto"
+default = { enabled = true, time_activation_seconds = 2.0 }
+type = "feature"
+description_key = "menu.hotstrings.magic_key.text_expansion_auto"
+
+[[features.hotstrings.magic_key]]
+id = "text_expansion_emojis"
+default = { enabled = true, time_activation_seconds = 2.0 }
+type = "feature"
+description_key = "menu.hotstrings.magic_key.text_expansion_emojis"
+
+[[features.hotstrings.magic_key]]
+id = "text_expansion_symbols"
+default = { enabled = true, time_activation_seconds = 2.0 }
+type = "feature"
+description_key = "menu.hotstrings.magic_key.text_expansion_symbols"
+
+[[features.hotstrings.magic_key]]
+id = "text_expansion_symbols_typst"
+default = { enabled = true, time_activation_seconds = 2.0 }
+type = "feature"
+description_key = "menu.hotstrings.magic_key.text_expansion_symbols_typst"
+
+
+
+# ====================================
+# ===== 3.2.6 hotstrings.dynamic =====
+# ====================================
+
+[[features.hotstrings.dynamic]]
+id = "date"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.dynamic.date"
+
+[[features.hotstrings.dynamic]]
+id = "date_fr"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.dynamic.date_fr"
+
+[[features.hotstrings.dynamic]]
+id = "date_long_fr"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.dynamic.date_long_fr"
+
+[[features.hotstrings.dynamic]]
+id = "iban_prefixes"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.dynamic.iban_prefixes"
+
+[[features.hotstrings.dynamic]]
+id = "phone_prefixes"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.dynamic.phone_prefixes"
+
+[[features.hotstrings.dynamic]]
+id = "ssn_prefixes"
+default = { enabled = true }
+type = "feature"
+description_key = "menu.hotstrings.dynamic.ssn_prefixes"
+
+[[features.hotstrings.dynamic]]
+id = "text_expansion_personal_information"
+default = { enabled = true, pattern_max_length = 1 }
+type = "feature"
+description_key = "menu.hotstrings.dynamic.text_expansion_personal_information"
+
+
+
+# =====================================
+# ===== 3.2.7 hotstrings.personal =====
+# =====================================
+
+[[features.hotstrings.personal]]
+id = "autocorrection"
+default = { enabled = true, time_activation_seconds = 0.75 }
+type = "feature"
+description_key = "menu.hotstrings.personal.autocorrection"
+
+[[features.hotstrings.personal]]
+id = "code"
+default = { enabled = true, time_activation_seconds = 0.75 }
+type = "feature"
+description_key = "menu.hotstrings.personal.code"
+
+[[features.hotstrings.personal]]
+id = "email_shortcuts"
+default = { enabled = true, time_activation_seconds = 0.75 }
+type = "feature"
+description_key = "menu.hotstrings.personal.email_shortcuts"
+
+[[features.hotstrings.personal]]
+id = "professional_vocabulary"
+default = { enabled = true, time_activation_seconds = 0.75 }
+type = "feature"
+description_key = "menu.hotstrings.personal.professional_vocabulary"
+
+[[features.hotstrings.personal]]
+id = "test"
+default = { enabled = true, time_activation_seconds = 0.75 }
+type = "feature"
+description_key = "menu.hotstrings.personal.test"
+
+
+
+# ===================
+# ===== 3.3 llm =====
+# ===================
+
+[[features.llm]]
+id = "enabled"
+default = false
+type = "boolean"
+description_key = "menu.llm.enabled"
+
+[[features.llm]]
+id = "onboarding_seen"
+default = false
+type = "boolean"
+description_key = "menu.llm.onboarding_seen"
+platforms = ["ahk"]
+
+[[features.llm]]
+id = "app_profile_overrides"
+default = ""
+type = "string"
+description_key = "menu.llm.app_profile_overrides"
+platforms = ["ahk"]
+
+
+
+# =============================
+# ===== 3.3.1 llm.display =====
+# =============================
+
+[[features.llm.display]]
+id = "pred_indent"
+default = 0
+type = "number"
+description_key = "menu.llm.display.pred_indent"
+
+[[features.llm.display]]
+id = "show_info_bar"
+default = true
+type = "boolean"
+description_key = "menu.llm.display.show_info_bar"
+
+[[features.llm.display]]
+id = "streaming"
+default = true
+type = "boolean"
+description_key = "menu.llm.display.streaming"
+
+[[features.llm.display]]
+id = "streaming_multi"
+default = true
+type = "boolean"
+description_key = "menu.llm.display.streaming_multi"
+
+
+
+# ================================
+# ===== 3.3.2 llm.generation =====
+# ================================
+
+[[features.llm.generation]]
+id = "context_length"
+default = 500
+type = "number"
+description_key = "menu.llm.generation.context_length"
+
+[[features.llm.generation]]
+id = "min_words"
+default = 3
+type = "number"
+description_key = "menu.llm.generation.min_words"
+
+[[features.llm.generation]]
+id = "max_words"
+default = 15
+type = "number"
+description_key = "menu.llm.generation.max_words"
+
+[[features.llm.generation]]
+id = "temperature"
+default = 0.10
+type = "number"
+description_key = "menu.llm.generation.temperature"
+
+[[features.llm.generation]]
+id = "auto_raise_temp"
+default = true
+type = "boolean"
+description_key = "menu.llm.generation.auto_raise_temp"
+
+[[features.llm.generation]]
+id = "reset_on_nav"
+default = true
+type = "boolean"
+description_key = "menu.llm.generation.reset_on_nav"
+
+[[features.llm.generation]]
+id = "sequential_mode"
+default = false
+type = "boolean"
+description_key = "menu.llm.generation.sequential_mode"
+
+
+
+# ============================
+# ===== 3.3.3 llm.models =====
+# ============================
+
+[[features.llm.models]]
+id = "selected"
+default_per_platform = { ahk = "ollama", hs = "mlx" }
+type = "string"
+description_key = "menu.llm.models.selected"
+
+[[features.llm.models]]
+id = "ollama"
+default_per_platform = { ahk = "Qwen3.5-0.8B", hs = "gemma-4-E2B-it" }
+type = "string"
+description_key = "menu.llm.models.ollama"
+
+[[features.llm.models]]
+id = "mlx"
+default = "Qwen3.5-2B"
+type = "string"
+description_key = "menu.llm.models.mlx"
+platforms = ["hs"]
+
+
+
+# ==============================
+# ===== 3.3.4 llm.profiles =====
+# ==============================
+
+[[features.llm.profiles]]
+id = "active"
+default = "basic"
+type = "string"
+description_key = "menu.llm.profiles.active"
+
+[[features.llm.profiles]]
+id = "num_predictions"
+default = 3
+type = "number"
+description_key = "menu.llm.profiles.num_predictions"
+
+[[features.llm.profiles]]
+id = "auto_profile_for_model"
+default = true
+type = "boolean"
+description_key = "menu.llm.profiles.auto_profile_for_model"
+
+
+
+# =============================
+# ===== 3.3.5 llm.trigger =====
+# =============================
+
+[[features.llm.trigger]]
+id = "debounce_ms"
+default_per_platform = { ahk = 500, hs = 200 }
+type = "number"
+description_key = "menu.llm.trigger.debounce_ms"
+
+[[features.llm.trigger]]
+id = "instant_on_word_end"
+default = true
+type = "boolean"
+description_key = "menu.llm.trigger.instant_on_word_end"
+
+[[features.llm.trigger]]
+id = "after_hotstring"
+default = true
+type = "boolean"
+description_key = "menu.llm.trigger.after_hotstring"
+
+[[features.llm.trigger]]
+id = "inline_autotype"
+default = false
+type = "boolean"
+description_key = "menu.llm.trigger.inline_autotype"
+platforms = ["ahk"]
+
+[[features.llm.trigger]]
+id = "secure_filter_enabled"
+default = true
+type = "boolean"
+description_key = "menu.llm.trigger.secure_filter_enabled"
+
+[[features.llm.trigger]]
+id = "url_bar_filter_enabled"
+default = true
+type = "boolean"
+description_key = "menu.llm.trigger.url_bar_filter_enabled"
+
+[[features.llm.trigger]]
+id = "shortcut"
+default = false
+type = "boolean"
+description_key = "menu.llm.trigger.shortcut"
+platforms = ["hs"]
+
+
+
+# ================================
+# ===== 3.3.6 llm.navigation =====
+# ================================
+
+[[features.llm.navigation]]
+id = "val_modifiers"
+default = ["alt"]
+type = "array"
+description_key = "menu.llm.navigation.val_modifiers"
+
+[[features.llm.navigation]]
+id = "arrow_nav_enabled"
+default = false
+type = "boolean"
+description_key = "menu.llm.navigation.arrow_nav_enabled"
+platforms = ["hs"]
+
+
+
+# =======================
+# ===== 3.4 metrics =====
+# =======================
+
+[[features.metrics]]
+id = "enabled"
+default = true
+type = "boolean"
+description_key = "menu.metrics.enabled"
+
+[[features.metrics]]
+id = "private_filter_enabled"
+default = true
+type = "boolean"
+description_key = "menu.metrics.private_filter_enabled"
+
+[[features.metrics]]
+id = "secure_filter_enabled"
+default = true
+type = "boolean"
+description_key = "menu.metrics.secure_filter_enabled"
+
+[[features.metrics]]
+id = "system_auth_filter_enabled"
+default = true
+type = "boolean"
+description_key = "menu.metrics.system_auth_filter_enabled"
+
+[[features.metrics]]
+id = "encrypt"
+default = false
+type = "boolean"
+description_key = "menu.metrics.encrypt"
+platforms = ["hs"]
+
+
+
+# =========================
+# ===== 3.5 shortcuts =====
+# =========================
+
+[[features.shortcuts]]
+id = "enabled"
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.enabled"
+platforms = ["hs"]
+
+[[features.shortcuts]]
+id = "chatgpt_url"
+default = "https://chat.openai.com"
+type = "string"
+description_key = "menu.shortcuts.chatgpt_url"
+
+[[features.shortcuts]]
+id = "get_hex_value"
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.get_hex_value"
+platforms = ["ahk"]
+
+[[features.shortcuts]]
+id = "gpt"
+default = { enabled = true, link = "https://chatgpt.com/" }
+type = "feature"
+description_key = "menu.shortcuts.gpt"
+platforms = ["ahk"]
+
+[[features.shortcuts]]
+id = "search"
+default = { enabled = true, search_engine = "https://www.google.com", search_engine_url_query = "https://www.google.com/search?q=" }
+type = "feature"
+description_key = "menu.shortcuts.search"
+platforms = ["ahk"]
+
+[[features.shortcuts]]
+id = "take_note"
+default = { enabled = true, dated_notes = false, destination_folder = "D:\\Bureau" }
+type = "feature"
+description_key = "menu.shortcuts.take_note"
+platforms = ["ahk"]
+
+[[features.shortcuts]]
+id = "microsoft_bold"
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.microsoft_bold"
+platforms = ["ahk"]
+
+[[features.shortcuts]]
+id = "title_case"
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.title_case"
+platforms = ["ahk"]
+
+[[features.shortcuts]]
+id = "uppercase"
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.uppercase"
+platforms = ["ahk"]
+
+[[features.shortcuts]]
+id = "paste_without_formatting"
+default = false
+type = "boolean"
+description_key = "shortcuts.label_cmd_shift_v"
+platforms = ["ahk"]
+
+[[features.shortcuts]]
+id = "select_line"
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.select_line"
+platforms = ["ahk"]
+
+[[features.shortcuts]]
+id = "spotlight_mouse"
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.spotlight_mouse"
+platforms = ["ahk"]
+
+[[features.shortcuts]]
+id = "surround_with_parentheses"
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.surround_with_parentheses"
+platforms = ["ahk"]
+
+[[features.shortcuts]]
+id = "teleport_mouse"
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.teleport_mouse"
+platforms = ["ahk"]
+
+[[features.shortcuts]]
+id = "wrap_text_if_selected"
+default = true
+type = "boolean"
+description_key = "shortcuts.label_wrap_text"
+platforms = ["ahk"]
+
+
+
+# ======================================
+# ===== 3.5.1 shortcuts.<accented> =====
+# ======================================
+
+# Accented-letter shortcuts. Each entry emits a sub-section
+# [shortcuts.<key>] with enabled + letter (the destination letter to press
+# while the accented key is held).
+
+[[features.shortcuts.a_grave]]
+id = "enabled"
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.a_grave"
+platforms = ["ahk"]
+
+[[features.shortcuts.a_grave]]
+id = "letter"
+default = "v"
+type = "string"
+description_key = "menu.shortcuts.a_grave.letter"
+platforms = ["ahk"]
+
+[[features.shortcuts.e_acute]]
+id = "enabled"
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.e_acute"
+platforms = ["ahk"]
+
+[[features.shortcuts.e_acute]]
+id = "letter"
+default = "c"
+type = "string"
+description_key = "menu.shortcuts.e_acute.letter"
+platforms = ["ahk"]
+
+[[features.shortcuts.e_circ]]
+id = "enabled"
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.e_circ"
+platforms = ["ahk"]
+
+[[features.shortcuts.e_circ]]
+id = "letter"
+default = "x"
+type = "string"
+description_key = "menu.shortcuts.e_circ.letter"
+platforms = ["ahk"]
+
+[[features.shortcuts.e_grave]]
+id = "enabled"
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.e_grave"
+platforms = ["ahk"]
+
+[[features.shortcuts.e_grave]]
+id = "letter"
+default = "z"
+type = "string"
+description_key = "menu.shortcuts.e_grave.letter"
+platforms = ["ahk"]
+
+
+
+
+
+# ====================================
+# ====================================
+# ======= 4. AHK-only features =======
+# ====================================
+# ====================================
+
+
+
+# ==========================
+# ===== 4.1 ahk.layout =====
+# ==========================
+
+[[features.ahk.layout]]
+id = "ergopti_base"
+default = true
+type = "boolean"
+description_key = "menu.layout.ergopti_base"
+
+[[features.ahk.layout]]
+id = "direct_access_digits"
+default = true
+type = "boolean"
+description_key = "menu.layout.direct_access_digits"
+
+[[features.ahk.layout]]
+id = "ergopti_alt_gr"
+default = true
+type = "boolean"
+description_key = "menu.layout.ergopti_alt_gr"
+
+[[features.ahk.layout]]
+id = "ergopti_plus"
+default = true
+type = "boolean"
+description_key = "menu.layout.ergopti_plus"
+
+[[features.ahk.layout]]
+id = "ctrl_magic_save"
+default = false
+type = "boolean"
+description_key = "menu.layout.ctrl_magic_save"
+
+
+
+# =============================
+# ===== 4.2 ahk.shortcuts =====
+# =============================
+
+[[features.ahk.shortcuts]]
+id = "open_downloads"
+default = true
+type = "boolean"
+description_key = "menu.ahk.shortcuts.open_downloads"
+
+[[features.ahk.shortcuts]]
+id = "move"
+default = true
+type = "boolean"
+description_key = "menu.ahk.shortcuts.move"
+
+[[features.ahk.shortcuts]]
+id = "screen"
+default = true
+type = "boolean"
+description_key = "menu.ahk.shortcuts.screen"
+
+[[features.ahk.shortcuts]]
+id = "screen_instant"
+default = true
+type = "boolean"
+description_key = "shortcuts.label_at_hash"
+
+[[features.ahk.shortcuts]]
+id = "win_caps_lock"
+default = true
+type = "boolean"
+description_key = "menu.ahk.shortcuts.win_caps_lock"
+
+
+
+# ==============================================
+# ===== 4.3 ahk.shortcuts.alt_gr_caps_lock =====
+# ==============================================
+
+[[features.ahk.shortcuts.alt_gr_caps_lock]]
+id = "backspace"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.backspace"
+
+[[features.ahk.shortcuts.alt_gr_caps_lock]]
+id = "caps_lock"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.caps_lock"
+
+[[features.ahk.shortcuts.alt_gr_caps_lock]]
+id = "caps_word"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.caps_word"
+
+[[features.ahk.shortcuts.alt_gr_caps_lock]]
+id = "ctrl_backspace"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.ctrl_backspace"
+
+[[features.ahk.shortcuts.alt_gr_caps_lock]]
+id = "ctrl_delete"
+default = true
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.ctrl_delete"
+
+[[features.ahk.shortcuts.alt_gr_caps_lock]]
+id = "delete"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.delete"
+
+[[features.ahk.shortcuts.alt_gr_caps_lock]]
+id = "enter"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.enter"
+
+[[features.ahk.shortcuts.alt_gr_caps_lock]]
+id = "escape"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.escape"
+
+[[features.ahk.shortcuts.alt_gr_caps_lock]]
+id = "one_shot_shift"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.one_shot_shift"
+
+[[features.ahk.shortcuts.alt_gr_caps_lock]]
+id = "tab"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.tab"
+
+
+
+# ============================
+# ===== 4.4 ahk.gestures =====
+# ============================
+
+[[features.ahk.gestures]]
+id = "enabled"
+default = true
+type = "boolean"
+description_key = "menu.gestures.enabled"
+
+[[features.ahk.gestures]]
+id = "swipe_3_down"
+default = "tab_close"
+type = "action"
+description_key = "menu.gestures.swipe_3_down"
+
+[[features.ahk.gestures]]
+id = "swipe_3_left"
+default = "tab_prev"
+type = "action"
+description_key = "menu.gestures.swipe_3_left"
+
+[[features.ahk.gestures]]
+id = "swipe_3_right"
+default = "tab_next"
+type = "action"
+description_key = "menu.gestures.swipe_3_right"
+
+[[features.ahk.gestures]]
+id = "swipe_3_up"
+default = "tab_new"
+type = "action"
+description_key = "menu.gestures.swipe_3_up"
+
+[[features.ahk.gestures]]
+id = "swipe_4_down"
+default = "win_app_prev"
+type = "action"
+description_key = "menu.gestures.swipe_4_down"
+
+[[features.ahk.gestures]]
+id = "swipe_4_left"
+default = "desktop_prev"
+type = "action"
+description_key = "menu.gestures.swipe_4_left"
+
+[[features.ahk.gestures]]
+id = "swipe_4_right"
+default = "desktop_next"
+type = "action"
+description_key = "menu.gestures.swipe_4_right"
+
+[[features.ahk.gestures]]
+id = "swipe_4_up"
+default = "win_app_next"
+type = "action"
+description_key = "menu.gestures.swipe_4_up"
+
+[[features.ahk.gestures]]
+id = "tap_3"
+default = "left_click_toggle"
+type = "action"
+description_key = "menu.gestures.tap_3"
+
+[[features.ahk.gestures]]
+id = "tap_4"
+default = "screenshot_window_clipboard"
+type = "action"
+description_key = "menu.gestures.tap_4"
+
+# =========================================
+# ===== 4.5 ahk.shortcuts.alt_gr_lalt =====
+# =========================================
+
+[[features.ahk.shortcuts.alt_gr_lalt]]
+id = "backspace"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_lalt.backspace"
+
+[[features.ahk.shortcuts.alt_gr_lalt]]
+id = "caps_lock"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_lalt.caps_lock"
+
+[[features.ahk.shortcuts.alt_gr_lalt]]
+id = "caps_word"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_lalt.caps_word"
+
+[[features.ahk.shortcuts.alt_gr_lalt]]
+id = "ctrl_backspace"
+default = true
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_lalt.ctrl_backspace"
+
+[[features.ahk.shortcuts.alt_gr_lalt]]
+id = "ctrl_delete"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_lalt.ctrl_delete"
+
+[[features.ahk.shortcuts.alt_gr_lalt]]
+id = "delete"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_lalt.delete"
+
+[[features.ahk.shortcuts.alt_gr_lalt]]
+id = "enter"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_lalt.enter"
+
+[[features.ahk.shortcuts.alt_gr_lalt]]
+id = "escape"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_lalt.escape"
+
+[[features.ahk.shortcuts.alt_gr_lalt]]
+id = "one_shot_shift"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_lalt.one_shot_shift"
+
+[[features.ahk.shortcuts.alt_gr_lalt]]
+id = "tab"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.alt_gr_lalt.tab"
+
+
+
+# ============================================
+# ===== 4.6 ahk.shortcuts.lalt_caps_lock =====
+# ============================================
+
+[[features.ahk.shortcuts.lalt_caps_lock]]
+id = "backspace"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.lalt_caps_lock.backspace"
+
+[[features.ahk.shortcuts.lalt_caps_lock]]
+id = "caps_lock"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.lalt_caps_lock.caps_lock"
+
+[[features.ahk.shortcuts.lalt_caps_lock]]
+id = "caps_word"
+default = true
+type = "boolean"
+description_key = "menu.ahk.shortcuts.lalt_caps_lock.caps_word"
+
+[[features.ahk.shortcuts.lalt_caps_lock]]
+id = "ctrl_backspace"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.lalt_caps_lock.ctrl_backspace"
+
+[[features.ahk.shortcuts.lalt_caps_lock]]
+id = "ctrl_delete"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.lalt_caps_lock.ctrl_delete"
+
+[[features.ahk.shortcuts.lalt_caps_lock]]
+id = "delete"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.lalt_caps_lock.delete"
+
+[[features.ahk.shortcuts.lalt_caps_lock]]
+id = "enter"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.lalt_caps_lock.enter"
+
+[[features.ahk.shortcuts.lalt_caps_lock]]
+id = "escape"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.lalt_caps_lock.escape"
+
+[[features.ahk.shortcuts.lalt_caps_lock]]
+id = "one_shot_shift"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.lalt_caps_lock.one_shot_shift"
+
+[[features.ahk.shortcuts.lalt_caps_lock]]
+id = "tab"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.lalt_caps_lock.tab"
+
+
+
+# ======================================
+# ===== 4.7 ahk.shortcuts.personal =====
+# ======================================
+
+[[features.ahk.shortcuts.personal]]
+id = "laptop_broken_key"
+default = true
+type = "boolean"
+description_key = "menu.ahk.shortcuts.personal.laptop_broken_key"
+
+[[features.ahk.shortcuts.personal]]
+id = "mouse_drag_window"
+default = true
+type = "boolean"
+description_key = "menu.ahk.shortcuts.personal.mouse_drag_window"
+
+[[features.ahk.shortcuts.personal]]
+id = "mouse_tab_switching"
+default = true
+type = "boolean"
+description_key = "menu.ahk.shortcuts.personal.mouse_tab_switching"
+
+[[features.ahk.shortcuts.personal]]
+id = "professional_environment"
+default = false
+type = "boolean"
+description_key = "menu.ahk.shortcuts.personal.professional_environment"
+
+[[features.ahk.shortcuts.personal]]
+id = "programmable_keyboard"
+default = true
+type = "boolean"
+description_key = "menu.ahk.shortcuts.personal.programmable_keyboard"
+
+
+
+# ============================================
+# ===== 4.8 ahk.shortcuts.script_control =====
+# ============================================
+
+[[features.ahk.shortcuts.script_control]]
+id = "script_altgr_backspace"
+default = "script_reload"
+type = "action"
+description_key = "menu.ahk.shortcuts.script_control.script_altgr_backspace"
+
+[[features.ahk.shortcuts.script_control]]
+id = "script_altgr_delete"
+default = "open_personal_shortcuts"
+type = "action"
+description_key = "menu.ahk.shortcuts.script_control.script_altgr_delete"
+
+[[features.ahk.shortcuts.script_control]]
+id = "script_altgr_enter"
+default = "script_pause_toggle"
+type = "action"
+description_key = "menu.ahk.shortcuts.script_control.script_altgr_enter"
+
+[[features.ahk.shortcuts.script_control]]
+id = "script_altgr_escape"
+default = "script_quit"
+type = "action"
+description_key = "menu.ahk.shortcuts.script_control.script_altgr_escape"
+
+
+
+# ==========================================
+# ===== 4.8b ahk.shortcuts.keyboard ========
+# ==========================================
+
+[[features.ahk.shortcuts.keyboard]]
+id = "ctrl_b"
+default = "microsoft_bold"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.ctrl_b"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "ctrl_shift_v"
+default = "paste_plain"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.ctrl_shift_v"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_a"
+default = "select_line"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_a"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_d"
+default = "open_hotstrings_editor"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_d"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_g"
+default = "open_url"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_g"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_h"
+default = "screen_capture"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_h"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_m"
+default = "activity_simulation"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_m"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_n"
+default = "take_note"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_n"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_o"
+default = "surround_parens"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_o"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_s"
+default = "search_web"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_s"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_sc029"
+default = "screen_capture_instant"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_sc029"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_t"
+default = "teleport_mouse"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_t"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_u"
+default = "uppercase_selection"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_u"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_w"
+default = "titlecase_selection"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_w"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_x"
+default = "pick_color"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_x"
+
+
+
+# ===========================
+# ===== 4.9 ahk.metrics =====
+# ===========================
+
+[[features.ahk.metrics]]
+id = "filter_private_browsing"
+default = true
+type = "boolean"
+description_key = "menu.ahk.metrics.filter_private_browsing"
+
+[[features.ahk.metrics]]
+id = "metrics_enabled"
+default = true
+type = "boolean"
+description_key = "menu.ahk.metrics.metrics_enabled"
+
+[[features.ahk.metrics]]
+id = "metrics_shortcut_typing"
+default = ""
+type = "string"
+description_key = "menu.ahk.metrics.metrics_shortcut_typing"
+
+[[features.ahk.metrics]]
+id = "metrics_shortcut_apps"
+default = ""
+type = "string"
+description_key = "menu.ahk.metrics.metrics_shortcut_apps"
+
+[[features.ahk.metrics]]
+id = "metrics_wpm_menubar_colors"
+default = false
+type = "boolean"
+description_key = "menu.ahk.metrics.metrics_wpm_menubar_colors"
+
+[[features.ahk.metrics]]
+id = "metrics_filter_secure_field"
+default = true
+type = "boolean"
+description_key = "menu.ahk.metrics.metrics_filter_secure_field"
+
+[[features.ahk.metrics]]
+id = "metrics_filter_system_auth"
+default = true
+type = "boolean"
+description_key = "menu.ahk.metrics.metrics_filter_system_auth"
+
+[[features.ahk.metrics]]
+id = "metrics_disabled_apps"
+default = []
+type = "array"
+description_key = "menu.ahk.metrics.metrics_disabled_apps"
+
+[[features.ahk.metrics]]
+id = "wpm_widget_visible"
+default = false
+type = "boolean"
+description_key = "menu.ahk.metrics.wpm_widget_visible"
+
+[[features.ahk.metrics]]
+id = "wpm_widget_x"
+default = -1
+type = "number"
+description_key = "menu.ahk.metrics.wpm_widget_x"
+
+[[features.ahk.metrics]]
+id = "wpm_widget_y"
+default = -1
+type = "number"
+description_key = "menu.ahk.metrics.wpm_widget_y"
+
+[[features.ahk.metrics]]
+id = "wpm_widget_colors"
+default = false
+type = "boolean"
+description_key = "menu.ahk.metrics.wpm_widget_colors"
+
+[[features.ahk.metrics]]
+id = "wpm_widget_graph"
+default = false
+type = "boolean"
+description_key = "menu.ahk.metrics.wpm_widget_graph"
+
+
+
+# =====================================
+# ===== 4.10 ahk.category_enabled =====
+# =====================================
+
+[[features.ahk.category_enabled]]
+id = "hotstrings"
+default = true
+type = "boolean"
+description_key = "menu.ahk.category_enabled.hotstrings"
+
+[[features.ahk.category_enabled]]
+id = "layout"
+default = true
+type = "boolean"
+description_key = "menu.ahk.category_enabled.layout"
+
+[[features.ahk.category_enabled]]
+id = "shortcuts"
+default = true
+type = "boolean"
+description_key = "menu.ahk.category_enabled.shortcuts"
+
+[[features.ahk.category_enabled]]
+id = "tap_holds"
+default = true
+type = "boolean"
+description_key = "menu.ahk.category_enabled.tap_holds"
+
+
+
+
+
+# ===================================
+# ===================================
+# ======= 5. HS-only features =======
+# ===================================
+# ===================================
+
+
+
+# ===========================
+# ===== 5.1 hs.gestures =====
+# ===========================
+
+[[features.hs.gestures]]
+id = "enabled"
+default = true
+type = "boolean"
+description_key = "menu.gestures.enabled"
+
+[[features.hs.gestures]]
+id = "space_wrap"
+default = true
+type = "boolean"
+# The config id stays "space_wrap" (persisted setting + get/set_space_wrap), but
+# the menu label is the canonical "circular_spaces" i18n key — the menu manifest,
+# the locales and menu_gestures.lua all use it. The duplicate "space_wrap" locale
+# entry was dropped by the i18n canonicalization, so this description_key must
+# point at the surviving key or it resolves to nothing.
+description_key = "menu.gestures.circular_spaces"
+
+[[features.hs.gestures]]
+id = "swipe_2_left"
+default = "arrow_up"
+type = "action"
+description_key = "menu.gestures.swipe_2_left"
+
+[[features.hs.gestures]]
+id = "swipe_3_left"
+default = "word_prev"
+type = "action"
+description_key = "menu.gestures.swipe_3_left"
+
+[[features.hs.gestures]]
+id = "swipe_3_right"
+default = "word_next"
+type = "action"
+description_key = "menu.gestures.swipe_3_right"
+
+[[features.hs.gestures]]
+id = "swipe_3_up"
+default = "tab_prev"
+type = "action"
+description_key = "menu.gestures.swipe_3_up"
+
+[[features.hs.gestures]]
+id = "swipe_3_down"
+default = "tab_next"
+type = "action"
+description_key = "menu.gestures.swipe_3_down"
+
+[[features.hs.gestures]]
+id = "swipe_4_up"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_4_up"
+
+[[features.hs.gestures]]
+id = "swipe_4_down"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_4_down"
+
+[[features.hs.gestures]]
+id = "swipe_4_left"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_4_left"
+
+[[features.hs.gestures]]
+id = "swipe_4_right"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_4_right"
+
+[[features.hs.gestures]]
+id = "swipe_5_up"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_5_up"
+
+[[features.hs.gestures]]
+id = "swipe_5_down"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_5_down"
+
+[[features.hs.gestures]]
+id = "swipe_5_left"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_5_left"
+
+[[features.hs.gestures]]
+id = "swipe_5_right"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_5_right"
+
+[[features.hs.gestures]]
+id = "tap_3"
+default = "left_click_toggle"
+type = "action"
+description_key = "menu.gestures.tap_3"
+
+[[features.hs.gestures]]
+id = "tap_4"
+default = "app_window_previous"
+type = "action"
+description_key = "menu.gestures.tap_4"
+
+# --- 2-finger remaining directions ---
+
+[[features.hs.gestures]]
+id = "swipe_2_right"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_2_right"
+
+[[features.hs.gestures]]
+id = "swipe_2_up"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_2_up"
+
+[[features.hs.gestures]]
+id = "swipe_2_down"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_2_down"
+
+[[features.hs.gestures]]
+id = "swipe_2_left_down"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_2_left_down"
+
+[[features.hs.gestures]]
+id = "swipe_2_left_up"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_2_left_up"
+
+[[features.hs.gestures]]
+id = "swipe_2_right_down"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_2_right_down"
+
+[[features.hs.gestures]]
+id = "swipe_2_right_up"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_2_right_up"
+
+[[features.hs.gestures]]
+id = "swipe_2_diag"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_2_diag"
+
+
+
+# --- 3-finger diagonals + horiz aggregator ---
+
+[[features.hs.gestures]]
+id = "swipe_3_left_down"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_3_left_down"
+
+[[features.hs.gestures]]
+id = "swipe_3_left_up"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_3_left_up"
+
+[[features.hs.gestures]]
+id = "swipe_3_right_down"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_3_right_down"
+
+[[features.hs.gestures]]
+id = "swipe_3_right_up"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_3_right_up"
+
+[[features.hs.gestures]]
+id = "swipe_3_diag"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_3_diag"
+
+[[features.hs.gestures]]
+id = "swipe_3_horiz"
+default = "words"
+type = "action"
+description_key = "menu.gestures.swipe_3_horiz"
+
+
+
+# --- 4-finger diagonals + horiz aggregator ---
+
+[[features.hs.gestures]]
+id = "swipe_4_left_down"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_4_left_down"
+
+[[features.hs.gestures]]
+id = "swipe_4_left_up"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_4_left_up"
+
+[[features.hs.gestures]]
+id = "swipe_4_right_down"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_4_right_down"
+
+[[features.hs.gestures]]
+id = "swipe_4_right_up"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_4_right_up"
+
+[[features.hs.gestures]]
+id = "swipe_4_diag"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_4_diag"
+
+[[features.hs.gestures]]
+id = "swipe_4_horiz"
+default = "spaces"
+type = "action"
+description_key = "menu.gestures.swipe_4_horiz"
+
+
+
+# --- 5-finger diagonals + horiz aggregator ---
+
+[[features.hs.gestures]]
+id = "swipe_5_left_down"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_5_left_down"
+
+[[features.hs.gestures]]
+id = "swipe_5_left_up"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_5_left_up"
+
+[[features.hs.gestures]]
+id = "swipe_5_right_down"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_5_right_down"
+
+[[features.hs.gestures]]
+id = "swipe_5_right_up"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_5_right_up"
+
+[[features.hs.gestures]]
+id = "swipe_5_diag"
+default = "none"
+type = "action"
+description_key = "menu.gestures.swipe_5_diag"
+
+[[features.hs.gestures]]
+id = "swipe_5_horiz"
+default = "windows"
+type = "action"
+description_key = "menu.gestures.swipe_5_horiz"
+
+
+
+# --- Taps ---
+
+[[features.hs.gestures]]
+id = "tap_2"
+default = "none"
+type = "action"
+description_key = "menu.gestures.tap_2"
+
+[[features.hs.gestures]]
+id = "tap_5"
+default = "none"
+type = "action"
+description_key = "menu.gestures.tap_5"
+
+
+
+# =================================
+# ===== 5.2 hs.gestures.modes =====
+# =================================
+
+# Per-direction firing mode ("x1" or "incremental"). Defaults from the existing
+# HS config are: 2-fingers = x1, 3-fingers = incremental, 4-fingers = x1,
+# 5-fingers horiz = incremental + vert = x1.
+
+# --- 2-finger (all x1) ---
+
+[[features.hs.gestures.modes]]
+id = "swipe_2_left"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_2_left"
+
+[[features.hs.gestures.modes]]
+id = "swipe_2_right"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_2_right"
+
+[[features.hs.gestures.modes]]
+id = "swipe_2_up"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_2_up"
+
+[[features.hs.gestures.modes]]
+id = "swipe_2_down"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_2_down"
+
+[[features.hs.gestures.modes]]
+id = "swipe_2_left_down"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_2_left_down"
+
+[[features.hs.gestures.modes]]
+id = "swipe_2_left_up"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_2_left_up"
+
+[[features.hs.gestures.modes]]
+id = "swipe_2_right_down"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_2_right_down"
+
+[[features.hs.gestures.modes]]
+id = "swipe_2_right_up"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_2_right_up"
+
+
+
+# --- 3-finger (all incremental) ---
+
+[[features.hs.gestures.modes]]
+id = "swipe_3_left"
+default = "incremental"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_3_left"
+
+[[features.hs.gestures.modes]]
+id = "swipe_3_right"
+default = "incremental"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_3_right"
+
+[[features.hs.gestures.modes]]
+id = "swipe_3_up"
+default = "incremental"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_3_up"
+
+[[features.hs.gestures.modes]]
+id = "swipe_3_down"
+default = "incremental"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_3_down"
+
+[[features.hs.gestures.modes]]
+id = "swipe_3_left_down"
+default = "incremental"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_3_left_down"
+
+[[features.hs.gestures.modes]]
+id = "swipe_3_left_up"
+default = "incremental"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_3_left_up"
+
+[[features.hs.gestures.modes]]
+id = "swipe_3_right_down"
+default = "incremental"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_3_right_down"
+
+[[features.hs.gestures.modes]]
+id = "swipe_3_right_up"
+default = "incremental"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_3_right_up"
+
+
+
+# --- 4-finger (all x1) ---
+
+[[features.hs.gestures.modes]]
+id = "swipe_4_left"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_4_left"
+
+[[features.hs.gestures.modes]]
+id = "swipe_4_right"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_4_right"
+
+[[features.hs.gestures.modes]]
+id = "swipe_4_up"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_4_up"
+
+[[features.hs.gestures.modes]]
+id = "swipe_4_down"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_4_down"
+
+[[features.hs.gestures.modes]]
+id = "swipe_4_left_down"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_4_left_down"
+
+[[features.hs.gestures.modes]]
+id = "swipe_4_left_up"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_4_left_up"
+
+[[features.hs.gestures.modes]]
+id = "swipe_4_right_down"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_4_right_down"
+
+[[features.hs.gestures.modes]]
+id = "swipe_4_right_up"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_4_right_up"
+
+
+
+# --- 5-finger (horiz incremental, vert x1) ---
+
+[[features.hs.gestures.modes]]
+id = "swipe_5_left"
+default = "incremental"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_5_left"
+
+[[features.hs.gestures.modes]]
+id = "swipe_5_right"
+default = "incremental"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_5_right"
+
+[[features.hs.gestures.modes]]
+id = "swipe_5_up"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_5_up"
+
+[[features.hs.gestures.modes]]
+id = "swipe_5_down"
+default = "x1"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_5_down"
+
+[[features.hs.gestures.modes]]
+id = "swipe_5_left_down"
+default = "incremental"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_5_left_down"
+
+[[features.hs.gestures.modes]]
+id = "swipe_5_left_up"
+default = "incremental"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_5_left_up"
+
+[[features.hs.gestures.modes]]
+id = "swipe_5_right_down"
+default = "incremental"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_5_right_down"
+
+[[features.hs.gestures.modes]]
+id = "swipe_5_right_up"
+default = "incremental"
+type = "enum"
+enum_values = ["x1", "incremental"]
+description_key = "menu.hs.gestures.modes.swipe_5_right_up"
+
+
+
+# =========================================
+# ===== 5.3 hs.gestures.sensitivities =====
+# =========================================
+
+# Activation threshold per direction (travel distance in centimetres).
+
+# All directions default to 3.5 cm of trackpad travel before firing.
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_2_left"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_2_left"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_2_right"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_2_right"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_2_up"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_2_up"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_2_down"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_2_down"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_2_left_down"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_2_left_down"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_2_left_up"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_2_left_up"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_2_right_down"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_2_right_down"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_2_right_up"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_2_right_up"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_3_left"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_3_left"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_3_right"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_3_right"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_3_up"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_3_up"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_3_down"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_3_down"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_3_left_down"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_3_left_down"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_3_left_up"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_3_left_up"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_3_right_down"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_3_right_down"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_3_right_up"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_3_right_up"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_4_left"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_4_left"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_4_right"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_4_right"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_4_up"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_4_up"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_4_down"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_4_down"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_4_left_down"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_4_left_down"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_4_left_up"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_4_left_up"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_4_right_down"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_4_right_down"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_4_right_up"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_4_right_up"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_5_left"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_5_left"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_5_right"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_5_right"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_5_up"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_5_up"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_5_down"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_5_down"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_5_left_down"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_5_left_down"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_5_left_up"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_5_left_up"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_5_right_down"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_5_right_down"
+
+[[features.hs.gestures.sensitivities]]
+id = "swipe_5_right_up"
+default = 3.5
+type = "number"
+description_key = "menu.hs.gestures.sensitivities.swipe_5_right_up"
+
+
+
+# =============================
+# ===== 5.4 hs.hotstrings =====
+# =============================
+
+[[features.hs.hotstrings]]
+id = "expansion_delay"
+default = 0.75
+type = "number"
+description_key = "menu.hs.hotstrings.expansion_delay"
+
+[[features.hs.hotstrings]]
+id = "preview_ai_enabled"
+default = true
+type = "boolean"
+description_key = "menu.hs.hotstrings.preview_ai_enabled"
+
+[[features.hs.hotstrings]]
+id = "preview_autocorrect_enabled"
+default = true
+type = "boolean"
+description_key = "menu.hs.hotstrings.preview_autocorrect_enabled"
+
+[[features.hs.hotstrings]]
+id = "preview_colored_tooltips"
+default = true
+type = "boolean"
+description_key = "menu.hs.hotstrings.preview_colored_tooltips"
+
+[[features.hs.hotstrings]]
+id = "preview_star_enabled"
+default = true
+type = "boolean"
+description_key = "menu.hs.hotstrings.preview_star_enabled"
+
+
+
+
+
+# =====================================
+# =====================================
+# ======= 6. Tap-hold reference =======
+# =====================================
+# =====================================
+
+# Tap-hold defaults are NOT declared in this manifest. They live in their own
+# template file (one source, generates per-driver config files at first boot):
+#
+#   _shared/tap_hold/defaults.toml
+#
+# Reason: tap_hold has its own schema (tap_hold.schema.json) with mutually
+# exclusive ``hold_layer`` and ``hold_modifier`` constraints that don't fit the
+# generic feature shape. The first-boot generator must call both sources:
+#   1. This manifest → renders config.toml
+#   2. tap_hold/defaults.toml → renders tap_hold.toml
+
+
+
+
+
+# =================================================
+# =================================================
+# ======= 5. Tray menu structure (codegen) =======
+# =================================================
+# =================================================
+
+# Source of truth for the cross-driver tray-menu tree. Hand-edited here; the
+# codegen tools/build/build-menu-manifest.js emits _shared/modules/menu/
+# menu_manifest.json from these [menu.*] tables, and a drift gate keeps the two
+# in sync. Both drivers read the generated JSON at runtime (unchanged). Item
+# types: toggle / feature / action / dynamic / group / section_header /
+# letter_picker / "---" separator. platforms = ["ahk"|"hs"] gates per driver.
+
+[menu]
+dynamic_hotstrings_order = ["DateLongFr", "DateFr", "Date", "PhonePrefixes", "SsnPrefixes", "IbanPrefixes", "---", "TextExpansionPersonalInformation"]
+
+[menu.gesture_slots]
+2 = ["tap_2", "swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down", "swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down"]
+3 = ["tap_3", "swipe_3_left", "swipe_3_right", "swipe_3_up", "swipe_3_down", "swipe_3_left_up", "swipe_3_right_up", "swipe_3_left_down", "swipe_3_right_down"]
+4 = ["tap_4", "swipe_4_left", "swipe_4_right", "swipe_4_up", "swipe_4_down", "swipe_4_left_up", "swipe_4_right_up", "swipe_4_left_down", "swipe_4_right_down"]
+5 = ["tap_5", "swipe_5_left", "swipe_5_right", "swipe_5_up", "swipe_5_down", "swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down"]
+
+[menu.hotstring_groups]
+standard = ["distances_reduction", "autocorrection", "magic_key"]
+ergopti = ["sfbs_reduction", "rolls"]
+dynamic = ["dynamic_hotstrings"]
+
+[menu.hotstring_category_keys]
+distances_reduction = "DistancesReduction"
+autocorrection = "Autocorrection"
+magic_key = "MagicKey"
+sfbs_reduction = "SFBsReduction"
+rolls = "Rolls"
+dynamic_hotstrings = "DynamicHotstrings"
+
+[[menu.top_level]]
+id = "keyboard_layout"
+
+[[menu.top_level]]
+id = "hotstrings"
+
+[[menu.top_level]]
+id = "llm"
+
+[[menu.top_level]]
+id = "metrics"
+
+[[menu.top_level]]
+id = "shortcuts"
+
+[[menu.top_level]]
+id = "tap_holds"
+platforms = ["ahk"]
+
+[[menu.top_level]]
+id = "karabiner"
+platforms = ["hs"]
+
+[[menu.top_level]]
+id = "gestures"
+
+[[menu.top_level]]
+id = "apps"
+platforms = ["hs"]
+
+[[menu.top_level]]
+id = "---"
+
+[[menu.top_level]]
+id = "global_actions"
+
+[[menu.top_level]]
+id = "language"
+
+[[menu.top_level]]
+id = "config_folder"
+
+[[menu.top_level]]
+id = "setup_wizard"
+
+[[menu.top_level]]
+id = "about"
+
+[[menu.top_level]]
+id = "---"
+
+[[menu.top_level]]
+id = "suspend"
+platforms = ["ahk"]
+
+[[menu.top_level]]
+id = "reload"
+
+[[menu.top_level]]
+id = "quit"
+
+[[menu.top_level]]
+id = "debug"
+
+[[menu.global_actions]]
+id = "enable_all"
+
+[[menu.global_actions]]
+id = "disable_all"
+
+[[menu.global_actions]]
+id = "reset_defaults"
+
+[[menu.debug_menu]]
+id = "window_spy"
+platforms = ["ahk"]
+
+[[menu.debug_menu]]
+id = "list_vars"
+platforms = ["ahk"]
+
+[[menu.debug_menu]]
+id = "key_history"
+platforms = ["ahk"]
+
+[[menu.debug_menu]]
+id = "console"
+platforms = ["hs"]
+
+[[menu.debug_menu]]
+id = "---"
+
+[[menu.debug_menu]]
+id = "log_level"
+
+[[menu.debug_menu]]
+id = "open_logs"
+
+[[menu.debug_menu]]
+id = "open_today_log"
+
+[[menu.debug_menu]]
+id = "open_error_log"
+
+[[menu.debug_menu]]
+id = "---"
+
+[[menu.debug_menu]]
+id = "healthcheck"
+
+[[menu.shortcuts_menu]]
+type = "toggle"
+i18n_on = "menu.shortcuts.on"
+i18n_off = "menu.shortcuts.off"
+category = "Shortcuts"
+
+[[menu.shortcuts_menu]]
+type = "feature"
+path = "ahk.shortcuts.screen_instant"
+platforms = ["ahk"]
+
+[[menu.shortcuts_menu]]
+type = "feature"
+path = "shortcuts.wrap_text_if_selected"
+
+[[menu.shortcuts_menu]]
+type = "dynamic"
+id = "wrap_symbols_menu"
+platforms = ["ahk"]
+
+[[menu.shortcuts_menu]]
+type = "group"
+id = "modifier_combos"
+i18n = "menu.shortcuts.group_modifiers"
+platforms = ["ahk"]
+
+[[menu.shortcuts_menu]]
+type = "group"
+id = "ctrl_shortcuts"
+i18n = "menu.shortcuts.submenu_ctrl"
+platforms = ["hs"]
+
+[[menu.shortcuts_menu]]
+type = "group"
+id = "cmd_shortcuts"
+i18n = "menu.shortcuts.submenu_cmd"
+platforms = ["hs"]
+
+[[menu.shortcuts_menu]]
+type = "dynamic"
+id = "script_control_shortcuts"
+
+[[menu.shortcuts_menu]]
+type = "dynamic"
+id = "personal_shortcuts"
+# AHK-only (mirrors wrap_symbols_menu above): the Windows driver maintains a
+# structured personal_shortcuts.ahk registry it can walk to list each
+# individually-registered shortcut. macOS's personal_shortcuts.lua is an
+# arbitrary dofile()-loaded script (hs.hotkey.bind calls are not
+# introspectable), so there is no equivalent registry to render here — the
+# macOS "edit_shortcuts" action below already covers "open the file to edit".
+platforms = ["ahk"]
+
+[[menu.shortcuts_menu]]
+type = "action"
+id = "edit_shortcuts"
+i18n = "menu.global.edit_shortcuts"
+
+[[menu.shortcuts_menu]]
+type = "dynamic"
+id = "extensions_shortcuts"
+
+[[menu.modifier_combos_group]]
+type = "feature"
+path = "ahk.shortcuts.alt_gr_lalt"
+platforms = ["ahk"]
+
+[[menu.modifier_combos_group]]
+type = "feature"
+path = "ahk.shortcuts.alt_gr_caps_lock"
+platforms = ["ahk"]
+
+[[menu.modifier_combos_group]]
+type = "feature"
+path = "ahk.shortcuts.lalt_caps_lock"
+platforms = ["ahk"]
+
+[[menu.metrics_menu]]
+type = "toggle"
+i18n_on = "menu.metrics.on"
+i18n_off = "menu.metrics.off"
+category = "Metrics"
+platforms = ["hs"]
+
+[[menu.metrics_menu]]
+type = "action"
+id = "show_typing"
+i18n = "menu.metrics.show_typing"
+disabled_when = ["keylogger_enabled"]
+
+[[menu.metrics_menu]]
+type = "action"
+id = "shortcut_typing"
+i18n_dynamic = "menu.metrics.shortcut_prefix"
+disabled_when = ["keylogger_enabled"]
+
+[[menu.metrics_menu]]
+type = "---"
+
+[[menu.metrics_menu]]
+type = "action"
+id = "show_apps"
+i18n = "menu.metrics.show_apps"
+disabled_when = ["keylogger_enabled"]
+
+[[menu.metrics_menu]]
+type = "action"
+id = "shortcut_apps"
+i18n_dynamic = "menu.metrics.shortcut_prefix"
+disabled_when = ["keylogger_enabled"]
+
+[[menu.metrics_menu]]
+type = "---"
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "wpm_menubar"
+platforms = ["hs"]
+disabled_when = ["keylogger_enabled"]
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "menubar_colors"
+platforms = ["hs"]
+disabled_when = ["keylogger_enabled", "wpm_menubar_visible"]
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "wpm_widget"
+disabled_when = ["keylogger_enabled"]
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "widget_colors"
+disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "include_realtime"
+disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "reset_wpm_position"
+disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
+
+[[menu.metrics_menu]]
+type = "---"
+
+[[menu.metrics_menu]]
+type = "section_header"
+i18n = "menu.metrics.privacy_header"
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "filter_private"
+disabled_when = ["keylogger_enabled"]
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "filter_secure"
+disabled_when = ["keylogger_enabled"]
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "filter_sysauth"
+disabled_when = ["keylogger_enabled"]
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "exclude_apps"
+disabled_when = ["keylogger_enabled"]
+
+[[menu.metrics_menu]]
+type = "---"
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "encryption"
+platforms = ["hs"]
+disabled_when = ["keylogger_enabled"]
+
+[[menu.layout_menu]]
+type = "toggle"
+i18n_on = "menu.layout.on"
+i18n_off = "menu.layout.off"
+category = "Layout"
+
+[[menu.layout_menu]]
+type = "dynamic"
+id = "layout_features_base"
+
+[[menu.layout_menu]]
+type = "group"
+id = "accented_letters"
+i18n = "menu.shortcuts.group_accented"
+platforms = ["ahk"]
+
+[[menu.layout_menu]]
+type = "---"
+
+[[menu.layout_menu]]
+type = "dynamic"
+id = "layout_features_altgr"
+
+[[menu.layout_menu]]
+type = "dynamic"
+id = "active_layouts"
+platforms = ["hs"]
+
+[[menu.layout_menu]]
+type = "---"
+
+[[menu.layout_menu]]
+type = "feature"
+path = "hotstrings.magic_key.replace"
+i18n = "menu.layout.replace"
+
+[[menu.layout_menu]]
+type = "feature"
+path = "ahk.layout.ctrl_magic_save"
+platforms = ["ahk"]
+
+[[menu.accented_letters_group]]
+type = "letter_picker"
+id = "e_grave"
+platforms = ["ahk"]
+
+[[menu.accented_letters_group]]
+type = "letter_picker"
+id = "e_circ"
+platforms = ["ahk"]
+
+[[menu.accented_letters_group]]
+type = "letter_picker"
+id = "e_acute"
+platforms = ["ahk"]
+
+[[menu.accented_letters_group]]
+type = "letter_picker"
+id = "a_grave"
+platforms = ["ahk"]
+
+[[menu.hotstrings_menu]]
+type = "toggle"
+i18n_on = "menu.hotstrings.on"
+i18n_off = "menu.hotstrings.off"
+category = "Hotstrings"
+
+[[menu.hotstrings_menu]]
+type = "group"
+id = "hotstrings_params"
+i18n = "menu.hotstrings.params"
+
+[[menu.hotstrings_menu]]
+type = "dynamic"
+id = "hotstring_bulk_actions"
+
+[[menu.hotstrings_menu]]
+type = "---"
+
+[[menu.hotstrings_menu]]
+type = "section_header"
+i18n = "menu.hotstrings.header_common"
+
+[[menu.hotstrings_menu]]
+type = "dynamic"
+id = "hotstring_categories_standard"
+
+[[menu.hotstrings_menu]]
+type = "dynamic"
+id = "hotstring_categories_dynamic"
+
+[[menu.hotstrings_menu]]
+type = "---"
+
+[[menu.hotstrings_menu]]
+type = "section_header"
+i18n = "menu.hotstrings.header_ergopti"
+
+[[menu.hotstrings_menu]]
+type = "dynamic"
+id = "hotstring_categories_ergopti"
+
+[[menu.hotstrings_menu]]
+type = "---"
+
+[[menu.hotstrings_menu]]
+type = "section_header"
+i18n = "menu.hotstrings.personal_header"
+
+[[menu.hotstrings_menu]]
+type = "dynamic"
+id = "hotstring_personal"
+
+[[menu.hotstrings_menu]]
+type = "---"
+
+[[menu.hotstrings_menu]]
+type = "section_header"
+i18n = "menu.extensions.header"
+
+[[menu.hotstrings_menu]]
+type = "dynamic"
+id = "hotstring_extensions"
+
+[[menu.hotstrings_params_group]]
+type = "dynamic"
+id = "word_expanders"
+
+[[menu.hotstrings_params_group]]
+type = "action"
+id = "delays_colors"
+i18n = "menu.hotstrings.delays_colors"
+
+[[menu.hotstrings_params_group]]
+type = "---"
+
+[[menu.hotstrings_params_group]]
+type = "dynamic"
+id = "magic_key_config"
+
+[[menu.hotstrings_params_group]]
+type = "dynamic"
+id = "repeat_key"
+platforms = ["ahk"]
+
+[[menu.gestures_menu]]
+type = "toggle"
+i18n_on = "menu.gestures.on"
+i18n_off = "menu.gestures.off"
+category = "Gestures"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "action"
+id = "auto_configure"
+i18n = "menu.gestures.auto_configure"
+platforms = ["ahk"]
+
+[[menu.gestures_menu]]
+type = "action"
+id = "manual_tutorial"
+i18n = "menu.gestures.manual_tutorial"
+platforms = ["ahk"]
+
+[[menu.gestures_menu]]
+type = "action"
+id = "disable_all"
+i18n = "menu.gestures.disable_all"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "action"
+id = "restore_defaults"
+i18n = "menu.gestures.restore_defaults"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "---"
+
+[[menu.gestures_menu]]
+type = "dynamic"
+id = "circular_spaces"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "dynamic"
+id = "gesture_slots_2"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "dynamic"
+id = "gesture_slots_3"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "dynamic"
+id = "gesture_slots_4"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "dynamic"
+id = "gesture_slots_5"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "dynamic"
+id = "gesture_slots_ahk"
+platforms = ["ahk"]
+
+[[menu.tap_holds_menu]]
+type = "toggle"
+i18n_on = "menu.tapholds.on"
+i18n_off = "menu.tapholds.off"
+category = "TapHolds"
+platforms = ["ahk"]
+
+[[menu.tap_holds_menu]]
+type = "action"
+id = "reset_defaults"
+i18n = "tap_hold.reset_defaults"
+platforms = ["ahk"]
+
+[[menu.tap_holds_menu]]
+type = "action"
+id = "disable_all"
+i18n = "tap_hold.disable_all"
+platforms = ["ahk"]
+
+[[menu.tap_holds_menu]]
+type = "---"
+platforms = ["ahk"]
+
+[[menu.tap_holds_menu]]
+type = "dynamic"
+id = "tap_hold_keys"
+platforms = ["ahk"]
+
+[[menu.word_delimiter_defs]]
+char = " "
+i18n = "hs_config.delim_space"
+
+[[menu.word_delimiter_defs]]
+char = "\t"
+i18n = "hs_config.delim_tab"
+
+[[menu.word_delimiter_defs]]
+char = "."
+label = "."
+
+[[menu.word_delimiter_defs]]
+char = ","
+label = ","
+
+[[menu.word_delimiter_defs]]
+char = ";"
+label = ";"
+
+[[menu.word_delimiter_defs]]
+char = ":"
+label = ":"
+
+[[menu.word_delimiter_defs]]
+char = "?"
+label = "?"
+
+[[menu.word_delimiter_defs]]
+char = "!"
+label = "!"
+
+[[menu.word_delimiter_defs]]
+char = "'"
+label = "' (ASCII)"
+
+[[menu.word_delimiter_defs]]
+char = "’"
+label = "’ (typogr.)"
+
+[[menu.word_delimiter_defs]]
+char = "-"
+label = "-"
+
+[[menu.word_delimiter_defs]]
+char = "="
+label = "="
+
+[[menu.word_delimiter_defs]]
+char = "("
+label = "("
+
+[[menu.word_delimiter_defs]]
+char = ")"
+label = ")"
+
+[[menu.word_delimiter_defs]]
+char = "["
+label = "["
+
+[[menu.word_delimiter_defs]]
+char = "]"
+label = "]"
+
+[[menu.word_delimiter_defs]]
+char = "/"
+label = "/"
+
+[[menu.word_delimiter_defs]]
+char = "\\"
+label = "\\"
+
+[[menu.word_delimiter_defs]]
+char = "+"
+label = "+"
+
+[[menu.word_delimiter_defs]]
+char = "*"
+label = "*"

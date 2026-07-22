@@ -1,0 +1,360 @@
+# static/ergopti_plus/_shared/modules/tooltip/constants.toml
+#
+# ==============================================================================
+# SCHEMA: Tooltip Visual Constants — Cross-Driver Canon
+# DESCRIPTION:
+# Single source of truth for every visual constant used by the Ergopti+
+# tooltip across all drivers (AutoHotkey, Hammerspoon, and future ports).
+# When a value changes here, the driver-side files must be updated to match.
+#
+# HOW EACH DRIVER CONSUMES THIS FILE:
+#   AHK         — lib/ui_style.ahk declares AHK globals whose values mirror
+#                 every entry here. Comments in that file cross-reference the
+#                 key names below.
+#   Hammerspoon — ui/tooltip/config.lua exposes a Lua table whose keys mirror
+#                 every entry here. Comments in that file cross-reference the
+#                 key names below.
+#   Future       — read this file directly at boot or generate driver-specific
+#                 code from it via a build step.
+#
+# COORDINATE SYSTEMS:
+#   All numeric values are expressed in "layout units" — logical pixels on
+#   Windows (1 lu = 1 CSS px at 96 DPI) and points on macOS (1 lu = 1 pt).
+#   Drivers that operate in physical pixels (AHK on a 125 % display) multiply
+#   by their platform DPI scale factor when calling OS drawing APIs, but store
+#   and compare values in layout units everywhere else.
+#
+# COLOR FORMAT:
+#   Colors are stored as RGBA tables with components in [0.0, 1.0].
+#   The "hex" companions (e.g. bg_hex) carry the same color in "#RRGGBB" form
+#   for drivers whose APIs only accept hex strings (AHK Gui.BackColor).
+# ==============================================================================
+
+
+# =============================
+# =============================
+# ======= 1/ Typography =======
+# =============================
+# =============================
+
+[typography]
+
+# Platform note: AHK uses "Segoe UI" (Windows system UI font, 11 pt at 96 DPI
+# ≈ 14 pt on macOS due to different point definitions). HS uses
+# ".AppleSystemUIFont". Both resolve to the OS default sans-serif UI typeface.
+font_main_ahk = "Segoe UI"
+font_main_hs  = ".AppleSystemUIFont"
+font_bold_hs  = ".AppleSystemUIFontBold"
+
+# Main body font size in layout units.
+# AHK value (11) matches Hammerspoon (14) visually at typical DPI/scale ratios.
+font_size_main_ahk = 11
+font_size_main_hs  = 14
+
+# Hint / trigger-label font size (trigger symbols ★ ↵ [Tab] ⌥1…⌥0).
+font_size_hint_ahk = 11
+font_size_hint_hs  = 11
+
+# Info-bar font size (model name, TTFT/TTLT timing line).
+font_size_info_ahk = 10
+font_size_info_hs  = 10
+
+
+# =========================
+# =========================
+# ======= 2/ Layout =======
+# =========================
+# =========================
+
+[layout]
+
+# Horizontal padding on each side of the text area (layout units).
+pad_x = 14
+
+# Vertical padding above and below each content row (layout units).
+pad_y = 7
+
+# Vertical gap between the predictions block and the hint/info blocks
+# in the LLM tooltip (layout units).
+line_spacing = 8
+
+# Reduced gap between the hint line and the info line when both are
+# rendered as separate rows (layout units).
+hint_spacing = 4
+
+# Gap between the expansion-text column and the trigger-label column
+# in stacked / hotstring tooltips (layout units).
+label_gap = 16
+
+# Corner arc radius applied to the rounded rectangle (layout units).
+# AHK passes 2 * corner_radius as the GDI ellipse diameter (nWidth/nHeight),
+# HS passes corner_radius directly as xRadius/yRadius on the canvas element.
+corner_radius = 7
+
+# Height of the 1 px separator between stacked rows (layout units).
+# Always 1 — listed here for cross-driver traceability.
+separator_height = 1
+
+# Minimum safe margin between the tooltip and the screen edge (layout units).
+screen_margin = 5
+
+# ==============================
+# ==============================
+# ======= 3/ Positioning =======
+# ==============================
+# ==============================
+
+[positioning]
+
+# Horizontal offset from the caret / UIA element left edge (layout units).
+caret_offset_x = 15
+
+# Vertical offset from the bottom of the caret / UIA element (layout units).
+caret_offset_y = 18
+
+# Vertical gap between the bottom of an input-box or window anchor and the
+# tooltip top edge (layout units).
+window_offset_y = 5
+
+# Distance in layout units inset from the window bottom edge when positioning
+# in "window" fallback mode (no caret / UIA element found).
+# AHK uses a larger value (60) because the taskbar intrudes more on Windows.
+window_bottom_inset_ahk = 60
+window_bottom_inset_hs  = 40
+
+# Height threshold that distinguishes a "caret-like" AX element from an
+# "input-box-like" one. Elements shorter than this are treated as carets
+# (anchor below, left-aligned); taller elements are input boxes (anchor
+# below, centred) (layout units).
+max_caret_height = 80
+
+# Anchor resolution priority order (informative — drivers implement this):
+#   1. Platform caret API (CaretGetPos on AHK / AXBoundsForRange on HS)
+#   2. Accessibility focused element bounding rect
+#   3. Active window frame (bottom-centre)
+#   4. Screen centre-bottom (last resort, never nil)
+# AHK adds a step between 2 and 3: mouse cursor coordinates.
+anchor_cascade = ["caret", "ax_element", "window_frame", "screen_center"]
+
+
+# =========================
+# =========================
+# ======= 4/ Colors =======
+# =========================
+# =========================
+
+[colors]
+
+# Near-black default tooltip background (no tint applied).
+# rgba: white=0.14, alpha=1.0 → #242424 at full opacity.
+bg_hex    = "#242424"
+bg_white  = 0.14    # normalized luminance shorthand for gray backgrounds
+bg_alpha  = 1.0     # canvas background panel alpha (fully opaque panel)
+
+# Canvas-level alpha applied to the background element in HS (gives the slight
+# see-through feel while keeping text readable). AHK does not support
+# per-panel transparency; it uses bg_hex at full opacity.
+canvas_alpha_hs = 0.97
+
+# Border ring: white stroke at reduced opacity so it reads as a subtle outline.
+border_white = 1.0
+border_alpha_ahk = 0.25   # → #40 pre-multiplied byte in AHK's DIB border
+border_alpha_hs  = 0.13   # hs.canvas strokeColor alpha
+
+# Separator line between stacked rows.
+sep_white = 1.0
+sep_alpha_ahk = 0.25   # alpha-blended onto 0x1A → 0x54 (#545454) in AHK
+sep_alpha_hs  = 0.09   # hs.canvas fillColor alpha (darker on macOS)
+
+# Trigger-label color (★ ↵ symbols, right column in stacked tooltips).
+label_white = 0.45
+label_alpha = 1.0
+# AHK hex alias for Gui.SetFont color option.
+label_hex = "#AAAAAA"
+
+# Dimmed / non-firing alternate rows.
+dim_white = 0.55
+dim_alpha = 1.0
+# AHK hex alias.
+dim_hex = "#8C8C8C"
+
+# Hint line color (navigation instructions below the predictions).
+hint_white = 0.40
+hint_alpha = 1.0
+hint_hex = "#666666"
+
+# Info bar (model + TTFT/TTLT timing).
+info_white = 0.30
+info_alpha = 1.0
+info_hex = "#4D4D4D"
+
+# Invisible / fully transparent (used to hide canvas elements without removal).
+invis_white = 0.0
+invis_alpha = 0.0
+
+
+# ==============================
+# ==============================
+# ======= 5/ Tint mixing =======
+# ==============================
+# ==============================
+
+[tint]
+
+# HSL target parameters used when blending an accent hue into the background.
+# Both drivers extract the hue from the provided accent color then reconstruct
+# a new color at fixed lightness and saturation so the tooltip always stays
+# "dark with a colored wash" regardless of how saturated the accent is.
+#
+# Algorithm (identical in AHK _TooltipMixTintHex and HS renderer.apply_tint):
+#   1. Convert accent RGB → HSL, keep only the hue (H).
+#   2. Reconstruct RGB from (H, tint_saturation, tint_lightness).
+#   3. Use the result as the tooltip background fill.
+lightness  = 0.13
+saturation = 0.85
+
+
+# ==============================================
+# ==============================================
+# ======= 6/ Accent colors (per context) =======
+# ==============================================
+# ==============================================
+
+[accent_colors]
+# Default accent colors per tooltip display context.
+# A driver that reads these values must resolve the final tint by passing the
+# accent color through the tint-mixing algorithm defined in [tint].
+# Use null / nil / absent to mean "no tint" (plain dark background).
+
+# Hotstring — magic key group (★ trigger).
+hotstring_star   = { red = 1.00, green = 0.00, blue = 0.00, alpha = 1.0 }
+
+# Hotstring — autocorrection group.
+hotstring_autocorrect = { red = 0.00, green = 0.80, blue = 0.00, alpha = 1.0 }
+
+# Hotstring — personal info group.
+hotstring_personal = { red = 0.20, green = 0.55, blue = 1.00, alpha = 1.0 }
+
+# LLM loading / in-flight indicator.
+ai_loading = { red = 0.68, green = 0.38, blue = 1.00, alpha = 1.0 }
+ai_loading_hex = "#AD61FF"
+
+# LLM prediction results — no tint by default (plain dark background).
+# ai_prediction = null
+
+
+# ========================================
+# ========================================
+# ======= 7/ LLM prediction colors =======
+# ========================================
+# ========================================
+
+[llm_colors]
+# Colors used for diff-chunk rendering inside LLM predictions.
+# "sel" = the currently selected prediction slot.
+# "unsel" = all other (non-active) slots.
+#
+# AHK hex aliases (no leading #) mirror the RGBA tables for drivers that only
+# accept hex strings. Keep the hex aliases in sync whenever the RGBA values change.
+
+# Corrected text (equal diff chunks, selected slot) — green.
+corr_sel = { red = 0.25, green = 0.90, blue = 0.40, alpha = 1.0 }
+corr_sel_hex = "#40E666"
+
+# Next-words text (insert diff chunks, selected slot) — orange.
+nw_sel = { red = 1.00, green = 0.62, blue = 0.10, alpha = 1.0 }
+nw_sel_hex = "#FF9E1A"
+
+# Unselected slot text — mid-gray.
+unsel_gray = { white = 0.50, alpha = 1.0 }
+unsel_gray_hex = "#808080"
+
+# Loading placeholder color — yellow-amber.
+loading = { red = 0.94, green = 0.78, blue = 0.28, alpha = 1.0 }
+loading_hex = "#F0C747"
+
+# Active-slot sparkle prefix (✨) — yellow cursor marker.
+cursor = { red = 0.98, green = 0.88, blue = 0.22, alpha = 1.0 }
+cursor_hex = "#FAE038"
+
+# Multi-slot shortcut labels on the right (modifier + digit).
+cmd_sel = { red = 0.95, green = 0.58, blue = 0.08, alpha = 0.75 }
+cmd_sel_hex = "#F29414"
+cmd_dim = { white = 0.45, alpha = 1.0 }
+cmd_dim_hex = "#737373"
+
+
+# ========================================
+# ========================================
+# ======= 8/ LLM tooltip UI chrome =======
+# ========================================
+# ========================================
+
+[llm_ui]
+# Structural LLM-tooltip constants shared by every driver.
+# User-facing hint strings live here as canonical defaults; drivers may
+# override via i18n (AHK: t(), HS: i18n.get()) when locale keys exist.
+
+# Active prediction row prefix (sparkle cursor marker).
+active_prefix = "✨ "
+
+# Placeholder text while a slot is still generating.
+slot_placeholder = "..."
+
+# Thin-space (U+2009) alignment compensation for inactive rows.
+inactive_align_char = " "
+
+# Footer layout: 6-space divider between hint segments / combined-line parts.
+footer_space_divider = "      "
+footer_combined_separator = "|"
+
+# Gap before modifier+digit shortcut labels (e.g. "   ⌥1").
+shortcut_label_gap = "   "
+
+# Vertical gap between stacked prediction lines (HS canvas gap font size).
+prediction_line_gap_hs = 3
+
+# Navigation hint strings (French canonical — mirror tooltip_llm.lua).
+hint_accept_single = "Tab pour accepter"
+hint_nav_left = "⇧G + Tab"
+hint_nav_right = "⇧D + Tab"
+hint_accept_center = "Tab = accepter"
+hint_arrow_left = "↑/←"
+hint_arrow_right = "↓/→"
+hint_or = " ou "
+hint_arrow_sep_left = " ◀"
+hint_arrow_sep_right = "▶ "
+
+
+# =========================
+# =========================
+# ======= 9/ Timing =======
+# =========================
+# =========================
+
+[timing]
+
+# Default auto-hide duration for hotstring tooltips (seconds).
+# 0 means "stay until explicitly hidden".
+hotstring_timeout_sec = 2.5
+
+# Default auto-hide duration for LLM prediction tooltips (seconds). Aligned with
+# the macOS llm_prediction delay default (20 s). User-overridable at runtime from
+# the hotstrings "Delays" submenu — stored as the "llm_prediction" delay override
+# and resolved live when the tooltip timer is armed.
+# 0 means "stay until explicitly hidden".
+llm_timeout_sec = 20.0
+
+# Safety cap applied when the caller requests duration = 0 (infinite).
+# Prevents ghost tooltips if the normal hide path is skipped due to an error.
+safety_timeout_sec = 3.0
+
+# Each tooltip's effective duration is shortened by this amount so the visual
+# disappears slightly before the expansion window closes.
+# Also mirrored as _shared/modules/timings/constants.toml [tooltip] ttl_decrement_ms = 200.
+# This file (tooltip/constants.toml) is the authoritative source; timings/constants.toml
+# mirrors the value for cross-module discovery.
+timeout_decrement_sec = 0.2
+
+# Hard floor below which the effective duration is never reduced.
+timeout_floor_sec = 0.05

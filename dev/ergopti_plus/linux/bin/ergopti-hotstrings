@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# bin/ergopti-hotstrings
+#
+# Wrapper shell script for the Ergopti hotstring expansion daemon.
+#
+# Resolves the installation directory (either the real install path
+# /usr/lib/ergopti/ or the repo checkout), configures LUA_PATH so
+# that all driver and shared modules are visible to LuaJIT, then
+# exec-replaces itself with the daemon process.
+#
+# Usage:
+#   ergopti-hotstrings [--install-deps] [-- <luajit flags>]
+#
+# The --install-deps flag detects the package manager and installs
+# the required runtime dependencies automatically.
+
+set -euo pipefail
+
+
+# ========================================
+# ========================================
+# ======= 1/ Dependency Validation =======
+# ========================================
+# ========================================
+
+# Check whether a command exists on PATH without relying on `which`
+# (not always available on minimal installs).
+_has() {
+	command -v "$1" >/dev/null 2>&1
+}
+
+_check_deps() {
+	local missing=()
+
+	if ! _has luajit; then
+		missing+=("luajit")
+	fi
+
+	if ! _has ydotool; then
+		# ydotool is required for Wayland/X11-agnostic keystroke injection;
+		# without it the text_sender adapter cannot emit characters.
+		missing+=("ydotool")
+	fi
+
+	if ! _has notify-send; then
+		# notify-send is the backend for the Linux notifier adapter.
+		missing+=("libnotify-bin")
+	fi
+
+	if [ "${#missing[@]}" -gt 0 ]; then
+		echo "Erreur : dépendances manquantes — ${missing[*]}" >&2
+		echo "  Lancez : ergopti-hotstrings --install-deps" >&2
+		echo "  Ou installez manuellement : apt-get install ${missing[*]}" >&2
+		exit 1
+	fi
+}
+
+
+# ====================================
+# ====================================
+# ======= 2/ Dependency Install =======
+# ====================================
+# ====================================
+
+_install_deps() {
+	echo "Installation des dépendances requises…"
+
+	if _has apt-get; then
+		sudo apt-get update -qq
+		sudo apt-get install -y luajit ydotool libnotify-bin
+	elif _has dnf; then
+		# luajit package name differs on Fedora/RHEL; ydotool may need a copr.
+		sudo dnf install -y luajit ydotool libnotify
+	elif _has pacman; then
+		sudo pacman -Sy --noconfirm luajit ydotool libnotify
+	else
+		echo "Erreur : gestionnaire de paquets introuvable (apt, dnf ou pacman requis)." >&2
+		exit 1
+	fi
+
+	echo "Dépendances installées avec succès."
+}
+
+
+# =======================================
+# =======================================
+# ======= 3/ Path Resolution =======
+# =======================================
+# =======================================
+
+# Resolve the directory that contains this script, following symlinks.
+# This is intentionally done without readlink -f (not available on macOS)
+# so the script stays portable; however this is a Linux-only file.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+
+# Determine the ergopti installation root.
+# When installed via .deb / AppImage: script lives at /usr/bin/ and libs at
+# /usr/lib/ergopti/.  When run from a repo checkout: script lives in
+# static/ergopti_plus/linux/bin/ and we go two levels up to reach the ergopti_plus root.
+if [ -d "/usr/lib/ergopti" ]; then
+	ERGOPTI_ROOT="/usr/lib/ergopti"
+else
+	# Repo checkout: bin/ → linux/ → ergopti_plus/ → …
+	DRIVERS_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
+	ERGOPTI_ROOT="${DRIVERS_ROOT}"
+fi
+
+DRIVER_ROOT="${ERGOPTI_ROOT}/linux"
+SHARED_LUA="${ERGOPTI_ROOT}/shared/lua"
+
+if [ ! -d "${DRIVER_ROOT}" ]; then
+	echo "Erreur : répertoire du driver Linux introuvable : ${DRIVER_ROOT}" >&2
+	exit 1
+fi
+
+
+# ===========================
+# ===========================
+# ======= 4/ Dispatch =======
+# ===========================
+# ===========================
+
+case "${1:-}" in
+	--install-deps)
+		_install_deps
+		exit 0
+		;;
+	--help|-h)
+		cat << 'HELP'
+Utilisation : ergopti-hotstrings [OPTIONS]
+
+Options :
+  --install-deps    Installe les dépendances manquantes via apt/dnf/pacman
+  --help            Affiche ce message d'aide
+
+Variables d'environnement :
+  ERGOPTI_CONFIG    Répertoire de configuration (défaut : ~/.config/ergopti)
+HELP
+		exit 0
+		;;
+esac
+
+_check_deps
+
+# Build the LuaJIT module search path: driver sources first so they can
+# shadow shared fallbacks, then the shared library layer.
+export LUA_PATH="${DRIVER_ROOT}/?.lua;${DRIVER_ROOT}/?/init.lua;${SHARED_LUA}/?.lua;${SHARED_LUA}/?/init.lua;;"
+
+# Hand off to the daemon; exec replaces the shell process so signal handling
+# (SIGTERM, SIGHUP) reaches LuaJIT directly.
+exec luajit "${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"

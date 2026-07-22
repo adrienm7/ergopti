@@ -1,0 +1,2296 @@
+_meta.flag	🇯🇵
+_meta.locale	ja
+_meta.name	日本語
+app_category.business	ビジネス
+app_category.development	開発者ツール
+app_category.education	教育
+app_category.entertainment	エンターテインメント
+app_category.finance	金融
+app_category.games	ゲーム
+app_category.graphics_design	グラフィック＆デザイン
+app_category.health	健康＆スポーツ
+app_category.lifestyle	ライフスタイル
+app_category.medical	医療
+app_category.music	音楽
+app_category.navigation	ナビゲーション
+app_category.news	ニュース
+app_category.photography	写真
+app_category.productivity	生産性
+app_category.reference	リファレンス
+app_category.social	ソーシャルネットワーク
+app_category.sports	スポーツ
+app_category.travel	旅行
+app_category.utility	ユーティリティ
+app_category.video	ビデオ
+app_category.weather	天気
+app_picker.add_another_app	+ 別のアプリを追加…
+app_picker.exclude_current	{app} を除外（現在）
+app_picker.no_app_excluded	除外するアプリケーションなし
+app_picker.search_placeholder	アプリケーションを検索…
+apps.cloner.btn_back	戻る
+apps.cloner.btn_browse	参照…
+apps.cloner.btn_choose	選択
+apps.cloner.btn_clone	アプリをクローン
+apps.cloner.btn_custom_icon	カスタム
+apps.cloner.btn_native_clone	ネイティブアプリをクローン
+apps.cloner.btn_open_log	ログを開く
+apps.cloner.btn_pwa_recommended	PWA（推奨）
+apps.cloner.btn_pwa_webapp	PWA ウェブアプリ
+apps.cloner.btn_tint_icon	カラートーン
+apps.cloner.btn_try_native	ネイティブを試す
+apps.cloner.btn_validate	確認
+apps.cloner.lbl_progress_dock	Dockに登録中…
+apps.cloner.lbl_progress_done	完了
+apps.cloner.lbl_progress_icon	着色アイコンを生成中…
+apps.cloner.lbl_progress_prep	アイコンとバンドルを準備中
+apps.cloner.lbl_progress_sign	バンドルにアドホック署名中…
+apps.cloner.lbl_progress_title	クローン作成中…
+apps.cloner.msg_bundle_missing	エラー：バンドルパスがありません。通常どおりアプリを起動してください。
+apps.cloner.title_clone_name	クローン名
+apps.cloner.title_error	クローン作成失敗
+apps.cloner.title_icon_style	アイコンスタイル
+apps.cloner.title_open_arg	起動時に開くアイテム
+apps.cloner.title_pwa_mode	PWAモード？
+apps.cloner.title_pwa_recommended	PWAモード推奨
+apps.cloner.title_pwa_url	PWA URL
+apps.cloner.title_summary	概要
+apps.cloner.title_tint	カラートーン
+apps.cloner.title_url_path	URLまたはパス
+apps.encryptor.btn_overwrite	上書き
+apps.encryptor.btn_reveal	Finderで表示
+apps.encryptor.err_decrypt_failed	復号に失敗しました。パスワードが違うか、ファイルが破損しています。
+apps.encryptor.err_empty_password	パスワードを入力してください。
+apps.encryptor.err_encrypt_failed	暗号化に失敗しました。
+apps.encryptor.err_file_missing	ファイルが見つかりません。
+apps.encryptor.err_openssl_missing	opensslが見つかりません。Xcode Command Line Toolsをインストールしてください。
+apps.encryptor.err_password_mismatch	パスワードが一致しません。
+apps.encryptor.lbl_file	ファイル：
+apps.encryptor.prompt_confirm	パスワード確認：
+apps.encryptor.prompt_password	パスワード：
+apps.encryptor.success_decrypted	復号完了：
+apps.encryptor.success_encrypted	暗号化完了：
+apps.encryptor.title_decrypt	ファイルを復号
+apps.encryptor.title_encrypt	ファイルを暗号化
+apps.encryptor.warn_overwrite	同名のファイルが既に存在します。上書きしますか？
+autocorrection.accents	アクセントの自動修正
+autocorrection.caps	文頭の自動大文字化
+autocorrection.errors	よくあるタイプミスの修正
+autocorrection.minus	マイナス記号の自動挿入
+autocorrection.minusapostrophe	マイナスの後にアポストロフィ
+autocorrection.multiplepunctuationmarks	複数のドット → 省略記号 (... = …)
+autocorrection.names	固有名詞の大文字修正
+autocorrection.ou	ou / où の修正
+autocorrection.suffixesachaining	à による接尾辞の連結
+autocorrection.typographicapostrophe	タイポグラフィアポストロフィ（直線 → 曲線）
+ax_actions.brightness	☀ 明るさ
+ax_actions.char	A 文字
+ax_actions.char_sel	✎ A 文字を選択
+ax_actions.desktops	▢ デスクトップ
+ax_actions.document	📄 ドキュメント（先頭/末尾）
+ax_actions.line_arrow	↕ 行（矢印）
+ax_actions.line_bounds	↔ 行（先頭/末尾）
+ax_actions.line_sel	✎ ↕ 行を選択
+ax_actions.lines	↕ 行（Alt）
+ax_actions.paragraphs	¶ 段落
+ax_actions.spaces	▢ スペース
+ax_actions.tabs	⧉ タブ
+ax_actions.tracks	♫ トラック
+ax_actions.volume	🔊 音量
+ax_actions.windows	◱ ウィンドウ
+ax_actions.words	W 単語
+ax_actions.words_sel	✎ W 単語を選択
+button.activate	有効化
+button.add	追加
+button.cancel	キャンセル
+button.close	閉じる
+button.confirm	確認
+button.decrypt	復号化
+button.delete	削除
+button.encrypt	暗号化
+button.ok	OK
+button.open_settings	設定を開く
+button.remove	削除
+button.retry	再試行
+button.save	保存
+category.autocorrection	自動修正
+category.distances_reduction	距離削減
+category.dynamic_hotstrings	動的ホットストリング
+category.gestures	🖐️ ジェスチャー
+category.layout	🌐 キーボードレイアウト
+category.magic_key	★キーとテキスト展開
+category.personal	個人 hotstrings
+category.rolls	ロール
+category.sfbs_reduction	SFB削減
+category.shortcuts	🎯 ショートカット
+category.tapholds	⌨️ タップホールド
+changelog_window.badge_latest	latest
+changelog_window.badge_prerelease	pre-release
+changelog_window.channel_dev	Dev
+changelog_window.channel_stable	Stable
+changelog_window.error_network	Unable to load releases from GitHub.\nCheck your internet connection.
+changelog_window.error_parse	Unable to parse GitHub response.
+changelog_window.error_rate_limited	Unable to load releases from GitHub.\nGitHub is limiting requests — please try again in a few minutes.
+changelog_window.loading	Loading releases…
+changelog_window.no_notes	(No release notes available.)
+changelog_window.no_releases	No releases found.
+changelog_window.open_github	View on GitHub ↗
+changelog_window.retry	Retry
+changelog_window.window_title	Release Notes
+common.browse	参照…
+common.cancel	キャンセル
+common.close	閉じる
+common.delete	削除
+common.disabled	無効
+common.error_prefix	エラー — 
+common.error_title	エラー
+common.key_enter	Enter
+common.later	後で
+common.loading	読み込み中…
+common.none	なし
+common.ok	OK
+common.save	保存
+common.saved	保存済み ✓
+common.warning	警告
+crash.report.save_failed	クラッシュレポートを保存できませんでした
+crash.report.saved_title	クラッシュレポートを保存しました
+dialog.action_picker.disabled	∅ なし
+dialog.action_picker.label	アクション:
+dialog.action_picker.no_results	一致するアクションがありません
+dialog.action_picker.search	アクションを検索…
+dialog.app_picker.active_suffix	（アクティブ）
+dialog.app_picker.prompt	アプリケーションを選択:
+dialog.app_picker.running_count	{n}個のアプリケーションが実行中。
+dialog.app_picker.stopped_suffix	（停止中）
+dialog.app_picker.title	アプリケーション選択
+dialog.bulk_toggle.save_failed	The change could not be saved to the configuration file.\nIt has been reverted. Close any app holding the file and try again.
+dialog.config_folder.hint	すべての個人ファイル (personal_shortcuts.ahk, personal_hotstrings.toml…) はこのフォルダーで検索されます。デフォルトフォルダーを使用するには空白のままにしてください。
+dialog.config_folder.label	パス:
+dialog.config_folder.select_title	設定フォルダーを選択
+dialog.config_folder.title	ErgoptiPlus — 設定フォルダー
+dialog.enable_all.warning	⚠ 警告: デフォルトで無効な機能を含む、すべての機能が有効になりました。
+dialog.fatal_error.cannot_start	Ergopti+ を起動できません。
+dialog.fatal_error.toml_key_missing	致命的なエラー: _shared/modules/tooltip/constants.toml — キーが見つからないか無効です: [{1}] {2}
+dialog.fatal_error.toml_not_found	致命的なエラー: _shared/modules/tooltip/constants.toml が見つかりません。
+dialog.gestures.auto_configure_error	レジストリへの書き込みエラー。\n\n管理者としてスクリプトを実行するか、\n手動で設定してください（手順を参照）。
+dialog.gestures.auto_configure_error_title	ErgoptiPlus — エラー
+dialog.gestures.auto_configure_success	ジェスチャー設定が正常に適用されました。\n\n10個のジェスチャーがWindowsレジストリに設定されました\n(Ctrl+Win+Shift+F1〜F10)。\n\nWindowsが新しいショートカットを認識するには\nサインアウト/サインインが必要な場合があります。
+dialog.gestures.auto_configure_title	ErgoptiPlus — ジェスチャー設定
+dialog.gestures.warning_msg	⚠️ 警告: タッチパッドジェスチャーを有効にすると、システムジェスチャーと干渉する可能性があります。\n\n競合を避けるため、以下のmacOSオプションを無効にしてください:\n\n• 2本指タッチパッドジェスチャー: Hammerspoonで使用する場合はスクロールとスワイプを無効にする\n• ウィンドウの移動とテキスト選択の3本指タッチパッドジェスチャー\n• 辞書で単語を調べる3本指タップ\n• スペースの切り替え、App ExposéまたはMission Controlの起動に使う3本指の水平/垂直スワイプ\n• スペースの切り替え、App ExposéまたはMission Controlの起動に使う4本指の水平/垂直スワイプ\n\n5本指ジェスチャーを定義するには、4本指のシステムジェスチャーを無効にすることが重要です。そうしないと、macOSはそれらを区別できず、5本指ジェスチャーの動作を妨げます。そのため、ジェスチャーモジュールではデフォルトの4本指ジェスチャーを再定義して、5本指ジェスチャーとの競合なしにシステム機能を復元しています。
+dialog.gestures.warning_title	ジェスチャーの警告
+dialog.gpt_link.title	Win + Gで開くリンクを編集
+dialog.hotstrings.consume_body	展開中にトリガー文字を消費（入力しない）しますか？
+dialog.hotstrings.consume_checkbox	消費する（文字を再入力しない）
+dialog.hotstrings.consume_no	いいえ — 文字を入力する
+dialog.hotstrings.consume_title	トリガーの動作
+dialog.hotstrings.consume_yes	はい — 消費する
+dialog.hotstrings.delete_body	このカスタムエクスパンダーを削除してもよいですか？
+dialog.hotstrings.delete_delimiter_body	Are you sure you want to delete this custom delimiter?
+dialog.hotstrings.delete_delimiter_title	Delete delimiter
+dialog.hotstrings.delete_title	エクスパンダーを削除
+dialog.hotstrings.invalid_body	正確に1文字を入力してください。
+dialog.hotstrings.invalid_title	無効な入力
+dialog.hotstrings.new_delimiter_prompt	区切り文字
+dialog.hotstrings.new_delimiter_title	New word delimiter
+dialog.hotstrings.new_prompt	トリガー文字を入力してください（正確に1文字）:
+dialog.hotstrings.new_title	新しい単語エクスパンダー
+dialog.keyboard_shortcut.prompt	キーの組み合わせを選択してください:
+dialog.keyboard_shortcut.title_prefix	キーを選択 — 
+dialog.llm.delete_profile_prefix	削除: "
+dialog.llm.delete_title	モデルを削除しますか？
+dialog.llm.exclude_ok	保存
+dialog.llm.exclude_prompt	AI生成を無効にするアプリケーションを選択してください。
+dialog.magic_key.prompt	新しい値（デフォルト: ★）:
+dialog.magic_key.title	マジックキーを編集
+dialog.metrics.bad_password_warning	⚠️ 警告: 復号化に失敗しました。パスワードが間違っている可能性があります。
+dialog.metrics.complete_label	操作が完了しました。\n\n正常に処理されたファイル: %d\nエラー: %d
+dialog.metrics.decrypt_confirm_body	暗号化されたすべてのログがディスク上のプレーンテキストとして復元されます。\n\n確認しますか？
+dialog.metrics.decrypt_confirm_title	無効化
+dialog.metrics.decrypt_key_prompt	復号化に必要なセキュリティキーを入力してください:
+dialog.metrics.disable_confirm	指標を無効にしますか？\n\nキーロガーはキー入力をキャプチャしなくなります。記録済みのデータは保持されます。
+dialog.metrics.enable_warning	警告: キーロガーを有効にしようとしています。\n\nミリ秒単位でキー入力を記録します。ログは以下にローカル保存されます:\n    {1}\n\nパスワード欄は自動的に無視されます (UIA フィルタ)。また、プライベート/シークレットブラウジングウィンドウにいる間はキー内容も破棄されます。それでもこれはキーロガーです — そのコンテキスト以外で機微情報を入力する際はスクリプトを一時停止してください。\n\n有効にしますか?
+dialog.metrics.encrypt_confirm_body	これを有効にすると、既存のログがすべて暗号化され、ディスク上で読み取り不能になります。\n\n確認しますか？
+dialog.metrics.encrypt_confirm_title	データ保護
+dialog.metrics.encrypt_key_prompt	暗号化キーを定義してください（デフォルト: Macシリアル番号）:
+dialog.metrics.encrypt_key_title	セキュリティキー
+dialog.metrics.encryptor_error_body	アプリケーションが見つかりませんでした。Pythonスクリプトを使用して最初に生成してください。
+dialog.metrics.encryptor_error_title	エラー
+dialog.metrics.exclude_ok	保存
+dialog.metrics.exclude_prompt	キーロガーが記録しないアプリケーションを選択してください。
+dialog.metrics.exclude_title	アプリケーションを除外 — 指標
+dialog.metrics.progress_label	処理中: %d / %d
+dialog.metrics.security_warning_body	⚠️  警告: メトリクスとキーロガーが有効になります。\n\nこのシステムはキー入力とタッチパッドジェスチャーの起動を記録します。\n\n• ログはHammerspoonフォルダーに保存されます\n• パスワードフィールドは自動的に無視されます\n• 機密データ入力時はスクリプトを一時停止することをお勧めします
+dialog.metrics.security_warning_title	⚠ セキュリティ警告 — 指標
+dialog.metrics.title	📊 指標
+dialog.path_copy.btn_backslash	&Backslash (\\)
+dialog.path_copy.btn_quit	&終了
+dialog.path_copy.msg_simple	パス\n%s\nがクリップボードにコピーされました。
+dialog.path_copy.msg_with_question	パス\n%s\nがクリップボードにコピーされました。\n\n/ の代わりに \\ を使うバージョンにしますか？
+dialog.path_copy.title	パスをコピー
+dialog.personal_info.saved	詳細を更新しました:
+dialog.personal_info.title	個人詳細を編集
+dialog.reset_defaults.failed	Could not reset: these files could not be deleted ({1}).\nClose any app holding them (editor, cloud sync) and try again.
+dialog.reset_defaults.failed_title	Reset failed
+dialog.reset_defaults.placeholder_failed	The configuration was reset, but the placeholder could not be written.\nThe setup wizard will run on the next start.
+dialog.shortcuts.chatgpt_prompt	Ctrl+Gで開くURL:
+dialog.shortcuts.chatgpt_title	ChatGPT URL
+dialog.shortcuts.wrap_symbol_close_prompt	終了記号を入力（空白 = 左右対称）:
+dialog.shortcuts.wrap_symbol_close_title	終了記号
+dialog.shortcuts.wrap_symbol_invalid	正確に1文字を入力してください。
+dialog.shortcuts.wrap_symbol_prompt	開始記号を入力（1文字）:
+dialog.shortcuts.wrap_symbol_title	囲み記号を追加
+distancesreduction.commafarletters	カンマ + 遠いキー (,è = z, ,é = …)
+distancesreduction.commaj	カンマ + 母音 → J (,a = ja, ,e = je…)
+distancesreduction.deadkeyecircumflex	Ê + 文字 → デッドキー (êo = ô, êa = â…)
+distancesreduction.ecircumflexe	Ê + E → Œ
+distancesreduction.qu	母音の前で Q → QU
+distancesreduction.spacearoundsymbols	ロール記号周辺の自動スペース
+distancesreduction.suffixesa	À + 文字 → 接尾辞 (às = -ement, àé = -ée…)
+download_window.btn_cancel	🛑 キャンセル
+download_window.btn_retry	🔄 再ダウンロード
+download_window.btn_terminal	🖥 ターミナル
+download_window.cancelling	キャンセル中…
+download_window.done_failed	ダウンロード失敗
+download_window.done_success	✅ 完了
+download_window.error_unknown	不明なエラー。
+download_window.eta_label	⏳ 残り時間:
+download_window.file_count	📁 ファイル：%s
+download_window.kind_mlx_install	⚙️ AI エンジンのインストール (MLX)
+download_window.kind_mlx_model	📥 MLX モデルのダウンロード
+download_window.kind_ollama_install	⚙️ AI エンジンのインストール (Ollama)
+download_window.kind_ollama_model	📥 Ollama モデルのダウンロード
+download_window.preparing	準備中…
+download_window.size_label	📦 サイズ：
+download_window.speed_label	⚡ 速度：
+download_window.starting	開始中…
+download_window.title	📥 ダウンロード中
+download_window.window_title	進行状況
+dynamichotstrings.date	td★ で現在の日付を入力 ({date})
+dynamichotstrings.datefr	dt★ で現在の日付を入力 ({date})
+dynamichotstrings.datelongfr	date★ で長い形式の日付を入力 ({date})
+dynamichotstrings.group_label	動的ホットストリング
+dynamichotstrings.ibanprefixes	IBANの最初の文字を入力すると自動補完されます
+dynamichotstrings.phoneprefixes	電話番号の最初の数桁を入力すると自動補完されます
+dynamichotstrings.ssnprefixes	社会保障番号の最初の数桁を入力すると自動補完されます
+dynamichotstrings.textexpansionpersonalinformation	@np★ = 姓 ⇥ 名 — 各文字がフィールドに対応（n=姓, p=名, e=メール…）
+editor.hotstrings.add_entry_title	hotstring を作成 — セクション « %s »
+editor.hotstrings.btn_add	➕ 追加
+editor.hotstrings.btn_add_entry	＋ Add a hotstring
+editor.hotstrings.btn_add_section	＋ セクション
+editor.hotstrings.btn_delete	削除
+editor.hotstrings.btn_delete_entry	🗑 削除
+editor.hotstrings.btn_edit	💾 編集
+editor.hotstrings.btn_new	新規…
+editor.hotstrings.btn_redefine	Redefine
+editor.hotstrings.btn_rename	名前変更…
+editor.hotstrings.btn_view_compact	Compact view
+editor.hotstrings.btn_view_expanded	Expanded view
+editor.hotstrings.bulk_move_placeholder	移動先…
+editor.hotstrings.bulk_selected_one	selected
+editor.hotstrings.bulk_selected_other	selected
+editor.hotstrings.cb_auto	自動展開
+editor.hotstrings.cb_case	大文字小文字を区別
+editor.hotstrings.cb_final	最終結果
+editor.hotstrings.cb_word	完全な単語
+editor.hotstrings.chk_case	大文字小文字を区別
+editor.hotstrings.chk_close_after	後で閉じる
+editor.hotstrings.chk_final	最終結果
+editor.hotstrings.chk_word	完全な単語
+editor.hotstrings.cmd_backspace	delete ←
+editor.hotstrings.cmd_delete	delete →
+editor.hotstrings.cmd_down	down
+editor.hotstrings.cmd_end	line end
+editor.hotstrings.cmd_enter	new line
+editor.hotstrings.cmd_escape	Escape
+editor.hotstrings.cmd_group_arrows	Arrows
+editor.hotstrings.cmd_group_edition	Edition
+editor.hotstrings.cmd_home	line start
+editor.hotstrings.cmd_left	left
+editor.hotstrings.cmd_right	right
+editor.hotstrings.cmd_tab	tab
+editor.hotstrings.cmd_up	up
+editor.hotstrings.col_auto	自動
+editor.hotstrings.col_case	大文字小文字
+editor.hotstrings.col_final	最終
+editor.hotstrings.col_priority	優先
+editor.hotstrings.col_result	結果
+editor.hotstrings.col_trigger	トリガー
+editor.hotstrings.col_word	単語
+editor.hotstrings.confirm_del_bulk	選択した %d 件のアイテムを削除しますか？
+editor.hotstrings.confirm_del_entry	« %s » を削除しますか？
+editor.hotstrings.confirm_del_section	« %s » とすべての hotstring を削除しますか？
+editor.hotstrings.desc_auto_off	Requires Space or Enter to expand (recommended for autocorrect).
+editor.hotstrings.desc_auto_on	Expands immediately (ideal for triggers ending with %s).
+editor.hotstrings.desc_case_off	The engine generates lowercase, Titlecase and UPPERCASE variants.
+editor.hotstrings.desc_case_on	Strictly distinguishes uppercase/lowercase.<br>Ex: <em>Btw</em> ≠ <em>btw</em>
+editor.hotstrings.desc_final_off	The result can trigger other hotstrings in cascade.
+editor.hotstrings.desc_final_on	The result will not be re-parsed as a trigger.
+editor.hotstrings.desc_prompt	このセクションのメニューに表示される説明:
+editor.hotstrings.desc_title	説明
+editor.hotstrings.desc_word_off	Triggers anywhere, even inside a word.<br>Ex: will trigger inside <em>hotel</em>
+editor.hotstrings.desc_word_on	Only triggers when it matches a standalone word.<br>Ex: <em>tel</em>→telephone but not <em>hotel</em>
+editor.hotstrings.drag_handle_title	Drag
+editor.hotstrings.edit_entry_title	hotstring を編集 — セクション « %s »
+editor.hotstrings.empty_hint	ホットストリングが定義されていません。+ セクションをクリックして開始してください。☰ ドラッグして並べ替え — タイトルをクリックして名前変更
+editor.hotstrings.entry_modal_title_new	新しいホットストリング
+editor.hotstrings.err_duplicate	⚠ このトリガーはこのセクションに既に存在します。
+editor.hotstrings.err_id_exists	« %s » already exists.
+editor.hotstrings.err_id_invalid	Invalid identifier: lowercase letters, digits and underscores only.
+editor.hotstrings.err_id_required	The identifier is required.
+editor.hotstrings.err_no_section	⚠ 最初にセクションを選択または作成してください。
+editor.hotstrings.err_no_section_selected	セクションが選択されていません。
+editor.hotstrings.err_output_empty	The replacement is required.
+editor.hotstrings.err_section_exists	このセクションは既に存在します。
+editor.hotstrings.err_select_to_delete	⚠ 削除するホットストリングを選択してください。
+editor.hotstrings.err_select_to_edit	⚠ 編集するホットストリングを選択してください。
+editor.hotstrings.err_trigger_dup_msg	The trigger <strong>%s</strong> already exists in <em>%s</em>.<br><br>Do you really want to redefine it?
+editor.hotstrings.err_trigger_empty	The trigger is required.
+editor.hotstrings.err_trigger_required	⚠ トリガーと結果は必須です。
+editor.hotstrings.err_write	⚠ personal_hotstrings.tomlへの書き込みエラー。
+editor.hotstrings.group_selected	選択したホットストリング
+editor.hotstrings.kbd_help	↩ = 改行\n⌘ + ↩ = 保存\n⇧ + ⌘ + ↩ = 保存 + 新しいホットストリング
+editor.hotstrings.label_result	結果:
+editor.hotstrings.label_section	セクション:
+editor.hotstrings.label_trigger	トリガー:
+editor.hotstrings.meta_desc	個人ホットストリング
+editor.hotstrings.new_section_prompt	新しいセクション名（識別子、スペースなし）:
+editor.hotstrings.new_section_title	新しいセクション
+editor.hotstrings.no_section	（セクションなし）
+editor.hotstrings.page_title	✏︎ 個人ホットストリング
+editor.hotstrings.priority_hint	空＝既定の優先度、高いほうが優先
+editor.hotstrings.priority_label	優先度
+editor.hotstrings.rename_desc_prompt	セクション "{1}" の新しい説明：
+editor.hotstrings.rename_title	名前変更
+editor.hotstrings.replacement_label	置換
+editor.hotstrings.replacement_placeholder	例: こんにちは、↵お元気ですか。
+editor.hotstrings.save_error	保存エラー
+editor.hotstrings.saved_prefix	✓ 保存済み — 
+editor.hotstrings.sec_desc_hint	（メニューに表示される）
+editor.hotstrings.sec_desc_label	説明
+editor.hotstrings.sec_desc_placeholder	例: マイ略語
+editor.hotstrings.sec_id_hint	（小文字、数字、アンダースコアのみ）
+editor.hotstrings.sec_id_label	識別子
+editor.hotstrings.sec_id_placeholder	例: my_abbrev
+editor.hotstrings.sec_modal_title_new	新しいセクション
+editor.hotstrings.sec_modal_title_rename	Rename section
+editor.hotstrings.special_cmds_summary	特殊コマンド — クリックして挿入
+editor.hotstrings.title_confirm	確認
+editor.hotstrings.title_error	エラー
+editor.hotstrings.trig_hint_text	shown, stored as
+editor.hotstrings.trigger_label	トリガー
+editor.hotstrings.trigger_placeholder	例: btw
+editor.hotstrings.window_title	個人ホットストリングエディター
+editor.personal_info.window_title	ErgoptiPlus — 個人情報
+ergopti.error_caught	ErgoptiPlus — 内部エラーを捕捉 :
+ergopti.windowspy_not_found	次の場所に WindowSpy.ahk が見つかりませんでした : {1}
+ext.demo.gui_message	Ergoptiデモ拡張からこんにちは！
+ext.demo.open_demo_gui	デモインターフェースを開く
+ext.demo.show_info	情報を表示
+ext.demo.visit_docs	ドキュメントを見る
+gesture.setup.auto_configure	\nまたはメニューの「自動設定」をクリックして\nこれらのショートカットをレジストリに直接書き込む。\n（再起動が必要な場合があります。）
+gesture.setup.for_each	各ジェスチャーで「カスタムショートカット」を選択し\n表示されたショートカットを入力してください：\n\n
+gesture.setup.header	タッチパッドジェスチャーの設定\n══════════════════════════════════\n\n
+gesture.setup.open_path	開く：設定 > Bluetoothとデバイス > タッチパッド\n         > 詳細なジェスチャー\n\n
+gesture.setup.title	ErgoptiPlus — タッチパッドジェスチャー
+gesture.slots.swipe_2_down	2本指スワイプ ↓
+gesture.slots.swipe_2_left	2本指スワイプ ←
+gesture.slots.swipe_2_left_down	2本指スワイプ ↙
+gesture.slots.swipe_2_left_up	2本指スワイプ ↖
+gesture.slots.swipe_2_right	2本指スワイプ →
+gesture.slots.swipe_2_right_down	2本指スワイプ ↘
+gesture.slots.swipe_2_right_up	2本指スワイプ ↗
+gesture.slots.swipe_2_up	2本指スワイプ ↑
+gesture.slots.swipe_3_down	3本指スワイプ ↓
+gesture.slots.swipe_3_left	3本指スワイプ ←
+gesture.slots.swipe_3_left_down	3本指スワイプ ↙
+gesture.slots.swipe_3_left_up	3本指スワイプ ↖
+gesture.slots.swipe_3_right	3本指スワイプ →
+gesture.slots.swipe_3_right_down	3本指スワイプ ↘
+gesture.slots.swipe_3_right_up	3本指スワイプ ↗
+gesture.slots.swipe_3_up	3本指スワイプ ↑
+gesture.slots.swipe_4_down	4本指スワイプ ↓
+gesture.slots.swipe_4_left	4本指スワイプ ←
+gesture.slots.swipe_4_left_down	4本指スワイプ ↙
+gesture.slots.swipe_4_left_up	4本指スワイプ ↖
+gesture.slots.swipe_4_right	4本指スワイプ →
+gesture.slots.swipe_4_right_down	4本指スワイプ ↘
+gesture.slots.swipe_4_right_up	4本指スワイプ ↗
+gesture.slots.swipe_4_up	4本指スワイプ ↑
+gesture.slots.swipe_5_diag	5本指スワイプ ↗↙
+gesture.slots.swipe_5_down	5本指スワイプ ↓
+gesture.slots.swipe_5_horiz	5本指スワイプ ↔
+gesture.slots.swipe_5_left	5本指スワイプ ←
+gesture.slots.swipe_5_left_down	5本指スワイプ ↙
+gesture.slots.swipe_5_left_up	5本指スワイプ ↖
+gesture.slots.swipe_5_right	5本指スワイプ →
+gesture.slots.swipe_5_right_down	5本指スワイプ ↘
+gesture.slots.swipe_5_right_up	5本指スワイプ ↗
+gesture.slots.swipe_5_up	5本指スワイプ ↑
+gesture.slots.tap_2	2本指タップ
+gesture.slots.tap_3	3本指タップ
+gesture.slots.tap_4	4本指タップ
+gesture.slots.tap_5	5本指タップ
+gesture.touchpad_open.body	タッチパッドページが開きました。\n\n下にスクロールして、\n「詳細なジェスチャー」をクリックしてショートカットにアクセスしてください。
+gestures.conflict_desc_swipe_2	2本指スワイプ — スクロール・ページ・Mission Control
+gestures.conflict_desc_swipe_3_horiz	3本指左右スワイプ — ページ / スペース切り替え
+gestures.conflict_desc_swipe_3_vert	3本指上下スワイプ — Mission Control & App Exposé
+gestures.conflict_desc_swipe_4_horiz	4/5本指左右スワイプ — スペース切り替え
+gestures.conflict_desc_swipe_4_vert	4/5本指上下スワイプ — Mission Control & App Exposé
+gestures.conflict_desc_tap_3	3本指タップ — 調べる＆データ検出
+gestures.conflict_dialog_line1	このジェスチャは macOS によって処理される可能性があります：
+gestures.conflict_dialog_line2	その場合、macOS と Hammerspoon が同時に反応します：
+gestures.conflict_dialog_line3	両方の動作が同時にトリガーされます。
+gestures.conflict_dialog_line4	まだ有効な場合は、ここで無効にしてください：
+gestures.conflict_hint_swipe_2	システム設定 › トラックパッド\n→ Hammerspoon で使用する場合は 2 本指ジェスチャをオフにしてください。
+gestures.conflict_hint_swipe_3_horiz	システム設定 › トラックパッド › その他のジェスチャ\n→「ページ間をスワイプ」と「スペース間を移動」をオフにする
+gestures.conflict_hint_swipe_3_vert	システム設定 › トラックパッド › その他のジェスチャ\n→「Mission Control」と「App Exposé」をオフにする
+gestures.conflict_hint_swipe_4_horiz	システム設定 › トラックパッド › その他のジェスチャ\n→「スペース間を移動」をオフにする
+gestures.conflict_hint_swipe_4_vert	システム設定 › トラックパッド › その他のジェスチャ\n→「Mission Control」と「App Exposé」をオフにする
+gestures.conflict_hint_tap_3	システム設定 › トラックパッド › ポイントとクリック\n→「調べる＆データ検出」をオフにする
+gestures.enabled	タッチパッドジェスチャー（Windows設定が必要）
+healthcheck.copy_and_close	クリップボードにコピーして閉じる
+hotstrings.custom_terminator	カスタム
+hotstrings.custom_terminator_consumed	カスタム（消費済み）
+hotstrings.shortcut_custom	カスタムショートカット
+hs_config.btn_all_gray	すべてグレー
+hs_config.btn_all_grey	すべてグレー
+hs_config.btn_close	閉じる
+hs_config.btn_reset_all	すべてリセット
+hs_config.btn_reset_default	デフォルトに戻す
+hs_config.cat_autocorrection	自動修正
+hs_config.cat_distances	距離削減
+hs_config.cat_magickey	★キーと展開
+hs_config.cat_personal	個人ホットストリング
+hs_config.cat_rolls	ロール
+hs_config.cat_sfbs	SFB削減
+hs_config.category_prefix	カテゴリー: 
+hs_config.color_blue	青
+hs_config.color_brown	茶
+hs_config.color_cyan	シアン
+hs_config.color_gray	灰
+hs_config.color_green	緑
+hs_config.color_indigo	藍
+hs_config.color_inherit	— デフォルトを継承 —
+hs_config.color_lime	ライム
+hs_config.color_orange	オレンジ
+hs_config.color_pink	ピンク
+hs_config.color_purple	紫
+hs_config.color_red	赤
+hs_config.color_turquoise	ターコイズ
+hs_config.color_yellow	黄
+hs_config.default_prefix	デフォルト: 
+hs_config.delim_space	Space
+hs_config.delim_tab	Tab
+hs_config.file_level	── ファイルレベル ──
+hs_config.file_level_short	（ファイルレベル）
+hs_config.group_common	共通
+hs_config.group_extensions	拡張機能
+hs_config.group_personal	個人
+hs_config.hint	カテゴリーまたはセクションで調整。すべての変更はすぐに保存されます。
+hs_config.label_category	カテゴリー:
+hs_config.label_color	色
+hs_config.label_delay	遅延 (ms)
+hs_config.label_file	ファイル:
+hs_config.label_group	グループ:
+hs_config.label_priority	優先度
+hs_config.label_section	セクション:
+hs_config.label_tooltip	ツールチップを表示
+hs_config.none	（なし）
+hs_config.notify_delimiters_saved	Word delimiters updated.
+hs_config.notify_reset_all	遅延と色がリセットされました.
+hs_config.override_active	オーバーライドが有効
+hs_config.section_prefix	セクション: 
+hs_config.window_title	ホットストリングの遅延と色
+init.reload_files	ファイルが変更されました — 再読み込み中…
+init.reload_hotstrings	ホットストリングが変更されました — 再読み込み中…
+init.reload_script	スクリプトが変更されました — 再読み込み中…
+init.reload_title	再読み込み中
+karabiner.download_failed	ダウンロード失敗：%s
+karabiner.downloading	Karabiner-Elementsをダウンロード中 (~46 MB)…
+karabiner.install_error_body	自動インストールに失敗しました：%s\n\nhttps://karabiner-elements.pqrs.org からKarabiner-Elementsを手動でダウンロードし、Hammerspoonを再起動してください。
+karabiner.install_error_title	インストール失敗
+karabiner.install_failed	インストール失敗：%s
+karabiner.installing	Karabiner-Elementsをインストール中（管理者パスワードが必要）…
+karabiner.lifecycle.unavailable	Karabiner-Elements が利用できません — インストールを確認してください。
+karabiner.onboarding.accessibility_body	システム機能拡張は有効ですが、Karabiner デーモンが実行されていません。Karabiner-Elements v16+ には「アクセシビリティ」権限が必要です（旧バージョンでは「入力監視」を要求します）。\n\n「アクセシビリティを開く」をクリックし、リストで Karabiner-Elements を有効にしてください。エントリが表示されない場合は、/Applications/ から Karabiner-Elements を一度開いて macOS に登録してください。
+karabiner.onboarding.accessibility_title	アクセシビリティが必要です
+karabiner.onboarding.btn_install_now	今すぐインストール
+karabiner.onboarding.btn_open_accessibility	アクセシビリティを開く
+karabiner.onboarding.btn_open_settings	設定を開く
+karabiner.onboarding.daemon_ready	Karabiner-Elements が動作中です。
+karabiner.onboarding.daemon_timeout	Karabiner デーモンの起動がタイムアウトしました。
+karabiner.onboarding.daemon_waiting	Karabiner デーモンの起動を待機中…
+karabiner.onboarding.error.manifest_unconfigured	マニフェストが設定されていません（TODO プレースホルダーが存在します）。
+karabiner.onboarding.error.mount_failed	マウントに失敗しました: {error}
+karabiner.onboarding.ext_activated	システム機能拡張が有効になりました。
+karabiner.onboarding.ext_body	Karabiner-Elements はインストールされていますが、システム機能拡張（DriverKit 仮想 HID）がまだ有効になっていません。\n\n「設定を開く」をクリックし、「システム機能拡張」セクションで「Karabiner-DriverKit-VirtualHIDDevice」を有効にしてください。
+karabiner.onboarding.ext_timeout	システム機能拡張の有効化がタイムアウトしました。
+karabiner.onboarding.ext_title	システム機能拡張を有効にする
+karabiner.onboarding.ext_waiting	システム機能拡張の有効化を待機中…
+karabiner.onboarding.install_body_suffix	\n\nアプリケーションは公式リポジトリ（pqrs-org/Karabiner-Elements）からダウンロードされ、自動的にインストールされます。管理者パスワードが要求されます。
+karabiner.onboarding.missing.daemon_not_running	• デーモンが実行されていません（入力監視？）
+karabiner.onboarding.missing.grabber_absent	• karabiner_grabber デーモンが存在しません
+karabiner.onboarding.missing.ke_not_installed	• Karabiner-Elements がインストールされていません
+karabiner.onboarding.missing.sysext_not_activated	• システム拡張（DriverKit）が有効化されていません
+karabiner.onboarding.missing_prefix	不足している要素：\n
+karabiner.onboarding.required_title	Karabiner-Elements の設定が必要です
+karabiner.pkg_not_found	DMGに.pkgが見つかりません。
+karabiner.ready_body	Karabinerエンジンの準備ができました。
+karabiner.ready_title	Karabinerの準備ができました
+karabiner.sha_failed	SHA-256検証失敗：%s
+keepawake.started	☕ スリープ防止：有効
+keepawake.stopped	☕ スリープ防止：無効
+keepawake.title	キーボード操作
+keylogger.category_general	一般
+keylogger.category_private	プライベートブラウジング
+keylogger.error_body	メトリクスインターフェースを読み込めませんでした。\n\nui/metrics_typing/init.lua を確認してください。
+keylogger.error_title	キーロガーエラー
+keylogger_ui.app_metrics	アプリ使用時間
+keylogger_ui.launch_error	ダッシュボードを起動できません : {1}
+keylogger_ui.metrics_disabled	メトリクスは無効です。
+keylogger_ui.metrics_disabled_body	有効にするには : 通知エリアのアイコン → 📊 メトリクス → « ❌ メトリクス無効（クリックして有効化）»
+keylogger_ui.metrics_title	📊 メトリクス
+keylogger_ui.typing_metrics	タイピングメトリクス
+layout.ctrlmagicsave	Ctrl+★ は Ctrl+S を送信
+layout.directaccessdigits	最上段の行で数字に直接アクセス
+layout.ergoptialtgr	ErgoptiレイアウトのAltGr層をエミュレート
+layout.ergoptibase	Ergoptiレイアウトのベース層をエミュレート
+layout.ergoptiplus	Ergopti➕のマイナーなAltGr変更を適用
+llm.deps.browser_install_tip	ブラウザで開いたページから Windows 用 Ollama をダウンロードし、インストーラを実行してここに戻ってください。接続は自動的に検出されます。
+llm.deps.done_success	✅ Ollama 準備完了
+llm.deps.fail_server_not_responding	インストーラーが終了しましたが、Ollamaサーバーが応答しません。
+llm.deps.fail_timeout	インストール後、Ollamaの応答を待つ間にタイムアウトしました。
+llm.deps.install_launching	Ollama のインストールを開始しています…
+llm.deps.install_launching_hotkey	Ollama のインストール（ショートカットにより開始）…
+llm.deps.tray_title	Ergopti — AI
+llm.generating	⏳ 生成中…
+llm.profile.advanced.label	●●○ 高度 — 修正 + 予測
+llm.profile.basic.label	●○○ 基本 — シンプルな予測
+llm.profile.batch_advanced.label	●●● バッチ高度 — {n} 件の予測{s}を含む 1つの高度なリクエスト
+llm.profile.raw.label	○○○ 未加工 — プロンプトなし、コンテキストのみ
+llm.server_mlx_ready_body	MLXサーバーの準備ができました。
+llm.server_ollama_ready_body	Ollamaサーバーの準備ができました。
+llm.server_ready_title	LLMが起動しました
+magickey.repeatcorrections	★キーが最後に入力した文字を繰り返す
+magickey.replace	JキーをJキーに変換する
+magickey.textexpansion	テキスト展開: c★ = c'est, gt★ = j'étais, pex★ = par exemple…
+magickey.textexpansionauto	★なしの自動展開: ju' = jusqu', ya = y'a…
+magickey.textexpansionemojis	絵文字展開: voiture★ = 🚗, koala★ = 🐨…
+magickey.textexpansionsymbols	記号展開: -->★ = ➜, (v)★ = ✓…
+magickey.textexpansionsymbolstypst	Typst記号: $eq.not$★ = ≠, $PP$★ = ℙ…
+menu.about.changelog	変更履歴
+menu.about.channel_dev	プレリリース (dev)
+menu.about.channel_local_source	✔  ローカルソース
+menu.about.channel_main	安定版 (main)
+menu.about.channel_menu	更新チャンネル
+menu.about.check_for_updates	アップデートを確認
+menu.about.frequency.10m	10 分ごと
+menu.about.frequency.12h	12 時間ごと
+menu.about.frequency.1h	1 時間ごと
+menu.about.frequency.1m	1 分ごと
+menu.about.frequency.24h	24 時間ごと
+menu.about.frequency.2d	2 日ごと
+menu.about.frequency.2h	2 時間ごと
+menu.about.frequency.3h	3 時間ごと
+menu.about.frequency.5m	5 分ごと
+menu.about.frequency.6h	6 時間ごと
+menu.about.frequency.7d	7 日ごと
+menu.about.frequency.never	Never
+menu.about.frequency_menu	確認頻度
+menu.about.install_update	アップデートをインストール…
+menu.about.open_releases_page	リリースページを開く — GitHub
+menu.about.title	バージョン / アップデート
+menu.about.update.changelog_error	GitHub からリリース情報を取得できませんでした。
+menu.about.update.changelog_header	{tag} のリリースノート:\n\n{notes}\n\nGitHub で開きますか?
+menu.about.update.install_error	アップデートのインストールに失敗しました。ログを確認するか、リリースページから手動でダウンロードしてください。
+menu.about.update.local_source	ローカルソースから実行中 — アップデートの確認は利用できません。
+menu.about.update.network_error	GitHub に接続できませんでした。\nインターネット接続を確認して、もう一度お試しください。
+menu.about.update.new_version	新しいバージョンが利用可能です!\n\n現在: {current}\n最新:  {latest}\n\nダウンロードのためにリリースページを開きますか?
+menu.about.update.no_asset	このリリースにアップデートアーカイブが見つかりませんでした。リリースページを開いて手動でダウンロードしてください。
+menu.about.update.parse_error	GitHub から最新リリースタグを取得できませんでした。
+menu.about.update.up_to_date	ErgoptiPlus は最新です。\n\n現在のバージョン: {version}
+menu.about.update_checking	確認中…
+menu.about.update_downloading	Downloading…
+menu.about.update_installing	インストール中…
+menu.about.update_now	{tag} にアップデート
+menu.apps.clone_desc	インストール済みアプリを複製
+menu.apps.config_per_app	Configure hotstrings per application
+menu.apps.encrypt_desc	ファイルとフォルダーを暗号化
+menu.apps.no_apps	アプリケーションが見つかりません
+menu.apps.title	🛠️ アプリケーション
+menu.builder.title	Ergopti+
+menu.builder.title_paused	Ergopti+ ⏸
+menu.debug.console	コンソール
+menu.debug.healthcheck	ヘルスチェック
+menu.debug.key_history	キー履歴
+menu.debug.list_vars	変数の状態
+menu.debug.log_level	ログレベル
+menu.debug.open_error_log	Open error log
+menu.debug.open_logs	ログフォルダーを開く
+menu.debug.open_today_log	本日のログファイルを開く
+menu.debug.title	⚠ デバッグ
+menu.debug.window_spy	ウィンドウスパイ
+menu.extensions.empty	拡張機能がインストールされていません
+menu.extensions.header	拡張機能
+menu.gestures.action_disabled	∅ Disabled
+menu.gestures.action_prefix	アクション: 
+menu.gestures.auto_configure	🔧 自動設定（レジストリ）
+menu.gestures.change_action	アクションを変更
+menu.gestures.circular_spaces	循環スペースナビゲーション (1 ↔ N)
+menu.gestures.conflict_title	ジェスチャーの競合
+menu.gestures.default_sensitivity	（一般デフォルト）
+menu.gestures.disable_all	✕ すべてのジェスチャーを無効化
+menu.gestures.enabled	️ ジェスチャー
+menu.gestures.manual_tutorial	📋 手動設定チュートリアル
+menu.gestures.mode_incremental	インクリメンタル送信（距離）
+menu.gestures.mode_prefix	モード: 
+menu.gestures.mode_single	シングルアクション (x1)
+menu.gestures.notify_title	ジェスチャー
+menu.gestures.off	❌ ジェスチャー無効（クリックで有効化）
+menu.gestures.on	✅ ジェスチャー有効（クリックで無効化）
+menu.gestures.open_settings	設定を開く
+menu.gestures.open_touchpad	⚙ タッチパッド設定を開く（「詳細なジェスチャー」）
+menu.gestures.restore_defaults	↩ デフォルトに戻す
+menu.gestures.sensitivity_hint	（小さいほど感度が高い）
+menu.gestures.sensitivity_label	アクションあたりの距離（感度）:
+menu.gestures.sensitivity_prefix	感度: 
+menu.gestures.swipe_2_diag	2本指スワイプ ↗↙
+menu.gestures.swipe_2_down	2本指スワイプ ↓
+menu.gestures.swipe_2_left	2本指スワイプ ←
+menu.gestures.swipe_2_left_down	2本指スワイプ ↙
+menu.gestures.swipe_2_left_up	2本指スワイプ ↖
+menu.gestures.swipe_2_right	2本指スワイプ →
+menu.gestures.swipe_2_right_down	2本指スワイプ ↘
+menu.gestures.swipe_2_right_up	2本指スワイプ ↗
+menu.gestures.swipe_2_up	2本指スワイプ ↑
+menu.gestures.swipe_3_diag	3本指スワイプ ↗↙
+menu.gestures.swipe_3_down	3本指スワイプ ↓
+menu.gestures.swipe_3_horiz	3本指スワイプ ↔
+menu.gestures.swipe_3_left	3本指スワイプ ←
+menu.gestures.swipe_3_left_down	3本指スワイプ ↙
+menu.gestures.swipe_3_left_up	3本指スワイプ ↖
+menu.gestures.swipe_3_right	3本指スワイプ →
+menu.gestures.swipe_3_right_down	3本指スワイプ ↘
+menu.gestures.swipe_3_right_up	3本指スワイプ ↗
+menu.gestures.swipe_3_up	3本指スワイプ ↑
+menu.gestures.swipe_4_diag	4本指スワイプ ↗↙
+menu.gestures.swipe_4_down	4本指スワイプ ↓
+menu.gestures.swipe_4_horiz	4本指スワイプ ↔
+menu.gestures.swipe_4_left	4本指スワイプ ←
+menu.gestures.swipe_4_left_down	4本指スワイプ ↙
+menu.gestures.swipe_4_left_up	4本指スワイプ ↖
+menu.gestures.swipe_4_right	4本指スワイプ →
+menu.gestures.swipe_4_right_down	4本指スワイプ ↘
+menu.gestures.swipe_4_right_up	4本指スワイプ ↗
+menu.gestures.swipe_4_up	4本指スワイプ ↑
+menu.gestures.swipe_5_diag	5本指スワイプ ↗↙
+menu.gestures.swipe_5_down	5本指スワイプ ↓
+menu.gestures.swipe_5_horiz	5本指スワイプ ↔
+menu.gestures.swipe_5_left	5本指スワイプ ←
+menu.gestures.swipe_5_left_down	5本指スワイプ ↙
+menu.gestures.swipe_5_left_up	5本指スワイプ ↖
+menu.gestures.swipe_5_right	5本指スワイプ →
+menu.gestures.swipe_5_right_down	5本指スワイプ ↘
+menu.gestures.swipe_5_right_up	5本指スワイプ ↗
+menu.gestures.swipe_5_up	5本指スワイプ ↑
+menu.gestures.tap_2	2本指タップ
+menu.gestures.tap_3	3本指タップ
+menu.gestures.tap_4	4本指タップ
+menu.gestures.tap_5	5本指タップ
+menu.gestures.title	🖐️ ジェスチャー
+menu.global.config_folder	📂 設定フォルダー…
+menu.global.disable_all	☐ すべての機能を無効化
+menu.global.edit_shortcuts	  ↳ 個人ショートカットを編集
+menu.global.enable_all	☑ すべての機能を有効化
+menu.global.language	🌐 言語
+menu.global.quit	⏹ 終了
+menu.global.reload	🔄 リロード
+menu.global.reset_defaults	↺ デフォルトにリセット
+menu.global.setup_wizard	セットアップウィザード…
+menu.global.suspend	⏸︎ 一時停止
+menu.global.title	グローバルアクション
+menu.hotstrings.add_custom	+ カスタムエクスパンダーを追加…
+menu.hotstrings.add_delimiter	+ Add custom delimiter…
+menu.hotstrings.category_off	❌ 無効（クリックして有効化）
+menu.hotstrings.category_on	✅ 有効（クリックして無効化）
+menu.hotstrings.check_all	☑ すべて選択
+menu.hotstrings.close_on_add	ショートカットでホットストリング追加後にUIを閉じる
+menu.hotstrings.config_item	⚙️ 遅延と色を設定…
+menu.hotstrings.consumed	消費済み
+menu.hotstrings.consumed_suffix	(消費済み)
+menu.hotstrings.custom_label	カスタム
+menu.hotstrings.default_category_prefix	デフォルトカテゴリー: 
+menu.hotstrings.default_none	なし
+menu.hotstrings.delay_autocorrection	自動修正遅延
+menu.hotstrings.delay_invalid_body	負でない整数（ミリ秒）を入力してください。
+menu.hotstrings.delay_invalid_title	無効な値
+menu.hotstrings.delay_magic_key	マジックキー (★) 遅延
+menu.hotstrings.delay_prompt	新しい遅延（ミリ秒）(0 = 遅延なし):
+menu.hotstrings.delays_colors	遅延と色…
+menu.hotstrings.delete_delimiter	Delete this delimiter…
+menu.hotstrings.delete_expander	このエクスパンダーを削除…
+menu.hotstrings.disable_all	❌ Disable all
+menu.hotstrings.enable_all	✅ Enable all
+menu.hotstrings.header_common	共通ホットストリング
+menu.hotstrings.header_common_count	共通ホットストリング (%s)
+menu.hotstrings.header_ergopti	Ergoptiレイアウト
+menu.hotstrings.header_ergopti_count	Ergoptiレイアウト (%s)
+menu.hotstrings.header_personal_count	マイ hotstrings (%s)
+menu.hotstrings.infinite	∞
+menu.hotstrings.magic_key_prefix	マジックキー: 
+menu.hotstrings.magic_key_prompt	新しい値（デフォルト: ★）:
+menu.hotstrings.magic_key_title	マジックキーを編集
+menu.hotstrings.missing_value	(値がありません)
+menu.hotstrings.notify_bubble_ai	バブル AI
+menu.hotstrings.notify_bubble_autocorrect	バブル 自動修正
+menu.hotstrings.notify_bubble_colored	カラーバブル
+menu.hotstrings.notify_bubble_star	バブル ★
+menu.hotstrings.off	❌ ホットストリング無効（クリックで有効化）
+menu.hotstrings.on	✅ ホットストリング有効（クリックで無効化）
+menu.hotstrings.open_editor	ホットストリングエディターを開く
+menu.hotstrings.open_file	ファイルを開く…
+menu.hotstrings.params	⚙️ ホットストリング設定
+menu.hotstrings.personal_header	マイ hotstrings
+menu.hotstrings.preview_bubbles	プレビューバブル
+menu.hotstrings.repeat_key_toggle	★キーで直前のキー入力を繰り返す
+menu.hotstrings.reset_magic_key	   ↳ リセット（デフォルト: ★）
+menu.hotstrings.rolls.assign	#! ➜ :=
+menu.hotstrings.rolls.assign_arrow_equal_left	=$ ➜ <=
+menu.hotstrings.rolls.assign_arrow_equal_right	$= ➜ =>
+menu.hotstrings.rolls.assign_arrow_minus_left	?+ ➜ <-
+menu.hotstrings.rolls.assign_arrow_minus_right	+? ➜ ->
+menu.hotstrings.rolls.bracket_quote	[# ➜ ["
+menu.hotstrings.rolls.chevron_equal	= ➜ <=
+menu.hotstrings.rolls.chevron_greater	>% ➜ >=
+menu.hotstrings.rolls.chevron_less	<% ➜ <=
+menu.hotstrings.rolls.close_chevron_tag	<@ ➜ </
+menu.hotstrings.rolls.comment_close	"\\  ➜ */
+menu.hotstrings.rolls.comment_open	\\" ➜ /*
+menu.hotstrings.rolls.ct	P' ➜ CT
+menu.hotstrings.rolls.cx	CX ➜ CK
+menu.hotstrings.rolls.english_negation	NT' ➜ N'T
+menu.hotstrings.rolls.equal_string	[) ➜ = ""
+menu.hotstrings.rolls.ez	EÉ ➜ EZ
+menu.hotstrings.rolls.hashtag_close_bracket	#] ➜ "]
+menu.hotstrings.rolls.hashtag_open_bracket	#[ ➜ "[
+menu.hotstrings.rolls.hashtag_parenthesis	#( ➜ ")
+menu.hotstrings.rolls.hashtag_quote	#" ➜ "
+menu.hotstrings.rolls.hc	HC ➜ WH
+menu.hotstrings.rolls.left_arrow	=+ = ➜
+menu.hotstrings.rolls.not_equal	!# ➜ !=
+menu.hotstrings.rolls.paren_quote	(# ➜ ("
+menu.hotstrings.rolls.sx	SX ➜ SK
+menu.hotstrings.shortcut_default_ctrl	Ctrl + %s
+menu.hotstrings.shortcut_none	ショートカットなし
+menu.hotstrings.shortcut_prefix	ショートカット: Win + 
+menu.hotstrings.shortcut_prompt	形式: mods+キー (例: ctrl+e)\n使用可能なmods: cmd, alt, ctrl, shift\n無効にするには空白のまま
+menu.hotstrings.title	⚡ ホットストリング
+menu.hotstrings.tooltip_ai	AIプレビュー
+menu.hotstrings.tooltip_ai_acceptance	AI受け入れ遅延
+menu.hotstrings.tooltip_autocompletion	自動補完遅延
+menu.hotstrings.tooltip_autocorrect	自動修正プレビュー
+menu.hotstrings.tooltip_colored	カラープレビュー
+menu.hotstrings.tooltip_default	デフォルト遅延（全グループ）
+menu.hotstrings.tooltip_magic	★ プレビュー
+menu.hotstrings.uncheck_all	□ すべて解除
+menu.hotstrings.word_delimiters	単語区切り文字
+menu.hotstrings.word_expanders	エクスパンダー
+menu.hs.gestures.modes	モード
+menu.hs.gestures.modes.swipe_2_down	モード — 2本指スワイプ ↓
+menu.hs.gestures.modes.swipe_2_left	モード — 2本指スワイプ ←
+menu.hs.gestures.modes.swipe_2_left_down	モード — 2本指スワイプ ↙
+menu.hs.gestures.modes.swipe_2_left_up	モード — 2本指スワイプ ↖
+menu.hs.gestures.modes.swipe_2_right	モード — 2本指スワイプ →
+menu.hs.gestures.modes.swipe_2_right_down	モード — 2本指スワイプ ↘
+menu.hs.gestures.modes.swipe_2_right_up	モード — 2本指スワイプ ↗
+menu.hs.gestures.modes.swipe_2_up	モード — 2本指スワイプ ↑
+menu.hs.gestures.modes.swipe_3_down	モード — 3本指スワイプ ↓
+menu.hs.gestures.modes.swipe_3_left	モード — 3本指スワイプ ←
+menu.hs.gestures.modes.swipe_3_left_down	モード — 3本指スワイプ ↙
+menu.hs.gestures.modes.swipe_3_left_up	モード — 3本指スワイプ ↖
+menu.hs.gestures.modes.swipe_3_right	モード — 3本指スワイプ →
+menu.hs.gestures.modes.swipe_3_right_down	モード — 3本指スワイプ ↘
+menu.hs.gestures.modes.swipe_3_right_up	モード — 3本指スワイプ ↗
+menu.hs.gestures.modes.swipe_3_up	モード — 3本指スワイプ ↑
+menu.hs.gestures.modes.swipe_4_down	モード — 4本指スワイプ ↓
+menu.hs.gestures.modes.swipe_4_left	モード — 4本指スワイプ ←
+menu.hs.gestures.modes.swipe_4_left_down	モード — 4本指スワイプ ↙
+menu.hs.gestures.modes.swipe_4_left_up	モード — 4本指スワイプ ↖
+menu.hs.gestures.modes.swipe_4_right	モード — 4本指スワイプ →
+menu.hs.gestures.modes.swipe_4_right_down	モード — 4本指スワイプ ↘
+menu.hs.gestures.modes.swipe_4_right_up	モード — 4本指スワイプ ↗
+menu.hs.gestures.modes.swipe_4_up	モード — 4本指スワイプ ↑
+menu.hs.gestures.modes.swipe_5_down	モード — 5本指スワイプ ↓
+menu.hs.gestures.modes.swipe_5_left	モード — 5本指スワイプ ←
+menu.hs.gestures.modes.swipe_5_left_down	モード — 5本指スワイプ ↙
+menu.hs.gestures.modes.swipe_5_left_up	モード — 5本指スワイプ ↖
+menu.hs.gestures.modes.swipe_5_right	モード — 5本指スワイプ →
+menu.hs.gestures.modes.swipe_5_right_down	モード — 5本指スワイプ ↘
+menu.hs.gestures.modes.swipe_5_right_up	モード — 5本指スワイプ ↗
+menu.hs.gestures.modes.swipe_5_up	モード — 5本指スワイプ ↑
+menu.hs.gestures.sensitivities	感度
+menu.hs.gestures.sensitivities.swipe_2_down	感度 — 2本指スワイプ ↓
+menu.hs.gestures.sensitivities.swipe_2_left	感度 — 2本指スワイプ ←
+menu.hs.gestures.sensitivities.swipe_2_left_down	感度 — 2本指スワイプ ↙
+menu.hs.gestures.sensitivities.swipe_2_left_up	感度 — 2本指スワイプ ↖
+menu.hs.gestures.sensitivities.swipe_2_right	感度 — 2本指スワイプ →
+menu.hs.gestures.sensitivities.swipe_2_right_down	感度 — 2本指スワイプ ↘
+menu.hs.gestures.sensitivities.swipe_2_right_up	感度 — 2本指スワイプ ↗
+menu.hs.gestures.sensitivities.swipe_2_up	感度 — 2本指スワイプ ↑
+menu.hs.gestures.sensitivities.swipe_3_down	感度 — 3本指スワイプ ↓
+menu.hs.gestures.sensitivities.swipe_3_left	感度 — 3本指スワイプ ←
+menu.hs.gestures.sensitivities.swipe_3_left_down	感度 — 3本指スワイプ ↙
+menu.hs.gestures.sensitivities.swipe_3_left_up	感度 — 3本指スワイプ ↖
+menu.hs.gestures.sensitivities.swipe_3_right	感度 — 3本指スワイプ →
+menu.hs.gestures.sensitivities.swipe_3_right_down	感度 — 3本指スワイプ ↘
+menu.hs.gestures.sensitivities.swipe_3_right_up	感度 — 3本指スワイプ ↗
+menu.hs.gestures.sensitivities.swipe_3_up	感度 — 3本指スワイプ ↑
+menu.hs.gestures.sensitivities.swipe_4_down	感度 — 4本指スワイプ ↓
+menu.hs.gestures.sensitivities.swipe_4_left	感度 — 4本指スワイプ ←
+menu.hs.gestures.sensitivities.swipe_4_left_down	感度 — 4本指スワイプ ↙
+menu.hs.gestures.sensitivities.swipe_4_left_up	感度 — 4本指スワイプ ↖
+menu.hs.gestures.sensitivities.swipe_4_right	感度 — 4本指スワイプ →
+menu.hs.gestures.sensitivities.swipe_4_right_down	感度 — 4本指スワイプ ↘
+menu.hs.gestures.sensitivities.swipe_4_right_up	感度 — 4本指スワイプ ↗
+menu.hs.gestures.sensitivities.swipe_4_up	感度 — 4本指スワイプ ↑
+menu.hs.gestures.sensitivities.swipe_5_down	感度 — 5本指スワイプ ↓
+menu.hs.gestures.sensitivities.swipe_5_left	感度 — 5本指スワイプ ←
+menu.hs.gestures.sensitivities.swipe_5_left_down	感度 — 5本指スワイプ ↙
+menu.hs.gestures.sensitivities.swipe_5_left_up	感度 — 5本指スワイプ ↖
+menu.hs.gestures.sensitivities.swipe_5_right	感度 — 5本指スワイプ →
+menu.hs.gestures.sensitivities.swipe_5_right_down	感度 — 5本指スワイプ ↘
+menu.hs.gestures.sensitivities.swipe_5_right_up	感度 — 5本指スワイプ ↗
+menu.hs.gestures.sensitivities.swipe_5_up	感度 — 5本指スワイプ ↑
+menu.kanata.title	🎹 Kanata
+menu.karabiner.clear_all	🧹 すべてクリア（タップ/ホールドとショートカット）
+menu.karabiner.combo_arrow	コンボ → %s
+menu.karabiner.copy_tap_to_combo	🔁 修飾キーにタップ→コンボをコピー
+menu.karabiner.disabled_warning_1	⚠️  メニューは無効ですが、Karabinerはまだ実行中です。
+menu.karabiner.disabled_warning_2	      リマッピングはまだ有効です。
+menu.karabiner.disabled_warning_3	      すべて停止するには: 上の🟢をクリックし、
+menu.karabiner.disabled_warning_4	      スタートアップアプリからKarabinerを削除してください。
+menu.karabiner.header_shortcuts	修飾キーショートカット
+menu.karabiner.header_taps_holds	タップ / ホールド
+menu.karabiner.hold_arrow	ホールド → %s
+menu.karabiner.hold_colon	ホールド: %s
+menu.karabiner.key_tap_delay	Tap delay: %s
+menu.karabiner.key_tap_delay_dialog_prompt	Tap / hold delay for this key, in milliseconds\n(global: %d ms)
+menu.karabiner.key_tap_delay_dialog_title	Karabiner — Per-key tap delay
+menu.karabiner.key_tap_delay_set	Set a custom delay…
+menu.karabiner.key_tap_delay_use_global	Use global delay (%s)
+menu.karabiner.left_hand	左手
+menu.karabiner.nothing_combo	アクションなし（コンボ、タップとホールド）
+menu.karabiner.nothing_tap_hold	アクションなし（タップとホールド）
+menu.karabiner.open_gui	Karabiner-Elementsを開く
+menu.karabiner.restore_defaults	↩ デフォルトに戻す
+menu.karabiner.right_hand	右手
+menu.karabiner.simultaneous_dialog_prompt	「コンボ」スロットをトリガーするショートカットの1番目と2番目のキーの間の最大遅延（ミリ秒）\n（コード入力スタイル: ほぼ同時にキーを押す）。\n\n（デフォルト: %d ms）
+menu.karabiner.simultaneous_dialog_title	Karabiner — コンボ起動遅延
+menu.karabiner.simultaneous_title	コンボ起動遅延: %s
+menu.karabiner.start	▶ Karabinerを起動
+menu.karabiner.status_active	🟢 Karabinerアクティブ
+menu.karabiner.status_inactive	🔴 Karabiner非アクティブ — クリックして再起動
+menu.karabiner.status_no_daemon	🟡 Karabiner有効 — デーモン未検出（KEはインストール済み？）
+menu.karabiner.status_not_primed	🟡 Karabiner有効 — ルール未適用（クリックしてプライム）
+menu.karabiner.status_priming	🔵 Karabiner — プライミング中…
+menu.karabiner.sticky_dialog_prompt	スティッキーキャンセル遅延（ミリ秒）\nこの時間、キー入力がなければワンショット修飾子はキャンセルされます。
+menu.karabiner.sticky_dialog_title	Karabiner — スティッキー遅延
+menu.karabiner.sticky_title	スティッキー修飾子遅延: %s
+menu.karabiner.stop	✕ Karabinerを終了
+menu.karabiner.symmetric	対称ショートカット（キー順不同）
+menu.karabiner.tap_arrow	タップ → %s
+menu.karabiner.tap_colon	タップ: %s
+menu.karabiner.tap_hold_dialog_prompt	タップ / ホールド遅延（ミリ秒）\n（Karabinerデフォルト: %d ms）
+menu.karabiner.tap_hold_dialog_title	Karabiner — タップ / ホールド遅延
+menu.karabiner.tap_hold_title	タップ / ホールド遅延: %s
+menu.keyboard_layout.add_ergopti	➕ Ergopti v%s をレイアウトリストに追加
+menu.keyboard_layout.open_system_prefs	システム環境設定 → キーボードを開く
+menu.layout.active_layouts	有効なレイアウト
+menu.layout.add_fail	追加に失敗しました — コンソールを確認してください。
+menu.layout.add_ok	%s をリストに追加しました。
+menu.layout.add_to_list	入力ソースにErgopti v%s を追加…
+menu.layout.already_added	✅ %s v%s — 追加済み
+menu.layout.in_list	すべてのErgoptiバリアント v%s が有効 ✅
+menu.layout.install_first	先にバンドルをインストールしてください
+menu.layout.install_version	%s Ergopti (%s) v%s をインストール
+menu.layout.installed_system	Ergoptiレイアウトをインストール済み（システムスコープ） ✅
+menu.layout.installed_user	Ergoptiレイアウトをインストール済み（ユーザースコープ） ✅
+menu.layout.installed_version	Ergopti (%s) v%s — 最新 ✅
+menu.layout.layout_auto	— 変更なし —
+menu.layout.layout_on_pause	スクリプト停止中のレイアウト
+menu.layout.layout_on_resume	スクリプト有効時のレイアウト
+menu.layout.logo_custom	カスタムアイコン
+menu.layout.logo_default	デフォルトアイコン
+menu.layout.no_bundle	Ergoptiバンドルが見つかりません
+menu.layout.off	❌ レイアウト無効（クリックで有効化）
+menu.layout.on	✅ レイアウト有効（クリックで無効化）
+menu.layout.open_prefs	キーボード設定を開く…
+menu.layout.pause_layout_enabled	一時停止/再開時にレイアウトを切り替える
+menu.layout.pause_layout_section	一時停止/再開時のレイアウト
+menu.layout.replace	キーを★キーに変換する
+menu.layout.scope_system	システム
+menu.layout.scope_user	ユーザー
+menu.layout.title	🌐 キーボードレイアウト
+menu.layout.update_list	有効リスト v%s → v%s を更新
+menu.layout.update_list_fail	更新に失敗しました — コンソールを確認してください。
+menu.layout.update_list_install_first	有効リストをv%sに更新（先にv%sをインストール）
+menu.layout.update_list_ok	入力ソースリストを更新しました。
+menu.layout.update_version	Ergopti (%s) v%s → v%s に更新
+menu.llm.about	Ergopti AIについて
+menu.llm.about_body	Ergopti AI — スマートキーボード提案\nバックエンド: Ollama (ローカル)\nバージョン: 1.0
+menu.llm.active_model_label	アクティブモデル: 
+menu.llm.add_custom_model	カスタムモデルを追加
+menu.llm.add_model_entry	➕ カスタムモデルを追加…
+menu.llm.after_hotstring	ホットストリングバブルが消えた後に提案
+menu.llm.api_add_entry	+ API を追加…
+menu.llm.api_dialog_title	ErgoptiPlus — API エンドポイント
+menu.llm.api_edit_entry	選択した API を編集…
+menu.llm.api_no_entry	API エンドポイントが未設定
+menu.llm.api_prompt_model	モデル名：
+menu.llm.api_prompt_name	名前（例：「自分の OpenAI キー」）：
+menu.llm.api_prompt_provider	プロバイダ ID（{1}）：
+menu.llm.api_prompt_token	API トークン / キー（非表示）：
+menu.llm.api_prompt_url	ベース URL：
+menu.llm.api_providers_unavailable	APIプロバイダー一覧を読み込めなかったため、APIエントリを追加できません。api_providers.json が存在し、有効であることを確認してください。
+menu.llm.api_remove_confirm_body	保存された API トークンは完全に削除されます。
+menu.llm.api_remove_confirm_title	API エントリ「%s」を削除しますか？
+menu.llm.api_remove_entry	選択した API を削除
+menu.llm.api_unreachable_body	「%s」は応答しませんでした — トークン、URL、モデルを確認してください。
+menu.llm.api_unreachable_title	API エントリに到達できません
+menu.llm.api_validated_body	「%s」が正常に応答しました。
+menu.llm.api_validated_title	API エントリ準備完了
+menu.llm.arrows	矢印
+menu.llm.arrows_only	矢印のみ
+menu.llm.auto_raise_temp	  ↳ 温度を自動的に上げる（提案ごとに+0.1）
+menu.llm.backend_api_suffix	リモート プロバイダ
+menu.llm.backend_default_model	↺ バックエンドデフォルトモデル (%s)
+menu.llm.backend_mlx_suffix	推奨（Apple Silicon ネイティブ）
+menu.llm.backend_ollama_suffix	標準
+menu.llm.backend_title	AI engine (Backend): 
+menu.llm.backend_unknown	Unknown
+menu.llm.browse_col_family	ファミリー
+menu.llm.browse_col_name	名前
+menu.llm.browse_col_params	パラメータ
+menu.llm.browse_col_ram	メモリ
+menu.llm.browse_col_speed	速度
+menu.llm.browse_col_status	ステータス
+menu.llm.browse_col_type	種類
+menu.llm.browse_models_entry	🔍 すべてのモデルを閲覧…
+menu.llm.browse_models_filter	フィルター：
+menu.llm.browse_models_title	ErgoptiPlus — LLMモデル
+menu.llm.browse_pick	このモデルを選択
+menu.llm.browse_status_available	⬇ 利用可能
+menu.llm.browse_status_installed	✅ インストール済み
+menu.llm.btn_download	ダウンロード
+menu.llm.caps_header	機能
+menu.llm.context_length_label	コンテキストサイズ: 直近%s文字
+menu.llm.context_length_prompt	分析する前の文字数:
+menu.llm.custom_model_title	カスタムモデル
+menu.llm.debounce_label	提案前のアイドル時間: %s
+menu.llm.debounce_prompt	生成前の待機時間（ms単位、例: 600）:
+menu.llm.delete_model_body	モデル"%s"をローカルキャッシュから削除してもよいですか？
+menu.llm.delete_model_cache	🗑️ このモデルをキャッシュから削除
+menu.llm.delete_model_title	モデルを削除しますか？
+menu.llm.digits	数字
+menu.llm.digits_only	数字のみ
+menu.llm.disable_password_fields	パスワードフィールドで無効化
+menu.llm.disable_url_bars	ブラウザーのアドレスバーで無効化
+menu.llm.disabled_in_label	%dアプリケーション%sで無効化
+menu.llm.disabled_in_prefix	無効化済み:
+menu.llm.display_menu_title	表示
+menu.llm.download_failed	ダウンロード失敗
+menu.llm.download_model	⬇️ このモデルをダウンロード
+menu.llm.download_window_lost	ダウンロードウィンドウが見つかりません
+menu.llm.download_window_lost_body	ダウンロードはバックグラウンドで継続しています。
+menu.llm.empty_model_id	識別子が空です — アクションなし。
+menu.llm.exclude_from_ai	AI自動生成から除外…
+menu.llm.generation_menu_title	生成設定
+menu.llm.hf_token_label	🔑 HuggingFaceトークン: %s
+menu.llm.hf_token_set	✅ 設定済み
+menu.llm.hf_token_unset	❌ 設定されていません
+menu.llm.hw_disk	ディスク容量: %s GB
+menu.llm.hw_download	ダウンロード: %s GB
+menu.llm.hw_header	要件 (%s)
+menu.llm.hw_ram	メモリ (RAM): %s GB
+menu.llm.indent_label	選択した提案のインデント
+menu.llm.indent_none	インデントなし
+menu.llm.indent_space	スペース
+menu.llm.indent_spaces	スペース
+menu.llm.inline_autotype	✍️ インライン自動入力（Copilot 風）
+menu.llm.instant_on_word_end	単語末での即時提案
+menu.llm.launch_download_prompt	ダウンロードを開始しますか？
+menu.llm.max_words_label	提案あたりの最大単語数: %s
+menu.llm.max_words_prompt	提案あたりの最大単語数（0 = 無制限）:
+menu.llm.min_words_label	提案あたりの最小単語数: %s
+menu.llm.min_words_prompt	提案あたりの最小単語数:
+menu.llm.mlx_model_hint	MLXモデルのHuggingFace識別子、例: mlx-community/Qwen2.5-3B-Instruct-4bit
+menu.llm.mlx_port_label	MLX サーバーポート: %s
+menu.llm.mlx_port_prompt	Ergopti のローカル MLX サーバーのポート（1024-65535）。デフォルト: %s。
+menu.llm.mlx_port_title	MLX サーバーポート
+menu.llm.model_backend	バックエンド: %s
+menu.llm.model_change_title	モデルの変更
+menu.llm.model_date	更新日: %s
+menu.llm.model_label	モデル：%s
+menu.llm.model_params_active	パラメーター（アクティブ）: %s
+menu.llm.model_params_total	パラメーター（合計）: %s
+menu.llm.model_source	ソース: %s
+menu.llm.model_speed	推定速度: %s トーク/秒
+menu.llm.model_tags	タグ: %s
+menu.llm.model_type	種類: %s
+menu.llm.my_models	🛠️ マイモデル
+menu.llm.nav_label	提案を移動（↑/← と ↓/→）
+menu.llm.nav_menu_title	ナビゲーション
+menu.llm.nav_modifiers_prompt	矢印ナビゲーション用修飾キー（例: ctrl, alt — 空欄 = 矢印のみ）:
+menu.llm.no_model	モデルなし（無効）
+menu.llm.no_model_none	なし
+menu.llm.not_installed_body	このモデルはまだインストールされていません。
+menu.llm.num_predictions_label	提案数: %s
+menu.llm.off	❌ AI無効（クリックして有効化）
+menu.llm.ollama_model_hint	Ollamaモデル識別子、例: qwen2.5:1.5b または llama3.2:3b
+menu.llm.ollama_port_label	Ollama サーバーポート: %s
+menu.llm.ollama_port_prompt	ローカル Ollama サーバーのポート（1024-65535）。デフォルト: 11434。
+menu.llm.ollama_port_title	Ollama サーバーポート
+menu.llm.on	✅ AI有効（クリックして無効化）
+menu.llm.params_active	パラメーター（アクティブ）: 
+menu.llm.params_total	パラメーター（合計）: 
+menu.llm.prediction_count_label	%d件の提案%s
+menu.llm.profile_already_ok_msg	モデル: %s\n%s\n\n現在のプロンプト:\n%s\n\n推奨プロンプト:\n%s\n\nこのプロファイルはすでにこのモデルに適しています。
+menu.llm.profile_change_msg	モデル: %s\n%s\n\n現在のプロンプト:\n%s\n\n推奨プロンプト:\n%s\n\n確認して推奨プロンプトを適用します。
+menu.llm.profile_power_warning	⚠️  高負荷プロファイル\n\n推奨:  %s\n選択中:  %s\n\nモデルの性能が不足している可能性があります。
+menu.llm.remove_model_body	カスタムモデル"%s"をリストから削除しますか？モデルはシステムからアンインストールされません。
+menu.llm.remove_model_title	このモデルを削除しますか？
+menu.llm.remove_user_model	🗑️ マイモデルから削除
+menu.llm.reset_label	  ↳ リセット（デフォルト: %s）
+menu.llm.reset_on_nav	クリック/移動時にコンテキストをクリア
+menu.llm.select_model	👉 このモデルを選択
+menu.llm.shortcut_prompt	形式: mods+キー  (例: cmd+alt+p)\n使用可能なmods: cmd, alt, ctrl, shift\n無効にするには空白のまま
+menu.llm.show_all_at_once	すべての提案を一度に表示（マルチ予測）
+menu.llm.show_download_window	📥 ダウンロード中 — ウィンドウを表示
+menu.llm.show_info_bar	情報バーを表示（モデルとレイテンシ）
+menu.llm.show_streaming	各提案をストリーミング表示（トークンごと）
+menu.llm.specs_header	仕様
+menu.llm.temperature_label	温度（創造性）: %s
+menu.llm.temperature_prompt	創造性レベル（0.0 = 決定論的、1.0 = 創造的）:
+menu.llm.thinking_model_info	  ↳ 情報: Thinkingモデル（非表示推論）
+menu.llm.title	✨ 人工知能
+menu.llm.toggle_disable	AI提案を無効にする
+menu.llm.toggle_enable	AI提案を有効にする
+menu.llm.trigger_menu_title	AIトリガー
+menu.llm.trigger_shortcut_label	手動生成のショートカット: %s
+menu.llm.trigger_shortcut_title	AI生成ショートカット
+menu.llm.unlimited	無制限
+menu.llm.val_label	提案番号を選択 (%s)
+menu.llm.val_modifiers_prompt	番号選択用修飾キー（例: ctrl, alt — 空欄 = 数字のみ）:
+menu.llm.warning_install_ollama	📥 Ollama を今すぐインストール
+menu.metrics.colors_by_source	    ↳ 入力ソース別に色分け
+menu.metrics.disabled_in_label	%dアプリケーション%sで無効化
+menu.metrics.encrypt_toggle	ディスク上のログを暗号化（セキュリティ）
+menu.metrics.exclude_apps	キーロガーからアプリを除外…
+menu.metrics.filter_private	プライベートブラウジングを無視
+menu.metrics.filter_secure	パスワードフィールドを無視
+menu.metrics.filter_sysauth	システム認証ダイアログを無視
+menu.metrics.include_realtime	    ↳ リアルタイムグラフを含める
+menu.metrics.off	❌ 指標無効（クリックで有効化）
+menu.metrics.on	✅ 指標有効（クリックで無効化）
+menu.metrics.open_encryptor	  ↳ スタンドアロン暗号化ツールを開く…
+menu.metrics.privacy_header	プライバシーフィルター
+menu.metrics.reset_wpm_position	    ↳ 位置をリセット
+menu.metrics.shortcut_apps_title	アプリ時間のショートカット
+menu.metrics.shortcut_item	    ↳ ショートカット: %s
+menu.metrics.shortcut_none	ショートカットなし
+menu.metrics.shortcut_prefix	  ↳ ショートカット: 
+menu.metrics.shortcut_prompt	形式: mods+キー (例: ctrl+m)\n無効にするには空白のまま
+menu.metrics.shortcut_typing_title	タイピング指標のショートカット
+menu.metrics.show_apps	アプリケーションごとの時間を表示
+menu.metrics.show_typing	タイピング指標を表示
+menu.metrics.show_wpm_menubar	メニューバーにWPMを表示
+menu.metrics.show_wpm_widget	フローティングWPMウィジェット
+menu.metrics.title	📊 指標
+menu.metrics.wpm_unit	wpm
+menu.paths.menu_item	設定フォルダー…
+menu.paths.pick_prompt	設定フォルダーを選択
+menu.paths.window_title	設定フォルダー
+menu.profiles.auto_detect	✨ 最適なプロファイルを自動検出
+menu.profiles.clone_builtin	✏️ このプロファイルを複製して編集…
+menu.profiles.copy_suffix	（コピー）
+menu.profiles.create_profile	カスタムプロファイルを作成…
+menu.profiles.custom_profile_label	カスタムプロファイル
+menu.profiles.delete_confirm_body	このカスタムプロファイルは完全に削除されます。
+menu.profiles.delete_confirm_title	"%s"を削除しますか？
+menu.profiles.delete_profile	🗑️ 削除…
+menu.profiles.edit_profile	✏️ 編集…
+menu.profiles.header_custom_profiles	カスタムプロファイル
+menu.profiles.header_default_profiles	デフォルトプロファイル
+menu.profiles.not_recommended	  ⚠️ 推奨しません（Thinking）
+menu.profiles.override_active_app_with_current	➕ 現在のプロファイルをアクティブなアプリに適用
+menu.profiles.per_app_overrides	🪟 アプリ別プロファイル
+menu.profiles.profile_label_prefix	プロファイル: %s
+menu.profiles.prompt_label	プロファイル名:
+menu.profiles.prompt_system_single	システムプロンプト（単一生成）:
+menu.profiles.recommended_profile	推奨プロファイル
+menu.profiles.recommended_unavailable_body	このコンテキストでは自動検出を適用できません
+menu.profiles.recommended_unavailable_title	推奨プロファイルが利用できません
+menu.profiles.shortcut_prefix	ショートカット: %s
+menu.profiles.shortcut_prompt	形式: mods+キー  (例: cmd+shift+b)\n使用可能なmods: cmd, alt, ctrl, shift\n無効にするには空白のまま
+menu.profiles.shortcut_title	プロファイルショートカット
+menu.profiles.use_profile	このプロファイルを使用
+menu.reloading	リロード中…
+menu.reloading_files	ファイルが変更されました — リロード中…
+menu.script_control.title	スクリプト制御
+menu.script_ready	スクリプト準備完了！
+menu.settings.context_length_title	コンテキストサイズ
+menu.settings.default_indicator	（デフォルト）
+menu.settings.delay_prompt	AIに問い合わせる前の必要なタイピング一時停止（ms）:\n\n（リセットするには空白のまま: %s ms）\n（「Never」または-1を入力して自動生成を無効にする）
+menu.settings.delay_title	待機時間
+menu.settings.disabled	無効
+menu.settings.indent_space	スペース
+menu.settings.indent_spaces	スペース
+menu.settings.max_words_prompt	提案あたりに保持する最大単語数（0 = 無制限）:
+menu.settings.max_words_title	提案あたりの最大単語数
+menu.settings.min_words_title	提案あたりの最小単語数
+menu.settings.never	なし
+menu.settings.no_modifier	修飾キーなし
+menu.settings.reset_instruction	\n\n（リセットするには空白のまま: %s）
+menu.settings.temperature_prompt	創造性レベル（0.0〜1.0）:
+menu.settings.temperature_title	温度
+menu.shortcuts.alt_add	[+ Alt+…ショートカットを追加]
+menu.shortcuts.alt_group	⎇ Altショートカット
+menu.shortcuts.altgr_symbol	AltGr + 記号
+menu.shortcuts.chatgpt_url_item	   ↳ ChatGPT URLを編集…
+menu.shortcuts.ctrl_add	[+ Ctrl+…ショートカットを追加]
+menu.shortcuts.ctrl_group	^ Ctrlショートカット
+menu.shortcuts.ctrl_shift_add	[+ Ctrl+Shift+…ショートカットを追加]
+menu.shortcuts.ctrl_shift_group	^⇧ Ctrl+Shiftショートカット
+menu.shortcuts.edit_personal_info	   ↳ 個人情報を編集…
+menu.shortcuts.group_accented	アクセント文字のショートカット
+menu.shortcuts.group_modifiers	修飾キーの組み合わせ
+menu.shortcuts.key_at_hash	@ / #
+menu.shortcuts.key_layer_scroll	Layer + Scroll
+menu.shortcuts.off	❌ ショートカット無効（クリックで有効化）
+menu.shortcuts.on	✅ ショートカット有効（クリックで無効化）
+menu.shortcuts.personal	個人ショートカット
+menu.shortcuts.right_opt_back	右Opt + ⌫ → %s
+menu.shortcuts.right_opt_escape	右Opt + Esc → %s
+menu.shortcuts.right_opt_return	右Opt + Return → %s
+menu.shortcuts.script_shortcuts	スクリプト管理ショートカット
+menu.shortcuts.submenu_cmd	Cmdショートカット
+menu.shortcuts.submenu_ctrl	Ctrlショートカット
+menu.shortcuts.title	🎯 ショートカット
+menu.shortcuts.win_add	[+ Win+…ショートカットを追加]
+menu.shortcuts.win_group	⊞ Winショートカット
+menu.shortcuts.wrap_group_angle	山括弧と装飾括弧
+menu.shortcuts.wrap_group_braces	水平波括弧
+menu.shortcuts.wrap_group_brackets	丸括弧と角括弧
+menu.shortcuts.wrap_group_cjk	CJK括弧
+menu.shortcuts.wrap_group_markdown	Markdown強調
+menu.shortcuts.wrap_group_other	その他の記号
+menu.shortcuts.wrap_group_quotes	引用符とアポストロフィ
+menu.shortcuts.wrap_symbols_add_custom	[+ 記号を追加…]
+menu.shortcuts.wrap_symbols_check_all	すべてチェック
+menu.shortcuts.wrap_symbols_custom_label	カスタム
+menu.shortcuts.wrap_symbols_title	  ↳ 選択範囲を囲む記号
+menu.shortcuts.wrap_symbols_uncheck_all	すべてチェック解除
+menu.tapholds.off	❌ タップホールド無効（クリックで有効化）
+menu.tapholds.on	✅ タップホールド有効（クリックで無効化）
+menu.tapholds.title	⌨️ タップホールド
+menu.updates.title	🔄 Updates
+metrics.shortcut_format_hint	形式 : 修飾キー+キー  (例 : ctrl+alt+m)\n使用可能な修飾キー : ctrl, alt, shift, win\n無効にする場合は空のままにしてください。
+metrics.shortcut_invalid_title	無効なショートカット
+metrics.shortcut_prompt_title	ショートカット — {1}
+metrics.shortcut_register_error	ショートカット « {1} » を登録できませんでした : {2}
+metrics_apps.chooser_placeholder	%s のカテゴリ
+metrics_apps.general_category	一般
+metrics_apps.new_category_create_subtext	新しいカテゴリを作成
+metrics_apps.new_category_item	+ 新しいカテゴリ…
+metrics_apps.new_category_prompt	%s の新しいカテゴリ名:
+metrics_apps.new_category_title	新しいカテゴリ
+metrics_apps.no_app_detected	アプリケーションを検出できませんでした。
+metrics_apps.rename_chooser_placeholder	名前を変更するカテゴリ
+metrics_apps.rename_item	✎ 既存のカテゴリの名前を変更…
+metrics_apps.rename_prompt	カテゴリ「%s」の新しい名前:
+metrics_apps.rename_subtext	このカテゴリのすべてのアプリが名前変更されます
+metrics_apps.rename_title	名前を変更
+metrics_apps.score_error	スコアは -2 から 2 の間でなければなりません。
+metrics_apps.score_prompt	%s の生産性スコア\n(-2 非常に気が散る〜2 非常に生産的):
+metrics_apps.score_title	スコア
+metrics_apps.title	タイピング指標
+metrics_apps.use_category_subtext	このカテゴリを使用
+metrics_apps.window_title	アプリ使用時間
+mlx.deps_failed	失敗…
+mlx.deps_missing	MLX 依存関係が不足しています
+mlx.deps_missing_body	自動 bootstrap が進行中です。数分後に再試行してください。
+mlx.deps_preparing	準備中…
+mlx.deps_pty_write_failed	PTY wrapper ファイルを書き込めませんでした。
+mlx.deps_step_bootstrap	インストールスクリプトを実行中…
+mlx.deps_step_python	Pythonをインストール中…
+mlx.deps_step_ready	AI エンジン準備完了。
+mlx.deps_step_sync	AI依存関係を同期中…
+mlx.deps_step_uv	uvをインストール中…
+mlx.deps_step_venv	ローカルvirtualenvを作成中…
+mlx.deps_task_create_failed	hs.taskを作成できません。
+mlx.deps_task_start_failed	hs.taskを起動できません。
+mlx.download_cancelled	キャンセルしました
+mlx.download_cancelled_body	%s のダウンロードが中断されました。
+mlx.download_failed	MLXエラー
+mlx.download_failed_body	ウィンドウのログを確認してください。
+mlx.download_interrupted	ダウンロードが中断されました
+mlx.download_interrupted_body	%s のダウンロードプロセスがリロード中に停止しました。
+mlx.download_stalled	MLXダウンロードが停止しています
+mlx.download_subtitle	Hugging Faceから重みを取得中…
+mlx.download_title	MLXモデルをダウンロード中
+mlx.hf_connected	HuggingFaceに接続しました
+mlx.hf_connected_body	トークンを保存しました。これでモデルをより速くダウンロードできます！
+mlx.hf_connection_failed	HuggingFace への接続に失敗しました
+mlx.hf_connection_failed_body	接続に失敗しました。トークンを確認してください。
+mlx.hf_login_title	HuggingFaceログイン
+mlx.hf_page_opened	モデルページをブラウザで開きました
+mlx.init_subtitle	AI initialization in progress, please wait…
+mlx.init_title	Initializing the AI engine (MLX)
+mlx.install_subtitle	ローカルPython依存関係を準備中…
+mlx.install_title	AIエンジンをインストール中 (MLX)
+mlx.launcher_failed	MLX起動に失敗しました
+mlx.launcher_failed_body	ランチャーが失敗しました（コード %d）。
+mlx.model_deleted	削除済み (MLX)
+mlx.model_incompatible	モデル %s は mlx-lm と互換性がありません。別のモデルを選択してください。
+mlx.model_installed	MLXモデルをインストールしました
+mlx.model_ready	%s の準備ができました！
+mlx.model_unavailable	MLXモデルは利用できません
+mlx.model_unavailable_body	モデル %s はMLX互換ではないか、MLXリポジトリが設定されていません
+mlx.open_source_failed	HuggingFaceページを開けません
+mlx.source_not_found	ソースが見つかりません
+mlx.source_not_found_body	このモデルのMLXリポジトリが見つかりません
+mlx.token_corrected	トークンを修正しました
+mlx.token_corrected_body	クリップボードの完全なトークンが使用されました
+mlx.token_detected	トークンを検出しました
+mlx.token_detected_body	クリップボードからトークンを取得しました
+mlx.token_missing	トークンがありません
+mlx.token_missing_body	トークンが指定されていません
+mlx.write_py_failed	Pythonスクリプトを /tmp に書き込めません
+mlx.write_sh_failed	Bashスクリプトを /tmp に書き込めません
+model_browser.col_family	ファミリー
+model_browser.col_name	モデル
+model_browser.col_params	パラメータ
+model_browser.col_ram	RAM
+model_browser.col_speed	速度
+model_browser.col_status	状態
+model_browser.col_type	種類
+model_browser.count_label	{total} 件中 {n} 件のモデル
+model_browser.no_models	検索条件に一致するモデルがありません。
+model_browser.search_placeholder	モデルを検索…
+model_browser.select_hint	モデルをダブルクリックするか、Enter キーを押して使用します。
+model_browser.status_available	利用可能
+model_browser.status_installed	インストール済み
+model_browser.type_chat	チャット
+model_browser.type_completion	補完
+model_browser.use_button	使用
+model_browser.window_title	モデルカタログ
+notify.all_features_disabled	すべての機能が無効になりました
+notify.all_features_enabled	すべての機能が有効になりました
+notify.clipboard	クリップボード
+notify.defaults_reset	デフォルトにリセット — リロード中…
+notify.hotstrings	ホットストリング
+notify.llm_disabled	🔴 無効
+notify.llm_enabled	🟢 有効
+notify.llm_mlx_failures_body	MLXサーバーが応答していません。モデルがロードされ、ポート8080でサーバーが実行中であることを確認してください。
+notify.llm_mlx_failures_title	LLM予測 — 繰り返し失敗
+notify.llm_suggestions	AI提案
+notify.personal_info	個人情報
+notify.screenshot_copied	スクリーンショットをコピーしました
+notify.screenshot_saved	スクリーンショットを保存しました
+notify.screenshot_saved_path	保存先: %s
+notify.screenshot_title	スクリーンショット
+notify.script_control	スクリプト制御
+notify.word_expander_prefix	単語エクスパンダー: %s
+ollama.cancelled_title	キャンセル
+ollama.daemon_fail	Ollama デーモンを起動できませんでした。
+ollama.delete_error	モデル：%s\n%s
+ollama.delete_fail_title	Ollama の削除に失敗しました
+ollama.deleted_title	削除されました (Ollama)
+ollama.deps_failed	失敗…
+ollama.deps_step_checking	Ollama を確認中…
+ollama.deps_step_installing	Ollamaをインストール中…
+ollama.deps_step_ready	Ollamaサーバーの準備ができました。
+ollama.deps_step_starting	Ollamaサーバーを起動中…
+ollama.deps_task_create_failed	hs.taskを作成できません。
+ollama.deps_task_start_failed	hs.taskを起動できません。
+ollama.download_cancelled	Ollama ダウンロードがキャンセルされました
+ollama.download_error	%s のダウンロードエラー
+ollama.download_subtitle	Ollama Hubから重みを取得中…
+ollama.download_title	Ollamaモデルをダウンロード中
+ollama.downloading	Ollama モデルをダウンロード中…
+ollama.fail_title	Ollama エラー
+ollama.install_subtitle	ローカルOllamaサーバーを準備中…
+ollama.install_title	AIエンジンをインストール中 (Ollama)
+ollama.model_deleted	モデルが削除されました：%s
+ollama.model_installed_title	Ollama モデルがインストールされました
+ollama.model_ready	%s の準備ができました！
+ollama.model_repair	モデルが破損しているようです。再ダウンロードを試みています：%s
+ollama.model_repair_title	Ollama モデルを修復中
+ollama.not_detected_body	Ollama をインストールして再試行してください。
+ollama.not_detected_title	Ollama が見つかりません
+ollama.service_disconnected	Ollama サービスが応答を停止しました。
+ollama.service_ready	Ollama サービス準備完了 ✅
+ollama.service_stopped	Ollama サービスが停止しています。起動中…
+ollama.start_fail	サービスを起動できませんでした。
+ollama.starting_service	Ollama サービスを起動中 (%s/%s)…
+ollama.starting_title	Ollama を起動中
+ollama.upgrade_required_body	インストールされている Ollama のバージョンはこのモデルには古すぎます。Ollama を手動で更新してください。
+ollama.upgrade_required_title	Ollama のアップグレードが必要です
+onboarding.back	← 戻る
+onboarding.btn.cancel	キャンセル
+onboarding.btn.no	いいえ
+onboarding.btn.ok	OK
+onboarding.btn.yes	はい
+onboarding.done.body	設定を保存しました。スクリプトを今すぐ再読み込みします。
+onboarding.done.title	セットアップ完了！
+onboarding.error.title	ErgoptiPlus — エラー
+onboarding.error.write_failed	設定ファイルの書き込みに失敗しました。
+onboarding.finish	完了 ✓
+onboarding.gestures.desc	トラックパッドのジェスチャーサポートを有効にします — スワイプ、タップ、ピンチで起動するカスタムアクション。
+onboarding.gestures.open_settings	タッチパッドの設定を開く
+onboarding.gestures.open_settings_hint	設定 → Bluetooth とデバイス → タッチパッド → 詳細なジェスチャーを開きます。各スロットは Ctrl + Win + Shift + F1..F10 ショートカットを受け付けます。
+onboarding.gestures.register_auto	自動設定
+onboarding.gestures.register_auto_hint	Windows 設定のすべてのジェスチャースロットを自動的に入力します。管理者権限は不要です。
+onboarding.gestures.register_deferred	ジェスチャーは次回起動時に設定されます。
+onboarding.gestures.register_failed	自動設定に失敗しました。以下の手動方法をご利用ください。
+onboarding.gestures.register_manual	手動方法
+onboarding.gestures.register_manual_hint	ステップバイステップのチュートリアルと、タッチパッド設定ページへのワンクリックショートカットを開きます。各ジェスチャーを手動で設定できます。
+onboarding.gestures.register_section	ジェスチャーは Windows 設定で構成する必要があります（Bluetooth とデバイス → タッチパッド → 詳細なジェスチャー）：
+onboarding.gestures.register_success	ジェスチャーが Windows 設定で構成されました。
+onboarding.gestures.title	ErgoptiPlus — ジェスチャー
+onboarding.language.placeholder	言語を選択…
+onboarding.layout.desc	レイアウトエミュレーション（ベースレイヤー + AltGr）と Ergopti ホットストリングを有効にします。
+onboarding.layout.no	システムレイアウトを使用
+onboarding.layout.title	ErgoptiPlus — Ergoptiキーボードエミュレーション
+onboarding.layout.yes	Ergoptiレイアウトをエミュレート
+onboarding.magic_key.choose_freely	どの文字でもトリガーとして使用できます — 誤作動を避けるほど珍しく、実用的なほど押しやすいものを選んでください。
+onboarding.magic_key.desc	ホットストリングを起動する文字。
+onboarding.magic_key.option_blackstar	★ — 推奨 (Ergopti レイアウトの専用キー)
+onboarding.magic_key.option_custom	カスタム入力
+onboarding.magic_key.option_semicolon	; — QWERTYで推奨
+onboarding.magic_key.option_star	* — 推奨 (すべてのレイアウトで動作)
+onboarding.magic_key.option_ugrave	ù — AZERTYで推奨
+onboarding.magic_key.title	ErgoptiPlus — マジックキー
+onboarding.metrics.desc	タイピングメトリクスの収集を有効にします。\n\nErgoptiPlus が追跡する内容：\n• セッション別、アプリ別、時系列でのタイピング速度（WPM）；\n• 最も入力されたキー、単語、n-grams、エルゴノミクス負荷；\n• 手の交互使用、指の負荷、同一指バイグラム；\n• アプリごとの使用時間（RescueTime スタイル）と生産性スコア；\n• メトリクスウィンドウのトレンド、ヒートマップ、詳細ダッシュボード。
+onboarding.metrics.title	ErgoptiPlus — タイピング指標
+onboarding.next	次へ →
+onboarding.no	いいえ
+onboarding.warning_label	注意
+onboarding.welcome.heading	言語
+onboarding.welcome.title	ErgoptiPlus — セットアップ
+onboarding.yes	はい
+paths_editor.btn_browse	参照…
+paths_editor.btn_cancel	キャンセル
+paths_editor.btn_reset	デフォルトに戻す
+paths_editor.btn_save	保存して再読み込み
+paths_editor.heading	設定フォルダー
+paths_editor.label_config_dir	設定フォルダー
+paths_editor.save_failed	設定フォルダーを保存できませんでした。ファイルが読み取り専用か、他のプログラムが使用中の可能性があります。
+paths_editor.save_failed_title	保存に失敗しました
+paths_editor.subtitle	すべての個人ファイル（ショートカット、ホットストリング…）はこのフォルダーから解決されます。
+paths_editor.tag_default	デフォルト
+paths_editor.tag_modified	変更済み
+personal_info.field_credit_card	クレジットカード
+personal_info.field_firstname	名前
+personal_info.field_phone_digits	電話番号（数字のみ）
+personal_info.field_phone_formatted	電話番号（フォーマット済み）
+personal_info.field_ssn	個人番号
+personal_info.saved_body	このタブを閉じることができます。
+personal_info.saved_title	✓ 保存しました
+profiles.created_title	プロファイルを作成しました
+profiles.updated_title	プロファイルを更新しました
+prompt_editor.default_label	カスタムプロフィール
+prompt_editor.help_text	{context}ブロックは選択したテキストに置き換えられます。{n}ブロックは予測数に置き換えられます。フォーマット（バッチ）: モデルに各提案を---で区切るよう指示してください。
+prompt_editor.insert_context	{context}ブロックを挿入
+prompt_editor.insert_language	{language}ブロックを挿入
+prompt_editor.insert_max_words	{max_words}ブロックを挿入
+prompt_editor.insert_min_words	{min_words}ブロックを挿入
+prompt_editor.insert_n	{n}ブロックを挿入
+prompt_editor.label_mode	リクエストモード
+prompt_editor.label_name	プロファイル名
+prompt_editor.label_prompt	システムプロンプト
+prompt_editor.mode.batch	バッチ — バッチ予測（大規模モデル）
+prompt_editor.mode.parallel	標準 — 並列予測
+prompt_editor.placeholder_prompt	テキストがあります、続けてください: {context}
+prompt_editor.title_edit	プロフィールを編集
+prompt_editor.title_new	新しいプロファイル
+script_control.paused	スクリプト一時停止中
+script_control.resumed	スクリプト再開
+sfbsreduction.bu	À + ★ → BU
+sfbsreduction.comma	カンマが同指バイグラムを減らす
+sfbsreduction.ecirc	Êが同指バイグラムを減らす
+sfbsreduction.egrave	Èが同指バイグラムを減らす
+sfbsreduction.ié	IEがIE/EIバイグラムを減らす
+sg_actions.activity_simulation	🖱 アクティビティをシミュレート（スリープ防止）
+sg_actions.alt_tab_monitor	Alt-Tab（モニター）
+sg_actions.app_expose	◱ アプリExposé
+sg_actions.app_previous	⇥ ← Alt+Tab — 前のアプリ
+sg_actions.app_switcher	⇥ Alt+Tab — 前のアプリ
+sg_actions.app_window_previous	⇥ ◱ ← Alt+Tab — 前のウィンドウ
+sg_actions.arrow_down	↓ 下矢印
+sg_actions.arrow_left	← 左矢印
+sg_actions.arrow_right	→ 右矢印
+sg_actions.arrow_up	↑ 上矢印
+sg_actions.backspace	⌫ Backspace
+sg_actions.brightness_down	☀ - 明るさ-
+sg_actions.brightness_up	☀ + 明るさ+
+sg_actions.caps_lock	⇪ CapsLock
+sg_actions.caps_word	⇪★ CapsWord
+sg_actions.close_window	◱ × ウィンドウを閉じる
+sg_actions.copy	⎘ コピー
+sg_actions.ctrl_backspace	⌫ Ctrl+Backspace
+sg_actions.ctrl_delete	⌦ Ctrl+Delete
+sg_actions.cut	⎘ 切り取り
+sg_actions.delete	⌦ Delete
+sg_actions.desktop_close	▢ × デスクトップを閉じる
+sg_actions.desktop_new	▢ + 新しいデスクトップ
+sg_actions.desktop_next	▢ → 次のデスクトップ
+sg_actions.desktop_prev	▢ ← 前のデスクトップ
+sg_actions.doc_end	⤓ ドキュメントの末尾
+sg_actions.doc_start	⤒ ドキュメントの先頭
+sg_actions.enter	↵ Enter
+sg_actions.escape	⎋ Escape
+sg_actions.find	🔍 検索
+sg_actions.fullscreen	📺 フルスクリーン
+sg_actions.left_click_toggle	🖱 左 左クリック（ホールド）
+sg_actions.line_down	↕ ↓ 次の行
+sg_actions.line_end	⇥ 行の末尾
+sg_actions.line_start	⇤ 行の先頭
+sg_actions.line_up	↕ ↑ 前の行
+sg_actions.lock_screen	🔒 画面をロック
+sg_actions.lookup	🔍 単語の定義
+sg_actions.maximize	🔲 最大化
+sg_actions.microsoft_bold	𝐁 Ctrl+B Microsoft (→ Ctrl+G)
+sg_actions.minimize_all	◱ すべて最小化
+sg_actions.mission_control	▢ Mission Control
+sg_actions.mute	🔇 ミュート/ミュート解除
+sg_actions.nav_back	← 戻る（ナビゲーション）
+sg_actions.nav_forward	→ 進む（ナビゲーション）
+sg_actions.none	∅ なし
+sg_actions.notification_center	🔔 通知
+sg_actions.ocr_screenshot	📷 OCRスクリーンショット (Win+Shift+T)
+sg_actions.one_shot_shift	⇧ OneShotShift
+sg_actions.open_config	⚙ 設定
+sg_actions.open_console	▤ コンソール
+sg_actions.open_error_log	📄 Error log
+sg_actions.open_hotstrings_editor	⌨ ホットストリングエディター
+sg_actions.open_key_history	キー履歴
+sg_actions.open_list_vars	変数の状態
+sg_actions.open_logs_folder	📁 ログフォルダー
+sg_actions.open_metrics_apps	📊 アプリ統計
+sg_actions.open_metrics_typing	📊 タイピング統計
+sg_actions.open_paths_editor	📂 パスエディター
+sg_actions.open_personal_hotstrings	👤 個人ホットストリング
+sg_actions.open_personal_info	👤 個人情報
+sg_actions.open_personal_shortcuts	👤 個人ショートカットファイル
+sg_actions.open_script_source	🛠 ソースコード
+sg_actions.open_today_log	📄 本日のログ
+sg_actions.open_url	🌐 リンクを開く（設定可能）
+sg_actions.open_window_spy	ウィンドウスパイ
+sg_actions.para_next	¶ ↓ 次の段落
+sg_actions.para_prev	¶ ↑ 前の段落
+sg_actions.paste	⎘ 貼り付け
+sg_actions.paste_plain	⎘ 書式なしで貼り付け
+sg_actions.pick_color	🎨 カーソル下のHEXカラー
+sg_actions.redo	↪ やり直し
+sg_actions.right_click_toggle	🖱 右 右クリック（ホールド）
+sg_actions.screen_capture	📸 選択キャプチャ (Win+Shift+S)
+sg_actions.screen_capture_instant	📸 即時キャプチャ（ウィンドウ）
+sg_actions.screen_record	⏺ 画面録画
+sg_actions.screenshot_fullscreen_clipboard	📸 🖥 画面をコピー
+sg_actions.screenshot_fullscreen_save	📸 🖥 画面を保存
+sg_actions.screenshot_region_clipboard	📸 ⬚ 領域をコピー
+sg_actions.screenshot_region_save	📸 ⬚ 領域を保存
+sg_actions.screenshot_window_clipboard	📸 ⊞ ウィンドウをコピー
+sg_actions.screenshot_window_save	📸 ⊞ ウィンドウを保存
+sg_actions.script_pause_toggle	⏸/▶ 一時停止 / 再開
+sg_actions.script_quit	✕ 終了
+sg_actions.script_reload	↻ リロード
+sg_actions.script_save_reload	↻ 保存してリロード
+sg_actions.search_web	🔍 Web検索（設定可能）
+sg_actions.sel_down	✎ ↓ 下を選択
+sg_actions.sel_left	✎ ← 左を選択
+sg_actions.sel_right	✎ → 右を選択
+sg_actions.sel_up	✎ ↑ 上を選択
+sg_actions.sel_word_next	✎ W → 次の単語を選択
+sg_actions.sel_word_prev	✎ W ← 前の単語を選択
+sg_actions.select_all	⬚ すべて選択
+sg_actions.select_line	☰ 行を選択
+sg_actions.sg_order.header.alt	#⎇ (Alt) ショートカット
+sg_actions.sg_order.header.cmd	#⌘ (Cmd) ショートカット
+sg_actions.sg_order.header.cmd_shift	#⌘⇧ (Cmd+Shift) ショートカット
+sg_actions.sg_order.header.ctrl	#^ (Ctrl) ショートカット
+sg_actions.sg_order.header.ctrl_shift	#^⇧ (Ctrl+Shift) ショートカット
+sg_actions.sg_order.header.cursor	#カーソルとテキスト
+sg_actions.sg_order.header.debug	#デバッグ
+sg_actions.sg_order.header.edition	#編集
+sg_actions.sg_order.header.files	#ファイル
+sg_actions.sg_order.header.grp_app	Ergopti
+sg_actions.sg_order.header.grp_input	入力
+sg_actions.sg_order.header.grp_media	メディア
+sg_actions.sg_order.header.grp_system	システム
+sg_actions.sg_order.header.grp_text	テキスト
+sg_actions.sg_order.header.grp_windows	ウィンドウとスペース
+sg_actions.sg_order.header.hs_ctrl	#^ (Ctrl) ショートカット — macOS
+sg_actions.sg_order.header.hs_ctrl_shift	#^⇧ (Ctrl+Shift) ショートカット — macOS
+sg_actions.sg_order.header.hs_option	#⌥ (Option) ショートカット — macOS
+sg_actions.sg_order.header.keys	#キー
+sg_actions.sg_order.header.media	#メディア
+sg_actions.sg_order.header.mouse_nav	#マウスとナビゲーション
+sg_actions.sg_order.header.navigation	#ナビゲーション
+sg_actions.sg_order.header.screenshot	#スクリーンショット
+sg_actions.sg_order.header.script	#スクリプト管理
+sg_actions.sg_order.header.selection	#テキスト選択
+sg_actions.sg_order.header.spaces	#スペース / デスクトップ
+sg_actions.sg_order.header.system	#システム
+sg_actions.sg_order.header.system_actions	#システムアクション
+sg_actions.sg_order.header.tabs	#タブ
+sg_actions.sg_order.header.tapholds	#タップホールド操作
+sg_actions.sg_order.header.ui	#インターフェース
+sg_actions.sg_order.header.win	#⊞ (Win) ショートカット
+sg_actions.sg_order.header.windows	#ウィンドウ
+sg_actions.snap_left	◧ ← 左にスナップ
+sg_actions.snap_right	◨ → 右にスナップ
+sg_actions.space	␣ スペース
+sg_actions.space_next	▢ → 次のスペース
+sg_actions.space_prev	▢ ← 前のスペース
+sg_actions.spotlight_mouse	🔦 マウスのスポットライト
+sg_actions.surround_parens	() 括弧で囲む
+sg_actions.tab	⇥ Tab
+sg_actions.tab_close	⧉ × タブを閉じる
+sg_actions.tab_new	⧉ + 新しいタブ
+sg_actions.tab_next	⧉ → 次のタブ
+sg_actions.tab_prev	⧉ ← 前のタブ
+sg_actions.take_note	📝 メモを取る
+sg_actions.task_view	▢ タスクビュー
+sg_actions.teleport_mouse	🖱 マウスを転送
+sg_actions.titlecase_selection	Aa タイトルケース
+sg_actions.toggle_capslock	⇪ CapsLockを切り替え
+sg_actions.track_next	⏭ 次のトラック
+sg_actions.track_play	⏯ 再生/一時停止
+sg_actions.track_prev	⏮ 前のトラック
+sg_actions.undo	↩ 元に戻す
+sg_actions.uppercase_selection	AA 大文字 / 小文字
+sg_actions.vol_down	🔊 - 音量-
+sg_actions.vol_up	🔊 + 音量+
+sg_actions.win_app_next	◱ → 次のウィンドウ（同アプリ）
+sg_actions.win_app_prev	◱ ← 前のウィンドウ（同アプリ）
+sg_actions.win_next	◱ → 次のウィンドウ
+sg_actions.win_prev	◱ ← 前のウィンドウ
+sg_actions.word_next	W → 次の単語
+sg_actions.word_prev	W ← 前の単語
+sg_labels.script_altgr_backspace	AltGr + ⌫
+sg_labels.script_altgr_delete	AltGr + ⌦
+sg_labels.script_altgr_enter	AltGr + Enter
+sg_labels.script_altgr_escape	AltGr + Esc
+shortcut_utils.format_hint	mods+キーの形式を使用してください（例：cmd+shift+b）
+shortcut_utils.format_invalid	無効な形式
+shortcuts.agrave	Àキーのすべてのショートカットは以下のキーのショートカットに対応します: 
+shortcuts.altgrcapslock.backspace	"AltGr" + "CapsLock" = BackSpace
+shortcuts.altgrcapslock.capslock	"AltGr" + "CapsLock" = CapsLock
+shortcuts.altgrcapslock.capsword	"AltGr" + "CapsLock" = CapsWord
+shortcuts.altgrcapslock.ctrlbackspace	"AltGr" + "CapsLock" = Ctrl + BackSpace
+shortcuts.altgrcapslock.ctrldelete	"AltGr" + "CapsLock" = Ctrl + Delete
+shortcuts.altgrcapslock.delete	"AltGr" + "CapsLock" = Delete
+shortcuts.altgrcapslock.enter	"AltGr" + "CapsLock" = Enter
+shortcuts.altgrcapslock.escape	"AltGr" + "CapsLock" = Escape
+shortcuts.altgrcapslock.oneshotshift	"AltGr" + "CapsLock" = OneShotShift
+shortcuts.altgrcapslock.tab	"AltGr" + "CapsLock" = Tab
+shortcuts.altgrlalt.backspace	"AltGr" + "LAlt" = BackSpace
+shortcuts.altgrlalt.capslock	"AltGr" + "LAlt" = CapsLock
+shortcuts.altgrlalt.capsword	"AltGr" + "LAlt" = CapsWord
+shortcuts.altgrlalt.ctrlbackspace	"AltGr" + "LAlt" = Ctrl + BackSpace
+shortcuts.altgrlalt.ctrldelete	"AltGr" + "LAlt" = Ctrl + Delete
+shortcuts.altgrlalt.delete	"AltGr" + "LAlt" = Delete
+shortcuts.altgrlalt.enter	"AltGr" + "LAlt" = Enter
+shortcuts.altgrlalt.escape	"AltGr" + "LAlt" = Escape
+shortcuts.altgrlalt.oneshotshift	"AltGr" + "LAlt" = OneShotShift
+shortcuts.altgrlalt.tab	"AltGr" + "LAlt" = Tab
+shortcuts.color_copied	色をコピーしました：%s
+shortcuts.color_picker_result	カーソル下の色は {1} です。\n\nクリップボードに保存されました : {2}
+shortcuts.color_picker_title	ピクセルカラー
+shortcuts.copy_path_notif	パスをコピーしました：%s
+shortcuts.eacute	Éキーのすべてのショートカットは以下のキーのショートカットに対応します: 
+shortcuts.ecirc	Êキーのすべてのショートカットは以下のキーのショートカットに対応します: 
+shortcuts.egrave	Èキーのすべてのショートカットは以下のキーのショートカットに対応します: 
+shortcuts.gethexvalue	Win + X (heX) = カーソル下のピクセルのHEXカラーをクリップボードにコピー
+shortcuts.gpt	Win + G(PT) = ChatGPTを開く (設定可能なURL)
+shortcuts.keep_awake_off	☕ キープアウェイク無効
+shortcuts.keep_awake_on	☕ キープアウェイク有効 — 無効にするには Ctrl+M
+shortcuts.label_at_hash	即時スクリーンショット
+shortcuts.label_cmd_shift_v	書式なしで貼り付け
+shortcuts.label_cmd_star	Cmd + S（修飾キーを保持）
+shortcuts.label_ctrl_a	行を選択
+shortcuts.label_ctrl_capslock	CapsLock を切り替え
+shortcuts.label_ctrl_d	ダウンロードを開く
+shortcuts.label_ctrl_e	Finder を開く
+shortcuts.label_ctrl_g	ChatGPT を開く（メニューで設定した URL）
+shortcuts.label_ctrl_h	クリップボードへインタラクティブスクリーンショット
+shortcuts.label_ctrl_i	設定を開く
+shortcuts.label_ctrl_l	画面をロック
+shortcuts.label_ctrl_m	スリープを防止
+shortcuts.label_ctrl_o	行をかっこで囲む
+shortcuts.label_ctrl_p	ミラー / 拡張デスクトップを切り替え
+shortcuts.label_ctrl_period	絵文字ピッカーを開く
+shortcuts.label_ctrl_quote	マウスをスポットライト
+shortcuts.label_ctrl_s	パスを開く / コピー
+shortcuts.label_ctrl_t	マウスを別のモニターにテレポート
+shortcuts.label_ctrl_u	大文字 / 小文字を切り替え
+shortcuts.label_ctrl_w	タイトルケース / 小文字を切り替え
+shortcuts.label_ctrl_x	カーソル下のピクセルの16進カラーをコピー
+shortcuts.label_layer_scroll	音量
+shortcuts.label_wrap_text	記号を入力すると選択範囲を囲む
+shortcuts.laltcapslock.backspace	"LAlt" + "CapsLock" = BackSpace
+shortcuts.laltcapslock.capslock	"LAlt" + "CapsLock" = CapsLock
+shortcuts.laltcapslock.capsword	"LAlt" + "CapsLock" = CapsWord
+shortcuts.laltcapslock.ctrlbackspace	"LAlt" + "CapsLock" = Ctrl + BackSpace
+shortcuts.laltcapslock.ctrldelete	"LAlt" + "CapsLock" = Ctrl + Delete
+shortcuts.laltcapslock.delete	"LAlt" + "CapsLock" = Delete
+shortcuts.laltcapslock.enter	"LAlt" + "CapsLock" = Enter
+shortcuts.laltcapslock.escape	"LAlt" + "CapsLock" = Escape
+shortcuts.laltcapslock.oneshotshift	"LAlt" + "CapsLock" = OneShotShift
+shortcuts.laltcapslock.tab	"LAlt" + "CapsLock" = Tab
+shortcuts.microsoftbold	Ctrl + B でMicrosoftアプリのテキストを太字にします (Ctrl + G と同様)
+shortcuts.move	Win + M(ove) = マウスをランダムに動かしてアクティビティをシミュレート。ショートカットを繰り返すかスクリプトをリロードして停止
+shortcuts.no_active_window	アクティブなウィンドウがありません
+shortcuts.no_other_monitor	他のモニターが見つかりません
+shortcuts.opendownloads	Win + D(ownloads) = ダウンロードフォルダーを開く
+shortcuts.pixel_read_error	ピクセルカラーを読み取れません
+shortcuts.saved	保存しました：%s
+shortcuts.screen	Win + H (screensHot) = スクリーンショット (Win + Shift + S を起動)
+shortcuts.screeninstant	1の左のキー = アクティブウィンドウの即時キャプチャ、タイムスタンプ付きでピクチャに保存
+shortcuts.screenocr	Win + C (OCR) = テキスト抽出付きスクリーンショット (Win + Shift + T)
+shortcuts.screenshot_copied	スクリーンショットをクリップボードにコピーしました
+shortcuts.screenshot_title	スクリーンショット
+shortcuts.search	Win + S(earch) = インターネットで選択テキストを検索。エクスプローラーでは選択ファイルパスをコピー
+shortcuts.shortcut_format_hint	形式: mods+キー (例: cmd+alt+p)\n使用可能なmods: cmd, alt, ctrl, shift\n無効にするには空白のまま
+shortcuts.shortcut_label	ショートカット
+shortcuts.spotlightmouse	Win + ' = 黄色いリングでマウスをハイライト
+shortcuts.surroundwithparentheses	Win + O = 行を括弧で囲む
+shortcuts.takenote	Win + N(ote) = メモ用ファイルを開く
+shortcuts.teleportmouse	Win + T(eleport) = マウスを別のモニターの中心に転送（循環）
+shortcuts.titlecase	Win + W = タイトルケースに変換（各単語の頭文字を大文字に）
+shortcuts.uppercase	Win + U(ppercase) = 選択範囲の大文字/小文字を切り替え
+shortcuts.wincapslock	Win + "CapsLock" = CapsLock
+startup.manifest_missing	起動エラー：_generated/features_manifest.ahk ファイルが見つからないか破損しています。\n\nプロジェクトディレクトリで `npm run build:manifest` を実行し、スクリプトを再起動してください。
+startup.manifest_title	ErgoptiPlus — manifest が見つかりません
+tap_hold.action.disable	ネイティブキー
+tap_hold.disable_all	すべて無効にする
+tap_hold.group.alt_gr	AltGr
+tap_hold.group.backspace	バックスペース
+tap_hold.group.caps_lock	CapsLock
+tap_hold.group.delete	Delete
+tap_hold.group.enter	エンター
+tap_hold.group.escape	エスケープ
+tap_hold.group.left_alt	LAlt
+tap_hold.group.left_ctrl	LCtrl
+tap_hold.group.left_shift	LShift
+tap_hold.group.right_ctrl	RCtrl
+tap_hold.group.right_shift	RShift
+tap_hold.group.space	スペース
+tap_hold.group.tab	Tab
+tap_hold.group.win	Win
+tap_hold.hold.alt	Alt
+tap_hold.hold.alt_gr	AltGr
+tap_hold.hold.ctrl	Ctrl
+tap_hold.hold.nav_layer	Navレイヤー
+tap_hold.hold.none	ネイティブキー
+tap_hold.hold.shift	Shift
+tap_hold.hold.win	Win
+tap_hold.picker.hold	Hold → %s
+tap_hold.picker.tap	Tap → %s
+tap_hold.picker.title_prefix	タップ操作 — 
+tap_hold.reset_defaults	デフォルト値にリセット
+tap_hold.tap.none	ネイティブキー
+terminators.label_close_paren	) : 閉じ括弧
+terminators.label_enter	⏎ : Enter
+terminators.label_equal	= : イコール
+terminators.label_nbsp	⍽ : ノーブレークスペース
+terminators.label_nnbsp	⍽ : 狭いノーブレークスペース
+token_prompt.create_link	👉 ここをクリックして作成
+token_prompt.instruction	ダウンロードを高速化するためにHuggingFaceトークン（hf_...）を貼り付けてください。
+token_prompt.label	HuggingFaceトークン:
+token_prompt.no_token	トークンをお持ちでない方は?
+token_prompt.placeholder	hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx...
+token_prompt.title	🔐 HuggingFaceログイン
+token_prompt.validate	検証
+token_prompt.window_title	HuggingFaceログイン
+ui_apps.axis_chars	文字
+ui_apps.axis_speed	文字 / フォーカス分
+ui_apps.boxplot_scale	スケール: 0 → {max}
+ui_apps.boxplot_tip	{n} セッション · 中央値 {med} (Q1 {q1}, Q3 {q3})
+ui_apps.btn_add_app	アプリを分類…
+ui_apps.btn_close	閉じる
+ui_apps.btn_compare	比較 ↔
+ui_apps.btn_count_awake	スリープ防止をカウント
+ui_apps.btn_mode_chars	文字
+ui_apps.btn_mode_time	時間
+ui_apps.btn_refresh	更新
+ui_apps.cat_edit_tooltip	カテゴリを編集
+ui_apps.chart_active_ratio	日別アクティブ比率
+ui_apps.chart_activity_cal	活動カレンダー（過去12ヶ月）
+ui_apps.chart_annotated_strip	注釈付きタイムライン
+ui_apps.chart_app_switches	アプリ切り替え
+ui_apps.chart_burst_hist	バーストヒストグラム
+ui_apps.chart_cat_evolution	カテゴリー推移
+ui_apps.chart_daily_evolution	日次推移
+ui_apps.chart_day_strip	日ストリップ
+ui_apps.chart_hour_weekday	時間 × 曜日
+ui_apps.chart_prod_vs_dist	生産的 vs 気散
+ui_apps.chart_session_durations	アプリ別セッション時間
+ui_apps.chart_speed_by_cat	カテゴリー別タイピング速度 (CPM)
+ui_apps.chart_speed_by_hour	時間別タイピング速度 (CPM)
+ui_apps.chart_time_by_cat	カテゴリー別時間
+ui_apps.chart_timeline	時系列推移
+ui_apps.chart_title_day	日別の推移
+ui_apps.chart_title_period	期間別の推移
+ui_apps.chart_top7	トップ7アプリケーション（時間）
+ui_apps.chart_top8	トップ8アプリ: 時間 vs 文字
+ui_apps.chart_top_days	トップの日
+ui_apps.chart_top_sessions	トップセッション
+ui_apps.chart_top_switch_pairs	トップ切り替えペア
+ui_apps.chart_top_windows	トップウィンドウ
+ui_apps.chart_wake_sleep	起動・スリープ時刻（キーボード）
+ui_apps.cmp_active_time	アクティブ時間
+ui_apps.cmp_chars	文字
+ui_apps.cmp_focus_time	フォーカス時間
+ui_apps.cmp_productivity	生産性
+ui_apps.cmp_sessions	セッション
+ui_apps.cmp_switches	切り替え
+ui_apps.cmp_window	現在: {cur} ‹{period}› · 前回: {prev}
+ui_apps.col_app	アプリケーション
+ui_apps.col_app_name	アプリケーション
+ui_apps.col_category	カテゴリー
+ui_apps.col_chars	文字
+ui_apps.col_day	日
+ui_apps.col_density	密度
+ui_apps.col_duration	時間
+ui_apps.col_focus	フォーカス
+ui_apps.col_focus_time	フォーカス時間
+ui_apps.col_from	開始
+ui_apps.col_hold	ホールド
+ui_apps.col_hs_pct	% HS
+ui_apps.col_latency	レイテンシ
+ui_apps.col_sessions	セッション
+ui_apps.col_share	割合
+ui_apps.col_switches	切り替え
+ui_apps.col_to	終了
+ui_apps.col_top_dests	トップ行先
+ui_apps.col_typing_pct	タイピング%
+ui_apps.col_window	ウィンドウ
+ui_apps.compare_title	前期間との比較
+ui_apps.detail_global_activity	記録された総活動
+ui_apps.detail_productivity_score	カテゴリーから計算されたスコア
+ui_apps.ds_active_ratio	アクティブ率 (%)
+ui_apps.ds_bursts	バースト
+ui_apps.ds_chars	文字
+ui_apps.ds_first_key	最初のキー入力
+ui_apps.ds_focus_h	フォーカス (h)
+ui_apps.ds_focus_time	フォーカス時間
+ui_apps.ds_last_key	最後のキー入力
+ui_apps.ds_speed	速度 (文字 / フォーカス分)
+ui_apps.ds_switches	切り替え
+ui_apps.empty_activity	この期間に記録されたアクティビティはありません。
+ui_apps.empty_app_switches	この期間に切り替えはありません。
+ui_apps.empty_boxplot	ボックスプロットを描画するにはセッションが不足しています (アプリごとに ≥ 4)。
+ui_apps.empty_comparator	比較を有効にするには期間を指定してください。
+ui_apps.empty_day	日が選択されていません。
+ui_apps.empty_days	記録された日はありません。
+ui_apps.empty_period	この期間のデータはありません。
+ui_apps.empty_sessions	セッションが検出されませんでした。
+ui_apps.empty_switches	この期間に切り替えはありません。
+ui_apps.empty_windows	ウィンドウタイトルはまだ集計されていません。
+ui_apps.goal_prompt	アクティブなフォーカス時間 (分) の毎日の目標:
+ui_apps.goal_reached	本日の目標を達成しました ✓
+ui_apps.goal_remaining	目標まで残り {pct}%
+ui_apps.h2_active_time	アクティブ時間
+ui_apps.h2_app_hopping	アプリホッピング
+ui_apps.h2_autorepeat	自動繰り返し
+ui_apps.h2_battery	バッテリー
+ui_apps.h2_best_hour	最良の時間帯
+ui_apps.h2_burst_record	バーストレコード
+ui_apps.h2_context_volume	コンテキスト量
+ui_apps.h2_daily_goal	デイリーゴール
+ui_apps.h2_density	密度
+ui_apps.h2_depth	平均深度
+ui_apps.h2_dominant_cat	主要カテゴリー
+ui_apps.h2_finger_streak	指連続
+ui_apps.h2_first_last	最初 / 最後
+ui_apps.h2_focus_index	フォーカス指数
+ui_apps.h2_focus_latency	フォーカスレイテンシ
+ui_apps.h2_keep_awake	スリープ防止
+ui_apps.h2_layouts	使用レイアウト
+ui_apps.h2_lock_vs_sleep	ロック対スリープ
+ui_apps.h2_locks	ロックイベント
+ui_apps.h2_long_sessions	長いセッション
+ui_apps.h2_longest_burst	最長バースト
+ui_apps.h2_longest_session	最長セッション
+ui_apps.h2_max_cascade	最大カスケード
+ui_apps.h2_most_errors	エラーが最も多いアプリ
+ui_apps.h2_muted	音声ミュート
+ui_apps.h2_night_wakeups	夜間の起動
+ui_apps.h2_passive_system	システムパッシブ
+ui_apps.h2_pivot_app	ピボットアプリ
+ui_apps.h2_productivity	生産性指数
+ui_apps.h2_record_day	記録の日
+ui_apps.h2_screen_time	スクリーンタイム
+ui_apps.h2_session_record	セッションレコード
+ui_apps.h2_sessions	セッション
+ui_apps.h2_slowest_recovery	最も遅い回復
+ui_apps.h2_spaces	スペース
+ui_apps.h2_streak_chars	文字連続 ≥ 1k
+ui_apps.h2_streak_focus	フォーカス連続 ≥ 30分
+ui_apps.h2_top_trio	トップトリオ
+ui_apps.h2_wifi_changes	Wi-Fi変更
+ui_apps.kpi_app_days_90	アプリ日数 ≥ 90 分
+ui_apps.kpi_app_switches	アプリ切り替え
+ui_apps.kpi_awake_excluded	統計から除外 (オフ)
+ui_apps.kpi_awake_included	統計に含まれる
+ui_apps.kpi_best_hour_score	平均スコア {score} (-2 から 2)
+ui_apps.kpi_bursts_count	{n} 回のバースト
+ui_apps.kpi_car_per_min	文字 / フォーカス分
+ui_apps.kpi_cascades_period	期間中 {n} 回のカスケード
+ui_apps.kpi_chars_in_a_row	連続文字数
+ui_apps.kpi_day_best	{date} に
+ui_apps.kpi_focus_taken	{n} 回のフォーカス取得
+ui_apps.kpi_hopping_detail	切り替え / フォーカス分
+ui_apps.kpi_in_app	{name} 内
+ui_apps.kpi_lock_sleep_cumul	{dur} 累積
+ui_apps.kpi_lock_vs_sleep	ロック / スリープ
+ui_apps.kpi_never_active	未アクティブ化
+ui_apps.kpi_never_reached	未達成
+ui_apps.kpi_night_wakes	0時から6時の間の起動
+ui_apps.kpi_no_backslash_out	送信切り替えなし
+ui_apps.kpi_no_burst	バーストなし
+ui_apps.kpi_no_data	データなし
+ui_apps.kpi_no_day_data	日別データなし
+ui_apps.kpi_no_enough_errors	エラーが不足
+ui_apps.kpi_no_enough_typing	入力が不足
+ui_apps.kpi_no_focus	フォーカスが不足
+ui_apps.kpi_no_focus_tracked	フォーカス追跡なし
+ui_apps.kpi_no_keystrokes	期間中のキー入力なし
+ui_apps.kpi_no_layout	レイアウト記録なし
+ui_apps.kpi_no_lock	ロック未検出
+ui_apps.kpi_no_long_session	長いセッションなし
+ui_apps.kpi_no_mobility	移動なし
+ui_apps.kpi_no_mute	ミュートなし
+ui_apps.kpi_no_record	期間中の記録なし
+ui_apps.kpi_no_repeat	繰り返しなし
+ui_apps.kpi_no_session	セッションなし
+ui_apps.kpi_no_switch	切り替えなし
+ui_apps.kpi_not_measured	未測定
+ui_apps.kpi_pct_focus_time	フォーカス時間の {pct}%
+ui_apps.kpi_productive	生産的 {p}% · 中立 {n}% · 注意散漫 {d}%
+ui_apps.kpi_session_mean	平均 {dur}
+ui_apps.kpi_sleep_intact	スリープ正常
+ui_apps.kpi_space_switches	Space 切り替え
+ui_apps.kpi_streak_chars	連続日 ≥ 1000 文字
+ui_apps.kpi_streak_focus	連続日 ≥ 30 分アクティブ
+ui_apps.kpi_switches_between	2 つの切り替え間 ({n} 回の切り替え)
+ui_apps.kpi_top_layout	トップ: {name}
+ui_apps.kpi_towards_apps	{n} 個の異なるアプリへ
+ui_apps.kpi_wifi_switches	ネットワーク切り替え
+ui_apps.label_categories	カテゴリー:
+ui_apps.label_date	日付:
+ui_apps.label_days	日数:
+ui_apps.label_period	期間:
+ui_apps.lbl_switches	切り替え:
+ui_apps.lbl_top_wifi	トップWiFi:
+ui_apps.lbl_unlocks	ロック解除:
+ui_apps.loading_data	データを読み込み中...
+ui_apps.modal_activity_hour	時間別活動
+ui_apps.modal_app_title	アプリケーション
+ui_apps.modal_backspace_pct	文字の {pct}%
+ui_apps.modal_chart_label	文字
+ui_apps.modal_density	{n} 文字/分
+ui_apps.modal_destinations	行先
+ui_apps.modal_hs_ai	ホットストリングとAI
+ui_apps.modal_hs_line	ホットストリング: {n} 文字 ({pct}%)
+ui_apps.modal_layouts	使用レイアウト
+ui_apps.modal_llm_line	AI: {n} 文字 ({pct}%)
+ui_apps.modal_longest_session	最長 {dur}
+ui_apps.modal_pct_focus	フォーカスの {pct}%
+ui_apps.modal_record_burst	最高バースト CPM: {n}
+ui_apps.modal_record_cascade	Backspace カスケード: {n}
+ui_apps.modal_record_session	最長セッション: {dur}{chars}
+ui_apps.modal_records	記録
+ui_apps.modal_total_chars	総入力文字数: {n}
+ui_apps.opt_period.all	すべて
+ui_apps.opt_period.day	日
+ui_apps.opt_period.month	過去30日
+ui_apps.opt_period.week	過去7日
+ui_apps.opt_period.year	年
+ui_apps.prod_negative	注意散漫
+ui_apps.prod_neutral	中立
+ui_apps.prod_positive	生産的
+ui_apps.row_tooltip	{name} の詳細を表示
+ui_apps.sub_speed_by_hour	アクティブ期間中のフォーカス分あたりの文字数
+ui_apps.tab_apps	アプリとマルチタスク
+ui_apps.tab_overview	概要
+ui_apps.tab_system	システムと記録
+ui_apps.tab_time	時間とリズム
+ui_apps.tab_typing	タイピングと生産性
+ui_apps.tile_backspaces	Backspace
+ui_apps.tile_chars	文字
+ui_apps.tile_focus	フォーカス
+ui_apps.tile_focus_lat	フォーカス遅延
+ui_apps.tile_sessions	セッション
+ui_apps.tile_typing	アクティブ入力
+ui_apps.title	アプリ別時間トラッカー
+ui_typing.apps_all	アプリ(全て)
+ui_typing.apps_none	アプリ(なし)
+ui_typing.btn_apps_all	アプリ（すべて）
+ui_typing.btn_case_sensitive	大文字小文字を区別
+ui_typing.btn_doublings_excluded	重複除外
+ui_typing.btn_doublings_included	重複を含む
+ui_typing.btn_reset	リセット
+ui_typing.btn_restore_zoom	ズームをリセット
+ui_typing.btn_toggle_hs_title	+ ホットストリング: ホットストリングの文字を統計に追加します。無効: 手動キー入力のみ。
+ui_typing.btn_toggle_llm_title	+ AI: AI生成の文字を統計に追加します。無効: 手動キー入力のみ。
+ui_typing.calendar_active_days	アクティブ日数
+ui_typing.calendar_chars	文字
+ui_typing.calendar_day_fri	金
+ui_typing.calendar_day_mon	月
+ui_typing.calendar_day_wed	水
+ui_typing.calendar_month_0	1月
+ui_typing.calendar_month_1	2月
+ui_typing.calendar_month_10	11月
+ui_typing.calendar_month_11	12月
+ui_typing.calendar_month_2	3月
+ui_typing.calendar_month_3	4月
+ui_typing.calendar_month_4	5月
+ui_typing.calendar_month_5	6月
+ui_typing.calendar_month_6	7月
+ui_typing.calendar_month_7	8月
+ui_typing.calendar_month_8	9月
+ui_typing.calendar_month_9	10月
+ui_typing.calendar_no_keystrokes	キーなし
+ui_typing.calendar_subtitle	過去12ヶ月
+ui_typing.calendar_title	アクティビティカレンダー
+ui_typing.charmix_digits	Digits
+ui_typing.charmix_letters	Letters
+ui_typing.charmix_other	Other
+ui_typing.charmix_punct	Punctuation
+ui_typing.charmix_spaces	Spaces
+ui_typing.chart_title_activity_5min	アクティビティ（キー / 5 分）
+ui_typing.chart_title_precision_5min	精度(%) — 5分ビュー
+ui_typing.col_acc	精度
+ui_typing.col_active_time	活動時間
+ui_typing.col_app	アプリ
+ui_typing.col_chars	文字数
+ui_typing.col_freq	相対頻度 ↕
+ui_typing.col_km	指のkm ↕
+ui_typing.col_occ	出現回数 ↕
+ui_typing.col_rep	繰り返し ↕
+ui_typing.col_seq	シーケンス ↕
+ui_typing.col_time	平均時間 (ms) ↕
+ui_typing.col_wpm	WPM相当
+ui_typing.cpm_mode_ai	AI含む
+ui_typing.cpm_mode_hs	HS含む
+ui_typing.cpm_mode_hs_ai	HS+AI含む
+ui_typing.cpm_mode_manual	手動のみ
+ui_typing.cpm_unit_output_chars	画面上の文字数
+ui_typing.cpm_unit_raw_chars	入力した生文字数
+ui_typing.dataset_ai	AI
+ui_typing.dataset_hs	ホットストリング
+ui_typing.dataset_manual	手動
+ui_typing.dataset_precision	精度 (%)
+ui_typing.dataset_speed	速度
+ui_typing.dataset_touches_5min	キー入力 / 5分
+ui_typing.dataset_touches_h	キー入力/時間
+ui_typing.day_0	日曜日
+ui_typing.day_1	月曜日
+ui_typing.day_2	火曜日
+ui_typing.day_3	水曜日
+ui_typing.day_4	木曜日
+ui_typing.day_5	金曜日
+ui_typing.day_6	土曜日
+ui_typing.errors_no_data	この期間の修正記録なし。
+ui_typing.errors_table_bigram	バイグラム
+ui_typing.errors_table_errors	エラー
+ui_typing.errors_table_occ	出現数
+ui_typing.errors_table_rate	率
+ui_typing.finger.hand_l	左
+ui_typing.finger.hand_r	右
+ui_typing.finger.l_idx	人差し指右
+ui_typing.finger.l_mid	中指右
+ui_typing.finger.l_pinky	小指右
+ui_typing.finger.l_ring	薬指右
+ui_typing.finger.l_thumb	親指右
+ui_typing.finger.r_idx	人差し指左
+ui_typing.finger.r_mid	中指左
+ui_typing.finger.r_pinky	小指左
+ui_typing.finger.r_ring	薬指左
+ui_typing.finger.r_thumb	親指左
+ui_typing.h2_ai	人工知能
+ui_typing.h2_app_activity	アプリ別活動
+ui_typing.h2_bigram_ergo	バイグラムエルゴノミクス
+ui_typing.h2_char_mix	文字ミックス
+ui_typing.h2_doublings	重複
+ui_typing.h2_error_bigrams	最も修正されたバイグラム
+ui_typing.h2_finger_dist	指の移動距離
+ui_typing.h2_health	健康とエルゴノミクス
+ui_typing.h2_hs	ホットストリング
+ui_typing.h2_hs_ai_prod	HS / AI生産性
+ui_typing.h2_lexicon	レキシコン
+ui_typing.h2_records	個人記録
+ui_typing.h2_rhythm	リズムとバースト
+ui_typing.h2_sessions	セッション
+ui_typing.h2_speed	平均速度
+ui_typing.h2_trigram_ergo	トリグラムエルゴノミクス
+ui_typing.h3_activity_hourly	活動（キー入力/時間）
+ui_typing.h3_keystroke_origin	キー入力の出所
+ui_typing.h3_precision	精度 (%)
+ui_typing.h3_precision_hourly	精度 (%) — 時間別ビュー
+ui_typing.h3_speed	速度 (WPM)
+ui_typing.heatmap_day_fri	金
+ui_typing.heatmap_day_mon	月
+ui_typing.heatmap_day_sat	土
+ui_typing.heatmap_day_sun	日
+ui_typing.heatmap_day_thu	木
+ui_typing.heatmap_day_tue	火
+ui_typing.heatmap_day_wed	水
+ui_typing.heatmap_hour_chars_abbrev	字
+ui_typing.heatmap_hour_no_keystrokes	キーなし
+ui_typing.heatmap_hour_subtitle	選択した期間
+ui_typing.heatmap_hour_title	時間帯・曜日別アクティビティ
+ui_typing.heatmap_hour_total	合計文字数
+ui_typing.key_caps	Caps
+ui_typing.key_enter	Enter
+ui_typing.key_esc	Esc
+ui_typing.key_shift	Shift
+ui_typing.key_tab	Tab
+ui_typing.key_tip_avg_dur	Avg. dur.:
+ui_typing.key_tip_freq	Freq.:
+ui_typing.key_tip_freq_total	Total freq.:
+ui_typing.label_burst_length_dist	Burst length distribution
+ui_typing.label_charmix_dist	Distribution (%s characters)
+ui_typing.label_finger_load_dist	Cumulative load per finger — ideal distribution ≈ 12.5% each
+ui_typing.label_from	開始:
+ui_typing.label_to	終了:
+ui_typing.label_word_length_dist	Length distribution (frequency-weighted)
+ui_typing.lbl_accepted	承認済み
+ui_typing.lbl_active_ratio	アクティブ比率
+ui_typing.lbl_activity	活動
+ui_typing.lbl_ai_acceptance	AI承認率
+ui_typing.lbl_avg_delay	平均遅延
+ui_typing.lbl_avg_duration	平均時間
+ui_typing.lbl_avg_length	平均長
+ui_typing.lbl_bad_redir	悪いリダイレクト
+ui_typing.lbl_best_day	最良の日
+ui_typing.lbl_cascades	カスケード
+ui_typing.lbl_corrected_bigrams	修正バイグラム
+ui_typing.lbl_digits	数字
+ui_typing.lbl_doublings	重打
+ui_typing.lbl_fastest_app	最速アプリ
+ui_typing.lbl_focus_latency	フォーカス → 最初のキーのレイテンシ
+ui_typing.lbl_frequent_pair	頻出ペア
+ui_typing.lbl_hand_balance	左/右バランス
+ui_typing.lbl_layouts_used	使用レイアウト
+ui_typing.lbl_letters	文字
+ui_typing.lbl_long_sessions	長いセッション
+ui_typing.lbl_longest_burst	最長バースト
+ui_typing.lbl_longest_chars	最長（文字）
+ui_typing.lbl_longest_session	最長セッション
+ui_typing.lbl_longest_time	最長（時間）
+ui_typing.lbl_most_active_finger	最も活発な指
+ui_typing.lbl_others	その他
+ui_typing.lbl_passive_time	システムパッシブ時間
+ui_typing.lbl_punctuation	句読点
+ui_typing.lbl_recovery_time	回復時間
+ui_typing.lbl_redir	リダイレクト
+ui_typing.lbl_regularity	規則性 (CV)
+ui_typing.lbl_roll_in	インワードロール
+ui_typing.lbl_roll_out	アウトワードロール
+ui_typing.lbl_same_finger_streak	同一指連続
+ui_typing.lbl_same_hand_streak	同一手連続
+ui_typing.lbl_saved	保存済み
+ui_typing.lbl_scissors	シザーズ
+ui_typing.lbl_sfbs_raw	生のSFB
+ui_typing.lbl_spaces	スペース
+ui_typing.lbl_streak	連続
+ui_typing.lbl_time_saved	節約した時間
+ui_typing.lbl_top_app	最もよく使うアプリ
+ui_typing.lbl_top_mod_held	最もよく押す修飾キー
+ui_typing.lbl_top_word	最もよく使う単語
+ui_typing.lbl_total	合計
+ui_typing.lbl_total_active_time	総アクティブ時間
+ui_typing.lbl_total_bursts	総バースト数
+ui_typing.lbl_total_words	総単語数
+ui_typing.lbl_unique_words	ユニーク単語
+ui_typing.lbl_via_ai	AI経由
+ui_typing.lbl_via_hotstrings	ホットストリング経由
+ui_typing.lbl_via_magic_key	★キー経由
+ui_typing.lbl_worst_bigram	最悪バイグラム
+ui_typing.loading	計算中...
+ui_typing.loading_ellipsis	計算中…
+ui_typing.modal_apply	閉じて適用
+ui_typing.modal_check_all	すべてチェック
+ui_typing.modal_search_app	アプリを検索...
+ui_typing.modal_select_apps	アプリケーションを選択
+ui_typing.modal_uncheck_all	すべてのチェックを外す
+ui_typing.month_0	1月
+ui_typing.month_1	2月
+ui_typing.month_10	11月
+ui_typing.month_11	12月
+ui_typing.month_2	3月
+ui_typing.month_3	4月
+ui_typing.month_4	5月
+ui_typing.month_5	6月
+ui_typing.month_6	7月
+ui_typing.month_7	8月
+ui_typing.month_8	9月
+ui_typing.month_9	10月
+ui_typing.no_app_found	アプリが見つかりません
+ui_typing.no_data	データなし
+ui_typing.not_found	見つかりません
+ui_typing.opt_pause.1000	一時停止 > 1秒
+ui_typing.opt_pause.10000	一時停止 > 10秒
+ui_typing.opt_pause.2000	一時停止 > 2秒
+ui_typing.opt_pause.20000	一時停止 > 20秒
+ui_typing.opt_pause.3000	一時停止 > 3秒
+ui_typing.opt_pause.30000	一時停止 > 30秒
+ui_typing.opt_pause.5000	一時停止 > 5秒
+ui_typing.opt_pause.60000	一時停止 > 1分
+ui_typing.opt_pause.99999999	フィルターなし
+ui_typing.opt_quick_range.	期間…
+ui_typing.opt_quick_range.3m	過去3ヶ月
+ui_typing.opt_quick_range.6m	過去6ヶ月
+ui_typing.opt_quick_range.all	すべて
+ui_typing.opt_quick_range.last_hour	過去1時間
+ui_typing.opt_quick_range.month	今月
+ui_typing.opt_quick_range.today	今日
+ui_typing.opt_quick_range.week	今週
+ui_typing.opt_quick_range.year	今年
+ui_typing.page_loading	インターフェースを読み込み中...
+ui_typing.pinch_hint	ピンチ（タッチパッド）でズーム。
+ui_typing.precision_no_filter	フィルターなし
+ui_typing.rep_doublings	重複
+ui_typing.rep_no_data	重複なし
+ui_typing.rep_table_bigram	バイグラム
+ui_typing.rep_table_manual	手動
+ui_typing.rep_table_total	合計
+ui_typing.rep_table_via_star	★ 経由
+ui_typing.search_close	閉じる (Esc)
+ui_typing.search_label	ページ内検索
+ui_typing.search_next	次へ (Enter)
+ui_typing.search_placeholder	検索…
+ui_typing.search_prev	前へ (Shift+Enter)
+ui_typing.sfb_avoided	HSで回避
+ui_typing.sfb_avoided_none	0 HSで回避
+ui_typing.sfb_no_data	SFBなし
+ui_typing.sfb_raw_count	生SFBs
+ui_typing.sfb_table_finger	指
+ui_typing.sfb_table_hand	手
+ui_typing.sfb_table_pair	ペア
+ui_typing.signal_equilibre	Balanced
+ui_typing.signal_surveille	Monitored
+ui_typing.signal_vigilance	Alert
+ui_typing.tab_bigrams	バイグラム
+ui_typing.tab_chars	文字
+ui_typing.tab_heptagrams	ヘプタグラム
+ui_typing.tab_hexagrams	ヘキサグラム
+ui_typing.tab_keycodes	キーコード
+ui_typing.tab_modifiers	修飾キー
+ui_typing.tab_pentagrams	ペンタグラム
+ui_typing.tab_quadgrams	クアドグラム
+ui_typing.tab_shortcut_bigrams	ショートカットバイグラム
+ui_typing.tab_shortcut_pentagrams	ショートカットペンタグラム
+ui_typing.tab_shortcut_quadgrams	ショートカットクアドグラム
+ui_typing.tab_shortcut_trigrams	ショートカットトリグラム
+ui_typing.tab_shortcuts	ショートカット
+ui_typing.tab_trigrams	トリグラム
+ui_typing.tab_word_bigrams	単語バイグラム
+ui_typing.tab_word_pentagrams	単語ペンタグラム
+ui_typing.tab_word_quadgrams	単語クアドグラム
+ui_typing.tab_word_trigrams	単語トリグラム
+ui_typing.tab_words	単語
+ui_typing.table_mode_mixed	混合
+ui_typing.table_mode_output	画面出力
+ui_typing.table_mode_raw	生キー入力
+ui_typing.title	タイピング指標
+ui_typing.title_hand_balance	左手と右手の間のキー入力バランス。50/50 = 完全なバランス。
+ui_typing.title_net_hs	入力された文字と生成された文字の純差分
+ui_typing.title_net_llm	削除された文字と生成された文字の純差分
+ui_typing.title_pause_threshold	ポーズしきい値: この値を超えるポーズは、WPM 計算のアクティブ時間から除外されます。
+ui_typing.title_quick_range	クイック範囲
+ui_typing.title_rep_total	期間中のダブリングの総数
+ui_typing.title_rep_via_star	★ キー (繰り返しホットストリング) によって生成されたダブリングの割合。+ ホットストリングモードでのみゼロ以外。
+ui_typing.title_top_finger	期間中に最も長い距離を移動した指
+ui_typing.tooltip_apps	<strong>Fastest app :</strong> highest average CPM across apps with ≥ 200 characters typed (below this threshold you'd catch apps used for 2 seconds).<br><br><strong>Frequent pair :</strong> the two apps you switch between most often, in both directions. Indicates your typical workflow (editor ↔ browser, doc ↔ chat…).
+ui_typing.tooltip_charmix	<strong>Categories :</strong> each manual character typed is classified Lua-side into one of five categories — Latin letters (including common accented), digits, punctuation and symbols, spaces (including NBSP / NNBSP / tab / return), and other (non-Latin characters, special keylogger markers).<br><br><strong>Indication :</strong> code-heavy = lots of punctuation and digits; prose-heavy = mostly letters and spaces; chat = a mix of everything.
+ui_typing.tooltip_col_acc	精度: Backspace なしでこのシーケンスが正しく入力された割合。
+ui_typing.tooltip_col_mpm	1分あたりの単語数: このフラグメントをループで入力した場合の推定速度 (1 単語 = 5 キー)。実際のキー入力のみをカウントします。
+ui_typing.tooltip_cpm_formula	<strong>計算式:</strong> CPM = 遷移 × 60000 / アクティブ時間。<br><strong>モード:</strong> {mode}。<br><br>分子: {pure_trans} 回の手動遷移 (≤ {thresh})<br>{add_hs}{add_llm}= {chars_total} 個の計上文字<br><br>WPM = CPM / 5。
+ui_typing.tooltip_cpm_hs_chars	追加された文字 (HS 出力 − トリガー)
+ui_typing.tooltip_cpm_llm_chars	追加された文字 (AI 出力 − トリガー)
+ui_typing.tooltip_cpm_simple	1分あたりの文字数 (デフォルトで HS + AI を含む)。
+ui_typing.tooltip_ergo_bigram	<strong>SHB / SHU :</strong> same-hand bigrams / their share of total bigrams.<br><strong>Inward roll :</strong> pinky toward index. The most comfortable.<br><strong>Outward roll :</strong> index toward pinky.<br><strong>LSB :</strong> Lateral Stretch Bigram — one of the two fingers extends at least 1.5 columns from its rest position.<br><strong>Scissors :</strong> SHB crossing ≥ 2 rows with the shorter finger going down (e.g. pinky low + middle high).
+ui_typing.tooltip_ergo_trigram	<strong>SFS :</strong> Same-Finger Skipgram — an SFB with a different-finger key in between (e.g. EAD).<br><strong>SKS :</strong> Same-Key Skipgram — the same key in positions 1 and 3 (e.g. ELE).<br><strong>Redirect :</strong> three keys on the same hand with a change of direction (pinky→middle→ring = peak). Uncomfortable.<br><strong>Bad redir. :</strong> redirect where none of the three fingers is the index. Among the worst possible sequences on a keyboard.
+ui_typing.tooltip_errors	<strong>Reading :</strong> bigrams (two consecutive keys) ranked by <em>error rate</em> = number of times the 2nd key was erased by a backspace, divided by total occurrences.<br><br><strong>Filter :</strong> only bigrams appearing ≥ 5 times in the period are shown, to avoid statistical noise from rare sequences.<br><br><strong>Cascades :</strong> runs of ≥ 3 consecutive backspaces (major correction: a word or sentence erased). The counter separates this signal from one-off errors.<br><br><strong>Recovery time :</strong> average delay between a backspace and the next key. The longer it is, the more the correction breaks your mental flow.
+ui_typing.tooltip_lexical	<strong>Richness :</strong> unique words ÷ total words. The higher, the more varied the vocabulary. A literary text will be around 40–60 %, chat or code much lower.<br><br><strong>Average length :</strong> frequency-weighted mean — this is the length of the word you type "on average", not the median dictionary length.<br><br><strong>Filter :</strong> words shorter than 2 characters are ignored (they are almost always tokenisation artefacts from punctuation splitting).
+ui_typing.tooltip_mpm	1分あたりの単語数 (実際の辞書の単語)。
+ui_typing.tooltip_precision_formula	<strong>計算式:</strong> 精度 = 正解 / 合計。<br>エラー: キー押下後すぐの Backspace (≤ {thresh})。
+ui_typing.tooltip_records	<strong>Scope :</strong> records are computed over <em>the entire</em> database — they do not follow the UI date filter (otherwise the record disappears when you zoom in). The app filter still applies.<br><br><strong>Streak :</strong> longest consecutive series of days with at least one keystroke. Missing a day resets the counter to zero.
+ui_typing.tooltip_rep_pct	Share of bigrams that are doublings (e.g. «aa», «ll»). Reflects the active source mode — compare "Without Ergopti+" and "+ Hotstrings" to see if the ★ key is being used.
+ui_typing.tooltip_rhythm	<strong>Burst :</strong> typing stretch with no gap > 1 s between two keys.<br><br><strong>Peak CPM :</strong> best CPM observed on a burst of at least 10 characters. The threshold excludes fleeting non-representative sprints.<br><br><strong>Regularity (CV) :</strong> coefficient of variation = standard deviation ÷ mean. 0 = perfect metronome, > 0.6 = very irregular.
+ui_typing.tooltip_roi	<strong>Characters saved :</strong> net output of HS / AI expansions, i.e. characters added on screen minus those that triggered the expansion (and were therefore typed manually).<br><br><strong>Time saved :</strong> characters saved × average pace (manual active time ÷ number of manual keystrokes) over the same period. This is an honest lower bound: it is what you would have taken to type them yourself.<br><br><strong>AI acceptance :</strong> share of AI suggestions displayed that were accepted by the user.
+ui_typing.tooltip_sessions	<strong>Session :</strong> typing block with no gap > 5 min between two consecutive keystrokes. Detected keylogger-side, so independent of the UI pause filter.<br><br><strong>Total active time :</strong> sum of all session durations — i.e. the time actually spent typing, ignoring pauses > 5 min.<br><br><strong>Longest (chars) :</strong> may refer to a different session from the longest in duration — e.g. a long slow session vs. a short ultra-fast one.
+ui_typing.tooltip_sfb_pct	Share of manual bigrams typed by the same finger. Excluding hotstrings — this KPI measures the raw physical difficulty of the layout.
+ui_typing.tooltip_sfb_rate	Rate: nb SFBs / nb key occurrences
+ui_typing.tooltip_wellness	<strong>Global signal :</strong> red "Alert" if ≥ 2 sessions over 90 min or a finger streak ≥ 8; orange "Monitored" if ≥ 1 long session or finger streak ≥ 6 or hand streak ≥ 12; green "Balanced" otherwise.<br><br><strong>Active ratio :</strong> time actually spent typing ÷ time the app was in focus. Low = you read a lot, which reduces typing load but also signals chronic input/output imbalance.<br><br><strong>Finger / hand streak :</strong> longest run of consecutive keys on the same finger or same hand. Beyond 5 (finger) or 12 (hand), the load is no longer distributed.<br><br><strong>Long sessions :</strong> sessions ≥ 90 min without a break. The clinical threshold beyond which RSI risk increases significantly.
+ui_typing.unit_activations	起動
+ui_typing.unit_active_apps	アクティブアプリ
+ui_typing.unit_chars_saved	保存した文字
+ui_typing.unit_cpm	字/分
+ui_typing.unit_cpm_burst	CPMピーク（バースト）
+ui_typing.unit_cpm_record	CPMレコード
+ui_typing.unit_global_rate	% グローバル率
+ui_typing.unit_keyspressed	キー押下
+ui_typing.unit_keystrokes	キー入力
+ui_typing.unit_km	km
+ui_typing.unit_mpm	語/分
+ui_typing.unit_richness	% 豊かさ
+ui_typing.unit_sessions	セッション
+ui_typing.unit_triggers	triggers
+ui_typing.unit_words_typed	words typed in total
+updater.changelog_channel_label	チャンネル:
+updater.changelog_empty	(このチャンネルのリリースノートはありません。)
+updater.changelog_install	このバージョンをインストール
+updater.changelog_install_current	現在のバージョン
+updater.changelog_local_source_note	ローカルソースモード — チャンネル変更は保存されません。
+updater.changelog_release_notes	{1} のリリースノート:\n\n{2}\n\nGitHub で開きますか?
+updater.changelog_select_release	バージョン選択 :
+updater.changelog_switch_to_dev	プレリリースチャンネルに切り替え (dev)
+updater.changelog_switch_to_main	安定版チャンネルに切り替え (main)
+updater.changelog_truncated	\n…(省略)
+updater.changelog_unreachable	GitHub からリリース情報を取得できませんでした。
+updater.channel_dev_suffix	 (プレリリースチャンネル)
+updater.channel_local_source_suffix	 (ローカルソース — リリースビルドではありません)
+updater.channel_main_suffix	 (安定版チャンネル)
+updater.channel_switch_blocked_download	現在アップデートをダウンロード中です。ダウンロードが完了するまで待つか、アプリを再起動してからチャンネルを切り替えてください。
+updater.checking	「{1}」チャンネルでアップデートを確認しています…\n(数秒かかる場合があります。)
+updater.close	閉じる
+updater.install_error	アップデートをインストールできませんでした。詳細はログを確認してください。
+updater.install_error_download	アップデートパッケージのダウンロードに失敗しました。インターネット接続を確認して再試行してください。
+updater.install_error_no_asset	このリリースには Windows 用実行ファイルが含まれていません。リリースページを開いて手動でダウンロードしてください。
+updater.install_local_source	ローカルソースから実行中 — 自動インストールは release ビルドでのみ利用可能です。
+updater.local_source	ローカルソースから実行中です — アップデートの確認はリリースビルドでのみ利用できます。
+updater.new_version	新しいバージョンが利用可能です。\n\n現在: {1}\n最新: {2}\n\nリリースページを開いてダウンロードしますか?
+updater.no_connection	GitHub に接続できませんでした。インターネット接続を確認してもう一度お試しください。
+updater.open_on_github	GitHub で開く
+updater.parse_failed	GitHub から最新リリースのタグを解析できませんでした。
+updater.title_changelog	ErgoptiPlus — リリースノート
+updater.title_update	ErgoptiPlus — アップデート
+updater.title_update_available	ErgoptiPlus — アップデートが利用可能です
+updater.title_version	ErgoptiPlus — バージョン
+updater.tray_new_version_body	バージョン {1} のインストール準備が整いました。トレイメニューの「Install update」項目をクリックしてください。
+updater.tray_new_version_title	ErgoptiPlus — アップデート利用可能
+updater.up_to_date	ErgoptiPlus は最新です。\n\n現在のバージョン: {1}
+updater.update_dialog_changelog	更新内容:
+updater.update_dialog_header	アップデート利用可能 — {1}
+updater.update_dialog_install	アップデートをインストール
+updater.update_dialog_later	あとで
+updater.update_dialog_open	GitHub で開く
+updater.update_dialog_title	ErgoptiPlus — アップデートのインストール
+updater.version_message	ErgoptiPlus {1}{2}\n\nGitHub のリリースページを開きますか?
+vscode.reload_required	タイピング拡張機能を有効にするには VSCode を再読込してください (Cmd+Shift+P > Reload Window)

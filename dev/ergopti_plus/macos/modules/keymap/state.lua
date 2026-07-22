@@ -1,0 +1,186 @@
+--- modules/keymap/state.lua
+
+--- ==============================================================================
+--- MODULE: Keymap CoreState factory
+--- DESCRIPTION:
+--- Owns the shared-state table passed by reference to every keymap submodule
+--- (Registry, Expander, LLMBridge, utils). Previously defined inline in
+--- keymap/init.lua; extracting it here makes the set of invariants that the
+--- submodules rely on explicit and easier to reason about in isolation.
+---
+--- FEATURES & RATIONALE:
+--- 1. Single Source of Truth for initial values: a factory function seeds
+---    every field from the canonical DEFAULT_STATE / DELAYS_DEFAULT tables
+---    supplied by keymap/init.lua. Submodules never re-declare defaults.
+--- 2. Closure-bound methods: suppress_rescan and suppress_rescan_keep_buffer
+---    are bound to the new state table at creation time so callers never have
+---    to thread the state handle through.
+--- 3. Declared Invariants: comments on the index fields document which pairs
+---    must stay consistent (e.g. mappings / mappings_by_tail_char) — the
+---    Registry is responsible for maintaining these after any structural
+---    change, but the invariant lives here with the state definition.
+--- ==============================================================================
+
+local hs = hs
+local M  = {}
+
+
+
+
+
+-- =============================================
+--- ===============================================
+--- ======= 1/ Default Initialisation Seeds =======
+--- ===============================================
+-- =============================================
+
+-- Default seconds the rescan window uses when callers do not pass an explicit
+-- duration to suppress_rescan(). Picked empirically to bridge the gap between
+-- an expansion firing and the next user keystroke without swallowing more
+-- than one human-speed key.
+local DEFAULT_SUPPRESS_SEC      = 0.5
+local DEFAULT_SUPPRESS_KEEP_SEC = 0.3
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 2/ State Factory ============
+-- =====================================
+-- =====================================
+
+--- Builds a fresh CoreState table seeded from the canonical defaults.
+---
+--- The returned table carries:
+---   - the rolling keystroke buffer and its synthetic-event bookkeeping,
+---   - the mapping database (flat list + O(1) lookup + tail-char buckets),
+---   - the terminator/delay configuration pulled from the supplied defaults,
+---   - bound closures (suppress_rescan / suppress_rescan_keep_buffer) that
+---     mutate the same table rather than any module-level state.
+---
+--- Invariants the Registry must maintain after any structural change:
+---   * mappings_lookup[trigger .. "\0" .. is_word .. "\0" .. auto] points to
+---     the same entry that appears in mappings (flat list).
+---   * For every entry e in mappings, e.tail_char indexes it inside
+---     mappings_by_tail_char; if e.has_magic then e.star_base_tail_char
+---     indexes it inside mappings_by_star_tail_char.
+---   * mappings stays sorted by (tlen desc, is_word first, group_order asc,
+---     seq asc) at all times.
+---
+--- @param defaults table The DEFAULT_STATE table from keymap/init.lua.
+--- @param delays_default table The DELAYS_DEFAULT table from keymap/init.lua.
+--- @return table The freshly-seeded CoreState.
+function M.new(defaults, delays_default)
+	if type(defaults) ~= "table" then
+		error("state.new(): defaults must be a table (got " .. type(defaults) .. ").")
+	end
+	if type(delays_default) ~= "table" then
+		error("state.new(): delays_default must be a table (got " .. type(delays_default) .. ").")
+	end
+
+	local s = {
+		buffer                     = "",
+		-- True when the character immediately to the LEFT of `buffer` is
+		-- known to be a word terminator (or there is no character at all
+		-- — start of input). Flipped to false whenever the cursor moves
+		-- into an unobservable context (Backspace past the buffer's start,
+		-- arrow / nav keys, mouse click, Ctrl/Cmd combos other than
+		-- select-all, paste, undo, etc.). The expander consults this flag
+		-- when an `is_word` mapping matches at byte index 1 of the buffer
+		-- — without it we cannot distinguish « fresh document » from
+		-- « cursor moved mid-word and buffer was wiped ».
+		start_is_word_boundary     = true,
+		magic_key                  = defaults.trigger_char,
+		-- Flat list of mapping entries, sorted longest-first. See the
+		-- invariants comment above for how the adjacent indexes must stay
+		-- consistent with this list.
+		mappings                   = {},
+		mappings_lookup            = {},
+		mappings_by_tail_char      = {},
+		mappings_by_star_tail_char = {},
+		groups                     = {},
+		seq_counter                = 0,
+		-- Monotonic counter assigned on first registration of a group name;
+		-- stable across disable/enable cycles so the sort tiebreaker
+		-- (group_order asc) cannot flip priority of same-length triggers.
+		group_order_counter        = 0,
+		interceptors               = {},
+		preview_providers          = {},
+		expected_synthetic_chars   = "",
+		expected_synthetic_deletes = 0,
+		expected_synthetic_pastes  = 0,
+		-- Epoch timestamp (seconds) of the last arm_synthetic() / perform_text_replacement()
+		-- call. Used by the stuck-counter reset guard in onKeyDownRaw to avoid wiping
+		-- counters that were just armed by an in-flight expansion (A6 audit fix).
+		last_synthetic_arm_time    = 0,
+		shift_side                 = nil,
+		processing_paused          = false,
+		last_key_time              = 0,
+		last_key_was_complex       = false,
+		no_rescan_until            = 0,
+		WORD_TIMEOUT_SEC           = 5.0,
+		BASE_DELAY_SEC             = defaults.expansion_delay,
+		DELAYS                     = {},
+		-- Per-section delay overrides (seconds), keyed by section name. Loaded
+		-- from a category TOML's [_meta.section_delays] block. Higher priority
+		-- than the group delay; see mapping_fires for the full precedence.
+		SECTION_DELAYS             = {},
+		DELAYS_DEFAULT             = delays_default,
+		current_group              = nil,
+		group_post_load_hooks      = {},
+		ignored_window_titles      = {},
+		ignored_window_patterns    = {},
+	}
+
+	-- Closure-bound so callers hold a single s reference and never have to
+	-- thread the state handle through. suppress_rescan always wipes the
+	-- buffer (used after an expansion) while suppress_rescan_keep_buffer
+	-- leaves it intact (used for sequential hotstring chains).
+	s.suppress_rescan = function(duration)
+		local epoch_fn = hs and hs.timer and hs.timer.secondsSinceEpoch or os.time
+		s.no_rescan_until = epoch_fn() + (tonumber(duration) or DEFAULT_SUPPRESS_SEC)
+		s.buffer = ""
+		-- Post-expansion: the replacement just landed on screen. Treat the
+		-- new cursor position as abutting a word boundary so the next typed
+		-- char can fire word-boundary-required triggers — that mirrors the
+		-- AHK HSEv2 contract (HSE_ApplyExpansion semantics).
+		s.start_is_word_boundary = true
+	end
+
+	s.suppress_rescan_keep_buffer = function(duration)
+		local epoch_fn = hs and hs.timer and hs.timer.secondsSinceEpoch or os.time
+		s.no_rescan_until = epoch_fn() + (tonumber(duration) or DEFAULT_SUPPRESS_KEEP_SEC)
+	end
+
+	-- Seed the initial per-group delays from defaults.
+	for k, v in pairs(delays_default) do
+		s.DELAYS[k] = v
+	end
+
+	-- Recompute the word-inactivity timeout from the LARGEST active delay,
+	-- considering BOTH group delays and per-section overrides. A delay of 0
+	-- means "always-active" → the timeout must be infinite (0) so the buffer is
+	-- never auto-wiped before such a trigger can fire. Section delays MUST be
+	-- included: a long per-section window (e.g. comma_j = 5 s) would otherwise
+	-- be cut short by a timeout sized only to the group delays. Call again
+	-- whenever DELAYS or SECTION_DELAYS change (set_delay, load_toml).
+	s.recompute_word_timeout = function()
+		local has_infinite = false
+		local max_delay    = 0
+		for _, tbl in ipairs({ s.DELAYS, s.SECTION_DELAYS }) do
+			for _, v in pairs(tbl) do
+				if type(v) == "number" then
+					if v == 0        then has_infinite = true end
+					if v > max_delay then max_delay = v       end
+				end
+			end
+		end
+		s.WORD_TIMEOUT_SEC = has_infinite and 0 or (max_delay + 0.5)
+	end
+	s.recompute_word_timeout()
+
+	return s
+end
+
+return M

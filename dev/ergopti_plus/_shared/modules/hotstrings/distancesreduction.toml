@@ -1,0 +1,231 @@
+# ====================
+# ====================
+# ======= Meta =======
+# ====================
+# ====================
+
+[_meta]
+delay = 0.5
+show_tooltip = false
+description = { fr = "Réduction des distances", en = "Distance reduction", de = "Distanzreduktion", es = "Reducción de distancias", zh = "距离减少", ar = "تقليل المسافات", cs = "Snížení vzdáleností", da = "Afstandsreduktion", he = "הפחתת מרחקים", hi = "दूरी में कमी", it = "Riduzione delle distanze", ja = "距離削減", ko = "거리 감소", nl = "Afstandsreductie", no = "Avstandsreduksjon", pl = "Redukcja odległości", pt = "Redução de distâncias", ru = "Уменьшение расстояний", sv = "Avståndsminskning", tr = "Mesafe azaltma", uk = "Зменшення відстаней" }
+sections_order = ["qu", "suffixes_a", "-", "comma_j", "comma_far_letters", "-", "dead_key_e_circumflex", "e_circumflex_e", "-", "space_around_symbols"]
+
+[_meta.section_delays]
+# Per-section expansion-delay overrides (seconds). A value here overrides the
+# group `delay` above for that section; a user custom delay still wins over it.
+# comma → J expansions are deliberate layer/dead-key sequences (shifted nnbsp +
+# punctuation, ¨+s nbsp, Shift for the uppercase vowel), so they need a generous
+# activation window or the typing-speed gate drops them — 5 s vs the 0.5 s group.
+comma_j = 5
+
+
+
+# =========================
+# ===== Meta.Sections =====
+# =========================
+
+[_meta.sections]
+comma_far_letters ={ fr = "Virgule permet de taper des lettres excentrées : ,è=z et ,y=k et ,c=ç et ,x=où et ,s=q", en = "Comma types eccentric letters: ,è=z and ,y=k and ,c=ç and ,x=où and ,s=q", de = "Komma tippt außermittige Buchstaben: ,è=z und ,y=k und ,c=ç und ,x=où und ,s=q", es = "La coma escribe letras excéntricas: ,è=z y ,y=k y ,c=ç y ,x=où y ,s=q", zh = "逗号输入偏远字母：,è=z 和 ,y=k 和 ,c=ç 和 ,x=où 和 ,s=q", ar = "الفاصلة تكتب حروفاً بعيدة: ,è=z و ,y=k و ,c=ç و ,x=où و ,s=q", cs = "Čárka píše excentriky: ,è=z a ,y=k a ,c=ç a ,x=où a ,s=q", da = "Komma skriver eksentriske bogstaver: ,è=z og ,y=k og ,c=ç og ,x=où og ,s=q", he = "פסיק מקליד אותיות רחוקות: ,è=z ו-,y=k ו-,c=ç ו-,x=où ו-,s=q", hi = "अल्पविराम दूर के अक्षर टाइप करता है: ,è=z और ,y=k और ,c=ç और ,x=où और ,s=q", it = "La virgola scrive lettere eccentriche: ,è=z e ,y=k e ,c=ç e ,x=où e ,s=q", ja = "カンマが遠い文字を入力：,è=z、,y=k、,c=ç、,x=où、,s=q", ko = "쉼표가 먼 문자를 입력: ,è=z 및 ,y=k 및 ,c=ç 및 ,x=où 및 ,s=q", nl = "Komma typt verre letters: ,è=z en ,y=k en ,c=ç en ,x=où en ,s=q", no = "Komma skriver eksentriske bokstaver: ,è=z og ,y=k og ,c=ç og ,x=où og ,s=q", pl = "Przecinek wpisuje odległe litery: ,è=z i ,y=k i ,c=ç i ,x=où i ,s=q", pt = "A vírgula escreve letras excêntricas: ,è=z e ,y=k e ,c=ç e ,x=où e ,s=q", ru = "Запятая вводит далёкие буквы: ,è=z и ,y=k и ,c=ç и ,x=où и ,s=q", sv = "Komma skriver excentriskt placerade bokstäver: ,è=z och ,y=k och ,c=ç och ,x=où och ,s=q", tr = "Virgül uzak harfleri yazar: ,è=z ve ,y=k ve ,c=ç ve ,x=où ve ,s=q", uk = "Кома вводить далекі літери: ,è=z та ,y=k та ,c=ç та ,x=où та ,s=q" }
+comma_j ={ fr = "Virgule + Voyelle donne J : ,a = ja, ,o = jo, ,’ = j’, …", en = "Comma + Vowel gives J: ,a = ja, ,o = jo, ,’ = j’, …", de = "Komma + Vokal ergibt J: ,a = ja, ,o = jo, ,’ = j’, …", es = "Coma + Vocal da J: ,a = ja, ,o = jo, ,’ = j’, …", zh = "逗号 + 元音 = J：,a = ja，,o = jo，,’ = j’，…", ar = "فاصلة + حرف علة تعطي J: ,a = ja, ,o = jo, ,’ = j’, …", cs = "Čárka + Samohláska dává J: ,a = ja, ,o = jo, ,’ = j’, …", da = "Komma + Vokal giver J: ,a = ja, ,o = jo, ,’ = j’, …", he = "פסיק + תנועה נותן J: ,a = ja, ,o = jo, ,’ = j’, …", hi = "अल्पविराम + स्वर J देता है: ,a = ja, ,o = jo, ,’ = j’, …", it = "Virgola + Vocale dà J: ,a = ja, ,o = jo, ,’ = j’, …", ja = "カンマ + 母音 = J：,a = ja, ,o = jo, ,’ = j’, …", ko = "쉼표 + 모음 = J: ,a = ja, ,o = jo, ,’ = j’, …", nl = "Komma + Klinker geeft J: ,a = ja, ,o = jo, ,’ = j’, …", no = "Komma + Vokal gir J: ,a = ja, ,o = jo, ,’ = j’, …", pl = "Przecinek + Samogłoska daje J: ,a = ja, ,o = jo, ,’ = j’, …", pt = "Vírgula + Vogal dá J: ,a = ja, ,o = jo, ,’ = j’, …", ru = "Запятая + Гласная даёт J: ,a = ja, ,o = jo, ,’ = j’, …", sv = "Komma + Vokal ger J: ,a = ja, ,o = jo, ,’ = j’, …", tr = "Virgül + Ünlü J verir: ,a = ja, ,o = jo, ,’ = j’, …", uk = "Кома + Голосна дає J: ,a = ja, ,o = jo, ,’ = j’, …" }
+dead_key_e_circumflex ={ fr = "Ê suivi d’une lettre agit comme une touche morte : êo = ô, êu = û, ês = ß…", en = "Ê followed by a letter acts as a dead key: êo = ô, êu = û, ês = ß…", de = "Ê gefolgt von einem Buchstaben wirkt als Tottaste: êo = ô, êu = û, ês = ß…", es = "Ê seguido de una letra actúa como tecla muerta: êo = ô, êu = û, ês = ß…", zh = "Ê 后接字母作为死键：êo = ô，êu = û，ês = ß…", ar = "Ê متبوعة بحرف تعمل كمفتاح ميت: êo = ô, êu = û, ês = ß…", cs = "Ê následované písmenem funguje jako mrtvá klávesa: êo = ô, êu = û, ês = ß…", da = "Ê efterfulgt af et bogstav fungerer som en dead key: êo = ô, êu = û, ês = ß…", he = "Ê אחרי אות פועלת כמקש מת: êo = ô, êu = û, ês = ß…", hi = "Ê के बाद अक्षर डेड की की तरह काम करता है: êo = ô, êu = û, ês = ß…", it = "Ê seguita da una lettera agisce come tasto morto: êo = ô, êu = û, ês = ß…", ja = "Ê の後に文字が続くとデッドキーとして機能：êo = ô, êu = û, ês = ß…", ko = "Ê 뒤에 문자가 오면 데드키로 작동: êo = ô, êu = û, ês = ß…", nl = "Ê gevolgd door een letter werkt als dode toets: êo = ô, êu = û, ês = ß…", no = "Ê etterfulgt av en bokstav fungerer som en dead key: êo = ô, êu = û, ês = ß…", pl = "Ê po którym następuje litera działa jak martwy klawisz: êo = ô, êu = û, ês = ß…", pt = "Ê seguido de uma letra funciona como tecla morta: êo = ô, êu = û, ês = ß…", ru = "Ê после буквы работает как мёртвая клавиша: êo = ô, êu = û, ês = ß…", sv = "Ê följt av en bokstav fungerar som en dead key: êo = ô, êu = û, ês = ß…", tr = "Ê’nin ardından gelen harf ölü tuş gibi davranır: êo = ô, êu = û, ês = ß…", uk = "Ê після літери працює як мертва клавіша: êo = ô, êu = û, ês = ß…" }
+e_circumflex_e ={ fr = "Ê suivi de E donne Œ", en = "Ê followed by E gives Œ", de = "Ê gefolgt von E ergibt Œ", es = "Ê seguido de E da Œ", zh = "Ê 后接 E 得 Œ", ar = "Ê متبوعة بـ E تعطي Œ", cs = "Ê následované E dává Œ", da = "Ê efterfulgt af E giver Œ", he = "Ê אחרי E נותן Œ", hi = "Ê के बाद E आने पर Œ मिलता है", it = "Ê seguita da E dà Œ", ja = "Ê の後にEが来るとŒになる", ko = "Ê 뒤에 E가 오면 Œ가 됨", nl = "Ê gevolgd door E geeft Œ", no = "Ê etterfulgt av E gir Œ", pl = "Ê po którym następuje E daje Œ", pt = "Ê seguido de E dá Œ", ru = "Ê после E даёт Œ", sv = "Ê följt av E ger Œ", tr = "Ê'nin ardından E gelirse Œ olur", uk = "Ê після E дає Œ" }
+qu = { fr = "Q devient QU quand elle est suivie d’une voyelle : qa = qua, qo = quo, …", en = "Q becomes QU when followed by a vowel: qa = qua, qo = quo, …", de = "Q wird zu QU, wenn ein Vokal folgt: qa = qua, qo = quo, …", es = "Q se convierte en QU ante vocal: qa = qua, qo = quo, …", zh = "Q 后接元音变为 QU：qa = qua，qo = quo，…", ar = "Q تصبح QU عند اتباعها بحرف علة: qa = qua, qo = quo, …", cs = "Q se stává QU, když následuje samohláska: qa = qua, qo = quo, …", da = "Q bliver QU efterfulgt af en vokal: qa = qua, qo = quo, …", he = "Q הופך ל-QU כשאחריה תנועה: qa = qua, qo = quo, …", hi = "Q के बाद स्वर आने पर QU बन जाता है: qa = qua, qo = quo, …", it = "Q diventa QU davanti a vocale: qa = qua, qo = quo, …", ja = "Qの後に母音が来るとQUになる：qa = qua, qo = quo, …", ko = "Q 뒤에 모음이 오면 QU가 됨: qa = qua, qo = quo, …", nl = "Q wordt QU gevolgd door een klinker: qa = qua, qo = quo, …", no = "Q blir QU etterfulgt av vokal: qa = qua, qo = quo, …", pl = "Q staje się QU przed samogłoską: qa = qua, qo = quo, …", pt = "Q torna-se QU antes de vogal: qa = qua, qo = quo, …", ru = "Q становится QU перед гласной: qa = qua, qo = quo, …", sv = "Q blir QU följt av vokal: qa = qua, qo = quo, …", tr = "Q, ünlüden önce QU olur: qa = qua, qo = quo, …", uk = "Q стає QU перед голосною: qa = qua, qo = quo, …" }
+space_around_symbols ={ fr = "Ajouter un espace avant et après les symboles obtenus par rolls ainsi qu’après la touche [où]", en = "Add a space before and after symbols produced by rolls, and after the [où] key", de = "Leerzeichen vor und nach durch Läufe erzeugten Symbolen sowie nach der [où]-Taste", es = "Añade espacio antes y después de los símbolos generados por rodamientos y tras la tecla [où]", zh = "在连击产生的符号前后添加空格，以及在 [où] 键后添加空格", ar = "أضف مسافة قبل وبعد الرموز الناتجة عن التداول وبعد مفتاح [où]", cs = "Přidat mezeru před a za symboly z rolování a za klávesu [où]", da = "Tilføj mellemrum før og efter symboler fra rolls og efter [où]-tasten", he = "הוסף רווח לפני ואחרי סמלים שנוצרו על ידי גלגולים ואחרי מקש [où]", hi = "रोल्स से बने प्रतीकों के आगे और पीछे और [où] कुंजी के बाद स्पेस जोड़ें", it = "Aggiunge spazio prima e dopo i simboli prodotti dalle rollate e dopo il tasto [où]", ja = "ロールで生成された記号の前後と[où]キーの後にスペースを追加", ko = "롤로 생성된 기호 앞뒤와 [où] 키 뒤에 공백 추가", nl = "Voeg spatie toe voor en na symbolen van rolls en na de [où]-toets", no = "Legg til mellomrom før og etter symboler fra rolls og etter [où]-tasten", pl = "Dodaj spację przed i po symbolach z rolad i po klawiszu [où]", pt = "Adicionar espaço antes e depois dos símbolos das rolagens e após a tecla [où]", ru = "Добавить пробел до и после символов перекатов и после клавиши [où]", sv = "Lägg till mellanslag före och efter symboler från rolls och efter [où]-tangenten", tr = "Rolls’tan üretilen sembollerin önüne ve arkasına ve [où] tuşundan sonra boşluk ekle", uk = "Додати пробіл до і після символів перекатів та після клавіші [où]" }
+suffixes_a ={ fr = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight, …", en = "À + letter gives a suffix: às = ement, àn = ation, àh = ight, …", de = "À + Buchstabe ergibt ein Suffix: às = ement, àn = ation, àh = ight, …", es = "À + letra da un sufijo: às = ement, àn = ation, àh = ight, …", zh = "À + 字母 = 后缀：às = ement，àn = ation，àh = ight，…", ar = "À + حرف يعطي لاحقة: às = ement, àn = ation, àh = ight, …", cs = "À + písmeno dává příponu: às = ement, àn = ation, àh = ight, …", da = "À + bogstav giver et suffiks: às = ement, àn = ation, àh = ight, …", he = "À + אות נותן סיומת: às = ement, àn = ation, àh = ight, …", hi = "À + अक्षर एक प्रत्यय देता है: às = ement, àn = ation, àh = ight, …", it = "À + lettera dà un suffisso: às = ement, àn = ation, àh = ight, …", ja = "À + 文字がサフィックスを生成：às = ement, àn = ation, àh = ight, …", ko = "À + 문자가 접미사를 만듦: às = ement, àn = ation, àh = ight, …", nl = "À + letter geeft een achtervoegsel: às = ement, àn = ation, àh = ight, …", no = "À + bokstav gir et suffiks: às = ement, àn = ation, àh = ight, …", pl = "À + litera daje sufiks: às = ement, àn = ation, àh = ight, …", pt = "À + letra dá um sufixo: às = ement, àn = ation, àh = ight, …", ru = "À + буква даёт суффикс: às = ement, àn = ation, àh = ight, …", sv = "À + bokstav ger ett suffix: às = ement, àn = ation, àh = ight, …", tr = "À + harf bir son ek verir: às = ement, àn = ation, àh = ight, …", uk = "À + літера дає суфікс: às = ement, àn = ation, àh = ight, …" }
+
+
+
+
+
+# =================================
+# =================================
+# ======= Comma_far_letters =======
+# =================================
+# =================================
+
+[[comma_far_letters]]
+",c" = { output = "ç", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",è" = { output = "z", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",s" = { output = "q", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",x" = { output = "où ", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",y" = { output = "k", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
+
+
+
+
+# =======================
+# =======================
+# ======= Comma_j =======
+# =======================
+# =======================
+
+[[comma_j]]
+",'" = { output = "j’", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",a" = { output = "ja", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",à" = { output = "j", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",e" = { output = "je", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",é" = { output = "jé", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",ê" = { output = "ju", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",i" = { output = "ji", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",o" = { output = "jo", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",u" = { output = "ju", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
+
+
+
+
+# =====================================
+# =====================================
+# ======= Dead_key_e_circumflex =======
+# =====================================
+# =====================================
+
+[[dead_key_e_circumflex]]
+"ê " = { output = "^", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê'" = { output = "⚠", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê," = { output = "➜", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê." = { output = "•", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê/" = { output = "⁄", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê0" = { output = "🄋", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê1" = { output = "➀", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê2" = { output = "➁", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê3" = { output = "➂", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê4" = { output = "➃", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê5" = { output = "➄", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê6" = { output = "➅", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê7" = { output = "➆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê8" = { output = "➇", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê9" = { output = "➈", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê:" = { output = "▶", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê;" = { output = "↪", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê^" = { output = "^", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê_" = { output = "\\", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êA" = { output = "Â", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êa" = { output = "â", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êÀ" = { output = "Æ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êà" = { output = "æ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êB" = { output = "Ó", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êb" = { output = "ó", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êC" = { output = "Ç", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êc" = { output = "ç", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êD" = { output = "☆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êd" = { output = "★", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êÈ" = { output = "Í", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êè" = { output = "í", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êÉ" = { output = "Œ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êé" = { output = "œ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êÊ" = { output = "Á", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êê" = { output = "á", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êF" = { output = "⚑", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êf" = { output = "⚐", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êG" = { output = "Ĝ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êg" = { output = "ĝ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êH" = { output = "Ĥ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êh" = { output = "ĥ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êI" = { output = "Î", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êi" = { output = "î", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êJ" = { output = "J", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êj" = { output = "j", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êK" = { output = "☻", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êk" = { output = "☺", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êL" = { output = "‡", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êl" = { output = "†", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êM" = { output = "☑", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êm" = { output = "✅", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êN" = { output = "Ñ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ên" = { output = "ñ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êO" = { output = "Ô", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êo" = { output = "ô", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êP" = { output = "⁂", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êp" = { output = "¶", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êQ" = { output = "☐", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êq" = { output = "☒", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êR" = { output = "°", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êr" = { output = "º", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êS" = { output = "ẞ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ês" = { output = "ß", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êU" = { output = "Û", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êu" = { output = "û", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êV" = { output = "✔", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êv" = { output = "✓", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êW" = { output = "Ù", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êw" = { output = "ù ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êX" = { output = "✖", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êx" = { output = "✕", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êY" = { output = "Ŷ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êy" = { output = "ŷ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êZ" = { output = "Ẑ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"êz" = { output = "ẑ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê¨" = { output = "/", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+
+
+
+
+
+# ==============================
+# ==============================
+# ======= E_circumflex_e =======
+# ==============================
+# ==============================
+
+[[e_circumflex_e]]
+"êe" = { output = "œ", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
+
+
+
+
+# ==================
+# ==================
+# ======= Qu =======
+# ==================
+# ==================
+
+[[qu]]
+"q'" = { output = "qu’", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"qa" = { output = "qua", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"qà" = { output = "quà", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"qe" = { output = "que", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"qè" = { output = "què", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"qé" = { output = "qué", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"qê" = { output = "quê", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"qi" = { output = "qui", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"qo" = { output = "quo", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"q’" = { output = "qu’", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
+
+
+
+
+# ==========================
+# ==========================
+# ======= Suffixes_a =======
+# ==========================
+# ==========================
+
+[[suffixes_a]]
+"à'" = { output = "ance", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àa" = { output = "aire", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àc" = { output = "ction", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àd" = { output = "would", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àê" = { output = "able", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àf" = { output = "iste", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àg" = { output = "ought", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àh" = { output = "ight", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ài" = { output = "ying", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àk" = { output = "ique", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àl" = { output = "elle", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àm" = { output = "isme", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àn" = { output = "ation", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àp" = { output = "ence", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àq" = { output = "ique", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àr" = { output = "erre", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"às" = { output = "ement", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àt" = { output = "ettre", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àv" = { output = "ment", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àx" = { output = "ieux", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àz" = { output = "ez-vous", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"à’" = { output = "ance", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"càd" = { output = "could", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"shàd" = { output = "should", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }

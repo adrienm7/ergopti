@@ -1,0 +1,1467 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<title data-i18n="ui_typing.title"></title>
+		<!-- Optional chart vendors must not block the dashboard data pipeline.
+		     On a captive/offline network normal scripts can hold the parser before
+		     main.js exports process_manifest, making macOS time out with an empty
+		     typing dashboard. `defer` preserves dependency order while local KPI
+		     data and filters become usable immediately. -->
+		<script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+		<script defer src="https://cdn.jsdelivr.net/npm/date-fns"></script>
+		<script defer src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+		<script defer src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+		<script defer src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
+		<link rel="stylesheet" href="style.css" />
+	</head>
+	<body>
+		<div class="top-fixed-bar">
+			<div class="header">
+				<h1 data-i18n="ui_typing.title"></h1>
+			</div>
+
+			<div class="filters-bar">
+				<div class="filter-group-dates">
+					<div>
+						<label data-i18n="ui_typing.label_from"></label
+						><input
+							type="date"
+							id="date_start"
+							onchange="app_state.hour_cutoff = null; apply_date_app_filters()"
+						/>
+					</div>
+					<div>
+						<label data-i18n="ui_typing.label_to"></label
+						><input
+							type="date"
+							id="date_end"
+							onchange="app_state.hour_cutoff = null; apply_date_app_filters()"
+						/>
+					</div>
+					<select
+						id="quick_range"
+						class="filter-btn"
+						onchange="apply_quick_date_range()"
+						data-i18n-option-prefix="ui_typing.opt_quick_range"
+						data-i18n-title="ui_typing.title_quick_range"
+					>
+						<option value=""></option>
+						<option value="last_hour"></option>
+						<option value="today"></option>
+						<option value="week"></option>
+						<option value="month"></option>
+						<option value="3m"></option>
+						<option value="6m"></option>
+						<option value="year"></option>
+						<option value="all"></option>
+					</select>
+				</div>
+
+				<div class="filter-group-buttons">
+					<button
+						class="filter-btn active"
+						id="app_filter_btn"
+						onclick="open_app_modal()"
+						data-i18n="ui_typing.btn_apps_all"
+					></button>
+
+					<!-- Source toggles : indépendants — HS et IA peuvent être actifs séparément -->
+					<!-- Sans aucun toggle actif = texte final affiché à l'écran (output) -->
+					<!-- Avec un toggle actif = frappe brute pour produire cet output (input) -->
+					<button
+						class="filter-btn source-toggle"
+						id="btn_toggle_llm"
+						onclick="toggle_llm_source()"
+						data-i18n-title="ui_typing.btn_toggle_llm_title"
+					>
+						+ IA
+					</button>
+					<button
+						class="filter-btn source-toggle"
+						id="btn_toggle_hs"
+						onclick="toggle_hs_source()"
+						data-i18n-title="ui_typing.btn_toggle_hs_title"
+					>
+						+ Hotstrings
+					</button>
+
+					<button
+						class="filter-btn"
+						id="btn_case_sensitive"
+						onclick="toggle_filter('btn_case_sensitive')"
+						data-i18n="ui_typing.btn_case_sensitive"
+					></button>
+				</div>
+
+				<button
+					class="filter-btn filter-reset"
+					onclick="reset_filters()"
+					data-i18n="ui_typing.btn_reset"
+				></button>
+			</div>
+		</div>
+
+		<div class="main-content">
+			<div class="stats-grid" id="main_stats_grid">
+				<div class="stat-card card-llm" id="llm_card">
+					<h2><span data-i18n="ui_typing.h2_ai"></span> <span id="llm_trend"></span></h2>
+					<div class="stat-value" id="llm_val">
+						0 <span class="stat-unit" data-i18n="ui_typing.unit_activations"></span>
+					</div>
+
+					<div class="stat-details" id="llm_loading" data-i18n="ui_typing.loading"></div>
+					<div class="stat-details-split" id="llm_details" style="display: none">
+						<div class="split-col" data-i18n-title="ui_typing.title_net_llm">
+							<div class="split-label" data-i18n="ui_typing.lbl_saved"></div>
+							<div class="split-val">
+								<strong id="llm_net_val">0</strong>
+								<span data-i18n="ui_typing.unit_keystrokes"></span>
+							</div>
+						</div>
+						<div class="split-col">
+							<div class="split-label" data-i18n="ui_typing.lbl_accepted"></div>
+							<div class="split-val">
+								<strong id="llm_acc_pct">0%</strong>
+								<span class="split-sub" id="llm_acc_raw">(0/0)</span>
+							</div>
+						</div>
+					</div>
+
+					<div class="sparkline-container"><canvas id="llm_sparkline"></canvas></div>
+				</div>
+
+				<div class="stat-card card-hs" id="hs_card">
+					<h2><span data-i18n="ui_typing.h2_hs"></span> <span id="hs_trend"></span></h2>
+					<div class="stat-value" id="hs_val">
+						0 <span class="stat-unit" data-i18n="ui_typing.unit_activations"></span>
+					</div>
+
+					<div class="stat-details" id="hs_loading" data-i18n="ui_typing.loading"></div>
+					<div class="stat-details-split" id="hs_details" style="display: none">
+						<div class="split-col" data-i18n-title="ui_typing.title_net_hs">
+							<div class="split-label" data-i18n="ui_typing.lbl_saved"></div>
+							<div class="split-val">
+								<strong id="hs_net_val">0</strong>
+								<span data-i18n="ui_typing.unit_keystrokes"></span>
+							</div>
+						</div>
+						<div class="split-col">
+							<div class="split-label" data-i18n="ui_typing.lbl_accepted"></div>
+							<div class="split-val">
+								<strong id="hs_acc_pct">0%</strong>
+								<span class="split-sub" id="hs_acc_raw">(0/0)</span>
+							</div>
+						</div>
+					</div>
+
+					<div class="sparkline-container"><canvas id="hs_sparkline"></canvas></div>
+				</div>
+
+				<div class="stat-card card-global" id="global_card">
+					<h2><span data-i18n="ui_typing.h2_speed"></span> <span id="wpm_trend"></span></h2>
+					<div class="stat-value" id="wpm_val" style="margin: 5px 0">0</div>
+					<div class="stat-details" id="global_details">
+						<div>
+							<strong>0</strong>
+							<span
+								class="stat-unit"
+								style="font-size: 0.9em"
+								data-i18n="ui_typing.unit_keyspressed"
+							></span>
+						</div>
+					</div>
+					<div id="wpm_words_sub"></div>
+					<div style="margin-top: 8px">
+						<select
+							id="pause_threshold"
+							class="filter-btn"
+							onchange="apply_local_filters()"
+							data-i18n-title="ui_typing.title_pause_threshold"
+							style="font-size: 11px; padding: 3px 6px; height: auto"
+							data-i18n-option-prefix="ui_typing.opt_pause"
+						>
+							<option value="1000"></option>
+							<option value="2000"></option>
+							<option value="3000"></option>
+							<option value="5000" selected></option>
+							<option value="10000"></option>
+							<option value="20000"></option>
+							<option value="30000"></option>
+							<option value="60000"></option>
+							<option value="99999999"></option>
+						</select>
+					</div>
+				</div>
+			</div>
+
+			<!-- align-items:flex-start prevents cross-axis stretching of side-by-side
+			     chart containers so each sizes to its own content height only -->
+			<div
+				style="
+					display: flex;
+					flex-wrap: wrap;
+					gap: 16px;
+					margin-bottom: 16px;
+					align-items: flex-start;
+				"
+			>
+				<div class="chart-row-block is-precision">
+					<div class="chart-row-block-header">
+						<div style="display: flex; align-items: baseline; gap: 10px">
+							<h3
+								id="precision_chart_title"
+								style="margin: 0; font-size: 14px; color: var(--kpi-precision-color)"
+								data-i18n="ui_typing.h3_precision"
+							></h3>
+							<span
+								id="precision_info"
+								class="tooltip stat-inline-tooltip"
+								style="color: var(--kpi-precision-color)"
+							></span>
+							<div class="chart-help" style="margin: 0" data-i18n="ui_typing.pinch_hint"></div>
+						</div>
+						<button
+							class="tab-btn"
+							style="padding: 2px 8px; font-size: 11px; border-color: var(--precision-border)"
+							onclick="reset_chart_zoom('precision')"
+							data-i18n="ui_typing.btn_restore_zoom"
+						></button>
+					</div>
+					<div class="chart-row-block-canvas">
+						<canvas
+							id="precision_chart"
+							style="position: absolute; inset: 0; width: 100%; height: 100%"
+						></canvas>
+					</div>
+				</div>
+
+				<div class="chart-row-block is-speed">
+					<div class="chart-row-block-header">
+						<div style="display: flex; align-items: baseline; gap: 10px">
+							<h3
+								id="wpm_chart_title"
+								style="margin: 0; font-size: 14px; color: var(--chart-wpm-color)"
+								data-i18n="ui_typing.h3_speed"
+							></h3>
+							<div class="chart-help" style="margin: 0" data-i18n="ui_typing.pinch_hint"></div>
+						</div>
+						<button
+							class="tab-btn"
+							style="padding: 2px 8px; font-size: 11px; border-color: var(--global-border)"
+							onclick="reset_chart_zoom('wpm')"
+							data-i18n="ui_typing.btn_restore_zoom"
+						></button>
+					</div>
+					<div class="chart-row-block-canvas">
+						<canvas
+							id="wpm_chart"
+							style="position: absolute; inset: 0; width: 100%; height: 100%"
+						></canvas>
+					</div>
+				</div>
+			</div>
+
+			<div
+				class="chart-container"
+				style="
+					height: 240px;
+					margin-bottom: 16px;
+					background: var(--delegation-bg);
+					border-color: var(--delegation-border);
+				"
+			>
+				<div
+					style="
+						display: flex;
+						justify-content: space-between;
+						align-items: center;
+						margin-bottom: 5px;
+					"
+				>
+					<div style="display: flex; align-items: baseline; gap: 10px">
+						<h3
+							style="margin: 0; font-size: 14px; color: var(--text-color)"
+							data-i18n="ui_typing.h3_keystroke_origin"
+						></h3>
+						<div class="chart-help" style="margin: 0" data-i18n="ui_typing.pinch_hint"></div>
+					</div>
+					<button
+						class="tab-btn"
+						style="padding: 2px 8px; font-size: 11px; border-color: var(--delegation-border)"
+						onclick="reset_chart_zoom('delegation')"
+						data-i18n="ui_typing.btn_restore_zoom"
+					></button>
+				</div>
+				<div style="flex: 1; min-height: 0; position: relative">
+					<canvas id="delegation_chart"></canvas>
+				</div>
+			</div>
+
+			<!-- Keyboard heatmaps — always visible above the tab buttons -->
+			<div class="heatmaps-row">
+				<div id="kc_heatmap_container" style="text-align: center"></div>
+				<div style="text-align: center; display: flex; flex-direction: column; align-items: center">
+					<div style="margin-bottom: 6px">
+						<button
+							id="sfb_heatmap_same_key_btn"
+							class="filter-btn sfb-toggle-btn active"
+							onclick="toggle_sfb_heatmap_same_key()"
+							title="Inclure ou exclure les redoublements de même touche (AA, BB…) dans la heatmap SFB. Indépendant du bouton du bloc SFB."
+							data-i18n="ui_typing.btn_doublings_included"
+						></button>
+					</div>
+					<div id="sfb_heatmap_container" style="width: 100%"></div>
+				</div>
+			</div>
+
+			<!-- Calendrier d’activité : 12 mois glissants. Intensité = caractères tapés ce jour-là. -->
+			<div id="activity_calendar_container" style="margin-bottom: 16px"></div>
+
+			<!-- Heatmap heure × jour de semaine : volume / cadence par créneau, agrégé sur tout l'historique. -->
+			<div id="hour_weekday_heatmap_container" style="margin-bottom: 16px"></div>
+
+			<!-- Expanded KPI row: Distance des doigts + Redoublements, placés sous le graphique
+			     Origine des frappes pour rester dans le contexte des données analysées. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-dist" id="dist_card">
+					<div class="ekpi-header">
+						<h2 data-i18n="ui_typing.h2_finger_dist"></h2>
+						<div class="stat-value" id="dist_val">
+							0 <span class="stat-unit" data-i18n="ui_typing.unit_km"></span>
+						</div>
+						<div class="stat-details" id="dist_loading" data-i18n="ui_typing.loading"></div>
+						<div class="stat-details-split" id="dist_details" style="display: none">
+							<div class="split-col" data-i18n-title="ui_typing.title_top_finger">
+								<div class="split-label" data-i18n="ui_typing.lbl_most_active_finger"></div>
+								<div class="split-val"><strong id="dist_top_finger">—</strong></div>
+							</div>
+							<div class="split-col" data-i18n-title="ui_typing.title_hand_balance">
+								<div class="split-label" data-i18n="ui_typing.lbl_hand_balance"></div>
+								<div class="split-val"><strong id="dist_hand_balance">—</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="dist_fingers_container">
+						<!-- Table injected by render_dist_table() -->
+					</div>
+				</div>
+
+				<div class="expanded-kpi-block card-rep" id="rep_card">
+					<div class="ekpi-header">
+						<h2 data-i18n="ui_typing.h2_doublings"></h2>
+						<div class="stat-value" id="rep_val">0<span class="stat-unit">%</span></div>
+						<div class="stat-details" id="rep_loading" data-i18n="ui_typing.loading"></div>
+						<div class="stat-details-split" id="rep_details" style="display: none">
+							<div class="split-col" data-i18n-title="ui_typing.title_rep_total">
+								<div class="split-label" data-i18n="ui_typing.lbl_total"></div>
+								<div class="split-val">
+									<strong id="rep_pct">0 <span data-i18n="ui_typing.lbl_doublings"></span></strong>
+								</div>
+							</div>
+							<div class="split-col" data-i18n-title="ui_typing.title_rep_via_star">
+								<div class="split-label" data-i18n="ui_typing.lbl_via_magic_key"></div>
+								<div class="split-val">
+									<strong id="rep_hs_pct">0%</strong>
+									<span class="split-sub" id="rep_hs_raw"></span>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="rep_doublings_container">
+						<!-- Table injected by render_rep_table() -->
+					</div>
+				</div>
+
+				<div class="expanded-kpi-block card-sfb" id="sfb_card">
+					<div class="ekpi-header">
+						<h2>
+							SFBs
+							<button
+								id="sfb_same_key_btn"
+								class="filter-btn sfb-toggle-btn active"
+								onclick="toggle_sfb_same_key()"
+								title="Inclure les redoublements de même touche (AA, BB…) dans le calcul des SFBs"
+								data-i18n="ui_typing.btn_doublings_included"
+							></button>
+						</h2>
+						<div class="stat-value" id="sfb_val">0<span class="stat-unit">%</span></div>
+						<div class="stat-details" id="sfb_loading" data-i18n="ui_typing.loading"></div>
+						<div class="stat-details-split" id="sfb_details" style="display: none">
+							<div
+								class="split-col"
+								title="SFBs bruts — bigrammes manuels frappés par le même doigt"
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_sfbs_raw"></div>
+								<div class="split-val"><strong id="sfb_pct">0 SFBs</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="SFBs évités grâce aux hotstrings — bigrammes dans les expansions HS qui auraient été des SFBs si typés manuellement"
+							>
+								<div
+									class="split-label"
+									style="font-size: 11px"
+									data-i18n="ui_typing.lbl_via_hotstrings"
+								></div>
+								<div class="split-val">
+									<strong id="sfb_avoided" style="font-size: 11px; color: var(--kpi-hs-color)"
+										>0 évités</strong
+									>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="sfb_pairs_container">
+						<!-- Table injected by render_sfb_table() -->
+					</div>
+				</div>
+			</div>
+
+			<!-- Ergonomie bigrammes : SHB / SHU, LSB, ciseaux, roulements. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-ergo-bigram" id="ergo_bigram_card">
+					<div class="ekpi-header">
+						<h2 data-i18n="ui_typing.h2_bigram_ergo">
+							<span class="tooltip stat-inline-tooltip" id="ergo_bigram_info"></span>
+						</h2>
+						<div class="stat-value" id="ergo_shu_val">0<span class="stat-unit">% SHU</span></div>
+						<div
+							class="stat-details"
+							id="ergo_bigram_loading"
+							data-i18n="ui_typing.loading_ellipsis"
+						></div>
+						<div class="stat-details-split" id="ergo_bigram_details" style="display: none">
+							<div
+								class="split-col"
+								title="Roulement intérieur : main vers le pouce (auriculaire vers index). Le plus confortable."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_roll_in"></div>
+								<div class="split-val"><strong id="ergo_roll_in_pct">0%</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Roulement extérieur : main vers le bord (index vers auriculaire)."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_roll_out"></div>
+								<div class="split-val"><strong id="ergo_roll_out_pct">0%</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Lateral Stretch Bigrams : bigramme même main avec une extension latérale."
+							>
+								<div class="split-label">LSB</div>
+								<div class="split-val"><strong id="ergo_lsb_pct">0%</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Ciseaux : changement de rangée inconfortable sur la même main."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_scissors"></div>
+								<div class="split-val"><strong id="ergo_scissor_pct">0%</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="ergo_bigram_table_container"></div>
+				</div>
+			</div>
+
+			<!-- Ergonomie trigrammes : SFS, SKS, redirections, mauvaises redirections. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-ergo-trigram" id="ergo_trigram_card">
+					<div class="ekpi-header">
+						<h2 data-i18n="ui_typing.h2_trigram_ergo">
+							<span class="tooltip stat-inline-tooltip" id="ergo_trigram_info"></span>
+						</h2>
+						<div class="stat-value" id="ergo_trigram_val">
+							0<span class="stat-unit">% Redir.</span>
+						</div>
+						<div
+							class="stat-details"
+							id="ergo_trigram_loading"
+							data-i18n="ui_typing.loading_ellipsis"
+						></div>
+						<div class="stat-details-split" id="ergo_trigram_details" style="display: none">
+							<div
+								class="split-col"
+								title="Same-Finger Skipgram : un SFB avec une touche d un autre doigt intercalée."
+							>
+								<div class="split-label">SFS</div>
+								<div class="split-val"><strong id="ergo_sfs_pct">0%</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Same-Key Skipgram : ABA, la même touche en positions 1 et 3."
+							>
+								<div class="split-label">SKS</div>
+								<div class="split-val"><strong id="ergo_sks_pct">0%</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Redirection : trois touches même main avec un changement de direction."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_redir"></div>
+								<div class="split-val"><strong id="ergo_redir_pct">0%</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Mauvaise redirection : redirection sans que l index intervienne."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_bad_redir"></div>
+								<div class="split-val"><strong id="ergo_bad_redir_pct">0%</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="ergo_trigram_table_container"></div>
+				</div>
+			</div>
+
+			<!-- Erreurs : top des séquences les plus corrigées. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-errors" id="errors_card">
+					<div class="ekpi-header">
+						<h2 data-i18n="ui_typing.h2_error_bigrams">
+							<span class="tooltip stat-inline-tooltip" id="errors_info"></span>
+						</h2>
+						<div class="stat-value" id="errors_val">
+							0<span class="stat-unit" data-i18n="ui_typing.unit_global_rate"></span>
+						</div>
+						<div
+							class="stat-details"
+							id="errors_loading"
+							data-i18n="ui_typing.loading_ellipsis"
+						></div>
+						<div class="stat-details-split" id="errors_details" style="display: none">
+							<div
+								class="split-col"
+								title="Total des bigrammes manuels qui ont été suivis d un backspace."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_corrected_bigrams"></div>
+								<div class="split-val"><strong id="errors_total">0</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Bigramme qui se trompe le plus souvent (taux d erreur le plus élevé)."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_worst_bigram"></div>
+								<div class="split-val"><strong id="errors_worst">—</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Cascades : runs de ≥ 3 backspaces consécutifs, signalant une correction majeure (mot ou phrase entière effacée)."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_cascades"></div>
+								<div class="split-val"><strong id="errors_cascades">—</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Délai moyen entre un backspace et la frappe suivante. Plus c\'est long, plus la correction interrompt votre flux."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_recovery_time"></div>
+								<div class="split-val"><strong id="errors_recovery">—</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="errors_bigrams_container"></div>
+				</div>
+			</div>
+
+			<!-- Productivité HS / IA. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-roi" id="roi_card">
+					<div class="ekpi-header">
+						<h2 data-i18n="ui_typing.h2_hs_ai_prod">
+							<span class="tooltip stat-inline-tooltip" id="roi_info"></span>
+						</h2>
+						<div class="stat-value" id="roi_val">
+							0<span class="stat-unit" data-i18n="ui_typing.unit_chars_saved"></span>
+						</div>
+						<div class="stat-details" id="roi_loading" data-i18n="ui_typing.loading_ellipsis"></div>
+						<div class="stat-details-split" id="roi_details" style="display: none">
+							<div class="split-col" title="Estimation du temps économisé.">
+								<div class="split-label" data-i18n="ui_typing.lbl_time_saved"></div>
+								<div class="split-val"><strong id="roi_time_saved">—</strong></div>
+							</div>
+							<div class="split-col" title="Caractères nets ajoutés par les hotstrings.">
+								<div class="split-label" data-i18n="ui_typing.lbl_via_hotstrings"></div>
+								<div class="split-val">
+									<strong id="roi_hs_saved" style="color: var(--kpi-hs-color)">0</strong>
+								</div>
+							</div>
+							<div class="split-col" title="Caractères nets ajoutés par l IA.">
+								<div class="split-label" data-i18n="ui_typing.lbl_via_ai"></div>
+								<div class="split-val">
+									<strong id="roi_llm_saved" style="color: var(--kpi-llm-color)">0</strong>
+								</div>
+							</div>
+							<div class="split-col" title="Part des suggestions IA acceptées.">
+								<div class="split-label" data-i18n="ui_typing.lbl_ai_acceptance"></div>
+								<div class="split-val"><strong id="roi_llm_acc">—</strong></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Lexique : richesse du vocabulaire et longueur des mots. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-lexical" id="lexical_card">
+					<div class="ekpi-header">
+						<h2 data-i18n="ui_typing.h2_lexicon">
+							<span class="tooltip stat-inline-tooltip" id="lexical_info"></span>
+						</h2>
+						<div class="stat-value" id="lexical_val">
+							0<span class="stat-unit" data-i18n="ui_typing.unit_richness"></span>
+						</div>
+						<div
+							class="stat-details"
+							id="lexical_loading"
+							data-i18n="ui_typing.loading_ellipsis"
+						></div>
+						<div class="stat-details-split" id="lexical_details" style="display: none">
+							<div class="split-col" title="Nombre de mots distincts produits sur la période.">
+								<div class="split-label" data-i18n="ui_typing.lbl_unique_words"></div>
+								<div class="split-val"><strong id="lexical_unique">0</strong></div>
+							</div>
+							<div class="split-col" title="Nombre total de mots tapés (avec leurs répétitions).">
+								<div class="split-label" data-i18n="ui_typing.lbl_total_words"></div>
+								<div class="split-val"><strong id="lexical_total">0</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Longueur moyenne d un mot, pondérée par sa fréquence d utilisation."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_avg_length"></div>
+								<div class="split-val"><strong id="lexical_avg_len">0</strong></div>
+							</div>
+							<div class="split-col" title="Le mot le plus tapé sur la période.">
+								<div class="split-label" data-i18n="ui_typing.lbl_top_word"></div>
+								<div class="split-val"><strong id="lexical_top">—</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="lexical_distribution_container"></div>
+				</div>
+			</div>
+			<!-- Rythme & rafales : longueur des bursts, vitesse pic, régularité du tempo. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-rhythm" id="rhythm_card">
+					<div class="ekpi-header">
+						<h2 data-i18n="ui_typing.h2_rhythm">
+							<span class="tooltip stat-inline-tooltip" id="rhythm_info"></span>
+						</h2>
+						<div class="stat-value" id="rhythm_val">
+							0<span class="stat-unit" data-i18n="ui_typing.unit_cpm_burst"></span>
+						</div>
+						<div
+							class="stat-details"
+							id="rhythm_loading"
+							data-i18n="ui_typing.loading_ellipsis"
+						></div>
+						<div class="stat-details-split" id="rhythm_details" style="display: none">
+							<div
+								class="split-col"
+								title="Plus longue rafale ininterrompue (gap < 1 s) sur la période."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_longest_burst"></div>
+								<div class="split-val"><strong id="rhythm_max_chars">—</strong></div>
+							</div>
+							<div class="split-col" title="Nombre total de rafales finalisées sur la période.">
+								<div class="split-label" data-i18n="ui_typing.lbl_total_bursts"></div>
+								<div class="split-val"><strong id="rhythm_count">—</strong></div>
+							</div>
+							<div class="split-col" title="Délai inter-touches moyen pendant les rafales (en ms).">
+								<div class="split-label" data-i18n="ui_typing.lbl_avg_delay"></div>
+								<div class="split-val"><strong id="rhythm_mean_delay">—</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Coefficient de variation des délais inter-touches : écart-type ÷ moyenne. Plus c'est bas, plus le rythme est régulier."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_regularity"></div>
+								<div class="split-val"><strong id="rhythm_cv">—</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="rhythm_distribution_container"></div>
+				</div>
+			</div>
+			<!-- Séances : blocs de typing détectés (gap < 5 min). -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-sessions" id="sessions_card">
+					<div class="ekpi-header">
+						<h2 data-i18n="ui_typing.h2_sessions">
+							<span class="tooltip stat-inline-tooltip" id="sessions_info"></span>
+						</h2>
+						<div class="stat-value" id="sessions_val">
+							0<span class="stat-unit" data-i18n="ui_typing.unit_sessions"></span>
+						</div>
+						<div
+							class="stat-details"
+							id="sessions_loading"
+							data-i18n="ui_typing.loading_ellipsis"
+						></div>
+						<div class="stat-details-split" id="sessions_details" style="display: none">
+							<div
+								class="split-col"
+								title="Durée cumulée passée à taper réellement (somme des durées de chaque séance)."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_total_active_time"></div>
+								<div class="split-val"><strong id="sessions_total_time">—</strong></div>
+							</div>
+							<div class="split-col" title="Plus longue séance par durée (en minutes).">
+								<div class="split-label" data-i18n="ui_typing.lbl_longest_time"></div>
+								<div class="split-val"><strong id="sessions_longest_time">—</strong></div>
+							</div>
+							<div class="split-col" title="Plus longue séance par nombre de caractères tapés.">
+								<div class="split-label" data-i18n="ui_typing.lbl_longest_chars"></div>
+								<div class="split-val"><strong id="sessions_longest_chars">—</strong></div>
+							</div>
+							<div class="split-col" title="Durée moyenne d’une séance.">
+								<div class="split-label" data-i18n="ui_typing.lbl_avg_duration"></div>
+								<div class="split-val"><strong id="sessions_avg_time">—</strong></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- Records personnels : meilleurs scores, sur toute la base de données (ignorent le filtre de dates). -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-records" id="records_card">
+					<div class="ekpi-header">
+						<h2 data-i18n="ui_typing.h2_records">
+							<span class="tooltip stat-inline-tooltip" id="records_info"></span>
+						</h2>
+						<div class="stat-value" id="records_val">
+							0<span class="stat-unit" data-i18n="ui_typing.unit_cpm_record"></span>
+						</div>
+						<div
+							class="stat-details"
+							id="records_loading"
+							data-i18n="ui_typing.loading_ellipsis"
+						></div>
+						<div class="stat-details-split" id="records_details" style="display: none">
+							<div
+								class="split-col"
+								title="Plus longue rafale ininterrompue (gap < 1 s) jamais enregistrée."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_longest_burst"></div>
+								<div class="split-val"><strong id="records_burst_chars">—</strong></div>
+							</div>
+							<div class="split-col" title="Plus longue séance par durée jamais enregistrée.">
+								<div class="split-label" data-i18n="ui_typing.lbl_longest_session"></div>
+								<div class="split-val"><strong id="records_session">—</strong></div>
+							</div>
+							<div class="split-col" title="Journée avec le plus de caractères tapés.">
+								<div class="split-label" data-i18n="ui_typing.lbl_best_day"></div>
+								<div class="split-val"><strong id="records_best_day">—</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Plus longue suite de jours consécutifs avec au moins une frappe."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_streak"></div>
+								<div class="split-val"><strong id="records_streak">—</strong></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- Mix de caractères : répartition lettres / chiffres / ponctuation / espaces / autres. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-charmix" id="charmix_card">
+					<div class="ekpi-header">
+						<h2 data-i18n="ui_typing.h2_char_mix">
+							<span class="tooltip stat-inline-tooltip" id="charmix_info"></span>
+						</h2>
+						<div class="stat-value" id="charmix_val">—</div>
+						<div
+							class="stat-details"
+							id="charmix_loading"
+							data-i18n="ui_typing.loading_ellipsis"
+						></div>
+						<div class="stat-details-split" id="charmix_details" style="display: none">
+							<div
+								class="split-col"
+								title="Lettres alphabétiques (latin de base + extensions courantes)."
+							>
+								<div
+									class="split-label"
+									style="color: rgb(96, 165, 250)"
+									data-i18n="ui_typing.lbl_letters"
+								></div>
+								<div class="split-val"><strong id="charmix_letter">—</strong></div>
+							</div>
+							<div class="split-col" title="Chiffres 0–9.">
+								<div
+									class="split-label"
+									style="color: rgb(251, 191, 36)"
+									data-i18n="ui_typing.lbl_digits"
+								></div>
+								<div class="split-val"><strong id="charmix_digit">—</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Ponctuation et symboles courants (.,;:!? '&quot; ()[]{}&lt;&gt;=+*/\|-)."
+							>
+								<div
+									class="split-label"
+									style="color: rgb(248, 113, 113)"
+									data-i18n="ui_typing.lbl_punctuation"
+								></div>
+								<div class="split-val"><strong id="charmix_punct">—</strong></div>
+							</div>
+							<div class="split-col" title="Espace, tabulation, retour à la ligne, NBSP, NNBSP.">
+								<div
+									class="split-label"
+									style="color: rgb(74, 222, 128)"
+									data-i18n="ui_typing.lbl_spaces"
+								></div>
+								<div class="split-val"><strong id="charmix_space">—</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Tout le reste : caractères non latins, marqueurs spéciaux ([BS], [F1]…), etc."
+							>
+								<div
+									class="split-label"
+									style="color: rgb(168, 162, 158)"
+									data-i18n="ui_typing.lbl_others"
+								></div>
+								<div class="split-val"><strong id="charmix_other">—</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="charmix_bar_container"></div>
+				</div>
+			</div>
+			<!-- Apps : vitesse moyenne, volume et co-occurrence par application. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-apps" id="apps_card">
+					<div class="ekpi-header">
+						<h2 data-i18n="ui_typing.h2_app_activity">
+							<span class="tooltip stat-inline-tooltip" id="apps_info"></span>
+						</h2>
+						<div class="stat-value" id="apps_val">
+							0<span class="stat-unit" data-i18n="ui_typing.unit_active_apps"></span>
+						</div>
+						<div
+							class="stat-details"
+							id="apps_loading"
+							data-i18n="ui_typing.loading_ellipsis"
+						></div>
+						<div class="stat-details-split" id="apps_details" style="display: none">
+							<div
+								class="split-col"
+								title="App où votre vitesse moyenne (CPM) est la plus élevée — où vous êtes le plus à l'aise."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_fastest_app"></div>
+								<div class="split-val"><strong id="apps_fastest">—</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="App qui concentre le plus de caractères tapés sur la période."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_top_app"></div>
+								<div class="split-val"><strong id="apps_top_volume">—</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Paire d’apps entre lesquelles vous alternez le plus — révèle le workflow type."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_frequent_pair"></div>
+								<div class="split-val"><strong id="apps_top_pair">—</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Layouts clavier détectés sur la période (selon hs.keycodes.currentLayout au moment du flush). Format : layout (occurrences)."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_layouts_used"></div>
+								<div class="split-val"><strong id="apps_layouts">—</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Modifieur dont la durée moyenne de maintien est la plus élevée. Un modifieur tenu très longtemps en moyenne signale un chord-typing lent ou un layer prolongé."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_top_mod_held"></div>
+								<div class="split-val"><strong id="apps_top_mod_hold">—</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="apps_table_container"></div>
+				</div>
+			</div>
+			<!-- Santé & Ergonomie : indicateurs de fatigue, déséquilibres, charge cumulée. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-wellness" id="wellness_card">
+					<div class="ekpi-header">
+						<h2 data-i18n="ui_typing.h2_health">
+							<span class="tooltip stat-inline-tooltip" id="wellness_info"></span>
+						</h2>
+						<div class="stat-value" id="wellness_val">—</div>
+						<div
+							class="stat-details"
+							id="wellness_loading"
+							data-i18n="ui_typing.loading_ellipsis"
+						></div>
+						<div class="stat-details-split" id="wellness_details" style="display: none">
+							<div
+								class="split-col"
+								title="Temps actif typing ÷ temps total où l'app était au foreground. 100% = vous tapez en continu, 20% = vous lisez beaucoup."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_active_ratio"></div>
+								<div class="split-val"><strong id="wellness_active_ratio">—</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Plus longue suite de touches frappées par le même doigt sans alternance. Au-delà de 4-5, le doigt accumule la fatigue."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_same_finger_streak"></div>
+								<div class="split-val"><strong id="wellness_finger_streak">—</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Plus longue suite sur la même main. Une bonne disposition vise à alterner les mains régulièrement."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_same_hand_streak"></div>
+								<div class="split-val"><strong id="wellness_hand_streak">—</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Nombre de séances dépassant 90 min sans pause de 5+ min. Au-delà, le risque ergonomique augmente sensiblement."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_long_sessions"></div>
+								<div class="split-val"><strong id="wellness_long_sessions">—</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Frappes considérées comme auto-repeat (touche maintenue, ex. flèche). Soustraites des compteurs effectifs car une seule décision motrice."
+							>
+								<div class="split-label" data-i18n="ui_apps.h2_autorepeat"></div>
+								<div class="split-val"><strong id="wellness_autorepeat">—</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Latence moyenne entre l'activation d’une app et votre première frappe — proxy de votre temps de réflexion / réorientation au changement de contexte."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_focus_latency"></div>
+								<div class="split-val"><strong id="wellness_focus_latency">—</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Temps cumulé pendant lequel l'écran était verrouillé ou la machine en veille. Soustrait du temps d’app pour un ratio actif précis (et non gonflé par les pauses physiques)."
+							>
+								<div class="split-label" data-i18n="ui_typing.lbl_passive_time"></div>
+								<div class="split-val"><strong id="wellness_passive_ms">—</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="wellness_finger_load_container"></div>
+				</div>
+			</div>
+
+			<div class="tabs tabs-row">
+				<button
+					class="tab-btn"
+					data-tab="kc"
+					onclick="switch_tab('kc')"
+					data-i18n="ui_typing.tab_keycodes"
+				></button>
+				<button
+					class="tab-btn active"
+					data-tab="c"
+					onclick="switch_tab('c')"
+					data-i18n="ui_typing.tab_chars"
+				></button>
+				<button
+					class="tab-btn"
+					data-tab="bg"
+					onclick="switch_tab('bg')"
+					data-i18n="ui_typing.tab_bigrams"
+				></button>
+				<button
+					class="tab-btn"
+					data-tab="tg"
+					onclick="switch_tab('tg')"
+					data-i18n="ui_typing.tab_trigrams"
+				></button>
+				<button
+					class="tab-btn"
+					data-tab="qg"
+					onclick="switch_tab('qg')"
+					data-i18n="ui_typing.tab_quadgrams"
+				></button>
+				<button
+					class="tab-btn"
+					data-tab="pg"
+					onclick="switch_tab('pg')"
+					data-i18n="ui_typing.tab_pentagrams"
+				></button>
+				<button
+					class="tab-btn"
+					data-tab="hx"
+					onclick="switch_tab('hx')"
+					data-i18n="ui_typing.tab_hexagrams"
+				></button>
+				<button
+					class="tab-btn"
+					data-tab="hp"
+					onclick="switch_tab('hp')"
+					data-i18n="ui_typing.tab_heptagrams"
+				></button>
+			</div>
+			<div class="tabs tabs-row">
+				<button
+					class="tab-btn"
+					data-tab="w"
+					onclick="switch_tab('w')"
+					data-i18n="ui_typing.tab_words"
+				></button>
+				<button
+					class="tab-btn"
+					data-tab="w_bg"
+					onclick="switch_tab('w_bg')"
+					data-i18n="ui_typing.tab_word_bigrams"
+				></button>
+				<button
+					class="tab-btn"
+					data-tab="w_tg"
+					onclick="switch_tab('w_tg')"
+					data-i18n="ui_typing.tab_word_trigrams"
+				></button>
+				<button
+					class="tab-btn"
+					data-tab="w_qg"
+					onclick="switch_tab('w_qg')"
+					data-i18n="ui_typing.tab_word_quadgrams"
+				></button>
+				<button
+					class="tab-btn"
+					data-tab="w_pg"
+					onclick="switch_tab('w_pg')"
+					data-i18n="ui_typing.tab_word_pentagrams"
+				></button>
+			</div>
+			<div class="tabs tabs-row">
+				<button
+					class="tab-btn"
+					data-tab="mods"
+					onclick="switch_tab('mods')"
+					data-i18n="ui_typing.tab_modifiers"
+				></button>
+				<button
+					class="tab-btn"
+					data-tab="sc"
+					onclick="switch_tab('sc')"
+					data-i18n="ui_typing.tab_shortcuts"
+				></button>
+				<button
+					class="tab-btn"
+					data-tab="sc_bg"
+					onclick="switch_tab('sc_bg')"
+					data-i18n="ui_typing.tab_shortcut_bigrams"
+				></button>
+				<button
+					class="tab-btn"
+					data-tab="sc_tg"
+					onclick="switch_tab('sc_tg')"
+					data-i18n="ui_typing.tab_shortcut_trigrams"
+				></button>
+				<button
+					class="tab-btn"
+					data-tab="sc_qg"
+					onclick="switch_tab('sc_qg')"
+					data-i18n="ui_typing.tab_shortcut_quadgrams"
+				></button>
+				<button
+					class="tab-btn"
+					data-tab="sc_pg"
+					onclick="switch_tab('sc_pg')"
+					data-i18n="ui_typing.tab_shortcut_pentagrams"
+				></button>
+			</div>
+
+			<div class="table-container">
+				<table id="metrics_table">
+					<thead>
+						<tr>
+							<th onclick="handle_sort('key')">
+								<div class="th-seq-header">
+									<div class="th-seq-title-row">
+										<span data-i18n="ui_typing.col_seq"></span>
+										<input
+											type="text"
+											id="search_input"
+											placeholder="Rechercher…"
+											onclick="event.stopPropagation()"
+											onkeyup="handle_search()"
+										/>
+									</div>
+									<span id="total_rows" class="th-stat"></span>
+								</div>
+							</th>
+							<th onclick="handle_sort('count')">
+								<span data-i18n="ui_typing.col_occ"></span><br />
+								<span id="total_occurrences" class="th-stat"></span>
+							</th>
+							<th class="col-rep" onclick="handle_sort('rep')" data-i18n="ui_typing.col_rep"></th>
+							<th onclick="handle_sort('km')">
+								<span data-i18n="ui_typing.col_km"></span><br />
+								<span id="col_global_km" class="th-stat"></span>
+							</th>
+							<th onclick="handle_sort('freq')" data-i18n="ui_typing.col_freq"></th>
+							<th onclick="handle_sort('avg')">
+								<span data-i18n="ui_typing.col_time"></span><br />
+								<span id="col_global_avg" class="th-stat"></span>
+							</th>
+							<th onclick="handle_sort('wpm')">
+								<span data-i18n="ui_typing.col_wpm"></span>
+								<div class="tooltip" onclick="event.stopPropagation()">
+									<svg
+										class="info-icon"
+										xmlns="http://www.w3.org/2000/svg"
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<circle cx="12" cy="12" r="10"></circle>
+										<line x1="12" y1="16" x2="12" y2="12"></line>
+										<line x1="12" y1="8" x2="12.01" y2="8"></line>
+									</svg>
+									<span class="tooltiptext" data-i18n="ui_typing.tooltip_col_mpm"></span>
+								</div>
+								↕<br />
+								<span id="col_global_wpm" class="th-stat"></span>
+							</th>
+							<th onclick="handle_sort('acc')">
+								<span data-i18n="ui_typing.col_acc"></span>
+								<div class="tooltip" onclick="event.stopPropagation()">
+									<svg
+										class="info-icon"
+										xmlns="http://www.w3.org/2000/svg"
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<circle cx="12" cy="12" r="10"></circle>
+										<line x1="12" y1="16" x2="12" y2="12"></line>
+										<line x1="12" y1="8" x2="12.01" y2="8"></line>
+									</svg>
+									<span class="tooltiptext" data-i18n="ui_typing.tooltip_col_acc"></span>
+								</div>
+								↕<br />
+								<span id="col_global_acc" class="th-stat"></span>
+							</th>
+						</tr>
+					</thead>
+					<tbody id="metrics_table_body">
+						<tr>
+							<td
+								colspan="8"
+								style="text-align: center; color: var(--text-muted); padding: 30px"
+								data-i18n="ui_typing.page_loading"
+							></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+
+		<div id="app_modal" class="modal" style="display: none">
+			<div class="modal-content">
+				<h2 data-i18n="ui_typing.modal_select_apps"></h2>
+				<div class="app-modal-controls">
+					<button
+						class="tab-btn"
+						onclick="select_all_apps()"
+						data-i18n="ui_typing.modal_check_all"
+					></button>
+					<button
+						class="tab-btn"
+						onclick="deselect_all_apps()"
+						data-i18n="ui_typing.modal_uncheck_all"
+					></button>
+				</div>
+				<input
+					type="text"
+					id="app_search"
+					placeholder="Rechercher une application..."
+					data-i18n-placeholder="ui_typing.modal_search_app"
+					onkeyup="render_app_list()"
+				/>
+				<div id="app_list" class="app-list"></div>
+				<button
+					class="tab-btn"
+					style="width: 100%; margin-top: 15px; font-weight: bold"
+					onclick="close_app_modal()"
+					data-i18n="ui_typing.modal_apply"
+				></button>
+			</div>
+		</div>
+
+		<!-- Find-in-page bar (hidden by default, revealed via Cmd+F) -->
+		<div id="find_bar">
+			<span class="find-label" data-i18n="ui_typing.search_label"></span>
+			<input
+				type="text"
+				id="find_input"
+				placeholder="Rechercher…"
+				autocomplete="off"
+				data-i18n-placeholder="ui_typing.search_placeholder"
+			/>
+			<span id="find_status" class="find-status"></span>
+			<button
+				class="find-nav-btn"
+				onclick="find_in_page(false)"
+				title="Précédent (Maj+Entrée)"
+				data-i18n-title="ui_typing.search_prev"
+			>
+				&#8249;
+			</button>
+			<button
+				class="find-nav-btn"
+				onclick="find_in_page(true)"
+				title="Suivant (Entrée)"
+				data-i18n-title="ui_typing.search_next"
+			>
+				&#8250;
+			</button>
+			<button
+				class="find-close-btn"
+				onclick="close_find_bar()"
+				title="Fermer (Échap)"
+				data-i18n-title="ui_typing.search_close"
+			>
+				&#x2715;
+			</button>
+		</div>
+
+		<!-- Load order matters: state/format first (no deps), then domain modules, then main -->
+		<script src="../host_bridge.js"></script>
+		<script src="../i18n.js"></script>
+		<script src="../dom_utils.js"></script>
+		<!-- Generated from _shared/data/keycodes/azerty.json (DC-1) — must load before state.js, which reads its KEYCODE_DATA global -->
+		<script src="_generated/keycode_data.js"></script>
+		<script src="state.js"></script>
+		<script src="format.js"></script>
+		<script src="filters.js"></script>
+		<script src="modal.js"></script>
+		<script src="data.js"></script>
+		<script src="charts.js"></script>
+		<script src="table.js"></script>
+		<script src="heatmap_win.js"></script>
+		<script src="main.js"></script>
+
+		<!--
+			Edge --app= bootstrap (B niveau 1 contract — AHK driver only).
+			Hammerspoon injects metrics_manifest / app_icons / _prefetch_data /
+			keycode_layout via evaluateJavaScript before calling process_manifest.
+			Edge has no equivalent bridge, so the AHK launcher writes a
+			prefetch.json sidecar next to this file and we read it here on load.
+			A pre-set window.metrics_manifest means HS got there first — leave
+			it alone so the two drivers can share these assets unchanged.
+		-->
+		<script>
+			(function () {
+				// Persistent historical cache. process_manifest() nulls
+				// window._prefetch_data on the first paint, so we can't rely on
+				// it for the live merge — we keep our own copy here instead.
+				let cached_historical = null;
+				let manifest_seeded = false;
+				// Apply a prefetch blob (initial fetch or live push) onto the
+				// global state and re-render.
+				function apply_prefetch(blob) {
+					if (!blob) return;
+					window.metrics_manifest = blob.metrics_manifest || {};
+					window.app_icons = blob.app_icons || {};
+					window.driver_meta = blob.driver_meta ||
+						window.driver_meta || { os: 'mac', heatmap_id: 'kc' };
+					// PC-scancode drivers render against macOS-style
+					// HS keycodes — translate the labels (and the n-gram
+					// data, below) so the heatmap geometry stays unchanged.
+					window.keycode_layout =
+						typeof window.build_keycode_layout_for_driver === 'function'
+							? window.build_keycode_layout_for_driver(window.driver_meta, blob.keycode_layout)
+							: blob.keycode_layout || {};
+					const has_prefetch = blob._prefetch_data !== undefined;
+					let merged = null;
+					if (has_prefetch) {
+						const incoming = blob._prefetch_data || {};
+						let incoming_hist = incoming.historical || {};
+						let incoming_today = incoming.today || {};
+						// PC-scancode drivers: translate sc_kb → kc per app so
+						// the renderer keeps reading the same field.
+						if (
+							window.driver_meta &&
+							(window.driver_meta.os === 'win' || window.driver_meta.os === 'linux') &&
+							typeof window.translate_win_today === 'function'
+						) {
+							incoming_today = window.translate_win_today(incoming_today);
+							incoming_hist = window.translate_win_today(incoming_hist);
+						}
+						if (Object.keys(incoming_hist).length > 0) {
+							cached_historical = incoming_hist;
+						}
+						merged = {
+							historical: cached_historical || incoming_hist || {},
+							today: incoming_today
+						};
+						window._prefetch_data = merged;
+					}
+					// First apply seeds the dashboard (process_manifest does the
+					// initial reset, sets up filters, and triggers request_range_data
+					// — which synchronously paints the loader spinner). Subsequent
+					// live pushes go directly to receive_range_data so the spinner
+					// doesn't clobber the rendered tables every 200 ms.
+					if (!manifest_seeded) {
+						if (typeof window.process_manifest === 'function') {
+							manifest_seeded = true;
+							window.process_manifest();
+						} else {
+							console.error(
+								'[apply_prefetch] window.process_manifest not defined — JS scripts may have failed to load'
+							);
+						}
+					}
+					if (merged && typeof window.receive_range_data === 'function') {
+						try {
+							window._lua_request = null;
+							window.receive_range_data(merged);
+						} catch (e) {
+							console.error('receive_range_data failed:', e);
+						}
+					} else if (
+						!has_prefetch &&
+						manifest_seeded &&
+						typeof window.apply_local_filters === 'function'
+					) {
+						// Manifest-only push (no _prefetch_data): the n-gram tables stay
+						// unchanged but KPI cards (MPM/CPM, chars) must re-render against
+						// the freshly updated window.metrics_manifest.
+						try {
+							window.apply_local_filters();
+						} catch (e) {
+							console.error('apply_local_filters (manifest push) failed:', e);
+						}
+					}
+				}
+
+				// WebKitGTK cannot receive the macOS evaluateJavaScript injection and
+				// has no file-sidecar fallback. Request the shared prefetch envelope
+				// through its native bridge, then keep the dashboard live with polling.
+				if (window.__ergopti_host === 'linux') {
+					const request_linux_refresh = () => {
+						try {
+							window.webkit.messageHandlers.metrics_typing_bridge.postMessage({ action: 'refresh' });
+						} catch (_) {}
+					};
+					window.__hostBridgeResponse = (bridge, isBase64, payload) => {
+						if (bridge !== 'metrics_typing_bridge') return;
+						const response = decodeHostBridgeResponse(isBase64, payload);
+						if (response) apply_prefetch(response);
+					};
+					try {
+						window.webkit.messageHandlers.metrics_typing_bridge.postMessage({ action: 'ready' });
+					} catch (_) {
+						request_linux_refresh();
+					}
+					window.setInterval(request_linux_refresh, 2000);
+					return;
+				}
+
+				// WebView2 path (B niveau 2): the AHK host listens for
+				// chrome.webview.postMessage and pushes prefetch blobs back
+				// via PostWebMessageAsString. We greet the host with
+				// {"action":"ready"} so it sends us the initial data straight
+				// away — no round-trip to the file system.
+				if (window.chrome && window.chrome.webview) {
+					console.log('WebView2 bridge active — using live push channel');
+					// Coalesce pushes: AHK fires every ~500 ms but each
+					// apply_prefetch + re-render takes longer than that
+					// when n-grams are included, so naive handling lets a
+					// queue build up and updates lag by seconds. We keep
+					// only the LATEST blob and run apply_prefetch via
+					// requestAnimationFrame so the renderer stays in
+					// sync with the freshest data instead of catching up
+					// from stale snapshots.
+					let pending_blob = null;
+					let frame_scheduled = false;
+					let push_count = 0;
+					let processed_count = 0;
+					let first_paint_done = false;
+					function flush_pending() {
+						frame_scheduled = false;
+						if (!pending_blob) return;
+						const blob = pending_blob;
+						pending_blob = null;
+						processed_count++;
+						console.log('apply push#' + processed_count + ' (received#' + push_count + ')');
+						apply_prefetch(blob);
+					}
+					window.chrome.webview.addEventListener('message', (e) => {
+						let payload = e.data;
+						if (typeof payload === 'string') {
+							try {
+								payload = JSON.parse(payload);
+							} catch (err) {
+								console.error('prefetch JSON.parse failed:', err.message, 'len=', e.data.length);
+								return;
+							}
+						}
+						if (!payload) return;
+						if (payload.type === 'range_data') {
+							if (typeof window.receive_range_data === 'function') {
+								window.receive_range_data(payload.payload);
+							}
+							return;
+						}
+						if (payload.type !== 'prefetch') return;
+						push_count++;
+						processed_count++;
+						console.log(
+							'apply push#' + processed_count + ' keys=' + Object.keys(payload.blob || {}).join(',')
+						);
+						apply_prefetch(payload.blob);
+					});
+					try {
+						window.chrome.webview.postMessage(JSON.stringify({ action: 'ready' }));
+					} catch (e) {
+						console.error('postMessage(ready) failed:', e);
+					}
+					return;
+				}
+
+				// Edge --app= fallback (B niveau 1): static fetch on load.
+				// state.js initialises metrics_manifest to {} so a plain
+				// truthy check would always bail; require non-empty.
+				if (window.metrics_manifest && Object.keys(window.metrics_manifest).length) return;
+				// The prefetch file lives in %TEMP% (not the repo dir) to avoid
+				// polluting version control. The AHK launcher embeds its file://
+				// URL in the hash fragment as "#prefetch=file:///...".
+				const _hash_params = new URLSearchParams(location.hash.slice(1));
+				const _prefetch_url = _hash_params.get('prefetch') || './prefetch.json';
+				fetch(_prefetch_url)
+					.then((r) => (r.ok ? r.json() : null))
+					.then((blob) => {
+						if (!blob) {
+							console.error('prefetch.json missing or unreadable');
+							return;
+						}
+						console.log('prefetch loaded:', Object.keys(blob));
+						apply_prefetch(blob);
+					})
+					.catch((e) => console.error('prefetch fetch failed:', e));
+			})();
+		</script>
+	</body>
+</html>

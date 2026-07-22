@@ -1,0 +1,43 @@
+xkb_types         { 
+    include "complete"
+
+    type "SEVEN_LEVEL_KEY" {
+        modifiers = Shift + Lock + LevelThree;
+
+        // ==============================
+        // ======= Level mappings =======
+        // ==============================
+
+        map[None]                               = Level1;
+
+        // Level 2: CapsLock only
+        map[Lock]                               = Level2;
+
+        // Level 3: Shift only
+        map[Shift]                              = Level3;
+
+        // Level 4: CapsLock + Shift
+        map[Lock + Shift]                       = Level4;
+
+        // Level 6: AltGr (LevelThree)
+        map[LevelThree]                         = Level6;
+        map[Lock + LevelThree]                  = Level6;
+
+        // Level 7: Shift + AltGr
+        map[Shift + LevelThree]                 = Level7;
+        map[Lock + Shift + LevelThree]          = Level7;
+
+        // ===========================
+        // ======= Level names =======
+        // ===========================
+        
+        level_name[Level1]                      = "Base";
+        level_name[Level2]                      = "CapsLock";
+        level_name[Level3]                      = "Shift";
+        level_name[Level4]                      = "CapsLock + Shift";
+        level_name[Level5]                      = "Other modifiers: Control, Alt, Super";
+        level_name[Level6]                      = "AltGr";
+        level_name[Level7]                      = "Shift + AltGr";
+    };
+
+};

@@ -1,0 +1,177 @@
+{
+	"$schema": "./process_prediction_vectors.schema.json",
+	"description": "Cross-driver golden corpus for the LLM semantic-diff parser (process_prediction). Generated from the shared Lua oracle by tools/build/gen-process-prediction-corpus.lua. Parity contract = physical fields only (deletes/to_type/nw/has_corrections/disable_bold); chunks are display-only and excluded.",
+	"version": 1,
+	"vectors": [
+		{
+			"id": "basic_completion_no_tags",
+			"description": "Plain completion with no TAIL_CORRECTED/NEXT_WORDS tags.",
+			"full_text": "je suis ",
+			"tail_text": "je suis ",
+			"block": "content de vous voir",
+			"min_words": 1,
+			"max_words": 15,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": "content de vous voir", "nw": "content de vous voir", "has_corrections": false, "disable_bold": false }
+		},
+		{
+			"id": "advanced_full_tail_correction",
+			"description": "Advanced format, whole tail word corrected, then new words.",
+			"full_text": "je envoit",
+			"tail_text": "je envoit",
+			"block": "TAIL_CORRECTED: je envoie\nNEXT_WORDS: ce mail",
+			"min_words": 1,
+			"max_words": 15,
+			"expected": { "is_nil": false, "deletes": 1, "to_type": "e ce mail", "nw": " ce mail", "has_corrections": true, "disable_bold": true }
+		},
+		{
+			"id": "advanced_tail_unchanged_only_new",
+			"description": "Advanced format, tail matches exactly, only new words follow.",
+			"full_text": "bonjour comment",
+			"tail_text": "bonjour comment",
+			"block": "TAIL_CORRECTED: bonjour comment\nNEXT_WORDS: allez vous",
+			"min_words": 1,
+			"max_words": 15,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": " allez vous", "nw": " allez vous", "has_corrections": false, "disable_bold": false }
+		},
+		{
+			"id": "advanced_partial_intra_word",
+			"description": "Advanced format, intra-word correction (messieu -> messieurs).",
+			"full_text": "bonjour messieu",
+			"tail_text": "bonjour messieu",
+			"block": "TAIL_CORRECTED: bonjour messieurs\nNEXT_WORDS: ravi",
+			"min_words": 1,
+			"max_words": 15,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": "rs ravi", "nw": " ravi", "has_corrections": true, "disable_bold": true }
+		},
+		{
+			"id": "advanced_word_cap_two",
+			"description": "max_words=2 truncates the NEXT_WORDS continuation.",
+			"full_text": "je ",
+			"tail_text": "je ",
+			"block": "TAIL_CORRECTED: je\nNEXT_WORDS: suis tres content de vous",
+			"min_words": 1,
+			"max_words": 2,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": "suis tres", "nw": "suis tres", "has_corrections": false, "disable_bold": false }
+		},
+		{
+			"id": "advanced_empty_next_words",
+			"description": "Advanced format with empty NEXT_WORDS — only the correction.",
+			"full_text": "je envoit",
+			"tail_text": "je envoit",
+			"block": "TAIL_CORRECTED: je envoie\nNEXT_WORDS: ",
+			"min_words": 1,
+			"max_words": 15,
+			"expected": { "is_nil": true }
+		},
+		{
+			"id": "empty_block_discarded",
+			"description": "Empty model output is discarded (nil).",
+			"full_text": "hello",
+			"tail_text": "hello",
+			"block": "",
+			"min_words": 1,
+			"max_words": 15,
+			"expected": { "is_nil": true }
+		},
+		{
+			"id": "advanced_suffix_append",
+			"description": "Tail correction appends a suffix to the last word (cat -> cats).",
+			"full_text": "the cat",
+			"tail_text": "the cat",
+			"block": "TAIL_CORRECTED: the cats\nNEXT_WORDS: are here",
+			"min_words": 1,
+			"max_words": 15,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": "s are here", "nw": " are here", "has_corrections": true, "disable_bold": true }
+		},
+		{
+			"id": "advanced_accented_intra_word",
+			"description": "Accented intra-word correction (prefere -> préfère).",
+			"full_text": "je prefere",
+			"tail_text": "je prefere",
+			"block": "TAIL_CORRECTED: je préfère\nNEXT_WORDS: ce choix",
+			"min_words": 1,
+			"max_words": 15,
+			"expected": { "is_nil": false, "deletes": 5, "to_type": "éfère ce choix", "nw": " ce choix", "has_corrections": true, "disable_bold": false }
+		},
+		{
+			"id": "advanced_apostrophe_insert",
+			"description": "Correction inserts a typographic apostrophe (l envoie -> l'envoie).",
+			"full_text": "je l envoie",
+			"tail_text": "je l envoie",
+			"block": "TAIL_CORRECTED: je l'envoie\nNEXT_WORDS: demain",
+			"min_words": 1,
+			"max_words": 15,
+			"expected": { "is_nil": false, "deletes": 9, "to_type": " l’envoie demain", "nw": " demain", "has_corrections": true, "disable_bold": false }
+		},
+		{
+			"id": "advanced_multi_word_change",
+			"description": "A whole word is replaced (beau -> froid) then new words.",
+			"full_text": "il fait beau",
+			"tail_text": "il fait beau",
+			"block": "TAIL_CORRECTED: il fait froid\nNEXT_WORDS: ce matin",
+			"min_words": 1,
+			"max_words": 15,
+			"expected": { "is_nil": true }
+		},
+		{
+			"id": "advanced_overlap_dup_word",
+			"description": "tc tail and nw head share a word — the overlap must be stripped.",
+			"full_text": "je vais",
+			"tail_text": "je vais",
+			"block": "TAIL_CORRECTED: je vais\nNEXT_WORDS: vais manger",
+			"min_words": 1,
+			"max_words": 15,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": " manger", "nw": " manger", "has_corrections": false, "disable_bold": false }
+		},
+		{
+			"id": "advanced_punctuation_next",
+			"description": "NEXT_WORDS begins with punctuation (no space inserted before it).",
+			"full_text": "bonjour",
+			"tail_text": "bonjour",
+			"block": "TAIL_CORRECTED: bonjour\nNEXT_WORDS: , comment allez",
+			"min_words": 1,
+			"max_words": 15,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": ", comment allez", "nw": ", comment allez", "has_corrections": false, "disable_bold": false }
+		},
+		{
+			"id": "advanced_long_buffer_window",
+			"description": "Buffer longer than the 60-char context window; correction near the end.",
+			"full_text": "this is a fairly long buffer of context exceeding sixty chars here weater",
+			"tail_text": "here weater",
+			"block": "TAIL_CORRECTED: here weather\nNEXT_WORDS: today",
+			"min_words": 1,
+			"max_words": 15,
+			"expected": { "is_nil": false, "deletes": 2, "to_type": "her today", "nw": " today", "has_corrections": true, "disable_bold": false }
+		},
+		{
+			"id": "advanced_append_only_no_change",
+			"description": "Tail matches exactly across several words; only an append.",
+			"full_text": "the cat sat",
+			"tail_text": "the cat sat",
+			"block": "TAIL_CORRECTED: the cat sat\nNEXT_WORDS: on the mat",
+			"min_words": 1,
+			"max_words": 15,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": " on the mat", "nw": " on the mat", "has_corrections": false, "disable_bold": false }
+		},
+		{
+			"id": "basic_next_prefix_stripped",
+			"description": "Basic (no tags): a leading NEXT: label is stripped.",
+			"full_text": "hello ",
+			"tail_text": "hello ",
+			"block": "NEXT: world how are you",
+			"min_words": 1,
+			"max_words": 15,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": "world how are you", "nw": "world how are you", "has_corrections": false, "disable_bold": false }
+		},
+		{
+			"id": "advanced_word_cap_one",
+			"description": "max_words=1 keeps a single new word.",
+			"full_text": "je ",
+			"tail_text": "je ",
+			"block": "TAIL_CORRECTED: je\nNEXT_WORDS: suis tres content",
+			"min_words": 1,
+			"max_words": 1,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": "suis", "nw": "suis", "has_corrections": false, "disable_bold": false }
+		}
+	]
+}

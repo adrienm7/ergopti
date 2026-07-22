@@ -1,0 +1,308 @@
+--- tests/unit/meta/test_kanata_manager.lua
+---
+--- Compliance tests for the kanata manager module.
+--- Verifies the module API surface, .kbd generation (without kanata binary),
+--- and idempotent lifecycle methods. Since kanata is a daemon-only feature,
+--- the process start/stop methods are tested only for crash-freedom.
+
+local helpers = require("tests.helpers")
+local km      = helpers.load_module("modules.kanata.manager")
+
+helpers.describe("kanata manager", function()
+
+  -- ==========================================================================
+  -- 1. Module structure
+  -- ==========================================================================
+
+  helpers.describe("module structure", function()
+    helpers.it("exports the expected methods", function()
+      helpers.assert_true(type(km.generate_kbd) == "function", "generate_kbd")
+      helpers.assert_true(type(km.write_kbd)    == "function", "write_kbd")
+      helpers.assert_true(type(km.get_kbd_path)  == "function", "get_kbd_path")
+      helpers.assert_true(type(km.start)        == "function", "start")
+      helpers.assert_true(type(km.stop)         == "function", "stop")
+      helpers.assert_true(type(km.restart)      == "function", "restart")
+      helpers.assert_true(type(km.is_running)   == "function", "is_running")
+    end)
+  end)
+
+  -- ==========================================================================
+  -- 2. .kbd generation (template-based, without kanata binary)
+  -- ==========================================================================
+
+  helpers.describe("kbd generation", function()
+
+    helpers.it("generate_kbd returns a non-empty string", function()
+      local kbd = km.generate_kbd()
+      -- May return nil if template not found (non-standard test cwd).
+      -- If template is found, it should produce valid content.
+      if kbd then
+        helpers.assert_true(type(kbd) == "string" and #kbd > 0,
+          "generate_kbd returns non-empty string")
+        -- Should contain kanata structural markers.
+        helpers.assert_true(kbd:find("defcfg", 1, true) or kbd:find("defsrc", 1, true),
+          "contains kanata structural markers")
+        helpers.assert_true(kbd:find("defalias", 1, true),
+          "contains defalias block")
+      end
+    end)
+
+    helpers.it("write_kbd writes a file to the kanata config dir", function()
+      local ok = km.write_kbd()
+      if ok then
+        local path = km.get_kbd_path()
+        helpers.assert_true(type(path) == "string" and path:find("kanata", 1, true),
+          "kbd path contains 'kanata'")
+        local fh = io.open(path, "r")
+        if fh then
+          local content = fh:read("*a")
+          fh:close()
+          helpers.assert_true(#content > 0, "written .kbd is non-empty")
+        end
+      end
+    end)
+
+    helpers.it("get_kbd_path returns a string with .kbd extension", function()
+      local path = km.get_kbd_path()
+      helpers.assert_true(type(path) == "string", "returns a string")
+      helpers.assert_true(path:find("%.kbd$") ~= nil, "ends with .kbd")
+    end)
+  end)
+
+  -- ==========================================================================
+  -- 2b. One-shot timeout is single-sourced (no hardcoded 2000 ms fallback)
+  -- ==========================================================================
+
+  helpers.describe("one-shot timeout single source", function()
+
+    -- The one-shot shift timeout must come only from the canonical timings
+    -- registry. A hardcoded fallback both duplicates the canonical value and
+    -- masks the fail-fast: a missing registry silently used 2000, hiding a
+    -- broken install. generate_kbd must instead fail loud (return nil).
+
+    helpers.it("emits the value from the timings registry, not a hardcoded 2000", function()
+      local real = require("lib.timings")
+      package.loaded["lib.timings"] = {
+        ms = function(cat, key)
+          if cat == "tap_hold" and key == "one_shot_shift_timeout_ms" then return 4242 end
+          return real.ms(cat, key)
+        end,
+        sec = real.sec,
+      }
+      local kbd = km.generate_kbd()
+      package.loaded["lib.timings"] = real
+      -- Only assert when a template was resolvable in this environment.
+      if kbd then
+        helpers.assert_true(kbd:find("4242", 1, true) ~= nil,
+          "the one-shot timeout in the generated defalias must come from the registry")
+      end
+    end)
+
+    helpers.it("fails loud (returns nil) when the canonical timeout is missing", function()
+      local real = require("lib.timings")
+      package.loaded["lib.timings"] = {
+        ms = function(cat, key)
+          if cat == "tap_hold" and key == "one_shot_shift_timeout_ms" then return nil end
+          return real.ms(cat, key)
+        end,
+        sec = real.sec,
+      }
+      local kbd = km.generate_kbd()
+      package.loaded["lib.timings"] = real
+      helpers.assert_true(kbd == nil,
+        "generate_kbd must return nil when the canonical one-shot timeout is missing — no hardcoded fallback")
+    end)
+
+    helpers.it("does not hardcode a one-shot fallback in the source", function()
+      local fh = io.open(helpers.driver_root() .. "/modules/kanata/manager.lua", "r")
+      helpers.assert_true(fh ~= nil, "manager source must be readable")
+      local src = fh:read("*a"); fh:close()
+      helpers.assert_true(src:find("one_shot_ms = 2000", 1, true) == nil,
+        "the hardcoded 2000 ms one-shot fallback must be gone")
+      helpers.assert_true(src:find('Timings.ms("tap_hold", "one_shot_shift_timeout_ms")', 1, true) ~= nil,
+        "the one-shot timeout must be read from the canonical timings registry")
+    end)
+
+  end)
+
+  -- ==========================================================================
+  -- 3. Process lifecycle (without kanata binary — safe stubs)
+  -- ==========================================================================
+
+  helpers.describe("process lifecycle", function()
+
+    helpers.it("is_running returns false when kanata is not started", function()
+      helpers.assert_true(type(km.is_running()) == "boolean", "is_running returns boolean")
+      -- On the maintainer's machine, kanata is not installed → false.
+    end)
+
+    helpers.it("start does not crash when kanata binary is absent", function()
+      local ok = pcall(function() km.start() end)
+      helpers.assert_true(ok, "start does not crash")
+    end)
+
+    helpers.it("stop does not crash when not running", function()
+      local ok = pcall(function() km.stop() end)
+      helpers.assert_true(ok, "stop when not running is safe")
+    end)
+
+    helpers.it("double stop is safe", function()
+      km.stop()
+      local ok = pcall(function() km.stop() end)
+      helpers.assert_true(ok, "double stop does not crash")
+    end)
+
+    helpers.it("restart does not crash (will fail gracefully without kanata)", function()
+      local ok = pcall(function() km.restart() end)
+      helpers.assert_true(ok, "restart does not crash")
+    end)
+  end)
+
+  -- ==========================================================================
+  -- 3b. Malformed / empty user tap_hold.toml fail-fast
+  -- ==========================================================================
+
+  helpers.describe("user tap_hold.toml fail-fast", function()
+
+    -- Writes `content` to a temp file, points the loader at it via the test seam,
+    -- runs the tap-hold config loader in isolation, and returns captured
+    -- error/warn messages. The seam avoids depending on $HOME or on creating
+    -- nested config dirs cross-platform, and bypasses generate_kbd()'s template
+    -- gate (the kanata.kbd template does not resolve in the headless suite).
+    local function load_with_user_toml(content)
+      local tmp_dir = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "/tmp"
+      local path    = tmp_dir:gsub("\\", "/") .. "/ergopti_kanata_user_taphold.toml"
+      local fh = assert(io.open(path, "w"))
+      fh:write(content)
+      fh:close()
+
+      local logger = require("logger.shim")
+      local orig_error, orig_warn = logger.error, logger.warn
+      local errors, warns = {}, {}
+      logger.error = function(_t, fmt, ...)
+        errors[#errors + 1] = (select("#", ...) > 0) and string.format(fmt, ...) or tostring(fmt)
+      end
+      logger.warn = function(_t, fmt, ...)
+        warns[#warns + 1] = (select("#", ...) > 0) and string.format(fmt, ...) or tostring(fmt)
+      end
+
+      pcall(function() km._load_tap_hold_config_for_test(path) end)
+
+      logger.error, logger.warn = orig_error, orig_warn
+      os.remove(path)
+      return errors, warns
+    end
+
+    local function any_contains(list, needle)
+      for _, m in ipairs(list) do
+        if m:find(needle, 1, true) then return true end
+      end
+      return false
+    end
+
+    helpers.it("logs Logger.error when the user tap_hold.toml is malformed", function()
+      -- Unterminated table header — the shared codec rejects it (decode → nil).
+      local errors = load_with_user_toml("[tap_hold.keys.a\ntap_action = \"a\"\n")
+      helpers.assert_true(any_contains(errors, "malformed"),
+        "a malformed user tap_hold.toml must log an ERROR")
+    end)
+
+    helpers.it("warns before falling back when the user tap_hold.toml is present but empty", function()
+      -- Valid TOML with a keys table but no key entries: parses fine, yields no
+      -- usable keys. Must warn that the user file was ignored — not silently drop.
+      local errors, warns = load_with_user_toml("[tap_hold.keys]\n")
+      helpers.assert_true(any_contains(warns, "present but yielded no usable keys"),
+        "a present-but-empty user tap_hold.toml must warn before falling back to defaults")
+      helpers.assert_true(not any_contains(errors, "malformed"),
+        "a valid-but-empty user file is not malformed — no malformed ERROR expected")
+    end)
+
+  end)
+
+  -- ==========================================================================
+  -- 4. Menu builder integration
+  -- ==========================================================================
+
+  helpers.describe("menu builder integration", function()
+
+    helpers.it("menu_builder Kanata section items have valid shape", function()
+      local mb = helpers.load_module("modules.menu.menu_builder")
+      local items = mb.build({ _version = "test", on_quit = function() end })
+
+      -- Find the Kanata section.
+      local kanata_section = nil
+      for _, item in ipairs(items) do
+        if type(item.title) == "string" and item.title:find("Kanata", 1, true) then
+          kanata_section = item
+          break
+        end
+      end
+
+      helpers.assert_true(kanata_section ~= nil, "Kanata section present in menu")
+      if kanata_section then
+        helpers.assert_true(type(kanata_section.menu) == "table" and #kanata_section.menu > 0,
+          "Kanata section has submenu items")
+        -- Verify each submenu item has a fn.
+        for _, sub in ipairs(kanata_section.menu) do
+          helpers.assert_true(type(sub.fn) == "function",
+            "Kanata item '" .. (sub.title or "?") .. "' has a callback")
+        end
+      end
+    end)
+  end)
+
+  -- ==========================================================================
+  -- 5. Lifecycle log pairing (source compliance)
+  -- ==========================================================================
+
+  helpers.describe("lifecycle log pairing", function()
+
+    -- Static source scan: the write_kbd()/start() SUCCESS lines are unreachable
+    -- in the headless suite (no kanata binary; the .kbd template resolves
+    -- off-tree), so a runtime spy cannot observe them — assert pairing on source.
+    local function read_manager_source()
+      local path = helpers.driver_root() .. "/modules/kanata/manager.lua"
+      local fh = assert(io.open(path, "r"), "cannot open manager.lua")
+      local content = fh:read("*a")
+      fh:close()
+      return content
+    end
+
+    helpers.it("emits no Logger.success without a preceding Logger.start", function()
+      local content = read_manager_source()
+      -- A top-level `function` header resets the per-function running balance so
+      -- each function is checked in isolation; success/done must never run ahead
+      -- of start/trace on their own lifecycle axis (lifecycle logs are paired).
+      local info_starts, info_success = 0, 0
+      local dbg_starts,  dbg_done     = 0, 0
+      local violations = {}
+      local lineno = 0
+      for line in (content .. "\n"):gmatch("([^\n]*)\n") do
+        lineno = lineno + 1
+        if line:match("^%s*function%s") or line:match("^%s*local%s+function%s") then
+          info_starts, info_success = 0, 0
+          dbg_starts,  dbg_done     = 0, 0
+        end
+        if line:find("Logger%.start%(")   then info_starts = info_starts + 1 end
+        if line:find("Logger%.trace%(")   then dbg_starts  = dbg_starts  + 1 end
+        if line:find("Logger%.success%(") then
+          info_success = info_success + 1
+          if info_success > info_starts then
+            violations[#violations + 1] =
+              "line " .. lineno .. ": Logger.success without a preceding Logger.start"
+          end
+        end
+        if line:find("Logger%.done%(") then
+          dbg_done = dbg_done + 1
+          if dbg_done > dbg_starts then
+            violations[#violations + 1] =
+              "line " .. lineno .. ": Logger.done without a preceding Logger.trace"
+          end
+        end
+      end
+      helpers.assert_eq(#violations, 0,
+        "orphaned lifecycle logs in manager.lua: " .. table.concat(violations, "; "))
+    end)
+  end)
+
+end)

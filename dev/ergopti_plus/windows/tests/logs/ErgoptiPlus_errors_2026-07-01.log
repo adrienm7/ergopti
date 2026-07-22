@@ -1,0 +1,5 @@
+﻿2026-07-01 22:25:39:105 [ERROR] [TimerScheduler] repeating callback threw: boom
+2026-07-01 22:25:39:248 [WARNING] [TomlParse] Unterminated multi-line array for key 'metrics_disabled_apps' in [metrics] - aborting array, resuming section parse.
+2026-07-01 22:25:40:102 [ERROR] [TimerScheduler] repeating callback threw: boom
+2026-07-01 22:25:41:102 [ERROR] [TimerScheduler] repeating callback threw: boom
+2026-07-01 22:25:43:930 [ERROR] [logger] ↑ 2 identical lines suppressed

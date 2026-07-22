@@ -1,0 +1,63 @@
+# static/ergopti_plus/_shared/modules/hotstrings/defaults.toml
+#
+# ==============================================================================
+# SCHEMA: Hotstring Resolution Defaults — Cross-Driver Canon
+# DESCRIPTION:
+# Single source of truth for the hard fallback values used by the hotstring
+# config resolver when neither a user override nor a category/section TOML
+# `[_meta]` declares a delay or color. Both drivers read this file at boot:
+#   AHK         — lib/hotstrings/hotstrings_config.ahk
+#                 (HotstringsConfigLoadSharedDefaults, fail-fast).
+#   Hammerspoon — modules/hotstrings_config.lua (load_shared_defaults, fail-fast).
+# A missing file or key aborts startup loudly — there is no compile-time
+# fallback, so this file is the only place these values are written.
+#
+# WHY A DEDICATED FILE (not tooltip/constants.toml):
+# These are hotstring-resolution defaults, not tooltip rendering chrome. They
+# live here next to the category TOMLs (magickey.toml, rolls.toml, …) and
+# priority.json that the same resolver already navigates.
+# ==============================================================================
+
+
+
+
+# =========================
+# =========================
+# ======= 1/ Colors =======
+# =========================
+# =========================
+
+[colors]
+
+# Ultimate fallback tooltip tint when nothing else is configured (blue).
+# Stored with the leading "#"; both drivers normalise/validate to "#RRGGBB".
+global_default = "#1e88e5"
+
+# Per-category baseline for the "personal" group — a neutral gray so user-added
+# entries only stand out once the user picks a color themselves.
+personal = "#6e6e73"
+
+
+
+
+# =========================
+# =========================
+# ======= 2/ Delays =======
+# =========================
+# =========================
+
+[delays]
+
+# Global default expansion delay (seconds) applied when no user/TOML delay is set.
+# Mirrored as _shared/modules/timings/constants.toml [debounce] hotstring_expansion_ms = 750.
+# This file (hotstrings/defaults.toml) is the authoritative source; the timings
+# entry mirrors it for cross-module discovery.
+default_sec = 0.75
+
+# Default activation delay (seconds) for the dynamic-hotstrings category (dates,
+# phone / SSN / IBAN prefixes). This category has no per-file [_meta] delay, so
+# this is the canonical default for both drivers — read by AHK
+# (DYN_HOTSTRINGS_DEFAULT_DELAY via HotstringsConfigLoadSharedDefaults) and macOS
+# (keymap DELAYS_DEFAULT.dynamichotstrings). Previously a re-typed literal in each
+# driver, kept in sync only by a comment (rules 5.2 / 5.4).
+dynamichotstrings_sec = 2.0

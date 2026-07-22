@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="UTF-8" />
+		<title data-i18n="editor.hotstrings.window_title"></title>
+		<link rel="stylesheet" href="style.css?v=10" />
+		<script src="../i18n.js"></script>
+		<script src="../host_bridge.js"></script>
+		<script src="../dom_utils.js"></script>
+	</head>
+	<body>
+		<div id="loading">
+			<div class="spinner"></div>
+			<span data-i18n="common.loading"></span>
+		</div>
+
+		<div id="app" style="display: none">
+			<div id="hdr">
+				<h1 data-i18n="editor.hotstrings.page_title"></h1>
+				<button id="compact-btn" class="btn btn-sm btn-s" onclick="toggleCompact()"></button>
+				<button
+					class="btn btn-sm btn-p"
+					onclick="showAddSec()"
+					data-i18n="editor.hotstrings.btn_add_section"
+				></button>
+			</div>
+			<div id="search-bar">
+				<span class="search-icon">⌕</span>
+				<input
+					id="search-input"
+					class="search-input"
+					type="text"
+					autocomplete="off"
+					spellcheck="false"
+					placeholder="Rechercher un déclencheur ou un texte…"
+					oninput="onSearch(this.value)"
+				/>
+				<button
+					id="search-clear"
+					class="search-clear"
+					type="button"
+					title="Effacer"
+					onclick="clearSearch()"
+					style="display: none"
+				>
+					✕
+				</button>
+			</div>
+			<div id="content">
+				<div id="secs-container"></div>
+				<div
+					id="empty"
+					class="empty"
+					style="display: none"
+					data-i18n="editor.hotstrings.empty_hint"
+				></div>
+				<div id="no-results" class="empty" style="display: none">
+					Aucun résultat pour cette recherche.
+				</div>
+			</div>
+		</div>
+
+		<div id="bulk-bar">
+			<span id="bulk-cnt" class="bulk-cnt"></span>
+			<div class="bulk-sep"></div>
+			<select
+				id="bulk-sec-sel"
+				class="btn btn-s"
+				style="margin: 0; outline: none; font-weight: normal"
+				onchange="if(this.value!=='') bulkMove()"
+			>
+				<option value="" data-i18n="editor.hotstrings.bulk_move_placeholder"></option>
+			</select>
+			<button
+				class="btn btn-sm"
+				style="background: #ffe5e3; color: var(--danger)"
+				onclick="bulkDel()"
+				data-i18n="common.delete"
+			></button>
+			<div class="bulk-sep"></div>
+			<button
+				class="btn btn-sm btn-s"
+				style="background: transparent; padding: 4px 8px"
+				onclick="clearBulk()"
+				data-i18n="common.cancel"
+			></button>
+		</div>
+
+		<div id="save-toast" data-i18n="common.saved"></div>
+		<div id="ac-popup"></div>
+
+		<div class="overlay" id="msg-modal">
+			<div class="modal">
+				<p id="msg-text"></p>
+				<div class="modal-foot" style="justify-content: flex-end">
+					<button
+						class="btn btn-p"
+						onclick="closeModal('msg-modal')"
+						data-i18n="common.ok"
+					></button>
+				</div>
+			</div>
+		</div>
+		<div class="overlay" id="confirm-modal">
+			<div class="modal">
+				<div id="confirm-text"></div>
+				<div class="modal-foot">
+					<button class="btn btn-s" id="confirm-cancel" data-i18n="common.cancel"></button>
+					<button class="btn btn-p" id="confirm-ok" data-i18n="common.ok"></button>
+				</div>
+			</div>
+		</div>
+		<div class="overlay" id="sec-modal">
+			<div class="modal">
+				<h2 id="sec-modal-title" data-i18n="editor.hotstrings.sec_modal_title_new"></h2>
+				<div class="fg">
+					<label>
+						<span data-i18n="editor.hotstrings.sec_id_label"></span>
+						<span class="hint" data-i18n="editor.hotstrings.sec_id_hint"></span>
+					</label>
+					<input
+						id="sec-id"
+						type="text"
+						data-i18n-placeholder="editor.hotstrings.sec_id_placeholder"
+						autocomplete="off"
+						spellcheck="false"
+					/>
+					<div class="field-error-msg" id="sec-id-err"></div>
+				</div>
+				<div class="fg">
+					<label>
+						<span data-i18n="editor.hotstrings.sec_desc_label"></span>
+						<span class="hint" data-i18n="editor.hotstrings.sec_desc_hint"></span>
+					</label>
+					<input
+						id="sec-desc"
+						type="text"
+						data-i18n-placeholder="editor.hotstrings.sec_desc_placeholder"
+					/>
+				</div>
+				<div class="modal-foot">
+					<span></span>
+					<div class="foot-btns">
+						<button
+							class="btn btn-s"
+							onclick="closeModal('sec-modal')"
+							data-i18n="common.cancel"
+						></button>
+						<button class="btn btn-p" onclick="saveSec()" data-i18n="common.save"></button>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="overlay" id="entry-modal">
+			<div class="modal">
+				<h2 id="entry-modal-title" data-i18n="editor.hotstrings.entry_modal_title_new"></h2>
+				<div class="fg">
+					<label
+						><span data-i18n="editor.hotstrings.trigger_label"></span>
+						<span class="hint" id="trig-hint"></span
+					></label>
+					<div class="trig-row">
+						<div
+							id="e-trig"
+							class="trig-editor"
+							contenteditable="true"
+							spellcheck="false"
+							data-i18n-placeholder="editor.hotstrings.trigger_placeholder"
+						></div>
+						<button class="magic-btn" id="magic-btn" onclick="insertMagicKey()"></button>
+					</div>
+					<div class="field-error-msg" id="trig-err"></div>
+				</div>
+				<div class="fg">
+					<label data-i18n="editor.hotstrings.replacement_label"></label>
+					<div class="editor-wrap">
+						<div
+							id="e-out-ph"
+							class="ph-overlay"
+							data-i18n="editor.hotstrings.replacement_placeholder"
+						></div>
+						<div id="e-out" class="output-editor" contenteditable="true" spellcheck="false"></div>
+					</div>
+					<div class="field-error-msg" id="out-err"></div>
+				</div>
+				<details class="cmd-help" id="cmd-help">
+					<summary data-i18n="editor.hotstrings.special_cmds_summary"></summary>
+					<div class="cmd-block" id="cmd-block"></div>
+				</details>
+				<div class="cbs">
+					<label class="cb-item">
+						<div class="cb-row">
+							<input type="checkbox" id="cb-word" onchange="updateCbDescs()" /><span
+								class="cb-label"
+								data-i18n="editor.hotstrings.cb_word"
+							></span>
+						</div>
+						<span class="cb-desc" id="desc-word"></span>
+					</label>
+					<label class="cb-item">
+						<div class="cb-row">
+							<input type="checkbox" id="cb-auto" onchange="updateCbDescs()" /><span
+								class="cb-label"
+								data-i18n="editor.hotstrings.cb_auto"
+							></span>
+						</div>
+						<span class="cb-desc" id="desc-auto"></span>
+					</label>
+					<label class="cb-item">
+						<div class="cb-row">
+							<input type="checkbox" id="cb-case" onchange="updateCbDescs()" /><span
+								class="cb-label"
+								data-i18n="editor.hotstrings.cb_case"
+							></span>
+						</div>
+						<span class="cb-desc" id="desc-case"></span>
+					</label>
+					<label class="cb-item">
+						<div class="cb-row">
+							<input type="checkbox" id="cb-final" onchange="updateCbDescs()" /><span
+								class="cb-label"
+								data-i18n="editor.hotstrings.cb_final"
+							></span>
+						</div>
+						<span class="cb-desc" id="desc-final"></span>
+					</label>
+				</div>
+				<div class="fg fg-prio">
+					<label
+						><span data-i18n="editor.hotstrings.priority_label"></span>
+						<span class="hint" data-i18n="editor.hotstrings.priority_hint"></span
+					></label>
+					<input
+						id="e-prio"
+						type="number"
+						min="0"
+						max="100"
+						step="1"
+						inputmode="numeric"
+						autocomplete="off"
+					/>
+				</div>
+				<div class="modal-foot">
+					<span class="foot-kbd" data-i18n="editor.hotstrings.kbd_help"></span>
+					<div class="foot-btns">
+						<button
+							class="btn btn-s"
+							onclick="closeModal('entry-modal')"
+							data-i18n="common.cancel"
+						></button>
+						<button class="btn btn-p" onclick="saveEntry(false)" data-i18n="common.save"></button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script src="script.js?v=3"></script>
+	</body>
+</html>

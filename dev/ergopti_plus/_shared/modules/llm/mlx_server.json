@@ -1,0 +1,5 @@
+{
+	"_comment": "Single source of truth for the local MLX inference server's bind address. The macOS Hammerspoon driver launches mlx_lm.server with an explicit --port equal to this value, so the server and every client agree on one port. We deliberately do NOT use mlx_lm.server's own 8080 default: 8080 is the most common local dev/LLM port and frequently already taken (another app, a user's own model server), which would make our server silently bind-fail or, worse, talk to a stranger's server. Port 3460 is a dedicated, uncommon choice for Ergopti's private mini-LLM: it is in the IANA registered range (1024-49151) so the kernel never hands it out as an ephemeral port, it is not a well-known service, and it is a stylized 'ERGO' (leetspeak: 3=E, 4=R, 6=G, 0=O). The user can override it from the LLM menu (persisted via hs.settings, key 'ergopti.llm.mlx_port'); that override takes precedence over this default. Host stays on loopback for security; only the port is meaningfully tunable.",
+	"host": "127.0.0.1",
+	"port": 3460
+}

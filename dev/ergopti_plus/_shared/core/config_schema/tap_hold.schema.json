@@ -1,0 +1,97 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ergopti.com/schema/tap_hold.schema.json",
+	"title": "Ergopti+ tap-hold configuration (shared)",
+	"description": "JSON Schema for _shared/tap_hold/defaults.toml AND for the AHK driver's complete tap-hold configuration under config/ergopti_plus/ahk/tap_hold.toml. The per-driver file is seeded once from the driver-local defaults at first boot and then owned by the user — there is no runtime merge.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["tap_hold"],
+
+	"properties": {
+		"tap_hold": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"keys": { "$ref": "#/$defs/keys_map" },
+				"layers": { "$ref": "#/$defs/layers_map" }
+			}
+		}
+	},
+
+	"$defs": {
+		"keys_map": {
+			"description": "Map of physical-key names to tap-hold configuration.",
+			"type": "object",
+			"additionalProperties": { "$ref": "#/$defs/key_definition" }
+		},
+
+		"key_definition": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["time_activation_seconds"],
+			"properties": {
+				"enabled": {
+					"type": "boolean",
+					"description": "Defaults to true. Set false to disable this tap-hold without removing the section."
+				},
+				"time_activation_seconds": {
+					"type": "number",
+					"minimum": 0,
+					"maximum": 5,
+					"description": "Hold threshold in seconds. Below = tap_action; above = hold_*."
+				},
+				"tap_action": {
+					"type": "string",
+					"description": "Action emitted on tap. Reference to _shared/modules/gestures/actions.toml entry or a key name."
+				},
+				"hold_layer": {
+					"type": "string",
+					"description": "Layer activated while held. Reference to a tap_hold.layers.<name> key."
+				},
+				"hold_modifier": {
+					"oneOf": [
+						{
+							"type": "string",
+							"enum": [""]
+						},
+						{
+							"type": "string",
+							"pattern": "^(?:$|(?:ctrl|shift|alt|alt_gr|win)(?:\\+(?:ctrl|shift|alt|alt_gr|win))*)$"
+						}
+					]
+				}
+			},
+
+			"allOf": [
+				{
+					"description": "hold_layer and hold_modifier are mutually exclusive.",
+					"not": {
+						"required": ["hold_layer", "hold_modifier"]
+					}
+				}
+			]
+		},
+
+		"layers_map": {
+			"type": "object",
+			"additionalProperties": { "$ref": "#/$defs/layer_definition" }
+		},
+
+		"layer_definition": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["mappings"],
+			"properties": {
+				"description_key": {
+					"type": "string",
+					"description": "i18n key used for the menu label. Resolved against static/locales/<lang>.json."
+				},
+				"mappings": {
+					"type": "object",
+					"additionalProperties": { "type": "string" },
+					"description": "Map of source key → action or destination key. Action strings reference _shared/modules/gestures/actions.toml."
+				}
+			}
+		}
+	}
+}

@@ -1,0 +1,524 @@
+# static/ergopti_plus/_shared/modules/timings/constants.toml
+#
+# Canonical registry of all timing constants used across Ergopti drivers.
+#
+# Both drivers consume this file:
+#   - Hammerspoon (macOS): read via the toml_codec adapter at startup.
+#   - AutoHotkey (Windows): read via the TOML reader module at startup.
+#
+# All values are in milliseconds unless the key name says otherwise.
+# Keys ending in _sec are in seconds (kept for readability where the
+# underlying API works in seconds, e.g. hs.timer.doAfter).
+#
+# Editing this file is the single authoritative way to tune timings.
+# Driver-local constants that duplicate a value here should be removed
+# and replaced with a reference to this file.
+
+
+# ──────────────────────────────────────────────────────────────────────
+# LLM prediction
+# ──────────────────────────────────────────────────────────────────────
+
+[llm]
+
+# Keystroke inactivity debounce before firing an LLM prediction request.
+# AHK: prediction_engine.ahk "debounce_ms" default.
+# HS:  prediction_engine.lua DEBOUNCE_MIN_SEC / DEBOUNCE_MAX_SEC range midpoint.
+prediction_debounce_ms = 500
+
+# Minimum debounce — snappiest allowed prediction trigger (HS only).
+prediction_debounce_min_ms = 50
+
+# Maximum debounce — slowest allowed prediction trigger (HS only).
+prediction_debounce_max_ms = 600
+
+# Chain-fallback timer: fire the chained LLM call if the F16 sync signal
+# is missed (HS prediction_engine.lua CHAIN_FALLBACK_SEC).
+chain_fallback_ms = 500
+
+# HTTP request hard timeout for the remote LLM API.
+# AHK: api_remote.ahk LLM_REMOTE_TIMEOUT_MS.
+# HS:  api_remote.lua REQUEST_TIMEOUT_S.
+request_timeout_ms = 30000
+
+# HTTP polling interval when the remote driver polls a streaming response.
+# AHK: api_remote.ahk LLM_REMOTE_POLL_MS / api_ollama.ahk LLM_OLLAMA_POLL_MS.
+poll_interval_ms = 50
+
+# MLX stream: fail fast if the server never sends the first TCP byte.
+stream_connect_timeout_ms = 5000
+
+# MLX stream: kill the task if the server accepts but never sends a token
+# (large models can take up to ~60 s to load weights).
+stream_hard_timeout_ms = 90000
+
+# MLX warmup: unblock _warmup_in_flight if the single-token POST never returns.
+warmup_post_timeout_ms = 30000
+
+# MLX non-streaming inference: prevents a hung server from blocking on_fail indefinitely.
+non_stream_timeout_ms = 8000
+
+# Initial delay before the first warmup attempt after startup.
+warmup_initial_delay_ms = 2000
+
+# Base retry interval for the exponential-backoff warmup retry loop.
+warmup_retry_base_ms = 5000
+
+# Cap for the warmup retry backoff interval.
+warmup_retry_cap_ms = 60000
+
+# Minimum interval between zombie-kill passes in the MLX process manager.
+zombie_kill_min_interval_ms = 3000
+
+# Minimum interval between restart-hook invocations (prevents restart storms).
+restart_hook_min_interval_ms = 10000
+
+# Grace period after a fresh MLX launch before treating silence as a failure
+# (8B-class models can take up to ~60 s to load weights).
+fresh_launch_grace_ms = 90000
+
+# Discovery: stop polling /v1/models after this much real time.
+discovery_max_wait_ms = 60000
+
+# Discovery: first inter-probe delay (doubles each miss, up to the cap).
+discovery_poll_initial_ms = 1000
+
+# Discovery: cap for the exponential backoff interval.
+discovery_poll_max_ms = 10000
+
+# Streaming watchdog: kill the handler if no token arrives within this window.
+# AHK streaming_handler equivalent; HS streaming_handler.lua STREAM_WATCHDOG_SEC.
+stream_watchdog_ms = 12000
+
+# Ollama installed-models cache TTL — avoids repeated "ollama list" calls.
+# AHK: models.ahk LLM_INSTALLED_CACHE_TTL_MS.
+installed_cache_ttl_ms = 2000
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Tooltip / UI overlays
+# ──────────────────────────────────────────────────────────────────────
+
+[tooltip]
+
+# Default duration a standard (non-LLM) tooltip stays visible.
+# HS: tooltip/config.lua DEFAULT_TIMEOUT_SEC.
+display_ttl_ms = 2500
+
+# Default duration an LLM prediction tooltip stays visible.
+# HS: tooltip/config.lua DEFAULT_LLM_TIMEOUT_SEC.
+llm_display_ttl_ms = 12000
+
+# Shortest tolerable tooltip display (guard against sub-frame flicker).
+# HS: tooltip/config.lua TIMEOUT_FLOOR_SEC.
+min_visible_ms = 50
+
+# Step size used when decrementing the remaining TTL on each poll tick.
+# HS: tooltip/config.lua TIMEOUT_DECREMENT_SEC.
+# AHK: lib/tooltip.ahk _TOOLTIP_TIMEOUT_DECREMENT_SEC.
+# Authoritative value: _shared/modules/tooltip/constants.toml [timing] timeout_decrement_sec = 0.2
+# (200 ms). If the two TOML files ever disagree again, tooltip/constants.toml wins —
+# it is the visual-layer canon; timings/constants.toml mirrors it for cross-module
+# discovery only.
+ttl_decrement_ms = 200
+
+# Stand-in for "never auto-dismiss" (24 h).
+# HS: keymap/llm_bridge.lua INFINITE_TOOLTIP_SEC.
+infinite_ttl_ms = 86400000
+
+# Minimum hotstring tooltip duration.
+# HS: keymap/llm_bridge.lua MIN_TOOLTIP_DURATION_SEC.
+hotstring_min_ttl_ms = 50
+
+# Auto-hide delay for success banners in the deps-checker UI.
+# HS: ollama_deps_checker / mlx_deps_checker SUCCESS_AUTO_HIDE_SEC.
+success_banner_autohide_ms = 1500
+
+# Auto-dismiss delay for error dialogs in the download window.
+# HS: download_window/init.lua ERROR_AUTO_DISMISS_SEC.
+error_dialog_autodismiss_ms = 8000
+
+# Webview auto-close delay after a successful Ollama operation.
+# AHK: ollama_webview.ahk -1800 SetTimer.
+ollama_webview_autoclose_ms = 1800
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Debounce / settle delays (keyboard, clipboard, UI)
+# ──────────────────────────────────────────────────────────────────────
+
+[debounce]
+
+# Input-source (keyboard layout) change debounce.
+# HS: karabiner/watchers.lua INPUT_SOURCE_DEBOUNCE_SEC.
+input_source_ms = 250
+
+# Delay after Cmd+C / Ctrl+C before reading the clipboard.
+# HS: shortcuts/actions/text.lua COPY_SETTLE_SEC.
+clipboard_copy_settle_ms = 200
+
+# Delay before pasting transformed text (let the OS process the copy).
+# HS: shortcuts/actions/text.lua PASTE_SETTLE_SEC.
+clipboard_paste_settle_ms = 80
+
+# Delay after paste before re-selecting the pasted text.
+# HS: shortcuts/actions/text.lua RESELECT_DELAY_SEC.
+clipboard_reselect_ms = 80
+
+# Delay before restoring the previous clipboard contents.
+# HS: shortcuts/actions/text.lua RESTORE_DELAY_SEC / keymap/utils.lua CLIPBOARD_RESTORE_SEC.
+clipboard_restore_ms = 150
+
+# Karabiner rules-priming: poll interval while waiting for socket ready.
+# HS: ke_lifecycle.lua PRIME_POLL_INTERVAL_SEC / PRIME_RULES_PROBE_RETRY_INTERVAL_SEC.
+karabiner_prime_poll_ms = 300
+
+# macOS TIS settle: the keycode map is updated asynchronously by the Text Input
+# Source subsystem AFTER the input-source-changed notification. Wait this long
+# before rebuilding the Karabiner config so the NEW layout's keycode map is read
+# (too short → wrong physical keys generated in karabiner.json).
+# HS: karabiner/init.lua LAYOUT_TIS_SETTLE_SEC.
+layout_tis_settle_ms = 500
+
+# Hotstring global default expansion delay.
+# AUTHORITATIVE SOURCE: _shared/modules/hotstrings/defaults.toml [delays] default_sec (0.75 s),
+# read at boot by both drivers (AHK GLOBAL_DEFAULT_DELAY / HS GLOBAL_DEFAULT_DELAY).
+# This entry mirrors that value in milliseconds for cross-module discovery only —
+# keep it in sync if the canonical default_sec ever changes.
+# UI: hotstrings_config_window GLOBAL_DEFAULT_DELAY_MS.
+hotstring_expansion_ms = 750
+
+# Text-sender inter-keystroke settle (used when injecting expanded text).
+# HS: adapters/text_sender.lua inline 0.15 s delay.
+text_sender_settle_ms = 150
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Gestures
+# ──────────────────────────────────────────────────────────────────────
+
+[gestures]
+
+# Touchdevice discovery: interval for the adaptive probe loop.
+# HS: gestures/init.lua hs.timer.doEvery(0.5, …).
+probe_interval_ms = 500
+
+# One-shot safety re-probe at startup if no frame has arrived yet.
+# HS: gestures/init.lua STARTUP_SAFETY_PROBE_SEC.
+startup_safety_probe_ms = 5000
+
+# Timeout after which the aggressive startup phase is abandoned.
+# HS: gestures/init.lua STARTUP_PHASE_TIMEOUT_SEC.
+startup_phase_timeout_ms = 30000
+
+# Slow health-check cadence once touch frames are flowing normally.
+# HS: gestures/init.lua HEALTH_CHECK_INTERVAL_SEC.
+health_check_interval_ms = 30000
+
+# Maximum capture window for a multi-finger tap gesture.
+# HS: gestures/engine.lua TAP_MAX_SEC.
+tap_max_ms = 700
+
+# Minimum rearm delay between consecutive live-axis triggers.
+# HS: gestures/engine.lua LIVE_REARM_SEC.
+live_rearm_ms = 80
+
+# Faster rearm when the user reverses direction strongly.
+# HS: gestures/engine.lua LIVE_REARM_REVERSE_FAST_SEC.
+live_rearm_reverse_ms = 30
+
+# Delay before confirming a finger contact as intentional.
+# HS: gestures/engine.lua FINGER_CONFIRM_MS.
+finger_confirm_ms = 50
+
+# Delay before confirming a finger lift.
+# HS: gestures/engine.lua FINGER_DROP_CONFIRM_MS.
+finger_drop_confirm_ms = 200
+
+# Window to wait for staggered multi-finger contact to stabilise.
+# HS: gestures/engine.lua FINGER_COUNT_STABLE_MS.
+finger_count_stable_ms = 60
+
+# Post-gesture click cooldown to prevent double-fires.
+# HS: gestures/actions.lua CLICK_COOLDOWN_SEC.
+click_cooldown_ms = 150
+
+# AHK: delay between a gesture-triggered keep-awake deferred config run.
+# AHK: gestures.ahk SetTimer(_DeferredGestureAutoConfigure, -2000).
+gesture_auto_configure_delay_ms = 2000
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Keep-awake (activity simulation)
+# ──────────────────────────────────────────────────────────────────────
+
+[keep_awake]
+
+# Minimum interval between mouse-jitter ticks.
+# AHK: win.ahk AWAKE_TICK_MIN_MS. HS: system.lua AWAKE_TICK_MIN_SEC.
+tick_min_ms = 1000
+
+# Maximum interval between mouse-jitter ticks.
+# AHK: win.ahk AWAKE_TICK_MAX_MS. HS: system.lua AWAKE_TICK_MAX_SEC.
+tick_max_ms = 5000
+
+# Delay to hold the cursor offset before returning it to origin.
+# AHK: win.ahk AWAKE_RETURN_MS. HS: system.lua AWAKE_RETURN_DELAY_SEC.
+return_delay_ms = 200
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Keylogger
+# ──────────────────────────────────────────────────────────────────────
+
+[keylogger]
+
+# Background ingest tick — how often buffered events are flushed to disk.
+# AHK: keylogger.ahk INGEST_TICK_MS. HS: log_manager.lua INGEST_TICK_SEC.
+ingest_tick_ms = 5000
+
+# Keystroke delay above this value is treated as a "thinking pause".
+# AHK: keylogger.ahk / keylogger_walker.ahk THINK_PAUSE_MS.
+# HS: aggregator.lua THINK_PAUSE_THRESHOLD_MS.
+think_pause_ms = 2000
+
+# Cap for inter-keystroke delay used in WPM bucketing / n-gram analysis.
+# AHK: keylogger.ahk / keylogger_walker.ahk WPM_MAX_DELAY_MS.
+# HS: aggregator.lua MAX_KEYSTROKE_DELAY_MS / log_manager.lua WPM_MAX_EVENT_DELAY_MS.
+max_keystroke_delay_ms = 5000
+
+# Day-rollover midnight check cadence.
+# AHK: keylogger.ahk MIDNIGHT_CHECK_TICK_MS.
+midnight_check_tick_ms = 60000
+
+# Gap between keystrokes that marks a burst boundary.
+# AHK: keylogger_walker.ahk BURST_GAP_MS. HS: aggregator.lua BURST_GAP_MS.
+burst_gap_ms = 1000
+
+# Inactivity gap that starts a new typing session.
+# AHK: keylogger_walker.ahk SESSION_GAP_MS. HS: aggregator.lua SESSION_GAP_MS.
+session_gap_ms = 300000
+
+# Maximum delay that is still classified as auto-repeat (key held down).
+# AHK: keylogger_walker.ahk AUTO_REPEAT_MAX_DELAY_MS. HS: aggregator.lua.
+auto_repeat_max_delay_ms = 50
+
+# Minimum hold duration to classify a key event as a deliberate hold.
+# AHK: keylogger_walker.ahk HOLD_THRESHOLD_MS. HS: aggregator.lua.
+hold_threshold_ms = 250
+
+# Micro-idle timeout: user is considered briefly idle after this silence.
+# AHK: keylogger_watchers.ahk MICRO_IDLE_TIMEOUT_MS. HS: keylogger/init.lua.
+micro_idle_timeout_ms = 30000
+
+# Full session timeout: user is considered absent after this silence.
+# AHK: keylogger_watchers.ahk SESSION_TIMEOUT_MS. HS: keylogger/init.lua.
+session_timeout_ms = 300000
+
+# Idle-check poll interval (how often the watcher tests for inactivity).
+# AHK: keylogger_watchers.ahk IDLE_CHECK_INTERVAL_MS. HS: keylogger/init.lua.
+idle_check_interval_ms = 10000
+
+# Maintenance pass interval (log rotation, cache cleanup, etc.).
+# HS: keylogger/init.lua MAINTENANCE_INTERVAL_SEC.
+maintenance_interval_ms = 5000
+
+# WPM sliding window duration.
+# HS: keylogger/init.lua WPM_WINDOW_MS.
+wpm_window_ms = 15000
+
+# Minimum typing duration before a WPM sample is considered valid.
+# HS: keylogger/init.lua WPM_MIN_DURATION_MS.
+wpm_min_duration_ms = 2000
+
+# System load poll interval (CPU / RAM sampling).
+# HS: keylogger/init.lua SYSTEM_LOAD_POLL_INTERVAL_MS.
+system_load_poll_ms = 300000
+
+# Tolerance window for matching synthetic vs. physical keystrokes.
+# HS: keylogger/init.lua SYNTH_MATCH_DELAY_MS.
+synth_match_delay_ms = 3
+
+# Auto-flush trigger: flush buffer when typing has been idle this long.
+# HS: keylogger/init.lua AUTO_FLUSH_IDLE_MS.
+auto_flush_idle_ms = 120000
+
+# Hook flush period — how often the low-level hook drains its buffer.
+# AHK: keylogger_hook.ahk FLUSH_PERIOD_MS.
+hook_flush_period_ms = 200
+
+# Hook context TTL — how long a context entry is kept before expiry.
+# AHK: keylogger_hook.ahk CONTEXT_TTL_MS (drift-gated to this value).
+hook_context_ttl_ms = 1000
+
+# Keylogger bridge poll fallback interval (HS kc_bridge without inotify).
+# HS: kc_bridge.lua POLL_FALLBACK_SEC.
+kc_bridge_poll_ms = 500
+
+# Window topology tick interval.
+# AHK: keylogger_window_topology.ahk TOPO_TICK_MS (drift-gated to this value).
+topo_tick_ms = 1500
+
+# AV-state fast-poll tick.
+# AHK: keylogger_av_state.ahk AVSTATE_TICK_MS.
+av_state_fast_tick_ms = 1000
+
+# AV-state slow-poll tick (media player / volume sampling).
+# AHK: keylogger_av_state.ahk SLOW_TICK_MS.
+av_state_slow_tick_ms = 30000
+
+# Network: Wi-Fi / SSID poll interval.
+# AHK: keylogger_network.ahk NETWORK_TICK_MS.
+network_wifi_tick_ms = 15000
+
+# Network: internet reachability check interval.
+# AHK: keylogger_network.ahk REACH_TICK_MS.
+network_reach_tick_ms = 30000
+
+# Network: VPN adapter poll interval.
+# AHK: keylogger_network.ahk VPN_TICK_MS.
+network_vpn_tick_ms = 20000
+
+# Sensor (CPU/GPU temp, fan) sampling tick.
+# AHK: keylogger_sensors.ahk SENSOR_TICK_MS.
+sensor_tick_ms = 60000
+
+# Mouse: gap between scroll events that flushes the burst accumulator.
+# AHK: keylogger_mouse.ahk SCROLL_BURST_GAP_MS.
+mouse_scroll_burst_gap_ms = 400
+
+# Mouse: park-position check interval.
+# AHK: keylogger_mouse.ahk PARK_CHECK_MS (drift-gated to this value).
+mouse_park_check_ms = 250
+
+# Mouse: idle duration before the cursor is considered "parked".
+# AHK: keylogger_mouse.ahk PARK_IDLE_MS.
+mouse_park_idle_ms = 3000
+
+# ROI half-life check interval (trigger decay recalculation).
+# AHK: keylogger_trigger_roi.ahk HALFLIFE_CHECK_MS.
+roi_halflife_check_ms = 3600000
+
+# Paste burst detection window (clipboard activity grouping).
+# AHK: keylogger_clipboard.ahk PASTE_BURST_WINDOW_MS.
+paste_burst_window_ms = 10000
+
+# Category auto-save debounce after a classification change.
+# AHK: keylogger_app_categories.ahk -5000 SetTimer.
+app_category_save_debounce_ms = 5000
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Tap-hold / key repeat (AHK)
+# ──────────────────────────────────────────────────────────────────────
+
+[tap_hold]
+
+# Minimum physical tap duration to register as intentional.
+# AHK: tap_holds/constants.ahk TAP_MIN_DURATION_MS.
+tap_min_duration_ms = 50
+
+# Initial delay before key-repeat begins.
+# AHK: tap_holds/constants.ahk KEY_REPEAT_INITIAL_DELAY_MS.
+key_repeat_initial_delay_ms = 300
+
+# Interval between subsequent key-repeat events.
+# AHK: tap_holds/constants.ahk KEY_REPEAT_INTERVAL_MS.
+key_repeat_interval_ms = 100
+
+# One-shot shift: auto-cancel timeout if no subsequent key is pressed.
+# AHK: tap_holds/constants.ahk ONE_SHOT_SHIFT_TIMEOUT_SEC (seconds).
+one_shot_shift_timeout_ms = 2000
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Ergonomics warnings
+# ──────────────────────────────────────────────────────────────────────
+
+[ergonomics]
+
+# Minimum continuous typing block before a micro-break is suggested.
+# AHK: keylogger_ergonomics.ahk BLOCK_BREAK_MS.
+block_break_ms = 10000
+
+# Continuous typing block that triggers a full break warning.
+# AHK: keylogger_ergonomics.ahk BLOCK_WARN_MS (20 minutes).
+block_warn_ms = 1200000
+
+# Flow-state detection window (sustained high-WPM period).
+# AHK: keylogger_ergonomics.ahk FLOW_WINDOW_MS (5 minutes).
+flow_window_ms = 300000
+
+# Pause duration above which a keystroke gap is classed as hesitation.
+# AHK: keylogger_ergonomics.ahk HESITATION_MS.
+hesitation_ms = 2000
+
+# Cooldown after a hesitation event before a new one can be registered.
+# AHK: keylogger_ergonomics.ahk HESITATION_COOLDOWN_MS.
+hesitation_cooldown_ms = 10000
+
+
+# ──────────────────────────────────────────────────────────────────────
+# UI / menu / system
+# ──────────────────────────────────────────────────────────────────────
+
+[ui]
+
+# Delay before the post-install keyboard-layout menu refresh fires.
+# HS: menu_keyboard_layout.lua POST_INSTALL_REFRESH_DELAY.
+post_install_refresh_ms = 1500
+
+# Small delay before invoking TIS (Text Input Source) calls.
+# HS: menu_keyboard_layout.lua TIS_CALL_DELAY.
+tis_call_delay_ms = 100
+
+# Karabiner ready notification debounce delay.
+# HS: ke_lifecycle.lua KARABINER_READY_NOTIFY_DELAY_SEC.
+karabiner_ready_notify_delay_ms = 2500
+
+# Minimum interval between repeated Karabiner-ready notifications.
+# HS: ke_lifecycle.lua KARABINER_READY_NOTIFY_COOLDOWN_SEC.
+karabiner_ready_notify_cooldown_ms = 10000
+
+# Capsword check interval (Karabiner caps-lock watcher).
+# HS: karabiner/watchers.lua CAPSWORD_CHECK_INTERVAL_S.
+capsword_check_interval_ms = 100
+
+# Layout poll interval (periodic layout drift detection).
+# HS: karabiner/watchers.lua LAYOUT_POLL_SEC.
+layout_poll_ms = 2000
+
+# UI-restore poll interval (window position persistence).
+# HS: lib/ui_restore.lua POLL_INTERVAL_SEC.
+ui_restore_poll_ms = 1000
+
+# WPM widget update interval.
+# HS: ui/wpm/wpm_widget.lua 0.2 s timer.
+wpm_widget_update_ms = 200
+
+# Inactivity duration before the WPM widget hides itself.
+# AHK: lib/metrics/wpm_widget.ahk WPMWidgetConst.IDLE_HIDE_MS.
+# HS:  ui/wpm/wpm_widget.lua IDLE_HIDE_MS.
+wpm_widget_idle_hide_ms = 3000
+
+# How long the WPM widget keeps showing the hotstring source color after the
+# last expansion before fading back to the manual-keystroke color.
+# AHK: lib/metrics/wpm_widget.ahk WPMWidgetConst.COLOR_HOLD_MS.
+# HS:  ui/wpm/wpm_widget.lua COLOR_HOLD_S (converted from ms at load time).
+wpm_color_hold_ms = 1000
+
+# WPM menubar update interval.
+# HS: ui/wpm/wpm_menubar.lua 0.5 s timer.
+wpm_menubar_update_ms = 500
+
+# Hammerspoon reload debounce after a config file change.
+# HS: init.lua / menu/init.lua 0.5 s reload_timer.
+hs_reload_debounce_ms = 500
+
+# Onboarding / first-run wizard startup delay.
+# HS: karabiner/onboarding.lua / karabiner/init.lua 2.0 s delay.
+onboarding_startup_delay_ms = 2000
+
+# LLM deps checker: Ollama poll interval (readiness probe loop).
+# AHK: ollama_deps_checker.ahk 3000 ms SetTimer.
+ollama_deps_poll_ms = 3000

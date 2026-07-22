@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "description": "Canonical modifier-key actions shared by the Windows, macOS and Linux drivers. Labels are deliberately language-neutral and must be rendered verbatim.",
+  "keys": [
+    { "id": "a", "label": "A" },
+    { "id": "b", "label": "B" },
+    { "id": "c", "label": "C" },
+    { "id": "d", "label": "D" },
+    { "id": "e", "label": "E" },
+    { "id": "f", "label": "F" },
+    { "id": "g", "label": "G" },
+    { "id": "h", "label": "H" },
+    { "id": "i", "label": "I" },
+    { "id": "j", "label": "J" },
+    { "id": "k", "label": "K" },
+    { "id": "l", "label": "L" },
+    { "id": "m", "label": "M" },
+    { "id": "n", "label": "N" },
+    { "id": "o", "label": "O" },
+    { "id": "p", "label": "P" },
+    { "id": "q", "label": "Q" },
+    { "id": "r", "label": "R" },
+    { "id": "s", "label": "S" },
+    { "id": "t", "label": "T" },
+    { "id": "u", "label": "U" },
+    { "id": "v", "label": "V" },
+    { "id": "w", "label": "W" },
+    { "id": "x", "label": "X" },
+    { "id": "y", "label": "Y" },
+    { "id": "z", "label": "Z" },
+    { "id": "0", "label": "0" },
+    { "id": "1", "label": "1" },
+    { "id": "2", "label": "2" },
+    { "id": "3", "label": "3" },
+    { "id": "4", "label": "4" },
+    { "id": "5", "label": "5" },
+    { "id": "6", "label": "6" },
+    { "id": "7", "label": "7" },
+    { "id": "8", "label": "8" },
+    { "id": "9", "label": "9" },
+    {
+      "id": "space",
+      "label": "Space",
+      "windows_key": "{Space}",
+      "macos_key": "space",
+      "linux_key": "space",
+      "karabiner_key": "spacebar"
+    },
+    {
+      "id": "enter",
+      "label": "Enter",
+      "windows_key": "{Enter}",
+      "macos_key": "return",
+      "linux_key": "Return",
+      "karabiner_key": "return_or_enter"
+    },
+    {
+      "id": "period",
+      "label": ".",
+      "windows_key": ".",
+      "macos_key": ".",
+      "linux_key": ".",
+      "karabiner_key": "period"
+    },
+    {
+      "id": "comma",
+      "label": ",",
+      "windows_key": ",",
+      "macos_key": ",",
+      "linux_key": ",",
+      "karabiner_key": "comma"
+    }
+  ],
+  "platforms": {
+    "windows": {
+      "modifiers": [
+        { "id": "ctrl", "label": "Ctrl", "ahk_prefix": "^" },
+        { "id": "shift", "label": "Shift", "ahk_prefix": "+" },
+        { "id": "alt", "label": "Alt", "ahk_prefix": "!" },
+        { "id": "win", "label": "Win", "ahk_prefix": "#" }
+      ]
+    },
+    "macos": {
+      "modifiers": [
+        { "id": "cmd", "label": "Cmd", "hammerspoon": "cmd", "karabiner": "left_command" },
+        { "id": "ctrl", "label": "Ctrl", "hammerspoon": "ctrl", "karabiner": "left_control" },
+        { "id": "option", "label": "Option", "hammerspoon": "alt", "karabiner": "left_option" },
+        { "id": "shift", "label": "Shift", "hammerspoon": "shift", "karabiner": "left_shift" }
+      ]
+    },
+    "linux": {
+      "modifiers": [
+        { "id": "ctrl", "label": "Ctrl", "xdotool": "ctrl" },
+        { "id": "shift", "label": "Shift", "xdotool": "shift" },
+        { "id": "alt", "label": "Alt", "xdotool": "alt" },
+        { "id": "super", "label": "Super", "xdotool": "super" }
+      ]
+    }
+  }
+}

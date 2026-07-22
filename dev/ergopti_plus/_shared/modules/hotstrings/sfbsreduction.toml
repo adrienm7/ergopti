@@ -1,0 +1,118 @@
+# ====================
+# ====================
+# ======= Meta =======
+# ====================
+# ====================
+
+[_meta]
+delay = 0.5
+show_tooltip = true
+description = { fr = "Réduction des SFBs", en = "SFB reduction", de = "SFB-Reduktion", es = "Reducción de SFBs", zh = "SFB 减少", ar = "تقليل SFBs", cs = "Redukce SFBs", da = "SFB-reduktion", he = "הפחתת SFBs", hi = "SFB कमी", it = "Riduzione SFBs", ja = "SFB削減", ko = "SFB 감소", nl = "SFB-reductie", no = "SFB-reduksjon", pl = "Redukcja SFBs", pt = "Redução de SFBs", ru = "Снижение SFBs", sv = "SFB-reduktion", tr = "SFB azaltma", uk = "Зменшення SFBs" }
+sections_order = ["comma", "-", "e_circ", "e_grave", "-", "bu", "i_e_acute"]
+
+
+
+# =========================
+# ===== Meta.Sections =====
+# =========================
+
+[_meta.sections]
+bu = { fr = "À + ★/U corrige 2 SFBs : à★ = bu et àu = ub", en = "À + ★/U fixes 2 SFBs: à★ = bu and àu = ub", de = "À + ★/U korrigiert 2 SFBs: à★ = bu und àu = ub", es = "À + ★/U corrige 2 SFBs: à★ = bu y àu = ub", zh = "À + ★/U 修正 2 个 SFB：à★ = bu 和 àu = ub", ar = "À + ★/U يصحح 2 SFBs: à★ = bu و àu = ub", cs = "À + ★/U opravuje 2 SFBs: à★ = bu a àu = ub", da = "À + ★/U retter 2 SFBs: à★ = bu og àu = ub", he = "À + ★/U מתקן 2 SFBs: à★ = bu ו-àu = ub", hi = "À + ★/U 2 SFBs ठीक करता है: à★ = bu और àu = ub", it = "À + ★/U corregge 2 SFBs: à★ = bu e àu = ub", ja = "À + ★/U が2つのSFBを修正：à★ = bu、àu = ub", ko = "À + ★/U가 2개의 SFB를 수정: à★ = bu 및 àu = ub", nl = "À + ★/U corrigeert 2 SFBs: à★ = bu en àu = ub", no = "À + ★/U retter 2 SFBs: à★ = bu og àu = ub", pl = "À + ★/U poprawia 2 SFBs: à★ = bu i àu = ub", pt = "À + ★/U corrige 2 SFBs: à★ = bu e àu = ub", ru = "À + ★/U исправляет 2 SFBs: à★ = bu и àu = ub", sv = "À + ★/U rättar 2 SFBs: à★ = bu och àu = ub", tr = "À + ★/U 2 SFBs düzeltir: à★ = bu ve àu = ub", uk = "À + ★/U виправляє 2 SFBs: à★ = bu та àu = ub" }
+comma = { fr = "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …", en = "Comma + Consonant fixes many SFBs: ,t = pt, ,d = ds, ,p = xp, …", de = "Komma + Konsonant korrigiert viele SFBs: ,t = pt, ,d = ds, ,p = xp, …", es = "Coma + Consonante corrige muchos SFBs: ,t = pt, ,d = ds, ,p = xp, …", zh = "逗号 + 辅音修正大量 SFB：,t = pt，,d = ds，,p = xp，…", ar = "فاصلة + صامت يصحح SFBs كثيرة: ,t = pt، ,d = ds، ,p = xp، …", cs = "Čárka + Souhláska opravuje mnoho SFBs: ,t = pt, ,d = ds, ,p = xp, …", da = "Komma + Konsonant retter mange SFBs: ,t = pt, ,d = ds, ,p = xp, …", he = "פסיק + עיצור מתקן SFBs רבים: ,t = pt, ,d = ds, ,p = xp, …", hi = "अल्पविराम + व्यंजन कई SFBs ठीक करता है: ,t = pt, ,d = ds, ,p = xp, …", it = "Virgola + Consonante corregge molti SFBs: ,t = pt, ,d = ds, ,p = xp, …", ja = "カンマ + 子音が多くのSFBを修正：,t = pt, ,d = ds, ,p = xp, …", ko = "쉼표 + 자음이 많은 SFB를 수정: ,t = pt, ,d = ds, ,p = xp, …", nl = "Komma + Medeklinker corrigeert veel SFBs: ,t = pt, ,d = ds, ,p = xp, …", no = "Komma + Konsonant retter mange SFBs: ,t = pt, ,d = ds, ,p = xp, …", pl = "Przecinek + Spółgłoska poprawia wiele SFBs: ,t = pt, ,d = ds, ,p = xp, …", pt = "Vírgula + Consoante corrige muitos SFBs: ,t = pt, ,d = ds, ,p = xp, …", ru = "Запятая + Согласная исправляет многие SFBs: ,t = pt, ,d = ds, ,p = xp, …", sv = "Komma + Konsonant rättar många SFBs: ,t = pt, ,d = ds, ,p = xp, …", tr = "Virgül + Ünsüz çok sayıda SFBs düzeltir: ,t = pt, ,d = ds, ,p = xp, …", uk = "Кома + Приголосна виправляє багато SFBs: ,t = pt, ,d = ds, ,p = xp, …" }
+e_circ ={ fr = "Ê + touche sur la main gauche corrige 4 SFBs : êé = oe, éê = eo, ê, = u, et ê. = u.", en = "Ê + left-hand key fixes 4 SFBs: êé = oe, éê = eo, ê, = u, and ê. = u.", de = "Ê + Linke-Hand-Taste korrigiert 4 SFBs: êé = oe, éê = eo, ê, = u, und ê. = u.", es = "Ê + tecla de la mano izquierda corrige 4 SFBs: êé = oe, éê = eo, ê, = u, y ê. = u.", zh = "Ê + 左手键修正 4 个 SFB：êé = oe，éê = eo，ê, = u，ê. = u", ar = "Ê + مفتاح اليد اليسرى يصحح 4 SFBs: êé = oe, éê = eo, ê, = u, وê. = u.", cs = "Ê + klávesa levé ruky opravuje 4 SFBs: êé = oe, éê = eo, ê, = u, a ê. = u.", da = "Ê + venstrehåndstast retter 4 SFBs: êé = oe, éê = eo, ê, = u, og ê. = u.", he = "Ê + מקש יד שמאל מתקן 4 SFBs: êé = oe, éê = eo, ê, = u, ו-ê. = u.", hi = "Ê + बाएं हाथ की कुंजी 4 SFBs ठीक करती है: êé = oe, éê = eo, ê, = u, और ê. = u.", it = "Ê + tasto della mano sinistra corregge 4 SFBs: êé = oe, éê = eo, ê, = u, e ê. = u.", ja = "Ê + 左手キーが4つのSFBを修正：êé = oe, éê = eo, ê, = u, ê. = u", ko = "Ê + 왼손 키가 4개의 SFB를 수정: êé = oe, éê = eo, ê, = u, ê. = u", nl = "Ê + linkerhandtoets corrigeert 4 SFBs: êé = oe, éê = eo, ê, = u, en ê. = u.", no = "Ê + venstrehandstast retter 4 SFBs: êé = oe, éê = eo, ê, = u, og ê. = u.", pl = "Ê + klawisz lewej ręki poprawia 4 SFBs: êé = oe, éê = eo, ê, = u, i ê. = u.", pt = "Ê + tecla da mão esquerda corrige 4 SFBs: êé = oe, éê = eo, ê, = u, e ê. = u.", ru = "Ê + клавиша левой руки исправляет 4 SFBs: êé = oe, éê = eo, ê, = u, и ê. = u.", sv = "Ê + vänsterhandstangent rättar 4 SFBs: êé = oe, éê = eo, ê, = u, och ê. = u.", tr = "Ê + sol el tuşu 4 SFBs düzeltir: êé = oe, éê = eo, ê, = u, ve ê. = u.", uk = "Ê + клавіша лівої руки виправляє 4 SFBs: êé = oe, éê = eo, ê, = u, та ê. = u." }
+e_grave ={ fr = "È + touche Y corrige 2 SFBs : èy = aî et yè = â", en = "È + Y key fixes 2 SFBs: èy = aî and yè = â", de = "È + Y-Taste korrigiert 2 SFBs: èy = aî und yè = â", es = "È + tecla Y corrige 2 SFBs: èy = aî y yè = â", zh = "È + Y 键修正 2 个 SFB：èy = aî 和 yè = â", ar = "È + مفتاح Y يصحح 2 SFBs: èy = aî و yè = â", cs = "È + klávesa Y opravuje 2 SFBs: èy = aî a yè = â", da = "È + Y-tast retter 2 SFBs: èy = aî og yè = â", he = "È + מקש Y מתקן 2 SFBs: èy = aî ו-yè = â", hi = "È + Y कुंजी 2 SFBs ठीक करती है: èy = aî और yè = â", it = "È + tasto Y corregge 2 SFBs: èy = aî e yè = â", ja = "È + Yキーが2つのSFBを修正：èy = aî、yè = â", ko = "È + Y키가 2개의 SFB를 수정: èy = aî 및 yè = â", nl = "È + Y-toets corrigeert 2 SFBs: èy = aî en yè = â", no = "È + Y-tast retter 2 SFBs: èy = aî og yè = â", pl = "È + klawisz Y poprawia 2 SFBs: èy = aî i yè = â", pt = "È + tecla Y corrige 2 SFBs: èy = aî e yè = â", ru = "È + клавиша Y исправляет 2 SFBs: èy = aî и yè = â", sv = "È + Y-tangent rättar 2 SFBs: èy = aî och yè = â", tr = "È + Y tuşu 2 SFBs düzeltir: èy = aî ve yè = â", uk = "È + клавіша Y виправляє 2 SFBs: èy = aî та yè = â" }
+i_e_acute ={ fr = "À + É corrige 2 SFBs : éà = ié et àé = éi", en = "À + É fixes 2 SFBs: éà = ié and àé = éi", de = "À + É korrigiert 2 SFBs: éà = ié und àé = éi", es = "À + É corrige 2 SFBs: éà = ié y àé = éi", zh = "À + É 修正 2 个 SFB：éà = ié 和 àé = éi", ar = "À + É يصحح 2 SFBs: éà = ié و àé = éi", cs = "À + É opravuje 2 SFBs: éà = ié a àé = éi", da = "À + É retter 2 SFBs: éà = ié og àé = éi", he = "À + É מתקן 2 SFBs: éà = ié ו-àé = éi", hi = "À + É 2 SFBs ठीक करता है: éà = ié और àé = éi", it = "À + É corregge 2 SFBs: éà = ié e àé = éi", ja = "À + É が2つのSFBを修正：éà = ié、àé = éi", ko = "À + É가 2개의 SFB를 수정: éà = ié 및 àé = éi", nl = "À + É corrigeert 2 SFBs: éà = ié en àé = éi", no = "À + É retter 2 SFBs: éà = ié og àé = éi", pl = "À + É poprawia 2 SFBs: éà = ié i àé = éi", pt = "À + É corrige 2 SFBs: éà = ié e àé = éi", ru = "À + É исправляет 2 SFBs: éà = ié и àé = éi", sv = "À + É rättar 2 SFBs: éà = ié och àé = éi", tr = "À + É 2 SFBs düzeltir: éà = ié ve àé = éi", uk = "À + É виправляє 2 SFBs: éà = ié та àé = éi" }
+
+
+
+
+
+# ==================
+# ==================
+# ======= Bu =======
+# ==================
+# ==================
+
+[[bu]]
+"àu" = { output = "ub", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"à★" = { output = "bu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"e mà★" = { output = "e mise à jour", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"es mà★" = { output = "es mises à jour", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"il a mà★" = { output = "il a mis à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"la mà★" = { output = "la mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ma mà★" = { output = "ma mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"mà★" = { output = "mettre à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"mià★" = { output = "mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"pià★" = { output = "pièce jointe", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ta mà★" = { output = "ta mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"tà★" = { output = "toujours", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+
+
+
+
+
+# =====================
+# =====================
+# ======= Comma =======
+# =====================
+# =====================
+
+[[comma]]
+",d" = { output = "ds", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",f" = { output = "fl", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",g" = { output = "gl", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",h" = { output = "ph", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",l" = { output = "cl", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",m" = { output = "ms", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",n" = { output = "nl", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",p" = { output = "xp", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",q" = { output = "qu’", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",r" = { output = "rq", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",t" = { output = "pt", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",v" = { output = "dv", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+",z" = { output = "bj", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
+
+
+
+
+# ======================
+# ======================
+# ======= E_circ =======
+# ======================
+# ======================
+
+[[e_circ]]
+"ê," = { output = "u,", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ê." = { output = "u.", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"éê" = { output = "eo", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"êé" = { output = "oe", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
+
+
+
+
+# =======================
+# =======================
+# ======= E_grave =======
+# =======================
+# =======================
+
+[[e_grave]]
+"èy" = { output = "aî", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"yè" = { output = "â", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
+
+
+
+
+# =========================
+# =========================
+# ======= I_e_acute =======
+# =========================
+# =========================
+
+[[i_e_acute]]
+"àé" = { output = "éi", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"éà" = { output = "ié", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ié★" = { output = "ébu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }

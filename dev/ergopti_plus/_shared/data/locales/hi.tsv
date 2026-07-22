@@ -1,0 +1,2296 @@
+_meta.flag	🇮🇳
+_meta.locale	hi
+_meta.name	हिन्दी
+app_category.business	व्यवसाय
+app_category.development	विकास
+app_category.education	शिक्षा
+app_category.entertainment	मनोरंजन
+app_category.finance	वित्त
+app_category.games	गेम्स
+app_category.graphics_design	ग्राफिक्स और डिज़ाइन
+app_category.health	स्वास्थ्य और खेल
+app_category.lifestyle	जीवनशैली
+app_category.medical	चिकित्सा
+app_category.music	संगीत
+app_category.navigation	नेविगेशन
+app_category.news	समाचार
+app_category.photography	फोटोग्राफी
+app_category.productivity	उत्पादकता
+app_category.reference	संदर्भ
+app_category.social	सोशल मीडिया
+app_category.sports	खेल
+app_category.travel	यात्रा
+app_category.utility	उपयोगिता
+app_category.video	वीडियो
+app_category.weather	मौसम
+app_picker.add_another_app	+ एक और एप जोड़ें…
+app_picker.exclude_current	{app} को हटाएं (वर्तमान)
+app_picker.no_app_excluded	बाहर करने के लिए कोई ऐप नहीं
+app_picker.search_placeholder	कोई ऐप खोजें…
+apps.cloner.btn_back	वापस
+apps.cloner.btn_browse	ब्राउज़ करें…
+apps.cloner.btn_choose	चुनें
+apps.cloner.btn_clone	ऐप क्लोन करें
+apps.cloner.btn_custom_icon	कस्टम
+apps.cloner.btn_native_clone	नेटिव ऐप क्लोन करें
+apps.cloner.btn_open_log	लॉग खोलें
+apps.cloner.btn_pwa_recommended	PWA (अनुशंसित)
+apps.cloner.btn_pwa_webapp	PWA वेब ऐप
+apps.cloner.btn_tint_icon	रंग टिंट
+apps.cloner.btn_try_native	नेटिव आज़माएं
+apps.cloner.btn_validate	सत्यापित करें
+apps.cloner.lbl_progress_dock	Dock में पंजीकरण…
+apps.cloner.lbl_progress_done	हो गया
+apps.cloner.lbl_progress_icon	टिंटेड आइकन बना रहे हैं…
+apps.cloner.lbl_progress_prep	आइकन और bundle तैयार करना
+apps.cloner.lbl_progress_sign	bundle पर ad-hoc हस्ताक्षर…
+apps.cloner.lbl_progress_title	क्लोन बना रहे हैं…
+apps.cloner.msg_bundle_missing	त्रुटि: bundle पथ अनुपलब्ध। ऐप सामान्य रूप से लॉन्च करें।
+apps.cloner.title_clone_name	क्लोन नाम
+apps.cloner.title_error	क्लोन निर्माण विफल
+apps.cloner.title_icon_style	आइकन शैली
+apps.cloner.title_open_arg	लॉन्च पर खोलने वाली आइटम
+apps.cloner.title_pwa_mode	PWA मोड?
+apps.cloner.title_pwa_recommended	PWA मोड अनुशंसित
+apps.cloner.title_pwa_url	PWA URL
+apps.cloner.title_summary	सारांश
+apps.cloner.title_tint	रंग टिंट
+apps.cloner.title_url_path	URL या पथ
+apps.encryptor.btn_overwrite	ओवरराइट करें
+apps.encryptor.btn_reveal	Finder में दिखाएं
+apps.encryptor.err_decrypt_failed	डिक्रिप्शन विफल हुई। गलत पासवर्ड या दूषित फ़ाइल?
+apps.encryptor.err_empty_password	पासवर्ड खाली नहीं हो सकता।
+apps.encryptor.err_encrypt_failed	एन्क्रिप्शन विफल हुई।
+apps.encryptor.err_file_missing	फ़ाइल नहीं मिली।
+apps.encryptor.err_openssl_missing	openssl नहीं मिला। Xcode Command Line Tools इंस्टॉल करें।
+apps.encryptor.err_password_mismatch	पासवर्ड मेल नहीं खाते।
+apps.encryptor.lbl_file	फ़ाइल:
+apps.encryptor.prompt_confirm	पासवर्ड की पुष्टि करें:
+apps.encryptor.prompt_password	पासवर्ड:
+apps.encryptor.success_decrypted	फ़ाइल डिक्रिप्ट हुई:
+apps.encryptor.success_encrypted	फ़ाइल एन्क्रिप्ट हुई:
+apps.encryptor.title_decrypt	फ़ाइल डिक्रिप्ट करें
+apps.encryptor.title_encrypt	फ़ाइल एन्क्रिप्ट करें
+apps.encryptor.warn_overwrite	गंतव्य फ़ाइल पहले से मौजूद है। ओवरराइट करें?
+autocorrection.accents	स्वचालित उच्चारण चिह्न सुधार
+autocorrection.caps	वाक्य की शुरुआत में स्वचालित बड़ा अक्षर
+autocorrection.errors	सामान्य टाइपो सुधार
+autocorrection.minus	माइनस चिह्न का स्वचालित सम्मिलन
+autocorrection.minusapostrophe	माइनस के बाद एपॉस्ट्रॉफ
+autocorrection.multiplepunctuationmarks	कई बिंदु → दीर्घ विराम (... = …)
+autocorrection.names	उचित नामों में बड़े अक्षर का सुधार
+autocorrection.ou	ou / où सुधार
+autocorrection.suffixesachaining	à के साथ प्रत्यय श्रृंखला
+autocorrection.typographicapostrophe	टाइपोग्राफिक एपॉस्ट्रॉफ (सीधा → घुमावदार)
+ax_actions.brightness	☀ चमक
+ax_actions.char	A वर्ण
+ax_actions.char_sel	✎ A चयनित वर्ण
+ax_actions.desktops	▢ डेस्कटॉप्स
+ax_actions.document	📄 दस्तावेज़ (शुरुआत/अंत)
+ax_actions.line_arrow	↕ पंक्तियाँ (तीर)
+ax_actions.line_bounds	↔ पंक्ति (शुरुआत/अंत)
+ax_actions.line_sel	✎ ↕ चयनित पंक्तियाँ
+ax_actions.lines	↕ पंक्तियाँ (Alt)
+ax_actions.paragraphs	¶ अनुच्छेद
+ax_actions.spaces	▢ Spaces
+ax_actions.tabs	⧉ टैब्स
+ax_actions.tracks	♫ ट्रैक्स
+ax_actions.volume	🔊 वॉल्यूम
+ax_actions.windows	◱ विंडोज़
+ax_actions.words	W शब्द
+ax_actions.words_sel	✎ W चयनित शब्द
+button.activate	सक्षम करें
+button.add	जोड़ें
+button.cancel	रद्द करें
+button.close	बंद करें
+button.confirm	पुष्टि करें
+button.decrypt	डिक्रिप्ट करें
+button.delete	हटाएँ
+button.encrypt	एन्क्रिप्ट करें
+button.ok	ठीक है
+button.open_settings	सेटिंग्स खोलें
+button.remove	हटाएँ
+button.retry	फिर से कोशिश करें
+button.save	सहेजें
+category.autocorrection	स्वतः सुधार
+category.distances_reduction	दूरी में कमी
+category.dynamic_hotstrings	गतिशील hotstrings
+category.gestures	🖐️ इशारे
+category.layout	🌐 कीबोर्ड लेआउट
+category.magic_key	★ कुंजी और टेक्स्ट विस्तार
+category.personal	व्यक्तिगत hotstrings
+category.rolls	रोल्स
+category.sfbs_reduction	SFB में कमी
+category.shortcuts	🎯 शॉर्टकट्स
+category.tapholds	⌨️ Tap-Holds
+changelog_window.badge_latest	latest
+changelog_window.badge_prerelease	pre-release
+changelog_window.channel_dev	Dev
+changelog_window.channel_stable	Stable
+changelog_window.error_network	Unable to load releases from GitHub.\nCheck your internet connection.
+changelog_window.error_parse	Unable to parse GitHub response.
+changelog_window.error_rate_limited	Unable to load releases from GitHub.\nGitHub is limiting requests — please try again in a few minutes.
+changelog_window.loading	Loading releases…
+changelog_window.no_notes	(No release notes available.)
+changelog_window.no_releases	No releases found.
+changelog_window.open_github	View on GitHub ↗
+changelog_window.retry	Retry
+changelog_window.window_title	Release Notes
+common.browse	ब्राउज़ करें…
+common.cancel	रद्द करें
+common.close	बंद करें
+common.delete	हटाएँ
+common.disabled	अक्षम
+common.error_prefix	त्रुटि — 
+common.error_title	त्रुटि
+common.key_enter	एंटर
+common.later	बाद में
+common.loading	लोड हो रहा है…
+common.none	कोई नहीं
+common.ok	ठीक है
+common.save	सहेजें
+common.saved	सहेजा गया ✓
+common.warning	चेतावनी
+crash.report.save_failed	क्रैश रिपोर्ट सहेजी नहीं जा सकी
+crash.report.saved_title	क्रैश रिपोर्ट सहेजी गई
+dialog.action_picker.disabled	∅ कुछ नहीं
+dialog.action_picker.label	क्रिया:
+dialog.action_picker.no_results	कोई मिलती-जुलती क्रिया नहीं
+dialog.action_picker.search	क्रिया खोजें…
+dialog.app_picker.active_suffix	 (सक्रिय)
+dialog.app_picker.prompt	अनुप्रयोग चुनें:
+dialog.app_picker.running_count	{n} चल रहा है अनुप्रयोग।
+dialog.app_picker.stopped_suffix	 (बंद)
+dialog.app_picker.title	अनुप्रयोग चयन
+dialog.bulk_toggle.save_failed	The change could not be saved to the configuration file.\nIt has been reverted. Close any app holding the file and try again.
+dialog.config_folder.hint	सभी व्यक्तिगत फ़ाइलें (personal_shortcuts.ahk, personal_hotstrings.toml…) इस फ़ोल्डर में खोजी जाएंगी। डिफ़ॉल्ट फ़ोल्डर का उपयोग करने के लिए खाली छोड़ें।
+dialog.config_folder.label	पथ:
+dialog.config_folder.select_title	कॉन्फ़िगरेशन फ़ोल्डर चुनें
+dialog.config_folder.title	ErgoptiPlus — कॉन्फ़िगरेशन फ़ोल्डर
+dialog.enable_all.warning	⚠ चेतावनी: सभी सुविधाएँ सक्षम की जा चुकी हैं, जिनमें कुछ डिफ़ॉल्ट रूप से अक्षम हैं।
+dialog.fatal_error.cannot_start	Ergopti+ प्रारंभ नहीं हो सकता।
+dialog.fatal_error.toml_key_missing	गंभीर त्रुटि: _shared/modules/tooltip/constants.toml — अनुपस्थित या अमान्य कुंजी: [{1}] {2}
+dialog.fatal_error.toml_not_found	गंभीर त्रुटि: _shared/modules/tooltip/constants.toml नहीं मिला।
+dialog.gestures.auto_configure_error	रजिस्ट्री में लिखने में त्रुटि।\n\nस्क्रिप्ट को प्रशासक के रूप में चलाने का प्रयास करें,\nया मैन्युअल रूप से कॉन्फ़िगर करें (निर्देश देखें)।
+dialog.gestures.auto_configure_error_title	ErgoptiPlus — त्रुटि
+dialog.gestures.auto_configure_success	इशारा कॉन्फ़िगरेशन सफलतापूर्वक लागू किया गया।\n\n10 इशारों को Windows रजिस्ट्री में कॉन्फ़िगर किया गया है\n(Ctrl+Win+Shift+F1 से F10)।\n\nWindows को नए शॉर्टकट्स उठाने के लिए\nसाइन-आउट/साइन-इन की आवश्यकता हो सकती है।
+dialog.gestures.auto_configure_title	ErgoptiPlus — इशारा कॉन्फ़िगरेशन
+dialog.gestures.warning_msg	⚠️ चेतावनी: ट्रैकपैड इशारों को सक्षम करने से सिस्टम इशारों में हस्तक्षेप हो सकता है।\n\nटकराव से बचने के लिए, निम्न macOS विकल्पों को अक्षम करें:\n\n• 2-फिंगर ट्रैकपैड इशारे: यदि आप उन्हें Hammerspoon में उपयोग करना चाहते हैं तो स्क्रॉल और स्वाइप को अक्षम करें।\n• विंडोज़ को स्थानांतरित करने और पाठ का चयन करने के लिए 3-फिंगर ट्रैकपैड इशारे\n• शब्दकोश में शब्दों को देखने के लिए 3-फिंगर टैप\n• स्पेसेस, App Exposé या Mission Control को स्विच करने के लिए 3-फिंगर क्षैतिज/ऊर्ध्वाधर स्वाइप\n• स्पेसेस, App Exposé या Mission Control को स्विच करने के लिए 4-फिंगर क्षैतिज/ऊर्ध्वाधर स्वाइप\n\n5-फिंगर इशारों को परिभाषित करने के लिए 4-फिंगर सिस्टम इशारों को अक्षम करना महत्वपूर्ण है। अन्यथा, macOS उनके बीच अंतर नहीं कर पाएगा और 5-फिंगर इशारों को काम करने से रोकेगा। यही कारण है कि डिफ़ॉल्ट 4-फिंगर इशारों को 5-फिंगर इशारों के साथ टकराव के बिना सिस्टम कार्यों को बहाल करने के लिए इशारे मॉड्यूल में पुनः परिभाषित किया गया है।
+dialog.gestures.warning_title	इशारा चेतावनी
+dialog.gpt_link.title	Win + G द्वारा खोली गई लिंक संपादित करें
+dialog.hotstrings.consume_body	क्या विस्तार के दौरान ट्रिगर वर्ण का उपभोग किया जाना चाहिए (टाइप न किया जाए)?
+dialog.hotstrings.consume_checkbox	Consume (do not retype the character)
+dialog.hotstrings.consume_no	नहीं — वर्ण टाइप करें
+dialog.hotstrings.consume_title	ट्रिगर व्यवहार
+dialog.hotstrings.consume_yes	हाँ — इसका उपभोग करें
+dialog.hotstrings.delete_body	क्या आप वाकई इस कस्टम एक्सपेंडर को हटाना चाहते हैं?
+dialog.hotstrings.delete_delimiter_body	Are you sure you want to delete this custom delimiter?
+dialog.hotstrings.delete_delimiter_title	Delete delimiter
+dialog.hotstrings.delete_title	एक्सपेंडर हटाएँ
+dialog.hotstrings.invalid_body	कृपया बिल्कुल एक वर्ण दर्ज करें।
+dialog.hotstrings.invalid_title	अमान्य इनपुट
+dialog.hotstrings.new_delimiter_prompt	सीमांकक वर्ण
+dialog.hotstrings.new_delimiter_title	New word delimiter
+dialog.hotstrings.new_prompt	ट्रिगर वर्ण दर्ज करें (बिल्कुल एक वर्ण):
+dialog.hotstrings.new_title	नया शब्द एक्सपेंडर
+dialog.keyboard_shortcut.prompt	कुंजी संयोजन चुनें:
+dialog.keyboard_shortcut.title_prefix	कुंजी चुनें — 
+dialog.llm.delete_profile_prefix	"
+dialog.llm.delete_title	मॉडल हटाएँ?
+dialog.llm.exclude_ok	सहेजें
+dialog.llm.exclude_prompt	वे ऐप्लिकेशन चुनें जिनमें AI जनरेशन अक्षम होगा।
+dialog.magic_key.prompt	नया मान (डिफ़ॉल्ट रूप से ★):
+dialog.magic_key.title	जादू कुंजी संपादित करें
+dialog.metrics.bad_password_warning	⚠️ चेतावनी: डिक्रिप्शन विफलता का पता चला। पासवर्ड गलत हो सकता है।
+dialog.metrics.complete_label	ऑपरेशन पूर्ण।\n\nसफलतापूर्वक संसाधित फ़ाइलें: %d\nआने वाली त्रुटियाँ: %d
+dialog.metrics.decrypt_confirm_body	आपके सभी एन्क्रिप्ट किए गए लॉग्स डिस्क पर सादे पाठ के रूप में पुनः स्थापित किए जाएंगे।\n\nपुष्टि करें?
+dialog.metrics.decrypt_confirm_title	निष्क्रिय करना
+dialog.metrics.decrypt_key_prompt	डिक्रिप्शन के लिए आवश्यक सुरक्षा कुंजी दर्ज करें:
+dialog.metrics.disable_confirm	मेट्रिक्स अक्षम करें?\n\nकीलॉगर अब किसी भी कीस्ट्रोक को कैप्चर नहीं करेगा। पहले से रिकॉर्ड किए गए डेटा को संरक्षित किया जाता है।
+dialog.metrics.enable_warning	चेतावनी: आप कीलॉगर सक्षम करने वाले हैं।\n\nयह आपकी कीस्ट्रोक्स को मिलीसेकंड की सटीकता से रिकॉर्ड करता है। लॉग स्थानीय रूप से यहाँ संग्रहित होते हैं:\n    {1}\n\nपासवर्ड फ़ील्ड स्वचालित रूप से अनदेखे किए जाते हैं (UIA फ़िल्टर), और जब आप निजी/गुप्त ब्राउज़र विंडो में होते हैं तो की सामग्री भी छोड़ दी जाती है। फिर भी, यह एक कीलॉगर है — इन संदर्भों के बाहर संवेदनशील डेटा दर्ज करते समय स्क्रिप्ट को रोकें।\n\nसक्षम करें?
+dialog.metrics.encrypt_confirm_body	इसे सक्षम करने से आपके सभी मौजूदा लॉग्स एन्क्रिप्ट किए जाएंगे जिससे वे डिस्क पर अपठनीय हों।\n\nपुष्टि करें?
+dialog.metrics.encrypt_confirm_title	डेटा सुरक्षा
+dialog.metrics.encrypt_key_prompt	एन्क्रिप्शन कुंजी परिभाषित करें (डिफ़ॉल्ट: Mac सीरियल नंबर):
+dialog.metrics.encrypt_key_title	सुरक्षा कुंजी
+dialog.metrics.encryptor_error_body	आवेदन नहीं मिला। कृपया पहले Python स्क्रिप्ट का उपयोग करके इसे जेनरेट करें।
+dialog.metrics.encryptor_error_title	त्रुटि
+dialog.metrics.exclude_ok	सहेजें
+dialog.metrics.exclude_prompt	उन अनुप्रयोगों का चयन करें जिनकी कीस्ट्रोक्स कभी भी कीलॉगर द्वारा रिकॉर्ड नहीं की जाएंगी।
+dialog.metrics.exclude_title	अनुप्रयोग को बाहर निकालें — मेट्रिक्स
+dialog.metrics.progress_label	प्रक्रिया में: %d / %d
+dialog.metrics.security_warning_body	⚠️ चेतावनी: मेट्रिक्स और कीलॉगर को सक्षम किया जाने वाला है।\n\nयह सिस्टम आपकी कीस्ट्रोक्स और ट्रैकपैड इशारा सक्रियण को रिकॉर्ड करता है।\n\n• लॉग्स Hammerspoon फ़ोल्डर में संग्रहीत हैं\n• पासवर्ड फ़ील्ड्स को स्वचालित रूप से अनदेखा किया जाता है\n• संवेदनशील डेटा दर्ज करते समय स्क्रिप्ट को PAUSE करने की सिफारिश की जाती है
+dialog.metrics.security_warning_title	⚠ सुरक्षा चेतावनी — मेट्रिक्स
+dialog.metrics.title	📊 मेट्रिक्स
+dialog.path_copy.btn_backslash	&बैकस्लैश (\\)
+dialog.path_copy.btn_quit	&बाहर निकलें
+dialog.path_copy.msg_simple	पथ\n%s\nक्लिपबोर्ड पर कॉपी किया गया है।
+dialog.path_copy.msg_with_question	पथ\n%s\nक्लिपबोर्ड पर कॉपी किया गया है।\n\nक्या आप / की जगह \\ वाला संस्करण चाहते हैं?
+dialog.path_copy.title	पथ कॉपी करें
+dialog.personal_info.saved	अपडेट की गई जानकारी:
+dialog.personal_info.title	व्यक्तिगत जानकारी संपादित करें
+dialog.reset_defaults.failed	Could not reset: these files could not be deleted ({1}).\nClose any app holding them (editor, cloud sync) and try again.
+dialog.reset_defaults.failed_title	Reset failed
+dialog.reset_defaults.placeholder_failed	The configuration was reset, but the placeholder could not be written.\nThe setup wizard will run on the next start.
+dialog.shortcuts.chatgpt_prompt	Ctrl+G द्वारा खोला गया URL:
+dialog.shortcuts.chatgpt_title	ChatGPT URL
+dialog.shortcuts.wrap_symbol_close_prompt	समापन प्रतीक दर्ज करें (खाली छोड़ें = सममित):
+dialog.shortcuts.wrap_symbol_close_title	समापन प्रतीक
+dialog.shortcuts.wrap_symbol_invalid	कृपया बिल्कुल एक वर्ण दर्ज करें।
+dialog.shortcuts.wrap_symbol_prompt	एक आरंभिक प्रतीक दर्ज करें (1 वर्ण):
+dialog.shortcuts.wrap_symbol_title	एक आवरण प्रतीक जोड़ें
+distancesreduction.commafarletters	कॉमा + दूर की कुंजी (,è = z, ,é = …)
+distancesreduction.commaj	कॉमा + स्वर → J (,a = ja, ,e = je…)
+distancesreduction.deadkeyecircumflex	Ê + अक्षर → डेड कुंजी (êo = ô, êa = â…)
+distancesreduction.ecircumflexe	Ê + E → Œ
+distancesreduction.qu	Q → QU स्वर से पहले
+distancesreduction.spacearoundsymbols	रोल प्रतीकों के चारों ओर स्वचालित स्थान
+distancesreduction.suffixesa	À + अक्षर → प्रत्यय (às = -ement, àé = -ée…)
+download_window.btn_cancel	🛑 रद्द करें
+download_window.btn_retry	🔄 डाउनलोड फिर से करें
+download_window.btn_terminal	🖥 टर्मिनल
+download_window.cancelling	रद्द किया जा रहा है…
+download_window.done_failed	डाउनलोड विफल रहा
+download_window.done_success	✅ पूर्ण
+download_window.error_unknown	अज्ञात त्रुटि।
+download_window.eta_label	⏳ शेष समय:
+download_window.file_count	📁 फ़ाइलें: %s
+download_window.kind_mlx_install	⚙️ AI इंजन स्थापना (MLX)
+download_window.kind_mlx_model	📥 MLX मॉडल डाउनलोड
+download_window.kind_ollama_install	⚙️ AI इंजन स्थापना (Ollama)
+download_window.kind_ollama_model	📥 Ollama मॉडल डाउनलोड
+download_window.preparing	तैयार किया जा रहा है…
+download_window.size_label	📦 आकार: 
+download_window.speed_label	⚡ गति: 
+download_window.starting	शुरू हो रहा है…
+download_window.title	📥 डाउनलोड चल रहा है
+download_window.window_title	प्रगति
+dynamichotstrings.date	तारीख
+dynamichotstrings.datefr	तारीख (fr)
+dynamichotstrings.datelongfr	तारीख (लंबी)
+dynamichotstrings.group_label	गतिशील hotstrings
+dynamichotstrings.ibanprefixes	IBAN उपसर्ग
+dynamichotstrings.phoneprefixes	फ़ोन उपसर्ग
+dynamichotstrings.ssnprefixes	SSN उपसर्ग
+dynamichotstrings.textexpansionpersonalinformation	@np★ = उपनाम ⇥ नाम — प्रत्येक अक्षर = एक फ़ील्ड (n=उपनाम, p=नाम, e=ईमेल…)
+editor.hotstrings.add_entry_title	hotstring बनाएँ — अनुभाग « %s »
+editor.hotstrings.btn_add	➕ जोड़ें
+editor.hotstrings.btn_add_entry	＋ Add a hotstring
+editor.hotstrings.btn_add_section	＋ अनुभाग
+editor.hotstrings.btn_delete	हटाएँ
+editor.hotstrings.btn_delete_entry	🗑 हटाएँ
+editor.hotstrings.btn_edit	💾 संपादित करें
+editor.hotstrings.btn_new	नया…
+editor.hotstrings.btn_redefine	Redefine
+editor.hotstrings.btn_rename	नाम बदलें…
+editor.hotstrings.btn_view_compact	Compact view
+editor.hotstrings.btn_view_expanded	Expanded view
+editor.hotstrings.bulk_move_placeholder	को स्थानांतरित करें…
+editor.hotstrings.bulk_selected_one	selected
+editor.hotstrings.bulk_selected_other	selected
+editor.hotstrings.cb_auto	स्वचालित-विस्तार
+editor.hotstrings.cb_case	केस संवेदनशील
+editor.hotstrings.cb_final	अंतिम परिणाम
+editor.hotstrings.cb_word	पूरा शब्द
+editor.hotstrings.chk_case	केस संवेदनशील
+editor.hotstrings.chk_close_after	के बाद बंद करें
+editor.hotstrings.chk_final	अंतिम परिणाम
+editor.hotstrings.chk_word	पूरा शब्द
+editor.hotstrings.cmd_backspace	delete ←
+editor.hotstrings.cmd_delete	delete →
+editor.hotstrings.cmd_down	down
+editor.hotstrings.cmd_end	line end
+editor.hotstrings.cmd_enter	new line
+editor.hotstrings.cmd_escape	Escape
+editor.hotstrings.cmd_group_arrows	Arrows
+editor.hotstrings.cmd_group_edition	Edition
+editor.hotstrings.cmd_home	line start
+editor.hotstrings.cmd_left	left
+editor.hotstrings.cmd_right	right
+editor.hotstrings.cmd_tab	tab
+editor.hotstrings.cmd_up	up
+editor.hotstrings.col_auto	ऑटो
+editor.hotstrings.col_case	केस
+editor.hotstrings.col_final	अंतिम
+editor.hotstrings.col_priority	प्राथ.
+editor.hotstrings.col_result	परिणाम
+editor.hotstrings.col_trigger	ट्रिगर
+editor.hotstrings.col_word	शब्द
+editor.hotstrings.confirm_del_bulk	%d चयनित आइटम हटाएं?
+editor.hotstrings.confirm_del_entry	« %s » हटाएं?
+editor.hotstrings.confirm_del_section	« %s » और इसके सभी hotstring हटाएं?
+editor.hotstrings.desc_auto_off	Requires Space or Enter to expand (recommended for autocorrect).
+editor.hotstrings.desc_auto_on	Expands immediately (ideal for triggers ending with %s).
+editor.hotstrings.desc_case_off	The engine generates lowercase, Titlecase and UPPERCASE variants.
+editor.hotstrings.desc_case_on	Strictly distinguishes uppercase/lowercase.<br>Ex: <em>Btw</em> ≠ <em>btw</em>
+editor.hotstrings.desc_final_off	The result can trigger other hotstrings in cascade.
+editor.hotstrings.desc_final_on	The result will not be re-parsed as a trigger.
+editor.hotstrings.desc_prompt	इस अनुभाग के लिए मेनू में दिखाया जाने वाला विवरण:
+editor.hotstrings.desc_title	विवरण
+editor.hotstrings.desc_word_off	Triggers anywhere, even inside a word.<br>Ex: will trigger inside <em>hotel</em>
+editor.hotstrings.desc_word_on	Only triggers when it matches a standalone word.<br>Ex: <em>tel</em>→telephone but not <em>hotel</em>
+editor.hotstrings.drag_handle_title	Drag
+editor.hotstrings.edit_entry_title	hotstring संपादित करें — अनुभाग « %s »
+editor.hotstrings.empty_hint	कोई hotstring परिभाषित नहीं। शुरुआत करने के लिए + अनुभाग पर क्लिक करें। ☰ पुनः क्रमित करने के लिए खींचें — शीर्षक का नाम बदलने के लिए क्लिक करें
+editor.hotstrings.entry_modal_title_new	नया hotstring
+editor.hotstrings.err_duplicate	⚠ यह ट्रिगर इस अनुभाग में पहले से मौजूद है।
+editor.hotstrings.err_id_exists	« %s » already exists.
+editor.hotstrings.err_id_invalid	Invalid identifier: lowercase letters, digits and underscores only.
+editor.hotstrings.err_id_required	The identifier is required.
+editor.hotstrings.err_no_section	⚠ पहले एक अनुभाग चुनें या बनाएं।
+editor.hotstrings.err_no_section_selected	कोई अनुभाग चुना नहीं गया।
+editor.hotstrings.err_output_empty	The replacement is required.
+editor.hotstrings.err_section_exists	यह अनुभाग पहले से मौजूद है।
+editor.hotstrings.err_select_to_delete	⚠ हटाने के लिए एक hotstring चुनें।
+editor.hotstrings.err_select_to_edit	⚠ संपादित करने के लिए एक hotstring चुनें।
+editor.hotstrings.err_trigger_dup_msg	The trigger <strong>%s</strong> already exists in <em>%s</em>.<br><br>Do you really want to redefine it?
+editor.hotstrings.err_trigger_empty	The trigger is required.
+editor.hotstrings.err_trigger_required	⚠ ट्रिगर और परिणाम आवश्यक हैं।
+editor.hotstrings.err_write	⚠ personal_hotstrings.toml में लेखन त्रुटि।
+editor.hotstrings.group_selected	चयनित hotstring
+editor.hotstrings.kbd_help	↩ = नई पंक्ति\n⌘ + ↩ = सहेजें\n⇧ + ⌘ + ↩ = सहेजें + नया hotstring
+editor.hotstrings.label_result	परिणाम:
+editor.hotstrings.label_section	अनुभाग:
+editor.hotstrings.label_trigger	ट्रिगर:
+editor.hotstrings.meta_desc	व्यक्तिगत hotstring
+editor.hotstrings.new_section_prompt	नया अनुभाग नाम (पहचानकर्ता, कोई स्थान नहीं):
+editor.hotstrings.new_section_title	नया अनुभाग
+editor.hotstrings.no_section	(कोई अनुभाग नहीं)
+editor.hotstrings.page_title	✏︎ व्यक्तिगत Hotstring
+editor.hotstrings.priority_hint	खाली = डिफ़ॉल्ट प्राथमिकता; अधिक मान जीतता है
+editor.hotstrings.priority_label	प्राथमिकता
+editor.hotstrings.rename_desc_prompt	अनुभाग "{1}" के लिए नया विवरण:
+editor.hotstrings.rename_title	नाम बदलें
+editor.hotstrings.replacement_label	प्रतिस्थापन
+editor.hotstrings.replacement_placeholder	जैसे: नमस्ते,↵मुझे आशा है कि आप ठीक हैं।
+editor.hotstrings.save_error	सहेजने में त्रुटि
+editor.hotstrings.saved_prefix	✓ सहेजा गया — 
+editor.hotstrings.sec_desc_hint	(मेनू में दिखाया गया)
+editor.hotstrings.sec_desc_label	विवरण
+editor.hotstrings.sec_desc_placeholder	जैसे: मेरे संक्षिप्त नाम
+editor.hotstrings.sec_id_hint	(केवल छोटे अक्षर, अंक और अंडरस्कोर)
+editor.hotstrings.sec_id_label	पहचानकर्ता
+editor.hotstrings.sec_id_placeholder	जैसे: my_abbrev
+editor.hotstrings.sec_modal_title_new	नया अनुभाग
+editor.hotstrings.sec_modal_title_rename	Rename section
+editor.hotstrings.special_cmds_summary	विशेष आदेश — सम्मिलित करने के लिए क्लिक करें
+editor.hotstrings.title_confirm	पुष्टि
+editor.hotstrings.title_error	त्रुटि
+editor.hotstrings.trig_hint_text	shown, stored as
+editor.hotstrings.trigger_label	ट्रिगर
+editor.hotstrings.trigger_placeholder	जैसे: btw
+editor.hotstrings.window_title	व्यक्तिगत hotstring संपादक
+editor.personal_info.window_title	ErgoptiPlus — व्यक्तिगत जानकारी
+ergopti.error_caught	ErgoptiPlus — आंतरिक त्रुटि पकड़ी गई:
+ergopti.windowspy_not_found	WindowSpy.ahk निम्न स्थान पर नहीं मिला: {1}
+ext.demo.gui_message	Ergopti डेमो एक्सटेंशन से नमस्ते!
+ext.demo.open_demo_gui	डेमो इंटरफ़ेस खोलें
+ext.demo.show_info	जानकारी दिखाएँ
+ext.demo.visit_docs	दस्तावेज़ देखें
+gesture.setup.auto_configure	\nया मेनू में "Auto-configure" पर क्लिक करें\nइन शॉर्टकट को सीधे रजिस्ट्री में लिखने के लिए।\n(पुनः आरंभ की आवश्यकता हो सकती है।)
+gesture.setup.for_each	प्रत्येक इशारे के लिए, "Custom shortcut" चुनें\nफिर दिखाया गया शॉर्टकट टाइप करें:\n\n
+gesture.setup.header	टचपैड इशारा कॉन्फ़िगरेशन\n══════════════════════════════════\n\n
+gesture.setup.open_path	खोलें: सेटिंग्स > Bluetooth और डिवाइस > टचपैड\n         > उन्नत इशारे\n\n
+gesture.setup.title	ErgoptiPlus — टचपैड इशारे
+gesture.slots.swipe_2_down	2-फिंगर स्वाइप ↓
+gesture.slots.swipe_2_left	2-फिंगर स्वाइप ←
+gesture.slots.swipe_2_left_down	2-फिंगर स्वाइप ↙
+gesture.slots.swipe_2_left_up	2-फिंगर स्वाइप ↖
+gesture.slots.swipe_2_right	2-फिंगर स्वाइप →
+gesture.slots.swipe_2_right_down	2-फिंगर स्वाइप ↘
+gesture.slots.swipe_2_right_up	2-फिंगर स्वाइप ↗
+gesture.slots.swipe_2_up	2-फिंगर स्वाइप ↑
+gesture.slots.swipe_3_down	3-फिंगर स्वाइप ↓
+gesture.slots.swipe_3_left	3-फिंगर स्वाइप ←
+gesture.slots.swipe_3_left_down	3-फिंगर स्वाइप ↙
+gesture.slots.swipe_3_left_up	3-फिंगर स्वाइप ↖
+gesture.slots.swipe_3_right	3-फिंगर स्वाइप →
+gesture.slots.swipe_3_right_down	3-फिंगर स्वाइप ↘
+gesture.slots.swipe_3_right_up	3-फिंगर स्वाइप ↗
+gesture.slots.swipe_3_up	3-फिंगर स्वाइप ↑
+gesture.slots.swipe_4_down	4-फिंगर स्वाइप ↓
+gesture.slots.swipe_4_left	4-फिंगर स्वाइप ←
+gesture.slots.swipe_4_left_down	4-फिंगर स्वाइप ↙
+gesture.slots.swipe_4_left_up	4-फिंगर स्वाइप ↖
+gesture.slots.swipe_4_right	4-फिंगर स्वाइप →
+gesture.slots.swipe_4_right_down	4-फिंगर स्वाइप ↘
+gesture.slots.swipe_4_right_up	4-फिंगर स्वाइप ↗
+gesture.slots.swipe_4_up	4-फिंगर स्वाइप ↑
+gesture.slots.swipe_5_diag	5-फिंगर स्वाइप ↗↙
+gesture.slots.swipe_5_down	5-फिंगर स्वाइप ↓
+gesture.slots.swipe_5_horiz	5-फिंगर स्वाइप ↔
+gesture.slots.swipe_5_left	5-फिंगर स्वाइप ←
+gesture.slots.swipe_5_left_down	5-फिंगर स्वाइप ↙
+gesture.slots.swipe_5_left_up	5-फिंगर स्वाइप ↖
+gesture.slots.swipe_5_right	5-फिंगर स्वाइप →
+gesture.slots.swipe_5_right_down	5-फिंगर स्वाइप ↘
+gesture.slots.swipe_5_right_up	5-फिंगर स्वाइप ↗
+gesture.slots.swipe_5_up	5-फिंगर स्वाइप ↑
+gesture.slots.tap_2	2-फिंगर टैप
+gesture.slots.tap_3	3-फिंगर टैप
+gesture.slots.tap_4	4-फिंगर टैप
+gesture.slots.tap_5	5-फिंगर टैप
+gesture.touchpad_open.body	टचपैड पृष्ठ खुला है।\n\nनीचे स्क्रॉल करें, फिर\n"उन्नत इशारे" पर क्लिक करें शॉर्टकट तक पहुंचने के लिए।
+gestures.conflict_desc_swipe_2	2-फिंगर स्वाइप — स्क्रॉलिंग, पृष्ठ, Mission Control
+gestures.conflict_desc_swipe_3_horiz	3-फिंगर स्वाइप बाएं/दाएं — पृष्ठ / स्पेस स्विच करें
+gestures.conflict_desc_swipe_3_vert	3-फिंगर स्वाइप ऊपर/नीचे — Mission Control और App Exposé
+gestures.conflict_desc_swipe_4_horiz	4/5-फिंगर स्वाइप बाएं/दाएं — स्पेस के बीच स्विच करें
+gestures.conflict_desc_swipe_4_vert	4/5-फिंगर स्वाइप ऊपर/नीचे — Mission Control और App Exposé
+gestures.conflict_desc_tap_3	3-फिंगर टैप — देखें और डेटा डिटेक्टर
+gestures.conflict_dialog_line1	यह इशारा macOS द्वारा संभाला जा सकता है:
+gestures.conflict_dialog_line2	यदि ऐसा है, तो macOS और Hammerspoon दोनों एक ही समय में प्रतिक्रिया करेंगे:
+gestures.conflict_dialog_line3	दोनों व्यवहार एक साथ ट्रिगर होंगे।
+gestures.conflict_dialog_line4	यदि अभी भी सक्रिय है, इसे यहां अक्षम करें:
+gestures.conflict_hint_swipe_2	सिस्टम सेटिंग्स › ट्रैकपैड\n→ यदि आप उन्हें Hammerspoon में उपयोग करना चाहते हैं तो 2-फिंगर इशारों को अनचेक करें।
+gestures.conflict_hint_swipe_3_horiz	सिस्टम सेटिंग्स › ट्रैकपैड › अधिक इशारे\n→ "पृष्ठों के बीच स्वाइप करें" और "स्पेस के बीच स्विच करें" को अनचेक करें
+gestures.conflict_hint_swipe_3_vert	सिस्टम सेटिंग्स › ट्रैकपैड › अधिक इशारे\n→ "Mission Control" और "App Exposé" को अनचेक करें
+gestures.conflict_hint_swipe_4_horiz	सिस्टम सेटिंग्स › ट्रैकपैड › अधिक इशारे\n→ "स्पेस के बीच स्विच करें" को अनचेक करें
+gestures.conflict_hint_swipe_4_vert	सिस्टम सेटिंग्स › ट्रैकपैड › अधिक इशारे\n→ "Mission Control" और "App Exposé" को अनचेक करें
+gestures.conflict_hint_tap_3	सिस्टम सेटिंग्स › ट्रैकपैड › बिंदु और क्लिक करें\n→ "देखें और डेटा डिटेक्टर" को अनचेक करें
+gestures.enabled	टचपैड इशारे (Windows कॉन्फ़िगरेशन की आवश्यकता है)
+healthcheck.copy_and_close	क्लिपबोर्ड में कॉपी करें और बंद करें
+hotstrings.custom_terminator	कस्टम
+hotstrings.custom_terminator_consumed	कस्टम (उपभोग किया गया)
+hotstrings.shortcut_custom	कस्टम शॉर्टकट
+hs_config.btn_all_gray	सभी ग्रे
+hs_config.btn_all_grey	सभी ग्रे
+hs_config.btn_close	बंद करें
+hs_config.btn_reset_all	सभी रीसेट करें
+hs_config.btn_reset_default	डिफॉल्ट पुनः स्थापित करें
+hs_config.cat_autocorrection	स्वतः सुधार
+hs_config.cat_distances	दूरी में कमी
+hs_config.cat_magickey	★ कुंजी और विस्तार
+hs_config.cat_personal	व्यक्तिगत hotstring
+hs_config.cat_rolls	रोल
+hs_config.cat_sfbs	SFB में कमी
+hs_config.category_prefix	श्रेणी: 
+hs_config.color_blue	नीला
+hs_config.color_brown	भूरा
+hs_config.color_cyan	सियान
+hs_config.color_gray	धूसर
+hs_config.color_green	हरा
+hs_config.color_indigo	नीला (इंडिगो)
+hs_config.color_inherit	— डिफॉल्ट विरासत में मिला —
+hs_config.color_lime	नीबू-हरा
+hs_config.color_orange	नारंगी
+hs_config.color_pink	गुलाबी
+hs_config.color_purple	बैंगनी
+hs_config.color_red	लाल
+hs_config.color_turquoise	फ़िरोज़ी
+hs_config.color_yellow	पीला
+hs_config.default_prefix	डिफॉल्ट: 
+hs_config.delim_space	Space
+hs_config.delim_tab	Tab
+hs_config.file_level	── फ़ाइल स्तर ––
+hs_config.file_level_short	(फ़ाइल स्तर)
+hs_config.group_common	सामान्य
+hs_config.group_extensions	एक्सटेंशन
+hs_config.group_personal	व्यक्तिगत
+hs_config.hint	श्रेणी या अनुभाग के अनुसार समायोजित करें। सभी परिवर्तन तुरंत सहेजे जाते हैं।
+hs_config.label_category	श्रेणी:
+hs_config.label_color	रंग
+hs_config.label_delay	विलंब (ms)
+hs_config.label_file	फ़ाइल:
+hs_config.label_group	समूह:
+hs_config.label_priority	प्राथमिकता
+hs_config.label_section	अनुभाग:
+hs_config.label_tooltip	टूलटिप दिखाएं
+hs_config.none	(कोई नहीं)
+hs_config.notify_delimiters_saved	Word delimiters updated.
+hs_config.notify_reset_all	विलंब और रंग रीसेट किए गए.
+hs_config.override_active	ओवरराइड सक्रिय
+hs_config.section_prefix	अनुभाग: 
+hs_config.window_title	Hotstring विलंब और रंग
+init.reload_files	फ़ाइलें बदली गईं — पुनः लोड हो रहा है…
+init.reload_hotstrings	हॉटस्ट्रिंग बदले गए — पुनः लोड हो रहा है…
+init.reload_script	स्क्रिप्ट बदली गई — पुनः लोड हो रहा है…
+init.reload_title	पुनः लोड हो रहा है
+karabiner.download_failed	डाउनलोड विफल: %s
+karabiner.downloading	Karabiner-Elements (~46 MB) डाउनलोड किया जा रहा है…
+karabiner.install_error_body	स्वचालित इंस्टॉलेशन विफल: %s\n\nआप https://karabiner-elements.pqrs.org से Karabiner-Elements को मैन्युअली डाउनलोड कर सकते हैं और Hammerspoon को पुनः लॉन्च कर सकते हैं।
+karabiner.install_error_title	इंस्टॉलेशन विफल
+karabiner.install_failed	इंस्टॉलेशन विफल: %s
+karabiner.installing	Karabiner-Elements इंस्टॉल किया जा रहा है (एडमिन पासवर्ड आवश्यक)…
+karabiner.lifecycle.unavailable	Karabiner-Elements अनुपलब्ध — इंस्टॉलेशन जाँचें।
+karabiner.onboarding.accessibility_body	सिस्टम एक्सटेंशन सक्षम है लेकिन Karabiner डेमॉन चल नहीं रहा है। Karabiner-Elements v16+ को "Accessibility" अनुमति की आवश्यकता है (पुराने संस्करण इसके बजाय "Input Monitoring" के लिए पूछते हैं)।\n\n"Open Accessibility" पर क्लिक करें, फिर सूची में Karabiner-Elements को सक्षम करें। यदि प्रविष्टि नहीं दिखाई देती है, तो /Applications/ से Karabiner-Elements को एक बार खोलें ताकि यह macOS के साथ पंजीकृत हो जाए।
+karabiner.onboarding.accessibility_title	Accessibility अनुमति आवश्यक
+karabiner.onboarding.btn_install_now	अभी इंस्टॉल करें
+karabiner.onboarding.btn_open_accessibility	Accessibility खोलें
+karabiner.onboarding.btn_open_settings	सेटिंग्स खोलें
+karabiner.onboarding.daemon_ready	Karabiner-Elements संचालनात्मक है।
+karabiner.onboarding.daemon_timeout	Karabiner डेमॉन के शुरू होने की प्रतीक्षा में समय समाप्त हो गया।
+karabiner.onboarding.daemon_waiting	Karabiner डेमन शुरू होने की प्रतीक्षा में…
+karabiner.onboarding.error.manifest_unconfigured	मैनिफ़ेस्ट कॉन्फ़िगर नहीं है (TODO प्लेसहोल्डर मौजूद हैं)।
+karabiner.onboarding.error.mount_failed	माउंट विफल: {error}
+karabiner.onboarding.ext_activated	सिस्टम एक्सटेंशन सक्रिय किया गया।
+karabiner.onboarding.ext_body	Karabiner-Elements स्थापित है, लेकिन इसकी सिस्टम एक्सटेंशन (DriverKit वर्चुअल HID) अभी सक्षम नहीं है।\n\n"सेटिंग्स खोलें" पर क्लिक करें, फिर सिस्टम एक्सटेंशन के अंतर्गत "Karabiner-DriverKit-VirtualHIDDevice" को सक्षम करें।
+karabiner.onboarding.ext_timeout	सिस्टम एक्सटेंशन सक्रियण की प्रतीक्षा समय समाप्त हुआ।
+karabiner.onboarding.ext_title	सिस्टम एक्सटेंशन सक्षम करें
+karabiner.onboarding.ext_waiting	सिस्टम एक्सटेंशन सक्रियण की प्रतीक्षा में…
+karabiner.onboarding.install_body_suffix	\n\nएप्लिकेशन को आधिकारिक रिपॉजिटरी (pqrs-org/Karabiner-Elements) से डाउनलोड किया जाएगा और स्वचालित रूप से इंस्टॉल किया जाएगा। एडमिनिस्ट्रेटर पासवर्ड माँगा जाएगा।
+karabiner.onboarding.missing.daemon_not_running	• डेमॉन नहीं चल रहा (इनपुट मॉनिटरिंग?)
+karabiner.onboarding.missing.grabber_absent	• karabiner_grabber डेमॉन अनुपस्थित है
+karabiner.onboarding.missing.ke_not_installed	• Karabiner-Elements इंस्टॉल नहीं है
+karabiner.onboarding.missing.sysext_not_activated	• सिस्टम एक्सटेंशन (DriverKit) सक्रिय नहीं है
+karabiner.onboarding.missing_prefix	अनुपलब्ध तत्व:\n
+karabiner.onboarding.required_title	Karabiner-Elements सेटअप आवश्यक है
+karabiner.pkg_not_found	DMG में कोई .pkg नहीं मिला।
+karabiner.ready_body	Karabiner इंजन तैयार है।
+karabiner.ready_title	Karabiner तैयार है
+karabiner.sha_failed	SHA-256 सत्यापन विफल: %s
+keepawake.started	☕ कीबोर्ड गतिविधि सक्रिय
+keepawake.stopped	☕ कीबोर्ड गतिविधि अक्षम
+keepawake.title	कीबोर्ड गतिविधि
+keylogger.category_general	सामान्य
+keylogger.category_private	निजी ब्राउज़िंग
+keylogger.error_body	मेट्रिक्स इंटरफ़ेस लोड नहीं हो सका।\n\nui/metrics_typing/init.lua जाँचें।
+keylogger.error_title	कीलॉगर त्रुटि
+keylogger_ui.app_metrics	ऐप में समय
+keylogger_ui.launch_error	डैशबोर्ड लॉन्च नहीं हो सका: {1}
+keylogger_ui.metrics_disabled	मेट्रिक्स अक्षम हैं।
+keylogger_ui.metrics_disabled_body	सक्षम करने के लिए: सिस्टम ट्रे आइकन → 📊 मेट्रिक्स
+keylogger_ui.metrics_title	📊 मेट्रिक्स
+keylogger_ui.typing_metrics	टाइपिंग मेट्रिक्स
+layout.ctrlmagicsave	Ctrl+★ Ctrl+S भेजता है
+layout.directaccessdigits	शीर्ष पंक्ति पर सीधा अंक अभिगम
+layout.ergoptialtgr	Ergopti लेआउट की AltGr परत का अनुकरण करें
+layout.ergoptibase	Ergopti लेआउट की आधार परत का अनुकरण करें
+layout.ergoptiplus	Ergopti➕ के मामूली AltGr परिवर्तन लागू करें
+llm.deps.browser_install_tip	ब्राउज़र में खुले पृष्ठ से Windows के लिए Ollama डाउनलोड करें, इंस्टॉलर चलाएँ, फिर यहाँ वापस आएँ — कनेक्शन स्वचालित रूप से पहचाना जाएगा।
+llm.deps.done_success	✅ Ollama तैयार है
+llm.deps.fail_server_not_responding	इंस्टॉलर समाप्त हो गया लेकिन Ollama सर्वर प्रतिक्रिया नहीं दे रहा।
+llm.deps.fail_timeout	इंस्टालेशन के बाद Ollama की प्रतिक्रिया की प्रतीक्षा में समय समाप्त हो गया।
+llm.deps.install_launching	Ollama इंस्टॉलेशन शुरू हो रहा है…
+llm.deps.install_launching_hotkey	Ollama इंस्टॉलेशन (शॉर्टकट द्वारा ट्रिगर किया गया)…
+llm.deps.tray_title	Ergopti — AI
+llm.generating	⏳ जनरेट हो रहा है…
+llm.profile.advanced.label	●●○ उन्नत — सुधार + भविष्यवाणी
+llm.profile.basic.label	●○○ बुनियादी — सरल भविष्यवाणी
+llm.profile.batch_advanced.label	●●● बैच उन्नत — 1 उन्नत अनुरोध के साथ {n} भविष्यवाणी{s}
+llm.profile.raw.label	○○○ कच्चा — कोई प्रॉम्प्ट नहीं, केवल संदर्भ
+llm.server_mlx_ready_body	MLX सर्वर तैयार है।
+llm.server_ollama_ready_body	Ollama सर्वर तैयार है।
+llm.server_ready_title	LLM सक्रिय
+magickey.repeatcorrections	★ कुंजी अंतिम टाइप किए गए अक्षर को दोहराती है
+magickey.replace	J कुंजी को ★ कुंजी में बदलें
+magickey.textexpansion	पाठ विस्तार: c★ = c'est, gt★ = j'étais, pex★ = par exemple…
+magickey.textexpansionauto	★ के बिना स्वचालित विस्तार: ju' = jusqu', ya = y'a…
+magickey.textexpansionemojis	इमोजी विस्तार: voiture★ = 🚗, koala★ = 🐨…
+magickey.textexpansionsymbols	प्रतीक विस्तार: -->★ = ➜, (v)★ = ✓…
+magickey.textexpansionsymbolstypst	Typst प्रतीक: $eq.not$★ = ≠, $PP$★ = ℙ…
+menu.about.changelog	परिवर्तन लॉग
+menu.about.channel_dev	प्री-रिलीज़ (dev)
+menu.about.channel_local_source	✔  स्थानीय स्रोत
+menu.about.channel_main	स्थिर (main)
+menu.about.channel_menu	अपडेट चैनल
+menu.about.check_for_updates	अपडेट जाँचें
+menu.about.frequency.10m	हर 10 मिनट
+menu.about.frequency.12h	हर 12 घंटे
+menu.about.frequency.1h	हर घंटे
+menu.about.frequency.1m	हर मिनट
+menu.about.frequency.24h	हर 24 घंटे
+menu.about.frequency.2d	हर 2 दिन
+menu.about.frequency.2h	हर 2 घंटे
+menu.about.frequency.3h	हर 3 घंटे
+menu.about.frequency.5m	हर 5 मिनट
+menu.about.frequency.6h	हर 6 घंटे
+menu.about.frequency.7d	हर 7 दिन
+menu.about.frequency.never	Never
+menu.about.frequency_menu	जाँच आवृत्ति
+menu.about.install_update	अपडेट इंस्टॉल करें…
+menu.about.open_releases_page	रिलीज़ पृष्ठ खोलें — GitHub
+menu.about.title	संस्करण / अपडेट
+menu.about.update.changelog_error	GitHub से रिलीज़ जानकारी प्राप्त नहीं की जा सकी।
+menu.about.update.changelog_header	{tag} के लिए रिलीज़ नोट्स:\n\n{notes}\n\nGitHub पर खोलें?
+menu.about.update.install_error	अपडेट इंस्टॉलेशन विफल रहा। लॉग जांचें या रिलीज़ पेज से मैन्युअल रूप से डाउनलोड करें।
+menu.about.update.local_source	स्थानीय स्रोत से चल रहा है — अपडेट जाँच उपलब्ध नहीं है।
+menu.about.update.network_error	GitHub तक नहीं पहुँचा जा सका।\nअपना इंटरनेट कनेक्शन जाँचें और पुनः प्रयास करें।
+menu.about.update.new_version	एक नया संस्करण उपलब्ध है!\n\nवर्तमान: {current}\nनवीनतम:  {latest}\n\nडाउनलोड के लिए रिलीज़ पृष्ठ खोलें?
+menu.about.update.no_asset	इस रिलीज़ में अपडेट आर्काइव नहीं मिला। मैन्युअल रूप से डाउनलोड करने के लिए रिलीज़ पेज खोलें।
+menu.about.update.parse_error	GitHub से नवीनतम रिलीज़ टैग को पार्स नहीं किया जा सका।
+menu.about.update.up_to_date	ErgoptiPlus अप टू डेट है।\n\nवर्तमान संस्करण: {version}
+menu.about.update_checking	जाँच हो रही है…
+menu.about.update_downloading	Downloading…
+menu.about.update_installing	इंस्टॉल हो रहा है…
+menu.about.update_now	{tag} पर अपडेट करें
+menu.apps.clone_desc	किसी भी स्थापित ऐप्स को डुप्लिकेट करें
+menu.apps.config_per_app	Configure hotstrings per application
+menu.apps.encrypt_desc	फाइलों और फोल्डरों को एन्क्रिप्ट करें
+menu.apps.no_apps	कोई अनुप्रयोग नहीं मिला
+menu.apps.title	🛠️ एप्लिकेशन
+menu.builder.title	Ergopti+
+menu.builder.title_paused	Ergopti+ ⏸
+menu.debug.console	कंसोल
+menu.debug.healthcheck	स्वास्थ्य जांच
+menu.debug.key_history	कुंजी इतिहास
+menu.debug.list_vars	चर स्थिति
+menu.debug.log_level	लॉग स्तर
+menu.debug.open_error_log	Open error log
+menu.debug.open_logs	लॉग फोल्डर खोलें
+menu.debug.open_today_log	आज की लॉग फाइल खोलें
+menu.debug.title	⚠ डिबग
+menu.debug.window_spy	Window Spy
+menu.extensions.empty	कोई एक्सटेंशन स्थापित नहीं
+menu.extensions.header	एक्सटेंशन
+menu.gestures.action_disabled	∅ Disabled
+menu.gestures.action_prefix	क्रिया: 
+menu.gestures.auto_configure	🔧 स्वचालित कॉन्फ़िगरेशन (रजिस्ट्री)
+menu.gestures.change_action	क्रिया बदलें
+menu.gestures.circular_spaces	वृत्ताकार Spaces नेविगेशन (1 ↔ N)
+menu.gestures.conflict_title	इशारा संघर्ष
+menu.gestures.default_sensitivity	(सामान्य डिफ़ॉल्ट)
+menu.gestures.disable_all	✕ सभी इशारों को अक्षम करें
+menu.gestures.enabled	️ इशारे
+menu.gestures.manual_tutorial	📋 मैन्युअल सेटअप ट्यूटोरियल
+menu.gestures.mode_incremental	वृद्धिशील भेजना (दूरी)
+menu.gestures.mode_prefix	मोड: 
+menu.gestures.mode_single	एकल क्रिया (x1)
+menu.gestures.notify_title	इशारे
+menu.gestures.off	❌ इशारे अक्षम (सक्षम करने के लिए क्लिक करें)
+menu.gestures.on	✅ इशारे सक्षम (अक्षम करने के लिए क्लिक करें)
+menu.gestures.open_settings	सेटिंग्स खोलें
+menu.gestures.open_touchpad	⚙ ट्रैकपैड सेटिंग्स खोलें (फिर "उन्नत इशारे")
+menu.gestures.restore_defaults	↩ डिफ़ॉल्ट पुनः स्थापित करें
+menu.gestures.sensitivity_hint	(छोटा = अधिक संवेदनशील/प्रतिक्रियाशील)
+menu.gestures.sensitivity_label	प्रति क्रिया दूरी (संवेदनशीलता):
+menu.gestures.sensitivity_prefix	संवेदनशीलता: 
+menu.gestures.swipe_2_diag	2-फिंगर स्वाइप ↗↙
+menu.gestures.swipe_2_down	2-फिंगर स्वाइप ↓
+menu.gestures.swipe_2_left	2-फिंगर स्वाइप ←
+menu.gestures.swipe_2_left_down	2-फिंगर स्वाइप ↙
+menu.gestures.swipe_2_left_up	2-फिंगर स्वाइप ↖
+menu.gestures.swipe_2_right	2-फिंगर स्वाइप →
+menu.gestures.swipe_2_right_down	2-फिंगर स्वाइप ↘
+menu.gestures.swipe_2_right_up	2-फिंगर स्वाइप ↗
+menu.gestures.swipe_2_up	2-फिंगर स्वाइप ↑
+menu.gestures.swipe_3_diag	3-फिंगर स्वाइप ↗↙
+menu.gestures.swipe_3_down	3-फिंगर स्वाइप ↓
+menu.gestures.swipe_3_horiz	3-फिंगर स्वाइप ↔
+menu.gestures.swipe_3_left	3-फिंगर स्वाइप ←
+menu.gestures.swipe_3_left_down	3-फिंगर स्वाइप ↙
+menu.gestures.swipe_3_left_up	3-फिंगर स्वाइप ↖
+menu.gestures.swipe_3_right	3-फिंगर स्वाइप →
+menu.gestures.swipe_3_right_down	3-फिंगर स्वाइप ↘
+menu.gestures.swipe_3_right_up	3-फिंगर स्वाइप ↗
+menu.gestures.swipe_3_up	3-फिंगर स्वाइप ↑
+menu.gestures.swipe_4_diag	4-फिंगर स्वाइप ↗↙
+menu.gestures.swipe_4_down	4-फिंगर स्वाइप ↓
+menu.gestures.swipe_4_horiz	4-फिंगर स्वाइप ↔
+menu.gestures.swipe_4_left	4-फिंगर स्वाइप ←
+menu.gestures.swipe_4_left_down	4-फिंगर स्वाइप ↙
+menu.gestures.swipe_4_left_up	4-फिंगर स्वाइप ↖
+menu.gestures.swipe_4_right	4-फिंगर स्वाइप →
+menu.gestures.swipe_4_right_down	4-फिंगर स्वाइप ↘
+menu.gestures.swipe_4_right_up	4-फिंगर स्वाइप ↗
+menu.gestures.swipe_4_up	4-फिंगर स्वाइप ↑
+menu.gestures.swipe_5_diag	5-फिंगर स्वाइप ↗↙
+menu.gestures.swipe_5_down	5-फिंगर स्वाइप ↓
+menu.gestures.swipe_5_horiz	5-फिंगर स्वाइप ↔
+menu.gestures.swipe_5_left	5-फिंगर स्वाइप ←
+menu.gestures.swipe_5_left_down	5-फिंगर स्वाइप ↙
+menu.gestures.swipe_5_left_up	5-फिंगर स्वाइप ↖
+menu.gestures.swipe_5_right	5-फिंगर स्वाइप →
+menu.gestures.swipe_5_right_down	5-फिंगर स्वाइप ↘
+menu.gestures.swipe_5_right_up	5-फिंगर स्वाइप ↗
+menu.gestures.swipe_5_up	5-फिंगर स्वाइप ↑
+menu.gestures.tap_2	2-फिंगर टैप
+menu.gestures.tap_3	3-फिंगर टैप
+menu.gestures.tap_4	4-फिंगर टैप
+menu.gestures.tap_5	5-फिंगर टैप
+menu.gestures.title	🖐️ इशारे
+menu.global.config_folder	📂 कॉन्फ़िगरेशन फोल्डर…
+menu.global.disable_all	☐ सभी विशेषताओं को अक्षम करें
+menu.global.edit_shortcuts	  ↳ व्यक्तिगत शॉर्टकट संपादित करें
+menu.global.enable_all	☑ सभी विशेषताओं को सक्षम करें
+menu.global.language	🌐 भाषा
+menu.global.quit	⏹ बंद करें
+menu.global.reload	🔄 पुनः लोड करें
+menu.global.reset_defaults	↺ डिफ़ॉल्ट पर रीसेट करें
+menu.global.setup_wizard	सेटअप विज़ार्ड…
+menu.global.suspend	⏸︎ निलंबित करें
+menu.global.title	वैश्विक क्रियाएं
+menu.hotstrings.add_custom	+ एक कस्टम विस्तारक जोड़ें…
+menu.hotstrings.add_delimiter	+ Add custom delimiter…
+menu.hotstrings.category_off	❌ अक्षम (सक्षम करने के लिए क्लिक करें)
+menu.hotstrings.category_on	✅ सक्षम (अक्षम करने के लिए क्लिक करें)
+menu.hotstrings.check_all	☑ सब चुनें
+menu.hotstrings.close_on_add	शॉर्टकट के माध्यम से hotstring जोड़ने के बाद UI बंद करें
+menu.hotstrings.config_item	⚙️ विलंब और रंग कॉन्फ़िगर करें…
+menu.hotstrings.consumed	उपभोग किया गया
+menu.hotstrings.consumed_suffix	(उपभोग किया गया)
+menu.hotstrings.custom_label	कस्टम
+menu.hotstrings.default_category_prefix	डिफ़ॉल्ट श्रेणी: 
+menu.hotstrings.default_none	कोई नहीं
+menu.hotstrings.delay_autocorrection	स्वतः सुधार विलंब
+menu.hotstrings.delay_invalid_body	कृपया एक गैर-नकारात्मक पूर्णांक (मिलीसेकंड) दर्ज करें।
+menu.hotstrings.delay_invalid_title	अमान्य मान
+menu.hotstrings.delay_magic_key	जादुई कुंजी (★) विलंब
+menu.hotstrings.delay_prompt	मिलीसेकंड में नया विलंब (0 = कोई विलंब नहीं):
+menu.hotstrings.delays_colors	विलंब और रंग…
+menu.hotstrings.delete_delimiter	Delete this delimiter…
+menu.hotstrings.delete_expander	इस विस्तारक को हटाएं…
+menu.hotstrings.disable_all	❌ Disable all
+menu.hotstrings.enable_all	✅ Enable all
+menu.hotstrings.header_common	सामान्य hotstrings
+menu.hotstrings.header_common_count	सामान्य hotstrings (%s)
+menu.hotstrings.header_ergopti	Ergopti लेआउट
+menu.hotstrings.header_ergopti_count	Ergopti लेआउट (%s)
+menu.hotstrings.header_personal_count	मेरे hotstrings (%s)
+menu.hotstrings.infinite	∞
+menu.hotstrings.magic_key_prefix	जादू कुंजी: 
+menu.hotstrings.magic_key_prompt	नया मान (डिफ़ॉल्ट रूप से ★):
+menu.hotstrings.magic_key_title	जादू कुंजी संपादित करें
+menu.hotstrings.missing_value	(मान अनुपलब्ध)
+menu.hotstrings.notify_bubble_ai	बबल AI
+menu.hotstrings.notify_bubble_autocorrect	बबल ऑटोकरेक्ट
+menu.hotstrings.notify_bubble_colored	रंगीन बबल
+menu.hotstrings.notify_bubble_star	बबल ★
+menu.hotstrings.off	❌ Hotstrings अक्षम (सक्षम करने के लिए क्लिक करें)
+menu.hotstrings.on	✅ Hotstrings सक्षम (अक्षम करने के लिए क्लिक करें)
+menu.hotstrings.open_editor	hotstring संपादक खोलें
+menu.hotstrings.open_file	फाइल खोलें…
+menu.hotstrings.params	⚙️ Hotstring सेटिंग्स
+menu.hotstrings.personal_header	मेरे hotstrings
+menu.hotstrings.preview_bubbles	बबल का पूर्वावलोकन करें
+menu.hotstrings.repeat_key_toggle	★ कुंजी अंतिम कीस्ट्रोक दोहराती है
+menu.hotstrings.reset_magic_key	   ↳ रीसेट करें (डिफ़ॉल्ट: ★)
+menu.hotstrings.rolls.assign	#! ➜ :=
+menu.hotstrings.rolls.assign_arrow_equal_left	=$ ➜ <=
+menu.hotstrings.rolls.assign_arrow_equal_right	$= ➜ =>
+menu.hotstrings.rolls.assign_arrow_minus_left	?+ ➜ <-
+menu.hotstrings.rolls.assign_arrow_minus_right	+? ➜ ->
+menu.hotstrings.rolls.bracket_quote	[# ➜ ["
+menu.hotstrings.rolls.chevron_equal	= ➜ <=
+menu.hotstrings.rolls.chevron_greater	>% ➜ >=
+menu.hotstrings.rolls.chevron_less	<% ➜ <=
+menu.hotstrings.rolls.close_chevron_tag	<@ ➜ </
+menu.hotstrings.rolls.comment_close	"\\  ➜ */
+menu.hotstrings.rolls.comment_open	\\" ➜ /*
+menu.hotstrings.rolls.ct	P' ➜ CT
+menu.hotstrings.rolls.cx	CX ➜ CK
+menu.hotstrings.rolls.english_negation	NT' ➜ N'T
+menu.hotstrings.rolls.equal_string	[) ➜ = ""
+menu.hotstrings.rolls.ez	EÉ ➜ EZ
+menu.hotstrings.rolls.hashtag_close_bracket	#] ➜ "]
+menu.hotstrings.rolls.hashtag_open_bracket	#[ ➜ "[
+menu.hotstrings.rolls.hashtag_parenthesis	#( ➜ ")
+menu.hotstrings.rolls.hashtag_quote	#" ➜ "
+menu.hotstrings.rolls.hc	HC ➜ WH
+menu.hotstrings.rolls.left_arrow	=+ = ➜
+menu.hotstrings.rolls.not_equal	!# ➜ !=
+menu.hotstrings.rolls.paren_quote	(# ➜ ("
+menu.hotstrings.rolls.sx	SX ➜ SK
+menu.hotstrings.shortcut_default_ctrl	Ctrl + %s
+menu.hotstrings.shortcut_none	कोई शॉर्टकट नहीं
+menu.hotstrings.shortcut_prefix	शॉर्टकट: Win + 
+menu.hotstrings.shortcut_prompt	प्रारूप: mods+key (जैसे ctrl+e)\nउपलब्ध mods: cmd, alt, ctrl, shift\nअक्षम करने के लिए खाली छोड़ें
+menu.hotstrings.title	⚡ Hotstrings
+menu.hotstrings.tooltip_ai	AI पूर्वावलोकन
+menu.hotstrings.tooltip_ai_acceptance	AI स्वीकृति विलंब
+menu.hotstrings.tooltip_autocompletion	स्वचालित समापन विलंब
+menu.hotstrings.tooltip_autocorrect	ऑटोकरेक्ट पूर्वावलोकन
+menu.hotstrings.tooltip_colored	रंगीन पूर्वावलोकन
+menu.hotstrings.tooltip_default	डिफ़ॉल्ट विलंब (सभी समूह)
+menu.hotstrings.tooltip_magic	★ पूर्वावलोकन
+menu.hotstrings.uncheck_all	□ सब हटाएं
+menu.hotstrings.word_delimiters	Word delimiters
+menu.hotstrings.word_expanders	विस्तारक
+menu.hs.gestures.modes	मोड
+menu.hs.gestures.modes.swipe_2_down	मोड — 2-फिंगर स्वाइप ↓
+menu.hs.gestures.modes.swipe_2_left	मोड — 2-फिंगर स्वाइप ←
+menu.hs.gestures.modes.swipe_2_left_down	मोड — 2-फिंगर स्वाइप ↙
+menu.hs.gestures.modes.swipe_2_left_up	मोड — 2-फिंगर स्वाइप ↖
+menu.hs.gestures.modes.swipe_2_right	मोड — 2-फिंगर स्वाइप →
+menu.hs.gestures.modes.swipe_2_right_down	मोड — 2-फिंगर स्वाइप ↘
+menu.hs.gestures.modes.swipe_2_right_up	मोड — 2-फिंगर स्वाइप ↗
+menu.hs.gestures.modes.swipe_2_up	मोड — 2-फिंगर स्वाइप ↑
+menu.hs.gestures.modes.swipe_3_down	मोड — 3-फिंगर स्वाइप ↓
+menu.hs.gestures.modes.swipe_3_left	मोड — 3-फिंगर स्वाइप ←
+menu.hs.gestures.modes.swipe_3_left_down	मोड — 3-फिंगर स्वाइप ↙
+menu.hs.gestures.modes.swipe_3_left_up	मोड — 3-फिंगर स्वाइप ↖
+menu.hs.gestures.modes.swipe_3_right	मोड — 3-फिंगर स्वाइप →
+menu.hs.gestures.modes.swipe_3_right_down	मोड — 3-फिंगर स्वाइप ↘
+menu.hs.gestures.modes.swipe_3_right_up	मोड — 3-फिंगर स्वाइप ↗
+menu.hs.gestures.modes.swipe_3_up	मोड — 3-फिंगर स्वाइप ↑
+menu.hs.gestures.modes.swipe_4_down	मोड — 4-फिंगर स्वाइप ↓
+menu.hs.gestures.modes.swipe_4_left	मोड — 4-फिंगर स्वाइप ←
+menu.hs.gestures.modes.swipe_4_left_down	मोड — 4-फिंगर स्वाइप ↙
+menu.hs.gestures.modes.swipe_4_left_up	मोड — 4-फिंगर स्वाइप ↖
+menu.hs.gestures.modes.swipe_4_right	मोड — 4-फिंगर स्वाइप →
+menu.hs.gestures.modes.swipe_4_right_down	मोड — 4-फिंगर स्वाइप ↘
+menu.hs.gestures.modes.swipe_4_right_up	मोड — 4-फिंगर स्वाइप ↗
+menu.hs.gestures.modes.swipe_4_up	मोड — 4-फिंगर स्वाइप ↑
+menu.hs.gestures.modes.swipe_5_down	मोड — 5-फिंगर स्वाइप ↓
+menu.hs.gestures.modes.swipe_5_left	मोड — 5-फिंगर स्वाइप ←
+menu.hs.gestures.modes.swipe_5_left_down	मोड — 5-फिंगर स्वाइप ↙
+menu.hs.gestures.modes.swipe_5_left_up	मोड — 5-फिंगर स्वाइप ↖
+menu.hs.gestures.modes.swipe_5_right	मोड — 5-फिंगर स्वाइप →
+menu.hs.gestures.modes.swipe_5_right_down	मोड — 5-फिंगर स्वाइप ↘
+menu.hs.gestures.modes.swipe_5_right_up	मोड — 5-फिंगर स्वाइप ↗
+menu.hs.gestures.modes.swipe_5_up	मोड — 5-फिंगर स्वाइप ↑
+menu.hs.gestures.sensitivities	संवेदनशीलता
+menu.hs.gestures.sensitivities.swipe_2_down	संवेदनशीलता — 2-फिंगर स्वाइप ↓
+menu.hs.gestures.sensitivities.swipe_2_left	संवेदनशीलता — 2-फिंगर स्वाइप ←
+menu.hs.gestures.sensitivities.swipe_2_left_down	संवेदनशीलता — 2-फिंगर स्वाइप ↙
+menu.hs.gestures.sensitivities.swipe_2_left_up	संवेदनशीलता — 2-फिंगर स्वाइप ↖
+menu.hs.gestures.sensitivities.swipe_2_right	संवेदनशीलता — 2-फिंगर स्वाइप →
+menu.hs.gestures.sensitivities.swipe_2_right_down	संवेदनशीलता — 2-फिंगर स्वाइप ↘
+menu.hs.gestures.sensitivities.swipe_2_right_up	संवेदनशीलता — 2-फिंगर स्वाइप ↗
+menu.hs.gestures.sensitivities.swipe_2_up	संवेदनशीलता — 2-फिंगर स्वाइप ↑
+menu.hs.gestures.sensitivities.swipe_3_down	संवेदनशीलता — 3-फिंगर स्वाइप ↓
+menu.hs.gestures.sensitivities.swipe_3_left	संवेदनशीलता — 3-फिंगर स्वाइप ←
+menu.hs.gestures.sensitivities.swipe_3_left_down	संवेदनशीलता — 3-फिंगर स्वाइप ↙
+menu.hs.gestures.sensitivities.swipe_3_left_up	संवेदनशीलता — 3-फिंगर स्वाइप ↖
+menu.hs.gestures.sensitivities.swipe_3_right	संवेदनशीलता — 3-फिंगर स्वाइप →
+menu.hs.gestures.sensitivities.swipe_3_right_down	संवेदनशीलता — 3-फिंगर स्वाइप ↘
+menu.hs.gestures.sensitivities.swipe_3_right_up	संवेदनशीलता — 3-फिंगर स्वाइप ↗
+menu.hs.gestures.sensitivities.swipe_3_up	संवेदनशीलता — 3-फिंगर स्वाइप ↑
+menu.hs.gestures.sensitivities.swipe_4_down	संवेदनशीलता — 4-फिंगर स्वाइप ↓
+menu.hs.gestures.sensitivities.swipe_4_left	संवेदनशीलता — 4-फिंगर स्वाइप ←
+menu.hs.gestures.sensitivities.swipe_4_left_down	संवेदनशीलता — 4-फिंगर स्वाइप ↙
+menu.hs.gestures.sensitivities.swipe_4_left_up	संवेदनशीलता — 4-फिंगर स्वाइप ↖
+menu.hs.gestures.sensitivities.swipe_4_right	संवेदनशीलता — 4-फिंगर स्वाइप →
+menu.hs.gestures.sensitivities.swipe_4_right_down	संवेदनशीलता — 4-फिंगर स्वाइप ↘
+menu.hs.gestures.sensitivities.swipe_4_right_up	संवेदनशीलता — 4-फिंगर स्वाइप ↗
+menu.hs.gestures.sensitivities.swipe_4_up	संवेदनशीलता — 4-फिंगर स्वाइप ↑
+menu.hs.gestures.sensitivities.swipe_5_down	संवेदनशीलता — 5-फिंगर स्वाइप ↓
+menu.hs.gestures.sensitivities.swipe_5_left	संवेदनशीलता — 5-फिंगर स्वाइप ←
+menu.hs.gestures.sensitivities.swipe_5_left_down	संवेदनशीलता — 5-फिंगर स्वाइप ↙
+menu.hs.gestures.sensitivities.swipe_5_left_up	संवेदनशीलता — 5-फिंगर स्वाइप ↖
+menu.hs.gestures.sensitivities.swipe_5_right	संवेदनशीलता — 5-फिंगर स्वाइप →
+menu.hs.gestures.sensitivities.swipe_5_right_down	संवेदनशीलता — 5-फिंगर स्वाइप ↘
+menu.hs.gestures.sensitivities.swipe_5_right_up	संवेदनशीलता — 5-फिंगर स्वाइप ↗
+menu.hs.gestures.sensitivities.swipe_5_up	संवेदनशीलता — 5-फिंगर स्वाइप ↑
+menu.kanata.title	🎹 Kanata
+menu.karabiner.clear_all	🧹 सभी को साफ करें (टैप/होल्ड और शॉर्टकट)
+menu.karabiner.combo_arrow	Combo → %s
+menu.karabiner.copy_tap_to_combo	🔁 मॉडिफायर कुंजियों के लिए tap → combo कॉपी करें
+menu.karabiner.disabled_warning_1	⚠️  मेनू अक्षम है लेकिन Karabiner अभी भी चल रहा है।
+menu.karabiner.disabled_warning_2	      इसलिए पुनः मैपिंग अभी भी सक्रिय है।
+menu.karabiner.disabled_warning_3	      सब कुछ बंद करने के लिए: ऊपर 🟢 पर क्लिक करें,
+menu.karabiner.disabled_warning_4	      और Karabiner को स्टार्टअप ऐप्स से हटाएं।
+menu.karabiner.header_shortcuts	मॉडिफायर शॉर्टकट
+menu.karabiner.header_taps_holds	Tap / Hold
+menu.karabiner.hold_arrow	Hold → %s
+menu.karabiner.hold_colon	होल्ड: %s
+menu.karabiner.key_tap_delay	Tap delay: %s
+menu.karabiner.key_tap_delay_dialog_prompt	Tap / hold delay for this key, in milliseconds\n(global: %d ms)
+menu.karabiner.key_tap_delay_dialog_title	Karabiner — Per-key tap delay
+menu.karabiner.key_tap_delay_set	Set a custom delay…
+menu.karabiner.key_tap_delay_use_global	Use global delay (%s)
+menu.karabiner.left_hand	बायां हाथ
+menu.karabiner.nothing_combo	कोई क्रिया नहीं (कॉम्बो, टैप और होल्ड)
+menu.karabiner.nothing_tap_hold	कोई क्रिया नहीं (टैप और होल्ड)
+menu.karabiner.open_gui	Karabiner-Elements खोलें
+menu.karabiner.restore_defaults	↩ डिफ़ॉल्ट पुनः स्थापित करें
+menu.karabiner.right_hand	दायां हाथ
+menu.karabiner.simultaneous_dialog_prompt	शॉर्टकट की 1st और 2nd कुंजी के बीच\nअधिकतम विलंब (मिलीसेकंड) "कॉम्बो" स्लॉट को ट्रिगर करने के लिए\n(कॉर्ड-शैली: लगभग एक साथ दबाई गई कुंजियां)।\n\n(डिफ़ॉल्ट: %d ms)
+menu.karabiner.simultaneous_dialog_title	Karabiner — कॉम्बो सक्रियण विलंब
+menu.karabiner.simultaneous_title	कॉम्बो सक्रियण विलंब: %s
+menu.karabiner.start	▶ Karabiner शुरू करें
+menu.karabiner.status_active	🟢 Karabiner सक्रिय
+menu.karabiner.status_inactive	🔴 Karabiner निष्क्रिय — पुनः शुरू करने के लिए क्लिक करें
+menu.karabiner.status_no_daemon	🟡 Karabiner सक्षम — डेमन नहीं मिला (KE स्थापित है?)
+menu.karabiner.status_not_primed	🟡 Karabiner सक्षम — नियम लागू नहीं (प्राइम करने के लिए क्लिक करें)
+menu.karabiner.status_priming	🔵 Karabiner — प्राइमिंग चल रही है…
+menu.karabiner.sticky_dialog_prompt	स्टिकी रद्दकरण विलंब (मिलीसेकंड)\nइस अवधि के बाद बिना कीप्रेस के, वन-शॉट संशोधक रद्द कर दिया जाता है।
+menu.karabiner.sticky_dialog_title	Karabiner — स्टिकी विलंब
+menu.karabiner.sticky_title	स्टिकी संशोधक विलंब: %s
+menu.karabiner.stop	✕ Karabiner बंद करें
+menu.karabiner.symmetric	सममित शॉर्टकट (कुंजी क्रम स्वतंत्र)
+menu.karabiner.tap_arrow	Tap → %s
+menu.karabiner.tap_colon	टैप: %s
+menu.karabiner.tap_hold_dialog_prompt	टैप / होल्ड विलंब मिलीसेकंड में\n(Karabiner डिफ़ॉल्ट: %d ms)
+menu.karabiner.tap_hold_dialog_title	Karabiner — टैप / होल्ड विलंब
+menu.karabiner.tap_hold_title	टैप / होल्ड विलंब: %s
+menu.keyboard_layout.add_ergopti	➕ Ergopti v%s को लेआउट सूची में जोड़ें
+menu.keyboard_layout.open_system_prefs	सिस्टम प्राथमिकताएं खोलें → कीबोर्ड
+menu.layout.active_layouts	सक्रिय लेआउट
+menu.layout.add_fail	जोड़ने में विफल — कंसोल देखें।
+menu.layout.add_ok	%s सूची में जोड़ा गया।
+menu.layout.add_to_list	Ergopti v%s को इनपुट स्रोतों में जोड़ें…
+menu.layout.already_added	✅ %s v%s — पहले से जोड़ा गया
+menu.layout.in_list	सभी Ergopti वेरिएंट सक्रिय v%s ✅
+menu.layout.install_first	पहले बंडल स्थापित करें
+menu.layout.install_version	%s Ergopti (%s) v%s स्थापित करें
+menu.layout.installed_system	Ergopti लेआउट स्थापित (सिस्टम स्कोप) ✅
+menu.layout.installed_user	Ergopti लेआउट स्थापित (उपयोगकर्ता स्कोप) ✅
+menu.layout.installed_version	Ergopti (%s) v%s — अद्यतन है ✅
+menu.layout.layout_auto	— कोई बदलाव नहीं —
+menu.layout.layout_on_pause	स्क्रिप्ट रुकने पर लेआउट
+menu.layout.layout_on_resume	स्क्रिप्ट सक्रिय होने पर लेआउट
+menu.layout.logo_custom	कस्टम आइकन
+menu.layout.logo_default	डिफ़ॉल्ट आइकन
+menu.layout.no_bundle	कोई Ergopti बंडल नहीं मिला
+menu.layout.off	❌ लेआउट अक्षम (सक्षम करने के लिए क्लिक करें)
+menu.layout.on	✅ लेआउट सक्षम (अक्षम करने के लिए क्लिक करें)
+menu.layout.open_prefs	कीबोर्ड सेटिंग्स खोलें…
+menu.layout.pause_layout_enabled	विराम / पुनः आरंभ पर लेआउट बदलें
+menu.layout.pause_layout_section	विराम / पुनः आरंभ पर लेआउट
+menu.layout.replace	एक कुंजी को ★ कुंजी में बदलें
+menu.layout.scope_system	सिस्टम
+menu.layout.scope_user	उपयोगकर्ता
+menu.layout.title	🌐 कीबोर्ड लेआउट
+menu.layout.update_list	सक्रिय सूची अपग्रेड करें v%s → v%s
+menu.layout.update_list_fail	अपडेट विफल — कंसोल देखें।
+menu.layout.update_list_install_first	सक्रिय सूची को v%s में अपग्रेड करें (पहले v%s स्थापित करें)
+menu.layout.update_list_ok	इनपुट स्रोत सूची अपडेट की गई।
+menu.layout.update_version	Ergopti (%s) v%s → v%s अपडेट करें
+menu.llm.about	Ergopti AI के बारे में
+menu.llm.about_body	Ergopti AI — स्मार्ट कीबोर्ड सुझाव\nबैकएंड: Ollama (स्थानीय)\nसंस्करण: 1.0
+menu.llm.active_model_label	सक्रिय मॉडल: 
+menu.llm.add_custom_model	कस्टम मॉडल जोड़ें
+menu.llm.add_model_entry	➕ कस्टम मॉडल जोड़ें…
+menu.llm.after_hotstring	hotstring बुलबुले समाप्त होने के बाद सुझाव
+menu.llm.api_add_entry	+ एक API जोड़ें…
+menu.llm.api_dialog_title	ErgoptiPlus — API एंडपॉइंट
+menu.llm.api_edit_entry	चयनित API संपादित करें…
+menu.llm.api_no_entry	कोई API एंडपॉइंट कॉन्फ़िगर नहीं किया गया
+menu.llm.api_prompt_model	मॉडल का नाम:
+menu.llm.api_prompt_name	नाम (उदा. 'मेरी OpenAI कुंजी'):
+menu.llm.api_prompt_provider	प्रदाता ID ({1}):
+menu.llm.api_prompt_token	API टोकन / कुंजी (छिपा):
+menu.llm.api_prompt_url	बेस URL:
+menu.llm.api_providers_unavailable	API प्रदाता सूची लोड नहीं हो सकी, इसलिए कोई API प्रविष्टि नहीं जोड़ी जा सकती। जाँचें कि api_providers.json मौजूद और वैध है।
+menu.llm.api_remove_confirm_body	सहेजा गया API टोकन स्थायी रूप से हटा दिया जाएगा।
+menu.llm.api_remove_confirm_title	API प्रविष्टि "%s" हटाएं?
+menu.llm.api_remove_entry	चयनित API हटाएँ
+menu.llm.api_unreachable_body	"%s" ने प्रतिक्रिया नहीं दी — टोकन, URL और मॉडल जांचें।
+menu.llm.api_unreachable_title	API प्रविष्टि अप्राप्य
+menu.llm.api_validated_body	"%s" ने सफलतापूर्वक प्रतिक्रिया दी।
+menu.llm.api_validated_title	API प्रविष्टि तैयार
+menu.llm.arrows	तीर
+menu.llm.arrows_only	केवल तीर
+menu.llm.auto_raise_temp	  ↳ स्वचालित रूप से तापमान बढ़ाएं (+0.1 प्रति सुझाव)
+menu.llm.backend_api_suffix	दूरस्थ प्रदाता
+menu.llm.backend_default_model	↺ बैकएंड डिफ़ॉल्ट मॉडल (%s)
+menu.llm.backend_mlx_suffix	अनुशंसित (Apple Silicon नेटिव)
+menu.llm.backend_ollama_suffix	मानक
+menu.llm.backend_title	AI engine (Backend): 
+menu.llm.backend_unknown	Unknown
+menu.llm.browse_col_family	श्रेणी
+menu.llm.browse_col_name	नाम
+menu.llm.browse_col_params	पैरामीटर
+menu.llm.browse_col_ram	रैम
+menu.llm.browse_col_speed	गति
+menu.llm.browse_col_status	स्थिति
+menu.llm.browse_col_type	प्रकार
+menu.llm.browse_models_entry	🔍 सभी मॉडल ब्राउज़ करें…
+menu.llm.browse_models_filter	फ़िल्टर:
+menu.llm.browse_models_title	ErgoptiPlus — LLM मॉडल
+menu.llm.browse_pick	यह मॉडल चुनें
+menu.llm.browse_status_available	⬇ उपलब्ध
+menu.llm.browse_status_installed	✅ इंस्टॉल किया गया
+menu.llm.btn_download	डाउनलोड
+menu.llm.caps_header	क्षमताएं
+menu.llm.context_length_label	संदर्भ आकार: %s अंतिम वर्ण
+menu.llm.context_length_prompt	विश्लेषण के लिए पूर्ववर्ती वर्णों की संख्या:
+menu.llm.custom_model_title	कस्टम मॉडल
+menu.llm.debounce_label	सुझाव से पहले निष्क्रिय समय: %s
+menu.llm.debounce_prompt	जनरेशन से पहले निष्क्रियता विलंब (ms में, जैसे 600):
+menu.llm.delete_model_body	क्या आप वास्तव में मॉडल "%s" को स्थानीय कैश से हटाना चाहते हैं?
+menu.llm.delete_model_cache	🗑️ इस मॉडल को कैश से हटाएं
+menu.llm.delete_model_title	मॉडल हटाएं?
+menu.llm.digits	अंक
+menu.llm.digits_only	केवल अंक
+menu.llm.disable_password_fields	पासवर्ड फील्ड में अक्षम करें
+menu.llm.disable_url_bars	ब्राउज़र पता पट्टी में अक्षम करें
+menu.llm.disabled_in_label	%d अनुप्रयोग%s में अक्षम
+menu.llm.disabled_in_prefix	में अक्षम
+menu.llm.display_menu_title	प्रदर्शन
+menu.llm.download_failed	डाउनलोड विफल
+menu.llm.download_model	⬇️ इस मॉडल को डाउनलोड करें
+menu.llm.download_window_lost	डाउनलोड विंडो नहीं मिली
+menu.llm.download_window_lost_body	डाउनलोड अभी भी पृष्ठभूमि में चल रहा है।
+menu.llm.empty_model_id	खाली पहचानकर्ता — कोई कार्रवाई नहीं।
+menu.llm.exclude_from_ai	स्वचालित AI पीढ़ी से बाहर रखें…
+menu.llm.generation_menu_title	पीढ़ी सेटिंग्स
+menu.llm.hf_token_label	🔑 HuggingFace टोकन: %s
+menu.llm.hf_token_set	✅ कॉन्फ़िगर किया गया
+menu.llm.hf_token_unset	❌ कॉन्फ़िगर नहीं किया गया
+menu.llm.hw_disk	डिस्क स्पेस: %s GB
+menu.llm.hw_download	डाउनलोड: %s GB
+menu.llm.hw_header	आवश्यकताएं (%s)
+menu.llm.hw_ram	मेमोरी (RAM): %s GB
+menu.llm.indent_label	चयनित सुझाव की इंडेंटेशन
+menu.llm.indent_none	कोई इंडेंटेशन नहीं
+menu.llm.indent_space	स्थान
+menu.llm.indent_spaces	स्पेस
+menu.llm.inline_autotype	✍️ इनलाइन ऑटो-टाइप (Copilot शैली)
+menu.llm.instant_on_word_end	शब्द के अंत में तत्काल सुझाव
+menu.llm.launch_download_prompt	क्या आप डाउनलोड शुरू करना चाहते हैं?
+menu.llm.max_words_label	प्रति सुझाव अधिकतम शब्द: %s
+menu.llm.max_words_prompt	प्रति सुझाव अधिकतम शब्दों की संख्या (0 = असीमित):
+menu.llm.min_words_label	प्रति सुझाव न्यूनतम शब्द: %s
+menu.llm.min_words_prompt	प्रति सुझाव न्यूनतम शब्दों की संख्या:
+menu.llm.mlx_model_hint	MLX मॉडल के लिए HuggingFace पहचानकर्ता, उदाहरण के लिए: mlx-community/Qwen2.5-3B-Instruct-4bit
+menu.llm.mlx_port_label	MLX सर्वर पोर्ट: %s
+menu.llm.mlx_port_prompt	Ergopti के स्थानीय MLX सर्वर का पोर्ट (1024-65535)। डिफ़ॉल्ट: %s।
+menu.llm.mlx_port_title	MLX सर्वर पोर्ट
+menu.llm.model_backend	बैकएंड: %s
+menu.llm.model_change_title	मॉडल परिवर्तन
+menu.llm.model_date	अपडेट तारीख: %s
+menu.llm.model_label	मॉडल: %s
+menu.llm.model_params_active	पैरामीटर (सक्रिय): %s
+menu.llm.model_params_total	पैरामीटर (कुल): %s
+menu.llm.model_source	स्रोत: %s
+menu.llm.model_speed	अनुमानित गति: %s tok/s
+menu.llm.model_tags	टैग: %s
+menu.llm.model_type	प्रकार: %s
+menu.llm.my_models	🛠️ मेरे मॉडल
+menu.llm.nav_label	सुझावों को नेविगेट करें (↑/← और ↓/→)
+menu.llm.nav_menu_title	नेविगेशन
+menu.llm.nav_modifiers_prompt	तीर कुंजियों से नेविगेशन के लिए संशोधक कुंजी (जैसे ctrl, alt — खाली छोड़ें = केवल तीर):
+menu.llm.no_model	कोई मॉडल नहीं (अक्षम)
+menu.llm.no_model_none	कोई नहीं
+menu.llm.not_installed_body	यह मॉडल अभी तक स्थापित नहीं है।
+menu.llm.num_predictions_label	सुझावों की संख्या: %s
+menu.llm.off	❌ AI अक्षम (सक्षम करने के लिए क्लिक करें)
+menu.llm.ollama_model_hint	Ollama मॉडल पहचानकर्ता, उदाहरण के लिए: qwen2.5:1.5b या llama3.2:3b
+menu.llm.ollama_port_label	Ollama सर्वर पोर्ट: %s
+menu.llm.ollama_port_prompt	स्थानीय Ollama सर्वर का पोर्ट (1024-65535)। डिफ़ॉल्ट: 11434।
+menu.llm.ollama_port_title	Ollama सर्वर पोर्ट
+menu.llm.on	✅ AI सक्षम (अक्षम करने के लिए क्लिक करें)
+menu.llm.params_active	पैरामीटर (सक्रिय): 
+menu.llm.params_total	पैरामीटर (कुल): 
+menu.llm.prediction_count_label	%d सुझाव%s
+menu.llm.profile_already_ok_msg	मॉडल: %s\n%s\n\nवर्तमान प्रॉम्प्ट:\n%s\n\nअनुशंसित प्रॉम्प्ट:\n%s\n\nयह प्रोफ़ाइल पहले से इस मॉडल के लिए उपयुक्त है।
+menu.llm.profile_change_msg	मॉडल: %s\n%s\n\nवर्तमान प्रॉम्प्ट:\n%s\n\nअनुशंसित प्रॉम्प्ट:\n%s\n\nअनुशंसित प्रॉम्प्ट लागू करने के लिए पुष्टि करें।
+menu.llm.profile_power_warning	⚠️  शक्तिशाली प्रोफ़ाइल\n\nअनुशंसित: %s\nचयनित: %s\n\nमॉडल पर्याप्त शक्तिशाली नहीं हो सकता।
+menu.llm.remove_model_body	क्या आप कस्टम मॉडल "%s" को अपनी सूची से हटाना चाहते हैं? मॉडल सिस्टम से अनइंस्टॉल नहीं होगा।
+menu.llm.remove_model_title	यह मॉडल हटाएं?
+menu.llm.remove_user_model	🗑️ मेरे मॉडल से हटाएं
+menu.llm.reset_label	  ↳ रीसेट (डिफ़ॉल्ट: %s)
+menu.llm.reset_on_nav	क्लिक/नेविगेशन पर संदर्भ साफ़ करें
+menu.llm.select_model	👉 इस मॉडल को चुनें
+menu.llm.shortcut_prompt	प्रारूप: mods+key (उदाहरण के लिए cmd+alt+p)\nउपलब्ध mods: cmd, alt, ctrl, shift\nअक्षम करने के लिए खाली छोड़ें
+menu.llm.show_all_at_once	सभी सुझाव एक साथ दिखाएं (बहु-भविष्यवाणियां)
+menu.llm.show_download_window	📥 डाउनलोड चल रहा है — विंडो दिखाएं
+menu.llm.show_info_bar	जानकारी पट्टी दिखाएं (मॉडल और विलंबता)
+menu.llm.show_streaming	प्रत्येक सुझाव स्ट्रीमिंग में दिखाएं (टोकन द्वारा टोकन)
+menu.llm.specs_header	विनिर्देश
+menu.llm.temperature_label	तापमान (रचनात्मकता): %s
+menu.llm.temperature_prompt	रचनात्मकता स्तर (0.0 = नियतात्मक, 1.0 = रचनात्मक):
+menu.llm.thinking_model_info	  ↳ जानकारी: थिंकिंग मॉडल (छिपी हुई तर्क)
+menu.llm.title	✨ कृत्रिम बुद्धिमत्ता
+menu.llm.toggle_disable	AI सुझाव अक्षम करें
+menu.llm.toggle_enable	AI सुझाव सक्षम करें
+menu.llm.trigger_menu_title	AI ट्रिगर करना
+menu.llm.trigger_shortcut_label	मैन्युअल रूप से उत्पन्न करने के लिए शॉर्टकट: %s
+menu.llm.trigger_shortcut_title	AI पीढ़ी शॉर्टकट
+menu.llm.unlimited	असीमित
+menu.llm.val_label	सुझाव संख्या चुनें (%s)
+menu.llm.val_modifiers_prompt	संख्या से चुनाव के लिए संशोधक कुंजी (जैसे ctrl, alt — खाली छोड़ें = केवल संख्याएँ):
+menu.llm.warning_install_ollama	📥 अभी Ollama स्थापित करें
+menu.metrics.colors_by_source	    ↳ इनपुट स्रोत द्वारा रंग
+menu.metrics.disabled_in_label	%d अनुप्रयोग%s में अक्षम
+menu.metrics.encrypt_toggle	डिस्क पर लॉग एन्क्रिप्ट करें (सुरक्षा)
+menu.metrics.exclude_apps	कीलॉगर से अनुप्रयोगों को बाहर रखें…
+menu.metrics.filter_private	निजी ब्राउज़िंग को अनदेखा करें
+menu.metrics.filter_secure	पासवर्ड फील्ड को अनदेखा करें
+menu.metrics.filter_sysauth	सिस्टम प्रमाणीकरण संवादों को अनदेखा करें
+menu.metrics.include_realtime	    ↳ रीयल-टाइम ग्राफ शामिल करें
+menu.metrics.off	❌ मेट्रिक्स अक्षम (सक्षम करने के लिए क्लिक करें)
+menu.metrics.on	✅ मेट्रिक्स सक्षम (अक्षम करने के लिए क्लिक करें)
+menu.metrics.open_encryptor	  ↳ स्टैंडअलोन एन्क्रिप्टर खोलें…
+menu.metrics.privacy_header	गोपनीयता फ़िल्टर
+menu.metrics.reset_wpm_position	    ↳ स्थिति रीसेट करें
+menu.metrics.shortcut_apps_title	ऐप समय शॉर्टकट
+menu.metrics.shortcut_item	    ↳ शॉर्टकट: %s
+menu.metrics.shortcut_none	कोई शॉर्टकट नहीं
+menu.metrics.shortcut_prefix	  ↳ शॉर्टकट: 
+menu.metrics.shortcut_prompt	प्रारूप: mods+key (उदाहरण के लिए ctrl+m)\nअक्षम करने के लिए खाली छोड़ें
+menu.metrics.shortcut_typing_title	टाइपिंग मेट्रिक्स शॉर्टकट
+menu.metrics.show_apps	अनुप्रयोग के अनुसार समय दिखाएं
+menu.metrics.show_typing	टाइपिंग मेट्रिक्स दिखाएं
+menu.metrics.show_wpm_menubar	मेनू बार में WPM
+menu.metrics.show_wpm_widget	फ्लोटिंग WPM विजेट
+menu.metrics.title	📊 मेट्रिक्स
+menu.metrics.wpm_unit	शब्द/मि
+menu.paths.menu_item	कॉन्फ़िगरेशन फ़ोल्डर…
+menu.paths.pick_prompt	कॉन्फ़िगरेशन फ़ोल्डर चुनें
+menu.paths.window_title	कॉन्फ़िगरेशन फ़ोल्डर
+menu.profiles.auto_detect	✨ सर्वोत्तम प्रोफ़ाइल स्वचालित रूप से पहचानें
+menu.profiles.clone_builtin	✏️ इस प्रोफ़ाइल को क्लोन करें और संपादित करें…
+menu.profiles.copy_suffix	(प्रति)
+menu.profiles.create_profile	कस्टम प्रोफ़ाइल बनाएँ…
+menu.profiles.custom_profile_label	कस्टम प्रोफ़ाइल
+menu.profiles.delete_confirm_body	यह कस्टम प्रोफ़ाइल स्थायी रूप से हटा दी जाएगी।
+menu.profiles.delete_confirm_title	"%s" हटाएँ?
+menu.profiles.delete_profile	🗑️ हटाएँ…
+menu.profiles.edit_profile	✏️ संपादित करें…
+menu.profiles.header_custom_profiles	कस्टम प्रोफ़ाइलें
+menu.profiles.header_default_profiles	डिफ़ॉल्ट प्रोफ़ाइलें
+menu.profiles.not_recommended	  ⚠️ अनुशंसित नहीं (विचारशील)
+menu.profiles.override_active_app_with_current	➕ सक्रिय ऐप के लिए वर्तमान प्रोफ़ाइल का उपयोग करें
+menu.profiles.per_app_overrides	🪟 ऐप-वार प्रोफ़ाइल
+menu.profiles.profile_label_prefix	प्रोफ़ाइल: %s
+menu.profiles.prompt_label	प्रोफ़ाइल नाम:
+menu.profiles.prompt_system_single	सिस्टम प्रॉम्प्ट (एकल जनरेशन):
+menu.profiles.recommended_profile	अनुशंसित प्रोफ़ाइल
+menu.profiles.recommended_unavailable_body	इस संदर्भ में स्वचालित पहचान लागू नहीं की जा सकती
+menu.profiles.recommended_unavailable_title	अनुशंसित प्रोफ़ाइल अनुपलब्ध
+menu.profiles.shortcut_prefix	शॉर्टकट: %s
+menu.profiles.shortcut_prompt	प्रारूप: mods+key  (उदा. cmd+shift+b)\nउपलब्ध mods: cmd, alt, ctrl, shift\nअक्षम करने के लिए खाली छोड़ें
+menu.profiles.shortcut_title	प्रोफ़ाइल शॉर्टकट
+menu.profiles.use_profile	इस प्रोफ़ाइल का उपयोग करें
+menu.reloading	पुनः लोड हो रहा है…
+menu.reloading_files	फ़ाइलें बदली गईं — पुनः लोड हो रहा है…
+menu.script_control.title	स्क्रिप्ट नियंत्रण
+menu.script_ready	स्क्रिप्ट तैयार है!
+menu.settings.context_length_title	संदर्भ आकार
+menu.settings.default_indicator	 (डिफ़ॉल्ट)
+menu.settings.delay_prompt	AI को क्वेरी करने से पहले आवश्यक टाइपिंग विराम (ms में):\n\n(रीसेट करने के लिए खाली छोड़ें: %s ms)\n(स्वचालित पीढ़ी को अक्षम करने के लिए "Never" या -1 दर्ज करें)
+menu.settings.delay_title	प्रतीक्षा समय
+menu.settings.disabled	अक्षम
+menu.settings.indent_space	 स्पेस
+menu.settings.indent_spaces	 स्पेस
+menu.settings.max_words_prompt	प्रति सुझाव रखने के लिए शब्दों की अधिकतम संख्या (0 = असीमित):
+menu.settings.max_words_title	प्रति सुझाव अधिकतम शब्द
+menu.settings.min_words_title	प्रति सुझाव न्यूनतम शब्द
+menu.settings.never	कभी नहीं
+menu.settings.no_modifier	कोई संशोधक नहीं
+menu.settings.reset_instruction	\n\n(रीसेट करने के लिए खाली छोड़ें: %s)
+menu.settings.temperature_prompt	रचनात्मकता स्तर (0.0 से 1.0 तक):
+menu.settings.temperature_title	तापमान
+menu.shortcuts.alt_add	[+ एक Alt+… शॉर्टकट जोड़ें]
+menu.shortcuts.alt_group	⎇ Alt शॉर्टकट
+menu.shortcuts.altgr_symbol	AltGr + प्रतीक
+menu.shortcuts.chatgpt_url_item	   ↳ ChatGPT URL संपादित करें…
+menu.shortcuts.ctrl_add	[+ एक Ctrl+… शॉर्टकट जोड़ें]
+menu.shortcuts.ctrl_group	^ Ctrl शॉर्टकट
+menu.shortcuts.ctrl_shift_add	[+ एक Ctrl+Shift+… शॉर्टकट जोड़ें]
+menu.shortcuts.ctrl_shift_group	^⇧ Ctrl+Shift शॉर्टकट
+menu.shortcuts.edit_personal_info	   ↳ व्यक्तिगत जानकारी संपादित करें…
+menu.shortcuts.group_accented	उच्चारण चिह्न वाले अक्षरों के शॉर्टकट
+menu.shortcuts.group_modifiers	संशोधक संयोजन
+menu.shortcuts.key_at_hash	@ / #
+menu.shortcuts.key_layer_scroll	Layer + Scroll
+menu.shortcuts.off	❌ शॉर्टकट अक्षम (सक्षम करने के लिए क्लिक करें)
+menu.shortcuts.on	✅ शॉर्टकट सक्षम (अक्षम करने के लिए क्लिक करें)
+menu.shortcuts.personal	व्यक्तिगत शॉर्टकट
+menu.shortcuts.right_opt_back	दायां Opt + ⌫ → %s
+menu.shortcuts.right_opt_escape	दायां Opt + Esc → %s
+menu.shortcuts.right_opt_return	दायां Opt + Return → %s
+menu.shortcuts.script_shortcuts	स्क्रिप्ट प्रबंधन शॉर्टकट
+menu.shortcuts.submenu_cmd	Cmd शॉर्टकट
+menu.shortcuts.submenu_ctrl	Ctrl शॉर्टकट
+menu.shortcuts.title	🎯 शॉर्टकट
+menu.shortcuts.win_add	[+ एक Win+… शॉर्टकट जोड़ें]
+menu.shortcuts.win_group	⊞ Win शॉर्टकट
+menu.shortcuts.wrap_group_angle	कोणीय और अलंकृत कोष्ठक
+menu.shortcuts.wrap_group_braces	क्षैतिज मझले कोष्ठक
+menu.shortcuts.wrap_group_brackets	कोष्ठक
+menu.shortcuts.wrap_group_cjk	CJK कोष्ठक
+menu.shortcuts.wrap_group_markdown	Markdown ज़ोर
+menu.shortcuts.wrap_group_other	अन्य प्रतीक
+menu.shortcuts.wrap_group_quotes	उद्धरण चिह्न और एपोस्ट्रोफी
+menu.shortcuts.wrap_symbols_add_custom	[+ एक प्रतीक जोड़ें…]
+menu.shortcuts.wrap_symbols_check_all	सभी चुनें
+menu.shortcuts.wrap_symbols_custom_label	कस्टम
+menu.shortcuts.wrap_symbols_title	  ↳ चयन को घेरने वाले प्रतीक
+menu.shortcuts.wrap_symbols_uncheck_all	सभी अचुनें
+menu.tapholds.off	❌ Tap-holds अक्षम (सक्षम करने के लिए क्लिक करें)
+menu.tapholds.on	✅ Tap-holds सक्षम (अक्षम करने के लिए क्लिक करें)
+menu.tapholds.title	⌨️ Tap-Holds
+menu.updates.title	🔄 Updates
+metrics.shortcut_format_hint	प्रारूप: mods+कुंजी  (जैसे ctrl+alt+m)\nउपलब्ध mods: ctrl, alt, shift, win\nअक्षम करने के लिए खाली छोड़ें।
+metrics.shortcut_invalid_title	अमान्य शॉर्टकट
+metrics.shortcut_prompt_title	शॉर्टकट — {1}
+metrics.shortcut_register_error	शॉर्टकट « {1} » पंजीकृत नहीं हो सका: {2}
+metrics_apps.chooser_placeholder	%s के लिए श्रेणी
+metrics_apps.general_category	सामान्य
+metrics_apps.new_category_create_subtext	एक नई श्रेणी बनाएँ
+metrics_apps.new_category_item	+ नई श्रेणी…
+metrics_apps.new_category_prompt	%s के लिए नई श्रेणी का नाम:
+metrics_apps.new_category_title	नई श्रेणी
+metrics_apps.no_app_detected	कोई एप्लिकेशन पहचाना नहीं जा सका।
+metrics_apps.rename_chooser_placeholder	नाम बदलने के लिए श्रेणी
+metrics_apps.rename_item	✎ किसी मौजूदा श्रेणी का नाम बदलें…
+metrics_apps.rename_prompt	श्रेणी "%s" के लिए नया नाम:
+metrics_apps.rename_subtext	इस श्रेणी में सभी ऐप्स का नाम बदला जाएगा
+metrics_apps.rename_title	नाम बदलें
+metrics_apps.score_error	स्कोर -2 से 2 के बीच होना चाहिए।
+metrics_apps.score_prompt	%s के लिए उत्पादकता स्कोर\n(-2 बहुत विचलित करने वाला से 2 बहुत उत्पादक):
+metrics_apps.score_title	स्कोर
+metrics_apps.title	टाइपिंग मेट्रिक्स
+metrics_apps.use_category_subtext	इस श्रेणी का उपयोग करें
+metrics_apps.window_title	ऐप समय
+mlx.deps_failed	विफल…
+mlx.deps_missing	MLX निर्भरताएँ अनुपलब्ध
+mlx.deps_missing_body	स्वचालित बूटस्ट्रैप प्रगति में है। कृपया कुछ मिनटों में पुनः प्रयास करें।
+mlx.deps_preparing	तैयारी हो रही है…
+mlx.deps_pty_write_failed	PTY रैपर फ़ाइल लिखने में विफल।
+mlx.deps_step_bootstrap	इंस्टॉलेशन स्क्रिप्ट चलाई जा रही है…
+mlx.deps_step_python	Python इंस्टॉल किया जा रहा है…
+mlx.deps_step_ready	AI इंजन तैयार।
+mlx.deps_step_sync	AI निर्भरताएँ सिंक की जा रही हैं…
+mlx.deps_step_uv	uv इंस्टॉल किया जा रहा है…
+mlx.deps_step_venv	स्थानीय virtualenv बनाया जा रहा है…
+mlx.deps_task_create_failed	hs.task बनाने में विफल।
+mlx.deps_task_start_failed	hs.task शुरू करने में विफल।
+mlx.download_cancelled	रद्द किया गया
+mlx.download_cancelled_body	%s का डाउनलोड बाधित किया गया।
+mlx.download_failed	MLX विफल
+mlx.download_failed_body	विंडो में लॉग देखें।
+mlx.download_interrupted	डाउनलोड बाधित
+mlx.download_interrupted_body	%s के लिए डाउनलोड प्रक्रिया पुनः लोड के दौरान रुक गई।
+mlx.download_stalled	MLX डाउनलोड अटका
+mlx.download_subtitle	Hugging Face से वेट प्राप्त किए जा रहे हैं…
+mlx.download_title	MLX मॉडल डाउनलोड हो रहा है
+mlx.hf_connected	HuggingFace से जुड़ा हुआ
+mlx.hf_connected_body	टोकन सहेजा गया। आप अब बहुत तेजी से मॉडल डाउनलोड कर सकते हैं!
+mlx.hf_connection_failed	HuggingFace कनेक्शन विफल
+mlx.hf_connection_failed_body	कनेक्शन विफल। अपने टोकन की जाँच करें।
+mlx.hf_login_title	HuggingFace लॉगिन
+mlx.hf_page_opened	मॉडल पृष्ठ आपके ब्राउज़र में खोला गया
+mlx.init_subtitle	AI initialization in progress, please wait…
+mlx.init_title	Initializing the AI engine (MLX)
+mlx.install_subtitle	स्थानीय Python निर्भरताएँ तैयार की जा रही हैं…
+mlx.install_title	AI इंजन (MLX) इंस्टॉल किया जा रहा है
+mlx.launcher_failed	MLX लॉन्च विफल
+mlx.launcher_failed_body	लॉन्चर विफल (कोड %d)।
+mlx.model_deleted	हटाया गया (MLX)
+mlx.model_incompatible	मॉडल %s mlx-lm के साथ संगत नहीं है। कृपया कोई अन्य मॉडल चुनें।
+mlx.model_installed	MLX मॉडल इंस्टॉल किया गया
+mlx.model_ready	%s तैयार है!
+mlx.model_unavailable	MLX मॉडल अनुपलब्ध
+mlx.model_unavailable_body	मॉडल %s MLX-संगत नहीं है या इसका कोई MLX रिपॉजिटरी कॉन्फ़िगर नहीं है
+mlx.open_source_failed	HuggingFace पृष्ठ खोलने में विफल
+mlx.source_not_found	स्रोत नहीं मिला
+mlx.source_not_found_body	इस मॉडल के लिए कोई MLX रिपॉजिटरी नहीं मिली
+mlx.token_corrected	टोकन सुधारा गया
+mlx.token_corrected_body	पूर्ण क्लिपबोर्ड टोकन का उपयोग किया गया
+mlx.token_detected	टोकन पहचाना गया
+mlx.token_detected_body	क्लिपबोर्ड से टोकन पुनः प्राप्त किया गया
+mlx.token_missing	टोकन अनुपलब्ध
+mlx.token_missing_body	कोई टोकन प्रदान नहीं किया गया
+mlx.write_py_failed	Python स्क्रिप्ट /tmp में लिखने में विफल
+mlx.write_sh_failed	Bash स्क्रिप्ट /tmp में लिखने में विफल
+model_browser.col_family	श्रेणी
+model_browser.col_name	मॉडल
+model_browser.col_params	पैरामीटर
+model_browser.col_ram	RAM
+model_browser.col_speed	गति
+model_browser.col_status	स्थिति
+model_browser.col_type	प्रकार
+model_browser.count_label	{total} में से {n} मॉडल
+model_browser.no_models	आपकी खोज से कोई मॉडल मेल नहीं खाता।
+model_browser.search_placeholder	मॉडल खोजें…
+model_browser.select_hint	किसी मॉडल का उपयोग करने के लिए उस पर डबल-क्लिक करें या Enter दबाएँ।
+model_browser.status_available	उपलब्ध
+model_browser.status_installed	इंस्टॉल किया गया
+model_browser.type_chat	चैट
+model_browser.type_completion	पूर्णता
+model_browser.use_button	उपयोग करें
+model_browser.window_title	मॉडल सूची
+notify.all_features_disabled	सभी सुविधाएँ अक्षम कर दी गई हैं
+notify.all_features_enabled	सभी सुविधाएँ सक्षम कर दी गई हैं
+notify.clipboard	क्लिपबोर्ड
+notify.defaults_reset	डिफ़ॉल्ट रीसेट किए गए — पुनः लोड हो रहा है…
+notify.hotstrings	Hotstrings
+notify.llm_disabled	🔴 अक्षम
+notify.llm_enabled	🟢 सक्षम
+notify.llm_mlx_failures_body	MLX सर्वर प्रतिक्रिया नहीं दे रहा। जाँचें कि मॉडल लोड है और सर्वर पोर्ट 8080 पर चल रहा है।
+notify.llm_mlx_failures_title	LLM पूर्वानुमान — बार-बार विफलताएँ
+notify.llm_suggestions	AI सुझाव
+notify.personal_info	व्यक्तिगत जानकारी
+notify.screenshot_copied	स्क्रीनशॉट कॉपी किया गया
+notify.screenshot_saved	स्क्रीनशॉट सहेजा गया
+notify.screenshot_saved_path	सहेजा गया: %s
+notify.screenshot_title	स्क्रीनशॉट
+notify.script_control	स्क्रिप्ट नियंत्रण
+notify.word_expander_prefix	शब्द विस्तारक: %s
+ollama.cancelled_title	रद्द किया गया
+ollama.daemon_fail	Ollama डेमन लॉन्च करने में विफल।
+ollama.delete_error	मॉडल: %s\n%s
+ollama.delete_fail_title	Ollama विलोपन विफल
+ollama.deleted_title	हटाया गया (Ollama)
+ollama.deps_failed	विफल…
+ollama.deps_step_checking	Ollama जाँच हो रही है…
+ollama.deps_step_installing	Ollama इंस्टॉल हो रहा है…
+ollama.deps_step_ready	Ollama सर्वर तैयार है।
+ollama.deps_step_starting	Ollama सर्वर शुरू हो रहा है…
+ollama.deps_task_create_failed	hs.task बनाने में विफल।
+ollama.deps_task_start_failed	hs.task शुरू करने में विफल।
+ollama.download_cancelled	Ollama डाउनलोड रद्द किया गया
+ollama.download_error	%s के लिए डाउनलोड त्रुटि
+ollama.download_subtitle	Ollama Hub से वेट फेच किए जा रहे हैं…
+ollama.download_title	Ollama मॉडल डाउनलोड हो रहा है
+ollama.downloading	Ollama मॉडल डाउनलोड हो रहा है…
+ollama.fail_title	Ollama विफलता
+ollama.install_subtitle	स्थानीय Ollama सर्वर तैयार किया जा रहा है…
+ollama.install_title	AI इंजन स्थापित किया जा रहा है (Ollama)
+ollama.model_deleted	मॉडल हटाया गया: %s
+ollama.model_installed_title	Ollama मॉडल स्थापित किया गया
+ollama.model_ready	%s तैयार है!
+ollama.model_repair	मॉडल क्षतिग्रस्त प्रतीत हो रहा है। पुनः डाउनलोड का प्रयास किया जा रहा है: %s
+ollama.model_repair_title	Ollama मॉडल की मरम्मत की जा रही है
+ollama.not_detected_body	कृपया Ollama स्थापित करें और पुनः प्रयास करें।
+ollama.not_detected_title	Ollama का पता नहीं चला
+ollama.service_disconnected	Ollama सेवा प्रतिक्रिया देना बंद कर दी।
+ollama.service_ready	Ollama सेवा तैयार है ✅
+ollama.service_stopped	Ollama सेवा बंद हो गई। शुरू किया जा रहा है…
+ollama.start_fail	सेवा शुरू करने में विफल।
+ollama.starting_service	Ollama सेवा शुरू की जा रही है (%s/%s)…
+ollama.starting_title	Ollama शुरू हो रहा है
+ollama.upgrade_required_body	स्थापित Ollama संस्करण इस मॉडल के लिए बहुत पुराना है। कृपया Ollama को मैनुअली अपडेट करें।
+ollama.upgrade_required_title	Ollama अपग्रेड आवश्यक है
+onboarding.back	← वापस
+onboarding.btn.cancel	रद्द करें
+onboarding.btn.no	नहीं
+onboarding.btn.ok	ठीक है
+onboarding.btn.yes	हाँ
+onboarding.done.body	कॉन्फ़िगरेशन सहेजा गया। स्क्रिप्ट अब पुनः लोड होगी।
+onboarding.done.title	सेटअप पूर्ण!
+onboarding.error.title	ErgoptiPlus — त्रुटि
+onboarding.error.write_failed	कॉन्फ़िगरेशन फ़ाइल लिखने में विफल।
+onboarding.finish	समाप्त करें ✓
+onboarding.gestures.desc	ट्रैकपैड जेस्चर समर्थन सक्षम करता है — स्वाइप, टैप और पिंच द्वारा ट्रिगर होने वाली कस्टम क्रियाएं।
+onboarding.gestures.open_settings	टचपैड सेटिंग्स खोलें
+onboarding.gestures.open_settings_hint	सेटिंग्स → Bluetooth और डिवाइस → टचपैड → उन्नत जेस्चर खोलता है। प्रत्येक स्लॉट Ctrl + Win + Shift + F1..F10 शॉर्टकट स्वीकार करता है।
+onboarding.gestures.register_auto	स्वचालित कॉन्फ़िगरेशन
+onboarding.gestures.register_auto_hint	आपके लिए Windows सेटिंग्स में सभी जेस्चर स्लॉट स्वचालित रूप से भरता है। व्यवस्थापक अधिकारों की आवश्यकता नहीं।
+onboarding.gestures.register_deferred	जेस्चर अगले स्टार्ट पर कॉन्फ़िगर किए जाएंगे।
+onboarding.gestures.register_failed	स्वचालित कॉन्फ़िगरेशन विफल हुआ। कृपया नीचे दी गई मैन्युअल विधि का उपयोग करें।
+onboarding.gestures.register_manual	मैन्युअल विधि
+onboarding.gestures.register_manual_hint	एक चरण-दर-चरण ट्यूटोरियल और टचपैड सेटिंग्स पेज पर एक-क्लिक शॉर्टकट खोलता है ताकि आप प्रत्येक जेस्चर को मैन्युअल रूप से सेट कर सकें।
+onboarding.gestures.register_section	जेस्चर को Windows सेटिंग्स में कॉन्फ़िगर किया जाना चाहिए (Bluetooth और डिवाइस → टचपैड → उन्नत जेस्चर):
+onboarding.gestures.register_success	जेस्चर अब Windows सेटिंग्स में कॉन्फ़िगर किए गए हैं।
+onboarding.gestures.title	ErgoptiPlus — जेस्चर
+onboarding.language.placeholder	अपनी भाषा चुनें…
+onboarding.layout.desc	लेआउट एमुलेशन (बेस लेयर + AltGr) और Ergopti हॉटस्ट्रिंग्स सक्रिय करता है।
+onboarding.layout.no	सिस्टम लेआउट का उपयोग करें
+onboarding.layout.title	ErgoptiPlus — Ergopti कीबोर्ड अनुकरण
+onboarding.layout.yes	Ergopti लेआउट अनुकरण करें
+onboarding.magic_key.choose_freely	कोई भी कैरेक्टर ट्रिगर के रूप में काम कर सकता है — गलत सक्रियण से बचने के लिए पर्याप्त दुर्लभ, और पहुँचने के लिए पर्याप्त आसान।
+onboarding.magic_key.desc	वह वर्ण जो हॉटस्ट्रिंग्स को ट्रिगर करता है।
+onboarding.magic_key.option_blackstar	★ — अनुशंसित (Ergopti लेआउट पर समर्पित कुंजी)
+onboarding.magic_key.option_custom	कस्टम इनपुट
+onboarding.magic_key.option_semicolon	; — QWERTY पर अनुशंसित
+onboarding.magic_key.option_star	* — अनुशंसित (सभी लेआउट पर काम करता है)
+onboarding.magic_key.option_ugrave	ù — AZERTY पर अनुशंसित
+onboarding.magic_key.title	ErgoptiPlus — मैजिक की
+onboarding.metrics.desc	टाइपिंग मेट्रिक्स संग्रह सक्षम करता है।\n\nErgoptiPlus क्या ट्रैक करता है:\n• प्रति सत्र, प्रति ऐप और समय के साथ टाइपिंग गति (WPM);\n• सबसे अधिक टाइप की गई कुंजियां, शब्द, n-grams और एर्गोनोमिक तनाव;\n• हाथ बदलाव, उंगली भार, एक ही उंगली के बिग्राम;\n• प्रत्येक एप्लिकेशन पर बिताया गया समय (RescueTime-शैली) उत्पादकता स्कोर के साथ;\n• Metrics विंडो में रुझान, हीटमैप और विस्तृत डैशबोर्ड।
+onboarding.metrics.title	ErgoptiPlus — टाइपिंग मेट्रिक्स
+onboarding.next	अगला →
+onboarding.no	नहीं
+onboarding.warning_label	चेतावनी
+onboarding.welcome.heading	भाषा
+onboarding.welcome.title	ErgoptiPlus — सेटअप
+onboarding.yes	हाँ
+paths_editor.btn_browse	ब्राउज़ करें…
+paths_editor.btn_cancel	रद्द करें
+paths_editor.btn_reset	डिफ़ॉल्ट पर रीसेट करें
+paths_editor.btn_save	सहेजें और पुनः लोड करें
+paths_editor.heading	कॉन्फ़िगरेशन फ़ोल्डर
+paths_editor.label_config_dir	कॉन्फ़िगरेशन फ़ोल्डर
+paths_editor.save_failed	कॉन्फ़िगरेशन फ़ोल्डर सहेजा नहीं जा सका। फ़ाइल केवल-पढ़ने योग्य हो सकती है या किसी अन्य प्रोग्राम द्वारा उपयोग में हो सकती है।
+paths_editor.save_failed_title	सहेजना विफल
+paths_editor.subtitle	सभी व्यक्तिगत फ़ाइलें (shortcuts, hotstrings…) इस फ़ोल्डर से हल की जाती हैं।
+paths_editor.tag_default	डिफ़ॉल्ट
+paths_editor.tag_modified	संशोधित
+personal_info.field_credit_card	क्रेडिट कार्ड
+personal_info.field_firstname	पहला नाम
+personal_info.field_phone_digits	फ़ोन (अंक)
+personal_info.field_phone_formatted	फ़ोन (स्वरूपित)
+personal_info.field_ssn	सामाजिक सुरक्षा नंबर
+personal_info.saved_body	आप यह टैब बंद कर सकते हैं।
+personal_info.saved_title	✓ सहेजा गया
+profiles.created_title	प्रोफ़ाइल बनाई गई
+profiles.updated_title	प्रोफ़ाइल अपडेट हुई
+prompt_editor.default_label	कस्टम प्रोफ़ाइल
+prompt_editor.help_text	{context} ब्लॉक को चयनित टेक्स्ट द्वारा प्रतिस्थापित किया जाएगा। {n} ब्लॉक को भविष्यवाणियों की संख्या द्वारा प्रतिस्थापित किया जाएगा। फॉर्मेटिंग (Batch): मॉडल को प्रत्येक सुझाव को --- से अलग करने के लिए कहें।
+prompt_editor.insert_context	{context} ब्लॉक डालें
+prompt_editor.insert_language	{language} ब्लॉक डालें
+prompt_editor.insert_max_words	{max_words} ब्लॉक डालें
+prompt_editor.insert_min_words	{min_words} ब्लॉक डालें
+prompt_editor.insert_n	{n} ब्लॉक डालें
+prompt_editor.label_mode	अनुरोध मोड
+prompt_editor.label_name	प्रोफ़ाइल नाम
+prompt_editor.label_prompt	सिस्टम प्रॉम्प्ट
+prompt_editor.mode.batch	बैच किया गया — बैच में भविष्यवाणियाँ (बड़े मॉडल)
+prompt_editor.mode.parallel	मानक — समानांतर भविष्यवाणियाँ
+prompt_editor.placeholder_prompt	यहाँ एक पाठ है, इसे जारी रखें: {context}
+prompt_editor.title_edit	प्रोफ़ाइल संपादित करें
+prompt_editor.title_new	नई प्रोफ़ाइल
+script_control.paused	रुका हुआ
+script_control.resumed	स्क्रिप्ट फिर से शुरू की गई
+sfbsreduction.bu	À + ★ → BU
+sfbsreduction.comma	कॉमा एक ही उंगली के बाइग्राम को कम करता है
+sfbsreduction.ecirc	Ê एक ही उंगली के बाइग्राम को कम करता है
+sfbsreduction.egrave	È एक ही उंगली के बाइग्राम को कम करता है
+sfbsreduction.ié	IE, IE/EI बाइग्राम को कम करता है
+sg_actions.activity_simulation	🖱 गतिविधि सिमुलेट करें (anti-sleep)
+sg_actions.alt_tab_monitor	Alt-Tab (मॉनीटर)
+sg_actions.app_expose	◱ App Exposé
+sg_actions.app_previous	⇥ ← Alt+Tab — पिछला ऐप
+sg_actions.app_switcher	⇥ Alt+Tab — पिछला ऐप
+sg_actions.app_window_previous	⇥ ◱ ← Alt+Tab — पिछली विंडो
+sg_actions.arrow_down	↓ नीचे तीर
+sg_actions.arrow_left	← बाईं ओर तीर
+sg_actions.arrow_right	→ दाईं ओर तीर
+sg_actions.arrow_up	↑ ऊपर तीर
+sg_actions.backspace	⌫ बैकस्पेस
+sg_actions.brightness_down	☀ - चमक कम करें
+sg_actions.brightness_up	☀ + चमक बढ़ाएँ
+sg_actions.caps_lock	⇪ CapsLock
+sg_actions.caps_word	⇪★ CapsWord
+sg_actions.close_window	◱ × विंडो बंद करें
+sg_actions.copy	⎘ कॉपी करें
+sg_actions.ctrl_backspace	⌫ Ctrl+Backspace
+sg_actions.ctrl_delete	⌦ Ctrl+Delete
+sg_actions.cut	⎘ कटें
+sg_actions.delete	⌦ डिलीट
+sg_actions.desktop_close	▢ × डेस्कटॉप बंद करें
+sg_actions.desktop_new	▢ + नया डेस्कटॉप
+sg_actions.desktop_next	▢ → अगला डेस्कटॉप
+sg_actions.desktop_prev	▢ ← पिछला डेस्कटॉप
+sg_actions.doc_end	⤓ दस्तावेज़ का अंत
+sg_actions.doc_start	⤒ दस्तावेज़ की शुरुआत
+sg_actions.enter	↵ एंटर
+sg_actions.escape	⎋ ESC
+sg_actions.find	🔍 खोजें
+sg_actions.fullscreen	📺 पूर्ण स्क्रीन
+sg_actions.left_click_toggle	🖱 L बाईं क्लिक (होल्ड)
+sg_actions.line_down	↕ ↓ अगली लाइन
+sg_actions.line_end	⇥ लाइन का अंत
+sg_actions.line_start	⇤ लाइन की शुरुआत
+sg_actions.line_up	↕ ↑ पिछली लाइन
+sg_actions.lock_screen	🔒 स्क्रीन लॉक करें
+sg_actions.lookup	🔍 शब्द परिभाषा
+sg_actions.maximize	🔲 अधिकतम करें
+sg_actions.microsoft_bold	𝐁 Ctrl+B Microsoft (→ Ctrl+G)
+sg_actions.minimize_all	◱ सभी को न्यूनतम करें
+sg_actions.mission_control	▢ Mission Control
+sg_actions.mute	🔇 म्यूट/अनम्यूट
+sg_actions.nav_back	← वापस (नेविगेशन)
+sg_actions.nav_forward	→ आगे (नेविगेशन)
+sg_actions.none	∅ कुछ नहीं
+sg_actions.notification_center	🔔 सूचनाएं
+sg_actions.ocr_screenshot	📷 OCR स्क्रीनशॉट (Win+Shift+T)
+sg_actions.one_shot_shift	⇧ OneShotShift
+sg_actions.open_config	⚙ कॉन्फ़िगरेशन
+sg_actions.open_console	▤ कंसोल
+sg_actions.open_error_log	📄 Error log
+sg_actions.open_hotstrings_editor	⌨ Hotstrings संपादक
+sg_actions.open_key_history	कुंजी इतिहास
+sg_actions.open_list_vars	चर स्थिति
+sg_actions.open_logs_folder	📁 लॉग फ़ोल्डर
+sg_actions.open_metrics_apps	📊 ऐप आँकड़े
+sg_actions.open_metrics_typing	📊 टाइपिंग आँकड़े
+sg_actions.open_paths_editor	📂 पाथ संपादक
+sg_actions.open_personal_hotstrings	👤 व्यक्तिगत hotstrings
+sg_actions.open_personal_info	👤 व्यक्तिगत जानकारी
+sg_actions.open_personal_shortcuts	👤 व्यक्तिगत शॉर्टकट फ़ाइल
+sg_actions.open_script_source	🛠 स्रोत कोड
+sg_actions.open_today_log	📄 आज का लॉग
+sg_actions.open_url	🌐 एक लिंक खोलें (कॉन्फ़िगर योग्य)
+sg_actions.open_window_spy	Window Spy
+sg_actions.para_next	¶ ↓ अगला पैराग्राफ
+sg_actions.para_prev	¶ ↑ पिछला पैराग्राफ
+sg_actions.paste	⎘ पेस्ट करें
+sg_actions.paste_plain	⎘ फॉर्मेटिंग के बिना पेस्ट करें
+sg_actions.pick_color	🎨 कर्सर के अंतर्गत HEX रंग
+sg_actions.redo	↪ फिर से करें
+sg_actions.right_click_toggle	🖱 R दाईं क्लिक (होल्ड)
+sg_actions.screen_capture	📸 चयनात्मक कैप्चर (Win+Shift+S)
+sg_actions.screen_capture_instant	📸 तत्काल कैप्चर (विंडो)
+sg_actions.screen_record	⏺ स्क्रीन रिकॉर्डिंग
+sg_actions.screenshot_fullscreen_clipboard	📸 🖥 स्क्रीन कॉपी करें
+sg_actions.screenshot_fullscreen_save	📸 🖥 स्क्रीन सहेजें
+sg_actions.screenshot_region_clipboard	📸 ⬚ क्षेत्र कॉपी करें
+sg_actions.screenshot_region_save	📸 ⬚ क्षेत्र सहेजें
+sg_actions.screenshot_window_clipboard	📸 ⊞ विंडो कॉपी करें
+sg_actions.screenshot_window_save	📸 ⊞ विंडो सहेजें
+sg_actions.script_pause_toggle	⏸/▶ निलंबित / फिर से शुरू करें
+sg_actions.script_quit	✕ छोड़ें
+sg_actions.script_reload	↻ रीलोड करें
+sg_actions.script_save_reload	↻ सहेजें और रीलोड करें
+sg_actions.search_web	🔍 वेब सर्च (कॉन्फ़िगर योग्य)
+sg_actions.sel_down	✎ ↓ नीचे चुनें
+sg_actions.sel_left	✎ ← बाएं चुनें
+sg_actions.sel_right	✎ → दाएं चुनें
+sg_actions.sel_up	✎ ↑ ऊपर चुनें
+sg_actions.sel_word_next	✎ W → अगला शब्द चुनें
+sg_actions.sel_word_prev	✎ W ← पिछला शब्द चुनें
+sg_actions.select_all	⬚ सभी चुनें
+sg_actions.select_line	☰ पंक्ति चुनें
+sg_actions.sg_order.header.alt	#⎇ (Alt) शॉर्टकट
+sg_actions.sg_order.header.cmd	#⌘ (Cmd) शॉर्टकट
+sg_actions.sg_order.header.cmd_shift	#⌘⇧ (Cmd+Shift) शॉर्टकट
+sg_actions.sg_order.header.ctrl	#^ (Ctrl) शॉर्टकट
+sg_actions.sg_order.header.ctrl_shift	#^⇧ (Ctrl+Shift) शॉर्टकट
+sg_actions.sg_order.header.cursor	#कर्सर और टेक्स्ट
+sg_actions.sg_order.header.debug	#डिबग
+sg_actions.sg_order.header.edition	#संपादन
+sg_actions.sg_order.header.files	#फाइलें
+sg_actions.sg_order.header.grp_app	Ergopti
+sg_actions.sg_order.header.grp_input	इनपुट
+sg_actions.sg_order.header.grp_media	मीडिया
+sg_actions.sg_order.header.grp_system	सिस्टम
+sg_actions.sg_order.header.grp_text	टेक्स्ट
+sg_actions.sg_order.header.grp_windows	विंडो और स्थान
+sg_actions.sg_order.header.hs_ctrl	#^ (Ctrl) शॉर्टकट — macOS
+sg_actions.sg_order.header.hs_ctrl_shift	#^⇧ (Ctrl+Shift) शॉर्टकट — macOS
+sg_actions.sg_order.header.hs_option	#⌥ (Option) शॉर्टकट — macOS
+sg_actions.sg_order.header.keys	#कुंजियां
+sg_actions.sg_order.header.media	#मीडिया
+sg_actions.sg_order.header.mouse_nav	#माउस और नेविगेशन
+sg_actions.sg_order.header.navigation	#नेविगेशन
+sg_actions.sg_order.header.screenshot	#स्क्रीनशॉट
+sg_actions.sg_order.header.script	#स्क्रिप्ट प्रबंधन
+sg_actions.sg_order.header.selection	#टेक्स्ट चयन
+sg_actions.sg_order.header.spaces	#स्पेसेस / डेस्कटॉप
+sg_actions.sg_order.header.system	#सिस्टम
+sg_actions.sg_order.header.system_actions	#सिस्टम क्रियाएं
+sg_actions.sg_order.header.tabs	#टैब
+sg_actions.sg_order.header.tapholds	#Tap-Hold क्रियाएं
+sg_actions.sg_order.header.ui	#इंटरफ़ेस
+sg_actions.sg_order.header.win	#⊞ (Win) शॉर्टकट
+sg_actions.sg_order.header.windows	#विंडोज
+sg_actions.snap_left	◧ ← बाएं स्नैप करें
+sg_actions.snap_right	◨ → दाएं स्नैप करें
+sg_actions.space	␣ स्पेस
+sg_actions.space_next	▢ → अगली स्पेस
+sg_actions.space_prev	▢ ← पिछली स्पेस
+sg_actions.spotlight_mouse	🔦 माउस स्पॉटलाइट
+sg_actions.surround_parens	() कोष्ठक से घेरें
+sg_actions.tab	⇥ टैब
+sg_actions.tab_close	⧉ × टैब बंद करें
+sg_actions.tab_new	⧉ + नया टैब
+sg_actions.tab_next	⧉ → अगला टैब
+sg_actions.tab_prev	⧉ ← पिछला टैब
+sg_actions.take_note	📝 नोट लें
+sg_actions.task_view	▢ टास्क व्यू
+sg_actions.teleport_mouse	🖱 माउस टेलीपोर्ट करें
+sg_actions.titlecase_selection	Aa शीर्षक केस
+sg_actions.toggle_capslock	⇪ CapsLock टॉगल करें
+sg_actions.track_next	⏭ अगला ट्रैक
+sg_actions.track_play	⏯ चलाएं/रोकें
+sg_actions.track_prev	⏮ पिछला ट्रैक
+sg_actions.undo	↩ पूर्ववत करें
+sg_actions.uppercase_selection	AA अपरकेस / लोअरकेस
+sg_actions.vol_down	🔊 - वॉल्यूम -
+sg_actions.vol_up	🔊 + वॉल्यूम +
+sg_actions.win_app_next	◱ → अगली विंडो (समान ऐप)
+sg_actions.win_app_prev	◱ ← पिछली विंडो (समान ऐप)
+sg_actions.win_next	◱ → अगली विंडो
+sg_actions.win_prev	◱ ← पिछली विंडो
+sg_actions.word_next	W → अगला शब्द
+sg_actions.word_prev	W ← पिछला शब्द
+sg_labels.script_altgr_backspace	AltGr + ⌫
+sg_labels.script_altgr_delete	AltGr + ⌦
+sg_labels.script_altgr_enter	AltGr + एंटर
+sg_labels.script_altgr_escape	AltGr + Esc
+shortcut_utils.format_hint	mods+कुंजी प्रारूप उपयोग करें, जैसे cmd+shift+b
+shortcut_utils.format_invalid	अमान्य प्रारूप
+shortcuts.agrave	À कुंजी पर सभी शॉर्टकट निम्न के मानचित्र हैं 
+shortcuts.altgrcapslock.backspace	"AltGr" + "CapsLock" = BackSpace
+shortcuts.altgrcapslock.capslock	"AltGr" + "CapsLock" = CapsLock
+shortcuts.altgrcapslock.capsword	"AltGr" + "CapsLock" = CapsWord
+shortcuts.altgrcapslock.ctrlbackspace	"AltGr" + "CapsLock" = Ctrl + BackSpace
+shortcuts.altgrcapslock.ctrldelete	"AltGr" + "CapsLock" = Ctrl + Delete
+shortcuts.altgrcapslock.delete	"AltGr" + "CapsLock" = Delete
+shortcuts.altgrcapslock.enter	"AltGr" + "Caps" = Enter
+shortcuts.altgrcapslock.escape	"AltGr" + "Caps" = Esc
+shortcuts.altgrcapslock.oneshotshift	"AltGr" + "CapsLock" = OneShotShift
+shortcuts.altgrcapslock.tab	"AltGr" + "CapsLock" = Tab
+shortcuts.altgrlalt.backspace	"AltGr" + "LAlt" = BackSpace
+shortcuts.altgrlalt.capslock	"AltGr" + "LAlt" = CapsLock
+shortcuts.altgrlalt.capsword	"AltGr" + "LAlt" = CapsWord
+shortcuts.altgrlalt.ctrlbackspace	"AltGr" + "LAlt" = Ctrl + BackSpace
+shortcuts.altgrlalt.ctrldelete	"AltGr" + "LAlt" = Ctrl + Delete
+shortcuts.altgrlalt.delete	"AltGr" + "LAlt" = Delete
+shortcuts.altgrlalt.enter	"AltGr" + "LAlt" = एंटर
+shortcuts.altgrlalt.escape	"AltGr" + "LAlt" = Esc
+shortcuts.altgrlalt.oneshotshift	"AltGr" + "LAlt" = OneShotShift
+shortcuts.altgrlalt.tab	"AltGr" + "LAlt" = Tab
+shortcuts.color_copied	रंग कॉपी किया: %s
+shortcuts.color_picker_result	कर्सर के नीचे का रंग {1} है।\n\nइसे क्लिपबोर्ड पर कॉपी किया गया।
+shortcuts.color_picker_title	पिक्सेल रंग
+shortcuts.copy_path_notif	पथ कॉपी किया: %s
+shortcuts.eacute	É कुंजी पर सभी शॉर्टकट निम्न के मानचित्र हैं 
+shortcuts.ecirc	Ê कुंजी पर सभी शॉर्टकट निम्न के मानचित्र हैं 
+shortcuts.egrave	È कुंजी पर सभी शॉर्टकट निम्न के मानचित्र हैं 
+shortcuts.gethexvalue	Win + X (heX) = कर्सर के नीचे पिक्सल के HEX रंग को क्लिपबोर्ड में कॉपी करें
+shortcuts.gpt	Win + G(PT) = ChatGPT खोलें (कॉन्फ़िगर योग्य URL)
+shortcuts.keep_awake_off	☕ जागता रखें — निष्क्रिय
+shortcuts.keep_awake_on	☕ जागता रखें — सक्रिय — Ctrl+M से निष्क्रिय करें
+shortcuts.label_at_hash	तुरंत स्क्रीनशॉट
+shortcuts.label_cmd_shift_v	फॉर्मेटिंग के बिना पेस्ट करें
+shortcuts.label_cmd_star	Cmd + S (mod को संरक्षित करता है।)
+shortcuts.label_ctrl_a	पंक्ति चुनें
+shortcuts.label_ctrl_capslock	CapsLock टॉगल करें
+shortcuts.label_ctrl_d	डाउनलोड खोलें
+shortcuts.label_ctrl_e	फाइंडर खोलें
+shortcuts.label_ctrl_g	ChatGPT खोलें (मेनू में URL सेट करें)
+shortcuts.label_ctrl_h	क्लिपबोर्ड में इंटरैक्टिव स्क्रीनशॉट
+shortcuts.label_ctrl_i	सेटिंग्स खोलें
+shortcuts.label_ctrl_l	स्क्रीन लॉक करें
+shortcuts.label_ctrl_m	एंटी-स्लीप
+shortcuts.label_ctrl_o	पंक्ति को कोष्ठक से घेरें
+shortcuts.label_ctrl_p	मिरर / विस्तारित डिस्प्ले टॉगल करें
+shortcuts.label_ctrl_period	इमोजी पिकर खोलें
+shortcuts.label_ctrl_quote	माउस स्पॉटलाइट
+shortcuts.label_ctrl_s	खोलें / पथ कॉपी करें
+shortcuts.label_ctrl_t	माउस को अन्य मॉनिटर में टेलीपोर्ट करें
+shortcuts.label_ctrl_u	अपरकेस / लोअरकेस टॉगल करें
+shortcuts.label_ctrl_w	शीर्षक केस / लोअरकेस टॉगल करें
+shortcuts.label_ctrl_x	कर्सर के नीचे पिक्सल का हेक्स रंग कॉपी करें
+shortcuts.label_layer_scroll	वॉल्यूम
+shortcuts.label_wrap_text	एक प्रतीक टाइप करने से चयन घिरता है
+shortcuts.laltcapslock.backspace	"LAlt" + "CapsLock" = BackSpace
+shortcuts.laltcapslock.capslock	"LAlt" + "CapsLock" = CapsLock
+shortcuts.laltcapslock.capsword	"LAlt" + "CapsLock" = CapsWord
+shortcuts.laltcapslock.ctrlbackspace	"LAlt" + "CapsLock" = Ctrl + BackSpace
+shortcuts.laltcapslock.ctrldelete	"LAlt" + "CapsLock" = Ctrl + Delete
+shortcuts.laltcapslock.delete	"LAlt" + "CapsLock" = Delete
+shortcuts.laltcapslock.enter	"LAlt" + "Caps" = Enter
+shortcuts.laltcapslock.escape	"LAlt" + "Caps" = Esc
+shortcuts.laltcapslock.oneshotshift	"LAlt" + "CapsLock" = OneShotShift
+shortcuts.laltcapslock.tab	"LAlt" + "CapsLock" = Tab
+shortcuts.microsoftbold	Ctrl + B Microsoft अनुप्रयोगों में पाठ को बोल्ड बनाता है (Ctrl + G की तरह)
+shortcuts.move	Win + M(ove) = माउस को यादृच्छिक रूप से स्थानांतरित करके गतिविधि अनुकरण करें। शॉर्टकट दोहराएं या स्क्रिप्ट को रीलोड करें रोकने के लिए
+shortcuts.no_active_window	कोई सक्रिय विंडो नहीं
+shortcuts.no_other_monitor	कोई अन्य मॉनिटर नहीं मिला
+shortcuts.opendownloads	Win + D(ownloads) = डाउनलोड फोल्डर खोलें
+shortcuts.pixel_read_error	पिक्सेल रंग नहीं पढ़ सका
+shortcuts.saved	सहेजा गया: %s
+shortcuts.screen	Win + H (screensHot) = स्क्रीन कैप्चर (Win + Shift + S ट्रिगर करता है)
+shortcuts.screeninstant	1 के बाईं ओर की कुंजी = सक्रिय विंडो का तुरंत कैप्चर, टाइमस्टैम्प के साथ चित्रों में सहेजा जाता है
+shortcuts.screenocr	Win + C (OCR) = टेक्स्ट निष्कर्षण के साथ स्क्रीनशॉट (Win + Shift + T)
+shortcuts.screenshot_copied	स्क्रीनशॉट क्लिपबोर्ड पर कॉपी किया
+shortcuts.screenshot_title	स्क्रीनशॉट
+shortcuts.search	Win + S(earch) = इंटरनेट पर चयन खोजें। एक्सप्लोरर में, चयनित फाइल पथ कॉपी करता है
+shortcuts.shortcut_format_hint	प्रारूप: mods+key (जैसे cmd+alt+p)\nउपलब्ध mods: cmd, alt, ctrl, shift\nअक्षम करने के लिए खाली छोड़ें
+shortcuts.shortcut_label	शॉर्टकट
+shortcuts.spotlightmouse	Win + ' = माउस को पीली रिंग से हाइलाइट करें
+shortcuts.surroundwithparentheses	Win + O = पंक्ति को कोष्ठक से घेरें
+shortcuts.takenote	Win + N(ote) = नोट लेने के लिए फाइल खोलें
+shortcuts.teleportmouse	Win + T(eleport) = माउस को अन्य मॉनिटर के केंद्र में टेलीपोर्ट करें (चक्रीय)
+shortcuts.titlecase	Win + W = शीर्षक केस में कनवर्ट करें (प्रत्येक शब्द के पहले अक्षर को बड़ा करें)
+shortcuts.uppercase	Win + U(ppercase) = चयन अपरकेस/लोअरकेस टॉगल करें
+shortcuts.wincapslock	Win + "CapsLock" = CapsLock
+startup.manifest_missing	स्टार्टअप त्रुटि: _generated/features_manifest.ahk फ़ाइल अनुपस्थित या दूषित है।\n\nप्रोजेक्ट डायरेक्टरी से `npm run build:manifest` चलाएं, फिर स्क्रिप्ट को पुनः प्रारंभ करें।
+startup.manifest_title	ErgoptiPlus — manifest अनुपस्थित
+tap_hold.action.disable	मूल कुंजी
+tap_hold.disable_all	सब अक्षम करें
+tap_hold.group.alt_gr	AltGr
+tap_hold.group.backspace	बैकस्पेस
+tap_hold.group.caps_lock	CapsLock
+tap_hold.group.delete	Delete
+tap_hold.group.enter	एंटर
+tap_hold.group.escape	एस्केप
+tap_hold.group.left_alt	LAlt
+tap_hold.group.left_ctrl	LCtrl
+tap_hold.group.left_shift	LShift
+tap_hold.group.right_ctrl	RCtrl
+tap_hold.group.right_shift	RShift
+tap_hold.group.space	स्पेस
+tap_hold.group.tab	Tab
+tap_hold.group.win	Win
+tap_hold.hold.alt	Alt
+tap_hold.hold.alt_gr	AltGr
+tap_hold.hold.ctrl	Ctrl
+tap_hold.hold.nav_layer	Nav परत
+tap_hold.hold.none	मूल कुंजी
+tap_hold.hold.shift	Shift
+tap_hold.hold.win	Win
+tap_hold.picker.hold	Hold → %s
+tap_hold.picker.tap	Tap → %s
+tap_hold.picker.title_prefix	टैप क्रिया — 
+tap_hold.reset_defaults	डिफ़ॉल्ट मान पुनर्स्थापित करें
+tap_hold.tap.none	मूल कुंजी
+terminators.label_close_paren	) : बंद कोष्ठक
+terminators.label_enter	⏎ : एंटर
+terminators.label_equal	= : बराबर
+terminators.label_nbsp	⍽ : नॉन-ब्रेकिंग स्पेस
+terminators.label_nnbsp	⍽ : नैरो नॉन-ब्रेकिंग स्पेस
+token_prompt.create_link	👉 एक बनाने के लिए यहां क्लिक करें
+token_prompt.instruction	डाउनलोड को तेजी से करने के लिए अपना HuggingFace टोकन (hf_...) पेस्ट करें।
+token_prompt.label	HuggingFace टोकन:
+token_prompt.no_token	टोकन नहीं है?
+token_prompt.placeholder	hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx...
+token_prompt.title	🔐 HuggingFace लॉगिन
+token_prompt.validate	सत्यापित करें
+token_prompt.window_title	HuggingFace लॉगिन
+ui_apps.axis_chars	वर्ण
+ui_apps.axis_speed	वर्ण / फोकस मिनट
+ui_apps.boxplot_scale	स्केल: 0 → {max}
+ui_apps.boxplot_tip	{n} सत्र · माध्यिका {med} (Q1 {q1}, Q3 {q3})
+ui_apps.btn_add_app	एक ऐप वर्गीकृत करें…
+ui_apps.btn_close	बंद करें
+ui_apps.btn_compare	तुलना करें ↔
+ui_apps.btn_count_awake	जागृत रखने की गिनती
+ui_apps.btn_mode_chars	वर्ण
+ui_apps.btn_mode_time	समय
+ui_apps.btn_refresh	ताज़ा करें
+ui_apps.cat_edit_tooltip	श्रेणी संपादित करें
+ui_apps.chart_active_ratio	दिनों में सक्रिय अनुपात
+ui_apps.chart_activity_cal	गतिविधि कैलेंडर (रोलिंग 12 महीने)
+ui_apps.chart_annotated_strip	एनोटेट किया गया टाइमलाइन
+ui_apps.chart_app_switches	ऐप स्विच
+ui_apps.chart_burst_hist	Burst हिस्टोग्राम
+ui_apps.chart_cat_evolution	श्रेणी विकास
+ui_apps.chart_daily_evolution	दैनिक विकास
+ui_apps.chart_day_strip	दिन पट्टी
+ui_apps.chart_hour_weekday	घंटा × सप्ताह का दिन
+ui_apps.chart_prod_vs_dist	उत्पादक बनाम व्याकुलता
+ui_apps.chart_session_durations	ऐप द्वारा सत्र अवधि
+ui_apps.chart_speed_by_cat	श्रेणी द्वारा टाइपिंग गति (CPM)
+ui_apps.chart_speed_by_hour	घंटे द्वारा टाइपिंग गति (CPM)
+ui_apps.chart_time_by_cat	श्रेणी द्वारा समय
+ui_apps.chart_timeline	कालानुक्रमिक विकास
+ui_apps.chart_title_day	दिन विकास
+ui_apps.chart_title_period	अवधि विकास
+ui_apps.chart_top7	शीर्ष 7 अनुप्रयोग (समय)
+ui_apps.chart_top8	शीर्ष 8 ऐप्स: समय बनाम वर्ण
+ui_apps.chart_top_days	शीर्ष दिन
+ui_apps.chart_top_sessions	शीर्ष सत्र
+ui_apps.chart_top_switch_pairs	शीर्ष स्विच जोड़ियाँ
+ui_apps.chart_top_windows	शीर्ष विंडोज़
+ui_apps.chart_wake_sleep	जागने और सोने के समय (कीबोर्ड)
+ui_apps.cmp_active_time	सक्रिय समय
+ui_apps.cmp_chars	वर्ण
+ui_apps.cmp_focus_time	फोकस समय
+ui_apps.cmp_productivity	उत्पादकता
+ui_apps.cmp_sessions	सत्र
+ui_apps.cmp_switches	स्विच
+ui_apps.cmp_window	वर्तमान: {cur} ‹{period}› · पिछला: {prev}
+ui_apps.col_app	अनुप्रयोग
+ui_apps.col_app_name	अनुप्रयोग
+ui_apps.col_category	श्रेणी
+ui_apps.col_chars	वर्ण
+ui_apps.col_day	दिन
+ui_apps.col_density	घनत्व
+ui_apps.col_duration	अवधि
+ui_apps.col_focus	फोकस
+ui_apps.col_focus_time	फोकस समय
+ui_apps.col_from	से
+ui_apps.col_hold	होल्ड
+ui_apps.col_hs_pct	% HS
+ui_apps.col_latency	विलंबता
+ui_apps.col_sessions	सत्र
+ui_apps.col_share	शेयर
+ui_apps.col_switches	स्विच
+ui_apps.col_to	को
+ui_apps.col_top_dests	शीर्ष गंतव्य
+ui_apps.col_typing_pct	टाइपिंग %
+ui_apps.col_window	विंडो
+ui_apps.compare_title	पिछली अवधि से तुलना
+ui_apps.detail_global_activity	कुल रिकॉर्ड की गई गतिविधि
+ui_apps.detail_productivity_score	आपकी श्रेणियों से गणना किया गया स्कोर
+ui_apps.ds_active_ratio	सक्रिय अनुपात (%)
+ui_apps.ds_bursts	Bursts
+ui_apps.ds_chars	वर्ण
+ui_apps.ds_first_key	पहली कुंजी दबाव
+ui_apps.ds_focus_h	फोकस (घं)
+ui_apps.ds_focus_time	फोकस समय
+ui_apps.ds_last_key	अंतिम कुंजी दबाव
+ui_apps.ds_speed	गति (वर्ण / फोकस मिनट)
+ui_apps.ds_switches	स्विच
+ui_apps.empty_activity	इस अवधि के लिए कोई गतिविधि रिकॉर्ड नहीं की गई।
+ui_apps.empty_app_switches	इस अवधि में कोई स्विच नहीं।
+ui_apps.empty_boxplot	बॉक्सप्लॉट खींचने के लिए पर्याप्त सत्र नहीं हैं (प्रति ऐप ≥ 4)।
+ui_apps.empty_comparator	तुलना सक्षम करने के लिए एक बंधी हुई अवधि चुनें।
+ui_apps.empty_day	कोई दिन चयनित नहीं।
+ui_apps.empty_days	कोई दिन रिकॉर्ड नहीं किया गया।
+ui_apps.empty_period	इस अवधि के लिए कोई डेटा नहीं।
+ui_apps.empty_sessions	कोई सत्र पहचाना नहीं गया।
+ui_apps.empty_switches	इस अवधि में कोई स्विच नहीं।
+ui_apps.empty_windows	अभी तक कोई विंडो शीर्षक एकत्रित नहीं किया गया।
+ui_apps.goal_prompt	दैनिक लक्ष्य सक्रिय फोकस मिनटों में:
+ui_apps.goal_reached	आज का लक्ष्य पूरा हुआ ✓
+ui_apps.goal_remaining	लक्ष्य तक पहुँचने के लिए {pct}% शेष है
+ui_apps.h2_active_time	सक्रिय समय
+ui_apps.h2_app_hopping	ऐप-हॉपिंग
+ui_apps.h2_autorepeat	स्वतः-दोहराव
+ui_apps.h2_battery	बैटरी
+ui_apps.h2_best_hour	सर्वश्रेष्ठ घंटा
+ui_apps.h2_burst_record	Burst रिकॉर्ड
+ui_apps.h2_context_volume	संदर्भ वॉल्यूम
+ui_apps.h2_daily_goal	दैनिक लक्ष्य
+ui_apps.h2_density	घनत्व
+ui_apps.h2_depth	औसत गहराई
+ui_apps.h2_dominant_cat	प्रमुख श्रेणी
+ui_apps.h2_finger_streak	उँगली की श्रृंखला
+ui_apps.h2_first_last	पहली / अंतिम
+ui_apps.h2_focus_index	फोकस सूचकांक
+ui_apps.h2_focus_latency	फोकस विलंबता
+ui_apps.h2_keep_awake	जागृत रखें
+ui_apps.h2_layouts	देखी गई लेआउट
+ui_apps.h2_lock_vs_sleep	लॉक बनाम नींद
+ui_apps.h2_locks	लॉक घटनाएँ
+ui_apps.h2_long_sessions	लंबे सत्र
+ui_apps.h2_longest_burst	सबसे लंबा burst
+ui_apps.h2_longest_session	सबसे लंबा सत्र
+ui_apps.h2_max_cascade	अधिकतम कैस्केड
+ui_apps.h2_most_errors	सबसे अधिक त्रुटियाँ ऐप
+ui_apps.h2_muted	ऑडियो म्यूट
+ui_apps.h2_night_wakeups	रात की जागरण
+ui_apps.h2_passive_system	सिस्टम निष्क्रिय
+ui_apps.h2_pivot_app	पिवट ऐप
+ui_apps.h2_productivity	उत्पादकता सूचकांक
+ui_apps.h2_record_day	रिकॉर्ड दिन
+ui_apps.h2_screen_time	स्क्रीन समय
+ui_apps.h2_session_record	सत्र रिकॉर्ड
+ui_apps.h2_sessions	सत्र
+ui_apps.h2_slowest_recovery	सबसे धीमी वसूली
+ui_apps.h2_spaces	Spaces
+ui_apps.h2_streak_chars	वर्ण श्रृंखला ≥ 1k
+ui_apps.h2_streak_focus	फोकस श्रृंखला ≥ 30 मिनट
+ui_apps.h2_top_trio	शीर्ष तिकड़ी
+ui_apps.h2_wifi_changes	Wi-Fi परिवर्तन
+ui_apps.kpi_app_days_90	ऐप-दिन ≥ 90 मिनट
+ui_apps.kpi_app_switches	ऐप स्विच
+ui_apps.kpi_awake_excluded	आँकड़ों से बाहर रखा गया (बंद करें)
+ui_apps.kpi_awake_included	आँकड़ों में शामिल
+ui_apps.kpi_best_hour_score	औसत स्कोर {score} (-2 से 2)
+ui_apps.kpi_bursts_count	{n} burst(s) में
+ui_apps.kpi_car_per_min	वर्ण / फोकस मिनट
+ui_apps.kpi_cascades_period	अवधि में {n} कैस्केड(s)
+ui_apps.kpi_chars_in_a_row	एक पंक्ति में वर्ण
+ui_apps.kpi_day_best	{date} को
+ui_apps.kpi_focus_taken	{n} फोकस ग्रैब(स) के ऊपर
+ui_apps.kpi_hopping_detail	स्विच / फोकस मिनट
+ui_apps.kpi_in_app	{name} में
+ui_apps.kpi_lock_sleep_cumul	{dur} संचित
+ui_apps.kpi_lock_vs_sleep	लॉक / नींद
+ui_apps.kpi_never_active	कभी सक्रिय नहीं
+ui_apps.kpi_never_reached	कभी पहुँचा नहीं
+ui_apps.kpi_night_wakes	0 घंटे और 6 घंटे के बीच जागरण
+ui_apps.kpi_no_backslash_out	कोई बाहर जाने वाला स्विच नहीं
+ui_apps.kpi_no_burst	कोई burst नहीं
+ui_apps.kpi_no_data	कोई डेटा नहीं
+ui_apps.kpi_no_day_data	दिन के आधार पर कोई डेटा नहीं
+ui_apps.kpi_no_enough_errors	पर्याप्त त्रुटियाँ नहीं
+ui_apps.kpi_no_enough_typing	पर्याप्त टाइपिंग नहीं
+ui_apps.kpi_no_focus	पर्याप्त फोकस नहीं
+ui_apps.kpi_no_focus_tracked	कोई फोकस ट्रैक नहीं किया गया
+ui_apps.kpi_no_keystrokes	अवधि में कोई कुंजी दबाव नहीं
+ui_apps.kpi_no_layout	कोई लेआउट रिकॉर्ड नहीं
+ui_apps.kpi_no_lock	कोई लॉक पहचाना नहीं गया
+ui_apps.kpi_no_long_session	कोई लंबा सत्र नहीं
+ui_apps.kpi_no_mobility	कोई गतिविधि नहीं
+ui_apps.kpi_no_mute	कभी म्यूट नहीं
+ui_apps.kpi_no_record	अवधि में कोई रिकॉर्ड नहीं
+ui_apps.kpi_no_repeat	कोई दोहराव नहीं
+ui_apps.kpi_no_session	कोई सत्र नहीं
+ui_apps.kpi_no_switch	कोई स्विच नहीं
+ui_apps.kpi_not_measured	अभी तक मापा नहीं गया
+ui_apps.kpi_pct_focus_time	फोकस समय का {pct}%
+ui_apps.kpi_productive	उत्पादक {p}% · तटस्थ {n}% · विकर्षण {d}%
+ui_apps.kpi_session_mean	औसत {dur}
+ui_apps.kpi_sleep_intact	नींद सुरक्षित
+ui_apps.kpi_space_switches	Space स्विच
+ui_apps.kpi_streak_chars	लगातार दिन ≥ 1000 वर्ण
+ui_apps.kpi_streak_focus	लगातार दिन ≥ 30 मिनट सक्रिय
+ui_apps.kpi_switches_between	2 स्विच के बीच ({n} स्विच)
+ui_apps.kpi_top_layout	शीर्ष: {name}
+ui_apps.kpi_towards_apps	{n} अलग ऐप्स की ओर
+ui_apps.kpi_wifi_switches	नेटवर्क स्विच
+ui_apps.label_categories	श्रेणियाँ:
+ui_apps.label_date	चालू:
+ui_apps.label_days	दिन:
+ui_apps.label_period	अवधि:
+ui_apps.lbl_switches	स्विच:
+ui_apps.lbl_top_wifi	शीर्ष WiFi:
+ui_apps.lbl_unlocks	अनलॉक:
+ui_apps.loading_data	डेटा लोड हो रहा है...
+ui_apps.modal_activity_hour	घंटे के अनुसार गतिविधि
+ui_apps.modal_app_title	अनुप्रयोग
+ui_apps.modal_backspace_pct	वर्णों का {pct}%
+ui_apps.modal_chart_label	वर्ण
+ui_apps.modal_density	{n} वर्ण/मिनट
+ui_apps.modal_destinations	गंतव्य
+ui_apps.modal_hs_ai	Hotstrings और AI
+ui_apps.modal_hs_line	Hotstring: {n} वर्ण ({pct}%)
+ui_apps.modal_layouts	उपयोग की गई लेआउट
+ui_apps.modal_llm_line	AI: {n} वर्ण ({pct}%)
+ui_apps.modal_longest_session	सबसे लंबा {dur}
+ui_apps.modal_pct_focus	फोकस का {pct}%
+ui_apps.modal_record_burst	सर्वश्रेष्ठ burst CPM: {n}
+ui_apps.modal_record_cascade	Backspace कैस्केड: {n}
+ui_apps.modal_record_session	सबसे लंबा सत्र: {dur}{chars}
+ui_apps.modal_records	रिकॉर्ड
+ui_apps.modal_total_chars	कुल टाइप किए गए वर्ण: {n}
+ui_apps.opt_period.all	सभी
+ui_apps.opt_period.day	दिन
+ui_apps.opt_period.month	पिछले 30 दिन
+ui_apps.opt_period.week	पिछले 7 दिन
+ui_apps.opt_period.year	वर्ष
+ui_apps.prod_negative	विकर्षण
+ui_apps.prod_neutral	तटस्थ
+ui_apps.prod_positive	उत्पादक
+ui_apps.row_tooltip	{name} का विवरण देखें
+ui_apps.sub_speed_by_hour	फोकस मिनट प्रति वर्ण, सक्रिय अवधि में
+ui_apps.tab_apps	ऐप्स और मल्टीटास्किंग
+ui_apps.tab_overview	अवलोकन
+ui_apps.tab_system	सिस्टम और रिकॉर्ड
+ui_apps.tab_time	समय और लय
+ui_apps.tab_typing	टाइपिंग और उत्पादकता
+ui_apps.tile_backspaces	बैकस्पेस
+ui_apps.tile_chars	वर्ण
+ui_apps.tile_focus	फोकस
+ui_apps.tile_focus_lat	फोकस विलंबता
+ui_apps.tile_sessions	सत्र
+ui_apps.tile_typing	सक्रिय टाइपिंग
+ui_apps.title	ऐप टाइम ट्रैकर
+ui_typing.apps_all	ऐप्स (सभी)
+ui_typing.apps_none	ऐप्स (कोई नहीं)
+ui_typing.btn_apps_all	ऐप्स (सभी)
+ui_typing.btn_case_sensitive	केस संवेदनशील
+ui_typing.btn_doublings_excluded	दोहराव बाहर रखे गए
+ui_typing.btn_doublings_included	दोहराव शामिल किए गए
+ui_typing.btn_reset	रीसेट करें
+ui_typing.btn_restore_zoom	ज़ूम रीसेट करें
+ui_typing.btn_toggle_hs_title	+ Hotstrings: सांख्यिकी में hotstring वर्ण जोड़ता है। अक्षम: केवल मैनुअल कीस्ट्रोक।
+ui_typing.btn_toggle_llm_title	+ AI: सांख्यिकी में AI-जनित वर्ण जोड़ता है। अक्षम: केवल मैनुअल कीस्ट्रोक।
+ui_typing.calendar_active_days	सक्रिय दिन
+ui_typing.calendar_chars	वर्ण
+ui_typing.calendar_day_fri	शुक्रवार
+ui_typing.calendar_day_mon	सोमवार
+ui_typing.calendar_day_wed	बुधवार
+ui_typing.calendar_month_0	जनवरी
+ui_typing.calendar_month_1	फरवरी
+ui_typing.calendar_month_10	नवंबर
+ui_typing.calendar_month_11	दिसंबर
+ui_typing.calendar_month_2	मार्च
+ui_typing.calendar_month_3	अप्रैल
+ui_typing.calendar_month_4	मई
+ui_typing.calendar_month_5	जून
+ui_typing.calendar_month_6	जुलाई
+ui_typing.calendar_month_7	अगस्त
+ui_typing.calendar_month_8	सितंबर
+ui_typing.calendar_month_9	अक्टूबर
+ui_typing.calendar_no_keystrokes	कोई कीस्ट्रोक नहीं
+ui_typing.calendar_subtitle	पिछले 12 महीने
+ui_typing.calendar_title	गतिविधि कैलेंडर
+ui_typing.charmix_digits	Digits
+ui_typing.charmix_letters	Letters
+ui_typing.charmix_other	Other
+ui_typing.charmix_punct	Punctuation
+ui_typing.charmix_spaces	Spaces
+ui_typing.chart_title_activity_5min	गतिविधि (कुंजियाँ / 5 मि)
+ui_typing.chart_title_precision_5min	सटीकता (%) — 5 मि. दृश्य
+ui_typing.col_acc	सटीकता
+ui_typing.col_active_time	सक्रिय समय
+ui_typing.col_app	ऐप
+ui_typing.col_chars	वर्ण
+ui_typing.col_freq	सापेक्ष आवृत्ति ↕
+ui_typing.col_km	उंगली किमी ↕
+ui_typing.col_occ	घटनाएँ ↕
+ui_typing.col_rep	पुनरावृत्तियां ↕
+ui_typing.col_seq	अनुक्रम ↕
+ui_typing.col_time	औसत समय (ms) ↕
+ui_typing.col_wpm	WPM समकक्ष
+ui_typing.cpm_mode_ai	AI के साथ
+ui_typing.cpm_mode_hs	HS के साथ
+ui_typing.cpm_mode_hs_ai	HS + AI के साथ
+ui_typing.cpm_mode_manual	केवल मैनुअल कीस्ट्रोक
+ui_typing.cpm_unit_output_chars	स्क्रीन पर वर्ण
+ui_typing.cpm_unit_raw_chars	कच्चे वर्ण टाइप किए गए
+ui_typing.dataset_ai	AI
+ui_typing.dataset_hs	Hotstrings
+ui_typing.dataset_manual	मैनुअल
+ui_typing.dataset_precision	सटीकता (%)
+ui_typing.dataset_speed	गति
+ui_typing.dataset_touches_5min	कीस्ट्रोक / 5 मिनट
+ui_typing.dataset_touches_h	कीस्ट्रोक/घंटा
+ui_typing.day_0	रविवार
+ui_typing.day_1	सोमवार
+ui_typing.day_2	मंगलवार
+ui_typing.day_3	बुधवार
+ui_typing.day_4	गुरुवार
+ui_typing.day_5	शुक्रवार
+ui_typing.day_6	शनिवार
+ui_typing.errors_no_data	इस अवधि के लिए कोई सुधार दर्ज नहीं किया गया।
+ui_typing.errors_table_bigram	बिग्राम
+ui_typing.errors_table_errors	त्रुटियां
+ui_typing.errors_table_occ	घटनाएँ
+ui_typing.errors_table_rate	दर
+ui_typing.finger.hand_l	बाएं
+ui_typing.finger.hand_r	दाएं
+ui_typing.finger.l_idx	तर्जनी दाएं
+ui_typing.finger.l_mid	मध्य दाएं
+ui_typing.finger.l_pinky	छोटी उंगली दाएं
+ui_typing.finger.l_ring	अनामिका दाएं
+ui_typing.finger.l_thumb	अंगूठा दाएं
+ui_typing.finger.r_idx	तर्जनी बाएं
+ui_typing.finger.r_mid	मध्य बाएं
+ui_typing.finger.r_pinky	छोटी उंगली बाएं
+ui_typing.finger.r_ring	अनामिका बाएं
+ui_typing.finger.r_thumb	अंगूठा बाएं
+ui_typing.h2_ai	कृत्रिम बुद्धिमत्ता
+ui_typing.h2_app_activity	ऐप द्वारा गतिविधि
+ui_typing.h2_bigram_ergo	बिग्राम एर्गोनॉमिक्स
+ui_typing.h2_char_mix	वर्ण मिश्रण
+ui_typing.h2_doublings	दोहराव
+ui_typing.h2_error_bigrams	सबसे अधिक सुधारे गए बिग्राम
+ui_typing.h2_finger_dist	उंगली की दूरी
+ui_typing.h2_health	स्वास्थ्य और एर्गोनॉमिक्स
+ui_typing.h2_hs	Hotstrings
+ui_typing.h2_hs_ai_prod	HS / AI उत्पादकता
+ui_typing.h2_lexicon	शब्दकोश
+ui_typing.h2_records	व्यक्तिगत रिकॉर्ड
+ui_typing.h2_rhythm	लय और burst
+ui_typing.h2_sessions	सत्र
+ui_typing.h2_speed	औसत गति
+ui_typing.h2_trigram_ergo	ट्राइग्राम एर्गोनॉमिक्स
+ui_typing.h3_activity_hourly	गतिविधि (कीस्ट्रोक/घंटा)
+ui_typing.h3_keystroke_origin	कीस्ट्रोक उत्पत्ति
+ui_typing.h3_precision	सटीकता (%)
+ui_typing.h3_precision_hourly	सटीकता (%) — प्रति घंटा दृश्य
+ui_typing.h3_speed	गति (WPM)
+ui_typing.heatmap_day_fri	शुक्रवार
+ui_typing.heatmap_day_mon	सोमवार
+ui_typing.heatmap_day_sat	शनिवार
+ui_typing.heatmap_day_sun	रविवार
+ui_typing.heatmap_day_thu	गुरुवार
+ui_typing.heatmap_day_tue	मंगलवार
+ui_typing.heatmap_day_wed	बुधवार
+ui_typing.heatmap_hour_chars_abbrev	वर्ण
+ui_typing.heatmap_hour_no_keystrokes	कोई कीस्ट्रोक नहीं
+ui_typing.heatmap_hour_subtitle	चयनित अवधि में
+ui_typing.heatmap_hour_title	घंटे और सप्ताह के दिन द्वारा गतिविधि
+ui_typing.heatmap_hour_total	कुल वर्ण
+ui_typing.key_caps	Caps
+ui_typing.key_enter	एंटर
+ui_typing.key_esc	Esc
+ui_typing.key_shift	Shift
+ui_typing.key_tab	टैब
+ui_typing.key_tip_avg_dur	Avg. dur.:
+ui_typing.key_tip_freq	Freq.:
+ui_typing.key_tip_freq_total	Total freq.:
+ui_typing.label_burst_length_dist	Burst length distribution
+ui_typing.label_charmix_dist	Distribution (%s characters)
+ui_typing.label_finger_load_dist	Cumulative load per finger — ideal distribution ≈ 12.5% each
+ui_typing.label_from	से:
+ui_typing.label_to	को:
+ui_typing.label_word_length_dist	Length distribution (frequency-weighted)
+ui_typing.lbl_accepted	स्वीकार किए गए
+ui_typing.lbl_active_ratio	सक्रिय अनुपात
+ui_typing.lbl_activity	गतिविधि
+ui_typing.lbl_ai_acceptance	AI स्वीकृति
+ui_typing.lbl_avg_delay	औसत देरी
+ui_typing.lbl_avg_duration	औसत अवधि
+ui_typing.lbl_avg_length	औसत लंबाई
+ui_typing.lbl_bad_redir	खराब रीडायरेक्ट
+ui_typing.lbl_best_day	सर्वश्रेष्ठ दिन
+ui_typing.lbl_cascades	कैस्केड
+ui_typing.lbl_corrected_bigrams	सुधारे गए बिग्राम
+ui_typing.lbl_digits	अंक
+ui_typing.lbl_doublings	दोहराव
+ui_typing.lbl_fastest_app	सबसे तेज़ ऐप
+ui_typing.lbl_focus_latency	फोकस → पहली कुंजी विलंबता
+ui_typing.lbl_frequent_pair	बार-बार आने वाली जोड़ी
+ui_typing.lbl_hand_balance	बाएं/दाएं संतुलन
+ui_typing.lbl_layouts_used	उपयोग किए गए लेआउट
+ui_typing.lbl_letters	अक्षर
+ui_typing.lbl_long_sessions	लंबे सत्र
+ui_typing.lbl_longest_burst	सबसे लंबा burst
+ui_typing.lbl_longest_chars	सबसे लंबा (वर्ण)
+ui_typing.lbl_longest_session	सबसे लंबा सत्र
+ui_typing.lbl_longest_time	सबसे लंबा (अवधि)
+ui_typing.lbl_most_active_finger	सबसे सक्रिय उंगली
+ui_typing.lbl_others	अन्य
+ui_typing.lbl_passive_time	सिस्टम निष्क्रिय समय
+ui_typing.lbl_punctuation	विराम चिह्न
+ui_typing.lbl_recovery_time	वसूली समय
+ui_typing.lbl_redir	रीडायरेक्ट
+ui_typing.lbl_regularity	नियमितता (CV)
+ui_typing.lbl_roll_in	अंदर की ओर रोल
+ui_typing.lbl_roll_out	बाहर की ओर रोल
+ui_typing.lbl_same_finger_streak	समान-उंगली श्रृंखला
+ui_typing.lbl_same_hand_streak	समान-हाथ श्रृंखला
+ui_typing.lbl_saved	सहेजा गया
+ui_typing.lbl_scissors	कैंची
+ui_typing.lbl_sfbs_raw	कच्चे SFB
+ui_typing.lbl_spaces	स्पेस
+ui_typing.lbl_streak	श्रृंखला
+ui_typing.lbl_time_saved	समय बचाया गया
+ui_typing.lbl_top_app	सबसे अधिक उपयोग की जाने वाली ऐप्लिकेशन
+ui_typing.lbl_top_mod_held	सबसे अधिक दबाया गया संशोधक
+ui_typing.lbl_top_word	सबसे अधिक उपयोग किया गया शब्द
+ui_typing.lbl_total	कुल
+ui_typing.lbl_total_active_time	कुल सक्रिय समय
+ui_typing.lbl_total_bursts	कुल burst
+ui_typing.lbl_total_words	कुल शब्द
+ui_typing.lbl_unique_words	अद्वितीय शब्द
+ui_typing.lbl_via_ai	AI के माध्यम से
+ui_typing.lbl_via_hotstrings	Hotstrings के माध्यम से
+ui_typing.lbl_via_magic_key	★ key के माध्यम से
+ui_typing.lbl_worst_bigram	सबसे खराब bigram
+ui_typing.loading	गणना जारी है...
+ui_typing.loading_ellipsis	गणना जारी है…
+ui_typing.modal_apply	बंद करें और लागू करें
+ui_typing.modal_check_all	सभी को चेक करें
+ui_typing.modal_search_app	एक ऐप्लिकेशन खोजें...
+ui_typing.modal_select_apps	ऐप्लिकेशन चुनें
+ui_typing.modal_uncheck_all	सभी को अनचेक करें
+ui_typing.month_0	जनवरी
+ui_typing.month_1	फरवरी
+ui_typing.month_10	नवंबर
+ui_typing.month_11	दिसंबर
+ui_typing.month_2	मार्च
+ui_typing.month_3	अप्रैल
+ui_typing.month_4	मई
+ui_typing.month_5	जून
+ui_typing.month_6	जुलाई
+ui_typing.month_7	अगस्त
+ui_typing.month_8	सितंबर
+ui_typing.month_9	अक्टूबर
+ui_typing.no_app_found	कोई ऐप नहीं मिла
+ui_typing.no_data	कोई डेटा नहीं
+ui_typing.not_found	नहीं मिला
+ui_typing.opt_pause.1000	विराम > 1 सेक
+ui_typing.opt_pause.10000	विराम > 10 सेक
+ui_typing.opt_pause.2000	विराम > 2 सेक
+ui_typing.opt_pause.20000	विराम > 20 सेक
+ui_typing.opt_pause.3000	विराम > 3 सेक
+ui_typing.opt_pause.30000	विराम > 30 सेक
+ui_typing.opt_pause.5000	विराम > 5 सेक
+ui_typing.opt_pause.60000	विराम > 1 मिनट
+ui_typing.opt_pause.99999999	कोई फिल्टर नहीं
+ui_typing.opt_quick_range.	अवधि…
+ui_typing.opt_quick_range.3m	पिछले 3 महीने
+ui_typing.opt_quick_range.6m	पिछले 6 महीने
+ui_typing.opt_quick_range.all	सभी
+ui_typing.opt_quick_range.last_hour	पिछला घंटा
+ui_typing.opt_quick_range.month	इस महीने
+ui_typing.opt_quick_range.today	आज
+ui_typing.opt_quick_range.week	इस हफ्ते
+ui_typing.opt_quick_range.year	इस वर्ष
+ui_typing.page_loading	इंटरफेस लोड हो रहा है...
+ui_typing.pinch_hint	ज़ूम करने के लिए (ट्रैकपैड) पिंच करें।
+ui_typing.precision_no_filter	कोई फिल्टर नहीं
+ui_typing.rep_doublings	दोहराव
+ui_typing.rep_no_data	कोई दोहराव नहीं
+ui_typing.rep_table_bigram	बाइग्राम
+ui_typing.rep_table_manual	मैनुअल
+ui_typing.rep_table_total	कुल
+ui_typing.rep_table_via_star	★ के माध्यम से
+ui_typing.search_close	बंद करें (Esc)
+ui_typing.search_label	पृष्ठ में खोजें
+ui_typing.search_next	अगला (Enter)
+ui_typing.search_placeholder	खोजें…
+ui_typing.search_prev	पिछला (Shift+Enter)
+ui_typing.sfb_avoided	HS के माध्यम से टाले गए
+ui_typing.sfb_avoided_none	0 HS के माध्यम से टाले गए
+ui_typing.sfb_no_data	कोई SFB नहीं
+ui_typing.sfb_raw_count	कच्चे SFB
+ui_typing.sfb_table_finger	उंगली
+ui_typing.sfb_table_hand	हाथ
+ui_typing.sfb_table_pair	जोड़ी
+ui_typing.signal_equilibre	Balanced
+ui_typing.signal_surveille	Monitored
+ui_typing.signal_vigilance	Alert
+ui_typing.tab_bigrams	बाइग्राम
+ui_typing.tab_chars	वर्ण
+ui_typing.tab_heptagrams	हेप्टाग्राम
+ui_typing.tab_hexagrams	हेक्साग्राम
+ui_typing.tab_keycodes	Keycodes
+ui_typing.tab_modifiers	संशोधक
+ui_typing.tab_pentagrams	पेंटाग्राम
+ui_typing.tab_quadgrams	क्वाडग्राम
+ui_typing.tab_shortcut_bigrams	शॉर्टकट bigrams
+ui_typing.tab_shortcut_pentagrams	शॉर्टकट pentagrams
+ui_typing.tab_shortcut_quadgrams	शॉर्टकट quadgrams
+ui_typing.tab_shortcut_trigrams	शॉर्टकट trigrams
+ui_typing.tab_shortcuts	शॉर्टकट
+ui_typing.tab_trigrams	ट्राइग्राम
+ui_typing.tab_word_bigrams	शब्द bigrams
+ui_typing.tab_word_pentagrams	शब्द pentagrams
+ui_typing.tab_word_quadgrams	शब्द quadgrams
+ui_typing.tab_word_trigrams	शब्द trigrams
+ui_typing.tab_words	शब्द
+ui_typing.table_mode_mixed	मिश्रित
+ui_typing.table_mode_output	स्क्रीन आउटपुट
+ui_typing.table_mode_raw	कच्चे कीस्ट्रोक
+ui_typing.title	टाइपिंग मेट्रिक्स
+ui_typing.title_hand_balance	बाएं और दाएं हाथ के बीच कीस्ट्रोक का संतुलन। 50/50 = पूर्ण संतुलन।
+ui_typing.title_net_hs	टाइप किए गए और उत्पन्न वर्णों के बीच शुद्ध अंतर
+ui_typing.title_net_llm	हटाए गए और उत्पन्न वर्णों के बीच शुद्ध अंतर
+ui_typing.title_pause_threshold	विराम सीमा: इस मान से ऊपर के विराम सक्रिय समय से बाहर रखे जाते हैं।
+ui_typing.title_quick_range	त्वरित अवधि
+ui_typing.title_rep_total	अवधि के दौरान कुल दोहराव की संख्या
+ui_typing.title_rep_via_star	★ key (दोहराव hotstring) द्वारा उत्पन्न दोहराव का हिस्सा। + Hotstrings मोड में शून्य नहीं।
+ui_typing.title_top_finger	वह उंगली जिसने अवधि के दौरान सबसे बड़ी दूरी तय की
+ui_typing.tooltip_apps	<strong>Fastest app :</strong> highest average CPM across apps with ≥ 200 characters typed (below this threshold you'd catch apps used for 2 seconds).<br><br><strong>Frequent pair :</strong> the two apps you switch between most often, in both directions. Indicates your typical workflow (editor ↔ browser, doc ↔ chat…).
+ui_typing.tooltip_charmix	<strong>Categories :</strong> each manual character typed is classified Lua-side into one of five categories — Latin letters (including common accented), digits, punctuation and symbols, spaces (including NBSP / NNBSP / tab / return), and other (non-Latin characters, special keylogger markers).<br><br><strong>Indication :</strong> code-heavy = lots of punctuation and digits; prose-heavy = mostly letters and spaces; chat = a mix of everything.
+ui_typing.tooltip_col_acc	सटीकता: इस अनुक्रम को बिना backspace के सही तरीके से टाइप किए जाने का प्रतिशत।
+ui_typing.tooltip_col_mpm	प्रति मिनट शब्द: यदि आप इस अंश को लूप में टाइप करते तो अनुमानित गति (1 शब्द = 5 कुंजियाँ)। केवल आपकी वास्तविक कीस्ट्रोक गिनता है।
+ui_typing.tooltip_cpm_formula	<strong>सूत्र:</strong> CPM = transitions × 60000 / सक्रिय समय।<br><strong>मोड:</strong> {mode}।<br><br>अंश: {pure_trans} मैनुअल transitions (≤ {thresh})<br>{add_hs}{add_llm}= {chars_total} स्वीकृत वर्ण<br><br>WPM = CPM / 5।
+ui_typing.tooltip_cpm_hs_chars	जोड़े गए वर्ण (HS आउटपुट − ट्रिगर)
+ui_typing.tooltip_cpm_llm_chars	जोड़े गए वर्ण (AI आउटपुट − ट्रिगर)
+ui_typing.tooltip_cpm_simple	प्रति मिनट वर्ण (डिफ़ॉल्ट रूप से HS + AI के साथ)।
+ui_typing.tooltip_ergo_bigram	<strong>SHB / SHU :</strong> same-hand bigrams / their share of total bigrams.<br><strong>Inward roll :</strong> pinky toward index. The most comfortable.<br><strong>Outward roll :</strong> index toward pinky.<br><strong>LSB :</strong> Lateral Stretch Bigram — one of the two fingers extends at least 1.5 columns from its rest position.<br><strong>Scissors :</strong> SHB crossing ≥ 2 rows with the shorter finger going down (e.g. pinky low + middle high).
+ui_typing.tooltip_ergo_trigram	<strong>SFS :</strong> Same-Finger Skipgram — an SFB with a different-finger key in between (e.g. EAD).<br><strong>SKS :</strong> Same-Key Skipgram — the same key in positions 1 and 3 (e.g. ELE).<br><strong>Redirect :</strong> three keys on the same hand with a change of direction (pinky→middle→ring = peak). Uncomfortable.<br><strong>Bad redir. :</strong> redirect where none of the three fingers is the index. Among the worst possible sequences on a keyboard.
+ui_typing.tooltip_errors	<strong>Reading :</strong> bigrams (two consecutive keys) ranked by <em>error rate</em> = number of times the 2nd key was erased by a backspace, divided by total occurrences.<br><br><strong>Filter :</strong> only bigrams appearing ≥ 5 times in the period are shown, to avoid statistical noise from rare sequences.<br><br><strong>Cascades :</strong> runs of ≥ 3 consecutive backspaces (major correction: a word or sentence erased). The counter separates this signal from one-off errors.<br><br><strong>Recovery time :</strong> average delay between a backspace and the next key. The longer it is, the more the correction breaks your mental flow.
+ui_typing.tooltip_lexical	<strong>Richness :</strong> unique words ÷ total words. The higher, the more varied the vocabulary. A literary text will be around 40–60 %, chat or code much lower.<br><br><strong>Average length :</strong> frequency-weighted mean — this is the length of the word you type "on average", not the median dictionary length.<br><br><strong>Filter :</strong> words shorter than 2 characters are ignored (they are almost always tokenisation artefacts from punctuation splitting).
+ui_typing.tooltip_mpm	प्रति मिनट शब्द (वास्तविक शब्दकोश शब्द)।
+ui_typing.tooltip_precision_formula	<strong>सूत्र:</strong> सटीकता = सही / कुल।<br>त्रुटियाँ: किसी कुंजी दबाने के तुरंत बाद backspace (≤ {thresh})।
+ui_typing.tooltip_records	<strong>Scope :</strong> records are computed over <em>the entire</em> database — they do not follow the UI date filter (otherwise the record disappears when you zoom in). The app filter still applies.<br><br><strong>Streak :</strong> longest consecutive series of days with at least one keystroke. Missing a day resets the counter to zero.
+ui_typing.tooltip_rep_pct	Share of bigrams that are doublings (e.g. «aa», «ll»). Reflects the active source mode — compare "Without Ergopti+" and "+ Hotstrings" to see if the ★ key is being used.
+ui_typing.tooltip_rhythm	<strong>Burst :</strong> typing stretch with no gap > 1 s between two keys.<br><br><strong>Peak CPM :</strong> best CPM observed on a burst of at least 10 characters. The threshold excludes fleeting non-representative sprints.<br><br><strong>Regularity (CV) :</strong> coefficient of variation = standard deviation ÷ mean. 0 = perfect metronome, > 0.6 = very irregular.
+ui_typing.tooltip_roi	<strong>Characters saved :</strong> net output of HS / AI expansions, i.e. characters added on screen minus those that triggered the expansion (and were therefore typed manually).<br><br><strong>Time saved :</strong> characters saved × average pace (manual active time ÷ number of manual keystrokes) over the same period. This is an honest lower bound: it is what you would have taken to type them yourself.<br><br><strong>AI acceptance :</strong> share of AI suggestions displayed that were accepted by the user.
+ui_typing.tooltip_sessions	<strong>Session :</strong> typing block with no gap > 5 min between two consecutive keystrokes. Detected keylogger-side, so independent of the UI pause filter.<br><br><strong>Total active time :</strong> sum of all session durations — i.e. the time actually spent typing, ignoring pauses > 5 min.<br><br><strong>Longest (chars) :</strong> may refer to a different session from the longest in duration — e.g. a long slow session vs. a short ultra-fast one.
+ui_typing.tooltip_sfb_pct	Share of manual bigrams typed by the same finger. Excluding hotstrings — this KPI measures the raw physical difficulty of the layout.
+ui_typing.tooltip_sfb_rate	Rate: nb SFBs / nb key occurrences
+ui_typing.tooltip_wellness	<strong>Global signal :</strong> red "Alert" if ≥ 2 sessions over 90 min or a finger streak ≥ 8; orange "Monitored" if ≥ 1 long session or finger streak ≥ 6 or hand streak ≥ 12; green "Balanced" otherwise.<br><br><strong>Active ratio :</strong> time actually spent typing ÷ time the app was in focus. Low = you read a lot, which reduces typing load but also signals chronic input/output imbalance.<br><br><strong>Finger / hand streak :</strong> longest run of consecutive keys on the same finger or same hand. Beyond 5 (finger) or 12 (hand), the load is no longer distributed.<br><br><strong>Long sessions :</strong> sessions ≥ 90 min without a break. The clinical threshold beyond which RSI risk increases significantly.
+ui_typing.unit_activations	सक्रियण
+ui_typing.unit_active_apps	सक्रिय ऐप्लिकेशन
+ui_typing.unit_chars_saved	बचाए गए वर्ण
+ui_typing.unit_cpm	अ/मि
+ui_typing.unit_cpm_burst	CPM शिखर (burst)
+ui_typing.unit_cpm_record	CPM रिकॉर्ड
+ui_typing.unit_global_rate	% वैश्विक दर
+ui_typing.unit_keyspressed	कुंजियाँ दबाई गई
+ui_typing.unit_keystrokes	कीस्ट्रोक
+ui_typing.unit_km	किमी
+ui_typing.unit_mpm	श/मि
+ui_typing.unit_richness	% विविधता
+ui_typing.unit_sessions	सत्र
+ui_typing.unit_triggers	triggers
+ui_typing.unit_words_typed	words typed in total
+updater.changelog_channel_label	चैनल:
+updater.changelog_empty	(इस चैनल के लिए कोई रिलीज़ नोट्स उपलब्ध नहीं हैं।)
+updater.changelog_install	यह संस्करण स्थापित करें
+updater.changelog_install_current	वर्तमान संस्करण
+updater.changelog_local_source_note	स्थानीय स्रोत मोड — चैनल परिवर्तन सहेजे नहीं जाते।
+updater.changelog_release_notes	{1} के रिलीज़ नोट्स:\n\n{2}\n\nGitHub पर खोलें?
+updater.changelog_select_release	संस्करण चयन :
+updater.changelog_switch_to_dev	पूर्व-रिलीज़ चैनल पर जाएं (dev)
+updater.changelog_switch_to_main	स्थिर चैनल पर जाएं (main)
+updater.changelog_truncated	\n…(छाँटा गया)
+updater.changelog_unreachable	GitHub से रिलीज़ की जानकारी नहीं मिल सकी।
+updater.channel_dev_suffix	 (प्री-रिलीज़ चैनल)
+updater.channel_local_source_suffix	 (स्थानीय स्रोत — रिलीज़ बिल्ड नहीं)
+updater.channel_main_suffix	 (स्थिर चैनल)
+updater.channel_switch_blocked_download	एक अपडेट अभी डाउनलोड हो रहा है। चैनल बदलने से पहले इसके पूरा होने की प्रतीक्षा करें (या ऐप को पुनः आरंभ करें)।
+updater.checking	‘{1}’ चैनल पर अपडेट खोजे जा रहे हैं…\n(इसमें कुछ सेकंड लग सकते हैं।)
+updater.close	बंद करें
+updater.install_error	अपडेट इंस्टॉल नहीं किया जा सका। विवरण के लिए लॉग देखें।
+updater.install_error_download	अपडेट पैकेज डाउनलोड करने में विफल। अपना इंटरनेट कनेक्शन जाँचें और पुनः प्रयास करें।
+updater.install_error_no_asset	इस रिलीज़ में Windows निष्पादन योग्य फ़ाइल शामिल नहीं है। मैन्युअल रूप से डाउनलोड करने के लिए रिलीज़ पृष्ठ खोलें।
+updater.install_local_source	स्थानीय स्रोत से चल रहा है — स्वचालित इंस्टॉल केवल रिलीज़ बिल्ड के लिए उपलब्ध है।
+updater.local_source	स्थानीय स्रोत से चल रहा है — अपडेट जाँच केवल रिलीज़ बिल्ड के लिए उपलब्ध है।
+updater.new_version	नया संस्करण उपलब्ध है!\n\nवर्तमान: {1}\nनवीनतम: {2}\n\nडाउनलोड के लिए रिलीज़ पेज खोलें?
+updater.no_connection	GitHub से कनेक्ट नहीं हो सका। अपना इंटरनेट कनेक्शन जाँचें और पुनः प्रयास करें।
+updater.open_on_github	GitHub पर खोलें
+updater.parse_failed	GitHub से नवीनतम रिलीज़ टैग को पार्स नहीं किया जा सका।
+updater.title_changelog	ErgoptiPlus — रिलीज़ नोट्स
+updater.title_update	ErgoptiPlus — अपडेट
+updater.title_update_available	ErgoptiPlus — अपडेट उपलब्ध है
+updater.title_version	ErgoptiPlus — संस्करण
+updater.tray_new_version_body	संस्करण {1} इंस्टॉल करने के लिए तैयार है। ट्रे मेनू की "Install update" प्रविष्टि पर क्लिक करें।
+updater.tray_new_version_title	ErgoptiPlus — अपडेट उपलब्ध
+updater.up_to_date	ErgoptiPlus अद्यतित है।\n\nवर्तमान संस्करण: {1}
+updater.update_dialog_changelog	नया क्या है:
+updater.update_dialog_header	अपडेट उपलब्ध — {1}
+updater.update_dialog_install	अपडेट इंस्टॉल करें
+updater.update_dialog_later	बाद में
+updater.update_dialog_open	GitHub पर खोलें
+updater.update_dialog_title	ErgoptiPlus — अपडेट इंस्टॉल करें
+updater.version_message	ErgoptiPlus {1}{2}\n\nGitHub पर रिलीज़ पेज खोलें?
+vscode.reload_required	टाइपिंग एक्सटेंशन सक्रिय करने के लिए VSCode पुनः लोड करें (Cmd+Shift+P > Reload Window)

@@ -1,0 +1,142 @@
+--- tests/unit/ui/model_browser/test_model_browser_bridge.lua
+
+--- ==============================================================================
+--- MODULE: Regression — Model Browser bridge silently no-ops on real WKWebView tables (F-HIGH-29)
+--- DESCRIPTION:
+--- host_bridge.js's makeHostBridge() posts non-string payloads RAW on WKWebView
+--- (no JSON.stringify — WebKit itself converts the JS object into a native Lua
+--- table), but ensure_ucc()'s callback ran pcall(hs.json.decode, body) on that
+--- already-a-table `body`. hs.json.decode expects a JSON *string*, so the decode
+--- always threw, the pcall swallowed the error, and BOTH row-click actions —
+--- "open_url" (the source-page link) and "select_model" ("Use this model") —
+--- silently no-oped with zero logging.
+---
+--- Fix: read msg.body directly as a table (no hs.json.decode), matching the
+--- convention already used by action_picker / hotstring_editor /
+--- hotstrings_config_window / metrics_apps (and the sibling changelog window,
+--- F-MED-14).
+---
+--- This test drives the REAL contract: the captured bridge callback is invoked
+--- with `{ body = { action = ..., ... } }` — a native Lua table, exactly what
+--- WKWebView delivers for a raw-object postMessage — NOT a JSON string. It
+--- fails before the fix (hs.json.decode(table) throws, swallowed silently,
+--- neither select_model nor open_url fires) and passes after.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+--- Builds the hs stub surface the model browser window needs to open without
+--- a real WKWebView (screen geometry, webview/usercontent constructors, urlevent).
+--- @return function get_bridge_callback Returns the captured setCallback fn once M.open() has run.
+local function install_hs_stubs()
+	_G.hs = _G.hs or {}
+
+	_G.hs.screen = {
+		mainScreen = function()
+			return {
+				frame     = function() return { x = 0, y = 0, w = 1920, h = 1080 } end,
+				fullFrame = function() return { x = 0, y = 0, w = 1920, h = 1080 } end,
+			}
+		end,
+		primaryScreen = function() return hs.screen.mainScreen() end,
+	}
+
+	local bridge_callback = nil
+	_G.hs.webview = _G.hs.webview or {}
+	_G.hs.webview.usercontent = {
+		new = function(_name)
+			return { setCallback = function(_self, fn) bridge_callback = fn end }
+		end,
+	}
+	_G.hs.webview.new = function()
+		return {
+			windowStyle     = function(self) return self end,
+			closeOnEscape   = function(self) return self end,
+			level           = function(self) return self end,
+			shadow          = function(self) return self end,
+			html            = function(self) return self end,
+			show            = function(self) return self end,
+			delete          = function(self) return self end,
+			hswWindow       = function(self) return self end,
+			frame           = function(self) return { x = 0, y = 0, w = 880, h = 560 } end,
+		}
+	end
+
+	_G.hs.urlevent = _G.hs.urlevent or {}
+	_G.hs.json = _G.hs.json or {}
+	_G.hs.json.encode = function(_t) return "mock_json" end
+
+	-- ui_builder's post-open focus retry (try_focus, added 2026-06-09) always
+	-- runs on M.open() and falls into its "handle not ready" branch here since
+	-- this stub's webview mock has no working hswindow()/focus(); without a
+	-- doAfter stub the very first retry crashes with "attempt to call a nil
+	-- value (field 'doAfter')" before the test ever reaches the bridge
+	-- assertions. Invoking synchronously just drains the bounded retry loop
+	-- (max_attempts = 20) down to the pcall-guarded bringToFront fallback.
+	_G.hs.timer = _G.hs.timer or {}
+	_G.hs.timer.doAfter = _G.hs.timer.doAfter or function(_delay, fn) fn() end
+
+	return function() return bridge_callback end
+end
+
+helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-29)", function()
+	helpers.it("select_model posted as a native table fires on_select and closes the window", function()
+		local get_bridge_callback = install_hs_stubs()
+
+		local opened_url = nil
+		_G.hs.urlevent.openURL = function(url) opened_url = url; return true end
+
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"]    = nil
+		local ModelBrowser = require("ui.model_browser")
+
+		local selected_name = nil
+		ModelBrowser.open({
+			presets       = {},
+			active_backend = "mlx",
+			active_model  = "",
+			models_mgr    = nil,
+			on_select     = function(name) selected_name = name end,
+		})
+
+		local bridge_callback = get_bridge_callback()
+		helpers.assert_true(type(bridge_callback) == "function", "bridge callback must be registered by M.open()")
+
+		-- Real WKWebView contract: msg.body is a native Lua table, not a JSON string.
+		bridge_callback({ body = { action = "select_model", name = "gemma-4-E4B-it" } })
+
+		helpers.assert_eq(selected_name, "gemma-4-E4B-it",
+			"a native-table select_model message must invoke on_select with the model name (F-HIGH-29)")
+		helpers.assert_nil(opened_url, "select_model must not also open a URL")
+	end)
+
+	helpers.it("open_url posted as a native table opens the model's source page", function()
+		local get_bridge_callback = install_hs_stubs()
+
+		local opened_url = nil
+		_G.hs.urlevent.openURL = function(url) opened_url = url; return true end
+
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"]    = nil
+		local ModelBrowser = require("ui.model_browser")
+
+		local selected_name = nil
+		ModelBrowser.open({
+			presets        = {},
+			active_backend = "mlx",
+			active_model   = "",
+			models_mgr     = nil,
+			on_select      = function(name) selected_name = name end,
+		})
+
+		local bridge_callback = get_bridge_callback()
+		helpers.assert_true(type(bridge_callback) == "function", "bridge callback must be registered by M.open()")
+
+		local mock_url = "https://huggingface.co/mlx-community/gemma-4-E4B-it"
+		bridge_callback({ body = { action = "open_url", url = mock_url } })
+
+		helpers.assert_eq(opened_url, mock_url,
+			"a native-table open_url message must open the model's source page (F-HIGH-29)")
+		helpers.assert_nil(selected_name, "open_url must not also select a model")
+	end)
+end)

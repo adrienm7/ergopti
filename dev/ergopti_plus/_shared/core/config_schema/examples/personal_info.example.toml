@@ -1,0 +1,38 @@
+# config_schema/examples/personal_info.example.toml
+# Example for ``config/ergopti_plus/personal_info.toml`` v2.
+# All keys are snake_case. Read identically by AHK and HS.
+
+[info]
+bic = "ABCDFRPP"
+city = "Puteaux"
+country = "France"
+credit_card = "1234 5678 9012 3456"
+date_of_birth = "02/12/1999"
+email_address = "exemple@example.com"
+first_name = "Adrien"
+iban = "FR00 0000 0000 0000 0000 0000 000"
+last_name = "Moyaux"
+phone_number = "0750399576"
+phone_number_clean = "07 50 39 95 76"
+postal_code = "92800"
+social_security_number = "1 99 99 99 999 999 99"
+street_address = "45 Rue Roque de Fillol"
+work_email_address = "exemple.pro@example.com"
+
+# The ``letters`` table maps a one-letter shortcut to an [info] field name.
+# Values MUST be snake_case keys present in [info] above.
+# Validation: any unknown reference triggers a warn at boot.
+[letters]
+a = "street_address"
+b = "bic"
+c = "credit_card"
+d = "date_of_birth"
+e = "email_address"
+f = "phone_number_clean"
+i = "iban"
+m = "email_address"
+n = "last_name"
+p = "first_name"
+s = "social_security_number"
+t = "phone_number"
+w = "work_email_address"

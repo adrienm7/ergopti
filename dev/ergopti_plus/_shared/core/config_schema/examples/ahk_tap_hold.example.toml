@@ -1,0 +1,64 @@
+# config_schema/examples/ahk_tap_hold.example.toml
+# Example for ``config/ergopti_plus/ahk/tap_hold.toml``.
+# This is the AHK driver's COMPLETE tap-hold configuration — there is no runtime
+# merge with any shared base file. The initial content is generated once at
+# first boot from _shared/tap_hold/defaults.toml; after that, the user owns it.
+#
+# Each [tap_hold.keys.<name>] is self-contained: missing the entire section
+# means the key has no tap-hold behaviour.
+
+
+
+
+
+# ========================================
+# ========================================
+# ======= 1. User-tuned thresholds =======
+# ========================================
+# ========================================
+
+# The user finds caps_lock too sensitive — raises the threshold.
+
+[tap_hold.keys.caps_lock]
+time_activation_seconds = 0.45
+tap_action = "escape"
+hold_modifier = "ctrl"
+
+
+
+# ========================
+# ===== 1.2 left_alt =====
+# ========================
+
+# The user disables the alt_gr tap-hold on Windows by setting enabled = false.
+
+[tap_hold.keys.alt_gr]
+enabled = false
+time_activation_seconds = 0.20
+tap_action = "tab"
+hold_modifier = "alt_gr"
+
+
+
+
+
+# ======================================
+# ======================================
+# ======= 2. Layer customization =======
+# ======================================
+# ======================================
+
+# Adds an entry to the ``nav`` layer: pressing ``n`` while space is held emits
+# the screenshot action.
+
+[tap_hold.layers.nav]
+description_key = "tap_hold.layer.nav"
+
+[tap_hold.layers.nav.mappings]
+h = "arrow_left"
+j = "arrow_down"
+k = "arrow_up"
+l = "arrow_right"
+backspace = "ctrl_backspace"
+delete = "ctrl_delete"
+n = "screenshot"

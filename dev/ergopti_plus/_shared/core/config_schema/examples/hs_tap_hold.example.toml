@@ -1,0 +1,50 @@
+# config_schema/examples/hs_tap_hold.example.toml
+# Example for ``config/ergopti_plus/hammerspoon/tap_hold.toml``.
+# This is the HS driver's COMPLETE tap-hold configuration — there is no runtime
+# merge with any shared base file. The Karabiner generator
+# (modules/karabiner/generator.lua) consumes this file to produce the
+# Karabiner Elements JSON.
+
+
+
+
+
+# =====================================
+# =====================================
+# ======= 1. macOS-tuned timing =======
+# =====================================
+# =====================================
+
+# On macOS the user prefers a shorter threshold (reactive mechanical keyboard).
+
+[tap_hold.keys.caps_lock]
+time_activation_seconds = 0.30
+tap_action = "escape"
+hold_modifier = "ctrl"
+
+[tap_hold.keys.space]
+time_activation_seconds = 0.12
+hold_layer = "nav"
+
+
+
+
+
+# =======================================
+# =======================================
+# ======= 2. HS-specific bindings =======
+# =======================================
+# =======================================
+
+# The nav_secondary layer on HS adds Mission Control on ``;``.
+
+[tap_hold.layers.nav_secondary]
+description_key = "tap_hold.layer.nav_secondary"
+
+[tap_hold.layers.nav_secondary.mappings]
+h = "word_prev"
+l = "word_next"
+j = "line_down"
+k = "line_up"
+";" = "mission_control"
+"'" = "app_expose"

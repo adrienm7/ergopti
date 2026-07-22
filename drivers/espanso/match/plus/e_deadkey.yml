@@ -1,0 +1,19 @@
+matches:
+  - trigger: 'êa'
+    replace: 'â'
+    propagate_case: true
+  - trigger: 'êe'
+    replace: 'œ'
+    propagate_case: true
+  - trigger: 'êi'
+    replace: 'î'
+    propagate_case: true
+  - trigger: 'êo'
+    replace: 'ô'
+    propagate_case: true
+  - trigger: 'êu'
+    replace: 'û'
+    propagate_case: true
+  - trigger: 'êy'
+    replace: 'ŷ'
+    propagate_case: true

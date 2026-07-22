@@ -1,0 +1,5 @@
+# _generated/config_template.toml
+# AUTO-GENERATED from _shared/modules/features/manifest.toml.
+# DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.
+# This is the default v2 config copied into config/ergopti_plus/linux/
+# on first boot. After that, the user owns the copy.

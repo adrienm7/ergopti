@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="UTF-8" />
+		<link rel="stylesheet" href="style.css" />
+		<script src="../i18n.js"></script>
+		<script src="../host_bridge.js"></script>
+	</head>
+	<body>
+		<h1 id="title" data-i18n="prompt_editor.title_new"></h1>
+		<div class="fg">
+			<div class="fg-header"><label data-i18n="prompt_editor.label_name"></label></div>
+			<input type="text" id="p-name" autocomplete="off" spellcheck="false" />
+		</div>
+		<div class="fg">
+			<div class="fg-header"><label data-i18n="prompt_editor.label_mode"></label></div>
+			<select id="p-mode" data-i18n-option-prefix="prompt_editor.mode">
+				<option value="parallel" selected></option>
+				<option value="batch"></option>
+			</select>
+		</div>
+		<div class="fg" style="flex-grow: 1; display: flex">
+			<div class="fg-header">
+				<label data-i18n="prompt_editor.label_prompt"></label>
+				<div>
+					<button
+						class="btn btn-sm btn-s"
+						onclick="insertChipAtCursor('context')"
+						data-i18n-title="prompt_editor.insert_context"
+					>
+						＋ {context}
+					</button>
+					<button
+						class="btn btn-sm btn-s"
+						onclick="insertChipAtCursor('n')"
+						data-i18n-title="prompt_editor.insert_n"
+					>
+						＋ {n}
+					</button>
+					<button
+						class="btn btn-sm btn-s"
+						onclick="insertChipAtCursor('min_words')"
+						data-i18n-title="prompt_editor.insert_min_words"
+					>
+						＋ {min_words}
+					</button>
+					<button
+						class="btn btn-sm btn-s"
+						onclick="insertChipAtCursor('max_words')"
+						data-i18n-title="prompt_editor.insert_max_words"
+					>
+						＋ {max_words}
+					</button>
+					<button
+						class="btn btn-sm btn-s"
+						onclick="insertChipAtCursor('language')"
+						data-i18n-title="prompt_editor.insert_language"
+					>
+						＋ {language}
+					</button>
+				</div>
+			</div>
+			<div class="editor-wrap">
+				<div id="e-out-ph" class="ph-overlay" data-i18n="prompt_editor.placeholder_prompt"></div>
+				<div id="e-out" class="output-editor" contenteditable="true" spellcheck="false"></div>
+			</div>
+			<div class="help" data-i18n="prompt_editor.help_text"></div>
+		</div>
+		<div class="btn-row">
+			<button class="btn btn-s" onclick="doCancel()" data-i18n="common.cancel"></button>
+			<button class="btn btn-p" onclick="doSave()" data-i18n="common.save"></button>
+		</div>
+
+		<div id="ac-popup"></div>
+		<script src="script.js"></script>
+	</body>
+</html>

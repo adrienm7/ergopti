@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<title data-i18n="token_prompt.window_title"></title>
+		<link rel="stylesheet" href="style.css" />
+		<script src="../i18n.js"></script>
+		<script src="../host_bridge.js"></script>
+	</head>
+	<body>
+		<div id="container">
+			<h2 data-i18n="token_prompt.title"></h2>
+
+			<div id="instruction" data-i18n="token_prompt.instruction"></div>
+
+			<div id="link-section">
+				<span data-i18n="token_prompt.no_token"></span>
+				<a
+					href="javascript:void(0)"
+					onclick="doOpenLink()"
+					data-i18n="token_prompt.create_link"
+				></a>
+			</div>
+
+			<div id="token-input-wrapper">
+				<label for="token-input" data-i18n="token_prompt.label"></label>
+				<input
+					type="text"
+					id="token-input"
+					data-i18n-placeholder="token_prompt.placeholder"
+					autofocus
+				/>
+			</div>
+
+			<div id="button-group">
+				<button id="btn-cancel" onclick="doCancel()" data-i18n="common.cancel"></button>
+				<button id="btn-validate" onclick="doValidate()" data-i18n="token_prompt.validate"></button>
+			</div>
+		</div>
+
+		<script src="script.js"></script>
+	</body>
+</html>

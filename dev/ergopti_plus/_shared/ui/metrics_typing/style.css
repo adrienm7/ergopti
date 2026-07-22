@@ -1,0 +1,1559 @@
+/* ui/metrics_typing/style.css */
+
+/* =========================================================================== */
+/* Metrics UI Styles.                                                          */
+/* */
+/* Dynamic Light/Dark mode, flex layouts, modals, and responsive tables.       */
+/* =========================================================================== */
+
+/* =================================== */
+/* =================================== */
+/* ======= 1/ Variables & Base ======= */
+/* =================================== */
+/* =================================== */
+
+/* Variables mode CLAIR (par défaut) */
+:root {
+	/* Single source of truth for all filter-bar control heights */
+	--filter-h: 35px;
+	--bg-color: #f5f5f7;
+	--panel-bg: #ffffff;
+	--text-color: #1d1d1f;
+	--text-color-rgb: 29, 29, 31; /* matches --text-color for use in rgba() */
+	--text-muted: #86868b;
+	--accent: #007aff;
+	--border: #d2d2d7;
+	--mono-bg: #eaeaea;
+	--mono-color: #005cc5;
+	--th-bg: #e5e5ea;
+	--th-hover: #d1d1d6;
+	--td-hover: #f0f0f5;
+	--tooltip-bg: #333333;
+	--modal-overlay: rgba(0, 0, 0, 0.3);
+
+	/* Button Tints Light Mode */
+	--filter-bg: var(--bg-color);
+	--filter-text: var(--text-muted);
+	--filter-hover: var(--th-hover);
+
+	/* KPI Colors (Strong contrast for Light Mode) */
+	--kpi-hs-color: rgb(217, 48, 37);
+	--kpi-llm-color: rgb(138, 62, 184);
+	/* WPM KPI card is orange; the chart uses --chart-wpm-color (yellow) */
+	--kpi-wpm-color: rgb(230, 140, 0);
+	--kpi-wpm-rgb: 230, 140, 0;
+	--chart-wpm-color: rgb(204, 163, 0);
+	--chart-wpm-rgb: 204, 163, 0;
+	--kpi-precision-color: #008000;
+	--kpi-delegation-color: rgb(0, 86, 179);
+	--kpi-sfb-color: rgb(0, 155, 150); /* Teal — same-finger bigram indicator (was rep color) */
+	--kpi-dist-color: rgb(0, 113, 197);
+	--kpi-rep-color: rgb(0, 134, 174); /* Mid-blue-cyan — between dist blue and sfb teal */
+
+	/* KPI Backgrounds Light Mode */
+	--hs-bg: color-mix(in srgb, var(--kpi-hs-color), transparent 95%);
+	--llm-bg: color-mix(in srgb, var(--kpi-llm-color), transparent 95%);
+	--global-bg: color-mix(in srgb, var(--chart-wpm-color), transparent 95%);
+	--precision-bg: color-mix(in srgb, var(--kpi-precision-color), transparent 95%);
+	--kpi-wpm-bg: color-mix(in srgb, var(--kpi-wpm-color), transparent 95%);
+	--delegation-bg: rgba(var(--text-color-rgb), 0.05);
+	--rep-bg: color-mix(in srgb, var(--kpi-rep-color), transparent 95%);
+	--dist-bg: color-mix(in srgb, var(--kpi-dist-color), transparent 95%);
+	--sfb-bg: color-mix(in srgb, var(--kpi-sfb-color), transparent 95%);
+
+	/* KPI Borders Light Mode (Soft opacity) */
+	--hs-border: color-mix(in srgb, var(--kpi-hs-color), transparent 50%);
+	--llm-border: color-mix(in srgb, var(--kpi-llm-color), transparent 50%);
+	--global-border: color-mix(in srgb, var(--chart-wpm-color), transparent 50%);
+	--precision-border: color-mix(in srgb, var(--kpi-precision-color), transparent 50%);
+	--kpi-wpm-border: color-mix(in srgb, var(--kpi-wpm-color), transparent 50%);
+	--delegation-border: rgba(var(--text-color-rgb), 0.5);
+	--rep-border: color-mix(in srgb, var(--kpi-rep-color), transparent 50%);
+	--dist-border: color-mix(in srgb, var(--kpi-dist-color), transparent 50%);
+	--sfb-border: color-mix(in srgb, var(--kpi-sfb-color), transparent 50%);
+
+	/* Chart container tint Light Mode */
+	--chart-bg: rgba(0, 0, 0, 0.02);
+	--chart-border: rgba(0, 0, 0, 0.3);
+
+	/* Text colors */
+	--strong-color: #1d1d1f;
+}
+
+/* Variables mode SOMBRE */
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg-color: #1e1e1e;
+		--panel-bg: #2d2d2d;
+		--text-color: #f0f0f0;
+		--text-color-rgb: 240, 240, 240; /* matches --text-color for use in rgba() */
+		--text-muted: #aaaaaa;
+		--accent: #0a84ff;
+		--border: #444444;
+		--mono-bg: #111111;
+		--mono-color: #9cdcfe;
+		--th-bg: #333333;
+		--th-hover: #444444;
+		--td-hover: #3d3d3d;
+		--tooltip-bg: #555555;
+		--modal-overlay: rgba(0, 0, 0, 0.6);
+
+		/* Button Tints Dark Mode */
+		--filter-bg: var(--bg-color);
+		--filter-text: var(--text-muted);
+		--filter-hover: var(--th-hover);
+
+		/* KPI Colors (Vibrant, readable colors for Dark Mode) */
+		--kpi-hs-color: rgb(255, 69, 58); /* #ff453a (Vibrant Red) */
+		--kpi-llm-color: rgb(191, 90, 242); /* #bf5af2 (Vibrant Purple) */
+		/* WPM KPI card is orange; the chart uses --chart-wpm-color (yellow) */
+		--kpi-wpm-color: rgb(255, 149, 0); /* #ff9500 (Vibrant Orange) */
+		--kpi-wpm-rgb: 255, 149, 0;
+		--chart-wpm-color: rgb(255, 214, 10); /* #ffd60a (Vibrant Yellow) */
+		--chart-wpm-rgb: 255, 214, 10;
+		--kpi-precision-color: rgb(48, 209, 88); /* #30d158 (Vibrant Green) */
+		--kpi-delegation-color: rgb(30, 150, 255); /* #0a84ff (Vibrant Blue) */
+		--kpi-sfb-color: rgb(0, 212, 204); /* #00d4cc (Vibrant Teal) — same-finger bigram indicator */
+		--kpi-dist-color: rgb(10, 132, 255); /* #0a84ff (Vibrant Blue) */
+		--kpi-rep-color: rgb(5, 172, 230); /* Mid-blue-cyan — between dist blue and sfb teal */
+
+		/* KPI Backgrounds Dark Mode */
+		--sfb-bg: color-mix(in srgb, var(--kpi-sfb-color), transparent 90%);
+		--sfb-border: color-mix(in srgb, var(--kpi-sfb-color), transparent 50%);
+		--hs-bg: color-mix(in srgb, var(--kpi-hs-color), transparent 90%);
+		--llm-bg: color-mix(in srgb, var(--kpi-llm-color), transparent 90%);
+		--global-bg: color-mix(in srgb, var(--chart-wpm-color), transparent 90%);
+		--precision-bg: color-mix(in srgb, var(--kpi-precision-color), transparent 90%);
+		--kpi-wpm-bg: color-mix(in srgb, var(--kpi-wpm-color), transparent 90%);
+		--delegation-bg: rgba(var(--text-color-rgb), 0.1);
+		--rep-bg: color-mix(in srgb, var(--kpi-rep-color), transparent 90%);
+		--dist-bg: color-mix(in srgb, var(--kpi-dist-color), transparent 90%);
+
+		/* KPI Borders Dark Mode */
+		--hs-border: color-mix(in srgb, var(--kpi-hs-color), transparent 50%);
+		--llm-border: color-mix(in srgb, var(--kpi-llm-color), transparent 50%);
+		--global-border: color-mix(in srgb, var(--chart-wpm-color), transparent 50%);
+		--precision-border: color-mix(in srgb, var(--kpi-precision-color), transparent 50%);
+		--kpi-wpm-border: color-mix(in srgb, var(--kpi-wpm-color), transparent 50%);
+		--delegation-border: rgba(var(--text-color-rgb), 0.5);
+		--rep-border: color-mix(in srgb, var(--kpi-rep-color), transparent 50%);
+		--dist-border: color-mix(in srgb, var(--kpi-dist-color), transparent 50%);
+
+		/* Chart container tint Dark Mode */
+		--chart-bg: rgba(255, 255, 255, 0.05);
+		--chart-border: rgba(255, 255, 255, 0.4);
+
+		/* Text colors */
+		--strong-color: #ffffff;
+	}
+}
+
+body {
+	background-color: var(--bg-color);
+	box-sizing: border-box;
+	color: var(--text-color);
+	display: flex;
+	flex-direction: column;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+	height: 100vh;
+	margin: 0;
+	overflow: hidden;
+	overflow-x: hidden;
+}
+
+/* ================================== */
+/* ================================== */
+/* ======= 2/ Layout & Header ======= */
+/* ================================== */
+/* ================================== */
+
+.top-fixed-bar {
+	background-color: var(--bg-color);
+	border-bottom: 1px solid var(--border);
+	flex-shrink: 0;
+	padding: 10px 20px 0 20px;
+	z-index: 100;
+}
+
+.main-content {
+	flex-grow: 1;
+	overflow-x: hidden;
+	overflow-y: auto;
+	padding: 0 20px 20px 20px;
+}
+
+.header {
+	align-items: center;
+	display: flex;
+	justify-content: center;
+	margin: 0 0 15px 0;
+	padding: 0;
+}
+
+h1 {
+	font-size: 22px;
+	margin: 0;
+	padding: 0;
+}
+
+/* ============================== */
+/* ============================== */
+/* ======= 3/ Filters Bar ======= */
+/* ============================== */
+/* ============================== */
+
+.filters-bar {
+	align-items: center;
+	background: var(--panel-bg);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 15px;
+	justify-content: space-between;
+	margin-bottom: 15px;
+	padding: 10px 15px;
+}
+
+.filter-group-dates {
+	align-items: center;
+	display: flex;
+	gap: 10px;
+}
+
+.filter-group-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 0 auto;
+}
+
+.filters-bar label {
+	font-size: 14px;
+	font-weight: 500;
+	margin-right: 5px;
+}
+
+/* Date inputs and selects share --filter-h with .filter-btn for uniform height */
+.filters-bar input[type='date'],
+.filters-bar select {
+	background: var(--bg-color);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	box-sizing: border-box;
+	color: var(--text-color);
+	color-scheme: light dark;
+	font-family: inherit;
+	height: var(--filter-h);
+	padding: 0 10px;
+}
+
+input[type='date']::-webkit-datetime-edit-text {
+	color: var(--text-muted) !important;
+}
+input[type='date']::-webkit-datetime-edit-month-field,
+input[type='date']::-webkit-datetime-edit-day-field,
+input[type='date']::-webkit-datetime-edit-year-field {
+	color: var(--text-color) !important;
+}
+
+/* --filter-h is the single source of truth; all filter controls share this height */
+.filter-btn {
+	background: var(--filter-bg);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	box-sizing: border-box;
+	color: var(--filter-text);
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 500;
+	height: var(--filter-h);
+	padding: 0 12px;
+	transition: all 0.2s ease;
+}
+
+.filter-btn:hover {
+	background: var(--filter-hover);
+}
+
+.filter-btn.active {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: #fff;
+}
+
+.filter-reset {
+	background: rgba(255, 59, 48, 0.05);
+	border-color: #ff3b30;
+	color: #ff3b30;
+}
+.filter-reset:hover {
+	background: rgba(255, 59, 48, 0.15);
+	color: #ff3b30;
+}
+
+/* ============================= */
+/* ============================= */
+/* ======= 4/ Stats Grid ======= */
+/* ============================= */
+/* ============================= */
+
+.stats-grid {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+	margin-bottom: 16px;
+	margin-top: 16px;
+	transition: all 0.3s ease;
+}
+
+/* Each KPI card grows to fill the row; at narrow widths cards stack one per line */
+.stats-grid .stat-card {
+	flex: 1 1 280px;
+	min-width: 0;
+}
+
+.stat-card {
+	background: var(--panel-bg);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+	display: flex;
+	flex-direction: column;
+	padding: 20px;
+	text-align: left;
+}
+
+.stat-card.card-hs {
+	background: var(--hs-bg);
+	border-color: var(--hs-border);
+}
+.stat-card.card-llm {
+	background: var(--llm-bg);
+	border-color: var(--llm-border);
+}
+.stat-card.card-global {
+	background: var(--kpi-wpm-bg);
+	border-color: var(--kpi-wpm-border);
+}
+.stat-card.card-rep {
+	background: var(--rep-bg);
+	border-color: var(--rep-border);
+}
+.stat-card.card-dist {
+	background: var(--dist-bg);
+	border-color: var(--dist-border);
+}
+
+.stat-card.card-hs h2,
+.stat-card.card-hs .stat-value {
+	color: var(--kpi-hs-color);
+}
+.stat-card.card-llm h2,
+.stat-card.card-llm .stat-value {
+	color: var(--kpi-llm-color);
+}
+.stat-card.card-global h2,
+.stat-card.card-global .stat-value {
+	color: var(--kpi-wpm-color);
+}
+.stat-card.card-rep h2,
+.stat-card.card-rep .stat-value {
+	color: var(--kpi-rep-color);
+}
+.stat-card.card-dist h2,
+.stat-card.card-dist .stat-value {
+	color: var(--kpi-dist-color);
+}
+
+.stat-card h2 {
+	align-items: center;
+	border-bottom: none;
+	display: flex;
+	font-size: 20px;
+	justify-content: space-between;
+	margin: 0 0 10px 0;
+}
+
+.stat-value {
+	align-items: baseline;
+	display: flex;
+	font-size: 2.8em;
+	font-weight: bold;
+	gap: 8px;
+	margin: 10px 0;
+}
+
+.stat-unit {
+	color: var(--text-muted);
+	font-size: 0.45em;
+	font-weight: normal;
+}
+
+.stat-details {
+	color: var(--text-muted);
+	display: flex;
+	flex-direction: column;
+	flex-grow: 1;
+	font-size: 0.95em;
+	line-height: 1.5;
+	margin-bottom: 15px;
+}
+
+#global_card .stat-details {
+	justify-content: flex-end;
+	margin-bottom: 0;
+}
+
+.stat-details strong {
+	color: var(--strong-color);
+	font-weight: 600;
+}
+
+.trend-svg {
+	height: 24px;
+	width: 24px;
+}
+
+.trend-svg.up,
+.trend-svg.down,
+.trend-svg.stable {
+	color: #ffffff;
+	opacity: 0.9;
+}
+
+.sparkline-container {
+	height: 120px;
+	margin-top: 10px;
+	position: relative;
+	width: 100%;
+}
+
+/* ================================================ */
+/* ================================================ */
+/* ======= 5/ Expanded KPI Row (Dist + Rep) ======= */
+/* ================================================ */
+/* ================================================ */
+
+/* Two side-by-side blocks immediately below the stats-grid, before the charts */
+.expanded-kpi-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+	margin-bottom: 16px;
+}
+
+/* Each block mirrors the visual language of .stat-card but is flex-column so
+   the table can grow to fill remaining height.
+   overflow: visible (not hidden) so that .tooltip .tooltiptext can render
+   outside the block bounds without being clipped. The table-wrap below
+   handles its own overflow independently. */
+.expanded-kpi-block {
+	background: var(--panel-bg);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+	display: flex;
+	flex: 1 1 340px;
+	flex-direction: column;
+	min-width: 0;
+	overflow: visible;
+	padding: 20px;
+}
+
+.expanded-kpi-block.card-dist {
+	background: var(--dist-bg);
+	border-color: var(--dist-border);
+}
+
+.expanded-kpi-block.card-rep {
+	background: var(--rep-bg);
+	border-color: var(--rep-border);
+}
+
+.expanded-kpi-block.card-sfb {
+	background: var(--sfb-bg);
+	border-color: var(--sfb-border);
+}
+
+.expanded-kpi-block.card-ergo-bigram {
+	background: rgba(99, 102, 241, 0.08);
+	border-color: rgba(99, 102, 241, 0.3);
+}
+
+.expanded-kpi-block.card-ergo-bigram h2,
+.expanded-kpi-block.card-ergo-bigram .stat-value {
+	color: rgb(129, 140, 248);
+}
+
+.expanded-kpi-block.card-ergo-trigram {
+	background: rgba(168, 85, 247, 0.08);
+	border-color: rgba(168, 85, 247, 0.3);
+}
+
+.expanded-kpi-block.card-ergo-trigram h2,
+.expanded-kpi-block.card-ergo-trigram .stat-value {
+	color: rgb(192, 132, 252);
+}
+
+.expanded-kpi-block.card-errors {
+	background: rgba(239, 68, 68, 0.08);
+	border-color: rgba(239, 68, 68, 0.3);
+}
+
+.expanded-kpi-block.card-errors h2,
+.expanded-kpi-block.card-errors .stat-value {
+	color: rgb(248, 113, 113);
+}
+
+.expanded-kpi-block.card-roi {
+	background: rgba(34, 197, 94, 0.08);
+	border-color: rgba(34, 197, 94, 0.3);
+}
+
+.expanded-kpi-block.card-roi h2,
+.expanded-kpi-block.card-roi .stat-value {
+	color: rgb(74, 222, 128);
+}
+
+.expanded-kpi-block.card-lexical {
+	background: rgba(245, 158, 11, 0.08);
+	border-color: rgba(245, 158, 11, 0.3);
+}
+
+.expanded-kpi-block.card-lexical h2,
+.expanded-kpi-block.card-lexical .stat-value {
+	color: rgb(251, 191, 36);
+}
+
+.expanded-kpi-block.card-rhythm {
+	background: rgba(14, 165, 233, 0.08);
+	border-color: rgba(14, 165, 233, 0.3);
+}
+
+.expanded-kpi-block.card-rhythm h2,
+.expanded-kpi-block.card-rhythm .stat-value {
+	color: rgb(56, 189, 248);
+}
+
+.expanded-kpi-block.card-sessions {
+	background: rgba(20, 184, 166, 0.08);
+	border-color: rgba(20, 184, 166, 0.3);
+}
+
+.expanded-kpi-block.card-sessions h2,
+.expanded-kpi-block.card-sessions .stat-value {
+	color: rgb(45, 212, 191);
+}
+
+.expanded-kpi-block.card-records {
+	background: rgba(236, 72, 153, 0.08);
+	border-color: rgba(236, 72, 153, 0.3);
+}
+
+.expanded-kpi-block.card-records h2,
+.expanded-kpi-block.card-records .stat-value {
+	color: rgb(244, 114, 182);
+}
+
+.expanded-kpi-block.card-charmix {
+	background: rgba(120, 113, 108, 0.08);
+	border-color: rgba(120, 113, 108, 0.3);
+}
+
+.expanded-kpi-block.card-charmix h2,
+.expanded-kpi-block.card-charmix .stat-value {
+	color: rgb(168, 162, 158);
+}
+
+.expanded-kpi-block.card-apps {
+	background: rgba(217, 70, 239, 0.08);
+	border-color: rgba(217, 70, 239, 0.3);
+}
+
+.expanded-kpi-block.card-apps h2,
+.expanded-kpi-block.card-apps .stat-value {
+	color: rgb(232, 121, 249);
+}
+
+.expanded-kpi-block.card-wellness {
+	background: rgba(132, 204, 22, 0.08);
+	border-color: rgba(132, 204, 22, 0.3);
+}
+
+.expanded-kpi-block.card-wellness h2,
+.expanded-kpi-block.card-wellness .stat-value {
+	color: rgb(163, 230, 53);
+}
+
+/* Header section: title + KPI value + split details */
+.ekpi-header {
+	flex-shrink: 0;
+	margin-bottom: 12px;
+}
+
+/* Inherit h2 styling from .stat-card h2 */
+.expanded-kpi-block h2 {
+	align-items: center;
+	border-bottom: none;
+	display: flex;
+	font-size: 20px;
+	justify-content: space-between;
+	margin: 0 0 10px 0;
+}
+
+.expanded-kpi-block.card-dist h2,
+.expanded-kpi-block.card-dist .stat-value {
+	color: var(--kpi-dist-color);
+}
+
+.expanded-kpi-block.card-rep h2,
+.expanded-kpi-block.card-rep .stat-value {
+	color: var(--kpi-rep-color);
+}
+
+.expanded-kpi-block.card-sfb h2,
+.expanded-kpi-block.card-sfb .stat-value {
+	color: var(--kpi-sfb-color);
+}
+
+/* SFB doubling toggle — pushed right via space-between flex on h2, brown when active */
+.sfb-toggle-btn {
+	background: transparent;
+	border-color: var(--kpi-sfb-color);
+	border-radius: 4px;
+	color: var(--kpi-sfb-color);
+	font-size: 10px;
+	margin-top: 1px;
+	padding: 1px 6px;
+}
+
+.sfb-toggle-btn.active {
+	background: var(--sfb-bg);
+	border-color: var(--kpi-sfb-color);
+	color: var(--kpi-sfb-color);
+}
+
+/* Scrollable table wrapper — fixed height so the row doesn't grow unbounded */
+.ekpi-table-wrap {
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	flex-grow: 1;
+	max-height: 260px;
+	overflow-y: auto;
+}
+
+/* Mini-table inside each expanded block */
+.ekpi-table {
+	border-collapse: collapse;
+	font-size: 13px;
+	width: 100%;
+}
+
+.ekpi-table th {
+	background: var(--th-bg);
+	border-bottom: 1px solid var(--border);
+	cursor: pointer;
+	font-weight: 600;
+	padding: 7px 10px;
+	position: sticky;
+	text-align: left;
+	top: 0;
+	user-select: none;
+	white-space: nowrap;
+	z-index: 5;
+}
+
+.ekpi-table th:hover {
+	background: var(--th-hover);
+}
+
+.ekpi-table td {
+	border-bottom: 1px solid var(--border);
+	padding: 6px 10px;
+	vertical-align: middle;
+}
+
+.ekpi-table tr:last-child td {
+	border-bottom: none;
+}
+
+.ekpi-table tr:hover td {
+	background: var(--td-hover);
+}
+
+/* num-tooltip hover works the same inside ekpi-table as in the main table */
+.expanded-kpi-block.card-dist .num-tooltip::after {
+	background: color-mix(in srgb, var(--tooltip-bg) 65%, var(--kpi-dist-color) 35%);
+}
+
+.expanded-kpi-block.card-rep .num-tooltip::after {
+	background: color-mix(in srgb, var(--tooltip-bg) 65%, var(--kpi-rep-color) 35%);
+}
+
+.expanded-kpi-block.card-sfb .num-tooltip::after {
+	background: color-mix(in srgb, var(--tooltip-bg) 65%, var(--kpi-sfb-color) 35%);
+}
+
+/* ============================================ */
+/* ============================================ */
+/* ======= 5b/ Keyboard Heatmaps Row ========== */
+/* ============================================ */
+/* ============================================ */
+
+/* Flex row holding both the keycode heatmap and the SFB heatmap side by side.
+   flex-wrap ensures they stack vertically on narrow viewports. */
+.heatmaps-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+	margin-bottom: 16px;
+}
+
+.heatmaps-row > div {
+	/* Each heatmap is ~ 760 px wide at native size; below ~ 1550 px of
+	   row width the two would overlap. Setting the flex-basis to the
+	   actual ideal width forces the wrap before any overlap. */
+	flex: 1 1 760px;
+	max-width: 100%;
+	min-width: 0;
+	overflow-x: auto;
+}
+
+/* ================================== */
+/* ================================== */
+/* ======= 6/ Chart Container ======= */
+/* ================================== */
+/* ================================== */
+
+.chart-container {
+	background: var(--chart-bg);
+	border: 1px solid var(--chart-border);
+	border-radius: 8px;
+	display: flex;
+	flex-direction: column;
+	padding: 15px;
+}
+
+.chart-help {
+	color: var(--text-muted);
+	flex-shrink: 0;
+	font-size: 11px;
+}
+
+/* Side-by-side blocks holding the precision and speed charts.
+   Flex column + gap puts a real visual breathing room between the title and
+   the chart, while a tight bottom padding stops the plot from feeling
+   stranded above an empty zone. Top padding is kept smaller than the
+   title-to-chart gap so the title is not glued to the upper border. */
+.chart-row-block {
+	border-radius: 8px;
+	display: flex;
+	flex: 1 1 300px;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 0;
+	padding: 10px 15px 0 15px;
+}
+
+.chart-row-block.is-precision {
+	background: var(--precision-bg);
+	border: 1px solid var(--precision-border);
+}
+
+.chart-row-block.is-speed {
+	background: var(--global-bg);
+	border: 1px solid var(--global-border);
+}
+
+.chart-row-block-header {
+	align-items: center;
+	display: flex;
+	justify-content: space-between;
+}
+
+.chart-row-block-canvas {
+	height: 240px;
+	position: relative;
+}
+
+/* ======================= */
+/* ======================= */
+/* ======= 6/ Tabs ======= */
+/* ======================= */
+/* ======================= */
+
+.tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-bottom: 15px;
+}
+
+.tabs-row {
+	margin-bottom: 6px;
+}
+
+.tabs-row:last-of-type {
+	margin-bottom: 15px;
+}
+
+.tab-btn {
+	background: var(--panel-bg);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	color: var(--text-color);
+	cursor: pointer;
+	font-size: 14px;
+	padding: 8px 16px;
+	transition: background 0.2s;
+}
+
+.tab-btn:hover {
+	background: var(--td-hover);
+}
+.tab-btn.active {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: #fff;
+}
+
+/* =================================== */
+/* =================================== */
+/* ======= 7/ Table & Controls ======= */
+/* =================================== */
+/* =================================== */
+
+.table-container {
+	background: var(--panel-bg);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	overflow: visible;
+}
+
+table {
+	border-collapse: collapse;
+	text-align: left;
+	width: 100%;
+}
+
+th {
+	background: var(--th-bg);
+	box-shadow: 0 1px 0 var(--border);
+	cursor: pointer;
+	font-weight: 600;
+	padding: 12px;
+	position: sticky;
+	top: 0;
+	user-select: none;
+	/* Top-align so every header title sits at the same vertical position regardless
+	   of whether the cell has one line (Occurrences) or two (Séquence with input) */
+	vertical-align: top;
+	white-space: nowrap;
+	z-index: 10;
+}
+
+th:hover {
+	background: var(--th-hover);
+	z-index: 200;
+}
+
+td {
+	border-bottom: 1px solid var(--border);
+	font-size: 14px;
+	padding: 10px 12px;
+	vertical-align: middle;
+}
+
+tr:hover td {
+	background: var(--td-hover);
+}
+
+/* All key chips (mono-space and shortcut-chip) share the same square base size.
+   Single-char chips become perfect squares; multi-char chips grow wider via min-width. */
+.mono-space {
+	align-items: center;
+	background: var(--mono-bg);
+	border: 1px solid color-mix(in srgb, var(--mono-color) 20%, var(--border));
+	border-radius: 6px;
+	box-sizing: border-box;
+	color: var(--mono-color);
+	display: inline-flex;
+	font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+	font-size: 12px;
+	font-weight: 700;
+	height: 26px;
+	justify-content: center;
+	line-height: 1;
+	min-width: 26px;
+	padding: 0 6px;
+	white-space: nowrap;
+}
+
+.shortcut-seq {
+	align-items: center;
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.shortcut-chip {
+	align-items: center;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	box-sizing: border-box;
+	display: inline-flex;
+	font-size: 12px;
+	font-weight: 700;
+	height: 26px;
+	justify-content: center;
+	line-height: 1;
+	min-width: 26px;
+	padding: 0 6px;
+	white-space: nowrap;
+}
+
+.shortcut-mod {
+	background: color-mix(in srgb, var(--accent) 14%, var(--panel-bg));
+	border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+	color: var(--accent);
+	text-transform: uppercase;
+}
+
+.shortcut-key {
+	background: var(--mono-bg);
+	border-color: color-mix(in srgb, var(--mono-color) 25%, var(--border));
+	color: var(--mono-color);
+	font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+.shortcut-plus {
+	color: var(--text-muted);
+	font-weight: 700;
+}
+
+/* Custom Space Badges */
+.space-reg {
+	color: var(--text-muted);
+}
+
+/* Space character inside a seq-chips row — muted color to de-emphasize */
+.seq-space {
+	color: var(--text-muted);
+}
+
+/* Row of individual key chips for sequences containing special markers */
+.seq-chips {
+	align-items: center;
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 2px;
+}
+
+/* Keycode tab: muted name in parentheses after the keycode number */
+.kc-name {
+	color: var(--text-muted);
+	font-weight: 400;
+}
+
+/* Subtitle stat in table column headers (total occurrences, global avg, etc.).
+   display: block + margin-top separates it from the column title above. */
+.th-stat {
+	color: var(--text-muted);
+	display: block;
+	font-size: 0.85em;
+	font-weight: normal;
+	margin-top: 4px;
+}
+
+/* NBSP and NNBSP rendered as inline control key chips — same black bg as characters */
+.space-badge {
+	/* Same visual treatment as .shortcut-key-control: dark background, vivid red border */
+	background: var(--mono-bg);
+	border: 1px solid rgba(255, 51, 51, 0.6);
+	border-radius: 3px;
+	color: #ff3333;
+	font-size: 0.85em;
+	font-weight: bold;
+	padding: 1px 3px;
+}
+
+/* Inline control key within format_display_key() (legacy path for pure-text sequences).
+   Same treatment as .shortcut-key-control for visual consistency. */
+.key-control {
+	background: var(--mono-bg);
+	border: 1px solid rgba(255, 51, 51, 0.6);
+	border-radius: 3px;
+	color: #ff3333 !important;
+	font-weight: bold;
+	padding: 1px 3px;
+}
+
+/* =================================================== */
+/* =================================================== */
+/* ======= 7.1) Modifier Key Chip Color Classes ====== */
+/* =================================================== */
+
+.shortcut-mod-cmd {
+	background: rgba(48, 209, 88, 0.1);
+	border-color: rgba(48, 209, 88, 0.4) !important;
+	color: #30d158 !important;
+}
+
+.shortcut-mod-ctrl {
+	background: rgba(255, 149, 0, 0.1);
+	border-color: rgba(255, 149, 0, 0.4) !important;
+	color: #ff9500 !important;
+}
+
+/* Brighter purple — aligns perceptual weight with cmd’s vibrant green */
+.shortcut-mod-alt {
+	background: rgba(204, 85, 255, 0.1);
+	border-color: rgba(204, 85, 255, 0.45) !important;
+	color: #cc55ff !important;
+}
+
+/* Bright sky-blue — same visual weight as cmd but in blue */
+.shortcut-mod-shift {
+	background: rgba(77, 182, 255, 0.1);
+	border-color: rgba(77, 182, 255, 0.5) !important;
+	color: #4db6ff !important;
+}
+
+/* Vivid gold/yellow — clearly distinct from ctrl's orange */
+.shortcut-mod-fn {
+	background: rgba(255, 204, 0, 0.1);
+	border-color: rgba(255, 204, 0, 0.5) !important;
+	color: #ffcc00 !important;
+}
+
+/* Control/special keys (Backspace, Tab, Escape, arrows…) — same dark bg as regular
+   chars but with vivid red text and border so they stand out clearly */
+.shortcut-key-control {
+	background: var(--mono-bg);
+	border-color: rgba(255, 51, 51, 0.6) !important;
+	color: #ff3333 !important;
+}
+
+/* =================================================== */
+/* ======= 7.2) Sequence Column Header Search ======== */
+/* =================================================== */
+
+/* Outer column wrapper: stacks the title-row then the row-count stat */
+.th-seq-header {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+/* Inline row: "Séquence ↕" text directly followed by the search input */
+.th-seq-title-row {
+	align-items: center;
+	display: flex;
+	gap: 8px;
+	white-space: nowrap;
+}
+
+#search_input {
+	background: var(--bg-color);
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	box-sizing: border-box;
+	color: var(--text-color);
+	font-size: 12px;
+	font-weight: normal;
+	/* Match the text-baseline height of the "Séquence" label next to it */
+	height: 22px;
+	/* Constrained so the Séquence column doesn't expand to fill the table */
+	max-width: 160px;
+	padding: 0 7px;
+	width: 100%;
+}
+
+#search_input:focus {
+	border-color: var(--accent);
+	outline: none;
+}
+
+/* Repetition column: slightly narrower, centred, muted when no data */
+td.col-rep {
+	text-align: center;
+	white-space: nowrap;
+}
+
+/* Hide the repetition column for n-gram tabs with more than 3 tokens (qg/pg/hx/hp) */
+#metrics_table.hide-rep th.col-rep,
+#metrics_table.hide-rep td.col-rep {
+	display: none;
+}
+
+/* ─── Row number sub-column within the Séquence cell ─────────────────────── */
+
+/* Wraps the row number, the vertical divider, and the key chip(s) */
+.cell-seq {
+	align-items: center;
+	display: flex;
+	gap: 0;
+}
+
+/* The line number: muted, fixed-width, right-aligned for easy scanning */
+.row-num {
+	color: var(--text-muted);
+	flex-shrink: 0;
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	min-width: 2.2em;
+	padding-right: 6px;
+	text-align: right;
+}
+
+/* Thin vertical separator between the line number and the sequence chip */
+.row-divider {
+	background: var(--border);
+	flex-shrink: 0;
+	height: 18px;
+	margin-right: 8px;
+	width: 1px;
+}
+
+/* =========================== */
+/* =========================== */
+/* ======= 8/ Tooltips ======= */
+/* =========================== */
+/* =========================== */
+
+.info-icon {
+	margin-right: 4px;
+	opacity: 0.7;
+	vertical-align: text-bottom;
+}
+
+.tooltip {
+	align-items: center;
+	color: var(--accent);
+	cursor: help;
+	display: inline-flex;
+	font-style: normal;
+	justify-content: center;
+	position: relative;
+}
+
+.tooltip .tooltiptext {
+	background-color: var(--tooltip-bg);
+	border-radius: 6px;
+	bottom: 150%;
+	box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+	color: #fff;
+	font-size: 12px;
+	font-weight: normal;
+	left: 0;
+	max-width: 300px;
+	opacity: 0;
+	padding: 8px 10px;
+	pointer-events: none;
+	position: absolute;
+	text-align: left;
+	transform: none;
+	transition: opacity 0.2s;
+	visibility: hidden;
+	white-space: normal;
+	width: max-content;
+	/* Above the sticky top bar (z-index 100) and any other overlay */
+	z-index: 10000;
+}
+
+th .tooltip .tooltiptext {
+	bottom: auto;
+	top: 150%;
+}
+
+/* When the tooltip would overflow the right edge, anchor it to the right side instead */
+.tooltip.tooltip-left .tooltiptext {
+	left: auto;
+	right: 0;
+}
+
+.tooltip:hover .tooltiptext {
+	opacity: 1;
+	visibility: visible;
+}
+
+.stat-inline-tooltip .info-icon {
+	margin-right: 0;
+	opacity: 0.8;
+}
+
+.stat-inline-tooltip {
+	color: var(--kpi-wpm-color);
+}
+
+/* Inline number tooltip — shows exact value on hover for abbreviated numbers */
+.num-tooltip {
+	cursor: help;
+	position: relative;
+}
+
+.num-tooltip::after {
+	background: var(--tooltip-bg);
+	border-radius: 4px;
+	bottom: calc(100% + 4px);
+	color: #fff;
+	content: attr(title);
+	display: none;
+	font-size: 11px;
+	left: 50%;
+	padding: 3px 7px;
+	position: absolute;
+	transform: translateX(-50%);
+	white-space: nowrap;
+	/* Max 32-bit integer: ensures num-tooltips always render above every other layer */
+	z-index: 99;
+}
+
+.num-tooltip:hover::after {
+	display: block;
+}
+
+/* KPI card tooltips inherit the card’s accent color for immediate context */
+.card-hs .num-tooltip::after {
+	background: color-mix(in srgb, var(--tooltip-bg) 65%, var(--kpi-hs-color) 35%);
+}
+.card-llm .num-tooltip::after {
+	background: color-mix(in srgb, var(--tooltip-bg) 65%, var(--kpi-llm-color) 35%);
+}
+.card-global .num-tooltip::after {
+	background: color-mix(in srgb, var(--tooltip-bg) 65%, var(--kpi-wpm-color) 35%);
+}
+.card-rep .num-tooltip::after {
+	background: color-mix(in srgb, var(--tooltip-bg) 65%, var(--kpi-rep-color) 35%);
+}
+
+/* ================================ */
+/* ================================ */
+/* ======= 9/ App Filter Modal ==== */
+/* ================================ */
+/* ================================ */
+
+.modal {
+	align-items: center;
+	background: var(--modal-overlay);
+	display: flex;
+	height: 100%;
+	justify-content: center;
+	left: 0;
+	position: fixed;
+	top: 0;
+	width: 100%;
+	z-index: 1000;
+}
+
+.modal-content {
+	background: var(--panel-bg);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+	display: flex;
+	flex-direction: column;
+	max-height: 80vh;
+	padding: 20px;
+	width: 450px;
+}
+
+.modal-content h2 {
+	font-size: 18px;
+	margin: 0 0 15px 0;
+}
+
+.app-modal-controls {
+	display: flex;
+	gap: 10px;
+	margin-bottom: 15px;
+}
+
+#app_search {
+	background: var(--bg-color);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	box-sizing: border-box;
+	color: var(--text-color);
+	font-size: 14px;
+	padding: 10px;
+	width: 100%;
+}
+
+.app-list {
+	background: var(--bg-color);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	flex-grow: 1;
+	margin-top: 15px;
+	overflow-y: auto;
+}
+
+.app-item {
+	align-items: center;
+	border-bottom: 1px solid var(--border);
+	cursor: pointer;
+	display: flex;
+	padding: 8px 12px;
+	transition: background 0.2s;
+}
+
+.app-item:last-child {
+	border-bottom: none;
+}
+
+.app-item:hover {
+	background: var(--td-hover);
+}
+
+.app-item input {
+	cursor: pointer;
+	margin-right: 10px;
+}
+
+.app-icon-wrapper {
+	align-items: center;
+	display: flex;
+	flex-shrink: 0;
+	height: 28px;
+	justify-content: center;
+	margin-right: 10px;
+	width: 28px;
+}
+
+.app-icon-img {
+	height: 28px;
+	object-fit: contain;
+	width: 28px;
+}
+
+.app-icon-div {
+	align-items: center;
+	border-radius: 6px;
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+	color: #fff;
+	display: flex;
+	font-size: 14px;
+	font-weight: bold;
+	height: 28px;
+	justify-content: center;
+	width: 28px;
+}
+
+.app-name {
+	flex-grow: 1;
+	font-size: 14px;
+}
+
+/* ======================================= */
+/* ======================================= */
+/* ======= 10/ Split Cards & Loader ====== */
+/* ======================================= */
+/* ======================================= */
+
+.stat-details-split {
+	border-radius: 6px;
+	display: flex;
+	font-size: 0.95em;
+	justify-content: space-around;
+	margin-bottom: 15px;
+	padding: 8px 0;
+	width: 100%;
+}
+
+/* Background tinted to box color but slightly darker */
+.stat-card.card-hs .stat-details-split {
+	background: color-mix(in srgb, var(--kpi-hs-color), transparent 80%);
+}
+.stat-card.card-llm .stat-details-split {
+	background: color-mix(in srgb, var(--kpi-llm-color), transparent 80%);
+}
+.stat-card.card-rep .stat-details-split {
+	background: color-mix(in srgb, var(--kpi-rep-color), transparent 80%);
+}
+.stat-card.card-dist .stat-details-split {
+	background: color-mix(in srgb, var(--kpi-dist-color), transparent 80%);
+}
+
+@media (prefers-color-scheme: dark) {
+	.stat-card.card-hs .stat-details-split {
+		background: color-mix(in srgb, var(--kpi-hs-color), black 80%);
+	}
+	.stat-card.card-llm .stat-details-split {
+		background: color-mix(in srgb, var(--kpi-llm-color), black 80%);
+	}
+	.stat-card.card-rep .stat-details-split {
+		background: color-mix(in srgb, var(--kpi-rep-color), black 80%);
+	}
+	.stat-card.card-dist .stat-details-split {
+		background: color-mix(in srgb, var(--kpi-dist-color), black 80%);
+	}
+}
+
+/* Regular text in split muted, KPIs bold color via script insertion */
+.stat-details-split .split-label {
+	color: var(--text-color) !important;
+}
+
+.stat-details-split .split-sub,
+.stat-details-split .split-val {
+	color: var(--text-muted) !important;
+}
+
+/* Explicitly style the strong tags to match box identity */
+.stat-card.card-hs .stat-details-split .split-val strong {
+	color: var(--kpi-hs-color) !important;
+}
+.stat-card.card-llm .stat-details-split .split-val strong {
+	color: var(--kpi-llm-color) !important;
+}
+.stat-card.card-rep .stat-details-split .split-val strong {
+	color: var(--kpi-rep-color) !important;
+}
+.stat-card.card-dist .stat-details-split .split-val strong {
+	color: var(--kpi-dist-color) !important;
+}
+
+.split-col {
+	flex: 1;
+	text-align: center;
+}
+
+.split-label {
+	font-size: 11px;
+	margin-bottom: 4px;
+	text-transform: uppercase;
+}
+
+.split-val {
+	font-size: 14px;
+}
+
+.split-sub {
+	font-size: 0.85em;
+}
+
+.loader-spinner {
+	animation: spin 1s linear infinite;
+	border: 3px solid rgba(128, 128, 128, 0.2);
+	border-radius: 50%;
+	border-top: 3px solid var(--accent);
+	display: inline-block;
+	height: 20px;
+	margin-right: 10px;
+	vertical-align: middle;
+	width: 20px;
+}
+
+@keyframes spin {
+	0% {
+		transform: rotate(0deg);
+	}
+	100% {
+		transform: rotate(360deg);
+	}
+}
+
+/* ========================================= */
+/* ========================================= */
+/* ======= 11/ Find-in-Page Overlay ======== */
+/* ========================================= */
+/* ========================================= */
+
+#find_bar {
+	align-items: center;
+	background: var(--panel-bg);
+	border: 1px solid var(--border);
+	border-bottom: none;
+	border-radius: 8px 8px 0 0;
+	bottom: 0;
+	box-shadow: 0 -3px 14px rgba(0, 0, 0, 0.12);
+	display: none;
+	gap: 8px;
+	padding: 8px 12px;
+	position: fixed;
+	right: 24px;
+	z-index: 9999;
+}
+
+.find-label {
+	color: var(--text-muted);
+	font-size: 13px;
+	white-space: nowrap;
+}
+
+#find_input {
+	background: var(--bg-color);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	box-sizing: border-box;
+	color: var(--text-color);
+	font-size: 13px;
+	padding: 4px 8px;
+	width: 200px;
+}
+
+#find_input:focus {
+	border-color: var(--accent);
+	outline: none;
+}
+
+/* Counter shows "i / n" in muted color; red only when nothing was found */
+.find-status {
+	color: var(--text-muted);
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+	min-width: 70px;
+	white-space: nowrap;
+}
+
+.find-status.find-not-found {
+	color: #ff3b30;
+}
+
+.find-nav-btn {
+	background: var(--filter-bg);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text-color);
+	cursor: pointer;
+	font-size: 15px;
+	height: 26px;
+	line-height: 1;
+	padding: 0 8px;
+}
+
+.find-nav-btn:hover {
+	background: var(--filter-hover);
+}
+
+.find-close-btn {
+	background: transparent;
+	border: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: 14px;
+	line-height: 1;
+	padding: 2px 4px;
+}
+
+.find-close-btn:hover {
+	color: var(--text-color);
+}
+
+/* ─── Find-in-page match highlights ─────────────────────────────────────── */
+
+/* All occurrences: subtle amber tint so context remains readable */
+.find-highlight {
+	background: rgba(255, 214, 10, 0.35);
+	border-radius: 2px;
+}
+
+/* The active (current) occurrence: brighter fill + orange outline */
+.find-highlight-current {
+	background: rgba(255, 159, 10, 0.65);
+	border-radius: 2px;
+	outline: 2px solid #ff9f0a;
+	outline-offset: 1px;
+}

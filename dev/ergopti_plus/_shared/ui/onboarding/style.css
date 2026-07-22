@@ -1,0 +1,466 @@
+/* ui/onboarding/style.css */
+
+/* =========================================================================== */
+/* Onboarding Wizard Styles.                                                   */
+/*                                                                             */
+/* Multi-step first-run wizard, matching the macOS system design language      */
+/* used across all Ergopti webview windows.                                    */
+/* =========================================================================== */
+
+/* =============================== */
+/* =============================== */
+/* ======= 1/ Reset & Base ======= */
+/* =============================== */
+/* =============================== */
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	background: #f5f5f7;
+	color: #333;
+	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+	font-size: 14px;
+	/* Lock the outer page so the only scrollable region is each step's
+	   .step-body (and the .lang-list nested inside step 1). Without this,
+	   a tall step would push the .btns row below the fold and the user
+	   would have to scroll the whole window to reach the Next button — the
+	   step-body's internal scroll keeps .btns pinned at the natural bottom
+	   of every step. */
+	overflow: hidden;
+}
+
+/* ====================================== */
+/* ====================================== */
+/* ======= 2/ Layout & Structure ======= */
+/* ====================================== */
+/* ====================================== */
+
+#wizard {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	/* Bottom padding deliberately larger than the top so the Next button
+	   never sits flush against the window's bottom edge — gives the
+	   action row visual breathing room and matches macOS sheet spacing. */
+	padding: 20px 24px 26px;
+}
+
+.step {
+	display: flex;
+	flex-direction: column;
+	flex-grow: 1;
+	/* Allows .step-body (flex-grow:1 inside) to actually shrink below its
+	   intrinsic content height so the scrollbar appears inside the body
+	   rather than on the outer window. */
+	min-height: 0;
+}
+
+.step.hidden {
+	display: none;
+}
+
+/* Scrollable region that holds every step's title + form controls.
+   Sized by the parent .step's free space; opts into vertical scroll when
+   its content exceeds that space (e.g. the metrics step with a long
+   description + warning + radio cards on a short window). The sibling
+   .btns row sits outside this region and stays pinned at the bottom of
+   the step regardless of how far the body is scrolled — see § 8.
+
+   The negative margin-right + padding-right pair shifts the scrollbar
+   visually: it bleeds the step-body 14px past the wizard's 24px right
+   padding so the overlay scrollbar sits ~10px from the window edge
+   instead of being recessed by 24px, then reserves 12px of internal
+   right padding so text content keeps a clear gutter from the
+   scrollbar (otherwise the macOS overlay scrollbar covers the last
+   characters of every line, which looked broken in step 4). The .btns
+   and .step-bar siblings keep their original 24px alignment. */
+.step-body {
+	display: flex;
+	flex-direction: column;
+	flex-grow: 1;
+	margin-right: -14px;
+	min-height: 0;
+	overflow-y: auto;
+	padding-right: 12px;
+}
+
+/* =============================== */
+/* =============================== */
+/* ======= 3/ Step Indicator ===== */
+/* =============================== */
+/* =============================== */
+
+.step-bar {
+	align-items: center;
+	display: flex;
+	gap: 6px;
+	justify-content: center;
+	margin-bottom: 18px;
+}
+
+.step-dot {
+	background: #d0d0d5;
+	border-radius: 50%;
+	height: 7px;
+	transition:
+		background 0.2s,
+		transform 0.2s;
+	width: 7px;
+}
+
+.step-dot.active {
+	background: #007aff;
+	transform: scale(1.25);
+}
+
+.step-dot.done {
+	background: #34c759;
+}
+
+/* =============================== */
+/* =============================== */
+/* ======= 4/ Typography ========= */
+/* =============================== */
+/* =============================== */
+
+h1 {
+	color: #1d1d1f;
+	font-size: 17px;
+	font-weight: 600;
+	margin: 0 0 6px;
+}
+
+.subtitle {
+	color: #888;
+	font-size: 12px;
+	margin: 0 0 14px;
+}
+
+.desc {
+	color: #555;
+	font-size: 12.5px;
+	line-height: 1.55;
+	margin: 0 0 16px;
+	white-space: pre-line;
+}
+
+.hint {
+	color: #888;
+	font-size: 11px;
+	font-style: italic;
+	line-height: 1.5;
+	margin: 8px 0 0;
+}
+
+.warning {
+	background: #fff8e1;
+	border: 1px solid #f0c040;
+	border-radius: 6px;
+	color: #7a5500;
+	font-size: 10.5px;
+	font-style: italic;
+	line-height: 1.5;
+	margin: 0 0 12px;
+	padding: 8px 10px;
+	white-space: pre-line;
+}
+
+/* ====================================== */
+/* ====================================== */
+/* ======= 5/ Language List ============= */
+/* ====================================== */
+/* ====================================== */
+
+.lang-list {
+	border: 1px solid #e0e0e0;
+	border-radius: 8px;
+	flex-grow: 1;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.lang-item {
+	align-items: center;
+	border-bottom: 1px solid #f0f0f0;
+	cursor: pointer;
+	display: flex;
+	gap: 10px;
+	padding: 9px 12px;
+	transition: background 0.1s;
+	user-select: none;
+}
+
+.lang-item:last-child {
+	border-bottom: none;
+}
+
+.lang-item:hover {
+	background: #f0f4ff;
+}
+
+.lang-item.selected {
+	background: #e8f0ff;
+}
+
+.lang-item.selected .lang-name {
+	color: #007aff;
+	font-weight: 600;
+}
+
+.lang-flag {
+	align-items: center;
+	display: flex;
+	flex-shrink: 0;
+	font-size: 18px;
+	justify-content: center;
+	line-height: 1;
+	width: 24px;
+}
+
+/* PNG flag (Windows path) — sized to sit on the emoji baseline without
+   distorting the source aspect ratio. */
+.lang-flag-img {
+	display: block;
+	height: auto;
+	max-height: 16px;
+	width: 22px;
+}
+
+.lang-name {
+	color: #1d1d1f;
+	font-size: 13px;
+}
+
+/* =========================================== */
+/* =========================================== */
+/* ======= 5b/ Layout Preview Image ========== */
+/* =========================================== */
+/* =========================================== */
+
+/* Scales the layout JPG to the wizard's content width while keeping its
+   aspect ratio — so the visual cue does not push the radios off-screen
+   on a narrow window. */
+.layout-preview {
+	border: 1px solid #e0e0e0;
+	border-radius: 6px;
+	display: block;
+	height: auto;
+	margin: 0 0 12px;
+	max-width: 100%;
+}
+
+/* ====================================== */
+/* ====================================== */
+/* ======= 6/ Radio Cards ============== */
+/* ====================================== */
+/* ====================================== */
+
+.radio-group {
+	display: flex;
+	flex-direction: column;
+	flex-grow: 1;
+	gap: 8px;
+}
+
+.radio-card {
+	align-items: center;
+	background: #fff;
+	border: 1.5px solid #e0e0e0;
+	border-radius: 8px;
+	cursor: pointer;
+	display: flex;
+	gap: 10px;
+	padding: 12px 14px;
+	transition:
+		border-color 0.15s,
+		background 0.1s;
+}
+
+.radio-card:hover {
+	background: #f5f8ff;
+	border-color: #a0bfff;
+}
+
+.radio-card input[type='radio'] {
+	accent-color: #007aff;
+	flex-shrink: 0;
+	height: 16px;
+	margin: 0;
+	width: 16px;
+}
+
+.radio-card input[type='radio']:checked + .radio-label {
+	color: #007aff;
+	font-weight: 500;
+}
+
+.radio-label {
+	color: #333;
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+/* ====================================== */
+/* ====================================== */
+/* ======= 7/ Magic Key Input ========== */
+/* ====================================== */
+/* ====================================== */
+
+.field-group {
+	display: flex;
+	margin-bottom: 4px;
+	width: 100%;
+}
+
+#sc-input {
+	background: #fff;
+	border: 1.5px solid #d0d0d0;
+	border-radius: 7px 0 0 7px;
+	border-right: none;
+	color: #1d1d1f;
+	flex: 1;
+	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+	font-size: 12.5px;
+	min-width: 0;
+	outline: none;
+	padding: 7px 10px;
+	transition:
+		border-color 0.15s,
+		box-shadow 0.15s;
+}
+
+#sc-input:focus {
+	border-color: #007aff;
+	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+	z-index: 1;
+}
+
+#sc-browse {
+	border-radius: 0 7px 7px 0;
+	flex-shrink: 0;
+	padding: 7px 12px;
+	white-space: nowrap;
+}
+
+#s3-input {
+	background: #fff;
+	border: 1.5px solid #d0d0d0;
+	border-radius: 7px;
+	color: #1d1d1f;
+	font-family: 'SF Mono', 'Monaco', monospace;
+	/* Matches the surrounding radio-label / desc text — the previous 22px
+	   made the field tower over its row's text and read as 1.5× the rest. */
+	font-size: 13px;
+	outline: none;
+	padding: 5px 10px;
+	text-align: center;
+	transition:
+		border-color 0.15s,
+		box-shadow 0.15s;
+	width: 70px;
+}
+
+#s3-input:focus {
+	border-color: #007aff;
+	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+/* ===================================== */
+/* ===================================== */
+/* ======= 8/ Buttons ================= */
+/* ===================================== */
+/* ===================================== */
+
+.btns {
+	align-items: center;
+	display: flex;
+	flex-shrink: 0;
+	gap: 8px;
+	justify-content: flex-end;
+	margin-top: 16px;
+}
+
+button {
+	border: none;
+	border-radius: 7px;
+	cursor: pointer;
+	font-size: 12.5px;
+	font-weight: 500;
+	padding: 7px 18px;
+	transition: filter 0.1s;
+}
+
+button:hover {
+	filter: brightness(0.92);
+}
+
+.primary {
+	background: #007aff;
+	color: #fff;
+}
+
+.secondary {
+	background: #e0e0e0;
+	color: #333;
+}
+
+/* General hide utility. The step show/hide uses ``.step.hidden`` specifically,
+   but the gestures step's warning, the Windows registration panel and its status
+   line are not ``.step`` elements and need a plain hide rule too. */
+.hidden {
+	display: none;
+}
+
+
+/* ============================================== */
+/* ============================================== */
+/* ======= 9/ Gesture Registration (Win) ======= */
+/* ============================================== */
+/* ============================================== */
+
+/* Windows-only touchpad-gesture registration panel on step 5 (auto/manual
+   buttons + result line). Hidden on macOS, which shows the warning box instead. */
+.gesture-register {
+	border-top: 1px solid #e8e8e8;
+	margin-top: 14px;
+	padding-top: 12px;
+}
+
+.register-section {
+	color: #1d1d1f;
+	font-size: 12px;
+	font-weight: 600;
+	margin: 0 0 10px;
+}
+
+.register-btn {
+	display: block;
+	width: 100%;
+}
+
+/* Tighten the gap between each button and its explanatory hint. */
+.register-btn + .hint {
+	margin-bottom: 10px;
+}
+
+.register-status {
+	font-size: 12px;
+	font-weight: 600;
+	margin: 12px 0 0;
+}
+
+.register-status.register-ok {
+	color: #1a8c3a;
+}
+
+.register-status.register-err {
+	color: #d11;
+}

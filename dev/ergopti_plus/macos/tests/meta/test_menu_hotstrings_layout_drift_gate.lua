@@ -1,0 +1,153 @@
+--- tests/meta/test_menu_hotstrings_layout_drift_gate.lua
+
+--- ==============================================================================
+--- MODULE: Menu Hotstrings/Layout Drift Gate (macOS) — F41b
+--- DESCRIPTION:
+--- macOS's hotstrings and layout submenus (ui/menu/menu_hotstrings.lua,
+--- ui/menu/menu_keyboard_layout.lua, orchestrated by ui/menu/builder.lua) are
+--- hand-assembled imperatively and never read
+--- _shared/modules/menu/menu_manifest.json's hotstrings_menu/layout_menu
+--- arrays — unlike gestures_menu/metrics_menu/shortcuts_menu, which are
+--- rendered through lib/manifest_menu.lua's ManifestMenu.build and therefore
+--- cannot drift from the manifest by construction.
+---
+--- A full manifest-driven migration of hotstrings/layout is a larger, riskier
+--- refactor deferred to a follow-up (AUDIT_AHK_2026-07-01.md, F41b — this
+--- gate is the interim mitigation the audit calls out explicitly). Until that
+--- migration lands, this test pins the manifest's current hs-filtered shape
+--- for both keys. Any edit to hotstrings_menu/layout_menu in
+--- menu_manifest.json now fails this test, forcing a human to consciously
+--- check whether ui/menu/menu_hotstrings.lua, ui/menu/builder.lua, or
+--- ui/menu/menu_keyboard_layout.lua still need updating — turning a
+--- previously silent desync into a loud one.
+---
+--- NOTE: layout_menu's pinned shape does NOT imply macOS renders every one of
+--- those entries — menu_keyboard_layout.lua only implements the
+--- active_layouts id today (the on/off toggle, layout_features_base/altgr,
+--- and the hotstrings.magic_key.replace feature path have no macOS
+--- counterpart yet). That gap is a known, separate limitation; this gate
+--- only prevents it from growing silently.
+---
+--- The AHK half reads both keys generically via MenuRenderer_Build in
+--- lib/manifest_menu.ahk (see ui/menu/menu_hotstrings.ahk,
+--- ui/menu/menu_layout.ahk) — no equivalent drift gate is needed there.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+-- Canonical hs-filtered signatures for hotstrings_menu, in manifest order.
+-- Signature = "<type>:<id>" for entries with a stable id, "<type>:<category|i18n|path>"
+-- for the few entries that key off a different field (toggle/section_header/feature),
+-- or "---" for separators.
+local CANONICAL_HOTSTRINGS_MENU = {
+	"toggle:Hotstrings",
+	"group:hotstrings_params",
+	"dynamic:hotstring_bulk_actions",
+	"---",
+	"section_header:menu.hotstrings.header_common",
+	"dynamic:hotstring_categories_standard",
+	"dynamic:hotstring_categories_dynamic",
+	"---",
+	"section_header:menu.hotstrings.header_ergopti",
+	"dynamic:hotstring_categories_ergopti",
+	"---",
+	"section_header:menu.hotstrings.personal_header",
+	"dynamic:hotstring_personal",
+	"---",
+	"section_header:menu.extensions.header",
+	"dynamic:hotstring_extensions",
+}
+
+-- Canonical hs-filtered signatures for layout_menu, in manifest order.
+-- ahk-only entries (accented_letters group, ahk.layout.ctrl_magic_save feature)
+-- are dropped by the hs platform filter, same as the real manifest reader.
+local CANONICAL_LAYOUT_MENU = {
+	"toggle:Layout",
+	"dynamic:layout_features_base",
+	"---",
+	"dynamic:layout_features_altgr",
+	"dynamic:active_layouts",
+	"---",
+	"feature:hotstrings.magic_key.replace",
+}
+
+--- Reads and decodes the shared menu_manifest.json.
+--- @return table Decoded manifest.
+local function read_manifest()
+	local fh = io.open(helpers.shared("modules/menu/menu_manifest.json"), "r")
+	helpers.assert_true(fh ~= nil, "Cannot open menu_manifest.json")
+	local raw = fh:read("*a")
+	fh:close()
+	local data = hs.json.decode(raw)
+	helpers.assert_true(type(data) == "table", "menu_manifest.json must decode to a table")
+	return data
+end
+
+--- Builds a signature string identifying a manifest entry regardless of which
+--- field it keys off (id, category, i18n, or path).
+--- @param entry table A menu_manifest.json array entry.
+--- @return string Signature, e.g. "dynamic:hotstring_bulk_actions" or "---".
+local function entry_signature(entry)
+	local t = entry.type
+	if t == "---" then return "---" end
+	if type(entry.id) == "string" then return t .. ":" .. entry.id end
+	if t == "toggle" and type(entry.category) == "string" then return t .. ":" .. entry.category end
+	if t == "section_header" and type(entry.i18n) == "string" then return t .. ":" .. entry.i18n end
+	if t == "feature" and type(entry.path) == "string" then return t .. ":" .. entry.path end
+	return tostring(t)
+end
+
+--- Filters a manifest menu array down to entries relevant to the "hs" platform.
+--- Entries with no `platforms` field apply to every platform.
+--- @param menu_array table Raw array from menu_manifest.json.
+--- @return table signatures Ordered list of entry_signature() results.
+local function hs_filtered_signatures(menu_array)
+	local sigs = {}
+	for _, entry in ipairs(menu_array) do
+		if type(entry) == "table" then
+			local include = true
+			if type(entry.platforms) == "table" then
+				include = false
+				for _, p in ipairs(entry.platforms) do
+					if p == "hs" then include = true; break end
+				end
+			end
+			if include then table.insert(sigs, entry_signature(entry)) end
+		end
+	end
+	return sigs
+end
+
+--- Asserts an ordered list of signatures matches a pinned canonical list.
+--- @param actual table Signatures extracted from the manifest.
+--- @param expected table Pinned CANONICAL_* list.
+--- @param label string Menu key name, for error messages.
+local function assert_signatures_match(actual, expected, label)
+	helpers.assert_eq(#actual, #expected,
+		label .. " has " .. #actual .. " hs-relevant entrie(s), expected " .. #expected ..
+		" — menu_manifest.json's " .. label .. " drifted; update the CANONICAL list above " ..
+		"AND check whether the macOS hand-built menu needs the same change (F41b)")
+	for i, expected_sig in ipairs(expected) do
+		helpers.assert_eq(actual[i], expected_sig,
+			label .. "[" .. i .. "] = '" .. tostring(actual[i]) .. "', expected '" .. expected_sig ..
+			"' — menu_manifest.json's " .. label .. " drifted; update the CANONICAL list above " ..
+			"AND check whether the macOS hand-built menu needs the same change (F41b)")
+	end
+end
+
+helpers.describe("menu drift gate (macOS): hotstrings_menu/layout_menu manifest shape is pinned (F41b)", function()
+
+	helpers.it("hotstrings_menu hs-filtered signatures match the pinned canonical order", function()
+		local data = read_manifest()
+		helpers.assert_true(type(data.hotstrings_menu) == "table", "menu_manifest.json must have a hotstrings_menu array")
+		local actual = hs_filtered_signatures(data.hotstrings_menu)
+		assert_signatures_match(actual, CANONICAL_HOTSTRINGS_MENU, "hotstrings_menu")
+	end)
+
+	helpers.it("layout_menu hs-filtered signatures match the pinned canonical order", function()
+		local data = read_manifest()
+		helpers.assert_true(type(data.layout_menu) == "table", "menu_manifest.json must have a layout_menu array")
+		local actual = hs_filtered_signatures(data.layout_menu)
+		assert_signatures_match(actual, CANONICAL_LAYOUT_MENU, "layout_menu")
+	end)
+end)
