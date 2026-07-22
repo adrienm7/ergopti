@@ -25,6 +25,8 @@ FEATURES & RATIONALE:
 
 	import './ergopti-plus.css';
 	import { ui, restoreOS } from './state.svelte.js';
+	import { t, restoreLang } from './i18n.svelte.js';
+	import LangToggle from './LangToggle.svelte';
 
 	import Hero from './Hero.svelte';
 	import KpiStrip from './KpiStrip.svelte';
@@ -52,30 +54,32 @@ FEATURES & RATIONALE:
 	// Window geometry lookup for the embedded driver frames.
 	const winGeo = Object.fromEntries(data.webviews.map((w) => [w.id, w]));
 
-	const kpis = [
-		{ value: data.hotstringTotal, suffix: '', label: 'hotstrings prêts à l’emploi' },
-		{ value: data.aiTotalModels, suffix: '', label: 'modèles d’IA locale au catalogue' },
-		{ value: 335, suffix: '', label: 'réglages, tous optionnels' },
-		{ value: data.localesCount, suffix: '', label: 'langues d’interface' }
-	];
+	// $derived so labels re-translate the instant the language toggles.
+	let kpis = $derived([
+		{ value: data.hotstringTotal, suffix: '', label: t('hotstrings prêts à l’emploi') },
+		{ value: data.aiTotalModels, suffix: '', label: t('modèles d’IA locale au catalogue') },
+		{ value: 335, suffix: '', label: t('réglages, tous optionnels') },
+		{ value: data.localesCount, suffix: '', label: t('langues d’interface') }
+	]);
 
-	const navItems = [
-		{ id: 'ep-pourqui', label: 'Pour qui ?' },
+	let navItems = $derived([
+		{ id: 'ep-pourqui', label: t('Pour qui ?') },
 		{ id: 'ep-hotstrings', label: 'Hotstrings' },
-		{ id: 'ep-ia', label: 'IA' },
+		{ id: 'ep-ia', label: t('IA') },
 		{ id: 'ep-tapholds', label: 'Tap-Holds' },
-		{ id: 'ep-raccourcis', label: 'Raccourcis' },
+		{ id: 'ep-raccourcis', label: t('Raccourcis') },
 		{ id: 'ep-trackpad', label: 'Trackpad' },
-		{ id: 'ep-metriques', label: 'Métriques' },
-		{ id: 'ep-confidentialite', label: 'Vie privée' },
-		{ id: 'ep-personnalisation', label: 'Réglages' },
-		{ id: 'ep-ergopti', label: 'Déjà en Ergopti ?' },
-		{ id: 'ep-comparatif', label: 'Comparatif' },
+		{ id: 'ep-metriques', label: t('Métriques') },
+		{ id: 'ep-confidentialite', label: t('Vie privée') },
+		{ id: 'ep-personnalisation', label: t('Réglages') },
+		{ id: 'ep-ergopti', label: t('Déjà en Ergopti ?') },
+		{ id: 'ep-comparatif', label: t('Comparatif') },
 		{ id: 'ep-faq', label: 'FAQ' },
-		{ id: 'ep-telecharger', label: 'Télécharger' }
-	];
+		{ id: 'ep-telecharger', label: t('Télécharger') }
+	]);
 
 	onMount(async () => {
+		restoreLang();
 		restoreOS();
 		ui.release = await getRelease();
 
@@ -94,10 +98,13 @@ FEATURES & RATIONALE:
 </script>
 
 <svelte:head>
-	<title>Ergopti+ — la frappe augmentée, gratuite et locale</title>
+	<title>{t('Ergopti+ — la frappe augmentée, gratuite et locale')}</title>
 	<meta
 		name="description"
-		content="Ergopti+ transforme votre frappe en temps réel : {data.hotstringTotal} expansions et corrections, prédictions IA 100 % locales ({data.aiTotalModels} modèles), tap-holds, gestes trackpad, métriques de frappe. Gratuit et open-source, sur Windows et macOS (Linux en alpha)."
+		content={t(
+			'Ergopti+ transforme votre frappe en temps réel : {n} expansions et corrections, prédictions IA 100 % locales ({m} modèles), tap-holds, gestes trackpad, métriques de frappe. Gratuit et open-source, sur Windows et macOS (Linux en alpha).',
+			{ n: data.hotstringTotal, m: data.aiTotalModels }
+		)}
 	/>
 </svelte:head>
 
@@ -116,10 +123,15 @@ FEATURES & RATIONALE:
 
 	<main class="ep-main">
 		<div class="ep-root">
-			<!-- Lien temporaire vers l'ancienne page le temps de valider celle-ci -->
-			<p class="legacy-link">
-				<a href="ergopti-plus-old">Ancienne version de cette page →</a>
-			</p>
+			<!-- Top bar: language selector + temporary link to the old page -->
+			<div class="ep-topbar">
+				<LangToggle />
+				<p class="legacy-link">
+					<a href="ergopti-plus-old"
+						>{t('Ancienne version de cette page →')}</a
+					>
+				</p>
+			</div>
 
 			<Hero />
 			<KpiStrip items={kpis} />
@@ -160,8 +172,16 @@ FEATURES & RATIONALE:
 </div>
 
 <style>
-	.legacy-link {
+	.ep-topbar {
+		align-items: center;
+		display: flex;
+		gap: 14px;
+		justify-content: space-between;
 		margin: 10px 0 0;
+	}
+
+	.legacy-link {
+		margin: 0;
 		text-align: right;
 	}
 
