@@ -28,6 +28,8 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-typing-latency-tooltip-coldstart](#project-typing-latency-tooltip-coldstart) — Latence de frappe : pourquoi la reutilisation de fenetre tooltip est rejetee, pourquoi le chunking de l'enregistrement differe a ete reverte, et pourquoi WebView2 a quitte le chemin de frappe
 - [project-ahk-menu-dispatcher-drop](#project-ahk-menu-dispatcher-drop) — AHK 2.0 perd silencieusement ~30-50 % des clics du menu tray. Contourne par lib/menu_dispatcher.ahk — tout item actionnable doit passer par RegisterMenuItem, jamais par Menu.Add brut.
 - [project-audit-2026-07-21-toml-onboarding](#project-audit-2026-07-21-toml-onboarding) — Regles durables sorties de l'audit de `lib/toml/` et `ui/onboarding/` : ou parse-t-on, comment signale-t-on un echec de lecture, et le piege de la sentinelle
+- [project-ahk-unreadable-config-persists-defaults](#project-ahk-unreadable-config-persists-defaults) — A config reader that returns "" on a locked file makes the next save persist DEFAULTS over the user's real config — the TOML_ReadFailed rule exists but is unapplied at five readers
+- [project-audit-ahk-2026-07-21-adversarial](#project-audit-ahk-2026-07-21-adversarial) — Fifth adversarial AHK pass: 52 confirmed / 10 refuted, full list in AUDIT_AHK_2026-07-21.md; two confident false-positives killed by measurement
 - [project-webview2-bridge-gotchas](#project-webview2-bridge-gotchas) — Hosting a shared HTML/JS frontend in a WebView2 control (thqby `vendor/WebView2.ahk`) on Windows has FOUR distinct gotchas that each silently break the JS↔AHK bridge. The onboarding wizard (`ui/onboarding/webview.ahk`) hit all four in sequence; model_browser predates some of the fixes.
 - [project-config-v2-refactor](#project-config-v2-refactor) — La migration v1 → v2 est terminee ; ne restent que les gotchas transversaux qu'elle a mis au jour
 - [project_debug_menu_sync](#project_debug_menu_sync) — L'ordre du sous-menu Debug est defini une seule fois dans `_shared/modules/menu/menu_manifest.json` (cle `debug_menu`) ; les deux drivers le consomment
@@ -671,6 +673,46 @@ aux ecritures de la phase de boot.
   doivent rester de purs renderers, parce que la premiere page sert aussi de
   cible au bouton Retour.
 
+### project-ahk-unreadable-config-persists-defaults
+
+_A config reader that returns "" on a locked file — instead of signalling the read failure — makes the next save persist DEFAULTS over the user's real config. The `TOML_ReadFailed` rule exists but is unapplied at five readers._
+
+<sub>slug: `project_ahk_unreadable_config_persists_defaults`</sub>
+
+The rule in [[project_audit_2026_07_21_toml_onboarding]] — "a read failure signals via `TOML_ReadFailed(Path)`, never an empty result, and any code that REWRITES a file from a parse must check it first" — is real but was never applied class-wide. Five readers still collapse "unreadable" into "empty", and the writer downstream then persists the empty/default state over the user's on-disk config. Every one is triggered by a transient boot-time lock (OneDrive/Dropbox sync, an AV real-time scan, a backup/indexer holding the file for a few hundred ms); the `07-20` logs show this machine really does hit sharing-violation locks on the config dir.
+
+Concrete sites and their data-loss path (audit 2026-07-21):
+
+- **`ReadTomlFile` → `ApplyConfigToml` (the worst).** `ReadTomlFile` (`toml_loader.ahk:88`) catches the `FileRead` throw, logs one lone ERROR, and returns `""` with **no signal to writers**. `ApplyConfigToml` (`toml_config_loader.ahk:140`) sees `FileExist`=true, skips its missing-file guard, `loop parse ""` applies 0 overrides → `Features` stays at manifest DEFAULTS → the `-500 ms` boot timer's `SaveFullConfig` (`config_io.ahk:395`, `_CollectFeatureUpdates` walks the whole tree unconditionally) writes those defaults back once the lock has cleared. **The entire feature configuration is silently lost.** The existing `TOML_ReadFailed` guard only fires while the file is *still* unreadable at write time — a lock that clears between boot and the timer defeats it.
+- **`_WS_Load`** (`wrap_symbols_config.ahk:292`) → empty maps → the next tray toggle's `_WS_Save` persists them → every disabled built-in re-enabled, custom pairs gone.
+- **`CS_Read`** (`config_shortcuts.ahk:78`) → keeps the in-memory metrics DEFAULTS → the first `SaveFullConfig` overwrites the user's real metrics settings.
+- **`ReadPersonalToml`** (`personal_toml_io.ahk:153`) and **`ReadPathsToml`** (`toml_helpers.ahk:735`): unguarded `FileRead` — the first swallows a locked `personal_hotstrings.toml` (personal hotstrings vanish, no log) and later crashes menu handlers; the second aborts the auto-execute boot mid-way with hotkeys already armed.
+
+**Symptom the user reports:** "my settings reset after a restart", "the wrap symbols I disabled came back", "my hotstring categories re-enabled themselves" — with nothing in the visible logs, because the read failure is a single easily-lost ERROR and the destructive save logs nothing.
+
+**How to apply:** give each reader the same read-failure sentinel `ParseTomlFile`/`TOML_ReadFailed` already has (a per-path failure flag), and make its writer (`SaveFullConfig`, `_WS_Save`, the metrics persist) FAIL CLOSED — refuse to serialize the affected section while the flag is set — so a transient lock can never be persisted as an empty/default config. One class fix closes all five; a regression test per reader writes a real file, forces the read to throw, mutates, and asserts the on-disk file is unchanged. This is the loop-the-class shape again: the rule was written but pinned at one layer only.
+
+Related [[project_audit_2026_07_21_toml_onboarding]], [[feedback_loader_target_explicit]], [[project_ahk_invariant_incomplete_application]].
+
+### project-audit-ahk-2026-07-21-adversarial
+
+_Fifth adversarial pass on the AHK driver: 52 confirmed / 10 refuted / 3 hypotheses, full list in the committed `AUDIT_AHK_2026-07-21.md`. Two confident false-positives killed by measurement._
+
+<sub>slug: `project_audit_ahk_2026_07_21_adversarial`</sub>
+
+Loop-until-dry to three passes, each finding verified by two independent adversarial lenses with a tie-breaker on disagreement. The report is kept at the repo root (`AUDIT_AHK_2026-07-21.md`) as the open-items record — read it before the next pass instead of re-deriving. 52 confirmed (1 high, 17 medium, 34 low). Dominant classes: the unreadable-config data loss ([[project_ahk_unreadable_config_persists_defaults]]); the `3f9ab1a1e` dead-key ring-visibility gate missing three sibling emit paths (`SendNewResult`, `_DigitRowDown`, and the OneShotShift / Space-hold hooks that `_EmitReachedScreen` never checks); the crash-B "`#HotIf` reads an unset global" class extending BEYOND `Features` (the `_LLM_Tooltip_Visible` trio via `tab_accept.ahk`'s `#HotIf`, and `LOGGER_LOG_PATH` read bare in the pre-ready error net); and the `_PrefixBuffer`/`HSE_Buffer` G5 desyncs on nav-layer sends, physical Home/End/PgUp/PgDn, tooltip expiry and Win+L lock.
+
+**Two confident false-positives were killed by measurement — recorded so they are not re-raised** ([[project_audit_findings_are_hypotheses]], [[project_audit_evidence_must_be_reproducible]]):
+
+- **"Ollama warmup / remote-ready `WinHTTP Send()` blocks the keystroke thread on connect"** (proposed high+medium G4). Both Opus verifiers CONFIRMED it on code-reading alone; a standalone bench refuted it — the async `Send()` returns in 15 ms (see the measured note in [[project_updater_nonblocking_http]]).
+- The `/validate`-executes-the-script confusion (wrong in both directions historically) is settled in [[project_ahk_map_delete_raises_on_missing_key]] — the flag validates when it PRECEDES the script path, runs the driver live when it trails it.
+
+**Also refuted this pass, do not re-raise:** the three config bulk-toggle "unchecked gate write" claims (`config_io.ahk:153/:320` — the "the twin reports the write result" premise is false); keep-awake torn-down-but-not-restored-on-resume; reload-mid-hold synthetic-modifier leak; render-once streaming-TTLT freeze; `_LLM_Ollama_TrimAsyncRegistry`'s `ProcessClose`-under-`Critical` (dead code on the Ollama path).
+
+**Coverage gaps left open (silence would read as covered):** ~9 adapters were cleared without being read; the `ui/` editor state machines were grepped only for the `2cc8a8b92` unbound-`this` pattern; `lib/tap_hold/tap_hold_writer.ahk` was never read; the runtime-only mutex-yield-vs-Reload race is unverifiable read-only; and G3 (races) is the thinnest-evidenced guarantee — exactly one confirmed race, every other race conclusion resting on "AHK is single-threaded + Reload is a full restart" with the LLM subsystem dormant across all 11 log days. Observability: the `07-19` boot crashes exist ONLY in `crash_reports/`, never reaching a daily log, because the file sink attaches after the config-read boot phase — read both when reconstructing a boot crash.
+
+Related [[project_ahk_unreadable_config_persists_defaults]], [[project_updater_nonblocking_http]], [[project_ahk_invariant_incomplete_application]], [[project_audit_2026_07_21_open_items]], [[project_ahk_isset_requires_variable_load_crash]].
+
 ### project-webview2-bridge-gotchas
 
 _Hosting a shared HTML/JS frontend in a WebView2 control (thqby `vendor/WebView2.ahk`) on Windows has FOUR distinct gotchas that each silently break the JS↔AHK bridge. The onboarding wizard (`ui/onboarding/webview.ahk`) hit all four in sequence; model_browser predates some of the fixes._
@@ -1252,6 +1294,7 @@ Two distinct foot-guns, both surfaced by a user reporting a "freeze au démarrag
 **How to apply:**
 
 - The unprompted background poll uses the async path: `_Updater_FetchLatestJsonAsync` opens the request in WinHTTP async mode (`Req.Open(url, true)`), `Send()` returns immediately, and `_Updater_PollAsync` harvests it via `WaitForResponse(0)` (0 = do not wait) re-armed by a `SetTimer`. The network I/O runs on WinHTTP's own worker threads — the main thread never blocks. This is the same **WinHTTP-async + `WaitForResponse(0)` + `SetTimer`-poll** pattern used in `modules/llm/api_ollama.ahk` + `api_remote.ahk` (mirroring `hs.http.asyncPost` on macOS). A `try`-wrapped `WaitForResponse(0)` that throws = the request errored (treated as failure); a max-polls cap derived from the timeout budget guarantees no orphaned poll timer.
+- **The async `Open(url, true)` + `Send()` does NOT block on connect — measured, not assumed.** A standalone bench on 2026-07-21 (`WinHttp.WinHttpRequest.5.1`, `SetTimeouts(3000,…)`, no hooks) called `Send()` against a black-hole IP whose SYN is dropped: **`Send()` returned in 15 ms**. So a finding of the shape "the async `Send()` blocks the keystroke thread on DNS/connect" is FALSE, and must be refuted with this bench rather than argued from reading — the 2026-07-21 audit's two Opus verifiers BOTH confirmed exactly that false claim for `ollama_warmup.ahk` before the measurement overturned it (an adversarial verifier can be wrong in the confident direction). What genuinely blocks is a *synchronous* `Open(url, false)+Send()` and a `WaitForResponse` given a non-finite argument — so keep every network surface on the async path above, and never migrate a "connect blocks" finding into a fix.
 - Status / ETag / array-unwrap interpretation is shared by the sync and async paths via `_Updater_InterpretResponse` (single source of truth — they must not drift).
 - **User-initiated** paths (one-click "check now", changelog, download) keep the _synchronous_ fetch: the user is actively waiting on the click, and the timeouts are now bounded. Only the unprompted poll needs to be async.
 - `Updater_StopBackgroundChecks` cancels in-flight async requests so a late response cannot pop a notification after the user picks "never".
