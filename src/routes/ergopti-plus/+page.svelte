@@ -27,6 +27,7 @@ FEATURES & RATIONALE:
 	import { ui, restoreOS } from './state.svelte.js';
 	import { t, restoreLang } from './i18n.svelte.js';
 	import LangToggle from './LangToggle.svelte';
+	import { FAQ_DATA } from './faq-data.js';
 
 	import Hero from './Hero.svelte';
 	import KpiStrip from './KpiStrip.svelte';
@@ -78,6 +79,38 @@ FEATURES & RATIONALE:
 		{ id: 'ep-telecharger', label: t('Télécharger') }
 	]);
 
+	// SEO structured data (schema.org): the application itself plus the FAQ,
+	// serialized once in French — the page's canonical language. The script
+	// tag is assembled from split halves because Svelte ends a component
+	// script at the first literal closing tag it sees, even inside a string
+	const stripTags = (html) => html.replace(/<[^>]+>/g, '');
+	const jsonLd =
+		'<scr' +
+		'ipt type="application/ld+json">' +
+		JSON.stringify([
+			{
+				'@context': 'https://schema.org',
+				'@type': 'SoftwareApplication',
+				name: 'Ergopti+',
+				operatingSystem: 'Windows, macOS, Linux',
+				applicationCategory: 'UtilitiesApplication',
+				offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
+				url: 'https://ergopti.fr/ergopti-plus',
+				description: `Ergopti+ transforme votre frappe en temps réel : ${data.hotstringTotal} expansions et corrections, prédictions IA 100 % locales, tap-holds, gestes trackpad, métriques de frappe. Gratuit et open-source.`
+			},
+			{
+				'@context': 'https://schema.org',
+				'@type': 'FAQPage',
+				mainEntity: FAQ_DATA.map((f) => ({
+					'@type': 'Question',
+					name: f.q,
+					acceptedAnswer: { '@type': 'Answer', text: stripTags(f.a) }
+				}))
+			}
+		]) +
+		'</scr' +
+		'ipt>';
+
 	onMount(async () => {
 		restoreLang();
 		restoreOS();
@@ -106,6 +139,9 @@ FEATURES & RATIONALE:
 			{ n: data.hotstringTotal, m: data.aiTotalModels }
 		)}
 	/>
+	<!-- The GitHub star badge fetches on mount — warm the connection up front -->
+	<link rel="preconnect" href="https://api.github.com" crossorigin="anonymous" />
+	{@html jsonLd}
 </svelte:head>
 
 <!--
