@@ -94,8 +94,26 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-hs-audit-round4-2026-07-21](#project-hs-audit-round4-2026-07-21)
 - [project-perf-2026-07-21-implementation](#project-perf-2026-07-21-implementation)
 - [feedback-stash-drop-by-index-trap](#feedback-stash-drop-by-index-trap) — Never compute a `stash@{n}` index from grep line numbers (1-based vs 0-based) and never match entries via the pretty list — capture the stash commit SHA at push time, restore with `git stash store`
+- [project-hs-suite-order-contamination](#project-hs-suite-order-contamination) — Green locally + red in CI on the same commit means test-file DISCOVERY ORDER (NTFS vs APFS): a leaked package.loaded stub or a warm-cache accident. The runner now cold-starts every file; never rely on a module being cached from an earlier test file
 
 ## Working conventions & feedback
+
+### project-hs-suite-order-contamination
+
+_Green locally + red in CI on the same commit means test-file DISCOVERY ORDER (NTFS vs APFS): a leaked package.loaded stub or a warm-cache accident. The runner now cold-starts every file; never rely on a module being cached from an earlier test file_
+
+<sub>slug: `project_hs_suite_order_contamination`</sub>
+
+Three CI-only failure waves (2026-07-22) came from one class: a test file installs a partial stub in `package.loaded` (shell_runner without `exec`, warmup_controller without `init`) or loads a module under a lucky environment, and whichever file the walker yields NEXT captures that state at require time. `tests/run.lua` walks the filesystem, and NTFS yields a different order than the CI runner's APFS — so the suite was green on Windows and red on macOS **for the same commit**, with a new victim surfacing after each targeted fix.
+
+**Why:** `local Dep = require("x")` snapshots whatever `package.loaded["x"]` holds at that instant; nothing ever re-checks it. The warm cache also HID a real defect for months: the hs stub's `fs.attributes` returned constant nil, so `lib.paths` could never locate `_shared/` under a pristine stub — `lib.timings` only ever loaded because an earlier file had cached it under a real-fs override.
+
+**How to apply:**
+
+- Diagnostic reflex: local-green/CI-red on identical commits ⇒ suspect discovery order, not the runner OS. Reproduce by requiring the suspected polluter then the victim in one Lua process.
+- The runner (`tests/run.lua`) now purges `modules.*`, `adapters.*`, `lib.*`, `ui.*` from `package.loaded` and installs a pristine hs stub between test FILES — never depend on a module surviving from a previous file, and never leave a deliberate stub installed past the end of your file (meta gate: `test_shell_runner_stub_restore`).
+- The hs stub's `fs.attributes` probes the real filesystem (lfs, else `io.open` + `os.rename`) — tests that need a missing-path scenario must override it explicitly instead of relying on the old constant-nil behavior.
+- The same accident class exists on the source-scan side: `read_driver_source("CONSTANT")` picks the FIRST file declaring the constant in walk order. If two files declare it (mlx vs ollama deps checkers), the test asserts a different file per OS — keep scanned constants unique, or fix every declaring site.
 
 ### feedback-stash-drop-by-index-trap
 
