@@ -28,6 +28,7 @@ local i18n          = require("lib.i18n")
 local notifications = require("lib.notifications")
 local ui_restore    = require("lib.ui_restore")
 local fs_dir        = require("lib.fs_dir")
+local git_status    = require("lib.git_status")
 
 local LOG = "file_watchers"
 
@@ -36,6 +37,25 @@ local LOG = "file_watchers"
 -- tree is a user-writable folder, so a self-referential symlink would make a
 -- naive recursion loop forever and abort boot with a stack overflow (F-LOW-4).
 local SCAN_MAX_DEPTH = 16
+
+-- Ignore file-change events for this long after the watchers are armed. macOS
+-- FSEvents buffers events across an hs.reload() and replays them to the freshly
+-- armed watcher; without this window a `git pull` whose writes landed during the
+-- previous boot would re-fire a reload immediately after the next boot — and,
+-- because the replay recurs every boot, cascade into the keyboard-freezing reload
+-- storm (fe57ce045). Mirrors the menu watcher's identical guard
+-- (ui/menu/init.lua BOOT_SUPPRESS_SEC) — the sibling this one was missing.
+local BOOT_SUPPRESS_SEC = 5
+
+-- Max consecutive re-polls (each one 0.5 s debounce tick) with the git lock held
+-- but NO new file activity, before the guard is bypassed. A real pull keeps
+-- writing, which resets the counter (see schedule_reload), so this can only trip
+-- on a STALE index.lock left by a crashed git — never on a genuine pull, however
+-- long. Capped so such a stale lock cannot postpone auto-reload forever.
+-- The debounce interval itself stays the bare literal 0.5 in hs.timer.doAfter
+-- below — a cross-driver single-source gate pins it to Linux's _debounce_sec
+-- (tools/test/test-file-watchers-constants-single-source.cjs).
+local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * 0.5s = 60s of a quiet-but-locked repo
 
 
 
@@ -59,18 +79,65 @@ function M.start(ctx)
 	-- Global table pins the watchers so the GC cannot destroy them mid-session.
 	_G.script_watchers = _G.script_watchers or {}
 
-	local reload_timer = nil
+	-- Drop FSEvents replays delivered during the post-boot suppress window (see
+	-- BOOT_SUPPRESS_SEC). Captured now because M.start runs at the tail of boot,
+	-- right where the freshly-armed watchers would otherwise catch the previous
+	-- session's buffered events.
+	local suppress_until = hs.timer.secondsSinceEpoch() + BOOT_SUPPRESS_SEC
+
+	local reload_timer    = nil
+	-- Consecutive git-settle re-polls with the lock held but no new file activity;
+	-- reset to 0 by any real file event (schedule_reload) and by a fired reload,
+	-- capped by GIT_SETTLE_MAX_DEFERRALS so only a stale lock can wedge it.
+	local git_defer_count = 0
+
+	-- ``fire_reload`` is forward-declared so the debounce timer closure can call it
+	-- while ``fire_reload`` itself re-arms through ``arm_timer``. The Lua
+	-- local-after-closure trap: a closure only captures a local declared ABOVE it,
+	-- so both names must exist before either body runs.
+	local fire_reload
+
+	local function arm_timer(msg)
+		if reload_timer then reload_timer:stop() end
+		-- Bare literal 0.5: a cross-driver single-source gate pins this debounce
+		-- to Linux's _debounce_sec (do not replace it with a named constant).
+		reload_timer = hs.timer.doAfter(0.5, function() fire_reload(msg) end)
+	end
 
 	local function schedule_reload(msg)
-		if reload_timer then reload_timer:stop() end
-		reload_timer = hs.timer.doAfter(0.5, function()
-			ui_restore.defer_reload(function()
-				-- snapshot() is a safety net for any UI still open at reload time;
-				-- under normal deferral they are already closed so it saves nothing
-				ui_restore.snapshot()
-				pcall(notifications.notify, i18n.get("init.reload_title"), msg or i18n.get("init.reload_files"), "info")
-				hs.reload()
-			end)
+		-- Ignore the FSEvents batch macOS replays right after an hs.reload(): during
+		-- the boot window these are the previous session's changes, not a new edit.
+		if hs.timer.secondsSinceEpoch() < suppress_until then return end
+		-- A genuine file event resets the git-settle counter, so a long-running pull
+		-- that keeps writing never trips the stale-lock cap — only a lock held with
+		-- NO further activity climbs toward it.
+		git_defer_count = 0
+		arm_timer(msg)
+	end
+
+	fire_reload = function(msg)
+		-- Never reload while git is still rewriting the driver's own working tree.
+		-- A `git pull` run against a live driver rewrites init.lua and dozens of
+		-- required modules; firing hs.reload() mid-pull boots against a
+		-- half-updated, internally inconsistent tree, which errors during boot and
+		-- leaves Hammerspoon with no config AND no watchers armed — a dead,
+		-- must-relaunch state. Re-poll each 0.5 s debounce tick until git settles,
+		-- capped so a stale index.lock can never postpone the reload forever
+		-- (macos-reload-during-git-pull).
+		if git_defer_count < GIT_SETTLE_MAX_DEFERRALS and git_status.operation_in_progress(base_dir) then
+			git_defer_count = git_defer_count + 1
+			Logger.debug(LOG, "Reload held — git operation in progress on '%s' (%d/%d).",
+				base_dir, git_defer_count, GIT_SETTLE_MAX_DEFERRALS)
+			arm_timer(msg)
+			return
+		end
+		git_defer_count = 0
+		ui_restore.defer_reload(function()
+			-- snapshot() is a safety net for any UI still open at reload time;
+			-- under normal deferral they are already closed so it saves nothing
+			ui_restore.snapshot()
+			pcall(notifications.notify, i18n.get("init.reload_title"), msg or i18n.get("init.reload_files"), "info")
+			hs.reload()
 		end)
 	end
 
