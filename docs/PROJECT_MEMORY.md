@@ -99,6 +99,9 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-perf-2026-07-21-implementation](#project-perf-2026-07-21-implementation)
 - [feedback-stash-drop-by-index-trap](#feedback-stash-drop-by-index-trap) — Never compute a `stash@{n}` index from grep line numbers (1-based vs 0-based) and never match entries via the pretty list — capture the stash commit SHA at push time, restore with `git stash store`
 - [project-hs-suite-order-contamination](#project-hs-suite-order-contamination) — Green locally + red in CI on the same commit means test-file DISCOVERY ORDER (NTFS vs APFS): a leaked package.loaded stub or a warm-cache accident. The runner now cold-starts every file; never rely on a module being cached from an earlier test file
+- [project-pages-deploy-branch-vs-workflow](#project-pages-deploy-branch-vs-workflow) — GitHub Pages set to "GitHub Actions" ignores the gh-pages branch entirely: pushes "succeed" while the live site stays frozen. This repo deploys from the BRANCH, and the deploy step must run its git ops in a worktree, never `git checkout gh-pages` inside the build dir
+- [project-site-i18n-gettext-french-key](#project-site-i18n-gettext-french-key) — The ergopti-plus page translates with t('French source'): the French text IS the key, so edited copy falls back to the new French instead of showing a stale translation; adding a language is one dictionary file + one list entry
+- [project-svelte-script-comment-closing-tag](#project-svelte-script-comment-closing-tag) — A literal closing script tag ANYWHERE inside a Svelte component script — even in a // comment — terminates the block and breaks the parse; assemble such strings from split halves
 
 ## Working conventions & feedback
 
@@ -2096,4 +2099,50 @@ par-dessus. Le commentaire au site d'appel affirmait meme le contraire.
 Related: [[project_audit_2026_07_21_open_items]],
 [[project_typing_latency_tooltip_coldstart]],
 [[project_ahk_guard_tests_must_loop_the_class]], [[feedback_regression_tests]].
+
+### project-pages-deploy-branch-vs-workflow
+
+_GitHub Pages set to "GitHub Actions" ignores the gh-pages branch entirely — pushes "succeed" while the live site stays frozen. This repo deploys from the BRANCH, and the deploy step must run its git ops in an isolated worktree_
+
+<sub>slug: `project_pages_deploy_branch_vs_workflow`</sub>
+
+Diagnosed 2026-07-22: ergopti.fr had been frozen at a 26 May artifact deploy and ergopti.fr/dev/ returned 404, while `deploy-site.yml` green-pushed a perfectly good `/dev/` tree to `gh-pages` on every dev push. Cause: the repo's Pages config had `build_type: "workflow"`, so GitHub served the last `actions/deploy-pages` artifact (from a long-deleted workflow) and **ignored the branch completely**. Nothing in the deploy job fails — the site just silently never updates.
+
+**Why this setup:** "Deploy from a branch" (`gh-pages`, `/root`) natively serves two builds on one site — `main` at `/`, `dev` at `/dev/` — and each push rebuilds only the pushed branch's subdirectory. The "GitHub Actions" mode deploys ONE artifact per deploy, so keeping `/` and `/dev/` side by side would require rebuilding both branches every time or a fragile cross-branch cache.
+
+**A second failure hid underneath:** the old deploy step ran `git checkout gh-pages` **inside the build checkout**, so `node_modules/`, `build/` and `.svelte-kit/` survived as untracked files and `git add -A` swept them into the published branch — the root lost its `index.html` and the branch ballooned. The step now attaches `gh-pages` in an isolated `git worktree` under `$RUNNER_TEMP` and copies `build/` output in; the worktree only ever contains the branch's own tracked files.
+
+**How to apply:**
+
+- Prod stopped updating (or `/dev/` 404s) while deploys are green ⇒ check `gh api repos/{owner}/{repo}/pages` — `build_type` must be `legacy` (branch mode), source `gh-pages` `/`.
+- Never `git checkout gh-pages` in a dir that contains build output; always a separate worktree.
+- `gh-pages` is protected by a ruleset (deletion + non_fast_forward, admin bypass): the CI pushes plain fast-forward commits — never force-push it, never commit to it by hand.
+- After changing the Pages config, a build can be forced with `POST /repos/{owner}/{repo}/pages/builds`.
+
+Related: [[feedback_commit_push]].
+
+### project-site-i18n-gettext-french-key
+
+_The ergopti-plus marketing page translates with gettext-style `t('French source')` — the French text IS the dictionary key, so edited copy falls back to the new French instead of ever showing a stale translation_
+
+<sub>slug: `project_site_i18n_gettext_french_key`</sub>
+
+`src/routes/ergopti-plus/i18n.svelte.js` + `locales/en.js` + `LangToggle.svelte`. French is implicit (`t()` returns the key verbatim); other languages are per-language dictionaries mapping the French source → translation. A missing key falls back to French, so **changing the French wording automatically retires the old translation** — re-translate at leisure by adding the new key. Language is auto-detected from `navigator.language`, persisted under `ergoptiplus.lang`, defaulting to French; the page prerenders in French (SSR-safe).
+
+**How to apply:**
+
+- Adding a language = create `locales/xx.js` + one entry in `AVAILABLE_LANGS`. No call site changes; the toggle renders one button per entry.
+- Dictionary keys must stay **byte-identical** to the component source, typographic apostrophes (’) included.
+- Arrays of translated strings inside components must be `$derived` (not `const`) or they will not re-render on language change.
+- This is the marketing-page system only — the drivers' 21-language locale JSONs are a separate pipeline ([[feedback-ui-must-be-i18n]], [[project-locale-parity-test]]).
+
+### project-svelte-script-comment-closing-tag
+
+_A literal closing `</script>` tag ANYWHERE inside a Svelte component's script block — even in a `//` comment — terminates the block and breaks the parse with a misleading template error_
+
+<sub>slug: `project_svelte_script_comment_closing_tag`</sub>
+
+Svelte scans the raw text of a component's `<script>` block for the closing tag without lexing JS first, so a comment (or string) containing the literal sequence ends the script early; everything after is parsed as template markup and dies with something like "Expected a valid element or component name" pointing at innocent JS. Hit 2026-07-22 in `+page.svelte`'s JSON-LD emitter, whose explanatory comment mentioned the closing tag it was working around.
+
+**How to apply:** build script-tag strings from split halves (`'<scr' + 'ipt …'` / `'</scr' + 'ipt>'`) and never write the closing sequence in comments inside `.svelte` files — describe it in words instead.
 
