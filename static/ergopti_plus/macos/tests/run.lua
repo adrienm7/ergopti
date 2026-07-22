@@ -182,10 +182,44 @@ end
 
 helpers.reset_results()
 
+-- Driver namespaces evicted from package.loaded between test FILES. A file
+-- that stubs one of these modules and forgets to restore it would otherwise
+-- contaminate whichever file the walker yields next — and the walk order
+-- differs between NTFS and APFS, so the same commit was green locally and
+-- red in CI. Cold-starting every file makes the suite order-independent by
+-- construction. tests.* (helpers, stubs) and plain "hs" deliberately survive:
+-- load_with_stubs manages those itself.
+local PURGE_PREFIXES = { "^modules%.", "^adapters%.", "^lib%.", "^ui%." }
+
+--- Evicts every cached driver module so the next test file starts cold, and
+--- installs a pristine hs stub: top-of-file require chains would otherwise
+--- resolve paths through whatever hs the PREVIOUS file left in _G (e.g. a
+--- scratch configdir), which is the same cross-file contamination in a
+--- different coat.
+local function purge_driver_modules()
+	for key in pairs(package.loaded) do
+		if type(key) == "string" then
+			for _, pattern in ipairs(PURGE_PREFIXES) do
+				if key:find(pattern) then
+					package.loaded[key] = nil
+					break
+				end
+			end
+		end
+	end
+	package.loaded["hs"] = nil
+	package.loaded["tests.stubs.hs"] = nil
+	local hs_stub = require("tests.stubs.hs")
+	hs_stub.__reset()
+	_G.hs = hs_stub
+	package.loaded["hs"] = hs_stub
+end
+
 local total_modules = 0
 for _, dir in ipairs(TEST_DIRS) do
 	for _, mod_name in ipairs(discover_tests(dir)) do
 		total_modules = total_modules + 1
+		purge_driver_modules()
 		print(string.format("\n>>> Loading %s", mod_name))
 		local ok, err = pcall(require, mod_name)
 		if not ok then
