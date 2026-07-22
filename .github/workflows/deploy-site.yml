@@ -101,58 +101,64 @@ jobs:
         run: npm run build
 
       - name: Deploy to GitHub Pages
-        # Checks out the gh-pages branch, replaces only the target
-        # subdirectory (root for main, /dev/ for dev), then force-pushes.
-        # This avoids wiping the other branch's files.
+        # Updates ONLY the target subdirectory on gh-pages (root for main,
+        # /dev/ for dev), leaving the other branch's files untouched.
+        #
+        # The git operations run in an ISOLATED worktree, never in the build
+        # checkout. Doing `git checkout gh-pages` in the build directory (the
+        # previous approach) left node_modules/, build/ and .svelte-kit/ as
+        # untracked files that `git add -A` then swept into the published
+        # branch — that is what corrupted gh-pages. A worktree only ever
+        # contains gh-pages' own tracked files, so the build tree can never
+        # leak in.
         run: |
           set -euo pipefail
 
           DEPLOY_DIR="${{ steps.target.outputs.deploy_dir }}"
           LABEL="${{ steps.target.outputs.label }}"
 
-          # Stash the freshly built output before switching branches
-          cp -r build /tmp/site-build
-
           # Configure git identity for the deploy commit
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Switch to gh-pages, creating it if it does not exist yet
+          # Attach gh-pages in an isolated worktree beside the build checkout,
+          # creating the branch (orphan) if it does not exist yet.
+          GHP="$RUNNER_TEMP/gh-pages"
+          rm -rf "$GHP"
           if git ls-remote --exit-code origin gh-pages > /dev/null 2>&1; then
-              git fetch origin gh-pages
-              git checkout gh-pages
+              git fetch --depth=1 origin gh-pages
+              git worktree add "$GHP" gh-pages
           else
-              git checkout --orphan gh-pages
-              git rm -rf . > /dev/null 2>&1 || true
+              git worktree add --orphan -b gh-pages "$GHP"
           fi
 
           # Replace only the target directory — the other branch is untouched
           if [[ "$DEPLOY_DIR" == "." ]]; then
-              # Main deploy: replace root but preserve any subdirectories
-              # that belong to other branches (e.g. /dev/)
-              find . -maxdepth 1 ! -name '.' \
+              # Main deploy: wipe root but preserve any subdirectories that
+              # belong to other branches (e.g. /dev/).
+              find "$GHP" -mindepth 1 -maxdepth 1 \
                      ! -name '.git' \
                      ! -name 'dev' \
                      -exec rm -rf {} +
-              cp -r /tmp/site-build/. .
+              cp -r build/. "$GHP"/
           else
-              rm -rf "$DEPLOY_DIR"
-              mkdir -p "$DEPLOY_DIR"
-              cp -r /tmp/site-build/. "$DEPLOY_DIR/"
+              rm -rf "${GHP:?}/$DEPLOY_DIR"
+              mkdir -p "$GHP/$DEPLOY_DIR"
+              cp -r build/. "$GHP/$DEPLOY_DIR/"
           fi
 
           # GitHub Pages needs a .nojekyll file at the root to serve
           # files whose names start with an underscore (SvelteKit chunks).
-          touch .nojekyll
+          touch "$GHP/.nojekyll"
 
-          git add -A
+          git -C "$GHP" add -A
           # Only commit if something actually changed
-          if git diff --cached --quiet; then
+          if git -C "$GHP" diff --cached --quiet; then
               echo "No changes to deploy — gh-pages already up to date."
               exit 0
           fi
 
           COMMIT_SHA="${{ github.sha }}"
-          git commit -m "deploy: ${LABEL} ← ${COMMIT_SHA::8} (${GITHUB_REF_NAME})"
-          git push origin gh-pages
+          git -C "$GHP" commit -m "deploy: ${LABEL} ← ${COMMIT_SHA::8} (${GITHUB_REF_NAME})"
+          git -C "$GHP" push origin gh-pages
           echo "Deployed to ${LABEL}"
