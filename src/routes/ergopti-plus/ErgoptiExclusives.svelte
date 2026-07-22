@@ -17,6 +17,8 @@ FEATURES & RATIONALE:
 
 <script>
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
+	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
+	import KeyboardControls from '$lib/keyboard/controls/KeyboardControls.svelte';
 	import { reveal } from './reveal.js';
 
 	const bigramCards = [
@@ -89,15 +91,25 @@ FEATURES & RATIONALE:
 			<p class="kicker">⚡ Bonus disposition Ergopti</p>
 			<h2>L’autre moitié du gain.</h2>
 			<p class="lead">
-				Tout ce qui précède fonctionne sur <strong>n’importe quelle disposition</strong>. Les
+				<strong><ErgoptiPlus></ErgoptiPlus> fonctionne sur n’importe quelle disposition</strong> —
+				AZERTY, QWERTY, Bépo… Tout ce qui précède marche sans rien changer à votre clavier. Les
 				fonctionnalités ci-dessous, elles, exploitent les positions exactes des touches d’<a
 					href="./"
 					class="ergo-link">Ergopti</a
-				>
-				— si vous adoptez la disposition,
-				<ErgoptiPlus></ErgoptiPlus> les active automatiquement.
+				> : adoptez la disposition et <ErgoptiPlus></ErgoptiPlus> les active automatiquement.
 			</p>
 		</header>
+
+		<div class="ergo-keyboard" use:reveal>
+			<KeyboardBasis id="presentation_plus" />
+			<div class="ergo-keyboard-controls">
+				<KeyboardControls id="presentation_plus" />
+			</div>
+			<p class="ergo-keyboard-caption">
+				La disposition Ergopti et ses couches — explorez la couche AltGr, la touche magique et les
+				symboles de programmation.
+			</p>
+		</div>
 
 		<div class="bigram-grid">
 			{#each bigramCards as cat, i}
@@ -134,6 +146,25 @@ FEATURES & RATIONALE:
 </section>
 
 <style>
+	/* Reused interactive layout viewer from the legacy page — shows the
+	 * Ergopti layers (AltGr, magic key, programming symbols). */
+	.ergo-keyboard {
+		margin: 0 auto 28px;
+		max-width: 940px;
+		text-align: center;
+	}
+
+	.ergo-keyboard-controls {
+		margin-top: 12px;
+	}
+
+	.ergo-keyboard-caption {
+		color: var(--ink-faint);
+		font-size: 0.82rem;
+		margin: 12px auto 0;
+		max-width: 620px;
+	}
+
 	.bigram-grid {
 		display: grid;
 		gap: 14px;
