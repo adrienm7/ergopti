@@ -222,7 +222,21 @@ function M.check_and_install_deps()
 			if llm_progress.is_active() then
 				pcall(llm_progress.set_step, i18n.get("ollama.deps_step_ready"))
 				pcall(llm_progress.set_progress, 100)
+				-- The progress window is a shared, single-instance surface: a model
+				-- download or the MLX bootstrap can claim it during this delay.
+				-- Capture whose window it is now and only hide THAT one, otherwise
+				-- this timer tears down an unrelated operation's UI mid-flight while
+				-- that operation keeps running with nothing on screen.
+				local hide_session = type(llm_progress.session_id) == "function"
+					and llm_progress.session_id() or nil
 				hs.timer.doAfter(SUCCESS_AUTO_HIDE_SEC, function()
+					if hide_session ~= nil then
+						local ok_sid, current = pcall(llm_progress.session_id)
+						if ok_sid and current ~= hide_session then
+							Logger.debug(LOG, "Auto-hide skipped — the progress window now belongs to another operation.")
+							return
+						end
+					end
 					pcall(llm_progress.hide)
 				end)
 			end
