@@ -119,6 +119,43 @@ FEATURES & RATIONALE:
 		{ key: '⌦', label: '⌦mot', desc: 'Suppr. mot' }
 	];
 
+	// A curated shortlist of the standout actions — the ones that solve a real
+	// daily annoyance. Labels/emojis mirror the shared catalog (actions.toml +
+	// fr.json); the "pain" copy is what makes them land. The full catalog below
+	// lists everything; this grid sells the highlights.
+	const superActions = [
+		{
+			icon: '🖱',
+			title: 'Téléporter la souris',
+			body: 'Le curseur saute sur l’écran voisin d’un seul tap — fini de deviner vers quel bord le pousser pour changer de moniteur.'
+		},
+		{
+			icon: '🔦',
+			title: 'Surbrillance du curseur',
+			body: 'Perdu votre souris sur trois écrans ? Un halo la fait ressortir à l’instant — parfait aussi en présentation.'
+		},
+		{
+			icon: '📸',
+			title: 'Capture en un tap',
+			body: 'Région, fenêtre, plein écran ou OCR — sur la touche à gauche du 1, sans chercher le raccourci système.'
+		},
+		{
+			icon: '☰',
+			title: 'Sélectionner la ligne',
+			body: 'La ligne entière sélectionnée d’un geste, sans viser au pixel ni tripler-cliquer.'
+		},
+		{
+			icon: '🌐',
+			title: 'Ouvrir lien ou chemin',
+			body: 'Ouvre l’URL ou le chemin de fichier local sous le curseur — où qu’il se trouve dans le texte.'
+		},
+		{
+			icon: 'AA',
+			title: 'Changer la casse',
+			body: 'Bascule la sélection en MAJUSCULES, minuscules ou Casse De Titre — plus besoin de retaper.'
+		}
+	];
+
 	const powerMoves = [
 		{
 			icon: '⇪',
@@ -213,6 +250,27 @@ FEATURES & RATIONALE:
 
 <section class="keyboard" id="ep-raccourcis" style="--section-accent: #fb8c00;">
 	<div class="ep-wrap">
+		<header class="section-head" use:reveal>
+			<p class="kicker">Raccourcis</p>
+			<h2>Des actions qui règlent de vraies galères.</h2>
+			<p class="lead">
+				Bien au-delà du copier-coller : voici quelques-unes des actions les plus utiles — chacune
+				assignable à n’importe quelle touche, tap-hold ou geste.
+			</p>
+		</header>
+
+		<div class="super-actions">
+			{#each superActions as a, i}
+				<article class="ep-card ep-card--hover super-action" use:reveal={{ delay: (i % 3) * 70 }}>
+					<span class="sa-icon" aria-hidden="true">{a.icon}</span>
+					<div class="sa-text">
+						<h3>{a.title}</h3>
+						<p>{a.body}</p>
+					</div>
+				</article>
+			{/each}
+		</div>
+
 		<!-- Shared action catalog, structured like the driver's picker and
 		     filtered by the page's OS toggle -->
 		<div class="actions-block">
@@ -382,6 +440,49 @@ FEATURES & RATIONALE:
 		display: inline-block;
 		font-size: 1.3rem;
 		margin-bottom: 10px;
+	}
+
+	/* ─── Standout actions ──────────────────────────────────── */
+
+	.super-actions {
+		display: grid;
+		gap: 14px;
+		grid-template-columns: repeat(3, 1fr);
+		margin-bottom: clamp(30px, 4.5vw, 48px);
+	}
+
+	.super-action {
+		--accent: #fb8c00;
+		align-items: flex-start;
+		display: flex;
+		gap: 14px;
+	}
+
+	.sa-icon {
+		flex-shrink: 0;
+		font-size: 1.5rem;
+		line-height: 1.15;
+	}
+
+	.sa-text h3 {
+		font-size: 1rem;
+		margin: 0 0 4px;
+	}
+
+	.sa-text p {
+		font-size: 0.88rem;
+	}
+
+	@media (max-width: 900px) {
+		.super-actions {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+
+	@media (max-width: 560px) {
+		.super-actions {
+			grid-template-columns: 1fr;
+		}
 	}
 
 	/* ─── Action catalog ────────────────────────────────────── */
