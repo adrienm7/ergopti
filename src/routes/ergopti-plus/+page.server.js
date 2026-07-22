@@ -29,6 +29,8 @@ const LLM_ROOT = resolve(SHARED_ROOT, 'modules/llm');
 const HOTSTRINGS_ROOT = resolve(SHARED_ROOT, 'modules/hotstrings');
 const UI_ROOT = resolve(SHARED_ROOT, 'ui');
 const LOCALES_ROOT = resolve(SHARED_ROOT, 'data/locales');
+// Canonical language display order — single source shared with the drivers.
+const LOCALE_ORDER_PATH = resolve(SHARED_ROOT, 'data/locale_order.json');
 
 /**
  * Read and parse a JSON file, failing the build loudly on malformed input.
@@ -267,11 +269,16 @@ function loadLocales() {
 		return { code, name, flag: entry?.flag ?? '' };
 	});
 
-	const isLatin = (l) => /^[A-Za-zÀ-ž]/.test(l.name);
-	return locales.sort((a, b) => {
-		if (isLatin(a) !== isLatin(b)) return isLatin(a) ? -1 : 1;
-		return isLatin(a) ? a.name.localeCompare(b.name, 'fr') : a.code.localeCompare(b.code);
-	});
+	// Single source of truth for row order: _shared/data/locale_order.json,
+	// read the same way by the Linux driver and pinned by the macOS/Windows
+	// tables. Codes absent from it (shouldn't happen — a parity test enforces
+	// coverage) fall to the end alphabetically, so a new locale still appears.
+	const order = readJson(LOCALE_ORDER_PATH).order;
+	const rank = (code) => {
+		const i = order.indexOf(code);
+		return i === -1 ? order.length : i;
+	};
+	return locales.sort((a, b) => rank(a.code) - rank(b.code) || a.code.localeCompare(b.code));
 }
 
 // ==================================================

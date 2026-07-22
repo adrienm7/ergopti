@@ -36,27 +36,27 @@
 ; Ordered list of supported locales: { Code, Flag, Name }
 ; Tag = short code shown in radio buttons (flag emojis don't render on Windows)
 global I18N_LOCALES := [
-	{ Code: "ar", Tag: "[AR]", Name: "العربية"    },
-	{ Code: "cs", Tag: "[CS]", Name: "Čeština"    },
 	{ Code: "da", Tag: "[DA]", Name: "Dansk"       },
 	{ Code: "de", Tag: "[DE]", Name: "Deutsch"     },
 	{ Code: "en", Tag: "[EN]", Name: "English"     },
 	{ Code: "es", Tag: "[ES]", Name: "Español"     },
 	{ Code: "fr", Tag: "[FR]", Name: "Français"    },
-	{ Code: "he", Tag: "[HE]", Name: "עברית"       },
-	{ Code: "hi", Tag: "[HI]", Name: "हिन्दी"      },
 	{ Code: "it", Tag: "[IT]", Name: "Italiano"    },
-	{ Code: "ja", Tag: "[JA]", Name: "日本語"       },
-	{ Code: "ko", Tag: "[KO]", Name: "한국어"       },
 	{ Code: "nl", Tag: "[NL]", Name: "Nederlands"  },
 	{ Code: "no", Tag: "[NO]", Name: "Norsk"        },
 	{ Code: "pl", Tag: "[PL]", Name: "Polski"       },
 	{ Code: "pt", Tag: "[PT]", Name: "Português"   },
-	{ Code: "ru", Tag: "[RU]", Name: "Русский"      },
 	{ Code: "sv", Tag: "[SV]", Name: "Svenska"      },
 	{ Code: "tr", Tag: "[TR]", Name: "Türkçe"       },
+	{ Code: "cs", Tag: "[CS]", Name: "Čeština"    },
+	{ Code: "ru", Tag: "[RU]", Name: "Русский"      },
 	{ Code: "uk", Tag: "[UK]", Name: "Українська"   },
+	{ Code: "he", Tag: "[HE]", Name: "עברית"       },
+	{ Code: "ar", Tag: "[AR]", Name: "العربية"    },
+	{ Code: "hi", Tag: "[HI]", Name: "हिन्दी"      },
 	{ Code: "zh", Tag: "[ZH]", Name: "中文"          },
+	{ Code: "ja", Tag: "[JA]", Name: "日本語"       },
+	{ Code: "ko", Tag: "[KO]", Name: "한국어"       },
 ]
 
 ; Debounce delay for locale-change reloads (ms).
@@ -246,28 +246,18 @@ _MakeLocaleSetter(Code) {
 	return (*) => I18nSetLocale(Code)
 }
 
-; Returns a copy of I18N_LOCALES sorted alphabetically by Name (case-insensitive).
-; Guarantees a stable display order regardless of the declaration order above.
+; Returns a copy of I18N_LOCALES in canonical display order. The table above is
+; already declared in that order — single-sourced from
+; _shared/data/locale_order.json and pinned to it by the parity test — so this
+; hands back a cached shallow copy without sorting. Every locale menu shares the
+; one order and can never desync from the other drivers or the site.
 _I18nSortedLocales() {
 	global _I18nSortedLocalesCache
 	if IsSet(_I18nSortedLocalesCache) and _I18nSortedLocalesCache
 		return _I18nSortedLocalesCache
 
-	Sorted := I18N_LOCALES.Clone()
-	n := Sorted.Length
-	Loop n - 1 {
-		i := A_Index
-		Loop n - i {
-			j := A_Index
-			if (StrCompare(Sorted[j].Name, Sorted[j + 1].Name, false) > 0) {
-				Tmp         := Sorted[j]
-				Sorted[j]   := Sorted[j + 1]
-				Sorted[j + 1] := Tmp
-			}
-		}
-	}
-	_I18nSortedLocalesCache := Sorted
-	return Sorted
+	_I18nSortedLocalesCache := I18N_LOCALES.Clone()
+	return _I18nSortedLocalesCache
 }
 
 ; Populate a Menu object with one language entry per supported locale.
