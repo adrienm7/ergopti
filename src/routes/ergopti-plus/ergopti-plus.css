@@ -307,7 +307,7 @@
 	background: linear-gradient(180deg, #ffffff 30%, rgba(255, 255, 255, 0.62));
 	-webkit-background-clip: text;
 	background-clip: text;
-	font-size: clamp(1.75rem, 4vw, 2.75rem);
+	font-size: clamp(1.55rem, 3.2vw, 2.3rem);
 	font-weight: 700;
 	letter-spacing: -0.02em;
 	line-height: 1.12;
@@ -322,7 +322,7 @@
 
 .ep-root .section-head .lead {
 	color: var(--ink-soft);
-	font-size: clamp(1rem, 1.35vw, 1.1rem);
+	font-size: clamp(0.95rem, 1.2vw, 1.05rem);
 	line-height: 1.65;
 	margin: 0;
 	text-align: center;

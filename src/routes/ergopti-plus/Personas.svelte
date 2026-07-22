@@ -15,12 +15,12 @@ Placed early so a visitor recognises themselves before diving into details.
 	const personas = [
 		{
 			icon: '💻',
-			who: 'Développeur·se',
+			who: 'Développeur',
 			body: 'Symboles de code en roulements (<code>=></code>, <code>!=</code>), snippets de boilerplate, ouverture de chemins de fichiers, et une IA locale qui complète sans jamais envoyer votre code ailleurs.'
 		},
 		{
 			icon: '✍️',
-			who: 'Rédacteur·rice',
+			who: 'Rédacteur',
 			body: 'Autocorrection en continu, signatures et formules en une abréviation, apostrophes typographiques automatiques, et des prédictions qui terminent vos phrases.'
 		},
 		{

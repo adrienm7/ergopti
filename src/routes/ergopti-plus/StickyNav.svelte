@@ -88,24 +88,23 @@ FEATURES & RATIONALE:
 	aria-label="Sections de la page"
 	style="--active-accent: {activeAccent || 'var(--accent-blue-deep)'};"
 >
-	<div class="read-progress" aria-hidden="true">
-		<span style="width: {progress}%;"></span>
-	</div>
-	<div class="nav-scroll" bind:this={navEl}>
-		{#each items as item}
-			<a href="#{item.id}" class:active={activeId === item.id}>
-				{item.label}
-			</a>
-		{/each}
+	<div class="nav-inner">
+		<div class="read-progress" aria-hidden="true">
+			<span style="width: {progress}%;"></span>
+		</div>
+		<div class="nav-scroll" bind:this={navEl}>
+			{#each items as item}
+				<a href="#{item.id}" class:active={activeId === item.id}>
+					{item.label}
+				</a>
+			{/each}
+		</div>
 	</div>
 </nav>
 
 <style>
 	.sticky-nav {
-		align-items: center;
 		display: flex;
-		flex-direction: column;
-		gap: 8px;
 		justify-content: center;
 		margin-top: clamp(24px, 4vw, 40px);
 		padding-inline: 12px;
@@ -114,14 +113,22 @@ FEATURES & RATIONALE:
 		z-index: 60;
 	}
 
-	/* Thin reading-progress bar above the pill — its fill adopts the active
-	 * section's accent colour, tying the whole page's motion together. */
+	/* Column wrapper sized to the pill bar, so the progress bar above can match
+	 * the pills' exact width (align-items: stretch fills the wrapper). */
+	.nav-inner {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		max-width: 100%;
+	}
+
+	/* Thin reading-progress bar above the pill — same width as the pill bar,
+	 * its fill adopts the active section's accent colour. */
 	.read-progress {
 		background: rgba(255, 255, 255, 0.08);
 		border-radius: 2px;
 		height: 3px;
 		overflow: hidden;
-		width: min(420px, 78vw);
 	}
 
 	.read-progress span {
