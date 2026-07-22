@@ -263,6 +263,30 @@
  * ====================================
  * ==================================== */
 
+/* Subtle per-section "chapter" divider: a faint accent-tinted hairline at the
+ * top of every section but the hero, giving a long page a sense of rhythm and
+ * tying each section to its own --section-accent. */
+.ep-root section {
+	position: relative;
+}
+
+.ep-root section:not(.hero)::before {
+	background: linear-gradient(
+		90deg,
+		transparent,
+		color-mix(in srgb, var(--section-accent, var(--accent-blue)) 55%, transparent),
+		transparent
+	);
+	content: '';
+	height: 1px;
+	left: 50%;
+	opacity: 0.6;
+	position: absolute;
+	top: 0;
+	transform: translateX(-50%);
+	width: min(280px, 55%);
+}
+
 .ep-root .section-head {
 	margin: 0 auto clamp(32px, 5vw, 56px);
 	max-width: 720px;

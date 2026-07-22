@@ -103,6 +103,9 @@ FEATURES & RATIONALE:
 		return () => clearTimeout(demoStepTimer);
 	});
 
+	// Active index for the sliding toggle indicator (windows → macos → linux).
+	let osIndex = $derived(ui.osStyle === 'windows' ? 0 : ui.osStyle === 'macos' ? 1 : 2);
+
 	let urlWindows = $derived(ui.release?.url('ErgoptiPlus.exe') ?? '#');
 	let urlMacos = $derived(ui.release?.url('ErgoptiPlus.app.zip') ?? '#');
 	let urlKanata = $derived(ui.release?.url('kanata.kbd') ?? '#');
@@ -124,6 +127,7 @@ FEATURES & RATIONALE:
 	<div class="hero-glow" aria-hidden="true"></div>
 	<div class="ep-wrap">
 		<div class="os-toggle" role="group" aria-label="Style des fenêtres">
+			<span class="os-slider" style="--i: {osIndex};" aria-hidden="true"></span>
 			<button
 				type="button"
 				class={ui.osStyle === 'windows' ? 'os-btn active' : 'os-btn'}
@@ -344,9 +348,25 @@ FEATURES & RATIONALE:
 		border: 1px solid var(--border);
 		border-radius: 999px;
 		display: inline-flex;
-		gap: 2px;
+		gap: 0;
 		margin-bottom: 28px;
 		padding: 4px;
+		position: relative;
+		width: min(340px, 92vw);
+	}
+
+	/* The single highlight that slides between the three options. */
+	.os-slider {
+		background: rgba(255, 255, 255, 0.13);
+		border-radius: 999px;
+		bottom: 4px;
+		left: 4px;
+		position: absolute;
+		top: 4px;
+		transform: translateX(calc(var(--i, 0) * 100%));
+		transition: transform 0.32s var(--ease-out);
+		width: calc((100% - 8px) / 3);
+		z-index: 0;
 	}
 
 	.os-btn {
@@ -357,14 +377,16 @@ FEATURES & RATIONALE:
 		color: var(--ink-soft);
 		cursor: pointer;
 		display: inline-flex;
+		flex: 1;
 		font: inherit;
 		font-size: 0.85rem;
 		font-weight: 600;
 		gap: 7px;
-		padding: 7px 16px;
-		transition:
-			background-color 0.25s var(--ease),
-			color 0.25s var(--ease);
+		justify-content: center;
+		padding: 7px 12px;
+		position: relative;
+		transition: color 0.25s var(--ease);
+		z-index: 1;
 	}
 
 	.os-btn:hover {
@@ -372,8 +394,13 @@ FEATURES & RATIONALE:
 	}
 
 	.os-btn.active {
-		background: rgba(255, 255, 255, 0.12);
 		color: var(--ink);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.os-slider {
+			transition: none;
+		}
 	}
 
 	/* ─── Headline ──────────────────────────────────────────── */
@@ -405,12 +432,26 @@ FEATURES & RATIONALE:
 	/* inline-block + bottom padding keep descenders inside the painted
 	 * area — background-clip:text renders them transparent otherwise */
 	.hero-title .grad {
-		background: linear-gradient(92deg, #31beff 5%, #02c9db 55%, #7ee3ff 100%);
+		animation: grad-shift 7s linear infinite;
+		background: linear-gradient(92deg, #31beff, #02c9db, #7ee3ff, #31beff);
+		background-size: 200% auto;
 		-webkit-background-clip: text;
 		background-clip: text;
 		display: inline-block;
 		padding-bottom: 0.1em;
 		-webkit-text-fill-color: transparent;
+	}
+
+	@keyframes grad-shift {
+		to {
+			background-position: 200% center;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.hero-title .grad {
+			animation: none;
+		}
 	}
 
 	.hero-sub {
