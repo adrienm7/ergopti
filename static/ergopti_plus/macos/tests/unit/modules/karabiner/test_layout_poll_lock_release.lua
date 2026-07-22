@@ -273,3 +273,10 @@ helpers.describe("karabiner.watchers: layout poll watchdog lifecycle", function(
 			.. "fire against a module that is no longer polling")
 	end)
 end)
+
+-- Restore the real adapters for later test files: the stubs installed above
+-- (shell_runner without exec, fake timer_scheduler) would otherwise leak
+-- through package.loaded into whichever module the runner loads next
+package.loaded["adapters.shell_runner"] = nil
+package.loaded["adapters.timer_scheduler"] = nil
+package.loaded["modules.karabiner.watchers"] = nil

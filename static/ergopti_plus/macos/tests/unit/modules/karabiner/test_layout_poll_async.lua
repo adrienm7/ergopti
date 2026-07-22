@@ -19,10 +19,12 @@ local helpers = require("tests.helpers")
 
 helpers.describe("karabiner.watchers: layout fallback poll is async (F-LOW-4)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "modules/karabiner/watchers.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open watchers.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/karabiner/watchers.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function read_current_layout_from_hitoolbox")
+		helpers.assert_true(src ~= nil, "modules/karabiner/watchers.lua source must be locatable")
+		if not src then return end
 		return src
 	end
 
@@ -104,3 +106,9 @@ helpers.describe("karabiner.watchers: layout fallback poll is async (F-LOW-4)", 
 			"spy test setup complete — source assertion above is the binding guard")
 	end)
 end)
+
+-- Restore the real adapters for later test files: the stub installed above
+-- (shell_runner without exec) would otherwise leak through package.loaded
+-- into whichever module the runner loads next
+package.loaded["adapters.shell_runner"] = nil
+package.loaded["modules.karabiner.watchers"] = nil
