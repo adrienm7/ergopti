@@ -19,6 +19,7 @@ FEATURES & RATIONALE:
 
 <script>
 	import DriverFrame from './DriverFrame.svelte';
+	import { countup } from './countup.js';
 	import { reveal } from './reveal.js';
 
 	/**
@@ -94,7 +95,7 @@ FEATURES & RATIONALE:
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Vous gardez la main</p>
-			<h2>335 réglages. Zéro obligation. Zéro code.</h2>
+			<h2><span use:countup={335}>335</span> réglages. Zéro obligation. Zéro code.</h2>
 			<p class="lead">
 				Nous livrons de bons défauts — touches, délais, couleurs, raccourcis — mais
 				<strong>tout se change depuis le menu</strong>, sans écrire une ligne de code. Le menu est

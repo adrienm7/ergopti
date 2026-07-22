@@ -15,6 +15,7 @@ FEATURES & RATIONALE:
 -->
 
 <script>
+	import { countup } from './countup.js';
 	import { reveal } from './reveal.js';
 
 	const gestures = [
@@ -61,7 +62,7 @@ FEATURES & RATIONALE:
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Gestes trackpad</p>
-			<h2>36 emplacements de gestes. 3 axes continus.</h2>
+			<h2><span use:countup={36}>36</span> emplacements de gestes. 3 axes continus.</h2>
 			<p class="lead">
 				Le driver intercepte les gestes multi-touch bruts (pas les événements souris) et les mappe
 				sur l’action de votre choix — taps et swipes de 2 à 5 doigts, catalogue d’actions intégré,
