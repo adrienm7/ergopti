@@ -12,21 +12,26 @@ whole experience — free, local, unified across OSes — with no scripting."
 
 <script>
 	import { reveal } from './reveal.js';
+	import { t } from './i18n.svelte.js';
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 
-	const cols = ['Ergopti+', 'Espanso', 'AutoHotkey', 'TextExpander', 'Autocorr. native'];
+	// $derived so labels re-translate the instant the language toggles.
+	let cols = $derived(['Ergopti+', 'Espanso', 'AutoHotkey', 'TextExpander', t('Autocorr. native')]);
 
 	// status: 'yes' | 'no' | text nuance
-	const rows = [
-		{ label: 'Gratuit', cells: ['yes', 'yes', 'yes', 'no', 'yes'] },
-		{ label: '100 % local, sans compte', cells: ['yes', 'yes', 'yes', 'cloud', 'yes'] },
-		{ label: 'Windows · macOS · Linux', cells: ['3 OS', '3 OS', 'Windows', '2 OS', 'variable'] },
-		{ label: 'Hotstrings + autocorrection', cells: ['yes', 'yes', 'yes', 'yes', 'basique'] },
-		{ label: 'IA locale intégrée', cells: ['yes', 'no', 'no', 'no', 'no'] },
-		{ label: 'Tap-holds + gestes trackpad', cells: ['yes', 'no', 'script', 'no', 'no'] },
-		{ label: 'Métriques de frappe', cells: ['yes', 'no', 'no', 'no', 'no'] },
-		{ label: 'Config sans écrire de code', cells: ['yes', 'YAML', 'script', 'yes', 'yes'] }
-	];
+	let rows = $derived([
+		{ label: t('Gratuit'), cells: ['yes', 'yes', 'yes', 'no', 'yes'] },
+		{ label: t('100 % local, sans compte'), cells: ['yes', 'yes', 'yes', 'cloud', 'yes'] },
+		{
+			label: 'Windows · macOS · Linux',
+			cells: ['3 OS', '3 OS', 'Windows', '2 OS', t('variable')]
+		},
+		{ label: t('Hotstrings + autocorrection'), cells: ['yes', 'yes', 'yes', 'yes', t('basique')] },
+		{ label: t('IA locale intégrée'), cells: ['yes', 'no', 'no', 'no', 'no'] },
+		{ label: t('Tap-holds + gestes trackpad'), cells: ['yes', 'no', 'script', 'no', 'no'] },
+		{ label: t('Métriques de frappe'), cells: ['yes', 'no', 'no', 'no', 'no'] },
+		{ label: t('Config sans écrire de code'), cells: ['yes', 'YAML', 'script', 'yes', 'yes'] }
+	]);
 
 	/**
 	 * Map a status to its display cell.
@@ -43,12 +48,14 @@ whole experience — free, local, unified across OSes — with no scripting."
 <section class="compare" id="ep-comparatif" style="--section-accent: #f59e0b;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
-			<p class="kicker">Comparatif</p>
-			<h2>Tout au même endroit, gratuitement.</h2>
+			<p class="kicker">{t('Comparatif')}</p>
+			<h2>{t('Tout au même endroit, gratuitement.')}</h2>
 			<p class="lead">
-				Les outils ci-dessous sont excellents — <ErgoptiPlus></ErgoptiPlus> s’appuie d’ailleurs sur AutoHotkey
-				et Hammerspoon. La différence : une <strong>suite complète, locale et unifiée</strong> sur les
-				trois OS, sans rien scripter.
+				{t('Les outils ci-dessous sont excellents —')}
+				<ErgoptiPlus></ErgoptiPlus>
+				{@html t(
+					's’appuie d’ailleurs sur AutoHotkey et Hammerspoon. La différence : une <strong>suite complète, locale et unifiée</strong> sur les trois OS, sans rien scripter.'
+				)}
 			</p>
 		</header>
 
@@ -56,7 +63,7 @@ whole experience — free, local, unified across OSes — with no scripting."
 			<table class="cmp">
 				<thead>
 					<tr>
-						<th class="feat-col">Fonctionnalité</th>
+						<th class="feat-col">{t('Fonctionnalité')}</th>
 						{#each cols as c, i}
 							<th class:hero-col={i === 0}>{c}</th>
 						{/each}
@@ -76,7 +83,7 @@ whole experience — free, local, unified across OSes — with no scripting."
 			</table>
 		</div>
 		<p class="cmp-note" use:reveal>
-			Comparatif indicatif des offres par défaut, dressé de bonne foi — chaque outil a ses forces.
+			{t('Comparatif indicatif des offres par défaut, dressé de bonne foi — chaque outil a ses forces.')}
 		</p>
 	</div>
 </section>

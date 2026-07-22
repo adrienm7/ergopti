@@ -159,6 +159,36 @@ export default {
 		'Every feature switches off with one click in the menu, and the application removes like any other. Your data (a local SQLite database) is yours and leaves with it.',
 	'Windows, macOS ou Linux ?': 'Windows, macOS or Linux?',
 	'Windows (AutoHotkey) et macOS (Hammerspoon) sont à parité et prêts à l’emploi. Le driver Linux (kanata + daemon Lua) est complet mais en alpha — il cherche ses premiers testeurs.':
-		'Windows (AutoHotkey) and macOS (Hammerspoon) are at parity and ready to use. The Linux driver (kanata + Lua daemon) is complete but in alpha — looking for its first testers.'
+		'Windows (AutoHotkey) and macOS (Hammerspoon) are at parity and ready to use. The Linux driver (kanata + Lua daemon) is complete but in alpha — looking for its first testers.',
+
+	// ── Comparison ───────────────────────────────────────────────────────────
+	'Autocorr. native': 'Native autocorrect',
+	'Tout au même endroit, gratuitement.': 'Everything in one place, for free.',
+	'Les outils ci-dessous sont excellents —': 'The tools below are excellent —',
+	's’appuie d’ailleurs sur AutoHotkey et Hammerspoon. La différence : une <strong>suite complète, locale et unifiée</strong> sur les trois OS, sans rien scripter.':
+		'is in fact built on AutoHotkey and Hammerspoon. The difference: a <strong>complete, local, unified suite</strong> across all three OSes, with nothing to script.',
+	Fonctionnalité: 'Feature',
+	Gratuit: 'Free',
+	'100 % local, sans compte': '100% local, no account',
+	'Hotstrings + autocorrection': 'Hotstrings + autocorrect',
+	'IA locale intégrée': 'Built-in local AI',
+	'Tap-holds + gestes trackpad': 'Tap-holds + trackpad gestures',
+	'Métriques de frappe': 'Typing metrics',
+	'Config sans écrire de code': 'Config without writing code',
+	basique: 'basic',
+	variable: 'varies',
+	'Comparatif indicatif des offres par défaut, dressé de bonne foi — chaque outil a ses forces.':
+		'An indicative, good-faith comparison of default offerings — every tool has its strengths.',
+
+	// ── Final CTA ────────────────────────────────────────────────────────────
+	'Gratuit · Open-source · 100 % local': 'Free · Open-source · 100% local',
+	'Prêt à taper moins&nbsp;?': 'Ready to type less?',
+	Garanties: 'Guarantees',
+	'★ {n} sur GitHub': '★ {n} on GitHub',
+	Licence: 'License',
+	'Aucun compte': 'No account',
+	'Désinstallation en un clic': 'One-click uninstall',
+	'Vous tapez déjà en Ergopti&nbsp;? Installez la disposition pour le combo complet →':
+		'Already typing in Ergopti? Install the layout for the full combo →'
 };
 

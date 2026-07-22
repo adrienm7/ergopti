@@ -22,6 +22,7 @@ FEATURES & RATIONALE:
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import { ui } from './state.svelte.js';
 	import { reveal } from './reveal.js';
+	import { t } from './i18n.svelte.js';
 
 	/** @type {{macosApps: Array<{id: string, name: string, description: string}>}} */
 	let { macosApps } = $props();
@@ -194,8 +195,8 @@ FEATURES & RATIONALE:
 		<!-- Final CTA -->
 		<div class="cta-card" use:reveal>
 			<div class="cta-glow" aria-hidden="true"></div>
-			<p class="cta-eyebrow">Gratuit · Open-source · 100 % local</p>
-			<h2 class="cta-title">Prêt à taper moins&nbsp;?</h2>
+			<p class="cta-eyebrow">{t('Gratuit · Open-source · 100 % local')}</p>
+			<h2 class="cta-title">{@html t('Prêt à taper moins&nbsp;?')}</h2>
 			<p class="cta-sub">
 				Installez <ErgoptiPlus></ErgoptiPlus>, lancez-le, tapez <code>ct★</code> — et regardez
 				<span class="cta-demo">c’était</span> s’écrire tout seul. Le reste suivra.
@@ -223,7 +224,7 @@ FEATURES & RATIONALE:
 					<i class="icon-linux"></i><span>Linux <small>(alpha)</small></span>
 				</a>
 			</div>
-			<ul class="cta-trust" aria-label="Garanties">
+			<ul class="cta-trust" aria-label={t('Garanties')}>
 				{#if ui.release}<li class="cta-trust-version">{ui.release.tag}</li>{/if}
 				{#if ui.repo}
 					<li>
@@ -231,18 +232,18 @@ FEATURES & RATIONALE:
 							class="cta-gh"
 							href="https://github.com/adrienm7/ergopti"
 							target="_blank"
-							rel="noopener">★ {ui.repo.stars} sur GitHub</a
+							rel="noopener">{t('★ {n} sur GitHub', { n: ui.repo.stars })}</a
 						>
 					</li>
 				{/if}
-				{#if ui.repo?.license}<li>Licence {ui.repo.license}</li>{/if}
-				<li>Aucun compte</li>
-				<li>Aucune télémétrie</li>
-				<li>Désinstallation en un clic</li>
+				{#if ui.repo?.license}<li>{t('Licence')} {ui.repo.license}</li>{/if}
+				<li>{t('Aucun compte')}</li>
+				<li>{t('Aucune télémétrie')}</li>
+				<li>{t('Désinstallation en un clic')}</li>
 			</ul>
 			<p class="cta-foot">
 				<a href="utilisation" class="cta-link"
-					>Vous tapez déjà en Ergopti&nbsp;? Installez la disposition pour le combo complet →</a
+					>{@html t('Vous tapez déjà en Ergopti&nbsp;? Installez la disposition pour le combo complet →')}</a
 				>
 			</p>
 		</div>
