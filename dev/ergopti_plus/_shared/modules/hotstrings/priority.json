@@ -1,0 +1,7 @@
+{
+	"_comment": "Single source of truth for hotstring collision-priority SOURCE defaults, shared by the AHK and Hammerspoon drivers. On a collision between triggers of equal length, the higher priority wins; these are the final fallback in the cascade individual > section > file > source. Personal hotstrings outrank third-party 'ext.' packages, which outrank bundled common ones.",
+	"_enforced_by": "tools/test/test-priority-parity.cjs locks both drivers' priority constants to these values (AHK HSE_PRIORITY_*, Lua PRIORITY_*), so they can never diverge.",
+	"common": 10,
+	"package": 30,
+	"personal": 50
+}

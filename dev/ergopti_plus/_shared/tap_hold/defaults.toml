@@ -1,0 +1,430 @@
+# _shared/tap_hold/defaults.toml
+# Canonical default values for the tap-hold configuration.
+#
+# Generation source only: at first boot, each driver renders this template into
+# its own ``config/ergopti_plus/<driver>/tap_hold.toml``. After that initial
+# generation, the per-driver file IS the complete config — there is no runtime
+# merge with this file, and the two drivers' configs may diverge freely.
+#
+# Consumers of the generated per-driver file:
+#   - AHK : ``modules/tap_holds.ahk`` arms the corresponding hotkeys.
+#   - HS  : ``modules/karabiner/generator.lua`` produces the Karabiner JSON.
+
+
+
+
+
+# =====================================
+# =====================================
+# ======= 1. Modifier-key holds =======
+# =====================================
+# =====================================
+
+# Each key may declare:
+#   - ``time_activation_seconds`` : tap (short) vs hold (long) threshold.
+#   - ``tap_action``   : action emitted on tap (string or null = native key).
+#   - ``hold_layer``   : layer activated on hold (ref to [tap_hold.layers.<name>]).
+#   - ``hold_modifier``: modifier emitted on hold (mutex with hold_layer).
+#
+# tap_action and hold_* are independent — a key may declare only one of them.
+
+
+
+# =========================
+# ===== 1.1 caps_lock =====
+# =========================
+
+[tap_hold.keys.caps_lock]
+time_activation_seconds = 0.35
+tap_action = "enter"
+hold_modifier = "ctrl"
+
+
+
+# ==========================
+# ===== 1.2 left_shift =====
+# ==========================
+
+[tap_hold.keys.left_shift]
+time_activation_seconds = 0.35
+tap_action = "copy"
+hold_modifier = "shift"
+
+
+
+# =========================
+# ===== 1.3 left_ctrl =====
+# =========================
+
+[tap_hold.keys.left_ctrl]
+time_activation_seconds = 0.20
+tap_action = "paste"
+hold_modifier = "ctrl"
+
+
+
+# ========================
+# ===== 1.4 left_alt =====
+# ========================
+
+[tap_hold.keys.left_alt]
+time_activation_seconds = 0.20
+tap_action = "backspace"
+hold_layer = "nav"
+
+
+
+
+# ==========================
+# ===== 1.6 right_ctrl =====
+# ==========================
+
+[tap_hold.keys.right_ctrl]
+time_activation_seconds = 0.20
+tap_action = "one_shot_shift"
+hold_modifier = "shift"
+
+
+
+# ======================
+# ===== 1.7 alt_gr =====
+# ======================
+
+[tap_hold.keys.alt_gr]
+time_activation_seconds = 0.20
+tap_action = "tab"
+hold_modifier = "alt_gr"
+
+
+
+# ===================
+# ===== 1.8 tab =====
+# ===================
+
+[tap_hold.keys.tab]
+time_activation_seconds = 0.20
+tap_action = "alt_tab_monitor"
+hold_modifier = "alt"
+
+
+
+
+
+# =================================
+# =================================
+# ======= 2. Layer mappings =======
+# =================================
+# =================================
+
+# A layer is a local key remapping that is active as long as its triggering key
+# is held. Each mapping is source-key → action OR source-key → destination-key.
+
+
+
+# =============================
+# ===== 2.1 Layer ``nav`` =====
+# =============================
+
+# Primary navigation layer: arrows on HJKL plus quick editing actions.
+
+[tap_hold.layers.nav]
+description_key = "tap_hold.layer.nav"
+
+[tap_hold.layers.nav.mappings]
+h = "arrow_left"
+j = "arrow_down"
+k = "arrow_up"
+l = "arrow_right"
+backspace = "ctrl_backspace"
+delete = "ctrl_delete"
+u = "page_up"
+d = "page_down"
+g = "home"
+shift_g = "end"
+
+
+
+# =======================================
+# ===== 2.2 Layer ``nav_secondary`` =====
+# =======================================
+
+# Secondary layer: word navigation and window management.
+
+[tap_hold.layers.nav_secondary]
+description_key = "tap_hold.layer.nav_secondary"
+
+[tap_hold.layers.nav_secondary.mappings]
+h = "word_prev"
+l = "word_next"
+j = "line_down"
+k = "line_up"
+backspace = "delete_word_back"
+delete = "delete_word_forward"
+
+
+
+
+
+# =================================================
+# =================================================
+# ======= 3. macOS Karabiner defaults (hs_*) =======
+# =================================================
+# =================================================
+
+# Read by macos/modules/karabiner/defaults.lua via lib.toml_reader. These keep
+# the macOS-specific paradigm (Karabiner key codes, the N*N modifier-combo
+# matrix, a single global tap/hold timeout) that has no AutoHotkey analog, so
+# they live in their own [hs_*] sections rather than the AHK [tap_hold.*] ones
+# above. The AHK loader's narrow parser ignores every [hs_*] header; the macOS
+# reader ignores the dotted [tap_hold.*] headers — each driver reads only its
+# own sections from this single shared file.
+#
+# Values mirror the former modules/karabiner/defaults.lua exactly (generated and
+# byte-verified against it). "Reset to defaults" on macOS restores these.
+
+# Slot encodings:
+#   [hs_tap_hold]  key = { tap = <action_id>, hold = <action_id> }
+#   [hs_combos]    id  = { combo = <action_id>, tap = <action_id>, hold = <action_id> }
+# Action ids reference macos/modules/karabiner/data/actions.json.
+
+[hs_timeouts]
+# Global tap-vs-hold threshold (KE basic.to_if_alone_timeout_milliseconds).
+tap_hold_timeout_ms = 1000
+# One-shot modifier auto-cancel delay.
+sticky_timeout_ms = 3000
+# Max delay between the two keys of a shortcut for the combo slot to fire.
+simultaneous_threshold_ms = 100
+# When true, A+B and B+A trigger the same chord (combo slot only).
+combo_symmetric = false
+
+[hs_tap_hold]
+#                              tap               hold
+escape = { tap = "none", hold = "none" }
+tab = { tap = "alt_tab_windows", hold = "fn" }
+caps_lock = { tap = "return", hold = "cmd" }
+left_shift = { tap = "copy", hold = "shift" }
+fn = { tap = "paste", hold = "cmd" }
+left_control = { tap = "cut", hold = "ctrl" }
+left_option = { tap = "delete_fwd", hold = "cmd_shift" }
+left_command = { tap = "backspace", hold = "layer" }
+spacebar = { tap = "none", hold = "none" }
+right_command = { tap = "tab", hold = "altgr" }
+right_option = { tap = "sticky_shift", hold = "shift" }
+right_shift = { tap = "none", hold = "none" }
+return_or_enter = { tap = "none", hold = "none" }
+delete_or_backspace = { tap = "none", hold = "none" }
+
+[hs_combos]
+# Échap
+esc_tab = { combo = "none", tap = "none", hold = "none" }
+esc_caps = { combo = "none", tap = "none", hold = "none" }
+esc_lshift = { combo = "none", tap = "none", hold = "none" }
+esc_fn = { combo = "none", tap = "none", hold = "none" }
+esc_lctrl = { combo = "none", tap = "none", hold = "none" }
+esc_lopt = { combo = "none", tap = "none", hold = "none" }
+esc_lcmd = { combo = "none", tap = "none", hold = "none" }
+esc_space = { combo = "none", tap = "none", hold = "none" }
+esc_rcmd = { combo = "none", tap = "none", hold = "none" }
+esc_ropt = { combo = "none", tap = "none", hold = "none" }
+esc_rshift = { combo = "none", tap = "none", hold = "none" }
+esc_ret = { combo = "none", tap = "none", hold = "none" }
+esc_bsp = { combo = "none", tap = "none", hold = "none" }
+# Tab
+tab_esc = { combo = "none", tap = "none", hold = "none" }
+tab_caps = { combo = "none", tap = "none", hold = "none" }
+tab_lshift = { combo = "none", tap = "none", hold = "none" }
+tab_fn = { combo = "none", tap = "none", hold = "none" }
+tab_lctrl = { combo = "none", tap = "none", hold = "none" }
+tab_lopt = { combo = "none", tap = "none", hold = "none" }
+tab_lcmd = { combo = "none", tap = "none", hold = "none" }
+tab_space = { combo = "none", tap = "none", hold = "none" }
+tab_rcmd = { combo = "none", tap = "none", hold = "none" }
+tab_ropt = { combo = "none", tap = "none", hold = "none" }
+tab_rshift = { combo = "none", tap = "none", hold = "none" }
+tab_ret = { combo = "none", tap = "none", hold = "none" }
+tab_bsp = { combo = "none", tap = "none", hold = "none" }
+# CapsLock
+caps_esc = { combo = "none", tap = "none", hold = "none" }
+caps_tab = { combo = "none", tap = "none", hold = "none" }
+caps_lshift = { combo = "none", tap = "none", hold = "none" }
+caps_fn = { combo = "none", tap = "none", hold = "none" }
+caps_lctrl = { combo = "none", tap = "none", hold = "none" }
+caps_lopt = { combo = "none", tap = "none", hold = "none" }
+caps_lcmd = { combo = "none", tap = "none", hold = "none" }
+caps_space = { combo = "none", tap = "none", hold = "none" }
+caps_rcmd = { combo = "none", tap = "none", hold = "none" }
+caps_ropt = { combo = "none", tap = "none", hold = "none" }
+caps_rshift = { combo = "none", tap = "none", hold = "none" }
+caps_ret = { combo = "none", tap = "none", hold = "none" }
+caps_bsp = { combo = "none", tap = "none", hold = "none" }
+# Shift gauche
+lshift_esc = { combo = "none", tap = "none", hold = "none" }
+lshift_tab = { combo = "none", tap = "none", hold = "none" }
+lshift_caps = { combo = "none", tap = "none", hold = "none" }
+lshift_fn = { combo = "none", tap = "none", hold = "none" }
+lshift_lctrl = { combo = "none", tap = "none", hold = "none" }
+lshift_lopt = { combo = "none", tap = "none", hold = "none" }
+lshift_lcmd = { combo = "none", tap = "none", hold = "none" }
+lshift_space = { combo = "none", tap = "none", hold = "none" }
+lshift_rcmd = { combo = "none", tap = "none", hold = "none" }
+lshift_ropt = { combo = "none", tap = "none", hold = "none" }
+lshift_rshift = { combo = "none", tap = "none", hold = "none" }
+lshift_ret = { combo = "none", tap = "none", hold = "none" }
+lshift_bsp = { combo = "none", tap = "none", hold = "none" }
+# Fn
+fn_esc = { combo = "none", tap = "none", hold = "none" }
+fn_tab = { combo = "none", tap = "none", hold = "none" }
+fn_caps = { combo = "none", tap = "none", hold = "none" }
+fn_lshift = { combo = "none", tap = "none", hold = "none" }
+fn_lctrl = { combo = "none", tap = "none", hold = "none" }
+fn_lopt = { combo = "none", tap = "none", hold = "none" }
+fn_lcmd = { combo = "none", tap = "none", hold = "none" }
+fn_space = { combo = "none", tap = "none", hold = "none" }
+fn_rcmd = { combo = "none", tap = "none", hold = "none" }
+fn_ropt = { combo = "none", tap = "none", hold = "none" }
+fn_rshift = { combo = "none", tap = "none", hold = "none" }
+fn_ret = { combo = "none", tap = "none", hold = "none" }
+fn_bsp = { combo = "none", tap = "none", hold = "none" }
+# Ctrl gauche
+lctrl_esc = { combo = "none", tap = "none", hold = "none" }
+lctrl_tab = { combo = "none", tap = "none", hold = "none" }
+lctrl_caps = { combo = "none", tap = "none", hold = "none" }
+lctrl_lshift = { combo = "none", tap = "none", hold = "none" }
+lctrl_fn = { combo = "none", tap = "none", hold = "none" }
+lctrl_lopt = { combo = "none", tap = "none", hold = "none" }
+lctrl_lcmd = { combo = "none", tap = "none", hold = "none" }
+lctrl_space = { combo = "none", tap = "none", hold = "none" }
+lctrl_rcmd = { combo = "none", tap = "none", hold = "none" }
+lctrl_ropt = { combo = "none", tap = "none", hold = "none" }
+lctrl_rshift = { combo = "none", tap = "none", hold = "none" }
+lctrl_ret = { combo = "none", tap = "none", hold = "none" }
+lctrl_bsp = { combo = "none", tap = "none", hold = "none" }
+# Option gauche
+lopt_esc = { combo = "none", tap = "none", hold = "none" }
+lopt_tab = { combo = "none", tap = "none", hold = "none" }
+lopt_caps = { combo = "none", tap = "none", hold = "none" }
+lopt_lshift = { combo = "none", tap = "none", hold = "none" }
+lopt_fn = { combo = "none", tap = "none", hold = "none" }
+lopt_lctrl = { combo = "none", tap = "none", hold = "none" }
+lopt_lcmd = { combo = "none", tap = "none", hold = "none" }
+lopt_space = { combo = "none", tap = "none", hold = "none" }
+lopt_rcmd = { combo = "none", tap = "none", hold = "none" }
+lopt_ropt = { combo = "none", tap = "none", hold = "none" }
+lopt_rshift = { combo = "none", tap = "none", hold = "none" }
+lopt_ret = { combo = "none", tap = "none", hold = "none" }
+lopt_bsp = { combo = "none", tap = "none", hold = "none" }
+# Cmd gauche
+lcmd_esc = { combo = "none", tap = "none", hold = "none" }
+lcmd_tab = { combo = "none", tap = "none", hold = "none" }
+lcmd_caps = { combo = "none", tap = "none", hold = "none" }
+lcmd_lshift = { combo = "none", tap = "none", hold = "none" }
+lcmd_fn = { combo = "none", tap = "none", hold = "none" }
+lcmd_lctrl = { combo = "none", tap = "none", hold = "none" }
+lcmd_lopt = { combo = "none", tap = "none", hold = "none" }
+lcmd_space = { combo = "none", tap = "none", hold = "none" }
+# lcmd + rcmd: canonical half of the (lcmd, rcmd) pair.
+#   combo : symmetric chord — fires opt_backspace regardless of press order.
+#   tap   : "none" here. When lcmd is first (layer active) + rcmd pressed,
+#           layer_keys.json's "Layer + Right Command" rule takes over
+#           (emits shift+option modifier). Adding a tap here would pre-empt it.
+#   hold  : "none" — same reason; layer_keys.json handles the lcmd-first hold path.
+lcmd_rcmd = { combo = "opt_backspace", tap = "none", hold = "none" }
+lcmd_ropt = { combo = "none", tap = "none", hold = "none" }
+lcmd_rshift = { combo = "none", tap = "none", hold = "none" }
+lcmd_ret = { combo = "none", tap = "none", hold = "none" }
+lcmd_bsp = { combo = "none", tap = "none", hold = "none" }
+# Espace
+space_esc = { combo = "none", tap = "none", hold = "none" }
+space_tab = { combo = "none", tap = "none", hold = "none" }
+space_caps = { combo = "none", tap = "none", hold = "none" }
+space_lshift = { combo = "none", tap = "none", hold = "none" }
+space_fn = { combo = "none", tap = "none", hold = "none" }
+space_lctrl = { combo = "none", tap = "none", hold = "none" }
+space_lopt = { combo = "none", tap = "none", hold = "none" }
+space_lcmd = { combo = "none", tap = "none", hold = "none" }
+space_rcmd = { combo = "none", tap = "none", hold = "none" }
+space_ropt = { combo = "none", tap = "none", hold = "none" }
+space_rshift = { combo = "none", tap = "none", hold = "none" }
+space_ret = { combo = "none", tap = "none", hold = "none" }
+space_bsp = { combo = "none", tap = "none", hold = "none" }
+# Cmd droit — non-canonical half of each pair (symmetric mode shares the chord
+# with the canonical half; this entry still drives the per-direction tap/hold).
+# Slot order: { combo, tap, hold }.
+#   rcmd + caps : CapsWord (combo = tap); tap fires on each press of caps
+#                 while rcmd is held, so it stays valid even if the 100 ms
+#                 simultaneous window is missed.
+#   rcmd + fn   : toggle CapsLock (combo = tap), same rationale.
+#   rcmd + lopt : word-level forward delete (combo = tap), using opt variant
+#                 to avoid conflict with Hammerspoon cmd+delete shortcut.
+#   rcmd + lcmd : word-level backward delete (combo = tap, repeatable on
+#                 key-repeat); hold = option+shift modifier so the combined
+#                 hold works as a shift+option accelerator (no layer activation).
+rcmd_esc = { combo = "none", tap = "none", hold = "none" }
+rcmd_tab = { combo = "cycle_windows_in_app", tap = "cycle_windows_in_app", hold = "none" }
+rcmd_caps = { combo = "capsword", tap = "capsword", hold = "none" }
+rcmd_lshift = { combo = "none", tap = "none", hold = "none" }
+rcmd_fn = { combo = "caps_lock", tap = "caps_lock", hold = "none" }
+rcmd_lctrl = { combo = "none", tap = "none", hold = "none" }
+rcmd_lopt = { combo = "opt_delete_fwd", tap = "opt_delete_fwd", hold = "none" }
+rcmd_lcmd = { combo = "opt_backspace", tap = "opt_backspace", hold = "option_shift" }
+rcmd_space = { combo = "none", tap = "none", hold = "none" }
+rcmd_ropt = { combo = "none", tap = "none", hold = "none" }
+rcmd_rshift = { combo = "none", tap = "none", hold = "none" }
+rcmd_ret = { combo = "none", tap = "none", hold = "none" }
+rcmd_bsp = { combo = "none", tap = "none", hold = "none" }
+# Option droit
+ropt_esc = { combo = "none", tap = "none", hold = "none" }
+ropt_tab = { combo = "none", tap = "none", hold = "none" }
+ropt_caps = { combo = "none", tap = "none", hold = "none" }
+ropt_lshift = { combo = "none", tap = "none", hold = "none" }
+ropt_fn = { combo = "none", tap = "none", hold = "none" }
+ropt_lctrl = { combo = "none", tap = "none", hold = "none" }
+ropt_lopt = { combo = "none", tap = "none", hold = "none" }
+ropt_lcmd = { combo = "none", tap = "none", hold = "none" }
+ropt_space = { combo = "none", tap = "none", hold = "none" }
+ropt_rcmd = { combo = "none", tap = "none", hold = "none" }
+ropt_rshift = { combo = "none", tap = "none", hold = "none" }
+ropt_ret = { combo = "none", tap = "none", hold = "none" }
+ropt_bsp = { combo = "none", tap = "none", hold = "none" }
+# Shift droit
+rshift_esc = { combo = "none", tap = "none", hold = "none" }
+rshift_tab = { combo = "none", tap = "none", hold = "none" }
+rshift_caps = { combo = "none", tap = "none", hold = "none" }
+rshift_lshift = { combo = "none", tap = "none", hold = "none" }
+rshift_fn = { combo = "none", tap = "none", hold = "none" }
+rshift_lctrl = { combo = "none", tap = "none", hold = "none" }
+rshift_lopt = { combo = "none", tap = "none", hold = "none" }
+rshift_lcmd = { combo = "none", tap = "none", hold = "none" }
+rshift_space = { combo = "none", tap = "none", hold = "none" }
+rshift_rcmd = { combo = "none", tap = "none", hold = "none" }
+rshift_ropt = { combo = "none", tap = "none", hold = "none" }
+rshift_ret = { combo = "none", tap = "none", hold = "none" }
+rshift_bsp = { combo = "none", tap = "none", hold = "none" }
+# Entrée
+ret_esc = { combo = "none", tap = "none", hold = "none" }
+ret_tab = { combo = "none", tap = "none", hold = "none" }
+ret_caps = { combo = "none", tap = "none", hold = "none" }
+ret_lshift = { combo = "none", tap = "none", hold = "none" }
+ret_fn = { combo = "none", tap = "none", hold = "none" }
+ret_lctrl = { combo = "none", tap = "none", hold = "none" }
+ret_lopt = { combo = "none", tap = "none", hold = "none" }
+ret_lcmd = { combo = "none", tap = "none", hold = "none" }
+ret_space = { combo = "none", tap = "none", hold = "none" }
+ret_rcmd = { combo = "none", tap = "none", hold = "none" }
+ret_ropt = { combo = "none", tap = "none", hold = "none" }
+ret_rshift = { combo = "none", tap = "none", hold = "none" }
+ret_bsp = { combo = "none", tap = "none", hold = "none" }
+# BackSpace
+bsp_esc = { combo = "none", tap = "none", hold = "none" }
+bsp_tab = { combo = "none", tap = "none", hold = "none" }
+bsp_caps = { combo = "none", tap = "none", hold = "none" }
+bsp_lshift = { combo = "none", tap = "none", hold = "none" }
+bsp_fn = { combo = "none", tap = "none", hold = "none" }
+bsp_lctrl = { combo = "none", tap = "none", hold = "none" }
+bsp_lopt = { combo = "none", tap = "none", hold = "none" }
+bsp_lcmd = { combo = "none", tap = "none", hold = "none" }
+bsp_space = { combo = "none", tap = "none", hold = "none" }
+bsp_rcmd = { combo = "none", tap = "none", hold = "none" }
+bsp_ropt = { combo = "none", tap = "none", hold = "none" }
+bsp_rshift = { combo = "none", tap = "none", hold = "none" }
+bsp_ret = { combo = "none", tap = "none", hold = "none" }

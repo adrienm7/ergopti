@@ -1,0 +1,11 @@
+{
+    "_comment": "Cross-driver updater scalars — owner/repo/timing. Single source replacing per-file literals in lib/updater/core.ahk and lib/updater.lua (P10.1 D-2). AHK keeps inline literals guarded by the JS drift gate; macOS reads this file at require-time via Paths.shared. Interval presets stay driver-specific (identical values, complex TOML array-of-tables not worth a custom parser).",
+    "github": {
+        "owner": "adrienm7",
+        "repo": "ergopti"
+    },
+    "timing": {
+        "default_check_interval_sec": 86400,
+        "boot_check_delay_sec": 30
+    }
+}

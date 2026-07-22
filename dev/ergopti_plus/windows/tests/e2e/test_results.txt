@@ -1,0 +1,12 @@
+﻿1..5
+RUNNING 1/5 - e2e[pure] simple_expansion
+ok 1 - e2e[pure] simple_expansion
+RUNNING 2/5 - e2e[pure] no_match_unrelated_buffer
+ok 2 - e2e[pure] no_match_unrelated_buffer
+RUNNING 3/5 - e2e[pure] word_boundary_mid_word_blocked
+ok 3 - e2e[pure] word_boundary_mid_word_blocked
+RUNNING 4/5 - e2e[pure] word_boundary_start_of_buffer
+ok 4 - e2e[pure] word_boundary_start_of_buffer
+RUNNING 5/5 - e2e[pure] case_sensitive_no_match
+ok 5 - e2e[pure] case_sensitive_no_match
+# 5 passed, 0 failed.

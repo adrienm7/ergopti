@@ -1,0 +1,319 @@
+{
+	"$schema": "https://ergopti.com/schema/corpus/hotstrings.v1.json",
+	"description": "Cross-driver regression corpus for hotstring expansion logic. Every vector must pass in both the AHK and Hammerspoon driver test suites without modification. 'vectors' covers single-trigger matching/arithmetic; 'collision_vectors' covers multi-trigger collision resolution (length > priority > first-registered).",
+	"version": "1.1.0",
+	"vectors": [
+		{
+			"id": "simple_expansion",
+			"description": "Exact trigger match expands to replacement.",
+			"trigger": "btw",
+			"replacement": "by the way",
+			"is_word": false,
+			"buffer": "btw",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "by the way",
+				"backspace_count": 3
+			}
+		},
+		{
+			"id": "no_match_unrelated_buffer",
+			"description": "Buffer that does not end with the trigger returns no match.",
+			"trigger": "btw",
+			"replacement": "by the way",
+			"is_word": false,
+			"buffer": "hello",
+			"terminator": " ",
+			"expected": {
+				"matched": false
+			}
+		},
+		{
+			"id": "word_boundary_mid_word_blocked",
+			"description": "is_word trigger does not fire when preceded by a word character.",
+			"trigger": "the",
+			"replacement": "THE",
+			"is_word": true,
+			"buffer": "othe",
+			"terminator": " ",
+			"expected": {
+				"matched": false
+			}
+		},
+		{
+			"id": "word_boundary_start_of_buffer",
+			"description": "is_word trigger fires when it is the entire buffer (start-of-line).",
+			"trigger": "the",
+			"replacement": "THE",
+			"is_word": true,
+			"buffer": "the",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "THE",
+				"backspace_count": 3
+			}
+		},
+		{
+			"id": "word_boundary_after_space",
+			"description": "is_word trigger fires when preceded by a space.",
+			"trigger": "the",
+			"replacement": "THE",
+			"is_word": true,
+			"buffer": "hello the",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "THE",
+				"backspace_count": 3
+			}
+		},
+		{
+			"id": "word_boundary_after_punctuation",
+			"description": "is_word trigger fires when preceded by punctuation.",
+			"trigger": "the",
+			"replacement": "THE",
+			"is_word": true,
+			"buffer": ".the",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "THE",
+				"backspace_count": 3
+			}
+		},
+		{
+			"id": "case_sensitive_no_match",
+			"description": "Case-sensitive trigger does not match different case input.",
+			"trigger": "BTW",
+			"replacement": "by the way",
+			"is_word": false,
+			"is_case_sensitive": true,
+			"buffer": "btw",
+			"terminator": " ",
+			"expected": {
+				"matched": false
+			}
+		},
+		{
+			"id": "case_sensitive_exact_match",
+			"description": "Case-sensitive trigger matches exact case.",
+			"trigger": "BTW",
+			"replacement": "by the way",
+			"is_word": false,
+			"is_case_sensitive": true,
+			"buffer": "BTW",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "by the way",
+				"backspace_count": 3
+			}
+		},
+		{
+			"id": "backspace_count_equals_trigger_length",
+			"description": "backspace_count equals trigger length when terminator is not consumed.",
+			"trigger": "afaik",
+			"replacement": "as far as I know",
+			"is_word": false,
+			"buffer": "afaik",
+			"terminator": " ",
+			"terminator_consumed": false,
+			"expected": {
+				"matched": true,
+				"replacement": "as far as I know",
+				"backspace_count": 5
+			}
+		},
+		{
+			"id": "backspace_count_with_consumed_terminator",
+			"description": "backspace_count = trigger_length + 1 when terminator is consumed.",
+			"trigger": "btw",
+			"replacement": "by the way",
+			"is_word": false,
+			"buffer": "btw",
+			"terminator": "★",
+			"terminator_consumed": true,
+			"expected": {
+				"matched": true,
+				"replacement": "by the way",
+				"backspace_count": 4
+			}
+		},
+		{
+			"id": "partial_trigger_no_match",
+			"description": "Buffer that is a strict prefix of the trigger does not match.",
+			"trigger": "btw",
+			"replacement": "by the way",
+			"is_word": false,
+			"buffer": "bt",
+			"terminator": " ",
+			"expected": {
+				"matched": false
+			}
+		},
+		{
+			"id": "trigger_with_special_chars",
+			"description": "Trigger containing an apostrophe expands correctly.",
+			"trigger": "don't",
+			"replacement": "do not",
+			"is_word": false,
+			"buffer": "don't",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "do not",
+				"backspace_count": 5
+			}
+		},
+		{
+			"id": "multiword_replacement",
+			"description": "Multi-word replacement is returned verbatim.",
+			"trigger": "omw",
+			"replacement": "on my way",
+			"is_word": false,
+			"buffer": "typing omw",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "on my way",
+				"backspace_count": 3
+			}
+		},
+		{
+			"id": "empty_buffer_no_match",
+			"description": "Empty buffer never produces a match.",
+			"trigger": "btw",
+			"replacement": "by the way",
+			"is_word": false,
+			"buffer": "",
+			"terminator": " ",
+			"expected": {
+				"matched": false
+			}
+		},
+
+		{
+			"id": "utf8_trigger_two_codepoints",
+			"description": "Trigger containing a 2-byte UTF-8 character (é): backspace_count must equal codepoint count, not byte count.",
+			"trigger": "cé",
+			"replacement": "c'est",
+			"is_word": false,
+			"buffer": "cé",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "c'est",
+				"backspace_count": 2
+			}
+		},
+
+		{
+			"id": "utf8_trigger_three_codepoints",
+			"description": "Trigger with 3 multi-byte UTF-8 codepoints (àèù): backspace_count = 3 (codepoints), not 6 (bytes).",
+			"trigger": "àèù",
+			"replacement": "accent test",
+			"is_word": false,
+			"buffer": "àèù",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "accent test",
+				"backspace_count": 3
+			}
+		},
+
+		{
+			"id": "word_boundary_after_newline",
+			"description": "is_word trigger fires when preceded by a newline (\\n is a word boundary).",
+			"trigger": "the",
+			"replacement": "THE",
+			"is_word": true,
+			"buffer": "line\nthe",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "THE",
+				"backspace_count": 3
+			}
+		},
+
+		{
+			"id": "word_boundary_after_tab",
+			"description": "is_word trigger fires when preceded by a tab (\\t is a word boundary).",
+			"trigger": "the",
+			"replacement": "THE",
+			"is_word": true,
+			"buffer": "\tthe",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "THE",
+				"backspace_count": 3
+			}
+		}
+	],
+	"collision_vectors": [
+		{
+			"id": "priority_breaks_equal_length_tie",
+			"description": "Two equal-length triggers (same string, two sources) collide; the higher priority wins regardless of registration order. The high-priority mapping is registered LAST here. Case-sensitive triggers isolate the tie-break from case-variant generation. Tie-break order is length > priority > first-registered, identical in the AHK engine and the Hammerspoon registry.",
+			"mappings": [
+				{ "trigger": "zz", "replacement": "LOW", "priority": 10, "group": "low", "is_case_sensitive": true },
+				{ "trigger": "zz", "replacement": "HIGH", "priority": 90, "group": "high", "is_case_sensitive": true }
+			],
+			"buffer": "zz",
+			"expected": { "matched": true, "winner": "HIGH" }
+		},
+		{
+			"id": "priority_order_independent",
+			"description": "Same collision as above but the high-priority mapping is registered FIRST; the outcome must not depend on registration order.",
+			"mappings": [
+				{ "trigger": "yy", "replacement": "HIGH", "priority": 90, "group": "high", "is_case_sensitive": true },
+				{ "trigger": "yy", "replacement": "LOW", "priority": 10, "group": "low", "is_case_sensitive": true }
+			],
+			"buffer": "yy",
+			"expected": { "matched": true, "winner": "HIGH" }
+		},
+		{
+			"id": "equal_priority_falls_back_to_first_registered",
+			"description": "Equal length AND equal priority falls back to first-registered (seq), the pre-priority default preserved on both drivers.",
+			"mappings": [
+				{ "trigger": "ww", "replacement": "FIRST", "priority": 30, "group": "g1", "is_case_sensitive": true },
+				{ "trigger": "ww", "replacement": "SECOND", "priority": 30, "group": "g2", "is_case_sensitive": true }
+			],
+			"buffer": "ww",
+			"expected": { "matched": true, "winner": "FIRST" }
+		},
+		{
+			"id": "longer_trigger_beats_higher_priority",
+			"description": "Length stays primary: a longer trigger wins even against a shorter, far-higher-priority one.",
+			"mappings": [
+				{ "trigger": "x", "replacement": "SHORT", "priority": 99, "group": "short", "is_case_sensitive": true },
+				{ "trigger": "vx", "replacement": "LONG", "priority": 1, "group": "long", "is_case_sensitive": true }
+			],
+			"buffer": "vx",
+			"expected": { "matched": true, "winner": "LONG" }
+		},
+		{
+			"id": "personal_tier_beats_common_tier",
+			"description": "The personal source default (50) outranks the common source default (10) for an identical trigger — the user-facing 'my personal hotstring always wins' contract. Personal is registered FIRST, as at startup; priority, not load order, decides. This is the case the macOS group-aware dedup fix restored.",
+			"mappings": [
+				{ "trigger": "abc", "replacement": "PERSONAL", "priority": 50, "group": "personal", "is_case_sensitive": true },
+				{ "trigger": "abc", "replacement": "COMMON", "priority": 10, "group": "common", "is_case_sensitive": true }
+			],
+			"buffer": "abc",
+			"expected": { "matched": true, "winner": "PERSONAL" }
+		},
+		{
+			"id": "no_match_when_buffer_ends_outside_any_trigger",
+			"description": "When the buffer does not end with any registered trigger, nothing fires even though competing mappings exist.",
+			"mappings": [
+				{ "trigger": "qq", "replacement": "Q", "priority": 50, "group": "g1", "is_case_sensitive": true },
+				{ "trigger": "rr", "replacement": "R", "priority": 90, "group": "g2", "is_case_sensitive": true }
+			],
+			"buffer": "hello",
+			"expected": { "matched": false }
+		}
+	]
+}

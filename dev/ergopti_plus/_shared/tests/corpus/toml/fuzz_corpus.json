@@ -1,0 +1,302 @@
+[
+	{
+		"id": "FUZZ-001",
+		"input": "",
+		"expect": "ok",
+		"description": "Empty string -- decoder must return an empty table, not crash."
+	},
+	{
+		"id": "FUZZ-002",
+		"input": "   \t  \n  ",
+		"expect": "ok",
+		"description": "Whitespace only -- no keys, must decode to empty table."
+	},
+	{
+		"id": "FUZZ-003",
+		"input": "key = \"value\"",
+		"expect": "ok",
+		"description": "Minimal valid TOML scalar string."
+	},
+	{
+		"id": "FUZZ-004",
+		"input": "count = 42",
+		"expect": "ok",
+		"description": "Valid integer assignment."
+	},
+	{
+		"id": "FUZZ-005",
+		"input": "enabled = true",
+		"expect": "ok",
+		"description": "Valid boolean true."
+	},
+	{
+		"id": "FUZZ-006",
+		"input": "enabled = false",
+		"expect": "ok",
+		"description": "Valid boolean false."
+	},
+	{
+		"id": "FUZZ-007",
+		"input": "[section\nkey = 1",
+		"expect": "error",
+		"description": "Missing closing bracket on section header."
+	},
+	{
+		"id": "FUZZ-008",
+		"input": "key = \"unclosed string",
+		"expect": "error",
+		"description": "Unclosed double-quoted string."
+	},
+	{
+		"id": "FUZZ-009",
+		"input": "key = 'unclosed single",
+		"expect": "error",
+		"description": "Unclosed single-quoted string."
+	},
+	{
+		"id": "FUZZ-010",
+		"input": "key = \"bad \\q escape\"",
+		"expect": "error",
+		"description": "Invalid escape sequence inside a quoted string."
+	},
+	{
+		"id": "FUZZ-011",
+		"input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 1",
+		"expect": "ok",
+		"description": "Very long key (1000 'a' characters) -- must not crash."
+	},
+	{
+		"id": "FUZZ-012",
+		"input": "key = 1\nkey = 2",
+		"expect": "error",
+		"description": "Duplicate top-level key -- TOML spec forbids this."
+	},
+	{
+		"id": "FUZZ-013",
+		"input": "key = \"\\u0000value\"",
+		"expect": "ok",
+		"description": "Null codepoint via TOML unicode escape -- decoder must not crash (result is implementation-defined)."
+	},
+	{
+		"id": "FUZZ-014",
+		"input": "key = \"bom-test\"",
+		"expect": "ok",
+		"description": "BOM-free file with quoted string -- baseline must decode successfully."
+	},
+	{
+		"id": "FUZZ-015",
+		"input": "key = \"crlf\"\r\nother = 1",
+		"expect": "ok",
+		"description": "CRLF line endings -- must decode successfully."
+	},
+	{
+		"id": "FUZZ-016",
+		"input": "key = \"lf\"\nother = 1",
+		"expect": "ok",
+		"description": "LF-only line endings -- must decode successfully."
+	},
+	{
+		"id": "FUZZ-017",
+		"input": "big = 99999999999999999999999999999999999999999999999999",
+		"expect": "ok",
+		"description": "Integer overflow value -- must not crash (may lose precision)."
+	},
+	{
+		"id": "FUZZ-018",
+		"input": "neg = -99999999999999999999999999999999999999999999999999",
+		"expect": "ok",
+		"description": "Negative integer overflow -- must not crash."
+	},
+	{
+		"id": "FUZZ-019",
+		"input": "[parent]\nkey = 1\n\n[parent.child]\nnested = 2",
+		"expect": "ok",
+		"description": "Nested table via dotted section headers."
+	},
+	{
+		"id": "FUZZ-020",
+		"input": "[[items]]\nname = \"first\"\n\n[[items]]\nname = \"second\"",
+		"expect": "ok",
+		"description": "Array of tables -- standard TOML feature."
+	},
+	{
+		"id": "FUZZ-021",
+		"input": "ml = \"\"\"\nline one\nline two\n\"\"\"",
+		"expect": "ok",
+		"description": "Multi-line basic string -- triple double-quoted."
+	},
+	{
+		"id": "FUZZ-022",
+		"input": "ml = '''\nline one\nline two\n'''",
+		"expect": "ok",
+		"description": "Multi-line literal string -- triple single-quoted."
+	},
+	{
+		"id": "FUZZ-023",
+		"input": "key =",
+		"expect": "error",
+		"description": "Key with no value after the equals sign."
+	},
+	{
+		"id": "FUZZ-024",
+		"input": "= \"no key\"",
+		"expect": "error",
+		"description": "Value with no key before the equals sign."
+	},
+	{
+		"id": "FUZZ-025",
+		"input": "[]\nkey = 1",
+		"expect": "error",
+		"description": "Empty section header brackets."
+	},
+	{
+		"id": "FUZZ-026",
+		"input": "arr = [1, 2, 3]",
+		"expect": "ok",
+		"description": "Inline array of integers."
+	},
+	{
+		"id": "FUZZ-027",
+		"input": "arr = [\"a\", \"b\", \"c\"]",
+		"expect": "ok",
+		"description": "Inline array of strings."
+	},
+	{
+		"id": "FUZZ-028",
+		"input": "arr = [1, \"mixed\", true]",
+		"expect": "error",
+		"description": "Mixed-type array -- TOML spec forbids heterogeneous arrays."
+	},
+	{
+		"id": "FUZZ-029",
+		"input": "# This is a comment\nkey = \"value\"",
+		"expect": "ok",
+		"description": "File starting with a comment -- must be ignored."
+	},
+	{
+		"id": "FUZZ-030",
+		"input": "key = \"value\" # inline comment",
+		"expect": "ok",
+		"description": "Inline comment after a value -- must be stripped."
+	},
+	{
+		"id": "FUZZ-031",
+		"input": "[section]\n[section]\nkey = 1",
+		"expect": "error",
+		"description": "Duplicate section header -- TOML spec forbids this."
+	},
+	{
+		"id": "FUZZ-032",
+		"input": "key = \"tab\\there\"",
+		"expect": "ok",
+		"description": "Valid \\t escape sequence in a quoted string."
+	},
+	{
+		"id": "FUZZ-033",
+		"input": "key = \"newline\\nhere\"",
+		"expect": "ok",
+		"description": "Valid \\n escape sequence in a quoted string."
+	},
+	{
+		"id": "FUZZ-034",
+		"input": "key = \"backslash\\\\here\"",
+		"expect": "ok",
+		"description": "Valid \\\\ escape sequence in a quoted string."
+	},
+	{
+		"id": "FUZZ-035",
+		"input": "key = \"unicode \\u0041\"",
+		"expect": "ok",
+		"description": "Valid \\uXXXX Unicode escape in a quoted string."
+	},
+	{
+		"id": "FUZZ-036",
+		"input": "key = \"bad \\u00ZZ\"",
+		"expect": "error",
+		"description": "Invalid Unicode escape with non-hex digits."
+	},
+	{
+		"id": "FUZZ-037",
+		"input": "[a.b.c]\ndeep = 1",
+		"expect": "ok",
+		"description": "Deeply nested dotted section key -- three levels."
+	},
+	{
+		"id": "FUZZ-038",
+		"input": "key = 1.5",
+		"expect": "ok",
+		"description": "Floating-point value."
+	},
+	{
+		"id": "FUZZ-039",
+		"input": "key = inf",
+		"expect": "ok",
+		"description": "Special float infinity -- must not crash."
+	},
+	{
+		"id": "FUZZ-040",
+		"input": "key = nan",
+		"expect": "ok",
+		"description": "Special float NaN -- must not crash."
+	},
+	{
+		"id": "FUZZ-041",
+		"input": "key = 1_000_000",
+		"expect": "ok",
+		"description": "Integer with underscore separators -- TOML 1.0 allows this."
+	},
+	{
+		"id": "FUZZ-042",
+		"input": "key = 0xFF",
+		"expect": "ok",
+		"description": "Hexadecimal integer literal."
+	},
+	{
+		"id": "FUZZ-043",
+		"input": "key = 0b1010",
+		"expect": "ok",
+		"description": "Binary integer literal."
+	},
+	{
+		"id": "FUZZ-044",
+		"input": "key = 0o17",
+		"expect": "ok",
+		"description": "Octal integer literal."
+	},
+	{
+		"id": "FUZZ-045",
+		"input": "[[]]",
+		"expect": "error",
+		"description": "Array of tables with empty header -- must error."
+	},
+	{
+		"id": "FUZZ-046",
+		"input": "\"quoted.key\" = 1",
+		"expect": "ok",
+		"description": "Quoted key containing a dot -- dot is literal, not nested."
+	},
+	{
+		"id": "FUZZ-047",
+		"input": "[section]\nkey = \"value\"\n[section.sub]\nnested = true",
+		"expect": "ok",
+		"description": "Section followed by a sub-section -- valid TOML nesting."
+	},
+	{
+		"id": "FUZZ-048",
+		"input": "key = {a = 1, b = 2}",
+		"expect": "ok",
+		"description": "Inline table -- must decode to a nested table."
+	},
+	{
+		"id": "FUZZ-049",
+		"input": "key = {a = 1, b = 2,}",
+		"expect": "error",
+		"description": "Trailing comma in inline table -- TOML spec forbids this."
+	},
+	{
+		"id": "FUZZ-050",
+		"input": "key = [\n  1,\n  2,\n  3,\n]",
+		"expect": "ok",
+		"description": "Multi-line array with trailing comma -- TOML 1.0 allows this."
+	}
+]

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key>
+  <string>App Cloner</string>
+  <key>CFBundleDisplayName</key>
+  <string>App Cloner</string>
+  <key>CFBundleIdentifier</key>
+  <string>fr.b519hs.appcloner</string>
+  <key>CFBundleVersion</key>
+  <string>2.0</string>
+  <key>CFBundleExecutable</key>
+  <string>AppCloner</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
+  <!-- Single source of truth for the app's pitch: the website extracts this
+       dict at build time (src/routes/ergopti-plus/+page.server.js), so the
+       description shown online always matches the shipped bundle. -->
+  <key>ErgoptiDescription</key>
+  <dict>
+    <key>fr</key>
+    <string>Clonez n'importe quelle application (VS Code, Slack…) : le clone reçoit sa propre icône teintée, son nom et son profil isolé. Plusieurs instances vraiment séparées, sans droits admin.</string>
+    <key>en</key>
+    <string>Clone any application (VS Code, Slack…): the clone gets its own tinted icon, name and isolated profile. Truly separate instances, no admin rights.</string>
+  </dict>
+</dict>
+</plist>

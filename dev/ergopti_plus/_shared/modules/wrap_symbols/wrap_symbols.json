@@ -1,0 +1,84 @@
+{
+	"_comment": "Single source of truth for the built-in wrap-selection symbol catalogue, shared by the AHK tray menu (lib/wrap_symbols_config.ahk) and the macOS menubar (modules/shortcuts/actions/text.lua). Do NOT hardcode this list, its order, or its grouping in driver code — edit it here only.",
+	"_comment_format": "'groups' is an ordered array of groups. Each group has an 'i18n' key (resolved to a localised label via the locale JSON; both menus render the group as a NAMED nested sub-submenu) and a 'pairs' array of {left, right}. 'left' is the opening character and the canonical key for the per-symbol enabled/disabled state; 'right' is the closing character (equal to 'left' for symmetric symbols). Asymmetric pairs register both characters so typing either one wraps the selection.",
+	"groups": [
+		{
+			"i18n": "menu.shortcuts.wrap_group_brackets",
+			"pairs": [
+				{ "left": "(", "right": ")" },
+				{ "left": "[", "right": "]" },
+				{ "left": "{", "right": "}" },
+				{ "left": "<", "right": ">" }
+			]
+		},
+		{
+			"i18n": "menu.shortcuts.wrap_group_quotes",
+			"pairs": [
+				{ "left": "\"", "right": "\"" },
+				{ "left": "'", "right": "'" },
+				{ "left": "`", "right": "`" },
+				{ "left": "‘", "right": "’" },
+				{ "left": "“", "right": "”" },
+				{ "left": "„", "right": "“" },
+				{ "left": "« ", "right": " »" }
+			]
+		},
+		{
+			"i18n": "menu.shortcuts.wrap_group_angle",
+			"pairs": [
+				{ "left": "〈", "right": "〉" },
+				{ "left": "❬", "right": "❭" },
+				{ "left": "❰", "right": "❱" },
+				{ "left": "❲", "right": "❳" },
+				{ "left": "❴", "right": "❵" },
+				{ "left": "⟦", "right": "⟧" },
+				{ "left": "⟪", "right": "⟫" }
+			]
+		},
+		{
+			"i18n": "menu.shortcuts.wrap_group_cjk",
+			"pairs": [
+				{ "left": "「", "right": "」" },
+				{ "left": "【", "right": "】" },
+				{ "left": "〖", "right": "〗" },
+				{ "left": "《", "right": "》" },
+				{ "left": "〘", "right": "〙" },
+				{ "left": "〚", "right": "〛" }
+			]
+		},
+		{
+			"i18n": "menu.shortcuts.wrap_group_braces",
+			"pairs": [
+				{ "left": "⎴", "right": "⎵" },
+				{ "left": "⏞", "right": "⏟" }
+			]
+		},
+		{
+			"i18n": "menu.shortcuts.wrap_group_markdown",
+			"pairs": [
+				{ "left": "*", "right": "*" },
+				{ "left": "_", "right": "_" },
+				{ "left": "~", "right": "~" },
+				{ "left": "|", "right": "|" },
+				{ "left": "/", "right": "/" },
+				{ "left": "\\", "right": "\\" }
+			]
+		},
+		{
+			"i18n": "menu.shortcuts.wrap_group_other",
+			"pairs": [
+				{ "left": "@", "right": "@" },
+				{ "left": "#", "right": "#" },
+				{ "left": "%", "right": "%" },
+				{ "left": "$", "right": "$" },
+				{ "left": "&", "right": "&" },
+				{ "left": "!", "right": "!" },
+				{ "left": "?", "right": "?" },
+				{ "left": "+", "right": "+" },
+				{ "left": "=", "right": "=" },
+				{ "left": ";", "right": ";" },
+				{ "left": ":", "right": ":" }
+			]
+		}
+	]
+}

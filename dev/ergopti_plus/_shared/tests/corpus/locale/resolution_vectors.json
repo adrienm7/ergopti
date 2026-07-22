@@ -1,0 +1,148 @@
+{
+	"_description": "Cross-driver locale resolution corpus. Each vector specifies an active locale, a set of locale tables (key→value), an optional trigger character, a lookup key, and the expected result. Both the Lua locale.core module and the AHK t() function must produce the identical expected string for the same input, pinning the active→en→fr fallback cascade and the ★ substitution behaviour.",
+	"vectors": [
+		{
+			"id": "key_found_in_active_locale",
+			"description": "Key present in the active locale (fr) — no fallback needed",
+			"active_locale": "fr",
+			"locales": {
+				"fr": { "menu.hello": "Bonjour" },
+				"en": { "menu.hello": "Hello" }
+			},
+			"trigger": null,
+			"key": "menu.hello",
+			"expected": "Bonjour"
+		},
+		{
+			"id": "key_missing_in_active_found_in_en",
+			"description": "Key absent from active locale (fr) but found in en fallback",
+			"active_locale": "fr",
+			"locales": {
+				"fr": { "menu.goodbye": "Au revoir" },
+				"en": { "menu.hello": "Hello" }
+			},
+			"trigger": null,
+			"key": "menu.hello",
+			"expected": "Hello"
+		},
+		{
+			"id": "key_missing_in_active_and_en_found_in_fr_fallback",
+			"description": "Key absent from active (de) and en, found only in fr fallback",
+			"active_locale": "de",
+			"locales": {
+				"de": { "menu.goodbye": "Tschüss" },
+				"en": { "menu.goodbye": "Goodbye" },
+				"fr": { "menu.hello": "Bonjour" }
+			},
+			"trigger": null,
+			"key": "menu.hello",
+			"expected": "Bonjour"
+		},
+		{
+			"id": "key_not_found_anywhere_returns_raw_key",
+			"description": "Key not found in active, en, or fr — returns raw key (Lua returns '', AHK returns Key itself)",
+			"active_locale": "fr",
+			"locales": {
+				"fr": {},
+				"en": {}
+			},
+			"trigger": null,
+			"key": "missing.key",
+			"expected_lua": "",
+			"expected_ahk": "missing.key"
+		},
+		{
+			"id": "star_substitution_with_known_trigger",
+			"description": "★ placeholder replaced with the trigger character (e.g. '£')",
+			"active_locale": "fr",
+			"locales": {
+				"fr": { "hotstrings.trigger": "Appuyez sur ★ pour déclencher" }
+			},
+			"trigger": "£",
+			"key": "hotstrings.trigger",
+			"expected": "Appuyez sur £ pour déclencher"
+		},
+		{
+			"id": "star_substitution_no_trigger_provider",
+			"description": "★ remains literal when no trigger provider is set",
+			"active_locale": "fr",
+			"locales": {
+				"fr": { "hotstrings.trigger": "Appuyez sur ★" }
+			},
+			"trigger": null,
+			"key": "hotstrings.trigger",
+			"expected": "Appuyez sur ★"
+		},
+		{
+			"id": "multiple_stars_in_same_string",
+			"description": "Multiple ★ characters all get replaced",
+			"active_locale": "fr",
+			"locales": {
+				"fr": { "multi.star": "★ et ★ et ★" }
+			},
+			"trigger": "★",
+			"key": "multi.star",
+			"expected": "★ et ★ et ★"
+		},
+		{
+			"id": "star_substitution_active_en_fallback",
+			"description": "★ substitution in a value retrieved from en fallback",
+			"active_locale": "de",
+			"locales": {
+				"de": {},
+				"en": { "hotstrings.trigger": "Press ★ to fire" }
+			},
+			"trigger": "£",
+			"key": "hotstrings.trigger",
+			"expected": "Press £ to fire"
+		},
+		{
+			"id": "locale_switch_rebuilds_cache",
+			"description": "After set_locale('en'), the active strings come from en, not fr",
+			"active_locale": "en",
+			"locales": {
+				"fr": { "menu.hello": "Bonjour" },
+				"en": { "menu.hello": "Hello" }
+			},
+			"trigger": null,
+			"key": "menu.hello",
+			"expected": "Hello"
+		},
+		{
+			"id": "empty_string_value_is_treated_as_missing",
+			"description": "A key whose value is '' (empty string) in the active locale falls through to en",
+			"active_locale": "fr",
+			"locales": {
+				"fr": { "menu.empty": "" },
+				"en": { "menu.empty": "Not empty" }
+			},
+			"trigger": null,
+			"key": "menu.empty",
+			"expected": "Not empty"
+		},
+		{
+			"id": "active_same_as_en_no_double_fallback",
+			"description": "When active is en, the en→fr fallback is still checked on miss",
+			"active_locale": "en",
+			"locales": {
+				"en": {},
+				"fr": { "menu.hello": "Bonjour" }
+			},
+			"trigger": null,
+			"key": "menu.hello",
+			"expected": "Bonjour"
+		},
+		{
+			"id": "active_same_as_fr_en_still_checked",
+			"description": "When active is fr, en is still checked before fr itself as fallback",
+			"active_locale": "fr",
+			"locales": {
+				"fr": {},
+				"en": { "menu.hello": "Hello" }
+			},
+			"trigger": null,
+			"key": "menu.hello",
+			"expected": "Hello"
+		}
+	]
+}

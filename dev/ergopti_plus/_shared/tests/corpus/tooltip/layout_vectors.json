@@ -1,0 +1,53 @@
+{
+  "description": "Cross-driver tooltip layout vectors — position resolution and clamping from _shared/modules/tooltip/layout.js layoutTestVectors(). Consumed by macOS and AHK layout tests.",
+  "vectors": [
+    {
+      "id": "caret_normal",
+      "description": "Caret anchor — tooltip appears below-right of the insertion point.",
+      "anchor": { "type": "caret", "x": 500, "y": 400, "w": 0, "h": 20 },
+      "canvasSize": { "w": 300, "h": 80 },
+      "screenFrame": { "x": 0, "y": 0, "w": 1920, "h": 1080 },
+      "expected": { "x": 515, "y": 438 }
+    },
+    {
+      "id": "caret_near_right_edge",
+      "description": "Caret near right edge — clamped so tooltip stays on screen.",
+      "anchor": { "type": "caret", "x": 1800, "y": 400, "w": 0, "h": 20 },
+      "canvasSize": { "w": 300, "h": 80 },
+      "screenFrame": { "x": 0, "y": 0, "w": 1920, "h": 1080 },
+      "expected": { "x": 1615, "y": 438 }
+    },
+    {
+      "id": "caret_near_bottom",
+      "description": "Caret near bottom — clamped upward so tooltip stays on screen.",
+      "anchor": { "type": "caret", "x": 500, "y": 1020, "w": 0, "h": 20 },
+      "canvasSize": { "w": 300, "h": 80 },
+      "screenFrame": { "x": 0, "y": 0, "w": 1920, "h": 1080 },
+      "expected": { "x": 515, "y": 995 }
+    },
+    {
+      "id": "input_box_normal",
+      "description": "Input-box anchor — centred below the element.",
+      "anchor": { "type": "input_box", "x": 960, "y": 500, "w": 0, "h": 0 },
+      "canvasSize": { "w": 300, "h": 80 },
+      "screenFrame": { "x": 0, "y": 0, "w": 1920, "h": 1080 },
+      "expected": { "x": 810, "y": 505 }
+    },
+    {
+      "id": "input_box_near_bottom_flips",
+      "description": "Input-box anchor near bottom — tooltip flips above the element.",
+      "anchor": { "type": "input_box", "x": 960, "y": 1010, "w": 0, "h": 0 },
+      "canvasSize": { "w": 300, "h": 80 },
+      "screenFrame": { "x": 0, "y": 0, "w": 1920, "h": 1080 },
+      "expected": { "x": 810, "y": 925 }
+    },
+    {
+      "id": "no_anchor_screen_center_bottom",
+      "description": "No anchor — tooltip appears at screen centre-bottom.",
+      "anchor": null,
+      "canvasSize": { "w": 300, "h": 80 },
+      "screenFrame": { "x": 0, "y": 0, "w": 1920, "h": 1080 },
+      "expected": { "x": 810, "y": 995 }
+    }
+  ]
+}

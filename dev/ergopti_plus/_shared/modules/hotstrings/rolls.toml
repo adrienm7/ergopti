@@ -1,0 +1,366 @@
+# ====================
+# ====================
+# ======= Meta =======
+# ====================
+# ====================
+
+[_meta]
+delay = 0.5
+show_tooltip = false
+description = { fr = "Roulements", en = "Rolls", de = "Läufe", es = "Rodamientos", zh = "连击", ar = "تداول", cs = "Rolování", da = "Rolls", he = "גלגולים", hi = "रोल्स", it = "Rollate", ja = "ロール", ko = "롤", nl = "Rolls", no = "Rolls", pl = "Rolady", pt = "Rolagens", ru = "Перекаты", sv = "Rolls", tr = "Yuvarlamalar", uk = "Перекати" }
+sections_order = ["hc", "sx", "cx", "english_negation", "ez", "ct", "-", "close_chevron_tag", "chevron_less", "chevron_greater", "comment_open", "comment_close", "-", "assign", "not_equal", "-", "paren_quote", "bracket_quote", "hashtag_parenthesis", "hashtag_open_bracket", "hashtag_close_bracket", "equal_string", "-", "left_arrow", "assign_arrow_equal_right", "assign_arrow_equal_left", "assign_arrow_minus_right", "assign_arrow_minus_left"]
+
+
+
+# =========================
+# ===== Meta.Sections =====
+# =========================
+
+[_meta.sections]
+assign = "#! ➜ :="
+assign_arrow_equal_left = "=$ ➜ <="
+assign_arrow_equal_right = "$= ➜ =>"
+assign_arrow_minus_left = "?+ ➜ <-"
+assign_arrow_minus_right = "+? ➜ ->"
+bracket_quote = "[# ➜ [\""
+chevron_greater = ">% ➜ >="
+chevron_less = "<% ➜ <="
+close_chevron_tag = "<@ ➜ </"
+comment_close = "\"\\ ➜ */"
+comment_open = "\\\" ➜ /*"
+ct = "P’ ➜ CT"
+cx = "CX ➜ CK"
+english_negation = "NT’ ➜ N’T"
+equal_string = "[) ➜ = \"\""
+ez = "EÉ ➜ EZ"
+hashtag_close_bracket = "#] ➜ \"]"
+hashtag_open_bracket = "#[ ➜ \"]"
+hashtag_parenthesis = "#( ➜ \")"
+paren_quote = "(# ➜ (\""
+hc = "HC ➜ WH"
+left_arrow = "=+ = ➜"
+not_equal = "!# ➜ !="
+sx = "SX ➜ SK"
+
+
+
+
+
+# ======================
+# ======================
+# ======= Assign =======
+# ======================
+# ======================
+
+[[assign]]
+" #!" = { output = " := ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+" #ç" = { output = " := ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+"#!" = { output = " := ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+"#ç" = { output = " := ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# =======================================
+# =======================================
+# ======= Assign_arrow_equal_left =======
+# =======================================
+# =======================================
+
+[[assign_arrow_equal_left]]
+" = $" = { output = " <= ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# ========================================
+# ========================================
+# ======= Assign_arrow_equal_right =======
+# ========================================
+# ========================================
+
+[[assign_arrow_equal_right]]
+" $ = " = { output = " => ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+"$ = " = { output = " => ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# =======================================
+# =======================================
+# ======= Assign_arrow_minus_left =======
+# =======================================
+# =======================================
+
+[[assign_arrow_minus_left]]
+" ?+" = { output = " <- ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+"?+" = { output = " <- ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# ========================================
+# ========================================
+# ======= Assign_arrow_minus_right =======
+# ========================================
+# ========================================
+
+[[assign_arrow_minus_right]]
+" +?" = { output = " -> ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+"+?" = { output = " -> ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# =============================
+# =============================
+# ======= Bracket_quote =======
+# =============================
+# =============================
+
+[[bracket_quote]]
+"[#" = { output = "[\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# ===============================
+# ===============================
+# ======= Chevron_greater =======
+# ===============================
+# ===============================
+
+[[chevron_greater]]
+">%" = { output = ">=", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# ============================
+# ============================
+# ======= Chevron_less =======
+# ============================
+# ============================
+
+[[chevron_less]]
+"<%" = { output = "<=", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# =================================
+# =================================
+# ======= Close_chevron_tag =======
+# =================================
+# =================================
+
+[[close_chevron_tag]]
+"<@" = { output = "</", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# =============================
+# =============================
+# ======= Comment_close =======
+# =============================
+# =============================
+
+[[comment_close]]
+"\"\\" = { output = "*/", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# ============================
+# ============================
+# ======= Comment_open =======
+# ============================
+# ============================
+
+[[comment_open]]
+"\\\"" = { output = "/*", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# ==================
+# ==================
+# ======= Ct =======
+# ==================
+# ==================
+
+[[ct]]
+"p'" = { output = "ct", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"p ?" = { output = "p ?", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+
+
+
+
+
+# ==================
+# ==================
+# ======= Cx =======
+# ==================
+# ==================
+
+[[cx]]
+"cx" = { output = "ck", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
+
+
+
+
+# ================================
+# ================================
+# ======= English_negation =======
+# ================================
+# ================================
+
+[[english_negation]]
+"nt'" = { output = "n’t", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+
+
+
+
+
+# ============================
+# ============================
+# ======= Equal_string =======
+# ============================
+# ============================
+
+[[equal_string]]
+" [)" = { output = " = \"\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+"[)" = { output = " = \"\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# ==================
+# ==================
+# ======= Ez =======
+# ==================
+# ==================
+
+[[ez]]
+"eé" = { output = "ez", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
+
+
+
+
+# =====================================
+# =====================================
+# ======= Hashtag_close_bracket =======
+# =====================================
+# =====================================
+
+[[hashtag_close_bracket]]
+"#]" = { output = "\"]", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# ====================================
+# ====================================
+# ======= Hashtag_open_bracket =======
+# ====================================
+# ====================================
+
+[[hashtag_open_bracket]]
+"#[" = { output = "\"]", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# ===================================
+# ===================================
+# ======= Hashtag_parenthesis =======
+# ===================================
+# ===================================
+
+[[hashtag_parenthesis]]
+"#(" = { output = "\")", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# ==================
+# ==================
+# ======= Hc =======
+# ==================
+# ==================
+
+[[hc]]
+"hc" = { output = "wh", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
+
+
+
+
+# ==========================
+# ==========================
+# ======= Left_arrow =======
+# ==========================
+# ==========================
+
+[[left_arrow]]
+" = +" = { output = " ➜ ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+
+
+
+
+
+# =========================
+# =========================
+# ======= Not_equal =======
+# =========================
+# =========================
+
+[[not_equal]]
+" !#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+" ç#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+"!#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+"ç#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# ===========================
+# ===========================
+# ======= Paren_quote =======
+# ===========================
+# ===========================
+
+[[paren_quote]]
+"(#" = { output = "(\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# ==================
+# ==================
+# ======= Sx =======
+# ==================
+# ==================
+
+[[sx]]
+"sx" = { output = "sk", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }

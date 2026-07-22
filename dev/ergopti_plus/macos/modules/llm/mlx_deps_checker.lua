@@ -1,0 +1,645 @@
+--- modules/llm/mlx_deps_checker.lua
+
+--- ==============================================================================
+--- MODULE: MLX Dependencies Checker
+--- DESCRIPTION:
+--- Auto-bootstraps the project-local Python virtualenv at
+--- static/ergopti_plus/macos/.venv from pyproject.toml on every Hammerspoon
+--- startup. The heavy lifting lives in modules/llm/ensure-mlx-deps.sh; this
+--- module orchestrates the async invocation, streams stdout AND stderr to
+--- surface granular progress through the unified download_window UI, and
+--- reports the FINAL state to the user.
+---
+--- FEATURES & RATIONALE:
+--- 1. Transparent fast path: the bash script hash-compares pyproject.toml
+---    against a marker file and exits silently in milliseconds when nothing
+---    changed. The Lua side never even shows the progress UI on a normal
+---    reload — exactly what the user expects.
+--- 2. Granular progress UX: the script prints identifiable markers
+---    (UV_INSTALLING, PYTHON_INSTALLING, VENV_CREATING, DEPS_SYNCING) on
+---    its stdout when about to start each long-running step. We forward
+---    each marker to ui.download_window.set_step with a French label, and
+---    every raw stderr line to ui.download_window.set_detail so the user sees
+---    live verbose output (uv "Downloading torch (220 MB)…").
+--- 3. Verbose live log: every line of the script's stderr is also
+---    forwarded to Logger.info so 'tail -f <config>/logs/ErgoptiPlus_*.log' shows the
+---    same live download progress instead of a 4-minute frozen silence.
+--- 4. Final state reporting: a successful slow-path run posts a final
+---    "Moteur IA prêt." step then auto-hides 1.5s later. Any failure
+---    routes through ui.download_window.set_error with the actual stderr
+---    tail from the script (network down, uv install blocked, etc.) so
+---    the user sees the real cause.
+--- 5. Non-blocking: full check + install runs in a background hs.task so
+---    the Hammerspoon main loop is never frozen, even on a fresh clone
+---    where bootstrapping uv + Python + the MLX wheels takes minutes.
+--- 6. Tri-state lifecycle: callers branch on get_state() ("pending" /
+---    "ready" / "failed"). The IA menu stays usable while bootstrap is
+---    "pending" and only flips to "failed" if a real IA attempt occurs
+---    after a definitive failure.
+--- ==============================================================================
+
+local M = {}
+local hs           = hs
+local Logger       = require("lib.logger")
+local i18n         = require("lib.i18n")
+local Paths        = require("lib.paths")
+local llm_progress = require("ui.download_window")
+
+local LOG = "mlx_deps"
+
+-- Marker line printed by ensure-mlx-deps.sh on its FIRST stdout flush
+-- whenever it is about to run a non-trivial sync. Absence of the marker
+-- means the script took the silent fast path.
+local SYNC_MARKER_LINE   = "VENV_SYNC_RAN"
+
+-- Granular progress markers printed by the bash script before each
+-- long-running step. Each maps to a French step label so the user
+-- always knows exactly what is happening.
+local MARKER_UV_INSTALL     = "UV_INSTALLING"
+local MARKER_UV_INSTALLED   = "UV_INSTALLED"
+local MARKER_PYTHON_INSTALL = "PYTHON_INSTALLING"
+local MARKER_PYTHON_DONE    = "PYTHON_INSTALLED"
+local MARKER_VENV_CREATE    = "VENV_CREATING"
+local MARKER_VENV_CREATED   = "VENV_CREATED"
+local MARKER_DEPS_SYNC      = "DEPS_SYNCING"
+local MARKER_DEPS_SYNCED    = "DEPS_SYNCED"
+
+-- Number of trailing characters of stderr/stdout to surface in the failure
+-- message. Long enough to include the actual error from curl / uv, short
+-- enough to fit on a single line of the progress UI.
+local FAILURE_TAIL_CHARS = 280
+
+-- Delay before auto-hiding the progress UI after a successful bootstrap.
+-- Long enough for the user to register "moteur IA prêt", short enough to
+-- not feel laggy.
+local SUCCESS_AUTO_HIDE_SEC = 1.5
+
+-- Keep UI hidden until the script proves a real sync is running by emitting
+-- VENV_SYNC_RAN / progress markers. This avoids a startup flash when the
+-- environment is already up to date and only quick validation is happening.
+
+-- Module-level state so callers can branch on the bootstrap outcome without
+-- re-running the script. The values are:
+--   "pending" — bootstrap not finished yet (initial state).
+--   "ready"   — venv is provisioned and pyproject.toml hash matches.
+--   "failed"  — bootstrap failed; IA features must stay disabled.
+local _bootstrap_state = "pending"
+
+-- Last error message captured from the script (stderr tail). Surfaced by
+-- callers that need to explain WHY an IA action was refused.
+local _last_failure_message = nil
+
+-- Callbacks registered while the script is running. Fired all at once when
+-- the script exits so concurrent callers (startup probe + user click) each
+-- get their on_complete called without launching a second bash process.
+local _pending_callbacks = {}
+
+-- Explicit boolean tracking whether a bootstrap task is currently running.
+-- Cannot use #_pending_callbacks > 0 as the guard: when on_complete is nil
+-- (most internal callers), no entry is added to the queue and the guard
+-- never fires — allowing two concurrent bootstrap processes to race and
+-- both write the same .venv directory.
+local _task_running = false
+
+-- GC root for the live bootstrap hs.task. The handle below is a FUNCTION-local, so
+-- it goes out of scope as soon as the spawning function returns while the
+-- subprocess is still running — an unreferenced hs.task can be collected mid-run,
+-- killing the install and dropping its completion callback. Canonical spelling
+-- recognised by tests/unit/meta/test_gc_retention.lua; released in the callback.
+local _active_tasks = {}
+
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 1/ Path Resolution ==========
+-- =====================================
+-- =====================================
+
+--- Resolves the HS driver root from this file path.
+--- @return string|nil hs_root Absolute path or nil.
+local function resolve_hs_root()
+	local source = debug.getinfo(1, "S").source or ""
+	source = source:sub(1, 1) == "@" and source:sub(2) or source
+	local root = source:match("^(.*)/modules/llm/mlx_deps_checker%.lua$")
+	if root and root ~= "" and hs.fs.attributes(root, "mode") then
+		return root
+	end
+	return nil
+end
+
+--- Resolves the absolute path to ensure-mlx-deps.sh in both dev and bundled
+--- layouts by first using this module's own location, then falling back to an
+--- upward search from hs.configdir.
+--- @return string|nil script_path Absolute script path, or nil if not found.
+local function resolve_bootstrap_script_path()
+	local hs_root = resolve_hs_root()
+	if hs_root then
+		local script_path = hs_root .. "/modules/llm/ensure-mlx-deps.sh"
+		if hs.fs.attributes(script_path, "mode") then
+			return script_path
+		end
+	end
+
+	return Paths.find_from_configdir("modules/llm/ensure-mlx-deps.sh", 12)
+end
+
+--- Shell-quotes an arbitrary string for safe insertion into /bin/bash -c.
+--- @param value string Raw string.
+--- @return string quoted Shell-safe quoted string.
+local function shell_quote(value)
+	local s = tostring(value or "")
+	return "'" .. s:gsub("'", "'\\''") .. "'"
+end
+
+
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 2/ Marker / Output Parsing =======
+-- ==========================================
+-- ==========================================
+
+-- Set of all known protocol marker lines. Used to decide whether a stdout
+-- line is protocol noise (skip) or genuine human-readable output (log).
+local KNOWN_MARKERS = {
+	[SYNC_MARKER_LINE]      = true,
+	[MARKER_UV_INSTALL]     = true,
+	[MARKER_UV_INSTALLED]   = true,
+	[MARKER_PYTHON_INSTALL] = true,
+	[MARKER_PYTHON_DONE]    = true,
+	[MARKER_VENV_CREATE]    = true,
+	[MARKER_VENV_CREATED]   = true,
+	[MARKER_DEPS_SYNC]      = true,
+	[MARKER_DEPS_SYNCED]    = true,
+}
+
+-- French step labels keyed by marker. Only the "starting" markers map to
+-- a fresh step label — the matching *_INSTALLED / *_DONE markers are
+-- absorbed silently because the next step's label supersedes them anyway.
+local PROGRESS_LABELS = {
+	[MARKER_UV_INSTALL]     = i18n.get("mlx.deps_step_uv"),
+	[MARKER_PYTHON_INSTALL] = i18n.get("mlx.deps_step_python"),
+	[MARKER_VENV_CREATE]    = i18n.get("mlx.deps_step_venv"),
+	[MARKER_DEPS_SYNC]      = i18n.get("mlx.deps_step_sync"),
+}
+
+--- Detects whether a stdout chunk contains a specific marker line.
+--- @param chunk string Stdout chunk (possibly multiple lines).
+--- @param marker string Marker constant to match against.
+--- @return boolean True when the chunk contains the exact marker.
+local function chunk_contains(chunk, marker)
+	if type(chunk) ~= "string" or chunk == "" then return false end
+	for line in chunk:gmatch("([^\n\r]+)") do
+		if line == marker then return true end
+	end
+	return false
+end
+
+--- Logs every non-empty line from a chunk at INFO level AND forwards it to
+--- the progress UI's verbose detail line + scrollable terminal log,
+--- skipping protocol markers.
+--- @param chunk string A stdout or stderr chunk.
+local function forward_chunk(chunk)
+	if type(chunk) ~= "string" or chunk == "" then return end
+	for line in chunk:gmatch("([^\n\r]+)") do
+		if line:match("%S") and not KNOWN_MARKERS[line] then
+			Logger.info(LOG, "[script] %s", line)
+			-- The detail line shows the latest, the log area shows history.
+			-- Both are wired so the user sees progress at a glance and the
+			-- full audit trail — matching how model downloads already render.
+			pcall(llm_progress.set_detail, line)
+			pcall(llm_progress.append_log, line)
+		end
+	end
+end
+
+-- Map each progress marker to a percentage so the bootstrap bar visibly
+-- advances rather than sitting at 0%. Values are coarse on purpose: they
+-- only need to show monotonic progress, not exact accuracy. uv resolution
+-- and wheel downloads dominate the slow path, hence the wide gap from
+-- DEPS_SYNCING (70%) to DEPS_SYNCED (100%) — the script can spend several
+-- minutes there.
+local MARKER_PROGRESS = {
+	[MARKER_UV_INSTALL]     = 5,
+	[MARKER_UV_INSTALLED]   = 15,
+	[MARKER_PYTHON_INSTALL] = 25,
+	[MARKER_PYTHON_DONE]    = 40,
+	[MARKER_VENV_CREATE]    = 50,
+	[MARKER_VENV_CREATED]   = 60,
+	[MARKER_DEPS_SYNC]      = 70,
+	[MARKER_DEPS_SYNCED]    = 100,
+}
+
+--- Returns the trailing N characters of `s`, trimmed of empty lines, so
+--- the failure message carries the actual cause rather than a generic
+--- "consultez la console".
+--- @param s string Combined stdout+stderr of the script.
+--- @return string Trimmed tail suitable for an error display.
+local function tail_for_error(s)
+	if type(s) ~= "string" or s == "" then return "" end
+	local n = #s
+	local start = n > FAILURE_TAIL_CHARS and (n - FAILURE_TAIL_CHARS + 1) or 1
+	local tail = s:sub(start)
+	tail = tail:gsub("^[^\n]*\n", "")
+	for marker, _ in pairs(KNOWN_MARKERS) do
+		tail = tail:gsub(marker .. "\n?", "")
+	end
+	tail = tail:gsub("[ \t]+\n", "\n"):gsub("\n\n+", "\n")
+	-- Keep only the last non-empty line for a single-line UI render
+	local last = tail:match("([^\n]+)%s*$")
+	return last or tail
+end
+
+--- @return boolean True when the Lua-side knows a real sync ran (slow path).
+local function chunk_marked_real_sync(stdout)
+	return chunk_contains(stdout or "", SYNC_MARKER_LINE)
+end
+
+
+
+
+-- ===============================================
+-- ===============================================
+-- ======= 3/ Streaming Progress Handler =========
+-- ===============================================
+-- ===============================================
+
+--- Builds a closure that consumes stdout AND stderr chunks from the bash
+--- script. Maintains per-marker dedupe state (each marker only fires once)
+--- and lazily shows the progress UI on the first slow-path marker so a
+--- silent fast-path run never paints anything on screen.
+--- @return function streaming_callback Compatible with hs.task:setStreamingCallback.
+local function make_streaming_handler()
+	-- Per-marker dedupe: stdout is line-buffered but each marker may arrive
+	-- multiple times across chunks; we want exactly one transition each.
+	local shown = {}
+	-- The proactive-show fallback in M.check_and_install_deps can flip the
+	-- progress UI on without going through this handler. Querying the UI
+	-- directly each time is more reliable than a cached local: it lets the
+	-- markers transition cleanly from "show" to "set_step" even when the UI
+	-- is already visible from the fallback path.
+	local function ui_already_visible()
+		local ok, visible = pcall(llm_progress.is_active)
+		return ok and visible == true
+	end
+
+	return function(_, stdout_chunk, stderr_chunk)
+		-- Forward stderr (uv's verbose output) so the live log AND the
+		-- progress UI's detail line both reflect real-time progress.
+		forward_chunk(stderr_chunk)
+		forward_chunk(stdout_chunk)
+
+		if type(stdout_chunk) ~= "string" or stdout_chunk == "" then
+			return true
+		end
+
+		-- VENV_SYNC_RAN is the first thing emitted on a slow path: that's
+		-- our cue to show the progress UI for the rest of the run.
+		if not shown[SYNC_MARKER_LINE] and chunk_contains(stdout_chunk, SYNC_MARKER_LINE) then
+			shown[SYNC_MARKER_LINE] = true
+			Logger.debug(LOG, "Slow-path marker observed (real sync in progress).")
+			if not ui_already_visible() then
+				pcall(llm_progress.show, {
+					kind     = "mlx_install",
+					title    = i18n.get("mlx.install_title"),
+					subtitle = i18n.get("mlx.deps_preparing"),
+				})
+			end
+		end
+
+		for marker, label in pairs(PROGRESS_LABELS) do
+			if not shown[marker] and chunk_contains(stdout_chunk, marker) then
+				shown[marker] = true
+				Logger.info(LOG, "Progress marker '%s' observed — updating UI.", marker)
+				if not ui_already_visible() then
+					pcall(llm_progress.show, {
+						kind     = "mlx_install",
+						title    = i18n.get("mlx.install_title"),
+						subtitle = label,
+					})
+				else
+					pcall(llm_progress.set_step, label)
+				end
+			end
+		end
+
+		-- Advance the progress bar: collect all new matching marker pcts and
+		-- call set_progress once with the maximum. pairs() has non-deterministic
+		-- order so multiple matches per chunk could call set_progress with
+		-- decreasing values, regressing the bar (lib-deps-2).
+		local max_pct = nil
+		for marker, pct in pairs(MARKER_PROGRESS) do
+			local progress_key = "progress:" .. marker
+			if not shown[progress_key] and chunk_contains(stdout_chunk, marker) then
+				shown[progress_key] = true
+				if not max_pct or pct > max_pct then max_pct = pct end
+			end
+		end
+		if max_pct then pcall(llm_progress.set_progress, max_pct) end
+		return true
+	end
+end
+
+
+
+
+-- ========================================
+-- ========================================
+-- ======= 4/ Public Bootstrap API ========
+-- ========================================
+-- ========================================
+
+--- Runs the bash script verifying python dependencies for MLX
+--- asynchronously. The script is hash-gated: a no-op run finishes silently
+--- and the progress UI never appears. A real sync prints SYNC_MARKER_LINE
+--- first and then granular markers per long-running step which we surface
+--- through ui.download_window.
+--- @param on_complete function|nil Called when the script exits — receives
+---   true on success, false on failure. Safe to call repeatedly; only the
+---   first invocation runs the script, subsequent ones queue the callback.
+-- Fires all pending callbacks with the given result and clears the queue.
+-- Also clears _task_running so the next ensure_bootstrap() call can launch.
+local function fire_pending_callbacks(ok)
+	_task_running = false
+	local cbs = _pending_callbacks
+	_pending_callbacks = {}
+	for _, cb in ipairs(cbs) do
+		pcall(cb, ok)
+	end
+end
+
+function M.check_and_install_deps(on_complete)
+	-- If already done, fire the callback immediately — no need to re-run.
+	if _bootstrap_state == "ready" then
+		if type(on_complete) == "function" then on_complete(true) end
+		return
+	end
+	if _bootstrap_state == "failed" then
+		if type(on_complete) == "function" then on_complete(false) end
+		return
+	end
+
+	-- Script is already running — queue the callback instead of launching a
+	-- second bash process in parallel. Guard on _task_running (not on
+	-- #_pending_callbacks) so nil-callback callers are also blocked.
+	if _task_running then
+		if type(on_complete) == "function" then
+			table.insert(_pending_callbacks, on_complete)
+		end
+		Logger.debug(LOG, "Bootstrap already running — queued on_complete callback (%d total).", #_pending_callbacks)
+		return
+	end
+
+	if type(on_complete) == "function" then
+		table.insert(_pending_callbacks, on_complete)
+	end
+
+	Logger.start(LOG, "Bootstrapping MLX virtualenv…")
+	local script_path = resolve_bootstrap_script_path()
+	if not script_path then
+		Logger.error(LOG, "Unable to resolve ensure-mlx-deps.sh from current runtime paths — bootstrap aborted.")
+		_bootstrap_state = "failed"
+		_last_failure_message = "ensure-mlx-deps.sh introuvable."
+		fire_pending_callbacks(false)
+		return
+	end
+
+	local hs_root = script_path:match("^(.*)/modules/llm/ensure%-mlx%-deps%.sh$") or ""
+	if hs_root == "" then
+		Logger.error(LOG, "Could not derive HS root from script path '%s' — bootstrap aborted.", script_path)
+		_bootstrap_state = "failed"
+		_last_failure_message = "Chemin du script MLX invalide."
+		fire_pending_callbacks(false)
+		return
+	end
+
+	-- Forward the project root so the script knows where to find .venv even
+	-- when launched outside the project directory (e.g. from launchd).
+	local env_prefix = "PROJECT_ROOT=" .. shell_quote(hs_root) .. " "
+	local bash_cmd = env_prefix .. "/bin/bash " .. shell_quote(script_path)
+
+	Logger.debug(LOG, "Executing dependency validation script in background (root=%s)…", hs_root)
+
+	-- Surface the launched command in the terminal area so the user has
+	-- visible proof that work has started — even before uv emits its first
+	-- line. The step-line communicates the macro phase; the detail-line is
+	-- left blank so the very first real subprocess line populates it.
+	pcall(llm_progress.append_log, "$ " .. bash_cmd)
+	pcall(llm_progress.set_step, i18n.get("mlx.deps_step_bootstrap"))
+	Logger.debug(LOG, "Full bash command: %s", bash_cmd)
+
+	-- Write the PTY wrapper to a temp file so we can pass it to Python properly
+	local random_suffix = math.random(100000, 999999)
+	local pty_wrapper_path = "/tmp/hs_pty_wrapper_" .. random_suffix .. ".py"
+	Logger.debug(LOG, "Creating PTY wrapper at %s…", pty_wrapper_path)
+	local pty_file = io.open(pty_wrapper_path, "w")
+	if not pty_file then
+		Logger.error(LOG, "Failed to write PTY wrapper to %s — aborting bootstrap.", pty_wrapper_path)
+		_bootstrap_state = "failed"
+		_last_failure_message = i18n.get("mlx.deps_pty_write_failed")
+		fire_pending_callbacks(false)
+		return
+	end
+	-- pty.spawn() alone doesn't forward PTY output to stdout (the Python
+	-- process's stdout pipe). We must use os.openpty() and manually forward
+	-- the PTY master fd to sys.stdout so hs.task's streaming callback sees
+	-- the output. The child process runs with its stdin/stdout/stderr all
+	-- wired to the PTY slave, so it behaves as if attached to a real terminal
+	-- and never switches to block-buffered I/O.
+	pty_file:write("import os, sys, select, subprocess\n")
+	pty_file:write("master_fd, slave_fd = os.openpty()\n")
+	pty_file:write("proc = subprocess.Popen(sys.argv[1:], stdin=slave_fd, stdout=slave_fd, stderr=slave_fd, close_fds=True)\n")
+	pty_file:write("os.close(slave_fd)\n")
+	pty_file:write("buf = b''\n")
+	pty_file:write("while True:\n")
+	pty_file:write("    try:\n")
+	pty_file:write("        r, _, _ = select.select([master_fd], [], [], 0.05)\n")
+	pty_file:write("    except (OSError, ValueError): break\n")
+	pty_file:write("    if r:\n")
+	pty_file:write("        try:\n")
+	pty_file:write("            data = os.read(master_fd, 4096)\n")
+	pty_file:write("        except OSError: break\n")
+	pty_file:write("        if not data: break\n")
+	pty_file:write("        sys.stdout.buffer.write(data)\n")
+	pty_file:write("        sys.stdout.buffer.flush()\n")
+	pty_file:write("    elif proc.poll() is not None: break\n")
+	pty_file:write("proc.wait()\n")
+	pty_file:write("os.close(master_fd)\n")
+	pty_file:write("sys.exit(proc.returncode)\n")
+	pty_file:close()
+	os.execute("chmod +x " .. pty_wrapper_path)
+	Logger.debug(LOG, "PTY wrapper created successfully at %s", pty_wrapper_path)
+
+	-- Wrap the bash invocation in a tiny Python pty.spawn shim so the child
+	-- processes (bash, uv, python install) see a real pseudo-TTY on their
+	-- stdio. Without a pty, uv (Rust) and any libc-using subprocess switch
+	-- to fully buffered stdio when piped, meaning their output only reaches
+	-- our streaming callback when a 4 KB buffer fills — i.e., not for
+	-- minutes. We use Python (built-in to macOS at /usr/bin/python3 since
+	-- Catalina) rather than BSD `script` because macOS `script -F` does not
+	-- mean "flush" (it means "write to named pipe") — `script` ends up
+	-- buffering its own stdout output and we get nothing in real time.
+	-- python -u + pty.spawn gives us unbuffered, line-by-line forwarding.
+
+	Logger.debug(LOG, "Creating hs.task for PTY wrapper execution…")
+	local task
+	-- Construct the full Python invocation: python3 executes the PTY wrapper,
+	-- passing bash_cmd as the first argument so pty.spawn(sys.argv[1:]) receives ["/bin/bash", "-c", bash_cmd].
+	-- The signature is: hs.task.new(launchPath, completionCallback, streamingCallback, arguments)
+	task = hs.task.new("/usr/bin/python3", function(exit_code, stdout, stderr)
+		if task then _active_tasks[task] = nil end
+		-- Completion callback: fires when the process exits
+		local combined = (stdout or "") .. (stderr or "")
+		-- Clean up the temporary PTY wrapper script
+		os.execute("rm -f " .. pty_wrapper_path)
+
+		-- Final pass: forward any residual lines the streaming callback may
+		-- have missed if the task ended before its final flush.
+		forward_chunk(stdout or "")
+		forward_chunk(stderr or "")
+
+		local ran_real_sync = chunk_marked_real_sync(stdout or "")
+
+		if exit_code == 0 then
+			_bootstrap_state = "ready"
+			_last_failure_message = nil
+			if ran_real_sync then
+				Logger.success(LOG, "MLX virtualenv synchronised — engine ready.")
+				pcall(llm_progress.set_step, i18n.get("mlx.deps_step_ready"))
+				pcall(llm_progress.set_progress, 100)
+				-- The progress window is a shared, single-instance surface: a model
+				-- download or the Ollama bootstrap can claim it during this delay.
+				-- Capture whose window it is now and only hide THAT one, otherwise
+				-- this timer tears down an unrelated operation's UI mid-flight while
+				-- that operation keeps running with nothing on screen.
+				local hide_session = type(llm_progress.session_id) == "function"
+					and llm_progress.session_id() or nil
+				hs.timer.doAfter(SUCCESS_AUTO_HIDE_SEC, function()
+					if hide_session ~= nil then
+						local ok_sid, current = pcall(llm_progress.session_id)
+						if ok_sid and current ~= hide_session then
+							Logger.debug(LOG, "Auto-hide skipped — the progress window now belongs to another operation.")
+							return
+						end
+					end
+					pcall(llm_progress.hide)
+				end)
+			else
+				Logger.success(LOG, "MLX virtualenv already in sync — fast path.")
+				-- Fast path can race with the proactive UI fallback (e.g. the
+				-- import probe took just over the threshold). Hide the UI so a
+				-- transient "Préparation en cours" stays out of the way once the
+				-- bootstrap is actually done.
+				pcall(llm_progress.hide)
+			end
+			fire_pending_callbacks(true)
+		else
+			_bootstrap_state = "failed"
+			local tail = tail_for_error(combined)
+			if tail == "" then tail = "Cause inconnue. Consultez " .. Logger.UNIFIED_LOG_FILE .. "." end
+			_last_failure_message = tail
+			Logger.error(LOG, "MLX bootstrap failed (exit=%d) — %s",
+				tonumber(exit_code) or -1, tail:gsub("\n", " | "))
+			-- Make sure the UI is visible so the error is surfaced even when
+			-- the failure happened before the slow-path marker was emitted.
+			if not llm_progress.is_active() then
+				pcall(llm_progress.show, {
+					kind     = "mlx_install",
+					title    = i18n.get("mlx.install_title"),
+					subtitle    = i18n.get("mlx.deps_failed"),
+				})
+			end
+			pcall(llm_progress.set_error, tail)
+			fire_pending_callbacks(false)
+		end
+	end, make_streaming_handler(), { "-u", pty_wrapper_path, "/bin/bash", "-c", bash_cmd })
+
+	if not task then
+		Logger.error(LOG, "Failed to create hs.task for MLX bootstrap script.")
+		_bootstrap_state = "failed"
+		_last_failure_message = i18n.get("mlx.deps_task_create_failed")
+		os.execute("rm -f " .. pty_wrapper_path)
+		fire_pending_callbacks(false)
+		return
+	end
+	Logger.debug(LOG, "hs.task created successfully")
+
+	Logger.debug(LOG, "Starting hs.task…")
+	-- Arm the reentrancy guard before task:start() so any callback that fires
+	-- synchronously (unlikely but possible) sees _task_running = true.
+	_task_running = true
+	if task then _active_tasks[task] = true end
+	if not pcall(function() task:start() end) then
+		if task then _active_tasks[task] = nil end
+		Logger.error(LOG, "Failed to start hs.task for MLX bootstrap script.")
+		_bootstrap_state = "failed"
+		_last_failure_message = i18n.get("mlx.deps_task_start_failed")
+		os.execute("rm -f " .. pty_wrapper_path)
+		fire_pending_callbacks(false)
+	else
+		Logger.debug(LOG, "hs.task started successfully")
+	end
+end
+
+
+
+
+
+-- =================================
+--- ==================================
+--- ======= 5/ State Accessors =======
+--- ==================================
+-- =================================
+
+--- @return string The current bootstrap state ("pending" / "ready" / "failed").
+function M.get_state() return _bootstrap_state end
+
+--- @return boolean True only when the venv is fully provisioned and matches
+--- the pinned pyproject.toml. Callers that gate IA features on the bootstrap
+--- outcome should use this predicate instead of inspecting raw state.
+function M.is_ready() return _bootstrap_state == "ready" end
+
+--- @return boolean True while the bootstrap is still running (initial state).
+--- Menus should NOT disable IA features in this state — the bootstrap is
+--- expected to flip to "ready" within seconds on a normal reload.
+function M.is_pending() return _bootstrap_state == "pending" end
+
+--- @return boolean True when the bootstrap definitively failed; IA features
+--- must stay disabled until the user fixes the venv and reloads HS.
+function M.has_failed() return _bootstrap_state == "failed" end
+
+--- @return string|nil Last failure message captured from the bash script
+--- (stderr tail), or nil when bootstrap is pending or successful.
+function M.get_failure_message() return _last_failure_message end
+
+--- Resets a definitively-"failed" bootstrap back to "pending" so the tray
+--- menu's "install now" action (or any subsequent check_and_install_deps
+--- call) can retry instead of hitting the permanent dead end the "failed"
+--- state used to be (F-LOW-10). Without this, a TRANSIENT failure (network
+--- down during the uv/Python download, a momentarily-locked file) required a
+--- full Hammerspoon reload to recover from — check_and_install_deps() short-
+--- circuits unconditionally on "failed" with no way back to "pending".
+--- A no-op while a bootstrap task is already running (retrying mid-flight
+--- would race the in-progress hs.task).
+--- @return boolean True if the reset was applied, false if a no-op (already
+--- pending/ready, or a bootstrap task is currently running).
+function M.reset_bootstrap_state()
+	if _task_running then
+		Logger.debug(LOG, "reset_bootstrap_state(): a bootstrap task is already running — ignoring.")
+		return false
+	end
+	if _bootstrap_state ~= "failed" then
+		return false
+	end
+	Logger.info(LOG, "Resetting MLX bootstrap state from 'failed' back to 'pending' — retry now possible.")
+	_bootstrap_state      = "pending"
+	_last_failure_message = nil
+	return true
+end
+
+return M

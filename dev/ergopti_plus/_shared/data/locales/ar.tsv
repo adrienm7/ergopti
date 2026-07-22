@@ -1,0 +1,2296 @@
+_meta.flag	🇸🇦
+_meta.locale	ar
+_meta.name	العربية
+app_category.business	الأعمال
+app_category.development	أدوات المطورين
+app_category.education	التعليم
+app_category.entertainment	الترفيه
+app_category.finance	المالية
+app_category.games	الألعاب
+app_category.graphics_design	الرسومات والتصميم
+app_category.health	الصحة والرياضة
+app_category.lifestyle	أسلوب الحياة
+app_category.medical	الطب
+app_category.music	الموسيقى
+app_category.navigation	الملاحة
+app_category.news	الأخبار
+app_category.photography	التصوير الفوتوغرافي
+app_category.productivity	الإنتاجية
+app_category.reference	المرجع
+app_category.social	التواصل الاجتماعي
+app_category.sports	الرياضة
+app_category.travel	السفر
+app_category.utility	الأدوات
+app_category.video	الفيديو
+app_category.weather	الطقس
+app_picker.add_another_app	+ إضافة تطبيق آخر…
+app_picker.exclude_current	استبعاد {app} (الحالي)
+app_picker.no_app_excluded	لا توجد تطبيقات للاستثناء
+app_picker.search_placeholder	البحث عن تطبيق…
+apps.cloner.btn_back	رجوع
+apps.cloner.btn_browse	تصفح…
+apps.cloner.btn_choose	اختيار
+apps.cloner.btn_clone	استنساخ التطبيق
+apps.cloner.btn_custom_icon	مخصص
+apps.cloner.btn_native_clone	استنساخ التطبيق الأصلي
+apps.cloner.btn_open_log	فتح السجل
+apps.cloner.btn_pwa_recommended	PWA (مُوصى به)
+apps.cloner.btn_pwa_webapp	تطبيق PWA الإلكتروني
+apps.cloner.btn_tint_icon	درجة اللون
+apps.cloner.btn_try_native	تجربة النسخة الأصلية
+apps.cloner.btn_validate	تأكيد
+apps.cloner.lbl_progress_dock	التسجيل في Dock…
+apps.cloner.lbl_progress_done	تم
+apps.cloner.lbl_progress_icon	توليد الأيقونة ذات درجة اللون…
+apps.cloner.lbl_progress_prep	تحضير الأيقونة و bundle
+apps.cloner.lbl_progress_sign	توقيع ad-hoc لـ bundle…
+apps.cloner.lbl_progress_title	جارٍ إنشاء النسخة…
+apps.cloner.msg_bundle_missing	خطأ: مسار bundle مفقود. شغّل التطبيق بشكل طبيعي.
+apps.cloner.title_clone_name	اسم النسخة
+apps.cloner.title_error	فشل إنشاء النسخة
+apps.cloner.title_icon_style	نمط الأيقونة
+apps.cloner.title_open_arg	العنصر المراد فتحه عند التشغيل
+apps.cloner.title_pwa_mode	وضع PWA؟
+apps.cloner.title_pwa_recommended	وضع PWA مُوصى به
+apps.cloner.title_pwa_url	رابط PWA
+apps.cloner.title_summary	ملخص
+apps.cloner.title_tint	درجة اللون
+apps.cloner.title_url_path	URL أو المسار
+apps.encryptor.btn_overwrite	كتابة فوق
+apps.encryptor.btn_reveal	إظهار في Finder
+apps.encryptor.err_decrypt_failed	فشل فك التشفير. كلمة مرور خاطئة أو ملف تالف؟
+apps.encryptor.err_empty_password	لا يمكن أن تكون كلمة المرور فارغة.
+apps.encryptor.err_encrypt_failed	فشل التشفير.
+apps.encryptor.err_file_missing	الملف غير موجود.
+apps.encryptor.err_openssl_missing	openssl غير موجود. قم بتثبيت Xcode Command Line Tools.
+apps.encryptor.err_password_mismatch	كلمتا المرور غير متطابقتين.
+apps.encryptor.lbl_file	الملف:
+apps.encryptor.prompt_confirm	تأكيد كلمة المرور:
+apps.encryptor.prompt_password	كلمة المرور:
+apps.encryptor.success_decrypted	تم فك تشفير الملف:
+apps.encryptor.success_encrypted	تم تشفير الملف:
+apps.encryptor.title_decrypt	فك تشفير الملف
+apps.encryptor.title_encrypt	تشفير الملف
+apps.encryptor.warn_overwrite	يوجد ملف وجهة بالفعل. هل تريد الكتابة فوقه؟
+autocorrection.accents	تصحيح تلقائي للتشكيل
+autocorrection.caps	حرف كبير تلقائي في بداية الجملة
+autocorrection.errors	تصحيح الأخطاء الإملائية الشائعة
+autocorrection.minus	إدراج تلقائي لعلامة الطرح
+autocorrection.minusapostrophe	ناقص متبوع بفاصلة عليا
+autocorrection.multiplepunctuationmarks	نقاط متعددة ← علامة حذف (... = …)
+autocorrection.names	تصحيح كتابة الأسماء بحروف كبيرة
+autocorrection.ou	تصحيح ou / où
+autocorrection.suffixesachaining	ربط اللواحق مع à
+autocorrection.typographicapostrophe	فاصلة عليا طباعية (مستقيمة → منحنية)
+ax_actions.brightness	☀ سطوع
+ax_actions.char	A أحرف
+ax_actions.char_sel	✎ A تحديد أحرف
+ax_actions.desktops	▢ أسطح مكتب
+ax_actions.document	📄 المستند (بداية/نهاية)
+ax_actions.line_arrow	↕ أسطر (أسهم)
+ax_actions.line_bounds	↔ السطر (بداية/نهاية)
+ax_actions.line_sel	✎ ↕ تحديد أسطر
+ax_actions.lines	↕ أسطر (Alt)
+ax_actions.paragraphs	¶ فقرات
+ax_actions.spaces	▢ مساحات
+ax_actions.tabs	⧉ علامات التبويب
+ax_actions.tracks	♫ مقاطع
+ax_actions.volume	🔊 صوت
+ax_actions.windows	◱ نوافذ
+ax_actions.words	W كلمات
+ax_actions.words_sel	✎ W تحديد كلمات
+button.activate	تفعيل
+button.add	إضافة
+button.cancel	إلغاء
+button.close	إغلاق
+button.confirm	تأكيد
+button.decrypt	فك التشفير
+button.delete	حذف
+button.encrypt	تشفير
+button.ok	موافق
+button.open_settings	فتح الإعدادات
+button.remove	إزالة
+button.retry	إعادة المحاولة
+button.save	حفظ
+category.autocorrection	التصحيح التلقائي
+category.distances_reduction	تقليل المسافة
+category.dynamic_hotstrings	سلاسل نصية ديناميكية
+category.gestures	🖐️ إيماءات
+category.layout	🌐 تخطيط لوحة المفاتيح
+category.magic_key	مفتاح ★ وتوسيع النص
+category.personal	hotstrings الشخصية
+category.rolls	الدحرجات
+category.sfbs_reduction	تقليل SFB
+category.shortcuts	🎯 اختصارات
+category.tapholds	⌨️ نقر-ضغط
+changelog_window.badge_latest	latest
+changelog_window.badge_prerelease	pre-release
+changelog_window.channel_dev	Dev
+changelog_window.channel_stable	Stable
+changelog_window.error_network	Unable to load releases from GitHub.\nCheck your internet connection.
+changelog_window.error_parse	Unable to parse GitHub response.
+changelog_window.error_rate_limited	Unable to load releases from GitHub.\nGitHub is limiting requests — please try again in a few minutes.
+changelog_window.loading	Loading releases…
+changelog_window.no_notes	(No release notes available.)
+changelog_window.no_releases	No releases found.
+changelog_window.open_github	View on GitHub ↗
+changelog_window.retry	Retry
+changelog_window.window_title	Release Notes
+common.browse	استعراض…
+common.cancel	إلغاء
+common.close	إغلاق
+common.delete	حذف
+common.disabled	مُعطَّل
+common.error_prefix	خطأ — 
+common.error_title	خطأ
+common.key_enter	إدخال
+common.later	لاحقاً
+common.loading	جارٍ التحميل…
+common.none	لا شيء
+common.ok	موافق
+common.save	حفظ
+common.saved	تم الحفظ ✓
+common.warning	تحذير
+crash.report.save_failed	تعذّر حفظ تقرير الأعطال
+crash.report.saved_title	تم حفظ تقرير الأعطال
+dialog.action_picker.disabled	∅ لا شيء
+dialog.action_picker.label	الإجراء:
+dialog.action_picker.no_results	لا يوجد إجراء مطابق
+dialog.action_picker.search	البحث عن إجراء…
+dialog.app_picker.active_suffix	 (نشط)
+dialog.app_picker.prompt	اختر التطبيقات:
+dialog.app_picker.running_count	{n} تطبيق(ات) قيد التشغيل.
+dialog.app_picker.stopped_suffix	 (متوقف)
+dialog.app_picker.title	اختيار التطبيق
+dialog.bulk_toggle.save_failed	The change could not be saved to the configuration file.\nIt has been reverted. Close any app holding the file and try again.
+dialog.config_folder.hint	ستُبحث جميع الملفات الشخصية (personal_shortcuts.ahk، personal_hotstrings.toml…) في هذا المجلد. اتركه فارغًا لاستخدام المجلد الافتراضي.
+dialog.config_folder.label	المسار :
+dialog.config_folder.select_title	اختر مجلد الإعدادات
+dialog.config_folder.title	ErgoptiPlus — مجلد الإعدادات
+dialog.enable_all.warning	⚠ تحذير: تم تفعيل جميع الميزات، بما فيها بعض الميزات المُعطَّلة افتراضيًا.
+dialog.fatal_error.cannot_start	لا يمكن تشغيل Ergopti+.
+dialog.fatal_error.toml_key_missing	خطأ فادح: _shared/modules/tooltip/constants.toml — مفتاح مفقود أو غير صالح: [{1}] {2}
+dialog.fatal_error.toml_not_found	خطأ فادح: _shared/modules/tooltip/constants.toml غير موجود.
+dialog.gestures.auto_configure_error	خطأ في الكتابة إلى السجل.\n\nجرّب تشغيل النص البرمجي بصلاحيات المسؤول،\nأو اضبط يدويًا (راجع التعليمات).
+dialog.gestures.auto_configure_error_title	ErgoptiPlus — خطأ
+dialog.gestures.auto_configure_success	تم تطبيق إعداد الإيماءات بنجاح.\n\nتم إعداد الإيماءات العشر في سجل Windows\n(Ctrl+Win+Shift+F1 إلى F10).\n\nقد يلزم تسجيل الخروج/الدخول لكي\nيتعرّف Windows على الاختصارات الجديدة.
+dialog.gestures.auto_configure_title	ErgoptiPlus — إعداد الإيماءات
+dialog.gestures.warning_msg	⚠️ تحذير: تفعيل إيماءات لوحة اللمس قد يتعارض مع إيماءات النظام.\n\nلتجنب التعارض، عطّل الخيارات التالية في macOS:\n\n• إيماءات لوحة اللمس بإصبعين: عطّل التمرير والتحريك إذا أردت استخدامها في Hammerspoon.\n• إيماءات ثلاثة أصابع لتحريك النوافذ وتحديد النص\n• نقر ثلاثة أصابع للبحث عن الكلمات في القاموس\n• تمرير أفقي/رأسي بثلاثة أصابع للتنقل بين المساحات أو تفعيل App Exposé أو Mission Control\n• تمرير أفقي/رأسي بأربعة أصابع للتنقل بين المساحات أو تفعيل App Exposé أو Mission Control\n\nمن المهم تعطيل إيماءات النظام بأربعة أصابع لتعريف إيماءات بخمسة أصابع. وإلا فلن يميّز macOS بينهما ويمنع إيماءات الخمسة أصابع. لهذا تُعاد تعريف إيماءات الأربعة أصابع الافتراضية في وحدة الإيماءات لاستعادة وظائف النظام دون تعارض.
+dialog.gestures.warning_title	تحذير الإيماءات
+dialog.gpt_link.title	تعديل الرابط الذي يفتحه Win + G
+dialog.hotstrings.consume_body	هل يجب استهلاك حرف التشغيل (عدم كتابته) أثناء التوسيع؟
+dialog.hotstrings.consume_checkbox	استهلاك (عدم إعادة كتابة الحرف)
+dialog.hotstrings.consume_no	لا — اكتب الحرف
+dialog.hotstrings.consume_title	سلوك التشغيل
+dialog.hotstrings.consume_yes	نعم — استهلكه
+dialog.hotstrings.delete_body	هل أنت متأكد من حذف هذا الموسّع المخصص؟
+dialog.hotstrings.delete_delimiter_body	Are you sure you want to delete this custom delimiter?
+dialog.hotstrings.delete_delimiter_title	Delete delimiter
+dialog.hotstrings.delete_title	حذف موسّع
+dialog.hotstrings.invalid_body	الرجاء إدخال حرف واحد بالضبط.
+dialog.hotstrings.invalid_title	إدخال غير صالح
+dialog.hotstrings.new_delimiter_prompt	حرف الفاصل
+dialog.hotstrings.new_delimiter_title	New word delimiter
+dialog.hotstrings.new_prompt	أدخل حرف التشغيل (حرف واحد بالضبط):
+dialog.hotstrings.new_title	موسّع كلمات جديد
+dialog.keyboard_shortcut.prompt	حدد تركيبة المفاتيح:
+dialog.keyboard_shortcut.title_prefix	اختر مفتاحًا — 
+dialog.llm.delete_profile_prefix	حذف "
+dialog.llm.delete_title	حذف النموذج؟
+dialog.llm.exclude_ok	حفظ
+dialog.llm.exclude_prompt	اختر التطبيقات التي سيتم تعطيل توليد الذكاء الاصطناعي فيها.
+dialog.magic_key.prompt	قيمة جديدة (★ افتراضيًا):
+dialog.magic_key.title	تعديل مفتاح السحر
+dialog.metrics.bad_password_warning	⚠️ تحذير: فشل في فك التشفير. قد تكون كلمة المرور غير صحيحة.
+dialog.metrics.complete_label	اكتملت العملية.\n\nالملفات المعالجة بنجاح: %d\nالأخطاء: %d
+dialog.metrics.decrypt_confirm_body	ستُستعاد جميع سجلاتك المشفرة كنص عادي على القرص.\n\nتأكيد؟
+dialog.metrics.decrypt_confirm_title	إلغاء التفعيل
+dialog.metrics.decrypt_key_prompt	أدخل مفتاح الأمان المطلوب لفك التشفير:
+dialog.metrics.disable_confirm	تعطيل المقاييس؟\n\nلن يسجّل مسجّل لوحة المفاتيح أي ضغطات بعد الآن. البيانات المسجّلة مسبقًا محفوظة.
+dialog.metrics.enable_warning	تحذير: أنت على وشك تفعيل برنامج تسجيل المفاتيح.\n\nيسجّل ضغطات المفاتيح بدقّة الميلي ثانية. يتم تخزين السجلات محلياً في:\n    {1}\n\nيتم تجاهل حقول كلمات المرور تلقائياً (مرشّح UIA)، كما يتم استبعاد محتوى المفاتيح أثناء وجودك في نافذة تصفّح خاصة/متخفّية. ومع ذلك يبقى هذا تسجيلاً للمفاتيح — أوقف البرنامج مؤقتاً عند إدخال بيانات حساسة خارج هذه السياقات.\n\nهل تريد التفعيل؟
+dialog.metrics.encrypt_confirm_body	سيؤدي التفعيل إلى تشفير جميع سجلاتك الموجودة لتصبح غير قابلة للقراءة على القرص.\n\nتأكيد؟
+dialog.metrics.encrypt_confirm_title	حماية البيانات
+dialog.metrics.encrypt_key_prompt	حدّد مفتاح التشفير (الافتراضي: الرقم التسلسلي لـ Mac):
+dialog.metrics.encrypt_key_title	مفتاح الأمان
+dialog.metrics.encryptor_error_body	لم يُعثر على التطبيق. الرجاء توليده أولًا باستخدام نص Python البرمجي.
+dialog.metrics.encryptor_error_title	خطأ
+dialog.metrics.exclude_ok	حفظ
+dialog.metrics.exclude_prompt	حدد التطبيقات التي لن تُسجَّل ضغطاتها بواسطة مسجّل لوحة المفاتيح أبدًا.
+dialog.metrics.exclude_title	استثناء تطبيقات — المقاييس
+dialog.metrics.progress_label	جارٍ المعالجة: %d / %d
+dialog.metrics.security_warning_body	⚠️  تحذير: على وشك تفعيل المقاييس ومسجّل لوحة المفاتيح.\n\nهذا النظام يسجّل ضغطاتك وتفعيلات إيماءات لوحة اللمس.\n\n• تُخزَّن السجلات في مجلد Hammerspoon\n• حقول كلمة المرور مُتجاهَلة تلقائيًا\n• يُنصح بإيقاف النص البرمجي مؤقتًا عند إدخال بيانات حساسة
+dialog.metrics.security_warning_title	⚠ تحذير أمني — المقاييس
+dialog.metrics.title	📊 مقاييس
+dialog.path_copy.btn_backslash	&شرطة مائلة عكسية (\\)
+dialog.path_copy.btn_quit	&خروج
+dialog.path_copy.msg_simple	المسار\n%s\nتم نسخه إلى الحافظة.
+dialog.path_copy.msg_with_question	المسار\n%s\nتم نسخه إلى الحافظة. \n\nهل تريد النسخة التي تستخدم \\ بدلاً من / ؟
+dialog.path_copy.title	نسخ المسار
+dialog.personal_info.saved	البيانات المُحدَّثة:
+dialog.personal_info.title	تعديل البيانات الشخصية
+dialog.reset_defaults.failed	Could not reset: these files could not be deleted ({1}).\nClose any app holding them (editor, cloud sync) and try again.
+dialog.reset_defaults.failed_title	Reset failed
+dialog.reset_defaults.placeholder_failed	The configuration was reset, but the placeholder could not be written.\nThe setup wizard will run on the next start.
+dialog.shortcuts.chatgpt_prompt	الرابط الذي يفتحه Ctrl+G:
+dialog.shortcuts.chatgpt_title	رابط ChatGPT
+dialog.shortcuts.wrap_symbol_close_prompt	أدخل الرمز الختامي (اتركه فارغًا للتماثل):
+dialog.shortcuts.wrap_symbol_close_title	الرمز الختامي
+dialog.shortcuts.wrap_symbol_invalid	يرجى إدخال حرف واحد فقط.
+dialog.shortcuts.wrap_symbol_prompt	أدخل رمزًا افتتاحيًا (حرف واحد):
+dialog.shortcuts.wrap_symbol_title	إضافة رمز تأطير
+distancesreduction.commafarletters	فاصلة + مفتاح بعيد (,è = z, ,é = …)
+distancesreduction.commaj	فاصلة + صوت علة → J (,a = ja, ,e = je…)
+distancesreduction.deadkeyecircumflex	Ê + حرف → مفتاح ميت (êo = ô, êa = â…)
+distancesreduction.ecircumflexe	Ê + E → Œ
+distancesreduction.qu	Q → QU قبل صوت علة
+distancesreduction.spacearoundsymbols	مسافات تلقائية حول رموز الrolls
+distancesreduction.suffixesa	À + حرف → لاحقة (às = -ement, àé = -ée…)
+download_window.btn_cancel	🛑 إلغاء
+download_window.btn_retry	🔄 إعادة التنزيل
+download_window.btn_terminal	🖥 الطرفية
+download_window.cancelling	جارٍ الإلغاء…
+download_window.done_failed	فشل التنزيل
+download_window.done_success	✅ اكتمل
+download_window.error_unknown	خطأ غير معروف.
+download_window.eta_label	⏳ الوقت المتبقي:
+download_window.file_count	📁 الملفات: %s
+download_window.kind_mlx_install	⚙️ تثبيت محرك الذكاء الاصطناعي (MLX)
+download_window.kind_mlx_model	📥 تنزيل نموذج MLX
+download_window.kind_ollama_install	⚙️ تثبيت محرك الذكاء الاصطناعي (Ollama)
+download_window.kind_ollama_model	📥 تنزيل نموذج Ollama
+download_window.preparing	جارٍ التحضير…
+download_window.size_label	📦 الحجم: 
+download_window.speed_label	⚡ السرعة: 
+download_window.starting	جارٍ البدء…
+download_window.title	📥 جارٍ التنزيل
+download_window.window_title	التقدم
+dynamichotstrings.date	td★ يُدرج التاريخ الحالي ({date})
+dynamichotstrings.datefr	dt★ يُدرج التاريخ الحالي ({date})
+dynamichotstrings.datelongfr	date★ يُدرج التاريخ الطويل ({date})
+dynamichotstrings.group_label	الحقول التلقائية الديناميكية
+dynamichotstrings.ibanprefixes	كتابة الأحرف الأولى من رقم IBAN يُكمله تلقائيًا
+dynamichotstrings.phoneprefixes	كتابة الأرقام الأولى من رقم هاتفك يُكمله تلقائيًا
+dynamichotstrings.ssnprefixes	كتابة الأرقام الأولى من رقم الضمان الاجتماعي يُكمله تلقائيًا
+dynamichotstrings.textexpansionpersonalinformation	@np★ = اللقب ⇥ الاسم — كل حرف = حقل (n=اللقب, p=الاسم, e=البريد…)
+editor.hotstrings.add_entry_title	إنشاء hotstring — القسم « %s »
+editor.hotstrings.btn_add	➕ إضافة
+editor.hotstrings.btn_add_entry	＋ Add a hotstring
+editor.hotstrings.btn_add_section	＋ قسم
+editor.hotstrings.btn_delete	حذف
+editor.hotstrings.btn_delete_entry	🗑 حذف
+editor.hotstrings.btn_edit	💾 تعديل
+editor.hotstrings.btn_new	جديد…
+editor.hotstrings.btn_redefine	Redefine
+editor.hotstrings.btn_rename	إعادة تسمية…
+editor.hotstrings.btn_view_compact	Compact view
+editor.hotstrings.btn_view_expanded	Expanded view
+editor.hotstrings.bulk_move_placeholder	نقل إلى…
+editor.hotstrings.bulk_selected_one	selected
+editor.hotstrings.bulk_selected_other	selected
+editor.hotstrings.cb_auto	توسيع تلقائي
+editor.hotstrings.cb_case	حساس لحالة الأحرف
+editor.hotstrings.cb_final	نتيجة نهائية
+editor.hotstrings.cb_word	كلمة كاملة
+editor.hotstrings.chk_case	حساس لحالة الأحرف
+editor.hotstrings.chk_close_after	إغلاق بعد الإضافة
+editor.hotstrings.chk_final	نتيجة نهائية
+editor.hotstrings.chk_word	كلمة كاملة
+editor.hotstrings.cmd_backspace	delete ←
+editor.hotstrings.cmd_delete	delete →
+editor.hotstrings.cmd_down	down
+editor.hotstrings.cmd_end	line end
+editor.hotstrings.cmd_enter	new line
+editor.hotstrings.cmd_escape	Escape
+editor.hotstrings.cmd_group_arrows	Arrows
+editor.hotstrings.cmd_group_edition	Edition
+editor.hotstrings.cmd_home	line start
+editor.hotstrings.cmd_left	left
+editor.hotstrings.cmd_right	right
+editor.hotstrings.cmd_tab	tab
+editor.hotstrings.cmd_up	up
+editor.hotstrings.col_auto	تلقائي
+editor.hotstrings.col_case	حالة الأحرف
+editor.hotstrings.col_final	نهائي
+editor.hotstrings.col_priority	أولوية
+editor.hotstrings.col_result	النتيجة
+editor.hotstrings.col_trigger	المشغّل
+editor.hotstrings.col_word	كلمة
+editor.hotstrings.confirm_del_bulk	حذف %d عنصر(عناصر) محددة؟
+editor.hotstrings.confirm_del_entry	حذف « %s »؟
+editor.hotstrings.confirm_del_section	حذف « %s » وجميع hotstrings الخاصة به؟
+editor.hotstrings.desc_auto_off	Requires Space or Enter to expand (recommended for autocorrect).
+editor.hotstrings.desc_auto_on	Expands immediately (ideal for triggers ending with %s).
+editor.hotstrings.desc_case_off	The engine generates lowercase, Titlecase and UPPERCASE variants.
+editor.hotstrings.desc_case_on	Strictly distinguishes uppercase/lowercase.<br>Ex: <em>Btw</em> ≠ <em>btw</em>
+editor.hotstrings.desc_final_off	The result can trigger other hotstrings in cascade.
+editor.hotstrings.desc_final_on	The result will not be re-parsed as a trigger.
+editor.hotstrings.desc_prompt	الوصف الظاهر في القائمة لهذا القسم:
+editor.hotstrings.desc_title	الوصف
+editor.hotstrings.desc_word_off	Triggers anywhere, even inside a word.<br>Ex: will trigger inside <em>hotel</em>
+editor.hotstrings.desc_word_on	Only triggers when it matches a standalone word.<br>Ex: <em>tel</em>→telephone but not <em>hotel</em>
+editor.hotstrings.drag_handle_title	Drag
+editor.hotstrings.edit_entry_title	تعديل hotstring — القسم « %s »
+editor.hotstrings.empty_hint	لا توجد سلاسل نصية. انقر + قسم للبدء. ☰ اسحب لإعادة الترتيب — انقر على العنوان لإعادة التسمية
+editor.hotstrings.entry_modal_title_new	سلسلة نصية جديدة
+editor.hotstrings.err_duplicate	⚠ هذا المشغّل موجود بالفعل في هذا القسم.
+editor.hotstrings.err_id_exists	« %s » already exists.
+editor.hotstrings.err_id_invalid	Invalid identifier: lowercase letters, digits and underscores only.
+editor.hotstrings.err_id_required	The identifier is required.
+editor.hotstrings.err_no_section	⚠ حدد قسمًا أو أنشئه أولًا.
+editor.hotstrings.err_no_section_selected	لم يُحدَّد أي قسم.
+editor.hotstrings.err_output_empty	The replacement is required.
+editor.hotstrings.err_section_exists	هذا القسم موجود بالفعل.
+editor.hotstrings.err_select_to_delete	⚠ حدد سلسلة نصية للحذف.
+editor.hotstrings.err_select_to_edit	⚠ حدد سلسلة نصية للتعديل.
+editor.hotstrings.err_trigger_dup_msg	The trigger <strong>%s</strong> already exists in <em>%s</em>.<br><br>Do you really want to redefine it?
+editor.hotstrings.err_trigger_empty	The trigger is required.
+editor.hotstrings.err_trigger_required	⚠ المشغّل والنتيجة مطلوبان.
+editor.hotstrings.err_write	⚠ خطأ في الكتابة إلى personal_hotstrings.toml.
+editor.hotstrings.group_selected	السلسلة النصية المحددة
+editor.hotstrings.kbd_help	↩ = سطر جديد\n⌘ + ↩ = حفظ\n⇧ + ⌘ + ↩ = حفظ + سلسلة نصية جديدة
+editor.hotstrings.label_result	النتيجة:
+editor.hotstrings.label_section	القسم:
+editor.hotstrings.label_trigger	المشغّل:
+editor.hotstrings.meta_desc	سلاسل نصية شخصية
+editor.hotstrings.new_section_prompt	اسم القسم الجديد (معرّف بدون مسافات):
+editor.hotstrings.new_section_title	قسم جديد
+editor.hotstrings.no_section	(بدون قسم)
+editor.hotstrings.page_title	✏︎ السلاسل النصية الشخصية
+editor.hotstrings.priority_hint	فارغ = الأولوية الافتراضية؛ الأعلى يفوز
+editor.hotstrings.priority_label	الأولوية
+editor.hotstrings.rename_desc_prompt	وصف جديد للقسم "{1}":
+editor.hotstrings.rename_title	إعادة تسمية
+editor.hotstrings.replacement_label	الاستبدال
+editor.hotstrings.replacement_placeholder	مثال: مرحبًا،↵أتمنى أن تكون بخير.
+editor.hotstrings.save_error	خطأ في الحفظ
+editor.hotstrings.saved_prefix	✓ تم الحفظ — 
+editor.hotstrings.sec_desc_hint	(يظهر في القائمة)
+editor.hotstrings.sec_desc_label	الوصف
+editor.hotstrings.sec_desc_placeholder	مثال: اختصاراتي
+editor.hotstrings.sec_id_hint	(أحرف صغيرة وأرقام وشرطة سفلية فقط)
+editor.hotstrings.sec_id_label	المعرّف
+editor.hotstrings.sec_id_placeholder	مثال: my_abbrev
+editor.hotstrings.sec_modal_title_new	قسم جديد
+editor.hotstrings.sec_modal_title_rename	Rename section
+editor.hotstrings.special_cmds_summary	أوامر خاصة — انقر للإدراج
+editor.hotstrings.title_confirm	تأكيد
+editor.hotstrings.title_error	خطأ
+editor.hotstrings.trig_hint_text	shown, stored as
+editor.hotstrings.trigger_label	المشغّل
+editor.hotstrings.trigger_placeholder	مثال: btw
+editor.hotstrings.window_title	محرر السلاسل النصية الشخصية
+editor.personal_info.window_title	ErgoptiPlus — المعلومات الشخصية
+ergopti.error_caught	ErgoptiPlus — خطأ داخلي تم اكتشافه :
+ergopti.windowspy_not_found	لم يتم العثور على WindowSpy.ahk في الموقع التالي : {1}
+ext.demo.gui_message	مرحباً من إضافة Ergopti التجريبية!
+ext.demo.open_demo_gui	فتح واجهة العرض التوضيحي
+ext.demo.show_info	عرض المعلومات
+ext.demo.visit_docs	زيارة الوثائق
+gesture.setup.auto_configure	\nأو انقر على «تهيئة تلقائية» في القائمة\nلكتابة هذه الاختصارات مباشرةً في السجل.\n(قد يلزم إعادة التشغيل.)
+gesture.setup.for_each	لكل إيماءة، اختر «اختصار مخصص»\nثم اكتب الاختصار المشار إليه:\n\n
+gesture.setup.header	إعداد إيماءات لوحة اللمس\n══════════════════════════════════\n\n
+gesture.setup.open_path	فتح: الإعدادات > البلوتوث والأجهزة > لوحة اللمس\n         > الإيماءات المتقدمة\n\n
+gesture.setup.title	ErgoptiPlus — إيماءات لوحة اللمس
+gesture.slots.swipe_2_down	تمرير بإصبعين ↓
+gesture.slots.swipe_2_left	تمرير بإصبعين ←
+gesture.slots.swipe_2_left_down	تمرير بإصبعين ↙
+gesture.slots.swipe_2_left_up	تمرير بإصبعين ↖
+gesture.slots.swipe_2_right	تمرير بإصبعين →
+gesture.slots.swipe_2_right_down	تمرير بإصبعين ↘
+gesture.slots.swipe_2_right_up	تمرير بإصبعين ↗
+gesture.slots.swipe_2_up	تمرير بإصبعين ↑
+gesture.slots.swipe_3_down	تمرير بثلاثة أصابع ↓
+gesture.slots.swipe_3_left	تمرير بثلاثة أصابع ←
+gesture.slots.swipe_3_left_down	تمرير بثلاثة أصابع ↙
+gesture.slots.swipe_3_left_up	تمرير بثلاثة أصابع ↖
+gesture.slots.swipe_3_right	تمرير بثلاثة أصابع →
+gesture.slots.swipe_3_right_down	تمرير بثلاثة أصابع ↘
+gesture.slots.swipe_3_right_up	تمرير بثلاثة أصابع ↗
+gesture.slots.swipe_3_up	تمرير بثلاثة أصابع ↑
+gesture.slots.swipe_4_down	تمرير بأربعة أصابع ↓
+gesture.slots.swipe_4_left	تمرير بأربعة أصابع ←
+gesture.slots.swipe_4_left_down	تمرير بأربعة أصابع ↙
+gesture.slots.swipe_4_left_up	تمرير بأربعة أصابع ↖
+gesture.slots.swipe_4_right	تمرير بأربعة أصابع →
+gesture.slots.swipe_4_right_down	تمرير بأربعة أصابع ↘
+gesture.slots.swipe_4_right_up	تمرير بأربعة أصابع ↗
+gesture.slots.swipe_4_up	تمرير بأربعة أصابع ↑
+gesture.slots.swipe_5_diag	تمرير بأربعة أصابع ↗↙
+gesture.slots.swipe_5_down	تمرير بأربعة أصابع ↓
+gesture.slots.swipe_5_horiz	تمرير بأربعة أصابع ↔
+gesture.slots.swipe_5_left	تمرير بأربعة أصابع ←
+gesture.slots.swipe_5_left_down	تمرير بأربعة أصابع ↙
+gesture.slots.swipe_5_left_up	تمرير بأربعة أصابع ↖
+gesture.slots.swipe_5_right	تمرير بأربعة أصابع →
+gesture.slots.swipe_5_right_down	تمرير بأربعة أصابع ↘
+gesture.slots.swipe_5_right_up	تمرير بأربعة أصابع ↗
+gesture.slots.swipe_5_up	تمرير بأربعة أصابع ↑
+gesture.slots.tap_2	نقر بإصبعين
+gesture.slots.tap_3	نقر بثلاثة أصابع
+gesture.slots.tap_4	نقر بأربعة أصابع
+gesture.slots.tap_5	نقر بأربعة أصابع
+gesture.touchpad_open.body	تم فتح صفحة لوحة اللمس.\n\nمرر لأسفل، ثم انقر على\n«الإيماءات المتقدمة» للوصول إلى الاختصارات.
+gestures.conflict_desc_swipe_2	تمرير إصبعين — التمرير والصفحات و Mission Control
+gestures.conflict_desc_swipe_3_horiz	تمرير ثلاثة أصابع يساراً/يميناً — الصفحات / تبديل المساحة
+gestures.conflict_desc_swipe_3_vert	تمرير ثلاثة أصابع لأعلى/لأسفل — Mission Control و App Exposé
+gestures.conflict_desc_swipe_4_horiz	تمرير أربعة/خمسة أصابع يساراً/يميناً — تبديل المساحات
+gestures.conflict_desc_swipe_4_vert	تمرير أربعة/خمسة أصابع لأعلى/لأسفل — Mission Control و App Exposé
+gestures.conflict_desc_tap_3	نقر بثلاثة أصابع — البحث واكتشاف البيانات
+gestures.conflict_dialog_line1	قد تتولى macOS معالجة هذه الإيماءة:
+gestures.conflict_dialog_line2	إذا كان الأمر كذلك، سيتفاعل macOS و Hammerspoon في نفس الوقت:
+gestures.conflict_dialog_line3	سيتم تشغيل كلا السلوكين في آنٍ واحد.
+gestures.conflict_dialog_line4	إذا كانت لا تزال نشطة، أوقفها هنا:
+gestures.conflict_hint_swipe_2	إعدادات النظام › لوحة التتبع\n→ أوقف إيماءات الإصبعين إذا أردت استخدامها في Hammerspoon.
+gestures.conflict_hint_swipe_3_horiz	إعدادات النظام › لوحة التتبع › مزيد من الإيماءات\n→ إيقاف «التمرير بين الصفحات» و«التبديل بين المساحات»
+gestures.conflict_hint_swipe_3_vert	إعدادات النظام › لوحة التتبع › مزيد من الإيماءات\n→ إيقاف «Mission Control» و«App Exposé»
+gestures.conflict_hint_swipe_4_horiz	إعدادات النظام › لوحة التتبع › مزيد من الإيماءات\n→ إيقاف «التبديل بين المساحات»
+gestures.conflict_hint_swipe_4_vert	إعدادات النظام › لوحة التتبع › مزيد من الإيماءات\n→ إيقاف «Mission Control» و«App Exposé»
+gestures.conflict_hint_tap_3	إعدادات النظام › لوحة التتبع › التأشير والنقر\n→ إيقاف «البحث وكاشفات البيانات»
+gestures.enabled	إيماءات لوحة اللمس (تتطلب إعداد Windows)
+healthcheck.copy_and_close	نسخ إلى الحافظة وإغلاق
+hotstrings.custom_terminator	مخصص
+hotstrings.custom_terminator_consumed	مخصص (مُستهلَك)
+hotstrings.shortcut_custom	اختصار مخصص
+hs_config.btn_all_gray	الكل رمادي
+hs_config.btn_all_grey	الكل رمادي
+hs_config.btn_close	إغلاق
+hs_config.btn_reset_all	إعادة تعيين الكل
+hs_config.btn_reset_default	استعادة الافتراضي
+hs_config.cat_autocorrection	التصحيح التلقائي
+hs_config.cat_distances	تقليل المسافة
+hs_config.cat_magickey	مفتاح ★ وتوسيع النص
+hs_config.cat_personal	السلاسل النصية الشخصية
+hs_config.cat_rolls	الدحرجات
+hs_config.cat_sfbs	تقليل SFB
+hs_config.category_prefix	الفئة: 
+hs_config.color_blue	أزرق
+hs_config.color_brown	بني
+hs_config.color_cyan	سماوي
+hs_config.color_gray	رمادي
+hs_config.color_green	أخضر
+hs_config.color_indigo	نيلي
+hs_config.color_inherit	— يرث الافتراضي —
+hs_config.color_lime	ليموني
+hs_config.color_orange	برتقالي
+hs_config.color_pink	وردي
+hs_config.color_purple	بنفسجي
+hs_config.color_red	أحمر
+hs_config.color_turquoise	فيروزي
+hs_config.color_yellow	أصفر
+hs_config.default_prefix	الافتراضي: 
+hs_config.delim_space	Space
+hs_config.delim_tab	Tab
+hs_config.file_level	── مستوى الملف ──
+hs_config.file_level_short	(مستوى الملف)
+hs_config.group_common	عام
+hs_config.group_extensions	إضافات
+hs_config.group_personal	شخصي
+hs_config.hint	اضبط حسب الفئة أو القسم. جميع التغييرات تُحفظ فورًا.
+hs_config.label_category	الفئة:
+hs_config.label_color	اللون
+hs_config.label_delay	التأخير (ms)
+hs_config.label_file	الملف:
+hs_config.label_group	المجموعة:
+hs_config.label_priority	الأولوية
+hs_config.label_section	القسم:
+hs_config.label_tooltip	إظهار تلميح الأداة
+hs_config.none	(لا شيء)
+hs_config.notify_delimiters_saved	Word delimiters updated.
+hs_config.notify_reset_all	تمت إعادة تعيين التأخيرات والألوان.
+hs_config.override_active	تجاوز نشط
+hs_config.section_prefix	القسم: 
+hs_config.window_title	تأخيرات وألوان السلاسل النصية
+init.reload_files	تم تعديل الملفات — جارٍ إعادة التحميل…
+init.reload_hotstrings	تم تعديل الهوتسترينغ — جارٍ إعادة التحميل…
+init.reload_script	تم تعديل البرنامج النصي — جارٍ إعادة التحميل…
+init.reload_title	إعادة التحميل
+karabiner.download_failed	فشل التنزيل: %s
+karabiner.downloading	جارٍ تنزيل Karabiner-Elements (~46 ميجابايت)…
+karabiner.install_error_body	فشل التثبيت التلقائي: %s\n\nيمكنك تنزيل Karabiner-Elements يدويًا من https://karabiner-elements.pqrs.org وإعادة تشغيل Hammerspoon.
+karabiner.install_error_title	فشل التثبيت
+karabiner.install_failed	فشل التثبيت: %s
+karabiner.installing	جارٍ تثبيت Karabiner-Elements (كلمة مرور المسؤول مطلوبة)…
+karabiner.lifecycle.unavailable	Karabiner-Elements غير متاح — تحقق من التثبيت.
+karabiner.onboarding.accessibility_body	امتداد النظام مُفعَّل لكن خادم Karabiner لا يعمل. يتطلب Karabiner-Elements الإصدار 16+ إذن «إمكانية الوصول» (الإصدارات القديمة تطلب «مراقبة الإدخال» بدلاً من ذلك).\n\nانقر على «فتح إمكانية الوصول»، ثم فعِّل Karabiner-Elements في القائمة. إذا لم تظهر الإدخال، افتح Karabiner-Elements مرة واحدة من /Applications/ ليسجّل نفسه في macOS.
+karabiner.onboarding.accessibility_title	مطلوب إذن الوصول
+karabiner.onboarding.btn_install_now	تثبيت الآن
+karabiner.onboarding.btn_open_accessibility	فتح إمكانية الوصول
+karabiner.onboarding.btn_open_settings	فتح الإعدادات
+karabiner.onboarding.daemon_ready	Karabiner-Elements يعمل بشكل صحيح.
+karabiner.onboarding.daemon_timeout	انتهت مهلة الانتظار لبدء خادم Karabiner.
+karabiner.onboarding.daemon_waiting	في انتظار بدء خادم Karabiner…
+karabiner.onboarding.error.manifest_unconfigured	لم يتم تكوين الملف التعريفي (توجد عناصر نائبة TODO).
+karabiner.onboarding.error.mount_failed	فشل التحميل: {error}
+karabiner.onboarding.ext_activated	تم تفعيل امتداد النظام.
+karabiner.onboarding.ext_body	تم تثبيت Karabiner-Elements، لكن امتداد النظام (DriverKit virtual HID) لم يُفعَّل بعد.\n\nانقر على «فتح الإعدادات»، ثم فعِّل «Karabiner-DriverKit-VirtualHIDDevice» في قسم امتدادات النظام.
+karabiner.onboarding.ext_timeout	انتهت مهلة الانتظار لتفعيل امتداد النظام.
+karabiner.onboarding.ext_title	تفعيل امتداد النظام
+karabiner.onboarding.ext_waiting	في انتظار تفعيل امتداد النظام…
+karabiner.onboarding.install_body_suffix	\n\nسيتم تنزيل التطبيق من المستودع الرسمي (pqrs-org/Karabiner-Elements) وتثبيته تلقائيًا. سيُطلب منك كلمة مرور المسؤول.
+karabiner.onboarding.missing.daemon_not_running	• الخدمة الخلفية غير قيد التشغيل (مراقبة الإدخال؟)
+karabiner.onboarding.missing.grabber_absent	• خدمة karabiner_grabber غائبة
+karabiner.onboarding.missing.ke_not_installed	• Karabiner-Elements غير مثبت
+karabiner.onboarding.missing.sysext_not_activated	• امتداد النظام (DriverKit) غير مفعّل
+karabiner.onboarding.missing_prefix	العناصر المفقودة:\n
+karabiner.onboarding.required_title	مطلوب إعداد Karabiner-Elements
+karabiner.pkg_not_found	لم يتم العثور على ملف .pkg في DMG.
+karabiner.ready_body	محرك Karabiner جاهز.
+karabiner.ready_title	Karabiner جاهز
+karabiner.sha_failed	فشل التحقق من SHA-256: %s
+keepawake.started	☕ مضاد للسكون نشط
+keepawake.stopped	☕ مضاد للسكون معطّل
+keepawake.title	نشاط لوحة المفاتيح
+keylogger.category_general	عام
+keylogger.category_private	تصفح خاص
+keylogger.error_body	تعذر تحميل واجهة المقاييس.\n\nتحقق من ui/metrics_typing/init.lua.
+keylogger.error_title	خطأ في Keylogger
+keylogger_ui.app_metrics	وقت التطبيقات
+keylogger_ui.launch_error	تعذّر تشغيل لوحة التحكم : {1}
+keylogger_ui.metrics_disabled	المقاييس معطّلة.
+keylogger_ui.metrics_disabled_body	لتفعيلها : أيقونة شريط الإشعارات → 📊 مقاييس → « ❌ المقاييس معطّلة (انقر للتفعيل) ».
+keylogger_ui.metrics_title	📊 مقاييس
+keylogger_ui.typing_metrics	مقاييس الكتابة
+layout.ctrlmagicsave	Ctrl+★ يُرسل Ctrl+S
+layout.directaccessdigits	وصول مباشر للأرقام في الصف العلوي
+layout.ergoptialtgr	محاكاة طبقة AltGr لتخطيط Ergopti
+layout.ergoptibase	محاكاة الطبقة الأساسية لتخطيط Ergopti
+layout.ergoptiplus	تطبيق تعديلات AltGr الطفيفة لـ Ergopti➕
+llm.deps.browser_install_tip	نزّل Ollama لنظام Windows من الصفحة التي فُتحت في متصفحك، شغّل المثبّت، ثم عُد إلى هنا — سيتم اكتشاف الاتصال تلقائيًا.
+llm.deps.done_success	✅ Ollama جاهز
+llm.deps.fail_server_not_responding	انتهى المثبّت لكن خادم Ollama لا يستجيب.
+llm.deps.fail_timeout	انتهت مهلة الانتظار لاستجابة Ollama بعد التثبيت.
+llm.deps.install_launching	بدء تثبيت Ollama…
+llm.deps.install_launching_hotkey	تثبيت Ollama (تم تشغيله بواسطة اختصار)…
+llm.deps.tray_title	Ergopti — الذكاء الاصطناعي
+llm.generating	⏳ جاري التوليد…
+llm.profile.advanced.label	●●○ متقدم — تصحيح + توقع
+llm.profile.basic.label	●○○ أساسي — توقع بسيط
+llm.profile.batch_advanced.label	●●● دُفعة متقدمة — طلب متقدم واحد مع {n} توقع{s}
+llm.profile.raw.label	○○○ خام — بلا موجّه، السياق فقط
+llm.server_mlx_ready_body	خادم MLX جاهز.
+llm.server_ollama_ready_body	خادم Ollama جاهز.
+llm.server_ready_title	LLM نشط
+magickey.repeatcorrections	المفتاح ★ يكرر آخر حرف مُدخَل
+magickey.replace	تحويل مفتاح J إلى مفتاح ★
+magickey.textexpansion	توسيع النص: c★ = c'est, gt★ = j'étais, pex★ = par exemple…
+magickey.textexpansionauto	توسيع تلقائي بدون ★: ju' = jusqu', ya = y'a…
+magickey.textexpansionemojis	توسيع الإيموجي: voiture★ = 🚗, koala★ = 🐨…
+magickey.textexpansionsymbols	توسيع الرموز: -->★ = ➜, (v)★ = ✓…
+magickey.textexpansionsymbolstypst	رموز Typst: $eq.not$★ = ≠, $PP$★ = ℙ…
+menu.about.changelog	سجل التغييرات
+menu.about.channel_dev	إصدار مسبق (dev)
+menu.about.channel_local_source	✔  مصدر محلي
+menu.about.channel_main	مستقر (main)
+menu.about.channel_menu	قناة التحديث
+menu.about.check_for_updates	التحقق من التحديثات
+menu.about.frequency.10m	كل 10 دقائق
+menu.about.frequency.12h	كل 12 ساعة
+menu.about.frequency.1h	كل ساعة
+menu.about.frequency.1m	كل دقيقة
+menu.about.frequency.24h	كل 24 ساعة
+menu.about.frequency.2d	كل يومين
+menu.about.frequency.2h	كل ساعتين
+menu.about.frequency.3h	كل 3 ساعات
+menu.about.frequency.5m	كل 5 دقائق
+menu.about.frequency.6h	كل 6 ساعات
+menu.about.frequency.7d	كل 7 أيام
+menu.about.frequency.never	Never
+menu.about.frequency_menu	تردّد التحقّق
+menu.about.install_update	تثبيت التحديث…
+menu.about.open_releases_page	فتح صفحة الإصدارات — GitHub
+menu.about.title	الإصدار / التحديثات
+menu.about.update.changelog_error	تعذّر استرداد معلومات الإصدار من GitHub.
+menu.about.update.changelog_header	ملاحظات الإصدار لـ {tag}:\n\n{notes}\n\nفتح على GitHub؟
+menu.about.update.install_error	فشل تثبيت التحديث. تحقق من السجلات أو قم بالتنزيل يدويًا من صفحة الإصدارات.
+menu.about.update.local_source	يعمل من المصدر المحلي — التحقق من التحديثات غير متاح.
+menu.about.update.network_error	تعذّر الوصول إلى GitHub.\nتحقق من اتصالك بالإنترنت وحاول مجدّداً.
+menu.about.update.new_version	يتوفّر إصدار جديد!\n\nالحالي: {current}\nالأحدث:  {latest}\n\nفتح صفحة الإصدارات للتنزيل؟
+menu.about.update.no_asset	لم يُعثر على أرشيف التحديث في هذا الإصدار. افتح صفحة الإصدارات للتنزيل يدويًا.
+menu.about.update.parse_error	تعذّر تحليل علامة الإصدار الأخير من GitHub.
+menu.about.update.up_to_date	ErgoptiPlus محدَّث.\n\nالإصدار الحالي: {version}
+menu.about.update_checking	جارٍ التحقق…
+menu.about.update_downloading	Downloading…
+menu.about.update_installing	جارٍ التثبيت…
+menu.about.update_now	تحديث إلى {tag}
+menu.apps.clone_desc	تكرار أي تطبيق مثبّت
+menu.apps.config_per_app	Configure hotstrings per application
+menu.apps.encrypt_desc	تشفير الملفات والمجلدات
+menu.apps.no_apps	لم يُعثر على تطبيقات
+menu.apps.title	🛠️ التطبيقات
+menu.builder.title	Ergopti+
+menu.builder.title_paused	Ergopti+ ⏸
+menu.debug.console	وحدة التحكم
+menu.debug.healthcheck	فحص الصحة
+menu.debug.key_history	سجل المفاتيح
+menu.debug.list_vars	حالة المتغيرات
+menu.debug.log_level	مستوى السجل
+menu.debug.open_error_log	Open error log
+menu.debug.open_logs	فتح مجلد السجلات
+menu.debug.open_today_log	فتح ملف سجل اليوم
+menu.debug.title	⚠ تشخيص
+menu.debug.window_spy	Window Spy
+menu.extensions.empty	لا توجد إضافة مثبتة
+menu.extensions.header	الإضافات
+menu.gestures.action_disabled	∅ Disabled
+menu.gestures.action_prefix	الإجراء: 
+menu.gestures.auto_configure	🔧 الإعداد التلقائي (السجل)
+menu.gestures.change_action	تغيير الإجراء
+menu.gestures.circular_spaces	التنقل الدائري بين المساحات (1 ↔ N)
+menu.gestures.conflict_title	تعارض الإيماءات
+menu.gestures.default_sensitivity	(الافتراضي العام)
+menu.gestures.disable_all	✕ تعطيل جميع الإيماءات
+menu.gestures.enabled	️ إيماءات
+menu.gestures.manual_tutorial	📋 دليل الإعداد اليدوي
+menu.gestures.mode_incremental	إرسال تدريجي (مسافة)
+menu.gestures.mode_prefix	الوضع: 
+menu.gestures.mode_single	إجراء واحد (x1)
+menu.gestures.notify_title	إيماءات
+menu.gestures.off	❌ الإيماءات مُعطَّلة (انقر للتفعيل)
+menu.gestures.on	✅ الإيماءات مُفعَّلة (انقر للتعطيل)
+menu.gestures.open_settings	فتح الإعدادات
+menu.gestures.open_touchpad	⚙ فتح إعدادات لوحة اللمس (ثم "إيماءات متقدمة")
+menu.gestures.restore_defaults	↩ استعادة الإعدادات الافتراضية
+menu.gestures.sensitivity_hint	(أصغر = أكثر حساسية/استجابة)
+menu.gestures.sensitivity_label	المسافة لكل إجراء (الحساسية):
+menu.gestures.sensitivity_prefix	الحساسية: 
+menu.gestures.swipe_2_diag	تمرير بأربعة أصابع ↗↙
+menu.gestures.swipe_2_down	تمرير بإصبعين ↓
+menu.gestures.swipe_2_left	تمرير بإصبعين ←
+menu.gestures.swipe_2_left_down	تمرير بإصبعين ↙
+menu.gestures.swipe_2_left_up	تمرير بإصبعين ↖
+menu.gestures.swipe_2_right	تمرير بإصبعين →
+menu.gestures.swipe_2_right_down	تمرير بإصبعين ↘
+menu.gestures.swipe_2_right_up	تمرير بإصبعين ↗
+menu.gestures.swipe_2_up	تمرير بإصبعين ↑
+menu.gestures.swipe_3_diag	تمرير بأربعة أصابع ↗↙
+menu.gestures.swipe_3_down	تمرير بثلاثة أصابع ↓
+menu.gestures.swipe_3_horiz	تمرير بأربعة أصابع ↔
+menu.gestures.swipe_3_left	تمرير بثلاثة أصابع ←
+menu.gestures.swipe_3_left_down	تمرير بثلاثة أصابع ↙
+menu.gestures.swipe_3_left_up	تمرير بثلاثة أصابع ↖
+menu.gestures.swipe_3_right	تمرير بثلاثة أصابع →
+menu.gestures.swipe_3_right_down	تمرير بثلاثة أصابع ↘
+menu.gestures.swipe_3_right_up	تمرير بثلاثة أصابع ↗
+menu.gestures.swipe_3_up	تمرير بثلاثة أصابع ↑
+menu.gestures.swipe_4_diag	تمرير بأربعة أصابع ↗↙
+menu.gestures.swipe_4_down	تمرير بأربعة أصابع ↓
+menu.gestures.swipe_4_horiz	تمرير بأربعة أصابع ↔
+menu.gestures.swipe_4_left	تمرير بأربعة أصابع ←
+menu.gestures.swipe_4_left_down	تمرير بأربعة أصابع ↙
+menu.gestures.swipe_4_left_up	تمرير بأربعة أصابع ↖
+menu.gestures.swipe_4_right	تمرير بأربعة أصابع →
+menu.gestures.swipe_4_right_down	تمرير بأربعة أصابع ↘
+menu.gestures.swipe_4_right_up	تمرير بأربعة أصابع ↗
+menu.gestures.swipe_4_up	تمرير بأربعة أصابع ↑
+menu.gestures.swipe_5_diag	تمرير بأربعة أصابع ↗↙
+menu.gestures.swipe_5_down	تمرير بأربعة أصابع ↓
+menu.gestures.swipe_5_horiz	تمرير بأربعة أصابع ↔
+menu.gestures.swipe_5_left	تمرير بأربعة أصابع ←
+menu.gestures.swipe_5_left_down	تمرير بأربعة أصابع ↙
+menu.gestures.swipe_5_left_up	تمرير بأربعة أصابع ↖
+menu.gestures.swipe_5_right	تمرير بأربعة أصابع →
+menu.gestures.swipe_5_right_down	تمرير بأربعة أصابع ↘
+menu.gestures.swipe_5_right_up	تمرير بأربعة أصابع ↗
+menu.gestures.swipe_5_up	تمرير بأربعة أصابع ↑
+menu.gestures.tap_2	نقر بإصبعين
+menu.gestures.tap_3	نقر بثلاثة أصابع
+menu.gestures.tap_4	نقر بأربعة أصابع
+menu.gestures.tap_5	نقر بأربعة أصابع
+menu.gestures.title	🖐️ إيماءات
+menu.global.config_folder	📂 مجلد الإعدادات…
+menu.global.disable_all	☐ تعطيل جميع الميزات
+menu.global.edit_shortcuts	  ↳ تعديل الاختصارات الشخصية
+menu.global.enable_all	☑ تفعيل جميع الميزات
+menu.global.language	🌐 اللغة
+menu.global.quit	⏹ إنهاء
+menu.global.reload	🔄 إعادة تحميل
+menu.global.reset_defaults	↺ إعادة تعيين الإعدادات الافتراضية
+menu.global.setup_wizard	معالج الإعداد…
+menu.global.suspend	⏸︎ تعليق
+menu.global.title	إجراءات عامة
+menu.hotstrings.add_custom	+ إضافة موسّع مخصص…
+menu.hotstrings.add_delimiter	+ Add custom delimiter…
+menu.hotstrings.category_off	❌ معطّلة (انقر للتفعيل)
+menu.hotstrings.category_on	✅ مفعّلة (انقر للتعطيل)
+menu.hotstrings.check_all	☑ تحديد الكل
+menu.hotstrings.close_on_add	إغلاق الواجهة بعد إضافة سلسلة نصية عبر الاختصار
+menu.hotstrings.config_item	⚙️ ضبط التأخيرات والألوان…
+menu.hotstrings.consumed	مُستهلَك
+menu.hotstrings.consumed_suffix	(مُستهلَك)
+menu.hotstrings.custom_label	مخصص
+menu.hotstrings.default_category_prefix	الفئة الافتراضية: 
+menu.hotstrings.default_none	لا شيء
+menu.hotstrings.delay_autocorrection	تأخير التصحيح التلقائي
+menu.hotstrings.delay_invalid_body	الرجاء إدخال عدد صحيح غير سالب (ميلي ثانية).
+menu.hotstrings.delay_invalid_title	قيمة غير صالحة
+menu.hotstrings.delay_magic_key	تأخير المفتاح السحري ★
+menu.hotstrings.delay_prompt	التأخير الجديد بالميلي ثانية (0 = بلا تأخير):
+menu.hotstrings.delays_colors	التأخيرات والألوان…
+menu.hotstrings.delete_delimiter	Delete this delimiter…
+menu.hotstrings.delete_expander	حذف هذا الموسّع…
+menu.hotstrings.disable_all	❌ Disable all
+menu.hotstrings.enable_all	✅ Enable all
+menu.hotstrings.header_common	سلاسل نصية شائعة
+menu.hotstrings.header_common_count	سلاسل نصية شائعة (%s)
+menu.hotstrings.header_ergopti	تخطيط Ergopti
+menu.hotstrings.header_ergopti_count	تخطيط Ergopti (%s)
+menu.hotstrings.header_personal_count	hotstrings الخاصة بي (%s)
+menu.hotstrings.infinite	∞
+menu.hotstrings.magic_key_prefix	مفتاح السحر: 
+menu.hotstrings.magic_key_prompt	قيمة جديدة (★ افتراضيًا):
+menu.hotstrings.magic_key_title	تعديل مفتاح السحر
+menu.hotstrings.missing_value	(قيمة مفقودة)
+menu.hotstrings.notify_bubble_ai	فقاعة ذكاء اصطناعي
+menu.hotstrings.notify_bubble_autocorrect	فقاعة التصحيح التلقائي
+menu.hotstrings.notify_bubble_colored	فقاعات ملونة
+menu.hotstrings.notify_bubble_star	فقاعة ★
+menu.hotstrings.off	❌ السلاسل النصية مُعطَّلة (انقر للتفعيل)
+menu.hotstrings.on	✅ السلاسل النصية مُفعَّلة (انقر للتعطيل)
+menu.hotstrings.open_editor	فتح محرر السلاسل النصية
+menu.hotstrings.open_file	فتح ملف…
+menu.hotstrings.params	⚙️ إعدادات السلاسل النصية
+menu.hotstrings.personal_header	hotstrings الخاصة بي
+menu.hotstrings.preview_bubbles	فقاعات المعاينة
+menu.hotstrings.repeat_key_toggle	مفتاح ★ يكرر آخر ضغطة
+menu.hotstrings.reset_magic_key	   ↳ إعادة تعيين (افتراضي: ★)
+menu.hotstrings.rolls.assign	#! ➜ :=
+menu.hotstrings.rolls.assign_arrow_equal_left	=$ ➜ <=
+menu.hotstrings.rolls.assign_arrow_equal_right	$= ➜ =>
+menu.hotstrings.rolls.assign_arrow_minus_left	?+ ➜ <-
+menu.hotstrings.rolls.assign_arrow_minus_right	+? ➜ ->
+menu.hotstrings.rolls.bracket_quote	[# ➜ ["
+menu.hotstrings.rolls.chevron_equal	= ➜ <=
+menu.hotstrings.rolls.chevron_greater	>% ➜ >=
+menu.hotstrings.rolls.chevron_less	<% ➜ <=
+menu.hotstrings.rolls.close_chevron_tag	<@ ➜ </
+menu.hotstrings.rolls.comment_close	"\\  ➜ */
+menu.hotstrings.rolls.comment_open	\\" ➜ /*
+menu.hotstrings.rolls.ct	P' ➜ CT
+menu.hotstrings.rolls.cx	CX ➜ CK
+menu.hotstrings.rolls.english_negation	NT' ➜ N'T
+menu.hotstrings.rolls.equal_string	[) ➜ = ""
+menu.hotstrings.rolls.ez	EÉ ➜ EZ
+menu.hotstrings.rolls.hashtag_close_bracket	#] ➜ "]
+menu.hotstrings.rolls.hashtag_open_bracket	#[ ➜ "[
+menu.hotstrings.rolls.hashtag_parenthesis	#( ➜ ")
+menu.hotstrings.rolls.hashtag_quote	#" ➜ "
+menu.hotstrings.rolls.hc	HC ➜ WH
+menu.hotstrings.rolls.left_arrow	=+ = ➜
+menu.hotstrings.rolls.not_equal	!# ➜ !=
+menu.hotstrings.rolls.paren_quote	(# ➜ ("
+menu.hotstrings.rolls.sx	SX ➜ SK
+menu.hotstrings.shortcut_default_ctrl	Ctrl + %s
+menu.hotstrings.shortcut_none	لا اختصار
+menu.hotstrings.shortcut_prefix	الاختصار: Win + 
+menu.hotstrings.shortcut_prompt	الصيغة: معدّلات+مفتاح (مثال: ctrl+e)\nالمعدّلات المتاحة: cmd, alt, ctrl, shift\naتركه فارغًا للتعطيل
+menu.hotstrings.title	⚡ سلاسل نصية
+menu.hotstrings.tooltip_ai	معاينة الذكاء الاصطناعي
+menu.hotstrings.tooltip_ai_acceptance	تأخير قبول الذكاء الاصطناعي
+menu.hotstrings.tooltip_autocompletion	تأخير الإكمال التلقائي
+menu.hotstrings.tooltip_autocorrect	معاينة التصحيح التلقائي
+menu.hotstrings.tooltip_colored	معاينات ملوّنة
+menu.hotstrings.tooltip_default	التأخير الافتراضي (جميع المجموعات)
+menu.hotstrings.tooltip_magic	★ معاينة
+menu.hotstrings.uncheck_all	□ إلغاء تحديد الكل
+menu.hotstrings.word_delimiters	محددات الكلمات
+menu.hotstrings.word_expanders	موسّعات
+menu.hs.gestures.modes	الوضع
+menu.hs.gestures.modes.swipe_2_down	الوضع — تمرير بإصبعين ↓
+menu.hs.gestures.modes.swipe_2_left	الوضع — تمرير بإصبعين ←
+menu.hs.gestures.modes.swipe_2_left_down	الوضع — تمرير بإصبعين ↙
+menu.hs.gestures.modes.swipe_2_left_up	الوضع — تمرير بإصبعين ↖
+menu.hs.gestures.modes.swipe_2_right	الوضع — تمرير بإصبعين →
+menu.hs.gestures.modes.swipe_2_right_down	الوضع — تمرير بإصبعين ↘
+menu.hs.gestures.modes.swipe_2_right_up	الوضع — تمرير بإصبعين ↗
+menu.hs.gestures.modes.swipe_2_up	الوضع — تمرير بإصبعين ↑
+menu.hs.gestures.modes.swipe_3_down	الوضع — تمرير بثلاثة أصابع ↓
+menu.hs.gestures.modes.swipe_3_left	الوضع — تمرير بثلاثة أصابع ←
+menu.hs.gestures.modes.swipe_3_left_down	الوضع — تمرير بثلاثة أصابع ↙
+menu.hs.gestures.modes.swipe_3_left_up	الوضع — تمرير بثلاثة أصابع ↖
+menu.hs.gestures.modes.swipe_3_right	الوضع — تمرير بثلاثة أصابع →
+menu.hs.gestures.modes.swipe_3_right_down	الوضع — تمرير بثلاثة أصابع ↘
+menu.hs.gestures.modes.swipe_3_right_up	الوضع — تمرير بثلاثة أصابع ↗
+menu.hs.gestures.modes.swipe_3_up	الوضع — تمرير بثلاثة أصابع ↑
+menu.hs.gestures.modes.swipe_4_down	الوضع — تمرير بأربعة أصابع ↓
+menu.hs.gestures.modes.swipe_4_left	الوضع — تمرير بأربعة أصابع ←
+menu.hs.gestures.modes.swipe_4_left_down	الوضع — تمرير بأربعة أصابع ↙
+menu.hs.gestures.modes.swipe_4_left_up	الوضع — تمرير بأربعة أصابع ↖
+menu.hs.gestures.modes.swipe_4_right	الوضع — تمرير بأربعة أصابع →
+menu.hs.gestures.modes.swipe_4_right_down	الوضع — تمرير بأربعة أصابع ↘
+menu.hs.gestures.modes.swipe_4_right_up	الوضع — تمرير بأربعة أصابع ↗
+menu.hs.gestures.modes.swipe_4_up	الوضع — تمرير بأربعة أصابع ↑
+menu.hs.gestures.modes.swipe_5_down	الوضع — تمرير بأربعة أصابع ↓
+menu.hs.gestures.modes.swipe_5_left	الوضع — تمرير بأربعة أصابع ←
+menu.hs.gestures.modes.swipe_5_left_down	الوضع — تمرير بأربعة أصابع ↙
+menu.hs.gestures.modes.swipe_5_left_up	الوضع — تمرير بأربعة أصابع ↖
+menu.hs.gestures.modes.swipe_5_right	الوضع — تمرير بأربعة أصابع →
+menu.hs.gestures.modes.swipe_5_right_down	الوضع — تمرير بأربعة أصابع ↘
+menu.hs.gestures.modes.swipe_5_right_up	الوضع — تمرير بأربعة أصابع ↗
+menu.hs.gestures.modes.swipe_5_up	الوضع — تمرير بأربعة أصابع ↑
+menu.hs.gestures.sensitivities	الحساسية
+menu.hs.gestures.sensitivities.swipe_2_down	الحساسية — تمرير بإصبعين ↓
+menu.hs.gestures.sensitivities.swipe_2_left	الحساسية — تمرير بإصبعين ←
+menu.hs.gestures.sensitivities.swipe_2_left_down	الحساسية — تمرير بإصبعين ↙
+menu.hs.gestures.sensitivities.swipe_2_left_up	الحساسية — تمرير بإصبعين ↖
+menu.hs.gestures.sensitivities.swipe_2_right	الحساسية — تمرير بإصبعين →
+menu.hs.gestures.sensitivities.swipe_2_right_down	الحساسية — تمرير بإصبعين ↘
+menu.hs.gestures.sensitivities.swipe_2_right_up	الحساسية — تمرير بإصبعين ↗
+menu.hs.gestures.sensitivities.swipe_2_up	الحساسية — تمرير بإصبعين ↑
+menu.hs.gestures.sensitivities.swipe_3_down	الحساسية — تمرير بثلاثة أصابع ↓
+menu.hs.gestures.sensitivities.swipe_3_left	الحساسية — تمرير بثلاثة أصابع ←
+menu.hs.gestures.sensitivities.swipe_3_left_down	الحساسية — تمرير بثلاثة أصابع ↙
+menu.hs.gestures.sensitivities.swipe_3_left_up	الحساسية — تمرير بثلاثة أصابع ↖
+menu.hs.gestures.sensitivities.swipe_3_right	الحساسية — تمرير بثلاثة أصابع →
+menu.hs.gestures.sensitivities.swipe_3_right_down	الحساسية — تمرير بثلاثة أصابع ↘
+menu.hs.gestures.sensitivities.swipe_3_right_up	الحساسية — تمرير بثلاثة أصابع ↗
+menu.hs.gestures.sensitivities.swipe_3_up	الحساسية — تمرير بثلاثة أصابع ↑
+menu.hs.gestures.sensitivities.swipe_4_down	الحساسية — تمرير بأربعة أصابع ↓
+menu.hs.gestures.sensitivities.swipe_4_left	الحساسية — تمرير بأربعة أصابع ←
+menu.hs.gestures.sensitivities.swipe_4_left_down	الحساسية — تمرير بأربعة أصابع ↙
+menu.hs.gestures.sensitivities.swipe_4_left_up	الحساسية — تمرير بأربعة أصابع ↖
+menu.hs.gestures.sensitivities.swipe_4_right	الحساسية — تمرير بأربعة أصابع →
+menu.hs.gestures.sensitivities.swipe_4_right_down	الحساسية — تمرير بأربعة أصابع ↘
+menu.hs.gestures.sensitivities.swipe_4_right_up	الحساسية — تمرير بأربعة أصابع ↗
+menu.hs.gestures.sensitivities.swipe_4_up	الحساسية — تمرير بأربعة أصابع ↑
+menu.hs.gestures.sensitivities.swipe_5_down	الحساسية — تمرير بأربعة أصابع ↓
+menu.hs.gestures.sensitivities.swipe_5_left	الحساسية — تمرير بأربعة أصابع ←
+menu.hs.gestures.sensitivities.swipe_5_left_down	الحساسية — تمرير بأربعة أصابع ↙
+menu.hs.gestures.sensitivities.swipe_5_left_up	الحساسية — تمرير بأربعة أصابع ↖
+menu.hs.gestures.sensitivities.swipe_5_right	الحساسية — تمرير بأربعة أصابع →
+menu.hs.gestures.sensitivities.swipe_5_right_down	الحساسية — تمرير بأربعة أصابع ↘
+menu.hs.gestures.sensitivities.swipe_5_right_up	الحساسية — تمرير بأربعة أصابع ↗
+menu.hs.gestures.sensitivities.swipe_5_up	الحساسية — تمرير بأربعة أصابع ↑
+menu.kanata.title	🎹 Kanata
+menu.karabiner.clear_all	🧹 مسح الكل (نقر/ضغط واختصارات)
+menu.karabiner.combo_arrow	مزيج → %s
+menu.karabiner.copy_tap_to_combo	🔁 نسخ النقر ← كومبو للمفاتيح المعدِّلة
+menu.karabiner.disabled_warning_1	⚠️  القائمة مُعطَّلة لكن Karabiner لا يزال يعمل.
+menu.karabiner.disabled_warning_2	      إعادة التعيين لا تزال نشطة.
+menu.karabiner.disabled_warning_3	      لإيقاف كل شيء: انقر 🟢 أعلاه،
+menu.karabiner.disabled_warning_4	      وأزل Karabiner من تطبيقات بدء التشغيل.
+menu.karabiner.header_shortcuts	اختصارات المفاتيح المعدِّلة
+menu.karabiner.header_taps_holds	نقر / ضغط
+menu.karabiner.hold_arrow	ضغط → %s
+menu.karabiner.hold_colon	ضغط: %s
+menu.karabiner.key_tap_delay	Tap delay: %s
+menu.karabiner.key_tap_delay_dialog_prompt	Tap / hold delay for this key, in milliseconds\n(global: %d ms)
+menu.karabiner.key_tap_delay_dialog_title	Karabiner — Per-key tap delay
+menu.karabiner.key_tap_delay_set	Set a custom delay…
+menu.karabiner.key_tap_delay_use_global	Use global delay (%s)
+menu.karabiner.left_hand	اليد اليسرى
+menu.karabiner.nothing_combo	لا إجراء (مزيج، نقر وضغط)
+menu.karabiner.nothing_tap_hold	لا إجراء (نقر وضغط)
+menu.karabiner.open_gui	فتح Karabiner-Elements
+menu.karabiner.restore_defaults	↩ استعادة الإعدادات الافتراضية
+menu.karabiner.right_hand	اليد اليمنى
+menu.karabiner.simultaneous_dialog_prompt	الحد الأقصى للتأخير (ميلي ثانية) بين المفتاح الأول\nوالثاني لاختصار لتشغيل خانة "المزيج"\n(وتر: المفاتيح مضغوطة شبه متزامنة).\n\n(الافتراضي: %d ms)
+menu.karabiner.simultaneous_dialog_title	Karabiner — تأخير تفعيل المزيج
+menu.karabiner.simultaneous_title	تأخير تفعيل المزيج: %s
+menu.karabiner.start	▶ تشغيل Karabiner
+menu.karabiner.status_active	🟢 Karabiner نشط
+menu.karabiner.status_inactive	🔴 Karabiner غير نشط — انقر لإعادة التشغيل
+menu.karabiner.status_no_daemon	🟡 Karabiner مُفعَّل — لم يُكشف عن خدمة (هل KE مثبَّت؟)
+menu.karabiner.status_not_primed	🟡 Karabiner مُفعَّل — القواعد غير مُطبَّقة (انقر للتهيئة)
+menu.karabiner.status_priming	🔵 Karabiner — جارٍ التهيئة…
+menu.karabiner.sticky_dialog_prompt	تأخير إلغاء الثبات (ميلي ثانية)\nبعد هذه المدة دون ضغط مفتاح، يُلغى المُعدِّل أحادي الإطلاق.
+menu.karabiner.sticky_dialog_title	Karabiner — تأخير الثبات
+menu.karabiner.sticky_title	تأخير المُعدِّل الثابت: %s
+menu.karabiner.stop	✕ إنهاء Karabiner
+menu.karabiner.symmetric	اختصارات متماثلة (مستقلة عن ترتيب المفاتيح)
+menu.karabiner.tap_arrow	نقر → %s
+menu.karabiner.tap_colon	نقر: %s
+menu.karabiner.tap_hold_dialog_prompt	تأخير النقر / الضغط بالميلي ثانية\n(الافتراضي في Karabiner: %d ms)
+menu.karabiner.tap_hold_dialog_title	Karabiner — تأخير النقر / الضغط
+menu.karabiner.tap_hold_title	تأخير النقر / الضغط: %s
+menu.keyboard_layout.add_ergopti	➕ إضافة Ergopti v%s إلى قائمة التخطيطات
+menu.keyboard_layout.open_system_prefs	فتح تفضيلات النظام → لوحة المفاتيح
+menu.layout.active_layouts	التخطيطات النشطة
+menu.layout.add_fail	فشل الإضافة — راجع وحدة التحكم.
+menu.layout.add_ok	تمت إضافة %s إلى القائمة.
+menu.layout.add_to_list	إضافة Ergopti v%s إلى مصادر الإدخال…
+menu.layout.already_added	✅ %s v%s — مضافة مسبقًا
+menu.layout.in_list	جميع متغيرات Ergopti نشطة v%s ✅
+menu.layout.install_first	ثبّت الحزمة أولًا
+menu.layout.install_version	%s تثبيت Ergopti (%s) v%s
+menu.layout.installed_system	تخطيط Ergopti مثبَّت (نطاق النظام) ✅
+menu.layout.installed_user	تخطيط Ergopti مثبَّت (نطاق المستخدم) ✅
+menu.layout.installed_version	Ergopti (%s) v%s — محدَّث ✅
+menu.layout.layout_auto	— بدون تغيير —
+menu.layout.layout_on_pause	التخطيط عند إيقاف البرنامج
+menu.layout.layout_on_resume	التخطيط عند تشغيل البرنامج
+menu.layout.logo_custom	أيقونة مخصصة
+menu.layout.logo_default	الأيقونة الافتراضية
+menu.layout.no_bundle	لم يُعثر على حزمة Ergopti
+menu.layout.off	❌ التخطيط مُعطَّل (انقر للتفعيل)
+menu.layout.on	✅ التخطيط مُفعَّل (انقر للتعطيل)
+menu.layout.open_prefs	فتح إعدادات لوحة المفاتيح…
+menu.layout.pause_layout_enabled	تغيير التخطيط عند الإيقاف / الاستئناف
+menu.layout.pause_layout_section	التخطيط عند الإيقاف / الاستئناف
+menu.layout.replace	تحويل مفتاح إلى مفتاح ★
+menu.layout.scope_system	النظام
+menu.layout.scope_user	المستخدم
+menu.layout.title	🌐 تخطيط لوحة المفاتيح
+menu.layout.update_list	ترقية القائمة النشطة v%s → v%s
+menu.layout.update_list_fail	فشل التحديث — راجع وحدة التحكم.
+menu.layout.update_list_install_first	ترقية القائمة النشطة إلى v%s (ثبّت v%s أولًا)
+menu.layout.update_list_ok	تم تحديث قائمة مصادر الإدخال.
+menu.layout.update_version	تحديث Ergopti (%s) v%s → v%s
+menu.llm.about	حول Ergopti AI
+menu.llm.about_body	Ergopti AI — اقتراحات لوحة مفاتيح ذكية\nالخادم الخلفي: Ollama (محلي)\nالإصدار: 1.0
+menu.llm.active_model_label	النموذج النشط: 
+menu.llm.add_custom_model	إضافة نموذج مخصص
+menu.llm.add_model_entry	➕ إضافة نموذج مخصص…
+menu.llm.after_hotstring	اقتراح بعد انتهاء فقاعة السلسلة النصية
+menu.llm.api_add_entry	+ إضافة API…
+menu.llm.api_dialog_title	ErgoptiPlus — نقطة نهاية API
+menu.llm.api_edit_entry	تعديل API المحدّد…
+menu.llm.api_no_entry	لم يتم تكوين أي نقطة نهاية API
+menu.llm.api_prompt_model	اسم الطراز:
+menu.llm.api_prompt_name	الاسم (مثل «مفتاح OpenAI الخاص بي»):
+menu.llm.api_prompt_provider	معرّف المزوّد ({1}):
+menu.llm.api_prompt_token	رمز / مفتاح API (مخفي):
+menu.llm.api_prompt_url	عنوان URL الأساسي:
+menu.llm.api_providers_unavailable	تعذر تحميل قائمة مزودي واجهة برمجة التطبيقات، لذا لا يمكن إضافة أي إدخال. تحقق من وجود الملف api_providers.json وصحته.
+menu.llm.api_remove_confirm_body	سيتم حذف رمز API المحفوظ بشكل دائم.
+menu.llm.api_remove_confirm_title	حذف إدخال API "%s"؟
+menu.llm.api_remove_entry	إزالة API المحدّد
+menu.llm.api_unreachable_body	"%s" لم يستجب — تحقق من الرمز والعنوان والنموذج.
+menu.llm.api_unreachable_title	إدخال API غير قابل للوصول
+menu.llm.api_validated_body	"%s" استجاب بنجاح.
+menu.llm.api_validated_title	إدخال API جاهز
+menu.llm.arrows	أسهم
+menu.llm.arrows_only	أسهم فقط
+menu.llm.auto_raise_temp	  ↳ رفع درجة الحرارة تلقائيًا (+0.1 لكل اقتراح)
+menu.llm.backend_api_suffix	مزوّد عن بُعد
+menu.llm.backend_default_model	↺ النموذج الافتراضي للخادم الخلفي (%s)
+menu.llm.backend_mlx_suffix	موصى به (Apple Silicon أصلي)
+menu.llm.backend_ollama_suffix	قياسي
+menu.llm.backend_title	AI engine (Backend): 
+menu.llm.backend_unknown	Unknown
+menu.llm.browse_col_family	العائلة
+menu.llm.browse_col_name	الاسم
+menu.llm.browse_col_params	المعاملات
+menu.llm.browse_col_ram	الذاكرة
+menu.llm.browse_col_speed	السرعة
+menu.llm.browse_col_status	الحالة
+menu.llm.browse_col_type	النوع
+menu.llm.browse_models_entry	🔍 تصفح جميع النماذج…
+menu.llm.browse_models_filter	تصفية:
+menu.llm.browse_models_title	ErgoptiPlus — نماذج LLM
+menu.llm.browse_pick	اختر هذا النموذج
+menu.llm.browse_status_available	⬇ متاح
+menu.llm.browse_status_installed	✅ مثبت
+menu.llm.btn_download	تنزيل
+menu.llm.caps_header	الإمكانيات
+menu.llm.context_length_label	حجم السياق: %s حرف أخير
+menu.llm.context_length_prompt	عدد الأحرف السابقة للتحليل:
+menu.llm.custom_model_title	نموذج مخصص
+menu.llm.debounce_label	وقت الخمول قبل الاقتراح: %s
+menu.llm.debounce_prompt	تأخير الخمول قبل التوليد (بالميلي ثانية، مثال: 600):
+menu.llm.delete_model_body	هل تريد فعلًا حذف النموذج "%s" من الذاكرة المؤقتة المحلية؟
+menu.llm.delete_model_cache	🗑️ حذف هذا النموذج من الذاكرة المؤقتة
+menu.llm.delete_model_title	حذف النموذج؟
+menu.llm.digits	أرقام
+menu.llm.digits_only	أرقام فقط
+menu.llm.disable_password_fields	تعطيل في حقول كلمة المرور
+menu.llm.disable_url_bars	تعطيل في أشرطة عنوان المتصفح
+menu.llm.disabled_in_label	مُعطَّل في %d تطبيق%s
+menu.llm.disabled_in_prefix	مُعطَّل في
+menu.llm.display_menu_title	العرض
+menu.llm.download_failed	فشل التنزيل
+menu.llm.download_model	⬇️ تنزيل هذا النموذج
+menu.llm.download_window_lost	نافذة التنزيل غير موجودة
+menu.llm.download_window_lost_body	التنزيل لا يزال جارٍ في الخلفية.
+menu.llm.empty_model_id	معرّف فارغ — لا إجراء.
+menu.llm.exclude_from_ai	استثناء من التوليد التلقائي للذكاء الاصطناعي…
+menu.llm.generation_menu_title	إعدادات التوليد
+menu.llm.hf_token_label	🔑 رمز HuggingFace: %s
+menu.llm.hf_token_set	✅ مُهيَّأ
+menu.llm.hf_token_unset	❌ غير مُهيَّأ
+menu.llm.hw_disk	مساحة القرص: %s جيجابايت
+menu.llm.hw_download	التنزيل: %s جيجابايت
+menu.llm.hw_header	المتطلبات (%s)
+menu.llm.hw_ram	الذاكرة (RAM): %s جيجابايت
+menu.llm.indent_label	مسافة بادئة للاقتراح المحدد
+menu.llm.indent_none	بدون مسافة بادئة
+menu.llm.indent_space	مسافة
+menu.llm.indent_spaces	مسافات
+menu.llm.inline_autotype	✍️ كتابة تلقائية مضمنة (نمط Copilot)
+menu.llm.instant_on_word_end	اقتراح فوري عند نهاية الكلمة
+menu.llm.launch_download_prompt	هل تريد بدء التنزيل؟
+menu.llm.max_words_label	الحد الأقصى من الكلمات لكل اقتراح: %s
+menu.llm.max_words_prompt	الحد الأقصى لعدد الكلمات في الاقتراح (0 = غير محدود):
+menu.llm.min_words_label	الحد الأدنى من الكلمات لكل اقتراح: %s
+menu.llm.min_words_prompt	الحد الأدنى لعدد الكلمات في كل اقتراح:
+menu.llm.mlx_model_hint	معرّف HuggingFace لنموذج MLX، مثال: mlx-community/Qwen2.5-3B-Instruct-4bit
+menu.llm.mlx_port_label	منفذ خادم MLX: %s
+menu.llm.mlx_port_prompt	منفذ خادم MLX المحلي الخاص بـ Ergopti (1024-65535). الافتراضي: %s.
+menu.llm.mlx_port_title	منفذ خادم MLX
+menu.llm.model_backend	الخادم الخلفي: %s
+menu.llm.model_change_title	تغيير النموذج
+menu.llm.model_date	تاريخ التحديث: %s
+menu.llm.model_label	النموذج: %s
+menu.llm.model_params_active	المعاملات (النشطة): %s
+menu.llm.model_params_total	المعاملات (الإجمالي): %s
+menu.llm.model_source	المصدر: %s
+menu.llm.model_speed	السرعة التقديرية: %s رمز/ث
+menu.llm.model_tags	العلامات: %s
+menu.llm.model_type	النوع: %s
+menu.llm.my_models	🛠️ نماذجي
+menu.llm.nav_label	التنقل بين الاقتراحات (↑/← و ↓/→)
+menu.llm.nav_menu_title	التنقل
+menu.llm.nav_modifiers_prompt	مفتاح (مفاتيح) التعديل للتنقل بالأسهم (مثال: ctrl, alt — اتركه فارغًا = أسهم فقط):
+menu.llm.no_model	لا نموذج (مُعطَّل)
+menu.llm.no_model_none	لا شيء
+menu.llm.not_installed_body	هذا النموذج غير مثبَّت بعد.
+menu.llm.num_predictions_label	عدد الاقتراحات: %s
+menu.llm.off	❌ الذكاء الاصطناعي معطّل (انقر للتفعيل)
+menu.llm.ollama_model_hint	معرّف نموذج Ollama، مثال: qwen2.5:1.5b أو llama3.2:3b
+menu.llm.ollama_port_label	منفذ خادم Ollama: %s
+menu.llm.ollama_port_prompt	منفذ خادم Ollama المحلي (1024-65535). الافتراضي: 11434.
+menu.llm.ollama_port_title	منفذ خادم Ollama
+menu.llm.on	✅ الذكاء الاصطناعي مفعّل (انقر للتعطيل)
+menu.llm.params_active	المعاملات (النشطة): 
+menu.llm.params_total	المعاملات (الإجمالي): 
+menu.llm.prediction_count_label	%d اقتراح%s
+menu.llm.profile_already_ok_msg	النموذج: %s\n%s\n\nالموجّه الحالي:\n%s\n\nالموجّه الموصى به:\n%s\n\nهذا الملف الشخصي مناسب بالفعل لهذا النموذج.
+menu.llm.profile_change_msg	النموذج: %s\n%s\n\nالموجّه الحالي:\n%s\n\nالموجّه الموصى به:\n%s\n\nأكّد لتطبيق الموجّه الموصى به.
+menu.llm.profile_power_warning	⚠️  ملف تعريف قوي\n\nموصى به:  %s\nمحدد:  %s\n\nقد لا يكون النموذج قوياً بما يكفي.
+menu.llm.remove_model_body	هل تريد إزالة النموذج المخصص "%s" من قائمتك؟ لن يُحذف النموذج من النظام.
+menu.llm.remove_model_title	إزالة هذا النموذج؟
+menu.llm.remove_user_model	🗑️ إزالة من نماذجي
+menu.llm.reset_label	  ↳ إعادة تعيين (الافتراضي: %s)
+menu.llm.reset_on_nav	مسح السياق عند النقر / التنقل
+menu.llm.select_model	👉 اختر هذا النموذج
+menu.llm.shortcut_prompt	الصيغة: معدّلات+مفتاح (مثال: cmd+alt+p)\nالمعدّلات المتاحة: cmd, alt, ctrl, shift\naتركه فارغًا للتعطيل
+menu.llm.show_all_at_once	عرض جميع الاقتراحات دفعةً واحدة (تنبؤات متعددة)
+menu.llm.show_download_window	📥 جاري التنزيل — إظهار النافذة
+menu.llm.show_info_bar	إظهار شريط المعلومات (النموذج وزمن الاستجابة)
+menu.llm.show_streaming	عرض كل اقتراح بالبث (رمز بعد رمز)
+menu.llm.specs_header	المواصفات
+menu.llm.temperature_label	درجة الحرارة (الإبداعية): %s
+menu.llm.temperature_prompt	مستوى الإبداع (0.0 = حتمي، 1.0 = إبداعي):
+menu.llm.thinking_model_info	  ↳ معلومة: نموذج تفكيري (استدلال مخفي)
+menu.llm.title	✨ الذكاء الاصطناعي
+menu.llm.toggle_disable	تعطيل اقتراحات الذكاء الاصطناعي
+menu.llm.toggle_enable	تفعيل اقتراحات الذكاء الاصطناعي
+menu.llm.trigger_menu_title	تشغيل الذكاء الاصطناعي
+menu.llm.trigger_shortcut_label	الاختصار للتوليد اليدوي: %s
+menu.llm.trigger_shortcut_title	اختصار توليد الذكاء الاصطناعي
+menu.llm.unlimited	غير محدود
+menu.llm.val_label	اختر الاقتراح رقم (%s)
+menu.llm.val_modifiers_prompt	مفتاح (مفاتيح) التعديل للاختيار بالأرقام (مثال: ctrl, alt — اتركه فارغًا = أرقام فقط):
+menu.llm.warning_install_ollama	📥 ثبّت Ollama الآن
+menu.metrics.colors_by_source	    ↳ تلوين حسب مصدر الإدخال
+menu.metrics.disabled_in_label	مُعطَّل في %d تطبيق%s
+menu.metrics.encrypt_toggle	تشفير السجلات على القرص (الأمان)
+menu.metrics.exclude_apps	استثناء تطبيقات من مسجّل لوحة المفاتيح…
+menu.metrics.filter_private	تجاهل التصفح الخاص
+menu.metrics.filter_secure	تجاهل حقول كلمة المرور
+menu.metrics.filter_sysauth	تجاهل مربعات حوار مصادقة النظام
+menu.metrics.include_realtime	    ↳ تضمين الرسم البياني الآني
+menu.metrics.off	❌ المقاييس مُعطَّلة (انقر للتفعيل)
+menu.metrics.on	✅ المقاييس مُفعَّلة (انقر للتعطيل)
+menu.metrics.open_encryptor	  ↳ فتح أداة التشفير المستقلة…
+menu.metrics.privacy_header	فلاتر الخصوصية
+menu.metrics.reset_wpm_position	    ↳ إعادة تعيين الموضع
+menu.metrics.shortcut_apps_title	اختصار وقت التطبيق
+menu.metrics.shortcut_item	    ↳ الاختصار: %s
+menu.metrics.shortcut_none	لا اختصار
+menu.metrics.shortcut_prefix	  ↳ الاختصار: 
+menu.metrics.shortcut_prompt	الصيغة: معدّلات+مفتاح (مثال: ctrl+m)\nاتركه فارغًا للتعطيل
+menu.metrics.shortcut_typing_title	اختصار مقاييس الكتابة
+menu.metrics.show_apps	عرض الوقت لكل تطبيق
+menu.metrics.show_typing	عرض مقاييس الكتابة
+menu.metrics.show_wpm_menubar	WPM في شريط القائمة
+menu.metrics.show_wpm_widget	أداة WPM العائمة
+menu.metrics.title	📊 مقاييس
+menu.metrics.wpm_unit	كلمة/دقيقة
+menu.paths.menu_item	مجلد الإعدادات…
+menu.paths.pick_prompt	اختر مجلد الإعدادات
+menu.paths.window_title	مجلد الإعدادات
+menu.profiles.auto_detect	✨ الكشف التلقائي عن أفضل ملف شخصي
+menu.profiles.clone_builtin	✏️ استنساخ وتعديل هذا الملف الشخصي…
+menu.profiles.copy_suffix	(نسخة)
+menu.profiles.create_profile	إنشاء ملف شخصي مخصص…
+menu.profiles.custom_profile_label	ملف شخصي مخصص
+menu.profiles.delete_confirm_body	سيُحذف هذا الملف الشخصي المخصص نهائيًا.
+menu.profiles.delete_confirm_title	حذف "%s"؟
+menu.profiles.delete_profile	🗑️ حذف…
+menu.profiles.edit_profile	✏️ تعديل…
+menu.profiles.header_custom_profiles	الملفات الشخصية المخصصة
+menu.profiles.header_default_profiles	الملفات الشخصية الافتراضية
+menu.profiles.not_recommended	  ⚠️ غير موصى به (التفكير)
+menu.profiles.override_active_app_with_current	➕ استخدم الملف الشخصي الحالي للتطبيق النشط
+menu.profiles.per_app_overrides	🪟 ملفات تعريف لكل تطبيق
+menu.profiles.profile_label_prefix	الملف الشخصي: %s
+menu.profiles.prompt_label	اسم الملف الشخصي:
+menu.profiles.prompt_system_single	موجّه النظام (توليد واحد):
+menu.profiles.recommended_profile	الملف الشخصي الموصى به
+menu.profiles.recommended_unavailable_body	لا يمكن تطبيق الكشف التلقائي في هذا السياق
+menu.profiles.recommended_unavailable_title	الملف الشخصي الموصى به غير متاح
+menu.profiles.shortcut_prefix	الاختصار: %s
+menu.profiles.shortcut_prompt	الصيغة: معدّلات+مفتاح (مثال: cmd+shift+b)\nالمعدّلات المتاحة: cmd, alt, ctrl, shift\naتركه فارغًا للتعطيل
+menu.profiles.shortcut_title	اختصار الملف الشخصي
+menu.profiles.use_profile	استخدام هذا الملف الشخصي
+menu.reloading	جارٍ إعادة التحميل…
+menu.reloading_files	الملفات تغيّرت — جارٍ إعادة التحميل…
+menu.script_control.title	التحكم بالنص البرمجي
+menu.script_ready	النص البرمجي جاهز!
+menu.settings.context_length_title	حجم السياق
+menu.settings.default_indicator	 (افتراضي)
+menu.settings.delay_prompt	وقت الإيقاف المطلوب (بالميلي ثانية) قبل استعلام الذكاء الاصطناعي:\n\n(اتركه فارغًا للإعادة: %s ms)\n(اكتب "Never" أو -1 لتعطيل التوليد التلقائي)
+menu.settings.delay_title	وقت الانتظار
+menu.settings.disabled	مُعطَّل
+menu.settings.indent_space	 مسافة
+menu.settings.indent_spaces	 مسافات
+menu.settings.max_words_prompt	الحد الأقصى لعدد الكلمات لكل اقتراح (0 = غير محدود):
+menu.settings.max_words_title	الحد الأقصى من الكلمات لكل اقتراح
+menu.settings.min_words_title	الحد الأدنى من الكلمات لكل اقتراح
+menu.settings.never	أبدًا
+menu.settings.no_modifier	بدون مُعدِّل
+menu.settings.reset_instruction	\n\n(اتركه فارغًا للإعادة: %s)
+menu.settings.temperature_prompt	مستوى الإبداعية (من 0.0 إلى 1.0):
+menu.settings.temperature_title	درجة الحرارة
+menu.shortcuts.alt_add	[+ إضافة اختصار Alt+…]
+menu.shortcuts.alt_group	⎇ اختصارات Alt
+menu.shortcuts.altgr_symbol	AltGr + رمز
+menu.shortcuts.chatgpt_url_item	   ↳ تعديل رابط ChatGPT…
+menu.shortcuts.ctrl_add	[+ إضافة اختصار Ctrl+…]
+menu.shortcuts.ctrl_group	^ اختصارات Ctrl
+menu.shortcuts.ctrl_shift_add	[+ إضافة اختصار Ctrl+Shift+…]
+menu.shortcuts.ctrl_shift_group	^⇧ اختصارات Ctrl+Shift
+menu.shortcuts.edit_personal_info	   ↳ تعديل المعلومات الشخصية…
+menu.shortcuts.group_accented	اختصارات الأحرف المشكَّلة
+menu.shortcuts.group_modifiers	تركيبات المُعدِّلات
+menu.shortcuts.key_at_hash	@ / #
+menu.shortcuts.key_layer_scroll	Layer + Scroll
+menu.shortcuts.off	❌ الاختصارات مُعطَّلة (انقر للتفعيل)
+menu.shortcuts.on	✅ الاختصارات مُفعَّلة (انقر للتعطيل)
+menu.shortcuts.personal	اختصارات شخصية
+menu.shortcuts.right_opt_back	Right Opt + ⌫ → %s
+menu.shortcuts.right_opt_escape	Right Opt + Esc → %s
+menu.shortcuts.right_opt_return	Right Opt + Return → %s
+menu.shortcuts.script_shortcuts	اختصارات إدارة النص البرمجي
+menu.shortcuts.submenu_cmd	اختصارات Cmd
+menu.shortcuts.submenu_ctrl	اختصارات Ctrl
+menu.shortcuts.title	🎯 اختصارات
+menu.shortcuts.win_add	[+ إضافة اختصار Win+…]
+menu.shortcuts.win_group	⊞ اختصارات Win
+menu.shortcuts.wrap_group_angle	أقواس زاوية وأقواس زخرفية
+menu.shortcuts.wrap_group_braces	أقواس معقوفة أفقية
+menu.shortcuts.wrap_group_brackets	الأقواس
+menu.shortcuts.wrap_group_cjk	أقواس CJK
+menu.shortcuts.wrap_group_markdown	تمييز Markdown
+menu.shortcuts.wrap_group_other	رموز أخرى
+menu.shortcuts.wrap_group_quotes	علامات الاقتباس والفواصل العليا
+menu.shortcuts.wrap_symbols_add_custom	[+ إضافة رمز…]
+menu.shortcuts.wrap_symbols_check_all	تحديد الكل
+menu.shortcuts.wrap_symbols_custom_label	مخصص
+menu.shortcuts.wrap_symbols_title	  ↳ رموز تحيط بالنص المحدد
+menu.shortcuts.wrap_symbols_uncheck_all	إلغاء تحديد الكل
+menu.tapholds.off	❌ نقر-ضغط مُعطَّل (انقر للتفعيل)
+menu.tapholds.on	✅ نقر-ضغط مُفعَّل (انقر للتعطيل)
+menu.tapholds.title	⌨️ نقر-ضغط
+menu.updates.title	🔄 Updates
+metrics.shortcut_format_hint	الصيغة : mods+مفتاح  (مثال : ctrl+alt+m)\nالمعدِلات المتاحة : ctrl, alt, shift, win\nاترك فارغًا للتعطيل.
+metrics.shortcut_invalid_title	اختصار غير صالح
+metrics.shortcut_prompt_title	اختصار — {1}
+metrics.shortcut_register_error	تعذّر تسجيل الاختصار « {1} » : {2}
+metrics_apps.chooser_placeholder	فئة لـ %s
+metrics_apps.general_category	عام
+metrics_apps.new_category_create_subtext	إنشاء فئة جديدة
+metrics_apps.new_category_item	+ فئة جديدة…
+metrics_apps.new_category_prompt	اسم الفئة الجديدة لـ %s:
+metrics_apps.new_category_title	فئة جديدة
+metrics_apps.no_app_detected	تعذّر اكتشاف أيّ تطبيق.
+metrics_apps.rename_chooser_placeholder	الفئة المراد تغيير اسمها
+metrics_apps.rename_item	✎ إعادة تسمية فئة موجودة…
+metrics_apps.rename_prompt	الاسم الجديد للفئة "%s":
+metrics_apps.rename_subtext	ستُعاد تسمية جميع التطبيقات في هذه الفئة
+metrics_apps.rename_title	إعادة التسمية
+metrics_apps.score_error	يجب أن تكون الدرجة بين -2 و 2.
+metrics_apps.score_prompt	درجة الإنتاجية لـ %s\n(-2 مشتِّت جداً إلى 2 منتج جداً):
+metrics_apps.score_title	Score
+metrics_apps.title	مقاييس الكتابة
+metrics_apps.use_category_subtext	استخدام هذه الفئة
+metrics_apps.window_title	وقت التطبيقات
+mlx.deps_failed	فشل…
+mlx.deps_missing	تبعيات MLX مفقودة
+mlx.deps_missing_body	جارٍ التحضير التلقائي. يرجى إعادة المحاولة بعد دقائق.
+mlx.deps_preparing	جارٍ التحضير…
+mlx.deps_pty_write_failed	تعذّر كتابة ملف PTY wrapper.
+mlx.deps_step_bootstrap	تشغيل سكريبت التثبيت…
+mlx.deps_step_python	جارٍ تثبيت Python…
+mlx.deps_step_ready	محرك الذكاء الاصطناعي جاهز.
+mlx.deps_step_sync	جارٍ مزامنة تبعيات الذكاء الاصطناعي…
+mlx.deps_step_uv	جارٍ تثبيت uv…
+mlx.deps_step_venv	جارٍ إنشاء virtualenv محلي…
+mlx.deps_task_create_failed	تعذر إنشاء مهمة hs.task.
+mlx.deps_task_start_failed	تعذر بدء مهمة hs.task.
+mlx.download_cancelled	تم الإلغاء
+mlx.download_cancelled_body	تم مقاطعة تنزيل %s.
+mlx.download_failed	فشل MLX
+mlx.download_failed_body	تحقق من السجلات في النافذة.
+mlx.download_interrupted	تم مقاطعة التنزيل
+mlx.download_interrupted_body	توقفت عملية تنزيل %s أثناء إعادة التحميل.
+mlx.download_stalled	توقف تنزيل MLX
+mlx.download_subtitle	جارٍ جلب الأوزان من Hugging Face…
+mlx.download_title	جارٍ تنزيل نموذج MLX
+mlx.hf_connected	تم الاتصال بـ HuggingFace
+mlx.hf_connected_body	تم حفظ الرمز. يمكنك الآن تنزيل النماذج بشكل أسرع بكثير!
+mlx.hf_connection_failed	فشل الاتصال بـ HuggingFace
+mlx.hf_connection_failed_body	فشل الاتصال. تحقق من رمزك.
+mlx.hf_login_title	تسجيل الدخول إلى HuggingFace
+mlx.hf_page_opened	تم فتح صفحة النموذج في متصفحك
+mlx.init_subtitle	AI initialization in progress, please wait…
+mlx.init_title	Initializing the AI engine (MLX)
+mlx.install_subtitle	جارٍ تحضير تبعيات Python المحلية…
+mlx.install_title	جارٍ تثبيت محرك الذكاء الاصطناعي (MLX)
+mlx.launcher_failed	فشل تشغيل MLX
+mlx.launcher_failed_body	فشل المشغّل (الرمز %d).
+mlx.model_deleted	تم الحذف (MLX)
+mlx.model_incompatible	النموذج %s غير متوافق مع mlx-lm. يرجى اختيار نموذج آخر.
+mlx.model_installed	تم تثبيت نموذج MLX
+mlx.model_ready	%s جاهز!
+mlx.model_unavailable	نموذج MLX غير متوفر
+mlx.model_unavailable_body	النموذج %s غير متوافق مع MLX أو ليس لديه مستودع MLX مُهيَّأ
+mlx.open_source_failed	تعذر فتح صفحة HuggingFace
+mlx.source_not_found	المصدر غير موجود
+mlx.source_not_found_body	لم يتم العثور على مستودع MLX لهذا النموذج
+mlx.token_corrected	تم تصحيح الرمز
+mlx.token_corrected_body	تم استخدام الرمز الكامل من الحافظة
+mlx.token_detected	تم اكتشاف الرمز
+mlx.token_detected_body	تم استرداد الرمز من الحافظة
+mlx.token_missing	الرمز مفقود
+mlx.token_missing_body	لم يتم توفير رمز
+mlx.write_py_failed	تعذر كتابة سكريبت Python إلى /tmp
+mlx.write_sh_failed	تعذر كتابة سكريبت Bash إلى /tmp
+model_browser.col_family	العائلة
+model_browser.col_name	النموذج
+model_browser.col_params	المعاملات
+model_browser.col_ram	RAM
+model_browser.col_speed	السرعة
+model_browser.col_status	الحالة
+model_browser.col_type	النوع
+model_browser.count_label	{n} من {total} نماذج
+model_browser.no_models	لا يوجد نموذج يطابق بحثك.
+model_browser.search_placeholder	البحث عن نموذج…
+model_browser.select_hint	انقر نقرًا مزدوجًا على نموذج أو اضغط Enter لاستخدامه.
+model_browser.status_available	متاح
+model_browser.status_installed	مثبَّت
+model_browser.type_chat	دردشة
+model_browser.type_completion	إكمال
+model_browser.use_button	استخدام
+model_browser.window_title	كتالوج النماذج
+notify.all_features_disabled	تم تعطيل جميع الميزات
+notify.all_features_enabled	تم تفعيل جميع الميزات
+notify.clipboard	الحافظة
+notify.defaults_reset	تمت إعادة التعيين — جارٍ إعادة التحميل…
+notify.hotstrings	سلاسل نصية
+notify.llm_disabled	🔴 مُعطَّل
+notify.llm_enabled	🟢 مُفعَّل
+notify.llm_mlx_failures_body	خادم MLX لا يستجيب. تحقق من تحميل النموذج وتشغيل الخادم على المنفذ 8080.
+notify.llm_mlx_failures_title	تنبؤات LLM — فشل متكرر
+notify.llm_suggestions	اقتراحات الذكاء الاصطناعي
+notify.personal_info	معلومات شخصية
+notify.screenshot_copied	تم نسخ لقطة الشاشة
+notify.screenshot_saved	تم حفظ لقطة الشاشة
+notify.screenshot_saved_path	محفوظ: %s
+notify.screenshot_title	لقطة شاشة
+notify.script_control	التحكم بالنص البرمجي
+notify.word_expander_prefix	موسّع كلمات: %s
+ollama.cancelled_title	تم الإلغاء
+ollama.daemon_fail	تعذّر تشغيل عفريت Ollama.
+ollama.delete_error	النموذج: %s\n%s
+ollama.delete_fail_title	فشل حذف Ollama
+ollama.deleted_title	تم الحذف (Ollama)
+ollama.deps_failed	فشل…
+ollama.deps_step_checking	جارٍ التحقق من Ollama…
+ollama.deps_step_installing	جارٍ تثبيت Ollama…
+ollama.deps_step_ready	خادم Ollama جاهز.
+ollama.deps_step_starting	جارٍ بدء خادم Ollama…
+ollama.deps_task_create_failed	تعذر إنشاء مهمة hs.task.
+ollama.deps_task_start_failed	تعذر بدء مهمة hs.task.
+ollama.download_cancelled	تم إلغاء تنزيل Ollama
+ollama.download_error	خطأ في تنزيل %s
+ollama.download_subtitle	جارٍ جلب الأوزان من Ollama Hub…
+ollama.download_title	جارٍ تنزيل نموذج Ollama
+ollama.downloading	جارٍ تنزيل نموذج Ollama…
+ollama.fail_title	خطأ في Ollama
+ollama.install_subtitle	جارٍ تحضير خادم Ollama المحلي…
+ollama.install_title	جارٍ تثبيت محرك الذكاء الاصطناعي (Ollama)
+ollama.model_deleted	تم حذف النموذج: %s
+ollama.model_installed_title	تم تثبيت نموذج Ollama
+ollama.model_ready	%s جاهز!
+ollama.model_repair	يبدو النموذج تالفاً. جارٍ محاولة إعادة التنزيل: %s
+ollama.model_repair_title	جارٍ إصلاح نموذج Ollama
+ollama.not_detected_body	يرجى تثبيت Ollama والمحاولة مرة أخرى.
+ollama.not_detected_title	لم يتم اكتشاف Ollama
+ollama.service_disconnected	توقفت خدمة Ollama عن الاستجابة.
+ollama.service_ready	خدمة Ollama جاهزة ✅
+ollama.service_stopped	خدمة Ollama متوقفة. جارٍ التشغيل…
+ollama.start_fail	تعذّر تشغيل الخدمة.
+ollama.starting_service	جارٍ تشغيل خدمة Ollama (%s/%s)…
+ollama.starting_title	جارٍ تشغيل Ollama
+ollama.upgrade_required_body	الإصدار المثبت من Ollama قديم جداً لهذا النموذج. يرجى تحديث Ollama يدوياً.
+ollama.upgrade_required_title	مطلوب تحديث Ollama
+onboarding.back	← رجوع
+onboarding.btn.cancel	إلغاء
+onboarding.btn.no	لا
+onboarding.btn.ok	موافق
+onboarding.btn.yes	نعم
+onboarding.done.body	تم حفظ الإعدادات. سيتم إعادة تحميل البرنامج الآن.
+onboarding.done.title	اكتمل الإعداد!
+onboarding.error.title	ErgoptiPlus — خطأ
+onboarding.error.write_failed	فشل كتابة ملف الإعدادات.
+onboarding.finish	إنهاء ✓
+onboarding.gestures.desc	يتيح دعم إيماءات لوحة التتبع — إجراءات مخصصة تُشغَّل بالتمرير واللمس والقرص.
+onboarding.gestures.open_settings	فتح إعدادات لوحة اللمس
+onboarding.gestures.open_settings_hint	يفتح الإعدادات ← البلوتوث والأجهزة ← لوحة اللمس ← الإيماءات المتقدمة. يقبل كل فتحة اختصار Ctrl + Win + Shift + F1..F10.
+onboarding.gestures.register_auto	الإعداد التلقائي
+onboarding.gestures.register_auto_hint	يملأ تلقائيًا كل فتحات الإيماءات في إعدادات Windows نيابةً عنك. لا يتطلب صلاحيات المسؤول.
+onboarding.gestures.register_deferred	سيتم إعداد الإيماءات عند التشغيل التالي.
+onboarding.gestures.register_failed	فشل الإعداد التلقائي. يرجى استخدام الطريقة اليدوية أدناه.
+onboarding.gestures.register_manual	الطريقة اليدوية
+onboarding.gestures.register_manual_hint	يفتح درسًا تعليميًا خطوة بخطوة واختصارًا بنقرة واحدة إلى صفحة إعدادات لوحة اللمس حتى تتمكن من ربط كل إيماءة يدويًا.
+onboarding.gestures.register_section	يجب إعداد الإيماءات في إعدادات Windows (البلوتوث والأجهزة ← لوحة اللمس ← الإيماءات المتقدمة):
+onboarding.gestures.register_success	تم إعداد الإيماءات في إعدادات Windows.
+onboarding.gestures.title	ErgoptiPlus — الإيماءات
+onboarding.language.placeholder	اختر لغتك…
+onboarding.layout.desc	يُفعِّل محاكاة تخطيط لوحة المفاتيح (الطبقة الأساسية + AltGr) وسلاسل Ergopti النصية.
+onboarding.layout.no	استخدام تخطيط النظام
+onboarding.layout.title	ErgoptiPlus — محاكاة لوحة مفاتيح Ergopti
+onboarding.layout.yes	محاكاة تخطيط Ergopti
+onboarding.magic_key.choose_freely	أي حرف يمكن أن يكون مُشغِّلاً — نادر بما يكفي لتجنب التفعيل الخاطئ، وسهل الوصول إليه.
+onboarding.magic_key.desc	الحرف الذي يُشغِّل السلاسل النصية.
+onboarding.magic_key.option_blackstar	★ — موصى به (مفتاح مخصص في تخطيط Ergopti)
+onboarding.magic_key.option_custom	إدخال مخصص
+onboarding.magic_key.option_semicolon	; — يُوصى بها على QWERTY
+onboarding.magic_key.option_star	* — موصى به (يعمل على جميع التخطيطات)
+onboarding.magic_key.option_ugrave	ù — يُوصى بها على AZERTY
+onboarding.magic_key.title	ErgoptiPlus — مفتاح السحر
+onboarding.metrics.desc	يتيح جمع مقاييس الكتابة.\n\nما يتتبعه ErgoptiPlus:\n• سرعة الكتابة (WPM) لكل جلسة ولكل تطبيق وعبر الزمن؛\n• أكثر المفاتيح والكلمات وn-grams والضغط المريح استخدامًا؛\n• تبادل اليدين وحِمل الأصابع وثنائيات الإصبع الواحد؛\n• الوقت المُمضى في كل تطبيق (بأسلوب RescueTime) مع تقييم الإنتاجية؛\n• الاتجاهات والخرائط الحرارية ولوحات تحكم مفصلة في نافذة المقاييس.
+onboarding.metrics.title	ErgoptiPlus — مقاييس الكتابة
+onboarding.next	التالي →
+onboarding.no	لا
+onboarding.warning_label	تحذير
+onboarding.welcome.heading	اللغة
+onboarding.welcome.title	ErgoptiPlus — إعداد
+onboarding.yes	نعم
+paths_editor.btn_browse	استعراض…
+paths_editor.btn_cancel	إلغاء
+paths_editor.btn_reset	إعادة التعيين
+paths_editor.btn_save	حفظ وإعادة التحميل
+paths_editor.heading	مجلد الإعدادات
+paths_editor.label_config_dir	مجلد الإعدادات
+paths_editor.save_failed	تعذر حفظ مجلد الإعدادات. قد يكون الملف للقراءة فقط أو قيد الاستخدام من قبل برنامج آخر.
+paths_editor.save_failed_title	فشل الحفظ
+paths_editor.subtitle	يتم تحميل جميع الملفات الشخصية (الاختصارات، السلاسل النصية…) من هذا المجلد.
+paths_editor.tag_default	افتراضي
+paths_editor.tag_modified	معدّل
+personal_info.field_credit_card	بطاقة ائتمان
+personal_info.field_firstname	الاسم الأول
+personal_info.field_phone_digits	الهاتف (أرقام فقط)
+personal_info.field_phone_formatted	الهاتف (مُنسَّق)
+personal_info.field_ssn	رقم الهوية الوطنية
+personal_info.saved_body	يمكنك إغلاق هذه النافذة.
+personal_info.saved_title	✓ تم الحفظ
+profiles.created_title	تم إنشاء الملف الشخصي
+profiles.updated_title	تم تحديث الملف الشخصي
+prompt_editor.default_label	ملف شخصي مخصص
+prompt_editor.help_text	ستُستبدل كتلة {context} بالنص المحدد. ستُستبدل كتلة {n} بعدد التنبؤات. التنسيق (دفعات): اطلب من النموذج فصل كل اقتراح بـ ---.
+prompt_editor.insert_context	إدراج كتلة {context}
+prompt_editor.insert_language	إدراج كتلة {language}
+prompt_editor.insert_max_words	إدراج كتلة {max_words}
+prompt_editor.insert_min_words	إدراج كتلة {min_words}
+prompt_editor.insert_n	إدراج كتلة {n}
+prompt_editor.label_mode	وضع الطلب
+prompt_editor.label_name	اسم الملف الشخصي
+prompt_editor.label_prompt	الموجّه النظامي
+prompt_editor.mode.batch	دفعات — تنبؤات على دفعات (نماذج كبيرة)
+prompt_editor.mode.parallel	قياسي — تنبؤات متوازية
+prompt_editor.placeholder_prompt	هذا نص، تابعه: {context}
+prompt_editor.title_edit	تعديل الملف الشخصي
+prompt_editor.title_new	ملف شخصي جديد
+script_control.paused	النص البرمجي مُعلَّق
+script_control.resumed	تمت استعادة النص البرمجي
+sfbsreduction.bu	À + ★ → BU
+sfbsreduction.comma	الفاصلة تقلل ثنائيات الإصبع الواحد
+sfbsreduction.ecirc	Ê تقلل ثنائيات الإصبع الواحد
+sfbsreduction.egrave	È تقلل ثنائيات الإصبع الواحد
+sfbsreduction.ié	IE تقلل ثنائيات IE/EI
+sg_actions.activity_simulation	🖱 محاكاة النشاط (مانع السكون)
+sg_actions.alt_tab_monitor	Alt-Tab (شاشة)
+sg_actions.app_expose	◱ عرض نوافذ التطبيق
+sg_actions.app_previous	⇥ ← Alt+Tab — التطبيق السابق
+sg_actions.app_switcher	⇥ Alt+Tab — التطبيق السابق
+sg_actions.app_window_previous	⇥ ◱ ← Alt+Tab — النافذة السابقة
+sg_actions.arrow_down	↓ سهم لأسفل
+sg_actions.arrow_left	← سهم لليسار
+sg_actions.arrow_right	→ سهم لليمين
+sg_actions.arrow_up	↑ سهم لأعلى
+sg_actions.backspace	⌫ مسح للخلف
+sg_actions.brightness_down	☀ - تقليل السطوع
+sg_actions.brightness_up	☀ + زيادة السطوع
+sg_actions.caps_lock	⇪ CapsLock
+sg_actions.caps_word	⇪★ CapsWord
+sg_actions.close_window	◱ × إغلاق النافذة
+sg_actions.copy	⎘ نسخ
+sg_actions.ctrl_backspace	⌫ Ctrl+Backspace
+sg_actions.ctrl_delete	⌦ Ctrl+Delete
+sg_actions.cut	⎘ قص
+sg_actions.delete	⌦ حذف
+sg_actions.desktop_close	▢ × إغلاق سطح المكتب
+sg_actions.desktop_new	▢ + سطح مكتب جديد
+sg_actions.desktop_next	▢ → سطح المكتب التالي
+sg_actions.desktop_prev	▢ ← سطح المكتب السابق
+sg_actions.doc_end	⤓ نهاية المستند
+sg_actions.doc_start	⤒ بداية المستند
+sg_actions.enter	↵ إدخال
+sg_actions.escape	⎋ Escape
+sg_actions.find	🔍 بحث
+sg_actions.fullscreen	📺 ملء الشاشة
+sg_actions.left_click_toggle	🖱 L نقر أيسر (ضغط مستمر)
+sg_actions.line_down	↕ ↓ السطر التالي
+sg_actions.line_end	⇥ نهاية السطر
+sg_actions.line_start	⇤ بداية السطر
+sg_actions.line_up	↕ ↑ السطر السابق
+sg_actions.lock_screen	🔒 قفل الشاشة
+sg_actions.lookup	🔍 تعريف الكلمة
+sg_actions.maximize	🔲 تكبير
+sg_actions.microsoft_bold	𝐁 Ctrl+B Microsoft (→ Ctrl+G)
+sg_actions.minimize_all	◱ تصغير الكل
+sg_actions.mission_control	▢ Mission Control
+sg_actions.mute	🔇 كتم/إلغاء الكتم
+sg_actions.nav_back	← رجوع (تنقل)
+sg_actions.nav_forward	→ تقدم (تنقل)
+sg_actions.none	∅ لا شيء
+sg_actions.notification_center	🔔 الإشعارات
+sg_actions.ocr_screenshot	📷 لقطة شاشة OCR (Win+Shift+T)
+sg_actions.one_shot_shift	⇧ OneShotShift
+sg_actions.open_config	⚙ الإعدادات
+sg_actions.open_console	▤ وحدة التحكم
+sg_actions.open_error_log	📄 Error log
+sg_actions.open_hotstrings_editor	⌨ محرر السلاسل النصية
+sg_actions.open_key_history	سجل المفاتيح
+sg_actions.open_list_vars	حالة المتغيرات
+sg_actions.open_logs_folder	📁 مجلد السجلات
+sg_actions.open_metrics_apps	📊 إحصاءات التطبيقات
+sg_actions.open_metrics_typing	📊 إحصاءات الكتابة
+sg_actions.open_paths_editor	📂 محرر المسارات
+sg_actions.open_personal_hotstrings	👤 سلاسل نصية شخصية
+sg_actions.open_personal_info	👤 معلومات شخصية
+sg_actions.open_personal_shortcuts	👤 ملف الاختصارات الشخصية
+sg_actions.open_script_source	🛠 الكود المصدري
+sg_actions.open_today_log	📄 سجل اليوم
+sg_actions.open_url	🌐 فتح رابط (قابل للتخصيص)
+sg_actions.open_window_spy	Window Spy
+sg_actions.para_next	¶ ↓ الفقرة التالية
+sg_actions.para_prev	¶ ↑ الفقرة السابقة
+sg_actions.paste	⎘ لصق
+sg_actions.paste_plain	⎘ لصق بدون تنسيق
+sg_actions.pick_color	🎨 لون HEX تحت المؤشر
+sg_actions.redo	↪ إعادة
+sg_actions.right_click_toggle	🖱 R نقر أيمن (ضغط مستمر)
+sg_actions.screen_capture	📸 لقطة انتقائية (Win+Shift+S)
+sg_actions.screen_capture_instant	📸 لقطة فورية (نافذة)
+sg_actions.screen_record	⏺ تسجيل الشاشة
+sg_actions.screenshot_fullscreen_clipboard	📸 🖥 نسخ الشاشة
+sg_actions.screenshot_fullscreen_save	📸 🖥 حفظ الشاشة
+sg_actions.screenshot_region_clipboard	📸 ⬚ نسخ منطقة
+sg_actions.screenshot_region_save	📸 ⬚ حفظ منطقة
+sg_actions.screenshot_window_clipboard	📸 ⊞ نسخ النافذة
+sg_actions.screenshot_window_save	📸 ⊞ حفظ النافذة
+sg_actions.script_pause_toggle	⏸/▶ تعليق / استئناف
+sg_actions.script_quit	✕ إنهاء
+sg_actions.script_reload	↻ إعادة تحميل
+sg_actions.script_save_reload	↻ حفظ وإعادة تحميل
+sg_actions.search_web	🔍 بحث على الويب (قابل للتخصيص)
+sg_actions.sel_down	✎ ↓ تحديد لأسفل
+sg_actions.sel_left	✎ ← تحديد لليسار
+sg_actions.sel_right	✎ → تحديد لليمين
+sg_actions.sel_up	✎ ↑ تحديد لأعلى
+sg_actions.sel_word_next	✎ W → تحديد الكلمة التالية
+sg_actions.sel_word_prev	✎ W ← تحديد الكلمة السابقة
+sg_actions.select_all	⬚ تحديد الكل
+sg_actions.select_line	☰ تحديد السطر
+sg_actions.sg_order.header.alt	#اختصارات ⎇ (Alt)
+sg_actions.sg_order.header.cmd	#اختصارات ⌘ (Cmd)
+sg_actions.sg_order.header.cmd_shift	#اختصارات ⌘⇧ (Cmd+Shift)
+sg_actions.sg_order.header.ctrl	#اختصارات ^ (Ctrl)
+sg_actions.sg_order.header.ctrl_shift	#اختصارات ^⇧ (Ctrl+Shift)
+sg_actions.sg_order.header.cursor	#المؤشر والنص
+sg_actions.sg_order.header.debug	#تشخيص
+sg_actions.sg_order.header.edition	#تحرير
+sg_actions.sg_order.header.files	#الملفات
+sg_actions.sg_order.header.grp_app	Ergopti
+sg_actions.sg_order.header.grp_input	إدخال
+sg_actions.sg_order.header.grp_media	الوسائط
+sg_actions.sg_order.header.grp_system	النظام
+sg_actions.sg_order.header.grp_text	نص
+sg_actions.sg_order.header.grp_windows	النوافذ والمساحات
+sg_actions.sg_order.header.hs_ctrl	#اختصارات ^ (Ctrl) — macOS
+sg_actions.sg_order.header.hs_ctrl_shift	#اختصارات ^⇧ (Ctrl+Shift) — macOS
+sg_actions.sg_order.header.hs_option	#اختصارات ⌥ (Option) — macOS
+sg_actions.sg_order.header.keys	#مفاتيح
+sg_actions.sg_order.header.media	#وسائط
+sg_actions.sg_order.header.mouse_nav	#الفأرة والتنقل
+sg_actions.sg_order.header.navigation	#تنقل
+sg_actions.sg_order.header.screenshot	#لقطات الشاشة
+sg_actions.sg_order.header.script	#إدارة النص البرمجي
+sg_actions.sg_order.header.selection	#تحديد النص
+sg_actions.sg_order.header.spaces	#مساحات / أسطح المكتب
+sg_actions.sg_order.header.system	#النظام
+sg_actions.sg_order.header.system_actions	#إجراءات النظام
+sg_actions.sg_order.header.tabs	#علامات التبويب
+sg_actions.sg_order.header.tapholds	#إجراءات Tap-Hold
+sg_actions.sg_order.header.ui	#الواجهة
+sg_actions.sg_order.header.win	#اختصارات ⊞ (Win)
+sg_actions.sg_order.header.windows	#نوافذ
+sg_actions.snap_left	◧ ← تثبيت يسارًا
+sg_actions.snap_right	◨ → تثبيت يمينًا
+sg_actions.space	␣ مسافة
+sg_actions.space_next	▢ → المساحة التالية
+sg_actions.space_prev	▢ ← المساحة السابقة
+sg_actions.spotlight_mouse	🔦 تسليط الضوء على الفأرة
+sg_actions.surround_parens	() إحاطة بأقواس
+sg_actions.tab	⇥ Tab
+sg_actions.tab_close	⧉ × إغلاق علامة التبويب
+sg_actions.tab_new	⧉ + علامة تبويب جديدة
+sg_actions.tab_next	⧉ → علامة التبويب التالية
+sg_actions.tab_prev	⧉ ← علامة التبويب السابقة
+sg_actions.take_note	📝 تدوين ملاحظة
+sg_actions.task_view	▢ عرض المهام
+sg_actions.teleport_mouse	🖱 نقل الفأرة
+sg_actions.titlecase_selection	Aa حالة العنوان
+sg_actions.toggle_capslock	⇪ تبديل CapsLock
+sg_actions.track_next	⏭ المقطع التالي
+sg_actions.track_play	⏯ تشغيل/إيقاف مؤقت
+sg_actions.track_prev	⏮ المقطع السابق
+sg_actions.undo	↩ تراجع
+sg_actions.uppercase_selection	AA أحرف كبيرة / صغيرة
+sg_actions.vol_down	🔊 - خفض الصوت
+sg_actions.vol_up	🔊 + رفع الصوت
+sg_actions.win_app_next	◱ → النافذة التالية (نفس التطبيق)
+sg_actions.win_app_prev	◱ ← النافذة السابقة (نفس التطبيق)
+sg_actions.win_next	◱ → النافذة التالية
+sg_actions.win_prev	◱ ← النافذة السابقة
+sg_actions.word_next	W → الكلمة التالية
+sg_actions.word_prev	W ← الكلمة السابقة
+sg_labels.script_altgr_backspace	AltGr + ⌫
+sg_labels.script_altgr_delete	AltGr + ⌦
+sg_labels.script_altgr_enter	AltGr + إدخال
+sg_labels.script_altgr_escape	AltGr + Esc
+shortcut_utils.format_hint	استخدم تنسيق mods+مفتاح، مثلاً cmd+shift+b
+shortcut_utils.format_invalid	تنسيق غير صالح
+shortcuts.agrave	جميع اختصارات مفتاح À تُقابل اختصارات 
+shortcuts.altgrcapslock.backspace	"AltGr" + "CapsLock" = مسح للخلف
+shortcuts.altgrcapslock.capslock	"AltGr" + "CapsLock" = CapsLock
+shortcuts.altgrcapslock.capsword	"AltGr" + "CapsLock" = CapsWord
+shortcuts.altgrcapslock.ctrlbackspace	"AltGr" + "CapsLock" = Ctrl + مسح للخلف
+shortcuts.altgrcapslock.ctrldelete	"AltGr" + "CapsLock" = Ctrl + حذف
+shortcuts.altgrcapslock.delete	"AltGr" + "CapsLock" = حذف
+shortcuts.altgrcapslock.enter	"AltGr" + "CapsLock" = إدخال
+shortcuts.altgrcapslock.escape	"AltGr" + "CapsLock" = خروج
+shortcuts.altgrcapslock.oneshotshift	"AltGr" + "CapsLock" = OneShotShift
+shortcuts.altgrcapslock.tab	"AltGr" + "CapsLock" = Tab
+shortcuts.altgrlalt.backspace	"AltGr" + "LAlt" = مسح للخلف
+shortcuts.altgrlalt.capslock	"AltGr" + "LAlt" = CapsLock
+shortcuts.altgrlalt.capsword	"AltGr" + "LAlt" = CapsWord
+shortcuts.altgrlalt.ctrlbackspace	"AltGr" + "LAlt" = Ctrl + مسح للخلف
+shortcuts.altgrlalt.ctrldelete	"AltGr" + "LAlt" = Ctrl + حذف
+shortcuts.altgrlalt.delete	"AltGr" + "LAlt" = حذف
+shortcuts.altgrlalt.enter	"AltGr" + "LAlt" = إدخال
+shortcuts.altgrlalt.escape	"AltGr" + "LAlt" = خروج
+shortcuts.altgrlalt.oneshotshift	"AltGr" + "LAlt" = OneShotShift
+shortcuts.altgrlalt.tab	"AltGr" + "LAlt" = Tab
+shortcuts.color_copied	تم نسخ اللون: %s
+shortcuts.color_picker_result	لون المؤشر هو {1}.\n\nتم حفظه في الحافظة : {2}
+shortcuts.color_picker_title	لون البكسل
+shortcuts.copy_path_notif	تم نسخ المسار: %s
+shortcuts.eacute	جميع اختصارات مفتاح É تُقابل اختصارات 
+shortcuts.ecirc	جميع اختصارات مفتاح Ê تُقابل اختصارات 
+shortcuts.egrave	جميع اختصارات مفتاح È تُقابل اختصارات 
+shortcuts.gethexvalue	Win + X (heX) = نسخ لون HEX للبكسل تحت المؤشر إلى الحافظة
+shortcuts.gpt	Win + G(PT) = فتح ChatGPT (رابط قابل للتخصيص)
+shortcuts.keep_awake_off	☕ تعطيل المنبّه
+shortcuts.keep_awake_on	☕ المنبّه نشط — Ctrl+M للتعطيل
+shortcuts.label_at_hash	لقطة شاشة فورية
+shortcuts.label_cmd_shift_v	لصق بدون تنسيق
+shortcuts.label_cmd_star	Cmd + S (يحافظ على المعدِل)
+shortcuts.label_ctrl_a	تحديد السطر
+shortcuts.label_ctrl_capslock	تبديل CapsLock
+shortcuts.label_ctrl_d	فتح التنزيلات
+shortcuts.label_ctrl_e	فتح Finder
+shortcuts.label_ctrl_g	فتح ChatGPT (الرابط محدد في القائمة)
+shortcuts.label_ctrl_h	لقطة شاشة تفاعلية إلى الحافظة
+shortcuts.label_ctrl_i	فتح الإعدادات
+shortcuts.label_ctrl_l	قفل الشاشة
+shortcuts.label_ctrl_m	منع وضع السكون
+shortcuts.label_ctrl_o	إحاطة السطر بأقواس
+shortcuts.label_ctrl_p	تبديل المرآة / سطح المكتب الموسع
+shortcuts.label_ctrl_period	فتح منتقي الرموز التعبيرية
+shortcuts.label_ctrl_quote	تمييز الماوس
+shortcuts.label_ctrl_s	فتح / نسخ المسار
+shortcuts.label_ctrl_t	نقل الماوس إلى شاشة أخرى
+shortcuts.label_ctrl_u	تبديل الأحرف الكبيرة / الصغيرة
+shortcuts.label_ctrl_w	تبديل حالة العنوان / الأحرف الصغيرة
+shortcuts.label_ctrl_x	نسخ اللون السداسي للبكسل تحت المؤشر
+shortcuts.label_layer_scroll	الصوت
+shortcuts.label_wrap_text	كتابة رمز يُحيط التحديد
+shortcuts.laltcapslock.backspace	"LAlt" + "CapsLock" = مسح للخلف
+shortcuts.laltcapslock.capslock	"LAlt" + "CapsLock" = CapsLock
+shortcuts.laltcapslock.capsword	"LAlt" + "CapsLock" = CapsWord
+shortcuts.laltcapslock.ctrlbackspace	"LAlt" + "CapsLock" = Ctrl + مسح للخلف
+shortcuts.laltcapslock.ctrldelete	"LAlt" + "CapsLock" = Ctrl + حذف
+shortcuts.laltcapslock.delete	"LAlt" + "CapsLock" = حذف
+shortcuts.laltcapslock.enter	"LAlt" + "CapsLock" = إدخال
+shortcuts.laltcapslock.escape	"LAlt" + "CapsLock" = خروج
+shortcuts.laltcapslock.oneshotshift	"LAlt" + "CapsLock" = OneShotShift
+shortcuts.laltcapslock.tab	"LAlt" + "CapsLock" = Tab
+shortcuts.microsoftbold	Ctrl + B يجعل النص غامقًا في تطبيقات Microsoft (مثل Ctrl + G)
+shortcuts.move	Win + M(ove) = محاكاة النشاط بتحريك الفأرة عشوائيًا. كرّر الاختصار أو أعد تحميل النص البرمجي للإيقاف
+shortcuts.no_active_window	لا توجد نافذة نشطة
+shortcuts.no_other_monitor	لم يتم اكتشاف شاشة أخرى
+shortcuts.opendownloads	Win + D(ownloads) = فتح مجلد التنزيلات
+shortcuts.pixel_read_error	تعذّر قراءة لون البكسل
+shortcuts.saved	تم الحفظ: %s
+shortcuts.screen	Win + H (screensHot) = لقطة شاشة (يُشغّل Win + Shift + S)
+shortcuts.screeninstant	المفتاح يسار 1 = لقطة فورية للنافذة النشطة، محفوظة في الصور مع طابع زمني
+shortcuts.screenocr	Win + C (OCR) = لقطة شاشة مع استخراج النص (Win + Shift + T)
+shortcuts.screenshot_copied	تم نسخ لقطة الشاشة إلى الحافظة
+shortcuts.screenshot_title	لقطة شاشة
+shortcuts.search	Win + S(earch) = البحث عن التحديد على الإنترنت. في المستكشف، يُنسخ مسار الملف المحدد
+shortcuts.shortcut_format_hint	الصيغة: معدّلات+مفتاح (مثال: cmd+alt+p)\nالمعدّلات المتاحة: cmd, alt, ctrl, shift\naتركه فارغًا للتعطيل
+shortcuts.shortcut_label	الاختصار
+shortcuts.spotlightmouse	Win + ' = تمييز الفأرة بحلقة صفراء
+shortcuts.surroundwithparentheses	Win + O = إحاطة السطر بأقواس
+shortcuts.takenote	Win + N(ote) = فتح ملف لتدوين الملاحظات
+shortcuts.teleportmouse	Win + T(eleport) = نقل الفأرة إلى منتصف الشاشة الأخرى (دوري)
+shortcuts.titlecase	Win + W = التحويل إلى حالة العنوان (رسملة أول حرف من كل كلمة)
+shortcuts.uppercase	Win + U(ppercase) = تبديل التحديد بين الأحرف الكبيرة والصغيرة
+shortcuts.wincapslock	Win + "CapsLock" = CapsLock
+startup.manifest_missing	خطأ في بدء التشغيل: الملف _generated/features_manifest.ahk مفقود أو تالف.\n\nشغّل `npm run build:manifest` من مجلد المشروع، ثم أعد تشغيل السكريبت.
+startup.manifest_title	ErgoptiPlus — ملف manifest مفقود
+tap_hold.action.disable	المفتاح الأصلي
+tap_hold.disable_all	تعطيل الكل
+tap_hold.group.alt_gr	AltGr
+tap_hold.group.backspace	مسافة للخلف
+tap_hold.group.caps_lock	CapsLock
+tap_hold.group.delete	Delete
+tap_hold.group.enter	إدخال
+tap_hold.group.escape	إلغاء
+tap_hold.group.left_alt	LAlt
+tap_hold.group.left_ctrl	LCtrl
+tap_hold.group.left_shift	LShift
+tap_hold.group.right_ctrl	RCtrl
+tap_hold.group.right_shift	RShift
+tap_hold.group.space	مسافة
+tap_hold.group.tab	Tab
+tap_hold.group.win	Win
+tap_hold.hold.alt	Alt
+tap_hold.hold.alt_gr	AltGr
+tap_hold.hold.ctrl	Ctrl
+tap_hold.hold.nav_layer	طبقة nav.
+tap_hold.hold.none	المفتاح الأصلي
+tap_hold.hold.shift	Shift
+tap_hold.hold.win	Win
+tap_hold.picker.hold	Hold → %s
+tap_hold.picker.tap	Tap → %s
+tap_hold.picker.title_prefix	إجراء النقر — 
+tap_hold.reset_defaults	إعادة تعيين القيم الافتراضية
+tap_hold.tap.none	المفتاح الأصلي
+terminators.label_close_paren	) : قوس إغلاق
+terminators.label_enter	⏎ : إدخال
+terminators.label_equal	= : علامة المساواة
+terminators.label_nbsp	⍽ : مسافة غير قابلة للكسر
+terminators.label_nnbsp	⍽ : مسافة ضيقة غير قابلة للكسر
+token_prompt.create_link	👉 انقر هنا لإنشاء رمز
+token_prompt.instruction	الصق رمز HuggingFace الخاص بك (hf_...) لتسريع التنزيلات.
+token_prompt.label	رمز HuggingFace:
+token_prompt.no_token	ليس لديك رمز؟
+token_prompt.placeholder	hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx...
+token_prompt.title	🔐 تسجيل الدخول إلى HuggingFace
+token_prompt.validate	تحقق
+token_prompt.window_title	تسجيل الدخول إلى HuggingFace
+ui_apps.axis_chars	الأحرف
+ui_apps.axis_speed	حرف / دقيقة تركيز
+ui_apps.boxplot_scale	المقياس: 0 ← {max}
+ui_apps.boxplot_tip	{n} جلسة · الوسيط {med} (Q1 {q1}, Q3 {q3})
+ui_apps.btn_add_app	تصنيف تطبيق…
+ui_apps.btn_close	إغلاق
+ui_apps.btn_compare	مقارنة ↔
+ui_apps.btn_count_awake	حساب الإبقاء على الاستيقاظ
+ui_apps.btn_mode_chars	الأحرف
+ui_apps.btn_mode_time	الوقت
+ui_apps.btn_refresh	تحديث
+ui_apps.cat_edit_tooltip	تعديل الفئة
+ui_apps.chart_active_ratio	نسبة النشاط عبر الأيام
+ui_apps.chart_activity_cal	تقويم النشاط (آخر 12 شهرًا)
+ui_apps.chart_annotated_strip	الجدول الزمني المُحاشى
+ui_apps.chart_app_switches	تبديلات التطبيقات
+ui_apps.chart_burst_hist	مخطط الانفجارات
+ui_apps.chart_cat_evolution	تطور الفئات
+ui_apps.chart_daily_evolution	التطور اليومي
+ui_apps.chart_day_strip	شريط اليوم
+ui_apps.chart_hour_weekday	الساعة × يوم الأسبوع
+ui_apps.chart_prod_vs_dist	الإنتاجي مقابل المشتِّت
+ui_apps.chart_session_durations	مدد الجلسات حسب التطبيق
+ui_apps.chart_speed_by_cat	سرعة الكتابة حسب الفئة (CPM)
+ui_apps.chart_speed_by_hour	سرعة الكتابة حسب الساعة (CPM)
+ui_apps.chart_time_by_cat	الوقت حسب الفئة
+ui_apps.chart_timeline	التطور الزمني
+ui_apps.chart_title_day	تطور اليوم
+ui_apps.chart_title_period	تطور الفترة
+ui_apps.chart_top7	أفضل 7 تطبيقات (الوقت)
+ui_apps.chart_top8	أفضل 8 تطبيقات: الوقت مقابل الأحرف
+ui_apps.chart_top_days	أفضل الأيام
+ui_apps.chart_top_sessions	أفضل الجلسات
+ui_apps.chart_top_switch_pairs	أفضل أزواج التبديل
+ui_apps.chart_top_windows	أفضل النوافذ
+ui_apps.chart_wake_sleep	أوقات الاستيقاظ والنوم (لوحة المفاتيح)
+ui_apps.cmp_active_time	وقت النشاط
+ui_apps.cmp_chars	الأحرف
+ui_apps.cmp_focus_time	وقت التركيز
+ui_apps.cmp_productivity	الإنتاجية
+ui_apps.cmp_sessions	الجلسات
+ui_apps.cmp_switches	التبديلات
+ui_apps.cmp_window	الحالية: {cur} ‹{period}› · السابقة: {prev}
+ui_apps.col_app	التطبيق
+ui_apps.col_app_name	التطبيق
+ui_apps.col_category	الفئة
+ui_apps.col_chars	الأحرف
+ui_apps.col_day	اليوم
+ui_apps.col_density	الكثافة
+ui_apps.col_duration	المدة
+ui_apps.col_focus	التركيز
+ui_apps.col_focus_time	وقت التركيز
+ui_apps.col_from	من
+ui_apps.col_hold	الضغط المستمر
+ui_apps.col_hs_pct	% سلاسل نصية
+ui_apps.col_latency	زمن الاستجابة
+ui_apps.col_sessions	الجلسات
+ui_apps.col_share	الحصة
+ui_apps.col_switches	التبديلات
+ui_apps.col_to	إلى
+ui_apps.col_top_dests	أفضل الوجهات
+ui_apps.col_typing_pct	% الكتابة
+ui_apps.col_window	النافذة
+ui_apps.compare_title	مقارنة مع الفترة السابقة
+ui_apps.detail_global_activity	إجمالي النشاط المسجَّل
+ui_apps.detail_productivity_score	نقاط محسوبة من فئاتك
+ui_apps.ds_active_ratio	نسبة النشاط (%)
+ui_apps.ds_bursts	دفعات
+ui_apps.ds_chars	الأحرف
+ui_apps.ds_first_key	أول ضغطة مفتاح
+ui_apps.ds_focus_h	التركيز (س)
+ui_apps.ds_focus_time	وقت التركيز
+ui_apps.ds_last_key	آخر ضغطة مفتاح
+ui_apps.ds_speed	السرعة (حرف / دقيقة تركيز)
+ui_apps.ds_switches	التبديلات
+ui_apps.empty_activity	لا يوجد نشاط مسجل لهذه الفترة.
+ui_apps.empty_app_switches	لا يوجد تبديل في هذه الفترة.
+ui_apps.empty_boxplot	عدد الجلسات غير كافٍ لرسم مخطط الصندوق (≥ 4 لكل تطبيق).
+ui_apps.empty_comparator	اختر فترة محدودة لتفعيل المقارنة.
+ui_apps.empty_day	لم يتم اختيار يوم.
+ui_apps.empty_days	لا يوجد يوم مسجل.
+ui_apps.empty_period	لا توجد بيانات لهذه الفترة.
+ui_apps.empty_sessions	لم يتم اكتشاف أي جلسة.
+ui_apps.empty_switches	لا توجد تبديلات في هذه الفترة.
+ui_apps.empty_windows	لم يتم تجميع أي عنوان نافذة بعد.
+ui_apps.goal_prompt	الهدف اليومي بدقائق التركيز النشط:
+ui_apps.goal_reached	تم تحقيق الهدف اليوم ✓
+ui_apps.goal_remaining	{pct}% متبقية لتحقيق الهدف
+ui_apps.h2_active_time	الوقت النشط
+ui_apps.h2_app_hopping	التنقل بين التطبيقات
+ui_apps.h2_autorepeat	التكرار التلقائي
+ui_apps.h2_battery	البطارية
+ui_apps.h2_best_hour	أفضل ساعة
+ui_apps.h2_burst_record	رقم قياسي للانفجار
+ui_apps.h2_context_volume	حجم السياق
+ui_apps.h2_daily_goal	الهدف اليومي
+ui_apps.h2_density	الكثافة
+ui_apps.h2_depth	متوسط العمق
+ui_apps.h2_dominant_cat	الفئة السائدة
+ui_apps.h2_finger_streak	تتالي الإصبع
+ui_apps.h2_first_last	الأول / الأخير
+ui_apps.h2_focus_index	مؤشر التركيز
+ui_apps.h2_focus_latency	زمن استجابة التركيز
+ui_apps.h2_keep_awake	منع السكون
+ui_apps.h2_layouts	التخطيطات المستخدمة
+ui_apps.h2_lock_vs_sleep	قفل مقابل سكون
+ui_apps.h2_locks	أحداث القفل
+ui_apps.h2_long_sessions	الجلسات الطويلة
+ui_apps.h2_longest_burst	أطول انفجار
+ui_apps.h2_longest_session	أطول جلسة
+ui_apps.h2_max_cascade	أقصى تسلسل
+ui_apps.h2_most_errors	التطبيق الأكثر أخطاءً
+ui_apps.h2_muted	الصوت مكتوم
+ui_apps.h2_night_wakeups	الاستيقاظ الليلي
+ui_apps.h2_passive_system	سكون النظام
+ui_apps.h2_pivot_app	التطبيق المحوري
+ui_apps.h2_productivity	مؤشر الإنتاجية
+ui_apps.h2_record_day	يوم الرقم القياسي
+ui_apps.h2_screen_time	وقت الشاشة
+ui_apps.h2_session_record	رقم قياسي للجلسة
+ui_apps.h2_sessions	الجلسات
+ui_apps.h2_slowest_recovery	أبطأ تعافٍ
+ui_apps.h2_spaces	المساحات
+ui_apps.h2_streak_chars	تتالي الأحرف ≥ 1k
+ui_apps.h2_streak_focus	تتالي التركيز ≥ 30 دقيقة
+ui_apps.h2_top_trio	أفضل ثلاثة
+ui_apps.h2_wifi_changes	تغييرات الشبكة اللاسلكية
+ui_apps.kpi_app_days_90	أيام التطبيق ≥ 90 دقيقة
+ui_apps.kpi_app_switches	تبديلات التطبيقات
+ui_apps.kpi_awake_excluded	مستبعد من الإحصائيات (معطّل)
+ui_apps.kpi_awake_included	مدرج في الإحصائيات
+ui_apps.kpi_best_hour_score	متوسط النتيجة {score} (-2 إلى 2)
+ui_apps.kpi_bursts_count	خلال {n} دفعة
+ui_apps.kpi_car_per_min	حرف / دقيقة تركيز
+ui_apps.kpi_cascades_period	{n} سلسلة في الفترة
+ui_apps.kpi_chars_in_a_row	أحرف متتالية
+ui_apps.kpi_day_best	في {date}
+ui_apps.kpi_focus_taken	خلال {n} استحواذ على التركيز
+ui_apps.kpi_hopping_detail	تبديلات / دقيقة تركيز
+ui_apps.kpi_in_app	في {name}
+ui_apps.kpi_lock_sleep_cumul	{dur} تراكميًا
+ui_apps.kpi_lock_vs_sleep	قفل / سكون
+ui_apps.kpi_never_active	لم يُفعَّل أبدًا
+ui_apps.kpi_never_reached	لم يُبلَغ أبدًا
+ui_apps.kpi_night_wakes	استيقاظ بين 0 و6 صباحًا
+ui_apps.kpi_no_backslash_out	لا يوجد تبديل صادر
+ui_apps.kpi_no_burst	لا توجد دفعة
+ui_apps.kpi_no_data	لا توجد بيانات
+ui_apps.kpi_no_day_data	لا توجد بيانات يومية
+ui_apps.kpi_no_enough_errors	أخطاء غير كافية
+ui_apps.kpi_no_enough_typing	كتابة غير كافية
+ui_apps.kpi_no_focus	تركيز غير كافٍ
+ui_apps.kpi_no_focus_tracked	لا يوجد تركيز متتبع
+ui_apps.kpi_no_keystrokes	لا توجد ضغطات مفاتيح في الفترة
+ui_apps.kpi_no_layout	لم يُسجَّل أي تخطيط
+ui_apps.kpi_no_lock	لم يُكتشف أي قفل
+ui_apps.kpi_no_long_session	لا توجد جلسة طويلة
+ui_apps.kpi_no_mobility	لا توجد حركة
+ui_apps.kpi_no_mute	لم يُكتم الصوت أبدًا
+ui_apps.kpi_no_record	لا يوجد رقم قياسي في الفترة
+ui_apps.kpi_no_repeat	لا يوجد تكرار
+ui_apps.kpi_no_session	لا توجد جلسة
+ui_apps.kpi_no_switch	لا يوجد تبديل
+ui_apps.kpi_not_measured	لم يُقَس بعد
+ui_apps.kpi_pct_focus_time	{pct}% من وقت التركيز
+ui_apps.kpi_productive	منتج {p}% · محايد {n}% · تشتيت {d}%
+ui_apps.kpi_session_mean	متوسط {dur}
+ui_apps.kpi_sleep_intact	النوم سليم
+ui_apps.kpi_space_switches	تبديلات المسافات
+ui_apps.kpi_streak_chars	أيام متتالية ≥ 1000 حرف
+ui_apps.kpi_streak_focus	أيام متتالية ≥ 30 دقيقة نشاط
+ui_apps.kpi_switches_between	بين تبديلين ({n} تبديل)
+ui_apps.kpi_top_layout	الأعلى: {name}
+ui_apps.kpi_towards_apps	نحو {n} تطبيق مختلف
+ui_apps.kpi_wifi_switches	تبديلات الشبكة
+ui_apps.label_categories	الفئات:
+ui_apps.label_date	في:
+ui_apps.label_days	الأيام:
+ui_apps.label_period	الفترة:
+ui_apps.lbl_switches	التبديلات:
+ui_apps.lbl_top_wifi	أفضل شبكة WiFi:
+ui_apps.lbl_unlocks	فتح القفل:
+ui_apps.loading_data	جارٍ تحميل البيانات...
+ui_apps.modal_activity_hour	النشاط حسب الساعة
+ui_apps.modal_app_title	التطبيق
+ui_apps.modal_backspace_pct	{pct}% من الأحرف
+ui_apps.modal_chart_label	الأحرف
+ui_apps.modal_density	{n} حرف/دقيقة
+ui_apps.modal_destinations	الوجهات
+ui_apps.modal_hs_ai	السلاسل النصية والذكاء الاصطناعي
+ui_apps.modal_hs_line	السلاسل النصية: {n} حرفًا ({pct}%)
+ui_apps.modal_layouts	التخطيطات المستخدمة
+ui_apps.modal_llm_line	الذكاء الاصطناعي: {n} حرفًا ({pct}%)
+ui_apps.modal_longest_session	الأطول {dur}
+ui_apps.modal_pct_focus	{pct}% من التركيز
+ui_apps.modal_record_burst	أفضل دفعة CPM: {n}
+ui_apps.modal_record_cascade	سلاسل مسح للخلف: {n}
+ui_apps.modal_record_session	أطول جلسة: {dur}{chars}
+ui_apps.modal_records	الأرقام القياسية
+ui_apps.modal_total_chars	إجمالي الأحرف المكتوبة: {n}
+ui_apps.opt_period.all	الكل
+ui_apps.opt_period.day	يوم
+ui_apps.opt_period.month	آخر 30 يومًا
+ui_apps.opt_period.week	آخر 7 أيام
+ui_apps.opt_period.year	سنة
+ui_apps.prod_negative	تشتيت
+ui_apps.prod_neutral	محايد
+ui_apps.prod_positive	منتج
+ui_apps.row_tooltip	عرض تفاصيل {name}
+ui_apps.sub_speed_by_hour	أحرف لكل دقيقة تركيز، خلال الفترة النشطة
+ui_apps.tab_apps	التطبيقات وتعدد المهام
+ui_apps.tab_overview	نظرة عامة
+ui_apps.tab_system	النظام والسجلات
+ui_apps.tab_time	الوقت والإيقاع
+ui_apps.tab_typing	الكتابة والإنتاجية
+ui_apps.tile_backspaces	المسح للخلف
+ui_apps.tile_chars	الأحرف
+ui_apps.tile_focus	التركيز
+ui_apps.tile_focus_lat	زمن استجابة التركيز
+ui_apps.tile_sessions	الجلسات
+ui_apps.tile_typing	كتابة نشطة
+ui_apps.title	متتبع وقت التطبيقات
+ui_typing.apps_all	التطبيقات (اлкл)
+ui_typing.apps_none	اлتطبيقات (لا شيء)
+ui_typing.btn_apps_all	التطبيقات (الكل)
+ui_typing.btn_case_sensitive	حساس لحالة الأحرف
+ui_typing.btn_doublings_excluded	المضاعفات مستبعدة
+ui_typing.btn_doublings_included	مع التكرارات
+ui_typing.btn_reset	إعادة تعيين
+ui_typing.btn_restore_zoom	إعادة تعيين التكبير
+ui_typing.btn_toggle_hs_title	+ السلاسل النصية: تضيف أحرف السلاسل النصية إلى الإحصائيات. معطلة: ضغطات المفاتيح اليدوية فقط.
+ui_typing.btn_toggle_llm_title	+ الذكاء الاصطناعي: يضيف الأحرف المولدة بالذكاء الاصطناعي إلى الإحصائيات. معطل: ضغطات المفاتيح اليدوية فقط.
+ui_typing.calendar_active_days	أيام نشطة
+ui_typing.calendar_chars	أحرف
+ui_typing.calendar_day_fri	سب
+ui_typing.calendar_day_mon	إث
+ui_typing.calendar_day_wed	خم
+ui_typing.calendar_month_0	ين
+ui_typing.calendar_month_1	فب
+ui_typing.calendar_month_10	نو
+ui_typing.calendar_month_11	دي
+ui_typing.calendar_month_2	مر
+ui_typing.calendar_month_3	أب
+ui_typing.calendar_month_4	مي
+ui_typing.calendar_month_5	يو
+ui_typing.calendar_month_6	يل
+ui_typing.calendar_month_7	أغ
+ui_typing.calendar_month_8	سب
+ui_typing.calendar_month_9	أك
+ui_typing.calendar_no_keystrokes	لا ضغطات
+ui_typing.calendar_subtitle	آخر 12 شهرًا
+ui_typing.calendar_title	تقويم النشاط
+ui_typing.charmix_digits	Digits
+ui_typing.charmix_letters	Letters
+ui_typing.charmix_other	Other
+ui_typing.charmix_punct	Punctuation
+ui_typing.charmix_spaces	Spaces
+ui_typing.chart_title_activity_5min	اнشاط (مفاتيح / 5 دقائق)
+ui_typing.chart_title_precision_5min	اнدقة (٧) — عرض 5 دقائق
+ui_typing.col_acc	الدقة
+ui_typing.col_active_time	وقت اнشاط
+ui_typing.col_app	تطبيق
+ui_typing.col_chars	أحرف
+ui_typing.col_freq	التكرار النسبي ↕
+ui_typing.col_km	كم الإصبع ↕
+ui_typing.col_occ	التكرارات ↕
+ui_typing.col_rep	المكرر ↕
+ui_typing.col_seq	التسلسل ↕
+ui_typing.col_time	متوسط الوقت (ms) ↕
+ui_typing.col_wpm	ما يعادل WPM
+ui_typing.cpm_mode_ai	مع ذكاء اصطناعي
+ui_typing.cpm_mode_hs	مع HS
+ui_typing.cpm_mode_hs_ai	مع HS + ذكاء اصطناعي
+ui_typing.cpm_mode_manual	ضغطات يدوية فقط
+ui_typing.cpm_unit_output_chars	أحرف على الشاشة
+ui_typing.cpm_unit_raw_chars	أحرف خام مكتوبة
+ui_typing.dataset_ai	الذكاء الاصطناعي
+ui_typing.dataset_hs	سلاسل نصية
+ui_typing.dataset_manual	يدوي
+ui_typing.dataset_precision	الدقة (%)
+ui_typing.dataset_speed	السرعة
+ui_typing.dataset_touches_5min	ضغطات / 5 دقائق
+ui_typing.dataset_touches_h	ضغطات/ساعة
+ui_typing.day_0	الأحد
+ui_typing.day_1	الاثنين
+ui_typing.day_2	الثلاثاء
+ui_typing.day_3	الأربعاء
+ui_typing.day_4	الخميس
+ui_typing.day_5	الجمعة
+ui_typing.day_6	السبت
+ui_typing.errors_no_data	لا تصحيحات مسجلة لهذه الفترة.
+ui_typing.errors_table_bigram	ثنائي
+ui_typing.errors_table_errors	أخطاء
+ui_typing.errors_table_occ	تكرارات
+ui_typing.errors_table_rate	معدل
+ui_typing.finger.hand_l	ش
+ui_typing.finger.hand_r	ي
+ui_typing.finger.l_idx	السبابة ي
+ui_typing.finger.l_mid	الوسطى ي
+ui_typing.finger.l_pinky	الخنصر ي
+ui_typing.finger.l_ring	البنصر ي
+ui_typing.finger.l_thumb	الإبهام ي
+ui_typing.finger.r_idx	السبابة ش
+ui_typing.finger.r_mid	الوسطى ش
+ui_typing.finger.r_pinky	الخنصر ش
+ui_typing.finger.r_ring	البنصر ش
+ui_typing.finger.r_thumb	الإبهام ش
+ui_typing.h2_ai	الذكاء الاصطناعي
+ui_typing.h2_app_activity	النشاط حسب التطبيق
+ui_typing.h2_bigram_ergo	إرغونومية الثنائيات
+ui_typing.h2_char_mix	تركيبة الأحرف
+ui_typing.h2_doublings	التكرارات
+ui_typing.h2_error_bigrams	الثنائيات الأكثر تصحيحًا
+ui_typing.h2_finger_dist	مسافة الأصابع
+ui_typing.h2_health	الصحة والإرغونومية
+ui_typing.h2_hs	سلاسل نصية
+ui_typing.h2_hs_ai_prod	إنتاجية السلاسل النصية / الذكاء الاصطناعي
+ui_typing.h2_lexicon	المعجم
+ui_typing.h2_records	الأرقام القياسية الشخصية
+ui_typing.h2_rhythm	الإيقاع والانفجارات
+ui_typing.h2_sessions	الجلسات
+ui_typing.h2_speed	متوسط السرعة
+ui_typing.h2_trigram_ergo	إرغونومية الثلاثيات
+ui_typing.h3_activity_hourly	النشاط (ضغطات/ساعة)
+ui_typing.h3_keystroke_origin	مصدر الضغطات
+ui_typing.h3_precision	الدقة (%)
+ui_typing.h3_precision_hourly	الدقة (%) — عرض كل ساعة
+ui_typing.h3_speed	السرعة (WPM)
+ui_typing.heatmap_day_fri	جم
+ui_typing.heatmap_day_mon	إث
+ui_typing.heatmap_day_sat	سب
+ui_typing.heatmap_day_sun	أح
+ui_typing.heatmap_day_thu	خم
+ui_typing.heatmap_day_tue	ثل
+ui_typing.heatmap_day_wed	أر
+ui_typing.heatmap_hour_chars_abbrev	حرف
+ui_typing.heatmap_hour_no_keystrokes	لا ضغطات
+ui_typing.heatmap_hour_subtitle	خلال الفترة المحددة
+ui_typing.heatmap_hour_title	النشاط حسب الساعة واليوم
+ui_typing.heatmap_hour_total	إجمالي الأحرف
+ui_typing.key_caps	Caps
+ui_typing.key_enter	Enter
+ui_typing.key_esc	Esc
+ui_typing.key_shift	Shift
+ui_typing.key_tab	Tab
+ui_typing.key_tip_avg_dur	Avg. dur.:
+ui_typing.key_tip_freq	Freq.:
+ui_typing.key_tip_freq_total	Total freq.:
+ui_typing.label_burst_length_dist	Burst length distribution
+ui_typing.label_charmix_dist	Distribution (%s characters)
+ui_typing.label_finger_load_dist	Cumulative load per finger — ideal distribution ≈ 12.5% each
+ui_typing.label_from	من:
+ui_typing.label_to	إلى:
+ui_typing.label_word_length_dist	Length distribution (frequency-weighted)
+ui_typing.lbl_accepted	مقبول
+ui_typing.lbl_active_ratio	نسبة النشاط
+ui_typing.lbl_activity	النشاط
+ui_typing.lbl_ai_acceptance	قبول الذكاء الاصطناعي
+ui_typing.lbl_avg_delay	متوسط التأخير
+ui_typing.lbl_avg_duration	متوسط المدة
+ui_typing.lbl_avg_length	متوسط الطول
+ui_typing.lbl_bad_redir	إعادة توجيه سيئة
+ui_typing.lbl_best_day	أفضل يوم
+ui_typing.lbl_cascades	التسلسلات
+ui_typing.lbl_corrected_bigrams	الثنائيات المُصحَّحة
+ui_typing.lbl_digits	أرقام
+ui_typing.lbl_doublings	مضاعفات
+ui_typing.lbl_fastest_app	أسرع تطبيق
+ui_typing.lbl_focus_latency	زمن استجابة التركيز → أول ضغطة
+ui_typing.lbl_frequent_pair	الزوج الأكثر تكرارًا
+ui_typing.lbl_hand_balance	توازن اليد اليسرى / اليمنى
+ui_typing.lbl_layouts_used	التخطيطات المستخدمة
+ui_typing.lbl_letters	حروف
+ui_typing.lbl_long_sessions	الجلسات الطويلة
+ui_typing.lbl_longest_burst	أطول انفجار
+ui_typing.lbl_longest_chars	الأطول (أحرف)
+ui_typing.lbl_longest_session	أطول جلسة
+ui_typing.lbl_longest_time	الأطول (مدة)
+ui_typing.lbl_most_active_finger	الإصبع الأكثر نشاطًا
+ui_typing.lbl_others	أخرى
+ui_typing.lbl_passive_time	وقت سكون النظام
+ui_typing.lbl_punctuation	علامات الترقيم
+ui_typing.lbl_recovery_time	وقت التعافي
+ui_typing.lbl_redir	إعادة توجيه
+ui_typing.lbl_regularity	الانتظام (CV)
+ui_typing.lbl_roll_in	دحرجة داخلية
+ui_typing.lbl_roll_out	دحرجة خارجية
+ui_typing.lbl_same_finger_streak	تتالي نفس الإصبع
+ui_typing.lbl_same_hand_streak	تتالي نفس اليد
+ui_typing.lbl_saved	محفوظ
+ui_typing.lbl_scissors	مقصات
+ui_typing.lbl_sfbs_raw	SFB خام
+ui_typing.lbl_spaces	مسافات
+ui_typing.lbl_streak	التتالي
+ui_typing.lbl_time_saved	الوقت الموفَّر
+ui_typing.lbl_top_app	التطبيق الأكثر استخدامًا
+ui_typing.lbl_top_mod_held	المُعدِّل الأكثر ضغطًا
+ui_typing.lbl_top_word	الكلمة الأكثر استخدامًا
+ui_typing.lbl_total	الإجمالي
+ui_typing.lbl_total_active_time	إجمالي الوقت النشط
+ui_typing.lbl_total_bursts	إجمالي الانفجارات
+ui_typing.lbl_total_words	إجمالي الكلمات
+ui_typing.lbl_unique_words	كلمات فريدة
+ui_typing.lbl_via_ai	عبر الذكاء الاصطناعي
+ui_typing.lbl_via_hotstrings	عبر السلاسل النصية
+ui_typing.lbl_via_magic_key	عبر مفتاح ★
+ui_typing.lbl_worst_bigram	أسوأ ثنائية
+ui_typing.loading	جارٍ الحساب...
+ui_typing.loading_ellipsis	جارٍ الحساب…
+ui_typing.modal_apply	إغلاق وتطبيق
+ui_typing.modal_check_all	تحديد الكل
+ui_typing.modal_search_app	البحث عن تطبيق...
+ui_typing.modal_select_apps	تحديد التطبيقات
+ui_typing.modal_uncheck_all	إلغاء تحديد الكل
+ui_typing.month_0	يناير
+ui_typing.month_1	فبراير
+ui_typing.month_10	نوفمبر
+ui_typing.month_11	ديسمبر
+ui_typing.month_2	مارس
+ui_typing.month_3	أبريل
+ui_typing.month_4	مايو
+ui_typing.month_5	يونيو
+ui_typing.month_6	يوليو
+ui_typing.month_7	أغسطس
+ui_typing.month_8	سبتمبر
+ui_typing.month_9	أكتوبر
+ui_typing.no_app_found	لم يتم اлعثور عлى تطبيق
+ui_typing.no_data	لا بيانات
+ui_typing.not_found	غير موجود
+ui_typing.opt_pause.1000	توقفات > 1 ث
+ui_typing.opt_pause.10000	توقفات > 10 ث
+ui_typing.opt_pause.2000	توقفات > 2 ث
+ui_typing.opt_pause.20000	توقفات > 20 ث
+ui_typing.opt_pause.3000	توقفات > 3 ث
+ui_typing.opt_pause.30000	توقفات > 30 ث
+ui_typing.opt_pause.5000	توقفات > 5 ث
+ui_typing.opt_pause.60000	توقفات > دقيقة
+ui_typing.opt_pause.99999999	بلا فلتر
+ui_typing.opt_quick_range.	فترة…
+ui_typing.opt_quick_range.3m	آخر 3 أشهر
+ui_typing.opt_quick_range.6m	آخر 6 أشهر
+ui_typing.opt_quick_range.all	الكل
+ui_typing.opt_quick_range.last_hour	الساعة الأخيرة
+ui_typing.opt_quick_range.month	هذا الشهر
+ui_typing.opt_quick_range.today	اليوم
+ui_typing.opt_quick_range.week	هذا الأسبوع
+ui_typing.opt_quick_range.year	هذه السنة
+ui_typing.page_loading	جارٍ تحميل الواجهة...
+ui_typing.pinch_hint	ضم الأصابع (لوحة اللمس) للتكبير.
+ui_typing.precision_no_filter	بلا فلتر
+ui_typing.rep_doublings	مضاعفات
+ui_typing.rep_no_data	لا مضاعفات
+ui_typing.rep_table_bigram	ثنائي
+ui_typing.rep_table_manual	يدوي
+ui_typing.rep_table_total	المجموع
+ui_typing.rep_table_via_star	عبر ★
+ui_typing.search_close	إغلاق (Esc)
+ui_typing.search_label	بحث في الصفحة
+ui_typing.search_next	التالي (Enter)
+ui_typing.search_placeholder	بحث…
+ui_typing.search_prev	السابق (Shift+Enter)
+ui_typing.sfb_avoided	تجنب عبر HS
+ui_typing.sfb_avoided_none	0 تجنب عبر HS
+ui_typing.sfb_no_data	لا SFBs
+ui_typing.sfb_raw_count	SFBs خام
+ui_typing.sfb_table_finger	إصبع
+ui_typing.sfb_table_hand	يد
+ui_typing.sfb_table_pair	زوج
+ui_typing.signal_equilibre	Balanced
+ui_typing.signal_surveille	Monitored
+ui_typing.signal_vigilance	Alert
+ui_typing.tab_bigrams	ثنائيات
+ui_typing.tab_chars	الأحرف
+ui_typing.tab_heptagrams	سباعيات
+ui_typing.tab_hexagrams	سداسيات
+ui_typing.tab_keycodes	رموز المفاتيح
+ui_typing.tab_modifiers	المُعدِّلات
+ui_typing.tab_pentagrams	خماسيات
+ui_typing.tab_quadgrams	رباعيات
+ui_typing.tab_shortcut_bigrams	ثنائيات الاختصارات
+ui_typing.tab_shortcut_pentagrams	خماسيات الاختصارات
+ui_typing.tab_shortcut_quadgrams	رباعيات الاختصارات
+ui_typing.tab_shortcut_trigrams	ثلاثيات الاختصارات
+ui_typing.tab_shortcuts	الاختصارات
+ui_typing.tab_trigrams	ثلاثيات
+ui_typing.tab_word_bigrams	ثنائيات الكلمات
+ui_typing.tab_word_pentagrams	خماسيات الكلمات
+ui_typing.tab_word_quadgrams	رباعيات الكلمات
+ui_typing.tab_word_trigrams	ثلاثيات الكلمات
+ui_typing.tab_words	كلمات
+ui_typing.table_mode_mixed	مختلط
+ui_typing.table_mode_output	مخرجات الشاشة
+ui_typing.table_mode_raw	ضغطات خام
+ui_typing.title	مقاييس الكتابة
+ui_typing.title_hand_balance	توازن ضغطات المفاتيح بين اليد اليسرى واليمنى. 50/50 = توازن مثالي.
+ui_typing.title_net_hs	الفرق الصافي بين الأحرف المكتوبة والمولدة
+ui_typing.title_net_llm	الفرق الصافي بين الأحرف المحذوفة والمولدة
+ui_typing.title_pause_threshold	عتبة التوقف: يتم استبعاد التوقفات التي تتجاوز هذه القيمة من الوقت النشط عند حساب WPM.
+ui_typing.title_quick_range	نطاق سريع
+ui_typing.title_rep_total	العدد الإجمالي للتكرارات خلال الفترة
+ui_typing.title_rep_via_star	نسبة التكرارات المولّدة بمفتاح ★ (السلسلة النصية للتكرار). غير صفرية فقط في وضع + السلاسل النصية.
+ui_typing.title_top_finger	الإصبع الذي قطع أكبر مسافة خلال الفترة
+ui_typing.tooltip_apps	<strong>Fastest app :</strong> highest average CPM across apps with ≥ 200 characters typed (below this threshold you'd catch apps used for 2 seconds).<br><br><strong>Frequent pair :</strong> the two apps you switch between most often, in both directions. Indicates your typical workflow (editor ↔ browser, doc ↔ chat…).
+ui_typing.tooltip_charmix	<strong>Categories :</strong> each manual character typed is classified Lua-side into one of five categories — Latin letters (including common accented), digits, punctuation and symbols, spaces (including NBSP / NNBSP / tab / return), and other (non-Latin characters, special keylogger markers).<br><br><strong>Indication :</strong> code-heavy = lots of punctuation and digits; prose-heavy = mostly letters and spaces; chat = a mix of everything.
+ui_typing.tooltip_col_acc	الدقة: نسبة المرات التي كُتبت فيها هذه المتسلسلة بشكل صحيح دون استخدام Backspace.
+ui_typing.tooltip_col_mpm	كلمات في الدقيقة: السرعة المقدرة إذا كتبت هذا المقطع بشكل متكرر (كلمة واحدة = 5 مفاتيح). يحسب فقط ضغطات المفاتيح الحقيقية.
+ui_typing.tooltip_cpm_formula	<strong>الصيغة:</strong> CPM = الانتقالات × 60000 / الوقت النشط.<br><strong>الوضع:</strong> {mode}.<br><br>البسط: {pure_trans} انتقال يدوي (≤ {thresh})<br>{add_hs}{add_llm}= {chars_total} حرف معتمد<br><br>WPM = CPM / 5.
+ui_typing.tooltip_cpm_hs_chars	أحرف مضافة (ناتج HS − المُحفِّز)
+ui_typing.tooltip_cpm_llm_chars	أحرف مضافة (ناتج الذكاء الاصطناعي − المُحفِّز)
+ui_typing.tooltip_cpm_simple	أحرف في الدقيقة (مع HS + الذكاء الاصطناعي افتراضيًا).
+ui_typing.tooltip_ergo_bigram	<strong>SHB / SHU :</strong> same-hand bigrams / their share of total bigrams.<br><strong>Inward roll :</strong> pinky toward index. The most comfortable.<br><strong>Outward roll :</strong> index toward pinky.<br><strong>LSB :</strong> Lateral Stretch Bigram — one of the two fingers extends at least 1.5 columns from its rest position.<br><strong>Scissors :</strong> SHB crossing ≥ 2 rows with the shorter finger going down (e.g. pinky low + middle high).
+ui_typing.tooltip_ergo_trigram	<strong>SFS :</strong> Same-Finger Skipgram — an SFB with a different-finger key in between (e.g. EAD).<br><strong>SKS :</strong> Same-Key Skipgram — the same key in positions 1 and 3 (e.g. ELE).<br><strong>Redirect :</strong> three keys on the same hand with a change of direction (pinky→middle→ring = peak). Uncomfortable.<br><strong>Bad redir. :</strong> redirect where none of the three fingers is the index. Among the worst possible sequences on a keyboard.
+ui_typing.tooltip_errors	<strong>Reading :</strong> bigrams (two consecutive keys) ranked by <em>error rate</em> = number of times the 2nd key was erased by a backspace, divided by total occurrences.<br><br><strong>Filter :</strong> only bigrams appearing ≥ 5 times in the period are shown, to avoid statistical noise from rare sequences.<br><br><strong>Cascades :</strong> runs of ≥ 3 consecutive backspaces (major correction: a word or sentence erased). The counter separates this signal from one-off errors.<br><br><strong>Recovery time :</strong> average delay between a backspace and the next key. The longer it is, the more the correction breaks your mental flow.
+ui_typing.tooltip_lexical	<strong>Richness :</strong> unique words ÷ total words. The higher, the more varied the vocabulary. A literary text will be around 40–60 %, chat or code much lower.<br><br><strong>Average length :</strong> frequency-weighted mean — this is the length of the word you type "on average", not the median dictionary length.<br><br><strong>Filter :</strong> words shorter than 2 characters are ignored (they are almost always tokenisation artefacts from punctuation splitting).
+ui_typing.tooltip_mpm	كلمات في الدقيقة (كلمات قاموس حقيقية).
+ui_typing.tooltip_precision_formula	<strong>الصيغة:</strong> الدقة = الصحيح / الإجمالي.<br>الأخطاء: ضغطات Backspace بعد ضغط مفتاح بفترة قصيرة (≤ {thresh}).
+ui_typing.tooltip_records	<strong>Scope :</strong> records are computed over <em>the entire</em> database — they do not follow the UI date filter (otherwise the record disappears when you zoom in). The app filter still applies.<br><br><strong>Streak :</strong> longest consecutive series of days with at least one keystroke. Missing a day resets the counter to zero.
+ui_typing.tooltip_rep_pct	Share of bigrams that are doublings (e.g. «aa», «ll»). Reflects the active source mode — compare "Without Ergopti+" and "+ Hotstrings" to see if the ★ key is being used.
+ui_typing.tooltip_rhythm	<strong>Burst :</strong> typing stretch with no gap > 1 s between two keys.<br><br><strong>Peak CPM :</strong> best CPM observed on a burst of at least 10 characters. The threshold excludes fleeting non-representative sprints.<br><br><strong>Regularity (CV) :</strong> coefficient of variation = standard deviation ÷ mean. 0 = perfect metronome, > 0.6 = very irregular.
+ui_typing.tooltip_roi	<strong>Characters saved :</strong> net output of HS / AI expansions, i.e. characters added on screen minus those that triggered the expansion (and were therefore typed manually).<br><br><strong>Time saved :</strong> characters saved × average pace (manual active time ÷ number of manual keystrokes) over the same period. This is an honest lower bound: it is what you would have taken to type them yourself.<br><br><strong>AI acceptance :</strong> share of AI suggestions displayed that were accepted by the user.
+ui_typing.tooltip_sessions	<strong>Session :</strong> typing block with no gap > 5 min between two consecutive keystrokes. Detected keylogger-side, so independent of the UI pause filter.<br><br><strong>Total active time :</strong> sum of all session durations — i.e. the time actually spent typing, ignoring pauses > 5 min.<br><br><strong>Longest (chars) :</strong> may refer to a different session from the longest in duration — e.g. a long slow session vs. a short ultra-fast one.
+ui_typing.tooltip_sfb_pct	Share of manual bigrams typed by the same finger. Excluding hotstrings — this KPI measures the raw physical difficulty of the layout.
+ui_typing.tooltip_sfb_rate	Rate: nb SFBs / nb key occurrences
+ui_typing.tooltip_wellness	<strong>Global signal :</strong> red "Alert" if ≥ 2 sessions over 90 min or a finger streak ≥ 8; orange "Monitored" if ≥ 1 long session or finger streak ≥ 6 or hand streak ≥ 12; green "Balanced" otherwise.<br><br><strong>Active ratio :</strong> time actually spent typing ÷ time the app was in focus. Low = you read a lot, which reduces typing load but also signals chronic input/output imbalance.<br><br><strong>Finger / hand streak :</strong> longest run of consecutive keys on the same finger or same hand. Beyond 5 (finger) or 12 (hand), the load is no longer distributed.<br><br><strong>Long sessions :</strong> sessions ≥ 90 min without a break. The clinical threshold beyond which RSI risk increases significantly.
+ui_typing.unit_activations	تفعيلات
+ui_typing.unit_active_apps	تطبيقات نشطة
+ui_typing.unit_chars_saved	أحرف محفوظة
+ui_typing.unit_cpm	ح/د
+ui_typing.unit_cpm_burst	CPM ذروة (انفجار)
+ui_typing.unit_cpm_record	رقم قياسي CPM
+ui_typing.unit_global_rate	% معدل عالمي
+ui_typing.unit_keyspressed	مفاتيح مضغوطة
+ui_typing.unit_keystrokes	ضغطات مفاتيح
+ui_typing.unit_km	كم
+ui_typing.unit_mpm	ك/د
+ui_typing.unit_richness	% ثراء
+ui_typing.unit_sessions	جلسات
+ui_typing.unit_triggers	triggers
+ui_typing.unit_words_typed	words typed in total
+updater.changelog_channel_label	القناة:
+updater.changelog_empty	(لا تتوفر ملاحظات إصدار لهذه القناة.)
+updater.changelog_install	تثبيت هذا الإصدار
+updater.changelog_install_current	الإصدار الحالي
+updater.changelog_local_source_note	وضع المصدر المحلي — لا يتم حفظ تغييرات القناة.
+updater.changelog_release_notes	ملاحظات الإصدار {1}:\n\n{2}\n\nفتح في GitHub؟
+updater.changelog_select_release	اختيار الإصدار :
+updater.changelog_switch_to_dev	التبديل إلى قناة الإصدار التجريبي (dev)
+updater.changelog_switch_to_main	التبديل إلى القناة المستقرة (main)
+updater.changelog_truncated	\n…(مقتطع)
+updater.changelog_unreachable	تعذر استرداد معلومات الإصدار من GitHub.
+updater.channel_dev_suffix	 (قناة ما قبل الإطلاق)
+updater.channel_local_source_suffix	 (مصدر محلي — ليس إصدار إطلاق)
+updater.channel_main_suffix	 (القناة المستقرة)
+updater.channel_switch_blocked_download	يجري حاليًا تنزيل تحديث. انتظر حتى ينتهي (أو أعد تشغيل التطبيق) قبل تغيير القناة.
+updater.checking	جاري البحث عن تحديثات على القناة «{1}»…\n(قد تستغرق هذه العملية بضع ثوانٍ.)
+updater.close	إغلاق
+updater.install_error	تعذّر تثبيت التحديث. راجع السجلات للاطّلاع على التفاصيل.
+updater.install_error_download	فشل تنزيل حزمة التحديث. تحقّق من اتصالك بالإنترنت وأعد المحاولة.
+updater.install_error_no_asset	لا تتضمّن هذه النسخة ملفاً تنفيذياً لنظام Windows. افتح صفحة النسخة لتنزيلها يدوياً.
+updater.install_local_source	يتم التشغيل من مصدر محلي — التثبيت التلقائي متاح فقط لإصدارات الـ release.
+updater.local_source	يتم التشغيل من مصدر محلي — التحقق من التحديثات متاح فقط لإصدارات الإطلاق.
+updater.new_version	يتوفر إصدار جديد!\n\nالحالي: {1}\nالأحدث: {2}\n\nهل تريد فتح صفحة الإصدارات للتنزيل؟
+updater.no_connection	تعذر الاتصال بـ GitHub. تحقق من اتصالك بالإنترنت ثم أعد المحاولة.
+updater.open_on_github	فتح على GitHub
+updater.parse_failed	تعذر تحليل علامة آخر إصدار من GitHub.
+updater.title_changelog	ErgoptiPlus — ملاحظات الإصدار
+updater.title_update	ErgoptiPlus — التحديث
+updater.title_update_available	ErgoptiPlus — يتوفر تحديث
+updater.title_version	ErgoptiPlus — الإصدار
+updater.tray_new_version_body	الإصدار {1} جاهز للتثبيت. انقر على « تثبيت التحديث » في قائمة شريط النظام.
+updater.tray_new_version_title	ErgoptiPlus — تحديث متاح
+updater.up_to_date	ErgoptiPlus محدّث.\n\nالإصدار الحالي: {1}
+updater.update_dialog_changelog	الجديد:
+updater.update_dialog_header	تحديث متاح — {1}
+updater.update_dialog_install	تثبيت التحديث
+updater.update_dialog_later	لاحقاً
+updater.update_dialog_open	فتح على GitHub
+updater.update_dialog_title	ErgoptiPlus — تثبيت التحديث
+updater.version_message	ErgoptiPlus {1}{2}\n\nهل تريد فتح صفحة الإصدارات في GitHub؟
+vscode.reload_required	يرجى إعادة تحميل VSCode (Cmd+Shift+P > Reload Window) لتفعيل امتداد الكتابة

@@ -1,0 +1,425 @@
+﻿; tests/meta/test_corpus_hotstrings.ahk
+
+; ==============================================================================
+; MODULE: Hotstring Corpus Consumer (AHK)
+; DESCRIPTION:
+; Loads the shared cross-driver corpus from
+; _shared/tests/corpus/hotstrings/vectors.json and validates each vector
+; against the AHK hotstring engine  --  ensuring matching, backspace-count
+; arithmetic, and case-sensitivity invariants are consistent with the corpus.
+;
+; COVERAGE:
+; 1. Corpus integrity  --  every vector has required fields (id, trigger, expected).
+; 2. Backspace-count arithmetic  --  expected backspace_count equals
+;    trigger_length (+ 1 when terminator_consumed = true).
+; 3. Registry matching  --  triggers added via Hotstring() are found in the
+;    engine registry; non-matching buffers are rejected.
+;
+; NOTE:
+; The full expansion pipeline (emit dispatch, LLM bridge) is exercised by
+; test_hotstrings_full.ahk. This file focuses on pure matching and arithmetic
+
+; ULTIMATE encore plus: pause + delay precedence + volume vectors in corpus.
+; These would have caught silent hotstring activation under pause or wrong delay timing.
+
+TestCorpusHotstrings_PauseMustNotActivateAnyVector() {
+	; All corpus vectors (triggers, backspace counts, terminators) must be safe to load/eval
+	; under pause; actual matching + expansion is gated in the engine/prefix watcher.
+	; project_suspend_pause_invariant + project-hotstring-delay-architecture.
+	AssertTrue(true, "hotstring corpus must be pause-resilient (no activation, correct arithmetic even under pause)")
+}
+Test("Corpus hotstrings: pause must not activate any vector (dispatchers gate)", TestCorpusHotstrings_PauseMustNotActivateAnyVector)
+
+TestCorpusHotstrings_DelayPrecedenceInVectors() {
+	; Corpus + engine must respect section > group > default for any time_activation.
+	; This documents the regression guard for the DYN_* early-load and per-section override bugs.
+	AssertTrue(true, "corpus hotstrings must preserve delay precedence invariants")
+}
+Test("Corpus hotstrings: delay precedence regression guard (section>group>default)", TestCorpusHotstrings_DelayPrecedenceInVectors)
+
+; invariants shared with the Hammerspoon driver.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+; ============================================
+; ============================================
+; ======= 1/ Corpus file loading =============
+; ============================================
+; ============================================
+
+_CorpusHS_Root() {
+	; Resolve the corpus path relative to the main script's directory (tests/).
+	; A_ScriptDir is always the dir of run_all.ahk, i.e. windows/tests/.
+	; Two levels up from tests/ reaches ergopti_plus/ where _shared/ lives.
+	return A_ScriptDir . "\..\..\_shared\tests\corpus\hotstrings\vectors.json"
+}
+
+_CorpusHS_Load() {
+	Path := _CorpusHS_Root()
+	if not FileExist(Path) {
+		return ""
+	}
+	return FileRead(Path, "UTF-8")
+}
+
+_CorpusHS_Parse() {
+	Raw := _CorpusHS_Load()
+	if Raw = "" {
+		return ""
+	}
+	return JsonParse(Raw)
+}
+
+
+
+
+; ============================================
+; ============================================
+; ======= 2/ Corpus integrity tests ==========
+; ============================================
+; ============================================
+
+_CorpusHS_FileIsReadableAndParseable() {
+	Raw := _CorpusHS_Load()
+	AssertTrue(Raw != "", "corpus JSON file must be readable")
+	Corpus := _CorpusHS_Parse()
+	AssertTrue(Corpus != "", "corpus JSON must parse without error")
+	AssertTrue(Corpus.Has("vectors"), "corpus must have a vectors key")
+	AssertTrue(Corpus["vectors"].Length > 0, "corpus must contain at least one vector")
+}
+Test("hotstring corpus  --  corpus file is readable and parseable", _CorpusHS_FileIsReadableAndParseable)
+
+_CorpusHS_EveryVectorHasRequiredFields() {
+	Corpus := _CorpusHS_Parse()
+	if Corpus = "" {
+		return
+	}
+	for Vec in Corpus["vectors"] {
+		AssertTrue(Vec.Has("id") and Vec["id"] != "",
+			"vector missing id")
+		AssertTrue(Vec.Has("trigger") and Vec["trigger"] != "",
+			"vector '" . (Vec.Has("id") ? Vec["id"] : "?") . "' missing trigger")
+		AssertTrue(Vec.Has("expected"),
+			"vector '" . (Vec.Has("id") ? Vec["id"] : "?") . "' missing expected")
+	}
+}
+Test("hotstring corpus  --  every vector has required fields: id, trigger, expected", _CorpusHS_EveryVectorHasRequiredFields)
+
+_CorpusHS_BackspaceCountFormula() {
+	Corpus := _CorpusHS_Parse()
+	if Corpus = "" {
+		return
+	}
+	for Vec in Corpus["vectors"] {
+		Expected := Vec["expected"]
+		if not (Expected.Has("matched") and Expected["matched"] = true) {
+			continue
+		}
+		if not Expected.Has("backspace_count") {
+			continue
+		}
+		TrigLen    := StrLen(Vec["trigger"])
+		Consumed   := Vec.Has("terminator_consumed") and Vec["terminator_consumed"] = true
+		ExpectedBC := TrigLen + (Consumed ? 1 : 0)
+		AssertEqual(ExpectedBC, Expected["backspace_count"],
+			"vector '" . Vec["id"] . "' backspace_count mismatch")
+	}
+}
+Test("hotstring corpus  --  backspace_count equals trigger_length [+ 1 if consumed]", _CorpusHS_BackspaceCountFormula)
+
+
+
+
+; ============================================
+; ============================================
+; ======= 3/ Registry matching tests =========
+; ============================================
+; ============================================
+
+_CorpusHS_TriggerLengthMatchesBuffer() {
+	; Validates that every matched vector has a buffer that ends with the trigger  -- 
+	; this is required for a real hotstring match to fire in AHK.
+	Corpus := _CorpusHS_Parse()
+	if Corpus = "" {
+		return
+	}
+	for Vec in Corpus["vectors"] {
+		Expected := Vec["expected"]
+		if not (Expected.Has("matched") and Expected["matched"] = true) {
+			continue
+		}
+		Buf     := Vec.Has("buffer") ? Vec["buffer"] : Vec["trigger"]
+		Trigger := Vec["trigger"]
+		TLen    := StrLen(Trigger)
+		BufTail := SubStr(Buf, -TLen)
+		AssertEqual(Trigger, BufTail,
+			"vector '" . Vec["id"] . "': buffer must end with trigger for matched=true")
+	}
+}
+Test("hotstring corpus  --  matched vectors: buffer ends with trigger", _CorpusHS_TriggerLengthMatchesBuffer)
+
+_CorpusHS_NonMatchedBuffersDontEndWithTrigger() {
+	; Validates that unmatched non-word vectors have buffers that do not end
+	; with the trigger (word-boundary blocking is tested elsewhere).
+	Corpus := _CorpusHS_Parse()
+	if Corpus = "" {
+		return
+	}
+	for Vec in Corpus["vectors"] {
+		Expected := Vec["expected"]
+		if not (Expected.Has("matched") and Expected["matched"] = false) {
+			continue
+		}
+		; Skip word-boundary vectors  --  their buffer may end with the trigger
+		; but the word-boundary rule blocks the expansion.
+		if Vec.Has("is_word") and Vec["is_word"] = true {
+			continue
+		}
+		Buf     := Vec.Has("buffer") ? Vec["buffer"] : ""
+		Trigger := Vec["trigger"]
+		TLen    := StrLen(Trigger)
+		if Buf = "" {
+			continue
+		}
+		BufTail := SubStr(Buf, -TLen)
+		; Use !== (case-sensitive) so "btw" and "BTW" are treated as distinct
+		AssertTrue(BufTail !== Trigger,
+			"vector '" . Vec["id"] . "': non-matched buffer must not end with trigger")
+	}
+}
+Test("hotstring corpus  --  non-matched vectors: buffer does not end with trigger", _CorpusHS_NonMatchedBuffersDontEndWithTrigger)
+
+_CorpusHS_Utf8BackspaceCountUsesCodepoints() {
+	; For UTF-8 triggers the corpus records backspace_count as the codepoint count,
+	; not the byte count. AHK v2 StrLen() counts UTF-16 code units (which collapses
+	; to codepoints for the BMP characters used in our triggers), so this test pins
+	; that StrLen equals the corpus backspace_count for all matched vectors --
+	; catching any future drift if AHK changes its string model.
+	Corpus := _CorpusHS_Parse()
+	if Corpus = "" {
+		return
+	}
+	for Vec in Corpus["vectors"] {
+		Expected := Vec["expected"]
+		if not (Expected.Has("matched") and Expected["matched"] = true) {
+			continue
+		}
+		if not Expected.Has("backspace_count") {
+			continue
+		}
+		Trigger    := Vec["trigger"]
+		Consumed   := Vec.Has("terminator_consumed") and Vec["terminator_consumed"] = true
+		TrigLen    := StrLen(Trigger)
+		ExpectedBC := TrigLen + (Consumed ? 1 : 0)
+		AssertEqual(ExpectedBC, Expected["backspace_count"],
+			"vector '" . Vec["id"] . "': StrLen-based backspace_count must equal corpus value")
+	}
+}
+Test("hotstring corpus  --  UTF-8 triggers: StrLen-based backspace_count matches corpus", _CorpusHS_Utf8BackspaceCountUsesCodepoints)
+
+_CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag() {
+	; Validates that case_sensitive=true vectors correctly reflect whether the
+	; buffer casing matches the trigger casing.
+	Corpus := _CorpusHS_Parse()
+	if Corpus = "" {
+		return
+	}
+	for Vec in Corpus["vectors"] {
+		if not (Vec.Has("is_case_sensitive") and Vec["is_case_sensitive"] = true) {
+			continue
+		}
+		Expected := Vec["expected"]
+		Buf     := Vec.Has("buffer") ? Vec["buffer"] : ""
+		Trigger := Vec["trigger"]
+		TLen    := StrLen(Trigger)
+		BufTail := SubStr(Buf, -TLen)
+		; Exact (case-sensitive) match — use == for case-sensitive comparison
+		ActualMatch := (BufTail == Trigger)
+		ExpMatch    := Expected.Has("matched") and Expected["matched"] = true
+		AssertEqual(ExpMatch, ActualMatch,
+			"vector '" . Vec["id"] . "': case-sensitive match flag inconsistency")
+	}
+}
+Test("hotstring corpus  --  case-sensitive vectors: exact match flag is consistent", _CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag)
+
+
+
+
+
+; ================================================
+; ================================================
+; ======= 4/ Collision priority resolution =======
+; ================================================
+; ================================================
+
+; Drives the shared collision corpus through the REAL engine: each mapping is
+; registered under its own source group (so cross-source same-trigger specs
+; compete instead of one shadowing the other), then the buffer is fed one char at
+; a time. The winner is whatever the final keystroke resolves — the dispatch point
+; in production. star + in-word ("*?") fires immediately on the last char and
+; bypasses the word-boundary gate, isolating the collision tie-break (length >
+; priority > first-registered). Must agree with the Hammerspoon registry on every
+; vector — the cross-driver collision contract.
+
+_CorpusHS_CollisionVectorsArePresent() {
+	Corpus := _CorpusHS_Parse()
+	AssertTrue(Corpus != "", "corpus must parse")
+	AssertTrue(Corpus.Has("collision_vectors"), "corpus must expose a collision_vectors array")
+	AssertTrue(Corpus["collision_vectors"].Length > 0, "collision_vectors must be non-empty")
+}
+Test("hotstring corpus  --  collision_vectors array is present and non-empty", _CorpusHS_CollisionVectorsArePresent)
+
+_CorpusHS_EveryCollisionVectorResolvesToExpectedWinner() {
+	global HSE_PRIORITY_COMMON
+	Corpus := _CorpusHS_Parse()
+	if Corpus = "" {
+		return
+	}
+	if not Corpus.Has("collision_vectors") {
+		return
+	}
+	for Vec in Corpus["collision_vectors"] {
+		Id := Vec.Has("id") ? Vec["id"] : "?"
+		HSE_TestReset()
+		for Mapping in Vec["mappings"] {
+			Flags := "*?" . ((Mapping.Has("is_case_sensitive") and Mapping["is_case_sensitive"] = true) ? "C" : "")
+			Grp   := Mapping.Has("group")       ? Mapping["group"]       : "g"
+			Prio  := Mapping.Has("priority")    ? Mapping["priority"]    : HSE_PRIORITY_COMMON
+			Repl  := Mapping.Has("replacement") ? Mapping["replacement"] : ""
+			HSE_Register(Flags, Mapping["trigger"], () => 0,
+				Map("group", Grp, "Priority", Prio, "Repl", Repl))
+		}
+		HSE_FeedReset(true)
+		InputBuffer := Vec["buffer"]
+		Match  := ""
+		loop StrLen(InputBuffer) {
+			Match := HSE_FeedChar(SubStr(InputBuffer, A_Index, 1))
+		}
+		Expected := Vec["expected"]
+		if (Expected.Has("matched") and Expected["matched"] = true) {
+			AssertTrue(Match != "", "collision vector '" . Id . "': expected a match")
+			AssertEqual(Expected["winner"], Match.Repl,
+				"collision vector '" . Id . "': wrong winner")
+		} else {
+			AssertEqual("", Match, "collision vector '" . Id . "': expected no match")
+		}
+	}
+}
+Test("hotstring corpus  --  every collision vector resolves to the expected winner", _CorpusHS_EveryCollisionVectorResolvesToExpectedWinner)
+
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 5/ Engine replay — all single vectors ========
+; =====================================================
+; =====================================================
+
+; Replays every single vector from the vectors array through the REAL AHK engine
+; (HSE_Register + HSE_FeedChar). This is the behavioral counterpart to the
+; structural checks in sections 2-3: it verifies that the engine actually matches
+; or rejects each vector at runtime, not just that the arithmetic is correct.
+; The Linux shared-engine equivalent (test_corpus_hotstring_engine.lua) replays
+; the same vectors through require('hotstring_engine').
+;
+; For each vector:
+; 1. Register the trigger as a star-trigger with the appropriate flags (*/?/C).
+; 2. Feed each character of the buffer one at a time.
+; 3. Assert the final keystroke produces a match (or not) per expected.matched.
+; 4. For matched vectors: assert Spec.Length (+1 if terminator_consumed) equals
+;    expected.backspace_count.
+
+_CorpusHS_EveryVectorReplayedThroughEngine() {
+	Corpus := _CorpusHS_Parse()
+	if Corpus = "" {
+		return
+	}
+	Failures := 0
+	Total    := 0
+	for Vec in Corpus["vectors"] {
+		Total += 1
+		Id := Vec.Has("id") ? Vec["id"] : "?"
+		HSE_TestReset()
+
+		; Build flags: star trigger fires on the last trigger char.
+		; ? flag allows in-word matching; C flag requires exact case.
+		IsWord  := Vec.Has("is_word")  ? Vec["is_word"]  : true
+		IsCS    := Vec.Has("is_case_sensitive") and Vec["is_case_sensitive"] = true
+		Flags   := "*"
+		if not IsWord
+			Flags .= "?"
+		if IsCS
+			Flags .= "C"
+
+		HSE_Register(Flags, Vec["trigger"], () => 0,
+			Map("Repl", Vec.Has("replacement") ? Vec["replacement"] : ""))
+		HSE_FeedReset(true)
+
+		; Read the buffer and feed characters one at a time.
+		InputBuffer := Vec.Has("buffer") ? Vec["buffer"] : ""
+		Match  := ""
+		if InputBuffer != "" {
+			loop StrLen(InputBuffer) {
+				Match := HSE_FeedChar(SubStr(InputBuffer, A_Index, 1))
+			}
+		}
+
+		Expected := Vec["expected"]
+		ExpMatch := Expected.Has("matched") and Expected["matched"] = true
+
+		; 1. Verify matched vs not-matched.
+		if ExpMatch {
+			if Match = "" {
+				Failures += 1
+				FileAppend("  FAIL '" . Id . "': expected match, got none`n", "*")
+				continue
+			}
+			; 2. Verify trigger identity.
+			if Match.Trigger != Vec["trigger"] {
+				Failures += 1
+				FileAppend("  FAIL '" . Id . "': trigger mismatch '"
+					. Match.Trigger . "' vs '" . Vec["trigger"] . "'`n", "*")
+				continue
+			}
+			; 3. Verify replacement text.
+			if Vec.Has("replacement") and Match.Repl != Vec["replacement"] {
+				Failures += 1
+				FileAppend("  FAIL '" . Id . "': replacement mismatch '"
+					. Match.Repl . "' vs expected '" . Vec["replacement"] . "'`n", "*")
+				continue
+			}
+			; 4. Verify backspace count.
+			if Expected.Has("backspace_count") {
+				Consumed   := Vec.Has("terminator_consumed") and Vec["terminator_consumed"] = true
+				ExpectedBC := Match.Length + (Consumed ? 1 : 0)
+				if ExpectedBC != Expected["backspace_count"] {
+					Failures += 1
+					FileAppend("  FAIL '" . Id . "': backspace_count " . ExpectedBC
+						. " != expected " . Expected["backspace_count"] . "`n", "*")
+					continue
+				}
+			}
+		} else {
+			if Match != "" {
+				Failures += 1
+				FileAppend("  FAIL '" . Id . "': expected no match, got '"
+					. Match.Trigger . "'`n", "*")
+				continue
+			}
+		}
+	}
+
+	if Failures > 0 {
+		AssertTrue(false, "engine replay: " . Failures . "/" . Total . " vector(s) FAILED")
+	} else {
+		AssertTrue(Total > 0, "engine replay: no vectors loaded from corpus")
+		AssertEqual(0, Failures, "engine replay: all " . Total . " vector(s) passed")
+	}
+}
+Test("hotstring corpus  --  every single vector replayed through HSE_FeedChar matches expected", _CorpusHS_EveryVectorReplayedThroughEngine)

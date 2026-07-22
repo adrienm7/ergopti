@@ -1,0 +1,51 @@
+<!-- _shared/ui/paths_editor/index.html -->
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<title data-i18n="menu.paths.window_title"></title>
+		<link rel="stylesheet" href="style.css" />
+		<script src="../host_bridge.js"></script>
+	</head>
+	<body>
+		<h1 data-i18n="paths_editor.heading"></h1>
+		<p class="subtitle" data-i18n="paths_editor.subtitle"></p>
+
+		<form id="paths-form">
+			<div class="row">
+				<div class="row-header">
+					<span class="row-icon">📁</span>
+					<label for="input-config-dir" data-i18n="paths_editor.label_config_dir"></label>
+					<span id="tag-config-dir" class="tag-default" data-i18n="paths_editor.tag_default"></span>
+				</div>
+				<div class="path-input-wrap">
+					<input type="text" id="input-config-dir" value="" />
+					<button
+						type="button"
+						id="btn-browse"
+						class="btn-browse"
+						data-i18n="paths_editor.btn_browse"
+					></button>
+				</div>
+			</div>
+		</form>
+
+		<div class="btns">
+			<button
+				type="button"
+				id="btn-reset"
+				class="reset"
+				data-i18n="paths_editor.btn_reset"
+			></button>
+			<button
+				type="button"
+				id="btn-cancel"
+				class="cancel"
+				data-i18n="paths_editor.btn_cancel"
+			></button>
+			<button type="button" id="btn-save" class="save" data-i18n="paths_editor.btn_save"></button>
+		</div>
+
+		<script src="script.js"></script>
+	</body>
+</html>

@@ -1,0 +1,179 @@
+{
+	"$schema": "https://ergopti.com/schema/corpus/dynamic_hotstrings_prefix.v1.json",
+	"description": "Cross-driver regression corpus for the personal-info dynamic-hotstrings prefix-counting logic. Every vector must pass in both the AHK and Hammerspoon driver test suites without modification. 'prefix_count_vectors' pins compute_prefix_counts() (the phone/SSN/IBAN threshold arithmetic, mirrored by AHK's CountDynamicSection and Lua's compute_prefix_counts); 'spaced_prefix_vectors' pins spaced_prefix() (the shortest-prefix-containing-N-non-space-chars helper). Expected values are computed programmatically from the shared Lua reference (_shared/lua/dynamic_hotstrings/init.lua), not hand-typed.",
+	"version": "1.0.0",
+	"prefix_count_vectors": [
+		{
+			"id": "all_empty",
+			"description": "No personal data at all — every prefix count is 0.",
+			"phone": "",
+			"fphone": "",
+			"ssn_raw": "",
+			"iban_raw": "",
+			"expected": { "phoneprefixes": 0, "ssnprefixes": 0, "ibanprefixes": 0 }
+		},
+		{
+			"id": "phone_1_digit",
+			"description": "Phone below the 2-digit threshold — no phone prefixes yet.",
+			"phone": "1",
+			"fphone": "1",
+			"ssn_raw": "",
+			"iban_raw": "",
+			"expected": { "phoneprefixes": 0, "ssnprefixes": 0, "ibanprefixes": 0 }
+		},
+		{
+			"id": "phone_2_digits",
+			"description": "Phone at the 2-digit threshold — first tier fires (+2).",
+			"phone": "12",
+			"fphone": "1 2",
+			"ssn_raw": "",
+			"iban_raw": "",
+			"expected": { "phoneprefixes": 2, "ssnprefixes": 0, "ibanprefixes": 0 }
+		},
+		{
+			"id": "phone_3_digits",
+			"description": "3 digits — still only the 2-digit tier (formatted phone too short for the 5-char fphone tier).",
+			"phone": "123",
+			"fphone": "1 23",
+			"ssn_raw": "",
+			"iban_raw": "",
+			"expected": { "phoneprefixes": 2, "ssnprefixes": 0, "ibanprefixes": 0 }
+		},
+		{
+			"id": "phone_4_digits",
+			"description": "4 raw digits crosses BOTH the 4-digit tier AND the 5-char formatted-phone tier (2+2+1=5).",
+			"phone": "1234",
+			"fphone": "12 34",
+			"ssn_raw": "",
+			"iban_raw": "",
+			"expected": { "phoneprefixes": 5, "ssnprefixes": 0, "ibanprefixes": 0 }
+		},
+		{
+			"id": "phone_5_digits_fphone_long",
+			"description": "5 raw digits — still below the 6-digit tier; fphone tier already counted.",
+			"phone": "12345",
+			"fphone": "1 23 45",
+			"ssn_raw": "",
+			"iban_raw": "",
+			"expected": { "phoneprefixes": 5, "ssnprefixes": 0, "ibanprefixes": 0 }
+		},
+		{
+			"id": "phone_6_digits",
+			"description": "6 raw digits crosses the final phone tier — all four phone tiers now fire (2+2+1+1=6).",
+			"phone": "123456",
+			"fphone": "12 34 56",
+			"ssn_raw": "",
+			"iban_raw": "",
+			"expected": { "phoneprefixes": 6, "ssnprefixes": 0, "ibanprefixes": 0 }
+		},
+		{
+			"id": "phone_full_10_digits",
+			"description": "A full 10-digit French phone number — the count is capped at 6 by the fixed tiers, not proportional to length.",
+			"phone": "0612345678",
+			"fphone": "06 12 34 56 78",
+			"ssn_raw": "",
+			"iban_raw": "",
+			"expected": { "phoneprefixes": 6, "ssnprefixes": 0, "ibanprefixes": 0 }
+		},
+		{
+			"id": "ssn_4_digits_below_threshold",
+			"description": "SSN below the 5-digit threshold — no SSN prefixes.",
+			"phone": "",
+			"fphone": "",
+			"ssn_raw": "1234",
+			"iban_raw": "",
+			"expected": { "phoneprefixes": 0, "ssnprefixes": 0, "ibanprefixes": 0 }
+		},
+		{
+			"id": "ssn_5_digits_at_threshold",
+			"description": "SSN at the 5-digit threshold — both the no-space and spaced triggers fire.",
+			"phone": "",
+			"fphone": "",
+			"ssn_raw": "12345",
+			"iban_raw": "",
+			"expected": { "phoneprefixes": 0, "ssnprefixes": 2, "ibanprefixes": 0 }
+		},
+		{
+			"id": "ssn_15_digits_full",
+			"description": "A full 15-digit French SSN — still only 2 prefixes (the threshold is a gate, not a per-digit count).",
+			"phone": "",
+			"fphone": "",
+			"ssn_raw": "123456789012345",
+			"iban_raw": "",
+			"expected": { "phoneprefixes": 0, "ssnprefixes": 2, "ibanprefixes": 0 }
+		},
+		{
+			"id": "iban_5_chars_below_threshold",
+			"description": "IBAN below the 6-char threshold — no IBAN prefixes.",
+			"phone": "",
+			"fphone": "",
+			"ssn_raw": "",
+			"iban_raw": "12345",
+			"expected": { "phoneprefixes": 0, "ssnprefixes": 0, "ibanprefixes": 0 }
+		},
+		{
+			"id": "iban_6_chars_at_threshold",
+			"description": "IBAN at the 6-char threshold — both the no-space and 7-char spaced triggers fire.",
+			"phone": "",
+			"fphone": "",
+			"ssn_raw": "",
+			"iban_raw": "123456",
+			"expected": { "phoneprefixes": 0, "ssnprefixes": 0, "ibanprefixes": 2 }
+		},
+		{
+			"id": "iban_full_27_chars",
+			"description": "A full 27-char French IBAN — still only 2 prefixes (threshold gate, not per-char count).",
+			"phone": "",
+			"fphone": "",
+			"ssn_raw": "",
+			"iban_raw": "FR7630006000011234567890189",
+			"expected": { "phoneprefixes": 0, "ssnprefixes": 0, "ibanprefixes": 2 }
+		},
+		{
+			"id": "all_three_populated",
+			"description": "Phone + SSN + IBAN all present — each field's count is independent of the others.",
+			"phone": "0612345678",
+			"fphone": "06 12 34 56 78",
+			"ssn_raw": "123456789012345",
+			"iban_raw": "FR7630006000011234567890189",
+			"expected": { "phoneprefixes": 6, "ssnprefixes": 2, "ibanprefixes": 2 }
+		}
+	],
+	"spaced_prefix_vectors": [
+		{
+			"id": "spaced_exact_count",
+			"description": "Returns the prefix ending right after the raw_count-th non-space character.",
+			"spaced": "1 2 3",
+			"raw_count": 2,
+			"expected": "1 2"
+		},
+		{
+			"id": "spaced_overflow_request",
+			"description": "Requesting more non-space chars than the string has returns the whole string.",
+			"spaced": "1 2",
+			"raw_count": 10,
+			"expected": "1 2"
+		},
+		{
+			"id": "spaced_zero_count",
+			"description": "raw_count=0 still consumes one character — the >= check fires on the very first iteration.",
+			"spaced": "1 2 3",
+			"raw_count": 0,
+			"expected": "1"
+		},
+		{
+			"id": "spaced_no_spaces",
+			"description": "A string with no spaces behaves like a plain substring.",
+			"spaced": "12345",
+			"raw_count": 3,
+			"expected": "123"
+		},
+		{
+			"id": "spaced_leading_space",
+			"description": "A leading space is not counted toward raw_count but is included in the returned prefix.",
+			"spaced": " 12 34",
+			"raw_count": 2,
+			"expected": " 12"
+		}
+	]
+}

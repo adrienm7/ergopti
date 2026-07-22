@@ -1,0 +1,18 @@
+# ====================
+# ====================
+# ======= Menu =======
+# ====================
+# ====================
+
+[menu]
+categories_order = ["distancesreduction", "sfbsreduction", "rolls", "autocorrection", "magickey"]
+
+
+
+# ======================================================================
+# ===== Modules.Dynamichotstrings.Textexpansionpersonalinformation =====
+# ======================================================================
+
+[modules.dynamichotstrings.textexpansionpersonalinformation]
+mod_id = "personal_info"
+description = { fr = "Remplissage de formulaires avec le préfixe @ : @np★ = Nom ⇥ Prénom, etc.", en = "Form filling with @ prefix: @np★ = Last ⇥ First name, etc.", de = "Formularausfüllung mit dem @-Präfix: @np★ = Nachname ⇥ Vorname, etc.", es = "Relleno de formularios con prefijo @: @np★ = Apellido ⇥ Nombre, etc.", zh = "使用 @ 前缀填写表单：@np★ = 姓 ⇥ 名，等" }

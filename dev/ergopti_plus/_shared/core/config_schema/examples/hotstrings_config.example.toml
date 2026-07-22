@@ -1,0 +1,29 @@
+# config_schema/examples/hotstrings_config.example.toml
+# Example for ``config/ergopti_plus/hotstrings_config.toml`` v2.
+# Per-group overrides for tooltip delays and colors. Read identically by AHK and HS.
+#
+# Any absent key falls back to the value declared in the features manifest.
+
+[autocorrection]
+color = "#00838f"
+delay = 0.5
+
+[distances_reduction]
+color = "#7e57c2"
+delay = 0.5
+
+[sfbs_reduction]
+color = "#ef6c00"
+delay = 0.5
+
+[rolls]
+color = "#43a047"
+delay = 0.5
+
+[magic_key]
+color = "#e91e63"
+delay = 0.0   # instant
+
+[personal]
+color = "#5e35b1"
+delay = 0.75

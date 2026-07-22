@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="UTF-8" />
+		<link rel="stylesheet" href="style.css" />
+		<script src="../i18n.js"></script>
+		<script src="../host_bridge.js"></script>
+	</head>
+	<body>
+		<header class="topbar">
+			<div class="title">
+				<h1 data-i18n="hs_config.window_title"></h1>
+				<p class="hint" data-i18n="hs_config.hint"></p>
+			</div>
+			<div class="actions">
+				<button class="btn" onclick="setAllGrey()" data-i18n="hs_config.btn_all_grey"></button>
+				<button
+					class="btn btn-danger"
+					onclick="resetAll()"
+					data-i18n="hs_config.btn_reset_all"
+				></button>
+				<button class="btn" onclick="closeWindow()" data-i18n="common.close"></button>
+			</div>
+		</header>
+
+		<div class="group-bar">
+			<label for="group-select" data-i18n="hs_config.label_group"></label>
+			<select id="group-select" onchange="onGroupChange()"></select>
+		</div>
+
+		<main id="content"></main>
+
+		<template id="tpl-category">
+			<section class="cat">
+				<header class="cat-head">
+					<button class="caret" data-role="toggle">▸</button>
+					<h2 class="cat-title"></h2>
+					<div class="row">
+						<div class="field field-delay" data-level="file" data-field="delay">
+							<label data-i18n-key="hs_config.label_delay"></label>
+							<div class="ctrl">
+								<input type="number" min="0" step="50" />
+								<button class="reset" data-i18n-title-key="hs_config.btn_reset_default">↺</button>
+							</div>
+						</div>
+						<div class="field field-color" data-level="file" data-field="color">
+							<label data-i18n-key="hs_config.label_color"></label>
+							<div class="ctrl">
+								<span class="swatch"></span>
+								<select></select>
+								<button class="reset" data-i18n-title-key="hs_config.btn_reset_default">↺</button>
+							</div>
+						</div>
+						<div class="field field-priority" data-level="file" data-field="priority">
+							<label data-i18n-key="hs_config.label_priority"></label>
+							<div class="ctrl">
+								<input type="number" min="0" max="100" step="1" />
+								<button class="reset" data-i18n-title-key="hs_config.btn_reset_default">↺</button>
+							</div>
+						</div>
+						<div class="field field-tooltip" data-level="file" data-field="tooltip">
+							<label data-i18n-key="hs_config.label_tooltip"></label>
+							<div class="ctrl">
+								<input type="checkbox" class="chk-tooltip" />
+								<button class="reset" data-i18n-title-key="hs_config.btn_reset_default">↺</button>
+							</div>
+						</div>
+					</div>
+				</header>
+				<div class="sections" hidden></div>
+			</section>
+		</template>
+
+		<template id="tpl-section">
+			<div class="sec">
+				<div class="sec-title"></div>
+				<div class="row">
+					<div class="field field-delay" data-level="section" data-field="delay">
+						<label data-i18n-key="hs_config.label_delay"></label>
+						<div class="ctrl">
+							<input type="number" min="0" step="50" />
+							<button class="reset" data-i18n-title-key="hs_config.btn_reset_default">↺</button>
+						</div>
+					</div>
+					<div class="field field-color" data-level="section" data-field="color">
+						<label data-i18n-key="hs_config.label_color"></label>
+						<div class="ctrl">
+							<span class="swatch"></span>
+							<select></select>
+							<button class="reset" data-i18n-title-key="hs_config.btn_reset_default">↺</button>
+						</div>
+					</div>
+					<div class="field field-priority" data-level="section" data-field="priority">
+						<label data-i18n-key="hs_config.label_priority"></label>
+						<div class="ctrl">
+							<input type="number" min="0" max="100" step="1" />
+							<button class="reset" data-i18n-title-key="hs_config.btn_reset_default">↺</button>
+						</div>
+					</div>
+					<div class="field field-tooltip" data-level="section" data-field="tooltip">
+						<label data-i18n-key="hs_config.label_tooltip"></label>
+						<div class="ctrl">
+							<input type="checkbox" class="chk-tooltip" />
+							<button class="reset" data-i18n-title-key="hs_config.btn_reset_default">↺</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</template>
+
+		<script src="script.js"></script>
+	</body>
+</html>

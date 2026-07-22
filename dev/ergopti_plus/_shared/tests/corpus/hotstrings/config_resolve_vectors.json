@@ -1,0 +1,52 @@
+{
+	"$schema": "https://ergopti.com/schema/corpus/hotstrings_config_resolve.v1.json",
+	"description": "Cross-driver regression corpus for the hotstrings delay/color/show_tooltip resolution cascade (DL-5). Both drivers resolve each field independently through the SAME four levels, first non-empty wins: user_section > user_category > toml_section > toml_category > (driver-specific hardcoded default, already pinned identical by TestHotstringsConfig_SharedDefaultsAreSingleSource / test_hotstrings_defaults.lua — not re-tested here). Scope note: AHK's cascade also has a Priority field and a menu-set '_global' delay tier that macOS's hotstrings_config.lua does not implement; those are intentionally OUT OF SCOPE for this corpus (not asserted equal) — every vector below only ever sets delay/color/show_tooltip at the four genuinely shared levels, so both drivers reach an identical result via identical precedence. A level object is OMITTED entirely when not set for a vector; a field key inside a present level is OMITTED when that specific field is not set at that level (both mean 'fall through to the next level' for that field).",
+	"version": "1.0.0",
+	"vectors": [
+		{
+			"id": "toml_category_only",
+			"description": "Only the category-level TOML _meta sets values; no section requested, no user override anywhere.",
+			"category": "dl5cat1",
+			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": false },
+			"expected": { "delay": 0.4, "color": "#444444", "show_tooltip": false, "has_override": false }
+		},
+		{
+			"id": "toml_section_overrides_toml_category",
+			"description": "A [_meta.sections.<name>] entry wins over the file-level [_meta] when that section is requested.",
+			"category": "dl5cat2",
+			"section": "sec",
+			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": true },
+			"toml_section": { "delay": 0.3, "color": "#333333", "show_tooltip": false },
+			"expected": { "delay": 0.3, "color": "#333333", "show_tooltip": false, "has_override": false }
+		},
+		{
+			"id": "user_category_overrides_toml",
+			"description": "A user file-level override wins over any TOML metadata, even with no section requested.",
+			"category": "dl5cat3",
+			"user_category": { "delay": 0.2, "color": "#222222", "show_tooltip": true },
+			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": false },
+			"expected": { "delay": 0.2, "color": "#222222", "show_tooltip": true, "has_override": true }
+		},
+		{
+			"id": "user_section_overrides_everything",
+			"description": "A user section-level override wins over user file-level, TOML section, and TOML file — the top of the cascade.",
+			"category": "dl5cat4",
+			"section": "sec",
+			"user_category": { "delay": 0.2, "color": "#222222", "show_tooltip": true },
+			"user_section": { "delay": 0.1, "color": "#111111", "show_tooltip": false },
+			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": true },
+			"toml_section": { "delay": 0.3, "color": "#333333", "show_tooltip": true },
+			"expected": { "delay": 0.1, "color": "#111111", "show_tooltip": false, "has_override": true }
+		},
+		{
+			"id": "mixed_fields_cascade_independently",
+			"description": "Each field resolves through the cascade on its own — delay from user_category (no user_section value for it), color from toml_section (no user value at any level), show_tooltip from toml_category (no toml_section value for it). Proves the cascade is per-field, not per-level.",
+			"category": "dl5cat5",
+			"section": "sec",
+			"user_category": { "delay": 0.2 },
+			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": false },
+			"toml_section": { "color": "#333333" },
+			"expected": { "delay": 0.2, "color": "#333333", "show_tooltip": false, "has_override": true }
+		}
+	]
+}

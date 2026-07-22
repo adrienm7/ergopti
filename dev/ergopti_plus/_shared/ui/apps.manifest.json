@@ -1,0 +1,103 @@
+{
+  "$description": "Per-app geometry and metadata for every webview UI. Read by all three hosts (macOS ui_builder, Windows WebView_Host_Open, future Linux WebKitGTK host) so geometry is defined once. Entry path convention: _shared/ui/<id>/index.html. Locales base convention: _shared/data/locales/. Note: macOS metrics_typing and metrics_apps use screen-relative sizing (sf.w-100, sf.h-100) rather than fixed dimensions — the values here are recommended defaults for non-macOS hosts.",
+  "apps": {
+    "action_picker": {
+      "width": 460,
+      "height": 560,
+      "min_width": 360,
+      "min_height": 360,
+      "vhost": "ergopti.actionpicker"
+    },
+    "changelog": {
+      "width": 860,
+      "height": 580,
+      "min_width": 860,
+      "min_height": 540,
+      "vhost": "ergopti.changelog"
+    },
+    "download_window": {
+      "width": 460,
+      "height": 380,
+      "min_width": 460,
+      "min_height": 380,
+      "vhost": "ergopti.download"
+    },
+    "healthcheck": {
+      "width": 740,
+      "height": 560,
+      "min_width": 540,
+      "min_height": 420,
+      "vhost": "ergopti.healthcheck"
+    },
+    "hotstrings_config_window": {
+      "width": 740,
+      "height": 660,
+      "min_width": 560,
+      "min_height": 320,
+      "vhost": "ergopti.hotstringsconfig"
+    },
+    "hotstring_editor": {
+      "width": 960,
+      "height": 640,
+      "min_width": 720,
+      "min_height": 520,
+      "vhost": "ergopti.hotstrings"
+    },
+    "metrics_apps": {
+      "width": 940,
+      "height": 640,
+      "min_width": 720,
+      "min_height": 400,
+      "vhost": "ergopti.metricsapps"
+    },
+    "metrics_typing": {
+      "width": 1020,
+      "height": 680,
+      "min_width": 800,
+      "min_height": 500,
+      "vhost": "ergopti.metricstyping"
+    },
+    "model_browser": {
+      "width": 900,
+      "height": 580,
+      "min_width": 780,
+      "min_height": 460,
+      "vhost": "ergopti.modelbrowser"
+    },
+    "onboarding": {
+      "width": 480,
+      "height": 560,
+      "min_width": 480,
+      "min_height": 520,
+      "vhost": "ergopti.onboarding"
+    },
+    "paths_editor": {
+      "width": 720,
+      "height": 300,
+      "min_width": 560,
+      "min_height": 200,
+      "vhost": "ergopti.paths"
+    },
+    "personal_info_editor": {
+      "width": 560,
+      "height": 680,
+      "min_width": 480,
+      "min_height": 400,
+      "vhost": "ergopti.personalinfo"
+    },
+    "prompt_editor": {
+      "width": 560,
+      "height": 500,
+      "min_width": 480,
+      "min_height": 360,
+      "vhost": "ergopti.prompteditor"
+    },
+    "token_prompt": {
+      "width": 720,
+      "height": 155,
+      "min_width": 720,
+      "min_height": 155,
+      "vhost": "ergopti.tokenprompt"
+    }
+  }
+}

@@ -1,0 +1,2 @@
+- Note-taking workflow: better not to use it and use instead Mac Settings → Keyboard → Keyboard Shortcuts and there modify from Globe + Q to Ctrl + N the note-taking shortcut
+- File Explorer workflow needs to be adapted if another file manager than Finder is used, for example QSpace

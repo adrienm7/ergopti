@@ -1,0 +1,447 @@
+/* _shared/ui/changelog/style.css */
+
+/* =========================================================================== */
+/* Changelog Window UI — release list sidebar + markdown content pane.        */
+/* =========================================================================== */
+
+/* =============================== */
+/* =============================== */
+/* ======= 1/ Reset & Base ======= */
+/* =============================== */
+/* =============================== */
+
+* {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+html,
+body {
+	height: 100%;
+	overflow: hidden;
+}
+
+body {
+	background: #1c1c1e;
+	color: #e8e8ea;
+	display: flex;
+	flex-direction: row;
+	font-family: -apple-system, 'SF Pro Text', 'Segoe UI', 'Helvetica Neue', sans-serif;
+	position: relative;
+}
+
+/* ========================================= */
+/* ========================================= */
+/* ======= 2/ Sidebar (release list) ======= */
+/* ========================================= */
+/* ========================================= */
+
+#sidebar {
+	background: #111113;
+	border-right: 1px solid #2c2c2e;
+	display: flex;
+	flex-direction: column;
+	flex-shrink: 0;
+	min-width: 180px;
+	overflow: hidden;
+	width: 220px;
+}
+
+#sidebar-header {
+	border-bottom: 1px solid #2c2c2e;
+	flex-shrink: 0;
+	padding: 14px 12px 10px;
+}
+
+#channel-toggle {
+	display: flex;
+	gap: 6px;
+}
+
+.channel-btn {
+	background: #2c2c2e;
+	border: 1px solid #3a3a3c;
+	border-radius: 6px;
+	color: #888;
+	cursor: pointer;
+	flex: 1;
+	font-size: 11px;
+	font-weight: 500;
+	padding: 5px 8px;
+	transition:
+		background 0.15s,
+		color 0.15s,
+		border-color 0.15s;
+}
+
+.channel-btn:hover {
+	background: #3a3a3c;
+	color: #ccc;
+}
+
+.channel-btn.active {
+	background: rgba(10, 132, 255, 0.18);
+	border-color: rgba(10, 132, 255, 0.55);
+	color: #4da6ff;
+}
+
+#release-list {
+	flex: 1;
+	overflow-y: auto;
+	padding: 6px 0;
+	scrollbar-color: #3a3a3c transparent;
+	scrollbar-width: thin;
+}
+
+#release-list::-webkit-scrollbar {
+	width: 4px;
+}
+#release-list::-webkit-scrollbar-thumb {
+	background: #3a3a3c;
+	border-radius: 2px;
+}
+
+.release-item {
+	border-left: 3px solid transparent;
+	cursor: pointer;
+	padding: 9px 14px;
+	transition: background 0.1s;
+}
+
+.release-item:hover {
+	background: #1e1e20;
+}
+
+.release-item.selected {
+	background: #1e2a38;
+	border-left-color: #4da6ff;
+}
+
+.release-item.prerelease .release-item-tag {
+	color: #bf7af0;
+}
+
+.release-item-tag {
+	color: #e8e8ea;
+	font-family: 'SF Mono', 'Fira Mono', monospace;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.release-item-date {
+	color: #666;
+	font-size: 11px;
+	margin-top: 2px;
+}
+
+.release-item-badge {
+	border-radius: 3px;
+	display: inline-block;
+	font-size: 9px;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	margin-top: 3px;
+	padding: 1px 5px;
+	text-transform: uppercase;
+}
+
+.badge-prerelease {
+	background: rgba(10, 132, 255, 0.18);
+	border: 1px solid rgba(10, 132, 255, 0.35);
+	color: #4da6ff;
+}
+
+.badge-latest {
+	background: rgba(48, 209, 88, 0.15);
+	border: 1px solid rgba(48, 209, 88, 0.35);
+	color: #30d158;
+}
+
+/* ============================================= */
+/* ============================================= */
+/* ======= 3/ Content pane (markdown view) ===== */
+/* ============================================= */
+/* ============================================= */
+
+#content {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+	overflow: hidden;
+}
+
+#content-header {
+	align-items: center;
+	background: #1c1c1e;
+	border-bottom: 1px solid #2c2c2e;
+	display: flex;
+	flex-shrink: 0;
+	gap: 10px;
+	padding: 12px 20px;
+}
+
+#release-tag {
+	color: #fff;
+	flex: 1;
+	font-family: 'SF Mono', 'Fira Mono', monospace;
+	font-size: 16px;
+	font-weight: 700;
+}
+
+#release-meta {
+	color: #666;
+	font-size: 12px;
+}
+
+#btn-github {
+	background: rgba(48, 209, 88, 0.1);
+	border: 1px solid rgba(48, 209, 88, 0.4);
+	border-radius: 7px;
+	color: #30d158;
+	cursor: pointer;
+	display: none;
+	font-size: 12px;
+	font-weight: 500;
+	padding: 5px 12px;
+	transition: background 0.15s;
+	white-space: nowrap;
+	-webkit-app-region: no-drag;
+}
+
+#btn-github:hover {
+	background: rgba(48, 209, 88, 0.2);
+}
+
+#release-body {
+	flex: 1;
+	overflow-y: auto;
+	padding: 24px 28px;
+	scrollbar-color: #3a3a3c transparent;
+	scrollbar-width: thin;
+}
+
+#release-body::-webkit-scrollbar {
+	width: 5px;
+}
+#release-body::-webkit-scrollbar-thumb {
+	background: #3a3a3c;
+	border-radius: 3px;
+}
+
+/* ================================= */
+/* ===== 3.1) Markdown Rendering ==== */
+/* ================================= */
+
+#release-body h1,
+#release-body h2,
+#release-body h3,
+#release-body h4 {
+	color: #fff;
+	font-weight: 600;
+	line-height: 1.3;
+	margin: 20px 0 8px;
+}
+
+#release-body h1 {
+	font-size: 20px;
+	margin-top: 0;
+}
+#release-body h2 {
+	border-bottom: 1px solid #2c2c2e;
+	font-size: 16px;
+	padding-bottom: 6px;
+}
+#release-body h3 {
+	color: #d0d0d4;
+	font-size: 14px;
+}
+#release-body h4 {
+	color: #aaa;
+	font-size: 13px;
+}
+
+#release-body p {
+	color: #c8c8cc;
+	font-size: 13px;
+	line-height: 1.7;
+	margin-bottom: 10px;
+}
+
+#release-body ul,
+#release-body ol {
+	color: #c8c8cc;
+	font-size: 13px;
+	line-height: 1.7;
+	margin: 6px 0 12px 20px;
+}
+
+#release-body li {
+	margin-bottom: 4px;
+}
+
+#release-body code {
+	background: #2c2c2e;
+	border-radius: 4px;
+	color: #bf7af0;
+	font-family: 'SF Mono', 'Fira Mono', monospace;
+	font-size: 12px;
+	padding: 1px 5px;
+}
+
+#release-body pre {
+	background: #111113;
+	border: 1px solid #2c2c2e;
+	border-radius: 8px;
+	margin: 12px 0;
+	overflow-x: auto;
+	padding: 14px 16px;
+}
+
+#release-body pre code {
+	background: none;
+	color: #c8c8cc;
+	font-size: 12px;
+	padding: 0;
+}
+
+#release-body blockquote {
+	border-left: 3px solid #4da6ff;
+	color: #888;
+	font-size: 13px;
+	font-style: italic;
+	margin: 12px 0;
+	padding: 6px 14px;
+}
+
+#release-body hr {
+	border: none;
+	border-top: 1px solid #2c2c2e;
+	margin: 18px 0;
+}
+
+#release-body a {
+	color: #4da6ff;
+	text-decoration: none;
+}
+
+#release-body a:hover {
+	text-decoration: underline;
+}
+
+#release-body strong {
+	color: #e8e8ea;
+	font-weight: 600;
+}
+
+#release-body em {
+	color: #bbb;
+}
+
+#release-body table {
+	border-collapse: collapse;
+	font-size: 13px;
+	margin: 12px 0;
+	width: 100%;
+}
+
+#release-body th,
+#release-body td {
+	border: 1px solid #2c2c2e;
+	padding: 7px 12px;
+	text-align: left;
+}
+
+#release-body th {
+	background: #111113;
+	color: #aaa;
+	font-weight: 600;
+}
+
+#release-body td {
+	color: #c8c8cc;
+}
+
+.empty-notes {
+	color: #555;
+	font-size: 13px;
+	font-style: italic;
+	margin-top: 8px;
+}
+
+/* ========================================= */
+/* ========================================= */
+/* ======= 4/ Loading & Error Overlays ===== */
+/* ========================================= */
+/* ========================================= */
+
+#loading-overlay,
+#error-overlay {
+	align-items: center;
+	background: #1c1c1e;
+	bottom: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	justify-content: center;
+	left: 0;
+	position: absolute;
+	right: 0;
+	top: 0;
+	z-index: 100;
+}
+
+#loading-overlay {
+	display: flex;
+}
+#error-overlay {
+	display: none;
+}
+
+#loading-spinner {
+	animation: spin 0.9s linear infinite;
+	border: 3px solid #2c2c2e;
+	border-radius: 50%;
+	border-top-color: #4da6ff;
+	height: 32px;
+	width: 32px;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+#loading-text {
+	color: #666;
+	font-size: 13px;
+}
+
+#error-icon {
+	font-size: 32px;
+}
+
+#error-text {
+	color: #aaa;
+	font-size: 13px;
+	line-height: 1.6;
+	max-width: 300px;
+	text-align: center;
+}
+
+#btn-retry {
+	background: rgba(10, 132, 255, 0.12);
+	border: 1px solid rgba(10, 132, 255, 0.45);
+	border-radius: 7px;
+	color: #4da6ff;
+	cursor: pointer;
+	font-size: 12px;
+	font-weight: 500;
+	padding: 6px 16px;
+}
+
+#btn-retry:hover {
+	background: rgba(10, 132, 255, 0.22);
+}

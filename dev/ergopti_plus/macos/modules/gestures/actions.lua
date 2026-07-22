@@ -1,0 +1,1093 @@
+﻿--- modules/gestures/actions.lua
+
+--- ==============================================================================
+--- MODULE: Gestures Actions Registry
+--- DESCRIPTION:
+--- Maps internal logic representations to human-readable labels and concrete
+--- Hammerspoon actions (keystrokes, system events, etc.).
+--- ==============================================================================
+
+local M = {}
+
+local hs            = hs
+local notifications = require("lib.notifications")
+local Logger        = require("lib.logger")
+local Paths         = require("lib.paths")
+local Timings       = require("lib.timings")
+local i18n          = require("lib.i18n")
+local text_utils    = require("lib.text_utils")
+local FileSystem    = require("adapters.file_system")
+local Click         = require("modules.gestures.actions_click")
+local LOG           = "gestures.actions"
+
+-- Explicit inter-key delay for every simulated keystroke. hs.eventtap.keyStroke()
+-- defaults this argument to 200 000 us and implements it as a BLOCKING usleep on the
+-- main run loop, so an omitted delay stalls the loop that services the typing event
+-- tap — long enough for macOS to disable it (kCGEventTapDisabledByTimeout). Declared
+-- here, above every closure that captures it, so it is never bound as a nil global.
+local KEYSTROKE_NO_DELAY_US = 0
+
+local _state = nil
+
+--- Binds the global shared state reference.
+--- @param core_state table The shared state object from the core module.
+function M.init(core_state)
+	Logger.start(LOG, "Initializing…")
+	if _state then
+		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
+		return
+	end
+	if type(core_state) ~= "table" then
+		Logger.error(LOG, "M.init(): core_state must be a table — module non-functional.")
+		return
+	end
+	_state = core_state
+	Logger.success(LOG, "Initialized.")
+end
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 1/ Low-Level Key Helpers ========
+-- =========================================
+-- =========================================
+
+--- Sends a system-level media or hardware key event.
+--- @param key string The hardware key name (e.g. "SOUND_UP").
+local function sysKey(key)
+	pcall(function() hs.eventtap.event.newSystemKeyEvent(key, true):post() end)
+	pcall(function() hs.eventtap.event.newSystemKeyEvent(key, false):post() end)
+end
+
+--- Simulates a keystroke with optional modifiers.
+--- Always passes an explicit delay: hs.eventtap.keyStroke() otherwise falls back to
+--- its 200 000 us default, which it implements as a BLOCKING usleep on the main run
+--- loop — long enough for macOS to disable the typing event tap it stalls.
+--- @param mods table List of modifiers (e.g. {"cmd", "shift"}).
+--- @param key string The key code or character.
+local function postKeyStroke(mods, key)
+	pcall(function() hs.eventtap.keyStroke(mods, key, KEYSTROKE_NO_DELAY_US) end)
+end
+
+local function url_encode_query(value)
+	value = tostring(value or "")
+	return (value:gsub("[^%w%-%._~]", function(char)
+		return string.format("%%%02X", string.byte(char))
+	end))
+end
+
+local function open_url(url)
+	if type(url) ~= "string" or url == "" then return end
+	pcall(function() hs.urlevent.openURL(url) end)
+end
+
+
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 2/ Action Registry ========
+-- ===================================
+-- ===================================
+
+local AX = {} -- Axis actions (continuous/scalable)
+local SG = {} -- Single actions (discrete)
+
+--- Registers an axis-based action (scalable).
+local function ax(name, prev_fn, next_fn, scalable)
+	AX[name] = { prev = prev_fn, next = next_fn, scalable = scalable }
+end
+
+--- Registers a discrete single-fire action.
+--- Accepts an optional label string as second argument so callers can pass
+--- (name, label, fn) without breaking the two-argument form (name, fn).
+--- Without this guard the 3-arg form silently bound the label string as fn,
+--- making every modifier+letter/digit action a no-op.
+local function sg(name, label_or_fn, fn_arg)
+	local fn = type(fn_arg) == "function" and fn_arg or label_or_fn
+	SG[name] = { fn = fn }
+end
+
+--- Resolves the driver's log directory, honouring a relocated config dir.
+--- Mirrors the resolver in ui/menu/init.lua so the gesture actions and the menu
+--- entries can never open two different folders. Falls back to hs.configdir,
+--- which is where the driver lives when the config dir has not been moved.
+--- @return string Absolute log directory, with a trailing slash.
+local function logs_dir()
+	local ok_mp, mp = pcall(require, "ui.menu.menu_paths")
+	local base = ok_mp and type(mp.get_config_dir) == "function" and mp.get_config_dir() or nil
+	if type(base) == "string" and base ~= "" then
+		if not base:match("[/\\]$") then base = base .. "/" end
+		return base .. "hammerspoon/logs/"
+	end
+	return hs.configdir .. "/logs/"
+end
+
+--- Calls `method` on a lazily required UI module, logging loudly on a miss.
+--- The plain `pcall(function() require(mod).method() end)` shape this replaces
+--- collapsed three distinct failures — module absent, method absent, method
+--- raised — into the same silent no-op, so four actions stayed dead through a
+--- module rename with nothing in the logs to say so.
+--- @param mod string Module name to require.
+--- @param method string Method to invoke on it.
+--- @param ... any Arguments forwarded to the method.
+local function invoke_ui(mod, method, ...)
+	local ok_mod, m = pcall(require, mod)
+	if not ok_mod or type(m) ~= "table" then
+		Logger.error(LOG, "Action target '%s' could not be required — gesture is a no-op.", mod)
+		return
+	end
+	if type(m[method]) ~= "function" then
+		Logger.error(LOG, "Action target '%s' has no '%s' function — gesture is a no-op.", mod, method)
+		return
+	end
+	local ok_call, err = pcall(m[method], ...)
+	if not ok_call then
+		Logger.error(LOG, "Action '%s.%s' raised: %s", mod, method, tostring(err))
+	end
+end
+
+--- Switch to the previous application in the MRU list.
+--- ke_lifecycle never exposed switch_to_previous_app, so the lazy-require branch
+--- that used to sit here was dead and the keystroke below was the only path ever
+--- taken. Removed rather than left as a shim, per the no-unused-fallback rule.
+local function switch_to_previous_application()
+	postKeyStroke({"cmd"}, "tab")
+end
+
+--- Switch to the previous window of the frontmost application.
+--- This used to share cmd+tab with switch_to_previous_application, so the
+--- "Prev. window" gesture silently performed an app switch. cmd+grave is the
+--- macOS binding that actually cycles windows within the front app.
+local function switch_to_previous_window_precise()
+	postKeyStroke({"cmd"}, "`")
+end
+
+--- Triggers a macOS system-wide dictionary lookup/definition.
+function M.trigger_lookup()
+	local pos = hs.mouse.absolutePosition()
+	pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseDown, pos):post() end)
+	pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseUp, pos):post() end)
+	hs.timer.doAfter(0.05, function()
+		postKeyStroke({"cmd", "ctrl"}, "d")
+	end)
+end
+
+-- The synthetic click-hold subsystem lives in its own module so the action
+-- registry below stays a pure name -> behaviour mapping. Re-export its public
+-- surface on M so existing callers (and the registry) keep their call sites.
+M.force_cleanup           = Click.force_cleanup
+M.toggle_right_click      = Click.toggle_right_click
+M.toggle_left_click       = Click.toggle_left_click
+M.is_right_click_held     = Click.is_right_click_held
+
+local function show_application_switcher_overlay()
+    postKeyStroke({"cmd"}, "tab")
+end
+
+--- Navigates between windows of the current application.
+local function winNav(goNext)
+	local key = goNext and "`" or "~"
+	postKeyStroke({"cmd"}, key)
+end
+
+--- Navigates between macOS Spaces (Desktops).
+local function spaceNav(goNext)
+	-- space_wrap is persisted, restored and exposed as a menu checkbox, but nothing
+	-- ever read it: the toggle looked functional and did nothing. macOS itself stops
+	-- at the first and last Space, so honouring the setting means suppressing the
+	-- navigation at the edge rather than asking the OS to wrap.
+	if _state and _state.space_wrap == false then
+		local ok_sp, spaces = pcall(require, "hs.spaces")
+		if ok_sp and spaces and type(spaces.spaceType) == "function" then
+			local ok_all, all = pcall(spaces.allSpaces)
+			local ok_cur, cur = pcall(spaces.focusedSpace)
+			if ok_all and ok_cur and type(all) == "table" and cur then
+				local screen_spaces
+				for _, list in pairs(all) do
+					for _, id in ipairs(list) do
+						if id == cur then screen_spaces = list break end
+					end
+					if screen_spaces then break end
+				end
+				if screen_spaces and #screen_spaces > 0 then
+					local at_edge = (goNext and screen_spaces[#screen_spaces] == cur)
+						or ((not goNext) and screen_spaces[1] == cur)
+					if at_edge then
+						Logger.debug(LOG, "Space navigation suppressed at the edge (space_wrap disabled).")
+						return
+					end
+				end
+			end
+		end
+	end
+
+	local key_code = goNext and 124 or 123 -- 124=Right, 123=Left
+	-- Deferred so the AppleScript call never blocks the gesture frameCallback
+	hs.timer.doAfter(0, function()
+		pcall(hs.osascript.applescript, string.format(
+			"tell application \"System Events\" to key code %d using {control down}",
+			key_code
+		))
+	end)
+end
+
+-- Axis actions (prev / next)
+ax("tabs",       
+	function() postKeyStroke({"ctrl", "shift"}, "tab") end,
+	function() postKeyStroke({"ctrl"}, "tab") end, true)
+
+ax("char",       
+	function() postKeyStroke({}, "left") end,
+	function() postKeyStroke({}, "right") end, true)
+
+ax("char_sel",   
+	function() postKeyStroke({"shift"}, "left") end,
+	function() postKeyStroke({"shift"}, "right") end, true)
+
+ax("line_arrow", 
+	function() postKeyStroke({}, "up") end,
+	function() postKeyStroke({}, "down") end, true)
+
+ax("line_sel",   
+	function() postKeyStroke({"shift"}, "up") end,
+	function() postKeyStroke({"shift"}, "down") end, true)
+
+ax("words",      
+	function() postKeyStroke({"alt"}, "left") end,
+	function() postKeyStroke({"alt"}, "right") end, true)
+
+ax("words_sel",  
+	function() postKeyStroke({"shift", "alt"}, "left") end,
+	function() postKeyStroke({"shift", "alt"}, "right") end, true)
+
+ax("windows",    
+	function() winNav(false) end, 
+	function() winNav(true) end)
+
+ax("spaces",     
+	function() spaceNav(false) end, 
+	function() spaceNav(true) end)
+
+ax("volume",     
+	function() sysKey("SOUND_DOWN") end, 
+	function() sysKey("SOUND_UP") end, true)
+
+ax("brightness", 
+	function() sysKey("BRIGHTNESS_DOWN") end, 
+	function() sysKey("BRIGHTNESS_UP") end, true)
+
+ax("tracks",     
+	function() sysKey("PREVIOUS") end, 
+	function() sysKey("NEXT") end)
+
+ax("lines",      
+	function() hs.timer.doAfter(0, function() postKeyStroke({"alt"}, "up") end) end,
+	function() hs.timer.doAfter(0, function() postKeyStroke({"alt"}, "down") end) end, true)
+
+ax("line_bounds",
+	function() hs.timer.doAfter(0, function() postKeyStroke({"cmd"}, "left") end) end,
+	function() hs.timer.doAfter(0, function() postKeyStroke({"cmd"}, "right") end) end)
+
+ax("paragraphs", 
+	function() postKeyStroke({"alt"}, "up") end,
+	function() postKeyStroke({"alt"}, "down") end, true)
+
+ax("document",   
+	function() postKeyStroke({"cmd"}, "up") end,
+	function() postKeyStroke({"cmd"}, "down") end)
+
+-- Single actions
+sg("none",                         function() end)
+
+-- Selection & navigation cursor
+sg("left_click_toggle",   M.toggle_left_click)
+sg("right_click_toggle",   M.toggle_right_click)
+sg("lookup",               M.trigger_lookup)
+sg("app_switcher",      show_application_switcher_overlay)
+sg("app_previous",      switch_to_previous_application)
+sg("app_window_previous",  switch_to_previous_window_precise)
+
+-- Keys
+sg("enter",                           function() postKeyStroke({}, "return") end)
+sg("tab",                                function() postKeyStroke({}, "tab") end)
+sg("escape",                           function() postKeyStroke({}, "escape") end)
+sg("backspace",               function() postKeyStroke({}, "delete") end)
+sg("delete",                    function() postKeyStroke({}, "forwarddelete") end)
+
+-- Tabs
+sg("tab_new",                  function() postKeyStroke({"cmd"}, "t") end)
+sg("tab_close",                function() postKeyStroke({"cmd"}, "w") end)
+sg("tab_prev",              function() postKeyStroke({"ctrl", "shift"}, "tab") end)
+sg("tab_next",                function() postKeyStroke({"ctrl"}, "tab") end)
+
+-- Windows & Spaces
+sg("win_prev",            function() winNav(false) end)
+sg("win_next",              function() winNav(true) end)
+sg("close_window",         function() postKeyStroke({"cmd"}, "w") end)
+sg("fullscreen",                 function() postKeyStroke({"cmd", "ctrl"}, "f") end)
+sg("snap_left",              function()
+	local win = hs.window.focusedWindow()
+	if win then pcall(function() win:moveToUnit(hs.layout.left50) end) end
+end)
+sg("snap_right",             function()
+	local win = hs.window.focusedWindow()
+	if win then pcall(function() win:moveToUnit(hs.layout.right50) end) end
+end)
+sg("maximize",                     function()
+	local win = hs.window.focusedWindow()
+	if win then pcall(function() win:maximize() end) end
+end)
+sg("space_prev",             function() spaceNav(false) end)
+sg("space_next",               function() spaceNav(true) end)
+sg("mission_control",        function()
+	-- Deferred so the AppleScript call never blocks the gesture frameCallback
+	hs.timer.doAfter(0, function()
+		pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 160")
+	end)
+end)
+sg("app_expose",                  function()
+	-- Deferred so the AppleScript call never blocks the gesture frameCallback
+	hs.timer.doAfter(0, function()
+		pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 125 using {control down}")
+	end)
+end)
+
+-- Cursor movement
+sg("word_prev",                function() postKeyStroke({"alt"}, "left") end)
+sg("word_next",                  function() postKeyStroke({"alt"}, "right") end)
+sg("line_up",               function() hs.timer.doAfter(0, function() postKeyStroke({"alt"}, "up") end) end)
+sg("line_down",               function() hs.timer.doAfter(0, function() postKeyStroke({"alt"}, "down") end) end)
+sg("line_start",              function() hs.timer.doAfter(0, function() postKeyStroke({"cmd"}, "left") end) end)
+sg("line_end",                  function() hs.timer.doAfter(0, function() postKeyStroke({"cmd"}, "right") end) end)
+sg("para_prev",         function() postKeyStroke({"alt"}, "up") end)
+sg("para_next",           function() postKeyStroke({"alt"}, "down") end)
+sg("doc_start",            function() postKeyStroke({"cmd"}, "up") end)
+sg("doc_end",                function() postKeyStroke({"cmd"}, "down") end)
+
+-- Media
+sg("vol_up",                        function() sysKey("SOUND_UP") end)
+sg("vol_down",                      function() sysKey("SOUND_DOWN") end)
+sg("mute",                       function() sysKey("MUTE") end)
+sg("brightness_up",             function() sysKey("BRIGHTNESS_UP") end)
+sg("brightness_down",           function() sysKey("BRIGHTNESS_DOWN") end)
+sg("track_play",               function() sysKey("PLAY") end)
+sg("track_next",              function() sysKey("NEXT") end)
+sg("track_prev",            function() sysKey("PREVIOUS") end)
+
+-- Single arrows
+sg("arrow_up",                   function() postKeyStroke({}, "up") end)
+sg("arrow_down",                  function() postKeyStroke({}, "down") end)
+sg("arrow_left",               function() postKeyStroke({}, "left") end)
+sg("arrow_right",              function() postKeyStroke({}, "right") end)
+
+-- Shift + Arrows
+sg("sel_up",                  function() postKeyStroke({"shift"}, "up") end)
+sg("sel_down",                 function() postKeyStroke({"shift"}, "down") end)
+sg("sel_left",              function() postKeyStroke({"shift"}, "left") end)
+sg("sel_right",             function() postKeyStroke({"shift"}, "right") end)
+
+-- Shift + Alt + Arrows (Word selection)
+sg("sel_word_prev",     function() postKeyStroke({"shift", "alt"}, "left") end)
+sg("sel_word_next",       function() postKeyStroke({"shift", "alt"}, "right") end)
+
+-- System
+sg("screenshot_window_clipboard",     function()
+	-- Deferred so hs.execute never blocks the gesture frameCallback
+	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture -cw") end)
+end)
+sg("screenshot_window_save",          function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture -w ~/Pictures/screenshots/win_$(date +%Y%m%d%H%M%S).png") end)
+end)
+sg("screenshot_region_clipboard",      function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture -ci") end)
+end)
+sg("screenshot_region_save",           function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture -i ~/Pictures/screenshots/reg_$(date +%Y%m%d%H%M%S).png") end)
+end)
+sg("screenshot_fullscreen_clipboard",   function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture -c") end)
+end)
+sg("screenshot_fullscreen_save",        function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture ~/Pictures/screenshots/full_$(date +%Y%m%d%H%M%S).png") end)
+end)
+
+sg("lock_screen",                    function() pcall(hs.caffeinate.lockScreen) end)
+sg("notification_center",          function()
+	-- Deferred so the AppleScript call never blocks the gesture frameCallback
+	hs.timer.doAfter(0, function()
+		pcall(hs.osascript.applescript, "tell application \"System Events\" to click menu bar item \"Notification Center\" of menu bar 1 of application process \"ControlCenter\"")
+	end)
+end)
+
+-- Applications and Stats
+-- These four target the same modules the menu dispatches to (ui/menu/init.lua),
+-- which is the reference for the real module names: the metrics overlays were
+-- never one "ui.metrics_overlay" module, the hotstring editor is singular, and
+-- the paths editor lives behind the menu_paths module rather than a UI module.
+sg("open_metrics_typing",            function() invoke_ui("ui.metrics_typing", "show") end)
+sg("open_metrics_apps",        function() invoke_ui("ui.metrics_apps", "show") end)
+sg("open_hotstrings_editor",    function() invoke_ui("ui.hotstring_editor", "open") end)
+sg("open_paths_editor",            function() invoke_ui("ui.menu.menu_paths", "open_editor") end)
+sg("open_script_source",               function()
+	-- Deferred so hs.execute never blocks the gesture frameCallback
+	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir)) end)
+end)
+sg("open_personal_shortcuts",     function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir) .. "/personal_shortcuts.toml") end)
+end)
+sg("open_personal_hotstrings",    function()
+	-- Resolve path eagerly (requires only Lua, no shell), then defer the shell open
+	local ok_mp, mp = pcall(require, "ui.menu.menu_paths")
+	local p = ok_mp and type(mp.get) == "function" and mp.get("PersonalTomlPath")
+	hs.timer.doAfter(0, function()
+		if p and p ~= "" then pcall(hs.execute, "open " .. text_utils.shell_quote(p))
+		else pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir) .. "/hotstrings/personal_hotstrings.toml") end
+	end)
+end)
+sg("open_personal_info",               function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir) .. "/personal_info.toml") end)
+end)
+sg("open_config",                    function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir) .. "/config.toml") end)
+end)
+sg("open_logs_folder",                function()
+	local dir = logs_dir()
+	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(dir)) end)
+end)
+sg("open_today_log",                   function()
+	-- Resolve the path synchronously (pure Lua), then open in a deferred shell call
+	local ok_p, path = pcall(function()
+		return logs_dir() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
+	end)
+	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(path)) end)
+end)
+sg("open_error_log",                   function()
+	-- Resolve the path synchronously (pure Lua), then open in a deferred shell call
+	local ok_p, path = pcall(function()
+		local ok_l, Logger = pcall(require, "lib.logger")
+		if ok_l and type(Logger) == "table" and type(Logger.ERRORS_LOG_FILE) == "string" and Logger.ERRORS_LOG_FILE ~= "" then
+			return Logger.ERRORS_LOG_FILE
+		end
+		return logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
+	end)
+	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(path)) end)
+end)
+
+-- Parameterized actions read their value from the binding that invoked them.
+-- They intentionally do not use a global fallback: every gesture/shortcut keeps
+-- the exact URL selected by the user in its own configuration entry.
+sg("open_url", function(binding)
+	local url = M.get_action_parameter(binding, "open_url")
+	if M.validate_action_parameter("open_url", url) then open_url(url) end
+end)
+sg("search_web", function(binding)
+	local template = M.get_action_parameter(binding, "search_web")
+	if not M.validate_action_parameter("search_web", template) then return end
+	local old_clipboard = hs.pasteboard and hs.pasteboard.getContents and hs.pasteboard.getContents() or nil
+	postKeyStroke({"cmd"}, "c")
+	hs.timer.doAfter(0.08, function()
+		local selected = hs.pasteboard and hs.pasteboard.getContents and hs.pasteboard.getContents() or ""
+		if old_clipboard ~= nil and hs.pasteboard and hs.pasteboard.setContents then
+			pcall(hs.pasteboard.setContents, old_clipboard)
+		end
+		-- url_encode_query returns percent-escapes, and this value lands on the
+		-- REPLACEMENT side of gsub where "%2" reads as capture reference #2. Any
+		-- selection containing a space encodes to "%20" and raised "invalid capture
+		-- index %2" — inside an hs.timer callback, so the error went to the HS
+		-- Console and never to the file logger, and the search silently never opened.
+		open_url((template:gsub("%%s", text_utils.escape_gsub_replacement(url_encode_query(selected)))))
+	end)
+end)
+
+-- Script management
+sg("script_pause_toggle",     function()
+	local ok, sc = pcall(require, "modules.shortcuts.script_control")
+	if ok and type(sc.toggle) == "function" then pcall(sc.toggle) end
+end)
+sg("script_reload",                       function() pcall(hs.reload) end)
+sg("script_save_reload",      function()
+	postKeyStroke({"cmd"}, "s")
+	hs.timer.doAfter(0.3, function() pcall(hs.reload) end)
+end)
+sg("script_quit",                         function()
+	pcall(function() hs.closeConsole() end)
+	-- Tear down Karabiner-Elements BEFORE exiting. os.exit() terminates the Lua
+	-- VM abruptly and BYPASSES the Hammerspoon shutdown callback (where the normal
+	-- KE kill lives), so on this quit path KE would otherwise keep running with the
+	-- Ergopti rules — leaving the physical keyboard remapped after HS is gone.
+	-- karabiner.kill() runs the robust launchctl-bootout teardown SYNCHRONOUSLY
+	-- (so launchd cannot respawn the remapper) and respects a user-managed KE
+	-- install (leaves it untouched when HS did not own the bridge). Because it
+	-- blocks until KE is down, the keyboard is guaranteed free before os.exit.
+	-- Lazy-required so this low-level action module carries no load-time
+	-- dependency on the Karabiner module.
+	pcall(function()
+		local ok_kb, karabiner = pcall(require, "modules.karabiner")
+		if ok_kb and type(karabiner) == "table" and type(karabiner.kill) == "function" then
+			karabiner.kill()
+		end
+	end)
+	-- Flush in-memory keystrokes before exiting — os.exit(0) bypasses
+	-- hs.shutdownCallback where the normal keylogger flush lives.
+	pcall(function()
+		local ok_kl, kl = pcall(require, "modules.keylogger")
+		if ok_kl and type(kl) == "table" and type(kl.stop) == "function" then
+			kl.stop()
+		end
+	end)
+	-- Terminate the MLX server + orphan helper processes — os.exit(0) likewise
+	-- bypasses the HS shutdown callback where these kills live, so without
+	-- duplicating them the mlx_lm.server keeps holding GPU memory + the MLX port and the
+	-- ergopti_plus_expander / ergopti_plus_http_server helpers survive as orphans.
+	-- Shared with that callback via menu_llm so the two quit paths cannot drift.
+	pcall(function()
+		local ok_llm, menu_llm = pcall(require, "ui.menu.menu_llm")
+		if ok_llm and type(menu_llm) == "table" then
+			if type(menu_llm.stop_mlx_server) == "function" then menu_llm.stop_mlx_server() end
+			if type(menu_llm.terminate_helper_processes) == "function" then menu_llm.terminate_helper_processes() end
+			-- stop_mlx_server only kills the in-process wrapper; the detached
+			-- mlx_lm.server (own process group) must be reaped via pgrep/lsof or it
+			-- keeps holding GPU memory + the MLX port after quit. Same sweep the
+			-- shutdown callback runs (script_quit is always a genuine quit) (F-M7).
+			if type(menu_llm.terminate_orphan_mlx_server) == "function" then menu_llm.terminate_orphan_mlx_server() end
+		end
+	end)
+	pcall(function() hs.timer.doAfter(0.1, function() os.exit(0) end) end)
+end)
+
+-- Debug
+sg("open_console",                        function() pcall(hs.openConsole) end)
+
+
+
+
+
+-- =============================
+-- =============================
+-- ======= 3/ Public API =======
+-- =============================
+-- =============================
+
+-- Hard-coded action labels — same in every locale (symbols + universal terms).
+-- app_expose and mission_control are intentionally absent: they vary by language
+-- and are served from the locale JSON.
+local LABELS = {
+	-- SG actions
+	none                             = "∅ Disabled",
+	left_click_toggle                = "🖱 L Left click (hold)",
+	right_click_toggle               = "🖱 R Right click (hold)",
+	lookup                           = "🔍 Word definition",
+	app_switcher                     = "⇥ Alt+Tab — Previous app",
+	app_previous                     = "⇥ ← Alt+Tab — Prev. app",
+	app_window_previous              = "⇥ ◱ ← Alt+Tab — Prev. window",
+	copy                             = "⎘ Copy",
+	paste                            = "⎘ Paste",
+	cut                              = "⎘ Cut",
+	undo                             = "↩ Undo",
+	redo                             = "↪ Redo",
+	select_all                       = "⬚ Select all",
+	find                             = "🔍 Find",
+	enter                            = "↵ Enter",
+	tab                              = "⇥ Tab",
+	escape                           = "⎋ Escape",
+	backspace                        = "⌫ Backspace",
+	delete                           = "⌦ Delete",
+	tab_new                          = "⧉ + New tab",
+	tab_close                        = "⧉ × Close tab",
+	tab_prev                         = "⧉ ← Previous tab",
+	tab_next                         = "⧉ → Next tab",
+	nav_back                         = "← Back (navigation)",
+	nav_forward                      = "→ Forward (navigation)",
+	win_prev                         = "◱ ← Previous window",
+	win_next                         = "◱ → Next window",
+	win_app_prev                     = "◱ ← Prev. window (same app)",
+	win_app_next                     = "◱ → Next window (same app)",
+	close_window                     = "◱ × Close window",
+	fullscreen                       = "📺 Fullscreen",
+	snap_left                        = "◧ ← Snap left",
+	snap_right                       = "◨ → Snap right",
+	maximize                         = "🔲 Maximize",
+	space_prev                       = "▢ ← Previous Space",
+	space_next                       = "▢ → Next Space",
+	desktop_prev                     = "▢ ← Previous desktop",
+	desktop_next                     = "▢ → Next desktop",
+	desktop_new                      = "▢ + New desktop",
+	desktop_close                    = "▢ × Close desktop",
+	task_view                        = "▢ Task View",
+	minimize_all                     = "◱ Minimize all",
+	word_prev                        = "W ← Previous word",
+	word_next                        = "W → Next word",
+	line_up                          = "↕ ↑ Previous line",
+	line_down                        = "↕ ↓ Next line",
+	line_start                       = "⇤ Line start",
+	line_end                         = "⇥ Line end",
+	para_prev                        = "¶ ↑ Previous paragraph",
+	para_next                        = "¶ ↓ Next paragraph",
+	doc_start                        = "⤒ Document start",
+	doc_end                          = "⤓ Document end",
+	arrow_up                         = "↑ Arrow Up",
+	arrow_down                       = "↓ Arrow Down",
+	arrow_left                       = "← Arrow Left",
+	arrow_right                      = "→ Arrow Right",
+	sel_up                           = "✎ ↑ Select Up",
+	sel_down                         = "✎ ↓ Select Down",
+	sel_left                         = "✎ ← Select Left",
+	sel_right                        = "✎ → Select Right",
+	sel_word_prev                    = "✎ W ← Sel. prev. word",
+	sel_word_next                    = "✎ W → Sel. next word",
+	vol_up                           = "🔊 + Volume +",
+	vol_down                         = "🔊 - Volume -",
+	mute                             = "🔇 Mute/Unmute",
+	brightness_up                    = "☀ + Brightness +",
+	brightness_down                  = "☀ - Brightness -",
+	track_play                       = "⏯ Play/Pause",
+	track_next                       = "⏭ Next track",
+	track_prev                       = "⏮ Previous track",
+	screenshot_window_clipboard      = "📸 ⊞ Copy window",
+	screenshot_window_save           = "📸 ⊞ Save window",
+	screenshot_region_clipboard      = "📸 ⬚ Copy region",
+	screenshot_region_save           = "📸 ⬚ Save region",
+	screenshot_fullscreen_clipboard  = "📸 🖥 Copy screen",
+	screenshot_fullscreen_save       = "📸 🖥 Save screen",
+	screen_record                    = "⏺ Screen recording",
+	lock_screen                      = "🔒 Lock screen",
+	notification_center              = "🔔 Notifications",
+	open_metrics_typing              = "📊 Typing stats",
+	open_metrics_apps                = "📊 App stats",
+	open_hotstrings_editor           = "⌨ Hotstrings editor",
+	open_paths_editor                = "📂 Paths editor",
+	open_script_source               = "🛠 Source code",
+	open_personal_shortcuts          = "👤 Personal shortcuts",
+	open_personal_hotstrings         = "👤 Personal hotstrings",
+	open_personal_info               = "👤 Personal info",
+	open_config                      = "⚙ Configuration",
+	open_logs_folder                 = "📁 Logs folder",
+	open_today_log                   = "📄 Today's log",
+	open_error_log                   = "📄 Error log",
+	script_pause_toggle              = "⏸/▶ Suspend / Resume",
+	script_reload                    = "↻ Reload",
+	script_save_reload               = "↻ Save and reload",
+	script_quit                      = "✕ Quit",
+	select_line                      = "☰ Select line",
+	screen_capture                   = "📸 Selective capture (Win+Shift+S)",
+	screen_capture_instant           = "📸 Instant capture (window)",
+	open_url                         = "🌐 Open a link (configurable)",
+	pick_color                       = "🎨 HEX colour under cursor",
+	take_note                        = "📝 Take a note",
+	activity_simulation              = "🖱 Simulate activity (anti-sleep)",
+	surround_parens                  = "() Surround with parentheses",
+	search_web                       = "🔍 Web search (configurable)",
+	teleport_mouse                   = "🖱 Teleport mouse",
+	uppercase_selection              = "AA Uppercase / lowercase",
+	titlecase_selection              = "Aa Title case",
+	spotlight_mouse                  = "🔦 Mouse spotlight",
+	toggle_capslock                  = "⇪ Toggle CapsLock",
+	microsoft_bold                   = "𝐁 Ctrl+B Microsoft (→ Ctrl+G)",
+	paste_plain                      = "⎘ Paste without formatting",
+	open_console                     = "▤ Console",
+	open_window_spy                  = "Window Spy",
+	open_list_vars                   = "Variable state",
+	open_key_history                 = "Key history",
+	-- AX actions
+	["ax.tabs"]                      = "⧉ Tabs",
+	["ax.char"]                      = "A Characters",
+	["ax.char_sel"]                  = "✎ A Sel. Characters",
+	["ax.line_arrow"]                = "↕ Lines (Arrows)",
+	["ax.line_sel"]                  = "✎ ↕ Sel. Lines",
+	["ax.words"]                     = "W Words",
+	["ax.words_sel"]                 = "✎ W Sel. Words",
+	["ax.windows"]                   = "◱ Windows",
+	["ax.spaces"]                    = "▢ Spaces",
+	["ax.desktops"]                  = "▢ Desktops",
+	["ax.volume"]                    = "🔊 Volume",
+	["ax.brightness"]                = "☀ Brightness",
+	["ax.tracks"]                    = "♫ Tracks",
+	["ax.lines"]                     = "↕ Lines (Alt)",
+	["ax.line_bounds"]               = "↔ Line (start/end)",
+	["ax.paragraphs"]                = "¶ Paragraphs",
+	["ax.document"]                  = "📄 Document (start/end)",
+}
+
+-- Path to the shared actions.toml, resolved through the single shared-tree
+-- resolver (Paths.shared) so the shared root lives in exactly one place.
+local _shared_toml = Paths.shared("modules/gestures/actions.toml")
+local _modifier_chords_json = Paths.shared("modules/gestures/modifier_chords.json")
+
+--- Parses the shared actions.toml using a lightweight line-by-line reader.
+--- Returns { sg_order = [...], ax_order = [...], sg_actions = {name={platform=...}}, ax_actions = {name={platform=...}} }
+local function load_shared_actions(path)
+	local result = { sg_order = {}, ax_order = {}, sg_actions = {}, ax_actions = {} }
+	local ok, f = pcall(io.open, path, "r")
+	if not ok or not f then
+		Logger.warn("gestures.actions", "Shared actions TOML not found: %s — using fallback.", tostring(path))
+		return nil
+	end
+
+	local current_section = nil
+	local current_key     = nil
+	local in_array        = false
+	local array_buf       = {}
+	local current_action  = nil  -- e.g. "sg_actions.left_click_toggle"
+
+	for line in f:lines() do
+		local trimmed = line:match("^%s*(.-)%s*$")
+
+		-- Skip blank lines and comments
+		if trimmed == "" or trimmed:sub(1, 1) == "#" then goto continue end
+
+		-- Multi-line array continuation
+		if in_array then
+			if trimmed:sub(1, 1) == "]" then
+				-- End of array
+				if current_section == "sg_order" then
+					result.sg_order = array_buf
+				elseif current_section == "ax_order" then
+					result.ax_order = array_buf
+				end
+				in_array  = false
+				array_buf = {}
+			else
+				-- Collect array items: strip trailing comma and quotes
+				local item = trimmed:match('^"(.-)"')
+				if item then array_buf[#array_buf + 1] = item end
+			end
+			goto continue
+		end
+
+		-- Section header [name] or [name.subkey]
+		local section = trimmed:match("^%[([^%[%]]+)%]$")
+		if section then
+			current_section = section
+			current_action  = nil
+			-- Pre-create entry for known action sections
+			local kind, name = section:match("^(sg_actions)%.(.+)$")
+			if not kind then kind, name = section:match("^(ax_actions)%.(.+)$") end
+			if kind and name then
+				current_action = section
+				result[kind][name] = result[kind][name] or {}
+			end
+			goto continue
+		end
+
+		-- Key = value
+		local key, val = trimmed:match("^([%w_]+)%s*=%s*(.+)$")
+		if key and val then
+			-- Unquote string values
+			local str_val = val:match('^"(.-)"$') or val
+			-- Array opening without closing on same line
+			if val:sub(1, 1) == "[" and not val:find("]", 2, true) then
+				current_key = key
+				in_array    = true
+				array_buf   = {}
+			elseif current_action then
+				-- Store attribute of current [sg_actions.X] or [ax_actions.X]
+				local kind, name = current_action:match("^(sg_actions)%.(.+)$")
+				if not kind then kind, name = current_action:match("^(ax_actions)%.(.+)$") end
+				if kind and name then
+					result[kind][name][key] = str_val
+				end
+			end
+		end
+
+		::continue::
+	end
+	f:close()
+	return result
+end
+
+local _shared = load_shared_actions(_shared_toml)
+
+local function parameter_key(binding, action)
+	return tostring(binding or "") .. "__" .. tostring(action or "")
+end
+
+--- Split only on a recognised parameterized-action suffix. A binding itself
+--- may contain ``__`` (for example keyboard__cmd_k), so splitting at the
+--- first delimiter would restore the parameter under the wrong binding.
+function M.split_action_parameter_key(key)
+	if type(key) ~= "string" then return nil, nil end
+	for action, meta in pairs((_shared and _shared.sg_actions) or {}) do
+		if type(meta) == "table" and type(meta.parameter) == "string" then
+			local suffix = "__" .. action
+			if key:sub(-#suffix) == suffix then return key:sub(1, #key - #suffix), action end
+		end
+	end
+	return nil, nil
+end
+
+function M.get_action_parameter_spec(action)
+	local meta = _shared and _shared.sg_actions and _shared.sg_actions[action]
+	return meta and meta.parameter or nil
+end
+
+function M.validate_action_parameter(action, value)
+	local spec = M.get_action_parameter_spec(action)
+	if not spec then return true end
+	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
+	if spec == "search_url" then
+		local _, placeholders = value:gsub("%%s", "")
+		return placeholders == 1
+	end
+	return true
+end
+
+function M.get_action_parameter(binding, action)
+	if not _state or type(_state.action_params) ~= "table" then return "" end
+	return _state.action_params[parameter_key(binding, action)] or ""
+end
+
+function M.set_action_parameter(binding, action, value)
+	if not _state or not M.validate_action_parameter(action, value) then return false end
+	_state.action_params = _state.action_params or {}
+	_state.action_params[parameter_key(binding, action)] = value
+	return true
+end
+
+function M.get_all_action_parameters()
+	local out = {}
+	for key, value in pairs((_state and _state.action_params) or {}) do out[key] = value end
+	return out
+end
+
+-- Labels for modifier-key actions are intentionally kept outside i18n: the
+-- shared catalogue defines their exact, language-neutral display form (for
+-- example "Ctrl + A") for every driver.
+local MODIFIER_ACTION_LABELS = {}
+local MODIFIER_ACTION_GROUPS = {}
+
+local function load_modifier_chords(path)
+	local raw = FileSystem.read(path)
+	if not raw then
+		Logger.warn(LOG, "Shared modifier chords JSON not found: %s", tostring(path))
+		return nil
+	end
+	local ok_json, data = pcall(hs.json.decode, raw)
+	if not ok_json or type(data) ~= "table" then
+		Logger.warn(LOG, "Shared modifier chords JSON is invalid: %s", tostring(path))
+		return nil
+	end
+	return data
+end
+
+local function join(parts, separator)
+	return table.concat(parts, separator)
+end
+
+local function register_modifier_chords(catalogue)
+	local platform = catalogue and catalogue.platforms and catalogue.platforms.macos
+	local modifiers = platform and platform.modifiers
+	local keys = catalogue and catalogue.keys
+	if type(modifiers) ~= "table" or type(keys) ~= "table" then return end
+
+	local max_mask = (2 ^ #modifiers) - 1
+	for mask = 1, max_mask do
+		local ids, labels, native_mods = {}, {}, {}
+		for index, modifier in ipairs(modifiers) do
+			if math.floor(mask / (2 ^ (index - 1))) % 2 == 1 then
+				ids[#ids + 1] = modifier.id
+				labels[#labels + 1] = modifier.label
+				native_mods[#native_mods + 1] = modifier.hammerspoon
+			end
+		end
+		local id_prefix = join(ids, "_")
+		local label_prefix = join(labels, " + ")
+		local action_ids = {}
+		for _, key_def in ipairs(keys) do
+			local action_id = id_prefix .. "_" .. key_def.id
+			local action_label = label_prefix .. " + " .. key_def.label
+			local key = key_def.macos_key or key_def.id
+			local mods = {}
+			for index, modifier in ipairs(native_mods) do mods[index] = modifier end
+			MODIFIER_ACTION_LABELS[action_id] = action_label
+			action_ids[#action_ids + 1] = action_id
+			sg(action_id, function() postKeyStroke(mods, key) end)
+		end
+		MODIFIER_ACTION_GROUPS[#MODIFIER_ACTION_GROUPS + 1] = {
+			label = label_prefix,
+			actions = action_ids,
+		}
+	end
+end
+
+register_modifier_chords(load_modifier_chords(_modifier_chords_json))
+
+--- Builds a picker-order list from the shared TOML, keeping only entries
+--- matching the given platform ("hs") plus sentinels ("--", "#…").
+--- The modifier-chord placeholder is expanded from modifier_chords.json.
+local function build_sg_names(shared)
+	if not shared then
+		-- The shared action-order catalogue is unavailable: omit picker entries
+		-- rather than exposing an unsynchronised fallback list.
+		return nil
+	end
+	local out = {}
+	for _, item in ipairs(shared.sg_order) do
+		-- Sentinels and headers always pass through (TOML uses "--" and "#…")
+		if item == "--" then
+			out[#out + 1] = "-"
+		elseif item:sub(1, 1) == "#" then
+			-- Header from TOML: the number of leading "#" encodes the heading
+			-- level ("#grp_input" = h1, "##mouse_nav" = h2). Re-emit with the
+			-- SAME marker so the picker can render the hierarchy. The locale value
+			-- carries a legacy "#" prefix — strip it so the level comes only from
+			-- the TOML marker, not the translated text.
+			local hashes     = item:match("^#+")
+			local key_suffix = item:sub(#hashes + 1)
+			local i18n_key   = "sg_actions.sg_order.header." .. key_suffix
+			local translated = i18n.get(i18n_key)
+			local title      = (translated ~= i18n_key) and translated or key_suffix
+			title            = (title:gsub("^#+", ""))
+			out[#out + 1] = hashes .. title
+		elseif item == "_modifier_chords_placeholder" then
+			for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
+				out[#out + 1] = "##Raccourcis " .. group.label
+				for _, action_id in ipairs(group.actions) do out[#out + 1] = action_id end
+			end
+		elseif item:sub(1, 1) == "_" then
+			-- Driver-specific placeholders are ignored deliberately.
+		else
+			local meta = shared.sg_actions[item]
+			local platform = meta and meta.platform or "all"
+			if platform == "all" or platform == "hs" then
+				out[#out + 1] = item
+			end
+		end
+	end
+	return out
+end
+
+local function build_ax_names(shared)
+	if not shared then return nil end
+	-- "none" is the disabled-axis sentinel; always first, never in the TOML order list
+	local out = {"none"}
+	for _, item in ipairs(shared.ax_order) do
+		local meta = shared.ax_actions[item]
+		local platform = meta and meta.platform or "all"
+		if platform == "all" or platform == "hs" then
+			out[#out + 1] = item
+		end
+	end
+	return out
+end
+
+M.AX_NAMES = build_ax_names(_shared) or {
+	"none", "char", "char_sel", "words", "words_sel",
+	"line_arrow", "line_sel", "lines", "paragraphs", "line_bounds", "document",
+	"tabs", "windows", "spaces", "volume", "brightness", "tracks",
+}
+
+-- Static export so callers (script_control, tests) can read SG_NAMES directly
+-- without calling get_sg_names(); mirrors the AX_NAMES pattern above.
+-- Built once at module load time using the fallback list when _shared is absent.
+M.SG_NAMES = nil  -- populated below after get_sg_names() is defined
+
+--- Returns the ordered list of SG action names with translated section headers.
+--- Called at menu-build time so headers always reflect the active locale.
+function M.get_sg_names()
+	local names = build_sg_names(_shared)
+	if names then return names end
+	-- Fallback when the shared TOML could not be loaded
+	local h = function(key) return "#" .. i18n.get(key) end
+	return {
+		"none", "-",
+		h("sg_actions.sg_order.header.mouse_nav"),
+		"left_click_toggle", "right_click_toggle", "lookup",
+		"app_switcher", "app_previous", "app_window_previous",
+		"-", h("sg_actions.sg_order.header.keys"),
+		"enter", "tab", "escape", "backspace", "delete",
+		"-", h("sg_actions.sg_order.header.tabs"),
+		"tab_new", "tab_close", "tab_prev", "tab_next",
+		"-", h("sg_actions.sg_order.header.windows"),
+		"win_prev", "win_next", "close_window", "fullscreen",
+		"snap_left", "snap_right", "maximize",
+		"-", h("sg_actions.sg_order.header.spaces"),
+		"space_prev", "space_next", "mission_control", "app_expose",
+		"-", h("sg_actions.sg_order.header.cursor"),
+		"arrow_up", "arrow_down", "arrow_left", "arrow_right",
+		"word_prev", "word_next",
+		"line_up", "line_down", "line_start", "line_end",
+		"para_prev", "para_next", "doc_start", "doc_end",
+		"-", h("sg_actions.sg_order.header.selection"),
+		"sel_up", "sel_down", "sel_left", "sel_right",
+		"sel_word_prev", "sel_word_next",
+		"-", h("sg_actions.sg_order.header.media"),
+		"vol_up", "vol_down", "mute", "brightness_up", "brightness_down",
+		"track_play", "track_next", "track_prev",
+		"-", h("sg_actions.sg_order.header.screenshot"),
+		"screenshot_window_clipboard", "screenshot_window_save",
+		"screenshot_region_clipboard", "screenshot_region_save",
+		"screenshot_fullscreen_clipboard", "screenshot_fullscreen_save",
+		"-", h("sg_actions.sg_order.header.system"),
+		"lock_screen", "notification_center",
+		"-", h("sg_actions.sg_order.header.ui"),
+		"open_metrics_typing", "open_metrics_apps",
+		"open_hotstrings_editor", "open_paths_editor",
+		"-", h("sg_actions.sg_order.header.files"),
+		"open_script_source", "open_personal_shortcuts",
+		"open_personal_hotstrings", "open_personal_info",
+		"open_config", "open_logs_folder", "open_today_log", "open_error_log",
+		"-", h("sg_actions.sg_order.header.script"),
+		"script_pause_toggle", "script_reload", "script_save_reload", "script_quit",
+		"-", h("sg_actions.sg_order.header.debug"),
+		"open_console",
+		"-", h("sg_actions.sg_order.header.cmd"),
+		"-", h("sg_actions.sg_order.header.cmd_shift"),
+	}
+end
+
+function M.get_label(name)
+	if not name or name == "none" then
+		local s = i18n.get("sg_actions.none")
+		return (s ~= "sg_actions.none") and s or LABELS.none
+	end
+	if MODIFIER_ACTION_LABELS[name] then return MODIFIER_ACTION_LABELS[name] end
+	-- Prefer locale JSON so the label is translated for the active language
+	local key_sg = "sg_actions." .. name
+	local s = i18n.get(key_sg)
+	if s ~= key_sg then return s end
+	local key_ax = "ax_actions." .. name
+	local s_ax = i18n.get(key_ax)
+	if s_ax ~= key_ax then return s_ax end
+	-- Fall back to hardcoded English label so new locales never show raw keys
+	if LABELS[name] then return LABELS[name] end
+	if LABELS["ax." .. name] then return LABELS["ax." .. name] end
+	return name
+end
+
+function M.execute_single(name, binding)
+	local s = SG[name]
+	if not s or type(s.fn) ~= "function" then return end
+	-- Any tap action (other than the click-toggle itself) must deactivate a held click
+	-- so that a selection started with left_click_toggle is properly released first.
+	if name ~= "left_click_toggle" and name ~= "right_click_toggle" then
+		Click.release_held_for_tap(name)
+	end
+	-- Logger.pcall (not a bare pcall) so a throwing action leaves a trace: with
+	-- ~150+ registered closures dispatched here, a caught-then-dropped exception
+	-- would otherwise be completely invisible in the logs (gestures-actions-silent-pcall).
+	Logger.pcall(LOG, s.fn, binding)
+end
+
+function M.execute_axis(name, goNext)
+	local a = AX[name]
+	if not a then return end
+	local fn = goNext and a.next or a.prev
+	if type(fn) == "function" then
+		Logger.pcall(LOG, fn)
+	end
+end
+
+function M.is_scalable(name)
+	local a = AX[name]
+	return a and a.scalable == true
+end
+
+-- Populate the static SG_NAMES now that get_sg_names() is defined
+M.SG_NAMES = M.get_sg_names()
+
+return M

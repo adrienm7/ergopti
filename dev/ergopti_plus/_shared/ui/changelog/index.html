@@ -1,0 +1,45 @@
+<!-- _shared/ui/changelog/index.html -->
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<title data-i18n="changelog_window.window_title"></title>
+		<link rel="stylesheet" href="style.css" />
+		<script src="../i18n.js"></script>
+		<script src="../host_bridge.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+	</head>
+	<body>
+		<div id="sidebar">
+			<div id="sidebar-header">
+				<div id="channel-toggle">
+					<button id="btn-stable" class="channel-btn" onclick="setChannel('main')"></button>
+					<button id="btn-dev" class="channel-btn" onclick="setChannel('dev')"></button>
+				</div>
+			</div>
+			<div id="release-list"></div>
+		</div>
+
+		<div id="content">
+			<div id="content-header">
+				<div id="release-tag"></div>
+				<div id="release-meta"></div>
+				<button id="btn-github" onclick="openOnGitHub()"></button>
+			</div>
+			<div id="release-body"></div>
+		</div>
+
+		<div id="loading-overlay">
+			<div id="loading-spinner"></div>
+			<div id="loading-text" data-i18n="changelog_window.loading"></div>
+		</div>
+
+		<div id="error-overlay" style="display: none">
+			<div id="error-icon">⚠️</div>
+			<div id="error-text"></div>
+			<button id="btn-retry" onclick="retry()"></button>
+		</div>
+
+		<script src="script.js"></script>
+	</body>
+</html>

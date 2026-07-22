@@ -1,0 +1,92 @@
+{
+	"_comment": "Single source of truth for remote LLM API providers and per-model pricing. Both drivers (AHK api_remote.ahk and HS api_remote.lua) load this file at boot — add a provider here first, then reload the driver.",
+	"provider_order": [
+		"openai",
+		"anthropic",
+		"gemini",
+		"xai",
+		"mistral",
+		"deepseek",
+		"cohere",
+		"cerebras",
+		"openai_compat"
+	],
+	"providers": {
+		"openai": {
+			"label": "OpenAI",
+			"base_url": "https://api.openai.com/v1",
+			"default_model": "gpt-4o-mini",
+			"format": "openai"
+		},
+		"anthropic": {
+			"label": "Anthropic",
+			"base_url": "https://api.anthropic.com/v1",
+			"default_model": "claude-haiku-4-5",
+			"format": "anthropic"
+		},
+		"gemini": {
+			"label": "Google Gemini",
+			"base_url": "https://generativelanguage.googleapis.com/v1beta",
+			"default_model": "gemini-2.0-flash",
+			"format": "gemini"
+		},
+		"xai": {
+			"label": "xAI (Grok)",
+			"base_url": "https://api.x.ai/v1",
+			"default_model": "grok-2-mini",
+			"format": "openai"
+		},
+		"mistral": {
+			"label": "Mistral",
+			"base_url": "https://api.mistral.ai/v1",
+			"default_model": "mistral-small-latest",
+			"format": "openai"
+		},
+		"deepseek": {
+			"label": "DeepSeek",
+			"base_url": "https://api.deepseek.com",
+			"default_model": "deepseek-chat",
+			"format": "openai"
+		},
+		"cohere": {
+			"label": "Cohere",
+			"base_url": "https://api.cohere.ai/compatibility/v1",
+			"default_model": "command-r7b-12-2024",
+			"format": "openai"
+		},
+		"cerebras": {
+			"label": "Cerebras",
+			"base_url": "https://api.cerebras.ai/v1",
+			"default_model": "llama-3.1-8b",
+			"format": "openai"
+		},
+		"openai_compat": {
+			"label": "OpenAI-compatible",
+			"base_url": "",
+			"default_model": "",
+			"format": "openai"
+		}
+	},
+	"model_prices": {
+		"gpt-4o-mini": { "in": 0.15, "out": 0.6 },
+		"gpt-4o": { "in": 2.5, "out": 10.0 },
+		"gpt-4.1-mini": { "in": 0.4, "out": 1.6 },
+		"gpt-4.1": { "in": 2.0, "out": 8.0 },
+		"claude-haiku-4-5": { "in": 0.25, "out": 1.25 },
+		"claude-sonnet-4-6": { "in": 3.0, "out": 15.0 },
+		"claude-opus-4-7": { "in": 15.0, "out": 75.0 },
+		"gemini-2.0-flash": { "in": 0.1, "out": 0.4 },
+		"gemini-1.5-pro": { "in": 1.25, "out": 5.0 },
+		"gemini-2.0-pro": { "in": 1.25, "out": 5.0 },
+		"grok-2-mini": { "in": 0.3, "out": 0.5 },
+		"grok-2-1212": { "in": 2.0, "out": 10.0 },
+		"grok-2": { "in": 2.0, "out": 10.0 },
+		"mistral-small-latest": { "in": 0.2, "out": 0.6 },
+		"mistral-large-latest": { "in": 2.0, "out": 6.0 },
+		"deepseek-chat": { "in": 0.14, "out": 0.28 },
+		"command-r7b-12-2024": { "in": 0.0375, "out": 0.15 },
+		"command-r-plus": { "in": 2.5, "out": 10.0 },
+		"llama-3.1-8b": { "in": 0.1, "out": 0.1 },
+		"llama-3.1-70b": { "in": 0.6, "out": 0.6 }
+	}
+}

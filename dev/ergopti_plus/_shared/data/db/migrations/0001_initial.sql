@@ -1,0 +1,13 @@
+-- _shared/schema/migrations/0001_initial.sql
+--
+-- Migration 0001: bootstrap from empty database to schema version 1.
+-- Applied when meta.schema_version is missing or NULL.
+--
+-- This file mirrors the cumulative DDL in ../schema.sql. The keylogger
+-- applies migrations in order; once applied, schema.sql is the canonical
+-- shape used to validate the current database.
+
+-- See ../schema.sql for the canonical source. To bootstrap a fresh database,
+-- the keylogger executes ../schema.sql directly. This file exists so that
+-- once future migrations land (0002_*.sql, 0003_*.sql, …), the migration
+-- runner has a complete chain to apply against any prior database.

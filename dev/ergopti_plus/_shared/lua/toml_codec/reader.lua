@@ -1,0 +1,676 @@
+--- _shared/lua/toml_codec/reader.lua
+
+--- ==============================================================================
+--- MODULE: TOML Reader (shared)
+--- DESCRIPTION:
+--- Parses the hotstrings TOML format produced by the generation scripts.
+--- Canonical source shared by all Lua-based drivers (Hammerspoon, future Linux
+--- driver). Previously lived at hammerspoon/lib/toml_reader.lua; moved here so
+--- both drivers share one implementation without duplication.
+---
+--- FEATURES & RATIONALE:
+--- 1. Lightweight and robust: designed to be extremely lightweight and robust
+---    against malformed syntax — parses only the subset of TOML used by the
+---    hotstrings format, avoiding a full-spec parser dependency.
+--- 2. Structured output: returns a table with `meta`, `sections_order`, and
+---    `sections` fields so callers can iterate sections in declared order.
+--- 3. Metadata-aware: handles `[_meta]`, `[_meta.sections]`, and
+---    `[_meta.sections.<name>]` blocks for per-section descriptions, delays,
+---    colors, and show_tooltip flags.
+--- ==============================================================================
+
+local M = {}
+-- Logger is resolved SOFTLY so this shared module genuinely loads on every Lua
+-- runtime (the Linux daemon, LuaJIT test runners, build scripts) — not only the
+-- macOS driver. The macOS driver logger (ring buffer + file, read by the
+-- healthcheck diagnostic) is preferred when present so on-macOS routing is
+-- unchanged; otherwise the platform-neutral print shim takes over. A hard
+-- require("lib.logger") here was the impurity that forced the Linux driver to
+-- fork its own TOML parser (audit SS-2).
+local _ok_log, Logger = pcall(require, "lib.logger")
+if not _ok_log or type(Logger) ~= "table" then
+	Logger = require("logger.shim")
+end
+local LOG    = "toml_reader"
+
+-- Optional disk-cache provider, injected by the host driver via
+-- M.set_cache_provider(). Stays nil in pure/test contexts so parsing is
+-- unaffected. When present it must expose load(path)->table|nil and
+-- store(path, parsed). Kept as an injected hook so this shared module never
+-- touches the filesystem directly — the slow character-level parse below is
+-- bypassed entirely when an unchanged snapshot already exists on disk.
+local _cache_provider = nil
+
+
+
+
+-- ========================================
+-- =========================================
+-- ======= 1/ String Parser Helpers =======
+-- =========================================
+-- ========================================
+
+--- Parses a TOML double-quoted string starting at an index.
+--- @param s string The input string.
+--- @param i number The starting index.
+--- @return string|nil, number Returns parsed string and next index.
+local function parse_dq_string(s, i)
+	if type(s) ~= "string" or type(i) ~= "number" then return nil, i end
+	if s:sub(i, i) ~= "\"" then return nil, i end
+
+	local buf = {}
+	local j = i + 1
+	local n = #s
+
+	while j <= n do
+		local c = s:sub(j, j)
+		if c == "\\" then
+			local esc = s:sub(j + 1, j + 1)
+			if     esc == "\""  then buf[#buf + 1] = "\"";  j = j + 2
+			elseif esc == "\\" then buf[#buf + 1] = "\\"; j = j + 2
+			elseif esc == "n"  then buf[#buf + 1] = "\n"; j = j + 2
+			elseif esc == "t"  then buf[#buf + 1] = "\t"; j = j + 2
+			elseif esc == "r"  then buf[#buf + 1] = "\r"; j = j + 2
+			else                    buf[#buf + 1] = esc;  j = j + 2
+			end
+		elseif c == "\"" then
+			return table.concat(buf), j + 1
+		else
+			buf[#buf + 1] = c
+			j = j + 1
+		end
+	end
+
+	return nil, i
+end
+
+--- Skips whitespace at a position and returns the new position.
+--- @param s string The input string.
+--- @param i number The starting index.
+--- @return number The index after skipping whitespace.
+local function skip_ws(s, i)
+	if type(s) ~= "string" or type(i) ~= "number" then return i end
+	while i <= #s and s:sub(i, i):match("%s") do
+		i = i + 1
+	end
+	return i
+end
+
+--- Parses a TOML inline array of double-quoted strings.
+--- @param s string The input string.
+--- @return table A list of strings.
+local function parse_string_array(s)
+	local result = {}
+	if type(s) ~= "string" then return result end
+
+	local i = skip_ws(s, 1)
+	if s:sub(i, i) ~= "[" then return result end
+
+	i = skip_ws(s, i + 1)
+	while i <= #s do
+		if s:sub(i, i) == "]" then break end
+
+		if s:sub(i, i) == "," then
+			i = skip_ws(s, i + 1)
+		elseif s:sub(i, i) == "\"" then
+			local val, ni = parse_dq_string(s, i)
+			if val then
+				result[#result + 1] = val
+				i = skip_ws(s, ni)
+			else
+				break
+			end
+		else
+			break
+		end
+	end
+
+	return result
+end
+
+
+
+
+-- ===============================
+-- ================================
+-- ======= 2/ Line Parsers =======
+-- ================================
+-- ===============================
+
+--- Parses a hotstring entry line.
+--- @param line string The line to parse.
+--- @return table|nil Returns a structured table or nil.
+local function parse_entry(line)
+	if type(line) ~= "string" then return nil end
+
+	local i = skip_ws(line, 1)
+	if line:sub(i, i) ~= "\"" then return nil end
+
+	local trigger, j = parse_dq_string(line, i)
+	if not trigger then return nil end
+
+	i = j
+	i = skip_ws(line, i)
+	if line:sub(i, i) ~= "=" then return nil end
+
+	i = skip_ws(line, i + 1)
+	if line:sub(i, i) ~= "{" then return nil end
+	i = i + 1
+
+	local result = {}
+	while i <= #line do
+		i = skip_ws(line, i)
+		local c = line:sub(i, i)
+
+		if c == "}" then break end
+		if c == "," then
+			i = i + 1
+			i = skip_ws(line, i)
+		end
+		if line:sub(i, i) == "}" then break end
+
+		local ks = i
+		while i <= #line and line:sub(i, i):match("[%w_]") do i = i + 1 end
+		local key = line:sub(ks, i - 1)
+		if key == "" then break end
+
+		i = skip_ws(line, i)
+		if line:sub(i, i) ~= "=" then break end
+		i = skip_ws(line, i + 1)
+
+		if line:sub(i, i) == "\"" then
+			local val, ni = parse_dq_string(line, i)
+			result[key] = val
+			i = ni
+		elseif line:sub(i, i + 3) == "true" then
+			result[key] = true
+			i = i + 4
+		elseif line:sub(i, i + 4) == "false" then
+			result[key] = false
+			i = i + 5
+		else
+			-- Numeric (or otherwise bare) value: capture the raw token up to the
+			-- next separator and coerce it. Without this an inline-table number
+			-- such as `priority = 75` would be skipped and silently lost.
+			local vs = i
+			while i <= #line and line:sub(i, i) ~= "," and line:sub(i, i) ~= "}" do
+				i = i + 1
+			end
+			local raw = line:sub(vs, i - 1):match("^%s*(.-)%s*$")
+			result[key] = tonumber(raw) or result[key]
+		end
+	end
+
+	if not result.output then return nil end
+
+	return {
+		trigger           = trigger,
+		output            = result.output,
+		is_word           = result.is_word           or false,
+		auto_expand       = result.auto_expand       or false,
+		is_case_sensitive = result.is_case_sensitive or false,
+		final_result      = result.final_result      or false,
+		-- Individual collision-priority override (top of the cascade). nil when
+		-- the entry has no `priority` key, so the loader falls back to the
+		-- section/file/source default via resolve_priority.
+		priority          = type(result.priority) == "number" and result.priority or nil,
+	}
+end
+
+--- Parses a TOML inline table.
+--- Expected format: { key = "val", key2 = 1.0, key3 = true, … }
+--- @param s string The input string.
+--- @param i number The starting index (must point at '{').
+--- @return table|nil, number Returns parsed table and next index, or nil on failure.
+local function parse_inline_table(s, i)
+	if type(s) ~= "string" or s:sub(i, i) ~= "{" then return nil, i end
+	local result = {}
+	i = skip_ws(s, i + 1)
+	while i <= #s do
+		if s:sub(i, i) == "}" then
+			return result, i + 1
+		end
+		if s:sub(i, i) == "," then
+			i = skip_ws(s, i + 1)
+		end
+
+		-- Parse the key (unquoted identifier)
+		local ks = i
+		while i <= #s and s:sub(i, i):match("[%w_%-]") do i = i + 1 end
+		local key = s:sub(ks, i - 1)
+		if key == "" then return nil, ks end
+
+		i = skip_ws(s, i)
+		if s:sub(i, i) ~= "=" then return nil, ks end
+		i = skip_ws(s, i + 1)
+
+		-- Parse the value (quoted string, number, or boolean)
+		local val, ni
+		local c = s:sub(i, i)
+		if c == "\"" then
+			val, ni = parse_dq_string(s, i)
+		elseif s:sub(i, i + 3) == "true" then
+			val, ni = true, i + 4
+		elseif s:sub(i, i + 4) == "false" then
+			val, ni = false, i + 5
+		else
+			-- Numeric value
+			local k = i
+			while k <= #s do
+				local cc = s:sub(k, k)
+				if cc:match("[%s,}]") or cc == "#" then break end
+				k = k + 1
+			end
+			local raw = s:sub(i, k - 1)
+			val = tonumber(raw)
+			ni = k
+		end
+
+		if val == nil and s:sub(i, i) ~= "}" then return nil, ks end
+		result[key] = val
+		i = skip_ws(s, ni)
+	end
+	return nil, i
+end
+
+--- Parses a plain key equals value line where the value is a quoted string or inline table.
+--- @param line string The line to parse.
+--- @return string|nil, string|table|nil Returns key and value.
+local function parse_kv_string(line)
+	if type(line) ~= "string" then return nil, nil end
+
+	local i = skip_ws(line, 1)
+	local key, j
+
+	if line:sub(i, i) == "\"" then
+		key, j = parse_dq_string(line, i)
+	else
+		j = i
+		while j <= #line and line:sub(j, j):match("[%w_]") do j = j + 1 end
+		key = line:sub(i, j - 1)
+	end
+
+	if not key or key == "" then return nil, nil end
+
+	i = skip_ws(line, j)
+	if line:sub(i, i) ~= "=" then return nil, nil end
+
+	i = skip_ws(line, i + 1)
+	if line:sub(i, i) == "{" then
+		local tbl = select(1, parse_inline_table(line, i))
+		return key, tbl
+	end
+	if line:sub(i, i) ~= "\"" then return nil, nil end
+
+	local val = select(1, parse_dq_string(line, i))
+	return key, val
+end
+
+--- Parses a key=value line where the value can be a quoted string, a number,
+--- or a boolean. Used for the `_meta` scalar fields (`defaut`, `color`).
+--- @param line string The line to parse.
+--- @return string|nil, any Returns key and typed value.
+local function parse_kv_value(line)
+	if type(line) ~= "string" then return nil, nil end
+
+	local i = skip_ws(line, 1)
+	local key, j
+
+	if line:sub(i, i) == "\"" then
+		key, j = parse_dq_string(line, i)
+	else
+		j = i
+		while j <= #line and line:sub(j, j):match("[%w_]") do j = j + 1 end
+		key = line:sub(i, j - 1)
+	end
+
+	if not key or key == "" then return nil, nil end
+
+	i = skip_ws(line, j)
+	if line:sub(i, i) ~= "=" then return nil, nil end
+	i = skip_ws(line, i + 1)
+
+	local c = line:sub(i, i)
+	if c == "{" then
+		local tbl = select(1, parse_inline_table(line, i))
+		return key, tbl
+	elseif c == "\"" then
+		local val = select(1, parse_dq_string(line, i))
+		return key, val
+	elseif line:sub(i, i + 3) == "true" then
+		return key, true
+	elseif line:sub(i, i + 4) == "false" then
+		return key, false
+	else
+		-- Numeric value: stop at whitespace, comment, or end of line
+		local k = i
+		while k <= #line do
+			local cc = line:sub(k, k)
+			if cc:match("%s") or cc == "#" then break end
+			k = k + 1
+		end
+		local raw = line:sub(i, k - 1)
+		local num = tonumber(raw)
+		if num then return key, num end
+		return key, nil
+	end
+end
+
+
+-- =============================
+-- ==============================
+-- ======= 3/ Public API =======
+-- ==============================
+-- =============================
+
+
+--- =============================
+-- ===== 3.1) Parse Method =====
+--- =============================
+
+--- Parses a given TOML file and returns a structured table.
+--- @param path string The absolute path to the TOML file.
+--- @return table The structured metadata and sections.
+function M.parse(path)
+	local empty_result = {
+		meta = { description = "", sections = {}, sections_order = {}, section_delays = {} },
+		sections_order = {},
+		sections = {}
+	}
+
+	if type(path) ~= "string" then return empty_result end
+
+	-- Fast path: a precompiled snapshot of an unchanged file loads ~10x faster
+	-- than the character-level parse below. A miss (nil) or any provider error
+	-- silently falls through to a normal parse.
+	if _cache_provider and type(_cache_provider.load) == "function" then
+		local ok_load, cached = pcall(_cache_provider.load, path)
+		if ok_load and type(cached) == "table" then
+			return cached
+		end
+	end
+
+	Logger.debug(LOG, "Parsing TOML file…")
+
+	local ok, f = pcall(io.open, path, "r")
+	if not ok or not f then
+		Logger.warn(LOG, string.format("Impossible d'ouvrir le fichier : %s.", tostring(path)))
+		return empty_result
+	end
+
+	local result = {
+		meta           = { description = "", sections = {}, sections_order = {}, section_delays = {} },
+		sections_order = {},
+		sections       = {},
+	}
+
+	-- Raw file order (order [[sec]] headers appear) — used as fallback
+	local file_order = {}
+
+	-- Lazily creates a meta-section entry so per-section metadata (description,
+	-- defaut, color) can be filled in any order regardless of how the TOML
+	-- declares them ([_meta.sections] flat form vs [_meta.sections.<name>] table)
+	local function ensure_meta_section(name)
+		local entry = result.meta.sections[name]
+		if type(entry) ~= "table" then
+			entry = { description = "" }
+			result.meta.sections[name] = entry
+		end
+		return entry
+	end
+
+	-- Parser state
+	local mode             = "top"   -- "top" | "meta" | "meta_sections" | "meta_section" | "section"
+	local current_sec      = nil
+	local current_meta_sec = nil
+
+	local read_ok, read_err = pcall(function()
+		for raw_line in f:lines() do
+			local line = raw_line:match("^%s*(.-)%s*$")
+
+			-- Skip blank lines and TOML comments
+			if not line or line == "" or line:sub(1, 1) == "#" then goto continue end
+
+			-- Detect section headers
+			if line == "[_meta.sections]" then
+				mode = "meta_sections"
+				goto continue
+			end
+
+			-- Per-section meta block: [_meta.sections.<name>]
+			local meta_sec_name = line:match("^%[_meta%.sections%.([%w_%-]+)%]$")
+			if meta_sec_name then
+				mode             = "meta_section"
+				current_meta_sec = meta_sec_name
+				ensure_meta_section(current_meta_sec)
+				goto continue
+			end
+
+			-- Per-section delay overrides: [_meta.section_delays] with
+			-- `<section> = <seconds>` lines. Kept separate from [_meta.sections]
+			-- (which holds inline lang-map descriptions) to avoid a TOML key clash.
+			if line == "[_meta.section_delays]" then
+				mode = "meta_section_delays"
+				goto continue
+			end
+
+			if line == "[_meta]" then
+				mode = "meta"
+				goto continue
+			end
+
+			-- Hotstring table array: [[name]]
+			local sec_name = line:match("^%[%[(.-)%]%]$")
+			if sec_name then
+				mode        = "section"
+				current_sec = sec_name
+				if not result.sections[current_sec] then
+					table.insert(file_order, current_sec)
+					local existing_meta = result.meta.sections[current_sec]
+					local desc = (type(existing_meta) == "table") and existing_meta.description or ""
+					result.sections[current_sec] = {
+						description = desc,
+						entries     = {},
+					}
+				end
+				goto continue
+			end
+
+			-- Simple table header: [name]
+			local simple_sec_name = line:match("^%[([%w_%-]+)%]$")
+			if simple_sec_name then
+				mode        = "section"
+				current_sec = simple_sec_name
+				if not result.sections[current_sec] then
+					table.insert(file_order, current_sec)
+					result.sections[current_sec] = {
+						description = "",
+						entries     = {},
+					}
+				end
+				goto continue
+			end
+
+			-- Any other [table] header resets mode (safety)
+			if line:sub(1, 1) == "[" then
+				mode = "top"
+				goto continue
+			end
+
+			-- Content lines processing
+			if mode == "meta" then
+				local arr_val = line:match("^sections_order%s*=%s*(%[.*)$")
+				if arr_val then
+					result.meta.sections_order = parse_string_array(arr_val)
+				else
+					local key, val = parse_kv_value(line)
+					if key == "description" and (type(val) == "string" or type(val) == "table") then
+						result.meta.description = val
+					elseif key == "delay" and type(val) == "number" then
+						result.meta.delay = val
+					elseif key == "color" and type(val) == "string" then
+						result.meta.color = val
+					elseif key == "show_tooltip" and type(val) == "boolean" then
+						result.meta.show_tooltip = val
+					elseif key == "priority" and type(val) == "number" then
+						result.meta.priority = val
+					end
+				end
+
+			elseif mode == "meta_sections" then
+				local key, val = parse_kv_string(line)
+				if key and val then
+					local entry = ensure_meta_section(key)
+					entry.description = val
+					-- Back-fill description for already-created sections
+					if result.sections[key] then
+						result.sections[key].description = val
+					end
+				end
+
+			elseif mode == "meta_section" and current_meta_sec then
+				local key, val = parse_kv_value(line)
+				if key then
+					local entry = ensure_meta_section(current_meta_sec)
+					if key == "description" and (type(val) == "string" or type(val) == "table") then
+						entry.description = val
+						if result.sections[current_meta_sec] then
+							result.sections[current_meta_sec].description = val
+						end
+					elseif key == "delay" and type(val) == "number" then
+						entry.delay = val
+					elseif key == "color" and type(val) == "string" then
+						entry.color = val
+					elseif key == "show_tooltip" and type(val) == "boolean" then
+						entry.show_tooltip = val
+					elseif key == "priority" and type(val) == "number" then
+						entry.priority = val
+					end
+				end
+
+			elseif mode == "meta_section_delays" then
+				local key, val = parse_kv_value(line)
+				if key and type(val) == "number" then
+					result.meta.section_delays[key] = val
+				end
+
+			elseif mode == "section" and current_sec then
+				local entry = parse_entry(line)
+				if entry then
+					table.insert(result.sections[current_sec].entries, entry)
+				else
+					-- Try parsing as a plain key-value pair (e.g. constants.toml)
+					local key, val = parse_kv_value(line)
+					if key then
+						result.sections[current_sec][key] = val
+					end
+				end
+			end
+
+			::continue::
+		end
+	end)
+
+	if not read_ok then
+		Logger.error(LOG, string.format("Erreur de lecture du fichier : %s.", tostring(read_err)))
+	end
+
+	pcall(function() f:close() end)
+
+	-- Rebuild sections_order from TOML metadata order when available;
+	-- otherwise fall back to the order sections appeared in the file.
+	-- Sections not mentioned in meta.sections_order are appended at the end
+	local meta_order = result.meta.sections_order
+	if type(meta_order) == "table" and #meta_order > 0 then
+		local seen = {}
+		for _, item in ipairs(meta_order) do
+			if type(item) == "string" then
+				if item == "-" then
+					table.insert(result.sections_order, "-")
+				elseif result.sections[item] then
+					table.insert(result.sections_order, item)
+					seen[item] = true
+				elseif result.meta.sections[item] then
+					-- Section listed in order with a description but no [[]] block —
+					-- create an empty placeholder so keymap.lua can detect it
+					local meta_entry = result.meta.sections[item]
+					local desc = (type(meta_entry) == "table") and meta_entry.description or meta_entry
+					result.sections[item] = {
+						description    = desc or "",
+						entries        = {},
+						is_placeholder = true,
+					}
+					table.insert(result.sections_order, item)
+					seen[item] = true
+				end
+			end
+		end
+		-- Append sections present in the file but absent from the meta order
+		for _, name in ipairs(file_order) do
+			if not seen[name] then
+				table.insert(result.sections_order, name)
+			end
+		end
+	else
+		-- Fallback: use file order (no separators)
+		result.sections_order = file_order
+	end
+
+	-- Refresh the on-disk snapshot so the next boot takes the fast path. Wrapped
+	-- so a read-only cache dir can never break a successful parse.
+	if _cache_provider and type(_cache_provider.store) == "function" then
+		pcall(_cache_provider.store, path, result)
+	end
+
+	Logger.info(LOG, "TOML file parsed successfully.")
+	return result
+end
+
+--- Injects an optional disk-cache provider so repeat parses of an unchanged
+--- TOML file skip the slow character-level parse and load a precompiled
+--- snapshot instead. Pass nil to disable. The provider keeps this shared module
+--- filesystem-free (port-adapter purity); the host driver supplies the actual
+--- read/write implementation.
+--- @param provider table|nil ``{ load = fn(path)->table|nil, store = fn(path, parsed) }``.
+function M.set_cache_provider(provider)
+	_cache_provider = provider
+end
+
+
+
+
+--- ============================
+-- ===== 3.2) Load Method =====
+--- ============================
+
+--- Loads all hotstring entries from a path and registers them into the keymap.
+--- @param path          string The absolute path to the TOML file.
+--- @param keymap_module table  The target keymap engine reference.
+--- @return number Total number of entries loaded.
+function M.load(path, keymap_module)
+	if type(path) ~= "string" or type(keymap_module) ~= "table" then return 0 end
+	if type(keymap_module.add) ~= "function" then return 0 end
+
+	Logger.debug(LOG, "Loading entries from TOML file into keymap…")
+	local data  = M.parse(path)
+	local count = 0
+
+	for _, sec_name in ipairs(data.sections_order) do
+		local section = data.sections[sec_name]
+		if section and type(section.entries) == "table" then
+			for _, entry in ipairs(section.entries) do
+				pcall(keymap_module.add, entry.trigger, entry.output, {
+					is_word           = entry.is_word,
+					auto_expand       = entry.auto_expand,
+					is_case_sensitive = entry.is_case_sensitive,
+				})
+				count = count + 1
+			end
+		end
+	end
+
+	Logger.info(LOG, string.format("Successfully loaded %d entries.", count))
+	return count
+end
+
+return M

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Allows the app to act as an automation/accessibility client. Required
+	     by Hammerspoon's eventtap and axuielement APIs. -->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+
+	<!-- Allows sending Apple Events to other apps (used by hs.applescript). -->
+	<key>com.apple.security.temporary-exception.apple-events</key>
+	<true/>
+</dict>
+</plist>

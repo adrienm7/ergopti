@@ -1,0 +1,9 @@
+(defalias
+    alttab     (tap-hold-press 200 200 (multi lalt tab) lalt)
+    cap        (tap-hold-press 350 350 enter lctl)
+    lsft       (tap-hold-press 350 350 @copy lsft)
+    lctl       (tap-hold-press 200 200 @paste lctl)
+    lalt       (tap-hold-press 200 200 bspc (layer-toggle navigation))
+    ralt       (tap-hold-press 200 200 tab ralt)
+    ossft      (one-shot 2000 lsft)
+)
