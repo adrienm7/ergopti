@@ -13,6 +13,7 @@ competes with the final call-to-action. OS-aware, like the hero button.
 <script>
 	import { onMount } from 'svelte';
 	import { ui } from './state.svelte.js';
+	import { t } from './i18n.svelte.js';
 
 	// Same OS → asset mapping as the hero's primary button.
 	let url = $derived(
@@ -60,7 +61,8 @@ competes with the final call-to-action. OS-aware, like the hero button.
 
 <a class="sticky-cta" class:visible href={url} download={!!ui.release}>
 	<i class={icon}></i>
-	<span>Télécharger — {label}</span>
+	<span>{t('Télécharger')} — {label}</span>
+	{#if ui.release}<span class="scta-tag">{ui.release.tag}</span>{/if}
 </a>
 
 <style>
@@ -92,6 +94,14 @@ competes with the final call-to-action. OS-aware, like the hero button.
 		opacity: 1;
 		pointer-events: auto;
 		transform: translate(-50%, 0);
+	}
+
+	.scta-tag {
+		background: rgba(255, 255, 255, 0.18);
+		border-radius: 999px;
+		font-size: 0.72rem;
+		font-weight: 700;
+		padding: 2px 8px;
 	}
 
 	@media (prefers-reduced-motion: reduce) {
