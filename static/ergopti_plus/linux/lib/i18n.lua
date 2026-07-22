@@ -69,8 +69,30 @@ end
 -- =========================================
 -- =========================================
 
+--- Reads the canonical language order shared with the other drivers and the
+--- site (_shared/data/locale_order.json) and returns a {code -> rank} map, or
+--- nil if it can't be read/decoded — the caller then falls back to code order.
+--- @param data_dir string Absolute path to the _shared/data directory.
+--- @return table|nil Map of locale code to 1-based rank.
+local function _load_order(data_dir)
+	local ok_j, json_mod = pcall(require, "json")
+	if not ok_j or type(json_mod) ~= "table" or type(json_mod.decode) ~= "function" then
+		return nil
+	end
+	local f = io.open(data_dir .. "/locale_order.json", "r")
+	if not f then return nil end
+	local raw = f:read("*a")
+	f:close()
+	local ok, doc = pcall(json_mod.decode, raw)
+	if not ok or type(doc) ~= "table" or type(doc.order) ~= "table" then return nil end
+	local rank = {}
+	for i, code in ipairs(doc.order) do rank[code] = i end
+	return rank
+end
+
 --- Scans _shared/data/locales/ for available .json files and returns the
---- basename (without extension) as locale codes.
+--- basename (without extension) as locale codes, in the canonical shared
+--- display order (falling back to code order if the order file is unreadable).
 --- @return table Array of locale code strings (e.g. {"en", "fr"}).
 local function _scan_locales()
 	local codes = {}
@@ -99,7 +121,19 @@ local function _scan_locales()
 	pipe:close()
 
 	if #codes == 0 then codes = { "en", "fr" } end
-	table.sort(codes)
+
+	-- Order by the canonical shared list; codes absent from it fall to the end
+	-- alphabetically, so a newly added locale still appears before it is listed.
+	local rank = _load_order(driver_root .. "/../../_shared/data")
+	if rank then
+		table.sort(codes, function(a, b)
+			local ra, rb = rank[a] or math.huge, rank[b] or math.huge
+			if ra ~= rb then return ra < rb end
+			return a < b
+		end)
+	else
+		table.sort(codes)
+	end
 	return codes
 end
 
