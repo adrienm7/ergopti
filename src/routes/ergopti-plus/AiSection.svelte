@@ -180,7 +180,10 @@ FEATURES & RATIONALE:
 
 		<!-- Step 1 — local backends -->
 		<div class="ai-step" use:reveal>
-			<h3><span class="step-badge">1</span> Choisissez votre moteur — local d’abord</h3>
+			<h3>
+				<span class="step-badge">1</span>
+				<span class="step-title">Choisissez votre moteur — local d’abord</span>
+			</h3>
 			<div class="backend-grid">
 				<article class="ep-card ep-card--hover backend-card">
 					<header>
@@ -240,7 +243,10 @@ FEATURES & RATIONALE:
 
 		<!-- Step 2 — model catalog -->
 		<div class="ai-step" use:reveal>
-			<h3><span class="step-badge">2</span> Choisissez votre modèle parmi {totals.models}</h3>
+			<h3>
+				<span class="step-badge">2</span>
+				<span class="step-title">Choisissez votre modèle parmi {totals.models}</span>
+			</h3>
 			<p class="step-lead">
 				Un catalogue curé de <strong>{totals.models} modèles open-weights</strong> issus de
 				<strong>{totals.providers} fournisseurs</strong>
@@ -281,7 +287,10 @@ FEATURES & RATIONALE:
 
 		<!-- Step 3 — prompt profiles -->
 		<div class="ai-step" use:reveal>
-			<h3><span class="step-badge">3</span> Choisissez (ou écrivez) votre profil de prompt</h3>
+			<h3>
+				<span class="step-badge">3</span>
+				<span class="step-title">Choisissez (ou écrivez) votre profil de prompt</span>
+			</h3>
 			<div class="profile-grid">
 				{#each profiles as p}
 					<article class="ep-card profile-card">
@@ -496,13 +505,23 @@ FEATURES & RATIONALE:
 		margin-bottom: clamp(36px, 5vw, 56px);
 	}
 
-	/* Block layout, not flex: a flex h3 splits its text nodes into gapped
-	 * flex items, which broke the line around the inline model count */
+	/* Flex with the title wrapped in its own span: the badge and the whole
+	 * title are two flex children, so the number stays vertically centred on
+	 * the title (even when it wraps) without the old vertical-align hack. The
+	 * title text lives in ONE span, so the inline model count no longer splits
+	 * into separate gapped flex items (the reason this was block layout before). */
 	.ai-step h3 {
+		align-items: center;
+		display: flex;
 		font-size: 1.25rem;
 		font-weight: 700;
+		gap: 10px;
+		justify-content: center;
 		margin: 0 auto 20px;
 		max-width: 700px;
+	}
+
+	.step-title {
 		text-align: center;
 		text-wrap: balance;
 	}
@@ -514,12 +533,11 @@ FEATURES & RATIONALE:
 		border-radius: 50%;
 		color: #ff8ab5;
 		display: inline-flex;
+		flex-shrink: 0;
 		font-size: 0.85rem;
 		font-weight: 800;
 		height: 30px;
 		justify-content: center;
-		margin-right: 10px;
-		vertical-align: -0.4em;
 		width: 30px;
 	}
 
