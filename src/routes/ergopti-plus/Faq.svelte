@@ -13,15 +13,16 @@ needs no JS, stays accessible, and works if scripting is disabled.
 <script>
 	import { reveal } from './reveal.js';
 	import { FAQ_DATA } from './faq-data.js';
+	import { t } from './i18n.svelte.js';
 </script>
 
 <section class="faq" id="ep-faq" style="--section-accent: #5e9cff;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
-			<p class="kicker">Questions fréquentes</p>
-			<h2>Tout ce qu’on se demande avant d’installer.</h2>
+			<p class="kicker">{t('Questions fréquentes')}</p>
+			<h2>{t('Tout ce qu’on se demande avant d’installer.')}</h2>
 			<p class="lead">
-				Confidentialité, performance, compatibilité — les réponses courtes, sans détour.
+				{t('Confidentialité, performance, compatibilité — les réponses courtes, sans détour.')}
 			</p>
 		</header>
 
@@ -29,11 +30,11 @@ needs no JS, stays accessible, and works if scripting is disabled.
 			{#each FAQ_DATA as f, i}
 				<details class="ep-card faq-item" use:reveal={{ delay: (i % 4) * 50 }}>
 					<summary>
-						<span class="faq-q">{f.q}</span>
+						<span class="faq-q">{t(f.q)}</span>
 						<span class="faq-chevron" aria-hidden="true"></span>
 					</summary>
 					<div class="faq-a">
-						<p>{@html f.a}</p>
+						<p>{@html t(f.a)}</p>
 					</div>
 				</details>
 			{/each}
