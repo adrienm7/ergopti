@@ -19,6 +19,7 @@ FEATURES & RATIONALE:
 
 <script>
 	import DriverFrame from './DriverFrame.svelte';
+	import LiveWpm from './LiveWpm.svelte';
 	import { reveal } from './reveal.js';
 
 	/** @type {{geo: Record<string, {width: number, height: number}>}} */
@@ -174,19 +175,16 @@ FEATURES & RATIONALE:
 			</p>
 		</div>
 
-		<div class="widget-callout ep-card" use:reveal>
-			<div class="widget-mock" aria-hidden="true">
-				<span class="widget-num">74</span>
-				<span class="widget-unit">MPM</span>
-			</div>
-			<div>
+		<div class="widget-live ep-card" use:reveal>
+			<header class="widget-live-head">
 				<h3>Le widget MPM, toujours sous les yeux</h3>
 				<p>
-					Un petit compteur flottant, toujours au premier plan, affiche votre vitesse en temps réel
-					pendant que vous tapez. Discret, déplaçable, désactivable — mais redoutable pour garder la
-					motivation.
+					Un petit compteur flottant, toujours au premier plan, affiche votre vitesse en temps réel.
+					Regardez-le <strong>bondir</strong> quand une hotstring ou l’IA tape à votre place — c’est
+					toute la frappe déléguée qui devient visible :
 				</p>
-			</div>
+			</header>
+			<LiveWpm />
 		</div>
 
 		<p class="metrics-privacy" use:reveal>
@@ -359,40 +357,30 @@ FEATURES & RATIONALE:
 		text-align: center;
 	}
 
-	/* ─── WPM widget callout ────────────────────────────────── */
+	/* ─── Live WPM widget ───────────────────────────────────── */
 
-	.widget-callout {
+	.widget-live {
 		--accent: #00bfa5;
-		align-items: center;
-		display: flex;
-		gap: 22px;
 		margin: 0 auto;
-		max-width: 720px;
+		max-width: 760px;
 	}
 
-	.widget-mock {
-		align-items: baseline;
-		background: rgba(10, 14, 26, 0.95);
-		border: 1px solid rgba(0, 191, 165, 0.4);
-		border-radius: 12px;
-		box-shadow: 0 8px 30px -8px rgba(0, 191, 165, 0.4);
-		display: inline-flex;
-		flex-shrink: 0;
-		gap: 6px;
-		padding: 14px 18px;
+	.widget-live-head {
+		margin-bottom: 18px;
+		text-align: center;
 	}
 
-	.widget-num {
-		color: #4fe3cd;
-		font-size: 1.7rem;
-		font-variant-numeric: tabular-nums;
-		font-weight: 800;
+	.widget-live-head h3 {
+		font-size: 1.15rem;
+		margin-bottom: 8px;
 	}
 
-	.widget-unit {
-		color: var(--ink-faint);
-		font-size: 0.8rem;
-		font-weight: 700;
+	.widget-live-head p {
+		color: var(--ink-soft);
+		font-size: 0.92rem;
+		line-height: 1.6;
+		margin: 0 auto;
+		max-width: 620px;
 	}
 
 	.metrics-privacy {
@@ -414,11 +402,6 @@ FEATURES & RATIONALE:
 
 		.cap-grid {
 			grid-template-columns: 1fr;
-		}
-
-		.widget-callout {
-			flex-direction: column;
-			text-align: center;
 		}
 	}
 </style>
