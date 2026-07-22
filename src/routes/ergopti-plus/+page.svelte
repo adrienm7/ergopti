@@ -56,11 +56,12 @@ FEATURES & RATIONALE:
 	const navItems = [
 		{ id: 'ep-hotstrings', label: 'Hotstrings' },
 		{ id: 'ep-ia', label: 'IA' },
-		{ id: 'ep-clavier', label: 'Clavier' },
+		{ id: 'ep-tapholds', label: 'Tap-Holds' },
+		{ id: 'ep-raccourcis', label: 'Raccourcis' },
 		{ id: 'ep-trackpad', label: 'Trackpad' },
 		{ id: 'ep-metriques', label: 'Métriques' },
 		{ id: 'ep-personnalisation', label: 'Réglages' },
-		{ id: 'ep-ergopti', label: 'Ergopti' },
+		{ id: 'ep-ergopti', label: 'Déjà en Ergopti ?' },
 		{ id: 'ep-telecharger', label: 'Télécharger' }
 	];
 

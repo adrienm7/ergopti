@@ -143,15 +143,17 @@ FEATURES & RATIONALE:
 	];
 </script>
 
-<section class="keyboard" id="ep-clavier" style="--section-accent: #fb8c00;">
+<section class="keyboard" id="ep-tapholds" style="--section-accent: #fb8c00;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
-			<p class="kicker">Clavier augmenté</p>
+			<p class="kicker">Tap-Holds</p>
 			<h2>Sept touches à double vie.</h2>
 			<p class="lead">
-				Un appui bref déclenche une action, un maintien conserve le rôle de modificateur. Les
-				mappings ci-dessous sont <strong>les défauts que nous livrons</strong> : chaque touche, chaque
-				action et chaque délai se changent depuis le menu — sans écrire une ligne de code.
+				Un appui bref déclenche une action, un maintien conserve le rôle de modificateur. La même
+				logique sur les deux OS : <strong>les mêmes doigts</strong> déclenchent les mêmes gestes, avec
+				le modificateur natif de chaque plateforme — <kbd>Ctrl</kbd> sur Windows, <kbd>⌘</kbd> sur
+				macOS. L’objectif : <strong>une expérience unifiée</strong>, quel que soit l’ordinateur devant
+				vous. Ce sont les défauts livrés ; chaque touche, action et délai se change depuis le menu.
 			</p>
 		</header>
 
@@ -206,7 +208,11 @@ FEATURES & RATIONALE:
 				</article>
 			{/each}
 		</div>
+	</div>
+</section>
 
+<section class="keyboard" id="ep-raccourcis" style="--section-accent: #fb8c00;">
+	<div class="ep-wrap">
 		<!-- Shared action catalog, structured like the driver's picker and
 		     filtered by the page's OS toggle -->
 		<div class="actions-block">
