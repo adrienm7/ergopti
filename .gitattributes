@@ -9,3 +9,9 @@
 # AHK v2 source uses UTF-8 BOM + LF. Keep the parser invariant identical on
 # Windows and Linux CI, and reject mixed line endings in the encoding gate.
 *.ahk text eol=lf
+
+# Markdown must check out LF everywhere. Generated docs (e.g. the architecture
+# diagram) are compared byte-for-byte by CI; with core.autocrlf=true a Windows
+# checkout would rewrite them to CRLF and fail that comparison locally even
+# though the committed blob is LF and CI (Linux/macOS) passes.
+*.md text eol=lf
