@@ -74,6 +74,7 @@ helpers.describe("lib/file_watchers — post-boot FSEvents-replay suppression (m
 		clock = 10
 		fire_lua_change()
 		helpers.assert_true(type(captured_fn) == "function", "a change after the window must schedule a reload")
+		clock = 11   -- past the lone-edit settle window so the reload fires
 		captured_fn()
 		helpers.assert_true(reloads == 1, "and must reload once (got " .. reloads .. ")")
 

@@ -12,10 +12,11 @@
 --- ==============================================================================
 
 local M = {}
-local hs         = hs
-local Logger     = require("lib.logger")
-local git_status = require("lib.git_status")
-local LOG        = "menu_watchers"
+local hs          = hs
+local Logger      = require("lib.logger")
+local git_status  = require("lib.git_status")
+local reload_gate = require("reload_gate")
+local LOG         = "menu_watchers"
 
 
 
@@ -30,15 +31,15 @@ local LOG        = "menu_watchers"
 -- Debounce delay (seconds): absorbs rapid bursts of file-change events
 -- (e.g. a git commit touching several .lua files at once) so that only a
 -- single hs.reload() fires instead of one per changed file. It doubles as the
--- git-settle poll interval below.
+-- settle poll interval below.
 local DEBOUNCE_SEC = 0.5
 
--- Max consecutive git-settle re-polls (each DEBOUNCE_SEC) with the lock held but
--- NO new file activity, before the guard is bypassed. A real pull keeps writing,
--- which resets the counter (see reload_config), so this only trips on a STALE
--- index.lock left by a crashed git — never on a genuine pull, however long.
--- Kept identical to lib/file_watchers' GIT_SETTLE_MAX_DEFERRALS.
-local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * 0.5s = 60s of a quiet-but-locked repo
+-- Max consecutive hold re-polls (each DEBOUNCE_SEC) with NO new file activity,
+-- before the hold is bypassed. Real activity resets the counter (see
+-- reload_config), so a genuine bulk write never trips it — only a quiet-but-stuck
+-- state (a STALE index.lock left by a crashed git) does. Kept identical to
+-- lib/file_watchers' GIT_SETTLE_MAX_DEFERRALS.
+local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * 0.5s = 60s of a quiet-but-stuck repo
 
 --- Creates and starts a pathwatcher on base_dir that triggers a reload on .lua/.toml changes.
 --- Ignores changes that arrive while the suppress window is active (e.g. after opening a file
@@ -49,14 +50,22 @@ local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * 0.5s = 60s of a quiet-but-locked
 --- @param ui_restore table lib.ui_restore module (provides defer_reload).
 --- @return userdata|nil The hs.pathwatcher object, or nil on failure.
 function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_restore)
-	-- Single debounce timer shared across all pathwatcher callbacks; cancelled
+	-- Single debounce/poll timer shared across all pathwatcher callbacks; cancelled
 	-- and restarted on every new event so that a burst of changes produces only
-	-- one reload fired DEBOUNCE_SEC after the last event in the burst.
+	-- one reload fired once the burst settles.
 	local _debounce_timer = nil
-	-- Consecutive git-settle re-polls with the lock held but no new file activity;
-	-- reset to 0 by any real file event (reload_config) and by a fired reload,
-	-- capped by GIT_SETTLE_MAX_DEFERRALS so only a stale lock can wedge it.
-	local git_defer_count = 0
+	-- Consecutive hold re-polls with no new file activity; reset to 0 by any real
+	-- file event (reload_config) and by a fired reload, capped by
+	-- GIT_SETTLE_MAX_DEFERRALS so only a quiet-but-stuck state can bypass the hold.
+	local defer_count = 0
+	-- Distinct source paths changed since the current burst began, and the epoch
+	-- time (s) of the last change — together they drive the adaptive settle so a
+	-- BULK write (git pull, OneDrive / Dropbox sync, rsync, mass save) is held
+	-- until activity has been quiet, while a lone edit still reloads fast
+	-- (macos-reload-during-git-pull).
+	local burst_paths     = {}
+	local burst_count     = 0
+	local last_change_sec = 0
 
 	-- ``fire_reload`` is forward-declared so the debounce closure can call it
 	-- while ``fire_reload`` itself re-arms through ``arm_reload`` (the Lua
@@ -64,8 +73,8 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 	local fire_reload
 
 	local function arm_reload()
-		-- Cancel any pending debounce and restart it; the reload fires only once
-		-- the burst settles.
+		-- Cancel any pending timer and restart it; the reload fires only once the
+		-- burst settles.
 		if _debounce_timer then
 			pcall(function() _debounce_timer:stop() end)
 		end
@@ -76,20 +85,25 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 	end
 
 	fire_reload = function()
-		-- Never reload while git is still rewriting base_dir. A `git pull` run
-		-- against the live driver would otherwise reload init.lua against a
-		-- half-updated tree and leave Hammerspoon dead (macos-reload-during-git-pull).
-		-- Shared root cause with lib/file_watchers — both auto-reload watchers must
-		-- hold their reload for the same git-settle window, or the unguarded one
-		-- reloads mid-pull.
-		if git_defer_count < GIT_SETTLE_MAX_DEFERRALS and git_status.operation_in_progress(base_dir) then
-			git_defer_count = git_defer_count + 1
-			Logger.debug(LOG, "Reload held — git operation in progress on '%s' (%d/%d).",
-				base_dir, git_defer_count, GIT_SETTLE_MAX_DEFERRALS)
+		-- Hold the reload while base_dir is still being written FROM ANY SOURCE, so
+		-- the driver never reloads init.lua against a half-updated tree (the freeze).
+		-- Two signals, shared with lib/file_watchers through reload_gate: quiescence
+		-- for a bulk write of many files, and the precise git index.lock guard. Both
+		-- watchers must hold for the same window, or the unguarded one reloads mid-op.
+		local elapsed = hs.timer.secondsSinceEpoch() - last_change_sec
+		local hold, why
+		if not reload_gate.is_settled(elapsed, burst_count) then
+			hold, why = true, "filesystem settling"
+		elseif git_status.operation_in_progress(base_dir) then
+			hold, why = true, "git operation in progress"
+		end
+		if hold and defer_count < GIT_SETTLE_MAX_DEFERRALS then
+			defer_count = defer_count + 1
+			Logger.debug(LOG, "Reload held (%s) on '%s' (%d/%d).", why, base_dir, defer_count, GIT_SETTLE_MAX_DEFERRALS)
 			arm_reload()
 			return
 		end
-		git_defer_count = 0
+		burst_paths, burst_count, defer_count = {}, 0, 0
 		ui_restore.defer_reload(on_reload)
 	end
 
@@ -97,23 +111,29 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 		-- HTML/CSS/JS are webview assets loaded at open-time — changing them
 		-- never requires hs.reload(); only .lua and .toml affect runtime behavior
 		if hs.timer.secondsSinceEpoch() < get_suppress_until() then return end
-		if type(files) == "table" then
-			for _, file in pairs(files) do
-				if type(file) == "string"
-					and (file:match("%.lua$") or file:match("%.toml$"))
-					and not file:match("logs/")
-					-- paths.toml is auto-generated at each boot — treating it as a
-					-- source change would cause an infinite reload loop (HS writes
-					-- it → watcher fires → reload → HS writes it again → …)
-					and not file:match("paths%.toml$") then
-					Logger.debug(LOG, "File change detected: %s — debounce armed.", file)
-					-- A genuine file event resets the git-settle counter, so a
-					-- long-running pull that keeps writing never trips the stale-lock cap.
-					git_defer_count = 0
-					arm_reload()
-					return
+		if type(files) ~= "table" then return end
+		local matched = false
+		for _, file in pairs(files) do
+			if type(file) == "string"
+				and (file:match("%.lua$") or file:match("%.toml$"))
+				and not file:match("logs/")
+				-- paths.toml is auto-generated at each boot — treating it as a source
+				-- change would cause an infinite reload loop (HS writes it, the
+				-- watcher fires, the reload rewrites it, and so on).
+				and not file:match("paths%.toml$") then
+				if not burst_paths[file] then
+					burst_paths[file] = true
+					burst_count = burst_count + 1
 				end
+				matched = true
 			end
+		end
+		if matched then
+			Logger.debug(LOG, "File change detected (%d distinct in burst) — settle armed.", burst_count)
+			last_change_sec = hs.timer.secondsSinceEpoch()
+			-- A genuine file event resets the stuck-state counter.
+			defer_count = 0
+			arm_reload()
 		end
 	end
 

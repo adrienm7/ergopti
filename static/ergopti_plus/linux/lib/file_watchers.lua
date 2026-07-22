@@ -32,6 +32,8 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Monotonic = require("lib.monotonic")
+local reload_gate = require("reload_gate")
+local FileSystem = require("adapters.file_system")
 local LOG = "file_watchers"
 
 
@@ -87,6 +89,24 @@ local _reload_deadline = nil
 
 -- Debounce window in seconds.
 local _debounce_sec = 0.5
+
+-- Absolute path of the driver source tree (opts.base_dir); used to probe whether
+-- a git operation is currently rewriting it.
+local _base_dir = nil
+
+-- Adaptive-settle burst state: distinct source paths changed since the current
+-- burst began, and the epoch (ms) of the last change. A BULK write (git pull,
+-- OneDrive / Dropbox sync, rsync, mass save — many files) is held until activity
+-- has been quiet for the shared bulk-settle window, so the daemon never re-scans
+-- a half-written TOML; a lone edit still reloads after the short edit window.
+local _burst_paths = {}
+local _burst_count = 0
+local _last_change_ms = 0
+
+-- Consecutive hold re-polls with no new file activity; reset by any real event,
+-- capped so only a quiet-but-stuck state (a stale index.lock) can bypass the hold.
+local _defer_count = 0
+local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * _debounce_sec = 60s of a quiet-but-stuck repo
 
 
 -- =========================================
@@ -191,17 +211,52 @@ end
 --- executed in M.pump() after the deadline passes (luv mode includes a timer
 --- fallback that calls pump via a fast poll).
 --- @param reason string Human-readable reason logged at debug level.
-local function _schedule_reload(reason)
-	Logger.debug(LOG, "Change detected (%s) — scheduling reload in %.1fs…", reason, _debounce_sec)
+local function _schedule_reload(reason, paths)
+	Logger.debug(LOG, "Change detected (%s) — settle armed (%.1fs).", reason, _debounce_sec)
+	if type(paths) == "table" then
+		for _, p in ipairs(paths) do
+			if type(p) == "string" and not _burst_paths[p] then
+				_burst_paths[p] = true
+				_burst_count = _burst_count + 1
+			end
+		end
+	end
+	_last_change_ms = _now_ms()
+	-- Genuine activity resets the stuck-state counter, so an ongoing bulk write
+	-- never bypasses the hold; only a quiet-but-stuck state climbs toward the cap.
+	_defer_count = 0
 	_reload_deadline = _now_ms() + _debounce_sec * 1000
 end
 
---- Fires the reload callback if the deadline has passed. Called from M.pump().
+--- Fires the reload callback if the deadline has passed AND the working tree has
+--- settled. Called from M.pump().
 local function _check_deadline()
 	if not _reload_deadline then return end
 	if _now_ms() < _reload_deadline then return end
+
+	-- Deadline reached, but hold the reload while the tree is still being written
+	-- FROM ANY SOURCE, so the daemon never re-scans a half-written config. Two
+	-- signals shared with the macOS driver through reload_gate: quiescence for a
+	-- bulk write of many files, and the precise git index.lock guard. (The Linux
+	-- reload is an in-process TOML re-scan, so this prevents loading a partial file
+	-- rather than a crash — macos-reload-during-git-pull.)
+	local elapsed_sec = (_now_ms() - _last_change_ms) / 1000
+	local hold, why
+	if not reload_gate.is_settled(elapsed_sec, _burst_count) then
+		hold, why = true, "filesystem settling"
+	elseif reload_gate.git_operation_in_progress(FileSystem, _base_dir) then
+		hold, why = true, "git operation in progress"
+	end
+	if hold and _defer_count < GIT_SETTLE_MAX_DEFERRALS then
+		_defer_count = _defer_count + 1
+		Logger.debug(LOG, "Reload held (%s) — re-polling (%d/%d).", why, _defer_count, GIT_SETTLE_MAX_DEFERRALS)
+		_reload_deadline = _now_ms() + _debounce_sec * 1000
+		return
+	end
+
 	_reload_deadline = nil
-	Logger.info(LOG, "Debounced reload firing…")
+	_burst_paths, _burst_count, _defer_count = {}, 0, 0
+	Logger.info(LOG, "Debounced reload firing.")
 	if _on_reload then
 		local ok, err = pcall(_on_reload)
 		if not ok then Logger.error(LOG, "on_reload callback raised: %s", tostring(err)) end
@@ -262,11 +317,11 @@ local function _arm_luv_watcher(path, accept_fn)
 			if type(fname) == "string" and fname ~= "" then
 				-- Directory watcher: filter by filename.
 				if accept_fn(fname) then
-					_schedule_reload(string.format("inotify: %s/%s", path:match("[^/]+$"), fname))
+					_schedule_reload(string.format("inotify: %s/%s", path:match("[^/]+$"), fname), { path .. "/" .. fname })
 				end
 			elseif events and #events > 0 then
 				-- File watcher: fire on any event.
-				_schedule_reload(string.format("inotify: %s (%s)", path:match("[^/]+$"), table.concat(events, ",")))
+				_schedule_reload(string.format("inotify: %s (%s)", path:match("[^/]+$"), table.concat(events, ",")), { path })
 			end
 		end)
 	end)
@@ -317,7 +372,7 @@ end
 
 --- Checks all pump-mode entries for mtime changes. Called from M.pump().
 local function _pump_check_all()
-	local any_changed = false
+	local changed = {}
 	for _, entry in ipairs(_pump_entries) do
 		local mtime = _mtime(entry.path)
 		if mtime then
@@ -326,20 +381,16 @@ local function _pump_check_all()
 				entry.last_mtime = mtime
 				entry.checked = true
 			elseif mtime ~= entry.last_mtime then
+				-- File or directory mtime moved (a dir's mtime changes on any entry
+				-- create / delete / rename); record the path so the adaptive settle
+				-- can tell a lone edit from a bulk write.
 				entry.last_mtime = mtime
-				if entry.is_dir then
-					-- Directory changed — don't fire yet; re-scan per-file entries? No,
-					-- the directory mtime changes on any entry change. Fire.
-					any_changed = true
-				else
-					-- File changed directly.
-					any_changed = true
-				end
+				changed[#changed + 1] = entry.path
 			end
 		end
 	end
-	if any_changed then
-		_schedule_reload("mtime poll")
+	if #changed > 0 then
+		_schedule_reload("mtime poll", changed)
 	end
 end
 
@@ -419,6 +470,7 @@ function M.start(opts)
 	local base_dir       = opts.base_dir
 	local personal_dir   = opts.personal_dir or ""
 	_on_reload           = opts.on_reload
+	_base_dir            = base_dir
 	if type(opts.now_ms) == "function" then _now_ms = opts.now_ms end
 
 	if not hotstrings_dir and not base_dir and personal_dir == "" then
@@ -519,8 +571,10 @@ function M.stop()
 	-- Clear pump entries.
 	_pump_entries = {}
 
-	-- Clear pending debounce deadline.
+	-- Clear pending debounce deadline and adaptive-settle burst state.
 	_reload_deadline = nil
+	_burst_paths, _burst_count, _last_change_ms, _defer_count = {}, 0, 0, 0
+	_base_dir = nil
 
 	_on_reload = nil
 	Logger.debug(LOG, "All file watchers stopped.")
