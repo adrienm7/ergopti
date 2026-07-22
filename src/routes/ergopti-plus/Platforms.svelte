@@ -195,8 +195,7 @@ FEATURES & RATIONALE:
 		<!-- Final CTA -->
 		<div class="cta-card" use:reveal>
 			<div class="cta-glow" aria-hidden="true"></div>
-			<p class="cta-eyebrow">{t('Gratuit · Open-source · 100 % local')}</p>
-			<h2 class="cta-title">{@html t('Prêt à taper moins&nbsp;?')}</h2>
+			<h2 class="cta-title">{t('Vos doigts vous diront merci.')}</h2>
 			<p class="cta-sub">
 				Installez <ErgoptiPlus></ErgoptiPlus>, lancez-le, tapez <code>ct★</code> — et regardez
 				<span class="cta-demo">c’était</span> s’écrire tout seul. Le reste suivra.
@@ -224,23 +223,17 @@ FEATURES & RATIONALE:
 					<i class="icon-linux"></i><span>Linux <small>(alpha)</small></span>
 				</a>
 			</div>
-			<ul class="cta-trust" aria-label={t('Garanties')}>
-				{#if ui.release}<li class="cta-trust-version">{ui.release.tag}</li>{/if}
+			<p class="cta-meta">
+				{#if ui.release}<span class="cta-version">{ui.release.tag}</span>{/if}
 				{#if ui.repo}
-					<li>
-						<a
-							class="cta-gh"
-							href="https://github.com/adrienm7/ergopti"
-							target="_blank"
-							rel="noopener">{t('★ {n} sur GitHub', { n: ui.repo.stars })}</a
-						>
-					</li>
+					<a
+						class="cta-gh"
+						href="https://github.com/adrienm7/ergopti"
+						target="_blank"
+						rel="noopener">{t('★ {n} sur GitHub', { n: ui.repo.stars })}</a
+					>
 				{/if}
-				{#if ui.repo?.license}<li>{t('Licence')} {ui.repo.license}</li>{/if}
-				<li>{t('Aucun compte')}</li>
-				<li>{t('Aucune télémétrie')}</li>
-				<li>{t('Désinstallation en un clic')}</li>
-			</ul>
+			</p>
 			<p class="cta-foot">
 				<a href="utilisation" class="cta-link"
 					>{@html t('Vous tapez déjà en Ergopti&nbsp;? Installez la disposition pour le combo complet →')}</a
@@ -542,9 +535,21 @@ FEATURES & RATIONALE:
 
 	/* ─── Final CTA ─────────────────────────────────────────── */
 
+	/* The card must visibly outrank every other block on the page: a brighter
+	 * layered surface, a stronger accent border, an outer glow and an inset
+	 * top highlight — the "buy box" of the page. */
 	.cta-card {
-		border: 1px solid rgba(49, 190, 255, 0.3);
+		/* Keep the blue wash faint — the emphasis comes from the border and
+		 * outer glow, and text must stay high-contrast on the surface */
+		background:
+			radial-gradient(120% 140% at 50% 0%, rgba(48, 136, 237, 0.08), transparent 55%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+		border: 1px solid rgba(49, 190, 255, 0.5);
 		border-radius: var(--radius-lg);
+		box-shadow:
+			0 0 90px -28px rgba(49, 190, 255, 0.55),
+			0 26px 60px -32px rgba(0, 0, 0, 0.65),
+			inset 0 1px 0 rgba(255, 255, 255, 0.14);
 		margin-top: clamp(48px, 7vw, 80px);
 		overflow: hidden;
 		padding: clamp(40px, 6vw, 72px) clamp(20px, 4vw, 48px);
@@ -552,10 +557,12 @@ FEATURES & RATIONALE:
 		text-align: center;
 	}
 
+	/* Edge-only glow: the blue lives at the card's rim, never behind the
+	 * text — white copy stays on a dark surface for full contrast */
 	.cta-glow {
 		background:
-			radial-gradient(ellipse at 30% 0%, rgba(48, 136, 237, 0.25), transparent 60%),
-			radial-gradient(ellipse at 70% 100%, rgba(2, 201, 219, 0.18), transparent 60%);
+			radial-gradient(90% 55% at 50% -12%, rgba(48, 136, 237, 0.18), transparent 55%),
+			radial-gradient(70% 45% at 75% 112%, rgba(2, 201, 219, 0.1), transparent 60%);
 		inset: 0;
 		pointer-events: none;
 		position: absolute;
@@ -579,78 +586,51 @@ FEATURES & RATIONALE:
 	.cta-sub {
 		color: var(--ink-soft);
 		font-size: 1.02rem;
-		margin: 0 0 26px;
+		margin: 0 auto 26px;
+		max-width: 560px;
 		position: relative;
 		text-align: center;
 	}
 
-	.cta-eyebrow {
-		color: var(--accent-blue);
-		font-size: 0.8rem;
-		font-weight: 700;
-		letter-spacing: 0.12em;
-		margin: 0 0 14px;
-		position: relative;
-		text-transform: uppercase;
-	}
-
-	/* The live-expansion word, tinted like the driver's magic-key family */
+	/* The live-expansion word: the same small chip as the <code> input right
+	 * before it, but tinted magic-key red — input chip in, output chip out */
 	.cta-demo {
-		color: #ff6b68;
+		background: rgba(229, 57, 53, 0.16);
+		border: 1px solid rgba(229, 57, 53, 0.5);
+		border-radius: 6px;
+		color: var(--ink);
+		font-family: 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+		font-size: 0.88em;
 		font-weight: 700;
+		padding: 1px 6px;
+		white-space: nowrap;
 	}
 
-	.cta-trust {
+	/* Version + GitHub proof — quiet plain text, chip-free */
+	.cta-meta {
 		align-items: center;
 		color: var(--ink-faint);
 		display: flex;
 		flex-wrap: wrap;
-		font-size: 0.82rem;
-		gap: 8px 18px;
+		font-size: 0.8rem;
+		gap: 14px;
 		justify-content: center;
-		list-style: none;
-		margin: 22px 0 0;
-		padding: 0;
+		margin: 14px 0 0;
 		position: relative;
 	}
 
-	.cta-trust li {
-		align-items: center;
-		display: flex;
-		gap: 6px;
-	}
-
-	/* Separator dot between trust items */
-	.cta-trust li:not(:first-child)::before {
-		background: var(--ink-faint);
-		border-radius: 50%;
-		content: '';
-		height: 3px;
-		opacity: 0.5;
-		width: 3px;
-	}
-
-	.cta-trust-version {
-		background: rgba(49, 190, 255, 0.12);
-		border: 1px solid rgba(49, 190, 255, 0.3);
-		border-radius: 999px;
-		color: var(--accent-blue);
-		font-weight: 700;
-		padding: 2px 10px;
-	}
-
-	/* The version chip owns its spacing — no separator dot before it */
-	.cta-trust .cta-trust-version::before {
-		display: none;
+	.cta-version {
+		font-weight: 600;
 	}
 
 	.cta-gh {
-		color: #fff;
-		font-weight: 700;
+		color: var(--ink-faint);
+		font-weight: 600;
 		text-decoration: none;
 	}
 
 	.cta-gh:hover {
+		color: var(--ink);
 		text-decoration: underline;
 	}
 

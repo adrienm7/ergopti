@@ -181,13 +181,8 @@ export default {
 		'An indicative, good-faith comparison of default offerings — every tool has its strengths.',
 
 	// ── Final CTA ────────────────────────────────────────────────────────────
-	'Gratuit · Open-source · 100 % local': 'Free · Open-source · 100% local',
-	'Prêt à taper moins&nbsp;?': 'Ready to type less?',
-	Garanties: 'Guarantees',
+	'Vos doigts vous diront merci.': 'Your fingers will thank you.',
 	'★ {n} sur GitHub': '★ {n} on GitHub',
-	Licence: 'License',
-	'Aucun compte': 'No account',
-	'Désinstallation en un clic': 'One-click uninstall',
 	'Vous tapez déjà en Ergopti&nbsp;? Installez la disposition pour le combo complet →':
 		'Already typing in Ergopti? Install the layout for the full combo →'
 };
