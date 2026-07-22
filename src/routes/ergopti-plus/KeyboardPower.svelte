@@ -400,15 +400,24 @@ FEATURES & RATIONALE:
 		text-align: center;
 	}
 
+	/* Masonry-style packing: CSS multi-column flows the group cards to fill
+	 * each column top-to-bottom instead of a rigid grid whose rows align to
+	 * the tallest card — that alignment left large vertical gaps. The
+	 * "240px 3" shorthand auto-fits as many ~240px columns as fit, capped at
+	 * 3, so the layout goes 1 → 2 → 3 columns purely on available width, no
+	 * media query needed. A tall group naturally sits beside two short ones. */
 	.actions-groups {
-		align-items: start;
-		display: grid;
-		gap: 14px;
-		grid-template-columns: repeat(2, 1fr);
+		column-gap: 14px;
+		columns: 240px 3;
 	}
 
 	.actions-group {
 		--accent: #fb8c00;
+		/* Never split a group across a column boundary */
+		break-inside: avoid;
+		display: inline-block;
+		margin-bottom: 14px;
+		width: 100%;
 	}
 
 	.group-title {
