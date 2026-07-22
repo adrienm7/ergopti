@@ -203,6 +203,38 @@ FEATURES & RATIONALE:
 		}
 	}
 
+	/** Retry interval and cap for the dashboard chart nudge. */
+	const NUDGE_INTERVAL_MS = 600;
+	const NUDGE_MAX_TRIES = 20;
+
+	/**
+	 * Re-trigger the dashboard render once Chart.js is available. The
+	 * dashboards load Chart.js from a CDN with defer; when the prefetch JSON
+	 * (local, fast) resolves first, their render_charts() early-returns and
+	 * the charts stay empty until a filter interaction. apply_local_filters()
+	 * is a global, idempotent re-render — calling it after Chart.js lands
+	 * closes the race.
+	 * @param {Window} win
+	 */
+	function nudgeMetricsCharts(win) {
+		let tries = 0;
+		const timer = setInterval(() => {
+			tries++;
+			try {
+				const rerender = win.apply_local_filters ?? win.render_all ?? win.render_charts;
+				if (win.Chart && typeof rerender === 'function') {
+					rerender();
+					clearInterval(timer);
+					return;
+				}
+			} catch (_) {
+				clearInterval(timer);
+				return;
+			}
+			if (tries >= NUDGE_MAX_TRIES) clearInterval(timer);
+		}, NUDGE_INTERVAL_MS);
+	}
+
 	/**
 	 * Play the native host: once the iframe loads, inject the data through
 	 * the same entry point the driver uses for this window.
@@ -215,7 +247,8 @@ FEATURES & RATIONALE:
 			if (id === 'model_browser') injectModelBrowser(win);
 			else if (id === 'hotstring_editor') injectHotstringEditor(win);
 			else if (id === 'personal_info_editor') injectPersonalInfo(win);
-			// changelog and the dashboards need nothing — they self-bootstrap.
+			else if (id.startsWith('metrics_')) nudgeMetricsCharts(win);
+			// changelog needs nothing — it self-bootstraps from GitHub.
 		} catch (e) {
 			console.error('Injection dans la fenêtre du driver impossible :', e);
 		}
