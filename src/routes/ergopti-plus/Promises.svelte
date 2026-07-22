@@ -15,31 +15,39 @@ FEATURES & RATIONALE:
 
 <script>
 	import { reveal } from './reveal.js';
+	import { t } from './i18n.svelte.js';
 
-	const promises = [
+	// $derived so the cards re-translate the instant the language toggles.
+	let promises = $derived([
 		{
 			icon: '⏱',
-			title: 'Utile dès la première heure',
-			body: 'Apostrophes typographiques, accents, expansions classiques : l’essentiel du gain est livré <strong>par défaut</strong>, sans rien apprendre. Vous tapez normalement, le reste se règle tout seul.'
+			title: t('Utile dès la première heure'),
+			body: t(
+				'Apostrophes typographiques, accents, expansions classiques : l’essentiel du gain est livré <strong>par défaut</strong>, sans rien apprendre. Vous tapez normalement, le reste se règle tout seul.'
+			)
 		},
 		{
 			icon: '🌱',
-			title: 'Progressif, jamais imposé',
-			body: 'Chaque fonctionnalité est <strong>activable indépendamment</strong>. Démarrez avec les hotstrings, ajoutez les tap-holds plus tard, l’IA en bonus. Tout se désactive d’un clic.'
+			title: t('Progressif, jamais imposé'),
+			body: t(
+				'Chaque fonctionnalité est <strong>activable indépendamment</strong>. Démarrez avec les hotstrings, ajoutez les tap-holds plus tard, l’IA en bonus. Tout se désactive d’un clic.'
+			)
 		},
 		{
 			icon: '🌐',
-			title: 'Toutes les dispositions',
-			body: 'AZERTY, QWERTY, Bépo, Dvorak… Le driver agit sur le <strong>texte produit</strong>, pas sur la touche physique. Gardez votre layout — ou adoptez Ergopti pour le combo idéal.'
+			title: t('Toutes les dispositions'),
+			body: t(
+				'AZERTY, QWERTY, Bépo, Dvorak… Le driver agit sur le <strong>texte produit</strong>, pas sur la touche physique. Gardez votre layout — ou adoptez Ergopti pour le combo idéal.'
+			)
 		}
-	];
+	]);
 </script>
 
 <section class="promises" id="ep-promesses">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
-			<p class="kicker">Trois promesses</p>
-			<h2>Une suite riche, jamais envahissante.</h2>
+			<p class="kicker">{t('Trois promesses')}</p>
+			<h2>{t('Une suite riche, jamais envahissante.')}</h2>
 		</header>
 
 		<div class="promise-grid">

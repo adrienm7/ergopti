@@ -11,38 +11,48 @@ Placed early so a visitor recognises themselves before diving into details.
 
 <script>
 	import { reveal } from './reveal.js';
+	import { t } from './i18n.svelte.js';
 
-	const personas = [
+	// $derived so the cards re-translate the instant the language toggles.
+	let personas = $derived([
 		{
 			icon: '💻',
-			who: 'Développeur',
-			body: 'Symboles de code en roulements (<code>=></code>, <code>!=</code>), snippets de boilerplate, ouverture de chemins de fichiers, et une IA locale qui complète sans jamais envoyer votre code ailleurs.'
+			who: t('Développeur'),
+			body: t(
+				'Symboles de code en roulements (<code>=></code>, <code>!=</code>), snippets de boilerplate, ouverture de chemins de fichiers, et une IA locale qui complète sans jamais envoyer votre code ailleurs.'
+			)
 		},
 		{
 			icon: '✍️',
-			who: 'Rédacteur',
-			body: 'Autocorrection en continu, signatures et formules en une abréviation, apostrophes typographiques automatiques, et des prédictions qui terminent vos phrases.'
+			who: t('Rédacteur'),
+			body: t(
+				'Autocorrection en continu, signatures et formules en une abréviation, apostrophes typographiques automatiques, et des prédictions qui terminent vos phrases.'
+			)
 		},
 		{
 			icon: '🌍',
-			who: 'Multilingue',
-			body: 'FR/EN et bien plus : corrections et prédictions bilingues, symboles et accents à portée de doigt, interface en 21 langues.'
+			who: t('Multilingue'),
+			body: t(
+				'FR/EN et bien plus : corrections et prédictions bilingues, symboles et accents à portée de doigt, interface en 21 langues.'
+			)
 		},
 		{
 			icon: '🖐️',
-			who: 'Ergonomie & confort',
-			body: 'Tap-holds pour garder les mains au repos, layer de navigation sans flèches, gestes trackpad, et des métriques pour voir vos progrès.'
+			who: t('Ergonomie & confort'),
+			body: t(
+				'Tap-holds pour garder les mains au repos, layer de navigation sans flèches, gestes trackpad, et des métriques pour voir vos progrès.'
+			)
 		}
-	];
+	]);
 </script>
 
 <section class="personas" id="ep-pourqui" style="--section-accent: #a78bfa;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
-			<p class="kicker">Pour qui ?</p>
-			<h2>Chacun y gagne, à sa façon.</h2>
+			<p class="kicker">{t('Pour qui ?')}</p>
+			<h2>{t('Chacun y gagne, à sa façon.')}</h2>
 			<p class="lead">
-				Ergopti+ n’impose pas une manière de travailler — il accélère la vôtre. Quelques exemples.
+				{t('Ergopti+ n’impose pas une manière de travailler — il accélère la vôtre. Quelques exemples.')}
 			</p>
 		</header>
 
