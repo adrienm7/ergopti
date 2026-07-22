@@ -316,19 +316,24 @@ end
 
 -- Pure-Lua existence probe used when LuaFileSystem is unavailable (e.g. a
 -- Windows dev box without lfs). Exposed as hs.fs.__probe_no_lfs so a regression
--- test can pin it directly on every OS.
---   - Files: io.open succeeds everywhere.
---   - Directories: io.open fails on Windows. os.rename(path, path) is a no-op
---     SUCCESS for an existing entry on POSIX, but on Windows it FAILS because
---     the target already exists — so accept any rename failure whose errno is
---     not ENOENT (2 = "no such file"). errno is the third os.rename return and,
---     unlike the message string, is NOT localized (critical on French Windows,
---     where os.rename(dir, dir) previously left _shared/ undiscoverable).
+-- test can pin it directly on every OS. Two platform asymmetries meet here:
+--   - POSIX opens DIRECTORIES read-only too, so io.open succeeding does not
+--     mean "file". read(0) disambiguates portably: "" for a regular file,
+--     nil (EISDIR) for a directory. (First CI run of this probe classified
+--     every Linux directory as a file for exactly this reason.)
+--   - Windows io.open fails on directories, so fall through to os.rename:
+--     a no-op rename SUCCEEDS on POSIX but FAILS on Windows because the
+--     target exists — accept any failure whose errno is not ENOENT (2).
+--     errno is the third os.rename return and, unlike the message string, is
+--     NOT localized (critical on French Windows, where os.rename(dir, dir)
+--     previously left _shared/ undiscoverable).
 local function probe_fs_without_lfs(path)
 	local fh = io.open(path, "r")
 	if fh then
+		local zero = fh:read(0)
 		fh:close()
-		return { mode = "file" }
+		if zero then return { mode = "file" } end
+		return { mode = "directory" }
 	end
 	local ok, _, code = os.rename(path, path)
 	if ok or (code and code ~= 2) then return { mode = "directory" } end
