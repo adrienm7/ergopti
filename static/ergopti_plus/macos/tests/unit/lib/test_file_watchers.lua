@@ -38,7 +38,7 @@ helpers.describe("lib/file_watchers — arming contract", function()
 		hs.pathwatcher = { new = function(_path, _cb)
 			return { start = function() armed = armed + 1 end }
 		end }
-		hs.timer = { doAfter = function(_s, _fn) return { stop = function() end } end }
+		hs.timer = { doAfter = function(_s, _fn) return { stop = function() end } end, secondsSinceEpoch = function() return 0 end }
 		-- No personal dir tree, no per-file entries: attributes returns nil so the
 		-- recursive personal scan early-returns; fs_dir over an unset dir yields none.
 		hs.fs.attributes = function(_p) return nil end
@@ -78,7 +78,7 @@ helpers.describe("lib/file_watchers — arming contract", function()
 		hs.pathwatcher = { new = function(_path, _cb)
 			return { start = function() end }
 		end }
-		hs.timer = { doAfter = function(_s, _fn) return { stop = function() end } end }
+		hs.timer = { doAfter = function(_s, _fn) return { stop = function() end } end, secondsSinceEpoch = function() return 0 end }
 		-- Every path in this fixture is a directory — there is no file to bottom
 		-- out on, so only the depth guard can stop the recursion.
 		hs.fs.attributes = function(_p) return { mode = "directory" } end
