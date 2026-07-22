@@ -11,37 +11,46 @@ install, launch, type. Removes the "what happens after I download?" friction.
 
 <script>
 	import { reveal } from './reveal.js';
+	import { t } from './i18n.svelte.js';
 
-	const steps = [
+	// $derived so the cards re-translate the instant the language toggles.
+	let steps = $derived([
 		{
 			n: 1,
 			icon: '⬇️',
-			title: 'Téléchargez et lancez',
-			body: 'Un exécutable pour Windows, une app pour macOS. Aucun compte, aucun droit administrateur nécessaire dans la plupart des cas.'
+			title: t('Téléchargez et lancez'),
+			body: t(
+				'Un exécutable pour Windows, une app pour macOS. Aucun compte, aucun droit administrateur nécessaire dans la plupart des cas.'
+			)
 		},
 		{
 			n: 2,
 			icon: '⌨️',
-			title: 'Tapez comme d’habitude',
-			body: 'Rien à réapprendre. Vos hotstrings, corrections et prédictions sont actifs immédiatement, sur votre disposition actuelle.'
+			title: t('Tapez comme d’habitude'),
+			body: t(
+				'Rien à réapprendre. Vos hotstrings, corrections et prédictions sont actifs immédiatement, sur votre disposition actuelle.'
+			)
 		},
 		{
 			n: 3,
 			icon: '🎛️',
-			title: 'Ajustez à votre rythme',
-			body: 'Activez une fonctionnalité à la fois depuis le menu — tap-holds, gestes, IA. Rien n’est imposé, tout est optionnel.'
+			title: t('Ajustez à votre rythme'),
+			body: t(
+				'Activez une fonctionnalité à la fois depuis le menu — tap-holds, gestes, IA. Rien n’est imposé, tout est optionnel.'
+			)
 		}
-	];
+	]);
 </script>
 
 <section class="steps" id="ep-demarrer" style="--section-accent: #02c9db;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
-			<p class="kicker">Prise en main</p>
-			<h2>Opérationnel en trois minutes.</h2>
+			<p class="kicker">{t('Prise en main')}</p>
+			<h2>{t('Opérationnel en trois minutes.')}</h2>
 			<p class="lead">
-				Pas de configuration obligatoire, pas de courbe d’apprentissage : ça marche dès le lancement,
-				et ça grandit avec vous.
+				{t(
+					'Pas de configuration obligatoire, pas de courbe d’apprentissage : ça marche dès le lancement, et ça grandit avec vous.'
+				)}
 			</p>
 		</header>
 
