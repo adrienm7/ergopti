@@ -235,7 +235,7 @@ FEATURES & RATIONALE:
 			</ul>
 		</div>
 
-		<a class="scroll-hint" href="#ep-hotstrings" aria-label="Découvrir les fonctionnalités">
+		<a class="scroll-hint" href="#ep-promesses" aria-label={t('Découvrir les fonctionnalités')}>
 			<span class="scroll-chevron" aria-hidden="true"></span>
 		</a>
 	</div>

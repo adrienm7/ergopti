@@ -61,6 +61,7 @@ export default {
 	'Afficher les fenêtres au style macOS (Hammerspoon)':
 		'Show the windows in macOS style (Hammerspoon)',
 	'Afficher les fenêtres au style Linux (kanata + daemon Lua, alpha)':
-		'Show the windows in Linux style (kanata + Lua daemon, alpha)'
+		'Show the windows in Linux style (kanata + Lua daemon, alpha)',
+	'Découvrir les fonctionnalités': 'Discover the features'
 };
 
