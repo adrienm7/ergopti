@@ -39,6 +39,7 @@ FEATURES & RATIONALE:
 	import Customization from './Customization.svelte';
 	import ErgoptiExclusives from './ErgoptiExclusives.svelte';
 	import Platforms from './Platforms.svelte';
+	import StickyCta from './StickyCta.svelte';
 
 	// Populated at build time by +page.server.js from the driver's data files.
 	let { data } = $props();
@@ -68,6 +69,18 @@ FEATURES & RATIONALE:
 	onMount(async () => {
 		restoreOS();
 		ui.release = await getRelease();
+
+		// Live GitHub trust signals (stars + licence). Best-effort: if the
+		// unauthenticated API is rate-limited or offline, the badges stay hidden.
+		try {
+			const r = await fetch('https://api.github.com/repos/adrienm7/ergopti');
+			if (r.ok) {
+				const d = await r.json();
+				ui.repo = { stars: d.stargazers_count ?? 0, license: d.license?.spdx_id || '' };
+			}
+		} catch (_) {
+			/* ignore — trust badges are optional */
+		}
 	});
 </script>
 
@@ -128,6 +141,8 @@ FEATURES & RATIONALE:
 			<div class="ep-endspace"></div>
 		</div>
 	</main>
+
+	<StickyCta />
 </div>
 
 <style>

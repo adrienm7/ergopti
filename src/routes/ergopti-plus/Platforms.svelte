@@ -97,8 +97,8 @@ FEATURES & RATIONALE:
 					</tr>
 				</thead>
 				<tbody>
-					{#each matrix as row}
-						<tr>
+					{#each matrix as row, i}
+						<tr style="--row: {i};">
 							<td class="feat-col">{row.label}</td>
 							{#each [row.win, row.mac, row.linux] as status}
 								{@const c = cell(status)}
@@ -225,6 +225,17 @@ FEATURES & RATIONALE:
 			</div>
 			<ul class="cta-trust" aria-label="Garanties">
 				{#if ui.release}<li class="cta-trust-version">{ui.release.tag}</li>{/if}
+				{#if ui.repo}
+					<li>
+						<a
+							class="cta-gh"
+							href="https://github.com/adrienm7/ergopti"
+							target="_blank"
+							rel="noopener">★ {ui.repo.stars} sur GitHub</a
+						>
+					</li>
+				{/if}
+				{#if ui.repo?.license}<li>Licence {ui.repo.license}</li>{/if}
 				<li>Aucun compte</li>
 				<li>Aucune télémétrie</li>
 				<li>Désinstallation en un clic</li>
@@ -334,6 +345,27 @@ FEATURES & RATIONALE:
 	.cell.note {
 		color: var(--ink-soft);
 		font-size: 0.8rem;
+	}
+
+	/* The matrix "checks itself": status cells pop in row-by-row when the table
+	 * scrolls into view. Guarded so cells stay visible without JS or with
+	 * reduced motion (the enclosing .reveal already handles the safe fade). */
+	@media (prefers-reduced-motion: no-preference) {
+		.table-wrap.is-visible .cell {
+			animation: cell-in 0.5s var(--ease-out) both;
+			animation-delay: calc(var(--row, 0) * 55ms + 120ms);
+		}
+	}
+
+	@keyframes cell-in {
+		from {
+			opacity: 0;
+			transform: scale(0.55);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
 	}
 
 	.legend {
@@ -609,6 +641,16 @@ FEATURES & RATIONALE:
 	/* The version chip owns its spacing — no separator dot before it */
 	.cta-trust .cta-trust-version::before {
 		display: none;
+	}
+
+	.cta-gh {
+		color: #fff;
+		font-weight: 700;
+		text-decoration: none;
+	}
+
+	.cta-gh:hover {
+		text-decoration: underline;
 	}
 
 	.cta-buttons {
