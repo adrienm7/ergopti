@@ -891,13 +891,21 @@ _OnPrefixKeyDown(IH, VK, SC) {
 ; being typed. Deriving one from the other is how they are reconciled without
 ; the preview having to remember anything the engine already knows.
 _PrefixWordTailFromEngine() {
-	global HSE_Buffer, _MAX_BUFFER_LEN
-	if (!IsSet(HSE_Buffer) or HSE_Buffer == "")
+	global HSE_Buffer
+	return IsSet(HSE_Buffer) ? _PrefixWordTail(HSE_Buffer) : ""
+}
+
+; The trailing word of an arbitrary buffer, using the shared boundary set. One
+; definition of "the word currently being typed", so every consumer agrees on
+; where it starts.
+_PrefixWordTail(Buf) {
+	global _MAX_BUFFER_LEN
+	if (Buf == "")
 		return ""
 	Boundaries := _PrefixWordBoundaries()
 	Tail := ""
-	Loop StrLen(HSE_Buffer) {
-		Ch := SubStr(HSE_Buffer, -A_Index, 1)
+	Loop StrLen(Buf) {
+		Ch := SubStr(Buf, -A_Index, 1)
 		if InStr(Boundaries, Ch)
 			break
 		Tail := Ch . Tail
@@ -970,21 +978,6 @@ _PrefixAppendTypedChar(Char) {
 	_PrefixScheduleRender()
 }
 
-; Return the suffix of Buf that follows the last word-boundary character.
-; Uses _PrefixWordBoundaries() so the result is the same SearchKey that
-; _LookupAndRender would compute. Returns Buf unchanged when no boundary
-; is present (the whole string is one word).
-_SuffixAfterLastBoundary(Buf) {
-	Idx := StrLen(Buf)
-	while (Idx >= 1) {
-		if (InStr(_PrefixWordBoundaries(), SubStr(Buf, Idx, 1)) > 0) {
-			return SubStr(Buf, Idx + 1)
-		}
-		Idx -= 1
-	}
-	return Buf
-}
-
 ; ConsumedByFire ─ true when the reset is the consequence of a hotstring
 ; firing. The currently-suggested entry is then cleared silently so the
 ; logger does not emit a ``hotstring_dismissed`` event paired with the
@@ -1024,7 +1017,16 @@ _CheckNearMiss(Buf) {
 	; between the deferred schedule and this firing (near-miss-on-hotpath-scan).
 	if !Keylogger.initialized
 		return
-	key := StrLower(Buf)
+	; Compare the last WORD, not the whole buffer. Since the star-fire path
+	; re-seeds the preview from HSE_Buffer, this buffer can hold several words
+	; plus the replacement that was just inserted — and every registered trigger
+	; is a single word, so a whole-buffer comparison could never match anything
+	; again after the first star fire of a sentence. The near-miss analytics went
+	; quiet without a single error.
+	Word := _PrefixWordTail(Buf)
+	if (StrLen(Word) < 2)
+		return
+	key := StrLower(Word)
 	; Exact match → user typed a known trigger without using the expansion
 	if _TriggerSet.Has(key) {
 		Entry := _TriggerSet[key]
@@ -1033,7 +1035,7 @@ _CheckNearMiss(Buf) {
 		return
 	}
 	; Edit-distance-1 check — scan triggers of same length ± 1
-	BufLen := StrLen(Buf)
+	BufLen := StrLen(Word)
 	for trig, Entry in _TriggerSet {
 		tLen := StrLen(trig)
 		if (Abs(tLen - BufLen) > 1)
@@ -1158,15 +1160,15 @@ _PrefixRenderFlush() {
 ; higher priority, then — when both are equal — a false return preserves the
 ; original registration order (the engine's final ``Seq`` tiebreak). HasOwnProp
 ; guards keep it safe against entries built before the Priority field existed.
+; Delegates to the ENGINE's rule rather than restating it. This function used to
+; carry its own copy, and the copy had drifted: it defaulted a missing Priority
+; to 0 where the engine defaults to 50, and it had no GroupOrder or Seq tiebreak
+; at all. Two implementations of "which trigger wins" mean the tooltip can rank a
+; collision differently from the engine that will fire it — the tooltip shows one
+; expansion and the user gets another. The correct cure for a duplicated rule is
+; to delete the second copy, not to keep the two in step by hand.
 _PrefixCandidateBeats(A, B) {
-	AL := A.HasOwnProp("Length") ? A.Length : 0
-	BL := B.HasOwnProp("Length") ? B.Length : 0
-	if (AL != BL) {
-		return AL > BL
-	}
-	AP := A.HasOwnProp("Priority") ? A.Priority : 0
-	BP := B.HasOwnProp("Priority") ? B.Priority : 0
-	return AP > BP
+	return _HSE_Beats(A, B)
 }
 
 ; Return a NEW array of the candidates ordered by _PrefixCandidateBeats. A stable
