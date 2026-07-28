@@ -400,12 +400,40 @@ TapHoldDispatchTap(KeyId, TapFn) {
 			try LoggerDebug("TapHoldDispatch", "Dispatch blocked for '{1}' ({2}, guard={3}ms).", KeyId, CancelReason, LimitMs)
 			return false
 		}
+		; CapsWord ends on a word terminator, and capsword.ahk arms its own
+		; `#HotIf CapsWordEnabled` Space/Enter hotkeys to do it. Those lose:
+		; both variants' criteria are true at once, and this repo's own pinned
+		; precedence is that the most-recently-DEFINED variant wins —
+		; modules/tap_holds.ahk is included after modules/shortcuts.ahk, so the
+		; tap-hold variant fires and the unlatch hotkey never runs. CapsWord then
+		; survived the space and kept capitalising the following word.
+		;
+		; Unlatching here rather than in the two key modules keeps one owner for
+		; the rule and covers every tap-hold variant that may later bind these
+		; keys. DisableCapsWord is a no-op when CapsWord is inactive.
+		if _TapHoldTapEndsCapsWord(KeyId)
+			DisableCapsWord()
 		TapFn.Call()
 		return true
 	}
 	finally {
 		TapHoldForgetTrackedKey(KeyId)
 	}
+}
+
+; Tap-hold keys whose tap output is a word terminator, and therefore ends
+; CapsWord. Mirrors the keys capsword.ahk binds for the same purpose; anything
+; else (Backspace, Escape, Delete, CapsLock…) leaves CapsWord latched, which is
+; what makes it usable for a whole word.
+global TAP_HOLD_CAPSWORD_TERMINATORS := Map("space", true, "enter", true)
+
+_TapHoldTapEndsCapsWord(KeyId) {
+	global TAP_HOLD_CAPSWORD_TERMINATORS
+	if !TAP_HOLD_CAPSWORD_TERMINATORS.Has(KeyId)
+		return false
+	; IsSet-guarded: the tap-hold layer is reachable in contexts where
+	; shortcuts/capsword.ahk is not loaded (standalone tests, tools).
+	return IsSet(CapsWordEnabled) and CapsWordEnabled and IsSet(DisableCapsWord)
 }
 
 ; Invoke the configured GESTURE_ACTIONS callback without applying guards. This
