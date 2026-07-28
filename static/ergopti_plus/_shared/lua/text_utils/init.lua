@@ -519,6 +519,25 @@ function M.shell_quote(value)
 	return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
 end
 
+--- Escapes a value for interpolation INSIDE an AppleScript double-quoted string.
+---
+--- AppleScript string literals treat the backslash as an escape character, so a
+--- value carrying one must have it doubled. Escaping only the double quote —
+--- what every call site here did — leaves a path like `~/My\Folder` producing a
+--- literal AppleScript never meant to run: at best the script errors, at worst
+--- a crafted value closes the string and appends statements of its own. The
+--- backslash must be escaped FIRST, or the backslashes introduced while
+--- escaping the quotes get escaped in turn.
+---
+--- The caller supplies the surrounding quotes, mirroring how the AppleScript
+--- source is written: `"…\"%s\"…"`.
+--- @param value any The value to escape (coerced with tostring).
+--- @return string The value with backslashes and double quotes escaped.
+function M.applescript_escape(value)
+	local escaped = tostring(value):gsub("\\", "\\\\"):gsub('"', '\\"')
+	return escaped
+end
+
 --- Escapes a string so it is safe to use as the REPLACEMENT argument of gsub.
 --- Lua treats "%" specially on that side: "%1".."%9" are capture references, "%%"
 --- is a literal percent, and "%" followed by anything else RAISES "invalid use of

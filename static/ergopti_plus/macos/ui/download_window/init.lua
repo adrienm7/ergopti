@@ -31,6 +31,7 @@ local Logger     = require("lib.logger")
 local Paths      = require("lib.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("lib.i18n")
+local text_utils = require("lib.text_utils")
 
 local LOG = "download_window"
 
@@ -124,9 +125,16 @@ _ucc:setCallback(function(msg)
     elseif msg.body == "terminal" then
         -- In bootstrap mode, show the live Hammerspoon log; in download mode, use the model-specific cmd
         local cmd = _mode == "bootstrap" and ("tail -f " .. Logger.UNIFIED_LOG_FILE) or (M._terminal_cmd or ("ollama pull " .. (M._current_model or "")))
+        -- Escaped for BOTH layers it passes through: the AppleScript string
+        -- literal (backslash is an escape char there, and escaping only the
+        -- double quote left a model name or log path containing one producing a
+        -- script that was never meant to run), then the surrounding /bin/sh
+        -- single quotes.
         local apple_script = string.format(
-            "osascript -e 'tell application \"Terminal\" to do script \"%s\"' -e 'tell application \"Terminal\" to activate'",
-            cmd:gsub("\"", "\\\"")
+            "osascript -e %s -e 'tell application \"Terminal\" to activate'",
+            text_utils.shell_quote(string.format(
+                'tell application "Terminal" to do script "%s"',
+                text_utils.applescript_escape(cmd)))
         )
         pcall(hs.execute, apple_script)
 
