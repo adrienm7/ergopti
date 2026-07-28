@@ -92,6 +92,15 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
 			if type(ct) == "table" and ct.key and ct.char then
 				try("keymap.add_custom_terminator", keymap.add_custom_terminator, ct.key, ct.char, ct.label or ct.char, ct.consume or false)
+				-- Resolved from the persisted states rather than read off an
+				-- undefined global. `enabled_ct` was never assigned anywhere, so it
+				-- was always nil and this branch never ran: a custom terminator the
+				-- user had DISABLED came back enabled on every restart. It has to be
+				-- re-applied here and not by the terminator_states loop above,
+				-- because that loop runs before add_custom_terminator has created
+				-- the key it would be setting.
+				local enabled_ct = type(saved.terminator_states) == "table"
+					and saved.terminator_states[ct.key] or nil
 				if enabled_ct ~= nil and type(keymap.set_terminator_enabled) == "function" then
 					try("keymap.set_terminator_enabled", keymap.set_terminator_enabled, ct.key, enabled_ct)
 				end
