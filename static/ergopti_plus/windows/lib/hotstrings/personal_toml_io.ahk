@@ -149,8 +149,26 @@ ReadPersonalToml() {
 		. '(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?'
 		. '(?:\s*,\s*priority\s*=\s*([0-9]+))?\s*\}'
 
+	; Guarded. An unguarded FileRead here threw out of the boot loader (personal
+	; hotstrings simply vanished for the session) and out of the menu handlers
+	; that call this at click time. Worse, the empty Result it would otherwise
+	; produce is indistinguishable from a user with no personal hotstrings — and
+	; WritePersonalToml serializes from exactly that shape, so a transient lock
+	; could be turned into permanent deletion by the next edit.
+	;
+	; The unreadable-file sentinel is the same one the config readers use, so the
+	; writer can ask rather than guess.
+	Raw := ""
+	try {
+		Raw := FileRead(FilePath, "UTF-8")
+	} catch as Err {
+		global _TomlUnreadableFiles
+		_TomlUnreadableFiles[FilePath] := true
+		try LoggerError("PersonalToml", "Cannot read '{1}': {2}. No personal hotstrings are loaded this session, and writes to this file are blocked so the empty result cannot replace its contents.", FilePath, Err.Message)
+		return Result
+	}
 	; Normalise to LF so every line ends cleanly — eliminates CRLF anchor bugs
-	FileContent := StrReplace(FileRead(FilePath, "UTF-8"), "`r`n", "`n")
+	FileContent := StrReplace(Raw, "`r`n", "`n")
 	FileContent := StrReplace(FileContent, "`r", "`n")
 
 	; ── Extract sections_order directly from raw content ──
@@ -256,9 +274,19 @@ ReadPersonalToml() {
 ; Writes [_meta], [_meta.sections], then all [[section]] blocks.
 WritePersonalToml(Data) {
 	global _ReadPersonalTomlCache, _HS_GrandTotalCache
+	FilePath := PersonalTomlPath()
+	; Refuse while the file is flagged unreadable. Data is built from what
+	; ReadPersonalToml returned, and a failed read returns an EMPTY model that
+	; looks exactly like "this user has no personal hotstrings" — serializing it
+	; would replace the whole file with an empty one. The flag is cleared by any
+	; successful read of the same path, so this unblocks itself as soon as the
+	; transient lock clears and something re-reads.
+	if (IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath)) {
+		try LoggerError("PersonalToml", "Refusing to write '{1}': it could not be read, so the model in memory is empty rather than the user's hotstrings. Reopen the editor once the file is readable.", FilePath)
+		return false
+	}
 	_ReadPersonalTomlCache := false ; Invalidate
 	_HS_GrandTotalCache := -1
-	FilePath := PersonalTomlPath()
 	; The two lines above evict only this module's editor-model cache. The engine
 	; loader (LoadHotstringsSection) and the prefix-watcher read personal hotstrings
 	; through the raw-content _TomlFileCache, which they do NOT touch. Without this

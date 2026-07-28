@@ -75,7 +75,24 @@ CS_Read() {
     if !FileExist(path)
         return out
     content := ""
-    try content := FileRead(path, "UTF-8")
+    ReadFailed := false
+    try {
+        content := FileRead(path, "UTF-8")
+    } catch as Err {
+        ReadFailed := true
+        try LoggerError("ConfigShortcuts", "Cannot read '{1}': {2}. Metrics settings stay at their in-memory defaults, and persistence is blocked so those defaults cannot be written over the real file.", path, Err.Message)
+    }
+    if (ReadFailed) {
+        ; Latch the SAME sentinel SaveFullConfig already honours. This reader
+        ; feeds the metrics settings, and a swallowed read left them at their
+        ; in-memory DEFAULTS — indistinguishable from a user who never changed
+        ; them — which the next full save then wrote over the user's real
+        ; values. The file here is config.toml, so reusing the boot latch keeps
+        ; one owner for "the in-memory config is not the user's".
+        global _ConfigBootReadFailed
+        _ConfigBootReadFailed := true
+        return out
+    }
     if (content = "")
         return out
 
