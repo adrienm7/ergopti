@@ -160,8 +160,16 @@ _SpaceTap() {
     ; post-expansion suppress window (which exists to filter the engine's output), so
     ; the space silently never reaches the buffer and the next trigger mis-frames.
     HSEMatch := HSE_FeedChar(" ", true)
-    if (HSEMatch != "") {
-        HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)
+    ; A match is only a CANDIDATE. HSE_DispatchMatch declines on the
+    ; time-activation gate, a mixed-case conform verdict, or a raw callback that
+    ; refused — and it says so through its return value. Discarding that verdict
+    ; swallowed the space entirely: no expansion reached the screen, no space was
+    ; typed, and KL_LogHotstring still recorded a fire that never happened while
+    ; HSE_Buffer kept a space the screen did not have. Falling through to the
+    ; literal-space path below is what makes the declined case indistinguishable
+    ; from "there was never a match". Same class as 356ba64c0's _OnPrefixChar
+    ; fix, at the sibling site it missed.
+    if (HSEMatch != "" and HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)) {
         HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
             ? "repeat_key"
             : (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
