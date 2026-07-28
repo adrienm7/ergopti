@@ -485,13 +485,30 @@ sg("open_url", function(binding)
 	local url = M.get_action_parameter(binding, "open_url")
 	if M.validate_action_parameter("open_url", url) then open_url(url) end
 end)
+-- Clipboard capture state for search_web. Declared above the closure that reads
+-- it: a local declared below one binds a nil global instead, and the failure
+-- surfaces only inside a timer callback where the file logger never sees it.
+local _search_capture_in_flight = false
+local _search_saved_clipboard   = nil
+
 sg("search_web", function(binding)
 	local template = M.get_action_parameter(binding, "search_web")
 	if not M.validate_action_parameter("search_web", template) then return end
-	local old_clipboard = hs.pasteboard and hs.pasteboard.getContents and hs.pasteboard.getContents() or nil
+	-- Capture the user's clipboard ONLY when no capture is already in flight.
+	-- Two search_web gestures in quick succession made the second snapshot what
+	-- the FIRST had just copied — the selection, not the user's clipboard — and
+	-- then dutifully "restored" it, so the real clipboard was gone for good. The
+	-- same stale-snapshot class the text-transform path was hardened against.
+	if not _search_capture_in_flight then
+		_search_saved_clipboard = hs.pasteboard and hs.pasteboard.getContents and hs.pasteboard.getContents() or nil
+	end
+	_search_capture_in_flight = true
+	local old_clipboard = _search_saved_clipboard
 	postKeyStroke({"cmd"}, "c")
 	hs.timer.doAfter(0.08, function()
 		local selected = hs.pasteboard and hs.pasteboard.getContents and hs.pasteboard.getContents() or ""
+		_search_capture_in_flight = false
+		_search_saved_clipboard   = nil
 		if old_clipboard ~= nil and hs.pasteboard and hs.pasteboard.setContents then
 			pcall(hs.pasteboard.setContents, old_clipboard)
 		end

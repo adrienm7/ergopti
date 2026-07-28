@@ -108,8 +108,21 @@ function M.send(text, opts, callback)
 				_paste_saved_original = Clipboard.save()
 			end
 			local saved = _paste_saved_original  -- bind the correct value into the closure
-			Clipboard.write(text)
-			hs.eventtap.keyStroke(PASTE_MODIFIER, PASTE_KEY, PASTE_KEY_DELAY_US)
+			-- From here the user's clipboard holds OUR payload. A throw before the
+			-- restore timer is armed — Clipboard.write failing, the keystroke
+			-- raising — left it there permanently, with _paste_saved_original still
+			-- set so the next send would not even re-capture. The pcall around this
+			-- block caught the error and logged it, which is precisely why nobody
+			-- noticed the clipboard had been eaten.
+			local ok_write = pcall(function()
+				Clipboard.write(text)
+				hs.eventtap.keyStroke(PASTE_MODIFIER, PASTE_KEY, PASTE_KEY_DELAY_US)
+			end)
+			if not ok_write then
+				Clipboard.restore(saved)
+				_paste_saved_original = nil
+				error("clipboard send failed before the restore could be armed", 0)
+			end
 			-- Restore after a short delay so the paste completes before we overwrite.
 			_paste_pending_timer = hs.timer.doAfter(CLIPBOARD_RESTORE_DELAY_S, function()
 				_paste_pending_timer  = nil
