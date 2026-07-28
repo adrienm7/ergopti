@@ -374,7 +374,7 @@ silent · the test that should have caught it · proposed fix · regression test
   re-types `NNBSP.."?"`. (`test_terminators.lua:69` pins the *first*-codepoint
   dead-key probe, which a last-codepoint probe preserves; nothing covers NNBSP+punct.)
 
-### H11 — Accept-time overlap solver swallows the user's just-typed word; the tooltip showed it as an append (shown ≠ inserted)
+### [x] H11 — Accept-time overlap solver swallows the user's just-typed word; the tooltip showed it as an append (shown ≠ inserted)
 **G5 · class G · `_shared/lua/keymap/utils.lua:220` · confidence: high · provenance: measured (probe against the real module)**
 
 - **Repro:** buffer `"j'aime la"` (word complete, no trailing space). The LLM
