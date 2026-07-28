@@ -769,6 +769,18 @@ _OnPrefixKeyDown(IH, VK, SC) {
 		0x26, true,  ; VK_UP
 		0x27, true,  ; VK_RIGHT
 		0x28, true,  ; VK_DOWN
+		; The rest of the navigation cluster. The engine's own contract lists
+		; these as buffer-invalidating, but only the arrows were ever enumerated
+		; here — so typing "bonjour ia", pressing Home and typing "." fired
+		; ia -> IA with {BackSpace 3} at line start and ate three characters of
+		; unrelated text. Delete and Insert belong with them: both rewrite the
+		; document by an amount this watcher cannot observe.
+		0x21, true,  ; VK_PRIOR  (PgUp)
+		0x22, true,  ; VK_NEXT   (PgDn)
+		0x23, true,  ; VK_END
+		0x24, true,  ; VK_HOME
+		0x2D, true,  ; VK_INSERT
+		0x2E, true,  ; VK_DELETE
 	)
 	; Same try guard as _OnPrefixChar — an unhandled error here permanently
 	; silences the OnKeyDown callback for all subsequent keystrokes.
@@ -835,11 +847,31 @@ _OnPrefixKeyDown(IH, VK, SC) {
 			; trailing else-if and silently never ran on this hook path.
 			if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
 				LLM_Bridge_FeedKeyDownIfActive(VK)
+		} else if (VK == 0x2D or VK == 0x2E) {
+			; Insert toggles overwrite mode and Delete removes text the watcher
+			; never saw. Neither moves the caret, so unlike the pure cursor
+			; movers below they cannot promise a word boundary on the left —
+			; the engine contract lists them with the disruptive Ctrl combos,
+			; and they take the same boundary-false reset those do.
+			;
+			; Resetting BOTH buffers here is the point: they were previously in
+			; neither branch, and adding them to the preview reset alone would
+			; simply move the divergence rather than close it.
+			HSE_FeedReset(false, true)
+			if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
+				LLM_Bridge_FeedKeyDownIfActive(VK)
 		} else if (VK == 0x1B
 				or VK == 0x25 or VK == 0x26
-				or VK == 0x27 or VK == 0x28) {
-			; Arrow keys and Escape move the cursor to an unknown position,
-			; but the next typed run starts fresh — treat as word boundary.
+				or VK == 0x27 or VK == 0x28
+				or VK == 0x21 or VK == 0x22
+				or VK == 0x23 or VK == 0x24) {
+			; Cursor movers: Escape, the four arrows, and the rest of the
+			; navigation cluster (PgUp/PgDn/End/Home). All of them move the
+			; caret to a position this watcher cannot observe, but the next
+			; typed run starts fresh — treat as word boundary. The engine
+			; buffer must be reset here as well as the preview: resetting only
+			; the preview leaves the engine expanding against text that is no
+			; longer to the left of the caret.
                         HSE_FeedReset(true, true)
 			if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
 				LLM_Bridge_FeedKeyDownIfActive(VK)
