@@ -54,34 +54,12 @@ code at all. Verified still present: `windows/tests/unit/test_domain_expander.ah
 where the two `Test()` calls are additionally declared *inside* the body of
 `_DE_Add()`, so they only register if that function is called.
 
-Two pieces of work: replace them with real assertions, and add a gate that fails
-on a `Test()` whose body cannot fail — otherwise they come back.
-
-### The Linux evdev decoder has no real coverage
-
-`linux/tests/unit/meta/test_input_reader_decode.lua:26` is `assert_true(true)`;
-lines 29-53 build a 24-byte `input_event` buffer for KEY_A and then **never feed
-it to `parse_event`** — the `data` variable is dead. Everything that turns raw
-kernel bytes into characters is untested: little-endian decode, struct offsets,
-`EV_KEY` filtering, shift tracking, key-repeat suppression (`value=2`), keyup
-(`value=0`), BACKSPACE/ENTER/TAB routing. A regression on the `value != KEY_DOWN`
-filter would fire hotstrings twice on a held key and stay green.
-
-### The Linux injector — the product's output path — only asserts "does not crash"
-
-`linux/tests/unit/meta/test_injector_commands.lua:23-60` wraps every assertion in
-`pcall`, while its own header claims it "verifies the command strings are
-well-formed". Nothing checks that `inject(3, txt)` emits exactly three `14:1
-14:0` pairs, nor that single quotes are escaped before `ydotool type`. A
-miscounted backspace deletes the wrong number of characters; a lost escape is a
-shell-injection hole. Both pass today.
-
-### The Linux "shell safety" tests are the same shape
-
-`test_notifier_commands.lua:84-103` and `test_text_sender_adapter.lua:50-57`
-assert only that nothing crashes — but `os.execute` / `io.popen` never crash on
-unescaped input, they **execute** it. Removing the escaping is a silent
-regression and a real command-injection hole, and these tests pass either way.
+The gate is already delivered: `tools/test/find-false-greens.cjs` runs inside
+`npm run test:js` and ratchets four classes (tautology, vacuous-absence,
+dead-test, pcall-only) at a combined baseline of 549 — it only turns down. What
+remains is burning the baseline down by replacing the placeholders with real
+assertions, starting with the ones whose `Test()` calls are declared inside a
+function body and therefore only register if that function is called.
 
 ### macOS: no ratchet against the closure-binds-nil-global pattern
 
@@ -98,17 +76,6 @@ fourth recurrence. Slug: `project_lua_closure_before_local_nil_global`.
 ---
 
 ## 3. Correctness and completeness
-
-### macOS: pin `check_task` in the GC root
-
-`macos/ui/menu/menu_llm/models_manager_mlx.lua:273` and `:321-322` — the last
-production `hs.task.new` still started without a GC pin, while the GC root
-`M._active_tasks` already exists at line 21 of the same file and is used
-correctly by `delete_task`. If the collector takes it first, Hammerspoon sends
-SIGTERM, the callback never runs, and neither `do_check()` nor `on_cancel()`
-fires: the MLX prerequisite check hangs with no log. Same failure already
-observed on Ollama. Three-line fix, and the sibling in the same file shows the
-shape.
 
 ### Karabiner: a corrupted config is still overwritten by the next setter
 
