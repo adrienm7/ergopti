@@ -27,6 +27,7 @@ local keyStrokes  = hs.eventtap.keyStrokes
 local keyStroke   = hs.eventtap.keyStroke
 local Logger      = require("lib.logger")
 local Timings     = require("lib.timings")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "keymap.utils"
 
@@ -68,6 +69,11 @@ local CLIPBOARD_PASTE_GAP_SEC = Timings.sec("debounce", "clipboard_paste_settle_
 -- so this long TTL only acts as a net in the unlikely case the watcher misses an
 -- event. Keeping it large means near-zero syscalls per keystroke in steady state.
 local IGNORED_WIN_TTL_SEC = 5.0
+
+-- True while a deferred TTL refresh is already queued, so a burst of keystrokes
+-- arms exactly one. Declared above the closure that clears it — a local declared
+-- after a closure binds the nil global instead.
+local _ignored_win_refresh_armed = false
 
 -- Key tokens whose synthetic keydown carries a character back through
 -- getCharacters() ("return" -> CR, "tab" -> HT). They must appear in the physical
@@ -427,6 +433,26 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 	-- Fast path: cache is clean and TTL has not elapsed.
 	local ttl_elapsed = (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC
 	if not _ignored_win_cache_dirty and not ttl_elapsed then
+		return _ignored_win_cache_value
+	end
+
+	-- A TTL expiry is NOT a signal that anything changed — invalidation is
+	-- event-driven, and the TTL exists only as a safety net for an event the
+	-- watchers might have missed. Probing synchronously for it meant a
+	-- cross-process AX round-trip inside the keyDown tap every few seconds of
+	-- steady typing, for an answer that is almost always the one already cached.
+	-- Serve the cached value and refresh off the tap; a genuinely DIRTY cache
+	-- still probes synchronously below, because that one really did change.
+	if not _ignored_win_cache_dirty then
+		if not _ignored_win_refresh_armed then
+			_ignored_win_refresh_armed = true
+			TimerScheduler.after(0, function()
+				_ignored_win_refresh_armed = false
+				_ignored_win_cache_dirty   = true
+				pcall(M.is_ignored_window, ignored_titles, ignored_patterns, nil)
+			end)
+		end
+		_ignored_win_cache_time = now
 		return _ignored_win_cache_value
 	end
 

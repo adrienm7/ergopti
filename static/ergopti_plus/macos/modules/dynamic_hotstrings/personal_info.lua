@@ -350,11 +350,17 @@ end
 --- @param event userdata The Hammerspoon hs.eventtap.event object.
 --- @param _km_buffer string The current typing buffer maintained by the keymap module.
 --- @return string|nil Returns "consume" to swallow the event, or "suppress" to block hotstrings.
-local function interceptor(event, _km_buffer)
+--- @param event userdata The keyDown event.
+--- @param _km_buffer string The keymap buffer (unused here).
+--- @param ctx table|nil Fields the keymap tap already read from the event
+---        (keyCode, flags, chars). Re-fetching them is an ObjC accessor call
+---        per interceptor per keystroke; the fallback keeps this working if the
+---        contract is ever invoked without a context.
+local function interceptor(event, _km_buffer, ctx)
 	if not _enabled then return nil end
 	if _replacing then return nil end
 
-	local flags = event:getFlags()
+	local flags = (ctx and ctx.flags) or event:getFlags()
 	
 	-- Reset state on command or control modifiers
 	if flags.cmd or flags.ctrl then

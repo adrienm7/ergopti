@@ -195,6 +195,40 @@ local function winNav(goNext)
 	postKeyStroke({"cmd"}, key)
 end
 
+-- The Spaces binding wraps a private API: loading it and querying it are both
+-- slow enough to matter on the gesture frame callback, and the module was being
+-- require()d afresh on every single navigation.
+local _spaces_mod = nil
+local function _spaces_module()
+	if _spaces_mod == nil then
+		local ok_sp, mod = pcall(require, "hs.spaces")
+		_spaces_mod = (ok_sp and mod) or false
+	end
+	return _spaces_mod or nil
+end
+
+-- Seconds the Space LAYOUT is trusted without re-querying. It only changes when
+-- the user adds or removes a desktop, which cannot happen mid-gesture.
+local SPACES_LAYOUT_TTL_SEC = 5.0
+local _all_spaces_cache = nil
+local _all_spaces_at    = 0
+
+--- Returns (ok, allSpaces) using a short-lived cache.
+--- @param spaces table The Spaces binding module.
+--- @return boolean, table|nil
+local function _cached_all_spaces(spaces)
+	local now = hs.timer.secondsSinceEpoch()
+	if _all_spaces_cache ~= nil and (now - _all_spaces_at) < SPACES_LAYOUT_TTL_SEC then
+		return true, _all_spaces_cache
+	end
+	local ok, all = pcall(spaces.allSpaces)
+	if ok and type(all) == "table" then
+		_all_spaces_cache = all
+		_all_spaces_at    = now
+	end
+	return ok, all
+end
+
 --- Navigates between macOS Spaces (Desktops).
 local function spaceNav(goNext)
 	-- space_wrap is persisted, restored and exposed as a menu checkbox, but nothing
@@ -202,9 +236,14 @@ local function spaceNav(goNext)
 	-- at the first and last Space, so honouring the setting means suppressing the
 	-- navigation at the edge rather than asking the OS to wrap.
 	if _state and _state.space_wrap == false then
-		local ok_sp, spaces = pcall(require, "hs.spaces")
-		if ok_sp and spaces and type(spaces.spaceType) == "function" then
-			local ok_all, all = pcall(spaces.allSpaces)
+		local spaces = _spaces_module()
+		if spaces and type(spaces.spaceType) == "function" then
+			-- allSpaces is a private-API round-trip and this runs on the gesture
+			-- frame callback, where a stall shows up directly as input lag. The
+			-- Space LAYOUT changes only when the user adds or removes a desktop,
+			-- so it is cached briefly; the focused Space, which changes with every
+			-- navigation, is always read live.
+			local ok_all, all = _cached_all_spaces(spaces)
 			local ok_cur, cur = pcall(spaces.focusedSpace)
 			if ok_all and ok_cur and type(all) == "table" and cur then
 				local screen_spaces

@@ -66,13 +66,19 @@ local _sections       = nil
 --- @param event userdata The Hammerspoon hs.eventtap.event object.
 --- @param km_buffer string The current typing buffer maintained by the keymap module.
 --- @return string|nil Returns "consume" to swallow the event, or nil to pass it through.
-local function interceptor(event, km_buffer)
+--- @param event userdata The keyDown event.
+--- @param km_buffer string The keymap buffer.
+--- @param ctx table|nil Fields the keymap tap already read from the event
+---        (keyCode, flags, chars). Re-fetching them is an ObjC accessor call
+---        per interceptor per keystroke; the fallback keeps this working if the
+---        contract is ever invoked without a context.
+local function interceptor(event, km_buffer, ctx)
 	if _is_injecting or not _km then return nil end
 
-	local flags = event:getFlags()
+	local flags = (ctx and ctx.flags) or event:getFlags()
 	if flags.cmd or flags.ctrl then return nil end
 
-	local char = event:getCharacters(false) or ""
+	local char = (ctx and ctx.chars) or event:getCharacters(false) or ""
 	if char ~= _trigger then return nil end
 
 	-- Gate on the group master toggle so that disabling the dynamichotstrings group
