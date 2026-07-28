@@ -102,6 +102,7 @@ OnError(_FatalErrorHandler)
 #Include ../lib/nav_layer_helpers.ahk
 #Include ../lib/hotstrings/hotstring_engine.ahk
 #Include ../lib/hotstrings/hotstring_engine_main.ahk
+#Include ../lib/hotstrings/hotstring_buffer_effects.ahk
 #Include ../lib/hotstrings/hotstring_live_toggle.ahk
 #Include ../lib/hotstrings/hotstring_count_policy.ahk
 #Include ../lib/hotstrings/hotstring_prefix_watcher.ahk
@@ -239,6 +240,7 @@ InstallSendNoOps()
 #Include unit/test_registry.ahk
 #Include unit/test_personal_toml_io.ahk
 #Include unit/test_nav_layer_helpers.ahk
+#Include unit/test_synthetic_buffer_effects.ahk
 #Include meta/test_tap_hold_suspend_boundary.ahk
 #Include unit/test_updater.ahk
 #Include unit/test_updater_constants_single_source.ahk
