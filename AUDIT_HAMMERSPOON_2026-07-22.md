@@ -165,7 +165,7 @@ silent · the test that should have caught it · proposed fix · regression test
   and the callback body must release it. This encodes the per-site invariant the
   file-granular guard structurally cannot.
 
-### H4 — Gemini API key written in cleartext to the on-disk log on every prediction
+### [x] H4 — Gemini API key written in cleartext to the on-disk log on every prediction
 **G2 · class E (secret leak) · `modules/llm/api_remote.lua:638` (url built `:309`) · confidence: high · provenance: deduced**
 
 - **Repro:** configure a Gemini-format API entry (token stored via Keychain),

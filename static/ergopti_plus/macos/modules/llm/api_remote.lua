@@ -297,6 +297,35 @@ end
 
 --- Build the per-provider request URL. Gemini bakes the model and API key
 --- into the path; the OpenAI / Anthropic / OpenAI-compat shapes use a fixed
+--- Query parameters that carry a credential. Gemini authenticates by URL
+--- (`?key=<token>`) rather than by header, so the finished request URL contains
+--- the decrypted API key verbatim.
+local CREDENTIAL_QUERY_PARAMS = { "key", "api_key", "apikey", "access_token", "token" }
+
+--- Redact credentials from a URL so it can be written to a log file.
+---
+--- The whole point of api_token_crypto is that the cleartext token never lands
+--- on disk. Logging the finished Gemini URL defeated that in one line: the
+--- default log level is DEBUG, retention is fourteen days, and this is a file
+--- users are actively told to consult and attach to support requests — so the
+--- key was written on EVERY prediction, to a file designed to be shared.
+---
+--- Redacting rather than dropping the URL keeps the diagnostic that matters
+--- (which endpoint and model were hit) while removing the part that must never
+--- be persisted.
+--- @param url string The URL about to be logged.
+--- @return string The URL with every credential parameter's value replaced.
+local function redact_url(url)
+	local out = tostring(url or "")
+	for _, param in ipairs(CREDENTIAL_QUERY_PARAMS) do
+		-- Match the parameter after "?" or "&", case-insensitively, and replace
+		-- everything up to the next separator.
+		out = out:gsub("([%?&]" .. param .. "=)[^&#]*", "%1REDACTED")
+		out = out:gsub("([%?&]" .. param:upper() .. "=)[^&#]*", "%1REDACTED")
+	end
+	return out
+end
+
 --- endpoint with the model in the JSON payload.
 local function build_url(base_url, format, model, token)
 	local base = rtrim_slash(base_url)
@@ -636,7 +665,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 	local t0      = TimerScheduler.now()
 
 	Logger.debug(LOG, "[%s] #%d POST -> %s (provider=%s, %d chars prompt)",
-		model, req_id, url, provider.format, #(user_prompt or ""))
+		model, req_id, redact_url(url), provider.format, #(user_prompt or ""))
 
 	_infer_client.post(url, headers, encoded, function(r)
 		local status, body = r.status, r.body
@@ -886,5 +915,10 @@ function M.is_thinking_model(name)
 		or name:find("think") ~= nil
 		or name:find("reasoning") ~= nil
 end
+
+--- Exposed for the regression test only. The invariant being guarded is "no log
+--- line ever contains the token", and that cannot be asserted without being able
+--- to run the thing that produces the logged string.
+M.__redact_url_for_test = redact_url
 
 return M
