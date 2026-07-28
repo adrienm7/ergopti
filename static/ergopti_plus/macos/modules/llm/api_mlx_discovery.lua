@@ -32,6 +32,7 @@ local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
 local Timings        = require("lib.timings")
+local ApiCommon = require("modules.llm.api_common")
 local _probe_client  = require("adapters.http_client").new()  -- Dedicated client for discover() POST probes; never shares state with warmup
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"
@@ -243,7 +244,7 @@ end
 --- @param on_done function|nil Optional callback invoked once the probe finishes.
 function M.discover(on_done)
 	if _endpoints_discovered then
-		if type(on_done) == "function" then pcall(on_done) end
+		if type(on_done) == "function" then ApiCommon.protected_call(on_done, "on_done") end
 		return
 	end
 	-- Enqueue the callback so it fires when the in-flight probe completes —
@@ -294,7 +295,7 @@ function M.discover(on_done)
 
 		local function probe_one(candidates, idx, found_so_far, kind, on_resolved)
 			if idx > #candidates then
-				pcall(on_resolved, found_so_far)
+				ApiCommon.protected_call(on_resolved, "on_resolved", found_so_far)
 				return
 			end
 			local path = candidates[idx]
@@ -306,7 +307,7 @@ function M.discover(on_done)
 				if type(r.status) == "number" and r.status >= 200 and r.status ~= 404 then
 					Logger.info(LOG, "Endpoint discovery (%s): %s -> HTTP %s — accepted as live route.",
 						kind, path, tostring(r.status))
-					pcall(on_resolved, _base_url .. path)
+					ApiCommon.protected_call(on_resolved, "on_resolved", _base_url .. path)
 				else
 					Logger.debug(LOG, "Endpoint discovery (%s): %s -> %s, trying next candidate.",
 						kind, path, tostring(r.status))

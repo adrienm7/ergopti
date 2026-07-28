@@ -326,4 +326,41 @@ function M.log_prediction_summary(logger, log_name, mode, requested, stats, kept
 	)
 end
 
+
+--- Invoke an LLM completion callback so a throw inside it cannot vanish.
+---
+--- Every backend hands its result to a caller-supplied callback, and those
+--- hand-offs were written as bare `pcall(on_x, ...)`. pcall without inspecting
+--- its result is not error handling, it is error deletion: an engine-side throw
+--- — a parser choking on a malformed body, a renderer hitting a nil field —
+--- became indistinguishable from a request that simply never completed. No
+--- prediction, no error, nothing to search the log for. That is the exact shape
+--- of the "green but no prediction" reports.
+---
+--- xpcall with a traceback rather than plain pcall: by the time the error
+--- surfaces the stack is gone, and the traceback is the only thing that says
+--- WHICH callback failed and where.
+---
+--- The error is contained rather than rethrown on purpose. These run from HTTP
+--- completion handlers and timer callbacks, where an escaping exception reaches
+--- Hammerspoon's own handler and is reported far from its cause; abandoning the
+--- one request is the correct blast radius.
+---
+--- @param fn function|nil The callback. A non-function is a no-op, matching the
+---        `type(x) == "function"` guards these call sites already carried.
+--- @param name string Callback name, for the log line.
+--- @param ... any Forwarded verbatim.
+function M.protected_call(fn, name, ...)
+	if type(fn) ~= "function" then return end
+	local args = table.pack(...)
+	local ok, err = xpcall(function()
+		return fn(table.unpack(args, 1, args.n))
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Callback '%s' raised: %s. This request is abandoned — nothing "
+			.. "downstream retries it, so the user simply never sees a prediction.",
+			tostring(name), tostring(err))
+	end
+end
+
 return M

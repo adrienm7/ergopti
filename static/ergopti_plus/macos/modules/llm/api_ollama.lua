@@ -273,7 +273,7 @@ function M.check_availability(model_name, on_available, on_missing)
 	_check_client.get(M.get_base_url() .. "/api/tags", {}, function(r)
 		if r.status ~= 200 then
 			Logger.warn(LOG, "Ollama server is unreachable.")
-			if type(on_missing) == "function" then pcall(on_missing, true) end
+			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
 			return
 		end
 		local body = r.body
@@ -289,14 +289,14 @@ function M.check_availability(model_name, on_available, on_missing)
 			
 			if found then
 				Logger.info(LOG, "Ollama server and model are available.")
-				if type(on_available) == "function" then pcall(on_available) end
+				if type(on_available) == "function" then ApiCommon.protected_call(on_available, "on_available") end
 			else
 				Logger.warn(LOG, "Ollama model is missing.")
-				if type(on_missing) == "function" then pcall(on_missing, false) end
+				if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", false) end
 			end
 		else
 			Logger.error(LOG, "Failed to parse Ollama tags response.")
-			if type(on_missing) == "function" then pcall(on_missing, false) end
+			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", false) end
 		end
 	end)
 end
@@ -419,7 +419,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 	local encoded, enc_err = JsonCodec.encode(payload)
 	if not encoded then
 		Logger.error(LOG, "Failed to encode Ollama payload — %s", tostring(enc_err))
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 
@@ -440,26 +440,26 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 							failure_reason = "http_" .. tostring(status or "unknown"),
 						})
 					end
-					if type(on_fail) == "function" then pcall(on_fail) end
+					if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 					return
 				end
 
 				local resp, dec_err = JsonCodec.decode(body)
 				if not resp then
 					Logger.error(LOG, "[%s] #%d JSON_DECODE_ERROR: %s", model_name, req_id, tostring(dec_err))
-					if type(on_fail) == "function" then pcall(on_fail) end
+					if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
                     return
                 end
                 
                 if type(resp) ~= "table" then
                     Logger.error(LOG, "[%s] #%d RESPONSE_INVALID: resp type=%s", model_name, req_id, type(resp))
-                    if type(on_fail) == "function" then pcall(on_fail) end
+                    if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
                     return
                 end
                 
                 if type(resp.message) ~= "table" then
                     Logger.error(LOG, "[%s] #%d MESSAGE_INVALID: message type=%s", model_name, req_id, type(resp.message))
-                    if type(on_fail) == "function" then pcall(on_fail) end
+                    if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
                     return
                 end
                 
@@ -471,7 +471,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                     else
                         Logger.error(LOG, "[%s] #%d CONTENT_INVALID: content type=%s", model_name, req_id, type(resp.message.content))
                     end
-                    if type(on_fail) == "function" then pcall(on_fail) end
+                    if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
                     return
                 end
 
@@ -493,7 +493,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 
                 if #results == 0 then
                     Logger.debug(LOG, "[%s] #%d PARSED -> 0 result (parser failure)", model_name, req_id)
-                    if type(on_fail) == "function" then pcall(on_fail) end return
+                    if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end return
                 end
                 Logger.debug(LOG, "[%s] #%d PARSED -> %d result(s)", model_name, req_id, #results)
                 if keylogger and type(keylogger.log_llm) == "function" then
@@ -504,7 +504,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                         user_prompt   = user_prompt,
                     })
                 end
-			if type(on_success) == "function" then pcall(on_success, results) end
+			if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results) end
 			end)
 		end
 	)
@@ -560,7 +560,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	local encoded, enc_err = JsonCodec.encode(payload)
 	if not encoded then
 		Logger.error(LOG, "Failed to encode Ollama streaming payload — %s", tostring(enc_err))
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 
@@ -577,7 +577,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	local fh = io.open(tmp_path, "w")
 	if not fh then
 		Logger.error(LOG, "Failed to open temp file '%s' for Ollama streaming payload.", tmp_path)
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 	fh:write(encoded)
@@ -594,7 +594,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 			local token = obj.message.content
 			if token ~= "" then
 				accumulated = accumulated .. token
-				if type(on_partial) == "function" then pcall(on_partial, accumulated) end
+				if type(on_partial) == "function" then ApiCommon.protected_call(on_partial, "on_partial", accumulated) end
 			end
 		end
 	end
@@ -639,7 +639,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 
 		if accumulated == "" then
 			Logger.warn(LOG, "[%s] #%d STREAM: empty accumulation — on_fail.", model_name, req_id)
-			if type(on_fail) == "function" then pcall(on_fail) end
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 			return
 		end
 
@@ -661,7 +661,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 
 		if #results == 0 then
 			Logger.debug(LOG, "[%s] #%d STREAM: parse yielded 0 result(s).", model_name, req_id)
-			if type(on_fail) == "function" then pcall(on_fail) end
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 			return
 		end
 		Logger.debug(LOG, "[%s] #%d STREAM: %d result(s).", model_name, req_id, #results)
@@ -673,7 +673,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 				user_prompt   = user_prompt,
 			})
 		end
-		if type(on_success) == "function" then pcall(on_success, results) end
+		if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results) end
 	end
 
 	local task = ShellRunner.spawn("/usr/bin/curl", {
@@ -748,12 +748,12 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 					local is_final = (idx == #results)
 					-- Pass is_batch_progressive=true so prediction_engine bypasses the
 					-- streaming_multi early-return for these intermediate calls
-					if type(on_success) == "function" then pcall(on_success, subset, ms, is_final, not is_final) end
+					if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", subset, ms, is_final, not is_final) end
 					if not is_final then TimerScheduler.after(0, function() reveal_next(idx + 1) end) end
 				end
 				reveal_next(1)
 			else
-				if type(on_success) == "function" then pcall(on_success, results, ms, true) end
+				if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results, ms, true) end
 			end
 		end,
 		on_fail,
@@ -814,10 +814,10 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 		end
 
 		if #results >= requested_predictions or attempt_index > max_attempts then
-			if #results == 0 then if type(on_fail) == "function" then pcall(on_fail) end return end
+			if #results == 0 then if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end return end
 			ApiCommon.log_prediction_summary(Logger, LOG, "sequential", requested_predictions, dedup_stats, #results)
 			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
-			if type(on_success) == "function" then pcall(on_success, results, ms, true) end
+			if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results, ms, true) end
 			return
 		end
 
@@ -839,7 +839,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 						if #results < requested_predictions then
 							ApiCommon.insert_prediction(results, preds[1], dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG)
 							local ms = math.floor((TimerScheduler.now() - t0) * 1000)
-							if type(on_success) == "function" then pcall(on_success, results, ms, false) end
+							if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results, ms, false) end
 						end
 					end
 					do_next()

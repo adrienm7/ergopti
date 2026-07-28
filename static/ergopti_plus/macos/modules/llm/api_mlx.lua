@@ -740,10 +740,10 @@ function M.check_availability(model_name, on_available, on_missing)
 	_check_client.get(MLX_BASE_URL .. "/v1/models", {}, function(r)
 		if r.status == 200 then
 			Logger.info(LOG, "MLX server is available.")
-			if type(on_available) == "function" then pcall(on_available) end
+			if type(on_available) == "function" then ApiCommon.protected_call(on_available, "on_available") end
 		else
 			Logger.warn(LOG, "MLX server is missing or unreachable.")
-			if type(on_missing) == "function" then pcall(on_missing, false) end
+			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", false) end
 		end
 	end)
 end
