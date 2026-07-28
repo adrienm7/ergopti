@@ -133,7 +133,19 @@ SendNewResult(Text, OnlyText := True, UpdateRing := True) {
         LoggerError("Hotstrings", "SendNewResult failed: {1}", Err.Message)
         return false
     }
-    if UpdateRing {
+    ; _EmitReachedScreen for the same reason the catch above returns without
+    ; advancing the ring: a character that never reached the application must not
+    ; be recorded as though it had. This is the primitive EVERY Shift/CapsLock/
+    ; AltGr layer emit goes through, so it is where the gate belongs — the
+    ; dead-key fix reached the two direct SendEvent emitters and missed this one.
+    ; Compose "Â" by typing the circumflex dead key then Shift+A and the ring held
+    ; ['A', 'Â'] for a single visible character; composition plus a Shift capital
+    ; is the mainline use of that dead key.
+    ;
+    ; IsSet-guarded because this primitive is also reachable from contexts where
+    ; the keymap module is not loaded (tools/, standalone tests), and there the
+    ; unqualified pre-fix behaviour is correct.
+    if UpdateRing and (!IsSet(_EmitReachedScreen) or _EmitReachedScreen()) {
         UpdateLastSentCharacter(SubStr(Text, -1))
     }
     return true

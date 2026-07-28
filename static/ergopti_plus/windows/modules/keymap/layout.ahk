@@ -442,9 +442,38 @@ _RemapEmit(SendStr, KeyChar, *) {
 ; emitting its own result but leaves the sequence flag set until afterwards, so
 ; gating on the flag would suppress the push for the one character that IS
 ; visible.
+; THREE hooks share this shape, not one. The dead-key hook was the one the
+; original probe used, but _OneShotShiftInputHook and _SpaceHoldInputHook are
+; both armed "L1" with VisibleText off and consume the character an emit just
+; produced in exactly the same way. Tap RCtrl for a one-shot shift and type "a":
+; the ring recorded "a" (dead-key hook empty, so the old check passed), the armed
+; OSS hook ate that "a", and OneShotShift emitted and recorded "A" — two ring
+; entries for one visible capital.
+;
+; Enumerated as a list rather than a chain of ors so a fourth suppressive hook
+; is a one-line addition next to its siblings, and so the regression test can
+; require every _*InputHook global in the driver to appear here.
+global _EMIT_SUPPRESSING_HOOKS := ["_DeadKeyInputHook", "_OneShotShiftInputHook", "_SpaceHoldInputHook"]
+
+; Capture hooks that deliberately do NOT suppress, listed so every hook in the
+; driver is accounted for in exactly one of the two sets and a new one cannot
+; quietly default to "harmless". The prefix watcher is armed "V L0 I1": the V
+; makes its text VISIBLE, so it observes the keystream instead of eating it, and
+; a character it sees still reaches the application. Adding it to the set above
+; would suppress every ring push for the entire life of the driver.
+global _EMIT_NONSUPPRESSING_HOOKS := ["_PrefixInputHook"]
+
 _EmitReachedScreen() {
-	global _DeadKeyInputHook
-	return !IsSet(_DeadKeyInputHook) or _DeadKeyInputHook == ""
+	global _EMIT_SUPPRESSING_HOOKS
+	for HookName in _EMIT_SUPPRESSING_HOOKS {
+		; Read through the global namespace: these hooks live in three different
+		; modules and only one of them is this file's own.
+		if !IsSet(%HookName%)
+			continue
+		if (%HookName% != "")
+			return false
+	}
+	return true
 }
 
 ; Win + remapped-L locks the workstation. Locking is a focus-destroying,
@@ -711,17 +740,26 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 				; nothing — so degrade to the bare symbol instead of swallowing the
 				; keystroke entirely (the selection is untouched in the app since ^v
 				; never fired, exactly like the no-selection path below).
+				; SendNewResult records the character it sent, under the same
+				; reached-the-screen gate as every other emit. Recording here too
+				; pushed it twice and shifted every GetLastSentCharacterAt(-N)
+				; lookup by one. SendInstant, in contrast, does NOT record — so
+				; the explicit push belongs only to its success branch.
 				if !SendInstant(LeftSymbol Selection RightSymbol)
 					SendNewResult(Symbol)
-				UpdateLastSentCharacter(Symbol)
+				else
+					UpdateLastSentCharacter(Symbol)
 				return
 			}
 		} finally {
 			Critical(_WrapCrit)
 		}
 	}
-	SendNewResult(Symbol) ; SendEvent({Text}) doesn't work everywhere, for example in Google Sheets
-	UpdateLastSentCharacter(Symbol)
+	; SendEvent({Text}) doesn't work everywhere, for example in Google Sheets.
+	; No UpdateLastSentCharacter after it: SendNewResult already records the
+	; character it sent, and doing it again here pushed one visible character
+	; into the ring twice.
+	SendNewResult(Symbol)
 }
 
 
@@ -798,7 +836,11 @@ SC00D:: _DigitShiftSend("=")
 _DigitRowDown(Digit, *) {
 	Critical("On")
 	SendEvent("{" Digit " Down}")
-	UpdateLastSentCharacter(Digit)
+	; Same rule as _RemapEmit and _DigitShiftSend ten lines below, which this
+	; sibling was left out of: an armed suppressing hook eats this character, so
+	; it must not be recorded as having reached the screen.
+	if _EmitReachedScreen()
+		UpdateLastSentCharacter(Digit)
 }
 _DigitRowUp(Digit, *) {
 	Critical("On")
@@ -972,12 +1014,16 @@ RegisterCapsLockLayer()
 ; base-row entries bind it — so it releases Critical itself around its clipboard
 ; round-trip. The old note here claimed the exemption came from a Sleep; there is
 ; no Sleep any more, but ClipboardAll() blocks just as effectively.
-_RollEmitCritical(Text, Record := "") {
+; The Record parameter is gone. SendNewResult already records the last character
+; of what it sent, so every caller that also passed Record pushed the SAME
+; character into the ring twice — and its two call sites passed exactly
+; SubStr(Text, -1). A doubled entry shifts every GetLastSentCharacterAt(-N)
+; lookup by one, which is what the roll handlers, the quote/hashtag guards and
+; the time-gated hotstring lookups all read.
+_RollEmitCritical(Text) {
 	_AtCrit := Critical("On")
 	try {
 		SendNewResult(Text)
-		if (Record != "")
-			UpdateLastSentCharacter(Record)
 	} finally {
 		Critical(_AtCrit)
 	}
@@ -995,7 +1041,7 @@ AddRollEqual() {
 		LastSentCharacter == "<" or LastSentCharacter == ">")
 	and A_TimeSincePriorHotkey < (HotstringsResolve("rolls", "chevron_equal").Delay * 1000
 	) {
-		_RollEmitCritical("=", "=")
+		_RollEmitCritical("=")
 	} else if Features["layout"]["ergopti_plus"] {
 		WrapTextIfSelected("%", "%", "%")
 	} else {
@@ -1026,7 +1072,7 @@ HashtagOrQuote() {
 		and A_TimeSincePriorHotkey < (HotstringsResolve("rolls", "hashtag_quote").Delay * 1000)
 		and Features["hotstrings"]["rolls"].Has(_QuoteSection)
 		and Features["hotstrings"]["rolls"][_QuoteSection]["enabled"]) {
-		_RollEmitCritical('"', '"')
+		_RollEmitCritical('"')
 	} else {
 		WrapTextIfSelected("#", "#", "#")
 	}
