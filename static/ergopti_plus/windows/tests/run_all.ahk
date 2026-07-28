@@ -501,6 +501,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_llm_ensure_model_ready_guard.ahk
 #Include meta/test_boot_deferred_tasks.ahk
 #Include meta/test_boot_error_fatal_before_ready.ahk
+#Include meta/test_hotif_globals_boot_safe.ahk
 #Include meta/test_wpm_widget_native_render.ahk
 #Include meta/test_wpm_widget_hidden_until_typed.ahk
 #Include meta/test_text_expansion_critical_path.ahk
