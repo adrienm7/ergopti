@@ -383,6 +383,20 @@ SaveFullConfig() {
         SetTimer(SaveFullConfig, -100)
         return
     }
+    ; Guard: refuse to serialize the feature tree when boot could not READ an
+    ; existing config.toml. In that case ApplyConfigToml applied nothing and the
+    ; tree below is ManifestBuildFeaturesMap() DEFAULTS — writing it out replaces
+    ; the user's whole configuration with factory values. TOML_BatchWrite's own
+    ; TOML_ReadFailed guard cannot catch this: it re-parses at write time, and a
+    ; transient lock (sync client, AV scan, backup) has usually cleared by then,
+    ; so the write looks perfectly safe while the payload is already wrong.
+    ; Returns false — not a bare return — so a caller (and the regression test)
+    ; can tell "refused" from "deferred until ready" and from a completed save.
+    global _ConfigBootReadFailed
+    if (IsSet(_ConfigBootReadFailed) && _ConfigBootReadFailed) {
+        try LoggerError("ConfigIO", "Refusing to save: config.toml could not be read at boot, so the in-memory feature tree holds defaults rather than the user's settings. Restart the driver once the file is readable.")
+        return false
+    }
     Updates := []
     ; Only sync LLM state into Features if LLM_Menu_Init() has already run and
     ; populated _LLM_Menu with the user's persisted values. Calling it before
