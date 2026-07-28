@@ -257,14 +257,21 @@ LLM_RemoteCancelAsync(req_id) {
     if !_LLM_Remote_Async.Has(req_id)
         return
     entry := _LLM_Remote_Async[req_id]
+    ; Flip the flag inline — the poll tick reads it — but release the transport
+    ; off-thread, exactly as the plural sibling does. This is reached from the
+    ; per-keystroke Critical, where both a blocking TerminateProcess and a WinHTTP
+    ; Abort (a cross-apartment COM call) starve the keyboard hook while the
+    ; message pump is suspended. The poll tick still cleans up the curl temp files
+    ; carrying request PII on its next iteration, exactly as before.
     entry["cancelled"] := true
-    ; Release the in-flight request immediately: a curl child is killed (the poll tick
-    ; then cleans up its PII temp files); a WinHTTP request is aborted.
+    Kills := []
     if (entry.Has("transport") and entry["transport"] == "curl") {
-        try ProcessClose(entry["pid"])
-    } else {
-        try entry["http"].Abort()
+        if entry.Has("pid")
+            Kills.Push(Map("pid", entry["pid"]))
+    } else if entry.Has("http") {
+        Kills.Push(Map("http", entry["http"]))
     }
+    LLM_DeferCancelKills(Kills)
 }
 
 LLM_RemoteCancelAllAsync() {
@@ -593,7 +600,19 @@ LLM_RemoteIsReady_Async(Entry, on_result) {
 _LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms) {
     global LLM_REMOTE_READY_PING_POLL_MS
     ready := false
-    try ready := Http.WaitForResponse(0)
+    try {
+        ready := Http.WaitForResponse(0)
+    } catch as com_err {
+        ; The last uncovered site of the ollama-com-exception invariant. A COM
+        ; exception means the connection dropped; the bare `try` this replaces
+        ; swallowed it and re-armed the poll, so a dead readiness ping kept
+        ; polling to its deadline against a socket that would never answer, with
+        ; nothing in the log to say why the backend looked unreachable.
+        try LoggerWarn("LLM.remote", "PollReady WaitForResponse threw COM error — abandoning: {1}", com_err.Message)
+        try Http.Abort()
+        _LLM_InvokeCallback(on_result, "on_result", false)
+        return
+    }
     if !ready {
         if _LLM_DeadlineExpired(start_tick, timeout_ms) {
             ; Abort the stalled request so the COM object + socket are released
