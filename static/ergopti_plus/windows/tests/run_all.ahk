@@ -133,6 +133,11 @@ OnError(_FatalErrorHandler)
 ; Pure helpers (no boot-time side effects) — CountDynamicSection is exercised
 ; by the dynamic-hotstrings corpus parity test.
 #Include ../lib/menu_helpers.ahk
+; Wrap-symbols persistence: globals and function definitions only, no top-level
+; side effects, so it loads headlessly. Included so the load/save data-loss
+; guard (test_wrap_symbols_unreadable_blocks_save.ahk) can drive the real
+; functions instead of scanning their source.
+#Include ../lib/wrap_symbols_config.ahk
 #Include ../modules/keymap/layout/layout_altgr.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
@@ -1078,6 +1083,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_audit_2026_07_20_webview.ahk
 #Include meta/test_audit_2026_07_20_batch4.ahk
 #Include meta/test_wrap_symbols_load_flush.ahk
+#Include unit/test_wrap_symbols_unreadable_blocks_save.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
