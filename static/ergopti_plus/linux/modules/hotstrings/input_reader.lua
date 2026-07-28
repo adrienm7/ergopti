@@ -225,6 +225,24 @@ local function parse_event(data)
 end
 
 
+--- Test seam for the binary decode layer.
+---
+--- decode_u16_le, decode_s32_le and parse_event are file-locals — correctly, as
+--- nothing outside this module has any business calling them. But that left the
+--- entire path from raw kernel bytes to a decoded event untested: its only test
+--- built a 24-byte buffer and then never fed it to anything, so struct offsets,
+--- little-endian order, the signed conversion and the short-buffer guard were
+--- all unverified. A regression in any of them mistypes or drops keystrokes.
+---
+--- Exposed under an explicit __for_test name so it reads as a seam rather than
+--- as API, matching the convention used elsewhere in the codebase.
+M.__decode_for_test = {
+	u16_le      = decode_u16_le,
+	s32_le      = decode_s32_le,
+	parse_event = parse_event,
+}
+
+
 -- =========================================
 -- =========================================
 -- ======= 5/ Reader Instance ==============
