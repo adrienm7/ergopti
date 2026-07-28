@@ -869,6 +869,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_llm_parser_dedup_stats.ahk
 #Include meta/test_paste_without_formatting_restore.ahk
 #Include meta/test_hold_layer_release_bounded.ahk
+#Include meta/test_hold_layer_survives_long_press.ahk
 #Include meta/test_toml_batchwrite_cache_coherence.ahk
 #Include meta/test_topology_debounce_settled_geometry.ahk
 #Include meta/test_topology_single_append.ahk
