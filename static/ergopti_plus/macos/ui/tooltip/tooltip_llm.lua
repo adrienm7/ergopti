@@ -160,13 +160,32 @@ end
 -- ================================
 -- ================================
 
+--- Dismisses the tooltip through the FULL cancel contract.
+---
+--- Hiding is only half of a dismissal. The prediction engine tracks its own
+--- `predictions_visible` flag and only the cancel callback clears it, so a path
+--- that merely calls M.hide() leaves the engine believing a live prediction is
+--- still on screen — and the next Tab or Enter applies the stale one the user
+--- watched disappear. Every dismissal therefore goes through here rather than
+--- calling M.hide() directly, so the pair can never come apart again.
+--- @param reason string Why the tooltip is being dismissed, for the log.
+local function dismiss(reason)
+	Logger.debug(LOG, "Dismissing predictions tooltip (%s).", reason)
+	if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
+	M.hide()
+end
+
 --- Clears active timers and sets a new idle timeout if applicable.
 local function reset_idle_timer()
 	if _idle_timer and type(_idle_timer.stop) == "function" then _idle_timer:stop() end
 	local active_timeout = Config.settings.llm_timeout_sec
 
 	if active_timeout > 0 then
-		_idle_timer = hs.timer.doAfter(active_timeout, M.hide)
+		-- Was `M.hide` alone. The tooltip vanished on idle while the engine still
+		-- had predictions_visible set, so the next Tab typed the prediction that
+		-- had already timed out — text the user never asked for, from a tooltip
+		-- that was no longer on screen.
+		_idle_timer = hs.timer.doAfter(active_timeout, function() dismiss("idle timeout") end)
 		Logger.debug(LOG, "Auto-hide idle timer (re)armed: %.1fs.", active_timeout)
 	end
 end
@@ -225,8 +244,7 @@ local function start_watchers()
 	-- and scrolls are sufficient for dismissal; pure mouse movement should not
 	-- interfere with input delivery.
 	local ok_mouse, watcher_mouse = pcall(hs.eventtap.new, { event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel }, function(_)
-		if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
-		M.hide()
+		dismiss("mouse activity")
 		return false
 	end)
 	
@@ -403,8 +421,7 @@ local function start_watchers()
 			if keycode == ignored_code then return false end
 		end
 		
-		if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end 
-		M.hide()
+		dismiss("keystroke")
 		return false
 	end)
 	
