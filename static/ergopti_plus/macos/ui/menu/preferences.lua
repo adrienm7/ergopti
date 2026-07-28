@@ -32,6 +32,8 @@
 local M = {}
 local hs        = hs
 local TomlCodec = require("lib.toml.codec")
+local Logger    = require("lib.logger")
+local LOG       = "preferences"
 
 
 --- Top-level TOML section names in the order they appear on disk.
@@ -402,18 +404,45 @@ end
 --- Load preferences from the TOML configuration file and normalise
 --- it to the flat dict the rest of the codebase expects.
 --- @param prefs_file string Path to <config_dir>/hammerspoon/config.toml.
+--- Returns a SECOND value distinguishing the three outcomes this used to
+--- collapse into one silent empty table:
+---   absent   - no file at all, a genuine fresh install
+---   corrupt  - the file exists but could not be read or decoded
+---   ok       - decoded normally
+---
+--- The distinction is load-bearing. The caller derives `config_absent` from
+--- `next(saved) == nil`, and on a fresh install that flag legitimately triggers
+--- a factory seed AND a save. A corrupt file produced exactly the same empty
+--- table, so a typo in the expert [script]/[features] layer, a merge-conflict
+--- marker, or a torn write from a cloud-synced directory made the driver
+--- factory-reset every group and then OVERWRITE the recoverable file with
+--- defaults - permanently, since preferences.save only keeps a .bak on Windows.
+---
+--- The karabiner loader already fixed this exact class; this parallel loader
+--- never received it.
 --- @return table The decoded preferences (empty when the file is absent or invalid).
+--- @return string "ok" | "absent" | "corrupt"
 function M.load(prefs_file)
 	local ok, fh = pcall(io.open, prefs_file, "r")
-	if not ok or not fh then return {} end
+	if not ok or not fh then return {}, "absent" end
 
 	local content = fh:read("*a")
 	pcall(function() fh:close() end)
 
 	local dec_ok, tbl = pcall(TomlCodec.decode, content)
-	if not dec_ok or type(tbl) ~= "table" then return {} end
+	if not dec_ok or type(tbl) ~= "table" then
+		-- Loud, and never silently overwritten. The user's settings are still on
+		-- disk and are recoverable by hand; treating this as "fresh install" is
+		-- what destroys them.
+		Logger.error(LOG,
+			"config.toml exists but could not be decoded (%s). Keeping it untouched and running "
+				.. "with in-memory defaults for this session - fix the file, or delete it to start "
+				.. "from factory settings.",
+			tostring(tbl))
+		return {}, "corrupt"
+	end
 
-	return flatten_from_disk(tbl)
+	return flatten_from_disk(tbl), "ok"
 end
 
 --- Save the current state to the TOML configuration file. Atomic via

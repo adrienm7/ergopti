@@ -254,7 +254,7 @@ silent · the test that should have caught it · proposed fix · regression test
   `M.reset()`; invoke the now-stale `on_success` again; assert `M.is_visible()==false`
   and `#M.get_predictions()==0`. Fails before, passes after.
 
-### H7 — A corrupt `config.toml` is indistinguishable from an absent one — boot silently factory-resets and overwrites the user's config
+### [x] H7 — A corrupt `config.toml` is indistinguishable from an absent one — boot silently factory-resets and overwrites the user's config
 **G2 · class A · `ui/menu/preferences.lua:414` → `ui/menu/init.lua:542` → `ui/menu/menu_state.lua:337` · confidence: high · provenance: deduced**
 
 - **Repro:** make `config.toml` unparseable (a typo in the expert `[script]`/
