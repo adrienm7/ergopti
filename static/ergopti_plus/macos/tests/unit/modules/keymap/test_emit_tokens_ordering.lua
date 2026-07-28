@@ -177,3 +177,55 @@ helpers.describe("emit_tokens preserves token order across a deferred paste", fu
 		fire_pending()
 	end)
 end)
+
+
+
+
+
+-- ==============================================
+-- ================================================
+-- ======= 3/ The Fence Is Reported Outward =======
+-- ================================================
+-- ==============================================
+
+helpers.describe("emit_tokens reports its ordering fence to the caller", function()
+	helpers.it("returns a positive delay once a paste has been deferred", function()
+		local KU, _log, fire_pending = load_utils()
+
+		local _c, _s, _logical, fence = KU.emit_tokens({
+			{ kind = "text", value = LONG_A },
+			{ kind = "text", value = LONG_B },
+		})
+		fire_pending()
+
+		helpers.assert_eq(type(fence), "number",
+			"emit_tokens must report the fence — a caller that emits anything MORE afterwards "
+				.. "has the same ordering hazard as the tokens and no other way to learn about it")
+		helpers.assert_true(fence > 0,
+			"with a paste still queued on a timer, a later synchronous send would overtake it, "
+				.. "so the fence must tell the caller how long to wait")
+	end)
+
+	helpers.it("returns zero when nothing was deferred", function()
+		local KU, _log, fire_pending = load_utils()
+
+		local _c, _s, _logical, fence = KU.emit_tokens({
+			{ kind = "text", value = LONG_A },
+			{ kind = "key",  value = "return" },
+		})
+		fire_pending()
+
+		helpers.assert_eq(fence, 0,
+			"a single paste fires inline and CGEvent delivery preserves post order, so nothing "
+				.. "follows it on a timer. Reporting a delay here would add a settle gap to every "
+				.. "ordinary single-segment expansion")
+	end)
+
+	helpers.it("emit_text reports no fence either", function()
+		local KU = load_utils()
+		local _c, _s, _logical, fence = KU.emit_text(LONG_A)
+		helpers.assert_eq(fence, 0,
+			"emit_text pastes at most once, inline — the contract must be uniform so callers "
+				.. "need not know which emitter they reached")
+	end)
+end)

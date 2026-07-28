@@ -25,6 +25,7 @@ local km_utils   = require("modules.keymap.utils")
 local Logger     = require("lib.logger")
 local TextSender = require("adapters.text_sender")
 local TooltipRenderer = require("adapters.tooltip_renderer")
+local TimerScheduler  = require("adapters.timer_scheduler")
 local LOG        = "keymap.expander"
 
 -- Optional modules — loaded with pcall because they are not required for core expansion.
@@ -492,23 +493,40 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		M.perform_text_replacement(
 			deletes,
 			function()
-				local c, s, logical = emit_dispatch(m, to_type)
+				local c, s, logical, order_delay = emit_dispatch(m, to_type)
+
+				-- The terminator re-type is one more emission after the tokens, so
+				-- it inherits their ordering fence. emit_tokens may DEFER a paste
+				-- onto a timer; these sends reach the OS synchronously, so without
+				-- the fence the terminator lands BEFORE the segment it is supposed
+				-- to follow and the replacement arrives scrambled on screen. The
+				-- fence lived inside emit_tokens and covered only its own tokens.
+				-- Scheduled through the TimerScheduler adapter rather than the OS
+				-- timer directly, so the call is attributed at the adapter boundary
+				-- like every other deferral in the driver.
+				local function in_order(fn)
+					if type(order_delay) == "number" and order_delay > 0 then
+						TimerScheduler.after(order_delay, fn)
+					else
+						fn()
+					end
+				end
 
 				-- Re-type the terminator unless it should be consumed.
 				if not consume_term then
 					if chars == "\r" or chars == "\n" then
-						TextSender.pressKey("return", nil, 0)
+						in_order(function() TextSender.pressKey("return", nil, 0) end)
 						-- Track the re-typed terminator so expected_synthetic_chars
 						-- and notify_synthetic see it; without this the keylogger
 						-- flushes its buffer mid-expansion on the Enter/Tab echo.
 						s = s .. chars
 						logical = logical .. chars
 					elseif chars == "\t" then
-						TextSender.pressKey("tab", nil, 0)
+						in_order(function() TextSender.pressKey("tab", nil, 0) end)
 						s = s .. chars
 						logical = logical .. chars
 					else
-						TextSender.send(chars, { mode = "direct" })
+						in_order(function() TextSender.send(chars, { mode = "direct" }) end)
 						s = s .. chars
 						logical = logical .. chars
 					end
