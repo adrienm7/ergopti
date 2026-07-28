@@ -83,6 +83,18 @@ local function load_expander()
 
 	package.loaded["modules.keymap.utils"] = nil
 	package.loaded["modules.keymap.expander"] = nil
+	-- The terminator is emitted by the replay gate, not by the expander, and the
+	-- gate binds its TextSender at load time. Leaving it cached would keep the
+	-- reference taken before the recording stub below was installed, so every
+	-- terminator would go somewhere this test cannot see and the ordering
+	-- assertions would pass on an empty log.
+	package.loaded["modules.keymap.terminator_replay"] = nil
+	-- Same reasoning one level down: the scheduler captures `hs` at load time, and
+	-- load_with_stubs builds a FRESH hs per call. A cached scheduler would keep
+	-- posting into the previous test case's timer list, so this case's
+	-- fire_pending() would find nothing to fire and conclude the terminator was
+	-- never queued.
+	package.loaded["adapters.timer_scheduler"] = nil
 
 	local E = helpers.load_with_stubs("modules.keymap.expander", {
 		eventtap = {
@@ -123,6 +135,7 @@ local function load_expander()
 		eraseChars = function(n, _d) emissions[#emissions + 1] = "erase:" .. tostring(n) end,
 	}
 	package.loaded["modules.keymap.expander"] = nil
+	package.loaded["modules.keymap.terminator_replay"] = nil
 	E = require("modules.keymap.expander")
 
 	local function fire_pending()
@@ -195,13 +208,14 @@ helpers.describe("try_terminator_expand: the re-typed terminator lands last", fu
 				.. table.concat(log, " | "))
 	end)
 
-	helpers.it("still emits inline when nothing was deferred", function()
+	helpers.it("waits for the settle window when the replacement was pasted", function()
 		local E, log, fire_pending = load_expander()
 
 		local s = make_state("btw ")
-		-- One paste-worthy segment only: nothing is deferred, so the re-type must
-		-- fire immediately. A fix that delayed every terminator would add a settle
-		-- gap to the ordinary single-segment expansion.
+		-- One paste-worthy segment: nothing is deferred on OUR side, and this case
+		-- used to assert the re-type therefore fired immediately. It must not. The
+		-- pasted text is produced by the target after it reads the pasteboard, so a
+		-- terminator posted straight after Cmd+V overtakes it.
 		local m = {
 			trigger       = "btw",
 			trigger_bytes = 3,
@@ -216,9 +230,67 @@ helpers.describe("try_terminator_expand: the re-typed terminator lands last", fu
 
 		E.try_terminator_expand(m, " ", 1, false)
 
-		helpers.assert_true(index_of(log, "term:") ~= nil,
-			"with no deferral the terminator must already be emitted, before any timer fires. "
+		helpers.assert_true(index_of(log, "term:") == nil,
+			"the terminator must NOT be emitted before the paste has settled. "
 				.. "Order was: " .. table.concat(log, " | "))
+
+		fire_pending()
+
+		local a_at    = index_of(log, "aaaaaa")
+		local term_at = index_of(log, "term:")
+		helpers.assert_true(a_at ~= nil and term_at ~= nil,
+			"both the paste and the terminator must be emitted once the fence elapses. "
+				.. "Order was: " .. table.concat(log, " | "))
+		helpers.assert_true(term_at > a_at,
+			"the terminator must land after the replacement it terminates. "
+				.. "Order was: " .. table.concat(log, " | "))
+	end)
+
+	helpers.it("a typed replacement releases its terminator on the echo, not on a timer", function()
+		-- The non-regression the paste cases must not cost us: an ordinary
+		-- keystroke-emitted autocorrection must not sit behind a settle gap. Its
+		-- terminator is released by the echo of what we injected, which arrives
+		-- through the keyboard tap within a keystroke or two — so here we drain the
+		-- counters the tap would drain and assert the terminator follows at once,
+		-- with no timer fired.
+		local E, log, fire_pending = load_expander()
+		local Replay = require("modules.keymap.terminator_replay")
+
+		local s = make_state("btw ")
+		local m = {
+			trigger       = "btw",
+			trigger_bytes = 3,
+			tlen          = 3,
+			repl          = "by the way",
+			plain_repl    = "by the way",
+			is_word       = false,
+			final_result  = false,
+		}
+		local reg = make_registry({ ["w"] = { m } })
+		E.init(s, reg, make_llm())
+
+		E.try_terminator_expand(m, " ", 1, false)
+
+		helpers.assert_true(index_of(log, "type:") ~= nil,
+			"the replacement must be typed, or this case proves nothing. "
+				.. "Order was: " .. table.concat(log, " | "))
+		helpers.assert_true(index_of(log, "term:") == nil,
+			"the terminator must NOT go out while the replacement's own echoes are still "
+				.. "outstanding — that ordering is the whole point. "
+				.. "Order was: " .. table.concat(log, " | "))
+
+		-- What the keyboard tap does as our injected events come back.
+		s.expected_synthetic_deletes = 0
+		s.expected_synthetic_chars   = " "   -- only the terminator's own echo remains
+		Replay.flush_if_delivered()
+
+		local text_at = index_of(log, "type:")
+		local term_at = index_of(log, "term:")
+		helpers.assert_true(term_at ~= nil,
+			"once the echoes have drained the terminator must be released immediately, with "
+				.. "no timer in the way. Order was: " .. table.concat(log, " | "))
+		helpers.assert_true(term_at > text_at,
+			"and it must land last. Order was: " .. table.concat(log, " | "))
 
 		fire_pending()
 	end)

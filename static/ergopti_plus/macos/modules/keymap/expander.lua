@@ -24,8 +24,8 @@ local text_utils = require("lib.text_utils")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("lib.logger")
 local TextSender = require("adapters.text_sender")
-local TooltipRenderer = require("adapters.tooltip_renderer")
-local TimerScheduler  = require("adapters.timer_scheduler")
+local TooltipRenderer  = require("adapters.tooltip_renderer")
+local TerminatorReplay = require("modules.keymap.terminator_replay")
 local LOG        = "keymap.expander"
 
 -- Optional modules — loaded with pcall because they are not required for core expansion.
@@ -475,6 +475,9 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		-- when we actually need to emit tokens (replacements with {Token} directives)
 		local repl_text        = m.plain_repl
 		local deletes, to_type = trig_len, repl_text
+		-- Filled in by the emit closure and consumed AFTER perform_text_replacement
+		-- has armed the echo bookkeeping the replay gate reads.
+		local replay_spec      = nil
 
 		if repl_text == m.repl then
 			-- Simple text: keep common prefix to reduce backspaces.
@@ -495,41 +498,35 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 			function()
 				local c, s, logical, order_delay = emit_dispatch(m, to_type)
 
-				-- The terminator re-type is one more emission after the tokens, so
-				-- it inherits their ordering fence. emit_tokens may DEFER a paste
-				-- onto a timer; these sends reach the OS synchronously, so without
-				-- the fence the terminator lands BEFORE the segment it is supposed
-				-- to follow and the replacement arrives scrambled on screen. The
-				-- fence lived inside emit_tokens and covered only its own tokens.
-				-- Scheduled through the TimerScheduler adapter rather than the OS
-				-- timer directly, so the call is attributed at the adapter boundary
-				-- like every other deferral in the driver.
-				local function in_order(fn)
-					if type(order_delay) == "number" and order_delay > 0 then
-						TimerScheduler.after(order_delay, fn)
-					else
-						fn()
-					end
-				end
-
-				-- Re-type the terminator unless it should be consumed.
+				-- The terminator is NOT emitted here. Enter and Tab travel as raw
+				-- key events while the replacement travels through the text-input
+				-- pipeline (or a clipboard read the target schedules itself), and
+				-- posting the two back to back does not order them: the Enter
+				-- reached the host first and submitted the pre-expansion content.
+				-- It is instead handed to TerminatorReplay below, which releases it
+				-- once the replacement has provably landed. order_delay is carried
+				-- through as a floor for the paste path, where there is no
+				-- per-character echo to wait on.
 				if not consume_term then
 					if chars == "\r" or chars == "\n" then
-						in_order(function() TextSender.pressKey("return", nil, 0) end)
+						replay_spec = { kind = "key", key = "return", chars = chars }
 						-- Track the re-typed terminator so expected_synthetic_chars
 						-- and notify_synthetic see it; without this the keylogger
 						-- flushes its buffer mid-expansion on the Enter/Tab echo.
 						s = s .. chars
 						logical = logical .. chars
 					elseif chars == "\t" then
-						in_order(function() TextSender.pressKey("tab", nil, 0) end)
+						replay_spec = { kind = "key", key = "tab", chars = chars }
 						s = s .. chars
 						logical = logical .. chars
 					else
-						in_order(function() TextSender.send(chars, { mode = "direct" }) end)
+						replay_spec = { kind = "text", chars = chars }
 						s = s .. chars
 						logical = logical .. chars
 					end
+					replay_spec.echo_bytes = #chars
+					replay_spec.min_delay  = (type(order_delay) == "number" and order_delay > 0)
+						and order_delay or 0
 					c = c + text_utils.utf8_len(chars)
 				end
 				return c, s, logical
@@ -547,6 +544,21 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 			m.group or nil,
 			m.is_private
 		)
+
+		-- Armed only now: the replay gate reads the synthetic-echo bookkeeping
+		-- that perform_text_replacement writes AFTER emit_action returns. Arming
+		-- from inside the emit closure would test an expectation that had not
+		-- been recorded yet and release the terminator immediately — the very
+		-- race this indirection exists to close.
+		if replay_spec then
+			TerminatorReplay.arm(replay_spec)
+			if is_ignored then
+				-- The keyboard handler exits before its synthetic-echo drain for
+				-- these windows, so no echo can ever be observed here. Waiting for
+				-- one would stall every Enter until the watchdog expired.
+				TerminatorReplay.flush_now("ignored window — echoes unobservable")
+			end
+		end
 
 		-- Same privacy contract as try_auto_expand: a private mapping's trigger
 		-- and replacement are both secrets and must reach neither the keylogger
@@ -756,6 +768,9 @@ function M.init(core_state, registry_mod, llm_mod)
 	_state    = core_state
 	_registry = registry_mod
 	_llm      = llm_mod
+	-- The replay gate reads the same synthetic-echo counters the expander writes,
+	-- so it is handed the identical state object rather than a copy.
+	TerminatorReplay.init(core_state)
 	Logger.success(LOG, "Expander initialized.")
 end
 

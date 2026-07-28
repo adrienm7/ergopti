@@ -28,6 +28,7 @@ local Registry   = require("modules.keymap.registry")
 local Expander   = require("modules.keymap.expander")
 local LLMBridge  = require("modules.keymap.llm_bridge")
 local CoreStateM = require("modules.keymap.state")
+local TerminatorReplay = require("modules.keymap.terminator_replay")
 local Perf       = require("lib.perf")
 local HotPath    = require("lib.hotpath_profiler")
 
@@ -148,6 +149,35 @@ Expander.init(CoreState, Registry, LLMBridge)
 local tap       = nil
 local shift_tap = nil
 local mouse_tap = nil
+
+
+--- Discards every belief the driver holds about the text around the cursor.
+---
+--- Called after a keyDown outage — macOS silently disables an event tap whose
+--- callback overruns the system timeout, and the user keeps typing into a driver
+--- that no longer sees anything. Reviving the tap without this left the buffer
+--- describing a line that no longer exists, so the next expansion sized its
+--- backspaces against stale text and erased characters the user had just typed.
+--- That is the second half of "my keystrokes get swallowed", and it outlives the
+--- outage that caused it.
+---
+--- Declared HERE, above every caller. A Lua local's scope starts after its
+--- declaration, so a copy placed further down would bind the never-assigned
+--- GLOBAL in the error handler that needs it most.
+local function invalidate_observed_context()
+	CoreState.buffer = ""
+	-- Not a word boundary: the cursor sits in territory we never observed, so
+	-- word-anchored triggers must stay silent until a real terminator is seen.
+	CoreState.start_is_word_boundary = false
+	CoreState.expected_synthetic_deletes = 0
+	CoreState.expected_synthetic_chars   = ""
+	CoreState.expected_synthetic_pastes  = 0
+	-- A terminator held across the outage has lost its ordering guarantee, but
+	-- dropping it would silently eat the user's Enter — send it rather than lose it.
+	TerminatorReplay.flush_now("keyboard tap outage")
+	LLMBridge.reset_predictions()
+	Logger.warn(LOG, "Typing context invalidated — keystrokes were missed.")
+end
 
 
 
@@ -646,6 +676,24 @@ local function onKeyDownRaw(e)
 	local now = hs.timer.secondsSinceEpoch()
 
 	if km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now) then
+		-- This early exit is ABOVE every synthetic-echo drain below, so an
+		-- expansion performed while such a window has focus arms expectations
+		-- that can never be consumed here. They used to survive until the
+		-- staleness ceiling and then absorb the user's first real keystrokes in
+		-- the next app — keys typed and never recorded, which is how the buffer
+		-- ends up shorter than the screen and the following expansion
+		-- backspaces over real text. Nothing observable is lost by clearing
+		-- them: every echo they describe returns through this same branch and
+		-- is discarded unread.
+		if (CoreState.expected_synthetic_deletes or 0) > 0
+			or #(CoreState.expected_synthetic_chars or "") > 0
+			or (CoreState.expected_synthetic_pastes or 0) > 0 then
+			CoreState.expected_synthetic_deletes = 0
+			CoreState.expected_synthetic_chars   = ""
+			CoreState.expected_synthetic_pastes  = 0
+			TerminatorReplay.flush_now("focus left the observable window")
+			Logger.debug(LOG, "Synthetic expectations cleared — window is not observed.")
+		end
 		return false
 	end
 
@@ -706,6 +754,9 @@ local function onKeyDownRaw(e)
 	if keyCode == Keycodes.BACKSPACE and CoreState.expected_synthetic_deletes > 0 then
 		if event_is_ours() then
 			CoreState.expected_synthetic_deletes = CoreState.expected_synthetic_deletes - 1
+			-- A held terminator waits on exactly these counters; the last delete of
+			-- a replacement that types nothing (a pure erase) is its release signal.
+			TerminatorReplay.flush_if_delivered()
 			return false
 		end
 	end
@@ -786,6 +837,9 @@ local function onKeyDownRaw(e)
 		if flags.cmd and keyCode == hs.keycodes.map["v"]
 			and (CoreState.expected_synthetic_pastes or 0) > 0 then
 			CoreState.expected_synthetic_pastes = CoreState.expected_synthetic_pastes - 1
+			-- A paste-backed replacement echoes no characters, so this is the only
+			-- evidence a held terminator will ever get that its text is on its way.
+			TerminatorReplay.flush_if_delivered()
 			return false
 		end
 		-- If expected_synthetic_chars is non-empty, this Cmd keystroke is the
@@ -853,14 +907,29 @@ local function onKeyDownRaw(e)
 		local ok_cut, cut = pcall(utf8.offset, CoreState.expected_synthetic_chars, chars_n + 1)
 		if ok_cut and cut and CoreState.expected_synthetic_chars:sub(1, cut - 1) == chars then
 			CoreState.expected_synthetic_chars = CoreState.expected_synthetic_chars:sub(cut)
+			-- The replacement is fully echoed once this drains — release the
+			-- terminator that has been waiting for exactly that.
+			TerminatorReplay.flush_if_delivered()
 			return false
-		elseif dt < 0.02 then
-			-- Tolerance window for macOS UTF-8 multi-event decomposition / regrouping.
+		elseif event_is_ours() then
+			-- Ours, but not byte-identical to the head of the expectation: the OS
+			-- text-input stack regrouped or normalised what we injected. Discard it
+			-- like any other echo — it is already on screen and must not be counted
+			-- twice — then clear the expectation, which can no longer be aligned.
+			CoreState.expected_synthetic_chars = ""
+			TerminatorReplay.flush_if_delivered()
 			return false
 		else
-			-- A real keystroke arrived > 20 ms after the arm and does not match the head
-			-- of the synthetic buffer — the buffer is stale. Purge it so future real
-			-- keystrokes are not silently absorbed by an expired synthetic expectation.
+			-- A HUMAN keystroke arriving mid-expansion. This branch used to swallow
+			-- it whenever it landed within 20 ms of the previous key, on the theory
+			-- that anything typed that fast had to be our own echo. Speed is not
+			-- evidence of provenance: the character stayed on screen but never
+			-- reached the buffer, so the driver's idea of the line grew shorter than
+			-- the line itself and the next expansion backspaced over text the user
+			-- had typed. Provenance is what the question actually asks, and the
+			-- source-PID test answers it exactly — the same migration from a timing
+			-- window to a provenance filter the Windows driver already made for this
+			-- bug. The stale expectation is purged so it absorbs nothing further.
 			CoreState.expected_synthetic_chars = ""
 		end
 	end
@@ -1015,6 +1084,11 @@ local function onKeyDown(e)
 		if tap and type(tap.isEnabled) == "function" and not tap:isEnabled() then
 			Logger.warn(LOG, "Event tap disabled after error — re-enabling.")
 			pcall(function() tap:start() end)
+			-- Re-arming here means the watchdog never sees the tap down and never
+			-- runs its own invalidation, so this path has to do it: keystrokes were
+			-- missed between the fault and the restart, and every belief about the
+			-- text around the cursor is now a guess.
+			invalidate_observed_context()
 		end
 		return false
 	end
@@ -1128,9 +1202,15 @@ mouse_tap = eventtap.new(
 -- macOS silently disables an event tap whose callback exceeds the system
 -- timeout (~300 ms). Once disabled, all keystrokes pass through but no
 -- expansion fires — from the user's perspective, letters are "swallowed".
--- This watchdog checks the three taps every 5 s and re-arms any that
--- the OS killed.
-local TAP_WATCHDOG_SEC = 5
+-- This watchdog checks the three taps and re-arms any that the OS killed.
+--
+-- The interval IS the length of the outage, not a sampling nicety: nothing else
+-- can notice a dead tap, because a dead tap delivers no events to notice WITH.
+-- It was 5 s — several sentences of typing during which no expansion fires and
+-- the buffer stops tracking the screen. The check is three CGEventTapIsEnabled
+-- reads on a timer, nowhere near the keystroke path, so buying back four
+-- seconds of dead typing costs nothing worth measuring.
+local TAP_WATCHDOG_SEC = 1
 local _watchdog_timer  = nil
 -- Post-boot window-filter prewarm timer. Held so M.stop() can cancel it: a reload
 -- during the quiet window otherwise left it armed to fire into a torn-down engine.
@@ -1149,11 +1229,15 @@ local function tap_watchdog()
 			local recovery_logger = name == "mouse" and Logger.debug or Logger.warn
 			recovery_logger(LOG, "macOS disabled the %s event tap — re-enabling.", name)
 			pcall(function() t:start() end)
+			return true
 		end
+		return false
 	end
-	revive("keyDown", tap)
+	local keydown_revived = revive("keyDown", tap)
 	revive("flagsChanged", shift_tap)
 	revive("mouse", mouse_tap)
+	-- Only the keyDown tap feeds the buffer, so only its outage invalidates it.
+	if keydown_revived then invalidate_observed_context() end
 end
 
 --- Starts the eventtap listeners and attaches them to the OS event queue.
@@ -1197,6 +1281,12 @@ function M.stop()
 	-- Cancelled here, before km_utils.stop() below, so there is no window in which
 	-- the prewarm can fire into an engine that has already been torn down.
 	if _prewarm_timer then _prewarm_timer:stop(); _prewarm_timer = nil end
+	-- Release a held terminator BEFORE the taps go down. Its release signal is a
+	-- synthetic echo arriving through the keyDown tap, so stopping first would
+	-- strand it until the watchdog expired — into a torn-down engine, or after a
+	-- reload, or never. The user pressed that key; it must not evaporate because
+	-- the engine was toggled off a few milliseconds later.
+	TerminatorReplay.flush_now("keymap engine stopping")
 	tap:stop()
 	shift_tap:stop()
 	mouse_tap:stop()
