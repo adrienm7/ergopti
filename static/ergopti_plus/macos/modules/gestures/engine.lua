@@ -691,6 +691,16 @@ function M.process_frame(touches)
 							gs.candidateFingers     = nil
 							gs.candidateSince       = nil
 							gs.candidateFrames      = 0
+							-- Rebase the peak on the confirmed count as well. Demoting
+							-- maxFingers alone left peakN holding the count the user just
+							-- abandoned, and the peak override at commit re-promoted it —
+							-- so a confirmed 4→3 change still fired the 4-finger action,
+							-- the exact outcome this demotion exists to prevent. The peak
+							-- is meant to recover intent from a finger lifting a frame
+							-- early, not to outrank a change we spent frames confirming.
+							gs.peakN          = n
+							gs.peakNFirstSeen = now
+							gs.peakNLastSeen  = now
 						else
 							gs.lifting = true
 						end
