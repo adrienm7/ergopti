@@ -740,18 +740,34 @@ function M.perform_check(force_trigger, profile_name)
 		predictions_visible_ref = visible_ref,
 	})
 
-	-- Wrap callbacks to keep local state in sync after each call
+	-- Wrap callbacks to keep local state in sync after each call.
+	--
+	-- STALENESS-AWARE, and it must stay that way. The StreamingHandler callbacks
+	-- already discard a superseded response on their own fetch-id guard, but the
+	-- refs still hold the PREVIOUS response's populated values — so a bare
+	-- sync_refs() copied them back into module state and resurrected a
+	-- prediction that reset() had just cleared. Nothing changed on screen at
+	-- that moment; the damage surfaced on the next Tab or Enter, which gates
+	-- only on engine.is_visible() and therefore typed a completion the user
+	-- never saw. Any other keystroke healed it, so it read as a one-off ghost
+	-- insertion rather than a bug.
+	--
+	-- The handler-level guard cannot cover this: the clobber happens one level
+	-- above it, in these two-line wrappers.
+	local function is_current_fetch()
+		return fetch_request_counter == my_fetch_id
+	end
 	local function on_success(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
 		on_success_cb(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
-		sync_refs()
+		if is_current_fetch() then sync_refs() end
 	end
 	local function on_fail()
 		on_fail_cb()
-		sync_refs()
+		if is_current_fetch() then sync_refs() end
 	end
 	local on_partial = on_partial_cb and function(partial_raw)
 		on_partial_cb(partial_raw)
-		sync_refs()
+		if is_current_fetch() then sync_refs() end
 	end or nil
 
 	-- Arm the watchdog via StreamingHandler

@@ -224,7 +224,7 @@ silent · the test that should have caught it · proposed fix · regression test
   neither `rich_text` nor the `events_json` `r`-values; and separately assert a
   **non**-private expansion's content **does** appear (no blanket muting).
 
-### H6 — Stale-callback wrapper `sync_refs` resurrects dead prediction state after `reset()` — next Tab/Enter types an invisible stale completion
+### [x] H6 — Stale-callback wrapper `sync_refs` resurrects dead prediction state after `reset()` — next Tab/Enter types an invisible stale completion
 **G5/G3 · class C · `modules/llm/prediction_engine.lua:744` · confidence: high · provenance: deduced**
 
 - **Repro:** backend `api` (or streaming off), `num_predictions=3`. Type; variant
