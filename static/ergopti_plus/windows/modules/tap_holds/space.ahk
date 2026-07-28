@@ -175,8 +175,15 @@ _SpaceTap() {
             : (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
         HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
         HotstringRepl := HSEMatch.HasOwnProp("Replacement") ? HSEMatch.Replacement : HSEMatch.Trigger
-        if IsSet(KL_LogHotstring)
-            try KL_LogHotstring(HSEMatch.Trigger, HotstringRepl, "endchar", "", HotstringCategory, HotstringSection)
+        ; Queue the metrics record instead of writing it here. This runs under
+        ; Critical("On") on the keystroke thread, BEFORE the post-expansion
+        ; suppress release, and KL_LogHotstring is a buffer flush plus a JSONL
+        ; append plus WPM pushes — a disk spike inside that window swallows the
+        ; next physical keys (the abcd→acd class). The prefix-watcher fire path
+        ; was moved off KL_LogHotstring onto this queue for exactly that reason;
+        ; this sibling kept the synchronous call.
+        if IsSet(_HSE_QueueFireLog)
+            try _HSE_QueueFireLog(HSEMatch.Trigger, HotstringRepl, "endchar", HotstringCategory, HotstringSection)
         UpdateLastSentCharacter(" ")
         Critical(PrevCrit ? PrevCrit : "Off")
         return

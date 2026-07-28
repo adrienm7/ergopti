@@ -133,7 +133,16 @@ _DVC_SpaceTapFallsThroughOnDecline() {
 
 	; The keylogger fire record must live inside the fired branch. Logging it
 	; before the verdict is what put phantom expansions in the metrics.
-	LogPos := InStr(Body, "KL_LogHotstring")
+	;
+	; Matched on either channel: the record is queued rather than written inline
+	; (see fire-log-never-synchronous), and pinning one spelling would make this
+	; guard fail the day the channel changes for an unrelated reason — while
+	; still not noticing a record emitted before the verdict.
+	LogPos := InStr(Body, "_HSE_QueueFireLog")
+	if (LogPos == 0)
+		LogPos := InStr(Body, "KL_LogHotstring")
+	Assert(LogPos > 0,
+		"_SpaceTap must still record the fire for the metrics pipeline, through the deferred queue or directly")
 	Assert(LogPos > DispatchPos,
 		"the hotstring fire must be logged only after the dispatch has confirmed it — a fire logged on a declined match is an expansion the user never saw")
 	Assert(LogPos < PressPos,
