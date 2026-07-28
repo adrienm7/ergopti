@@ -846,6 +846,17 @@ require("lib.file_watchers").start({
 	hotstrings_dir          = hotstrings_dir,
 	base_dir                = base_dir,
 	personal_hotstrings_dir = (menu_paths.get("PersonalHotstringsDir") or ""):gsub("[/\\]+$", ""),
+	-- Files this session writes itself. hotstrings_dir resolves to the config
+	-- ROOT whenever that root holds an ordinary .toml (it does — wrap_symbols),
+	-- and the pathwatcher is recursive, so these two would otherwise register as
+	-- external edits: every save_prefs — every menu toggle — reloaded the whole
+	-- driver, and every layout change regenerated config_karabiner.toml and did
+	-- it again. Resolved from menu_paths so the watcher and the writers cannot
+	-- disagree about where these files are.
+	self_written_files      = {
+		menu_paths.get("ConfigTomlPath"),
+		menu_paths.get("KarabinerConfigPath"),
+	},
 })
 
 

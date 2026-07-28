@@ -68,14 +68,48 @@ local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * 0.5s = 60s of a quiet-but-stuck 
 -- =======================================
 -- ========================================
 
+--- Normalises a path for comparison: lowercased, backslashes folded to slashes.
+--- @param p string|nil
+--- @return string
+local function canonical_path(p)
+	if type(p) ~= "string" then return "" end
+	return p:gsub("\\", "/"):lower()
+end
+
 --- Arms every auto-reload watcher. Pins them in _G.script_watchers (the GC root
 --- init.lua's shutdown callback stops on quit).
 --- @param ctx table { hotstrings_dir: string, base_dir: string,
----   personal_hotstrings_dir: string } — absolute paths resolved by the boot script.
+---   personal_hotstrings_dir: string, self_written_files: string[] } — absolute
+---   paths resolved by the boot script.
 function M.start(ctx)
 	local hotstrings_dir = ctx.hotstrings_dir
 	local base_dir       = ctx.base_dir
 	local personal_dir   = ctx.personal_hotstrings_dir or ""
+
+	-- Files this session writes ITSELF, which must never look like an external
+	-- change. The hotstrings directory resolves to the config ROOT whenever that
+	-- root holds any ordinary .toml — and the real tree does, wrap_symbols.toml —
+	-- so the recursive pathwatcher covers hammerspoon/config.toml too. Every
+	-- save_prefs, meaning every single menu toggle, then looked exactly like a
+	-- user editing a hotstring file and reloaded the whole driver half a second
+	-- later. config_karabiner.toml is worse still: the driver regenerates it
+	-- whenever the layout changes.
+	--
+	-- Matched by resolved PATH rather than by filename, and resolved by the
+	-- caller from menu_paths, so there is no second spelling of these names to
+	-- drift from the one the writers use.
+	local self_written = {}
+	for _, p in ipairs(ctx.self_written_files or {}) do
+		local key = canonical_path(p)
+		if key ~= "" then self_written[key] = true end
+	end
+
+	--- True when a changed path is one this session wrote itself.
+	--- @param path string
+	--- @return boolean
+	local function is_self_written(path)
+		return self_written[canonical_path(path)] == true
+	end
 
 	-- Global table pins the watchers so the GC cannot destroy them mid-session.
 	_G.script_watchers = _G.script_watchers or {}
@@ -181,7 +215,8 @@ function M.start(ctx)
 	local dir_watcher = hs.pathwatcher.new(hotstrings_dir, function(paths)
 		local hit = {}
 		for _, p in ipairs(paths) do
-			if p:match("%.toml$") or p:match("_index%.json$") or p:match("%.local_ahk_path$") then
+			if (p:match("%.toml$") or p:match("_index%.json$") or p:match("%.local_ahk_path$"))
+				and not is_self_written(p) then
 				hit[#hit + 1] = p
 			end
 		end
@@ -273,7 +308,8 @@ function M.start(ctx)
 
 	-- Safety net for in-place edits that directory watchers may miss
 	for _, fname in ipairs(fs_dir.entries(hotstrings_dir)) do
-		if fname:match("%.toml$") or fname:match("_index%.json$") then
+		if (fname:match("%.toml$") or fname:match("_index%.json$"))
+			and not is_self_written(hotstrings_dir .. fname) then
 			local w = hs.pathwatcher.new(hotstrings_dir .. fname, function(paths)
 				note_change(i18n.get("init.reload_hotstrings"), paths)
 			end)
