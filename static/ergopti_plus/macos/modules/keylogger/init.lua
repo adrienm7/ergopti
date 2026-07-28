@@ -935,7 +935,39 @@ end
 --- @param source_variant string|nil Optional sub-type for UI rendering.
 --- @param physical_echo string|nil Text whose delayed physical key echoes must
 ---   be discarded. Clipboard output intentionally passes an empty string.
-function M.notify_synthetic(text, source_type, deletes, source_variant, physical_echo)
+--- Stand-in recorded in place of each character of a PRIVATE expansion. One
+--- placeholder per real character, so every count, WPM sample and timing
+--- derived from these events stays accurate while the content itself is
+--- unrecoverable from the metrics database or from a cross-device export.
+local PRIVATE_PLACEHOLDER_CHAR = string.char(0xE2, 0x80, 0xA2) -- U+2022 BULLET
+
+--- What is actually PERSISTED for one synthetic character.
+---
+--- Pure and exported so the privacy invariant can be asserted directly: the
+--- alternative is reloading the whole keylogger to reach its private CoreState,
+--- which drags the event tap, watchers and context tracker into the test run.
+---
+--- Backspace markers are never redacted — they carry no content, and rewriting
+--- them would desynchronise the deletion count the buffer replays.
+--- @param char string       The character about to be recorded.
+--- @param is_private boolean|nil  True for a private mapping's replacement.
+--- @return string           The value to persist.
+function M.recorded_char(char, is_private)
+	if is_private and char ~= "[BS]" then
+		return PRIVATE_PLACEHOLDER_CHAR
+	end
+	return char
+end
+
+--- @param is_private boolean|nil  When true, the CONTENT is replaced by a
+---        redacted placeholder in everything that is persisted, while the
+---        physical-echo discard markers below still use the real text.
+---        Skipping this call outright for a private expansion would be WORSE
+---        than the leak it fixes: the physical echoes would then fall through
+---        handle_key unclaimed and be recorded as ordinary human keystrokes in
+---        buffer_text, so the secret would land in the metrics anyway - just in
+---        a different column.
+function M.notify_synthetic(text, source_type, deletes, source_variant, physical_echo, is_private)
 	-- When the keylogger is OFF there is no consumer for synth_queue (handle_key
 	-- returns at the is_enabled guard, so the idle-drain self-heal never runs).
 	-- Queuing here while disabled is pure leak/poison: the queue and the WPM window
@@ -949,14 +981,22 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, physical
 	-- the logical replacement immediately, then discard only the later physical
 	-- echoes of direct key injection. This keeps clipboard hotstrings and LLM
 	-- completions in the same raw event format as typed synthetic output.
+	-- What gets PERSISTED for one synthetic character. For a private expansion
+	-- the SHAPE is preserved (one entry per character, so counts, WPM and
+	-- timings stay correct) while the character itself is replaced. The
+	-- .text-based privacy tests never caught this because buffer_text stays
+	-- clean either way: the secret travelled in the per-character `r` field of
+	-- buffer_events and in rich_chunks, which become events_json and rich_text
+	-- in the database and are replicated by cross-device export.
 	local function append_virtual(char)
+		local recorded = M.recorded_char(char, is_private)
 		table.insert(CoreState.buffer_events, {
-			char, 0,
-			{ s = true, st = source_type, c = false, ss = "none", r = char,
+			recorded, 0,
+			{ s = true, st = source_type, c = false, ss = "none", r = recorded,
 				m = "", h = 0, d = 0, dk = false, cp = false, kc = nil },
 		})
 		if char ~= "[BS]" then
-			table.insert(CoreState.rich_chunks, { type = source_type, text = char })
+			table.insert(CoreState.rich_chunks, { type = source_type, text = recorded })
 		end
 	end
 

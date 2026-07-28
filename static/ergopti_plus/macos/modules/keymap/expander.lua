@@ -72,7 +72,7 @@ end
 --- @param is_ignored boolean When true, skips tooltip and LLM side-effects.
 --- @param source_type string Telemetry label passed to the keylogger.
 --- @param source_variant string|nil Optional sub-type for the keylogger.
-function M.perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored, source_type, source_variant)
+function M.perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored, source_type, source_variant, is_private)
 	Logger.trace(LOG, "Performing replacement (%d deletion(s))…", deletes)
 
 	_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + deletes
@@ -120,8 +120,14 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		-- can reach notify_synthetic with malformed UTF-8, and its utf8.codes loop
 		-- would otherwise raise, aborting the expansion mid-flight and leaving the
 		-- synthetic-injection trackers desynced (F-HIGH-16 fix).
+		-- is_private is forwarded, NOT used to skip the call. Skipping would let
+		-- the physical echoes fall through handle_key unclaimed and be logged as
+		-- ordinary human keystrokes in buffer_text - the same secret, recorded in
+		-- a worse place. The keylogger's private mode keeps the discard markers
+		-- intact and redacts only what it persists.
 		local ok_notify, notify_err = pcall(keylogger.notify_synthetic,
-			logical_text, source_type or "hotstring", deletes, source_variant, emitted_str)
+			logical_text, source_type or "hotstring", deletes, source_variant, emitted_str,
+			is_private)
 		if not ok_notify then
 			Logger.error(LOG, "notify_synthetic failed: %s.", tostring(notify_err))
 		end
@@ -361,7 +367,8 @@ function M.try_auto_expand(m, char_len, is_ignored)
 		m.final_result,
 		is_ignored,
 		"hotstring",
-		m.group or nil
+		m.group or nil,
+		m.is_private
 	)
 
 	-- Private mappings carry PII sourced from personal_info.toml (phone, SSN,
@@ -519,7 +526,8 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 			m.final_result,
 			is_ignored,
 			"hotstring",
-			m.group or nil
+			m.group or nil,
+			m.is_private
 		)
 
 		-- Same privacy contract as try_auto_expand: a private mapping's trigger
