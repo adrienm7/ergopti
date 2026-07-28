@@ -56,10 +56,18 @@ _PBT_BackspaceIsNotAResetKey() {
 }
 
 ; The decrement must actually be a decrement, and must not underflow.
+;
+; HSE_Buffer is set explicitly throughout: the production caller always runs
+; HSE_FeedBackspace immediately BEFORE this helper, so the engine side is
+; already up to date by the time it is entered. Leaving it to whatever a
+; previous test happened to leave behind would make these assertions depend on
+; execution order.
 _PBT_BackspaceDecrementsByOne() {
-	global _PrefixBuffer
+	global _PrefixBuffer, HSE_Buffer
 	Saved := _PrefixBuffer
+	SavedEngine := HSE_Buffer
 	try {
+		HSE_Buffer := "abc"
 		_PrefixBuffer := "abc"
 		_PrefixFeedBackspace()
 		Assert(_PrefixBuffer == "ab",
@@ -70,12 +78,39 @@ _PBT_BackspaceDecrementsByOne() {
 		Assert(_PrefixBuffer == "",
 			"backspacing the whole buffer must empty it — got '" . _PrefixBuffer . "'")
 
-		; One more than there are characters must be harmless.
+		; One more than there are characters must be harmless. With the engine
+		; buffer also empty there is genuinely nothing on screen to recover.
+		HSE_Buffer := ""
 		_PrefixFeedBackspace()
 		Assert(_PrefixBuffer == "",
 			"backspacing an empty buffer must stay empty rather than underflow")
 	} finally {
 		_PrefixBuffer := Saved
+		HSE_Buffer := SavedEngine
+	}
+}
+
+; The other half of the same contract: an empty preview does NOT always mean
+; there is nothing on screen. Typing a terminator resets the preview while the
+; engine keeps it, so a backspace deleting that terminator re-exposes the
+; previous word on the engine side — and the preview must follow it back rather
+; than stay silent for the rest of that word.
+_PBT_BackspaceRecoversTheWordTheEngineStillHolds() {
+	global _PrefixBuffer, HSE_Buffer
+	Saved := _PrefixBuffer
+	SavedEngine := HSE_Buffer
+	try {
+		; State right after backspacing the space out of "bonjour ": the engine
+		; has shrunk back to the word, the preview was reset when the space was
+		; typed and has nothing of its own left.
+		HSE_Buffer := "bonjour"
+		_PrefixBuffer := ""
+		_PrefixFeedBackspace()
+		Assert(_PrefixBuffer == "bonjour",
+			"the preview must recover the word the engine still holds — left empty, the tooltip stays silent for a trigger the engine would expand, and cannot catch up for the rest of the word. Got: '" . _PrefixBuffer . "'")
+	} finally {
+		_PrefixBuffer := Saved
+		HSE_Buffer := SavedEngine
 	}
 }
 
@@ -202,6 +237,8 @@ _PBT_NoParallelExpansionArithmetic() {
 
 Test("meta watcher: backspace shrinks the preview buffer", _PBT_BackspaceIsNotAResetKey)
 Test("meta watcher: backspace decrements by exactly one", _PBT_BackspaceDecrementsByOne)
+Test("meta watcher: backspace recovers the word the engine still holds",
+	_PBT_BackspaceRecoversTheWordTheEngineStillHolds)
 Test("meta watcher: VK_BACK is not a reset key", _PBT_ResetListExcludesBackspace)
 Test("meta watcher: a declined match takes the no-match path", _PBT_DeclinedMatchTakesTheNoMatchPath)
 Test("meta watcher: one path grows the preview buffer", _PBT_OneAppendPath)

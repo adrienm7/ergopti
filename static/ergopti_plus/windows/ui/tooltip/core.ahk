@@ -105,22 +105,27 @@ global _TooltipLastItems := 0
 _TooltipTimerFn() {
     global _TooltipGeneration, _TooltipTimerGeneration
     ; SetTimer bypasses native Suspend, like both sibling timers in this file
-    ; already guard against. Firing while paused would call _ResetPrefixBuffer()
-    ; below and mutate hotstring-engine state behind a driver the user believes
-    ; is off — the suspend reactor has already hidden the tooltip and reset the
-    ; engine, so there is nothing left for this timer to do.
+    ; already guard against. The suspend reactor has already hidden the tooltip
+    ; and reset the engine, so a fire while paused would only tear down a
+    ; surface that is already gone.
     if A_IsSuspended
         return
     if (_TooltipTimerGeneration != _TooltipGeneration)
         return
     TooltipHide("TimerFn", true)
-    ; The timer fires when the user has not typed anything new since the
-    ; tooltip appeared — they have effectively abandoned the current word.
-    ; Reset the prefix buffer so the next keystroke starts a fresh lookup
-    ; rather than accumulating onto the stale word (which would prevent any
-    ; subsequent tooltip from showing for that trigger).
-    if IsSet(_ResetPrefixBuffer)
-        try _ResetPrefixBuffer()
+    ; The preview buffer is deliberately NOT reset here.
+    ;
+    ; This timer means "the tooltip has been on screen a while", not "the user
+    ; abandoned the word". Nothing was typed, nothing moved the caret, and the
+    ; ENGINE still holds the word — so wiping the preview made the two buffers
+    ; describe different text after any mid-word pause longer than the display
+    ; duration. The visible symptom was a suggestion that never came back for a
+    ; trigger the engine would still have expanded: the preview restarted from
+    ; empty while the engine kept accumulating, so no later keystroke could
+    ; reproduce the prefix the tooltip needed.
+    ;
+    ; The preview is reset by the events that genuinely invalidate it — a
+    ; terminator, a caret move, a fire — each of which resets the engine too.
 }
 
 _TooltipDeferredShowFn() {
