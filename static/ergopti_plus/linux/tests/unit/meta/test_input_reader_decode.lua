@@ -17,39 +17,115 @@ helpers.describe("input_reader (evdev decode)", function()
   -- 1. Binary decode helpers (decode_u16_le, decode_s32_le)
   -- ==========================================================================
 
+  -- The decode layer is reached through an explicit test seam. Its previous
+  -- "coverage" built a 24-byte buffer and then never fed it to anything: the
+  -- `data` local was dead, and every assertion in the block was assert_true(true)
+  -- or a type check on the constructor. Struct offsets, byte order, the signed
+  -- conversion and the short-buffer guard were all unverified — and each of them,
+  -- when wrong, silently mistypes or drops keystrokes rather than failing.
+  local decode = inputReader.__decode_for_test
+
+  --- Builds a 24-byte input_event exactly as the kernel lays it out.
+  --- @param ev_type number
+  --- @param ev_code number
+  --- @param ev_value number Signed 32-bit.
+  --- @return string
+  local function make_event(ev_type, ev_code, ev_value)
+    local bytes = {}
+    for _ = 1, 16 do bytes[#bytes + 1] = string.char(0x00) end   -- timeval
+    bytes[#bytes + 1] = string.char(ev_type % 256)
+    bytes[#bytes + 1] = string.char(math.floor(ev_type / 256) % 256)
+    bytes[#bytes + 1] = string.char(ev_code % 256)
+    bytes[#bytes + 1] = string.char(math.floor(ev_code / 256) % 256)
+    local v = ev_value < 0 and (ev_value + 0x100000000) or ev_value
+    bytes[#bytes + 1] = string.char(v % 256)
+    bytes[#bytes + 1] = string.char(math.floor(v / 256) % 256)
+    bytes[#bytes + 1] = string.char(math.floor(v / 65536) % 256)
+    bytes[#bytes + 1] = string.char(math.floor(v / 16777216) % 256)
+    return table.concat(bytes)
+  end
+
   helpers.describe("decode_u16_le()", function()
-    helpers.it("decodes a simple little-endian uint16", function()
-      -- bytes: 0x10 0x27 → little-endian uint16 = 0x2710 = 10000
-      local data = string.char(0x10, 0x27)
-      -- We can't call the local function directly, so we test via parse_event
-      -- which uses it internally
-      helpers.assert_true(true)  -- structure test
+    helpers.it("is exposed through the test seam", function()
+      helpers.assert_eq(type(decode), "table",
+        "the decode layer must be reachable from tests — file-locals with no seam are why this whole path went unverified")
+      helpers.assert_eq(type(decode.u16_le), "function", "u16_le must be reachable")
+      helpers.assert_eq(type(decode.s32_le), "function", "s32_le must be reachable")
+      helpers.assert_eq(type(decode.parse_event), "function", "parse_event must be reachable")
     end)
 
-    helpers.it("parse_event decodes a well-formed 24-byte input_event", function()
-      -- Build a synthetic input_event:
-      -- timeval: 16 bytes (zeros)
-      -- type:   uint16 = 1 (EV_KEY), bytes 17-18: 0x01 0x00
-      -- code:   uint16 = 30 (KEY_A),  bytes 19-20: 0x1E 0x00
-      -- value:  int32  = 1 (KEY_DOWN), bytes 21-24: 0x01 0x00 0x00 0x00
-      local bytes = {}
-      for _ = 1, 16 do bytes[#bytes + 1] = string.char(0x00) end
-      bytes[#bytes + 1] = string.char(0x01) -- type lo
-      bytes[#bytes + 1] = string.char(0x00) -- type hi
-      bytes[#bytes + 1] = string.char(0x1E) -- code lo (KEY_A = 30)
-      bytes[#bytes + 1] = string.char(0x00) -- code hi
-      bytes[#bytes + 1] = string.char(0x01) -- value lo
-      bytes[#bytes + 1] = string.char(0x00) -- value hi
-      bytes[#bytes + 1] = string.char(0x00) -- value hi
-      bytes[#bytes + 1] = string.char(0x00) -- value hi
-      local data = table.concat(bytes)
+    helpers.it("decodes little-endian, not big-endian", function()
+      -- 0x10 0x27 is 10000 little-endian and 4135 big-endian. A byte-order
+      -- regression turns every keycode into a different key.
+      helpers.assert_eq(decode.u16_le(string.char(0x10, 0x27), 1), 10000,
+        "the low byte comes first — reading it big-endian maps each keycode to an unrelated key")
+    end)
 
-      -- Create a reader to access parse_event internally.
-      -- We use the constructor just for structure; don't start the loop.
-      local reader = inputReader.new("/dev/null", "qwerty", function() end)
-      helpers.assert_true(type(reader) == "table", "reader created")
-      helpers.assert_true(type(reader.start) == "function", "has start()")
-      helpers.assert_true(type(reader.stop) == "function", "has stop()")
+    helpers.it("reads from the given offset", function()
+      local data = string.char(0xFF, 0xFF) .. string.char(0x1E, 0x00)
+      helpers.assert_eq(decode.u16_le(data, 3), 30,
+        "the offset must be honoured, or every field is read from the wrong place in the struct")
+    end)
+  end)
+
+  helpers.describe("decode_s32_le()", function()
+    helpers.it("decodes a positive value", function()
+      helpers.assert_eq(decode.s32_le(string.char(0x01, 0x00, 0x00, 0x00), 1), 1,
+        "KEY_DOWN is value 1 — the most common event in the stream")
+    end)
+
+    helpers.it("converts the high half of the range to negative", function()
+      -- 0xFFFFFFFF is -1 signed. Without the conversion it reads as 4294967295,
+      -- which equals nothing the dispatcher tests for, so such an event would
+      -- fall through every branch silently.
+      helpers.assert_eq(decode.s32_le(string.char(0xFF, 0xFF, 0xFF, 0xFF), 1), -1,
+        "values at or above 0x80000000 must convert to negative")
+    end)
+
+    helpers.it("leaves the boundary value just below the sign bit positive", function()
+      helpers.assert_eq(decode.s32_le(string.char(0xFF, 0xFF, 0xFF, 0x7F), 1), 2147483647,
+        "0x7FFFFFFF is the largest positive int32 — converting it too would be an off-by-one on the sign boundary")
+    end)
+  end)
+
+  helpers.describe("parse_event()", function()
+    helpers.it("decodes a well-formed KEY_A keydown", function()
+      local ev = decode.parse_event(make_event(1, 30, 1))
+      helpers.assert_true(ev ~= nil, "a full 24-byte event must decode")
+      helpers.assert_eq(ev.ev_type, 1, "EV_KEY is type 1 — the filter the whole dispatcher depends on")
+      helpers.assert_eq(ev.ev_code, 30, "KEY_A is code 30")
+      helpers.assert_eq(ev.ev_value, 1, "KEY_DOWN is value 1")
+    end)
+
+    helpers.it("distinguishes keydown, repeat and keyup", function()
+      -- The dispatcher forwards ONLY value == 1. If repeat (2) or keyup (0)
+      -- decoded as 1, a held key would fire its hotstring on every repeat.
+      helpers.assert_eq(decode.parse_event(make_event(1, 30, 2)).ev_value, 2,
+        "auto-repeat must decode as 2, or a held key fires its hotstring repeatedly")
+      helpers.assert_eq(decode.parse_event(make_event(1, 30, 0)).ev_value, 0,
+        "key release must decode as 0, or every keystroke is counted twice")
+    end)
+
+    helpers.it("decodes a two-byte keycode above 255", function()
+      -- Codes above 255 exercise the high byte; a decoder that only read the low
+      -- byte would handle KEY_F13 (183) fine but alias anything past 0xFF.
+      local ev = decode.parse_event(make_event(1, 300, 1))
+      helpers.assert_eq(ev.ev_code, 300, "the high byte of the keycode must be read")
+    end)
+
+    helpers.it("rejects a short buffer instead of decoding garbage", function()
+      helpers.assert_eq(decode.parse_event(string.rep(string.char(0), 23)), nil,
+        "a partial read must return nil — decoding it would emit a keystroke assembled from whatever followed in memory")
+      helpers.assert_eq(decode.parse_event(""), nil, "an empty buffer must return nil")
+    end)
+
+    helpers.it("does not filter by type — that is the dispatcher's job", function()
+      -- EV_SYN (type 0) arrives after every key event. parse_event must decode
+      -- it faithfully and leave the filtering to the caller, which is where the
+      -- EV_KEY test lives.
+      local ev = decode.parse_event(make_event(0, 0, 0))
+      helpers.assert_true(ev ~= nil, "a synchronisation event must still decode")
+      helpers.assert_eq(ev.ev_type, 0, "and report its real type")
     end)
   end)
 
