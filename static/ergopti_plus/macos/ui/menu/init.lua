@@ -521,7 +521,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		clear_persisted_binding_overrides()
 		pcall(os.remove, MenuPaths.get("ConfigTomlPath"))
 		pcall(os.remove, MenuPaths.get("KarabinerConfigPath"))
-		save_prefs()
+		-- NO save_prefs() here. It rewrote config.toml from the still-current
+		-- in-memory `state`, which restore_factory_bindings does not touch: it
+		-- resets bindings only, never the feature toggles. The reload that
+		-- follows then found a NON-empty config, so config_absent was false, the
+		-- factory-seed branch was skipped, and merge_saved_data re-hydrated every
+		-- toggle the user had just asked to reset. Deleting the files and letting
+		-- the reload take the config_absent path is what actually seeds defaults;
+		-- the two calls above already clear the bindings through their own stores,
+		-- which is the job this save_prefs() was added for.
 		pcall(notifications.notify, i18n.get("notify.defaults_reset"), nil, "info")
 		hs.timer.doAfter(0.25, function() pcall(hs.reload) end)
 	end

@@ -102,7 +102,7 @@ silent · the test that should have caught it · proposed fix · regression test
   a Lua-escape string compare, which would itself be fooled).
 - *Note:* the LOW row `logger.lua:325` is **this same bug**, site 2.
 
-### H2 — Interceptor error-latch binds a nil global (local-after-closure) — one throwing interceptor kills the whole keystroke pipeline
+### [x] H2 — Interceptor error-latch binds a nil global (local-after-closure) — one throwing interceptor kills the whole keystroke pipeline
 **G2 · class F · `modules/keymap/init.lua:715` (decl at `:1101`) · confidence: high · provenance: measured (repro'd the extracted shape in `lua`)**
 
 - **Repro:** register an interceptor that throws (what `dynamic_hotstrings`
@@ -132,7 +132,7 @@ silent · the test that should have caught it · proposed fix · regression test
   this class) — `src:find("local _interceptor_error_logged") <
   src:find("local function onKeyDownRaw")`. Fails at HEAD, passes after the move.
 
-### H3 — MLX requirements-check `hs.task` (`check_task`) is never GC-pinned — startup and every MLX model switch can silently stall
+### [x] H3 — MLX requirements-check `hs.task` (`check_task`) is never GC-pinned — startup and every MLX model switch can silently stall
 **G3 · class C · `ui/menu/menu_llm/models_manager_mlx.lua:273` · confidence: high · provenance: deduced (GC-timing) · found independently by 3 zones**
 
 - **Repro:** MLX backend, LLM enabled → switch to any MLX model, or reload HS.
@@ -283,7 +283,7 @@ silent · the test that should have caught it · proposed fix · regression test
   corruption (not plain `{}`); behavioural test on `sync_state_to_modules`
   asserting `save_prefs` is **not** called when the config was corrupt.
 
-### H8 — `reset_all_defaults` re-saves the current config before reload — factory reset keeps every config-backed toggle
+### [x] H8 — `reset_all_defaults` re-saves the current config before reload — factory reset keeps every config-backed toggle
 **G2 · class F · `ui/menu/init.lua:524` · confidence: high · provenance: deduced**
 
 - **Repro:** disable some hotstring groups, raise `expansion_delay`, change

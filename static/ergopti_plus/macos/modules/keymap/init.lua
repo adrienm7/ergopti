@@ -622,6 +622,18 @@ local FAST_EXIT_KEYCODES = {
 	[135] = true,  -- LAYER_SYN_3
 }
 
+-- One-shot per interceptor index, so a throwing interceptor is reported once
+-- instead of on every keystroke.
+--
+-- DECLARED HERE, ABOVE onKeyDownRaw, and it must stay above it. In Lua a local's
+-- scope begins AFTER its declaration, so a closure written earlier in the file
+-- binds the never-assigned GLOBAL of the same name instead. Indexing that nil
+-- raises on the very first throwing interceptor -- inside the handler whose
+-- whole purpose is to REPORT one -- and the outer pcall then logs a misdirecting
+-- "Keyboard interception failure" while every keystroke loses Escape handling,
+-- backspace handling, buffer tracking and expansions.
+local _interceptor_error_logged = {}
+
 local function onKeyDownRaw(e)
 	if CoreState.processing_paused then return false end
 
@@ -1096,9 +1108,6 @@ local _watchdog_timer  = nil
 -- Post-boot window-filter prewarm timer. Held so M.stop() can cancel it: a reload
 -- during the quiet window otherwise left it armed to fire into a torn-down engine.
 local _prewarm_timer   = nil
--- One-shot per interceptor index, so a throwing interceptor is reported once
--- instead of on every keystroke.
-local _interceptor_error_logged = {}
 
 -- Delay before prewarming the ignored-window watchers off the keystroke path.
 -- Short enough to almost always beat the user's first keystroke, long enough to
