@@ -36,6 +36,10 @@
 global _I18nLocale := "fr"
 
 ; Flat map of key → translated string for the active locale. Populated lazily.
+; Keys already reported as untranslated, so the warning fires once per key
+; rather than on every menu rebuild.
+global _I18nMissWarned := Map()
+
 global _I18nCache := Map()
 global _I18nCacheLoaded := false
 
@@ -307,5 +311,20 @@ t(Key) {
 		return _I18nCacheEn[Key]
 	if _I18nCacheFrLoaded and _I18nCacheFr.Has(Key) and _I18nCacheFr[Key] != ""
 		return _I18nCacheFr[Key]
+	; TOTAL miss: absent from the active locale AND from both fallbacks. The
+	; raw dotted key is still returned — rendering "menu.hotstrings.delay_prompt"
+	; in the UI is ugly but survivable, and throwing here would take the tray menu
+	; down over a typo. But it was returned in COMPLETE silence, so a stale or
+	; mistyped key showed up as garbage in the interface with nothing in the log
+	; to connect it to, and the locale-parity gate only covers keys that exist in
+	; en.json — precisely not this case.
+	;
+	; Warned once per key: t() is called for every menu label on every rebuild,
+	; so an unthrottled line would flood the log and bury the first occurrence.
+	global _I18nMissWarned
+	if !_I18nMissWarned.Has(Key) {
+		_I18nMissWarned[Key] := true
+		try LoggerWarn("Locale", "No translation for '{1}' in the active locale, en or fr — the raw key is being displayed to the user.", Key)
+	}
 	return Key
 }

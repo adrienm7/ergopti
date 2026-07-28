@@ -164,6 +164,25 @@ class KLHook {
 ; ==================================
 ; ==================================
 
+; Advance the context watermarks by Elapsed WITHOUT letting them overshoot the
+; present.
+;
+; Two independent compensations exist for the same wall-clock span: this timer's
+; suspend branch, and the keystroke-gap branch in KL_Watchers_OnKeystroke. After
+; a pause longer than the session timeout BOTH fire and both describe the same
+; missing time, so applied one after the other they push app_entered_at PAST
+; A_TickCount. The next app_switch then computes `Now - app_entered_at` as a
+; NEGATIVE duration, and the walker adds that verbatim to app_time — silently
+; subtracting screen time from whichever app was focused.
+;
+; Clamping here rather than at the consumer keeps the watermark itself honest:
+; it can never claim the app was entered in the future.
+KL_Hook_AdvanceContextWatermarks(Elapsed) {
+    Now := A_TickCount
+    KLHook.app_entered_at   := Min(KLHook.app_entered_at + Elapsed, Now)
+    KLHook.title_entered_at := Min(KLHook.title_entered_at + Elapsed, Now)
+}
+
 KL_Hook_RefreshContext(force := false) {
     ; Driven by SetTimer, which bypasses native Suspend — stay silent while
     ; the driver is paused so no app/title switch is observed or flushed.
@@ -180,8 +199,7 @@ KL_Hook_RefreshContext(force := false) {
         PausedNow := A_TickCount
         if (KLHook.suspend_tick != 0) {
             Elapsed := (PausedNow - KLHook.suspend_tick) & 0xFFFFFFFF
-            KLHook.app_entered_at   += Elapsed
-            KLHook.title_entered_at += Elapsed
+            KL_Hook_AdvanceContextWatermarks(Elapsed)
         }
         KLHook.suspend_tick := PausedNow
         return
