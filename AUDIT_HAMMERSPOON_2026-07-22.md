@@ -312,7 +312,7 @@ silent · the test that should have caught it · proposed fix · regression test
   that would load next boot is treated as absent, or that the persisted flat state
   equals factory `DEFAULT_STATE` for hotstrings/`expansion_delay`/`trigger_char`.
 
-### H9 — `resync_context` reads `app:title()` not `app:name()` — a vault whose title differs is not re-suppressed on resume (PII leak)
+### [x] H9 — `resync_context` reads `app:title()` not `app:name()` — a vault whose title differs is not re-suppressed on resume (PII leak)
 **G2 · class F · `modules/keylogger/context_tracker.lua:522` · confidence: medium (nil-title case not measurable here) · provenance: deduced**
 
 - **Repro (hypothesis on the nil/differ case):** pause while frontmost = TextEdit,
@@ -339,7 +339,7 @@ silent · the test that should have caught it · proposed fix · regression test
   existing `test_context_resync_on_resume.lua` double defines `title` to return the
   exact vault name and no `name`, so it is structurally blind to both cases.)
 
-### H10 — French typographic punctuation never terminator-expands — `is_terminator` ignores the last codepoint of NNBSP-prefixed events
+### [x] H10 — French typographic punctuation never terminator-expands — `is_terminator` ignores the last codepoint of NNBSP-prefixed events
 **G2/G5 · class B · `_shared/lua/keymap/terminators.lua:115` · confidence: medium (deduced; needs a real-Mac repro) · provenance: deduced**
 
 - **Repro:** a non-auto mapping (e.g. `autocorrection.toml` `agé→âgé`,
