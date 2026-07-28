@@ -612,6 +612,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_capslock_led_single_owner.ahk
 #Include meta/test_config_shortcuts_array_escape.ahk
 #Include meta/test_config_window_delay_write_per_keystroke.ahk
+#Include meta/test_config_window_republishes_baked_fields.ahk
 #Include meta/test_config_window_no_delimiter_ui.ahk
 #Include meta/test_curl_payload_pii_temp_leak.ahk
 #Include meta/test_deadkey_suspend_guard.ahk

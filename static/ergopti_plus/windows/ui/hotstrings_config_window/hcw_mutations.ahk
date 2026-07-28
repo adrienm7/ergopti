@@ -16,6 +16,19 @@
 ; extension entries) or _HCW_PatchTomlMeta (for personal TOML files).
 ; ==============================================================================
 
+; Override fields that are BAKED INTO EACH SPEC at registration time rather than
+; derived at read time. Persisting one of these only bumps the resolve
+; generation, so the window (which reads through HotstringsResolve) shows the new
+; value while the live engine keeps gating on the value it was registered with —
+; the tooltip advertises an expansion window the engine refuses, or a collision
+; resolves by a priority the user has already changed. Both need a live
+; re-registration, which is exactly what the tray-menu delay editors already do.
+;
+; Color and show_tooltip are deliberately absent: they ARE derived at read, and
+; a ~1.3 s re-registration on every color pick would be a serious regression in
+; a window whose numeric edits already fire on a debounce.
+global HCW_REBUILD_ON_WRITE_FIELDS := Map("delay", true, "priority", true)
+
 
 
 
@@ -212,6 +225,7 @@ _HCW_SetOverride(Entry, Sec, Field, Value) {
 	} else {
 		HotstringsSetOverride(Entry.Key, Sec, Field, Value)
 	}
+	_HCW_RepublishIfBakedField(Field)
 }
 
 _HCW_ClearOverride(Entry, Sec, Field) {
@@ -221,6 +235,25 @@ _HCW_ClearOverride(Entry, Sec, Field) {
 		HotstringsClearOverride("ext." . Entry.ExtId, Sec, Field)
 	} else {
 		HotstringsClearOverride(Entry.Key, Sec, Field)
+	}
+	_HCW_RepublishIfBakedField(Field)
+}
+
+; Re-register live when the field just written is one the engine baked at
+; registration time. Without this the window and the engine hold two different
+; values for the same setting until the next Reload — the window's is the one the
+; user is looking at, the engine's is the one that decides.
+;
+; Failure is contained: a rebuild that throws must not lose the write that
+; already succeeded, nor tear down the config window the user is still editing in.
+_HCW_RepublishIfBakedField(Field) {
+	global HCW_REBUILD_ON_WRITE_FIELDS
+	if !HCW_REBUILD_ON_WRITE_FIELDS.Has(Field)
+		return
+	try {
+		RebuildHotstringsLive()
+	} catch as Err {
+		try LoggerError("HotstringsConfigWindow", "Live re-registration after writing '{1}' failed: {2}. The value is persisted but the running engine still uses the previous one until the next reload.", Field, Err.Message)
 	}
 }
 
