@@ -694,7 +694,11 @@ local function upgrade_active_list(legacy_active)
 		table.insert(lines, string.format("\tset selSrc to my findSource(\"%s\")", last_new:gsub('"', '\\"')))
 		table.insert(lines, "\tif selSrc is not missing value then current application's TISSelectInputSource(selSrc)")
 	end
-	table.insert(lines, "\treturn (count of disabled) & \"/\" & (count of enabled)")
+	-- Both counts coerced to text FIRST. AppleScript's & on two non-string
+	-- operands builds a LIST, so this returned "1, /, 2" rather than "1/2" and the
+	-- Lua pattern below matched nothing — enabled_n stayed nil, the > 0 test
+	-- failed, and every SUCCESSFUL upgrade was reported to the user as a failure.
+	table.insert(lines, "\treturn ((count of disabled) as text) & \"/\" & ((count of enabled) as text)")
 	table.insert(lines, "end run")
 	local script = table.concat(lines, "\n")
 	Logger.start(LOG, "Upgrading %d legacy Ergopti entry(ies) in the active input-source list…", #legacy_active)

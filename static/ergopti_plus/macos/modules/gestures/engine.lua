@@ -624,10 +624,19 @@ function M.process_frame(touches)
 				gs.peakNFirstSeen = now
 				gs.peakNLastSeen  = now
 			elseif n == gs.peakN then
-				-- Extend the held span only while the peak is still on the trackpad,
-				-- so the override measures a sustained hold rather than the age of a
-				-- momentary spike
-				gs.peakNLastSeen = now
+				-- Extend the held span only while the peak is CONTINUOUSLY on the
+				-- trackpad. gs.lastN still holds the previous frame's count here, so
+				-- a mismatch means the peak was dropped and re-attained: two
+				-- momentary spikes with a dip between them, which the old
+				-- unconditional extension measured as one long hold and let the
+				-- override promote. Restarting the span on re-attainment means each
+				-- spike is judged on the time it was actually held.
+				if gs.lastN == gs.peakN then
+					gs.peakNLastSeen = now
+				else
+					gs.peakNFirstSeen = now
+					gs.peakNLastSeen  = now
+				end
 			end
 
 			-- StartPos Compensation: if finger count changed, the centroid (pos) jumps.

@@ -449,7 +449,7 @@ twice). All confirmed via two lenses; each carries a repro + fix in the journal.
 | [x] G3/E | `macos/adapters/toml_cache.lua:191` | `toml_cache` writes `.lua` snapshots **inside** the watched `base_dir` — a runtime store fires a spurious full reload. |
 | G3/C | `macos/modules/keymap/init.lua:704` | Synthetic Tab/Return echoes are consumed by `handle_llm_keys` as prediction-accept while predictions are visible → LLM text injected mid-expansion. |
 | G4/D | `macos/modules/keymap/utils.lua:435` | `is_ignored_window` runs synchronous AX probes inside the keyDown tap on every cache miss and every 5 s TTL expiry. |
-| G2/F | `macos/modules/keymap/input_sources.lua:708` | `upgrade_active_list` parses `<n>/<n>` but AppleScript returns a list (`1, /, 2`) → successful layout upgrades reported as failures. |
+| [x] G2/F | `macos/modules/keymap/input_sources.lua:708` | `upgrade_active_list` parses `<n>/<n>` but AppleScript returns a list (`1, /, 2`) → successful layout upgrades reported as failures. |
 | [x] G5/G | `macos/modules/keymap/llm_bridge.lua:501` | `would_fire`'s no-op returns a truthy 2nd value → the preview builds a **nil-text** row that crashes `render_stacked` and silently kills the whole preview stack. |
 | [x] G5/G | `macos/modules/keymap/llm_bridge.lua:524` | Stacked star rows label the validation key with a hard-coded `★` instead of `CoreState.magic_key` — wrong after the user customises the magic key. |
 | G5/C | `macos/modules/keymap/llm_bridge.lua:345` | Preview offers rows during the rescan-suppression window in which the engine is hard-blocked; the trigger is then lost forever. |
@@ -464,10 +464,10 @@ twice). All confirmed via two lenses; each carries a repro + fix in the journal.
 | [x] G3/C | `macos/modules/gestures/actions.lua:491` | `search_web` snapshots/restores the clipboard with no in-flight guard — the stale-snapshot class `7bf0cc3cd` fixed, left unguarded here. |
 | [x] G2/A | `macos/adapters/http_client.lua:126` | Completion callbacks run under bare `pcall` with no `Logger.error` (`:98/:126/:155/:178`) — a throw in the LLM response handler vanishes. Recorded-open, still true; the callers currently backstop it (see §6). |
 | [x] G2/E | `macos/adapters/text_sender.lua:112` | A throw between `Clipboard.write` and arming the restore timer permanently clobbers the clipboard. |
-| G2/B | `macos/ui/menu/menu_state.lua:95` | Dead branch references an undefined global `enabled_ct` → custom-terminator enabled-state restore is a permanent no-op. |
+| [x] G2/B | `macos/ui/menu/menu_state.lua:95` | Dead branch references an undefined global `enabled_ct` → custom-terminator enabled-state restore is a permanent no-op. |
 | [x] G1/B | `macos/ui/download_window/init.lua:127` | The `terminal` bridge builds `osascript` with double-quote-only escaping — a single quote in a path/model breaks it. |
 | [x] G1/B | `macos/ui/onboarding/init.lua:504` | `pickConfigDir` builds the AppleScript folder-picker seed with double-quote-only escaping (backslash unescaped). |
-| G2/F | `macos/modules/gestures/engine.lua:626` | The sustained-peak override accepts two momentary spikes separated by a dip as a held peak. |
+| [x] G2/F | `macos/modules/gestures/engine.lua:626` | The sustained-peak override accepts two momentary spikes separated by a dip as a held peak. |
 | [x] G3/F | `macos/modules/shortcuts/script_control.lua:210` | `pause_all` stops MLX warmup but not Ollama's — the exact sibling `df063a2fa` fixed on the disable path. |
 | [x] G2/F | `macos/modules/shortcuts/actions/text.lua:202` | `do_transform`'s in-flight flag is released only by a 2 s timer → legit repeat transforms dropped; long selections re-open the race. |
 | G4/F | `macos/modules/gestures/actions.lua:204` | `d40baf8dd`'s `space_wrap` check runs `hs.spaces` require + `allSpaces` + `focusedSpace` synchronously in the gesture frame callback. |
