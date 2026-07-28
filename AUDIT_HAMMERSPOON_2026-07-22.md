@@ -72,7 +72,7 @@ Treat "no finding" for those files as "not looked at", not "clean".
 Each carries: guarantee violated · `file:line` · repro · root cause · why it is
 silent · the test that should have caught it · proposed fix · regression test.
 
-### H1 — Canonical `shell_quote` emits `'''` instead of the POSIX `'\''` — re-opens shell injection and corrupts every apostrophe-bearing path
+### [x] H1 — Canonical `shell_quote` emits `'''` instead of the POSIX `'\''` — re-opens shell injection and corrupts every apostrophe-bearing path
 **G1 · class F · `_shared/lua/text_utils/init.lua:519` (+ `macos/lib/logger.lua:325`, `macos/modules/karabiner/init.lua:545`) · confidence: high · provenance: measured**
 
 - **Repro (measured, `lua` on this box):** `shell_quote("a'b")` returns
