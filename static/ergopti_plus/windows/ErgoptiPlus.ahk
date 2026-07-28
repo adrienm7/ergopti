@@ -17,9 +17,21 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 ; single live hook/log owner in the common case. The handle is intentionally never
 ; closed: the OS releases the mutex when this process exits, so a successor's wait
 ; unblocks the instant we die.
+;
+; EXEMPT: the detached keylogger-prefetch worker. The driver deliberately
+; re-runs this entry with /force and --keylogger-prefetch-worker to compute a
+; metrics projection; that worker registers no hook, no log owner and no tray,
+; so it is not what this gate exists to prevent. But the gate is the FIRST
+; auto-execute statement while the worker's own gate sits ~300 lines below, so
+; every worker spawned while the driver is alive blocked the full wait on the
+; live driver's mutex, timed out and ExitApp(0)'d before reaching its main —
+; the projection could never publish. KLPF_IsWorkerInvocation reads only
+; A_Args and its definition is hoisted, so it is callable here.
 global DRIVER_MUTEX_NAME := "Local\ErgoptiPlusDriver"
 global DRIVER_MUTEX_WAIT_MS := 3000 ; max boot delay while a previous instance exits
-global _DriverMutexHandle := DllCall("CreateMutexW", "Ptr", 0, "Int", 0, "Str", DRIVER_MUTEX_NAME, "Ptr")
+global _DriverMutexHandle := 0
+if !KLPF_IsWorkerInvocation()
+	_DriverMutexHandle := DllCall("CreateMutexW", "Ptr", 0, "Int", 0, "Str", DRIVER_MUTEX_NAME, "Ptr")
 if (_DriverMutexHandle) {
 	; Take ownership, waiting (bounded) for any previous owner to release it (exit).
 	; 0 = WAIT_OBJECT_0 (acquired), 0x80 = WAIT_ABANDONED (prior owner died holding it
