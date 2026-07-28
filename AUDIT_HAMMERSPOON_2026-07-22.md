@@ -461,15 +461,15 @@ twice). All confirmed via two lenses; each carries a repro + fix in the journal.
 | [x] G1/A | `macos/modules/llm/api_ollama.lua:429` | Non-streaming response path swallows callback throws under bare `pcall` — "green but no prediction", zero log evidence. |
 | [x] G3/C | `macos/modules/llm/api_mlx.lua:653` | MLX warmup POST timeout never bumps `_warmup_gen` and the response cancels the newer timeout's pre-guard → warmup POSTs pile up. |
 | G1/A | `macos/modules/llm/prediction_engine.lua:989` | The canonical inactivity debounce timer is built at **require** time, before `install_runtime_error_capture` → its callback is permanently unguarded. |
-| G3/C | `macos/modules/gestures/actions.lua:491` | `search_web` snapshots/restores the clipboard with no in-flight guard — the stale-snapshot class `7bf0cc3cd` fixed, left unguarded here. |
+| [x] G3/C | `macos/modules/gestures/actions.lua:491` | `search_web` snapshots/restores the clipboard with no in-flight guard — the stale-snapshot class `7bf0cc3cd` fixed, left unguarded here. |
 | [x] G2/A | `macos/adapters/http_client.lua:126` | Completion callbacks run under bare `pcall` with no `Logger.error` (`:98/:126/:155/:178`) — a throw in the LLM response handler vanishes. Recorded-open, still true; the callers currently backstop it (see §6). |
-| G2/E | `macos/adapters/text_sender.lua:112` | A throw between `Clipboard.write` and arming the restore timer permanently clobbers the clipboard. |
+| [x] G2/E | `macos/adapters/text_sender.lua:112` | A throw between `Clipboard.write` and arming the restore timer permanently clobbers the clipboard. |
 | G2/B | `macos/ui/menu/menu_state.lua:95` | Dead branch references an undefined global `enabled_ct` → custom-terminator enabled-state restore is a permanent no-op. |
 | [x] G1/B | `macos/ui/download_window/init.lua:127` | The `terminal` bridge builds `osascript` with double-quote-only escaping — a single quote in a path/model breaks it. |
 | [x] G1/B | `macos/ui/onboarding/init.lua:504` | `pickConfigDir` builds the AppleScript folder-picker seed with double-quote-only escaping (backslash unescaped). |
 | G2/F | `macos/modules/gestures/engine.lua:626` | The sustained-peak override accepts two momentary spikes separated by a dip as a held peak. |
 | [x] G3/F | `macos/modules/shortcuts/script_control.lua:210` | `pause_all` stops MLX warmup but not Ollama's — the exact sibling `df063a2fa` fixed on the disable path. |
-| G2/F | `macos/modules/shortcuts/actions/text.lua:202` | `do_transform`'s in-flight flag is released only by a 2 s timer → legit repeat transforms dropped; long selections re-open the race. |
+| [x] G2/F | `macos/modules/shortcuts/actions/text.lua:202` | `do_transform`'s in-flight flag is released only by a 2 s timer → legit repeat transforms dropped; long selections re-open the race. |
 | G4/F | `macos/modules/gestures/actions.lua:204` | `d40baf8dd`'s `space_wrap` check runs `hs.spaces` require + `allSpaces` + `focusedSpace` synchronously in the gesture frame callback. |
 | [x] G1/A | `macos/modules/llm/api_ollama.lua:165` | A config-derived log path is interpolated into `/bin/sh` with `string.format('%q')` at two sites the shell-quoting guard cannot see. |
 | G4/D | `macos/lib/logger.lua:634` | Default log level is DEBUG, so the per-keystroke hot path does synchronous line-flushed file I/O (`fh:flush`) inside the eventtap. |
