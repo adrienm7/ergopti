@@ -322,7 +322,7 @@ function M.init_log_path(config_dir, max_age_days)
 	-- POSIX-quoted inline rather than via lib.text_utils: the logger is the most
 	-- foundational module in the driver and must not acquire a require() that could
 	-- reorder or cycle at boot. Same idiom as text_utils.shell_quote.
-	ShellRunner.exec("mkdir -p '" .. tostring(log_dir):gsub("'", "'\''") .. "'")
+	ShellRunner.exec("mkdir -p '" .. tostring(log_dir):gsub("'", "'\\''") .. "'")
 	_log_dir = log_dir
 
 	-- Close any handle open on the old path so the next write re-opens cleanly

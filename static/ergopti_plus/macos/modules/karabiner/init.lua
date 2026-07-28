@@ -542,7 +542,7 @@ function M.regenerate()
 		-- is the same shell-quoting rule the generator applies 150 lines away, and the
 		-- generator's own regression test covers only that file. Memoised because this
 		-- runs on every regenerate: the directory does not stop existing.
-		local function sq(v) return "'" .. tostring(v):gsub("'", "'\''") .. "'" end
+		local function sq(v) return "'" .. tostring(v):gsub("'", "'\\''") .. "'" end
 		pcall(hs.execute, "mkdir -p " .. sq(kc_parent))
 		_kc_parent_ensured = true
 	end

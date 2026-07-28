@@ -516,7 +516,7 @@ end
 --- @param value any The value to quote (coerced with tostring).
 --- @return string The value wrapped in single quotes, safe for /bin/sh.
 function M.shell_quote(value)
-	return "'" .. tostring(value):gsub("'", "'\''") .. "'"
+	return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
 end
 
 --- Escapes a string so it is safe to use as the REPLACEMENT argument of gsub.
