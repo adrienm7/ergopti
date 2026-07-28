@@ -138,6 +138,36 @@ end
 -- ===============================================
 -- ===============================================
 
+-- Identity of the shared progress window at the moment THIS checker claimed it,
+-- or nil while it owns nothing.
+--
+-- The window is a single-instance surface: the model download, the MLX
+-- bootstrap and this checker can each take it over. Every later write or hide
+-- must therefore prove it still owns what it is about to touch — and the
+-- session has to be captured when the window is CLAIMED, not sampled at
+-- completion, which reads whoever owns it by then.
+--
+-- Module-level on purpose. make_streaming_handler assigns it and the task
+-- completion callback reads it; a local inside check_and_install_deps would be
+-- out of scope for the handler, which would silently bind a nil global instead.
+local _ui_session = nil
+
+local function owned_session()
+	if type(llm_progress.session_id) ~= "function" then return nil end
+	local ok, sid = pcall(llm_progress.session_id)
+	return ok and sid or nil
+end
+
+--- True when the progress window still belongs to this checker. Defaults to
+--- true when no session was ever recorded, so a build without session support
+--- behaves exactly as before rather than silently doing nothing.
+local function owns_window()
+	if _ui_session == nil then return true end
+	local current = owned_session()
+	if current == nil then return true end
+	return current == _ui_session
+end
+
 --- Builds a closure consuming stdout/stderr chunks. Lazily shows the
 --- progress UI on the first marker so a silent fast-path run never paints.
 local function make_streaming_handler()
@@ -163,7 +193,13 @@ local function make_streaming_handler()
 						subtitle = label,
 					})
 					ui_shown = true
-				else
+					-- Record WHOSE window this is at the moment we claim it. Sampling
+					-- the session later, at bootstrap completion, reads whatever
+					-- operation owns the surface by then -- so a model download or the
+					-- MLX bootstrap that claimed it mid-install would be the thing this
+					-- checker then wrote into and hid.
+					_ui_session = owned_session()
+				elseif owns_window() then
 					pcall(llm_progress.set_step, label)
 				end
 			end
@@ -219,7 +255,10 @@ function M.check_and_install_deps()
 			_last_failure_message = nil
 			Logger.success(LOG, "Ollama backend ready.")
 			-- Only auto-hide if the UI was actually shown (slow path).
-			if llm_progress.is_active() then
+			-- is_active() only proves SOME window is open. Writing "ready" and 100%
+			-- into a window another operation now owns overwrites its live progress
+			-- with this one's outcome.
+			if llm_progress.is_active() and owns_window() then
 				pcall(llm_progress.set_step, i18n.get("ollama.deps_step_ready"))
 				pcall(llm_progress.set_progress, 100)
 				-- The progress window is a shared, single-instance surface: a model
@@ -227,8 +266,8 @@ function M.check_and_install_deps()
 				-- Capture whose window it is now and only hide THAT one, otherwise
 				-- this timer tears down an unrelated operation's UI mid-flight while
 				-- that operation keeps running with nothing on screen.
-				local hide_session = type(llm_progress.session_id) == "function"
-					and llm_progress.session_id() or nil
+				-- The session captured at CLAIM time, not now.
+				local hide_session = _ui_session
 				hs.timer.doAfter(SUCCESS_AUTO_HIDE_SEC, function()
 					if hide_session ~= nil then
 						local ok_sid, current = pcall(llm_progress.session_id)

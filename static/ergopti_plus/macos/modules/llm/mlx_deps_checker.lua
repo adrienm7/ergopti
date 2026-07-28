@@ -274,6 +274,37 @@ end
 --- and lazily shows the progress UI on the first slow-path marker so a
 --- silent fast-path run never paints anything on screen.
 --- @return function streaming_callback Compatible with hs.task:setStreamingCallback.
+-- Identity of the shared progress window at the moment THIS checker claimed it,
+-- or nil while it owns nothing.
+--
+-- The window is a single-instance surface that the model download, the Ollama
+-- bootstrap and this checker can each take over, so every later write or hide
+-- has to prove it still owns what it is about to touch. Captured when the
+-- window is CLAIMED rather than sampled at completion, which would read
+-- whichever operation owns it by then -- precisely the one that must not be
+-- touched.
+--
+-- Module-level on purpose: the streaming handler assigns it and the completion
+-- path reads it, so a local inside either would be out of scope for the other
+-- and would silently bind a nil global instead.
+local _ui_session = nil
+
+local function owned_session()
+	if type(llm_progress.session_id) ~= "function" then return nil end
+	local ok, sid = pcall(llm_progress.session_id)
+	return ok and sid or nil
+end
+
+--- True when the progress window still belongs to this checker. Defaults to
+--- true when no session was ever recorded, so a build without session support
+--- behaves exactly as before rather than silently doing nothing.
+local function owns_window()
+	if _ui_session == nil then return true end
+	local current = owned_session()
+	if current == nil then return true end
+	return current == _ui_session
+end
+
 local function make_streaming_handler()
 	-- Per-marker dedupe: stdout is line-buffered but each marker may arrive
 	-- multiple times across chunks; we want exactly one transition each.
@@ -309,6 +340,7 @@ local function make_streaming_handler()
 					title    = i18n.get("mlx.install_title"),
 					subtitle = i18n.get("mlx.deps_preparing"),
 				})
+				_ui_session = owned_session()
 			end
 		end
 
@@ -322,6 +354,7 @@ local function make_streaming_handler()
 						title    = i18n.get("mlx.install_title"),
 						subtitle = label,
 					})
+					_ui_session = owned_session()
 				else
 					pcall(llm_progress.set_step, label)
 				end
@@ -517,8 +550,8 @@ function M.check_and_install_deps(on_complete)
 				-- Capture whose window it is now and only hide THAT one, otherwise
 				-- this timer tears down an unrelated operation's UI mid-flight while
 				-- that operation keeps running with nothing on screen.
-				local hide_session = type(llm_progress.session_id) == "function"
-					and llm_progress.session_id() or nil
+				-- The session captured at CLAIM time, not sampled now.
+				local hide_session = _ui_session
 				hs.timer.doAfter(SUCCESS_AUTO_HIDE_SEC, function()
 					if hide_session ~= nil then
 						local ok_sid, current = pcall(llm_progress.session_id)
@@ -534,8 +567,15 @@ function M.check_and_install_deps(on_complete)
 				-- Fast path can race with the proactive UI fallback (e.g. the
 				-- import probe took just over the threshold). Hide the UI so a
 				-- transient "Préparation en cours" stays out of the way once the
-				-- bootstrap is actually done.
-				pcall(llm_progress.hide)
+				-- bootstrap is actually done -- but ONLY if this checker still
+				-- owns the window. Unguarded, this closes a model download or an
+				-- Ollama bootstrap that claimed the shared surface meanwhile,
+				-- leaving it running with nothing on screen.
+				if owns_window() then
+					pcall(llm_progress.hide)
+				else
+					Logger.debug(LOG, "Fast-path hide skipped: the window now belongs to another operation.")
+				end
 			end
 			fire_pending_callbacks(true)
 		else

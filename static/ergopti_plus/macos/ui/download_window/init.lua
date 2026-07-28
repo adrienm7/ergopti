@@ -588,7 +588,19 @@ function M.complete(success, _model_name, error_kind)
     eval(js)
 
     if is_ok then
-        hs.timer.doAfter(4, M.hide)
+        -- Capture the session BEFORE arming, and hide only if it is unchanged.
+        -- This window is shared: a four-second timer belonging to a finished
+        -- operation otherwise closes whatever unrelated operation happens to own
+        -- the window when it fires. The session identity exists for exactly this
+        -- and was applied to one deferred-hide site; these two never got it.
+        local sid = M.session_id()
+        hs.timer.doAfter(4, function()
+            if M.session_id() ~= sid then
+                Logger.debug(LOG, "Auto-hide skipped: the window now belongs to a newer operation.")
+                return
+            end
+            pcall(M.hide)
+        end)
     end
 end
 
@@ -647,9 +659,16 @@ function M.set_error(msg)
     local text = type(msg) == "string" and msg or i18n.get("download_window.error_unknown")
     Logger.warn(LOG, "Progress UI flipped to error state: %s", text)
     eval(string.format("setError(%s)", js_str(text)))
+    -- Same session capture as M.complete: "_wv is non-nil" only proves SOME
+    -- window is open, not that it is still this operation's.
+    local sid = M.session_id()
     hs.timer.doAfter(ERROR_AUTO_DISMISS_SEC, function()
-        -- Only auto-dismiss if we are still in an error state for the same window
-        if _wv then pcall(M.hide) end
+        if not _wv then return end
+        if M.session_id() ~= sid then
+            Logger.debug(LOG, "Error auto-dismiss skipped: the window now belongs to a newer operation.")
+            return
+        end
+        pcall(M.hide)
     end)
 end
 
