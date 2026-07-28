@@ -1053,6 +1053,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_llm_callbacks_never_swallowed.ahk
 #Include meta/test_llm_inflight_hygiene.ahk
 #Include meta/test_wpm_widget_consistency.ahk
+#Include meta/test_marker_and_heatmap_completeness.ahk
 #Include meta/test_text_send_direct_mode_guarded.ahk
 #Include meta/test_http_post_reentrancy_guard.ahk
 #Include meta/test_personal_editor_autoexpand_i18n.ahk

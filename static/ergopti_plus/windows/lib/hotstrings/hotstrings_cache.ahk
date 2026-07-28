@@ -403,6 +403,12 @@ _HsCacheRegisterSection(LoaderKey, FeatureConfig, ExtraOptions, ResolvedPriority
 		if HasOnlyText
 			Opts["OnlyText"] := ExtraOptions["OnlyText"]
 		Trigger := StrReplace(Row[2], HS_CACHE_MARKER, MagicKey)
-		HSE_RegisterFromTomlFlags(Row[6], Row[1], Trigger, Row[3], Opts)
+		; The REPLACEMENT carries the marker too, and the preview index already
+		; substitutes it on both sides (hotstring_registry). Substituting only the
+		; trigger here meant a replacement containing the marker was previewed with
+		; the user's magic key and then EMITTED with a literal star — the tooltip
+		; promising one string and the engine typing another.
+		Output := StrReplace(Row[3], HS_CACHE_MARKER, MagicKey)
+		HSE_RegisterFromTomlFlags(Row[6], Row[1], Trigger, Output, Opts)
 	}
 }

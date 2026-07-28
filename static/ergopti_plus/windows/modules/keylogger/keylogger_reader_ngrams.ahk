@@ -143,6 +143,16 @@ KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset) {
     for r in SQLite_Query(db, kc_sql)
         out["kc"][String(r["keycode"])] := KLR_NewNgramItem(r["c"], 0, 0, "")
 
+    ; The scancode heatmap, mirroring the keycode projection above. The walker
+    ; WRITES ngram_scancodes and the live 500 ms path fills today, so the
+    ; dashboard looked populated — while this reader declared the "sc_kb" slot,
+    ; returned it empty, and left every historical and range scancode heatmap
+    ; blank. The macOS twin keys its heatmap on "kc", which IS read, so no amount
+    ; of cross-driver testing could surface a gap that exists only here.
+    sc_kb_sql := "SELECT scancode, SUM(c) AS c FROM ngram_scancodes" . where . " GROUP BY scancode"
+    for r in SQLite_Query(db, sc_kb_sql)
+        out["sc_kb"][String(r["scancode"])] := KLR_NewNgramItem(r["c"], 0, 0, "")
+
     return out
 }
 
