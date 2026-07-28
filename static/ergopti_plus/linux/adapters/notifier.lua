@@ -31,6 +31,10 @@ local LOG = "adapters.notifier"
 -- =============================================
 -- =============================================
 
+-- Set by M._set_runner(); see the seam in send(). Declared above every closure
+-- that reads it, so it can never be bound as a nil global.
+local _test_runner = nil
+
 -- Maps the port "kind" field to a notify-send --urgency value.
 -- D-Bus org.freedesktop.Notifications accepts low/normal/critical.
 local KIND_URGENCY = {
@@ -66,6 +70,14 @@ function M.send(title, opts)
 			"notify-send --urgency=%s '%s' '%s' 2>/dev/null",
 			urgency, safe_title, safe_body
 		)
+		-- Test seam: io.popen never RAISES on unescaped input, it executes it, so
+		-- a test that only checks "nothing crashed" passes whether or not the
+		-- escaping above exists. Handing the composed command over is the only
+		-- way a test can verify the quoting at all.
+		if _test_runner then
+			_test_runner(cmd)
+			return
+		end
 		local pipe = io.popen(cmd)
 		if pipe then pipe:close() end
 	end)
@@ -73,6 +85,18 @@ function M.send(title, opts)
 	if not ok then
 		Logger.error(LOG, "send(): notify-send failed — %s", tostring(err))
 	end
+end
+
+--- Installs a test runner: the composed command is handed to `fn` instead of
+--- being executed. Mirrors the injector's seam of the same name.
+--- @param fn function|nil Receives the command string; nil resets.
+function M._set_runner(fn)
+	_test_runner = (type(fn) == "function") and fn or nil
+end
+
+--- Restores real execution.
+function M._reset_runner()
+	_test_runner = nil
 end
 
 return M
