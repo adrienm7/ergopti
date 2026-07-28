@@ -408,6 +408,14 @@ local function start_watchers()
 		-- 54-60 are physical modifiers; the rest are owned by lib.keycodes.
 		local ignored_keycodes = {
 			54, 55, 56, 58, 59, 60,
+			-- Escape belongs to the persistent trap, not to this watcher. This tap
+			-- is created per render, so it is always NEWER than the trap and runs
+			-- first: dismissing here and returning false left the trap looking at
+			-- an already-invisible tooltip, which is its signal to pass Escape
+			-- through — and the keystroke reached the app, opening Raycast on
+			-- every dismissal after the first show. Ignoring it lets the trap see
+			-- a visible tooltip, consume the key, and reset the predictions.
+			Keycodes.ESCAPE,
 			Keycodes.F13_KARABINER_RETURN,
 			Keycodes.F14_KARABINER_BACKSPACE,
 			Keycodes.F15_KARABINER_ESCAPE,
