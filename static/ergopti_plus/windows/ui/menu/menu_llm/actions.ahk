@@ -115,13 +115,32 @@ LLM_Menu_OnToggle(*) {
 /**
  * Persists the current LLM tray state to the shared config TOML.
  * (_LLM_Menu_SyncToFeatures lives in persist.ahk, included by ui/menu/menu_llm.ahk before this file.)
+ *
+ * A failed write is NOT silent. TOML_BatchWrite returns false without throwing
+ * when the staging file cannot be opened or the atomic replace is refused, and
+ * the LLM live toggles are the one family that never reaches a Reload: they
+ * mutate _LLM_Menu in memory, re-init the engine and rebuild the menu in place.
+ * So a failed persist left memory, engine and menu agreeing on a state that
+ * existed nowhere on disk, and the next restart silently undid it. The bulk
+ * togglers and the gesture/metrics toggles do not have this problem precisely
+ * because they end in an unconditional Reload that re-reads the truth.
+ *
+ * Reload is therefore the recovery here too: the user sees their toggle revert,
+ * which is honest, instead of a setting that quietly forgets itself overnight.
+ *
+ * @returns {Boolean} True when the state reached disk (or the save was deferred
+ *                    because the driver is not ready yet).
  */
 LLM_Menu_SaveConfig() {
 	global _SaveFullConfigReady
-	if IsSet(_SaveFullConfigReady) && _SaveFullConfigReady {
-		_LLM_Menu_SyncToFeatures()
-		SaveFullConfig()
-	}
+	if !(IsSet(_SaveFullConfigReady) && _SaveFullConfigReady)
+		return true
+	_LLM_Menu_SyncToFeatures()
+	if SaveFullConfig()
+		return true
+	try LoggerError("LLM_Menu", "The LLM settings could not be written to config.toml. Reloading so the menu, the engine and the file agree again — the change has been discarded rather than shown as saved.")
+	Reload()
+	return false
 }
 
 LLM_Menu_OnInstantToggle(*) {

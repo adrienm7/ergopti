@@ -545,23 +545,30 @@ TOML_BatchWrite(Path, Updates) {
             global _ParseTomlCache
             if _ParseTomlCache.Has(Path)
                 _ParseTomlCache.Delete(Path)
+            ; Logged, not merely returned. This branch fails without throwing, and
+            ; every caller that discarded the boolean turned it into a silent
+            ; no-op: the menu and the engine went on showing a state that never
+            ; reached disk, with nothing in the log to explain the next restart.
+            try LoggerError("TomlWrite", "Cannot open the staging file for '{1}' — nothing was written and the change is NOT persisted.", Path)
             return false
         }
         f.Write(body)
         f.Close()
-    } catch {
+    } catch as Err {
         global _ParseTomlCache
         if _ParseTomlCache.Has(Path)
             _ParseTomlCache.Delete(Path)
+        try LoggerError("TomlWrite", "Writing the staging file for '{1}' failed: {2}. The change is NOT persisted.", Path, Err.Message)
         return false
     }
 	; Atomic replace: FileMove with overwrite=true swaps the file in one OS call.
 	; If the move fails, the original config.toml remains intact.
 	try FileMove(tmp, Path, true)
-	catch {
+	catch as Err {
 		global _ParseTomlCache
 		if _ParseTomlCache.Has(Path)
 			_ParseTomlCache.Delete(Path)
+		try LoggerError("TomlWrite", "Atomic replace of '{1}' failed: {2}. The previous contents are intact, so the change is NOT persisted.", Path, Err.Message)
 		return false
 	}
 
