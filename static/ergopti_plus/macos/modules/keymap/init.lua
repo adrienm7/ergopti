@@ -483,20 +483,10 @@ local function mapping_fires(m)
 	--   user-overridden group delay > TOML per-section delay > group delay > base.
 	-- A group delay that differs from its hardcoded default is treated as a user
 	-- override (priority 0) and wins over a per-section TOML value.
-	local specific_delay
-	if m.has_magic then
-		specific_delay = CoreState.DELAYS.STAR_TRIGGER
-	elseif m.group and CoreState.DELAYS[m.group] ~= nil
-		and CoreState.DELAYS_DEFAULT[m.group] ~= nil
-		and CoreState.DELAYS[m.group] ~= CoreState.DELAYS_DEFAULT[m.group] then
-		specific_delay = CoreState.DELAYS[m.group]
-	elseif m.section and CoreState.SECTION_DELAYS[m.section] then
-		specific_delay = CoreState.SECTION_DELAYS[m.section]
-	elseif m.group and CoreState.DELAYS[m.group] then
-		specific_delay = CoreState.DELAYS[m.group]
-	else
-		specific_delay = CoreState.BASE_DELAY_SEC
-	end
+	-- Resolved by CoreState so the PREVIEW gets the identical answer: it sizes
+	-- the row's lifetime from this, and a second implementation is exactly how
+	-- the tooltip came to promise expansions the engine would refuse.
+	local specific_delay = CoreState.resolve_mapping_delay(m)
 	-- Autocorrections are never stretched for complex keystrokes (they
 	-- fire on letter combos, not on modifier+letter sequences)
 	local allow_complex_delay = (m.group ~= "autocorrection")

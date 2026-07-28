@@ -451,8 +451,23 @@ function M.update_preview(buf)
 		end
 	end
 
+	-- The expansion engine is hard-blocked during the rescan-suppression window
+	-- that follows an expansion, so any hotstring row offered now names a trigger
+	-- that CANNOT fire. The user pressed the validation key, nothing happened,
+	-- and the window then wiped the buffer — the trigger was lost with no way to
+	-- retry it except retyping the whole word. Read from the same CoreState field
+	-- the tap tests, so the preview and the engine cannot disagree about whether
+	-- a trigger is live. Custom providers above are unaffected: they do not go
+	-- through the trigger engine.
+	local epoch_fn = (hs and hs.timer and hs.timer.secondsSinceEpoch) or os.time
+	local engine_blocked = epoch_fn() < (_state.no_rescan_until or 0)
+	if engine_blocked then
+		Logger.debug(LOG, "Preview: static mappings skipped — engine suppressed for %.3fs more.",
+			(_state.no_rescan_until or 0) - epoch_fn())
+	end
+
 	-- Walk static mappings via the tail-char indexes.
-	if #matches == 0 then
+	if #matches == 0 and not engine_blocked then
 		-- Guard against malformed UTF-8: LuaJIT raises a C-level error on bad sequences
 		local ok_poff, poff = pcall(utf8.offset, buf, -1)
 		if not ok_poff then poff = nil end
@@ -509,6 +524,10 @@ function M.update_preview(buf)
 							input      = star_base,
 							type       = "star",
 							group      = mapping.group,
+							-- Carried so the row's lifetime can be resolved through
+							-- the same precedence chain the engine applies.
+							section    = mapping.section,
+							has_magic  = mapping.has_magic,
 							-- Carried so the DEBUG sink below can honour the same
 							-- privacy contract the expander applies (acc7946fc).
 							is_private = mapping.is_private,
@@ -560,6 +579,8 @@ function M.update_preview(buf)
 							input      = matched_input,
 							type       = "autocorrect",
 							group      = mapping.group,
+							section    = mapping.section,
+							has_magic  = mapping.has_magic,
 							-- Same privacy contract as the star bucket above.
 							is_private = mapping.is_private,
 						}
@@ -624,9 +645,19 @@ function M.update_preview(buf)
 				if ok_cfg and cfg and cfg.show_tooltip == false then enabled = false end
 			end
 
-			local delay_key = is_star and "STAR_TRIGGER"
-				or (m.type == "autocorrect" and "autocorrection" or "dynamichotstrings")
-			local raw_delay = _state.DELAYS[delay_key] or 0
+			-- Sized by the SAME precedence chain the engine uses to decide
+			-- whether the trigger may still fire. The old three-way key
+			-- (STAR_TRIGGER / autocorrection / dynamichotstrings) ignored
+			-- per-section overrides and user-overridden group delays entirely, so
+			-- the row could vanish while its trigger was still live — or linger
+			-- after it had expired, offering an expansion the engine would refuse.
+			-- Providers do not go through that chain and keep the group default.
+			local raw_delay
+			if m.type == "provider" or type(_state.resolve_mapping_delay) ~= "function" then
+				raw_delay = _state.DELAYS["dynamichotstrings"] or 0
+			else
+				raw_delay = _state.resolve_mapping_delay(m) or 0
+			end
 			local row_timeout = raw_delay == 0 and INFINITE_TOOLTIP_SEC
 				or math.max(MIN_TOOLTIP_DURATION_SEC, raw_delay)
 
