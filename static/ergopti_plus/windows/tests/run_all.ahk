@@ -445,6 +445,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_clipboard_ram_leak.ahk
 #Include meta/test_space_tap_dispatch.ahk
 #Include meta/test_dispatch_verdict_consumed.ahk
+#Include meta/test_fire_log_never_synchronous.ahk
 #Include meta/test_roi_map_mutation_race.ahk
 #Include meta/test_deferred_registration_live_rebuild_race.ahk
 #Include meta/test_spotlight_non_blocking.ahk
