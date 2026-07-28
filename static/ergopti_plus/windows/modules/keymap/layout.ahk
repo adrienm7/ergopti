@@ -489,7 +489,16 @@ _EmitReachedScreen() {
 _LockWorkstationEmit(*) {
 	Critical("On")
 	DllCall("LockWorkStation")
-	HSE_FeedReset(false)
+	; IsPhysical=true. Locking is a real, user-initiated event, but the default
+	; false makes HSE_FeedReset a NO-OP whenever HSE_Suppressed is non-zero —
+	; that is, whenever Win+L lands inside the ~60 ms post-expansion suppress
+	; window, which is exactly when a lock is most likely to follow a burst of
+	; typing. The preview was wiped unconditionally on the line below, so the
+	; two buffers ended up disagreeing across the lock: stale left-context
+	; survived unlock and the first expansion afterwards backspaced into
+	; unrelated text. Every other genuinely-physical reset site passes true for
+	; the same reason.
+	HSE_FeedReset(false, true)
 	if IsSet(_ResetPrefixBuffer)
 		_ResetPrefixBuffer()
 }

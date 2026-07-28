@@ -105,7 +105,12 @@ _HSE_DispatchRawCallback(Spec, EndChar) {
             }
         }
     } finally {
-        if IsSet(_ResetPrefixBuffer) {
+        ; Gated on Fired. A raw callback that DECLINED changed nothing on screen:
+        ; the trigger characters are all still there and HSE_Buffer still holds
+        ; them (the branch above leaves it untouched). Wiping the preview anyway
+        ; made the tooltip describe a word the engine was still matching against,
+        ; so the suggestion vanished for text that would still have expanded.
+        if (Fired and IsSet(_ResetPrefixBuffer)) {
             try _ResetPrefixBuffer(true)
         }
         ; Release via the same path used to suppress — a single matched pair keeps

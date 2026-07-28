@@ -884,6 +884,29 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	}
 }
 
+; The trailing word of the ENGINE buffer, using the same boundary set the
+; preview uses. The two buffers deliberately hold different things: the engine
+; keeps the terminator and everything before it (a trigger may contain a
+; terminator as a non-final character), while the preview tracks only the word
+; being typed. Deriving one from the other is how they are reconciled without
+; the preview having to remember anything the engine already knows.
+_PrefixWordTailFromEngine() {
+	global HSE_Buffer, _MAX_BUFFER_LEN
+	if (!IsSet(HSE_Buffer) or HSE_Buffer == "")
+		return ""
+	Boundaries := _PrefixWordBoundaries()
+	Tail := ""
+	Loop StrLen(HSE_Buffer) {
+		Ch := SubStr(HSE_Buffer, -A_Index, 1)
+		if InStr(Boundaries, Ch)
+			break
+		Tail := Ch . Tail
+	}
+	if (StrLen(Tail) > _MAX_BUFFER_LEN)
+		Tail := SubStr(Tail, -_MAX_BUFFER_LEN)
+	return Tail
+}
+
 ; Shrink the watcher buffer by one character, mirroring HSE_FeedBackspace on the
 ; engine side so the tooltip keeps describing the same text the matcher will
 ; gate on. The tooltip is re-rendered from the shortened buffer rather than
@@ -895,8 +918,21 @@ _OnPrefixKeyDown(IH, VK, SC) {
 _PrefixFeedBackspace() {
 	global _PrefixBuffer
 	if (_PrefixBuffer == "") {
+		; Empty does not always mean "nothing to step back over". Typing a
+		; terminator resets the preview while the engine keeps it, so a backspace
+		; that deletes that terminator re-exposes the PREVIOUS word on the engine
+		; side and left the preview stranded at empty. The tooltip then stayed
+		; silent for a word the engine was still perfectly able to expand — and
+		; stayed silent for the rest of that word, because the preview could never
+		; catch back up. Recover it from the engine, which is the side that still
+		; knows what is on screen.
+		Recovered := _PrefixWordTailFromEngine()
 		TooltipHide("Backspace", true)
 		_NotifySuggestionDismissed()
+		if (Recovered == "")
+			return
+		_PrefixBuffer := Recovered
+		_PrefixScheduleRender()
 		return
 	}
 	_PrefixBuffer := SubStr(_PrefixBuffer, 1, StrLen(_PrefixBuffer) - 1)
