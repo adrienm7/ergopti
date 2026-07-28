@@ -73,7 +73,14 @@ _LLM_Menu_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 ; bypasses the menu entirely. Always armed (no #HotIf) so the user
 ; can rescue an LLM in a broken state without re-toggling anything.
 ^!+i:: {
-	LoggerInfo("LLM", "Debug hotkey Ctrl+Alt+Shift+I — direct install trigger.")
+	; try-wrapped like every other call in this handler. The hotkey is
+	; deliberately always armed (no #HotIf) so a broken LLM can be rescued, which
+	; also means it is live during Bundle_Init's message-pumping RunWait — before
+	; the logger's severity flags exist. A bare LoggerInfo there reads an unset
+	; global, throws inside a hotkey thread while _DriverBootPhase is still
+	; "starting", and the error net treats that as a fatal boot fault: pressing a
+	; debug rescue hotkey killed the boot it was meant to rescue.
+	try LoggerInfo("LLM", "Debug hotkey Ctrl+Alt+Shift+I — direct install trigger.")
 	try TrayTip(t("llm.deps.tray_title"), t("llm.deps.install_launching_hotkey"), 0x1)
 	try LLM_Menu_BootstrapOllama(true)
 }

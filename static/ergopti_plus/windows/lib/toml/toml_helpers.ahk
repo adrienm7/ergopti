@@ -764,7 +764,25 @@ ReadPathsToml(FilePath) {
     ; reader in this unit. A BOM-less paths.toml hand-saved as UTF-8 would otherwise
     ; be decoded with the system codepage, turning a non-ASCII ConfigDirPath
     ; (accented Windows home dir) into mojibake and silently losing the user's config.
-    loop parse, FileRead(FilePath, "UTF-8"), "`n", "`r" {
+    ; Guarded. This runs during the auto-execute section, BEFORE the logger is
+    ; initialised and while hotkeys registered at parse time are already armed —
+    ; so an unguarded throw here aborts the boot mid-way and leaves a resident
+    ; half-driver with a subset of hotkeys live. A locked paths.toml (a sync
+    ; client, an AV scan) is exactly the transient condition that triggers it.
+    ;
+    ; Returning the empty Map falls back to the default config directory, which
+    ; is the same behaviour as a paths.toml that exists but sets nothing. That is
+    ; safe here BECAUSE this file only ever redirects where config is READ from:
+    ; nothing serializes back through it, so there is no defaults-over-real-file
+    ; hazard of the kind the config readers have.
+    Content := ""
+    try {
+        Content := FileRead(FilePath, "UTF-8")
+    } catch as Err {
+        try LoggerError("TomlPaths", "Cannot read '{1}': {2}. Falling back to the default configuration directory for this session.", FilePath, Err.Message)
+        return Result
+    }
+    loop parse, Content, "`n", "`r" {
         Line := Trim(A_LoopField, " `t")
         if (Line == "" or SubStr(Line, 1, 1) == "#") {
             continue
