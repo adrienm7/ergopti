@@ -546,8 +546,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- toggling persisted preferences (e.g. logo variant)
 	M.refresh_icon = function() pcall(update_icon) end
 
-	local saved = Preferences.load(MenuPaths.get("ConfigTomlPath"))
-	local config_absent = (next(saved) == nil)
+	local saved, load_status = Preferences.load(MenuPaths.get("ConfigTomlPath"))
+	-- A CORRUPT file must never be treated as absent. Both yield an empty table,
+	-- but only "absent" means the user has no settings to lose: it seeds factory
+	-- defaults and then saves them, which on a corrupt file overwrites settings
+	-- that were still recoverable. Anything that is not positively absent is
+	-- therefore treated as present-but-unusable - defaults in memory for this
+	-- session, and nothing written back.
+	local config_absent = (load_status == "absent") and (next(saved) == nil)
 
 	if config_absent then
 		for _, f in ipairs(type(hotfiles) == "table" and hotfiles or {}) do
