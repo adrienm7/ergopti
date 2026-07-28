@@ -654,16 +654,27 @@ function M.warmup(model_name, profile)
 		_warmup_timeout = nil
 		if not _warmup_in_flight then return end
 		_warmup_in_flight = false
-		Logger.warn(LOG, "Warmup POST timed out after %.0fs — unblocking and retrying in 2s.",
-			WARMUP_POST_TIMEOUT_SEC)
+		-- Retire the generation before scheduling the retry. Abandoning a POST does
+		-- not stop the server answering it, and without this bump that late reply
+		-- still matched the generation check and flipped _is_ready — describing a
+		-- request nobody was waiting for any more, on behalf of the retry that had
+		-- meanwhile taken its place.
+		_warmup_gen = _warmup_gen + 1
+		Logger.warn(LOG, "Warmup POST timed out after %.0fs — unblocking and retrying in 2s (gen %d).",
+			WARMUP_POST_TIMEOUT_SEC, _warmup_gen)
 		TimerScheduler.after(2, function() M.warmup(model_name, profile) end)
 	end)
 	_warmup_timeout = _wt_handle
 	_warmup_client.post(endpoint, { ["Content-Type"] = "application/json" }, payload,
 		function(r)
 			local status, body = r.status, r.body
-			if _warmup_timeout then
-				TimerScheduler.cancel(_warmup_timeout)
+			-- Cancel THIS request's timeout, not whichever one happens to be
+			-- stored. After a timeout-triggered retry the slot holds the NEW
+			-- POST's timer, so a late reply from the abandoned request disarmed
+			-- the live request's only hard timeout — and warmup POSTs piled up
+			-- with nothing left to bound them.
+			if _warmup_timeout == _wt_handle then
+				TimerScheduler.cancel(_wt_handle)
 				_warmup_timeout = nil
 			end
 			-- Discard a stale warmup: a reset/load-failure since this POST was issued

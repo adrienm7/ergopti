@@ -240,6 +240,18 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
 	local timeout_handle = TimerScheduler.after(NON_STREAM_TIMEOUT_SEC, function()
 		if done then return end
 		done = true
+		-- A SUPERSEDED request must not report failure. Nothing cancels this timer
+		-- when a newer request starts, so it still fired eight seconds later and
+		-- called on_fail — and on_fail is a retry path, which cancels streaming
+		-- and tore down the transport of the request that is actually live. The
+		-- abandoned request killed its successor. req_id against the counter is
+		-- the identity: a newer request exists precisely when the counter has
+		-- moved past this one.
+		if req_id ~= _req_counter then
+			Logger.debug(LOG, "[%s] #%d timeout ignored — superseded by #%d.",
+				model_name, req_id, _req_counter)
+			return
+		end
 		Logger.warn(LOG, "[%s] #%d TIMEOUT after %.0fs", model_name, req_id, NON_STREAM_TIMEOUT_SEC)
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 	end)
