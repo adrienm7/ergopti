@@ -546,6 +546,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_remote_poll_com_exception_bails.ahk
 #Include meta/test_cle_emoji_gated.ahk
 #Include meta/test_hse_consumed_endchar_ring.ahk
+#Include meta/test_expansion_burst_atomic.ahk
 #Include meta/test_parsetomlfile_unterminated_array_recovers.ahk
 #Include meta/test_dispatcher_register_duplicate_label.ahk
 #Include meta/test_updater_cancel_fires_on_json.ahk
