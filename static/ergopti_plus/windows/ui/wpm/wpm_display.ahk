@@ -360,10 +360,20 @@ _WPMWidget_NormaliseHex(AccentHex, FallbackHex) {
         Max(0, Min(255, Round((Nb + M) * 255))))
 }
 
-; Read the [_meta] color for a hotstring category directly from the TOML file,
-; bypassing HotstringGroupConfig cache to avoid stale empty entries from early
-; init calls before _SharedDir was fully resolved.
-; Returns "" when the file is absent or has no color key.
+; Resolve the color for a hotstring category.
+;
+; The USER OVERRIDE comes first. Reading the TOML file directly — which is all
+; this used to do — sees only what is on disk, so a color changed in the config
+; window sat in _HotstringsOverrides and never reached the widget until the next
+; reload: the tooltip repainted immediately and the widget did not, from the same
+; edit. HotstringsResolve owns the full cascade (user section > user category >
+; TOML section > TOML category > default) and is the single place that knows
+; about overrides at all.
+;
+; The direct TOML read remains as the FALLBACK, which is the case the bypass was
+; written for: during early init _SharedDir may not be resolved yet and the
+; resolver would hand back a stale empty entry.
+; Returns "" when neither source has a color.
 ; Results are memoized in a static Map keyed by CategoryName; call
 ; WPMWidget_InvalidateColorCache() to flush the cache after a TOML save.
 _WPMWidget_ReadTomlColor(CategoryName, InvalidateCache := false) {
@@ -374,6 +384,19 @@ _WPMWidget_ReadTomlColor(CategoryName, InvalidateCache := false) {
     }
     if _color_cache.Has(CategoryName)
         return _color_cache[CategoryName]
+
+    ; Ask the override-aware resolver first. Not memoised in _color_cache: an
+    ; override can change at any moment from the config window, and caching it
+    ; here would re-create the very staleness this fixes. The resolver has its
+    ; own memoisation, invalidated when overrides change.
+    if (CategoryName != "" and IsSet(HotstringsResolve)) {
+        try {
+            Resolved := HotstringsResolve(CategoryName, "")
+            if (IsObject(Resolved) and Resolved.HasOwnProp("Color") and Resolved.Color != "")
+                return Resolved.Color
+        }
+    }
+
     global _SharedDir, GLOBAL_DEFAULT_COLOR
     FilePath := _SharedDir . "\modules\hotstrings\" . StrLower(CategoryName) . ".toml"
     if !FileExist(FilePath) {
@@ -783,8 +806,15 @@ WPMWidget_Tick() {
             label  := wpm_str . " " . t("menu.metrics.wpm_unit")
             WPMWidget_RenderGraph(label, accent)
             GR_Show(WPMWidget._graph_gui.Hwnd)
-        } catch {
+        } catch as _e {
+            ; Mirrors the compact-mode sibling below: LOG the failure and rebuild.
+            ; A bare catch that only dropped the handle left the widget dead until
+            ; the user happened to toggle the mode by hand, with nothing anywhere
+            ; to say a render had thrown — the two branches of the same tick
+            ; behaved differently for no reason anyone chose.
+            try LoggerError("WPMWidget", "Graph mode tick threw — rebuilding widget: {1}.", _e.Message)
             WPMWidget._graph_gui := false
+            try WPMWidget_BuildGraph()
         }
     } else {
         bg_color := WPMWidget_ResolveBgColor(is_idle, has_hs, has_ai, has_ac, WPMWidget.use_colors)
