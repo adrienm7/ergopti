@@ -142,7 +142,7 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
                                temperature, num_predict_tokens, num_predictions, is_batch,
                                on_success, on_fail, dedup_stats, force_line_mode)
     if not require_ctx("post_and_parse") then
-        if type(on_fail) == "function" then pcall(on_fail) end
+        if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
         return
     end
     _req_counter = _req_counter + 1
@@ -232,7 +232,7 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
 	local encoded, enc_err = JsonCodec.encode(payload)
 	if not encoded then
 		Logger.error(LOG, "Failed to encode MLX payload — %s", tostring(enc_err))
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 
@@ -241,7 +241,7 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
 		if done then return end
 		done = true
 		Logger.warn(LOG, "[%s] #%d TIMEOUT after %.0fs", model_name, req_id, NON_STREAM_TIMEOUT_SEC)
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 	end)
 
 	_infer_client.post(endpoint, { ["Content-Type"] = "application/json" }, encoded,
@@ -253,14 +253,14 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
 
 			if status ~= 200 then
 				Logger.error(LOG, "MLX HTTP %s :: %s", tostring(status), tostring((body or ""):sub(1, 260)))
-				if type(on_fail) == "function" then pcall(on_fail) end
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 				return
 			end
 
 			local resp, _ = JsonCodec.decode(body)
 			if type(resp) ~= "table" or type(resp.choices) ~= "table" or not resp.choices[1] then
                 Logger.debug(LOG, "[%s] #%d Unusable response (decode/choices), body='%s'", model_name, req_id, tostring((body or ""):sub(1, 220)))
-				if type(on_fail) == "function" then pcall(on_fail) end
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 				return
 			end
 
@@ -295,7 +295,7 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
                     Logger.debug(LOG, "[%s] #%d Reasoning-only response detected (empty content).", model_name, req_id)
                 end
                 Logger.debug(LOG, "[%s] #%d Empty content in choices[1]", model_name, req_id)
-                if type(on_fail) == "function" then pcall(on_fail) end
+                if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
                 return
             end
 
@@ -317,7 +317,7 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
 
             if #results == 0 then
                 Logger.debug(LOG, "[%s] #%d PARSED -> 0 result (parser failure)", model_name, req_id)
-                if type(on_fail) == "function" then pcall(on_fail) end return
+                if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end return
             end
             Logger.debug(LOG, "[%s] #%d PARSED -> %d result(s)", model_name, req_id, #results)
             if keylogger and type(keylogger.log_llm) == "function" then
@@ -328,7 +328,7 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
                     user_prompt   = user_prompt,
                 })
             end
-			if type(on_success) == "function" then pcall(on_success, results) end
+			if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results) end
 		end
 	)
 end
@@ -353,7 +353,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
                                          temperature, num_predict_tokens, num_predictions, is_batch,
                                          on_success, on_fail, dedup_stats, on_partial)
 	if not require_ctx("post_and_parse_streaming") then
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 	-- Supersede any previous stream: always terminate to free the MLX server connection
@@ -458,7 +458,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	local encoded, enc_err = JsonCodec.encode(payload)
 	if not encoded then
 		Logger.error(LOG, "Failed to encode MLX streaming payload — %s", tostring(enc_err))
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 
@@ -477,7 +477,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	local fh = io.open(tmp_path, "w")
 	if not fh then
 		Logger.error(LOG, "Failed to open temp file '%s' for MLX streaming payload.", tmp_path)
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 	fh:write(encoded)
@@ -560,7 +560,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 			appended = true
 		end
 		if appended and type(on_partial) == "function" then
-			pcall(on_partial, accumulated)
+			ApiCommon.protected_call(on_partial, "on_partial", accumulated)
 		end
 	end
 
@@ -598,7 +598,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 				_ctx.stream.task.terminate()
 				_ctx.stream.task       = nil
 				_ctx.stream.has_chunks = false
-				if type(on_fail) == "function" then pcall(on_fail) end
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 			end
 		end)
 	end
@@ -674,7 +674,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 
 		if accumulated == "" then
 			Logger.warn(LOG, "[%s] #%d STREAM: empty accumulation — on_fail.", model_name, req_id)
-			if type(on_fail) == "function" then pcall(on_fail) end
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 			return
 		end
 
@@ -696,7 +696,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 
 		if #results == 0 then
 			Logger.debug(LOG, "[%s] #%d STREAM: parse yielded 0 result(s).", model_name, req_id)
-			if type(on_fail) == "function" then pcall(on_fail) end
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 			return
 		end
 		Logger.debug(LOG, "[%s] #%d STREAM: %d result(s).", model_name, req_id, #results)
@@ -713,7 +713,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 					or nil,
 			})
 		end
-		if type(on_success) == "function" then pcall(on_success, results) end
+		if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results) end
 	end
 
 	if _ctx.stream.timeout then

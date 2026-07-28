@@ -297,6 +297,7 @@ M.api_remote = ApiRemote
 local API_ENTRIES_KEY    = "llm_api_entries"
 local API_ENTRY_ID_KEY   = "llm_api_entry_id"
 local TokenCrypto = require("modules.llm.api_token_crypto")
+local ApiCommon = require("modules.llm.api_common")
 
 --- Load persisted API entries from hs.settings and seed the remote backend.
 --- Idempotent — calling it more than once just refreshes the in-memory state
@@ -654,7 +655,7 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
 								or configured_name:find(name, 1, true)))
 						if path_match or bid_match or name_match then
 						Logger.info(LOG, "Prediction aborted due to application blacklist.")
-						if type(on_fail) == "function" then pcall(on_fail) end
+						if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 						return
 						end
 					end

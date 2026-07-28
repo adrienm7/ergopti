@@ -573,17 +573,17 @@ end
 function M.check_availability(_model_name, on_available, on_missing)
 	local entry = M.get_active_entry()
 	if not entry then
-		if type(on_missing) == "function" then pcall(on_missing, true) end
+		if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
 		return
 	end
 	local provider = M.PROVIDERS[entry.provider]
 	if not provider then
-		if type(on_missing) == "function" then pcall(on_missing, true) end
+		if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
 		return
 	end
 	local base = (entry.base_url and entry.base_url ~= "") and entry.base_url or provider.base_url
 	if base == "" or (entry.token or "") == "" then
-		if type(on_missing) == "function" then pcall(on_missing, true) end
+		if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
 		return
 	end
 
@@ -598,9 +598,9 @@ function M.check_availability(_model_name, on_available, on_missing)
 
 	_check_client.get(url, build_headers(format, entry.token), function(r)
 		if r.ok then
-			if type(on_available) == "function" then pcall(on_available) end
+			if type(on_available) == "function" then ApiCommon.protected_call(on_available, "on_available") end
 		else
-			if type(on_missing) == "function" then pcall(on_missing, r.status == 0) end
+			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", r.status == 0) end
 		end
 	end)
 end
@@ -626,18 +626,18 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                                on_success, on_fail, dedup_stats)
 	local entry = M.get_active_entry()
 	if not entry then
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 	local provider = M.PROVIDERS[entry.provider]
 	if not provider then
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 	local base = (entry.base_url and entry.base_url ~= "") and entry.base_url or provider.base_url
 	local model = (model_name and model_name ~= "") and model_name or (entry.model and entry.model ~= "" and entry.model) or provider.default_model
 	if base == "" or model == "" then
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 
@@ -673,7 +673,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 	local encoded, enc_err = JsonCodec.encode(payload)
 	if not encoded then
 		Logger.error(LOG, "[%s] #%d Payload encode failed — %s", model, req_id, tostring(enc_err))
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 
@@ -705,7 +705,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 						elapsed_ms     = ms,
 					})
 				end
-				if type(on_fail) == "function" then pcall(on_fail) end
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 				return
 			end
 
@@ -722,7 +722,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 						elapsed_ms     = ms,
 					})
 				end
-				if type(on_fail) == "function" then pcall(on_fail) end
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 				return
 			end
 
@@ -751,7 +751,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 						elapsed_ms     = ms,
 					})
 				end
-				if type(on_fail) == "function" then pcall(on_fail) end
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 				return
 			end
 
@@ -775,7 +775,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 					elapsed_ms        = ms,
 				})
 			end
-			if type(on_success) == "function" then pcall(on_success, results) end
+			if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results) end
 		end)
 	end)
 end
@@ -830,12 +830,12 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 					local subset = {}
 					for j = 1, idx do subset[j] = results[j] end
 					local is_final = (idx == #results)
-					if type(on_success) == "function" then pcall(on_success, subset, ms, is_final, not is_final) end
+					if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", subset, ms, is_final, not is_final) end
 					if not is_final then TimerScheduler.after(0, function() reveal_next(idx + 1) end) end
 				end
 				reveal_next(1)
 			else
-				if type(on_success) == "function" then pcall(on_success, results, ms, true) end
+				if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results, ms, true) end
 			end
 		end,
 		on_fail, dedup_stats)
@@ -869,12 +869,12 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 		end
 		if #results >= requested_predictions or attempt_index > max_attempts then
 			if #results == 0 then
-				if type(on_fail) == "function" then pcall(on_fail) end
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 				return
 			end
 			ApiCommon.log_prediction_summary(Logger, LOG, "sequential", requested_predictions, dedup_stats, #results)
 			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
-			if type(on_success) == "function" then pcall(on_success, results, ms, true) end
+			if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results, ms, true) end
 			return
 		end
 		local variant_index = attempt_index
@@ -890,7 +890,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 						if #results < requested_predictions then
 							ApiCommon.insert_prediction(results, preds[1], dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG)
 							local ms = math.floor((TimerScheduler.now() - t0) * 1000)
-							if type(on_success) == "function" then pcall(on_success, results, ms, false) end
+							if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results, ms, false) end
 						end
 					end
 					do_next()
