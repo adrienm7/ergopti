@@ -478,10 +478,17 @@ SaveFullConfig() {
     PrevCanonState := _TOML_STRICT_CANON_IN_PROGRESS
     _TOML_STRICT_CANON_IN_PROGRESS := true
     try {
-        TOML_BatchWrite(ConfigurationFile, Updates)
+        ; RETURNED, not discarded. TOML_BatchWrite fails without throwing when
+        ; the staging file cannot be opened or the atomic replace is refused, and
+        ; every caller that dropped this boolean turned that into a silent no-op:
+        ; the live toggles mutate memory, re-init the engine and rebuild the menu
+        ; with no Reload, so memory, engine and menu all showed a state that never
+        ; reached disk — and the next restart silently undid it.
+        Written := TOML_BatchWrite(ConfigurationFile, Updates)
     } finally {
         _TOML_STRICT_CANON_IN_PROGRESS := PrevCanonState
     }
+    return Written
 }
 
 _CollectFeatureUpdates(Updates, SectionPath, Node) {

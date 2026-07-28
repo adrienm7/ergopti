@@ -399,7 +399,16 @@ _HS_TryLiveToggleV2(V2Path) {
 	NewEnabled := !(State.Has("enabled") and State["enabled"])
 	; WriteFeatureV2 mutates the in-memory Features node AND persists to disk, so
 	; the rebuild below re-reads the new value with no Reload.
-	WriteFeatureV2(Features, V2Path, NewEnabled)
+	;
+	; Returning false on a failed persist hands the toggle back to the caller's
+	; Reload path, which re-reads the truth from disk. Ignoring the result made
+	; this the only toggle family that could no-op in silence: the bulk siblings
+	; report their write result, and the ~1.3 s engine rebuild below was paid in
+	; full for a change that never left memory.
+	if !WriteFeatureV2(Features, V2Path, NewEnabled) {
+		try LoggerError("Menu", "Live-toggle (v2) for '{1}' could not be persisted — falling back to a reload so the menu and the engine match what is actually on disk.", V2Path)
+		return false
+	}
 	RebuildHotstringsLive()
 	return true
 }
