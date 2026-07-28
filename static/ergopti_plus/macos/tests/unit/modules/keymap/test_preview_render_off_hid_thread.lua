@@ -88,12 +88,13 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 		local src = helpers.read_driver_source("_preview_render_generation")
 		local code = src:gsub("%-%-[^\n]*", "")
 
-		-- Each tooltip.hide() in this module is a dismissal, and a render already
-		-- waiting on its tick would land right after it and put the tooltip back.
+		-- Every dismissal in this module counts, in BOTH spellings: hide() and the
+		-- forced variant the preview-disable setters use. A render already waiting
+		-- on its tick would land right after either one and put the tooltip back.
 		local hides, guarded = 0, 0
 		local pos = 1
 		while true do
-			local at = code:find("tooltip.hide()", pos, true)
+			local at = code:find("tooltip.hide", pos, true)
 			if not at then break end
 			pos = at + 1
 			hides = hides + 1

@@ -450,11 +450,11 @@ twice). All confirmed via two lenses; each carries a repro + fix in the journal.
 | G3/C | `macos/modules/keymap/init.lua:704` | Synthetic Tab/Return echoes are consumed by `handle_llm_keys` as prediction-accept while predictions are visible → LLM text injected mid-expansion. |
 | G4/D | `macos/modules/keymap/utils.lua:435` | `is_ignored_window` runs synchronous AX probes inside the keyDown tap on every cache miss and every 5 s TTL expiry. |
 | G2/F | `macos/modules/keymap/input_sources.lua:708` | `upgrade_active_list` parses `<n>/<n>` but AppleScript returns a list (`1, /, 2`) → successful layout upgrades reported as failures. |
-| G5/G | `macos/modules/keymap/llm_bridge.lua:501` | `would_fire`'s no-op returns a truthy 2nd value → the preview builds a **nil-text** row that crashes `render_stacked` and silently kills the whole preview stack. |
-| G5/G | `macos/modules/keymap/llm_bridge.lua:524` | Stacked star rows label the validation key with a hard-coded `★` instead of `CoreState.magic_key` — wrong after the user customises the magic key. |
+| [x] G5/G | `macos/modules/keymap/llm_bridge.lua:501` | `would_fire`'s no-op returns a truthy 2nd value → the preview builds a **nil-text** row that crashes `render_stacked` and silently kills the whole preview stack. |
+| [x] G5/G | `macos/modules/keymap/llm_bridge.lua:524` | Stacked star rows label the validation key with a hard-coded `★` instead of `CoreState.magic_key` — wrong after the user customises the magic key. |
 | G5/C | `macos/modules/keymap/llm_bridge.lua:345` | Preview offers rows during the rescan-suppression window in which the engine is hard-blocked; the trigger is then lost forever. |
 | G5/G | `macos/modules/keymap/llm_bridge.lua:566` | Preview tooltip lifetime uses a coarse 3-way delay key while the engine gate uses the per-mapping precedence chain — they can diverge. |
-| G5/F | `macos/modules/keymap/llm_bridge.lua:225` | Preview-toggle setters call dequeue-guarded `tooltip.hide()` → a stale preview survives the settings change (missed sibling). |
+| [x] G5/F | `macos/modules/keymap/llm_bridge.lua:225` | Preview-toggle setters call dequeue-guarded `tooltip.hide()` → a stale preview survives the settings change (missed sibling). |
 | G2/C | `macos/modules/llm/api_mlx_fetch.lua:238` | A superseded MLX request's un-cancelled 8 s timeout fires `on_fail` → an unguarded retry cancels the **live** request's transport. |
 | [x] G3/E | `macos/modules/shortcuts/script_control.lua:210` | Ollama warmup is not parked during pause: `pause_all` misses `api_ollama.stop_warmup`; `set_llm_model`/`set_active_profile` lack pause guards. |
 | [x] G2/F | `macos/modules/llm/mlx_deps_checker.lua:538` | The MLX deps-checker fast-path hide is not session-owner-guarded → closes another operation's progress window (sibling of `f239b252d`). |
