@@ -38,6 +38,7 @@ local engine           = require("modules.llm.prediction_engine")
 local Registry         = require("modules.keymap.registry")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local expander         = require("modules.keymap.expander")
+local TimerScheduler   = require("adapters.timer_scheduler")
 
 local LOG    = "keymap.llm_bridge"
 local _state = nil  -- Shared CoreState, injected via M.init().
@@ -108,6 +109,31 @@ local last_shown_hotstring = nil
 -- Inserting a new eventtap at HEAD ensures it fires before any pre-existing tap (e.g. Raycast).
 -- The trap checks tooltip.is_visible() at runtime so it never needs to be disarmed.
 local _escape_trap = nil
+
+-- Identity of the most recently REQUESTED preview render.
+--
+-- The hotstring preview used to render synchronously inside the HID callback,
+-- and rendering is not cheap: resolving the anchor performs cross-process
+-- accessibility IPC and creates and destroys eventtaps, on EVERY preview
+-- keystroke. Against a beach-balling front app that IPC blocks until the AX
+-- timeout, which is long enough for macOS to disable the whole keyboard tap for
+-- being unresponsive — taking the driver down with it. The render is therefore
+-- deferred by one runloop tick, exactly as the LLM tooltip already defers its
+-- own re-renders.
+--
+-- Deferring introduces a gap in which the preview can be superseded or
+-- dismissed, so each request is stamped: a pending render that is no longer the
+-- newest drops itself rather than resurrecting a tooltip the user has already
+-- dismissed or replaced. Declared above every closure that reads it — a local
+-- declared below one binds a nil global instead.
+local _preview_render_generation = 0
+
+--- Invalidates any preview render still waiting on its deferral tick.
+--- Called wherever the tooltip is hidden or the predictions reset, so a render
+--- requested moments earlier cannot land afterwards.
+local function invalidate_pending_preview()
+	_preview_render_generation = _preview_render_generation + 1
+end
 
 -- ── Preview visibility toggles ────────────────────────────────────────────────
 -- Initial values are set in M.init() from the keymap defaults passed by keymap/init.lua.
@@ -222,7 +248,7 @@ end
 function M.set_preview_star_enabled(v)
 	is_star_preview_enabled = (v == true)
 	Logger.debug(LOG, "Star preview: %s.", is_star_preview_enabled and "on" or "off")
-	if not v then tooltip.hide() end
+	if not v then invalidate_pending_preview(); tooltip.hide() end
 end
 
 --- Enables or disables the autocorrect hotstring preview tooltip.
@@ -230,7 +256,7 @@ end
 function M.set_preview_autocorrect_enabled(v)
 	is_autocorrect_preview_enabled = (v == true)
 	Logger.debug(LOG, "Autocorrect preview: %s.", is_autocorrect_preview_enabled and "on" or "off")
-	if not v then tooltip.hide() end
+	if not v then invalidate_pending_preview(); tooltip.hide() end
 end
 
 --- Enables or disables the AI prediction tooltip.
@@ -246,7 +272,7 @@ function M.set_preview_enabled(enabled)
 	is_star_preview_enabled        = (enabled == true)
 	is_autocorrect_preview_enabled = (enabled == true)
 	Logger.debug(LOG, "All hotstring tooltips: %s.", enabled and "on" or "off")
-	if not enabled then tooltip.hide() end
+	if not enabled then invalidate_pending_preview(); tooltip.hide() end
 end
 
 --- Enables or disables background tinting for all tooltip types.
@@ -255,6 +281,9 @@ end
 function M.set_preview_colored_tooltips(v)
 	tooltip.set_colorization_enabled(v == true)
 	Logger.debug(LOG, "Colored tooltips: %s.", v and "on" or "off")
+	-- The hide clears the surface so the new tint applies to the next render; a
+	-- render still waiting on its tick would repaint it with the old one.
+	invalidate_pending_preview()
 	tooltip.hide()
 end
 
@@ -604,7 +633,15 @@ function M.update_preview(buf)
 		tooltip.set_timeout(tooltip_timeout)
 
 		if any_enabled then
-			tooltip.show_stacked(rows, true)
+			-- Off the HID thread: see _preview_render_generation. One runloop tick
+			-- is imperceptible for a preview; a blocked AX query on this thread is
+			-- not — it can trip the tap-timeout that disables the keyboard tap.
+			invalidate_pending_preview()
+			local my_generation = _preview_render_generation
+			TimerScheduler.after(0, function()
+				if my_generation ~= _preview_render_generation then return end
+				tooltip.show_stacked(rows, true)
+			end)
 		end
 
 		-- Chain: arm the LLM timer so it fires just as the tooltip window closes.
@@ -707,6 +744,9 @@ end
 --- Clears all active predictions and optionally emits hotstring-dismissed telemetry.
 --- @param keep_hotstring_log boolean When true, skips the dismiss telemetry event.
 function M.reset_predictions(keep_hotstring_log)
+	-- A preview render requested a tick ago must not land after this reset and
+	-- put the tooltip back on screen.
+	invalidate_pending_preview()
 	if not keep_hotstring_log and last_shown_hotstring then
 		keylogger.log_hotstring_dismissed(nil,
 			last_shown_hotstring.trigger,
