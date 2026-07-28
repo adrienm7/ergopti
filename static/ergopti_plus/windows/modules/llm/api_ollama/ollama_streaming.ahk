@@ -194,12 +194,18 @@ LLM_OllamaCancelAsync(req_id) {
 	if !_LLM_Ollama_Async.Has(req_id)
 		return
 	entry := _LLM_Ollama_Async[req_id]
+	; Flip the flag inline — the poll ticks read it — but defer the kill, exactly
+	; as the plural sibling does. This runs under the per-keystroke Critical,
+	; where a blocking TerminateProcess starves the keyboard hook.
 	entry["cancelled"] := true
-	if entry.Has("http") {
-		try entry["http"].Abort()
-	} else if entry.Has("pid") and entry["pid"] > 0 {
-		try ProcessClose(entry["pid"])
-	}
+	Kills := []
+	if (entry.Has("pid") and entry["pid"] > 0)
+		Kills.Push(Map("pid", entry["pid"]))
+	; The former entry.Has("http") branch was dead here for the same reason it was
+	; dead in the plural: _LLM_Ollama_Async entries are created at one site that
+	; carries no "http" key, and the live Ollama transport is curl. Removed rather
+	; than left as a shim that reads like a supported path.
+	LLM_DeferCancelKills(Kills)
 }
 
 /**
@@ -458,7 +464,20 @@ _LLM_Ollama_PollGeneric(http, on_ok, on_err, start_tick := 0, timeout_ms := 0, p
 		poll_ms := LLM_OLLAMA_POLL_MS
 
 	ready := false
-	try ready := http.WaitForResponse(0)
+	try {
+		ready := http.WaitForResponse(0)
+	} catch as com_err {
+		; Same abandonment contract as the two sibling polls. A COM exception here
+		; means the connection dropped (WiFi cut, Ollama restarted): the bare `try`
+		; this replaces swallowed it and re-queued, so a dead request kept polling
+		; every 50 ms until the 90 s deadline — a busy-loop against a socket that
+		; was never going to answer, with no diagnostic anywhere
+		; (ollama-com-exception-busy-loop).
+		try LoggerWarn("LLM.ollama", "WaitForResponse threw COM error in poll — abandoning: {1}", com_err.Message)
+		try http.Abort()
+		_LLM_InvokeCallback(on_err, "on_err")
+		return
+	}
 	if !ready {
 		if _LLM_DeadlineExpired(start_tick, timeout_ms) {
 			; Abort the in-flight request before dropping our reference — a

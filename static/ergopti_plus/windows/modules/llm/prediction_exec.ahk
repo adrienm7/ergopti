@@ -467,8 +467,7 @@ _LLM_Engine_DispatchBatch(state) {
 
 _LLM_Engine_OnBatchSuccess(state, text, meta := "") {
 	global _LLM_Engine
-	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	if (state["request_id"] != current_id)
+	if !_LLM_Engine_IsCurrent(state)
 		return
 	; Capture per-request token usage when the backend provided it. Same
 	; structure as the sequential path so the finalize step can emit a
@@ -490,8 +489,7 @@ _LLM_Engine_OnBatchFail(state) {
 	; of the first attempt. Let the tooltip fade via its auto-dismiss
 	; timer instead.
 	global _LLM_Engine
-	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	if (state["request_id"] != current_id)
+	if !_LLM_Engine_IsCurrent(state)
 		return
 	; Keep slots empty + finalize so any subsequent cache hit is consistent.
 	state["slots"]       := []
@@ -541,8 +539,7 @@ _LLM_Engine_DispatchVariant(state) {
 	; Bail if a newer request has been fired since this variant was queued —
 	; the closure may have been pending on the SetTimer queue and now lands
 	; into stale context.
-	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	if (state["request_id"] != current_id)
+	if !_LLM_Engine_IsCurrent(state)
 		return
 
 	; Done? Either we got enough predictions or we ran out of attempts.
@@ -617,8 +614,7 @@ _LLM_Engine_DispatchVariant(state) {
 ; comparison is meaningful.
 _LLM_Engine_OnStreamPartial(state, slot_idx, partial) {
 	global _LLM_Engine
-	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	if (state["request_id"] != current_id)
+	if !_LLM_Engine_IsCurrent(state)
 		return
 	preview := []
 	for _, s in state["slots"]
@@ -635,8 +631,7 @@ _LLM_Engine_OnStreamPartial(state, slot_idx, partial) {
 
 _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 	global _LLM_Engine
-	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	if (state["request_id"] != current_id) {
+	if !_LLM_Engine_IsCurrent(state) {
 		try LoggerInfo("LLM", "Variant success ignored — superseded by newer typing.")
 		return
 	}
@@ -688,8 +683,7 @@ _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 
 _LLM_Engine_OnVariantFail(state, failure := "") {
 	global _LLM_Engine
-	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	if (state["request_id"] != current_id) {
+	if !_LLM_Engine_IsCurrent(state) {
 		try LoggerInfo("LLM", "Variant failure ignored — superseded by newer typing.")
 		return
 	}
@@ -714,10 +708,29 @@ _LLM_Engine_OnVariantFail(state, failure := "") {
 	_LLM_Engine_DispatchVariant(state)
 }
 
-_LLM_Engine_FinalizeRequest(state) {
+/**
+ * True while `state` still describes the request the engine is waiting for.
+ *
+ * The engine bumps ``request_id`` on every fire, so a callback that was queued
+ * before the newest keystroke must not act. The check had four copies of the
+ * same expression and — more importantly — was only ever evaluated at callback
+ * ENTRY: finalization logs, hides tooltips and calls into the keylogger before
+ * it renders, and any of those can yield long enough for a keystroke to
+ * supersede the request. The render then painted a prediction for text the user
+ * had already moved past, and re-seeded the cache with that stale context so
+ * the NEXT prediction inherited it too.
+ * @param {Map} state The per-request state carried by the callback.
+ * @returns {Integer} 1 when the request is still current.
+ */
+_LLM_Engine_IsCurrent(state) {
 	global _LLM_Engine
 	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	if (state["request_id"] != current_id)
+	return (state["request_id"] == current_id)
+}
+
+_LLM_Engine_FinalizeRequest(state) {
+	global _LLM_Engine
+	if !_LLM_Engine_IsCurrent(state)
 		return
 	if (state["slots"].Length == 0) {
 		; Every variant failed — log a single ``llm_generation_failed`` so
@@ -741,6 +754,15 @@ _LLM_Engine_FinalizeRequest(state) {
 				"failure_reason", "all_variants_failed"
 			))
 		}
+		return
+	}
+	; Re-checked HERE, not only at entry. Everything between the two — the
+	; summary log, the tooltip hide on the empty-slot path, the keylogger write —
+	; can yield, and a keystroke arriving in that window supersedes this request.
+	; Painting anyway shows a prediction for text the user has already left, and
+	; seeding last_ctx with it hands the stale context to the next request too.
+	if !_LLM_Engine_IsCurrent(state) {
+		try LoggerInfo("LLM", "Prediction superseded before render — discarding request #{1}.", state["request_id"])
 		return
 	}
 	_LLM_Engine["last_ctx"]     := state["ctx"]
