@@ -130,14 +130,38 @@ helpers.describe("modules/keymap/init.lua: stale synthetic buffer purged on miss
 			'keymap/init.lua must clear expected_synthetic_chars to "" in the stale-miss else branch')
 	end)
 
-	helpers.it("the clear appears after the elseif dt < 0.02 tolerance branch", function()
+	-- The purge used to be pinned to its position after an `elseif dt < 0.02`
+	-- tolerance window, which made the WINDOW part of the protected contract. The
+	-- window was itself a defect: it classified any keystroke arriving within
+	-- 20 ms of the previous one as our own echo and dropped it from the buffer,
+	-- so a fast typist's real characters stayed on screen but stopped being
+	-- tracked — and the next expansion sized its backspaces against a buffer
+	-- shorter than the line, erasing text the user had typed. The invariant worth
+	-- protecting was never "a 20 ms window exists"; it is "an unmatched keystroke
+	-- is classified by PROVENANCE, and a stale expectation is purged". That is
+	-- what these two now assert, and neither can pass against the old code.
+	helpers.it("no timing window is allowed to decide whether a keystroke is ours", function()
 		local src = read_source("modules/keymap/init.lua")
-		local elseif_pos = src:find("elseif dt < 0%.02 then", 1, false)
-		helpers.assert_true(elseif_pos ~= nil, "elseif dt < 0.02 branch must exist")
-		local clear_pos  = src:find('CoreState%.expected_synthetic_chars%s*=%s*""', elseif_pos, false)
 		helpers.assert_true(
-			clear_pos ~= nil and clear_pos > elseif_pos,
-			"expected_synthetic_chars clear must appear AFTER the elseif dt < 0.02 block")
+			src:find("elseif dt < 0%.02 then", 1, false) == nil,
+			"the dt < 0.02 tolerance window must NOT come back: typing speed is not evidence "
+				.. "of provenance, and treating it as such silently drops the user's own "
+				.. "keystrokes from the buffer")
+	end)
+
+	helpers.it("the synthetic filter branches on event provenance instead", function()
+		local src = read_source("modules/keymap/init.lua")
+		local filter_pos = src:find("CRUCIAL SYNTHETIC FILTER", 1, true)
+		helpers.assert_true(filter_pos ~= nil,
+			"the synthetic filter block must still exist — without it this test guards nothing")
+		local tail = src:sub(filter_pos)
+		local ours_pos  = tail:find("event_is_ours%(%)")
+		local clear_pos = tail:find('CoreState%.expected_synthetic_chars%s*=%s*""')
+		helpers.assert_true(ours_pos ~= nil,
+			"the filter must consult event_is_ours() — the source-PID test is the only thing "
+				.. "that actually distinguishes our echo from a human keystroke")
+		helpers.assert_true(clear_pos ~= nil,
+			"a stale expectation must still be purged, or it absorbs the keystrokes that follow")
 	end)
 
 end)

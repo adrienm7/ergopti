@@ -269,9 +269,16 @@ function M.emit_tokens(tokens)
 				-- Every following paste-worthy token must wait at least one more
 				-- gap so two deferred pastes never collapse onto the same tick.
 				next_paste_delay = paste_at + CLIPBOARD_PASTE_GAP_SEC
-				-- A DEFERRED paste has not reached the OS yet, so every later token
-				-- must queue strictly behind it. An inline one needs no such fence.
-				if paste_at > 0 then order_delay = next_paste_delay end
+				-- Every later token queues behind a paste, deferred or not. The
+				-- fence used to be skipped for an inline paste on the grounds that
+				-- its Cmd+V had already been posted and post order is preserved.
+				-- Post order is — but the pasted TEXT is not one of our events: the
+				-- target produces it later, on its own schedule, after reading the
+				-- pasteboard. A keystroke posted immediately behind the Cmd+V
+				-- therefore reaches the host ahead of the text it is meant to
+				-- follow, which is how an Enter terminator landed on an unpasted
+				-- line and submitted it empty.
+				order_delay = next_paste_delay
 			else
 				local text_value = tok.value  -- Bound per iteration for the deferred closure
 				emit_in_order(order_delay, function() keyStrokes(text_value) end)
@@ -320,8 +327,12 @@ function M.emit_text(text)
 		-- expansion prefix to be silently absorbed (paste-synthetic-chars-leak).
 		_paste_ops_pending = _paste_ops_pending + 1
 		local ok_l, l = pcall(text_utils.utf8_len, text)
-		-- 0: a single paste fires inline, so nothing is queued behind it.
-		return (ok_l and l or 1), "", text, 0
+		-- The fence is NOT zero just because this paste fired inline. Cmd+V is our
+		-- last event; the text itself is produced by the target when it gets around
+		-- to reading the pasteboard. Anything the caller emits after this — the
+		-- terminator re-type above all — must wait out that settle window or it
+		-- arrives ahead of the replacement it terminates.
+		return (ok_l and l or 1), "", text, CLIPBOARD_PASTE_GAP_SEC
 	end
 
 	keyStrokes(text)
