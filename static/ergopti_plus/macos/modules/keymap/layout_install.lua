@@ -146,7 +146,11 @@ local function path_exists(path)
 	end
 	-- Shell fallback — handles SIP-protected paths that hs.fs.attributes can't stat.
 	-- /bin/test -e accepts any filesystem object (file, dir, bundle symlink).
-	local cmd = string.format("/bin/test -e %q && echo OK", path)
+	-- shell_quote, not %q. Lua's %q escapes for a LUA literal: it leaves $,
+	-- backticks and ! untouched, every one of which /bin/sh expands. This path is
+	-- user-influenced (the config directory is a setting), so %q here is both
+	-- wrong for ordinary paths and a shell-injection hazard.
+	local cmd = string.format("/bin/test -e %s && echo OK", text_utils.shell_quote(path))
 	local out = hs.execute and hs.execute(cmd) or nil
 	if type(out) == "string" and out:find("OK") then return true end
 	-- Pure-Lua fallback for unit-test runs where hs is unavailable.
@@ -271,9 +275,17 @@ local function install_system(bundles_dir, bundle_name)
 	-- Remove both the user copy (no privilege needed) and the old system copy
 	-- (done inside the privileged shell so both are cleaned atomically).
 	hs.execute("rm -rf " .. text_utils.shell_quote((USER_LAYOUTS_DIR:gsub("/$", ""))) .. "/Ergopti_v*.bundle")
+	-- POSIX-quoted, like the rm above and the 41 sites migrated by the quoting
+	-- campaign. This one kept raw %s inside hand-written single quotes, so an
+	-- apostrophe anywhere in the bundle path -- a relocated install, a user
+	-- directory like /Users/O'Brien -- closed the quoted run early and broke the
+	-- PRIVILEGED shell command. The glob must stay outside the quoting, so the
+	-- directory is quoted separately and concatenated.
 	local shell_cmd = string.format(
-		"rm -rf '%sErgopti_v'*.bundle && cp -R '%s%s' '%s'",
-		SYSTEM_LAYOUTS_DIR, bundles_dir, bundle_name, SYSTEM_LAYOUTS_DIR
+		"rm -rf %s && cp -R %s %s",
+		text_utils.shell_quote(SYSTEM_LAYOUTS_DIR .. "Ergopti_v") .. "*.bundle",
+		text_utils.shell_quote(bundles_dir .. bundle_name),
+		text_utils.shell_quote(SYSTEM_LAYOUTS_DIR)
 	)
 	local script = string.format(
 		"do shell script \"%s\" with administrator privileges",

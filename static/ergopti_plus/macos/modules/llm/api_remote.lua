@@ -250,7 +250,21 @@ function M.get_active_entry()
 	-- Lazy-resolve the Keychain reference on first use so the blocking
 	-- security(1) subprocess never fires on the boot or load tick.
 	if type(entry.token) == "string" and TokenCrypto.is_encrypted(entry.token) then
-		entry.token = TokenCrypto.decrypt(entry.token)
+		-- Cache ONLY a non-empty result. TokenCrypto.decrypt returns "" as its
+		-- failure sentinel, which is indistinguishable from a legitimately empty
+		-- value once stored -- and a locked or permission-denied Keychain
+		-- produces exactly that. Caching it replaced the encrypted REFERENCE in
+		-- the live entry, and the next persist_api_entries then wrote the empty
+		-- string back to disk, destroying the stored token permanently. Leaving
+		-- the reference in place means the next call simply retries.
+		local cleartext = TokenCrypto.decrypt(entry.token)
+		if type(cleartext) == "string" and cleartext ~= "" then
+			entry.token = cleartext
+		else
+			Logger.warn(LOG,
+				"Keychain decrypt returned nothing for entry '%s' - keeping the encrypted "
+					.. "reference so it is not persisted over.", tostring(entry.id))
+		end
 	end
 	return entry
 end
@@ -273,7 +287,10 @@ function M.prewarm_active_entry_decrypt()
 		-- STILL the active one and still holds the same encrypted reference
 		-- we resolved (otherwise we would clobber a fresher lazy decrypt).
 		local still_active = find_active_entry()
-		if still_active == entry and TokenCrypto.is_encrypted(entry.token) then
+		-- Same non-empty guard as the lazy path above: the async decrypt reports
+		-- failure the same way, and caching "" here is equally destructive.
+		if still_active == entry and TokenCrypto.is_encrypted(entry.token)
+			and type(cleartext) == "string" and cleartext ~= "" then
 			entry.token = cleartext
 			Logger.debug(LOG, "Pre-warmed Keychain decrypt for active API entry '%s'.", tostring(entry.id))
 		end
