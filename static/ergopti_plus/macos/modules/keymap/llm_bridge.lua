@@ -495,9 +495,12 @@ function M.update_preview(buf)
 		-- The buffer the engine will actually match against once ★ is pressed. The
 		-- preview must ask about THAT buffer, not the current one, or it is
 		-- answering a different question than the engine will be asked.
-		local star_buf = buf .. (_state.magic_key or "")
-
+		-- Built only when the star bucket has something to match against. This is
+		-- a string concatenation on every keystroke, and the overwhelmingly common
+		-- case is an empty bucket — so the allocation was pure waste on the
+		-- latency-critical path for all but a handful of keys.
 		local star_bucket = Registry.mappings_for_star_tail(buf_tail_char)
+		local star_buf = star_bucket and (buf .. (_state.magic_key or "")) or nil
 		if star_bucket then
 			for _, mapping in ipairs(star_bucket) do
 				if group_active(mapping) then

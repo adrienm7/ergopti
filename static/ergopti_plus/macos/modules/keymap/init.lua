@@ -639,14 +639,16 @@ local function onKeyDownRaw(e)
 	-- makes this nearly free on repeated keystrokes; it already treats the HS app
 	-- as always-ignored, so we move the check before the expensive LLM/interceptor
 	-- path so typing in any HS dialog or webview incurs no processing overhead.
-	do
-		local now_pre = hs.timer.secondsSinceEpoch()
-		if km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now_pre) then
-			return false
-		end
+	-- One clock read per keystroke, shared by the ignored-window cache below and
+	-- the inter-key delta. Two separate reads bought nothing: they are microseconds
+	-- apart, so the second value was identical for every purpose either consumer
+	-- has, and this is the hottest path in the driver.
+	local now = hs.timer.secondsSinceEpoch()
+
+	if km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now) then
+		return false
 	end
 
-	local now = hs.timer.secondsSinceEpoch()
 	local dt  = now - CoreState.last_key_time
 	CoreState.last_key_time = now
 
@@ -729,9 +731,21 @@ local function onKeyDownRaw(e)
 	end
 
 	-- 3. Run custom interceptors registered by external modules.
+	-- The character is read HERE rather than at step 8, because the interceptors
+	-- below need it too and each was fetching it through its own ObjC accessor.
+	-- One read now serves all three consumers; the only keystrokes that pay for
+	-- it without using it are those an interceptor suppresses, which are rare
+	-- next to the ones that fall through to step 8 and read it anyway.
+	local chars = e:getCharacters(false)
+	local _interceptor_ctx = { keyCode = keyCode, flags = flags, chars = chars }
 	local suppress_triggers = false
 	for idx, interceptor in ipairs(CoreState.interceptors) do
-		local ok, result = pcall(interceptor, e, CoreState.buffer)
+		-- The already-fetched event fields are handed over as a third argument.
+		-- Every interceptor needs the same flags and characters this callback has
+		-- just read, and each was re-fetching them through its own ObjC accessors
+		-- — on every keystroke, once per interceptor. Passed additively so an
+		-- interceptor that only declares (event, buffer) is unaffected.
+		local ok, result = pcall(interceptor, e, CoreState.buffer, _interceptor_ctx)
 		if not ok then
 			-- The failure branch logged NOTHING, so a throwing interceptor silently
 			-- disabled whatever it implements — @-tag and date expansion both run from
@@ -821,8 +835,8 @@ local function onKeyDownRaw(e)
 		return false
 	end
 
-	-- 8. Gather the character produced by this keystroke.
-	local chars = e:getCharacters(false)
+	-- 8. The character was gathered above, before the interceptors, so it is read
+	-- from the event exactly once per keystroke.
 	if not chars or chars == "" then return false end
 
 	-- CRUCIAL SYNTHETIC FILTER:

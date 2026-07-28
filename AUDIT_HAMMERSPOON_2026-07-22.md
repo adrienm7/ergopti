@@ -448,7 +448,7 @@ twice). All confirmed via two lenses; each carries a repro + fix in the journal.
 | [x] G1/C | `macos/lib/file_watchers.lua:164` | The git/settle gate is evaluated at **schedule** time, not fire time — the `ui_restore` deferral window can still reload mid-pull. |
 | [x] G3/E | `macos/adapters/toml_cache.lua:191` | `toml_cache` writes `.lua` snapshots **inside** the watched `base_dir` — a runtime store fires a spurious full reload. |
 | [x] G3/C | `macos/modules/keymap/init.lua:704` | Synthetic Tab/Return echoes are consumed by `handle_llm_keys` as prediction-accept while predictions are visible → LLM text injected mid-expansion. |
-| G4/D | `macos/modules/keymap/utils.lua:435` | `is_ignored_window` runs synchronous AX probes inside the keyDown tap on every cache miss and every 5 s TTL expiry. |
+| [x] G4/D | `macos/modules/keymap/utils.lua:435` | `is_ignored_window` runs synchronous AX probes inside the keyDown tap on every cache miss and every 5 s TTL expiry. |
 | [x] G2/F | `macos/modules/keymap/input_sources.lua:708` | `upgrade_active_list` parses `<n>/<n>` but AppleScript returns a list (`1, /, 2`) → successful layout upgrades reported as failures. |
 | [x] G5/G | `macos/modules/keymap/llm_bridge.lua:501` | `would_fire`'s no-op returns a truthy 2nd value → the preview builds a **nil-text** row that crashes `render_stacked` and silently kills the whole preview stack. |
 | [x] G5/G | `macos/modules/keymap/llm_bridge.lua:524` | Stacked star rows label the validation key with a hard-coded `★` instead of `CoreState.magic_key` — wrong after the user customises the magic key. |
@@ -470,12 +470,12 @@ twice). All confirmed via two lenses; each carries a repro + fix in the journal.
 | [x] G2/F | `macos/modules/gestures/engine.lua:626` | The sustained-peak override accepts two momentary spikes separated by a dip as a held peak. |
 | [x] G3/F | `macos/modules/shortcuts/script_control.lua:210` | `pause_all` stops MLX warmup but not Ollama's — the exact sibling `df063a2fa` fixed on the disable path. |
 | [x] G2/F | `macos/modules/shortcuts/actions/text.lua:202` | `do_transform`'s in-flight flag is released only by a 2 s timer → legit repeat transforms dropped; long selections re-open the race. |
-| G4/F | `macos/modules/gestures/actions.lua:204` | `d40baf8dd`'s `space_wrap` check runs `hs.spaces` require + `allSpaces` + `focusedSpace` synchronously in the gesture frame callback. |
+| [x] G4/F | `macos/modules/gestures/actions.lua:204` | `d40baf8dd`'s `space_wrap` check runs `hs.spaces` require + `allSpaces` + `focusedSpace` synchronously in the gesture frame callback. |
 | [x] G1/A | `macos/modules/llm/api_ollama.lua:165` | A config-derived log path is interpolated into `/bin/sh` with `string.format('%q')` at two sites the shell-quoting guard cannot see. |
-| G4/D | `macos/lib/logger.lua:634` | Default log level is DEBUG, so the per-keystroke hot path does synchronous line-flushed file I/O (`fh:flush`) inside the eventtap. |
-| G4/D | `macos/init.lua:403` | Boot spawns two synchronous subprocesses (`uname`, `sw_vers`) via `backend_detector.effective_backend()` before `keymap.start()`, uncached. |
-| G4/D | `macos/modules/keymap/init.lua:708` | The interceptor contract makes each interceptor re-fetch `keyCode`/`flags`/`chars` from the event, duplicating ObjC accessors already fetched. |
-| G4/D | `macos/modules/keymap/llm_bridge.lua:436` | `update_preview` builds `star_buf` unconditionally before the star-bucket check; `onKeyDownRaw` reads the wall clock twice per keystroke. |
+| [x] G4/D | `macos/lib/logger.lua:634` | Default log level is DEBUG, so the per-keystroke hot path does synchronous line-flushed file I/O (`fh:flush`) inside the eventtap. |
+| [x] G4/D | `macos/init.lua:403` | Boot spawns two synchronous subprocesses (`uname`, `sw_vers`) via `backend_detector.effective_backend()` before `keymap.start()`, uncached. |
+| [x] G4/D | `macos/modules/keymap/init.lua:708` | The interceptor contract makes each interceptor re-fetch `keyCode`/`flags`/`chars` from the event, duplicating ObjC accessors already fetched. |
+| [x] G4/D | `macos/modules/keymap/llm_bridge.lua:436` | `update_preview` builds `star_buf` unconditionally before the star-bucket check; `onKeyDownRaw` reads the wall clock twice per keystroke. |
 | [x] G3/F | `macos/tests/unit/meta/test_gc_retention.lua:84` | The `lfs` walk scans only `{adapters,lib,modules,ui}`, skipping root `init.lua`; only the shell fallback scans all → coverage depends on which path runs. |
 
 ---

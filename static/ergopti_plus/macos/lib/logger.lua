@@ -625,13 +625,48 @@ local function _sub_file_mode(path, today)
 	return (os.date("%Y-%m-%d", attrs.modification) == today) and "a" or "w"
 end
 
-local function _write_to_file(stamp, line)
+-- DEBUG lines written since the last flush.
+local _unflushed_debug = 0
+
+--- Buffered DEBUG lines allowed before the handle is flushed anyway. A COUNT
+--- rather than a deadline so this needs no clock read of its own: the exposure
+--- is bounded by volume, which is what actually matters — a burst of tracing is
+--- exactly when losing the tail would hurt, and an idle driver writes nothing to
+--- lose.
+local FLUSH_EVERY_N_DEBUG = 40
+
+--- Appends one line to the unified log.
+---
+--- The flush is LEVEL-AWARE. The default level is DEBUG, and DEBUG lines are
+--- emitted from the keystroke path, so flushing every line meant a synchronous
+--- fsync inside the eventtap on every key the user pressed — the one place in
+--- the driver where blocking I/O is least affordable, since a stalled tap is
+--- exactly what macOS disables for being unresponsive.
+---
+--- Anything at INFO or above still flushes immediately: those are the lines that
+--- matter after a crash, and they are rare. DEBUG lines stay in the handle's
+--- buffer and are flushed by the next important line or once
+--- FLUSH_EVERY_N_DEBUG of them have accumulated, so only a bounded tail of
+--- verbose tracing is ever at risk.
+--- @param stamp string Formatted timestamp.
+--- @param line string The already-composed log line.
+--- @param immediate boolean|nil False to defer the flush; anything else flushes now.
+local function _write_to_file(stamp, line, immediate)
 	local full = stamp .. " " .. line .. "\n"
 	local fh = _ensure_log_file()
 	if fh then
 		pcall(function()
 			fh:write(full)
-			fh:flush()
+			if immediate == false then
+				_unflushed_debug = _unflushed_debug + 1
+				if _unflushed_debug >= FLUSH_EVERY_N_DEBUG then
+					fh:flush()
+					_unflushed_debug = 0
+				end
+			else
+				fh:flush()
+				_unflushed_debug = 0
+			end
 		end)
 	end
 	-- Fan-out to topical sub-files. Each is opened/closed per write so a crash
@@ -744,7 +779,10 @@ _log = function(variant_key, module_name, msg, ...)
 	local sink_variant = variant_key == "WARNING" and "warn" or string.lower(variant_key)
 	if _test_sink then pcall(_test_sink, console_line, sink_variant) end
 
-	_write_to_file(stamp, line)
+	-- Only the DEBUG-class variants defer their flush; see _write_to_file. These
+	-- are the ones emitted per keystroke, and they are also the ones whose loss
+	-- in a crash costs least.
+	_write_to_file(stamp, line, variant.level ~= M.LEVELS.DEBUG)
 
 	-- Dedicated errors-only log (WARNING + ERROR). Separate open/close per
 	-- write (like sub-files) so a crash never leaks a handle. This file stays
