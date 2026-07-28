@@ -369,6 +369,19 @@ function M.warmup_model(model_name, profile)
 		Logger.debug(LOG, "warmup_model: skipped — model_name is empty.")
 		return
 	end
+	-- « pause = tout éteint » applies to warmups the USER starts too. Switching
+	-- profile or model from the menu during a pause funnels through here, and
+	-- api_mlx's own _warmup_stopped flag only short-circuits its self-rescheduling
+	-- retry chain — a freshly dispatched warmup sails past it, and Ollama has no
+	-- such flag at all by design. Read through package.loaded rather than
+	-- require() to avoid a circular dependency, exactly as the prediction engine
+	-- does for the same question.
+	local sc = package.loaded["modules.shortcuts.script_control"]
+	if sc and type(sc.is_paused) == "function" and sc.is_paused() then
+		Logger.debug(LOG, "warmup_model: paused — '%s' stays cold until resume.", tostring(model_name))
+		return
+	end
+
 	local resolved_profile = profile or M.get_active_profile()
 	Logger.debug(LOG, "warmup_model: dispatching to backend '%s' for model '%s'.",
 		tostring(CoreState.backend), tostring(model_name))
