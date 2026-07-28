@@ -200,6 +200,14 @@ KL_BuildInserts(entry) {
         case "hotstring_dismissed":          return [KL_BuildInsertHotstring(entry, id, "dismissed")]
         case "hotstring_near_miss", "manual_typed_known_trigger":   return [KL_BuildInsertHotstring(entry, id, EventType)]
         case "llm_generation":      return [KL_BuildInsertLlm(entry, id, "generation")]
+        ; Routed to events_system, NOT events_llm: that table's CHECK constraint
+        ; does not admit a failure kind, so the naive route would trade a silent
+        ; drop for a rejected insert. This mirrors the macOS twin. Without the
+        ; case the event fell through to the "unknown type — skip" default, so
+        ; the one event class whose entire purpose is to answer "are predictions
+        ; silently dropping?" was itself silently dropped: written to today.log,
+        ; never present in data.sql, invisible on the dashboard.
+        case "llm_generation_failed": return [KL_BuildInsertSystem(entry, id)]
         case "llm_suggested":       return [KL_BuildInsertLlm(entry, id, "suggested")]
         case "llm_dismissed":       return [KL_BuildInsertLlm(entry, id, "dismissed")]
         case "llm_accepted":        return [KL_BuildInsertLlm(entry, id, "accepted")]

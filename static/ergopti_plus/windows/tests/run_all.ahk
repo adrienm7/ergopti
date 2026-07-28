@@ -377,6 +377,7 @@ global _ConfigDir := A_Temp . "\ergopti_test_config\"
 #Include ../modules/keylogger/keylogger_sql.ahk
 #Include unit/test_keylogger_walker.ahk
 #Include unit/test_keylogger_sql.ahk
+#Include unit/test_build_inserts_covers_emitted_types.ahk
 #Include unit/test_keylogger_app_categories.ahk
 #Include meta/test_keylogger_ui_dead_code.ahk
 #Include unit/test_keylogger_reader.ahk
