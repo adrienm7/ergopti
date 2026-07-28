@@ -1028,11 +1028,28 @@ _RollEmitCritical(Text) {
 		Critical(_AtCrit)
 	}
 }
+; Serialized like AltGrShiftDispatch, which wraps EVERY base-row AltGr callback
+; in Critical("On"). These two roll handlers are the exception: they are
+; registered straight onto Hotkey() by _RegisterRollsAltGrHotkeys, so they never
+; passed through that dispatcher. The result was one callback with two different
+; concurrency contracts — WrapTextIfSelected and SendNewResult ran serialized
+; when reached from a base row and bare when reached from a roll, and the bare
+; path's SendEvent could interleave with a neighbouring remapped key's emit in
+; the single OS input queue and reorder the output.
+;
+; Nesting is safe and intentional: _RollEmitCritical takes its own Critical, and
+; WrapTextIfSelected releases and restores Critical itself around its clipboard
+; round-trip, which is precisely why it must be entered with a known state.
 _RollChevronEqualHandler(*) {
-	if GetKeyState("Shift", "P") {
-		Features["layout"]["ergopti_plus"] ? _RollEmitCritical(" %") : _RollEmitCritical("Œ")
-	} else {
-		AddRollEqual()
+	_AtCrit := Critical("On")
+	try {
+		if GetKeyState("Shift", "P") {
+			Features["layout"]["ergopti_plus"] ? _RollEmitCritical(" %") : _RollEmitCritical("Œ")
+		} else {
+			AddRollEqual()
+		}
+	} finally {
+		Critical(_AtCrit)
 	}
 }
 AddRollEqual() {
@@ -1051,11 +1068,18 @@ AddRollEqual() {
 
 ; The AltGr roll for SC017 (# / " / %) is also registered dynamically — same
 ; rationale as the SC012 block above.
+; Same contract as _RollChevronEqualHandler above — its sibling registration,
+; and the second of the only two AltGr callbacks that bypass AltGrShiftDispatch.
 _RollHashtagQuoteHandler(*) {
-	if GetKeyState("Shift", "P") {
-		_RollEmitCritical("%")
-	} else {
-		HashtagOrQuote()
+	_AtCrit := Critical("On")
+	try {
+		if GetKeyState("Shift", "P") {
+			_RollEmitCritical("%")
+		} else {
+			HashtagOrQuote()
+		}
+	} finally {
+		Critical(_AtCrit)
 	}
 }
 HashtagOrQuote() {
