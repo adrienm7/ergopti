@@ -270,7 +270,18 @@ function M.new(deps, presets)
 		-- user must run modules/llm/ensure-mlx-deps.sh manually — silently
 		-- pip-installing a fallback would bypass pyproject.toml.
 		local check_cmd = "\"" .. project_venv_python_escaped .. "\" -c 'import mlx_lm; import huggingface_hub; import jinja2; import safetensors'"
-		local check_task = hs.task.new("/bin/bash", function(code)
+		-- Forward-declared, pinned before start() and released as the callback's
+		-- first act — the same three steps its sibling delete_task performs.
+		-- Held only by a local, the task was collectable the moment this function
+		-- returned, while the python import probe still had one to three seconds
+		-- to run. A GC cycle in that window makes Hammerspoon SIGTERM the
+		-- subprocess and the completion callback never fires: neither do_check nor
+		-- on_cancel runs, and on_cancel is what releases the prediction lock that
+		-- model_switcher and startup_controller set. Predictions then stay locked
+		-- with no START-without-SUCCESS trail, and only a full reload recovers.
+		local check_task
+		check_task = hs.task.new("/bin/bash", function(code)
+			if check_task then M._active_tasks[check_task] = nil end
 			if code == 0 then
 				do_check()
 			else
@@ -319,6 +330,7 @@ function M.new(deps, presets)
 		end, {"-c", check_cmd})
 		
 		if check_task then
+			M._active_tasks[check_task] = true
 			pcall(function() check_task:start() end)
 		else
 			Logger.error(LOG, "Failed to create MLX requirement check task.")
