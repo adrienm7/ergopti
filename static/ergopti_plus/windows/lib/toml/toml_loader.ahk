@@ -118,8 +118,14 @@ _TomlWarmFileCounts(FilePath) {
         if (Line == "" or SubStr(Line, 1, 1) == "#")
             continue
             
-        ; [[section]] or [section] header
-        if RegExMatch(Line, "^\[+([^\[\]]+)\]+$", &SectionMatch) {
+        ; [[section]] or [section] header.
+        ; Stripped like LoadHotstringsSection does. This pattern is ANCHORED, so
+        ; a header carrying a trailing comment simply fails to match: the line
+        ; then falls through to the entry parser, fails that too, and continues —
+        ; leaving CurrentSec on the PREVIOUS section, so every entry below is
+        ; counted against the wrong one. That is why the menu's hotstring count
+        ; could disagree with the number of entries actually registered.
+        if RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SectionMatch) {
             CurrentSec := StrLower(Trim(SectionMatch[1]))
             if !Counts.Has(CurrentSec)
                 Counts[CurrentSec] := 0
@@ -420,7 +426,10 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
         if (Line == "" or SubStr(Line, 1, 1) == "#") {
             continue
         }
-        if RegExMatch(Line, "^\[+([^\[\]]+)\]+$", &SecM) {
+        ; Stripped for the same reason as the counter above and
+        ; LoadHotstringsSection: an anchored pattern silently mis-attributes
+        ; every following entry when a header carries a trailing comment.
+        if RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SecM) {
             CurrentSection := StrLower(Trim(SecM[1]))
             continue
         }
