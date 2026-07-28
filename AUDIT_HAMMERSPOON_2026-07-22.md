@@ -444,9 +444,9 @@ twice). All confirmed via two lenses; each carries a repro + fix in the journal.
 
 | G/cls | Location | Defect |
 | --- | --- | --- |
-| G2/F | `macos/lib/file_watchers.lua:153` | Git-operation reload-hold probes only `base_dir` — a `git pull` in the **config** repo (personal hotstrings tree) is unguarded. |
-| G1/C | `macos/lib/file_watchers.lua:164` | The git/settle gate is evaluated at **schedule** time, not fire time — the `ui_restore` deferral window can still reload mid-pull. |
-| G3/E | `macos/adapters/toml_cache.lua:191` | `toml_cache` writes `.lua` snapshots **inside** the watched `base_dir` — a runtime store fires a spurious full reload. |
+| [x] G2/F | `macos/lib/file_watchers.lua:153` | Git-operation reload-hold probes only `base_dir` — a `git pull` in the **config** repo (personal hotstrings tree) is unguarded. |
+| [x] G1/C | `macos/lib/file_watchers.lua:164` | The git/settle gate is evaluated at **schedule** time, not fire time — the `ui_restore` deferral window can still reload mid-pull. |
+| [x] G3/E | `macos/adapters/toml_cache.lua:191` | `toml_cache` writes `.lua` snapshots **inside** the watched `base_dir` — a runtime store fires a spurious full reload. |
 | G3/C | `macos/modules/keymap/init.lua:704` | Synthetic Tab/Return echoes are consumed by `handle_llm_keys` as prediction-accept while predictions are visible → LLM text injected mid-expansion. |
 | G4/D | `macos/modules/keymap/utils.lua:435` | `is_ignored_window` runs synchronous AX probes inside the keyDown tap on every cache miss and every 5 s TTL expiry. |
 | G2/F | `macos/modules/keymap/input_sources.lua:708` | `upgrade_active_list` parses `<n>/<n>` but AppleScript returns a list (`1, /, 2`) → successful layout upgrades reported as failures. |

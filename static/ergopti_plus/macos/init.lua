@@ -205,10 +205,17 @@ Boot.mark("Path: runtime error capture installed")
 -- after a file change re-parses and refreshes the snapshot, every later boot reads
 -- it, and the same-boot delay-reading pass also hits the snapshot. Kept in an
 -- adapter so _shared/ stays filesystem-free (the reader sees only a load/store hook).
+--
+-- Declared here rather than inline because the file watchers must EXCLUDE this
+-- directory: it sits inside the watched driver tree and the snapshots are .lua
+-- files, so every cache write looked like a source edit and reloaded the driver.
+-- Two spellings of the path is exactly how the writer and the watcher would
+-- drift apart again.
+local TOML_CACHE_DIR = (hs.configdir or ".") .. "/cache/toml_hotstrings"
 do
 	local ok_cache, toml_cache = pcall(require, "adapters.toml_cache")
 	if ok_cache and type(toml_cache) == "table" and type(toml_cache.init) == "function" then
-		toml_cache.init((hs.configdir or ".") .. "/cache/toml_hotstrings")
+		toml_cache.init(TOML_CACHE_DIR)
 		local ok_reader, toml_reader = pcall(require, "lib.toml.reader")
 		if ok_reader and type(toml_reader) == "table" and type(toml_reader.set_cache_provider) == "function" then
 			toml_reader.set_cache_provider(toml_cache)
@@ -856,6 +863,16 @@ require("lib.file_watchers").start({
 	self_written_files      = {
 		menu_paths.get("ConfigTomlPath"),
 		menu_paths.get("KarabinerConfigPath"),
+	},
+	-- Runtime store, not source: the TOML snapshot cache lives inside the
+	-- watched driver tree and writes .lua files, so without this every cache
+	-- refresh triggered a full reload — and the reload re-warms the cache.
+	ignored_dirs            = { TOML_CACHE_DIR },
+	-- The personal hotstrings tree is usually a SEPARATE git repository from the
+	-- driver, so a pull there must be gated by its own .git, not the driver's.
+	git_roots               = {
+		base_dir,
+		(menu_paths.get("HotstringsDirPath") or ""):gsub("[/\\]+$", ""),
 	},
 })
 
