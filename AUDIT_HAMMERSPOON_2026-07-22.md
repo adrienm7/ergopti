@@ -189,7 +189,7 @@ silent · the test that should have caught it · proposed fix · regression test
   `"SECRET123"`, stub http client, call `post_and_parse` (and warmup); assert **no**
   captured line contains `SECRET123`. Encodes the invariant, not the phrasing.
 
-### H5 — Private hotstring / personal-info PII persists to `today.log` via `notify_synthetic`
+### [x] H5 — Private hotstring / personal-info PII persists to `today.log` via `notify_synthetic`
 **G2 · class E (PII leak) · `modules/keymap/expander.lua:117` · confidence: high · provenance: deduced**
 
 - **Repro:** enable Metrics (keylogger), put an IBAN/SSN/phone in
