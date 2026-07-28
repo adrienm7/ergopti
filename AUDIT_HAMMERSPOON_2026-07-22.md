@@ -456,7 +456,7 @@ twice). All confirmed via two lenses; each carries a repro + fix in the journal.
 | G5/G | `macos/modules/keymap/llm_bridge.lua:566` | Preview tooltip lifetime uses a coarse 3-way delay key while the engine gate uses the per-mapping precedence chain — they can diverge. |
 | G5/F | `macos/modules/keymap/llm_bridge.lua:225` | Preview-toggle setters call dequeue-guarded `tooltip.hide()` → a stale preview survives the settings change (missed sibling). |
 | G2/C | `macos/modules/llm/api_mlx_fetch.lua:238` | A superseded MLX request's un-cancelled 8 s timeout fires `on_fail` → an unguarded retry cancels the **live** request's transport. |
-| G3/E | `macos/modules/shortcuts/script_control.lua:210` | Ollama warmup is not parked during pause: `pause_all` misses `api_ollama.stop_warmup`; `set_llm_model`/`set_active_profile` lack pause guards. |
+| [x] G3/E | `macos/modules/shortcuts/script_control.lua:210` | Ollama warmup is not parked during pause: `pause_all` misses `api_ollama.stop_warmup`; `set_llm_model`/`set_active_profile` lack pause guards. |
 | [x] G2/F | `macos/modules/llm/mlx_deps_checker.lua:538` | The MLX deps-checker fast-path hide is not session-owner-guarded → closes another operation's progress window (sibling of `f239b252d`). |
 | G1/A | `macos/modules/llm/api_ollama.lua:429` | Non-streaming response path swallows callback throws under bare `pcall` — "green but no prediction", zero log evidence. |
 | G3/C | `macos/modules/llm/api_mlx.lua:653` | MLX warmup POST timeout never bumps `_warmup_gen` and the response cancels the newer timeout's pre-guard → warmup POSTs pile up. |
@@ -468,7 +468,7 @@ twice). All confirmed via two lenses; each carries a repro + fix in the journal.
 | [x] G1/B | `macos/ui/download_window/init.lua:127` | The `terminal` bridge builds `osascript` with double-quote-only escaping — a single quote in a path/model breaks it. |
 | [x] G1/B | `macos/ui/onboarding/init.lua:504` | `pickConfigDir` builds the AppleScript folder-picker seed with double-quote-only escaping (backslash unescaped). |
 | G2/F | `macos/modules/gestures/engine.lua:626` | The sustained-peak override accepts two momentary spikes separated by a dip as a held peak. |
-| G3/F | `macos/modules/shortcuts/script_control.lua:210` | `pause_all` stops MLX warmup but not Ollama's — the exact sibling `df063a2fa` fixed on the disable path. |
+| [x] G3/F | `macos/modules/shortcuts/script_control.lua:210` | `pause_all` stops MLX warmup but not Ollama's — the exact sibling `df063a2fa` fixed on the disable path. |
 | G2/F | `macos/modules/shortcuts/actions/text.lua:202` | `do_transform`'s in-flight flag is released only by a 2 s timer → legit repeat transforms dropped; long selections re-open the race. |
 | G4/F | `macos/modules/gestures/actions.lua:204` | `d40baf8dd`'s `space_wrap` check runs `hs.spaces` require + `allSpaces` + `focusedSpace` synchronously in the gesture frame callback. |
 | [x] G1/A | `macos/modules/llm/api_ollama.lua:165` | A config-derived log path is interpolated into `/bin/sh` with `string.format('%q')` at two sites the shell-quoting guard cannot see. |

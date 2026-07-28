@@ -221,6 +221,18 @@ local function pause_all()
 	if ok_api and api and type(api.stop_warmup) == "function" then
 		pcall(function() api.stop_warmup() end)
 	end
+	-- Ollama's warmup needs parking for the same reason MLX's does, and its
+	-- stop_warmup was added for the disable path without being wired here: an
+	-- in-flight warmup POST kept its callbacks live across the pause and could
+	-- flip readiness or fire the user-facing "server ready" notification while
+	-- the script was supposed to be entirely off. No resume counterpart, per its
+	-- own contract — it has no self-rescheduling retry chain to short-circuit
+	-- and does not clear readiness, so a resume must not force a pointless
+	-- re-warm of weights that are still loaded.
+	local ok_oll, oll = pcall(require, "modules.llm.api_ollama")
+	if ok_oll and oll and type(oll.stop_warmup) == "function" then
+		pcall(function() oll.stop_warmup() end)
+	end
 	local ok_tt, tt = pcall(require, "ui.tooltip")
 	if ok_tt and tt and type(tt.hide_forced) == "function" then
 		pcall(function() tt.hide_forced() end)
