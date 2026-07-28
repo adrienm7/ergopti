@@ -432,7 +432,13 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 	_infer_client.post(M.get_base_url() .. "/api/chat", { ["Content-Type"] = "application/json" }, encoded,
 		function(r)
 			local status, body = r.status, r.body
-			pcall(function()
+			-- xpcall, not a bare pcall whose status is discarded. The ENTIRE
+			-- non-streaming response path runs in here — status checks, JSON
+			-- decode, result shaping and the on_success hand-off — so a throw
+			-- anywhere in it produced no prediction, no error and nothing to
+			-- search the log for: the "green but no prediction" shape, with the
+			-- whole handler as its blast radius.
+			local ok_response, response_err = xpcall(function()
 				Logger.debug(LOG, "[%s] #%d HTTP_RESPONSE status=%d, body_len=%d", model_name, req_id, status or -1, #(body or ""))
 
 				if not status or status ~= 200 then
@@ -511,7 +517,12 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                     })
                 end
 			if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results) end
-			end)
+			end, debug.traceback)
+			if not ok_response then
+				Logger.error(LOG, "[%s] #%d response handler raised: %s. The request is abandoned — "
+					.. "nothing downstream retries it, so the user simply never sees a prediction.",
+					tostring(model_name), req_id, tostring(response_err))
+			end
 		end
 	)
 end

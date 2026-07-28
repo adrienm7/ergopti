@@ -458,11 +458,11 @@ twice). All confirmed via two lenses; each carries a repro + fix in the journal.
 | G2/C | `macos/modules/llm/api_mlx_fetch.lua:238` | A superseded MLX request's un-cancelled 8 s timeout fires `on_fail` → an unguarded retry cancels the **live** request's transport. |
 | [x] G3/E | `macos/modules/shortcuts/script_control.lua:210` | Ollama warmup is not parked during pause: `pause_all` misses `api_ollama.stop_warmup`; `set_llm_model`/`set_active_profile` lack pause guards. |
 | [x] G2/F | `macos/modules/llm/mlx_deps_checker.lua:538` | The MLX deps-checker fast-path hide is not session-owner-guarded → closes another operation's progress window (sibling of `f239b252d`). |
-| G1/A | `macos/modules/llm/api_ollama.lua:429` | Non-streaming response path swallows callback throws under bare `pcall` — "green but no prediction", zero log evidence. |
+| [x] G1/A | `macos/modules/llm/api_ollama.lua:429` | Non-streaming response path swallows callback throws under bare `pcall` — "green but no prediction", zero log evidence. |
 | G3/C | `macos/modules/llm/api_mlx.lua:653` | MLX warmup POST timeout never bumps `_warmup_gen` and the response cancels the newer timeout's pre-guard → warmup POSTs pile up. |
 | G1/A | `macos/modules/llm/prediction_engine.lua:989` | The canonical inactivity debounce timer is built at **require** time, before `install_runtime_error_capture` → its callback is permanently unguarded. |
 | G3/C | `macos/modules/gestures/actions.lua:491` | `search_web` snapshots/restores the clipboard with no in-flight guard — the stale-snapshot class `7bf0cc3cd` fixed, left unguarded here. |
-| G2/A | `macos/adapters/http_client.lua:126` | Completion callbacks run under bare `pcall` with no `Logger.error` (`:98/:126/:155/:178`) — a throw in the LLM response handler vanishes. Recorded-open, still true; the callers currently backstop it (see §6). |
+| [x] G2/A | `macos/adapters/http_client.lua:126` | Completion callbacks run under bare `pcall` with no `Logger.error` (`:98/:126/:155/:178`) — a throw in the LLM response handler vanishes. Recorded-open, still true; the callers currently backstop it (see §6). |
 | G2/E | `macos/adapters/text_sender.lua:112` | A throw between `Clipboard.write` and arming the restore timer permanently clobbers the clipboard. |
 | G2/B | `macos/ui/menu/menu_state.lua:95` | Dead branch references an undefined global `enabled_ct` → custom-terminator enabled-state restore is a permanent no-op. |
 | [x] G1/B | `macos/ui/download_window/init.lua:127` | The `terminal` bridge builds `osascript` with double-quote-only escaping — a single quote in a path/model breaks it. |
@@ -476,7 +476,7 @@ twice). All confirmed via two lenses; each carries a repro + fix in the journal.
 | G4/D | `macos/init.lua:403` | Boot spawns two synchronous subprocesses (`uname`, `sw_vers`) via `backend_detector.effective_backend()` before `keymap.start()`, uncached. |
 | G4/D | `macos/modules/keymap/init.lua:708` | The interceptor contract makes each interceptor re-fetch `keyCode`/`flags`/`chars` from the event, duplicating ObjC accessors already fetched. |
 | G4/D | `macos/modules/keymap/llm_bridge.lua:436` | `update_preview` builds `star_buf` unconditionally before the star-bucket check; `onKeyDownRaw` reads the wall clock twice per keystroke. |
-| G3/F | `macos/tests/unit/meta/test_gc_retention.lua:84` | The `lfs` walk scans only `{adapters,lib,modules,ui}`, skipping root `init.lua`; only the shell fallback scans all → coverage depends on which path runs. |
+| [x] G3/F | `macos/tests/unit/meta/test_gc_retention.lua:84` | The `lfs` walk scans only `{adapters,lib,modules,ui}`, skipping root `init.lua`; only the shell fallback scans all → coverage depends on which path runs. |
 
 ---
 

@@ -216,6 +216,13 @@ local function all_driver_sources()
 			end
 		end
 		for _, d in ipairs({ "adapters", "lib", "modules", "ui" }) do walk(d .. "/", d .. "/") end
+		-- Root-level sources are NOT inside those four directories, and init.lua is
+		-- the largest of them. The shell fallback below scans the whole tree, so
+		-- coverage silently depended on which of the two paths ran — green on a
+		-- machine without lfs, blind on one with it.
+		for entry in lfs.dir(DRIVER_ROOT) do
+			if entry:match("%.lua$") then out[#out + 1] = entry end
+		end
 		return out
 	end
 
@@ -258,6 +265,21 @@ helpers.describe("GC retention: EVERY hs.task.new site in the driver is pinned",
 		helpers.assert_true(scanned >= 10,
 			"the walk must actually reach the spawning modules (found " .. scanned
 				.. ") — a scan that matches nothing cannot fail")
+
+		-- The walk has two implementations — an lfs recursion and a shell fallback
+		-- — and they must enumerate the same tree. The lfs branch descended only
+		-- into adapters/lib/modules/ui and skipped every ROOT-level source,
+		-- init.lua included, so coverage silently depended on which branch ran:
+		-- complete on a machine without lfs, blind on one with it. Asserting a
+		-- known root file is present holds whichever branch executes here.
+		local saw_root_source = false
+		for _, rel in ipairs(files) do
+			if rel == "init.lua" then saw_root_source = true end
+		end
+		helpers.assert_true(saw_root_source,
+			"the walk must include root-level sources such as init.lua — otherwise an unpinned "
+				.. "hs.task.new there is invisible to this guard on any machine where lfs is "
+				.. "installed, and the suite reports coverage it does not have")
 
 		helpers.assert_true(#offenders == 0, string.format(
 			"%d hs.task.new call site(s) have no GC-root pin. An unreferenced hs.task is "

@@ -47,6 +47,32 @@ local Logger = require("lib.logger")
 
 local LOG = "adapters.http_client"
 
+--- Invokes a completion callback so a throw inside it cannot vanish.
+---
+--- Every response path here handed its result to the caller through a bare
+--- `pcall(callback, …)` whose status was never inspected. That is not error
+--- handling, it is error deletion: a throw in the LLM response handler — a
+--- parser choking on a malformed body, a renderer hitting a nil field — became
+--- indistinguishable from a request that never completed. No prediction, no
+--- error, nothing to search the log for.
+---
+--- xpcall with a traceback rather than plain pcall: by the time the error
+--- surfaces the stack is gone, and the traceback is the only thing that says
+--- where the callback failed. The error is contained rather than rethrown
+--- because these run from HTTP completion handlers and timer callbacks, where
+--- an escaping exception is reported far from its cause.
+--- @param callback function|nil The completion callback; a non-function is a no-op.
+--- @param result table The response table to deliver.
+local function invoke_callback(callback, result)
+	if type(callback) ~= "function" then return end
+	local ok, err = xpcall(function() return callback(result) end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Completion callback raised: %s. This request is abandoned — nothing "
+			.. "downstream retries it.", tostring(err))
+	end
+end
+
+
 
 -- =========================================
 -- =========================================
@@ -94,9 +120,7 @@ local function new()
 				_active_task = nil
 			end
 			Logger.warn(LOG, "request timed out after %dms.", DEFAULT_TIMEOUT_MS)
-			if type(callback) == "function" then
-				pcall(callback, { ok = false, status = 0, body = "", error = "timeout" })
-			end
+			invoke_callback(callback, { ok = false, status = 0, body = "", error = "timeout" })
 		end)
 	end
 
@@ -122,14 +146,12 @@ local function new()
 			_stop_timeout()
 			local is_ok  = type(status) == "number" and status >= 200 and status < 300
 			local err_msg = is_ok and nil or string.format("HTTP %s", tostring(status))
-			if type(callback) == "function" then
-				pcall(callback, {
-					ok     = is_ok,
-					status = type(status) == "number" and status or 0,
-					body   = type(response_body) == "string" and response_body or "",
-					error  = err_msg,
-				})
-			end
+			invoke_callback(callback, {
+				ok     = is_ok,
+				status = type(status) == "number" and status or 0,
+				body   = type(response_body) == "string" and response_body or "",
+				error  = err_msg,
+			})
 		end
 	end
 
@@ -151,9 +173,7 @@ local function new()
 			_cancelled = true
 			_stop_timeout()
 			Logger.error(LOG, "post(): hs.http.asyncPost failed — %s", tostring(task_or_err))
-			if type(callback) == "function" then
-				pcall(callback, { ok = false, status = 0, body = "", error = tostring(task_or_err) })
-			end
+			invoke_callback(callback, { ok = false, status = 0, body = "", error = tostring(task_or_err) })
 			return
 		end
 		_active_task = task_or_err
@@ -174,9 +194,7 @@ local function new()
 			_cancelled = true
 			_stop_timeout()
 			Logger.error(LOG, "get(): hs.http.asyncGet failed — %s", tostring(task_or_err))
-			if type(callback) == "function" then
-				pcall(callback, { ok = false, status = 0, body = "", error = tostring(task_or_err) })
-			end
+			invoke_callback(callback, { ok = false, status = 0, body = "", error = tostring(task_or_err) })
 			return
 		end
 		_active_task = task_or_err
