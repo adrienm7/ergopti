@@ -193,7 +193,7 @@ end
 function M.emit_tokens(tokens)
 	if type(tokens) ~= "table" then
 		Logger.error(LOG, "emit_tokens: tokens must be a table (got %s).", type(tokens))
-		return 0, "", ""
+		return 0, "", "", 0
 	end
 
 	Logger.trace(LOG, "Emitting %d token(s)…", #tokens)
@@ -279,7 +279,12 @@ function M.emit_tokens(tokens)
 	end
 
 	Logger.done(LOG, "%d token(s) emitted (%d char(s)).", #tokens, count)
-	return count, emitted_str, logical_text
+	-- The fence is returned, not just applied internally. A caller that emits
+	-- anything MORE after this call — the terminator re-type does — has the same
+	-- ordering hazard as the tokens themselves, and no way to know about it
+	-- otherwise: everything here already looks finished from the outside while a
+	-- paste is still queued on a timer.
+	return count, emitted_str, logical_text, order_delay
 end
 
 --- Emits a raw string directly, choosing between keystrokes and clipboard-paste.
@@ -289,7 +294,7 @@ end
 function M.emit_text(text)
 	if type(text) ~= "string" then
 		Logger.error(LOG, "emit_text: text must be a string (got %s).", type(text))
-		return 0, "", ""
+		return 0, "", "", 0
 	end
 
 	-- Log the payload's SIZE, never the payload. Every expansion funnels through
@@ -309,13 +314,14 @@ function M.emit_text(text)
 		-- expansion prefix to be silently absorbed (paste-synthetic-chars-leak).
 		_paste_ops_pending = _paste_ops_pending + 1
 		local ok_l, l = pcall(text_utils.utf8_len, text)
-		return (ok_l and l or 1), "", text
+		-- 0: a single paste fires inline, so nothing is queued behind it.
+		return (ok_l and l or 1), "", text, 0
 	end
 
 	keyStrokes(text)
 	local ok, len = pcall(text_utils.utf8_len, text)
 	Logger.done(LOG, "Text emitted as keystrokes (%d char(s)).", ok and len or 1)
-	return (ok and len or 1), text, text
+	return (ok and len or 1), text, text, 0
 end
 
 
