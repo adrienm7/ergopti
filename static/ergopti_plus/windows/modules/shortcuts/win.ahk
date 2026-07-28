@@ -31,6 +31,10 @@ if Features["shortcuts"]["select_line"] {
     AddShortcut("#", "a", SelectLine)
 
     SelectLine(*) {
+        ; Synthetic Home/End are invisible to the prefix watcher's InputHook, so
+        ; the hotstring buffers must be told the caret moved — otherwise the next
+        ; expansion backspaces over the selected line instead of its own trigger.
+        HS_DeclareSyntheticEffect("{Home}{Shift Down}{End}{Shift Up}")
         SendFinalResult("{Home}{Shift Down}{End}{Shift Up}")
     }
 }
@@ -358,7 +362,14 @@ if Features["shortcuts"]["move"] {
 }
 
 if Features["shortcuts"]["surround_with_parentheses"] {
-    AddShortcut("#", "o", (*) => SendFinalResult("{Home}({End}){Home}"))
+    ; Same declaration as SelectLine: the payload ends with the caret parked at
+    ; line start, nowhere near the text the buffers still describe.
+    AddShortcut("#", "o", SurroundLineWithParentheses)
+
+    SurroundLineWithParentheses(*) {
+        HS_DeclareSyntheticEffect("{Home}({End}){Home}")
+        SendFinalResult("{Home}({End}){Home}")
+    }
 }
 
 if Features["shortcuts"]["search"]["enabled"] {

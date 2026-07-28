@@ -248,6 +248,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; stays focused on ErgoptiPlus-specific logic.
 #Include lib/hotstrings/hotstring_engine.ahk
 #Include lib/hotstrings/hotstring_engine_main.ahk
+#Include lib/hotstrings/hotstring_buffer_effects.ahk
 #Include lib/hotstrings/hotstring_live_toggle.ahk
 #Include lib/hotstrings/hotstring_count_policy.ahk
 ; Generated terminator catalogue (single source of truth — shared with macOS via

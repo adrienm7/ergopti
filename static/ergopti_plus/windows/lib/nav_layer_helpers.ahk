@@ -89,7 +89,14 @@ AppState_SetNumberOfRepetitions(N) {
 	global NumberOfRepetitions := N
 }
 
+; Every nav-layer key routes through here, and almost every payload moves the
+; caret or deletes text. The send is a SendInput at SendLevel 0, which the
+; prefix watcher's InputHook filters out by design (``I1``), so none of the
+; eight physical reset sites ever see it: without the declaration below the
+; hotstring engine still believed the caret sat where the user stopped typing,
+; and the next expansion backspaced over text at the NEW position.
 ActionLayer(action) {
+	HS_DeclareSyntheticEffect(action)
 	SendInput(action)
 	ResetNumberOfRepetitions()
 }
