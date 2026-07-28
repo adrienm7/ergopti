@@ -465,13 +465,13 @@ twice). All confirmed via two lenses; each carries a repro + fix in the journal.
 | G2/A | `macos/adapters/http_client.lua:126` | Completion callbacks run under bare `pcall` with no `Logger.error` (`:98/:126/:155/:178`) — a throw in the LLM response handler vanishes. Recorded-open, still true; the callers currently backstop it (see §6). |
 | G2/E | `macos/adapters/text_sender.lua:112` | A throw between `Clipboard.write` and arming the restore timer permanently clobbers the clipboard. |
 | G2/B | `macos/ui/menu/menu_state.lua:95` | Dead branch references an undefined global `enabled_ct` → custom-terminator enabled-state restore is a permanent no-op. |
-| G1/B | `macos/ui/download_window/init.lua:127` | The `terminal` bridge builds `osascript` with double-quote-only escaping — a single quote in a path/model breaks it. |
-| G1/B | `macos/ui/onboarding/init.lua:504` | `pickConfigDir` builds the AppleScript folder-picker seed with double-quote-only escaping (backslash unescaped). |
+| [x] G1/B | `macos/ui/download_window/init.lua:127` | The `terminal` bridge builds `osascript` with double-quote-only escaping — a single quote in a path/model breaks it. |
+| [x] G1/B | `macos/ui/onboarding/init.lua:504` | `pickConfigDir` builds the AppleScript folder-picker seed with double-quote-only escaping (backslash unescaped). |
 | G2/F | `macos/modules/gestures/engine.lua:626` | The sustained-peak override accepts two momentary spikes separated by a dip as a held peak. |
 | G3/F | `macos/modules/shortcuts/script_control.lua:210` | `pause_all` stops MLX warmup but not Ollama's — the exact sibling `df063a2fa` fixed on the disable path. |
 | G2/F | `macos/modules/shortcuts/actions/text.lua:202` | `do_transform`'s in-flight flag is released only by a 2 s timer → legit repeat transforms dropped; long selections re-open the race. |
 | G4/F | `macos/modules/gestures/actions.lua:204` | `d40baf8dd`'s `space_wrap` check runs `hs.spaces` require + `allSpaces` + `focusedSpace` synchronously in the gesture frame callback. |
-| G1/A | `macos/modules/llm/api_ollama.lua:165` | A config-derived log path is interpolated into `/bin/sh` with `string.format('%q')` at two sites the shell-quoting guard cannot see. |
+| [x] G1/A | `macos/modules/llm/api_ollama.lua:165` | A config-derived log path is interpolated into `/bin/sh` with `string.format('%q')` at two sites the shell-quoting guard cannot see. |
 | G4/D | `macos/lib/logger.lua:634` | Default log level is DEBUG, so the per-keystroke hot path does synchronous line-flushed file I/O (`fh:flush`) inside the eventtap. |
 | G4/D | `macos/init.lua:403` | Boot spawns two synchronous subprocesses (`uname`, `sw_vers`) via `backend_detector.effective_backend()` before `keymap.start()`, uncached. |
 | G4/D | `macos/modules/keymap/init.lua:708` | The interceptor contract makes each interceptor re-fetch `keyCode`/`flags`/`chars` from the event, duplicating ObjC accessors already fetched. |

@@ -162,7 +162,13 @@ local function ensure_ollama_running()
 			local launch_cmd = "/opt/homebrew/bin/ollama serve 2>&1 | " ..
 				"while IFS= read -r LINE; do " ..
 				"printf '%s [OLLAMA-SERVER] %s\\n' \"$(date +%H:%M:%S)\" \"$LINE\" " ..
-				">> " .. string.format("%q", log_path) .. "; " ..
+				-- shell_quote, not string.format("%q"). %q escapes for a LUA
+				-- literal: it handles backslashes and quotes but leaves $,
+				-- backticks and ! untouched, every one of which /bin/sh expands.
+				-- The log path derives from the configurable config directory, so
+				-- this is the injection hazard shell_quote exists for — and the
+				-- shell-quoting guard cannot see a %q call to flag it.
+				">> " .. text_utils.shell_quote(log_path) .. "; " ..
 				"done"
 			local serve_handle = ShellRunner.spawn("/bin/sh", {
 				"-c", launch_cmd
