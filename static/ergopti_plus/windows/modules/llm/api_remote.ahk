@@ -92,7 +92,7 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
 
     resolved := _LLMRemoteResolveEntry(Entry)
     if (resolved == "") {
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return req_id
     }
 
@@ -117,7 +117,7 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
         _LLMRemoteSetAuthHeaders(http, resolved["Format"], resolved["Token"])
         http.Send(Payload)
     } catch as err {
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return req_id
     }
 
@@ -181,7 +181,7 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
     tmp_stdout  := tmp_dir . "\ergopti_remote_" . uid . ".out"
     if !FSWrite(tmp_payload, Payload) {
         try LoggerWarn("LLM.remote", "Failed to write curl payload file.")
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return true
     }
     cmdLine := '"' . curl_exe . '" -s -S -X POST '
@@ -196,7 +196,7 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
     } catch as err {
         try FSDelete(tmp_payload)
         try LoggerWarn("LLM.remote", "curl launch failed: {1}.", err.Message)
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return true
     }
     _LLMRemote_TrimAsyncRegistry()
@@ -241,15 +241,15 @@ _LLMRemote_PollCurl(req_id) {
     _LLMRemote_CurlCleanup(entry)
     _LLM_Remote_Async.Delete(req_id)
     if (body == "") {
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
     text := _LLMRemoteParseResponse(fmt, body)
     if (text == "") {
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
-    try on_success(text)
+    _LLM_InvokeCallback(on_success, "on_success", text)
 }
 
 LLM_RemoteCancelAsync(req_id) {
@@ -315,7 +315,7 @@ _LLMRemote_PollRequest(req_id) {
             try entry["http"].Abort()
         _LLM_Remote_Async.Delete(req_id)
         try LoggerWarn("LLM.remote", "Poll deadline exceeded for req_id={1} — aborting.", req_id)
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
     http := entry["http"]
@@ -332,7 +332,7 @@ _LLMRemote_PollRequest(req_id) {
         try http.Abort()
         _LLM_Remote_Async.Delete(req_id)
         try LoggerWarn("LLM.remote", "WaitForResponse COM error for req_id={1}: {2} — aborting.", req_id, com_err.Message)
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
     if !ready {
@@ -347,16 +347,16 @@ _LLMRemote_PollRequest(req_id) {
         status := http.Status
         body   := http.ResponseText
     } catch {
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
     if (status < 200 or status >= 300) {
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
     text := _LLMRemoteParseResponse(entryFormat, body)
     if (text == "") {
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
     ; Pull the per-provider ``usage`` block out of the response so the
@@ -366,7 +366,7 @@ _LLMRemote_PollRequest(req_id) {
     ; ``prompt_eval_count`` instead, which we don't parse for the remote
     ; path because the engine only treats local backends as "free").
     meta := _LLMRemoteExtractUsage(entryFormat, body, entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : "")
-    try on_success(text, meta)
+    _LLM_InvokeCallback(on_success, "on_success", text, meta)
 }
 
 ; Token + cost extraction. Each provider exposes the same numeric fields
@@ -549,14 +549,14 @@ LLM_RemoteIsReady_Async(Entry, on_result) {
 
     ProviderId := _LLMRemoteEntryGet(Entry, "Provider", "openai_compat")
     if !LLM_API_PROVIDERS.Has(ProviderId) {
-        try on_result(false)
+        _LLM_InvokeCallback(on_result, "on_result", false)
         return
     }
     Provider := LLM_API_PROVIDERS[ProviderId]
     BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", Provider["BaseUrl"])
     Token    := _LLMRemoteEntryGet(Entry, "Token", "")
     if (BaseUrl == "" or Token == "") {
-        try on_result(false)
+        _LLM_InvokeCallback(on_result, "on_result", false)
         return
     }
 
@@ -568,7 +568,7 @@ LLM_RemoteIsReady_Async(Entry, on_result) {
         PingUrl := RTrim(BaseUrl, "/") . "/models?key=" . Token
     }
     if (PingUrl == "") {
-        try on_result(false)
+        _LLM_InvokeCallback(on_result, "on_result", false)
         return
     }
 
@@ -580,7 +580,7 @@ LLM_RemoteIsReady_Async(Entry, on_result) {
         _LLMRemoteSetAuthHeaders(Http, ProvFmt, Token)
         Http.Send()
     } catch {
-        try on_result(false)
+        _LLM_InvokeCallback(on_result, "on_result", false)
         return
     }
     _LLMRemote_PollReady(Http, on_result, A_TickCount, LLM_REMOTE_READY_PING_DEADLINE_MS)
@@ -599,7 +599,7 @@ _LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms) {
             ; Abort the stalled request so the COM object + socket are released
             ; now rather than lingering until WinHTTP's own timeout fires.
             try Http.Abort()
-            try on_result(false)
+            _LLM_InvokeCallback(on_result, "on_result", false)
             return
         }
         SetTimer(() => _LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms), -LLM_REMOTE_READY_PING_POLL_MS)
@@ -607,7 +607,7 @@ _LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms) {
     }
     status := 0
     try status := Http.Status
-    try on_result(status >= 200 and status < 300)
+    _LLM_InvokeCallback(on_result, "on_result", status >= 200 and status < 300)
 }
 
 

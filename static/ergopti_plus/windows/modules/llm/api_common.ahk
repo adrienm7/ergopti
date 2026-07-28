@@ -487,3 +487,33 @@ _LLM_RunCancelKills(Kills) {
 			try K["http"].Abort()
 	}
 }
+
+
+; Invoke an LLM completion callback so a throw inside it can never vanish.
+;
+; Every backend hands its result to a caller-supplied callback, and 49 of those
+; hand-offs were written as a bare `_LLM_InvokeCallback(on_x, "on_x", ...)`. A bare try discards the
+; exception with no log line at all, so an engine-side throw — a malformed
+; response the parser chokes on, a renderer that hits an unset global — looked
+; exactly like a request that simply never completed: no prediction, no error,
+; nothing to search for. This is the class the adapters were already ratcheted
+; against; the LLM backends were never brought in line.
+;
+; The catch is deliberate rather than a rethrow: these run from HTTP completion
+; handlers and timer callbacks, where an escaping exception reaches the global
+; error net and, before the driver is ready, is treated as fatal. Logging and
+; abandoning the one request is the correct blast radius.
+;
+; @param Fn    {Func}   The callback. A falsy value is a no-op, matching the
+;                       previous `try` behaviour when the caller passed nothing.
+; @param Name  {String} Callback name, for the log line.
+; @param Args* {Any}    Forwarded verbatim.
+_LLM_InvokeCallback(Fn, Name, Args*) {
+    if !Fn
+        return
+    try {
+        Fn(Args*)
+    } catch as Err {
+        try LoggerError("LLM", "Callback '{1}' raised: {2}. This request is abandoned — nothing downstream retries it, so the user simply never sees a prediction.", Name, Err.Message)
+    }
+}

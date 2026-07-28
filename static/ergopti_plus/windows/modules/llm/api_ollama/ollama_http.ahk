@@ -101,7 +101,7 @@ LLM_OllamaIsRunning_Async(on_result) {
 		Run(cmd, , "Hide", &pid)
 		_LLM_Ollama_PingPoll(pid, tmp_out, on_result, A_TickCount)
 	} catch {
-		try on_result(false)
+		_LLM_InvokeCallback(on_result, "on_result", false)
 	}
 }
 
@@ -122,7 +122,7 @@ _LLM_Ollama_PingPoll(pid, tmp_out, on_result, start_tick) {
 		if (_LLM_DeadlineExpired(start_tick, 4000)) {
 			try ProcessClose(pid)
 			try FSDelete(tmp_out)
-			try on_result(false)
+			_LLM_InvokeCallback(on_result, "on_result", false)
 			return
 		}
 		SetTimer(() => _LLM_Ollama_PingPoll(pid, tmp_out, on_result, start_tick), -150)
@@ -131,7 +131,7 @@ _LLM_Ollama_PingPoll(pid, tmp_out, on_result, start_tick) {
 	reachable := false
 	try reachable := (FileExist(tmp_out) and FileGetSize(tmp_out) > 0)
 	try FSDelete(tmp_out)
-	try on_result(reachable)
+	_LLM_InvokeCallback(on_result, "on_result", reachable)
 }
 
 /**
@@ -203,7 +203,7 @@ LLM_OllamaListModels_Async(on_result) {
 		Run(cmd, , "Hide", &pid)
 		_LLM_Ollama_TagsPoll(pid, tmp_out, on_result, A_TickCount)
 	} catch {
-		try on_result([])
+		_LLM_InvokeCallback(on_result, "on_result", [])
 	}
 }
 
@@ -223,7 +223,7 @@ _LLM_Ollama_TagsPoll(pid, tmp_out, on_result, start_tick) {
 		if (_LLM_DeadlineExpired(start_tick, 4000)) {
 			try ProcessClose(pid)
 			try FSDelete(tmp_out)
-			try on_result([])
+			_LLM_InvokeCallback(on_result, "on_result", [])
 			return
 		}
 		SetTimer(() => _LLM_Ollama_TagsPoll(pid, tmp_out, on_result, start_tick), -150)
@@ -236,7 +236,7 @@ _LLM_Ollama_TagsPoll(pid, tmp_out, on_result, start_tick) {
 			tags := _LLM_Ollama_ParseTagNames(body)
 	}
 	try FSDelete(tmp_out)
-	try on_result(tags)
+	_LLM_InvokeCallback(on_result, "on_result", tags)
 }
 
 /**
@@ -254,7 +254,7 @@ _LLM_Ollama_TagsPoll(pid, tmp_out, on_result, start_tick) {
 LLM_OllamaDeleteModel_Async(tag, on_result) {
 	global LLM_OLLAMA_BASE_URL, LLM_OLLAMA_DELETE_TIMEOUT_MS
 	if (tag == "") {
-		try on_result(false)
+		_LLM_InvokeCallback(on_result, "on_result", false)
 		return
 	}
 	try {
@@ -268,7 +268,7 @@ LLM_OllamaDeleteModel_Async(tag, on_result) {
 		body := '{"name":"' . StrReplace(tag, '"', '\"') . '"}'
 		if !FSWrite(tmp_payload, body) {
 			try LoggerWarn("LLM.ollama", "Failed to write delete payload file for '{1}'.", tag)
-			try on_result(false)
+			_LLM_InvokeCallback(on_result, "on_result", false)
 			return
 		}
 		curl_exe := A_WinDir . "\System32\curl.exe"
@@ -282,7 +282,7 @@ LLM_OllamaDeleteModel_Async(tag, on_result) {
 		_LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, tag, on_result, A_TickCount)
 	} catch as e {
 		try LoggerError("LLM.ollama", "Ollama delete '{1}' launch failed: {2}.", tag, e.Message)
-		try on_result(false)
+		_LLM_InvokeCallback(on_result, "on_result", false)
 	}
 }
 
@@ -308,7 +308,7 @@ _LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, tag, on_result, start_tick) {
 			try FSDelete(tmp_payload)
 			try FSDelete(tmp_out)
 			try LoggerWarn("LLM.ollama", "Ollama delete '{1}' timed out.", tag)
-			try on_result(false)
+			_LLM_InvokeCallback(on_result, "on_result", false)
 			return
 		}
 		SetTimer(() => _LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, tag, on_result, start_tick), -LLM_OLLAMA_POLL_MS)
@@ -328,5 +328,5 @@ _LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, tag, on_result, start_tick) {
 		else
 			LoggerWarn("LLM.ollama", "Ollama delete '{1}' failed: {2}.", tag, body)
 	}
-	try on_result(ok)
+	_LLM_InvokeCallback(on_result, "on_result", ok)
 }

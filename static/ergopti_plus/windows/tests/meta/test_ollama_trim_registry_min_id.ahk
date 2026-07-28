@@ -88,7 +88,13 @@ _OTR_PollCatchesCom() {
 		"_LLM_Ollama_PollRequest must have an explicit catch clause for WaitForResponse COM errors (ollama-com-exception-busy-loop)")
 
 	; The catch must call on_fail and exit, not re-queue the poller
-	Assert(InStr(Body, "on_fail()") > 0 or InStr(Body, "on_fail.Call()") > 0,
+	; Any of the three call shapes satisfies the invariant. The completion
+	; callbacks now route through _LLM_InvokeCallback so a throw inside on_fail
+	; cannot vanish; that changes how the call is spelled, not what is being
+	; asserted — the COM catch must still notify the caller rather than
+	; re-queueing the poller and spinning to the deadline.
+	Assert(InStr(Body, "on_fail()") > 0 or InStr(Body, "on_fail.Call()") > 0
+			or InStr(Body, "on_fail,") > 0,
 		"_LLM_Ollama_PollRequest COM catch must call on_fail to honour the async contract (ollama-com-exception-busy-loop)")
 }
 Test("api_ollama: PollRequest catches COM exception and aborts immediately (ollama-com-exception-busy-loop)", _OTR_PollCatchesCom)

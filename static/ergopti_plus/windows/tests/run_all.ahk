@@ -1050,6 +1050,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_toggle_category_all_features_atomic.ahk
 #Include meta/test_crypto_djb2_fallback_logged.ahk
 #Include meta/test_adapter_callback_swallow_logged.ahk
+#Include meta/test_llm_callbacks_never_swallowed.ahk
 #Include meta/test_text_send_direct_mode_guarded.ahk
 #Include meta/test_http_post_reentrancy_guard.ahk
 #Include meta/test_personal_editor_autoexpand_i18n.ahk

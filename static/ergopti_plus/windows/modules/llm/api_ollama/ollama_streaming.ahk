@@ -291,7 +291,7 @@ _LLM_Ollama_PollRequest(req_id, parser) {
 		try LoggerWarn("LLM.ollama", "WaitForResponse threw COM error — aborting req {1}: {2}", req_id, com_err.Message)
 		on_fail := entry["on_fail"]
 		_LLM_Ollama_Async.Delete(req_id)
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		_LLM_Ollama_DrainPending()
 		return
 	}
@@ -301,7 +301,7 @@ _LLM_Ollama_PollRequest(req_id, parser) {
 			try LoggerWarn("LLM.ollama", "Ollama request timed out after {1} ms.", elapsed)
 			on_fail := entry["on_fail"]
 			_LLM_Ollama_Async.Delete(req_id)
-			try on_fail()
+			_LLM_InvokeCallback(on_fail, "on_fail")
 			_LLM_Ollama_DrainPending()
 			return
 		}
@@ -323,13 +323,13 @@ _LLM_Ollama_PollRequest(req_id, parser) {
 		status := http.Status
 		body   := http.ResponseText
 	} catch {
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		_LLM_Ollama_DrainPending()
 		return
 	}
 	if (status != 200) {
 		try LoggerWarn("LLM.ollama", "Ollama request failed — HTTP {1}.", status)
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		_LLM_Ollama_DrainPending()
 		return
 	}
@@ -359,7 +359,7 @@ _LLM_Ollama_PollCurl(req_id) {
 		on_fail := entry["on_fail"]
 		_LLM_Ollama_CleanupCurlFiles(entry)
 		_LLM_Ollama_Async.Delete(req_id)
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		_LLM_Ollama_DrainPending()
 		return
 	}
@@ -380,7 +380,7 @@ _LLM_Ollama_PollCurl(req_id) {
 	_LLM_Ollama_Async.Delete(req_id)
 	if (body == "") {
 		try LoggerWarn("LLM.ollama", "curl finished with empty stdout.")
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		_LLM_Ollama_DrainPending()
 		return
 	}
@@ -409,7 +409,7 @@ _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
 	; otherwise on_fail would receive the raw Map as if it were prediction text.
 	if (text is Map) and text.Has("error") {
 		try LoggerWarn("LLM.ollama", "Ollama response parse failed: {1}.", text.Has("message") ? text["message"] : "unknown error")
-		try on_fail(text)
+		_LLM_InvokeCallback(on_fail, "on_fail", text)
 		return
 	}
 	if (text == "") {
@@ -418,13 +418,13 @@ _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
 		if (entry is Map) and entry.Has("payload_snip")
 			payload_hint := " Payload: «" . entry["payload_snip"] . "»."
 		try LoggerWarn("LLM.ollama", "Ollama returned an empty prediction (parse miss). Body: «{1}».{2}", snip, payload_hint)
-		try on_fail(Map("error", true, "message", "empty prediction"))
+		_LLM_InvokeCallback(on_fail, "on_fail", Map("error", true, "message", "empty prediction"))
 		return
 	}
 	snip := StrLen(text) > 60 ? SubStr(text, 1, 60) . "…" : text
 	try LoggerInfo("LLM.ollama", "Prediction received ({1} chars): «{2}».", StrLen(text), snip)
 	try LLM_OllamaNoteInferenceSuccess()
-	try on_success(text)
+	_LLM_InvokeCallback(on_success, "on_success", text)
 }
 
 /**
@@ -466,7 +466,7 @@ _LLM_Ollama_PollGeneric(http, on_ok, on_err, start_tick := 0, timeout_ms := 0, p
 			; otherwise keep the COM object + socket resident until WinHTTP's
 			; own timeout fires, long after we have stopped polling it.
 			try http.Abort()
-			try on_err()
+			_LLM_InvokeCallback(on_err, "on_err")
 			return
 		}
 		SetTimer(() => _LLM_Ollama_PollGeneric(http, on_ok, on_err, start_tick, timeout_ms, poll_ms), -poll_ms)
@@ -476,10 +476,10 @@ _LLM_Ollama_PollGeneric(http, on_ok, on_err, start_tick := 0, timeout_ms := 0, p
 		status := http.Status
 		body := http.ResponseText
 	} catch {
-		try on_err()
+		_LLM_InvokeCallback(on_err, "on_err")
 		return
 	}
-	try on_ok(status, body)
+	_LLM_InvokeCallback(on_ok, "on_ok", status, body)
 }
 
 /**
@@ -562,7 +562,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	tmp_dir := _LLM_Ollama_TempDir()
 	tmp_payload := tmp_dir . "\ergopti_ollama_" . uid . ".json"
 	if !FSWrite(tmp_payload, payload) {
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		return { Pid: 0, Cancelled: false }
 	}
 
@@ -582,7 +582,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 		Run(cmdLine, , "Hide", &pid)
 		handle.Pid := pid
 	} catch {
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		_LLM_Ollama_CleanupStreamFiles(handle)
 		return handle
 	}
@@ -610,7 +610,7 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 		_LLM_Ollama_CleanupStreamFiles(handle)
 		_LLM_Ollama_RemoveStreamHandle(handle)
 		try LoggerInfo("LLM.ollama", "Streaming cancelled (newer prediction).")
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		return
 	}
 	if (state.Has("start_tick") and state.Has("timeout_ms") and _LLM_DeadlineExpired(state["start_tick"], state["timeout_ms"])) {
@@ -620,7 +620,7 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 		_LLM_Ollama_RemoveStreamHandle(handle)
 		elapsed := state.Has("start_tick") ? (A_TickCount - state["start_tick"]) : 0
 		try LoggerWarn("LLM.ollama", "Streaming timed out after {1} ms.", elapsed)
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		return
 	}
 	; Read whatever new bytes appeared.
@@ -696,11 +696,11 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 	if (final == "") {
 		hint := _LLM_Ollama_StreamFailHint(handle.TmpStdout)
 		try LoggerWarn("LLM.ollama", "Streaming finished with empty response.{1}", hint != "" ? " " hint : "")
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		return
 	}
 	try LLM_OllamaNoteInferenceSuccess()
-	try on_success(final)
+	_LLM_InvokeCallback(on_success, "on_success", final)
 }
 
 _LLM_Ollama_RemoveStreamHandle(handle) {
@@ -772,7 +772,7 @@ _LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial) {
 	}
 	if (new_acc != state["acc"]) {
 		state["acc"] := new_acc
-		try on_partial(new_acc)
+		_LLM_InvokeCallback(on_partial, "on_partial", new_acc)
 	}
 }
 
