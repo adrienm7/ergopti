@@ -248,7 +248,14 @@ end
 function M.set_preview_star_enabled(v)
 	is_star_preview_enabled = (v == true)
 	Logger.debug(LOG, "Star preview: %s.", is_star_preview_enabled and "on" or "off")
-	if not v then invalidate_pending_preview(); tooltip.hide() end
+	if not v then
+		-- hide_forced, not hide: a dequeue cycle in progress makes tooltip.hide()
+		-- a no-op so multi-row previews survive the first row's expiry — which
+		-- means turning the preview OFF left the rows the user just disabled
+		-- sitting on screen until they timed out on their own.
+		invalidate_pending_preview()
+		tooltip.hide_forced()
+	end
 end
 
 --- Enables or disables the autocorrect hotstring preview tooltip.
@@ -256,7 +263,14 @@ end
 function M.set_preview_autocorrect_enabled(v)
 	is_autocorrect_preview_enabled = (v == true)
 	Logger.debug(LOG, "Autocorrect preview: %s.", is_autocorrect_preview_enabled and "on" or "off")
-	if not v then invalidate_pending_preview(); tooltip.hide() end
+	if not v then
+		-- hide_forced, not hide: a dequeue cycle in progress makes tooltip.hide()
+		-- a no-op so multi-row previews survive the first row's expiry — which
+		-- means turning the preview OFF left the rows the user just disabled
+		-- sitting on screen until they timed out on their own.
+		invalidate_pending_preview()
+		tooltip.hide_forced()
+	end
 end
 
 --- Enables or disables the AI prediction tooltip.
@@ -272,7 +286,11 @@ function M.set_preview_enabled(enabled)
 	is_star_preview_enabled        = (enabled == true)
 	is_autocorrect_preview_enabled = (enabled == true)
 	Logger.debug(LOG, "All hotstring tooltips: %s.", enabled and "on" or "off")
-	if not enabled then invalidate_pending_preview(); tooltip.hide() end
+	if not enabled then
+		-- hide_forced for the same reason as the per-kind setters above.
+		invalidate_pending_preview()
+		tooltip.hide_forced()
+	end
 end
 
 --- Enables or disables background tinting for all tooltip types.
@@ -527,7 +545,15 @@ function M.update_preview(buf)
 					-- case-conform resolution and word-boundary rules — the copy that
 					-- had to be kept in sync by hand and was not.
 					local matched_plain, matched_input = expander.would_fire(mapping, buf)
-					if matched_input then
+					-- Gated on the RESOLVED replacement, not on the typed text. A
+					-- no-op mapping returns (nil, typed, nil, true) — nil expansion
+					-- but a perfectly truthy second value — so gating on the input
+					-- built a row whose text was nil. render_stacked then threw and
+					-- took the ENTIRE preview stack down with it, so one no-op
+					-- mapping silently erased every other suggestion on screen. The
+					-- star bucket above already gates on the expansion, which is what
+					-- "the preview treats a no-op exactly like no match" means.
+					if matched_plain then
 						matches[#matches + 1] = {
 							repl       = matched_plain,
 							plain_repl = matched_plain,
@@ -550,7 +576,13 @@ function M.update_preview(buf)
 		-- provider) the FIRST surviving row is the one the engine will fire — the
 		-- rest are rendered dimmed + strikethrough so the user can see the
 		-- alternatives without confusing them with the real outcome.
-		local magic_key = "★"
+		-- The key the user actually has to press to validate a star row. Read from
+		-- CoreState, which owns it and is what star_buf above is already built
+		-- from: a hard-coded ★ told anyone who customised the magic key to press a
+		-- character their layout no longer produces. The literal remains only as
+		-- the fallback for a state that has not resolved one yet.
+		local magic_key = (_state and _state.magic_key ~= nil and _state.magic_key ~= "")
+			and _state.magic_key or "★"
 		local rows          = {}
 		local any_enabled   = false
 		local min_timeout   = nil
