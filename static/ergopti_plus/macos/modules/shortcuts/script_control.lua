@@ -59,6 +59,16 @@ local KEYCODE_BACKSPACE = Keycodes.BACKSPACE
 local KEYCODE_RETURN    = Keycodes.RETURN
 local KEYCODE_ESCAPE    = Keycodes.ESCAPE
 
+--- Prefix of the binding key every script-control dispatch passes to the gesture
+--- action layer, so a script key and a gesture slot of the same name cannot
+--- collide in the (binding, action) parameter store.
+---
+--- Exported because the menu must PROMPT for a parameter under the exact key
+--- dispatch will later READ it under. Spelling it a second time in the menu is
+--- how a configured link ended up written to an entry nothing consults, leaving
+--- the key silently inert.
+M.BINDING_PREFIX = "script__"
+
 -- The script-control eventtap lives on the main run loop. macOS disables a
 -- CGEventTap whose callback is stalled past the system timeout — and a blocking
 -- osascript on that run loop (e.g. the pause/resume layout switch) can trip it.
@@ -387,7 +397,7 @@ local function handle_key(e)
 		end
 		Logger.info(LOG, "Backspace sentinel (F14) — dispatching '%s'.", tostring(_key_actions.backspace))
 		log_shortcut_if_available("Alt+Backspace")
-		dispatch_action(_key_actions.backspace, "script__backspace")
+		dispatch_action(_key_actions.backspace, M.BINDING_PREFIX .. "backspace")
 		return true
 	end
 	if code == KEYCODE_RETURN_SENTINEL then
@@ -398,7 +408,7 @@ local function handle_key(e)
 		end
 		Logger.info(LOG, "Return sentinel (F13) — dispatching '%s'.", tostring(_key_actions.return_key))
 		log_shortcut_if_available("Alt+Enter")
-		dispatch_action(_key_actions.return_key, "script__return_key")
+		dispatch_action(_key_actions.return_key, M.BINDING_PREFIX .. "return_key")
 		return true
 	end
 	if code == KEYCODE_ESCAPE_SENTINEL then
@@ -409,7 +419,7 @@ local function handle_key(e)
 		end
 		Logger.info(LOG, "Escape sentinel (F15) — dispatching '%s'.", tostring(_key_actions.escape))
 		log_shortcut_if_available("Alt+Escape")
-		dispatch_action(_key_actions.escape, "script__escape")
+		dispatch_action(_key_actions.escape, M.BINDING_PREFIX .. "escape")
 		return true
 	end
 
@@ -419,17 +429,17 @@ local function handle_key(e)
 	if code == KEYCODE_BACKSPACE then
 		Logger.info(LOG, "Right-cmd + Backspace (KE-paused fallback) — dispatching '%s'.", tostring(_key_actions.backspace))
 		log_shortcut_if_available("Alt+Backspace")
-		return dispatch_action(_key_actions.backspace, "script__backspace")
+		return dispatch_action(_key_actions.backspace, M.BINDING_PREFIX .. "backspace")
 	end
 	if code == KEYCODE_RETURN then
 		Logger.info(LOG, "Right-cmd + Return (KE-paused fallback) — dispatching '%s'.", tostring(_key_actions.return_key))
 		log_shortcut_if_available("Alt+Enter")
-		return dispatch_action(_key_actions.return_key, "script__return_key")
+		return dispatch_action(_key_actions.return_key, M.BINDING_PREFIX .. "return_key")
 	end
 	if code == KEYCODE_ESCAPE then
 		Logger.info(LOG, "Right-cmd + Escape (KE-paused fallback) — dispatching '%s'.", tostring(_key_actions.escape))
 		log_shortcut_if_available("Alt+Escape")
-		return dispatch_action(_key_actions.escape, "script__escape")
+		return dispatch_action(_key_actions.escape, M.BINDING_PREFIX .. "escape")
 	end
 
 	return false
