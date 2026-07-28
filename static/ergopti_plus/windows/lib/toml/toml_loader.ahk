@@ -70,7 +70,7 @@ _ParseEntryPriority(Line, Fallback) {
 
 ; Return the cached content of a TOML file, reading it from disk on first access.
 ReadTomlFile(FilePath) {
-    global _TomlFileCache
+    global _TomlFileCache, _TomlUnreadableFiles
     if _TomlFileCache.Has(FilePath) {
         return _TomlFileCache[FilePath]
     }
@@ -83,10 +83,19 @@ ReadTomlFile(FilePath) {
         ; hide a whole hotstring file for the entire session: every consumer
         ; saw zero entries and the load was still logged as done. Leaving the
         ; path uncached lets the next caller retry.
-        if FileExist(FilePath)
-            try LoggerError("TomlLoader", "Cannot read '{1}': {2}. Treated as empty for this call; not cached so a later read retries.", FilePath, Err.Message)
+        if FileExist(FilePath) {
+            ; Record the failure so writers can tell "unreadable" from "empty".
+            ; Only for an existing file: a missing one legitimately reads empty,
+            ; and flagging it would block the first save of a fresh install.
+            _TomlUnreadableFiles[FilePath] := true
+            try LoggerError("TomlLoader", "Cannot read '{1}': {2}. Treated as empty for this call; not cached so a later read retries, and flagged unreadable so writers refuse to rebuild from it.", FilePath, Err.Message)
+        }
         return ""
     }
+    ; A successful read clears the sticky flag: the content below is now the
+    ; real file, so anything derived from it is safe to persist again.
+    if _TomlUnreadableFiles.Has(FilePath)
+        _TomlUnreadableFiles.Delete(FilePath)
     _TomlFileCache[FilePath] := Content
     return Content
 }

@@ -97,6 +97,31 @@ TOML_ReadFailed(Path) {
     return _TomlReadFailures.Has(Path)
 }
 
+; Paths whose last ReadTomlFile could not open an EXISTING file. The sibling of
+; _TomlReadFailures above, and deliberately STICKY where that one is per-parse:
+; _TomlReadFailures is cleared at the top of every ParseTomlFile, which means a
+; lock that clears between a failed boot read and the deferred save is invisible
+; to the writer — the re-parse succeeds and the write looks perfectly safe while
+; the payload it was handed was already derived from nothing. Only a successful
+; read of the SAME path clears an entry here.
+global _TomlUnreadableFiles := Map()
+
+; True when the last ReadTomlFile for this path could not read an EXISTING file.
+; Callers that turn the returned content into in-memory state which is later
+; serialized back must consult this: treating "" as "the file said nothing" and
+; then persisting the resulting defaults destroys the real file.
+TOML_UnreadableFile(Path) {
+    global _TomlUnreadableFiles
+    return _TomlUnreadableFiles.Has(Path)
+}
+
+; Session latch: an EXISTING config.toml could not be read during the boot
+; apply, so the in-memory feature tree holds manifest DEFAULTS rather than the
+; user's settings. SaveFullConfig honours it and refuses to serialize. Never
+; cleared once set — nothing re-applies the config in-process, so the tree stays
+; untrustworthy until the driver is restarted.
+global _ConfigBootReadFailed := false
+
 ; Parse a TOML file into Map<Section, Map<Key, Value>>. Values are coerced
 ; to AHK booleans / integers / strings / arrays of strings — anything more
 ; exotic falls through as a raw string. Returns an empty Map when the file

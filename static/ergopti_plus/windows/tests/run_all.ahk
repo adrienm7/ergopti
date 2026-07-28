@@ -580,6 +580,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_corpus_toml_fuzz.ahk
 #Include meta/test_toml_inline_comment_stripping.ahk
 #Include meta/test_toml_read_failure_is_loud.ahk
+#Include meta/test_config_boot_read_failure_blocks_persist.ahk
 ; Keylogger aggregation corpus -- tests KLW_WalkTypingEntry / KLW_WalkAppSwitch /
 ; KLW_WalkWindowSwitch / KLW_WalkSystemEvent against shared cross-driver vectors.
 #Include meta/test_corpus_keylogger_aggregation.ahk
