@@ -699,9 +699,20 @@ local function onKeyDownRaw(e)
 	-- 1. Ignore our own synthetic "Delete" keystrokes to prevent double-deletion.
 	-- Guard with a source-PID check so a human Backspace pressed during an in-flight
 	-- expansion does not incorrectly consume a slot and desync the buffer (Bug 1 fix).
+	-- Is this event one WE posted? Both the synthetic-Delete guard below and the
+	-- LLM-key routing further down need the answer, and the property read is an
+	-- ObjC round-trip on the hottest path in the driver — so it is taken at most
+	-- once per keystroke, and only when something actually asks.
+	local _event_is_ours = nil
+	local function event_is_ours()
+		if _event_is_ours == nil then
+			_event_is_ours = e:getProperty(hs.eventtap.event.properties.eventSourceUnixProcessID) == hs.processInfo.processID
+		end
+		return _event_is_ours
+	end
+
 	if keyCode == Keycodes.BACKSPACE and CoreState.expected_synthetic_deletes > 0 then
-		local source_pid = e:getProperty(hs.eventtap.event.properties.eventSourceUnixProcessID)
-		if source_pid == hs.processInfo.processID then
+		if event_is_ours() then
 			CoreState.expected_synthetic_deletes = CoreState.expected_synthetic_deletes - 1
 			return false
 		end
@@ -713,7 +724,19 @@ local function onKeyDownRaw(e)
 	local is_ignored = km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now)
 
 	-- 2. Route LLM prediction keys (Enter / digits / arrows) before buffer logic.
-	if LLMBridge.handle_llm_keys(keyCode, flags, is_ignored) then return true end
+	-- Skipped for our OWN synthetic echoes while an expansion is still emitting.
+	-- The terminator re-type posts a real Return or Tab, which comes back through
+	-- this tap; with predictions on screen handle_llm_keys read it as the user
+	-- accepting one and injected LLM text into the middle of the expansion that
+	-- was still being typed. Same source-PID test as the synthetic-Delete guard
+	-- above, and narrowed to the emitting window so a human Tab pressed at any
+	-- other moment still routes normally.
+	local mid_expansion = (CoreState.expected_synthetic_chars or "") ~= ""
+		or (CoreState.expected_synthetic_pastes or 0) > 0
+	local is_own_event = mid_expansion and event_is_ours()
+	if not is_own_event then
+		if LLMBridge.handle_llm_keys(keyCode, flags, is_ignored) then return true end
+	end
 
 	-- 3. Run custom interceptors registered by external modules.
 	local suppress_triggers = false

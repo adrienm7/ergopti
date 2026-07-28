@@ -447,7 +447,7 @@ twice). All confirmed via two lenses; each carries a repro + fix in the journal.
 | [x] G2/F | `macos/lib/file_watchers.lua:153` | Git-operation reload-hold probes only `base_dir` — a `git pull` in the **config** repo (personal hotstrings tree) is unguarded. |
 | [x] G1/C | `macos/lib/file_watchers.lua:164` | The git/settle gate is evaluated at **schedule** time, not fire time — the `ui_restore` deferral window can still reload mid-pull. |
 | [x] G3/E | `macos/adapters/toml_cache.lua:191` | `toml_cache` writes `.lua` snapshots **inside** the watched `base_dir` — a runtime store fires a spurious full reload. |
-| G3/C | `macos/modules/keymap/init.lua:704` | Synthetic Tab/Return echoes are consumed by `handle_llm_keys` as prediction-accept while predictions are visible → LLM text injected mid-expansion. |
+| [x] G3/C | `macos/modules/keymap/init.lua:704` | Synthetic Tab/Return echoes are consumed by `handle_llm_keys` as prediction-accept while predictions are visible → LLM text injected mid-expansion. |
 | G4/D | `macos/modules/keymap/utils.lua:435` | `is_ignored_window` runs synchronous AX probes inside the keyDown tap on every cache miss and every 5 s TTL expiry. |
 | [x] G2/F | `macos/modules/keymap/input_sources.lua:708` | `upgrade_active_list` parses `<n>/<n>` but AppleScript returns a list (`1, /, 2`) → successful layout upgrades reported as failures. |
 | [x] G5/G | `macos/modules/keymap/llm_bridge.lua:501` | `would_fire`'s no-op returns a truthy 2nd value → the preview builds a **nil-text** row that crashes `render_stacked` and silently kills the whole preview stack. |
@@ -460,7 +460,7 @@ twice). All confirmed via two lenses; each carries a repro + fix in the journal.
 | [x] G2/F | `macos/modules/llm/mlx_deps_checker.lua:538` | The MLX deps-checker fast-path hide is not session-owner-guarded → closes another operation's progress window (sibling of `f239b252d`). |
 | [x] G1/A | `macos/modules/llm/api_ollama.lua:429` | Non-streaming response path swallows callback throws under bare `pcall` — "green but no prediction", zero log evidence. |
 | [x] G3/C | `macos/modules/llm/api_mlx.lua:653` | MLX warmup POST timeout never bumps `_warmup_gen` and the response cancels the newer timeout's pre-guard → warmup POSTs pile up. |
-| G1/A | `macos/modules/llm/prediction_engine.lua:989` | The canonical inactivity debounce timer is built at **require** time, before `install_runtime_error_capture` → its callback is permanently unguarded. |
+| [x] G1/A | `macos/modules/llm/prediction_engine.lua:989` | The canonical inactivity debounce timer is built at **require** time, before `install_runtime_error_capture` → its callback is permanently unguarded. |
 | [x] G3/C | `macos/modules/gestures/actions.lua:491` | `search_web` snapshots/restores the clipboard with no in-flight guard — the stale-snapshot class `7bf0cc3cd` fixed, left unguarded here. |
 | [x] G2/A | `macos/adapters/http_client.lua:126` | Completion callbacks run under bare `pcall` with no `Logger.error` (`:98/:126/:155/:178`) — a throw in the LLM response handler vanishes. Recorded-open, still true; the callers currently backstop it (see §6). |
 | [x] G2/E | `macos/adapters/text_sender.lua:112` | A throw between `Clipboard.write` and arming the restore timer permanently clobbers the clipboard. |

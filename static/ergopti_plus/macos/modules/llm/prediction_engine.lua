@@ -1005,7 +1005,18 @@ M.CHAIN_FALLBACK_SEC = CHAIN_FALLBACK_SEC  -- Bridge passes this to suppress_res
 _inactivity_timer = hs.timer.delayed.new(inactivity_debounce_sec, function()
 	local profile = _deferred_profile_name
 	_deferred_profile_name = nil
-	M.perform_check(false, profile)
+	-- Guarded explicitly rather than left to the console tee. An unhandled throw
+	-- in here reaches Hammerspoon's own handler, which prints a traceback: the
+	-- runtime capture does persist that, but as an anonymous [CONSOLE] line with
+	-- no module, no level and no context — and the prediction for that keystroke
+	-- is simply gone. This is the single entry point for EVERY debounced
+	-- prediction, so it is the last place that should report failures as console
+	-- noise.
+	local ok, err = xpcall(function() M.perform_check(false, profile) end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Inactivity debounce check raised: %s. This prediction is abandoned — "
+			.. "nothing retries it, so the user simply never sees one.", tostring(err))
+	end
 end)
 
 -- Enable Enter-to-accept only after the user has explicitly navigated at least once;
