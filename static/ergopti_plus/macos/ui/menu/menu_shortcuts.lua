@@ -479,8 +479,23 @@ function M.build(ctx)
 							local spec = gestures and type(gestures.get_action_parameter_spec) == "function"
 								and gestures.get_action_parameter_spec(a) or nil
 							if spec then
+								-- The parameter store is keyed by (binding, action), and the
+								-- binding script_control dispatches under is the PREFIXED key —
+								-- it passes "script__backspace", never "backspace". Prompting
+								-- under the bare key name wrote the URL to an entry nothing ever
+								-- reads, so the handler found an empty parameter and returned
+								-- silently: the very inert binding this prompt exists to
+								-- prevent, one layer deeper. The prefix is read from the module
+								-- that dispatches it rather than re-spelled here, because a
+								-- second spelling is exactly what drifted.
+								local prefix = script_control.BINDING_PREFIX
+								if type(prefix) ~= "string" then
+									Logger.error(LOG, "script_control.BINDING_PREFIX missing — refusing to "
+										.. "store '%s' under a binding key dispatch will not read.", tostring(a))
+									return
+								end
 								hs.timer.doAfter(0.05, function()
-									if ShortcutUtils.prompt_action_parameter(gestures, keyname, a, spec) then
+									if ShortcutUtils.prompt_action_parameter(gestures, prefix .. keyname, a, spec) then
 										assign()
 									end
 								end)
