@@ -96,6 +96,25 @@ local function first_codepoint(s)
 	return s:sub(1, 1)
 end
 
+--- Returns the last UTF-8 codepoint of `s`.
+---
+--- Needed because the macOS layout emits French punctuation as a SINGLE event
+--- carrying its typographic space first: ":" arrives as NBSP..":" and
+--- ";" / "!" / "?" as NNBSP..<char>. Those spaces are default-DISABLED
+--- terminators while the punctuation itself is default-enabled, so probing only
+--- the whole string and its FIRST codepoint missed every one of them - the
+--- enabled character was always the tail.
+--- @param s string The input string.
+--- @return string The last UTF-8 character, or "" when s is empty.
+local function last_codepoint(s)
+	if type(s) ~= "string" or s == "" then return "" end
+	local ok, len = pcall(utf8.len, s)
+	if not ok or not len or len < 1 then return s:sub(-1) end
+	local ok_off, off = pcall(utf8.offset, s, len)
+	if ok_off and off then return s:sub(off) end
+	return s:sub(-1)
+end
+
 
 
 
@@ -117,6 +136,15 @@ function M.is_terminator(chars)
 	if #chars > 0 then
 		local first = first_codepoint(chars)
 		if first ~= chars and _chars_set[first] then return true end
+		-- ...and the LAST codepoint. autocorrection - the flagship feature - is
+		-- entirely non-auto French accent corrections that fire only on a
+		-- terminator, and four of the enabled defaults (? ! : ;) arrive from the
+		-- macOS layout with their typographic space PREPENDED in the same event.
+		-- Probing the whole string and its head alone therefore rejected every
+		-- French sentence ending: the correction silently did not fire while the
+		-- tooltip had already advertised the row.
+		local last = last_codepoint(chars)
+		if last ~= chars and _chars_set[last] then return true end
 	end
 	return false
 end
@@ -131,6 +159,11 @@ function M.terminator_is_consumed(chars)
 	if #chars > 0 then
 		local first = first_codepoint(chars)
 		if first ~= chars and _consume_set[first] then return true end
+		-- Same tail probe as is_terminator, and it must stay in step with it:
+		-- a terminator recognised by one and not the other either gets consumed
+		-- when it should be re-typed, or re-typed when it should be consumed.
+		local last = last_codepoint(chars)
+		if last ~= chars and _consume_set[last] then return true end
 	end
 	return false
 end

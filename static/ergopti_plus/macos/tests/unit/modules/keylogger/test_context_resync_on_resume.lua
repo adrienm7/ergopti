@@ -48,7 +48,19 @@ local NOT_PAUSED = function() return false end
 
 --- Builds hs overrides whose frontmost application is `app_name` and whose AX tree
 --- exposes a plain (non-secure) text field — the vault-unlock-screen shape.
---- @param app_name string Title reported by hs.application.frontmostApplication().
+---
+--- The double exposes BOTH name() and title(), and they deliberately disagree.
+--- name() is the stable display-name API the whole pipeline is keyed on —
+--- SecureFieldDetector.isSecureApp exact-matches display names — while title()
+--- describes windows and is absent for some application instances. An earlier
+--- version of this double defined title() ONLY, which made it structurally
+--- incapable of noticing that resync_context was reading the wrong API: a vault
+--- whose title is nil or differs from its display name was never re-recognised
+--- as secure on resume, so keystrokes typed into it were logged.
+---
+--- Returning a deliberately WRONG title is what keeps that hole closed: any
+--- code path that resolves the app by title now fails this fixture loudly.
+--- @param app_name string Display name reported by app:name().
 --- @return table hs_overrides suitable for helpers.load_with_stubs.
 local function make_overrides(app_name)
 	local fake_observer = {
@@ -71,7 +83,10 @@ local function make_overrides(app_name)
 		application = {
 			frontmostApplication = function()
 				return {
-					title    = function() return app_name end,
+					name     = function() return app_name end,
+					-- Deliberately NOT the display name: resolving the app by
+					-- title must not accidentally work.
+					title    = function() return "window title of " .. app_name end,
 					bundleID = function() return "com.example." .. app_name end,
 					path     = function() return "/Applications/" .. app_name .. ".app" end,
 					pid      = function() return 4242 end,
