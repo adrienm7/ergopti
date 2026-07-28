@@ -41,10 +41,21 @@ _HSE_Beats(Cand, Best) {
     if (CandPrio != BestPrio) {
         return CandPrio > BestPrio
     }
-    if (Cand.GroupOrder != Best.GroupOrder) {
-        return Cand.GroupOrder < Best.GroupOrder
+    ; Guarded like Priority above. The preview's prefix-index entries are built
+    ; from the same TOML but carry only the fields the tooltip needs, so they
+    ; have no GroupOrder or Seq. Defaulting both makes this rule usable as the
+    ; SINGLE owner of collision precedence for the engine and the preview alike
+    ; — previously the preview carried its own copy, which had drifted to a
+    ; different Priority default and no GroupOrder/Seq tiebreak at all, so the
+    ; two could rank the same pair of triggers differently.
+    CandGroup := Cand.HasOwnProp("GroupOrder") ? Cand.GroupOrder : 0
+    BestGroup := Best.HasOwnProp("GroupOrder") ? Best.GroupOrder : 0
+    if (CandGroup != BestGroup) {
+        return CandGroup < BestGroup
     }
-    return Cand.Seq < Best.Seq
+    CandSeq := Cand.HasOwnProp("Seq") ? Cand.Seq : 0
+    BestSeq := Best.HasOwnProp("Seq") ? Best.Seq : 0
+    return CandSeq < BestSeq
 }
 
 ; Precedence for an end-char candidate against the current best, which may be a

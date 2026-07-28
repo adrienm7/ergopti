@@ -4,7 +4,7 @@
 ; ==============================================================================
 ; MODULE: Hotstring Tooltip / Core Engine + Public API
 ; DESCRIPTION:
-; Tooltip GUI state, font/style constants, the dequeue + safety timers, style refresh, and the public API (TooltipShow / TooltipHide / TooltipIsVisible / TooltipRearmTimer).
+; Tooltip GUI state, font/style constants, the dequeue + safety timers, style refresh, and the public API (TooltipShow / TooltipHide / TooltipIsVisible).
 ;
 ; Split out of the former lib/tooltip.ahk (P5 refactor); see ui/tooltip/init.ahk
 ; for the module overview. Functions and globals are hoisted, so load order
@@ -93,11 +93,6 @@ global _TooltipDequeueItems := 0
 ; and the safety timer (via _TooltipTimerFn) are authorised to call
 ; TooltipHide() during an active dequeue cycle.
 global _TooltipDequeueActive := false
-
-; Last items passed to TooltipShow, kept so that after a hotstring fires the
-; timer can be re-armed for the full duration from the moment of fire rather
-; than counting down from when the preview was first shown.
-global _TooltipLastItems := 0
 
 ; Stable function references. A single named function per timer is mandatory
 ; so SetTimer can cancel it by identity — each closure literal produces a
@@ -408,7 +403,7 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true) {
     global _TooltipGeneration, _TooltipTimerGeneration
     global _TooltipShownHwnds, _TOOLTIP_HWND_TRACK_CAP
     global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC, _TOOLTIP_SAFETY_SEC
-    global _TooltipDequeueItems, _TooltipDequeueActive, _TooltipLastItems
+    global _TooltipDequeueItems, _TooltipDequeueActive
     _TooltipGeneration += 1
     ; A rendering pass owns only the generation it created.  `_TooltipBuildGui`
     ; and `_TooltipResolvePosition` can pump/re-enter through GUI/COM, so a newer
@@ -416,7 +411,6 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true) {
     ; Never let the older invocation arm a timer, present, or clean up the newer
     ; surface after that point.
     RenderGeneration := _TooltipGeneration
-    _TooltipLastItems := Items
 
     ; Timer already cancelled by TooltipHide("NewShow") above — this is a
     ; belt-and-suspenders guard in case TooltipHide returned early for any reason.
@@ -718,39 +712,4 @@ TooltipIsVisible() {
     return IsSet(_TooltipGui) and _TooltipGui != 0
 }
 
-; Re-arm the auto-hide timer from zero using the durations stored in
-; _TooltipLastItems. Called after a hotstring fires so the timer counts
-; from the moment of fire, not from when the preview was first shown
-; (which may have been seconds earlier when the user was still typing).
-; Only applies to the simple single-timer path — the dequeue path manages
-; its own deadlines and is not affected by this call.
-TooltipRearmTimer() {
-    global _TooltipLastItems
-    global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC
-    global _TooltipGeneration, _TooltipTimerGeneration
-
-    if (!IsObject(_TooltipLastItems) or _TooltipLastItems.Length == 0)
-        return
-
-    ; Find the shortest non-zero duration among the displayed items.
-    ; Rows with DurationSec = 0 are "infinite" — if ALL rows are infinite,
-    ; no timer is needed and we leave the safety timer in place.
-    EffectiveDur := 0
-    for , Item in _TooltipLastItems {
-        D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
-        if (D > 0 and (EffectiveDur == 0 or D < EffectiveDur))
-            EffectiveDur := D
-    }
-    if (EffectiveDur == 0)
-        return
-
-    Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
-        EffectiveDur - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
-    ; Cancel any stale timer and arm a fresh one from now.
-    SetTimer(_TooltipTimerFn, 0)
-    _TooltipTimerGeneration := _TooltipGeneration
-    SetTimer(_TooltipTimerFn, -Round(Effective * 1000))
-    if IsSet(LLM_Bridge_ScheduleAfterHotstring)
-        try LLM_Bridge_ScheduleAfterHotstring(_TooltipLastItems)
-}
 

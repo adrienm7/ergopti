@@ -254,7 +254,7 @@ LLM_Bridge_FeedKeyDownIfActive(vk) {
 
 /**
  * Schedules an LLM prediction to fire when the hotstring tooltip closes.
- * Called from the prefix watcher after TooltipShow / TooltipRearmTimer.
+ * Called from the prefix watcher after a hotstring preview is shown.
  * Parity with macOS llm_bridge.update_preview() chain branch.
  * @param {Array} items - Tooltip rows shown by TooltipShow (DurationSec per row).
  */
@@ -344,7 +344,7 @@ LLM_Bridge_OnChar(ch) {
 		_LLM_Bridge_Buffer := SubStr(_LLM_Bridge_Buffer, -LLM_BRIDGE_BUFFER_MAX_CHARS)
 	; Hotstring tooltip priority: if the PrefixWatcher's tooltip is visible,
 	; update the buffer but do NOT arm the LLM timer — LLM_Bridge_ScheduleAfterHotstring
-	; (fired from _LookupAndRender / TooltipRearmTimer) owns the chain delay until
+	; (fired from _LookupAndRender) owns the chain delay until
 	; the overlay closes, mirroring HS update_preview().
 	if TooltipIsVisible()
 		return
