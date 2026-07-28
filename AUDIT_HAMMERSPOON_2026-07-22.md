@@ -455,11 +455,11 @@ twice). All confirmed via two lenses; each carries a repro + fix in the journal.
 | G5/C | `macos/modules/keymap/llm_bridge.lua:345` | Preview offers rows during the rescan-suppression window in which the engine is hard-blocked; the trigger is then lost forever. |
 | G5/G | `macos/modules/keymap/llm_bridge.lua:566` | Preview tooltip lifetime uses a coarse 3-way delay key while the engine gate uses the per-mapping precedence chain — they can diverge. |
 | [x] G5/F | `macos/modules/keymap/llm_bridge.lua:225` | Preview-toggle setters call dequeue-guarded `tooltip.hide()` → a stale preview survives the settings change (missed sibling). |
-| G2/C | `macos/modules/llm/api_mlx_fetch.lua:238` | A superseded MLX request's un-cancelled 8 s timeout fires `on_fail` → an unguarded retry cancels the **live** request's transport. |
+| [x] G2/C | `macos/modules/llm/api_mlx_fetch.lua:238` | A superseded MLX request's un-cancelled 8 s timeout fires `on_fail` → an unguarded retry cancels the **live** request's transport. |
 | [x] G3/E | `macos/modules/shortcuts/script_control.lua:210` | Ollama warmup is not parked during pause: `pause_all` misses `api_ollama.stop_warmup`; `set_llm_model`/`set_active_profile` lack pause guards. |
 | [x] G2/F | `macos/modules/llm/mlx_deps_checker.lua:538` | The MLX deps-checker fast-path hide is not session-owner-guarded → closes another operation's progress window (sibling of `f239b252d`). |
 | [x] G1/A | `macos/modules/llm/api_ollama.lua:429` | Non-streaming response path swallows callback throws under bare `pcall` — "green but no prediction", zero log evidence. |
-| G3/C | `macos/modules/llm/api_mlx.lua:653` | MLX warmup POST timeout never bumps `_warmup_gen` and the response cancels the newer timeout's pre-guard → warmup POSTs pile up. |
+| [x] G3/C | `macos/modules/llm/api_mlx.lua:653` | MLX warmup POST timeout never bumps `_warmup_gen` and the response cancels the newer timeout's pre-guard → warmup POSTs pile up. |
 | G1/A | `macos/modules/llm/prediction_engine.lua:989` | The canonical inactivity debounce timer is built at **require** time, before `install_runtime_error_capture` → its callback is permanently unguarded. |
 | G3/C | `macos/modules/gestures/actions.lua:491` | `search_web` snapshots/restores the clipboard with no in-flight guard — the stale-snapshot class `7bf0cc3cd` fixed, left unguarded here. |
 | [x] G2/A | `macos/adapters/http_client.lua:126` | Completion callbacks run under bare `pcall` with no `Logger.error` (`:98/:126/:155/:178`) — a throw in the LLM response handler vanishes. Recorded-open, still true; the callers currently backstop it (see §6). |
