@@ -217,7 +217,25 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 		end
 	end
 
-	if best_overlap > 0 then
+	-- A LEADING SPACE IS A DECLARATION, NOT NOISE.
+	--
+	-- The parser emits deletes = 0 with a leading space precisely to say "this
+	-- completion starts a NEW word", and the tooltip renders it that way, as ghost
+	-- text appended after what the user typed. Converting it anyway reinterprets
+	-- it as a mid-word continuation: for buffer "j'aime la" and prediction
+	-- " lavande est magnifique" the window matches the buffer suffix "la" against
+	-- the prediction prefix "la", sets deletes = 2, and accepting produces
+	-- "j'aime lavande est magnifique" with the user's own word swallowed. Shown and
+	-- inserted then disagree, so it reads as a model mistake and the user blames
+	-- the LLM. Any prediction whose first word merely EXTENDS the last typed one
+	-- hits this: la->lavande, de->demain, the->theatre.
+	--
+	-- Only the CONVERSION is skipped. Everything below still runs, in particular
+	-- the join-point cleanup that removes a double space or a space after a
+	-- hyphen; an early return here would silently disable that too.
+	local declares_new_word = pred_to_type:match("^[%s\194\160\226\128\175]") ~= nil
+
+	if best_overlap > 0 and not declares_new_word then
 		deletes = best_overlap
 		to_type = tt_trim
 
@@ -236,7 +254,9 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 			end
 		end
 	else
-		-- No overlap detected — trust the AI's original instruction completely.
+		-- Either no overlap, or the prediction declared a new word. Both mean the
+		-- parser's own instruction is the truth -- and it is also exactly what the
+		-- tooltip rendered, so shown and inserted stay the same text.
 		deletes = orig_deletes
 		to_type = pred_to_type
 	end

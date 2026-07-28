@@ -27,7 +27,12 @@ local LOG    = "vscode_bridge"
 local PORT          = 7878
 local EXT_ID        = "hs-caret-bridge"
 local EXT_VERSION   = "0.0.3"
-local EXT_DIR       = os.getenv("HOME") .. "/.vscode/extensions/" .. EXT_ID .. "-" .. EXT_VERSION
+-- HOME is always set on macOS, but this concatenation runs at MODULE LOAD, so a
+-- nil there does not degrade the feature — it raises before a single function is
+-- defined and takes down whatever required the module. Defaulting keeps the
+-- failure inside the feature that needs the path.
+local HOME          = os.getenv("HOME") or ""
+local EXT_DIR       = HOME .. "/.vscode/extensions/" .. EXT_ID .. "-" .. EXT_VERSION
 
 -- AX frame cache: the accessibility call can block for up to 100 ms on a
 -- busy VSCode instance. Cache the result for FRAME_CACHE_TTL_S so that rapid
