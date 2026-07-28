@@ -53,9 +53,17 @@ global _SR_POLL_INTERVAL_MS := 100
 ; driver includes logger.ahk before it, but direct /validate with #Warn must not
 ; report LoggerError as an unassigned local.  Resolve the logger dynamically and
 ; keep OutputDebug as a non-throwing diagnostic fallback for standalone use.
+;
+; The resolution is a dynamic variable dereference, NOT Func("LoggerError").
+; In AHK v2 Func is the native CLASS, not a name-lookup built-in, so calling it
+; raises `ValueError: Invalid base` every single time — measured, not assumed.
+; That throw was caught by this helper's own try and fell through to
+; OutputDebug, which is invisible without a debugger attached. Every shell_runner
+; error the driver has ever produced was therefore discarded, including the ones
+; explaining why a shell-out failed.
 _SR_LogError(FormatString, Args*) {
 	try {
-		LoggerFn := Func("LoggerError")
+		LoggerFn := %"LoggerError"%
 		LoggerFn.Call("adapters.shell_runner", FormatString, Args*)
 	} catch as Err {
 		try OutputDebug("[adapters.shell_runner] " . Format(FormatString, Args*))
