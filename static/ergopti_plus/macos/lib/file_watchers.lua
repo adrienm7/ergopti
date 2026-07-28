@@ -111,6 +111,47 @@ function M.start(ctx)
 		return self_written[canonical_path(path)] == true
 	end
 
+	-- Directories inside the watched trees that hold RUNTIME artefacts rather
+	-- than source. The TOML snapshot cache is the reason this exists: it lives
+	-- under the driver directory and writes .lua files, so every cache refresh
+	-- looked exactly like a source edit — and the reload it triggered re-warmed
+	-- the cache, which wrote again.
+	local ignored_dirs = {}
+	for _, d in ipairs(ctx.ignored_dirs or {}) do
+		local key = canonical_path(d):gsub("/+$", "")
+		if key ~= "" then ignored_dirs[#ignored_dirs + 1] = key .. "/" end
+	end
+
+	--- True when a changed path lies inside an ignored runtime directory.
+	--- @param path string
+	--- @return boolean
+	local function is_runtime_artefact(path)
+		local key = canonical_path(path)
+		for _, prefix in ipairs(ignored_dirs) do
+			if key:sub(1, #prefix) == prefix then return true end
+		end
+		return false
+	end
+
+	-- Every tree whose git state can invalidate a reload. The driver repo is one;
+	-- the personal hotstrings tree is usually ANOTHER repository entirely, and a
+	-- pull there rewrites files this watcher is watching while the driver's own
+	-- .git sits perfectly idle — so probing only the driver left the config repo
+	-- completely unguarded.
+	local git_roots = {}
+	for _, r in ipairs(ctx.git_roots or { base_dir }) do
+		if type(r) == "string" and r ~= "" then git_roots[#git_roots + 1] = r end
+	end
+
+	--- True when a git write-operation is in flight in ANY watched tree.
+	--- @return boolean, string|nil The verdict and the repository that is busy.
+	local function any_git_operation_in_progress()
+		for _, root in ipairs(git_roots) do
+			if git_status.operation_in_progress(root) then return true, root end
+		end
+		return false, nil
+	end
+
 	-- Global table pins the watchers so the GC cannot destroy them mid-session.
 	_G.script_watchers = _G.script_watchers or {}
 
@@ -185,8 +226,11 @@ function M.start(ctx)
 		local hold, why
 		if not reload_gate.is_settled(elapsed, burst_count) then
 			hold, why = true, "filesystem settling"
-		elseif git_status.operation_in_progress(base_dir) then
-			hold, why = true, "git operation in progress"
+		else
+			local busy, repo = any_git_operation_in_progress()
+			if busy then
+				hold, why = true, "git operation in progress in " .. tostring(repo)
+			end
 		end
 		if hold and defer_count < GIT_SETTLE_MAX_DEFERRALS then
 			defer_count = defer_count + 1
@@ -197,6 +241,19 @@ function M.start(ctx)
 		-- Tree is settled and consistent: clear the burst and reload.
 		burst_paths, burst_count, defer_count = {}, 0, 0
 		ui_restore.defer_reload(function()
+			-- Re-check at FIRE time, not only at schedule time. defer_reload holds
+			-- the reload for as long as a UI stays open — seconds, or minutes if
+			-- the user leaves a window up — and the verdict computed before that
+			-- wait says nothing about the tree now. A pull that starts during the
+			-- hold would otherwise be re-exec'd into mid-write, which is the
+			-- half-updated-tree boot failure the gate exists to prevent.
+			local busy, repo = any_git_operation_in_progress()
+			if busy then
+				Logger.info(LOG, "Reload aborted at fire time: git operation started in '%s' during the "
+					.. "UI hold — re-arming.", tostring(repo))
+				arm_timer(msg)
+				return
+			end
 			-- snapshot() is a safety net for any UI still open at reload time;
 			-- under normal deferral they are already closed so it saves nothing
 			ui_restore.snapshot()
@@ -216,7 +273,7 @@ function M.start(ctx)
 		local hit = {}
 		for _, p in ipairs(paths) do
 			if (p:match("%.toml$") or p:match("_index%.json$") or p:match("%.local_ahk_path$"))
-				and not is_self_written(p) then
+				and not is_self_written(p) and not is_runtime_artefact(p) then
 				hit[#hit + 1] = p
 			end
 		end
@@ -288,7 +345,8 @@ function M.start(ctx)
 		for _, p in ipairs(paths) do
 			-- Ignore temporary files (tokens, etc.); a batch may still carry a real
 			-- .lua change alongside them, so skip rather than abandon the batch.
-			if not (p:find("^/tmp/") or p:find("hs_hf_token_") or p:find("hs_hf_login_")) and p:match("%.lua$") then
+			if not (p:find("^/tmp/") or p:find("hs_hf_token_") or p:find("hs_hf_login_"))
+				and not is_runtime_artefact(p) and p:match("%.lua$") then
 				hit[#hit + 1] = p
 			end
 		end
