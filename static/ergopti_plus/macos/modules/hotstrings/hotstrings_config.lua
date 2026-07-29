@@ -217,7 +217,8 @@ end
 --- Serializes the in-memory override table back to TOML.
 --- @param overrides table The override table (same shape as parse_overrides).
 --- @return string The serialized TOML content.
-local function serialize_overrides(overrides)
+--- @param word_delimiters string|nil The [__global__] word_delimiters value, if set.
+local function serialize_overrides(overrides, word_delimiters)
 	local out = {
 		"# Hotstrings — overrides utilisateur",
 		"# Édité depuis la fenêtre « Délais & couleurs hotstrings ».",
@@ -225,6 +226,23 @@ local function serialize_overrides(overrides)
 		"# ne doit apparaître qu'une seule fois.",
 		"",
 	}
+
+	-- [__global__] is re-emitted FIRST. parse_overrides returns it as a separate
+	-- value from the category table, and this function only ever received the
+	-- second — so every save from the delays-and-colours window rewrote the file
+	-- without it, silently discarding the word_delimiters the AutoHotkey driver
+	-- writes into the very same shared file. A round trip that reads more than it
+	-- writes destroys whatever it did not read.
+	if type(word_delimiters) == "string" and word_delimiters ~= "" then
+		table.insert(out, "[__global__]")
+		-- Written in the shape the PARSER reads: a plain double-quoted string with
+		-- only the quote and the backslash escaped. string.format("%q") emits LUA
+		-- escapes — a tab becomes \9 — which round-trips through Lua and not
+		-- through `word_delimiters%s*=%s*"(.-)"`.
+		local escaped = word_delimiters:gsub("\\", "\\\\"):gsub('"', '\\"')
+		table.insert(out, 'word_delimiters = "' .. escaped .. '"')
+		table.insert(out, "")
+	end
 
 	-- Stable ordering: alphabetical category, alphabetical section.
 	local cats = {}
@@ -287,7 +305,7 @@ end
 --- @return boolean True on success, false on I/O failure.
 local function save_to_disk()
 	if not _state then return false end
-	local content = serialize_overrides(_state.overrides)
+	local content = serialize_overrides(_state.overrides, _state.word_delimiters)
 	local f, err = io.open(_state.path, "w")
 	if not f then
 		Logger.error(LOG, "Failed to open override file for writing: %s.", tostring(err))
