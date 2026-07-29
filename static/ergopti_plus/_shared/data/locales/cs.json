@@ -1415,7 +1415,7 @@
 	"sfbsreduction.comma": "Čárka snižuje bigramy stejného prstu",
 	"sfbsreduction.ecirc": "Ê snižuje bigramy stejného prstu",
 	"sfbsreduction.egrave": "È snižuje bigramy stejného prstu",
-	"sfbsreduction.ié": "IE snižuje bigramy IE/EI",
+	"sfbsreduction.ieacute": "IE snižuje bigramy IE/EI",
 	"sg_actions.activity_simulation": "🖱 Simulovat aktivitu (proti spánku)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (monitor)",
 	"sg_actions.app_expose": "◱ Přehled oken aplikace",

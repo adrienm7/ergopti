@@ -1415,7 +1415,7 @@
 	"sfbsreduction.comma": "Comma reduces same-finger bigrams",
 	"sfbsreduction.ecirc": "Ê reduces same-finger bigrams",
 	"sfbsreduction.egrave": "È reduces same-finger bigrams",
-	"sfbsreduction.ié": "IE reduces IE/EI bigrams",
+	"sfbsreduction.ieacute": "IE reduces IE/EI bigrams",
 	"sg_actions.activity_simulation": "🖱 Simulate activity (anti-sleep)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (monitor)",
 	"sg_actions.app_expose": "◱ App Exposé",

@@ -1415,7 +1415,7 @@
 	"sfbsreduction.comma": "Komma vermindert bigrammen van dezelfde vinger",
 	"sfbsreduction.ecirc": "Ê vermindert bigrammen van dezelfde vinger",
 	"sfbsreduction.egrave": "È vermindert bigrammen van dezelfde vinger",
-	"sfbsreduction.ié": "IE vermindert IE/EI-bigrammen",
+	"sfbsreduction.ieacute": "IE vermindert IE/EI-bigrammen",
 	"sg_actions.activity_simulation": "🖱 Activiteit simuleren (anti-slaapstand)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (monitor)",
 	"sg_actions.app_expose": "◱ App-Exposé",

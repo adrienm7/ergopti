@@ -1415,7 +1415,7 @@
 	"sfbsreduction.comma": "Vírgula reduz bigramas do mesmo dedo",
 	"sfbsreduction.ecirc": "Ê reduz bigramas do mesmo dedo",
 	"sfbsreduction.egrave": "È reduz bigramas do mesmo dedo",
-	"sfbsreduction.ié": "IE reduz bigramas IE/EI",
+	"sfbsreduction.ieacute": "IE reduz bigramas IE/EI",
 	"sg_actions.activity_simulation": "🖱 Simular atividade (anti-suspensão)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (monitor)",
 	"sg_actions.app_expose": "◱ Exposé do App",

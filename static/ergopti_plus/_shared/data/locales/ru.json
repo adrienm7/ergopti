@@ -1415,7 +1415,7 @@
 	"sfbsreduction.comma": "Запятая уменьшает биграммы одного пальца",
 	"sfbsreduction.ecirc": "Ê уменьшает биграммы одного пальца",
 	"sfbsreduction.egrave": "È уменьшает биграммы одного пальца",
-	"sfbsreduction.ié": "IE уменьшает биграммы IE/EI",
+	"sfbsreduction.ieacute": "IE уменьшает биграммы IE/EI",
 	"sg_actions.activity_simulation": "🖱 Симулировать активность (анти-сон)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (монитор)",
 	"sg_actions.app_expose": "◱ Приложение Exposé",

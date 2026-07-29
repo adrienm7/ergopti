@@ -1415,7 +1415,7 @@
 	"sfbsreduction.comma": "쉼표가 같은 손가락 바이그램을 줄입니다",
 	"sfbsreduction.ecirc": "Ê가 같은 손가락 바이그램을 줄입니다",
 	"sfbsreduction.egrave": "È가 같은 손가락 바이그램을 줄입니다",
-	"sfbsreduction.ié": "IE가 IE/EI 바이그램을 줄입니다",
+	"sfbsreduction.ieacute": "IE가 IE/EI 바이그램을 줄입니다",
 	"sg_actions.activity_simulation": "🖱 활동 시뮬레이션 (절전 방지)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (모니터)",
 	"sg_actions.app_expose": "◱ 앱 Exposé",

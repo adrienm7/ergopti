@@ -1415,7 +1415,7 @@
 	"sfbsreduction.comma": "La coma reduce bigramas del mismo dedo",
 	"sfbsreduction.ecirc": "Ê reduce bigramas del mismo dedo",
 	"sfbsreduction.egrave": "È reduce bigramas del mismo dedo",
-	"sfbsreduction.ié": "IE reduce bigramas IE/EI",
+	"sfbsreduction.ieacute": "IE reduce bigramas IE/EI",
 	"sg_actions.activity_simulation": "🖱 Simular actividad (anti-reposo)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (monitor)",
 	"sg_actions.app_expose": "◱ App Exposé",

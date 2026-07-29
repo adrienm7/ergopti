@@ -1415,7 +1415,7 @@
 	"sfbsreduction.comma": "Virgule réduit les bigrammes de même doigt",
 	"sfbsreduction.ecirc": "Ê réduit les bigrammes de même doigt",
 	"sfbsreduction.egrave": "È réduit les bigrammes de même doigt",
-	"sfbsreduction.ié": "IE réduit les bigrammes IE/EI",
+	"sfbsreduction.ieacute": "IE réduit les bigrammes IE/EI",
 	"sg_actions.activity_simulation": "🖱 Simuler l'activité (anti-veille)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (moniteur)",
 	"sg_actions.app_expose": "◱ App Exposé",

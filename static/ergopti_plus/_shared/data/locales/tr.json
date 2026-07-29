@@ -1415,7 +1415,7 @@
 	"sfbsreduction.comma": "Virgül aynı parmak bigramlarını azaltır",
 	"sfbsreduction.ecirc": "Ê aynı parmak bigramlarını azaltır",
 	"sfbsreduction.egrave": "È aynı parmak bigramlarını azaltır",
-	"sfbsreduction.ié": "IE, IE/EI bigramlarını azaltır",
+	"sfbsreduction.ieacute": "IE, IE/EI bigramlarını azaltır",
 	"sg_actions.activity_simulation": "🖱 Etkinlik simüle et (uyku önleme)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (ekran)",
 	"sg_actions.app_expose": "◱ Exposé Uygulaması",
