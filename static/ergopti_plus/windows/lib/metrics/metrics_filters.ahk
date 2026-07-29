@@ -229,8 +229,23 @@ MF_ShouldFilter() {
     ;    is loaded later in the include order and an early caller (e.g.
     ;    boot-time metrics) might race ahead of it.
     if MetricsFilters.secure_field {
-        is_pw := false
-        try is_pw := KL_IsFocusedFieldPassword()
+        ; Default to "password" BEFORE the try, never after: this caller
+        ; persists characters to disk, so it cannot be laxer than the LLM
+        ; caller of the same predicate, which test_disable_password_fields_gate
+        ; already pins to `IsPw := true` ahead of `try IsPw := SFD_IsSecureField()`.
+        ; Seeding it false made a throwing detector (a UIA change, a new
+        ; unguarded call in the chain, KLPW_CACHE_TTL_MS read before the include
+        ; that defines it has run at boot) answer "ordinary field" and the
+        ; keystroke got logged. Worse, the bare try swallowed the error before
+        ; KL_AppendLog's own fail-closed catch could see it.
+        is_pw := true
+        try {
+            is_pw := KL_IsFocusedFieldPassword()
+        } catch as err {
+            ; Staying secure is the right behaviour, but a permanently degraded
+            ; detector must not look like a healthy one (conventions 5.3).
+            try LoggerWarn("MetricsFilters", "KL_IsFocusedFieldPassword unavailable — defaulting to secure: {1}.", err.Message)
+        }
         if is_pw
             return true
     }
