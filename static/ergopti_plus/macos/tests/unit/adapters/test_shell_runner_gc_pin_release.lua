@@ -226,7 +226,11 @@ helpers.describe("ShellRunner: GC pin release", function()
 			task = {
 				new = function(_exe, done_cb, _a3, _a4)
 					captured_done = done_cb
-					fake_task = { start = function() end, terminate = function() end }
+					-- start() returns TRUE, as the real hs.task does. A stub returning nil
+					-- makes a refused launch indistinguishable from a successful one, and
+					-- this file's own history records that shape cementing the defect its
+					-- test claimed to lock.
+					fake_task = { start = function() return true end, terminate = function() end }
 					return fake_task
 				end,
 			},
@@ -251,4 +255,42 @@ helpers.describe("ShellRunner: GC pin release", function()
 		helpers.assert_eq(seen.out, "hi\n")
 		helpers.assert_eq(seen.err, "")
 	end)
+end)
+
+
+
+
+-- ==================================================================
+-- ==================================================================
+-- ======= A refused launch must not leak its GC pin ================
+-- ==================================================================
+-- ==================================================================
+
+--- The pin is taken at construction so the task cannot be collected mid-run, and
+--- released by the completion callback. That callback never fires for a task
+--- that never launched, so every refused launch left a dead hs.task and its
+--- captured closures in _active_tasks for the life of the process — and that
+--- table is the one GC root nothing ever prunes.
+helpers.describe("ShellRunner: a task that refuses to launch is unpinned", function()
+
+	helpers.it("releases the pin when start() returns false", function()
+		local fake_task
+		local ShellRunner = helpers.load_with_stubs("adapters.shell_runner", {
+			task = {
+				new = function(_bin, _done, _stream)
+					fake_task = { start = function() return false end, terminate = function() end }
+					return fake_task
+				end,
+			},
+		})
+
+		local handle = ShellRunner.spawn("/nonexistent/binary", {}, function() end)
+		local started = handle.start()
+
+		helpers.assert_true(started == false, "a refused launch must be reported to the caller")
+		helpers.assert_true(ShellRunner._active_tasks[fake_task] == nil,
+			"the completion callback that normally releases the pin never fires for a task "
+			.. "that never ran, so the release has to happen on the failure path itself")
+	end)
+
 end)
