@@ -3147,13 +3147,13 @@ platforms = ["ahk"]
 type = "action"
 id = "disable_all"
 i18n = "menu.gestures.disable_all"
-platforms = ["hs"]
+platforms = ["hs", "ahk"]
 
 [[menu.gestures_menu]]
 type = "action"
 id = "restore_defaults"
 i18n = "menu.gestures.restore_defaults"
-platforms = ["hs"]
+platforms = ["hs", "ahk"]
 
 [[menu.gestures_menu]]
 type = "---"
