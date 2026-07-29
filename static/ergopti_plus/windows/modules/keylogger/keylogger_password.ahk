@@ -195,23 +195,38 @@ KL_DetectPasswordFor(hwnd) {
         ; matters when hosted in a security dialog. Fall through to UIA.
     }
 
-    ; Layer 3 — UIA.IsPasswordPattern. The vendor/UIA.ahk lib initialises
-    ; the global ``UIA`` object on first use. Any failure (UIA not loaded,
-    ; element not reachable) falls back to "not a password" so we keep
-    ; logging by default — better-safe-but-noisy beats silent loss.
+    ; Layer 3 — UIA IsPassword, read from the FOCUSED element.
+    ;
+    ; It must be UIA.GetFocusedElement(), never UIA.ElementFromHandle(hwnd):
+    ; ElementFromHandle answers about the element BEHIND that window handle. For
+    ; every single-HWND UI framework — Chromium and Electron
+    ; (Chrome_RenderWidgetHostHWND), WPF/UWP (HwndWrapper[…]) — that is the
+    ; render widget or the window pane, never the web/XAML input the caret is
+    ; in, so its IsPassword is always 0. Layers 1-2 cannot classify those
+    ; frameworks either (the class allow-list is matched against a window
+    ; class), so the window-scoped probe committed a bogus "not a password" for
+    ; the whole window, and KL_IsFocusedFieldPassword's per-HWND cache then
+    ; latched it across every field in it — the site's password box included.
+    ; adapters/secure_field_detector.ahk asks the same question of the same API
+    ; the right way; this is the same guarantee for the consumer that persists
+    ; characters to disk.
+    ;
+    ; Any failure (UIA not loaded, no focused element) falls back to "not a
+    ; password": the caller already fails closed for unclassified controls and
+    ; only ever relaxes that verdict from here.
     if !IsSet(UIA)
         return false
     try {
-        el := UIA.ElementFromHandle(hwnd)
+        el := UIA.GetFocusedElement()
         if !IsObject(el)
             return false
-        ; IsPassword is exposed both as a direct property on the element
-        ; (UIA-v2) and via the Pattern. Prefer the direct property; fall
-        ; back to the pattern read.
-        if el.HasOwnProp("IsPassword")
-            return el.IsPassword ? true : false
-        try
-            return el.GetCurrentPropertyValue(UIA.Property.IsPassword) ? true : false
+        return el.GetCurrentPropertyValue(UIA.Property.IsPassword) ? true : false
+    } catch as err {
+        ; A catch-less try made "UIA is unavailable on this machine" look
+        ; exactly like "this one target refused", so a permanently degraded
+        ; detector was indistinguishable from a healthy one (conventions 5.3).
+        ; DEBUG because an elevated or closing target is an expected outcome.
+        try LoggerDebug("Keylogger", "UIA password probe failed: {1}.", err.Message)
     }
     return false
 }
