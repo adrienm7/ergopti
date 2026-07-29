@@ -511,16 +511,14 @@ local function handle_message(body)
 		-- quote left a seed path containing a backslash producing a literal the
 		-- picker could not parse — and the seed is the user-configurable config
 		-- directory, so it is exactly the value most likely to carry one.
-		local escaped = text_utils.applescript_escape(seed)
-		local prompt = text_utils.applescript_escape(i18n.get("dialog.config_folder.select_title") or "")
-		local script = string.format([[
+		local script = text_utils.applescript_format([[
 			try
 				set r to choose folder with prompt "%s" default location ((POSIX file "%s") as alias)
 				return POSIX path of r
 			on error
 				return ""
 			end try
-		]], prompt, escaped)
+		]], i18n.get("dialog.config_folder.select_title") or "", seed)
 		local ok_as, _r2, raw = hs.osascript.applescript(script)
 		Logger.debug(LOG, "pickConfigDir: ok=%s raw=%s.", tostring(ok_as), tostring(raw))
 		local chosen = type(raw) == "string" and raw or ""
