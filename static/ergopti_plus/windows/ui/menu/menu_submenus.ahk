@@ -101,6 +101,16 @@ InitSubMenus() {
 		RegisterMenuItemInsert(SubMenu, "3&", t("menu.hotstrings.disable_all"),
 			((c) => (*) => ToggleCategoryAllSections(c, false))(V1Cat))
 		SubMenus[V1Cat] := SubMenu
+		; Per-category attribution. This loop is the largest post-ready boot
+		; segment by a wide margin — 1094 ms of a 3406 ms warm boot on 2026-07-30,
+		; four times the next one — and it is repaid in FULL on every live tray
+		; rebuild via RebuildTrayMenu. Its cost is also wildly variable: 31 ms to
+		; 1672 ms across boots that shared a commit, which is an I/O or scheduling
+		; signature rather than a CPU one. One aggregate mark cannot tell which
+		; category or which phase owns the second, so any optimisation chosen from
+		; it would be a guess. Marking each category is the cheap step that turns
+		; the next boot log into an answer.
+		BootProfile_Mark("MENU/InitSub: flat cat " . V1Cat)
 	}
 	BootProfile_Mark("MENU/InitSub: flat hotstring submenus")
 
