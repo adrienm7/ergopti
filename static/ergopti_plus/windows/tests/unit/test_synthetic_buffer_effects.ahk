@@ -135,11 +135,12 @@ _SBE_EveryLayerPayloadIsClassified() {
 
 	for Payload in Payloads {
 		Result := _SBE_FeedFrom("att", Payload)
-		IsNeutral := false
-		for Token in HS_BUFFER_NEUTRAL_PAYLOADS {
-			if InStr(Payload, Token)
-				IsNeutral := true
-		}
+		; Match the DRIVER's own anchored pattern, never a copy of its logic.
+		; This loop used to re-implement the substring scan, so the test and the
+		; driver could drift apart about what "text-neutral" means and both stay
+		; green — the same duplicated-prediction shape the buffers themselves
+		; exist to avoid.
+		IsNeutral := RegExMatch(Payload, HS_BUFFER_NEUTRAL_PAYLOAD)
 		if (IsNeutral) {
 			AssertEqual("att", Result,
 				"layer payload '" . Payload . "' is on the text-neutral allowlist, so it must leave the buffer intact")
@@ -153,6 +154,47 @@ _SBE_EveryLayerPayloadIsClassified() {
 		}
 	}
 }
+
+
+
+; =====================================================
+; ===== 2.1) The allowlist is anchored, not loose =====
+; =====================================================
+
+; ROOT CAUSE: the allowlist used to be tested with InStr(Payload, "{Volume_Up") —
+; a substring match anywhere in the payload — while its comment claimed it
+; matched a prefix of the key token. Its sibling HS_BUFFER_BACKSPACE_PAYLOAD is
+; deliberately anchored precisely to stop the same fail-open ("{End}{BackSpace 2}"
+; must reset, not decrement). These cases pin the anchoring on BOTH sides: a bare
+; neutral key stays neutral, and a neutral key travelling with a caret move does
+; not. No production caller emits the compound shape today, which is exactly why
+; only a test can keep the hole closed.
+;
+; Asserted through HS_DeclareSyntheticEffect's observable EFFECT on the buffers
+; rather than by classifying the payload here — re-deriving the verdict in the
+; test is the very duplication this change removes.
+_SBE_NeutralAllowlistIsAnchored() {
+	for Payload in ["{Volume_Up}", "{Volume_Up 3}", "{Volume_Down}", "{Volume_Mute 2}"] {
+		AssertEqual("att", _SBE_FeedFrom("att", Payload),
+			"payload '" . Payload . "' is a bare text-neutral key press — it touches neither caret nor document, "
+			. "so both buffers must be left intact")
+	}
+
+	; The fail-open shapes. Each CONTAINS a neutral token but also moves the
+	; caret or edits the line, so it must fall through to the reset branch.
+	for Payload in ["{End}{Volume_Up}", "{Volume_Up}{End}", "{Volume_Up 2}{Left}"] {
+		AssertEqual("", _SBE_FeedFrom("att", Payload),
+			"payload '" . Payload . "' carries a neutral token but ALSO moves the caret, so it must invalidate both "
+			. "buffers. Testing the allowlist with a substring match anywhere in the payload waves it through as "
+			. "text-neutral and leaves both hotstring buffers describing text no longer on screen — the next "
+			. "expansion then backspaces over characters belonging to an earlier word. Anchor the match the way the "
+			. "sibling backspace pattern already is (hs-neutral-payload-substring-fails-open)")
+	}
+}
+
+
+Test("hotstring buffers: the text-neutral allowlist is anchored to a single key press (hs-neutral-payload-substring-fails-open)",
+	_SBE_NeutralAllowlistIsAnchored)
 
 
 
