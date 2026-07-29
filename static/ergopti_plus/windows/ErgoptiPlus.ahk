@@ -148,6 +148,12 @@ OnError(ErgoptiGlobalErrorHandler)
 ; from source or from a compiled binary. In dev mode Bundle_Init() is a no-op.
 #Include lib/bundle.ahk
 Bundle_Init()
+; First of the retroactive boot stamps (lib/boot_profiler.ahk). Everything from
+; here to BootProfile_Begin() used to be one opaque "script parse + load: ~N ms"
+; number, so a slow start could be attributed to "pre-boot" and no further. A
+; stamp only records a tick — the logger does not exist yet — and BootProfile_Begin
+; replays them all once it does.
+BootProfile_Stamp("Bundle extracted")
 
 ; Compute _StaticDir and _VendorDir early so i18n.ahk and any module-level
 ; t() calls that run during #Include processing can resolve locale file paths.
@@ -380,6 +386,8 @@ LLM_Defaults_Load()
 #Include ui/tooltip/tooltip_llm.ahk
 #Include ui/menu/menu_llm/_index.ahk
 #Include ui/model_browser/init.ahk
+; Closes the include graph: every module's top-level initialiser has now run.
+BootProfile_Stamp("Module includes initialised")
 
 ; ======================================================
 ; ======================================================
@@ -407,6 +415,10 @@ LLM_Defaults_Load()
 ; regardless of the boot path (normal OR first-run).
 A_TrayMenu.Delete()
 Onboarding_Run()
+; Blocking on a first run, a no-op otherwise — which is exactly why it needs its
+; own stamp: a first-run boot and a normal boot are otherwise indistinguishable
+; in the timings.
+BootProfile_Stamp("Tray reset + onboarding")
 
 global _IniCache := ParseTomlFile(ConfigurationFile)
 ; Latch the session sentinel SaveFullConfig honours when that parse could not
@@ -423,6 +435,7 @@ if TOML_UnreadableFile(ConfigurationFile) {
 ReadScriptConfig(_IniCache)
 ReadCategoryEnabled(_IniCache)
 I18nInit(_IniCache)
+BootProfile_Stamp("Config parsed (TOML + i18n)")
 
 ; Resolve _ALTGR_KANA_FIXUP: TOML override (ScriptInformation["AltGrIsKanaRemap"])
 ; wins when set; otherwise auto-detect via the reverse VK_RMENU→SC probe. Must
@@ -430,6 +443,7 @@ I18nInit(_IniCache)
 ; this file triggers a full Reload() on layout switch, so this re-runs and
 ; adapts to the new layout automatically.
 HotstringEngineInit()
+BootProfile_Stamp("Hotstring engine initialised")
 
 ; Initialise the logger now that the ini cache is built and ScriptInformation
 ; reflects user overrides — LoggerInit reads [Script] LogLevel from the ini.
