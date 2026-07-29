@@ -1652,6 +1652,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = Apri la cartella Download",
 	"shortcuts.pixel_read_error": "Impossibile leggere il colore del pixel",
 	"shortcuts.saved": "Salvato: %s",
+	"shortcuts.screenshot_failed": "Screenshot non riuscito",
 	"shortcuts.screen": "Win + H (screensHot) = Cattura schermo (attiva Win + Shift + S)",
 	"shortcuts.screeninstant": "Tasto a sinistra di 1 = Cattura istantanea della finestra attiva, salvata in Immagini con timestamp",
 	"shortcuts.screenocr": "Win + C (OCR) = Schermata con estrazione del testo (Win + Shift + T)",

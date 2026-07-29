@@ -1652,6 +1652,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = Open de map Downloads",
 	"shortcuts.pixel_read_error": "Kan pixelkleur niet lezen",
 	"shortcuts.saved": "Opgeslagen: %s",
+	"shortcuts.screenshot_failed": "Schermafbeelding mislukt",
 	"shortcuts.screen": "Win + H (screensHot) = Schermopname (activeert Win + Shift + S)",
 	"shortcuts.screeninstant": "Toets links van 1 = Directe opname van het actieve venster, opgeslagen in Afbeeldingen met tijdstempel",
 	"shortcuts.screenocr": "Win + C (OCR) = Schermafbeelding met tekstextractie (Win + Shift + T)",

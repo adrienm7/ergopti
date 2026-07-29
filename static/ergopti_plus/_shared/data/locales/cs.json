@@ -1652,6 +1652,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = Otevřít složku Stažené soubory",
 	"shortcuts.pixel_read_error": "Nelze přečíst barvu pixelu",
 	"shortcuts.saved": "Uloženo: %s",
+	"shortcuts.screenshot_failed": "Snímek obrazovky se nepodařilo vytvořit",
 	"shortcuts.screen": "Win + H (screensHot) = Snímek obrazovky (spustí Win + Shift + S)",
 	"shortcuts.screeninstant": "Klávesa vlevo od 1 = Okamžitý snímek aktivního okna, uložený v Obrázcích s časovým razítkem",
 	"shortcuts.screenocr": "Win + C (OCR) = Snímek obrazovky s extrakcí textu (Win + Shift + T)",

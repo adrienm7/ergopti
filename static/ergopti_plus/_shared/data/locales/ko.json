@@ -1652,6 +1652,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = 다운로드 폴더 열기",
 	"shortcuts.pixel_read_error": "픽셀 색상을 읽을 수 없습니다",
 	"shortcuts.saved": "저장됨: %s",
+	"shortcuts.screenshot_failed": "스크린샷 실패",
 	"shortcuts.screen": "Win + H (screensHot) = 화면 캡처 (Win + Shift + S 실행)",
 	"shortcuts.screeninstant": "1 왼쪽 키 = 활성 창의 즉시 캡처, 타임스탬프와 함께 사진에 저장",
 	"shortcuts.screenocr": "Win + C (OCR) = 텍스트 추출 스크린샷 (Win + Shift + T)",

@@ -1652,6 +1652,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = فتح مجلد التنزيلات",
 	"shortcuts.pixel_read_error": "تعذّر قراءة لون البكسل",
 	"shortcuts.saved": "تم الحفظ: %s",
+	"shortcuts.screenshot_failed": "فشل التقاط الشاشة",
 	"shortcuts.screen": "Win + H (screensHot) = لقطة شاشة (يُشغّل Win + Shift + S)",
 	"shortcuts.screeninstant": "المفتاح يسار 1 = لقطة فورية للنافذة النشطة، محفوظة في الصور مع طابع زمني",
 	"shortcuts.screenocr": "Win + C (OCR) = لقطة شاشة مع استخراج النص (Win + Shift + T)",

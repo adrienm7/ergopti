@@ -20,8 +20,14 @@ local pasteboard    = hs.pasteboard
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
 local i18n          = require("lib.i18n")
+local ShellRunner   = require("adapters.shell_runner")
 
 local LOG = "shortcuts.actions.system"
+
+-- Absolute paths: the interactive layer must not inherit its binaries from PATH,
+-- which differs between a login shell and the Hammerspoon process.
+local SCREENCAPTURE_BIN = "/usr/sbin/screencapture"
+local PYTHON_BIN        = "/usr/bin/python3"
 
 -- GC root for live hs.task objects. A task not referenced from a GC root can be
 -- collected mid-run, which kills the subprocess so its completion callback never
@@ -43,23 +49,31 @@ local _active_tasks = {}
 --- Reads the hex color of the pixel at (x, y) via a minimal inline Python PNG decoder.
 --- Captures a 3×3-pixel region and samples the center pixel.
 --- Python is used because Hammerspoon has no native per-pixel color API.
+---
+--- The result arrives through a callback instead of a return value. This needs a
+--- screencapture round trip AND a Python interpreter start — together well over a
+--- tenth of a second — and it is triggered by a shortcut, so doing it
+--- synchronously held the single Hammerspoon runloop for that whole window: no
+--- keystroke was delivered, and a keyboard tap that misses its deadline is
+--- disabled outright by macOS. The neighbouring interactive_screenshot in this
+--- same file was already async for exactly this reason.
 --- @param x number X screen coordinate.
 --- @param y number Y screen coordinate.
---- @return string|nil Hex color string like "#a1b2c3", or nil on failure.
-local function pixel_hex_at(x, y)
+--- @param on_hex function Called as on_hex(hex_or_nil) with "#a1b2c3" or nil.
+local function pixel_hex_at(x, y, on_hex)
 	Logger.trace(LOG, "Pixel color read started…")
 	local tmpfile = "/tmp/_hs_pixel_cap.png"
 	local safe_x  = math.floor(tonumber(x) or 0) - 1
 	local safe_y  = math.floor(tonumber(y) or 0) - 1
 
-	local cap_cmd = string.format("screencapture -x -R \"%d,%d,3,3\" \"%s\"", safe_x, safe_y, tmpfile)
-	local ok_cap  = pcall(hs.execute, cap_cmd)
-	if not ok_cap then
-		Logger.error(LOG, "screencapture failed — pixel read aborted.")
-		return nil
-	end
+	-- argv, not a shell string: the region and the temp path are passed as
+	-- separate arguments, so neither can be re-interpreted by /bin/sh.
+	local region = string.format("%d,%d,3,3", safe_x, safe_y)
 
-	local py = string.format([[python3 -c "
+	-- Bare Python source: with argv there is no shell, so the `python3 -c "…"`
+	-- wrapper and its quoting are gone and the interpreter receives the program
+	-- exactly as written here.
+	local py_src = string.format([[
 import struct,zlib
 try:
   data=open('%s','rb').read()
@@ -77,20 +91,28 @@ try:
   print('#%%02x%%02x%%02x' %% (r,g,b))
 except Exception:
   pass
-"
 ]], tmpfile)
 
-	local ok_py, out = pcall(hs.execute, py)
-	if ok_py and out then
-		local hex = out:match("(#%x%x%x%x%x%x)")
-		if hex then
-			Logger.done(LOG, "Pixel color read — %s.", hex)
-			return hex
+	ShellRunner.spawn(SCREENCAPTURE_BIN, { "-x", "-R", region, tmpfile }, function(cap_code)
+		if cap_code ~= 0 then
+			Logger.error(LOG, "screencapture exited with code %s — pixel read aborted.",
+				tostring(cap_code))
+			on_hex(nil)
+			return
 		end
-	end
-
-	Logger.warn(LOG, "Python pixel extractor returned no valid hex code.")
-	return nil
+		ShellRunner.spawn(PYTHON_BIN, { "-c", py_src }, function(py_code, stdout)
+			local hex = (py_code == 0) and type(stdout) == "string"
+				and stdout:match("(#%x%x%x%x%x%x)") or nil
+			if hex then
+				Logger.done(LOG, "Pixel color read — %s.", hex)
+				on_hex(hex)
+				return
+			end
+			Logger.warn(LOG, "Python pixel extractor returned no valid hex code (exit %s).",
+				tostring(py_code))
+			on_hex(nil)
+		end).start()
+	end).start()
 end
 
 --- Reads the color of the pixel currently under the mouse cursor and copies it to the clipboard.
@@ -101,14 +123,15 @@ function M.copy_pixel_color()
 		return
 	end
 
-	local hex = pixel_hex_at(math.floor(pos.x), math.floor(pos.y))
-	if not hex then
-		notifications.notify(i18n.get("shortcuts.pixel_read_error"), nil, "error")
-		return
-	end
+	pixel_hex_at(math.floor(pos.x), math.floor(pos.y), function(hex)
+		if not hex then
+			notifications.notify(i18n.get("shortcuts.pixel_read_error"), nil, "error")
+			return
+		end
 
-	pcall(pasteboard.setContents, hex)
-	notifications.notify(string.format(i18n.get("shortcuts.color_copied"), hex), nil, "success")
+		pcall(pasteboard.setContents, hex)
+		notifications.notify(string.format(i18n.get("shortcuts.color_copied"), hex), nil, "success")
+	end)
 end
 
 --- Launches the native macOS interactive screenshot tool and copies the result to the clipboard.

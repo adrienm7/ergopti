@@ -1652,6 +1652,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = Åpne Downloads-mappen",
 	"shortcuts.pixel_read_error": "Kan ikke lese pikselfargen",
 	"shortcuts.saved": "Lagret: %s",
+	"shortcuts.screenshot_failed": "Skjermbildet mislyktes",
 	"shortcuts.screen": "Win + H (screensHot) = Skjermbilde (utløser Win + Shift + S)",
 	"shortcuts.screeninstant": "Tast til venstre for 1 = Øyeblikkelig skjermbilde av aktivt vindu, lagret i Bilder med tidsstempel",
 	"shortcuts.screenocr": "Win + C (OCR) = Skjermbilde med tekstutdrag (Win + Shift + T)",
