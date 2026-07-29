@@ -129,7 +129,7 @@ global _ConfigBootReadFailed := false
 ; ``FileExist``.
 ; Multi-line arrays ( key = [\n  "a",\n  "b"\n] ) are fully supported.
 ParseTomlFile(Path) {
-    global _ParseTomlCache, _TomlReadFailures
+    global _ParseTomlCache, _TomlReadFailures, _TomlUnreadableFiles
     if _ParseTomlCache.Has(Path)
         return _ParseTomlCache[Path]
     Sections := Map()
@@ -149,9 +149,22 @@ ParseTomlFile(Path) {
         ; — so without this flag "I could not read your config" silently became
         ; "your config was empty" and the next write persisted that as truth.
         _TomlReadFailures[Path] := true
+        ; Raise the STICKY sentinel too, exactly as ReadTomlFile does for the
+        ; same file. _TomlReadFailures is deleted at the top of the very next
+        ; parse of this path, so a lock that clears between the boot snapshot
+        ; and a deferred save is invisible to every writer that asks later —
+        ; and _IniCache, the widest reader of config.toml, is taken through
+        ; here. Only for an existing file: a missing one legitimately parses
+        ; empty, and flagging it would block the first save of a fresh install.
+        if FileExist(Path)
+            _TomlUnreadableFiles[Path] := true
         try LoggerError("TomlParse", "Cannot read '{1}': {2}. Reported as unreadable so writers refuse to rebuild from it.", Path, Err.Message)
         return Sections
     }
+    ; A successful read clears the sticky flag: what follows is the real file,
+    ; so anything derived from it is safe to persist again.
+    if _TomlUnreadableFiles.Has(Path)
+        _TomlUnreadableFiles.Delete(Path)
     if (Content = "")
         return Sections
 
