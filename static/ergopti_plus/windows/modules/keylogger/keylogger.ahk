@@ -85,6 +85,13 @@ class KeylogConst {
     ; within this window defers the rebuild to the next ingest tick so the rebuild
     ; never runs while keystrokes are being dropped by LowLevelHooksTimeout.
     static INGEST_LIVE_PUSH_IDLE_MS := 500
+    ; Max KL_IngestOnce passes KL_Stop is allowed to run at shutdown. Each pass
+    ; drains at most INGEST_BATCH_LINES from today.log, and the RAM-only
+    ; _pending_entries queue is only flushed once the reader reaches EOF, so a
+    ; backlog has to be walked to the end here or the final session_end /
+    ; idle_end batch dies with the process. Bounded so a pathological backlog
+    ; cannot stall a Reload for minutes: 20 passes cover 100 000 lines.
+    static SHUTDOWN_INGEST_MAX_PASSES := 20
     static SCHEMA_VERSION           := 1
     ; Tail size (bytes) read from data.sql at startup to scan for the max event id.
     ; data.sql is append-only and per-device, so the highest id is always near the
@@ -337,6 +344,30 @@ KL_OpenTodayFh() {
     return fh
 }
 
+; Push AHK's user-mode write buffer for ``fh`` out to the OS.
+;
+; AHK v2's File object has NO Flush() method — ``HasMethod(fh, "Flush")`` is 0
+; and the call raises a MethodError. Both former call sites wrapped it in a bare
+; ``try``, so the error was discarded and the buffer was never flushed: measured
+; here, 200 buffered writes left ``fh.Pos`` at 6695 while the file was 3 bytes on
+; disk and a second reader handle saw those same 3 bytes. That matters because
+; today_log_offset is persisted FROM ``fh.Pos``, so the offset routinely named
+; bytes that existed only inside this process — the ingest reader could not see
+; the tail it claimed to have consumed, and any exit that skips KL_CloseTodayFh
+; (hard crash, power loss, taskkill, #SingleInstance replacement) dropped it for
+; good. Reading the ``Handle`` property is the documented v2 idiom: AHK must
+; commit its buffer before it can hand out the raw OS handle.
+; @param fh {File} An open File object. Anything else is ignored.
+KL_FlushTodayFh(fh) {
+    if !IsObject(fh)
+        return
+    ; The read IS the flush — the handle value itself is deliberately unused.
+    try _ := fh.Handle
+    catch as err {
+        try LoggerWarn("Keylogger", "today.log flush failed: {1}.", err.Message)
+    }
+}
+
 KL_CloseTodayFh() {
     if Keylogger.HasOwnProp("_today_fh") && IsObject(Keylogger._today_fh) {
         try Keylogger._today_fh.Close()
@@ -549,18 +580,35 @@ KL_AppendLog(entry) {
     }
     if filtered
         return
-    ; app_switch / window_switch carry the OUTGOING (prev_app / prev_title)
-    ; context as their payload, but MF_ShouldFilter() above only evaluated the
-    ; LIVE (new) focused window — which by definition is never excluded, since
-    ; the hook just detected a switch AWAY from it. Explicitly re-check the
-    ; outgoing side so a switch away from an excluded app / private-browsing
-    ; window never leaks its process name or verbatim title into the log (F9).
-    if (entry["type"] = "app_switch" || entry["type"] = "window_switch") {
+    ; MF_ShouldFilter() above evaluated MetricsFocusCache, which MF_RefreshFocus
+    ; repoints within MF_FOCUS_TTL_MS (50 ms). The PAYLOAD, however, describes
+    ; whatever window its producer saw, and every producer lags that cache:
+    ; app_switch / window_switch carry the OUTGOING prev_app / prev_title by
+    ; design, while every other type carries Keylogger.session_app /
+    ; session_title, which only KL_Hook_RefreshContext writes and only under its
+    ; own 1000 ms TTL on a 250 ms timer. So for up to ~1.25 s after switching
+    ; away from an excluded or private-browsing window the live check passed
+    ; while the row still stamped that window's process name and verbatim title
+    ; — precisely the identifiers the filter exists to suppress. Scoping the
+    ; re-check to the two switch types (F9) left the typing / shortcut /
+    ; hotstring / mouse / ergo siblings leaking the same stale pair, so it now
+    ; runs for every entry against whatever context that entry actually carries:
+    ; the verdict and the payload can no longer describe two different windows.
+    ctx_app   := ""
+    ctx_title := ""
+    if (entry["type"] = "app_switch") {
+        ctx_app := entry.Has("prev_app") ? entry["prev_app"] : ""
+    } else if (entry["type"] = "window_switch") {
+        ctx_app   := entry.Has("app") ? entry["app"] : ""
+        ctx_title := entry.Has("prev_title") ? entry["prev_title"] : ""
+    } else {
+        ctx_app   := entry.Has("app") ? entry["app"] : ""
+        ctx_title := entry.Has("title") ? entry["title"] : ""
+    }
+    if (ctx_app != "" || ctx_title != "") {
         outgoing_filtered := false
         try {
-            outgoing_filtered := (entry["type"] = "app_switch")
-                ? MF_ShouldFilterFor(entry["prev_app"], "")
-                : MF_ShouldFilterFor(entry["app"], entry["prev_title"])
+            outgoing_filtered := MF_ShouldFilterFor(ctx_app, ctx_title)
         } catch {
             ; Module not loaded or error — fail closed, same contract as the
             ; live-focus check above.
@@ -870,11 +918,11 @@ KL_ReadNewTodayLog() {
 
     ; Flush the writer's pending buffer so the reader sees every line that
     ; the hot path appended since the last tick — without this, in-flight
-    ; events stay invisible until OS buffer pressure forces a flush.
-    if Keylogger.HasOwnProp("_today_fh") && IsObject(Keylogger._today_fh) {
-        try Keylogger._today_fh.RawWriteFlush := 0  ; no-op, kept as a marker
-        try Keylogger._today_fh.Flush()
-    }
+    ; events stay invisible until OS buffer pressure forces a flush. The
+    ; reader below opens its own handle and can only ever see what the OS
+    ; actually holds, so this has to be a real flush (see KL_FlushTodayFh).
+    if Keylogger.HasOwnProp("_today_fh")
+        KL_FlushTodayFh(Keylogger._today_fh)
 
     ; Read everything past current offset.
     fh := false
@@ -926,7 +974,13 @@ KL_IngestOnce(force := false, rollover_owned := false) {
     ; Moved BEFORE the pending-entries drain so we never clear _pending_entries
     ; from RAM and then defer — that would leave entries on disk only, where
     ; KL_JsonDecode is a no-op on 64-bit and entries are silently lost.
-    if (!force and IsSet(KLHook) and KLHook.last_tick != 0 and (A_TickCount - KLHook.last_tick) & 0xFFFFFFFF < KeylogConst.INGEST_IDLE_MS)
+    ; Bypasses on _shutting_down for the same reason the suspend guard above
+    ; does: deferring only works while a next tick still exists. At shutdown
+    ; there is none, so "defer" means "discard" — and _pending_entries lives in
+    ; RAM only, so quitting or reloading within INGEST_IDLE_MS of a keystroke
+    ; used to throw away the whole closing batch (session_end, idle_end, the
+    ; final roi_snapshot), leaving events_session with an unpaired session_start.
+    if (!force and !Keylogger._shutting_down and IsSet(KLHook) and KLHook.last_tick != 0 and (A_TickCount - KLHook.last_tick) & 0xFFFFFFFF < KeylogConst.INGEST_IDLE_MS)
         return Map("ok", true, "eof", false, "reason", "typing")
 
     ; The ingest timer can beat the midnight timer. Only the rollover
@@ -946,18 +1000,32 @@ KL_IngestOnce(force := false, rollover_owned := false) {
     new_offset := read_result["offset"]
     entries    := read_result["entries"]
     source_eof := read_result["eof"]
+	; Only drain the RAM queue once the reader has caught up with today.log.
+	; KL_ReadNewTodayLog caps every pass at INGEST_BATCH_LINES, so while a
+	; backlog remains the append handle sits far past the reader's bookmark.
+	; Draining anyway forced a choice between two silent corruptions: publish
+	; the writer's position and every unread line is skipped for good (worse,
+	; KL_DayRollover then deletes today.log), or publish the reader's bookmark
+	; and the lines just appended are read back on a later tick and inserted a
+	; second time under a freshly allocated event id. Holding the queue in RAM
+	; for the few ticks the backlog needs avoids both; it is bounded because
+	; each pass advances the bookmark by up to INGEST_BATCH_LINES.
+	;
 	; Atomically snapshot and clear _pending_entries under Critical so the
 	; keystroke hook cannot Push a new entry between our Length check and
 	; the := [] reset — without this, entries pushed after the Length check
 	; but before the clear are silently dropped, never reaching data.sql.
-	previous_critical := Critical("On")
-	try {
-		pending_snapshot := Keylogger._pending_entries
-		Keylogger._pending_entries := []
-	} finally {
-		Critical(previous_critical)
+	pending_snapshot := []
+	if source_eof {
+		previous_critical := Critical("On")
+		try {
+			pending_snapshot := Keylogger._pending_entries
+			Keylogger._pending_entries := []
+		} finally {
+			Critical(previous_critical)
+		}
 	}
-	
+
 	; Write pending events to disk now, off the hot path. Track the completed
 	; JSONL lines precisely: on a later data.sql failure, completed lines are
 	; already recoverable from the old offset and must NOT also be re-queued.
@@ -1006,8 +1074,12 @@ KL_IngestOnce(force := false, rollover_owned := false) {
 			}
 			; Advance the success path past the JSONL lines just written. On an SQL
 			; failure the old offset is deliberately retained, so those same lines
-			; are read once from disk on the following tick.
-			try fh.Flush()
+			; are read once from disk on the following tick. The flush is what makes
+			; fh.Pos trustworthy here: without it the position counts bytes still
+			; sitting in AHK's write buffer, so the committed offset named a byte
+			; that did not exist in the file yet. Reaching this line at all implies
+			; source_eof, so the writer's position and the reader's bookmark agree.
+			KL_FlushTodayFh(fh)
 			new_offset := fh.Pos
 		}
 	}
@@ -1351,7 +1423,16 @@ KL_Stop() {
     ; _shutting_down was raised at the top of this function (see the comment
     ; there) so the module drains above could emit their closing events too.
     KL_FlushBuffer()
-    KL_IngestOnce()
+    ; force := true — the typing-idle guard would otherwise return before the
+    ; pending drain, and there is no next tick left to defer to. Looped because
+    ; each pass drains at most INGEST_BATCH_LINES and the RAM-only queue is only
+    ; flushed once the reader reaches EOF, so a backlog has to be walked out.
+    loop KeylogConst.SHUTDOWN_INGEST_MAX_PASSES {
+        ingest_result := KL_IngestOnce(true)
+        ; A rollover result carries no "eof" key — nothing left to walk either way.
+        if (!ingest_result["ok"] or KL_GetMap(ingest_result, "eof", true))
+            break
+    }
     KL_SaveState()
     KL_CloseTodayFh()
     Keylogger.initialized := false
