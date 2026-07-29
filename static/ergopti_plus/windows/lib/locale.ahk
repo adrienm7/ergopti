@@ -310,9 +310,21 @@ _I18nEnsureLoaded() {
 ; =============================
 ; =============================
 
-; Returns the localised string for the given dot-notation key.
-; Falls back to the raw key name if the locale file is missing or the key is absent.
-t(Key) {
+; Resolve a dot-notation key through the locale cascade WITHOUT reporting a miss.
+;
+; This is the accessor for SPECULATIVE lookups — a caller walking a chain of
+; candidate keys, where a miss is the normal control flow rather than a defect.
+; It exists because t() below both resolves and DIAGNOSES, and those two
+; contracts collided: lib/manifest_descriptions.ahk probes up to nine candidates
+; per menu label and expects all but one to miss, so every label emitted several
+; warnings claiming "the raw key is being displayed to the user" when it was not.
+; Measured 2026-07-29: 282 unique keys warned per boot, of which 281 were probes
+; and exactly one was a real, user-visible miss — which is how that one defect
+; survived a full day inside its own alarm.
+;
+; @param Key string Dot-notation locale key.
+; @returns {String} The translation, or "" when the key resolves nowhere.
+I18nLookup(Key) {
 	global _I18nCache, _I18nCacheLoaded, _I18nFallbacksWarmed
 	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
 	if !_I18nCacheLoaded
@@ -332,6 +344,19 @@ t(Key) {
 		return _I18nCacheEn[Key]
 	if _I18nCacheFrLoaded and _I18nCacheFr.Has(Key) and _I18nCacheFr[Key] != ""
 		return _I18nCacheFr[Key]
+	return ""
+}
+
+; Returns the localised string for the given dot-notation key.
+; Falls back to the raw key name if the locale file is missing or the key is absent.
+;
+; This is the accessor for the DISPLAY path, where a total miss really is a
+; defect worth a WARNING. A caller probing a chain of candidates must use
+; I18nLookup instead — see its comment.
+t(Key) {
+	Value := I18nLookup(Key)
+	if (Value != "")
+		return Value
 	; TOTAL miss: absent from the active locale AND from both fallbacks. The
 	; raw dotted key is still returned — rendering "menu.hotstrings.delay_prompt"
 	; in the UI is ugly but survivable, and throwing here would take the tray menu
