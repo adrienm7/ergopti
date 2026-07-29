@@ -1652,6 +1652,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = Otwórz folder Pobrane",
 	"shortcuts.pixel_read_error": "Nie można odczytać koloru piksela",
 	"shortcuts.saved": "Zapisano: %s",
+	"shortcuts.screenshot_failed": "Nie udało się zrobić zrzutu ekranu",
 	"shortcuts.screen": "Win + H (screensHot) = Zrzut ekranu (uruchamia Win + Shift + S)",
 	"shortcuts.screeninstant": "Klawisz na lewo od 1 = Natychmiastowe przechwycenie aktywnego okna, zapisane w Obrazach ze znacznikiem czasu",
 	"shortcuts.screenocr": "Win + C (OCR) = Zrzut ekranu z wyodrębnianiem tekstu (Win + Shift + T)",

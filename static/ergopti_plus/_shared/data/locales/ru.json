@@ -1652,6 +1652,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = Открыть папку Загрузки",
 	"shortcuts.pixel_read_error": "Не удалось прочитать цвет пикселя",
 	"shortcuts.saved": "Сохранено: %s",
+	"shortcuts.screenshot_failed": "Не удалось сделать снимок экрана",
 	"shortcuts.screen": "Win + H (screensHot) = Снимок экрана (запускает Win + Shift + S)",
 	"shortcuts.screeninstant": "Клавиша слева от 1 = Мгновенный снимок активного окна, сохраняется в Изображения с меткой времени",
 	"shortcuts.screenocr": "Win + C (OCR) = Снимок экрана с извлечением текста (Win + Shift + T)",

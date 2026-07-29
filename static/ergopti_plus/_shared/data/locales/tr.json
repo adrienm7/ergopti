@@ -1652,6 +1652,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = İndirilenler klasörünü aç",
 	"shortcuts.pixel_read_error": "Piksel rengi okunamıyor",
 	"shortcuts.saved": "Kaydedildi: %s",
+	"shortcuts.screenshot_failed": "Ekran görüntüsü alınamadı",
 	"shortcuts.screen": "Win + H (screensHot) = Ekran görüntüsü (Win + Shift + S'yi tetikler)",
 	"shortcuts.screeninstant": "1'in solundaki tuş = Etkin pencerenin anlık görüntüsü, Resimler'e zaman damgasıyla kaydedilir",
 	"shortcuts.screenocr": "Win + C (OCR) = Metin çıkarma ile ekran görüntüsü (Win + Shift + T)",

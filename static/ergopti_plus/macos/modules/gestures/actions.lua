@@ -17,6 +17,7 @@ local Timings       = require("lib.timings")
 local i18n          = require("lib.i18n")
 local text_utils    = require("lib.text_utils")
 local FileSystem    = require("adapters.file_system")
+local ShellRunner   = require("adapters.shell_runner")
 local Click         = require("modules.gestures.actions_click")
 local LOG           = "gestures.actions"
 
@@ -266,13 +267,10 @@ local function spaceNav(goNext)
 	end
 
 	local key_code = goNext and 124 or 123 -- 124=Right, 123=Left
-	-- Deferred so the AppleScript call never blocks the gesture frameCallback
-	hs.timer.doAfter(0, function()
-		pcall(hs.osascript.applescript, string.format(
-			"tell application \"System Events\" to key code %d using {control down}",
-			key_code
-		))
-	end)
+	ShellRunner.applescript(string.format(
+		"tell application \"System Events\" to key code %d using {control down}",
+		key_code
+	))
 end
 
 -- Axis actions (prev / next)
@@ -386,13 +384,13 @@ sg("space_next",               function() spaceNav(true) end)
 sg("mission_control",        function()
 	-- Deferred so the AppleScript call never blocks the gesture frameCallback
 	hs.timer.doAfter(0, function()
-		pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 160")
+		ShellRunner.applescript("tell application \"System Events\" to key code 160")
 	end)
 end)
 sg("app_expose",                  function()
 	-- Deferred so the AppleScript call never blocks the gesture frameCallback
 	hs.timer.doAfter(0, function()
-		pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 125 using {control down}")
+		ShellRunner.applescript("tell application \"System Events\" to key code 125 using {control down}")
 	end)
 end)
 
@@ -434,33 +432,56 @@ sg("sel_right",             function() postKeyStroke({"shift"}, "right") end)
 sg("sel_word_prev",     function() postKeyStroke({"shift", "alt"}, "left") end)
 sg("sel_word_next",       function() postKeyStroke({"shift", "alt"}, "right") end)
 
+-- Absolute path: the interactive layer must not inherit its binaries from PATH,
+-- which differs between a login shell and the Hammerspoon process.
+local SCREENCAPTURE_BIN    = "/usr/sbin/screencapture"
+local SCREENSHOT_DIR_REL   = "/Pictures/screenshots"
+local SCREENSHOT_STAMP_FMT = "%Y%m%d%H%M%S"
+
+--- Builds the absolute path a saved screenshot goes to.
+---
+--- `~` and the shell's `$(date …)` used to be expanded by the shell that
+--- the blocking launcher spawned. The async one hands argv straight to the binary
+--- no shell in between, so both are resolved here - which also means a space or a
+--- `$` in HOME can no longer be re-interpreted.
+--- @param prefix string Filename prefix identifying the capture mode.
+--- @return string Absolute PNG path.
+local function screenshot_path(prefix)
+	local home = os.getenv("HOME") or ""
+	return string.format("%s%s/%s_%s.png",
+		home, SCREENSHOT_DIR_REL, prefix, os.date(SCREENSHOT_STAMP_FMT))
+end
+
+--- Fires screencapture without blocking the runloop.
+--- @param args table Array of argv entries (flags, then an optional target path).
+local function capture(args)
+	ShellRunner.spawn(SCREENCAPTURE_BIN, args).start()
+end
+
+
 -- System
 sg("screenshot_window_clipboard",     function()
-	-- Deferred so hs.execute never blocks the gesture frameCallback
-	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture -cw") end)
+	capture({ "-cw" })
 end)
 sg("screenshot_window_save",          function()
-	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture -w ~/Pictures/screenshots/win_$(date +%Y%m%d%H%M%S).png") end)
+	capture({ "-w", screenshot_path("win") })
 end)
 sg("screenshot_region_clipboard",      function()
-	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture -ci") end)
+	capture({ "-ci" })
 end)
 sg("screenshot_region_save",           function()
-	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture -i ~/Pictures/screenshots/reg_$(date +%Y%m%d%H%M%S).png") end)
+	capture({ "-i", screenshot_path("reg") })
 end)
 sg("screenshot_fullscreen_clipboard",   function()
-	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture -c") end)
+	capture({ "-c" })
 end)
 sg("screenshot_fullscreen_save",        function()
-	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture ~/Pictures/screenshots/full_$(date +%Y%m%d%H%M%S).png") end)
+	capture({ screenshot_path("full") })
 end)
 
 sg("lock_screen",                    function() pcall(hs.caffeinate.lockScreen) end)
 sg("notification_center",          function()
-	-- Deferred so the AppleScript call never blocks the gesture frameCallback
-	hs.timer.doAfter(0, function()
-		pcall(hs.osascript.applescript, "tell application \"System Events\" to click menu bar item \"Notification Center\" of menu bar 1 of application process \"ControlCenter\"")
-	end)
+	ShellRunner.applescript("tell application \"System Events\" to click menu bar item \"Notification Center\" of menu bar 1 of application process \"ControlCenter\"")
 end)
 
 -- Applications and Stats
@@ -473,40 +494,39 @@ sg("open_metrics_apps",        function() invoke_ui("ui.metrics_apps", "show") e
 sg("open_hotstrings_editor",    function() invoke_ui("ui.hotstring_editor", "open") end)
 sg("open_paths_editor",            function() invoke_ui("ui.menu.menu_paths", "open_editor") end)
 sg("open_script_source",               function()
-	-- Deferred so hs.execute never blocks the gesture frameCallback
-	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir)) end)
+	ShellRunner.open(hs.configdir)
 end)
 sg("open_personal_shortcuts",     function()
-	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir) .. "/personal_shortcuts.toml") end)
+	ShellRunner.open(hs.configdir .. "/personal_shortcuts.toml")
 end)
 sg("open_personal_hotstrings",    function()
-	-- Resolve path eagerly (requires only Lua, no shell), then defer the shell open
 	local ok_mp, mp = pcall(require, "ui.menu.menu_paths")
 	local p = ok_mp and type(mp.get) == "function" and mp.get("PersonalTomlPath")
-	hs.timer.doAfter(0, function()
-		if p and p ~= "" then pcall(hs.execute, "open " .. text_utils.shell_quote(p))
-		else pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir) .. "/hotstrings/personal_hotstrings.toml") end
-	end)
+	if type(p) == "string" and p ~= "" then
+		ShellRunner.open(p)
+	else
+		ShellRunner.open(hs.configdir .. "/hotstrings/personal_hotstrings.toml")
+	end
 end)
 sg("open_personal_info",               function()
-	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir) .. "/personal_info.toml") end)
+	ShellRunner.open(hs.configdir .. "/personal_info.toml")
 end)
 sg("open_config",                    function()
-	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(hs.configdir) .. "/config.toml") end)
+	ShellRunner.open(hs.configdir .. "/config.toml")
 end)
 sg("open_logs_folder",                function()
-	local dir = logs_dir()
-	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(dir)) end)
+	ShellRunner.open(logs_dir())
 end)
 sg("open_today_log",                   function()
-	-- Resolve the path synchronously (pure Lua), then open in a deferred shell call
 	local ok_p, path = pcall(function()
 		return logs_dir() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
 	end)
-	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(path)) end)
+	-- The open is skipped rather than attempted with a nil path: the launcher
+	-- logs an ERROR for a nil target, which is the fail-fast we want, but only
+	-- when there was really a path to open.
+	if ok_p then ShellRunner.open(path) end
 end)
 sg("open_error_log",                   function()
-	-- Resolve the path synchronously (pure Lua), then open in a deferred shell call
 	local ok_p, path = pcall(function()
 		local ok_l, Logger = pcall(require, "lib.logger")
 		if ok_l and type(Logger) == "table" and type(Logger.ERRORS_LOG_FILE) == "string" and Logger.ERRORS_LOG_FILE ~= "" then
@@ -514,7 +534,7 @@ sg("open_error_log",                   function()
 		end
 		return logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
 	end)
-	hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(path)) end)
+	if ok_p then ShellRunner.open(path) end
 end)
 
 -- Parameterized actions read their value from the binding that invoked them.

@@ -1652,6 +1652,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = Open the Downloads folder",
 	"shortcuts.pixel_read_error": "Unable to read pixel colour",
 	"shortcuts.saved": "Saved: %s",
+	"shortcuts.screenshot_failed": "Screenshot failed",
 	"shortcuts.screen": "Win + H (screensHot) = Screen capture (triggers Win + Shift + S)",
 	"shortcuts.screeninstant": "Key left of 1 = Instant capture of the active window, saved in Pictures with timestamp",
 	"shortcuts.screenocr": "Win + C (OCR) = Screenshot with text extraction (Win + Shift + T)",

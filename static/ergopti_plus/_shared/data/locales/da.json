@@ -1652,6 +1652,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = Åbn Hentninger-mappen",
 	"shortcuts.pixel_read_error": "Kan ikke aflæse pixelfarven",
 	"shortcuts.saved": "Gemt: %s",
+	"shortcuts.screenshot_failed": "Skærmbilledet mislykkedes",
 	"shortcuts.screen": "Win + H (screensHot) = Skærmbillede (aktiverer Win + Shift + S)",
 	"shortcuts.screeninstant": "Tast til venstre for 1 = Øjeblikkelig capture af aktivt vindue, gemt i Billeder med tidsstempel",
 	"shortcuts.screenocr": "Win + C (OCR) = Skærmbillede med tekstudtræk (Win + Shift + T)",

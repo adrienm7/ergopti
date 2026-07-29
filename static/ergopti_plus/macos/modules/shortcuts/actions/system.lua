@@ -32,12 +32,18 @@ local eventtap      = hs.eventtap
 local pasteboard    = hs.pasteboard
 local notifications = require("lib.notifications")
 local EventTapGuard = require("adapters.event_tap_guard")
+local ShellRunner   = require("adapters.shell_runner")
 local Logger        = require("lib.logger")
 local text_utils = require("lib.text_utils")
 local Timings       = require("lib.timings")
 local i18n          = require("lib.i18n")
 
 local LOG = "shortcuts.actions.system"
+
+-- Absolute paths: the interactive layer must not inherit its binaries from PATH,
+-- which differs between a login shell and the Hammerspoon process.
+local MKDIR_BIN         = "/bin/mkdir"
+local SCREENCAPTURE_BIN = "/usr/sbin/screencapture"
 
 -- Explicit inter-key delay for simulated keystrokes. hs.eventtap.keyStroke()
 -- defaults this argument to 200 000 us and implements it as a BLOCKING usleep on
@@ -510,11 +516,24 @@ function M.bind_instant_screenshot()
 		local home = os.getenv("HOME") or "~"
 		local dir  = home .. "/Pictures/screenshots"
 		local filename = string.format("%s/screenshot_%s.png", dir, os.date("%Y_%m_%d_%Hh_%Mmin_%Ss"))
-		hs.timer.doAfter(0, function()
-			pcall(hs.execute, "mkdir -p " .. text_utils.shell_quote(dir))
-			pcall(hs.execute, "screencapture -l " .. id .. " " .. text_utils.shell_quote(filename))
-			notifications.notify(string.format(i18n.get("shortcuts.saved"), filename), nil, "success")
-		end)
+		-- mkdir then screencapture, chained through the completion callback: the
+		-- directory has to exist before the capture runs. Both are asynchronous
+		-- because the deferral this used to rely on ran the blocking calls on the
+		-- same runloop the keyboard tap lives on — it moved the freeze off the tap
+		-- callback without removing it.
+		ShellRunner.spawn(MKDIR_BIN, { "-p", dir }, function()
+			ShellRunner.spawn(SCREENCAPTURE_BIN, { "-l", tostring(id), filename }, function(exit_code)
+				if exit_code == 0 then
+					notifications.notify(string.format(i18n.get("shortcuts.saved"), filename), nil, "success")
+					return
+				end
+				-- The old code notified success unconditionally, so a capture that
+				-- never wrote a file still told the user where to find it.
+				Logger.warn(LOG, "screencapture -l exited with code %s — no file written.",
+					tostring(exit_code))
+				notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
+			end).start()
+		end).start()
 		return true
 	end)
 	tap:start()
