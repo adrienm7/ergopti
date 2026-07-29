@@ -100,6 +100,19 @@ global _MenuDispatchTokens := Map()
 global _MenuDispatchTokenCounter := 0
 global _MenuDispatchClickSequences := Map()
 
+; Every HMENU an item has been registered into. MenuDispatcher_PruneMenu folds
+; these handles into its live set because liveness is OWNERSHIP, not tray
+; reachability: this driver builds its submenus DETACHED on purpose
+; (InitSubMenus / initMenu register into fresh Menu() objects and only attach
+; them at TrayMenuStage_Publish), so between the first registration and
+; publication every new item is invisible to a walk that starts at A_TrayMenu.
+; LLM_Menu_Build prunes from a SetTimer thread that preempts the deliberately
+; non-Critical tray build on every boot, and it used to delete hundreds of live
+; registrations inside that window; _TrackedDispatch's token fence then refuses
+; the click and _OnMenuCommandWmCommand returns before arming the retry, so the
+; item is permanently dead with nothing logged at any level.
+global _MenuDispatchOwnerHandles := Map()
+
 ; Hard ceiling on retry delay (ms) — long enough for any reasonable AHK
 ; dispatch latency, short enough that the user doesn't perceive the
 ; recovered click as laggy. 60ms is sufficient: AHK always dispatches
@@ -131,12 +144,15 @@ global _MENU_RETRY_DELAY_MS := 60
 ; unbounded growth of both Maps when a rebuild shrinks the menu and never
 ; re-registers the dropped IDs.
 MenuDispatcher_Reset() {
-    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchClickSequences
+    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchClickSequences, _MenuDispatchOwnerHandles
     _MenuDispatcherEpoch += 1
     _MenuDispatchCallbacks := Map()
     _MenuDispatchLastFire  := Map()
     _MenuDispatchTokens    := Map()
     _MenuDispatchClickSequences := Map()
+    ; Nothing is tracked any more, so the ownership set must go with it —
+    ; otherwise handles from the retired generation keep being walked forever.
+    _MenuDispatchOwnerHandles := Map()
 }
 
 ; Advance the retry epoch before replacing the tray tree, without clearing the
@@ -163,8 +179,14 @@ MenuDispatcher_BeginReplacement() {
 ; fresh IDs and the previous pass's IDs are never re-added once the item count
 ; shrinks). Reuses freed IDs are still re-added by RegisterMenuItem during the
 ; same rebuild, so live items keep their tracking.
+;
+; An ID counts as live when it is present in ANY menu the driver has registered
+; into — this menu, the tray, or a submenu still detached from it — not merely in
+; the ones the tray can reach right now. Tray reachability alone is wrong here
+; because the driver builds its submenus detached and publishes them at the end,
+; and this prune runs from a timer thread that lands inside that window.
 MenuDispatcher_PruneMenu(MenuObj) {
-    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens, _MenuDispatchClickSequences
+    global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens, _MenuDispatchClickSequences, _MenuDispatchOwnerHandles
 
     ; Collect the IDs currently live in this menu's HMENU.
     LiveIds := Map()
@@ -208,6 +230,37 @@ MenuDispatcher_PruneMenu(MenuObj) {
     ; live menu from a freed one, so skip the prune rather than drop a live entry.
     if (!TrayWalked)
         return
+
+    ; Fold in every menu an item has been registered INTO, not only the ones the
+    ; tray can currently reach. The tray walk above answers "is this id on screen
+    ; right now", but the driver registers its submenus DETACHED and publishes
+    ; them later, so during a rebuild every freshly registered id looks dead to
+    ; it. LLM_Menu_Build's prune runs from a SetTimer thread that lands inside
+    ; that window on every boot, and the ids it deleted there belonged to items
+    ; that were very much alive — the click then vanishes with no log at all
+    ; (menu-prune-kills-detached-registrations). Walking the owning menus instead
+    ; makes liveness ownership-based, which is the property the prune actually
+    ; needs. A handle whose Menu object has been released fails
+    ; GetMenuItemCount, so its ids stay correctly dead and the set self-heals.
+    try {
+        OwnerSeen := Map()
+        DeadHandles := []
+        for OwnerHandle in _MenuDispatchOwnerHandles {
+            if (DllCall("GetMenuItemCount", "ptr", OwnerHandle, "int") < 0) {
+                DeadHandles.Push(OwnerHandle)
+                continue
+            }
+            _MenuDispatchCollectLiveIds(OwnerHandle, LiveIds, OwnerSeen)
+        }
+        for OwnerHandle in DeadHandles {
+            _MenuDispatchOwnerHandles.Delete(OwnerHandle)
+        }
+    } catch {
+        ; Without the complete ownership set we cannot tell a detached-but-live
+        ; id from a freed one, so skip the prune rather than delete a live entry
+        ; — the same policy as the two bail-outs above.
+        return
+    }
 
     ; Drop every tracked ID no longer live in this menu OR anywhere in the tray.
     ; Collect dead IDs first to avoid mutating the Map during enumeration.
@@ -262,6 +315,25 @@ _MenuDispatchCollectLiveIds(HMENU, LiveSet, Seen) {
     }
 }
 
+; Record the HMENU an item has just been registered into, so
+; MenuDispatcher_PruneMenu can recognise it as live even while its menu is still
+; detached from the tray. Called by every registrar; keeping it in one helper is
+; what makes the ownership set complete, and an incomplete set is exactly how
+; the prune came to delete live registrations in the first place.
+_MenuDispatchTrackOwner(MenuObj) {
+    global _MenuDispatchOwnerHandles
+    try {
+        HMENU := MenuObj.Handle
+        if (HMENU) {
+            _MenuDispatchOwnerHandles[HMENU] := true
+        }
+    } catch as Err {
+        ; The prune then falls back to pure tray reachability for this menu,
+        ; which is the pre-fix behaviour — worth a line, not worth failing over.
+        try LoggerDebug("MenuDispatcher", "Could not record the owning menu handle: {1}", Err.Message)
+    }
+}
+
 ; Add a menu item that participates in the dispatch bypass. Behaves like
 ; ``MenuObj.Add(ItemName, Callback)`` but additionally records the
 ; callback so the OnMessage handler can re-dispatch if AHK drops the
@@ -310,6 +382,7 @@ RegisterMenuItem(MenuObj, ItemName, Callback) {
     _MenuDispatchCallbacks[ItemId] := Callback
     _MenuDispatchLastFire[ItemId]  := 0
     _MenuDispatchTokens[ItemId]    := TrackedObj.Token
+    _MenuDispatchTrackOwner(MenuObj)
     return 1
 }
 
@@ -401,6 +474,7 @@ RegisterMenuItemInsert(MenuObj, BeforeItem, ItemName, Callback) {
     _MenuDispatchCallbacks[ItemId] := Callback
     _MenuDispatchLastFire[ItemId]  := 0
     _MenuDispatchTokens[ItemId]    := TrackedObj.Token
+    _MenuDispatchTrackOwner(MenuObj)
     return 1
 }
 
