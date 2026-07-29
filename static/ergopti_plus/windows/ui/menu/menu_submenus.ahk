@@ -110,6 +110,16 @@ InitSubMenus() {
 
 	; Shortcuts — Accents + WrapTextIfSelected + Modifier combos + transitional Personal.
 	SubMenus["Shortcuts"] := _BuildShortcutsSubmenu()
+	; Splice the Alt/Ctrl/Ctrl+Shift/Win keyboard-shortcut groups in above the
+	; modifier-combos anchor HERE, at the single construction point of the menu
+	; object. InsertKeyboardShortcutGroups is a plain Menu.Insert sequence with no
+	; idempotence check, and AHK v2's Menu.Insert appends on an existing label
+	; instead of merging the way Menu.Add does — so running it twice on the same
+	; Menu duplicates all four groups plus their separator. It used to run from
+	; initMenu(), which _Updater_RebuildMenu calls ALONE (no InitSubMenus), so
+	; every updater-driven tray refresh grew the submenu by five more rows,
+	; unbounded until the next Reload.
+	InsertKeyboardShortcutGroups(SubMenus["Shortcuts"], t("menu.shortcuts.group_modifiers"))
 	BootProfile_Mark("MENU/InitSub: shortcuts submenu")
 
 	; TapHolds — built from the v2 variant tables in tap_hold_writer.ahk.
