@@ -110,6 +110,25 @@ M._active_tasks = {}
 --- @param module_sections table Extra module sections definitions.
 --- @return table|nil myMenu The created menubar object.
 --- @return table|nil configWatcher The file watcher object.
+--- Stops the watchers this module owns.
+---
+--- The shutdown callback stops everything pinned in _G.script_watchers, but the
+--- menubar's config pathwatcher and theme watcher are held here instead — so
+--- they could still fire during the Lua-state teardown window, which is exactly
+--- the hazard that loop's own comment cites. This module holds the handles, so
+--- it is the only place that can stop them.
+function M.stop_watchers()
+	if M._watcher then
+		pcall(function() M._watcher:stop() end)
+		M._watcher = nil
+	end
+	if M._theme_watcher then
+		pcall(function() M._theme_watcher:stop() end)
+		M._theme_watcher = nil
+	end
+	Logger.debug(LOG, "Menubar watchers stopped.")
+end
+
 function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections, karabiner, hotfile_paths)
 	base_dir = type(base_dir) == "string" and base_dir or (hs.configdir .. "/")
 	-- MenuPaths was already initialized by init.lua before menu.start() is called;

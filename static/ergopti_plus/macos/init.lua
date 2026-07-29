@@ -323,7 +323,17 @@ hs.shutdownCallback = function()
 			pcall(function() w:stop() end)
 		end
 	end
-	Logger.info(LOG, "Hammerspoon arrêté")
+	-- The menubar owns watchers of its own (the config path watcher and the theme
+	-- watcher) that are NOT in that table, so they could still fire during the
+	-- teardown window — the exact hazard the comment above cites. Ask the module
+	-- that owns them to stop them; it is the only thing holding the handles.
+	pcall(function()
+		local ok_menu, menu_mod = pcall(require, "ui.menu")
+		if ok_menu and type(menu_mod) == "table" and type(menu_mod.stop_watchers) == "function" then
+			menu_mod.stop_watchers()
+		end
+	end)
+	Logger.info(LOG, "Hammerspoon shut down.")
 end
 
 -- Global uncaught-error handler: offer the user an opt-in crash report.
@@ -405,6 +415,14 @@ Boot.mark("Script control engine started (panic-button eventtap)")
 -- boot_llm_enabled computation (including the saved-prefs / DEFAULT_STATE
 -- fallback) runs later in Section 3. Named distinctly so the two never shadow
 -- each other and the intent of each is unambiguous.
+-- Overrides applied FIRST. config.toml's [features] layer can disable the LLM,
+-- and it writes into hs.settings — but it used to run 50 lines below this read,
+-- so a user who turned the LLM off in the file still paid the synchronous
+-- lsof + curl cleanup on every boot. The two readers of this one setting sat on
+-- opposite sides of the layer that populates it.
+local config_overrides = require("lib.config_overrides")
+config_overrides.apply(menu_paths.get("ConfigTomlPath"))
+
 local mlx_cleanup_enabled = hs.settings.get("llm.enabled") ~= false
 
 -- Hammerspoon does not always reap children on quit/reload, so a fresh boot can
@@ -457,8 +475,8 @@ Boot.mark("MLX server cleanup scheduled (deferred off boot critical path)")
 -- layer the user can edit by hand to override anything the menu exposes
 -- (LogLevel, individual feature flags). All overrides live in the
 -- driver-specific config — no separate cross-driver config.toml.
-local config_overrides = require("lib.config_overrides")
-config_overrides.apply(menu_paths.get("ConfigTomlPath"))
+-- (config_overrides.apply already ran in Section 2, before the MLX cleanup gate
+-- that reads a value it can write.)
 
 -- Re-apply the log level AFTER overrides. Logger.set_level already ran at boot
 -- (above), BEFORE config_overrides — so a [script] log_level / LogLevel override
