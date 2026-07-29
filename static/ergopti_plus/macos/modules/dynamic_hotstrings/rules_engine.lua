@@ -116,7 +116,14 @@ local function interceptor(event, km_buffer, ctx)
 					hs.eventtap.keyStrokes(result)
 					return #result, result
 				end
-			end, "dynamic")
+			-- is_private = true for the same reason the comment above declines
+			-- log_hotstring: the result may be a phone number, an SSN or an IBAN.
+			-- Declining ONE sink while the other recorded the plaintext is what
+			-- made that comment describe an invariant the code did not hold.
+			-- Retained by default rather than per-rule, because a rule carries no
+			-- confidentiality metadata and default-retain is the only shape in
+			-- which a future rule cannot leak by omission.
+			end, "dynamic", true)
 		else
 			-- Fallback if inject_dynamic is not available
 			if _km then
@@ -124,7 +131,9 @@ local function interceptor(event, km_buffer, ctx)
 				if type(_km.arm_synthetic) == "function" then _km.arm_synthetic(n_back, result) end
 			end
 			if keylogger and type(keylogger.notify_synthetic) == "function" then
-				pcall(keylogger.notify_synthetic, result, "hotstring", n_back, "dynamic")
+				-- Same privacy contract as the primary path above — this branch
+				-- reaches the identical sink, so it needs the identical flag.
+				pcall(keylogger.notify_synthetic, result, "hotstring", n_back, "dynamic", nil, true)
 			end
 			for _ = 1, n_back do
 				hs.eventtap.keyStroke({}, "delete", 0)
