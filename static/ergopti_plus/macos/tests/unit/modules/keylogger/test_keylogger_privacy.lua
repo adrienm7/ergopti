@@ -207,6 +207,11 @@ local function start_real_keylogger()
 		set_paused      = function(v) is_paused = v end,
 		set_disabled_apps = km.set_disabled_apps,
 		stop            = km.stop,
+		-- The two SYNTHETIC routes into the same sink. handle_key was the only
+		-- entry point this harness could drive, which is precisely why the context
+		-- filters were never checked on the other two.
+		notify_synthetic = km.notify_synthetic,
+		log_hotstring    = km.log_hotstring,
 	}
 end
 
@@ -646,6 +651,101 @@ helpers.describe("disabled-apps guard — CoreState.disabled_apps blocks matchin
 			disabled_apps     = {},
 		}, "hello")
 		helpers.assert_eq(count_typing_entries(entries), 1)
+	end)
+
+end)
+
+
+
+
+
+-- ================================================================
+-- ==================================================================
+-- ======= 6/ The synthetic routes obey the same four filters =======
+-- ==================================================================
+-- ================================================================
+
+--- Drives a SYNTHETIC expansion (not a keystroke) through the real engine under a
+--- given context, and returns everything that reached the persistence layer.
+---
+--- handle_key was the only entry point the harness above could drive, and it is
+--- the only one that ever applied the context filters. notify_synthetic and
+--- log_hotstring are independent routes into the identical sink and gated solely
+--- on is_enabled, so an expansion fired inside a password manager, a system-auth
+--- prompt or an explicitly disabled app was persisted in full.
+--- @param overrides table CoreState field overrides describing the context.
+--- @param secret string The payload the expansion emits.
+--- @return table appended Entries that reached Rotation.append_log.
+local function expand_through_real_pipeline(overrides, secret)
+	local session = start_real_keylogger()
+	local state   = session.core_state()
+
+	if overrides.is_secure_field   ~= nil then state.is_secure_field   = overrides.is_secure_field   end
+	if overrides.is_private_window ~= nil then state.is_private_window = overrides.is_private_window end
+	if overrides.active_app_bundle ~= nil then state.active_app_bundle = overrides.active_app_bundle end
+	if overrides.disabled_apps     ~= nil then session.set_disabled_apps(overrides.disabled_apps)     end
+
+	session.notify_synthetic(secret, "hotstring", 0, nil, secret)
+	session.log_hotstring("trg", secret, "auto")
+	session.stop()
+	return session.appended
+end
+
+--- Asserts the payload appears nowhere in what was persisted.
+--- @param entries table Appended entries.
+--- @param secret string The payload that must be absent.
+--- @param context_label string Which filter was under test, for the message.
+local function assert_secret_absent(entries, secret, context_label)
+	for _, e in ipairs(entries) do
+		for _, field in ipairs({ "rich_text", "events_json", "tag", "replacement", "trigger", "text" }) do
+			local v = e[field]
+			if type(v) == "string" then
+				helpers.assert_true(v:find(secret, 1, true) == nil,
+					context_label .. ": the expansion payload reached the persisted '" .. field
+					.. "' field — the synthetic route must honour the same filter as a keystroke")
+			end
+		end
+	end
+end
+
+helpers.describe("context filters apply to synthetic expansions, not only to keystrokes", function()
+
+	local SECRET = "ZZEXPANSIONSECRETZZ"
+
+	helpers.it("a private window silences notify_synthetic and log_hotstring", function()
+		local entries = expand_through_real_pipeline({ is_private_window = true }, SECRET)
+		assert_secret_absent(entries, SECRET, "private window")
+	end)
+
+	helpers.it("a secure field silences them", function()
+		local entries = expand_through_real_pipeline({ is_secure_field = true }, SECRET)
+		assert_secret_absent(entries, SECRET, "secure field")
+	end)
+
+	helpers.it("a system-auth dialog silences them", function()
+		local entries = expand_through_real_pipeline({ active_app_bundle = "com.apple.SecurityAgent" }, SECRET)
+		assert_secret_absent(entries, SECRET, "system-auth dialog")
+	end)
+
+	helpers.it("a user-disabled app silences them", function()
+		local entries = expand_through_real_pipeline({
+			active_app_bundle = "com.example.Excluded",
+			disabled_apps     = { { bundleID = "com.example.Excluded" } },
+		}, SECRET)
+		assert_secret_absent(entries, SECRET, "disabled app")
+	end)
+
+	helpers.it("an ordinary context still records the expansion (the filters are not a blanket block)", function()
+		local entries = expand_through_real_pipeline({ active_app_bundle = "com.example.Allowed" }, SECRET)
+		local found = false
+		for _, e in ipairs(entries) do
+			for _, field in ipairs({ "rich_text", "events_json", "tag", "replacement" }) do
+				if type(e[field]) == "string" and e[field]:find(SECRET, 1, true) then found = true end
+			end
+		end
+		helpers.assert_true(found,
+			"without this case every assertion above would pass against a keylogger that "
+			.. "records nothing at all")
 	end)
 
 end)
