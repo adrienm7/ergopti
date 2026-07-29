@@ -1193,6 +1193,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_uia_clamp_every_probe_site.ahk
 #Include meta/test_uia_poll_segment_bounded.ahk
 #Include meta/test_hcw_reset_all_republishes.ahk
+#Include meta/test_llm_inline_autotype_staleness.ahk
 #Include meta/test_walker_batch_has_an_inprocess_drain.ahk
 #Include unit/test_walker_title_cap_enforced.ahk
 #Include meta/test_boot_profile_retroactive_stamps.ahk
