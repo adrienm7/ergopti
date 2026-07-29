@@ -24,19 +24,38 @@ npm run test:js -- --full  # also runs the slow property + mutation tests
 ```
 
 `test:js` prints a pass/fail line per check and, on failure, the **exact command
-to reproduce that one check** plus the tail of its output. It bundles:
+to reproduce that one check** plus the tail of its output.
 
-- `npm run build:domain` — the codegen pipeline + drift detection. This is the
-  one that catches "I edited the manifest but forgot to regenerate". It runs, in
-  order: `build:manifest`, `codegen:*`, `test:manifest-parity`,
-  `test:port-compliance`, `test:config-schema`, `test:feature-read-sites`, then a
-  **drift-check** (`git diff` over every generated file). If drift-check fails,
-  run `npm run codegen` and commit the regenerated files.
-- `test:priority-parity`, `audit-translations`, `lint:conventions:strict`.
+**The inventory of checks is the run itself.** `run-js-suite.cjs` prints one
+bullet per check as it goes, so `npm run test:js` on your own tree is the
+authoritative list — and the `CHECKS` array in `tools/test/run-js-suite.cjs` is
+its single source of truth. It carries ~70 checks (drift detection, cross-driver
+parity, single-source ratchets, bridge wiring, encoding and syntax gates…), and
+new ones land regularly; re-typing them here would be stale within a week, so
+this page deliberately does not. Same rule one level down: `build:domain` names
+each of its own steps as it runs them.
 
-Not in `test:js` (run on demand): `python tools/format_toml.py --hotstrings
---all --check` (hotstring TOML formatting), `npm run test:properties`,
-`npm run test:mutation`.
+Two entries are worth explaining, because the name does not tell you what a
+failure means:
+
+- **`domain pipeline (…)`** = `npm run build:domain`, the codegen pipeline plus
+  drift detection. This is the one that catches "I edited the manifest but forgot
+  to regenerate": it rebuilds every generated file, runs the parity/schema/port
+  checks over the result, then **drift-checks** (`git diff`) the generated tree.
+  If the drift-check fails, run `npm run codegen` and commit the regenerated
+  files — the code is fine, the commit is incomplete.
+- **`tests that cannot fail (…)`** = `tools/test/find-false-greens.cjs`, a
+  ratchet on tests that can never go red (tautologies, vacuous absence
+  assertions, unregistered tests, `pcall`-only bodies). It only turns down, so a
+  failure means a new false green was added, not that a test broke.
+
+**Slow checks**, excluded from the default run: `npm run test:js -- --full` adds
+`test:properties` (fast-check) and `test:mutation` (Stryker). CI runs both in the
+`Validate · JS ports + properties` job, mutation on `main` only.
+
+**Not bundled at all**: `python tools/format_toml.py --hotstrings --all --check`
+(hotstring TOML sorting/formatting) is its own CI job, `Validate · hotstrings
+TOML`. Run it after touching any hotstring `.toml`.
 
 **Adding a feature flag?** Edit only `static/ergopti_plus/_shared/modules/features/manifest.toml`,
 then `npm run codegen`, then commit the regenerated `_generated/` files. If you
