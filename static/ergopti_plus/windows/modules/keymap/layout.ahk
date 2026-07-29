@@ -595,6 +595,24 @@ global UIA_SELECTION_IDLE_REQUIRED_MS := 250
 ; large document selection monopolise the keyboard/message thread.
 global UIA_SELECTION_MAX_TEXT_CHARS := 8192
 
+; Deadline for the WHOLE probe, not for one COM call. The timeout clamp below
+; bounds each individual call; this bounds their SUM, because a provider that
+; answers just under the per-call limit on each of five hops still owns the
+; keystroke-dispatch thread for a multiple of it. Measured 2026-07-29: one tick
+; reached 301.0 ms, i.e. past Windows' ~300 ms LowLevelHooksTimeout, where the
+; keystroke is delivered WITHOUT the hook's verdict — silent data loss, not a slow
+; feel. Chosen well under that ceiling while still leaving room for a healthy
+; probe (mean 14.3 ms over 2993 measured round trips).
+global UIA_SELECTION_SEGMENT_BUDGET_MS := 60
+
+; Inputs of the last probe. A selection cannot appear unless the FOCUS moved or
+; the user touched the input stream, so a probe whose inputs are identical to the
+; previous one can only produce the previous answer. Skipping those removed the
+; bulk of the round trips on an idle machine (~80 % of ticks exceeded the 5 ms
+; hot-path threshold before this gate). 0 means "no probe yet".
+global _UIA_LastProbeHwnd := 0
+global _UIA_LastProbeIdleEpoch := 0
+
 ; Bound UIA's own waits before this poll makes its first COM round-trip.
 ;
 ; The library ships Windows' defaults — 2000 ms TransactionTimeout, 20000 ms
@@ -675,6 +693,7 @@ _UIA_SelectionPollTick() {
 	global _UIA_SelectionCache, UIA, _UIA_NO_TP_CACHE, _UIA_NO_TP_TTL_MS
 	global UIA_SELECTION_IDLE_REQUIRED_MS, UIA_SELECTION_MAX_TEXT_CHARS
 	global _DriverBootPhase
+	global _UIA_LastProbeHwnd, _UIA_LastProbeIdleEpoch, UIA_SELECTION_SEGMENT_BUDGET_MS
 	; No UIA/COM work before the driver is ready. This timer is armed at include
 	; position, so without this gate it fires several times during the multi-second
 	; RegisterAllHotstrings boot phase — each tick doing out-of-proc STA COM round-trips
@@ -707,6 +726,28 @@ _UIA_SelectionPollTick() {
     ; starting new COM work until the input stream has been quiet long enough.
     if (A_TimeIdlePhysical < UIA_SELECTION_IDLE_REQUIRED_MS)
         return
+    ; Nothing can have changed since the last probe unless the FOCUS moved or the
+    ; user touched the input stream, and a selection cannot appear without one of
+    ; those. So once a probe has answered "no selection" for this window, repeating
+    ; it every 500 ms on an idle machine buys nothing and costs a cross-process COM
+    ; round trip on the thread that dispatches keystrokes. Measured over one
+    ; 31-minute session before this gate: 2993 round trips exceeded 5 ms, mean
+    ; 14.3 ms, worst 301.0 ms — past Windows' ~300 ms LowLevelHooksTimeout, where
+    ; the keystroke is delivered WITHOUT the hook's verdict.
+    ;
+    ; The skip is released by either signal, so correctness is preserved: making a
+    ; selection IS physical input, which resets A_TimeIdlePhysical and therefore
+    ; the epoch below. It only suppresses probes whose inputs are provably
+    ; identical to the previous one.
+    ActiveHwnd := WinExist("A")
+    ; A_TimeIdlePhysical counts DOWN from the last input, so the moment of that
+    ; input is what identifies the input stream's state, not the idle time itself.
+    IdleEpoch := A_TickCount - A_TimeIdlePhysical
+    if (_UIA_LastProbeHwnd == ActiveHwnd and _UIA_LastProbeIdleEpoch == IdleEpoch
+        and !IsObject(_UIA_SelectionCache))
+        return
+    _UIA_LastProbeHwnd := ActiveHwnd
+    _UIA_LastProbeIdleEpoch := IdleEpoch
     if (!IsSet(UIA))
         return
     ; Bound the round-trip BEFORE making it. The gate above only decides whether
@@ -732,16 +773,39 @@ _UIA_SelectionPollTick() {
             return
         }
 
+        ; Deadline for the WHOLE probe, checked between hops. The timeout clamp
+        ; above bounds each individual COM call, so a provider that answers just
+        ; under the per-call limit five times over still owns this thread for a
+        ; multiple of it — which is how a single tick reached 301.0 ms, past
+        ; Windows' ~300 ms LowLevelHooksTimeout. Abandoning mid-probe yields "no
+        ; selection", the same safe fallback every other early exit takes.
+        Deadline := Now + UIA_SELECTION_SEGMENT_BUDGET_MS
+
         el := UIA.GetFocusedElement()
         if !el.IsTextPatternAvailable {
             _UIA_NO_TP_CACHE[ProcName] := Now + _UIA_NO_TP_TTL_MS
 			_UIA_SelectionCache := 0
             return
         }
+        if (A_TickCount > Deadline) {
+            try LoggerWarn("Layout", "UIA selection probe abandoned after the focused element: {1} ms budget exceeded on the keystroke thread.", UIA_SELECTION_SEGMENT_BUDGET_MS)
+			_UIA_SelectionCache := 0
+            return
+        }
 
         tp := el.GetPattern("Text")
+        if (A_TickCount > Deadline) {
+            try LoggerWarn("Layout", "UIA selection probe abandoned after the text pattern: {1} ms budget exceeded on the keystroke thread.", UIA_SELECTION_SEGMENT_BUDGET_MS)
+			_UIA_SelectionCache := 0
+            return
+        }
         ranges := tp.GetSelection()
         if (ranges.Length > 0) {
+            if (A_TickCount > Deadline) {
+                try LoggerWarn("Layout", "UIA selection probe abandoned before reading the selection: {1} ms budget exceeded on the keystroke thread.", UIA_SELECTION_SEGMENT_BUDGET_MS)
+				_UIA_SelectionCache := 0
+                return
+            }
             Text := ranges[1].GetText(UIA_SELECTION_MAX_TEXT_CHARS)
             ; Blank-only selections (newlines) are not meaningful to wrap
             if (Text != "" and !RegExMatch(Text, "^(\r\n|\r|\n)+$")) {
