@@ -40,7 +40,7 @@ is run by pointing AutoHotkey64 at the runner:
 & "C:\Program Files\AutoHotkey\v2.0.x\AutoHotkey64.exe" /ErrorStdOut tests\run_all.ahk
 ```
 
-Add `/validate` against `ErgoptiPlus.ahk` to syntax-check the full include graph
+To syntax-check the full include graph, compile it with `Ahk2Exe` (`/in ErgoptiPlus.ahk /out %TEMP%\probe.exe`, exit 17 on a syntax error). Never use `/validate`: the flag is ignored and the script RUNS
 without launching the driver.
 
 ## Conventions
