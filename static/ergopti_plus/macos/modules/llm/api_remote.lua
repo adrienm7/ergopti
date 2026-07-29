@@ -686,7 +686,13 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 
 	_infer_client.post(url, headers, encoded, function(r)
 		local status, body = r.status, r.body
-		pcall(function()
+		-- Logger.pcall, not a bare pcall. This closure IS the entire response
+		-- handler: parsing, dedup, telemetry and the on_success dispatch all live
+		-- inside it. A throw anywhere aborts the rest silently — the caller's
+		-- callback simply never fires and no line appears anywhere — which is the
+		-- documented "green but no prediction" failure mode. api_remote was the
+		-- one backend never migrated off that anti-pattern.
+		Logger.pcall(LOG, function()
 			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 			if not r.ok then
 				Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%s body=%s",
