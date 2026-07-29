@@ -77,6 +77,23 @@ const CHECKS = [
 	{ name: 'WebView2 host teardown order (closing a window must not quit AHK)', cmd: 'node', args: ['tools/test/test-webview-teardown-order.cjs'], repro: 'node tools/test/test-webview-teardown-order.cjs' },
 	{ name: 'dynamic hotstrings menu labels (resolver bridge + locale keys)', cmd: 'node', args: ['tools/test/test-dynamic-hotstrings-menu-labels.cjs'], repro: 'node tools/test/test-dynamic-hotstrings-menu-labels.cjs' },
 	{ name: 'manifest menu labels resolve (whole class, not a sample)', cmd: 'node', args: ['tools/test/test-manifest-menu-labels-resolve.cjs'], repro: 'node tools/test/test-manifest-menu-labels-resolve.cjs' },
+	// Five gate scripts under tools/test/ used to be invoked by nothing at all —
+	// not by this umbrella, not by any CI workflow, not by the pre-commit hook.
+	// They passed when run by hand, so nothing looked wrong; a gate that never
+	// runs is the purest false green there is. test-feature-read-sites in
+	// particular guards a keyboard-thread crash class and the features README
+	// documents it as a "CI gate".
+	{ name: 'feature read sites resolve against the manifest (UnsetItemError crash class)', cmd: 'node', args: ['tools/test/test-feature-read-sites.js'], repro: 'node tools/test/test-feature-read-sites.js' },
+	{ name: 'config schema (v2 TOML shape)', cmd: 'node', args: ['tools/test/test-config-schema.cjs'], repro: 'node tools/test/test-config-schema.cjs' },
+	{ name: 'metrics heatmap translation coverage', cmd: 'node', args: ['tools/test/test-metrics-heatmap-translation.cjs'], repro: 'node tools/test/test-metrics-heatmap-translation.cjs' },
+	// CI verifies AHK encoding with an inline PowerShell step rather than this
+	// script, so the script itself never ran anywhere: a divergence between the
+	// two implementations was invisible. Run the real one here too.
+	{ name: 'AHK source encoding (UTF-8 BOM + LF)', cmd: 'node', args: ['tools/test/test-ahk-encoding.cjs'], repro: 'npm run test:ahk-encoding' },
+	// Stryker's own harness. Running it here proves it still passes un-mutated,
+	// which is the precondition for the mutation score meaning anything.
+	{ name: 'mutation-test harness passes un-mutated (Stryker precondition)', cmd: 'node', args: ['tools/test/test-mutation-targets.cjs'], repro: 'node tools/test/test-mutation-targets.cjs' },
+	{ name: 'every gate script is actually wired into a runner', cmd: 'node', args: ['tools/test/test-gate-scripts-are-wired.cjs'], repro: 'node tools/test/test-gate-scripts-are-wired.cjs' },
 	{ name: 'hotstrings config window bridge (shared frontend ↔ Windows host)', cmd: 'node', args: ['tools/test/test-hotstrings-config-window-bridge.cjs'], repro: 'node tools/test/test-hotstrings-config-window-bridge.cjs' },
 	{ name: 'prompt editor bridge (shared frontend ↔ Windows host)', cmd: 'node', args: ['tools/test/test-prompt-editor-bridge.cjs'], repro: 'node tools/test/test-prompt-editor-bridge.cjs' },
 	{ name: 'action picker bridge (shared frontend ↔ both hosts)', cmd: 'node', args: ['tools/test/test-action-picker-bridge.cjs'], repro: 'node tools/test/test-action-picker-bridge.cjs' },
