@@ -184,7 +184,7 @@ function M.run_total_reset_async()
 	if not write_total_reset_script(script_path) then
 		return "Unable to create async reset script", false
 	end
-	local cmd = string.format("/usr/bin/nohup /bin/zsh %q >/tmp/ergopti_ke_total_reset_async.log 2>&1 </dev/null &", script_path)
+	local cmd = string.format("/usr/bin/nohup /bin/zsh %s >/tmp/ergopti_ke_total_reset_async.log 2>&1 </dev/null &", text_utils.shell_quote(script_path))
 	local _, ok = hs.execute(cmd)
 	if ok == true then
 		_last_async_reset_launch_ts = now
@@ -247,7 +247,7 @@ local KE_CLI_BIN =
 	"/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
 
 local KE_PRIME_HEADLESS_CMD =
-	string.format("/usr/bin/nohup %q", KE_CONSOLE_USER_SERVER_BIN)
+	"/usr/bin/nohup " .. text_utils.shell_quote(KE_CONSOLE_USER_SERVER_BIN)
 	.. " >/tmp/ke_console_user_server.out 2>/tmp/ke_console_user_server.err </dev/null &"
 
 -- GUI fallback intentionally disabled: the user explicitly requires 100%

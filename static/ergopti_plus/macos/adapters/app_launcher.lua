@@ -20,6 +20,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("lib.logger")
+local text_utils = require("lib.text_utils")
 
 local LOG = "adapters.app_launcher"
 
@@ -66,7 +67,10 @@ function M.launchWithArgs(app_path, args)
 		else
 			quoted_args = shq(args or "")
 		end
-		local cmd = string.format("open -a %q --args %s", app_path, quoted_args)
+		-- %q escapes for a LUA literal and leaves $, backticks and ! live for
+		-- /bin/sh. Every app path here is user-configurable, so the shell quoter
+		-- is the only correct escape. The class guard misses this two-line form.
+		local cmd = string.format("open -a %s --args %s", text_utils.shell_quote(app_path), quoted_args)
 		hs.execute(cmd)
 	end)
 	if not ok then

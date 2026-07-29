@@ -11,6 +11,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local i18n   = require("lib.i18n")
 local LOG    = "vscode_bridge"
 
@@ -173,7 +174,7 @@ end
 --- @return boolean True if installation occurred and VSCode reload is required.
 function M.install_extension()
 	Logger.debug(LOG, "Verifying VSCode extension installation…")
-	os.execute("mkdir -p \"" .. EXT_DIR .. "\"")
+	os.execute("mkdir -p " .. text_utils.shell_quote(EXT_DIR))
 
 	local pkg_path = EXT_DIR .. "/package.json"
 	local ext_path = EXT_DIR .. "/extension.js"
