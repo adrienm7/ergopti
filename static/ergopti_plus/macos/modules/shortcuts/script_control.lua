@@ -365,7 +365,15 @@ local function dispatch_action(action, binding)
 
 	-- Use centralized action dispatcher for everything else
 	Logger.debug(LOG, "Dispatching centralized action: %s…", action)
-	pcall(GestActions.execute_single, action, binding)
+	local ok_exec, handled = pcall(GestActions.execute_single, action, binding)
+	-- …and fall back to the extras table when the central registry does not know
+	-- the action. call_extra had NO caller, so M.set_extras stored handlers that
+	-- nothing could ever reach: a public API documenting a dispatch path that did
+	-- not exist. Registering a handler and watching it never fire is worse than
+	-- having no extension point at all.
+	if not ok_exec or handled ~= true then
+		call_extra(action)
+	end
 	return true
 end
 

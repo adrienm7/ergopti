@@ -268,10 +268,12 @@ helpers.describe("ScriptControl suspend-exempt regression (pause_bindings API)",
 		-- Read the source of script_control.lua and assert the conditional
 		-- that prefers pause_bindings exists, so a future refactor cannot
 		-- accidentally remove the guard.
-		local src_path = helpers.driver_root() .. "modules/shortcuts/script_control.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "script_control.lua must be readable at " .. tostring(src_path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/shortcuts/script_control.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function log_shortcut_if_available")
+		helpers.assert_true(src ~= nil, "modules/shortcuts/script_control.lua source must be locatable")
+		if not src then return end
 		helpers.assert_true(src:find("pause_bindings", 1, true) ~= nil,
 			"script_control.lua must reference pause_bindings to keep the tap alive during pause")
 		helpers.assert_true(src:find("resume_bindings", 1, true) ~= nil,
@@ -296,10 +298,12 @@ helpers.describe("ScriptControl suspend-exempt regression (pause_bindings API)",
 		local ok, shortcuts_mod = pcall(require, "modules.shortcuts")
 		if not ok then
 			-- If loading fails due to other stubs, just verify via source inspection
-			local src_path = helpers.driver_root() .. "modules/shortcuts/init.lua"
-			local fh = io.open(src_path, "r")
-			helpers.assert_true(fh ~= nil)
-			local src = fh:read("*a"); fh:close()
+			-- Selected by a declaration unique to modules/shortcuts/init.lua rather than by
+			-- path, so moving or splitting the module cannot turn this invariant
+			-- into a path error.
+			local src = helpers.read_driver_source("function M.is_bindings_started")
+			helpers.assert_true(src ~= nil, "modules/shortcuts/init.lua source must be locatable")
+			if not src then return end
 			helpers.assert_true(src:find("pause_bindings", 1, true) ~= nil,
 				"shortcuts/init.lua must expose pause_bindings()")
 			helpers.assert_true(src:find("resume_bindings", 1, true) ~= nil,
@@ -363,10 +367,12 @@ helpers.describe("Karabiner layout-change must NOT kill the script-control event
 	-- feature triggers on every pause). The handler must rebind via pause_bindings /
 	-- resume_bindings, which leave the keycode-based eventtap alive.
 	helpers.it("karabiner/init.lua rebinds via rebind_for_layout, never shortcuts.stop/start", function()
-		local src_path = helpers.driver_root() .. "modules/karabiner/init.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "must be able to read karabiner/init.lua")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/karabiner/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function build_paused_ke_config")
+		helpers.assert_true(src ~= nil, "modules/karabiner/init.lua source must be locatable")
+		if not src then return end
 
 		-- The layout-rebind path must use the binding-only helper…
 		helpers.assert_true(src:find("shortcuts.rebind_for_layout", 1, true) ~= nil,
@@ -395,10 +401,12 @@ helpers.describe("Karabiner layout-change must respect pause (« pause = tout é
 	-- pause (full remapping back, user-facing shortcuts live mid-pause). It must
 	-- short-circuit while the script is paused.
 	helpers.it("karabiner/init.lua skips the layout rebuild while the script is paused", function()
-		local src_path = helpers.driver_root() .. "modules/karabiner/init.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "must be able to read karabiner/init.lua")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/karabiner/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function build_paused_ke_config")
+		helpers.assert_true(src ~= nil, "modules/karabiner/init.lua source must be locatable")
+		if not src then return end
 		helpers.assert_true(src:find("is_paused", 1, true) ~= nil,
 			"layout-change handler must consult the pause state")
 		helpers.assert_true(src:find("Layout change ignored", 1, true) ~= nil,
@@ -414,10 +422,12 @@ helpers.describe("resume_all must not re-enable user-disabled gestures or shortc
 	-- The fix snapshots the pre-pause state in pause_all() and restores only what
 	-- was active.
 	helpers.it("script_control source snapshots pre-pause state before disabling", function()
-		local src_path = helpers.driver_root() .. "modules/shortcuts/script_control.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "must be able to read script_control.lua")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/shortcuts/script_control.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function log_shortcut_if_available")
+		helpers.assert_true(src ~= nil, "modules/shortcuts/script_control.lua source must be locatable")
+		if not src then return end
 
 		helpers.assert_true(src:find("_gestures_were_enabled", 1, true) ~= nil,
 			"script_control must declare _gestures_were_enabled snapshot")
@@ -426,10 +436,12 @@ helpers.describe("resume_all must not re-enable user-disabled gestures or shortc
 	end)
 
 	helpers.it("resume_all only calls enable_all when gestures were enabled before pause", function()
-		local src_path = helpers.driver_root() .. "modules/shortcuts/script_control.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/shortcuts/script_control.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function log_shortcut_if_available")
+		helpers.assert_true(src ~= nil, "modules/shortcuts/script_control.lua source must be locatable")
+		if not src then return end
 
 		-- The guard must appear before the enable_all call
 		local guard_pos = src:find("_gestures_were_enabled", 1, true)
@@ -441,10 +453,12 @@ helpers.describe("resume_all must not re-enable user-disabled gestures or shortc
 	end)
 
 	helpers.it("bindings.lua exposes is_started() to detect active state before pause", function()
-		local src_path = helpers.driver_root() .. "modules/shortcuts/bindings.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/shortcuts/bindings.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function get_frontmost_app_name")
+		helpers.assert_true(src ~= nil, "modules/shortcuts/bindings.lua source must be locatable")
+		if not src then return end
 		helpers.assert_true(src:find("function M.is_started", 1, true) ~= nil,
 			"bindings.lua must expose M.is_started() for pre-pause state detection")
 	end)
@@ -674,4 +688,46 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 
 		SC.stop()
 	end)
+end)
+
+
+
+
+-- ====================================================================
+-- ====================================================================
+-- ======= N/ set_extras must feed a dispatch path that exists ========
+-- ====================================================================
+-- ====================================================================
+
+--- The two set_extras cases above only prove the setter does not throw. They
+--- would pass against a setter that discards its argument — which is effectively
+--- what shipped: call_extra had NO caller, so a handler registered through the
+--- public API could never run. A public extension point that silently does
+--- nothing is worse than none at all, because the caller has no way to notice.
+helpers.describe("ScriptControl: the extras table is actually reachable", function()
+
+	helpers.it("dispatch falls back to call_extra when the central registry declines", function()
+		local src = helpers.read_driver_source("call_extra")
+		helpers.assert_true(type(src) == "string" and src ~= "",
+			"the script-control source must be readable or this invariant asserts nothing")
+		helpers.assert_true(src:find("call_extra(action)", 1, true) ~= nil,
+			"set_extras must feed a dispatch path that is actually reached")
+	end)
+
+	helpers.it("the central dispatcher reports whether it handled the action", function()
+		local src = helpers.read_driver_source("function M.execute_single")
+		helpers.assert_true(type(src) == "string" and src ~= "",
+			"the actions source must be readable or this invariant asserts nothing")
+		-- Bounded to execute_single's own body: "return false" appears elsewhere in
+		-- the same file, so an unbounded search would pass against the unfixed code.
+		local at = src:find("function M.execute_single", 1, true)
+		helpers.assert_true(at ~= nil, "execute_single must exist")
+		local body = src:sub(at, at + 700)
+		helpers.assert_true(body:find("return false", 1, true) ~= nil,
+			"execute_single must report an unknown action instead of returning nil for both "
+			.. "outcomes; without that signal the caller cannot know when to try its fallback")
+		helpers.assert_true(body:find("return true", 1, true) ~= nil,
+			"and it must report the handled case too, or the fallback fires after a success")
+	end)
+
 end)
