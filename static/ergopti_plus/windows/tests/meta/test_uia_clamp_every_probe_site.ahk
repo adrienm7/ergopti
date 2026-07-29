@@ -134,7 +134,90 @@ _UCP_EveryProbeSiteClampsFirst() {
 }
 
 
+
+
+
+
+; ==========================================================
+; ==========================================================
+; ======= 3/ The one-shot latch proves the clamp landed ====
+; ==========================================================
+; ==========================================================
+
+; The clamp helper each probe site calls, derived from the site bodies rather
+; than hardcoded, so a renamed helper is followed instead of silently skipped.
+_UCP_ClampHelperNames() {
+	Names := Map()
+	for Site in _UCP_ProbeSites() {
+		Body := _DriverFuncBody(Site)
+		if (Body == "")
+			continue
+		if RegExMatch(Body, "i)([_A-Za-z0-9]*Clamp[_A-Za-z0-9]*Timeouts)\(", &M)
+			Names[M[1]] := true
+	}
+	return Names
+}
+
+; Position of the LAST occurrence of Needle in Hay, or 0.
+_UCP_LastPos(Hay, Needle) {
+	Last := 0
+	Pos := 1
+	while (Pos := InStr(Hay, Needle, , Pos)) {
+		Last := Pos
+		Pos += 1
+	}
+	return Last
+}
+
+; ROOT CAUSE: all three helpers set their one-shot latch BEFORE attempting the
+; two property writes, and wrapped each write in a bare `try` with no catch. On
+; any machine where a write cannot land — an older IUIAutomation, a provider that
+; refuses the property — the latch was burned, the reason was swallowed, and the
+; driver spent the whole session believing its probes were bounded while they ran
+; against Windows' 2000 ms transaction default. That default plus overhead IS the
+; worst stall this driver has ever logged, so "we think we clamped" is the exact
+; state that produced it.
+;
+; The invariant: a one-shot must only latch on a path that has PROVED the clamp
+; applied, and a failed write must be reported rather than swallowed.
+_UCP_EveryClampLatchesOnlyOnSuccess() {
+	Helpers := _UCP_ClampHelperNames()
+	Count := 0
+	for Name, _ in Helpers {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", Name . "() must exist in the driver source")
+		Count++
+
+		WritePos := InStr(Body, "TransactionTimeout :=")
+		ConnPos  := InStr(Body, "ConnectionTimeout :=")
+		Assert(WritePos > 0 and ConnPos > 0,
+			Name . " must still write both UIA timeout properties — without them there is no clamp to latch")
+
+		LastWrite := Max(WritePos, ConnPos)
+		LatchPos := _UCP_LastPos(Body, "Clamped := true")
+		Assert(LatchPos > 0,
+			Name . " must still be a one-shot — re-applying process-wide singleton properties on every probe is "
+			. "pointless work on the keystroke-dispatch thread")
+		Assert(LatchPos > LastWrite,
+			Name . " latches its one-shot BEFORE the property writes it is meant to record. A write that cannot "
+			. "land then leaves the driver believing it is clamped for the rest of the session, running against "
+			. "Windows' 2000 ms transaction default — the exact state behind the 2560 ms stall this file exists "
+			. "for. Latch only after the writes have succeeded (uia-clamp-latches-before-it-applies)")
+
+		Assert(InStr(SubStr(Body, WritePos), "catch") > 0,
+			Name . " must catch a failed timeout write instead of swallowing it in a bare try. A silent failure "
+			. "here is indistinguishable from a successful clamp, which is what made this unfalsifiable from a "
+			. "log (conventions 5.3)")
+	}
+	Assert(Count >= 3,
+		"the three layer-local clamp helpers must all be reached by this scan (found " . Count . ") — a scan that "
+		. "matches fewer cannot fail for the sites it missed")
+}
+
+
 Test("meta uia-clamp: the probe-site list covers every UIA.GetFocusedElement call site",
 	_UCP_EveryCallSiteIsEnumerated)
 Test("meta uia-clamp: every UIA probe bounds its own wait before making it",
 	_UCP_EveryProbeSiteClampsFirst)
+Test("meta uia-clamp: the one-shot latch is only set once the clamp has landed (uia-clamp-latches-before-it-applies)",
+	_UCP_EveryClampLatchesOnlyOnSuccess)

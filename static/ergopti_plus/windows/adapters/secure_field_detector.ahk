@@ -215,25 +215,50 @@ _SFD_MarkUiaHostile(ProcName) {
 _SFD_ClampUiaTimeouts() {
 	global UIA_TRANSACTION_TIMEOUT_MS, UIA_CONNECTION_TIMEOUT_MS
 	static Clamped := false
+	; One diagnostic per process: this probe runs on focus changes, so an
+	; unthrottled warning would become a flood of its own.
+	static Warned := false
 	if Clamped
 		return
 	if !IsSet(UIA)
 		return
 	if (!IsSet(UIA_TRANSACTION_TIMEOUT_MS) or !IsSet(UIA_CONNECTION_TIMEOUT_MS)) {
-		try LoggerWarn("SecureField", "UIA timeout constants are unavailable — the probe would run on Windows' 2000 ms default; skipping the probe's clamp.")
+		if !Warned {
+			Warned := true
+			try LoggerWarn("SecureField", "UIA timeout constants are unavailable — the probe would run on Windows' 2000 ms default; skipping the probe's clamp.")
+		}
 		return
 	}
-	Clamped := true
 	; Both properties are IUIAutomation2 vtable slots; an older interface must not
 	; throw into this callback, which shares the keystroke-dispatch thread.
-	try {
-		if !UIA.IsIUIAutomation2Available
-			return
-	} catch {
+	Supported := false
+	try Supported := UIA.IsIUIAutomation2Available ? true : false
+	if !Supported {
+		Clamped := true
+		if !Warned {
+			Warned := true
+			try LoggerWarn("SecureField", "IUIAutomation2 is unavailable — the password probe runs against Windows' 2000 ms transaction default and cannot be bounded here.")
+		}
 		return
 	}
+	; Latch only once the writes have LANDED. Setting the flag first left the
+	; driver believing it was clamped after a failed write, for the whole session,
+	; with two bare `try`s swallowing the reason (conventions 5.3).
+	Ok := true
 	try UIA.TransactionTimeout := UIA_TRANSACTION_TIMEOUT_MS
+	catch
+		Ok := false
 	try UIA.ConnectionTimeout := UIA_CONNECTION_TIMEOUT_MS
+	catch
+		Ok := false
+	if Ok {
+		Clamped := true
+		return
+	}
+	if !Warned {
+		Warned := true
+		try LoggerWarn("SecureField", "Could not apply the UIA timeout clamp — the password probe is NOT bounded; retrying on the next probe.")
+	}
 }
 
 SFD_ProbeFocusedUia(Hwnd) {

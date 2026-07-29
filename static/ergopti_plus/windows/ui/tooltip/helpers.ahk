@@ -854,19 +854,49 @@ _TooltipNoteRenderPresented() {
 _TooltipClampUiaTimeouts() {
     global UIA_TRANSACTION_TIMEOUT_MS, UIA_CONNECTION_TIMEOUT_MS
     static Clamped := false
+    ; One diagnostic per process: this runs on every tooltip present.
+    static Warned := false
     if Clamped
         return
-    Clamped := true
+    ; Latch AFTER the guards, not before them. Latching first meant an early
+    ; present — before the UIA include had run, or before the timeout constants
+    ; were seeded — burned the single attempt and left every later probe on
+    ; Windows' 2000 ms default. This site also never checked the constants at all,
+    ; so an unset one turned the two writes below into a swallowed exception.
     if !IsSet(UIA)
         return
-    try {
-        if !UIA.IsIUIAutomation2Available
-            return
-    } catch {
+    if (!IsSet(UIA_TRANSACTION_TIMEOUT_MS) or !IsSet(UIA_CONNECTION_TIMEOUT_MS)) {
+        if !Warned {
+            Warned := true
+            try LoggerWarn("Tooltip", "UIA timeout constants are unavailable — the position probe would run against Windows' 2000 ms default; skipping the clamp.")
+        }
         return
     }
+    Supported := false
+    try Supported := UIA.IsIUIAutomation2Available ? true : false
+    if !Supported {
+        Clamped := true
+        if !Warned {
+            Warned := true
+            try LoggerWarn("Tooltip", "IUIAutomation2 is unavailable — the position probe runs against Windows' 2000 ms transaction default and cannot be bounded here.")
+        }
+        return
+    }
+    Ok := true
     try UIA.TransactionTimeout := UIA_TRANSACTION_TIMEOUT_MS
+    catch
+        Ok := false
     try UIA.ConnectionTimeout := UIA_CONNECTION_TIMEOUT_MS
+    catch
+        Ok := false
+    if Ok {
+        Clamped := true
+        return
+    }
+    if !Warned {
+        Warned := true
+        try LoggerWarn("Tooltip", "Could not apply the UIA timeout clamp — the position probe is NOT bounded; retrying on the next present.")
+    }
 }
 
 _TooltipResolvePosition() {
