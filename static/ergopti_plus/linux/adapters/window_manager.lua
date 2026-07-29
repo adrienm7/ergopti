@@ -22,6 +22,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Shell  = require("adapters.shell_runner")
 
 local LOG = "adapters.window_manager"
 
@@ -40,24 +41,24 @@ local INVALID_HWND = 0
 --- @param cmd string
 --- @return string|nil
 local function _popen_line(cmd)
-	local fh = io.popen(cmd .. " 2>/dev/null", "r")
-	if not fh then return nil end
-	local line = fh:read("*l")
-	fh:close()
-	return line
+	return Shell.exec_line(cmd .. " 2>/dev/null")
 end
 
 --- Returns the xdotool window ID for the first window whose name matches spec.
+--- The spec is a window title or class chosen by whatever application drew the
+--- window, so it is quoted through the shell_runner. The previous
+--- string.format("%q") form produced a double-quoted word, in which a title
+--- containing $( ) or a backtick was executed by the shell.
 --- @param spec string App name or window title substring.
 --- @return number|nil
 local function _find_window_by_spec(spec)
 	-- Try by process name first (xdotool search --classname / --name)
 	local id_str = _popen_line(
-		string.format("xdotool search --classname %q | head -1", spec))
+		string.format("xdotool search --classname %s | head -1", Shell.quote(spec)))
 	local id = tonumber(id_str)
 	if id then return id end
 	id_str = _popen_line(
-		string.format("xdotool search --name %q | head -1", spec))
+		string.format("xdotool search --name %s | head -1", Shell.quote(spec)))
 	return tonumber(id_str)
 end
 
@@ -82,9 +83,8 @@ function M.activate(hwnd_or_spec)
 			wid = _find_window_by_spec(hwnd_or_spec)
 		end
 		if not wid then return false end
-		local code = os.execute(
+		return Shell.run(
 			string.format("xdotool windowactivate --sync %d 2>/dev/null", wid))
-		return code == true or code == 0
 	end)
 	if not ok then
 		Logger.error(LOG, "activate(): error — %s", tostring(result))
@@ -117,15 +117,14 @@ function M.kill(spec)
 	local ok, result = pcall(function()
 		if type(spec) ~= "string" then return false end
 		-- Graceful close via wmctrl
-		local code = os.execute(
-			string.format("wmctrl -c %q 2>/dev/null", spec))
-		if code == true or code == 0 then return true end
+		if Shell.run(string.format("wmctrl -c %s 2>/dev/null", Shell.quote(spec))) then
+			return true
+		end
 		-- Hard fallback via xdotool
 		local wid = _find_window_by_spec(spec)
 		if not wid then return false end
-		code = os.execute(
+		return Shell.run(
 			string.format("xdotool windowkill %d 2>/dev/null", wid))
-		return code == true or code == 0
 	end)
 	if not ok then
 		Logger.error(LOG, "kill(): error — %s", tostring(result))

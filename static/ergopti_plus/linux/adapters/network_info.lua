@@ -22,6 +22,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Shell  = require("adapters.shell_runner")
 
 local LOG = "adapters.network_info"
 
@@ -33,18 +34,17 @@ local LOG = "adapters.network_info"
 -- =========================================
 
 --- Computes the SHA-256 hex digest of a string via openssl.
+--- The SSID is chosen by whoever named the access point, so it is quoted
+--- through the shell_runner rather than interpolated: the previous
+--- string.format("%q") form produced a double-quoted word, where an SSID
+--- named `$(…)` or containing $HOME both corrupted the digest and ran.
 --- @param s string
 --- @return string hex digest or ""
 local function _sha256_hex(s)
 	if type(s) ~= "string" or s == "" then return "" end
 	local ok, out = pcall(function()
-		local cmd = string.format(
-			"printf '%%s' %q | openssl dgst -sha256 -hex 2>/dev/null", s)
-		local fh = io.popen(cmd, "r")
-		if not fh then return "" end
-		local result = fh:read("*a")
-		fh:close()
-		return result
+		return Shell.exec(string.format(
+			"printf '%%s' %s | openssl dgst -sha256 -hex 2>/dev/null", Shell.quote(s)))
 	end)
 	if not ok or type(out) ~= "string" then return "" end
 	local hex = out:match("[0-9a-f]+%s*$") or ""
@@ -55,27 +55,12 @@ end
 --- Tries iwgetid first, then nmcli as fallback.
 local function _get_raw_ssid()
 	-- iwgetid: lightweight, works without NetworkManager
-	local fh = io.popen("iwgetid -r 2>/dev/null", "r")
-	if fh then
-		local ssid = fh:read("*a")
-		fh:close()
-		if type(ssid) == "string" then
-			ssid = ssid:match("^%s*(.-)%s*$")
-			if ssid ~= "" then return ssid end
-		end
-	end
+	local ssid = Shell.exec("iwgetid -r 2>/dev/null"):match("^%s*(.-)%s*$")
+	if ssid ~= "" then return ssid end
 	-- nmcli fallback: covers NetworkManager environments
-	fh = io.popen("nmcli -t -f active,ssid dev wifi 2>/dev/null | grep '^yes'", "r")
-	if fh then
-		local line = fh:read("*a")
-		fh:close()
-		if type(line) == "string" then
-			local ssid = line:match("^yes:(.+)$")
-			if ssid then
-				return ssid:match("^%s*(.-)%s*$")
-			end
-		end
-	end
+	local line = Shell.exec("nmcli -t -f active,ssid dev wifi 2>/dev/null | grep '^yes'")
+	local from_nmcli = line:match("^yes:(.+)$")
+	if from_nmcli then return from_nmcli:match("^%s*(.-)%s*$") end
 	return nil
 end
 
