@@ -343,6 +343,7 @@ _LogBootProgress("loading gestures modules")
 #Include ../modules/gestures/window_cycle.ahk
 #Include ../modules/gestures/config.ahk
 #Include unit/test_gestures.ahk
+#Include unit/test_gesture_restart_result_zero_is_success.ahk
 _LogBootProgress("gestures + test included")
 
 ; Keylogger sub-modules — pure-logic subsets included here to test category
