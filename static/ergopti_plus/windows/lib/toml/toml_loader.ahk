@@ -150,6 +150,13 @@ _TomlWarmFileCounts(FilePath) {
         }
     }
 
+    ; Never memoise a count derived from a read that failed. ReadTomlFile
+    ; deliberately leaves an unreadable path uncached so the next caller retries;
+    ; caching the zero it produced here reinstated the very bug that rule removed,
+    ; one call level up — the menu showed the category as empty for the whole
+    ; session and no later successful read could reach this consumer again.
+    if TOML_UnreadableFile(FilePath)
+        return Counts
     _TomlFileSectionCounts[FilePath] := Counts
     return Counts
 }
@@ -196,6 +203,25 @@ CountTomlHotstrings(CategoryName, FilePath := "") {
     return Total
 }
 
+; Resolve the (CategoryName, FilePath) pair ParseTomlGroupConfig was called with
+; to the TOML file that actually backs it. Shared with the invalidator below so
+; the cache key and the eviction key can never drift apart: the resolver calls
+; ParseTomlGroupConfig("personal") while the config window calls it with an
+; explicit path, and both must be recognised as the same file.
+_ParseTomlGroupConfig_ResolveFile(CategoryName, FilePath := "") {
+    global ScriptInformation, _SharedDir
+    if (FilePath != "") {
+        return FilePath
+    }
+    LowerCat := StrLower(CategoryName)
+    if (LowerCat == "personal"
+        and IsSet(ScriptInformation)
+        and ScriptInformation.Has("PersonalTomlPath")) {
+        return ScriptInformation["PersonalTomlPath"]
+    }
+    return (IsSet(_SharedDir) ? _SharedDir : "") . "\modules\hotstrings\" . LowerCat . ".toml"
+}
+
 ; Evict all cache entries for a given file path so that the next call to
 ; ParseTomlGroupConfig or ReadTomlFile re-reads from disk. Called after
 ; _HCW_PatchTomlMeta writes changes to a personal TOML file.
@@ -204,8 +230,23 @@ _ParseTomlGroupConfig_InvalidatePath(FilePath) {
     if _TomlFileCache.Has(FilePath) {
         _TomlFileCache.Delete(FilePath)
     }
-    if HotstringGroupConfig.Has(FilePath) {
-        HotstringGroupConfig.Delete(FilePath)
+    ; One file is cached under more than one key: the engine/tooltip resolver
+    ; reaches personal_hotstrings.toml as the bare category "personal" while the
+    ; config window reaches it by absolute path. Deleting only the path left the
+    ; category-keyed entry alive, so a personal delay/priority edit re-registered
+    ; the engine from the PRE-edit [_meta] while the window displayed the new
+    ; value — with every signal saying the write had landed. Evict every key that
+    ; resolves to this file, not just the one the caller happened to name.
+    for Key, _ in HotstringGroupConfig.Clone() {
+        if (Key == FilePath) {
+            HotstringGroupConfig.Delete(Key)
+            continue
+        }
+        Resolved := ""
+        try Resolved := _ParseTomlGroupConfig_ResolveFile(Key)
+        if (Resolved != "" and Resolved == FilePath) {
+            HotstringGroupConfig.Delete(Key)
+        }
     }
     ; The resolved hotstring delay/color for this group may now differ, so drop
     ; the memoised HotstringsResolve results too (defined in hotstrings_config.ahk).
@@ -372,6 +413,12 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         Trigger := UnescapeTomlString(Match[1])
         Output := UnescapeTomlString(Match[2])
         Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
+        ; The REPLACEMENT carries the marker too — the bundled corpus ships
+        ; entries whose output is the magic key itself. Substituting only the
+        ; trigger emitted a literal U+2605 the user cannot type, while the
+        ; preview index (hotstring_registry.ahk) substitutes both sides, so the
+        ; tooltip promised one string and the engine typed another.
+        Output := StrReplace(Output, "★", ScriptInformation["MagicKey"])
         IsWord := (Match[3] == "true")
         AutoExpand := (Match[4] == "true")
         IsCaseSens := (Match[5] == "true")
@@ -451,6 +498,10 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
                 Trigger := (SimpleM[1] != "") ? SimpleM[1] : SimpleM[2]
                 Output  := SimpleM[3]
                 Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
+                ; Same marker substitution on the replacement as on the trigger:
+                ; an extension pack whose output is the magic key must emit the
+                ; user's key, not the corpus placeholder.
+                Output  := StrReplace(Output, "★", ScriptInformation["MagicKey"])
                 Options := Map("TimeActivationSeconds", 0, "FinalResult", true, "Priority", HSE_PRIORITY_PACKAGE)
                 CreateCaseSensitiveHotstrings("", Trigger, Output, Options)
                 TotalLoaded += 1
@@ -460,6 +511,7 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
         Trigger    := UnescapeTomlString(Match[1])
         Output     := UnescapeTomlString(Match[2])
         Trigger    := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
+        Output     := StrReplace(Output, "★", ScriptInformation["MagicKey"])
         IsWord     := (Match[3] == "true")
         AutoExpand := (Match[4] == "true")
         IsCaseSens := (Match[5] == "true")
@@ -518,15 +570,9 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
         return HotstringGroupConfig[CacheKey]
     }
 
-    if (FilePath == "") {
-        if (LowerCat == "personal"
-            and IsSet(ScriptInformation)
-            and ScriptInformation.Has("PersonalTomlPath")) {
-            FilePath := ScriptInformation["PersonalTomlPath"]
-        } else {
-            FilePath := _SharedDir . "\modules\hotstrings\" . LowerCat . ".toml"
-        }
-    }
+    ; Resolved through the shared helper so _ParseTomlGroupConfig_InvalidatePath
+    ; recognises exactly the same file for a bare-category key as for a path one.
+    FilePath := _ParseTomlGroupConfig_ResolveFile(CategoryName, FilePath)
 
     Config := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
     if !FileExist(FilePath) {
@@ -607,6 +653,12 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
         }
     }
 
+    ; Same rule as _TomlWarmFileCounts: an all-empty Config produced by a read
+    ; that never saw the file must not become permanent. Memoising it froze the
+    ; group's [_meta] delay/colour/priority at the global fallback for the whole
+    ; session, and the cache hit precedes the read so no retry could correct it.
+    if TOML_UnreadableFile(FilePath)
+        return Config
     HotstringGroupConfig[CacheKey] := Config
     return Config
 }
