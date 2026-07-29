@@ -316,6 +316,12 @@ global _HC_WebView    := unset
 global _HC_NavSub     := unset
 global _HC_SnapshotJs := ""
 
+; The host window itself. Without it the singleton bookkeeping was split in half:
+; the controller lived in a global, the Gui was a function-local, and _HC_Close
+; could only reach the half it could see — so "close the previous singleton" left
+; the previous window on screen with a dead blank pane.
+global _HC_Gui := unset
+
 ; True once _HC_Reset() has torn the controller down — guards against
 ; double-close (same SEH access-violation pattern as action_picker_webview.ahk).
 global _HC_ResetDone := false
@@ -328,7 +334,7 @@ global _HC_ResetDone := false
 HealthCheck_ShowWindow() {
 	global _VendorDir, _SharedDir, _HC_WIN_W, _HC_MARGIN, _HC_BTN_H, _HC_BTN_PAD
 	global HC_VHOST, HC_HOST_ACCESS_ALLOW
-	global _HC_Controller, _HC_WebView, _HC_NavSub, _HC_SnapshotJs, _HC_ResetDone
+	global _HC_Controller, _HC_WebView, _HC_NavSub, _HC_SnapshotJs, _HC_ResetDone, _HC_Gui
 
 	Snapshot  := HealthCheck_Run()
 	PlainText := HealthCheck_FormatPlain(Snapshot)
@@ -361,6 +367,8 @@ HealthCheck_ShowWindow() {
 	BtnCopy.OnEvent("Click", CloseAndCopy)
 
 	G.Show("w" . _HC_WIN_W . " AutoSize")
+	; Publish the host window so the next open can actually destroy this one.
+	_HC_Gui := G
 
 	UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll") && !WebView_ShouldUseNativeFallback()
 	if UseWV {
@@ -417,10 +425,14 @@ _HealthCheck_AddFallbackEdit(G, HostCtl, Text) {
 }
 
 _HealthCheck_CloseGui(G) {
+	global _HC_Gui
 	_HC_Reset()
 	if G.HasProp("WVC") && G.WVC
 		try G.WVC.Close()
 	try G.Destroy()
+	; Drop the singleton handle so a later _HC_Close cannot Destroy() a window
+	; that is already gone.
+	_HC_Gui := unset
 }
 
 ; ── WebView2 navigation + teardown helpers ──────────────────────────────────
@@ -484,9 +496,27 @@ _HC_Join(Arr, Sep) {
 	return Out
 }
 
+; Closes the previous healthcheck singleton — controller AND window.
+;
+; This used to call _HC_Reset() alone, which only closes the CONTROLLER. The host
+; Gui was a function-local that no global held, so nothing could destroy it: the
+; previous window stayed on screen with a dead blank pane while a second one
+; opened on top, once per menu click. Worse, closing one of those stale windows
+; ran _HC_Reset again — and since every successful WebView2 create re-arms
+; _HC_ResetDone, that second pass closed the LIVE controller of the window the
+; user was actually reading.
 _HC_Close() {
-	global _HC_Controller
+	global _HC_Gui
+	; Save the reference BEFORE the reset, close the controller while its host
+	; HWND is still alive, and only then destroy the window — the ordering the
+	; WebView2 spec requires, and the one _CLW_OnClose / _LLM_MBW_OnClose use.
+	saved_gui := IsSet(_HC_Gui) ? _HC_Gui : 0
 	_HC_Reset()
+	try {
+		if saved_gui
+			saved_gui.Destroy()
+	}
+	_HC_Gui := unset   ; Always clear the reference, even if Destroy threw
 }
 
 _HC_Reset() {
