@@ -435,6 +435,24 @@ local function interceptor(event, _km_buffer, ctx)
 
 	if _state == STATE_COLLECTING then
 		if char == _trigger then
+			-- The keymap buffer is the authority on what is actually on screen.
+			--
+			-- This state machine is fed exclusively from keyDown, so it resets on
+			-- modifiers, navigation, backspace and any non-letter — but a MOUSE
+			-- CLICK produces no keyDown at all, and neither does a focus change.
+			-- The pending combo therefore survived a caret move, and do_expand
+			-- sizes its backspaces from #_combo alone: it would erase that many
+			-- characters wherever the caret now sits and inject the PII there.
+			-- Cross-checking against the buffer makes every unobserved caret move
+			-- invalidate the combo by construction, and makes this engine's answer
+			-- identical to the preview's, which already derives it from the buffer.
+			local buffer = _km_buffer or ""
+			if buffer:sub(-(#_combo + 1)) ~= "@" .. _combo then
+				Logger.debug(LOG, "Pending @-combo no longer matches the buffer — discarding.")
+				_state = STATE_IDLE
+				_combo = ""
+				return nil
+			end
 			if #_combo > 0 and #resolve_combo(_combo) > 0 then
 				local combo = _combo
 				
