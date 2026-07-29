@@ -100,11 +100,19 @@ function M.spawn(executable, args, on_done, on_chunk)
 		-- reported success for the most common real failure (missing or non-executable
 		-- binary) — exactly the case this function's contract exists to surface.
 		local ok, started = pcall(function() return _task:start() end)
+		-- Release the GC pin on BOTH failure paths. The pin is taken at
+		-- construction so the task cannot be collected mid-run, and is released by
+		-- the completion callback — which never fires for a task that never
+		-- launched. Without this, every refused launch left a dead hs.task and its
+		-- captured closures in the GC root for the life of the process, and the
+		-- root is the one table that is never pruned.
 		if not ok then
+			if _task then M._active_tasks[_task] = nil end
 			Logger.error(LOG, "spawn.start(): hs.task:start() failed — %s", tostring(started))
 			return false
 		end
 		if not started then
+			if _task then M._active_tasks[_task] = nil end
 			Logger.error(LOG, "spawn.start(): hs.task:start() refused to launch %s", tostring(executable))
 			return false
 		end
