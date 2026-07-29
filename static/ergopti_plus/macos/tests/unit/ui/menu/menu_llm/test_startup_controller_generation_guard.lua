@@ -217,3 +217,44 @@ helpers.describe("startup_controller: shared generation guard between primary an
 			"the primary chain's success must still be honoured when it is the first terminal outcome")
 	end)
 end)
+
+
+
+
+-- ==================================================================
+-- ==================================================================
+-- ======= A late success must not revert a USER toggle =============
+-- ==================================================================
+-- ==================================================================
+
+--- The generation guard catches a TERMINAL OUTCOME from the other chain. It does
+--- not catch the user turning AI off from the menu while a check is in flight —
+--- a different event, on a different axis, that both success callbacks used to
+--- ignore. They re-enabled unconditionally, silently reverting the choice the
+--- user had just made.
+helpers.describe("startup_controller: a check's success re-reads the live enable flag", function()
+
+	-- Asserted at the source rather than behaviourally: this harness's stub does
+	-- not route force_mlx_check's on_ok to the two production re-enable sites, so
+	-- a behavioural case here passed against the unfixed code — a false green, and
+	-- worth saying out loud rather than leaving as a green tick.
+	helpers.it("every re-enable site consults state.llm_enabled first", function()
+		local src = helpers.read_driver_source("Startup MLX backup check succeeded")
+		helpers.assert_true(type(src) == "string" and src ~= "",
+			"the startup controller source must be readable or this asserts nothing")
+		local code = src:gsub("%-%-[^\n]*", "")
+
+		-- Both re-enable sites must DECLINE when the flag is off. Anchored on the
+		-- decline branch each one takes, because a bare count of state.llm_enabled
+		-- mentions passed against the unfixed code (the backup's dispatch condition
+		-- already read the flag) — the weaker assertion was a false green and is
+		-- worth naming rather than leaving as a green tick.
+		local declines = 0
+		for _ in code:gmatch("not re%-enabling") do declines = declines + 1 end
+		helpers.assert_true(declines >= 2,
+			"the primary and the backup success paths must each refuse to re-enable when the "
+			.. "user turned AI off while the check was in flight; the generation guard sees a "
+			.. "terminal outcome from the other chain, never the user's own toggle")
+	end)
+
+end)
