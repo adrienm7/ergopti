@@ -32,9 +32,18 @@
 ; they must NOT invalidate the buffers. Kept as an explicit allowlist rather
 ; than a denylist of navigation keys: a denylist silently fails open for every
 ; caret-moving key nobody thought of, which is exactly how the nav layer came
-; to bypass all eight existing reset sites. Matched as a prefix of the payload's
-; key token, so the repetition suffix ("{Volume_Up 3}") is covered.
-global HS_BUFFER_NEUTRAL_PAYLOADS := ["{Volume_Up", "{Volume_Down", "{Volume_Mute"]
+; to bypass all eight existing reset sites.
+;
+; ANCHORED, exactly like HS_BUFFER_BACKSPACE_PAYLOAD below and for the same
+; reason. The previous form was an array tested with InStr(Payload, "{Volume_Up")
+; — a substring match ANYWHERE in the payload — while its own comment claimed it
+; matched a prefix of the key token. That fails OPEN for a compound payload that
+; also moves the caret ("{End}{Volume_Up}"): it would be waved through as
+; text-neutral and leave both buffers describing text no longer on screen. No
+; caller emits that shape today, so this is a latent hole rather than a live bug
+; — and closing a latent hole in the whole class is cheaper than discovering the
+; one caller that opens it. The optional count covers "{Volume_Up 3}".
+global HS_BUFFER_NEUTRAL_PAYLOAD := "i)^\{(?:Volume_Up|Volume_Down|Volume_Mute)(?:\s+\d+)?\}$"
 
 ; A "{BackSpace}" / "{BackSpace N}" payload and nothing else — the only shape
 ; whose effect on the buffers is exactly known. Anchored so a payload that also
@@ -60,13 +69,11 @@ global HS_BUFFER_BACKSPACE_PAYLOAD := "i)^\{BackSpace(?:\s+(\d+))?\}$"
 ;
 ; @param Payload string The exact Send/SendInput payload about to be emitted.
 HS_DeclareSyntheticEffect(Payload) {
-	global HS_BUFFER_NEUTRAL_PAYLOADS, HS_BUFFER_BACKSPACE_PAYLOAD
+	global HS_BUFFER_NEUTRAL_PAYLOAD, HS_BUFFER_BACKSPACE_PAYLOAD
 
-	for Neutral in HS_BUFFER_NEUTRAL_PAYLOADS {
-		if InStr(Payload, Neutral) {
-			try LoggerDebug("HotstringBuffers", "Synthetic payload '{1}' is text-neutral — buffers untouched.", Payload)
-			return
-		}
+	if RegExMatch(Payload, HS_BUFFER_NEUTRAL_PAYLOAD) {
+		try LoggerDebug("HotstringBuffers", "Synthetic payload '{1}' is text-neutral — buffers untouched.", Payload)
+		return
 	}
 
 	if RegExMatch(Payload, HS_BUFFER_BACKSPACE_PAYLOAD, &BsMatch) {
