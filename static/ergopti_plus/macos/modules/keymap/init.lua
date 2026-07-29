@@ -389,6 +389,13 @@ M.reset_predictions  = LLMBridge.reset_predictions
 
 M.classify_trigger   = Registry.classify_trigger
 M.has_exact_trigger  = Registry.has_exact_trigger
+-- The group name personal hotstrings are registered under. lib/personal_hotstrings
+-- loads the file with it at boot and ui/hotstring_editor reloads the SAME file with
+-- it on save. Exported so the two cannot drift: reloading under a different name
+-- left both copies alive, and the sort tie-break handed the win to whichever loaded
+-- first — always the boot one — so an edited hotstring kept expanding to its old text.
+M.PERSONAL_GROUP_NAME = "personal"
+
 M.has_trigger_prefix = Registry.has_trigger_prefix
 M.has_trigger_suffix = Registry.has_trigger_suffix
 

@@ -33,6 +33,10 @@ helpers.describe("lib/personal_hotstrings — load contract", function()
 		-- the returned list (the two must agree).
 		local registered = {}
 		mock("modules.keymap", {
+			-- The real module exports this constant and lib/personal_hotstrings reads
+			-- it, so a stub without it hands nil to load_toml and the group silently
+			-- registers under no name. A stub must model the real API it stands in for.
+			PERSONAL_GROUP_NAME = "personal",
 			load_toml = function(name, path) table.insert(registered, { name = name, path = path }) end,
 			source_priority = function(_) return nil end,
 		})
@@ -96,6 +100,7 @@ helpers.describe("lib/personal_hotstrings — load contract", function()
 		-- apart from a real filesystem symlink loop. Before the depth guard,
 		-- M.load would recurse until Lua's C-stack limit aborted the process.
 		mock("modules.keymap", {
+			PERSONAL_GROUP_NAME = "personal",
 			load_toml = function(_, _) end,
 			source_priority = function(_) return nil end,
 		})
@@ -142,6 +147,7 @@ helpers.describe("lib/personal_hotstrings — load contract", function()
 		-- nested one — the warn must fire and the loaded list must still record
 		-- something sane rather than throwing.
 		mock("modules.keymap", {
+			PERSONAL_GROUP_NAME = "personal",
 			load_toml = function(_, _) end,
 			source_priority = function(_) return nil end,
 		})
