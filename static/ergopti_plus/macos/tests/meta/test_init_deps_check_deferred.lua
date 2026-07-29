@@ -51,12 +51,25 @@ helpers.describe("boot: LLM deps check is deferred via hs.timer.doAfter(0)", fun
 
 	helpers.it("does not call check_and_install_deps synchronously on the boot path", function()
 		local src = read_init()
-		-- A bare, unindented-into-doAfter synchronous call would look like
-		-- "\n\t\tmlx_deps_checker.check_and_install_deps()" at the old call site. The
-		-- only legitimate occurrences now are the pcall-wrapped ones inside doAfter.
-		helpers.assert_true(src:find("\t\tmlx_deps_checker.check_and_install_deps()", 1, true) == nil,
-			"the MLX deps check must not be a bare synchronous call on the boot path")
-		helpers.assert_true(src:find("\t\tollama_deps_checker.check_and_install_deps()", 1, true) == nil,
-			"the Ollama deps check must not be a bare synchronous call on the boot path")
+		-- Anchored on NESTING DEPTH, not on one spelling of the old call. The
+		-- previous version searched for exactly two tabs followed by empty
+		-- parentheses, so re-introducing the synchronous call with an argument, or
+		-- at any other indentation, sailed straight past it. Every legitimate
+		-- dispatch lives inside the deferred closure and is therefore indented
+		-- deeper than the boot-path statements around it.
+		local MIN_NESTED_TABS = 3
+		local seen = 0
+		for line in src:gmatch("[^\n]+") do
+			if line:find("deps_checker%.check_and_install_deps") then
+				seen = seen + 1
+				local tabs = #(line:match("^	*") or "")
+				helpers.assert_true(tabs >= MIN_NESTED_TABS,
+					"a deps check at indentation depth " .. tabs .. " is on the boot path, not "
+					.. "inside the deferred closure; installing dependencies synchronously there "
+					.. "blocks boot behind a network round-trip")
+			end
+		end
+		helpers.assert_true(seen >= 2,
+			"both backend deps checks must be present, or this loop asserts nothing")
 	end)
 end)
