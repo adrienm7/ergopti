@@ -22,6 +22,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [feedback-regression-tests](#feedback-regression-tests) — Every user-requested bug fix must ship with a regression test that fails before / passes after the fix
 - [feedback-local-gate-mirrors-ci](#feedback-local-gate-mirrors-ci) — Green locally must mean green in CI: the local gate is four commands, and it is only trustworthy once `node_modules` is installed on a Node satisfying the engine floor
 - [project-gate-scripts-must-be-wired](#project-gate-scripts-must-be-wired) — A `tools/test/` script is only a gate once `run-js-suite.cjs` invokes it; four exist that nothing runs, one of them documented as a "CI gate"
+- [project-audit-ahk-2026-07-30-pass](#project-audit-ahk-2026-07-30-pass) — Sixth adversarial AHK pass: 14 findings all fixed; the refuted list, the coverage gaps, and the two measurements worth keeping
 - [feedback-ahk-suite-needs-temp-space](#feedback-ahk-suite-needs-temp-space) — A near-full `%TEMP%` volume makes the AHK runner report assertion failures that do not reproduce; check free space before believing a red run
 - [feedback-test-before-merge](#feedback-test-before-merge) — Never merge a slice into dev before the user has tested it live. Stay on the branch and wait for explicit validation.
 - [feedback-ui-must-be-i18n](#feedback-ui-must-be-i18n) — All user-facing UI text goes through the i18n system in 21 languages — never hardcode a UI string anywhere, WebView UIs included
@@ -468,6 +469,79 @@ Installing is itself a trap: `.npmrc` sets `engine-strict=true` and a transitive
 
 Related, and the failure mode this entry's own "a gate that cannot run is worse than one that fails"
 predicts: [[project_gate_scripts_must_be_wired]].
+
+### project-audit-ahk-2026-07-30-pass
+
+_Sixth adversarial AHK pass: 14 findings, all fixed and committed with regression tests. The refuted list, the coverage gaps, and the two measurements worth keeping._
+
+<sub>slug: `project_audit_ahk_2026_07_30_pass`</sub>
+
+Seven adversarial lenses plus an independent manual pass, each finding
+refuted-by-default before being reported, then every survivor fixed one commit at
+a time. The report itself was deleted once the fixes landed — a finding list that
+outlives its fixes reads as a backlog and gets re-worked. What is worth keeping:
+
+**The dominant class, again: an invariant applied per site.** Four of the fourteen
+were siblings of an already-fixed defect, and in each case the shipped guard test
+was scoped to the directory of the original fix and structurally blind to the rest:
+
+- the pause-preserving reload existed only in `ui/menu/`, and 19 other reachable
+  `Reload` sites — including the tray's own « Recharger » item — dropped the pause;
+- the ext-pack preview was unified with the engine on the FILE SET but not on the
+  GRAMMAR (single-bracket headers and bare `key = "value"` entries expanded and
+  could never be previewed) nor on the PRIORITY (previewed at COMMON, fired at
+  PACKAGE, so a colliding pack previewed as the loser and fired as the winner);
+- the hotstrings-config "reset all" existed twice and only the native twin
+  flushed the debounced write and republished;
+- a 3-key sample gate for menu labels missed its sibling, leaving one tray row
+  rendering `i_e_acute` in all 21 languages.
+
+Reflex: when a fix lands, ask what the guarantee's SCOPE is, then make the test
+enumerate that scope. `test_menu_reload_preserves_suspend` and
+`test-manifest-menu-labels-resolve` are the shapes to copy.
+
+**REFUTED — do not re-raise** (in addition to the older lists):
+
+- **The preview wiping its buffer on a word-boundary character** is DELIBERATE and
+  documented in `_PrefixAppendTypedChar`: `HSE_Buffer` keeps the terminator
+  because a trigger may contain one as a non-final character, while the preview
+  scopes to the current word and the post-fire resync (`_PrefixBuffer := HSE_Buffer`)
+  covers the `l'` + `ia` case. Needs a concrete failing trigger before touching.
+- **`_HSE_SourcePriority`'s `ext.` branch is unreachable from the loader** —
+  `LoadExtTomlFile` sets the package priority directly and never consults the
+  cascade. The branch stays because `test-priority-parity` pins it to
+  `priority.json` and the macOS registry. Not dead code to delete unilaterally.
+- **A per-pack delay/priority/colour override is honoured by NEITHER side.** The
+  config window writes it under `ext.<extId>`; the engine ignores the cascade for
+  packs entirely. Exposed by the priority fix, deliberately left open — it is a
+  missing feature, not a fidelity bug, and the tooltip now matches the engine.
+- **`MENU/InitSub: flat hotstring submenus` is not a code regression.** It swung
+  47 ms → 406 ms with ZERO commits touching the driver in between, and spans
+  31–1672 ms across boots sharing a commit. That is an I/O or scheduling
+  signature. Per-category `BootProfile_Mark`s were added so the next boot log can
+  attribute it; do not optimise it from the aggregate number.
+
+**Two measurements worth keeping** (re-derive before relying on them):
+
+- `OnChar`'s own cost is **mean 1.0 ms, max 4.7 ms exclusive**. The historical
+  701 ms figures were re-entrant work billed to the host segment by the raw wall
+  clock. Never quote a raw `OnChar` number as its cost again — read the
+  `[excl … , nested …]` breakdown the profiler now emits.
+- The `UIA.SelectionPoll` probe reached **301.0 ms**, past Windows'
+  ~300 ms `LowLevelHooksTimeout`, where the keystroke is delivered WITHOUT the
+  hook's verdict. Per-call timeout clamps cannot bound a five-hop COM sequence;
+  that is why the segment now has its own deadline.
+
+**Coverage gaps left open — silence here would read as covered:**
+`modules/keylogger/*` (24 files, the largest unaudited subsystem) was not
+examined; 19 of 22 `adapters/` were not read; the `ui/` editor state machines were
+only sampled; `lib/tap_hold/tap_hold_writer.ahk` remains unread for a second pass
+running; and `tests/e2e/` + `tests/startup/` were never searched when looking for
+contradicting tests. Loop-until-dry was NOT reached — one discovery wave ran.
+
+Related: [[project_ahk_invariant_incomplete_application]],
+[[project_gate_scripts_must_be_wired]], [[feedback_ahk_ui_syntax_validation]],
+[[errors_only_log_sink]], [[project_audit_ahk_2026_07_21_adversarial]].
 
 ### project-gate-scripts-must-be-wired
 
