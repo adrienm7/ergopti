@@ -327,17 +327,26 @@ function M.init_log_path(config_dir, max_age_days)
 	if type(config_dir) ~= "string" or config_dir == "" then return end
 	if not config_dir:match("[/\\]$") then config_dir = config_dir .. "/" end
 
-	-- Lazy-require avoids a circular dependency: ShellRunner requires Logger,
-	-- but Logger is a foundational module loaded before adapters. By deferring
-	-- the require to init_log_path() (called post-startup, not at require time)
-	-- both modules are fully loaded before either references the other.
-	local ShellRunner = require("adapters.shell_runner")
-
 	local log_dir = config_dir .. "hammerspoon/logs/"
-	-- POSIX-quoted inline rather than via lib.text_utils: the logger is the most
-	-- foundational module in the driver and must not acquire a require() that could
-	-- reorder or cycle at boot. Same idiom as text_utils.shell_quote.
-	ShellRunner.exec("mkdir -p '" .. tostring(log_dir):gsub("'", "'\\''") .. "'")
+
+	-- Created in-process, not by forking /bin/sh.
+	--
+	-- This runs on the boot critical path, and `mkdir -p` through the fully
+	-- synchronous ShellRunner is a fork+exec paid on every launch for a directory
+	-- that already exists on all but the first. Four other modules in this driver
+	-- create directories in-process already. hs.fs.mkdir creates ONE level, so the
+	-- components are walked; every call is best-effort, because a permission
+	-- problem must not block boot — exactly as the shell version's discarded exit
+	-- status did not.
+	local hs_ref = rawget(_G, "hs")
+	local fs_ref = (type(hs_ref) == "table") and hs_ref.fs or nil
+	if type(fs_ref) == "table" and type(fs_ref.mkdir) == "function" then
+		local built = (log_dir:sub(1, 1) == "/") and "/" or ""
+		for part in log_dir:gmatch("[^/]+") do
+			built = built .. part .. "/"
+			pcall(fs_ref.mkdir, built)
+		end
+	end
 	_log_dir = log_dir
 
 	-- Close any handle open on the old path so the next write re-opens cleanly
