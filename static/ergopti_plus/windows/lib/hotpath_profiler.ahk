@@ -47,6 +47,10 @@ global _HOTPATH_NEST_MIN_MS := 1.0
 ; most a few deep (OnChar > HSE.FeedChar > Tooltip.Build > a re-entrant OnChar),
 ; so this is generous; it exists to bound both memory and the containment sweep.
 global _HOTPATH_NEST_TRACK_CAP := 16
+; Upper bound on the sub-steps one segment may attribute. A segment with more
+; parts than this is not a segment any more, and the cap keeps the accumulator
+; allocation-free in the steady state.
+global _HOTPATH_BREAKDOWN_CAP := 12
 
 
 
@@ -134,4 +138,80 @@ HotPath_LogIfSlow(Label, StartTicks, Detail := "") {
 		while (Closed.Length > _HOTPATH_NEST_TRACK_CAP)
 			Closed.RemoveAt(1)
 	}
+}
+
+
+
+
+
+; =======================================
+; =======================================
+; ======= 2/ Sub-step attribution =======
+; =======================================
+; =======================================
+
+; A segment only prints once it exceeds _HOTPATH_SLOW_MS, which means a composite
+; segment built out of sub-steps that are each BELOW that threshold reports a
+; number with no attribution at all. Tooltip.Present is exactly that shape: six
+; sub-steps of 0.02–4.4 ms that add up to a reported 6–53 ms, and no log line
+; says which of them moved. Instrumenting each sub-step with its own
+; HotPath_LogIfSlow does not help — every one of them is censored by the same
+; 5 ms floor.
+;
+; So sub-steps accumulate into a buffer instead of logging, and the PARENT
+; renders them into its own (already gated) line. Cost when the parent is fast:
+; one array push per sub-step and one discarded string build — no I/O, no log.
+;
+; Deliberately a static local rather than a module global, matching the nesting
+; ring above: this file's mutable state stays inside the functions that own it.
+; @param Op {String} "reset" | "mark" | "drain".
+; @param Label {String} Sub-step name, for "mark".
+; @param StartTicks {Integer} QPC value at sub-step entry, for "mark".
+; @returns {String} For "drain", the rendered attribution; "" otherwise.
+_HotPathBreakdown(Op, Label := "", StartTicks := 0) {
+	global _HOTPATH_QPC_FREQ, _HOTPATH_BREAKDOWN_CAP
+	static Marks := []
+	if (Op == "reset") {
+		Marks := []
+		return ""
+	}
+	if (Op == "mark") {
+		if (Marks.Length >= _HOTPATH_BREAKDOWN_CAP)
+			return ""
+		local now := 0
+		if (_HOTPATH_QPC_FREQ == 0)
+			DllCall("QueryPerformanceFrequency", "Int64*", &_HOTPATH_QPC_FREQ)
+		DllCall("QueryPerformanceCounter", "Int64*", &now)
+		Marks.Push({ L: Label,
+			Ms: (_HOTPATH_QPC_FREQ > 0)
+				? ((now - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0) : 0.0 })
+		return ""
+	}
+	; "drain" — render and clear, so a parent that never drains cannot leak its
+	; sub-steps into the next segment's line.
+	Text := ""
+	for , Mark in Marks
+		Text .= (Text == "" ? "" : " + ") . Mark.L . " " . Round(Mark.Ms, 2) . " ms"
+	Marks := []
+	return Text
+}
+
+; Discard any sub-steps left over from an earlier segment. Call at the top of the
+; composite segment, never at the top of a sub-step.
+HotPath_BreakdownBegin() {
+	_HotPathBreakdown("reset")
+}
+
+; Record one closed sub-step of the segment currently being measured.
+; @param Label {String} Short sub-step name (e.g. "border").
+; @param StartTicks {Integer} QPC value captured by HotPath_Now at sub-step entry.
+HotPath_BreakdownMark(Label, StartTicks) {
+	_HotPathBreakdown("mark", Label, StartTicks)
+}
+
+; Render the accumulated sub-steps as a Detail string and clear them. Pass the
+; result straight to HotPath_LogIfSlow as its Detail argument.
+; @returns {String} e.g. "prepare 0.15 ms + corners 0.46 ms + border 4.33 ms".
+HotPath_BreakdownDetail() {
+	return _HotPathBreakdown("drain")
 }

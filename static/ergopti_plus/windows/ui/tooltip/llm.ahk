@@ -894,6 +894,12 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration) {
         return false
     Row := Rows[1]
     _TooltipTimerGeneration := RenderGeneration
+    ; The LLM path presents the same stack as the hotstring path but had no
+    ; Present segment of its own, so a slow prediction render was invisible while
+    ; the identical work on the preview path was reported. Draining the sub-step
+    ; attribution here is also what stops _TooltipPresentStack's marks leaking
+    ; into whichever segment happens to be measured next.
+    _hpLlmPresent := HotPath_Now()
     try {
         _TooltipPresentStack(Pos, Row, true)
     } catch {
@@ -901,6 +907,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration) {
             TooltipHide("LlmPresentFail", true)
         return false
     }
+    HotPath_LogIfSlow("Tooltip.LlmPresent", _hpLlmPresent, HotPath_BreakdownDetail())
     if (RenderGeneration != _TooltipGeneration)
         return false
     return true
