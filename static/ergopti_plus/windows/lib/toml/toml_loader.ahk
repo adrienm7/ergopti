@@ -46,6 +46,18 @@ global _HOTSTRING_ENTRY_PATTERN :=
 ; over-count malformed or non-entry lines versus the registered rows.
 global _HOTSTRING_SIMPLE_ENTRY_PATTERN := 'i)^(?:"([^"]+)"|([A-Za-z0-9_.-]+))\s*=\s*"([^"]+)"'
 
+; A TOML section header, accepting ONE or MORE brackets — `[snippets]` and
+; `[[snippets]]` are both valid and both register hotstrings.
+;
+; Named and shared because the extension-pack PREVIEW indexer
+; (lib/hotstrings/hotstring_registry.ahk) parses the same files and used to
+; accept double brackets only, resetting its current section on anything else.
+; A pack written with single-bracket headers therefore expanded — the engine
+; accepted it here — while never being indexed for the tooltip, so it could never
+; be previewed. The two sides were unified on the FILE SET first; this is the
+; other half, the GRAMMAR, and a shared constant is what stops it drifting again.
+global HS_TOML_SECTION_HEADER_PATTERN := "^\[+([^\[\]]+)\]+$"
+
 
 
 
@@ -459,6 +471,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 ; Load all hotstring entries from every [[section]] in an arbitrary TOML file.
 LoadExtTomlFile(FilePath, CategoryLabel) {
     global ScriptInformation, _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN, HSE_PRIORITY_PACKAGE
+    global HS_TOML_SECTION_HEADER_PATTERN
     if !FileExist(FilePath) {
         try LoggerWarn("TomlLoader", "Extension TOML '{1}' not found — skipped.", FilePath)
         return
@@ -476,7 +489,7 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
         ; Stripped for the same reason as the counter above and
         ; LoadHotstringsSection: an anchored pattern silently mis-attributes
         ; every following entry when a header carries a trailing comment.
-        if RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SecM) {
+        if RegExMatch(TOML_StripInlineComment(Line), HS_TOML_SECTION_HEADER_PATTERN, &SecM) {
             CurrentSection := StrLower(Trim(SecM[1]))
             continue
         }
