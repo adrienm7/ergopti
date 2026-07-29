@@ -5,14 +5,16 @@
 ; MODULE: Tap-Holds — Delete (Suppr)
 ; DESCRIPTION:
 ; Delete tap-hold: any action from GESTURE_ACTIONS on tap (default: delete),
-; any hold modifier or nav layer on hold. Scancode SC053.
+; any hold modifier or nav layer on hold. Scancode SC153.
 ;
 ; Two-phase design (mirrors space.ahk) to prevent auto-repeat during long hold:
 ; Phase 1 — KeyWait with timeout discriminates tap from hold.
 ; Phase 2 (modifier) — arm modifier, capture next key, release on key-up.
 ; Phase 2 (layer) — activate layer until key-up.
 ;
-; Note: this remaps the physical Delete/Suppr key (SC053). The LAlt and RCtrl
+; Note: this remaps the physical Delete/Suppr key (SC153 — the EXTENDED scancode).
+; SC053 is NumpadDel/NumpadDot, a different physical key: binding it meant the
+; nav-cluster Delete never reached this module at all. The LAlt and RCtrl
 ; modules emit Delete as an *output* action — that is unrelated to this module.
 ; ==============================================================================
 
@@ -43,7 +45,7 @@ _DeleteHoldModKey() {
 ; ======= 13.1) Hold-modifier variant =======
 
 #HotIf TapHoldHoldModifier(TapHold, "delete") != "" and not LayerEnabled
-*$SC053:: {
+*$SC153:: {
 	tap := KeyWait("Delete", "T" . TapHoldDuration(TapHold, "delete"))
 	if tap {
 		if (A_PriorKey == "Delete")
@@ -77,7 +79,7 @@ _DeleteHoldModKey() {
 ; ======= 13.2) Hold-layer variant =======
 
 #HotIf TapHoldHoldLayer(TapHold, "delete") != "" and TapHoldHoldModifier(TapHold, "delete") == "" and not LayerEnabled
-*$SC053:: {
+*$SC153:: {
 	tap := KeyWait("Delete", "T" . TapHoldDuration(TapHold, "delete"))
 	if tap {
 		if (A_PriorKey == "Delete")
@@ -117,7 +119,7 @@ _DeleteHoldModKey() {
 ; guard needed since there is no hold behaviour. No ~ needed: the action replaces
 ; the native key entirely; ~ would send both Delete and the action.
 #HotIf TapHoldTapAction(TapHold, "delete") != "" and TapHoldTapAction(TapHold, "delete") != "delete" and TapHoldHoldModifier(TapHold, "delete") == "" and TapHoldHoldLayer(TapHold, "delete") == "" and not LayerEnabled
-$SC053:: _DeleteDispatch()
+$SC153:: _DeleteDispatch()
 #HotIf
 
 
