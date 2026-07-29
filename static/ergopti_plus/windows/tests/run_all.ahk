@@ -855,6 +855,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_savefullconfig_no_delete.ahk
 #Include meta/test_keylogger_scan_max_id_tail.ahk
 #Include meta/test_gesture_screenshot_no_tempfile.ahk
+#Include meta/test_wmexists_is_not_a_handle.ahk
 #Include meta/test_hotstrings_deadkey_uppercase_cleanup.ahk
 #Include meta/test_parser_splitblocks_cap.ahk
 #Include meta/test_ollama_trim_registry_min_id.ahk

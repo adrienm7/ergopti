@@ -164,7 +164,12 @@ GestureScreenshotComplete(Kind, Mode, Path, Ok, Reason := "") {
 ;   Mode = "save"      → write a PNG to disk and TrayTip the path.
 ;   Mode = "clipboard" → copy the bitmap to the Windows clipboard.
 GestureScreenshotWindow(Mode) {
-    HWnd := WMExists("A")
+    ; WMExists is an EXISTENCE PREDICATE — it returns true/false, never a handle.
+    ; Assigning it here made every capture build the spec "ahk_id 1", so WinGetPos
+    ; threw, the catch below logged "WinGetPos failed" and returned: the window
+    ; screenshot gesture could never once produce an image. WMGetFocused is the
+    ; adapter that actually yields the active window's handle.
+    HWnd := WMGetFocused()["hwnd"]
     if (!HWnd) {
         LoggerWarn("gestures", "screenshot_window: no active window.")
         return
