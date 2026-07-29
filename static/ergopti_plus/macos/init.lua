@@ -226,23 +226,10 @@ do
 end
 Boot.mark("TOML hotstring cache wired")
 
--- Now safe to load modules that depend on config_dir
-local file_system        = require("adapters.file_system")
-local karabiner          = require("modules.karabiner")
-local menu               = require("ui.menu")
-local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
-local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
-local backend_detector    = require("modules.llm.backend_detector")
-local notifications       = require("lib.notifications")
-local ui_restore         = require("lib.ui_restore")
-
--- Wire Logger.error → system notification so every ERROR surfaces to the user
--- without any module needing to call notifications.notify() directly.
--- Registered here (after notifications is loaded) to keep logger dependency-free.
-Logger.set_error_notification_handler(function(module_name, message)
-	pcall(notifications.notify, i18n.get("common.error_prefix") .. tostring(module_name), message, "error")
-end)
-Boot.mark("Config-dependent module requires")
+-- Forward-declared so the shutdown callback below can capture it as an upvalue.
+-- A reference written above the `local` would bind the nil global of the same
+-- name instead, and the teardown would silently never touch Karabiner.
+local karabiner
 
 -- Armed HERE, not at the end of boot. The body is fully defensive — every
 -- module reference is nil-checked inside its own pcall — and every upvalue it
@@ -335,6 +322,24 @@ hs.shutdownCallback = function()
 	end)
 	Logger.info(LOG, "Hammerspoon shut down.")
 end
+
+-- Now safe to load modules that depend on config_dir
+local file_system        = require("adapters.file_system")
+karabiner                = require("modules.karabiner")
+local menu               = require("ui.menu")
+local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
+local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
+local backend_detector    = require("modules.llm.backend_detector")
+local notifications       = require("lib.notifications")
+local ui_restore         = require("lib.ui_restore")
+
+-- Wire Logger.error → system notification so every ERROR surfaces to the user
+-- without any module needing to call notifications.notify() directly.
+-- Registered here (after notifications is loaded) to keep logger dependency-free.
+Logger.set_error_notification_handler(function(module_name, message)
+	pcall(notifications.notify, i18n.get("common.error_prefix") .. tostring(module_name), message, "error")
+end)
+Boot.mark("Config-dependent module requires")
 
 -- Global uncaught-error handler: offer the user an opt-in crash report.
 -- Hammerspoon surfaces unhandled errors via hs.crash.crashLog, but there is no

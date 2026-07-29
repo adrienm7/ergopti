@@ -100,12 +100,21 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 		-- uses silently binds a nil global instead, and the error surfaces only in
 		-- the Hammerspoon Console during shutdown — the least observable moment
 		-- there is (project-lua-closure-before-local-nil-global).
+		-- Anchored on the DECLARATION of each name, not on the whole
+		-- `local x = require(...)` line. karabiner is now forward-declared and
+		-- assigned later, because the shutdown callback had to move above the
+		-- requires that can raise: modules/karabiner/defaults.lua calls error()
+		-- by design when the shared tap-hold TOML is unreadable, and arming the
+		-- teardown after that meant the one failure which leaves the keyboard
+		-- remapped was also the one that prevented the teardown existing.
+		-- What must hold is that the NAME is in scope above the closure — which
+		-- a forward declaration satisfies exactly as an inline require does.
 		local required = {
-			'local karabiner          = require("modules.karabiner")',
-			'local keymap             = require("modules.keymap")',
-			'local gestures           = require("modules.gestures")',
-			'local shortcuts          = require("modules.shortcuts")',
-			'local reload_guard       = require("lib.reload_guard")',
+			"local karabiner",
+			"local keymap",
+			"local gestures",
+			"local shortcuts",
+			"local reload_guard",
 		}
 
 		local checked = 0
