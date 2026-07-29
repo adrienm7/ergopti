@@ -200,7 +200,14 @@ _HotstringsCacheBuildRows() {
 			Line := Trim(A_LoopField, " `t")
 			if (Line == "" or SubStr(Line, 1, 1) == "#")
 				continue
-			if RegExMatch(Line, "^\[+([^\[\]]+)\]+$", &SectionMatch) {
+			; Strip the trailing comment before the anchored header match. TOML
+			; allows `[[ct]] # note`, and the raw line cannot match `…\]+$`, so
+			; the header used to fall through to the entry parser, fail that too
+			; and `continue` — leaving CurrentSection on the PREVIOUS section, so
+			; every entry under the commented header was cached against the wrong
+			; section (or dropped when it was the first). The runtime loaders this
+			; scan claims to reproduce exactly already strip (toml_loader.ahk).
+			if RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SectionMatch) {
 				CurrentSection := StrLower(Trim(SectionMatch[1]))
 				continue
 			}
