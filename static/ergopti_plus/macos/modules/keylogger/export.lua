@@ -115,6 +115,10 @@ local _now_ts = require("modules.keylogger.timestamp").now_ts
 -- ======================================
 -- =======================================
 
+-- Per-app-name category memo. Declared above the function that reads it: a local
+-- placed below would bind the nil global instead.
+local _category_cache = {}
+
 --- Return the human-readable category for an app, looked up via macOS
 --- LSApplicationCategoryType. Falls back to the i18n "general" label when
 --- the app is not running or not categorized.
@@ -124,19 +128,36 @@ function M.get_native_app_category(app_name)
 	if type(app_name) ~= "string" or app_name == "" then
 		return i18n.get("metrics_apps.general_category")
 	end
+	-- Memoised per app name. Every ingest tick re-resolved each app's category
+	-- with a running-application scan plus an Info.plist read from disk, and did
+	-- it INSIDE the open SQLite write transaction — so the database stayed locked
+	-- for the duration of a filesystem round-trip per distinct app, on a timer.
+	-- An app's LSApplicationCategoryType does not change while it is installed.
+	local cached = _category_cache[app_name]
+	if cached ~= nil then return cached end
+
+	local resolved = nil
 	local app = hs.application.get(app_name)
 	if app then
 		local app_path = app:path()
-		if type(app_path) ~= "string" then
-			return i18n.get("metrics_apps.general_category")
+		if type(app_path) == "string" then
+			local info = hs.application.infoForBundlePath(app_path)
+			if info and info.LSApplicationCategoryType then
+				local raw = info.LSApplicationCategoryType:gsub("public%.app%-category%.", "")
+				raw = raw:gsub("%-", " ")
+				local cap = raw:sub(1, 1):upper() .. raw:sub(2)
+				resolved = MAC_CATEGORIES_FR[cap] or cap
+			end
 		end
-		local info = hs.application.infoForBundlePath(app_path)
-		if info and info.LSApplicationCategoryType then
-			local raw = info.LSApplicationCategoryType:gsub("public%.app%-category%.", "")
-			raw = raw:gsub("%-", " ")
-			local cap = raw:sub(1, 1):upper() .. raw:sub(2)
-			return MAC_CATEGORIES_FR[cap] or cap
-		end
+	end
+
+	-- A miss is cached too: an app that is not running, or carries no category,
+	-- answers the same way on the next tick and re-scanning to learn that again
+	-- is exactly the cost this cache exists to remove. Only the localised
+	-- fallback is left uncached, since the active locale can change at runtime.
+	if resolved ~= nil then
+		_category_cache[app_name] = resolved
+		return resolved
 	end
 	return i18n.get("metrics_apps.general_category")
 end

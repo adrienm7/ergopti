@@ -286,7 +286,16 @@ local CoreState = {
 -- ready to drain them.
 -- LogManager and ContextTracker are deferred to M.start() so that
 -- metrics directories are not created when the feature is off.
-KcBridge.init(CoreState, nil, nil, nil)
+
+-- Forward-declared here so the closure handed to KcBridge.init below captures
+-- the real upvalue rather than a nil global.
+local _is_paused
+
+-- Passed as a CLOSURE, not as the function value: _is_paused is declared further
+-- down, and a reference here would hand over the nil global of that name instead
+-- (the local-after-use trap this driver keeps hitting). The closure resolves it
+-- at call time, by which point the real local exists.
+KcBridge.init(CoreState, nil, nil, nil, function() return _is_paused() end)
 
 -- Tracks whether LogManager/ContextTracker have been initialized
 local _state                = nil
@@ -424,7 +433,7 @@ end
 --- Returns true when the script-control module signals that the script is paused.
 --- Used as a fast guard in all timer/watcher callbacks so no data is written
 --- to the log while the user has explicitly suspended the keylogger.
-local function _is_paused()
+_is_paused = function()
 	return _script_control
 		and type(_script_control.is_paused) == "function"
 		and _script_control.is_paused()
@@ -516,11 +525,21 @@ local function handle_key(event_obj)
 		then
 			CoreState.session_mouse_clicks = CoreState.session_mouse_clicks + 1
 			if #CoreState.buffer_events > 0 then LogManager.flush_buffer() end
+			-- Re-seed the delay baseline. flush_buffer() zeroes CoreState.last_time,
+			-- and these three branches RETURN before the keystroke path assigns it —
+			-- so the next real keystroke measured its delay against 0, recorded a
+			-- zero-millisecond gap, and could be mistaken for synthetic output.
+			CoreState.last_time = now
 			return
 		end
 		if evt_type == hs.eventtap.event.types.scrollWheel then
 			CoreState.session_mouse_scrolls = CoreState.session_mouse_scrolls + 1
 			if #CoreState.buffer_events > 0 then LogManager.flush_buffer() end
+			-- Re-seed the delay baseline. flush_buffer() zeroes CoreState.last_time,
+			-- and these three branches RETURN before the keystroke path assigns it —
+			-- so the next real keystroke measured its delay against 0, recorded a
+			-- zero-millisecond gap, and could be mistaken for synthetic output.
+			CoreState.last_time = now
 			return
 		end
 
@@ -584,6 +603,9 @@ local function handle_key(event_obj)
 				and _keymap_mod.is_pending_synthetic_paste(flags, keycode)
 			if not is_synth_paste then
 				LogManager.flush_buffer()
+				-- Same re-seed as the mouse branches: this one returns below without
+				-- ever reaching the keystroke path's assignment.
+				CoreState.last_time = now
 				local front_app = hs.application.frontmostApplication()
 				LogManager.log_shortcut(
 					build_shortcut_key(event_obj, flags, keycode),
