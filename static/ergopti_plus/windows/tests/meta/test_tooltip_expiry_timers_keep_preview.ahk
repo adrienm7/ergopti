@@ -84,7 +84,10 @@ _TETKP_NoExpiryTimerWipesThePreview() {
 		Body := _DriverFuncBody(Name)
 		; Only the callbacks that actually tear the surface down are in scope;
 		; the deferred-show timer builds, it does not expire anything.
-		if (Body == "" or InStr(Body, "TooltipHide") == 0)
+		Assert(Body != "",
+			Name . "() must exist — a missing body would silently drop it from this scan and "
+			. "make the absence assertion below vacuous for that callback")
+		if (InStr(Body, "TooltipHide") == 0)
 			continue
 		Checked += 1
 		Assert(InStr(Body, "_ResetPrefixBuffer") == 0,

@@ -1,6 +1,6 @@
 {
 	"tautology": 153,
 	"vacuous-absence": 17,
-	"dead-test": 5,
-	"pcall-only": 374
+	"dead-test": 4,
+	"pcall-only": 367
 }

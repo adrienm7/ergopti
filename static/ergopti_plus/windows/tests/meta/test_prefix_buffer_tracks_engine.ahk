@@ -239,12 +239,13 @@ _PBT_NoParallelExpansionArithmetic() {
 	; index without touching any buffer. Assert the guarantee instead, so a real
 	; truncation is still caught however it is spelled.
 	Collect := _DriverFuncBody("_PrefixCollectCandidates")
-	if (Collect != "") {
-		Assert(InStr(Collect, "_PrefixBuffer") == 0,
-			"candidate collection must be READ-ONLY with respect to the preview buffer. "
-			. "Consulting the index is fine; letting index membership rewrite or shorten "
-			. "_PrefixBuffer is the truncation that hid 'att'")
-	}
+	Assert(Collect != "",
+		"_PrefixCollectCandidates() must exist — it is where the preview asks the index for "
+		. "candidates, and an absent body would make the assertion below pass vacuously")
+	Assert(InStr(Collect, "_PrefixBuffer") == 0,
+		"candidate collection must be READ-ONLY with respect to the preview buffer. "
+		. "Consulting the index is fine; letting index membership rewrite or shorten "
+		. "_PrefixBuffer is the truncation that hid 'att'")
 	; And from the other direction: every function that WRITES the preview buffer
 	; must decide without asking the index. Pairing the two in one body is the
 	; truncation, in whatever form it returns.

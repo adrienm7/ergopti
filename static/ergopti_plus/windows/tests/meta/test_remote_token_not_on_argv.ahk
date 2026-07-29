@@ -57,6 +57,9 @@ _RTNA_NoHelperEmitsATokenBearingHeaderArg() {
 		"no surviving helper may emit a -H argument carrying the token — moving the splice one function away does not move it off the command line")
 
 	Disp := _DriverFuncBody("_LLMRemote_DispatchCurl")
+	Assert(Disp != "",
+		"_LLMRemote_DispatchCurl() must exist — an absent body makes the two absence "
+		. "assertions below pass without proving anything")
 	Assert(InStr(Disp, "Bearer") == 0 and InStr(Disp, "x-api-key") == 0,
 		"the dispatch function must not name an auth header at all: whatever it concatenates ends up in argv")
 }
