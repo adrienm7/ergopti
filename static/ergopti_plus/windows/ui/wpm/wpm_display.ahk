@@ -591,6 +591,30 @@ WPMWidget_ShowPos(&out_x, &out_y) {
 ; ==============================
 ; ============================================
 
+; Applies the widget's geometry to a surface Gui: seeds the saved anchor on first
+; use, derives the current mode's top-left from it and sizes + positions the
+; window WHILE HIDDEN (the tick is the only thing allowed to reveal it).
+;
+; THE single owner of that Show call. A Gui that was constructed but never Shown
+; has a 0x0 client rect, and GR_DrawBitmap early-returns on `W <= 0 or H <= 0` —
+; so a rebuilt-but-unsized graph surface never receives another
+; UpdateLayeredWindow and the widget silently paints nothing for the rest of the
+; session. The builders construct; this positions; every path that produces a
+; usable surface must go through both.
+_WPMWidget_ApplySurfaceGeometry(gui_ref) {
+    if !gui_ref
+        return
+    if (WPMWidget.pos_x = -1 || WPMWidget.pos_y = -1) {
+        WPMWidget_DefaultPos(&def_x, &def_y)
+        WPMWidget.pos_x := def_x
+        WPMWidget.pos_y := def_y
+    }
+    w := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_W : WPMWidgetConst.W
+    h := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_H : WPMWidgetConst.H
+    WPMWidget_ShowPos(&show_x, &show_y)
+    gui_ref.Show("Hide NoActivate x" . show_x . " y" . show_y . " w" . w . " h" . h)
+}
+
 ; No-op draw callback for GR_DrawBitmap: leaves the freshly created DIB untouched.
 ; CreateDIBSection zero-fills its pixels, so the uploaded layered surface is FULLY
 ; TRANSPARENT (every ARGB = 0). This is the key to warming the graph window without
@@ -623,19 +647,12 @@ WPMWidget_PrewarmGraph() {
     g := WPMWidget._graph_gui
     if !g
         return
-    if (WPMWidget.pos_x = -1 || WPMWidget.pos_y = -1) {
-        WPMWidget_DefaultPos(&def_x, &def_y)
-        WPMWidget.pos_x := def_x
-        WPMWidget.pos_y := def_y
-    }
-    WPMWidget_ShowPos(&show_x, &show_y)
     try {
         ; Size the layered window, start GDI+, then upload one TRANSPARENT frame to
         ; warm the CreateDIBSection -> UpdateLayeredWindow -> DWM path. Nothing is ever
         ; visible (transparent surface), so the WS_VISIBLE that Show("Hide") sets is
         ; harmless. GR_Hide leaves it in the clean SW_HIDE resting state.
-        g.Show("Hide NoActivate x" . show_x . " y" . show_y
-            . " w" . WPMWidgetConst.GRAPH_W . " h" . WPMWidgetConst.GRAPH_H)
+        _WPMWidget_ApplySurfaceGeometry(g)
         WPMWidget_EnsureGdip()
         GR_DrawBitmap(g.Hwnd, _WPMWidget_WarmDrawTransparent)
         GR_Hide(g.Hwnd)
@@ -684,25 +701,14 @@ WPMWidget_Show() {
     ; reload so the surface stays hidden until the user types AFTER it is shown.
     _WPMWidget_ResetRolling()
 
-    if (WPMWidget.pos_x = -1 || WPMWidget.pos_y = -1) {
-        WPMWidget_DefaultPos(&def_x, &def_y)
-        WPMWidget.pos_x := def_x
-        WPMWidget.pos_y := def_y
-    }
-
-    w      := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_W : WPMWidgetConst.W
-    h      := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_H : WPMWidgetConst.H
     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
-
-    ; Derive the top-left for the current mode from the compact anchor (pos_x/pos_y).
-    WPMWidget_ShowPos(&show_x, &show_y)
 
     ; Both modes start invisible; the tick reveals the surface once the user types.
     ; Graph mode is a layered GDI+ window: position + size it WHILE HIDDEN, then the
     ; tick paints it via UpdateLayeredWindow and reveals it (per-pixel alpha rules
     ; out WinSetTransparent here — the two layering modes are mutually exclusive).
     ; Compact mode uses the same "Hide" approach — no flash on startup.
-    gui_ref.Show("Hide NoActivate x" . show_x . " y" . show_y . " w" . w . " h" . h)
+    _WPMWidget_ApplySurfaceGeometry(gui_ref)
 
     SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
 
@@ -815,6 +821,11 @@ WPMWidget_Tick() {
             try LoggerError("WPMWidget", "Graph mode tick threw — rebuilding widget: {1}.", _e.Message)
             WPMWidget._graph_gui := false
             try WPMWidget_BuildGraph()
+            ; The builder only constructs. Without the geometry the rebuilt Gui
+            ; keeps a 0x0 client rect, GR_DrawBitmap early-returns on every later
+            ; tick and the "recovery" leaves the widget exactly as dead as the bare
+            ; catch it replaced — just with one ERROR line to show for it.
+            try _WPMWidget_ApplySurfaceGeometry(WPMWidget._graph_gui)
         }
     } else {
         bg_color := WPMWidget_ResolveBgColor(is_idle, has_hs, has_ai, has_ac, WPMWidget.use_colors)
@@ -840,6 +851,10 @@ WPMWidget_Tick() {
             WPMWidget._lbl_unit  := false
             WPMWidget._lbl_strip := false
             try WPMWidget_BuildCompact()
+            ; Same reason as the graph sibling above: the next tick reveals this
+            ; window with a bare Show("NoActivate"), which would put the rebuilt
+            ; widget at the OS default position instead of the user's corner.
+            try _WPMWidget_ApplySurfaceGeometry(WPMWidget._gui)
         }
     }
     WPMWidget._last_wpm := wpm
