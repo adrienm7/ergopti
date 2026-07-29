@@ -40,7 +40,12 @@ _FreshSameSec_TieIsStale() {
 	HsDir := Base . "\modules\hotstrings"
 	try DirCreate(HsDir)
 
-	global _SharedDir := Base
+	; Save the real shared root: this global is process-wide, and every later
+	; test that resolves a bundled file through it would otherwise be pointed at
+	; this temp tree for the rest of the suite.
+	global _SharedDir
+	_FreshSameSec_PrevShared := _SharedDir
+	_SharedDir := Base
 	TsvPath := _HotstringsCacheTsvPath()
 	TomlPath := _HotstringsCacheTomlPath("distancesreduction")
 
@@ -60,6 +65,7 @@ _FreshSameSec_TieIsStale() {
 		AssertFalse(_HotstringsCacheIsFresh(TsvPath),
 			"a bundled TOML mtime equal to the .tsv mtime must be judged stale (rebuild) - the strict > comparison served a same-second edit stale")
 	} finally {
+		_SharedDir := _FreshSameSec_PrevShared
 		try FileDelete(TsvPath)
 		try FileDelete(TomlPath)
 		try DirDelete(HsDir)
@@ -82,7 +88,12 @@ _FreshSameSec_NewerTsvStillFresh() {
 	HsDir := Base . "\modules\hotstrings"
 	try DirCreate(HsDir)
 
-	global _SharedDir := Base
+	; Save the real shared root: this global is process-wide, and every later
+	; test that resolves a bundled file through it would otherwise be pointed at
+	; this temp tree for the rest of the suite.
+	global _SharedDir
+	_FreshSameSec_PrevShared := _SharedDir
+	_SharedDir := Base
 	TsvPath := _HotstringsCacheTsvPath()
 	TomlPath := _HotstringsCacheTomlPath("distancesreduction")
 
@@ -98,6 +109,7 @@ _FreshSameSec_NewerTsvStillFresh() {
 		AssertTrue(_HotstringsCacheIsFresh(TsvPath),
 			"a .tsv strictly newer than the TOML must still be fresh (no spurious rebuild)")
 	} finally {
+		_SharedDir := _FreshSameSec_PrevShared
 		try FileDelete(TsvPath)
 		try FileDelete(TomlPath)
 		try DirDelete(HsDir)
