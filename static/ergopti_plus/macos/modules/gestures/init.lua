@@ -610,7 +610,12 @@ start_startup_probe_loop = function()
 		-- Ghost-timer guard: if M.stop() was called while this timer was pending,
 		-- do not kick or recycle — CoreState.enabled is the canonical stopped signal
 		-- (gesture-engine-ghost-timer).
-		if not CoreState.enabled then return end
+		-- CoreState.enabled is the FEATURE flag; CoreState.suspended is the pause.
+		-- Checking only the first let kickstart_hid warp the cursor and post a
+		-- synthetic scroll while the script was paused, which the invariant
+		-- "pause = everything off" forbids — and a cursor that jumps during a
+		-- pause is the most visible way to break it.
+		if not CoreState.enabled or CoreState.suspended then return end
 		if _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then return end
 		Logger.info(LOG, "Safety-net recycle at +%.1fs (no frame yet) — one-shot, will not retry further",
 			STARTUP_SAFETY_PROBE_SEC)
@@ -664,7 +669,12 @@ local function schedule_emergency_recycle()
 	Logger.debug(LOG, "schedule_emergency_recycle: SCHEDULED in 20ms (first_frame=%s, watchers=%d)",
 		tostring(_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME), count_watchers())
 	hs.timer.doAfter(0.02, function()
-		if not CoreState.enabled then return end
+		-- CoreState.enabled is the FEATURE flag; CoreState.suspended is the pause.
+		-- Checking only the first let kickstart_hid warp the cursor and post a
+		-- synthetic scroll while the script was paused, which the invariant
+		-- "pause = everything off" forbids — and a cursor that jumps during a
+		-- pause is the most visible way to break it.
+		if not CoreState.enabled or CoreState.suspended then return end
 		if _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then
 			Logger.done(LOG, "Emergency recycle ABORTED — first frame arrived in the meantime.")
 			return

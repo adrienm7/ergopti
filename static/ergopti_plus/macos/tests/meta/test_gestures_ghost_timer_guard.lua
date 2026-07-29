@@ -54,8 +54,13 @@ helpers.describe("gestures/init.lua: ghost timer guard (gesture-engine-ghost-tim
 	helpers.it("emergency recycle doAfter(0.02) checks CoreState.enabled before acting", function()
 		local src = read_source("modules/gestures/init.lua")
 		-- The 20ms emergency recycle callback must also guard
+		-- Matches the INVARIANT (the callback refuses to act when the engine is not
+		-- enabled), not one spelling of it. The guard was later widened to also
+		-- refuse while the script is paused, which is strictly stronger — pinning
+		-- the exact text made a strengthening look like a regression.
 		helpers.assert_true(
-			src:find("if not CoreState.enabled then return end") ~= nil,
+			src:find("if not CoreState.enabled then return end") ~= nil
+			or src:find("if not CoreState.enabled or CoreState.suspended then return end") ~= nil,
 			"gestures/init.lua emergency-recycle callback must guard against CoreState.enabled=false (gesture-engine-ghost-timer)")
 	end)
 
