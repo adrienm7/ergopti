@@ -102,10 +102,19 @@ end
 --- once, up front, for the whole expansion). It has not been sent yet, so it is
 --- still outstanding — which is why the test is "nothing but my own echo is
 --- left", not "the expectation is empty".
+---
+--- The settle fence is part of this predicate, not an alternative to it. On the
+--- paste path the ledger is drained by OUR OWN Cmd+V echo, which returns through
+--- the tap within a millisecond: it proves the Cmd+V was posted, never that the
+--- target read the pasteboard. Leaving the fence out of the test meant the echo
+--- released the terminator ~79 ms before the settle window the emitter asked
+--- for — reopening, on the paste path, exactly the race this module exists to
+--- close. The module header states that reasoning; the predicate did not apply it.
 --- @return boolean True when the replacement has provably landed.
 local function replacement_has_landed()
 	if (_state.expected_synthetic_deletes or 0) > 0 then return false end
 	if (_state.expected_synthetic_pastes  or 0) > 0 then return false end
+	if _pending.min_delay > 0 and not _pending.fence_open then return false end
 	return #(_state.expected_synthetic_chars or "") <= _pending.echo_bytes
 end
 
@@ -120,6 +129,13 @@ local function emit_pending(reason)
 	if pending.watchdog then
 		TimerScheduler.cancel(pending.watchdog)
 		pending.watchdog = nil
+	end
+	-- The settle fence is cancelled on the same terms as the watchdog. Its handle
+	-- used not to be stored at all, so a terminator released early (forced flush,
+	-- superseding expansion, teardown) left a timer running into an empty slot.
+	if pending.fence then
+		TimerScheduler.cancel(pending.fence)
+		pending.fence = nil
 	end
 
 	if pending.kind == "key" then
@@ -193,6 +209,11 @@ function M.arm(spec)
 		chars      = spec.chars,
 		echo_bytes = tonumber(spec.echo_bytes) or #spec.chars,
 		min_delay  = tonumber(spec.min_delay) or 0,
+		-- Declared here rather than left implicit: replacement_has_landed() reads
+		-- fence_open, and a field that only ever exists on one code path is how a
+		-- predicate ends up depending on nil-versus-false by accident.
+		fence_open = false,
+		fence      = nil,
 	}
 	Logger.trace(LOG, "Terminator held pending delivery of the replacement…")
 
@@ -210,11 +231,20 @@ function M.arm(spec)
 	end)
 
 	-- A paste-backed expansion has no per-character echo to wait on: the target
-	-- reads the clipboard on its own schedule, so the only honest gate is the
-	-- settle delay the emitter reported.
+	-- reads the clipboard on its own schedule, so the settle delay the emitter
+	-- reported is the only honest lower bound. Opening a FENCE rather than
+	-- emitting directly means the echo path and the timer path agree on when the
+	-- replacement has landed: whichever arrives second releases the terminator,
+	-- instead of the echo racing past a fence it could not see.
 	if pending.min_delay > 0 then
-		TimerScheduler.after(pending.min_delay, function()
-			if _pending == pending then emit_pending("paste settled") end
+		pending.fence_open = false
+		pending.fence = TimerScheduler.after(pending.min_delay, function()
+			if _pending ~= pending then return end
+			pending.fence_open = true
+			pending.fence      = nil
+			-- The echoes may already be accounted for, in which case this is the
+			-- second of the two conditions and the terminator goes now.
+			M.flush_if_delivered()
 		end)
 		return true
 	end
@@ -265,6 +295,7 @@ end
 function M.cancel()
 	if not _pending then return end
 	if _pending.watchdog then TimerScheduler.cancel(_pending.watchdog) end
+	if _pending.fence then TimerScheduler.cancel(_pending.fence) end
 	_pending = nil
 	Logger.debug(LOG, "Pending terminator cancelled.")
 end

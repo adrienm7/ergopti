@@ -340,6 +340,45 @@ helpers.describe("terminator replay: clipboard-backed replacements", function()
 		helpers.assert_eq(#sent, 1, "and the terminator follows once the settle window elapses")
 	end)
 
+	helpers.it("does not let our own Cmd+V echo open the settle fence", function()
+		local Replay, sent, timers, state = load_gate()
+		-- The state production ACTUALLY produces, which neither case above builds:
+		-- a paste-backed replacement whose non-consumed terminator is re-typed arms
+		-- the paste counter AND reports a settle floor, at the same time.
+		state.expected_synthetic_deletes = 0
+		state.expected_synthetic_chars   = "\r"
+		state.expected_synthetic_pastes  = 1
+
+		Replay.arm({ kind = "key", key = "return", chars = "\r", echo_bytes = 1, min_delay = 0.08 })
+		helpers.assert_eq(#sent, 0, "nothing may go out while the Cmd+V is still outstanding")
+
+		-- The OS returns our own Cmd+V through the tap within a millisecond and the
+		-- keyboard handler drains the counter. That proves the Cmd+V was POSTED. It
+		-- says nothing about whether the target has read the pasteboard yet.
+		state.expected_synthetic_pastes = 0
+		Replay.flush_if_delivered()
+		helpers.assert_eq(#sent, 0,
+			"our own echo is not evidence the paste landed: releasing on it puts Enter ahead of "
+				.. "the text by the whole settle window, which is the race this gate exists to close")
+
+		fire_timers(timers, 0.08)
+		helpers.assert_eq(#sent, 1,
+			"the terminator goes out when the SECOND of the two conditions is met, not the first")
+	end)
+
+	helpers.it("still bounds the wait: the watchdog releases a terminator whose fence never opens", function()
+		local Replay, sent, timers, state = load_gate()
+		state.expected_synthetic_deletes = 0
+		state.expected_synthetic_chars   = "\r"
+		state.expected_synthetic_pastes  = 0
+
+		Replay.arm({ kind = "key", key = "return", chars = "\r", echo_bytes = 1, min_delay = 0.08 })
+		-- Fire ONLY the watchdog, never the fence: late is recoverable, lost is not,
+		-- so adding a second condition must not create a way to hold Enter forever.
+		fire_timers(timers, 0.25)
+		helpers.assert_eq(#sent, 1, "the watchdog must still be able to release the terminator")
+	end)
+
 end)
 
 
