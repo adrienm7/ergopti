@@ -25,16 +25,27 @@ helpers.describe("tooltip: a failed render does not leave the tooltip 'visible'"
 		local src = helpers.read_driver_source("Crash during stacked tooltip rendering")
 		helpers.assert_true(type(src) == "string" and src ~= "",
 			"the tooltip source must be readable or this asserts nothing")
-		-- Ordering, not a fixed-width window: the rollback must come AFTER the
-		-- failure branch opens. A byte window is a guess about formatting, and it
-		-- was the wrong guess here.
-		local at = src:find("Crash during stacked tooltip rendering", 1, true)
-		helpers.assert_not_nil(at, "the failure branch must exist")
-		local rollback = src:find("_state.is_visible = false", at, true)
-		helpers.assert_not_nil(rollback,
+		-- Two files carry this phrase and the concatenated blob orders them
+		-- arbitrarily, so a single find() lands in whichever came first — which is
+		-- how an earlier version of this assertion passed against the unfixed code.
+		-- Every occurrence's own block is checked, and at least one must withdraw
+		-- the claim.
+		local found_rollback = false
+		local pos = 1
+		while true do
+			local at = src:find("Crash during stacked tooltip rendering", pos, true)
+			if not at then break end
+			local block_end = src:find("\n\tend\n", at, true) or (at + 600)
+			if src:sub(at, block_end):find("is_visible = false", 1, true) then
+				found_rollback = true
+				break
+			end
+			pos = at + 1
+		end
+		helpers.assert_true(found_rollback,
 			"is_visible is set optimistically before the render; if the render throws the "
-			.. "claim must be withdrawn, or the Escape trap swallows Escape for a tooltip "
-			.. "that is not on screen")
+			.. "claim must be withdrawn INSIDE that failure branch, or the Escape trap "
+			.. "swallows Escape for a tooltip that is not on screen")
 	end)
 
 end)
