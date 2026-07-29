@@ -317,12 +317,21 @@ _SuspendStateWatchdog() {
 ; closes the data-loss window. EVERY step is try-wrapped: an OnExit callback that
 ; throws is swallowed by AHK and can hang exit, so the handler must never throw.
 ; Returning 0 lets the exit proceed.
+;
+; The same reasoning covers any transaction whose COMPLETION depends on a
+; callback owned by this process. The self-update staging worker is one: it is a
+; detached PowerShell child, and swap_update.cmd is launched only from
+; _Updater_PollDownloadAsync, so a Reload here used to orphan the download and
+; the user's "Update now" click silently installed nothing
+; (updater-staging-worker-orphaned-on-exit). Every future subsystem with that
+; shape belongs in this handler too.
 Ergopti_OnShutdown(reason, code) {
     try KL_Stop()
     try HotstringPrefixWatcherStop()
     try HookDispatcher.Stop()
     try KLWV_CloseAll()
     try OllamaWV_Close()
+    try _Updater_AbortStagingOnExit()
     return 0
 }
 ; Build the full tray menu off the boot critical path (armed after "ready").

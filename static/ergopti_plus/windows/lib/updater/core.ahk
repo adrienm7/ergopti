@@ -626,6 +626,39 @@ _Updater_CancelAsyncChecks() {
 	try LoggerDebug("Updater", "Cancelled all in-flight async update checks.")
 }
 
+; Aborts an in-flight self-update staging worker because the process is going
+; away. Wired into the driver's single OnExit handler (Ergopti_OnShutdown).
+;
+; Reload() and ExitApp() tear the process down WITHOUT running any per-module
+; destructor, and Reload is this driver's standard "apply settings" mechanism —
+; it also fires automatically from the keyboard-layout watcher. The download
+; transaction, however, lives entirely in process-local state
+; (_UpdaterDownloadInProgress plus the ShellRunner task in
+; _UpdaterDownloadWorker) and completes through a callback owned by THIS
+; process: swap_update.cmd is launched from _Updater_PollDownloadAsync and from
+; nowhere else. So a Reload landing mid-download orphaned the detached
+; PowerShell child — it kept downloading, wrote ErgoptiPlus_new.exe and
+; swap_update.cmd, and exited, while the fresh instance booted with the flag
+; re-zeroed and no residue scan. The user who clicked "Update now" waited, got
+; no update, and no log line anywhere said why
+; (updater-staging-worker-orphaned-on-exit).
+;
+; Killing the child and logging a WARNING makes the interrupted update visible
+; instead of vanishing. Never throws: an OnExit callback that throws is
+; swallowed by AHK and can hang the exit.
+_Updater_AbortStagingOnExit() {
+	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker
+	if !(IsSet(_UpdaterDownloadInProgress) and _UpdaterDownloadInProgress)
+		return
+	if (IsSet(_UpdaterDownloadWorker) and IsObject(_UpdaterDownloadWorker)) {
+		try _UpdaterDownloadWorker.terminate()
+	}
+	_UpdaterDownloadWorker := 0
+	_UpdaterDownloadInProgress := false
+	try SetTimer(_Updater_MonitorStagingWorker, 0)
+	try LoggerWarn("Updater", "Update staging aborted: the driver is exiting, and nothing outside this process would ever launch the staged swap script.")
+}
+
 ; Async, non-blocking sibling of Updater_FetchReleasesListJson. Dispatches the
 ; GitHub releases-list request in WinHTTP async mode (Open(…, true)) and returns
 ; at once; OnJson(Json) is invoked from a poll timer once the response completes
@@ -634,6 +667,7 @@ _Updater_CancelAsyncChecks() {
 _Updater_FetchReleasesListJsonAsync(Channel, OnJson) {
 	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
 	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
+	global _UpdaterAsyncRequests, _UpdaterAsyncCounter
 	Url := Updater_ReleasesListApiUrl(Channel)
 	try {
 		Req := ComObject("WinHttp.WinHttpRequest.5.1")
@@ -651,14 +685,32 @@ _Updater_FetchReleasesListJsonAsync(Channel, OnJson) {
 		}
 		return
 	}
-	_Updater_PollReleasesListAsync(Req, Url, OnJson, 0)
+	; Register in the SHARED async registry, exactly like _Updater_FetchLatestJsonAsync.
+	; _Updater_CancelAsyncChecks — the teardown Ergopti_OnSuspendEnter relies on to
+	; honour "pause = tout éteint" — cancels by draining that map and nothing else,
+	; so a request that keeps its state in closure arguments is structurally
+	; uncancellable: its 250 ms poll timer and its live WinHTTP request would keep
+	; running for the whole poll budget (~85 s) while the driver is meant to be
+	; silent (updater-releases-list-uncancellable).
+	_UpdaterAsyncCounter += 1
+	id := _UpdaterAsyncCounter
+	_UpdaterAsyncRequests[id] := Map(
+		"http", Req, "channel", Channel, "on_json", OnJson, "url", Url, "polls", 0)
+	_Updater_PollReleasesListAsync(id)
 }
 
 ; Non-blocking completion poll for one in-flight async releases-list fetch.
-; Mirrors _Updater_PollAsync but without the ETag / _InterpretResponse machinery
-; (the releases list is always returned in full — no 304 caching).
-_Updater_PollReleasesListAsync(Req, Url, OnJson, Polls) {
-	global UPDATER_ASYNC_POLL_MS, UPDATER_ASYNC_MAX_POLLS
+; Mirrors _Updater_PollAsync — including its registry-based cancellation: a tick
+; whose id has been dropped from _UpdaterAsyncRequests no-ops — but without the
+; ETag / _InterpretResponse machinery (the releases list is always returned in
+; full — no 304 caching).
+_Updater_PollReleasesListAsync(id) {
+	global _UpdaterAsyncRequests, UPDATER_ASYNC_POLL_MS, UPDATER_ASYNC_MAX_POLLS
+	if !_UpdaterAsyncRequests.Has(id)
+		return
+	rec := _UpdaterAsyncRequests[id]
+	Req := rec["http"]
+	Url := rec["url"]
 	ready  := false
 	failed := false
 	try {
@@ -668,15 +720,17 @@ _Updater_PollReleasesListAsync(Req, Url, OnJson, Polls) {
 		try LoggerDebug("Updater", "Async releases-list poll failed: {1}.", Err.Message)
 	}
 	if (!failed and !ready) {
-		Polls += 1
-		if (Polls > UPDATER_ASYNC_MAX_POLLS) {
+		rec["polls"] += 1
+		if (rec["polls"] > UPDATER_ASYNC_MAX_POLLS) {
 			failed := true
 			try LoggerWarn("Updater", "Async releases-list exceeded poll budget — aborting.")
 		} else {
-			SetTimer(() => _Updater_PollReleasesListAsync(Req, Url, OnJson, Polls), -UPDATER_ASYNC_POLL_MS)
+			SetTimer(() => _Updater_PollReleasesListAsync(id), -UPDATER_ASYNC_POLL_MS)
 			return
 		}
 	}
+	OnJson := rec["on_json"]
+	_UpdaterAsyncRequests.Delete(id)
 	Json := ""
 	if !failed {
 		try {
