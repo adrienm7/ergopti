@@ -53,8 +53,22 @@ _PrefixWatcherTomlPath(Category) {
 ; resolve to the live globals (the historical behaviour every direct caller
 ; relies on); HotstringPrefixWatcherRebuildIndex passes fresh locals instead so
 ; it can build the whole index off to the side and swap it in atomically.
+; One TOML hotstring entry, as written by the generator.
+; Capture: 1=trigger, 2=output, 3=is_case_sensitive,
+; 4=is_case_sensitive_strict (optional), 5=priority (optional). The individual
+; priority is captured so the preview can rank colliding candidates by the same
+; tie-break the engine uses (so the non-dimmed winner matches what actually fires).
+;
+; Hoisted to a single constant because the extension-pack indexer below parses the
+; SAME file shape: two copies of a regex this size drift, and a drift here shows up
+; as a hotstring that expands but is never previewed — the exact class of defect
+; the ext-pack indexing was added to close.
+global HS_PREFIX_ENTRY_PATTERN :=
+	'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(?:true|false)\s*,\s*auto_expand\s*=\s*(?:true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(?:true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?(?:\s*,\s*priority\s*=\s*([0-9]+))?\s*\}'
+
 _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "") {
 	global ScriptInformation, Features, _V1CatToV2CatMap, _PrefixIndex, _TriggerSet
+	global HS_PREFIX_ENTRY_PATTERN
 	if !IsObject(IndexTarget)
 		IndexTarget := _PrefixIndex
 	if !IsObject(SetTarget)
@@ -86,12 +100,7 @@ _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "") {
 		return 0
 	}
 
-	; Capture: 1=trigger, 2=output, 3=is_case_sensitive,
-	; 4=is_case_sensitive_strict (optional), 5=priority (optional). The individual
-	; priority is captured so the preview can rank colliding candidates by the same
-	; tie-break the engine uses (so the non-dimmed winner matches what actually fires).
-	EntryPattern :=
-		'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(?:true|false)\s*,\s*auto_expand\s*=\s*(?:true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(?:true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?(?:\s*,\s*priority\s*=\s*([0-9]+))?\s*\}'
+	EntryPattern := HS_PREFIX_ENTRY_PATTERN
 
 	CurrentSection := ""
 	Count := 0
@@ -148,6 +157,105 @@ _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "") {
 			Output  := StrReplace(Output,  "★", ScriptInformation["MagicKey"])
 		}
 		_AddTriggerVariants(Trigger, Output, Category, CurrentSection, IsCaseSensitive, IsStrict, Individual, IndexTarget, SetTarget)
+		Count += 1
+	}
+	return Count
+}
+
+; Enumerates the extension-pack TOMLs: every *.toml under PersonalHotstringsDir
+; except the root personal_hotstrings.toml, which is its own category. Sub-folders
+; produce hierarchical labels ("work / snippets"), matching what the engine's
+; registration already builds.
+;
+; Extracted so the engine registration and the preview index walk the SAME tree.
+; They used to disagree structurally — the engine recursed, the preview read one
+; hardcoded path — and every pack therefore expanded with no tooltip, forever. A
+; second copy of the walk would just drift back to that.
+; @returns {Array} Items of Map("Path", <full path>, "Label", <category label>).
+HS_EnumeratePersonalExtFiles() {
+	global ScriptInformation
+	Found := []
+	if !(IsSet(ScriptInformation) and ScriptInformation.Has("PersonalHotstringsDir"))
+		return Found
+	Root := RegExReplace(ScriptInformation["PersonalHotstringsDir"], "[/\\]+$")
+	if !DirExist(Root)
+		return Found
+
+	; Explicit stack rather than a recursive closure: this runs on the index
+	; rebuild path, and a closure that captures itself is the shape that already
+	; cost this driver a silent nil-binding elsewhere.
+	Pending := [Map("Dir", Root, "Prefix", "")]
+	while (Pending.Length > 0) {
+		Node := Pending.Pop()
+		Dir := Node["Dir"]
+		Prefix := Node["Prefix"]
+		Loop Files Dir . "\*", "DF" {
+			Child := (Prefix == "" ? "" : Prefix . " / ") . A_LoopFileName
+			if (A_LoopFileAttrib ~= "D") {
+				Pending.Push(Map("Dir", A_LoopFileFullPath, "Prefix", Child))
+				continue
+			}
+			if !(A_LoopFileName ~= "i)\.toml$")
+				continue
+			if (Prefix == "" and A_LoopFileName == "personal_hotstrings.toml")
+				continue
+			SplitPath A_LoopFileFullPath, , , , &Stem
+			Found.Push(Map("Path", A_LoopFileFullPath,
+				"Label", (Prefix == "" ? "" : Prefix . " / ") . Stem))
+		}
+	}
+	return Found
+}
+
+; Indexes one extension-pack TOML into the preview index.
+;
+; Deliberately does NOT apply the per-section Features gate _RegisterCategoryTriggers
+; applies: an extension pack has no per-section toggle in the menu — the engine loads
+; every section of it (LoadExtTomlFile, "all sections enabled") — so gating the preview
+; on a Features node that cannot exist would index nothing and reproduce the defect.
+; The master hotstrings gate still applies, because that one really can silence a pack.
+; @param Path        {String} Full path to the pack's TOML.
+; @param Label       {String} Category label to attribute previews to.
+; @param IndexTarget {Map}    Index being built.
+; @param SetTarget   {Map}    Trigger set being built.
+; @returns {Integer} Number of triggers indexed.
+_RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget) {
+	global ScriptInformation, HS_PREFIX_ENTRY_PATTERN
+	if !IsCategoryGated("Hotstrings")
+		return 0
+	if !FileExist(Path)
+		return 0
+
+	CurrentSection := ""
+	Count := 0
+	loop parse, ReadTomlFile(Path), "`n", "`r" {
+		Line := Trim(A_LoopField, " `t")
+		if (Line == "" or SubStr(Line, 1, 1) == "#")
+			continue
+		if RegExMatch(Line, "^\[\[(.+)\]\]$", &SectionMatch) {
+			CurrentSection := StrLower(SectionMatch[1])
+			continue
+		}
+		if (SubStr(Line, 1, 1) == "[") {
+			CurrentSection := ""
+			continue
+		}
+		if (CurrentSection == "")
+			continue
+		if !RegExMatch(Line, HS_PREFIX_ENTRY_PATTERN, &Match)
+			continue
+
+		Trigger := UnescapeTomlString(Match[1])
+		Output := UnescapeTomlString(Match[2])
+		IsCaseSensitive := (Match[3] == "true")
+		IsStrict := (Match.Count >= 4 and Match[4] == "true")
+		Individual := (Match[5] != "") ? Match[5] + 0 : ""
+		if (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
+			Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
+			Output := StrReplace(Output, "★", ScriptInformation["MagicKey"])
+		}
+		_AddTriggerVariants(Trigger, Output, Label, CurrentSection, IsCaseSensitive, IsStrict,
+			Individual, IndexTarget, SetTarget)
 		Count += 1
 	}
 	return Count
