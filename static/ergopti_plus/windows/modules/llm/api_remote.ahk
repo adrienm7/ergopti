@@ -244,7 +244,7 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
     return true
 }
 
-; Polls the curl child WITHOUT blocking the message loop. Mirrors _LLM_Ollama_PollRequest.
+; Polls the curl child WITHOUT blocking the message loop. Mirrors _LLM_Ollama_PollCurl.
 _LLMRemote_PollCurl(req_id) {
     global _LLM_Remote_Async, LLM_REMOTE_POLL_MS
     if !_LLM_Remote_Async.Has(req_id)

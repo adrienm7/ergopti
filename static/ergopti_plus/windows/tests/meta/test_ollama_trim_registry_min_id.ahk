@@ -13,11 +13,16 @@
 ; Fix: explicit min-ID scan before deletion.
 ;
 ; BUG 2 (ollama-com-exception-busy-loop):
-; _LLM_Ollama_PollRequest used a bare `try ready := http.WaitForResponse(0)`.
+; An Ollama poll tick used a bare `try ready := http.WaitForResponse(0)`.
 ; A COM exception (network drop, Ollama crash) was swallowed silently, leaving
 ; ready=false and re-queuing the 50ms poller indefinitely — saturating the CPU
 ; for up to 3 minutes until the global deadline fired.
-; Fix: explicit catch clause that calls on_fail and exits immediately.
+; Fix: explicit catch clause that notifies the caller and exits immediately.
+; The guard below names no poll function: it derives the set of Ollama functions
+; that actually call WaitForResponse and requires the contract of each. Pinning
+; one name meant the guard fired when the dead WinHTTP generation poll (never
+; armed, and reading an "http" key no entry ever carried) was deleted, which is
+; the opposite of what it was written to protect.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -76,25 +81,57 @@ Test("api_ollama: TrimAsyncRegistry uses explicit min-ID scan (trim-async-regist
 ; ====================================================
 ; ====================================================
 
-_OTR_PollCatchesCom() {
-	Src := _OTR_StripComments(_OTR_ReadSource("modules/llm/api_ollama.ahk"))
-	Body := _DriverFuncBody("_LLM_Ollama_PollRequest")
-
-	Assert(Body != "", "_LLM_Ollama_PollRequest must exist in api_ollama.ahk")
-
-	; The bare `try ready := ...` swallows the error silently and re-queues
-	; the poller — the fix requires an explicit catch that aborts
-	Assert(RegExMatch(Body, "catch\s+as\s+\w+") > 0,
-		"_LLM_Ollama_PollRequest must have an explicit catch clause for WaitForResponse COM errors (ollama-com-exception-busy-loop)")
-
-	; The catch must call on_fail and exit, not re-queue the poller
-	; Any of the three call shapes satisfies the invariant. The completion
-	; callbacks now route through _LLM_InvokeCallback so a throw inside on_fail
-	; cannot vanish; that changes how the call is spelled, not what is being
-	; asserted — the COM catch must still notify the caller rather than
-	; re-queueing the poller and spinning to the deadline.
-	Assert(InStr(Body, "on_fail()") > 0 or InStr(Body, "on_fail.Call()") > 0
-			or InStr(Body, "on_fail,") > 0,
-		"_LLM_Ollama_PollRequest COM catch must call on_fail to honour the async contract (ollama-com-exception-busy-loop)")
+; Every Ollama function that reads WaitForResponse, found by walking back from each
+; call site to the column-0 definition that encloses it. Deriving the set is what
+; makes this a guarantee ("whoever polls WinHTTP abandons on a COM error") instead
+; of a spelling ("_LLM_Ollama_PollRequest abandons").
+_OTR_OllamaWaitForResponseFns() {
+	Src := _OTR_StripComments(_DriverDirConcat("modules/llm/api_ollama"))
+	Names := []
+	Pos := 1
+	while (F := RegExMatch(Src, "i):=\s*\w+\.WaitForResponse\(", &M, Pos)) {
+		Pos := F + M.Len
+		Head := SubStr(Src, 1, F)
+		Owner := ""
+		P := 1
+		while (G := RegExMatch(Head, "m)^(\w+)\([^\r\n]*\)\s*\{", &MD, P)) {
+			P := G + MD.Len
+			Owner := MD[1]
+		}
+		if (Owner != "")
+			Names.Push(Owner)
+	}
+	return Names
 }
-Test("api_ollama: PollRequest catches COM exception and aborts immediately (ollama-com-exception-busy-loop)", _OTR_PollCatchesCom)
+
+_OTR_PollCatchesCom() {
+	Names := _OTR_OllamaWaitForResponseFns()
+	Assert(Names.Length >= 1,
+		"the Ollama backend must still have at least one WaitForResponse poll for this invariant to mean anything (found " . Names.Length . ") — a scan that matches nothing would pass vacuously")
+
+	for _, Name in Names {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", Name . " must be resolvable in the driver source")
+
+		; The bare `try ready := ...` swallows the error silently and re-queues
+		; the poller — the fix requires an explicit catch that abandons
+		Assert(RegExMatch(Body, "catch\s+as\s+\w+") > 0,
+			Name . " must have an explicit catch clause for WaitForResponse COM errors (ollama-com-exception-busy-loop)")
+
+		; The catch must notify the caller and exit, not re-queue the poller.
+		; The completion callbacks route through _LLM_InvokeCallback so a throw
+		; inside the callback cannot vanish; that changes how the call is spelled,
+		; not what is asserted. Both failure-callback names in this backend are
+		; accepted — the generic poll reports through on_err, the request polls
+		; through on_fail — because the invariant is "the caller is told", not
+		; which parameter carries the news.
+		Assert(InStr(Body, "on_fail") > 0 or InStr(Body, "on_err") > 0,
+			Name . " COM catch must notify the caller to honour the async contract (ollama-com-exception-busy-loop)")
+
+		; And it must release the transport, or the socket and COM object stay
+		; resident long after we stopped polling them.
+		Assert(InStr(Body, ".Abort()") > 0 or InStr(Body, "_LLM_Ollama_Async.Delete") > 0,
+			Name . " must release the in-flight request when it abandons, not merely stop looking at it")
+	}
+}
+Test("api_ollama: every WaitForResponse poll catches the COM exception and aborts immediately (ollama-com-exception-busy-loop)", _OTR_PollCatchesCom)

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Unit-tests for the purely-logical helpers in modules/llm/api_ollama.ahk:
 ; LLM_BuildOllamaPayload, LLM_ParseOllamaResponse, LLM_UnescapeJSON,
-; LLM_OllamaCancelAsync, LLM_OllamaCancelAllAsync, and the async-registry
+; LLM_OllamaCancelAllAsync, the unknown-id poll path, and the async-registry
 ; trimming logic. All tests are offline — no real HTTP calls are made.
 ; ==============================================================================
 
@@ -281,26 +281,42 @@ Test("LLM_UnescapeJSON: an escaped backslash adjacent to another escape sequence
 ; ====================================================
 ; ====================================================
 
-_OllamaCancelAsync_FlagsEntry() {
+; Same guarantee the retired LLM_OllamaCancelAsync test asserted — cancelling an
+; in-flight request must flip the flag the poll tick reads — but exercised against
+; the entry shape _LLM_Ollama_DispatchAsync actually creates. The old fixture
+; injected a "http" key that no production code path ever writes, which is exactly
+; how a dead WinHTTP branch kept looking like a supported transport: the only test
+; that touched it fabricated the shape it needed. No COM object here, because the
+; live Ollama transport is a curl child identified by its pid.
+_OllamaCancel_FlagsProductionShapedEntry() {
 	global _LLM_Ollama_Async
-	; Inject a fake entry into the registry so we can cancel it without HTTP
 	fake_id := 99901
-	_LLM_Ollama_Async[fake_id] := Map("http", "", "on_success", (*) => 0, "on_fail", (*) => 0, "cancelled", false)
-	LLM_OllamaCancelAsync(fake_id)
-	AssertTrue(_LLM_Ollama_Async[fake_id]["cancelled"])
+	_LLM_Ollama_Async[fake_id] := Map(
+		"pid", 0, "tmp_payload", "", "tmp_stdout", "",
+		"on_success", (*) => 0, "on_fail", (*) => 0,
+		"cancelled", false, "start_tick", A_TickCount,
+		"timeout_ms", 1000, "payload_snip", "")
+	LLM_OllamaCancelAllAsync()
+	AssertTrue(_LLM_Ollama_Async[fake_id]["cancelled"],
+		"the cancel must flip the flag on an entry shaped as production creates it — the poll tick reads that flag, and deleting the entry is the tick's job, not the cancel's")
 	_LLM_Ollama_Async.Delete(fake_id)
 }
-Test("LLM_OllamaCancelAsync: sets cancelled flag on in-flight entry", _OllamaCancelAsync_FlagsEntry)
+Test("LLM_OllamaCancelAllAsync: flags an entry shaped exactly as the dispatcher creates it", _OllamaCancel_FlagsProductionShapedEntry)
 
 
-_OllamaCancelAsync_NoOpOnMissingId() {
+; The retired singular cancel carried this guarantee for its req_id argument; the
+; surviving req_id-taking entry point is the curl poll tick, which a stale
+; SetTimer closure can still reach after the registry entry is gone. AHK v2 throws
+; on Map[missing_key], so the lookup must go through .Has() — assert the behaviour,
+; not the spelling.
+_OllamaPollCurl_NoOpOnMissingId() {
 	global _LLM_Ollama_Async
 	before_count := _LLM_Ollama_Async.Count
-	; Must not throw when the id does not exist
-	LLM_OllamaCancelAsync(999999)
-	AssertEqual(before_count, _LLM_Ollama_Async.Count)
+	_LLM_Ollama_PollCurl(999999)
+	AssertEqual(before_count, _LLM_Ollama_Async.Count,
+		"a poll tick for an id no longer in the registry must return silently, not throw and not mutate the registry")
 }
-Test("LLM_OllamaCancelAsync: no-op when request id not found", _OllamaCancelAsync_NoOpOnMissingId)
+Test("_LLM_Ollama_PollCurl: no-op when the request id is no longer in the registry", _OllamaPollCurl_NoOpOnMissingId)
 
 
 _OllamaCancelAllAsync_FlagsAll() {

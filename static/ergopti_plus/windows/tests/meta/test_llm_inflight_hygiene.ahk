@@ -35,6 +35,21 @@
 ; ==================================================================
 ; ==================================================================
 
+; Counts the real WaitForResponse CALL sites (an assignment from a COM handle) in
+; the LLM backends. Derived rather than hardcoded: the guarantee is "every site
+; abandons", not "there are N sites", so adding or retiring a poll must not need a
+; number edited here. Docstring mentions of ``WaitForResponse(0)`` carry no ":=",
+; so prose can never inflate the count.
+_LIH_WaitForResponseSiteCount(Src) {
+	Sites := 0
+	Pos := 1
+	while (F := RegExMatch(Src, "i):=\s*\w+\.WaitForResponse\(", &M, Pos)) {
+		Pos := F + M.Len
+		Sites += 1
+	}
+	return Sites
+}
+
 ; Every WaitForResponse call in the async backends must sit in a try/catch that
 ; ABANDONS. A bare `try` re-queues the tick, which is the busy-loop.
 _LIH_EveryWaitForResponseAbandons() {
@@ -55,8 +70,18 @@ _LIH_EveryWaitForResponseAbandons() {
 		Pos := F + M2.Len
 		Guarded += 1
 	}
-	Assert(Guarded >= 4,
-		"all four poll sites must carry the abandonment contract (found " . Guarded . ") — a guard that only forbids the old spelling is satisfied by deleting the call instead of handling it")
+	; The old form of this assertion was ``Guarded >= 4``, which pinned the SIZE of
+	; the class instead of the invariant over it — retiring the dead Ollama WinHTTP
+	; generation poll (which never ran, and whose entries never held an "http" key)
+	; would have "failed" the suite for removing dead code. The guarantee is one
+	; abandonment guard per live call site, so both numbers are now derived and
+	; compared. The floor keeps the scan from passing vacuously if the regex ever
+	; stops matching.
+	Sites := _LIH_WaitForResponseSiteCount(Src)
+	Assert(Sites >= 3,
+		"the scan must still find the WaitForResponse call sites (found " . Sites . ") — a regex that matches nothing would make this whole test vacuous")
+	Assert(Guarded == Sites,
+		"every WaitForResponse call site must carry the abandonment contract (" . Sites . " site(s), " . Guarded . " guard(s)) — a guard that only forbids the old spelling is satisfied by deleting the call instead of handling it")
 }
 
 ; Abandoning must also RELEASE the transport, or the socket and COM object stay
@@ -72,7 +97,13 @@ _LIH_AbandonmentReleasesTheTransport() {
 		Assert(InStr(Window, ".Abort()") > 0 or InStr(Window, "_LLM_Ollama_Async.Delete") > 0,
 			"an abandoning poll must release the in-flight request, not merely stop looking at it")
 	}
-	Assert(Checked >= 4, "the scan must reach every abandonment site (found " . Checked . ")")
+	; Same reasoning as above: the count is derived from the live call sites rather
+	; than frozen at 4, so the invariant survives a poll being added or retired.
+	Sites := _LIH_WaitForResponseSiteCount(Src)
+	Assert(Sites >= 3,
+		"the scan must still find the WaitForResponse call sites (found " . Sites . ")")
+	Assert(Checked == Sites,
+		"the scan must reach every abandonment site (" . Sites . " site(s), " . Checked . " reached)")
 }
 
 
@@ -85,10 +116,24 @@ _LIH_AbandonmentReleasesTheTransport() {
 ; ==================================================================
 
 ; The singular cancels must defer their kills exactly as the plural ones do.
+; The set is DERIVED from the source rather than listed here: the previous
+; hardcoded pair pinned which cancels exist, so retiring one (the Ollama singular
+; had no production caller — the engine only ever cancels all) read as a test
+; failure, and a newly added sibling would silently never be checked. What the
+; test promises is "every singular cancel defers", so the class is enumerated.
 _LIH_SingularCancelsDeferTheirKills() {
 	Src := _StripFullLineComments(_DriverDirConcat("modules/llm"))
 
-	for _, Fn in ["LLM_OllamaCancelAsync", "LLM_RemoteCancelAsync"] {
+	Fns := []
+	Pos := 1
+	while (F := RegExMatch(Src, "m)^[ \t]*(\w+CancelAsync)\(req_id\)\s*\{", &MD, Pos)) {
+		Pos := F + MD.Len
+		Fns.Push(MD[1])
+	}
+	Assert(Fns.Length >= 1,
+		"at least one singular per-request cancel must exist for this invariant to mean anything (found " . Fns.Length . ")")
+
+	for _, Fn in Fns {
 		At := InStr(Src, Fn . "(req_id) {")
 		Assert(At > 0, "the singular cancel " . Fn . " must exist")
 		Body := SubStr(Src, At, 900)
