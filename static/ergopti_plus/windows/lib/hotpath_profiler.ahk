@@ -39,6 +39,26 @@ global _HOTPATH_QPC_FREQ := 0
 ; at WARNING. 5 ms is below the threshold of perceptible single-keystroke lag yet
 ; high enough that a healthy keystroke (sub-millisecond) never trips it.
 global _HOTPATH_SLOW_MS := 5.0
+; Per-segment overrides of the threshold above, for segments whose NORMAL cost is
+; already past it. The global 5 ms is calibrated for per-keystroke work, where
+; 5 ms is alarming. Applied to a repeating background probe whose healthy cost is
+; an order of magnitude higher, it fires on almost every tick: the tripwire then
+; reports "this ran", not "this is slow", and stops being able to signal
+; anything. Measured 2026-07-29 over one 31-minute session, the errors-only sink
+; — the maintainer's triage channel — was 85.5 % ONE segment and 0.3 % actual
+; signal, which is how a real user-visible defect sat in it unnoticed for a day.
+;
+; Every entry MUST carry its measured normal cost in a comment: an override
+; without a measurement behind it is indistinguishable from hiding a regression,
+; and tests/unit/test_hotpath_per_segment_threshold.ahk enforces the comment.
+global _HOTPATH_SLOW_MS_BY_SEGMENT := Map(
+	; 2 Hz unattended cross-process UIA/COM round trip on the message thread.
+	; Measured 2026-07-29 21:15-21:46: n=2993, mean 14.3 ms, max 301.0 ms, ~80 %
+	; of all possible ticks over 5 ms. 60 ms keeps every >100 ms event and the one
+	; 301 ms breach of Windows' ~300 ms LowLevelHooksTimeout, while dropping ~99 %
+	; of the volume.
+	"UIA.SelectionPoll", 60.0
+)
 ; A closed segment shorter than this is not remembered as a possible child. It
 ; cannot materially distort a parent that has to exceed _HOTPATH_SLOW_MS to be
 ; reported at all, and skipping it keeps normal typing allocation-free.
@@ -113,7 +133,7 @@ _HotPathNestedMs(Closed, StartTicks, EndTicks) {
 ; @param Detail {String} Context shown when slow (typed char, buffer, …).
 HotPath_LogIfSlow(Label, StartTicks, Detail := "") {
 	global _HOTPATH_QPC_FREQ, _HOTPATH_SLOW_MS
-	global _HOTPATH_NEST_MIN_MS, _HOTPATH_NEST_TRACK_CAP
+	global _HOTPATH_NEST_MIN_MS, _HOTPATH_NEST_TRACK_CAP, _HOTPATH_SLOW_MS_BY_SEGMENT
 	; Ring of recently closed segments, oldest first. Deliberately a static local
 	; rather than a module global: this file otherwise holds no mutable state.
 	; A segment that closed before this one started can never be contained in it,
@@ -124,7 +144,10 @@ HotPath_LogIfSlow(Label, StartTicks, Detail := "") {
 		DllCall("QueryPerformanceFrequency", "Int64*", &_HOTPATH_QPC_FREQ)
 	DllCall("QueryPerformanceCounter", "Int64*", &now)
 	ElapsedMs := (now - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0
-	if (ElapsedMs > _HOTPATH_SLOW_MS) {
+	; .Get, never a bracket read: an absent key THROWS in AHK v2, and this runs on
+	; the keystroke path where a throw would take the hook down.
+	SlowMs := _HOTPATH_SLOW_MS_BY_SEGMENT.Get(Label, _HOTPATH_SLOW_MS)
+	if (ElapsedMs > SlowMs) {
 		; Computed before this segment joins the ring, or it would contain itself.
 		NestedMs := _HotPathNestedMs(Closed, StartTicks, now)
 		Breakdown := ""

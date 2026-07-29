@@ -1149,6 +1149,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_fire_log_callable_replacement.ahk
 #Include unit/test_group_config_cache_alias_invalidation.ahk
 #Include unit/test_hotpath_profiler_exclusive.ahk
+#Include unit/test_hotpath_per_segment_threshold.ahk
 #Include unit/test_keylogger_today_fh_flush.ahk
 #Include unit/test_llm_cache_hit_logs_suggested.ahk
 #Include unit/test_llm_keep_alive_from_shared_defaults.ahk
