@@ -141,3 +141,55 @@ helpers.describe("preview: turning it off clears what is already on screen", fun
 		end
 	end)
 end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 4/ The preview describes what the ENGINE will do ========
+-- =================================================================
+-- =================================================================
+
+--- Three divergences shared one shape: the row builder answered a question the
+--- engine answers differently, and the tooltip is only useful while the two agree.
+helpers.describe("preview: the rows describe the outcome the engine will produce", function()
+
+	local function builder_code()
+		local src = helpers.read_driver_source("_preview_render_generation")
+		helpers.assert_true(type(src) == "string" and src ~= "",
+			"the preview source must be readable or these invariants assert nothing")
+		return src
+	end
+
+	helpers.it("resolves show_tooltip with the row's own section, not nil", function()
+		local code = builder_code():gsub("%-%-[^\n]*", "")
+		helpers.assert_true(code:find("hotstrings_config%.resolve%(m%.group,%s*m%.section%)") ~= nil,
+			"the config window keys its per-section \"hide the bubble\" override by section "
+			.. "name, so resolving with nil consults only the group level and every "
+			.. "per-section override the user set is silently ignored")
+		helpers.assert_true(code:find("hotstrings_config%.resolve%(m%.group,%s*nil%)") == nil,
+			"the nil-section resolve must be gone, not merely joined by a correct one")
+	end)
+
+	helpers.it("advances the primary ledger before the display gate", function()
+		local code = builder_code():gsub("%-%-[^\n]*", "")
+		local ledger = code:find("primary_seen%[m%.type%]%s*=%s*true")
+		local gate   = code:find("if%s+enabled%s+and%s+not%s+kind_suppressed")
+		helpers.assert_true(ledger ~= nil, "the row builder must keep a primary ledger")
+		helpers.assert_true(gate ~= nil, "the display gate must consult the suppression ledger")
+		helpers.assert_true(ledger < gate,
+			"the winner of each kind must claim primary status even when it cannot be shown; "
+			.. "advancing the ledger only for RENDERED rows promoted the runner-up and drew it "
+			.. "undimmed, presenting as certain an expansion the engine will not produce")
+	end)
+
+	helpers.it("labels a provider row with the magic key, not Enter", function()
+		local code = builder_code():gsub("%-%-[^\n]*", "")
+		helpers.assert_true(code:find('is_star%s+or%s+m%.type%s*==%s*"provider"') ~= nil,
+			"both shipped providers fire from the interceptor on the trigger character, so a "
+			.. "row labelled with the terminator tells the user to press Enter — which destroys "
+			.. "the pending expansion instead of firing it")
+	end)
+
+end)

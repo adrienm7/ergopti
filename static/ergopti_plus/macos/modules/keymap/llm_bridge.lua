@@ -615,6 +615,9 @@ function M.update_preview(buf)
 		-- Track whether each kind has already produced its primary row. Subsequent
 		-- enabled rows of the same kind are marked dimmed.
 		local primary_seen = { star = false, autocorrect = false, provider = false }
+		-- Kinds whose WINNER could not be displayed. Every later row of such a kind
+		-- describes an expansion the engine will not produce, so none may be shown.
+		local kind_suppressed = {}
 		-- Re-order matches so end-char (↵) rows come first, then star (★) rows,
 		-- then providers. End-char triggers usually have a shorter delay (the
 		-- user types space/tab quickly) so they need maximum visibility on top.
@@ -644,7 +647,11 @@ function M.update_preview(buf)
 			local enabled = is_star and is_star_preview_enabled
 				or (not is_star and is_autocorrect_preview_enabled)
 			if enabled and m.group and type(hotstrings_config.resolve) == "function" then
-				local ok_cfg, cfg = pcall(function() return hotstrings_config.resolve(m.group, nil) end)
+				-- m.section, not nil: the config window keys its per-section
+				-- "hide the bubble" override by exactly this name, so resolving with
+				-- nil consulted only the group level and every per-section override
+				-- the user set was silently ignored by the preview.
+				local ok_cfg, cfg = pcall(function() return hotstrings_config.resolve(m.group, m.section) end)
 				if ok_cfg and cfg and cfg.show_tooltip == false then enabled = false end
 			end
 
@@ -664,17 +671,34 @@ function M.update_preview(buf)
 			local row_timeout = raw_delay == 0 and INFINITE_TOOLTIP_SEC
 				or math.max(MIN_TOOLTIP_DURATION_SEC, raw_delay)
 
-			if enabled then
+			-- The ledger advances for the WINNER of each kind, displayable or not.
+			-- Advancing it only for rendered rows meant that when the winning
+			-- mapping's group was silenced, the next mapping of the same kind was
+			-- promoted and drawn UNDIMMED — presented as what will happen, when the
+			-- engine will produce the silenced winner instead.
+			local is_primary = not primary_seen[m.type]
+			primary_seen[m.type] = true
+
+			-- And if that winner cannot be shown, no alternative of its kind may be
+			-- shown either: every remaining row of the kind is an expansion the
+			-- engine will not produce. The tooltip tells the truth or says nothing.
+			if not enabled and is_primary then
+				kind_suppressed[m.type] = true
+			end
+
+			if enabled and not kind_suppressed[m.type] then
 				any_enabled = true
 				if not min_timeout or row_timeout < min_timeout then
 					min_timeout = row_timeout
 				end
-				local is_primary = not primary_seen[m.type]
-				primary_seen[m.type] = true
 				rows[#rows + 1] = {
 					text          = m.plain_repl,
 					tint          = tooltip.tint(tint_key),
-					trigger_label = is_star and magic_key or "↵",
+					-- Providers are validated by the magic key, exactly like a star
+					-- trigger: both shipped ones fire from the interceptor on the
+					-- trigger char. Labelling their row "↵" told the user to press
+					-- Enter, which destroys the pending expansion instead of firing it.
+					trigger_label = (is_star or m.type == "provider") and magic_key or "↵",
 					dimmed        = not is_primary,
 					duration      = row_timeout,
 				}
