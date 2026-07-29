@@ -491,6 +491,27 @@ function M.get_info()         return _info    end
 --- @return string The trigger character.
 function M.get_trigger_char() return _trigger end
 
+--- Updates the live trigger character used by the @-tag interceptor.
+---
+--- Without this the module had no way to learn about a magic key changed from
+--- the menu: the sibling RulesEngine gained a setter, and dynamic_hotstrings
+--- aliased its own proxy straight to that one engine, so the fix for the shared
+--- defect reached exactly half of the pair. The @-tag engine went deaf while the
+--- preview kept advertising the expansion.
+--- @param char string The new trigger character.
+function M.set_trigger_char(char)
+	if type(char) ~= "string" or char == "" then
+		Logger.error(LOG, "set_trigger_char(): expected a non-empty string, got %s — trigger unchanged.", type(char))
+		return
+	end
+	_trigger = char
+	-- A pending combo was accumulated against the OLD trigger; keeping it would
+	-- let the next keystroke fire a combo the user started under different rules.
+	_state = STATE_IDLE
+	_combo = ""
+	Logger.debug(LOG, "Trigger char: %s.", char)
+end
+
 --- Opens the browser-based HTML form using the extracted UI module.
 function M.open_editor()
 	Logger.debug(LOG, "Opening personal info editor UI…")
@@ -522,9 +543,20 @@ function M.start(base_dir, keymap_module, info_toml_path)
 		return
 	end
 
-	_trigger = tostring(config.trigger_char or "★")
 	_info    = type(config.info) == "table" and config.info or {}
 	_letters = type(config.letters) == "table" and config.letters or {}
+
+	-- Source the trigger from the real, user-configurable magic key, exactly as
+	-- the sibling RulesEngine already does. personal_info.toml's trigger_char is
+	-- only this module's own default and never reflects a magic key changed from
+	-- the menu, so booting from it left the @-tag engine listening for a key the
+	-- user had stopped typing — while the preview, which has no trigger of its
+	-- own, kept promising the expansion.
+	if type(keymap_module) == "table" and type(keymap_module.get_trigger_char) == "function" then
+		_trigger = tostring(keymap_module.get_trigger_char() or config.trigger_char or "★")
+	else
+		_trigger = tostring(config.trigger_char or "★")
+	end
 
 	-- Materialise defaults to disk if the file did not exist, so the user can
 	-- edit it directly and so renaming or deleting it triggers a fresh
