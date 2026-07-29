@@ -126,8 +126,10 @@ local function inject_strings(code)
 	-- Inject the privacy warning pre-formatted with the actual metrics path so
 	-- the user sees exactly the same text as the tray-menu toggle dialog
 	local metrics_dir = (_config_path or ""):match("^(.*[/\\])") or ""
+	-- i18n.format, not string.format: the shared locale strings use {1}, and
+	-- string.format looks for %s — it left the placeholder on screen verbatim.
 	strings["dialog.metrics.enable_warning_formatted"] =
-		string.format(i18n.get("dialog.metrics.enable_warning"), metrics_dir .. "metrics")
+		i18n.format("dialog.metrics.enable_warning", metrics_dir .. "metrics")
 
 	i18n.set_locale_no_reload(prev_code)
 
@@ -177,8 +179,10 @@ local function inject_init_data()
 
 	-- Same privacy warning as inject_strings — pre-formatted with the metrics path
 	local metrics_dir = (_config_path or ""):match("^(.*[/\\])") or ""
+	-- i18n.format, not string.format: the shared locale strings use {1}, and
+	-- string.format looks for %s — it left the placeholder on screen verbatim.
 	strings["dialog.metrics.enable_warning_formatted"] =
-		string.format(i18n.get("dialog.metrics.enable_warning"), metrics_dir .. "metrics")
+		i18n.format("dialog.metrics.enable_warning", metrics_dir .. "metrics")
 
 	-- Also include the labels needed by the inserted config-folder step.
 	local config_step_keys = {

@@ -168,6 +168,32 @@ function M.get(key)
 end
 
 --- Returns the active locale code (e.g. ``"fr"``).
+
+--- Returns a localised string with its {n} placeholders substituted.
+---
+--- The shared locale files use {1}, {2}, … — the AutoHotkey driver's logger
+--- understands that syntax natively, macOS had no equivalent, and the two
+--- onboarding call sites reached for string.format instead. string.format looks
+--- for %s and leaves {1} untouched, so the privacy warning shown before enabling
+--- the keylogger displayed a literal "{1}" where the metrics path belongs — on
+--- the one screen where the user most needs to see where their data will go.
+--- @param key string Locale key.
+--- @param ... any Values substituted for {1}, {2}, … in order.
+--- @return string The localised, substituted string.
+function M.format(key, ...)
+	local text = M.get(key)
+	if type(text) ~= "string" then return text end
+	local args = table.pack(...)
+	for n = 1, args.n do
+		local value = tostring(args[n])
+		-- The replacement is outside-world data (a filesystem path), and a "%" in
+		-- a gsub replacement raises. Escape it rather than trusting the input.
+		value = value:gsub("%%", "%%%%")
+		text = text:gsub("{" .. n .. "}", value)
+	end
+	return text
+end
+
 --- @return string
 function M.get_locale()
 	return _locale

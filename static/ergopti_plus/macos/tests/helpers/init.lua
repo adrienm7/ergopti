@@ -194,6 +194,18 @@ function M.load_with_stubs(module_name, hs_overrides)
 		set_locale      = function() end,
 		decorate_section = function(text) return "— " .. text .. " —" end,
 		section          = function(key) return "— " .. key .. " —" end,
+		-- Mirrors the real {n} substitution. A stub narrower than the module it
+		-- stands in for is how a production call to a missing function reaches
+		-- nil under test and nobody notices: every consumer of i18n.format would
+		-- otherwise crash here for a reason that has nothing to do with its own bug.
+		format          = function(key, ...)
+			local text = tostring(key)
+			local args = table.pack(...)
+			for n = 1, args.n do
+				text = text:gsub("{" .. n .. "}", (tostring(args[n]):gsub("%%", "%%%%")))
+			end
+			return text
+		end,
 	}
 
 	-- Stub lib.paths so that any module (e.g. llm/api_remote, profiles resolution)
