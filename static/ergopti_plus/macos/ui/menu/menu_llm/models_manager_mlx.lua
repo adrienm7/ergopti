@@ -14,6 +14,7 @@ local M = {}
 local hs            = hs
 local notifications = require("lib.notifications")
 local Logger = require("lib.logger")
+local fs_dir       = require("lib.fs_dir")
 local i18n = require("lib.i18n")
 
 -- GC-root table: every live hs.task is pinned here so Lua's garbage collector
@@ -162,12 +163,12 @@ function M.new(deps, presets)
 						local attr = hs.fs.attributes(snapshots_dir)
 						if attr and attr.mode == "directory" then
 							local is_valid = false
-							for commit in hs.fs.dir(snapshots_dir) do
+							for _, commit in ipairs(fs_dir.entries(snapshots_dir)) do
 								if commit ~= "." and commit ~= ".." then
 									local commit_dir = snapshots_dir .. "/" .. commit
 									local attr_c = hs.fs.attributes(commit_dir)
 									if attr_c and attr_c.mode == "directory" then
-										for file in hs.fs.dir(commit_dir) do
+										for _, file in ipairs(fs_dir.entries(commit_dir)) do
 											if file:match("%.safetensors$") or file:match("%.bin$") then
 												local file_path = commit_dir .. "/" .. file
 												local fattr = hs.fs.attributes(file_path)

@@ -15,6 +15,7 @@
 local M = {}
 local hs = hs
 local Logger        = require("lib.logger")
+local fs_dir       = require("lib.fs_dir")
 local dialog        = require("lib.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
 local text_acts     = require("modules.shortcuts.actions.text")
@@ -539,11 +540,14 @@ function M.build(ctx)
 
 	local function dyn_extensions_shortcuts(items, _ctx)
 		local ext_root = ctx.base_dir and (ctx.base_dir .. "../../extensions/")
-		local ok_attr, attr = ext_root and pcall(hs.fs.attributes, ext_root) or false
+		-- Same truncation as hotstring_counter: `and pcall() or false` keeps only
+		-- the status, so attr was always nil and this branch never ran.
+		local ok_attr, attr = false, nil
+		if ext_root then ok_attr, attr = pcall(hs.fs.attributes, ext_root) end
 		if not (ok_attr and type(attr) == "table" and attr.mode == "directory") then return end
 
 		local ext_ids = {}
-		for fname in hs.fs.dir(ext_root) do
+		for _, fname in ipairs(fs_dir.entries(ext_root)) do
 			if fname ~= "." and fname ~= ".." then
 				local ok_a2, a2 = pcall(hs.fs.attributes, ext_root .. fname)
 				if ok_a2 and type(a2) == "table" and a2.mode == "directory" then

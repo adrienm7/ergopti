@@ -14,6 +14,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
+local fs_dir       = require("lib.fs_dir")
 local LOG    = "hotstring_counter"
 local Labels = require("menu.labels")
 
@@ -220,10 +221,14 @@ function M.count_all(ctx, ergopti_groups)
 		ext_details   = _ext_meta_cache.details
 	else
 		local ext_root = ctx.base_dir and (ctx.base_dir .. "../../extensions/")
-		local ok_attr, attr = ext_root and pcall(hs.fs.attributes, ext_root) or false
+		-- `x and pcall(...) or false` truncates pcall to ONE value, so the second
+		-- local was always nil and the type(attr) == "table" test below could never
+		-- pass: the whole extensions surface was unreachable. Call pcall directly.
+		local ok_attr, attr = false, nil
+		if ext_root then ok_attr, attr = pcall(hs.fs.attributes, ext_root) end
 		if ok_attr and type(attr) == "table" and attr.mode == "directory" then
 			local ext_ids = {}
-			for fname in hs.fs.dir(ext_root) do
+			for _, fname in ipairs(fs_dir.entries(ext_root)) do
 				if fname ~= "." and fname ~= ".." then
 					local fpath = ext_root .. fname
 					local ok_a2, a2 = pcall(hs.fs.attributes, fpath)
@@ -245,7 +250,7 @@ function M.count_all(ctx, ergopti_groups)
 				if not (ok_hd and type(ahd) == "table" and ahd.mode == "directory") then goto continue_ext end
 
 				local toml_stems = {}
-				for fname in hs.fs.dir(hs_dir) do
+				for _, fname in ipairs(fs_dir.entries(hs_dir)) do
 					if fname:match("%.toml$") and not fname:match("^_") then
 						local stem = fname:match("^(.-)%.toml$")
 						if stem and stem ~= "" then table.insert(toml_stems, stem) end
