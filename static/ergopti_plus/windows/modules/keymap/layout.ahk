@@ -413,11 +413,19 @@ AppState_TouchLastSentKey(Character) {
 ; drained — restoring strict per-key ordering. Same SendEvent semantics
 ; (``{Blind}`` / AltGr / modifiers unchanged); only ordering is enforced. There is
 ; NO Sleep on this path, so Critical's guarantee holds (a Sleep would yield it).
+; Profiled because this is the FIRST stage of every remapped keystroke and the
+; only one that had no segment at all: an "OnChar" line that looked slow could
+; equally have been a slow SendEvent that had already finished before OnChar
+; started, and nothing in the log distinguished the two. Two QPC reads, and the
+; WARNING path only runs above the 5 ms floor. LoggerWarn queues the line rather
+; than writing it, so the Critical section below never performs file I/O.
 _RemapEmit(SendStr, KeyChar, *) {
+	_hpEmit := HotPath_Now()
 	Critical("On")
 	SendEvent(SendStr)
 	if _EmitReachedScreen()
 		UpdateLastSentCharacter(KeyChar)
+	HotPath_LogIfSlow("RemapEmit", _hpEmit, KeyChar)
 }
 
 ; False while a dead-key InputHook is armed. That hook runs with VisibleText at
