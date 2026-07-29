@@ -140,7 +140,13 @@ SC11D:: {
 
 ; ======= 7.4) Generic — hold-modifier, any other tap =======
 
-#HotIf not _RCtrlIsSpecialTap() and TapHoldHoldModifier(TapHold, "right_ctrl") != "" and TapHoldTapAction(TapHold, "right_ctrl") != "" and not LayerEnabled
+; The gate deliberately does NOT require a configured tap action. The tray
+; picker offers the hold options independently of the tap, persists the choice
+; and puts a checkmark next to it — so requiring a tap here made « Natif / Rien »
+; + hold=<modifier> match no variant at all, and the hold the user just picked
+; did nothing. A hold must arm on the hold alone, as CapsLock, Space, Escape,
+; Enter, Backspace, Delete and Win already do.
+#HotIf not _RCtrlIsSpecialTap() and TapHoldHoldModifier(TapHold, "right_ctrl") != "" and not LayerEnabled
 $SC11D:: {
 	ModKey := _RCtrlHoldModKey()
 	HoldGuardMs := TapHoldDuration(TapHold, "right_ctrl") * 1100
@@ -176,7 +182,9 @@ $SC11D:: {
 
 ; ======= 7.5) Generic — hold-layer, any other tap =======
 
-#HotIf not _RCtrlIsSpecialTap() and TapHoldHoldLayer(TapHold, "right_ctrl") != "" and TapHoldTapAction(TapHold, "right_ctrl") != "" and not LayerEnabled
+; No tap-action conjunct, for the reason given on block 7.4: a hold must arm on
+; the hold alone or the picker offers a choice the driver silently ignores.
+#HotIf not _RCtrlIsSpecialTap() and TapHoldHoldLayer(TapHold, "right_ctrl") != "" and not LayerEnabled
 $SC11D:: {
 	tap := KeyWait("SC11D", "T" . TapHoldDuration(TapHold, "right_ctrl"))
 	if tap {

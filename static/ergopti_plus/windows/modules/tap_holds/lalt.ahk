@@ -310,7 +310,15 @@ $SC038:: {
 
 ; ======= 4.7) Generic — hold-modifier, any other tap =======
 
-#HotIf not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, "left_alt") != "" and TapHoldTapAction(TapHold, "left_alt") != "" and not LayerEnabled
+; The gate deliberately does NOT require a configured tap action. The tray
+; picker offers the hold options independently of the tap, persists the choice
+; and puts a checkmark next to it — so requiring a tap here made « Natif / Rien »
+; + hold=<modifier> match no variant at all, and the hold the user just picked
+; did nothing. Holding on the hold alone is what the eight keys that never had
+; the conjunct (CapsLock, Space, Escape, Enter, Backspace, Delete, Win) already
+; do. The tap branch below is safe with no action configured:
+; _TapHoldInvokeConfiguredAction logs a native pass-through and returns.
+#HotIf not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, "left_alt") != "" and not LayerEnabled
 $SC038:: {
 	ModKey := _LAltHoldModKey()
 	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
@@ -345,7 +353,9 @@ $SC038:: {
 
 ; ======= 4.8) Generic — hold-layer, any other tap =======
 
-#HotIf not _LAltIsSpecialTap() and TapHoldHoldLayer(TapHold, "left_alt") != "" and TapHoldTapAction(TapHold, "left_alt") != "" and not LayerEnabled
+; No tap-action conjunct, for the reason given on block 4.7: a hold must arm on
+; the hold alone or the picker offers a choice the driver silently ignores.
+#HotIf not _LAltIsSpecialTap() and TapHoldHoldLayer(TapHold, "left_alt") != "" and not LayerEnabled
 $SC038:: {
 	UpdateLastSentCharacter("LAlt")
 
