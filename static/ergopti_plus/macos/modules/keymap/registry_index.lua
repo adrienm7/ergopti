@@ -154,6 +154,10 @@ function M.set_repeat_feature_enabled(enabled)
 	else
 		hs.settings.set("magickey_repeat_enabled", false)
 	end
+	-- A user-facing feature toggle with no log line leaves the repeat engine's
+	-- state unrecoverable from the logs, which is where every other setting's
+	-- applied value can be read back.
+	Logger.debug(LOG, "Magic-key repeat engine: %s.", enabled and "on" or "off")
 end
 
 --- Persists the enabled state of ONE OR MORE sections and rebuilds their group
