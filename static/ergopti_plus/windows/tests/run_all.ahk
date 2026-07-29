@@ -442,6 +442,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_searchpath_regjump_catch.ahk
 #Include meta/test_gesture_exit_button_release.ahk
 #Include meta/test_textsend_clipall.ahk
+#Include meta/test_text_sender_clipboard_restore.ahk
 #Include meta/test_llm_autotype_hse_suppress.ahk
 #Include meta/test_ingest_tick_guards.ahk
 #Include meta/test_ingest_failure_requeues.ahk
