@@ -83,10 +83,12 @@ LLM_Ollama_LoadDefaults() {
 ; while the server is sluggish" without leaking handles indefinitely.
 global LLM_OLLAMA_MAX_INFLIGHT := 16
 
-; Registry of in-flight async requests, keyed by an internal id. Each value
-; is a Map(http, on_success, on_fail, cancelled). The cancelled flag flips
-; to true when LLM_OllamaCancelAllAsync is called; the polling tick checks
-; it and bails before invoking the user's callback.
+; Registry of in-flight async requests, keyed by an internal id. Entries are
+; created at exactly ONE site (_LLM_Ollama_DispatchAsync) and carry the curl
+; child's pid, its two temp-file paths, the callbacks, the cancelled flag and
+; the deadline — never a COM object, because the Ollama transport is curl. The
+; cancelled flag flips to true when LLM_OllamaCancelAllAsync is called; the
+; polling tick checks it and bails before invoking the user's callback.
 global _LLM_Ollama_Async := Map()
 global _LLM_Ollama_AsyncCounter := 0
 ; Latest-only queue when Ollama is busy — coalesces rapid re-fires instead of
