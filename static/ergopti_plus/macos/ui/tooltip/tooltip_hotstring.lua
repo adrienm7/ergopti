@@ -331,7 +331,16 @@ function M.show_stacked(rows, is_enabled)
 			Renderer.render_stacked(rows, _state, start_watchers)
 		end
 	end)
-	if not ok then Logger.error(LOG, "Crash during stacked tooltip rendering: " .. tostring(err) .. ".") end
+	if not ok then
+		Logger.error(LOG, "Crash during stacked tooltip rendering: " .. tostring(err) .. ".")
+		-- The visibility flag was optimistically set BEFORE the render. If the
+		-- render threw there is no canvas on screen, yet tooltip.is_visible() went
+		-- on reporting true — and the persistent Escape trap consults exactly that
+		-- to decide whether to swallow Escape. The user's next Escape would vanish
+		-- into a tooltip that does not exist. Roll the claim back on failure.
+		_state.is_visible = false
+		pcall(Renderer.hide_stacked)
+	end
 end
 
 --- Hides the stacked canvas alongside the standard one (authoritative).

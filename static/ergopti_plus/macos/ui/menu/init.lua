@@ -859,6 +859,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			L.set_level(level)
 			pcall(function() hs.settings.set("ergopti.log_level", level) end)
 			L.info("menu", "Log level set to %s.", level)
+			-- The menubar tree is cached and only rebuilt when _menu_dirty is set.
+			-- Without this the Debug submenu kept showing the previous level and
+			-- its checkmark indefinitely — the menu asserting a setting the engine
+			-- no longer has.
+			_menu_dirty = true
+			if type(schedule_menu_refresh) == "function" then schedule_menu_refresh() end
 		end,
 	}
 
