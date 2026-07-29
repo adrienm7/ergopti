@@ -15,8 +15,12 @@
 --- 1. Dual mode: "observe" (intercept=false, default) reads from libinput
 ---    debug-events without consuming events; "intercept" (intercept=true)
 ---    calls evtest --grab which acquires EVIOCGRAB, suppressing delivery
----    to the desktop — required for tap-hold detection. Re-injection is
----    handled by the injector module via ydotool uinput.
+---    to the desktop — required for race-free hotstring replacement. In that
+---    mode the adapter re-emits every consumed EV_KEY event through the
+---    caller-supplied onEmitRaw channel (the injector's ydotool uinput path)
+---    before dispatching it to the domain callbacks, and refuses to start at
+---    all when no such channel is given — a grab with no way back leaves the
+---    user with a dead keyboard.
 --- 2. Subprocess architecture: the blocking evdev read loop runs in a
 ---    child process (libinput debug-events or evtest); the Lua daemon
 ---    reads parsed events line-by-line from a pipe, avoiding the need for
@@ -63,6 +67,19 @@ local _layout   = "qwerty"
 
 -- Intercept mode flag.
 local _intercept = false
+
+-- Raw re-emit channel used in intercept mode — function(evdev_code, evdev_value).
+-- Injected per capture session through start({ onEmitRaw = … }) rather than
+-- required here, because the caller owns the output stream (the injector's
+-- ydotool/uinput channel in production, a recorder in the harness). Rebound on
+-- every start() so a session can never inherit a previous session's emitter.
+local _emit_raw = nil
+
+-- evdev event type for a key report (linux/input-event-codes.h EV_KEY).
+-- Only EV_KEY is forwarded: ydotool emits its own EV_SYN terminator after each
+-- key, and EV_MSC/MSC_SCAN is duplicate scancode metadata the desktop derives
+-- from the key report itself.
+local EVDEV_TYPE_KEY = 1
 
 -- Modifier tracking — updated by _pump_one() on each KEY_DOWN/KEY_UP.
 local _shift_held = false
@@ -197,6 +214,27 @@ local function _parse_evtest_line(line)
 	return nil
 end
 
+--- Extracts the raw evdev triple from an evtest line, independently of the
+--- semantic parse above.
+---
+--- Pass-through must never go through _parse_evtest_line: that one exists to
+--- name a key for the domain callbacks, so it drops the autorepeat value (2)
+--- and cannot match a KEY_* name containing a second underscore
+--- (KEY_BRIGHTNESS_CYCLE, KEY_NUMERIC_0…). Under EVIOCGRAB, anything the parse
+--- fails to recognise is an event the user typed and never sees. Reading the
+--- numeric type/code/value straight off the line keeps forwarding lossless
+--- regardless of which names the driver happens to know.
+---
+--- @param line string One evtest output line.
+--- @return table|nil { type = integer, code = integer, value = integer }.
+local function _parse_evtest_raw(line)
+	local ev_type = tonumber(line:match("type%s+(%d+)%s+%(EV_"))
+	local code    = tonumber(line:match("code%s+(%d+)%s+%("))
+	local value   = tonumber(line:match("value%s+(%-?%d+)%s*$"))
+	if not ev_type or not code or not value then return nil end
+	return { type = ev_type, code = code, value = value }
+end
+
 -- Forward declaration: _pump_one (below) resolves the typed character via
 -- _resolve_char, which is defined further down. Declaring the local here means
 -- _pump_one binds THIS local (assigned by the later `function _resolve_char`)
@@ -217,6 +255,24 @@ local function _pump_one()
 		_running = false
 		_pipe = nil
 		return false
+	end
+
+	-- Intercept mode grabbed the device, so nothing reaches the application
+	-- except through here: put the raw event back before doing anything else.
+	-- Order is the whole point — the application must already show the trigger
+	-- when inject() erases it, and a keystroke read after an injection was
+	-- buffered in the subprocess pipe during it, so it lands after the
+	-- replacement instead of interleaving with it. In observe mode the physical
+	-- event was never consumed and re-emitting it would type everything twice.
+	if _intercept and _emit_raw then
+		local raw = _parse_evtest_raw(line)
+		if raw and raw.type == EVDEV_TYPE_KEY then
+			local ok_emit, err_emit = pcall(_emit_raw, raw.code, raw.value)
+			if not ok_emit then
+				Logger.error(LOG, "Raw pass-through failed (code=%d value=%d) — %s.",
+					raw.code, raw.value, tostring(err_emit))
+			end
+		end
 	end
 
 	-- Parse the line based on the mode.
@@ -374,13 +430,38 @@ end
 -- =========================================
 -- =========================================
 
+--- Decides whether a capture session may start, given the requested mode and the
+--- raw re-emit channel.
+---
+--- Intercept mode calls evtest --grab, which takes EVIOCGRAB and stops the
+--- desktop from ever seeing the device again. Without a channel to put those
+--- events back, the user's keyboard simply stops working — a far worse outcome
+--- than the interleaving bug interception is meant to cure. Refuse instead.
+---
+--- Exported because start() itself cannot run under the headless harness (it
+--- needs a real /dev/input node and an evtest binary); this is the actual
+--- decision start() delegates to, not a copy of it.
+---
+--- @param intercept boolean       Whether EVIOCGRAB was requested.
+--- @param emit_raw  function|nil  The raw re-emit channel, if any.
+--- @return boolean ok, string|nil refusal Reason when ok is false.
+function M.can_capture(intercept, emit_raw)
+	if intercept and type(emit_raw) ~= "function" then
+		return false, "intercept mode requires an onEmitRaw pass-through channel"
+	end
+	return true
+end
+
 --- Starts the keyboard hook. Idempotent — safe to call while already running.
---- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, device? }
+--- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, onEmitRaw?, device? }
 ---              intercept boolean   Grab the device (needs root). Default false.
 ---              layout    string    "qwerty" or "azerty". Default "qwerty".
 ---              onChar    function  Called with (char_string, evdev_scancode) for printable keys.
 ---              onKey     function  Called with (key_name) for control keys.
 ---              onPhysical function  Called with (evdev_scancode, key_name, char_or_nil) for every physical keydown.
+---              onEmitRaw function  Called with (evdev_scancode, evdev_value) to put a
+---                                  consumed event back on the wire. MANDATORY when
+---                                  intercept is true, ignored otherwise.
 ---              device    string    Override /dev/input/eventN path.
 function M.start(opts)
 	if _running then
@@ -394,6 +475,16 @@ function M.start(opts)
 	if type(options.onPhysical) == "function" then _on_physical = options.onPhysical end
 	if type(options.layout) == "string"  then _layout   = options.layout end
 	_intercept = options.intercept == true
+	-- Bound unconditionally (not "kept if absent" like the domain callbacks):
+	-- an emitter left over from an earlier session would satisfy the guard below
+	-- while pointing at a channel this session never asked for.
+	_emit_raw  = type(options.onEmitRaw) == "function" and options.onEmitRaw or nil
+
+	local ok_capture, refusal = M.can_capture(_intercept, _emit_raw)
+	if not ok_capture then
+		Logger.error(LOG, "start(): %s — refusing to grab the device.", refusal)
+		return
+	end
 
 	-- Resolve the device path.
 	if type(options.device) == "string" and options.device ~= "" then
@@ -448,11 +539,15 @@ end
 --- in "intercept" mode, where physical keys never reach the app directly. In
 --- "observe" mode the daemon does NOT grab, so physical keys typed during an
 --- injection still reach the app and can interleave with the synthetic
---- backspace+replacement stream (the "abcd"→"acd" corruption). Flipping the
---- default to "intercept" additionally requires lossless raw-event pass-through
---- (re-emitting EVERY physical event — modifiers, control keys, key-repeat and
---- releases included — through the single ydotool/uinput channel), which must be
---- validated on real evdev+ydotool hardware before it can become the default.
+--- backspace+replacement stream (the "abcd"→"acd" corruption).
+---
+--- The lossless raw-event pass-through that "intercept" requires now exists (see
+--- _pump_one and start's onEmitRaw), and is proven by
+--- tests/unit/meta/test_keyboard_hook_intercept_passthrough.lua for modifiers,
+--- autorepeat, releases and names the semantic parser cannot resolve. Two things
+--- still block making it the default, and neither is answerable off real
+--- hardware: whether a `ydotool key` process per physical event sustains normal
+--- typing speed, and whether the grabbed device is the one kanata already reads.
 --- @return string "intercept" | "observe"
 function M.get_mode()
 	return _intercept and "intercept" or "observe"
@@ -477,11 +572,15 @@ end
 --- @param on_char_cb function Called with the resolved character and evdev code.
 --- @param intercept boolean  true = parse evtest lines, false = libinput lines.
 --- @param on_physical_cb function|nil Called with physical key metadata.
+--- @param on_emit_raw_cb function|nil Raw re-emit channel (intercept pass-through).
+--- @param on_key_cb function|nil Called with the control-key name.
 --- @return boolean The _pump_one return value.
-function M._test_inject_and_pump(mock_pipe, on_char_cb, intercept, on_physical_cb)
+function M._test_inject_and_pump(mock_pipe, on_char_cb, intercept, on_physical_cb, on_emit_raw_cb, on_key_cb)
 	_pipe = mock_pipe
 	_on_char = on_char_cb
 	_on_physical = on_physical_cb
+	_on_key = on_key_cb
+	_emit_raw = on_emit_raw_cb
 	_intercept = intercept and true or false
 	return _pump_one()
 end

@@ -59,6 +59,11 @@ local INTER_PHASE_DELAY_MS = 20
 -- 0 is fastest but can cause drops in some applications; 12 ms is reliable.
 local YDOTOOL_KEY_DELAY_MS = 12
 
+-- evdev EV_KEY event values (linux/input-event-codes.h): a key report carries
+-- 0 on release, 1 on press and 2 for a kernel-generated autorepeat.
+local EVDEV_VALUE_UP     = 0
+local EVDEV_VALUE_DOWN   = 1
+
 
 -- =========================================
 -- =========================================
@@ -196,6 +201,34 @@ end
 --- Restores the default (os.execute) shell runner.
 function M._reset_runner()
 	_test_runner = nil
+end
+
+--- Re-emits a single raw evdev key event through the ydotool uinput channel.
+---
+--- Only meaningful in the keyboard hook's intercept mode: EVIOCGRAB suppresses
+--- delivery of the grabbed device to the desktop, which makes the daemon the
+--- ONLY remaining path to the application. Every physical event it consumes must
+--- therefore be put back, in arrival order, or the keyboard is dead.
+---
+--- The autorepeat value (2) is re-emitted as a fresh press: ydotool's
+--- `<code>:<value>` wire format encodes only press and release, and a press is
+--- what the application already derives from an autorepeat report.
+---
+--- @param code  integer evdev keycode (input-event-codes.h KEY_*).
+--- @param value integer 0 = release, 1 = press, 2 = autorepeat.
+--- @return boolean True when ydotool accepted the event.
+function M.emit_key(code, value)
+	if type(code) ~= "number" or type(value) ~= "number" then
+		Logger.error(LOG, "emit_key(): invalid arguments — code=%s value=%s.",
+			tostring(code), tostring(value))
+		return false
+	end
+	local wire = (value == EVDEV_VALUE_UP) and EVDEV_VALUE_UP or EVDEV_VALUE_DOWN
+	local success = shell_run(string.format("ydotool key %d:%d", code, wire))
+	if not success then
+		Logger.warn(LOG, "emit_key(%d:%d): ydotool key returned non-zero.", code, wire)
+	end
+	return success
 end
 
 --- Performs a hotstring injection: erases the trigger then types the replacement.
