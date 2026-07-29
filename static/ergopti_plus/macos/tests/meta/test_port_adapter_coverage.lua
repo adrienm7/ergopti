@@ -309,7 +309,10 @@ helpers.describe("meta: _shared/ code purity", function()
 	end
 
 	helpers.it(string.format("no direct OS API calls in _shared/ JS source files (%d scanned)", scanned), function()
-		helpers.assert_true(scanned >= 0,
+		-- A floor, not `>= 0`, which every possible run satisfies: if the walk
+		-- silently stops finding files this must go red instead of reporting a
+		-- clean scan of nothing.
+		helpers.assert_true(scanned >= 1,
 			"shared JS purity scanner failed to initialise")
 		helpers.assert_true(js_violations == 0,
 			string.format("%d OS-API call(s) found in _shared/ JS — shared code must be pure logic", js_violations))

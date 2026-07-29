@@ -172,8 +172,15 @@ helpers.describe("keymap tap recovery: a revived tap must not trust the old buff
 		local src = keymap_source()
 		local decl = src:find("local function invalidate_observed_context%(")
 		helpers.assert_not_nil(decl, "invalidate_observed_context must exist")
-		local first_call = src:find("[^%s]invalidate_observed_context%(")
-		helpers.assert_true(first_call == nil or first_call > decl,
+		-- [^%w_] not [^%s]: production calls sit at the start of an indented line,
+		-- so the character before them is a TAB. Requiring a non-whitespace
+		-- character there meant this guard never matched a real call site and
+		-- passed vacuously — a guard against the driver's signature bug that
+		-- could not fire.
+		local first_call = src:find("[^%w_]invalidate_observed_context%(")
+		helpers.assert_not_nil(first_call,
+			"the pattern must actually match a call site, or this assertion is vacuous")
+		helpers.assert_true(first_call > decl,
 			"every call site must sit BELOW the declaration — see the interceptor-error-latch "
 				.. "regression for what an above-declaration reference does here")
 	end)
