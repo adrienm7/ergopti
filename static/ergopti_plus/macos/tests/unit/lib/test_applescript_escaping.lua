@@ -122,9 +122,31 @@ helpers.describe("the AppleScript call sites escape through the shared helper", 
 					.. "interpreter receives is not the one that was written:\n  "
 					.. table.concat(offenders, "\n  "))
 
-			helpers.assert_true(code:find("applescript_escape", 1, true) ~= nil,
-				entry.what .. " must escape through the shared helper, so the rule has one owner "
-					.. "rather than a copy per call site")
+			-- Either shared entry point satisfies the invariant, and the formatter is
+			-- the stronger of the two: applescript_escape is opt-in per VALUE, so a
+			-- site can escape one of its two interpolated values and leave the other
+			-- raw — which is precisely how ui/menu/menu_paths.lua shipped a folder
+			-- picker with an escaped path and a raw prompt. applescript_format
+			-- escapes every string argument, so the choice no longer exists.
+			--
+			-- Asserting the ESCAPE symbol by name would now reject that better shape,
+			-- which is why the invariant is stated as "routes through the shared
+			-- layer" rather than as one function's name.
+			local routes_through_shared_layer =
+				code:find("applescript_escape", 1, true) ~= nil
+				or code:find("applescript_format", 1, true) ~= nil
+			helpers.assert_true(routes_through_shared_layer,
+				entry.what .. " must escape through the shared layer (applescript_escape or "
+					.. "applescript_format), so the rule has one owner rather than a copy per "
+					.. "call site")
+
+			-- And it must not ALSO hand-roll one alongside the shared call: a file
+			-- can satisfy the assertion above with a single correct site while a
+			-- sibling site in the same file stays broken.
+			helpers.assert_true(code:find("string.format", 1, true) == nil
+					or code:find("applescript_format", 1, true) ~= nil
+					or code:find("applescript_escape", 1, true) ~= nil,
+				entry.what .. " builds an AppleScript with a bare string.format")
 		end
 	end)
 
@@ -142,4 +164,71 @@ helpers.describe("the AppleScript call sites escape through the shared helper", 
 			"it must go through shell_quote, which is also the spelling the shell-quoting guard "
 				.. "can see — a %q call is invisible to the check that exists for exactly this")
 	end)
+end)
+
+
+
+
+-- ====================================================================
+-- ====================================================================
+-- ======= 4/ applescript_format escapes by construction ==============
+-- ====================================================================
+-- ====================================================================
+
+-- applescript_escape is opt-in PER VALUE, and that is what kept regressing: a
+-- call site would escape one of its two interpolated values and leave the other
+-- raw. ui/menu/menu_paths.lua shipped exactly that — an escaped default path and
+-- a raw prompt, inside one string.format. No shape-based check can see a missing
+-- escape in an argument list, so the formatter removes the choice instead.
+
+helpers.describe("applescript_format escapes every interpolated string", function()
+
+	helpers.it("escapes the backslash before the quote, in one pass over each value", function()
+		local out = text_utils.applescript_format('do script "%s"', [[C:\My"Dir]])
+
+		-- The expected value spelled out: `C:\My"Dir` must arrive as
+		-- `C:\\My\"Dir` — backslash doubled, quote escaped, in that order.
+		helpers.assert_eq(out, 'do script "C:\\\\My\\"Dir"',
+			"the backslash must be doubled and the quote escaped, in that order: escaping "
+			.. "the quote first would leave the introduced backslash to be doubled in turn")
+	end)
+
+	helpers.it("escapes EVERY string argument, not just the first", function()
+		local out = text_utils.applescript_format('a "%s" b "%s"', [[x\y]], [[p"q]])
+
+		helpers.assert_true(out:find([[x\\y]], 1, true) ~= nil,
+			"the first value must be escaped")
+		helpers.assert_true(out:find([[p\"q]], 1, true) ~= nil,
+			"and so must the second — this is the whole reason the formatter exists, and the "
+			.. "assertion that would have failed on the menu_paths folder picker")
+	end)
+
+	helpers.it("passes numbers through untouched so %d still works", function()
+		local out = text_utils.applescript_format('answer "%d" of "%s"', 250, "ok")
+
+		helpers.assert_eq(out, 'answer "250" of "ok"',
+			"escaping a number would coerce it to a string and break %d; numbers cannot "
+			.. "carry a backslash or a quote, so there is nothing to escape")
+	end)
+
+	helpers.it("does not double-escape a value that is already safe", function()
+		local out = text_utils.applescript_format('x "%s"', "plain text")
+
+		helpers.assert_eq(out, 'x "plain text"',
+			"without this case the assertions above would pass against a formatter that "
+			.. "mangles every value it touches")
+	end)
+
+	helpers.it("handles a nil argument without raising", function()
+		-- The picker prompt is `i18n.get(key) or ""`, so a missing translation
+		-- reaches this layer as nil in the shape just above the `or`. Raising here
+		-- would abort inside a menu callback, where the throw is invisible.
+		local ok, out = pcall(text_utils.applescript_format, 'x "%s"', nil)
+
+		helpers.assert_true(ok, "a nil argument must not raise: %s")
+		helpers.assert_true(type(out) == "string" and out:find("nil", 1, true) ~= nil,
+			"string.format's own nil handling is preserved — the formatter only escapes "
+			.. "strings and leaves everything else to string.format")
+	end)
+
 end)

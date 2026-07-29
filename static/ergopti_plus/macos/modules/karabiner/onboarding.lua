@@ -353,13 +353,15 @@ end
 --- @param pkg_path string Absolute path to the .pkg.
 --- @param callback function fun(ok: boolean, err: string|nil)
 local function run_pkg_with_sudo_async(pkg_path, callback)
-	-- AppleScript's `quoted form of` handles spaces and special chars safely.
-	-- We must escape any embedded `"` in the path to keep our enclosing
-	-- AppleScript literal valid.
-	local escaped = pkg_path:gsub('"', '\\"')
-	local script  = string.format(
+	-- `quoted form of` operates on the AppleScript VALUE, and that value is
+	-- produced by PARSING the literal below — so anything the literal itself
+	-- mis-parses is already lost before `quoted form of` ever runs. The escape must
+	-- therefore handle the backslash too, and handle it first: pkg_path is
+	-- mount_point .. "/" .. a filename listed from a third-party DMG, and this
+	-- string reaches a shell running with administrator privileges.
+	local script = text_utils.applescript_format(
 		[[do shell script "/usr/sbin/installer -pkg " & quoted form of "%s" & " -target /" with administrator privileges]],
-		escaped
+		pkg_path
 	)
 	local task
 	task = hs.task.new("/usr/bin/osascript", function(rc, _, stderr)

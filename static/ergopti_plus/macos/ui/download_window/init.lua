@@ -132,9 +132,8 @@ _ucc:setCallback(function(msg)
         -- single quotes.
         local apple_script = string.format(
             "osascript -e %s -e 'tell application \"Terminal\" to activate'",
-            text_utils.shell_quote(string.format(
-                'tell application "Terminal" to do script "%s"',
-                text_utils.applescript_escape(cmd)))
+            text_utils.shell_quote(text_utils.applescript_format(
+                'tell application "Terminal" to do script "%s"', cmd))
         )
         pcall(hs.execute, apple_script)
 

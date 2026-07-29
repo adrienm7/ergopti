@@ -290,7 +290,13 @@ local function install_system(bundles_dir, bundle_name)
 		text_utils.shell_quote(bundles_dir .. bundle_name),
 		text_utils.shell_quote(SYSTEM_LAYOUTS_DIR)
 	)
-	local script = string.format(
+	-- TWO layers, and only the inner one was handled. shell_cmd above is correctly
+	-- quoted for /bin/sh, but shell_quote wraps in SINGLE quotes and escapes only
+	-- the single quote — so a `\` or a `"` anywhere in bundles_dir, bundle_name or
+	-- SYSTEM_LAYOUTS_DIR passed through untouched into this AppleScript literal.
+	-- The backslash was then eaten (the privileged cp -R targeting a different
+	-- path) or the quote terminated the literal outright.
+	local script = text_utils.applescript_format(
 		"do shell script \"%s\" with administrator privileges",
 		shell_cmd
 	)

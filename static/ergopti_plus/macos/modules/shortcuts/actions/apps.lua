@@ -208,9 +208,9 @@ end
 --- @param folder_path string POSIX path of the folder to look for.
 --- @param on_result function Called as on_result(focused) with a boolean.
 local function focus_existing_finder_window(folder_path, on_result)
-	local script = string.format([[
+	local script = text_utils.applescript_format([[
 		tell application "Finder"
-			set targetPath to POSIX file %q as alias
+			set targetPath to POSIX file "%s" as alias
 			repeat with w in windows
 				try
 					if (target of w as alias) is targetPath then

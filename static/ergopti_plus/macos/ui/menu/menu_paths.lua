@@ -408,15 +408,21 @@ local function pick_dir(current)
 		default_dir = os.getenv("HOME") or "/"
 	end
 
-	local escaped = default_dir:gsub('"', '\\"')
-	local script  = string.format([[
+	-- Both values need escaping and only one used to get it. default_dir is the
+	-- user-configurable config directory (or HOME): a backslash in it was silently
+	-- eaten by AppleScript, the `as alias` coercion then failed, and the on-error
+	-- branch returned "" — the folder picker did nothing at all, with no
+	-- diagnostic. The prompt is i18n text from a 21-locale corpus, and the other
+	-- copy of this very script (ui/onboarding/init.lua) escaped it while this one
+	-- did not. applescript_format removes the choice.
+	local script = text_utils.applescript_format([[
 		try
 			set r to choose folder with prompt "%s" default location ((POSIX file "%s") as alias)
 			return POSIX path of r
 		on error
 			return ""
 		end try
-	]], i18n.get("menu.paths.pick_prompt"), escaped)
+	]], i18n.get("menu.paths.pick_prompt") or "", default_dir)
 
 	local ok, r2, raw = hs.osascript.applescript(script)
 	Logger.debug(LOG, "pick_dir: ok=%s r2=%s.", tostring(ok), tostring(r2))

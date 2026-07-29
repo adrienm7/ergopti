@@ -538,6 +538,32 @@ function M.applescript_escape(value)
 	return escaped
 end
 
+--- Formats an AppleScript source string, escaping every interpolated value.
+---
+--- `applescript_escape` is opt-in, and opt-in is how this class kept regressing:
+--- a call site would escape one of its two interpolated values and leave the
+--- other raw, which is not a shape any checker can spot — the line looks right
+--- and the argument list is simply one escape short. Formatting through here
+--- makes the escape structural, so the only thing a reviewer or a guard has to
+--- verify is WHICH formatter was used.
+---
+--- Numbers and booleans are passed through untouched: they cannot carry a
+--- backslash or a quote, and escaping them would coerce them to strings and break
+--- `%d`.
+---
+--- @param fmt string The AppleScript source with standard string.format placeholders.
+--- @param ... any Values to interpolate; every string one is escaped.
+--- @return string The formatted AppleScript source.
+function M.applescript_format(fmt, ...)
+	local args = table.pack(...)
+	for i = 1, args.n do
+		if type(args[i]) == "string" then
+			args[i] = M.applescript_escape(args[i])
+		end
+	end
+	return string.format(fmt, table.unpack(args, 1, args.n))
+end
+
 --- Escapes a string so it is safe to use as the REPLACEMENT argument of gsub.
 --- Lua treats "%" specially on that side: "%1".."%9" are capture references, "%%"
 --- is a literal percent, and "%" followed by anything else RAISES "invalid use of
