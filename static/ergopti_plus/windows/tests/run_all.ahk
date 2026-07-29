@@ -1168,6 +1168,12 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_tooltip_row_band_elision.ahk
 #Include meta/test_boot_profile_retroactive_stamps.ahk
 #Include meta/test_hotpath_segment_coverage.ahk
+#Include meta/test_tooltip_debounce_is_load_bearing.ahk
+#Include meta/test_tooltip_present_subsegmented.ahk
+#Include meta/test_tooltip_render_accounting.ahk
+#Include meta/test_uia_clamp_every_probe_site.ahk
+#Include meta/test_boot_profile_retroactive_stamps.ahk
+#Include meta/test_hotpath_segment_coverage.ahk
 #Include meta/test_uia_clamp_every_probe_site.ahk
 #Include meta/test_boot_profile_retroactive_stamps.ahk
 #Include meta/test_uia_clamp_every_probe_site.ahk

@@ -97,6 +97,23 @@ global _TooltipUiaHostileCache := Map()
 global UIA_TRANSACTION_TIMEOUT_MS := 120
 global UIA_CONNECTION_TIMEOUT_MS := 120
 
+; Render accounting. HotPath only ever prints the renders that exceed its 5 ms
+; floor, which gives the log a numerator with no denominator: "342 slow
+; Tooltip.Present events over four days" cannot be read as good or catastrophic
+; without knowing whether the sessions rendered four hundred previews or forty
+; thousand. Worse, _TooltipResolvePosition has five distinct exits and the log
+; showed which one was taken exactly never — so "the position cache never hits"
+; and "UIA never answers" were indistinguishable, and both were guessed at.
+; These two counters make the slow-render RATIO and the cascade's real exit
+; distribution readable from an ordinary production log with no extra tooling.
+; They are bumped only on paths that already cost milliseconds.
+global _TooltipRenderCount := 0
+global _TooltipResolveExits := Map()
+; How many presented renders between two accounting lines. Large enough that the
+; line is rare next to the slow-segment warnings it contextualises, small enough
+; that a short session still emits one.
+global _TOOLTIP_STATS_LOG_EVERY := 100
+
 ; Dequeue state — items that have per-row expiry deadlines. Canonical algorithm:
 ; _shared/modules/tooltip/dequeue.js (SPEC.md § 7.1). When rows carry distinct non-zero
 ; DurationSec values, TooltipShow stores the full item list here with absolute
@@ -499,7 +516,13 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true, OriginMs := 0) {
             TooltipHide("ShowFail", true)
         return
     }
-    HotPath_LogIfSlow("Tooltip.Present", _hpPresent, "")
+    ; Detail carries the per-sub-step attribution _TooltipPresentStack accumulated.
+    ; Draining it here (rather than logging each step) is what makes the breakdown
+    ; visible at all: every sub-step is below the profiler's 5 ms floor.
+    HotPath_LogIfSlow("Tooltip.Present", _hpPresent, HotPath_BreakdownDetail())
+    ; Counted here and nowhere else: this is the exact point at which pixels are
+    ; on screen, so it is the denominator every "Slow Tooltip.*" line needs.
+    _TooltipNoteRenderPresented()
     if (RenderGeneration != _TooltipGeneration)
         return
 

@@ -87,15 +87,28 @@ _TooltipClampToScreen(X, Y, W, H) {
     return { X: X, Y: Y }
 }
 
+; Sub-segmented on purpose. Tooltip.Present is the dominant hot-path offender in
+; production (102 of 194 slow lines on the first day after the UIA fix, ~12.9 ms
+; mean), but it aggregates six steps whose individual costs all sit BELOW the
+; profiler's 5 ms reporting floor — so the parent's number never said which of
+; them moved, and every optimisation proposed against it was speculation. The
+; marks below cost two QPC reads each, accumulate without logging, and are
+; rendered into the parent's own already-gated line by HotPath_BreakdownDetail()
+; in _TooltipShowNow. This runs on the deferred render timer, never on the
+; keystroke callback.
 _TooltipPresentStack(Pos, Row, ArmSafety := true) {
     global _TooltipShownHwnds, _TOOLTIP_HWND_TRACK_CAP, _TOOLTIP_SAFETY_SEC
     global _TooltipLastPos
+    HotPath_BreakdownBegin()
     ; Keep the whole tooltip on-screen — a wide prediction near the bottom-right
     ; corner would otherwise overflow and be clipped.
+    _hpClamp := HotPath_Now()
     Pos := _TooltipClampToScreen(Pos.X, Pos.Y, Row.W, Row.H)
     _TooltipLastPos := Pos
+    HotPath_BreakdownMark("clamp", _hpClamp)
 
     ; PREPARE — hidden at final coordinates (Hwnd valid, nothing painted yet).
+    _hpPrepare := HotPath_Now()
     Row.Gui.Show(Format("Hide NoActivate w{1} h{2} x{3} y{4}", Row.W, Row.H, Pos.X, Pos.Y))
     _TooltipDisableDwmRounding(Row.Gui.Hwnd)
     if (_TooltipShownHwnds.Length >= _TOOLTIP_HWND_TRACK_CAP) {
@@ -105,9 +118,19 @@ _TooltipPresentStack(Pos, Row, ArmSafety := true) {
     _TooltipShownHwnds.Push(Row.Gui.Hwnd)
     if ArmSafety
         SetTimer(_TooltipTimerFn, -Round(_TOOLTIP_SAFETY_SEC * 1000))
+    HotPath_BreakdownMark("prepare", _hpPrepare)
+
+    _hpCorners := HotPath_Now()
     _TooltipApplyStackedCorners()
+    HotPath_BreakdownMark("corners", _hpCorners)
+
+    _hpBorder := HotPath_Now()
     _TooltipShowBorder(Pos.X, Pos.Y, Row.W, Row.H, false)
+    HotPath_BreakdownMark("border", _hpBorder)
+
+    _hpReveal := HotPath_Now()
     _TooltipRevealSurfaces()
+    HotPath_BreakdownMark("reveal", _hpReveal)
 }
 
 ; In-place destack rebuild — SUSPEND → build → PREPARE → REVEAL without TEARDOWN.
@@ -137,12 +160,17 @@ _TooltipDequeueRebuild(Items) {
 
     Pos := IsObject(_TooltipLastPos) ? _TooltipLastPos : _TooltipResolvePosition()
     Row := Rows[1]
+    ; The destack rebuild presents the same stack the render path does, so it must
+    ; carry the same attribution — otherwise a slow row expiry looks like a slow
+    ; render and the two are indistinguishable in the log.
+    _hpDqPresent := HotPath_Now()
     try {
         _TooltipPresentStack(Pos, Row, false)
     } catch {
         TooltipHide("DequeuePresentFail", true)
         return
     }
+    HotPath_LogIfSlow("Tooltip.DequeuePresent", _hpDqPresent, HotPath_BreakdownDetail())
 
     MaxMs := 0
     Now := A_TickCount
@@ -790,6 +818,32 @@ _TooltipMarkUiaHostile(ProcName) {
     _TooltipUiaHostileCache[ProcName] := A_TickCount + TOOLTIP_UIA_HOSTILE_TTL_MS
 }
 
+; Record which stage of the position cascade answered this call.
+; Counted per STAGE rather than as one "resolved" total: the two failure modes
+; this cascade actually has — "the position cache never hits" and "UIA never
+; answers" — are invisible in a total, and both have been argued about from the
+; log without a single number to settle them.
+; @param Stage {String} Cascade exit name (caret, cache, uia_caret, …).
+_TooltipCountResolveExit(Stage) {
+    global _TooltipResolveExits
+    _TooltipResolveExits[Stage] := _TooltipResolveExits.Get(Stage, 0) + 1
+}
+
+; Count one presented render and flush the accounting line every
+; _TOOLTIP_STATS_LOG_EVERY renders. This is the DENOMINATOR for every
+; "Slow Tooltip.*" warning in the same log.
+_TooltipNoteRenderPresented() {
+    global _TooltipRenderCount, _TOOLTIP_STATS_LOG_EVERY, _TooltipResolveExits
+    _TooltipRenderCount += 1
+    if (Mod(_TooltipRenderCount, _TOOLTIP_STATS_LOG_EVERY) != 0)
+        return
+    Parts := ""
+    for Stage, Count in _TooltipResolveExits
+        Parts .= (Parts == "" ? "" : ", ") . Stage . "=" . Count
+    try LoggerInfo("Tooltip", "{1} render(s) presented; position cascade exits: {2}.",
+        _TooltipRenderCount, (Parts == "") ? "none" : Parts)
+}
+
 ; Bound UIA's own waits. The library ships Windows' defaults — 2000 ms
 ; TransactionTimeout and 20000 ms ConnectionTimeout — so an unresponsive
 ; foreground app can stall the driver's only message thread for seconds; the
@@ -827,6 +881,7 @@ _TooltipResolvePosition() {
     GotCaret := false
     try GotCaret := CaretGetPos(&Cx, &Cy)
     if (GotCaret and (Cx != 0 or Cy != 0)) {
+        _TooltipCountResolveExit("caret")
         return _TooltipCachePosition(WinExist("A"),
             { X: Cx + _TOOLTIP_OFFSET_RIGHT, Y: Cy + _TOOLTIP_OFFSET_BELOW })
     }
@@ -836,6 +891,7 @@ _TooltipResolvePosition() {
         Age := A_TickCount - _TooltipPositionCache["tick"]
         if (_TooltipPositionCache["hwnd"] == ActiveHwnd and Age >= 0
             and Age <= TOOLTIP_POSITION_CACHE_MS) {
+            _TooltipCountResolveExit("cache")
             return { X: _TooltipPositionCache["x"], Y: _TooltipPositionCache["y"] }
         }
     }
@@ -887,11 +943,13 @@ _TooltipResolvePosition() {
                 if (W > 0 and H > 0) {
                     if (H < _TOOLTIP_MAX_CARET_HEIGHT_PX) {
                         ; Caret-like: anchor under the rect's lower-left.
+                        _TooltipCountResolveExit("uia_caret")
                         return _TooltipCachePosition(ActiveHwnd,
                             { X: Rect.l + _TOOLTIP_OFFSET_RIGHT,
                                 Y: Rect.b + _TOOLTIP_OFFSET_BELOW })
                     } else {
                         ; Input-box-like: anchor under the bottom centre.
+                        _TooltipCountResolveExit("uia_box")
                         return _TooltipCachePosition(ActiveHwnd,
                             { X: Rect.l + W // 2,
                                 Y: Rect.b + _TOOLTIP_OFFSET_BELOW })
@@ -921,6 +979,7 @@ _TooltipResolvePosition() {
         Wh := 0
         WinGetPos(&Wx, &Wy, &Ww, &Wh, "A")
         if (Ww > 0 and Wh > 0) {
+            _TooltipCountResolveExit("window")
             return _TooltipCacheUnlessProbePending(ActiveHwnd,
                 { X: Wx + Ww // 2,
                     Y: Wy + Wh - _TOOLTIP_WINDOW_BOTTOM_INSET_PX },
@@ -932,6 +991,7 @@ _TooltipResolvePosition() {
     Mx := 0
     My := 0
     try MouseGetPos(&Mx, &My)
+    _TooltipCountResolveExit("mouse")
     return _TooltipCacheUnlessProbePending(ActiveHwnd,
         { X: Mx, Y: My + _TOOLTIP_OFFSET_BELOW },
         UiaSkippedForIdle)
