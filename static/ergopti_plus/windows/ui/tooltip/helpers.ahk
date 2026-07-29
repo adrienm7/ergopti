@@ -179,6 +179,20 @@ _TooltipTeardownBorder() {
     _TooltipShownBorderHwnds := []
 }
 
+; Does a row need its own full-width background band?
+;
+; The Gui's BackColor is already _TooltipMixTintHex(Items[1].ColorHex), and the
+; band spans (0, RowY, TotalW, RowH) — a strict sub-rectangle of the client area
+; that brush fills. For row 1 the two are the same pure function over the same
+; input, so the control repaints pixels that are already correct; the same is
+; true of any later row sharing the first row's tint. Each elided band saves one
+; CreateWindowEx plus one SetFont, on the ~97 % of renders that are single-row.
+;
+; Pure and hex-only so the decision is unit-testable without touching GDI.
+_TooltipRowNeedsBand(BgHex, GuiBgHex) {
+    return BgHex != GuiBgHex
+}
+
 ; Build a single Gui that holds the entire tooltip stack.
 ; Each row is rendered as a full-width background Text control (tinted per group)
 ; with a smaller foreground Text control overlaid for the content and label.
@@ -248,11 +262,13 @@ _TooltipBuildGui(Items) {
     ; Default background matches the first item's tint (the Gui BackColor covers
     ; any gap the compositor might paint before controls are drawn).
     FirstColorHex := Items[1].HasOwnProp("ColorHex") ? Items[1].ColorHex : ""
+    ; Resolved once and kept as the reference every row's band is elided against.
+    GuiBgHex := _TooltipMixTintHex(FirstColorHex)
     ; WS_EX_TOOLWINDOW (0x80) suppresses the DWM drop shadow and rounded-corner
     ; treatment that Windows 11 applies to all top-level windows; combined with
     ; SetWindowRgn this gives us full control over the visible shape.
     G := Gui("+AlwaysOnTop -Caption +E0x20 +E0x80 +LastFound")
-    G.BackColor := _TooltipMixTintHex(FirstColorHex)
+    G.BackColor := GuiBgHex
     G.MarginX := 0
     G.MarginY := 0
 
@@ -265,9 +281,14 @@ _TooltipBuildGui(Items) {
         RowH := Meta.H
         IsDimmed := Item.HasOwnProp("IsDimmed") && Item.IsDimmed
 
-        ; Full-width background band for this row's tint color.
-        G.SetFont("norm s1", _TOOLTIP_FONT_NAME)
-        G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", BgHex, RowY, TotalW, RowH), "")
+        ; Full-width background band for this row's tint color — skipped when the
+        ; Gui background already paints exactly that colour (see
+        ; _TooltipRowNeedsBand). The 1 px separator below is a DIFFERENT colour
+        ; and is never elided.
+        if _TooltipRowNeedsBand(BgHex, GuiBgHex) {
+            G.SetFont("norm s1", _TOOLTIP_FONT_NAME)
+            G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", BgHex, RowY, TotalW, RowH), "")
+        }
 
         ; Main text overlay. Dimmed alternates (rows beyond the firing one of
         ; their group) get gray text + strikethrough so the user sees what is
@@ -846,9 +867,14 @@ _TooltipResolvePosition() {
     ;     first touch of UIA initialises the COM object, so clamping at boot
     ;     would move that cost onto the startup path. The two properties live
     ;     on the UIA singleton, so setting them here bounds every call site in
-    ;     the driver, not just this one.
-    if UiaAllowed
-        _TooltipClampUiaTimeouts()
+    ;     the driver, not just this one — which is exactly why it must NOT sit
+    ;     under `if UiaAllowed`. Gated that way, the clamp only ran when this
+    ;     probe was itself allowed to run, so the sibling probes that share the
+    ;     singleton (_UIA_SelectionPollTick, SFD_ProbeFocusedUia — both on this
+    ;     same message thread) kept Windows' 2000 ms / 20000 ms defaults for the
+    ;     whole session. Reaching stage 2 at all is the right trigger: the caret
+    ;     stage has already failed, so UIA is about to matter.
+    _TooltipClampUiaTimeouts()
     try {
         if (UiaAllowed and IsSet(UIA)) {
             Elem := UIA.GetFocusedElement()
