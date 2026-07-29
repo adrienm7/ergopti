@@ -36,6 +36,17 @@ global _MM_DEBUG_MENU_CACHE       := false
 global _MM_TOP_LEVEL_TAIL_CACHE   := false
 global _MM_GLOBAL_ACTIONS_CACHE   := false
 
+; The PARSED manifest root, cached for the process lifetime and deliberately NOT
+; cleared by MenuManifest_InvalidateCache(). The three tail loaders below each
+; used to FileRead + JsonParse the same 12.7 KB file, and initMenu() invalidates
+; their derived caches on every tray rebuild, so a single tray toggle paid three
+; cold decodes — benched at 36-42 ms each, ~110 ms per rebuild, and it shows up
+; in the boot profile as "tail (global_actions…debug): +78 ms". Keeping the root
+; warm is safe because the derived structures carry only ids and platform
+; filters (no localised text, no runtime state) and the manifest ships inside
+; the driver bundle, so it cannot change while the process runs.
+global _MM_MANIFEST_ROOT_CACHE := false
+
 
 
 ; ========================================
@@ -76,6 +87,41 @@ _MM_ResolveIdArray(IdsArr, CategoryKeysMap, GroupName, Fallback) {
 ; ==============================
 ; ===== 1.2) Public loader =====
 ; ==============================
+
+; Returns the parsed manifest root, reading and decoding the file at most once
+; per process. Returns false — never a partial object — when the manifest cannot
+; be read or is not a JSON object, so every caller keeps its own hard-coded
+; fallback. A failure is deliberately not cached: a transient I/O error must not
+; pin the fallback lists for the rest of the session.
+_MM_GetManifestRoot() {
+	global _SharedDir, _MM_MANIFEST_ROOT_CACHE
+
+	if (_MM_MANIFEST_ROOT_CACHE != false)
+		return _MM_MANIFEST_ROOT_CACHE
+
+	FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
+	if !FileExist(FilePath) {
+		try LoggerWarn("MenuManifest", "manifest not found at '{1}' — callers fall back to their hard-coded lists.", FilePath)
+		return false
+	}
+
+	FileContent := ""
+	try FileContent := FileRead(FilePath, "UTF-8")
+	if FileContent == "" {
+		try LoggerWarn("MenuManifest", "manifest at '{1}' is empty — callers fall back to their hard-coded lists.", FilePath)
+		return false
+	}
+
+	Root := ""
+	try Root := JsonParse(FileContent)
+	if !(Root is Map) {
+		try LoggerWarn("MenuManifest", "manifest root is not a JSON object — callers fall back to their hard-coded lists.")
+		return false
+	}
+
+	_MM_MANIFEST_ROOT_CACHE := Root
+	return Root
+}
 
 ; Invalidates all manifest-driven caches.
 MenuManifest_InvalidateCache() {
@@ -191,25 +237,12 @@ _MM_BuildResult(Standard, Ergopti, Dynamic) {
 ; Filters out any entry whose ``platforms`` list exists and does not include "ahk".
 ; Returns a hard-coded fallback array on any read or parse failure.
 MenuManifest_LoadDebugMenu() {
-	global _SharedDir, _MM_DEBUG_MENU_CACHE
+	global _MM_DEBUG_MENU_CACHE
 
 	if (_MM_DEBUG_MENU_CACHE != false)
 		return _MM_DEBUG_MENU_CACHE
 
-	FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
-
-	if !FileExist(FilePath) {
-		try LoggerWarn("MenuManifest", "manifest not found — using fallback debug menu order.")
-		return _MM_DebugFallback()
-	}
-
-	FileContent := ""
-	try FileContent := FileRead(FilePath, "UTF-8")
-	if FileContent == ""
-		return _MM_DebugFallback()
-
-	Root := ""
-	try Root := JsonParse(FileContent)
+	Root := _MM_GetManifestRoot()
 	if !(Root is Map)
 		return _MM_DebugFallback()
 
@@ -277,25 +310,12 @@ _MM_DebugFallback() {
 ; filtered for the AHK platform.  Used by _MI_AppendTail() to drive the
 ; lower-menu assembly in manifest order rather than imperative order.
 MenuManifest_LoadTopLevelTail() {
-	global _SharedDir, _MM_TOP_LEVEL_TAIL_CACHE
+	global _MM_TOP_LEVEL_TAIL_CACHE
 
 	if (_MM_TOP_LEVEL_TAIL_CACHE != false)
 		return _MM_TOP_LEVEL_TAIL_CACHE
 
-	FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
-
-	if !FileExist(FilePath) {
-		try LoggerWarn("MenuManifest", "manifest not found — using fallback top-level tail.")
-		return _MM_TopLevelTailFallback()
-	}
-
-	FileContent := ""
-	try FileContent := FileRead(FilePath, "UTF-8")
-	if FileContent == ""
-		return _MM_TopLevelTailFallback()
-
-	Root := ""
-	try Root := JsonParse(FileContent)
+	Root := _MM_GetManifestRoot()
 	if !(Root is Map)
 		return _MM_TopLevelTailFallback()
 
@@ -388,25 +408,12 @@ _MM_TopLevelTailFallback() {
 ; "Actions globales" submenu), filtered for the AHK platform.  Returned as
 ; an Array of Maps with "id".  Used by _MI_BuildGlobalActionsMenu().
 MenuManifest_LoadGlobalActions() {
-	global _SharedDir, _MM_GLOBAL_ACTIONS_CACHE
+	global _MM_GLOBAL_ACTIONS_CACHE
 
 	if (_MM_GLOBAL_ACTIONS_CACHE != false)
 		return _MM_GLOBAL_ACTIONS_CACHE
 
-	FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
-
-	if !FileExist(FilePath) {
-		try LoggerWarn("MenuManifest", "manifest not found — using fallback global_actions.")
-		return _MM_GlobalActionsFallback()
-	}
-
-	FileContent := ""
-	try FileContent := FileRead(FilePath, "UTF-8")
-	if FileContent == ""
-		return _MM_GlobalActionsFallback()
-
-	Root := ""
-	try Root := JsonParse(FileContent)
+	Root := _MM_GetManifestRoot()
 	if !(Root is Map)
 		return _MM_GlobalActionsFallback()
 
