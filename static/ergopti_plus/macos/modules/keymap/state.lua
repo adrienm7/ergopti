@@ -39,6 +39,12 @@ local M  = {}
 -- an expansion firing and the next user keystroke without swallowing more
 -- than one human-speed key.
 local DEFAULT_SUPPRESS_SEC      = 0.5
+
+-- Suppression window applied after a FINAL-RESULT expansion, which must also
+-- outlast the replacement landing on screen. Named here, beside the default it
+-- doubles, because a bare literal at the call site is a magic number whose
+-- relationship to that default is invisible (project convention 5.1).
+M.FINAL_RESULT_SUPPRESS_SEC = DEFAULT_SUPPRESS_SEC * 2
 local DEFAULT_SUPPRESS_KEEP_SEC = 0.3
 
 

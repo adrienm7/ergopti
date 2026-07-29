@@ -103,6 +103,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-pages-deploy-branch-vs-workflow](#project-pages-deploy-branch-vs-workflow) — GitHub Pages set to "GitHub Actions" ignores the gh-pages branch entirely: pushes "succeed" while the live site stays frozen. This repo deploys from the BRANCH, and the deploy step must run its git ops in a worktree, never `git checkout gh-pages` inside the build dir
 - [project-site-i18n-gettext-french-key](#project-site-i18n-gettext-french-key) — The ergopti-plus page translates with t('French source'): the French text IS the key, so edited copy falls back to the new French instead of showing a stale translation; adding a language is one dictionary file + one list entry
 - [project-svelte-script-comment-closing-tag](#project-svelte-script-comment-closing-tag) — A literal closing script tag ANYWHERE inside a Svelte component script — even in a // comment — terminates the block and breaks the parse; assemble such strings from split halves
+- [project-hs-audit-2026-07-29](#project-hs-audit-2026-07-29) — Every cross-cutting hygiene ratchet in this repo was written for the Windows driver and never extended to macOS; that one gap shipped a red CI job, sixteen mojibake sequences and nineteen unparseable locales
 
 ## Working conventions & feedback
 
@@ -2169,3 +2170,60 @@ Svelte scans the raw text of a component's `<script>` block for the closing tag 
 
 **How to apply:** build script-tag strings from split halves (`'<scr' + 'ipt …'` / `'</scr' + 'ipt>'`) and never write the closing sequence in comments inside `.svelte` files — describe it in words instead.
 
+
+
+### project-hs-audit-2026-07-29
+
+_Chaque ratchet d'hygiene transverse du depot a ete ecrit pour le driver Windows et jamais
+etendu a macOS — un seul trou de politique, trois defauts livres_
+
+<sub>slug: `project_hs_audit_2026_07_29`</sub>
+
+Passe adverse sur le driver Hammerspoon : 111 findings adjuges (92 confirmes, 17 refutes,
+2 hypotheses), 128 agents. Le rapport a ete retire ; les 60 findings non livres sont dans
+`TODO.md` avec leur cause, leur correctif et leur test proposes.
+
+**La trouvaille structurante n'est aucun des bugs, c'est leur cause commune.** Trois ratchets
+existaient — `verify-change.cjs`, `test-ahk-encoding.cjs`, `test-no-pinned-source-reads.cjs` —
+et les trois etaient scopes au driver Windows. Le troisieme l'admettait dans son propre
+commentaire (« this is an .ahk-only ratchet »). Chaque trou a coute :
+
+- pas de regle `hs-e2e` → une regression keymap a rougi la CI pendant que la suite unitaire
+  affichait 3548/3548. **Le gate local et le gate CI couvraient des terrains disjoints.**
+  En elargissant la garde a la CLASSE, le driver **Linux** s'est revele avoir le meme trou :
+  personne ne l'avait signale.
+- garde d'encodage limite aux `.ahk` → 16 sequences UTF-8 double-encodees dans 3 sources Lua
+  (dont une qui s'echappe dans le `paths.toml` genere au premier lancement) et **19 locales
+  sur 21 rendues illisibles par un double BOM**, introduit par le commit
+  *« chore: standardize repository line endings to lf »* — la passe qui durcissait le garde
+  `.ahk` est celle qui a casse les `.json`. Un cinquieme fichier corrompu
+  (`_shared/modules/gestures/actions.toml`) n'a ete trouve que par le nouveau garde.
+
+**Comment l'appliquer :** quand tu ecris un ratchet, scanne l'arbre entier des le depart. Un
+garde scope a un driver est une politique a moitie appliquee, et la moitie non couverte est
+exactement celle ou personne ne regarde.
+
+**Autres lecons durables de cette passe :**
+
+- **Un correctif peut contenir l'erreur qu'il documente.** `terminator_replay` retenait le
+  terminateur jusqu'a preuve d'atterrissage du remplacement, et son message de commit explique
+  que « le texte colle n'est pas un de nos evenements ». Sa predicate acceptait pourtant l'echo
+  de notre propre Cmd+V comme preuve, relachant ~79 ms trop tot sur le chemin de collage.
+- **Un point de passage unique peut retrecir un contrat.** Faire passer les injecteurs dynamiques
+  par `keymap.inject_dynamic` a ferme la desynchronisation des deux trackers — et perdu
+  `is_private`, donc SSN/IBAN/carte/telephone etaient persistes en clair 14 jours. Quand tu
+  centralises, compare les ARITES, pas seulement les comportements.
+- **Un stub plus etroit que le vrai module cache le defaut qu'il pretend verrouiller.** Le stub
+  keymap de `test_personal_hotstrings` n'exposait pas la constante que le loader lit ; reparer
+  le stub renforce le test.
+- **Une garde qui epingle l'orthographe transforme un durcissement en regression.**
+  `test_gestures_ghost_timer_guard` matchait le texte exact du garde ; l'elargir a l'invariant
+  etait la correction, pas l'affaiblissement.
+- **Verifier avant d'agir sur un finding.** `is_hs_owned_bridge()` renvoie `false` quand le
+  marqueur est simplement absent, donc le garde « evident » sur le marquage de propriete KE
+  aurait casse le tout premier amorcage. Ce finding est reste ouvert exprès.
+- **G4 reste non mesurable ici** : `<config_dir>/hammerspoon/` n'a pas de `logs/`. Les seuls
+  chiffres citables viennent d'artefacts executes (suite, e2e, banc), jamais du raisonnement.
+
+Related: [[project_hs_audit_round4_2026_07_21]], [[project_ahk_invariant_incomplete_application]],
+[[project_audit_findings_are_hypotheses]], [[feedback_regression_tests]].
