@@ -409,6 +409,17 @@ A_TrayMenu.Delete()
 Onboarding_Run()
 
 global _IniCache := ParseTomlFile(ConfigurationFile)
+; Latch the session sentinel SaveFullConfig honours when that parse could not
+; READ an existing config.toml. This snapshot is taken once and never refreshed,
+; yet it seeds the locale, the magic key, every category master gate, both
+; shortcut tables, the gesture assignments and the WPM widget — all of which
+; SaveFullConfig serialises back a few hundred ms later. By then the transient
+; lock has usually cleared, so no write-time check can tell that the payload was
+; derived from nothing; only latching at the instant of the failed read can.
+if TOML_UnreadableFile(ConfigurationFile) {
+    _ConfigBootReadFailed := true
+    try LoggerError("ErgoptiPlus", "Cannot read '{1}' at boot: every setting below stays at its compiled-in default, so persistence is blocked for this session. Restart the driver once the file is readable.", ConfigurationFile)
+}
 ReadScriptConfig(_IniCache)
 ReadCategoryEnabled(_IniCache)
 I18nInit(_IniCache)
