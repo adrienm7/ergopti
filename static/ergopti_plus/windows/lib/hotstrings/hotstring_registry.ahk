@@ -221,6 +221,7 @@ HS_EnumeratePersonalExtFiles() {
 ; @returns {Integer} Number of triggers indexed.
 _RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget) {
 	global ScriptInformation, HS_PREFIX_ENTRY_PATTERN
+	global HS_TOML_SECTION_HEADER_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN
 	if !IsCategoryGated("Hotstrings")
 		return 0
 	if !FileExist(Path)
@@ -232,24 +233,47 @@ _RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget) {
 		Line := Trim(A_LoopField, " `t")
 		if (Line == "" or SubStr(Line, 1, 1) == "#")
 			continue
-		if RegExMatch(Line, "^\[\[(.+)\]\]$", &SectionMatch) {
-			CurrentSection := StrLower(SectionMatch[1])
-			continue
-		}
-		if (SubStr(Line, 1, 1) == "[") {
-			CurrentSection := ""
+		; The SHARED header pattern, which accepts one OR more brackets. This
+		; previously matched `[[section]]` only and reset CurrentSection on any
+		; other bracketed line, so every entry under a single-bracket `[section]`
+		; header was skipped — while LoadExtTomlFile registered them happily. The
+		; pack expanded and could never be previewed.
+		if RegExMatch(Line, HS_TOML_SECTION_HEADER_PATTERN, &SectionMatch) {
+			CurrentSection := StrLower(Trim(SectionMatch[1]))
 			continue
 		}
 		if (CurrentSection == "")
 			continue
-		if !RegExMatch(Line, HS_PREFIX_ENTRY_PATTERN, &Match)
+		; Metadata blocks describe the file and are not hotstrings. The engine skips
+		; them explicitly; here the old single-bracket RESET happened to stand in
+		; for that, so accepting single brackets above means the skip has to become
+		; explicit too — otherwise a [_meta] description would index as a trigger.
+		if (CurrentSection == "_meta" or InStr(CurrentSection, "_meta."))
 			continue
 
-		Trigger := UnescapeTomlString(Match[1])
-		Output := UnescapeTomlString(Match[2])
-		IsCaseSensitive := (Match[3] == "true")
-		IsStrict := (Match.Count >= 4 and Match[4] == "true")
-		Individual := (Match[5] != "") ? Match[5] + 0 : ""
+		Trigger := ""
+		Output := ""
+		IsCaseSensitive := false
+		IsStrict := false
+		Individual := ""
+		if RegExMatch(Line, HS_PREFIX_ENTRY_PATTERN, &Match) {
+			Trigger := UnescapeTomlString(Match[1])
+			Output := UnescapeTomlString(Match[2])
+			IsCaseSensitive := (Match[3] == "true")
+			IsStrict := (Match.Count >= 4 and Match[4] == "true")
+			Individual := (Match[5] != "") ? Match[5] + 0 : ""
+		} else if RegExMatch(Line, _HOTSTRING_SIMPLE_ENTRY_PATTERN, &SimpleMatch) {
+			; The engine's second accepted shape: a bare `key = "value"` line, which
+			; LoadExtTomlFile registers through CreateCaseSensitiveHotstrings. The
+			; preview side ignored it entirely, so those entries expanded without
+			; ever being previewable.
+			Trigger := (SimpleMatch[1] != "") ? SimpleMatch[1] : SimpleMatch[2]
+			Output := SimpleMatch[3]
+		} else {
+			continue
+		}
+		if (Trigger == "")
+			continue
 		if (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
 			Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
 			Output := StrReplace(Output, "★", ScriptInformation["MagicKey"])

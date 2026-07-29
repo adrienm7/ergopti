@@ -56,6 +56,16 @@ _PICR_MakeFixture() {
 	FileAppend(
 		'[[notes]]`n"wfh" = { output = "work from home", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n',
 		Root . "\work\team.toml", "UTF-8")
+	; The OTHER two shapes LoadExtTomlFile accepts, which the preview indexer used
+	; to drop on the floor: a SINGLE-bracket header, and a bare key = "value"
+	; entry. The [_meta] block is here because accepting single brackets means the
+	; metadata skip has to become explicit — its description must never index as a
+	; trigger.
+	FileAppend(
+		'[_meta]`ndescription = "not a hotstring"`n'
+		. '[snippets]`n"sbx" = { output = "single bracket", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n'
+		. 'simplekey = "simple value"`n',
+		Root . "\otherpack.toml", "UTF-8")
 	return Root
 }
 
@@ -127,6 +137,43 @@ _PICR_PackTriggersReachTheIndex() {
 	}
 }
 
+; ROOT CAUSE of the second half of this defect: the two sides were unified on the
+; FILE SET but not on the GRAMMAR. LoadExtTomlFile accepts one-or-more-bracket
+; headers AND bare `key = "value"` entries; the preview indexer accepted double
+; brackets and inline tables only, resetting its section on anything else. A pack
+; written in either of the other two shapes expanded and could never be previewed
+; — the same user-visible symptom, through a different mechanism, with the same
+; positively-successful log line.
+_PICR_EveryAcceptedShapeIsIndexed() {
+	global ScriptInformation
+	Root := _PICR_MakeFixture()
+	Saved := ScriptInformation.Has("PersonalHotstringsDir") ? ScriptInformation["PersonalHotstringsDir"] : ""
+	ScriptInformation["PersonalHotstringsDir"] := Root
+	try {
+		Index := Map()
+		Set := Map()
+		_RegisterExtPackTriggers(Root . "\otherpack.toml", "otherpack", Index, Set)
+
+		Assert(Set.Has("sbx"),
+			"an entry under a SINGLE-bracket [section] header must be indexed: LoadExtTomlFile's header pattern "
+			. "accepts one or more brackets, so it registers and expands the hotstring. Accepting only [[section]] "
+			. "here made the pack expand while never being previewable "
+			. "(preview-index-grammar-stricter-than-engine)")
+		Assert(Set.Has("simplekey"),
+			'a bare key = "value" entry must be indexed: LoadExtTomlFile registers that shape through '
+			. 'CreateCaseSensitiveHotstrings, so it expands. Matching only the inline-table pattern here left it '
+			. 'un-previewable (preview-index-grammar-stricter-than-engine)')
+		Assert(!Set.Has("description"),
+			"a [_meta] key must NOT be indexed as a trigger. The old single-bracket RESET stood in for the metadata "
+			. "skip by accident, so accepting single brackets requires the skip to be explicit — otherwise the "
+			. "pack's own description becomes an expandable hotstring")
+	} finally {
+		if (Saved != "")
+			ScriptInformation["PersonalHotstringsDir"] := Saved
+		_PICR_Cleanup(Root)
+	}
+}
+
 ; An extension pack has no per-section toggle in the menu — the engine enables
 ; every section of it. Gating the preview on a Features node that cannot exist
 ; would index nothing and silently restore the original defect.
@@ -167,6 +214,8 @@ Test("preview index: extension packs are enumerated, the root personal file is n
 	_PICR_EnumerationFindsPacksAndSkipsTheRootFile)
 Test("preview index: an extension pack's triggers reach the index (preview-index-covers-every-registration)",
 	_PICR_PackTriggersReachTheIndex)
+Test("preview index: every entry shape the engine registers is also indexed (preview-index-grammar-stricter-than-engine)",
+	_PICR_EveryAcceptedShapeIsIndexed)
 Test("preview index: pack indexing is not gated on a per-section Features node (preview-index-covers-every-registration)",
 	_PICR_PackIndexingIsNotGatedOnPerSectionFeatures)
 Test("preview index: the engine and the index share one pack enumeration (preview-index-covers-every-registration)",
