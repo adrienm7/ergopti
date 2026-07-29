@@ -201,6 +201,31 @@ end
 --- and the very first drain_log() after the feature is enabled replays the
 --- entire backlog in one burst with fabricated (current-time) timestamps
 --- instead of the real press times.
+-- Injected pause predicate. Declared above may_persist: a local declared below
+-- a closure that reads it binds the nil global instead.
+local _is_paused = nil
+
+--- Reports whether this bridge may persist an event right now.
+---
+--- kc_bridge is a FOURTH keylogger writer, and it carried neither guard: no
+--- pause predicate and no privacy predicate anywhere in the file. Its drain
+--- triggers are torn down only by M.stop(), which pause never calls and focusing
+--- a secure field never calls — so physical key press/release kept reaching
+--- today.log while a password field had focus.
+---
+--- Returning false must NOT stop the surrounding bookkeeping: the file offset and
+--- the pending-down table still advance, exactly as the existing "no log manager"
+--- path does, so nothing is replayed as a backlog when logging resumes.
+--- @return boolean
+local function may_persist()
+	if _is_paused and _is_paused() then return false end
+	local ok_kl, kl = pcall(require, "modules.keylogger")
+	if ok_kl and type(kl) == "table" and type(kl.context_allows_logging) == "function" then
+		return kl.context_allows_logging() == true
+	end
+	return true
+end
+
 local function drain_log()
 	local fh = io.open(KC_LOG_PATH, "r")
 	if not fh then
@@ -242,12 +267,13 @@ local function drain_log()
 					-- LogManager is nil while the keylogger feature is off (F-MED-26):
 					-- keep advancing the offset/pending_down bookkeeping below, but
 					-- there is no consumer for the event, so skip only the log call.
-					if _log_manager and type(_log_manager.log_karabiner_release) == "function" then
+					if _log_manager and type(_log_manager.log_karabiner_release) == "function"
+						and may_persist() then
 						_log_manager.log_karabiner_release(kc_num, app_name, hold_ms)
 					end
 				else
 					_pending_down[kc_num] = hs.timer.absoluteTime() / 1000000
-					if _log_manager then
+					if _log_manager and may_persist() then
 						_log_manager.log_karabiner_press(kc_num, app_name)
 					end
 				end
@@ -370,7 +396,7 @@ end
 --- @param log_manager table The LogManager module reference.
 --- @param tap_hold_config table Map of key_id → {tap, hold} action ids.
 --- @param available_actions table List of action definitions from actions.json.
-function M.init(core_state, log_manager, tap_hold_config, available_actions)
+function M.init(core_state, log_manager, tap_hold_config, available_actions, is_paused_fn)
 	Logger.start(LOG, "Initializing KE physical-kc bridge…")
 
 	if type(core_state) ~= "table" then
@@ -384,6 +410,8 @@ function M.init(core_state, log_manager, tap_hold_config, available_actions)
 
 	_state        = core_state
 	_log_manager  = log_manager
+	-- Injected like the watcher and context-tracker layers already receive it.
+	if type(is_paused_fn) == "function" then _is_paused = is_paused_fn end
 
 	if type(tap_hold_config) == "table" and type(available_actions) == "table" then
 		build_managed_output_set(tap_hold_config, available_actions)
