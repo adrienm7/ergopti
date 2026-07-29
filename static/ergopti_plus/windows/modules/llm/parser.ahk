@@ -888,6 +888,30 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 }
 
 /**
+ * True when a parsed prediction can be injected without erasing anything first.
+ *
+ * ``deletes`` counts characters the accept step must ERASE before typing
+ * ``to_type``, because ``to_type`` is deliberately only the suffix that survives
+ * that erasure — not the whole corrected tail. The Windows accept path
+ * (LLM_Bridge_OnAccept) types without erasing, so a prediction carrying
+ * ``deletes > 0`` is appended to the very characters it was meant to replace and
+ * the sentence comes out garbled. Refusing the suggestion costs the user a
+ * correction they can still make by hand; accepting it costs them their sentence,
+ * so refuse until the erase step exists on this driver.
+ * @param {Map} pred A record returned by LLM_Parser_ProcessPrediction.
+ * @returns {Integer} 1 when the prediction needs no erasure.
+ */
+_LLM_Parser_IsPhysicallyInjectable(pred) {
+	if !(pred is Map)
+		return true
+	deletes := pred.Has("deletes") ? pred["deletes"] : 0
+	if (deletes <= 0)
+		return true
+	try LoggerWarn("LLM.parser", "Dropping a correction that needs {1} character(s) erased — the Windows accept path types without erasing, so injecting it would append the fix to the typo instead of replacing it.", deletes)
+	return false
+}
+
+/**
  * Full post-API parse path — mirrors api_ollama.lua post_and_parse.
  * @returns {Array} Slot strings (to_type) ready for the tooltip.
  */
@@ -905,12 +929,12 @@ LLM_Parser_ParseResponse(raw, full_text, tail_text, min_words, max_words, is_bat
 			if (slots.Length >= n_predictions)
 				break
 			pred := LLM_Parser_ProcessPrediction(full_text, tail_text, block, min_words, max_words)
-			if (pred != "")
+			if (pred != "" and _LLM_Parser_IsPhysicallyInjectable(pred))
 				LLM_ApiCommon_InsertPrediction(slots, pred, stats, true)
 		}
 	} else {
 		pred := LLM_Parser_ProcessPrediction(full_text, tail_text, raw, min_words, max_words)
-		if (pred != "")
+		if (pred != "" and _LLM_Parser_IsPhysicallyInjectable(pred))
 			LLM_ApiCommon_InsertPrediction(slots, pred, stats, true)
 	}
 	if IsSet(out_stats)
