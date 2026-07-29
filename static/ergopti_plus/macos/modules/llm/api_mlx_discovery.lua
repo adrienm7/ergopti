@@ -64,6 +64,11 @@ local _completions_endpoint = nil
 local _chat_endpoint        = nil
 local _endpoints_discovered = false
 local _endpoint_probe_in_flight = false
+
+-- Inter-probe delay, carried ACROSS discovery cycles. Declared here rather than
+-- inside discover() so a failed cycle's backoff is still in force when the next
+-- caller retries.
+local _poll_delay_sec = nil
 -- Callbacks waiting for the current discovery probe to complete; each
 -- discover() call during a probe enqueues its on_done here so no
 -- caller is silently dropped when a second warmup fires mid-poll.
@@ -136,6 +141,9 @@ local DISCOVERY_MAX_WAIT_SEC        = 180  -- Stop polling /v1/models after this
                                            -- discovered routes fresh and silences the scary warning).
 local DISCOVERY_POLL_INITIAL_SEC    = Timings.sec("llm", "discovery_poll_initial_ms")  -- First inter-probe delay (doubles each miss, capped below)
 local DISCOVERY_POLL_MAX_SEC        = Timings.sec("llm", "discovery_poll_max_ms")       -- Cap for the exponential backoff interval
+
+-- Seeded once the initial value is known; reset to it on a successful discovery.
+_poll_delay_sec = DISCOVERY_POLL_INITIAL_SEC
 
 
 
@@ -291,6 +299,9 @@ function M.discover(on_done)
 		_endpoint_probe_in_flight = false
 		if success then
 			_endpoints_discovered = true
+			-- The server answered — that, and only that, justifies probing eagerly
+			-- again on the next cycle.
+			_poll_delay_sec = DISCOVERY_POLL_INITIAL_SEC
 			Logger.warn(LOG, "MLX endpoints resolved: completions=%s, chat=%s.",
 				_completions_endpoint, _chat_endpoint)
 		end
@@ -399,7 +410,13 @@ function M.discover(on_done)
 	-- so we react quickly on fast starts while not hammering the kernel during a
 	-- slow model load (weights can take 30 s+ to map into GPU memory).
 	local poll_timer       = nil
-	local poll_delay_sec   = DISCOVERY_POLL_INITIAL_SEC
+	-- Backoff read from module scope, not re-initialised here. As a local it
+	-- restarted at the shortest interval on every discover() call, so a cycle
+	-- that gave up followed by a retry on the next run-loop tick probed as
+	-- eagerly as the first attempt — a curl spawn and an HTTP POST per tick
+	-- against a server that is down, with the backoff resetting each time it was
+	-- supposed to grow.
+	local poll_delay_sec   = _poll_delay_sec
 	local function do_poll()
 		-- Guard: a reset() since this cycle started makes this an ORPHANED chain.
 		-- Relying on _endpoint_probe_in_flight alone is not enough — a newer
@@ -491,7 +508,9 @@ function M.discover(on_done)
 				Logger.debug(LOG,
 					"Endpoint discovery: server not ready — next probe in %.1fs.", poll_delay_sec)
 				poll_timer   = TimerScheduler.after(poll_delay_sec, do_poll)
-				poll_delay_sec = math.min(poll_delay_sec * 2, DISCOVERY_POLL_MAX_SEC)
+				poll_delay_sec  = math.min(poll_delay_sec * 2, DISCOVERY_POLL_MAX_SEC)
+				-- Persist it: the growth has to outlive the call that earned it.
+				_poll_delay_sec = poll_delay_sec
 			end
 		end)
 		curl_task.start()
