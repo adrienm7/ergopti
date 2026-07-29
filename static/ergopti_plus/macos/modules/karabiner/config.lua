@@ -431,7 +431,16 @@ function M.save_user_config(state, user_config_path)
 		return
 	end
 	fh:write(payload); fh:close()
-	pcall(os.rename, tmp, user_config_path)
+	-- This is the ONLY persistence path for every Karabiner setting, and the
+	-- rename is the step that actually publishes them. Discarding its result and
+	-- logging success unconditionally meant a failed save was indistinguishable
+	-- from a successful one until the next boot restored the old file.
+	local ok_rename, renamed = pcall(os.rename, tmp, user_config_path)
+	if not ok_rename or not renamed then
+		Logger.error(LOG, "Cannot publish user config to '%s' — settings NOT saved (staged at '%s').",
+			user_config_path, tmp)
+		return
+	end
 	Logger.debug(LOG, "User config saved.")
 end
 

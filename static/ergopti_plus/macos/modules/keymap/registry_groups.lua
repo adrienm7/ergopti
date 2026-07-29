@@ -165,6 +165,9 @@ function M.load_toml(name, path)
 	end
 
 	ensure_group_order(name)
+	-- Snapshot before registering so the success line can report what THIS file
+	-- contributed rather than the size of the whole corpus.
+	local mappings_before = #_state.mappings
 	_state.current_group = name
 	local sections_info  = {}
 
@@ -312,7 +315,19 @@ function M.load_toml(name, path)
 		group_order      = existing_order,
 	}
 
-	Logger.success(LOG, "TOML mapping file '%s' loaded (%d total mapping(s)).", name, #_state.mappings)
+	-- Report THIS group's contribution, not the global corpus size. The shared
+	-- reader never raises and returns an empty table for a missing or unreadable
+	-- file, so a group that registered nothing still reached this line and paired
+	-- its Logger.start with a success whose count came from every OTHER group —
+	-- the one number guaranteed to look healthy. A group that loads zero entries
+	-- is almost always a path or permission problem, and it now says so.
+	local added = #_state.mappings - mappings_before
+	if added == 0 then
+		Logger.warn(LOG, "TOML mapping file '%s' registered ZERO mappings — check the path and its contents.", name)
+	else
+		Logger.success(LOG, "TOML mapping file '%s' loaded (%d mapping(s); %d total).",
+			name, added, #_state.mappings)
+	end
 end
 
 
