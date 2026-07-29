@@ -314,11 +314,17 @@ end
 -- ================================
 
 local function notify_new_version(tag, update_menu_fn)
+	-- Availability and the menu refresh are recorded FIRST, unconditionally. The
+	-- tag guard below suppresses a repeated NOTIFICATION, which is all it was ever
+	-- meant to do — gating the state on it too meant that after a channel or
+	-- interval change the "Update to vX" entry silently vanished while the release
+	-- was still cached, because the second pass returned before setting either.
+	_update_state = "available"
+	if type(update_menu_fn) == "function" then pcall(update_menu_fn) end
+
 	if M.normalize_tag(_last_notified_tag) == M.normalize_tag(tag) then return end
 	_last_notified_tag = tag
 	Logger.info(LOG, "New release available: %s (current: %s).", tag, M.current_version())
-	_update_state = "available"
-	if type(update_menu_fn) == "function" then pcall(update_menu_fn) end
 	-- The tag lands on the REPLACEMENT side of gsub, where "%" is special and a
 	-- release such as "v2.1%-rc1" raises. The label builder above already escapes
 	-- for exactly this reason; this notification body was the site it missed.

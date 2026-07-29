@@ -311,6 +311,10 @@ local _last_log_path  = nil
 -- test can never fire for the files that actually need resetting.
 local _sub_file_date  = {}
 
+-- Open append handles for the topical sub-files, keyed by path. Declared here
+-- with the other sink state and ABOVE every closure that touches it.
+local _sub_handles    = {}
+
 -- Forward declaration — implementation is in Section 3.2. Declared here for the
 -- same reason as the handles above: init_log_path() and _purge_old_logs() are
 -- defined before it and must reach the real dispatcher, not a nil global.
@@ -348,6 +352,16 @@ function M.init_log_path(config_dir, max_age_days)
 		end
 	end
 	_log_dir = log_dir
+
+	-- Close every sub-file handle open on the OLD directory. They are keyed by
+	-- absolute path, so a re-point would otherwise keep writing the topical logs
+	-- into the previous config directory for the rest of the session — and the
+	-- per-day truncation decision, cached alongside them, would be stale too.
+	for path, entry in pairs(_sub_handles) do
+		pcall(function() entry.fh:close() end)
+		_sub_handles[path]   = nil
+		_sub_file_date[path] = nil
+	end
 
 	-- Close any handle open on the old path so the next write re-opens cleanly
 	if _file_handle then
@@ -693,18 +707,40 @@ local function _write_to_file(stamp, line, immediate)
 			end
 		end)
 	end
-	-- Fan-out to topical sub-files. Each is opened/closed per write so a crash
-	-- never leaves a stale handle. Cost is negligible vs. the operations logged.
+	-- Fan-out to topical sub-files.
+	--
+	-- Handles are kept OPEN, exactly like the main one. Opening and closing per
+	-- line looked cheap next to "the operations logged" — true of the operations,
+	-- and false of a keystroke: the default level is DEBUG and DEBUG lines are
+	-- emitted from the keystroke path, so every matching line paid an
+	-- open+write+close inside the eventtap callback. That is the same blocking
+	-- I/O the main handle's level-aware flush policy exists to avoid, arriving
+	-- through the back door.
+	--
+	-- Lines are still flushed on the same terms as the main handle, so a crash
+	-- loses at most the buffered DEBUG tail rather than leaving a stale handle
+	-- holding everything.
 	local today = os.date("%Y-%m-%d")
 	for _, sub in ipairs(SUB_LOG_NAMES) do
 		if _matches_any(line, sub.patterns) then
 			pcall(function()
 				local path = _log_dir .. sub.name
-				local f = io.open(path, _sub_file_mode(path, today))
-				if f then
-					f:write(full)
-					f:close()
+				local mode = _sub_file_mode(path, today)
+				local entry = _sub_handles[path]
+				-- Re-open when the mode changes: "w" means a new calendar day has
+				-- to truncate the file, which an already-open append handle cannot do.
+				if entry and entry.mode ~= mode then
+					pcall(function() entry.fh:close() end)
+					entry = nil
 				end
+				if not entry then
+					local fh = io.open(path, mode)
+					if not fh then return end
+					entry = { fh = fh, mode = "a" }
+					_sub_handles[path] = entry
+				end
+				entry.fh:write(full)
+				if immediate ~= false then entry.fh:flush() end
 			end)
 		end
 	end
