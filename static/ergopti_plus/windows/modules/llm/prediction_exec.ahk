@@ -942,6 +942,18 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 					try LoggerInfo("LLM", "Inline auto-type skipped while suspended.")
 					return
 				}
+				; The SAME staleness gate the tooltip render performs further down,
+				; applied here because this branch returns before ever reaching it.
+				; That gate exists because this thread can be pre-empted between the
+				; caller check and the paint, and the consequence is far worse on this
+				; path: a superseded tooltip paints a stale suggestion the user can
+				; ignore, while a superseded inline auto-type SendTexts model output for
+				; ABANDONED text straight into the document, where nothing takes it back
+				; (llm-inline-autotype-injects-superseded-prediction).
+				if (request_id != "" and !_LLM_Engine_IsCurrent(Map("request_id", request_id))) {
+					try LoggerInfo("LLM", "Inline auto-type skipped — prediction superseded during render (request #{1}).", request_id)
+					return
+				}
 				; Mute the hotstring InputHook so the injected characters do
 				; not re-enter the engine and trigger false hotstring matches.
 				if IsSet(PrefixWatcherSuppress)
