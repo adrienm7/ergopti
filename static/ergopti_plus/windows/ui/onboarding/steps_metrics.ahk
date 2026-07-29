@@ -450,6 +450,6 @@ _Step5_Finish(g, rYes, *) {
 	global _ob_gestures := (rYes.Value = 1)
 	if _Onboarding_Commit() {
 		_Onboarding_DestroyActive()
-		Reload
+		ReloadPreservingSuspend()
 	}
 }

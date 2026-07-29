@@ -208,7 +208,7 @@ _PathsEdWeb_Save(ConfigDir) {
 	if !_PathsFile_Write(N)
 		return
 	try LoggerInfo("PathsEditor", "Applying new config directory and reloading…")
-	Reload()
+	ReloadPreservingSuspend()
 }
 
 ; Persist ``N`` as the configured directory in paths.toml. THE single writer.

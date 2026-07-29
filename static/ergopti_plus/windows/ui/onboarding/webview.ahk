@@ -450,7 +450,7 @@ _OnbWeb_Finish(answers) {
 		; Close the WebView2 controller before the host window is torn down by
 		; Reload (the WebView2 spec requires Controller.Close first).
 		_OnbWeb_Reset()
-		Reload
+		ReloadPreservingSuspend()
 	}
 }
 

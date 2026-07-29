@@ -183,7 +183,7 @@ _PiEdWeb_Save(Values) {
 		return
 	}
 	try LoggerInfo("PersonalInfo", "Saved personal information — reloading…")
-	Reload()
+	ReloadPreservingSuspend()
 }
 
 

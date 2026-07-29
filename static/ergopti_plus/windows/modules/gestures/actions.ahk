@@ -867,7 +867,7 @@ GestureSaveAndReload() {
         TextPressKey("s", ["Ctrl"])
         Sleep(300)
     }
-    Reload()
+    ReloadPreservingSuspend()
 }
 
 ; Ensure personal_shortcuts.ahk exists (creating it from the template on

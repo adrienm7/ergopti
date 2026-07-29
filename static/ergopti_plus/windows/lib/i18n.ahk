@@ -230,7 +230,7 @@ _I18nDoReload() {
 	global _I18nLocale
 	try LoggerStart("i18n", "Switching locale to '{1}'…", _I18nLocale)
 	try LoggerSuccess("i18n", "Locale set to '{1}' — reloading script.", _I18nLocale)
-	Reload
+	ReloadPreservingSuspend()
 }
 
 ; Return the locale code of the active locale.
