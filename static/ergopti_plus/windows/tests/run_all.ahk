@@ -204,6 +204,7 @@ InstallSendNoOps()
 #Include unit/test_timer_scheduler.ahk
 #Include unit/test_hook_dispatcher.ahk
 #Include unit/test_logger.ahk
+#Include unit/test_logger_format_failure_is_visible.ahk
 #Include unit/test_logger_contract.ahk
 #Include unit/test_logger_daily_rotation.ahk
 #Include unit/test_healthcheck_core.ahk

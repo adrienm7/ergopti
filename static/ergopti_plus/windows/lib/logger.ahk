@@ -697,9 +697,16 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
     if Args.Length > 0 {
         try {
             Body := Format(Msg, Args*)
-        } catch {
-            ; Bad format string must not break the driver — fall back to raw message.
-            Body := Msg
+        } catch as FormatErr {
+            ; A bad format string must not break the driver, but falling back to
+            ; the raw template SILENTLY is the worst of both worlds: the line
+            ; still looks like a log entry while carrying none of its
+            ; information — every placeholder intact, every value gone — and
+            ; nothing anywhere records that the substitution failed (§5.3).
+            ; Recursing into the logger to report it risks a loop on the hot
+            ; path, so the evidence rides on the emitted line itself.
+            Body := Msg . "  [!! log format failed: " . FormatErr.Message
+                . " — " . Args.Length . " arg(s) not substituted]"
         }
     }
     ; FormatTime of the full date string is the dominant per-emit cost and is
