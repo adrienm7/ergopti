@@ -346,13 +346,20 @@ _GestureRestartBuildPsScript(ResultPath) {
 ; section, two after the header), so they are concatenated as-is here — adding
 ; extra ``\n`` separators surfaced as visible blank-line clutter inside the
 ; rendered popup.
+; The slot data comes from the constants ACCESSORS, never from the GESTURE_SLOTS
+; / GESTURE_SHORTCUT_LABELS globals. Those are top-level assignments in
+; modules/gestures/init.ahk, included ~300 lines after ErgoptiPlus.ahk calls
+; Onboarding_Run(), so during the whole first-run wizard they were unset — and
+; the IsSet() guard that used to wrap this loop turned that into a silently
+; EMPTY tutorial: the panel told the user to type the shortcut shown next to
+; each gesture and then listed no gestures at all. A function has no include
+; position, so this answers correctly whenever it is called.
 GestureBuildSetupInstructions() {
     Body := t("gesture.setup.header") . t("gesture.setup.open_path") . t("gesture.setup.for_each")
-    if IsSet(GESTURE_SLOTS) and IsSet(GESTURE_SHORTCUT_LABELS) {
-        for _, Slot in GESTURE_SLOTS {
-            Body .= "  " . t("gesture.slots." . Slot) . " :  "
-                . GESTURE_SHORTCUT_LABELS[Slot] . "`n"
-        }
+    Labels := GestureShortcutLabels()
+    for _, Slot in GestureSlotIds() {
+        Body .= "  " . t("gesture.slots." . Slot) . " :  "
+            . Labels[Slot] . "`n"
     }
     return Body
 }
