@@ -178,7 +178,10 @@ end
 local function find_installed_bundles(dir)
 	local out = {}
 	if type(dir) ~= "string" or dir == "" then return out end
-	local cmd = string.format("ls -1 %q 2>/dev/null", dir)
+	-- shell_quote, not %q: the sibling function 60 lines down already documents
+	-- why (%q escapes for a Lua literal and leaves $, backticks and ! live for
+	-- /bin/sh), and every path reaching here is user-configurable.
+	local cmd = string.format("ls -1 %s 2>/dev/null", text_utils.shell_quote(dir))
 	local p = io.popen(cmd)
 	if not p then return out end
 	local dir_with_slash = dir:match("[/\\]$") and dir or (dir .. "/")

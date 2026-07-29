@@ -32,6 +32,7 @@ local eventtap      = hs.eventtap
 local pasteboard    = hs.pasteboard
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local Timings       = require("lib.timings")
 local i18n          = require("lib.i18n")
 
@@ -487,8 +488,8 @@ function M.bind_instant_screenshot()
 		local dir  = home .. "/Pictures/screenshots"
 		local filename = string.format("%s/screenshot_%s.png", dir, os.date("%Y_%m_%d_%Hh_%Mmin_%Ss"))
 		hs.timer.doAfter(0, function()
-			pcall(hs.execute, "mkdir -p \"" .. dir .. "\"")
-			pcall(hs.execute, "screencapture -l " .. id .. " \"" .. filename .. "\"")
+			pcall(hs.execute, "mkdir -p " .. text_utils.shell_quote(dir))
+			pcall(hs.execute, "screencapture -l " .. id .. " " .. text_utils.shell_quote(filename))
 			notifications.notify(string.format(i18n.get("shortcuts.saved"), filename), nil, "success")
 		end)
 		return true

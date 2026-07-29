@@ -31,6 +31,7 @@ local H = {}
 
 local hs       = hs
 local Logger   = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local Snapshot = require("healthcheck.snapshot")
 
 local LOG = "healthcheck"
@@ -199,7 +200,10 @@ function H.sys_info()
 		return src:match("^(.*)[/\\][^/\\]+$") or hs.configdir
 	end)()
 	local git_hash = "unknown"
-	local ok_git, out = pcall(hs.execute, "git -C " .. _this_dir .. " rev-parse --short HEAD 2>/dev/null")
+	-- Quoted: an install path containing a space split the command and made
+	-- "Last git commit" read "unknown" on every such machine.
+	local ok_git, out = pcall(hs.execute,
+		"git -C " .. text_utils.shell_quote(_this_dir) .. " rev-parse --short HEAD 2>/dev/null")
 	if ok_git and type(out) == "string" and out ~= "" then
 		git_hash = out:match("^%s*(.-)%s*$")
 	else

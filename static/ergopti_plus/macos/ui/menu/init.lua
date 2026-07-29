@@ -657,11 +657,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			pcall(core_mods.shortcuts_mod.set_shortcut_action, "escape",     "none")
 		end
 		pcall(core_mods.shortcuts_mod.set_extras, {
-			open_init = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open \"" .. base_dir .. "init.lua\"") end) end,
+			open_init = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "init.lua")) end) end,
 			open_personal_toml = function()
 				hs.timer.doAfter(0, function()
 					local personal_path = MenuPaths.get("PersonalTomlPath")
-					pcall(hs.execute, "open \"" .. personal_path .. "\"")
+					pcall(hs.execute, "open " .. text_utils.shell_quote(personal_path))
 				end)
 			end,
 			trigger_prediction = function() if keymap and type(keymap.trigger_prediction) == "function" then pcall(keymap.trigger_prediction) end end,
@@ -691,8 +691,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end
 				local ok_at, at = pcall(require, "ui.metrics_apps"); if ok_at and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
 			end,
-			open_config = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open \"" .. MenuPaths.get("ConfigTomlPath") .. "\"") end) end,
-			open_logs = function() hs.timer.doAfter(0, function() pcall(hs.execute, "open \"" .. base_dir .. "logs\"") end) end,
+			open_config = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open " .. text_utils.shell_quote(MenuPaths.get("ConfigTomlPath"))) end) end,
+			open_logs = function() hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "logs")) end) end,
 		})
 
 		-- Wire the active-wrap-pairs getter eagerly at startup so the wrap-selection
@@ -802,7 +802,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			local ok, m = pcall(require, "ui.metrics_apps")
 			if ok and type(m.show) == "function" then pcall(m.show) end
 		end,
-		open_script_source        = function() pcall(hs.execute, string.format("open \"%sinit.lua\"", base_dir)) end,
+		open_script_source        = function() pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "init.lua")) end,
 		open_personal_shortcuts   = function()
 			local ok, ps = pcall(require, "lib.personal_shortcuts")
 			if ok and type(ps.open) == "function" then pcall(ps.open) end

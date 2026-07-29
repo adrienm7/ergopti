@@ -26,6 +26,7 @@ local urlevent      = hs.urlevent
 local http          = hs.http
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local i18n          = require("lib.i18n")
 local AppLauncher   = require("adapters.app_launcher")
 local WindowInfo    = require("adapters.window_info")
@@ -237,10 +238,10 @@ function M.open_downloads()
 	end
 
 	if not launch_first_available(FILE_MANAGERS) then
-		pcall(hs.execute, "open \"" .. downloads .. "\"")
+		pcall(hs.execute, "open " .. text_utils.shell_quote(downloads))
 	else
 		timer.doAfter(FOLDER_OPEN_DELAY_SEC, function()
-			pcall(hs.execute, "open \"" .. downloads .. "\"")
+			pcall(hs.execute, "open " .. text_utils.shell_quote(downloads))
 		end)
 	end
 	center_frontmost_after(CENTER_DELAY_SEC)
@@ -250,10 +251,10 @@ end
 function M.open_finder()
 	local home = os.getenv("HOME") or "~"
 	if not launch_first_available(FILE_MANAGERS) then
-		pcall(hs.execute, "open \"" .. home .. "\"")
+		pcall(hs.execute, "open " .. text_utils.shell_quote(home))
 	else
 		timer.doAfter(FOLDER_OPEN_DELAY_SEC, function()
-			pcall(hs.execute, "open \"" .. home .. "\"")
+			pcall(hs.execute, "open " .. text_utils.shell_quote(home))
 		end)
 	end
 	center_frontmost_after(CENTER_DELAY_SEC)

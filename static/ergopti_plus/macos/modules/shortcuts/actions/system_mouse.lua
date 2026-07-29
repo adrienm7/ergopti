@@ -19,6 +19,7 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local notifications = require("lib.notifications")
 local i18n          = require("lib.i18n")
 local MouseControl  = require("adapters.mouse_control")
@@ -187,7 +188,7 @@ else:
 		return
 	end
 
-	local ok_py, out = pcall(hs.execute, "python3 \"" .. tmpfile .. "\" 2>&1")
+	local ok_py, out = pcall(hs.execute, "python3 " .. text_utils.shell_quote(tmpfile) .. " 2>&1")
 	if not ok_py or not out then
 		Logger.error(LOG, "toggle_display_mirror: Python execution failed.")
 		return
