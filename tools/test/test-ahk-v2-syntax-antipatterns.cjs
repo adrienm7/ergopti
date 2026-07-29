@@ -17,6 +17,13 @@
  * 2. block-body fat arrows — `() => { stmt; stmt }`. A v2.1-only construct; under
  *    v2.0 the `{ ... }` after `=>` is parsed as an object literal, which errors
  *    ("Missing propertyname:" / "Error in object literal") on any statement body.
+ * 3. an unbraced one-line `try` used as an `if` body, immediately followed by
+ *    `else`. AHK v2's `Try` carries its OWN optional `Else` clause, so the `else`
+ *    is captured by the `try` instead of the `if` and the parser aborts the whole
+ *    script with `Unexpected "Else"`. This one shipped to a user's machine: the
+ *    driver refused to start at all, and nothing caught it because ui/ files are
+ *    not reachable from run_all.ahk — their only gate was an Ahk2Exe compile
+ *    nobody runs. Braces on the if/else bodies are the fix.
  *
  * FEATURES & RATIONALE:
  * - Cross-platform: runs in the JS validation layer (npm run test:js) so a parse
@@ -74,6 +81,27 @@ for (const file of files) {
 			errors.push(
 				`${rel}:${i + 1}: three or more consecutive double-quotes — AHK v1 quote escaping; ` +
 					'in v2 a literal quote is `" (backtick-quote).'
+			);
+		}
+	});
+
+	// An unbraced `try <statement>` whose next code line is a BARE `else`. A
+	// `} else` is safe — the brace closes the if-body block, so the else binds to
+	// the `if` as intended; only the brace-less form is ambiguous.
+	codeLines.forEach((line, i) => {
+		const stripped = line.replace(/\s+;.*$/, '').trim();
+		if (!/^try\s+\S/i.test(stripped)) return;
+		if (/^try\s*\{/i.test(stripped)) return;
+		// Find the next line that carries code.
+		let j = i + 1;
+		while (j < codeLines.length && codeLines[j].trim() === '') j++;
+		if (j >= codeLines.length) return;
+		const next = codeLines[j].replace(/\s+;.*$/, '').trim();
+		if (/^else\b/i.test(next)) {
+			errors.push(
+				`${rel}:${i + 1}: unbraced one-line \`try\` as an if-body followed by \`else\` on ` +
+					`line ${j + 1} — AHK v2's \`try\` has its own \`else\` clause, so this aborts the ` +
+					'whole script with `Unexpected "Else"`. Brace the if/else bodies.'
 			);
 		}
 	});
