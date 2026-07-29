@@ -144,6 +144,11 @@ local NESTED_KEY_MAP = {
 	-- binding__action → value, e.g. tap_3__open_url = "https://…".
 	gesture_action_parameters = { sec = "gestures",  key = "action_parameters"         },
 	-- Hotstrings nested tables
+	-- Per-category expansion delays. Written by the Hotstrings menu into
+	-- state.delays and read back at boot by menu_state, but absent from BOTH
+	-- maps: save_prefs therefore dropped every one of them, and the value the
+	-- user had just set was gone at the next reload with no diagnostic.
+	delays                   = { sec = "hotstrings", key = "delays"                    },
 	hotstrings               = { sec = "hotstrings", key = "groups"                    },
 	section_states           = { sec = "hotstrings", key = "modules"                   },
 	terminator_states        = { sec = "hotstrings", key = "terminator_states"          },
@@ -504,11 +509,19 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 	end
 
 	local ok, encoded = pcall(TomlCodec.encode, group_for_disk(existing))
-	if not ok or type(encoded) ~= "string" then return end
+	if not ok or type(encoded) ~= "string" then
+		-- A silent return here looks exactly like a successful save until the next
+		-- reload restores the previous file and the user's change is simply gone.
+		Logger.error(LOG, "Cannot encode preferences — settings NOT saved: %s.", tostring(encoded))
+		return
+	end
 
 	local tmp_path = prefs_file .. ".tmp"
 	local file_ok, fh = pcall(io.open, tmp_path, "w")
-	if not file_ok or not fh then return end
+	if not file_ok or not fh then
+		Logger.error(LOG, "Cannot open '%s' for writing — settings NOT saved.", tostring(tmp_path))
+		return
+	end
 	fh:write(encoded)
 	pcall(function() fh:close() end)
 	-- os.rename overwrites existing files on POSIX. The test host can be
@@ -528,7 +541,14 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 			end
 		end
 	end
-	if not renamed_ok or not renamed then return end
+	if not renamed_ok or not renamed then
+		-- The third and last silent exit. The temp file is left behind on purpose:
+		-- it holds the settings that failed to land, so the failure is recoverable
+		-- by hand instead of merely reported.
+		Logger.error(LOG, "Cannot replace '%s' — settings NOT saved (staged at '%s').",
+			tostring(prefs_file), tostring(tmp_path))
+		return
+	end
 end
 
 --- Merges the saved disk state into the current memory state.
