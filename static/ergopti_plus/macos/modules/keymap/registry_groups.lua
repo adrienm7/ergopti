@@ -67,10 +67,6 @@ end
 --- @param path string|nil File path (nil for programmatic groups).
 --- @param kind string "lua" or "toml".
 local function record_group(name, path, kind)
-	local seqs = {}
-	for _, m in ipairs(_state.mappings) do
-		if m.group == name then table.insert(seqs, m.seq) end
-	end
 	local existing = _state.groups[name]
 	local group_order = (existing and existing.group_order)
 		or (_state.group_order_counter or 0) + 1
@@ -79,7 +75,6 @@ local function record_group(name, path, kind)
 	end
 	_state.groups[name] = {
 		path        = path,
-		seqs        = seqs,
 		enabled     = true,
 		kind        = kind or "lua",
 		group_order = group_order,
@@ -103,7 +98,6 @@ local function ensure_group_order(name)
 	else
 		_state.groups[name] = {
 			path        = nil,
-			seqs        = {},
 			enabled     = true,
 			kind        = "pending",
 			group_order = _state.group_order_counter,
@@ -298,16 +292,11 @@ function M.load_toml(name, path)
 		end
 	end
 
-	local seqs = {}
-	for _, m in ipairs(_state.mappings) do
-		if m.group == name then table.insert(seqs, m.seq) end
-	end
 	-- Preserve group_order across reloads: ensure_group_order() stamped it earlier,
 	-- but overwriting the table would silently drop the value and break sort stability
 	local existing_order = _state.groups[name] and _state.groups[name].group_order or nil
 	_state.groups[name] = {
 		path             = path,
-		seqs             = seqs,
 		enabled          = true,
 		kind             = "toml",
 		meta_description = data.meta and data.meta.description or nil,
@@ -420,7 +409,6 @@ function M.register_lua_group(name, meta_description, sections)
 	end
 	_state.groups[name] = {
 		path             = nil,
-		seqs             = {},
 		enabled          = true,
 		kind             = "lua",
 		meta_description = meta_description,

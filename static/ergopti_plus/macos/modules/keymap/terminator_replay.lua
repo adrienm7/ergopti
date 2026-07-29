@@ -289,16 +289,5 @@ function M.is_pending()
 end
 
 
---- Drops the pending terminator WITHOUT replaying it. Reserved for teardown
---- paths where injecting a keystroke would be worse than losing it; every
---- other caller wants flush_now().
-function M.cancel()
-	if not _pending then return end
-	if _pending.watchdog then TimerScheduler.cancel(_pending.watchdog) end
-	if _pending.fence then TimerScheduler.cancel(_pending.fence) end
-	_pending = nil
-	Logger.debug(LOG, "Pending terminator cancelled.")
-end
-
 
 return M

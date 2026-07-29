@@ -1115,9 +1115,15 @@ function M.get_label(name)
 	return name
 end
 
+--- Dispatches a registered single-shot action.
+--- @param name string Action identifier.
+--- @param binding table|nil The binding that invoked it.
+--- @return boolean True when a handler was found and invoked; false when the
+--- action is unknown here, so the caller can try its own fallback instead of
+--- assuming the action ran.
 function M.execute_single(name, binding)
 	local s = SG[name]
-	if not s or type(s.fn) ~= "function" then return end
+	if not s or type(s.fn) ~= "function" then return false end
 	-- Any tap action (other than the click-toggle itself) must deactivate a held click
 	-- so that a selection started with left_click_toggle is properly released first.
 	if name ~= "left_click_toggle" and name ~= "right_click_toggle" then
@@ -1127,6 +1133,7 @@ function M.execute_single(name, binding)
 	-- ~150+ registered closures dispatched here, a caught-then-dropped exception
 	-- would otherwise be completely invisible in the logs (gestures-actions-silent-pcall).
 	Logger.pcall(LOG, s.fn, binding)
+	return true
 end
 
 function M.execute_axis(name, goNext)
