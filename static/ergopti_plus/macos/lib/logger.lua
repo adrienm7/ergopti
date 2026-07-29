@@ -138,7 +138,15 @@ local function _load_sub_files_toml(driver_root)
 	local in_plats    = false   -- accumulating a multi-line platforms array
 
 	--- Extracts all quoted strings from an array fragment like ["foo", "bar"]
-	local function extract_strings(fragment)
+	--- Removes every double-quoted segment from a line, so structural characters can
+--- be located without a string's contents standing in for them.
+--- @param line string
+--- @return string The line with quoted spans blanked out.
+local function strip_quoted(line)
+	return (line:gsub('"[^"]*"', ""))
+end
+
+local function extract_strings(fragment)
 		local out = {}
 		for s in fragment:gmatch('"([^"\\]*)"') do out[#out + 1] = s end
 		return out
@@ -172,15 +180,22 @@ local function _load_sub_files_toml(driver_root)
 			goto next_line
 		end
 
-		-- Accumulate multi-line arrays
+		-- Accumulate multi-line arrays.
+		--
+		-- The array closes on a "]" OUTSIDE a quoted string. Testing the raw line
+		-- ended the array on the first pattern that merely CONTAINED one — and the
+		-- file's own guidance is to "prefer tag-based patterns (e.g. \"[gestures\")",
+		-- so bracket-bearing patterns are the documented norm rather than an edge
+		-- case. Every pattern after such a line was silently discarded, and the
+		-- sub-file it belonged to simply never received those lines.
 		if in_pats then
 			for _, s in ipairs(extract_strings(line)) do cur_pats[#cur_pats + 1] = s end
-			if line:find("]", 1, true) then in_pats = false end
+			if strip_quoted(line):find("]", 1, true) then in_pats = false end
 			goto next_line
 		end
 		if in_plats then
 			for _, s in ipairs(extract_strings(line)) do cur_plats[#cur_plats + 1] = s end
-			if line:find("]", 1, true) then in_plats = false end
+			if strip_quoted(line):find("]", 1, true) then in_plats = false end
 			goto next_line
 		end
 
