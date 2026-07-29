@@ -311,12 +311,23 @@ _GestureRestartPoll(Epoch) {
 
 _GestureRestartReadResult(ResultPath) {
     Result := FSRead(ResultPath)
-    if (Result = false) {
+    ; Type-check the sentinel, never value-compare it. FSRead returns a String on
+    ; success and the BOOLEAN false on any failure, and the helper script writes
+    ; its exit code as a bare string whose SUCCESS value is "0" — a numeric
+    ; string that loosely equals false in v2. So `Result = false` was TRUE on
+    ; exactly the successful runs, which took the "missing" branch and made the
+    ; success return below unreachable: a working restart always reported failure.
+    if !(Result is String) {
         try LoggerError("gestures", "Touchpad restart result missing.")
         return False
     }
-    Result := Trim(Result)
-    return (Result = "0")
+    ; Newlines must be trimmed EXPLICITLY: AHK v2's default OmitChars is " `t"
+    ; only, so a bare Trim() leaves a "0`r`n" payload unequal to "0". The helper
+    ; writes no newline today, but a switch to WriteAllLines would silently turn
+    ; every success back into a failure.
+    ; == and not =, so a numeric coercion cannot creep back in and accept
+    ; "0.0" / "+0" as the success code.
+    return (Trim(Result, " `t`r`n") == "0")
 }
 
 _GestureRestartBuildPsScript(ResultPath) {
