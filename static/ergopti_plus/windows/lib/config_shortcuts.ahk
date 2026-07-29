@@ -22,9 +22,10 @@
 ; 1. Per-driver subfolder: ``<config_dir>/ahk/`` is auto-created on first
 ;    save. Disjoint from ``<config_dir>/hammerspoon/`` so the two drivers
 ;    never touch the same file.
-; 2. Section-preserving writer: CS_Save merges back into the existing
-;    file without touching other sections, so any future hand-written
-;    sections survive a shortcut change.
+; 2. Read-only module: this file parses config.toml, it never writes it.
+;    Persistence goes through the single canonical writer (SaveFullConfig →
+;    TOML_BatchWrite), which preserves every section it does not re-collect
+;    and refuses to rebuild a file it could not read.
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
@@ -52,8 +53,8 @@ CS_GetTomlPath() {
 }
 
 ; The single section we own inside config.toml. Other sections
-; ([Script], [Shortcuts.ScriptControl], [Gestures], feature sections …) are
-; preserved verbatim by the section-aware writer below.
+; ([Script], [Shortcuts.ScriptControl], [Gestures], feature sections …) belong
+; to other readers and are never touched from here.
 global CS_SECTION := "ahk.metrics"
 
 
@@ -256,125 +257,6 @@ CS_Unescape(s) {
 
 
 
-; ===================================
-; =========================
-; ======= 3/ Writer =======
-; =========================
-; ===================================
-
-; Replaces the [Metrics] section in the on-disk config.toml without
-; touching any other section. Atomic via .tmp + rename. ``new_kv`` is a
-; Map of key → value pairs that becomes the new contents of the section.
-CS_WriteShortcutsSection(new_kv) {
-    global CS_SECTION
-    path := CS_GetTomlPath()
-    body := ""
-    if FileExist(path)
-        try body := FileRead(path, "UTF-8")
-
-    rendered := CS_RenderSection(CS_SECTION, new_kv)
-    new_body := CS_ReplaceSection(body, CS_SECTION, rendered)
-
-    tmp := path . ".tmp"
-    try {
-        try FileDelete(tmp)
-        FileAppend(new_body, tmp, "UTF-8")
-        FileMove(tmp, path, 1)   ; overwrite=1 is atomic on NTFS — no bare FileDelete(path) needed
-    } catch as Err {
-        try FileDelete(tmp)
-        try LoggerError("ConfigShortcuts", "Could not write config.toml: {1}.", Err.Message)
-    }
-}
-
-; Render a single section to its [section]\nkey = value\n… form. A
-; trailing blank line keeps the file readable when more sections follow.
-CS_RenderSection(name, kv) {
-    out := "[" . name . "]`n"
-    for k, v in kv
-        out .= k . " = " . CS_RenderValue(v) . "`n"
-    return out
-}
-
-; Take an existing TOML body and either replace the named section in
-; place (preserving its blank-line surroundings) or append it at the
-; end when the section is missing.
-CS_ReplaceSection(body, section_name, replacement) {
-    if (body = "")
-        return replacement . "`n"
-
-    lines := StrSplit(body, "`n", "`r")
-    out_before := []
-    out_after := []
-    in_target := false
-    seen := false
-    loop lines.Length {
-        line := lines[A_Index]
-        trimmed := Trim(line)
-        is_section := (SubStr(trimmed, 1, 1) = "[" && SubStr(trimmed, -1) = "]")
-        if is_section {
-            sec_name := Trim(SubStr(trimmed, 2, StrLen(trimmed) - 2))
-            if (sec_name = section_name) {
-                in_target := true
-                seen := true
-                continue
-            }
-            if in_target {
-                in_target := false
-                ; fallthrough — this section header belongs to the « after » bucket
-            }
-        }
-        if in_target
-            continue
-        if !seen
-            out_before.Push(line)
-        else
-            out_after.Push(line)
-    }
-
-    head := CS_Join(out_before, "`n")
-    tail := CS_Join(out_after, "`n")
-    if (head != "" && SubStr(head, -1) != "`n")
-        head .= "`n"
-    if (tail = "")
-        return head . replacement
-    return head . replacement . "`n" . tail
-}
-
-CS_RenderValue(v) {
-    if (v = true)
-        return "true"
-    if (v = false)
-        return "false"
-    if (v is Array) {
-        parts := []
-        for s in v
-            parts.Push(CS_RenderString(s))
-        return "[" . CS_Join(parts, ", ") . "]"
-    }
-    if IsNumber(v)
-        return String(v)
-    return CS_RenderString(String(v))
-}
-
-CS_RenderString(s) {
-    s := StrReplace(s, "\", "\\")
-    s := StrReplace(s, '"', '\"')
-    s := StrReplace(s, "`n", "\n")
-    s := StrReplace(s, "`r", "\r")
-    s := StrReplace(s, "`t", "\t")
-    return '"' . s . '"'
-}
-
-CS_Join(arr, sep) {
-    out := ""
-    for i, v in arr
-        out .= (i = 1 ? "" : sep) . v
-    return out
-}
-
-
-
-
 
 ; ============================================
 ; =========================================
@@ -419,8 +301,10 @@ CS_Load() {
     }
 }
 
-; Serialise the in-memory state back to disk. Only the [Metrics]
-; section is rewritten; every other section in config.toml stays put.
+; Serialise the in-memory state back to disk. config.toml has exactly ONE
+; writer — SaveFullConfig, which routes through TOML_BatchWrite's atomic write
+; and its read-failure refusal — and the metrics keys this module owns are part
+; of the payload it collects.
 CS_Save() {
     global _SaveFullConfigReady
     if IsSet(_SaveFullConfigReady) {
@@ -428,19 +312,13 @@ CS_Save() {
         return
     }
 
-    apps := []
-    for proc, _ in MetricsFilters.disabled_apps
-        apps.Push(proc)
-
-    kv := Map(
-        "metrics_enabled", MetricsShortcuts.enabled,
-        "metrics_shortcut_typing", MetricsShortcuts.typing_str,
-        "metrics_shortcut_apps", MetricsShortcuts.apps_str,
-        "metrics_wpm_menubar_colors", MetricsShortcuts.wpm_menubar_colors,
-        "metrics_filter_private_browsing", MetricsFilters.private_browsing,
-        "metrics_filter_secure_field", MetricsFilters.secure_field,
-        "metrics_filter_system_auth", MetricsFilters.system_auth,
-        "metrics_disabled_apps", apps
-    )
-    CS_WriteShortcutsSection(kv)
+    ; No second writer for config.toml exists here on purpose. The section
+    ; splicer that used to live in this branch seeded its rewrite from a bare-try
+    ; FileRead: an unreadable file left the body empty, the section merge then
+    ; short-circuited to the rendered [ahk.metrics] block alone, and the atomic
+    ; move replaced the user's entire configuration with that one section —
+    ; silently, because the only catch covered the write. Every caller reaching
+    ; CS_Save is a post-boot menu handler, i.e. long after the full-config writer
+    ; is armed, so refusing here costs nothing and keeps one owner for the file.
+    try LoggerWarn("ConfigShortcuts", "CS_Save called before the full-config writer was armed — metrics preferences kept in memory only; the next SaveFullConfig persists them.")
 }
