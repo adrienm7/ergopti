@@ -37,6 +37,11 @@ local _state = nil  -- Injected via M.init(); required before all public functio
 -- Deferred-sort machinery. When _sort_deferred is true, sort_mappings() becomes
 -- a no-op that only sets _sort_pending; flush_sort() then performs exactly one
 -- final sort. Used at startup so the 6 TOML loads sort only once together.
+-- classify_trigger memo, keyed by query string. Declared above every function
+-- that touches it. Dropped by sort_mappings, which is the one funnel every
+-- registration, removal and group toggle passes through.
+local _classify_cache = {}
+
 local _sort_deferred = false
 local _sort_pending  = false
 
@@ -296,6 +301,10 @@ end
 --- Rebuilds the tail-char bucket indexes at the end so they stay in sync.
 function M.sort_mappings()
 	if not require_state("sort_mappings") then return end
+	-- Dropped BEFORE the deferral check: a deferred sort still means the corpus
+	-- has changed, and the memo must not survive that even if the sort itself
+	-- is coalesced to later.
+	_classify_cache = {}
 	if _sort_deferred then
 		_sort_pending = true
 		return
@@ -362,6 +371,15 @@ function M.classify_trigger(str)
 	if not _state or type(str) ~= "string" or str == "" then
 		return false, false, false
 	end
+	-- Memoised. This walks every registered mapping and builds two substrings per
+	-- entry, inside the keyDown eventtap, to answer a question about a string that
+	-- is almost always the one it was asked about a keystroke earlier. The answer
+	-- is a pure function of (str, corpus), and the cache is dropped whenever the
+	-- corpus changes — a memo that outlived a re-registration would answer for a
+	-- mapping set that no longer exists, which is worse than the scan it replaces.
+	local hit = _classify_cache[str]
+	if hit then return hit[1], hit[2], hit[3] end
+
 	local n     = #str
 	local exact = false
 	local pref  = false
@@ -373,6 +391,7 @@ function M.classify_trigger(str)
 		if not suff  and t:sub(-n)    == str  then suff  = true end
 		if exact and pref and suff then break end
 	end
+	_classify_cache[str] = { exact, pref, suff }
 	return exact, pref, suff
 end
 
