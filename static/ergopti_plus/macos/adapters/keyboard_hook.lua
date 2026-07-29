@@ -23,6 +23,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("lib.logger")
+local EventTapGuard = require("adapters.event_tap_guard")
 
 local LOG = "adapters.keyboard_hook"
 
@@ -70,6 +71,9 @@ end
 --- @return function hs.eventtap handler function.
 local function _make_handler()
 	return function(event)
+		-- macOS reports a disabled tap THROUGH this callback; without this line
+		-- the hook goes permanently deaf and nothing anywhere says so.
+		if EventTapGuard.handle_disabled(event, _tap, "keyboard_hook") then return false end
 		if _on_event then
 			local ok, consume = pcall(_on_event, event)
 			return ok and consume == true

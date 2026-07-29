@@ -15,6 +15,7 @@ local M = {}
 
 local hs       = hs
 local Logger   = require("lib.logger")
+local EventTapGuard = require("adapters.event_tap_guard")
 local Timings  = require("lib.timings")
 local Geometry = require("modules.gestures.geometry")
 local LOG      = "gestures.engine"
@@ -876,7 +877,10 @@ function M.init(core_state, actions_mod)
 		local evTypes = hs.eventtap.event.types
 		scrollBlocker = hs.eventtap.new(
 			{ evTypes.scrollWheel, evTypes.gesture },
-			function() return isBlockingScroll end
+			function(e)
+				if EventTapGuard.handle_disabled(e, scrollBlocker, "gestures.scroll_blocker") then return false end
+				return isBlockingScroll
+			end
 		)
 		if scrollBlocker then
 			pcall(function() scrollBlocker:start() end)

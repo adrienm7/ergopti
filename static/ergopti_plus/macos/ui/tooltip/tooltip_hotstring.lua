@@ -15,6 +15,7 @@
 local M = {}
 local hs = hs
 local Logger = require("lib.logger")
+local EventTapGuard = require("adapters.event_tap_guard")
 local Keycodes = require("lib.keycodes")
 local LOG = "tooltip_hotstring"
 
@@ -113,7 +114,9 @@ local function start_watchers()
 	-- HID-thread latency while the tooltip is visible. Clicks and scrolls are
 	-- sufficient for dismissal; pure mouse movement must not block input delivery.
 	-- The dequeue-cycle comment still holds for the remaining event types.
-	local ok_mouse, watcher_mouse = pcall(hs.eventtap.new, { event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel }, function()
+	local ok_mouse, watcher_mouse
+	ok_mouse, watcher_mouse = pcall(hs.eventtap.new, { event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel }, function(e)
+		if EventTapGuard.handle_disabled(e, watcher_mouse, "tooltip.hotstring_mouse") then return false end
 		M.hide()
 		return false
 	end)
@@ -123,7 +126,9 @@ local function start_watchers()
 		table.insert(_watchers, watcher_mouse) 
 	end
 
-	local ok_key, watcher_key = pcall(hs.eventtap.new, { event_types.keyDown }, function(event)
+	local ok_key, watcher_key
+	ok_key, watcher_key = pcall(hs.eventtap.new, { event_types.keyDown }, function(event)
+		if EventTapGuard.handle_disabled(event, watcher_key, "tooltip.hotstring_key") then return false end
 		local keycode = event:getKeyCode()
 		local ignored_keycodes = {
 			54, 55, 56, 58, 59, 60,

@@ -19,6 +19,7 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("lib.logger")
+local EventTapGuard = require("adapters.event_tap_guard")
 local text_utils = require("lib.text_utils")
 local notifications = require("lib.notifications")
 local i18n          = require("lib.i18n")
@@ -356,7 +357,9 @@ function M.spotlight_mouse(duration_s)
 	-- (e.g. from teleport_mouse) does not fire and immediately dismiss the spotlight
 	hs.timer.doAfter(SPOTLIGHT_TAP_DELAY_SEC, function()
 		if dismissed then return end
-		local ok_tap, tap = pcall(hs.eventtap.new, {hs.eventtap.event.types.mouseMoved}, function()
+		local ok_tap, tap
+		ok_tap, tap = pcall(hs.eventtap.new, {hs.eventtap.event.types.mouseMoved}, function(e)
+			if EventTapGuard.handle_disabled(e, tap, "shortcuts.spotlight_mouse") then return false end
 			dismiss()
 			return false  -- Do not consume the event; the cursor must keep moving normally
 		end)

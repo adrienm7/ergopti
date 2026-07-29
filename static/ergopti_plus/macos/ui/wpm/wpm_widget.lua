@@ -18,6 +18,7 @@ local M = {}
 
 local hs         = hs
 local keylogger  = require("modules.keylogger")
+local EventTapGuard = require("adapters.event_tap_guard")
 local WPMShared  = require("ui.wpm.shared")
 local Logger     = require("lib.logger")
 local Paths      = require("lib.paths")
@@ -591,6 +592,7 @@ function M.start(show_graph)
 			hs.eventtap.event.types.rightMouseDown,
 			hs.eventtap.event.types.scrollWheel,
 		}, function(e)
+			if EventTapGuard.handle_disabled(e, _mouse_tap, "wpm.mouse") then return false end
 			local now = hs.timer.absoluteTime() / 1000000000
 			local is_move = e:getType() == hs.eventtap.event.types.mouseMoved
 			-- Throttle mouseMoved: only update at most every MOUSE_MOVE_THROTTLE_SEC.
