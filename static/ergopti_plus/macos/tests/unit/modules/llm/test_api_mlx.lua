@@ -28,7 +28,6 @@ local ApiMlx = helpers.load_with_stubs("modules.llm.api_mlx")
 helpers.describe("ApiMlx module surface", function()
 	helpers.it("exposes core public functions", function()
 		helpers.assert_eq(type(ApiMlx.is_ready), "function")
-		helpers.assert_eq(type(ApiMlx.set_restart_hook), "function")
 		helpers.assert_eq(type(ApiMlx.set_active_server_pgid), "function")
 		helpers.assert_eq(type(ApiMlx.cancel_streaming), "function")
 		helpers.assert_eq(type(ApiMlx.warmup), "function")
@@ -41,9 +40,14 @@ helpers.describe("ApiMlx module surface", function()
 		helpers.assert_eq(ApiMlx.is_ready(), false)
 	end)
 
-	helpers.it("set_restart_hook accepts a function or nil", function()
-		ApiMlx.set_restart_hook(function() end)
-		ApiMlx.set_restart_hook(nil)
+	-- set_restart_hook was removed with the code that called it: api_mlx_discovery
+	-- records that reading data[1].id as the loaded model and "fixing" mismatches
+	-- with zombie kills and forced restarts was chasing a phantom. The registration
+	-- side outlived its only invoker. The case that stood here asserted nothing
+	-- anyway — it called the setter twice and checked no result.
+	helpers.it("no longer exposes the restart hook, whose only caller was removed", function()
+		helpers.assert_eq(ApiMlx.set_restart_hook, nil,
+			"a registration API with no invoker is dead code that reads as a safety net")
 	end)
 
 	helpers.it("set_active_server_pgid accepts numeric and nil", function()

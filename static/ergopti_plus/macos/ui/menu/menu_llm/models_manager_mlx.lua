@@ -30,7 +30,8 @@ if not ok_mlx_deps then mlx_deps_checker = nil end
 
 local LOG = "menu_llm.mlx"
 
--- Needed so M.new can register the cross-session restart hook (set_restart_hook).
+-- Retained for start_server / port helpers; the restart-hook registration it once
+-- carried was removed with its only invoker.
 -- The server-launch port resolution and active-PID reporting now live in the
 -- sibling models_manager_mlx_server module. A plain require (not pcall) because
 -- api_mlx is the MLX backend's core module — if it cannot load, MLX predictions
@@ -59,46 +60,10 @@ function M.new(deps, presets)
 	local INSTALLED_CACHE_TTL = 30
 	local function invalidate_installed_cache() obj._installed_cache_ts = 0 end
 
-	-- Register a restart hook so api_mlx can request a fresh launch when its
-	-- discovery loop detects a model-ID mismatch it cannot resolve on its own
-	-- (typically a cross-session leftover whose PGID was wrongly adopted as the
-	-- active guard). The hook is invoked with the expected short model name.
-	if type(ApiMlx) == "table" and type(ApiMlx.set_restart_hook) == "function" then
-		ApiMlx.set_restart_hook(function(target)
-			-- api_mlx passes _expected_model_id, which is the resolved backend ID
-			-- (e.g. "Meta-Llama-3.1-8B-Instruct-4bit"). get_mlx_repo expects the
-			-- menu label (e.g. "Llama-3.1-8B-Instruct"). When the resolved ID does
-			-- not match any preset, fall back to obj._server_target — the label
-			-- of the most recent successful start_server, which is exactly the
-			-- server we are trying to restart.
-			local resolved_repo = (type(target) == "string" and target ~= "") and obj.get_mlx_repo(target) or nil
-			local effective_target = target
-			if not resolved_repo and obj._server_target and obj._server_target ~= "" then
-				Logger.warn(LOG, "Restart hook target '%s' has no repo — falling back to last server target '%s'.",
-					tostring(target), tostring(obj._server_target))
-				effective_target = obj._server_target
-			end
-			if type(effective_target) ~= "string" or effective_target == "" then
-				Logger.warn(LOG, "Restart hook invoked without a usable target — ignoring.")
-				return
-			end
-			Logger.warn(LOG, "Restart hook invoked for target='%s' — calling start_server.", effective_target)
-			-- Force a fresh launch: clear server_target and the active task entry so
-			-- start_server's reuse branch cannot short-circuit. The currently-tracked
-			-- task is the one we just hard-killed (or about to); reusing it would
-			-- mean returning success against a dead/wrong-model process.
-			if deps.active_tasks and deps.active_tasks["mlx_server"] then
-				local existing = deps.active_tasks["mlx_server"]
-				pcall(function() if type(existing.terminate) == "function" then existing:terminate() end end)
-				deps.active_tasks["mlx_server"] = nil
-			end
-			obj._server_target = nil
-			-- on_success / on_cancel are nil here: the prediction layer is already
-			-- waiting on its own warmup retry loop and will pick up the new server
-			-- automatically once the bash launcher emits the PGID line.
-			pcall(obj.start_server, effective_target, nil, nil, { silent_notifications = true })
-		end)
-	end
+	-- The cross-session restart hook was removed with the code that called it:
+	-- api_mlx_discovery documents that reading data[1].id as the loaded model and
+	-- "fixing" mismatches with zombie kills and forced restarts was chasing a
+	-- phantom. The registration side outlived its only invoker and read as live.
 
 	local module_source = debug.getinfo(1, "S").source:sub(2)
 	local project_root = module_source:match("^(.*)/static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx%.lua$")
