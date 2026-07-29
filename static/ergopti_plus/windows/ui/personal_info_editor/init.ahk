@@ -173,7 +173,15 @@ _PiEdWeb_Save(Values) {
 	global PersonalInformation, ScriptInformation
 	for Key, Val in Values
 		PersonalInformation[Key] := Val
-	WritePersonalInfoToml(ScriptInformation["PersonalInfoTomlPath"])
+	; Branch on the writer's result and keep the editor open on failure — the
+	; window is the only place the typed values still exist. Discarding the
+	; boolean logged "Saved…" and then Reload()ed, which re-read the unchanged
+	; file: the edits vanished while every user-visible signal reported success.
+	; Same shape and same reason as _PathsEdWeb_Save.
+	if !WritePersonalInfoToml(ScriptInformation["PersonalInfoTomlPath"]) {
+		try LoggerError("PersonalInfo", "Personal information NOT saved — keeping the editor open so the values are not lost.")
+		return
+	}
 	try LoggerInfo("PersonalInfo", "Saved personal information — reloading…")
 	Reload()
 }
