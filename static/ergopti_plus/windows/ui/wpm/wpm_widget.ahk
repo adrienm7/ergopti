@@ -83,6 +83,19 @@ WPMWidget_BuildGraph() {
     g.MarginX   := 0
     g.MarginY   := 0
 
+    ; The graph surface is painted entirely by GDI+ and used to carry NO control,
+    ; so a click on it went straight to DefWindowProc: the widget could not be
+    ; dragged in graph mode at all, even though the module docstring advertises it
+    ; as draggable, WPMWidget_ResetPosition moves this very window, and the
+    ; show_graph branches of DragStart/DragEnd — including the anchor conversion —
+    ; sat here as unreachable code. A full-size transparent Text gives the graph
+    ; the same entry point the three compact labels give the compact mode.
+    ; UpdateLayeredWindow paints the window from its own bitmap and never renders
+    ; child controls, so this one is invisible and serves purely as a hit target.
+    drag_area := g.AddText("x0 y0 w" . WPMWidgetConst.GRAPH_W
+        . " h" . WPMWidgetConst.GRAPH_H . " BackgroundTrans", "")
+    drag_area.OnEvent("Click", WPMWidget_DragStart)
+
     g.OnEvent("Close", (*) => WPMWidget_Hide())
     OnMessage(0x0232, WPMWidget_DragEnd, 1)
 
