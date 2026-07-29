@@ -21,6 +21,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [No co-author trailers (Copilot, Claude, bots)](#no-co-author-trailers-copilot-claude-bots) — Never add Co-Authored-By trailers — and never whitelist legacy ones to make a lint pass
 - [feedback-regression-tests](#feedback-regression-tests) — Every user-requested bug fix must ship with a regression test that fails before / passes after the fix
 - [feedback-local-gate-mirrors-ci](#feedback-local-gate-mirrors-ci) — Green locally must mean green in CI: the local gate is four commands, and it is only trustworthy once `node_modules` is installed on a Node satisfying the engine floor
+- [project-gate-scripts-must-be-wired](#project-gate-scripts-must-be-wired) — A `tools/test/` script is only a gate once `run-js-suite.cjs` invokes it; four exist that nothing runs, one of them documented as a "CI gate"
 - [feedback-ahk-suite-needs-temp-space](#feedback-ahk-suite-needs-temp-space) — A near-full `%TEMP%` volume makes the AHK runner report assertion failures that do not reproduce; check free space before believing a red run
 - [feedback-test-before-merge](#feedback-test-before-merge) — Never merge a slice into dev before the user has tested it live. Stay on the branch and wait for explicit validation.
 - [feedback-ui-must-be-i18n](#feedback-ui-must-be-i18n) — All user-facing UI text goes through the i18n system in 21 languages — never hardcode a UI string anywhere, WebView UIs included
@@ -69,7 +70,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-lua-nil-and-expr-is-nil](#project-lua-nil-and-expr-is-nil) — In Lua, `local x = cond and expr` yields **nil**, not false, when `cond` is nil — and `not nil` is `true`, so a "negative" gate silently inverts.
 - [project-ahk-invariant-incomplete-application](#project-ahk-invariant-incomplete-application) — Every AHK-driver hardening invariant is applied per call-site; the recurring bug is the one missed sibling site, or a guarantee defeated one call level down by indirection — audit the whole class, not the documented site.
 - [project-toml-cache-returns-real-booleans](#project-toml-cache-returns-real-booleans) — A TOML `true` reaches the cache as an AHK boolean, not the string "true" — compare through `TomlCacheBool`, never `StrLower(v) == "true"`
-- [project-ahk-map-delete-raises-on-missing-key](#project-ahk-map-delete-raises-on-missing-key) — `Map.Delete(k)` throws when the key is absent, and `/validate` only syntax-checks when it PRECEDES the script path
+- [project-ahk-map-delete-raises-on-missing-key](#project-ahk-map-delete-raises-on-missing-key) — `Map.Delete(k)` throws when the key is absent; the `/validate` half of this entry is superseded — the flag never validates
 - [project-ahk-probing-synthetic-input](#project-ahk-probing-synthetic-input) — Two ways a synthetic-input probe silently measures nothing and reports a confident false negative
 - [project-ahk-keyword-as-variable-hangs-the-parser](#project-ahk-keyword-as-variable-hangs-the-parser) — Naming a local `Catch` (or any control-flow keyword) makes AHK v2 hang with ZERO output — no syntax error, no dialog, no partial log
 - [project-ahk-numeric-string-equals-false](#project-ahk-numeric-string-equals-false) — In AHK v2, `"0" = false` is **TRUE** — comparing a `String|false` return value against `false` silently swallows any numeric-string success token
@@ -171,7 +172,7 @@ AHK's custom-combination prefix-down flag is SEPARATE from `GetKeyState` and is 
 - **Menu/gesture pause → keyboard can't un-pause.** Toggling `Suspend` from a non-hook thread rebuilds the hook with the prefix un-armed, so the suspend-exempt script combos (AltGr+Enter/BackSpace/Delete/Escape) stop firing. **Fix:** also register the chords as plain **suffix** hotkeys gated on `HotIf((*) => A_IsSuspended and GetKeyState("SC138","P"))` — a suffix needs no prefix arming, never re-registers the prefix, and yields to the real combo when the prefix IS armed (no double-fire). Live in `lib/script_altgr_hotkeys.ahk`.
 - **Keyboard pause → « AltGr bloqué ».** A keyboard pause holds the prefix down through `Suspend(1)`; its physical release lands while the layer is disarmed, so the flag stays latched and the layer later dispatches with `GetKeyState("SC138")==0`. **Fix:** drain every registered prefix key BEFORE suspending — `_SuspendPrefixesAreClear()` in `lib/lifecycle.ahk`, driven by `SUSPEND_CUSTOM_COMBO_PREFIX_KEYS` so a future suspend path cannot bypass the wait. `AltGrShiftDispatch` keeps a permanent WARNING guard-rail for any dispatch with the prefix not physically held.
 
-**Never** reach for synthetic taps or Off→On re-registration. To syntax-check an edit, see [[feedback_ahk_ui_syntax_validation]] — and pass `/validate` BEFORE the script path, never after, or the script runs live ([[project_ahk_map_delete_raises_on_missing_key]]). Related: [[project_suspend_pause_invariant]].
+**Never** reach for synthetic taps or Off→On re-registration. To syntax-check an edit, see [[feedback_ahk_ui_syntax_validation]] — and never use `/validate`, in any shell or position: it does not validate, it RUNS the script. Related: [[project_suspend_pause_invariant]].
 
 ### feedback_ahk_ui_syntax_validation
 
@@ -202,6 +203,25 @@ were re-derived directly; if a future version behaves differently, re-measure be
 **Never read an exit code through a pipe.** `cmd … | head` makes `$?` report *head's* status. An
 audit refuted the real "driver does not start" defect on a `EXIT=0` read this way. Capture first —
 `out=$(cmd 2>&1); rc=$?` — then filter.
+
+**CONFIRMED THE HARD WAY 2026-07-29 (second time in one day), plus one new variant.** An audit pass
+ran `/ErrorStdOut /validate` over the 58 `ui/` files, twice, and both attempts **launched the driver's
+UI files as live scripts** — 58 `AutoHotkey64.exe` processes spawned one after another, killed
+manually. Two distinct mechanisms, so guarding against one is not enough:
+
+- **Under Git Bash the flags never reach AHK.** MSYS argument conversion rewrites any `/flag` into a
+  Windows path. Observed directly in `Win32_Process.CommandLine`:
+  `AutoHotkey64.exe "C:/Program Files/Git/ErrorStdOut" "C:/Program Files/Git/validate" <script>` —
+  AHK sees two bogus script arguments and runs `<script>`. Same class as the `Ahk2Exe /in /out` trap
+  above; it applies to **every** `/flag` passed to a Windows exe from Git Bash.
+- **Under PowerShell the flags arrive correctly and it still runs**, because `/validate` is ignored
+  (measured above).
+
+**Cleanup discipline when this happens:** kill by matching the command line, and **exclude your own
+PID** — a `Where-Object { $_.CommandLine -match 'my_pattern' }` matches the very command containing
+that pattern, so the sweep kills its own shell (observed: three consecutive `exit 255`). Kill the
+spawning loop's process first or it keeps launching new children faster than they are reaped, then
+assert the only surviving `AutoHotkey64.exe` is the driver.
 
 **The concrete defect this gap shipped (2026-07-29):** `ui/menu/menu_rebuild.ahk` used an unbraced
 one-line `try` as an `if` body followed by `else`. **AHK v2's `Try` carries its own optional `Else`
@@ -347,6 +367,27 @@ Both drivers mirror every WARNING/ERROR line into a small daily `ErgoptiPlus_err
 
 **How to apply:** use `LoggerError` / `Logger.error` for any noteworthy failure even when execution continues — and when the user reports "it did something weird", open the errors file first.
 
+**2026-07-29 — the sink's purpose was defeated, and the mechanism generalises.** Measured composition
+of `ErgoptiPlus_errors_2026-07-29.log` (790 KB, 8 775 lines): **85.5 % one background timer's normal
+cost, 9.6 % a probe loop warning about itself, 4.6 % other hot-path lines — 0.3 % (25 lines) actual
+signal.** A genuine G2 defect (one tray-menu row rendering its raw id) sat in that file for a full day
+looking like 1 line among 282 identical ones. Two independent causes, one rule each:
+
+- **A hot-path profiler threshold is calibrated per population, not globally.**
+  `_HOTPATH_SLOW_MS := 5.0` is right for per-keystroke work, where 5 ms is alarming. Applied to a
+  2 Hz cross-process COM round trip whose *normal* cost is ~14 ms, it fires on ~80 % of ticks and the
+  tripwire stops meaning anything. When instrumenting a **background repeating** segment, give it its
+  own threshold set above its measured normal cost, and record that measurement in a comment.
+- **An accessor that warns must not be reused as a speculative probe.** `t()` warns on a total miss
+  because a miss on the display path *is* a defect. `manifest_descriptions.ahk`'s candidate cascade
+  calls the same `t()` for candidates it fully expects to miss, so each label emits several warnings
+  asserting "the raw key is being displayed to the user" when it is not. Split the accessor: a silent
+  lookup for probes, the warning one for terminal display.
+
+Diagnostic reflex: before reading this file's contents, measure its **composition**
+(`awk` by message class). A sink that is >90 % one message is telling you about the instrument, not
+the driver.
+
 Related: [[feedback_coding_style]] (logging conventions).
 
 ### feedback-loader-target-explicit
@@ -424,6 +465,45 @@ Installing is itself a trap: `.npmrc` sets `engine-strict=true` and a transitive
 - Run all four before pushing. Any `MODULE_NOT_FOUND`, or a check count well below what the suite normally reports, means the gate did **not** run — fix the install, do not read it as a pass. (Do not memorise the exact count; it grows.)
 - New AHK tests must read driver source through `_DriverFuncBody` / `_DriverSourceConcat` / `_DriverDirConcat`, never a hardcoded `modules/…` or `lib/….ahk` path. `tools/test/test-no-pinned-source-reads.cjs` fails the build past its `BASELINE`. **Never raise the baseline to make a change pass** — convert the test to a helper read ([[feedback_regression_tests]] applied to the ratchet itself).
 - Two gotchas that cost several red runs: a **comment** containing a token a meta-test scans for shifts naive `InStr` position assertions — reword it or strip comments via `_StripFullLineComments`; and in AHK v2 an embedded quote is `` `" `` — a stray `\"` aborts the parse mid-file and the runner exits with no results at all, which looks like "tests vanished", not "tests failed" (same signature as [[feedback_ahk_source_encoding]]).
+
+Related, and the failure mode this entry's own "a gate that cannot run is worse than one that fails"
+predicts: [[project_gate_scripts_must_be_wired]].
+
+### project-gate-scripts-must-be-wired
+
+_A `tools/test/` gate script is only a gate once `run-js-suite.cjs` invokes it; four exist that nothing runs, one of them documented as a "CI gate"_
+
+<sub>slug: `project_gate_scripts_must_be_wired`</sub>
+
+`tools/test/` holds 73 `test-*.{js,cjs}` scripts. `run-js-suite.cjs` — the umbrella CI runs via
+`npm run test:js` — references **64**. Of the nine unreferenced, five are covered another way (their
+own CI step, or an equivalent inline check). **Four are invoked by nothing at all:**
+`test-feature-read-sites.js`, `test-config-schema.cjs`, `test-metrics-heatmap-translation.cjs`,
+`test-mutation-targets.cjs` (`test:mutation` runs `stryker run`, not this script). The last two have no
+npm script either.
+
+**Why it matters:** `test-feature-read-sites.js` exists to kill the `UnsetItemError` crash class — a
+`Features["x"]["y"]` read at a path the manifest does not back. It validates 261 literal read sites,
+five of them inside `#HotIf` expressions where the throw lands *in the hotkey evaluator on the
+keystroke path*. And `_shared/modules/features/README.md` documents it as "CI gate asserting every
+`Features[…]` call resolves against the manifest" — the doc asserts a guarantee that does not hold.
+All four pass when run by hand, so a maintainer spot-checking them sees green; nothing anywhere
+reports that CI skipped them. This is the purest false green in the repo: not a test that cannot
+fail, a test that never runs.
+
+**How to apply:**
+
+- Adding a gate script is two steps, never one: write it **and** add it to `run-js-suite.cjs`'s check
+  list. An npm alias is for local repro, not for coverage.
+- Do not trust a README or `docs/TESTING.md` claim that something "is a CI gate" — grep
+  `run-js-suite.cjs` and `.github/workflows/*.yml` for the script name. Documentation drifts; the
+  invocation list is the truth.
+- The durable guard is a meta-check that enumerates `tools/test/test-*` and asserts each is either in
+  `run-js-suite.cjs` or in an explicit allow-list whose entries name the CI step that runs them —
+  and that check must be wired into `run-js-suite.cjs` itself so it cannot become its own victim.
+
+Related: [[feedback_local_gate_mirrors_ci]], [[feedback_regression_tests]],
+[[project_ahk_invariant_incomplete_application]].
 
 ### feedback-ahk-suite-needs-temp-space
 
@@ -765,7 +845,7 @@ Loop-until-dry to three passes, each finding verified by two independent adversa
 **Two confident false-positives were killed by measurement — recorded so they are not re-raised** ([[project_audit_findings_are_hypotheses]], [[project_audit_evidence_must_be_reproducible]]):
 
 - **"Ollama warmup / remote-ready `WinHTTP Send()` blocks the keystroke thread on connect"** (proposed high+medium G4). Both Opus verifiers CONFIRMED it on code-reading alone; a standalone bench refuted it — the async `Send()` returns in 15 ms (see the measured note in [[project_updater_nonblocking_http]]).
-- The `/validate`-executes-the-script confusion (wrong in both directions historically) is settled in [[project_ahk_map_delete_raises_on_missing_key]] — the flag validates when it PRECEDES the script path, runs the driver live when it trails it.
+- The `/validate`-executes-the-script confusion is settled in [[feedback_ahk_ui_syntax_validation]] — the flag NEVER validates, in any position or shell, and the script runs. (An earlier note here claimed position mattered; it was measured against an already-broken file, which exits 2 and looks exactly like a working validator.)
 
 **Also refuted this pass, do not re-raise:** the three config bulk-toggle "unchecked gate write" claims (`config_io.ahk:153/:320` — the "the twin reports the write result" premise is false); keep-awake torn-down-but-not-restored-on-resume; reload-mid-hold synthetic-modifier leak; render-once streaming-TTLT freeze; `_LLM_Ollama_TrimAsyncRegistry`'s `ProcessClose`-under-`Critical` (dead code on the Ollama path).
 
@@ -1513,25 +1593,28 @@ if Cache.Has(Key)      ; required
     Cache.Delete(Key)
 ```
 
-**`/validate` works in v2.0 — but ONLY before the script path.** This entry has
-been wrong twice, in both directions, so it is now stated from an empirical
-re-derivation on v2.0.26 using an execution marker:
+**`/validate` DOES NOT WORK. Never use it, in any shell, in any position.**
+Superseded 2026-07-29 by [[feedback_ahk_ui_syntax_validation]], which carries the
+measurements and the two safe alternatives — read that entry, not this paragraph.
 
-```bash
-AutoHotkey64.exe /ErrorStdOut /validate <file>   # validates, does NOT run
-AutoHotkey64.exe /ErrorStdOut <file> /validate   # RUNS THE SCRIPT
-```
+This entry has now been wrong three times, in every direction, which is the
+lesson worth keeping. The version that stood here claimed the flag validates when
+it PRECEDES the script path and runs the script only when it trails it. That is
+false: on v2.0.26 the flag is ignored wherever it sits, so the file is parsed and,
+if it parses, EXECUTED. The earlier "validates when it precedes" reading came from
+testing against a file that had a syntax error — which exits 2 immediately and is
+indistinguishable from a working validator. Testing a validator only against
+INVALID input cannot tell validation from execution; that is the methodological
+mistake, not the flag.
 
-Flag **before** the path is a real headless syntax check: a valid script exits 0
-silently, a broken one exits 2 and prints `<file> (2) : ==> Missing "` on stdout.
-Flag **after** the path is consumed as an ordinary script argument (`A_Args`),
-because AHK already took the path as the script — so the script starts live. That
-is what launched a second driver from a worktree for two minutes; the flag was
-never the problem, its position was.
+Two independent mechanisms, so guarding against one is not enough: under Git Bash
+MSYS rewrites `/validate` into a Windows path so it never reaches AHK at all, and
+under PowerShell it arrives correctly and is ignored. Both end with the script
+running. Full detail, including the cleanup discipline for the processes this
+spawns, lives in [[feedback_ahk_ui_syntax_validation]].
 
-The earlier claim that the flag "does not exist in v2.0 and is ignored" was a
-wrong correction of a wrong original. **A refutation needs the same standard of
-proof as the claim it refutes** — four commands settled this one. See
+**A refutation needs the same standard of proof as the claim it refutes**, and
+"the same standard" includes testing the NEGATIVE case. See
 [[project_audit_findings_are_hypotheses]].
 
 The test suite remains the check that matters for anything `run_all.ahk`

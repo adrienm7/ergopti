@@ -366,12 +366,28 @@ d'une source commune.
 ### Outils
 
 ```bash
-# Valider la syntaxe d'un fichier (exit 0 = clean)
-"C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe" /ErrorStdOut /validate <script>
-
 # Lancer la suite ; le rapport TAP va dans %TEMP%\ergopti_test_results.txt, PAS sur stdout
 "C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe" static/ergopti_plus/windows/tests/run_all.ahk
 ```
+
+**N'utilise JAMAIS `/validate`.** Sur AutoHotkey 2.0.26 le flag est ignoré en
+silence : le fichier est parsé et, s'il parse, **il est EXÉCUTÉ**. Un audit s'est
+fait piéger deux fois le 2026-07-29 et a lancé 58 fichiers `ui/` comme scripts
+vivants. Deux mécanismes distincts, donc se protéger d'un seul ne suffit pas :
+
+- sous **Git Bash**, la conversion d'arguments MSYS réécrit `/ErrorStdOut` et
+  `/validate` en chemins Windows (`C:/Program Files/Git/validate`) — AHK reçoit
+  deux arguments bidon et exécute le script, quel que soit l'ordre des flags ;
+- sous **PowerShell**, les flags arrivent correctement et le script s'exécute
+  quand même, parce que `/validate` est un no-op.
+
+Pour vérifier la syntaxe, utilise l'une des deux méthodes de
+[`feedback_ahk_ui_syntax_validation`](../PROJECT_MEMORY.md) : une compilation
+`Ahk2Exe` (référence, identique à la CI, `exit 17` sur erreur de syntaxe), ou un
+harnais jetable dont la PREMIÈRE instruction auto-exécutée est `ExitApp(0)` suivi
+d'un `#Include` du fichier — AHK parse tout le script fusionné avant d'exécuter
+quoi que ce soit. Dans les deux cas, vérifie avant/après que le seul
+`AutoHotkey64.exe` en cours est bien le driver.
 
 Les fichiers `ui/` ne sont PAS dans `run_all.ahk` : leur seul gate de parsing est la compilation
 `Ahk2Exe`. Valide-les explicitement.

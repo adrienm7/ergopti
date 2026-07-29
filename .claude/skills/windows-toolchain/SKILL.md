@@ -110,23 +110,36 @@ the line.
 
 AutoHotkey v2 is at `C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe`.
 
-## `/validate` works, but only before the script path
+## `/validate` never validates — it runs the script
 
-Re-derived empirically on v2.0.26 with an execution marker, because this repo has
-now got it wrong twice in both directions:
+Do not use it, in any shell, in any position. On v2.0.26 the flag is ignored
+wherever it sits, so the file is parsed and, if it parses, **executed**. Two
+independent mechanisms get you there, so guarding against one is not enough:
 
-```bash
-AutoHotkey64.exe /ErrorStdOut /validate <file>   # validates, does NOT run
-AutoHotkey64.exe /ErrorStdOut <file> /validate   # RUNS THE SCRIPT
+- **Git Bash** rewrites `/ErrorStdOut` and `/validate` into Windows paths
+  (`C:/Program Files/Git/validate`) — MSYS argument conversion — so AHK receives
+  two bogus script arguments and runs the file. This applies to **every** `/flag`
+  passed to a Windows exe from Git Bash, `Ahk2Exe`'s `/in` `/out` included.
+- **PowerShell** passes the flags correctly and the script still runs.
+
+This entry claimed the opposite until 2026-07-29 ("validates when it precedes the
+path"), and that reading came from measuring against a file that already had a
+syntax error — which exits 2 immediately and is indistinguishable from a working
+validator. **Test a validator against VALID input too**, or you cannot tell
+validation from execution. An audit trusted the old note and launched 58 `ui/`
+files as live scripts.
+
+Two ways that do work:
+
+```powershell
+# 1. Ahk2Exe — the reference, identical to CI. exit 0 = parsed, exit 17 = syntax error.
+& "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe" /in ErgoptiPlus.ahk /out "$env:TEMP\probe.exe"
+
+# 2. Parse-only harness for a file outside the entry's include graph: AHK parses the
+#    whole merged script before executing anything, so ExitApp(0) first is safe.
+#    "ExitApp(0)`n#Include <file>" -> probe.ahk, then run probe.ahk with /ErrorStdOut.
 ```
 
-Flag **before** the path: a valid script exits 0 silently, a broken one exits 2
-and prints `<file> (2) : ==> Missing "` on stdout. That is a real headless syntax
-check and it is safe.
-
-Flag **after** the path: AHK has already taken the path as the script, so
-`/validate` becomes an ordinary script argument in `A_Args` and the script starts
-**live**. This is what once left a second driver running against the user's real
-keyboard for two minutes — the flag was fine, its position was not.
-
-Never point either form at `ErgoptiPlus.ahk` while the driver is running.
+Before and after either, assert the only running `AutoHotkey64.exe` is the
+driver: `Get-CimInstance Win32_Process | ? { $_.Name -eq 'AutoHotkey64.exe' }`.
+Never point anything at `ErgoptiPlus.ahk` while the driver is running.

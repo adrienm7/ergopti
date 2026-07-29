@@ -49,7 +49,7 @@ existantes :
 
 | Couche | Commande | Sens |
 |---|---|---|
-| Parse/validate AHK | `& "C:\Program Files\AutoHotkey\v2.0.19\AutoHotkey64.exe" /validate ErgoptiPlus.ahk` (depuis `windows/`) | exit 0 = tout parse |
+| Parse/validate AHK | `& "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe" /in ErgoptiPlus.ahk /out "$env:TEMP\probe.exe"` (depuis `windows/`, **PowerShell uniquement** — Git Bash réécrit `/in` et `/out` en chemins) | exit 0 = tout parse, exit 17 = erreur de syntaxe. **Jamais `/validate`** : le flag est ignoré et le script s'EXÉCUTE (`feedback_ahk_ui_syntax_validation`) |
 | Suite AHK | `AutoHotkey64.exe tests\run_all.ahk` (TAP dans `%TEMP%\ergopti_test_results.txt`) | unitaires + meta |
 | Suite JS/CI | `npm run test:js` | drift gates, lint, parité, headers… |
 | Encodage AHK | `npm run test:ahk-encoding` | UTF-8 BOM + LF |
