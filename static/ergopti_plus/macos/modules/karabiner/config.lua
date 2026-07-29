@@ -86,10 +86,19 @@ end
 --- Appends the full shared modifier × key matrix used by gesture and tap-hold
 --- action pickers. The labels come verbatim from the catalogue, so "Ctrl + A"
 --- never depends on the active UI language.
+-- Decoded once. The shared modifier-chord catalogue is a file on disk that does
+-- not change while the driver runs, and this whole function re-ran on EVERY
+-- layout change — re-reading and re-decoding the JSON to rebuild the same 673
+-- action tables. Declared above the function that reads it.
+local _chord_catalogue = nil
+
 local function append_shared_modifier_chords(actions)
 	local catalogue_path = Paths.shared("modules/gestures/modifier_chords.json")
 	if not catalogue_path then return end
-	local catalogue = load_json_file(catalogue_path)
+	if _chord_catalogue == nil then
+		_chord_catalogue = load_json_file(catalogue_path) or false
+	end
+	local catalogue = _chord_catalogue or nil
 	local platform = catalogue and catalogue.platforms and catalogue.platforms.macos
 	local modifiers = platform and platform.modifiers
 	local keys = catalogue and catalogue.keys
@@ -144,6 +153,7 @@ function M.load_available_actions(actions_file)
 	append_shared_modifier_chords(list)
 
 	-- Resolve layout-dependent actions: logical_char → physical key_code
+	local resolved = 0
 	for _, action in ipairs(list) do
 		if action.logical_char then
 			local key_code = Layout.key_code_for_char(action.logical_char)
@@ -153,11 +163,14 @@ function M.load_available_actions(actions_file)
 				entry.modifiers = mods
 			end
 			action.karabiner_to = { entry }
-			Logger.debug(LOG, "Action '%s': logical '%s' → key_code '%s'.",
-				action.id, action.logical_char, key_code)
+			resolved = resolved + 1
 		end
 	end
 
+	-- One summary line, not one per action. DEBUG is this driver's default level
+	-- and every layout change re-ran this loop, so the per-action lines were 548
+	-- log writes for a fact the total already conveys.
+	Logger.debug(LOG, "Resolved %d logical-char action(s) to key codes.", resolved)
 	Logger.info(LOG, "Loaded %d action(s) from actions.json.", #list)
 	return list
 end

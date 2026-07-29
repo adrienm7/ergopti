@@ -122,6 +122,13 @@ local CAPSWORD_PROBE_TIMEOUT_SEC = 1.5
 -- callback can cancel it and the watchdog callback can reach the pending flag.
 local _capsword_probe_watchdog = nil
 
+-- Monotonic probe generation. A terminated or timed-out probe's callback still
+-- fires, and it used to clear _capsword_check_pending and cancel the watchdog
+-- unconditionally — the SUCCESSOR probe's, by then. The sibling layout read in
+-- this same module was generation-gated for exactly this; the CapsWord probe was
+-- not, so a slow probe could unlock a fresh one and leave two racing.
+local _capsword_gen = 0
+
 -- GC root for the CapsWord probe tasks. An hs.task that is not referenced from a
 -- GC root can be collected mid-run, which kills the subprocess and means its
 -- completion callback never fires — here that would leave KE with capsword=1 and
@@ -157,11 +164,16 @@ local function deactivate_capsword()
 	if _capsword_check_pending then return end
 	_capsword_last_check_s    = now_s
 	_capsword_check_pending   = true
+	_capsword_gen             = _capsword_gen + 1
+	local my_capsword_gen     = _capsword_gen
 
 	-- Async get: unblocks the main loop immediately; callback fires on completion
 	local task
 	task = hs.task.new(KARABINER_CLI, function(exit_code, stdout, _)
 		if task then _active_tasks[task] = nil end
+		-- A superseded probe releases nothing: the flag and the watchdog it would
+		-- clear belong to the probe that replaced it.
+		if my_capsword_gen ~= _capsword_gen then return end
 		_capsword_check_pending = false
 		if _capsword_probe_watchdog then
 			TimerScheduler.cancel(_capsword_probe_watchdog)
