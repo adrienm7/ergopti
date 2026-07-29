@@ -67,8 +67,20 @@ global LOGGER_MIN_LEVEL := LOGGER_DEFAULT_LEVEL
 ; LoggerDebug / LoggerTrace / LoggerDone invoked from per-keystroke dispatch)
 ; check the flag before doing any work, so a disabled level collapses to a
 ; single boolean test instead of a Map lookup + Format + FileAppend.
-global _LOGGER_MIN_SEVERITY := 20   ; INFO
-global _LOGGER_DEBUG_ENABLED := False   ; DEBUG / TRACE / DONE
+;
+; The pre-init defaults are deliberately PERMISSIVE. These flags decide what
+; survives during the whole boot window that precedes LoggerInit — the entire
+; #Include graph's top-level code, the onboarding wizard, the config parse and
+; I18nInit — because the public wrappers short-circuit on them before
+; _LoggerEmit's unconditional "queue it, the path is not resolved yet" push is
+; ever reached. With DEBUG defaulting to off, every boot-phase DEBUG/TRACE/DONE
+; line was DISCARDED rather than queued, so a user running at log_level = DEBUG
+; never saw them at all (logger-preinit-level-drop). A queued line can still be
+; dropped once the configured level is known — LoggerInit narrows the queue via
+; _LoggerDropPreInitBelowLevel — but a line that was never emitted cannot be
+; recovered.
+global _LOGGER_MIN_SEVERITY := 10   ; DEBUG until the configured level is read
+global _LOGGER_DEBUG_ENABLED := True    ; DEBUG / TRACE / DONE
 global _LOGGER_INFO_ENABLED := True     ; INFO / START / SUCCESS
 global _LOGGER_WARN_ENABLED := True     ; WARNING
 global _LOGGER_ERROR_ENABLED := True    ; ERROR
@@ -225,6 +237,10 @@ LoggerInit() {
         }
     }
     _LoggerRefreshFastFlags()
+    ; Now that the user's level is finally known, apply it retroactively to
+    ; everything the permissive pre-init defaults let through. This is the half
+    ; of logger-preinit-level-drop that keeps the fail-open default honest.
+    _LoggerDropPreInitBelowLevel()
 
     ; Start the background flusher once. LoggerInit may be called again when
     ; the user toggles the log level via the menu — we do not restart the
@@ -480,6 +496,56 @@ _LoggerRefreshFastFlags() {
     _LOGGER_INFO_ENABLED := (_LOGGER_MIN_SEVERITY <= 20)
     _LOGGER_WARN_ENABLED := (_LOGGER_MIN_SEVERITY <= 30)
     _LOGGER_ERROR_ENABLED := (_LOGGER_MIN_SEVERITY <= 40)
+}
+
+; Retro-applies the configured level to everything that was logged BEFORE
+; LoggerInit resolved it.
+;
+; The pre-init fast-path flags fail OPEN (see their declaration) so no boot-phase
+; line is lost before the user's log_level can be read — but that would otherwise
+; hand a user running at log_level = ERROR a full boot's worth of DEBUG and INFO
+; noise, since _LoggerEmit queues unconditionally while the log path is unknown
+; and LoggerInit later drains the whole queue to disk. Filtering the queue here,
+; immediately after _LoggerRefreshFastFlags and before the drain, makes the
+; pre-init window behave exactly like the post-init one for every level, in both
+; directions (logger-preinit-level-drop).
+;
+; The ring buffer is intentionally NOT filtered: it feeds crash reports, where
+; more boot context is strictly better.
+_LoggerDropPreInitBelowLevel() {
+    global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_MIN_LEVEL
+    Before := _LOGGER_PENDING.Length
+    _LOGGER_PENDING := _LoggerFilterQueueByLevel(_LOGGER_PENDING)
+    _LOGGER_PENDING_ERRORS := _LoggerFilterQueueByLevel(_LOGGER_PENDING_ERRORS)
+    Dropped := Before - _LOGGER_PENDING.Length
+    if (Dropped > 0) {
+        LoggerDebug("logger", "Dropped {1} pre-init line(s) below the configured level '{2}'.",
+            Dropped, LOGGER_MIN_LEVEL)
+    }
+}
+
+; Returns a copy of ``Queue`` holding only the lines at or above the cached
+; minimum severity. A formatted line looks like
+; "yyyy-MM-dd HH:mm:ss:fff [LEVEL] [Tag] body", so the first "[WORD] [" pair is
+; always the level; anything without one is structural (the blank separator, the
+; session banner) and is always kept.
+_LoggerFilterQueueByLevel(Queue) {
+    global LOGGER_SEVERITY, _LOGGER_MIN_SEVERITY
+    Kept := []
+    for _, Line in Queue {
+        if !RegExMatch(Line, "\[([A-Z]+)\] \[", &M) {
+            Kept.Push(Line)
+            continue
+        }
+        if !LOGGER_SEVERITY.Has(M[1]) {
+            Kept.Push(Line)
+            continue
+        }
+        if (LOGGER_SEVERITY[M[1]] >= _LOGGER_MIN_SEVERITY) {
+            Kept.Push(Line)
+        }
+    }
+    return Kept
 }
 
 ; Verbose detail — setter calls, state snapshots, per-keystroke events.
@@ -890,6 +956,18 @@ _LoggerLoadSubFilesToml(ScriptDir) {
         return Strings
     }
 
+    ; True when a fragment closes its TOML array. Only a "]" OUTSIDE a quoted
+    ; value ends the array: this file's own authoring rules prefer tag-shaped
+    ; patterns ("[LayoutCaps]"), every one of which carries a "]" inside its own
+    ; string. Testing the raw line therefore closed a multi-line array on its
+    ; FIRST value and silently discarded every pattern after it - 1309 of 1867
+    ; routable production lines never reached their sub-file, and one sub-file
+    ; was structurally guaranteed to stay empty forever
+    ; (logger-subfiles-multiline-array-truncated).
+    _ArrayIsClosed(Fragment) {
+        return InStr(RegExReplace(Fragment, '"([^"\\]*(?:\\.[^"\\]*)*)"', ""), "]") > 0
+    }
+
     Lines := StrSplit(Raw, "`n")
     for _, Line in Lines {
         ; Strip inline comments and trim
@@ -907,7 +985,7 @@ _LoggerLoadSubFilesToml(ScriptDir) {
             for _, S in Extracted {
                 CurrentPatterns.Push(S)
             }
-            if InStr(Line, "]") {
+            if _ArrayIsClosed(Line) {
                 InPatternsArray := false
             }
             continue
@@ -917,7 +995,7 @@ _LoggerLoadSubFilesToml(ScriptDir) {
             for _, S in Extracted {
                 CurrentPlatforms.Push(S)
             }
-            if InStr(Line, "]") {
+            if _ArrayIsClosed(Line) {
                 InPlatformsArray := false
             }
             continue
@@ -931,7 +1009,7 @@ _LoggerLoadSubFilesToml(ScriptDir) {
             for _, S in Extracted {
                 CurrentPlatforms.Push(S)
             }
-            if !InStr(Fragment, "]") {
+            if !_ArrayIsClosed(Fragment) {
                 InPlatformsArray := true
             }
         } else if RegExMatch(Line, '^patterns\s*=\s*\[(.*)$', &M) {
@@ -940,7 +1018,7 @@ _LoggerLoadSubFilesToml(ScriptDir) {
             for _, S in Extracted {
                 CurrentPatterns.Push(S)
             }
-            if !InStr(Fragment, "]") {
+            if !_ArrayIsClosed(Fragment) {
                 InPatternsArray := true
             }
         }
