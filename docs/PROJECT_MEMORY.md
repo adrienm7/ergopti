@@ -21,6 +21,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [No co-author trailers (Copilot, Claude, bots)](#no-co-author-trailers-copilot-claude-bots) — Never add Co-Authored-By trailers — and never whitelist legacy ones to make a lint pass
 - [feedback-regression-tests](#feedback-regression-tests) — Every user-requested bug fix must ship with a regression test that fails before / passes after the fix
 - [feedback-local-gate-mirrors-ci](#feedback-local-gate-mirrors-ci) — Green locally must mean green in CI: the local gate is four commands, and it is only trustworthy once `node_modules` is installed on a Node satisfying the engine floor
+- [feedback-ahk-suite-needs-temp-space](#feedback-ahk-suite-needs-temp-space) — A near-full `%TEMP%` volume makes the AHK runner report assertion failures that do not reproduce; check free space before believing a red run
 - [feedback-test-before-merge](#feedback-test-before-merge) — Never merge a slice into dev before the user has tested it live. Stay on the branch and wait for explicit validation.
 - [feedback-ui-must-be-i18n](#feedback-ui-must-be-i18n) — All user-facing UI text goes through the i18n system in 21 languages — never hardcode a UI string anywhere, WebView UIs included
 - [project-ahk-menu-dispatcher-error-swallow](#project-ahk-menu-dispatcher-error-swallow) — The menu-dispatcher bypass must re-throw callback errors — a local try/catch only destroys reporting
@@ -423,6 +424,31 @@ Installing is itself a trap: `.npmrc` sets `engine-strict=true` and a transitive
 - Run all four before pushing. Any `MODULE_NOT_FOUND`, or a check count well below what the suite normally reports, means the gate did **not** run — fix the install, do not read it as a pass. (Do not memorise the exact count; it grows.)
 - New AHK tests must read driver source through `_DriverFuncBody` / `_DriverSourceConcat` / `_DriverDirConcat`, never a hardcoded `modules/…` or `lib/….ahk` path. `tools/test/test-no-pinned-source-reads.cjs` fails the build past its `BASELINE`. **Never raise the baseline to make a change pass** — convert the test to a helper read ([[feedback_regression_tests]] applied to the ratchet itself).
 - Two gotchas that cost several red runs: a **comment** containing a token a meta-test scans for shifts naive `InStr` position assertions — reword it or strip comments via `_StripFullLineComments`; and in AHK v2 an embedded quote is `` `" `` — a stray `\"` aborts the parse mid-file and the runner exits with no results at all, which looks like "tests vanished", not "tests failed" (same signature as [[feedback_ahk_source_encoding]]).
+
+### feedback-ahk-suite-needs-temp-space
+
+_A near-full `%TEMP%` volume makes the AHK runner report assertion failures that do not reproduce; check free space before believing a red run_
+
+<sub>slug: `feedback_ahk_suite_needs_temp_space`</sub>
+
+The runner writes its TAP output and its intermediates under `%TEMP%`. On 2026-07-29 the suite was run with the `%TEMP%` volume at **0 bytes free** and reported **4 failures**. Re-running the same tree with `%TEMP%` pointed at a volume with space reported **2**, and those two were genuine — a test and its fix disagreeing. The other two never reproduced.
+
+What makes this expensive is the shape of the false failures: they arrive as ordinary named assertion failures, not as an I/O error, a write exception, or a runner abort. There is nothing in the output that says "the disk is full". So they read as real defects and get debugged as real defects.
+
+**Why:** a red run is normally trustworthy, so the instinct is to go straight to the named test. Here the failing test names were unrelated to any recent change, which is the only tell — and it is a weak one, because an audit pass touching many modules makes unrelated failures look plausible.
+
+**How to apply:**
+
+- Before debugging a red AHK run, check free space on the `%TEMP%` volume. A run that reports failures in tests nothing recent touched is the signature.
+- To run the suite without consuming a nearly-full system drive, point `%TEMP%`/`%TMP%` at another volume for that process only:
+
+```powershell
+$env:TEMP = "D:\ergopti_build_tmp"; $env:TMP = $env:TEMP
+AutoHotkey64.exe static/ergopti_plus/windows/tests/run_all.ahk
+```
+
+- Confirm a fix against a run with space available. Two of the four failures above would otherwise have been "fixed" by changing code that was never broken.
+- Same family as [[feedback_local_gate_mirrors_ci]]: a gate that cannot run properly is worse than one that fails, because its output still looks like a verdict.
 
 ### feedback-test-before-merge
 
