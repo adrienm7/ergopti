@@ -30,13 +30,38 @@ local LOG = "app_picker"
 -- ========================================
 
 --- Scans the system for installed applications.
+
+-- Discovered-application cache. Declared above the function that reads it: a
+-- local placed below would bind the nil global instead.
+local _apps_cache    = nil
+local _apps_cache_at = 0
+
+-- How long a discovery result stays warm. Long enough that reopening the picker
+-- costs nothing, short enough that an app installed during the session shows up
+-- without a reload.
+local APPS_CACHE_TTL_SEC = 60
+
 --- @return table A list of choices for hs.chooser.
 function M.discover_apps()
+	-- Served from cache when it is still warm. The scan is a blocking `find`
+	-- across two application trees plus one Info.plist read and one icon
+	-- rasterisation PER INSTALLED APP, all on the main run loop — hs.timer.doAfter
+	-- moves it off the click's stack frame but not off that thread. The set of
+	-- installed applications does not change between two menu opens a few seconds
+	-- apart, so re-paying it on every open buys nothing.
+	local now = os.time()
+	if _apps_cache and (now - _apps_cache_at) < APPS_CACHE_TTL_SEC then
+		Logger.debug(LOG, "Serving %d application(s) from cache.", #_apps_cache)
+		return _apps_cache
+	end
+
 	Logger.debug(LOG, "Discovering installed applications…")
 	local cmd = "find /Applications \"$HOME/Applications\" -maxdepth 2 -name \"*.app\" -not -name \".*\" 2>/dev/null | sort"
 	local ok, raw = pcall(hs.execute, cmd)
 	if not ok or type(raw) ~= "string" then
 		Logger.warn(LOG, "Failed to execute application discovery command.")
+		-- A failure is NOT cached: the next open should retry rather than serve
+		-- an empty picker for the whole TTL.
 		return {}
 	end
 	
@@ -69,6 +94,8 @@ function M.discover_apps()
 	
 	table.sort(choices, function(a, b) return a.text:lower() < b.text:lower() end)
 	Logger.info(LOG, "Application discovery completed.")
+	_apps_cache    = choices
+	_apps_cache_at = os.time()
 	return choices
 end
 

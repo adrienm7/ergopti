@@ -188,12 +188,30 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return text:gsub("★", text_utils.escape_gsub_replacement(state.trigger_char))
 	end
 
+	-- Inputs the menubar icon was last rendered for. Declared above update_icon:
+	-- a local below the closure would bind the nil global instead.
+	local _last_icon_key = nil
+
+
 	local function update_icon(custom_text)
 		local shortcuts = core_mods.shortcuts_mod
 		local paused    = shortcuts and type(shortcuts.is_paused) == "function" and shortcuts.is_paused() or false
 
 		-- Logo variant is persisted via hs.settings; default is "simple"
 		local variant = hs.settings.get("ergopti_menubar_logo_variant") or "simple"
+
+		-- Skip the whole rebuild when nothing that determines the icon changed.
+		--
+		-- This function reads a PNG off disk, decodes it, and re-renders it
+		-- through an off-screen hs.canvas — and the pause listener runs it
+		-- SYNCHRONOUSLY inside the script-control eventtap callback, the same tap
+		-- that carries the key needed to un-pause. It also ran twice per toggle,
+		-- once from the listener and once from the menu refresh that follows.
+		-- The icon depends on exactly two inputs; when neither moved there is
+		-- nothing to redraw.
+		local icon_key = tostring(variant) .. "|" .. tostring(paused)
+		if custom_text == nil and icon_key == _last_icon_key then return end
+		_last_icon_key = (custom_text == nil) and icon_key or nil
 
 		-- The shared logo directory lives at static/img/logo (two levels up from
 		-- static/ergopti_plus/macos, where base_dir points)
