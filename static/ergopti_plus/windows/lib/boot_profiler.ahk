@@ -45,6 +45,73 @@ BootProfile_Begin() {
 		if (Uptime >= 0)
 			LoggerInfo("BootProfile",
 				"Script parse + load (pre-boot, until tray icon appears): ~{1} ms.", Uptime)
+		_BootProfileReplayStamps((Uptime >= 0) ? (_BOOT_PROFILE_START - Uptime) : 0)
+	}
+}
+
+; Record a phase boundary that happens BEFORE the logger is usable.
+;
+; Everything up to LoggerInit() — bundle extraction, the whole #Include graph's
+; top-level code, the config parse, HotstringEngineInit — used to arrive at
+; BootProfile_Begin as a single opaque "script parse + load: ~N ms" number, so a
+; user reporting a slow start could be told how much was pre-boot but never
+; which part of it. A stamp is two integer writes and no logging, which is the
+; only thing that is safe this early; BootProfile_Begin replays them all as
+; normal marks once the logger exists.
+; @param PhaseName {String} Human-readable label for the phase that just ended.
+BootProfile_Stamp(PhaseName) {
+	_BootProfileStampStore("push", PhaseName)
+}
+
+; Storage for the retroactive stamps.
+;
+; The buffer and its cap are function statics, NOT file-level globals, and that
+; is load-bearing rather than a style choice: a top-level ``global X := []`` is
+; an ordinary statement executed at this file's #Include position, whereas the
+; earliest stamp is taken in the pre-pump block far above it. A global would
+; therefore be unset when the first stamp is pushed and — worse — would be reset
+; to an empty array when this file's include position was finally reached,
+; silently discarding every stamp taken before it. Function statics are
+; initialised before the auto-execute thread starts, so they are valid from the
+; very first executable line. Verified against AutoHotkey64 v2 before use.
+; @param Op {String} "push" to record, "drain" to take and clear.
+; @param PhaseName {String} Label, for "push".
+; @returns {Array} For "drain", the recorded stamps; an empty array otherwise.
+_BootProfileStampStore(Op, PhaseName := "") {
+	; Upper bound on retroactive stamps. The pre-logger window has a handful of
+	; meaningful boundaries; a caller wanting more is measuring the wrong thing,
+	; and the cap keeps a runaway loop from growing this array unbounded.
+	static CAP := 12
+	static Stamps := []
+	if (Op == "push") {
+		if (Stamps.Length < CAP)
+			Stamps.Push({ Name: PhaseName, Tick: A_TickCount })
+		return []
+	}
+	Drained := Stamps
+	Stamps := []
+	return Drained
+}
+
+; Emit one line per retroactive stamp, then clear them.
+;
+; Deliberately does NOT touch _BOOT_PROFILE_START / _BOOT_PROFILE_LAST: the marks
+; that follow keep measuring from BootProfile_Begin exactly as before, so the
+; existing phase lines stay comparable with logs collected before this existed.
+; The replayed lines carry their own "since process start" total instead.
+; @param ProcessStartTick {Integer} A_TickCount at process creation, 0 if unknown.
+_BootProfileReplayStamps(ProcessStartTick) {
+	Stamps := _BootProfileStampStore("drain")
+	if (Stamps.Length == 0)
+		return
+	; Anchor on the first stamp when the process creation time is unavailable —
+	; the deltas between stamps stay correct, only the absolute total is lost.
+	Origin := (ProcessStartTick > 0) ? ProcessStartTick : Stamps[1].Tick
+	Prev := Origin
+	for , Stamp in Stamps {
+		try LoggerInfo("BootProfile", "(pre-logger) {1}: +{2} ms (at {3} ms since process start).",
+			Stamp.Name, Stamp.Tick - Prev, Stamp.Tick - Origin)
+		Prev := Stamp.Tick
 	}
 }
 

@@ -1166,6 +1166,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_taphold_synthetic_refcount_combo.ahk
 #Include unit/test_taphold_unreadable_blocks_rewrite.ahk
 #Include unit/test_tooltip_row_band_elision.ahk
+#Include meta/test_boot_profile_retroactive_stamps.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
