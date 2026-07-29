@@ -182,10 +182,37 @@ _Some AHK UI files are outside the headless test runner; how to syntax-check the
 
 **How to syntax-check them locally** (two ways, both gotcha-laden):
 
-1. **Ahk2Exe compile** (gold standard, == CI), at `C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe`. **Run it from PowerShell, never Git Bash** — MSYS path conversion rewrites `/in` `/out` `/base` into Windows paths (`/in` → `C:/Program Files/Git/in`) and the compile dies with "Unrecognised parameter". Ahk2Exe also **exits 0 on failure**, so verify the `.exe` was actually created.
+1. **Ahk2Exe compile** (gold standard, == CI), at `C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe`. **Run it from PowerShell, never Git Bash** — MSYS path conversion rewrites `/in` `/out` `/base` into Windows paths (`/in` → `C:/Program Files/Git/in`) and the compile dies with "Unrecognised parameter".
 2. **Parse-only harness**: a throwaway `.ahk` with `ExitApp(0)` as its first auto-execute statement, then `#Include` the UI file. AHK parses the whole merged script before running anything, so a syntax error aborts at load while `ExitApp(0)` exits before any included top-level code runs. Launch via `Start-Process -FilePath AutoHotkey64.exe -ArgumentList @("/ErrorStdOut",$script) -Wait -PassThru -RedirectStandardError $err` — a plain `& AutoHotkey64.exe` captures neither exit code nor stderr, because it is a GUI-subsystem app that detaches.
 
-`/validate` is a real headless syntax check, but ONLY when it precedes the script path — in final position it becomes a script argument and the script runs live ([[project_ahk_map_delete_raises_on_missing_key]]). The headless runner writes its TAP report to `%TEMP%\ergopti_test_results.txt`, NOT stdout — read that file for pass/fail. See [[feedback_ahk_source_encoding]].
+**CORRECTED 2026-07-29 — two claims in this entry were measured FALSE on AutoHotkey 2.0.26.** Both
+were re-derived directly; if a future version behaves differently, re-measure before trusting either.
+
+- **`/validate` does NOT validate here, even when it precedes the script path.** The flag is
+  silently ignored: the script is parsed, and *if it parses it RUNS*. Measured on the real driver:
+  with the parse break present the command returned `exit 2` immediately (looking exactly like a
+  working validator); with the break fixed the same command **hung for two minutes and left an
+  orphaned `AutoHotkey64.exe` holding the keyboard hook** after the shell wrapper was killed. Never
+  point it at the driver.
+- **Ahk2Exe does NOT exit 0 on failure.** Measured: syntax error → **exit 17** with
+  `<file> (<line>) : ==> <message>` on stdout and no `.exe`; success → exit 0 plus the `.exe`.
+  Checking the exit code is sufficient, and checking that the `.exe` appeared is a fine belt-and-braces.
+
+**Never read an exit code through a pipe.** `cmd … | head` makes `$?` report *head's* status. An
+audit refuted the real "driver does not start" defect on a `EXIT=0` read this way. Capture first —
+`out=$(cmd 2>&1); rc=$?` — then filter.
+
+**The concrete defect this gap shipped (2026-07-29):** `ui/menu/menu_rebuild.ahk` used an unbraced
+one-line `try` as an `if` body followed by `else`. **AHK v2's `Try` carries its own optional `Else`
+clause**, so the `else` binds to the `try` and the `if`'s `else` is orphaned — `Unexpected "Else"`,
+a load-time abort of the whole driver. The 3 499-test suite stayed fully green because `ui/` is not
+reachable from `run_all.ahk`. Braces on both bodies are the fix; the class is now gated statically
+by `tools/test/test-ahk-v2-syntax-antipatterns.cjs` (runs on every platform, so it does not depend
+on AutoHotkey being installed).
+
+The headless runner writes its TAP report to `%TEMP%\ergopti_test_results.txt`, NOT stdout — read
+that file for pass/fail. See [[feedback_ahk_source_encoding]],
+[[project_audit_evidence_must_be_reproducible]].
 
 ### Coding style and conventions for this project
 

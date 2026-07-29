@@ -190,10 +190,14 @@ LoggerSetLevel(Level) {
 	; which is what the user asked for and is strictly better than reverting it.
 	Persisted := false
 	try Persisted := TOML_Write(Level, ConfigurationFile, "script", "log_level")
-	if !Persisted
+	; Braces are load-bearing: AHK v2's `try` carries its OWN optional `else`
+	; clause, so a one-line `try` as an if-body captures the `else` that was meant
+	; for the `if` and the parser aborts the whole script with `Unexpected "Else"`.
+	if !Persisted {
 		try LoggerError("Menu", "Log level set to {1} for this session, but it could NOT be written to config.toml — it will revert on the next restart.", Level)
-	else
+	} else {
 		try LoggerInfo("Menu", "Log level set to {1}.", Level)
+	}
 	RebuildTrayMenu()
 }
 
