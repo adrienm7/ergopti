@@ -402,7 +402,21 @@ end
 
 --- Centralized entry point for external modules (rules_engine, personal_info)
 --- to emit synthetic keystrokes and accurately sync the core buffer.
-function M.inject_dynamic(deletes, result_text, emit_action, source_variant)
+---
+--- `is_private` is NOT optional decoration: it is the only channel through which
+--- a dynamic injector can tell the keylogger that what it just emitted is a
+--- secret. perform_text_replacement forwards it to notify_synthetic, which keeps
+--- the discard markers intact and redacts only what it persists. Omitting it —
+--- which this function structurally forced, by stopping one argument short —
+--- means an @-tag expansion of an SSN, IBAN, card or phone number is recorded
+--- verbatim in a 14-day log, while the injectors above it carry comments
+--- asserting that exact plaintext must never reach the log.
+--- @param deletes integer Codepoints to erase before injecting.
+--- @param result_text string Logical text the buffer must end up holding.
+--- @param emit_action function Emitter returning (count, emitted[, logical]).
+--- @param source_variant string|nil Telemetry variant tag.
+--- @param is_private boolean|nil True when the payload is PII and must be redacted.
+function M.inject_dynamic(deletes, result_text, emit_action, source_variant, is_private)
 	Expander.perform_text_replacement(
 		deletes,
 		emit_action,
@@ -416,7 +430,8 @@ function M.inject_dynamic(deletes, result_text, emit_action, source_variant)
 		true, -- is_final (suppress rescan)
 		false, -- is_ignored
 		"hotstring",
-		source_variant
+		source_variant,
+		is_private
 	)
 end
 

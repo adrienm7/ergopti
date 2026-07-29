@@ -296,7 +296,13 @@ local function do_expand(combo)
 				-- logical_text stays tab-free so the buffer and the logged record
 				-- hold only what the fields actually inserted.
 				return c, emitted, echoed
-			end, "personal")
+			-- is_private = true: every value this module emits comes from
+			-- personal_info.toml, which rules_engine already treats as PII in its
+			-- entirety when it registers the same data as mappings. The two paths
+			-- must agree — an @-tag expansion of the SSN is exactly as secret as
+			-- the prefix-triggered one, and only this argument tells the keylogger
+			-- to redact what it persists.
+			end, "personal", true)
 		else
 			-- Fallback: emit raw keystrokes without inject_dynamic.
 			-- Only arm the synthetic delete count — not the replacement text. The
@@ -309,7 +315,9 @@ local function do_expand(combo)
 				if type(_keymap.suppress_rescan) == "function" then _keymap.suppress_rescan() end
 			end
 			if keylogger and type(keylogger.notify_synthetic) == "function" then
-				pcall(keylogger.notify_synthetic, emitted, "hotstring", n_back, "personal")
+				-- Same privacy contract as the primary path: this branch reaches
+				-- the identical sink and must carry the identical flag.
+				pcall(keylogger.notify_synthetic, emitted, "hotstring", n_back, "personal", nil, true)
 			end
 			for _ = 1, n_back do
 				eventtap.keyStroke({}, "delete", 0)
