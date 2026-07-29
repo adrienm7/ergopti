@@ -201,6 +201,14 @@ local function new()
 	end
 
 	--- Aborts the in-flight request. The callback is NOT called after cancel().
+	---
+	--- "Aborts" means the RESULT is discarded, not that the socket is torn down.
+	--- hs.http.asyncGet/asyncPost return nothing, so _active_task is nil in
+	--- practice and the :cancel() branch below never runs — the request completes
+	--- at the OS level and its callback self-discards on the generation check.
+	--- The branch is kept for a Hammerspoon version that starts returning a
+	--- handle; what mattered was that the comment implied a teardown the code
+	--- cannot perform, which is worse than the limitation itself.
 	function inst.cancel()
 		_cancelled  = true
 		_generation = _generation + 1
