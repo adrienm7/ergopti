@@ -102,3 +102,40 @@ Test("meta boot-stamps: recorded stamps are drained and replayed without moving 
 	_BPS_StampsAreReplayed)
 Test("meta boot-stamps: the pre-logger boot window is broken into phases",
 	_BPS_ThePreLoggerWindowIsCovered)
+
+
+
+
+; ==============================================================
+; ===== 3.1) The biggest boot segment is attributed ============
+; ==============================================================
+
+; The flat-hotstring submenu loop is the largest post-ready boot segment by a
+; wide margin — measured 1094 ms of a 3406 ms warm boot — and it is repaid in
+; full on every live tray rebuild. Its cost also swings from 31 ms to 1672 ms
+; across boots that shared a commit, so one aggregate mark cannot say which
+; category or which phase owns the time, and any optimisation chosen from that
+; number would be a guess. The per-category marks are what makes the next boot
+; log an answer instead of a question; losing them silently would put the segment
+; back to being unattributable.
+_BPS_TheFlatSubmenuLoopIsAttributed() {
+	Body := _DriverFuncBody("InitSubMenus")
+	Assert(Body != "", "InitSubMenus() must exist in the driver source")
+
+	LoopPos := InStr(Body, "for _, V1Cat in _FLAT_HOTSTRING_V1_CATS")
+	Assert(LoopPos > 0, "prerequisite: InitSubMenus must still build the flat hotstring categories in a loop")
+
+	AggregatePos := InStr(Body, 'BootProfile_Mark("MENU/InitSub: flat hotstring submenus")')
+	Assert(AggregatePos > 0, "the aggregate mark for the whole loop must remain — it is the segment being attributed")
+
+	PerCatPos := InStr(Body, 'BootProfile_Mark("MENU/InitSub: flat cat "')
+	Assert(PerCatPos > 0,
+		"the flat-category loop must mark each category. Without per-category attribution the driver's single "
+		. "largest post-ready boot segment is a number with no explanation, and it is paid again on every tray "
+		. "rebuild (menu-flat-submenu-loop-unattributed)")
+	Assert(PerCatPos > LoopPos and PerCatPos < AggregatePos,
+		"the per-category mark must sit INSIDE the loop, before the aggregate mark — a mark after the loop measures "
+		. "the same thing the aggregate already does")
+}
+Test("meta boot-stamps: the flat-submenu loop is attributed per category (menu-flat-submenu-loop-unattributed)",
+	_BPS_TheFlatSubmenuLoopIsAttributed)
