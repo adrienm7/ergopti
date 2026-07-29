@@ -771,7 +771,15 @@ function M.update_preview(buf)
 			or (primary_match.type == "autocorrect" and "autocorrect" or "personal")
 		if not last_shown_hotstring or last_shown_hotstring.trigger ~= trigger_key then
 			last_shown_hotstring = { trigger = trigger_key, replacement = primary_match.repl, h_type = type_str }
-			keylogger.log_hotstring_suggested(nil, trigger_key, primary_match.repl, type_str)
+			-- Off the HID thread. This is pure telemetry: nothing downstream depends
+			-- on it landing before the keystroke completes, and it ends in a
+			-- synchronous file write on the very callback whose overrun makes macOS
+			-- disable the keyboard tap. The values are captured now so a later
+			-- keystroke cannot change what gets recorded.
+			local t_key, t_repl, t_type = trigger_key, primary_match.repl, type_str
+			TimerScheduler.after(0, function()
+				pcall(keylogger.log_hotstring_suggested, nil, t_key, t_repl, t_type)
+			end)
 		end
 	else
 		-- No hotstring match — let the inactivity timer drive the LLM.

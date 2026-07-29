@@ -475,6 +475,30 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 	-- steady typing, for an answer that is almost always the one already cached.
 	-- Serve the cached value and refresh off the tap; a genuinely DIRTY cache
 	-- still probes synchronously below, because that one really did change.
+	-- The DIRTY branch below is served from cache too, and refreshed off the tap.
+	--
+	-- The TTL-expiry path was already moved off the keyDown callback, with a
+	-- comment naming "a cross-process AX round-trip inside the keyDown tap" as the
+	-- reason. The dirty path was left synchronous on the grounds that the window
+	-- really had changed — but a focus change is precisely the moment the newly
+	-- focused process is most likely to be busy answering something else, and
+	-- hs.window.timeout() is never set anywhere in this driver, so those AX calls
+	-- inherit the system messaging timeout rather than a short one we chose.
+	-- Accepting ONE stale keystroke after an app switch is the same trade already
+	-- accepted for TTL expiry.
+	if _ignored_win_cache_dirty and _ignored_win_cache_value ~= nil then
+		if not _ignored_win_refresh_armed then
+			_ignored_win_refresh_armed = true
+			TimerScheduler.after(0, function()
+				_ignored_win_refresh_armed = false
+				-- Cleared only here, off the tap, so the refresh below actually probes.
+				_ignored_win_cache_dirty = false
+				pcall(M.is_ignored_window, ignored_titles, ignored_patterns, nil)
+			end)
+		end
+		return _ignored_win_cache_value
+	end
+
 	if not _ignored_win_cache_dirty then
 		if not _ignored_win_refresh_armed then
 			_ignored_win_refresh_armed = true
