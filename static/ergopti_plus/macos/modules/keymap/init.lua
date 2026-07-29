@@ -329,6 +329,9 @@ M.source_priority       = Registry.source_priority
 M.is_section_enabled    = Registry.is_section_enabled
 M.disable_section       = Registry.disable_section
 M.enable_section        = Registry.enable_section
+-- Batch form. The menu toggles every section of a group at once, and routing that
+-- through the single-section API rebuilt the group once per section.
+M.set_sections_enabled  = Registry.set_sections_enabled
 M.get_sections          = Registry.get_sections
 M.get_meta_description  = Registry.get_meta_description
 M.set_group_context     = Registry.set_group_context

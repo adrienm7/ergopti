@@ -97,12 +97,25 @@ local function setGroupSectionsFn(ctx, group_name, enable)
 		local km = ctx.keymap
 		local secs = (km and type(km.get_sections) == "function") and km.get_sections(group_name) or nil
 		if type(secs) == "table" then
+			-- Collect first, apply once. Calling the per-section API in a loop
+			-- rebuilt the whole group — and re-sorted the whole corpus — once per
+			-- section, so a single click on a 24-section group paid for 24
+			-- rebuilds and kept the last one.
+			local names = {}
 			for _, sec in ipairs(secs) do
 				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
+					names[#names + 1] = sec.name
+				end
+			end
+			if #names > 0 and type(km.set_sections_enabled) == "function" then
+				pcall(km.set_sections_enabled, group_name, names, enable)
+			else
+				-- Older keymap surface without the batch API: correctness first.
+				for _, name in ipairs(names) do
 					if enable and type(km.enable_section) == "function" then
-						pcall(km.enable_section, group_name, sec.name)
+						pcall(km.enable_section, group_name, name)
 					elseif not enable and type(km.disable_section) == "function" then
-						pcall(km.disable_section, group_name, sec.name)
+						pcall(km.disable_section, group_name, name)
 					end
 				end
 			end
