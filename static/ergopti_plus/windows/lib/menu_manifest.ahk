@@ -144,37 +144,22 @@ MenuManifest_InvalidateCache() {
 ;
 ; On any read or parse failure the fallback hard-coded arrays are returned.
 MenuManifest_LoadHotstringGroups() {
-	global _SharedDir, _MM_HOTSTRING_GROUPS_CACHE
+	global _MM_HOTSTRING_GROUPS_CACHE
 	global _MM_FALLBACK_STANDARD, _MM_FALLBACK_ERGOPTI, _MM_FALLBACK_DYNAMIC
 
 	if (_MM_HOTSTRING_GROUPS_CACHE != false)
 		return _MM_HOTSTRING_GROUPS_CACHE
 
-	FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
+	try LoggerTrace("MenuManifest", "Loading hotstring groups from the shared manifest…")
 
-	; Guard: file must exist before we attempt to read it
-	if !FileExist(FilePath) {
-		try LoggerWarn("MenuManifest", "manifest not found at '{1}' — using fallback lists.", FilePath)
-		return _MM_BuildResult(_MM_FALLBACK_STANDARD, _MM_FALLBACK_ERGOPTI, _MM_FALLBACK_DYNAMIC)
-	}
-
-	try LoggerTrace("MenuManifest", "Loading hotstring groups from '{1}'…", FilePath)
-
-	FileContent := ""
-	try FileContent := FileRead(FilePath, "UTF-8")
-	if FileContent == "" {
-		try LoggerWarn("MenuManifest", "manifest is empty — using fallback lists.")
-		try LoggerDone("MenuManifest", "Hotstring groups fallback: manifest is empty.")
-		return _MM_BuildResult(_MM_FALLBACK_STANDARD, _MM_FALLBACK_ERGOPTI, _MM_FALLBACK_DYNAMIC)
-	}
-
-	; ── Parse the whole manifest via the canonical JSON parser
-	; Variables inside a function are local by default in AHK v2 — no keyword needed
-	Root := ""
-	try Root := JsonParse(FileContent)
+	; Same parsed root as every other loader. This function used to run its own
+	; FileRead + JsonParse of the identical 12.5 KB file — a full extra decode
+	; (~44 ms) paid on the boot path for no gain, since the root is immutable for
+	; the process lifetime. _MM_GetManifestRoot reports its own read/parse
+	; failures with the path, so only the fallback needs handling here.
+	Root := _MM_GetManifestRoot()
 	if !(Root is Map) {
-		try LoggerWarn("MenuManifest", "manifest root is not a JSON object — using fallback lists.")
-		try LoggerDone("MenuManifest", "Hotstring groups fallback: manifest root is invalid.")
+		try LoggerDone("MenuManifest", "Hotstring groups fallback: manifest unavailable.")
 		return _MM_BuildResult(_MM_FALLBACK_STANDARD, _MM_FALLBACK_ERGOPTI, _MM_FALLBACK_DYNAMIC)
 	}
 

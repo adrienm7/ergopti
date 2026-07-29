@@ -30,12 +30,16 @@
 
 #Requires AutoHotkey v2.0
 
-; MenuManifest_LoadHotstringGroups is deliberately exempt. It runs exactly once,
-; at load time (ui/tray_menu.ahk seeds _HotstringGroups from it), so it never
-; pays a per-rebuild decode, and its four traced fallback branches are pinned
-; line by line by tests/meta/test_menu_manifest_lifecycle_pair.ahk - moving its
-; read into the shared accessor would move those branches out of its body.
-_MMSD_EXEMPT := Map("MenuManifest_LoadHotstringGroups", true)
+; MenuManifest_LoadHotstringGroups used to be exempt here, on the grounds that it
+; runs exactly once at load time (ui/tray_menu.ahk seeds _HotstringGroups from
+; it) so it never pays a PER-REBUILD decode, and that
+; tests/meta/test_menu_manifest_lifecycle_pair.ahk pinned its four fallback
+; branches line by line. Neither survives scrutiny: one decode of the 12.5 KB
+; manifest still costs ~44 ms of BOOT time for a file the process has already
+; parsed, and the sibling test pinned the branch SPELLINGS where it meant to
+; guarantee that every traced fallback closes its lifecycle. That assertion has
+; been rewritten to derive its branch set, so the exemption is gone and the whole
+; loader class is held to one decode.
 
 
 
@@ -48,19 +52,17 @@ _MMSD_EXEMPT := Map("MenuManifest_LoadHotstringGroups", true)
 ; ===========================================================
 
 _MMSD_LoadersReuseTheParsedRoot() {
-	global _MMSD_EXEMPT
 	Src := _DriverSourceNoComments()
 	Names := Map()
 	Pos := 1
 	while (Found := RegExMatch(Src, "m)^(MenuManifest_Load\w+)\([^\r\n]*\)\s*\{", &M, Pos)) {
-		if !_MMSD_EXEMPT.Has(M[1])
-			Names[M[1]] := true
+		Names[M[1]] := true
 		Pos := Found + StrLen(M[0])
 	}
-	Assert(Names.Count >= 3,
-		"the manifest-loader class must be derived from driver source and hold at least the three "
-		. "per-rebuild loaders (debug menu, top-level tail, global actions) - an empty class would "
-		. "make this test vacuous")
+	Assert(Names.Count >= 4,
+		"the manifest-loader class must be derived from driver source and hold every public loader "
+		. "(hotstring groups, debug menu, top-level tail, global actions) - an empty or truncated "
+		. "class would make this test vacuous")
 
 	for Name in Names {
 		Body := _DriverFuncBody(Name)
