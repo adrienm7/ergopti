@@ -504,10 +504,18 @@ end
 --- reboot, which is also when KE's in-memory rules state is wiped. This is
 --- a safer signal than tracking login sessions, which can be hard to detect.
 --- @return string|nil
+--- Memoised for the life of the process: the value is the machine's boot time,
+--- so it cannot change while this Lua state exists. Every ownership and
+--- prime-marker check called it, and each call forked /usr/sbin/sysctl and
+--- blocked the run loop for a constant that was already known.
+local _boot_timestamp = nil
+
 local function get_boot_timestamp()
+	if _boot_timestamp then return _boot_timestamp end
 	local out, ok = hs.execute("/usr/sbin/sysctl -n kern.boottime 2>/dev/null")
 	if ok ~= true or type(out) ~= "string" then return nil end
-	return out:match("sec = (%d+)")
+	_boot_timestamp = out:match("sec = (%d+)")
+	return _boot_timestamp
 end
 
 --- True when the KE bridge has been primed in the current boot session.
