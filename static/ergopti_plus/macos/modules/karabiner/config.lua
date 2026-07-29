@@ -18,6 +18,10 @@
 ---    (bare string, {tap,hold} without combo slot) to the current format, and
 ---    seeds any newly added combos from defaults so the saved file stays valid
 ---    across updates.
+--- 4. Corruption Safety: an unparseable config_karabiner.toml is never silently
+---    replaced. The read path falls back to defaults without touching the file
+---    and the write path refuses to publish over it, so the user keeps a file
+---    they can still repair by hand. Only an explicit reset overrides that.
 --- ==============================================================================
 
 local M = {}
@@ -413,9 +417,27 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 end
 
 --- Persists the current full state to config_karabiner.toml.
+--- Refuses to publish over a file that exists but cannot be decoded as TOML:
+--- load_user_config() already falls back to defaults without touching such a
+--- file, so the overwrite performed by the very next setter is where the user's
+--- still-recoverable tap/hold and combo configuration was actually destroyed.
 --- @param state table The current module state table.
 --- @param user_config_path string Absolute path to config_karabiner.toml.
-function M.save_user_config(state, user_config_path)
+--- @param overwrite_corrupt boolean|nil True only for the explicit reset-to-defaults
+---        action — the one case where clobbering an unparseable file is the intent.
+--- @return boolean True when the state reached disk, false when nothing was saved.
+function M.save_user_config(state, user_config_path, overwrite_corrupt)
+	if not overwrite_corrupt then
+		-- Re-reading before every save is cheap (a few KB, only on user action)
+		-- and is the only way to notice that the file went bad since boot.
+		local _, err = M._load_toml_file(user_config_path)
+		if err == "parse_error" then
+			Logger.error(LOG, "Refusing to overwrite the unparseable user config at '%s' — settings NOT saved. Repair or delete the file, or reset the Karabiner settings to defaults to rewrite it.",
+				user_config_path)
+			return false
+		end
+	end
+
 	local ok, payload = pcall(TomlCodec.encode, {
 		karabiner = {
 			enabled = state.enabled == true,
@@ -433,7 +455,7 @@ function M.save_user_config(state, user_config_path)
 	})
 	if not ok or type(payload) ~= "string" then
 		Logger.error(LOG, "Failed to encode user config as TOML.")
-		return
+		return false
 	end
 
 	-- Atomic write via .tmp + rename.
@@ -441,7 +463,7 @@ function M.save_user_config(state, user_config_path)
 	local fh  = io.open(tmp, "w")
 	if not fh then
 		Logger.error(LOG, "Cannot write user config at '%s'.", user_config_path)
-		return
+		return false
 	end
 	fh:write(payload); fh:close()
 	-- This is the ONLY persistence path for every Karabiner setting, and the
@@ -452,9 +474,10 @@ function M.save_user_config(state, user_config_path)
 	if not ok_rename or not renamed then
 		Logger.error(LOG, "Cannot publish user config to '%s' — settings NOT saved (staged at '%s').",
 			user_config_path, tmp)
-		return
+		return false
 	end
 	Logger.debug(LOG, "User config saved.")
+	return true
 end
 
 return M
