@@ -180,12 +180,37 @@ const RULES = [
 			f.endsWith('.md'),
 	},
 	{
+		gate: 'hs-e2e',
+		// Exact sibling of the ahk-e2e rule above. Its absence is how a keymap
+		// change shipped that left the macOS e2e harness red while the unit suite
+		// stayed fully green: the two tiers are disjoint, and only CI ran the
+		// second one. Excluding tests/ mirrors ahk-e2e — editing the harness
+		// itself does not need a behaviour re-run.
+		why: 'driver behaviour changed, and the e2e runner exercises the expansion pipeline end to end',
+		match: (f) =>
+			f.startsWith('static/ergopti_plus/macos/') &&
+			f.endsWith('.lua') &&
+			!f.includes('/tests/'),
+	},
+	{
 		gate: 'hs',
 		why: 'the macOS driver changed',
 		// Markdown under a driver tree is documentation, not driver code: it cannot
 		// break a Lua suite, and running one for a README edit trains people to
 		// ignore the tool's answer.
 		match: (f) => f.startsWith('static/ergopti_plus/macos/') && !f.endsWith('.md'),
+	},
+	{
+		gate: 'linux-e2e',
+		// Found by tools/test/test-e2e-gate-symmetry.cjs, not by a bug report: the
+		// Linux driver ships tests/e2e/run_e2e.lua and a CI job for it, and had the
+		// same missing rule macOS did. Widening the guard to the whole class is
+		// what surfaced it.
+		why: 'driver behaviour changed, and the e2e runner exercises the expansion pipeline end to end',
+		match: (f) =>
+			f.startsWith('static/ergopti_plus/linux/') &&
+			f.endsWith('.lua') &&
+			!f.includes('/tests/'),
 	},
 	{
 		gate: 'linux',
@@ -223,26 +248,31 @@ function runNpm(script) {
 	return spawnSync('npm', ['run', script], { cwd: REPO_ROOT, stdio: 'inherit', shell: true });
 }
 
+// How each gate is actually executed. A TABLE rather than a switch so a test can
+// assert that every rule above resolves to a real command without spawning any of
+// them: a rule whose gate has no entry here selects silently and runs nothing,
+// which is indistinguishable from "the gate passed".
+const GATE_COMMANDS = {
+	'ahk-encoding': { npm: 'test:ahk-encoding' },
+	js: { npm: 'test:js' },
+	hs: { npm: 'test:hs' },
+	'hs-e2e': { npm: 'test:hs:e2e' },
+	linux: { npm: 'test:linux' },
+	'linux-e2e': { npm: 'test:linux:e2e' },
+	'ahk-suite': { ahk: 'run_all.ahk' },
+	'ahk-e2e': { ahk: 'e2e/run_e2e.ahk' },
+};
+
 function runGate(gate) {
-	const ahk = findAhk();
-	switch (gate) {
-		case 'ahk-encoding':
-			return runNpm('test:ahk-encoding');
-		case 'js':
-			return runNpm('test:js');
-		case 'hs':
-			return runNpm('test:hs');
-		case 'linux':
-			return runNpm('test:linux');
-		case 'ahk-suite':
-			if (!ahk) return { skipped: 'AutoHotkey v2 not installed on this machine' };
-			return spawnSync(ahk, ['run_all.ahk'], { cwd: WINDOWS_TESTS, stdio: 'inherit' });
-		case 'ahk-e2e':
-			if (!ahk) return { skipped: 'AutoHotkey v2 not installed on this machine' };
-			return spawnSync(ahk, ['e2e/run_e2e.ahk'], { cwd: WINDOWS_TESTS, stdio: 'inherit' });
-		default:
-			return { status: 0 };
+	const spec = GATE_COMMANDS[gate];
+	// Fail loudly instead of reporting a pass for a gate nobody wired up.
+	if (!spec) {
+		return { error: new Error(`gate "${gate}" has no command in GATE_COMMANDS`) };
 	}
+	if (spec.npm) return runNpm(spec.npm);
+	const ahk = findAhk();
+	if (!ahk) return { skipped: 'AutoHotkey v2 not installed on this machine' };
+	return spawnSync(ahk, [spec.ahk], { cwd: WINDOWS_TESTS, stdio: 'inherit' });
 }
 
 // ==================================================
@@ -323,4 +353,12 @@ function main() {
 	return 0;
 }
 
-process.exit(main());
+// Exported so a regression test can assert which gates a change SELECTS, and that
+// every selectable gate resolves to a real command, without spawning any suite.
+// The auto-run stays guarded on require.main so `node verify-change.cjs` behaves
+// exactly as before.
+module.exports = { RULES, GATE_COMMANDS, selectGates };
+
+if (require.main === module) {
+	process.exit(main());
+}
