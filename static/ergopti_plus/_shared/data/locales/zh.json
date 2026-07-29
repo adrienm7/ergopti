@@ -1415,7 +1415,7 @@
 	"sfbsreduction.comma": "逗号减少同指二合字母",
 	"sfbsreduction.ecirc": "Ê 减少同指二合字母",
 	"sfbsreduction.egrave": "È 减少同指二合字母",
-	"sfbsreduction.ié": "IE 减少 IE/EI 二合字母",
+	"sfbsreduction.ieacute": "IE 减少 IE/EI 二合字母",
 	"sg_actions.activity_simulation": "🖱 模拟活动（防休眠）",
 	"sg_actions.alt_tab_monitor": "Alt-Tab（显示器）",
 	"sg_actions.app_expose": "◱ App Exposé",

@@ -1415,7 +1415,7 @@
 	"sfbsreduction.comma": "Komma reducerer bigrammer for samme finger",
 	"sfbsreduction.ecirc": "Ê reducerer bigrammer for samme finger",
 	"sfbsreduction.egrave": "È reducerer bigrammer for samme finger",
-	"sfbsreduction.ié": "IE reducerer IE/EI-bigrammer",
+	"sfbsreduction.ieacute": "IE reducerer IE/EI-bigrammer",
 	"sg_actions.activity_simulation": "🖱 Simuler aktivitet (anti-dvalebil)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (skærm)",
 	"sg_actions.app_expose": "◱ App Exposé",

@@ -1415,7 +1415,7 @@
 	"sfbsreduction.comma": "カンマが同指バイグラムを減らす",
 	"sfbsreduction.ecirc": "Êが同指バイグラムを減らす",
 	"sfbsreduction.egrave": "Èが同指バイグラムを減らす",
-	"sfbsreduction.ié": "IEがIE/EIバイグラムを減らす",
+	"sfbsreduction.ieacute": "IEがIE/EIバイグラムを減らす",
 	"sg_actions.activity_simulation": "🖱 アクティビティをシミュレート（スリープ防止）",
 	"sg_actions.alt_tab_monitor": "Alt-Tab（モニター）",
 	"sg_actions.app_expose": "◱ アプリExposé",
