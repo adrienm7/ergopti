@@ -159,14 +159,23 @@ ReadPersonalToml() {
 	; The unreadable-file sentinel is the same one the config readers use, so the
 	; writer can ask rather than guess.
 	Raw := ""
+	global _TomlUnreadableFiles
 	try {
 		Raw := FileRead(FilePath, "UTF-8")
 	} catch as Err {
-		global _TomlUnreadableFiles
 		_TomlUnreadableFiles[FilePath] := true
 		try LoggerError("PersonalToml", "Cannot read '{1}': {2}. No personal hotstrings are loaded this session, and writes to this file are blocked so the empty result cannot replace its contents.", FilePath, Err.Message)
 		return Result
 	}
+	; Lower the latch the catch above raises. It is keyed by PATH in a
+	; process-wide Map, and the only other code that clears it is ReadTomlFile —
+	; which is never reached for this path when every personal section is
+	; disabled. So one transient boot lock blocked EVERY personal-hotstrings save
+	; for the rest of the session, even though this very reader had since
+	; succeeded and _ReadPersonalTomlCache held the user's real model. The reader
+	; that raises the latch has to be the reader that lowers it.
+	if (IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath))
+		_TomlUnreadableFiles.Delete(FilePath)
 	; Normalise to LF so every line ends cleanly — eliminates CRLF anchor bugs
 	FileContent := StrReplace(Raw, "`r`n", "`n")
 	FileContent := StrReplace(FileContent, "`r", "`n")
@@ -393,12 +402,28 @@ ReadPersonalInfoToml(FilePath) {
 		return
 	}
 
+	global _TomlUnreadableFiles
 	try {
 		FileContent := FileRead(FilePath, "UTF-8")
 	} catch as e {
-		LoggerError("hotstrings", "Could not read personal info TOML '{1}': {2}.", FilePath, e.Message)
+		; Latch the failure the way the personal_hotstrings.toml sibling above
+		; already does. The placeholder identity left in PersonalInformation
+		; ("Prénom", "FR00 0000 …", "1234 5678 9012 3456", "1 99 99 99 999 999
+		; 99") is byte-for-byte what a user who never filled the form produces,
+		; so WritePersonalInfoToml cannot tell the two apart at write time — and
+		; by then the transient lock has cleared, so every write-time re-check
+		; would pass. Without the latch, opening the editor once and clicking OK
+		; overwrites the user's real IBAN, card number and SSN with the shipped
+		; placeholders, unrecoverably.
+		if IsSet(_TomlUnreadableFiles)
+			_TomlUnreadableFiles[FilePath] := true
+		LoggerError("hotstrings", "Could not read personal info TOML '{1}': {2}. Writes to this file are blocked so the placeholder identity cannot replace its contents.", FilePath, e.Message)
 		return
 	}
+	; The read succeeded: the in-memory identity is the user's again, so the
+	; writer may run. Same lower-what-you-raise rule as ReadPersonalToml.
+	if (IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath))
+		_TomlUnreadableFiles.Delete(FilePath)
 	NextInformation := PersonalInformation.Clone()
 	NextLetters := Map()
 	SawLetters := false
@@ -453,6 +478,18 @@ ReadPersonalInfoToml(FilePath) {
 ; Serialise PersonalInformation and PersonalInformationLetters to personal_info.toml.
 WritePersonalInfoToml(FilePath) {
 	global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
+	; Refuse while the file is flagged unreadable, exactly as WritePersonalToml
+	; does for personal_hotstrings.toml. A failed read leaves the compiled-in
+	; placeholder identity in memory, and this writer serialises EVERY key of
+	; PersonalInformation / PersonalInformationLetters over the file — so one
+	; transient lock at boot plus one visit to the editor destroys the user's
+	; real name, address, IBAN, card number and social-security number.
+	; EnsurePersonalInfoTomlFile only writes when the file does NOT exist, so
+	; this guard cannot block first-install materialisation.
+	if (IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath)) {
+		try LoggerError("PersonalToml", "Refusing to write '{1}': it could not be read, so the identity in memory is the shipped placeholder rather than the user's. Reopen the editor once the file is readable.", FilePath)
+		return False
+	}
 	_ReadPersonalInfoTomlCache := false ; Invalidate
 	Q := Chr(34)
 	Lines := []
@@ -561,6 +598,21 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
 	; "Category"/"Section" (Meta.Category . "." . Meta.Section).
 	Group := "personal." . SectionName
 	HSE_ClearGroupForReload(Group)
+	; Resolve the expansion delay through the SAME cascade LoadHotstringsSection
+	; uses at boot (toml_loader.ahk). This used to be a hardcoded 0, and 0 is a
+	; legal value that DISABLES the time gate — so saving anything from the
+	; editor silently removed the 0.75 s window every personal spec is registered
+	; with at boot, for the rest of the session. The tooltip kept dequeueing its
+	; row at the resolved delay while the engine had stopped enforcing it, so the
+	; preview and the engine permanently disagreed about the expansion window.
+	ResolvedDelay := 0
+	try {
+		Resolved := HotstringsResolve("personal", SectionName)
+		if (Resolved.Delay != "")
+			ResolvedDelay := Resolved.Delay
+	} catch as DelayErr {
+		try LoggerWarn("PersonalToml", "Could not resolve the expansion delay for section '{1}': {2}. Registering without a time gate.", SectionName, DelayErr.Message)
+	}
 	for E in Data["sections"][SectionName]["entries"] {
 		Trigger := StrReplace(E["trigger"], "★", ScriptInformation["MagicKey"])
 		Output := E["output"]
@@ -583,7 +635,7 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
 			? E["priority"]
 			: _HSE_SourcePriority("personal")
 		Options := Map(
-			"TimeActivationSeconds", 0,
+			"TimeActivationSeconds", ResolvedDelay,
 			"FinalResult", E["final_result"],
 			"Category", "personal",
 			; Without this, HSE_Register's Group derivation requires BOTH
