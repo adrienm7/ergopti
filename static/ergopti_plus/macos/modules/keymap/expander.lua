@@ -23,6 +23,7 @@ local hs = hs
 local text_utils = require("lib.text_utils")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("lib.logger")
+local CoreStateM = require("modules.keymap.state")
 local TextSender = require("adapters.text_sender")
 local TooltipRenderer  = require("adapters.tooltip_renderer")
 local TerminatorReplay = require("modules.keymap.terminator_replay")
@@ -167,7 +168,9 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		end)
 	end
 
-	if is_final then _state.suppress_rescan(1.0) end
+	-- Named constant rather than a bare 1.0: it is deliberately DOUBLE the module
+	-- default, and that relationship is invisible when the literal sits here.
+	if is_final then _state.suppress_rescan(CoreStateM.FINAL_RESULT_SUPPRESS_SEC) end
 
 	if not is_ignored and _llm.get_llm_enabled() then
 		_llm.start_timer()
@@ -347,6 +350,17 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	local trig_len         = m.tlen
 	local char_offset      = is_ignored and 0 or char_len
 	local screen_len       = trig_len - char_offset
+	-- Clamped at zero. A trigger shorter than the typed event's codepoint count
+	-- (a multi-codepoint composed character arriving as one event) made this
+	-- negative, and the negative flowed straight into expected_synthetic_deletes:
+	-- the counter then read as "fewer than zero deletes outstanding", so the NEXT
+	-- expansion's real deletes were mis-accounted and its echoes leaked into the
+	-- buffer as human keystrokes.
+	if screen_len < 0 then
+		Logger.warn(LOG, "Trigger shorter than the typed event (%d < %d) — clamping deletes to 0.",
+			trig_len, char_offset)
+		screen_len = 0
+	end
 	local deletes, to_type = screen_len, repl_text
 
 	if repl_text == eff_repl then
