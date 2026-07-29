@@ -28,6 +28,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Shell  = require("adapters.shell_runner")
 
 local LOG = "adapters.tooltip_renderer"
 
@@ -60,11 +61,16 @@ local _backend  = nil   -- "yad", "zenity", or nil
 -- =========================================
 -- =========================================
 
+--- Selects the tooltip backend once.
+--- Probing goes through Shell.has_command because comparing os.execute()'s
+--- result against 0 is the Lua 5.1/LuaJIT spelling only: from Lua 5.2 on the
+--- same success is reported as `true`, so both probes read as "absent" and the
+--- adapter warned that neither tool was installed even when both were.
 local function _detect_backend()
 	if _backend then return _backend end
-	if os.execute("which yad >/dev/null 2>&1") == 0 then
+	if Shell.has_command("yad") then
 		_backend = "yad"
-	elseif os.execute("which zenity >/dev/null 2>&1") == 0 then
+	elseif Shell.has_command("zenity") then
 		_backend = "zenity"
 	else
 		Logger.warn(LOG, "Neither yad nor zenity is installed — tooltips unavailable.")

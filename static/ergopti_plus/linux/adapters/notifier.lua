@@ -21,6 +21,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Shell  = require("adapters.shell_runner")
 
 local LOG = "adapters.notifier"
 
@@ -57,18 +58,23 @@ local KIND_URGENCY = {
 ---                        kind  string  "info" | "warn" | "error" (default "info").
 function M.send(title, opts)
 	-- TODO(linux): implement via D-Bus org.freedesktop.Notifications or notify-send
+	-- Guard explicitly: quote() degrades a nil title to an empty argument, which
+	-- would post a blank notification instead of reporting the caller's mistake.
+	if type(title) ~= "string" then
+		Logger.error(LOG, "send(): title must be a string, got %s — notification dropped.", type(title))
+		return
+	end
 	local options  = type(opts) == "table" and opts or {}
 	local body     = type(options.body) == "string" and options.body or ""
 	local kind     = type(options.kind) == "string" and options.kind or "info"
 	local urgency  = KIND_URGENCY[kind] or "normal"
 
 	local ok, err = pcall(function()
-		-- Escape single quotes in title and body to avoid shell injection.
-		local safe_title = title:gsub("'", "'\\''")
-		local safe_body  = body:gsub("'", "'\\''")
+		-- Quoting goes through the shell_runner so the driver has exactly one
+		-- escaping implementation to keep correct, instead of one per call site.
 		local cmd = string.format(
-			"notify-send --urgency=%s '%s' '%s' 2>/dev/null",
-			urgency, safe_title, safe_body
+			"notify-send --urgency=%s %s %s 2>/dev/null",
+			urgency, Shell.quote(title), Shell.quote(body)
 		)
 		-- Test seam: io.popen never RAISES on unescaped input, it executes it, so
 		-- a test that only checks "nothing crashed" passes whether or not the
