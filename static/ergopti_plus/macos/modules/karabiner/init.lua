@@ -454,6 +454,9 @@ end
 
 --- Resets all settings to their defaults and saves the user config.
 --- Does NOT regenerate — call M.regenerate() explicitly when ready.
+--- This is the only save allowed to overwrite an unparseable config file: every
+--- other setter refuses, so without this the user could never repair a corrupt
+--- config from the UI.
 function M.reset_to_defaults()
 	if not require_state("reset_to_defaults") then return end
 	Logger.start(LOG, "Resetting all settings to defaults…")
@@ -464,7 +467,7 @@ function M.reset_to_defaults()
 	_state.sticky_timeout_ms         = defaults.sticky_timeout_ms
 	_state.simultaneous_threshold_ms = defaults.simultaneous_threshold_ms
 	_state.combo_symmetric           = defaults.combo_symmetric
-	Config.save_user_config(_state, resolve_user_config())
+	Config.save_user_config(_state, resolve_user_config(), true)
 	Logger.success(LOG, "All settings reset to defaults.")
 end
 
@@ -684,8 +687,13 @@ function M.init(file_system)
 	local tab_cfg      = user_cfg.tap_hold_config and user_cfg.tap_hold_config.tab
 	if type(tab_cfg) == "table" and tab_cfg.tap == "cmd_tab" then
 		tab_cfg.tap = "alt_tab_windows"
-		Config.save_user_config(user_cfg, resolve_user_config())
-		Logger.info(LOG, "Migrated tab.tap: 'cmd_tab' → 'alt_tab_windows'.")
+		-- The save is refused when the file on disk is unparseable, so announcing
+		-- the migration unconditionally would claim a persistence that never happened.
+		if Config.save_user_config(user_cfg, resolve_user_config()) then
+			Logger.info(LOG, "Migrated tab.tap: 'cmd_tab' → 'alt_tab_windows'.")
+		else
+			Logger.warn(LOG, "tab.tap migrated in memory only — the user config was not written.")
+		end
 	end
 
 	_state = {
@@ -721,8 +729,12 @@ function M.init(file_system)
 
 	-- Persist immediately on first launch so the file exists for future runs
 	if first_launch then
-		Config.save_user_config(_state, resolve_user_config())
-		Logger.info(LOG, "Default config written to '%s'.", resolve_user_config())
+		if Config.save_user_config(_state, resolve_user_config()) then
+			Logger.info(LOG, "Default config written to '%s'.", resolve_user_config())
+		else
+			Logger.error(LOG, "Default config could NOT be written to '%s' — settings will not survive a restart.",
+				resolve_user_config())
+		end
 	end
 
 	-- Gestures engine is an optional dependency: it provides the any-touch hook
