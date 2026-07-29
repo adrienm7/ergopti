@@ -130,21 +130,11 @@ local _pgid_pending_timeout = nil
 -- cannot resolve (e.g. cross-session leftover whose PGID was wrongly adopted as the
 -- active guard). The hook receives the expected short model name and is responsible
 -- for invoking start_server with the correct target.
-local _restart_hook = nil
 
---- Registers a callback that api_mlx invokes when it cannot recover from a model-ID
---- mismatch on its own and needs the menu layer to relaunch the server.
---- @param fn function|nil Callback receiving the expected model name, or nil to clear.
-function M.set_restart_hook(fn)
-	_restart_hook = (type(fn) == "function") and fn or nil
-	Logger.debug(LOG, "Restart hook %s.", _restart_hook and "registered" or "cleared")
-end
 
 --- Cooldown so we don't spam restart requests when the discovery loop fires repeatedly
 --- before the new server has had time to come up. 10 s is enough for bash to do its
 --- kill+lsof loop and for the new mlx_lm to start binding port 8080.
-local RESTART_HOOK_MIN_INTERVAL_SEC = Timings.sec("llm", "restart_hook_min_interval_ms")
-local _last_restart_hook_at = 0
 
 -- Timestamp of the most recent set_active_server_pgid() call. Used by discover_endpoints
 -- to grant a "fresh launch" grace window during which a mismatched /v1/models model ID
