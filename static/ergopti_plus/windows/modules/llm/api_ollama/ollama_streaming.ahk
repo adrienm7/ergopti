@@ -61,9 +61,14 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
 		; by failing the displaced job before overwriting it. Without this a
 		; future consumer that advances a state machine on the callback would
 		; stall forever on the dropped job.
+		displaced := ""
 		if (_LLM_Ollama_Pending is Map and _LLM_Ollama_Pending.Has("on_fail"))
-			try _LLM_Ollama_Pending["on_fail"]()
+			displaced := _LLM_Ollama_Pending["on_fail"]
+		; Overwrite the slot BEFORE firing the displaced callback: on_fail re-enters
+		; the engine, and a re-entrant dispatch that still found the displaced job
+		; parked here would fail it a second time, breaking the exactly-once contract.
 		_LLM_Ollama_Pending := job
+		_LLM_InvokeCallback(displaced, "on_fail")
 		try LoggerInfo("LLM.ollama", "Ollama busy — coalescing request #{1} until slot free.", req_id)
 		return req_id
 	}
@@ -126,14 +131,14 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job) {
 		try LoggerInfo("LLM.ollama", "Deferred spawn for req {1} skipped — {2}.",
 			req_id, A_IsSuspended ? "suspended" : "cancelled before dispatch")
 		_LLM_Ollama_Async.Delete(req_id)
-		try job["on_fail"]()
+		_LLM_InvokeCallback(job.Has("on_fail") ? job["on_fail"] : "", "on_fail")
 		_LLM_Ollama_DrainPending()
 		return
 	}
 	if !FSWrite(tmp_payload, payload) {
 		try LoggerWarn("LLM.ollama", "Failed to write curl payload file.")
 		_LLM_Ollama_Async.Delete(req_id)
-		try job["on_fail"]()
+		_LLM_InvokeCallback(job.Has("on_fail") ? job["on_fail"] : "", "on_fail")
 		_LLM_Ollama_DrainPending()
 		return
 	}
@@ -150,7 +155,7 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job) {
 		try FSDelete(tmp_payload)
 		try LoggerWarn("LLM.ollama", "curl launch failed: {1}.", err.Message)
 		_LLM_Ollama_Async.Delete(req_id)
-		try job["on_fail"]()
+		_LLM_InvokeCallback(job.Has("on_fail") ? job["on_fail"] : "", "on_fail")
 		_LLM_Ollama_DrainPending()
 		return
 	}
@@ -247,9 +252,11 @@ LLM_OllamaCancelAllAsync() {
 	; calls this from Ergopti_OnSuspendEnter -> LLM_Engine_StopGeneration). Honour
 	; the async contract by failing the displaced job exactly once before dropping.
 	if (_LLM_Ollama_Pending is Map) {
-		if _LLM_Ollama_Pending.Has("on_fail")
-			try _LLM_Ollama_Pending["on_fail"]()
+		displaced := _LLM_Ollama_Pending.Has("on_fail") ? _LLM_Ollama_Pending["on_fail"] : ""
+		; Drop the slot before firing so a callback that re-enters the dispatcher
+		; cannot find — and fail — the same job twice.
 		_LLM_Ollama_Pending := ""
+		_LLM_InvokeCallback(displaced, "on_fail")
 	}
 }
 
@@ -531,7 +538,7 @@ _LLM_Ollama_TrimAsyncRegistry() {
 	; fire. Without this the caller (e.g. the prediction engine slot state
 	; machine) hangs forever waiting for a callback that will never arrive.
 	if oldest_entry.Has("on_fail") and oldest_entry["on_fail"] is Func
-		try oldest_entry["on_fail"].Call()
+		_LLM_InvokeCallback(oldest_entry["on_fail"], "on_fail")
 	_LLM_Ollama_Async.Delete(oldest_id)
 }
 
