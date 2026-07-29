@@ -209,10 +209,20 @@ MF_StopFocusRefresh() {
 }
 
 MF_ShouldFilter() {
+    ; Last window title the private-browsing pattern scan ran on, with its
+    ; verdict. The seven RegExMatch calls below used to run on EVERY logged
+    ; event; the title they read only changes when MF_RefreshFocus publishes a
+    ; new snapshot (50 ms TTL), so scanning it again per keystroke re-derived a
+    ; value that could not have changed. Same build-then-swap discipline as
+    ; MetricsFocusCache: title and verdict are published together through a
+    ; single reference assignment, so a timer interrupting mid-scan can never
+    ; expose a new title paired with the old (possibly "not private") verdict.
+    static _private_memo := { title: "", is_private: false }
+
     ; Focus cache is refreshed off-thread by the periodic timer started in
     ; MF_StartFocusRefresh() — NEVER call MF_RefreshFocus() synchronously
     ; here (it does blocking WinGet* calls that stall the keystroke hook).
-    
+
     ; Capture the reference once so all subsequent property reads are
     ; consistent with each other even if a background refresh occurs.
     s := MetricsFocusCache.state
@@ -258,12 +268,24 @@ MF_ShouldFilter() {
             return true
     }
 
-    ; 4. Private browsing (title pattern match).
+    ; 4. Private browsing (title pattern match), memoized on the title itself.
     if MetricsFilters.private_browsing && title != "" {
-        for _, pat in MF_PRIVATE_TITLE_PATTERNS {
-            if RegExMatch(title, pat)
-                return true
+        memo := _private_memo
+        ; Case-sensitive compare: two titles differing only in case are two
+        ; different titles, and the patterns are already case-insensitive.
+        if (title !== memo.title) {
+            is_private := false
+            for _, pat in MF_PRIVATE_TITLE_PATTERNS {
+                if RegExMatch(title, pat) {
+                    is_private := true
+                    break
+                }
+            }
+            memo := { title: title, is_private: is_private }
+            _private_memo := memo
         }
+        if memo.is_private
+            return true
     }
     return false
 }
