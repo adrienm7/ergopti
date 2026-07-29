@@ -618,25 +618,55 @@ global UIA_SELECTION_MAX_TEXT_CHARS := 8192
 _UIA_ClampSelectionTimeouts() {
 	global UIA_TRANSACTION_TIMEOUT_MS, UIA_CONNECTION_TIMEOUT_MS
 	static Clamped := false
+	; Throttles the diagnostics below to one line per process. This runs twice a
+	; second, so an unthrottled warning would itself become the flood it exists to
+	; report.
+	static Warned := false
 	if Clamped
 		return
 	if !IsSet(UIA)
 		return
 	if (!IsSet(UIA_TRANSACTION_TIMEOUT_MS) or !IsSet(UIA_CONNECTION_TIMEOUT_MS)) {
-		try LoggerWarn("Layout", "UIA timeout constants are unavailable — the selection poll would run against Windows' 2000 ms default; skipping the clamp.")
+		if !Warned {
+			Warned := true
+			try LoggerWarn("Layout", "UIA timeout constants are unavailable — the selection poll would run against Windows' 2000 ms default; skipping the clamp.")
+		}
 		return
 	}
-	Clamped := true
 	; Both properties are IUIAutomation2 vtable slots; an older interface must not
 	; throw into this callback, which shares the keystroke-dispatch thread.
-	try {
-		if !UIA.IsIUIAutomation2Available
-			return
-	} catch {
+	Supported := false
+	try Supported := UIA.IsIUIAutomation2Available ? true : false
+	if !Supported {
+		; Latch: there is nothing to retry on an older interface. But SAY so — the
+		; poll now runs against Windows' 2000 ms transaction default, and the
+		; caller's own comment promises the round trip is bounded before it starts.
+		Clamped := true
+		if !Warned {
+			Warned := true
+			try LoggerWarn("Layout", "IUIAutomation2 is unavailable — the selection poll runs against Windows' 2000 ms transaction default and cannot be bounded here.")
+		}
 		return
 	}
+	; Latch only once the writes have LANDED. Setting the flag before attempting
+	; them meant a failed write left the driver believing it was clamped, for the
+	; whole session, with two bare `try`s swallowing the reason (conventions 5.3).
+	; That is the exact state behind the worst stall this driver ever logged.
+	Ok := true
 	try UIA.TransactionTimeout := UIA_TRANSACTION_TIMEOUT_MS
+	catch
+		Ok := false
 	try UIA.ConnectionTimeout := UIA_CONNECTION_TIMEOUT_MS
+	catch
+		Ok := false
+	if Ok {
+		Clamped := true
+		return
+	}
+	if !Warned {
+		Warned := true
+		try LoggerWarn("Layout", "Could not apply the UIA timeout clamp — the selection poll is NOT bounded; retrying on the next tick.")
+	}
 }
 
 ; Background timer to poll the current UIA selection. Moves the expensive
