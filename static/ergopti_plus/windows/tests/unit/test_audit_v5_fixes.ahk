@@ -26,23 +26,26 @@ _AuditV5_ReadSrc(RelPath) {
 ; ===== 1) crypto.ahk -- stream.Position := 3 skips the UTF-8 BOM
 ; =======================================================================
 
+; The original invariant here — "the BOM must not end up in the hash input" — is
+; still exactly right, but it was expressed as a source assertion about the ADODB
+; implementation, and that implementation was later PROVEN unable to run at all:
+; ADODB.Stream only permits a Type switch while Position is 0, so the very line
+; this test demanded (`Position := 3` before `Type := 1`) raised 0x800A0C93 on
+; every call and the adapter always fell through to the 8-char DJB2 fallback. The
+; source form could therefore be satisfied by code that never executed.
+;
+; Restated behaviourally against the real digest, which is strictly stronger: if
+; anything — a BOM, a terminating NUL, the wrong text encoding — were prepended
+; or appended to the hash input, the digest would not match the canonical value.
 TestAuditV5_CryptoBomSkip() {
-	Src := _AuditV5_ReadSrc("adapters\crypto.ahk")
-
-	; The bug: stream.Position := 0 before Type := 1 + Read() included the 3-byte
-	; BOM that ADODB.Stream prepends when Charset := "utf-8", yielding a hash of
-	; Chr(0xEF) Chr(0xBB) Chr(0xBF) + data instead of data alone.
-	; The fix: advance the position past the 3-byte BOM before switching to binary mode.
-	AssertFalse(
-		InStr(Src, "stream.Position := 0"),
-		"crypto.ahk must not reset stream.Position to 0 (includes the UTF-8 BOM in the hash input)"
-	)
+	Got := CryptoSha256("hello")
 	AssertTrue(
-		InStr(Src, "stream.Position := 3"),
-		"crypto.ahk must set stream.Position := 3 to skip the ADODB.Stream UTF-8 BOM"
+		Got = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+		"CryptoSha256('hello') must hash the UTF-8 bytes ALONE — a leading BOM, a trailing NUL "
+		. "or a UTF-16 encoding all change the digest; got: " . Got
 	)
 }
-Test("Audit-v5: CryptoSha256 skips ADODB UTF-8 BOM by setting stream.Position := 3", TestAuditV5_CryptoBomSkip)
+Test("Audit-v5: CryptoSha256 hashes the bare UTF-8 bytes, with no BOM", TestAuditV5_CryptoBomSkip)
 
 
 
