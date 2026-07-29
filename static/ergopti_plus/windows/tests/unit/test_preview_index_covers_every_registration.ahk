@@ -145,7 +145,7 @@ _PICR_PackTriggersReachTheIndex() {
 ; — the same user-visible symptom, through a different mechanism, with the same
 ; positively-successful log line.
 _PICR_EveryAcceptedShapeIsIndexed() {
-	global ScriptInformation
+	global ScriptInformation, HSE_PRIORITY_PACKAGE
 	Root := _PICR_MakeFixture()
 	Saved := ScriptInformation.Has("PersonalHotstringsDir") ? ScriptInformation["PersonalHotstringsDir"] : ""
 	ScriptInformation["PersonalHotstringsDir"] := Root
@@ -163,6 +163,19 @@ _PICR_EveryAcceptedShapeIsIndexed() {
 			'a bare key = "value" entry must be indexed: LoadExtTomlFile registers that shape through '
 			. 'CreateCaseSensitiveHotstrings, so it expands. Matching only the inline-table pattern here left it '
 			. 'un-previewable (preview-index-grammar-stricter-than-engine)')
+		; The preview ranks colliding candidates by Priority so the non-dimmed row
+		; is the one the engine will fire. LoadExtTomlFile registers every ext-pack
+		; entry at HSE_PRIORITY_PACKAGE, while the index's own fallback is
+		; HSE_PRIORITY_COMMON — reached here because a pack's Category is its LABEL,
+		; which HotstringsResolve knows nothing about. A pack trigger colliding with
+		; a bundled one therefore previewed as the LOSER and fired as the winner.
+		Assert(Set.Has("sbx") and IsObject(Set["sbx"]),
+			"prerequisite: the pack entry must be in the trigger set to inspect its rank")
+		AssertEqual(HSE_PRIORITY_PACKAGE, Set["sbx"].Priority,
+			"an extension-pack preview must be ranked at the priority the ENGINE fires it at. Ranking it at the "
+			. "common default makes the tooltip name one expansion while the engine performs another whenever a "
+			. "pack trigger collides with a bundled one — preview-without-fire, the visible lie "
+			. "(ext-pack-preview-ranked-below-its-fire)")
 		Assert(!Set.Has("description"),
 			"a [_meta] key must NOT be indexed as a trigger. The old single-bracket RESET stood in for the metadata "
 			. "skip by accident, so accepting single brackets requires the skip to be explicit — otherwise the "
