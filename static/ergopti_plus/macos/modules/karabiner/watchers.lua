@@ -27,6 +27,7 @@ local M = {}
 
 local hs             = hs
 local Logger         = require("lib.logger")
+local EventTapGuard = require("adapters.event_tap_guard")
 local Timings        = require("lib.timings")
 local Keycodes       = require("lib.keycodes")
 local ShellRunner    = require("adapters.shell_runner")
@@ -253,7 +254,8 @@ end
 --- @return hs.eventtap The running eventtap watcher instance.
 function M.start_gesture_watcher(gestures_engine)
 	local ev = hs.eventtap.event.types
-	local watcher = hs.eventtap.new(
+	local watcher
+	watcher = hs.eventtap.new(
 		{
 			ev.mouseMoved,
 			ev.scrollWheel,
@@ -263,6 +265,7 @@ function M.start_gesture_watcher(gestures_engine)
 			ev.otherMouseDown,
 		},
 		function(_event)
+			if EventTapGuard.handle_disabled(_event, watcher, "karabiner.trackpad_capsword") then return false end
 			-- This callback fires on mouseMoved/scrollWheel/gesture/click — the
 			-- hottest possible eventtap. deactivate_capsword() contains an
 			-- unguarded hs.task.new(...) call; every sibling eventtap added in

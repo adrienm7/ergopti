@@ -21,6 +21,7 @@ local M = {}
 
 local hs            = hs
 local notifications = require("lib.notifications")
+local EventTapGuard = require("adapters.event_tap_guard")
 local Logger        = require("lib.logger")
 local Keycodes      = require("lib.keycodes")
 local i18n          = require("lib.i18n")
@@ -401,6 +402,7 @@ end
 --- @param e userdata The hs.eventtap.event object.
 --- @return boolean True to consume the keystroke, false to pass it through.
 local function handle_key(e)
+	if EventTapGuard.handle_disabled(e, _tap, "shortcuts.script_control") then return false end
 	local ok, code = pcall(function() return e:getKeyCode() end)
 	if not ok or type(code) ~= "number" then return false end
 

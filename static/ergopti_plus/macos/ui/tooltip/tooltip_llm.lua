@@ -13,6 +13,7 @@
 local M = {}
 local hs = hs
 local Logger = require("lib.logger")
+local EventTapGuard = require("adapters.event_tap_guard")
 local Keycodes = require("lib.keycodes")
 local LOG = "tooltip_llm"
 
@@ -243,7 +244,9 @@ local function start_watchers()
 	-- HID-thread latency on every pointer event while the tooltip is visible. Clicks
 	-- and scrolls are sufficient for dismissal; pure mouse movement should not
 	-- interfere with input delivery.
-	local ok_mouse, watcher_mouse = pcall(hs.eventtap.new, { event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel }, function(_)
+	local ok_mouse, watcher_mouse
+	ok_mouse, watcher_mouse = pcall(hs.eventtap.new, { event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel }, function(e)
+		if EventTapGuard.handle_disabled(e, watcher_mouse, "tooltip.llm_mouse") then return false end
 		dismiss("mouse activity")
 		return false
 	end)
@@ -257,7 +260,9 @@ local function start_watchers()
 	-- Track which shift key is held so Tab navigation uses the correct direction.
 	-- Left shift + Tab  → previous prediction (-1)
 	-- Right shift + Tab → next prediction    (+1)
-	local ok_flags, watcher_flags = pcall(hs.eventtap.new, { event_types.flagsChanged }, function(e)
+	local ok_flags, watcher_flags
+	ok_flags, watcher_flags = pcall(hs.eventtap.new, { event_types.flagsChanged }, function(e)
+		if EventTapGuard.handle_disabled(e, watcher_flags, "tooltip.llm_flags") then return false end
 		local kc = e:getKeyCode()
 		local f  = e:getFlags()
 		if not f.shift then
@@ -274,7 +279,9 @@ local function start_watchers()
 		table.insert(_watchers, watcher_flags)
 	end
 
-	local ok_key, watcher_key = pcall(hs.eventtap.new, { event_types.keyDown }, function(event)
+	local ok_key, watcher_key
+	ok_key, watcher_key = pcall(hs.eventtap.new, { event_types.keyDown }, function(event)
+		if EventTapGuard.handle_disabled(event, watcher_key, "tooltip.llm_key") then return false end
 		local keycode = event:getKeyCode()
 		local flags = event:getFlags()
 		local chars = event:getCharacters(true) or event:getCharacters(false) or ""

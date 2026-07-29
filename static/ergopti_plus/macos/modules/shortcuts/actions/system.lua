@@ -31,6 +31,7 @@ local timer         = hs.timer
 local eventtap      = hs.eventtap
 local pasteboard    = hs.pasteboard
 local notifications = require("lib.notifications")
+local EventTapGuard = require("adapters.event_tap_guard")
 local Logger        = require("lib.logger")
 local text_utils = require("lib.text_utils")
 local Timings       = require("lib.timings")
@@ -347,6 +348,7 @@ function M.toggle_awake()
 			end
 		end
 		awake_input_watcher = eventtap.new(watch_types, function(_ev)
+			if EventTapGuard.handle_disabled(_ev, awake_input_watcher, "shortcuts.keep_awake") then return false end
 			if not awake_active then return false end
 
 			-- Ignore events within the activation grace window so the trigger
@@ -481,7 +483,9 @@ end
 --- Uses a raw keyDown tap so the shortcut fires before macOS generates characters.
 --- @return table Fake-hotkey object with :delete().
 function M.bind_instant_screenshot()
-	local tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+	local tap
+	tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+		if EventTapGuard.handle_disabled(e, tap, "shortcuts.at_hash") then return false end
 		if e:getKeyCode() ~= KEYCODE_AT_HASH then return false end
 
 		local flags = e:getFlags()
@@ -524,9 +528,11 @@ function M.bind_layer_scroll()
 	local layer_held  = false
 	local f19_keycode = Keycodes.F19_VOLUME_SCROLL_MODIFIER
 
-	local key_tap = hs.eventtap.new(
+	local key_tap
+	key_tap = hs.eventtap.new(
 		{hs.eventtap.event.types.keyDown, hs.eventtap.event.types.keyUp},
 		function(event)
+			if EventTapGuard.handle_disabled(event, key_tap, "shortcuts.f19_layer") then return false end
 			if event:getKeyCode() ~= f19_keycode then return false end
 
 			if event:getType() == hs.eventtap.event.types.keyDown then
@@ -544,7 +550,9 @@ function M.bind_layer_scroll()
 		end
 	)
 
-	local scroll_tap = hs.eventtap.new({hs.eventtap.event.types.scrollWheel}, function(event)
+	local scroll_tap
+	scroll_tap = hs.eventtap.new({hs.eventtap.event.types.scrollWheel}, function(event)
+		if EventTapGuard.handle_disabled(event, scroll_tap, "shortcuts.f19_scroll") then return false end
 		if not layer_held then return false end
 
 		if gestures and type(gestures.isRightClickHeld) == "function" then
@@ -588,7 +596,9 @@ end
 --- @param on_trigger function|nil Called as on_trigger(label, app_name) for shortcut logging.
 --- @return table Fake-hotkey object with :delete().
 function M.bind_cmd_star(on_trigger)
-	local tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+	local tap
+	tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+		if EventTapGuard.handle_disabled(e, tap, "shortcuts.cmd_star") then return false end
 		local flags = e:getFlags()
 		if not flags.cmd then return false end
 
@@ -710,7 +720,9 @@ end
 ---   When nil, falls back to text_acts.WRAP_PAIRS (the full built-in catalogue).
 --- @return table Fake-hotkey object with :delete().
 function M.bind_wrap_text_if_selected(get_wrap_pairs)
-	local tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+	local tap
+	tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+		if EventTapGuard.handle_disabled(e, tap, "shortcuts.wrap_text") then return false end
 		local flags = e:getFlags()
 		-- Fast path: Cmd/Ctrl are real shortcuts — bail before any AX probe. Alt is
 		-- intentionally allowed through (Ergopti wrap symbols are on the AltGr layer).

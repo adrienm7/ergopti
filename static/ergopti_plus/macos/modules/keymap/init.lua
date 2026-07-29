@@ -19,6 +19,7 @@
 local hs         = hs
 local eventtap   = hs.eventtap
 local text_utils = require("lib.text_utils")
+local EventTapGuard = require("adapters.event_tap_guard")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("lib.logger")
 local Keycodes   = require("lib.keycodes")
@@ -1083,6 +1084,10 @@ end
 --- @param e table Event parameters.
 --- @return boolean Pass-through result from the inner handler.
 local function onKeyDown(e)
+	-- First line of the hottest callback in the driver: macOS reports a tap it
+	-- disabled THROUGH the callback, and a disabled typing tap is the whole
+	-- driver going silent mid-sentence with nothing logged anywhere.
+	if EventTapGuard.handle_disabled(e, tap, "keymap.main") then return false end
 	-- Always-on latency tripwire (ported from the AHK hot-path profiler): two
 	-- monotonic clock reads per keystroke, logging a WARNING only when a keystroke
 	-- exceeds the slow threshold. Normal typing stays silent; a real hitch surfaces
@@ -1160,6 +1165,7 @@ end
 shift_tap = eventtap.new(
 	{ eventtap.event.types.flagsChanged },
 	function(e)
+		if EventTapGuard.handle_disabled(e, shift_tap, "keymap.shift") then return false end
 		local ok, result = pcall(function()
 			local kc = e:getKeyCode()
 			local f  = e:getFlags()
@@ -1205,7 +1211,8 @@ mouse_tap = eventtap.new(
 		eventtap.event.types.rightMouseDown,
 		eventtap.event.types.middleMouseDown,
 	},
-	function()
+	function(e)
+		if EventTapGuard.handle_disabled(e, mouse_tap, "keymap.mouse") then return false end
 		local ok, result = pcall(function()
 			-- Mouse click moves the cursor; the next typed run starts
 			-- fresh — treat as a word boundary. check_nav_reset may

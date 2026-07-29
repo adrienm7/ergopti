@@ -28,6 +28,7 @@ local hs        = hs
 local keyStroke = hs.eventtap.keyStroke
 
 local km_utils         = require("modules.keymap.utils")
+local EventTapGuard = require("adapters.event_tap_guard")
 local text_utils       = require("lib.text_utils")
 local core_llm         = require("modules.llm")
 local Logger           = require("lib.logger")
@@ -825,6 +826,7 @@ end
 local function arm_escape_trap()
 	if _escape_trap then return end
 	_escape_trap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
+		if EventTapGuard.handle_disabled(event, _escape_trap, "llm.escape_trap") then return false end
 		if event:getKeyCode() ~= KEYCODE_ESCAPE then return false end
 		-- Let Escape through when no tooltip is on screen — Raycast (or the system)
 		-- should handle it normally in that case.
