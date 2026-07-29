@@ -1113,10 +1113,10 @@ KL_IngestOnce(force := false, rollover_owned := false) {
         for _, sql in KL_BuildInserts(entry)
             statements.Push(sql)
     }
-    ; KLW.batch is NOT flushed to data.sql here anymore. The walker keeps
-    ; accumulating in RAM; KLR_InjectKlwBatch drains it into the in-memory
-    ; SQLite DB on every reader refresh cycle (every 5 s). This eliminates
-    ; the 94% UPSERT bloat that was causing data.sql to grow ~140 MB/day.
+    ; Only raw events reach data.sql — never the walker's aggregate UPSERTs,
+    ; which used to make the file grow ~140 MB/day. Every derived aggregate is
+    ; projected out-of-process instead (see the walk note further down), so
+    ; there is deliberately no KLW.batch flush on this path.
     if (statements.Length = 0) {
         old_offset := Keylogger.today_log_offset
         Keylogger.today_log_offset := new_offset
@@ -1165,35 +1165,22 @@ KL_IngestOnce(force := false, rollover_owned := false) {
         return Map("ok", false, "eof", false, "reason", "state_failed")
     }
 
-    ; Walk only after the raw transaction reached data.sql.  Walking before
-    ; FileAppend meant a transient disk failure left the batch populated; the
-    ; retry then walked the very same entries a second time and doubled WPM,
-    ; n-grams and correction metrics even though the durable event stream had
-    ; exactly one copy.  The raw event log is now the single commit point for
-    ; both live and cold-cache metrics reconstruction.
+    ; This process deliberately does NOT walk the entries it just committed.
+    ; KLW.batch has exactly one consumer, KLW_BuildBatchSql, and it is reachable
+    ; only from KLR_ReplayFlush / KLR_InjectKlwBatch inside KLR_BuildDatabase —
+    ; which runs in the detached `--keylogger-prefetch-worker` instance spawned
+    ; by KLPF_RequestBuild, never here. A foreground walk therefore had no
+    ; reader at all: it pushed seven n-gram maps per keystroke (quadgrams and
+    ; longer are near-unique, so ~4 new Map entries per keystroke) into an
+    ; accumulator that only KLW_ResetBatch at init and KLW_DayRolloverReset at
+    ; midnight ever touched again — tens of MB retained for a whole day and then
+    ; discarded unread, plus that work paid under Critical on the ingest tick.
     ;
-    ; Protect KLW.batch from a live-push timer reset while this short loop is
-    ; running.  Critical() restores the caller's previous setting afterwards.
-    local _crit_walk := Critical("On")
-    try {
-        for _, entry in entries {
-            try {
-                t := entry["type"]
-                if (t = "typing") {
-                    KLW_WalkTypingEntry(entry)
-                } else if (t = "app_switch") {
-                    KLW_WalkAppSwitch(entry)
-                } else if (t = "window_switch") {
-                    KLW_WalkWindowSwitch(entry)
-                } else if (t = "system_event") {
-                    KLW_WalkSystemEvent(entry)
-                }
-            }
-        }
-    } finally {
-        Critical(_crit_walk)
-    }
-
+    ; The worker rebuilds every walker-owned aggregate from the durable
+    ; events_* rows with a fresh context (KLR_RebuildWalkerAggregates), so the
+    ; dashboard is already correct without an in-process copy. The rule this
+    ; encodes: an accumulator must have a consumer in the same process.
+    ;
     ; B niveau 2 hook: when the dashboard is hosted via WebView2, push
     ; the freshly-projected prefetch blob to the page so the user sees
     ; the new data without reloading. No-op when no WebView2 dashboards

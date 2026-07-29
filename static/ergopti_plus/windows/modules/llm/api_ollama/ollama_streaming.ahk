@@ -23,10 +23,11 @@
  * ``on_success(text)`` when the model finishes responding, or ``on_fail()``
  * on any HTTP / parse failure. Mirrors hs.http.asyncPost on the HS side.
  *
- * Internally the request goes through WinHTTP's async mode (``Open(..., true)``)
- * and a SetTimer poll checks ``WaitForResponse(0)`` every LLM_OLLAMA_POLL_MS.
- * That gives us a non-blocking dispatch without depending on COM event sinks
- * (which AHK v2's ComObjConnect supports but is finicky to debug).
+ * The transport is a curl child process, not WinHTTP: WinHTTP's async ``Send()``
+ * returned HTTP 200 with an empty ``content`` on this driver despite valid JSON
+ * payloads. A SetTimer poll (_LLM_Ollama_PollCurl) watches the child every
+ * LLM_OLLAMA_POLL_MS and reads its stdout file once the process exits, which
+ * keeps the dispatch non-blocking without any COM object in the picture.
  *
  * @param {string}   model         - Ollama model tag.
  * @param {string}   system_prompt - System instruction.
@@ -34,7 +35,9 @@
  * @param {number}   temperature   - Sampling temperature.
  * @param {function} on_success    - Callback receiving the generated text.
  * @param {function} on_fail       - Callback fired on any failure.
- * @returns {Integer} The request id (use with LLM_OllamaCancelAsync to abort).
+ * @returns {Integer} The request id, for correlating log lines. Aborting is
+ *                    always all-or-nothing via LLM_OllamaCancelAllAsync — the
+ *                    registry holds at most one in-flight slot by design.
  */
 LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_success, on_fail, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "") {
 	global _LLM_Ollama_AsyncCounter, _LLM_Ollama_Pending
