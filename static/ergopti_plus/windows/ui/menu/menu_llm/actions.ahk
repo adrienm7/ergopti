@@ -18,8 +18,8 @@
 ;    writing back an incomplete tray state before every module has reported
 ;    in.
 ; 2. Async health probe: ``_LLM_Menu_FireHealthProbe`` is throttled (one
-;    probe per 3 s) so opening the menu twice in quick succession doesn't
-;    fire two redundant pings.
+;    probe per LLM_HEALTH_PROBE_THROTTLE_MS) so opening the menu twice in
+;    quick succession doesn't fire two redundant pings.
 ; 3. Flip-guard rebuild: ``_LLM_Menu_OnHealthProbeDone`` only rebuilds when
 ;    the status actually flipped — avoids an infinite rebuild loop when the
 ;    backend stays stable.
@@ -91,15 +91,15 @@ LLM_Menu_OnToggle(*) {
 		return
 	_Toggling := true
 	try {
-		global _LLM_Menu
+		global _LLM_Menu, LLM_HEALTH_PROBE_INTERVAL_MS
 		_LLM_Menu["enabled"] := !_LLM_Menu["enabled"]
 		LoggerInfo("LLM", "Toggle clicked — enabled: " (_LLM_Menu["enabled"] ? "true" : "false") ".")
 		LLM_Menu_SaveConfig()
 		LLM_Menu_Build()
 		if _LLM_Menu["enabled"] {
 			; Re-arm the health probe timer so the dot updates promptly
-			; after re-enabling without waiting for the next 10 s tick
-			SetTimer(_LLM_Menu_FireHealthProbe, 10000)
+			; after re-enabling without waiting for the next tick
+			SetTimer(_LLM_Menu_FireHealthProbe, LLM_HEALTH_PROBE_INTERVAL_MS)
 			LLM_Menu_EnsureModelReady()
 			SetTimer(() => LLM_Menu_BootstrapOllama(true), -1)
 		} else {
@@ -146,7 +146,7 @@ LLM_Menu_SaveConfig() {
 	if SaveFullConfig()
 		return true
 	try LoggerError("LLM_Menu", "The LLM settings could not be written to config.toml. Reloading so the menu, the engine and the file agree again — the change has been discarded rather than shown as saved.")
-	Reload()
+	ReloadPreservingSuspend()
 	return false
 }
 
@@ -256,9 +256,9 @@ LLM_Menu_SetModel(tag) {
 ; is surgically limited to that gate: every other guard below still applies, and
 ; the suspend guard deliberately sits ahead of it.
 _LLM_Menu_FireHealthProbe(Force := false) {
-	global _LLM_Menu, LLM_HEALTH_PROBE_IDLE_MAX_MS
+	global _LLM_Menu, LLM_HEALTH_PROBE_IDLE_MAX_MS, LLM_HEALTH_PROBE_THROTTLE_MS
 	; Edge trigger for the idle-gate log: an unattended machine must produce one
-	; line when it goes quiet and one when it wakes, not one line per 10 s tick
+	; line when it goes quiet and one when it wakes, not one line per tick
 	static _idle_gated := false
 	; Pause invariant: SetTimer callbacks bypass native Suspend, so this 10 s
 	; health tick keeps pinging Ollama (and can trigger a full tray rebuild)
@@ -276,18 +276,18 @@ _LLM_Menu_FireHealthProbe(Force := false) {
 		return
 	if !_LLM_Menu["enabled"]
 		return
-	; Throttle to one probe every 3 seconds. Opening the tray menu fires a
-	; rebuild which calls this helper; without the throttle the user
+	; Throttle to one probe per LLM_HEALTH_PROBE_THROTTLE_MS. Opening the tray menu
+	; fires a rebuild which calls this helper; without the throttle the user
 	; opening the menu twice in 100 ms would fire two redundant pings.
 	now := A_TickCount
 	last := _LLM_Menu.Has("last_health_probe_tick") ? _LLM_Menu["last_health_probe_tick"] : 0
-	if (last > 0 and (now - last) < 3000)
+	if (last > 0 and (now - last) < LLM_HEALTH_PROBE_THROTTLE_MS)
 		return
 	; Idle gate, kept LAST so the caller-supplied bypass reaches only this guard
 	; and can never defeat the suspend, backend, enabled or throttle checks above.
 	; That ordering is load-bearing: _LLM_Menu_OnHealthProbeDone rebuilds the menu
-	; on a state flip, the rebuild re-enters here with Force, and only the 3 s
-	; throttle breaks the build → probe → flip → build loop.
+	; on a state flip, the rebuild re-enters here with Force, and only the
+	; LLM_HEALTH_PROBE_THROTTLE_MS gap breaks the build → probe → flip → build loop.
 	; Every tick that gets past this point spawns a curl.exe child (see
 	; LLM_OllamaIsRunning_Async) plus its poll chain — 8640 a day on a machine
 	; nobody is sitting at. The tick stamp below is deliberately NOT written on

@@ -15,26 +15,28 @@
 
 
 ; ── Filter toggles. Each persists + flips the corresponding flag and
-; triggers a Reload so the menu rerenders with the new checkmark state
+; triggers a reload so the menu rerenders with the new checkmark state
 ; (AHK Menu.Check / Uncheck cannot retro-update an entry whose label was
 ; built into the submenu reference; rebuilding the whole tray is cleaner
-; than playing with .ToggleCheck on a stale label).
+; than playing with .ToggleCheck on a stale label). The reload goes through
+; ReloadPreservingSuspend because a tray click stays reachable while the
+; driver is paused, and a bare Reload comes back armed.
 ToggleFilterPrivate(*) {
 	MetricsFilters.private_browsing := !MetricsFilters.private_browsing
 	MF_SaveToIni()
-	Reload
+	ReloadPreservingSuspend()
 }
 
 ToggleFilterSecureField(*) {
 	MetricsFilters.secure_field := !MetricsFilters.secure_field
 	MF_SaveToIni()
-	Reload
+	ReloadPreservingSuspend()
 }
 
 ToggleFilterSystemAuth(*) {
 	MetricsFilters.system_auth := !MetricsFilters.system_auth
 	MF_SaveToIni()
-	Reload
+	ReloadPreservingSuspend()
 }
 
 ; ── WPM toggle helpers — closures capture the menu reference and label strings
@@ -110,7 +112,7 @@ OnMetricsAppPickerSave(selected) {
 	for _, proc in selected
 		MetricsFilters.disabled_apps[StrLower(proc)] := true
 	MF_SaveToIni()
-	Reload
+	ReloadPreservingSuspend()
 }
 
 ; Flip the global keylogger feature with a warning dialog before enabling.
@@ -129,7 +131,7 @@ ToggleMetricsEnabled() {
 			return
 		MetricsShortcuts.enabled := false
 		MS_SaveToIni()
-		Reload
+		ReloadPreservingSuspend()
 		return
 	}
 
@@ -148,5 +150,5 @@ ToggleMetricsEnabled() {
 		return
 	MetricsShortcuts.enabled := true
 	MS_SaveToIni()
-	Reload
+	ReloadPreservingSuspend()
 }

@@ -37,6 +37,7 @@
  */
 LLM_Menu_Init(saved_opts := Map()) {
 	global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray, DRIVER_BASELINE_PRIORITY_CLASS
+	global LLM_HEALTH_PROBE_INTERVAL_MS
 
 	; Defensive: a previous session that crashed mid-install would have
 	; left the AHK process at PriorityClass = High (we boost it in
@@ -152,13 +153,13 @@ LLM_Menu_Init(saved_opts := Map()) {
 	if _LLM_Menu["enabled"]
 		SetTimer(() => LLM_Menu_BootstrapOllama(false), -1)
 
-	; Background health-tick: refreshes the dot every 10 s without waiting
-	; for the user to open the menu. The previous "probe on menu open"
+	; Background health-tick: refreshes the dot on the shared cadence without
+	; waiting for the user to open the menu. The previous "probe on menu open"
 	; model painted a stale dot on the first open after the daemon died
 	; (probe result only landed the second time around). The tick uses
 	; the same flip-guard as the on-open probe, so a stable backend
 	; doesn't trigger spurious rebuilds.
-	SetTimer(_LLM_Menu_FireHealthProbe, 10000)
+	SetTimer(_LLM_Menu_FireHealthProbe, LLM_HEALTH_PROBE_INTERVAL_MS)
 
 	global _LLM_Menu_Loaded
 	_LLM_Menu_Loaded := true
