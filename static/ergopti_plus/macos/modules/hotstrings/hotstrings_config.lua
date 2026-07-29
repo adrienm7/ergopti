@@ -375,6 +375,20 @@ end
 --- Returns the effective delay (seconds) and color (hex string) for a group.
 --- @param category string The TOML file name without extension (e.g. "rolls").
 --- @param section string|nil Optional section name within the category.
+
+--- Returns the shared global default expansion delay, in milliseconds.
+---
+--- Published so consumers read the canon instead of mirroring it. The hotstrings
+--- config window carried its own `GLOBAL_DEFAULT_DELAY_MS = 750` with a comment
+--- saying the two "must stay in sync" — which is the definition of two sources,
+--- and the shared TOML is the one the AutoHotkey driver reads.
+--- @return number|nil Milliseconds, or nil before init() has loaded the canon.
+function M.get_global_default_delay_ms()
+	if type(GLOBAL_DEFAULT_DELAY) ~= "number" then return nil end
+	-- GLOBAL_DEFAULT_DELAY is held in seconds; the window speaks milliseconds.
+	return math.floor(GLOBAL_DEFAULT_DELAY * 1000 + 0.5)
+end
+
 --- @return table { delay = number, color = string|nil, has_override = boolean }
 function M.resolve(category, section)
 	if not require_state("resolve") then
