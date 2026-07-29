@@ -374,21 +374,23 @@ _WPMWidget_NormaliseHex(AccentHex, FallbackHex) {
 ; written for: during early init _SharedDir may not be resolved yet and the
 ; resolver would hand back a stale empty entry.
 ; Returns "" when neither source has a color.
-; Results are memoized in a static Map keyed by CategoryName; call
-; WPMWidget_InvalidateColorCache() to flush the cache after a TOML save.
-_WPMWidget_ReadTomlColor(CategoryName, InvalidateCache := false) {
+; Only the FALLBACK file read is memoized, in a static Map keyed by
+; CategoryName. The resolver is asked on every call and is never memoized here.
+_WPMWidget_ReadTomlColor(CategoryName) {
     static _color_cache := Map()
-    if (InvalidateCache) {
-        _color_cache.Clear()
-        return ""
-    }
-    if _color_cache.Has(CategoryName)
-        return _color_cache[CategoryName]
 
-    ; Ask the override-aware resolver first. Not memoised in _color_cache: an
-    ; override can change at any moment from the config window, and caching it
-    ; here would re-create the very staleness this fixes. The resolver has its
-    ; own memoisation, invalidated when overrides change.
+    ; Ask the override-aware resolver FIRST, before any cache lookup. The
+    ; cache-hit early return used to sit above this block, so the first call
+    ; that fell through to the fallback (resolver not yet available during early
+    ; init — the exact window the fallback exists for) cached its answer, often
+    ; the empty string, and every later call short-circuited on it. The resolver
+    ; was then skipped permanently for that category: a colour changed in the
+    ; config window repainted the tooltip and left the widget on the manual blue
+    ; until restart, which is the very staleness the resolver was added to fix.
+    ; Its result is deliberately NOT memoized — HotstringsResolve owns a
+    ; generation-invalidated cache of its own (_HSResolveCache /
+    ; HotstringsResolveBumpGen), and a second copy here could only desynchronise
+    ; from it.
     if (CategoryName != "" and IsSet(HotstringsResolve)) {
         try {
             Resolved := HotstringsResolve(CategoryName, "")
@@ -396,6 +398,12 @@ _WPMWidget_ReadTomlColor(CategoryName, InvalidateCache := false) {
                 return Resolved.Color
         }
     }
+
+    ; Resolver unavailable or empty — serve the memoized file read. The WPM tick
+    ; fires every ~100 ms and would otherwise re-read the category TOML dozens of
+    ; times per second.
+    if _color_cache.Has(CategoryName)
+        return _color_cache[CategoryName]
 
     global _SharedDir, GLOBAL_DEFAULT_COLOR
     FilePath := _SharedDir . "\modules\hotstrings\" . StrLower(CategoryName) . ".toml"
@@ -432,12 +440,6 @@ _WPMWidget_ReadTomlColor(CategoryName, InvalidateCache := false) {
     LoggerDebug("WPMWidget", "ReadTomlColor: no color key found for '{1}'", CategoryName)
     _color_cache[CategoryName] := ""
     return ""
-}
-
-; Invalidate the per-category color cache — call when a hotstring TOML file
-; is written (e.g. from the config window) so the next tick re-reads the file.
-WPMWidget_InvalidateColorCache() {
-    _WPMWidget_ReadTomlColor("", true)
 }
 
 ; Returns the raw compact-mode background hex for a hotstring category

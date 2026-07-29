@@ -101,9 +101,20 @@ _WWC_OverrideIsNotMemoisedByTheWidget() {
 	At := InStr(Body, "HotstringsResolve(")
 	Assert(At > 0, "the resolver call must exist")
 
-	Window := SubStr(Body, At, 400)
-	Assert(InStr(Window, "_color_cache[") == 0,
+	; The guarantee is that the RESOLVER'S answer is never frozen in the widget's
+	; own memo — the fallback file read may be, and must be, or the ~100 ms tick
+	; re-reads the category TOML dozens of times a second.
+	;
+	; This used to be checked by scanning the 400 characters after the resolver
+	; call for "_color_cache[". That only worked while the resolver sat BELOW the
+	; cache logic; moving it above — so a fallback answer taken during early init
+	; can no longer be cached and short-circuit the resolver forever — put the
+	; legitimate fallback memo inside the window and failed a strictly better
+	; arrangement. Assert the relationship instead of the layout.
+	Assert(!RegExMatch(Body, "i)_color_cache\[[^\]]*\]\s*:=\s*Resolved"),
 		"the resolved colour must not be written into the widget's static cache. That cache is flushed only on an explicit TOML-save invalidation, so caching an override there would keep the widget stale for exactly the edits this fix is about")
+	Assert(RegExMatch(Body, "i)return\s+Resolved\.Color"),
+		"the resolver's answer must be returned directly, so an override that changes between two ticks is seen on the next one")
 }
 
 
