@@ -242,6 +242,7 @@ InstallSendNoOps()
 #Include unit/test_hotstrings_full.ahk
 #Include unit/test_tap_hold_loader.ahk
 #Include unit/test_i18n.ahk
+#Include unit/test_locale_probe_is_silent.ahk
 #Include unit/test_window_utils.ahk
 #Include unit/test_text_utils.ahk
 #Include unit/test_registry.ahk
