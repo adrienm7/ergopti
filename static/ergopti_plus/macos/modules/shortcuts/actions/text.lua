@@ -189,6 +189,8 @@ end
 -- already used by lib/ui_restore and api_mlx, including their hard timeout: a
 -- flag that could stick would block every later transform for the session.
 local _transform_in_flight = false
+-- Same guard for the wrap path, declared beside its sibling so the pair stays visible.
+local _wrap_in_flight      = false
 local TRANSFORM_LOCK_TIMEOUT_SEC = 2.0
 
 -- Identity of the transform that currently owns the clipboard. The failsafe
@@ -418,6 +420,16 @@ end
 --- @param left string Opening symbol to prepend.
 --- @param right string Closing symbol to append.
 function M.wrap_selection(sel, left, right)
+	-- The missed sibling of _transform_in_flight, twenty lines up in this same
+	-- file. Without it a second wrap fired while the first is still holding the
+	-- clipboard snapshots the text the FIRST one just wrote, then "restores" it
+	-- 250 ms later — so the user's real clipboard is replaced by a wrapped
+	-- fragment of their own selection and is gone for good.
+	if _wrap_in_flight then
+		Logger.debug(LOG, "Wrap already in flight — ignoring the second request.")
+		return
+	end
+	_wrap_in_flight = true
 	Logger.debug(LOG, "Wrapping %d-char selection with '%s'…'%s'.", #sel, left, right)
 	local prior = pasteboard.getContents()
 	pcall(pasteboard.setContents, left .. sel .. right)
@@ -428,6 +440,9 @@ function M.wrap_selection(sel, left, right)
 				if prior and prior ~= "" then pasteboard.setContents(prior)
 				else pasteboard.clearContents() end
 			end)
+			-- Released only after the restore, so the window the guard covers is
+			-- exactly the window in which `prior` is the value that must survive.
+			_wrap_in_flight = false
 			Logger.done(LOG, "Selection wrapped.")
 		end)
 	end)

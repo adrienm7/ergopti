@@ -126,6 +126,10 @@ local awake_alert_shown = false
 -- "closeAll even when the alert id is nil" regression test, and it is gated on
 -- awake_alert_shown so a call made when no banner of ours is up (the defensive
 -- clear on the activation path) sweeps nothing.
+-- Pending "return the cursor to where it was" timer. Declared above every closure
+-- that touches it: a local declared below one binds the nil global instead.
+local _awake_return_timer = nil
+
 local function close_awake_alert()
 	local id    = awake_alert_id
 	local shown = awake_alert_shown
@@ -217,7 +221,13 @@ schedule_awake_tick = function()
 
 			pcall(hs.mouse.absolutePosition, {x = tx, y = ty})
 
-			timer.doAfter(AWAKE_RETURN_DELAY_SEC, function()
+			-- Handle retained so switching keep-awake OFF can cancel it. Without
+			-- that, the cursor was still teleported back to its remembered origin
+			-- up to AWAKE_RETURN_DELAY_SEC after the user turned the feature off —
+			-- a pointer that moves on its own once the feature is disabled.
+			if _awake_return_timer then pcall(function() _awake_return_timer:stop() end) end
+			_awake_return_timer = timer.doAfter(AWAKE_RETURN_DELAY_SEC, function()
+				_awake_return_timer = nil
 				if origin then pcall(hs.mouse.absolutePosition, {x = origin.x, y = origin.y}) end
 			end)
 
@@ -254,6 +264,15 @@ function M.toggle_awake()
 		if awake_timer and type(awake_timer.stop) == "function" then
 			pcall(function() awake_timer:stop() end)
 			awake_timer = nil
+		end
+
+		-- Cancel the pending cursor return too. Stopping only the tick timer left
+		-- a scheduled "put the pointer back" firing up to AWAKE_RETURN_DELAY_SEC
+		-- after the user switched the feature off — a cursor that moves by itself
+		-- once nothing is supposed to be moving it.
+		if _awake_return_timer then
+			pcall(function() _awake_return_timer:stop() end)
+			_awake_return_timer = nil
 		end
 
 		-- Log the keep-awake duration as a special passive period AND tag the
