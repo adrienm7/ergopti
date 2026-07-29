@@ -561,6 +561,15 @@ ArrayJoin(Arr, Sep) {
 	return Out
 }
 
+; Coalescing delay before the preview index is rebuilt after a live reload.
+; Negative-period SetTimer with the same function object RE-ARMS rather than
+; queueing, so the webview save path — which reloads every edited section in a
+; loop — pays for exactly ONE rebuild instead of one per section. The rebuild
+; costs ~150 ms warm and far more on a cold TOML read, so it also belongs off
+; the save handler's synchronous path: the editor window closes immediately and
+; the index catches up a fraction of a second later.
+global HS_PERSONAL_RELOAD_INDEX_DELAY_MS := 120
+
 ; Re-register all hotstrings in a given section from the current TOML data.
 ; Called after save so new/edited entries are immediately active.
 ReloadPersonalSection(Data, SectionName, FeatureConfig) {
@@ -647,5 +656,30 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
 			"Priority", EntryPriority,
 		)
 		HSE_RegisterFromTomlFlags(E["is_case_sensitive"], Flags, Trigger, Output, Options)
+	}
+	; The engine registry has just been rewritten in place, and the tooltip's
+	; preview index has NOT — it still holds whatever the last full rebuild put
+	; there. Without this the editor's Save left the two describing different
+	; hotstrings: typing "zz" advertised the pre-edit expansion while typing the
+	; final character emitted the new one, and a DELETED trigger was worse still
+	; (the preview kept offering it, and _PreviewEngineWouldFire fails OPEN for a
+	; trigger it can no longer find in the registry).
+	;
+	; The resync belongs HERE rather than in the two save handlers: this is the
+	; function that mutates the engine registry, so pairing the two makes the
+	; guarantee hold for every caller instead of for the callers someone
+	; remembered. RebuildHotstringsLive (ui/menu/menu_rebuild.ahk) is the sibling
+	; that already pairs them; the editor path was the one that was forgotten.
+	global HS_PERSONAL_RELOAD_INDEX_DELAY_MS
+	if IsSet(HotstringPrefixWatcherRebuildIndex) {
+		try {
+			SetTimer(HotstringPrefixWatcherRebuildIndex, -HS_PERSONAL_RELOAD_INDEX_DELAY_MS)
+			try LoggerDebug("PersonalToml", "Preview-index resync armed after reloading '{1}'.", SectionName)
+		} catch as ResyncErr {
+			; A silent failure here is exactly the bug this pairing exists to
+			; prevent, so it must name itself rather than leave the two sides
+			; diverged with no trace.
+			try LoggerError("PersonalToml", "Could not arm the preview-index resync after reloading '{1}': {2}", SectionName, ResyncErr.Message)
+		}
 	}
 }
