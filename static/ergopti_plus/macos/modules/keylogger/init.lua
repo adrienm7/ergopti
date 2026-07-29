@@ -431,6 +431,40 @@ local function _is_paused()
 end
 
 
+--- Reports whether the CURRENT context may be recorded at all.
+---
+--- Four independent user-facing filters answer this question — private window,
+--- secure field, system-auth dialog, and the disabled-apps list — and they used
+--- to be spelled out inline in handle_key only. Every other route into the same
+--- sink applied none of them: notify_synthetic and log_hotstring gated solely on
+--- is_enabled, so an expansion fired inside a password manager, a system-auth
+--- prompt or an app the user had explicitly excluded was persisted in full, and
+--- was additionally mis-attributed, because the app name is only assigned on the
+--- handle_key path that never ran there.
+---
+--- Exported rather than local so every writer consults ONE implementation. A
+--- second copy is how these four answers drift apart again.
+--- @return boolean True when the context is loggable.
+function M.context_allows_logging()
+	if CoreState.private_filter_enabled and CoreState.is_private_window then return false end
+	if CoreState.secure_field_filter_enabled and CoreState.is_secure_field then return false end
+	-- System auth dialogs: belt-and-suspenders in case the AX observer attaches late.
+	if CoreState.system_auth_filter_enabled and CoreState.active_app_bundle
+		and SYSTEM_AUTH_BUNDLE_IDS[CoreState.active_app_bundle] then
+		return false
+	end
+	if CoreState.disabled_apps and #CoreState.disabled_apps > 0 then
+		for _, disabled in ipairs(CoreState.disabled_apps) do
+			if (disabled.bundleID and disabled.bundleID == CoreState.active_app_bundle)
+				or (disabled.appPath and disabled.appPath == CoreState.active_app_path) then
+				return false
+			end
+		end
+	end
+	return true
+end
+
+
 
 
 
@@ -458,22 +492,11 @@ local function handle_key(event_obj)
 			return
 		end
 
-		-- Fast-path guards: skip private/secure contexts when the respective filter is enabled
-		if CoreState.private_filter_enabled and CoreState.is_private_window then return end
-		if CoreState.secure_field_filter_enabled and CoreState.is_secure_field then return end
-		-- System auth dialogs: belt-and-suspenders guard in case the AX observer attaches too late
-		if CoreState.system_auth_filter_enabled and CoreState.active_app_bundle
-		and SYSTEM_AUTH_BUNDLE_IDS[CoreState.active_app_bundle] then return end
-
-		-- Check the disabled-apps list
-		if CoreState.disabled_apps and #CoreState.disabled_apps > 0 then
-			for _, disabled in ipairs(CoreState.disabled_apps) do
-				if (disabled.bundleID and disabled.bundleID == CoreState.active_app_bundle)
-				or (disabled.appPath  and disabled.appPath  == CoreState.active_app_path) then
-					return
-				end
-			end
-		end
+		-- Private/secure/system-auth/disabled-app context. Delegated to the shared
+		-- predicate so the physical path and the SYNTHETIC path cannot answer this
+		-- question differently — they used to, and notify_synthetic persisted
+		-- expansions this branch would have refused.
+		if not M.context_allows_logging() then return end
 
 		local evt_type = event_obj:getType()
 		local now      = hs.timer.absoluteTime() / 1000000
@@ -989,6 +1012,13 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, physical
 	-- buffer_events and in rich_chunks, which become events_json and rich_text
 	-- in the database and are replicated by cross-device export.
 	local function append_virtual(char)
+		-- The four context filters apply to the SYNTHETIC route exactly as they do
+		-- to the physical one. Gating here — at the persistence step — rather than
+		-- at the top of notify_synthetic is deliberate: the synth_queue discard
+		-- markers below MUST still be queued, because dropping them would leave the
+		-- physical echoes unclaimed and handle_key would record the very same
+		-- secret as ordinary human keystrokes. The same text, in a worse place.
+		if not M.context_allows_logging() then return end
 		local recorded = M.recorded_char(char, is_private)
 		table.insert(CoreState.buffer_events, {
 			recorded, 0,
@@ -1125,6 +1155,11 @@ end
 --- @param h_type string Hotstring category ("star", "autocorrect", "personal", …).
 function M.log_hotstring(trigger, replacement, h_type)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	LogManager.flush_buffer()
 	local net_saved = (utf8.len(replacement) or 0) - (utf8.len(trigger) or 0)
 	LogManager.append_log({
@@ -1153,6 +1188,11 @@ end
 --- a prompt regression or comparing providers.
 function M.log_llm(context, results, app_name, extras)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	LogManager.flush_buffer()
 	local preds = {}
 	for _, r in ipairs(results or {}) do table.insert(preds, r.to_type) end
@@ -1195,6 +1235,11 @@ end
 ---     user_prompt, failure_reason, elapsed_ms.
 function M.log_llm_failed(context, app_name, extras)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	LogManager.flush_buffer()
 	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
 	local entry = {
@@ -1221,6 +1266,11 @@ end
 --- @param app_name string The frontmost application.
 function M.log_shortcut(shortcut_key, app_name)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	LogManager.log_shortcut(shortcut_key, app_name or CoreState.session_app_name)
 end
 
@@ -1231,6 +1281,11 @@ end
 --- @param h_type string Hotstring category.
 function M.log_hotstring_suggested(app_name, trigger, replacement, h_type)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
 	LogManager.append_log({
 		type        = "hotstring_suggested",
@@ -1249,6 +1304,11 @@ end
 --- @param h_type string Hotstring category.
 function M.log_hotstring_dismissed(app_name, trigger, replacement, h_type)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
 	LogManager.append_log({
 		type        = "hotstring_dismissed",
@@ -1264,6 +1324,11 @@ end
 --- @param count number Number of predictions shown.
 function M.log_llm_suggested(app_name, count)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
 	local c = tonumber(count) or 1
 	LogManager.append_log({ type = "llm_suggested", app = target_app, count = c })
@@ -1275,6 +1340,11 @@ end
 --- @param all_predictions table All predictions that were shown.
 function M.log_llm_dismissed(app_name, all_predictions)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
 	LogManager.append_log({
 		type            = "llm_dismissed",
@@ -1292,6 +1362,11 @@ end
 --- @param deleted_text string The text that was deleted by those backspaces.
 function M.log_llm_accepted(prediction_text, app_name, all_predictions, chosen_index, deletes, deleted_text)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
 	-- The synthetic typing burst is the canonical trigger counter. A manifest
 	-- increment here used to be ignored by the whitelist and would double-count
