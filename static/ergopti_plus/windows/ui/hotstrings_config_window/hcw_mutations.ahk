@@ -159,6 +159,14 @@ _HCW_ResetAll() {
 			}
 		}
 	}
+	; The loop above clears delay and priority through the storage primitives
+	; DIRECTLY, so it never passes the _HCW_SetOverride / _HCW_ClearOverride choke
+	; point where the republish lives. Both fields are baked into every Spec at
+	; registration: clearing them only bumps the resolve generation, so the window
+	; and the tooltip would advertise the default delay while the engine kept
+	; gating on the value the user had set. One rebuild for the whole reset rather
+	; than one per entry — the reset is a single user action, not N of them.
+	_HCW_RepublishIfBakedField("delay")
 	if (_HCWGui != 0) {
 		_HCWGui.Destroy()
 	}
@@ -217,26 +225,34 @@ _HCW_OnClose() {
 ; - personal  → [_meta] in the TOML file
 ; - extension → hotstrings_config.toml under key "ext.<id>"
 ; - common    → hotstrings_config.toml under the category key
+;
+; Every backend reports whether the value reached disk, so the result is passed
+; straight through rather than dropped: a caller that announces success must be
+; able to tell that the write was refused (a locked personal file) or failed.
+; @returns {Boolean} True when the value was persisted.
 _HCW_SetOverride(Entry, Sec, Field, Value) {
 	if Entry.IsPersonal {
-		_HCW_PatchTomlMeta(Entry.Path, Sec, Field, Value)
+		Ok := _HCW_PatchTomlMeta(Entry.Path, Sec, Field, Value)
 	} else if Entry.IsExtension {
-		HotstringsSetOverride("ext." . Entry.ExtId, Sec, Field, Value)
+		Ok := HotstringsSetOverride("ext." . Entry.ExtId, Sec, Field, Value)
 	} else {
-		HotstringsSetOverride(Entry.Key, Sec, Field, Value)
+		Ok := HotstringsSetOverride(Entry.Key, Sec, Field, Value)
 	}
 	_HCW_RepublishIfBakedField(Field)
+	return Ok
 }
 
+; @returns {Boolean} True when the cleared state was persisted.
 _HCW_ClearOverride(Entry, Sec, Field) {
 	if Entry.IsPersonal {
-		_HCW_PatchTomlMeta(Entry.Path, Sec, Field, "")
+		Ok := _HCW_PatchTomlMeta(Entry.Path, Sec, Field, "")
 	} else if Entry.IsExtension {
-		HotstringsClearOverride("ext." . Entry.ExtId, Sec, Field)
+		Ok := HotstringsClearOverride("ext." . Entry.ExtId, Sec, Field)
 	} else {
-		HotstringsClearOverride(Entry.Key, Sec, Field)
+		Ok := HotstringsClearOverride(Entry.Key, Sec, Field)
 	}
 	_HCW_RepublishIfBakedField(Field)
+	return Ok
 }
 
 ; Re-register live when the field just written is one the engine baked at
@@ -311,12 +327,31 @@ _HCW_ReadTomlMeta(Path, Sec) {
 ; Strategy: scan lines once, track which "zone" we are in, emit each line
 ; unchanged except for the target zone where the field is added or removed.
 ; If the target header was never found, append it at the end.
+; @param Path {String} Absolute path of the personal TOML file to patch.
+; @param Sec {String} Section name, or "" for the file-level [_meta].
+; @param Field {String} "delay", "color", "priority" or "show_tooltip".
+; @param Value {String} New value, or "" to remove the key.
+; @returns {Boolean} True when the file was rewritten; false when the patch was
+;          refused or the write failed — in both cases the file is untouched.
 _HCW_PatchTomlMeta(Path, Sec, Field, Value) {
 	if !FileExist(Path) {
-		return
+		return false
 	}
 
 	FileContent := ReadTomlFile(Path)
+	; ReadTomlFile returns "" for an EXISTING file it could not open (a sync
+	; client's exclusive handle, an AV scan, another editor) and records the path
+	; in the shared unreadable sentinel precisely so writers of this shape refuse
+	; — the same guard ApplyConfigToml, WritePersonalToml and TOML_BatchWrite
+	; already carry. Without it "I could not read it" is indistinguishable from
+	; "it was empty": the scan below finds nothing, and the rewrite serialises
+	; that emptiness over the original — "Réinitialiser tout" truncates
+	; personal_hotstrings.toml to zero bytes and every personal hotstring in it
+	; is gone, under a success notification.
+	if TOML_UnreadableFile(Path) {
+		try LoggerError("HotstringsConfigWindow", "Refusing to patch '{1}': its current contents could not be read, and rewriting from an unread file discards every hotstring it holds.", Path)
+		return false
+	}
 	Lines := StrSplit(FileContent, "`n", "`r")
 	Field := StrLower(Field)
 	Sec   := StrLower(Sec)
@@ -378,10 +413,23 @@ _HCW_PatchTomlMeta(Path, Sec, Field, Value) {
 		}
 	}
 	try {
-		FileOpen(Path, "w", "UTF-8").Write(NewContent)
+		F := FileOpen(Path, "w", "UTF-8")
+		; FileOpen throws in v2 rather than returning falsy, so this is belt and
+		; braces — but it turns any future falsy return into a loud error instead
+		; of a skipped write against a file that has already been truncated.
+		if !IsObject(F) {
+			throw Error("FileOpen returned no handle for '" . Path . "'.")
+		}
+		F.Write(NewContent)
+		; Close explicitly rather than leaving it to the collector: the config
+		; window rewrites the same file several times in a row, and a handle still
+		; open on the previous pass makes the next one fail for no visible reason.
+		F.Close()
 	} catch as Err {
 		try LoggerError("HotstringsConfigWindow", "Failed to write TOML meta to '{1}': {2}.", Path, Err.Message)
+		return false
 	}
+	return true
 }
 
 ; Format a value for TOML output.
