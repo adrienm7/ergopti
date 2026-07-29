@@ -472,8 +472,12 @@ UpdateTrayIcon() {
             TraySetIcon(IconPath)
     }
 }
+; The tray menu's own « Recharger » item — the single most obviously
+; paused-reachable reload in the driver, and it dropped the pause like all the
+; others. "Reload the driver" and "stop being paused" are two different requests;
+; only one of them was made.
 ActivateReload(*) {
-    Reload()
+    ReloadPreservingSuspend()
 }
 ActivateExitApp(*) {
     ExitApp()

@@ -53,7 +53,7 @@ ModifyMagicKey(gui, NewValue) {
     }
     if (gui != 0)
         gui.Destroy()
-    Reload
+    ReloadPreservingSuspend()
 }
 
 ToggleRepeatKeyEnabled(*) {
@@ -116,7 +116,7 @@ ProcessUserInput(gui, edits) {
         }
     }
     MsgBox(t("dialog.personal_info.saved") "`n`n" PersonalInformationSummary)
-    Reload
+    ReloadPreservingSuspend()
 }
 
 GPTLinkEditor(*) {
@@ -138,5 +138,5 @@ ModifyLink(gui, NewValue) {
         Features["shortcuts"]["gpt"]["link"] := NewValue
     }
     gui.Destroy()
-    Reload
+    ReloadPreservingSuspend()
 }

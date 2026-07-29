@@ -123,7 +123,7 @@ ToggleAllFeatures(Value) {
     } catch as Err {
         try LoggerError("Config", "Bulk feature toggle could not be saved: {1}", Err.Message)
         try MsgBox(t("dialog.bulk_toggle.save_failed"), t("dialog.reset_defaults.failed_title"), "Iconx")
-        Reload
+        ReloadPreservingSuspend()
         return
     }
     if Bool {
@@ -133,7 +133,7 @@ ToggleAllFeatures(Value) {
         if (HsBatch.Length > 0)
             WriteFeatureBatchV2(Features, HsBatch)
     }
-    Reload
+    ReloadPreservingSuspend()
 }
 
 ToggleAllHotstringsOn(*) {
@@ -156,7 +156,7 @@ ToggleAllHotstrings(Value) {
         Batch.Push(Map("path", V2Path, "value", Bool))
     if (Batch.Length > 0)
         WriteFeatureBatchV2(Features, Batch)
-    Reload
+    ReloadPreservingSuspend()
 }
 
 IsCategoryAllEnabled(Categories) {
@@ -267,7 +267,7 @@ ToggleCategoryAllFeatures(Category, Value) {
         } catch as Err {
             try LoggerError("Config", "Category toggle for '{1}' could not be saved: {2}", Category, Err.Message)
             try MsgBox(t("dialog.bulk_toggle.save_failed"), t("dialog.reset_defaults.failed_title"), "Iconx")
-            Reload
+            ReloadPreservingSuspend()
             return
         }
         LoggerStart("Menu", "Applying live category toggle for {1}…", Category)
@@ -285,7 +285,7 @@ ToggleCategoryAllFeatures(Category, Value) {
         try LoggerError("Config", "Category toggle for '{1}' could not be saved: {2}", Category, Err.Message)
         try MsgBox(t("dialog.bulk_toggle.save_failed"), t("dialog.reset_defaults.failed_title"), "Iconx")
     }
-    Reload
+    ReloadPreservingSuspend()
 }
 
 ; Force every section of one hotstring category on/off (bulk action), scoped to
@@ -323,7 +323,7 @@ ToggleCategoryAllSections(V1Cat, Enable) {
         Batch.Push(Map("path", Entry["path"], "value", Bool))
     if (Batch.Length > 0)
         WriteFeatureBatchV2(Features, Batch)
-    Reload
+    ReloadPreservingSuspend()
 }
 
 ; Force every personal hotstring section (from personal_hotstrings.toml) on/off.
@@ -355,7 +355,7 @@ HS_TogglePersonalAllSections(Enable) {
     }
     if (Batch.Length > 0)
         WriteFeatureBatchV2(Features, Batch)
-    Reload
+    ReloadPreservingSuspend()
 }
 
 _CategoryEnabledKey(Category) {
@@ -609,7 +609,7 @@ ReloadWithDefaultConfig(*) {
         try MsgBox(t("dialog.reset_defaults.placeholder_failed"),
             t("dialog.reset_defaults.failed_title"), "Icon!")
     }
-    Reload
+    ReloadPreservingSuspend()
 }
 
 ReadScriptShortcutsConfig() {
@@ -678,7 +678,7 @@ SetScriptShortcutAction(Slot, ActionName) {
         return
     ScriptShortcutAssignments[Slot] := ActionName
     TOML_Write(ActionName, ConfigurationFile, "ahk.shortcuts.script_control", Slot)
-    Reload
+    ReloadPreservingSuspend()
 }
 
 BuildScriptShortcutsMenu() {
@@ -769,7 +769,7 @@ SetKeyboardShortcutAction(SlotId, ActionName) {
         return
     KeyboardShortcutAssignments[SlotId] := ActionName
     TOML_Write(ActionName, ConfigurationFile, "ahk.shortcuts.keyboard", SlotId)
-    Reload
+    ReloadPreservingSuspend()
 }
 
 _MakeKeyboardShortcutHandler(SlotId, ActionName) {

@@ -181,7 +181,7 @@ Updater_SetChannel(Channel) {
 	; for its in-process restart path instead of relying on the implicit
 	; teardown.
 	Updater_StopBackgroundChecks()
-	Reload
+	ReloadPreservingSuspend()
 }
 
 

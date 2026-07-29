@@ -159,7 +159,12 @@ _A0720WV_PathsEditorSurfacesWriteFailure() {
 	Assert(GuardPos > 0,
 		"_PathsEdWeb_Save must branch on the shared writer's result — a write that failed must not fall through")
 
-	ReloadPos := InStr(Body, "Reload()")
+	; Spelling-independent: the reload now routes through ReloadPreservingSuspend()
+	; so a paused user is not silently un-paused by saving. The INVARIANT here is
+	; unchanged — the failure branch must return before whatever performs the
+	; reload — and matching either spelling keeps it from becoming a false green
+	; the next time the reload path is renamed.
+	ReloadPos := RegExMatch(Body, "Reload(?:PreservingSuspend)?\(")
 	Assert(ReloadPos > 0, "prerequisite: the success path still reloads")
 	Assert(GuardPos < ReloadPos,
 		"the failure branch must return BEFORE Reload() — reloading after a failed write drops the user back into the OLD config directory with no error anywhere, so the change simply appears not to have happened")

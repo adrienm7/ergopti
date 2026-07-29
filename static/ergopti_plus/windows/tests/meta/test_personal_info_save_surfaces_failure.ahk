@@ -42,7 +42,11 @@ _PISF_SaveBranchesBeforeReload() {
 	Assert(GuardPos > 0,
 		"_PiEdWeb_Save must branch on WritePersonalInfoToml's result — discarding it is what turned a reported write failure back into a silent one")
 
-	ReloadPos := InStr(Body, "Reload()")
+	; Spelling-independent: the reload now routes through ReloadPreservingSuspend()
+	; so saving from this editor cannot silently un-pause the driver. The INVARIANT
+	; is unchanged — the failure branch must come before whatever reloads — and
+	; matching either spelling stops this becoming a false green after a rename.
+	ReloadPos := RegExMatch(Body, "Reload(?:PreservingSuspend)?\(")
 	Assert(ReloadPos > 0, "prerequisite: the success path still reloads so the engine rebuilds its expansions")
 	Assert(GuardPos < ReloadPos,
 		"the failure branch must come BEFORE Reload(). Reloading after a failed write re-reads the unchanged file and discards the in-memory edits — the editor window is the only place the user's values still exist at that point")
