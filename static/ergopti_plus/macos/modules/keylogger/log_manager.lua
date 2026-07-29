@@ -1069,7 +1069,7 @@ function M.day_rollover()
 	-- Keep the old day intact and retry the append before a later rotation.
 	local db = SqliteWriter.get_db()
 	if db and not _flush_local_data_sql_outbox(db) then
-		Logger.warn(LOG, "day_rollover: local data.sql outbox is not durable â€” preserving today.log.")
+		Logger.warn(LOG, "day_rollover: local data.sql outbox is not durable — preserving today.log.")
 		return false
 	end
 

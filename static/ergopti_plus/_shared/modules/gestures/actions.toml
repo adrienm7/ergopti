@@ -1,4 +1,4 @@
-﻿﻿# static/ergopti_plus/_shared/modules/gestures/actions.toml
+# static/ergopti_plus/_shared/modules/gestures/actions.toml
 #
 # Source de vérité unique pour les actions de gestes.
 # Lue par Hammerspoon (modules/gestures/actions.lua) et AutoHotkey
