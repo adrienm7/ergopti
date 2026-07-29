@@ -246,6 +246,7 @@ InstallSendNoOps()
 #Include unit/test_personal_toml_io.ahk
 #Include unit/test_nav_layer_helpers.ahk
 #Include unit/test_synthetic_buffer_effects.ahk
+#Include unit/test_synthetic_sends_declare_buffer_effect.ahk
 #Include unit/test_capsword_taphold_unlatch.ahk
 #Include meta/test_tap_hold_suspend_boundary.ahk
 #Include unit/test_updater.ahk
