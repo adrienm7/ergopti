@@ -68,25 +68,12 @@ _HS_RegisterPersonal() {
 	; Extension personal TOML files — any *.toml in the hotstrings\ folder other than
 	; personal_hotstrings.toml is loaded as an extension pack (all sections enabled,
 	; no per-section toggle). Sub-folders generate hierarchical category labels.
-	if IsSet(ScriptInformation) and ScriptInformation.Has("PersonalHotstringsDir") {
-		HsExtDir := ScriptInformation["PersonalHotstringsDir"]
-		if DirExist(HsExtDir) {
-			_LoadPersonalExtRecursive(dir, prefix) {
-				Loop Files dir . "\*", "DF" {
-					if (A_LoopFileAttrib ~= "D") {
-						; Recurse into sub-folder
-						_LoadPersonalExtRecursive(A_LoopFileFullPath, (prefix == "" ? "" : prefix . " / ") . A_LoopFileName)
-					} else if (A_LoopFileName ~= "i)\.toml$") {
-						if (prefix == "" and A_LoopFileName == "personal_hotstrings.toml")
-							continue
-						SplitPath A_LoopFileFullPath, , , , &_ExtStem
-						FullLabel := (prefix == "" ? "" : prefix . " / ") . _ExtStem
-						LoadExtTomlFile(A_LoopFileFullPath, FullLabel)
-					}
-				}
-			}
-			_LoadPersonalExtRecursive(RegExReplace(HsExtDir, "[/\\]+$"), "")
-		}
-	}
+	; Shared with the preview-index rebuild (HS_EnumeratePersonalExtFiles). The two
+	; used to walk the tree independently — this one recursively, the index from a
+	; single hardcoded path — so every pack registered here expanded with no tooltip
+	; and nothing anywhere reported the gap. One enumeration means they cannot drift
+	; apart again.
+	for _, Pack in HS_EnumeratePersonalExtFiles()
+		LoadExtTomlFile(Pack["Path"], Pack["Label"])
 	try BootProfile_Mark("HS sub: personal + extension TOML registered")
 }

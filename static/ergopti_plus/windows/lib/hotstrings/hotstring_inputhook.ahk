@@ -522,6 +522,16 @@ HotstringPrefixWatcherRebuildIndex() {
 			_tomlCats += 1
 		}
 	}
+	; Extension packs. The six categories above enumerate FILES the driver ships;
+	; the engine additionally registers every other *.toml under
+	; PersonalHotstringsDir. Indexing only the six meant a pack expanded correctly
+	; and could never be previewed — and the config window still offered it a
+	; per-pack tooltip colour, a setting with nothing behind it.
+	_extPacks := 0
+	for _, Pack in HS_EnumeratePersonalExtFiles() {
+		_RegisterExtPackTriggers(Pack["Path"], Pack["Label"], NewIndex, NewSet)
+		_extPacks += 1
+	}
 	_buildMs := A_TickCount - _buildStart
 	_PrefixIndex := NewIndex
 	_TriggerSet := NewSet
@@ -532,8 +542,8 @@ HotstringPrefixWatcherRebuildIndex() {
 	; (cache-load vs the in-memory build loop) and confirm the fast path stays live
 	; (cache=0 toml=6 would mean the cache path silently broke).
 	try LoggerInfo("PrefixWatcher",
-		"Index rebuilt: {1} trigger(s) in {2} ms (ensure={3}ms build={4}ms cache={5} toml={6} rows={7}).",
-		NewSet.Count, A_TickCount - _rebuildStart, _ensureMs, _buildMs, _cachedCats, _tomlCats,
+		"Index rebuilt: {1} trigger(s) in {2} ms (ensure={3}ms build={4}ms cache={5} toml={6} ext={7} rows={8}).",
+		NewSet.Count, A_TickCount - _rebuildStart, _ensureMs, _buildMs, _cachedCats, _tomlCats, _extPacks,
 		(IsSet(_HS_CACHE_ROWS) ? _HS_CACHE_ROWS.Count : "unset"))
 	; A just-disabled section may still have a tooltip on screen — hide it so the
 	; preview cannot outlive the expansion it was advertising.
