@@ -183,7 +183,14 @@ local instant_on_word_end        = LLM_DEFAULTS.llm_instant_on_word_end  -- Bypa
 function M.set_preview_ai_enabled(v)
 	is_ai_preview_enabled = (v == true)
 	Logger.debug(LOG, "AI preview: %s.", is_ai_preview_enabled and "on" or "off")
-	if not v then tooltip.hide() end
+	-- Disabling is a state TEARDOWN, not a UI hide. A bare tooltip.hide() clears
+	-- the canvas and nothing else: predictions_visible stayed true, the pending
+	-- set stayed populated, and neither request counter moved — so an in-flight
+	-- stream still passed its own generation check and repainted the bubble the
+	-- user had just switched off. M.reset() is the contract that actually holds:
+	-- it clears the state, bumps both counters so late callbacks discard
+	-- themselves, stops the chain timer and hides forcibly.
+	if not v then M.reset() end
 end
 
 --- @param color table|nil RGBA table, or nil to restore the module default.

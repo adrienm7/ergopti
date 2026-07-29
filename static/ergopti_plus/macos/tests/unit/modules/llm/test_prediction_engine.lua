@@ -458,3 +458,55 @@ helpers.describe("prediction_engine — perform_check dispatch", function()
 		helpers.assert_true(dispatched, "perform_check must dispatch fetch_llm_prediction when the backend is ready")
 	end)
 end)
+
+
+
+
+
+-- ==================================================================
+-- ====================================================================
+-- ======= 9/ Disabling the AI bubble is a teardown, not a hide =======
+-- ====================================================================
+-- ==================================================================
+
+--- set_preview_ai_enabled(false) used to call a bare tooltip.hide(). That clears
+--- the canvas and nothing else: predictions_visible stayed true, the pending set
+--- stayed populated, and neither request counter moved — so an in-flight stream
+--- still passed its own generation check and repainted the bubble the user had
+--- just switched off. The teardown contract already existed in M.reset(); the
+--- disable path simply did not use it.
+helpers.describe("prediction_engine: turning the AI preview off tears the state down", function()
+
+	helpers.it("hides forcibly rather than with the soft hide the dismiss contract forbids", function()
+		local calls = {}
+		local tt = package.loaded["ui.tooltip"]
+		local old_hide, old_forced = tt.hide, tt.hide_forced
+		tt.hide        = function() calls[#calls + 1] = "hide" end
+		tt.hide_forced = function() calls[#calls + 1] = "hide_forced" end
+
+		PE.set_preview_ai_enabled(false)
+
+		tt.hide, tt.hide_forced = old_hide, old_forced
+
+		local saw_forced = false
+		for _, c in ipairs(calls) do if c == "hide_forced" then saw_forced = true end end
+		helpers.assert_true(saw_forced,
+			"a soft hide clears the canvas without firing the cancel contract, so the engine "
+			.. "still believes a prediction is on screen and an in-flight stream repaints it")
+	end)
+
+	helpers.it("leaves no prediction believed visible", function()
+		PE.set_preview_ai_enabled(false)
+		helpers.assert_eq(PE.is_visible(), false,
+			"predictions_visible must be cleared by the disable, otherwise navigation and "
+			.. "validation keystrokes keep being captured for a bubble that is gone")
+	end)
+
+	helpers.it("re-enabling does not resurrect the torn-down state", function()
+		PE.set_preview_ai_enabled(false)
+		PE.set_preview_ai_enabled(true)
+		helpers.assert_eq(PE.is_visible(), false,
+			"turning the preview back on must not make a previously pending set visible again")
+	end)
+
+end)
