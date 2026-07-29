@@ -18,10 +18,6 @@
 ;    include "ahk" are silently skipped.
 ; ==============================================================================
 
-; Hard-coded fallback strings when platform JSON is unreadable at boot —
-; guards against empty-menu edge case during first-run / manifest missing.
-global _MR_MANIFEST_CACHE := false   ; cached parsed root object
-
 
 
 
@@ -32,38 +28,17 @@ global _MR_MANIFEST_CACHE := false   ; cached parsed root object
 ; =============================================
 ; =============================================
 
-; Returns the parsed manifest root Map, loading and caching it on first call.
-; Returns ``false`` on any read / parse failure.
+; Returns the parsed manifest root Map, or ``false`` on any read / parse failure.
+;
+; Thin delegate to the single shared accessor. This function used to keep its own
+; independent cache of the very same menu_manifest.json, so the 12.5 KB file was
+; decoded once here and again in lib/menu_manifest.ahk — ~44 ms of pure duplicate
+; work on the boot path. One decoder means one decode per process, and the
+; failure contract is inherited unchanged: a failed load is never cached, so a
+; transient I/O error stays retryable instead of freezing the session into the
+; fallback defaults.
 _MR_GetManifestRoot() {
-	global _MR_MANIFEST_CACHE, _SharedDir
-	if (_MR_MANIFEST_CACHE != false) {
-		return _MR_MANIFEST_CACHE
-	}
-	FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
-	if !FileExist(FilePath) {
-		try LoggerWarn("MenuRenderer", "manifest not found at '{1}'.", FilePath)
-		return false
-	}
-	FileContent := ""
-	try FileContent := FileRead(FilePath, "UTF-8")
-	if FileContent == "" {
-		try LoggerWarn("MenuRenderer", "manifest is empty.")
-		return false
-	}
-	Root := ""
-	try Root := JsonParse(FileContent)
-	if !(Root is Map) {
-		try LoggerWarn("MenuRenderer", "manifest root is not a JSON object.")
-		return false
-	}
-	_MR_MANIFEST_CACHE := Root
-	return Root
-}
-
-; Invalidates the manifest cache — call after hot-reload or locale change.
-MenuRenderer_InvalidateCache() {
-	global _MR_MANIFEST_CACHE
-	_MR_MANIFEST_CACHE := false
+	return _MM_GetManifestRoot()
 }
 
 ; Returns the array at ``Key`` inside the manifest root, or an empty Array.
@@ -154,6 +129,14 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 
 	for Item in MenuDef {
 		if !_MR_IsForAhk(Item) {
+			; A handler registered for an entry the platform filter drops is
+			; always drift: the driver implements the action, the manifest says
+			; this platform does not have it, and the row silently disappears
+			; with nothing anywhere to explain why. Surface the asymmetry.
+			FilteredId := _MR_Get(Item, "id")
+			if (FilteredId != "" and DynamicHandlers is Map and DynamicHandlers.Has(FilteredId)) {
+				try LoggerDebug("MenuRenderer", "Item '{1}' in '{2}' is platform-filtered out but a handler is registered for it — manifest/driver drift.", FilteredId, ManifestKey)
+			}
 			continue
 		}
 
