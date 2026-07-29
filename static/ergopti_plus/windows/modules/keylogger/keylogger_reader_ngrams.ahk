@@ -328,6 +328,30 @@ KLR_ReadRangeSplitTodayFast(db, selected_apps := unset) {
         }
     }
 
+    KLR__FillTodayAuxTables(db, today, app_clause, today_idx)
+    return Map("historical", Map(), "today", today_idx)
+}
+
+; Fill the four today slots that KLR_NGRAM_TYPE_TABLE does not cover — kc
+; (keycode heatmap), sc_kb (scancode heatmap), sc (shortcuts) and sc_bg
+; (shortcut bigrams) — into ``today_idx``, creating each per-app bucket on
+; demand.
+;
+; One owner for the three today projections. KLR_NewTodayBucket declares
+; thirteen slots while KLR_NGRAM_TYPE_TABLE names only nine, so every projection
+; has to add these four explicitly. KLR_ReadRangeSplitTodayFast and
+; KLR_BuildTodayIdxJson did; KLR_ReadRangeSplitToday — the full first-paint AND
+; user-range path — did not, and returned them as well-formed EMPTY maps. A
+; declared-but-unfed slot is worse than a missing one: every downstream merge is
+; a valid no-op, so a custom date range that includes today rendered the
+; Shortcuts tab and today's share of the keyboard heatmap as nothing at all,
+; with no log line and no exception. Copying the queries into the third caller
+; would only have set up the next drift.
+; @param db {Integer} Open SQLite handle.
+; @param today {String} Today's date as "yyyy-MM-dd".
+; @param app_clause {String} Pre-built " AND app IN (…)" filter, or "".
+; @param today_idx {Map} Per-app bucket index, mutated in place.
+KLR__FillTodayAuxTables(db, today, app_clause, today_idx) {
     ; Keycode heatmap data (ngram_keycodes). The dashboard renders a
     ; per-keyboard-key colour map from this table; the user expects it
     ; to track typing live.
@@ -371,7 +395,6 @@ KLR_ReadRangeSplitTodayFast(db, selected_apps := unset) {
             today_idx[app] := KLR_NewTodayBucket()
         today_idx[app]["sc_bg"][r["token"]] := KLR_NewNgramItem(r["c"], 0, 0, "")
     }
-    return Map("historical", Map(), "today", today_idx)
 }
 
 KLR_ReadRangeSplitToday(db, start_date := "", end_date := "", selected_apps := unset) {
@@ -417,6 +440,11 @@ KLR_ReadRangeSplitToday(db, start_date := "", end_date := "", selected_apps := u
             today_idx[app][code][r["token"]] := KLR_NewNgramItem(r["c"], r["t"], r["e"], r["esrc_json"])
         }
     }
+
+    ; KLR_NGRAM_TYPE_TABLE stops at the nine text n-gram tables; the shortcut,
+    ; shortcut-bigram, keycode and scancode slots KLR_NewTodayBucket also
+    ; declares are filled here, exactly as on the fast and live paths.
+    KLR__FillTodayAuxTables(db, today, app_clause, today_idx)
 
     return Map("historical", historical, "today", today_idx)
 }
