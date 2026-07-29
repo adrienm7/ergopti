@@ -587,6 +587,50 @@ global UIA_SELECTION_IDLE_REQUIRED_MS := 250
 ; large document selection monopolise the keyboard/message thread.
 global UIA_SELECTION_MAX_TEXT_CHARS := 8192
 
+; Bound UIA's own waits before this poll makes its first COM round-trip.
+;
+; The library ships Windows' defaults — 2000 ms TransactionTimeout, 20000 ms
+; ConnectionTimeout — and the driver's worst measured stall (2560 ms, logged as
+; "Slow Tooltip.ResolvePos: 2560.32 ms") is exactly that 2000 ms plus overhead.
+; This poll fires twice a second, unattended, on the SAME message thread that
+; dispatches keystrokes, so an unresponsive provider blocks typing for as long
+; as Windows lets it. The idle gate below decides whether to START the round
+; trip; it does nothing at all about how long the round-trip may then take.
+;
+; Kept module-local, mirroring _SFD_ClampUiaTimeouts in the secure-field adapter
+; and _TooltipClampUiaTimeouts in ui/tooltip. A single shared helper would be
+; tidier, but the three owners sit in three layers that must not depend on each
+; other (an adapter may not reach into ui/, a module may not reach into an
+; adapter for a UI concern), and the driver's headless test runner loads those
+; trees selectively — a helper hoisted into any one of them would break the load
+; of the others. All three write the same two process-wide singleton properties
+; and are one-shot, so whichever probe touches UIA first wins and the rest are
+; no-ops; what matters is only that no probe can reach the COM call unclamped.
+; @returns {void}
+_UIA_ClampSelectionTimeouts() {
+	global UIA_TRANSACTION_TIMEOUT_MS, UIA_CONNECTION_TIMEOUT_MS
+	static Clamped := false
+	if Clamped
+		return
+	if !IsSet(UIA)
+		return
+	if (!IsSet(UIA_TRANSACTION_TIMEOUT_MS) or !IsSet(UIA_CONNECTION_TIMEOUT_MS)) {
+		try LoggerWarn("Layout", "UIA timeout constants are unavailable — the selection poll would run against Windows' 2000 ms default; skipping the clamp.")
+		return
+	}
+	Clamped := true
+	; Both properties are IUIAutomation2 vtable slots; an older interface must not
+	; throw into this callback, which shares the keystroke-dispatch thread.
+	try {
+		if !UIA.IsIUIAutomation2Available
+			return
+	} catch {
+		return
+	}
+	try UIA.TransactionTimeout := UIA_TRANSACTION_TIMEOUT_MS
+	try UIA.ConnectionTimeout := UIA_CONNECTION_TIMEOUT_MS
+}
+
 ; Background timer to poll the current UIA selection. Moves the expensive
 ; COM round-trip off the synchronous keyboard path (uia-selection-blocks-keyboard-thread).
 _UIA_SelectionPollTick() {
@@ -627,7 +671,15 @@ _UIA_SelectionPollTick() {
         return
     if (!IsSet(UIA))
         return
+    ; Bound the round-trip BEFORE making it. The gate above only decides whether
+    ; to start; without this the wait itself is unbounded, and a keystroke
+    ; arriving one millisecond later queues behind it on this same thread.
+    _UIA_ClampSelectionTimeouts()
 
+    ; This tick is the driver's only unattended repeating COM round-trip. It was
+    ; the one probe with no hot-path segment at all, so a provider that answered
+    ; slowly showed up in the logs as an unexplained gap rather than as itself.
+    _hpPoll := HotPath_Now()
     try {
         ProcName := ""
         try ProcName := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
@@ -670,6 +722,11 @@ _UIA_SelectionPollTick() {
         ; provider is diagnosable (uia-error-swallowed-silently). The poll then
         ; degrades to "no selection" below, which is the safe fallback.
         try LoggerWarn("Layout", "UIA selection probe failed: {1}.", e.Message)
+    } finally {
+        ; finally, not a trailing statement: the block above returns from four
+        ; places, and a segment that is only closed on the fall-through path
+        ; would silently stop measuring the exact cases that are slow.
+        HotPath_LogIfSlow("UIA.SelectionPoll", _hpPoll, "")
     }
 	_UIA_SelectionCache := 0
 }
