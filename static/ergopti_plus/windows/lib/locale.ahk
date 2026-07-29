@@ -160,9 +160,22 @@ _I18nWriteTsvCache(TsvPath, Parsed) {
 				Esc := StrReplace(Esc, "`n", "\n")
 			Content .= Key . "`t" . Esc . "`n"
 		}
-		if FileExist(TsvPath)
-			FileDelete(TsvPath)
-		FileAppend(Content, TsvPath, "UTF-8-RAW")
+		; Stage then rename. FileDelete + FileAppend is a two-step publication that
+		; leaves the LIVE cache absent or half-written between the two calls, and a
+		; Reload lands in that window routinely (the layout-change watcher reloads
+		; on any Windows layout switch, and #SingleInstance replacement can kill the
+		; process mid-write). _I18nTsvIsFresh is a pure mtime compare and
+		; _I18nParseTSV has no line-count or sentinel check, so a torn file is served
+		; as "fresh" forever and every key past the truncation silently degrades to
+		; the EN fallback or to its raw dotted name. FileMove over an existing target
+		; is an atomic NTFS rename, so the cache is always either the old one or the
+		; new one, never a prefix of the new one (locale-tsv-non-atomic-write).
+		; Mirrors _HotstringsCacheWriteTsv, which was fixed first.
+		TmpPath := TsvPath . ".tmp"
+		if FileExist(TmpPath)
+			FileDelete(TmpPath)
+		FileAppend(Content, TmpPath, "UTF-8-RAW")
+		FileMove(TmpPath, TsvPath, 1)
 	} catch as err {
 		try LoggerWarn("i18n", "Could not write fast-cache '{1}' ({2}); JSON path stays active.", TsvPath, err.Message)
 	}
@@ -185,7 +198,15 @@ _I18nLoadLocaleMap(JsonPath, MagicKey) {
 	; ── Fast path: a fresh .tsv cache ──
 	if FileExist(TsvPath) and _I18nTsvIsFresh(TsvPath, JsonPath) {
 		try {
-			return { Cache: _I18nParseTSV(FileRead(TsvPath, "UTF-8"), MagicKey), Ok: true, Fast: true }
+			Fast := _I18nParseTSV(FileRead(TsvPath, "UTF-8"), MagicKey)
+			; A cache that parses to zero keys is damage, not content: every shipped
+			; locale carries thousands of entries. Falling through to the JSON makes
+			; the "self-healing cache" contract in this module's header true for a
+			; TRUNCATED cache too, not only for a missing one, and the slow path
+			; rewrites the cache on its way out.
+			if (Fast.Count > 0)
+				return { Cache: Fast, Ok: true, Fast: true }
+			try LoggerWarn("i18n", "Fast cache '{1}' parsed to 0 keys; rebuilding from JSON.", TsvPath)
 		} catch as err {
 			try LoggerWarn("i18n", "Fast cache '{1}' unreadable ({2}); rebuilding from JSON.", TsvPath, err.Message)
 		}
