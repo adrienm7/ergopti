@@ -156,16 +156,42 @@ function M.set_repeat_feature_enabled(enabled)
 	end
 end
 
---- Disables a section and reloads its group so the mapping database reflects the change.
+--- Persists the enabled state of ONE OR MORE sections and rebuilds their group
+--- exactly once.
+---
+--- Separating "record the user's choice" from "rebuild the group" is the whole
+--- point. Each rebuild tears down and fully re-registers the group and re-sorts
+--- the entire corpus, and the menu's "toggle every section of this group" helper
+--- called the single-section API once per section — twenty-four full-corpus
+--- rebuilds for one click on the rolls group, twenty-three of them discarded by
+--- the next. The TOML snapshot cache absorbs the re-parse; the re-registration,
+--- the global sort and the two index rebuilds are paid in full every time.
 --- @param gn string Group name.
---- @param sn string Section name.
-function M.disable_section(gn, sn)
-	Logger.debug(LOG, "Disabling section '%s/%s'.", gn, sn)
-	hs.settings.set("hotstrings_section_" .. tostring(gn) .. "_" .. tostring(sn), false)
+--- @param section_names table Array of section names.
+--- @param enabled boolean True to enable (clears the explicit false), false to disable.
+function M.set_sections_enabled(gn, section_names, enabled)
+	if type(section_names) ~= "table" or #section_names == 0 then return end
+	Logger.debug(LOG, "%s %d section(s) of '%s'.",
+		enabled and "Enabling" or "Disabling", #section_names, tostring(gn))
+
+	-- Every setting first: the rebuild below reads them all, so a rebuild
+	-- interleaved between writes would register a half-applied state.
+	for _, sn in ipairs(section_names) do
+		hs.settings.set("hotstrings_section_" .. tostring(gn) .. "_" .. tostring(sn),
+			enabled and nil or false)
+	end
+
 	if M.is_group_enabled(gn) then
 		M.disable_group(gn)
 		M.enable_group(gn)
 	end
+end
+
+--- Disables a section and reloads its group so the mapping database reflects the change.
+--- @param gn string Group name.
+--- @param sn string Section name.
+function M.disable_section(gn, sn)
+	M.set_sections_enabled(gn, { sn }, false)
 end
 
 --- Enables a section (removes the explicit false, restoring the default-enabled state)
@@ -173,12 +199,7 @@ end
 --- @param gn string Group name.
 --- @param sn string Section name.
 function M.enable_section(gn, sn)
-	Logger.debug(LOG, "Enabling section '%s/%s'.", gn, sn)
-	hs.settings.set("hotstrings_section_" .. tostring(gn) .. "_" .. tostring(sn), nil)
-	if M.is_group_enabled(gn) then
-		M.disable_group(gn)
-		M.enable_group(gn)
-	end
+	M.set_sections_enabled(gn, { sn }, true)
 end
 
 --- Returns the sections table for a group, or nil if the group is unknown.
