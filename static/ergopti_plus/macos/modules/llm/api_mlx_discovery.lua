@@ -242,7 +242,23 @@ end
 --- Idempotent: the timer runs only once; subsequent calls enqueue their
 --- on_done callback and return.
 --- @param on_done function|nil Optional callback invoked once the probe finishes.
+--- Reports whether the script is paused. Discovery spawns curl polls and POSTs
+--- inference probes, which the "pause = everything off" invariant forbids: this
+--- module had no reference to a pause predicate at all.
+--- @return boolean
+local function _is_paused()
+	local sc = package.loaded["modules.shortcuts.script_control"]
+	return type(sc) == "table" and type(sc.is_paused) == "function" and sc.is_paused() == true
+end
+
 function M.discover(on_done)
+	if _is_paused() then
+		Logger.debug(LOG, "Discovery skipped — script is paused.")
+		-- The caller is answered rather than dropped: a warmup waiting on a
+		-- callback that never fires is how the prediction lock got stuck.
+		if type(on_done) == "function" then ApiCommon.protected_call(on_done, "on_done") end
+		return
+	end
 	if _endpoints_discovered then
 		if type(on_done) == "function" then ApiCommon.protected_call(on_done, "on_done") end
 		return
