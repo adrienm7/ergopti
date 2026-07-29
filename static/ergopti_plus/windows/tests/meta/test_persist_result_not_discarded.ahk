@@ -146,7 +146,13 @@ _PRND_LlmSaveSurfacesAndRecovers() {
 		"LLM_Menu_SaveConfig must test SaveFullConfig's result — the LLM toggles never reach a Reload, so nothing else can notice the write failed")
 	Assert(InStr(Body, "LoggerError") > 0,
 		"a failed LLM persist must be logged at ERROR: the user's setting is gone and every other signal reported success")
-	Assert(InStr(Body, "Reload()") > 0,
+	; Any of the driver's reload entry points satisfies this: what matters is that
+	; the process re-reads the file, not which helper does it. Pinning the literal
+	; "Reload()" started failing the moment the call became
+	; ReloadPreservingSuspend(), which re-synchronises exactly the same way and
+	; additionally carries the user's pause state across the restart — a strictly
+	; better answer that the old spelling-based assertion called a regression.
+	Assert(InStr(Body, "Reload()") > 0 or InStr(Body, "ReloadPreservingSuspend()") > 0,
 		"a failed LLM persist must re-synchronise from disk. Without it memory, engine and menu keep agreeing on a state that exists nowhere, which is a lie the user only discovers at the next restart")
 }
 

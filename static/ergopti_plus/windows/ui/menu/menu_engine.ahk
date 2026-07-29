@@ -236,7 +236,7 @@ SetFeatureLetter(V2Path, Letter) {
 		Map("path", V2Path, "value", true),
 		Map("path", V2Path, "value", Letter, "prop", "letter"),
 	])
-	Reload
+	ReloadPreservingSuspend()
 }
 
 ; Disables a letter-picker feature without touching its letter, so the
@@ -245,7 +245,7 @@ SetFeatureLetter(V2Path, Letter) {
 SetFeatureLetterOff(V2Path) {
 	global Features
 	WriteFeatureV2(Features, V2Path, false)
-	Reload
+	ReloadPreservingSuspend()
 }
 
 global _TrayTitleCache := Map()
@@ -374,7 +374,7 @@ ToggleFeatureV2(V2Path) {
 	}
 	Batch.Push(Map("path", V2Path, "value", NewValue))
 	WriteFeatureBatchV2(Features, Batch)
-	Reload
+	ReloadPreservingSuspend()
 }
 
 ; v2-native live-toggle classifier + applier — the no-translation counterpart of
