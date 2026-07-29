@@ -152,16 +152,19 @@ LLM_Menu_BuildModelMenu() {
 	; menu while the feature is off (Ollama is usually not running then).
 	if (!presets_used) {
 		installed := deps_ready ? _LLM_GetInstalledTagsCached() : []
-		if (installed.Length == 0) {
-			no_models_label := t("menu.llm.no_model")
-			m.Add(no_models_label, (*) => 0)
-			m.Disable(no_models_label)
-		} else {
-			for tag in installed {
-				RegisterMenuItem(m, tag, _LLM_Menu_MakeSetModelHandler(tag))
-				if (tag == active)
-					m.Check(tag)
-			}
+		; An empty list adds NO placeholder row. It used to add one built from
+		; t("menu.llm.no_model") — the SAME i18n key as the actionable "Aucun
+		; modèle" selector registered at the top of this menu — and AHK v2's
+		; Menu.Add with an already-present label modifies that item in place
+		; instead of appending, so the raw no-op Add replaced the selector's
+		; callback and the Disable that followed greyed out the very row the user
+		; needs to clear a configured model (llm-no-model-row-clobbered). The
+		; selector already reads "no model" and stays clickable, so the
+		; placeholder never carried information the menu was not showing.
+		for tag in installed {
+			RegisterMenuItem(m, tag, _LLM_Menu_MakeSetModelHandler(tag))
+			if (tag == active)
+				m.Check(tag)
 		}
 	}
 
