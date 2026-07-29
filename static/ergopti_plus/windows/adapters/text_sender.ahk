@@ -185,6 +185,31 @@ _TextSenderInvokeCallback(Callback, Ok := true, ErrorMessage := "") {
 ; strand a partially applied modifier transaction.
 _TextSenderSendInput(Keys, Operation := "SendInput") {
 	global _AHK_SendInput
+
+	; Every TextPressKey emission funnels through here at SendLevel 0, and the
+	; prefix watcher's InputHook is armed "V L0 I1" — so it filters these out by
+	; construction and neither hotstring buffer ever learns that a synthetic
+	; Ctrl+Backspace just deleted a whole word. The declaration channel was wired
+	; at three call sites and ~40 others reach this funnel without it, so declare
+	; HERE instead of chasing the call sites: the default-on AltGr+LAlt shortcut
+	; alone left both buffers describing text no longer on screen, and the next
+	; expansion then backspaced over characters that had nothing to do with it.
+	;
+	; Deliberately restricted to the two real key-press operations:
+	;   - "erase character" is the engine backspacing over its OWN trigger mid
+	;     expansion. It already accounts for those, so declaring would decrement
+	;     both buffers a second time — corruption in the opposite direction.
+	;   - "clipboard paste" is that same expansion machinery injecting its
+	;     replacement, likewise already accounted for.
+	;   - the modifier Down/Up and rollback operations change modifier state
+	;     only; they touch neither the caret nor the document.
+	; IsSet-guarded because the headless runner loads these trees selectively and
+	; an adapter must stay usable without the hotstring layer present.
+	if (Operation == "key press" or Operation == "modified key press") {
+		if IsSet(HS_DeclareSyntheticEffect)
+			try HS_DeclareSyntheticEffect(Keys)
+	}
+
 	try {
 		_AHK_SendInput.Call(Keys)
 		return true
