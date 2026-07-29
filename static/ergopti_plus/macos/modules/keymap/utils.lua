@@ -166,8 +166,29 @@ local function perform_paste(value)
 		-- Preserve all clipboard types (images, RTF, etc.), not just plain text.
 		_paste_saved_original = hs.pasteboard.readAllData()
 	end
-	hs.pasteboard.setContents(value)
-	keyStroke({ "cmd" }, "v", 0)
+	-- From here the user's clipboard holds OUR payload, and the restore timer is
+	-- not armed yet. A throw in between — setContents failing, the keystroke
+	-- raising — used to leave it there permanently, with _paste_saved_original
+	-- still set so the NEXT paste would not even re-capture the real value. The
+	-- enclosing pcall caught the error and logged it, which is precisely why the
+	-- eaten clipboard was never traced back here. The sibling path in
+	-- adapters/text_sender was fixed for this; this one, which every real
+	-- hotstring paste goes through, was missed.
+	local ok_write = pcall(function()
+		hs.pasteboard.setContents(value)
+		keyStroke({ "cmd" }, "v", 0)
+	end)
+	if not ok_write then
+		local original = _paste_saved_original
+		_paste_saved_original = nil
+		pcall(function()
+			if type(original) == "table" and next(original) ~= nil then
+				hs.pasteboard.writeAllData(original)
+			end
+		end)
+		Logger.error(LOG, "Clipboard paste failed before the restore could be armed — original restored.")
+		return
+	end
 	-- Restore clipboard asynchronously after the target app has received the paste.
 	local saved = _paste_saved_original
 	_paste_pending_timer = hs.timer.doAfter(CLIPBOARD_RESTORE_SEC, function()
