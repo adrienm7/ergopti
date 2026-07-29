@@ -406,7 +406,7 @@ SaveFullConfig() {
     if IsSet(_LLM_Menu_SyncToFeatures) && (IsSet(_LLM_Menu_Loaded) && _LLM_Menu_Loaded)
         _LLM_Menu_SyncToFeatures()
     if IsSet(Features) {
-        _CollectFeatureUpdates(Updates, "", Features)
+        _CollectFeatureUpdates(Updates, "", _PruneMasterGatedFeatures(Features))
         Updates.Push({ Section: "_meta", Key: "schema_version", Value: 2 })
     }
     Updates.Push({ Section: "script", Key: "locale", Value: I18nGetLocale() })
@@ -489,6 +489,74 @@ SaveFullConfig() {
         _TOML_STRICT_CANON_IN_PROGRESS := PrevCanonState
     }
     return Written
+}
+
+; Resolve the CategoryEnabled master-gate label that owns a Features node key
+; ("layout" -> "Layout", "distances_reduction" -> "DistancesReduction"), or ""
+; when that key has no dedicated gate. Derived from CategoryEnabled through
+; _CategoryEnabledKey rather than a second table, so a new master gate is picked
+; up here automatically instead of being silently unprotected.
+_MasterGateLabelFor(NodeKey) {
+    global CategoryEnabled
+    if !IsSet(CategoryEnabled)
+        return ""
+    for Category, _Bool in CategoryEnabled {
+        if (_CategoryEnabledKey(Category) == NodeKey)
+            return Category
+    }
+    return ""
+}
+
+; True when the Features node named NodeKey may be serialized right now. A node
+; with no gate is always persistable; a gated one only while its master is on.
+_MasterGateAllowsPersist(NodeKey) {
+    Label := _MasterGateLabelFor(NodeKey)
+    if (Label == "")
+        return true
+    return IsCategoryGated(Label)
+}
+
+; Return a shallow view of Features with every master-gated-OFF branch removed,
+; for the walker below to flatten.
+;
+; ApplyMasterGatesToFeatures (lib/master_gates.ahk) zeroes those branches IN
+; PLACE as a RUNTIME gate, and its own contract states the per-feature state on
+; disk is NOT touched and is restored at the next Reload once the master flips
+; back on. SaveFullConfig had no notion of that distinction: it walked the same
+; live map, so the boot-armed save wrote the runtime zeroes back as if they were
+; the user's intent, and re-enabling the category later revealed every child
+; unticked with nothing logged. TOML_BatchWrite preserves keys it does not
+; re-collect, so omitting the branch is exactly what "leave the disk alone"
+; means — the same mechanism the [llm] block already relies on.
+_PruneMasterGatedFeatures(FeaturesMap) {
+    Pruned := Map()
+    if (Type(FeaturesMap) != "Map")
+        return Pruned
+    for TopKey, TopVal in FeaturesMap {
+        ; Non-Map top-level entries are skipped by the walker anyway.
+        if (Type(TopVal) != "Map")
+            continue
+        if !_MasterGateAllowsPersist(TopKey) {
+            try LoggerDebug("ConfigIO", "Not serializing '{1}': its master gate is off, so the in-memory tree holds runtime zeroes rather than the user's settings.", TopKey)
+            continue
+        }
+        if (TopKey != "hotstrings") {
+            Pruned[TopKey] := TopVal
+            continue
+        }
+        ; Hotstring sub-categories own gates independent of the Hotstrings
+        ; master and are zeroed the same way when theirs is off.
+        SubTree := Map()
+        for SubKey, SubVal in TopVal {
+            if (Type(SubVal) == "Map" and !_MasterGateAllowsPersist(SubKey)) {
+                try LoggerDebug("ConfigIO", "Not serializing 'hotstrings.{1}': its sub-category gate is off.", SubKey)
+                continue
+            }
+            SubTree[SubKey] := SubVal
+        }
+        Pruned[TopKey] := SubTree
+    }
+    return Pruned
 }
 
 _CollectFeatureUpdates(Updates, SectionPath, Node) {
