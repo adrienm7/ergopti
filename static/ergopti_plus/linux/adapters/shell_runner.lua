@@ -201,6 +201,25 @@ function M.exec_stdin(cmd, input)
 	return M.exec(M.with_stdin(cmd, input))
 end
 
+--- Appends a heredoc delivering EXACTLY the bytes of `input`.
+--- @param cmd        string Fully composed command.
+--- @param input      string Payload for the command's standard input.
+--- @param token_base string|nil Starting terminator token.
+--- @return string The command with its byte-exact heredoc attached.
+function M.with_exact_stdin(cmd, input, token_base)
+	return Heredoc.with_exact_stdin(cmd, input, token_base or HEREDOC_BASE_TOKEN)
+end
+
+--- Runs a command with EXACTLY the bytes of `input` on its standard input.
+--- The plain exec_stdin() normalises the payload's trailing newlines away, which
+--- is fine for a SQL script and silent corruption for a value being encrypted.
+--- @param cmd   string Fully composed command (quote every interpolation).
+--- @param input string Payload for standard input, delivered byte for byte.
+--- @return string Captured stdout, or "" on any failure.
+function M.exec_exact_stdin(cmd, input)
+	return M.exec(M.with_exact_stdin(cmd, input))
+end
+
 
 
 

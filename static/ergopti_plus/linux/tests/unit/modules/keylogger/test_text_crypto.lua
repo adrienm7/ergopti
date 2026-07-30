@@ -25,6 +25,7 @@
 local helpers = require("tests.helpers")
 
 local TextCrypto = require("keylogger.text_crypto")
+local Heredoc    = require("shell.heredoc")
 
 --- Resolves the shell adapter at CALL time, never once at file scope. Another
 --- test file reloads adapters.shell_runner through helpers.load_module, which
@@ -291,6 +292,63 @@ helpers.describe("text_cipher — enabled changes what is stored", function()
 		cipher.set_enabled(true)
 		helpers.assert_eq(cipher.encrypt("dev", 1, ""), "")
 		Shell()._reset_runner()
+	end)
+end)
+
+
+helpers.describe("text_cipher — the payload reaches openssl unchanged", function()
+	helpers.it("truncates the newline a heredoc is forced to append", function()
+		-- A heredoc cannot express "a body with no final newline", so the plain
+		-- framing normalises the payload's own trailing newlines away and openssl
+		-- encrypts a value the user never typed. Truncating the stream to the
+		-- payload's real byte length undoes both halves of that.
+		local cmd = Heredoc.with_exact_stdin("openssl enc", "abc")
+		helpers.assert_contains(cmd, "head -c 3 ", "the byte count must be the payload's own length")
+		helpers.assert_contains(cmd, "| openssl enc", "the truncation must feed the real command")
+	end)
+
+	helpers.it("writes the payload's own trailing newlines into the body", function()
+		local cmd = Heredoc.with_exact_stdin("cat", "abc\n\n")
+		helpers.assert_contains(cmd, "head -c 5 ")
+		helpers.assert_true(cmd:find("abc\n\n\n", 1, true) ~= nil,
+			"the body must be written unchanged; only the truncation removes the framing newline")
+	end)
+
+	helpers.it("counts bytes, not characters", function()
+		-- "é" is two bytes in UTF-8, and the keylogger stores whatever was typed.
+		-- Counting characters would cut a multi-byte sequence in half.
+		helpers.assert_contains(Heredoc.with_exact_stdin("cat", "é"), "head -c 2 ")
+	end)
+
+	helpers.it("is the framing encrypt() actually uses", function()
+		local cipher = fresh_cipher()
+		local seen = capture_shell()
+		cipher.set_enabled(true)
+		cipher.encrypt("dev", 1, "line\n\n")
+		Shell()._reset_runner()
+
+		local framed = false
+		for _, cmd in ipairs(seen) do
+			local head = cmd:match("^([^\n]*)") or ""
+			if head:match("^head %-c 6 ") and head:find("openssl enc", 1, true) then framed = true end
+		end
+		helpers.assert_true(framed,
+			"without exact framing every stored row is the ciphertext of something the user never typed")
+	end)
+
+	helpers.it("is the framing decrypt() actually uses", function()
+		local cipher = fresh_cipher()
+		local seen = capture_shell()
+		cipher.decrypt(TextCrypto.wrap(IV, "QUJD"))
+		Shell()._reset_runner()
+
+		local framed = false
+		for _, cmd in ipairs(seen) do
+			local head = cmd:match("^([^\n]*)") or ""
+			if head:match("^head %-c 4 ") and head:find("openssl enc -d", 1, true) then framed = true end
+		end
+		helpers.assert_true(framed,
+			"a decryption that reads a padded payload returns bytes the row never held")
 	end)
 end)
 

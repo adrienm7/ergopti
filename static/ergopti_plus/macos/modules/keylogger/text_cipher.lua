@@ -116,7 +116,11 @@ local function ensure_key()
 	end
 
 	Logger.start(LOG, "Deriving the at-rest key from the hardware UUID…")
-	local key = TextCrypto.parse_derived_key(Shell.exec(Heredoc.with_stdin(derive, machine_id)))
+	-- Byte-exact stdin: the plain heredoc appends a newline, so the key would be
+	-- PBKDF2("<uuid>\n") here and PBKDF2("<uuid>") on Linux and Windows. Same
+	-- machine id, three different keys — which quietly falsifies the "identical
+	-- format everywhere" claim the parity gate exists to protect.
+	local key = TextCrypto.parse_derived_key(Shell.exec(Heredoc.with_exact_stdin(derive, machine_id)))
 	if not key then
 		_derivation_failed = true
 		Logger.error(LOG, "Key derivation produced no usable key — is openssl available?")
@@ -185,7 +189,10 @@ function M.encrypt(device_id, event_id, plaintext)
 		return nil
 	end
 
-	local ciphertext = Shell.exec(Heredoc.with_stdin(cmd, plaintext))
+	-- Byte-exact stdin, never the plain heredoc: that one normalises the payload's
+	-- trailing newlines away, so "line\n\n" would be stored as the ciphertext of
+	-- "line" and read back as a value the user never typed.
+	local ciphertext = Shell.exec(Heredoc.with_exact_stdin(cmd, plaintext))
 	if type(ciphertext) ~= "string" or ciphertext == "" then
 		Logger.error(LOG, "Encryption produced no output — refusing to store plaintext.")
 		return nil
@@ -213,7 +220,7 @@ function M.decrypt(value)
 		return ""
 	end
 
-	local plaintext = Shell.exec(Heredoc.with_stdin(cmd, ciphertext))
+	local plaintext = Shell.exec(Heredoc.with_exact_stdin(cmd, ciphertext))
 	if type(plaintext) ~= "string" then return "" end
 	return plaintext
 end
