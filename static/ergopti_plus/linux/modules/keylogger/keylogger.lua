@@ -29,6 +29,10 @@ local M = {}
 local Logger   = require("logger.shim")
 local Monotonic = require("lib.monotonic")
 local Timings   = require("lib.timings")
+-- Hard requires: the privacy posture must come from the shared manifest, and a
+-- missing filter must fail loudly rather than degrade into "record everything".
+local Manifest      = require("lib.manifest_reader")
+local PrivateWindow = require("keylogger.private_window")
 -- WPM ring cap single-sourced from the shared keylogger metrics module so the
 -- per-app rings below never drift from the collector's global ring cap.
 local SharedMetrics    = require("keylogger.metrics")
@@ -87,19 +91,48 @@ local _manifest_cache = { revision = nil, manifest = nil }
 -- Whether password-field suppression is active.
 local _suppressed = false
 
--- Base list of apps considered password fields (case-insensitive substring match
--- on appId). Single source — the init reset below rebuilds from this instead of
--- re-typing the same eight entries. NOTE: intentionally distinct from the AT-SPI
--- adapter's secure_field_detector.SECURE_APP_IDS (exact WM_CLASS match, smaller
--- list e.g. keepassxc). Delegating this substring check to that adapter is
--- deferred: the adapter matches exactly, so delegation would NARROW coverage
--- (dropping gpg/ssh-agent/polkit/sudo and every substring variant) and leak
--- keystrokes — a privacy regression. The broad coverage is locked by the
--- "coverage must never narrow" guard in tests/unit/meta/test_keylogger.lua.
-local _DEFAULT_PASSWORD_APPS = {
+-- Cross-driver privacy posture, read from the shared features manifest so the
+-- three drivers cannot drift. Linux had none of these: it recorded
+-- unconditionally, because the metrics section of the manifest did not list
+-- "linux" and the codegen emitted no manifest for this driver to read.
+local _enabled                    = Manifest.default_for("metrics.enabled")
+local _private_filter_enabled     = Manifest.default_for("metrics.private_filter_enabled")
+local _secure_filter_enabled      = Manifest.default_for("metrics.secure_filter_enabled")
+local _system_auth_filter_enabled = Manifest.default_for("metrics.system_auth_filter_enabled")
+
+-- Whether the focused window is a private/incognito browser session. Set from
+-- the focus-change callback, never computed on the keystroke path.
+local _private_window = false
+
+-- Whether the AT-SPI adapter reported a secure field on the focused window.
+-- Also set from the focus-change callback: the probe spawns a subprocess and
+-- has no business running once per keystroke.
+local _secure_field = false
+
+-- Password managers and credential UIs (case-insensitive substring match on
+-- appId). Gated by metrics.secure_filter_enabled.
+--
+-- NOTE: intentionally distinct from the AT-SPI adapter's
+-- secure_field_detector.SECURE_APP_IDS (exact WM_CLASS match, smaller list e.g.
+-- keepassxc). The adapter is consulted IN ADDITION to this list, never instead
+-- of it: it matches exactly, so delegating would NARROW coverage and leak
+-- keystrokes. The broad coverage is locked by the "coverage must never narrow"
+-- guard in tests/unit/meta/test_keylogger.lua.
+local _SECURE_APPS = {
 	"1password", "bitwarden", "keepass", "lastpass",
+}
+
+-- OS-level authentication prompts. Gated by metrics.system_auth_filter_enabled,
+-- matching the "system_auth" category of the shared no-persist corpus.
+local _SYSTEM_AUTH_APPS = {
 	"gpg", "ssh-agent", "polkit", "sudo",
 }
+
+-- The union both flags cover when enabled — which is the default, so the eight
+-- entries that were previously one flat list still all match.
+local _DEFAULT_PASSWORD_APPS = {}
+for _, app in ipairs(_SECURE_APPS) do _DEFAULT_PASSWORD_APPS[#_DEFAULT_PASSWORD_APPS + 1] = app end
+for _, app in ipairs(_SYSTEM_AUTH_APPS) do _DEFAULT_PASSWORD_APPS[#_DEFAULT_PASSWORD_APPS + 1] = app end
 
 -- Returns a fresh shallow copy so per-init appends never mutate the base list.
 local function _default_password_apps()
@@ -108,8 +141,32 @@ local function _default_password_apps()
 	return out
 end
 
--- Active list (rebuilt on init when custom apps are supplied).
+-- Returns a fresh shallow copy of the secure-app base list.
+local function _default_secure_apps()
+	local out = {}
+	for i = 1, #_SECURE_APPS do out[i] = _SECURE_APPS[i] end
+	return out
+end
+
+-- Active secure-app list (base + any custom apps supplied to init). Custom
+-- entries join this list rather than the system-auth one: a user-supplied app is
+-- a credential UI, not an OS authentication prompt.
+local _secure_apps = _default_secure_apps()
+
+-- Active full list, kept for diagnostics and the stats snapshot.
 local _password_apps = _default_password_apps()
+
+--- The single decision point for "may this keystroke be recorded?".
+--- Every recording entry point asks this and nothing else, so a new filter is
+--- added in one place and cannot be forgotten on one of the five paths.
+--- @return boolean
+local function may_record()
+	if not _enabled then return false end
+	if _suppressed then return false end
+	if _secure_filter_enabled and _secure_field then return false end
+	if _private_filter_enabled and _private_window then return false end
+	return true
+end
 
 -- Base directory for log file persistence (JSON fallback).
 local _log_dir = nil
@@ -209,8 +266,10 @@ function M.init(opts)
 
 	-- Custom password apps (reset then rebuild to avoid duplicates on re-init).
 	if type(options.password_apps) == "table" then
+		_secure_apps   = _default_secure_apps()
 		_password_apps = _default_password_apps()
 		for _, app in ipairs(options.password_apps) do
+			_secure_apps[#_secure_apps + 1]     = app:lower()
 			_password_apps[#_password_apps + 1] = app:lower()
 		end
 	end
@@ -235,7 +294,7 @@ end
 --- @param app_id       string|nil  The focused app identifier (from window_info).
 --- @param scancode     number|nil  Physical evdev code captured at keydown.
 function M.on_keydown(ch, timestamp_ms, app_id, scancode)
-	if _suppressed then return end
+	if not may_record() then return end
 
 	-- Forward to the base metrics collector if available.
 	if Metrics then
@@ -283,7 +342,7 @@ end
 --- @param ch           string  Character typed.
 --- @param timestamp_ms number  Wall-clock timestamp.
 function M.record_app_key(app_id, ch, timestamp_ms)
-	if _suppressed then return end
+	if not may_record() then return end
 
 	local app = ensure_app_stats(app_id, timestamp_ms)
 	if type(app.last_key_at) == "number" then
@@ -314,7 +373,7 @@ end
 --- @param scancode number Linux evdev key code.
 --- @param timestamp_ms number Event time in ms.
 function M.record_physical_key(app_id, scancode, timestamp_ms)
-	if _suppressed then return end
+	if not may_record() then return end
 	if type(scancode) ~= "number" or scancode <= 0 then return end
 	local resolved_app = (type(app_id) == "string" and app_id ~= "") and app_id or "Unknown"
 	local app = ensure_app_stats(resolved_app, timestamp_ms)
@@ -364,7 +423,7 @@ end
 --- @param replacement string Generated replacement text.
 --- @param timestamp_ms number Event timestamp.
 function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, deletes)
-	if _suppressed or type(app_id) ~= "string" or app_id == "" then return end
+	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
 	if type(replacement) ~= "string" or replacement == "" then return end
 	local app = ensure_app_stats(app_id, timestamp_ms)
 	app.hs_chars       = app.hs_chars + char_count(replacement)
@@ -389,7 +448,7 @@ end
 --- only after the producer confirms success, so cancelled streamed output never
 --- appears as a false logical keystroke.
 function M.record_synthetic_output(app_id, text, source, timestamp_ms, deletes, input_chars)
-	if _suppressed or type(app_id) ~= "string" or app_id == "" then return end
+	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
 	if type(text) ~= "string" or text == "" then return end
 	local kind = type(source) == "string" and source or "other"
 	local app = ensure_app_stats(app_id, timestamp_ms)
@@ -593,10 +652,29 @@ end
 function M.is_password_app(app_id)
 	if type(app_id) ~= "string" then return false end
 	local lower = app_id:lower()
-	for _, pattern in ipairs(_password_apps) do
-		if lower:find(pattern, 1, true) then return true end
+
+	-- Two lists, two flags, matching the "secure_field" and "system_auth"
+	-- categories of the shared no-persist corpus. With both flags at their
+	-- manifest default (true) the union is exactly the flat list this replaced,
+	-- so coverage is unchanged unless the user deliberately turns a filter off.
+	if _secure_filter_enabled then
+		for _, pattern in ipairs(_secure_apps) do
+			if lower:find(pattern, 1, true) then return true end
+		end
+	end
+	if _system_auth_filter_enabled then
+		for _, pattern in ipairs(_SYSTEM_AUTH_APPS) do
+			if lower:find(pattern, 1, true) then return true end
+		end
 	end
 	return false
+end
+
+--- Reports whether a window title marks a private/incognito browser session.
+--- @param title string|nil Focused window title.
+--- @return boolean
+function M.is_private_window(title)
+	return PrivateWindow.matches(title)
 end
 
 --- Enables password suppression for the current focused app.
@@ -620,6 +698,70 @@ end
 --- @return boolean
 function M.is_suppressed()
 	return _suppressed
+end
+
+--- Turns keystroke collection on or off. The Linux driver had no off switch at
+--- all; the other two drivers have had one since they shipped.
+--- @param enabled boolean
+function M.set_enabled(enabled)
+	_enabled = (enabled == true)
+	Logger.debug(LOG, "Metrics collection: %s.", tostring(_enabled))
+end
+
+--- Returns whether keystroke collection is enabled.
+--- @return boolean
+function M.is_enabled()
+	return _enabled
+end
+
+--- Records whether the focused window is a private/incognito browser session.
+--- @param is_private boolean
+function M.set_private_window(is_private)
+	_private_window = (is_private == true)
+	Logger.debug(LOG, "Private browsing window: %s.", tostring(_private_window))
+end
+
+--- Records the AT-SPI adapter's secure-field verdict for the focused window.
+--- Consulted IN ADDITION to the app-name list, never instead of it.
+--- @param is_secure boolean
+function M.set_secure_field(is_secure)
+	_secure_field = (is_secure == true)
+	Logger.debug(LOG, "Secure field focused: %s.", tostring(_secure_field))
+end
+
+--- Toggles the private-browsing filter.
+--- @param enabled boolean
+function M.set_private_filter_enabled(enabled)
+	_private_filter_enabled = (enabled == true)
+	Logger.debug(LOG, "Private-browsing filter: %s.", tostring(_private_filter_enabled))
+end
+
+--- Toggles the secure-field / password-manager filter.
+--- @param enabled boolean
+function M.set_secure_filter_enabled(enabled)
+	_secure_filter_enabled = (enabled == true)
+	Logger.debug(LOG, "Secure-field filter: %s.", tostring(_secure_filter_enabled))
+end
+
+--- Toggles the OS authentication-prompt filter.
+--- @param enabled boolean
+function M.set_system_auth_filter_enabled(enabled)
+	_system_auth_filter_enabled = (enabled == true)
+	Logger.debug(LOG, "System-auth filter: %s.", tostring(_system_auth_filter_enabled))
+end
+
+--- Snapshot of the active privacy posture, for the menu and for diagnostics.
+--- @return table
+function M.get_privacy_state()
+	return {
+		enabled                    = _enabled,
+		private_filter_enabled     = _private_filter_enabled,
+		secure_filter_enabled      = _secure_filter_enabled,
+		system_auth_filter_enabled = _system_auth_filter_enabled,
+		private_window             = _private_window,
+		secure_field               = _secure_field,
+		suppressed                 = _suppressed,
+	}
 end
 
 

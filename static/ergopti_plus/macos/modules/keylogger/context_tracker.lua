@@ -43,11 +43,17 @@ local _last_ax_value        = ""
 local _last_win_title       = nil
 local _last_win_time        = 0
 
--- Incognito / private browsing window title keywords across all major browsers
-local PRIVATE_KEYWORDS = {
-	-- Populated at first use via i18n to pick the locale-correct term
-	"Private Browsing", "Incognito", "InPrivate", "Anonymous",
-}
+-- Incognito / private browsing window title markers. The list itself lives in
+-- _shared/lua/keylogger/private_window.lua: "drop keystrokes typed in a private
+-- window" is one of the four categories of the shared no-persist corpus, so it
+-- cannot be one driver's private variable — the Linux driver had no such filter
+-- at all precisely because this list was never shared.
+local PrivateWindow = require("keylogger.private_window")
+
+local PRIVATE_KEYWORDS = {}
+for _, keyword in ipairs(PrivateWindow.KEYWORDS) do
+	PRIVATE_KEYWORDS[#PRIVATE_KEYWORDS + 1] = keyword
+end
 local function get_private_keywords()
 	local localized = i18n.get("keylogger.category_private")
 	if localized ~= "keylogger.category_private" then

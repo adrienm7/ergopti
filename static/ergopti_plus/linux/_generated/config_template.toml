@@ -3,3 +3,9 @@
 # DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.
 # This is the default v2 config copied into config/ergopti_plus/linux/
 # on first boot. After that, the user owns the copy.
+
+[metrics]
+enabled = true
+private_filter_enabled = true
+secure_filter_enabled = true
+system_auth_filter_enabled = true
