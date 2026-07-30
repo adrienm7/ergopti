@@ -411,15 +411,29 @@ local function interceptor(event, _km_buffer, ctx)
 		if char == "@" then
 			local full_trigger = (_km_buffer or "") .. "@"
 			if _keymap then
-				-- Single-pass scan: classify_trigger returns all three flags in
-				-- one O(N) loop instead of the former three separate N-scans.
+				-- Single-pass and memoised: classify_trigger returns all three flags
+				-- from one walk of the corpus, and its answer is cached until the
+				-- corpus changes.
+				--
+				-- There is no fallback. The else branch here used to run
+				-- has_exact_trigger, has_trigger_prefix and has_trigger_suffix as three
+				-- separate, uncached full scans — and it was unreachable in production,
+				-- because keymap always exports classify_trigger. Its only real effect
+				-- would have been to hide a partial keymap injection behind a slower
+				-- path with different caching, which is the hardcoded behavioural
+				-- fallback convention 5.4 forbids.
 				local exact, pref, suff = false, false, false
-				if _keymap.classify_trigger then
+				if type(_keymap.classify_trigger) == "function" then
 					exact, pref, suff = _keymap.classify_trigger(full_trigger)
 				else
-					exact = (_keymap.has_exact_trigger  and _keymap.has_exact_trigger(full_trigger))  or false
-					pref  = (_keymap.has_trigger_prefix and _keymap.has_trigger_prefix(full_trigger)) or false
-					suff  = (_keymap.has_trigger_suffix and _keymap.has_trigger_suffix(full_trigger)) or false
+					-- Loud, not silent. Absent means the keymap module was injected
+					-- partially, which is a wiring mistake and used to be absorbed by
+					-- three slower scans that reported nothing. Collection still proceeds
+					-- on the all-false answer, exactly as before, so the diagnostic is
+					-- added without changing what the user sees.
+					Logger.error(LOG, "keymap.classify_trigger is missing — cannot tell whether "
+						.. "'%s' is already claimed by a static hotstring; proceeding as "
+						.. "unclaimed.", full_trigger)
 				end
 				if exact or pref or suff then
 					return nil
@@ -457,9 +471,17 @@ local function interceptor(event, _km_buffer, ctx)
 				local combo = _combo
 				
 				local full_trigger = "@" .. combo .. _trigger
-				if _keymap and _keymap.has_exact_trigger
-						and _keymap.has_exact_trigger(full_trigger)
-						and full_trigger:sub(1, 1) == "@" then
+				-- Through the memoised classifier, like the @-entry check above.
+				-- has_exact_trigger walks the whole mapping corpus and caches nothing,
+				-- and this runs on the keystroke that completes a combo - so the same
+				-- question was answered by a full scan here and from cache there.
+				-- classify_trigger returns all three flags; only `exact` matters at this
+				-- point, because a prefix or suffix match does not claim the trigger.
+				local claimed = false
+				if _keymap and type(_keymap.classify_trigger) == "function" then
+					claimed = (_keymap.classify_trigger(full_trigger)) == true
+				end
+				if claimed and full_trigger:sub(1, 1) == "@" then
 					_state = STATE_IDLE
 					_combo = ""
 					return nil
