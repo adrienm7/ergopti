@@ -848,10 +848,27 @@ function M.reset_predictions(keep_hotstring_log)
 	-- put the tooltip back on screen.
 	invalidate_pending_preview()
 	if not keep_hotstring_log and last_shown_hotstring then
-		keylogger.log_hotstring_dismissed(nil,
-			last_shown_hotstring.trigger,
-			last_shown_hotstring.replacement,
-			last_shown_hotstring.h_type)
+		-- Deferred and pcall'd, exactly like the log_hotstring_suggested sibling a
+		-- few hundred lines up. That one was moved off the HID thread and this one
+		-- was not, because the deferral was applied per call site instead of at the
+		-- sink — so the telemetry writer still ran an open/write/flush inside the
+		-- keyDown tap on every dismissal.
+		--
+		-- The pcall matters for a second reason, and it is not about the throw being
+		-- silent: on the keyDown and mouse paths it is logged. It is about STATE. A
+		-- throw here skipped both `last_shown_hotstring = nil` below and
+		-- `engine.reset()`, leaving the tooltip state and the engine live, so every
+		-- later reset re-emitted the same stale dismiss event. The Escape trap path
+		-- has no pcall of its own, so there it was silent as well.
+		--
+		-- The values are captured NOW: a later keystroke must not change what gets
+		-- recorded, and the field is cleared immediately below.
+		local d_trigger = last_shown_hotstring.trigger
+		local d_repl    = last_shown_hotstring.replacement
+		local d_type    = last_shown_hotstring.h_type
+		TimerScheduler.after(0, function()
+			pcall(keylogger.log_hotstring_dismissed, nil, d_trigger, d_repl, d_type)
+		end)
 		last_shown_hotstring = nil
 	end
 	engine.reset()
