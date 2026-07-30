@@ -79,7 +79,6 @@
 		"bench:hotstring": "node ./tools/build/bench-hotstring.cjs",
 		"codegen:terminators": "node ./tools/codegen/codegen-terminators.cjs",
 		"codegen:prompt-builder:ahk": "node ./tools/codegen/codegen-prompt-builder-ahk.cjs",
-		"codegen:prompt-builder:hs": "node ./tools/codegen/codegen-prompt-builder-hs.cjs",
 		"codegen:contracts": "node ./tools/codegen/codegen-contracts-json.cjs",
 		"codegen:llm-profiles-data:ahk": "node ./tools/codegen/codegen-llm-profiles-data-ahk.cjs",
 		"codegen:keycode-data:js": "node ./tools/codegen/codegen-keycode-data-js.cjs",

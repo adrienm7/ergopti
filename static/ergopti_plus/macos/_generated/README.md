@@ -36,8 +36,15 @@ local Shared = require("llm.prompt_builder")  -- shared/lua/llm/prompt_builder.l
 ```
 
 No AHK-style code generation is needed because `.lua` files are portable across
-all Lua-based drivers. Run `npm run codegen:prompt-builder:hs` to confirm this
-(it is a deliberate no-op that documents the design decision).
+all Lua-based drivers. AutoHotkey cannot `require` a `.lua` file, which is why
+`codegen-prompt-builder-ahk.cjs` translates the same algorithm into AHK v2 and
+writes `windows/_generated/prompt_builder.ahk` — the asymmetry is between the
+two languages, not between the two drivers.
+
+There used to be a `codegen:prompt-builder:hs` task alongside it. It generated
+nothing: its own docstring said it existed "only to document the asymmetry and
+give the developer a consistent npm task that always succeeds". A task that
+cannot fail teaches nobody anything, so the explanation lives here instead.
 
 ## Why no `registry.lua` / `expander.lua` / `shortcuts_bindings.lua`?
 

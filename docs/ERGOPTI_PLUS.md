@@ -609,7 +609,7 @@ Le prétexte historique « l'AHK ne peut pas lire les données partagées » est
 `windows/_generated/prompt_builder.ahk` | *prétend* `prompt_builder.lua` | **supprimer le générateur** : il ne lit rien. Déplacer le fichier tel quel en source écrite à la main, le corpus devient le contrat |
 `windows/_generated/llm_profiles_data.ahk` | `legacy_ids.json` + `profiles.json` | **remplacer par une lecture runtime** : 215 lignes de générateur pour livrer une Map de 4 entrées, dans un fichier qui parse déjà le JSON voisin |
 `{macos,linux}/_generated/config_template.toml` | `manifest.toml` | **aucun lecteur** — supprimer la sortie ou lui donner un premier-boot |
-`tools/codegen/codegen-prompt-builder-hs.cjs` | — | **supprimer** : 34 lignes qui n'émettent rien, dont la docstring dit qu'elles existent pour documenter une asymétrie |
+~~`tools/codegen/codegen-prompt-builder-hs.cjs`~~ | — | ✅ **supprimé** (2026-07-31) : 34 lignes qui n'émettaient rien ; l'explication de l'asymétrie vit maintenant dans `macos/_generated/README.md` |
 
 **La commande à lancer** après avoir édité une donnée partagée : `npm run codegen` (alias de
 `build:domain`). ⚠ Elle lance 6 des 9 générateurs vivants : `codegen:contracts` et
