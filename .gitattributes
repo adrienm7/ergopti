@@ -15,3 +15,24 @@
 # checkout would rewrite them to CRLF and fail that comparison locally even
 # though the committed blob is LF and CI (Linux/macOS) passes.
 *.md text eol=lf
+
+# Same reasoning, extended to the formats the generators emit. Every codegen in
+# tools/ writes LF, and six of the twelve tracked generated files are .json or
+# .toml — without a rule they check out CRLF on Windows and present as modified
+# with an empty `git diff`, which is the state this repo was in. It also forces
+# per-gate workarounds: test-port-compliance.cjs carries a hand-rolled
+# normalizeEol() with a comment explaining exactly this.
+*.json text eol=lf
+*.toml text eol=lf
+*.js text eol=lf
+*.cjs text eol=lf
+*.mjs text eol=lf
+
+# systemd units and Arch PKGBUILDs are consumed by Linux tooling only.
+*.service text eol=lf
+PKGBUILD text eol=lf
+
+# Test fixtures whose bytes are asserted.
+*.ini text eol=lf
+*.kbd text eol=lf
+*.tsv text eol=lf
