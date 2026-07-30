@@ -50,54 +50,54 @@
 ; ===============================
 
 AppPicker_Show(opts) {
-    if !(opts is Map) {
-        ; Defensive — mis-call must not crash the caller.
-        return
-    }
-    title := opts.Has("title") ? opts["title"] : t("dialog.app_picker.title")
-    prompt := opts.Has("prompt") ? opts["prompt"] : t("dialog.app_picker.prompt")
-    ok_label := opts.Has("ok_label") ? opts["ok_label"] : t("common.ok")
-    on_save := opts.Has("on_save") ? opts["on_save"] : ""
+		if !(opts is Map) {
+				; Defensive — mis-call must not crash the caller.
+				return
+		}
+		title := opts.Has("title") ? opts["title"] : t("dialog.app_picker.title")
+		prompt := opts.Has("prompt") ? opts["prompt"] : t("dialog.app_picker.prompt")
+		ok_label := opts.Has("ok_label") ? opts["ok_label"] : t("common.ok")
+		on_save := opts.Has("on_save") ? opts["on_save"] : ""
 
-    initial := Map()
-    if opts.Has("initial") && opts["initial"] is Array {
-        for n in opts["initial"]
-            initial[StrLower(n)] := true
-    }
+		initial := Map()
+		if opts.Has("initial") && opts["initial"] is Array {
+				for n in opts["initial"]
+						initial[StrLower(n)] := true
+		}
 
-    rows := AppPicker_BuildRows(initial)
+		rows := AppPicker_BuildRows(initial)
 
-    g := Gui_Create("+Resize +MinSize400x500", title)
-    g.SetFont("s10")
-    g.MarginX := 14
-    g.MarginY := 14
-    g.AddText("w400", prompt)
+		g := Gui_Create("+Resize +MinSize400x500", title)
+		g.SetFont("s10")
+		g.MarginX := 14
+		g.MarginY := 14
+		g.AddText("w400", prompt)
 
-    ; ListView with checkboxes. ProcessName column is the canonical key;
-    ; DisplayName is friendlier for the user (window title fallback).
-    lv := g.AddListView("Checked w480 r18 Grid -Multi", ["Application", "Processus"])
-    lv.ModifyCol(1, 320)
-    lv.ModifyCol(2, 160)
-    for row in rows {
-        idx := lv.Add(row.checked ? "Check" : "", row.display, row.process)
-    }
+		; ListView with checkboxes. ProcessName column is the canonical key;
+		; DisplayName is friendlier for the user (window title fallback).
+		lv := g.AddListView("Checked w480 r18 Grid -Multi", ["Application", "Processus"])
+		lv.ModifyCol(1, 320)
+		lv.ModifyCol(2, 160)
+		for row in rows {
+				idx := lv.Add(row.checked ? "Check" : "", row.display, row.process)
+		}
 
-    ; Footer: count + buttons.
-    g.AddText("xs y+10 w300 vAppPickerStatus",
-        StrReplace(t("dialog.app_picker.running_count"), "{n}", rows.Length))
-    ; Auto-sized OK / Cancel pair — harmonised so both buttons share the
-    ; widest natural width (prevents clipping of long localised labels like
-    ; German "Abbrechen" or Portuguese "Cancelar" inside a fixed w100).
-    btn_ok     := g.AddButton("x+10 yp-4 Default", ok_label)
-    btn_cancel := g.AddButton("x+5 yp",            t("common.cancel"))
-    Gui_HarmoniseButtonWidths([btn_ok, btn_cancel])
+		; Footer: count + buttons.
+		g.AddText("xs y+10 w300 vAppPickerStatus",
+				StrReplace(t("dialog.app_picker.running_count"), "{n}", rows.Length))
+		; Auto-sized OK / Cancel pair — harmonised so both buttons share the
+		; widest natural width (prevents clipping of long localised labels like
+		; German "Abbrechen" or Portuguese "Cancelar" inside a fixed w100).
+		btn_ok     := g.AddButton("x+10 yp-4 Default", ok_label)
+		btn_cancel := g.AddButton("x+5 yp",            t("common.cancel"))
+		Gui_HarmoniseButtonWidths([btn_ok, btn_cancel])
 
-    btn_ok.OnEvent("Click", (*) => AppPicker_OnOK(g, lv, on_save))
-    btn_cancel.OnEvent("Click", (*) => g.Destroy())
-    g.OnEvent("Close", (*) => g.Destroy())
-    g.OnEvent("Escape", (*) => g.Destroy())
+		btn_ok.OnEvent("Click", (*) => AppPicker_OnOK(g, lv, on_save))
+		btn_cancel.OnEvent("Click", (*) => g.Destroy())
+		g.OnEvent("Close", (*) => g.Destroy())
+		g.OnEvent("Escape", (*) => g.Destroy())
 
-    g.Show()
+		g.Show()
 }
 
 ; Collect the ticked rows and hand them to the caller's on_save callback.
@@ -112,20 +112,20 @@ AppPicker_Show(opts) {
 ; index). The control is the only object the sort touches, so it is the only
 ; object allowed to answer "which app is on row N".
 AppPicker_OnOK(g, lv, on_save) {
-    selected := []
-    row_idx := 0
-    loop {
-        row_idx := lv.GetNext(row_idx, "Checked")
-        if !row_idx
-            break
-        proc := StrLower(Trim(lv.GetText(row_idx, 2)))
-        if (proc == "")
-            continue
-        selected.Push(proc)
-    }
-    g.Destroy()
-    if (on_save != "" && on_save is Func)
-        on_save(selected)
+		selected := []
+		row_idx := 0
+		loop {
+				row_idx := lv.GetNext(row_idx, "Checked")
+				if !row_idx
+						break
+				proc := StrLower(Trim(lv.GetText(row_idx, 2)))
+				if (proc == "")
+						continue
+				selected.Push(proc)
+		}
+		g.Destroy()
+		if (on_save != "" && on_save is Func)
+				on_save(selected)
 }
 
 
@@ -142,112 +142,112 @@ AppPicker_OnOK(g, lv, on_save) {
 ; { process, display, checked }. The currently focused app is pinned
 ; on top with " (en cours)" appended; everything else sorted alpha.
 AppPicker_BuildRows(initial) {
-    rows := []
-    seen := Map()
-    focused_proc := ""
-    focused_disp := ""
-    try {
-        focused_hwnd := WinGetID("A")
-        if focused_hwnd {
-            focused_proc := StrLower(WinGetProcessName("ahk_id " . focused_hwnd))
-            focused_disp := AppPicker_FriendlyName(focused_hwnd)
-        }
-    }
+		rows := []
+		seen := Map()
+		focused_proc := ""
+		focused_disp := ""
+		try {
+				focused_hwnd := WinGetID("A")
+				if focused_hwnd {
+						focused_proc := StrLower(WinGetProcessName("ahk_id " . focused_hwnd))
+						focused_disp := AppPicker_FriendlyName(focused_hwnd)
+				}
+		}
 
-    ; Pin the focused app on top, even if it has no other top-level window
-    ; (e.g. menus opened over it).
-    if (focused_proc != "") {
-        rows.Push({
-            process: focused_proc,
-            display: focused_disp . t("dialog.app_picker.active_suffix"),
-            checked: initial.Has(focused_proc)
-        })
-        seen[focused_proc] := true
-    }
+		; Pin the focused app on top, even if it has no other top-level window
+		; (e.g. menus opened over it).
+		if (focused_proc != "") {
+				rows.Push({
+						process: focused_proc,
+						display: focused_disp . t("dialog.app_picker.active_suffix"),
+						checked: initial.Has(focused_proc)
+				})
+				seen[focused_proc] := true
+		}
 
-    others := []
-    win_list := []
-    try win_list := WinGetList()
-    for hwnd in win_list {
-        try {
-            ; Skip invisible / titleless windows (system trays, hidden
-            ; helpers) — they would clutter the list with names like
-            ; "Default IME" that the user has no business unchecking.
-            if !DllCall("IsWindowVisible", "Ptr", hwnd)
-                continue
-            winTitle := WinGetTitle("ahk_id " . hwnd)
-            if (winTitle = "")
-                continue
-            proc := StrLower(WinGetProcessName("ahk_id " . hwnd))
-            if (proc = "" || seen.Has(proc))
-                continue
-            seen[proc] := true
-            others.Push({
-                process: proc,
-                display: AppPicker_FriendlyName(hwnd),
-                checked: initial.Has(proc)
-            })
-        }
-    }
+		others := []
+		win_list := []
+		try win_list := WinGetList()
+		for hwnd in win_list {
+				try {
+						; Skip invisible / titleless windows (system trays, hidden
+						; helpers) — they would clutter the list with names like
+						; "Default IME" that the user has no business unchecking.
+						if !DllCall("IsWindowVisible", "Ptr", hwnd)
+								continue
+						winTitle := WinGetTitle("ahk_id " . hwnd)
+						if (winTitle = "")
+								continue
+						proc := StrLower(WinGetProcessName("ahk_id " . hwnd))
+						if (proc = "" || seen.Has(proc))
+								continue
+						seen[proc] := true
+						others.Push({
+								process: proc,
+								display: AppPicker_FriendlyName(hwnd),
+								checked: initial.Has(proc)
+						})
+				}
+		}
 
-    ; Sort the non-focused list alphabetically by display name. AHK has
-    ; no Array.Sort built-in for objects, so we delegate to a small
-    ; insertion-sort that's plenty fast for the dozen-ish entries we
-    ; typically deal with.
-    ; AHK v2: `<` on strings tries a numeric coerce and throws when the
-    ; operands are non-numeric. Use StrCompare() instead.
-    loop others.Length {
-        i := A_Index
-        j := i
-        while (j > 1 && StrCompare(others[j].display, others[j - 1].display, false) < 0) {
-            tmp := others[j]
-            others[j] := others[j - 1]
-            others[j - 1] := tmp
-            j -= 1
-        }
-    }
+		; Sort the non-focused list alphabetically by display name. AHK has
+		; no Array.Sort built-in for objects, so we delegate to a small
+		; insertion-sort that's plenty fast for the dozen-ish entries we
+		; typically deal with.
+		; AHK v2: `<` on strings tries a numeric coerce and throws when the
+		; operands are non-numeric. Use StrCompare() instead.
+		loop others.Length {
+				i := A_Index
+				j := i
+				while (j > 1 && StrCompare(others[j].display, others[j - 1].display, false) < 0) {
+						tmp := others[j]
+						others[j] := others[j - 1]
+						others[j - 1] := tmp
+						j -= 1
+				}
+		}
 
-    for o in others
-        rows.Push(o)
+		for o in others
+				rows.Push(o)
 
-    ; Append every "initially selected" entry that is NOT currently
-    ; running, so the user can still see + uncheck excluded apps that
-    ; happen to be closed at picker time. Greyed-display is rendered
-    ; via an "(arrêté)" suffix.
-    for proc, _ in initial {
-        if seen.Has(proc)
-            continue
-        rows.Push({
-            process: proc,
-            display: proc . t("dialog.app_picker.stopped_suffix"),
-            checked: true
-        })
-        seen[proc] := true
-    }
+		; Append every "initially selected" entry that is NOT currently
+		; running, so the user can still see + uncheck excluded apps that
+		; happen to be closed at picker time. Greyed-display is rendered
+		; via an "(arrêté)" suffix.
+		for proc, _ in initial {
+				if seen.Has(proc)
+						continue
+				rows.Push({
+						process: proc,
+						display: proc . t("dialog.app_picker.stopped_suffix"),
+						checked: true
+				})
+				seen[proc] := true
+		}
 
-    return rows
+		return rows
 }
 
 ; Return a friendly display name for a top-level window. Falls back to
 ; the bare executable name when no descriptive title is available.
 AppPicker_FriendlyName(hwnd) {
-    proc := ""
-    try proc := WinGetProcessName("ahk_id " . hwnd)
-    title := ""
-    try title := WinGetTitle("ahk_id " . hwnd)
+		proc := ""
+		try proc := WinGetProcessName("ahk_id " . hwnd)
+		title := ""
+		try title := WinGetTitle("ahk_id " . hwnd)
 
-    ; Strip the « ProcessName » suffix some apps tack on; we want the
-    ; human-meaningful part. Heuristic: prefer the longest segment
-    ; separated by " - ".
-    best := ""
-    if (title != "") {
-        for seg in StrSplit(title, " - ") {
-            seg := Trim(seg)
-            if (seg != "" && StrLen(seg) > StrLen(best))
-                best := seg
-        }
-    }
-    if (best != "")
-        return best
-    return proc
+		; Strip the « ProcessName » suffix some apps tack on; we want the
+		; human-meaningful part. Heuristic: prefer the longest segment
+		; separated by " - ".
+		best := ""
+		if (title != "") {
+				for seg in StrSplit(title, " - ") {
+						seg := Trim(seg)
+						if (seg != "" && StrLen(seg) > StrLen(best))
+								best := seg
+				}
+		}
+		if (best != "")
+				return best
+		return proc
 }

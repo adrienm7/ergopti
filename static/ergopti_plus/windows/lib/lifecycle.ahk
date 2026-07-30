@@ -12,7 +12,7 @@
 ; ==============================================================================
 
 ActivateEdit(*) {
-    Edit()
+		Edit()
 }
 ; Physical keys registered as an AHK custom-combination PREFIX (the left side of
 ; a "&" hotkey definition, e.g. "SC138 & SC01C::" in script_altgr_hotkeys.ahk or
@@ -51,19 +51,19 @@ global _SuspendPendingSince := 0
 ; state, when a key's own feature gate is off (SC138 only arms as a prefix when
 ; the Kana fixup is active), or when the key is not physically held.
 _SuspendPrefixesAreClear() {
-    global _ALTGR_KANA_FIXUP
-    if A_IsSuspended
-        return
-    for PrefixKey in SUSPEND_CUSTOM_COMBO_PREFIX_KEYS {
-        ; SC138 (AltGr/Kana) only behaves as an armed prefix when the Kana
-        ; fixup is active on the current keyboard layout -- draining it
-        ; unconditionally would KeyWait on a key that is not really latching.
-        if (PrefixKey = "SC138") and !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
-            continue
-        if GetKeyState(PrefixKey, "P")
-            return false
-    }
-    return true
+		global _ALTGR_KANA_FIXUP
+		if A_IsSuspended
+				return
+		for PrefixKey in SUSPEND_CUSTOM_COMBO_PREFIX_KEYS {
+				; SC138 (AltGr/Kana) only behaves as an armed prefix when the Kana
+				; fixup is active on the current keyboard layout -- draining it
+				; unconditionally would KeyWait on a key that is not really latching.
+				if (PrefixKey = "SC138") and !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
+						continue
+				if GetKeyState(PrefixKey, "P")
+						return false
+		}
+		return true
 }
 ; Releases every modifier + the SC138 (AltGr/Kana) prefix key to clear any
 ; OS-level phantom "down" state carried across a Reload. A Reload — the driver's
@@ -78,21 +78,21 @@ _SuspendPrefixesAreClear() {
 ; the _SuspendPrefixesAreClear / _SuspendPendingPoll gate before a Suspend, the one
 ; transition that freezes it).
 _ReleasePhantomModifiers() {
-    Send("{Blind}{LCtrl up}{RCtrl up}{LAlt up}{RAlt up}{LShift up}{RShift up}{LWin up}{RWin up}{SC138 up}")
+		Send("{Blind}{LCtrl up}{RCtrl up}{LAlt up}{RAlt up}{LShift up}{RShift up}{LWin up}{RWin up}{SC138 up}")
 }
 ; Names the prefix keys currently holding the gate shut, for the timeout report.
 ; Without this a wedged deferral says only "still waiting" — the user has no way
 ; to know WHICH key to cycle, which is the one thing that would fix it.
 _SuspendHeldPrefixKeys() {
-    global _ALTGR_KANA_FIXUP
-    Held := ""
-    for PrefixKey in SUSPEND_CUSTOM_COMBO_PREFIX_KEYS {
-        if (PrefixKey = "SC138") and !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
-            continue
-        if GetKeyState(PrefixKey, "P")
-            Held .= (Held == "" ? "" : ", ") . PrefixKey
-    }
-    return Held == "" ? "(none)" : Held
+		global _ALTGR_KANA_FIXUP
+		Held := ""
+		for PrefixKey in SUSPEND_CUSTOM_COMBO_PREFIX_KEYS {
+				if (PrefixKey = "SC138") and !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
+						continue
+				if GetKeyState(PrefixKey, "P")
+						Held .= (Held == "" ? "" : ", ") . PrefixKey
+		}
+		return Held == "" ? "(none)" : Held
 }
 
 ; File name of the one-shot marker that carries a pause across a Reload. It sits
@@ -104,11 +104,11 @@ global SUSPEND_MARKER_FILENAME := "suspend_restore.marker"
 ; Absolute path of the suspend hand-off marker, derived from the resolved
 ; configuration file so it always follows the user's real config directory.
 _SuspendMarkerPath() {
-    global ConfigurationFile
-    if !IsSet(ConfigurationFile) or (ConfigurationFile == "")
-        return ""
-    SplitPath(ConfigurationFile, , &Dir)
-    return Dir . "\" . SUSPEND_MARKER_FILENAME
+		global ConfigurationFile
+		if !IsSet(ConfigurationFile) or (ConfigurationFile == "")
+				return ""
+		SplitPath(ConfigurationFile, , &Dir)
+		return Dir . "\" . SUSPEND_MARKER_FILENAME
 }
 
 ; Reloads the driver WITHOUT discarding the user's pause.
@@ -123,25 +123,25 @@ _SuspendMarkerPath() {
 ; swallowed: silently resuming a driver the user paused is exactly the failure
 ; this exists to remove.
 ReloadPreservingSuspend() {
-    if A_IsSuspended {
-        Path := _SuspendMarkerPath()
-        Written := false
-        if (Path != "") {
-            try {
-                Handle := FileOpen(Path, "w")
-                if IsObject(Handle) {
-                    Handle.Write("1")
-                    Handle.Close()
-                    Written := true
-                }
-            }
-        }
-        if Written
-            LoggerInfo("Lifecycle", "Reloading while suspended — pause handed off via '{1}'.", Path)
-        else
-            LoggerError("Lifecycle", "Reloading while suspended but the pause marker could NOT be written to '{1}' — the driver will come back ARMED.", Path)
-    }
-    Reload()
+		if A_IsSuspended {
+				Path := _SuspendMarkerPath()
+				Written := false
+				if (Path != "") {
+						try {
+								Handle := FileOpen(Path, "w")
+								if IsObject(Handle) {
+										Handle.Write("1")
+										Handle.Close()
+										Written := true
+								}
+						}
+				}
+				if Written
+						LoggerInfo("Lifecycle", "Reloading while suspended — pause handed off via '{1}'.", Path)
+				else
+						LoggerError("Lifecycle", "Reloading while suspended but the pause marker could NOT be written to '{1}' — the driver will come back ARMED.", Path)
+		}
+		Reload()
 }
 
 ; Consumes the hand-off marker left by ReloadPreservingSuspend and re-enters
@@ -155,77 +155,77 @@ ReloadPreservingSuspend() {
 ; the drain exists for. It also means the reactors and the tray indicator run
 ; exactly as they do for a manual pause.
 _SuspendRestoreFromMarker() {
-    Path := _SuspendMarkerPath()
-    if (Path == "") or !FileExist(Path)
-        return
-    try FileDelete(Path)
-    ; Already suspended means the user beat the restore to it (a tray pause in
-    ; the boot window); the marker is spent and there is nothing left to do.
-    if A_IsSuspended
-        return
-    LoggerInfo("Lifecycle", "Restoring the pause that a menu-driven Reload would otherwise have dropped.")
-    ToggleSuspend()
+		Path := _SuspendMarkerPath()
+		if (Path == "") or !FileExist(Path)
+				return
+		try FileDelete(Path)
+		; Already suspended means the user beat the restore to it (a tray pause in
+		; the boot window); the marker is spent and there is nothing left to do.
+		if A_IsSuspended
+				return
+		LoggerInfo("Lifecycle", "Restoring the pause that a menu-driven Reload would otherwise have dropped.")
+		ToggleSuspend()
 }
 ToggleSuspend(*) {
-    global _SuspendPending, _SuspendPendingSince
-    ; A second press while a suspend is PENDING must cancel it. Without this
-    ; branch the press fell through and simply re-armed the deferral, so the
-    ; control the user reaches for to escape a wedged gate was the one control
-    ; that could not escape it — and once the key finally lifted they were
-    ; suspended against their intent, having asked twice to not be.
-    if (!A_IsSuspended and _SuspendPending) {
-        _SuspendPending := false
-        SetTimer(_SuspendPendingPoll, 0)
-        LoggerInfo("Lifecycle", "Pending suspend cancelled by a second toggle.")
-        return
-    }
-    if A_IsSuspended {
-        _SuspendPending := false
-        SetTimer(_SuspendPendingPoll, 0)
-        Suspend(0)
-        _SuspendStateWatchdog()
-        return
-    }
-    if _SuspendPrefixesAreClear() {
-        _SuspendPending := false
-        Suspend(1)
-        _SuspendStateWatchdog()
-        return
-    }
-    _SuspendPending := true
-    _SuspendPendingSince := A_TickCount
-    LoggerWarn("Lifecycle", "Suspend deferred until custom-combination prefix keys are released (held: {1}).",
-        _SuspendHeldPrefixKeys())
-    SetTimer(_SuspendPendingPoll, 25)
+		global _SuspendPending, _SuspendPendingSince
+		; A second press while a suspend is PENDING must cancel it. Without this
+		; branch the press fell through and simply re-armed the deferral, so the
+		; control the user reaches for to escape a wedged gate was the one control
+		; that could not escape it — and once the key finally lifted they were
+		; suspended against their intent, having asked twice to not be.
+		if (!A_IsSuspended and _SuspendPending) {
+				_SuspendPending := false
+				SetTimer(_SuspendPendingPoll, 0)
+				LoggerInfo("Lifecycle", "Pending suspend cancelled by a second toggle.")
+				return
+		}
+		if A_IsSuspended {
+				_SuspendPending := false
+				SetTimer(_SuspendPendingPoll, 0)
+				Suspend(0)
+				_SuspendStateWatchdog()
+				return
+		}
+		if _SuspendPrefixesAreClear() {
+				_SuspendPending := false
+				Suspend(1)
+				_SuspendStateWatchdog()
+				return
+		}
+		_SuspendPending := true
+		_SuspendPendingSince := A_TickCount
+		LoggerWarn("Lifecycle", "Suspend deferred until custom-combination prefix keys are released (held: {1}).",
+				_SuspendHeldPrefixKeys())
+		SetTimer(_SuspendPendingPoll, 25)
 }
 _SuspendPendingPoll() {
-    global _SuspendPending, _SuspendPendingSince
-    if !_SuspendPending or A_IsSuspended {
-        SetTimer(_SuspendPendingPoll, 0)
-        return
-    }
-    if !_SuspendPrefixesAreClear() {
-        ; Bounded. Past the deadline, try once to clear an OS-level phantom
-        ; latch — the common cause after a Reload landed on a held modifier —
-        ; and if the key is genuinely still down, suspend anyway and say so.
-        ; A latched prefix on one key is strictly better than a driver the user
-        ; cannot pause (fail loudly rather than hang silently, conventions 5.3).
-        if (((A_TickCount - _SuspendPendingSince) & 0xFFFFFFFF) < SUSPEND_DEFER_TIMEOUT_MS)
-            return
-        Held := _SuspendHeldPrefixKeys()
-        _ReleasePhantomModifiers()
-        if !_SuspendPrefixesAreClear() {
-            LoggerError("Lifecycle", "Suspend deferral timed out after {1} ms — prefix key(s) still held ({2}); suspending anyway. Cycle that key if a layer stays latched.",
-                SUSPEND_DEFER_TIMEOUT_MS, Held)
-        } else {
-            LoggerWarn("Lifecycle", "Suspend deferral cleared a phantom latch on {1} after {2} ms.",
-                Held, SUSPEND_DEFER_TIMEOUT_MS)
-        }
-    }
-    _SuspendPending := false
-    SetTimer(_SuspendPendingPoll, 0)
-    Suspend(1)
-    _SuspendStateWatchdog()
+		global _SuspendPending, _SuspendPendingSince
+		if !_SuspendPending or A_IsSuspended {
+				SetTimer(_SuspendPendingPoll, 0)
+				return
+		}
+		if !_SuspendPrefixesAreClear() {
+				; Bounded. Past the deadline, try once to clear an OS-level phantom
+				; latch — the common cause after a Reload landed on a held modifier —
+				; and if the key is genuinely still down, suspend anyway and say so.
+				; A latched prefix on one key is strictly better than a driver the user
+				; cannot pause (fail loudly rather than hang silently, conventions 5.3).
+				if (((A_TickCount - _SuspendPendingSince) & 0xFFFFFFFF) < SUSPEND_DEFER_TIMEOUT_MS)
+						return
+				Held := _SuspendHeldPrefixKeys()
+				_ReleasePhantomModifiers()
+				if !_SuspendPrefixesAreClear() {
+						LoggerError("Lifecycle", "Suspend deferral timed out after {1} ms — prefix key(s) still held ({2}); suspending anyway. Cycle that key if a layer stays latched.",
+								SUSPEND_DEFER_TIMEOUT_MS, Held)
+				} else {
+						LoggerWarn("Lifecycle", "Suspend deferral cleared a phantom latch on {1} after {2} ms.",
+								Held, SUSPEND_DEFER_TIMEOUT_MS)
+				}
+		}
+		_SuspendPending := false
+		SetTimer(_SuspendPendingPoll, 0)
+		Suspend(1)
+		_SuspendStateWatchdog()
 }
 Ergopti_OnSuspendEnter() {
 	global _SpaceHoldInputHook, _OneShotShiftInputHook, _DeadKeyInputHook
@@ -248,43 +248,43 @@ Ergopti_OnSuspendEnter() {
 		try _OneShotShiftInputHook.Stop()
 	if IsSet(_DeadKeyInputHook) and IsObject(_DeadKeyInputHook)
 		try _DeadKeyInputHook.Stop()
-    try TooltipHide("Suspend", true)
-    try LLM_Tooltip_Hide(true)
-    try LLM_Engine_CancelTimer()
-    ; Stop in-flight generation AND clear the prediction cache so a suggestion
-    ; produced before the pause cannot re-render after resume on a rebuilt
-    ; context ("pause = tout eteint" invariant). StopGeneration drops last_ctx /
-    ; last_results, bumps request_id, and cancels async streams.
-    try LLM_Engine_StopGeneration()
-    ; Cancel the Ollama warm-up retry timer so it does not make background HTTP
-    ; calls while the driver is paused ("pause = tout éteint" invariant).
-    try LLM_OllamaCancelWarmupRetry()
-    ; Stop the LLM pointer-dismiss poll timer + its pass-through mouse hotkeys.
-    ; SetTimer/Hotkey callbacks bypass native Suspend, so without this the
-    ; 50 ms MouseGetPos poll keeps firing for the whole pause ("pause = tout
-    ; éteint" invariant). Re-armed from Ergopti_OnSuspendResume when the bridge
-    ; is active.
-    try _LLM_PointerWatch_Stop()
-    ; Disarm the 20 Hz metrics focus poll. Same class as the pointer watch above:
-    ; a repeating SetTimer bypasses native Suspend, and its WinGetTitle probe is a
-    ; blocking WM_GETTEXT round-trip against the foreground window. Re-armed from
-    ; Ergopti_OnSuspendResume when metrics are enabled.
-    try MF_StopFocusRefresh()
-    ; Cancel in-flight background update checks so a stale async callback cannot
-    ; surface a TrayTip or rebuild the menu while paused ("pause = tout éteint").
-    try _Updater_CancelAsyncChecks()
-    ; A metrics projection can be a multi-second detached AHK process.  Native
-    ; Suspend only disarms hotkeys, so explicitly kill its process tree rather
-    ; than letting SQLite/JSON work continue throughout a paused driver.
-    try KLPF_CancelBuild("typing")
-    try KLPF_CancelBuild("apps")
-    try KLPF_CancelBuild("range:typing")
-    try StopActivitySimulation()
-    ; AHK-12: A gesture left/right click-hold (SendEvent "{LButton Down}") that
-    ; was in progress when the user pauses the driver outlives the suspend because
-    ; SetTimer callbacks bypass native Suspend — the button stays logically held
-    ; until the next mouse event. Release both hold states unconditionally here so
-    ; no synthetic button-down leaks into the suspended window ("pause = tout éteint").
+		try TooltipHide("Suspend", true)
+		try LLM_Tooltip_Hide(true)
+		try LLM_Engine_CancelTimer()
+		; Stop in-flight generation AND clear the prediction cache so a suggestion
+		; produced before the pause cannot re-render after resume on a rebuilt
+		; context ("pause = tout eteint" invariant). StopGeneration drops last_ctx /
+		; last_results, bumps request_id, and cancels async streams.
+		try LLM_Engine_StopGeneration()
+		; Cancel the Ollama warm-up retry timer so it does not make background HTTP
+		; calls while the driver is paused ("pause = tout éteint" invariant).
+		try LLM_OllamaCancelWarmupRetry()
+		; Stop the LLM pointer-dismiss poll timer + its pass-through mouse hotkeys.
+		; SetTimer/Hotkey callbacks bypass native Suspend, so without this the
+		; 50 ms MouseGetPos poll keeps firing for the whole pause ("pause = tout
+		; éteint" invariant). Re-armed from Ergopti_OnSuspendResume when the bridge
+		; is active.
+		try _LLM_PointerWatch_Stop()
+		; Disarm the 20 Hz metrics focus poll. Same class as the pointer watch above:
+		; a repeating SetTimer bypasses native Suspend, and its WinGetTitle probe is a
+		; blocking WM_GETTEXT round-trip against the foreground window. Re-armed from
+		; Ergopti_OnSuspendResume when metrics are enabled.
+		try MF_StopFocusRefresh()
+		; Cancel in-flight background update checks so a stale async callback cannot
+		; surface a TrayTip or rebuild the menu while paused ("pause = tout éteint").
+		try _Updater_CancelAsyncChecks()
+		; A metrics projection can be a multi-second detached AHK process.  Native
+		; Suspend only disarms hotkeys, so explicitly kill its process tree rather
+		; than letting SQLite/JSON work continue throughout a paused driver.
+		try KLPF_CancelBuild("typing")
+		try KLPF_CancelBuild("apps")
+		try KLPF_CancelBuild("range:typing")
+		try StopActivitySimulation()
+		; AHK-12: A gesture left/right click-hold (SendEvent "{LButton Down}") that
+		; was in progress when the user pauses the driver outlives the suspend because
+		; SetTimer callbacks bypass native Suspend — the button stays logically held
+		; until the next mouse event. Release both hold states unconditionally here so
+		; no synthetic button-down leaks into the suspended window ("pause = tout éteint").
 	try GestureReleaseLeftClick()
 	try GestureReleaseRightClick()
 	; A tap-hold may have armed a synthetic modifier before entering KeyWait.
@@ -292,99 +292,99 @@ Ergopti_OnSuspendEnter() {
 	; immediately instead of waiting for the eventual physical key-up/finally.
 	try TapHoldReleaseSyntheticKeys()
 	; AHK-16: CapsWord keeps the hardware CapsLock LED lit (via UpdateCapsLockLED)
-    ; and continues arming its mouse-cancel HookDispatcher listeners even when the
-    ; driver is suspended — the LED misleads the user and the listeners fire through
-    ; native Suspend. DisableCapsWord resets CapsWordEnabled, unregisters mouse
-    ; listeners, and corrects the LED ("pause = tout éteint" invariant).
-    if IsSet(DisableCapsWord)
-        try DisableCapsWord()
-    ; Reset OneShotShift so a shift armed just before suspension is not applied
-    ; to the first keystroke after resume ("pause = tout éteint" invariant)
-    global OneShotShiftEnabled := False
-    ; Wipe the hotstring engine buffer: suspend is a context-unknown boundary just
-    ; like a mouse click, Ctrl+V or Win+L. The on-screen text the buffer mirrors can
-    ; change completely while paused (the user clicks into another document), so a
-    ; surviving buffer would fire a stale trigger on the first post-resume terminator
-    ; and BackSpace into unrelated text. Mirrors RebuildHotstringsLive/_LockWorkstationEmit;
-    ; _ResetPrefixBuffer() on resume keeps the preview buffer paired with the engine.
-    if IsSet(HSE_HardReset)
-        try HSE_HardReset()
-    global _LLM_Deps_PollTimer
-    if IsSet(_LLM_Deps_PollTimer)
-        try SetTimer(_LLM_Deps_PollTimer, 0)
-    LoggerSuccess("Lifecycle", "Suspend entered — all suspend-bypassing subsystems torn down.")
+		; and continues arming its mouse-cancel HookDispatcher listeners even when the
+		; driver is suspended — the LED misleads the user and the listeners fire through
+		; native Suspend. DisableCapsWord resets CapsWordEnabled, unregisters mouse
+		; listeners, and corrects the LED ("pause = tout éteint" invariant).
+		if IsSet(DisableCapsWord)
+				try DisableCapsWord()
+		; Reset OneShotShift so a shift armed just before suspension is not applied
+		; to the first keystroke after resume ("pause = tout éteint" invariant)
+		global OneShotShiftEnabled := False
+		; Wipe the hotstring engine buffer: suspend is a context-unknown boundary just
+		; like a mouse click, Ctrl+V or Win+L. The on-screen text the buffer mirrors can
+		; change completely while paused (the user clicks into another document), so a
+		; surviving buffer would fire a stale trigger on the first post-resume terminator
+		; and BackSpace into unrelated text. Mirrors RebuildHotstringsLive/_LockWorkstationEmit;
+		; _ResetPrefixBuffer() on resume keeps the preview buffer paired with the engine.
+		if IsSet(HSE_HardReset)
+				try HSE_HardReset()
+		global _LLM_Deps_PollTimer
+		if IsSet(_LLM_Deps_PollTimer)
+				try SetTimer(_LLM_Deps_PollTimer, 0)
+		LoggerSuccess("Lifecycle", "Suspend entered — all suspend-bypassing subsystems torn down.")
 }
 Ergopti_OnSuspendResume() {
-    LoggerStart("Lifecycle", "Resuming from suspend…")
-    if IsSet(_ResetPrefixBuffer)
-        try _ResetPrefixBuffer()
-    ; Replay a prefix-index rebuild deferred because it was requested while
-    ; suspended (a live hotstring section toggle during pause), so the preview
-    ; index re-syncs with the engine registry instead of staying diverged.
-    global _PrefixIndexRebuildPending
-    if IsSet(_PrefixIndexRebuildPending) and _PrefixIndexRebuildPending {
-        _PrefixIndexRebuildPending := false
-        if IsSet(HotstringPrefixWatcherRebuildIndex)
-            try HotstringPrefixWatcherRebuildIndex()
-    }
-    global _LLM_Deps_PollTimer, _LLM_Deps_Checking
-    if IsSet(_LLM_Deps_PollTimer) and IsSet(_LLM_Deps_Checking) and _LLM_Deps_Checking
-        try SetTimer(_LLM_Deps_PollTimer, 3000)
-    ; Re-arm the LLM pointer-dismiss watcher stopped in Ergopti_OnSuspendEnter,
-    ; but only when the bridge is still active — _LLM_PointerWatch_Start is a
-    ; no-op when already armed, so this is safe to call unconditionally on the
-    ; active path.
-    global _LLM_Bridge_Active
-    if IsSet(_LLM_Bridge_Active) and _LLM_Bridge_Active
-        try _LLM_PointerWatch_Start()
-    ; Re-arm the metrics focus poll disarmed in Ergopti_OnSuspendEnter, gated on
-    ; the same feature flag that armed it at boot. Without this the cache would
-    ; stay frozen after the first pause and every metrics privacy filter would
-    ; read a stale foreground window for the rest of the session.
-    if IsSet(MetricsShortcuts) and MetricsShortcuts.enabled
-        try MF_StartFocusRefresh()
-    ; Deferred dependency callbacks are not allowed to rebuild the tray or
-    ; start the bridge while native Suspend is active. Replay the pending work
-    ; only after the resume transition has completed.
-    if IsSet(LLM_Menu_OnResume)
-        try LLM_Menu_OnResume()
-    LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
+		LoggerStart("Lifecycle", "Resuming from suspend…")
+		if IsSet(_ResetPrefixBuffer)
+				try _ResetPrefixBuffer()
+		; Replay a prefix-index rebuild deferred because it was requested while
+		; suspended (a live hotstring section toggle during pause), so the preview
+		; index re-syncs with the engine registry instead of staying diverged.
+		global _PrefixIndexRebuildPending
+		if IsSet(_PrefixIndexRebuildPending) and _PrefixIndexRebuildPending {
+				_PrefixIndexRebuildPending := false
+				if IsSet(HotstringPrefixWatcherRebuildIndex)
+						try HotstringPrefixWatcherRebuildIndex()
+		}
+		global _LLM_Deps_PollTimer, _LLM_Deps_Checking
+		if IsSet(_LLM_Deps_PollTimer) and IsSet(_LLM_Deps_Checking) and _LLM_Deps_Checking
+				try SetTimer(_LLM_Deps_PollTimer, 3000)
+		; Re-arm the LLM pointer-dismiss watcher stopped in Ergopti_OnSuspendEnter,
+		; but only when the bridge is still active — _LLM_PointerWatch_Start is a
+		; no-op when already armed, so this is safe to call unconditionally on the
+		; active path.
+		global _LLM_Bridge_Active
+		if IsSet(_LLM_Bridge_Active) and _LLM_Bridge_Active
+				try _LLM_PointerWatch_Start()
+		; Re-arm the metrics focus poll disarmed in Ergopti_OnSuspendEnter, gated on
+		; the same feature flag that armed it at boot. Without this the cache would
+		; stay frozen after the first pause and every metrics privacy filter would
+		; read a stale foreground window for the rest of the session.
+		if IsSet(MetricsShortcuts) and MetricsShortcuts.enabled
+				try MF_StartFocusRefresh()
+		; Deferred dependency callbacks are not allowed to rebuild the tray or
+		; start the bridge while native Suspend is active. Replay the pending work
+		; only after the resume transition has completed.
+		if IsSet(LLM_Menu_OnResume)
+				try LLM_Menu_OnResume()
+		LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
 }
 _SuspendStateWatchdog() {
-    global _LastSuspendState
-    ; Serialize the transition. This runs both from a 500 ms repeating timer and
-    ; directly on each toggle; AHK pseudo-threads are interruptible, so a rapid
-    ; double-toggle could otherwise interrupt Ergopti_OnSuspendEnter's teardown with
-    ; Ergopti_OnSuspendResume, leaving a resumed driver half torn down. If a reactor
-    ; is already running, leave _LastSuspendState unchanged and return — the repeating
-    ; timer re-detects the (possibly reversed) state on its next tick and dispatches
-    ; the correct reactor once the current one has finished.
-    static _TransitionBusy := false
-    ; First invocation after boot: replay a pause handed off by
-    ; ReloadPreservingSuspend. Doing it here rather than in the boot block keeps
-    ; the whole suspend machine in one file, and the state change is picked up by
-    ; the comparison right below, so the restored pause runs the same reactor and
-    ; the same tray-icon update as a manual one.
-    static _BootRestoreDone := false
-    if !_BootRestoreDone {
-        _BootRestoreDone := true
-        try _SuspendRestoreFromMarker()
-    }
-    if (A_IsSuspended == _LastSuspendState)
-        return
-    if _TransitionBusy
-        return
-    _TransitionBusy := true
-    try {
-        _LastSuspendState := A_IsSuspended
-        UpdateTrayIcon()
-        if A_IsSuspended
-            Ergopti_OnSuspendEnter()
-        else
-            Ergopti_OnSuspendResume()
-    } finally {
-        _TransitionBusy := false
-    }
+		global _LastSuspendState
+		; Serialize the transition. This runs both from a 500 ms repeating timer and
+		; directly on each toggle; AHK pseudo-threads are interruptible, so a rapid
+		; double-toggle could otherwise interrupt Ergopti_OnSuspendEnter's teardown with
+		; Ergopti_OnSuspendResume, leaving a resumed driver half torn down. If a reactor
+		; is already running, leave _LastSuspendState unchanged and return — the repeating
+		; timer re-detects the (possibly reversed) state on its next tick and dispatches
+		; the correct reactor once the current one has finished.
+		static _TransitionBusy := false
+		; First invocation after boot: replay a pause handed off by
+		; ReloadPreservingSuspend. Doing it here rather than in the boot block keeps
+		; the whole suspend machine in one file, and the state change is picked up by
+		; the comparison right below, so the restored pause runs the same reactor and
+		; the same tray-icon update as a manual one.
+		static _BootRestoreDone := false
+		if !_BootRestoreDone {
+				_BootRestoreDone := true
+				try _SuspendRestoreFromMarker()
+		}
+		if (A_IsSuspended == _LastSuspendState)
+				return
+		if _TransitionBusy
+				return
+		_TransitionBusy := true
+		try {
+				_LastSuspendState := A_IsSuspended
+				UpdateTrayIcon()
+				if A_IsSuspended
+						Ergopti_OnSuspendEnter()
+				else
+						Ergopti_OnSuspendResume()
+		} finally {
+				_TransitionBusy := false
+		}
 }
 ; Single global shutdown handler wired to OnExit (see the auto-execute section
 ; after the keylogger is started). AHK v2 Reload() and ExitApp() tear the process
@@ -408,95 +408,95 @@ _SuspendStateWatchdog() {
 ; (updater-staging-worker-orphaned-on-exit). Every future subsystem with that
 ; shape belongs in this handler too.
 Ergopti_OnShutdown(reason, code) {
-    try KL_Stop()
-    try HotstringPrefixWatcherStop()
-    try HookDispatcher.Stop()
-    try KLWV_CloseAll()
-    try OllamaWV_Close()
-    try _Updater_AbortStagingOnExit()
-    return 0
+		try KL_Stop()
+		try HotstringPrefixWatcherStop()
+		try HookDispatcher.Stop()
+		try KLWV_CloseAll()
+		try OllamaWV_Close()
+		try _Updater_AbortStagingOnExit()
+		return 0
 }
 ; Build the full tray menu off the boot critical path (armed after "ready").
 ; initMenu stages every subtree while the old root remains live and enters
 ; Critical only for the short root replacement. UpdateTrayIcon runs last, once
 ; MenuSuspend exists.
 BuildTrayMenuDeferred() {
-    global _DriverReady, _LangMenuBuildPending, LANG_MENU_DEFER_MS
-    ; Same rationale for the bundled-extensions scan: it does DirExist/Loop Files/
-    ; FileRead over the extensions tree. Warm its cache off-Critical too so the
-    ; under-Critical _HS_Extensions call hits only the warm cache.
-    _HS_PreScanExtensions()
-    ; Warm the personal-hotstrings prescan cache BEFORE taking Critical. The scan
-    ; recurses the personal-hotstrings dir and parses every ext TOML — unbounded
-    ; file I/O that, on a cloud-synced config dir (OneDrive Files On-Demand) or a
-    ; spun-down drive, can stall for seconds. Critical("On") starves the LL keyboard
-    ; hook for its whole duration, so doing that I/O under Critical turns a one-time
-    ; menu build into a multi-second keyboard freeze on the first keystrokes after
-    ; launch. _HS_PreScanPersonal is cache-guarded (idempotent once
-    ; _HS_PreScanPersonalCacheLoaded is set), so the InitSubMenus call below hits
-    ; only the warm cache — the Critical span then covers ONLY the pure Win32
-    ; Menu.Add / RegisterMenuItem pass that must be one uninterrupted block.
-    _HS_PreScanPersonal()
+		global _DriverReady, _LangMenuBuildPending, LANG_MENU_DEFER_MS
+		; Same rationale for the bundled-extensions scan: it does DirExist/Loop Files/
+		; FileRead over the extensions tree. Warm its cache off-Critical too so the
+		; under-Critical _HS_Extensions call hits only the warm cache.
+		_HS_PreScanExtensions()
+		; Warm the personal-hotstrings prescan cache BEFORE taking Critical. The scan
+		; recurses the personal-hotstrings dir and parses every ext TOML — unbounded
+		; file I/O that, on a cloud-synced config dir (OneDrive Files On-Demand) or a
+		; spun-down drive, can stall for seconds. Critical("On") starves the LL keyboard
+		; hook for its whole duration, so doing that I/O under Critical turns a one-time
+		; menu build into a multi-second keyboard freeze on the first keystrokes after
+		; launch. _HS_PreScanPersonal is cache-guarded (idempotent once
+		; _HS_PreScanPersonalCacheLoaded is set), so the InitSubMenus call below hits
+		; only the warm cache — the Critical span then covers ONLY the pure Win32
+		; Menu.Add / RegisterMenuItem pass that must be one uninterrupted block.
+		_HS_PreScanPersonal()
 	try {
 		InitSubMenus()
 		; Build everything EXCEPT the 21-locale language submenu. Forcing
 		; _DriverReady false preserves the deferred language-menu behaviour.
-        _SavedReady := _DriverReady
-        _DriverReady := false
-        ; Restore _DriverReady even if initMenu() throws (I/O error, parse failure…);
-        ; leaving it false permanently would silently block all async saves thereafter.
-        try initMenu()
-        finally _DriverReady := _SavedReady
-        UpdateTrayIcon()
+				_SavedReady := _DriverReady
+				_DriverReady := false
+				; Restore _DriverReady even if initMenu() throws (I/O error, parse failure…);
+				; leaving it false permanently would silently block all async saves thereafter.
+				try initMenu()
+				finally _DriverReady := _SavedReady
+				UpdateTrayIcon()
 	} catch as e {
 		try LoggerError("TrayMenu", "Deferred tray-menu build failed: {1}", e.Message)
 	}
-    if _LangMenuBuildPending
-        SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
-    BootProfile_Mark("Tray menu built (deferred, off time-to-ready)")
+		if _LangMenuBuildPending
+				SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
+		BootProfile_Mark("Tray menu built (deferred, off time-to-ready)")
 }
 
 UpdateTrayIcon() {
-    ; The MenuSuspend item exists only after BuildTrayMenuDeferred has run. This is
-    ; called from ToggleSuspend / the suspend watchdog, which can fire in the brief
-    ; pre-build window after launch — guard the check so an early suspend cannot
-    ; throw on a not-yet-built menu item. The icon swap below still happens.
-    if A_IsSuspended {
-        try A_TrayMenu.Check(MenuSuspend)
-        if FileExist(IconPathDisabled)
-            TraySetIcon(IconPathDisabled, , True)
-    }
-    else {
-        try A_TrayMenu.Uncheck(MenuSuspend)
-        if FileExist(IconPath)
-            TraySetIcon(IconPath)
-    }
+		; The MenuSuspend item exists only after BuildTrayMenuDeferred has run. This is
+		; called from ToggleSuspend / the suspend watchdog, which can fire in the brief
+		; pre-build window after launch — guard the check so an early suspend cannot
+		; throw on a not-yet-built menu item. The icon swap below still happens.
+		if A_IsSuspended {
+				try A_TrayMenu.Check(MenuSuspend)
+				if FileExist(IconPathDisabled)
+						TraySetIcon(IconPathDisabled, , True)
+		}
+		else {
+				try A_TrayMenu.Uncheck(MenuSuspend)
+				if FileExist(IconPath)
+						TraySetIcon(IconPath)
+		}
 }
 ; The tray menu's own « Recharger » item — the single most obviously
 ; paused-reachable reload in the driver, and it dropped the pause like all the
 ; others. "Reload the driver" and "stop being paused" are two different requests;
 ; only one of them was made.
 ActivateReload(*) {
-    ReloadPreservingSuspend()
+		ReloadPreservingSuspend()
 }
 ActivateExitApp(*) {
-    ExitApp()
+		ExitApp()
 }
 WindowSpy(*) {
-    SplitPath(A_AhkPath, , &ahkDir)
-    SplitPath(ahkDir, , &parentDir)
-    spyPath := parentDir "\WindowSpy.ahk"
-    if FileExist(spyPath)
-        Run(spyPath)
-    else
-        MsgBox(Format(t("ergopti.windowspy_not_found"), spyPath))
+		SplitPath(A_AhkPath, , &ahkDir)
+		SplitPath(ahkDir, , &parentDir)
+		spyPath := parentDir "\WindowSpy.ahk"
+		if FileExist(spyPath)
+				Run(spyPath)
+		else
+				MsgBox(Format(t("ergopti.windowspy_not_found"), spyPath))
 }
 ActivateListVars(*) {
-    ListVars()
+		ListVars()
 }
 ActivateKeyHistory(*) {
-    KeyHistory()
+		KeyHistory()
 }
 ShowHealthCheck(*) {
-    HealthCheck_ShowWindow()
+		HealthCheck_ShowWindow()
 }

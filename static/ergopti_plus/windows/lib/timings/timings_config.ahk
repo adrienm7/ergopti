@@ -45,15 +45,15 @@ global _TimingsCache := ""
 ; constants from it. A missing/empty file THROWS (fail fast — no fallback).
 ; @param SharedDir Optional _shared/ root; defaults to the global ``_SharedDir``.
 TimingsLoadShared(SharedDir := "") {
-    global _SharedDir, _TimingsCache
-    Dir  := (SharedDir != "") ? SharedDir : (IsSet(_SharedDir) ? _SharedDir : "")
-    Path := Dir . "\modules\timings\constants.toml"
-    c    := ParseTomlFile(Path)
-    if !c.Count {
-        throw Error("_shared/modules/timings/constants.toml introuvable ou vide : " . Path)
-    }
-    _TimingsCache := c
-    try LoggerInfo("Timings", "Shared timings registry loaded ({1} section(s)).", c.Count)
+		global _SharedDir, _TimingsCache
+		Dir  := (SharedDir != "") ? SharedDir : (IsSet(_SharedDir) ? _SharedDir : "")
+		Path := Dir . "\modules\timings\constants.toml"
+		c    := ParseTomlFile(Path)
+		if !c.Count {
+				throw Error("_shared/modules/timings/constants.toml introuvable ou vide : " . Path)
+		}
+		_TimingsCache := c
+		try LoggerInfo("Timings", "Shared timings registry loaded ({1} section(s)).", c.Count)
 }
 
 ; Fetch a required ``[Section] Key`` timing (an integer number of milliseconds)
@@ -63,15 +63,15 @@ TimingsLoadShared(SharedDir := "") {
 ; @param Key Key within that section (e.g. "think_pause_ms").
 ; @return Integer The value in milliseconds.
 TimingsGet(Section, Key) {
-    global _TimingsCache
-    if (Type(_TimingsCache) != "Map") {
-        throw Error(Format("TimingsGet('{1}','{2}') called before TimingsLoadShared() — registry not loaded.", Section, Key))
-    }
-    Val := IniCacheGet(_TimingsCache, Section, Key)
-    if (Val == "_") {
-        throw Error(Format("_shared/modules/timings/constants.toml — clé manquante : [{1}] {2}", Section, Key))
-    }
-    return Integer(Val)
+		global _TimingsCache
+		if (Type(_TimingsCache) != "Map") {
+				throw Error(Format("TimingsGet('{1}','{2}') called before TimingsLoadShared() — registry not loaded.", Section, Key))
+		}
+		Val := IniCacheGet(_TimingsCache, Section, Key)
+		if (Val == "_") {
+				throw Error(Format("_shared/modules/timings/constants.toml — clé manquante : [{1}] {2}", Section, Key))
+		}
+		return Integer(Val)
 }
 
 ; Same lookup as TimingsGet but converted to seconds, for the APIs that take a
@@ -80,5 +80,5 @@ TimingsGet(Section, Key) {
 ; @param Key Key within that section.
 ; @return Float The value in seconds.
 TimingsGetSec(Section, Key) {
-    return TimingsGet(Section, Key) / 1000.0
+		return TimingsGet(Section, Key) / 1000.0
 }

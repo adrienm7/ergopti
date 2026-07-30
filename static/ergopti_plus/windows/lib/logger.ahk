@@ -45,14 +45,14 @@ global LOGGER_RING_BUFFER_SIZE := 200
 ; Numeric severity used to filter messages against the user-configured minimum
 ; level. Lifecycle helpers map back onto these via _LevelSeverity().
 global LOGGER_SEVERITY := Map(
-    "DEBUG", 10,
-    "TRACE", 10,
-    "DONE", 10,
-    "INFO", 20,
-    "START", 20,
-    "SUCCESS", 20,
-    "WARNING", 30,
-    "ERROR", 40,
+		"DEBUG", 10,
+		"TRACE", 10,
+		"DONE", 10,
+		"INFO", 20,
+		"START", 20,
+		"SUCCESS", 20,
+		"WARNING", 30,
+		"ERROR", 40,
 )
 
 ; Default log level when nothing is configured in the ini. INFO keeps the file
@@ -152,10 +152,10 @@ global LOGGER_SUB_FILES := []
 ; Hardcoded fallback used when sub_files.toml cannot be found. Covers the
 ; minimum set of AHK-only sub-files required for production log triage.
 global LOGGER_SUB_FILES_FALLBACK := [
-    Map("name", "ErgoptiPlus_gestures.log", "tags", ["[gestures"]),
-    Map("name", "ErgoptiPlus_layout.log", "tags", ["[LayoutShift]", "[LayoutCaps]", "[LayoutAltGr]"]),
-    Map("name", "ErgoptiPlus_dispatch.log", "tags", ["[Dispatch]", "[ScriptShortcuts]", "[TomlLoader]"]),
-    Map("name", "ErgoptiPlus_tray.log", "tags", ["[ErgoptiPlus]"]),
+		Map("name", "ErgoptiPlus_gestures.log", "tags", ["[gestures"]),
+		Map("name", "ErgoptiPlus_layout.log", "tags", ["[LayoutShift]", "[LayoutCaps]", "[LayoutAltGr]"]),
+		Map("name", "ErgoptiPlus_dispatch.log", "tags", ["[Dispatch]", "[ScriptShortcuts]", "[TomlLoader]"]),
+		Map("name", "ErgoptiPlus_tray.log", "tags", ["[ErgoptiPlus]"]),
 ]
 
 ; Resolved absolute paths for each sub-file (populated by LoggerInit).
@@ -197,73 +197,73 @@ global _LastErrTime := 0
 ; filename format lives in exactly one place.
 ; @returns {String} The resolved log directory, with a trailing backslash.
 _LoggerResolveDatedPaths() {
-    global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
-    global _ConfigDir, _AhkSubDir
+		global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
+		global _ConfigDir, _AhkSubDir
 
-    LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
-        ? _ConfigDir . _AhkSubDir . "logs\"
-        : A_ScriptDir . "\logs\"
-    if !DirExist(LogDir) {
-        try DirCreate(LogDir)
-    }
-    Today := FormatTime(, "yyyy-MM-dd")
-    LOGGER_LOG_PATH := LogDir . "ErgoptiPlus_" . Today . ".log"
-    LOGGER_ERRORS_LOG_PATH := LogDir . "ErgoptiPlus_errors_" . Today . ".log"
-    _LOGGER_PATH_DATE := Today
-    return LogDir
+		LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
+				? _ConfigDir . _AhkSubDir . "logs\"
+				: A_ScriptDir . "\logs\"
+		if !DirExist(LogDir) {
+				try DirCreate(LogDir)
+		}
+		Today := FormatTime(, "yyyy-MM-dd")
+		LOGGER_LOG_PATH := LogDir . "ErgoptiPlus_" . Today . ".log"
+		LOGGER_ERRORS_LOG_PATH := LogDir . "ErgoptiPlus_errors_" . Today . ".log"
+		_LOGGER_PATH_DATE := Today
+		return LogDir
 }
 
 ; Initialise the logger. Reads the minimum level from the ini and resolves the
 ; log file path. Safe to call multiple times — later calls just refresh the
 ; minimum level (e.g. after the user changes it via the menu).
 LoggerInit() {
-    global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL, ConfigurationFile
-    global _LOGGER_FLUSH_TIMER_STARTED, LOGGER_FLUSH_INTERVAL_MS, _ConfigDir, _AhkSubDir, _LOGGER_PENDING
-    global LOGGER_RETENTION_DAYS
+		global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL, ConfigurationFile
+		global _LOGGER_FLUSH_TIMER_STARTED, LOGGER_FLUSH_INTERVAL_MS, _ConfigDir, _AhkSubDir, _LOGGER_PENDING
+		global LOGGER_RETENTION_DAYS
 
-    LogDir := _LoggerResolveDatedPaths()
-    _LoggerPurgeOldLogs(LogDir, LOGGER_RETENTION_DAYS)
-    ; Load sub-file routing rules from _shared/modules/logger/sub_files.toml so adding a
-    ; new topical log requires only a TOML edit, not a code change in both drivers.
-    _LoggerLoadSubFilesToml(A_ScriptDir . "\")
-    _LoggerInitSubFiles(LogDir)
-    LOGGER_MIN_LEVEL := LOGGER_DEFAULT_LEVEL
-    if IsSet(ConfigurationFile) and FileExist(ConfigurationFile) {
-        try {
-            Value := TOML_Read(ConfigurationFile, "script", "log_level", LOGGER_DEFAULT_LEVEL)
-            if LOGGER_SEVERITY.Has(Value) {
-                LOGGER_MIN_LEVEL := Value
-            }
-        }
-    }
-    _LoggerRefreshFastFlags()
-    ; Now that the user's level is finally known, apply it retroactively to
-    ; everything the permissive pre-init defaults let through. This is the half
-    ; of logger-preinit-level-drop that keeps the fail-open default honest.
-    _LoggerDropPreInitBelowLevel()
+		LogDir := _LoggerResolveDatedPaths()
+		_LoggerPurgeOldLogs(LogDir, LOGGER_RETENTION_DAYS)
+		; Load sub-file routing rules from _shared/modules/logger/sub_files.toml so adding a
+		; new topical log requires only a TOML edit, not a code change in both drivers.
+		_LoggerLoadSubFilesToml(A_ScriptDir . "\")
+		_LoggerInitSubFiles(LogDir)
+		LOGGER_MIN_LEVEL := LOGGER_DEFAULT_LEVEL
+		if IsSet(ConfigurationFile) and FileExist(ConfigurationFile) {
+				try {
+						Value := TOML_Read(ConfigurationFile, "script", "log_level", LOGGER_DEFAULT_LEVEL)
+						if LOGGER_SEVERITY.Has(Value) {
+								LOGGER_MIN_LEVEL := Value
+						}
+				}
+		}
+		_LoggerRefreshFastFlags()
+		; Now that the user's level is finally known, apply it retroactively to
+		; everything the permissive pre-init defaults let through. This is the half
+		; of logger-preinit-level-drop that keeps the fail-open default honest.
+		_LoggerDropPreInitBelowLevel()
 
-    ; Start the background flusher once. LoggerInit may be called again when
-    ; the user toggles the log level via the menu — we do not restart the
-    ; timer in that case. OnExit ensures any pending lines are flushed before
-    ; the driver terminates so crash diagnostics are not lost.
-    if !_LOGGER_FLUSH_TIMER_STARTED {
-        SetTimer(_LoggerFlush, LOGGER_FLUSH_INTERVAL_MS)
-        OnExit(_LoggerOnExitFlush)
-        _LOGGER_FLUSH_TIMER_STARTED := True
-        ; Session boundary marker (matches the macOS driver) so tailing the log
-        ; reveals where the driver (re)started. Written once per session to the
-        ; main unified log only — not the ring, errors, or sub-files. The blank
-        ; line precedes the banner; Chr(0x2014) is the em-dash, kept out of the
-        ; source so a UTF-8/BOM regression cannot corrupt it.
-        SessionStamp := FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") . ":" . Format("{:03}", A_MSec)
-        _LOGGER_PENDING.Push("")
-        _LOGGER_PENDING.Push("===== " . SessionStamp . " " . Chr(0x2014) . " ErgoptiPlus session opened =====")
-    }
-    ; Drain any lines that were emitted before LoggerInit resolved the log path.
-    ; Without this flush, every _LoggerEmit call that fired during early boot
-    ; (before LOGGER_LOG_PATH was set) would silently stay in the pending queue
-    ; until the next periodic tick (~500 ms), or be lost entirely on a crash.
-    _LoggerFlush(false)
+		; Start the background flusher once. LoggerInit may be called again when
+		; the user toggles the log level via the menu — we do not restart the
+		; timer in that case. OnExit ensures any pending lines are flushed before
+		; the driver terminates so crash diagnostics are not lost.
+		if !_LOGGER_FLUSH_TIMER_STARTED {
+				SetTimer(_LoggerFlush, LOGGER_FLUSH_INTERVAL_MS)
+				OnExit(_LoggerOnExitFlush)
+				_LOGGER_FLUSH_TIMER_STARTED := True
+				; Session boundary marker (matches the macOS driver) so tailing the log
+				; reveals where the driver (re)started. Written once per session to the
+				; main unified log only — not the ring, errors, or sub-files. The blank
+				; line precedes the banner; Chr(0x2014) is the em-dash, kept out of the
+				; source so a UTF-8/BOM regression cannot corrupt it.
+				SessionStamp := FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") . ":" . Format("{:03}", A_MSec)
+				_LOGGER_PENDING.Push("")
+				_LOGGER_PENDING.Push("===== " . SessionStamp . " " . Chr(0x2014) . " ErgoptiPlus session opened =====")
+		}
+		; Drain any lines that were emitted before LoggerInit resolved the log path.
+		; Without this flush, every _LoggerEmit call that fired during early boot
+		; (before LOGGER_LOG_PATH was set) would silently stay in the pending queue
+		; until the next periodic tick (~500 ms), or be lost entirely on a crash.
+		_LoggerFlush(false)
 }
 
 ; Drain the pending-lines queue into the log file in a single FileAppend.
@@ -378,25 +378,25 @@ _LoggerFlush(ForceFlush := false) {
 		_LOGGER_SUB_PENDING := Map()
 	} finally {
 		Critical(_crit2)
-    }
-    for Name, Lines in SubSnap {
-            if !_LOGGER_SUB_PATHS.Has(Name) {
-                    _LoggerRequeueSub(Name, Lines)
-                    continue
-            }
-            SubBlob := ""
-            for _, SLine in Lines {
-                    SubBlob .= SLine . "`r`n"
-            }
-            if SubBlob == ""
-                    continue
-            SubWritten := false
-            try {
-                    FileAppend(SubBlob, _LOGGER_SUB_PATHS[Name], "UTF-8")
-                    SubWritten := true
-            }
-            if !SubWritten
-                    _LoggerRequeueSub(Name, Lines)
+		}
+		for Name, Lines in SubSnap {
+						if !_LOGGER_SUB_PATHS.Has(Name) {
+										_LoggerRequeueSub(Name, Lines)
+										continue
+						}
+						SubBlob := ""
+						for _, SLine in Lines {
+										SubBlob .= SLine . "`r`n"
+						}
+						if SubBlob == ""
+										continue
+						SubWritten := false
+						try {
+										FileAppend(SubBlob, _LOGGER_SUB_PATHS[Name], "UTF-8")
+										SubWritten := true
+						}
+						if !SubWritten
+										_LoggerRequeueSub(Name, Lines)
 	}
 
 	; Report the truncation only once the sink is proven writable again. Emitting
@@ -465,37 +465,37 @@ _LoggerRequeue(Pending, PendingErr) {
 }
 
 _LoggerOnExitFlush(ExitReason, ExitCode) {
-    global _LOGGER_DEDUP_COUNT, _LOGGER_DEDUP_LEVEL
-    ; If the very last log call before shutdown was itself a suppressed
-    ; duplicate, its streak's "N more identical lines" summary is still
-    ; pending — the streak only ever gets flushed when a DIFFERENT line
-    ; arrives (see _LoggerEmit). Emit it now so a repeating warning/error
-    ; storm immediately preceding this exit/reload is not silently lost
-    ; (logger-dedup-streak-lost-on-exit).
-    if (_LOGGER_DEDUP_COUNT > 0) {
-        _LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)
-        _LOGGER_DEDUP_COUNT := 0
-    }
-    ; Use the forced-flush path on exit too — a subsequent OS kill cannot
-    ; replay the buffered FileAppend.
-    _LoggerFlush(true)
-    return 0
+		global _LOGGER_DEDUP_COUNT, _LOGGER_DEDUP_LEVEL
+		; If the very last log call before shutdown was itself a suppressed
+		; duplicate, its streak's "N more identical lines" summary is still
+		; pending — the streak only ever gets flushed when a DIFFERENT line
+		; arrives (see _LoggerEmit). Emit it now so a repeating warning/error
+		; storm immediately preceding this exit/reload is not silently lost
+		; (logger-dedup-streak-lost-on-exit).
+		if (_LOGGER_DEDUP_COUNT > 0) {
+				_LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)
+				_LOGGER_DEDUP_COUNT := 0
+		}
+		; Use the forced-flush path on exit too — a subsequent OS kill cannot
+		; replay the buffered FileAppend.
+		_LoggerFlush(true)
+		return 0
 }
 
 ; Recompute the cached integer severity and per-level fast-path flags from
 ; ``LOGGER_MIN_LEVEL``. Called once from LoggerInit and anywhere the minimum
 ; level is mutated at runtime.
 _LoggerRefreshFastFlags() {
-    global LOGGER_MIN_LEVEL, LOGGER_SEVERITY
-    global _LOGGER_MIN_SEVERITY, _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED
-    global _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
-    _LOGGER_MIN_SEVERITY := LOGGER_SEVERITY.Has(LOGGER_MIN_LEVEL)
-        ? LOGGER_SEVERITY[LOGGER_MIN_LEVEL]
-        : 20
-    _LOGGER_DEBUG_ENABLED := (_LOGGER_MIN_SEVERITY <= 10)
-    _LOGGER_INFO_ENABLED := (_LOGGER_MIN_SEVERITY <= 20)
-    _LOGGER_WARN_ENABLED := (_LOGGER_MIN_SEVERITY <= 30)
-    _LOGGER_ERROR_ENABLED := (_LOGGER_MIN_SEVERITY <= 40)
+		global LOGGER_MIN_LEVEL, LOGGER_SEVERITY
+		global _LOGGER_MIN_SEVERITY, _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED
+		global _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
+		_LOGGER_MIN_SEVERITY := LOGGER_SEVERITY.Has(LOGGER_MIN_LEVEL)
+				? LOGGER_SEVERITY[LOGGER_MIN_LEVEL]
+				: 20
+		_LOGGER_DEBUG_ENABLED := (_LOGGER_MIN_SEVERITY <= 10)
+		_LOGGER_INFO_ENABLED := (_LOGGER_MIN_SEVERITY <= 20)
+		_LOGGER_WARN_ENABLED := (_LOGGER_MIN_SEVERITY <= 30)
+		_LOGGER_ERROR_ENABLED := (_LOGGER_MIN_SEVERITY <= 40)
 }
 
 ; Retro-applies the configured level to everything that was logged BEFORE
@@ -513,15 +513,15 @@ _LoggerRefreshFastFlags() {
 ; The ring buffer is intentionally NOT filtered: it feeds crash reports, where
 ; more boot context is strictly better.
 _LoggerDropPreInitBelowLevel() {
-    global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_MIN_LEVEL
-    Before := _LOGGER_PENDING.Length
-    _LOGGER_PENDING := _LoggerFilterQueueByLevel(_LOGGER_PENDING)
-    _LOGGER_PENDING_ERRORS := _LoggerFilterQueueByLevel(_LOGGER_PENDING_ERRORS)
-    Dropped := Before - _LOGGER_PENDING.Length
-    if (Dropped > 0) {
-        LoggerDebug("logger", "Dropped {1} pre-init line(s) below the configured level '{2}'.",
-            Dropped, LOGGER_MIN_LEVEL)
-    }
+		global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_MIN_LEVEL
+		Before := _LOGGER_PENDING.Length
+		_LOGGER_PENDING := _LoggerFilterQueueByLevel(_LOGGER_PENDING)
+		_LOGGER_PENDING_ERRORS := _LoggerFilterQueueByLevel(_LOGGER_PENDING_ERRORS)
+		Dropped := Before - _LOGGER_PENDING.Length
+		if (Dropped > 0) {
+				LoggerDebug("logger", "Dropped {1} pre-init line(s) below the configured level '{2}'.",
+						Dropped, LOGGER_MIN_LEVEL)
+		}
 }
 
 ; Returns a copy of ``Queue`` holding only the lines at or above the cached
@@ -530,33 +530,33 @@ _LoggerDropPreInitBelowLevel() {
 ; always the level; anything without one is structural (the blank separator, the
 ; session banner) and is always kept.
 _LoggerFilterQueueByLevel(Queue) {
-    global LOGGER_SEVERITY, _LOGGER_MIN_SEVERITY
-    Kept := []
-    for _, Line in Queue {
-        if !RegExMatch(Line, "\[([A-Z]+)\] \[", &M) {
-            Kept.Push(Line)
-            continue
-        }
-        if !LOGGER_SEVERITY.Has(M[1]) {
-            Kept.Push(Line)
-            continue
-        }
-        if (LOGGER_SEVERITY[M[1]] >= _LOGGER_MIN_SEVERITY) {
-            Kept.Push(Line)
-        }
-    }
-    return Kept
+		global LOGGER_SEVERITY, _LOGGER_MIN_SEVERITY
+		Kept := []
+		for _, Line in Queue {
+				if !RegExMatch(Line, "\[([A-Z]+)\] \[", &M) {
+						Kept.Push(Line)
+						continue
+				}
+				if !LOGGER_SEVERITY.Has(M[1]) {
+						Kept.Push(Line)
+						continue
+				}
+				if (LOGGER_SEVERITY[M[1]] >= _LOGGER_MIN_SEVERITY) {
+						Kept.Push(Line)
+				}
+		}
+		return Kept
 }
 
 ; Verbose detail — setter calls, state snapshots, per-keystroke events.
 ; Short-circuits on the cached flag so disabled DEBUG collapses to a
 ; single boolean test, no Format / FileAppend cost on the hot path.
 LoggerDebug(Tag, Msg, Args*) {
-    global _LOGGER_DEBUG_ENABLED
-    if !_LOGGER_DEBUG_ENABLED {
-        return
-    }
-    _LoggerEmit("DEBUG", Tag, Msg, Args*)
+		global _LOGGER_DEBUG_ENABLED
+		if !_LOGGER_DEBUG_ENABLED {
+				return
+		}
+		_LoggerEmit("DEBUG", Tag, Msg, Args*)
 }
 
 ; Cheap predicate for hot-path call sites (per-keystroke dispatch) that want to
@@ -565,72 +565,72 @@ LoggerDebug(Tag, Msg, Args*) {
 ; but the call + arg-array build still costs something per keystroke; gating at
 ; the call site removes even that. Mirrors the macOS Logger.is_enabled(DEBUG).
 LoggerIsDebugEnabled() {
-    global _LOGGER_DEBUG_ENABLED
-    return _LOGGER_DEBUG_ENABLED
+		global _LOGGER_DEBUG_ENABLED
+		return _LOGGER_DEBUG_ENABLED
 }
 
 ; Start of a routine internal operation (debug granularity). Pair with Done.
 LoggerTrace(Tag, Msg, Args*) {
-    global _LOGGER_DEBUG_ENABLED
-    if !_LOGGER_DEBUG_ENABLED {
-        return
-    }
-    _LoggerEmit("TRACE", Tag, Msg, Args*)
+		global _LOGGER_DEBUG_ENABLED
+		if !_LOGGER_DEBUG_ENABLED {
+				return
+		}
+		_LoggerEmit("TRACE", Tag, Msg, Args*)
 }
 
 ; Successful end of a routine internal operation. Pair with Trace.
 LoggerDone(Tag, Msg, Args*) {
-    global _LOGGER_DEBUG_ENABLED
-    if !_LOGGER_DEBUG_ENABLED {
-        return
-    }
-    _LoggerEmit("DONE", Tag, Msg, Args*)
+		global _LOGGER_DEBUG_ENABLED
+		if !_LOGGER_DEBUG_ENABLED {
+				return
+		}
+		_LoggerEmit("DONE", Tag, Msg, Args*)
 }
 
 ; General status worth knowing — config loaded, feature toggled, model changed.
 LoggerInfo(Tag, Msg, Args*) {
-    global _LOGGER_INFO_ENABLED
-    if !_LOGGER_INFO_ENABLED {
-        return
-    }
-    _LoggerEmit("INFO", Tag, Msg, Args*)
+		global _LOGGER_INFO_ENABLED
+		if !_LOGGER_INFO_ENABLED {
+				return
+		}
+		_LoggerEmit("INFO", Tag, Msg, Args*)
 }
 
 ; Start of a significant action (init, HTTP request, user-triggered op).
 ; Pair with Success — a missing Success in the logs flags a silent failure.
 LoggerStart(Tag, Msg, Args*) {
-    global _LOGGER_INFO_ENABLED
-    if !_LOGGER_INFO_ENABLED {
-        return
-    }
-    _LoggerEmit("START", Tag, Msg, Args*)
+		global _LOGGER_INFO_ENABLED
+		if !_LOGGER_INFO_ENABLED {
+				return
+		}
+		_LoggerEmit("START", Tag, Msg, Args*)
 }
 
 ; Successful completion of a significant action. Pair with Start.
 LoggerSuccess(Tag, Msg, Args*) {
-    global _LOGGER_INFO_ENABLED
-    if !_LOGGER_INFO_ENABLED {
-        return
-    }
-    _LoggerEmit("SUCCESS", Tag, Msg, Args*)
+		global _LOGGER_INFO_ENABLED
+		if !_LOGGER_INFO_ENABLED {
+				return
+		}
+		_LoggerEmit("SUCCESS", Tag, Msg, Args*)
 }
 
 ; Unexpected condition the code can recover from; must be investigated.
 LoggerWarn(Tag, Msg, Args*) {
-    global _LOGGER_WARN_ENABLED
-    if !_LOGGER_WARN_ENABLED {
-        return
-    }
-    _LoggerEmit("WARNING", Tag, Msg, Args*)
+		global _LOGGER_WARN_ENABLED
+		if !_LOGGER_WARN_ENABLED {
+				return
+		}
+		_LoggerEmit("WARNING", Tag, Msg, Args*)
 }
 
 ; Unrecoverable failure; execution should stop or degrade gracefully.
 LoggerError(Tag, Msg, Args*) {
-    global _LOGGER_ERROR_ENABLED
-    if !_LOGGER_ERROR_ENABLED {
-        return
-    }
-    _LoggerEmit("ERROR", Tag, Msg, Args*)
+		global _LOGGER_ERROR_ENABLED
+		if !_LOGGER_ERROR_ENABLED {
+				return
+		}
+		_LoggerEmit("ERROR", Tag, Msg, Args*)
 }
 
 ; Registers a callable that receives every formatted log line (as a string).
@@ -650,26 +650,26 @@ LoggerClearTestSink() {
 ; Return a snapshot of the in-memory ring buffer in chronological order, so
 ; the most recent line is last. Useful for a "Dump recent logs" menu entry.
 LoggerRingBufferSnapshot() {
-    global LOGGER_RING_BUFFER, LOGGER_RING_BUFFER_SIZE, LOGGER_RING_CURSOR
-    if LOGGER_RING_BUFFER.Length == 0 {
-        return []
-    }
-    if LOGGER_RING_BUFFER.Length < LOGGER_RING_BUFFER_SIZE {
-        ; Buffer not yet full — entries are already in order.
-        Snapshot := []
-        for _, Line in LOGGER_RING_BUFFER {
-            Snapshot.Push(Line)
-        }
-        return Snapshot
-    }
-    ; Buffer is full and wrapped — read from cursor (oldest) to wrap-around.
-    Snapshot := []
-    Idx := LOGGER_RING_CURSOR
-    loop LOGGER_RING_BUFFER_SIZE {
-        Idx := Mod(Idx, LOGGER_RING_BUFFER_SIZE) + 1
-        Snapshot.Push(LOGGER_RING_BUFFER[Idx])
-    }
-    return Snapshot
+		global LOGGER_RING_BUFFER, LOGGER_RING_BUFFER_SIZE, LOGGER_RING_CURSOR
+		if LOGGER_RING_BUFFER.Length == 0 {
+				return []
+		}
+		if LOGGER_RING_BUFFER.Length < LOGGER_RING_BUFFER_SIZE {
+				; Buffer not yet full — entries are already in order.
+				Snapshot := []
+				for _, Line in LOGGER_RING_BUFFER {
+						Snapshot.Push(Line)
+				}
+				return Snapshot
+		}
+		; Buffer is full and wrapped — read from cursor (oldest) to wrap-around.
+		Snapshot := []
+		Idx := LOGGER_RING_CURSOR
+		loop LOGGER_RING_BUFFER_SIZE {
+				Idx := Mod(Idx, LOGGER_RING_BUFFER_SIZE) + 1
+				Snapshot.Push(LOGGER_RING_BUFFER[Idx])
+		}
+		return Snapshot
 }
 
 
@@ -685,69 +685,69 @@ LoggerRingBufferSnapshot() {
 ; Format and emit a log line if the current level allows it. Best-effort —
 ; never raises so a logging failure cannot break the driver. Hot-path-safe.
 _LoggerEmit(Level, Tag, Msg, Args*) {
-    global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_SEVERITY, _LOGGER_PENDING
-    global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
-    ; Safety net for unknown levels — the public wrappers already short-circuit
-    ; on the per-level fast-path flags, so a severity comparison here would be
-    ; a redundant second filter. Only guard against a completely unrecognised Level.
-    if !LOGGER_SEVERITY.Has(Level) {
-        return
-    }
-    Body := Msg
-    if Args.Length > 0 {
-        try {
-            Body := Format(Msg, Args*)
-        } catch as FormatErr {
-            ; A bad format string must not break the driver, but falling back to
-            ; the raw template SILENTLY is the worst of both worlds: the line
-            ; still looks like a log entry while carrying none of its
-            ; information — every placeholder intact, every value gone — and
-            ; nothing anywhere records that the substitution failed (§5.3).
-            ; Recursing into the logger to report it risks a loop on the hot
-            ; path, so the evidence rides on the emitted line itself.
-            Body := Msg . "  [!! log format failed: " . FormatErr.Message
-                . " — " . Args.Length . " arg(s) not substituted]"
-        }
-    }
-    ; FormatTime of the full date string is the dominant per-emit cost and is
-    ; identical for every line within the same second. On the DEBUG path it runs
-    ; several times per keystroke (the prefix-watcher hot path), which is the
-    ; source of the « debug mode lag ». Cache the second-resolution part keyed on
-    ; A_Now and only recompute the millisecond suffix.
-    static _StampSecKey := ""
-    static _StampSecStr := ""
-    SecKey := A_Now
-    if (SecKey != _StampSecKey) {
-        _StampSecKey := SecKey
-        _StampSecStr := FormatTime(SecKey, "yyyy-MM-dd HH:mm:ss")
-    }
-    Stamp := _StampSecStr . ":" . Format("{:03}", A_MSec)
-    ; Timestamp-independent message identity — the dedup key. Matches the macOS
-    ; logger, which dedups on its "[LEVEL] [module] body" line.
-    MsgLine := Format("[{1}] [{2}] {3}", Level, Tag, Body)
-    Line := Stamp . " " . MsgLine
+		global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_SEVERITY, _LOGGER_PENDING
+		global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
+		; Safety net for unknown levels — the public wrappers already short-circuit
+		; on the per-level fast-path flags, so a severity comparison here would be
+		; a redundant second filter. Only guard against a completely unrecognised Level.
+		if !LOGGER_SEVERITY.Has(Level) {
+				return
+		}
+		Body := Msg
+		if Args.Length > 0 {
+				try {
+						Body := Format(Msg, Args*)
+				} catch as FormatErr {
+						; A bad format string must not break the driver, but falling back to
+						; the raw template SILENTLY is the worst of both worlds: the line
+						; still looks like a log entry while carrying none of its
+						; information — every placeholder intact, every value gone — and
+						; nothing anywhere records that the substitution failed (§5.3).
+						; Recursing into the logger to report it risks a loop on the hot
+						; path, so the evidence rides on the emitted line itself.
+						Body := Msg . "  [!! log format failed: " . FormatErr.Message
+								. " — " . Args.Length . " arg(s) not substituted]"
+				}
+		}
+		; FormatTime of the full date string is the dominant per-emit cost and is
+		; identical for every line within the same second. On the DEBUG path it runs
+		; several times per keystroke (the prefix-watcher hot path), which is the
+		; source of the « debug mode lag ». Cache the second-resolution part keyed on
+		; A_Now and only recompute the millisecond suffix.
+		static _StampSecKey := ""
+		static _StampSecStr := ""
+		SecKey := A_Now
+		if (SecKey != _StampSecKey) {
+				_StampSecKey := SecKey
+				_StampSecStr := FormatTime(SecKey, "yyyy-MM-dd HH:mm:ss")
+		}
+		Stamp := _StampSecStr . ":" . Format("{:03}", A_MSec)
+		; Timestamp-independent message identity — the dedup key. Matches the macOS
+		; logger, which dedups on its "[LEVEL] [module] body" line.
+		MsgLine := Format("[{1}] [{2}] {3}", Level, Tag, Body)
+		Line := Stamp . " " . MsgLine
 
-    ; ── Deduplication ──
-    ; Suppress consecutive identical lines (any level) within a 5000 ms window so a
-    ; recurring line is de-bounced, not permanently silenced (logger-dedup-tick): a
-    ; streak that outlives the window re-surfaces. When the streak ends a single
-    ; "N identical lines suppressed" summary is emitted. Mirrors the macOS driver.
-    if (MsgLine == _LOGGER_DEDUP_KEY and ((A_TickCount - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < 5000) {
-        _LOGGER_DEDUP_COUNT += 1
-        return
-    }
-    if (_LOGGER_DEDUP_COUNT > 0) {
-        _LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)
-    }
-    _LOGGER_DEDUP_KEY := MsgLine
-    _LOGGER_DEDUP_LEVEL := Level
-    _LOGGER_DEDUP_COUNT := 0
-    _LastErrTime := A_TickCount
+		; ── Deduplication ──
+		; Suppress consecutive identical lines (any level) within a 5000 ms window so a
+		; recurring line is de-bounced, not permanently silenced (logger-dedup-tick): a
+		; streak that outlives the window re-surfaces. When the streak ends a single
+		; "N identical lines suppressed" summary is emitted. Mirrors the macOS driver.
+		if (MsgLine == _LOGGER_DEDUP_KEY and ((A_TickCount - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < 5000) {
+				_LOGGER_DEDUP_COUNT += 1
+				return
+		}
+		if (_LOGGER_DEDUP_COUNT > 0) {
+				_LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)
+		}
+		_LOGGER_DEDUP_KEY := MsgLine
+		_LOGGER_DEDUP_LEVEL := Level
+		_LOGGER_DEDUP_COUNT := 0
+		_LastErrTime := A_TickCount
 
-    _LoggerPushRing(Line)
-    if _LOGGER_TEST_SINK != 0 {
-        try _LOGGER_TEST_SINK(Line)
-    }
+		_LoggerPushRing(Line)
+		if _LOGGER_TEST_SINK != 0 {
+				try _LOGGER_TEST_SINK(Line)
+		}
 	if (Level == "WARNING") {
 		if IsSet(HealthCheck_RecordWarn)
 			HealthCheck_RecordWarn()
@@ -810,22 +810,22 @@ _LoggerEmitDedupSummary(Level, Count) {
 ; whose date does not match today. Sub-files are ephemeral (today only) — they
 ; are a filtered view of the main unified log, not an independent archive.
 _LoggerInitSubFiles(LogDir) {
-    global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS
-    Today := FormatTime(, "yyyy-MM-dd")
-    _LOGGER_SUB_PATHS := Map()
-    for _, Entry in LOGGER_SUB_FILES {
-        SubPath := LogDir . Entry["name"]
-        _LOGGER_SUB_PATHS[Entry["name"]] := SubPath
-        ; Delete if the file exists but belongs to a previous day
-        if FileExist(SubPath) {
-            FileDate := ""
-            try FileDate := FileGetTime(SubPath, "M")  ; last-modified YYYYMMDDHHMMSS
-            FileDate := SubStr(FileDate, 1, 4) . "-" . SubStr(FileDate, 5, 2) . "-" . SubStr(FileDate, 7, 2)
-            if (FileDate != Today) {
-                try FileDelete(SubPath)
-            }
-        }
-    }
+		global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS
+		Today := FormatTime(, "yyyy-MM-dd")
+		_LOGGER_SUB_PATHS := Map()
+		for _, Entry in LOGGER_SUB_FILES {
+				SubPath := LogDir . Entry["name"]
+				_LOGGER_SUB_PATHS[Entry["name"]] := SubPath
+				; Delete if the file exists but belongs to a previous day
+				if FileExist(SubPath) {
+						FileDate := ""
+						try FileDate := FileGetTime(SubPath, "M")  ; last-modified YYYYMMDDHHMMSS
+						FileDate := SubStr(FileDate, 1, 4) . "-" . SubStr(FileDate, 5, 2) . "-" . SubStr(FileDate, 7, 2)
+						if (FileDate != Today) {
+								try FileDelete(SubPath)
+						}
+				}
+		}
 }
 
 ; Restore one failed sub-file snapshot ahead of entries emitted while its I/O
@@ -833,25 +833,25 @@ _LoggerInitSubFiles(LogDir) {
 ; disposable view: losing it precisely when disk access fails hides recovery
 ; evidence from the person investigating the incident.
 _LoggerRequeueSub(Name, Lines) {
-    global _LOGGER_SUB_PENDING
-    if (Lines.Length == 0)
-            return
-    local _crit := Critical("On")
-    try {
-            Current := _LOGGER_SUB_PENDING.Has(Name) ? _LOGGER_SUB_PENDING[Name] : []
-            Restored := []
-            for Index, Line in Lines
-                    Restored.Push(Line)
-            for Index, Line in Current
-                    Restored.Push(Line)
-            ; _LOGGER_SUB_PENDING is a Map OF queues, one per sub-file, so the cap
-            ; has to apply per queue — capping the Map would bound the number of
-            ; sub-files, which is fixed anyway, and not their contents.
-            _LoggerTrimQueueToCap(Restored)
-            _LOGGER_SUB_PENDING[Name] := Restored
-    } finally {
-            Critical(_crit)
-    }
+		global _LOGGER_SUB_PENDING
+		if (Lines.Length == 0)
+						return
+		local _crit := Critical("On")
+		try {
+						Current := _LOGGER_SUB_PENDING.Has(Name) ? _LOGGER_SUB_PENDING[Name] : []
+						Restored := []
+						for Index, Line in Lines
+										Restored.Push(Line)
+						for Index, Line in Current
+										Restored.Push(Line)
+						; _LOGGER_SUB_PENDING is a Map OF queues, one per sub-file, so the cap
+						; has to apply per queue — capping the Map would bound the number of
+						; sub-files, which is fixed anyway, and not their contents.
+						_LoggerTrimQueueToCap(Restored)
+						_LOGGER_SUB_PENDING[Name] := Restored
+		} finally {
+						Critical(_crit)
+		}
 }
 
 ; Appends Line to every sub-file whose tag list contains a pattern that is a
@@ -859,21 +859,21 @@ _LoggerRequeueSub(Name, Lines) {
 ; "[LayoutShift]" matched against the full formatted log line — exact tag
 ; equality would never match because the line already wraps the tag in brackets.
 _LoggerFanOut(Tag, Line) {
-    global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS, _LOGGER_SUB_PENDING
-    if !IsSet(_LOGGER_SUB_PATHS) or _LOGGER_SUB_PATHS.Count == 0 {
-        return
-    }
-    for _, Entry in LOGGER_SUB_FILES {
-        for _, Pat in Entry["tags"] {
-            if InStr(Line, Pat, true) {   ; case-sensitive substring vs full line
-                Name := Entry["name"]
-                if !_LOGGER_SUB_PENDING.Has(Name)
-                    _LOGGER_SUB_PENDING[Name] := []
-                _LOGGER_SUB_PENDING[Name].Push(Line)
-                break
-            }
-        }
-    }
+		global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS, _LOGGER_SUB_PENDING
+		if !IsSet(_LOGGER_SUB_PATHS) or _LOGGER_SUB_PATHS.Count == 0 {
+				return
+		}
+		for _, Entry in LOGGER_SUB_FILES {
+				for _, Pat in Entry["tags"] {
+						if InStr(Line, Pat, true) {   ; case-sensitive substring vs full line
+								Name := Entry["name"]
+								if !_LOGGER_SUB_PENDING.Has(Name)
+										_LOGGER_SUB_PENDING[Name] := []
+								_LOGGER_SUB_PENDING[Name].Push(Line)
+								break
+						}
+				}
+		}
 }
 
 ; Parses _shared/modules/logger/sub_files.toml and populates LOGGER_SUB_FILES with the
@@ -890,188 +890,188 @@ _LoggerFanOut(Tag, Line) {
 ; The file is NOT the general-purpose TOML parser because [[array_of_tables]] is
 ; outside the scope of toml_helpers.ahk — this dedicated reader is intentionally minimal.
 _LoggerLoadSubFilesToml(ScriptDir) {
-    global LOGGER_SUB_FILES, LOGGER_SUB_FILES_FALLBACK, _SharedDir
-    ; Prefer the canonical _SharedDir resolved at boot by ErgoptiPlus.ahk; fall back
-    ; to the corrected one-level relative path (windows/ → ergopti_plus/_shared/).
-    if (IsSet(_SharedDir) and _SharedDir != "")
-        TomlPath := _SharedDir . "\modules\logger\sub_files.toml"
-    else
-        TomlPath := ScriptDir . "..\_shared\modules\logger\sub_files.toml"
-    if !FileExist(TomlPath) {
-        LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
-        return
-    }
-    Raw := ""
-    try {
-        Raw := FileRead(TomlPath, "UTF-8")
-    } catch {
-        LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
-        return
-    }
-    if Raw = "" {
-        LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
-        return
-    }
+		global LOGGER_SUB_FILES, LOGGER_SUB_FILES_FALLBACK, _SharedDir
+		; Prefer the canonical _SharedDir resolved at boot by ErgoptiPlus.ahk; fall back
+		; to the corrected one-level relative path (windows/ → ergopti_plus/_shared/).
+		if (IsSet(_SharedDir) and _SharedDir != "")
+				TomlPath := _SharedDir . "\modules\logger\sub_files.toml"
+		else
+				TomlPath := ScriptDir . "..\_shared\modules\logger\sub_files.toml"
+		if !FileExist(TomlPath) {
+				LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
+				return
+		}
+		Raw := ""
+		try {
+				Raw := FileRead(TomlPath, "UTF-8")
+		} catch {
+				LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
+				return
+		}
+		if Raw = "" {
+				LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
+				return
+		}
 
-    ; Collapse CRLF and LF to a single line-break token for uniform processing
-    Raw := StrReplace(Raw, "`r`n", "`n")
-    Raw := StrReplace(Raw, "`r", "`n")
+		; Collapse CRLF and LF to a single line-break token for uniform processing
+		Raw := StrReplace(Raw, "`r`n", "`n")
+		Raw := StrReplace(Raw, "`r", "`n")
 
-    Result := []
-    CurrentEntry := ""       ; "name" string while inside a [[sub_files]] block
-    CurrentPlatforms := []   ; platforms array for the current entry
-    CurrentPatterns  := []   ; patterns array for the current entry
-    InPatternsArray := false ; true while accumulating a multi-line array value
-    InPlatformsArray := false
+		Result := []
+		CurrentEntry := ""       ; "name" string while inside a [[sub_files]] block
+		CurrentPlatforms := []   ; platforms array for the current entry
+		CurrentPatterns  := []   ; patterns array for the current entry
+		InPatternsArray := false ; true while accumulating a multi-line array value
+		InPlatformsArray := false
 
-    _FlushEntry() {
-        if CurrentEntry = "" {
-            return
-        }
-        ; Only include entries that list "ahk" in their platforms array
-        IsAhk := false
-        for _, P in CurrentPlatforms {
-            if (P = "ahk") {
-                IsAhk := true
-                break
-            }
-        }
-        if IsAhk and CurrentPatterns.Length > 0 {
-            Result.Push(Map(
-                "name", "ErgoptiPlus_" . CurrentEntry . ".log",
-                "tags", CurrentPatterns
-            ))
-        }
-        CurrentEntry := ""
-        CurrentPlatforms := []
-        CurrentPatterns  := []
-        InPatternsArray  := false
-        InPlatformsArray := false
-    }
+		_FlushEntry() {
+				if CurrentEntry = "" {
+						return
+				}
+				; Only include entries that list "ahk" in their platforms array
+				IsAhk := false
+				for _, P in CurrentPlatforms {
+						if (P = "ahk") {
+								IsAhk := true
+								break
+						}
+				}
+				if IsAhk and CurrentPatterns.Length > 0 {
+						Result.Push(Map(
+								"name", "ErgoptiPlus_" . CurrentEntry . ".log",
+								"tags", CurrentPatterns
+						))
+				}
+				CurrentEntry := ""
+				CurrentPlatforms := []
+				CurrentPatterns  := []
+				InPatternsArray  := false
+				InPlatformsArray := false
+		}
 
-    ; Extracts all quoted strings from an array fragment like ["foo", "bar"]
-    _ExtractStrings(Fragment) {
-        Strings := []
-        Pos := 1
-        loop {
-            if !RegExMatch(Fragment, '"([^"\\]*(?:\\.[^"\\]*)*)"', &M, Pos) {
-                break
-            }
-            Strings.Push(M[1])
-            Pos := M.Pos + M.Len
-        }
-        return Strings
-    }
+		; Extracts all quoted strings from an array fragment like ["foo", "bar"]
+		_ExtractStrings(Fragment) {
+				Strings := []
+				Pos := 1
+				loop {
+						if !RegExMatch(Fragment, '"([^"\\]*(?:\\.[^"\\]*)*)"', &M, Pos) {
+								break
+						}
+						Strings.Push(M[1])
+						Pos := M.Pos + M.Len
+				}
+				return Strings
+		}
 
-    ; True when a fragment closes its TOML array. Only a "]" OUTSIDE a quoted
-    ; value ends the array: this file's own authoring rules prefer tag-shaped
-    ; patterns ("[LayoutCaps]"), every one of which carries a "]" inside its own
-    ; string. Testing the raw line therefore closed a multi-line array on its
-    ; FIRST value and silently discarded every pattern after it - 1309 of 1867
-    ; routable production lines never reached their sub-file, and one sub-file
-    ; was structurally guaranteed to stay empty forever
-    ; (logger-subfiles-multiline-array-truncated).
-    _ArrayIsClosed(Fragment) {
-        return InStr(RegExReplace(Fragment, '"([^"\\]*(?:\\.[^"\\]*)*)"', ""), "]") > 0
-    }
+		; True when a fragment closes its TOML array. Only a "]" OUTSIDE a quoted
+		; value ends the array: this file's own authoring rules prefer tag-shaped
+		; patterns ("[LayoutCaps]"), every one of which carries a "]" inside its own
+		; string. Testing the raw line therefore closed a multi-line array on its
+		; FIRST value and silently discarded every pattern after it - 1309 of 1867
+		; routable production lines never reached their sub-file, and one sub-file
+		; was structurally guaranteed to stay empty forever
+		; (logger-subfiles-multiline-array-truncated).
+		_ArrayIsClosed(Fragment) {
+				return InStr(RegExReplace(Fragment, '"([^"\\]*(?:\\.[^"\\]*)*)"', ""), "]") > 0
+		}
 
-    Lines := StrSplit(Raw, "`n")
-    for _, Line in Lines {
-        ; Strip inline comments and trim
-        Line := Trim(RegExReplace(Line, "\s*#.*$", ""))
-        if Line = "" {
-            continue
-        }
-        if (Line = "[[sub_files]]") {
-            _FlushEntry()
-            continue
-        }
-        ; Accumulate multi-line arrays
-        if InPatternsArray {
-            Extracted := _ExtractStrings(Line)
-            for _, S in Extracted {
-                CurrentPatterns.Push(S)
-            }
-            if _ArrayIsClosed(Line) {
-                InPatternsArray := false
-            }
-            continue
-        }
-        if InPlatformsArray {
-            Extracted := _ExtractStrings(Line)
-            for _, S in Extracted {
-                CurrentPlatforms.Push(S)
-            }
-            if _ArrayIsClosed(Line) {
-                InPlatformsArray := false
-            }
-            continue
-        }
-        ; Key-value lines
-        if RegExMatch(Line, '^name\s*=\s*"([^"]*)"', &M) {
-            CurrentEntry := M[1]
-        } else if RegExMatch(Line, '^platforms\s*=\s*\[(.*)$', &M) {
-            Fragment := M[1]
-            Extracted := _ExtractStrings(Fragment)
-            for _, S in Extracted {
-                CurrentPlatforms.Push(S)
-            }
-            if !_ArrayIsClosed(Fragment) {
-                InPlatformsArray := true
-            }
-        } else if RegExMatch(Line, '^patterns\s*=\s*\[(.*)$', &M) {
-            Fragment := M[1]
-            Extracted := _ExtractStrings(Fragment)
-            for _, S in Extracted {
-                CurrentPatterns.Push(S)
-            }
-            if !_ArrayIsClosed(Fragment) {
-                InPatternsArray := true
-            }
-        }
-    }
-    _FlushEntry()
+		Lines := StrSplit(Raw, "`n")
+		for _, Line in Lines {
+				; Strip inline comments and trim
+				Line := Trim(RegExReplace(Line, "\s*#.*$", ""))
+				if Line = "" {
+						continue
+				}
+				if (Line = "[[sub_files]]") {
+						_FlushEntry()
+						continue
+				}
+				; Accumulate multi-line arrays
+				if InPatternsArray {
+						Extracted := _ExtractStrings(Line)
+						for _, S in Extracted {
+								CurrentPatterns.Push(S)
+						}
+						if _ArrayIsClosed(Line) {
+								InPatternsArray := false
+						}
+						continue
+				}
+				if InPlatformsArray {
+						Extracted := _ExtractStrings(Line)
+						for _, S in Extracted {
+								CurrentPlatforms.Push(S)
+						}
+						if _ArrayIsClosed(Line) {
+								InPlatformsArray := false
+						}
+						continue
+				}
+				; Key-value lines
+				if RegExMatch(Line, '^name\s*=\s*"([^"]*)"', &M) {
+						CurrentEntry := M[1]
+				} else if RegExMatch(Line, '^platforms\s*=\s*\[(.*)$', &M) {
+						Fragment := M[1]
+						Extracted := _ExtractStrings(Fragment)
+						for _, S in Extracted {
+								CurrentPlatforms.Push(S)
+						}
+						if !_ArrayIsClosed(Fragment) {
+								InPlatformsArray := true
+						}
+				} else if RegExMatch(Line, '^patterns\s*=\s*\[(.*)$', &M) {
+						Fragment := M[1]
+						Extracted := _ExtractStrings(Fragment)
+						for _, S in Extracted {
+								CurrentPatterns.Push(S)
+						}
+						if !_ArrayIsClosed(Fragment) {
+								InPatternsArray := true
+						}
+				}
+		}
+		_FlushEntry()
 
-    if Result.Length > 0 {
-        LOGGER_SUB_FILES := Result
-    } else {
-        ; Parsed but no valid entries — fall back to avoid an empty fan-out table
-        LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
-    }
+		if Result.Length > 0 {
+				LOGGER_SUB_FILES := Result
+		} else {
+				; Parsed but no valid entries — fall back to avoid an empty fan-out table
+				LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
+		}
 }
 
 ; Removes ErgoptiPlus_*.log (and ErgoptiPlus_errors_*.log) files in LogDir whose
 ; date prefix is older than MaxAgeDays. Best-effort: errors are swallowed so a
 ; permission issue cannot break logger init.
 _LoggerPurgeOldLogs(LogDir, MaxAgeDays) {
-    if !DirExist(LogDir) {
-        return
-    }
-    CutoffStamp := DateAdd(A_Now, -MaxAgeDays, "Days")
-    CutoffDate := SubStr(CutoffStamp, 1, 8)  ; YYYYMMDD
-    try {
-        loop files, LogDir . "ErgoptiPlus_*.log" {
-            ; Supports both unified (ErgoptiPlus_YYYY-MM-DD.log) and the dedicated
-            ; errors file (ErgoptiPlus_errors_YYYY-MM-DD.log).
-            if RegExMatch(A_LoopFileName, "^ErgoptiPlus(?:_errors)?_(\d{4})-(\d{2})-(\d{2})\.log$",
-                &Match) {
-                FileDate := Match[1] . Match[2] . Match[3]
-                if (FileDate < CutoffDate) {
-                    try FileDelete(A_LoopFileFullPath)
-                }
-            }
-        }
-    }
+		if !DirExist(LogDir) {
+				return
+		}
+		CutoffStamp := DateAdd(A_Now, -MaxAgeDays, "Days")
+		CutoffDate := SubStr(CutoffStamp, 1, 8)  ; YYYYMMDD
+		try {
+				loop files, LogDir . "ErgoptiPlus_*.log" {
+						; Supports both unified (ErgoptiPlus_YYYY-MM-DD.log) and the dedicated
+						; errors file (ErgoptiPlus_errors_YYYY-MM-DD.log).
+						if RegExMatch(A_LoopFileName, "^ErgoptiPlus(?:_errors)?_(\d{4})-(\d{2})-(\d{2})\.log$",
+								&Match) {
+								FileDate := Match[1] . Match[2] . Match[3]
+								if (FileDate < CutoffDate) {
+										try FileDelete(A_LoopFileFullPath)
+								}
+						}
+				}
+		}
 }
 
 ; Append to the in-memory ring buffer with O(1) overwrite once full.
 _LoggerPushRing(Line) {
-    global LOGGER_RING_BUFFER, LOGGER_RING_BUFFER_SIZE, LOGGER_RING_CURSOR
-    if LOGGER_RING_BUFFER.Length < LOGGER_RING_BUFFER_SIZE {
-        LOGGER_RING_BUFFER.Push(Line)
-        LOGGER_RING_CURSOR := LOGGER_RING_BUFFER.Length
-        return
-    }
-    LOGGER_RING_CURSOR := Mod(LOGGER_RING_CURSOR, LOGGER_RING_BUFFER_SIZE) + 1
-    LOGGER_RING_BUFFER[LOGGER_RING_CURSOR] := Line
+		global LOGGER_RING_BUFFER, LOGGER_RING_BUFFER_SIZE, LOGGER_RING_CURSOR
+		if LOGGER_RING_BUFFER.Length < LOGGER_RING_BUFFER_SIZE {
+				LOGGER_RING_BUFFER.Push(Line)
+				LOGGER_RING_CURSOR := LOGGER_RING_BUFFER.Length
+				return
+		}
+		LOGGER_RING_CURSOR := Mod(LOGGER_RING_CURSOR, LOGGER_RING_BUFFER_SIZE) + 1
+		LOGGER_RING_BUFFER[LOGGER_RING_CURSOR] := Line
 }

@@ -99,15 +99,15 @@ global _VK_RMENU := 0xA5
 ; fails. Used by both DetectAltGrKanaRemap and the layout-change watcher in
 ; ErgoptiPlus.ahk so both observe the same value.
 GetForegroundKeyboardLayout() {
-    HWND := DllCall("GetForegroundWindow", "Ptr")
-    if (HWND = 0) {
-        return 0
-    }
-    TID := DllCall("GetWindowThreadProcessId", "Ptr", HWND, "Ptr", 0, "UInt")
-    if (TID = 0) {
-        return 0
-    }
-    return DllCall("GetKeyboardLayout", "UInt", TID, "Ptr")
+		HWND := DllCall("GetForegroundWindow", "Ptr")
+		if (HWND = 0) {
+				return 0
+		}
+		TID := DllCall("GetWindowThreadProcessId", "Ptr", HWND, "Ptr", 0, "UInt")
+		if (TID = 0) {
+				return 0
+		}
+		return DllCall("GetKeyboardLayout", "UInt", TID, "Ptr")
 }
 
 ; Probe the active layout in REVERSE direction: does VK_RMENU have a scancode?
@@ -123,46 +123,46 @@ GetForegroundKeyboardLayout() {
 ; inconsistently across bépo HKLs (returning VK_LMENU or 0 instead of
 ; VK_RMENU), wrongly flagging bépo as a Kana layout.
 DetectAltGrKanaRemap() {
-    HKL := GetForegroundKeyboardLayout()
-    if (HKL = 0) {
-        HKL := DllCall("GetKeyboardLayout", "UInt", 0, "Ptr")
-    }
-    SC := DllCall("MapVirtualKeyExW",
-        "UInt", _VK_RMENU,
-        "UInt", _MAPVK_VK_TO_VSC_EX,
-        "Ptr", HKL,
-        "UInt")
-    return (SC == 0)
+		HKL := GetForegroundKeyboardLayout()
+		if (HKL = 0) {
+				HKL := DllCall("GetKeyboardLayout", "UInt", 0, "Ptr")
+		}
+		SC := DllCall("MapVirtualKeyExW",
+				"UInt", _VK_RMENU,
+				"UInt", _MAPVK_VK_TO_VSC_EX,
+				"Ptr", HKL,
+				"UInt")
+		return (SC == 0)
 }
 
 ; Read the manual TOML override from ScriptInformation. Returns "" when the
 ; key is missing or set to the sentinel "auto"; "true" / "false" when forced.
 _ReadKanaTomlOverride() {
-    if !IsSet(ScriptInformation) or !ScriptInformation.Has("AltGrIsKanaRemap") {
-        return ""
-    }
-    Val := ScriptInformation["AltGrIsKanaRemap"]
-    if (Val == true or Val == 1 or Val == "1" or Val == "true" or Val == "True") {
-        return "true"
-    }
-    if (Val == false or Val == 0 or Val == "0" or Val == "false" or Val == "False") {
-        return "false"
-    }
-    return ""  ; "auto" or unrecognised → defer to detection
+		if !IsSet(ScriptInformation) or !ScriptInformation.Has("AltGrIsKanaRemap") {
+				return ""
+		}
+		Val := ScriptInformation["AltGrIsKanaRemap"]
+		if (Val == true or Val == 1 or Val == "1" or Val == "true" or Val == "True") {
+				return "true"
+		}
+		if (Val == false or Val == 0 or Val == "0" or Val == "false" or Val == "False") {
+				return "false"
+		}
+		return ""  ; "auto" or unrecognised → defer to detection
 }
 
 HotstringEngineInit() {
-    global _ALTGR_KANA_FIXUP
-    Override := _ReadKanaTomlOverride()
-    if (Override == "true") {
-        _ALTGR_KANA_FIXUP := True
-        return
-    }
-    if (Override == "false") {
-        _ALTGR_KANA_FIXUP := False
-        return
-    }
-    _ALTGR_KANA_FIXUP := DetectAltGrKanaRemap()
+		global _ALTGR_KANA_FIXUP
+		Override := _ReadKanaTomlOverride()
+		if (Override == "true") {
+				_ALTGR_KANA_FIXUP := True
+				return
+		}
+		if (Override == "false") {
+				_ALTGR_KANA_FIXUP := False
+				return
+		}
+		_ALTGR_KANA_FIXUP := DetectAltGrKanaRemap()
 }
 
 

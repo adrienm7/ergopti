@@ -41,15 +41,15 @@
 ; ==================================
 
 CS_GetTomlPath() {
-    ; Driver-specific subfolder under the user's resolved config dir.
-    ; Auto-created here so callers can read/write straight away without
-    ; worrying about ENOENT on a fresh install.
-    global _ConfigDir
-    base := (IsSet(_ConfigDir) && _ConfigDir != "") ? _ConfigDir : A_ScriptDir . "\"
-    global _AhkSubDir
-    dir := base . _AhkSubDir
-    try DirCreate(dir)
-    return dir . "config.toml"
+		; Driver-specific subfolder under the user's resolved config dir.
+		; Auto-created here so callers can read/write straight away without
+		; worrying about ENOENT on a fresh install.
+		global _ConfigDir
+		base := (IsSet(_ConfigDir) && _ConfigDir != "") ? _ConfigDir : A_ScriptDir . "\"
+		global _AhkSubDir
+		dir := base . _AhkSubDir
+		try DirCreate(dir)
+		return dir . "config.toml"
 }
 
 ; The single section we own inside config.toml. Other sections
@@ -71,55 +71,55 @@ global CS_SECTION := "ahk.metrics"
 ; strings, integers, booleans (1/0), or Arrays of strings.
 ; Comments (lines starting with #) and blank lines are skipped.
 CS_Read() {
-    out := Map()
-    path := CS_GetTomlPath()
-    if !FileExist(path)
-        return out
-    content := ""
-    ReadFailed := false
-    try {
-        content := FileRead(path, "UTF-8")
-    } catch as Err {
-        ReadFailed := true
-        try LoggerError("ConfigShortcuts", "Cannot read '{1}': {2}. Metrics settings stay at their in-memory defaults, and persistence is blocked so those defaults cannot be written over the real file.", path, Err.Message)
-    }
-    if (ReadFailed) {
-        ; Latch the SAME sentinel SaveFullConfig already honours. This reader
-        ; feeds the metrics settings, and a swallowed read left them at their
-        ; in-memory DEFAULTS — indistinguishable from a user who never changed
-        ; them — which the next full save then wrote over the user's real
-        ; values. The file here is config.toml, so reusing the boot latch keeps
-        ; one owner for "the in-memory config is not the user's".
-        global _ConfigBootReadFailed
-        _ConfigBootReadFailed := true
-        return out
-    }
-    if (content = "")
-        return out
+		out := Map()
+		path := CS_GetTomlPath()
+		if !FileExist(path)
+				return out
+		content := ""
+		ReadFailed := false
+		try {
+				content := FileRead(path, "UTF-8")
+		} catch as Err {
+				ReadFailed := true
+				try LoggerError("ConfigShortcuts", "Cannot read '{1}': {2}. Metrics settings stay at their in-memory defaults, and persistence is blocked so those defaults cannot be written over the real file.", path, Err.Message)
+		}
+		if (ReadFailed) {
+				; Latch the SAME sentinel SaveFullConfig already honours. This reader
+				; feeds the metrics settings, and a swallowed read left them at their
+				; in-memory DEFAULTS — indistinguishable from a user who never changed
+				; them — which the next full save then wrote over the user's real
+				; values. The file here is config.toml, so reusing the boot latch keeps
+				; one owner for "the in-memory config is not the user's".
+				global _ConfigBootReadFailed
+				_ConfigBootReadFailed := true
+				return out
+		}
+		if (content = "")
+				return out
 
-    section := ""
-    loop parse, content, "`n", "`r" {
-        line := Trim(A_LoopField)
-        if (line = "" || SubStr(line, 1, 1) = "#")
-            continue
-        ; Section header: [name]
-        if (SubStr(line, 1, 1) = "[" && SubStr(line, -1) = "]") {
-            section := Trim(SubStr(line, 2, StrLen(line) - 2))
-            if !out.Has(section)
-                out[section] := Map()
-            continue
-        }
-        ; Key = value
-        eq := InStr(line, "=")
-        if !eq
-            continue
-        key := Trim(SubStr(line, 1, eq - 1))
-        val := Trim(SubStr(line, eq + 1))
-        if (section = "")
-            continue
-        out[section][key] := CS_CoerceValue(val)
-    }
-    return out
+		section := ""
+		loop parse, content, "`n", "`r" {
+				line := Trim(A_LoopField)
+				if (line = "" || SubStr(line, 1, 1) = "#")
+						continue
+				; Section header: [name]
+				if (SubStr(line, 1, 1) = "[" && SubStr(line, -1) = "]") {
+						section := Trim(SubStr(line, 2, StrLen(line) - 2))
+						if !out.Has(section)
+								out[section] := Map()
+						continue
+				}
+				; Key = value
+				eq := InStr(line, "=")
+				if !eq
+						continue
+				key := Trim(SubStr(line, 1, eq - 1))
+				val := Trim(SubStr(line, eq + 1))
+				if (section = "")
+						continue
+				out[section][key] := CS_CoerceValue(val)
+		}
+		return out
 }
 
 ; Truncate a value at the first '#' that sits OUTSIDE a quoted string, so an
@@ -129,82 +129,82 @@ CS_Read() {
 ; escaped quote is preserved. Without this, "false # x" fell through to the bare-
 ; string fallback and coerced to a TRUTHY string, inverting the user's opt-out.
 CS_StripInlineComment(s) {
-    in_str := false
-    escaped := false
-    loop parse, s {
-        c := A_LoopField
-        if escaped {
-            escaped := false
-        } else if (c = "\") {
-            escaped := true
-        } else if (c = '"') {
-            in_str := !in_str
-        } else if (!in_str && c = "#") {
-            return Trim(SubStr(s, 1, A_Index - 1))
-        }
-    }
-    return s
+		in_str := false
+		escaped := false
+		loop parse, s {
+				c := A_LoopField
+				if escaped {
+						escaped := false
+				} else if (c = "\") {
+						escaped := true
+				} else if (c = '"') {
+						in_str := !in_str
+				} else if (!in_str && c = "#") {
+						return Trim(SubStr(s, 1, A_Index - 1))
+				}
+		}
+		return s
 }
 
 CS_CoerceValue(raw) {
-    raw := Trim(raw)
-    ; Drop any inline comment first so `false # note` coerces to boolean false and
-    ; `[ "a" ] # note` is still recognised as an array (the trailing comment would
-    ; otherwise break the "]"-suffix check below and fall through to a bare string).
-    raw := Trim(CS_StripInlineComment(raw))
-    if (raw = "")
-        return ""
-    ; Booleans.
-    if (StrLower(raw) = "true")
-        return true
-    if (StrLower(raw) = "false")
-        return false
-    ; Quoted string.
-    if (SubStr(raw, 1, 1) = '"' && SubStr(raw, -1) = '"')
-        return CS_Unescape(SubStr(raw, 2, StrLen(raw) - 2))
-    ; Array of strings: [ "a", "b", ... ]
-    if (SubStr(raw, 1, 1) = "[" && SubStr(raw, -1) = "]") {
-        body := Trim(SubStr(raw, 2, StrLen(raw) - 2))
-        out := []
-        if (body = "")
-            return out
-        ; Split on commas that sit OUTSIDE a quoted string. Array elements may
-        ; legitimately contain commas inside quotes (title-based window filters)
-        ; or escaped quotes, so a naive split would corrupt them.
-        ;
-        ; The escape state is tracked from the RAW character stream via a
-        ; dedicated `escaped` flag — never from the accumulated `cur`, whose
-        ; last char is unreliable as a lookbehind (e.g. an escaped backslash
-        ; ``\\`` right before a closing quote would fool an accumulator probe
-        ; into treating the quote as escaped and never closing the string).
-        in_str := false
-        escaped := false
-        cur := ""
-        loop parse, body {
-            c := A_LoopField
-            if escaped {
-                ; Previous raw char was a backslash — this char is literal.
-                escaped := false
-            } else if (c = "\") {
-                escaped := true
-            } else if (c = '"') {
-                in_str := !in_str
-            } else if (!in_str && c = ",") {
-                out.Push(CS_CoerceElement(Trim(cur)))
-                cur := ""
-                continue
-            }
-            cur .= c
-        }
-        if (Trim(cur) != "")
-            out.Push(CS_CoerceElement(Trim(cur)))
-        return out
-    }
-    ; Integer.
-    if RegExMatch(raw, "^-?\d+$")
-        return Integer(raw)
-    ; Bare string fallback.
-    return raw
+		raw := Trim(raw)
+		; Drop any inline comment first so `false # note` coerces to boolean false and
+		; `[ "a" ] # note` is still recognised as an array (the trailing comment would
+		; otherwise break the "]"-suffix check below and fall through to a bare string).
+		raw := Trim(CS_StripInlineComment(raw))
+		if (raw = "")
+				return ""
+		; Booleans.
+		if (StrLower(raw) = "true")
+				return true
+		if (StrLower(raw) = "false")
+				return false
+		; Quoted string.
+		if (SubStr(raw, 1, 1) = '"' && SubStr(raw, -1) = '"')
+				return CS_Unescape(SubStr(raw, 2, StrLen(raw) - 2))
+		; Array of strings: [ "a", "b", ... ]
+		if (SubStr(raw, 1, 1) = "[" && SubStr(raw, -1) = "]") {
+				body := Trim(SubStr(raw, 2, StrLen(raw) - 2))
+				out := []
+				if (body = "")
+						return out
+				; Split on commas that sit OUTSIDE a quoted string. Array elements may
+				; legitimately contain commas inside quotes (title-based window filters)
+				; or escaped quotes, so a naive split would corrupt them.
+				;
+				; The escape state is tracked from the RAW character stream via a
+				; dedicated `escaped` flag — never from the accumulated `cur`, whose
+				; last char is unreliable as a lookbehind (e.g. an escaped backslash
+				; ``\\`` right before a closing quote would fool an accumulator probe
+				; into treating the quote as escaped and never closing the string).
+				in_str := false
+				escaped := false
+				cur := ""
+				loop parse, body {
+						c := A_LoopField
+						if escaped {
+								; Previous raw char was a backslash — this char is literal.
+								escaped := false
+						} else if (c = "\") {
+								escaped := true
+						} else if (c = '"') {
+								in_str := !in_str
+						} else if (!in_str && c = ",") {
+								out.Push(CS_CoerceElement(Trim(cur)))
+								cur := ""
+								continue
+						}
+						cur .= c
+				}
+				if (Trim(cur) != "")
+						out.Push(CS_CoerceElement(Trim(cur)))
+				return out
+		}
+		; Integer.
+		if RegExMatch(raw, "^-?\d+$")
+				return Integer(raw)
+		; Bare string fallback.
+		return raw
 }
 
 ; Coerce a single array element that the tokenizer already extracted. A
@@ -213,10 +213,10 @@ CS_CoerceValue(raw) {
 ; quote-detection + CS_Unescape pass and risk a second unescape. Non-quoted
 ; elements (bools, integers, bare strings) still flow through CS_CoerceValue.
 CS_CoerceElement(token) {
-    token := Trim(token)
-    if (SubStr(token, 1, 1) = '"' && SubStr(token, -1) = '"')
-        return CS_Unescape(SubStr(token, 2, StrLen(token) - 2))
-    return CS_CoerceValue(token)
+		token := Trim(token)
+		if (SubStr(token, 1, 1) = '"' && SubStr(token, -1) = '"')
+				return CS_Unescape(SubStr(token, 2, StrLen(token) - 2))
+		return CS_CoerceValue(token)
 }
 
 CS_Unescape(s) {
@@ -268,42 +268,42 @@ CS_Unescape(s) {
 ; at boot — missing file or missing keys leave the in-memory defaults
 ; untouched.
 CS_Load() {
-    global CS_SECTION
-    data := CS_Read()
-    if !data.Has(CS_SECTION) {
-        return
-    }
-    s := data[CS_SECTION]
+		global CS_SECTION
+		data := CS_Read()
+		if !data.Has(CS_SECTION) {
+				return
+		}
+		s := data[CS_SECTION]
 
-    if s.Has("metrics_enabled")
-        MetricsShortcuts.enabled := s["metrics_enabled"] ? true : false
-    if s.Has("metrics_shortcut_typing")
-        MetricsShortcuts.typing_str := String(s["metrics_shortcut_typing"])
-    if s.Has("metrics_shortcut_apps")
-        MetricsShortcuts.apps_str := String(s["metrics_shortcut_apps"])
+		if s.Has("metrics_enabled")
+				MetricsShortcuts.enabled := s["metrics_enabled"] ? true : false
+		if s.Has("metrics_shortcut_typing")
+				MetricsShortcuts.typing_str := String(s["metrics_shortcut_typing"])
+		if s.Has("metrics_shortcut_apps")
+				MetricsShortcuts.apps_str := String(s["metrics_shortcut_apps"])
 
-    if s.Has("metrics_wpm_menubar_colors")
-        MetricsShortcuts.wpm_menubar_colors := s["metrics_wpm_menubar_colors"] ? true : false
-    if s.Has("metrics_filter_private_browsing")
-        MetricsFilters.private_browsing := s["metrics_filter_private_browsing"] ? true : false
-    if s.Has("metrics_filter_secure_field")
-        MetricsFilters.secure_field := s["metrics_filter_secure_field"] ? true : false
-    if s.Has("metrics_filter_system_auth")
-        MetricsFilters.system_auth := s["metrics_filter_system_auth"] ? true : false
-    if s.Has("metrics_encrypt") {
-        MetricsFilters.encrypt := s["metrics_encrypt"] ? true : false
-        ; Drive the real cipher so a restart with encryption on keeps encrypting.
-        KL_Enc_SetEnabled(MetricsFilters.encrypt)
-    }
+		if s.Has("metrics_wpm_menubar_colors")
+				MetricsShortcuts.wpm_menubar_colors := s["metrics_wpm_menubar_colors"] ? true : false
+		if s.Has("metrics_filter_private_browsing")
+				MetricsFilters.private_browsing := s["metrics_filter_private_browsing"] ? true : false
+		if s.Has("metrics_filter_secure_field")
+				MetricsFilters.secure_field := s["metrics_filter_secure_field"] ? true : false
+		if s.Has("metrics_filter_system_auth")
+				MetricsFilters.system_auth := s["metrics_filter_system_auth"] ? true : false
+		if s.Has("metrics_encrypt") {
+				MetricsFilters.encrypt := s["metrics_encrypt"] ? true : false
+				; Drive the real cipher so a restart with encryption on keeps encrypting.
+				KL_Enc_SetEnabled(MetricsFilters.encrypt)
+		}
 
-    if s.Has("metrics_disabled_apps") && (s["metrics_disabled_apps"] is Array) {
-        MetricsFilters.disabled_apps := Map()
-        for name in s["metrics_disabled_apps"] {
-            t := Trim(String(name))
-            if (t != "")
-                MetricsFilters.disabled_apps[StrLower(t)] := true
-        }
-    }
+		if s.Has("metrics_disabled_apps") && (s["metrics_disabled_apps"] is Array) {
+				MetricsFilters.disabled_apps := Map()
+				for name in s["metrics_disabled_apps"] {
+						t := Trim(String(name))
+						if (t != "")
+								MetricsFilters.disabled_apps[StrLower(t)] := true
+				}
+		}
 }
 
 ; Serialise the in-memory state back to disk. config.toml has exactly ONE
@@ -311,19 +311,19 @@ CS_Load() {
 ; and its read-failure refusal — and the metrics keys this module owns are part
 ; of the payload it collects.
 CS_Save() {
-    global _SaveFullConfigReady
-    if IsSet(_SaveFullConfigReady) {
-        SaveFullConfig()
-        return
-    }
+		global _SaveFullConfigReady
+		if IsSet(_SaveFullConfigReady) {
+				SaveFullConfig()
+				return
+		}
 
-    ; No second writer for config.toml exists here on purpose. The section
-    ; splicer that used to live in this branch seeded its rewrite from a bare-try
-    ; FileRead: an unreadable file left the body empty, the section merge then
-    ; short-circuited to the rendered [ahk.metrics] block alone, and the atomic
-    ; move replaced the user's entire configuration with that one section —
-    ; silently, because the only catch covered the write. Every caller reaching
-    ; CS_Save is a post-boot menu handler, i.e. long after the full-config writer
-    ; is armed, so refusing here costs nothing and keeps one owner for the file.
-    try LoggerWarn("ConfigShortcuts", "CS_Save called before the full-config writer was armed — metrics preferences kept in memory only; the next SaveFullConfig persists them.")
+		; No second writer for config.toml exists here on purpose. The section
+		; splicer that used to live in this branch seeded its rewrite from a bare-try
+		; FileRead: an unreadable file left the body empty, the section merge then
+		; short-circuited to the rendered [ahk.metrics] block alone, and the atomic
+		; move replaced the user's entire configuration with that one section —
+		; silently, because the only catch covered the write. Every caller reaching
+		; CS_Save is a post-boot menu handler, i.e. long after the full-config writer
+		; is armed, so refusing here costs nothing and keeps one owner for the file.
+		try LoggerWarn("ConfigShortcuts", "CS_Save called before the full-config writer was armed — metrics preferences kept in memory only; the next SaveFullConfig persists them.")
 }

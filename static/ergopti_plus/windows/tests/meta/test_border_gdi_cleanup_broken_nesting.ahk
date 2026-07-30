@@ -71,7 +71,13 @@ _BGCN_CleanupReleasesBothAndReturns() {
 		or InStr(Block, "if MemDC DllCall") > 0
 	Assert(!BrokenChain,
 		"GDI-failure cleanup must NOT use the single-line if-HBmp-DllCall chain -- it makes the DeleteDC and return conditional on HBmp, leaking the surviving MemDC")
-	Assert(InStr(Block, "`n        return") > 0,
-		"GDI-failure cleanup must contain an unconditional return at block indentation so it always bails on a failed GDI allocation")
+	; A `return` that is the ENTIRE statement on its line is unconditional; one
+	; chained after an `if` on the same line is not, and that chaining is the
+	; regression above. Matching the statement shape rather than a literal eight
+	; spaces is what the invariant actually needs — the old form pinned the
+	; driver's indentation, so re-indenting it to the project's tab convention
+	; turned a correct file into a red test.
+	Assert(RegExMatch(Block, "m)^[ \t]*return[ \t]*$") > 0,
+		"GDI-failure cleanup must contain an unconditional return — a return that is its own statement, not one chained after an if — so it always bails on a failed GDI allocation")
 }
 Test("tooltip: _TooltipShowBorder GDI-failure cleanup releases both handles and returns (border-gdi-cleanup-broken-nesting)", _BGCN_CleanupReleasesBothAndReturns)

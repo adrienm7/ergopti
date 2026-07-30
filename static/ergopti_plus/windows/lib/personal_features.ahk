@@ -20,41 +20,41 @@
 ; ==================================
 
 RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
-    global _PersonalShortcutsRegistry, Features
-    Name := StrLower(Name)
-    if !_PersonalShortcutsRegistry.Has(Name) {
-        _PersonalShortcutsRegistry[Name] := Description
-        Found := false
-        for _, Item in _PersonalShortcutsRegistry["__Order"] {
-            if Item == Name {
-                Found := true
-                break
-            }
-        }
-        if !Found {
-            _PersonalShortcutsRegistry["__Order"].Push(Name)
-        }
-    }
-    if !(IsSet(Features) and Features.Has("shortcuts")
-        and Features["shortcuts"].Has("personal")
-        and IsObject(Features["shortcuts"]["personal"])
-        and Features["shortcuts"]["personal"].Has(Name)) {
-        if IsSet(Features) and Features.Has("shortcuts") {
-            if !Features["shortcuts"].Has("personal") {
-                Features["shortcuts"]["personal"] := Map()
-            }
-            Features["shortcuts"]["personal"][Name] := DefaultEnabled
-        }
-    }
+		global _PersonalShortcutsRegistry, Features
+		Name := StrLower(Name)
+		if !_PersonalShortcutsRegistry.Has(Name) {
+				_PersonalShortcutsRegistry[Name] := Description
+				Found := false
+				for _, Item in _PersonalShortcutsRegistry["__Order"] {
+						if Item == Name {
+								Found := true
+								break
+						}
+				}
+				if !Found {
+						_PersonalShortcutsRegistry["__Order"].Push(Name)
+				}
+		}
+		if !(IsSet(Features) and Features.Has("shortcuts")
+				and Features["shortcuts"].Has("personal")
+				and IsObject(Features["shortcuts"]["personal"])
+				and Features["shortcuts"]["personal"].Has(Name)) {
+				if IsSet(Features) and Features.Has("shortcuts") {
+						if !Features["shortcuts"].Has("personal") {
+								Features["shortcuts"]["personal"] := Map()
+						}
+						Features["shortcuts"]["personal"][Name] := DefaultEnabled
+				}
+		}
 }
 PersonalFeatureEnabled(name) {
-    global Features
-    name := StrLower(name)
-    try {
-        return Features["shortcuts"]["personal"][name] = true
-    } catch {
-        return false
-    }
+		global Features
+		name := StrLower(name)
+		try {
+				return Features["shortcuts"]["personal"][name] = true
+		} catch {
+				return false
+		}
 }
 
 ; Seed a file-discovered personal HOTSTRING section into Features["hotstrings"]["personal"]
@@ -62,12 +62,12 @@ PersonalFeatureEnabled(name) {
 ; the fixed manifest 5 are toggleable + loadable. No-op when already present (manifest seed
 ; or a prior call). Mirrors RegisterPersonalFeature for shortcuts (personal-hotstring-seed).
 EnsurePersonalHotstringFeature(SecName) {
-    global Features
-    SecName := StrLower(SecName)
-    if !(IsSet(Features) and Features.Has("hotstrings"))
-        return
-    if !Features["hotstrings"].Has("personal")
-        Features["hotstrings"]["personal"] := Map()
-    if !Features["hotstrings"]["personal"].Has(SecName)
-        Features["hotstrings"]["personal"][SecName] := Map("enabled", false, "time_activation_seconds", 0)
+		global Features
+		SecName := StrLower(SecName)
+		if !(IsSet(Features) and Features.Has("hotstrings"))
+				return
+		if !Features["hotstrings"].Has("personal")
+				Features["hotstrings"]["personal"] := Map()
+		if !Features["hotstrings"]["personal"].Has(SecName)
+				Features["hotstrings"]["personal"][SecName] := Map("enabled", false, "time_activation_seconds", 0)
 }

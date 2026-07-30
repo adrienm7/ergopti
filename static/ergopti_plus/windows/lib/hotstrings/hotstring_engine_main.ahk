@@ -109,13 +109,13 @@ global HSE_PRIORITY_PERSONAL := 50
 ; no override is set at the individual, section or file level. Personal beats
 ; "ext." packages, which beat bundled common categories.
 _HSE_SourcePriority(CategoryName) {
-    global HSE_PRIORITY_COMMON, HSE_PRIORITY_PACKAGE, HSE_PRIORITY_PERSONAL
-    Cat := StrLower(CategoryName)
-    if (Cat == "personal")
-        return HSE_PRIORITY_PERSONAL
-    if (SubStr(Cat, 1, 4) == "ext.")
-        return HSE_PRIORITY_PACKAGE
-    return HSE_PRIORITY_COMMON
+		global HSE_PRIORITY_COMMON, HSE_PRIORITY_PACKAGE, HSE_PRIORITY_PERSONAL
+		Cat := StrLower(CategoryName)
+		if (Cat == "personal")
+				return HSE_PRIORITY_PERSONAL
+		if (SubStr(Cat, 1, 4) == "ext.")
+				return HSE_PRIORITY_PACKAGE
+		return HSE_PRIORITY_COMMON
 }
 
 
@@ -271,156 +271,156 @@ global HSE_TypoNbspStripped := false
 ; PrevCharKey, IsRepeat, Category, Section). When absent the Spec can still
 ; be exercised by unit tests that pass a bare Callback.
 HSE_Register(Flags, Trigger, Callback, Meta := unset) {
-    global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
-    global HSE_RegistryByGroup, HSE_DisabledGroups, HSE_SeqCounter, HSE_PRIORITY_COMMON
-    if (Trigger == "") {
-        return
-    }
-    HSE_SeqCounter++
-    ; Resolve the group used by HSE_EnableGroup / HSE_DisableGroup for live,
-    ; reload-free section toggling. An explicit Meta "group" always wins; when
-    ; absent we derive "<category>.<section>" from the dispatch metadata so every
-    ; hotstring loaded for a TOML section lands in its own toggleable group.
-    ; Section-less registrations (inline expansions, unit tests) stay "default".
-    ; Meta may be a Map (legacy / tests) or an object (production _MakeHotstringMeta).
-    Group := "default"
-    GroupOrder := 0
-    if IsSet(Meta) {
-        if Meta is Map {
-            if Meta.Has("group")
-                Group := Meta["group"]
-            if Meta.Has("group_order")
-                GroupOrder := Meta["group_order"]
-            if (Group == "default" and Meta.Has("Category") and Meta.Has("Section")
-                and Meta["Category"] != "" and Meta["Section"] != "")
-                Group := Meta["Category"] . "." . Meta["Section"]
-        } else {
-            if Meta.HasOwnProp("group")
-                Group := Meta.group
-            if Meta.HasOwnProp("group_order")
-                GroupOrder := Meta.group_order
-            if (Group == "default" and Meta.HasOwnProp("Category") and Meta.HasOwnProp("Section")
-                and Meta.Category != "" and Meta.Section != "")
-                Group := Meta.Category . "." . Meta.Section
-        }
-    }
-    IsStar := InStr(Flags, "*") > 0
-    ; StarBase: trigger without trailing magic key (for magic-key cycling).
-    ; Computed here once so the Spec is self-contained.
-    StarBase := IsStar ? SubStr(Trigger, 1, StrLen(Trigger) - 1) : ""
-    TailChar := SubStr(Trigger, -1)
-    Spec := {
-        Trigger:       Trigger,
-        Length:        StrLen(Trigger),
-        Callback:      Callback,
-        Star:          IsStar,
-        InWord:        InStr(Flags, "?") > 0,
-        CaseSensitive: InStr(Flags, "C") > 0,
-        ; Registry.spec.js domain-contract fields
-        Repl:          "",
-        PlainRepl:     "",
-        IsWord:        InStr(Flags, "?") == 0,
-        Auto:          IsStar,
-        Seq:           HSE_SeqCounter,
-        TLen:          StrLen(Trigger),
-        TriggerBytes:  StrLen(Trigger),   ; AHK StrLen is codepoint-based; good enough
-        TailChar:      TailChar,
-        HasMagic:      IsStar,
-        StarBase:      StarBase,
-        StarBaseBytes: StrLen(StarBase),
-        StarBaseTail:  (StarBase != "") ? SubStr(StarBase, -1) : "",
-        Group:         Group,
-        GroupOrder:    GroupOrder,
-        ; Collision precedence among EQUAL-LENGTH triggers. Higher wins. Defaults
-        ; to the common-source value; the loader overrides it via Meta with the
-        ; resolved cascade (individual > section > file > source default). When no
-        ; registration sets distinct priorities every Spec shares this value, so
-        ; ties fall straight back to Seq — the pre-priority behaviour.
-        Priority:      HSE_PRIORITY_COMMON,
-        FinalResult:   false,
-        Color:         ""
-    }
-    ; Optional dispatch metadata injected by the production loader.
-    if IsSet(Meta) {
-        if Meta is Map {
-            for Key, Val in Meta {
-                Spec.%Key% := Val
-            }
-        } else {
-            ; Support legacy object-literal Meta (older callers).
-            for Key, Val in Meta.OwnProps() {
-                Spec.%Key% := Val
-            }
-        }
-    }
-    ; Propagate Repl → PlainRepl when the caller set Repl directly.
-    if (Spec.PlainRepl == "" and Spec.Repl != "") {
-        Spec.PlainRepl := Spec.Repl
-    }
-    ; Propagate Replacement (dispatch key) → Repl / PlainRepl for the
-    ; contract fields when the loader used the old Replacement key name.
-    if Spec.HasOwnProp("Replacement") and (Spec.Repl == "") {
-        Spec.Repl := Spec.Replacement
-        if (Spec.PlainRepl == "") {
-            Spec.PlainRepl := Spec.Replacement
-        }
-    }
+		global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
+		global HSE_RegistryByGroup, HSE_DisabledGroups, HSE_SeqCounter, HSE_PRIORITY_COMMON
+		if (Trigger == "") {
+				return
+		}
+		HSE_SeqCounter++
+		; Resolve the group used by HSE_EnableGroup / HSE_DisableGroup for live,
+		; reload-free section toggling. An explicit Meta "group" always wins; when
+		; absent we derive "<category>.<section>" from the dispatch metadata so every
+		; hotstring loaded for a TOML section lands in its own toggleable group.
+		; Section-less registrations (inline expansions, unit tests) stay "default".
+		; Meta may be a Map (legacy / tests) or an object (production _MakeHotstringMeta).
+		Group := "default"
+		GroupOrder := 0
+		if IsSet(Meta) {
+				if Meta is Map {
+						if Meta.Has("group")
+								Group := Meta["group"]
+						if Meta.Has("group_order")
+								GroupOrder := Meta["group_order"]
+						if (Group == "default" and Meta.Has("Category") and Meta.Has("Section")
+								and Meta["Category"] != "" and Meta["Section"] != "")
+								Group := Meta["Category"] . "." . Meta["Section"]
+				} else {
+						if Meta.HasOwnProp("group")
+								Group := Meta.group
+						if Meta.HasOwnProp("group_order")
+								GroupOrder := Meta.group_order
+						if (Group == "default" and Meta.HasOwnProp("Category") and Meta.HasOwnProp("Section")
+								and Meta.Category != "" and Meta.Section != "")
+								Group := Meta.Category . "." . Meta.Section
+				}
+		}
+		IsStar := InStr(Flags, "*") > 0
+		; StarBase: trigger without trailing magic key (for magic-key cycling).
+		; Computed here once so the Spec is self-contained.
+		StarBase := IsStar ? SubStr(Trigger, 1, StrLen(Trigger) - 1) : ""
+		TailChar := SubStr(Trigger, -1)
+		Spec := {
+				Trigger:       Trigger,
+				Length:        StrLen(Trigger),
+				Callback:      Callback,
+				Star:          IsStar,
+				InWord:        InStr(Flags, "?") > 0,
+				CaseSensitive: InStr(Flags, "C") > 0,
+				; Registry.spec.js domain-contract fields
+				Repl:          "",
+				PlainRepl:     "",
+				IsWord:        InStr(Flags, "?") == 0,
+				Auto:          IsStar,
+				Seq:           HSE_SeqCounter,
+				TLen:          StrLen(Trigger),
+				TriggerBytes:  StrLen(Trigger),   ; AHK StrLen is codepoint-based; good enough
+				TailChar:      TailChar,
+				HasMagic:      IsStar,
+				StarBase:      StarBase,
+				StarBaseBytes: StrLen(StarBase),
+				StarBaseTail:  (StarBase != "") ? SubStr(StarBase, -1) : "",
+				Group:         Group,
+				GroupOrder:    GroupOrder,
+				; Collision precedence among EQUAL-LENGTH triggers. Higher wins. Defaults
+				; to the common-source value; the loader overrides it via Meta with the
+				; resolved cascade (individual > section > file > source default). When no
+				; registration sets distinct priorities every Spec shares this value, so
+				; ties fall straight back to Seq — the pre-priority behaviour.
+				Priority:      HSE_PRIORITY_COMMON,
+				FinalResult:   false,
+				Color:         ""
+		}
+		; Optional dispatch metadata injected by the production loader.
+		if IsSet(Meta) {
+				if Meta is Map {
+						for Key, Val in Meta {
+								Spec.%Key% := Val
+						}
+				} else {
+						; Support legacy object-literal Meta (older callers).
+						for Key, Val in Meta.OwnProps() {
+								Spec.%Key% := Val
+						}
+				}
+		}
+		; Propagate Repl → PlainRepl when the caller set Repl directly.
+		if (Spec.PlainRepl == "" and Spec.Repl != "") {
+				Spec.PlainRepl := Spec.Repl
+		}
+		; Propagate Replacement (dispatch key) → Repl / PlainRepl for the
+		; contract fields when the loader used the old Replacement key name.
+		if Spec.HasOwnProp("Replacement") and (Spec.Repl == "") {
+				Spec.Repl := Spec.Replacement
+				if (Spec.PlainRepl == "") {
+						Spec.PlainRepl := Spec.Replacement
+				}
+		}
 
-    ; Only insert into the live index when the group is not disabled.
-    if !HSE_DisabledGroups.Has(Group) {
-        _HsCrit := Critical("On")
-        try {
-            LastChar := TailChar
-            LookupKey := Spec.CaseSensitive ? LastChar : StrLower(LastChar)
-            if !HSE_RegistryByLastChar.Has(LookupKey) {
-                HSE_RegistryByLastChar[LookupKey] := []
-            }
-            HSE_RegistryByLastChar[LookupKey].Push(Spec)
-            ; Maintain the flat star-spec index and the O(1) prefix set so
-            ; _HSE_StarTriggerCoversBody never has to scan on every terminator keystroke.
-            if Spec.Star {
-                HSE_StarSpecs.Push(Spec)
-                _HSE_IndexStarPrefixes(Spec)
-                _HSE_IndexStarTrigger(Spec)
-            } else {
-                _HSE_IndexEndTrigger(Spec)
-            }
-        } finally {
-            Critical(_HsCrit)
-        }
-    }
+		; Only insert into the live index when the group is not disabled.
+		if !HSE_DisabledGroups.Has(Group) {
+				_HsCrit := Critical("On")
+				try {
+						LastChar := TailChar
+						LookupKey := Spec.CaseSensitive ? LastChar : StrLower(LastChar)
+						if !HSE_RegistryByLastChar.Has(LookupKey) {
+								HSE_RegistryByLastChar[LookupKey] := []
+						}
+						HSE_RegistryByLastChar[LookupKey].Push(Spec)
+						; Maintain the flat star-spec index and the O(1) prefix set so
+						; _HSE_StarTriggerCoversBody never has to scan on every terminator keystroke.
+						if Spec.Star {
+								HSE_StarSpecs.Push(Spec)
+								_HSE_IndexStarPrefixes(Spec)
+								_HSE_IndexStarTrigger(Spec)
+						} else {
+								_HSE_IndexEndTrigger(Spec)
+						}
+				} finally {
+						Critical(_HsCrit)
+				}
+		}
 
-    ; Always store in the group index regardless of enabled/disabled state
-    ; so HSE_EnableGroup can restore them without re-registration.
-    if !HSE_RegistryByGroup.Has(Group) {
-        HSE_RegistryByGroup[Group] := []
-    }
-    HSE_RegistryByGroup[Group].Push(Spec)
+		; Always store in the group index regardless of enabled/disabled state
+		; so HSE_EnableGroup can restore them without re-registration.
+		if !HSE_RegistryByGroup.Has(Group) {
+				HSE_RegistryByGroup[Group] := []
+		}
+		HSE_RegistryByGroup[Group].Push(Spec)
 
-    return Spec
+		return Spec
 }
 
 ; Erase the entire registry. Tests rely on this between cases; the live
 ; engine never needs it because Reload re-runs the registration code from
 ; scratch with a fresh module state.
 HSE_RegistryClear() {
-    global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
-    global HSE_RegistryByGroup, HSE_DisabledGroups, HSE_SeqCounter
-    global HSE_StarByTriggerCI, HSE_StarByTriggerCS, HSE_MaxStarTriggerLen
-    global HSE_EndByTriggerCI, HSE_EndByTriggerCS, HSE_MaxEndTriggerLen
-    HSE_RegistryByLastChar := Map()
-    HSE_StarSpecs := []
-    HSE_StarPrefixSetCI := Map()
-    HSE_StarPrefixSetCS := Map()
-    HSE_StarByTriggerCI := Map()
-    HSE_StarByTriggerCS := Map()
-    HSE_MaxStarTriggerLen := 0
-    HSE_EndByTriggerCI := Map()
-    HSE_EndByTriggerCS := Map()
-    HSE_MaxEndTriggerLen := 0
-    HSE_RegistryByGroup := Map()
-    HSE_DisabledGroups := Map()
-    HSE_SeqCounter := 0
+		global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
+		global HSE_RegistryByGroup, HSE_DisabledGroups, HSE_SeqCounter
+		global HSE_StarByTriggerCI, HSE_StarByTriggerCS, HSE_MaxStarTriggerLen
+		global HSE_EndByTriggerCI, HSE_EndByTriggerCS, HSE_MaxEndTriggerLen
+		HSE_RegistryByLastChar := Map()
+		HSE_StarSpecs := []
+		HSE_StarPrefixSetCI := Map()
+		HSE_StarPrefixSetCS := Map()
+		HSE_StarByTriggerCI := Map()
+		HSE_StarByTriggerCS := Map()
+		HSE_MaxStarTriggerLen := 0
+		HSE_EndByTriggerCI := Map()
+		HSE_EndByTriggerCS := Map()
+		HSE_MaxEndTriggerLen := 0
+		HSE_RegistryByGroup := Map()
+		HSE_DisabledGroups := Map()
+		HSE_SeqCounter := 0
 }
 
 ; Return all active mappings whose trigger ends with TailChar, sorted
@@ -436,166 +436,166 @@ HSE_RegistryClear() {
 ; statement about the hot path, which sent a performance reader here by mistake.
 ; Its sibling _HSE_BucketsFor, which had no callers at all, was deleted.
 HSE_MappingsForTail(TailChar) {
-    global HSE_RegistryByLastChar
-    ; Collect from both the case-sensitive and case-insensitive buckets.
-    Out := []
-    LowerKey := StrLower(TailChar)
-    if HSE_RegistryByLastChar.Has(TailChar) {
-        for _, Spec in HSE_RegistryByLastChar[TailChar] {
-            Out.Push(Spec)
-        }
-    }
-    ; Avoid double-adding when TailChar is already lowercase.
-    if (TailChar !== LowerKey) and HSE_RegistryByLastChar.Has(LowerKey) {
-        for _, Spec in HSE_RegistryByLastChar[LowerKey] {
-            Out.Push(Spec)
-        }
-    }
-    ; Sort: longest trigger first, then Priority desc, then GroupOrder asc, then
-    ; Seq asc. Priority slots in right after length so it mirrors the
-    ; HSE_FindMatchAtEnd tie-break exactly.
-    Len := Out.Length
-    loop (Len - 1) {
-        i := A_Index
-        loop (Len - i) {
-            j := A_Index
-            A := Out[j]
-            B := Out[j + 1]
-            APrio := A.HasOwnProp("Priority") ? A.Priority : 50
-            BPrio := B.HasOwnProp("Priority") ? B.Priority : 50
-            Swap := false
-            if (A.Length < B.Length) {
-                Swap := true
-            } else if (A.Length == B.Length) {
-                if (APrio < BPrio) {
-                    Swap := true
-                } else if (APrio == BPrio and A.GroupOrder > B.GroupOrder) {
-                    Swap := true
-                } else if (APrio == BPrio and A.GroupOrder == B.GroupOrder and A.Seq > B.Seq) {
-                    Swap := true
-                }
-            }
-            if Swap {
-                Out[j]     := B
-                Out[j + 1] := A
-            }
-        }
-    }
-    return Out
+		global HSE_RegistryByLastChar
+		; Collect from both the case-sensitive and case-insensitive buckets.
+		Out := []
+		LowerKey := StrLower(TailChar)
+		if HSE_RegistryByLastChar.Has(TailChar) {
+				for _, Spec in HSE_RegistryByLastChar[TailChar] {
+						Out.Push(Spec)
+				}
+		}
+		; Avoid double-adding when TailChar is already lowercase.
+		if (TailChar !== LowerKey) and HSE_RegistryByLastChar.Has(LowerKey) {
+				for _, Spec in HSE_RegistryByLastChar[LowerKey] {
+						Out.Push(Spec)
+				}
+		}
+		; Sort: longest trigger first, then Priority desc, then GroupOrder asc, then
+		; Seq asc. Priority slots in right after length so it mirrors the
+		; HSE_FindMatchAtEnd tie-break exactly.
+		Len := Out.Length
+		loop (Len - 1) {
+				i := A_Index
+				loop (Len - i) {
+						j := A_Index
+						A := Out[j]
+						B := Out[j + 1]
+						APrio := A.HasOwnProp("Priority") ? A.Priority : 50
+						BPrio := B.HasOwnProp("Priority") ? B.Priority : 50
+						Swap := false
+						if (A.Length < B.Length) {
+								Swap := true
+						} else if (A.Length == B.Length) {
+								if (APrio < BPrio) {
+										Swap := true
+								} else if (APrio == BPrio and A.GroupOrder > B.GroupOrder) {
+										Swap := true
+								} else if (APrio == BPrio and A.GroupOrder == B.GroupOrder and A.Seq > B.Seq) {
+										Swap := true
+								}
+						}
+						if Swap {
+								Out[j]     := B
+								Out[j + 1] := A
+						}
+				}
+		}
+		return Out
 }
 
 ; Remove all mappings in Group from the live index. They remain stored in
 ; HSE_RegistryByGroup so HSE_EnableGroup can restore them later.
 HSE_DisableGroup(Group) {
-    global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
-    global HSE_RegistryByGroup, HSE_DisabledGroups
-    if !HSE_RegistryByGroup.Has(Group) {
-        HSE_DisabledGroups[Group] := true
-        return
-    }
-    HSE_DisabledGroups[Group] := true
-    ; ATOMICITY — same contract as HSE_Register: the splice below resets the whole
-    ; star prefix set / by-trigger index to empty before re-indexing the survivors,
-    ; opening a wide window where an OnChar reader (HSE_FindMatchAtEnd) would see an
-    ; empty star index and drop every star expansion for the rebuild duration. This
-    ; is wrapped in Critical so the reader thread never preempts mid-rebuild and the
-    ; index is never observed empty. Critical is safe here: every step is in-memory
-    ; (Map/Array mutation), no Sleep. NOTE for any future re-wiring of group toggling
-    ; to a live menu path: keep this Critical wrap — without it the dead-path race
-    ; this guards becomes a live high-severity star-expansion drop.
-    _DgCrit := Critical("On")
-    try {
-        ; Remove each spec from the live index.
-        for _, Spec in HSE_RegistryByGroup[Group] {
-            LookupKey := Spec.CaseSensitive ? Spec.TailChar : StrLower(Spec.TailChar)
-            if HSE_RegistryByLastChar.Has(LookupKey) {
-                Bucket := HSE_RegistryByLastChar[LookupKey]
-                NewBucket := []
-                for _, S in Bucket {
-                    if (S.Seq !== Spec.Seq) {
-                        NewBucket.Push(S)
-                    }
-                }
-                HSE_RegistryByLastChar[LookupKey] := NewBucket
-            }
-            ; Remove from star index if applicable.
-            if Spec.Star {
-                NewStarSpecs := []
-                for _, S in HSE_StarSpecs {
-                    if (S.Seq !== Spec.Seq) {
-                        NewStarSpecs.Push(S)
-                    }
-                }
-                HSE_StarSpecs := NewStarSpecs
-            }
-        }
-        ; Rebuild the prefix sets and the by-trigger index from the remaining star
-        ; specs — both derive from HSE_StarSpecs, which was just spliced above.
-        HSE_StarPrefixSetCI := Map()
-        HSE_StarPrefixSetCS := Map()
-        for _, S in HSE_StarSpecs {
-            _HSE_IndexStarPrefixes(S)
-        }
-        _HSE_RebuildStarTriggerIndex()
-        _HSE_RebuildEndTriggerIndex()
-    } finally {
-        Critical(_DgCrit)
-    }
+		global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
+		global HSE_RegistryByGroup, HSE_DisabledGroups
+		if !HSE_RegistryByGroup.Has(Group) {
+				HSE_DisabledGroups[Group] := true
+				return
+		}
+		HSE_DisabledGroups[Group] := true
+		; ATOMICITY — same contract as HSE_Register: the splice below resets the whole
+		; star prefix set / by-trigger index to empty before re-indexing the survivors,
+		; opening a wide window where an OnChar reader (HSE_FindMatchAtEnd) would see an
+		; empty star index and drop every star expansion for the rebuild duration. This
+		; is wrapped in Critical so the reader thread never preempts mid-rebuild and the
+		; index is never observed empty. Critical is safe here: every step is in-memory
+		; (Map/Array mutation), no Sleep. NOTE for any future re-wiring of group toggling
+		; to a live menu path: keep this Critical wrap — without it the dead-path race
+		; this guards becomes a live high-severity star-expansion drop.
+		_DgCrit := Critical("On")
+		try {
+				; Remove each spec from the live index.
+				for _, Spec in HSE_RegistryByGroup[Group] {
+						LookupKey := Spec.CaseSensitive ? Spec.TailChar : StrLower(Spec.TailChar)
+						if HSE_RegistryByLastChar.Has(LookupKey) {
+								Bucket := HSE_RegistryByLastChar[LookupKey]
+								NewBucket := []
+								for _, S in Bucket {
+										if (S.Seq !== Spec.Seq) {
+												NewBucket.Push(S)
+										}
+								}
+								HSE_RegistryByLastChar[LookupKey] := NewBucket
+						}
+						; Remove from star index if applicable.
+						if Spec.Star {
+								NewStarSpecs := []
+								for _, S in HSE_StarSpecs {
+										if (S.Seq !== Spec.Seq) {
+												NewStarSpecs.Push(S)
+										}
+								}
+								HSE_StarSpecs := NewStarSpecs
+						}
+				}
+				; Rebuild the prefix sets and the by-trigger index from the remaining star
+				; specs — both derive from HSE_StarSpecs, which was just spliced above.
+				HSE_StarPrefixSetCI := Map()
+				HSE_StarPrefixSetCS := Map()
+				for _, S in HSE_StarSpecs {
+						_HSE_IndexStarPrefixes(S)
+				}
+				_HSE_RebuildStarTriggerIndex()
+				_HSE_RebuildEndTriggerIndex()
+		} finally {
+				Critical(_DgCrit)
+		}
 }
 
 ; Restore all mappings in Group to the live index.
 HSE_EnableGroup(Group) {
-    global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
-    global HSE_RegistryByGroup, HSE_DisabledGroups
-    if HSE_DisabledGroups.Has(Group) {
-        HSE_DisabledGroups.Delete(Group)
-    }
-    if !HSE_RegistryByGroup.Has(Group) {
-        return
-    }
-    ; ATOMICITY — same contract as HSE_DisableGroup: re-inserting specs into the live
-    ; index must not be observed half-done by _OnPrefixChar running on the hook thread.
-    ; Without Critical, the reader can see a partially re-populated bucket and match
-    ; against stale (duplicate or missing) specs for the rebuild duration.
-    _EgCrit := Critical("On")
-    try {
-        ; Re-insert each spec into the live index.
-        for _, Spec in HSE_RegistryByGroup[Group] {
-            LookupKey := Spec.CaseSensitive ? Spec.TailChar : StrLower(Spec.TailChar)
-            if !HSE_RegistryByLastChar.Has(LookupKey) {
-                HSE_RegistryByLastChar[LookupKey] := []
-            }
-            ; Avoid duplicates (idempotent enable).
-            AlreadyIn := false
-            for _, S in HSE_RegistryByLastChar[LookupKey] {
-                if (S.Seq == Spec.Seq) {
-                    AlreadyIn := true
-                    break
-                }
-            }
-            if !AlreadyIn {
-                HSE_RegistryByLastChar[LookupKey].Push(Spec)
-            }
-            if Spec.Star {
-                AlreadyStar := false
-                for _, S in HSE_StarSpecs {
-                    if (S.Seq == Spec.Seq) {
-                        AlreadyStar := true
-                        break
-                    }
-                }
-                if !AlreadyStar {
-                    HSE_StarSpecs.Push(Spec)
-                    _HSE_IndexStarPrefixes(Spec)
-                    _HSE_IndexStarTrigger(Spec)
-                }
-            } else if !AlreadyIn {
-                _HSE_IndexEndTrigger(Spec)
-            }
-        }
-    } finally {
-        Critical(_EgCrit)
-    }
+		global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
+		global HSE_RegistryByGroup, HSE_DisabledGroups
+		if HSE_DisabledGroups.Has(Group) {
+				HSE_DisabledGroups.Delete(Group)
+		}
+		if !HSE_RegistryByGroup.Has(Group) {
+				return
+		}
+		; ATOMICITY — same contract as HSE_DisableGroup: re-inserting specs into the live
+		; index must not be observed half-done by _OnPrefixChar running on the hook thread.
+		; Without Critical, the reader can see a partially re-populated bucket and match
+		; against stale (duplicate or missing) specs for the rebuild duration.
+		_EgCrit := Critical("On")
+		try {
+				; Re-insert each spec into the live index.
+				for _, Spec in HSE_RegistryByGroup[Group] {
+						LookupKey := Spec.CaseSensitive ? Spec.TailChar : StrLower(Spec.TailChar)
+						if !HSE_RegistryByLastChar.Has(LookupKey) {
+								HSE_RegistryByLastChar[LookupKey] := []
+						}
+						; Avoid duplicates (idempotent enable).
+						AlreadyIn := false
+						for _, S in HSE_RegistryByLastChar[LookupKey] {
+								if (S.Seq == Spec.Seq) {
+										AlreadyIn := true
+										break
+								}
+						}
+						if !AlreadyIn {
+								HSE_RegistryByLastChar[LookupKey].Push(Spec)
+						}
+						if Spec.Star {
+								AlreadyStar := false
+								for _, S in HSE_StarSpecs {
+										if (S.Seq == Spec.Seq) {
+												AlreadyStar := true
+												break
+										}
+								}
+								if !AlreadyStar {
+										HSE_StarSpecs.Push(Spec)
+										_HSE_IndexStarPrefixes(Spec)
+										_HSE_IndexStarTrigger(Spec)
+								}
+						} else if !AlreadyIn {
+								_HSE_IndexEndTrigger(Spec)
+						}
+				}
+		} finally {
+				Critical(_EgCrit)
+		}
 }
 
 ; Fully wipe a single HSE group in preparation for a live section-scoped
@@ -608,22 +608,22 @@ HSE_EnableGroup(Group) {
 ; (personal-hotstring-live-reload-stale-group).
 ; @param Group {String} HSE group string ("<loader_category>.<section>").
 HSE_ClearGroupForReload(Group) {
-    global HSE_RegistryByGroup, HSE_DisabledGroups
-    HSE_DisableGroup(Group)
-    HSE_RegistryByGroup[Group] := []
-    if HSE_DisabledGroups.Has(Group)
-        HSE_DisabledGroups.Delete(Group)
+		global HSE_RegistryByGroup, HSE_DisabledGroups
+		HSE_DisableGroup(Group)
+		HSE_RegistryByGroup[Group] := []
+		if HSE_DisabledGroups.Has(Group)
+				HSE_DisabledGroups.Delete(Group)
 }
 
 ; Return the total number of active mappings across all groups.
 ; Mirrors Registry.spec.js size().
 HSE_Size() {
-    global HSE_RegistryByLastChar
-    Total := 0
-    for , Bucket in HSE_RegistryByLastChar {
-        Total += Bucket.Length
-    }
-    return Total
+		global HSE_RegistryByLastChar
+		Total := 0
+		for , Bucket in HSE_RegistryByLastChar {
+				Total += Bucket.Length
+		}
+		return Total
 }
 
 
@@ -655,25 +655,25 @@ HSE_Size() {
 ; associated end character is exposed via HSE_LastEndChar — empty for
 ; star triggers, the just-typed terminator for end-char-gated triggers.
 HSE_FeedChar(Char, IsPhysical := false) {
-    global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN
-    global HSE_LastMatch, HSE_LastEndChar, HSE_Suppressed
-    HSE_LastMatch := ""
-    HSE_LastEndChar := ""
-    if ((HSE_Suppressed and !IsPhysical) or (Char == "")) {
-        return ""
-    }
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN
+		global HSE_LastMatch, HSE_LastEndChar, HSE_Suppressed
+		HSE_LastMatch := ""
+		HSE_LastEndChar := ""
+		if ((HSE_Suppressed and !IsPhysical) or (Char == "")) {
+				return ""
+		}
 
-    HSE_Buffer .= Char
-    if (StrLen(HSE_Buffer) > HSE_MAX_BUFFER_LEN) {
-        ; Drop the oldest characters; once trimmed we can no longer prove
-        ; the new start sits on a word boundary, so flip the flag.
-        HSE_Buffer := SubStr(HSE_Buffer, -HSE_MAX_BUFFER_LEN)
-        HSE_StartIsWordBoundary := false
-    }
+		HSE_Buffer .= Char
+		if (StrLen(HSE_Buffer) > HSE_MAX_BUFFER_LEN) {
+				; Drop the oldest characters; once trimmed we can no longer prove
+				; the new start sits on a word boundary, so flip the flag.
+				HSE_Buffer := SubStr(HSE_Buffer, -HSE_MAX_BUFFER_LEN)
+				HSE_StartIsWordBoundary := false
+		}
 
-    Match := HSE_FindMatchAtEnd(Char)
-    HSE_LastMatch := Match
-    return Match
+		Match := HSE_FindMatchAtEnd(Char)
+		HSE_LastMatch := Match
+		return Match
 }
 
 ; Backspace: chop the last character off the buffer. When the buffer is
@@ -682,15 +682,15 @@ HSE_FeedChar(Char, IsPhysical := false) {
 ; start, into territory we never observed — we can no longer guarantee the
 ; new cursor position abuts a word boundary.
 HSE_FeedBackspace(IsPhysical := false) {
-    global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed
-    if HSE_Suppressed and !IsPhysical {
-        return
-    }
-    if (HSE_Buffer != "") {
-        HSE_Buffer := SubStr(HSE_Buffer, 1, StrLen(HSE_Buffer) - 1)
-        return
-    }
-    HSE_StartIsWordBoundary := false
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed
+		if HSE_Suppressed and !IsPhysical {
+				return
+		}
+		if (HSE_Buffer != "") {
+				HSE_Buffer := SubStr(HSE_Buffer, 1, StrLen(HSE_Buffer) - 1)
+				return
+		}
+		HSE_StartIsWordBoundary := false
 }
 
 ; Generic reset. KnownTerminatorBefore declares whether the caller can
@@ -702,12 +702,12 @@ HSE_FeedBackspace(IsPhysical := false) {
 ;     buffer content to the left is completely unknown: Ctrl+X (cut),
 ;     Ctrl+V (paste), Ctrl+Z/Y (undo/redo), backspace on empty buffer.
 HSE_FeedReset(KnownTerminatorBefore := false, IsPhysical := false) {
-    global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed
-    if HSE_Suppressed and !IsPhysical {
-        return
-    }
-    HSE_Buffer := ""
-    HSE_StartIsWordBoundary := !!KnownTerminatorBefore
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed
+		if HSE_Suppressed and !IsPhysical {
+				return
+		}
+		HSE_Buffer := ""
+		HSE_StartIsWordBoundary := !!KnownTerminatorBefore
 }
 
 ; Suppress / un-suppress feeds for the duration of an internal SendEvent
@@ -721,12 +721,12 @@ HSE_FeedReset(KnownTerminatorBefore := false, IsPhysical := false) {
 ; Callers that genuinely want to wipe the buffer (e.g. on focus change to
 ; an unknown context) should call HSE_HardReset() explicitly.
 HSE_Suppress(YesNo) {
-    global HSE_Suppressed
-    if YesNo {
-        HSE_Suppressed += 1
-    } else {
-        HSE_Suppressed := Max(0, HSE_Suppressed - 1)
-    }
+		global HSE_Suppressed
+		if YesNo {
+				HSE_Suppressed += 1
+		} else {
+				HSE_Suppressed := Max(0, HSE_Suppressed - 1)
+		}
 }
 
 ; Force the buffer back to a known-empty state with no word-boundary
@@ -734,9 +734,9 @@ HSE_Suppress(YesNo) {
 ; sit flush at the start of the new buffer will refuse to fire until a
 ; word terminator has been observed.
 HSE_HardReset() {
-    global HSE_Buffer, HSE_StartIsWordBoundary
-    HSE_Buffer := ""
-    HSE_StartIsWordBoundary := false
+		global HSE_Buffer, HSE_StartIsWordBoundary
+		HSE_Buffer := ""
+		HSE_StartIsWordBoundary := false
 }
 
 ; Apply an expansion to the buffer to mirror the screen change a hotstring
@@ -748,34 +748,34 @@ HSE_HardReset() {
 ; terminator (the new HSE_FeedChar keeps terminators in the buffer too,
 ; so triggers that span them — e.g. « ,a → ja » — can still match).
 HSE_ApplyExpansion(Spec, Replacement, EndChar := "") {
-    global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN, HSE_TypoNbspStripped
-    global HSE_CONSUMED_DELIMITERS
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN, HSE_TypoNbspStripped
+		global HSE_CONSUMED_DELIMITERS
 
-    StripLen := Spec.Length + (EndChar != "" ? 1 : 0) + (HSE_TypoNbspStripped ? 1 : 0)
-    BufLen := StrLen(HSE_Buffer)
+		StripLen := Spec.Length + (EndChar != "" ? 1 : 0) + (HSE_TypoNbspStripped ? 1 : 0)
+		BufLen := StrLen(HSE_Buffer)
 
-    ; Strip the trigger suffix (and the end char when present). Be
-    ; defensive: if the buffer drifted out of sync we still strip
-    ; StripLen chars off the right end since that reflects the BackSpace
-    ; count the dispatcher will send.
-    if (BufLen >= StripLen) {
-        HSE_Buffer := SubStr(HSE_Buffer, 1, BufLen - StripLen)
-    } else {
-        HSE_Buffer := ""
-    }
+		; Strip the trigger suffix (and the end char when present). Be
+		; defensive: if the buffer drifted out of sync we still strip
+		; StripLen chars off the right end since that reflects the BackSpace
+		; count the dispatcher will send.
+		if (BufLen >= StripLen) {
+				HSE_Buffer := SubStr(HSE_Buffer, 1, BufLen - StripLen)
+		} else {
+				HSE_Buffer := ""
+		}
 
-    ; Append the replacement, then the end character if any.
-    ; Consumed delimiters are swallowed by the dispatcher and never re-injected
-    ; into the app — appending them to the buffer here would desync it with the
-    ; actual screen state and make the next trigger match against a ghost char.
-    HSE_Buffer .= Replacement
-    if (EndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, EndChar))
-        HSE_Buffer .= EndChar
+		; Append the replacement, then the end character if any.
+		; Consumed delimiters are swallowed by the dispatcher and never re-injected
+		; into the app — appending them to the buffer here would desync it with the
+		; actual screen state and make the next trigger match against a ghost char.
+		HSE_Buffer .= Replacement
+		if (EndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, EndChar))
+				HSE_Buffer .= EndChar
 
-    if (StrLen(HSE_Buffer) > HSE_MAX_BUFFER_LEN) {
-        HSE_Buffer := SubStr(HSE_Buffer, -HSE_MAX_BUFFER_LEN)
-        HSE_StartIsWordBoundary := false
-    }
+		if (StrLen(HSE_Buffer) > HSE_MAX_BUFFER_LEN) {
+				HSE_Buffer := SubStr(HSE_Buffer, -HSE_MAX_BUFFER_LEN)
+				HSE_StartIsWordBoundary := false
+		}
 }
 
 
@@ -788,70 +788,70 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "") {
 ; Returns a minimal Spec-like object compatible with HSE_DispatchMatch (star
 ; trigger, no end char) or "" when the repeat condition is not met.
 HSE_TryRepeatKey(MagicKey) {
-    global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS, HSE_RepeatEnabled, HSE_Suppressed
-    global HSE_RebuildInProgress
-    ; The live-rebuild fence belongs here as much as in HSE_FindMatchAtEnd. While
-    ; the registry is being rewritten the matcher answers "" for EVERY sequence —
-    ; that means "the registry cannot answer right now", not "no trigger claims
-    ; this". _OnPrefixChar cannot tell the two apart, so it falls through to this
-    ; fallback and the doubling replaces the expansion the user asked for with
-    ; different text for the ~1.3 s a live toggle takes. Passing the keystroke
-    ; through unexpanded is the contract RebuildHotstringsLive advertises.
-    if (HSE_RebuildInProgress or !HSE_RepeatEnabled or HSE_Suppressed) {
-        return ""
-    }
-    MkLen := StrLen(MagicKey)
-    BufLen := StrLen(HSE_Buffer)
-    ; Buffer must contain at least <x><RepeatChar><MagicKey> = MkLen+2 chars.
-    if (BufLen <= MkLen) {
-        return ""
-    }
-    ; Verify the buffer ends with MagicKey.
-    if (SubStr(HSE_Buffer, -MkLen) !== MagicKey) {
-        return ""
-    }
-    ; The char being repeated is immediately before the magic key.
-    RepeatCharPos := BufLen - MkLen
-    RepeatChar := SubStr(HSE_Buffer, RepeatCharPos, 1)
-    ; Refuse to repeat whitespace or terminators.
-    if (RepeatChar == "" or InStr(_HSE_WordBoundarySet(), RepeatChar) > 0) {
-        return ""
-    }
-    ; The char before RepeatChar must exist and be a non-terminator — this ensures
-    ; RepeatChar is at least the 2nd letter of the current word.
-    PredPos := RepeatCharPos - 1
-    if (PredPos < 1) {
-        ; RepeatChar is flush at the start of the buffer — refuse to repeat because
-        ; we cannot confirm it is mid-word.
-        return ""
-    }
-    PredChar := SubStr(HSE_Buffer, PredPos, 1)
-    ; Boundary set, not terminator set: after an opening quote the char is the
-    ; FIRST letter of its word, so doubling it is meaningless and the real
-    ; expansion must be allowed to win instead.
-    if (InStr(_HSE_WordBoundarySet(), PredChar) > 0) {
-        return ""
-    }
-    ; When PredChar sits at position 1 of the buffer (PredPos == 1) and the buffer
-    ; start context is unknown (HSE_StartIsWordBoundary = false), we cannot confirm
-    ; RepeatChar is truly the 2nd+ letter of a word — refuse to avoid false-positive
-    ; doubling when a registered text-expansion with the same suffix happens to fail
-    ; its own word-boundary check.
-    if (PredPos == 1 and !HSE_StartIsWordBoundary) {
-        return ""
-    }
-    ; All checks passed — build a transient Spec and fire.
-    TriggerStr := RepeatChar . MagicKey
-    return {
-        Trigger:     TriggerStr,
-        Length:      StrLen(TriggerStr),
-        Star:        true,
-        InWord:      true,
-        IsRepeat:    true,
-        Replacement: RepeatChar . RepeatChar,
-        OnlyText:    true,
-        FinalResult: false
-    }
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS, HSE_RepeatEnabled, HSE_Suppressed
+		global HSE_RebuildInProgress
+		; The live-rebuild fence belongs here as much as in HSE_FindMatchAtEnd. While
+		; the registry is being rewritten the matcher answers "" for EVERY sequence —
+		; that means "the registry cannot answer right now", not "no trigger claims
+		; this". _OnPrefixChar cannot tell the two apart, so it falls through to this
+		; fallback and the doubling replaces the expansion the user asked for with
+		; different text for the ~1.3 s a live toggle takes. Passing the keystroke
+		; through unexpanded is the contract RebuildHotstringsLive advertises.
+		if (HSE_RebuildInProgress or !HSE_RepeatEnabled or HSE_Suppressed) {
+				return ""
+		}
+		MkLen := StrLen(MagicKey)
+		BufLen := StrLen(HSE_Buffer)
+		; Buffer must contain at least <x><RepeatChar><MagicKey> = MkLen+2 chars.
+		if (BufLen <= MkLen) {
+				return ""
+		}
+		; Verify the buffer ends with MagicKey.
+		if (SubStr(HSE_Buffer, -MkLen) !== MagicKey) {
+				return ""
+		}
+		; The char being repeated is immediately before the magic key.
+		RepeatCharPos := BufLen - MkLen
+		RepeatChar := SubStr(HSE_Buffer, RepeatCharPos, 1)
+		; Refuse to repeat whitespace or terminators.
+		if (RepeatChar == "" or InStr(_HSE_WordBoundarySet(), RepeatChar) > 0) {
+				return ""
+		}
+		; The char before RepeatChar must exist and be a non-terminator — this ensures
+		; RepeatChar is at least the 2nd letter of the current word.
+		PredPos := RepeatCharPos - 1
+		if (PredPos < 1) {
+				; RepeatChar is flush at the start of the buffer — refuse to repeat because
+				; we cannot confirm it is mid-word.
+				return ""
+		}
+		PredChar := SubStr(HSE_Buffer, PredPos, 1)
+		; Boundary set, not terminator set: after an opening quote the char is the
+		; FIRST letter of its word, so doubling it is meaningless and the real
+		; expansion must be allowed to win instead.
+		if (InStr(_HSE_WordBoundarySet(), PredChar) > 0) {
+				return ""
+		}
+		; When PredChar sits at position 1 of the buffer (PredPos == 1) and the buffer
+		; start context is unknown (HSE_StartIsWordBoundary = false), we cannot confirm
+		; RepeatChar is truly the 2nd+ letter of a word — refuse to avoid false-positive
+		; doubling when a registered text-expansion with the same suffix happens to fail
+		; its own word-boundary check.
+		if (PredPos == 1 and !HSE_StartIsWordBoundary) {
+				return ""
+		}
+		; All checks passed — build a transient Spec and fire.
+		TriggerStr := RepeatChar . MagicKey
+		return {
+				Trigger:     TriggerStr,
+				Length:      StrLen(TriggerStr),
+				Star:        true,
+				InWord:      true,
+				IsRepeat:    true,
+				Replacement: RepeatChar . RepeatChar,
+				OnlyText:    true,
+				FinalResult: false
+		}
 }
 
 #Include hotstring_match.ahk

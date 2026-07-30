@@ -48,8 +48,8 @@ global _TOML_STRICT_CANON_IN_PROGRESS := false
 ; onboarding wizard again even for existing users. The dev-mode fallback keeps
 ; using A_ScriptDir\_generated\paths.toml.
 global _PathsFile := A_IsCompiled
-    ? (A_AppData . "\Ergopti\paths.toml")
-    : (A_ScriptDir . "\_generated\paths.toml")
+		? (A_AppData . "\Ergopti\paths.toml")
+		: (A_ScriptDir . "\_generated\paths.toml")
 global _PathsOverrides := ReadPathsToml(_PathsFile)
 
 ; ConfigDirPath is the single relocatable folder that holds all personal files.
@@ -57,12 +57,12 @@ global _PathsOverrides := ReadPathsToml(_PathsFile)
 ; must end with a backslash.
 global _DefaultConfigDir := EnvGet("USERPROFILE") . "\.config\ergopti_plus\"
 global _ConfigDir := (_PathsOverrides.Has("ConfigDirPath") and _PathsOverrides["ConfigDirPath"] != "")
-    ? _PathsOverrides["ConfigDirPath"]
-    : _DefaultConfigDir
+		? _PathsOverrides["ConfigDirPath"]
+		: _DefaultConfigDir
 if !(_ConfigDir ~= "[/\\]$")
-    _ConfigDir .= "\"
+		_ConfigDir .= "\"
 if !DirExist(_ConfigDir) {
-    try DirCreate(_ConfigDir)
+		try DirCreate(_ConfigDir)
 }
 
 ; Subfolder name for AHK-specific user files under _ConfigDir. Centralised so
@@ -131,7 +131,7 @@ global IconPathDisabled := _LogoDir . "\logo_simple_disabled.ico"
 ; Set the custom tray icon immediately so the default green AHK icon never
 ; appears — even briefly during the module loading phase that follows.
 if FileExist(IconPath)
-    TraySetIcon(IconPath)
+		TraySetIcon(IconPath)
 
 ; Auto-create driver and shared subfolders under _ConfigDir on first launch.
 ; autohotkey/ holds driver-specific files; hotstrings/ holds the shared TOML
@@ -142,4 +142,4 @@ try DirCreate(_ConfigDir . "hotstrings")
 ; user always has a file to open rather than a confusing error.
 _PersonalTomlBootstrap := _ConfigDir . "hotstrings\personal_hotstrings.toml"
 if !FileExist(_PersonalTomlBootstrap)
-    try FileAppend("", _PersonalTomlBootstrap)
+		try FileAppend("", _PersonalTomlBootstrap)
