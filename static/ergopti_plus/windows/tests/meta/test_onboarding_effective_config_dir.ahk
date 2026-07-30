@@ -94,10 +94,8 @@ _OEC_PublishStillFollowsPersistence() {
 ; the fix.
 _OEC_MetricsWarningUsesTheChosenDir() {
 	Checked := 0
-	for Name in ["_Onboarding_Step4", "_OnbWeb_LocaleStringsExpr", "_OnbWeb_BuildDialogPayload"] {
+	for Name in ["_Onboarding_Step4", "_OnbWeb_LocaleStringsExpr"] {
 		Body := _DriverFuncBody(Name)
-		if (Body == "")
-			continue
 		if (InStr(Body, "enable_warning") == 0)
 			continue
 		Checked += 1

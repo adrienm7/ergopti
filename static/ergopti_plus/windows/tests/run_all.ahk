@@ -660,6 +660,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_dispatcher_start_guarded.ahk
 #Include meta/test_dispatcher_start_ungated.ahk
 #Include meta/test_dispatcher_stop_wired.ahk
+#Include meta/test_driver_source_helpers_fail_loudly.ahk
 #Include meta/test_error_handler_heavy_diagnostics.ahk
 #Include meta/test_ext_builder_fn_dynamic_call_swallow.ahk
 #Include meta/test_format_toml_stale_path_deadcode.ahk

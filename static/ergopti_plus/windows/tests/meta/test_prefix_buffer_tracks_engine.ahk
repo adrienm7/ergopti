@@ -47,10 +47,7 @@
 ; ======================================================
 
 _PBT_BackspaceIsNotAResetKey() {
-	Body := _DriverFuncBody("_PrefixWatcherOnKeyDown")
-	if (Body == "")
-		Body := _DriverDirConcat("lib/hotstrings")
-	Assert(Body != "", "the watcher key-down path must be readable")
+	Body := _DriverFuncBody("_OnPrefixKeyDown")
 	Assert(InStr(Body, "_PrefixFeedBackspace()") > 0,
 		"backspace must shrink the watcher buffer by one character — wiping it left the engine still able to fire a hotstring the tooltip had stopped offering, because HSE_FeedBackspace only decrements")
 }
@@ -133,10 +130,7 @@ _PBT_ResetListExcludesBackspace() {
 ; ===============================================================
 
 _PBT_DeclinedMatchTakesTheNoMatchPath() {
-	Body := _DriverFuncBody("_PrefixWatcherOnChar")
-	if (Body == "")
-		Body := _DriverDirConcat("lib/hotstrings")
-	Assert(Body != "", "the watcher char path must be readable")
+	Body := _DriverFuncBody("_OnPrefixChar")
 
 	FiredGate := InStr(Body, "if !_HseFired")
 	Assert(FiredGate > 0,

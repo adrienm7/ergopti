@@ -67,7 +67,7 @@ _CTSW_NoSecondSectionSplicingWriter() {
 		"the scanned driver source must actually contain the config-shortcuts module")
 
 	for Name in ["CS_WriteShortcutsSection", "CS_ReplaceSection", "CS_RenderSection", "CS_RenderValue", "CS_Join"] {
-		Assert(_DriverFuncBody(Name) == "",
+		Assert(_DriverFuncBodyOrEmpty(Name) == "",
 			Name . " must not be reintroduced — config.toml has exactly one writer, and a section splicer seeded from a bare-try FileRead cannot tell an unreadable file from an empty one")
 		Assert(InStr(Src, Name) == 0,
 			Name . " must not appear anywhere in the driver source: a call left behind after the helper was deleted is a load-time 'call to nonexistent function' and the driver never starts")

@@ -40,7 +40,7 @@ _MPQT_PruneIsLinear() {
 
 	; The quadratic per-ID tray walker must be gone — its very presence is the
 	; regression (a full tray descent invoked once per tracked ID).
-	Assert(_DriverFuncBody("_MenuDispatchIdIsLiveAnywhere") == "",
+	Assert(_DriverFuncBodyOrEmpty("_MenuDispatchIdIsLiveAnywhere") == "",
 		"_MenuDispatchIdIsLiveAnywhere must be removed — it walked the whole tray PER tracked "
 		. "ID, making the prune O(tracked x tray) (~6 s at boot; menu-prune-quadratic-tray-walk)")
 
