@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# _shared/modules/llm/validate_menu_persistence_contract.py
 """Validate menu_persistence_contract.json (CI-friendly, no AHK/Lua required)."""
 
 from __future__ import annotations

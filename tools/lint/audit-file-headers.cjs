@@ -41,7 +41,10 @@ const TREES = [
 	'windows/lib', 'windows/modules', 'windows/ui', 'windows/adapters',
 	'macos/lib', 'macos/modules', 'macos/ui', 'macos/adapters',
 	'linux/modules', 'linux/adapters', 'linux/lib', 'linux/bin', 'linux/ui',
-	'_shared/lua', '_shared/ui'
+	// _shared/core (the port specs) and _shared/modules were outside the audit,
+	// and had drifted to a repo-relative header (`static/ergopti_plus/_shared/…`)
+	// where every other tree under _shared/ uses the BASE-relative form.
+	'_shared/lua', '_shared/ui', '_shared/core', '_shared/modules'
 ];
 const EXTS = new Set(['.ahk', '.lua', '.js', '.cjs', '.mjs', '.py', '.sh', '.swift']);
 const SKIP_DIR = new Set(['tests', 'vendor', '_generated', 'node_modules']);

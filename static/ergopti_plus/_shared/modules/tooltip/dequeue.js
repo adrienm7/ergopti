@@ -1,4 +1,4 @@
-// static/ergopti_plus/_shared/modules/tooltip/dequeue.js
+// _shared/modules/tooltip/dequeue.js
 
 /**
  * ==============================================================================

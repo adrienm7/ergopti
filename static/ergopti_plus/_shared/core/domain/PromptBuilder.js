@@ -1,4 +1,4 @@
-// static/ergopti_plus/_shared/core/domain/PromptBuilder.js
+// _shared/core/domain/PromptBuilder.js
 
 /**
  * ==============================================================================

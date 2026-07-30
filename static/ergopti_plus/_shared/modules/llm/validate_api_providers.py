@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# _shared/modules/llm/validate_api_providers.py
 """Validate _shared/modules/llm/api_providers.json (CI-friendly, no AHK/Lua required)."""
 
 from __future__ import annotations
