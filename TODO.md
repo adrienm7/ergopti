@@ -10,7 +10,7 @@ than carried forward.
 
 [`docs/PLAN_SIMPLIFICATION.md`](docs/PLAN_SIMPLIFICATION.md) is the full audit and
 plan; [`docs/ERGOPTI_PLUS.md`](docs/ERGOPTI_PLUS.md) documents how the system works
-today. Lot 0 and 5 of the 12 blockers are done on that branch. What remains, in
+today. Lot 0 and 6 of the 12 blockers are done on that branch. What remains, in
 the plan's own priority order:
 
 | # | Blocker | Why it is next | Note before starting |

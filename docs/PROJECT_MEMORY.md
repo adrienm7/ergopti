@@ -2554,7 +2554,7 @@ Le plan complet est dans `docs/PLAN_SIMPLIFICATION.md`, la documentation du
 fonctionnement dans `docs/ERGOPTI_PLUS.md`.
 
 **Livre** : lot 0 (la verite : README, specs partagees, angles morts de lint) et
-5 des 12 blocages — B1 (aucun log sur Linux), B2 (tray absent de toute unite
+6 des 12 blocages — B1 (aucun log sur Linux), B2 (tray absent de toute unite
 packagee), B7 (`resolve_disabled_when` AHK echouait ouvert), B8 (chemins des
 packs d'extensions), B11 (le LLM Windows journalisait le texte tape), B12 (le
 bloc `<think>` etait tape dans le document sur Linux). Restants : B3, B4, B5, B6,
