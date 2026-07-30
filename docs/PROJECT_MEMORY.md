@@ -108,6 +108,8 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-svelte-script-comment-closing-tag](#project-svelte-script-comment-closing-tag) — A literal closing script tag ANYWHERE inside a Svelte component script — even in a // comment — terminates the block and breaks the parse; assemble such strings from split halves
 - [project-hs-audit-2026-07-29](#project-hs-audit-2026-07-29) — Every cross-cutting hygiene ratchet in this repo was written for the Windows driver and never extended to macOS; that one gap shipped a red CI job, sixteen mojibake sequences and nineteen unparseable locales
 - [project-hs-audit-2026-07-30-implementation](#project-hs-audit-2026-07-30-implementation) — Ce qui casse quand on implemente les findings : un garde qui cherche le helper « quelque part dans l'appel » est un faux vert, et `doAfter(0, …)` deplace le gel sans le supprimer
+- [project-source-scanning-guards-must-strip-comments](#project-source-scanning-guards-must-strip-comments) — Tout garde qui cherche du texte dans du code source doit retirer les commentaires d'abord : commenter la ligne gardee laisse le texte cherche intact, et le garde reste vert. Piege rencontre deux fois en une session, sur des tests neufs
+- [project-simplification-branch-2026-07-30](#project-simplification-branch-2026-07-30) — Etat de la branche `simplification` : ce qui est livre, ce qui reste, et les trois affirmations d'audit qui se sont revelees fausses a la verification
 
 ## Working conventions & feedback
 
@@ -2490,3 +2492,102 @@ Hammerspoon, distincts de ceux rencontres en le menant.
 
 Related: [[project_hs_audit_2026_07_29]], [[project_audit_findings_are_hypotheses]],
 [[project_ahk_invariant_incomplete_application]], [[feedback_regression_tests]].
+
+
+
+
+### project-source-scanning-guards-must-strip-comments
+
+_Tout garde qui cherche du texte dans du code source doit retirer les commentaires d'abord : commenter la ligne gardee laisse le texte cherche intact, et le garde reste vert. Piege rencontre deux fois en une session, sur des tests neufs_
+
+<sub>slug: `project_source_scanning_guards_must_strip_comments`</sub>
+
+Un meta-test qui asserte `assert_contains(source, "Foo.install(")` **ne peut pas
+echouer** quand on desactive l'appel en le commentant : la chaine cherchee est
+toujours presente, dans le commentaire. Verifie deux fois le 2026-07-30, sur deux
+gardes ecrits le jour meme :
+
+1. `linux/tests/unit/meta/test_logger_sink.lua` — commenter
+   `LoggerSink.install(Logger)` laissait les trois assertions vertes. Le garde ne
+   prouvait donc rien sur le bug qu'il etait cense encoder.
+2. `tools/test/test-extensions-path-resolves.cjs` — le cliquet interdisant
+   l'ancien prefixe `static/extensions` signalait **les commentaires qui
+   expliquent le bug**, y compris les siens et ceux du correctif.
+
+C'est la meme famille que le cliquet de purete `hs.*`, qui compte la sous-chaine
+`hs.` dans les commentaires et les litteraux : la difference est que la, le
+faux positif est bruyant, alors qu'ici le faux **negatif** est silencieux.
+
+**Comment appliquer.**
+
+- Retirer les lignes entierement commentees avant toute recherche de code. Une
+  bande passante suffisante : `^%s*%-%-` (Lua), `^\s*;` (AHK), `^\s*(//|#)`.
+  C'est ainsi que du code se desactive en pratique, et ca ne peut pas se
+  declencher a tort sur un `--` dans un litteral de chaine.
+- Pour un cliquet qui doit aussi ignorer les commentaires de fin de ligne,
+  couper la ligne au premier marqueur de commentaire de ce langage.
+- **Ajouter un auto-test du strippeur** dans le meme fichier
+  (`strip("-- Foo.install()")` ne doit plus contenir `Foo`). Sans lui, la
+  regression du garde est invisible.
+- Et surtout : **verifier le rouge**. Desactiver le correctif, lancer, constater
+  l'echec, retablir. Les deux pieges ci-dessus n'ont ete trouves que comme ca.
+- Un garde qui scanne son propre fichier doit s'exclure : les deux le
+  mentionnaient dans leur docstring.
+
+Memoires soeurs : [[feedback_regression_tests]] (tout correctif part avec son
+test), [[project_ahk_guard_tests_must_loop_the_class]] (enumerer la classe, pas
+le site), [[project_hs_purity_ratchet_counts_comments]] (le meme comptage, cote
+faux positif).
+
+
+
+
+### project-simplification-branch-2026-07-30
+
+_Etat de la branche `simplification` : ce qui est livre, ce qui reste, et les trois affirmations d'audit qui se sont revelees fausses a la verification_
+
+<sub>slug: `project_simplification_branch_2026_07_30`</sub>
+
+Branche `simplification`, derivee de `dev`, worktree sous
+`.claude/worktrees/simplification`. Non fusionnee : le mainteneur decide quand.
+Le plan complet est dans `docs/PLAN_SIMPLIFICATION.md`, la documentation du
+fonctionnement dans `docs/ERGOPTI_PLUS.md`.
+
+**Livre** : lot 0 (la verite : README, specs partagees, angles morts de lint) et
+5 des 12 blocages — B1 (aucun log sur Linux), B2 (tray absent de toute unite
+packagee), B7 (`resolve_disabled_when` AHK echouait ouvert), B8 (chemins des
+packs d'extensions), B11 (le LLM Windows journalisait le texte tape), B12 (le
+bloc `<think>` etait tape dans le document sur Linux). Restants : B3, B4, B5, B6,
+B9, B10 — listes avec leurs pieges dans `TODO.md`.
+
+**Trois affirmations d'audit fausses, corrigees a la verification.** A citer
+comme rappel que l'etape de verification n'est pas optionnelle :
+
+1. « `.husky/` n'existe pas, il n'y a aucun hook git. » **Faux** :
+   `.husky/{pre-commit,commit-msg}` sont suivis par git. Le test qui a produit
+   cette conclusion avait tourne depuis `static/ergopti_plus/` apres une derive
+   du repertoire courant. En revanche l'agent avait raison sur le fond : le hook
+   annoncait « BOM + CRLF » alors que le fixer qu'il appelle normalise en LF.
+2. « Supprimer `tools/build/PKGBUILD`, reference nulle part. » **Faux** : c'est la
+   recette de packaging Arch/AUR elle-meme, consommee par `makepkg`, pas par un
+   script du depot. La supprimer aurait retire le support Arch. Elle contenait en
+   revanche un vrai bug : six sites de packaging pointaient vers
+   `github.com/nizos/ergopti`, et `PKGBUILD` clonait ce mauvais depot.
+3. « Brancher `linux/adapters/secure_field_detector.lua`, il n'a aucun
+   consommateur. » **Faux comme correctif** : le non-usage est delibere et
+   documente (`modules/keylogger/keylogger.lua:90-98`) — l'adaptateur matche le
+   `WM_CLASS` exactement sur une liste plus courte, donc deleguer *reduirait* la
+   couverture et laisserait fuir `gpg`/`ssh-agent`/`polkit`/`sudo`. Un garde de
+   test verrouille « la couverture ne doit jamais se reduire ». Le correctif de
+   B4 doit etre **additif**.
+
+**Deux mesures a garder.** Le ratio d'identite d'arborescence est de **18,9 %**
+(10 des 53 sous-repertoires de profondeur <= 2 presents dans les trois drivers) —
+c'est la metrique de progression de l'invariant I1. Et `_shared/lua/` n'est
+partage qu'a **37,7 %** (3 195 des 8 473 lignes requises en production par les
+deux drivers Lua) : verifier les consommateurs reels avant de supposer qu'une
+modification y atteint macOS *et* Linux.
+
+Memoires soeurs : [[project_source_scanning_guards_must_strip_comments]],
+[[project_audit_findings_are_hypotheses]],
+[[project_audit_evidence_must_be_reproducible]].
