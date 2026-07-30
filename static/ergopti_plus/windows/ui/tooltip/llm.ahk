@@ -41,6 +41,12 @@ global _LLM_Tooltip_Loading  := false
 global _LLM_TOOLTIP_MIN_DISPLAY_MS := 600
 ; A_TickCount when the current real prediction was rendered (0 = none / loading).
 global _LLM_Tooltip_ShownAt := 0
+; Spinner label used when the i18n layer is not up yet (t is unset during the
+; earliest boot window). It carries NO language on purpose: the previous
+; fallback was hardcoded French, so a user on any of the other 20 locales who
+; triggered a prediction in that window was shown French. An hourglass says the
+; same thing in every one of them.
+global _LLM_TOOLTIP_LOADING_FALLBACK := "⏳"
 ; Footer state — mirrors tooltip_llm.lua info/hint rows.
 global _LLM_Tooltip_ShowInfoBar := false
 global _LLM_Tooltip_InfoModel   := ""
@@ -192,7 +198,7 @@ LLM_TooltipShowLoading() {
 	; The violet spinner is not a real prediction — clear any grace stamp so the
 	; window cannot keep a previous prediction "protected" behind the loading state.
 	_LLM_Tooltip_ShownAt := 0
-	label := (IsSet(t)) ? t("llm.generating") : "⏳ Génération en cours…"
+	label := (IsSet(t)) ? t("llm.generating") : _LLM_TOOLTIP_LOADING_FALLBACK
 	accent := _TooltipResolveAccent("ai_loading")
 	; DurationSec 0 + ArmSafety false: the spinner must live until the prediction
 	; lands or LLM_TooltipHide runs — inference legitimately outlasts the 3 s
@@ -693,7 +699,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration) {
 	MaxW  := 0
 	slotCount := slots.Length
 	all_placeholder := _LLM_AllSlotsPlaceholder(slots)
-	loading_label := (IsSet(t)) ? t("llm.generating") : "⏳ Génération en cours…"
+	loading_label := (IsSet(t)) ? t("llm.generating") : _LLM_TOOLTIP_LOADING_FALLBACK
 	for i, slot in slots {
 		is_active := (i == active_idx)
 		display := all_placeholder ? loading_label : _LLM_SlotBuildText(slot, is_active, i, slotCount)
@@ -774,7 +780,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration) {
 			; stack is still waiting; otherwise sparkle + ellipsis per slot (HS).
 			color := UI_LLM_LOADING_HEX
 			prefix := is_active ? activePrefix : inactivePrefix
-			loading_label := (IsSet(t)) ? t("llm.generating") : "⏳ Génération en cours…"
+			loading_label := (IsSet(t)) ? t("llm.generating") : _LLM_TOOLTIP_LOADING_FALLBACK
 			display := _LLM_AllSlotsPlaceholder(slots) ? loading_label : (prefix . LLM_TOOLTIP_PLACEHOLDER)
 			G.SetFont("italic c" . color . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",

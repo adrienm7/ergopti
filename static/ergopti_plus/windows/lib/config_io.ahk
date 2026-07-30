@@ -779,11 +779,21 @@ _MakeKeyboardShortcutHandler(SlotId, ActionName) {
 
 _FormatSlotLabel(SlotId) {
     static _ModLabels := Map("ctrl_shift_", "Ctrl + Shift + ", "ctrl_", "Ctrl + ", "win_", "Win + ", "alt_", "Alt + ")
-    static _KeyNames := Map("space", "Espace", "enter", "Entrée", "period", ".", "comma", ",", "sc029", "²")
+    ; Only the two NAMED keys are translatable — ".", "," and "²" are the glyphs
+    ; themselves. The map holds i18n KEYS, never labels: a static initialised with
+    ; t() would freeze the language at first call, and the menu is rebuilt on a
+    ; language switch expecting the new one.
+    static _KeyNameKeys := Map("space", "common.key_space", "enter", "common.key_enter")
+    static _KeyGlyphs := Map("period", ".", "comma", ",", "sc029", "²")
     for Prefix, ModLabel in _ModLabels {
         if (SubStr(SlotId, 1, StrLen(Prefix)) = Prefix) {
             Suffix := SubStr(SlotId, StrLen(Prefix) + 1)
-            Key := _KeyNames.Has(Suffix) ? _KeyNames[Suffix] : StrUpper(Suffix)
+            if _KeyNameKeys.Has(Suffix)
+                Key := t(_KeyNameKeys[Suffix])
+            else if _KeyGlyphs.Has(Suffix)
+                Key := _KeyGlyphs[Suffix]
+            else
+                Key := StrUpper(Suffix)
             return ModLabel . Key
         }
     }
