@@ -117,9 +117,22 @@ helpers.describe("the MLX auto-hide only closes the window it armed for", functi
 		if not arm_at then return end
 		local window = src:sub(math.max(1, arm_at - 400), arm_at + 600)
 
-		helpers.assert_true(window:find('type%(llm_progress%.session_id%)') ~= nil,
+		-- The type guard has MOVED, not gone. The session is now captured when the
+		-- window is CLAIMED rather than sampled at completion — sampling later
+		-- reads whichever operation owns the surface by then, which is exactly
+		-- the one that must not be touched — and the guard lives in the shared
+		-- owned_session() helper that performs the capture. The invariant is
+		-- unchanged: a build without the accessor must degrade to hiding as
+		-- before, never raise inside a timer callback where the error is
+		-- swallowed to the Console.
+		local guard_src = helpers.read_driver_source("owned_session")
+		helpers.assert_true(guard_src ~= nil and guard_src ~= "",
+			"the ownership capture helper must exist")
+		helpers.assert_true(guard_src:find('type%(llm_progress%.session_id%)') ~= nil,
 			"the capture must be type-guarded so a download_window build without the accessor "
 			.. "still hides as before rather than raising inside a timer callback, where the "
 			.. "error would be swallowed to the Hammerspoon Console")
+		helpers.assert_true(guard_src:find("pcall", 1, true) ~= nil,
+			"and the accessor call itself must be pcall-wrapped for the same reason")
 	end)
 end)

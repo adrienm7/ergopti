@@ -66,12 +66,41 @@ LLM_Menu_GetProfileLabel(id) {
 }
 
 /**
+ * Returns ``Label`` unchanged the first time it is used in a menu, then
+ * " #2", " #3"… suffixed for each further use, and records the use in ``Seen``.
+ *
+ * Mirrors the disambiguator personal hotstring sections already use
+ * (``_HS_BuildDisambiguatedSectionLabels``): the suffix is a bare digit, so no
+ * i18n string is needed and the common unique case renders exactly as before.
+ *
+ * @param {Map}    Seen  - Per-menu occurrence counter, one per menu being built.
+ * @param {string} Label - Candidate row label.
+ * @returns {string} A label unique within that menu.
+ */
+_LLM_Menu_UniqueMenuLabel(Seen, Label) {
+	Seen[Label] := (Seen.Has(Label) ? Seen[Label] : 0) + 1
+	return (Seen[Label] > 1) ? (Label . " #" . Seen[Label]) : Label
+}
+
+/**
  * Builds the profile selection submenu with built-in and user profiles.
  * @returns {Menu} Populated profile submenu.
  */
 LLM_Menu_BuildProfileMenu() {
 	global _LLM_Menu
 	m := Menu()
+
+	; Row labels must be unique WITHIN this menu: AHK v2's Menu.Add with an
+	; already-present label modifies the existing item in place instead of
+	; appending, so a second row carrying the same text silently overwrites the
+	; first one's wrapper and RegisterMenuItem then rebinds the single surviving
+	; id to the newcomer. The first profile becomes unselectable and the
+	; checkmark paints on the wrong row. Nothing guarantees uniqueness here: a
+	; user profile's label is free text, and the "(Ctrl+n)" hint that happens to
+	; separate the early ones is empty past LLM_PROFILE_HOTKEY_LIMIT, so two
+	; profiles both named "Perso" collide from the sixth one onward
+	; (duplicate-user-profile-label-menu-collapse).
+	seen_labels := Map()
 
 	; Section header: built-in profiles
 	header_builtin := t("menu.profiles.header_default_profiles")
@@ -82,6 +111,7 @@ LLM_Menu_BuildProfileMenu() {
 		base_label := LLM_Menu_GetProfileLabel(id)
 		hint := LLM_Menu_GetProfileHotkeyHint(id)
 		label := (hint != "") ? base_label . "  (" . hint . ")" : base_label
+		label := _LLM_Menu_UniqueMenuLabel(seen_labels, label)
 		RegisterMenuItem(m, label, _LLM_Menu_MakeSetProfileHandler(id))
 		if (id == _LLM_Menu["profile_id"])
 			m.Check(label)
@@ -100,6 +130,7 @@ LLM_Menu_BuildProfileMenu() {
 			base_plabel := p.Has("label") ? p["label"] : pid
 			hint := LLM_Menu_GetProfileHotkeyHint(pid)
 			plabel := (hint != "") ? base_plabel . "  (" . hint . ")" : base_plabel
+			plabel := _LLM_Menu_UniqueMenuLabel(seen_labels, plabel)
 			RegisterMenuItem(m, plabel, _LLM_Menu_MakeUserProfileClickHandler(p))
 			if (pid == _LLM_Menu["profile_id"])
 				m.Check(plabel)

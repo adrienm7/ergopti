@@ -78,7 +78,7 @@ function M.load(ctx)
 		end
 	end
 	hotstring_editor.init(personal_path, keymap, nil, personal_default_priority)
-	keymap.load_toml("personal", personal_path)
+	keymap.load_toml(keymap.PERSONAL_GROUP_NAME, personal_path)
 	table.insert(loaded, { name = "personal", path = personal_path })
 
 	-- Recursively scan for extra TOML files in the hotstrings folder.

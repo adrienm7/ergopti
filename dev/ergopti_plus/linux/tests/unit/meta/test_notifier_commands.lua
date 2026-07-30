@@ -21,15 +21,92 @@ helpers.describe("notifier (notify-send)", function()
   -- 1. Module structure
   -- ==========================================================================
 
-  helpers.describe("module structure", function()
-    helpers.it("exports send function", function()
-      helpers.assert_true(type(notifier.send) == "function", "send is a function")
+  -- Every case below inspects the command the notifier composes, through its
+  -- own _set_runner seam. The previous version asserted only that send() did
+  -- not crash — but io.popen never raises on unescaped input, it EXECUTES it,
+  -- so removing the escaping was a silent regression and a real command
+  -- injection hole that these tests passed either way.
+
+  --- Captures the command a single send() would run.
+  --- @param title string
+  --- @param opts table|nil
+  --- @return string|nil
+  local function captured(title, opts)
+    local seen
+    notifier._set_runner(function(cmd) seen = cmd end)
+    local ok, err = pcall(function() notifier.send(title, opts) end)
+    notifier._reset_runner()
+    if not ok then error(err, 0) end
+    return seen
+  end
+
+  --- Counts non-overlapping occurrences of a plain substring.
+  local function count_of(haystack, needle)
+    local n, pos = 0, 1
+    while true do
+      local at = haystack:find(needle, pos, true)
+      if not at then return n end
+      n = n + 1
+      pos = at + #needle
+    end
+  end
+
+  helpers.describe("send() command composition", function()
+    helpers.it("passes the title and body through to notify-send", function()
+      local cmd = captured("Titre", { body = "Corps" })
+      helpers.assert_true(cmd ~= nil, "a command must be composed")
+      helpers.assert_true(cmd:find("notify-send", 1, true) ~= nil,
+        "notify-send must be the program invoked")
+      helpers.assert_true(cmd:find("Titre", 1, true) ~= nil, "the title must reach the command")
+      helpers.assert_true(cmd:find("Corps", 1, true) ~= nil, "the body must reach the command")
+    end)
+
+    helpers.it("maps the kind to an urgency", function()
+      helpers.assert_true(captured("t", { kind = "error" }):find("--urgency=critical", 1, true) ~= nil,
+        "an error notification must be critical, or it is silently indistinguishable from routine noise")
+      helpers.assert_true(captured("t", { kind = "info" }):find("--urgency=normal", 1, true) ~= nil,
+        "info maps to normal")
+      helpers.assert_true(captured("t", { kind = "banana" }):find("--urgency=normal", 1, true) ~= nil,
+        "an unknown kind must fall back to normal rather than composing an invalid flag")
+    end)
+
+    helpers.it("escapes a single quote in the title instead of ending the argument", function()
+      local cmd = captured("l'ami", {})
+      -- The POSIX close-escape-reopen idiom. A raw quote terminates the
+      -- single-quoted argument and hands the remainder to the shell as syntax.
+      helpers.assert_true(cmd:find("'\\''", 1, true) ~= nil,
+        "an embedded quote must be closed, escaped and reopened — left raw, the rest of the title reaches the shell as code rather than as text")
+      local at = cmd:find("'\\''", 1, true)
+      helpers.assert_true(cmd:byte(at + 1) == 92,
+        "the escape must be a real backslash (byte 92), not a lookalike character")
+    end)
+
+    helpers.it("escapes a single quote in the body as well", function()
+      local cmd = captured("t", { body = "d'accord" })
+      helpers.assert_true(cmd:find("'\\''", 1, true) ~= nil,
+        "the body is just as attacker-controlled as the title — a hotstring replacement or an app name can reach it")
+    end)
+
+    helpers.it("escapes every quote, not just the first", function()
+      local cmd = captured("a'b'c", { body = "d'e'f" })
+      helpers.assert_true(count_of(cmd, "'\\''") >= 4,
+        "gsub must replace all occurrences — one unescaped quote anywhere is enough to break out of the argument")
+    end)
+
+    helpers.it("keeps a command-substitution payload inside the quoted argument", function()
+      -- $(...) is inert inside a correctly quoted argument. This pins that the
+      -- escaping is what makes it inert, not the characters themselves.
+      local cmd = captured("x'$(id)'y", {})
+      helpers.assert_true(count_of(cmd, "'\\''") >= 2,
+        "both quotes delimiting the payload must be escaped — leaving one raw is what would let the $(...) be executed instead of displayed")
+    end)
+
+    helpers.it("composes a command even with no body", function()
+      local cmd = captured("seul", nil)
+      helpers.assert_true(cmd ~= nil and cmd:find("notify-send", 1, true) ~= nil,
+        "a title-only notification must still be sent — the body defaults to empty, not to a skipped call")
     end)
   end)
-
-  -- ==========================================================================
-  -- 2. send() basic API
-  -- ==========================================================================
 
   helpers.describe("send()", function()
     helpers.it("does not crash with basic title + body", function()

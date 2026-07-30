@@ -3,7 +3,7 @@
 
 # Architecture Overview
 
-> Generated on 2026-07-21 from port specs, domain specs, and adapter file listings.
+> Generated on 2026-07-29 from port specs, domain specs, and adapter file listings.
 
 The diagram below shows the three-layer hexagonal architecture:
 **Ports** (shared contracts) → **Adapters** (driver-specific implementations) → **Domain** (pure business logic).
@@ -62,6 +62,7 @@ graph TD
         HS_app_launcher["AppLauncher.lua"]
         HS_clipboard["Clipboard.lua"]
         HS_crypto["Crypto.lua"]
+        HS_event_tap_guard["EventTapGuard.lua"]
         HS_file_system["FileSystem.lua"]
         HS_graphics_renderer["GraphicsRenderer.lua"]
         HS_http_client["HttpClient.lua"]

@@ -392,6 +392,17 @@ _TH_WriteTapHoldToml(Data := unset) {
 		return
 	}
 	Path := _ConfigDir . _AhkSubDir . "tap_hold.toml"
+	; Refuse to rebuild a file the loader could not READ. Everything below is
+	; serialized from the in-memory map, and when the load saw nothing that map
+	; is the shipped defaults overlay — byte-for-byte what a user who customised
+	; nothing produces. Rewriting from it erases their per-key overrides, their
+	; hand-edited layer mappings and their explicit disable-all opt-out, and
+	; every caller here re-publishes TapHold only on a true return, so refusing
+	; leaves memory and disk consistent.
+	if TOML_UnreadableFile(Path) {
+		try LoggerError("TapHoldWriter", "Refusing to rewrite '{1}': it could not be read at load, so the in-memory tap-hold map holds the shipped defaults rather than the user's configuration. Restart the driver once the file is readable.", Path)
+		return false
+	}
 	try LoggerDebug("TapHoldWriter", "Persisting tap-hold config to '{1}' (keys={2}, layers={3}, inherit_defaults={4}).",
                 Path, Data.Has("keys") ? Data["keys"].Count : 0, Data.Has("layers") ? Data["layers"].Count : 0,
                 Data.Has("inherit_defaults") ? (Data["inherit_defaults"] ? "true" : "false") : "unset")

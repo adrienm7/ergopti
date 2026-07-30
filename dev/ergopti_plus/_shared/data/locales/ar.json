@@ -1,4 +1,4 @@
-﻿﻿{
+{
 	"_meta.flag": "🇸🇦",
 	"_meta.locale": "ar",
 	"_meta.name": "العربية",
@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "اسم الفئة الجديدة لـ %s:",
 	"metrics_apps.new_category_title": "فئة جديدة",
 	"metrics_apps.no_app_detected": "تعذّر اكتشاف أيّ تطبيق.",
+	"metrics_apps.pick_app_placeholder": "اختر تطبيقًا لتصنيفه…",
 	"metrics_apps.rename_chooser_placeholder": "الفئة المراد تغيير اسمها",
 	"metrics_apps.rename_item": "✎ إعادة تسمية فئة موجودة…",
 	"metrics_apps.rename_prompt": "الاسم الجديد للفئة \"%s\":",
@@ -1415,7 +1416,7 @@
 	"sfbsreduction.comma": "الفاصلة تقلل ثنائيات الإصبع الواحد",
 	"sfbsreduction.ecirc": "Ê تقلل ثنائيات الإصبع الواحد",
 	"sfbsreduction.egrave": "È تقلل ثنائيات الإصبع الواحد",
-	"sfbsreduction.ié": "IE تقلل ثنائيات IE/EI",
+	"sfbsreduction.ieacute": "IE تقلل ثنائيات IE/EI",
 	"sg_actions.activity_simulation": "🖱 محاكاة النشاط (مانع السكون)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (شاشة)",
 	"sg_actions.app_expose": "◱ عرض نوافذ التطبيق",
@@ -1652,6 +1653,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = فتح مجلد التنزيلات",
 	"shortcuts.pixel_read_error": "تعذّر قراءة لون البكسل",
 	"shortcuts.saved": "تم الحفظ: %s",
+	"shortcuts.screenshot_failed": "فشل التقاط الشاشة",
 	"shortcuts.screen": "Win + H (screensHot) = لقطة شاشة (يُشغّل Win + Shift + S)",
 	"shortcuts.screeninstant": "المفتاح يسار 1 = لقطة فورية للنافذة النشطة، محفوظة في الصور مع طابع زمني",
 	"shortcuts.screenocr": "Win + C (OCR) = لقطة شاشة مع استخراج النص (Win + Shift + T)",

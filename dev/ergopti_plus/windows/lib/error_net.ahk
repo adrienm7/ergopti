@@ -82,7 +82,15 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
         ; BEFORE LoggerInit, so a fault there would ExitApp with the line still in RAM:
         ; no log, no crash report, no dialog -- the exe silently "does nothing" on every
         ; launch. Resolve a log path and force a flush so the fatal line survives.
-        if (LOGGER_LOG_PATH == "")
+        ; IsSet first. LOGGER_LOG_PATH is only DECLARED at the logger include's
+        ; position, well below where OnError is armed, so for every fault in the
+        ; window between the two — which is exactly the window this branch exists
+        ; to cover, the Bundle_Init pump — the bare read raised UnsetError inside
+        ; the error handler itself. The whole fail-closed contract below (resolve
+        ; a path, flush, tell the user, exit 1) never ran, AHK's raw error dialog
+        ; appeared instead, and nothing reached any log. That is why the boot
+        ; crashes of 07-19 exist only in crash_reports/ and in no daily log.
+        if (!IsSet(LOGGER_LOG_PATH) or LOGGER_LOG_PATH == "")
             try LoggerInit()
         try _LoggerFlush(true)
         ; Tell the user WHY the driver is exiting. A modal is safe here: no input

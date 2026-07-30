@@ -156,10 +156,15 @@ helpers.describe("emit_tokens preserves token order across a deferred paste", fu
 			.. "Order was: " .. table.concat(log, " | "))
 	end)
 
-	helpers.it("a single paste with a following key still emits inline, in order", function()
-		-- Non-regression: with only ONE paste-worthy token nothing is deferred, so
-		-- the key must still be emitted immediately and after it. A fix that
-		-- deferred everything unconditionally would add latency to every expansion.
+	helpers.it("a key after a single inline paste is fenced behind it, and lands after it", function()
+		-- This case used to assert the key was emitted INLINE, on the reasoning that
+		-- an inline paste has already posted its Cmd+V and post order is preserved.
+		-- Post order is preserved — but the pasted TEXT is not one of our events:
+		-- the target produces it later, when it gets around to reading the
+		-- pasteboard. A key posted immediately behind the Cmd+V therefore reaches
+		-- the host ahead of the text it is supposed to follow, which is how an
+		-- Enter terminator landed on a line whose replacement had not arrived and
+		-- submitted it as it was. The fence now covers every paste.
 		local KU, log, fire_pending = load_utils()
 
 		KU.emit_tokens({
@@ -167,13 +172,115 @@ helpers.describe("emit_tokens preserves token order across a deferred paste", fu
 			{ kind = "key",  value = "return" },
 		})
 
-		local a_at   = index_of(log, "aaaaaa")
-		local key_at = index_of(log, "key:return")
-
-		helpers.assert_true(a_at ~= nil and key_at ~= nil,
-			"both the paste and the key must be emitted without needing the timer to fire")
-		helpers.assert_true(key_at > a_at, "order must hold on the inline path too")
+		helpers.assert_true(index_of(log, "key:return") == nil,
+			"the key must NOT be emitted before the paste has had its settle window — "
+				.. "Cmd+V is our last event, the text itself is the target's work. "
+				.. "Order was: " .. table.concat(log, " | "))
 
 		fire_pending()
+
+		local a_at   = index_of(log, "aaaaaa")
+		local key_at = index_of(log, "key:return")
+		helpers.assert_true(a_at ~= nil and key_at ~= nil,
+			"both the paste and the key must be emitted once the fence elapses. "
+				.. "Order was: " .. table.concat(log, " | "))
+		helpers.assert_true(key_at > a_at, "order must hold on the fenced path too")
+	end)
+
+	helpers.it("a keystroke-only expansion is never fenced", function()
+		-- The real non-regression behind the case above: nothing that avoids the
+		-- clipboard may pay a settle gap. Ordinary autocorrections are short ASCII
+		-- text and must still reach the screen with no timer in the way.
+		local KU, log, fire_pending = load_utils()
+
+		KU.emit_tokens({
+			{ kind = "text", value = "oui" },
+			{ kind = "key",  value = "return" },
+		})
+
+		local t_at   = index_of(log, "type:oui")
+		local key_at = index_of(log, "key:return")
+		helpers.assert_true(t_at ~= nil and key_at ~= nil,
+			"a keystroke-only expansion must be fully emitted inline, with no timer. "
+				.. "Order was: " .. table.concat(log, " | "))
+		helpers.assert_true(key_at > t_at, "order must hold inline")
+
+		fire_pending()
+	end)
+end)
+
+
+
+
+
+-- ==============================================
+-- ================================================
+-- ======= 3/ The Fence Is Reported Outward =======
+-- ================================================
+-- ==============================================
+
+helpers.describe("emit_tokens reports its ordering fence to the caller", function()
+	helpers.it("returns a positive delay once a paste has been deferred", function()
+		local KU, _log, fire_pending = load_utils()
+
+		local _c, _s, _logical, fence = KU.emit_tokens({
+			{ kind = "text", value = LONG_A },
+			{ kind = "text", value = LONG_B },
+		})
+		fire_pending()
+
+		helpers.assert_eq(type(fence), "number",
+			"emit_tokens must report the fence — a caller that emits anything MORE afterwards "
+				.. "has the same ordering hazard as the tokens and no other way to learn about it")
+		helpers.assert_true(fence > 0,
+			"with a paste still queued on a timer, a later synchronous send would overtake it, "
+				.. "so the fence must tell the caller how long to wait")
+	end)
+
+	helpers.it("returns zero when no clipboard was involved at all", function()
+		local KU, _log, fire_pending = load_utils()
+
+		local _c, _s, _logical, fence = KU.emit_tokens({
+			{ kind = "text", value = "oui" },
+			{ kind = "key",  value = "return" },
+		})
+		fire_pending()
+
+		helpers.assert_eq(fence, 0,
+			"keystrokes are OUR events end to end and CGEvent delivery preserves post order, so "
+				.. "nothing follows them on a timer. Reporting a delay here would add a settle "
+				.. "gap to every ordinary expansion, which is the cost this case exists to refuse")
+	end)
+
+	helpers.it("a single inline paste still reports a fence", function()
+		-- The fence is not about whether WE deferred anything. It is about who
+		-- produces the text: after Cmd+V the target does, on its own schedule, so a
+		-- caller emitting anything more must wait even though our own queue is empty.
+		local KU, _log, fire_pending = load_utils()
+
+		local _c, _s, _logical, fence = KU.emit_tokens({
+			{ kind = "text", value = LONG_A },
+			{ kind = "key",  value = "return" },
+		})
+		fire_pending()
+
+		helpers.assert_true(type(fence) == "number" and fence > 0,
+			"an inline paste must report a settle fence — reporting 0 told the terminator "
+				.. "re-type it was safe to fire immediately, and it landed on unpasted text")
+	end)
+
+	helpers.it("emit_text reports the same fence for the same reason", function()
+		local KU = load_utils()
+		local _c, _s, _logical, fence = KU.emit_text(LONG_A)
+		helpers.assert_true(type(fence) == "number" and fence > 0,
+			"emit_text pastes inline too — the contract must be uniform so callers need not "
+				.. "know which emitter they reached")
+	end)
+
+	helpers.it("emit_text reports no fence for text it types", function()
+		local KU = load_utils()
+		local _c, _s, _logical, fence = KU.emit_text("oui")
+		helpers.assert_eq(fence, 0,
+			"short text goes out as keystrokes, which need no settle window")
 	end)
 end)

@@ -17,9 +17,21 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 ; single live hook/log owner in the common case. The handle is intentionally never
 ; closed: the OS releases the mutex when this process exits, so a successor's wait
 ; unblocks the instant we die.
+;
+; EXEMPT: the detached keylogger-prefetch worker. The driver deliberately
+; re-runs this entry with /force and --keylogger-prefetch-worker to compute a
+; metrics projection; that worker registers no hook, no log owner and no tray,
+; so it is not what this gate exists to prevent. But the gate is the FIRST
+; auto-execute statement while the worker's own gate sits ~300 lines below, so
+; every worker spawned while the driver is alive blocked the full wait on the
+; live driver's mutex, timed out and ExitApp(0)'d before reaching its main —
+; the projection could never publish. KLPF_IsWorkerInvocation reads only
+; A_Args and its definition is hoisted, so it is callable here.
 global DRIVER_MUTEX_NAME := "Local\ErgoptiPlusDriver"
 global DRIVER_MUTEX_WAIT_MS := 3000 ; max boot delay while a previous instance exits
-global _DriverMutexHandle := DllCall("CreateMutexW", "Ptr", 0, "Int", 0, "Str", DRIVER_MUTEX_NAME, "Ptr")
+global _DriverMutexHandle := 0
+if !KLPF_IsWorkerInvocation()
+	_DriverMutexHandle := DllCall("CreateMutexW", "Ptr", 0, "Int", 0, "Str", DRIVER_MUTEX_NAME, "Ptr")
 if (_DriverMutexHandle) {
 	; Take ownership, waiting (bounded) for any previous owner to release it (exit).
 	; 0 = WAIT_OBJECT_0 (acquired), 0x80 = WAIT_ABANDONED (prior owner died holding it
@@ -136,6 +148,12 @@ OnError(ErgoptiGlobalErrorHandler)
 ; from source or from a compiled binary. In dev mode Bundle_Init() is a no-op.
 #Include lib/bundle.ahk
 Bundle_Init()
+; First of the retroactive boot stamps (lib/boot_profiler.ahk). Everything from
+; here to BootProfile_Begin() used to be one opaque "script parse + load: ~N ms"
+; number, so a slow start could be attributed to "pre-boot" and no further. A
+; stamp only records a tick — the logger does not exist yet — and BootProfile_Begin
+; replays them all once it does.
+BootProfile_Stamp("Bundle extracted")
 
 ; Compute _StaticDir and _VendorDir early so i18n.ahk and any module-level
 ; t() calls that run during #Include processing can resolve locale file paths.
@@ -248,6 +266,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; stays focused on ErgoptiPlus-specific logic.
 #Include lib/hotstrings/hotstring_engine.ahk
 #Include lib/hotstrings/hotstring_engine_main.ahk
+#Include lib/hotstrings/hotstring_buffer_effects.ahk
 #Include lib/hotstrings/hotstring_live_toggle.ahk
 #Include lib/hotstrings/hotstring_count_policy.ahk
 ; Generated terminator catalogue (single source of truth — shared with macOS via
@@ -367,6 +386,8 @@ LLM_Defaults_Load()
 #Include ui/tooltip/tooltip_llm.ahk
 #Include ui/menu/menu_llm/_index.ahk
 #Include ui/model_browser/init.ahk
+; Closes the include graph: every module's top-level initialiser has now run.
+BootProfile_Stamp("Module includes initialised")
 
 ; ======================================================
 ; ======================================================
@@ -394,11 +415,27 @@ LLM_Defaults_Load()
 ; regardless of the boot path (normal OR first-run).
 A_TrayMenu.Delete()
 Onboarding_Run()
+; Blocking on a first run, a no-op otherwise — which is exactly why it needs its
+; own stamp: a first-run boot and a normal boot are otherwise indistinguishable
+; in the timings.
+BootProfile_Stamp("Tray reset + onboarding")
 
 global _IniCache := ParseTomlFile(ConfigurationFile)
+; Latch the session sentinel SaveFullConfig honours when that parse could not
+; READ an existing config.toml. This snapshot is taken once and never refreshed,
+; yet it seeds the locale, the magic key, every category master gate, both
+; shortcut tables, the gesture assignments and the WPM widget — all of which
+; SaveFullConfig serialises back a few hundred ms later. By then the transient
+; lock has usually cleared, so no write-time check can tell that the payload was
+; derived from nothing; only latching at the instant of the failed read can.
+if TOML_UnreadableFile(ConfigurationFile) {
+    _ConfigBootReadFailed := true
+    try LoggerError("ErgoptiPlus", "Cannot read '{1}' at boot: every setting below stays at its compiled-in default, so persistence is blocked for this session. Restart the driver once the file is readable.", ConfigurationFile)
+}
 ReadScriptConfig(_IniCache)
 ReadCategoryEnabled(_IniCache)
 I18nInit(_IniCache)
+BootProfile_Stamp("Config parsed (TOML + i18n)")
 
 ; Resolve _ALTGR_KANA_FIXUP: TOML override (ScriptInformation["AltGrIsKanaRemap"])
 ; wins when set; otherwise auto-detect via the reverse VK_RMENU→SC probe. Must
@@ -406,6 +443,7 @@ I18nInit(_IniCache)
 ; this file triggers a full Reload() on layout switch, so this re-runs and
 ; adapts to the new layout automatically.
 HotstringEngineInit()
+BootProfile_Stamp("Hotstring engine initialised")
 
 ; Initialise the logger now that the ini cache is built and ScriptInformation
 ; reflects user overrides — LoggerInit reads [Script] LogLevel from the ini.

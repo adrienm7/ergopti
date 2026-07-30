@@ -31,11 +31,19 @@ local timer         = hs.timer
 local eventtap      = hs.eventtap
 local pasteboard    = hs.pasteboard
 local notifications = require("lib.notifications")
+local EventTapGuard = require("adapters.event_tap_guard")
+local ShellRunner   = require("adapters.shell_runner")
 local Logger        = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local Timings       = require("lib.timings")
 local i18n          = require("lib.i18n")
 
 local LOG = "shortcuts.actions.system"
+
+-- Absolute paths: the interactive layer must not inherit its binaries from PATH,
+-- which differs between a login shell and the Hammerspoon process.
+local MKDIR_BIN         = "/bin/mkdir"
+local SCREENCAPTURE_BIN = "/usr/sbin/screencapture"
 
 -- Explicit inter-key delay for simulated keystrokes. hs.eventtap.keyStroke()
 -- defaults this argument to 200 000 us and implements it as a BLOCKING usleep on
@@ -125,6 +133,10 @@ local awake_alert_shown = false
 -- "closeAll even when the alert id is nil" regression test, and it is gated on
 -- awake_alert_shown so a call made when no banner of ours is up (the defensive
 -- clear on the activation path) sweeps nothing.
+-- Pending "return the cursor to where it was" timer. Declared above every closure
+-- that touches it: a local declared below one binds the nil global instead.
+local _awake_return_timer = nil
+
 local function close_awake_alert()
 	local id    = awake_alert_id
 	local shown = awake_alert_shown
@@ -216,7 +228,13 @@ schedule_awake_tick = function()
 
 			pcall(hs.mouse.absolutePosition, {x = tx, y = ty})
 
-			timer.doAfter(AWAKE_RETURN_DELAY_SEC, function()
+			-- Handle retained so switching keep-awake OFF can cancel it. Without
+			-- that, the cursor was still teleported back to its remembered origin
+			-- up to AWAKE_RETURN_DELAY_SEC after the user turned the feature off —
+			-- a pointer that moves on its own once the feature is disabled.
+			if _awake_return_timer then pcall(function() _awake_return_timer:stop() end) end
+			_awake_return_timer = timer.doAfter(AWAKE_RETURN_DELAY_SEC, function()
+				_awake_return_timer = nil
 				if origin then pcall(hs.mouse.absolutePosition, {x = origin.x, y = origin.y}) end
 			end)
 
@@ -253,6 +271,15 @@ function M.toggle_awake()
 		if awake_timer and type(awake_timer.stop) == "function" then
 			pcall(function() awake_timer:stop() end)
 			awake_timer = nil
+		end
+
+		-- Cancel the pending cursor return too. Stopping only the tick timer left
+		-- a scheduled "put the pointer back" firing up to AWAKE_RETURN_DELAY_SEC
+		-- after the user switched the feature off — a cursor that moves by itself
+		-- once nothing is supposed to be moving it.
+		if _awake_return_timer then
+			pcall(function() _awake_return_timer:stop() end)
+			_awake_return_timer = nil
 		end
 
 		-- Log the keep-awake duration as a special passive period AND tag the
@@ -327,6 +354,7 @@ function M.toggle_awake()
 			end
 		end
 		awake_input_watcher = eventtap.new(watch_types, function(_ev)
+			if EventTapGuard.handle_disabled(_ev, awake_input_watcher, "shortcuts.keep_awake") then return false end
 			if not awake_active then return false end
 
 			-- Ignore events within the activation grace window so the trigger
@@ -461,7 +489,9 @@ end
 --- Uses a raw keyDown tap so the shortcut fires before macOS generates characters.
 --- @return table Fake-hotkey object with :delete().
 function M.bind_instant_screenshot()
-	local tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+	local tap
+	tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+		if EventTapGuard.handle_disabled(e, tap, "shortcuts.at_hash") then return false end
 		if e:getKeyCode() ~= KEYCODE_AT_HASH then return false end
 
 		local flags = e:getFlags()
@@ -486,11 +516,24 @@ function M.bind_instant_screenshot()
 		local home = os.getenv("HOME") or "~"
 		local dir  = home .. "/Pictures/screenshots"
 		local filename = string.format("%s/screenshot_%s.png", dir, os.date("%Y_%m_%d_%Hh_%Mmin_%Ss"))
-		hs.timer.doAfter(0, function()
-			pcall(hs.execute, "mkdir -p \"" .. dir .. "\"")
-			pcall(hs.execute, "screencapture -l " .. id .. " \"" .. filename .. "\"")
-			notifications.notify(string.format(i18n.get("shortcuts.saved"), filename), nil, "success")
-		end)
+		-- mkdir then screencapture, chained through the completion callback: the
+		-- directory has to exist before the capture runs. Both are asynchronous
+		-- because the deferral this used to rely on ran the blocking calls on the
+		-- same runloop the keyboard tap lives on — it moved the freeze off the tap
+		-- callback without removing it.
+		ShellRunner.spawn(MKDIR_BIN, { "-p", dir }, function()
+			ShellRunner.spawn(SCREENCAPTURE_BIN, { "-l", tostring(id), filename }, function(exit_code)
+				if exit_code == 0 then
+					notifications.notify(string.format(i18n.get("shortcuts.saved"), filename), nil, "success")
+					return
+				end
+				-- The old code notified success unconditionally, so a capture that
+				-- never wrote a file still told the user where to find it.
+				Logger.warn(LOG, "screencapture -l exited with code %s — no file written.",
+					tostring(exit_code))
+				notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
+			end).start()
+		end).start()
 		return true
 	end)
 	tap:start()
@@ -504,9 +547,11 @@ function M.bind_layer_scroll()
 	local layer_held  = false
 	local f19_keycode = Keycodes.F19_VOLUME_SCROLL_MODIFIER
 
-	local key_tap = hs.eventtap.new(
+	local key_tap
+	key_tap = hs.eventtap.new(
 		{hs.eventtap.event.types.keyDown, hs.eventtap.event.types.keyUp},
 		function(event)
+			if EventTapGuard.handle_disabled(event, key_tap, "shortcuts.f19_layer") then return false end
 			if event:getKeyCode() ~= f19_keycode then return false end
 
 			if event:getType() == hs.eventtap.event.types.keyDown then
@@ -524,7 +569,9 @@ function M.bind_layer_scroll()
 		end
 	)
 
-	local scroll_tap = hs.eventtap.new({hs.eventtap.event.types.scrollWheel}, function(event)
+	local scroll_tap
+	scroll_tap = hs.eventtap.new({hs.eventtap.event.types.scrollWheel}, function(event)
+		if EventTapGuard.handle_disabled(event, scroll_tap, "shortcuts.f19_scroll") then return false end
 		if not layer_held then return false end
 
 		if gestures and type(gestures.isRightClickHeld) == "function" then
@@ -568,7 +615,9 @@ end
 --- @param on_trigger function|nil Called as on_trigger(label, app_name) for shortcut logging.
 --- @return table Fake-hotkey object with :delete().
 function M.bind_cmd_star(on_trigger)
-	local tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+	local tap
+	tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+		if EventTapGuard.handle_disabled(e, tap, "shortcuts.cmd_star") then return false end
 		local flags = e:getFlags()
 		if not flags.cmd then return false end
 
@@ -690,7 +739,9 @@ end
 ---   When nil, falls back to text_acts.WRAP_PAIRS (the full built-in catalogue).
 --- @return table Fake-hotkey object with :delete().
 function M.bind_wrap_text_if_selected(get_wrap_pairs)
-	local tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+	local tap
+	tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+		if EventTapGuard.handle_disabled(e, tap, "shortcuts.wrap_text") then return false end
 		local flags = e:getFlags()
 		-- Fast path: Cmd/Ctrl are real shortcuts — bail before any AX probe. Alt is
 		-- intentionally allowed through (Ergopti wrap symbols are on the AltGr layer).

@@ -31,6 +31,7 @@ local Logger     = require("lib.logger")
 local Paths      = require("lib.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("lib.i18n")
+local text_utils = require("lib.text_utils")
 
 local LOG = "download_window"
 
@@ -124,9 +125,15 @@ _ucc:setCallback(function(msg)
     elseif msg.body == "terminal" then
         -- In bootstrap mode, show the live Hammerspoon log; in download mode, use the model-specific cmd
         local cmd = _mode == "bootstrap" and ("tail -f " .. Logger.UNIFIED_LOG_FILE) or (M._terminal_cmd or ("ollama pull " .. (M._current_model or "")))
+        -- Escaped for BOTH layers it passes through: the AppleScript string
+        -- literal (backslash is an escape char there, and escaping only the
+        -- double quote left a model name or log path containing one producing a
+        -- script that was never meant to run), then the surrounding /bin/sh
+        -- single quotes.
         local apple_script = string.format(
-            "osascript -e 'tell application \"Terminal\" to do script \"%s\"' -e 'tell application \"Terminal\" to activate'",
-            cmd:gsub("\"", "\\\"")
+            "osascript -e %s -e 'tell application \"Terminal\" to activate'",
+            text_utils.shell_quote(text_utils.applescript_format(
+                'tell application "Terminal" to do script "%s"', cmd))
         )
         pcall(hs.execute, apple_script)
 
@@ -398,45 +405,53 @@ function M.show(opts)
         M._terminal_cmd  = type(opts.terminal_cmd) == "string" and opts.terminal_cmd or ("ollama pull " .. M._current_model)
     end
 
-    if _wv then
-        -- Reuse existing window: just refresh kind and titles
-        eval(string.format("setKind(%s,%s,%s)", js_str(_kind), js_str(title), js_str(subtitle)))
-    else
-        ensure_webview(title)
-        -- Push the kind first so the page initialises in the correct mode
-        eval(string.format("setKind(%s,%s,%s)", js_str(_kind), js_str(title), js_str(subtitle)))
-    end
+    -- ONE decision, taken before anything can invalidate it. This used to be two
+    -- separate `if _wv then` tests with ensure_webview() in between, so a window
+    -- created two lines earlier looked "already open": the reuse branch then
+    -- cleared _queued (discarding the setKind that carries the title, subtitle and
+    -- kind) and forced _ready = true, which made every following eval() fire
+    -- against a page whose document had not finished loading. Nothing arrived, and
+    -- the block written to be the fresh-window path was unreachable.
+    local reusing = (_wv ~= nil)
 
-    Logger.success(LOG, "Progress UI shown (title=%q).", title)
-
-    if _wv then
-        -- Window already open — reset state to prevent zombie placeholders
-        _start_ts  = hs.timer.secondsSinceEpoch()
-        _queued    = {}
-        _ready     = true
-        _log_shown = false
-        M._total_files = nil
-        M._last_file_count = nil
-
-        eval("resetUI()")
-        eval(string.format("setKind(%s,null,null)", js_str(_kind)))
-        -- _current_model is nil for bootstrap kinds (mlx_install, ollama_install)
-        if M._current_model then
-            eval("setModel(" .. js_str(M._current_model) .. ")")
-        end
-        return
-    end
-
-    _start_ts  = hs.timer.secondsSinceEpoch()
-    M._total_files = nil
+    _start_ts          = hs.timer.secondsSinceEpoch()
+    _log_shown         = false
+    M._total_files     = nil
     M._last_file_count = nil
 
-    ensure_webview(i18n.get("mlx.download_title"))
+    if not reusing then
+        ensure_webview(title)
+    elseif not _ready then
+        -- Reusing a window whose page never finished loading: the previous
+        -- occupant's undelivered payload must not flush on top of this one's.
+        _queued = {}
+    end
 
-    eval(string.format("setKind(%s,null,null)", js_str(_kind)))
+    if reusing then
+        -- Same window, new occupant: clear the previous download's percentage, log
+        -- lines and "done" banner, or they linger as zombie placeholders.
+        --
+        -- Deliberately NOT done on a fresh page. resetUI() hides AND disables
+        -- #btn-cancel when download_window.btn_cancel is missing from
+        -- window._i18n_strings — and ui_builder injects that table only AFTER the
+        -- navigation callback that flushes this queue. The i18n pass rewrites
+        -- textContent and never restores `display`, so Cancel would be gone for the
+        -- entire life of every freshly opened window.
+        eval("resetUI()")
+    end
+
+    -- Exactly one setKind, carrying the RESOLVED pair. The old code followed the
+    -- real call with setKind(kind, null, null); script.js falls back to the kind's
+    -- default title and blanks the subtitle when they are null, so the second call
+    -- undid the first — and the subtitle is the deps checkers' current step label.
+    eval(string.format("setKind(%s,%s,%s)", js_str(_kind), js_str(title), js_str(subtitle)))
+
+    -- _current_model is nil for bootstrap kinds (mlx_install, ollama_install)
     if M._current_model then
         eval("setModel(" .. js_str(M._current_model) .. ")")
     end
+
+    Logger.success(LOG, "Progress UI shown (title=%q, reusing=%s).", title, tostring(reusing))
 end
 
 --- Updates the UI with current download metrics. Download mode only.
@@ -588,7 +603,19 @@ function M.complete(success, _model_name, error_kind)
     eval(js)
 
     if is_ok then
-        hs.timer.doAfter(4, M.hide)
+        -- Capture the session BEFORE arming, and hide only if it is unchanged.
+        -- This window is shared: a four-second timer belonging to a finished
+        -- operation otherwise closes whatever unrelated operation happens to own
+        -- the window when it fires. The session identity exists for exactly this
+        -- and was applied to one deferred-hide site; these two never got it.
+        local sid = M.session_id()
+        hs.timer.doAfter(4, function()
+            if M.session_id() ~= sid then
+                Logger.debug(LOG, "Auto-hide skipped: the window now belongs to a newer operation.")
+                return
+            end
+            pcall(M.hide)
+        end)
     end
 end
 
@@ -647,9 +674,16 @@ function M.set_error(msg)
     local text = type(msg) == "string" and msg or i18n.get("download_window.error_unknown")
     Logger.warn(LOG, "Progress UI flipped to error state: %s", text)
     eval(string.format("setError(%s)", js_str(text)))
+    -- Same session capture as M.complete: "_wv is non-nil" only proves SOME
+    -- window is open, not that it is still this operation's.
+    local sid = M.session_id()
     hs.timer.doAfter(ERROR_AUTO_DISMISS_SEC, function()
-        -- Only auto-dismiss if we are still in an error state for the same window
-        if _wv then pcall(M.hide) end
+        if not _wv then return end
+        if M.session_id() ~= sid then
+            Logger.debug(LOG, "Error auto-dismiss skipped: the window now belongs to a newer operation.")
+            return
+        end
+        pcall(M.hide)
     end)
 end
 

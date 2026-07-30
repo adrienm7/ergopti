@@ -469,6 +469,21 @@ function M.walk_system_event(entry)
 		eg.focus_to_first_key_sum_ms = eg.focus_to_first_key_sum_ms + (tonumber(entry.latency_ms) or 0)
 		eg.focus_to_first_key_count  = eg.focus_to_first_key_count + 1
 	end
+	-- A physical press reported by the Karabiner bridge feeds the keycode heatmap,
+	-- exactly as a typed keystroke does in walk_typing. The walker had branches
+	-- for manifest_increment, focus_first_key, modifier_hold and karabiner_release
+	-- but none for karabiner_press, so those events were written to the log and
+	-- then dropped on ingest — and with the shipped tap/hold defaults the keys the
+	-- bridge owns (Return, Backspace, Tab, Delete among them) are suppressed on
+	-- the typing path too. They vanished from the heatmap entirely.
+	if action == "karabiner_press" and type(entry.keycode) == "number" then
+		local app = entry.app or "Unknown"
+		local kk  = date_str .. "" .. app .. "" .. tostring(entry.keycode)
+		local row = C.gc(S.agg_batch.kc_ngram, kk,
+			{ date = date_str, app = app, keycode = entry.keycode, count = 0 })
+		row.count = row.count + 1
+	end
+
 	if action == "modifier_hold" or action == "karabiner_release" then
 		local kc  = entry.keycode
 		local app = entry.app or "Unknown"

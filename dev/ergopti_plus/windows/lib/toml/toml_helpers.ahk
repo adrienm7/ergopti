@@ -97,6 +97,31 @@ TOML_ReadFailed(Path) {
     return _TomlReadFailures.Has(Path)
 }
 
+; Paths whose last ReadTomlFile could not open an EXISTING file. The sibling of
+; _TomlReadFailures above, and deliberately STICKY where that one is per-parse:
+; _TomlReadFailures is cleared at the top of every ParseTomlFile, which means a
+; lock that clears between a failed boot read and the deferred save is invisible
+; to the writer — the re-parse succeeds and the write looks perfectly safe while
+; the payload it was handed was already derived from nothing. Only a successful
+; read of the SAME path clears an entry here.
+global _TomlUnreadableFiles := Map()
+
+; True when the last ReadTomlFile for this path could not read an EXISTING file.
+; Callers that turn the returned content into in-memory state which is later
+; serialized back must consult this: treating "" as "the file said nothing" and
+; then persisting the resulting defaults destroys the real file.
+TOML_UnreadableFile(Path) {
+    global _TomlUnreadableFiles
+    return _TomlUnreadableFiles.Has(Path)
+}
+
+; Session latch: an EXISTING config.toml could not be read during the boot
+; apply, so the in-memory feature tree holds manifest DEFAULTS rather than the
+; user's settings. SaveFullConfig honours it and refuses to serialize. Never
+; cleared once set — nothing re-applies the config in-process, so the tree stays
+; untrustworthy until the driver is restarted.
+global _ConfigBootReadFailed := false
+
 ; Parse a TOML file into Map<Section, Map<Key, Value>>. Values are coerced
 ; to AHK booleans / integers / strings / arrays of strings — anything more
 ; exotic falls through as a raw string. Returns an empty Map when the file
@@ -104,7 +129,7 @@ TOML_ReadFailed(Path) {
 ; ``FileExist``.
 ; Multi-line arrays ( key = [\n  "a",\n  "b"\n] ) are fully supported.
 ParseTomlFile(Path) {
-    global _ParseTomlCache, _TomlReadFailures
+    global _ParseTomlCache, _TomlReadFailures, _TomlUnreadableFiles
     if _ParseTomlCache.Has(Path)
         return _ParseTomlCache[Path]
     Sections := Map()
@@ -124,9 +149,22 @@ ParseTomlFile(Path) {
         ; — so without this flag "I could not read your config" silently became
         ; "your config was empty" and the next write persisted that as truth.
         _TomlReadFailures[Path] := true
+        ; Raise the STICKY sentinel too, exactly as ReadTomlFile does for the
+        ; same file. _TomlReadFailures is deleted at the top of the very next
+        ; parse of this path, so a lock that clears between the boot snapshot
+        ; and a deferred save is invisible to every writer that asks later —
+        ; and _IniCache, the widest reader of config.toml, is taken through
+        ; here. Only for an existing file: a missing one legitimately parses
+        ; empty, and flagging it would block the first save of a fresh install.
+        if FileExist(Path)
+            _TomlUnreadableFiles[Path] := true
         try LoggerError("TomlParse", "Cannot read '{1}': {2}. Reported as unreadable so writers refuse to rebuild from it.", Path, Err.Message)
         return Sections
     }
+    ; A successful read clears the sticky flag: what follows is the real file,
+    ; so anything derived from it is safe to persist again.
+    if _TomlUnreadableFiles.Has(Path)
+        _TomlUnreadableFiles.Delete(Path)
     if (Content = "")
         return Sections
 
@@ -520,23 +558,30 @@ TOML_BatchWrite(Path, Updates) {
             global _ParseTomlCache
             if _ParseTomlCache.Has(Path)
                 _ParseTomlCache.Delete(Path)
+            ; Logged, not merely returned. This branch fails without throwing, and
+            ; every caller that discarded the boolean turned it into a silent
+            ; no-op: the menu and the engine went on showing a state that never
+            ; reached disk, with nothing in the log to explain the next restart.
+            try LoggerError("TomlWrite", "Cannot open the staging file for '{1}' — nothing was written and the change is NOT persisted.", Path)
             return false
         }
         f.Write(body)
         f.Close()
-    } catch {
+    } catch as Err {
         global _ParseTomlCache
         if _ParseTomlCache.Has(Path)
             _ParseTomlCache.Delete(Path)
+        try LoggerError("TomlWrite", "Writing the staging file for '{1}' failed: {2}. The change is NOT persisted.", Path, Err.Message)
         return false
     }
 	; Atomic replace: FileMove with overwrite=true swaps the file in one OS call.
 	; If the move fails, the original config.toml remains intact.
 	try FileMove(tmp, Path, true)
-	catch {
+	catch as Err {
 		global _ParseTomlCache
 		if _ParseTomlCache.Has(Path)
 			_ParseTomlCache.Delete(Path)
+		try LoggerError("TomlWrite", "Atomic replace of '{1}' failed: {2}. The previous contents are intact, so the change is NOT persisted.", Path, Err.Message)
 		return false
 	}
 
@@ -732,7 +777,25 @@ ReadPathsToml(FilePath) {
     ; reader in this unit. A BOM-less paths.toml hand-saved as UTF-8 would otherwise
     ; be decoded with the system codepage, turning a non-ASCII ConfigDirPath
     ; (accented Windows home dir) into mojibake and silently losing the user's config.
-    loop parse, FileRead(FilePath, "UTF-8"), "`n", "`r" {
+    ; Guarded. This runs during the auto-execute section, BEFORE the logger is
+    ; initialised and while hotkeys registered at parse time are already armed —
+    ; so an unguarded throw here aborts the boot mid-way and leaves a resident
+    ; half-driver with a subset of hotkeys live. A locked paths.toml (a sync
+    ; client, an AV scan) is exactly the transient condition that triggers it.
+    ;
+    ; Returning the empty Map falls back to the default config directory, which
+    ; is the same behaviour as a paths.toml that exists but sets nothing. That is
+    ; safe here BECAUSE this file only ever redirects where config is READ from:
+    ; nothing serializes back through it, so there is no defaults-over-real-file
+    ; hazard of the kind the config readers have.
+    Content := ""
+    try {
+        Content := FileRead(FilePath, "UTF-8")
+    } catch as Err {
+        try LoggerError("TomlPaths", "Cannot read '{1}': {2}. Falling back to the default configuration directory for this session.", FilePath, Err.Message)
+        return Result
+    }
+    loop parse, Content, "`n", "`r" {
         Line := Trim(A_LoopField, " `t")
         if (Line == "" or SubStr(Line, 1, 1) == "#") {
             continue

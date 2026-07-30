@@ -177,11 +177,31 @@ KLW_BuildBatchSql(device_id_lit := "") {
     ; agg_app_day_titles — walker owns `ms` (focus time per title); the
     ; occurrence count `c` is owned by KLR_RebuildAggregates (from
     ; events_window_switch), so it is not written here.
+    ;
+    ; Every app-day touched by this batch is collected while inserting so the
+    ; per-app-day cap can be enforced once per group afterwards. Any app whose
+    ; window title carries variable content — browser tabs, chat unread counts,
+    ; editor "file:line" captions, terminal progress spinners — otherwise adds a
+    ; permanent row per distinct title, and each one is projected into
+    ; win_titles inside the prefetch blob the dashboard downloads. The macOS
+    ; twin (aggregator/sql.lua) has always run this cleanup; the Windows port
+    ; copied KLWConst.TITLE_CAP_PER_APP_DAY across but not the DELETE that gives
+    ; it meaning, leaving the table unbounded by construction.
+    title_app_days := Map()
     for _, row in KLW.batch["titles"] {
         out .= Format(
             "INSERT INTO agg_app_day_titles (device_id, date, app, title, ms) VALUES ({1},{2},{3},{4},{5}) ON CONFLICT(device_id, date, app, title) DO UPDATE SET ms=ms+excluded.ms;`n",
             d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
             KLW_SqlEscape(row["title"]), row["ms"])
+        title_app_days[row["date"] . Chr(1) . row["app"]] := row
+    }
+    ; Ranked by (c + ms) like the macOS twin: a title matters either because it
+    ; was seen often or because it held focus for a long time.
+    for _, ad in title_app_days {
+        out .= Format(
+            "DELETE FROM agg_app_day_titles WHERE device_id={1} AND date={2} AND app={3} AND title NOT IN (SELECT title FROM agg_app_day_titles WHERE device_id={1} AND date={2} AND app={3} ORDER BY (c + ms) DESC LIMIT {4});`n",
+            d, KLW_SqlEscape(ad["date"]), KLW_SqlEscape(ad["app"]),
+            KLWConst.TITLE_CAP_PER_APP_DAY)
     }
 
     ; agg_app_day_hourly — walker owns the per-hour error columns

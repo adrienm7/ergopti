@@ -19,6 +19,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Shell  = require("adapters.shell_runner")
 
 local LOG = "adapters.clipboard"
 
@@ -30,14 +31,18 @@ local LOG = "adapters.clipboard"
 -- =========================================
 
 --- Detect which clipboard tool is available.
+--- Probing goes through Shell.has_command because the previous form compared
+--- os.execute()'s result against 0 only. That is the Lua 5.1/LuaJIT spelling;
+--- from Lua 5.2 on the same success is reported as `true`, so every probe read
+--- as "absent" and the whole adapter silently no-opped on any modern
+--- interpreter — invisible in CI, which runs LuaJIT.
 --- Returns a backend string: "wayland", "xclip", "xsel", or nil.
 local function _detect_backend()
-	if os.execute("which wl-paste >/dev/null 2>&1") == 0 then
-		-- Verify WAYLAND_DISPLAY is set
-		if os.getenv("WAYLAND_DISPLAY") then return "wayland" end
-	end
-	if os.execute("which xclip >/dev/null 2>&1") == 0 then return "xclip" end
-	if os.execute("which xsel  >/dev/null 2>&1") == 0 then return "xsel"  end
+	-- WAYLAND_DISPLAY decides first: wl-copy exists on X11 sessions too, but
+	-- writing through it there silently reaches no clipboard.
+	if os.getenv("WAYLAND_DISPLAY") and Shell.has_command("wl-paste") then return "wayland" end
+	if Shell.has_command("xclip") then return "xclip" end
+	if Shell.has_command("xsel")  then return "xsel"  end
 	return nil
 end
 
@@ -64,20 +69,23 @@ local function _read_raw()
 end
 
 --- Writes text to the clipboard via the detected backend.
+--- Clipboard content is whatever the user last copied, so it is quoted through
+--- the shell_runner. The previous string.format("%q") form emitted a
+--- double-quoted word: copying a snippet containing $(…) or a backtick ran it.
 --- @param text string
 --- @return boolean
 local function _write_raw(text)
 	if not _backend then return false end
+	local quoted = Shell.quote(text)
 	local cmd
 	if _backend == "wayland" then
-		cmd = string.format("printf '%%s' %q | wl-copy 2>/dev/null", text)
+		cmd = string.format("printf '%%s' %s | wl-copy 2>/dev/null", quoted)
 	elseif _backend == "xclip" then
-		cmd = string.format("printf '%%s' %q | xclip -selection clipboard 2>/dev/null", text)
+		cmd = string.format("printf '%%s' %s | xclip -selection clipboard 2>/dev/null", quoted)
 	else
-		cmd = string.format("printf '%%s' %q | xsel --clipboard --input 2>/dev/null", text)
+		cmd = string.format("printf '%%s' %s | xsel --clipboard --input 2>/dev/null", quoted)
 	end
-	local code = os.execute(cmd)
-	return code == true or code == 0
+	return Shell.run(cmd)
 end
 
 

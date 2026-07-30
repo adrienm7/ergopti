@@ -183,7 +183,14 @@ local instant_on_word_end        = LLM_DEFAULTS.llm_instant_on_word_end  -- Bypa
 function M.set_preview_ai_enabled(v)
 	is_ai_preview_enabled = (v == true)
 	Logger.debug(LOG, "AI preview: %s.", is_ai_preview_enabled and "on" or "off")
-	if not v then tooltip.hide() end
+	-- Disabling is a state TEARDOWN, not a UI hide. A bare tooltip.hide() clears
+	-- the canvas and nothing else: predictions_visible stayed true, the pending
+	-- set stayed populated, and neither request counter moved — so an in-flight
+	-- stream still passed its own generation check and repainted the bubble the
+	-- user had just switched off. M.reset() is the contract that actually holds:
+	-- it clears the state, bumps both counters so late callbacks discard
+	-- themselves, stops the chain timer and hides forcibly.
+	if not v then M.reset() end
 end
 
 --- @param color table|nil RGBA table, or nil to restore the module default.
@@ -740,18 +747,34 @@ function M.perform_check(force_trigger, profile_name)
 		predictions_visible_ref = visible_ref,
 	})
 
-	-- Wrap callbacks to keep local state in sync after each call
+	-- Wrap callbacks to keep local state in sync after each call.
+	--
+	-- STALENESS-AWARE, and it must stay that way. The StreamingHandler callbacks
+	-- already discard a superseded response on their own fetch-id guard, but the
+	-- refs still hold the PREVIOUS response's populated values — so a bare
+	-- sync_refs() copied them back into module state and resurrected a
+	-- prediction that reset() had just cleared. Nothing changed on screen at
+	-- that moment; the damage surfaced on the next Tab or Enter, which gates
+	-- only on engine.is_visible() and therefore typed a completion the user
+	-- never saw. Any other keystroke healed it, so it read as a one-off ghost
+	-- insertion rather than a bug.
+	--
+	-- The handler-level guard cannot cover this: the clobber happens one level
+	-- above it, in these two-line wrappers.
+	local function is_current_fetch()
+		return fetch_request_counter == my_fetch_id
+	end
 	local function on_success(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
 		on_success_cb(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
-		sync_refs()
+		if is_current_fetch() then sync_refs() end
 	end
 	local function on_fail()
 		on_fail_cb()
-		sync_refs()
+		if is_current_fetch() then sync_refs() end
 	end
 	local on_partial = on_partial_cb and function(partial_raw)
 		on_partial_cb(partial_raw)
-		sync_refs()
+		if is_current_fetch() then sync_refs() end
 	end or nil
 
 	-- Arm the watchdog via StreamingHandler
@@ -989,7 +1012,18 @@ M.CHAIN_FALLBACK_SEC = CHAIN_FALLBACK_SEC  -- Bridge passes this to suppress_res
 _inactivity_timer = hs.timer.delayed.new(inactivity_debounce_sec, function()
 	local profile = _deferred_profile_name
 	_deferred_profile_name = nil
-	M.perform_check(false, profile)
+	-- Guarded explicitly rather than left to the console tee. An unhandled throw
+	-- in here reaches Hammerspoon's own handler, which prints a traceback: the
+	-- runtime capture does persist that, but as an anonymous [CONSOLE] line with
+	-- no module, no level and no context — and the prediction for that keystroke
+	-- is simply gone. This is the single entry point for EVERY debounced
+	-- prediction, so it is the last place that should report failures as console
+	-- noise.
+	local ok, err = xpcall(function() M.perform_check(false, profile) end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Inactivity debounce check raised: %s. This prediction is abandoned — "
+			.. "nothing retries it, so the user simply never sees one.", tostring(err))
+	end
 end)
 
 -- Enable Enter-to-accept only after the user has explicitly navigated at least once;

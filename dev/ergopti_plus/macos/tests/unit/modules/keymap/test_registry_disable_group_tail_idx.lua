@@ -119,4 +119,63 @@ helpers.describe("Registry.disable_group: tail-index consistency", function()
 		helpers.assert_eq(before, after,
 			"tail index must be unchanged after disabling an unknown group")
 	end)
+
+	helpers.it("the classify_trigger memo does not survive a group disable", function()
+		-- classify_trigger's own comment states the invariant this case enforces:
+		-- "the cache is dropped whenever the corpus changes — a memo that outlived a
+		-- re-registration would answer for a mapping set that no longer exists".
+		-- disable_group changes the corpus and was the one mutation that did not pass
+		-- through sort_mappings, which is the single place the memo is dropped. So a
+		-- disabled hotstring kept answering `exact = true` forever, and the dynamic
+		-- @-collector reads exactly that answer to decide whether a trigger is already
+		-- claimed — a stale true silently suppresses collection.
+		--
+		-- This lives in THIS file because it is the file that documents
+		-- disable_group's habit of forgetting one of the structures it invalidates.
+		local state = fresh_registry()
+
+		Registry.register_lua_group("memo_grp", "Memo Group", {})
+		state.groups.memo_grp.path = "fake_path"
+		Registry.set_group_context("memo_grp")
+		Registry.add("gamma", "GAMMA", { is_case_sensitive = true })
+		Registry.set_group_context(nil)
+		Registry.sort_mappings()
+
+		local exact_before = Registry.classify_trigger("gamma")
+		helpers.assert_true(exact_before,
+			"the memo must be primed for a trigger that IS registered, or the assertion "
+			.. "below would pass against a classify_trigger that never answers true at all")
+
+		Registry.disable_group("memo_grp")
+
+		local exact_after = Registry.classify_trigger("gamma")
+		helpers.assert_true(not exact_after,
+			"the mapping was removed from the corpus, so classify_trigger must stop "
+			.. "claiming it exists. sort_mappings is the only place the memo is dropped and "
+			.. "disable_group does not go through it")
+	end)
+
+	helpers.it("re-enabling a group makes the memo answer again", function()
+		-- Without this case the assertion above would pass against a fix that simply
+		-- disabled memoisation, or that cleared the memo and never refilled it.
+		local state = fresh_registry()
+
+		Registry.register_lua_group("memo_grp2", "Memo Group 2", {})
+		state.groups.memo_grp2.path = "fake_path"
+		Registry.set_group_context("memo_grp2")
+		Registry.add("delta", "DELTA", { is_case_sensitive = true })
+		Registry.set_group_context(nil)
+		Registry.sort_mappings()
+		Registry.disable_group("memo_grp2")
+
+		-- Put the mapping back the way enable_group's post-load hook would, then let
+		-- the normal sort funnel run.
+		Registry.set_group_context("memo_grp2")
+		Registry.add("delta", "DELTA", { is_case_sensitive = true })
+		Registry.set_group_context(nil)
+		Registry.sort_mappings()
+
+		helpers.assert_true(Registry.classify_trigger("delta"),
+			"a re-registered trigger must be classified again")
+	end)
 end)

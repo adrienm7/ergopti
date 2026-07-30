@@ -200,7 +200,14 @@ _HotstringsCacheBuildRows() {
 			Line := Trim(A_LoopField, " `t")
 			if (Line == "" or SubStr(Line, 1, 1) == "#")
 				continue
-			if RegExMatch(Line, "^\[+([^\[\]]+)\]+$", &SectionMatch) {
+			; Strip the trailing comment before the anchored header match. TOML
+			; allows `[[ct]] # note`, and the raw line cannot match `…\]+$`, so
+			; the header used to fall through to the entry parser, fail that too
+			; and `continue` — leaving CurrentSection on the PREVIOUS section, so
+			; every entry under the commented header was cached against the wrong
+			; section (or dropped when it was the first). The runtime loaders this
+			; scan claims to reproduce exactly already strip (toml_loader.ahk).
+			if RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SectionMatch) {
 				CurrentSection := StrLower(Trim(SectionMatch[1]))
 				continue
 			}
@@ -403,6 +410,12 @@ _HsCacheRegisterSection(LoaderKey, FeatureConfig, ExtraOptions, ResolvedPriority
 		if HasOnlyText
 			Opts["OnlyText"] := ExtraOptions["OnlyText"]
 		Trigger := StrReplace(Row[2], HS_CACHE_MARKER, MagicKey)
-		HSE_RegisterFromTomlFlags(Row[6], Row[1], Trigger, Row[3], Opts)
+		; The REPLACEMENT carries the marker too, and the preview index already
+		; substitutes it on both sides (hotstring_registry). Substituting only the
+		; trigger here meant a replacement containing the marker was previewed with
+		; the user's magic key and then EMITTED with a literal star — the tooltip
+		; promising one string and the engine typing another.
+		Output := StrReplace(Row[3], HS_CACHE_MARKER, MagicKey)
+		HSE_RegisterFromTomlFlags(Row[6], Row[1], Trigger, Output, Opts)
 	}
 }

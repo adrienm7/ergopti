@@ -1,4 +1,4 @@
-﻿﻿{
+{
 	"_meta.flag": "🇮🇳",
 	"_meta.locale": "hi",
 	"_meta.name": "हिन्दी",
@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "%s के लिए नई श्रेणी का नाम:",
 	"metrics_apps.new_category_title": "नई श्रेणी",
 	"metrics_apps.no_app_detected": "कोई एप्लिकेशन पहचाना नहीं जा सका।",
+	"metrics_apps.pick_app_placeholder": "वर्गीकृत करने के लिए एक एप्लिकेशन चुनें…",
 	"metrics_apps.rename_chooser_placeholder": "नाम बदलने के लिए श्रेणी",
 	"metrics_apps.rename_item": "✎ किसी मौजूदा श्रेणी का नाम बदलें…",
 	"metrics_apps.rename_prompt": "श्रेणी \"%s\" के लिए नया नाम:",
@@ -1415,7 +1416,7 @@
 	"sfbsreduction.comma": "कॉमा एक ही उंगली के बाइग्राम को कम करता है",
 	"sfbsreduction.ecirc": "Ê एक ही उंगली के बाइग्राम को कम करता है",
 	"sfbsreduction.egrave": "È एक ही उंगली के बाइग्राम को कम करता है",
-	"sfbsreduction.ié": "IE, IE/EI बाइग्राम को कम करता है",
+	"sfbsreduction.ieacute": "IE, IE/EI बाइग्राम को कम करता है",
 	"sg_actions.activity_simulation": "🖱 गतिविधि सिमुलेट करें (anti-sleep)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (मॉनीटर)",
 	"sg_actions.app_expose": "◱ App Exposé",
@@ -1652,6 +1653,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = डाउनलोड फोल्डर खोलें",
 	"shortcuts.pixel_read_error": "पिक्सेल रंग नहीं पढ़ सका",
 	"shortcuts.saved": "सहेजा गया: %s",
+	"shortcuts.screenshot_failed": "स्क्रीनशॉट लेने में विफल",
 	"shortcuts.screen": "Win + H (screensHot) = स्क्रीन कैप्चर (Win + Shift + S ट्रिगर करता है)",
 	"shortcuts.screeninstant": "1 के बाईं ओर की कुंजी = सक्रिय विंडो का तुरंत कैप्चर, टाइमस्टैम्प के साथ चित्रों में सहेजा जाता है",
 	"shortcuts.screenocr": "Win + C (OCR) = टेक्स्ट निष्कर्षण के साथ स्क्रीनशॉट (Win + Shift + T)",

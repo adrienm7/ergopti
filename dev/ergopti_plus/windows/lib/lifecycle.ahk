@@ -94,6 +94,78 @@ _SuspendHeldPrefixKeys() {
     }
     return Held == "" ? "(none)" : Held
 }
+
+; File name of the one-shot marker that carries a pause across a Reload. It sits
+; next to config.toml (so a paths.toml relocation is honoured for free) and is
+; CONSUMED the moment it is read — a crash between writing it and restoring the
+; pause must never wedge the driver suspended on every future boot.
+global SUSPEND_MARKER_FILENAME := "suspend_restore.marker"
+
+; Absolute path of the suspend hand-off marker, derived from the resolved
+; configuration file so it always follows the user's real config directory.
+_SuspendMarkerPath() {
+    global ConfigurationFile
+    if !IsSet(ConfigurationFile) or (ConfigurationFile == "")
+        return ""
+    SplitPath(ConfigurationFile, , &Dir)
+    return Dir . "\" . SUSPEND_MARKER_FILENAME
+}
+
+; Reloads the driver WITHOUT discarding the user's pause.
+;
+; AHK's Reload starts a fresh process that is never suspended, and the tray menu
+; is the one surface that stays fully clickable while paused — native Suspend
+; only disarms hotkeys and hotstrings, never a tray WM_COMMAND. So every menu
+; action that persists a setting and reloads used to come back fully armed, with
+; the « Suspendre » checkmark gone and nothing whatsoever in the logs. Persist
+; the state first, then reload; _SuspendRestoreFromMarker re-applies it on the
+; next boot. A marker that cannot be written is reported as an ERROR rather than
+; swallowed: silently resuming a driver the user paused is exactly the failure
+; this exists to remove.
+ReloadPreservingSuspend() {
+    if A_IsSuspended {
+        Path := _SuspendMarkerPath()
+        Written := false
+        if (Path != "") {
+            try {
+                Handle := FileOpen(Path, "w")
+                if IsObject(Handle) {
+                    Handle.Write("1")
+                    Handle.Close()
+                    Written := true
+                }
+            }
+        }
+        if Written
+            LoggerInfo("Lifecycle", "Reloading while suspended — pause handed off via '{1}'.", Path)
+        else
+            LoggerError("Lifecycle", "Reloading while suspended but the pause marker could NOT be written to '{1}' — the driver will come back ARMED.", Path)
+    }
+    Reload()
+}
+
+; Consumes the hand-off marker left by ReloadPreservingSuspend and re-enters
+; suspend. Called once, from the first _SuspendStateWatchdog invocation. The
+; marker is deleted BEFORE the pause is re-applied, so a failure past this point
+; costs one restored pause instead of wedging the driver suspended forever.
+;
+; Routed through ToggleSuspend rather than a bare Suspend(1) on purpose: that is
+; the one path carrying the custom-combination prefix-drain protocol, and a
+; Reload can land while a prefix key is still physically held — the very state
+; the drain exists for. It also means the reactors and the tray indicator run
+; exactly as they do for a manual pause.
+_SuspendRestoreFromMarker() {
+    Path := _SuspendMarkerPath()
+    if (Path == "") or !FileExist(Path)
+        return
+    try FileDelete(Path)
+    ; Already suspended means the user beat the restore to it (a tray pause in
+    ; the boot window); the marker is spent and there is nothing left to do.
+    if A_IsSuspended
+        return
+    LoggerInfo("Lifecycle", "Restoring the pause that a menu-driven Reload would otherwise have dropped.")
+    ToggleSuspend()
+}
 ToggleSuspend(*) {
     global _SuspendPending, _SuspendPendingSince
     ; A second press while a suspend is PENDING must cancel it. Without this
@@ -288,6 +360,16 @@ _SuspendStateWatchdog() {
     ; timer re-detects the (possibly reversed) state on its next tick and dispatches
     ; the correct reactor once the current one has finished.
     static _TransitionBusy := false
+    ; First invocation after boot: replay a pause handed off by
+    ; ReloadPreservingSuspend. Doing it here rather than in the boot block keeps
+    ; the whole suspend machine in one file, and the state change is picked up by
+    ; the comparison right below, so the restored pause runs the same reactor and
+    ; the same tray-icon update as a manual one.
+    static _BootRestoreDone := false
+    if !_BootRestoreDone {
+        _BootRestoreDone := true
+        try _SuspendRestoreFromMarker()
+    }
     if (A_IsSuspended == _LastSuspendState)
         return
     if _TransitionBusy
@@ -317,12 +399,21 @@ _SuspendStateWatchdog() {
 ; closes the data-loss window. EVERY step is try-wrapped: an OnExit callback that
 ; throws is swallowed by AHK and can hang exit, so the handler must never throw.
 ; Returning 0 lets the exit proceed.
+;
+; The same reasoning covers any transaction whose COMPLETION depends on a
+; callback owned by this process. The self-update staging worker is one: it is a
+; detached PowerShell child, and swap_update.cmd is launched only from
+; _Updater_PollDownloadAsync, so a Reload here used to orphan the download and
+; the user's "Update now" click silently installed nothing
+; (updater-staging-worker-orphaned-on-exit). Every future subsystem with that
+; shape belongs in this handler too.
 Ergopti_OnShutdown(reason, code) {
     try KL_Stop()
     try HotstringPrefixWatcherStop()
     try HookDispatcher.Stop()
     try KLWV_CloseAll()
     try OllamaWV_Close()
+    try _Updater_AbortStagingOnExit()
     return 0
 }
 ; Build the full tray menu off the boot critical path (armed after "ready").
@@ -381,8 +472,12 @@ UpdateTrayIcon() {
             TraySetIcon(IconPath)
     }
 }
+; The tray menu's own « Recharger » item — the single most obviously
+; paused-reachable reload in the driver, and it dropped the pause like all the
+; others. "Reload the driver" and "stop being paused" are two different requests;
+; only one of them was made.
 ActivateReload(*) {
-    Reload()
+    ReloadPreservingSuspend()
 }
 ActivateExitApp(*) {
     ExitApp()

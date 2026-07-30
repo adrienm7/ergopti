@@ -190,14 +190,22 @@ function is_pc_scancode_driver(driver_meta) {
 function translate_win_bucket(app_bucket) {
 	if (!app_bucket || !app_bucket.sc_kb) return app_bucket;
 	const sc_kb = app_bucket.sc_kb;
-	const kc_out = { ...(app_bucket.kc || {}) };
+	// Start EMPTY, never from `app_bucket.kc`. On a PC-scancode driver the `kc`
+	// slot is filled from ngram_keycodes, whose values are Windows VIRTUAL KEY
+	// codes — a completely different numbering from the Hammerspoon keycodes the
+	// renderer's geometry is keyed by. They collide numerically without
+	// overlapping in meaning (VK 65 = 'A' lands on HS keycode 65 = keypad
+	// decimal), so seeding from it painted unrelated cells for every key typed.
+	// `sc_kb` is the authoritative physical-key map on these drivers.
+	const kc_out = {};
 	Object.entries(sc_kb).forEach(([sc_str, item]) => {
 		const sc_num = Number(sc_str);
 		const kc_num = SC_TO_KC[sc_num];
 		if (kc_num === undefined) return;
 		const kc_key = String(kc_num);
-		// Sum into any existing kc entry — defensive in case both fields
-		// happen to be populated for the same physical key.
+		// Sum into any existing kc entry — several scancodes legitimately map to
+		// the same physical position (the bare and high-byte arrow forms, rwin
+		// and the app/menu key).
 		const prev = kc_out[kc_key];
 		if (!prev) {
 			kc_out[kc_key] = { ...item };
@@ -216,17 +224,34 @@ function translate_win_bucket(app_bucket) {
 }
 
 /**
- * Walk the entire `today` payload and apply `translate_win_bucket` to
- * every app. Idempotent — calling it on already-translated data is a
- * no-op because the kc field is the merge target.
+ * Walk a payload and apply `translate_win_bucket` to it.
  *
- * @param {Object} today - `_prefetch_data.today` from the live blob.
- * @returns {Object} A new today object with kc fields populated.
+ * Two payload SHAPES reach this function. The live `today` blob is a per-app
+ * map (`{ "chrome.exe": bucket, … }`), but the historical block produced by the
+ * AHK range reader is a single FLAT aggregate (`{ c, w, kc, sc_kb }`) with no
+ * app dimension at all. Treating the flat one as a per-app map walked `c`, `w`,
+ * `kc` and `sc_kb` as if they were application names, and every one of them
+ * returned unchanged from `translate_win_bucket` (a token→item map has no
+ * `sc_kb` field), so the historical scancode data was silently never
+ * translated: the renderer reads `app_state.data.kc`, `app_state.data` declares
+ * no `sc_kb` slot, and the merge simply skipped a source key with no
+ * destination. The heatmap still lit up — with the Windows VK values in `kc` —
+ * so it never looked blank and never looked broken.
+ *
+ * Detecting the flat shape here keeps ONE translator for both blocks.
+ *
+ * @param {Object} payload - `_prefetch_data.today` or `_prefetch_data.historical`.
+ * @returns {Object} A new payload of the same shape with kc fields populated.
  */
-function translate_win_today(today) {
-	if (!today || typeof today !== 'object') return today;
+function translate_win_today(payload) {
+	if (!payload || typeof payload !== 'object') return payload;
+	// A flat aggregate carries the n-gram slots directly; a per-app map never
+	// has an application literally named "sc_kb".
+	if (payload.sc_kb && typeof payload.sc_kb === 'object') {
+		return translate_win_bucket(payload);
+	}
 	const out = {};
-	Object.entries(today).forEach(([app, bucket]) => {
+	Object.entries(payload).forEach(([app, bucket]) => {
 		out[app] = translate_win_bucket(bucket);
 	});
 	return out;

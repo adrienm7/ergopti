@@ -32,19 +32,18 @@ A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
 ; ActivateLayer, DisableLayer, ResetNumberOfRepetitions, SetNumberOfRepetitions,
 ; and ActionLayer are defined in lib/nav_layer_helpers.ahk and loaded globally.
 
-; Fix to get the CapsWord shortcut working when pressing "LAlt" activates the layer
+; Fix to get the CapsWord shortcut working when pressing "LAlt" activates the layer.
+; The group-enabled test is delegated to _AnyShortcutEnabled(), the same single
+; source the SC038 & SC03A sibling uses (modules/shortcuts/base_modifier.ahk) —
+; it is literally the same question asked twice. A hand-written disjunction of
+; action ids drifts from the manifest: this one had lost "enter", "escape" and
+; "tab", so picking any of those three made the criterion false and the press
+; fell through to the layer's own SC03A mapping, DELETING a character instead of
+; emitting the chosen action. Iterating the sub-map also drops the raw
+; Features[...] reads, which throw on a missing key
 #HotIf (LayerEnabled
     and TapHoldHoldLayer(TapHold, "left_alt") == "nav"
-    and (
-        Features["shortcuts"]["lalt_caps_lock"]["backspace"]
-        or Features["shortcuts"]["lalt_caps_lock"]["caps_lock"]
-        or Features["shortcuts"]["lalt_caps_lock"]["caps_word"]
-        or Features["shortcuts"]["lalt_caps_lock"]["ctrl_backspace"]
-        or Features["shortcuts"]["lalt_caps_lock"]["ctrl_delete"]
-        or Features["shortcuts"]["lalt_caps_lock"]["delete"]
-        or Features["shortcuts"]["lalt_caps_lock"]["one_shot_shift"]
-    )
-)
+    and _AnyShortcutEnabled("lalt_caps_lock"))
 ; Overrides the "BackSpace" shortcut on the layer
 SC03A:: {
     DisableLayer() LAltCapsLockShortcut()

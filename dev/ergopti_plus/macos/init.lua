@@ -205,10 +205,17 @@ Boot.mark("Path: runtime error capture installed")
 -- after a file change re-parses and refreshes the snapshot, every later boot reads
 -- it, and the same-boot delay-reading pass also hits the snapshot. Kept in an
 -- adapter so _shared/ stays filesystem-free (the reader sees only a load/store hook).
+--
+-- Declared here rather than inline because the file watchers must EXCLUDE this
+-- directory: it sits inside the watched driver tree and the snapshots are .lua
+-- files, so every cache write looked like a source edit and reloaded the driver.
+-- Two spellings of the path is exactly how the writer and the watcher would
+-- drift apart again.
+local TOML_CACHE_DIR = (hs.configdir or ".") .. "/cache/toml_hotstrings"
 do
 	local ok_cache, toml_cache = pcall(require, "adapters.toml_cache")
 	if ok_cache and type(toml_cache) == "table" and type(toml_cache.init) == "function" then
-		toml_cache.init((hs.configdir or ".") .. "/cache/toml_hotstrings")
+		toml_cache.init(TOML_CACHE_DIR)
 		local ok_reader, toml_reader = pcall(require, "lib.toml.reader")
 		if ok_reader and type(toml_reader) == "table" and type(toml_reader.set_cache_provider) == "function" then
 			toml_reader.set_cache_provider(toml_cache)
@@ -219,9 +226,144 @@ do
 end
 Boot.mark("TOML hotstring cache wired")
 
+-- Forward-declared so the shutdown callback below can capture it as an upvalue.
+-- A reference written above the `local` would bind the nil global of the same
+-- name instead, and the teardown would silently never touch Karabiner.
+local karabiner
+
+-- Armed HERE, not at the end of boot. The body is fully defensive — every
+-- module reference is nil-checked inside its own pcall — and every upvalue it
+-- needs exists by this line. Installed as the LAST boot phase, a reload whose
+-- new boot threw anywhere in between left the previous session's teardown
+-- already gone and the new one not yet installed: Karabiner kept remapping the
+-- keyboard with ZERO teardown on the next quit, taps and timers were never
+-- released, and the only way out was killing the grabber by hand.
+hs.shutdownCallback = function()
+	pcall(function() hs.settings.set(HS_BOOT_READY_SETTING_KEY, false) end)
+	Logger.info(LOG, "Hammerspoon is shutting down — cleaning up resources…")
+
+	-- 1. Stop core modules (releases eventtaps, timers, watchers)
+	pcall(function() if keymap and type(keymap.stop) == "function" then keymap.stop() end end)
+	pcall(function() if gestures and type(gestures.stop) == "function" then gestures.stop() end end)
+	pcall(function() if shortcuts and type(shortcuts.stop) == "function" then shortcuts.stop() end end)
+
+	-- 2. Restore system overrides
+	if type(gestures) == "table" and type(gestures.restore_all_overrides) == "function" then
+		pcall(gestures.restore_all_overrides)
+	end
+
+	-- 3. Tear down the Karabiner-Elements bridge — but ONLY on a genuine quit.
+	-- Skip it entirely on a reload: the root grabber reapplies karabiner.json via
+	-- FSEvents, so killing the user-level bridge here would needlessly drop
+	-- remapping and, on some KE versions, cascade the grabber down — surfacing the
+	-- native "install Karabiner" prompt on the next boot. Only a genuine quit (no
+	-- reload sentinel) should stop remapping.
+	if reload_guard.is_reloading() then
+		Logger.info(LOG, "Reload in progress — leaving KE bridge alive (FSEvents will reapply the config).")
+	else
+		-- Genuine quit: use karabiner.kill(), which runs the launchctl BOOTOUT
+		-- (KILL_CMD) synchronously. A bare pkill (KILL_FAST_CMD) is respawned within
+		-- milliseconds by launchd's KeepAlive plist, so the keyboard would stay
+		-- remapped after HS has exited. kill() also gates on is_hs_owned_bridge,
+		-- leaving a user-managed KE setup untouched (a bare pkill killed it blindly).
+		pcall(function()
+			if karabiner and type(karabiner.kill) == "function" then
+				karabiner.kill()
+				Logger.info(LOG, "Shutdown KE bridge torn down via bootout (genuine quit).")
+				return
+			end
+
+			-- The module never loaded. Until now this branch simply no-opped, which is
+			-- the worst possible outcome: Karabiner-Elements keeps remapping after
+			-- Hammerspoon exits, launchd's KeepAlive restarts the grabber, and the two
+			-- things that could recover it — the menubar and the panic-button eventtap
+			-- — are required BELOW the raise and were never created either.
+			--
+			-- ke_lifecycle is required near the top of this file, far above the module
+			-- that can raise, and it owns both KILL_CMD and is_hs_owned_bridge: exactly
+			-- what karabiner.kill() consumes. So it is the one teardown path guaranteed
+			-- to be reachable here.
+			local ok_kl, kl = pcall(require, "modules.karabiner.ke_lifecycle")
+			if not ok_kl or type(kl) ~= "table" then
+				Logger.error(LOG, "Shutdown: neither the Karabiner module nor ke_lifecycle "
+					.. "could be loaded — the KE bridge cannot be torn down from here.")
+				return
+			end
+			-- Still gated on ownership: a bare kill would boot out a user-managed
+			-- Karabiner setup, which is the regression the ownership marker exists for.
+			if type(kl.is_hs_owned_bridge) == "function" and kl.is_hs_owned_bridge() then
+				pcall(function() hs.execute(kl.KILL_CMD) end)
+				Logger.info(LOG, "Shutdown KE bridge torn down via the ke_lifecycle "
+					.. "fallback (the Karabiner module had failed to load).")
+			else
+				Logger.info(LOG, "Shutdown: KE bridge left alive — not owned by Hammerspoon.")
+			end
+		end)
+	end
+
+	-- 4. Flush the keylogger buffer so in-memory keystrokes are not lost on reload
+	pcall(function()
+		local ok_kl, kl = pcall(require, "modules.keylogger")
+		if ok_kl and kl and type(kl.stop) == "function" then
+			kl.stop()
+		end
+	end)
+
+	-- 5. Stop the VS Code caret bridge HTTP server
+	pcall(function()
+		local ok_vb, vb = pcall(require, "lib.vscode_bridge")
+		if ok_vb and vb and type(vb.stop_server) == "function" then vb.stop_server() end
+	end)
+
+	-- 7. Terminate any running MLX server process
+	pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
+
+	-- 8. Kill orphan child processes — shared with the script_quit action via
+	-- menu_llm.terminate_helper_processes() so the os.exit quit path performs the
+	-- identical teardown and the two paths can never drift.
+	pcall(function() require("ui.menu.menu_llm").terminate_helper_processes() end)
+	-- Kill any orphan mlx_lm.server on genuine quit only — not on reload.
+	-- Boot logic deliberately spares a healthy server across sessions; killing it
+	-- on every reload makes the cold-restart avoidance dead code. Shared with the
+	-- script_quit (os.exit) action so the two quit paths cannot drift (F-M7).
+	if not reload_guard.is_reloading() then
+		pcall(function() require("ui.menu.menu_llm").terminate_orphan_mlx_server() end)
+	end
+	-- Stop all path-watchers that were pinned at module scope to survive GC.
+	-- Explicit :stop() prevents stray file-system callbacks from firing during
+	-- the Lua state teardown window.
+	if type(_G.script_watchers) == "table" then
+		for _, w in ipairs(_G.script_watchers) do
+			pcall(function() w:stop() end)
+		end
+	end
+	-- The menubar owns watchers of its own (the config path watcher and the theme
+	-- watcher) that are NOT in that table, so they could still fire during the
+	-- teardown window — the exact hazard the comment above cites. Ask the module
+	-- that owns them to stop them; it is the only thing holding the handles.
+	pcall(function()
+		local ok_menu, menu_mod = pcall(require, "ui.menu")
+		if ok_menu and type(menu_mod) == "table" and type(menu_mod.stop_watchers) == "function" then
+			menu_mod.stop_watchers()
+		end
+	end)
+	Logger.info(LOG, "Hammerspoon shut down.")
+end
+
 -- Now safe to load modules that depend on config_dir
 local file_system        = require("adapters.file_system")
-local karabiner          = require("modules.karabiner")
+-- Guarded: modules.karabiner reaches modules/karabiner/defaults.lua, whose
+-- top-level body calls load_sections() and require_section() and raises from both.
+-- This require sits above the menubar, the panic-button eventtap and every other
+-- line of boot, so a missing or truncated tap_hold defaults.toml used to cost the
+-- whole session rather than one feature.
+local ok_karabiner
+ok_karabiner, karabiner = pcall(require, "modules.karabiner")
+if not ok_karabiner then
+	Logger.error(LOG, "modules.karabiner failed to load: %s — the Karabiner bridge is "
+		.. "disabled for this session; everything else continues.", tostring(karabiner))
+	karabiner = nil
+end
 local menu               = require("ui.menu")
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
 local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
@@ -316,6 +458,14 @@ Boot.mark("Script control engine started (panic-button eventtap)")
 -- boot_llm_enabled computation (including the saved-prefs / DEFAULT_STATE
 -- fallback) runs later in Section 3. Named distinctly so the two never shadow
 -- each other and the intent of each is unambiguous.
+-- Overrides applied FIRST. config.toml's [features] layer can disable the LLM,
+-- and it writes into hs.settings — but it used to run 50 lines below this read,
+-- so a user who turned the LLM off in the file still paid the synchronous
+-- lsof + curl cleanup on every boot. The two readers of this one setting sat on
+-- opposite sides of the layer that populates it.
+local config_overrides = require("lib.config_overrides")
+config_overrides.apply(menu_paths.get("ConfigTomlPath"))
+
 local mlx_cleanup_enabled = hs.settings.get("llm.enabled") ~= false
 
 -- Hammerspoon does not always reap children on quit/reload, so a fresh boot can
@@ -368,8 +518,8 @@ Boot.mark("MLX server cleanup scheduled (deferred off boot critical path)")
 -- layer the user can edit by hand to override anything the menu exposes
 -- (LogLevel, individual feature flags). All overrides live in the
 -- driver-specific config — no separate cross-driver config.toml.
-local config_overrides = require("lib.config_overrides")
-config_overrides.apply(menu_paths.get("ConfigTomlPath"))
+-- (config_overrides.apply already ran in Section 2, before the MLX cleanup gate
+-- that reads a value it can write.)
 
 -- Re-apply the log level AFTER overrides. Logger.set_level already ran at boot
 -- (above), BEFORE config_overrides — so a [script] log_level / LogLevel override
@@ -709,7 +859,9 @@ Boot.mark("Keymap engine started")
 -- Initialize the Karabiner bridge (starts trackpad watcher + loads feature flags)
 -- The FileSystem adapter is injected so KE config path resolution goes through
 -- the port boundary (hs.fs.pathToAbsolute) instead of raw os.getenv("HOME").
-karabiner.init(file_system)
+if karabiner then
+	karabiner.init(file_system)
+end
 Boot.mark("UI: karabiner.init")
 
 Logger.debug(LOG, "Starting user interface components…")
@@ -764,94 +916,41 @@ require("lib.file_watchers").start({
 	hotstrings_dir          = hotstrings_dir,
 	base_dir                = base_dir,
 	personal_hotstrings_dir = (menu_paths.get("PersonalHotstringsDir") or ""):gsub("[/\\]+$", ""),
+	-- Files this session writes itself. hotstrings_dir resolves to the config
+	-- ROOT whenever that root holds an ordinary .toml (it does — wrap_symbols),
+	-- and the pathwatcher is recursive, so these two would otherwise register as
+	-- external edits: every save_prefs — every menu toggle — reloaded the whole
+	-- driver, and every layout change regenerated config_karabiner.toml and did
+	-- it again. Resolved from menu_paths so the watcher and the writers cannot
+	-- disagree about where these files are.
+	self_written_files      = {
+		menu_paths.get("ConfigTomlPath"),
+		menu_paths.get("KarabinerConfigPath"),
+	},
+	-- Runtime store, not source: the TOML snapshot cache lives inside the
+	-- watched driver tree and writes .lua files, so without this every cache
+	-- refresh triggered a full reload — and the reload re-warms the cache.
+	ignored_dirs            = { TOML_CACHE_DIR },
+	-- The personal hotstrings tree is usually a SEPARATE git repository from the
+	-- driver, so a pull there must be gated by its own .git, not the driver's.
+	git_roots               = {
+		base_dir,
+		(menu_paths.get("HotstringsDirPath") or ""):gsub("[/\\]+$", ""),
+	},
 })
 
 
 
 
 
--- ====================================
--- =====================================
--- ======= 8/ Shutdown Callback =======
--- =====================================
--- ====================================
+-- ===================================
+-- ===================================
+-- ======= 8/ Post-boot Warmup =======
+-- ===================================
+-- ===================================
 
 Boot.mark("File watchers armed")
 
-hs.shutdownCallback = function()
-	pcall(function() hs.settings.set(HS_BOOT_READY_SETTING_KEY, false) end)
-	Logger.info(LOG, "Hammerspoon is shutting down — cleaning up resources…")
-
-	-- 1. Stop core modules (releases eventtaps, timers, watchers)
-	pcall(function() if keymap and type(keymap.stop) == "function" then keymap.stop() end end)
-	pcall(function() if gestures and type(gestures.stop) == "function" then gestures.stop() end end)
-	pcall(function() if shortcuts and type(shortcuts.stop) == "function" then shortcuts.stop() end end)
-
-	-- 2. Restore system overrides
-	if type(gestures) == "table" and type(gestures.restore_all_overrides) == "function" then
-		pcall(gestures.restore_all_overrides)
-	end
-
-	-- 3. Tear down the Karabiner-Elements bridge — but ONLY on a genuine quit.
-	-- Skip it entirely on a reload: the root grabber reapplies karabiner.json via
-	-- FSEvents, so killing the user-level bridge here would needlessly drop
-	-- remapping and, on some KE versions, cascade the grabber down — surfacing the
-	-- native "install Karabiner" prompt on the next boot. Only a genuine quit (no
-	-- reload sentinel) should stop remapping.
-	if reload_guard.is_reloading() then
-		Logger.info(LOG, "Reload in progress — leaving KE bridge alive (FSEvents will reapply the config).")
-	else
-		-- Genuine quit: use karabiner.kill(), which runs the launchctl BOOTOUT
-		-- (KILL_CMD) synchronously. A bare pkill (KILL_FAST_CMD) is respawned within
-		-- milliseconds by launchd's KeepAlive plist, so the keyboard would stay
-		-- remapped after HS has exited. kill() also gates on is_hs_owned_bridge,
-		-- leaving a user-managed KE setup untouched (a bare pkill killed it blindly).
-		pcall(function()
-			if karabiner and type(karabiner.kill) == "function" then
-				karabiner.kill()
-				Logger.info(LOG, "Shutdown KE bridge torn down via bootout (genuine quit).")
-			end
-		end)
-	end
-
-	-- 4. Flush the keylogger buffer so in-memory keystrokes are not lost on reload
-	pcall(function()
-		local ok_kl, kl = pcall(require, "modules.keylogger")
-		if ok_kl and kl and type(kl.stop) == "function" then
-			kl.stop()
-		end
-	end)
-
-	-- 5. Stop the VS Code caret bridge HTTP server
-	pcall(function()
-		local ok_vb, vb = pcall(require, "lib.vscode_bridge")
-		if ok_vb and vb and type(vb.stop_server) == "function" then vb.stop_server() end
-	end)
-
-	-- 7. Terminate any running MLX server process
-	pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
-
-	-- 8. Kill orphan child processes — shared with the script_quit action via
-	-- menu_llm.terminate_helper_processes() so the os.exit quit path performs the
-	-- identical teardown and the two paths can never drift.
-	pcall(function() require("ui.menu.menu_llm").terminate_helper_processes() end)
-	-- Kill any orphan mlx_lm.server on genuine quit only — not on reload.
-	-- Boot logic deliberately spares a healthy server across sessions; killing it
-	-- on every reload makes the cold-restart avoidance dead code. Shared with the
-	-- script_quit (os.exit) action so the two quit paths cannot drift (F-M7).
-	if not reload_guard.is_reloading() then
-		pcall(function() require("ui.menu.menu_llm").terminate_orphan_mlx_server() end)
-	end
-	-- Stop all path-watchers that were pinned at module scope to survive GC.
-	-- Explicit :stop() prevents stray file-system callbacks from firing during
-	-- the Lua state teardown window.
-	if type(_G.script_watchers) == "table" then
-		for _, w in ipairs(_G.script_watchers) do
-			pcall(function() w:stop() end)
-		end
-	end
-	Logger.info(LOG, "Hammerspoon arrêté")
-end
 
 -- Warm up macOS WebKit in the background so the first dashboard open is
 -- not penalised by the framework load (~1-2 s).  Deferred so it never

@@ -124,28 +124,87 @@ _PrefixWordBoundaries() {
 ; @param Trigger The candidate trigger, exactly as registered.
 ; @return true when the engine would fire it against its current buffer.
 _PreviewEngineWouldFire(Trigger) {
-    global HSE_RegistryByLastChar, HSE_Buffer
+    global HSE_Buffer
     if (Trigger == "")
         return false
-    LastChar := SubStr(Trigger, -1)
-    if (!IsSet(HSE_RegistryByLastChar) or !HSE_RegistryByLastChar.Has(LastChar))
+    Spec := _PreviewSpecForTrigger(Trigger)
+    ; Fails OPEN: no index holds this trigger, so leave the row visible.
+    if (Spec == "")
         return true
-    for _, Spec in HSE_RegistryByLastChar[LastChar] {
+    ; A star trigger is evaluated against the buffer as it will be ONE
+    ; keystroke from now — the magic key has not been typed yet at preview
+    ; time, but it is the trigger's last character, so appending it
+    ; reconstructs exactly what the engine will match against.
+    EvalBuf := HSE_Buffer
+    if (Spec.HasOwnProp("Star") and Spec.Star)
+        EvalBuf .= SubStr(Trigger, -1)
+    CaseSensitive := (Spec.HasOwnProp("CaseSensitive") and Spec.CaseSensitive)
+    if !HSE_SuffixMatches(EvalBuf, Trigger, CaseSensitive)
+        return false
+    return _HSE_WordBoundaryAllows(EvalBuf, Spec)
+}
+
+; Resolve a candidate trigger to the engine's own Spec through the SAME O(1)
+; by-trigger indexes HSE_FindMatchAtEnd probes, CS before CI, star before
+; end-char.
+;
+; This used to walk HSE_RegistryByLastChar[SubStr(Trigger, -1)] linearly. Every
+; star trigger ends in the magic key, so they all share ONE ~2100-entry bucket —
+; the exact scan hotstring_match.ahk documents at "~21 ms per press" as the
+; reason the matcher stopped using it. The preview was the one production reader
+; left behind, and it paid the FULL scan precisely in the useless case (a trigger
+; the bucket does not hold, where the answer is the fail-open default). Worse,
+; the raw last character was used as the bucket key while HSE_Register buckets
+; case-insensitive triggers under the LOWERCASED one, so any CI trigger ending
+; in an uppercase character always took that full-scan fail-open path.
+;
+; @param Trigger The candidate trigger, exactly as registered.
+; @return The first matching Spec, or "" when no index holds the trigger.
+_PreviewSpecForTrigger(Trigger) {
+    global HSE_StarByTriggerCS, HSE_StarByTriggerCI
+    global HSE_EndByTriggerCS, HSE_EndByTriggerCI
+    Lower := StrLower(Trigger)
+    if IsSet(HSE_StarByTriggerCS) {
+        Found := _PreviewSpecFromBucket(HSE_StarByTriggerCS, Trigger, Trigger)
+        if (Found != "")
+            return Found
+    }
+    if IsSet(HSE_StarByTriggerCI) {
+        Found := _PreviewSpecFromBucket(HSE_StarByTriggerCI, Lower, Trigger)
+        if (Found != "")
+            return Found
+    }
+    if IsSet(HSE_EndByTriggerCS) {
+        Found := _PreviewSpecFromBucket(HSE_EndByTriggerCS, Trigger, Trigger)
+        if (Found != "")
+            return Found
+    }
+    if IsSet(HSE_EndByTriggerCI) {
+        Found := _PreviewSpecFromBucket(HSE_EndByTriggerCI, Lower, Trigger)
+        if (Found != "")
+            return Found
+    }
+    return ""
+}
+
+; One by-trigger index probe. Map[missing] THROWS in v2, so the key is tested
+; with .Has() first. The trigger comparison stays case-INSENSITIVE, exactly as
+; the bucket walk this replaced was: a case variant is registered under its own
+; trigger string on both sides, and tightening the test here would change which
+; rows the preview validates rather than only how fast it finds them.
+; @param Index The by-trigger Map to probe.
+; @param Key The lookup key (exact for CS indexes, lowercased for CI ones).
+; @param Trigger The candidate trigger to confirm on the resolved Spec.
+; @return The matching Spec, or "" when the bucket does not hold it.
+_PreviewSpecFromBucket(Index, Key, Trigger) {
+    if !Index.Has(Key)
+        return ""
+    for _, Spec in Index[Key] {
         if (Spec.Trigger != Trigger)
             continue
-        ; A star trigger is evaluated against the buffer as it will be ONE
-        ; keystroke from now — the magic key has not been typed yet at preview
-        ; time, but it is the trigger's last character, so appending it
-        ; reconstructs exactly what the engine will match against.
-        EvalBuf := HSE_Buffer
-        if (Spec.HasOwnProp("Star") and Spec.Star)
-            EvalBuf .= LastChar
-        CaseSensitive := (Spec.HasOwnProp("CaseSensitive") and Spec.CaseSensitive)
-        if !HSE_SuffixMatches(EvalBuf, Trigger, CaseSensitive)
-            return false
-        return _HSE_WordBoundaryAllows(EvalBuf, Spec)
+        return Spec
     }
-    return true
+    return ""
 }
 
 ; Categories scanned at boot. The order matches Hammerspoon's default load
@@ -355,6 +414,17 @@ PrefixWatcherSuppress(YesNo) {
 ; fire in place of a synchronous KL_LogHotstring.
 _HSE_QueueFireLog(Trigger, Replacement, HType, Category, Section) {
 	global _HSE_FireLogQueue, _HSE_FireLogScheduled, HSE_FIRE_LOG_DEFER_MS
+	; Dynamic hotstrings (@dt, @date, the phone/SSN/IBAN prefixes…) store a
+	; CALLABLE in Spec.Replacement and resolve it at fire time. HSE_DispatchMatch
+	; resolves it into a local and never writes it back, so the fire paths read
+	; the raw property and would hand the Func object straight to the drain —
+	; where KL_LogHotstring opens with StrLen(replacement) and throws. That throw
+	; lands inside the drain's try, so every date / phone / SSN / IBAN expansion
+	; simply vanished from the JSONL and the WPM widget with nothing logged.
+	; Neutralise here, at the one funnel every fire path shares, rather than at
+	; each call site: the metric records the trigger, never the resolved PII.
+	if HasMethod(Replacement)
+		Replacement := ""
 	_HSE_FireLogQueue.Push({ Trigger: Trigger, Replacement: Replacement,
 		HType: HType, Category: Category, Section: Section })
 	if !_HSE_FireLogScheduled {
@@ -375,7 +445,14 @@ _HSE_DrainFireLog() {
 	Batch := _HSE_FireLogQueue
 	_HSE_FireLogQueue := []
 	for _, Rec in Batch {
-		try KL_LogHotstring(Rec.Trigger, Rec.Replacement, Rec.HType, "", Rec.Category, Rec.Section)
+		; A bare try here swallowed a TypeError for weeks with no trace at all.
+		; The drain is the last stop before the metrics pipeline, so a failure
+		; must at least name itself instead of silently dropping the record.
+		try {
+			KL_LogHotstring(Rec.Trigger, Rec.Replacement, Rec.HType, "", Rec.Category, Rec.Section)
+		} catch as Err {
+			try LoggerError("PrefixWatcher", "Fire-log drain failed for trigger '{1}': {2}.", Rec.Trigger, Err.Message)
+		}
 	}
 }
 
@@ -445,6 +522,16 @@ HotstringPrefixWatcherRebuildIndex() {
 			_tomlCats += 1
 		}
 	}
+	; Extension packs. The six categories above enumerate FILES the driver ships;
+	; the engine additionally registers every other *.toml under
+	; PersonalHotstringsDir. Indexing only the six meant a pack expanded correctly
+	; and could never be previewed — and the config window still offered it a
+	; per-pack tooltip colour, a setting with nothing behind it.
+	_extPacks := 0
+	for _, Pack in HS_EnumeratePersonalExtFiles() {
+		_RegisterExtPackTriggers(Pack["Path"], Pack["Label"], NewIndex, NewSet)
+		_extPacks += 1
+	}
 	_buildMs := A_TickCount - _buildStart
 	_PrefixIndex := NewIndex
 	_TriggerSet := NewSet
@@ -455,8 +542,8 @@ HotstringPrefixWatcherRebuildIndex() {
 	; (cache-load vs the in-memory build loop) and confirm the fast path stays live
 	; (cache=0 toml=6 would mean the cache path silently broke).
 	try LoggerInfo("PrefixWatcher",
-		"Index rebuilt: {1} trigger(s) in {2} ms (ensure={3}ms build={4}ms cache={5} toml={6} rows={7}).",
-		NewSet.Count, A_TickCount - _rebuildStart, _ensureMs, _buildMs, _cachedCats, _tomlCats,
+		"Index rebuilt: {1} trigger(s) in {2} ms (ensure={3}ms build={4}ms cache={5} toml={6} ext={7} rows={8}).",
+		NewSet.Count, A_TickCount - _rebuildStart, _ensureMs, _buildMs, _cachedCats, _tomlCats, _extPacks,
 		(IsSet(_HS_CACHE_ROWS) ? _HS_CACHE_ROWS.Count : "unset"))
 	; A just-disabled section may still have a tooltip on screen — hide it so the
 	; preview cannot outlive the expansion it was advertising.
@@ -576,7 +663,19 @@ _OnPrefixChar(IH, Char) {
 						SendInstant(Left . UIASel . Right)
 					} finally {
 						PrefixWatcherSuppress(false)
+						; Both buffers or neither. The wrap deletes the character the
+						; pass-through hook already delivered and inserts a selection
+						; of unknown extent, then returns BEFORE HSE_FeedChar runs — so
+						; resetting the preview alone leaves the ENGINE holding text
+						; that is no longer left of the caret, and its next expansion
+						; backspaces over the wrapped selection. IsPhysical must be
+						; true: the wrap runs with the suppression held, and
+						; HSE_FeedReset is a no-op for non-physical callers while
+						; HSE_Suppressed is up. KnownTerminatorBefore is true because
+						; the caret lands right after the closing symbol, which the
+						; next typed run may legitimately treat as a word start.
 						_ResetPrefixBuffer()
+						HSE_FeedReset(true, true)
 					}
 					return
 				}
@@ -769,6 +868,18 @@ _OnPrefixKeyDown(IH, VK, SC) {
 		0x26, true,  ; VK_UP
 		0x27, true,  ; VK_RIGHT
 		0x28, true,  ; VK_DOWN
+		; The rest of the navigation cluster. The engine's own contract lists
+		; these as buffer-invalidating, but only the arrows were ever enumerated
+		; here — so typing "bonjour ia", pressing Home and typing "." fired
+		; ia -> IA with {BackSpace 3} at line start and ate three characters of
+		; unrelated text. Delete and Insert belong with them: both rewrite the
+		; document by an amount this watcher cannot observe.
+		0x21, true,  ; VK_PRIOR  (PgUp)
+		0x22, true,  ; VK_NEXT   (PgDn)
+		0x23, true,  ; VK_END
+		0x24, true,  ; VK_HOME
+		0x2D, true,  ; VK_INSERT
+		0x2E, true,  ; VK_DELETE
 	)
 	; Same try guard as _OnPrefixChar — an unhandled error here permanently
 	; silences the OnKeyDown callback for all subsequent keystrokes.
@@ -835,11 +946,31 @@ _OnPrefixKeyDown(IH, VK, SC) {
 			; trailing else-if and silently never ran on this hook path.
 			if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
 				LLM_Bridge_FeedKeyDownIfActive(VK)
+		} else if (VK == 0x2D or VK == 0x2E) {
+			; Insert toggles overwrite mode and Delete removes text the watcher
+			; never saw. Neither moves the caret, so unlike the pure cursor
+			; movers below they cannot promise a word boundary on the left —
+			; the engine contract lists them with the disruptive Ctrl combos,
+			; and they take the same boundary-false reset those do.
+			;
+			; Resetting BOTH buffers here is the point: they were previously in
+			; neither branch, and adding them to the preview reset alone would
+			; simply move the divergence rather than close it.
+			HSE_FeedReset(false, true)
+			if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
+				LLM_Bridge_FeedKeyDownIfActive(VK)
 		} else if (VK == 0x1B
 				or VK == 0x25 or VK == 0x26
-				or VK == 0x27 or VK == 0x28) {
-			; Arrow keys and Escape move the cursor to an unknown position,
-			; but the next typed run starts fresh — treat as word boundary.
+				or VK == 0x27 or VK == 0x28
+				or VK == 0x21 or VK == 0x22
+				or VK == 0x23 or VK == 0x24) {
+			; Cursor movers: Escape, the four arrows, and the rest of the
+			; navigation cluster (PgUp/PgDn/End/Home). All of them move the
+			; caret to a position this watcher cannot observe, but the next
+			; typed run starts fresh — treat as word boundary. The engine
+			; buffer must be reset here as well as the preview: resetting only
+			; the preview leaves the engine expanding against text that is no
+			; longer to the left of the caret.
                         HSE_FeedReset(true, true)
 			if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
 				LLM_Bridge_FeedKeyDownIfActive(VK)
@@ -850,6 +981,37 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	} catch as Err {
 		LoggerError("PrefixWatcher", "OnKeyDown error for VK {1}: {2}.", VK, Err.Message)
 	}
+}
+
+; The trailing word of the ENGINE buffer, using the same boundary set the
+; preview uses. The two buffers deliberately hold different things: the engine
+; keeps the terminator and everything before it (a trigger may contain a
+; terminator as a non-final character), while the preview tracks only the word
+; being typed. Deriving one from the other is how they are reconciled without
+; the preview having to remember anything the engine already knows.
+_PrefixWordTailFromEngine() {
+	global HSE_Buffer
+	return IsSet(HSE_Buffer) ? _PrefixWordTail(HSE_Buffer) : ""
+}
+
+; The trailing word of an arbitrary buffer, using the shared boundary set. One
+; definition of "the word currently being typed", so every consumer agrees on
+; where it starts.
+_PrefixWordTail(Buf) {
+	global _MAX_BUFFER_LEN
+	if (Buf == "")
+		return ""
+	Boundaries := _PrefixWordBoundaries()
+	Tail := ""
+	Loop StrLen(Buf) {
+		Ch := SubStr(Buf, -A_Index, 1)
+		if InStr(Boundaries, Ch)
+			break
+		Tail := Ch . Tail
+	}
+	if (StrLen(Tail) > _MAX_BUFFER_LEN)
+		Tail := SubStr(Tail, -_MAX_BUFFER_LEN)
+	return Tail
 }
 
 ; Shrink the watcher buffer by one character, mirroring HSE_FeedBackspace on the
@@ -863,8 +1025,21 @@ _OnPrefixKeyDown(IH, VK, SC) {
 _PrefixFeedBackspace() {
 	global _PrefixBuffer
 	if (_PrefixBuffer == "") {
+		; Empty does not always mean "nothing to step back over". Typing a
+		; terminator resets the preview while the engine keeps it, so a backspace
+		; that deletes that terminator re-exposes the PREVIOUS word on the engine
+		; side and left the preview stranded at empty. The tooltip then stayed
+		; silent for a word the engine was still perfectly able to expand — and
+		; stayed silent for the rest of that word, because the preview could never
+		; catch back up. Recover it from the engine, which is the side that still
+		; knows what is on screen.
+		Recovered := _PrefixWordTailFromEngine()
 		TooltipHide("Backspace", true)
 		_NotifySuggestionDismissed()
+		if (Recovered == "")
+			return
+		_PrefixBuffer := Recovered
+		_PrefixScheduleRender()
 		return
 	}
 	_PrefixBuffer := SubStr(_PrefixBuffer, 1, StrLen(_PrefixBuffer) - 1)
@@ -900,21 +1075,6 @@ _PrefixAppendTypedChar(Char) {
 	if LoggerIsDebugEnabled()
 		LoggerDebug("PrefixWatcher", "DBG about to _LookupAndRender: buf='{1}' indexSize={2}.", _PrefixBuffer, _PrefixIndex.Count)
 	_PrefixScheduleRender()
-}
-
-; Return the suffix of Buf that follows the last word-boundary character.
-; Uses _PrefixWordBoundaries() so the result is the same SearchKey that
-; _LookupAndRender would compute. Returns Buf unchanged when no boundary
-; is present (the whole string is one word).
-_SuffixAfterLastBoundary(Buf) {
-	Idx := StrLen(Buf)
-	while (Idx >= 1) {
-		if (InStr(_PrefixWordBoundaries(), SubStr(Buf, Idx, 1)) > 0) {
-			return SubStr(Buf, Idx + 1)
-		}
-		Idx -= 1
-	}
-	return Buf
 }
 
 ; ConsumedByFire ─ true when the reset is the consequence of a hotstring
@@ -956,7 +1116,16 @@ _CheckNearMiss(Buf) {
 	; between the deferred schedule and this firing (near-miss-on-hotpath-scan).
 	if !Keylogger.initialized
 		return
-	key := StrLower(Buf)
+	; Compare the last WORD, not the whole buffer. Since the star-fire path
+	; re-seeds the preview from HSE_Buffer, this buffer can hold several words
+	; plus the replacement that was just inserted — and every registered trigger
+	; is a single word, so a whole-buffer comparison could never match anything
+	; again after the first star fire of a sentence. The near-miss analytics went
+	; quiet without a single error.
+	Word := _PrefixWordTail(Buf)
+	if (StrLen(Word) < 2)
+		return
+	key := StrLower(Word)
 	; Exact match → user typed a known trigger without using the expansion
 	if _TriggerSet.Has(key) {
 		Entry := _TriggerSet[key]
@@ -965,7 +1134,7 @@ _CheckNearMiss(Buf) {
 		return
 	}
 	; Edit-distance-1 check — scan triggers of same length ± 1
-	BufLen := StrLen(Buf)
+	BufLen := StrLen(Word)
 	for trig, Entry in _TriggerSet {
 		tLen := StrLen(trig)
 		if (Abs(tLen - BufLen) > 1)
@@ -1090,15 +1259,15 @@ _PrefixRenderFlush() {
 ; higher priority, then — when both are equal — a false return preserves the
 ; original registration order (the engine's final ``Seq`` tiebreak). HasOwnProp
 ; guards keep it safe against entries built before the Priority field existed.
+; Delegates to the ENGINE's rule rather than restating it. This function used to
+; carry its own copy, and the copy had drifted: it defaulted a missing Priority
+; to 0 where the engine defaults to 50, and it had no GroupOrder or Seq tiebreak
+; at all. Two implementations of "which trigger wins" mean the tooltip can rank a
+; collision differently from the engine that will fire it — the tooltip shows one
+; expansion and the user gets another. The correct cure for a duplicated rule is
+; to delete the second copy, not to keep the two in step by hand.
 _PrefixCandidateBeats(A, B) {
-	AL := A.HasOwnProp("Length") ? A.Length : 0
-	BL := B.HasOwnProp("Length") ? B.Length : 0
-	if (AL != BL) {
-		return AL > BL
-	}
-	AP := A.HasOwnProp("Priority") ? A.Priority : 0
-	BP := B.HasOwnProp("Priority") ? B.Priority : 0
-	return AP > BP
+	return _HSE_Beats(A, B)
 }
 
 ; Return a NEW array of the candidates ordered by _PrefixCandidateBeats. A stable
@@ -1125,6 +1294,47 @@ _PrefixSortCandidates(Candidates) {
 	return Sorted
 }
 
+; Build the preview's candidate set from the ENGINE's buffer, ranked by the
+; engine's own tie-break. Returns a (possibly empty) Array of index entries.
+;
+; The preview used to derive its candidates from ONE index key: the tail of
+; _PrefixBuffer after the last word-boundary character. That is a second,
+; NARROWER derivation than the matcher's. _PrefixAppendTypedChar wipes
+; _PrefixBuffer on every boundary character, so a key containing a space or an
+; apostrophe could never be produced — while _AddTriggerToIndex happily indexes
+; « la dispo★ » under the key « la dispo ». The engine, which probes EVERY
+; suffix of HSE_Buffer and prefers the longer trigger, therefore fired
+; « la disposition » while the tooltip had promised « disponible », and
+; _PreviewEngineWouldFire could not catch it: it only validates the candidate
+; the preview already chose, it never asks which candidate the engine would pick.
+;
+; Probing the same suffixes the matcher probes deletes that second derivation
+; instead of patching it. The probe is bounded by the longest registered trigger
+; (the engine already tracks it for exactly this purpose), so the cost is
+; O(longest trigger) Map lookups, not O(buffer).
+_PrefixCollectCandidates() {
+	global _PrefixIndex, HSE_Buffer, HSE_MaxStarTriggerLen, HSE_MaxEndTriggerLen
+	Candidates := []
+	if (!IsSet(HSE_Buffer) or HSE_Buffer == "" or !IsSet(_PrefixIndex) or _PrefixIndex.Count == 0)
+		return Candidates
+	MaxKeyLen := IsSet(HSE_MaxStarTriggerLen) ? HSE_MaxStarTriggerLen : 0
+	if (IsSet(HSE_MaxEndTriggerLen) and HSE_MaxEndTriggerLen > MaxKeyLen)
+		MaxKeyLen := HSE_MaxEndTriggerLen
+	if (MaxKeyLen < 1)
+		return Candidates
+	; AHK v2's Map is case-sensitive by default, so this lookup distinguishes
+	; ``ct`` from ``CT`` — the index registers each case variant separately with
+	; its pre-cased output, exactly mirroring CreateCaseSensitiveHotstrings.
+	Loop Min(StrLen(HSE_Buffer), MaxKeyLen) {
+		Suffix := SubStr(HSE_Buffer, -A_Index)
+		if !_PrefixIndex.Has(Suffix)
+			continue
+		for _, Entry in _PrefixIndex[Suffix]
+			Candidates.Push(Entry)
+	}
+	return _PrefixSortCandidates(Candidates)
+}
+
 _LookupAndRender() {
 	global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN, ScriptInformation
 	PrefixSnapshot := _PrefixBuffer
@@ -1141,45 +1351,18 @@ _LookupAndRender() {
 		return
 	}
 
-	; Walk the buffer from the right edge backwards; the first character we
-	; meet that appears in ``HSE_WORD_TERMINATORS`` marks the boundary of
-	; the leading context, and everything to its right is the current word
-	; under typing. The straightforward ``InStr(..., , 1, -1)`` form does
-	; NOT do this: with a positive StartingPos and a negative Occurrence,
-	; AHK v2 essentially returns the first match from the left, not the
-	; last from the right — verified by direct probe, which is why ``a'ia``
-	; used to return ``a'ia`` (no terminator found) instead of ``ia``.
-	LastTermPos := 0
-	BufScanIdx := StrLen(PrefixSnapshot)
-	while (BufScanIdx >= 1) {
-		ScanChar := SubStr(PrefixSnapshot, BufScanIdx, 1)
-		if (InStr(_PrefixWordBoundaries(), ScanChar) > 0) {
-			LastTermPos := BufScanIdx
-			break
-		}
-		BufScanIdx -= 1
-	}
-	SearchKey := (LastTermPos > 0) ? SubStr(PrefixSnapshot, LastTermPos + 1) : PrefixSnapshot
-	if (SearchKey == "") {
-		TooltipHide("LookupKeyEmpty", true)
-		_NotifySuggestionDismissed()
-		return
-	}
-	; AHK v2's Map is case-sensitive by default, so this lookup distinguishes
-	; ``ct`` from ``CT`` — the index registers each case variant separately
-	; with its pre-cased output, exactly mirroring CreateCaseSensitiveHotstrings.
-	if !_PrefixIndex.Has(SearchKey) {
+	Candidates := _PrefixCollectCandidates()
+	if (Candidates.Length == 0) {
 		if LoggerIsDebugEnabled()
-			LoggerDebug("PrefixWatcher", "DBG no prefix match for '{1}'.", SearchKey)
+			LoggerDebug("PrefixWatcher", "DBG no prefix match for '{1}'.", PrefixSnapshot)
 		TooltipHide("LookupNoMatch", true)
 		_NotifySuggestionDismissed()
 		return
 	}
 	if LoggerIsDebugEnabled()
-		LoggerDebug("PrefixWatcher", "DBG prefix MATCH for '{1}' ({2} candidates).", SearchKey, _PrefixIndex[SearchKey].Length)
-	PrefixSnapshot := SearchKey
+		LoggerDebug("PrefixWatcher", "DBG prefix MATCH for '{1}' ({2} candidates).", PrefixSnapshot, Candidates.Length)
 
-	; Collect candidates per group and lay them out as the user requested:
+	; Lay the candidates out per group as the user requested:
 	; end-char (↵) triggers FIRST (top), then magic-key (★) triggers below.
 	; End-char triggers usually have a shorter delay (the user types
 	; space/tab/enter quickly) so they need maximum visibility on top.
@@ -1194,7 +1377,6 @@ _LookupAndRender() {
 	; dimmed. Without this the non-dimmed preview was just the first-scanned trigger
 	; (category load order), which made a personal trigger that the engine fires show
 	; up dimmed beneath a common one it loses to.
-	Candidates := _PrefixSortCandidates(_PrefixIndex[PrefixSnapshot])
 	MK := ScriptInformation["MagicKey"]
 	EndItems := []
 	StarItems := []
@@ -1203,7 +1385,7 @@ _LookupAndRender() {
 		if !Cfg.ShowTooltip {
 			continue
 		}
-		; Only offer what the engine would actually fire. The SearchKey scan above
+		; Only offer what the engine would actually fire. The suffix probe above
 		; decides WHICH candidates to consider; it is not a word-boundary verdict,
 		; and treating it as one is what let a mid-word "tt" be advertised as a
 		; word-initial trigger the engine then refused.

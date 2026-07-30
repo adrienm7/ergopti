@@ -130,7 +130,19 @@ SpaceTapHoldLayer() {
     UpdateLastSentCharacter("Space")
     ActivateLayer()
     try {
-        KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+        ; The cap is a failsafe for waits that hold a SYNTHETIC modifier Down: those
+        ; must never latch it forever if the key-up event is lost. A hold LAYER holds no
+        ; synthetic key, so there is nothing to latch. Applied verbatim, the cap simply
+        ; dropped the layer out from under the user after five seconds of legitimate
+        ; navigation, and base-layer letters then landed in the document until it
+        ; re-armed. Re-arm the wait instead while the key is still physically down: every
+        ; iteration stays bounded, which is the property test_hold_layer_release_bounded
+        ; pins, and a timeout with the key already up means the key-up really was lost --
+        ; exactly the case the failsafe exists for.
+        while !KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
+            if !GetKeyState("SC039", "P")
+                break
+        }
     } finally {
         DisableLayer()
     }
@@ -160,15 +172,30 @@ _SpaceTap() {
     ; post-expansion suppress window (which exists to filter the engine's output), so
     ; the space silently never reaches the buffer and the next trigger mis-frames.
     HSEMatch := HSE_FeedChar(" ", true)
-    if (HSEMatch != "") {
-        HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)
+    ; A match is only a CANDIDATE. HSE_DispatchMatch declines on the
+    ; time-activation gate, a mixed-case conform verdict, or a raw callback that
+    ; refused — and it says so through its return value. Discarding that verdict
+    ; swallowed the space entirely: no expansion reached the screen, no space was
+    ; typed, and KL_LogHotstring still recorded a fire that never happened while
+    ; HSE_Buffer kept a space the screen did not have. Falling through to the
+    ; literal-space path below is what makes the declined case indistinguishable
+    ; from "there was never a match". Same class as 356ba64c0's _OnPrefixChar
+    ; fix, at the sibling site it missed.
+    if (HSEMatch != "" and HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)) {
         HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
             ? "repeat_key"
             : (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
         HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
         HotstringRepl := HSEMatch.HasOwnProp("Replacement") ? HSEMatch.Replacement : HSEMatch.Trigger
-        if IsSet(KL_LogHotstring)
-            try KL_LogHotstring(HSEMatch.Trigger, HotstringRepl, "endchar", "", HotstringCategory, HotstringSection)
+        ; Queue the metrics record instead of writing it here. This runs under
+        ; Critical("On") on the keystroke thread, BEFORE the post-expansion
+        ; suppress release, and KL_LogHotstring is a buffer flush plus a JSONL
+        ; append plus WPM pushes — a disk spike inside that window swallows the
+        ; next physical keys (the abcd→acd class). The prefix-watcher fire path
+        ; was moved off KL_LogHotstring onto this queue for exactly that reason;
+        ; this sibling kept the synchronous call.
+        if IsSet(_HSE_QueueFireLog)
+            try _HSE_QueueFireLog(HSEMatch.Trigger, HotstringRepl, "endchar", HotstringCategory, HotstringSection)
         UpdateLastSentCharacter(" ")
         Critical(PrevCrit ? PrevCrit : "Off")
         return

@@ -789,7 +789,15 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "") {
 ; trigger, no end char) or "" when the repeat condition is not met.
 HSE_TryRepeatKey(MagicKey) {
     global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS, HSE_RepeatEnabled, HSE_Suppressed
-    if !HSE_RepeatEnabled or HSE_Suppressed {
+    global HSE_RebuildInProgress
+    ; The live-rebuild fence belongs here as much as in HSE_FindMatchAtEnd. While
+    ; the registry is being rewritten the matcher answers "" for EVERY sequence —
+    ; that means "the registry cannot answer right now", not "no trigger claims
+    ; this". _OnPrefixChar cannot tell the two apart, so it falls through to this
+    ; fallback and the doubling replaces the expansion the user asked for with
+    ; different text for the ~1.3 s a live toggle takes. Passing the keystroke
+    ; through unexpanded is the contract RebuildHotstringsLive advertises.
+    if (HSE_RebuildInProgress or !HSE_RepeatEnabled or HSE_Suppressed) {
         return ""
     }
     MkLen := StrLen(MagicKey)

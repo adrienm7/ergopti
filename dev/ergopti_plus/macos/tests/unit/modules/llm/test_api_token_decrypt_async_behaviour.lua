@@ -36,11 +36,17 @@ helpers.describe("TokenCrypto.decrypt_async: never blocks on the Keychain (F-MED
 
 	helpers.it("returns control to the caller before the async task completes", function()
 		local captured_cb = nil
+		local started = false
 		local hs_overrides = {
 			task = {
 				new = function(_exe, cb, _args)
 					captured_cb = cb
-					return { start = function() end, terminate = function() end }
+					-- start() returns TRUE, as the real hs.task does. Returning nil
+					-- made a probe that was never started indistinguishable from one
+					-- that ran, so a regression that stopped starting it stayed green.
+					local t = { terminate = function() end }
+					t.start = function() started = true; return true end
+					return t
 				end,
 			},
 		}
@@ -59,6 +65,9 @@ helpers.describe("TokenCrypto.decrypt_async: never blocks on the Keychain (F-MED
 		helpers.assert_true(delivered == nil,
 			"decrypt_async must not deliver its result synchronously — the caller must not block")
 		helpers.assert_true(captured_cb ~= nil, "decrypt_async must spawn an hs.task for the Keychain read")
+		helpers.assert_true(started,
+			"the task must actually have been STARTED; hand-delivering its callback without "
+			.. "checking this hides a probe that is spawned and never launched")
 
 		-- Simulate the async subprocess completing.
 		captured_cb(0, "super-secret-token", "")
@@ -69,11 +78,17 @@ helpers.describe("TokenCrypto.decrypt_async: never blocks on the Keychain (F-MED
 
 	helpers.it("delivers empty string when the async Keychain read fails", function()
 		local captured_cb = nil
+		local started = false
 		local hs_overrides = {
 			task = {
 				new = function(_exe, cb, _args)
 					captured_cb = cb
-					return { start = function() end, terminate = function() end }
+					-- start() returns TRUE, as the real hs.task does. Returning nil
+					-- made a probe that was never started indistinguishable from one
+					-- that ran, so a regression that stopped starting it stayed green.
+					local t = { terminate = function() end }
+					t.start = function() started = true; return true end
+					return t
 				end,
 			},
 		}
@@ -118,11 +133,17 @@ helpers.describe("ApiRemote.prewarm_active_entry_decrypt: caches the active entr
 	--- @return table ApiRemote, function fire_pending (fires the captured callback with the given cleartext)
 	local function load_fresh_api_remote()
 		local captured_cb = nil
+		local started = false
 		local hs_overrides = {
 			task = {
 				new = function(_exe, cb, _args)
 					captured_cb = cb
-					return { start = function() end, terminate = function() end }
+					-- start() returns TRUE, as the real hs.task does. Returning nil
+					-- made a probe that was never started indistinguishable from one
+					-- that ran, so a regression that stopped starting it stayed green.
+					local t = { terminate = function() end }
+					t.start = function() started = true; return true end
+					return t
 				end,
 			},
 		}

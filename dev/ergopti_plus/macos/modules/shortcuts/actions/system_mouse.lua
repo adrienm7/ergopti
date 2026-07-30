@@ -19,11 +19,18 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("lib.logger")
+local EventTapGuard = require("adapters.event_tap_guard")
+local text_utils = require("lib.text_utils")
 local notifications = require("lib.notifications")
 local i18n          = require("lib.i18n")
 local MouseControl  = require("adapters.mouse_control")
+local ShellRunner   = require("adapters.shell_runner")
 
 local LOG = "shortcuts.actions.system"
+
+-- Absolute path: the interactive layer must not inherit its binaries from PATH,
+-- which differs between a login shell and the Hammerspoon process.
+local PYTHON_BIN = "/usr/bin/python3"
 
 -- Spotlight ring color (circle on the screen that holds the cursor)
 local SPOTLIGHT_COLOR = {red = 1, green = 0.85, blue = 0}    -- Yellow
@@ -187,22 +194,27 @@ else:
 		return
 	end
 
-	local ok_py, out = pcall(hs.execute, "python3 \"" .. tmpfile .. "\" 2>&1")
-	if not ok_py or not out then
-		Logger.error(LOG, "toggle_display_mirror: Python execution failed.")
-		return
-	end
-
-	local result = (out or ""):match("(%S+)")
-	if result == "mirror_enabled" then
-		Logger.success(LOG, "Display mirroring enabled.")
-	elseif result == "mirror_disabled" then
-		Logger.success(LOG, "Display mirroring disabled.")
-	elseif result == "single_screen" then
-		Logger.info(LOG, "Display mirror toggle: single screen — nothing to do.")
-	else
-		Logger.error(LOG, "toggle_display_mirror: unexpected Python output: '%s'.", tostring(out):gsub("\n", " "))
-	end
+	-- Asynchronous: a Python interpreter start plus a display-configuration round
+	-- trip is hundreds of milliseconds, and this runs from a shortcut — the
+	-- blocking form froze every keystroke for that whole window.
+	ShellRunner.spawn(PYTHON_BIN, { tmpfile }, function(exit_code, stdout, stderr)
+		if exit_code ~= 0 then
+			Logger.error(LOG, "toggle_display_mirror: Python exited with code %s — %s.",
+				tostring(exit_code), (tostring(stderr):gsub("%s+$", "")))
+			return
+		end
+		local result = (stdout or ""):match("(%S+)")
+		if result == "mirror_enabled" then
+			Logger.success(LOG, "Display mirroring enabled.")
+		elseif result == "mirror_disabled" then
+			Logger.success(LOG, "Display mirroring disabled.")
+		elseif result == "single_screen" then
+			Logger.info(LOG, "Display mirror toggle: single screen — nothing to do.")
+		else
+			Logger.error(LOG, "toggle_display_mirror: unexpected Python output: '%s'.",
+				(tostring(stdout):gsub("\n", " ")))
+		end
+	end).start()
 end
 
 --- Builds and immediately shows a yellow × marker centered on the given screen.
@@ -355,7 +367,9 @@ function M.spotlight_mouse(duration_s)
 	-- (e.g. from teleport_mouse) does not fire and immediately dismiss the spotlight
 	hs.timer.doAfter(SPOTLIGHT_TAP_DELAY_SEC, function()
 		if dismissed then return end
-		local ok_tap, tap = pcall(hs.eventtap.new, {hs.eventtap.event.types.mouseMoved}, function()
+		local ok_tap, tap
+		ok_tap, tap = pcall(hs.eventtap.new, {hs.eventtap.event.types.mouseMoved}, function(e)
+			if EventTapGuard.handle_disabled(e, tap, "shortcuts.spotlight_mouse") then return false end
 			dismiss()
 			return false  -- Do not consume the event; the cursor must keep moving normally
 		end)

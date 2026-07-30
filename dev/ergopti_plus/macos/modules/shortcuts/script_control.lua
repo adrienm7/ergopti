@@ -21,6 +21,7 @@ local M = {}
 
 local hs            = hs
 local notifications = require("lib.notifications")
+local EventTapGuard = require("adapters.event_tap_guard")
 local Logger        = require("lib.logger")
 local Keycodes      = require("lib.keycodes")
 local i18n          = require("lib.i18n")
@@ -58,6 +59,16 @@ local KEYCODE_ESCAPE_SENTINEL    = Keycodes.F15_KARABINER_ESCAPE
 local KEYCODE_BACKSPACE = Keycodes.BACKSPACE
 local KEYCODE_RETURN    = Keycodes.RETURN
 local KEYCODE_ESCAPE    = Keycodes.ESCAPE
+
+--- Prefix of the binding key every script-control dispatch passes to the gesture
+--- action layer, so a script key and a gesture slot of the same name cannot
+--- collide in the (binding, action) parameter store.
+---
+--- Exported because the menu must PROMPT for a parameter under the exact key
+--- dispatch will later READ it under. Spelling it a second time in the menu is
+--- how a configured link ended up written to an entry nothing consults, leaving
+--- the key silently inert.
+M.BINDING_PREFIX = "script__"
 
 -- The script-control eventtap lives on the main run loop. macOS disables a
 -- CGEventTap whose callback is stalled past the system timeout — and a blocking
@@ -211,6 +222,18 @@ local function pause_all()
 	if ok_api and api and type(api.stop_warmup) == "function" then
 		pcall(function() api.stop_warmup() end)
 	end
+	-- Ollama's warmup needs parking for the same reason MLX's does, and its
+	-- stop_warmup was added for the disable path without being wired here: an
+	-- in-flight warmup POST kept its callbacks live across the pause and could
+	-- flip readiness or fire the user-facing "server ready" notification while
+	-- the script was supposed to be entirely off. No resume counterpart, per its
+	-- own contract — it has no self-rescheduling retry chain to short-circuit
+	-- and does not clear readiness, so a resume must not force a pointless
+	-- re-warm of weights that are still loaded.
+	local ok_oll, oll = pcall(require, "modules.llm.api_ollama")
+	if ok_oll and oll and type(oll.stop_warmup) == "function" then
+		pcall(function() oll.stop_warmup() end)
+	end
 	local ok_tt, tt = pcall(require, "ui.tooltip")
 	if ok_tt and tt and type(tt.hide_forced) == "function" then
 		pcall(function() tt.hide_forced() end)
@@ -343,7 +366,15 @@ local function dispatch_action(action, binding)
 
 	-- Use centralized action dispatcher for everything else
 	Logger.debug(LOG, "Dispatching centralized action: %s…", action)
-	pcall(GestActions.execute_single, action, binding)
+	local ok_exec, handled = pcall(GestActions.execute_single, action, binding)
+	-- …and fall back to the extras table when the central registry does not know
+	-- the action. call_extra had NO caller, so M.set_extras stored handlers that
+	-- nothing could ever reach: a public API documenting a dispatch path that did
+	-- not exist. Registering a handler and watching it never fire is worse than
+	-- having no extension point at all.
+	if not ok_exec or handled ~= true then
+		call_extra(action)
+	end
 	return true
 end
 
@@ -371,6 +402,7 @@ end
 --- @param e userdata The hs.eventtap.event object.
 --- @return boolean True to consume the keystroke, false to pass it through.
 local function handle_key(e)
+	if EventTapGuard.handle_disabled(e, _tap, "shortcuts.script_control") then return false end
 	local ok, code = pcall(function() return e:getKeyCode() end)
 	if not ok or type(code) ~= "number" then return false end
 
@@ -387,7 +419,7 @@ local function handle_key(e)
 		end
 		Logger.info(LOG, "Backspace sentinel (F14) — dispatching '%s'.", tostring(_key_actions.backspace))
 		log_shortcut_if_available("Alt+Backspace")
-		dispatch_action(_key_actions.backspace, "script__backspace")
+		dispatch_action(_key_actions.backspace, M.BINDING_PREFIX .. "backspace")
 		return true
 	end
 	if code == KEYCODE_RETURN_SENTINEL then
@@ -398,7 +430,7 @@ local function handle_key(e)
 		end
 		Logger.info(LOG, "Return sentinel (F13) — dispatching '%s'.", tostring(_key_actions.return_key))
 		log_shortcut_if_available("Alt+Enter")
-		dispatch_action(_key_actions.return_key, "script__return_key")
+		dispatch_action(_key_actions.return_key, M.BINDING_PREFIX .. "return_key")
 		return true
 	end
 	if code == KEYCODE_ESCAPE_SENTINEL then
@@ -409,7 +441,7 @@ local function handle_key(e)
 		end
 		Logger.info(LOG, "Escape sentinel (F15) — dispatching '%s'.", tostring(_key_actions.escape))
 		log_shortcut_if_available("Alt+Escape")
-		dispatch_action(_key_actions.escape, "script__escape")
+		dispatch_action(_key_actions.escape, M.BINDING_PREFIX .. "escape")
 		return true
 	end
 
@@ -419,17 +451,17 @@ local function handle_key(e)
 	if code == KEYCODE_BACKSPACE then
 		Logger.info(LOG, "Right-cmd + Backspace (KE-paused fallback) — dispatching '%s'.", tostring(_key_actions.backspace))
 		log_shortcut_if_available("Alt+Backspace")
-		return dispatch_action(_key_actions.backspace, "script__backspace")
+		return dispatch_action(_key_actions.backspace, M.BINDING_PREFIX .. "backspace")
 	end
 	if code == KEYCODE_RETURN then
 		Logger.info(LOG, "Right-cmd + Return (KE-paused fallback) — dispatching '%s'.", tostring(_key_actions.return_key))
 		log_shortcut_if_available("Alt+Enter")
-		return dispatch_action(_key_actions.return_key, "script__return_key")
+		return dispatch_action(_key_actions.return_key, M.BINDING_PREFIX .. "return_key")
 	end
 	if code == KEYCODE_ESCAPE then
 		Logger.info(LOG, "Right-cmd + Escape (KE-paused fallback) — dispatching '%s'.", tostring(_key_actions.escape))
 		log_shortcut_if_available("Alt+Escape")
-		return dispatch_action(_key_actions.escape, "script__escape")
+		return dispatch_action(_key_actions.escape, M.BINDING_PREFIX .. "escape")
 	end
 
 	return false

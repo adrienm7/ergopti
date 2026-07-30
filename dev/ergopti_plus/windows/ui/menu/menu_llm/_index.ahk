@@ -90,6 +90,23 @@ _LLMMenuBuildIndentRange() {
 ; "has the typing burst ended?" (a 250 ms floor), the opposite question.
 global LLM_HEALTH_PROBE_IDLE_MAX_MS := 60000
 
+; Cadence of that same background tick. It was written as a bare 10000 at BOTH
+; arming sites — the boot arm in init.ahk and the re-arm when the user toggles the
+; feature back on in actions.ahk — so the two could silently drift apart and the
+; number carried none of the reasoning above (it is the "how fast does a dead
+; daemon show up as a red dot" budget, and it is what makes the 8640-probes-a-day
+; arithmetic in LLM_HEALTH_PROBE_IDLE_MAX_MS true).
+global LLM_HEALTH_PROBE_INTERVAL_MS := 10000
+
+; Floor between two probes, whoever asks. Opening the tray fires a rebuild that
+; re-enters _LLM_Menu_FireHealthProbe with Force, and a status flip rebuilds the
+; menu again from _LLM_Menu_OnHealthProbeDone — so this throttle is the ONLY thing
+; that breaks the build → probe → flip → build loop, and the idle gate cannot help
+; because Force bypasses it. Kept well under LLM_HEALTH_PROBE_INTERVAL_MS so the
+; ordinary tick is never throttled away, and above the cost of a curl round-trip
+; so opening the menu twice in a second cannot spawn two children.
+global LLM_HEALTH_PROBE_THROTTLE_MS := 3000
+
 
 
 

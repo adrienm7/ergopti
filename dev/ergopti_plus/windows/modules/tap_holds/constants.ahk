@@ -304,46 +304,86 @@ TapHoldShouldSuppressHold(KeyId, GuardMs := 250) {
 	return false
 }
 
+; Flatten a hold-modifier value into the list of individual key names it holds.
+; A combination hold (« Ctrl + Maj ») is resolved by ResolveHoldModifierKey into
+; a FRESHLY ALLOCATED Array on every single press, and AHK v2 Map keys are
+; identity-based for objects: refcounting the Array itself gave every hold site
+; its own private entry that could never collide with another branch's — not
+; with an identical combination, and not with the scalar "LCtrl" a second key is
+; holding. The count then degraded to "release on the first Up" for every combo,
+; exactly the failure reference counting exists to prevent. Counting the
+; individual key names is what makes the invariant true for both shapes.
+; Empty entries are dropped only for the Array shape, mirroring TextPressKey's
+; own combo branch; a scalar "" is passed through so its existing ERROR (a
+; hold_modifier the resolver could not map) is still reported at the adapter.
+; @param Key {String|Array} Scalar key name, or a combo array of key names.
+; @return {Array} The individual key names to reference-count.
+_TH_SyntheticKeyList(Key) {
+	if !(Key is Array)
+		return [Key]
+	Names := []
+	for _, Name in Key {
+		if (Name != "")
+			Names.Push(Name)
+	}
+	return Names
+}
+
+; Human-readable label for a synthetic hold modifier, used in logs. Format()
+; cannot stringify an Array, so a combo would otherwise silently lose its log.
+_TH_SyntheticKeyLabel(Key) {
+	Label := ""
+	for _, Name in _TH_SyntheticKeyList(Key)
+		Label .= (Label == "" ? "" : "+") . Name
+	return Label
+}
+
 ; Acquire/release synthetic keys whose lifetime crosses a KeyWait. Reference
 ; counting keeps independently overlapping tap-hold branches from releasing a
 ; key another branch still owns; the physical Send happens only on the 0->1 and
-; 1->0 transitions.
+; 1->0 transitions of each INDIVIDUAL key (see _TH_SyntheticKeyList).
 TapHoldSyntheticKeyDown(Key) {
 	global _TH_SyntheticHeldKeys
 	if A_IsSuspended {
-		try LoggerDebug("TapHoldDispatch", "Not arming synthetic '{1}' while the driver is suspended.", Key)
+		try LoggerDebug("TapHoldDispatch", "Not arming synthetic '{1}' while the driver is suspended.", _TH_SyntheticKeyLabel(Key))
 		return false
 	}
-	Count := _TH_SyntheticHeldKeys.Has(Key) ? _TH_SyntheticHeldKeys[Key] : 0
-	_TH_SyntheticHeldKeys[Key] := Count + 1
-	if (Count = 0)
-		TextPressKey(Key, "Down")
+	; The loop variable is the parameter itself: each iteration rebinds Key to one
+	; scalar key name, so a combo and a plain modifier share the same counters
+	for Key in _TH_SyntheticKeyList(Key) {
+		Count := _TH_SyntheticHeldKeys.Has(Key) ? _TH_SyntheticHeldKeys[Key] : 0
+		_TH_SyntheticHeldKeys[Key] := Count + 1
+		if (Count = 0)
+			TextPressKey(Key, "Down")
+	}
 	return true
 }
 
 TapHoldSyntheticKeyUp(Key) {
 	global _TH_SyntheticHeldKeys
-	if !_TH_SyntheticHeldKeys.Has(Key) {
-		; A suspend cleanup (TapHoldReleaseSyntheticKeys) may already have released the
-		; key. Never inject a synthetic Up while suspended (« pause = tout éteint ») — it
-		; would land in a paused session and could clear a modifier the user is
-		; physically holding. Only re-balance an untracked key while the driver is live.
-		if A_IsSuspended {
-			try LoggerDebug("TapHoldDispatch", "Not releasing untracked synthetic '{1}' while the driver is suspended.", Key)
-			return true
+	for Key in _TH_SyntheticKeyList(Key) {
+		if !_TH_SyntheticHeldKeys.Has(Key) {
+			; A suspend cleanup (TapHoldReleaseSyntheticKeys) may already have released the
+			; key. Never inject a synthetic Up while suspended (« pause = tout éteint ») — it
+			; would land in a paused session and could clear a modifier the user is
+			; physically holding. Only re-balance an untracked key while the driver is live.
+			if A_IsSuspended {
+				try LoggerDebug("TapHoldDispatch", "Not releasing untracked synthetic '{1}' while the driver is suspended.", Key)
+				continue
+			}
+			; Keep the ordinary finally path idempotent so it can still balance any direct
+			; Send failure for a key that was armed but somehow lost from the map.
+			TextPressKey(Key, "Up")
+			continue
 		}
-		; Keep the ordinary finally path idempotent so it can still balance any direct
-		; Send failure for a key that was armed but somehow lost from the map.
+		Count := _TH_SyntheticHeldKeys[Key] - 1
+		if (Count > 0) {
+			_TH_SyntheticHeldKeys[Key] := Count
+			continue
+		}
+		_TH_SyntheticHeldKeys.Delete(Key)
 		TextPressKey(Key, "Up")
-		return true
 	}
-	Count := _TH_SyntheticHeldKeys[Key] - 1
-	if (Count > 0) {
-		_TH_SyntheticHeldKeys[Key] := Count
-		return true
-	}
-	_TH_SyntheticHeldKeys.Delete(Key)
-	TextPressKey(Key, "Up")
 	return true
 }
 
@@ -400,12 +440,40 @@ TapHoldDispatchTap(KeyId, TapFn) {
 			try LoggerDebug("TapHoldDispatch", "Dispatch blocked for '{1}' ({2}, guard={3}ms).", KeyId, CancelReason, LimitMs)
 			return false
 		}
+		; CapsWord ends on a word terminator, and capsword.ahk arms its own
+		; `#HotIf CapsWordEnabled` Space/Enter hotkeys to do it. Those lose:
+		; both variants' criteria are true at once, and this repo's own pinned
+		; precedence is that the most-recently-DEFINED variant wins —
+		; modules/tap_holds.ahk is included after modules/shortcuts.ahk, so the
+		; tap-hold variant fires and the unlatch hotkey never runs. CapsWord then
+		; survived the space and kept capitalising the following word.
+		;
+		; Unlatching here rather than in the two key modules keeps one owner for
+		; the rule and covers every tap-hold variant that may later bind these
+		; keys. DisableCapsWord is a no-op when CapsWord is inactive.
+		if _TapHoldTapEndsCapsWord(KeyId)
+			DisableCapsWord()
 		TapFn.Call()
 		return true
 	}
 	finally {
 		TapHoldForgetTrackedKey(KeyId)
 	}
+}
+
+; Tap-hold keys whose tap output is a word terminator, and therefore ends
+; CapsWord. Mirrors the keys capsword.ahk binds for the same purpose; anything
+; else (Backspace, Escape, Delete, CapsLock…) leaves CapsWord latched, which is
+; what makes it usable for a whole word.
+global TAP_HOLD_CAPSWORD_TERMINATORS := Map("space", true, "enter", true)
+
+_TapHoldTapEndsCapsWord(KeyId) {
+	global TAP_HOLD_CAPSWORD_TERMINATORS
+	if !TAP_HOLD_CAPSWORD_TERMINATORS.Has(KeyId)
+		return false
+	; IsSet-guarded: the tap-hold layer is reachable in contexts where
+	; shortcuts/capsword.ahk is not loaded (standalone tests, tools).
+	return IsSet(CapsWordEnabled) and CapsWordEnabled and IsSet(DisableCapsWord)
 }
 
 ; Invoke the configured GESTURE_ACTIONS callback without applying guards. This

@@ -97,6 +97,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.event_tap_guard",
+		contract = { "handle_disabled" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.file_system",
 		contract = { "read", "write", "exists" },
 		wired    = true,

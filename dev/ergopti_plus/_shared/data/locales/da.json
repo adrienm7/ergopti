@@ -1,4 +1,4 @@
-﻿﻿{
+{
 	"_meta.flag": "🇩🇰",
 	"_meta.locale": "da",
 	"_meta.name": "Dansk",
@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "Navn på den nye kategori for %s:",
 	"metrics_apps.new_category_title": "Ny kategori",
 	"metrics_apps.no_app_detected": "Der kunne ikke detekteres nogen applikation.",
+	"metrics_apps.pick_app_placeholder": "Vælg et program, der skal klassificeres…",
 	"metrics_apps.rename_chooser_placeholder": "Kategori til omdøbelse",
 	"metrics_apps.rename_item": "✎ Omdøb en eksisterende kategori…",
 	"metrics_apps.rename_prompt": "Nyt navn for kategori \"%s\":",
@@ -1415,7 +1416,7 @@
 	"sfbsreduction.comma": "Komma reducerer bigrammer for samme finger",
 	"sfbsreduction.ecirc": "Ê reducerer bigrammer for samme finger",
 	"sfbsreduction.egrave": "È reducerer bigrammer for samme finger",
-	"sfbsreduction.ié": "IE reducerer IE/EI-bigrammer",
+	"sfbsreduction.ieacute": "IE reducerer IE/EI-bigrammer",
 	"sg_actions.activity_simulation": "🖱 Simuler aktivitet (anti-dvalebil)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (skærm)",
 	"sg_actions.app_expose": "◱ App Exposé",
@@ -1652,6 +1653,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = Åbn Hentninger-mappen",
 	"shortcuts.pixel_read_error": "Kan ikke aflæse pixelfarven",
 	"shortcuts.saved": "Gemt: %s",
+	"shortcuts.screenshot_failed": "Skærmbilledet mislykkedes",
 	"shortcuts.screen": "Win + H (screensHot) = Skærmbillede (aktiverer Win + Shift + S)",
 	"shortcuts.screeninstant": "Tast til venstre for 1 = Øjeblikkelig capture af aktivt vindue, gemt i Billeder med tidsstempel",
 	"shortcuts.screenocr": "Win + C (OCR) = Skærmbillede med tekstudtræk (Win + Shift + T)",

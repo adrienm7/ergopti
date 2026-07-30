@@ -514,16 +514,32 @@ function M.generate(ctx, menu_mods, actions)
 			table.insert(items, { title = "-" })
 		elseif id == "global_actions" then
 			local ga_items = {}
+
+			-- Pause owns the bindings axis for the whole pause window: pause_all()
+			-- snapshots what was running and resume_all() restores that snapshot.
+			-- A global action taken in between is therefore either silently
+			-- discarded on resume, or — for « Tout activer » — binds every hotkey
+			-- immediately and breaks the « pause = tout éteint » invariant the
+			-- pause exists to guarantee. The per-feature toggles were gated for
+			-- exactly this; these three, which move ALL of them at once, were not.
+			local function global_action_item(label_key, fn)
+				return {
+					title    = i18n.get(label_key),
+					disabled = ctx.paused or nil,
+					fn       = (not ctx.paused) and fn or nil,
+				}
+			end
+
 			for _, ga in ipairs(load_global_actions()) do
 				local gid = ga.id
 				if gid == "---" then
 					table.insert(ga_items, { title = "-" })
 				elseif gid == "enable_all" then
-					table.insert(ga_items, { title = i18n.get("menu.global.enable_all"),    fn = actions.enable_all })
+					table.insert(ga_items, global_action_item("menu.global.enable_all", actions.enable_all))
 				elseif gid == "disable_all" then
-					table.insert(ga_items, { title = i18n.get("menu.global.disable_all"),   fn = actions.disable_all })
+					table.insert(ga_items, global_action_item("menu.global.disable_all", actions.disable_all))
 				elseif gid == "reset_defaults" then
-					table.insert(ga_items, { title = i18n.get("menu.global.reset_defaults"), fn = actions.reset_defaults })
+					table.insert(ga_items, global_action_item("menu.global.reset_defaults", actions.reset_defaults))
 				end
 			end
 			table.insert(items, { title = i18n.get("menu.global.title"), menu = ga_items })

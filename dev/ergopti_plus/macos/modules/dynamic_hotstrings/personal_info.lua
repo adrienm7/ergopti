@@ -296,7 +296,13 @@ local function do_expand(combo)
 				-- logical_text stays tab-free so the buffer and the logged record
 				-- hold only what the fields actually inserted.
 				return c, emitted, echoed
-			end, "personal")
+			-- is_private = true: every value this module emits comes from
+			-- personal_info.toml, which rules_engine already treats as PII in its
+			-- entirety when it registers the same data as mappings. The two paths
+			-- must agree — an @-tag expansion of the SSN is exactly as secret as
+			-- the prefix-triggered one, and only this argument tells the keylogger
+			-- to redact what it persists.
+			end, "personal", true)
 		else
 			-- Fallback: emit raw keystrokes without inject_dynamic.
 			-- Only arm the synthetic delete count — not the replacement text. The
@@ -309,7 +315,9 @@ local function do_expand(combo)
 				if type(_keymap.suppress_rescan) == "function" then _keymap.suppress_rescan() end
 			end
 			if keylogger and type(keylogger.notify_synthetic) == "function" then
-				pcall(keylogger.notify_synthetic, emitted, "hotstring", n_back, "personal")
+				-- Same privacy contract as the primary path: this branch reaches
+				-- the identical sink and must carry the identical flag.
+				pcall(keylogger.notify_synthetic, emitted, "hotstring", n_back, "personal", nil, true)
 			end
 			for _ = 1, n_back do
 				eventtap.keyStroke({}, "delete", 0)
@@ -350,11 +358,17 @@ end
 --- @param event userdata The Hammerspoon hs.eventtap.event object.
 --- @param _km_buffer string The current typing buffer maintained by the keymap module.
 --- @return string|nil Returns "consume" to swallow the event, or "suppress" to block hotstrings.
-local function interceptor(event, _km_buffer)
+--- @param event userdata The keyDown event.
+--- @param _km_buffer string The keymap buffer (unused here).
+--- @param ctx table|nil Fields the keymap tap already read from the event
+---        (keyCode, flags, chars). Re-fetching them is an ObjC accessor call
+---        per interceptor per keystroke; the fallback keeps this working if the
+---        contract is ever invoked without a context.
+local function interceptor(event, _km_buffer, ctx)
 	if not _enabled then return nil end
 	if _replacing then return nil end
 
-	local flags = event:getFlags()
+	local flags = (ctx and ctx.flags) or event:getFlags()
 	
 	-- Reset state on command or control modifiers
 	if flags.cmd or flags.ctrl then
@@ -421,6 +435,24 @@ local function interceptor(event, _km_buffer)
 
 	if _state == STATE_COLLECTING then
 		if char == _trigger then
+			-- The keymap buffer is the authority on what is actually on screen.
+			--
+			-- This state machine is fed exclusively from keyDown, so it resets on
+			-- modifiers, navigation, backspace and any non-letter — but a MOUSE
+			-- CLICK produces no keyDown at all, and neither does a focus change.
+			-- The pending combo therefore survived a caret move, and do_expand
+			-- sizes its backspaces from #_combo alone: it would erase that many
+			-- characters wherever the caret now sits and inject the PII there.
+			-- Cross-checking against the buffer makes every unobserved caret move
+			-- invalidate the combo by construction, and makes this engine's answer
+			-- identical to the preview's, which already derives it from the buffer.
+			local buffer = _km_buffer or ""
+			if buffer:sub(-(#_combo + 1)) ~= "@" .. _combo then
+				Logger.debug(LOG, "Pending @-combo no longer matches the buffer — discarding.")
+				_state = STATE_IDLE
+				_combo = ""
+				return nil
+			end
 			if #_combo > 0 and #resolve_combo(_combo) > 0 then
 				local combo = _combo
 				
@@ -477,6 +509,27 @@ function M.get_info()         return _info    end
 --- @return string The trigger character.
 function M.get_trigger_char() return _trigger end
 
+--- Updates the live trigger character used by the @-tag interceptor.
+---
+--- Without this the module had no way to learn about a magic key changed from
+--- the menu: the sibling RulesEngine gained a setter, and dynamic_hotstrings
+--- aliased its own proxy straight to that one engine, so the fix for the shared
+--- defect reached exactly half of the pair. The @-tag engine went deaf while the
+--- preview kept advertising the expansion.
+--- @param char string The new trigger character.
+function M.set_trigger_char(char)
+	if type(char) ~= "string" or char == "" then
+		Logger.error(LOG, "set_trigger_char(): expected a non-empty string, got %s — trigger unchanged.", type(char))
+		return
+	end
+	_trigger = char
+	-- A pending combo was accumulated against the OLD trigger; keeping it would
+	-- let the next keystroke fire a combo the user started under different rules.
+	_state = STATE_IDLE
+	_combo = ""
+	Logger.debug(LOG, "Trigger char: %s.", char)
+end
+
 --- Opens the browser-based HTML form using the extracted UI module.
 function M.open_editor()
 	Logger.debug(LOG, "Opening personal info editor UI…")
@@ -508,9 +561,20 @@ function M.start(base_dir, keymap_module, info_toml_path)
 		return
 	end
 
-	_trigger = tostring(config.trigger_char or "★")
 	_info    = type(config.info) == "table" and config.info or {}
 	_letters = type(config.letters) == "table" and config.letters or {}
+
+	-- Source the trigger from the real, user-configurable magic key, exactly as
+	-- the sibling RulesEngine already does. personal_info.toml's trigger_char is
+	-- only this module's own default and never reflects a magic key changed from
+	-- the menu, so booting from it left the @-tag engine listening for a key the
+	-- user had stopped typing — while the preview, which has no trigger of its
+	-- own, kept promising the expansion.
+	if type(keymap_module) == "table" and type(keymap_module.get_trigger_char) == "function" then
+		_trigger = tostring(keymap_module.get_trigger_char() or config.trigger_char or "★")
+	else
+		_trigger = tostring(config.trigger_char or "★")
+	end
 
 	-- Materialise defaults to disk if the file did not exist, so the user can
 	-- edit it directly and so renaming or deleting it triggers a fresh

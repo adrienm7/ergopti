@@ -286,7 +286,16 @@ local CoreState = {
 -- ready to drain them.
 -- LogManager and ContextTracker are deferred to M.start() so that
 -- metrics directories are not created when the feature is off.
-KcBridge.init(CoreState, nil, nil, nil)
+
+-- Forward-declared here so the closure handed to KcBridge.init below captures
+-- the real upvalue rather than a nil global.
+local _is_paused
+
+-- Passed as a CLOSURE, not as the function value: _is_paused is declared further
+-- down, and a reference here would hand over the nil global of that name instead
+-- (the local-after-use trap this driver keeps hitting). The closure resolves it
+-- at call time, by which point the real local exists.
+KcBridge.init(CoreState, nil, nil, nil, function() return _is_paused() end)
 
 -- Tracks whether LogManager/ContextTracker have been initialized
 local _state                = nil
@@ -424,10 +433,44 @@ end
 --- Returns true when the script-control module signals that the script is paused.
 --- Used as a fast guard in all timer/watcher callbacks so no data is written
 --- to the log while the user has explicitly suspended the keylogger.
-local function _is_paused()
+_is_paused = function()
 	return _script_control
 		and type(_script_control.is_paused) == "function"
 		and _script_control.is_paused()
+end
+
+
+--- Reports whether the CURRENT context may be recorded at all.
+---
+--- Four independent user-facing filters answer this question — private window,
+--- secure field, system-auth dialog, and the disabled-apps list — and they used
+--- to be spelled out inline in handle_key only. Every other route into the same
+--- sink applied none of them: notify_synthetic and log_hotstring gated solely on
+--- is_enabled, so an expansion fired inside a password manager, a system-auth
+--- prompt or an app the user had explicitly excluded was persisted in full, and
+--- was additionally mis-attributed, because the app name is only assigned on the
+--- handle_key path that never ran there.
+---
+--- Exported rather than local so every writer consults ONE implementation. A
+--- second copy is how these four answers drift apart again.
+--- @return boolean True when the context is loggable.
+function M.context_allows_logging()
+	if CoreState.private_filter_enabled and CoreState.is_private_window then return false end
+	if CoreState.secure_field_filter_enabled and CoreState.is_secure_field then return false end
+	-- System auth dialogs: belt-and-suspenders in case the AX observer attaches late.
+	if CoreState.system_auth_filter_enabled and CoreState.active_app_bundle
+		and SYSTEM_AUTH_BUNDLE_IDS[CoreState.active_app_bundle] then
+		return false
+	end
+	if CoreState.disabled_apps and #CoreState.disabled_apps > 0 then
+		for _, disabled in ipairs(CoreState.disabled_apps) do
+			if (disabled.bundleID and disabled.bundleID == CoreState.active_app_bundle)
+				or (disabled.appPath and disabled.appPath == CoreState.active_app_path) then
+				return false
+			end
+		end
+	end
+	return true
 end
 
 
@@ -458,22 +501,11 @@ local function handle_key(event_obj)
 			return
 		end
 
-		-- Fast-path guards: skip private/secure contexts when the respective filter is enabled
-		if CoreState.private_filter_enabled and CoreState.is_private_window then return end
-		if CoreState.secure_field_filter_enabled and CoreState.is_secure_field then return end
-		-- System auth dialogs: belt-and-suspenders guard in case the AX observer attaches too late
-		if CoreState.system_auth_filter_enabled and CoreState.active_app_bundle
-		and SYSTEM_AUTH_BUNDLE_IDS[CoreState.active_app_bundle] then return end
-
-		-- Check the disabled-apps list
-		if CoreState.disabled_apps and #CoreState.disabled_apps > 0 then
-			for _, disabled in ipairs(CoreState.disabled_apps) do
-				if (disabled.bundleID and disabled.bundleID == CoreState.active_app_bundle)
-				or (disabled.appPath  and disabled.appPath  == CoreState.active_app_path) then
-					return
-				end
-			end
-		end
+		-- Private/secure/system-auth/disabled-app context. Delegated to the shared
+		-- predicate so the physical path and the SYNTHETIC path cannot answer this
+		-- question differently — they used to, and notify_synthetic persisted
+		-- expansions this branch would have refused.
+		if not M.context_allows_logging() then return end
 
 		local evt_type = event_obj:getType()
 		local now      = hs.timer.absoluteTime() / 1000000
@@ -493,11 +525,21 @@ local function handle_key(event_obj)
 		then
 			CoreState.session_mouse_clicks = CoreState.session_mouse_clicks + 1
 			if #CoreState.buffer_events > 0 then LogManager.flush_buffer() end
+			-- Re-seed the delay baseline. flush_buffer() zeroes CoreState.last_time,
+			-- and these three branches RETURN before the keystroke path assigns it —
+			-- so the next real keystroke measured its delay against 0, recorded a
+			-- zero-millisecond gap, and could be mistaken for synthetic output.
+			CoreState.last_time = now
 			return
 		end
 		if evt_type == hs.eventtap.event.types.scrollWheel then
 			CoreState.session_mouse_scrolls = CoreState.session_mouse_scrolls + 1
 			if #CoreState.buffer_events > 0 then LogManager.flush_buffer() end
+			-- Re-seed the delay baseline. flush_buffer() zeroes CoreState.last_time,
+			-- and these three branches RETURN before the keystroke path assigns it —
+			-- so the next real keystroke measured its delay against 0, recorded a
+			-- zero-millisecond gap, and could be mistaken for synthetic output.
+			CoreState.last_time = now
 			return
 		end
 
@@ -561,6 +603,9 @@ local function handle_key(event_obj)
 				and _keymap_mod.is_pending_synthetic_paste(flags, keycode)
 			if not is_synth_paste then
 				LogManager.flush_buffer()
+				-- Same re-seed as the mouse branches: this one returns below without
+				-- ever reaching the keystroke path's assignment.
+				CoreState.last_time = now
 				local front_app = hs.application.frontmostApplication()
 				LogManager.log_shortcut(
 					build_shortcut_key(event_obj, flags, keycode),
@@ -935,7 +980,39 @@ end
 --- @param source_variant string|nil Optional sub-type for UI rendering.
 --- @param physical_echo string|nil Text whose delayed physical key echoes must
 ---   be discarded. Clipboard output intentionally passes an empty string.
-function M.notify_synthetic(text, source_type, deletes, source_variant, physical_echo)
+--- Stand-in recorded in place of each character of a PRIVATE expansion. One
+--- placeholder per real character, so every count, WPM sample and timing
+--- derived from these events stays accurate while the content itself is
+--- unrecoverable from the metrics database or from a cross-device export.
+local PRIVATE_PLACEHOLDER_CHAR = string.char(0xE2, 0x80, 0xA2) -- U+2022 BULLET
+
+--- What is actually PERSISTED for one synthetic character.
+---
+--- Pure and exported so the privacy invariant can be asserted directly: the
+--- alternative is reloading the whole keylogger to reach its private CoreState,
+--- which drags the event tap, watchers and context tracker into the test run.
+---
+--- Backspace markers are never redacted — they carry no content, and rewriting
+--- them would desynchronise the deletion count the buffer replays.
+--- @param char string       The character about to be recorded.
+--- @param is_private boolean|nil  True for a private mapping's replacement.
+--- @return string           The value to persist.
+function M.recorded_char(char, is_private)
+	if is_private and char ~= "[BS]" then
+		return PRIVATE_PLACEHOLDER_CHAR
+	end
+	return char
+end
+
+--- @param is_private boolean|nil  When true, the CONTENT is replaced by a
+---        redacted placeholder in everything that is persisted, while the
+---        physical-echo discard markers below still use the real text.
+---        Skipping this call outright for a private expansion would be WORSE
+---        than the leak it fixes: the physical echoes would then fall through
+---        handle_key unclaimed and be recorded as ordinary human keystrokes in
+---        buffer_text, so the secret would land in the metrics anyway - just in
+---        a different column.
+function M.notify_synthetic(text, source_type, deletes, source_variant, physical_echo, is_private)
 	-- When the keylogger is OFF there is no consumer for synth_queue (handle_key
 	-- returns at the is_enabled guard, so the idle-drain self-heal never runs).
 	-- Queuing here while disabled is pure leak/poison: the queue and the WPM window
@@ -949,14 +1026,29 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, physical
 	-- the logical replacement immediately, then discard only the later physical
 	-- echoes of direct key injection. This keeps clipboard hotstrings and LLM
 	-- completions in the same raw event format as typed synthetic output.
+	-- What gets PERSISTED for one synthetic character. For a private expansion
+	-- the SHAPE is preserved (one entry per character, so counts, WPM and
+	-- timings stay correct) while the character itself is replaced. The
+	-- .text-based privacy tests never caught this because buffer_text stays
+	-- clean either way: the secret travelled in the per-character `r` field of
+	-- buffer_events and in rich_chunks, which become events_json and rich_text
+	-- in the database and are replicated by cross-device export.
 	local function append_virtual(char)
+		-- The four context filters apply to the SYNTHETIC route exactly as they do
+		-- to the physical one. Gating here — at the persistence step — rather than
+		-- at the top of notify_synthetic is deliberate: the synth_queue discard
+		-- markers below MUST still be queued, because dropping them would leave the
+		-- physical echoes unclaimed and handle_key would record the very same
+		-- secret as ordinary human keystrokes. The same text, in a worse place.
+		if not M.context_allows_logging() then return end
+		local recorded = M.recorded_char(char, is_private)
 		table.insert(CoreState.buffer_events, {
-			char, 0,
-			{ s = true, st = source_type, c = false, ss = "none", r = char,
+			recorded, 0,
+			{ s = true, st = source_type, c = false, ss = "none", r = recorded,
 				m = "", h = 0, d = 0, dk = false, cp = false, kc = nil },
 		})
 		if char ~= "[BS]" then
-			table.insert(CoreState.rich_chunks, { type = source_type, text = char })
+			table.insert(CoreState.rich_chunks, { type = source_type, text = recorded })
 		end
 	end
 
@@ -1085,6 +1177,11 @@ end
 --- @param h_type string Hotstring category ("star", "autocorrect", "personal", …).
 function M.log_hotstring(trigger, replacement, h_type)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	LogManager.flush_buffer()
 	local net_saved = (utf8.len(replacement) or 0) - (utf8.len(trigger) or 0)
 	LogManager.append_log({
@@ -1113,6 +1210,11 @@ end
 --- a prompt regression or comparing providers.
 function M.log_llm(context, results, app_name, extras)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	LogManager.flush_buffer()
 	local preds = {}
 	for _, r in ipairs(results or {}) do table.insert(preds, r.to_type) end
@@ -1155,6 +1257,11 @@ end
 ---     user_prompt, failure_reason, elapsed_ms.
 function M.log_llm_failed(context, app_name, extras)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	LogManager.flush_buffer()
 	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
 	local entry = {
@@ -1181,6 +1288,11 @@ end
 --- @param app_name string The frontmost application.
 function M.log_shortcut(shortcut_key, app_name)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	LogManager.log_shortcut(shortcut_key, app_name or CoreState.session_app_name)
 end
 
@@ -1191,6 +1303,11 @@ end
 --- @param h_type string Hotstring category.
 function M.log_hotstring_suggested(app_name, trigger, replacement, h_type)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
 	LogManager.append_log({
 		type        = "hotstring_suggested",
@@ -1209,6 +1326,11 @@ end
 --- @param h_type string Hotstring category.
 function M.log_hotstring_dismissed(app_name, trigger, replacement, h_type)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
 	LogManager.append_log({
 		type        = "hotstring_dismissed",
@@ -1224,6 +1346,11 @@ end
 --- @param count number Number of predictions shown.
 function M.log_llm_suggested(app_name, count)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
 	local c = tonumber(count) or 1
 	LogManager.append_log({ type = "llm_suggested", app = target_app, count = c })
@@ -1235,6 +1362,11 @@ end
 --- @param all_predictions table All predictions that were shown.
 function M.log_llm_dismissed(app_name, all_predictions)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
 	LogManager.append_log({
 		type            = "llm_dismissed",
@@ -1252,6 +1384,11 @@ end
 --- @param deleted_text string The text that was deleted by those backspaces.
 function M.log_llm_accepted(prediction_text, app_name, all_predictions, chosen_index, deletes, deleted_text)
 	if not CoreState.is_enabled then return end
+	-- Same four context filters the physical path applies. These writers record
+	-- triggers, replacements and LLM prompts verbatim, so a private window, a
+	-- secure field, a system-auth dialog or a user-disabled app must silence them
+	-- exactly as it silences a keystroke.
+	if not M.context_allows_logging() then return end
 	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
 	-- The synthetic typing burst is the canonical trigger counter. A manifest
 	-- increment here used to be ignored by the whitelist and would double-count

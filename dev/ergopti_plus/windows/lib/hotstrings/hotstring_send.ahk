@@ -133,7 +133,19 @@ SendNewResult(Text, OnlyText := True, UpdateRing := True) {
         LoggerError("Hotstrings", "SendNewResult failed: {1}", Err.Message)
         return false
     }
-    if UpdateRing {
+    ; _EmitReachedScreen for the same reason the catch above returns without
+    ; advancing the ring: a character that never reached the application must not
+    ; be recorded as though it had. This is the primitive EVERY Shift/CapsLock/
+    ; AltGr layer emit goes through, so it is where the gate belongs — the
+    ; dead-key fix reached the two direct SendEvent emitters and missed this one.
+    ; Compose "Â" by typing the circumflex dead key then Shift+A and the ring held
+    ; ['A', 'Â'] for a single visible character; composition plus a Shift capital
+    ; is the mainline use of that dead key.
+    ;
+    ; IsSet-guarded because this primitive is also reachable from contexts where
+    ; the keymap module is not loaded (tools/, standalone tests), and there the
+    ; unqualified pre-fix behaviour is correct.
+    if UpdateRing and (!IsSet(_EmitReachedScreen) or _EmitReachedScreen()) {
         UpdateLastSentCharacter(SubStr(Text, -1))
     }
     return true
@@ -239,28 +251,73 @@ SendInstant(Text, Prefix := "") {
 }
 
 ; Commit any pending end-char hotstring before the next symbol is emitted.
-; The space/backspace dance pokes the engine: the injected space round-trips
-; through the prefix-watcher InputHook, fires any end-char-gated trigger, then
-; the backspace removes it. SendEvent delivers the synthetic char during this
-; call; yielding with Sleep here let a physical key land between the two sends.
+; The space/backspace dance puts a space on screen so an end-char-gated trigger
+; can claim it, then takes the space back away.
 ;
-; That Sleep parks the keyboard dispatch thread for ACTIVATE_HOTSTRINGS_DELAY_MS
-; on EVERY Shift French-punctuation key — a hot, default key set. Gate the whole
-; dance on there actually being a pending abbreviation in the engine buffer: when
+; The commit itself is NOT a hook round-trip any more. It used to be: the space
+; was injected at the caller's send level, the prefix-watcher InputHook observed
+; it, and _OnPrefixChar fired the trigger. That design needs the message loop to
+; run BETWEEN the two sends — and every caller reaches this function from a
+; serialized layer hotkey that holds Critical across both the poke AND the
+; following NNBSP+punctuation emit, so no InputHook callback can be delivered
+; until all of it has already landed. The queued OnChar(' ') then fired the
+; expansion at a caret that had moved past the punctuation, destroying the
+; character the user typed, and HSE_ApplyExpansion mirrored the same wrong edit
+; into HSE_Buffer so nothing could detect the corruption. Making the poke atomic
+; did not break the round-trip — it proved the round-trip was never possible.
+;
+; So the engine is fed DIRECTLY, and the poke is emitted BELOW the watcher's
+; input level so it is not re-ingested as a phantom keystroke on top of that.
+; The space is still really sent: it has to be on screen for the expansion's own
+; backspace count to be right.
+;
+; The whole dance is gated on there actually being a pending abbreviation. When
 ; HSE_Buffer is empty (the common case — punctuation typed at a word boundary or
-; after a space) there is nothing to commit, so we skip the space/backspace pair
-; AND its former blocking delay entirely. IsSet guards the load order: the engine buffer
-; global lives in hotstring_engine_main.ahk, included alongside this file.
+; after a space) there is nothing to commit, so the pair is skipped entirely on
+; a hot, default key set. IsSet guards the load order: the engine buffer global
+; lives in hotstring_engine_main.ahk, included alongside this file.
 ActivateHotstrings() {
+    global HSE_LastEndChar
     ; Nothing to flush — no pending abbreviation, so skip the costly poke.
     if (IsSet(HSE_Buffer) and HSE_Buffer == "") {
         return
     }
     previous_critical := Critical("On")
+    PreviousSendLevel := A_SendLevel
     try {
+        ; The prefix watcher's InputHook is armed "V L0 I1", so level 0 is below
+        ; what it accepts: the poke lands on screen without ever coming back as
+        ; an OnChar the engine would count twice.
+        SendLevel(0)
         SendNewResult(" ")
+        ; IsPhysical=true on both feeds: the dispatch below holds HSE_Suppressed
+        ; for its own send burst (released on a deferred timer), and a
+        ; non-physical feed is a no-op while it is up.
+        PendingMatch := HSE_FeedChar(" ", true)
+        if (PendingMatch != "") {
+            ; Contained: this runs inside a layer callback that still owes the
+            ; user its punctuation, so a throwing expansion must not abort the
+            ; emit that follows.
+            try {
+                Fired := HSE_DispatchMatch(PendingMatch, HSE_LastEndChar)
+                ; Same metrics contract the prefix-watcher fire path follows:
+                ; only a real expansion is a fire, and the record is queued
+                ; rather than logged inline so no disk work lands on the
+                ; keyboard thread.
+                if (Fired and IsSet(_HSE_QueueFireLog)) {
+                    FiredReplacement := PendingMatch.HasOwnProp("Replacement") ? PendingMatch.Replacement : PendingMatch.Trigger
+                    FiredCategory := PendingMatch.HasOwnProp("Category") ? PendingMatch.Category : ""
+                    FiredSection := PendingMatch.HasOwnProp("Section") ? PendingMatch.Section : ""
+                    try _HSE_QueueFireLog(PendingMatch.Trigger, FiredReplacement, "endchar", FiredCategory, FiredSection)
+                }
+            } catch as CommitErr {
+                try LoggerError("Hotstrings", "ActivateHotstrings: committing '{1}' failed: {2}", PendingMatch.Trigger, CommitErr.Message)
+            }
+        }
         SendNewResult("{BackSpace}", False)
+        HSE_FeedBackspace(true)
     } finally {
+        SendLevel(PreviousSendLevel)
         Critical(previous_critical)
     }
 }

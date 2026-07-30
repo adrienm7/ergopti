@@ -11,6 +11,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local i18n   = require("lib.i18n")
 local LOG    = "vscode_bridge"
 
@@ -27,7 +28,12 @@ local LOG    = "vscode_bridge"
 local PORT          = 7878
 local EXT_ID        = "hs-caret-bridge"
 local EXT_VERSION   = "0.0.3"
-local EXT_DIR       = os.getenv("HOME") .. "/.vscode/extensions/" .. EXT_ID .. "-" .. EXT_VERSION
+-- HOME is always set on macOS, but this concatenation runs at MODULE LOAD, so a
+-- nil there does not degrade the feature — it raises before a single function is
+-- defined and takes down whatever required the module. Defaulting keeps the
+-- failure inside the feature that needs the path.
+local HOME          = os.getenv("HOME") or ""
+local EXT_DIR       = HOME .. "/.vscode/extensions/" .. EXT_ID .. "-" .. EXT_VERSION
 
 -- AX frame cache: the accessibility call can block for up to 100 ms on a
 -- busy VSCode instance. Cache the result for FRAME_CACHE_TTL_S so that rapid
@@ -168,7 +174,7 @@ end
 --- @return boolean True if installation occurred and VSCode reload is required.
 function M.install_extension()
 	Logger.debug(LOG, "Verifying VSCode extension installation…")
-	os.execute("mkdir -p \"" .. EXT_DIR .. "\"")
+	os.execute("mkdir -p " .. text_utils.shell_quote(EXT_DIR))
 
 	local pkg_path = EXT_DIR .. "/package.json"
 	local ext_path = EXT_DIR .. "/extension.js"
@@ -187,8 +193,19 @@ function M.install_extension()
 		return false
 	end
 	Logger.info(LOG, string.format("Extension installed in %s.", EXT_DIR))
-	local dialog = require("lib.dialog_util")
-	dialog.alert(i18n.get("vscode.reload_required"), 4)
+	-- A transient toast, through the layer that actually provides one.
+	-- dialog_util.alert forwards to hs.dialog.alert, whose leading parameters are
+	-- coordinates and a callback — passing it (message, duration) raised, and the
+	-- throw travelled out of install_extension and aborted setup() before
+	-- start_server() had run. The notice is cosmetic; it is also pcall'd, so it can
+	-- no longer take anything with it.
+	local ok_notify, notifications = pcall(require, "lib.notifications")
+	if ok_notify and type(notifications.notify) == "function" then
+		local ok_toast, err = pcall(notifications.notify, i18n.get("vscode.reload_required"), nil, "info")
+		if not ok_toast then
+			Logger.warn(LOG, "Reload notice could not be shown: %s.", tostring(err))
+		end
+	end
 	return true
 end
 
@@ -339,11 +356,23 @@ function M.estimate_position()
 	return { x = x, y = y, h = M.LINE_HEIGHT, type = "vscode_caret" }
 end
 
---- Initializes the bridge: installs the VS Code extension and starts the HTTP server.
---- Called explicitly from init.lua after the tooltip subsystem is ready.
+--- Initializes the bridge: starts the HTTP server, then installs the VS Code
+--- extension. Called explicitly from init.lua after the tooltip subsystem is ready.
+---
+--- The server goes FIRST and the install is isolated. These two used to be chained
+--- in the other order with nothing between them, so any throw inside the install —
+--- including from the purely cosmetic "reload VS Code" notice at its very last
+--- line — aborted setup() before the server existed. That happened on exactly the
+--- boot that installed or updated the extension, and init.lua's call site pcalls
+--- setup(), so the log said the bridge had failed and nothing said the server had
+--- never been reached.
 function M.setup()
-	M.install_extension()
 	M.start_server()
+	local ok, err = pcall(M.install_extension)
+	if not ok then
+		Logger.error(LOG, "Extension install failed: %s — the caret server is up regardless.",
+			tostring(err))
+	end
 end
 
 return M

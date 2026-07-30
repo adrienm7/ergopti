@@ -255,6 +255,13 @@ _HCWWeb_Dispatch(Payload) {
 ; matching the native _HCW_ResetAll loop minus the Gui teardown.
 _HCWWeb_ResetAll() {
 	global _HCW_CATEGORY_LIST
+	; Same two steps as the native _HCW_ResetAll, and for the same reasons — this
+	; twin had neither.
+	;
+	; FLUSH FIRST: a numeric edit armed up to _HCW_NUMERIC_DEBOUNCE_MS ago would
+	; otherwise land AFTER the loop below and persist on top of the override it just
+	; cleared, silently un-resetting that one field.
+	_HCW_FlushNumericWrite()
 	for _, E in _HCW_CATEGORY_LIST {
 		if E.IsPersonal {
 			_HCW_PatchTomlMeta(E.Path, "", "delay", "")
@@ -275,6 +282,15 @@ _HCWWeb_ResetAll() {
 				HotstringsClearOverride(E.Key, Sec.Name, "")
 		}
 	}
+	; REPUBLISH AFTER: the loop clears delay and priority through the storage
+	; primitives DIRECTLY, bypassing the _HCW_SetOverride / _HCW_ClearOverride choke
+	; point where the republish lives. Both fields are baked into every Spec at
+	; registration, so clearing them only bumps the resolve generation: without this,
+	; the window and the TOOLTIP advertise the default delay while the engine keeps
+	; gating on the value the user had set — the tooltip promising an expansion the
+	; engine will refuse (hcw-webview-reset-does-not-republish). One rebuild for the
+	; whole reset, because the reset is a single user action rather than N of them.
+	_HCW_RepublishIfBakedField("delay")
 	try TrayTip(t("hs_config.notify_reset_all"), t("hs_config.btn_reset_all"), "Iconi Mute")
 }
 

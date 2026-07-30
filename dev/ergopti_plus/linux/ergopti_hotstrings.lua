@@ -532,19 +532,20 @@ local function main()
 	-- therefore interleave with the synthetic backspace+replacement stream and
 	-- scramble the output (the "abcd"→"acd" corruption). The injector's queue
 	-- (_begin/_queue/_end_injection) only helps once the daemon OWNS the output
-	-- stream — i.e. in intercept mode (evtest --grab / EVIOCGRAB). Making grab the
-	-- default additionally requires lossless raw-event pass-through: re-emitting
-	-- EVERY physical event (modifiers, control keys, key-repeat and releases
-	-- included) through the single ydotool/uinput channel, else grabbing would
-	-- make all normal typing vanish. That pass-through must be validated on real
-	-- evdev+ydotool hardware, so observe mode is retained here until then; see
-	-- keyboard_hook.get_mode().
+	-- stream — i.e. in intercept mode (evtest --grab / EVIOCGRAB).
+	-- onEmitRaw is wired unconditionally: it is inert in observe mode (nothing was
+	-- consumed, so nothing needs putting back), and it is what makes intercept a
+	-- one-word change rather than a rewrite. The grab itself stays off until it
+	-- can be measured on real hardware — one `ydotool key` process per physical
+	-- event is a fork per keystroke, and the device kanata auto-detects is not
+	-- coordinated with the one device_finder picks here.
 	keyboard_hook.start({
 		device = device,
 		layout = opts.layout,
 		onChar  = on_char,
 		onKey   = on_control,
 		onPhysical = on_physical,
+		onEmitRaw  = injector.emit_key,
 	})
 
 	if not keyboard_hook.isRunning() then

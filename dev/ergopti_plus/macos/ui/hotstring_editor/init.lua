@@ -35,7 +35,14 @@ local LOG           = "hotstring_editor"
 -- ====================================
 -- ====================================
 
-local CUSTOM_GROUP_NAME = "custom"
+-- Fallback only. The live value comes from keymap.PERSONAL_GROUP_NAME, which is
+-- the SAME name lib/personal_hotstrings.lua uses to load this very file at boot.
+-- Reloading it under a different group name did not replace the boot copy: the
+-- dedup key includes the group, so both survived, and the sort comparator broke
+-- the tie on group_order — a first-load-wins counter the boot group always wins.
+-- The editor's freshly saved text therefore lost to the text it replaced.
+local PERSONAL_GROUP_FALLBACK = "personal"
+
 local STAR_CANONICAL    = "★"
 
 -- Absolute path to the assets folder. The hotstring-editor frontend (index.html,
@@ -56,6 +63,22 @@ local _pending_mode    = "menu"
 -- the caller (init.lua) and forwarded to the UI as the priority field's
 -- placeholder — never hardcoded here.
 local _default_priority = nil
+
+--- Returns the group name personal hotstrings are registered under.
+--- Read from the keymap module so the editor and the boot loader cannot drift.
+--- Public so the invariant "the editor reloads into the boot group" is
+--- assertable without reaching into the private message handler.
+---
+--- Declared BELOW _keymap on purpose: a function written above that local binds
+--- the nil global of the same name, and would silently always return the
+--- fallback. That is the closure-before-local trap this driver keeps hitting.
+--- @return string
+function M.get_reload_group_name()
+	if type(_keymap) == "table" and type(_keymap.PERSONAL_GROUP_NAME) == "string" then
+		return _keymap.PERSONAL_GROUP_NAME
+	end
+	return PERSONAL_GROUP_FALLBACK
+end
 
 -- Callbacks
 local _update_menu     = nil
@@ -291,9 +314,14 @@ local function handle_message(msg)
 		if ok_write and err == true then
 			if type(_keymap) == "table" and type(_keymap.load_toml) == "function" then
 				pcall(function()
-					_keymap.disable_group(CUSTOM_GROUP_NAME)
-					_keymap.load_toml(CUSTOM_GROUP_NAME, _toml_path)
-					_keymap.enable_group(CUSTOM_GROUP_NAME)
+					-- Same group the boot loader used, so this REPLACES the boot copy
+					-- instead of racing it. It also keeps the group's priority, its
+					-- per-group expansion delay and any user override applying to the
+					-- reloaded rows, all of which are keyed by group name.
+					local group = M.get_reload_group_name()
+					_keymap.disable_group(group)
+					_keymap.load_toml(group, _toml_path)
+					_keymap.enable_group(group)
 					if type(_keymap.sort_mappings) == "function" then _keymap.sort_mappings() end
 				end)
 			end

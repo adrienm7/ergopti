@@ -22,6 +22,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Shell  = require("adapters.shell_runner")
 
 -- Shared pure-Lua JSON codec (single source of truth for all Lua drivers). The
 -- bespoke encoder/decoder this replaces silently flattened nested tables and
@@ -79,8 +80,11 @@ end
 --- @return boolean
 local function _flush()
 	if _cache == nil then return false end
-	-- Ensure the config directory exists
-	os.execute(string.format("mkdir -p %q 2>/dev/null", _config_dir()))
+	-- Ensure the config directory exists. The path comes from XDG_CONFIG_HOME or
+	-- HOME, i.e. from the environment: string.format("%q") wrapped it in DOUBLE
+	-- quotes, so a home directory with a space silently created two wrong
+	-- directories and one with a $ or a backtick was expanded again.
+	Shell.run(string.format("mkdir -p %s 2>/dev/null", Shell.quote(_config_dir())))
 	local ok, err = pcall(function()
 		local fh = io.open(_TMP_PATH, "w")
 		if not fh then error("cannot open tmp file") end

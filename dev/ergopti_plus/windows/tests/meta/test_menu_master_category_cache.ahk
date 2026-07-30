@@ -133,17 +133,34 @@ Test("menu: the real manifest has no master_gates key, so the hardcoded defaults
 ; =============================================================
 ; =============================================================
 
+; GUARANTEE, unchanged: the shared menu-manifest accessor must never cache a
+; FAILED load, or a transient I/O error freezes the whole session into the
+; fallback defaults with no retry.
+;
+; Only the ASSERTION moved. It used to name _MR_MANIFEST_CACHE inside
+; _MR_GetManifestRoot, which pinned a SECOND independent decode of the very same
+; menu_manifest.json in place -- a mechanism, and a ~44 ms one on the boot path.
+; _MR_GetManifestRoot now delegates to the single shared decoder, so the property
+; is asserted where the disk read and the cache write actually live, and the
+; delegation itself is asserted so the second decode cannot quietly come back.
 _MMCC_CheckAccessorDoesNotCacheFailure() {
-	Body := _DriverFuncBody("_MR_GetManifestRoot")
-	Assert(Body != "", "_MR_GetManifestRoot must exist in the driver source")
+	Entry := _DriverFuncBody("_MR_GetManifestRoot")
+	Assert(Entry != "", "_MR_GetManifestRoot must exist in the driver source")
+	Assert(!InStr(Entry, "FileRead(") and !InStr(Entry, "JsonParse("),
+		"_MR_GetManifestRoot must not read or decode menu_manifest.json itself -- one decode of the 12.5 KB manifest benches at ~44 ms and the shared accessor has already paid it")
+	Assert(InStr(Entry, "_MM_GetManifestRoot") > 0,
+		"_MR_GetManifestRoot must resolve the manifest through the single shared accessor _MM_GetManifestRoot()")
 
-	AssignPos := InStr(Body, "_MR_MANIFEST_CACHE := Root")
+	Body := _DriverFuncBody("_MM_GetManifestRoot")
+	Assert(Body != "", "_MM_GetManifestRoot must exist in the driver source")
+
+	AssignPos := InStr(Body, "_MM_MANIFEST_ROOT_CACHE := Root")
 	Assert(AssignPos > 0,
-		"_MR_GetManifestRoot must publish the parsed root into _MR_MANIFEST_CACHE")
+		"the shared accessor must publish the parsed root into its cache")
 
 	FailPos := InStr(Body, "return false")
 	Assert(FailPos > 0 and FailPos < AssignPos,
-		"_MR_GetManifestRoot must return false on failure BEFORE writing the cache -- caching a failed load would freeze the whole session into the fallback defaults with no retry")
+		"the shared accessor must return false on failure BEFORE writing the cache -- caching a failed load would freeze the whole session into the fallback defaults with no retry")
 }
 Test("menu: _MR_GetManifestRoot caches only successful loads, so a transient failure stays retryable (menu-master-category-reparse)",
 	_MMCC_CheckAccessorDoesNotCacheFailure)

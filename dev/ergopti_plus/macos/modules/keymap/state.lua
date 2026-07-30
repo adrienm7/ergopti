@@ -39,6 +39,12 @@ local M  = {}
 -- an expansion firing and the next user keystroke without swallowing more
 -- than one human-speed key.
 local DEFAULT_SUPPRESS_SEC      = 0.5
+
+-- Suppression window applied after a FINAL-RESULT expansion, which must also
+-- outlast the replacement landing on screen. Named here, beside the default it
+-- doubles, because a bare literal at the call site is a magic number whose
+-- relationship to that default is invisible (project convention 5.1).
+M.FINAL_RESULT_SUPPRESS_SEC = DEFAULT_SUPPRESS_SEC * 2
 local DEFAULT_SUPPRESS_KEEP_SEC = 0.3
 
 
@@ -146,6 +152,34 @@ function M.new(defaults, delays_default)
 		-- char can fire word-boundary-required triggers — that mirrors the
 		-- AHK HSEv2 contract (HSE_ApplyExpansion semantics).
 		s.start_is_word_boundary = true
+	end
+
+	--- Resolves the expansion delay (seconds) that applies to one mapping.
+	---
+	--- Precedence, highest first, mirroring the AHK HotstringsResolve chain:
+	---   user-overridden group delay > TOML per-section delay > group delay > base.
+	--- A group delay differing from its hardcoded default counts as a user
+	--- override and wins over a per-section TOML value.
+	---
+	--- Lives on CoreState because TWO consumers need the same answer: the tap,
+	--- which decides whether a trigger may still fire, and the preview, which
+	--- decides how long to show the row offering it. The preview used to derive
+	--- its lifetime from a coarse three-way key instead, so the tooltip could
+	--- vanish while the trigger was still live, or linger after it had expired —
+	--- promising an expansion the engine would refuse.
+	--- @param m table A registry mapping (reads has_magic, group and section).
+	--- @return number Delay in seconds; 0 means "always active".
+	s.resolve_mapping_delay = function(m)
+		if type(m) ~= "table" then return s.BASE_DELAY_SEC end
+		if m.has_magic then return s.DELAYS.STAR_TRIGGER or s.BASE_DELAY_SEC end
+		if m.group and s.DELAYS[m.group] ~= nil
+			and s.DELAYS_DEFAULT[m.group] ~= nil
+			and s.DELAYS[m.group] ~= s.DELAYS_DEFAULT[m.group] then
+			return s.DELAYS[m.group]
+		end
+		if m.section and s.SECTION_DELAYS[m.section] then return s.SECTION_DELAYS[m.section] end
+		if m.group and s.DELAYS[m.group] then return s.DELAYS[m.group] end
+		return s.BASE_DELAY_SEC
 	end
 
 	s.suppress_rescan_keep_buffer = function(duration)

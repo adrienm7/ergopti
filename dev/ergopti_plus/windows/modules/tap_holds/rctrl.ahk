@@ -140,7 +140,13 @@ SC11D:: {
 
 ; ======= 7.4) Generic — hold-modifier, any other tap =======
 
-#HotIf not _RCtrlIsSpecialTap() and TapHoldHoldModifier(TapHold, "right_ctrl") != "" and TapHoldTapAction(TapHold, "right_ctrl") != "" and not LayerEnabled
+; The gate deliberately does NOT require a configured tap action. The tray
+; picker offers the hold options independently of the tap, persists the choice
+; and puts a checkmark next to it — so requiring a tap here made « Natif / Rien »
+; + hold=<modifier> match no variant at all, and the hold the user just picked
+; did nothing. A hold must arm on the hold alone, as CapsLock, Space, Escape,
+; Enter, Backspace, Delete and Win already do.
+#HotIf not _RCtrlIsSpecialTap() and TapHoldHoldModifier(TapHold, "right_ctrl") != "" and not LayerEnabled
 $SC11D:: {
 	ModKey := _RCtrlHoldModKey()
 	HoldGuardMs := TapHoldDuration(TapHold, "right_ctrl") * 1100
@@ -176,7 +182,9 @@ $SC11D:: {
 
 ; ======= 7.5) Generic — hold-layer, any other tap =======
 
-#HotIf not _RCtrlIsSpecialTap() and TapHoldHoldLayer(TapHold, "right_ctrl") != "" and TapHoldTapAction(TapHold, "right_ctrl") != "" and not LayerEnabled
+; No tap-action conjunct, for the reason given on block 7.4: a hold must arm on
+; the hold alone or the picker offers a choice the driver silently ignores.
+#HotIf not _RCtrlIsSpecialTap() and TapHoldHoldLayer(TapHold, "right_ctrl") != "" and not LayerEnabled
 $SC11D:: {
 	tap := KeyWait("SC11D", "T" . TapHoldDuration(TapHold, "right_ctrl"))
 	if tap {
@@ -194,7 +202,19 @@ $SC11D:: {
 	}
 	ActivateLayer()
 	try {
-		KeyWait("SC11D", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+		; The cap is a failsafe for waits that hold a SYNTHETIC modifier Down: those
+		; must never latch it forever if the key-up event is lost. A hold LAYER holds no
+		; synthetic key, so there is nothing to latch. Applied verbatim, the cap simply
+		; dropped the layer out from under the user after five seconds of legitimate
+		; navigation, and base-layer letters then landed in the document until it
+		; re-armed. Re-arm the wait instead while the key is still physically down: every
+		; iteration stays bounded, which is the property test_hold_layer_release_bounded
+		; pins, and a timeout with the key already up means the key-up really was lost --
+		; exactly the case the failsafe exists for.
+		while !KeyWait("SC11D", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
+			if !GetKeyState("SC11D", "P")
+				break
+		}
 	} finally {
 		DisableLayer()
 	}

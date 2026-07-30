@@ -67,16 +67,24 @@ local SETTING_KEY = "llm_backend"
 --- Returns true on Apple Silicon (arm64). Falls back to a heuristic on the
 --- /opt/homebrew prefix when uname is unavailable for any reason.
 --- @return boolean True when the host CPU is arm64.
+local _is_arm_cached = nil
+local _macos_major_cached = nil
+
 local function is_apple_silicon()
+	-- Memoised: the CPU architecture cannot change while the process runs, and
+	-- this used to spawn a subprocess on every call — including twice during
+	-- boot, on the critical path before the keymap starts.
+	if _is_arm_cached ~= nil then return _is_arm_cached end
 	local ok, out = pcall(hs.execute, "/usr/bin/uname -m")
 	if ok and type(out) == "string" then
-		if out:match("arm64") then return true end
-		if out:match("x86_64") then return false end
+		if out:match("arm64") then _is_arm_cached = true; return true end
+		if out:match("x86_64") then _is_arm_cached = false; return false end
 	end
 	-- Heuristic fallback: Homebrew on Apple Silicon installs to /opt/homebrew,
 	-- on Intel to /usr/local. Not 100 % bullet-proof, but catches every
 	-- realistic case on a Mac shipped after late-2020.
-	return hs.fs.attributes("/opt/homebrew", "mode") == "directory"
+	_is_arm_cached = hs.fs.attributes("/opt/homebrew", "mode") == "directory"
+	return _is_arm_cached
 end
 
 --- Returns the macOS major version as an integer (13, 14, 15, …) or nil
@@ -84,10 +92,20 @@ end
 --- not selected.
 --- @return integer|nil major Major macOS version, or nil if unknown.
 local function macos_major_version()
+	-- Memoised for the same reason as the architecture probe: the OS version is
+	-- fixed for the life of the process, and a failed probe is cached as false
+	-- so a broken sw_vers is not re-spawned on every call either.
+	if _macos_major_cached ~= nil then
+		return _macos_major_cached or nil
+	end
 	local ok, out = pcall(hs.execute, "/usr/bin/sw_vers -productVersion")
-	if not ok or type(out) ~= "string" then return nil end
+	if not ok or type(out) ~= "string" then
+		_macos_major_cached = false
+		return nil
+	end
 	local major = out:match("^(%d+)")
-	return major and tonumber(major) or nil
+	_macos_major_cached = (major and tonumber(major)) or false
+	return _macos_major_cached or nil
 end
 
 

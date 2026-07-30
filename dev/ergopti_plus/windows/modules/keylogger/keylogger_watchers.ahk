@@ -163,8 +163,12 @@ KL_Watchers_OnKeystroke() {
         ; The advance can never overshoot now: app_entered_at <= last, so
         ; app_entered_at + gap <= now.
         if (gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
-            KLHook.app_entered_at   += gap
-            KLHook.title_entered_at += gap
+            ; Clamped, because the suspend branch of KL_Hook_RefreshContext may
+            ; already have compensated this very span: after a pause both
+            ; advances describe the same missing wall-clock time, and applied
+            ; together they push the watermark past the present, making the next
+            ; app_switch report a negative duration.
+            KL_Hook_AdvanceContextWatermarks(gap)
         }
         if KLWatch.is_idle {
             KLWatch.is_idle := false

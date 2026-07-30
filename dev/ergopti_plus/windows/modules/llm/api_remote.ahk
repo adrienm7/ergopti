@@ -92,7 +92,7 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
 
     resolved := _LLMRemoteResolveEntry(Entry)
     if (resolved == "") {
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return req_id
     }
 
@@ -117,7 +117,7 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
         _LLMRemoteSetAuthHeaders(http, resolved["Format"], resolved["Token"])
         http.Send(Payload)
     } catch as err {
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return req_id
     }
 
@@ -142,28 +142,51 @@ _LLMRemote_CurlAvailable() {
     return FileExist(A_WinDir . "\System32\curl.exe") != ""
 }
 
-; Build the curl auth -H args for a provider format, mirroring _LLMRemoteSetAuthHeaders.
-; The token is shell-quoted via _Q so an odd key cannot break the curl arg parsing.
-_LLMRemote_BuildCurlAuthArgs(Format, Token) {
-    if (Format == "anthropic") {
-        args := ""
-        if (Token != "")
-            args .= "-H " . _Q("x-api-key: " . Token) . " "
-        args .= "-H " . _Q("anthropic-version: 2023-06-01") . " "
-        return args
-    }
-    if (Format == "gemini")
-        return ""   ; token is carried in the URL
-    if (Token != "")
-        return "-H " . _Q("Authorization: Bearer " . Token) . " "
-    return ""
+; Quotes a value for a curl config file. curl unescapes `\\` and `\"` inside a
+; quoted value, so both have to be escaped here — an unescaped backslash or quote
+; in a provider token would truncate the header and ship a malformed credential.
+_LLMRemote_CurlConfQuote(Value) {
+    Escaped := StrReplace(Value, '\', '\\')
+    Escaped := StrReplace(Escaped, '"', '\"')
+    return '"' . Escaped . '"'
 }
 
-; Removes the per-request temp files (the payload carries the user's typed PII, so it
-; must not linger). Best-effort.
+; Builds the curl config-file text carrying the request URL and every auth header,
+; mirroring _LLMRemoteSetAuthHeaders for the child-process transport.
+;
+; The credential must never travel on the command line: Win32_Process.CommandLine
+; is readable by any same-user process with no elevation, and process-creation
+; telemetry (Sysmon event 1, EDR, several AV products) copies argv verbatim into
+; logs the driver does not control. A file in the per-PID temp directory is the
+; same boundary the request payload already accepted, and it is deleted on every
+; completion path.
+_LLMRemote_BuildCurlConfig(Format, Token, Url) {
+    ; Gemini carries the key inside the URL, which is why the URL travels through
+    ; this file too rather than being spliced into the command line.
+    cfg := "url = " . _LLMRemote_CurlConfQuote(Url) . "`n"
+    cfg .= "header = " . _LLMRemote_CurlConfQuote("Content-Type: application/json") . "`n"
+    if (Format == "anthropic") {
+        if (Token != "")
+            cfg .= "header = " . _LLMRemote_CurlConfQuote("x-api-key: " . Token) . "`n"
+        cfg .= "header = " . _LLMRemote_CurlConfQuote("anthropic-version: 2023-06-01") . "`n"
+        return cfg
+    }
+    if (Format == "gemini")
+        return cfg
+    if (Token != "")
+        cfg .= "header = " . _LLMRemote_CurlConfQuote("Authorization: Bearer " . Token) . "`n"
+    return cfg
+}
+
+; Removes the per-request temp files (the payload carries the user's typed PII and
+; the config file carries the provider token, so neither must linger). Best-effort.
 _LLMRemote_CurlCleanup(entry) {
     try FSDelete(entry["tmp_payload"])
     try FSDelete(entry["tmp_stdout"])
+    ; The token lives in tmp_config; it has to be reaped on the cancelled, deadline,
+    ; trim and completion paths alike, which all funnel through here.
+    if entry.Has("tmp_config")
+        try FSDelete(entry["tmp_config"])
 }
 
 ; Dispatch the POST through a curl child process so the connect happens in curl's own
@@ -179,37 +202,49 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
     tmp_dir := _LLM_Ollama_TempDir()
     tmp_payload := tmp_dir . "\ergopti_remote_" . uid . ".json"
     tmp_stdout  := tmp_dir . "\ergopti_remote_" . uid . ".out"
+    tmp_config  := tmp_dir . "\ergopti_remote_" . uid . ".conf"
     if !FSWrite(tmp_payload, Payload) {
         try LoggerWarn("LLM.remote", "Failed to write curl payload file.")
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return true
     }
+    if !FSWrite(tmp_config, _LLMRemote_BuildCurlConfig(resolved["Format"], resolved["Token"], Url)) {
+        try FSDelete(tmp_payload)
+        try LoggerWarn("LLM.remote", "Failed to write curl config file — request abandoned rather than sent with the token on the command line.")
+        _LLM_InvokeCallback(on_fail, "on_fail")
+        return true
+    }
+    ; URL and auth headers come from --config, never from argv (see
+    ; _LLMRemote_BuildCurlConfig): argv has no ACL for a same-user reader.
     cmdLine := '"' . curl_exe . '" -s -S -X POST '
-        . '-H "Content-Type: application/json" '
-        . _LLMRemote_BuildCurlAuthArgs(resolved["Format"], resolved["Token"])
+        . '--config ' . _Q(tmp_config) . ' '
         . '--data-binary @' . _Q(tmp_payload) . ' '
-        . _Q(Url) . ' '
         . '-o ' . _Q(tmp_stdout)
     pid := 0
     try {
         Run(cmdLine, , "Hide", &pid)
     } catch as err {
         try FSDelete(tmp_payload)
+        try FSDelete(tmp_config)
         try LoggerWarn("LLM.remote", "curl launch failed: {1}.", err.Message)
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return true
     }
     _LLMRemote_TrimAsyncRegistry()
+    ; ``model_id_at_dispatch`` is what the usage extractor prices the response
+    ; against; the WinHTTP sibling has always recorded it and the curl transport
+    ; (the only one reached on a host that ships curl.exe) must too.
     _LLM_Remote_Async[req_id] := Map(
         "transport", "curl", "pid", pid,
-        "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout,
-        "format", resolved["Format"], "on_success", on_success, "on_fail", on_fail,
+        "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout, "tmp_config", tmp_config,
+        "format", resolved["Format"], "model_id_at_dispatch", resolved["Model"],
+        "on_success", on_success, "on_fail", on_fail,
         "cancelled", false, "start_tick", A_TickCount, "timeout_ms", timeout_ms)
     _LLMRemote_PollCurl(req_id)
     return true
 }
 
-; Polls the curl child WITHOUT blocking the message loop. Mirrors _LLM_Ollama_PollRequest.
+; Polls the curl child WITHOUT blocking the message loop. Mirrors _LLM_Ollama_PollCurl.
 _LLMRemote_PollCurl(req_id) {
     global _LLM_Remote_Async, LLM_REMOTE_POLL_MS
     if !_LLM_Remote_Async.Has(req_id)
@@ -222,11 +257,14 @@ _LLMRemote_PollCurl(req_id) {
         return
     }
     if (_LLM_DeadlineExpired(entry["start_tick"], entry["timeout_ms"])) {
+        ; Hoisted above the Delete so the wrapper still has the callback, matching
+        ; the sibling branches in _LLMRemote_PollRequest.
+        on_fail := entry["on_fail"]
         try ProcessClose(entry["pid"])
         _LLMRemote_CurlCleanup(entry)
         _LLM_Remote_Async.Delete(req_id)
         try LoggerWarn("LLM.remote", "curl poll deadline exceeded for req_id={1} - aborting.", req_id)
-        try entry["on_fail"]()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
     if ProcessExist(entry["pid"]) {
@@ -236,20 +274,32 @@ _LLMRemote_PollCurl(req_id) {
     on_success := entry["on_success"]
     on_fail    := entry["on_fail"]
     fmt        := entry["format"]
+    model_id   := entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : ""
     body := ""
     try body := FileRead(entry["tmp_stdout"], "UTF-8")
     _LLMRemote_CurlCleanup(entry)
     _LLM_Remote_Async.Delete(req_id)
     if (body == "") {
-        try on_fail()
+        try LoggerWarn("LLM.remote", "curl produced an empty body for req_id={1} — the request never reached the provider (DNS, proxy, TLS).", req_id)
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
     text := _LLMRemoteParseResponse(fmt, body)
     if (text == "") {
-        try on_fail()
+        ; curl writes a provider ERROR body (401 bad key, 429 quota, 400 bad model)
+        ; to the same file as a success, and only the parse miss distinguishes the
+        ; two. Without the snippet a rejected API key is indistinguishable from a
+        ; model that simply answered nothing.
+        snip := StrLen(body) > 200 ? SubStr(body, 1, 200) . "…" : body
+        try LoggerWarn("LLM.remote", "curl response for req_id={1} carried no completion — body: «{2}».", req_id, snip)
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
-    try on_success(text)
+    ; Same tail as _LLMRemote_PollRequest: the engine records tokens + estimated
+    ; cost from this block, and curl is the transport every shipping Windows host
+    ; actually takes — dropping it here zeroed every metric on the API backend.
+    meta := _LLMRemoteExtractUsage(fmt, body, model_id)
+    _LLM_InvokeCallback(on_success, "on_success", text, meta)
 }
 
 LLM_RemoteCancelAsync(req_id) {
@@ -257,14 +307,21 @@ LLM_RemoteCancelAsync(req_id) {
     if !_LLM_Remote_Async.Has(req_id)
         return
     entry := _LLM_Remote_Async[req_id]
+    ; Flip the flag inline — the poll tick reads it — but release the transport
+    ; off-thread, exactly as the plural sibling does. This is reached from the
+    ; per-keystroke Critical, where both a blocking TerminateProcess and a WinHTTP
+    ; Abort (a cross-apartment COM call) starve the keyboard hook while the
+    ; message pump is suspended. The poll tick still cleans up the curl temp files
+    ; carrying request PII on its next iteration, exactly as before.
     entry["cancelled"] := true
-    ; Release the in-flight request immediately: a curl child is killed (the poll tick
-    ; then cleans up its PII temp files); a WinHTTP request is aborted.
+    Kills := []
     if (entry.Has("transport") and entry["transport"] == "curl") {
-        try ProcessClose(entry["pid"])
-    } else {
-        try entry["http"].Abort()
+        if entry.Has("pid")
+            Kills.Push(Map("pid", entry["pid"]))
+    } else if entry.Has("http") {
+        Kills.Push(Map("http", entry["http"]))
     }
+    LLM_DeferCancelKills(Kills)
 }
 
 LLM_RemoteCancelAllAsync() {
@@ -315,7 +372,7 @@ _LLMRemote_PollRequest(req_id) {
             try entry["http"].Abort()
         _LLM_Remote_Async.Delete(req_id)
         try LoggerWarn("LLM.remote", "Poll deadline exceeded for req_id={1} — aborting.", req_id)
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
     http := entry["http"]
@@ -332,7 +389,7 @@ _LLMRemote_PollRequest(req_id) {
         try http.Abort()
         _LLM_Remote_Async.Delete(req_id)
         try LoggerWarn("LLM.remote", "WaitForResponse COM error for req_id={1}: {2} — aborting.", req_id, com_err.Message)
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
     if !ready {
@@ -347,16 +404,16 @@ _LLMRemote_PollRequest(req_id) {
         status := http.Status
         body   := http.ResponseText
     } catch {
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
     if (status < 200 or status >= 300) {
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
     text := _LLMRemoteParseResponse(entryFormat, body)
     if (text == "") {
-        try on_fail()
+        _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
     ; Pull the per-provider ``usage`` block out of the response so the
@@ -366,7 +423,7 @@ _LLMRemote_PollRequest(req_id) {
     ; ``prompt_eval_count`` instead, which we don't parse for the remote
     ; path because the engine only treats local backends as "free").
     meta := _LLMRemoteExtractUsage(entryFormat, body, entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : "")
-    try on_success(text, meta)
+    _LLM_InvokeCallback(on_success, "on_success", text, meta)
 }
 
 ; Token + cost extraction. Each provider exposes the same numeric fields
@@ -446,7 +503,7 @@ _LLMRemote_TrimAsyncRegistry() {
         ; fire. Without this the caller (e.g. the prediction engine slot state
         ; machine) hangs forever waiting for a callback that will never arrive.
         if oldest_entry.Has("on_fail") and oldest_entry["on_fail"] is Func
-            try oldest_entry["on_fail"].Call()
+            _LLM_InvokeCallback(oldest_entry["on_fail"], "on_fail")
         _LLM_Remote_Async.Delete(oldest_id)
         return
 }
@@ -549,14 +606,14 @@ LLM_RemoteIsReady_Async(Entry, on_result) {
 
     ProviderId := _LLMRemoteEntryGet(Entry, "Provider", "openai_compat")
     if !LLM_API_PROVIDERS.Has(ProviderId) {
-        try on_result(false)
+        _LLM_InvokeCallback(on_result, "on_result", false)
         return
     }
     Provider := LLM_API_PROVIDERS[ProviderId]
     BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", Provider["BaseUrl"])
     Token    := _LLMRemoteEntryGet(Entry, "Token", "")
     if (BaseUrl == "" or Token == "") {
-        try on_result(false)
+        _LLM_InvokeCallback(on_result, "on_result", false)
         return
     }
 
@@ -568,7 +625,7 @@ LLM_RemoteIsReady_Async(Entry, on_result) {
         PingUrl := RTrim(BaseUrl, "/") . "/models?key=" . Token
     }
     if (PingUrl == "") {
-        try on_result(false)
+        _LLM_InvokeCallback(on_result, "on_result", false)
         return
     }
 
@@ -580,7 +637,7 @@ LLM_RemoteIsReady_Async(Entry, on_result) {
         _LLMRemoteSetAuthHeaders(Http, ProvFmt, Token)
         Http.Send()
     } catch {
-        try on_result(false)
+        _LLM_InvokeCallback(on_result, "on_result", false)
         return
     }
     _LLMRemote_PollReady(Http, on_result, A_TickCount, LLM_REMOTE_READY_PING_DEADLINE_MS)
@@ -593,13 +650,25 @@ LLM_RemoteIsReady_Async(Entry, on_result) {
 _LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms) {
     global LLM_REMOTE_READY_PING_POLL_MS
     ready := false
-    try ready := Http.WaitForResponse(0)
+    try {
+        ready := Http.WaitForResponse(0)
+    } catch as com_err {
+        ; The last uncovered site of the ollama-com-exception invariant. A COM
+        ; exception means the connection dropped; the bare `try` this replaces
+        ; swallowed it and re-armed the poll, so a dead readiness ping kept
+        ; polling to its deadline against a socket that would never answer, with
+        ; nothing in the log to say why the backend looked unreachable.
+        try LoggerWarn("LLM.remote", "PollReady WaitForResponse threw COM error — abandoning: {1}", com_err.Message)
+        try Http.Abort()
+        _LLM_InvokeCallback(on_result, "on_result", false)
+        return
+    }
     if !ready {
         if _LLM_DeadlineExpired(start_tick, timeout_ms) {
             ; Abort the stalled request so the COM object + socket are released
             ; now rather than lingering until WinHTTP's own timeout fires.
             try Http.Abort()
-            try on_result(false)
+            _LLM_InvokeCallback(on_result, "on_result", false)
             return
         }
         SetTimer(() => _LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms), -LLM_REMOTE_READY_PING_POLL_MS)
@@ -607,7 +676,7 @@ _LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms) {
     }
     status := 0
     try status := Http.Status
-    try on_result(status >= 200 and status < 300)
+    _LLM_InvokeCallback(on_result, "on_result", status >= 200 and status < 300)
 }
 
 

@@ -27,6 +27,7 @@ local keyStrokes  = hs.eventtap.keyStrokes
 local keyStroke   = hs.eventtap.keyStroke
 local Logger      = require("lib.logger")
 local Timings     = require("lib.timings")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "keymap.utils"
 
@@ -68,6 +69,11 @@ local CLIPBOARD_PASTE_GAP_SEC = Timings.sec("debounce", "clipboard_paste_settle_
 -- so this long TTL only acts as a net in the unlikely case the watcher misses an
 -- event. Keeping it large means near-zero syscalls per keystroke in steady state.
 local IGNORED_WIN_TTL_SEC = 5.0
+
+-- True while a deferred TTL refresh is already queued, so a burst of keystrokes
+-- arms exactly one. Declared above the closure that clears it — a local declared
+-- after a closure binds the nil global instead.
+local _ignored_win_refresh_armed = false
 
 -- Key tokens whose synthetic keydown carries a character back through
 -- getCharacters() ("return" -> CR, "tab" -> HT). They must appear in the physical
@@ -160,8 +166,29 @@ local function perform_paste(value)
 		-- Preserve all clipboard types (images, RTF, etc.), not just plain text.
 		_paste_saved_original = hs.pasteboard.readAllData()
 	end
-	hs.pasteboard.setContents(value)
-	keyStroke({ "cmd" }, "v", 0)
+	-- From here the user's clipboard holds OUR payload, and the restore timer is
+	-- not armed yet. A throw in between — setContents failing, the keystroke
+	-- raising — used to leave it there permanently, with _paste_saved_original
+	-- still set so the NEXT paste would not even re-capture the real value. The
+	-- enclosing pcall caught the error and logged it, which is precisely why the
+	-- eaten clipboard was never traced back here. The sibling path in
+	-- adapters/text_sender was fixed for this; this one, which every real
+	-- hotstring paste goes through, was missed.
+	local ok_write = pcall(function()
+		hs.pasteboard.setContents(value)
+		keyStroke({ "cmd" }, "v", 0)
+	end)
+	if not ok_write then
+		local original = _paste_saved_original
+		_paste_saved_original = nil
+		pcall(function()
+			if type(original) == "table" and next(original) ~= nil then
+				hs.pasteboard.writeAllData(original)
+			end
+		end)
+		Logger.error(LOG, "Clipboard paste failed before the restore could be armed — original restored.")
+		return
+	end
 	-- Restore clipboard asynchronously after the target app has received the paste.
 	local saved = _paste_saved_original
 	_paste_pending_timer = hs.timer.doAfter(CLIPBOARD_RESTORE_SEC, function()
@@ -193,7 +220,7 @@ end
 function M.emit_tokens(tokens)
 	if type(tokens) ~= "table" then
 		Logger.error(LOG, "emit_tokens: tokens must be a table (got %s).", type(tokens))
-		return 0, "", ""
+		return 0, "", "", 0
 	end
 
 	Logger.trace(LOG, "Emitting %d token(s)…", #tokens)
@@ -263,9 +290,16 @@ function M.emit_tokens(tokens)
 				-- Every following paste-worthy token must wait at least one more
 				-- gap so two deferred pastes never collapse onto the same tick.
 				next_paste_delay = paste_at + CLIPBOARD_PASTE_GAP_SEC
-				-- A DEFERRED paste has not reached the OS yet, so every later token
-				-- must queue strictly behind it. An inline one needs no such fence.
-				if paste_at > 0 then order_delay = next_paste_delay end
+				-- Every later token queues behind a paste, deferred or not. The
+				-- fence used to be skipped for an inline paste on the grounds that
+				-- its Cmd+V had already been posted and post order is preserved.
+				-- Post order is — but the pasted TEXT is not one of our events: the
+				-- target produces it later, on its own schedule, after reading the
+				-- pasteboard. A keystroke posted immediately behind the Cmd+V
+				-- therefore reaches the host ahead of the text it is meant to
+				-- follow, which is how an Enter terminator landed on an unpasted
+				-- line and submitted it empty.
+				order_delay = next_paste_delay
 			else
 				local text_value = tok.value  -- Bound per iteration for the deferred closure
 				emit_in_order(order_delay, function() keyStrokes(text_value) end)
@@ -279,7 +313,12 @@ function M.emit_tokens(tokens)
 	end
 
 	Logger.done(LOG, "%d token(s) emitted (%d char(s)).", #tokens, count)
-	return count, emitted_str, logical_text
+	-- The fence is returned, not just applied internally. A caller that emits
+	-- anything MORE after this call — the terminator re-type does — has the same
+	-- ordering hazard as the tokens themselves, and no way to know about it
+	-- otherwise: everything here already looks finished from the outside while a
+	-- paste is still queued on a timer.
+	return count, emitted_str, logical_text, order_delay
 end
 
 --- Emits a raw string directly, choosing between keystrokes and clipboard-paste.
@@ -289,7 +328,7 @@ end
 function M.emit_text(text)
 	if type(text) ~= "string" then
 		Logger.error(LOG, "emit_text: text must be a string (got %s).", type(text))
-		return 0, "", ""
+		return 0, "", "", 0
 	end
 
 	-- Log the payload's SIZE, never the payload. Every expansion funnels through
@@ -309,13 +348,18 @@ function M.emit_text(text)
 		-- expansion prefix to be silently absorbed (paste-synthetic-chars-leak).
 		_paste_ops_pending = _paste_ops_pending + 1
 		local ok_l, l = pcall(text_utils.utf8_len, text)
-		return (ok_l and l or 1), "", text
+		-- The fence is NOT zero just because this paste fired inline. Cmd+V is our
+		-- last event; the text itself is produced by the target when it gets around
+		-- to reading the pasteboard. Anything the caller emits after this — the
+		-- terminator re-type above all — must wait out that settle window or it
+		-- arrives ahead of the replacement it terminates.
+		return (ok_l and l or 1), "", text, CLIPBOARD_PASTE_GAP_SEC
 	end
 
 	keyStrokes(text)
 	local ok, len = pcall(text_utils.utf8_len, text)
 	Logger.done(LOG, "Text emitted as keystrokes (%d char(s)).", ok and len or 1)
-	return (ok and len or 1), text, text
+	return (ok and len or 1), text, text, 0
 end
 
 
@@ -421,6 +465,50 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 	-- Fast path: cache is clean and TTL has not elapsed.
 	local ttl_elapsed = (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC
 	if not _ignored_win_cache_dirty and not ttl_elapsed then
+		return _ignored_win_cache_value
+	end
+
+	-- A TTL expiry is NOT a signal that anything changed — invalidation is
+	-- event-driven, and the TTL exists only as a safety net for an event the
+	-- watchers might have missed. Probing synchronously for it meant a
+	-- cross-process AX round-trip inside the keyDown tap every few seconds of
+	-- steady typing, for an answer that is almost always the one already cached.
+	-- Serve the cached value and refresh off the tap; a genuinely DIRTY cache
+	-- still probes synchronously below, because that one really did change.
+	-- The DIRTY branch below is served from cache too, and refreshed off the tap.
+	--
+	-- The TTL-expiry path was already moved off the keyDown callback, with a
+	-- comment naming "a cross-process AX round-trip inside the keyDown tap" as the
+	-- reason. The dirty path was left synchronous on the grounds that the window
+	-- really had changed — but a focus change is precisely the moment the newly
+	-- focused process is most likely to be busy answering something else, and
+	-- hs.window.timeout() is never set anywhere in this driver, so those AX calls
+	-- inherit the system messaging timeout rather than a short one we chose.
+	-- Accepting ONE stale keystroke after an app switch is the same trade already
+	-- accepted for TTL expiry.
+	if _ignored_win_cache_dirty and _ignored_win_cache_value ~= nil then
+		if not _ignored_win_refresh_armed then
+			_ignored_win_refresh_armed = true
+			TimerScheduler.after(0, function()
+				_ignored_win_refresh_armed = false
+				-- Cleared only here, off the tap, so the refresh below actually probes.
+				_ignored_win_cache_dirty = false
+				pcall(M.is_ignored_window, ignored_titles, ignored_patterns, nil)
+			end)
+		end
+		return _ignored_win_cache_value
+	end
+
+	if not _ignored_win_cache_dirty then
+		if not _ignored_win_refresh_armed then
+			_ignored_win_refresh_armed = true
+			TimerScheduler.after(0, function()
+				_ignored_win_refresh_armed = false
+				_ignored_win_cache_dirty   = true
+				pcall(M.is_ignored_window, ignored_titles, ignored_patterns, nil)
+			end)
+		end
+		_ignored_win_cache_time = now
 		return _ignored_win_cache_value
 	end
 

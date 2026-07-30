@@ -4,7 +4,7 @@
 ; ==============================================================================
 ; MODULE: Hotstring Tooltip / Core Engine + Public API
 ; DESCRIPTION:
-; Tooltip GUI state, font/style constants, the dequeue + safety timers, style refresh, and the public API (TooltipShow / TooltipHide / TooltipIsVisible / TooltipRearmTimer).
+; Tooltip GUI state, font/style constants, the dequeue + safety timers, style refresh, and the public API (TooltipShow / TooltipHide / TooltipIsVisible).
 ;
 ; Split out of the former lib/tooltip.ahk (P5 refactor); see ui/tooltip/init.ahk
 ; for the module overview. Functions and globals are hoisted, so load order
@@ -40,6 +40,17 @@ global TOOLTIP_RENDER_DEBOUNCE_MS := 75
 ; after TooltipShow returns: the timer is not armed until _TooltipPresentStack
 ; runs, TOOLTIP_RENDER_DEBOUNCE_MS later, so such a cancel is a silent no-op.
 global _TooltipPendingArmSafety := true
+; Tick at which the render was REQUESTED, carried across the debounce so a row's
+; expiry is anchored at the request instead of at present time.
+;
+; The engine's time-activation gate is anchored on the keystroke
+; (LastSentCharacterKeyTime), while _TooltipShowNow used to anchor the row's
+; deadline on A_TickCount read AFTER both debounces AND after the GUI build and
+; the UIA position resolve — measured at up to 113 ms on their own. The fixed
+; _TOOLTIP_TIMEOUT_DECREMENT_SEC could not absorb a variable latency, so the
+; preview outlived the window it was previewing: the user saw the suggestion,
+; pressed the magic key, and nothing was emitted.
+global _TooltipPendingOriginMs := 0
 
 ; Reuse the non-caret anchor briefly for LLM refreshes and repeated preview
 ; renders in controls without a native caret. The foreground HWND fence makes
@@ -58,9 +69,19 @@ global TOOLTIP_POSITION_CACHE_MS := 600
 ; Minimum physical-input idle before the UIA position probe may run. The render
 ; debounce above is a COALESCING timer, not an idle gate: it decides when the
 ; deferred render happens, not whether the user is still mid-burst, and the work
-; it defers runs on the one thread that dispatches keystrokes. Same value and
-; same reasoning as UIA_SELECTION_IDLE_REQUIRED_MS in modules/keymap/layout.ahk.
-global TOOLTIP_UIA_IDLE_REQUIRED_MS := 250
+; it defers runs on the one thread that dispatches keystrokes. Same reasoning as
+; UIA_SELECTION_IDLE_REQUIRED_MS in modules/keymap/layout.ahk.
+;
+; MUST STAY BELOW the combined debounce that gates the preview path
+; (_PREFIX_RENDER_DEBOUNCE_MS 150 + TOOLTIP_RENDER_DEBOUNCE_MS 75 = ~225 ms).
+; The value copied from the selection poll was 250, but that poll has no debounce
+; in front of it while this probe does: a preview render cannot happen earlier
+; than 225 ms after the last character, so a 250 ms gate rejected EVERY preview.
+; Stage 2 of the position cascade — and with it the lazy timeout clamp — was
+; structurally unreachable on the only path it exists for, and every preview in a
+; caret-less app (Electron/Chromium/UWP) anchored at the bottom of the window
+; instead of under the caret. Pinned by test_tooltip_uia_gate_reachable.ahk.
+global TOOLTIP_UIA_IDLE_REQUIRED_MS := 200
 
 ; How long a process stays marked as not answering UIA usefully. Generous
 ; re-probe window, mirroring _UIA_NO_TP_TTL_MS in modules/keymap/layout.ahk:
@@ -75,6 +96,23 @@ global _TooltipUiaHostileCache := Map()
 ; is what turns an unbounded cross-process wait into a bounded one.
 global UIA_TRANSACTION_TIMEOUT_MS := 120
 global UIA_CONNECTION_TIMEOUT_MS := 120
+
+; Render accounting. HotPath only ever prints the renders that exceed its 5 ms
+; floor, which gives the log a numerator with no denominator: "342 slow
+; Tooltip.Present events over four days" cannot be read as good or catastrophic
+; without knowing whether the sessions rendered four hundred previews or forty
+; thousand. Worse, _TooltipResolvePosition has five distinct exits and the log
+; showed which one was taken exactly never — so "the position cache never hits"
+; and "UIA never answers" were indistinguishable, and both were guessed at.
+; These two counters make the slow-render RATIO and the cascade's real exit
+; distribution readable from an ordinary production log with no extra tooling.
+; They are bumped only on paths that already cost milliseconds.
+global _TooltipRenderCount := 0
+global _TooltipResolveExits := Map()
+; How many presented renders between two accounting lines. Large enough that the
+; line is rare next to the slow-segment warnings it contextualises, small enough
+; that a short session still emits one.
+global _TOOLTIP_STATS_LOG_EVERY := 100
 
 ; Dequeue state — items that have per-row expiry deadlines. Canonical algorithm:
 ; _shared/modules/tooltip/dequeue.js (SPEC.md § 7.1). When rows carry distinct non-zero
@@ -94,50 +132,52 @@ global _TooltipDequeueItems := 0
 ; TooltipHide() during an active dequeue cycle.
 global _TooltipDequeueActive := false
 
-; Last items passed to TooltipShow, kept so that after a hotstring fires the
-; timer can be re-armed for the full duration from the moment of fire rather
-; than counting down from when the preview was first shown.
-global _TooltipLastItems := 0
-
 ; Stable function references. A single named function per timer is mandatory
 ; so SetTimer can cancel it by identity — each closure literal produces a
 ; distinct object that SetTimer treats as a different timer.
 _TooltipTimerFn() {
     global _TooltipGeneration, _TooltipTimerGeneration
     ; SetTimer bypasses native Suspend, like both sibling timers in this file
-    ; already guard against. Firing while paused would call _ResetPrefixBuffer()
-    ; below and mutate hotstring-engine state behind a driver the user believes
-    ; is off — the suspend reactor has already hidden the tooltip and reset the
-    ; engine, so there is nothing left for this timer to do.
+    ; already guard against. The suspend reactor has already hidden the tooltip
+    ; and reset the engine, so a fire while paused would only tear down a
+    ; surface that is already gone.
     if A_IsSuspended
         return
     if (_TooltipTimerGeneration != _TooltipGeneration)
         return
     TooltipHide("TimerFn", true)
-    ; The timer fires when the user has not typed anything new since the
-    ; tooltip appeared — they have effectively abandoned the current word.
-    ; Reset the prefix buffer so the next keystroke starts a fresh lookup
-    ; rather than accumulating onto the stale word (which would prevent any
-    ; subsequent tooltip from showing for that trigger).
-    if IsSet(_ResetPrefixBuffer)
-        try _ResetPrefixBuffer()
+    ; The preview buffer is deliberately NOT reset here.
+    ;
+    ; This timer means "the tooltip has been on screen a while", not "the user
+    ; abandoned the word". Nothing was typed, nothing moved the caret, and the
+    ; ENGINE still holds the word — so wiping the preview made the two buffers
+    ; describe different text after any mid-word pause longer than the display
+    ; duration. The visible symptom was a suggestion that never came back for a
+    ; trigger the engine would still have expanded: the preview restarted from
+    ; empty while the engine kept accumulating, so no later keystroke could
+    ; reproduce the prefix the tooltip needed.
+    ;
+    ; The preview is reset by the events that genuinely invalidate it — a
+    ; terminator, a caret move, a fire — each of which resets the engine too.
 }
 
 _TooltipDeferredShowFn() {
     global _TooltipPendingActive, _TooltipPendingItems, _TooltipPendingDurationSec
-    global _TooltipPendingArmSafety
+    global _TooltipPendingArmSafety, _TooltipPendingOriginMs
     if !_TooltipPendingActive
         return
     Items := _TooltipPendingItems
     DurationSec := _TooltipPendingDurationSec
     ArmSafety := _TooltipPendingArmSafety
+    OriginMs := _TooltipPendingOriginMs
     _TooltipPendingActive := false
     _TooltipPendingItems := 0
     _TooltipPendingDurationSec := 0
     _TooltipPendingArmSafety := true
+    _TooltipPendingOriginMs := 0
     if A_IsSuspended
         return
-    _TooltipShowNow(Items, DurationSec, ArmSafety)
+    _TooltipShowNow(Items, DurationSec, ArmSafety, OriginMs)
 }
 
 ; Dequeue poll timer — runs every 100 ms while a dequeue cycle is active.
@@ -182,8 +222,17 @@ _TooltipDequeuePollFn() {
     }
     if (Remaining.Length == 0) {
         TooltipHide("PollEmpty", true)
-        if IsSet(_ResetPrefixBuffer)
-            try _ResetPrefixBuffer()
+        ; The preview buffer is deliberately NOT reset here — identical reasoning
+        ; to _TooltipTimerFn above, of which this is the per-row sibling.
+        ;
+        ; A row expiring means "this has been on screen long enough", not "the
+        ; user abandoned the word". Nothing was typed, nothing moved the caret,
+        ; and the ENGINE still holds the word — so wiping the preview alone left
+        ; the two buffers describing different text, and no later keystroke in
+        ; that word could reproduce the prefix the tooltip needed.
+        ;
+        ; The preview is reset by the events that genuinely invalidate it — a
+        ; terminator, a caret move, a fire — each of which resets the engine too.
         return
     }
     ; Rebuild without the expired rows. Preserve ExpireMs so the poll
@@ -344,6 +393,7 @@ global _TOOLTIP_SAFETY_SEC := 3.0
 TooltipShow(Items, DurationSec := 0, ArmSafety := true) {
     global _TooltipPendingActive, _TooltipPendingItems, _TooltipPendingDurationSec
     global TOOLTIP_RENDER_DEBOUNCE_MS, _TooltipPendingArmSafety
+    global _TooltipPendingOriginMs
 
     if A_IsSuspended {
         TooltipHide("Suspend", true)
@@ -355,6 +405,10 @@ TooltipShow(Items, DurationSec := 0, ArmSafety := true) {
     _TooltipPendingItems := Items
     _TooltipPendingDurationSec := DurationSec
     _TooltipPendingArmSafety := ArmSafety
+    ; Stamp the request, not the render: everything after this line (the debounce,
+    ; the Gui build, the UIA resolve) is latency the row's deadline must NOT be
+    ; pushed back by, because the engine's own window keeps running meanwhile.
+    _TooltipPendingOriginMs := A_TickCount
     _TooltipPendingActive := true
     SetTimer(_TooltipDeferredShowFn, -TOOLTIP_RENDER_DEBOUNCE_MS)
 }
@@ -362,7 +416,12 @@ TooltipShow(Items, DurationSec := 0, ArmSafety := true) {
 ; Runs from the debounced timer, never directly from the prefix watcher.
 ; ArmSafety is threaded from TooltipShow so a caller can opt out of the
 ; _TOOLTIP_SAFETY_SEC auto-hide deadline across the debounce boundary.
-_TooltipShowNow(Items, DurationSec := 0, ArmSafety := true) {
+; OriginMs is the tick at which the render was REQUESTED. Row deadlines are
+; measured from it, never from present time: the engine's time-activation gate
+; runs from the keystroke, so anchoring the preview on the render would let it
+; promise an expansion the engine has already refused. 0 means "no origin
+; supplied" and falls back to present time.
+_TooltipShowNow(Items, DurationSec := 0, ArmSafety := true, OriginMs := 0) {
 
     ; While the script is suspended nothing may paint — « pause = AHK éteint ».
     ; The per-callback input guards normally prevent reaching here, but the
@@ -403,7 +462,7 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true) {
     global _TooltipGeneration, _TooltipTimerGeneration
     global _TooltipShownHwnds, _TOOLTIP_HWND_TRACK_CAP
     global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC, _TOOLTIP_SAFETY_SEC
-    global _TooltipDequeueItems, _TooltipDequeueActive, _TooltipLastItems
+    global _TooltipDequeueItems, _TooltipDequeueActive
     _TooltipGeneration += 1
     ; A rendering pass owns only the generation it created.  `_TooltipBuildGui`
     ; and `_TooltipResolvePosition` can pump/re-enter through GUI/COM, so a newer
@@ -411,7 +470,6 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true) {
     ; Never let the older invocation arm a timer, present, or clean up the newer
     ; surface after that point.
     RenderGeneration := _TooltipGeneration
-    _TooltipLastItems := Items
 
     ; Timer already cancelled by TooltipHide("NewShow") above — this is a
     ; belt-and-suspenders guard in case TooltipHide returned early for any reason.
@@ -458,7 +516,13 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true) {
             TooltipHide("ShowFail", true)
         return
     }
-    HotPath_LogIfSlow("Tooltip.Present", _hpPresent, "")
+    ; Detail carries the per-sub-step attribution _TooltipPresentStack accumulated.
+    ; Draining it here (rather than logging each step) is what makes the breakdown
+    ; visible at all: every sub-step is below the profiler's 5 ms floor.
+    HotPath_LogIfSlow("Tooltip.Present", _hpPresent, HotPath_BreakdownDetail())
+    ; Counted here and nowhere else: this is the exact point at which pixels are
+    ; on screen, so it is the denominator every "Slow Tooltip.*" line needs.
+    _TooltipNoteRenderPresented()
     if (RenderGeneration != _TooltipGeneration)
         return
 
@@ -491,6 +555,13 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true) {
         }
     }
 
+    ; Anchor every deadline computed below on the moment the render was ASKED
+    ; for. Present time is that moment plus TOOLTIP_RENDER_DEBOUNCE_MS plus the
+    ; Gui build and the position resolve, and the engine's window has been
+    ; running throughout — so measuring from here is what let the preview
+    ; outlive the expansion it was advertising.
+    OriginMs := (OriginMs > 0) ? OriginMs : A_TickCount
+
     if (IsDequeueRebuild or (HasAnyDur and HasMixedDur)) {
         ; Dequeue path — each item tracks its own absolute expiry.
         ; The poll timer (_TooltipDequeuePollFn, 100 ms) checks these
@@ -504,7 +575,7 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true) {
                 ExpMs := Item.ExpireMs
             } else if (D > 0) {
                 Eff := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC, D - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
-                ExpMs := Now + Round(Eff * 1000)
+                ExpMs := OriginMs + Round(Eff * 1000)
             } else {
                 ExpMs := 0   ; no expiry for this row
             }
@@ -537,7 +608,13 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true) {
         if (EffectiveDur > 0) {
             Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
                 EffectiveDur - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
-            SetTimer(_TooltipTimerFn, -Round(Effective * 1000))
+            ; Same anchor as the dequeue path: the deadline is absolute, so the
+            ; timer period is what is LEFT of it, not the full duration again.
+            ; The 50 ms floor mirrors the dequeue path and is mandatory — a
+            ; non-positive period would be read by SetTimer as "disable", leaving
+            ; the surface with no auto-hide at all.
+            ExpMs := OriginMs + Round(Effective * 1000)
+            SetTimer(_TooltipTimerFn, -Max(50, ExpMs - A_TickCount))
             ; Guard the tooltip for its declared duration — same protection as
             ; the dequeue path. Without this, LookupNoMatch / ResetBuf events
             ; arriving before the timer fires would kill the tooltip instantly.
@@ -580,6 +657,7 @@ TooltipHide(DbgTag := "?", Force := false) {
     global _TooltipDequeueItems, _TooltipDequeueActive
     global _TooltipGeneration, _TooltipTimerGeneration
     global _TooltipPendingActive, _TooltipPendingItems, _TooltipPendingDurationSec
+    global _TooltipPendingOriginMs
     ; Diagnostic (debug-only): whenever an LLM loading/prediction tooltip is on
     ; screen, record WHO hid it. ``DbgTag`` names the caller — TimerFn (auto-hide),
     ; NewShow (a fresh TooltipShow superseded it), PollEmpty (dequeue), LLM
@@ -632,6 +710,7 @@ TooltipHide(DbgTag := "?", Force := false) {
     _TooltipPendingActive := false
     _TooltipPendingItems := 0
     _TooltipPendingDurationSec := 0
+    _TooltipPendingOriginMs := 0
     SetTimer(_TooltipDeferredShowFn, 0)
     ; Hiding is a render transition too. Invalidate any renderer currently
     ; waiting in UIA/GUI work before it can resume and resurrect this surface.
@@ -713,39 +792,4 @@ TooltipIsVisible() {
     return IsSet(_TooltipGui) and _TooltipGui != 0
 }
 
-; Re-arm the auto-hide timer from zero using the durations stored in
-; _TooltipLastItems. Called after a hotstring fires so the timer counts
-; from the moment of fire, not from when the preview was first shown
-; (which may have been seconds earlier when the user was still typing).
-; Only applies to the simple single-timer path — the dequeue path manages
-; its own deadlines and is not affected by this call.
-TooltipRearmTimer() {
-    global _TooltipLastItems
-    global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC
-    global _TooltipGeneration, _TooltipTimerGeneration
-
-    if (!IsObject(_TooltipLastItems) or _TooltipLastItems.Length == 0)
-        return
-
-    ; Find the shortest non-zero duration among the displayed items.
-    ; Rows with DurationSec = 0 are "infinite" — if ALL rows are infinite,
-    ; no timer is needed and we leave the safety timer in place.
-    EffectiveDur := 0
-    for , Item in _TooltipLastItems {
-        D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
-        if (D > 0 and (EffectiveDur == 0 or D < EffectiveDur))
-            EffectiveDur := D
-    }
-    if (EffectiveDur == 0)
-        return
-
-    Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
-        EffectiveDur - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
-    ; Cancel any stale timer and arm a fresh one from now.
-    SetTimer(_TooltipTimerFn, 0)
-    _TooltipTimerGeneration := _TooltipGeneration
-    SetTimer(_TooltipTimerFn, -Round(Effective * 1000))
-    if IsSet(LLM_Bridge_ScheduleAfterHotstring)
-        try LLM_Bridge_ScheduleAfterHotstring(_TooltipLastItems)
-}
 

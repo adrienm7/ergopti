@@ -110,6 +110,25 @@ M._active_tasks = {}
 --- @param module_sections table Extra module sections definitions.
 --- @return table|nil myMenu The created menubar object.
 --- @return table|nil configWatcher The file watcher object.
+--- Stops the watchers this module owns.
+---
+--- The shutdown callback stops everything pinned in _G.script_watchers, but the
+--- menubar's config pathwatcher and theme watcher are held here instead — so
+--- they could still fire during the Lua-state teardown window, which is exactly
+--- the hazard that loop's own comment cites. This module holds the handles, so
+--- it is the only place that can stop them.
+function M.stop_watchers()
+	if M._watcher then
+		pcall(function() M._watcher:stop() end)
+		M._watcher = nil
+	end
+	if M._theme_watcher then
+		pcall(function() M._theme_watcher:stop() end)
+		M._theme_watcher = nil
+	end
+	Logger.debug(LOG, "Menubar watchers stopped.")
+end
+
 function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections, karabiner, hotfile_paths)
 	base_dir = type(base_dir) == "string" and base_dir or (hs.configdir .. "/")
 	-- MenuPaths was already initialized by init.lua before menu.start() is called;
@@ -169,12 +188,30 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return text:gsub("★", text_utils.escape_gsub_replacement(state.trigger_char))
 	end
 
+	-- Inputs the menubar icon was last rendered for. Declared above update_icon:
+	-- a local below the closure would bind the nil global instead.
+	local _last_icon_key = nil
+
+
 	local function update_icon(custom_text)
 		local shortcuts = core_mods.shortcuts_mod
 		local paused    = shortcuts and type(shortcuts.is_paused) == "function" and shortcuts.is_paused() or false
 
 		-- Logo variant is persisted via hs.settings; default is "simple"
 		local variant = hs.settings.get("ergopti_menubar_logo_variant") or "simple"
+
+		-- Skip the whole rebuild when nothing that determines the icon changed.
+		--
+		-- This function reads a PNG off disk, decodes it, and re-renders it
+		-- through an off-screen hs.canvas — and the pause listener runs it
+		-- SYNCHRONOUSLY inside the script-control eventtap callback, the same tap
+		-- that carries the key needed to un-pause. It also ran twice per toggle,
+		-- once from the listener and once from the menu refresh that follows.
+		-- The icon depends on exactly two inputs; when neither moved there is
+		-- nothing to redraw.
+		local icon_key = tostring(variant) .. "|" .. tostring(paused)
+		if custom_text == nil and icon_key == _last_icon_key then return end
+		_last_icon_key = (custom_text == nil) and icon_key or nil
 
 		-- The shared logo directory lives at static/img/logo (two levels up from
 		-- static/ergopti_plus/macos, where base_dir points)
@@ -521,7 +558,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		clear_persisted_binding_overrides()
 		pcall(os.remove, MenuPaths.get("ConfigTomlPath"))
 		pcall(os.remove, MenuPaths.get("KarabinerConfigPath"))
-		save_prefs()
+		-- NO save_prefs() here. It rewrote config.toml from the still-current
+		-- in-memory `state`, which restore_factory_bindings does not touch: it
+		-- resets bindings only, never the feature toggles. The reload that
+		-- follows then found a NON-empty config, so config_absent was false, the
+		-- factory-seed branch was skipped, and merge_saved_data re-hydrated every
+		-- toggle the user had just asked to reset. Deleting the files and letting
+		-- the reload take the config_absent path is what actually seeds defaults;
+		-- the two calls above already clear the bindings through their own stores,
+		-- which is the job this save_prefs() was added for.
 		pcall(notifications.notify, i18n.get("notify.defaults_reset"), nil, "info")
 		hs.timer.doAfter(0.25, function() pcall(hs.reload) end)
 	end
@@ -538,8 +583,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- toggling persisted preferences (e.g. logo variant)
 	M.refresh_icon = function() pcall(update_icon) end
 
-	local saved = Preferences.load(MenuPaths.get("ConfigTomlPath"))
-	local config_absent = (next(saved) == nil)
+	local saved, load_status = Preferences.load(MenuPaths.get("ConfigTomlPath"))
+	-- A CORRUPT file must never be treated as absent. Both yield an empty table,
+	-- but only "absent" means the user has no settings to lose: it seeds factory
+	-- defaults and then saves them, which on a corrupt file overwrites settings
+	-- that were still recoverable. Anything that is not positively absent is
+	-- therefore treated as present-but-unusable - defaults in memory for this
+	-- session, and nothing written back.
+	local config_absent = (load_status == "absent") and (next(saved) == nil)
 
 	if config_absent then
 		for _, f in ipairs(type(hotfiles) == "table" and hotfiles or {}) do
@@ -643,11 +694,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			pcall(core_mods.shortcuts_mod.set_shortcut_action, "escape",     "none")
 		end
 		pcall(core_mods.shortcuts_mod.set_extras, {
-			open_init = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open \"" .. base_dir .. "init.lua\"") end) end,
+			open_init = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "init.lua")) end) end,
 			open_personal_toml = function()
 				hs.timer.doAfter(0, function()
 					local personal_path = MenuPaths.get("PersonalTomlPath")
-					pcall(hs.execute, "open \"" .. personal_path .. "\"")
+					pcall(hs.execute, "open " .. text_utils.shell_quote(personal_path))
 				end)
 			end,
 			trigger_prediction = function() if keymap and type(keymap.trigger_prediction) == "function" then pcall(keymap.trigger_prediction) end end,
@@ -677,8 +728,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end
 				local ok_at, at = pcall(require, "ui.metrics_apps"); if ok_at and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
 			end,
-			open_config = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open \"" .. MenuPaths.get("ConfigTomlPath") .. "\"") end) end,
-			open_logs = function() hs.timer.doAfter(0, function() pcall(hs.execute, "open \"" .. base_dir .. "logs\"") end) end,
+			open_config = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open " .. text_utils.shell_quote(MenuPaths.get("ConfigTomlPath"))) end) end,
+			open_logs = function() hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "logs")) end) end,
 		})
 
 		-- Wire the active-wrap-pairs getter eagerly at startup so the wrap-selection
@@ -788,7 +839,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			local ok, m = pcall(require, "ui.metrics_apps")
 			if ok and type(m.show) == "function" then pcall(m.show) end
 		end,
-		open_script_source        = function() pcall(hs.execute, string.format("open \"%sinit.lua\"", base_dir)) end,
+		open_script_source        = function() pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "init.lua")) end,
 		open_personal_shortcuts   = function()
 			local ok, ps = pcall(require, "lib.personal_shortcuts")
 			if ok and type(ps.open) == "function" then pcall(ps.open) end
@@ -826,6 +877,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			L.set_level(level)
 			pcall(function() hs.settings.set("ergopti.log_level", level) end)
 			L.info("menu", "Log level set to %s.", level)
+			-- The menubar tree is cached and only rebuilt when _menu_dirty is set.
+			-- Without this the Debug submenu kept showing the previous level and
+			-- its checkmark indefinitely — the menu asserting a setting the engine
+			-- no longer has.
+			_menu_dirty = true
+			if type(schedule_menu_refresh) == "function" then schedule_menu_refresh() end
 		end,
 	}
 

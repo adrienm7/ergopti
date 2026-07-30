@@ -72,15 +72,27 @@ DisableCapsWord() {
 	UpdateCapsLockLED()
 }
 
+; The user's genuine CapsLock intent, flipped only by ToggleCapsLock.
+;
+; This MUST NOT be re-derived from GetKeyState("CapsLock", "T"): that bit is the
+; one SetCapsLockState below writes, so reading it back made the function's own
+; output an input. Once CapsWord (or the nav layer) lit the LED, the next
+; evaluation saw the toggle it had just set, concluded the user wanted CapsLock,
+; and re-asserted it — so CapsLock survived CapsWord and everything kept typing
+; in uppercase until the user toggled it by hand. Seeded from the real toggle
+; once, at load, so a CapsLock already on when the driver starts is respected.
+global _HardwareCapsLockOn := GetKeyState("CapsLock", "T") ? true : false
+
 ; UpdateCapsLockLED is the SINGLE owner of the physical CapsLock LED. Three
 ; logical states can independently want the LED lit: CapsWord, the nav layer,
 ; and a real hardware CapsLock toggle (AltGr+CapsLock). Computing the LED from
 ; the OR of all three — instead of letting each state drive SetCapsLockState
 ; on its own — keeps the LED a reliable indicator no matter how the three are
-; interleaved. ToggleCapsLock flips the hardware toggle then routes through
+; interleaved. ToggleCapsLock flips the hardware intent then routes through
 ; here so the LED can never disagree with the union of the logical states.
 UpdateCapsLockLED() {
-	if CapsWordEnabled or LayerEnabled or GetKeyState("CapsLock", "T") {
+	global _HardwareCapsLockOn
+	if CapsWordEnabled or LayerEnabled or _HardwareCapsLockOn {
 		SetCapsLockState("On")
 	} else {
 		SetCapsLockState("Off")

@@ -1,4 +1,4 @@
-﻿﻿{
+{
 	"_meta.flag": "🇨🇳",
 	"_meta.locale": "zh",
 	"_meta.name": "中文",
@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "%s 的新分类名称:",
 	"metrics_apps.new_category_title": "新建分类",
 	"metrics_apps.no_app_detected": "未能检测到任何应用程序。",
+	"metrics_apps.pick_app_placeholder": "选择要分类的应用程序…",
 	"metrics_apps.rename_chooser_placeholder": "要重命名的类别",
 	"metrics_apps.rename_item": "✎ 重命名现有分类…",
 	"metrics_apps.rename_prompt": "分类「%s」的新名称:",
@@ -1415,7 +1416,7 @@
 	"sfbsreduction.comma": "逗号减少同指二合字母",
 	"sfbsreduction.ecirc": "Ê 减少同指二合字母",
 	"sfbsreduction.egrave": "È 减少同指二合字母",
-	"sfbsreduction.ié": "IE 减少 IE/EI 二合字母",
+	"sfbsreduction.ieacute": "IE 减少 IE/EI 二合字母",
 	"sg_actions.activity_simulation": "🖱 模拟活动（防休眠）",
 	"sg_actions.alt_tab_monitor": "Alt-Tab（显示器）",
 	"sg_actions.app_expose": "◱ App Exposé",
@@ -1652,6 +1653,7 @@
 	"shortcuts.opendownloads": "Win + D（下载）= 打开下载文件夹",
 	"shortcuts.pixel_read_error": "无法读取像素颜色",
 	"shortcuts.saved": "已保存：%s",
+	"shortcuts.screenshot_failed": "截图失败",
 	"shortcuts.screen": "Win + H（截屏）= 屏幕截图（触发 Win + Shift + S）",
 	"shortcuts.screeninstant": "1 键左侧的键 = 即时截图当前窗口，带时间戳保存至图片文件夹",
 	"shortcuts.screenocr": "Win + C (OCR) = 带文字提取的截图 (Win + Shift + T)",

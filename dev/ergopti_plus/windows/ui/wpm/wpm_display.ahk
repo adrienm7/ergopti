@@ -360,20 +360,51 @@ _WPMWidget_NormaliseHex(AccentHex, FallbackHex) {
         Max(0, Min(255, Round((Nb + M) * 255))))
 }
 
-; Read the [_meta] color for a hotstring category directly from the TOML file,
-; bypassing HotstringGroupConfig cache to avoid stale empty entries from early
-; init calls before _SharedDir was fully resolved.
-; Returns "" when the file is absent or has no color key.
-; Results are memoized in a static Map keyed by CategoryName; call
-; WPMWidget_InvalidateColorCache() to flush the cache after a TOML save.
-_WPMWidget_ReadTomlColor(CategoryName, InvalidateCache := false) {
+; Resolve the color for a hotstring category.
+;
+; The USER OVERRIDE comes first. Reading the TOML file directly — which is all
+; this used to do — sees only what is on disk, so a color changed in the config
+; window sat in _HotstringsOverrides and never reached the widget until the next
+; reload: the tooltip repainted immediately and the widget did not, from the same
+; edit. HotstringsResolve owns the full cascade (user section > user category >
+; TOML section > TOML category > default) and is the single place that knows
+; about overrides at all.
+;
+; The direct TOML read remains as the FALLBACK, which is the case the bypass was
+; written for: during early init _SharedDir may not be resolved yet and the
+; resolver would hand back a stale empty entry.
+; Returns "" when neither source has a color.
+; Only the FALLBACK file read is memoized, in a static Map keyed by
+; CategoryName. The resolver is asked on every call and is never memoized here.
+_WPMWidget_ReadTomlColor(CategoryName) {
     static _color_cache := Map()
-    if (InvalidateCache) {
-        _color_cache.Clear()
-        return ""
+
+    ; Ask the override-aware resolver FIRST, before any cache lookup. The
+    ; cache-hit early return used to sit above this block, so the first call
+    ; that fell through to the fallback (resolver not yet available during early
+    ; init — the exact window the fallback exists for) cached its answer, often
+    ; the empty string, and every later call short-circuited on it. The resolver
+    ; was then skipped permanently for that category: a colour changed in the
+    ; config window repainted the tooltip and left the widget on the manual blue
+    ; until restart, which is the very staleness the resolver was added to fix.
+    ; Its result is deliberately NOT memoized — HotstringsResolve owns a
+    ; generation-invalidated cache of its own (_HSResolveCache /
+    ; HotstringsResolveBumpGen), and a second copy here could only desynchronise
+    ; from it.
+    if (CategoryName != "" and IsSet(HotstringsResolve)) {
+        try {
+            Resolved := HotstringsResolve(CategoryName, "")
+            if (IsObject(Resolved) and Resolved.HasOwnProp("Color") and Resolved.Color != "")
+                return Resolved.Color
+        }
     }
+
+    ; Resolver unavailable or empty — serve the memoized file read. The WPM tick
+    ; fires every ~100 ms and would otherwise re-read the category TOML dozens of
+    ; times per second.
     if _color_cache.Has(CategoryName)
         return _color_cache[CategoryName]
+
     global _SharedDir, GLOBAL_DEFAULT_COLOR
     FilePath := _SharedDir . "\modules\hotstrings\" . StrLower(CategoryName) . ".toml"
     if !FileExist(FilePath) {
@@ -409,12 +440,6 @@ _WPMWidget_ReadTomlColor(CategoryName, InvalidateCache := false) {
     LoggerDebug("WPMWidget", "ReadTomlColor: no color key found for '{1}'", CategoryName)
     _color_cache[CategoryName] := ""
     return ""
-}
-
-; Invalidate the per-category color cache — call when a hotstring TOML file
-; is written (e.g. from the config window) so the next tick re-reads the file.
-WPMWidget_InvalidateColorCache() {
-    _WPMWidget_ReadTomlColor("", true)
 }
 
 ; Returns the raw compact-mode background hex for a hotstring category
@@ -568,6 +593,30 @@ WPMWidget_ShowPos(&out_x, &out_y) {
 ; ==============================
 ; ============================================
 
+; Applies the widget's geometry to a surface Gui: seeds the saved anchor on first
+; use, derives the current mode's top-left from it and sizes + positions the
+; window WHILE HIDDEN (the tick is the only thing allowed to reveal it).
+;
+; THE single owner of that Show call. A Gui that was constructed but never Shown
+; has a 0x0 client rect, and GR_DrawBitmap early-returns on `W <= 0 or H <= 0` —
+; so a rebuilt-but-unsized graph surface never receives another
+; UpdateLayeredWindow and the widget silently paints nothing for the rest of the
+; session. The builders construct; this positions; every path that produces a
+; usable surface must go through both.
+_WPMWidget_ApplySurfaceGeometry(gui_ref) {
+    if !gui_ref
+        return
+    if (WPMWidget.pos_x = -1 || WPMWidget.pos_y = -1) {
+        WPMWidget_DefaultPos(&def_x, &def_y)
+        WPMWidget.pos_x := def_x
+        WPMWidget.pos_y := def_y
+    }
+    w := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_W : WPMWidgetConst.W
+    h := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_H : WPMWidgetConst.H
+    WPMWidget_ShowPos(&show_x, &show_y)
+    gui_ref.Show("Hide NoActivate x" . show_x . " y" . show_y . " w" . w . " h" . h)
+}
+
 ; No-op draw callback for GR_DrawBitmap: leaves the freshly created DIB untouched.
 ; CreateDIBSection zero-fills its pixels, so the uploaded layered surface is FULLY
 ; TRANSPARENT (every ARGB = 0). This is the key to warming the graph window without
@@ -600,19 +649,12 @@ WPMWidget_PrewarmGraph() {
     g := WPMWidget._graph_gui
     if !g
         return
-    if (WPMWidget.pos_x = -1 || WPMWidget.pos_y = -1) {
-        WPMWidget_DefaultPos(&def_x, &def_y)
-        WPMWidget.pos_x := def_x
-        WPMWidget.pos_y := def_y
-    }
-    WPMWidget_ShowPos(&show_x, &show_y)
     try {
         ; Size the layered window, start GDI+, then upload one TRANSPARENT frame to
         ; warm the CreateDIBSection -> UpdateLayeredWindow -> DWM path. Nothing is ever
         ; visible (transparent surface), so the WS_VISIBLE that Show("Hide") sets is
         ; harmless. GR_Hide leaves it in the clean SW_HIDE resting state.
-        g.Show("Hide NoActivate x" . show_x . " y" . show_y
-            . " w" . WPMWidgetConst.GRAPH_W . " h" . WPMWidgetConst.GRAPH_H)
+        _WPMWidget_ApplySurfaceGeometry(g)
         WPMWidget_EnsureGdip()
         GR_DrawBitmap(g.Hwnd, _WPMWidget_WarmDrawTransparent)
         GR_Hide(g.Hwnd)
@@ -661,25 +703,14 @@ WPMWidget_Show() {
     ; reload so the surface stays hidden until the user types AFTER it is shown.
     _WPMWidget_ResetRolling()
 
-    if (WPMWidget.pos_x = -1 || WPMWidget.pos_y = -1) {
-        WPMWidget_DefaultPos(&def_x, &def_y)
-        WPMWidget.pos_x := def_x
-        WPMWidget.pos_y := def_y
-    }
-
-    w      := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_W : WPMWidgetConst.W
-    h      := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_H : WPMWidgetConst.H
     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
-
-    ; Derive the top-left for the current mode from the compact anchor (pos_x/pos_y).
-    WPMWidget_ShowPos(&show_x, &show_y)
 
     ; Both modes start invisible; the tick reveals the surface once the user types.
     ; Graph mode is a layered GDI+ window: position + size it WHILE HIDDEN, then the
     ; tick paints it via UpdateLayeredWindow and reveals it (per-pixel alpha rules
     ; out WinSetTransparent here — the two layering modes are mutually exclusive).
     ; Compact mode uses the same "Hide" approach — no flash on startup.
-    gui_ref.Show("Hide NoActivate x" . show_x . " y" . show_y . " w" . w . " h" . h)
+    _WPMWidget_ApplySurfaceGeometry(gui_ref)
 
     SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
 
@@ -783,8 +814,20 @@ WPMWidget_Tick() {
             label  := wpm_str . " " . t("menu.metrics.wpm_unit")
             WPMWidget_RenderGraph(label, accent)
             GR_Show(WPMWidget._graph_gui.Hwnd)
-        } catch {
+        } catch as _e {
+            ; Mirrors the compact-mode sibling below: LOG the failure and rebuild.
+            ; A bare catch that only dropped the handle left the widget dead until
+            ; the user happened to toggle the mode by hand, with nothing anywhere
+            ; to say a render had thrown — the two branches of the same tick
+            ; behaved differently for no reason anyone chose.
+            try LoggerError("WPMWidget", "Graph mode tick threw — rebuilding widget: {1}.", _e.Message)
             WPMWidget._graph_gui := false
+            try WPMWidget_BuildGraph()
+            ; The builder only constructs. Without the geometry the rebuilt Gui
+            ; keeps a 0x0 client rect, GR_DrawBitmap early-returns on every later
+            ; tick and the "recovery" leaves the widget exactly as dead as the bare
+            ; catch it replaced — just with one ERROR line to show for it.
+            try _WPMWidget_ApplySurfaceGeometry(WPMWidget._graph_gui)
         }
     } else {
         bg_color := WPMWidget_ResolveBgColor(is_idle, has_hs, has_ai, has_ac, WPMWidget.use_colors)
@@ -810,6 +853,10 @@ WPMWidget_Tick() {
             WPMWidget._lbl_unit  := false
             WPMWidget._lbl_strip := false
             try WPMWidget_BuildCompact()
+            ; Same reason as the graph sibling above: the next tick reveals this
+            ; window with a bare Show("NoActivate"), which would put the rebuilt
+            ; widget at the OS default position instead of the user's corner.
+            try _WPMWidget_ApplySurfaceGeometry(WPMWidget._gui)
         }
     }
     WPMWidget._last_wpm := wpm

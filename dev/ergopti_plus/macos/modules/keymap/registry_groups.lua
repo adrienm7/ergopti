@@ -44,9 +44,35 @@ end
 --- Must be called exactly once, from within registry.lua'·s M.init().
 --- @param state table The shared CoreState.
 --- @param callbacks table {add, sort_mappings, is_section_enabled, resolve_priority, rebuild_lookup, rebuild_tail_indexes}.
+--- Required callback names. Validated once at init rather than checked at each
+--- call site: every caller of disable_group wraps it in pcall, so a missing
+--- callback would throw AFTER the group was marked disabled and its mappings
+--- purged, leaving exactly the half-disabled state this module's guards exist to
+--- forbid — and the pcall would swallow the reason. A guard per call site would
+--- also be the silent fallback convention 5.3/5.4 forbids.
+local REQUIRED_CALLBACKS = {
+	"add", "sort_mappings", "is_section_enabled", "resolve_priority",
+	"rebuild_lookup", "rebuild_tail_indexes", "drop_classify_cache",
+}
+
+--- Injects the shared state and the registry's callback table.
+--- @param state table The shared CoreState.
+--- @param callbacks table Must provide every name in REQUIRED_CALLBACKS.
 function M.init(state, callbacks)
 	_state     = state
 	_callbacks = callbacks
+
+	local missing = {}
+	for _, name in ipairs(REQUIRED_CALLBACKS) do
+		if type(callbacks) ~= "table" or type(callbacks[name]) ~= "function" then
+			table.insert(missing, name)
+		end
+	end
+	if #missing > 0 then
+		Logger.error(LOG, "M.init(): missing callback(s) %s — group operations will be "
+			.. "incomplete and their callers pcall the throw away.",
+			table.concat(missing, ", "))
+	end
 end
 
 
@@ -67,10 +93,6 @@ end
 --- @param path string|nil File path (nil for programmatic groups).
 --- @param kind string "lua" or "toml".
 local function record_group(name, path, kind)
-	local seqs = {}
-	for _, m in ipairs(_state.mappings) do
-		if m.group == name then table.insert(seqs, m.seq) end
-	end
 	local existing = _state.groups[name]
 	local group_order = (existing and existing.group_order)
 		or (_state.group_order_counter or 0) + 1
@@ -79,7 +101,6 @@ local function record_group(name, path, kind)
 	end
 	_state.groups[name] = {
 		path        = path,
-		seqs        = seqs,
 		enabled     = true,
 		kind        = kind or "lua",
 		group_order = group_order,
@@ -103,7 +124,6 @@ local function ensure_group_order(name)
 	else
 		_state.groups[name] = {
 			path        = nil,
-			seqs        = {},
 			enabled     = true,
 			kind        = "pending",
 			group_order = _state.group_order_counter,
@@ -165,6 +185,9 @@ function M.load_toml(name, path)
 	end
 
 	ensure_group_order(name)
+	-- Snapshot before registering so the success line can report what THIS file
+	-- contributed rather than the size of the whole corpus.
+	local mappings_before = #_state.mappings
 	_state.current_group = name
 	local sections_info  = {}
 
@@ -295,16 +318,11 @@ function M.load_toml(name, path)
 		end
 	end
 
-	local seqs = {}
-	for _, m in ipairs(_state.mappings) do
-		if m.group == name then table.insert(seqs, m.seq) end
-	end
 	-- Preserve group_order across reloads: ensure_group_order() stamped it earlier,
 	-- but overwriting the table would silently drop the value and break sort stability
 	local existing_order = _state.groups[name] and _state.groups[name].group_order or nil
 	_state.groups[name] = {
 		path             = path,
-		seqs             = seqs,
 		enabled          = true,
 		kind             = "toml",
 		meta_description = data.meta and data.meta.description or nil,
@@ -312,7 +330,19 @@ function M.load_toml(name, path)
 		group_order      = existing_order,
 	}
 
-	Logger.success(LOG, "TOML mapping file '%s' loaded (%d total mapping(s)).", name, #_state.mappings)
+	-- Report THIS group's contribution, not the global corpus size. The shared
+	-- reader never raises and returns an empty table for a missing or unreadable
+	-- file, so a group that registered nothing still reached this line and paired
+	-- its Logger.start with a success whose count came from every OTHER group —
+	-- the one number guaranteed to look healthy. A group that loads zero entries
+	-- is almost always a path or permission problem, and it now says so.
+	local added = #_state.mappings - mappings_before
+	if added == 0 then
+		Logger.warn(LOG, "TOML mapping file '%s' registered ZERO mappings — check the path and its contents.", name)
+	else
+		Logger.success(LOG, "TOML mapping file '%s' loaded (%d mapping(s); %d total).",
+			name, added, #_state.mappings)
+	end
 end
 
 
@@ -373,6 +403,11 @@ function M.disable_group(name)
 	_state.mappings = kept
 	_callbacks.rebuild_lookup()
 	_callbacks.rebuild_tail_indexes()
+	-- The third structure this purge invalidates. The classify_trigger memo is a
+	-- pure function of (string, corpus), and the corpus just shrank; sort_mappings
+	-- is the only other place it is dropped and this path deliberately does not
+	-- sort. Without this the disabled group's triggers keep classifying as present.
+	_callbacks.drop_classify_cache()
 
 	Logger.debug(LOG, "Group '%s' disabled (%d mapping(s) remaining).", name, #_state.mappings)
 end
@@ -405,7 +440,6 @@ function M.register_lua_group(name, meta_description, sections)
 	end
 	_state.groups[name] = {
 		path             = nil,
-		seqs             = {},
 		enabled          = true,
 		kind             = "lua",
 		meta_description = meta_description,

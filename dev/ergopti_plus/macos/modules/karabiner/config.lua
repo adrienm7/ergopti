@@ -18,6 +18,10 @@
 ---    (bare string, {tap,hold} without combo slot) to the current format, and
 ---    seeds any newly added combos from defaults so the saved file stays valid
 ---    across updates.
+--- 4. Corruption Safety: an unparseable config_karabiner.toml is never silently
+---    replaced. The read path falls back to defaults without touching the file
+---    and the write path refuses to publish over it, so the user keeps a file
+---    they can still repair by hand. Only an explicit reset overrides that.
 --- ==============================================================================
 
 local M = {}
@@ -86,10 +90,19 @@ end
 --- Appends the full shared modifier × key matrix used by gesture and tap-hold
 --- action pickers. The labels come verbatim from the catalogue, so "Ctrl + A"
 --- never depends on the active UI language.
+-- Decoded once. The shared modifier-chord catalogue is a file on disk that does
+-- not change while the driver runs, and this whole function re-ran on EVERY
+-- layout change — re-reading and re-decoding the JSON to rebuild the same 673
+-- action tables. Declared above the function that reads it.
+local _chord_catalogue = nil
+
 local function append_shared_modifier_chords(actions)
 	local catalogue_path = Paths.shared("modules/gestures/modifier_chords.json")
 	if not catalogue_path then return end
-	local catalogue = load_json_file(catalogue_path)
+	if _chord_catalogue == nil then
+		_chord_catalogue = load_json_file(catalogue_path) or false
+	end
+	local catalogue = _chord_catalogue or nil
 	local platform = catalogue and catalogue.platforms and catalogue.platforms.macos
 	local modifiers = platform and platform.modifiers
 	local keys = catalogue and catalogue.keys
@@ -144,6 +157,7 @@ function M.load_available_actions(actions_file)
 	append_shared_modifier_chords(list)
 
 	-- Resolve layout-dependent actions: logical_char → physical key_code
+	local resolved = 0
 	for _, action in ipairs(list) do
 		if action.logical_char then
 			local key_code = Layout.key_code_for_char(action.logical_char)
@@ -153,11 +167,14 @@ function M.load_available_actions(actions_file)
 				entry.modifiers = mods
 			end
 			action.karabiner_to = { entry }
-			Logger.debug(LOG, "Action '%s': logical '%s' → key_code '%s'.",
-				action.id, action.logical_char, key_code)
+			resolved = resolved + 1
 		end
 	end
 
+	-- One summary line, not one per action. DEBUG is this driver's default level
+	-- and every layout change re-ran this loop, so the per-action lines were 548
+	-- log writes for a fact the total already conveys.
+	Logger.debug(LOG, "Resolved %d logical-char action(s) to key codes.", resolved)
 	Logger.info(LOG, "Loaded %d action(s) from actions.json.", #list)
 	return list
 end
@@ -400,9 +417,27 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 end
 
 --- Persists the current full state to config_karabiner.toml.
+--- Refuses to publish over a file that exists but cannot be decoded as TOML:
+--- load_user_config() already falls back to defaults without touching such a
+--- file, so the overwrite performed by the very next setter is where the user's
+--- still-recoverable tap/hold and combo configuration was actually destroyed.
 --- @param state table The current module state table.
 --- @param user_config_path string Absolute path to config_karabiner.toml.
-function M.save_user_config(state, user_config_path)
+--- @param overwrite_corrupt boolean|nil True only for the explicit reset-to-defaults
+---        action — the one case where clobbering an unparseable file is the intent.
+--- @return boolean True when the state reached disk, false when nothing was saved.
+function M.save_user_config(state, user_config_path, overwrite_corrupt)
+	if not overwrite_corrupt then
+		-- Re-reading before every save is cheap (a few KB, only on user action)
+		-- and is the only way to notice that the file went bad since boot.
+		local _, err = M._load_toml_file(user_config_path)
+		if err == "parse_error" then
+			Logger.error(LOG, "Refusing to overwrite the unparseable user config at '%s' — settings NOT saved. Repair or delete the file, or reset the Karabiner settings to defaults to rewrite it.",
+				user_config_path)
+			return false
+		end
+	end
+
 	local ok, payload = pcall(TomlCodec.encode, {
 		karabiner = {
 			enabled = state.enabled == true,
@@ -420,7 +455,7 @@ function M.save_user_config(state, user_config_path)
 	})
 	if not ok or type(payload) ~= "string" then
 		Logger.error(LOG, "Failed to encode user config as TOML.")
-		return
+		return false
 	end
 
 	-- Atomic write via .tmp + rename.
@@ -428,11 +463,21 @@ function M.save_user_config(state, user_config_path)
 	local fh  = io.open(tmp, "w")
 	if not fh then
 		Logger.error(LOG, "Cannot write user config at '%s'.", user_config_path)
-		return
+		return false
 	end
 	fh:write(payload); fh:close()
-	pcall(os.rename, tmp, user_config_path)
+	-- This is the ONLY persistence path for every Karabiner setting, and the
+	-- rename is the step that actually publishes them. Discarding its result and
+	-- logging success unconditionally meant a failed save was indistinguishable
+	-- from a successful one until the next boot restored the old file.
+	local ok_rename, renamed = pcall(os.rename, tmp, user_config_path)
+	if not ok_rename or not renamed then
+		Logger.error(LOG, "Cannot publish user config to '%s' — settings NOT saved (staged at '%s').",
+			user_config_path, tmp)
+		return false
+	end
 	Logger.debug(LOG, "User config saved.")
+	return true
 end
 
 return M

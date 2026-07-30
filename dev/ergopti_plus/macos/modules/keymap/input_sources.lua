@@ -424,7 +424,7 @@ local function set_input_source(localised_name, kl_name)
 		local kl_map = build_kl_name_to_tis_id() or {}
 		tis_id = kl_map[kl_name] or kl_name
 	end
-	local script = string.format([[
+	local script = text_utils.applescript_format([[
 use framework "Carbon"
 use framework "Foundation"
 on run
@@ -437,7 +437,7 @@ on run
 	end if
 	return "MISS"
 end run
-]], tis_id:gsub('"', '\\"'))
+]], tis_id)
 	local ok, out = run_osascript_isolated(script)
 	if ok and out and tostring(out):find("OK") then
 		Logger.info(LOG, "Active layout switched to '%s' (TIS subprocess, tis_id=%s).", localised_name or kl_name, tis_id)
@@ -679,22 +679,26 @@ local function upgrade_active_list(legacy_active)
 	for _, old in ipairs(legacy_active) do
 		local new_id = migrate_legacy_id(old)
 		last_new = new_id
-		table.insert(lines, string.format("\tset oldSrc to my findSource(\"%s\")", old:gsub('"', '\\"')))
+		table.insert(lines, text_utils.applescript_format("\tset oldSrc to my findSource(\"%s\")", old))
 		table.insert(lines, "\tif oldSrc is not missing value then")
 		table.insert(lines, "\t\tcurrent application's TISDisableInputSource(oldSrc)")
 		table.insert(lines, "\t\tset end of disabled to oldSrc")
 		table.insert(lines, "\tend if")
-		table.insert(lines, string.format("\tset newSrc to my findSource(\"%s\")", new_id:gsub('"', '\\"')))
+		table.insert(lines, text_utils.applescript_format("\tset newSrc to my findSource(\"%s\")", new_id))
 		table.insert(lines, "\tif newSrc is not missing value then")
 		table.insert(lines, "\t\tcurrent application's TISEnableInputSource(newSrc)")
 		table.insert(lines, "\t\tset end of enabled to newSrc")
 		table.insert(lines, "\tend if")
 	end
 	if last_new then
-		table.insert(lines, string.format("\tset selSrc to my findSource(\"%s\")", last_new:gsub('"', '\\"')))
+		table.insert(lines, text_utils.applescript_format("\tset selSrc to my findSource(\"%s\")", last_new))
 		table.insert(lines, "\tif selSrc is not missing value then current application's TISSelectInputSource(selSrc)")
 	end
-	table.insert(lines, "\treturn (count of disabled) & \"/\" & (count of enabled)")
+	-- Both counts coerced to text FIRST. AppleScript's & on two non-string
+	-- operands builds a LIST, so this returned "1, /, 2" rather than "1/2" and the
+	-- Lua pattern below matched nothing — enabled_n stayed nil, the > 0 test
+	-- failed, and every SUCCESSFUL upgrade was reported to the user as a failure.
+	table.insert(lines, "\treturn ((count of disabled) as text) & \"/\" & ((count of enabled) as text)")
 	table.insert(lines, "end run")
 	local script = table.concat(lines, "\n")
 	Logger.start(LOG, "Upgrading %d legacy Ergopti entry(ies) in the active input-source list…", #legacy_active)

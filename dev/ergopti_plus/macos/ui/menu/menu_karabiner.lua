@@ -21,6 +21,30 @@ local KeLifecycle = require("modules.karabiner.ke_lifecycle")
 local MenuUtils   = require("ui.menu.menu_utils")
 local LOG         = "menu.karabiner"
 local i18n        = require("lib.i18n")
+local text_utils  = require("lib.text_utils")
+
+
+
+
+--- Builds the AppleScript for a numeric-input dialog.
+---
+--- Every interpolated label is i18n text from a 21-locale corpus, so it goes
+--- through applescript_escape rather than Lua's %q. %q escapes for a LUA literal
+--- and agrees with AppleScript only by coincidence — it diverges on control
+--- characters and emits \ddd decimal escapes AppleScript cannot read. The four
+--- call sites below used to carry four copies of this format string.
+--- @param prompt string Dialog body text.
+--- @param default_ms number Pre-filled numeric answer.
+--- @param title string Window title.
+--- @param btn_cancel string Cancel button label.
+--- @param btn_ok string OK button label, also the default button.
+--- @return string The AppleScript source.
+local function delay_dialog_script(prompt, default_ms, title, btn_cancel, btn_ok)
+	return text_utils.applescript_format(
+		"display dialog \"%s\" default answer \"%d\" with title \"%s\" "
+			.. "buttons {\"%s\", \"%s\"} default button \"%s\"",
+		prompt, default_ms, title, btn_cancel, btn_ok, btn_ok)
+end
 
 -- Stop all KE launchd services for the current user, then kill any remaining
 -- processes. launchctl bootout must run first so launchd does not restart them.
@@ -201,6 +225,11 @@ local function _load_left_hand_from_catalog()
 	if type(data) ~= "table" then
 		-- Fallback: direct read (manifest_menu may not be loaded yet).
 		local Paths = require("lib.paths")
+
+
+
+
+
 		local path = Paths.shared("modules/menu/menu_manifest.json") or ""
 		local ok_r, fh = pcall(io.open, path, "r")
 		if not ok_r or not fh then return fallback end
@@ -317,10 +346,7 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 						local title_d    = i18n.get("menu.karabiner.key_tap_delay_dialog_title")
 						local btn_ok     = i18n.get("button.ok")
 						local btn_cancel = i18n.get("button.cancel")
-						local script = string.format(
-							"display dialog %q default answer \"%d\" with title %q buttons {%q, %q} default button %q",
-							prompt, effective_ms, title_d, btn_cancel, btn_ok, btn_ok
-						)
+						local script = delay_dialog_script(prompt, effective_ms, title_d, btn_cancel, btn_ok)
 						local ok, result = hs.osascript.applescript(script)
 						if not ok or type(result) ~= "table" then return end
 						local ms = tonumber(result["text returned"])
@@ -541,11 +567,8 @@ local function build_delay_item(karabiner, update_menu)
 			local title_d = i18n.get("menu.karabiner.tap_hold_dialog_title")
 			local btn_ok = i18n.get("button.ok")
 			local btn_cancel = i18n.get("button.cancel")
-			local script = string.format(
-				"display dialog %q default answer \"%d\" with title %q buttons {%q, %q} default button %q",
-				prompt, timeout_ms or karabiner.DEFAULT_TAP_HOLD_TIMEOUT_MS,
-				title_d, btn_cancel, btn_ok, btn_ok
-			)
+			local script = delay_dialog_script(prompt,
+				timeout_ms or karabiner.DEFAULT_TAP_HOLD_TIMEOUT_MS, title_d, btn_cancel, btn_ok)
 			local ok, result = hs.osascript.applescript(script)
 			Logger.debug(LOG, "Delay input dialog: ok=%s result=%s.", tostring(ok), hs.inspect(result))
 			if not ok or type(result) ~= "table" then return end
@@ -581,11 +604,8 @@ local function build_sticky_delay_item(karabiner, update_menu)
 			local title_d = i18n.get("menu.karabiner.sticky_dialog_title")
 			local btn_ok = i18n.get("button.ok")
 			local btn_cancel = i18n.get("button.cancel")
-			local script = string.format(
-				"display dialog %q default answer \"%d\" with title %q buttons {%q, %q} default button %q",
-				prompt, timeout_ms or karabiner.DEFAULT_STICKY_TIMEOUT_MS,
-				title_d, btn_cancel, btn_ok, btn_ok
-			)
+			local script = delay_dialog_script(prompt,
+				timeout_ms or karabiner.DEFAULT_STICKY_TIMEOUT_MS, title_d, btn_cancel, btn_ok)
 			local ok, result = hs.osascript.applescript(script)
 			Logger.debug(LOG, "Sticky delay input: ok=%s result=%s.", tostring(ok), hs.inspect(result))
 			if not ok or type(result) ~= "table" then return end
@@ -621,11 +641,8 @@ local function build_simultaneous_threshold_item(karabiner, update_menu)
 			local title_d = i18n.get("menu.karabiner.simultaneous_dialog_title")
 			local btn_ok = i18n.get("button.ok")
 			local btn_cancel = i18n.get("button.cancel")
-			local script = string.format(
-				"display dialog %q default answer \"%d\" with title %q buttons {%q, %q} default button %q",
-				prompt, threshold_ms or karabiner.DEFAULT_SIMULTANEOUS_THRESHOLD_MS,
-				title_d, btn_cancel, btn_ok, btn_ok
-			)
+			local script = delay_dialog_script(prompt,
+				threshold_ms or karabiner.DEFAULT_SIMULTANEOUS_THRESHOLD_MS, title_d, btn_cancel, btn_ok)
 			local ok, result = hs.osascript.applescript(script)
 			Logger.debug(LOG, "Simultaneous threshold input: ok=%s result=%s.", tostring(ok), hs.inspect(result))
 			if not ok or type(result) ~= "table" then return end

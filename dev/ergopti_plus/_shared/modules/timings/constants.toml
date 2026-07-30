@@ -71,7 +71,6 @@ warmup_retry_cap_ms = 60000
 zombie_kill_min_interval_ms = 3000
 
 # Minimum interval between restart-hook invocations (prevents restart storms).
-restart_hook_min_interval_ms = 10000
 
 # Grace period after a fresh MLX launch before treating silence as a failure
 # (8B-class models can take up to ~60 s to load weights).

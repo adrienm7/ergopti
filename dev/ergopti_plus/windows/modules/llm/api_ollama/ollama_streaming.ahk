@@ -23,10 +23,11 @@
  * ``on_success(text)`` when the model finishes responding, or ``on_fail()``
  * on any HTTP / parse failure. Mirrors hs.http.asyncPost on the HS side.
  *
- * Internally the request goes through WinHTTP's async mode (``Open(..., true)``)
- * and a SetTimer poll checks ``WaitForResponse(0)`` every LLM_OLLAMA_POLL_MS.
- * That gives us a non-blocking dispatch without depending on COM event sinks
- * (which AHK v2's ComObjConnect supports but is finicky to debug).
+ * The transport is a curl child process, not WinHTTP: WinHTTP's async ``Send()``
+ * returned HTTP 200 with an empty ``content`` on this driver despite valid JSON
+ * payloads. A SetTimer poll (_LLM_Ollama_PollCurl) watches the child every
+ * LLM_OLLAMA_POLL_MS and reads its stdout file once the process exits, which
+ * keeps the dispatch non-blocking without any COM object in the picture.
  *
  * @param {string}   model         - Ollama model tag.
  * @param {string}   system_prompt - System instruction.
@@ -34,7 +35,9 @@
  * @param {number}   temperature   - Sampling temperature.
  * @param {function} on_success    - Callback receiving the generated text.
  * @param {function} on_fail       - Callback fired on any failure.
- * @returns {Integer} The request id (use with LLM_OllamaCancelAsync to abort).
+ * @returns {Integer} The request id, for correlating log lines. Aborting is
+ *                    always all-or-nothing via LLM_OllamaCancelAllAsync — the
+ *                    registry holds at most one in-flight slot by design.
  */
 LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_success, on_fail, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "") {
 	global _LLM_Ollama_AsyncCounter, _LLM_Ollama_Pending
@@ -61,9 +64,14 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
 		; by failing the displaced job before overwriting it. Without this a
 		; future consumer that advances a state machine on the callback would
 		; stall forever on the dropped job.
+		displaced := ""
 		if (_LLM_Ollama_Pending is Map and _LLM_Ollama_Pending.Has("on_fail"))
-			try _LLM_Ollama_Pending["on_fail"]()
+			displaced := _LLM_Ollama_Pending["on_fail"]
+		; Overwrite the slot BEFORE firing the displaced callback: on_fail re-enters
+		; the engine, and a re-entrant dispatch that still found the displaced job
+		; parked here would fail it a second time, breaking the exactly-once contract.
 		_LLM_Ollama_Pending := job
+		_LLM_InvokeCallback(displaced, "on_fail")
 		try LoggerInfo("LLM.ollama", "Ollama busy — coalescing request #{1} until slot free.", req_id)
 		return req_id
 	}
@@ -112,7 +120,7 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job) {
 	; gap between reservation and this callback firing can still slip a real
 	; HTTP POST + PII payload write out the door — no curl PID exists yet for
 	; the cancel path to kill. Mirrors the "cancelled" re-check that
-	; _LLM_Ollama_PollCurl / _LLM_Ollama_PollRequest already do on every tick
+	; _LLM_Ollama_PollCurl already does on every tick
 	; (F23: deferred-spawn-ignores-cancel-suspend).
 	if !_LLM_Ollama_Async.Has(req_id) {
 		; Entry vanished before this tick fired (e.g. evicted by
@@ -126,14 +134,14 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job) {
 		try LoggerInfo("LLM.ollama", "Deferred spawn for req {1} skipped — {2}.",
 			req_id, A_IsSuspended ? "suspended" : "cancelled before dispatch")
 		_LLM_Ollama_Async.Delete(req_id)
-		try job["on_fail"]()
+		_LLM_InvokeCallback(job.Has("on_fail") ? job["on_fail"] : "", "on_fail")
 		_LLM_Ollama_DrainPending()
 		return
 	}
 	if !FSWrite(tmp_payload, payload) {
 		try LoggerWarn("LLM.ollama", "Failed to write curl payload file.")
 		_LLM_Ollama_Async.Delete(req_id)
-		try job["on_fail"]()
+		_LLM_InvokeCallback(job.Has("on_fail") ? job["on_fail"] : "", "on_fail")
 		_LLM_Ollama_DrainPending()
 		return
 	}
@@ -150,7 +158,7 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job) {
 		try FSDelete(tmp_payload)
 		try LoggerWarn("LLM.ollama", "curl launch failed: {1}.", err.Message)
 		_LLM_Ollama_Async.Delete(req_id)
-		try job["on_fail"]()
+		_LLM_InvokeCallback(job.Has("on_fail") ? job["on_fail"] : "", "on_fail")
 		_LLM_Ollama_DrainPending()
 		return
 	}
@@ -183,33 +191,9 @@ _LLM_Ollama_DrainPending() {
 }
 
 /**
- * Cancel an in-flight async request. The polling tick will discover the
- * cancelled flag on its next iteration and bail without invoking the
- * caller's callbacks. Used by the engine to abandon stale variants when
- * the user keeps typing.
- * @param {Integer} req_id - The id returned by LLM_OllamaGenerate_Async.
- */
-LLM_OllamaCancelAsync(req_id) {
-	global _LLM_Ollama_Async
-	if !_LLM_Ollama_Async.Has(req_id)
-		return
-	entry := _LLM_Ollama_Async[req_id]
-	entry["cancelled"] := true
-	if entry.Has("http") {
-		try entry["http"].Abort()
-	} else if entry.Has("pid") and entry["pid"] > 0 {
-		try ProcessClose(entry["pid"])
-	}
-}
-
-/**
- * Cancel every in-flight async request. The engine calls this on each new
- * prediction fire so previous variants don't keep landing into the tooltip
- * after the user has typed more characters.
- */
-/**
- * Cancels in-flight curl streams only. WinHTTP async requests are left running;
- * stale responses are ignored via the engine's request_id (macOS parity).
+ * Cancels every in-flight curl stream. The streaming poll tick discovers the
+ * flag on its next iteration and reaps the temp files it owns; stale responses
+ * are additionally ignored via the engine's request_id (macOS parity).
  */
 LLM_OllamaCancelStreams() {
 	global _LLM_Ollama_ActiveStreams
@@ -218,14 +202,16 @@ LLM_OllamaCancelStreams() {
 	_LLM_Ollama_ActiveStreams := []
 }
 
+/**
+ * Cancel every in-flight async request. The engine calls this on each new
+ * prediction fire so previous variants don't keep landing into the tooltip
+ * after the user has typed more characters.
+ */
 LLM_OllamaCancelAllAsync() {
 	global _LLM_Ollama_Async, _LLM_Ollama_Pending
 	; Flip the flags now — the poll ticks read them — but snapshot the pids and
 	; kill them off-thread: this runs under the per-keystroke Critical, where a
 	; blocking TerminateProcess starves the keyboard hook.
-	; The former entry.Has("http") branch was dead: _LLM_Ollama_Async entries are
-	; only ever created at one site, which carries no "http" key, and the whole
-	; WinHTTP path for Ollama is unreachable — the live transport is curl.
 	Kills := []
 	for _id, entry in _LLM_Ollama_Async {
 		entry["cancelled"] := true
@@ -241,9 +227,11 @@ LLM_OllamaCancelAllAsync() {
 	; calls this from Ergopti_OnSuspendEnter -> LLM_Engine_StopGeneration). Honour
 	; the async contract by failing the displaced job exactly once before dropping.
 	if (_LLM_Ollama_Pending is Map) {
-		if _LLM_Ollama_Pending.Has("on_fail")
-			try _LLM_Ollama_Pending["on_fail"]()
+		displaced := _LLM_Ollama_Pending.Has("on_fail") ? _LLM_Ollama_Pending["on_fail"] : ""
+		; Drop the slot before firing so a callback that re-enters the dispatcher
+		; cannot find — and fail — the same job twice.
 		_LLM_Ollama_Pending := ""
+		_LLM_InvokeCallback(displaced, "on_fail")
 	}
 }
 
@@ -259,82 +247,6 @@ LLM_OllamaNoteInferenceSuccess() {
 	try LoggerInfo("LLM.ollama", "Model ready — first successful prediction.")
 	; First real prediction succeeded — backoff can safely reset for the next cycle
 	LLM_OllamaCancelWarmupRetry(true)
-}
-
-/**
- * Polling tick — fires every LLM_OLLAMA_POLL_MS until the request is done
- * or cancelled. Uses ``WaitForResponse(0)`` which returns immediately with
- * a boolean indicating whether the response is ready.
- *
- * @param {Integer}  req_id   - The id used to look up the registry entry.
- * @param {function} parser   - parser(http, on_success, on_fail) — called when ready.
- */
-_LLM_Ollama_PollRequest(req_id, parser) {
-	global _LLM_Ollama_Async, LLM_OLLAMA_POLL_MS
-	if !_LLM_Ollama_Async.Has(req_id)
-		return
-	entry := _LLM_Ollama_Async[req_id]
-	if entry["cancelled"] {
-		_LLM_Ollama_Async.Delete(req_id)
-		_LLM_Ollama_DrainPending()
-		return
-	}
-	http := entry["http"]
-	ready := false
-	try {
-		ready := http.WaitForResponse(0)
-	} catch as com_err {
-		; A COM exception here means the connection dropped (WiFi cut, Ollama
-		; restarted). Abandon immediately — re-queuing would produce a busy-loop
-		; at 50 ms saturating the CPU until the 3-minute global timeout fires
-		; (ollama-com-exception-busy-loop fix).
-		try LoggerWarn("LLM.ollama", "WaitForResponse threw COM error — aborting req {1}: {2}", req_id, com_err.Message)
-		on_fail := entry["on_fail"]
-		_LLM_Ollama_Async.Delete(req_id)
-		try on_fail()
-		_LLM_Ollama_DrainPending()
-		return
-	}
-	if !ready {
-		if (entry.Has("start_tick") and entry.Has("timeout_ms") and _LLM_DeadlineExpired(entry["start_tick"], entry["timeout_ms"])) {
-			elapsed := A_TickCount - entry["start_tick"]
-			try LoggerWarn("LLM.ollama", "Ollama request timed out after {1} ms.", elapsed)
-			on_fail := entry["on_fail"]
-			_LLM_Ollama_Async.Delete(req_id)
-			try on_fail()
-			_LLM_Ollama_DrainPending()
-			return
-		}
-		SetTimer(() => _LLM_Ollama_PollRequest(req_id, parser), -LLM_OLLAMA_POLL_MS)
-		return
-	}
-	; Response received — honour cancellation before invoking callbacks. Without
-	; this check, ``Abort()`` races could still deliver empty ``content`` bodies
-	; from superseded requests into the active variant loop.
-	if entry["cancelled"] {
-		_LLM_Ollama_Async.Delete(req_id)
-		_LLM_Ollama_DrainPending()
-		return
-	}
-	on_success := entry["on_success"]
-	on_fail    := entry["on_fail"]
-	_LLM_Ollama_Async.Delete(req_id)
-	try {
-		status := http.Status
-		body   := http.ResponseText
-	} catch {
-		try on_fail()
-		_LLM_Ollama_DrainPending()
-		return
-	}
-	if (status != 200) {
-		try LoggerWarn("LLM.ollama", "Ollama request failed — HTTP {1}.", status)
-		try on_fail()
-		_LLM_Ollama_DrainPending()
-		return
-	}
-	try parser(body, on_success, on_fail, entry)
-	_LLM_Ollama_DrainPending()
 }
 
 ; Polls a non-streaming curl child until stdout is ready or the slot times out.
@@ -359,7 +271,7 @@ _LLM_Ollama_PollCurl(req_id) {
 		on_fail := entry["on_fail"]
 		_LLM_Ollama_CleanupCurlFiles(entry)
 		_LLM_Ollama_Async.Delete(req_id)
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		_LLM_Ollama_DrainPending()
 		return
 	}
@@ -380,7 +292,7 @@ _LLM_Ollama_PollCurl(req_id) {
 	_LLM_Ollama_Async.Delete(req_id)
 	if (body == "") {
 		try LoggerWarn("LLM.ollama", "curl finished with empty stdout.")
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		_LLM_Ollama_DrainPending()
 		return
 	}
@@ -409,7 +321,7 @@ _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
 	; otherwise on_fail would receive the raw Map as if it were prediction text.
 	if (text is Map) and text.Has("error") {
 		try LoggerWarn("LLM.ollama", "Ollama response parse failed: {1}.", text.Has("message") ? text["message"] : "unknown error")
-		try on_fail(text)
+		_LLM_InvokeCallback(on_fail, "on_fail", text)
 		return
 	}
 	if (text == "") {
@@ -418,13 +330,13 @@ _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
 		if (entry is Map) and entry.Has("payload_snip")
 			payload_hint := " Payload: «" . entry["payload_snip"] . "»."
 		try LoggerWarn("LLM.ollama", "Ollama returned an empty prediction (parse miss). Body: «{1}».{2}", snip, payload_hint)
-		try on_fail(Map("error", true, "message", "empty prediction"))
+		_LLM_InvokeCallback(on_fail, "on_fail", Map("error", true, "message", "empty prediction"))
 		return
 	}
 	snip := StrLen(text) > 60 ? SubStr(text, 1, 60) . "…" : text
 	try LoggerInfo("LLM.ollama", "Prediction received ({1} chars): «{2}».", StrLen(text), snip)
 	try LLM_OllamaNoteInferenceSuccess()
-	try on_success(text)
+	_LLM_InvokeCallback(on_success, "on_success", text)
 }
 
 /**
@@ -458,7 +370,20 @@ _LLM_Ollama_PollGeneric(http, on_ok, on_err, start_tick := 0, timeout_ms := 0, p
 		poll_ms := LLM_OLLAMA_POLL_MS
 
 	ready := false
-	try ready := http.WaitForResponse(0)
+	try {
+		ready := http.WaitForResponse(0)
+	} catch as com_err {
+		; Same abandonment contract as the two sibling polls. A COM exception here
+		; means the connection dropped (WiFi cut, Ollama restarted): the bare `try`
+		; this replaces swallowed it and re-queued, so a dead request kept polling
+		; every 50 ms until the 90 s deadline — a busy-loop against a socket that
+		; was never going to answer, with no diagnostic anywhere
+		; (ollama-com-exception-busy-loop).
+		try LoggerWarn("LLM.ollama", "WaitForResponse threw COM error in poll — abandoning: {1}", com_err.Message)
+		try http.Abort()
+		_LLM_InvokeCallback(on_err, "on_err")
+		return
+	}
 	if !ready {
 		if _LLM_DeadlineExpired(start_tick, timeout_ms) {
 			; Abort the in-flight request before dropping our reference — a
@@ -466,7 +391,7 @@ _LLM_Ollama_PollGeneric(http, on_ok, on_err, start_tick := 0, timeout_ms := 0, p
 			; otherwise keep the COM object + socket resident until WinHTTP's
 			; own timeout fires, long after we have stopped polling it.
 			try http.Abort()
-			try on_err()
+			_LLM_InvokeCallback(on_err, "on_err")
 			return
 		}
 		SetTimer(() => _LLM_Ollama_PollGeneric(http, on_ok, on_err, start_tick, timeout_ms, poll_ms), -poll_ms)
@@ -476,10 +401,10 @@ _LLM_Ollama_PollGeneric(http, on_ok, on_err, start_tick := 0, timeout_ms := 0, p
 		status := http.Status
 		body := http.ResponseText
 	} catch {
-		try on_err()
+		_LLM_InvokeCallback(on_err, "on_err")
 		return
 	}
-	try on_ok(status, body)
+	_LLM_InvokeCallback(on_ok, "on_ok", status, body)
 }
 
 /**
@@ -512,7 +437,7 @@ _LLM_Ollama_TrimAsyncRegistry() {
 	; fire. Without this the caller (e.g. the prediction engine slot state
 	; machine) hangs forever waiting for a callback that will never arrive.
 	if oldest_entry.Has("on_fail") and oldest_entry["on_fail"] is Func
-		try oldest_entry["on_fail"].Call()
+		_LLM_InvokeCallback(oldest_entry["on_fail"], "on_fail")
 	_LLM_Ollama_Async.Delete(oldest_id)
 }
 
@@ -562,7 +487,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	tmp_dir := _LLM_Ollama_TempDir()
 	tmp_payload := tmp_dir . "\ergopti_ollama_" . uid . ".json"
 	if !FSWrite(tmp_payload, payload) {
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		return { Pid: 0, Cancelled: false }
 	}
 
@@ -582,7 +507,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 		Run(cmdLine, , "Hide", &pid)
 		handle.Pid := pid
 	} catch {
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		_LLM_Ollama_CleanupStreamFiles(handle)
 		return handle
 	}
@@ -610,7 +535,7 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 		_LLM_Ollama_CleanupStreamFiles(handle)
 		_LLM_Ollama_RemoveStreamHandle(handle)
 		try LoggerInfo("LLM.ollama", "Streaming cancelled (newer prediction).")
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		return
 	}
 	if (state.Has("start_tick") and state.Has("timeout_ms") and _LLM_DeadlineExpired(state["start_tick"], state["timeout_ms"])) {
@@ -620,7 +545,7 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 		_LLM_Ollama_RemoveStreamHandle(handle)
 		elapsed := state.Has("start_tick") ? (A_TickCount - state["start_tick"]) : 0
 		try LoggerWarn("LLM.ollama", "Streaming timed out after {1} ms.", elapsed)
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		return
 	}
 	; Read whatever new bytes appeared.
@@ -696,11 +621,11 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 	if (final == "") {
 		hint := _LLM_Ollama_StreamFailHint(handle.TmpStdout)
 		try LoggerWarn("LLM.ollama", "Streaming finished with empty response.{1}", hint != "" ? " " hint : "")
-		try on_fail()
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		return
 	}
 	try LLM_OllamaNoteInferenceSuccess()
-	try on_success(final)
+	_LLM_InvokeCallback(on_success, "on_success", final)
 }
 
 _LLM_Ollama_RemoveStreamHandle(handle) {
@@ -772,7 +697,7 @@ _LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial) {
 	}
 	if (new_acc != state["acc"]) {
 		state["acc"] := new_acc
-		try on_partial(new_acc)
+		_LLM_InvokeCallback(on_partial, "on_partial", new_acc)
 	}
 }
 

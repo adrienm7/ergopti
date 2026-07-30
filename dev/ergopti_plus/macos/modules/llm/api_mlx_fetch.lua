@@ -92,7 +92,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
                        max_predict, num_predictions, profile,
                        on_success, on_fail, request_id_provider, streaming, on_partial)
 	if not require_ctx("fetch_batch") then
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 
@@ -122,12 +122,12 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 					local is_final = (idx == #results)
 					-- Pass is_batch_progressive=true so prediction_engine bypasses the
 					-- streaming_multi early-return for these intermediate calls
-					if type(on_success) == "function" then pcall(on_success, subset, ms, is_final, not is_final) end
+					if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", subset, ms, is_final, not is_final) end
 					if not is_final then TimerScheduler.after(0, function() reveal_next(idx + 1) end) end
 				end
 				reveal_next(1)
 			else
-				if type(on_success) == "function" then pcall(on_success, results, ms, true) end
+				if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results, ms, true) end
 			end
 		end,
 		on_fail,
@@ -175,7 +175,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
                              max_predict, num_predictions, profile,
                              on_success, on_fail, request_id_provider, streaming, on_partial)
 	if not require_ctx("fetch_sequential") then
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 
@@ -204,10 +204,10 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 		end
 
 		if #results >= requested_predictions or attempt_index > max_attempts then
-			if #results == 0 then if type(on_fail) == "function" then pcall(on_fail) end return end
+			if #results == 0 then if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end return end
 			ApiCommon.log_prediction_summary(Logger, LOG, "sequential", requested_predictions, dedup_stats, #results)
 			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
-			if type(on_success) == "function" then pcall(on_success, results, ms, true) end
+			if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results, ms, true) end
 			return
 		end
 
@@ -229,7 +229,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 						if #results < requested_predictions then
 							ApiCommon.insert_prediction(results, preds[1], dedup_stats, _dedup_enabled, Logger, LOG)
 							local ms = math.floor((TimerScheduler.now() - t0) * 1000)
-							if type(on_success) == "function" then pcall(on_success, results, ms, false) end
+							if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results, ms, false) end
 						end
 					end
 					do_next()

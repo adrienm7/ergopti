@@ -1,4 +1,4 @@
-﻿﻿{
+{
 	"_meta.flag": "🇮🇹",
 	"_meta.locale": "it",
 	"_meta.name": "Italiano",
@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "Nome della nuova categoria per %s:",
 	"metrics_apps.new_category_title": "Nuova categoria",
 	"metrics_apps.no_app_detected": "Nessuna applicazione rilevata.",
+	"metrics_apps.pick_app_placeholder": "Scegli un’applicazione da classificare…",
 	"metrics_apps.rename_chooser_placeholder": "Categoria da rinominare",
 	"metrics_apps.rename_item": "✎ Rinomina una categoria esistente…",
 	"metrics_apps.rename_prompt": "Nuovo nome per la categoria \"%s\":",
@@ -1415,7 +1416,7 @@
 	"sfbsreduction.comma": "La virgola riduce i bigrammi dello stesso dito",
 	"sfbsreduction.ecirc": "Ê riduce i bigrammi dello stesso dito",
 	"sfbsreduction.egrave": "È riduce i bigrammi dello stesso dito",
-	"sfbsreduction.ié": "IE riduce i bigrammi IE/EI",
+	"sfbsreduction.ieacute": "IE riduce i bigrammi IE/EI",
 	"sg_actions.activity_simulation": "🖱 Simula attività (anti-sleep)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (monitor)",
 	"sg_actions.app_expose": "◱ App Exposé",
@@ -1652,6 +1653,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = Apri la cartella Download",
 	"shortcuts.pixel_read_error": "Impossibile leggere il colore del pixel",
 	"shortcuts.saved": "Salvato: %s",
+	"shortcuts.screenshot_failed": "Screenshot non riuscito",
 	"shortcuts.screen": "Win + H (screensHot) = Cattura schermo (attiva Win + Shift + S)",
 	"shortcuts.screeninstant": "Tasto a sinistra di 1 = Cattura istantanea della finestra attiva, salvata in Immagini con timestamp",
 	"shortcuts.screenocr": "Win + C (OCR) = Schermata con estrazione del testo (Win + Shift + T)",

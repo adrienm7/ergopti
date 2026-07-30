@@ -108,6 +108,7 @@ OneShotShiftFix() {
 ; intent (e.g. turning the LED off via SetCapsLockState("Off") while the nav
 ; layer is still active).
 ToggleCapsLock() {
+	global _HardwareCapsLockOn
 	; Route through DisableCapsWord so subscriber cleanup (mouse-down listener
 	; unregistration) runs before the LED is updated.  Calling it unconditionally
 	; is safe — DisableCapsWord is a no-op when CapsWord is not active.
@@ -115,6 +116,12 @@ ToggleCapsLock() {
 		DisableCapsWord()
 	else
 		global CapsWordEnabled := False
-	SetCapsLockState(GetKeyState("CapsLock", "T") ? "Off" : "On")
+	; Flip the recorded INTENT, never the live toggle: deriving the next state
+	; from GetKeyState("CapsLock", "T") read back whatever CapsWord or the nav
+	; layer had just written, so a toggle pressed while either was active
+	; inverted their LED instead of the user's own CapsLock.
+	if !IsSet(_HardwareCapsLockOn)
+		_HardwareCapsLockOn := false
+	_HardwareCapsLockOn := !_HardwareCapsLockOn
 	UpdateCapsLockLED()
 }

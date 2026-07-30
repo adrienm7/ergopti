@@ -1,4 +1,4 @@
-﻿﻿{
+{
 	"_meta.flag": "🇨🇿",
 	"_meta.locale": "cs",
 	"_meta.name": "Čeština",
@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "Název nové kategorie pro %s:",
 	"metrics_apps.new_category_title": "Nová kategorie",
 	"metrics_apps.no_app_detected": "Nepodařilo se zjistit žádnou aplikaci.",
+	"metrics_apps.pick_app_placeholder": "Vyberte aplikaci ke zařazení…",
 	"metrics_apps.rename_chooser_placeholder": "Kategorie k přejmenování",
 	"metrics_apps.rename_item": "✎ Přejmenovat existující kategorii…",
 	"metrics_apps.rename_prompt": "Nový název pro kategorii „%s\":",
@@ -1415,7 +1416,7 @@
 	"sfbsreduction.comma": "Čárka snižuje bigramy stejného prstu",
 	"sfbsreduction.ecirc": "Ê snižuje bigramy stejného prstu",
 	"sfbsreduction.egrave": "È snižuje bigramy stejného prstu",
-	"sfbsreduction.ié": "IE snižuje bigramy IE/EI",
+	"sfbsreduction.ieacute": "IE snižuje bigramy IE/EI",
 	"sg_actions.activity_simulation": "🖱 Simulovat aktivitu (proti spánku)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (monitor)",
 	"sg_actions.app_expose": "◱ Přehled oken aplikace",
@@ -1652,6 +1653,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = Otevřít složku Stažené soubory",
 	"shortcuts.pixel_read_error": "Nelze přečíst barvu pixelu",
 	"shortcuts.saved": "Uloženo: %s",
+	"shortcuts.screenshot_failed": "Snímek obrazovky se nepodařilo vytvořit",
 	"shortcuts.screen": "Win + H (screensHot) = Snímek obrazovky (spustí Win + Shift + S)",
 	"shortcuts.screeninstant": "Klávesa vlevo od 1 = Okamžitý snímek aktivního okna, uložený v Obrázcích s časovým razítkem",
 	"shortcuts.screenocr": "Win + C (OCR) = Snímek obrazovky s extrakcí textu (Win + Shift + T)",

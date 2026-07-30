@@ -73,6 +73,11 @@ class KLErgoConst {
 
     ; Hesitation — single inter-key delay above this value
     static HESITATION_MS           := 2000
+    ; Upper bound on what counts as a hesitation. Pinned to the session timeout
+    ; (KLWatchConst.SESSION_TIMEOUT_MS) rather than restated: past that gap the
+    ; watchers already consider the session over, so by the driver's own
+    ; definition the user was away rather than hesitating.
+    static HESITATION_MAX_MS       := 300000
     ; Debounce: don't emit consecutive hesitations within this window
     static HESITATION_COOLDOWN_MS  := 10000
 
@@ -169,6 +174,15 @@ KL_Ergo_OnKeystroke(delay_ms, vk, is_bs := false) {
 
 KL_Ergo_CheckHesitation(delay_ms, now, app) {
     if (delay_ms < KLErgoConst.HESITATION_MS)
+        return
+    ; An away-gap is not a hesitation. Returning from lunch, a meeting or an
+    ; overnight pause produces a delay of minutes or hours, and recording that
+    ; as a "hesitation" put values three to five orders of magnitude above a real
+    ; one into the distribution — a handful of them dominate every percentile
+    ; the dashboard computes. A hesitation is someone pausing mid-thought at the
+    ; keyboard, which is bounded by the same threshold that ends a typing
+    ; session: past it the user was not hesitating, they were gone.
+    if (delay_ms >= KLErgoConst.HESITATION_MAX_MS)
         return
     if (KLErgo.last_hesitation > 0
             and (now - KLErgo.last_hesitation) < KLErgoConst.HESITATION_COOLDOWN_MS)

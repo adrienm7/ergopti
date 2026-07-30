@@ -297,6 +297,7 @@ M.api_remote = ApiRemote
 local API_ENTRIES_KEY    = "llm_api_entries"
 local API_ENTRY_ID_KEY   = "llm_api_entry_id"
 local TokenCrypto = require("modules.llm.api_token_crypto")
+local ApiCommon = require("modules.llm.api_common")
 
 --- Load persisted API entries from hs.settings and seed the remote backend.
 --- Idempotent — calling it more than once just refreshes the in-memory state
@@ -368,6 +369,19 @@ function M.warmup_model(model_name, profile)
 		Logger.debug(LOG, "warmup_model: skipped — model_name is empty.")
 		return
 	end
+	-- « pause = tout éteint » applies to warmups the USER starts too. Switching
+	-- profile or model from the menu during a pause funnels through here, and
+	-- api_mlx's own _warmup_stopped flag only short-circuits its self-rescheduling
+	-- retry chain — a freshly dispatched warmup sails past it, and Ollama has no
+	-- such flag at all by design. Read through package.loaded rather than
+	-- require() to avoid a circular dependency, exactly as the prediction engine
+	-- does for the same question.
+	local sc = package.loaded["modules.shortcuts.script_control"]
+	if sc and type(sc.is_paused) == "function" and sc.is_paused() then
+		Logger.debug(LOG, "warmup_model: paused — '%s' stays cold until resume.", tostring(model_name))
+		return
+	end
+
 	local resolved_profile = profile or M.get_active_profile()
 	Logger.debug(LOG, "warmup_model: dispatching to backend '%s' for model '%s'.",
 		tostring(CoreState.backend), tostring(model_name))
@@ -474,6 +488,11 @@ function M.set_backend(backend)
 		if backend == "ollama" then
 			pcall(function() ApiOllama.ensure_running() end)
 		end
+		-- Convention 5.5: a public setter logs its new value, so the applied
+		-- backend can be read back from the logs like every other setting.
+		Logger.debug(LOG, "Backend: %s.", backend)
+	else
+		Logger.warn(LOG, "set_backend(): ignoring invalid backend %s.", tostring(backend))
 	end
 end
 
@@ -489,6 +508,10 @@ end
 --- @param enabled boolean True when runtime LLM activity is enabled.
 function M.set_runtime_llm_enabled(enabled)
 	CoreState.runtime_llm_enabled = (enabled == true)
+	-- This flag is the ONE gate that authorises a model load or a warmup, so its
+	-- transitions are exactly what a "why did it warm up while disabled?" report
+	-- needs from the log. It was the only writer of it that said nothing.
+	Logger.debug(LOG, "Runtime LLM gate: %s.", CoreState.runtime_llm_enabled and "enabled" or "disabled")
 end
 
 --- Returns the current runtime LLM enabled state.
@@ -631,37 +654,13 @@ end
 function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
                                   max_predict, num_predictions, on_success, on_fail, sequential_mode, force, request_id_provider, on_partial)
 
-	-- Prevent firing requests if the active application is blacklisted by user settings
-	if not force then
-		local ok_front, front = pcall(hs.application.frontmostApplication)
-		if ok_front and front then
-			local disabled = hs.settings.get("llm_disabled_apps")
-			if type(disabled) == "table" then
-				local bid  = type(front.bundleID) == "function" and front:bundleID() or ""
-				local path = type(front.path) == "function" and front:path() or ""
-				local name = type(front.name) == "function" and (front:name() or "") or ""
-				name = name:lower()
-				for _, app in ipairs(disabled) do
-					if type(app) == "table" then
-						local has_path = type(app.appPath) == "string" and app.appPath ~= ""
-						local has_bid  = type(app.bundleID) == "string" and app.bundleID ~= ""
-						local configured_name = type(app.name) == "string" and app.name:lower() or ""
-						local path_match = has_path and (app.appPath == path)
-						local bid_match  = (not has_path and has_bid and app.bundleID == bid)
-						local name_match = (not has_path and not has_bid and configured_name ~= ""
-							and (configured_name == name
-								or name:find(configured_name, 1, true)
-								or configured_name:find(name, 1, true)))
-						if path_match or bid_match or name_match then
-						Logger.info(LOG, "Prediction aborted due to application blacklist.")
-						if type(on_fail) == "function" then pcall(on_fail) end
-						return
-						end
-					end
-				end
-			end
-		end
-	end
+	-- The app-exclusion filter lives in modules/llm/app_filter.lua and is applied
+	-- by prediction_engine before it ever dispatches. A second copy lived here and
+	-- read hs.settings.get("llm_disabled_apps") — a key nothing in the tree writes,
+	-- because the real setter keeps the list in module state. So this copy could
+	-- never block anything, and had drifted from the live one besides. Removed
+	-- rather than repaired: two implementations of "may this app receive a
+	-- prediction?" is the divergence, not the answer either gave.
 
 	num_predictions = math.max(1, math.floor(tonumber(num_predictions) or 1))
 	local profile = M.get_active_profile()

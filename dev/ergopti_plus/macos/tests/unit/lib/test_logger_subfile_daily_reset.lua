@@ -133,8 +133,23 @@ helpers.describe("logger — topical sub-files reset on the first write of a new
 		end)
 
 		local modes = sub_file_modes(opens)
-		helpers.assert_true(#modes >= 2,
-			"several sub-file writes must have been captured for this assertion to mean anything")
+		helpers.assert_true(#modes >= 1,
+			"at least one sub-file open must be captured for this assertion to mean anything")
+
+		-- The invariant is "only the FIRST write of a calendar day may truncate",
+		-- and it is asserted as such rather than as "one open per write". The
+		-- fan-out now keeps its handles open — the same policy the main handle
+		-- follows because DEBUG lines come off the keystroke path — so a same-day
+		-- burst legitimately produces a single open. What must never appear is a
+		-- SECOND truncating open, which would discard the day's earlier lines.
+		local truncations = 0
+		for _, m in ipairs(modes) do
+			if m == "w" then truncations = truncations + 1 end
+		end
+		helpers.assert_true(truncations <= 1,
+			"only the first write of a calendar day may truncate; a second 'w' throws away "
+			.. "everything logged earlier that day")
+
 		for i = 2, #modes do
 			helpers.assert_eq(modes[i], "a", string.format(
 				"write #%d of the same day must APPEND: truncating on every write would keep "

@@ -66,13 +66,19 @@ local _sections       = nil
 --- @param event userdata The Hammerspoon hs.eventtap.event object.
 --- @param km_buffer string The current typing buffer maintained by the keymap module.
 --- @return string|nil Returns "consume" to swallow the event, or nil to pass it through.
-local function interceptor(event, km_buffer)
+--- @param event userdata The keyDown event.
+--- @param km_buffer string The keymap buffer.
+--- @param ctx table|nil Fields the keymap tap already read from the event
+---        (keyCode, flags, chars). Re-fetching them is an ObjC accessor call
+---        per interceptor per keystroke; the fallback keeps this working if the
+---        contract is ever invoked without a context.
+local function interceptor(event, km_buffer, ctx)
 	if _is_injecting or not _km then return nil end
 
-	local flags = event:getFlags()
+	local flags = (ctx and ctx.flags) or event:getFlags()
 	if flags.cmd or flags.ctrl then return nil end
 
-	local char = event:getCharacters(false) or ""
+	local char = (ctx and ctx.chars) or event:getCharacters(false) or ""
 	if char ~= _trigger then return nil end
 
 	-- Gate on the group master toggle so that disabling the dynamichotstrings group
@@ -110,7 +116,14 @@ local function interceptor(event, km_buffer)
 					hs.eventtap.keyStrokes(result)
 					return #result, result
 				end
-			end, "dynamic")
+			-- is_private = true for the same reason the comment above declines
+			-- log_hotstring: the result may be a phone number, an SSN or an IBAN.
+			-- Declining ONE sink while the other recorded the plaintext is what
+			-- made that comment describe an invariant the code did not hold.
+			-- Retained by default rather than per-rule, because a rule carries no
+			-- confidentiality metadata and default-retain is the only shape in
+			-- which a future rule cannot leak by omission.
+			end, "dynamic", true)
 		else
 			-- Fallback if inject_dynamic is not available
 			if _km then
@@ -118,7 +131,9 @@ local function interceptor(event, km_buffer)
 				if type(_km.arm_synthetic) == "function" then _km.arm_synthetic(n_back, result) end
 			end
 			if keylogger and type(keylogger.notify_synthetic) == "function" then
-				pcall(keylogger.notify_synthetic, result, "hotstring", n_back, "dynamic")
+				-- Same privacy contract as the primary path above — this branch
+				-- reaches the identical sink, so it needs the identical flag.
+				pcall(keylogger.notify_synthetic, result, "hotstring", n_back, "dynamic", nil, true)
 			end
 			for _ = 1, n_back do
 				hs.eventtap.keyStroke({}, "delete", 0)

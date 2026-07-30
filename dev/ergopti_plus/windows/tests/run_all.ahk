@@ -102,6 +102,7 @@ OnError(_FatalErrorHandler)
 #Include ../lib/nav_layer_helpers.ahk
 #Include ../lib/hotstrings/hotstring_engine.ahk
 #Include ../lib/hotstrings/hotstring_engine_main.ahk
+#Include ../lib/hotstrings/hotstring_buffer_effects.ahk
 #Include ../lib/hotstrings/hotstring_live_toggle.ahk
 #Include ../lib/hotstrings/hotstring_count_policy.ahk
 #Include ../lib/hotstrings/hotstring_prefix_watcher.ahk
@@ -132,6 +133,11 @@ OnError(_FatalErrorHandler)
 ; Pure helpers (no boot-time side effects) — CountDynamicSection is exercised
 ; by the dynamic-hotstrings corpus parity test.
 #Include ../lib/menu_helpers.ahk
+; Wrap-symbols persistence: globals and function definitions only, no top-level
+; side effects, so it loads headlessly. Included so the load/save data-loss
+; guard (test_wrap_symbols_unreadable_blocks_save.ahk) can drive the real
+; functions instead of scanning their source.
+#Include ../lib/wrap_symbols_config.ahk
 #Include ../modules/keymap/layout/layout_altgr.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
@@ -198,6 +204,7 @@ InstallSendNoOps()
 #Include unit/test_timer_scheduler.ahk
 #Include unit/test_hook_dispatcher.ahk
 #Include unit/test_logger.ahk
+#Include unit/test_logger_format_failure_is_visible.ahk
 #Include unit/test_logger_contract.ahk
 #Include unit/test_logger_daily_rotation.ahk
 #Include unit/test_healthcheck_core.ahk
@@ -213,6 +220,7 @@ InstallSendNoOps()
 #Include unit/test_hotstring_live_toggle.ahk
 #Include unit/test_hotstring_count_policy.ahk
 #Include unit/test_prefix_watcher_index.ahk
+#Include unit/test_preview_index_covers_every_registration.ahk
 #Include unit/test_preview_defers_to_engine.ahk
 #Include unit/test_prefix_index_cache_equiv.ahk
 #Include unit/test_master_gates.ahk
@@ -234,11 +242,15 @@ InstallSendNoOps()
 #Include unit/test_hotstrings_full.ahk
 #Include unit/test_tap_hold_loader.ahk
 #Include unit/test_i18n.ahk
+#Include unit/test_locale_probe_is_silent.ahk
 #Include unit/test_window_utils.ahk
 #Include unit/test_text_utils.ahk
 #Include unit/test_registry.ahk
 #Include unit/test_personal_toml_io.ahk
 #Include unit/test_nav_layer_helpers.ahk
+#Include unit/test_synthetic_buffer_effects.ahk
+#Include unit/test_synthetic_sends_declare_buffer_effect.ahk
+#Include unit/test_capsword_taphold_unlatch.ahk
 #Include meta/test_tap_hold_suspend_boundary.ahk
 #Include unit/test_updater.ahk
 #Include unit/test_updater_constants_single_source.ahk
@@ -333,6 +345,7 @@ _LogBootProgress("loading gestures modules")
 #Include ../modules/gestures/window_cycle.ahk
 #Include ../modules/gestures/config.ahk
 #Include unit/test_gestures.ahk
+#Include unit/test_gesture_restart_result_zero_is_success.ahk
 _LogBootProgress("gestures + test included")
 
 ; Keylogger sub-modules — pure-logic subsets included here to test category
@@ -369,6 +382,8 @@ global _ConfigDir := A_Temp . "\ergopti_test_config\"
 #Include ../modules/keylogger/keylogger_sql.ahk
 #Include unit/test_keylogger_walker.ahk
 #Include unit/test_keylogger_sql.ahk
+#Include unit/test_build_inserts_covers_emitted_types.ahk
+#Include unit/test_metrics_and_locale_honesty.ahk
 #Include unit/test_keylogger_app_categories.ahk
 #Include meta/test_keylogger_ui_dead_code.ahk
 #Include unit/test_keylogger_reader.ahk
@@ -432,6 +447,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_searchpath_regjump_catch.ahk
 #Include meta/test_gesture_exit_button_release.ahk
 #Include meta/test_textsend_clipall.ahk
+#Include meta/test_text_sender_clipboard_restore.ahk
 #Include meta/test_llm_autotype_hse_suppress.ahk
 #Include meta/test_ingest_tick_guards.ahk
 #Include meta/test_ingest_failure_requeues.ahk
@@ -442,6 +458,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_metrics_focus_off_thread.ahk
 #Include meta/test_clipboard_ram_leak.ahk
 #Include meta/test_space_tap_dispatch.ahk
+#Include meta/test_dispatch_verdict_consumed.ahk
+#Include meta/test_fire_log_never_synchronous.ahk
 #Include meta/test_roi_map_mutation_race.ahk
 #Include meta/test_deferred_registration_live_rebuild_race.ahk
 #Include meta/test_spotlight_non_blocking.ahk
@@ -497,6 +515,9 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_llm_ensure_model_ready_guard.ahk
 #Include meta/test_boot_deferred_tasks.ahk
 #Include meta/test_boot_error_fatal_before_ready.ahk
+#Include meta/test_hotif_globals_boot_safe.ahk
+#Include meta/test_error_net_prelogger_safe.ahk
+#Include meta/test_boot_paths_fail_soft.ahk
 #Include meta/test_wpm_widget_native_render.ahk
 #Include meta/test_wpm_widget_hidden_until_typed.ahk
 #Include meta/test_text_expansion_critical_path.ahk
@@ -531,6 +552,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_remote_poll_com_exception_bails.ahk
 #Include meta/test_cle_emoji_gated.ahk
 #Include meta/test_hse_consumed_endchar_ring.ahk
+#Include meta/test_expansion_burst_atomic.ahk
 #Include meta/test_parsetomlfile_unterminated_array_recovers.ahk
 #Include meta/test_dispatcher_register_duplicate_label.ahk
 #Include meta/test_updater_cancel_fires_on_json.ahk
@@ -561,6 +583,9 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_corpus_hotstrings.ahk
 #Include meta/test_preview_matches_engine.ahk
 #Include meta/test_prefix_buffer_tracks_engine.ahk
+#Include meta/test_nav_cluster_resets_both_buffers.ahk
+#Include meta/test_preview_never_wiped_alone.ahk
+#Include meta/test_preview_engine_single_owner.ahk
 #Include meta/test_corpus_dynamic_hotstrings_prefix.ahk
 #Include meta/test_corpus_hotstrings_config_resolve.ahk
 #Include meta/test_corpus_tap_hold.ahk
@@ -580,6 +605,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_corpus_toml_fuzz.ahk
 #Include meta/test_toml_inline_comment_stripping.ahk
 #Include meta/test_toml_read_failure_is_loud.ahk
+#Include meta/test_config_boot_read_failure_blocks_persist.ahk
+#Include meta/test_persist_result_not_discarded.ahk
 ; Keylogger aggregation corpus -- tests KLW_WalkTypingEntry / KLW_WalkAppSwitch /
 ; KLW_WalkWindowSwitch / KLW_WalkSystemEvent against shared cross-driver vectors.
 #Include meta/test_corpus_keylogger_aggregation.ahk
@@ -608,6 +635,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_capslock_led_single_owner.ahk
 #Include meta/test_config_shortcuts_array_escape.ahk
 #Include meta/test_config_window_delay_write_per_keystroke.ahk
+#Include meta/test_config_window_republishes_baked_fields.ahk
 #Include meta/test_config_window_no_delimiter_ui.ahk
 #Include meta/test_curl_payload_pii_temp_leak.ahk
 #Include meta/test_deadkey_suspend_guard.ahk
@@ -833,6 +861,10 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_savefullconfig_no_delete.ahk
 #Include meta/test_keylogger_scan_max_id_tail.ahk
 #Include meta/test_gesture_screenshot_no_tempfile.ahk
+#Include meta/test_wmexists_is_not_a_handle.ahk
+#Include meta/test_taphold_scancodes_are_the_real_keys.ahk
+#Include unit/test_crypto_sha256_is_real.ahk
+#Include meta/test_capslock_led_does_not_latch.ahk
 #Include meta/test_hotstrings_deadkey_uppercase_cleanup.ahk
 #Include meta/test_parser_splitblocks_cap.ahk
 #Include meta/test_ollama_trim_registry_min_id.ahk
@@ -861,6 +893,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_llm_parser_dedup_stats.ahk
 #Include meta/test_paste_without_formatting_restore.ahk
 #Include meta/test_hold_layer_release_bounded.ahk
+#Include meta/test_hold_layer_survives_long_press.ahk
 #Include meta/test_toml_batchwrite_cache_coherence.ahk
 #Include meta/test_topology_debounce_settled_geometry.ahk
 #Include meta/test_topology_single_append.ahk
@@ -933,6 +966,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_keymap_hotpath_guards.ahk
 #Include meta/test_keymap_deadkey_emit_serialized.ahk
 #Include meta/test_deadkey_ring_push.ahk
+#Include meta/test_altgr_callbacks_serialized.ahk
 #Include meta/test_hook_dispatcher_critical_save_restore.ahk
 #Include meta/test_hook_dispatcher_err_cache_cap.ahk
 #Include meta/test_walker_batch_critical.ahk
@@ -1027,6 +1061,10 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_toggle_category_all_features_atomic.ahk
 #Include meta/test_crypto_djb2_fallback_logged.ahk
 #Include meta/test_adapter_callback_swallow_logged.ahk
+#Include meta/test_llm_callbacks_never_swallowed.ahk
+#Include meta/test_llm_inflight_hygiene.ahk
+#Include meta/test_wpm_widget_consistency.ahk
+#Include meta/test_marker_and_heatmap_completeness.ahk
 #Include meta/test_text_send_direct_mode_guarded.ahk
 #Include meta/test_http_post_reentrancy_guard.ahk
 #Include meta/test_personal_editor_autoexpand_i18n.ahk
@@ -1067,6 +1105,116 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_audit_2026_07_20_webview.ahk
 #Include meta/test_audit_2026_07_20_batch4.ahk
 #Include meta/test_wrap_symbols_load_flush.ahk
+#Include unit/test_wrap_symbols_unreadable_blocks_save.ahk
+#Include unit/test_unreadable_config_never_persisted.ahk
+#Include meta/test_app_picker_sort_safe_selection.ahk
+#Include meta/test_changelog_ready_not_stranded.ahk
+#Include meta/test_hcw_bulk_writers_republish.ahk
+#Include meta/test_hcw_patch_toml_meta_refuses_unread_file.ahk
+#Include meta/test_healthcheck_singleton_destroys_window.ahk
+#Include meta/test_ingest_offset_respects_batch_limit.ahk
+#Include meta/test_kl_payload_privacy_filter.ahk
+#Include meta/test_kl_stop_shutdown_ingest_forced.ahk
+#Include meta/test_llm_finalize_guard_before_yield.ahk
+#Include meta/test_llm_indexed_callbacks_never_swallowed.ahk
+#Include meta/test_llm_model_menu_no_model_row_actionable.ahk
+#Include meta/test_llm_profile_menu_unique_labels.ahk
+#Include meta/test_locale_tsv_atomic_write.ahk
+#Include meta/test_menu_manifest_single_decode.ahk
+#Include meta/test_menu_prune_keeps_detached_registrations.ahk
+#Include meta/test_metrics_filter_secure_field_fails_closed.ahk
+#Include meta/test_nav_layer_lalt_capslock_group_gate.ahk
+#Include meta/test_network_info_single_wlan_roundtrip.ahk
+#Include meta/test_onboarding_unbraced_if_scope.ahk
+#Include meta/test_personal_info_save_surfaces_failure.ahk
+#Include meta/test_remote_curl_forwards_usage_meta.ahk
+#Include meta/test_remote_token_not_on_argv.ahk
+#Include meta/test_secure_field_native_detect_conclusive_order.ahk
+#Include meta/test_secure_field_probes_focused_element.ahk
+#Include meta/test_secure_field_stale_verdict_fails_closed.ahk
+#Include meta/test_secure_field_uia_probe_guards.ahk
+#Include meta/test_today_bucket_slots_all_fed.ahk
+#Include meta/test_tooltip_expiry_anchored_at_request.ahk
+#Include meta/test_tooltip_expiry_timers_keep_preview.ahk
+#Include meta/test_tooltip_uia_gate_reachable.ahk
+#Include meta/test_uia_wrap_resets_both_buffers.ahk
+#Include meta/test_updater_releases_list_cancellable.ahk
+#Include meta/test_updater_worker_terminated_on_exit.ahk
+#Include meta/test_webview_reset_guard_class.ahk
+#Include meta/test_wpm_graph_mode_draggable.ahk
+#Include meta/test_wpm_rebuilt_surface_is_sized.ahk
+#Include unit/test_activate_hotstrings_commits_synchronously.ahk
+#Include unit/test_cache_builder_strips_header_comment.ahk
+#Include unit/test_config_toml_single_writer.ahk
+#Include unit/test_derived_toml_caches_not_memoised_on_failed_read.ahk
+#Include unit/test_fire_log_callable_replacement.ahk
+#Include unit/test_group_config_cache_alias_invalidation.ahk
+#Include unit/test_hotpath_profiler_exclusive.ahk
+#Include unit/test_hotpath_per_segment_threshold.ahk
+#Include unit/test_keylogger_today_fh_flush.ahk
+#Include unit/test_llm_cache_hit_logs_suggested.ahk
+#Include unit/test_llm_keep_alive_from_shared_defaults.ahk
+#Include unit/test_llm_parser_refuses_uninjectable_deletes.ahk
+#Include unit/test_logger_preinit_level.ahk
+#Include unit/test_logger_sub_files_multiline_arrays.ahk
+#Include unit/test_marker_substituted_in_replacement.ahk
+#Include unit/test_master_gates_not_persisted.ahk
+#Include unit/test_parse_toml_file_sticky_unreadable.ahk
+#Include unit/test_personal_info_unreadable_never_persisted.ahk
+#Include unit/test_personal_read_clears_unreadable_latch.ahk
+#Include unit/test_personal_reload_bakes_resolved_delay.ahk
+#Include unit/test_prefetch_apps_list_deduped.ahk
+#Include unit/test_prefetch_dbg_write_level_gated.ahk
+#Include unit/test_preview_picks_engine_winner.ahk
+#Include unit/test_preview_uses_by_trigger_index.ahk
+#Include unit/test_repeat_key_honours_rebuild_fence.ahk
+#Include unit/test_shell_runner_multiline_arg.ahk
+#Include unit/test_taphold_inherit_defaults_roundtrip.ahk
+#Include unit/test_taphold_synthetic_refcount_combo.ahk
+#Include unit/test_taphold_unreadable_blocks_rewrite.ahk
+#Include unit/test_tooltip_row_band_elision.ahk
+#Include meta/test_boot_profile_retroactive_stamps.ahk
+#Include meta/test_fast_timer_inventory.ahk
+#Include meta/test_gestures_bulk_actions_ahk_reachable.ahk
+#Include meta/test_gesture_constants_available_to_onboarding.ahk
+#Include meta/test_hotpath_segment_coverage.ahk
+#Include meta/test_llm_health_probe_constants.ahk
+#Include meta/test_menu_manifest_one_decoder.ahk
+#Include meta/test_menu_reload_preserves_suspend.ahk
+#Include meta/test_menu_shortcut_groups_spliced_once.ahk
+#Include meta/test_metrics_private_title_memo.ahk
+#Include meta/test_ollama_async_registry_is_curl_only.ahk
+#Include meta/test_personal_save_rebuilds_preview_index.ahk
+#Include meta/test_taphold_hold_gate_arms_without_tap.ahk
+#Include meta/test_tooltip_debounce_is_load_bearing.ahk
+#Include meta/test_tooltip_present_subsegmented.ahk
+#Include meta/test_tooltip_render_accounting.ahk
+#Include meta/test_tray_suspend_checkmark_survives_rebuild.ahk
+#Include meta/test_uia_clamp_every_probe_site.ahk
+#Include meta/test_uia_poll_segment_bounded.ahk
+#Include meta/test_hcw_reset_all_republishes.ahk
+#Include meta/test_llm_inline_autotype_staleness.ahk
+#Include meta/test_walker_batch_has_an_inprocess_drain.ahk
+#Include unit/test_walker_title_cap_enforced.ahk
+#Include meta/test_boot_profile_retroactive_stamps.ahk
+#Include meta/test_fast_timer_inventory.ahk
+#Include meta/test_hotpath_segment_coverage.ahk
+#Include meta/test_tooltip_debounce_is_load_bearing.ahk
+#Include meta/test_tooltip_present_subsegmented.ahk
+#Include meta/test_tooltip_render_accounting.ahk
+#Include meta/test_uia_clamp_every_probe_site.ahk
+#Include meta/test_boot_profile_retroactive_stamps.ahk
+#Include meta/test_hotpath_segment_coverage.ahk
+#Include meta/test_tooltip_debounce_is_load_bearing.ahk
+#Include meta/test_tooltip_present_subsegmented.ahk
+#Include meta/test_tooltip_render_accounting.ahk
+#Include meta/test_uia_clamp_every_probe_site.ahk
+#Include meta/test_boot_profile_retroactive_stamps.ahk
+#Include meta/test_hotpath_segment_coverage.ahk
+#Include meta/test_uia_clamp_every_probe_site.ahk
+#Include meta/test_boot_profile_retroactive_stamps.ahk
+#Include meta/test_uia_clamp_every_probe_site.ahk
+#Include meta/test_boot_profile_retroactive_stamps.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,

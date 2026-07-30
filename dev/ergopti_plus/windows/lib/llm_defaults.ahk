@@ -195,8 +195,13 @@ LLM_Defaults_Load() {
 			d[key] := _LLMD_GetNumber(raw, key)
 	}
 
-	; Strings (shared) — model/backend are AHK-local and applied below
-	for key in ["llm_active_profile"] {
+	; Strings (shared) — model/backend are AHK-local and applied below.
+	; llm_ollama_keep_alive belongs here and not to a `Has()` guard downstream:
+	; api_ollama/init.ahk only copies it when the key exists, so omitting it from
+	; this list left that guard permanently false and the payload builder fell back
+	; to a hardcoded literal — the shared JSON could be edited with no effect on
+	; Windows while macOS honoured it.
+	for key in ["llm_active_profile", "llm_ollama_keep_alive"] {
 		if !_LLMD_HasKey(raw, key)
 			missing.Push(key)
 		else

@@ -48,11 +48,16 @@ helpers.describe("M-10: vscode_bridge lifecycle wired in init.lua", function()
 			src:find(".setup()", 1, true) ~= nil,
 			"init.lua must call .setup() on the bridge so the HTTP server starts")
 
-		-- setup() must appear AFTER menu.start (tooltip subsystem must be up first)
+		-- setup() must appear AFTER menu.start (tooltip subsystem must be up first).
+		--
+		-- Anchored on the SETUP CALL, not on the first mention of the module. The
+		-- shutdown callback also requires vscode_bridge — for stop_server — and it
+		-- is armed early in boot, so the first mention is the teardown's and says
+		-- nothing about when the server starts.
 		local menu_pos  = src:find("menu.start(", 1, true)
-		local setup_pos = src:find("vscode_bridge", 1, true)
+		local setup_pos = src:find('require("lib.vscode_bridge").setup()', 1, true)
 		helpers.assert_true(menu_pos ~= nil, "init.lua must call menu.start()")
-		helpers.assert_true(setup_pos ~= nil, "init.lua must reference vscode_bridge")
+		helpers.assert_true(setup_pos ~= nil, "init.lua must call vscode_bridge.setup()")
 		helpers.assert_true(setup_pos > menu_pos,
 			"vscode_bridge.setup() must be called after menu.start() in init.lua")
 	end)
