@@ -361,6 +361,10 @@ global SpaceAroundSymbols := ""
 global _StaticDir := A_ScriptDir . "\..\..\.."
 global _SharedDir := _StaticDir . "\ergopti_plus\_shared"
 global _DriverDir := _StaticDir . "\ergopti_plus\windows"
+; Mirrors the entry point's sub-root for extension packs. Any new pre-pump global
+; in ErgoptiPlus.ahk must be mirrored here or the first read from a unit test
+; raises "global variable has not been assigned a value".
+global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
 
 ; Strict-canonicalisation guard read by TOML_RunStrictCanonicalization in
 ; lib/toml/toml_helpers.ahk. Production declares this in ErgoptiPlus.ahk

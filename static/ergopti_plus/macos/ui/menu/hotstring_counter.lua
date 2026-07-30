@@ -220,7 +220,7 @@ function M.count_all(ctx, ergopti_groups)
 		ext_has_count = _ext_meta_cache.has_count
 		ext_details   = _ext_meta_cache.details
 	else
-		local ext_root = ctx.base_dir and (ctx.base_dir .. "../../extensions/")
+		local ext_root = ctx.base_dir and (ctx.base_dir .. "../extensions/")
 		-- `x and pcall(...) or false` truncates pcall to ONE value, so the second
 		-- local was always nil and the type(attr) == "table" test below could never
 		-- pass: the whole extensions surface was unreachable. Call pcall directly.

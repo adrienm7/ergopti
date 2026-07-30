@@ -160,10 +160,11 @@ _HCW_BuildCategoryList() {
 	}
 
 	; --- Extension TOML files ---
-	; Resolve extensions root relative to the driver's static/ ancestor
-	SplitPath(A_ScriptDir, , &DriversDir)
-	SplitPath(DriversDir, , &StaticDir)
-	ExtRoot := StaticDir . "\extensions\"
+	; One resolver, set by the entry point. This site used to walk two levels up
+	; from A_ScriptDir and land on static/, which has held no extensions/ since the
+	; reorg; DirExist() then turned the miss into a silent no-op.
+	global _ExtensionsDir
+	ExtRoot := _ExtensionsDir . "\"
 	if DirExist(ExtRoot) {
 		ExtDirNames := []
 		Loop Files, ExtRoot . "*", "D" {

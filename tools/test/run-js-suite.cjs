@@ -70,6 +70,7 @@ const CHECKS = [
 	{ name: 'section-title decoration parity (single "— … —" source per driver, no re-inlining)', cmd: 'node', args: ['tools/test/test-section-decoration-parity.cjs'], repro: 'node tools/test/test-section-decoration-parity.cjs' },
 	{ name: 'macOS bundle layout (build script + launcher mirror the repo)', cmd: 'node', args: ['tools/test/test-macos-bundle-layout.cjs'], repro: 'node tools/test/test-macos-bundle-layout.cjs' },
 	{ name: 'Linux package layout (.deb/.rpm install into /usr/lib/ergopti; wrapper boots the same bundle entry)', cmd: 'node', args: ['tools/test/test-linux-package-layout.cjs'], repro: 'node tools/test/test-linux-package-layout.cjs' },
+	{ name: 'extension-pack paths resolve (every read site lands on a real pack; pre-reorg prefix ratcheted out)', cmd: 'node', args: ['tools/test/test-extensions-path-resolves.cjs'], repro: 'node tools/test/test-extensions-path-resolves.cjs' },
 	{ name: 'launcher single-instance guard (LSMultipleInstancesProhibited in Info.plist)', cmd: 'node', args: ['tools/test/test-launcher-single-instance.cjs'], repro: 'node tools/test/test-launcher-single-instance.cjs' },
 	{ name: 'menu manifest drift (feature paths + i18n keys resolve against manifest.toml)', cmd: 'node', args: ['tools/test/test-menu-manifest.cjs'], repro: 'node tools/test/test-menu-manifest.cjs' },
 	{ name: 'features manifest no-drift (committed .lua/.ahk match the live generator)', cmd: 'node', args: ['tools/test/test-features-manifest-no-drift.cjs'], repro: 'node tools/test/test-features-manifest-no-drift.cjs' },

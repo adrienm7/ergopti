@@ -54,8 +54,8 @@ _SC_ScriptControl(SubMenu, _Cat) {
 
 ; Dynamic handler: extensions shortcuts submenus.
 _SC_Extensions(SubMenu, _Cat) {
-	global _StaticDir
-	ExtShortcutsBaseDir := _StaticDir . "\extensions\"
+	global _ExtensionsDir
+	ExtShortcutsBaseDir := _ExtensionsDir . "\"
 	HasExtShortcuts := false
 	if DirExist(ExtShortcutsBaseDir) {
 		Loop Files ExtShortcutsBaseDir . "*", "D" {

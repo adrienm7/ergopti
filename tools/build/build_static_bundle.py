@@ -66,9 +66,11 @@ ASSET_TREES: list[tuple[str, str, tuple[str, ...]]] = [
 		"static/ergopti_plus/windows/_generated",
 		("personal_shortcuts.ahk", "paths.toml"),
 	),
-	("static/ergopti_plus/windows/data",       "static/ergopti_plus/windows/data",       ()),
-	# Extensions tree: read-only enumeration by the tray menu via _StaticDir + "\extensions\".
-	("static/extensions",                      "static/extensions",                      (".git*",)),
+	# Extensions tree: read-only enumeration by the tray menu via _ExtensionsDir.
+	# Was "static/extensions", a path the static/ reorg removed. The bundler
+	# warns-and-continues on a missing source, so the shipped .exe carried no
+	# extension packs at all and CI stayed green.
+	("static/ergopti_plus/extensions",         "static/ergopti_plus/extensions",         (".git*",)),
 	# Driver icons and language flags read via _StaticDir + "\img\...".
 	("static/img/logo",                        "static/img/logo",                        ()),
 	("static/img/flags",                       "static/img/flags",                       ()),
@@ -124,8 +126,17 @@ def build_bundle(repo_root: Path, output: Path) -> int:
 		for src_rel, dst_rel, excludes in ASSET_TREES:
 			src_dir = repo_root / src_rel
 			if not src_dir.is_dir():
-				print(f"[bundle] WARN: missing directory '{src_rel}' — skipped.", file=sys.stderr)
-				continue
+				# Fail fast (§5.3). Warning-and-continuing is how a stale path in
+				# ASSET_TREES shipped an .exe with no extension packs while CI
+				# stayed green: every declared tree here is a runtime dependency of
+				# the compiled driver, so a missing one is a broken build, not a
+				# note. Remove the entry deliberately if a tree is retired.
+				print(
+					f"[bundle] ERROR: declared tree '{src_rel}' does not exist. "
+					"Fix the path or remove it from ASSET_TREES.",
+					file=sys.stderr,
+				)
+				return -1
 			for path in sorted(src_dir.rglob("*")):
 				if not path.is_file():
 					continue
@@ -176,6 +187,11 @@ def main() -> int:
 	print(f"[bundle] Repo root  : {repo_root}")
 	print(f"[bundle] Output     : {output}")
 	count = build_bundle(repo_root, output)
+	if count < 0:
+		# A declared asset tree was missing — the zip on disk is incomplete and
+		# must not be treated as a build product.
+		output.unlink(missing_ok=True)
+		return 1
 	size_kb = output.stat().st_size / 1024
 	print(f"[bundle] Files      : {count}")
 	print(f"[bundle] Size       : {size_kb:.1f} KB")
