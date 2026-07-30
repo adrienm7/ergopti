@@ -406,6 +406,10 @@ function M.update_private_status()
 	end
 	_last_win_title = title
 	_last_win_time  = now
+	-- Published into the shared state so the keystroke path can read the focused
+	-- window title instead of making its own cross-process AX call for it. This
+	-- function already has the title in hand on every window change.
+	_state.active_win_title = title
 
 	-- Check for private/incognito mode keywords in the window title
 	for _, keyword in ipairs(get_private_keywords()) do
