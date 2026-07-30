@@ -384,10 +384,15 @@ global _ConfigDir := A_Temp . "\ergopti_test_config\"
 ; with no top-level hotkeys, and keylogger_sql.ahk now calls it, so it must load
 ; before the SQL builders.
 #Include ../modules/keylogger/keylogger_text_cipher.ahk
+; keylogger_text_migration.ahk (the data.sql rewrite that converts rows stored
+; before the setting changed) is likewise pure definitions: its only side effect
+; is armed by a timer from KL_Init, which the runner never calls.
+#Include ../modules/keylogger/keylogger_text_migration.ahk
 #Include ../modules/keylogger/keylogger_sql.ahk
 #Include unit/test_keylogger_walker.ahk
 #Include unit/test_keylogger_sql.ahk
 #Include unit/test_keylogger_text_cipher.ahk
+#Include unit/test_keylogger_text_migration.ahk
 #Include unit/test_build_inserts_covers_emitted_types.ahk
 #Include unit/test_metrics_and_locale_honesty.ahk
 #Include unit/test_keylogger_app_categories.ahk

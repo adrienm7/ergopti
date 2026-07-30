@@ -900,6 +900,7 @@ KL_LogSession(kind, duration_ms := unset) {
 
 
 #Include keylogger_text_cipher.ahk
+#Include keylogger_text_migration.ahk
 #Include keylogger_sql.ahk
 
 
@@ -971,6 +972,13 @@ KL_IngestOnce(force := false, rollover_owned := false) {
     ; + live-push while suspended violates the pause invariant.
     if A_IsSuspended && !Keylogger._shutting_down
         return Map("ok", false, "eof", false, "reason", "suspended")
+    ; Hold off while the at-rest migration is rewriting data.sql. It publishes the
+    ; converted ledger with a single move, and an append landing between its last
+    ; read and that move would be overwritten and lost for good. Deferring is
+    ; free: today.log is the durable buffer and keeps accepting events, exactly as
+    ; during the typing-burst deferral below.
+    if (IsSet(KLMigration) && KLMigration.active && !Keylogger._shutting_down)
+        return Map("ok", false, "eof", false, "reason", "migrating")
     ; Guard against running the heavy SQL/I/O path during a typing burst.
     ; Moved BEFORE the pending-entries drain so we never clear _pending_entries
     ; from RAM and then defer — that would leave entries on disk only, where
@@ -1375,6 +1383,12 @@ KL_Init(metrics_dir) {
     ; Initial ingest pass to drain anything buffered while the script was
     ; not running.
     SetTimer(KL_IngestOnce.Bind(), -250)
+
+    ; Bring data.sql in line with the at-rest posture the config just restored.
+    ; A no-op unless they disagree, and deferred either way: the comparison is
+    ; cheap but the rewrite it may start is not, and neither belongs on the boot
+    ; critical path.
+    SetTimer(KL_Mig_SyncToPosture, -KL_MIG_BOOT_DELAY_MS)
 }
 
 KL_Stop() {
@@ -1391,6 +1405,11 @@ KL_Stop() {
     ; explicit flushes but none of the six module drains that carry most of the
     ; shutdown write traffic.
     Keylogger._shutting_down := true
+    ; Drop any in-flight ledger rewrite before the shutdown drain: its staging
+    ; file describes a data.sql that the flush below is about to extend, and the
+    ; ingest guard bypasses on _shutting_down, so leaving it armed would publish a
+    ; ledger missing the closing batch.
+    try KL_Mig_Cancel()
     ; Release the keystroke hook FIRST so no late event lands in a
     ; buffer we are about to flush + serialise.
     try KL_Hook_Stop()

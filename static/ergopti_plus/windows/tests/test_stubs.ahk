@@ -689,6 +689,12 @@ class Keylogger {
     ; encryption IV per row.
     static device_id      := "test-device"
     static next_event_id  := 1
+    ; Ledger location + lifecycle flag, read by modules/keylogger/
+    ; keylogger_text_migration.ahk. AHK v2 THROWS on an undeclared static, so a
+    ; missing field here is a crash in the migration test rather than a skip.
+    static initialized    := false
+    static by_device_dir  := ""
+    static data_sql_path  := ""
 }
 
 ; Synthetic keystroke tagging. In production this lives in keylogger.ahk.
