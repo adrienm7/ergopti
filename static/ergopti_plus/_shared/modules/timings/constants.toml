@@ -77,7 +77,7 @@ zombie_kill_min_interval_ms = 3000
 fresh_launch_grace_ms = 90000
 
 # Discovery: stop polling /v1/models after this much real time.
-discovery_max_wait_ms = 60000
+discovery_max_wait_ms = 180000
 
 # Discovery: first inter-probe delay (doubles each miss, up to the cap).
 discovery_poll_initial_ms = 1000

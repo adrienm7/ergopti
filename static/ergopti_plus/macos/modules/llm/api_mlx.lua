@@ -268,6 +268,12 @@ local _warmup_stopped    = false -- set by stop_warmup(); blocks the self-retry 
 -- broken model is always visible instead of an eternal orange spinner.
 local _load_failed         = false  -- true once the current model is known to be unloadable
 local _warmup_started_at   = nil    -- epoch of the first warmup attempt for the current model
+-- Epoch of the first warmup attempt that found the endpoints undiscovered. The
+-- warmup budget below is stamped only AFTER discovery succeeds, so without this a
+-- server that never answers left no clock running at all: warmup returned at the
+-- discovery branch on every retry and the terminal "load failed" state was
+-- unreachable. The orange "still loading" dot stayed up forever.
+local _discovery_started_at = nil
 local _warmup_fail_notified = false -- guards against firing the failure notification twice
 -- Give-up budget: after this much CONTINUOUS warmup failure we stop retrying and surface
 -- the error. Deliberately generous — far longer than any legitimate cold load (8B-class
@@ -276,6 +282,14 @@ local _warmup_fail_notified = false -- guards against firing the failure notific
 -- (models_manager_mlx) is the FAST path for the common arch-mismatch case; this is the
 -- model-agnostic backstop for failures that print no recognizable traceback.
 local WARMUP_GIVE_UP_SEC   = 120
+
+-- Budget for the DISCOVERY phase, which precedes the warmup budget above and used
+-- to have none. Read from the shared timings registry, where the key already
+-- existed with no reader at all while api_mlx_discovery hardcoded its own copy —
+-- one concept, two values. Deliberately longer than the polling window
+-- api_mlx_discovery uses, so the poller gives up first and this is the backstop
+-- for the case where even the retry cycles never converge.
+local DISCOVERY_GIVE_UP_SEC = Timings.sec("llm", "discovery_max_wait_ms") + WARMUP_GIVE_UP_SEC
 
 -- The MLX server base URL — single source of truth in _shared/modules/llm/mlx_server.json.
 -- Derived from MLX_HOST/MLX_PORT (loaded at the top of this file). Endpoint route
@@ -459,6 +473,7 @@ function M.reset_endpoints()
 	-- newly selected (or relaunched) model is given the full warmup budget again.
 	_load_failed                 = false
 	_warmup_started_at           = nil
+	_discovery_started_at        = nil
 	_warmup_fail_notified        = false
 	Logger.warn(LOG, "Endpoint discovery state reset.")
 end
@@ -532,6 +547,17 @@ function M.warmup(model_name, profile)
 	-- the warmup budget (WARMUP_GIVE_UP_SEC = 120s) — a large model that takes
 	-- 120-180s to map into GPU would otherwise trigger a false failure.
 	if not ApiMlxDiscovery.is_discovered() then
+		-- The discovery phase gets its own budget, for the same reason warmup has one:
+		-- a model that never becomes reachable must end in a red dot the user can act
+		-- on, not an orange one that spins for the rest of the session.
+		if not _discovery_started_at then _discovery_started_at = TimerScheduler.now() end
+		local discovery_elapsed = TimerScheduler.now() - _discovery_started_at
+		if discovery_elapsed >= DISCOVERY_GIVE_UP_SEC then
+			Logger.error(LOG, "MLX discovery for '%s' gave up after %.0fs — surfacing as load failure.",
+				tostring(model_name), discovery_elapsed)
+			M.mark_load_failed(model_name, true)
+			return
+		end
 		Logger.debug(LOG, "warmup() — endpoints not yet discovered, triggering discovery…")
 		-- Record the model we are waiting for so the discovery poll can reject a
 		-- /v1/models 200 from the old server (still alive for ~2 s during model switch).
