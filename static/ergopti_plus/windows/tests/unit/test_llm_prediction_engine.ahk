@@ -59,6 +59,12 @@ _EngineInit_LanguageFollowsLocale() {
 	Saved := _I18nLocale
 	_I18nLocale := "en"
 	LLM_Engine_Init(Map())
+	; These cases exercise the cache and debounce paths, not the privacy gate.
+	; State the posture explicitly: the shared default now BLOCKS secure fields,
+	; and the production gate fails closed when the detector cannot answer —
+	; which is always the case in a headless harness, so every prediction would
+	; be suppressed and these tests would assert nothing about their own subject.
+	_LLM_Engine["disable_password_fields"] := false
 	Lang := _LLM_Engine["language"]
 	_I18nLocale := Saved
 	AssertEqual("en", Lang)
@@ -117,6 +123,12 @@ Test("LLM_Engine_Init: copies disabled_apps array from opts", _EngineInit_Copies
 _EngineSetEnabled_DisablesEngine() {
 	global _LLM_Engine
 	LLM_Engine_Init(Map())
+	; These cases exercise the cache and debounce paths, not the privacy gate.
+	; State the posture explicitly: the shared default now BLOCKS secure fields,
+	; and the production gate fails closed when the detector cannot answer —
+	; which is always the case in a headless harness, so every prediction would
+	; be suppressed and these tests would assert nothing about their own subject.
+	_LLM_Engine["disable_password_fields"] := false
 	LLM_Engine_SetEnabled(false)
 	AssertFalse(_LLM_Engine["enabled"])
 }
@@ -136,6 +148,12 @@ _EngineSetEnabled_CancelsTimerOnDisable() {
 	global _LLM_Engine
 	; Arm a fake timer marker, then disable — timer_active must be cleared
 	LLM_Engine_Init(Map())
+	; These cases exercise the cache and debounce paths, not the privacy gate.
+	; State the posture explicitly: the shared default now BLOCKS secure fields,
+	; and the production gate fails closed when the detector cannot answer —
+	; which is always the case in a headless harness, so every prediction would
+	; be suppressed and these tests would assert nothing about their own subject.
+	_LLM_Engine["disable_password_fields"] := false
 	_LLM_Engine["timer_active"] := true
 	_LLM_Engine["pending_timer"] := ""   ; no real timer object, just the flag
 	LLM_Engine_SetEnabled(false)
@@ -517,6 +535,12 @@ _CacheHit_ExactMatchReturnsCachedResults() {
 	_LLM_Ollama_IsReady := true
 	; Seed the cache with a known context and results
 	LLM_Engine_Init(Map())
+	; These cases exercise the cache and debounce paths, not the privacy gate.
+	; State the posture explicitly: the shared default now BLOCKS secure fields,
+	; and the production gate fails closed when the detector cannot answer —
+	; which is always the case in a headless harness, so every prediction would
+	; be suppressed and these tests would assert nothing about their own subject.
+	_LLM_Engine["disable_password_fields"] := false
 	_LLM_Engine["last_ctx"]     := "intelligen"
 	_LLM_Engine["last_results"] := ["intelligence", "intelligent"]
 	id_before := _LLM_Engine["request_id"]
@@ -535,6 +559,12 @@ _CacheHit_PrefixMatchSlicesResults() {
 	; Firing with ctx="intelligence " gives typed_delta="ce " which matches the
 	; start of the cached slot — prefix-cache hits and slices to "alone".
 	LLM_Engine_Init(Map())
+	; These cases exercise the cache and debounce paths, not the privacy gate.
+	; State the posture explicitly: the shared default now BLOCKS secure fields,
+	; and the production gate fails closed when the detector cannot answer —
+	; which is always the case in a headless harness, so every prediction would
+	; be suppressed and these tests would assert nothing about their own subject.
+	_LLM_Engine["disable_password_fields"] := false
 	_LLM_Engine["last_ctx"]     := "intelligen"
 	_LLM_Engine["last_results"] := ["ce alone"]
 	; Now fire with a context that extends the cache by "ce " — prefix match
@@ -551,6 +581,12 @@ _CacheHit_EmptyContextSkipsRequest() {
 	global _LLM_Engine, _LLM_Ollama_IsReady
 	_LLM_Ollama_IsReady := true
 	LLM_Engine_Init(Map())
+	; These cases exercise the cache and debounce paths, not the privacy gate.
+	; State the posture explicitly: the shared default now BLOCKS secure fields,
+	; and the production gate fails closed when the detector cannot answer —
+	; which is always the case in a headless harness, so every prediction would
+	; be suppressed and these tests would assert nothing about their own subject.
+	_LLM_Engine["disable_password_fields"] := false
 	id_before := _LLM_Engine["request_id"]
 	; Empty context must return early without bumping request_id
 	LLM_Engine_FirePrediction("")

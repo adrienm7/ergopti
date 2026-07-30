@@ -48,6 +48,15 @@ M.DEFAULT_KEEP_ALIVE = "30m"
 --- Linux prediction engine sends the same window as macOS/Windows (was 2000).
 M.DEFAULT_CONTEXT_LENGTH = 500
 
+--- Privacy gates for the prediction path, mirroring the canonical defaults.json
+--- (llm_disable_password_fields = true, llm_disable_url_bars = false). The posture
+--- distinguishes by real risk: the text around the caret in a password field is a
+--- credential, a URL is not. Pinned to the JSON by
+--- tools/test/test-linux-llm-defaults-single-source.cjs, like every other scalar
+--- here — never re-type these.
+M.DEFAULT_DISABLE_PASSWORD_FIELDS = true
+M.DEFAULT_DISABLE_URL_BARS = false
+
 --- Number of words from the buffer tail kept as rolling context window.
 --- Single-sourced from the shared PromptBuilder (already required above) — it is
 --- the canonical for this value, so re-typing 5 here would let the two drift.

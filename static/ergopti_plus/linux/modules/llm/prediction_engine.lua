@@ -50,12 +50,62 @@ if ok_ps then ProfileSelector = ps_mod end
 -- thinking text, which is a correctness bug, not a missing nicety.
 local Parser = require("llm.parser")
 
+-- Canonical privacy posture, from defaults.json via the shared bridge. Never
+-- re-typed: the same two keys drive Windows and macOS.
+local _secure_field_filter_enabled =
+	(HttpBridge and HttpBridge.DEFAULT_DISABLE_PASSWORD_FIELDS)
+local _url_bar_filter_enabled =
+	(HttpBridge and HttpBridge.DEFAULT_DISABLE_URL_BARS)
+
 
 -- =========================================
 -- =========================================
 -- ======= 1/ Imports (lazy) ===============
 -- =========================================
 -- =========================================
+
+--- The AT-SPI secure-field detector. Optional: on a desktop without AT-SPI the
+--- adapter cannot answer, and the gate then fails CLOSED (see _is_secure_context).
+local function _get_secure_field_detector()
+	local ok, mod = pcall(require, "adapters.secure_field_detector")
+	if ok then return mod end
+	return nil
+end
+
+--- True when the current focus must not be sent to the model.
+--- Fails CLOSED: if the filter is enabled but the detector cannot be loaded or
+--- cannot answer, the prediction is suppressed. A privacy gate that degrades to
+--- "allow" is not a gate.
+--- @return boolean
+local function _is_secure_context()
+	if not _secure_field_filter_enabled and not _url_bar_filter_enabled then
+		return false
+	end
+
+	local detector = _get_secure_field_detector()
+	if not detector then
+		return _secure_field_filter_enabled == true
+	end
+
+	if _secure_field_filter_enabled then
+		local ok, secure = pcall(detector.isSecureField)
+		if not ok then return true end
+		if secure then return true end
+	end
+
+	if _url_bar_filter_enabled then
+		local ok_app, app_id = pcall(function()
+			local pl = require("adapters.process_lifecycle")
+			return pl and pl.getForegroundApp and pl.getForegroundApp()
+		end)
+		if ok_app and type(app_id) == "string" and app_id ~= "" then
+			local ok_secure, is_secure = pcall(detector.isSecureApp, app_id)
+			if ok_secure and is_secure then return true end
+		end
+	end
+
+	return false
+end
 
 local function _get_ollama()
 	local ok, mod = pcall(require, "modules.llm.api_ollama")
@@ -199,6 +249,17 @@ local _build_user_context
 --- @param output_context table|nil App and trigger metadata captured at request start.
 function M.predict(context, output_context)
 	if _predicting then return end
+
+	-- Privacy gate. Linux had none at all: the text around the caret was sent to
+	-- the model from password fields like any other context. The canonical posture
+	-- lives in defaults.json — secure fields blocked, URL bars allowed — and this
+	-- is the only driver-side decision, so it reads the same values as the other
+	-- two. Unlike the keylogger's app-name list, there is no pre-existing broader
+	-- filter here to narrow, so consuming the AT-SPI adapter is purely additive.
+	if _is_secure_context() then
+		Logger.debug(LOG, "Prediction suppressed: secure field or excluded context.")
+		return
+	end
 
 	local ollama = _get_ollama()
 	local profiles = _get_profiles()

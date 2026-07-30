@@ -158,8 +158,13 @@ local sequential_mode         = LLM_DEFAULTS.llm_sequential_mode
 local inactivity_debounce_sec = LLM_DEFAULTS.llm_debounce
 local excluded_apps              = {}
 local is_ai_preview_enabled      = true
-local url_bar_filter_enabled     = true  -- When false, predictions are allowed inside browser URL bars
-local secure_field_filter_enabled = true  -- When false, predictions are allowed inside password/secure fields
+-- Privacy gates, sourced from defaults.json like every other shared scalar. These
+-- were hardcoded to true here while the shared value said false and Windows read
+-- the shared value, so the same setting shipped with opposite defaults on the two
+-- drivers. Canonical posture: password/secure fields blocked, URL bars allowed —
+-- a credential is not a URL.
+local url_bar_filter_enabled      = LLM_DEFAULTS.llm_disable_url_bars
+local secure_field_filter_enabled = LLM_DEFAULTS.llm_disable_password_fields
 local auto_raise_temperature  = LLM_DEFAULTS.llm_auto_raise_temp
 local is_streaming_enabled       = LLM_DEFAULTS.llm_streaming
 local is_streaming_multi_enabled = LLM_DEFAULTS.llm_streaming_multi  -- Show each variant as it streams in
