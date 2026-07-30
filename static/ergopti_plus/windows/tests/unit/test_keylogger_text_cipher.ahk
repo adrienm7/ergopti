@@ -28,6 +28,8 @@
 ; ======= 1/ Round-Trip Through Real CNG Crypto =======
 ; =====================================================
 ; =====================================================
+
+_KLEnc_RoundTrip_Ascii() {
 	KL_Enc_SetMachineIdOverride("00000000-0000-0000-0000-000000000001")
 	KL_Enc_SetEnabled(true)
 	stored := KL_Enc_Encrypt("dev", 1, "hello world")
@@ -67,6 +69,8 @@ Test("KL_Enc: the plaintext does not appear in the stored envelope", _KLEnc_Stor
 ; ======= 2/ Envelope And Per-Row IV =======
 ; ==========================================
 ; ==========================================
+
+_KLEnc_EnvelopeFormat() {
 	KL_Enc_SetMachineIdOverride("00000000-0000-0000-0000-000000000001")
 	KL_Enc_SetEnabled(true)
 	stored := KL_Enc_Encrypt("dev", 4, "text")
@@ -104,6 +108,8 @@ Test("KL_Enc: does not double-wrap an already-encrypted value", _KLEnc_NoDoubleW
 ; ======= 3/ Disabled + Fail-Closed Behaviour =======
 ; ===================================================
 ; ===================================================
+
+_KLEnc_DisabledPassthrough() {
 	KL_Enc_SetMachineIdOverride("00000000-0000-0000-0000-000000000001")
 	KL_Enc_SetEnabled(false)
 	AssertEqual("hello", KL_Enc_Encrypt("dev", 8, "hello"), "a disabled cipher must return the plaintext untouched")
@@ -141,6 +147,8 @@ Test("KL_Enc: failure returns empty rather than plaintext", _KLEnc_FailClosed)
 ; ======= 4/ The Writer Drops Rather Than Leak =======
 ; ====================================================
 ; ====================================================
+
+_KLEnc_WriterDropsOnFailure() {
 	Keylogger.next_event_id := 1
 	KL_Enc_SetMachineIdOverride("")   ; force derivation failure
 	KL_Enc_SetEnabled(true)
