@@ -143,29 +143,12 @@ Two conventions that make asymmetry legible:
 
 Constraints: **paths before moves, moves before content, data before code.**
 
-- **Lot 2 — the safety net before any rename.** *Nothing below matters until 2.1
-  lands.*
-  1. **`_DriverDirConcat` and `_DriverFuncBody` must throw on empty.** They return
-     `""` when the directory or function is missing, and `InStr("", x)` is 0, so
-     **every "must NOT contain" assertion passes vacuously**. 220 call sites over
-     139 files, 24 hardcoded directory names — and
-     `test-no-pinned-source-reads.cjs:48` *certifies those 139 files as
-     move-resilient* because they use the helper. The macOS twin is safe by
-     accident (`read_driver_source` returns `nil`, and `nil:find` throws): the AHK
-     helper's design is the defect.
+- **Lot 2 — the safety net before any rename.**
   2. Extend `test-git-mv-resilience.cjs` (macOS-only today) to AHK directory pins
      and Linux file pins.
   3. Convert the 88 auto-convertible macOS pinned reads
      (`tools/lint/fix-pinned-source-reads.cjs --all --fix`), hand-convert the
      other 90, **lower** both ratchets.
-  4. Fix the 16 AHK corpus assertions that `return` silently when the corpus
-     cannot be parsed (`test_corpus_hotstrings.ahk` 8, `test_corpus_tap_hold.ahk`
-     8, `unit/test_tooltip_dequeue_contract.ahk` 1). Moving the corpus today
-     produces 1 red and 16 silent greens.
-  5. `verify-change.cjs`: an edit under `_shared/tests/**` or `_shared/core/**`
-     must select `ahk-suite`, `hs` and `linux`. Four lines. Today the one file
-     class ADR-006 declares mandatory for every driver is the one whose edit runs
-     no driver suite.
   6. Parse coverage per driver: **115 of 240 production AHK files (48 %)** are
      reachable from the entry point but not from `run_all.ahk`, so they are
      validated only as text; the Linux entry point has **zero** parse coverage.

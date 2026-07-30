@@ -28,13 +28,14 @@
 ; ===================================================
 ; ===================================================
 
+; THROWS when the corpus is missing. Returning "" made the consumers below skip,
+; so the one event that must fail loudest — the cross-driver contract went
+; missing — was the one event that produced green.
 _TtLayoutCorpus_LoadCorpus() {
 	Path := A_ScriptDir . "\..\..\_shared\tests\corpus\tooltip\layout_vectors.json"
-	if !FileExist(Path) {
-		return ""
-	}
-	Raw := FileRead(Path, "UTF-8")
-	return JsonParse(Raw)
+	if !FileExist(Path)
+		throw Error("tooltip layout corpus not found at '" . Path . "' — the shared vectors are a cross-driver contract; a missing corpus must fail this suite, never skip it")
+	return JsonParse(FileRead(Path, "UTF-8"))
 }
 
 
@@ -56,18 +57,13 @@ _TtLayoutCorpus_LoadCorpus() {
 
 _TtLayoutCorpus_TestHasVectors() {
 	Data := _TtLayoutCorpus_LoadCorpus()
-	if (Data = "") {
-		AssertTrue(false, "Corpus file not found at _shared/tests/corpus/tooltip/layout_vectors.json")
-		return
-	}
 	AssertTrue(Data.Has("vectors"), "corpus must have 'vectors' key")
 	AssertTrue(Data["vectors"].Length > 0, "vectors must be non-empty")
 }
 
 _TtLayoutCorpus_TestVectorFields() {
 	Data := _TtLayoutCorpus_LoadCorpus()
-	if (Data = "" || !Data.Has("vectors"))
-		return
+	AssertTrue(Data.Has("vectors"), "corpus must expose a vectors array — skipping when the key is absent is how the whole field contract stopped being exercised without a single red")
 	for Vec in Data["vectors"] {
 		Id := Vec.Has("id") ? Vec["id"] : "unknown"
 		AssertTrue(Vec.Has("anchor"), "vector '" . Id . "' missing 'anchor'")

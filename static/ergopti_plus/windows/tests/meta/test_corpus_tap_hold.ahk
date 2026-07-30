@@ -41,20 +41,23 @@ _CorpusTH_Root() {
 	return A_ScriptDir . "\..\..\_shared\tests\corpus\tap_hold\vectors.json"
 }
 
+; THROWS when the corpus is missing or malformed. It used to return "", and
+; every consumer below opened with `if Corpus = "" { return }` — so moving or
+; breaking the corpus produced ONE red (the readability test) and EIGHT silent
+; greens. A cross-driver contract that can be deleted without the suite noticing
+; is not a contract.
 _CorpusTH_Load() {
 	Path := _CorpusTH_Root()
-	if not FileExist(Path) {
-		return ""
-	}
+	if not FileExist(Path)
+		throw Error("tap-hold corpus not found at '" . Path . "' — the shared vectors are a cross-driver contract; a missing corpus must fail this suite, never skip it")
 	return FileRead(Path, "UTF-8")
 }
 
 _CorpusTH_Parse() {
-	Raw := _CorpusTH_Load()
-	if Raw = "" {
-		return ""
-	}
-	return JsonParse(Raw)
+	Corpus := JsonParse(_CorpusTH_Load())
+	if (Corpus = "")
+		throw Error("tap-hold corpus at '" . _CorpusTH_Root() . "' did not parse into an object — a malformed corpus must fail this suite, never skip it")
+	return Corpus
 }
 
 
@@ -67,10 +70,10 @@ _CorpusTH_Parse() {
 ; ============================================
 
 _CorpusTH_FileIsReadableAndParseable() {
-	Raw := _CorpusTH_Load()
-	AssertTrue(Raw != "", "corpus JSON file must be readable")
+	; Readability and parseability are now enforced by the loader itself, which
+	; throws with the resolved path — asserting them again here would only
+	; restate what already cannot be false.
 	Corpus := _CorpusTH_Parse()
-	AssertTrue(Corpus != "", "corpus JSON must parse without error")
 	AssertTrue(Corpus.Has("vectors"), "corpus must have a vectors key")
 	AssertTrue(Corpus["vectors"].Length > 0, "corpus must contain at least one vector")
 }
@@ -78,9 +81,6 @@ Test("tap_hold corpus  --  corpus file is readable and parseable", _CorpusTH_Fil
 
 _CorpusTH_EveryVectorHasRequiredFields() {
 	Corpus := _CorpusTH_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		AssertTrue(Vec.Has("id") and Vec["id"] != "",
 			"vector missing id")
@@ -94,9 +94,6 @@ Test("tap_hold corpus  --  every vector has required fields: id, key, expected",
 
 _CorpusTH_ConfiguredTrueHasNonNullConfig() {
 	Corpus := _CorpusTH_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		Expected := Vec["expected"]
 		if Expected.Has("configured") and Expected["configured"] = true {
@@ -110,9 +107,6 @@ Test("tap_hold corpus  --  configured=true vectors have a non-null config block"
 
 _CorpusTH_ConfiguredFalseHasNullConfig() {
 	Corpus := _CorpusTH_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		Expected := Vec["expected"]
 		if Expected.Has("configured") and Expected["configured"] = false {
@@ -181,9 +175,6 @@ _CorpusTH_CleanToml() {
 
 _CorpusTH_ConfiguredVectorsRoundTrip() {
 	Corpus := _CorpusTH_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		; JSON null parses to JSON_NULL (Object), not a Map — skip null configs
 		if not (Vec.Has("config") and Type(Vec["config"]) = "Map") {
@@ -204,9 +195,6 @@ Test("tap_hold corpus  --  configured vectors: TapHoldIsConfigured returns true"
 
 _CorpusTH_TapActionPreserved() {
 	Corpus := _CorpusTH_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		; JSON null parses to JSON_NULL (Object), not a Map — skip null configs
 		if not (Vec.Has("config") and Type(Vec["config"]) = "Map") {
@@ -231,9 +219,6 @@ Test("tap_hold corpus  --  tap_action is preserved after TOML round-trip", _Corp
 
 _CorpusTH_DurationPreserved() {
 	Corpus := _CorpusTH_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		; JSON null parses to JSON_NULL (Object), not a Map — skip null configs
 		if not (Vec.Has("config") and Type(Vec["config"]) = "Map") {
@@ -258,9 +243,6 @@ Test("tap_hold corpus  --  time_activation_seconds is preserved after TOML round
 
 _CorpusTH_HoldModifierPreserved() {
 	Corpus := _CorpusTH_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		; JSON null parses to JSON_NULL (Object), not a Map — skip null configs
 		if not (Vec.Has("config") and Type(Vec["config"]) = "Map") {
@@ -290,9 +272,6 @@ Test("tap_hold corpus  --  hold_modifier is preserved after TOML round-trip", _C
 
 _CorpusTH_UnconfiguredKeyReturnsNotConfigured() {
 	Corpus := _CorpusTH_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		Expected := Vec["expected"]
 		if not (Expected.Has("configured") and Expected["configured"] = false) {

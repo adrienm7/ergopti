@@ -375,6 +375,56 @@ function findPcallOnly(file, src) {
 	return out;
 }
 
+/**
+ * PATTERN 6 — A corpus consumer that SKIPS when its corpus cannot be loaded.
+ * `Corpus := _CorpusHS_Parse()` followed by `if Corpus = "" { return }` turns a
+ * missing or malformed corpus into a PASS. The shared corpora are cross-driver
+ * contracts, so the one event that must fail loudest — the contract went
+ * missing — was the one event that produced green.
+ *
+ * Measured before the guard existed: moving `_shared/tests/corpus/` produced
+ * one red (the single readability test) and sixteen silent greens across
+ * test_corpus_hotstrings.ahk and test_corpus_tap_hold.ahk. The fix is for the
+ * LOADER to throw; a consumer never needs this branch.
+ */
+function findCorpusSkips(file, src, ext) {
+	const out = [];
+	const lines = src.split(/\r?\n/);
+	const isAhk = ext === '.ahk';
+	// Only a value that came from a corpus/fixture/vector loader — a plain "" guard
+	// on a parsed field is ordinary defensive code, not a skipped contract.
+	const assign = isAhk
+		? /^\s*(\w+)\s*:=\s*[\w.]*(?:corpus|fixture|vectors)\w*\s*\(/i
+		: /^\s*local\s+(\w+)\s*=\s*[\w.]*(?:corpus|fixture|vectors)\w*\s*\(/i;
+
+	for (let i = 0; i < lines.length; i++) {
+		if (isComment(lines[i], ext)) continue;
+		const m = lines[i].match(assign);
+		if (!m) continue;
+		const v = m[1];
+		const guard = isAhk
+			? new RegExp(`^\\s*if\\s*\\(?\\s*!?\\s*${v}\\s*(?:==?=?\\s*""|\\)?\\s*(?:\\{|$))`)
+			: new RegExp(`^\\s*if\\s+(?:not\\s+${v}\\b|${v}\\s*==\\s*nil)`);
+		for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+			if (isComment(lines[j], ext)) continue;
+			if (!guard.test(lines[j])) continue;
+			// The guard is only a false green when its body gives up silently.
+			const body = lines.slice(j, Math.min(j + 4, lines.length)).join('\n');
+			if (/\bAssert\w*\s*\(|\bassert\w*\s*\(|\bthrow\b|\berror\s*\(|\bTest\s*\(/.test(body)) break;
+			if (/^\s*return\b|\breturn\s+end\b/m.test(body)) {
+				out.push({
+					file: rel(file),
+					line: j + 1,
+					text: lines[j].trim(),
+					detail: `"${v}" came from a corpus loader — skipping makes a missing contract pass`,
+				});
+			}
+			break;
+		}
+	}
+	return out;
+}
+
 // ==================================================
 // ==================================================
 // ======= 4/ Scanning and reporting ================
@@ -386,15 +436,17 @@ const PATTERNS = {
 	'vacuous-absence': 'Absence assertion on a _DriverFuncBody() that may be empty',
 	'dead-test': 'Test body that asserts nothing, or a Test() never registered',
 	'pcall-only': 'Assertion on a pcall status — proves "did not crash", nothing else',
+	'corpus-skip': 'Early return when a corpus could not be loaded — a missing contract passes',
 };
 
 function scan() {
-	const findings = { tautology: [], 'vacuous-absence': [], 'dead-test': [], 'pcall-only': [] };
+	const findings = { tautology: [], 'vacuous-absence': [], 'dead-test': [], 'pcall-only': [], 'corpus-skip': [] };
 	for (const tree of TREES) {
 		for (const file of walk(tree.dir, tree.ext)) {
 			const src = fs.readFileSync(file, 'utf8');
 			findings.tautology.push(...findTautologies(file, src, tree.ext));
 			findings['dead-test'].push(...findDeadTests(file, src, tree.ext));
+			findings['corpus-skip'].push(...findCorpusSkips(file, src, tree.ext));
 			if (tree.ext === '.ahk') findings['vacuous-absence'].push(...findVacuousAbsence(file, src));
 			else findings['pcall-only'].push(...findPcallOnly(file, src));
 		}

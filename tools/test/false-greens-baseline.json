@@ -2,5 +2,6 @@
 	"tautology": 153,
 	"vacuous-absence": 17,
 	"dead-test": 4,
-	"pcall-only": 367
+	"pcall-only": 367,
+	"corpus-skip": 0
 }
