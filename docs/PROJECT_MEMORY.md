@@ -237,6 +237,30 @@ reachable from `run_all.ahk`. Braces on both bodies are the fix; the class is no
 by `tools/test/test-ahk-v2-syntax-antipatterns.cjs` (runs on every platform, so it does not depend
 on AutoHotkey being installed).
 
+**SUPERSEDED 2026-07-30 — there is now a gate, `npm run test:ahk-parse`.** Nobody should hand-roll
+this again. `tools/test/test-ahk-parse-coverage.cjs` compiles `ErgoptiPlus.ahk` with Ahk2Exe through
+Node's `spawnSync` (no shell, so the Git Bash `/flag` rewrite cannot apply) and reports the failing
+file and line. Measured: a deliberate break in `ui/tray_menu.ahk` → `exit 17` naming
+`ui\tray_menu.ahk (130) : ==> Missing "}"`. Wired into `verify-change` as the `ahk-parse` gate for
+every non-test `.ahk` edit, and into `npm run test:js`.
+
+Two things that cost an hour before that landed, both worth keeping:
+
+- **The `ExitApp` parse-only harness described above is NOT safe on the real driver.** `ExitApp`
+  fires the entry point's `OnExit` handlers, so driver teardown code runs against uninitialised
+  state; the probe hung and left an orphaned process. It is fine for a single `ui/` file, which is
+  what it was written for — never for `ErgoptiPlus.ahk`. Ahk2Exe writes an `.exe` and executes
+  nothing, which is the only reason it is the right tool here.
+- **I re-fell into the "never read an exit code through a pipe" trap two paragraphs above**, with
+  `Ahk2Exe … | head -5`, and concluded from `exit=0` that Ahk2Exe could not tell a valid script from
+  a broken one. It can. Reading that rule is not the same as applying it: capture first, filter after.
+
+The gate self-validates before trusting its own verdict — it compiles a known-good and a known-bad
+fixture and reports SKIPPED, never OK, unless the compiler separates them. That is not defensive
+padding: invoked a different way on this same machine, Ahk2Exe returned `exit 52` on *every* input.
+A gate wired straight to that is a permanent false red, and one that read 52 as "no syntax error"
+would be a permanent false green.
+
 The headless runner writes its TAP report to `%TEMP%\ergopti_test_results.txt`, NOT stdout — read
 that file for pass/fail. See [[feedback_ahk_source_encoding]],
 [[project_audit_evidence_must_be_reproducible]].
