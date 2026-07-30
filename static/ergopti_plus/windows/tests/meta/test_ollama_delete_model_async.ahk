@@ -44,7 +44,7 @@ _ODMA_AssertBlockingVariantRemoved() {
 	; _DriverFuncBody anchors on a column-0 "Name(...) {" definition, so
 	; "LLM_OllamaDeleteModel_Async(...)" cannot false-match "LLM_OllamaDeleteModel" —
 	; only the retired blocking def would.
-	Body := _DriverFuncBody("LLM_OllamaDeleteModel")
+	Body := _DriverFuncBodyOrEmpty("LLM_OllamaDeleteModel")
 	Assert(Body == "",
 		"the blocking LLM_OllamaDeleteModel(tag) must be fully removed once its only caller uses the async variant (F24 — no unused fallback code)")
 }

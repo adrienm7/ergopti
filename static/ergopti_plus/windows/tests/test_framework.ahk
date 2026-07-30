@@ -242,9 +242,25 @@ _DriverSourceNoComments() {
 
 ; Returns the body (signature through the matching closing brace, full-line
 ; comments stripped) of a top-level driver function, found across the whole
-; driver source. Anchors on the column-0 DEFINITION, so a call site (always
-; indented) in an earlier-concatenated file is never mistaken for the body.
+; driver source. THROWS when no definition exists.
+;
+; Failing loudly is the whole point: the helper used to return "" for a missing
+; function, and `InStr("", Needle)` is 0, so every `Assert(InStr(Body, X) > 0)`
+; became `Assert(0 > 0)` — red — while every "must NOT contain" assertion passed
+; VACUOUSLY. A rename therefore disarmed hundreds of guarantees instead of
+; reporting them. Use _DriverFuncBodyOrEmpty when the absence itself is what the
+; test asserts.
 _DriverFuncBody(Name) {
+	Body := _DriverFuncBodyOrEmpty(Name)
+	if (Body == "")
+		throw Error("_DriverFuncBody: no definition of '" . Name . "()' anywhere in the driver source — it was renamed, deleted, or its file moved outside the scanned tree. Fix the test's symbol name, or use _DriverFuncBodyOrEmpty if the absence is the assertion.")
+	return Body
+}
+
+; Same scan as _DriverFuncBody but returns "" instead of throwing when the
+; function is absent. Reserved for the handful of tests whose assertion IS the
+; absence (e.g. "this dead helper must stay deleted").
+_DriverFuncBodyOrEmpty(Name) {
 	Src := _DriverSourceConcat()
 	; Match a function DEFINITION line — the name, its (...) params and the opening
 	; brace — optionally indented (nested functions), never a bare call site (a
@@ -281,12 +297,20 @@ _DriverFuncBody(Name) {
 ; into one string. Use for source-introspection tests that scan a specific
 ; module's files (e.g. "ui/tooltip") regardless of how that module is internally
 ; split into sub-files. RelDir uses forward slashes.
+;
+; THROWS when the directory holds no .ahk file. The directory name is the one
+; thing this helper hardcodes, so a rename is exactly what it must catch: a
+; silent "" here turned every downstream "must NOT contain" assertion into a
+; vacuous pass, while test-no-pinned-source-reads.cjs certified the caller as
+; move-resilient precisely BECAUSE it used this helper.
 _DriverDirConcat(RelDir) {
 	SplitPath(A_ScriptDir, , &Root)   ; A_ScriptDir = windows/tests  ->  Root = windows
 	Dir := Root . "\" . StrReplace(RelDir, "/", "\")
 	Combined := ""
 	Loop Files, Dir . "\*.ahk", "FR"
 		try Combined .= "`n" . FileRead(A_LoopFileFullPath)
+	if (Combined == "")
+		throw Error("_DriverDirConcat: '" . RelDir . "' holds no readable .ahk file — the directory was renamed, moved or emptied. Update the test's directory name; do not let it scan nothing.")
 	return Combined
 }
 
