@@ -20,7 +20,7 @@ Sibling trees: `adapters/` (22 files — the port implementations), `lib/` (6 fi
 cross-cutting infra), `ui/` (1 file — `webkit_host.lua`).
 
 > Two divergences from the other drivers that this layout makes visible, and that
-> [`docs/PLAN_SIMPLIFICATION.md`](../../../../docs/PLAN_SIMPLIFICATION.md) closes:
+> [`TODO.md`](../../../../TODO.md) §0 closes:
 > the tray menu and the webview hosts live under `modules/` here and under `ui/`
 > elsewhere, and `linux/` therefore has **two** `ui` namespaces (`ui.*` →
 > `linux/ui/`, `modules.ui.*` → `linux/modules/ui/`).

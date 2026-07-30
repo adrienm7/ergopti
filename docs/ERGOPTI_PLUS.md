@@ -8,7 +8,7 @@
 > **Honnêteté.** Ce document décrit le code **tel qu'il est** au 2026-07-30, pièges inclus.
 > Là où la procédure actuelle est douloureuse, les runbooks du §10 donnent **deux** réponses :
 > `Aujourd'hui` (ce qu'il faut réellement faire) et `Cible` (ce que ce sera après le lot
-> correspondant de [PLAN_SIMPLIFICATION.md](PLAN_SIMPLIFICATION.md)). Si les deux diffèrent
+> correspondant de [TODO.md](../TODO.md) §0). Si les deux diffèrent
 > beaucoup, c'est le sujet du plan, pas une fatalité.
 >
 > **Règles du projet** (obligatoires, non négociées ici) :
@@ -1071,7 +1071,7 @@ kanata choisit son périphérique sans coordination avec le hook | — |
 ## 13. Les pièges transverses à connaître avant de toucher au code
 
 Douze défauts vivants, mesurés. Ils sont détaillés avec preuves dans le
-[registre des blocages du plan](PLAN_SIMPLIFICATION.md#7-registre-des-blocages) ; ils sont
+[registre des blocages](../TODO.md#04-the-remaining-blockers) ; ils sont
 répétés ici parce qu'ils changent la façon de lire le code.
 
 **Linux, quatre blocages :**
@@ -1108,7 +1108,7 @@ renommage.**
 
 | Question | Document |
 |---|---|
-« Que faut-il changer, dans quel ordre, et pour quel gain ? » | [PLAN_SIMPLIFICATION.md](PLAN_SIMPLIFICATION.md) |
+« Que faut-il changer, dans quel ordre, et pour quel gain ? » | [TODO.md](../TODO.md) — §0 porte le programme de simplification complet |
 « Quelles sont les règles de style, de log, de nommage ? » | [.github/copilot-instructions.md](../.github/copilot-instructions.md) |
 « Ce piège a-t-il déjà mordu quelqu'un ? » | [PROJECT_MEMORY.md](PROJECT_MEMORY.md) |
 « Comment lancer quoi ? » | [TESTING.md](TESTING.md) |

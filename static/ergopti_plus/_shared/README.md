@@ -60,7 +60,7 @@ A third hand-maintained copy with no corpus between it and its twin is not allow
 >    when you do generate, generate *data*, never *logic*.
 > 3. No node under `_shared/` may be named after a platform. Two current violations
 >    (`lua/linux/`, `lua/llm/linux_bridge.lua`) are tracked in
->    [`docs/PLAN_SIMPLIFICATION.md`](../../../docs/PLAN_SIMPLIFICATION.md) §5.5.
+>    [`TODO.md`](../../../TODO.md) §0.3.
 > 4. `_shared/lua/` is **not** automatically shared: measured, only 37.7 % of its
 >    8 473 lines are required in production by both Lua drivers. Check the real
 >    consumers before assuming an edit reaches macOS *and* Linux.

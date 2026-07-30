@@ -2550,7 +2550,7 @@ _Etat de la branche `simplification` : ce qui est livre, ce qui reste, et les tr
 
 Branche `simplification`, derivee de `dev`, worktree sous
 `.claude/worktrees/simplification`. Non fusionnee : le mainteneur decide quand.
-Le plan complet est dans `docs/PLAN_SIMPLIFICATION.md`, la documentation du
+Le programme complet est dans `TODO.md` §0, la documentation du
 fonctionnement dans `docs/ERGOPTI_PLUS.md`.
 
 **Livre** : lot 0 (la verite : README, specs partagees, angles morts de lint) et
