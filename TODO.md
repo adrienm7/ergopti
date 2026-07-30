@@ -196,6 +196,22 @@ Two notes worth keeping:
 
 Evidence in `docs/PROJECT_MEMORY.md`.
 
+- **Re-seeding the delay baseline at every remaining flush site** (raised as
+  `shortcut-and-mouse-flush-skip-baseline-reseed`): the three keystroke-path sites
+  were real and 17286ec2e fixed them. Widening it to the rest of the tree is
+  refuted on its stated consequence AND on the semantics.
+  The claim was that a zeroed baseline makes the next keystroke record a
+  zero-millisecond gap and be "recognised as synthetic". It is not: synthetic is
+  carried by the explicit `meta.s` flag (`aggregator/events.lua:101`), never
+  inferred from a delay. The real effect is the one the code's own comment states —
+  the inter-word gap vanishes from the timing data — which is why only the
+  keystroke-path sites needed it.
+  And `last_time == 0` is a deliberate sentinel: `init.lua:631` reads
+  `last_time > 0 and (now - last_time) or 0`, i.e. "no previous keystroke in this
+  buffer". Every remaining flush site is a boundary where that is the correct
+  answer — session end after an idle timeout, the midnight day rollover, native
+  autocorrect, and the stop/teardown paths. Re-seeding there would invent a typing
+  interval across a gap that was not typing.
 - **A resolve memo bypassed on the dynamic-hotstring preview path** (raised as
   `resolve-not-memoised-on-preview-path`): refuted by reading the file.
   `_shared/lua/dynamic_hotstrings/init.lua` holds exactly one state table,
@@ -372,11 +388,6 @@ reproduce but the AppleScript grammar model behind the conclusion is wrong),
   - **Cause:** Ownership is asserted at the START of the prime cycle rather than at the moment HS actually launches the bridge (launch_headless_once(), ke_lifecycle.lua:779-787). And KILL_FAST_CMD at :922 is the one kill in the module with no is_hs_owned_bridge() gate — set_enabled(false) (karabiner/init.lua:200-209) and M.kill() (:886-896) both have one. The non-forced paths are correct: a running user bridge short-circuits at :752-757 BEFORE mark_hs_owned_bridge(), which is exactly why the gap only shows on force=true.
   - **Fix:** (1) Gate ke_lifecycle.lua:922 on `M.is_hs_owned_bridge()` (log and skip otherwise), mirroring karabiner/init.lua:200-209. (2) Move mark_hs_owned_bridge() out of :774 and into launch_headless_once() on the branch where hs.execute(KE_PRIME_HEADLESS_CMD) actually ran, so the marker only ever means "HS spawned this bridge". The three existing success sites (:800, :894, :913) already re-call it, so the happy path is unaffected.
   - **Test:** Extend tests/unit/modules/karabiner/test_ke_lifecycle.lua: stub hs.execute so is_ipc_bridge_running() reports a live bridge and is_cli_roundtrip_ready() reports failure, ensure no owner marker exists, call KE.prime_ke_for_session(function() end, true), then assert (a) `helpers.assert_eq(KE.is_hs_owned_bridge(), false, "a forced prime must not claim ownership of a bridge HS did not start")` and (b) the recorded hs.execute command list contains no KILL_FAST_CMD. Both fail today.
-- [ ] **shortcut-and-mouse-flush-skip-baseline-reseed** (keylogger) — The shortcut and mouse flush sites in handle_key bypass flush_keeping_baseline, so the keystroke after every shortcut or click records delay 0 and can be swallowed as synthetic
-  - `static/ergopti_plus/macos/modules/keylogger/init.lua:563; static/ergopti_plus/macos/modules/keylogger/init.lua:495; static/ergopti_plus/macos/modules/keylogger/init.lua:500; static/ergopti_plus/macos/modules/keylogger/init.lua:596-599; static/ergopti_plus/macos/modules/keylogger/log_manager.lua:363`
-  - **Cause:** LogManager.flush_buffer sets `_state.last_time = 0` (log_manager.lua:363). handle_key computes `delay = CoreState.last_time > 0 and math.floor(now - CoreState.last_time) or 0` (:586), so the next keystroke measures against 0. The 2026 fix introduced `flush_keeping_baseline()` (:596-599) and routed the seven keystroke-driven branches through it -- but the shortcut branch flushes at :563 and returns at :570, and the two mouse branches flush at :495/:500 and return at :497/:501, all BEFORE line 587 ever assigns `CoreState.last_time = now`. The helper is also declared at :596, textually below those three branches, so they could not call it as written. Second-order: with delay==0 the stale-queue 
-  - **Fix:** In handle_key, assign `CoreState.last_time = now` immediately after each of the three flushes (`now` is already in scope from :479), or hoist the `flush_keeping_baseline` declaration above the mouse branch and call it there and in the shortcut branch. Note the mouse branches guard the flush on `#CoreState.buffer_events > 0` while the shortcut branch does not, so the seed must be unconditional at the shortcut site.
-  - **Test:** Two parts. (1) Cheap source ratchet: add "leftMouseDown" and "is_shortcut_candidate" to KEYSTROKE_FLUSH_MARKERS in tests/unit/modules/keylogger/test_flush_preserves_delay_baseline.lua -- its existing case "no keystroke-driven branch still calls flush_buffer directly" then fails on both new markers and passes after the fix. (2) Behavioural, in the tests/unit/modules/keylogger/test_keylogger_privacy.lua harness (its absoluteTime stub already advances 80 ms per call): type "a", deliver a leftMouseD
 - [ ] **eventtap-does-ax-and-tis-work-once-per-word** (keylogger) — handle_key performs a cross-process AX window-title read and a Carbon TIS layout query on the first keystroke of every word, inside the eventtap callback
   - `static/ergopti_plus/macos/modules/keylogger/init.lua:617-626; static/ergopti_plus/macos/modules/keylogger/init.lua:531; static/ergopti_plus/macos/modules/keylogger/init.lua:537`
   - **Cause:** The context snapshot was written as a direct query instead of a read of already-cached state. CoreState.active_app_name / active_app_bundle are maintained by context_tracker.app_watcher_cb (context_tracker.lua:472-476) on every activation, and the focused window title is already tracked in context_tracker's `_last_win_title` (:407). Nothing in handle_key consults either. hs.window title reads go through AXUIElementCopyAttributeValue, which blocks on the target process; macOS answers a slow tap with kCGEventTapDisabledByTimeout, which turns a lag problem into a dead keylogger tap (the watchdog at init.lua:1424-1432 would restart it 5 s later, losing everything typed in between). The driver al
