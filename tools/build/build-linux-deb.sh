@@ -156,7 +156,7 @@ echo "  Config: /etc/ergopti/config.toml"
 cat > "$DEB_ROOT/usr/lib/systemd/user/ergopti.service" << 'SERVICE_EOF'
 [Unit]
 Description=Ergopti — ergonomic keyboard optimizer
-Documentation=https://github.com/nizos/ergopti
+Documentation=https://github.com/adrienm7/ergopti
 After=graphical-session.target
 
 [Service]
@@ -182,7 +182,7 @@ Depends: luajit (>= 2.1), ydotool, xdotool, xclip, libnotify-bin, curl
 Recommends: lua-luv, lua-filesystem, openssl, kanata
 Section: utils
 Priority: optional
-Homepage: https://github.com/nizos/ergopti
+Homepage: https://github.com/adrienm7/ergopti
 Description: Ergonomic keyboard optimizer with AI-powered hotstrings
  Ergopti is a cross-platform keyboard optimizer that provides an
  intelligent hotstring engine, keystroke metrics, and AI-assisted
