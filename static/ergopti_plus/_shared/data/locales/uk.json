@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "Назва нової категорії для %s:",
 	"metrics_apps.new_category_title": "Нова категорія",
 	"metrics_apps.no_app_detected": "Жодного застосунку не виявлено.",
+	"metrics_apps.pick_app_placeholder": "Виберіть застосунок для класифікації…",
 	"metrics_apps.rename_chooser_placeholder": "Категорія для перейменування",
 	"metrics_apps.rename_item": "✎ Перейменувати існуючу категорію…",
 	"metrics_apps.rename_prompt": "Нова назва для категорії «%s»:",

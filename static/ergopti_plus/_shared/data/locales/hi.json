@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "%s के लिए नई श्रेणी का नाम:",
 	"metrics_apps.new_category_title": "नई श्रेणी",
 	"metrics_apps.no_app_detected": "कोई एप्लिकेशन पहचाना नहीं जा सका।",
+	"metrics_apps.pick_app_placeholder": "वर्गीकृत करने के लिए एक एप्लिकेशन चुनें…",
 	"metrics_apps.rename_chooser_placeholder": "नाम बदलने के लिए श्रेणी",
 	"metrics_apps.rename_item": "✎ किसी मौजूदा श्रेणी का नाम बदलें…",
 	"metrics_apps.rename_prompt": "श्रेणी \"%s\" के लिए नया नाम:",

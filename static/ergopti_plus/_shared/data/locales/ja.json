@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "%s の新しいカテゴリ名:",
 	"metrics_apps.new_category_title": "新しいカテゴリ",
 	"metrics_apps.no_app_detected": "アプリケーションを検出できませんでした。",
+	"metrics_apps.pick_app_placeholder": "分類するアプリケーションを選択…",
 	"metrics_apps.rename_chooser_placeholder": "名前を変更するカテゴリ",
 	"metrics_apps.rename_item": "✎ 既存のカテゴリの名前を変更…",
 	"metrics_apps.rename_prompt": "カテゴリ「%s」の新しい名前:",

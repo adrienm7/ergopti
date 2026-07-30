@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "שם הקטגוריה החדשה עבור %s:",
 	"metrics_apps.new_category_title": "קטגוריה חדשה",
 	"metrics_apps.no_app_detected": "לא ניתן לזהות יישום.",
+	"metrics_apps.pick_app_placeholder": "בחר יישום לסיווג…",
 	"metrics_apps.rename_chooser_placeholder": "קטגוריה לשינוי שם",
 	"metrics_apps.rename_item": "✎ שנה שם של קטגוריה קיימת…",
 	"metrics_apps.rename_prompt": "שם חדש לקטגוריה \"%s\":",

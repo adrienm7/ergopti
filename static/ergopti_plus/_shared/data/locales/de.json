@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "Name der neuen Kategorie für %s:",
 	"metrics_apps.new_category_title": "Neue Kategorie",
 	"metrics_apps.no_app_detected": "Es konnte keine Anwendung erkannt werden.",
+	"metrics_apps.pick_app_placeholder": "Anwendung zum Einordnen auswählen…",
 	"metrics_apps.rename_chooser_placeholder": "Kategorie umbenennen",
 	"metrics_apps.rename_item": "✎ Vorhandene Kategorie umbenennen…",
 	"metrics_apps.rename_prompt": "Neuer Name für Kategorie „%s\":",
