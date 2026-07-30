@@ -3,10 +3,15 @@
 All files in this directory are **auto-generated** and must not be edited manually.
 Run the corresponding npm script to regenerate.
 
-| File                    | Generator script              | Status                                            |
-| ----------------------- | ----------------------------- | ------------------------------------------------- |
-| `features_manifest.lua` | `npm run build:manifest`      | ✅ Wired — read via `lib/manifest_reader.lua`     |
-| `terminators.lua`       | `npm run codegen:terminators` | ✅ Wired — loaded by `modules.keymap.terminators` |
+| File                    | Generator script         | Status                                        |
+| ----------------------- | ------------------------ | --------------------------------------------- |
+| `features_manifest.lua` | `npm run build:manifest` | ✅ Wired — read via `lib/manifest_reader.lua` |
+| `config_template.toml`  | `npm run build:manifest` | ⚠️ **No macOS runtime reader** — generated, schema-validated and shipped inside every `.app`, read by nothing. Only Windows copies a template on first boot (`windows/lib/first_boot.ahk`) |
+
+There is **no** `terminators.lua` here. The terminator catalogue is generated once,
+shared, at `_shared/lua/keymap/terminators_catalogue.lua`, and this driver reaches it
+through the hand-written shim `modules/keymap/terminators.lua` (which adds the i18n
+labels). The AHK side gets its own generated copy at `windows/_generated/terminators.ahk`.
 
 ### `features_manifest.lua` — `description_key` is AHK-only consumed
 
