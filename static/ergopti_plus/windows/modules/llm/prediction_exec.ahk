@@ -166,11 +166,12 @@ LLM_Engine_FirePrediction(buffer) {
 		return
 	}
 
-	try {
-		preview := SubStr(tail, -40)
-		LoggerInfo("LLM", "Prediction request queued — tail: «{1}».", preview)
-	} catch {
-	}
+	; Log the SIZE of the context, never its content. This used to emit
+	; SubStr(tail, -40), so the daily log accumulated a rolling 40-character
+	; sample of everything the user typed while the LLM was on — a plaintext
+	; keystroke sink outside the keylogger's privacy policy, which governs
+	; today.log and data.sql only. macOS already logs a length here.
+	try LoggerInfo("LLM", "Prediction request queued — {1} chars of context.", StrLen(tail))
 
 	; Cache hit (exact match): re-display last result without an API call.
 	; The cache is an array of slot strings so the multi-prediction reveal
