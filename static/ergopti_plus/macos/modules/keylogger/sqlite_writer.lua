@@ -28,6 +28,9 @@ local sqlite3 = require("hs.sqlite3")
 
 local Logger = require("lib.logger")
 local Paths  = require("lib.paths")
+-- At-rest encryption of the typed-text columns. Hard require: the setting must
+-- never silently degrade into "stored in clear".
+local TextCipher = require("modules.keylogger.text_cipher")
 local LOG    = "keylogger.sqlite_writer"
 
 
@@ -272,15 +275,24 @@ local function _sql_num(n)
 	return tostring(n)
 end
 
---- JSON-encode a Lua value compactly. nil → '{}'.
-local function _sql_json(v)
-	if v == nil then return "'{}'" end
+--- JSON-encode a Lua value compactly, WITHOUT quoting it for SQL. Split out from
+--- _sql_json because the typing builder must encrypt the payload before it is
+--- turned into a SQL literal.
+--- @param v any
+--- @return string The encoded JSON, or "{}" when encoding fails.
+local function _json_text(v)
+	if v == nil then return "{}" end
 	local ok, encoded = pcall(json.encode, v)
 	if not ok then
-		Logger.warn(LOG, "_sql_json: json.encode failed (%s) — storing empty object.", tostring(encoded))
-		return "'{}'"
+		Logger.warn(LOG, "_json_text: json.encode failed (%s) — storing empty object.", tostring(encoded))
+		return "{}"
 	end
-	return _sql_str(encoded)
+	return encoded
+end
+
+--- JSON-encode a Lua value compactly as a SQL literal. nil → '{}'.
+local function _sql_json(v)
+	return _sql_str(_json_text(v))
 end
 
 --- Allocate the next event id (per-device autoincrement).
@@ -303,6 +315,18 @@ end
 local _builders = {}
 
 function _builders.typing(e, id)
+	-- `text` and `events_json` are the only columns holding what the user
+	-- literally typed, so they are the only ones encrypted. The aggregates the
+	-- dashboard computes over stay in clear, which is what keeps reads fast.
+	local enc_text = TextCipher.encrypt(_device_id, id, e.text or "")
+	local enc_json = TextCipher.encrypt(_device_id, tostring(id) .. "j", _json_text(e.events))
+	if enc_text == nil or enc_json == nil then
+		-- Encryption is on but could not run. Storing the plaintext would defeat
+		-- the setting the user turned on, so this row is not written at all.
+		Logger.error(LOG, "At-rest encryption failed — typing event %d dropped rather than stored in clear.", id)
+		return nil
+	end
+
 	return string.format(
 		"INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES (%s, %d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);",
 		_sql_str(_device_id), id,
@@ -319,7 +343,7 @@ function _builders.typing(e, id)
 		_sql_num(e.mouse_clicks or 0), _sql_num(e.mouse_scrolls or 0),
 		_sql_num(e.mouse_distance_px or 0), _sql_num(e.pause_before_ms),
 		_sql_num(e.battery_level), _sql_num(e.audio_volume), _sql_num(e.wpm),
-		_sql_str(e.text or ""), _sql_str(e.rich_text), _sql_json(e.events))
+		_sql_str(enc_text), _sql_str(e.rich_text), _sql_str(enc_json))
 end
 
 function _builders.app_switch(e, id)
@@ -428,7 +452,11 @@ function M.build_inserts(entry)
 	end
 	local t = entry.type
 	if t == "typing" then
-		return { _builders.typing(entry, _alloc_event_id()) }
+		-- The typing builder returns nil when at-rest encryption is enabled but
+		-- cannot run. An empty list drops the row, which is the intended
+		-- outcome: storing the text the user asked to protect would be worse.
+		local sql = _builders.typing(entry, _alloc_event_id())
+		return sql and { sql } or {}
 	elseif t == "app_switch" then
 		return { _builders.app_switch(entry, _alloc_event_id()) }
 	elseif t == "window_switch" then

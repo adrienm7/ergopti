@@ -290,6 +290,11 @@ CS_Load() {
         MetricsFilters.secure_field := s["metrics_filter_secure_field"] ? true : false
     if s.Has("metrics_filter_system_auth")
         MetricsFilters.system_auth := s["metrics_filter_system_auth"] ? true : false
+    if s.Has("metrics_encrypt") {
+        MetricsFilters.encrypt := s["metrics_encrypt"] ? true : false
+        ; Drive the real cipher so a restart with encryption on keeps encrypting.
+        KL_Enc_SetEnabled(MetricsFilters.encrypt)
+    }
 
     if s.Has("metrics_disabled_apps") && (s["metrics_disabled_apps"] is Array) {
         MetricsFilters.disabled_apps := Map()

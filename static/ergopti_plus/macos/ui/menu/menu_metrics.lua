@@ -30,8 +30,6 @@ local kl_mod        = require("modules.keylogger")
 local i18n          = require("lib.i18n")
 local ManifestMenu  = require("lib.manifest_menu")
 
-local _prog_canvas = nil
-
 
 
 
@@ -67,69 +65,6 @@ M.DEFAULT_STATE = {
 -- ======= 2/ Local Utilities =======
 -- ==================================
 -- ==================================
-
---- Draws or updates the floating progress bar during mass encryption/decryption.
---- @param current_index number Current file count.
---- @param total_files number Total file count.
-local function update_progress(current_index, total_files)
-	if not _prog_canvas then
-		local screen_frame = hs.screen.mainScreen():frame()
-		local canvas_width, canvas_height = 400, 80
-		_prog_canvas = hs.canvas.new({ x = (screen_frame.w - canvas_width) / 2, y = (screen_frame.h - canvas_height) / 2, w = canvas_width, h = canvas_height })
-		_prog_canvas:behavior({ "canJoinAllSpaces", "stationary" }):level(hs.drawing.windowLevels.overlay)
-	end
-
-	local is_dark_mode = hs.host.interfaceStyle() == "Dark"
-	local palette = {
-		bg_color       = is_dark_mode and { white = 0, alpha = 0.8 } or { white = 0.95, alpha = 0.9 },
-		text_color     = is_dark_mode and { white = 1 } or { white = 0 },
-		track_color    = is_dark_mode and { white = 0.2, alpha = 1 } or { white = 0.85, alpha = 1 },
-		progress_color = { hex = "#007aff", alpha = 1 }
-	}
-
-	local percentage = total_files > 0 and (current_index / total_files) or 0
-	local ui_label = string.format(i18n.get("dialog.metrics.progress_label"), current_index, total_files)
-
-	_prog_canvas:replaceElements({
-		{ type = "rectangle", action = "fill", fillColor = palette.bg_color, roundedRectRadii = { xRadius = 10, yRadius = 10 } },
-		{ type = "text", text = ui_label, frame = { x = 20, y = 15, w = 360, h = 25 }, textSize = 14, textColor = palette.text_color },
-		{ type = "rectangle", action = "fill", frame = { x = 20, y = 45, w = 360, h = 10 }, fillColor = palette.track_color, roundedRectRadii = { xRadius = 5, yRadius = 5 } },
-		{ type = "rectangle", action = "fill", frame = { x = 20, y = 45, w = 360 * percentage, h = 10 }, fillColor = palette.progress_color, roundedRectRadii = { xRadius = 5, yRadius = 5 } }
-	})
-	_prog_canvas:show()
-end
-
---- Wraps the backend processing loop to provide UI feedback.
---- @param files_to_process table Array of absolute file paths.
---- @param is_encrypt boolean True to encrypt, false to decrypt.
---- @param password string The security key to provide to OpenSSL.
-local function process_files_with_ui(files_to_process, is_encrypt, password)
-	local total_files = #files_to_process
-	update_progress(0, total_files)
-
-	local function on_progress(current_index)
-		update_progress(current_index, total_files)
-	end
-	
-	local function on_complete(success_count, error_count, has_bad_password)
-		if _prog_canvas then
-			_prog_canvas:delete()
-			_prog_canvas = nil
-		end
-
-		local alert_msg = string.format(i18n.get("dialog.metrics.complete_label"), success_count, error_count)
-		if has_bad_password then
-			alert_msg = alert_msg .. "\n\n" .. i18n.get("dialog.metrics.bad_password_warning")
-		end
-
-		dialog.block_alert("Encryptor", alert_msg, i18n.get("button.ok"))
-	end
-
-	local log_manager = require("modules.keylogger.log_manager")
-	if type(log_manager.process_files_async) == "function" then
-		log_manager.process_files_async(files_to_process, is_encrypt, password, on_progress, on_complete)
-	end
-end
 
 
 
@@ -496,93 +431,36 @@ function M.build(ctx)
 	end
 
 	local function dyn_encryption(items, _ctx)
+		-- This entry used to call two empty stubs: it ticked its box, persisted
+		-- the setting, and encrypted nothing, while docs/security told users to
+		-- enable it. It also collected *.log.gz files — a storage format retired
+		-- when persistence moved to SQLite. It is now a plain toggle over the
+		-- real backend, and it refuses to tick when no key can be derived.
+		local TextCipher = require("modules.keylogger.text_cipher")
 		table.insert(items, {
 			title    = i18n.get("menu.metrics.encrypt_toggle"),
 			checked  = state.keylogger_encrypt,
 			disabled = ManifestMenu.resolve_disabled_when("metrics_menu", "encryption", STATE_GETTERS),
 			fn       = function()
-				local log_manager = require("modules.keylogger.log_manager")
-				local log_dir     = hs.configdir .. "/logs"
-				local default_pwd = "ERGOPTI_FALLBACK_KEY"
-				if type(log_manager.get_mac_serial) == "function" then default_pwd = log_manager.get_mac_serial() end
-
-				if not state.keylogger_encrypt then
-					local res = dialog.block_alert(i18n.get("dialog.metrics.encrypt_confirm_title"),
-						i18n.get("dialog.metrics.encrypt_confirm_body"),
-						i18n.get("button.encrypt"), i18n.get("button.cancel"))
-					if res ~= i18n.get("button.encrypt") then return end
-
-					local ok_p, btn, pwd = pcall(dialog.text_prompt,
-						i18n.get("dialog.metrics.encrypt_key_title"),
-						i18n.get("dialog.metrics.encrypt_key_prompt"),
-						default_pwd, i18n.get("button.ok"), i18n.get("button.cancel"))
-					if not ok_p or btn ~= "OK" or type(pwd) ~= "string" or pwd == "" then return end
-
-					if type(log_manager.register_encryptor_app) == "function" then
-						pcall(log_manager.register_encryptor_app)
-					end
-
-					local files = {}
-					local dir_iter = fs.dir(log_dir)
-					if dir_iter then
-						for file in dir_iter do
-							if file:match("%.log%.gz$") and not file:match("%.enc$") then
-								table.insert(files, log_dir .. "/" .. file)
-							end
-						end
-					end
-					state.keylogger_encrypt = true
-					save_prefs()
-					local Keylogger = require("modules.keylogger")
-					if type(Keylogger.set_options) == "function" then
-						Keylogger.set_options({ encrypt = true })
-					end
-					updateMenu()
-					if #files > 0 then process_files_with_ui(files, true, pwd) end
-				else
-					local res = dialog.block_alert(i18n.get("dialog.metrics.decrypt_confirm_title"),
-						i18n.get("dialog.metrics.decrypt_confirm_body"),
-						i18n.get("button.decrypt"), i18n.get("button.cancel"))
-					if res ~= i18n.get("button.decrypt") then return end
-
-					local ok_p, btn, pwd = pcall(dialog.text_prompt,
-						i18n.get("dialog.metrics.encrypt_key_title"),
-						i18n.get("dialog.metrics.decrypt_key_prompt"),
-						default_pwd, i18n.get("button.ok"), i18n.get("button.cancel"))
-					if not ok_p or btn ~= "OK" or type(pwd) ~= "string" or pwd == "" then return end
-
-					local files = {}
-					local dir_iter2 = fs.dir(log_dir)
-					if dir_iter2 then
-						for file in dir_iter2 do
-							if file:match("%.enc$") then
-								table.insert(files, log_dir .. "/" .. file)
-							end
-						end
-					end
-					state.keylogger_encrypt = false
-					save_prefs()
-					local Keylogger = require("modules.keylogger")
-					if type(Keylogger.set_options) == "function" then
-						Keylogger.set_options({ encrypt = false })
-					end
-					updateMenu()
-					if #files > 0 then process_files_with_ui(files, false, pwd) end
-				end
-			end,
-		})
-		table.insert(items, {
-			title = i18n.get("menu.metrics.open_encryptor"),
-			fn    = function()
-				local app_path = hs.configdir .. "/utils/encryptor/Encryptor.app"
-				if fs.attributes(app_path) then
-					hs.execute("open " .. text_utils.shell_quote(app_path))
-				else
+				local want = not state.keylogger_encrypt
+				if want and not TextCipher.is_available() then
+					-- Existing keys, already translated in all 21 locales: the only
+					-- way the key derivation fails on a Mac is a missing openssl,
+					-- which is exactly what this message says.
 					dialog.block_alert(
 						i18n.get("dialog.metrics.encryptor_error_title"),
-						i18n.get("dialog.metrics.encryptor_error_body"),
+						i18n.get("apps.encryptor.err_openssl_missing"),
 						i18n.get("button.ok"))
+					return
 				end
+				TextCipher.set_enabled(want)
+				state.keylogger_encrypt = want
+				save_prefs()
+				local Keylogger = require("modules.keylogger")
+				if type(Keylogger.set_options) == "function" then
+					Keylogger.set_options({ encrypt = want })
+				end
+				updateMenu()
 			end,
 		})
 	end

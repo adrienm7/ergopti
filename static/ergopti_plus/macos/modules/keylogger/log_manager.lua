@@ -1288,9 +1288,5 @@ function M.rebuild_index_if_needed_async(on_done)
 	if type(on_done) == "function" then pcall(on_done, false) end
 end
 function M.get_mac_serial() return "" end
-function M.process_files_async(_files, _is_encrypt, _password, _on_progress, on_complete)
-	if type(on_complete) == "function" then pcall(on_complete, false) end
-end
-function M.register_encryptor_app() end
 
 return M

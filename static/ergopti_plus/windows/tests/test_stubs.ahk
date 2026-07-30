@@ -685,6 +685,9 @@ class Keylogger {
     ; Needed by KL_BuildInserts / KL_AllocEventId (modules/keylogger/keylogger_sql.ahk)
     ; when that pure builder module is exercised directly from unit tests.
     static _device_id_lit := "'test-device'"
+    ; Raw (unquoted) id, used by KL_BuildInsertTyping to derive the at-rest
+    ; encryption IV per row.
+    static device_id      := "test-device"
     static next_event_id  := 1
 }
 

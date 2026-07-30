@@ -1027,7 +1027,7 @@ description_key = "menu.metrics.system_auth_filter_enabled"
 id = "encrypt"
 default = false
 type = "boolean"
-description_key = "menu.metrics.encrypt"
+description_key = "menu.metrics.encrypt_toggle"
 
 
 
@@ -2975,7 +2975,6 @@ type = "---"
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "encryption"
-platforms = ["hs"]
 disabled_when = ["keylogger_enabled"]
 
 [[menu.layout_menu]]

