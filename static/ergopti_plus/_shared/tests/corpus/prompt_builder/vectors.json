@@ -213,6 +213,57 @@
 			"expected": {
 				"context": "hello world"
 			}
+		},
+		{
+			"id": "context_window_chars_overrides_max_words",
+			"description": "context_window_chars is an AUTHORITATIVE user override (llm_context_length): it wins over the max_words-derived limit and truncates to the trailing N characters. No vector covered it, which is why the AHK side shipped without the parameter and the setting had no effect on the automatic path.",
+			"buffer": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxABCDEFGHIJ",
+			"config": {
+				"max_words": 0,
+				"min_words": 1,
+				"num_predictions": 1,
+				"temperature": 0.1,
+				"auto_raise_temp": false,
+				"language": "fr",
+				"context_window_chars": 10
+			},
+			"expected": {
+				"context": "ABCDEFGHIJ"
+			}
+		},
+		{
+			"id": "context_window_chars_shorter_than_buffer_is_noop",
+			"description": "A cap larger than the buffer returns it unchanged.",
+			"buffer": "hello world",
+			"config": {
+				"max_words": 0,
+				"min_words": 1,
+				"num_predictions": 1,
+				"temperature": 0.1,
+				"auto_raise_temp": false,
+				"language": "fr",
+				"context_window_chars": 500
+			},
+			"expected": {
+				"context": "hello world"
+			}
+		},
+		{
+			"id": "context_window_chars_zero_falls_back_to_max_words",
+			"description": "0 means no override: the max_words-derived char limit applies (max(CONTEXT_MIN_CHARS, max_words*CONTEXT_CHARS_PER_WORD) = max(100, 5*40) = 200).",
+			"buffer": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxABCDEFGHIJ",
+			"config": {
+				"max_words": 5,
+				"min_words": 1,
+				"num_predictions": 1,
+				"temperature": 0.1,
+				"auto_raise_temp": false,
+				"language": "fr",
+				"context_window_chars": 0
+			},
+			"expected": {
+				"context": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxABCDEFGHIJ"
+			}
 		}
 	]
 }

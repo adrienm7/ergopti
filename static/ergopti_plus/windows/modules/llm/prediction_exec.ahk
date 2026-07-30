@@ -144,12 +144,16 @@ LLM_Engine_FirePrediction(buffer) {
 
 	pb := PromptBuilder()
 	pb_cfg := Map(
-		"max_words",       _LLM_Engine["max_words"],
-		"min_words",       _LLM_Engine["min_words"],
-		"num_predictions", _LLM_Engine["n_predictions"],
-		"temperature",     _LLM_Engine["temperature"] + 0.0,
-		"auto_raise_temp", _LLM_Engine["auto_raise_temp"],
-		"language",        _LLM_Engine["language"]
+		"max_words",            _LLM_Engine["max_words"],
+		"min_words",            _LLM_Engine["min_words"],
+		"num_predictions",      _LLM_Engine["n_predictions"],
+		"temperature",          _LLM_Engine["temperature"] + 0.0,
+		"auto_raise_temp",      _LLM_Engine["auto_raise_temp"],
+		"language",             _LLM_Engine["language"],
+		; The user's llm_context_length. Omitting it is why the setting had no
+		; effect on the automatic path: the menu wrote it, the manual trigger
+		; shortcut honoured it, and every automatic prediction ignored it.
+		"context_window_chars", _LLM_Engine["ctx_chars"]
 	)
 	params := pb.Build(buffer, pb_cfg)
 	ctx := params["context"]

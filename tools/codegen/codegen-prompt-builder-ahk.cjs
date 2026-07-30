@@ -268,10 +268,29 @@ function buildAhkSource() {
 	lines.push('\t; Truncates the context to a char limit proportional to max_words.');
 	lines.push('\t; Prevents oversized prefill tokens from driving up TTFT on short predictions.');
 	lines.push('\t;');
-	lines.push('\t; Param buffer   - The full context buffer.');
-	lines.push('\t; Param maxWords - Max predicted words (0 = unlimited, returns buffer unchanged).');
-	lines.push('\t; Returns string - The possibly truncated context.');
-	lines.push('\t_CapContext(buffer, maxWords) {');
+	lines.push('\t; Param buffer     - The full context buffer.');
+	lines.push('\t; Param maxWords   - Max predicted words (0 = unlimited).');
+	lines.push(
+		'\t; Param ctxChars   - User-configured hard char cap (0 = no override). When'
+	);
+	lines.push(
+		'\t;                    positive this is AUTHORITATIVE and wins over maxWords,'
+	);
+	lines.push(
+		"\t;                    mirroring the shared Lua cap_context(). Omitting it is why"
+	);
+	lines.push(
+		'\t;                    llm_context_length had no effect on the automatic path.'
+	);
+	lines.push('\t; Returns string   - The possibly truncated context.');
+	lines.push('\t_CapContext(buffer, maxWords, ctxChars := 0) {');
+	lines.push('\t\tif (ctxChars && ctxChars > 0) {');
+	lines.push('\t\t\tlocal bufLenOverride := StrLen(buffer)');
+	lines.push('\t\t\tif (bufLenOverride <= ctxChars) {');
+	lines.push('\t\t\t\treturn buffer');
+	lines.push('\t\t\t}');
+	lines.push('\t\t\treturn SubStr(buffer, bufLenOverride - ctxChars + 1)');
+	lines.push('\t\t}');
 	lines.push('\t\tif (!maxWords || maxWords <= 0) {');
 	lines.push('\t\t\treturn buffer');
 	lines.push('\t\t}');
@@ -327,7 +346,10 @@ function buildAhkSource() {
 	);
 	lines.push('');
 	lines.push('\t\tlocal tail    := this._ExtractTail(buffer)');
-	lines.push('\t\tlocal context := this._CapContext(buffer, maxWords)');
+	lines.push(
+		`\t\tlocal ctxChars       := config.Has(${AQ}context_window_chars${AQ}) ? config[${AQ}context_window_chars${AQ}] : 0`
+	);
+	lines.push('\t\tlocal context := this._CapContext(buffer, maxWords, ctxChars)');
 	lines.push('');
 	lines.push('\t\treturn Map(');
 	lines.push(`\t\t\t${AQ}context${AQ},          context,`);
