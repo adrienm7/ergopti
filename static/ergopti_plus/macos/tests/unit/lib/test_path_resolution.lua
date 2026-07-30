@@ -29,11 +29,11 @@ end
 
 
 
--- =====================================
+--- ======================================
 --- ======================================
 --- ======= 1/ WPM Widget Resolver =======
 --- ======================================
--- =====================================
+--- ======================================
 
 helpers.describe("wpm_widget.resolve_shared_constants_path", function()
 	helpers.it("resolves both shared constants files at load (no not-found ERROR)", function()

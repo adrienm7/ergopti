@@ -51,11 +51,11 @@ end
 
 
 
--- ==============================
+-- =============================
 -- =============================
 -- ======= 1/ Public API =======
 -- =============================
--- ==============================
+-- =============================
 
 --- Builds the API entries submenu and returns the title string and menu table.
 --- Only call when state.llm_backend == "api" — returns nil, nil otherwise.

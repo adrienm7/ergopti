@@ -122,11 +122,11 @@ M._version_gt        = version_gt
 
 
 
--- =================================
+--- ==================================
 --- ==================================
 --- ======= 5/ Submenu Builder =======
 --- ==================================
--- =================================
+--- ==================================
 
 --- Builds the complete "Disposition clavier" submenu item.
 --- @param ctx table Global UI context. Must contain ctx.base_dir and ctx.updateMenu.

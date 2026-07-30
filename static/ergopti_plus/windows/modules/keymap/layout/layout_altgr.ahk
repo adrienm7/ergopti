@@ -37,11 +37,11 @@
 
 
 
-; ==========================================
+; ===============================
 ; ===============================
 ; ======= 1/ Layer tables =======
 ; ===============================
-; ==========================================
+; ===============================
 
 ; The three tables below are populated lazily — at the time this file is
 ; loaded, the ``DeadkeyMappingX`` globals and ``SpaceAroundSymbols`` are not
@@ -198,11 +198,11 @@ _BuildAltGrTables() {
 
 
 
-; ==============================================
+; ===============================================
 ; ===============================================
 ; ======= 2/ Dispatchers and registration =======
 ; ===============================================
-; ==============================================
+; ===============================================
 
 ; Discriminate a real AltGr/Kana keypress from a ghost SC138 prefix injected
 ; by an OS keyboard driver (e.g. Bépo) around AltGr-mapped keys like `'`.

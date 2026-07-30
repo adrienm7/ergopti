@@ -62,11 +62,11 @@ InstallHotstringHooks()
 
 
 
-; ============================================
+; ============================
 ; ============================
 ; ======= 1/ Constants =======
 ; ============================
-; ============================================
+; ============================
 
 ; Whether Strategy B (real Gui window injection) is requested.
 ; Set to 1 by passing any truthy first argument on the command line.
@@ -147,11 +147,11 @@ global E2E_SCENARIOS := [
 
 
 
-; =====================================================================
+; =====================================================
 ; =====================================================
 ; ======= 2/ Strategy A — Pure engine injection =======
 ; =====================================================
-; =====================================================================
+; =====================================================
 
 ; Resets the engine and stubs, registers a single trigger, feeds the buffer
 ; char-by-char then the terminator, and returns a result Map with keys:
@@ -255,11 +255,11 @@ E2E_RunScenarioPure(Scenario) {
 
 
 
-; =====================================================================
+; ==================================================
 ; ==================================================
 ; ======= 3/ Strategy B — Real GUI injection =======
 ; ==================================================
-; =====================================================================
+; ==================================================
 
 ; Creates a hidden Gui with an Edit control, sends the trigger string and
 ; terminator via SendInput, and reads back the control text. Returns the
@@ -298,11 +298,11 @@ E2E_RunScenarioGui(Trigger, Terminator) {
 
 
 
-; =====================================================================
+; ====================================
 ; ====================================
 ; ======= 4/ Test registration =======
 ; ====================================
-; =====================================================================
+; ====================================
 
 ; Named helper used by the loop below — receives the scenario Map directly
 ; so each Test() callback is bound to a specific scenario via .Bind().
@@ -343,11 +343,11 @@ _E2E_RunGuiTest() {
 
 
 
-; ==============================================
+; ==============================
 ; ==============================
 ; ======= 5/ Entry point =======
 ; ==============================
-; ==============================================
+; ==============================
 
 ; Safety watchdog: kill the process if RunTests does not exit within 30 s.
 ; This prevents the CI job from hanging indefinitely if AHK's message loop

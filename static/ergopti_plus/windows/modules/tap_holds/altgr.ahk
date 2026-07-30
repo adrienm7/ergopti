@@ -15,11 +15,11 @@
 
 
 
-; ==============================
+; ========================
 ; ========================
 ; ======= 6/ ALTGR =======
 ; ========================
-; ==============================
+; ========================
 
 ; The standalone ``RAlt::`` hotkey below consumes every AltGr/Kana press while
 ; it is active, breaking native AltGr typing in any context where the user

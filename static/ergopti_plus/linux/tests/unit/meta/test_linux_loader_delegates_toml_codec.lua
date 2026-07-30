@@ -28,11 +28,11 @@ local LOADER_PATH = DRIVER_ROOT .. "/modules/hotstrings/loader.lua"
 
 
 
--- ==========================================
+-- =========================================
 -- =========================================
 -- ======= 1/ Static Source Analysis =======
 -- =========================================
--- ==========================================
+-- =========================================
 
 local function read_file(path)
 	local fh = io.open(path, "r")
@@ -72,11 +72,11 @@ describe("Linux TOML loader delegation to toml_codec.reader", function()
 
 
 
--- ======================================
+-- =====================================
 -- =====================================
 -- ======= 2/ Runtime Load Guard =======
 -- =====================================
--- ======================================
+-- =====================================
 
 	it("toml_codec.reader loads without error on Linux runtime", function()
 		local ok, result = pcall(require, "toml_codec.reader")

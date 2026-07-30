@@ -30,11 +30,11 @@
 
 
 
-; =========================================
+; ======================================
 ; ======================================
 ; ======= 1/ Constants and state =======
 ; ======================================
-; =========================================
+; ======================================
 
 ; Bundled categories compiled into the cache. "personal" is excluded — its TOML
 ; can live outside the repo and always loads through the runtime TOML parser.
@@ -62,11 +62,11 @@ global _HS_CACHE_LOADED := false
 
 
 
-; ===============================================
+; ======================================
 ; ======================================
 ; ======= 2/ Paths and freshness =======
 ; ======================================
-; ===============================================
+; ======================================
 
 ; Absolute path to the gitignored flat cache, beside the source TOML files so a
 ; read-only install (compiled bundle) and a dev checkout resolve it identically.
@@ -176,11 +176,11 @@ _HsCacheUnescape(Value) {
 
 
 
-; ==============================================
+; ===========================================
 ; ===========================================
 ; ======= 4/ Build rows from the TOML =======
 ; ===========================================
-; ==============================================
+; ===========================================
 
 ; Parse every bundled category TOML into a Map(cat.sec → Array of rows), using the
 ; SAME line-based scan + _HOTSTRING_ENTRY_PATTERN as the runtime LoadHotstringsSection
@@ -262,11 +262,11 @@ _HotstringsCacheBuildRows() {
 
 
 
-; ====================================================
+; ===================================================
 ; ===================================================
 ; ======= 5/ TSV read / write (the cache I/O) =======
 ; ===================================================
-; ====================================================
+; ===================================================
 
 ; Serialise a Map(cat.sec → rows) to the flat .tsv. One record per hotstring:
 ; cat<TAB>sec<TAB>flags<TAB>trigger<TAB>output<TAB>final<TAB>repeat<TAB>caseSens<TAB>priority.
@@ -333,11 +333,11 @@ _HotstringsCacheReadTsv(Content) {
 
 
 
-; ==================================================
+; =================================================
 ; =================================================
 ; ======= 6/ Ensure + register (public API) =======
 ; =================================================
-; ==================================================
+; =================================================
 
 ; Load the hotstring cache exactly once: read the fresh .tsv, else rebuild from
 ; the TOML and rewrite the .tsv for next boot. Populates _GENERATED_HOTSTRINGS so

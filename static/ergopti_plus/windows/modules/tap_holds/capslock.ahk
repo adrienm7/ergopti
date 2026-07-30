@@ -29,11 +29,11 @@
 
 
 
-; ==============================
+; ===========================
 ; ===========================
 ; ======= 2/ CAPSLOCK =======
 ; ===========================
-; ==============================
+; ===========================
 
 ; Helper predicates -------------------------------------------------------
 
@@ -71,7 +71,11 @@ _CapsLockHoldModKey() {
 
 
 
+; ==================================================
+; ==================================================
 ; ======= 2.1) No-remap LAlt+CapsLock rescue =======
+; ==================================================
+; ==================================================
 
 ; When CapsLock is not remapped at all but LAlt is on one_shot_shift, the
 ; LAlt+CapsLock shortcut must still fire. Without this block AHK would let
@@ -96,7 +100,11 @@ SC03A:: {
 
 
 
+; =======================================================================
+; =======================================================================
 ; ======= 2.2) Plain-backspace variant (tap=backspace, hold=none) =======
+; =======================================================================
+; =======================================================================
 
 ; Uses *SC03A (wildcard = pass modifiers through Blind) so Shift/Ctrl+CapsLock
 ; still produce Shift+BackSpace / Ctrl+BackSpace as expected.
@@ -116,7 +124,11 @@ SC03A:: {
 
 
 
+; ==========================================
+; ==========================================
 ; ======= 2.3) Hold-modifier variant =======
+; ==========================================
+; ==========================================
 
 ; Pre-arms the configured modifier on key-down, waits for key-up, then either
 ; sends the tap action (short press) or keeps the modifier held until release.
@@ -165,7 +177,11 @@ SC03A:: {
 
 
 
+; =======================================
+; =======================================
 ; ======= 2.4) Hold-layer variant =======
+; =======================================
+; =======================================
 
 ; Mirrors the LAlt layer approach: activate layer on hold, tap action on release.
 #HotIf _CapsLockHasHoldLayer() and not LayerEnabled
@@ -222,7 +238,11 @@ $SC03A:: {
 
 
 
+; ======================================================================================
+; ======================================================================================
 ; ======= 2.5) Tap-only variant (tap action set, hold=none, not plain backspace) =======
+; ======================================================================================
+; ======================================================================================
 
 ; Simple gate: fire the tap action on every press (no hold behaviour).
 #HotIf TapHoldTapAction(TapHold, "caps_lock") != "" and not _CapsLockHasHoldModifier() and not _CapsLockHasHoldLayer() and not _CapsLockIsPlainBackspace() and not LayerEnabled
@@ -241,7 +261,11 @@ SC03A:: {
 
 
 
+; =================================
+; =================================
 ; ======= 2.6) Tap dispatch =======
+; =================================
+; =================================
 
 ; Dispatch the configured tap action for CapsLock.
 ; CtrlActivated: true when LCtrl was physically held at key-down time — the

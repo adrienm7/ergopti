@@ -39,11 +39,11 @@
 
 
 
-; ==============================================================
+; ==========================
 ; ==========================
 ; ======= 1/ Harness =======
 ; ==========================
-; ==============================================================
+; ==========================
 
 ; Runs Action with the OS send primitive replaced by a no-op recorder, starting
 ; from a known engine-buffer state, and reports what the buffer became.
@@ -72,11 +72,11 @@ _SSDB_BufferAfter(Start, Action) {
 
 
 
-; ==============================================================
+; ==================================================
 ; ==================================================
 ; ======= 2/ The emissions that MUST declare =======
 ; ==================================================
-; ==============================================================
+; ==================================================
 
 ; The finding's own repro, reduced to the emission that caused it.
 _SSDB_CtrlBackspaceInvalidatesTheBuffer() {
@@ -97,11 +97,11 @@ _SSDB_UnmodifiedCaretMoveInvalidatesTheBuffer() {
 
 
 
-; ==============================================================
+; ======================================================
 ; ======================================================
 ; ======= 3/ The emissions that MUST NOT declare =======
 ; ======================================================
-; ==============================================================
+; ======================================================
 
 ; The engine backspacing over its own trigger during an expansion. It already
 ; accounts for those characters; a second decrement here corrupts typing in the
@@ -123,11 +123,11 @@ _SSDB_ModifierHoldLeavesTheBufferAlone() {
 
 
 
-; ==============================================================
+; ===================================================
 ; ===================================================
 ; ======= 4/ The wiring that makes it general =======
 ; ===================================================
-; ==============================================================
+; ===================================================
 
 ; The behavioural cases above prove the two branches in use today. This one
 ; states WHY the fix generalises: it lives at the funnel, not at the call sites,

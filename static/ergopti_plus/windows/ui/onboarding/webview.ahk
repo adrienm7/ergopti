@@ -217,11 +217,11 @@ _OnbWeb_UnavailableReason() {
 
 
 
-; ==============================================================
+; ====================================
 ; ====================================
 ; ======= 2/ JS <-> AHK bridge =======
 ; ====================================
-; ==============================================================
+; ====================================
 
 ; Receives messages from the page. The frontend JSON-encodes every payload for
 ; the WebView2 (chrome.webview) channel, so each message is an object with an
@@ -492,11 +492,11 @@ _OnbWeb_RegisterGesturesManual() {
 
 
 
-; ==============================================================
+; ===================================
 ; ===================================
 ; ======= 4/ initData sources =======
 ; ===================================
-; ==============================================================
+; ===================================
 
 ; Returns the JSON array of supported locales [{code,name,flag}], in the same
 ; order as the tray language menu (_I18nSortedLocales). The flag emoji is read

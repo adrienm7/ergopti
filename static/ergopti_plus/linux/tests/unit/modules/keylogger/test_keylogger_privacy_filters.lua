@@ -69,11 +69,11 @@ end
 
 
 
--- =========================================
+-- ==========================================
 -- ==========================================
 -- ======= 1/ Posture Comes From Data =======
 -- ==========================================
--- =========================================
+-- ==========================================
 
 helpers.describe("keylogger privacy — the posture is read, not re-typed", function()
 	helpers.it("exposes every flag the shared manifest declares", function()

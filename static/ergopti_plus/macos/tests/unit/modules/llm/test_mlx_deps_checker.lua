@@ -14,22 +14,18 @@ local helpers = require("tests.helpers")
 
 
 
--- =========================================
+--- ==========================================
 --- ==========================================
 --- ======= 1/ Source-level invariants =======
 --- ==========================================
--- =========================================
+--- ==========================================
 
-local function read_source()
-	local path = helpers.driver_root() .. "modules/llm/mlx_deps_checker.lua"
-	local fh = io.open(path, "r")
-	if not fh then return "" end
-	local body = fh:read("*a") or ""
-	fh:close()
-	return body
-end
-
-local SOURCE = read_source()
+-- Selected by a declaration unique to modules/llm/mlx_deps_checker.lua rather
+-- than by path, so moving or splitting the module cannot turn these invariants
+-- into a path error. The old form returned "" on a missing file, which made
+-- every assertion below pass against an empty string.
+local SOURCE = helpers.read_driver_source("local function resolve_bootstrap_script_path")
+helpers.assert_true(SOURCE ~= nil, "modules/llm/mlx_deps_checker.lua source must be locatable")
 
 helpers.describe("mlx_deps_checker source invariants", function()
 	helpers.it("imports lib.paths for fallback discovery", function()
@@ -97,11 +93,11 @@ end)
 
 
 
--- ====================================
+--- ======================================
 --- ======================================
 --- ======= 2/ Public API contract =======
 --- ======================================
--- ====================================
+--- ======================================
 
 helpers.describe("mlx_deps_checker public API", function()
 	local original_logger = package.loaded["lib.logger"]

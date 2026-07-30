@@ -20,11 +20,11 @@ local dialog = require("lib.dialog_util")
 
 
 
--- ==============================
+-- ==========================
 -- ==========================
 -- ======= 1/ Helpers =======
 -- ==========================
--- ==============================
+-- ==========================
 
 --- Resolves a description value that may be a plain string or a multilingual table.
 --- Falls back to the "fr" locale, then to an empty string.

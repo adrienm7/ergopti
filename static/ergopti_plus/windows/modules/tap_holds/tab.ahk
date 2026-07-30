@@ -24,11 +24,11 @@
 
 
 
-; ==============================
+; ======================
 ; ======================
 ; ======= 8/ TAB =======
 ; ======================
-; ==============================
+; ======================
 
 ; Helper predicates -------------------------------------------------------
 
@@ -43,7 +43,11 @@ _TabHoldModKey() {
 
 
 
+; ========================================
+; ========================================
 ; ======= 8.1) alt_tab_monitor tap =======
+; ========================================
+; ========================================
 
 ; SC00F::LAlt remap so the OS hold phase sees Alt (enables Alt+Tab switching).
 #HotIf TapHoldTapAction(TapHold, "tab") == "alt_tab_monitor" and not LayerEnabled
@@ -88,7 +92,11 @@ SC00F Up:: TapHoldSyntheticKeyUp("LAlt")
 
 
 
+; ===========================================================
+; ===========================================================
 ; ======= 8.2) Generic — hold-modifier, any other tap =======
+; ===========================================================
+; ===========================================================
 
 ; The gate deliberately does NOT require a configured tap action. The tray
 ; picker offers the hold options independently of the tap, persists the choice
@@ -128,7 +136,11 @@ $SC00F:: {
 
 
 
+; ========================================================
+; ========================================================
 ; ======= 8.3) Generic — hold-layer, any other tap =======
+; ========================================================
+; ========================================================
 
 ; No tap-action conjunct, for the reason given on block 8.2: a hold must arm on
 ; the hold alone or the picker offers a choice the driver silently ignores.
@@ -175,7 +187,11 @@ $SC00F:: {
 
 
 
+; ===================================================
+; ===================================================
 ; ======= 8.4) Generic — tap-only (hold=none) =======
+; ===================================================
+; ===================================================
 
 #HotIf TapHoldTapAction(TapHold, "tab") != "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "tab") == "" and TapHoldHoldLayer(TapHold, "tab") == "" and TapHoldTapAction(TapHold, "tab") != "" and not LayerEnabled
 SC00F:: _TabDispatch()
@@ -187,7 +203,11 @@ SC00F:: _TabDispatch()
 
 
 
+; =================================
+; =================================
 ; ======= 8.5) Tap dispatch =======
+; =================================
+; =================================
 
 _TabDispatch() {
 	local action := TapHoldTapAction(TapHold, "tab")

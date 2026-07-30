@@ -88,11 +88,11 @@ GestureGetCyclableWindows(ProcessFilter := "") {
 
 
 
-; ====================================================
+; ===================================================
 ; ===================================================
 ; ======= X/ Manual-activation window tracker =======
 ; ===================================================
-; ====================================================
+; ===================================================
 
 ; WinEvent callback fired by Windows whenever a window gains foreground focus.
 ; Ignored when _GestureCycling is True so our own WinActivate calls do not

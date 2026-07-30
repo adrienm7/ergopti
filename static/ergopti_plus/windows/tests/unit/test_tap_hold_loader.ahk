@@ -14,11 +14,11 @@
 
 
 
-; ======================================
+; ==================================
 ; ==================================
 ; ======= 1/ LoadTapHoldToml =======
 ; ==================================
-; ======================================
+; ==================================
 
 _TH_TmpPath() => A_ScriptDir . "\test_tap_hold_tmp.toml"
 
@@ -149,11 +149,11 @@ Test("LoadTapHoldToml: ignores blank lines and comments", _TH_IgnoresBlankLinesA
 
 
 
-; ==========================================
+; ======================================
 ; ======================================
 ; ======= 2/ TapHoldIsConfigured =======
 ; ======================================
-; ==========================================
+; ======================================
 
 _TH_IsConfiguredFalseWhenEmpty() {
 	TH := Map("keys", Map(), "layers", Map())
@@ -190,11 +190,11 @@ Test("TapHoldIsConfigured: false when entry exists but has none of the three key
 
 
 
-; ========================================
+; ===================================
 ; ===================================
 ; ======= 3/ TapHoldTapAction =======
 ; ===================================
-; ========================================
+; ===================================
 
 ; Pause invariant regression (project_suspend_pause_invariant)
 ; Tap-hold must not activate when script is paused (A_IsSuspended guard in dispatch).
@@ -294,11 +294,11 @@ Test("TapHoldTapAction: returns empty string when tap_action key absent", _TH_Ta
 
 
 
-; ======================================
+; ==================================
 ; ==================================
 ; ======= 4/ TapHoldDuration =======
 ; ==================================
-; ======================================
+; ==================================
 
 _TH_DurationDefaultForUnknownKey() {
 	TH := Map("keys", Map(), "layers", Map())
@@ -331,11 +331,11 @@ Test("TapHoldDuration: returns configured value", _TH_DurationReturnsConfiguredV
 
 
 
-; ==========================================
+; ======================================
 ; ======================================
 ; ======= 5/ TapHoldHoldModifier =======
 ; ======================================
-; ==========================================
+; ======================================
 
 _TH_HoldModifierEmptyForUnknownKey() {
 	TH := Map("keys", Map(), "layers", Map())
@@ -360,11 +360,11 @@ Test("TapHoldHoldModifier: returns empty string when hold_modifier absent", _TH_
 
 
 
-; ========================================
+; ===================================
 ; ===================================
 ; ======= 6/ TapHoldHoldLayer =======
 ; ===================================
-; ========================================
+; ===================================
 
 _TH_HoldLayerEmptyForUnknownKey() {
 	TH := Map("keys", Map(), "layers", Map())
@@ -388,11 +388,11 @@ Test("TapHoldHoldLayer: returns empty string when hold_layer absent", _TH_HoldLa
 
 
 
-; ====================================================================
+; ==================================================
 ; ==================================================
 ; ======= 7/ Runtime overlay (defaults+user) =======
 ; ==================================================
-; ====================================================================
+; ==================================================
 
 ; Helper: write a second temp file for defaults (path distinct from the user tmp)
 _TH_DefaultsTmpPath() => A_ScriptDir . "\test_tap_hold_defaults_tmp.toml"
@@ -501,11 +501,11 @@ Test("LoadTapHoldToml: inherit_defaults=false skips shipped defaults", _TH_Inher
 
 
 
-; ==========================================================
+; =========================================================
 ; =========================================================
 ; ======= 8/ ResolveHoldModifierKey (single-source) =======
 ; =========================================================
-; ==========================================================
+; =========================================================
 
 _TH_ResolveHoldModifierKeyKnownValuesMap() {
 	AssertEqual("LCtrl", ResolveHoldModifierKey("ctrl", "backspace"))

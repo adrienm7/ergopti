@@ -91,11 +91,11 @@ _CBRF_UnreadableExistingFileIsFlagged() {
 
 
 
-; ===================================================================
+; ====================================================================
 ; ====================================================================
 ; ======= 2/ The boot apply refuses to report a silent success =======
 ; ====================================================================
-; ===================================================================
+; ====================================================================
 
 ; The destructive step needs TWO things to be true: the tree in memory is
 ; defaults, and something later serializes it. This asserts the first — the
@@ -152,11 +152,11 @@ _CBRF_ApplyStillWorksWhenReadable() {
 
 
 
-; ===============================================================
+; ================================================================
 ; ================================================================
 ; ======= 3/ The persist declines while the flag is raised =======
 ; ================================================================
-; ===============================================================
+; ================================================================
 
 ; The last link: even with the file readable again and the driver fully ready,
 ; SaveFullConfig must refuse, because what it would serialize is the default

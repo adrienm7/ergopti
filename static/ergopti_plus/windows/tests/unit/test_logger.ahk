@@ -488,11 +488,11 @@ Test("Ring buffer: snapshot is correct after double wrap-around",
 
 
 
-; =====================================================
+; =======================================================================================
 ; =======================================================================================
 ; ======= 9/ Healthcheck / Diagnostic integration (encore plus — 100% regression) =======
 ; =======================================================================================
-; =====================================================
+; =======================================================================================
 ; The enriched Diagnostic système (healthcheck) must be fully usable by paused users
 ; for troubleshooting. It must correctly surface the dedicated errors sink, keylogger
 ; summary (privacy-safe), pause_state, llm/layout/hotstrings/logs/config collectors.
@@ -580,11 +580,11 @@ Test("LoggerPurgeOldLogs: missing directory is silently ignored",
 
 
 
-; ==================================================
+; =================================================
 ; =================================================
 ; ======= 5/ Test sink (injectable capture) =======
 ; =================================================
-; ==================================================
+; =================================================
 
 TestLogger_SinkReceivesLine() {
 	_ResetLogger()
@@ -638,11 +638,11 @@ Test("Test sink: cleared sink does not receive subsequent lines",
 
 
 
-; ==================================================
+; ============================================================
 ; ============================================================
 ; ======= 6/ Errors-only log sink (WARNING/ERROR only) =======
 ; ============================================================
-; ==================================================
+; ============================================================
 ; The dedicated LOGGER_ERRORS_LOG_PATH receives only lines at WARNING level
 ; and above. This keeps a small, focused file for triage. Lower levels must
 ; never appear in it. The main ring buffer and unified log continue to receive
@@ -868,11 +868,11 @@ Test("LoggerPurgeOldLogs: also purges old ErgoptiPlus_errors_*.log files (14-day
 
 
 
-; ==================================================
+; =================================================================================
 ; =================================================================================
 ; ======= 8/ Maximum coverage: day rollover, pcall-style, FS failure, edges =======
 ; =================================================================================
-; ==================================================
+; =================================================================================
 
 ; Day-rollover simulation for errors filename (create "yesterday" and "today" error paths,
 ; emit on each, verify correct file gets the line and purge still works).

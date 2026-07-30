@@ -18,11 +18,11 @@ local ApiCommon = helpers.load_with_stubs("modules.llm.api_common")
 
 
 
--- =====================================
+--- ========================================
 --- ========================================
 --- ======= 1/ Diversity Temperature =======
 --- ========================================
--- =====================================
+--- ========================================
 
 helpers.describe("ApiCommon.get_diversity_temperature", function()
 	helpers.it("returns base for the first variant", function()
@@ -236,11 +236,11 @@ end)
 
 
 
--- ============================================
+-- ===========================================
 -- ===========================================
 -- ======= 8/ get_stop_sequences (D-3) =======
 -- ===========================================
--- ============================================
+-- ===========================================
 
 helpers.describe("ApiCommon.get_stop_sequences: stop-sequences single source (D-3)", function()
 	helpers.it("returns a non-empty table for batch", function()

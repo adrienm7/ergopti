@@ -49,11 +49,11 @@ M.KEYWORDS = {
 
 
 
--- ==========================
+-- ===========================
 -- ===========================
 -- ======= 2/ Matching =======
 -- ===========================
--- ==========================
+-- ===========================
 
 --- Reports whether a window title marks a private/incognito browser window.
 --- @param title string|nil          Focused window title.

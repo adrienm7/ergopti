@@ -74,11 +74,11 @@ _TSCR_HasRestore(Segment) {
 
 
 
-; ==========================
+; =========================
 ; =========================
 ; ======= 3/ Guards =======
 ; =========================
-; ==========================
+; =========================
 
 ; The specific branch the fix is about, named so a regression reads clearly.
 _TSCR_OwnershipBailOutRestores() {
@@ -143,11 +143,11 @@ _TSCR_ClipWaitTimeoutRestores() {
 
 
 
-; ================================
+; ===============================
 ; ===============================
 ; ======= 4/ Registration =======
 ; ===============================
-; ================================
+; ===============================
 
 Test("meta text-sender-clipboard: the ownership-unavailable bail-out restores the clipboard",
 	_TSCR_OwnershipBailOutRestores)

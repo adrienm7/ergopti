@@ -14,11 +14,11 @@
 
 
 
-; ================================================
+; =============================================
 ; =============================================
 ; ======= 1/ Constants and wizard state =======
 ; =============================================
-; ================================================
+; =============================================
 
 ; Default locale index within I18N_LOCALES (1-based; English is index 4 — see
 ; the table in i18n.ahk: ar, cs, da, de, en, …). Pre-selecting English mirrors
@@ -124,11 +124,11 @@ IsOnboardingActive() {
 
 
 
-; =========================================
+; ======================================
 ; ======================================
 ; ======= 2/ Public entry points =======
 ; ======================================
-; =========================================
+; ======================================
 
 ; Run the wizard only when config.toml does not yet exist.
 ; Called at startup before features are loaded.
@@ -187,11 +187,11 @@ Onboarding_ShowFromMenu(*) {
 
 
 
-; ===============================================
+; =======================================
 ; =======================================
 ; ======= 3/ i18n preview helpers =======
 ; =======================================
-; ===============================================
+; =======================================
 
 ; Resolve a translation key in a target locale WITHOUT touching the active
 ; locale cache. Used by step 1 so the heading/title/button can be re-rendered

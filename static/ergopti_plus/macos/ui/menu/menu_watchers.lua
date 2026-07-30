@@ -22,11 +22,11 @@ local LOG         = "menu_watchers"
 
 
 
--- =====================================
+-- ======================================
 -- ======================================
 -- ======= 1/ Config File Watcher =======
 -- ======================================
--- =====================================
+-- ======================================
 
 -- Debounce delay (seconds): absorbs rapid bursts of file-change events
 -- (e.g. a git commit touching several .lua files at once) so that only a
@@ -174,11 +174,11 @@ end
 
 
 
--- =====================================
+--- =======================================
 --- =======================================
 --- ======= 2/ Theme Change Watcher =======
 --- =======================================
--- =====================================
+--- =======================================
 
 --- Creates and starts a distributed-notification watcher for macOS theme changes.
 --- Calls on_update when the interface style switches between Light and Dark.

@@ -52,11 +52,11 @@ local PROFILE_POWER_LEVELS = {
 
 
 
--- ==============================
+-- =============================
 -- =============================
 -- ======= 1/ Public API =======
 -- =============================
--- ==============================
+-- =============================
 
 --- Creates and returns a model-switcher instance bound to the given context.
 --- @param ctx table Context with fields:

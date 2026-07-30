@@ -33,11 +33,11 @@ local Labels     = require("menu.labels")
 
 
 
--- ==========================================
+-- =============================================
 -- =============================================
 -- ======= 1/ Constants and module state =======
 -- =============================================
--- ==========================================
+-- =============================================
 
 --- Ordered list of supported locales, in the canonical language-menu order.
 --- That order is single-sourced from _shared/data/locale_order.json and pinned
@@ -84,11 +84,11 @@ local RELOAD_DEBOUNCE_SEC = 0.15
 
 
 
--- =====================================
+-- ===================================
 -- ===================================
 -- ======= 2/ Internal helpers =======
 -- ===================================
--- =====================================
+-- ===================================
 
 --- Returns true when code is a supported locale code.
 local function is_known(code)
@@ -108,11 +108,11 @@ local _locale_set_fn = nil  -- injected by init() below
 
 
 
--- =========================================
+-- =============================
 -- =============================
 -- ======= 3/ Public API =======
 -- =============================
--- =========================================
+-- =============================
 
 --- Detects the macOS system UI locale and returns the best matching supported
 --- locale code.  Falls back to "en" when the system locale cannot be mapped.

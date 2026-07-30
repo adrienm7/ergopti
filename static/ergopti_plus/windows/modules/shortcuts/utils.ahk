@@ -14,11 +14,11 @@
 
 
 
-; ==============================
+; ============================
 ; ============================
 ; ======= 1/ UTILITIES =======
 ; ============================
-; ==============================
+; ============================
 
 ; This function makes it possible to create a shortcut that works
 ; no matter the keyboard layout or the potential emulation of the Ergopti layout on top of it.

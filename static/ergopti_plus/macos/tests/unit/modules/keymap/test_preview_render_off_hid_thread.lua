@@ -29,11 +29,11 @@ local helpers = require("tests.helpers")
 
 
 
--- =====================================================
+-- =======================================================
 -- =======================================================
 -- ======= 1/ The render is deferred, then stamped =======
 -- =======================================================
--- =====================================================
+-- =======================================================
 
 helpers.describe("llm_bridge: the preview render leaves the keyboard callback", function()
 	helpers.it("shows the preview through a deferral, not inline", function()

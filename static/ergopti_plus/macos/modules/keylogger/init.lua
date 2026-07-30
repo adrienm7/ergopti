@@ -41,11 +41,11 @@ local LOG            = "keylogger"
 
 
 
--- ================================
+-- ============================
 -- ============================
 -- ======= 1/ Constants =======
 -- ============================
--- ================================
+-- ============================
 
 -- Timing thresholds come from the shared cross-driver registry
 -- (_shared/modules/timings/constants.toml [keylogger]) so the AHK and macOS keyloggers
@@ -358,11 +358,11 @@ local _keycode_to_name = nil
 
 
 
--- ==========================================
+-- =============================================
 -- =============================================
 -- ======= 4/ Key Event Helper Utilities =======
 -- =============================================
--- ==========================================
+-- =============================================
 
 --- Builds a keycode → name lookup table from hs.keycodes.map.
 --- Lazy: only computed once on first use.
@@ -483,11 +483,11 @@ end
 
 
 
--- =======================================
+-- ========================================
 -- ========================================
 -- ======= 5/ Event Tap Interceptor =======
 -- ========================================
--- =======================================
+-- ========================================
 
 --- Main eventtap callback. Processes all keyboard and mouse events.
 --- Wrapped in pcall to prevent any Lua error from locking the OS keyboard.
@@ -917,11 +917,11 @@ end
 
 
 
--- =============================================
+-- ================================================
 -- ================================================
 -- ======= 6/ Hardware Watchers And Sensors =======
 -- ================================================
--- =============================================
+-- ================================================
 
 -- The background sensor layer (idle/maintenance timers, sleep/wake caffeinate
 -- callback, and the Wi-Fi/battery/spaces/audio hardware watchers) lives in the

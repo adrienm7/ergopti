@@ -178,11 +178,11 @@ end)
 
 
 
--- =================================================
+--- ==================================================
 --- ==================================================
 --- ======= 3/ init.lua throw-protection guard =======
 --- ==================================================
--- =================================================
+--- ==================================================
 
 helpers.describe("lib/fs_dir: hs.fs.dir iteration is pcall-protected (init-fsdir-pcall)", function()
 	helpers.it("fs_dir.entries wraps an hs.fs.dir loop in pcall so a bad directory cannot abort boot", function()

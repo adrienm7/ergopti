@@ -12,11 +12,11 @@
 
 
 
-; ======================================
+; =======================================
 ; =======================================
 ; ======= 1/ DEAD KEY DEFINITIONS =======
 ; =======================================
-; ======================================
+; =======================================
 
 ; TODO : if KbdEdit is upgraded, some "NEW" Unicode characters will become available
 ; This AutoHotkey script has all the characters, and the KbdEdit file has some missing ones
@@ -934,11 +934,11 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 
 
 
-; ============================
+; =============================
 ; =============================
 ; ======= 3/ BASE LAYER =======
 ; =============================
-; ============================
+; =============================
 
 
 ; Returns true when digit keys 1-0 require Shift on the active OS keyboard
@@ -1165,11 +1165,11 @@ RegisterCapsLockLayer()
 
 
 
-; =============================================
+; ==============================================
 ; ==============================================
 ; ======= 6/ ALTGR AND SHIFT+ALTGR LAYER =======
 ; ==============================================
-; =============================================
+; ==============================================
 
 ; The AltGr roll for SC012 (= / Œ / %) is registered dynamically via
 ; _RegisterRollsAltGrHotkeys() below. Static ``SC138 & SC012::`` would have AHK

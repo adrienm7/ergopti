@@ -62,11 +62,11 @@ local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * 0.5s = 60s of a quiet-but-stuck 
 
 
 
--- ========================================
+-- =======================================
 -- =======================================
 -- ======= 1/ Auto-Reload Watchers =======
 -- =======================================
--- ========================================
+-- =======================================
 
 --- Normalises a path for comparison: lowercased, backslashes folded to slashes.
 --- @param p string|nil

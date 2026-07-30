@@ -28,11 +28,11 @@ local M  = {}
 
 
 
--- =============================================
+--- ===============================================
 --- ===============================================
 --- ======= 1/ Default Initialisation Seeds =======
 --- ===============================================
--- =============================================
+--- ===============================================
 
 -- Default seconds the rescan window uses when callers do not pass an explicit
 -- duration to suppress_rescan(). Picked empirically to bridge the gap between

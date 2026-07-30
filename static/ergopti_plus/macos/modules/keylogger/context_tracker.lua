@@ -87,11 +87,11 @@ end
 
 
 
--- =========================================
+-- ==========================================
 -- ==========================================
 -- ======= 2/ Accessibility Observers =======
 -- ==========================================
--- =========================================
+-- ==========================================
 
 --- Inspects a focused UI element and updates the secure-field flag on CoreState.
 --- Called whenever the focused element changes so the engine can stop logging
@@ -263,11 +263,11 @@ end
 
 
 
--- ==========================================
+-- =============================================
 -- =============================================
 -- ======= 3/ Application Switch Tracker =======
 -- =============================================
--- ==========================================
+-- =============================================
 
 --- Returns the unpersisted foreground duration for the active application.
 --- App-time events are normally committed only on a focus transition. The
@@ -577,11 +577,11 @@ end
 
 
 
--- =============================
+-- ============================
 -- ============================
 -- ======= 4/ Lifecycle =======
 -- ============================
--- =============================
+-- ============================
 
 --- Initializes the context tracker with its three injected dependencies.
 --- Must be called exactly once before any callbacks are registered.

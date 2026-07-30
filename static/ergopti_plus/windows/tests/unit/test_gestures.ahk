@@ -12,11 +12,11 @@
 
 
 
-; ====================================
+; ======================================
 ; ======================================
 ; ======= 1/ Configuration Tests =======
 ; ======================================
-; ====================================
+; ======================================
 
 TestGestures_DefaultAssignments() {
     AssertTrue(GestureAssignments.Has("tap_3"), "tap_3 should exist")
@@ -51,11 +51,11 @@ Test("Gestures: all slots have shortcut labels", TestGestures_AllSlotsHaveShortc
 
 
 
-; ====================================
+; ================================================
 ; ================================================
 ; ======= 2/ Pause and reversal regression =======
 ; ================================================
-; ====================================
+; ================================================
 
 ; Regression for project_suspend_pause_invariant: gestures must respect pause.
 TestGestures_RespectPause() {
@@ -164,11 +164,11 @@ Test("Gestures: action count matches GESTURE_ACTION_NAMES length", TestGestures_
 
 
 
-; ===============================================
+; =================================================
 ; =================================================
 ; ======= 3/ Right-Click Hold State Machine =======
 ; =================================================
-; ===============================================
+; =================================================
 
 TestGestures_RightClickStartsReleased() {
     AssertFalse(GestureLeftClickHeld, "right-click hold should start released")
@@ -293,11 +293,11 @@ Test("Gestures: slot count is 10", TestGestures_SlotCountMatchesExpected)
 
 
 
-; =====================================================
+; ==========================================================
 ; ==========================================================
 ; ======= 5/ New actions (cycle / nav / screenshots) =======
 ; ==========================================================
-; =====================================================
+; ==========================================================
 
 TestGestures_NewActionsRegistered() {
     for Name in ["win_prev", "win_next", "win_app_prev", "win_app_next",
@@ -341,11 +341,11 @@ Test("Gestures: GestureNextIndex handles index=0 (active not in list)",
 
 
 
-; ===========================================================
+; =======================================================
 ; =======================================================
 ; ======= 6/ Registry encoding for auto-configure =======
 ; =======================================================
-; ===========================================================
+; =======================================================
 
 TestGestures_KeyParamsEncodingF1() {
     ; F1 = VK 0x70, modifiers Ctrl+Win+Shift = 0x07. The registry layout

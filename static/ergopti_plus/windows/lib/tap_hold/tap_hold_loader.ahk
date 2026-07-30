@@ -44,11 +44,11 @@ global TAPHOLD_MAX_ACTIVATION_SECONDS := 10
 
 
 
-; ==============================================================
+; =====================================
 ; =====================================
 ; ======= 1. Public entry point =======
 ; =====================================
-; ==============================================================
+; =====================================
 
 ; Read ``FilePath`` (user config) and return the hierarchical TapHold Map.
 ; When ``DefaultsFilePath`` is supplied the shared defaults are loaded first
@@ -187,11 +187,11 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 
 
 
-; ==============================================================
+; ========================================
 ; ========================================
 ; ======= 2. Internal parse helper =======
 ; ========================================
-; ==============================================================
+; ========================================
 
 ; Parse ``FilePath`` and merge its key/value pairs into ``Result`` in-place.
 ; Existing entries are overwritten field-by-field so a user file that only
@@ -279,11 +279,11 @@ _TapHold_ParseFileInto(FilePath, Result) {
 
 
 
-; ==============================================================
+; ========================================
 ; ========================================
 ; ======= 3. Convenience accessors =======
 ; ========================================
-; ==============================================================
+; ========================================
 
 ; Return true when the key ``KeyId`` has a configured tap_action OR hold_layer
 ; OR hold_modifier — i.e. when the tap-hold for this key should be armed.
@@ -363,11 +363,11 @@ TapHoldHoldLayer(TapHold, KeyId) {
 
 
 
-; ==============================================================
+; ===========================================
 ; ===========================================
 ; ======= 4. Hold-modifier resolution =======
 ; ===========================================
-; ==============================================================
+; ===========================================
 
 ; Central hold_modifier -> AHK key-name resolver shared by every tap-holds
 ; module's per-key XxxHoldModKey() wrapper. Centralizing the switch means a

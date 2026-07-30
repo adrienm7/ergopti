@@ -31,11 +31,11 @@
 
 
 
-; ==============================================================
+; =============================================
 ; =============================================
 ; ======= 1/ Constants and shared state =======
 ; =============================================
-; ==============================================================
+; =============================================
 
 ; Maximum number of log lines kept in the in-memory ring buffer. 200 lines is
 ; enough to cover ~30 s of typical activity at INFO level while staying small
@@ -184,11 +184,11 @@ global _LastErrTime := 0
 
 
 
-; ==================================================
+; =============================
 ; =============================
 ; ======= 2/ Public API =======
 ; =============================
-; ==================================================
+; =============================
 
 ; Resolve the dated log-file paths for TODAY under <ConfigDir>/autohotkey/logs/,
 ; creating the directory if needed, and record the date they were built for.
@@ -676,11 +676,11 @@ LoggerRingBufferSnapshot() {
 
 
 
-; ==========================================
+; ===================================
 ; ===================================
 ; ======= 3/ Internal helpers =======
 ; ===================================
-; ==========================================
+; ===================================
 
 ; Format and emit a log line if the current level allows it. Best-effort —
 ; never raises so a logging failure cannot break the driver. Hot-path-safe.

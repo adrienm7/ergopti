@@ -27,11 +27,11 @@
 
 
 
-; ============================================
+; ========================================
 ; ========================================
 ; ======= 1/ Side-effect recorders =======
 ; ========================================
-; ============================================
+; ========================================
 
 global _Stub_SentText := []          ; Recorded SendNewResult / SendInput / SendEvent payloads
 global _Stub_LastChars := []         ; Recorded UpdateLastSentCharacter calls
@@ -407,11 +407,11 @@ global DeadkeyMappingCurrency := Map()
 
 
 
-; ==================================
+; =================================
 ; =================================
 ; ======= 3/ Function stubs =======
 ; =================================
-; ==================================
+; =================================
 
 ; AHK refuses duplicate function definitions, so we can only stub functions
 ; that are NOT defined in any included lib/ file. The list below covers the
@@ -510,11 +510,11 @@ GetCapsLockCondition() {
 
 
 
-; ==========================================
+; =========================================
 ; =========================================
 ; ======= 4/ Hotstring engine hooks =======
 ; =========================================
-; ==========================================
+; =========================================
 
 ; Recorder consumed by ``_HotstringRegistrar`` once installed. Stores the
 ; trigger spec (``:flags:abbrev``) and the callback so individual tests can

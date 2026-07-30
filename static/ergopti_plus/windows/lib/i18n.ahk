@@ -27,11 +27,11 @@
 
 
 
-; ============================================
+; =============================================
 ; =============================================
 ; ======= 1/ Constants and module state =======
 ; =============================================
-; ============================================
+; =============================================
 
 ; Ordered list of supported locales: { Code, Flag, Name }
 ; Tag = short code shown in radio buttons (flag emojis don't render on Windows)
@@ -81,11 +81,11 @@ global _I18nFlagExistsCache := Map()
 
 
 
-; =============================================
+; ===================================
 ; ===================================
 ; ======= 2/ Internal helpers =======
 ; ===================================
-; =============================================
+; ===================================
 
 ; Detect the Windows UI language via GetLocaleInfoEx(LOCALE_SISO639LANGNAME)
 ; and map it to a supported locale code. Falls back to "en" when the detected
@@ -127,11 +127,11 @@ _I18nDetectSystemLocale() {
 
 
 
-; =========================================
+; =============================
 ; =============================
 ; ======= 3/ Public API =======
 ; =============================
-; =========================================
+; =============================
 
 ; Initialise the i18n module from the script configuration cache.
 ; Must be called after ParseTomlFile and ReadScriptConfig so the Locale key

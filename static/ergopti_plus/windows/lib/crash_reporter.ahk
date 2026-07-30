@@ -325,11 +325,11 @@ CrashReport_PromptUser(Report) {
 
 
 
-; ===========================
+; ==========================
 ; ==========================
 ; ======= 3/ Helpers =======
 ; ==========================
-; ===========================
+; ==========================
 
 ; Returns a Map with full OS, CPU, RAM, screen, AHK, and git fields.
 ; Mirrors _HealthCheck_SysInfo() so the crash report is a superset of the

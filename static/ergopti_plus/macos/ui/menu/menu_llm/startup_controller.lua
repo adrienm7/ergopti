@@ -29,11 +29,11 @@ local LOG = "startup_ctrl"
 
 
 
--- ==============================
+-- =============================
 -- =============================
 -- ======= 1/ Public API =======
 -- =============================
--- ==============================
+-- =============================
 
 --- Returns a check_startup closure bound to the given context.
 --- Call the returned function once after all hotkeys and profile shortcuts

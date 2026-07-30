@@ -47,11 +47,11 @@ global _MANIFEST_PATH_INDEX    := Map()
 
 
 
-; ==============================================================
+; =============================
 ; =============================
 ; ======= 1. Load guard =======
 ; =============================
-; ==============================================================
+; =============================
 
 ; Returns true when ``FEATURES_MANIFEST`` is defined; logs an ERROR and returns
 ; false otherwise. Public accessors below all call this guard before reading
@@ -84,11 +84,11 @@ ManifestEnsureLoaded() {
 
 
 
-; ==============================================================
+; ===================================
 ; ===================================
 ; ======= 2. Public accessors =======
 ; ===================================
-; ==============================================================
+; ===================================
 
 ; Manifest format version string (e.g. "2.0.0").
 ManifestVersion() {
@@ -189,11 +189,11 @@ ManifestResolveFeatureSection(StrippedLeafPath, FallbackSection) {
 
 
 
-; ==============================================================
+; =======================================
 ; =======================================
 ; ======= 3. Features Map builder =======
 ; =======================================
-; ==============================================================
+; =======================================
 
 ; Build a hierarchical Features Map from the flat manifest entries. The output
 ; mirrors the shape of the legacy ``Features := Map(...)`` literal in

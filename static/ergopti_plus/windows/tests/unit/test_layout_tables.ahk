@@ -483,11 +483,11 @@ Test("CAPSLOCK_SYMBOLS: every entry runs without crashing", TestLT_CapsLockSymbo
 
 
 
-; ========================================================================
+; ==========================================================================
 ; ==========================================================================
 ; ======= Regression: AltGr number-row must not require ergopti_base =======
 ; ==========================================================================
-; ========================================================================
+; ==========================================================================
 
 ; Source-scan the registration block in layout_altgr.ahk to ensure the HotIf
 ; condition for ALTGR_NUMBER_ROW does not require ergopti_base. When that

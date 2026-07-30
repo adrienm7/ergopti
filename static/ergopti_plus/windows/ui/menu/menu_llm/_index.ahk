@@ -111,11 +111,11 @@ global LLM_HEALTH_PROBE_THROTTLE_MS := 3000
 
 
 
-; ============================
+; =============================
 ; =============================
 ; ======= 2/ Tray State =======
 ; =============================
-; ============================
+; =============================
 
 ; Initial values are replaced at startup by LLM_Menu_ApplySharedDefaults()
 ; which reads from the shared defaults.json via LLM_Defaults (lib/llm_defaults.ahk).
@@ -279,11 +279,11 @@ global _LLM_Menu_TriggerHk := unset
 
 
 
-; ===================================
+; ====================================
 ; ====================================
 ; ======= 3/ Sub-module Wiring =======
 ; ====================================
-; ===================================
+; ====================================
 
 ; Order is non-binding for AHK v2 — functions and globals from #Include files
 ; are merged into the main script before any user code runs, so any sub-module

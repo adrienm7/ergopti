@@ -22,11 +22,11 @@
 
 
 
-; ===================================
+; ============================
 ; ============================
 ; ======= 1/ Constants =======
 ; ============================
-; ===================================
+; ============================
 
 class KLReadConst {
     ; Maximum number of n-gram rows projected per (date-range, table). We
@@ -46,11 +46,11 @@ class KLReadConst {
 
 
 
-; ===================================
+; ================================
 ; ================================
 ; ======= 2/ Schema loader =======
 ; ================================
-; ===================================
+; ================================
 
 ; Resolve the canonical schema.sql path. The shared schema lives at
 ; `static/ergopti_plus/_shared/data/db/schema.sql`; _StaticDir already
@@ -75,11 +75,11 @@ KLR_LoadSchema(db) {
 
 
 
-; =========================================
+; =======================================
 ; =======================================
 ; ======= 3/ Database materialise =======
 ; =======================================
-; =========================================
+; =======================================
 
 ; Module-level cache for the in-memory SQLite database. Rebuilding the
 ; entire schema + every device's data.sql on every ingest tick was
@@ -366,11 +366,11 @@ KLR_ApplyIncremental(db, md, logPath) {
 
 
 
-; =================================================================
+; ================================================================
 ; ================================================================
 ; ======= 4/ Aggregate rebuild from raw events (in-memory) =======
 ; ================================================================
-; =================================================================
+; ================================================================
 
 ; Delete all agg_* rows from the in-memory DB so that KLR_RebuildAggregates
 ; can recalculate them cleanly from events_*.  Called once per refresh cycle

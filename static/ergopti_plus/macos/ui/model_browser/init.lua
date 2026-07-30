@@ -203,11 +203,11 @@ end
 
 
 
--- ==============================
+-- =============================
 -- =============================
 -- ======= 4/ Public API =======
 -- =============================
--- ==============================
+-- =============================
 
 --- Opens (or brings to front) the model browser window.
 --- @param ctx table { presets, active_backend, active_model, models_mgr, on_select }.

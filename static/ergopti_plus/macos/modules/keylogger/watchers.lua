@@ -69,11 +69,11 @@ local _last_system_load_poll_ms = 0
 
 
 
--- ==========================================
+-- ===========================================
 -- ===========================================
 -- ======= 1/ Guard And Initialization =======
 -- ===========================================
--- ==========================================
+-- ===========================================
 
 --- Guards every public function against being called before M.init().
 --- @param func_name string The calling function name for the error message.

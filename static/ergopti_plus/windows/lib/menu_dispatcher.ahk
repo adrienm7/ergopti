@@ -76,11 +76,11 @@
 
 
 
-; ==============================================================
+; ========================
 ; ========================
 ; ======= 1/ State =======
 ; ========================
-; ==============================================================
+; ========================
 
 ; Maps Win32 menu-item ID (LOWORD of WM_COMMAND wParam) to the ORIGINAL
 ; user callback. Populated by RegisterMenuItem at menu-build time, read by
@@ -124,11 +124,11 @@ global _MENU_RETRY_DELAY_MS := 60
 
 
 
-; ==============================================================
+; ===============================
 ; ===============================
 ; ======= 2/ Registration =======
 ; ===============================
-; ==============================================================
+; ===============================
 
 ; Clear both dispatch Maps. MUST be called at the very start of any tray
 ; rebuild (RebuildTrayMenu / BuildTrayMenuDeferred) BEFORE A_TrayMenu.Delete()
@@ -585,11 +585,11 @@ _FindUniqueMenuItemIdByName(MenuObj, ItemName) {
 
 
 
-; ==============================================================
+; ==========================================
 ; ==========================================
 ; ======= 3/ OnMessage retry handler =======
 ; ==========================================
-; ==============================================================
+; ==========================================
 
 ; Catches WM_COMMAND for every tray menu click. Snapshots the per-ItemId
 ; "last fire" timestamp and schedules a delayed check; if AHK's native
@@ -679,11 +679,11 @@ _DispatchIfMissed(ItemId, ExpectedLastFire, ExpectedEpoch := 0, ExpectedToken :=
 
 
 
-; ==============================================================
+; =======================
 ; =======================
 ; ======= 4/ Init =======
 ; =======================
-; ==============================================================
+; =======================
 
 ; Install the OnMessage hook for WM_COMMAND (0x0111). Called once at
 ; module include time below.

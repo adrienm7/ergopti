@@ -41,11 +41,11 @@ end
 
 
 
--- ==============================================
+--- ================================================
 --- ================================================
 --- ======= 1/ Config file is TOML, not JSON =======
 --- ================================================
--- ==============================================
+--- ================================================
 
 helpers.describe("boot config: the TOML config is never JSON-decoded (json-decode-toml-config)", function()
 	helpers.it("ConfigTomlPath resolves to a .toml file", function()

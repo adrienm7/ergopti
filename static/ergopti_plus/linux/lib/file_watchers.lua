@@ -398,11 +398,11 @@ end
 
 
 
--- =========================================
+-- ==========================================
 -- ==========================================
 -- ======= 8/ Recursive Personal Scan =======
 -- ==========================================
--- =========================================
+-- ==========================================
 
 --- Recursively scans personal_dir for .toml files, arming watchers on each
 --- directory and per-file. Guards against symlink cycles and depth bombs.

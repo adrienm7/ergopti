@@ -13,11 +13,11 @@
 
 
 
-; =========================================
+; ======================================
 ; ======================================
 ; ======= 1/ GetMonitorFromPoint =======
 ; ======================================
-; =========================================
+; ======================================
 
 ; GetMonitorFromPoint delegates entirely to MonitorGetCount() and MonitorGet()
 ; which call the Windows API directly — we cannot stub those in AHK v2 without

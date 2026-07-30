@@ -41,11 +41,11 @@ local LOG            = "llm.api_mlx"
 
 
 
--- ===========================================
+--- ===========================================
 --- ===========================================
 --- ======= 1/ Route & Identifier State =======
 --- ===========================================
--- ===========================================
+--- ===========================================
 
 -- Discovered endpoint paths. Different mlx-lm releases have shipped completions
 -- and chat-completions under different routes (with/without the `/v1/` prefix);
@@ -153,11 +153,11 @@ _poll_delay_sec = DISCOVERY_POLL_INITIAL_SEC
 
 
 
--- ============================================
+--- ===========================================
 --- ===========================================
 --- ======= 2/ Lifecycle & Route Access =======
 --- ===========================================
--- ============================================
+--- ===========================================
 
 --- Initialises the route cache from the controller's base URL. Must be called
 --- once at module wiring time before any discover()/warmup.
@@ -236,11 +236,11 @@ end
 
 
 
--- =====================================
+--- =====================================
 --- =====================================
 --- ======= 3/ Endpoint Discovery =======
 --- =====================================
--- =====================================
+--- =====================================
 
 --- Probes the MLX server to discover which endpoint paths are valid in this
 --- mlx-lm install. Two phases:

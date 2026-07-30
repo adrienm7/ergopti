@@ -14,11 +14,11 @@
 
 
 
-; ============================================
+; =====================================
 ; =====================================
 ; ======= 8/ Config persistence =======
 ; =====================================
-; ============================================
+; =====================================
 
 ; Reads _shared/modules/wpm_widget/constants.toml and _shared/modules/timings/constants.toml at
 ; startup and populates the zero-initialised fields of WPMWidgetConst.

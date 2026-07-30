@@ -32,11 +32,11 @@
 
 
 
-; =====================================
+; ==================================
 ; ==================================
 ; ======= 1/ Path resolution =======
 ; ==================================
-; =====================================
+; ==================================
 
 ; Resolve the dashboard assets folder for a given page key (« typing »
 ; or « apps »). The dashboards live under
@@ -232,11 +232,11 @@ KLPF_WorkerMain() {
 
 
 
-; ====================================
+; ===============================
 ; ===============================
 ; ======= 2/ Public entry =======
 ; ===============================
-; ====================================
+; ===============================
 
 ; Build and write the prefetch blob for the named dashboard. Returns true
 ; on success, false on any failure (a failure leaves the previous file
@@ -411,11 +411,11 @@ KLPF_MoveAtomic(source, destination, flags := unset) {
 
 
 
-; =========================================
+; ========================================
 ; ========================================
 ; ======= 3/ Typing dashboard blob =======
 ; ========================================
-; =========================================
+; ========================================
 
 ; Manifest cache: historical days never change once persisted, so we keep
 ; the full projection and only re-query today's row on live ticks. Drops
@@ -525,11 +525,11 @@ KLPF_BuildTyping(db, mode := "full") {
 
 
 
-; =======================================
+; ======================================
 ; ======================================
 ; ======= 4/ Apps dashboard blob =======
 ; ======================================
-; =======================================
+; ======================================
 
 KLPF_BuildApps(db) {
     ; metrics_apps reads (date, app) totals only — no n-grams. The same
@@ -545,11 +545,11 @@ KLPF_BuildApps(db) {
 
 
 
-; ============================================
+; ===========================================
 ; ===========================================
 ; ======= 5/ Keycode layout (heatmap) =======
 ; ===========================================
-; ============================================
+; ===========================================
 
 ; Build the « scancode → printable label » map for the heatmap. When
 ; the Ergopti base-layer emulation is enabled (Features["layout"]
@@ -623,11 +623,11 @@ KLPF_KeycodeLayout() {
 
 
 
-; ===================================
+; ===============================
 ; ===============================
 ; ======= 6/ Tiny helpers =======
 ; ===============================
-; ===================================
+; ===============================
 
 ; Insertion sort over an Array of Strings (case-insensitive). Plenty fast
 ; for the typical "few dozen apps" range; AHK has no built-in Array.Sort.

@@ -33,11 +33,11 @@
 
 
 
-; ==================================
+; ===================================
 ; ===================================
 ; ======= 1/ Public Interface =======
 ; ===================================
-; ==================================
+; ===================================
 
 /**
  * Compute diff chunks for a single LLM prediction against the buffer tail.
@@ -109,11 +109,11 @@ LLM_Diff_Compute(buffer_tail, prediction) {
 
 
 
-; ====================================
+; ===================================
 ; ===================================
 ; ======= 2/ Internal helpers =======
 ; ===================================
-; ====================================
+; ===================================
 
 ; Tokenise a string into an array of word / space / punctuation tokens,
 ; mirroring the Lua tokenize() function in parser.lua. Each token is either:

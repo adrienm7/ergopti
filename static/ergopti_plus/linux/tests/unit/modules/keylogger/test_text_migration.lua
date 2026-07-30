@@ -439,11 +439,11 @@ end)
 
 
 
--- =========================================
+-- ==========================================
 -- ==========================================
 -- ======= 5/ Restart And Idempotence =======
 -- ==========================================
--- =========================================
+-- ==========================================
 
 helpers.describe("text_migration — an interrupted pass converges", function()
 	helpers.it("finishes a half-migrated table without double-wrapping", function()

@@ -34,11 +34,11 @@
 
 
 
-; ===================================
+; ===============================
 ; ===============================
 ; ======= 1/ Module state =======
 ; ===============================
-; ===================================
+; ===============================
 
 class MetricsFilters {
     ; Privacy filters — all three default ON. They only matter when the
@@ -63,11 +63,11 @@ class MetricsFilters {
 
 
 
-; ============================================
+; ==================================
 ; ==================================
 ; ======= 2/ INI load / save =======
 ; ==================================
-; ============================================
+; ==================================
 
 ; Persistence is delegated to lib/config_shortcuts.ahk (CS_Load / CS_Save)
 ; which owns the [shortcuts] section inside <config_dir>/config.toml.
@@ -84,11 +84,11 @@ MF_SaveToIni() {
 
 
 
-; ===================================================
+; =================================================
 ; =================================================
 ; ======= 3/ Window / process introspection =======
 ; =================================================
-; ===================================================
+; =================================================
 
 ; Cached focused-window probe. UIA-style filters can be expensive to run
 ; on every keystroke; we cache the (process_name, title, class) of the
@@ -159,11 +159,11 @@ MF_RefreshFocus() {
 
 
 
-; ============================================
+; ====================================
 ; ====================================
 ; ======= 4/ Filter predicates =======
 ; ====================================
-; ============================================
+; ====================================
 
 ; Heuristic patterns for private browsing windows. The match is on the
 ; window title and is intentionally generous — false positives mean
@@ -336,11 +336,11 @@ MF_ShouldFilterFor(app, title) {
 
 
 
-; ===================================================
+; =================================================
 ; =================================================
 ; ======= 5/ Disabled-apps mutation helpers =======
 ; =================================================
-; ===================================================
+; =================================================
 
 ; Add or remove an app (process name) from the exclusion list. Persists
 ; immediately. Returns the new state (true = excluded).

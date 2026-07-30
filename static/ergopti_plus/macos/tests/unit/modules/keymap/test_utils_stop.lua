@@ -30,11 +30,11 @@ local KU = helpers.load_with_stubs("modules.keymap.utils")
 
 
 
--- ==================================================
+-- =================================================
 -- =================================================
 -- ======= 1/ M.stop() existence & signature =======
 -- =================================================
--- ==================================================
+-- =================================================
 
 helpers.describe("keymap.utils M.stop(): existence (watcher-leak-on-reload)", function()
 	helpers.it("M.stop is a function", function()

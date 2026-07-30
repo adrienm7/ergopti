@@ -64,7 +64,9 @@ _SimulateInGracePeriod(visible, loading, shownAt, nowTick, windowMs) {
 
 
 
+; ==================================================================
 ; ===== 1.1) A fresh prediction inside the window is protected =====
+; ==================================================================
 
 _TestGrace_FreshPredictionIsProtected() {
 	; Shown at tick 1000, now 1300, window 600 -> 300 ms elapsed -> protected.
@@ -77,7 +79,9 @@ Test("grace predicate: fresh prediction within the window is protected",
 
 
 
+; =========================================================
 ; ===== 1.2) Once the window elapses, protection ends =====
+; =========================================================
 
 _TestGrace_WindowElapses() {
 	; Shown at 1000, now 1700, window 600 -> 700 ms elapsed -> no longer protected.
@@ -90,7 +94,9 @@ Test("grace predicate: protection ends once the window elapses",
 
 
 
+; ===================================================
 ; ===== 1.3) Loading spinner is never protected =====
+; ===================================================
 
 _TestGrace_LoadingNotProtected() {
 	Assert(!_SimulateInGracePeriod(true, true, 1000, 1100, 600),
@@ -102,7 +108,9 @@ Test("grace predicate: loading spinner is never inside the window",
 
 
 
+; =============================================
 ; ===== 1.4) No stamp (0) means no window =====
+; =============================================
 
 _TestGrace_NoStampNoWindow() {
 	Assert(!_SimulateInGracePeriod(true, false, 0, 1100, 600),
@@ -114,7 +122,9 @@ Test("grace predicate: a zero show-time stamp opens no window",
 
 
 
+; ================================================
 ; ===== 1.5) Nothing visible means no window =====
+; ================================================
 
 _TestGrace_HiddenNoWindow() {
 	Assert(!_SimulateInGracePeriod(false, false, 1000, 1100, 600),
@@ -126,7 +136,9 @@ Test("grace predicate: a hidden tooltip opens no window",
 
 
 
+; ======================================================================
 ; ===== 1.6) Surface ownership is time-independent (whole display) =====
+; ======================================================================
 
 ; Mirror of LLM_TooltipOwnsSurface(): a real prediction owns the shared surface
 ; for its WHOLE display - no time component, unlike the grace window. This is what

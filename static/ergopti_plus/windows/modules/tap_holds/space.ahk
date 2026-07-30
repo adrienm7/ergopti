@@ -32,11 +32,11 @@ global _SpaceHoldOwnerReleased := false
 
 
 
-; ==============================
+; ========================
 ; ========================
 ; ======= 5/ SPACE =======
 ; ========================
-; ==============================
+; ========================
 
 ; Design: two-phase tap/hold, modifier never held during auto-repeat window.
 ;
