@@ -177,6 +177,17 @@ const RULES = [
 			(f.startsWith('static/ergopti_plus/windows/') && f.endsWith('.ahk')) || isCrossDriverContract(f),
 	},
 	{
+		gate: 'ahk-parse',
+		// run_all.ahk deliberately excludes the production files that register
+		// hotkeys or build menus at top level, so a syntax error in one of them
+		// was caught only by the CI compile job. The AHK suite's brace-balance
+		// meta test catches the subset that happens to unbalance a brace, and
+		// nothing at all catches the rest.
+		why: 'a compile parses the WHOLE #Include graph, including the files run_all.ahk cannot include',
+		match: (f) =>
+			f.startsWith('static/ergopti_plus/windows/') && f.endsWith('.ahk') && !f.includes('/tests/'),
+	},
+	{
 		gate: 'ahk-e2e',
 		why: 'driver behaviour changed, and the e2e runner exercises the expansion pipeline end to end',
 		match: (f) =>
@@ -281,6 +292,7 @@ const GATE_COMMANDS = {
 	'hs-e2e': { npm: 'test:hs:e2e' },
 	linux: { npm: 'test:linux' },
 	'linux-e2e': { npm: 'test:linux:e2e' },
+	'ahk-parse': { npm: 'test:ahk-parse' },
 	'ahk-suite': { ahk: 'run_all.ahk' },
 	'ahk-e2e': { ahk: 'e2e/run_e2e.ahk' },
 };

@@ -157,11 +157,6 @@ Constraints: **paths before moves, moves before content, data before code.**
      That is why the macOS count did not move when four more files were
      converted. Counting per READ is the fix; it belongs with the §0.7 work on
      the same gates.
-  6. Parse coverage per driver: **115 of 240 production AHK files (48 %)** are
-     reachable from the entry point but not from `run_all.ahk`, so they are
-     validated only as text; the Linux entry point has **zero** parse coverage.
-     Use a compile (`exit 17`), **never `/validate`** — the flag is ignored and the
-     script runs.
 
 - **Lot 3 — one tree.** Four independently-green steps: (a) extract `platform/`;
   (b) `lib/` → `infra/` with features promoted out — ⚠ the macOS `lib.text_utils`

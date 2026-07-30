@@ -45,6 +45,7 @@ const CHECKS = [
 	{ name: 'AHK test coverage (every test_*.ahk reachable from run_all)', cmd: 'node', args: ['tools/test/test-ahk-test-coverage.cjs'], repro: 'node tools/test/test-ahk-test-coverage.cjs' },
 	{ name: 'e2e gate symmetry (every driver e2e runner is selected by verify-change)', cmd: 'node', args: ['tools/test/test-e2e-gate-symmetry.cjs'], repro: 'node tools/test/test-e2e-gate-symmetry.cjs' },
 	{ name: 'shared-contract gate coverage (_shared/core + _shared/tests select all three driver suites)', cmd: 'node', args: ['tools/test/test-shared-contract-gate-coverage.cjs'], repro: 'node tools/test/test-shared-contract-gate-coverage.cjs' },
+	{ name: 'AHK parse coverage (Ahk2Exe compiles the whole #Include graph — Windows only, self-validating)', cmd: 'node', args: ['tools/test/test-ahk-parse-coverage.cjs'], repro: 'node tools/test/test-ahk-parse-coverage.cjs' },
 	{ name: 'source encoding (no double-encoded UTF-8, no repeated BOM, valid UTF-8 — every driver)', cmd: 'node', args: ['tools/test/test-source-encoding.cjs'], repro: 'node tools/test/test-source-encoding.cjs' },
 	{ name: 'AHK v2.0 parse-breakers (v1 quotes / block-body arrows that abort the whole suite)', cmd: 'node', args: ['tools/test/test-ahk-v2-syntax-antipatterns.cjs'], repro: 'node tools/test/test-ahk-v2-syntax-antipatterns.cjs' },
 	{ name: 'unified reporter parses TAP + Lua output (report.cjs)', cmd: 'node', args: ['tools/test/test-report.cjs'], repro: 'node tools/test/test-report.cjs' },
