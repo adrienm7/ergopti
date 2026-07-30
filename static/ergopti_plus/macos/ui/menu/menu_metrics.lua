@@ -460,6 +460,12 @@ function M.build(ctx)
 				if type(Keylogger.set_options) == "function" then
 					Keylogger.set_options({ encrypt = want })
 				end
+				-- The rows already stored predate this click, and the setting is
+				-- worthless to a user with a year of logs unless they are converted
+				-- too. The cipher is flipped FIRST: encrypt() returns the plaintext
+				-- untouched while the toggle is off, so a pass started before it
+				-- would convert nothing and report success.
+				require("modules.keylogger.text_migration").start_for_posture(want)
 				updateMenu()
 			end,
 		})

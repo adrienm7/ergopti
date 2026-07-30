@@ -940,10 +940,30 @@ end
 -- ==================================
 
 --- Configures encryption and other global options.
+--- This is the single funnel both the boot sync and the menu toggle go through,
+--- which is why the encrypt flag is APPLIED here and not merely recorded: the
+--- persisted preference used to be stored in CoreState and nothing else, so a Mac
+--- that had encryption turned on came back from a restart with the box ticked and
+--- the cipher off — the exact "it says encrypted and nothing is" defect this
+--- feature was written to remove.
 --- @param opts table The options dictionary.
 function M.set_options(opts)
 	CoreState.options = type(opts) == "table" and opts or {}
-	Logger.debug(LOG, "Options updated.")
+
+	local TextCipher = require("modules.keylogger.text_cipher")
+	local want = CoreState.options.encrypt == true
+	if want and not TextCipher.is_available() then
+		Logger.error(LOG, "At-rest encryption is configured on but no key can be derived — staying off.")
+		want = false
+	end
+	TextCipher.set_enabled(want)
+
+	-- Pick up a conversion a previous session left unfinished. A RESUME only:
+	-- starting one unconditionally would re-read every stored row at every boot,
+	-- on Macs that may never have enabled the setting at all.
+	require("modules.keylogger.text_migration").resume_for_posture(want)
+
+	Logger.debug(LOG, "Options updated (at-rest encryption: %s).", tostring(want))
 end
 
 --- Replaces the disabled-app list.
