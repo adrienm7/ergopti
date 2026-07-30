@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "Navn på den nye kategori for %s:",
 	"metrics_apps.new_category_title": "Ny kategori",
 	"metrics_apps.no_app_detected": "Der kunne ikke detekteres nogen applikation.",
+	"metrics_apps.pick_app_placeholder": "Vælg et program, der skal klassificeres…",
 	"metrics_apps.rename_chooser_placeholder": "Kategori til omdøbelse",
 	"metrics_apps.rename_item": "✎ Omdøb en eksisterende kategori…",
 	"metrics_apps.rename_prompt": "Nyt navn for kategori \"%s\":",

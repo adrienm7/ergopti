@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "%s için yeni kategorinin adı:",
 	"metrics_apps.new_category_title": "Yeni kategori",
 	"metrics_apps.no_app_detected": "Hiçbir uygulama tespit edilemedi.",
+	"metrics_apps.pick_app_placeholder": "Sınıflandırılacak bir uygulama seçin…",
 	"metrics_apps.rename_chooser_placeholder": "Yeniden adlandırılacak kategori",
 	"metrics_apps.rename_item": "✎ Mevcut bir kategoriyi yeniden adlandır…",
 	"metrics_apps.rename_prompt": "\"%s\" kategorisi için yeni ad:",

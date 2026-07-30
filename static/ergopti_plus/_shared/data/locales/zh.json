@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "%s 的新分类名称:",
 	"metrics_apps.new_category_title": "新建分类",
 	"metrics_apps.no_app_detected": "未能检测到任何应用程序。",
+	"metrics_apps.pick_app_placeholder": "选择要分类的应用程序…",
 	"metrics_apps.rename_chooser_placeholder": "要重命名的类别",
 	"metrics_apps.rename_item": "✎ 重命名现有分类…",
 	"metrics_apps.rename_prompt": "分类「%s」的新名称:",

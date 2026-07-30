@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "%s의 새 카테고리 이름:",
 	"metrics_apps.new_category_title": "새 카테고리",
 	"metrics_apps.no_app_detected": "앱을 감지할 수 없었습니다.",
+	"metrics_apps.pick_app_placeholder": "분류할 응용 프로그램 선택…",
 	"metrics_apps.rename_chooser_placeholder": "이름을 바꿀 카테고리",
 	"metrics_apps.rename_item": "✎ 기존 카테고리 이름 변경…",
 	"metrics_apps.rename_prompt": "카테고리 \"%s\"의 새 이름:",

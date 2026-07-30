@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "Naam van de nieuwe categorie voor %s:",
 	"metrics_apps.new_category_title": "Nieuwe categorie",
 	"metrics_apps.no_app_detected": "Er kon geen applicatie worden gedetecteerd.",
+	"metrics_apps.pick_app_placeholder": "Kies een applicatie om te classificeren…",
 	"metrics_apps.rename_chooser_placeholder": "Categorie hernoemen",
 	"metrics_apps.rename_item": "✎ Bestaande categorie hernoemen…",
 	"metrics_apps.rename_prompt": "Nieuwe naam voor categorie \"%s\":",

@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "Nombre de la nueva categoría para %s:",
 	"metrics_apps.new_category_title": "Nueva categoría",
 	"metrics_apps.no_app_detected": "No se pudo detectar ninguna aplicación.",
+	"metrics_apps.pick_app_placeholder": "Elegir una aplicación para clasificar…",
 	"metrics_apps.rename_chooser_placeholder": "Categoría a renombrar",
 	"metrics_apps.rename_item": "✎ Renombrar una categoría existente…",
 	"metrics_apps.rename_prompt": "Nuevo nombre para la categoría \"%s\":",
