@@ -490,12 +490,6 @@ function body and therefore only register if that function is called.
 
 ## 3. Correctness and completeness
 
-### Karabiner: a corrupted config is still overwritten by the next setter
-
-The read path now refuses to silently reset a corrupted user file, but the write
-path was never given the same treatment: the next setter overwrites it anyway,
-which is where the data is actually lost.
-
 ### i18n: ~15-19 user-facing surfaces are still hardcoded
 
 Verified one by one, all still present, across all three drivers — macOS model
