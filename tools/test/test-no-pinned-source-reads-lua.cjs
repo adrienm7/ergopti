@@ -83,7 +83,7 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'tests');
 //                     their target module has no declaration unique to it, so
 //                     read_driver_source would concatenate several files and
 //                     silently change what the test asserts.)
-const BASELINE = 34;
+const BASELINE = 32;
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the count.
