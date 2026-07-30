@@ -565,12 +565,32 @@ const luaDirs = [
 ];
 const luaAll = luaDirs.flatMap((d) => walkFiles(d, ['.lua']));
 
-// TOML files — config repo sibling
+// TOML files — the shared data tree, plus the maintainer's sibling config repo
+// when it happens to be checked out next door.
+//
+// The second entry used to be static/drivers/_shared, a path deleted in the
+// static/ reorg. walkFiles() returns [] for a missing directory, so the ADR-003
+// snake_case check silently covered ZERO repository files: in CI the count was 0,
+// and locally the non-zero count came entirely from the sibling repo, which made
+// the hole invisible. The sibling stays (it is a genuine convenience) but it is
+// never the reason this list is non-empty.
 const tomlDirs = [
-	join(REPO_ROOT, '..', 'config', 'ergopti_plus'),
-	join(REPO_ROOT, 'static', 'drivers', '_shared')
+	join(REPO_ROOT, 'static', 'ergopti_plus', '_shared'),
+	join(REPO_ROOT, '..', 'config', 'ergopti_plus')
 ];
 const tomlAll = tomlDirs.flatMap((d) => walkFiles(d, ['.toml']));
+
+// Guard against the exact regression above: a stale path makes walkFiles() return
+// [] and the whole TOML check pass vacuously. The shared tree always has TOMLs, so
+// finding none means the selector is wrong, not the tree.
+const sharedTomlCount = walkFiles(join(REPO_ROOT, 'static', 'ergopti_plus', '_shared'), ['.toml']).length;
+if (sharedTomlCount === 0) {
+	console.error(
+		'lint-conventions: FATAL — no .toml found under static/ergopti_plus/_shared. ' +
+		'The scan path is stale; fix it rather than letting the TOML checks pass on an empty set.'
+	);
+	process.exit(1);
+}
 
 console.log(`  AHK files : ${ahkAll.length}`);
 console.log(`  Lua files : ${luaAll.length}`);
