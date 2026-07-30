@@ -38,11 +38,11 @@
 
 
 
-; ============================================
+; =============================================
 ; =============================================
 ; ======= 1/ Constants and shared state =======
 ; =============================================
-; ============================================
+; =============================================
 
 ; Registry of all Test() calls. Each entry is { name, callback }.
 global TEST_REGISTRY := []
@@ -71,11 +71,11 @@ if !IsSet(_AHK_ONLY_FILTER)
 
 
 
-; ==================================
+; =============================
 ; =============================
 ; ======= 2/ Assertions =======
 ; =============================
-; ==================================
+; =============================
 
 ; Throw a TestFailure when ``Condition`` is falsy. The accompanying message
 ; describes the property being checked, for use in the CI failure log.
@@ -324,11 +324,11 @@ global _DriverDirConcatFn := _DriverDirConcat
 
 
 
-; ===============================
+; ==============================
 ; ==============================
 ; ======= 3/ Test runner =======
 ; ==============================
-; ===============================
+; ==============================
 
 ; Register a test. ``Callback`` must be a 0-arg callable; it receives no
 ; setup/teardown — tests should be self-contained.

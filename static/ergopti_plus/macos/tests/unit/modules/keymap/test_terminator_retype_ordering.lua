@@ -162,11 +162,11 @@ end
 
 
 
--- =============================================
+-- ==============================================
 -- ==============================================
 -- ======= 2/ Order Survives The Deferral =======
 -- ==============================================
--- =============================================
+-- ==============================================
 
 helpers.describe("try_terminator_expand: the re-typed terminator lands last", function()
 	helpers.it("is emitted after a deferred second paste segment", function()

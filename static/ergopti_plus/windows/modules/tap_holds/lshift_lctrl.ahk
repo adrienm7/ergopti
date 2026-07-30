@@ -28,11 +28,11 @@
 
 
 
-; ==========================================
+; ===================================
 ; ===================================
 ; ======= 3/ LSHIFT AND LCTRL =======
 ; ===================================
-; ==========================================
+; ===================================
 
 ; Gate: any configured tap action activates the handler.
 ; The hold behaviour (Shift staying Shift) is provided by the OS passthrough
@@ -78,7 +78,11 @@ _LShiftDispatch() {
 
 
 
+; ==========================
+; ==========================
 ; ======= 3.1) LCtrl =======
+; ==========================
+; ==========================
 
 ; ~$SC01D: ~ passes LCtrl through to the OS during KeyWait so Ctrl+X combos
 ; still work. $ prevents keyboard-hook re-entry. The AltGr (LCtrl+RAlt) case is

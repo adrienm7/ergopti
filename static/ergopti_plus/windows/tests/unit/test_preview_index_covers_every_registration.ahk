@@ -204,11 +204,11 @@ _PICR_PackIndexingIsNotGatedOnPerSectionFeatures() {
 
 
 
-; =========================================
+; ==========================================
 ; ==========================================
 ; ======= 4/ One walk, two consumers =======
 ; ==========================================
-; =========================================
+; ==========================================
 
 ; The guarantee that keeps this fixed: both sides read the same enumeration.
 _PICR_BothSidesShareOneEnumeration() {

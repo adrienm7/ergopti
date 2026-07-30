@@ -24,11 +24,11 @@
 
 
 
-; ==========================
+; ===========================
 ; ===========================
 ; ======= 1/ Key defs =======
 ; ===========================
-; ==========================
+; ===========================
 
 ; Ordered list of physical keys exposed in the tap-hold tray submenu.
 ; Each entry: Map("id" => v2_key_id, "i18n" => group_i18n_key).
@@ -215,11 +215,11 @@ IsTapHoldHoldActive(KeyId, HoldOpt) {
 
 
 
-; ============================
+; =============================
 ; =============================
 ; ======= 3/ Tap writer =======
 ; =============================
-; ============================
+; =============================
 
 ; Apply a new tap action for a key directly to TapHold + tap_hold.toml.
 ; ``ActionId`` is a GESTURE_ACTIONS id string, or "" to force native passthrough
@@ -507,11 +507,11 @@ _TH_CloneData(Value) {
 
 
 
-; ===========================================================================
+; =========================================================================
 ; =========================================================================
 ; ======= 5/ Legacy compat stubs (no longer called by the new menu) =======
 ; =========================================================================
-; ===========================================================================
+; =========================================================================
 
 ; No-op stub kept so that path_translator.ahk routing code does not crash
 ; if reached by a stale caller. The new tray menu uses WriteTapHoldTap and

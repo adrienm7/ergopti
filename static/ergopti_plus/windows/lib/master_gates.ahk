@@ -23,11 +23,11 @@
 
 
 
-; ==============================================================
+; =============================================
 ; =============================================
 ; ======= 1/ ApplyMasterGatesToFeatures =======
 ; =============================================
-; ==============================================================
+; =============================================
 
 ; When a master category gate is off, force every v2 feature in that
 ; category to ``false`` so #HotIf evaluations on Features short-circuit.
@@ -131,11 +131,11 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 
 
 
-; ================================================================
+; =============================================================
 ; =============================================================
 ; ======= 2/ Manifest-driven Sub-Category Loader (MG-3) =======
 ; =============================================================
-; ================================================================
+; =============================================================
 
 ; Reads and validates hotstring_category_keys from menu_manifest.json.
 ; The manifest is the sole behavioral definition: failure is explicit so a

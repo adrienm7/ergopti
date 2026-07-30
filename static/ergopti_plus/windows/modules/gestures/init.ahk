@@ -159,11 +159,11 @@ global GESTURE_SHORTCUT_LABELS := GestureShortcutLabels()
 
 
 
-; ===========================================
+; ==========================================
 ; ==========================================
 ; ======= 2/ Right-Click Hold Toggle =======
 ; ==========================================
-; ===========================================
+; ==========================================
 
 ; Parses an AHK v2 shortcut string (e.g. "^+{Tab}", "!{Left}", "^t") into a
 ; TextPressKey-compatible (Key, Modifiers) pair and dispatches via the adapter.
@@ -268,11 +268,11 @@ GestureDispatch(slot) {
 
 
 
-; =============================================
+; ==============================================
 ; ==============================================
 ; ======= 4/ Hotkey Bindings (Listeners) =======
 ; ==============================================
-; =============================================
+; ==============================================
 
 ; These shortcuts must be assigned in Windows Settings > Bluetooth & devices
 ; > Touchpad > Advanced gesture configuration.

@@ -55,11 +55,11 @@ global HS_BUFFER_BACKSPACE_PAYLOAD := "i)^\{BackSpace(?:\s+(\d+))?\}$"
 
 
 
-; =================================================================
+; ================================================================
 ; ================================================================
 ; ======= 1/ Declaring the effect of a synthetic keystroke =======
 ; ================================================================
-; =================================================================
+; ================================================================
 
 ; Tell both hotstring buffers what a synthetic keystroke payload is about to do.
 ; Call this BEFORE the send: if the send throws, the buffers have already been

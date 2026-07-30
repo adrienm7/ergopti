@@ -36,11 +36,11 @@ local LOG = "crash_reporter"
 
 
 
--- ===========================
+-- ============================
 -- ============================
 -- ======= 1/ Constants =======
 -- ============================
--- ===========================
+-- ============================
 
 -- Subdirectory under the user config dir that receives all Hammerspoon crash
 -- report files. Nested under hammerspoon/ to mirror the driver folder layout
@@ -64,11 +64,11 @@ local COLLECT_SYSTEM_PROBES_DEFAULT = false
 
 
 
--- =========================
+-- ==========================
 -- ==========================
 -- ======= 2/ Helpers =======
 -- ==========================
--- =========================
+-- ==========================
 
 --- Resolves the absolute path to the crash_reports directory.
 --- @return string Absolute path ending with a directory separator.
@@ -142,11 +142,11 @@ end
 
 
 
--- =======================
+-- ======================
 -- ======================
 -- ======= 3/ API =======
 -- ======================
--- =======================
+-- ======================
 
 --- Builds a rich crash report from an error string and optional context.
 --- Includes the full system snapshot, adapter status, session counters, the

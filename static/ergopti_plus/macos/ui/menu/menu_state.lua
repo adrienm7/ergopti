@@ -40,11 +40,11 @@ end
 
 
 
--- =========================================
+-- ==========================================
 -- ==========================================
 -- ======= 1/ Module State Sync Logic =======
 -- ==========================================
--- =========================================
+-- ==========================================
 
 --- Synchronises the loaded state table back into all engine modules.
 --- Called once at startup after preferences are loaded, and after a reset.

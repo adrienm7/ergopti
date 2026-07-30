@@ -119,11 +119,11 @@ _AltGrCapsLockReset() {
 
 
 
-; ===================================================
+; =======================================================
 ; =======================================================
 ; ======= 1/ RetrieveScancode / AddShortcut Tests =======
 ; =======================================================
-; ===================================================
+; =======================================================
 
 TestShortcuts_RetrieveScancodeUnmapped() {
 	; An unmapped letter returns a sc<hex> string computed from GetKeySC.
@@ -148,11 +148,11 @@ Test("Shortcuts/utils: RetrieveScancode honours RemappedList overrides", TestSho
 
 
 
-; ==============================================
+; ============================================
 ; ============================================
 ; ======= 2/ _AnyShortcutEnabled Tests =======
 ; ============================================
-; ==============================================
+; ============================================
 
 TestShortcuts_AnyEnabledAllFalse() {
 	; All entries false -> should return false.
@@ -190,11 +190,11 @@ Test("Shortcuts/altgr: _AnyShortcutEnabled handles all-false group", TestShortcu
 
 
 
-; ==============================================================
+; ========================================================
 ; ========================================================
 ; ======= 3/ LAltCapsLockShortcut Dispatcher Tests =======
 ; ========================================================
-; ==============================================================
+; ========================================================
 
 TestShortcuts_LaltCapsLock_CapsLock() {
 	global _Stub_SentText
@@ -293,11 +293,11 @@ Test("Shortcuts/base_modifier: LAltCapsLockShortcut degrades gracefully when its
 
 
 
-; ========================================================
+; =========================================================
 ; =========================================================
 ; ======= 4/ AltGrCapsLockShortcut Dispatcher Tests =======
 ; =========================================================
-; ========================================================
+; =========================================================
 
 TestShortcuts_AltGrCapsLock_CapsLock() {
 	global _Stub_SentText
@@ -435,11 +435,11 @@ Test("Shortcuts/altgr: AltGr+LAlt with all actions off is a no-op", TestShortcut
 
 
 
-; =====================================================
+; =================================================
 ; =================================================
 ; ======= 6/ Win-shortcuts Pure-Logic Tests =======
 ; =================================================
-; =====================================================
+; =================================================
 
 TestShortcuts_SearchPath_FileDetection() {
 	; Every branch inside SearchPath() ends in a real Run() (open the file,
@@ -490,11 +490,11 @@ Test("Shortcuts/win: GetKnownFolderDownloads returns a string value", TestShortc
 
 
 
-; =====================================================
+; =======================================================================================
 ; =======================================================================================
 ; ======= 7/ Pause + Volume + Resilience (encore plus, 100% regression certainty) =======
 ; =======================================================================================
-; =====================================================
+; =======================================================================================
 ; Every public dispatcher / gate / menu path in shortcuts must be provably
 ; pause-safe. The six tests below used to be bare AssertTrue(true, "...")
 ; placeholders that exercised zero production code -- they would have passed

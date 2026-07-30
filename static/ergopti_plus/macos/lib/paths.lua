@@ -38,11 +38,11 @@ end)()
 
 
 
--- =========================================
+-- ==========================================
 -- ==========================================
 -- ======= 1/ Directory-walk resolver =======
 -- ==========================================
--- =========================================
+-- ==========================================
 
 --- Walks up the directory tree from ``base_dir`` looking for a file or directory
 --- whose path relative to the current level matches ``relative_target``.
@@ -105,11 +105,11 @@ end
 
 
 
--- ======================================
+-- =======================================
 -- =======================================
 -- ======= 2/ Shared-tree resolver =======
 -- =======================================
--- ======================================
+-- =======================================
 
 -- Absolute path of the _shared/ tree, resolved once and memoised. This is THE
 -- single source of truth for the shared root on macOS: a repo-layout change

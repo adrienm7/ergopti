@@ -244,23 +244,51 @@ function checkBannerAlignment(file) {
 
 		// Expected banner length = prefix + leftEq + 1 + title + 1 + rightEq
 		const expectedBannerLen = prefix.length + leftEq + 1 + title.length + 1 + rightEq;
-		// Check adjacent banner lines (look up and down)
-		for (const adj of [i - 1, i + 1]) {
-			if (adj < 0 || adj >= lines.length) continue;
-			const adjLine = lines[adj];
-			// A banner line: SAME marker as the title line + one or more =
-			const adjMatch = adjLine.match(/^(;|---?) (=+)$/);
-			if (!adjMatch) continue;
-			if (adjMatch[1] !== m[1]) {
-				warn(file, adj + 1, `Banner marker '${adjMatch[1]}' does not match title line marker '${m[1]}'`);
-				continue;
+
+		// Convention 2: a MAJOR banner (7 "=" either side of the title) carries 2
+		// rule lines above and 2 below; a MINOR banner (5 "=") carries 1 and 1.
+		const expectedRules = leftEq === 7 ? 2 : 1;
+
+		// Walks the contiguous run of rule lines away from the title and returns
+		// them in the order they appear in the file.
+		const runFrom = (start, step) => {
+			const run = [];
+			for (let k = start; k >= 0 && k < lines.length; k += step) {
+				if (!/^(;|---?) (=+)$/.test(lines[k])) break;
+				run.push(k);
 			}
-			if (adjLine.length !== expectedBannerLen) {
+			return run;
+		};
+
+		// The old check looked at lines i-1 and i+1 ONLY, and `continue`d when
+		// either was not a rule line. So it verified the LENGTH of whichever rule
+		// lines happened to be adjacent and never the COUNT — a major banner with
+		// one rule line, or with none at all, passed in complete silence. That is
+		// how 68 non-conforming major banners coexisted with a linter reporting
+		// zero violations.
+		const above = runFrom(i - 1, -1);
+		const below = runFrom(i + 1, 1);
+		for (const [side, run] of [['above', above], ['below', below]]) {
+			if (run.length !== expectedRules) {
 				warn(
 					file,
-					adj + 1,
-					`Banner line length ${adjLine.length} does not match title line length ${expectedBannerLen}`
+					i + 1,
+					`${leftEq === 7 ? 'Major' : 'Minor'} banner needs ${expectedRules} rule line(s) ${side} the title, found ${run.length}`
 				);
+			}
+			for (const adj of run) {
+				const adjMatch = lines[adj].match(/^(;|---?) (=+)$/);
+				if (adjMatch[1] !== m[1]) {
+					warn(file, adj + 1, `Banner marker '${adjMatch[1]}' does not match title line marker '${m[1]}'`);
+					continue;
+				}
+				if (lines[adj].length !== expectedBannerLen) {
+					warn(
+						file,
+						adj + 1,
+						`Banner line length ${lines[adj].length} does not match title line length ${expectedBannerLen}`
+					);
+				}
 			}
 		}
 	});
@@ -292,20 +320,50 @@ function fixBannersInFile(file) {
 		const expectedLen = prefix.length + leftEq + 1 + title.length + 1 + rightEq;
 		const bannerBody = '='.repeat(expectedLen - prefix.length);
 		const bannerLine = prefix + bannerBody;
+		// Convention 2: 2 rule lines each side of a major title, 1 each side of a
+		// minor one. The checker used to look at i-1 and i+1 only, so it repaired
+		// the LENGTH of whichever rule lines happened to be adjacent and never the
+		// COUNT.
+		const expectedRules = leftEq === 7 ? 2 : 1;
 
-		for (const adj of [i - 1, i + 1]) {
-			if (adj < 0 || adj >= lines.length) continue;
-			const adjMatch = lines[adj].match(/^(;|---?) (=+)$/);
-			if (!adjMatch) continue;
-			// Repair BOTH a wrong marker and a wrong length — a fill line
-			// belongs to this title's banner and must match it on both. This
-			// is what actually heals the accumulated damage from the old
-			// hardcoded-prefix bug (mismatched-marker fill lines left behind
-			// by previous runs), rather than just refusing to touch them.
-			if (adjMatch[1] !== m[1] || lines[adj].length !== expectedLen) {
+		const isRule = (s) => /^(;|---?) (=+)$/.test(s || '');
+		const runFrom = (start, step) => {
+			const run = [];
+			for (let k = start; k >= 0 && k < lines.length; k += step) {
+				if (!isRule(lines[k])) break;
+				run.push(k);
+			}
+			return run;
+		};
+
+		// Repair BOTH a wrong marker and a wrong length on every rule line of the
+		// run — a fill line belongs to this title's banner and must match it on
+		// both. This is what heals the accumulated damage from the old
+		// hardcoded-prefix bug, rather than just refusing to touch it.
+		for (const adj of [...runFrom(i - 1, -1), ...runFrom(i + 1, 1)]) {
+			if (lines[adj] !== bannerLine) {
 				lines[adj] = bannerLine;
 				changed = true;
 			}
+		}
+
+		// INSERT the missing rule lines; never delete a surplus one. Every
+		// violation measured in this repo is "too few" (0 or 1 where 2 are due),
+		// and a delete could eat the closing rule of a module docstring sitting
+		// directly above a banner in a file whose blank-line spacing is also
+		// wrong. A surplus stays a warning for a human to read.
+		const below = runFrom(i + 1, 1);
+		if (below.length < expectedRules) {
+			lines.splice(i + 1, 0, ...Array(expectedRules - below.length).fill(bannerLine));
+			changed = true;
+		}
+		const above = runFrom(i - 1, -1);
+		if (above.length < expectedRules) {
+			const insertAt = i - above.length;
+			lines.splice(insertAt, 0, ...Array(expectedRules - above.length).fill(bannerLine));
+			// The title moved down by however many lines were inserted above it.
+			i += expectedRules - above.length;
+			changed = true;
 		}
 	}
 

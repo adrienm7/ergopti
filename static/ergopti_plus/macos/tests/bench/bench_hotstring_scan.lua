@@ -20,11 +20,11 @@
 
 
 
--- ===========================
+-- ============================
 -- ============================
 -- ======= 1/ Constants =======
 -- ============================
--- ===========================
+-- ============================
 
 -- Absolute p95 ceiling in milliseconds
 local P95_LIMIT_MS        = 5.0
@@ -49,11 +49,11 @@ local BASELINE_PATH       = BASELINES_DIR .. "hotstring_scan.json"
 
 
 
--- ===========================
+-- ============================
 -- ============================
 -- ======= 2/ Utilities =======
 -- ============================
--- ===========================
+-- ============================
 
 --- Returns the last UTF-8 codepoint of a string. Falls back to the last byte
 --- on malformed UTF-8, matching the behaviour of tail_codepoint() in registry.lua.
@@ -212,11 +212,11 @@ end
 
 
 
--- ======================================
+-- =======================================
 -- =======================================
 -- ======= 4/ Hot-Path Scan Kernel =======
 -- =======================================
--- ======================================
+-- =======================================
 
 --- Simulates a single keystroke scan: fetches the tail-char bucket for `keystroke`
 --- and iterates it checking buffer suffix match. Same algorithmic path as
@@ -246,11 +246,11 @@ end
 
 
 
--- ==============================
+-- ================================
 -- ================================
 -- ======= 5/ Benchmark Run =======
 -- ================================
--- ==============================
+-- ================================
 
 --- Generates a random string of `len` characters drawn from `charset`.
 --- @param len number Length of the desired string.

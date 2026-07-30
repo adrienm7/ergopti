@@ -30,11 +30,11 @@ local LOG = "menu_llm.trigger_orchestrator"
 
 
 
--- ======================================
+-- =====================================
 -- =====================================
 -- ======= 1/ Module Constructor =======
 -- =====================================
--- ======================================
+-- =====================================
 
 --- Creates a new trigger orchestrator bound to the given context.
 --- @param ctx table Required fields: state, keymap, save_prefs, update_menu,

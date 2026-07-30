@@ -35,11 +35,11 @@ local LOG = "layout"
 
 
 
--- =====================================
+-- ====================================
 -- ====================================
 -- ======= 1/ Keycode Constants =======
 -- ====================================
--- =====================================
+-- ====================================
 
 --- Fixed mapping from Carbon virtual keycode numbers to Karabiner key_code
 --- names (USB HID QWERTY physical key names).
@@ -155,11 +155,11 @@ local KEYCODE_TO_QWERTY_NAME = {
 
 
 
--- ==============================
+-- ===============================
 -- ===============================
 -- ======= 2/ Core Helpers =======
 -- ===============================
--- ==============================
+-- ===============================
 
 --- Returns the current hs.keycodes.map snapshot, or nil on failure.
 --- hs.keycodes.map is a bidirectional table:

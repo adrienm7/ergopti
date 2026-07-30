@@ -32,11 +32,11 @@ local helpers = require("tests.helpers")
 
 
 
--- =========================================
+-- ========================================
 -- ========================================
 -- ======= 1/ Drain-loop Simulation =======
 -- ========================================
--- =========================================
+-- ========================================
 
 --- Builds a minimal harness that replicates the day_rollover drain loop using
 --- injectable stubs for Rotation and ingest_once, then returns observable state.
@@ -373,11 +373,11 @@ end)
 
 
 
--- ================================================
+-- ===============================================
 -- ===============================================
 -- ======= 4/ Source-level Structure Guard =======
 -- ===============================================
--- ================================================
+-- ===============================================
 
 local function read_source()
 	-- Selected by a declaration unique to modules/keylogger/log_manager.lua rather than by

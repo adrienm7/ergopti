@@ -53,11 +53,11 @@
 
 
 
-; ===================================
+; ============================
 ; ============================
 ; ======= 1/ Constants =======
 ; ============================
-; ===================================
+; ============================
 
 class KLWatchConst {
     ; Mirrors hammerspoon/modules/keylogger/init.lua HS constants. Keeping
@@ -100,11 +100,11 @@ global KLHOOK_MODIFIER_VKS := Map(
 
 
 
-; ===================================
+; ===============================
 ; ===============================
 ; ======= 2/ Module state =======
 ; ===============================
-; ===================================
+; ===============================
 
 class KLWatch {
     ; Session machine. ``is_session_active`` flips to true the first time
@@ -129,11 +129,11 @@ class KLWatch {
 
 
 
-; ===========================================
+; ==========================================
 ; ==========================================
 ; ======= 3/ Session / idle producer =======
 ; ==========================================
-; ===========================================
+; ==========================================
 
 ; Called by the InputHook on every captured keystroke (printable or
 ; special). Reads ``KLHook.last_tick`` BEFORE it is updated to the new
@@ -280,11 +280,11 @@ KL_Watchers_DetectShortcut(vk) {
 
 
 
-; =================================
+; ================================
 ; ================================
 ; ======= 5/ System events =======
 ; ================================
-; =================================
+; ================================
 
 ; WM_WTSSESSION_CHANGE handler — wParam carries the session change code
 ; (WTS_SESSION_LOCK / UNLOCK among others). lParam is the session id,
@@ -319,11 +319,11 @@ KL_Watchers_OnPowerBroadcast(wParam, lParam, msg, hwnd) {
 
 
 
-; ==================================
+; ============================
 ; ============================
 ; ======= 6/ Lifecycle =======
 ; ============================
-; ==================================
+; ============================
 
 KL_Watchers_Start() {
     ; Idempotent — successive calls are no-ops once the timer is armed.

@@ -14,22 +14,18 @@ local helpers = require("tests.helpers")
 
 
 
--- =========================================
+--- ==========================================
 --- ==========================================
 --- ======= 1/ Source-level invariants =======
 --- ==========================================
--- =========================================
+--- ==========================================
 
-local function read_source()
-	local path = helpers.driver_root() .. "modules/gestures/init.lua"
-	local fh = io.open(path, "r")
-	if not fh then return "" end
-	local body = fh:read("*a") or ""
-	fh:close()
-	return body
-end
-
-local SOURCE = read_source()
+-- Selected by a declaration unique to modules/gestures/init.lua rather than by
+-- path, so moving or splitting the module cannot turn these invariants into a
+-- path error. The old form returned "" on a missing file, which made every
+-- assertion below pass against an empty string.
+local SOURCE = helpers.read_driver_source("local function schedule_emergency_recycle")
+helpers.assert_true(SOURCE ~= nil, "modules/gestures/init.lua source must be locatable")
 
 helpers.describe("gestures touchdevice loader source invariants", function()
 	helpers.it("defines load_touchdevice_module helper", function()
@@ -65,11 +61,11 @@ end)
 
 
 
--- =======================================
+--- ========================================
 --- ========================================
 --- ======= 2/ Runtime degraded mode =======
 --- ========================================
--- =======================================
+--- ========================================
 
 helpers.describe("gestures startup degraded mode", function()
 	local original_logger = package.loaded["lib.logger"]

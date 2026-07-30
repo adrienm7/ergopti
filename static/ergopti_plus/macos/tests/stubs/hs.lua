@@ -277,11 +277,11 @@ M.logger = {
 
 
 
--- ============================
+--- =============================
 --- =============================
 --- ======= 6/ Filesystem =======
 --- =============================
--- ============================
+--- =============================
 
 -- Per-path directory listings a test can populate: __entries["/abs/path"] = { "a.toml", "b.toml" }.
 -- Empty by default so an un-populated directory simply iterates to nothing.
@@ -370,11 +370,11 @@ M.fs = {
 
 
 
--- =================================
+-- ================================
 -- ================================
 -- ======= 6b/ SQLite3 Stub =======
 -- ================================
--- =================================
+-- ================================
 
 -- Minimal stub for hs.sqlite3 — records open() calls; exec/prepare/close are no-ops.
 -- Real DB logic is tested via integration tests with a temp SQLite file.

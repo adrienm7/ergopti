@@ -44,11 +44,11 @@ local SCAN_MAX_DEPTH = 16
 
 
 
--- ===============================================
+--- ==============================================
 --- ==============================================
 --- ======= 1/ Personal Hotstrings Loading =======
 --- ==============================================
--- ===============================================
+--- ==============================================
 
 --- Registers the personal hotstring group and all extra personal extension groups.
 --- @param ctx table { bundled_hotstrings_dir: string } — path to the bundled

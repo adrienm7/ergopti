@@ -34,11 +34,11 @@ local Logger = require("logger.shim")
 
 
 
--- ==========================================
+--- ==========================================
 --- ==========================================
 --- ======= 1/ Constants & Definitions =======
 --- ==========================================
--- ==========================================
+--- ==========================================
 
 --- Built-in terminator definitions. Each entry with a key produces one entry
 --- in the enable/disable table. Separators (type = "separator") are UI-only.

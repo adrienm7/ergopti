@@ -596,11 +596,11 @@ end
 
 
 
--- =================================
+--- ==================================
 --- ==================================
 --- ======= 5/ Bridge Handlers =======
 --- ==================================
--- =================================
+--- ==================================
 
 local function push_state()
 	if not _webview then return end
@@ -783,11 +783,11 @@ M._on_message = on_message
 
 
 
--- ============================
+--- =============================
 --- =============================
 --- ======= 6/ Public API =======
 --- =============================
--- ============================
+--- =============================
 
 --- Configure optional directories for personal and extension hotstring discovery.
 --- Must be called before M.open() if personal/extension groups are desired.

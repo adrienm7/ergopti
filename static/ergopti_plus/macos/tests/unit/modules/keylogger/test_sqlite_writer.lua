@@ -36,11 +36,11 @@ local SW = helpers.load_with_stubs("modules.keylogger.sqlite_writer")
 
 
 
--- =============================================
+-- ============================================
 -- ============================================
 -- ======= 2/ Module surface invariants =======
 -- ============================================
--- =============================================
+-- ============================================
 
 helpers.describe("sqlite_writer — public surface", function()
 	helpers.it("exposes init, open_db, close_db, get_db, build_inserts", function()
@@ -60,11 +60,11 @@ end)
 
 
 
--- ==============================================
+-- =============================================
 -- =============================================
 -- ======= 3/ Pre-init guard enforcement =======
 -- =============================================
--- ==============================================
+-- =============================================
 
 helpers.describe("sqlite_writer — pre-init guard", function()
 	helpers.it("open_db returns false when called before init", function()

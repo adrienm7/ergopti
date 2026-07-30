@@ -62,11 +62,11 @@ end
 
 
 
---- ============================================
+--- ==========================================
 --- ==========================================
 --- ======= 1/ Adapter & Port Registry =======
 --- ==========================================
---- ============================================
+--- ==========================================
 
 -- Each entry: { id = "require.path", contract = { "method1", "method2", … }, wired = bool }
 -- Contract methods are the minimal public surface that must be present for the
@@ -207,11 +207,11 @@ local ADAPTER_SPECS = {
 
 
 
---- ============================================
+--- =============================
 --- =============================
 --- ======= 2/ Public API =======
 --- =============================
---- ============================================
+--- =============================
 
 --- Records the most recent driver error so M.run() can surface it.
 --- Call this from any error handler that wants healthcheck visibility.

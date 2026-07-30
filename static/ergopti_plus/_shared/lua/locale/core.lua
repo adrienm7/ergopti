@@ -175,11 +175,11 @@ end
 
 
 
--- ============================
+-- =============================
 -- =============================
 -- ======= 3/ Public API =======
 -- =============================
--- ============================
+-- =============================
 
 --- Returns the translated string for the given dot-notation key,
 --- with ★ substituted for the current trigger character.

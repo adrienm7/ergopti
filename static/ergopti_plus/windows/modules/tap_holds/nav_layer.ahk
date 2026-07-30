@@ -111,7 +111,15 @@ SC00A:: SetNumberOfRepetitions(9) ; On key 9
 
 SC00B:: SetNumberOfRepetitions(10) ; On key 0
 
+
+
+
+
+; =========================
+; =========================
 ; ======= Left hand =======
+; =========================
+; =========================
 
 ; === Top row ===
 SC010:: ActionLayer("^+{Home}") ; Select to the beginning of the document
@@ -144,7 +152,15 @@ SC02F:: ActionLayer("{End}{Enter " . AppState_GetNumberOfRepetitions() . "}") ; 
 
 ; SC030:: ; On K
 
+
+
+
+
+; ==========================
+; ==========================
 ; ======= Right hand =======
+; ==========================
+; ==========================
 
 ; === Top row ===
 SC015:: ActionLayer("+{Home}") ; Select everything to the beginning of the line

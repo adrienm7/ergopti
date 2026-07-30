@@ -43,11 +43,11 @@ end
 
 
 
--- ==========================================
+-- ===========================================
 -- ===========================================
 -- ======= 1/ Group Loaders (forwards) =======
 -- ===========================================
--- ==========================================
+-- ===========================================
 
 -- All group-loading and group-lifecycle logic lives in registry_groups.lua.
 -- The public surface below is a thin forward layer so callers of registry.lua
@@ -122,11 +122,11 @@ end
 
 
 
--- =======================================
+-- =====================================
 -- =====================================
 -- ======= 2/ Section Management =======
 -- =====================================
--- =======================================
+-- =====================================
 
 --- Returns true when the section is not explicitly disabled.
 --- hs.settings stores `false` when the user disables it; nil means enabled.

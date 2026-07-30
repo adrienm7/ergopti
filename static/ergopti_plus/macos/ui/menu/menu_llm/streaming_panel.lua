@@ -23,11 +23,11 @@ local i18n    = require("lib.i18n")
 
 
 
--- ==============================
+-- =============================
 -- =============================
 -- ======= 1/ Public API =======
 -- =============================
--- ==============================
+-- =============================
 
 --- Builds the display submenu items and returns the full submenu table.
 --- @param ctx table Context: { state, keymap, is_disabled, save_prefs, update_menu, settings_mgr }.

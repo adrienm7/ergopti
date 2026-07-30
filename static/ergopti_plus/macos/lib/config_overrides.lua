@@ -91,11 +91,11 @@ end
 
 
 
--- ===================================
+-- ==================================
 -- ==================================
 -- ======= 2/ Override Loader =======
 -- ==================================
--- ===================================
+-- ==================================
 
 --- Reads file_path and applies its [script] / [features] sections to
 --- hs.settings. Returns the number of overrides applied. A missing or

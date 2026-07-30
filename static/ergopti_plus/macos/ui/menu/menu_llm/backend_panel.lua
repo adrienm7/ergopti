@@ -58,11 +58,11 @@ end
 
 
 
--- ==============================
+-- =============================
 -- =============================
 -- ======= 1/ Public API =======
 -- =============================
--- ==============================
+-- =============================
 
 --- Builds the full backend-switcher submenu and returns it as two values:
 --- the title string for the parent row and the menu table to embed in it.

@@ -31,11 +31,11 @@ local _model_browser_chooser = nil
 
 
 
--- ==============================
+-- =============================
 -- =============================
 -- ======= 1/ Public API =======
 -- =============================
--- ==============================
+-- =============================
 
 --- Builds the model-selection menu and returns it as a flat table.
 --- @param ctx table Context with fields:

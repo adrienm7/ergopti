@@ -30,11 +30,11 @@ local C = require("modules.keylogger.aggregator.core")
 
 
 
--- ================================
+-- ==============================
 -- ==============================
 -- ======= 1/ SQL Helpers =======
 -- ==============================
--- ================================
+-- ==============================
 
 --- Execute a SQL statement against the open db; log on failure.
 ---
@@ -125,11 +125,11 @@ end
 
 
 
--- ===================================
+-- =================================
 -- =================================
 -- ======= 2/ Batch DB Flush =======
 -- =================================
--- ===================================
+-- =================================
 
 --- Flush all pending batch deltas into SQLite aggregate tables.
 --- Must be called inside an open transaction managed by the caller.

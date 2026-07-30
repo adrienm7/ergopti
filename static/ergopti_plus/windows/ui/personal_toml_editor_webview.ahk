@@ -164,11 +164,11 @@ _HsEdWeb_TryOpen(DefaultSection := "") {
 
 
 
-; ==============================================================
+; ====================================
 ; ====================================
 ; ======= 2/ JS <-> AHK bridge =======
 ; ====================================
-; ==============================================================
+; ====================================
 
 ; Receives messages from the page. The frontend JSON-encodes every payload for
 ; the WebView2 channel, so each message is an object {action, data}. Handled

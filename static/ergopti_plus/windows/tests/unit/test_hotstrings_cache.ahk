@@ -31,11 +31,11 @@
 
 
 
-; =====================================
+; ===============================
 ; ===============================
 ; ======= 1/ Test helpers =======
 ; ===============================
-; =====================================
+; ===============================
 
 ; Point the cache at the real shared hotstrings tree (static/ergopti_plus/_shared)
 ; resolved relative to the tests directory, so the build reads the genuine TOMLs.

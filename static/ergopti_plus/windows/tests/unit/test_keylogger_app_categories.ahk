@@ -277,11 +277,11 @@ Test("KL_SortArray: sorts ordinary alphabetic app-name strings without throwing"
 
 
 
-; ============================================================
+; ==============================================================
 ; ==============================================================
 ; ======= 4/ KL_AppCat_DeferredSave — suspend guard (1g) =======
 ; ==============================================================
-; ============================================================
+; ==============================================================
 
 ; Regression for Pattern 1 (1g): KL_AppCat_DeferredSave runs on a SetTimer,
 ; which native Suspend() never disarms. A pending write must be deferred

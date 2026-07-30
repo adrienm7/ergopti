@@ -22,11 +22,11 @@ local i18n         = require("lib.i18n")
 
 
 
--- ==============================
+-- =============================
 -- =============================
 -- ======= 1/ Public API =======
 -- =============================
--- ==============================
+-- =============================
 
 --- Builds the trigger submenu and returns it as a flat table of menu items.
 --- @param ctx table Context with fields: state, keymap, is_disabled,

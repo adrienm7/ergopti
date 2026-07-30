@@ -28,11 +28,11 @@
 
 
 
-; ==============================================================
+; ===================================
 ; ===================================
 ; ======= 1/ Lifecycle / open =======
 ; ===================================
-; ==============================================================
+; ===================================
 
 ; Singleton window + WebView2 plumbing. Subscription handles live in globals so
 ; the binding does not GC them; they are released BEFORE Controller.Close() in
@@ -154,11 +154,11 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false) {
 
 
 
-; ==============================================================
+; ====================================
 ; ====================================
 ; ======= 2/ JS <-> AHK bridge =======
 ; ====================================
-; ==============================================================
+; ====================================
 
 ; Receives messages from the page. The frontend JSON-encodes every payload for
 ; the WebView2 channel, so each message is an object {action, …}. Work is
@@ -215,11 +215,11 @@ _ActPickWeb_Confirm(Id) {
 
 
 
-; ==============================================================
+; ===================================
 ; ===================================
 ; ======= 3/ initData builder =======
 ; ===================================
-; ==============================================================
+; ===================================
 
 ; Build the `init({...})` call string consumed by the frontend.
 _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative) {
@@ -262,11 +262,11 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative) {
 
 
 
-; ==============================================================
+; =====================================
 ; =====================================
 ; ======= 4/ Helpers / teardown =======
 ; =====================================
-; ==============================================================
+; =====================================
 
 ; Builds one JSON key/value pair (key:"value") with the value safely escaped.
 _ActPickWeb_Kv(Key, Value) {

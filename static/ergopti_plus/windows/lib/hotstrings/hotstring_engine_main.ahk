@@ -50,11 +50,11 @@
 
 
 
-; ============================================
+; ============================
 ; ============================
 ; ======= 1/ Constants =======
 ; ============================
-; ============================================
+; ============================
 
 ; Maximum buffer length. Anything older than the longest registered trigger
 ; is irrelevant for matching; we cap so memory and lookup cost stay bounded.
@@ -122,11 +122,11 @@ _HSE_SourcePriority(CategoryName) {
 
 
 
-; ============================================
+; ========================
 ; ========================
 ; ======= 2/ State =======
 ; ========================
-; ============================================
+; ========================
 
 ; The user-typed buffer to the left of the cursor. Mirrors the visible
 ; screen content as best we can observe — updated by HSE_FeedChar (append),
@@ -241,11 +241,11 @@ global HSE_TypoNbspStripped := false
 
 
 
-; ============================================
+; ======================================
 ; ======================================
 ; ======= 3/ Public registry API =======
 ; ======================================
-; ============================================
+; ======================================
 
 ; Register a trigger. The Flags string mirrors the AHK Hotstring() option
 ; letters so existing callers (CreateHotstring, CreateCaseSensitiveHotstrings,
@@ -630,11 +630,11 @@ HSE_Size() {
 
 
 
-; ============================================
+; ==================================
 ; ==================================
 ; ======= 4/ Buffer mutation =======
 ; ==================================
-; ============================================
+; ==================================
 
 ; Append a printable character to the buffer and report whether a trigger
 ; just matched. Word terminators are appended to the buffer like any other

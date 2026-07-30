@@ -213,11 +213,11 @@ end)
 
 
 
--- ==============================================
+-- ================================================
 -- ================================================
 -- ======= 3/ The Fence Is Reported Outward =======
 -- ================================================
--- ==============================================
+-- ================================================
 
 helpers.describe("emit_tokens reports its ordering fence to the caller", function()
 	helpers.it("returns a positive delay once a paste has been deferred", function()

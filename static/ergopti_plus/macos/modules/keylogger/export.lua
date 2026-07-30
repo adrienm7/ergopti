@@ -35,11 +35,11 @@ local LOG    = "keylogger.export"
 
 
 
--- ==============================================
+-- =============================================
 -- =============================================
 -- ======= 1/ Module State and Constants =======
 -- =============================================
--- ==============================================
+-- =============================================
 
 --- macOS app category → i18n key mapping.
 --- MUST stay in sync with MAC_CATEGORIES_FR in log_manager if that table is
@@ -85,11 +85,11 @@ local _initialized = false
 
 
 
--- ====================================
+-- ===================================
 -- ===================================
 -- ======= 2/ Guards and Utils =======
 -- ===================================
--- ====================================
+-- ===================================
 
 --- Guards public functions against being called before M.init().
 local function _require_init(func_name)
@@ -109,11 +109,11 @@ local _now_ts = require("modules.keylogger.timestamp").now_ts
 
 
 
--- =======================================
+-- ======================================
 -- ======================================
 -- ======= 3/ App Category Lookup =======
 -- ======================================
--- =======================================
+-- ======================================
 
 -- Per-app-name category memo. Declared above the function that reads it: a local
 -- placed below would bind the nil global instead.
@@ -201,11 +201,11 @@ end
 
 
 
--- ====================================
+-- ===================================
 -- ===================================
 -- ======= 4/ Device Accessors =======
 -- ===================================
--- ====================================
+-- ===================================
 
 --- Returns a stable short label for the current device. Used by menu modules
 --- that display device names without reading device.json directly.
@@ -240,11 +240,11 @@ end
 
 
 
--- ================================================
+-- ===============================================
 -- ===============================================
 -- ======= 5/ Foreign Device Data.sql Sync =======
 -- ===============================================
--- ================================================
+-- ===============================================
 
 --- Scan `metrics/by_device/*` and apply any data.sql bytes that the local
 --- db.sqlite has not yet ingested. KEYLOGGER_SPEC §16.
@@ -426,11 +426,11 @@ end
 
 
 
--- ===============================
+-- ==============================
 -- ==============================
 -- ======= 6/ Initializer =======
 -- ==============================
--- ===============================
+-- ==============================
 
 --- Initialize the export module with resolved paths and live db accessor.
 --- @param deps table Must contain: paths (table), device_id (string), get_db (function).

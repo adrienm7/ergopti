@@ -82,11 +82,11 @@ end
 
 
 
--- ===================================
+--- ====================================
 --- ====================================
 --- ======= 3/ Override File I/O =======
 --- ====================================
--- ===================================
+--- ====================================
 
 --- Parses the user override TOML file into two structures:
 --- - overrides: { [category] = { delay = n, color = s, sections = { [name] = { delay, color } } } }
@@ -357,11 +357,11 @@ end
 
 
 
--- ============================
+--- =============================
 --- =============================
 --- ======= 5/ Public API =======
 --- =============================
--- ============================
+--- =============================
 
 --- Initializes the module. Must be called before any resolve/setter.
 --- @param opts table { override_path = string, toml_resolver = function(category) -> path }

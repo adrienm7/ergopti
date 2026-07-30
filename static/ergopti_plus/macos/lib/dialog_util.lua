@@ -35,11 +35,11 @@ local M = {}
 
 
 
--- ============================================
+-- ==========================================
 -- ==========================================
 -- ======= 1/ Focused Dialog Wrappers =======
 -- ==========================================
--- ============================================
+-- ==========================================
 
 --- Brings Hammerspoon to the front so the next modal dialog receives keyboard
 --- focus. Wrapped in pcall because hs.focus can briefly fail during app

@@ -35,11 +35,11 @@
 
 
 
-; ==========================================
+; ============================
 ; ============================
 ; ======= 1/ Utilities =======
 ; ============================
-; ==========================================
+; ============================
 
 ; Sentinel wrapper that carries boolean intent through TOML_RenderValue.
 ; AHK v2 has no distinct boolean type: `true` IS integer 1 and `false` IS 0,
@@ -74,11 +74,11 @@ SortArray(arr) {
 
 
 
-; ===================================
+; =========================
 ; =========================
 ; ======= 2/ Reader =======
 ; =========================
-; ===================================
+; =========================
 
 ; Parse result cache: keyed by file path, invalidated by TOML_BatchWrite.
 global _ParseTomlCache := Map()
@@ -391,11 +391,11 @@ TOML_Unescape(s) {
 
 
 
-; ===================================
+; =================================
 ; =================================
 ; ======= 3/ Single-key API =======
 ; =================================
-; ===================================
+; =================================
 
 ; Read a single key. Returns ``Default`` when the file, the section, or the
 ; key is missing. Coerces back to the closest AHK type — booleans become
@@ -425,11 +425,11 @@ TOML_Write(Value, Path, Section, Key) {
 
 
 
-; ===================================
+; ===============================
 ; ===============================
 ; ======= 4/ Batch writer =======
 ; ===============================
-; ===================================
+; ===============================
 
 ; Apply every (Section, Key, Value) update in one read-modify-write cycle.
 ; Preserves keys we did not touch; sections appear in the original order
@@ -673,11 +673,11 @@ TOML_RenderString(s) {
 
 
 
-; ===================================
+; =================================
 ; =================================
 ; ======= 5/ Cache accessor =======
 ; =================================
-; ===================================
+; =================================
 
 ; Look up Section/Key in a parsed cache (the Map produced by
 ; ``ParseTomlFile``). Returns ``Default`` (defaulting to the underscore
@@ -728,11 +728,11 @@ ResolveConfigPath(RawValue, DefaultPath) {
 
 
 
-; =============================================
+; ====================================
 ; ====================================
 ; ======= 6/ paths.toml reader =======
 ; ====================================
-; =============================================
+; ====================================
 
 ; Reads a simple flat TOML file (Key = "value" pairs, ignores comments).
 ; Auto-generates the file with a header comment if it does not exist.

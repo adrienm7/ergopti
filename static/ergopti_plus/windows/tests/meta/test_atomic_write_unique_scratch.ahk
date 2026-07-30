@@ -38,11 +38,11 @@
 
 
 
-; ===============================================
+; ================================================
 ; ================================================
 ; ======= 1/ Class-wide scratch uniqueness =======
 ; ================================================
-; ===============================================
+; ================================================
 
 ; Every writer that stages to a sibling scratch file before publishing it over
 ; the target. They are checked together so the invariant is pinned to the

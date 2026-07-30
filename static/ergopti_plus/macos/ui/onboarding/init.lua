@@ -76,11 +76,11 @@ end
 
 
 
--- ============================================
+-- ==========================================
 -- ==========================================
 -- ======= 1/ Locale string injection =======
 -- ==========================================
--- ============================================
+-- ==========================================
 
 --- Loads the strings for a given locale code and injects them into the webview
 --- via window.applyStrings().  Used both for the initial render and for the

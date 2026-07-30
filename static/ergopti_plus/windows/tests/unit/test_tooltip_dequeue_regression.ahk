@@ -73,7 +73,9 @@ _SimulateDequeueRebuildMaxMs(DequeueItemsGlobal, NowMs) {
 
 
 
+; ============================================================
 ; ===== 2.1) Integer sentinel (0) must not be enumerated =====
+; ============================================================
 
 ; This is the exact state that caused the crash: TooltipHide() set
 ; _TooltipDequeueItems := 0 and a concurrent rebuild tried to iterate it.
@@ -95,7 +97,9 @@ Test("dequeue regression: _SimulateDequeueRebuildMaxMs returns 0 when items is i
 
 
 
+; =============================================================
 ; ===== 2.2) Empty array must pass the guard and return 0 =====
+; =============================================================
 
 _TestTooltipDequeue_EmptyArrayReturnsZero() {
 	Result := _SimulateDequeueRebuildMaxMs([], 1000)
@@ -108,7 +112,9 @@ Test("dequeue regression: empty dequeue array returns MaxMs 0 without crash",
 
 
 
+; ==============================================================
 ; ===== 2.3) Live rows: MaxMs reflects the furthest expiry =====
+; ==============================================================
 
 ; Two rows both still alive: ExpireMs 1500 and 2000 relative to Now=1000.
 ; Remaining values: Max(50, 500)=500 and Max(50, 1000)=1000. MaxMs = 1000.
@@ -127,7 +133,9 @@ Test("dequeue regression: MaxMs = furthest remaining deadline",
 
 
 
+; ============================================================
 ; ===== 2.4) Rows with ExpireMs 0 (infinite) are skipped =====
+; ============================================================
 
 _TestTooltipDequeue_InfiniteRowsSkipped() {
 	Items := [
@@ -144,7 +152,9 @@ Test("dequeue regression: rows with ExpireMs=0 do not contribute to MaxMs",
 
 
 
+; ===============================================================
 ; ===== 2.5) Mixed: infinite + live - only live contributes =====
+; ===============================================================
 
 ; One infinite row (ExpireMs=0) plus one live row expiring at 1800.
 ; Remaining = Max(50, 800) = 800. MaxMs must be 800.
@@ -163,7 +173,9 @@ Test("dequeue regression: mixed rows - only live row contributes to MaxMs",
 
 
 
+; ================================================================
 ; ===== 2.6) 50 ms floor is enforced for nearly-expired rows =====
+; ================================================================
 
 ; Row whose deadline is only 10 ms in the future - Max(50, 10) = 50.
 _TestTooltipDequeue_FiftyMsFloor() {

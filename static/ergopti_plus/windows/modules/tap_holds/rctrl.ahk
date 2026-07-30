@@ -25,11 +25,11 @@
 
 
 
-; ==============================
+; ========================
 ; ========================
 ; ======= 7/ RCTRL =======
 ; ========================
-; ==============================
+; ========================
 
 ; Helper predicates -------------------------------------------------------
 
@@ -54,7 +54,11 @@ _RCtrlHoldModKey() {
 
 
 
+; ===============================================
+; ===============================================
 ; ======= 7.1) backspace tap (key-repeat) =======
+; ===============================================
+; ===============================================
 
 #HotIf TapHoldTapAction(TapHold, "right_ctrl") == "backspace" and not LayerEnabled
 SC11D::
@@ -85,7 +89,11 @@ SC11D::
 
 
 
+; ============================
+; ============================
 ; ======= 7.2) tab tap =======
+; ============================
+; ============================
 
 ; ~ prefix: RCtrl passthrough so the OS still sees Ctrl during KeyWait.
 ; Explicit modifier pass-throughs so Shift+Tab, Ctrl+Tab, Win+Tab still work.
@@ -110,7 +118,11 @@ SC11D::
 
 
 
+; =======================================
+; =======================================
 ; ======= 7.3) one_shot_shift tap =======
+; =======================================
+; =======================================
 
 #HotIf TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" and not LayerEnabled
 SC11D:: {
@@ -138,7 +150,11 @@ SC11D:: {
 
 
 
+; ===========================================================
+; ===========================================================
 ; ======= 7.4) Generic — hold-modifier, any other tap =======
+; ===========================================================
+; ===========================================================
 
 ; The gate deliberately does NOT require a configured tap action. The tray
 ; picker offers the hold options independently of the tap, persists the choice
@@ -180,7 +196,11 @@ $SC11D:: {
 
 
 
+; ========================================================
+; ========================================================
 ; ======= 7.5) Generic — hold-layer, any other tap =======
+; ========================================================
+; ========================================================
 
 ; No tap-action conjunct, for the reason given on block 7.4: a hold must arm on
 ; the hold alone or the picker offers a choice the driver silently ignores.
@@ -227,7 +247,11 @@ $SC11D:: {
 
 
 
+; ===================================================
+; ===================================================
 ; ======= 7.6) Generic — tap-only (hold=none) =======
+; ===================================================
+; ===================================================
 
 #HotIf not _RCtrlIsSpecialTap() and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and TapHoldHoldLayer(TapHold, "right_ctrl") == "" and TapHoldTapAction(TapHold, "right_ctrl") != "" and not LayerEnabled
 SC11D:: _RCtrlDispatch()
@@ -239,7 +263,11 @@ SC11D:: _RCtrlDispatch()
 
 
 
+; =================================
+; =================================
 ; ======= 7.7) Tap dispatch =======
+; =================================
+; =================================
 
 _RCtrlDispatch() {
 	_TapHoldFireAction("right_ctrl")

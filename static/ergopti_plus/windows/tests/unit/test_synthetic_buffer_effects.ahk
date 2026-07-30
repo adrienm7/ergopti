@@ -98,11 +98,11 @@ _SBE_MixedPayloadIsTreatedAsAMove() {
 
 
 
-; ==================================================================
+; ===================================================================
 ; ===================================================================
 ; ======= 2/ Every real layer payload, enumerated from source =======
 ; ===================================================================
-; ==================================================================
+; ===================================================================
 
 ; Rebuild the payload of each ActionLayer key from nav_layer.ahk. The real call
 ; sites concatenate a repetition count onto a literal prefix
@@ -200,11 +200,11 @@ Test("hotstring buffers: the text-neutral allowlist is anchored to a single key 
 
 
 
-; ==================================================================
+; ===================================================================
 ; ===================================================================
 ; ======= 3/ The declaration is actually wired to the senders =======
 ; ===================================================================
-; ==================================================================
+; ===================================================================
 
 ; ActionLayer's SendInput is a live OS call here, so the wiring is asserted on
 ; the source instead of by firing it at whatever window has focus. The ordering

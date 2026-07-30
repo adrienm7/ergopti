@@ -21,11 +21,11 @@ local i18n    = require("lib.i18n")
 
 
 
--- ==============================
+-- =============================
 -- =============================
 -- ======= 1/ Public API =======
 -- =============================
--- ==============================
+-- =============================
 
 --- Builds temperature-related menu items and appends them to the target table.
 --- @param ctx table Context: { state, keymap, is_disabled, save_prefs, update_menu, settings_mgr, llm_mod }.
