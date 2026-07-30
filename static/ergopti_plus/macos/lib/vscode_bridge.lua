@@ -193,8 +193,19 @@ function M.install_extension()
 		return false
 	end
 	Logger.info(LOG, string.format("Extension installed in %s.", EXT_DIR))
-	local dialog = require("lib.dialog_util")
-	dialog.alert(i18n.get("vscode.reload_required"), 4)
+	-- A transient toast, through the layer that actually provides one.
+	-- dialog_util.alert forwards to hs.dialog.alert, whose leading parameters are
+	-- coordinates and a callback — passing it (message, duration) raised, and the
+	-- throw travelled out of install_extension and aborted setup() before
+	-- start_server() had run. The notice is cosmetic; it is also pcall'd, so it can
+	-- no longer take anything with it.
+	local ok_notify, notifications = pcall(require, "lib.notifications")
+	if ok_notify and type(notifications.notify) == "function" then
+		local ok_toast, err = pcall(notifications.notify, i18n.get("vscode.reload_required"), nil, "info")
+		if not ok_toast then
+			Logger.warn(LOG, "Reload notice could not be shown: %s.", tostring(err))
+		end
+	end
 	return true
 end
 
@@ -345,11 +356,23 @@ function M.estimate_position()
 	return { x = x, y = y, h = M.LINE_HEIGHT, type = "vscode_caret" }
 end
 
---- Initializes the bridge: installs the VS Code extension and starts the HTTP server.
---- Called explicitly from init.lua after the tooltip subsystem is ready.
+--- Initializes the bridge: starts the HTTP server, then installs the VS Code
+--- extension. Called explicitly from init.lua after the tooltip subsystem is ready.
+---
+--- The server goes FIRST and the install is isolated. These two used to be chained
+--- in the other order with nothing between them, so any throw inside the install —
+--- including from the purely cosmetic "reload VS Code" notice at its very last
+--- line — aborted setup() before the server existed. That happened on exactly the
+--- boot that installed or updated the extension, and init.lua's call site pcalls
+--- setup(), so the log said the bridge had failed and nothing said the server had
+--- never been reached.
 function M.setup()
-	M.install_extension()
 	M.start_server()
+	local ok, err = pcall(M.install_extension)
+	if not ok then
+		Logger.error(LOG, "Extension install failed: %s — the caret server is up regardless.",
+			tostring(err))
+	end
 end
 
 return M
