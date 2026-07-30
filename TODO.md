@@ -141,59 +141,26 @@ Two conventions that make asymmetry legible:
 
 ### 0.4 The remaining blockers
 
-#### B6 — at-rest encryption of typed text, on all three drivers
+#### B6 follow-up — bulk migration of pre-existing rows (deferred)
 
-**Current state.** The macOS "Chiffrement" menu entry is a complete no-op backed
-by two stubs (`log_manager.process_files_async`, `register_encryptor_app`). It
-ticks the box, persists `keylogger_encrypt = true`, calls
-`Keylogger.set_options({encrypt = true})` — and encrypts nothing. The
-`on_complete(false)` the stub fires does not match the 3-argument callback, so
-`string.format("%d", false)` raises inside the stub's own `pcall` and no dialog
-ever appears. Worse, the flow collects `*.log.gz` files: a storage format that no
-longer exists, since persistence moved to SQLite. Meanwhile
-`static/ergopti_plus/docs/security/keylogger_privacy.md:93` tells privacy-seeking
-users to enable exactly this.
+At-rest encryption itself is **done** on all three drivers: the `metrics.encrypt`
+toggle over a real backend (`{linux,macos}/modules/keylogger/text_cipher.lua`,
+`windows/modules/keylogger/keylogger_text_cipher.ahk`), the shared codec
+(`_shared/lua/keylogger/text_crypto.lua`), the cross-driver envelope parity gate,
+and the honest threat-model paragraph in `keylogger_privacy.md`. Enabling the
+toggle encrypts every row written **from that point on**, and reads are correct
+either way (the decrypt path is fail-open on a non-envelope value, and the
+dashboard reader never projects the encrypted columns).
 
-**Decisions taken (maintainer, this session).**
-
-1. Implement it for real, on **all three drivers**.
-2. The key derives from the **machine ID**, so it can never be lost. No random
-   salt in the OS secret store: if that store is ever lost, every log is
-   unreadable, and durability wins over secrecy here.
-3. A **checkbox in the Metrics submenu** of all three drivers, **off by default**
-   (`metrics.encrypt` already defaults to `false` in the shared manifest — it
-   still needs `platforms` widened from `["hs"]` to all three).
-4. Keylogger and dashboard performance must not regress.
-5. Stated limitation, to be written plainly into `keylogger_privacy.md`: the
-   repository is public, so "you must read the source to know the password"
-   means "you must look at GitHub". This protects against **off-machine**
-   disclosure — a stolen disk, a backup, a synced folder — not against anything
-   running on the machine. Do not oversell it.
-
-**Design.**
-
-- *Algorithm*: `openssl enc -aes-256-cbc`, matching the existing
-  `macos/apps/Encryptor.app` droplet (PBKDF2, 600 000 iterations).
-- *The performance trap*: `openssl enc -pbkdf2 -iter 600000` re-derives the key
-  on **every invocation** (~0.5 s). Derive **once** when encryption is enabled,
-  cache the 256-bit key in memory, then encrypt with `-K <hex> -iv <hex>`, which
-  skips derivation entirely. Never one subprocess per row: **one per flush** and
-  **one per dashboard read**, batched.
-- *Scope of encryption*: only the columns that hold literal typed text —
-  `events_typing.text` and `events_typing.events_json`. Aggregates (n-grams,
-  counters, WPM, scancodes) stay in clear: they are what the dashboard computes
-  over, and they are not readable as text. This is what keeps both the keylogger
-  and the dashboard fast.
-- *Machine ID per driver*: macOS `IOPlatformUUID` (the existing
-  `log_manager.get_mac_serial` seam), Linux `/etc/machine-id`, Windows
-  `MachineGuid`. One shared derivation contract, three adapters — the `crypto`
-  port and `adapters/crypto.lua` already exist on Linux.
-- *Migration*: enabling encrypts existing rows in batches; disabling decrypts
-  them. Rows carry a marker so a half-migrated database is detectable rather
-  than silently corrupt.
-
-**Do not** ship the checkbox before the backend works — a tick box that lies
-about encryption is the exact defect being fixed.
+**What is not done:** enabling encryption does not go back and encrypt rows that
+were already written in clear (nor does disabling decrypt them in place). The
+envelope carries a version marker, so a mixed database is detectable per row
+rather than silently corrupt — the groundwork for a migration pass is there. A
+proper bulk migration (read `events_typing` in batches, re-wrap `text` /
+`events_json`, restart-safe) is worth doing because the privacy promise for a
+user's **existing** logs depends on it, but it is a distinct, riskier piece
+(three drivers, in-place rewrite of a live DB) and is left as its own task rather
+than rushed in alongside the feature.
 
 ### 0.5 The lots, in dependency order
 
