@@ -1,5 +1,7 @@
-// scripts/fix-ahk-encoding.cjs
-// One-time utility to add missing UTF-8 BOM and normalize LF on all .ahk files.
+// tools/deploy/fix-ahk-encoding.cjs
+// Adds the missing UTF-8 BOM and normalizes line endings to LF on all .ahk files.
+// Run from the pre-commit hook; the same invariant is asserted by
+// tools/test/test-ahk-encoding.cjs.
 
 'use strict';
 
@@ -41,8 +43,8 @@ for (const filePath of files) {
 		fixedBom++;
 	}
 
-	// 2. Normalize line endings: replace bare \n (not preceded by \r) with \r\n
-	// Work on the content after BOM
+	// 2. Normalize line endings to LF — this is what tools/test/test-ahk-encoding.cjs
+	// enforces, so any CR byte is collapsed away. Work on the content after the BOM.
 	const contentStart = hasBom ? 3 : 0; // after we already prepended BOM above, offset is 3
 	// Since we may have prepended BOM, re-derive: BOM is always first 3 bytes now
 	const content = data.slice(3).toString('binary');
