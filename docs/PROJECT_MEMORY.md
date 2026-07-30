@@ -26,6 +26,8 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [feedback-ahk-suite-needs-temp-space](#feedback-ahk-suite-needs-temp-space) — A near-full `%TEMP%` volume makes the AHK runner report assertion failures that do not reproduce; check free space before believing a red run
 - [feedback-test-before-merge](#feedback-test-before-merge) — Never merge a slice into dev before the user has tested it live. Stay on the branch and wait for explicit validation.
 - [feedback-ui-must-be-i18n](#feedback-ui-must-be-i18n) — All user-facing UI text goes through the i18n system in 21 languages — never hardcode a UI string anywhere, WebView UIs included
+- [project-heredoc-normalises-trailing-newlines](#project-heredoc-normalises-trailing-newlines) — A shell heredoc always appends a newline, so `with_stdin` silently alters DATA payloads; use `with_exact_stdin`
+- [project-windows-at-rest-store-is-data-sql](#project-windows-at-rest-store-is-data-sql) — Windows never opens db.sqlite: data.sql is the data at rest, and the cache is rebuilt from it
 - [project-ahk-menu-dispatcher-error-swallow](#project-ahk-menu-dispatcher-error-swallow) — The menu-dispatcher bypass must re-throw callback errors — a local try/catch only destroys reporting
 - [project-audit-2026-07-21-open-items](#project-audit-2026-07-21-open-items) — Troisieme et quatrieme passes d'audit AHK : les pistes refutees a ne pas re-soulever, et deux decisions qui ne sont pas des correctifs
 - [project-typing-latency-tooltip-coldstart](#project-typing-latency-tooltip-coldstart) — Latence de frappe : pourquoi la reutilisation de fenetre tooltip est rejetee, pourquoi le chunking de l'enregistrement differe a ete reverte, et pourquoi WebView2 a quitte le chemin de frappe
@@ -2591,3 +2593,65 @@ modification y atteint macOS *et* Linux.
 Memoires soeurs : [[project_source_scanning_guards_must_strip_comments]],
 [[project_audit_findings_are_hypotheses]],
 [[project_audit_evidence_must_be_reproducible]].
+
+### project-heredoc-normalises-trailing-newlines
+
+_A shell heredoc always delivers its body plus one newline, so `Heredoc.with_stdin` cannot carry DATA — only `with_exact_stdin` does_
+
+<sub>slug: `project_heredoc_normalises_trailing_newlines`</sub>
+
+`_shared/lua/shell/heredoc.lua` frames a payload as `cmd <<'TOKEN'\n<body>\nTOKEN\n`.
+There is no shell syntax for a heredoc whose body ends without a newline, so
+`with_stdin()` strips the payload's own trailing newlines before writing the
+body and the shell then appends exactly one. The command therefore reads
+`strip_trailing_newlines(payload) .. "\n"`, never `payload`.
+
+That is harmless for a **script** (a SQL script does not care how many newlines
+it ends with) and silent corruption for **data**. It shipped that way in the
+at-rest cipher: `encrypt("abc")` stored the ciphertext of `"abc\n"`, `"abc\n\n"`
+collapsed onto the same value, and the round trip was not the identity. Nothing
+read the encrypted columns yet, so it surfaced only when a migration started
+rewriting stored rows in place.
+
+`with_exact_stdin()` pipes the heredoc through `head -c <byte length>`, which
+removes the framing newline without removing any of the payload's own. Verified
+against real openssl: `"abc"` and `"abc\n\n"` both round-trip byte for byte.
+
+**How to apply:**
+- Payload is a script the command parses → `with_stdin` is fine.
+- Payload is a VALUE that must come back unchanged (a plaintext, a ciphertext, a
+  key input, anything hashed) → `with_exact_stdin`, always.
+- The same trap applies to any framing that appends a terminator: check what the
+  reader actually receives, not what you passed.
+
+Related: [[project_windows_at_rest_store_is_data_sql]].
+
+### project-windows-at-rest-store-is-data-sql
+
+_The Windows driver never opens `db.sqlite` — `data.sql` is the data at rest, and `db.sqlite` is a disposable cache rebuilt from it_
+
+<sub>slug: `project_windows_at_rest_store_is_data_sql`</sub>
+
+On macOS and Linux the keylogger writes into a SQLite database. On Windows it
+does not: `KL_BuildInserts` emits INSERT statements that `KL_IngestOnce` appends
+to `<config>/metrics/by_device/<device>/data.sql`, an append-only ledger, and
+`KL_GetSqlitePath()` points into **tmpdir**, where `keylogger_prefetch.ahk`
+rebuilds an in-memory database from schema.sql + data.sql for each dashboard
+open.
+
+The consequence for anything that must change what is stored: **converting the
+database on Windows protects nothing**, because the next rebuild restores the old
+content straight out of the ledger. The ledger is what has to change. That is why
+`modules/keylogger/keylogger_text_migration.ahk` rewrites a file where the two
+Lua drivers run `UPDATE` statements.
+
+Two traps when rewriting that ledger:
+- **It is not line-oriented.** `KL_SqlStr` escapes quotes and nothing else, so
+  typed text puts raw newlines, semicolons, commas and `--` inside a statement.
+  Splitting on any of them cuts a statement in half. Track quoting.
+- **The ingest tick keeps appending.** A rewrite that snapshots the file and then
+  replaces it loses everything appended in between. Raise `KLMigration.active`,
+  which `KL_IngestOnce` checks and defers on, and publish with a single
+  `FSMove(..., overwrite)` so the original is intact until the last instant.
+
+Related: [[project_heredoc_normalises_trailing_newlines]].

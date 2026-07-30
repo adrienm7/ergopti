@@ -139,30 +139,7 @@ Two conventions that make asymmetry legible:
   macos/modules)` becomes empty, "not implemented" becomes visible instead of
   absent, and a junior asked to add a feature knows exactly which file to open.
 
-### 0.4 The remaining blockers
-
-#### B6 follow-up — bulk migration of pre-existing rows (deferred)
-
-At-rest encryption itself is **done** on all three drivers: the `metrics.encrypt`
-toggle over a real backend (`{linux,macos}/modules/keylogger/text_cipher.lua`,
-`windows/modules/keylogger/keylogger_text_cipher.ahk`), the shared codec
-(`_shared/lua/keylogger/text_crypto.lua`), the cross-driver envelope parity gate,
-and the honest threat-model paragraph in `keylogger_privacy.md`. Enabling the
-toggle encrypts every row written **from that point on**, and reads are correct
-either way (the decrypt path is fail-open on a non-envelope value, and the
-dashboard reader never projects the encrypted columns).
-
-**What is not done:** enabling encryption does not go back and encrypt rows that
-were already written in clear (nor does disabling decrypt them in place). The
-envelope carries a version marker, so a mixed database is detectable per row
-rather than silently corrupt — the groundwork for a migration pass is there. A
-proper bulk migration (read `events_typing` in batches, re-wrap `text` /
-`events_json`, restart-safe) is worth doing because the privacy promise for a
-user's **existing** logs depends on it, but it is a distinct, riskier piece
-(three drivers, in-place rewrite of a live DB) and is left as its own task rather
-than rushed in alongside the feature.
-
-### 0.5 The lots, in dependency order
+### 0.4 The lots, in dependency order
 
 Constraints: **paths before moves, moves before content, data before code.**
 
