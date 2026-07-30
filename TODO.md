@@ -141,9 +141,59 @@ Two conventions that make asymmetry legible:
 
 ### 0.4 The remaining blockers
 
-| # | Blocker | Note before starting |
-| --- | --- | --- |
-| **B6** | The macOS "Chiffrement" menu item is a complete no-op (ten empty stubs) and `docs/security/keylogger_privacy.md:93` tells users to enable it for at-rest privacy | the `type(...) == "function"` guard is always true because the stub exists, so the flow raises inside the stub's own `pcall`, the progress canvas is never deleted and no dialog appears. Decide: implement, or delete the feature **and** the doc sentence together |
+#### B6 — at-rest encryption of typed text, on all three drivers
+
+**Current state.** The macOS "Chiffrement" menu entry is a complete no-op backed
+by two stubs (`log_manager.process_files_async`, `register_encryptor_app`). It
+ticks the box, persists `keylogger_encrypt = true`, calls
+`Keylogger.set_options({encrypt = true})` — and encrypts nothing. The
+`on_complete(false)` the stub fires does not match the 3-argument callback, so
+`string.format("%d", false)` raises inside the stub's own `pcall` and no dialog
+ever appears. Worse, the flow collects `*.log.gz` files: a storage format that no
+longer exists, since persistence moved to SQLite. Meanwhile
+`static/ergopti_plus/docs/security/keylogger_privacy.md:93` tells privacy-seeking
+users to enable exactly this.
+
+**Decisions taken (maintainer, this session).**
+
+1. Implement it for real, on **all three drivers**.
+2. The key derives from the **machine ID**, so it can never be lost. No random
+   salt in the OS secret store: if that store is ever lost, every log is
+   unreadable, and durability wins over secrecy here.
+3. A **checkbox in the Metrics submenu** of all three drivers, **off by default**
+   (`metrics.encrypt` already defaults to `false` in the shared manifest — it
+   still needs `platforms` widened from `["hs"]` to all three).
+4. Keylogger and dashboard performance must not regress.
+5. Stated limitation, to be written plainly into `keylogger_privacy.md`: the
+   repository is public, so "you must read the source to know the password"
+   means "you must look at GitHub". This protects against **off-machine**
+   disclosure — a stolen disk, a backup, a synced folder — not against anything
+   running on the machine. Do not oversell it.
+
+**Design.**
+
+- *Algorithm*: `openssl enc -aes-256-cbc`, matching the existing
+  `macos/apps/Encryptor.app` droplet (PBKDF2, 600 000 iterations).
+- *The performance trap*: `openssl enc -pbkdf2 -iter 600000` re-derives the key
+  on **every invocation** (~0.5 s). Derive **once** when encryption is enabled,
+  cache the 256-bit key in memory, then encrypt with `-K <hex> -iv <hex>`, which
+  skips derivation entirely. Never one subprocess per row: **one per flush** and
+  **one per dashboard read**, batched.
+- *Scope of encryption*: only the columns that hold literal typed text —
+  `events_typing.text` and `events_typing.events_json`. Aggregates (n-grams,
+  counters, WPM, scancodes) stay in clear: they are what the dashboard computes
+  over, and they are not readable as text. This is what keeps both the keylogger
+  and the dashboard fast.
+- *Machine ID per driver*: macOS `IOPlatformUUID` (the existing
+  `log_manager.get_mac_serial` seam), Linux `/etc/machine-id`, Windows
+  `MachineGuid`. One shared derivation contract, three adapters — the `crypto`
+  port and `adapters/crypto.lua` already exist on Linux.
+- *Migration*: enabling encrypts existing rows in batches; disabling decrypts
+  them. Rows carry a marker so a half-migrated database is detectable rather
+  than silently corrupt.
+
+**Do not** ship the checkbox before the backend works — a tick box that lies
+about encryption is the exact defect being fixed.
 
 ### 0.5 The lots, in dependency order
 
