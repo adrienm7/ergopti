@@ -33,6 +33,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Heredoc = require("shell.heredoc")
 
 local LOG = "adapters.shell_runner"
 
@@ -45,12 +46,9 @@ local QUOTE_ESCAPE = "'\\''"
 -- the boolean true from Lua 5.2 onwards. Both spellings must be accepted.
 local EXIT_SUCCESS = 0
 
--- Default opening token of a stdin heredoc. Extended on demand by
--- heredoc_token(); callers with their own convention pass a base of their own.
+-- Default opening token of a stdin heredoc for this driver. The framing itself
+-- lives in _shared/lua/shell/heredoc.lua.
 local HEREDOC_BASE_TOKEN = "ERGOPTI_STDIN"
-
--- Appended to the token until it no longer matches any line of the payload.
-local HEREDOC_TOKEN_PADDING = "_X"
 
 -- Set by M._set_runner(). Declared above every closure that reads it so it can
 -- never be captured as a nil global: in Lua the scope of a local starts AFTER
@@ -176,52 +174,23 @@ end
 -- ===================================
 -- ===================================
 
---- Reports whether any line of `text` is exactly `token`.
---- Exactness matters: `<<` (unlike `<<-`) strips nothing, so only a line equal
---- to the token byte for byte terminates the heredoc.
---- @param text  string
---- @param token string
---- @return boolean
-local function has_line_equal(text, token)
-	-- The trailing newline makes the last line match the pattern like any other.
-	for line in (text .. "\n"):gmatch("([^\n]*)\n") do
-		if line == token then return true end
-	end
-	return false
-end
-
 --- Returns a heredoc terminator that cannot appear as a line of `text`.
---- A heredoc ends at the first line equal to its token, and the payload is
---- arbitrary user data, so a payload containing the token on a line of its own
---- would close the document early and hand the remainder to the shell.
+--- Delegates to the shared framing: macOS shells out with the same user text,
+--- and a second copy of the collision rule is a second place for it to be wrong.
 --- @param text string Payload the terminator will delimit.
---- @param base string|nil Starting token; defaults to HEREDOC_BASE_TOKEN.
+--- @param base string|nil Starting token.
 --- @return string
 function M.heredoc_token(text, base)
-	local token = (type(base) == "string" and base ~= "") and base or HEREDOC_BASE_TOKEN
-	if type(text) ~= "string" then return token end
-	while has_line_equal(text, token) do
-		token = token .. HEREDOC_TOKEN_PADDING
-	end
-	return token
+	return Heredoc.token(text, base or HEREDOC_BASE_TOKEN)
 end
 
 --- Appends a quoted heredoc carrying `input` to a composed command.
---- Quoted (`<<'TOKEN'`) so the shell performs NO expansion on the payload: it is
---- user data, and an unquoted heredoc would run `$( )` and backticks out of it.
---- Feeding data this way keeps it off the filesystem and out of the process
---- table, the two places a local account can read it from.
 --- @param cmd        string Fully composed command.
 --- @param input      string Payload for the command's standard input.
 --- @param token_base string|nil Starting terminator token.
 --- @return string The command with its heredoc attached.
 function M.with_stdin(cmd, input, token_base)
-	local payload = (type(input) == "string") and input or ""
-	local token   = M.heredoc_token(payload, token_base)
-	-- The terminator must sit on its own line, so the body is normalised to
-	-- exactly one trailing newline rather than however many it arrived with.
-	local body = (payload:gsub("\n+$", ""))
-	return cmd .. " <<'" .. token .. "'\n" .. body .. "\n" .. token .. "\n"
+	return Heredoc.with_stdin(cmd, input, token_base or HEREDOC_BASE_TOKEN)
 end
 
 --- Runs a command with `input` on its standard input and captures stdout.

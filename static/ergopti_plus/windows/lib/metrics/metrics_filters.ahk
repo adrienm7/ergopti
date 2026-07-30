@@ -48,6 +48,11 @@ class MetricsFilters {
     static secure_field      := true   ; Ignorer les champs mot de passe (UIA)
     static system_auth       := true
 
+    ; At-rest encryption of the typed-text columns. Off by default, matching the
+    ; shared manifest's metrics.encrypt — unlike the filters above, this one is a
+    ; deliberate opt-in, not a privacy default.
+    static encrypt           := false
+
     ; Per-app exclusion list. Keys are process names (e.g. "chrome.exe");
     ; presence of the key means « do not log this app ». Map for O(1)
     ; lookup on the hot path.

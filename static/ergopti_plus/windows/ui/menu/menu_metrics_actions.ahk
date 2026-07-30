@@ -39,6 +39,21 @@ ToggleFilterSystemAuth(*) {
 	ReloadPreservingSuspend()
 }
 
+; At-rest encryption of the typed-text columns. Refuses to enable when no key can
+; be derived on this machine — a box that reports encryption while nothing
+; encrypts is exactly the macOS defect this feature set out to fix.
+ToggleAtRestEncryption(*) {
+	want := !MetricsFilters.encrypt
+	if (want && !KL_Enc_IsAvailable()) {
+		LoggerError("Keylogger", "At-rest encryption requested but no key can be derived - staying off.")
+		return
+	}
+	MetricsFilters.encrypt := want
+	KL_Enc_SetEnabled(want)
+	MF_SaveToIni()
+	ReloadPreservingSuspend()
+}
+
 ; ── WPM toggle helpers — closures capture the menu reference and label strings
 ; from BuildMetricsMenu locals, so no global state is needed. ──────────────────
 

@@ -122,6 +122,165 @@ CryptoSha256(Data) {
     }
 }
 
+
+
+
+
+
+; =========================================
+; =========================================
+; ======= 2/ AES + PBKDF2 primitives ======
+; =========================================
+; =========================================
+
+; These back the keylogger's at-rest encryption. They live here, in the crypto
+; adapter, because the OS-purity ratchet requires every DllCall to sit inside
+; adapters/ — and CNG is exactly the kind of OS primitive an adapter exists to
+; wrap. The envelope format and the orchestration live in
+; modules/keylogger/keylogger_text_cipher.ahk, which calls these and holds no
+; DllCall of its own.
+
+; BCRYPT_ALG_HANDLE_HMAC_FLAG — the SHA-256 provider must be opened with this to
+; drive PBKDF2.
+global CRYPTO_BCRYPT_HMAC_FLAG := 0x8
+
+; BCRYPT_BLOCK_PADDING — PKCS7, matching `openssl enc -aes-256-cbc`.
+global CRYPTO_BCRYPT_BLOCK_PADDING := 0x1
+
+; Derives bytes with PBKDF2-HMAC-SHA256. With dkLen = 32 the output is exactly
+; the first block openssl derives, so the same password yields the same AES-256
+; key across the three drivers.
+; @param passPtr   Ptr    Password bytes (UTF-8, no NUL).
+; @param passLen   UInt   Password length in bytes.
+; @param saltPtr   Ptr    Salt bytes.
+; @param saltLen   UInt   Salt length in bytes.
+; @param iterations Integer Iteration count.
+; @param dkLen     UInt   Desired key length in bytes.
+; @return Buffer|"" The derived bytes, or "" on failure.
+CryptoPbkdf2Sha256(passPtr, passLen, saltPtr, saltLen, iterations, dkLen) {
+    hAlg := 0
+    try {
+        if (DllCall("bcrypt\BCryptOpenAlgorithmProvider", "Ptr*", &hAlg,
+            "Str", "SHA256", "Ptr", 0, "UInt", CRYPTO_BCRYPT_HMAC_FLAG, "UInt") != 0)
+            throw Error("BCryptOpenAlgorithmProvider(SHA256, HMAC) failed")
+        out := Buffer(dkLen, 0)
+        status := DllCall("bcrypt\BCryptDeriveKeyPBKDF2", "Ptr", hAlg,
+            "Ptr", passPtr, "UInt", passLen,
+            "Ptr", saltPtr, "UInt", saltLen,
+            "Int64", iterations,
+            "Ptr", out.Ptr, "UInt", dkLen, "UInt", 0)
+        if (status != 0)
+            throw Error("BCryptDeriveKeyPBKDF2 failed (" . status . ")")
+        return out
+    } catch as Err {
+        LoggerError("Crypto", "CryptoPbkdf2Sha256 failed: {1}", Err.Message)
+        return ""
+    } finally {
+        if (hAlg)
+            DllCall("bcrypt\BCryptCloseAlgorithmProvider", "Ptr", hAlg, "UInt", 0)
+    }
+}
+
+; Runs AES-256-CBC with PKCS7 padding.
+; @param keyBuf  Buffer 32 bytes.
+; @param ivBuf   Buffer 16 bytes (not modified: a private copy is used).
+; @param dataPtr Ptr    Input bytes.
+; @param dataLen UInt   Input length.
+; @param encrypt Bool   True to encrypt, false to decrypt.
+; @return Buffer|"" Output bytes with a .UsedSize field, or "" on failure.
+CryptoAesCbc(keyBuf, ivBuf, dataPtr, dataLen, encrypt) {
+    hAlg := 0, hKey := 0
+    try {
+        if (DllCall("bcrypt\BCryptOpenAlgorithmProvider", "Ptr*", &hAlg,
+            "Str", "AES", "Ptr", 0, "UInt", 0, "UInt") != 0)
+            throw Error("BCryptOpenAlgorithmProvider(AES) failed")
+
+        mode := "ChainingModeCBC"
+        modeBuf := Buffer((StrLen(mode) + 1) * 2, 0)
+        StrPut(mode, modeBuf, "UTF-16")
+        if (DllCall("bcrypt\BCryptSetProperty", "Ptr", hAlg, "Str", "ChainingMode",
+            "Ptr", modeBuf.Ptr, "UInt", modeBuf.Size, "UInt", 0, "UInt") != 0)
+            throw Error("BCryptSetProperty(CBC) failed")
+
+        objLen := 0, discarded := 0
+        DllCall("bcrypt\BCryptGetProperty", "Ptr", hAlg, "Str", "ObjectLength",
+            "UInt*", &objLen, "UInt", 4, "UInt*", &discarded, "UInt", 0)
+        keyObj := Buffer(objLen, 0)
+
+        if (DllCall("bcrypt\BCryptGenerateSymmetricKey", "Ptr", hAlg, "Ptr*", &hKey,
+            "Ptr", keyObj.Ptr, "UInt", objLen, "Ptr", keyBuf.Ptr, "UInt", keyBuf.Size,
+            "UInt", 0, "UInt") != 0)
+            throw Error("BCryptGenerateSymmetricKey failed")
+
+        fn := encrypt ? "BCryptEncrypt" : "BCryptDecrypt"
+
+        ; BCrypt updates the IV in place for chaining, so a fresh copy is passed —
+        ; and re-copied before the second call, since the sizing call touches it.
+        ivWork := Buffer(ivBuf.Size, 0)
+        DllCall("RtlMoveMemory", "Ptr", ivWork.Ptr, "Ptr", ivBuf.Ptr, "UPtr", ivBuf.Size)
+
+        outLen := 0
+        if (DllCall("bcrypt\" . fn, "Ptr", hKey, "Ptr", dataPtr, "UInt", dataLen,
+            "Ptr", 0, "Ptr", ivWork.Ptr, "UInt", ivBuf.Size,
+            "Ptr", 0, "UInt", 0, "UInt*", &outLen, "UInt", CRYPTO_BCRYPT_BLOCK_PADDING, "UInt") != 0)
+            throw Error(fn . " sizing failed")
+
+        out := Buffer(outLen, 0)
+        DllCall("RtlMoveMemory", "Ptr", ivWork.Ptr, "Ptr", ivBuf.Ptr, "UPtr", ivBuf.Size)
+        result := 0
+        if (DllCall("bcrypt\" . fn, "Ptr", hKey, "Ptr", dataPtr, "UInt", dataLen,
+            "Ptr", 0, "Ptr", ivWork.Ptr, "UInt", ivBuf.Size,
+            "Ptr", out.Ptr, "UInt", outLen, "UInt*", &result, "UInt", CRYPTO_BCRYPT_BLOCK_PADDING, "UInt") != 0)
+            throw Error(fn . " failed")
+
+        out.UsedSize := result
+        return out
+    } catch as Err {
+        LoggerError("Crypto", "CryptoAesCbc failed: {1}", Err.Message)
+        return ""
+    } finally {
+        if (hKey)
+            DllCall("bcrypt\BCryptDestroyKey", "Ptr", hKey, "UInt", 0)
+        if (hAlg)
+            DllCall("bcrypt\BCryptCloseAlgorithmProvider", "Ptr", hAlg, "UInt", 0)
+    }
+}
+
+; Base64-encodes a Buffer, single line (no CR/LF), matching openssl -base64 -A.
+; @param buf Buffer
+; @return String
+CryptoBase64Encode(buf) {
+    flags := 0x40000001   ; CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF
+    required := 0
+    DllCall("Crypt32\CryptBinaryToStringW", "Ptr", buf.Ptr, "UInt", buf.Size,
+        "UInt", flags, "Ptr", 0, "UInt*", &required)
+    if (required <= 0)
+        return ""
+    out := Buffer(required * 2, 0)
+    DllCall("Crypt32\CryptBinaryToStringW", "Ptr", buf.Ptr, "UInt", buf.Size,
+        "UInt", flags, "Ptr", out.Ptr, "UInt*", &required)
+    return StrGet(out.Ptr, required, "UTF-16")
+}
+
+; Base64-decodes to a Buffer.
+; @param b64 String
+; @return Buffer (size 0 on failure).
+CryptoBase64Decode(b64) {
+    flags := 0x1   ; CRYPT_STRING_BASE64
+    required := 0
+    DllCall("Crypt32\CryptStringToBinaryW", "WStr", b64, "UInt", StrLen(b64),
+        "UInt", flags, "Ptr", 0, "UInt*", &required, "Ptr", 0, "Ptr", 0)
+    if (required <= 0)
+        return Buffer(0, 0)
+    out := Buffer(required, 0)
+    ok := DllCall("Crypt32\CryptStringToBinaryW", "WStr", b64, "UInt", StrLen(b64),
+        "UInt", flags, "Ptr", out.Ptr, "UInt*", &required, "Ptr", 0, "Ptr", 0)
+    return ok ? out : Buffer(0, 0)
+}
+
+
+
+
 ; Port dispatch map (ADAPTER_CRYPTO) — the single-source-of-truth contract
 ; surface, verified against _shared/core/ports/contracts.json by
 ; tools/test/test-port-compliance.cjs.

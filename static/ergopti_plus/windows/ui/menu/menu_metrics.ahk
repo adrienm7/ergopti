@@ -53,6 +53,7 @@ BuildMetricsMenu() {
 		"widget_colors",      (M, C) => _MET_WpmWidgetColors(M, C, _MET_STATE_GETTERS),
 		"include_realtime",   (M, C) => _MET_WpmWidgetGraph(M, C, _MET_STATE_GETTERS),
 		"reset_wpm_position", (M, C) => _MET_WpmWidgetReset(M, C, _MET_STATE_GETTERS),
+		"encryption",         (M, C) => _MET_Encryption(M, C, _MET_STATE_GETTERS),
 	)
 
 	MetricsMenu := MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers)
@@ -127,6 +128,16 @@ _MET_FilterSysauth(M, _Cat, Getters) {
 	if MetricsFilters.system_auth
 		M.Check(Label)
 	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "filter_sysauth", Getters)
+		M.Disable(Label)
+}
+
+; Dynamic handler: At-rest encryption toggle.
+_MET_Encryption(M, _Cat, Getters) {
+	Label := t("menu.metrics.encrypt_toggle")
+	RegisterMenuItem(M, Label, ToggleAtRestEncryption)
+	if KL_Enc_IsEnabled()
+		M.Check(Label)
+	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "encryption", Getters)
 		M.Disable(Label)
 }
 

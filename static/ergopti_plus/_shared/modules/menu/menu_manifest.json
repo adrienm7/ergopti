@@ -446,9 +446,6 @@
 		{
 			"type": "dynamic",
 			"id": "encryption",
-			"platforms": [
-				"hs"
-			],
 			"disabled_when": [
 				"keylogger_enabled"
 			]

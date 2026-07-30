@@ -380,9 +380,14 @@ global _ConfigDir := A_Temp . "\ergopti_test_config\"
 ; builders (F19/F21: llm_*/av/network/clipboard/roi event types must not
 ; silently fall through KL_BuildInserts's switch).
 #Include ../modules/keylogger/keylogger_json.ahk
+; keylogger_text_cipher.ahk (KL_Enc_* at-rest encryption) is pure definitions
+; with no top-level hotkeys, and keylogger_sql.ahk now calls it, so it must load
+; before the SQL builders.
+#Include ../modules/keylogger/keylogger_text_cipher.ahk
 #Include ../modules/keylogger/keylogger_sql.ahk
 #Include unit/test_keylogger_walker.ahk
 #Include unit/test_keylogger_sql.ahk
+#Include unit/test_keylogger_text_cipher.ahk
 #Include unit/test_build_inserts_covers_emitted_types.ahk
 #Include unit/test_metrics_and_locale_honesty.ahk
 #Include unit/test_keylogger_app_categories.ahk
