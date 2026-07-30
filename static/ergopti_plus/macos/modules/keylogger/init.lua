@@ -341,6 +341,12 @@ local function ensure_browser_window_filter()
 end
 -- Sleep/wake/lock watcher handle; its callback lives in the watchers module
 local _caffeinate_watcher   = nil
+-- Active keyboard layout, cached. hs.keycodes.currentLayout() is a Carbon/TIS
+-- query and the per-word context snapshot called it on every new buffer. The
+-- layout only changes when the OS says so, so it is read once and refreshed from
+-- the notification below.
+local _cached_layout        = nil
+local _layout_listener      = nil
 
 -- Cached module references to avoid pcall(require, ...) on every keystroke
 local _keymap_mod = nil
@@ -661,11 +667,16 @@ local function handle_key(event_obj)
 		-- Capture context on the first keystroke of a new buffer
 		if #CoreState.buffer_events == 0 then
 			CoreState.current_session_pause = math.floor(now - CoreState.last_flush_time)
-			local front_app = hs.application.frontmostApplication()
-			CoreState.session_app_name = front_app and front_app:title() or "Unknown"
-			local main_win = front_app and front_app:mainWindow()
-			CoreState.session_win_title = main_win and main_win:title() or "Unknown"
-			CoreState.session_layout    = hs.keycodes.currentLayout()
+			-- Read from state the context tracker already maintains, not queried here.
+			-- frontmostApplication():title() and mainWindow():title() are cross-process
+			-- accessibility calls, and this block runs on the FIRST KEYSTROKE OF EVERY
+			-- WORD inside the eventtap callback — the one callback whose overrun makes
+			-- macOS disable the tap. The tracker's app watcher sets active_app_name on
+			-- every activation and its window handler publishes active_win_title on
+			-- every window change, so both are already current.
+			CoreState.session_app_name  = CoreState.active_app_name  or "Unknown"
+			CoreState.session_win_title = CoreState.active_win_title or "Unknown"
+			CoreState.session_layout    = _cached_layout or "Unknown"
 			CoreState.session_field_role = "Unknown"
 			CoreState.session_url        = nil
 		end
@@ -1438,6 +1449,26 @@ function M.start(script_control)
 	end
 	Logger.start(LOG, "Starting keylogger engine…")
 	_script_control = script_control
+
+	-- Seed the layout cache and keep it current from the OS notification. The
+	-- per-word context snapshot used to call hs.keycodes.currentLayout() itself,
+	-- inside the eventtap callback; the layout only changes when the system says so,
+	-- so one read plus a listener replaces one read per word.
+	local ok_layout, layout = pcall(hs.keycodes.currentLayout)
+	_cached_layout = (ok_layout and type(layout) == "string") and layout or "Unknown"
+	if type(hs.keycodes.inputSourceChanged) == "function" then
+		_layout_listener = true
+		pcall(hs.keycodes.inputSourceChanged, function()
+			local ok_new, new_layout = pcall(hs.keycodes.currentLayout)
+			if ok_new and type(new_layout) == "string" then
+				_cached_layout = new_layout
+				Logger.debug(LOG, "Layout cache refreshed: %s.", new_layout)
+			end
+		end)
+	else
+		Logger.warn(LOG, "hs.keycodes.inputSourceChanged unavailable — the logged layout "
+			.. "will stay at '%s' for this session.", tostring(_cached_layout))
+	end
 
 	-- Cache the keymap module reference once to avoid pcall(require, ...) per keystroke
 	local ok_km, km = pcall(require, "modules.keymap")
