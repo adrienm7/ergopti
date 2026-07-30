@@ -303,8 +303,20 @@ echo "  ✔  lanceur : ${BIN_DIR}/ergopti-hotstrings"
 # ============================================================
 
 KANATA_CONFIG_DIR="${HOME}/.config/kanata"
-# Kanata layout lives in the shared kanata/ folder one level above this driver.
-KANATA_SRC="${SCRIPT_DIR}/../kanata/kanata.kbd"
+# The layout ships in two shapes: flattened beside install.sh in the built
+# package, and inside the driver tree in a source checkout. Probe both rather
+# than assume one — the previous single path was correct only in a checkout.
+KANATA_SRC=""
+for _kanata_candidate in \
+	"${SCRIPT_DIR}/kanata.kbd" \
+	"${SCRIPT_DIR}/modules/kanata/data/kanata.kbd" \
+	"${SCRIPT_DIR}/linux/modules/kanata/data/kanata.kbd"
+do
+	if [ -f "${_kanata_candidate}" ]; then
+		KANATA_SRC="${_kanata_candidate}"
+		break
+	fi
+done
 
 echo ""
 echo "=== Configuration de kanata ==="
