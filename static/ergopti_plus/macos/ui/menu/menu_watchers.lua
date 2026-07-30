@@ -49,7 +49,7 @@ local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * 0.5s = 60s of a quiet-but-stuck 
 --- @param get_suppress_until function Returns the epoch timestamp until which events are suppressed.
 --- @param ui_restore table lib.ui_restore module (provides defer_reload).
 --- @return userdata|nil The hs.pathwatcher object, or nil on failure.
-function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_restore)
+function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_restore, ignored_dirs)
 	-- Single debounce/poll timer shared across all pathwatcher callbacks; cancelled
 	-- and restarted on every new event so that a burst of changes produces only
 	-- one reload fired once the burst settles.
@@ -107,6 +107,19 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 		ui_restore.defer_reload(on_reload)
 	end
 
+	--- True when a changed path lies inside a directory the driver writes itself.
+	--- @param file string Absolute path reported by the pathwatcher.
+	--- @return boolean
+	local function is_ignored(file)
+		if type(ignored_dirs) ~= "table" then return false end
+		for _, dir in ipairs(ignored_dirs) do
+			if type(dir) == "string" and dir ~= "" and file:sub(1, #dir) == dir then
+				return true
+			end
+		end
+		return false
+	end
+
 	local function reload_config(files)
 		-- HTML/CSS/JS are webview assets loaded at open-time — changing them
 		-- never requires hs.reload(); only .lua and .toml affect runtime behavior
@@ -120,7 +133,16 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 				-- paths.toml is auto-generated at each boot — treating it as a source
 				-- change would cause an infinite reload loop (HS writes it, the
 				-- watcher fires, the reload rewrites it, and so on).
-				and not file:match("paths%.toml$") then
+				and not file:match("paths%.toml$")
+				-- Directories the DRIVER ITSELF writes into. This watcher is the second
+				-- recursive one on this tree; lib/file_watchers arms the other and is
+				-- given the same list, but only that one used it. The TOML snapshot
+				-- cache writes files named "<base>_<hash>.lua" — the exact extension
+				-- treated as a source change here — so under the symlink/copy layout a
+				-- snapshot write reloaded the driver, the reload re-parsed and rewrote
+				-- snapshots, and the cycle repeated. That is the same loop the
+				-- paths.toml exclusion above was added for.
+				and not is_ignored(file) then
 				if not burst_paths[file] then
 					burst_paths[file] = true
 					burst_count = burst_count + 1
