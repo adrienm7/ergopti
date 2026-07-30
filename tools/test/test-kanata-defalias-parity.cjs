@@ -203,6 +203,160 @@ for (const alias of Object.keys(goldenDefalias)) {
 	}
 }
 
+// ================================================
+// ======= 3/ Alias resolution: nothing may dangle
+// ================================================
+//
+// kanata resolves every @name at load time, so ONE dangling reference makes the
+// WHOLE configuration unloadable — not just the key that references it. That is
+// what shipped: the generator emits 7 aliases, the block it replaces defined 12,
+// and the generated `lsft`/`lctl` directives themselves reference @copy/@paste
+// while the layers reference @rollx/@deadtrema. Sections 1 and 2 above compared
+// only timeout numbers, so none of them could see it.
+
+/** Strips `;;` comments. A LONE `;` is a legitimate alias name in this layout. */
+function stripKanataComments(src) {
+	return src.replace(/;;[^\n]*/g, '');
+}
+
+/** Skips whitespace from `i`, returning the next significant index. */
+function skipSpace(src, i) {
+	while (i < src.length && /\s/.test(src[i])) i++;
+	return i;
+}
+
+/** Returns the index just past the parenthesised group starting at `i`. */
+function skipGroup(src, i) {
+	let depth = 0;
+	for (; i < src.length; i++) {
+		if (src[i] === '(') depth++;
+		else if (src[i] === ')') {
+			depth--;
+			if (depth === 0) return i + 1;
+		}
+	}
+	return src.length;
+}
+
+/** Reads one atom (a run of characters that is neither space nor parenthesis). */
+function readAtom(src, i) {
+	const start = i;
+	while (i < src.length && !/[\s()]/.test(src[i])) i++;
+	return [src.slice(start, i), i];
+}
+
+/**
+ * Collects the alias names defined by every `(defalias …)` block, in file order.
+ * Entries alternate NAME then VALUE, where a VALUE is either an atom or a
+ * parenthesised group.
+ */
+function definedAliases(src) {
+	const clean = stripKanataComments(src);
+	const names = [];
+	const blockRe = /\(defalias\b/g;
+	let m;
+	while ((m = blockRe.exec(clean)) !== null) {
+		const blockEnd = skipGroup(clean, m.index);
+		let i = m.index + '(defalias'.length;
+		while (i < blockEnd - 1) {
+			i = skipSpace(clean, i);
+			if (i >= blockEnd - 1) break;
+			// A name is always an atom; a stray '(' here means malformed input.
+			if (clean[i] === '(') { i = skipGroup(clean, i); continue; }
+			const [name, afterName] = readAtom(clean, i);
+			i = skipSpace(clean, afterName);
+			i = clean[i] === '(' ? skipGroup(clean, i) : readAtom(clean, i)[1];
+			if (name) names.push(name);
+		}
+		blockRe.lastIndex = blockEnd;
+	}
+	return names;
+}
+
+/** Collects every `@name` reference in the source. */
+function referencedAliases(src) {
+	const clean = stripKanataComments(src);
+	const refs = new Set();
+	const re = /@([^\s()]+)/g;
+	let m;
+	while ((m = re.exec(clean)) !== null) refs.add(m[1]);
+	return refs;
+}
+
+/** Reports every reference with no definition. */
+function danglingAliases(src) {
+	const defined = new Set(definedAliases(src));
+	return [...referencedAliases(src)].filter((r) => !defined.has(r)).sort();
+}
+
+/**
+ * Reproduces modules/kanata/manager.lua's merge: the LAST `(defalias)` block of
+ * the template is replaced wholesale by the generated one. The golden corpus is
+ * pinned byte-for-byte to the generator's output by the Lua suite
+ * (linux/tests/unit/meta/test_kanata_generator.lua), so substituting it here
+ * exercises the artifact the daemon actually writes to disk.
+ */
+function mergedConfig(templateSrc, generatedBlock) {
+	let lastStart = -1;
+	const re = /\n\(defalias\b/g;
+	let m;
+	while ((m = re.exec(templateSrc)) !== null) lastStart = m.index + 1;
+	if (lastStart === -1) return null;
+	const end = skipGroup(templateSrc, lastStart);
+	return templateSrc.slice(0, lastStart) + generatedBlock.trim() + templateSrc.slice(end);
+}
+
+console.log('');
+console.log('Alias resolution (every @reference must be defined)');
+console.log('='.repeat(60));
+
+const committedDangling = danglingAliases(kanataTxt);
+if (committedDangling.length === 0) {
+	console.log(`  ${PASS}  kanata.kbd: every @alias resolves (${definedAliases(kanataTxt).length} defined)`);
+	pass++;
+} else {
+	console.log(`  ${FAIL}  kanata.kbd: dangling @alias — ${committedDangling.map((a) => '@' + a).join(', ')}`);
+	fail++;
+}
+
+const merged = mergedConfig(kanataTxt, goldenTxt);
+if (merged === null) {
+	console.log(`  ${FAIL}  kanata.kbd has no (defalias) block for the generator to replace`);
+	fail++;
+} else {
+	const mergedDangling = danglingAliases(merged);
+	if (mergedDangling.length === 0) {
+		console.log(`  ${PASS}  generated config: every @alias resolves after the defalias block is replaced`);
+		pass++;
+	} else {
+		console.log(
+			`  ${FAIL}  generated config is UNLOADABLE — dangling @alias after replacement: ` +
+				mergedDangling.map((a) => '@' + a).join(', ')
+		);
+		console.log(
+			'        The generator replaces the LAST (defalias) block wholesale. Anything it ' +
+				'does not emit must live in an EARLIER block, or it disappears from the config kanata loads.'
+		);
+		fail++;
+	}
+}
+
+// The composites the generator cannot produce must survive the replacement.
+// Naming them explicitly means moving one back into the generated block fails
+// here with a message that says why, rather than as an opaque parse error.
+const SURVIVES_REPLACEMENT = ['rollc', 'rollx', 'deadtrema', 'copy', 'paste'];
+if (merged !== null) {
+	const mergedDefined = new Set(definedAliases(merged));
+	const lost = SURVIVES_REPLACEMENT.filter((a) => !mergedDefined.has(a));
+	if (lost.length === 0) {
+		console.log(`  ${PASS}  hand-maintained composites survive the replacement (${SURVIVES_REPLACEMENT.join(', ')})`);
+		pass++;
+	} else {
+		console.log(`  ${FAIL}  composites lost to the replacement: ${lost.join(', ')} — move them to an earlier (defalias) block`);
+		fail++;
+	}
+}
+
 console.log('');
 console.log(`Total: ${pass + fail} check(s) - ${pass} passed, ${fail} failed`);
 console.log('');
