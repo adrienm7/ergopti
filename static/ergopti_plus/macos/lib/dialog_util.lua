@@ -21,7 +21,12 @@
 
 local hs = hs
 
-local Logger = require("lib.logger")
+local Logger         = require("lib.logger")
+local ShellRunner    = require("adapters.shell_runner")
+local TimerScheduler = require("adapters.timer_scheduler")
+
+-- Absolute path: this process does not inherit the login shell's PATH.
+local OPEN_BIN = "/usr/bin/open"
 local LOG    = "dialog_util"
 
 local M = {}
@@ -64,9 +69,19 @@ local function focus_hammerspoon()
 	pcall(function()
 		local bundlePath = hs.processInfo.bundlePath
 		if bundlePath then
-			local safe_path = bundlePath:gsub("'", "'\\''")
-			hs.timer.doAfter(0.1, function()
-				pcall(hs.execute, "open '" .. safe_path .. "'")
+			-- Asynchronous, and argv rather than a shell string. `open` waits on
+			-- Launch Services, so the blocking form parked the single runloop for that
+			-- whole window immediately before putting up a modal dialog — the one
+			-- moment the driver can least afford to stop servicing the keyboard tap.
+			-- The argv form also retires the hand-rolled single-quote escaping, which
+			-- duplicated text_utils.shell_quote and covered only the quote.
+			--
+			-- The GC pitfall the old comment worried about is handled by the spawner:
+			-- it pins the task in its own long-lived table before starting it and
+			-- releases it in the completion callback.
+			TimerScheduler.after(0.1, function()
+				local handle = ShellRunner.spawn(OPEN_BIN, { bundlePath })
+				if handle then handle.start() end
 			end)
 		end
 	end)
