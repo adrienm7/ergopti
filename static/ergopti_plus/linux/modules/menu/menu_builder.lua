@@ -189,6 +189,28 @@ local function _privacy_toggle(k, key, label, setter)
 	}
 end
 
+--- Reports the at-rest migration and offers to stop it.
+--- Converting a year of stored rows takes minutes, and without this entry the
+--- user ticks "Chiffrer les données au repos" and sees nothing happen at all.
+--- @param k table The keylogger module.
+--- @return table One menu entry.
+local function _migration_status(k)
+	if type(k.get_migration_progress) ~= "function" then
+		return { title = "Migration du chiffrement (indisponible)", fn = function() end, disabled = true }
+	end
+	local progress = k.get_migration_progress()
+	if not progress.running then
+		return { title = "Migration du chiffrement : inactive", fn = function() end, disabled = true }
+	end
+	return {
+		title = string.format("Migration : %d/%d ligne(s) — cliquer pour arrêter",
+			progress.scanned, progress.total),
+		fn = function()
+			if type(k.cancel_migration) == "function" then k.cancel_migration() end
+		end,
+	}
+end
+
 local function _build_metrics(ctx)
 	local k = ctx.keylogger
 	if type(k) ~= "table" then
@@ -237,6 +259,7 @@ local function _build_metrics(ctx)
 			"Ignorer les invites d'authentification", k.set_system_auth_filter_enabled),
 		_privacy_toggle(k, "encrypt",
 			"Chiffrer les données au repos", k.set_encrypt_enabled),
+		_migration_status(k),
 		{ title = "-" },
 		{
 			title = "Suspendre " .. (type(k.is_suppressed) == "function" and k.is_suppressed() and "✓" or ""),

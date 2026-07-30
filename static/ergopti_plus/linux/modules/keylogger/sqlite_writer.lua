@@ -547,6 +547,53 @@ function M.upsert_scancodes(device_id, date, app, scancodes)
 		.. " ON CONFLICT(device_id, date, app, scancode) DO UPDATE SET c = c + excluded.c;")
 end
 
+--- Runs an arbitrary SQL script through the same stdin path as every write.
+--- Exposed for the at-rest migration, which rewrites rows this module wrote and
+--- must not open a second, less careful route to the database: the script it
+--- builds embeds the characters the user typed, so it may never touch /tmp.
+--- @param sql string Complete SQL script.
+--- @return boolean True on success.
+function M.exec_sql(sql)
+	if not M.is_available() then return false end
+	if type(sql) ~= "string" or sql == "" then return false end
+	return _exec(sql)
+end
+
+--- Runs a SELECT and returns its output lines.
+--- @param sql string Complete SELECT statement.
+--- @return table|nil One entry per output line, or nil when no database is open.
+function M.query_rows(sql)
+	if not M.is_available() then return nil end
+	if type(sql) ~= "string" or sql == "" then return nil end
+	local cmd = SqliteCommand.build(_db_path, sql, { flags = { "-noheader" } })
+	if not cmd then return nil end
+	local pipe = io.popen(cmd, "r")
+	if not pipe then return nil end
+	local lines = {}
+	for line in pipe:lines() do lines[#lines + 1] = line end
+	pipe:close()
+	return lines
+end
+
+--- Reads one meta key. Used by the migration to resume where it stopped rather
+--- than re-reading every row of a year-long history at each daemon start.
+--- @param key string
+--- @return string|nil The stored value, or nil when absent.
+function M.get_meta(key)
+	if not M.is_available() or type(key) ~= "string" or key == "" then return nil end
+	return _query_scalar(string.format("SELECT value FROM meta WHERE key = '%s';", _sql_escape(key)))
+end
+
+--- Writes one meta key.
+--- @param key   string
+--- @param value string
+--- @return boolean True on success.
+function M.set_meta(key, value)
+	if not M.is_available() or type(key) ~= "string" or key == "" then return false end
+	return _exec(string.format("INSERT OR REPLACE INTO meta (key, value) VALUES ('%s', '%s');",
+		_sql_escape(key), _sql_escape(tostring(value))))
+end
+
 --- Bumps the meta.rev counter so the view cache knows new data is available.
 function M.bump_rev()
 	if not M.is_available() then return end
