@@ -113,8 +113,23 @@ function M.install(ctx)
 			Logger.debug(LOG, "Existing MLX task found — running=%s, server_target='%s', target_model='%s'.",
 				tostring(running), tostring(obj._server_target), tostring(target_model))
 			if running and obj._server_target == target_model then
-				Logger.info(LOG, "MLX server already running for model '%s' — reusing, calling on_success.", tostring(target_model))
-				if on_success then pcall(on_success) end
+				-- isRunning() means the PROCESS is alive, not that the model is loaded.
+				-- Resolving on it fired the second caller's on_success while the first
+				-- caller's readiness probe was still running, so a duplicate request was
+				-- told the server was ready 60-90 s before it was.
+				if obj._server_ready then
+					Logger.info(LOG, "MLX server already ready for '%s' — reusing.",
+						tostring(target_model))
+					if on_success then pcall(on_success) end
+				elseif on_success then
+					-- Join the startup already in flight. The waiter is drained by
+					-- mark_server_ready below, so nobody is told "ready" early and nobody
+					-- has their callback dropped either.
+					obj._server_waiters = obj._server_waiters or {}
+					table.insert(obj._server_waiters, on_success)
+					Logger.info(LOG, "MLX server for '%s' still starting — joined as waiter #%d.",
+						tostring(target_model), #obj._server_waiters)
+				end
 				return
 			end
 			if running then
@@ -143,6 +158,11 @@ function M.install(ctx)
 				Logger.info(LOG, "Adopting MLX server from a previous session (already serving '%s' on :%d) — skipping cold restart.",
 					tostring(target_model), MLX_PORT)
 				obj._server_target = target_model
+				-- Adopted from a previous session with the weights already resident, so
+				-- this one really is ready — a later duplicate request must resolve
+				-- immediately rather than queue behind a startup that will never run.
+				obj._server_ready = true
+				obj._server_waiters = {}
 				if type(ApiMlx) == "table" and type(ApiMlx.reset_endpoints) == "function" then
 					ApiMlx.reset_endpoints()
 				end
@@ -212,11 +232,23 @@ function M.install(ctx)
 				tostring(target_model), unified_log_file)
 			local startup_confirmed = false
 			local startup_closed = false
+			-- A fresh server is not ready, and any waiter queued against the PREVIOUS
+			-- one must not be resolved by this launch's probe: they asked about a
+			-- process that has since been terminated.
+			obj._server_ready = false
+			obj._server_waiters = {}
 
 			local function mark_server_ready()
 				if startup_confirmed or startup_closed then return end
 				startup_confirmed = true
+				-- Promoted to obj state: a start_server call arriving after this point
+				-- must be able to see that the server is ready, and one arriving BEFORE
+				-- it must be able to queue. A per-invocation local could do neither.
+				obj._server_ready = true
 				if on_success then pcall(on_success) on_success = nil end
+				local waiters = obj._server_waiters or {}
+				obj._server_waiters = {}
+				for _, cb in ipairs(waiters) do pcall(cb) end
 			end
 
 			local function probe_server_ready(retries)
