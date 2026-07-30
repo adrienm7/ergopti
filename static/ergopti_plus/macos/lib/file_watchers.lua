@@ -282,60 +282,39 @@ function M.start(ctx)
 	dir_watcher:start()
 	table.insert(_G.script_watchers, dir_watcher)
 
-	-- ``visited`` is a set of canonical (lowercased, trailing-slash-stripped)
-	-- absolute directory paths already entered; combined with the depth cap
-	-- below it guarantees the walk terminates even on a self-referential
-	-- symlink cycle in the user's folder (F-LOW-4 — same guard as
-	-- lib/personal_hotstrings.lua's scan_recursive).
-	local visited = {}
-	local function watch_personal_hotstrings_dir(dir, depth)
-		depth = depth or 1
-		if depth > SCAN_MAX_DEPTH then
-			Logger.warn(LOG, "Personal hotstrings watcher scan hit max depth %d at '%s' — not descending further (directory cycle?).",
-				SCAN_MAX_DEPTH, dir)
-			return
-		end
-
-		local ok_attr, attr = pcall(hs.fs.attributes, dir)
-		if not (ok_attr and type(attr) == "table" and attr.mode == "directory") then return end
-
-		local canonical = dir:gsub("[/\\]+$", ""):lower()
-		if visited[canonical] then
-			Logger.warn(LOG, "Personal hotstrings watcher scan revisited '%s' — skipping to break a directory cycle.", dir)
-			return
-		end
-		visited[canonical] = true
-
-		local w = hs.pathwatcher.new(dir, function(paths)
+	-- ONE recursive watcher on the personal root, filtered exactly like the
+	-- directory watcher above.
+	--
+	-- This replaced a recursive walk that armed an hs.pathwatcher per DIRECTORY
+	-- and another per .toml FILE, so the number of FSEvents streams grew with the
+	-- size of the user's corpus - and every one of them was created synchronously
+	-- after the typing eventtap was already armed. All of it was redundant:
+	-- hs.pathwatcher is recursive and already reports the individual changed
+	-- paths, so the root watcher sees every event its descendants did. The walk's
+	-- depth cap and `visited` cycle guard existed only to survive a symlink loop
+	-- that no longer has to be walked at all.
+	local personal_root = (personal_dir):gsub("[/\\]+$", "")
+	local ok_personal, personal_watcher =
+		pcall(hs.pathwatcher.new, personal_root, function(paths)
 			local hit = {}
 			for _, p in ipairs(paths) do
-				if not p:match("^/tmp/") then hit[#hit + 1] = p end
+				-- /tmp is excluded for the same reason the old per-directory callback
+				-- excluded it. The self-written and runtime-artefact filters are the
+				-- ones the sibling watcher already applies; the per-file watchers had
+				-- neither, so a write the driver made itself could trigger a reload.
+				if not p:match("^/tmp/")
+					and not is_self_written(p) and not is_runtime_artefact(p) then
+					hit[#hit + 1] = p
+				end
 			end
 			if #hit > 0 then note_change(i18n.get("init.reload_hotstrings"), hit) end
 		end)
-		w:start()
-		table.insert(_G.script_watchers, w)
-
-		for _, fname in ipairs(fs_dir.entries(dir)) do
-			if fname ~= "." and fname ~= ".." then
-				local path = dir .. "/" .. fname
-				local ok_a, a = pcall(hs.fs.attributes, path)
-				if ok_a and type(a) == "table" then
-					if a.mode == "directory" then
-						watch_personal_hotstrings_dir(path, depth + 1)
-					elseif a.mode == "file" and fname:match("%.toml$") then
-						local fw = hs.pathwatcher.new(path, function(paths)
-							note_change(i18n.get("init.reload_hotstrings"), paths)
-						end)
-						fw:start()
-						table.insert(_G.script_watchers, fw)
-					end
-				end
-			end
-		end
+	if ok_personal and personal_watcher then
+		personal_watcher:start()
+		table.insert(_G.script_watchers, personal_watcher)
+	else
+		Logger.warn(LOG, "Could not watch the personal hotstrings root '%s'.", personal_root)
 	end
-
-	watch_personal_hotstrings_dir((personal_dir):gsub("[/\\]+$", ""))
 
 	-- HTML/CSS/JS are webview assets loaded at open-time — only .lua changes
 	-- drive Hammerspoon runtime behavior and warrant a reload
@@ -360,21 +339,11 @@ function M.start(ctx)
 
 
 
-	-- ==================================
-	-- ===== 1.2) Per-File Watchers =====
-	-- ==================================
-
-	-- Safety net for in-place edits that directory watchers may miss
-	for _, fname in ipairs(fs_dir.entries(hotstrings_dir)) do
-		if (fname:match("%.toml$") or fname:match("_index%.json$"))
-			and not is_self_written(hotstrings_dir .. fname) then
-			local w = hs.pathwatcher.new(hotstrings_dir .. fname, function(paths)
-				note_change(i18n.get("init.reload_hotstrings"), paths)
-			end)
-			w:start()
-			table.insert(_G.script_watchers, w)
-		end
-	end
+	-- The per-file watchers that used to live here were described as "a safety net
+	-- for in-place edits that directory watchers may miss". They were not: the
+	-- directory watcher above is recursive and reports the individual changed
+	-- paths, so it already saw every in-place edit these duplicated - while ALSO
+	-- applying the is_runtime_artefact filter they lacked.
 end
 
 return M
