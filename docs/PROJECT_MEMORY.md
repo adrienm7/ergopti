@@ -107,6 +107,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-site-i18n-gettext-french-key](#project-site-i18n-gettext-french-key) — The ergopti-plus page translates with t('French source'): the French text IS the key, so edited copy falls back to the new French instead of showing a stale translation; adding a language is one dictionary file + one list entry
 - [project-svelte-script-comment-closing-tag](#project-svelte-script-comment-closing-tag) — A literal closing script tag ANYWHERE inside a Svelte component script — even in a // comment — terminates the block and breaks the parse; assemble such strings from split halves
 - [project-hs-audit-2026-07-29](#project-hs-audit-2026-07-29) — Every cross-cutting hygiene ratchet in this repo was written for the Windows driver and never extended to macOS; that one gap shipped a red CI job, sixteen mojibake sequences and nineteen unparseable locales
+- [project-hs-audit-2026-07-30-implementation](#project-hs-audit-2026-07-30-implementation) — Ce qui casse quand on implemente les findings : un garde qui cherche le helper « quelque part dans l'appel » est un faux vert, et `doAfter(0, …)` deplace le gel sans le supprimer
 
 ## Working conventions & feedback
 
@@ -2437,3 +2438,55 @@ exactement celle ou personne ne regarde.
 
 Related: [[project_hs_audit_round4_2026_07_21]], [[project_ahk_invariant_incomplete_application]],
 [[project_audit_findings_are_hypotheses]], [[feedback_regression_tests]].
+
+
+### project-hs-audit-2026-07-30-implementation
+
+**Type:** project — **Sujet:** les pieges rencontres en IMPLEMENTANT les findings de l'audit
+Hammerspoon, distincts de ceux rencontres en le menant.
+
+- **`hs.timer.doAfter(0, …)` protege l'echeance du tap, pas la boucle.** Huit sites du calque
+  d'actions interactives differaient leur `hs.execute` avec ce motif et leurs commentaires
+  affirmaient que le probleme etait regle. Le corps du timer tourne sur la MEME boucle unique :
+  le gel est deplace d'un tick, pas supprime. Seul un sous-processus asynchrone l'elimine. Tout
+  garde ecrit pour cette classe doit donc refuser la deferral comme preuve.
+- **Un garde qui cherche le helper « quelque part dans l'appel » est un faux vert.**
+  `menu_paths` echappait son chemin et interpolait son prompt BRUT, dans un seul
+  `string.format`. Ma premiere version du garde cherchait `applescript_escape` dans le texte de
+  l'appel : elle est restee VERTE quand j'ai retabli le prompt brut. Aucune verification de
+  FORME ne voit un argument manquant dans une liste d'arguments. La correction est structurelle —
+  `applescript_format` echappe chaque argument chaine par construction, et le garde demande
+  desormais QUEL formateur a ete utilise (un seul token, au point d'appel).
+- **Enoncer l'invariant, jamais l'appel.** La regle « doit appeler le helper » aurait signale
+  trois lignes CORRECTES du driver qui echappent un guillemet en ligne pour JavaScript — elles
+  sont justes precisement parce qu'elles doublent l'antislash d'abord. La regle publiee est donc
+  l'ORDRE (antislash avant guillemet), avec un controle positif qui inclut le cas « passe
+  antislash placee APRES » — pire qu'absente, puisqu'elle redouble les antislashs que la passe
+  guillemet vient d'introduire.
+- **Ne pas balayer `^adapters%.` dans `load_with_stubs`.** Les adaptateurs capturent tous
+  `local hs = hs` au require, donc un balayage global semble etre la bonne correction de classe.
+  Il casse 18 tests : plusieurs installent leurs propres doubles d'adaptateur dans
+  `package.loaded` AVANT d'appeler `load_with_stubs`, et le balayage les efface. Vider
+  l'adaptateur precis dans la fabrique du test qui en a besoin.
+- **`test_shell_runner_on_done_visible` interdit `pcall(on_done,` dans tout le fichier.** Toute
+  nouvelle fonction de `shell_runner` qui invoque un callback fourni par l'appelant doit passer
+  par `xpcall` + `Logger.error`. Ce test a attrape ma premiere version le jour meme.
+- **Un test qui epingle le MECANISME bloque une meilleure correction.** Trois cas de capture
+  d'ecran exigeaient un `doAfter` de delai 0 et grepaient la chaine de commande shell. Leur
+  invariant — le travail ne doit pas tourner en ligne sur le thread du tap — est satisfait plus
+  fortement par un sous-processus. Ré-encoder a son nouveau lieu, en plus fort : chemin absolu du
+  binaire, `start()` reellement appele, ORDRE mkdir/capture (que le bloc dos-a-dos precedent ne
+  pouvait pas exprimer), et un id de fenetre nil ne lancant RIEN plutot que deux sous-chaines
+  dans le bon ordre dans le fichier.
+- **Un stub muet rend une absence vacueuse.** Le premier cas du test de propriete KE passait
+  parce que le `sysctl -n kern.boottime` stubbe renvoyait une sortie vide : `get_boot_timestamp`
+  valait nil et les DEUX ecritures de marqueur etaient silencieusement supprimees. L'assertion
+  aurait tenu face a un driver qui revendique la propriete bruyamment. C'est le cas apparie —
+  « et il enregistre toujours que le remappage est applique » — qui l'a revele.
+- **Ecrire du Lua riche en antislashs via un heredoc bash le corrompt.** Une paire
+  d'antislashs est reduite a un seul, et la sequence antislash-n devient un vrai saut de
+  ligne qui casse le parse. Utiliser les outils d'edition, ou construire avec
+  `chr(92)`. Ce piege s'est represente trois fois dans cette session.
+
+Related: [[project_hs_audit_2026_07_29]], [[project_audit_findings_are_hypotheses]],
+[[project_ahk_invariant_incomplete_application]], [[feedback_regression_tests]].
