@@ -42,6 +42,12 @@ local _SHARED_SCALAR_KEYS = {
 	"llm_streaming", "llm_streaming_multi", "llm_instant_on_word_end",
 	"llm_after_hotstring", "llm_reset_on_nav", "llm_auto_raise_temp",
 	"llm_ollama_port",
+	-- Privacy gates for the prediction path. These were absent from this list AND
+	-- hardcoded to true in prediction_engine.lua, so the shared value was
+	-- unreachable and the two drivers shipped opposite defaults for the same
+	-- setting. The canonical posture now lives in defaults.json: password/secure
+	-- fields blocked, URL bars allowed.
+	"llm_disable_password_fields", "llm_disable_url_bars",
 }
 
 --- HS-only defaults: keys intentionally NOT in the cross-platform defaults.json

@@ -48,7 +48,7 @@ global _LLM_Engine := Map(
 	"after_hotstring",            true,
 	"reset_on_nav",               true,
 	"disable_url_bars",           false,
-	"disable_password_fields",    false,
+	"disable_password_fields",    true,
 	"disabled_apps",              [],
 	"show_info_bar",              true,
 	"streaming",                  true,

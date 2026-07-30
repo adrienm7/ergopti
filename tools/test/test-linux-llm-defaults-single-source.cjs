@@ -54,7 +54,20 @@ const bridgeChecks = [
 	['OLLAMA_DEFAULT_PORT', DEFAULTS.llm_ollama_port, 'defaults.json llm_ollama_port'],
 	['DEFAULT_TEMPERATURE', DEFAULTS.llm_temperature, 'defaults.json llm_temperature'],
 	['DEFAULT_KEEP_ALIVE', `"${DEFAULTS.llm_ollama_keep_alive}"`, 'defaults.json llm_ollama_keep_alive'],
-	['DEFAULT_CONTEXT_LENGTH', DEFAULTS.llm_context_length, 'defaults.json llm_context_length']
+	['DEFAULT_CONTEXT_LENGTH', DEFAULTS.llm_context_length, 'defaults.json llm_context_length'],
+	// Privacy posture. Pinned here because the same two keys previously shipped
+	// with opposite values on Windows and macOS: macOS hardcoded true while the
+	// shared JSON said false and Windows read the JSON.
+	[
+		'DEFAULT_DISABLE_PASSWORD_FIELDS',
+		DEFAULTS.llm_disable_password_fields,
+		'defaults.json llm_disable_password_fields'
+	],
+	[
+		'DEFAULT_DISABLE_URL_BARS',
+		DEFAULTS.llm_disable_url_bars,
+		'defaults.json llm_disable_url_bars'
+	]
 ];
 for (const [name, value, source] of bridgeChecks) {
 	const re = new RegExp(`M\\.${name}\\s*=\\s*${esc(value)}(?!\\d)`);
