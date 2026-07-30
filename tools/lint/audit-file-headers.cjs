@@ -40,7 +40,7 @@ const FIX = process.argv.includes('--fix');
 const TREES = [
 	'windows/lib', 'windows/modules', 'windows/ui', 'windows/adapters',
 	'macos/lib', 'macos/modules', 'macos/ui', 'macos/adapters',
-	'linux/modules', 'linux/adapters', 'linux/lib', 'linux/bin',
+	'linux/modules', 'linux/adapters', 'linux/lib', 'linux/bin', 'linux/ui',
 	'_shared/lua', '_shared/ui'
 ];
 const EXTS = new Set(['.ahk', '.lua', '.js', '.cjs', '.mjs', '.py', '.sh', '.swift']);

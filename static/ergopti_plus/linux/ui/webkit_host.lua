@@ -1,4 +1,4 @@
---- linux/ui/webkit_host.lua
+--- ui/webkit_host.lua
 ---
 --- Pure logic for the WebKit2GTK host bridge — path resolution, HTML asset
 --- inlining, i18n locale injection, and bridge handler registry.
