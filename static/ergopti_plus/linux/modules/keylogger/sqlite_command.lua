@@ -47,6 +47,7 @@ local Shell = require("adapters.shell_runner")
 
 
 
+
 -- ============================
 -- ============================
 -- ======= 1/ Constants =======
@@ -74,6 +75,7 @@ local ERROR_LOG_MAX_CHARS = 200
 
 
 
+
 -- ==================================
 -- ==================================
 -- ======= 2/ Heredoc Framing =======
@@ -89,6 +91,7 @@ local ERROR_LOG_MAX_CHARS = 200
 function M.heredoc_token(sql)
 	return Shell.heredoc_token(sql, HEREDOC_BASE_TOKEN)
 end
+
 
 
 
@@ -125,6 +128,7 @@ function M.build(db_path, sql, opts)
 
 	return Shell.with_stdin(table.concat(words, " "), sql, HEREDOC_BASE_TOKEN)
 end
+
 
 
 

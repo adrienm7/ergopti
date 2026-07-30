@@ -39,6 +39,7 @@ local TextCrypto = require("keylogger.text_crypto")
 
 
 
+
 -- ============================
 -- ============================
 -- ======= 1/ Constants =======
@@ -56,6 +57,7 @@ local CURSOR_SEPARATOR = ":"
 --- Rows converted between two progress lines. Low enough to show that a long
 --- migration is alive, high enough not to flood the log.
 local PROGRESS_LOG_INTERVAL_ROWS = 500
+
 
 
 

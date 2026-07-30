@@ -23,6 +23,7 @@ local helpers = require("tests.helpers")
 
 
 
+
 -- ====================================
 -- ====================================
 -- ======= 1/ Writer spy helper =======
@@ -61,6 +62,7 @@ local function with_writer_spy(module_name, invoke)
 	if not ok then error(err, 0) end
 	return captured
 end
+
 
 
 

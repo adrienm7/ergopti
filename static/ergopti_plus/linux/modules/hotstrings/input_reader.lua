@@ -74,10 +74,13 @@ local KEY_ENTER      = 28
 local KEY_TAB        = 15
 
 
+
+
+
 -- =========================================
--- =========================================
+-- ==========================================
 -- ======= 3/ Keycode Tables (shared) =======
--- =========================================
+-- ==========================================
 -- =========================================
 
 -- Load the evdev keycode maps from the shared JSON (LNX-1). The loader returns
@@ -153,9 +156,9 @@ assert(LAYOUTS ~= nil, "input_reader: evdev.json keycode tables failed to load â
 
 
 
--- ========================================
+-- =======================================
 -- ===== 3.5) Public Layout Accessor =====
--- ========================================
+-- =======================================
 
 --- Returns the loaded LAYOUTS table so other modules (e.g. keyboard_hook)
 --- can resolve keycodes â†’ characters without re-loading evdev.json or

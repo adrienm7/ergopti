@@ -26,6 +26,7 @@ local helpers = require("tests.helpers")
 
 
 
+
 -- =======================================
 -- =======================================
 -- ======= 1/ Constants & Fixtures =======
@@ -49,6 +50,7 @@ local TMP_HOME     = (REAL_GETENV("TEMP") or REAL_GETENV("TMP") or "/tmp")
 
 -- The crash directory the module must derive from TMP_HOME at require time.
 local EXPECTED_DIR = TMP_HOME .. "/.local/share/ergopti/crashes"
+
 
 
 
@@ -135,6 +137,7 @@ local function with_sandbox(opts, fn)
 	cap.content = table.concat(cap.parts, "")
 	return cap
 end
+
 
 
 
