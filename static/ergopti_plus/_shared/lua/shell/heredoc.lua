@@ -44,6 +44,15 @@ M.DEFAULT_TOKEN = "ERGOPTI_STDIN"
 --- Appended to the terminator until it no longer matches any line of the body.
 M.TOKEN_PADDING = "_X"
 
+--- Filter that restores byte-exactness, used by with_exact_stdin().
+--- A heredoc ALWAYS delivers its body followed by one newline — the shell has no
+--- syntax for a heredoc that ends without one — so with_stdin() has to normalise
+--- the payload's own trailing newlines away, and the command then reads a byte
+--- string that is not what the caller passed. Truncating the stream back to the
+--- payload's real byte length undoes both halves of that: nothing is added, and
+--- nothing is removed.
+M.TRUNCATE_COMMAND = "head -c"
+
 
 
 
@@ -91,6 +100,28 @@ function M.with_stdin(cmd, input, token_base)
 	-- exactly one trailing newline rather than however many it arrived with.
 	local body = (payload:gsub("\n+$", ""))
 	return cmd .. " <<'" .. token .. "'\n" .. body .. "\n" .. token .. "\n"
+end
+
+--- Appends a heredoc carrying EXACTLY the bytes of `input`, trailing newlines
+--- included.
+--- Use this whenever the payload is DATA rather than a script. A SQL script does
+--- not care how many newlines it ends with, but a value being encrypted does:
+--- with_stdin() would hand openssl a plaintext the caller never wrote, and the
+--- stored ciphertext would then decrypt to something different from the original
+--- — silent corruption that only surfaces the day the value is read back.
+--- @param cmd        string     Fully composed command; it reads standard input.
+--- @param input      string     Payload for the command's standard input.
+--- @param token_base string|nil Starting terminator token.
+--- @return string The command, wrapped so it receives `input` byte for byte.
+function M.with_exact_stdin(cmd, input, token_base)
+	local payload = (type(input) == "string") and input or ""
+	local token   = M.token(payload, token_base)
+	-- The truncation READS the heredoc and pipes the result on, so it has to come
+	-- first: a redirection binds to the command it follows, and the body of a
+	-- heredoc starts on the line after the whole pipeline. The payload is written
+	-- unchanged — the truncation, not a gsub, is what removes the framing newline.
+	return M.TRUNCATE_COMMAND .. " " .. #payload .. " <<'" .. token .. "' | " .. cmd
+		.. "\n" .. payload .. "\n" .. token .. "\n"
 end
 
 return M
