@@ -11,10 +11,11 @@
 local helpers = require("tests.helpers")
 
 -- After the F2 split, the navigationCallback / poll-timer logic lives in core.lua.
-local src_path = helpers.driver_root() .. "ui/healthcheck/core.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("healthcheck core.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to ui/healthcheck/core.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function _stop_poll")
+helpers.assert_true(src ~= nil, "ui/healthcheck/core.lua source must be locatable")
 
 -- Locate the didFinishNavigation branch.
 local nav_pos = src:find('"didFinishNavigation"', 1, true)

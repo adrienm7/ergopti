@@ -86,9 +86,11 @@ end)
 -- 2) Source invariant — the toggle never calls the tap-killing stop()/start.
 helpers.describe("menu_shortcuts feature toggle is wired to the binding-only pair", function()
 	helpers.it("the top-level toggle uses resume_bindings/pause_bindings, not shortcuts.start/stop", function()
-		local path = helpers.driver_root() .. "ui/menu/menu_shortcuts.lua"
-		local fh = assert(io.open(path, "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_shortcuts.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function build_wrap_symbols_submenu")
+		helpers.assert_true(src ~= nil, "ui/menu/menu_shortcuts.lua source must be locatable")
 
 		-- Isolate the top-level feature toggle fn: it sets `state.shortcuts = not state.shortcuts`.
 		local toggle_start = src:find("state%.shortcuts%s*=%s*not%s+state%.shortcuts", 1)

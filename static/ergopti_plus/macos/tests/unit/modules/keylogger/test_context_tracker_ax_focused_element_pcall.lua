@@ -132,10 +132,11 @@ end)
 helpers.describe("context_tracker: source pins the AXFocusedUIElement pcall guard (F-HIGH-27)", function()
 
 	helpers.it("the AXFocusedUIElement read inside update_ax_observer is wrapped in pcall", function()
-		local path = helpers.driver_root() .. "modules/keylogger/context_tracker.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open context_tracker.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keylogger/context_tracker.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function update_secure_field_state")
+		helpers.assert_true(src ~= nil, "modules/keylogger/context_tracker.lua source must be locatable")
 
 		local fn_start = src:find("function M.update_ax_observer", 1, true)
 		helpers.assert_true(fn_start ~= nil, "update_ax_observer must still exist")
@@ -149,10 +150,11 @@ helpers.describe("context_tracker: source pins the AXFocusedUIElement pcall guar
 	end)
 
 	helpers.it("keylogger uses the guarded ProcessLifecycle application watcher", function()
-		local init_path = helpers.driver_root() .. "modules/keylogger/init.lua"
-		local init_fh = io.open(init_path, "r")
-		helpers.assert_true(init_fh ~= nil, "cannot open keylogger/init.lua at " .. tostring(init_path))
-		local init_src = init_fh:read("*a"); init_fh:close()
+		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local init_src = helpers.read_driver_source("local function ensure_browser_window_filter")
+		helpers.assert_true(init_src ~= nil, "modules/keylogger/init.lua source must be locatable")
 
 		helpers.assert_true(
 			init_src:find("ProcessLifecycle.onAppActivate", 1, true) ~= nil
@@ -160,10 +162,11 @@ helpers.describe("context_tracker: source pins the AXFocusedUIElement pcall guar
 			"keylogger must register application activation through ProcessLifecycle"
 		)
 
-		local adapter_path = helpers.driver_root() .. "adapters/process_lifecycle.lua"
-		local adapter_fh = io.open(adapter_path, "r")
-		helpers.assert_true(adapter_fh ~= nil, "cannot open process_lifecycle.lua at " .. tostring(adapter_path))
-		local adapter_src = adapter_fh:read("*a"); adapter_fh:close()
+		-- Selected by a declaration unique to adapters/process_lifecycle.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local adapter_src = helpers.read_driver_source("function M.getForegroundApp")
+		helpers.assert_true(adapter_src ~= nil, "adapters/process_lifecycle.lua source must be locatable")
 		local guard_pos = adapter_src:find("pcall(function()", 1, true)
 		local watcher_pos = adapter_src:find("_app_watcher = hs.application.watcher.new", 1, true)
 		helpers.assert_true(

@@ -21,10 +21,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("llm: persisted API-entry load is deferred off the require path (F-HIGH-4)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "modules/llm/init.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open modules/llm/init.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/llm/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.start_background_network_bootstrap")
+		helpers.assert_true(src ~= nil, "modules/llm/init.lua source must be locatable")
 		return src
 	end
 

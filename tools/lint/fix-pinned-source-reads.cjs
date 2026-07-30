@@ -113,52 +113,65 @@ function uniqueSelectorFor(relTarget) {
  */
 function convertFile(file, apply) {
 	let src = fs.readFileSync(file, 'utf8');
+	// The loop advances by neutralising each occurrence it refuses, which must
+	// happen on a SCRATCH copy only. Doing it on `src` wrote the sentinel to disk
+	// for any file holding both a convertible and a refused read — the refused
+	// read then resolved to the literal path "__PINNED_UNRESOLVED__" and the test
+	// died at load time with "not readable at: __PINNED_UNRESOLVED__".
+	let scan = src;
 	const blocked = [];
 	let converted = 0;
 
 	for (;;) {
-		const m = src.match(PINNED_RE);
+		const m = scan.match(PINNED_RE);
 		if (!m) break;
 
 		const [, indent, varName, relTarget] = m;
 		const selector = uniqueSelectorFor(relTarget);
 		if (!selector) {
 			blocked.push(relTarget);
-			// Neutralise this occurrence for the scan so the loop terminates,
-			// without touching the file we are refusing to convert.
-			src = src.replace(PINNED_RE, `${indent}local ${varName} = "__PINNED_UNRESOLVED__"`);
+			scan = scan.replace(PINNED_RE, `${indent}local ${varName} = "__PINNED_UNRESOLVED__"`);
 			continue;
 		}
 
 		// Consume the whole read block, whatever optional lines it carries.
+		//
+		// The three handle shapes below are all mechanical rewrites of the same
+		// read, and every one of them appears in the tree: a bare io.open, an
+		// assert(io.open(...)) and an io.open followed by an explicit `if not fh
+		// then error(...) end`. Refusing the last two bought nothing — they are
+		// no more ambiguous than the first — while leaving 90 files pinned.
 		const block = new RegExp(
 			PINNED_RE.source +
 				'\\r?\\n' +
-				`[ \\t]*local\\s+\\w+\\s*=\\s*io\\.open\\(${varName}, "r"\\)\\r?\\n` +
+				`[ \\t]*local\\s+\\w+\\s*=\\s*(?:assert\\(\\s*)?io\\.open\\(\\s*${varName}\\s*,\\s*"r"\\s*\\)\\s*\\)?[ \\t]*\\r?\\n` +
 				'(?:[ \\t]*helpers\\.assert_[a-z_]+\\([^\\n]*\\r?\\n)?' +
-				'(?:[ \\t]*if not \\w+ then return end\\r?\\n)?' +
-				'[ \\t]*local\\s+(\\w+)\\s*=\\s*\\w+:read\\("\\*a"\\)[ \\t]*(?:;\\s*\\w+:close\\(\\))?\\r?\\n' +
-				'(?:[ \\t]*\\w+:close\\(\\)\\r?\\n)?'
+				'(?:[ \\t]*if not \\w+ then (?:return end|error\\([^\\n]*\\)[ \\t]*end)[ \\t]*\\r?\\n)?' +
+				'[ \\t]*local\\s+(\\w+)\\s*=\\s*\\w+:read\\("\\*a"\\)[ \\t]*(?:;[ \\t]*\\w+:close\\(\\))?[ \\t]*\\r?\\n' +
+				'(?:[ \\t]*\\w+:close\\(\\)[ \\t]*\\r?\\n)?'
 		);
-		const bm = src.match(block);
+		const bm = scan.match(block);
 		if (!bm) {
 			// The read exists but is not written in a shape this fixer can rewrite
 			// safely. Reported separately from a uniqueness failure, because the
 			// remedy is different: this one just needs converting by hand.
 			blocked.push(`${relTarget} [unrecognised read shape — convert by hand]`);
-			src = src.replace(PINNED_RE, `${indent}local ${varName} = "__PINNED_UNRESOLVED__"`);
+			scan = scan.replace(PINNED_RE, `${indent}local ${varName} = "__PINNED_UNRESOLVED__"`);
 			continue;
 		}
 
 		const srcVar = bm[4];
+		// No `if not src then return end` tail: assert_true raises, so the guard
+		// could never run — and at file scope a bare `return` would end the chunk
+		// and silently drop every test declared below it.
 		const replacement =
 			`${indent}-- Selected by a declaration unique to ${relTarget} rather than by\n` +
 			`${indent}-- path, so moving or splitting the module cannot turn this invariant\n` +
 			`${indent}-- into a path error.\n` +
 			`${indent}local ${srcVar} = helpers.read_driver_source("${selector}")\n` +
-			`${indent}helpers.assert_true(${srcVar} ~= nil, "${relTarget} source must be locatable")\n` +
-			`${indent}if not ${srcVar} then return end\n`;
+			`${indent}helpers.assert_true(${srcVar} ~= nil, "${relTarget} source must be locatable")\n`;
 		src = src.replace(block, replacement);
+		scan = scan.replace(block, replacement);
 		converted += 1;
 	}
 

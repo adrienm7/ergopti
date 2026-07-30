@@ -24,10 +24,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("karabiner/onboarding: all four hs.task closures forward-declare their handle (closure-nil guard)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "modules/karabiner/onboarding.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open onboarding.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/karabiner/onboarding.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function run_pkg_with_sudo_async")
+		helpers.assert_true(src ~= nil, "modules/karabiner/onboarding.lua source must be locatable")
 		return src
 	end
 

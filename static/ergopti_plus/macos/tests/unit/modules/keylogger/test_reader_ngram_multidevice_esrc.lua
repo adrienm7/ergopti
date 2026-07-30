@@ -11,10 +11,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "modules/keylogger/sqlite_reader.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("sqlite_reader.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to modules/keylogger/sqlite_reader.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("function M.read_range_split_today")
+helpers.assert_true(src ~= nil, "modules/keylogger/sqlite_reader.lua source must be locatable")
 
 -- Test 1: MIN(esrc_json) AS ... must not appear in SQL context.
 -- Matches SQL aggregation syntax "MIN(esrc_json) AS" but not inline comments.

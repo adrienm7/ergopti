@@ -12,10 +12,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "modules/llm/mlx_deps_checker.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("mlx_deps_checker.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to modules/llm/mlx_deps_checker.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function resolve_bootstrap_script_path")
+helpers.assert_true(src ~= nil, "modules/llm/mlx_deps_checker.lua source must be locatable")
 
 -- Locate the MARKER_PROGRESS iteration block.
 local block_pos = src:find("max_pct", 1, true)

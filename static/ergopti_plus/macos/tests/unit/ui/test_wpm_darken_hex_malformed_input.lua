@@ -40,10 +40,11 @@ helpers.describe("wpm_widget: _wpm_darken_hex survives malformed hex input (F-ME
 	-- the source and eval just that function in isolation so the test exercises
 	-- the exact production implementation without needing to expose it.
 	local function extract_darken_hex_fn()
-		local path = helpers.driver_root() .. "ui/wpm/wpm_widget.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open wpm_widget.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/wpm/wpm_widget.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function resolve_shared_constants_path")
+		helpers.assert_true(src ~= nil, "ui/wpm/wpm_widget.lua source must be locatable")
 
 		local body = src:match("(local function _wpm_darken_hex.-\nend)")
 		helpers.assert_true(body ~= nil, "could not locate _wpm_darken_hex body in wpm_widget.lua")
@@ -82,10 +83,11 @@ end)
 
 helpers.describe("wpm_widget: _wpm_darken_hex source mirrors the _wpm_normalise_hex guard (F-MED-25)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "ui/wpm/wpm_widget.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open wpm_widget.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/wpm/wpm_widget.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function resolve_shared_constants_path")
+		helpers.assert_true(src ~= nil, "ui/wpm/wpm_widget.lua source must be locatable")
 		return src
 	end
 

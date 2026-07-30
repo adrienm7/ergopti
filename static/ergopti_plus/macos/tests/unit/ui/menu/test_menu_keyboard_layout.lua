@@ -387,10 +387,11 @@ helpers.describe("Startup applies the resume layout (regression)", function()
 	-- calls schedule_pause_layout_switch(false, state) once the boot settles. Behaviour
 	-- of the false→resume mapping itself is covered above; here we lock in the wiring.
 	helpers.it("ui/menu/init.lua applies the non-paused (resume) layout at startup", function()
-		local src_path = helpers.driver_root() .. "ui/menu/init.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "must be able to read ui/menu/init.lua")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function safe_require")
+		helpers.assert_true(src ~= nil, "ui/menu/init.lua source must be locatable")
 		-- The on_pause_change listener calls it with the `is_paused` variable; the
 		-- startup application is the one that passes the `false` literal (resume layout).
 		helpers.assert_true(src:find("schedule_pause_layout_switch, false", 1, true) ~= nil,

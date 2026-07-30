@@ -40,10 +40,15 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'windows', 'tests');
 //                     added a raw FileRead of a driver source. This is an .ahk-only
 //                     ratchet, so only .ahk tests count here — the .lua source-scan
 //                     tests from the same session are tracked by the sibling
-//                     test-no-pinned-source-reads-lua.cjs, not here. Prefer migrating
-//                     test_hse_suppress_release_bounded.ahk to a _Driver* helper so
-//                     this baseline can return to 19.)
-const BASELINE = 20;
+//                     test-no-pinned-source-reads-lua.cjs, not here.)
+//          20 → 16 (three tap-hold / metrics / menu_llm tests moved to
+//                     _DriverDirConcat, and the scan stopped counting PROSE — see
+//                     stripComments below.)
+// The 16 that remain each pin something on purpose: run_all.ahk itself, a
+// _generated/ file (which _DriverSourceConcat deliberately excludes), a runner
+// script, or a single file carrying an ABSENCE assertion that a directory-wide
+// scan would weaken.
+const BASELINE = 16;
 
 const HELPER_RE = /_DriverSourceConcat|_DriverFuncBody|_DriverDirConcat/;
 // A quoted relative path into a driver SOURCE tree ending in .ahk, e.g.
@@ -68,9 +73,25 @@ function collectTests(dir, acc) {
 	return acc;
 }
 
+/**
+ * Drops every full-line `;` comment. Without this the scan counted PROSE: a
+ * module docstring saying "source-introspection (FileRead + pattern match)"
+ * plus an assertion message naming "lib/webview_utils.ahk" was enough to book a
+ * file as location-pinned when it never opens a file at all. A ratchet inflated
+ * by its own explanatory comments cannot be driven to zero.
+ * @param {string} src Full file content.
+ * @returns {string} The same source with full-line comments removed.
+ */
+function stripComments(src) {
+	return src
+		.split(/\r?\n/)
+		.filter((line) => !/^\s*;/.test(line))
+		.join('\n');
+}
+
 const pinned = [];
 for (const file of collectTests(TESTS_DIR, [])) {
-	const src = fs.readFileSync(file, 'utf8');
+	const src = stripComments(fs.readFileSync(file, 'utf8'));
 	if (HELPER_RE.test(src)) continue; // already move-resilient
 	if (!src.includes('FileRead')) continue; // not a source reader
 	if (!SOURCE_PATH_RE.test(src)) continue; // reads a fixture, not a source file

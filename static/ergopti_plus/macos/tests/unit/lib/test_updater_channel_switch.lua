@@ -48,10 +48,11 @@ helpers.describe("updater: channel switch clears cached release", function()
 	end)
 
 	helpers.it("source calls clear_cached_release inside start_background_checks", function()
-		local src_path = helpers.driver_root() .. "lib/updater.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "lib/updater.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to lib/updater.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.unwrap_first_prerelease_json")
+		helpers.assert_true(src ~= nil, "lib/updater.lua source must be locatable")
 
 		local start_pos = src:find("function M%.start_background_checks")
 		helpers.assert_true(start_pos ~= nil, "start_background_checks must exist")

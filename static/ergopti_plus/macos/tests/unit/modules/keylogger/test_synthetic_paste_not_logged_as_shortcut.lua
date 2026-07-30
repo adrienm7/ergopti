@@ -163,10 +163,11 @@ end)
 helpers.describe("keylogger: handle_key source gates log_shortcut on is_pending_synthetic_paste (F-HIGH-17)", function()
 
 	helpers.it("the shortcut branch checks is_pending_synthetic_paste before calling log_shortcut", function()
-		local path = helpers.driver_root() .. "modules/keylogger/init.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open keylogger/init.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function ensure_browser_window_filter")
+		helpers.assert_true(src ~= nil, "modules/keylogger/init.lua source must be locatable")
 
 		local branch_start = src:find("is_shortcut_candidate(flags, keycode) then", 1, true)
 		helpers.assert_true(branch_start ~= nil, "the shortcut-classification branch must still exist")

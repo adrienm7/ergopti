@@ -18,10 +18,11 @@
 local helpers = require("tests.helpers")
 
 local function read_menu_state_src()
-	local path = helpers.driver_root() .. "ui/menu/menu_state.lua"
-	local fh   = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "ui/menu/menu_state.lua must be readable")
-	local src = fh:read("*a"); fh:close()
+	-- Selected by a declaration unique to ui/menu/menu_state.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("function M.sync_state_to_modules")
+	helpers.assert_true(src ~= nil, "ui/menu/menu_state.lua source must be locatable")
 	return src
 end
 

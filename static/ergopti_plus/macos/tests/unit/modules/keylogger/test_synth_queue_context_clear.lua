@@ -19,10 +19,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("context_tracker: synth_queue cleared on context change (F-LOW-1)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "modules/keylogger/context_tracker.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open context_tracker.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keylogger/context_tracker.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function update_secure_field_state")
+		helpers.assert_true(src ~= nil, "modules/keylogger/context_tracker.lua source must be locatable")
 		return src
 	end
 

@@ -77,10 +77,11 @@ end)
 
 helpers.describe("keymap.M.start schedules the prewarm off the keystroke path", function()
 	helpers.it("M.start defers km_utils.prewarm_ignored_win_watchers via hs.timer.doAfter", function()
-		local path = helpers.driver_root() .. "modules/keymap/init.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open keymap/init.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keymap/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function invalidate_observed_context")
+		helpers.assert_true(src ~= nil, "modules/keymap/init.lua source must be locatable")
 
 		-- The prewarm must be scheduled (doAfter), never called inline in M.start —
 		-- an inline call would just move the 3 s cost onto the boot path instead.

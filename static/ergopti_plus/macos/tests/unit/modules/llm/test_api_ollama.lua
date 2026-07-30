@@ -101,11 +101,11 @@ helpers.describe("ApiOllama run-loop safety", function()
 		-- ShellRunner.exec wraps hs.execute which blocks the Lua thread.
 		-- When called inside a timer callback (even doAfter(0)), this permanently
 		-- kills the Cocoa CFRunLoop — destroying timers, menubar, and eventtaps.
-		local src_path = helpers.driver_root() .. "modules/llm/api_ollama.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh, "could not open api_ollama.lua source")
-		local source = fh:read("*a")
-		fh:close()
+		-- Selected by a declaration unique to modules/llm/api_ollama.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local source = helpers.read_driver_source("local function read_ollama_port_override")
+		helpers.assert_true(source ~= nil, "modules/llm/api_ollama.lua source must be locatable")
 
 		-- Extract the ensure_ollama_running function body (multiline match)
 		local fn_body = source:match("local function ensure_ollama_running%(%)\n(.-)\nend\n")
@@ -119,11 +119,11 @@ helpers.describe("ApiOllama run-loop safety", function()
 
 	helpers.it("ensure_ollama_running does not use TimerScheduler.sleep_us", function()
 		-- TimerScheduler.sleep_us wraps hs.timer.usleep which blocks the thread
-		local src_path = helpers.driver_root() .. "modules/llm/api_ollama.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh, "could not open api_ollama.lua source")
-		local source = fh:read("*a")
-		fh:close()
+		-- Selected by a declaration unique to modules/llm/api_ollama.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local source = helpers.read_driver_source("local function read_ollama_port_override")
+		helpers.assert_true(source ~= nil, "modules/llm/api_ollama.lua source must be locatable")
 
 		local fn_body = source:match("local function ensure_ollama_running%(%)\n(.-)\nend\n")
 		helpers.assert_true(fn_body, "could not locate ensure_ollama_running function body")
@@ -136,11 +136,11 @@ helpers.describe("ApiOllama run-loop safety", function()
 
 	helpers.it("ensure_ollama_running uses ShellRunner.spawn for async launch", function()
 		-- ShellRunner.spawn wraps hs.task (non-blocking subprocess)
-		local src_path = helpers.driver_root() .. "modules/llm/api_ollama.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh, "could not open api_ollama.lua source")
-		local source = fh:read("*a")
-		fh:close()
+		-- Selected by a declaration unique to modules/llm/api_ollama.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local source = helpers.read_driver_source("local function read_ollama_port_override")
+		helpers.assert_true(source ~= nil, "modules/llm/api_ollama.lua source must be locatable")
 
 		local fn_body = source:match("local function ensure_ollama_running%(%)\n(.-)\nend\n")
 		helpers.assert_true(fn_body, "could not locate ensure_ollama_running function body")
@@ -154,11 +154,11 @@ helpers.describe("ApiOllama run-loop safety", function()
 		-- Verify no synchronous shell call happens outside of function bodies
 		-- (i.e. at require-time). Only function definitions and deferred calls
 		-- (TimerScheduler.after) are allowed at top level.
-		local src_path = helpers.driver_root() .. "modules/llm/api_ollama.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh, "could not open api_ollama.lua source")
-		local source = fh:read("*a")
-		fh:close()
+		-- Selected by a declaration unique to modules/llm/api_ollama.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local source = helpers.read_driver_source("local function read_ollama_port_override")
+		helpers.assert_true(source ~= nil, "modules/llm/api_ollama.lua source must be locatable")
 
 		-- Remove all function bodies to isolate top-level code
 		local top_level = source:gsub("local function [^\n]-%).-\nend\n", "")

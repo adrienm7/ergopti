@@ -22,10 +22,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("keylogger: notify_synthetic gated on is_enabled + start clears the queue (F-MED-3)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "modules/keylogger/init.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open keylogger/init.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function ensure_browser_window_filter")
+		helpers.assert_true(src ~= nil, "modules/keylogger/init.lua source must be locatable")
 		return src
 	end
 

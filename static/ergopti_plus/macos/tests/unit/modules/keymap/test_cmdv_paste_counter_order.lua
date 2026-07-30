@@ -21,9 +21,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("onKeyDownRaw drains the paste counter before the chars guard", function()
 	helpers.it("paste-counter guard precedes the expected_synthetic_chars guard in the Cmd branch", function()
-		local path = helpers.driver_root() .. "modules/keymap/init.lua"
-		local fh = assert(io.open(path, "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keymap/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function invalidate_observed_context")
+		helpers.assert_true(src ~= nil, "modules/keymap/init.lua source must be locatable")
 
 		-- Locate the start of the Cmd/Ctrl branch that handles a Cmd keystroke.
 		local branch = src:find("if flags%.cmd or flags%.ctrl then")

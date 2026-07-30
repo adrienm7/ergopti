@@ -75,10 +75,18 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'tests');
 //                     ONLY: the .ahk source-scans go to test-no-pinned-source-reads.cjs
 //                     and Linux .lua source-scans (e.g. test_injector_commands.lua) are
 //                     not counted here at all.)
-const BASELINE = 156;
+//          156 → 34 (fix-pinned-source-reads.cjs converted 153 reads once it was
+//                     taught the two other handle shapes in the tree —
+//                     assert(io.open(…)) and an explicit `if not fh then error(…)
+//                     end` — neither of which is any more ambiguous than the bare
+//                     io.open it already accepted. The 20 that remain need a human:
+//                     their target module has no declaration unique to it, so
+//                     read_driver_source would concatenate several files and
+//                     silently change what the test asserts.)
+const BASELINE = 34;
 
-// A move-resilient scan helper (symbol-keyed whole-tree read). None exists yet;
-// listed so that converting a test to such a helper drops it from the count.
+// A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
+// test to one of these drops it from the count.
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 // driver_root() concatenated with a quoted relative path into a driver SOURCE
 // tree ending in .lua, e.g. driver_root() .. "modules/keymap/input_sources.lua".

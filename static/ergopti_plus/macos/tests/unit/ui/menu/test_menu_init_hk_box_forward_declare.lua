@@ -10,10 +10,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "ui/menu/init.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("ui/menu/init.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to ui/menu/init.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function safe_require")
+helpers.assert_true(src ~= nil, "ui/menu/init.lua source must be locatable")
 
 -- Find positions of the forward declarations and the first apply_*_shortcut
 -- function definition that uses the boxes.

@@ -183,10 +183,11 @@ end)
 helpers.describe("file_system.write — parent directory creation (filesystem-adapter-missing-mkdir)", function()
 
 	helpers.it("source defines ensure_dir to create missing parent directories", function()
-		local src_path = helpers.driver_root() .. "adapters/file_system.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "file_system.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to adapters/file_system.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.expand_path")
+		helpers.assert_true(src ~= nil, "adapters/file_system.lua source must be locatable")
 		helpers.assert_true(
 			src:find("ensure_dir", 1, true) ~= nil,
 			"file_system.write must call ensure_dir to create missing parent directories (filesystem-adapter-missing-mkdir)"
@@ -194,10 +195,11 @@ helpers.describe("file_system.write — parent directory creation (filesystem-ad
 	end)
 
 	helpers.it("source calls hs.fs.mkdir inside ensure_dir", function()
-		local src_path = helpers.driver_root() .. "adapters/file_system.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to adapters/file_system.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.expand_path")
+		helpers.assert_true(src ~= nil, "adapters/file_system.lua source must be locatable")
 		helpers.assert_true(
 			src:find("hs.fs.mkdir", 1, true) ~= nil,
 			"ensure_dir must invoke hs.fs.mkdir to create the directory (filesystem-adapter-missing-mkdir)"

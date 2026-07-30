@@ -640,10 +640,11 @@ end)
 helpers.describe("Generator — same_output uses deep structural equality (karabiner-generator-json-dedup)", function()
 
 	helpers.it("source does NOT use hs.json.encode comparison in same_output", function()
-		local src_path = helpers.driver_root() .. "modules/karabiner/generator.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "generator.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/karabiner/generator.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function build_sticky_companion_manipulators")
+		helpers.assert_true(src ~= nil, "modules/karabiner/generator.lua source must be locatable")
 		-- hs.json.encode on two logically identical Lua tables can return different
 		-- strings because Lua hash-table iteration order is non-deterministic.
 		helpers.assert_true(
@@ -653,10 +654,11 @@ helpers.describe("Generator — same_output uses deep structural equality (karab
 	end)
 
 	helpers.it("source defines a deep_equal function", function()
-		local src_path = helpers.driver_root() .. "modules/karabiner/generator.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/karabiner/generator.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function build_sticky_companion_manipulators")
+		helpers.assert_true(src ~= nil, "modules/karabiner/generator.lua source must be locatable")
 		helpers.assert_true(
 			src:find("local function deep_equal", 1, true) ~= nil,
 			"generator.lua must define a local deep_equal function (karabiner-generator-json-dedup)"

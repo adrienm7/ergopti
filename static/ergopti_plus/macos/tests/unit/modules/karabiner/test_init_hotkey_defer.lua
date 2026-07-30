@@ -20,10 +20,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("karabiner.init defers the convenience hotkeys", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "modules/karabiner/init.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open karabiner/init.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/karabiner/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function build_paused_ke_config")
+		helpers.assert_true(src ~= nil, "modules/karabiner/init.lua source must be locatable")
 		return src
 	end
 

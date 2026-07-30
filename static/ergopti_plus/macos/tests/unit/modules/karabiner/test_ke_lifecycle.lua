@@ -256,10 +256,11 @@ helpers.describe("KELifecycle.kill_async — unique temp script path (ke-kill-as
 		-- produce the same path, overwriting the script the first nohup is reading.
 		-- Only the kill_async script path is guarded here; other functions in the file
 		-- may legitimately use os.time() for rate-limiting or unrelated naming.
-		local src_path = helpers.driver_root() .. "modules/karabiner/ke_lifecycle.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "ke_lifecycle.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/karabiner/ke_lifecycle.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.flush_pending_ready_notification")
+		helpers.assert_true(src ~= nil, "modules/karabiner/ke_lifecycle.lua source must be locatable")
 		-- The bug was: ke_kill_async path used os.time() as a suffix.
 		-- Match only the kill_async-specific format string to avoid false positives
 		-- from other functions (e.g. run_total_reset_async) that may use os.time().
@@ -271,10 +272,11 @@ helpers.describe("KELifecycle.kill_async — unique temp script path (ke-kill-as
 	end)
 
 	helpers.it("source uses hs.timer.secondsSinceEpoch() for the script suffix", function()
-		local src_path = helpers.driver_root() .. "modules/karabiner/ke_lifecycle.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/karabiner/ke_lifecycle.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.flush_pending_ready_notification")
+		helpers.assert_true(src ~= nil, "modules/karabiner/ke_lifecycle.lua source must be locatable")
 		helpers.assert_true(
 			src:find("secondsSinceEpoch()", 1, true) ~= nil,
 			"kill_async must use hs.timer.secondsSinceEpoch() for microsecond-precision path uniqueness (ke-kill-async-script-race)"

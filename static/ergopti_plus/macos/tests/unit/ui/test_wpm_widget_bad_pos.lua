@@ -18,10 +18,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("wpm_widget: persisted position coerced with tonumber (F-LOW-5)", function()
 	helpers.it("reads pos_x and pos_y through tonumber", function()
-		local path = helpers.driver_root() .. "ui/wpm/wpm_widget.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open wpm_widget.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/wpm/wpm_widget.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function resolve_shared_constants_path")
+		helpers.assert_true(src ~= nil, "ui/wpm/wpm_widget.lua source must be locatable")
 
 		helpers.assert_true(src:find("tonumber(hs.settings.get(_SETTINGS_X))", 1, true) ~= nil,
 			"pos_x must be read via tonumber(hs.settings.get(_SETTINGS_X)) so a string plist value defaults")

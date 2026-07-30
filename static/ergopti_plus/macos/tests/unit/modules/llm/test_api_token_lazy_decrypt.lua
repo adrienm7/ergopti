@@ -23,16 +23,15 @@
 
 local helpers = require("tests.helpers")
 
-local init_path   = helpers.driver_root() .. "modules/llm/init.lua"
-local remote_path = helpers.driver_root() .. "modules/llm/api_remote.lua"
+-- Each side is selected by a declaration unique to its module rather than by
+-- path, so moving or splitting either one cannot turn these invariants into a
+-- path error. Uniqueness matters twice over here: test 1 is an ABSENCE
+-- assertion, and a selector matching a second file would widen what it scans.
+local init_src = helpers.read_driver_source("function M.start_background_network_bootstrap")
+helpers.assert_true(init_src ~= nil, "modules/llm/init.lua source must be locatable")
 
-local fh = io.open(init_path, "r")
-if not fh then error("init.lua not readable at: " .. init_path) end
-local init_src = fh:read("*a") ; fh:close()
-
-local fh2 = io.open(remote_path, "r")
-if not fh2 then error("api_remote.lua not readable at: " .. remote_path) end
-local remote_src = fh2:read("*a") ; fh2:close()
+local remote_src = helpers.read_driver_source("function M.prewarm_active_entry_decrypt")
+helpers.assert_true(remote_src ~= nil, "modules/llm/api_remote.lua source must be locatable")
 
 -- Test 1: load_api_entries must NOT call TokenCrypto.decrypt inside its loop.
 -- A decrypt call at load time is the root cause: any positive match here means
@@ -73,10 +72,11 @@ helpers.assert_true(
 	"get_active_entry must guard the decrypt call with TokenCrypto.is_encrypted"
 )
 
-local crypto_path = helpers.driver_root() .. "modules/llm/api_token_crypto.lua"
-local fh3 = io.open(crypto_path, "r")
-if not fh3 then error("api_token_crypto.lua not readable at: " .. crypto_path) end
-local crypto_src = fh3:read("*a") ; fh3:close()
+-- Selected by a declaration unique to modules/llm/api_token_crypto.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local crypto_src = helpers.read_driver_source("local function quote_shell")
+helpers.assert_true(crypto_src ~= nil, "modules/llm/api_token_crypto.lua source must be locatable")
 
 -- Test 5 (F-MED-9): api_token_crypto.lua must expose an async decrypt path
 -- so callers reachable from a timer callback need not block on hs.execute.

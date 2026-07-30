@@ -20,10 +20,11 @@
 local helpers = require("tests.helpers")
 
 local function read_shell_runner_src()
-	local path = helpers.driver_root() .. "adapters/shell_runner.lua"
-	local fh   = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "adapters/shell_runner.lua must be readable")
-	local src = fh:read("*a"); fh:close()
+	-- Selected by a declaration unique to adapters/shell_runner.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("local function invoke_guarded")
+	helpers.assert_true(src ~= nil, "adapters/shell_runner.lua source must be locatable")
 	return src
 end
 

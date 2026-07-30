@@ -36,10 +36,11 @@ local helpers = require("tests.helpers")
 helpers.describe("prediction_engine — is_noise_pred regex performance (prediction-engine-noise-pred-on)", function()
 
 	local function read_source()
-		local src_path = helpers.driver_root() .. "modules/llm/prediction_engine.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "prediction_engine.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/llm/prediction_engine.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function compute_adaptive_debounce")
+		helpers.assert_true(src ~= nil, "modules/llm/prediction_engine.lua source must be locatable")
 		return src
 	end
 

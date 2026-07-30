@@ -30,10 +30,11 @@ local helpers = require("tests.helpers")
 helpers.describe("keylogger pause wiring — source-level invariant (e2e-pause-suspend-2 regression)", function()
 
 	helpers.it("script_control.lua does NOT reference _keylogger.pause or _keylogger.resume", function()
-		local src_path = helpers.driver_root() .. "modules/shortcuts/script_control.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "script_control.lua must be readable at " .. tostring(src_path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/shortcuts/script_control.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function log_shortcut_if_available")
+		helpers.assert_true(src ~= nil, "modules/shortcuts/script_control.lua source must be locatable")
 		-- The dead push branch (_keylogger.pause / _keylogger.resume) was never
 		-- reachable in production because the 5th arg was never passed. Removing it
 		-- avoids false confidence that the keylogger is silenced via push.
@@ -44,10 +45,11 @@ helpers.describe("keylogger pause wiring — source-level invariant (e2e-pause-s
 	end)
 
 	helpers.it("keylogger/init.lua handle_key checks _script_control.is_paused (real mechanism)", function()
-		local src_path = helpers.driver_root() .. "modules/keylogger/init.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "keylogger/init.lua must be readable at " .. tostring(src_path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function ensure_browser_window_filter")
+		helpers.assert_true(src ~= nil, "modules/keylogger/init.lua source must be locatable")
 		helpers.assert_true(src:find("_script_control.is_paused", 1, true) ~= nil,
 			"keylogger/init.lua must poll _script_control.is_paused — the real silence mechanism")
 	end)

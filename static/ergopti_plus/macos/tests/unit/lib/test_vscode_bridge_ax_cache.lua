@@ -33,10 +33,11 @@ local helpers = require("tests.helpers")
 helpers.describe("vscode_bridge — AX frame cache (vscode-bridge-blocking-ax-call)", function()
 
 	local function read_source()
-		local src_path = helpers.driver_root() .. "lib/vscode_bridge.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "vscode_bridge.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to lib/vscode_bridge.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function get_editor_ax_frame")
+		helpers.assert_true(src ~= nil, "lib/vscode_bridge.lua source must be locatable")
 		return src
 	end
 

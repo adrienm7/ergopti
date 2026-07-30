@@ -35,10 +35,11 @@ local helpers = require("tests.helpers")
 helpers.describe("ke_lifecycle notify cooldown — pending flag re-armed (karabiner-life-2 regression)", function()
 
 	helpers.it("cooldown branch sets _pending_karabiner_ready_notify = true", function()
-		local src_path = helpers.driver_root() .. "modules/karabiner/ke_lifecycle.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "ke_lifecycle.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/karabiner/ke_lifecycle.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.flush_pending_ready_notification")
+		helpers.assert_true(src ~= nil, "modules/karabiner/ke_lifecycle.lua source must be locatable")
 
 		-- Locate the cooldown guard (KARABINER_READY_NOTIFY_COOLDOWN_SEC comparison).
 		local cooldown_pos = src:find("KARABINER_READY_NOTIFY_COOLDOWN_SEC", 1, true)
@@ -77,10 +78,11 @@ end)
 helpers.describe("ke_lifecycle notify cooldown — periodic retry armed (F-MED-18 regression)", function()
 
 	local function read_source()
-		local src_path = helpers.driver_root() .. "modules/karabiner/ke_lifecycle.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "ke_lifecycle.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/karabiner/ke_lifecycle.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.flush_pending_ready_notification")
+		helpers.assert_true(src ~= nil, "modules/karabiner/ke_lifecycle.lua source must be locatable")
 		return src
 	end
 
