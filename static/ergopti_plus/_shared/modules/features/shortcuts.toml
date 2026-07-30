@@ -1,10 +1,25 @@
 # _shared/modules/features/shortcuts.toml
 # Companion manifest defining keyboard shortcut bindings for each driver.
-# Single source of truth for shortcut ids, i18n keys and default key chords.
 #
-# Consumed by `scripts/codegen-shortcuts.cjs` which generates:
-#   static/ergopti_plus/windows/_generated/shortcuts_bindings.ahk
-#   static/ergopti_plus/macos/_generated/shortcuts_bindings.lua
+# ============================== STATUS: UNREAD ==============================
+# NOTHING READS THIS FILE. Its generator `tools/codegen/codegen-shortcuts.cjs`
+# and both of its outputs (`windows/_generated/shortcuts_bindings.ahk`,
+# `macos/_generated/shortcuts_bindings.lua`) were deleted on 2026-06-13 in
+# commit 794204fe6 as dead code; this data file was left behind. A repo-wide
+# grep for "features/shortcuts.toml" returns only this line.
+#
+# Do NOT treat it as a single source of truth: the live registries are
+# `windows/lib/feature_state.ahk` (KEYBOARD_SHORTCUT_DEFAULTS, 15 ids) and
+# `macos/modules/shortcuts/bindings.lua` (hotkey_defs, 21 ids), and this file
+# mirrors both faithfully while binding nothing.
+#
+# It is kept, not deleted, because it is the best-written description of the
+# shortcut model in the repo and is the target design for the one shared action
+# registry — see docs/PLAN_SIMPLIFICATION.md, invariant I4 and lot 6. Its
+# content folds into `_shared/modules/actions/actions.toml` as the
+# `default_chord` / `default_chord_<os>` fields, and this file is deleted in the
+# same commit that makes the drivers read those fields.
+# ===========================================================================
 #
 # Fields:
 #   id               Unique shortcut identifier (matches bindings.lua / ErgoptiPlus.ahk).

@@ -28,12 +28,41 @@ There is **no overlap**, only a naming coincidence:
   scripts** (`defaults.json`, model install scripts, `SPEC.md`, `test_vectors.json`)
   — zero `.lua` files.
 
-AHK cannot `require` Lua, so where macOS reads `_shared/lua/*` live, the AHK
-driver consumes a **generated** transpilation under `windows/_generated/` instead
-(produced from the same sources by `tools/codegen/` + `tools/build/`).
+## How the AHK driver gets shared logic — no transpilation exists
 
-## Invariant
+**Nothing in this repository is transpiled.** Every generator under `tools/codegen/`
+and `tools/build/` emits **data** in the target language; none translates Lua to AHK.
+Two of them additionally carry hand-written AHK inside a JS template string, which
+is what creates the illusion of transpilation — and one of those never even opens
+the Lua file it names as its source.
 
-> No runtime `.lua` belongs under `modules/`; no data-only catalogue belongs under
-> `lua/` (the `.lua` files in `lua/` are all executable modules, e.g. `lua/json.lua`).
-> Keep new files on the correct side of this line.
+The prior claim that "AHK cannot read the shared data" is also false:
+`windows/lib/json.ahk` and `windows/lib/toml/` exist, and the AHK driver already
+reads `menu_manifest.json`, `priority.json`, the 21 locale JSONs, every hotstrings
+TOML and `profiles.json` **at runtime**. Codegen here is therefore never about
+capability — only about boot cost and pre-resolution.
+
+So a behaviour shared with the AHK driver reaches it in exactly one of two ways:
+
+1. **Generated data** — the shared source is collapsed into a pre-resolved literal
+   (`_generated/features_manifest.ahk`, `_generated/terminators.ahk`).
+2. **A hand-written twin pinned by a shared vector corpus** — `_shared/tests/corpus/`
+   is then the contract, and a divergence fails CI on both drivers.
+
+A third hand-maintained copy with no corpus between it and its twin is not allowed.
+
+## Invariants
+
+> 1. No runtime `.lua` belongs under `modules/`; no data-only catalogue belongs under
+>    `lua/` (the `.lua` files in `lua/` are all executable modules, e.g. `lua/json.lua`).
+> 2. **Generate only** when the driver cannot read the source, or when reading it at
+>    boot would cost measurable milliseconds. Otherwise read the data at runtime — and
+>    when you do generate, generate *data*, never *logic*.
+> 3. No node under `_shared/` may be named after a platform. Two current violations
+>    (`lua/linux/`, `lua/llm/linux_bridge.lua`) are tracked in
+>    [`docs/PLAN_SIMPLIFICATION.md`](../../../docs/PLAN_SIMPLIFICATION.md) §5.5.
+> 4. `_shared/lua/` is **not** automatically shared: measured, only 37.7 % of its
+>    8 473 lines are required in production by both Lua drivers. Check the real
+>    consumers before assuming an edit reaches macOS *and* Linux.
+>
+> Keep new files on the correct side of these lines.

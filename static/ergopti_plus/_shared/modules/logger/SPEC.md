@@ -1,10 +1,16 @@
 # Ergopti+ — Logger Specification (cross-driver)
 
 This document is the **single source of truth** for the logger contract shared by
-the AHK and Hammerspoon drivers. Both `lib/logger.ahk` and `lib/logger.lua` MUST
-conform to every behaviour described here. Divergences between the two
-implementations are listed explicitly in [§ Driver-specific extensions](#driver-specific-extensions)
-and are intentional.
+**all three** drivers. `windows/lib/logger.ahk`, `macos/lib/logger.lua` and
+`_shared/lua/logger/init.lua` MUST conform to every behaviour described here.
+Divergences are listed explicitly in
+[§ Driver-specific extensions](#driver-specific-extensions) and are intentional.
+
+> Note on the third implementation: `_shared/lua/logger/init.lua` is the
+> platform-neutral core (levels, formatter, ring buffer, level filter) and is
+> designed to be extended by injecting an output sink via `M.set_sink()`. It is
+> consumed today by the **Linux** driver only, via `logger/shim.lua`; macOS and
+> Windows each re-implement the same contract independently.
 
 ---
 
@@ -276,7 +282,7 @@ contract. Both drivers are free to keep or remove them independently.
 | ------------------------------ | --- | --- | ------------------------------------------------------------------- |
 | Coloured console output        | ✗   | ✓   | `hs.console.printStyledText()` with per-variant RGB colour          |
 | DEBUG-axis indentation         | ✗   | ✓   | 10-space prefix on DEBUG / TRACE / DONE lines in console            |
-| Consecutive-line deduplication | ✗   | ✓   | Suppresses repeated identical lines; prints count summary           |
+| Consecutive-line deduplication | ✓   | ✓   | Suppresses repeated identical lines; prints count summary. AHK: `_LOGGER_DEDUP_KEY/_LEVEL/_COUNT` + `_LoggerEmitDedupSummary`, guarded by `tests/meta/test_logger_dedup_tick.ahk` and `test_logger_dedup_exit_flush.ahk` |
 | Error notification callback    | ✗   | ✓   | Optional handler passed to `set_error_notification_handler()`       |
 | `pcall` wrapper                | ✗   | ✓   | `Logger.pcall(module, fn, ...)` — wraps pcall with error logging    |
 | `build` wrapper                | ✗   | ✓   | `Logger.build(module, label, fn, ctx)` — builder with error logging |
@@ -293,9 +299,12 @@ time-independent.
 
 Test-runner integration:
 
-- **AHK**: `tests/test_logger.ahk` includes a section that loads `test_vectors.json`
-  via `JsonParse()` and asserts each expected line (with timestamp replaced).
-- **HS**: `tests/unit/lib/test_logger.lua` does the same via `require("lib.json")`.
+- **AHK**: `windows/tests/unit/test_logger.ahk` includes a section that loads
+  `test_vectors.json` via `JsonParse()` and asserts each expected line (with timestamp
+  replaced).
+- **HS**: `macos/tests/unit/lib/test_logger.lua` does the same via `require("lib.json")`.
+- **Linux**: no vector replay today. The shared core it runs is therefore unpinned by
+  this spec.
 
 ---
 
