@@ -17,10 +17,11 @@ local helpers = require("tests.helpers")
 -- We use the source-invariant approach: verify the structural properties of
 -- the source rather than executing it (hs.* is unavailable headless).
 
-local src_path = helpers.driver_root() .. "ui/onboarding/init.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("onboarding/init.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to ui/onboarding/init.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function _layout_image_url")
+helpers.assert_true(src ~= nil, "ui/onboarding/init.lua source must be locatable")
 
 -- Test 1: M._answers_from_config must be defined.
 local has_answers_from_config = src:find("function M._answers_from_config(", 1, true) ~= nil

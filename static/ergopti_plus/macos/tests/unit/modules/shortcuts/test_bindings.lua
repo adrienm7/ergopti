@@ -49,10 +49,11 @@ local Bindings = helpers.load_with_stubs("modules.shortcuts.bindings")
 helpers.describe("bindings — disable persists across stop/start (shortcuts-bindings-reenable-on-resume)", function()
 
 	local function read_source()
-		local src_path = helpers.driver_root() .. "modules/shortcuts/bindings.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "bindings.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/shortcuts/bindings.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function get_frontmost_app_name")
+		helpers.assert_true(src ~= nil, "modules/shortcuts/bindings.lua source must be locatable")
 		return src
 	end
 

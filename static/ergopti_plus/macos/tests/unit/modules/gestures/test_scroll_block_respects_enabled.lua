@@ -29,10 +29,11 @@ local helpers = require("tests.helpers")
 helpers.describe("gestures.engine scroll-block — respects enabled flag (gestures-engine-scroll regression)", function()
 
 	helpers.it("source: the n >= 3 scroll-block branch contains _state.enabled guard", function()
-		local src_path = helpers.driver_root() .. "modules/gestures/engine.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "gestures/engine.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/gestures/engine.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function triggerLiveAxisIfNeeded")
+		helpers.assert_true(src ~= nil, "modules/gestures/engine.lua source must be locatable")
 
 		-- Locate the n >= 3 branch that calls startScrollBlock. The gate now also
 		-- checks _state.suspended so a paused engine cannot activate scroll-block
@@ -49,10 +50,11 @@ helpers.describe("gestures.engine scroll-block — respects enabled flag (gestur
 	end)
 
 	helpers.it("source: stopScrollBlock() on n == 0 remains unconditional (guard must not be added there)", function()
-		local src_path = helpers.driver_root() .. "modules/gestures/engine.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/gestures/engine.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function triggerLiveAxisIfNeeded")
+		helpers.assert_true(src ~= nil, "modules/gestures/engine.lua source must be locatable")
 
 		-- The n == 0 branch must call stopScrollBlock() unconditionally so the block
 		-- is always released when fingers lift, regardless of enabled state.

@@ -134,10 +134,11 @@ end)
 helpers.describe("M-8: prediction_engine wires context_window_chars (source)", function()
 
 	helpers.it("prediction_engine.lua passes context_window_chars in PromptBuilder.build config", function()
-		local path = helpers.driver_root() .. "modules/llm/prediction_engine.lua"
-		local fh   = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "prediction_engine.lua must be readable")
-		local src  = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/llm/prediction_engine.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function compute_adaptive_debounce")
+		helpers.assert_true(src ~= nil, "modules/llm/prediction_engine.lua source must be locatable")
 		helpers.assert_true(src:find("context_window_chars", 1, true) ~= nil,
 			"prediction_engine.lua must pass context_window_chars into PromptBuilder.build so the user setting takes effect (M-8)")
 	end)

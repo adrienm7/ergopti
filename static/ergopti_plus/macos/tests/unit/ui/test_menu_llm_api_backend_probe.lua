@@ -18,10 +18,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "ui/menu/menu_llm/init.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("menu_llm/init.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to ui/menu/menu_llm/init.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("function M.terminate_orphan_mlx_server")
+helpers.assert_true(src ~= nil, "ui/menu/menu_llm/init.lua source must be locatable")
 
 -- Locate probe_llm_health body.
 local fn_pos = src:find("local function probe_llm_health(", 1, true)
@@ -65,14 +66,21 @@ helpers.assert_true(
 
 -- Test 5 (F-LOW-6): backend_panel.lua's API-backend switch handler must call
 -- the reset hook when activating the API backend.
-local backend_panel_path = helpers.driver_root() .. "ui/menu/menu_llm/backend_panel.lua"
-local fh2 = io.open(backend_panel_path, "r")
-helpers.assert_true(fh2 ~= nil, "backend_panel.lua must be readable")
-local panel_src = fh2:read("*a"); fh2:close()
+-- Selected by a declaration rather than by path, so moving or splitting the
+-- module cannot turn this invariant into a path error. The selector is not
+-- unique to backend_panel.lua — menu_llm/init.lua declares it too — so the
+-- assertion below is written to be ORDER-INDEPENDENT: it extracts the handler
+-- by its own delimiters instead of taking a fixed-width window after a hit,
+-- which is what made the old form depend on where the file sat in the scan.
+local panel_src = helpers.read_driver_source("local function check_backend_deps")
+helpers.assert_true(panel_src ~= nil, "ui/menu/menu_llm/backend_panel.lua source must be locatable")
 
 local api_switch_pos = panel_src:find('state.llm_backend = "api"', 1, true)
 helpers.assert_true(api_switch_pos ~= nil, "backend_panel.lua must set state.llm_backend = \"api\" on API switch")
-local api_switch_body = panel_src:sub(api_switch_pos, api_switch_pos + 500)
+-- The handler runs from the backend flip to the `end` closing its `if`, at the
+-- same indentation as the `if` itself. Bounding on that instead of on 500
+-- characters keeps the check inside the one function it is about.
+local api_switch_body = panel_src:sub(api_switch_pos, (panel_src:find("\n\t\t\tend\n", api_switch_pos, true) or #panel_src))
 helpers.assert_true(
 	api_switch_body:find("reset_llm_health_status", 1, true) ~= nil,
 	"backend_panel.lua's API-backend switch handler must call reset_llm_health_status (F-LOW-6)"

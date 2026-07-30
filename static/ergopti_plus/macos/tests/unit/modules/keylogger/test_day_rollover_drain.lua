@@ -380,10 +380,11 @@ end)
 -- ================================================
 
 local function read_source()
-	local path = helpers.driver_root() .. "modules/keylogger/log_manager.lua"
-	local fh = io.open(path, "r")
-	if not fh then error("Cannot read log_manager.lua for source scan") end
-	local src = fh:read("*a"); fh:close()
+	-- Selected by a declaration unique to modules/keylogger/log_manager.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("local function _mark_aggregate_cache_rebuilt")
+	helpers.assert_true(src ~= nil, "modules/keylogger/log_manager.lua source must be locatable")
 	return src
 end
 

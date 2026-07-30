@@ -100,10 +100,11 @@ end)
 helpers.describe("keylogger: notify_synthetic source guards utf8.codes with pcall(utf8.len, …) (F-HIGH-16)", function()
 
 	helpers.it("the validation call precedes the utf8.codes loop inside notify_synthetic", function()
-		local path = helpers.driver_root() .. "modules/keylogger/init.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open keylogger/init.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function ensure_browser_window_filter")
+		helpers.assert_true(src ~= nil, "modules/keylogger/init.lua source must be locatable")
 
 		local body = src:match("function M%.notify_synthetic.-\nend")
 		helpers.assert_true(body ~= nil, "notify_synthetic body must be locatable")
@@ -116,10 +117,11 @@ helpers.describe("keylogger: notify_synthetic source guards utf8.codes with pcal
 	end)
 
 	helpers.it("expander.lua wraps its notify_synthetic call site in a pcall", function()
-		local path = helpers.driver_root() .. "modules/keymap/expander.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open expander.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keymap/expander.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.perform_text_replacement")
+		helpers.assert_true(src ~= nil, "modules/keymap/expander.lua source must be locatable")
 
 		helpers.assert_true(
 			src:find("pcall(keylogger.notify_synthetic", 1, true) ~= nil,

@@ -32,10 +32,11 @@ local helpers = require("tests.helpers")
 helpers.describe("personal_info interceptor — Alt+Backspace resets state (dynhotstrings-2 regression)", function()
 
 	local function read_source()
-		local src_path = helpers.driver_root() .. "modules/dynamic_hotstrings/personal_info.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "personal_info.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/dynamic_hotstrings/personal_info.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function parse_toml_section")
+		helpers.assert_true(src ~= nil, "modules/dynamic_hotstrings/personal_info.lua source must be locatable")
 		return src
 	end
 

@@ -137,10 +137,11 @@ helpers.describe("config_overrides source: no {N} log placeholders", function()
 	-- Logger.success passed those to string.format, which treated them as literal
 	-- brace-sequences and left them in the output — keys and paths were never shown.
 	helpers.it("source uses %s / %d placeholders, not {N}", function()
-		local src_path = helpers.driver_root() .. "lib/config_overrides.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "lib/config_overrides.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to lib/config_overrides.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function match_quoted_prefix")
+		helpers.assert_true(src ~= nil, "lib/config_overrides.lua source must be locatable")
 		helpers.assert_true(
 			src:find("{1}", 1, true) == nil and src:find("{2}", 1, true) == nil,
 			"config_overrides.lua must not use {N} log placeholders — use %s / %d instead")

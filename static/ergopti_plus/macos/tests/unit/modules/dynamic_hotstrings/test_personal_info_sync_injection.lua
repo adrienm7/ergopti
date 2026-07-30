@@ -30,10 +30,11 @@ local helpers = require("tests.helpers")
 helpers.describe("personal_info interceptor — synchronous do_expand (dynhotstrings-1 regression)", function()
 
 	helpers.it("source does NOT defer do_expand via timer.doAfter(0, ...)", function()
-		local src_path = helpers.driver_root() .. "modules/dynamic_hotstrings/personal_info.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "personal_info.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/dynamic_hotstrings/personal_info.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function parse_toml_section")
+		helpers.assert_true(src ~= nil, "modules/dynamic_hotstrings/personal_info.lua source must be locatable")
 
 		-- The A3 race: the interceptor used to return "consume" while deferring the
 		-- actual expansion to the next run-loop tick via doAfter(0, function() do_expand(...) end).
@@ -45,10 +46,11 @@ helpers.describe("personal_info interceptor — synchronous do_expand (dynhotstr
 	end)
 
 	helpers.it("source still defers _replacing release via doAfter(0.15, ...) — that path is valid", function()
-		local src_path = helpers.driver_root() .. "modules/dynamic_hotstrings/personal_info.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/dynamic_hotstrings/personal_info.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function parse_toml_section")
+		helpers.assert_true(src ~= nil, "modules/dynamic_hotstrings/personal_info.lua source must be locatable")
 		-- The 0.15 s deferred _replacing release is intentional (prevents re-entrant
 		-- expansion on the same keystroke) and must still be present.
 		helpers.assert_true(
@@ -72,10 +74,11 @@ helpers.describe("personal_info fallback — arm_synthetic must not pass emitted
 	-- count — and relies on suppress_rescan() to prevent spurious hotstring matches.
 
 	helpers.it("fallback path calls arm_synthetic with empty string, not emitted", function()
-		local src_path = helpers.driver_root() .. "modules/dynamic_hotstrings/personal_info.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "personal_info.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/dynamic_hotstrings/personal_info.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function parse_toml_section")
+		helpers.assert_true(src ~= nil, "modules/dynamic_hotstrings/personal_info.lua source must be locatable")
 
 		-- Verify the fallback does NOT pass emitted to arm_synthetic
 		helpers.assert_true(
@@ -90,10 +93,11 @@ helpers.describe("personal_info fallback — arm_synthetic must not pass emitted
 	end)
 
 	helpers.it("fallback path calls suppress_rescan after arm_synthetic", function()
-		local src_path = helpers.driver_root() .. "modules/dynamic_hotstrings/personal_info.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/dynamic_hotstrings/personal_info.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function parse_toml_section")
+		helpers.assert_true(src ~= nil, "modules/dynamic_hotstrings/personal_info.lua source must be locatable")
 		helpers.assert_true(
 			src:find("suppress_rescan", 1, true) ~= nil,
 			"fallback must call suppress_rescan() to prevent hotstring re-triggering after injection"

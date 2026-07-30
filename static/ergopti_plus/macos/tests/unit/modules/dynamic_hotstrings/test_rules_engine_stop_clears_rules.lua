@@ -10,10 +10,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "modules/dynamic_hotstrings/rules_engine.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("rules_engine.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to modules/dynamic_hotstrings/rules_engine.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function register_prefix_entries")
+helpers.assert_true(src ~= nil, "modules/dynamic_hotstrings/rules_engine.lua source must be locatable")
 
 -- Locate the stop() function body.
 local stop_start = src:find("function M.stop()", 1, true)

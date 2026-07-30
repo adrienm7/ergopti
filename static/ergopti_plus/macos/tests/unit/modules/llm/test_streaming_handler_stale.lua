@@ -174,10 +174,11 @@ end
 helpers.describe("streaming_handler.on_success: reset ordered after the stale guard (source)", function()
 
 	helpers.it("_consecutive_llm_failures = 0 appears AFTER the fetch_id stale-guard return", function()
-		local path = helpers.driver_root() .. "modules/llm/streaming_handler.lua"
-		local fh   = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "modules/llm/streaming_handler.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/llm/streaming_handler.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function build_dedup_key")
+		helpers.assert_true(src ~= nil, "modules/llm/streaming_handler.lua source must be locatable")
 
 		local success_start = src:find("local function on_success", 1, true)
 		helpers.assert_true(success_start ~= nil, "on_success must be defined")

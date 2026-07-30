@@ -25,10 +25,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("boot: core backend is synced before the model is pushed to the engine", function()
 	local function read_menu_init()
-		local path = helpers.driver_root() .. "ui/menu/init.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open ui/menu/init.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function safe_require")
+		helpers.assert_true(src ~= nil, "ui/menu/init.lua source must be locatable")
 		return src
 	end
 
@@ -59,10 +60,11 @@ helpers.describe("set_llm_model resolves the backend at call time (not capture t
 	-- must read core_llm.get_backend() when it runs, so asserting the backend before
 	-- the model is pushed is what routes the warmup correctly.
 	helpers.it("set_llm_model reads core_llm.get_backend() inside the function body", function()
-		local path = helpers.driver_root() .. "modules/llm/prediction_engine.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open prediction_engine.lua")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/llm/prediction_engine.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function compute_adaptive_debounce")
+		helpers.assert_true(src ~= nil, "modules/llm/prediction_engine.lua source must be locatable")
 
 		local fn_start = src:find("function M.set_llm_model(model_name)", 1, true)
 		helpers.assert_true(fn_start ~= nil, "set_llm_model must exist")

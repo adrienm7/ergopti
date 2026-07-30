@@ -12,18 +12,17 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "modules/gestures/actions.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("modules/gestures/actions.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to modules/gestures/actions.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function switch_to_previous_window_precise")
+helpers.assert_true(src ~= nil, "modules/gestures/actions.lua source must be locatable")
 
 -- The synthetic click-hold subsystem (the guarded mouseUp re-toggle) was
 -- extracted into actions_click.lua. Read it too and search the combined source
 -- for the rclick-guard assertion, so the regression check survives that move.
-local click_path = helpers.driver_root() .. "modules/gestures/actions_click.lua"
-local cfh = io.open(click_path, "r")
-local click_src = cfh and cfh:read("*a") or ""
-if cfh then cfh:close() end
+local click_src = helpers.read_driver_source("local function start_click_key_watcher")
+helpers.assert_true(click_src ~= nil, "modules/gestures/actions_click.lua source must be locatable")
 local all_src = src .. "\n" .. click_src
 
 -- Test 1 (gestures-actions-snap): snap_right uses moveToUnit(hs.layout.right50).

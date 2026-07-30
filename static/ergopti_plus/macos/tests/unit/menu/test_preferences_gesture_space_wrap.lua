@@ -122,10 +122,11 @@ end)
 helpers.describe("preferences.save — gesture_space_wrap nil-vs-false guard (ui-menu-core-2 regression)", function()
 
 	helpers.it("source: no 'get_space_wrap() or true' short-circuit (Lua nil-vs-false trap)", function()
-		local src_path = helpers.driver_root() .. "ui/menu/preferences.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "preferences.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/preferences.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function flatten_from_disk")
+		helpers.assert_true(src ~= nil, "ui/menu/preferences.lua source must be locatable")
 
 		-- The buggy expression: `fn() or true` returns true when fn() returns false.
 		-- Even restricted to the get_space_wrap context the pattern is unambiguous.
@@ -137,10 +138,11 @@ helpers.describe("preferences.save — gesture_space_wrap nil-vs-false guard (ui
 	end)
 
 	helpers.it("source: explicit if/else guards get_space_wrap call", function()
-		local src_path = helpers.driver_root() .. "ui/menu/preferences.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/preferences.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function flatten_from_disk")
+		helpers.assert_true(src ~= nil, "ui/menu/preferences.lua source must be locatable")
 
 		-- The fix uses an explicit guard so false is not confused with nil.
 		local has_guard = src:find('type(gestures.get_space_wrap) == "function" then', 1, true) ~= nil

@@ -10,10 +10,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "ui/metrics_typing/init.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("metrics_typing/init.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to ui/metrics_typing/init.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function _maybe_invalidate_range_cache")
+helpers.assert_true(src ~= nil, "ui/metrics_typing/init.lua source must be locatable")
 
 -- Locate the clear_cache handler block.
 local cc_start = src:find('query.action == "clear_cache"', 1, true)

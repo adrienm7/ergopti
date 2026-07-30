@@ -24,10 +24,11 @@
 local helpers = require("tests.helpers")
 
 local function read_network_info_src()
-	local path = helpers.driver_root() .. "adapters/network_info.lua"
-	local fh   = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "adapters/network_info.lua must be readable")
-	local src = fh:read("*a"); fh:close()
+	-- Selected by a declaration unique to adapters/network_info.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("local function _refresh_internet_reachable")
+	helpers.assert_true(src ~= nil, "adapters/network_info.lua source must be locatable")
 	return src
 end
 

@@ -63,9 +63,11 @@ end)
 
 helpers.describe("active-layout probe: handle is forward-declared and GC-pinned", function()
 	helpers.it("input_sources pins the probe task and checks start()", function()
-		local path = helpers.driver_root() .. "modules/keymap/input_sources.lua"
-		local fh = assert(io.open(path, "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keymap/input_sources.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function resolve_installed_ergopti_version")
+		helpers.assert_true(src ~= nil, "modules/keymap/input_sources.lua source must be locatable")
 
 		-- A module-level GC-root table must exist.
 		helpers.assert_true(src:find("_active_probe_tasks", 1, true) ~= nil,

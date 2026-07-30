@@ -15,10 +15,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "modules/keymap/registry.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("registry.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to modules/keymap/registry.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function trigger_has_shift_symbol")
+helpers.assert_true(src ~= nil, "modules/keymap/registry.lua source must be locatable")
 
 -- Find the update_trigger_char function body.
 local fn_start = src:find("function update_trigger_char", 1, true)

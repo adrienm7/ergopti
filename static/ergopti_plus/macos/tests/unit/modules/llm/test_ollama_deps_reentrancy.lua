@@ -10,10 +10,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "modules/llm/ollama_deps_checker.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("modules/llm/ollama_deps_checker.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to modules/llm/ollama_deps_checker.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function resolve_project_root")
+helpers.assert_true(src ~= nil, "modules/llm/ollama_deps_checker.lua source must be locatable")
 
 -- Test 1: reentrancy flag declared at module level.
 local flag_pos = src:find("local _task_running", 1, true)

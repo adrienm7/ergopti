@@ -201,10 +201,11 @@ helpers.describe("tooltip: empty content uses hide_forced, not hide (F32 regress
 		-- The bug: show(nil) and show('') called M.hide(), which is blocked
 		-- while a dequeue cycle is running. The tooltip stayed visible even though
 		-- the caller explicitly asked to show nothing. Fix: use hide_forced().
-		local src_path = helpers.driver_root() .. "ui/tooltip/tooltip_hotstring.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "tooltip_hotstring.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/tooltip/tooltip_hotstring.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function stop_watchers_only")
+		helpers.assert_true(src ~= nil, "ui/tooltip/tooltip_hotstring.lua source must be locatable")
 
 		-- Find the M.show function body and assert it uses hide_forced on empty content
 		local show_body = src:match("function M%.show%(.-\nend")
@@ -223,10 +224,11 @@ helpers.describe("tooltip: empty content uses hide_forced, not hide (F32 regress
 	end)
 
 	helpers.it("show_loading('') path calls hide_forced in source", function()
-		local src_path = helpers.driver_root() .. "ui/tooltip/tooltip_hotstring.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/tooltip/tooltip_hotstring.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function stop_watchers_only")
+		helpers.assert_true(src ~= nil, "ui/tooltip/tooltip_hotstring.lua source must be locatable")
 
 		local load_body = src:match("function M%.show_loading%(.-\nend")
 		helpers.assert_true(load_body ~= nil, "M.show_loading must be present")
@@ -236,10 +238,11 @@ helpers.describe("tooltip: empty content uses hide_forced, not hide (F32 regress
 	end)
 
 	helpers.it("show_stacked with empty rows calls hide_forced in source", function()
-		local src_path = helpers.driver_root() .. "ui/tooltip/tooltip_hotstring.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/tooltip/tooltip_hotstring.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function stop_watchers_only")
+		helpers.assert_true(src ~= nil, "ui/tooltip/tooltip_hotstring.lua source must be locatable")
 
 		local stack_body = src:match("function M%.show_stacked%(.-\nend")
 		helpers.assert_true(stack_body ~= nil, "M.show_stacked must be present")

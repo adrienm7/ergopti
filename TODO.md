@@ -144,9 +144,19 @@ Two conventions that make asymmetry legible:
 Constraints: **paths before moves, moves before content, data before code.**
 
 - **Lot 2 — the safety net before any rename.**
-  3. Convert the 88 auto-convertible macOS pinned reads
-     (`tools/lint/fix-pinned-source-reads.cjs --all --fix`), hand-convert the
-     other 90, **lower** both ratchets.
+  3. Residual pinned reads, both ratchets now at their floor (macOS 34, AHK 16).
+     The macOS 15 left need a human: their target module has no declaration
+     unique to it, so `read_driver_source` would concatenate several files and
+     silently change what the test asserts — make the assertion
+     order-independent first, as `test_menu_llm_api_backend_probe.lua` now is.
+     The AHK 16 each pin deliberately (`run_all.ahk` itself, a `_generated/` file
+     that `_DriverSourceConcat` excludes, a runner, or a single file carrying an
+     ABSENCE assertion a directory-wide scan would weaken).
+     **Hole found while doing this:** both ratchets apply `HELPER_RE` per FILE,
+     so one converted read hides every remaining pinned read in the same file.
+     That is why the macOS count did not move when four more files were
+     converted. Counting per READ is the fix; it belongs with the §0.7 work on
+     the same gates.
   6. Parse coverage per driver: **115 of 240 production AHK files (48 %)** are
      reachable from the entry point but not from `run_all.ahk`, so they are
      validated only as text; the Linux entry point has **zero** parse coverage.

@@ -10,10 +10,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "modules/shortcuts/keyboard_shortcuts.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("keyboard_shortcuts.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to modules/shortcuts/keyboard_shortcuts.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function load_assignments")
+helpers.assert_true(src ~= nil, "modules/shortcuts/keyboard_shortcuts.lua source must be locatable")
 
 -- Locate the stop() function body.
 local stop_start = src:find("function M.stop()", 1, true)

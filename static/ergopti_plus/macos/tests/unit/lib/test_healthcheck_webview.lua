@@ -35,10 +35,11 @@ helpers.describe("healthcheck — evaluateJavaScript pcall guard (healthcheck-we
 
 	local function read_source()
 		-- After the F2 split, the webview poll-timer logic lives in core.lua.
-		local src_path = helpers.driver_root() .. "ui/healthcheck/core.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "healthcheck core.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/healthcheck/core.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function _stop_poll")
+		helpers.assert_true(src ~= nil, "ui/healthcheck/core.lua source must be locatable")
 		return src
 	end
 

@@ -22,10 +22,11 @@ local helpers = require("tests.helpers")
 
 local function read_src()
 	-- The streaming path lives in the request engine.
-	local path = helpers.driver_root() .. "modules/llm/api_mlx_inference.lua"
-	local fh = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "cannot open api_mlx_inference.lua at " .. tostring(path))
-	local src = fh:read("*a"); fh:close()
+	-- Selected by a declaration unique to modules/llm/api_mlx_inference.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("function M.post_and_parse_streaming")
+	helpers.assert_true(src ~= nil, "modules/llm/api_mlx_inference.lua source must be locatable")
 	return src
 end
 

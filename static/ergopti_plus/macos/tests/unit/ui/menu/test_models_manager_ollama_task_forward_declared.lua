@@ -23,10 +23,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("models_manager_ollama: installed-models refresh task is forward-declared (closure-nil guard)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "ui/menu/menu_llm/models_manager_ollama.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open models_manager_ollama.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_llm/models_manager_ollama.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function get_ollama_path")
+		helpers.assert_true(src ~= nil, "ui/menu/menu_llm/models_manager_ollama.lua source must be locatable")
 		return src
 	end
 

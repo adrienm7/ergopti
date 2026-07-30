@@ -22,10 +22,11 @@ local helpers = require("tests.helpers")
 helpers.describe("menu_shortcuts: extension sandbox has __index fallback to _G", function()
 
 	helpers.it("source calls setmetatable(sandbox, { __index = _G }) before setfenv", function()
-		local src_path = helpers.driver_root() .. "ui/menu/menu_shortcuts.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "ui/menu/menu_shortcuts.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_shortcuts.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function build_wrap_symbols_submenu")
+		helpers.assert_true(src ~= nil, "ui/menu/menu_shortcuts.lua source must be locatable")
 
 		-- The fix adds a setmetatable call with __index = _G inside the sandbox block.
 		helpers.assert_true(
@@ -37,10 +38,11 @@ helpers.describe("menu_shortcuts: extension sandbox has __index fallback to _G",
 	end)
 
 	helpers.it("setmetatable call appears before setfenv in source", function()
-		local src_path = helpers.driver_root() .. "ui/menu/menu_shortcuts.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_shortcuts.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function build_wrap_symbols_submenu")
+		helpers.assert_true(src ~= nil, "ui/menu/menu_shortcuts.lua source must be locatable")
 
 		local meta_pos  = src:find("setmetatable(sandbox", 1, true)
 		local fenv_pos  = src:find("setfenv(chunk_or_err", 1, true)

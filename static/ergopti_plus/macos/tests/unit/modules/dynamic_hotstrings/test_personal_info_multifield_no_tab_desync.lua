@@ -39,9 +39,11 @@
 local helpers = require("tests.helpers")
 
 local function read_src()
-	local path = helpers.driver_root() .. "modules/dynamic_hotstrings/personal_info.lua"
-	local fh = assert(io.open(path, "r"))
-	local src = fh:read("*a"); fh:close()
+	-- Selected by a declaration unique to modules/dynamic_hotstrings/personal_info.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("local function parse_toml_section")
+	helpers.assert_true(src ~= nil, "modules/dynamic_hotstrings/personal_info.lua source must be locatable")
 	return src
 end
 

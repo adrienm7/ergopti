@@ -16,10 +16,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "ui/personal_info_editor/init.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("personal_info_editor/init.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to ui/personal_info_editor/init.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function build_fields")
+helpers.assert_true(src ~= nil, "ui/personal_info_editor/init.lua source must be locatable")
 
 -- Test 1: No local HTTP server — that was the source of the leak.
 helpers.assert_true(

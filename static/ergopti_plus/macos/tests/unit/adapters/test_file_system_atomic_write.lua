@@ -159,10 +159,11 @@ end)
 -- a direct io.open(path, "w") without a regression test catching it.
 helpers.describe("adapters.file_system: write() source uses temp+rename (F-MED-16)", function()
 	local function read_source()
-		local path = helpers.driver_root() .. "adapters/file_system.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "file_system.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to adapters/file_system.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.expand_path")
+		helpers.assert_true(src ~= nil, "adapters/file_system.lua source must be locatable")
 		return src
 	end
 
