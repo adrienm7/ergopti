@@ -33,6 +33,7 @@ local Logger = require("logger.shim")
 local Timings = require("lib.timings")
 local Monotonic = require("lib.monotonic")
 local TomlCodec = require("toml_codec")
+local i18n = require("lib.i18n")
 local LOG = "modules.gestures.manager"
 local _writer_ok, TomlWriter = pcall(require, "toml_codec.writer")
 if not _writer_ok then TomlWriter = nil end
@@ -159,51 +160,69 @@ end
 -- =========================================
 -- =========================================
 
---- Linux action labels (fallback when i18n is absent).
-local ACTION_LABELS = {
-	open_url = "Ouvrir un lien",
-	search_web = "Rechercher sur le web",
-	none                        = "∅ Désactivé",
-	left_click_toggle           = "🖱 Clic gauche (maintien)",
-	right_click_toggle          = "🖱 Clic droit (maintien)",
-	ws_prev                     = "▢ ← Bureau précédent",
-	ws_next                     = "▢ → Bureau suivant",
-	tab_prev                    = "⇥ Onglet précédent",
-	tab_next                    = "⇥ Onglet suivant",
-	vol_up                      = "🔊 Volume +",
-	vol_down                    = "🔊 Volume -",
-	mute                        = "🔇 Muet",
-	brightness_up               = "☀ Luminosité +",
-	brightness_down             = "☀ Luminosité -",
-	track_play                  = "⏯ Lecture/Pause",
-	track_next                  = "⏭ Piste suivante",
-	track_prev                  = "⏮ Piste précédente",
-	app_switcher                = "⇥ Alt+Tab",
-	app_window_previous         = "◱ Fenêtre précédente",
-	close_window                = "◱ × Fermer fenêtre",
-	maximize                    = "🔲 Maximiser",
-	snap_left                   = "◧ ← Aligner gauche",
-	snap_right                  = "◨ → Aligner droite",
-	fullscreen                  = "📺 Plein écran",
-	word_prev                   = "W ← Mot précédent",
-	word_next                   = "W → Mot suivant",
-	line_up                     = "↕ ↑ Ligne précédente",
-	line_down                   = "↕ ↓ Ligne suivante",
-	line_start                  = "⇤ Début de ligne",
-	line_end                    = "⇥ Fin de ligne",
-	doc_start                   = "⤒ Début du document",
-	doc_end                     = "⤓ Fin du document",
-	enter                       = "↵ Entrée",
-	escape                      = "⎋ Échap",
-	backspace                   = "⌫ Retour",
-	delete                      = "⌦ Suppr",
-	arrow_up                    = "↑ Flèche haut",
-	arrow_down                  = "↓ Flèche bas",
-	arrow_left                  = "← Flèche gauche",
-	arrow_right                 = "→ Flèche droite",
-	lock_screen                 = "🔒 Verrouiller",
-	notification_center         = "🔔 Notifications",
+--- The registry of supported action ids, mapped to their suffix in the shared
+--- `sg_actions.*` catalogue.
+---
+--- This table used to hold hardcoded FRENCH labels, described as a "fallback
+--- when i18n is absent" — but nothing ever replaced them, so every user of the
+--- other 20 locales read French gesture names. The catalogue they belong in
+--- already existed, already carried all 21 translations, and was already
+--- consumed by the two other drivers; only Linux was not reading it.
+---
+--- Two ids differ from their catalogue name: this driver calls a virtual desktop
+--- a "workspace", the shared catalogue calls it a desktop. The mapping lives
+--- here rather than in a rename so the persisted config.toml of existing users
+--- keeps resolving.
+local ACTION_I18N_KEYS = {
+	open_url                    = "open_url",
+	search_web                  = "search_web",
+	none                        = "none",
+	left_click_toggle           = "left_click_toggle",
+	right_click_toggle          = "right_click_toggle",
+	ws_prev                     = "desktop_prev",
+	ws_next                     = "desktop_next",
+	tab_prev                    = "tab_prev",
+	tab_next                    = "tab_next",
+	vol_up                      = "vol_up",
+	vol_down                    = "vol_down",
+	mute                        = "mute",
+	brightness_up               = "brightness_up",
+	brightness_down             = "brightness_down",
+	track_play                  = "track_play",
+	track_next                  = "track_next",
+	track_prev                  = "track_prev",
+	app_switcher                = "app_switcher",
+	app_window_previous         = "app_window_previous",
+	close_window                = "close_window",
+	maximize                    = "maximize",
+	snap_left                   = "snap_left",
+	snap_right                  = "snap_right",
+	fullscreen                  = "fullscreen",
+	word_prev                   = "word_prev",
+	word_next                   = "word_next",
+	line_up                     = "line_up",
+	line_down                   = "line_down",
+	line_start                  = "line_start",
+	line_end                    = "line_end",
+	doc_start                   = "doc_start",
+	doc_end                     = "doc_end",
+	enter                       = "enter",
+	escape                      = "escape",
+	backspace                   = "backspace",
+	delete                      = "delete",
+	arrow_up                    = "arrow_up",
+	arrow_down                  = "arrow_down",
+	arrow_left                  = "arrow_left",
+	arrow_right                 = "arrow_right",
+	lock_screen                 = "lock_screen",
+	notification_center         = "notification_center",
 }
+
+--- Labels COMPUTED at registration time for the modifier-chord actions
+--- ("Ctrl + Shift + A"). They are language-neutral by construction — modifier
+--- and key names are the same in every locale — so they are stored as labels
+--- rather than as catalogue keys.
+local ACTION_COMPUTED_LABELS = {}
 
 -- Dynamic modifier-key actions use the same shared catalogue as Windows and
 -- macOS. Their labels are intentionally language-neutral (for example
@@ -255,7 +274,7 @@ local function register_modifier_chords(catalogue)
 		for _, key_def in ipairs(keys) do
 			local action_id = id_prefix .. "_" .. key_def.id
 			local key = key_def.linux_key or key_def.id
-			ACTION_LABELS[action_id] = label_prefix .. " + " .. key_def.label
+			ACTION_COMPUTED_LABELS[action_id] = label_prefix .. " + " .. key_def.label
 			MODIFIER_ACTION_COMMANDS[action_id] = table.concat(native_modifiers, "+") .. "+" .. key
 		end
 	end
@@ -398,14 +417,21 @@ end
 --- @return string
 function M.get_action_label(action_name)
 	if not action_name or action_name == "" then return "∅" end
-	return ACTION_LABELS[action_name] or action_name
+	local computed = ACTION_COMPUTED_LABELS[action_name]
+	if computed then return computed end
+	local suffix = ACTION_I18N_KEYS[action_name]
+	if not suffix then return action_name end
+	return i18n.get("sg_actions." .. suffix)
 end
 
 --- Returns the list of all available action names.
 --- @return table
 function M.get_action_names()
 	local names = {}
-	for k in pairs(ACTION_LABELS) do
+	for k in pairs(ACTION_I18N_KEYS) do
+		names[#names + 1] = k
+	end
+	for k in pairs(ACTION_COMPUTED_LABELS) do
 		names[#names + 1] = k
 	end
 	table.sort(names)
@@ -475,7 +501,7 @@ function M.set_action(slot, action_name)
 		Logger.warn(LOG, "Unknown gesture slot: %s", tostring(slot))
 		return
 	end
-	if action_name ~= "none" and not ACTION_LABELS[action_name] then
+	if action_name ~= "none" and not (ACTION_I18N_KEYS[action_name] or ACTION_COMPUTED_LABELS[action_name]) then
 		Logger.warn(LOG, "Unknown action '%s' for slot '%s' — will be a no-op.",
 			tostring(action_name), tostring(slot))
 	end
@@ -815,7 +841,7 @@ local function load_user_config(path)
 	if type(linux) ~= "table" then return end
 	if type(linux.gestures) == "table" then
 		for slot, action in pairs(linux.gestures) do
-			if M.DEFAULT_GESTURES[slot] and (action == "none" or ACTION_LABELS[action]) then _actions[slot] = action end
+			if M.DEFAULT_GESTURES[slot] and (action == "none" or ACTION_I18N_KEYS[action] or ACTION_COMPUTED_LABELS[action]) then _actions[slot] = action end
 		end
 	end
 	if type(linux.action_parameters) == "table" then
