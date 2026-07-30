@@ -485,17 +485,6 @@ remains is burning the baseline down by replacing the placeholders with real
 assertions, starting with the ones whose `Test()` calls are declared inside a
 function body and therefore only register if that function is called.
 
-### macOS: no ratchet against the closure-binds-nil-global pattern
-
-The recommendation was made in the 2026-06-19 audit and never delivered (no
-`*local_task*` test exists). This is the only bug class documented as having
-recurred **three** times — `api_ollama os.remove`, the F10 download fix, then
-F-CRIT-2, which left self-update completely dead. In Lua the scope of `local x`
-starts *after* the full statement, so the closure on the right-hand side captures
-the nil global, and `t[nil] = v` raises "table index is nil" — swallowed by
-`hs.task`'s internal pcall and invisible in the file logger. Every site is fixed
-today, so the guard goes green immediately: it is a pure ratchet against the
-fourth recurrence. Slug: `project_lua_closure_before_local_nil_global`.
 
 ---
 
