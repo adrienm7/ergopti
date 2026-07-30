@@ -336,13 +336,13 @@ function M.new(ctx)
 		-- Build a human-readable power description for the dialog body
 		local power_desc
 		if is_completion then
-			power_desc = "Profil de puissance détecté : complétion brute"
+			power_desc = i18n.get("menu.llm.power_completion")
 		elseif is_moe and active_params > 0 and total_params > 0 then
-			power_desc = string.format("Puissance détectée (MoE) : %gB actifs / %gB total", active_params, total_params)
+			power_desc = string.format(i18n.get("menu.llm.power_moe"), active_params, total_params)
 		elseif active_params > 0 then
-			power_desc = string.format("Puissance détectée : %gB", active_params)
+			power_desc = string.format(i18n.get("menu.llm.power_dense"), active_params)
 		else
-			power_desc = "Puissance détectée : inconnue"
+			power_desc = i18n.get("menu.llm.power_unknown")
 		end
 
 		local cur_profile = get_normalized_active_profile_id()
@@ -381,7 +381,9 @@ function M.new(ctx)
 				end
 			end
 		elseif opts.force_dialog then
-			local title = type(opts.dialog_title) == "string" and opts.dialog_title or "Profil recommandé"
+			local title = type(opts.dialog_title) == "string"
+				and opts.dialog_title
+				or  i18n.get("menu.llm.profile_recommended_title")
 			local msg = string.format(
 				i18n.get("menu.llm.profile_already_ok_msg"),
 				display_name, power_desc, cur_label, rec_label)

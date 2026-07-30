@@ -67,9 +67,15 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 		}
 
 		-- dialog_util is stubbed by the harness; drive it to return a valid value.
+		-- The stub echoes back the CONFIRM label the caller passed rather than a
+		-- literal: hardcoding "Enregistrer" pinned the test to a French spelling
+		-- that only held while the button itself was hardcoded, so routing it
+		-- through i18n turned this green test red for no behavioural reason.
 		local dialog = package.loaded["lib.dialog_util"]
 		if type(dialog) == "table" then
-			dialog.text_prompt = function() return "Enregistrer", "https://example.com" end
+			dialog.text_prompt = function(_title, _prompt, _prior, confirm)
+				return confirm, "https://example.com"
+			end
 		end
 
 		local ok = SU.prompt_action_parameter(gestures, "return_key", "open_url", "url")
@@ -93,9 +99,12 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 			validate_action_parameter = function() return true end,
 			set_action_parameter = function() stored = stored + 1 end,
 		}
+		-- Echo the CANCEL label the caller passed, for the same reason as above.
 		local dialog = package.loaded["lib.dialog_util"]
 		if type(dialog) == "table" then
-			dialog.text_prompt = function() return "Annuler", nil end
+			dialog.text_prompt = function(_title, _prompt, _prior, _confirm, cancel)
+				return cancel, nil
+			end
 		end
 
 		local ok = SU.prompt_action_parameter(gestures, "return_key", "open_url", "url")

@@ -288,21 +288,21 @@ function M.new(deps)
 
 		local warnings, is_critical = {}, false
 		
-		if sys_ram_gb > 0 and sys_ram_gb < ram_req then 
-			table.insert(warnings, string.format("⚠️ RAM : requis ~%.1f Go (%d Go disponible) — risque de lenteur", ram_req, sys_ram_gb))
-		else 
-			table.insert(warnings, string.format("🟢 RAM : requis ~%.1f Go (%d Go disponible)", ram_req, sys_ram_gb)) 
+		if sys_ram_gb > 0 and sys_ram_gb < ram_req then
+			table.insert(warnings, string.format(i18n.get("menu.llm.req_ram_low"), ram_req, sys_ram_gb))
+		else
+			table.insert(warnings, string.format(i18n.get("menu.llm.req_ram_ok"), ram_req, sys_ram_gb))
 		end
-		
+
 		if free_disk_gb > 0 then
 			local rem = free_disk_gb - dl_req
 			if rem < 2 then
 				is_critical = true
-				table.insert(warnings, string.format("❌ Disque : requis ~%.1f Go (%d Go disponible) — espace insuffisant", dl_req, free_disk_gb))
-			elseif rem < 15 then 
-				table.insert(warnings, string.format("⚠️ Disque : requis ~%.1f Go (%d Go disponible) — espace limité", dl_req, free_disk_gb))
-			else 
-				table.insert(warnings, string.format("🟢 Disque : requis ~%.1f Go (%d Go disponible)", dl_req, free_disk_gb)) 
+				table.insert(warnings, string.format(i18n.get("menu.llm.req_disk_insufficient"), dl_req, free_disk_gb))
+			elseif rem < 15 then
+				table.insert(warnings, string.format(i18n.get("menu.llm.req_disk_tight"), dl_req, free_disk_gb))
+			else
+				table.insert(warnings, string.format(i18n.get("menu.llm.req_disk_ok"), dl_req, free_disk_gb))
 			end
 		end
 

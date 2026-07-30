@@ -213,30 +213,50 @@ end
 --- @param action string The action being configured.
 --- @param spec string The parameter spec ("search_url" or a plain link).
 --- @return boolean True when a valid value was stored, false when cancelled.
+--- Builds the "Configure <action>" dialog title from its translated template.
+---
+--- The substitution is done on plain indices rather than with gsub: an action
+--- label may contain a `%`, which gsub reads as a capture reference in the
+--- REPLACEMENT string and would raise "invalid use of '%'".
+--- @param label string The human-readable action label.
+--- @return string The localised title.
+function M.action_parameter_title(label)
+	local template = i18n.get("dialog.gestures.param_title")
+	local at = template:find("{1}", 1, true)
+	if not at then return template .. " " .. tostring(label) end
+	return template:sub(1, at - 1) .. tostring(label) .. template:sub(at + 3)
+end
+
 function M.prompt_action_parameter(gestures, binding, action, spec)
 	if type(gestures) ~= "table" or type(spec) ~= "string" then return false end
 
 	local label  = (type(gestures.get_action_label) == "function" and gestures.get_action_label(action)) or action
 	local prior  = (type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(binding, action)) or ""
-	local prompt = spec == "search_url"
-		and "URL de recherche, avec exactement un %s pour la requête :"
-		or "Lien à ouvrir :"
+	-- The %s inside the search-URL prompt is LITERAL — it is the placeholder the
+	-- user has to type — so this string is never run through string.format. The
+	-- title uses {1} precisely so the two can never be confused.
+	local prompt = i18n.get(spec == "search_url"
+		and "dialog.gestures.param_search_url"
+		or  "dialog.gestures.param_link")
 
 	-- Loop until the value validates or the user cancels: accepting an invalid one
 	-- would store a parameter the action's own validator later rejects, which is
 	-- the silent no-op this prompt exists to prevent.
+	local title    = M.action_parameter_title(label)
+	local save_btn = i18n.get("button.save")
+
 	while true do
 		local button, value = dialog.text_prompt(
-			"Configurer " .. label, prompt, prior, "Enregistrer", "Annuler")
-		if button ~= "Enregistrer" then return false end
+			title, prompt, prior, save_btn, i18n.get("button.cancel"))
+		if button ~= save_btn then return false end
 		if type(gestures.validate_action_parameter) == "function"
 			and gestures.validate_action_parameter(action, value) then
 			pcall(gestures.set_action_parameter, binding, action, value)
 			return true
 		end
-		pcall(dialog.block_alert, "Valeur invalide",
-			"Saisissez une URL http:// ou https:// valide."
-			.. (spec == "search_url" and " L’URL doit contenir un seul %s." or ""),
+		pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
+			i18n.get("dialog.gestures.param_err_url")
+			.. (spec == "search_url" and (" " .. i18n.get("dialog.gestures.param_err_many_placeholders")) or ""),
 			"OK", nil, "warning")
 		prior = value or prior
 	end

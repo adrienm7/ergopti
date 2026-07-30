@@ -20,6 +20,7 @@ local dialog        = require("lib.dialog_util")
 local i18n          = require("lib.i18n")
 local ManifestMenu  = require("lib.manifest_menu")
 local ActionPicker  = require("ui.action_picker")
+local shortcut_utils = require("ui.menu.shortcut_utils")
 
 
 
@@ -154,12 +155,18 @@ function M.build(ctx)
 			if spec then
 				hs.timer.doAfter(0.05, function()
 					local prior = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, a) or ""
-					local prompt = spec == "search_url"
-						and "URL de recherche, avec exactement un %s pour la requête :"
-						or "Lien à ouvrir :"
+					-- The %s inside the search-URL prompt is LITERAL — it is the
+					-- placeholder the user has to type — so this string is never run
+					-- through string.format. The title uses {1} so the two cannot be
+					-- confused.
+					local prompt = i18n.get(spec == "search_url"
+						and "dialog.gestures.param_search_url"
+						or  "dialog.gestures.param_link")
+					local title    = shortcut_utils.action_parameter_title(gestures.get_action_label(a) or a)
+					local save_btn = i18n.get("button.save")
 					while true do
-						local button, value = dialog.text_prompt("Configurer " .. (gestures.get_action_label(a) or a), prompt, prior, "Enregistrer", "Annuler")
-						if button ~= "Enregistrer" then return end
+						local button, value = dialog.text_prompt(title, prompt, prior, save_btn, i18n.get("button.cancel"))
+						if button ~= save_btn then return end
 						if type(gestures.validate_action_parameter) == "function" and gestures.validate_action_parameter(a, value) then
 							pcall(gestures.set_action_parameter, slot, a, value)
 							local conflict = apply_action()
@@ -170,7 +177,10 @@ function M.build(ctx)
 							end
 							return
 						end
-						pcall(dialog.block_alert, "Valeur invalide", "Saisissez une URL http:// ou https:// valide." .. (spec == "search_url" and " L’URL doit contenir un seul %s." or ""), "OK", nil, "warning")
+						pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
+							i18n.get("dialog.gestures.param_err_url")
+							.. (spec == "search_url" and (" " .. i18n.get("dialog.gestures.param_err_many_placeholders")) or ""),
+							"OK", nil, "warning")
 						prior = value or prior
 					end
 				end)

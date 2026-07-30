@@ -386,7 +386,9 @@ function M.build(ctx)
 
 				local prefix         = (active_display_model == m_name) and "✓ " or "  "
 				local status         = is_inst and "🟢 " or ""
-				local type_str       = (info.type == "completion") and " [📝 Complétion]" or " [💬 Chat]"
+				local type_str       = " [" .. i18n.get((info.type == "completion")
+					and "menu.llm.model_type_completion"
+					or  "menu.llm.model_type_chat") .. "]"
 				local params_ram_str = (info.params and info.params > 0)
 					and string.format(" (%gB params, ~%d Go RAM)", math.ceil(info.params * 10) / 10, math.ceil(ram))
 					or  string.format(" (~%d Go RAM)", math.ceil(ram))
@@ -443,7 +445,9 @@ function M.build(ctx)
 				table.insert(model_submenu, { title = i18n.section("menu.llm.specs_header"), disabled = true })
 
 				local m_type    = m.type or info.type or "Inconnu"
-				local type_label = (m_type == "completion") and "📝 Complétion" or "💬 Chat"
+				local type_label = i18n.get((m_type == "completion")
+					and "menu.llm.model_type_completion"
+					or  "menu.llm.model_type_chat")
 				table.insert(model_submenu, {
 					title = string.format(i18n.get("menu.llm.model_type"), type_label),
 					fn    = function() end
