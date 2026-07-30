@@ -150,7 +150,7 @@ fi
 cat > "$INSTALL_ROOT/usr/lib/systemd/user/ergopti.service" << 'SERVICE_EOF'
 [Unit]
 Description=Ergopti — ergonomic keyboard optimizer
-Documentation=https://github.com/nizos/ergopti
+Documentation=https://github.com/adrienm7/ergopti
 After=graphical-session.target
 
 [Service]
@@ -172,7 +172,7 @@ Version:        $VERSION
 Release:        $RELEASE%{?dist}
 Summary:        Ergonomic keyboard optimizer with AI-powered hotstrings
 License:        MIT
-URL:            https://github.com/nizos/ergopti
+URL:            https://github.com/adrienm7/ergopti
 Source0:        %{name}-%{version}.tar.gz
 
 BuildArch:      noarch

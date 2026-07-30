@@ -123,6 +123,49 @@ if (luaOldRepoLiteral.test(luaSrc)) {
 	pass("updater.lua no longer has bare GH_REPO literal (reads from defaults.json)");
 }
 
+// ─── Check the Linux packaging recipes point at the real repository ──────────
+
+// Regression guard: build-linux-deb.sh, build-linux-rpm.sh and PKGBUILD each
+// carried "github.com/nizos/ergopti" — a different project. PKGBUILD used it as
+// its `source=` clone URL, so `makepkg` would have built the wrong repository,
+// and the .deb/.rpm advertised the wrong Homepage. The canonical owner/repo is
+// already single-sourced in defaults.json, so these files must agree with it.
+// Enumerated as a class rather than pinned per file: any new packaging recipe
+// under tools/build/ is covered the moment it is added.
+const PACKAGING_DIR = path.join(ROOT, "tools", "build");
+const GITHUB_URL_RE = /github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?=["'\s)#]|$)/g;
+
+let packagingFilesScanned = 0;
+let packagingUrlsChecked  = 0;
+
+for (const entry of fs.readdirSync(PACKAGING_DIR, { withFileTypes: true })) {
+	if (!entry.isFile()) continue;
+	// Shell packagers plus the extensionless Arch recipe.
+	if (!/\.(sh|cjs|js|py)$/.test(entry.name) && entry.name !== "PKGBUILD") continue;
+
+	const full = path.join(PACKAGING_DIR, entry.name);
+	const src  = fs.readFileSync(full, "utf8");
+	packagingFilesScanned++;
+
+	for (const m of src.matchAll(GITHUB_URL_RE)) {
+		packagingUrlsChecked++;
+		if (m[1] !== owner || m[2] !== repo) {
+			fail(
+				`tools/build/${entry.name}: github.com/${m[1]}/${m[2]} does not match ` +
+				`defaults.json github.owner/repo (${owner}/${repo})`
+			);
+		}
+	}
+}
+
+if (packagingFilesScanned === 0) {
+	fail("tools/build/ scan matched no packaging file — the selector is wrong, not the tree");
+} else if (packagingUrlsChecked === 0) {
+	fail("tools/build/ contains no github.com URL — expected at least the packaging Homepage/source lines");
+} else if (exitCode === 0) {
+	pass(`every github.com URL in tools/build/ matches defaults.json (${packagingUrlsChecked} URL(s) across ${packagingFilesScanned} file(s))`);
+}
+
 // ─── Verify dead constants.toml is gone ──────────────────────────────────────
 
 const deadToml = path.join(SHARED_ROOT, "modules", "updater", "constants.toml");
