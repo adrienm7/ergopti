@@ -43,12 +43,12 @@
 ; ``description_key`` and ``path``). Returns a string ready for the menu.
 ; ``MenuLabelFromManifestEntry``     -- preferred entry point.
 MenuLabelFromManifestEntry(Entry) {
-    if !IsObject(Entry) {
-        return ""
-    }
-    DescKey := Entry.Has("description_key") ? Entry["description_key"] : ""
-    Path    := Entry.Has("path")            ? Entry["path"]            : ""
-    return MenuLabelFromDescriptionKey(DescKey, Path)
+		if !IsObject(Entry) {
+				return ""
+		}
+		DescKey := Entry.Has("description_key") ? Entry["description_key"] : ""
+		Path    := Entry.Has("path")            ? Entry["path"]            : ""
+		return MenuLabelFromDescriptionKey(DescKey, Path)
 }
 
 ; Resolve a localised label given the manifest ``description_key`` and the
@@ -56,16 +56,16 @@ MenuLabelFromManifestEntry(Entry) {
 ; derived candidate keys resolves, the function returns the last segment of the
 ; path (or the key itself as a last-resort sentinel).
 MenuLabelFromDescriptionKey(DescKey, Path := "") {
-    Label := TryMenuLabelFromDescriptionKey(DescKey, Path)
-    if (Label != "") {
-        return Label
-    }
-    ; Last-resort fallback: the v2 path's tail segment, or the raw key.
-    if (Path != "") {
-        Parts := StrSplit(Path, ".")
-        return Parts[Parts.Length]
-    }
-    return DescKey
+		Label := TryMenuLabelFromDescriptionKey(DescKey, Path)
+		if (Label != "") {
+				return Label
+		}
+		; Last-resort fallback: the v2 path's tail segment, or the raw key.
+		if (Path != "") {
+				Parts := StrSplit(Path, ".")
+				return Parts[Parts.Length]
+		}
+		return DescKey
 }
 
 ; Try to resolve a localised label and return "" when no candidate key
@@ -73,39 +73,39 @@ MenuLabelFromDescriptionKey(DescKey, Path := "") {
 ; chain to a different fallback source (e.g. Features.Description for
 ; user-defined personal hotstring sections) rather than show the raw key.
 TryMenuLabelFromManifestEntry(Entry) {
-    if !IsObject(Entry) {
-        return ""
-    }
-    DescKey := Entry.Has("description_key") ? Entry["description_key"] : ""
-    Path    := Entry.Has("path")            ? Entry["path"]            : ""
-    return TryMenuLabelFromDescriptionKey(DescKey, Path)
+		if !IsObject(Entry) {
+				return ""
+		}
+		DescKey := Entry.Has("description_key") ? Entry["description_key"] : ""
+		Path    := Entry.Has("path")            ? Entry["path"]            : ""
+		return TryMenuLabelFromDescriptionKey(DescKey, Path)
 }
 
 TryMenuLabelFromDescriptionKey(DescKey, Path := "") {
-    global ScriptInformation
+		global ScriptInformation
 
-    Candidates := _MenuLabelCandidateKeys(DescKey, Path)
-    Label := ""
-    for Cand in Candidates {
-        if (Cand == "") {
-            continue
-        }
-        ; I18nLookup, never t(): a miss here is this loop's normal control flow,
-        ; and t() reports a miss as a user-visible defect. Probing through the
-        ; warning accessor made every label emit several false alarms — 281 of the
-        ; 282 warned keys in a boot were this loop talking about itself, and they
-        ; buried the one genuine miss (i18n-probe-warns-about-itself).
-        Resolved := I18nLookup(Cand)
-        if (Resolved != "") {
-            Label := Resolved
-            break
-        }
-    }
+		Candidates := _MenuLabelCandidateKeys(DescKey, Path)
+		Label := ""
+		for Cand in Candidates {
+				if (Cand == "") {
+						continue
+				}
+				; I18nLookup, never t(): a miss here is this loop's normal control flow,
+				; and t() reports a miss as a user-visible defect. Probing through the
+				; warning accessor made every label emit several false alarms — 281 of the
+				; 282 warned keys in a boot were this loop talking about itself, and they
+				; buried the one genuine miss (i18n-probe-warns-about-itself).
+				Resolved := I18nLookup(Cand)
+				if (Resolved != "") {
+						Label := Resolved
+						break
+				}
+		}
 
-    if (Label != "" and IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
-        Label := StrReplace(Label, "★", ScriptInformation["MagicKey"])
-    }
-    return Label
+		if (Label != "" and IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
+				Label := StrReplace(Label, "★", ScriptInformation["MagicKey"])
+		}
+		return Label
 }
 
 
@@ -128,64 +128,64 @@ TryMenuLabelFromDescriptionKey(DescKey, Path := "") {
 ; (``ergopti_base`` -> ``ergoptibase``) yields the same string the old v1
 ; PascalCase id folded to, so a separate v1-derived candidate is unnecessary.
 _MenuLabelCandidateKeys(DescKey, Path) {
-    Out := []
-    if (DescKey != "") {
-        Out.Push(DescKey)
-    }
+		Out := []
+		if (DescKey != "") {
+				Out.Push(DescKey)
+		}
 
-    ; ``menu.X.Y`` -> ``X.Y``
-    if (StrLen(DescKey) > 5 and SubStr(DescKey, 1, 5) == "menu.") {
-        NoMenu := SubStr(DescKey, 6)
-        Out.Push(NoMenu)
-        Out.Push(_StripUnderscores(NoMenu))
-        ; ``hotstrings.X.Y`` -> ``X.Y``
-        if (StrLen(NoMenu) > 11 and SubStr(NoMenu, 1, 11) == "hotstrings.") {
-            NoHs := SubStr(NoMenu, 12)
-            Out.Push(NoHs)
-            Out.Push(_StripUnderscores(NoHs))
-        }
-    }
+		; ``menu.X.Y`` -> ``X.Y``
+		if (StrLen(DescKey) > 5 and SubStr(DescKey, 1, 5) == "menu.") {
+				NoMenu := SubStr(DescKey, 6)
+				Out.Push(NoMenu)
+				Out.Push(_StripUnderscores(NoMenu))
+				; ``hotstrings.X.Y`` -> ``X.Y``
+				if (StrLen(NoMenu) > 11 and SubStr(NoMenu, 1, 11) == "hotstrings.") {
+						NoHs := SubStr(NoMenu, 12)
+						Out.Push(NoHs)
+						Out.Push(_StripUnderscores(NoHs))
+				}
+		}
 
-    ; Same transformations starting from the v2 path (for entries whose
-    ; description_key is missing or non-canonical).
-    if (Path != "" and Path != DescKey) {
-        Out.Push(Path)
-        ; Strip ``ahk.`` prefix.
-        Trimmed := Path
-        if (StrLen(Trimmed) > 4 and SubStr(Trimmed, 1, 4) == "ahk.") {
-            Trimmed := SubStr(Trimmed, 5)
-            Out.Push(Trimmed)
-        }
-        ; ``hotstrings.X.Y`` -> ``X.Y``.
-        if (StrLen(Trimmed) > 11 and SubStr(Trimmed, 1, 11) == "hotstrings.") {
-            Trimmed := SubStr(Trimmed, 12)
-            Out.Push(Trimmed)
-        }
-        Out.Push(_StripUnderscores(Trimmed))
-    }
+		; Same transformations starting from the v2 path (for entries whose
+		; description_key is missing or non-canonical).
+		if (Path != "" and Path != DescKey) {
+				Out.Push(Path)
+				; Strip ``ahk.`` prefix.
+				Trimmed := Path
+				if (StrLen(Trimmed) > 4 and SubStr(Trimmed, 1, 4) == "ahk.") {
+						Trimmed := SubStr(Trimmed, 5)
+						Out.Push(Trimmed)
+				}
+				; ``hotstrings.X.Y`` -> ``X.Y``.
+				if (StrLen(Trimmed) > 11 and SubStr(Trimmed, 1, 11) == "hotstrings.") {
+						Trimmed := SubStr(Trimmed, 12)
+						Out.Push(Trimmed)
+				}
+				Out.Push(_StripUnderscores(Trimmed))
+		}
 
-    ; The dynamic-hotstrings category folds to "dynamichotstrings" in the locale
-    ; (the menu category name), whereas the manifest path/description_key use the
-    ; short "dynamic" segment. The transformations above only strip underscores,
-    ; so they never bridge "dynamic" -> "dynamichotstrings" and every dynamic
-    ; section would fall back to its raw id. Emit the folded category key
-    ; explicitly: hotstrings.dynamic.text_expansion_personal_information ->
-    ; dynamichotstrings.textexpansionpersonalinformation.
-    Combined := (DescKey != "") ? DescKey : Path
-    DynPos := InStr(Combined, ".dynamic.")
-    if (DynPos) {
-        Section := SubStr(Combined, DynPos + StrLen(".dynamic."))
-        if (Section != "") {
-            Out.Push("dynamichotstrings." . Section)
-            Out.Push("dynamichotstrings." . _StripUnderscores(Section))
-        }
-    }
+		; The dynamic-hotstrings category folds to "dynamichotstrings" in the locale
+		; (the menu category name), whereas the manifest path/description_key use the
+		; short "dynamic" segment. The transformations above only strip underscores,
+		; so they never bridge "dynamic" -> "dynamichotstrings" and every dynamic
+		; section would fall back to its raw id. Emit the folded category key
+		; explicitly: hotstrings.dynamic.text_expansion_personal_information ->
+		; dynamichotstrings.textexpansionpersonalinformation.
+		Combined := (DescKey != "") ? DescKey : Path
+		DynPos := InStr(Combined, ".dynamic.")
+		if (DynPos) {
+				Section := SubStr(Combined, DynPos + StrLen(".dynamic."))
+				if (Section != "") {
+						Out.Push("dynamichotstrings." . Section)
+						Out.Push("dynamichotstrings." . _StripUnderscores(Section))
+				}
+		}
 
-    return Out
+		return Out
 }
 
 ; Remove underscores from every segment of a dotted key while keeping the
 ; dots in place. ``layout.ergopti_base`` -> ``layout.ergoptibase``.
 _StripUnderscores(Key) {
-    return StrReplace(Key, "_", "")
+		return StrReplace(Key, "_", "")
 }

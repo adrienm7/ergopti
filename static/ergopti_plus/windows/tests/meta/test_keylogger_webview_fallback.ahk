@@ -19,7 +19,12 @@ _KWF_WebViewFailureFallsBackToEdge() {
     FallbackPos := InStr(Body, "KLUI.typing_pid := KLUI_LaunchWindow")
 	Assert(OpenPos > 0 and FallbackPos > OpenPos,
 		"a false KLWV_Open result must fall through to the legacy Edge launcher instead of returning after runtime availability")
-	Assert(InStr(Body, "if KLWV_Open(which, metrics_dir)`n            return") > 0,
+	; Matched on structure, not on layout. This used to pin the literal
+	; "…metrics_dir)`n            return" — twelve spaces — so re-indenting the
+	; driver to the project's tab convention turned a correct file into a red
+	; test. What the invariant needs is that the statement guarded by the `if`
+	; IS the bare return, whatever whitespace separates them.
+	Assert(RegExMatch(Body, "if KLWV_Open\(which, metrics_dir\)[ \t]*[\r\n]+[ \t]*return") > 0,
 		"only a successful KLWV_Open may return before the Edge fallback; this encodes the caller-enforced Boolean contract")
 }
 

@@ -35,14 +35,14 @@
 ; "" / 0 for those two: HSE_DispatchMatch dispatches via ``Spec.Replacement`` and
 ; never invokes the callback, so building either would be pure boot-time waste.
 _RegisterHotstringFast(Rec, HseFlags, Abbrev, TrigSpec, Callback, Meta := unset) {
-    if Rec {
-        Rec(TrigSpec, Callback)
-    }
-    if IsSet(Meta) {
-        HSE_Register(HseFlags, Abbrev, Callback, Meta)
-    } else {
-        HSE_Register(HseFlags, Abbrev, Callback)
-    }
+		if Rec {
+				Rec(TrigSpec, Callback)
+		}
+		if IsSet(Meta) {
+				HSE_Register(HseFlags, Abbrev, Callback, Meta)
+		} else {
+				HSE_Register(HseFlags, Abbrev, Callback)
+		}
 }
 
 ; Extract just the matching-relevant flag letters (``*``, ``?``, ``C``) in
@@ -51,17 +51,17 @@ _RegisterHotstringFast(Rec, HseFlags, Abbrev, TrigSpec, Callback, Meta := unset)
 ; the assembled spec. Computing it directly at the call site is what lets the
 ; production path skip building and re-parsing the ``:flags:B0O:abbrev`` string.
 _HseFlagSubset(Flags) {
-    Out := ""
-    if InStr(Flags, "*") {
-        Out .= "*"
-    }
-    if InStr(Flags, "?") {
-        Out .= "?"
-    }
-    if InStr(Flags, "C") {
-        Out .= "C"
-    }
-    return Out
+		Out := ""
+		if InStr(Flags, "*") {
+				Out .= "*"
+		}
+		if InStr(Flags, "?") {
+				Out .= "?"
+		}
+		if InStr(Flags, "C") {
+				Out .= "C"
+		}
+		return Out
 }
 
 ; Parse the AHK ``:flags:abbrev`` trigger spec and forward to HSE_Register.
@@ -70,39 +70,39 @@ _HseFlagSubset(Flags) {
 ; are dropped. Abbreviations are registered as-is so the HSE bucket
 ; index stays in lockstep with the upstream registration call.
 _MirrorRegistrationToHSE(TriggerSpec, Callback, Meta := unset) {
-    ; Parse the ``:<flags>:<abbrev>`` spec with InStr rather than a per-call
-    ; RegExMatch: this runs once for EVERY hotstring registered at boot (~5400
-    ; calls), and the abbreviation was just assembled by the caller — a regex to
-    ; pull it back apart is pure overhead on the startup hot path. Semantics match
-    ; the old ``^:([^:]*):(.+)$``: flags hold no colon, the abbreviation is
-    ; everything after the second colon and must be non-empty.
-    if (SubStr(TriggerSpec, 1, 1) != ":") {
-        return
-    }
-    SecondColon := InStr(TriggerSpec, ":", true, 2)
-    if (!SecondColon) {
-        return
-    }
-    RawFlags := SubStr(TriggerSpec, 2, SecondColon - 2)
-    Abbrev := SubStr(TriggerSpec, SecondColon + 1)
-    if (Abbrev == "") {
-        return
-    }
-    HseFlags := ""
-    if InStr(RawFlags, "*") {
-        HseFlags .= "*"
-    }
-    if InStr(RawFlags, "?") {
-        HseFlags .= "?"
-    }
-    if InStr(RawFlags, "C") {
-        HseFlags .= "C"
-    }
-    if IsSet(Meta) {
-        HSE_Register(HseFlags, Abbrev, Callback, Meta)
-    } else {
-        HSE_Register(HseFlags, Abbrev, Callback)
-    }
+		; Parse the ``:<flags>:<abbrev>`` spec with InStr rather than a per-call
+		; RegExMatch: this runs once for EVERY hotstring registered at boot (~5400
+		; calls), and the abbreviation was just assembled by the caller — a regex to
+		; pull it back apart is pure overhead on the startup hot path. Semantics match
+		; the old ``^:([^:]*):(.+)$``: flags hold no colon, the abbreviation is
+		; everything after the second colon and must be non-empty.
+		if (SubStr(TriggerSpec, 1, 1) != ":") {
+				return
+		}
+		SecondColon := InStr(TriggerSpec, ":", true, 2)
+		if (!SecondColon) {
+				return
+		}
+		RawFlags := SubStr(TriggerSpec, 2, SecondColon - 2)
+		Abbrev := SubStr(TriggerSpec, SecondColon + 1)
+		if (Abbrev == "") {
+				return
+		}
+		HseFlags := ""
+		if InStr(RawFlags, "*") {
+				HseFlags .= "*"
+		}
+		if InStr(RawFlags, "?") {
+				HseFlags .= "?"
+		}
+		if InStr(RawFlags, "C") {
+				HseFlags .= "C"
+		}
+		if IsSet(Meta) {
+				HSE_Register(HseFlags, Abbrev, Callback, Meta)
+		} else {
+				HSE_Register(HseFlags, Abbrev, Callback)
+		}
 }
 
 ; Hotstrings will still be triggered downstream, so SendNewResult("a") can
@@ -114,60 +114,60 @@ _MirrorRegistrationToHSE(TriggerSpec, Callback, Meta := unset) {
 ; emitted character — SubStr(Text, -1) on that sequence would record its
 ; trailing "}" instead of what actually landed on screen.
 SendNewResult(Text, OnlyText := True, UpdateRing := True) {
-    ; Every layout/hotstring callback reaches this primitive.  A failed OS send
-    ; must be contained here and must NOT advance the output ring: advancing it
-    ; after a failed injection corrupts deadkey/time-gated decisions as though
-    ; the character reached the foreground application.
-    try {
-        if _SendHook {
-            Hook := _SendHook
-            Hook("SendNewResult", Text, OnlyText)
-        } else {
-            if OnlyText {
-                SendEvent("{Text}" Text)
-            } else {
-                SendEvent(Text)
-            }
-        }
-    } catch as Err {
-        LoggerError("Hotstrings", "SendNewResult failed: {1}", Err.Message)
-        return false
-    }
-    ; _EmitReachedScreen for the same reason the catch above returns without
-    ; advancing the ring: a character that never reached the application must not
-    ; be recorded as though it had. This is the primitive EVERY Shift/CapsLock/
-    ; AltGr layer emit goes through, so it is where the gate belongs — the
-    ; dead-key fix reached the two direct SendEvent emitters and missed this one.
-    ; Compose "Â" by typing the circumflex dead key then Shift+A and the ring held
-    ; ['A', 'Â'] for a single visible character; composition plus a Shift capital
-    ; is the mainline use of that dead key.
-    ;
-    ; IsSet-guarded because this primitive is also reachable from contexts where
-    ; the keymap module is not loaded (tools/, standalone tests), and there the
-    ; unqualified pre-fix behaviour is correct.
-    if UpdateRing and (!IsSet(_EmitReachedScreen) or _EmitReachedScreen()) {
-        UpdateLastSentCharacter(SubStr(Text, -1))
-    }
-    return true
+		; Every layout/hotstring callback reaches this primitive.  A failed OS send
+		; must be contained here and must NOT advance the output ring: advancing it
+		; after a failed injection corrupts deadkey/time-gated decisions as though
+		; the character reached the foreground application.
+		try {
+				if _SendHook {
+						Hook := _SendHook
+						Hook("SendNewResult", Text, OnlyText)
+				} else {
+						if OnlyText {
+								SendEvent("{Text}" Text)
+						} else {
+								SendEvent(Text)
+						}
+				}
+		} catch as Err {
+				LoggerError("Hotstrings", "SendNewResult failed: {1}", Err.Message)
+				return false
+		}
+		; _EmitReachedScreen for the same reason the catch above returns without
+		; advancing the ring: a character that never reached the application must not
+		; be recorded as though it had. This is the primitive EVERY Shift/CapsLock/
+		; AltGr layer emit goes through, so it is where the gate belongs — the
+		; dead-key fix reached the two direct SendEvent emitters and missed this one.
+		; Compose "Â" by typing the circumflex dead key then Shift+A and the ring held
+		; ['A', 'Â'] for a single visible character; composition plus a Shift capital
+		; is the mainline use of that dead key.
+		;
+		; IsSet-guarded because this primitive is also reachable from contexts where
+		; the keymap module is not loaded (tools/, standalone tests), and there the
+		; unqualified pre-fix behaviour is correct.
+		if UpdateRing and (!IsSet(_EmitReachedScreen) or _EmitReachedScreen()) {
+				UpdateLastSentCharacter(SubStr(Text, -1))
+		}
+		return true
 }
 
 ; SendInput prevents other hotstrings/hotkeys from activating, so this is the
 ; "final" result — used when we do not want cascading expansion.
 SendFinalResult(Text, OnlyText := False) {
-    try {
-        if _SendHook {
-            Hook := _SendHook
-            Hook("SendFinalResult", Text, OnlyText)
-        } else if OnlyText {
-            SendInput("{Text}" Text)
-        } else {
-            SendInput(Text)
-        }
-    } catch as Err {
-        LoggerError("Hotstrings", "SendFinalResult failed: {1}", Err.Message)
-        return false
-    }
-    return true
+		try {
+				if _SendHook {
+						Hook := _SendHook
+						Hook("SendFinalResult", Text, OnlyText)
+				} else if OnlyText {
+						SendInput("{Text}" Text)
+				} else {
+						SendInput(Text)
+				}
+		} catch as Err {
+				LoggerError("Hotstrings", "SendFinalResult failed: {1}", Err.Message)
+				return false
+		}
+		return true
 }
 
 _SendInstant_RestoreClipboard(OldClip, OwnedSequence) {
@@ -277,49 +277,49 @@ SendInstant(Text, Prefix := "") {
 ; a hot, default key set. IsSet guards the load order: the engine buffer global
 ; lives in hotstring_engine_main.ahk, included alongside this file.
 ActivateHotstrings() {
-    global HSE_LastEndChar
-    ; Nothing to flush — no pending abbreviation, so skip the costly poke.
-    if (IsSet(HSE_Buffer) and HSE_Buffer == "") {
-        return
-    }
-    previous_critical := Critical("On")
-    PreviousSendLevel := A_SendLevel
-    try {
-        ; The prefix watcher's InputHook is armed "V L0 I1", so level 0 is below
-        ; what it accepts: the poke lands on screen without ever coming back as
-        ; an OnChar the engine would count twice.
-        SendLevel(0)
-        SendNewResult(" ")
-        ; IsPhysical=true on both feeds: the dispatch below holds HSE_Suppressed
-        ; for its own send burst (released on a deferred timer), and a
-        ; non-physical feed is a no-op while it is up.
-        PendingMatch := HSE_FeedChar(" ", true)
-        if (PendingMatch != "") {
-            ; Contained: this runs inside a layer callback that still owes the
-            ; user its punctuation, so a throwing expansion must not abort the
-            ; emit that follows.
-            try {
-                Fired := HSE_DispatchMatch(PendingMatch, HSE_LastEndChar)
-                ; Same metrics contract the prefix-watcher fire path follows:
-                ; only a real expansion is a fire, and the record is queued
-                ; rather than logged inline so no disk work lands on the
-                ; keyboard thread.
-                if (Fired and IsSet(_HSE_QueueFireLog)) {
-                    FiredReplacement := PendingMatch.HasOwnProp("Replacement") ? PendingMatch.Replacement : PendingMatch.Trigger
-                    FiredCategory := PendingMatch.HasOwnProp("Category") ? PendingMatch.Category : ""
-                    FiredSection := PendingMatch.HasOwnProp("Section") ? PendingMatch.Section : ""
-                    try _HSE_QueueFireLog(PendingMatch.Trigger, FiredReplacement, "endchar", FiredCategory, FiredSection)
-                }
-            } catch as CommitErr {
-                try LoggerError("Hotstrings", "ActivateHotstrings: committing '{1}' failed: {2}", PendingMatch.Trigger, CommitErr.Message)
-            }
-        }
-        SendNewResult("{BackSpace}", False)
-        HSE_FeedBackspace(true)
-    } finally {
-        SendLevel(PreviousSendLevel)
-        Critical(previous_critical)
-    }
+		global HSE_LastEndChar
+		; Nothing to flush — no pending abbreviation, so skip the costly poke.
+		if (IsSet(HSE_Buffer) and HSE_Buffer == "") {
+				return
+		}
+		previous_critical := Critical("On")
+		PreviousSendLevel := A_SendLevel
+		try {
+				; The prefix watcher's InputHook is armed "V L0 I1", so level 0 is below
+				; what it accepts: the poke lands on screen without ever coming back as
+				; an OnChar the engine would count twice.
+				SendLevel(0)
+				SendNewResult(" ")
+				; IsPhysical=true on both feeds: the dispatch below holds HSE_Suppressed
+				; for its own send burst (released on a deferred timer), and a
+				; non-physical feed is a no-op while it is up.
+				PendingMatch := HSE_FeedChar(" ", true)
+				if (PendingMatch != "") {
+						; Contained: this runs inside a layer callback that still owes the
+						; user its punctuation, so a throwing expansion must not abort the
+						; emit that follows.
+						try {
+								Fired := HSE_DispatchMatch(PendingMatch, HSE_LastEndChar)
+								; Same metrics contract the prefix-watcher fire path follows:
+								; only a real expansion is a fire, and the record is queued
+								; rather than logged inline so no disk work lands on the
+								; keyboard thread.
+								if (Fired and IsSet(_HSE_QueueFireLog)) {
+										FiredReplacement := PendingMatch.HasOwnProp("Replacement") ? PendingMatch.Replacement : PendingMatch.Trigger
+										FiredCategory := PendingMatch.HasOwnProp("Category") ? PendingMatch.Category : ""
+										FiredSection := PendingMatch.HasOwnProp("Section") ? PendingMatch.Section : ""
+										try _HSE_QueueFireLog(PendingMatch.Trigger, FiredReplacement, "endchar", FiredCategory, FiredSection)
+								}
+						} catch as CommitErr {
+								try LoggerError("Hotstrings", "ActivateHotstrings: committing '{1}' failed: {2}", PendingMatch.Trigger, CommitErr.Message)
+						}
+				}
+				SendNewResult("{BackSpace}", False)
+				HSE_FeedBackspace(true)
+		} finally {
+				SendLevel(PreviousSendLevel)
+				Critical(previous_critical)
+		}
 }
 
 ; Clipboard copy completion is asynchronous in many applications. Waiting in a
@@ -332,131 +332,131 @@ global SELECTION_CAPTURE_POLL_MS := 15
 global SELECTION_CAPTURE_INPUT_GRACE_MS := 20
 
 GetSelectionAsync(OnReady) {
-    global _SelectionCaptureJob, _SelectionCaptureNextId
-    global SELECTION_CAPTURE_POLL_MS
+		global _SelectionCaptureJob, _SelectionCaptureNextId
+		global SELECTION_CAPTURE_POLL_MS
 
-    if A_IsSuspended
-        return false
-    if !IsObject(OnReady)
-        throw TypeError("GetSelectionAsync requires a callback object")
+		if A_IsSuspended
+				return false
+		if !IsObject(OnReady)
+				throw TypeError("GetSelectionAsync requires a callback object")
 
-    ; The newest user command owns the clipboard capture. Finishing the prior
-    ; job first stops its timer and restores its clipboard snapshot before the
-    ; new Ctrl+C clears the clipboard.
-    if IsObject(_SelectionCaptureJob)
-        _SelectionCaptureFinish(_SelectionCaptureJob, "", false, "superseded")
+		; The newest user command owns the clipboard capture. Finishing the prior
+		; job first stops its timer and restores its clipboard snapshot before the
+		; new Ctrl+C clears the clipboard.
+		if IsObject(_SelectionCaptureJob)
+				_SelectionCaptureFinish(_SelectionCaptureJob, "", false, "superseded")
 
-    Job := Map(
-        "id", ++_SelectionCaptureNextId,
-        "callback", OnReady,
-        "started", A_TickCount,
-        "foreground", WinExist("A"),
-        "clipboard", "",
-        "clear_sequence", 0,
-        "timer", 0
-    )
-    try {
-        Job["clipboard"] := ClipboardAll()
-        A_Clipboard := ""
-        Job["clear_sequence"] := _SelectionClipboardSequence()
-        SendEvent("^c")
-        Job["timer"] := _SelectionCapturePoll.Bind(Job)
-        _SelectionCaptureJob := Job
-        SetTimer(Job["timer"], SELECTION_CAPTURE_POLL_MS)
-        return true
-    } catch as Err {
-        try A_Clipboard := Job["clipboard"]
-        Job["clipboard"] := ""
-        try LoggerError("hotstring_engine", "GetSelectionAsync could not start: {1}", Err.Message)
-        return false
-    }
+		Job := Map(
+				"id", ++_SelectionCaptureNextId,
+				"callback", OnReady,
+				"started", A_TickCount,
+				"foreground", WinExist("A"),
+				"clipboard", "",
+				"clear_sequence", 0,
+				"timer", 0
+		)
+		try {
+				Job["clipboard"] := ClipboardAll()
+				A_Clipboard := ""
+				Job["clear_sequence"] := _SelectionClipboardSequence()
+				SendEvent("^c")
+				Job["timer"] := _SelectionCapturePoll.Bind(Job)
+				_SelectionCaptureJob := Job
+				SetTimer(Job["timer"], SELECTION_CAPTURE_POLL_MS)
+				return true
+		} catch as Err {
+				try A_Clipboard := Job["clipboard"]
+				Job["clipboard"] := ""
+				try LoggerError("hotstring_engine", "GetSelectionAsync could not start: {1}", Err.Message)
+				return false
+		}
 }
 
 _SelectionCapturePoll(Job) {
-    global _SelectionCaptureJob, GET_SELECTION_TIMEOUT_SEC
-    global SELECTION_CAPTURE_INPUT_GRACE_MS
+		global _SelectionCaptureJob, GET_SELECTION_TIMEOUT_SEC
+		global SELECTION_CAPTURE_INPUT_GRACE_MS
 
-    if !IsObject(_SelectionCaptureJob) || _SelectionCaptureJob["id"] != Job["id"]
-        return
-    Elapsed := A_TickCount - Job["started"]
-    if A_IsSuspended {
-        _SelectionCaptureFinish(Job, "", false, "suspended")
-        return
-    }
-    ; If a new physical action happened after the shortcut, never inject into
-    ; its potentially different selection. The small grace absorbs the key-up
-    ; events that complete the initiating chord.
-    if (Elapsed - A_TimeIdlePhysical > SELECTION_CAPTURE_INPUT_GRACE_MS) {
-        _SelectionCaptureFinish(Job, "", false, "superseded by input")
-        return
-    }
-    if (WinExist("A") != Job["foreground"]) {
-        _SelectionCaptureFinish(Job, "", false, "foreground changed")
-        return
-    }
-    ; Zero timeout is a probe, never a blocking wait. Accept every clipboard
-    ; format so an image selection resolves immediately to an empty text result.
-    if ClipWait(0, 1) {
-        _SelectionCaptureFinish(Job, A_Clipboard, true, "ready")
-        return
-    }
-    if (Elapsed >= Round(GET_SELECTION_TIMEOUT_SEC * 1000)) {
-        try LoggerWarn("hotstring_engine",
-            "GetSelectionAsync timed out after {1}s; returning no selection.",
-            GET_SELECTION_TIMEOUT_SEC)
-        _SelectionCaptureFinish(Job, "", false, "timeout")
-    }
+		if !IsObject(_SelectionCaptureJob) || _SelectionCaptureJob["id"] != Job["id"]
+				return
+		Elapsed := A_TickCount - Job["started"]
+		if A_IsSuspended {
+				_SelectionCaptureFinish(Job, "", false, "suspended")
+				return
+		}
+		; If a new physical action happened after the shortcut, never inject into
+		; its potentially different selection. The small grace absorbs the key-up
+		; events that complete the initiating chord.
+		if (Elapsed - A_TimeIdlePhysical > SELECTION_CAPTURE_INPUT_GRACE_MS) {
+				_SelectionCaptureFinish(Job, "", false, "superseded by input")
+				return
+		}
+		if (WinExist("A") != Job["foreground"]) {
+				_SelectionCaptureFinish(Job, "", false, "foreground changed")
+				return
+		}
+		; Zero timeout is a probe, never a blocking wait. Accept every clipboard
+		; format so an image selection resolves immediately to an empty text result.
+		if ClipWait(0, 1) {
+				_SelectionCaptureFinish(Job, A_Clipboard, true, "ready")
+				return
+		}
+		if (Elapsed >= Round(GET_SELECTION_TIMEOUT_SEC * 1000)) {
+				try LoggerWarn("hotstring_engine",
+						"GetSelectionAsync timed out after {1}s; returning no selection.",
+						GET_SELECTION_TIMEOUT_SEC)
+				_SelectionCaptureFinish(Job, "", false, "timeout")
+		}
 }
 
 _SelectionCaptureFinish(Job, Text, Deliver, Reason) {
-    global _SelectionCaptureJob
+		global _SelectionCaptureJob
 
-    if !IsObject(_SelectionCaptureJob) || _SelectionCaptureJob["id"] != Job["id"]
-        return
-    SetTimer(Job["timer"], 0)
-    _SelectionCaptureJob := false
+		if !IsObject(_SelectionCaptureJob) || _SelectionCaptureJob["id"] != Job["id"]
+				return
+		SetTimer(Job["timer"], 0)
+		_SelectionCaptureJob := false
 
-    ; On a physical-input cancellation, preserve clipboard data which arrived
-    ; after our clear: it may be the user's own copy, and restoring the old
-    ; snapshot would silently destroy it. All normal completion paths restore
-    ; exactly the prior clipboard contents.
-    PreserveCurrent := (Reason == "superseded by input"
-        and _SelectionClipboardSequence() != Job["clear_sequence"])
-    if !PreserveCurrent {
-        try A_Clipboard := Job["clipboard"]
-        catch as Err {
-            try LoggerError("hotstring_engine", "GetSelectionAsync clipboard restore failed: {1}", Err.Message)
-        }
-    }
-    Job["clipboard"] := ""
+		; On a physical-input cancellation, preserve clipboard data which arrived
+		; after our clear: it may be the user's own copy, and restoring the old
+		; snapshot would silently destroy it. All normal completion paths restore
+		; exactly the prior clipboard contents.
+		PreserveCurrent := (Reason == "superseded by input"
+				and _SelectionClipboardSequence() != Job["clear_sequence"])
+		if !PreserveCurrent {
+				try A_Clipboard := Job["clipboard"]
+				catch as Err {
+						try LoggerError("hotstring_engine", "GetSelectionAsync clipboard restore failed: {1}", Err.Message)
+				}
+		}
+		Job["clipboard"] := ""
 
-    if !Deliver || A_IsSuspended
-        return
-    try Job["callback"].Call(Text)
-    catch as Err {
-        try LoggerError("hotstring_engine", "GetSelectionAsync callback failed: {1}", Err.Message)
-    }
+		if !Deliver || A_IsSuspended
+				return
+		try Job["callback"].Call(Text)
+		catch as Err {
+				try LoggerError("hotstring_engine", "GetSelectionAsync callback failed: {1}", Err.Message)
+		}
 }
 
 ; Kept as a fail-closed compatibility seam. All user-triggered paths must use
 ; GetSelectionAsync; a synchronous clipboard wait on the hook thread is unsafe.
 GetSelection() {
-    try LoggerError("hotstring_engine", "GetSelection() is synchronous-only and must not be used on an input path.")
-    return ""
+		try LoggerError("hotstring_engine", "GetSelection() is synchronous-only and must not be used on an input path.")
+		return ""
 }
 
 GetSelectionCancel(*) {
-    global _SelectionCaptureJob
-    if IsObject(_SelectionCaptureJob)
-        _SelectionCaptureFinish(_SelectionCaptureJob, "", false, "cancelled")
+		global _SelectionCaptureJob
+		if IsObject(_SelectionCaptureJob)
+				_SelectionCaptureFinish(_SelectionCaptureJob, "", false, "cancelled")
 }
 
 _SelectionClipboardSequence() {
-    try return DllCall("GetClipboardSequenceNumber", "uint")
-    catch as Err {
-        try LoggerError("hotstring_engine", "GetClipboardSequenceNumber failed: {1}", Err.Message)
-        return 0
-    }
+		try return DllCall("GetClipboardSequenceNumber", "uint")
+		catch as Err {
+				try LoggerError("hotstring_engine", "GetClipboardSequenceNumber failed: {1}", Err.Message)
+				return 0
+		}
 }
 
 ; Set of Microsoft Office (and Teams) executable names.
@@ -472,11 +472,11 @@ global MICROSOFT_OFFICE_EXES := Map(
 )
 
 MicrosoftApps() {
-    try {
-        exe := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
-        return MICROSOFT_OFFICE_EXES.Has(exe)
-    }
-    return false
+		try {
+				exe := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
+				return MICROSOFT_OFFICE_EXES.Has(exe)
+		}
+		return false
 }
 
 
@@ -507,25 +507,25 @@ global _LSC_LEN := 0     ; number of populated slots, saturates at _LSC_CAP
 
 ; Push a new character; O(1), no reallocation after boot.
 _LSCPush(Char) {
-    global _LSC_RING, _LSC_CAP, _LSC_CURSOR, _LSC_LEN
-    _LSC_CURSOR := Mod(_LSC_CURSOR, _LSC_CAP) + 1
-    _LSC_RING[_LSC_CURSOR] := Char
-    if _LSC_LEN < _LSC_CAP {
-        _LSC_LEN += 1
-    }
+		global _LSC_RING, _LSC_CAP, _LSC_CURSOR, _LSC_LEN
+		_LSC_CURSOR := Mod(_LSC_CURSOR, _LSC_CAP) + 1
+		_LSC_RING[_LSC_CURSOR] := Char
+		if _LSC_LEN < _LSC_CAP {
+				_LSC_LEN += 1
+		}
 }
 
 ; Reset the ring to a known sequence (oldest-first). Kept as a thin wrapper
 ; so tests can seed state without reaching into globals.
 _LSCResetFrom(Chars) {
-    global _LSC_RING, _LSC_CAP, _LSC_CURSOR, _LSC_LEN
-    _LSC_RING := []
-    loop _LSC_CAP {
-        _LSC_RING.Push("")
-    }
-    _LSC_CURSOR := 0
-    _LSC_LEN := 0
-    for c in Chars {
-        _LSCPush(c)
-    }
+		global _LSC_RING, _LSC_CAP, _LSC_CURSOR, _LSC_LEN
+		_LSC_RING := []
+		loop _LSC_CAP {
+				_LSC_RING.Push("")
+		}
+		_LSC_CURSOR := 0
+		_LSC_LEN := 0
+		for c in Chars {
+				_LSCPush(c)
+		}
 }

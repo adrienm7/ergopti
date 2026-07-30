@@ -42,26 +42,26 @@ A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
 ; emitting the chosen action. Iterating the sub-map also drops the raw
 ; Features[...] reads, which throw on a missing key
 #HotIf (LayerEnabled
-    and TapHoldHoldLayer(TapHold, "left_alt") == "nav"
-    and _AnyShortcutEnabled("lalt_caps_lock"))
+		and TapHoldHoldLayer(TapHold, "left_alt") == "nav"
+		and _AnyShortcutEnabled("lalt_caps_lock"))
 ; Overrides the "BackSpace" shortcut on the layer
 SC03A:: {
-    DisableLayer() LAltCapsLockShortcut()
+		DisableLayer() LAltCapsLockShortcut()
 }
 #HotIf
 
 ; Fix when LAlt triggers the layer
 #HotIf (
-    _LAltIsBackspaceLayer()
-    and LayerEnabled
+		_LAltIsBackspaceLayer()
+		and LayerEnabled
 )
 SC038:: TapHoldSyntheticKeyUp("LAlt") ; Necessary to do this, otherwise multicursor trigger in VSCode when scrolling in the layer and then leaving it
 #HotIf
 
 ; Fix when Space triggers the layer
 #HotIf (
-    TapHoldHoldLayer(TapHold, "space") == "nav"
-    and LayerEnabled
+		TapHoldHoldLayer(TapHold, "space") == "nav"
+		and LayerEnabled
 )
 SC039:: return ; Necessary to do this, otherwise Space keeps being sent while it is held to get the layer
 #HotIf
@@ -70,25 +70,25 @@ SC039:: return ; Necessary to do this, otherwise Space keeps being sent while it
 ; The base layer will become this one when the navigation layer variable is set to True
 
 *WheelUp:: {
-    ActionLayer("{Volume_Up " . AppState_GetNumberOfRepetitions() . "}") ; Turn on the volume by scrolling up
+		ActionLayer("{Volume_Up " . AppState_GetNumberOfRepetitions() . "}") ; Turn on the volume by scrolling up
 }
 *WheelDown:: {
-    ActionLayer("{Volume_Down " . AppState_GetNumberOfRepetitions() . "}") ; Turn down the volume by scrolling down
+		ActionLayer("{Volume_Down " . AppState_GetNumberOfRepetitions() . "}") ; Turn down the volume by scrolling down
 }
 
 SC01D & ~SC138:: ; RAlt
 RAlt:: ; RAlt on QWERTY
 {
-    ; Physical Kana AltGr is SC138 and has its own handler below. Do not let
-    ; a virtual RAlt alias emit a second Escape for one physical tap.
-    if (_ALTGR_KANA_FIXUP && GetKeyState("SC138", "P"))
-        return
-    ActionLayer("{Escape " . AppState_GetNumberOfRepetitions() . "}")
+		; Physical Kana AltGr is SC138 and has its own handler below. Do not let
+		; a virtual RAlt alias emit a second Escape for one physical tap.
+		if (_ALTGR_KANA_FIXUP && GetKeyState("SC138", "P"))
+				return
+		ActionLayer("{Escape " . AppState_GetNumberOfRepetitions() . "}")
 }
 
 #HotIf LayerEnabled and _ALTGR_KANA_FIXUP
 SC138:: {
-    ActionLayer("{Escape " . AppState_GetNumberOfRepetitions() . "}")
+		ActionLayer("{Escape " . AppState_GetNumberOfRepetitions() . "}")
 }
 #HotIf
 

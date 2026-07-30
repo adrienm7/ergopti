@@ -162,12 +162,12 @@ BootProfile_Stamp("Bundle extracted")
 ; from the script location (static/ergopti_plus/windows → static) and _VendorDir
 ; is the vendor/ sibling of the entry script.
 if A_IsCompiled {
-    _StaticDir := _BundleDir . "\static"
-    _VendorDir := _BundleDir . "\vendor"
+		_StaticDir := _BundleDir . "\static"
+		_VendorDir := _BundleDir . "\vendor"
 } else {
-    SplitPath(A_ScriptDir, , &_DriversDir_early)    ; static/ergopti_plus
-    SplitPath(_DriversDir_early, , &_StaticDir)     ; static
-    _VendorDir := A_ScriptDir . "\vendor"
+		SplitPath(A_ScriptDir, , &_DriversDir_early)    ; static/ergopti_plus
+		SplitPath(_DriversDir_early, , &_StaticDir)     ; static
+		_VendorDir := A_ScriptDir . "\vendor"
 }
 global _StaticDir
 global _VendorDir
@@ -374,7 +374,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; It publishes one staged JSON file and exits; the live instance validates the
 ; generation before atomically making that file visible to a dashboard.
 if KLPF_IsWorkerInvocation()
-    KLPF_WorkerMain()
+		KLPF_WorkerMain()
 
 #Include _generated/prompt_builder.ahk
 #Include modules/llm/api_common.ahk
@@ -438,8 +438,8 @@ global _IniCache := ParseTomlFile(ConfigurationFile)
 ; lock has usually cleared, so no write-time check can tell that the payload was
 ; derived from nothing; only latching at the instant of the failed read can.
 if TOML_UnreadableFile(ConfigurationFile) {
-    _ConfigBootReadFailed := true
-    try LoggerError("ErgoptiPlus", "Cannot read '{1}' at boot: every setting below stays at its compiled-in default, so persistence is blocked for this session. Restart the driver once the file is readable.", ConfigurationFile)
+		_ConfigBootReadFailed := true
+		try LoggerError("ErgoptiPlus", "Cannot read '{1}' at boot: every setting below stays at its compiled-in default, so persistence is blocked for this session. Restart the driver once the file is readable.", ConfigurationFile)
 }
 ReadScriptConfig(_IniCache)
 ReadCategoryEnabled(_IniCache)
@@ -459,10 +459,10 @@ BootProfile_Stamp("Hotstring engine initialised")
 LoggerInit()
 bootScriptName := IsSet(A_ScriptName) ? A_ScriptName : "ErgoptiPlus"
 if !IsSet(A_ScriptName) && IsSet(A_ScriptFullPath) {
-    bootScriptName := A_ScriptFullPath
+		bootScriptName := A_ScriptFullPath
 }
 if !IsSet(A_ScriptName) {
-    LoggerWarn("ErgoptiPlus", "A_ScriptName was not set during boot; using fallback name='{1}'.", bootScriptName)
+		LoggerWarn("ErgoptiPlus", "A_ScriptName was not set during boot; using fallback name='{1}'.", bootScriptName)
 }
 try Updater_LoadChannel()
 try Updater_LoadCheckInterval()
@@ -503,9 +503,9 @@ HotstringsConfigLoadLlmPredictionColor()
 _DetectHKL := KS_ResolveKeyboardLayout()
 _DetectSC := KS_ProbeRightAltScancode(_DetectHKL)
 LoggerInfo("AltGrDetect",
-    "HKL=0x{1:X}, VK_RMENU→SC=0x{2:X}, _ALTGR_KANA_FIXUP={3}.",
-    _DetectHKL, _DetectSC,
-    _ALTGR_KANA_FIXUP ? "true" : "false")
+		"HKL=0x{1:X}, VK_RMENU→SC=0x{2:X}, _ALTGR_KANA_FIXUP={3}.",
+		_DetectHKL, _DetectSC,
+		_ALTGR_KANA_FIXUP ? "true" : "false")
 
 ; Under this text is the configuration of the features, especially whether or not they are enabled.
 ; It is advised to modify which features are enabled by using the ErgoptiPlus_Configuration.ini file.
@@ -518,36 +518,36 @@ LoggerInfo("AltGrDetect",
 
 ; It is best to modify those values by using the option in the script menu
 global PersonalInformation := Map(
-    "first_name", "Prénom",
-    "last_name", "Nom",
-    "date_of_birth", "01/01/2000",
-    "email_address", "prenom.nom@mail.fr",
-    "work_email_address", "prenom.nom@mail.pro",
-    "phone_number", "0606060606",
-    "phone_number_clean", "06 06 06 06 06",
-    "street_address", "1 Rue de la Paix",
-    "city", "Paris",
-    "country", "France",
-    "postal_code", "75000",
-    "iban", "FR00 0000 0000 0000 0000 0000 000",
-    "bic", "ABCDFRPP",
-    "credit_card", "1234 5678 9012 3456",
-    "social_security_number", "1 99 99 99 999 999 99",
+		"first_name", "Prénom",
+		"last_name", "Nom",
+		"date_of_birth", "01/01/2000",
+		"email_address", "prenom.nom@mail.fr",
+		"work_email_address", "prenom.nom@mail.pro",
+		"phone_number", "0606060606",
+		"phone_number_clean", "06 06 06 06 06",
+		"street_address", "1 Rue de la Paix",
+		"city", "Paris",
+		"country", "France",
+		"postal_code", "75000",
+		"iban", "FR00 0000 0000 0000 0000 0000 000",
+		"bic", "ABCDFRPP",
+		"credit_card", "1234 5678 9012 3456",
+		"social_security_number", "1 99 99 99 999 999 99",
 )
 global PersonalInformationLetters := Map(
-    "a", "street_address",
-    "b", "bic",
-    "c", "credit_card",
-    "d", "date_of_birth",
-    "e", "email_address",
-    "f", "phone_number_clean",
-    "i", "iban",
-    "m", "email_address",
-    "n", "last_name",
-    "p", "first_name",
-    "s", "social_security_number",
-    "t", "phone_number",
-    "w", "work_email_address",
+		"a", "street_address",
+		"b", "bic",
+		"c", "credit_card",
+		"d", "date_of_birth",
+		"e", "email_address",
+		"f", "phone_number_clean",
+		"i", "iban",
+		"m", "email_address",
+		"n", "last_name",
+		"p", "first_name",
+		"s", "social_security_number",
+		"t", "phone_number",
+		"w", "work_email_address",
 )
 
 ; ======================================================================
@@ -649,90 +649,90 @@ global SpaceAroundSymbols := (_SpaceAroundSymbolsNode.Has("enabled") and _SpaceA
 
 
 EnsurePersonalShortcutsFile(Path, AllowReload := true) {
-    global PERSONAL_SHORTCUTS_TEMPLATE
-    if (!IsSet(Path) or Type(Path) != "String" or Path == "") {
-        try LoggerWarn("ErgoptiPlus", "EnsurePersonalShortcutsFile called with empty Path — skipping.")
-        return
-    }
-    FileWasCreated := false
-    if !FileExist(Path) {
-        try {
-            Dir := RegExReplace(Path, "\\[^\\]+$", "")
-            if (Dir != "" and !DirExist(Dir)) {
-                DirCreate(Dir)
-            }
-            Template := IsSet(PERSONAL_SHORTCUTS_TEMPLATE) ? PERSONAL_SHORTCUTS_TEMPLATE : ""
-            ; Every generated AHK source must be UTF-8 with BOM and LF.
-            ; `UTF-8-RAW` silently creates a parser-risking BOM-less file.
-            FileAppend(Template, Path, "UTF-8")
-            FileWasCreated := true
-            try LoggerInfo("ErgoptiPlus", "Personal shortcuts file created from template at '{1}'.", Path)
-        } catch as e {
-            try LoggerWarn("ErgoptiPlus", "Could not create personal shortcuts file at '{1}': {2}.",
-                Path, e.Message)
-            return
-        }
-    }
-    StubDir := ""
-    if A_IsCompiled {
-        LocalAppData := ResolveLocalAppDataDir()
-        if (LocalAppData == "") {
-            try LoggerWarn("ErgoptiPlus", "EnsurePersonalShortcutsFile: cannot resolve LocalAppData — skipping stub creation.")
-            return
-        }
-        StubDir := LocalAppData . "\Ergopti\_generated"
-    } else {
-        StubDir := A_ScriptDir . "\_generated"
-    }
-    try DirCreate(StubDir)
-    StubPath := StubDir . "\personal_shortcuts.ahk"
-    DesiredStub := "; Auto-generated forwarding stub — do not edit.`n"
-        . "; Forwards to the user's personal shortcuts file located at:`n"
-        . ";     " . Path . "`n"
-        . "; Edit that file (e.g. via the tray menu) rather than this stub.`n"
-        . "#Include *i " . Path . "`n"
-    Existing := ""
-    if FileExist(StubPath) {
-        try Existing := FileRead(StubPath, "UTF-8-RAW")
-    }
-    StubMatches := (Existing == DesiredStub)
-    if !StubMatches {
-        try {
-            if FileExist(StubPath) {
-                FileDelete(StubPath)
-            }
-            FileAppend(DesiredStub, StubPath, "UTF-8")
-            try LoggerInfo("ErgoptiPlus", "Personal shortcuts forwarding stub refreshed at '{1}'.", StubPath)
-        } catch as e {
-            try LoggerWarn("ErgoptiPlus", "Could not write forwarding stub at '{1}': {2}.",
-                StubPath, e.Message)
-            return
-        }
-    }
-    if FileWasCreated or !StubMatches {
-        if !AllowReload {
-            ; A runtime caller (the "open personal shortcuts" gesture/menu) wants to open
-            ; the file for editing, NOT restart the driver mid-session — the freshly
-            ; written file is an empty template, so nothing needs re-including before the
-            ; user has even edited it. Their next Reload picks up the edits.
-            try LoggerInfo("ErgoptiPlus", "Personal shortcuts file/stub (re)created; skipping Reload (caller opted out).")
-            return
-        }
-        try LoggerInfo("ErgoptiPlus", "Reloading to pick up freshly-written personal shortcuts chain.")
-        Reload
-        ; Reload starts the replacement instance but returns to this
-        ; auto-execute thread. Continuing would register the old instance's
-        ; hooks/layout beside the replacement for one scheduling window.
-        ; Exit immediately: native input remains available until the new
-        ; process is ready, but there is never two owners of the keyboard.
-        ExitApp(0)
-    }
+		global PERSONAL_SHORTCUTS_TEMPLATE
+		if (!IsSet(Path) or Type(Path) != "String" or Path == "") {
+				try LoggerWarn("ErgoptiPlus", "EnsurePersonalShortcutsFile called with empty Path — skipping.")
+				return
+		}
+		FileWasCreated := false
+		if !FileExist(Path) {
+				try {
+						Dir := RegExReplace(Path, "\\[^\\]+$", "")
+						if (Dir != "" and !DirExist(Dir)) {
+								DirCreate(Dir)
+						}
+						Template := IsSet(PERSONAL_SHORTCUTS_TEMPLATE) ? PERSONAL_SHORTCUTS_TEMPLATE : ""
+						; Every generated AHK source must be UTF-8 with BOM and LF.
+						; `UTF-8-RAW` silently creates a parser-risking BOM-less file.
+						FileAppend(Template, Path, "UTF-8")
+						FileWasCreated := true
+						try LoggerInfo("ErgoptiPlus", "Personal shortcuts file created from template at '{1}'.", Path)
+				} catch as e {
+						try LoggerWarn("ErgoptiPlus", "Could not create personal shortcuts file at '{1}': {2}.",
+								Path, e.Message)
+						return
+				}
+		}
+		StubDir := ""
+		if A_IsCompiled {
+				LocalAppData := ResolveLocalAppDataDir()
+				if (LocalAppData == "") {
+						try LoggerWarn("ErgoptiPlus", "EnsurePersonalShortcutsFile: cannot resolve LocalAppData — skipping stub creation.")
+						return
+				}
+				StubDir := LocalAppData . "\Ergopti\_generated"
+		} else {
+				StubDir := A_ScriptDir . "\_generated"
+		}
+		try DirCreate(StubDir)
+		StubPath := StubDir . "\personal_shortcuts.ahk"
+		DesiredStub := "; Auto-generated forwarding stub — do not edit.`n"
+				. "; Forwards to the user's personal shortcuts file located at:`n"
+				. ";     " . Path . "`n"
+				. "; Edit that file (e.g. via the tray menu) rather than this stub.`n"
+				. "#Include *i " . Path . "`n"
+		Existing := ""
+		if FileExist(StubPath) {
+				try Existing := FileRead(StubPath, "UTF-8-RAW")
+		}
+		StubMatches := (Existing == DesiredStub)
+		if !StubMatches {
+				try {
+						if FileExist(StubPath) {
+								FileDelete(StubPath)
+						}
+						FileAppend(DesiredStub, StubPath, "UTF-8")
+						try LoggerInfo("ErgoptiPlus", "Personal shortcuts forwarding stub refreshed at '{1}'.", StubPath)
+				} catch as e {
+						try LoggerWarn("ErgoptiPlus", "Could not write forwarding stub at '{1}': {2}.",
+								StubPath, e.Message)
+						return
+				}
+		}
+		if FileWasCreated or !StubMatches {
+				if !AllowReload {
+						; A runtime caller (the "open personal shortcuts" gesture/menu) wants to open
+						; the file for editing, NOT restart the driver mid-session — the freshly
+						; written file is an empty template, so nothing needs re-including before the
+						; user has even edited it. Their next Reload picks up the edits.
+						try LoggerInfo("ErgoptiPlus", "Personal shortcuts file/stub (re)created; skipping Reload (caller opted out).")
+						return
+				}
+				try LoggerInfo("ErgoptiPlus", "Reloading to pick up freshly-written personal shortcuts chain.")
+				Reload
+				; Reload starts the replacement instance but returns to this
+				; auto-execute thread. Continuing would register the old instance's
+				; hooks/layout beside the replacement for one scheduling window.
+				; Exit immediately: native input remains available until the new
+				; process is ready, but there is never two owners of the keyboard.
+				ExitApp(0)
+		}
 }
 
 try {
-    EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"])
+		EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"])
 } catch as _epsErr {
-    try LoggerError("ErgoptiPlus", "EnsurePersonalShortcutsFile failed: {1}.", _epsErr.Message)
+		try LoggerError("ErgoptiPlus", "EnsurePersonalShortcutsFile failed: {1}.", _epsErr.Message)
 }
 #InputLevel 2
 #Include *i _generated/personal_shortcuts.ahk
@@ -758,20 +758,20 @@ ReadKeyboardShortcutsConfig()
 LoggerStart("KeyboardShortcuts", "Registering configurable keyboard hotkeys…")
 _KbBoundCount := 0
 for _KbSlot, _KbAction in KeyboardShortcutAssignments {
-    if (_KbAction == "none")
-        continue
-    _KbSend := _KeyboardSlotSendCode(_KbSlot)
-    if (_KbSend == "") {
-        LoggerWarn("KeyboardShortcuts", "Slot '{1}' skipped — send code not found.", _KbSlot)
-        continue
-    }
-    try {
-        Hotkey(_KbSend, ((_s) => (*) => RunKeyboardShortcutAction(_s))(_KbSlot))
-        LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' registered.", _KbSlot, _KbAction)
-        _KbBoundCount++
-    } catch as _KbErr {
-        LoggerWarn("KeyboardShortcuts", "Failed to register hotkey '{1}': {2}.", _KbSlot, _KbErr.Message)
-    }
+		if (_KbAction == "none")
+				continue
+		_KbSend := _KeyboardSlotSendCode(_KbSlot)
+		if (_KbSend == "") {
+				LoggerWarn("KeyboardShortcuts", "Slot '{1}' skipped — send code not found.", _KbSlot)
+				continue
+		}
+		try {
+				Hotkey(_KbSend, ((_s) => (*) => RunKeyboardShortcutAction(_s))(_KbSlot))
+				LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' registered.", _KbSlot, _KbAction)
+				_KbBoundCount++
+		} catch as _KbErr {
+				LoggerWarn("KeyboardShortcuts", "Failed to register hotkey '{1}': {2}.", _KbSlot, _KbErr.Message)
+		}
 }
 LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", _KbBoundCount)
 
@@ -779,7 +779,7 @@ CS_Load()
 global _SaveFullConfigReady := true
 global _ParseExtTomlSectionsCache := Map()
 if MetricsShortcuts.enabled
-    WPMWidget_LoadConfig(_IniCache)
+		WPMWidget_LoadConfig(_IniCache)
 
 BootProfile_Mark("Config, features & shortcuts loaded")
 ; The tray menu build (~157 ms: per-category TOML submenus + manifest items) was the
@@ -807,42 +807,42 @@ SetTimer(SaveFullConfig, -500)
 ; OnExit) — do NOT register a second anonymous OnExit lambda here; double-Stop
 ; can trigger a "hook already released" error on some AHK builds.
 if !HookDispatcher.Start() {
-    ; The shared hook is the driver’s keyboard ownership boundary. Publishing
-    ; readiness without it would create a half-boot where menu/UI state looks
-    ; healthy but remaps and hook consumers silently never receive input.
-    LoggerError("ErgoptiPlus", "Startup aborted: unified keyboard hook could not start.")
-    ExitApp(1)
+		; The shared hook is the driver’s keyboard ownership boundary. Publishing
+		; readiness without it would create a half-boot where menu/UI state looks
+		; healthy but remaps and hook consumers silently never receive input.
+		LoggerError("ErgoptiPlus", "Startup aborted: unified keyboard hook could not start.")
+		ExitApp(1)
 }
 
 if MetricsShortcuts.enabled {
-    LoggerDebug("Startup", "Metrics enabled — WPMWidget.visible={1}, show_graph={2}.",
-        WPMWidget.visible, WPMWidget.show_graph)
-    ; Refresh the metrics focus cache off the keystroke thread via a periodic timer
-    ; so WinGetTitle/WinGetProcessName (which send WM_GETTEXT and can block on a
-    ; busy foreground window) never land on the hot path. Armed here — inside the
-    ; metrics gate and BEFORE KL_Init below — because the cache has exactly one
-    ; reader, MF_ShouldFilter, which the keylogger consults per event: with metrics
-    ; off the poll would issue blocking probes nobody reads.
-    MF_StartFocusRefresh()
-    ; (The WebView2 widget cold-start is armed at the very END of boot — after
-    ; "Driver fully initialised" — NOT here. A timer armed mid-boot fires ~its
-    ; delay later, while the hotstring registration is still running, and AHK
-    ; preempts that auto-execute thread to run it: WebView2's ~3 s startup gets
-    ; dragged back onto the critical path, AND the interruption pumps the message
-    ; queue, painting a tray click queued during boot against a half-built menu.
-    ; See the deferred-task block after LoggerSuccess("…ready").)
-    KL_Init(_ConfigDir . "metrics")
-    MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
-    ; HookDispatcher is already started unconditionally above.
-    KL_Hook_Start()
-    KL_Watchers_Start()
-    KL_Mouse_Start()
-    KL_Sensors_Start()
-    KL_Topo_Start()
-    KL_AV_Start()
-    KL_Net_Start()
-    KL_Clip_Start()
-    KL_Roi_Start()
+		LoggerDebug("Startup", "Metrics enabled — WPMWidget.visible={1}, show_graph={2}.",
+				WPMWidget.visible, WPMWidget.show_graph)
+		; Refresh the metrics focus cache off the keystroke thread via a periodic timer
+		; so WinGetTitle/WinGetProcessName (which send WM_GETTEXT and can block on a
+		; busy foreground window) never land on the hot path. Armed here — inside the
+		; metrics gate and BEFORE KL_Init below — because the cache has exactly one
+		; reader, MF_ShouldFilter, which the keylogger consults per event: with metrics
+		; off the poll would issue blocking probes nobody reads.
+		MF_StartFocusRefresh()
+		; (The WebView2 widget cold-start is armed at the very END of boot — after
+		; "Driver fully initialised" — NOT here. A timer armed mid-boot fires ~its
+		; delay later, while the hotstring registration is still running, and AHK
+		; preempts that auto-execute thread to run it: WebView2's ~3 s startup gets
+		; dragged back onto the critical path, AND the interruption pumps the message
+		; queue, painting a tray click queued during boot against a half-built menu.
+		; See the deferred-task block after LoggerSuccess("…ready").)
+		KL_Init(_ConfigDir . "metrics")
+		MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
+		; HookDispatcher is already started unconditionally above.
+		KL_Hook_Start()
+		KL_Watchers_Start()
+		KL_Mouse_Start()
+		KL_Sensors_Start()
+		KL_Topo_Start()
+		KL_AV_Start()
+		KL_Net_Start()
+		KL_Clip_Start()
+		KL_Roi_Start()
 }
 
 BootProfile_Mark("Metrics/keylogger started")
@@ -990,26 +990,26 @@ global _PENDING_KEYBOARD_HKL := 0
 #Include modules/keymap/layout_poll_helper.ahk
 
 CheckKeyboardLayoutChange() {
-    global _LAST_KEYBOARD_HKL, _PENDING_KEYBOARD_HKL, HSE_Suppressed, _PrefixWatcherSuppressed
-    
-    suspended := A_IsSuspended
-    isBlacklisted := false
-    try {
-        if IsSet(MF_ShouldFilter) && MF_ShouldFilter()
-            isBlacklisted := true
-    }
-    
-    curHkl := GetForegroundKeyboardLayout()
-    hseSup := (IsSet(HSE_Suppressed)) ? HSE_Suppressed : 0
-    pwSup := (IsSet(_PrefixWatcherSuppressed)) ? _PrefixWatcherSuppressed : 0
+		global _LAST_KEYBOARD_HKL, _PENDING_KEYBOARD_HKL, HSE_Suppressed, _PrefixWatcherSuppressed
+		
+		suspended := A_IsSuspended
+		isBlacklisted := false
+		try {
+				if IsSet(MF_ShouldFilter) && MF_ShouldFilter()
+						isBlacklisted := true
+		}
+		
+		curHkl := GetForegroundKeyboardLayout()
+		hseSup := (IsSet(HSE_Suppressed)) ? HSE_Suppressed : 0
+		pwSup := (IsSet(_PrefixWatcherSuppressed)) ? _PrefixWatcherSuppressed : 0
 	inputBusy := (IsSet(InDeadKeySequence) and InDeadKeySequence)
 		or (IsSet(_SpaceHoldInputHook) and IsObject(_SpaceHoldInputHook))
 		or (IsSet(_OneShotShiftInputHook) and IsObject(_OneShotShiftInputHook))
 		or (IsSet(_DeadKeyInputHook) and IsObject(_DeadKeyInputHook))
 		or GetKeyState("SC039", "P") or GetKeyState("SC038", "P") or GetKeyState("SC138", "P")
-    
-    if _ShouldReloadForHkl(curHkl, &_LAST_KEYBOARD_HKL, &_PENDING_KEYBOARD_HKL, suspended, isBlacklisted, hseSup, pwSup, A_TimeIdlePhysical, inputBusy) {
-        Reload()
-    }
+		
+		if _ShouldReloadForHkl(curHkl, &_LAST_KEYBOARD_HKL, &_PENDING_KEYBOARD_HKL, suspended, isBlacklisted, hseSup, pwSup, A_TimeIdlePhysical, inputBusy) {
+				Reload()
+		}
 }
 SetTimer(CheckKeyboardLayoutChange, _LAYOUT_POLL_INTERVAL_MS)

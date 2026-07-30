@@ -43,7 +43,7 @@ global DYN_HOTSTRINGS_DEFAULT_DELAY := ""
 ; empty so a missing load fails fast (rule 5.3) rather than masking drift behind
 ; a re-typed literal (rules 5.2 / 5.4).
 global HOTSTRINGS_CATEGORY_DEFAULT_COLORS := Map(
-    "llm_prediction", "",
+		"llm_prediction", "",
 )
 
 ; Shared terminator catalogue instance — the single source of truth for the

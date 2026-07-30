@@ -26,12 +26,12 @@
 ; configured for left_alt or only the OneShotShift variant which we
 ; explicitly exclude here).
 _LAltKeepsBareModifierForCapsLockCombo() {
-    TapAct := TapHoldTapAction(TapHold, "left_alt")
-    if (TapAct == "")
-        return true  ; LAlt not configured for tap-hold -> bare modifier
-    ; Block all configured tap-holds (each intercepts SC038 and would
-    ; eat the combo before AHK could test the LAlt+CapsLock chord).
-    return false
+		TapAct := TapHoldTapAction(TapHold, "left_alt")
+		if (TapAct == "")
+				return true  ; LAlt not configured for tap-hold -> bare modifier
+		; Block all configured tap-holds (each intercepts SC038 and would
+		; eat the combo before AHK could test the LAlt+CapsLock chord).
+		return false
 }
 
 ; AHK-32: mirror the AltGr siblings — fall back to native CapsLock when the
@@ -41,38 +41,38 @@ SC038 & SC03A:: LAltCapsLockShortcut()
 #HotIf
 
 LAltCapsLockShortcut() {
-    ; Defense-in-depth: the #HotIf guard above only fires this dispatcher
-    ; when _AnyShortcutEnabled("lalt_caps_lock") is already true, which
-    ; requires the sub-map to exist -- but this function is also reachable
-    ; via 6 direct calls that bypass #HotIf entirely (5 in
-    ; modules/tap_holds/capslock.ahk, 1 in modules/tap_holds/nav_layer.ahk),
-    ; so malformed/missing config must degrade gracefully instead of throwing
-    ; on the raw Map access below. Mirrors AltGrLAltShortcut/
-    ; AltGrCapsLockShortcut in modules/shortcuts/altgr.ahk.
-    if !IsSet(Features) or !Features.Has("shortcuts") or !Features["shortcuts"].Has("lalt_caps_lock")
-        return
-    ; All ten possible actions are simple, no Shift inversion or modifier
-    ; bracketing needed -- inline v2 if/else cascade (action table is the
-    ; SIMPLE_ACTIONS Map that used to live in lib/dispatchers.ahk).
-    if Features["shortcuts"]["lalt_caps_lock"].Get("backspace", false) {
-        TextPressKey("BackSpace", [])
-    } else if Features["shortcuts"]["lalt_caps_lock"].Get("caps_lock", false) {
-        ToggleCapsLock()
-    } else if Features["shortcuts"]["lalt_caps_lock"].Get("caps_word", false) {
-        ToggleCapsWord()
-    } else if Features["shortcuts"]["lalt_caps_lock"].Get("ctrl_backspace", false) {
-        TextPressKey("BackSpace", ["Ctrl"])
-    } else if Features["shortcuts"]["lalt_caps_lock"].Get("ctrl_delete", false) {
-        TextPressKey("Delete", ["Ctrl"])
-    } else if Features["shortcuts"]["lalt_caps_lock"].Get("delete", false) {
-        TextPressKey("Delete", [])
-    } else if Features["shortcuts"]["lalt_caps_lock"].Get("enter", false) {
-        TextPressKey("Enter", [])
-    } else if Features["shortcuts"]["lalt_caps_lock"].Get("escape", false) {
-        TextPressKey("Escape", [])
-    } else if Features["shortcuts"]["lalt_caps_lock"].Get("one_shot_shift", false) {
-        OneShotShift()
-    } else if Features["shortcuts"]["lalt_caps_lock"].Get("tab", false) {
-        TextPressKey("Tab", [])
-    }
+		; Defense-in-depth: the #HotIf guard above only fires this dispatcher
+		; when _AnyShortcutEnabled("lalt_caps_lock") is already true, which
+		; requires the sub-map to exist -- but this function is also reachable
+		; via 6 direct calls that bypass #HotIf entirely (5 in
+		; modules/tap_holds/capslock.ahk, 1 in modules/tap_holds/nav_layer.ahk),
+		; so malformed/missing config must degrade gracefully instead of throwing
+		; on the raw Map access below. Mirrors AltGrLAltShortcut/
+		; AltGrCapsLockShortcut in modules/shortcuts/altgr.ahk.
+		if !IsSet(Features) or !Features.Has("shortcuts") or !Features["shortcuts"].Has("lalt_caps_lock")
+				return
+		; All ten possible actions are simple, no Shift inversion or modifier
+		; bracketing needed -- inline v2 if/else cascade (action table is the
+		; SIMPLE_ACTIONS Map that used to live in lib/dispatchers.ahk).
+		if Features["shortcuts"]["lalt_caps_lock"].Get("backspace", false) {
+				TextPressKey("BackSpace", [])
+		} else if Features["shortcuts"]["lalt_caps_lock"].Get("caps_lock", false) {
+				ToggleCapsLock()
+		} else if Features["shortcuts"]["lalt_caps_lock"].Get("caps_word", false) {
+				ToggleCapsWord()
+		} else if Features["shortcuts"]["lalt_caps_lock"].Get("ctrl_backspace", false) {
+				TextPressKey("BackSpace", ["Ctrl"])
+		} else if Features["shortcuts"]["lalt_caps_lock"].Get("ctrl_delete", false) {
+				TextPressKey("Delete", ["Ctrl"])
+		} else if Features["shortcuts"]["lalt_caps_lock"].Get("delete", false) {
+				TextPressKey("Delete", [])
+		} else if Features["shortcuts"]["lalt_caps_lock"].Get("enter", false) {
+				TextPressKey("Enter", [])
+		} else if Features["shortcuts"]["lalt_caps_lock"].Get("escape", false) {
+				TextPressKey("Escape", [])
+		} else if Features["shortcuts"]["lalt_caps_lock"].Get("one_shot_shift", false) {
+				OneShotShift()
+		} else if Features["shortcuts"]["lalt_caps_lock"].Get("tab", false) {
+				TextPressKey("Tab", [])
+		}
 }

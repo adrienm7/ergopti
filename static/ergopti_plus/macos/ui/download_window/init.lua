@@ -104,58 +104,58 @@ local ERROR_AUTO_DISMISS_SEC = 8.0
 
 local _ucc = hs.webview.usercontent.new("dl_bridge")
 _ucc:setCallback(function(msg)
-    if type(msg) ~= "table" then return end
+		if type(msg) ~= "table" then return end
 
-    if msg.body == "cancel" then
-        -- Notify central manager hook (if set) so it can mark downloads aborted
-        local hook = package.loaded and package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"]
-        if type(hook) == "function" then pcall(hook) end
-        if type(_on_cancel) == "function" then pcall(_on_cancel) end
+		if msg.body == "cancel" then
+				-- Notify central manager hook (if set) so it can mark downloads aborted
+				local hook = package.loaded and package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"]
+				if type(hook) == "function" then pcall(hook) end
+				if type(_on_cancel) == "function" then pcall(_on_cancel) end
 
-    elseif msg.body == "resolve" then
-        if type(_on_resolve) == "function" then pcall(_on_resolve) end
+		elseif msg.body == "resolve" then
+				if type(_on_resolve) == "function" then pcall(_on_resolve) end
 
-    elseif msg.body == "retry" then
-        -- Un-abort the menubar icon lock so we can display progress again
-        local retry_hook = package.loaded["ui.menu.menu_llm.models_manager.download_retry_hook"]
-        if type(retry_hook) == "function" then pcall(retry_hook) end
+		elseif msg.body == "retry" then
+				-- Un-abort the menubar icon lock so we can display progress again
+				local retry_hook = package.loaded["ui.menu.menu_llm.models_manager.download_retry_hook"]
+				if type(retry_hook) == "function" then pcall(retry_hook) end
 
-        if type(_on_retry) == "function" then pcall(_on_retry) end
+				if type(_on_retry) == "function" then pcall(_on_retry) end
 
-    elseif msg.body == "terminal" then
-        -- In bootstrap mode, show the live Hammerspoon log; in download mode, use the model-specific cmd
-        local cmd = _mode == "bootstrap" and ("tail -f " .. Logger.UNIFIED_LOG_FILE) or (M._terminal_cmd or ("ollama pull " .. (M._current_model or "")))
-        -- Escaped for BOTH layers it passes through: the AppleScript string
-        -- literal (backslash is an escape char there, and escaping only the
-        -- double quote left a model name or log path containing one producing a
-        -- script that was never meant to run), then the surrounding /bin/sh
-        -- single quotes.
-        local apple_script = string.format(
-            "osascript -e %s -e 'tell application \"Terminal\" to activate'",
-            text_utils.shell_quote(text_utils.applescript_format(
-                'tell application "Terminal" to do script "%s"', cmd))
-        )
-        pcall(hs.execute, apple_script)
+		elseif msg.body == "terminal" then
+				-- In bootstrap mode, show the live Hammerspoon log; in download mode, use the model-specific cmd
+				local cmd = _mode == "bootstrap" and ("tail -f " .. Logger.UNIFIED_LOG_FILE) or (M._terminal_cmd or ("ollama pull " .. (M._current_model or "")))
+				-- Escaped for BOTH layers it passes through: the AppleScript string
+				-- literal (backslash is an escape char there, and escaping only the
+				-- double quote left a model name or log path containing one producing a
+				-- script that was never meant to run), then the surrounding /bin/sh
+				-- single quotes.
+				local apple_script = string.format(
+						"osascript -e %s -e 'tell application \"Terminal\" to activate'",
+						text_utils.shell_quote(text_utils.applescript_format(
+								'tell application "Terminal" to do script "%s"', cmd))
+				)
+				pcall(hs.execute, apple_script)
 
-    elseif msg.body == "expand" then
-        if _wv and type(_wv.frame) == "function" then
-            local current = _wv:frame()
-            local screen = hs.screen.mainScreen()
-            local sf = screen and type(screen.frame) == "function" and screen:frame() or { x = 0, y = 0, w = 1920, h = 1080 }
-            local target_h = math.floor((sf.h or 1080) * 0.5)
+		elseif msg.body == "expand" then
+				if _wv and type(_wv.frame) == "function" then
+						local current = _wv:frame()
+						local screen = hs.screen.mainScreen()
+						local sf = screen and type(screen.frame) == "function" and screen:frame() or { x = 0, y = 0, w = 1920, h = 1080 }
+						local target_h = math.floor((sf.h or 1080) * 0.5)
 
-            if target_h > current.h then
-                local bottom = current.y + current.h
-                local new_frame = {
-                    x = current.x,
-                    y = bottom - target_h,
-                    w = current.w,
-                    h = target_h,
-                }
-                pcall(function() _wv:frame(new_frame) end)
-            end
-        end
-    end
+						if target_h > current.h then
+								local bottom = current.y + current.h
+								local new_frame = {
+										x = current.x,
+										y = bottom - target_h,
+										w = current.w,
+										h = target_h,
+								}
+								pcall(function() _wv:frame(new_frame) end)
+						end
+				end
+		end
 end)
 
 
@@ -172,54 +172,54 @@ end)
 --- @param b number The amount in bytes.
 --- @return string|nil The formatted string.
 local function fmt_bytes(b)
-    if type(b) ~= "number" or b <= 0 then return nil end
-    if b > 1e9 then return string.format("%.1f Go", b / 1e9) end
-    if b > 1e6 then return string.format("%.0f Mo", b / 1e6) end
-    return string.format("%.0f Ko", b / 1e3)
+		if type(b) ~= "number" or b <= 0 then return nil end
+		if b > 1e9 then return string.format("%.1f Go", b / 1e9) end
+		if b > 1e6 then return string.format("%.0f Mo", b / 1e6) end
+		return string.format("%.0f Ko", b / 1e3)
 end
 
 --- Formats a raw size value properly whether it's bytes or GB.
 --- @param val any The value to format.
 --- @return string|nil The cleanly formatted size string.
 local function format_size(val)
-    if type(val) == "string" then return val end
-    if type(val) == "number" then
-        -- High magnitude means bytes. Low magnitude means GB
-        if val > 1e6 then return fmt_bytes(val) end
-        return string.format("%.1f Go", val)
-    end
-    return nil
+		if type(val) == "string" then return val end
+		if type(val) == "number" then
+				-- High magnitude means bytes. Low magnitude means GB
+				if val > 1e6 then return fmt_bytes(val) end
+				return string.format("%.1f Go", val)
+		end
+		return nil
 end
 
 --- Formats seconds into a human-readable time string.
 --- @param s number Seconds.
 --- @return string|nil The formatted string.
 local function fmt_time(s)
-    if type(s) ~= "number" or s <= 0 or s ~= s or s == math.huge then return nil end
-    if s > 3600 then return string.format("%dh %02dm", math.floor(s / 3600), math.floor((s % 3600) / 60)) end
-    if s > 60   then return string.format("%dm %02ds", math.floor(s / 60), math.floor(s % 60)) end
-    return string.format("%ds", math.floor(s))
+		if type(s) ~= "number" or s <= 0 or s ~= s or s == math.huge then return nil end
+		if s > 3600 then return string.format("%dh %02dm", math.floor(s / 3600), math.floor((s % 3600) / 60)) end
+		if s > 60   then return string.format("%dm %02ds", math.floor(s / 60), math.floor(s % 60)) end
+		return string.format("%ds", math.floor(s))
 end
 
 --- Safely escapes a string for injection into JavaScript.
 --- @param s string|nil The input string.
 --- @return string The escaped string wrapped in quotes.
 local function js_str(s)
-    if not s then return "null" end
-    return "\"" .. tostring(s):gsub("\\", "\\\\"):gsub("\"", "\\\"") .. "\""
+		if not s then return "null" end
+		return "\"" .. tostring(s):gsub("\\", "\\\\"):gsub("\"", "\\\"") .. "\""
 end
 
 --- Safely evaluates a JavaScript string in the active webview, queueing it
 --- if the page has not finished loading yet.
 --- @param code string The JS code to execute.
 local function eval(code)
-    if not _wv then return end
-    if _ready and type(_wv.evaluateJavaScript) == "function" then
-        pcall(function() _wv:evaluateJavaScript(code) end)
-    else
-        table.insert(_queued, code)
-        if #_queued > 200 then table.remove(_queued, 1) end
-    end
+		if not _wv then return end
+		if _ready and type(_wv.evaluateJavaScript) == "function" then
+				pcall(function() _wv:evaluateJavaScript(code) end)
+		else
+				table.insert(_queued, code)
+				if #_queued > 200 then table.remove(_queued, 1) end
+		end
 end
 
 
@@ -236,72 +236,72 @@ end
 --- @param mode string Either "download" or "bootstrap"; bootstrap mode is shorter.
 --- @return table frame {x, y, w, h}
 local function compute_frame(mode)
-    local screen = hs.screen.mainScreen()
-    local f = screen and type(screen.frame) == "function" and screen:frame() or {x=0, y=0, w=1920, h=1080}
+		local screen = hs.screen.mainScreen()
+		local f = screen and type(screen.frame) == "function" and screen:frame() or {x=0, y=0, w=1920, h=1080}
 
-    -- Both modes use the same 460x380 footprint: bootstrap now shows the live
-    -- terminal log so the user can see uv output without needing to expand.
-    local W = 460
-    local H = 380
-    return {
-        x = f.x + f.w - W - 10,
-        y = f.y + f.h - H - 10,
-        w = W,
-        h = H,
-    }
+		-- Both modes use the same 460x380 footprint: bootstrap now shows the live
+		-- terminal log so the user can see uv output without needing to expand.
+		local W = 460
+		local H = 380
+		return {
+				x = f.x + f.w - W - 10,
+				y = f.y + f.h - H - 10,
+				w = W,
+				h = H,
+		}
 end
 
 --- Internally creates the webview if missing. Idempotent.
 local function ensure_webview(title)
-    if _wv then return end
-    _ready  = false
-    _queued = {}
+		if _wv then return end
+		_ready  = false
+		_queued = {}
 
-    _wv = ui_builder.show_webview({
-        frame             = compute_frame(_mode),
-        title             = title or i18n.get("download_window.title"),
-        style_masks       = {"titled", "closable", "miniaturizable", "resizable", "nonactivating"},
-        level             = hs.drawing.windowLevels.floating,
-        allow_text_entry  = false,
-        allow_new_windows = false,
-        usercontent       = _ucc,
-        assets_dir        = ASSETS_DIR,
-        on_navigation     = function(action)
-            if action == "didFinishNavigation" then
-                _ready = true
-                local q = _queued
-                _queued = {}
-                for _, code in ipairs(q) do
-                    pcall(function() _wv:evaluateJavaScript(code) end)
-                end
-            end
-            return true
-        end,
-        on_close          = function()
-            -- Skip if we are programmatically closing the window via M.hide()
-            if _is_hiding then return end
-            _wv = nil
-            M._total_files = nil
-            M._last_file_count = nil
+		_wv = ui_builder.show_webview({
+				frame             = compute_frame(_mode),
+				title             = title or i18n.get("download_window.title"),
+				style_masks       = {"titled", "closable", "miniaturizable", "resizable", "nonactivating"},
+				level             = hs.drawing.windowLevels.floating,
+				allow_text_entry  = false,
+				allow_new_windows = false,
+				usercontent       = _ucc,
+				assets_dir        = ASSETS_DIR,
+				on_navigation     = function(action)
+						if action == "didFinishNavigation" then
+								_ready = true
+								local q = _queued
+								_queued = {}
+								for _, code in ipairs(q) do
+										pcall(function() _wv:evaluateJavaScript(code) end)
+								end
+						end
+						return true
+				end,
+				on_close          = function()
+						-- Skip if we are programmatically closing the window via M.hide()
+						if _is_hiding then return end
+						_wv = nil
+						M._total_files = nil
+						M._last_file_count = nil
 
-            -- Auto-abort download and reset menubar if the window is closed natively
-            local hook = package.loaded and package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"]
-            if type(hook) == "function" then pcall(hook) end
-            if type(_on_cancel) == "function" then pcall(_on_cancel) end
-        end
-    })
+						-- Auto-abort download and reset menubar if the window is closed natively
+						local hook = package.loaded and package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"]
+						if type(hook) == "function" then pcall(hook) end
+						if type(_on_cancel) == "function" then pcall(_on_cancel) end
+				end
+		})
 
-    -- Safety: even if didFinishNavigation never fires, flush queued JS after 1s
-    hs.timer.doAfter(1.0, function()
-        if _wv and not _ready then
-            _ready = true
-            local q = _queued
-            _queued = {}
-            for _, code in ipairs(q) do
-                pcall(function() _wv:evaluateJavaScript(code) end)
-            end
-        end
-    end)
+		-- Safety: even if didFinishNavigation never fires, flush queued JS after 1s
+		hs.timer.doAfter(1.0, function()
+				if _wv and not _ready then
+						_ready = true
+						local q = _queued
+						_queued = {}
+						for _, code in ipairs(q) do
+								pcall(function() _wv:evaluateJavaScript(code) end)
+						end
+				end
+		end)
 end
 
 
@@ -346,23 +346,23 @@ end
 
 --- Hides and destroys the progress window.
 function M.hide()
-    _is_hiding = true
-    if _wv and type(_wv.delete) == "function" then
-        pcall(function() _wv:delete() end)
-    end
-    _wv = nil
-    _on_cancel = nil
-    _on_resolve = nil
-    _on_retry  = nil
-    _start_ts  = nil
-    _ready     = false
-    _queued    = {}
-    _log_shown = false
-    _is_hiding = false
-    _kind      = nil
-    _mode      = "download"
-    M._total_files = nil
-    M._last_file_count = nil
+		_is_hiding = true
+		if _wv and type(_wv.delete) == "function" then
+				pcall(function() _wv:delete() end)
+		end
+		_wv = nil
+		_on_cancel = nil
+		_on_resolve = nil
+		_on_retry  = nil
+		_start_ts  = nil
+		_ready     = false
+		_queued    = {}
+		_log_shown = false
+		_is_hiding = false
+		_kind      = nil
+		_mode      = "download"
+		M._total_files = nil
+		M._last_file_count = nil
 end
 
 
@@ -378,80 +378,80 @@ end
 ---   • terminal_cmd: command for terminal output (download mode only)
 ---   • model: model name or table with .name/.repo (download mode only)
 function M.show(opts)
-    if type(opts) ~= "table" or type(opts.kind) ~= "string" or not PRESETS[opts.kind] then
-        Logger.error(LOG, "M.show() requires opts.kind as valid preset.")
-        return
-    end
+		if type(opts) ~= "table" or type(opts.kind) ~= "string" or not PRESETS[opts.kind] then
+				Logger.error(LOG, "M.show() requires opts.kind as valid preset.")
+				return
+		end
 
-    local preset = PRESETS[opts.kind]
-    local title    = (type(opts.title)    == "string" and opts.title    ~= "") and opts.title    or preset.default_title
-    local subtitle = (type(opts.subtitle) == "string" and opts.subtitle ~= "") and opts.subtitle or preset.default_subtitle
+		local preset = PRESETS[opts.kind]
+		local title    = (type(opts.title)    == "string" and opts.title    ~= "") and opts.title    or preset.default_title
+		local subtitle = (type(opts.subtitle) == "string" and opts.subtitle ~= "") and opts.subtitle or preset.default_subtitle
 
-    Logger.start(LOG, "Showing progress UI (kind=%s, mode=%s).", opts.kind, preset.mode)
+		Logger.start(LOG, "Showing progress UI (kind=%s, mode=%s).", opts.kind, preset.mode)
 
-    -- New occupant: invalidate any deferred hide armed by the previous one.
-    _session = _session + 1
-    _kind = opts.kind
-    _mode = preset.mode
-    _on_cancel  = type(opts.on_cancel)  == "function" and opts.on_cancel  or nil
-    _on_resolve = type(opts.on_resolve) == "function" and opts.on_resolve or nil
-    _on_retry   = type(opts.on_retry)   == "function" and opts.on_retry   or nil
+		-- New occupant: invalidate any deferred hide armed by the previous one.
+		_session = _session + 1
+		_kind = opts.kind
+		_mode = preset.mode
+		_on_cancel  = type(opts.on_cancel)  == "function" and opts.on_cancel  or nil
+		_on_resolve = type(opts.on_resolve) == "function" and opts.on_resolve or nil
+		_on_retry   = type(opts.on_retry)   == "function" and opts.on_retry   or nil
 
-    -- Download mode: extract model and terminal command
-    if opts.kind == "mlx_model" or opts.kind == "ollama_model" then
-        local model = opts.model
-        local model_name = type(model) == "table" and (model.name or model.repo) or model
-        M._current_model = type(model_name) == "string" and model_name or "inconnu"
-        M._terminal_cmd  = type(opts.terminal_cmd) == "string" and opts.terminal_cmd or ("ollama pull " .. M._current_model)
-    end
+		-- Download mode: extract model and terminal command
+		if opts.kind == "mlx_model" or opts.kind == "ollama_model" then
+				local model = opts.model
+				local model_name = type(model) == "table" and (model.name or model.repo) or model
+				M._current_model = type(model_name) == "string" and model_name or "inconnu"
+				M._terminal_cmd  = type(opts.terminal_cmd) == "string" and opts.terminal_cmd or ("ollama pull " .. M._current_model)
+		end
 
-    -- ONE decision, taken before anything can invalidate it. This used to be two
-    -- separate `if _wv then` tests with ensure_webview() in between, so a window
-    -- created two lines earlier looked "already open": the reuse branch then
-    -- cleared _queued (discarding the setKind that carries the title, subtitle and
-    -- kind) and forced _ready = true, which made every following eval() fire
-    -- against a page whose document had not finished loading. Nothing arrived, and
-    -- the block written to be the fresh-window path was unreachable.
-    local reusing = (_wv ~= nil)
+		-- ONE decision, taken before anything can invalidate it. This used to be two
+		-- separate `if _wv then` tests with ensure_webview() in between, so a window
+		-- created two lines earlier looked "already open": the reuse branch then
+		-- cleared _queued (discarding the setKind that carries the title, subtitle and
+		-- kind) and forced _ready = true, which made every following eval() fire
+		-- against a page whose document had not finished loading. Nothing arrived, and
+		-- the block written to be the fresh-window path was unreachable.
+		local reusing = (_wv ~= nil)
 
-    _start_ts          = hs.timer.secondsSinceEpoch()
-    _log_shown         = false
-    M._total_files     = nil
-    M._last_file_count = nil
+		_start_ts          = hs.timer.secondsSinceEpoch()
+		_log_shown         = false
+		M._total_files     = nil
+		M._last_file_count = nil
 
-    if not reusing then
-        ensure_webview(title)
-    elseif not _ready then
-        -- Reusing a window whose page never finished loading: the previous
-        -- occupant's undelivered payload must not flush on top of this one's.
-        _queued = {}
-    end
+		if not reusing then
+				ensure_webview(title)
+		elseif not _ready then
+				-- Reusing a window whose page never finished loading: the previous
+				-- occupant's undelivered payload must not flush on top of this one's.
+				_queued = {}
+		end
 
-    if reusing then
-        -- Same window, new occupant: clear the previous download's percentage, log
-        -- lines and "done" banner, or they linger as zombie placeholders.
-        --
-        -- Deliberately NOT done on a fresh page. resetUI() hides AND disables
-        -- #btn-cancel when download_window.btn_cancel is missing from
-        -- window._i18n_strings — and ui_builder injects that table only AFTER the
-        -- navigation callback that flushes this queue. The i18n pass rewrites
-        -- textContent and never restores `display`, so Cancel would be gone for the
-        -- entire life of every freshly opened window.
-        eval("resetUI()")
-    end
+		if reusing then
+				-- Same window, new occupant: clear the previous download's percentage, log
+				-- lines and "done" banner, or they linger as zombie placeholders.
+				--
+				-- Deliberately NOT done on a fresh page. resetUI() hides AND disables
+				-- #btn-cancel when download_window.btn_cancel is missing from
+				-- window._i18n_strings — and ui_builder injects that table only AFTER the
+				-- navigation callback that flushes this queue. The i18n pass rewrites
+				-- textContent and never restores `display`, so Cancel would be gone for the
+				-- entire life of every freshly opened window.
+				eval("resetUI()")
+		end
 
-    -- Exactly one setKind, carrying the RESOLVED pair. The old code followed the
-    -- real call with setKind(kind, null, null); script.js falls back to the kind's
-    -- default title and blanks the subtitle when they are null, so the second call
-    -- undid the first — and the subtitle is the deps checkers' current step label.
-    eval(string.format("setKind(%s,%s,%s)", js_str(_kind), js_str(title), js_str(subtitle)))
+		-- Exactly one setKind, carrying the RESOLVED pair. The old code followed the
+		-- real call with setKind(kind, null, null); script.js falls back to the kind's
+		-- default title and blanks the subtitle when they are null, so the second call
+		-- undid the first — and the subtitle is the deps checkers' current step label.
+		eval(string.format("setKind(%s,%s,%s)", js_str(_kind), js_str(title), js_str(subtitle)))
 
-    -- _current_model is nil for bootstrap kinds (mlx_install, ollama_install)
-    if M._current_model then
-        eval("setModel(" .. js_str(M._current_model) .. ")")
-    end
+		-- _current_model is nil for bootstrap kinds (mlx_install, ollama_install)
+		if M._current_model then
+				eval("setModel(" .. js_str(M._current_model) .. ")")
+		end
 
-    Logger.success(LOG, "Progress UI shown (title=%q, reusing=%s).", title, tostring(reusing))
+		Logger.success(LOG, "Progress UI shown (title=%q, reusing=%s).", title, tostring(reusing))
 end
 
 --- Updates the UI with current download metrics. Download mode only.
@@ -461,33 +461,33 @@ end
 --- @param raw_line string The raw log line from the download process to display.
 --- @param python_file_count number|nil Authoritative completed-file count from the Python watcher.
 function M.update(pct_str, bytes_done, bytes_total, raw_line, python_file_count)
-    if not _wv then return end
+		if not _wv then return end
 
-    local pct = tonumber(pct_str) or 0
-    local elapsed = hs.timer.secondsSinceEpoch() - (_start_ts or hs.timer.secondsSinceEpoch())
+		local pct = tonumber(pct_str) or 0
+		local elapsed = hs.timer.secondsSinceEpoch() - (_start_ts or hs.timer.secondsSinceEpoch())
 
-    local dl_str, speed_str, eta_str, file_count_str
+		local dl_str, speed_str, eta_str, file_count_str
 
-    if type(bytes_total) == "number" and bytes_total > 0 then
-        local ds = fmt_bytes(bytes_done)
-        local ts = fmt_bytes(bytes_total)
-        if ds and ts then dl_str = ds .. " / " .. ts end
-    elseif type(bytes_done) == "number" and bytes_done > 0 then
-        dl_str = fmt_bytes(bytes_done)
-    end
+		if type(bytes_total) == "number" and bytes_total > 0 then
+				local ds = fmt_bytes(bytes_done)
+				local ts = fmt_bytes(bytes_total)
+				if ds and ts then dl_str = ds .. " / " .. ts end
+		elseif type(bytes_done) == "number" and bytes_done > 0 then
+				dl_str = fmt_bytes(bytes_done)
+		end
 
-    if type(bytes_done) == "number" and bytes_done > 0 and elapsed > 2 then
-        local speed = bytes_done / elapsed
-        speed_str = fmt_bytes(speed) and (fmt_bytes(speed) .. "/s") or nil
+		if type(bytes_done) == "number" and bytes_done > 0 and elapsed > 2 then
+				local speed = bytes_done / elapsed
+				speed_str = fmt_bytes(speed) and (fmt_bytes(speed) .. "/s") or nil
 
-        if type(bytes_total) == "number" and bytes_total > bytes_done and speed > 0 then
-            eta_str = fmt_time((bytes_total - bytes_done) / speed)
-        end
-    end
+				if type(bytes_total) == "number" and bytes_total > bytes_done and speed > 0 then
+						eta_str = fmt_time((bytes_total - bytes_done) / speed)
+				end
+		end
 
-    -- Parse file counts for MLX and rich stats for Ollama directly from the logs
-    if type(raw_line) == "string" and raw_line ~= "" then
-        local clean_line = raw_line:gsub("\27%[[%d;]*%a", "")
+		-- Parse file counts for MLX and rich stats for Ollama directly from the logs
+		if type(raw_line) == "string" and raw_line ~= "" then
+				local clean_line = raw_line:gsub("\27%[[%d;]*%a", "")
 
         -- 1. Extract Ollama native progress (Ollama doesn't pass bytes_done via parameters)
         if not bytes_done then

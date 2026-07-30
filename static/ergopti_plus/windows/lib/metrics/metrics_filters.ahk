@@ -41,22 +41,22 @@
 ; ===============================
 
 class MetricsFilters {
-    ; Privacy filters — all three default ON. They only matter when the
-    ; keylogger itself is enabled; KL_AppendLog short-circuits anyway
-    ; when off.
-    static private_browsing  := true
-    static secure_field      := true   ; Ignorer les champs mot de passe (UIA)
-    static system_auth       := true
+		; Privacy filters — all three default ON. They only matter when the
+		; keylogger itself is enabled; KL_AppendLog short-circuits anyway
+		; when off.
+		static private_browsing  := true
+		static secure_field      := true   ; Ignorer les champs mot de passe (UIA)
+		static system_auth       := true
 
-    ; At-rest encryption of the typed-text columns. Off by default, matching the
-    ; shared manifest's metrics.encrypt — unlike the filters above, this one is a
-    ; deliberate opt-in, not a privacy default.
-    static encrypt           := false
+		; At-rest encryption of the typed-text columns. Off by default, matching the
+		; shared manifest's metrics.encrypt — unlike the filters above, this one is a
+		; deliberate opt-in, not a privacy default.
+		static encrypt           := false
 
-    ; Per-app exclusion list. Keys are process names (e.g. "chrome.exe");
-    ; presence of the key means « do not log this app ». Map for O(1)
-    ; lookup on the hot path.
-    static disabled_apps := Map()
+		; Per-app exclusion list. Keys are process names (e.g. "chrome.exe");
+		; presence of the key means « do not log this app ». Map for O(1)
+		; lookup on the hot path.
+		static disabled_apps := Map()
 }
 
 
@@ -73,11 +73,11 @@ class MetricsFilters {
 ; which owns the [shortcuts] section inside <config_dir>/config.toml.
 ; MF_LoadFromIni / MF_SaveToIni are kept as thin shims.
 MF_LoadFromIni() {
-    CS_Load()
+		CS_Load()
 }
 
 MF_SaveToIni() {
-    CS_Save()
+		CS_Save()
 }
 
 
@@ -103,56 +103,56 @@ MF_SaveToIni() {
 global MF_FOCUS_TTL_MS := 50
 
 class MetricsFocusCache {
-    ; Build-then-swap pattern for atomic state updates: multiple properties
-    ; are gathered into a local object first, then published via a single
-    ; reference swap. This ensures readers (MF_ShouldFilter) never see an
-    ; inconsistent mix of old and new data (metrics-focus-cache-atomic).
-    static state := {
-        last_at:      0,
-        hwnd:         0,
-        process_name: "",
-        title:        "",
-        class:        ""
-    }
+		; Build-then-swap pattern for atomic state updates: multiple properties
+		; are gathered into a local object first, then published via a single
+		; reference swap. This ensures readers (MF_ShouldFilter) never see an
+		; inconsistent mix of old and new data (metrics-focus-cache-atomic).
+		static state := {
+				last_at:      0,
+				hwnd:         0,
+				process_name: "",
+				title:        "",
+				class:        ""
+		}
 }
 
 MF_RefreshFocus() {
-    ; SetTimer callbacks bypass native Suspend, which only disarms hotkeys. Probing
-    ; the foreground window while paused violates « pause = tout éteint » and keeps
-    ; issuing blocking WM_GETTEXT round-trips 20x/second against whatever the user
-    ; focuses. The cache is TTL-based, so simply skipping the tick self-heals on the
-    ; first refresh after resume — nothing needs to be replayed.
-    if A_IsSuspended
-        return
-    if (A_TickCount - (MetricsFocusCache.state.last_at) & 0xFFFFFFFF) < MF_FOCUS_TTL_MS
-        return
-    hwnd := 0
-    try hwnd := WinGetID("A")
-    if !hwnd {
-        ; Atomic swap: publish empty context
-        MetricsFocusCache.state := {
-            last_at:      A_TickCount,
-            hwnd:         0,
-            process_name: "",
-            title:        "",
-            class:        ""
-        }
-        return
-    }
-    
-    pn := "", t := "", c := ""
-    try pn := WinGetProcessName("ahk_id " . hwnd)
-    try t  := WinGetTitle("ahk_id " . hwnd)
-    try c  := WinGetClass("ahk_id " . hwnd)
+		; SetTimer callbacks bypass native Suspend, which only disarms hotkeys. Probing
+		; the foreground window while paused violates « pause = tout éteint » and keeps
+		; issuing blocking WM_GETTEXT round-trips 20x/second against whatever the user
+		; focuses. The cache is TTL-based, so simply skipping the tick self-heals on the
+		; first refresh after resume — nothing needs to be replayed.
+		if A_IsSuspended
+				return
+		if (A_TickCount - (MetricsFocusCache.state.last_at) & 0xFFFFFFFF) < MF_FOCUS_TTL_MS
+				return
+		hwnd := 0
+		try hwnd := WinGetID("A")
+		if !hwnd {
+				; Atomic swap: publish empty context
+				MetricsFocusCache.state := {
+						last_at:      A_TickCount,
+						hwnd:         0,
+						process_name: "",
+						title:        "",
+						class:        ""
+				}
+				return
+		}
+		
+		pn := "", t := "", c := ""
+		try pn := WinGetProcessName("ahk_id " . hwnd)
+		try t  := WinGetTitle("ahk_id " . hwnd)
+		try c  := WinGetClass("ahk_id " . hwnd)
 
-    ; Atomic swap: readers always see a consistent snapshot.
-    MetricsFocusCache.state := {
-        last_at:      A_TickCount,
-        hwnd:         hwnd,
-        process_name: pn,
-        title:        t,
-        class:        c
-    }
+		; Atomic swap: readers always see a consistent snapshot.
+		MetricsFocusCache.state := {
+				last_at:      A_TickCount,
+				hwnd:         hwnd,
+				process_name: pn,
+				title:        t,
+				class:        c
+		}
 }
 
 
@@ -169,130 +169,130 @@ MF_RefreshFocus() {
 ; window title and is intentionally generous — false positives mean
 ; "we logged a bit less than we could have", which is the safe direction.
 global MF_PRIVATE_TITLE_PATTERNS := [
-    "i)\bInPrivate\b",
-    "i)\bIncognito\b",
-    "i)\bPrivate Browsing\b",
-    "i)\(Private\)",
-    "i)Navigation privée",
-    "i)Privé",
-    "i)Privater Modus"
+		"i)\bInPrivate\b",
+		"i)\bIncognito\b",
+		"i)\bPrivate Browsing\b",
+		"i)\(Private\)",
+		"i)Navigation privée",
+		"i)Privé",
+		"i)Privater Modus"
 ]
 
 ; System-auth windows. Both process names AND class names — UAC consent
 ; runs in consent.exe but the credential prompt that shows up for sudo-
 ; like operations runs as a XAML host with a stable class name.
 global MF_SYSTEM_AUTH_PROCESSES := Map(
-    "consent.exe",                 true,    ; UAC
-    "logonui.exe",                 true,    ; lock screen
-    "credentialuibroker.exe",      true,    ; modern credential prompts
-    "credui.exe",                  true,    ; legacy credential prompts
-    "winlogon.exe",                true
+		"consent.exe",                 true,    ; UAC
+		"logonui.exe",                 true,    ; lock screen
+		"credentialuibroker.exe",      true,    ; modern credential prompts
+		"credui.exe",                  true,    ; legacy credential prompts
+		"winlogon.exe",                true
 )
 global MF_SYSTEM_AUTH_CLASSES := Map(
-    "Credential Dialog Xaml Host", true,
-    "ConsentUI",                   true,
-    "LogonUI",                     true
+		"Credential Dialog Xaml Host", true,
+		"ConsentUI",                   true,
+		"LogonUI",                     true
 )
 
 ; Returns true when the keylogger should DROP the current event because
 ; one of the privacy filters matches the focused window.
 MF_StartFocusRefresh() {
-    ; Refresh the focus cache off the keystroke thread via a periodic timer
-    ; so WinGetTitle/WinGetProcessName (which send WM_GETTEXT and can block
-    ; on a busy/unresponsive foreground window) never land on the hot path.
-    ; The 50 ms interval matches the TTL the cache itself enforces.
-    SetTimer(MF_RefreshFocus, MF_FOCUS_TTL_MS)
-    try LoggerTrace("MetricsFilters", "Focus-cache refresh started ({1} ms).", MF_FOCUS_TTL_MS)
+		; Refresh the focus cache off the keystroke thread via a periodic timer
+		; so WinGetTitle/WinGetProcessName (which send WM_GETTEXT and can block
+		; on a busy/unresponsive foreground window) never land on the hot path.
+		; The 50 ms interval matches the TTL the cache itself enforces.
+		SetTimer(MF_RefreshFocus, MF_FOCUS_TTL_MS)
+		try LoggerTrace("MetricsFilters", "Focus-cache refresh started ({1} ms).", MF_FOCUS_TTL_MS)
 }
 
 ; Disarm the focus-cache poll. Required because MF_RefreshFocus is a REPEATING
 ; timer: without a cancel site it runs for the whole process lifetime, including
 ; the entire pause, issuing blocking WM_GETTEXT probes the user believes are off.
 MF_StopFocusRefresh() {
-    SetTimer(MF_RefreshFocus, 0)
-    try LoggerDone("MetricsFilters", "Focus-cache refresh stopped.")
+		SetTimer(MF_RefreshFocus, 0)
+		try LoggerDone("MetricsFilters", "Focus-cache refresh stopped.")
 }
 
 MF_ShouldFilter() {
-    ; Last window title the private-browsing pattern scan ran on, with its
-    ; verdict. The seven RegExMatch calls below used to run on EVERY logged
-    ; event; the title they read only changes when MF_RefreshFocus publishes a
-    ; new snapshot (50 ms TTL), so scanning it again per keystroke re-derived a
-    ; value that could not have changed. Same build-then-swap discipline as
-    ; MetricsFocusCache: title and verdict are published together through a
-    ; single reference assignment, so a timer interrupting mid-scan can never
-    ; expose a new title paired with the old (possibly "not private") verdict.
-    static _private_memo := { title: "", is_private: false }
+		; Last window title the private-browsing pattern scan ran on, with its
+		; verdict. The seven RegExMatch calls below used to run on EVERY logged
+		; event; the title they read only changes when MF_RefreshFocus publishes a
+		; new snapshot (50 ms TTL), so scanning it again per keystroke re-derived a
+		; value that could not have changed. Same build-then-swap discipline as
+		; MetricsFocusCache: title and verdict are published together through a
+		; single reference assignment, so a timer interrupting mid-scan can never
+		; expose a new title paired with the old (possibly "not private") verdict.
+		static _private_memo := { title: "", is_private: false }
 
-    ; Focus cache is refreshed off-thread by the periodic timer started in
-    ; MF_StartFocusRefresh() — NEVER call MF_RefreshFocus() synchronously
-    ; here (it does blocking WinGet* calls that stall the keystroke hook).
+		; Focus cache is refreshed off-thread by the periodic timer started in
+		; MF_StartFocusRefresh() — NEVER call MF_RefreshFocus() synchronously
+		; here (it does blocking WinGet* calls that stall the keystroke hook).
 
-    ; Capture the reference once so all subsequent property reads are
-    ; consistent with each other even if a background refresh occurs.
-    s := MetricsFocusCache.state
-    proc  := StrLower(s.process_name)
-    title := s.title
-    cls   := s.class
+		; Capture the reference once so all subsequent property reads are
+		; consistent with each other even if a background refresh occurs.
+		s := MetricsFocusCache.state
+		proc  := StrLower(s.process_name)
+		title := s.title
+		cls   := s.class
 
-    ; 1. Disabled-apps list — fastest check.
-    if (proc != "" && MetricsFilters.disabled_apps.Has(proc))
-        return true
+		; 1. Disabled-apps list — fastest check.
+		if (proc != "" && MetricsFilters.disabled_apps.Has(proc))
+				return true
 
-    ; 2. Password field — relies on the UIA-backed detector in
-    ;    modules/keylogger.ahk §13. Wrapped in try because the function
-    ;    is loaded later in the include order and an early caller (e.g.
-    ;    boot-time metrics) might race ahead of it.
-    if MetricsFilters.secure_field {
-        ; Default to "password" BEFORE the try, never after: this caller
-        ; persists characters to disk, so it cannot be laxer than the LLM
-        ; caller of the same predicate, which test_disable_password_fields_gate
-        ; already pins to `IsPw := true` ahead of `try IsPw := SFD_IsSecureField()`.
-        ; Seeding it false made a throwing detector (a UIA change, a new
-        ; unguarded call in the chain, KLPW_CACHE_TTL_MS read before the include
-        ; that defines it has run at boot) answer "ordinary field" and the
-        ; keystroke got logged. Worse, the bare try swallowed the error before
-        ; KL_AppendLog's own fail-closed catch could see it.
-        is_pw := true
-        try {
-            is_pw := KL_IsFocusedFieldPassword()
-        } catch as err {
-            ; Staying secure is the right behaviour, but a permanently degraded
-            ; detector must not look like a healthy one (conventions 5.3).
-            try LoggerWarn("MetricsFilters", "KL_IsFocusedFieldPassword unavailable — defaulting to secure: {1}.", err.Message)
-        }
-        if is_pw
-            return true
-    }
+		; 2. Password field — relies on the UIA-backed detector in
+		;    modules/keylogger.ahk §13. Wrapped in try because the function
+		;    is loaded later in the include order and an early caller (e.g.
+		;    boot-time metrics) might race ahead of it.
+		if MetricsFilters.secure_field {
+				; Default to "password" BEFORE the try, never after: this caller
+				; persists characters to disk, so it cannot be laxer than the LLM
+				; caller of the same predicate, which test_disable_password_fields_gate
+				; already pins to `IsPw := true` ahead of `try IsPw := SFD_IsSecureField()`.
+				; Seeding it false made a throwing detector (a UIA change, a new
+				; unguarded call in the chain, KLPW_CACHE_TTL_MS read before the include
+				; that defines it has run at boot) answer "ordinary field" and the
+				; keystroke got logged. Worse, the bare try swallowed the error before
+				; KL_AppendLog's own fail-closed catch could see it.
+				is_pw := true
+				try {
+						is_pw := KL_IsFocusedFieldPassword()
+				} catch as err {
+						; Staying secure is the right behaviour, but a permanently degraded
+						; detector must not look like a healthy one (conventions 5.3).
+						try LoggerWarn("MetricsFilters", "KL_IsFocusedFieldPassword unavailable — defaulting to secure: {1}.", err.Message)
+				}
+				if is_pw
+						return true
+		}
 
-    ; 3. System-auth dialogs.
-    if MetricsFilters.system_auth {
-        if (proc != "" && MF_SYSTEM_AUTH_PROCESSES.Has(proc))
-            return true
-        if (cls != "" && MF_SYSTEM_AUTH_CLASSES.Has(cls))
-            return true
-    }
+		; 3. System-auth dialogs.
+		if MetricsFilters.system_auth {
+				if (proc != "" && MF_SYSTEM_AUTH_PROCESSES.Has(proc))
+						return true
+				if (cls != "" && MF_SYSTEM_AUTH_CLASSES.Has(cls))
+						return true
+		}
 
-    ; 4. Private browsing (title pattern match), memoized on the title itself.
-    if MetricsFilters.private_browsing && title != "" {
-        memo := _private_memo
-        ; Case-sensitive compare: two titles differing only in case are two
-        ; different titles, and the patterns are already case-insensitive.
-        if (title !== memo.title) {
-            is_private := false
-            for _, pat in MF_PRIVATE_TITLE_PATTERNS {
-                if RegExMatch(title, pat) {
-                    is_private := true
-                    break
-                }
-            }
-            memo := { title: title, is_private: is_private }
-            _private_memo := memo
-        }
-        if memo.is_private
-            return true
-    }
-    return false
+		; 4. Private browsing (title pattern match), memoized on the title itself.
+		if MetricsFilters.private_browsing && title != "" {
+				memo := _private_memo
+				; Case-sensitive compare: two titles differing only in case are two
+				; different titles, and the patterns are already case-insensitive.
+				if (title !== memo.title) {
+						is_private := false
+						for _, pat in MF_PRIVATE_TITLE_PATTERNS {
+								if RegExMatch(title, pat) {
+										is_private := true
+										break
+								}
+						}
+						memo := { title: title, is_private: is_private }
+						_private_memo := memo
+				}
+				if memo.is_private
+						return true
+		}
+		return false
 }
 
 
@@ -311,25 +311,25 @@ MF_ShouldFilter() {
 ; of the CURRENTLY focused control and has no meaning for a context that has
 ; already lost focus.
 MF_ShouldFilterFor(app, title) {
-    proc := StrLower(app)
+		proc := StrLower(app)
 
-    ; 1. Disabled-apps list.
-    if (proc != "" && MetricsFilters.disabled_apps.Has(proc))
-        return true
+		; 1. Disabled-apps list.
+		if (proc != "" && MetricsFilters.disabled_apps.Has(proc))
+				return true
 
-    ; 2. System-auth dialogs — process name only, there is no live window
-    ;    class available for a non-focused snapshot.
-    if (MetricsFilters.system_auth && proc != "" && MF_SYSTEM_AUTH_PROCESSES.Has(proc))
-        return true
+		; 2. System-auth dialogs — process name only, there is no live window
+		;    class available for a non-focused snapshot.
+		if (MetricsFilters.system_auth && proc != "" && MF_SYSTEM_AUTH_PROCESSES.Has(proc))
+				return true
 
-    ; 3. Private browsing (title pattern match).
-    if (MetricsFilters.private_browsing && title != "") {
-        for _, pat in MF_PRIVATE_TITLE_PATTERNS {
-            if RegExMatch(title, pat)
-                return true
-        }
-    }
-    return false
+		; 3. Private browsing (title pattern match).
+		if (MetricsFilters.private_browsing && title != "") {
+				for _, pat in MF_PRIVATE_TITLE_PATTERNS {
+						if RegExMatch(title, pat)
+								return true
+				}
+		}
+		return false
 }
 
 
@@ -345,29 +345,29 @@ MF_ShouldFilterFor(app, title) {
 ; Add or remove an app (process name) from the exclusion list. Persists
 ; immediately. Returns the new state (true = excluded).
 MF_ToggleDisabledApp(process_name) {
-    if (process_name = "")
-        return false
-    key := StrLower(process_name)
-    if MetricsFilters.disabled_apps.Has(key) {
-        MetricsFilters.disabled_apps.Delete(key)
-        MF_SaveToIni()
-        return false
-    }
-    MetricsFilters.disabled_apps[key] := true
-    MF_SaveToIni()
-    return true
+		if (process_name = "")
+				return false
+		key := StrLower(process_name)
+		if MetricsFilters.disabled_apps.Has(key) {
+				MetricsFilters.disabled_apps.Delete(key)
+				MF_SaveToIni()
+				return false
+		}
+		MetricsFilters.disabled_apps[key] := true
+		MF_SaveToIni()
+		return true
 }
 
 MF_DisabledCount() {
-    n := 0
-    for _, _ in MetricsFilters.disabled_apps
-        n += 1
-    return n
+		n := 0
+		for _, _ in MetricsFilters.disabled_apps
+				n += 1
+		return n
 }
 
 MF_DisabledList() {
-    out := []
-    for name, _ in MetricsFilters.disabled_apps
-        out.Push(name)
-    return out
+		out := []
+		for name, _ in MetricsFilters.disabled_apps
+				out.Push(name)
+		return out
 }

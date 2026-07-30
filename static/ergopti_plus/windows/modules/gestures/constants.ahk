@@ -40,36 +40,36 @@
 ; Ordered gesture slot identifiers. Mirrors Hammerspoon's slot identifiers.
 ; @return {Array} The canonical slot ids, in menu order.
 GestureSlotIds() {
-    static Slots := [
-        "tap_3",
-        "swipe_3_up",
-        "swipe_3_down",
-        "swipe_3_left",
-        "swipe_3_right",
-        "tap_4",
-        "swipe_4_up",
-        "swipe_4_down",
-        "swipe_4_left",
-        "swipe_4_right",
-    ]
-    return Slots
+		static Slots := [
+				"tap_3",
+				"swipe_3_up",
+				"swipe_3_down",
+				"swipe_3_left",
+				"swipe_3_right",
+				"tap_4",
+				"swipe_4_up",
+				"swipe_4_down",
+				"swipe_4_left",
+				"swipe_4_right",
+		]
+		return Slots
 }
 
 ; The keyboard shortcut each slot must be bound to in Windows Settings >
 ; Touchpad > Advanced gestures. Shown verbatim in the manual-setup tutorial.
 ; @return {Map} slot id => human-readable shortcut label.
 GestureShortcutLabels() {
-    static Labels := Map(
-        "tap_3", "Ctrl + Win + Shift + F1",
-        "swipe_3_up", "Ctrl + Win + Shift + F2",
-        "swipe_3_down", "Ctrl + Win + Shift + F3",
-        "swipe_3_left", "Ctrl + Win + Shift + F4",
-        "swipe_3_right", "Ctrl + Win + Shift + F5",
-        "tap_4", "Ctrl + Win + Shift + F6",
-        "swipe_4_up", "Ctrl + Win + Shift + F7",
-        "swipe_4_down", "Ctrl + Win + Shift + F8",
-        "swipe_4_left", "Ctrl + Win + Shift + F9",
-        "swipe_4_right", "Ctrl + Win + Shift + F10",
-    )
-    return Labels
+		static Labels := Map(
+				"tap_3", "Ctrl + Win + Shift + F1",
+				"swipe_3_up", "Ctrl + Win + Shift + F2",
+				"swipe_3_down", "Ctrl + Win + Shift + F3",
+				"swipe_3_left", "Ctrl + Win + Shift + F4",
+				"swipe_3_right", "Ctrl + Win + Shift + F5",
+				"tap_4", "Ctrl + Win + Shift + F6",
+				"swipe_4_up", "Ctrl + Win + Shift + F7",
+				"swipe_4_down", "Ctrl + Win + Shift + F8",
+				"swipe_4_left", "Ctrl + Win + Shift + F9",
+				"swipe_4_right", "Ctrl + Win + Shift + F10",
+		)
+		return Labels
 }

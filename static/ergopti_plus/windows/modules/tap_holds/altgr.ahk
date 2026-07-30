@@ -32,21 +32,21 @@
 SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap directly
 RAlt:: ; Necessary to work on layouts like QWERTY
 {
-    ; On Kana/IME layouts the physical AltGr key is SC138. AHK can still
-    ; surface a virtual RAlt event for it, so leave ownership to the explicit
-    ; SC138 handler below instead of dispatching the same tap twice.
-    if (_ALTGR_KANA_FIXUP && GetKeyState("SC138", "P"))
-        return
-    tap := KeyWait("RAlt", "T" . TapHoldDuration(TapHold, "alt_gr"))
-    if (tap and (A_PriorKey == "RAlt" or A_PriorKey == "^")) {
-        DisableCapsWord()
-        AltGrTapHoldDispatchV2()
-    }
+		; On Kana/IME layouts the physical AltGr key is SC138. AHK can still
+		; surface a virtual RAlt event for it, so leave ownership to the explicit
+		; SC138 handler below instead of dispatching the same tap twice.
+		if (_ALTGR_KANA_FIXUP && GetKeyState("SC138", "P"))
+				return
+		tap := KeyWait("RAlt", "T" . TapHoldDuration(TapHold, "alt_gr"))
+		if (tap and (A_PriorKey == "RAlt" or A_PriorKey == "^")) {
+				DisableCapsWord()
+				AltGrTapHoldDispatchV2()
+		}
 }
 
 SC01D & ~SC138 Up::
 RAlt Up:: {
-    UpdateLastSentCharacter("")
+		UpdateLastSentCharacter("")
 }
 #HotIf
 
@@ -55,15 +55,15 @@ RAlt Up:: {
 ; keep it mutually exclusive with the virtual-RAlt path above.
 #HotIf _ALTGR_KANA_FIXUP and not LayerEnabled and not IsOnboardingActive() and TapHoldIsConfigured(TapHold, "alt_gr")
 SC138:: {
-    tap := KeyWait("SC138", "T" . TapHoldDuration(TapHold, "alt_gr"))
-    if (tap and A_PriorKey == "SC138") {
-        DisableCapsWord()
-        AltGrTapHoldDispatchV2()
-    }
+		tap := KeyWait("SC138", "T" . TapHoldDuration(TapHold, "alt_gr"))
+		if (tap and A_PriorKey == "SC138") {
+				DisableCapsWord()
+				AltGrTapHoldDispatchV2()
+		}
 }
 
 SC138 Up:: {
-    UpdateLastSentCharacter("")
+		UpdateLastSentCharacter("")
 }
 #HotIf
 
@@ -71,5 +71,5 @@ SC138 Up:: {
 ; AltGr is already released when this fires (tap=true means key-up occurred),
 ; so no Blind prefix is needed — actions run clean without AltGr held.
 AltGrTapHoldDispatchV2() {
-    _TapHoldFireAction("alt_gr")
+		_TapHoldFireAction("alt_gr")
 }
