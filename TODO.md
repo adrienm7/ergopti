@@ -6,6 +6,35 @@ Known, scoped, not done. Everything here was verified against the code on
 2026-07-21 — items that turned out to be already delivered were dropped rather
 than carried forward.
 
+## Simplification plan — remaining blockers (branch `simplification`)
+
+[`docs/PLAN_SIMPLIFICATION.md`](docs/PLAN_SIMPLIFICATION.md) is the full audit and
+plan; [`docs/ERGOPTI_PLUS.md`](docs/ERGOPTI_PLUS.md) documents how the system works
+today. Lot 0 and 5 of the 12 blockers are done on that branch. What remains, in
+the plan's own priority order:
+
+| # | Blocker | Why it is next | Note before starting |
+| --- | --- | --- | --- |
+| **B5** | Linux writes every typed character, in plaintext, into a world-readable `/tmp` file on every keylogger flush (`linux/modules/keylogger/sqlite_writer.lua:96-112`, `:127-139`) | privacy, and the temp name is derived from `tmpnam(3)` then mutated, so it is not the reserved file — a symlink/TOCTOU target | the fix is to stop shelling the SQL through a file; the `sqlite3` CLI accepts a script on stdin |
+| **B4** | Linux keylogger is always on, in plaintext, with no off switch and no private-browsing/system-auth filter | privacy | ⚠ **do NOT simply wire `adapters/secure_field_detector.lua`** — the comment at `modules/keylogger/keylogger.lua:90-98` explains that its exact `WM_CLASS` match on a shorter list would *narrow* coverage and leak `gpg`/`ssh-agent`/`polkit`/`sudo`. The fix is additive |
+| **B3** | The generated kanata config is unloadable: the generator emits 7 of the 12 aliases the template defines, leaving `@copy`, `@paste`, `@rollx`, `@deadtrema` dangling | Linux remap is broken outright | `test:kanata-defalias-parity` never runs the generator against the template — extend it, then fix the generator |
+| **B6** | The macOS "Chiffrement" menu item is a complete no-op whose backend is ten empty stubs, and `docs/security/keylogger_privacy.md:93` tells users to enable it | a false security claim in the docs | needs a decision: implement or delete the feature *and* the doc sentence together |
+| **B9** | `llm_context_length` has no effect on the Windows automatic path (the `context_window_chars` fix was never ported into the AHK generator) | user-visible setting that does nothing | add a corpus vector with `context_window_chars` set — none of the 12 existing vectors does, which is why the corpus cannot catch it |
+| **B10** | Opposite secure-field defaults for LLM predictions (macOS hardcodes `true` and never reads the shared value; Windows sends context from password fields) | security posture | **maintainer decision required** on which default wins (D9 in the plan) |
+
+Also carried over from the audit, not blockers:
+
+- The Lua half of `lint-conventions.js` scans macOS only: Linux (142 files) and
+  `_shared/lua` (32) are never checked for headers, banners or section spacing.
+- `_shared/core` (33 port specs) and `_shared/modules` (3 scripts) are outside
+  `audit-file-headers.cjs`. The specs use a repo-relative header where everything
+  else under `_shared/` uses the BASE-relative form; unifying them is a 36-file
+  rewrite touching files other meta-tests grep, so it needs its own commit.
+- `windows/tests/COVERAGE.md` and `macos/tests/COVERAGE.md` are hand-maintained
+  inventories that are already stale (one claims "~1 230+ assertions across ~34
+  unit-test files" against a measured 143 unit + 686 meta files). `docs/TESTING.md`
+  already states the right principle: the inventory of checks is the run itself.
+
 Working rules: no behaviour change without a regression test, never weaken a
 test to make a change pass, and run the gates that cover what you touched —
 `node ./tools/test/verify-change.cjs` derives them (see the `verify-change`
