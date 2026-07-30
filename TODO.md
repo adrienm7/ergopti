@@ -490,17 +490,29 @@ function body and therefore only register if that function is called.
 
 ## 3. Correctness and completeness
 
-### i18n: ~15-19 user-facing surfaces are still hardcoded
+### i18n: the remaining hardcoded surfaces
 
-Verified one by one, all still present, across all three drivers — macOS model
-switcher and models manager ("Puissance détectée", the RAM/disk block), the
-metrics app picker, Linux menu leaf titles and gesture action labels, Linux GTK
-window titles, Windows LLM model menu, deps checker, `config_io.ahk:692`
-("Espace"/"Entrée"), and the tooltip's French fallbacks. The stated goal is 21
-languages. Note for planning: the update-related keys the earlier plan claimed
-were missing **do exist** (`_shared/data/locales/fr.json:607-610` plus
-`check_for_updates`, `channel_*`, `install_update`, `open_releases_page`), so
-routing the Linux updater menu needs no new translation.
+Delivered so far: the macOS model switcher and models manager (power profile,
+RAM/disk block, model-type badge), the gesture parameter prompt on macOS **and**
+Windows (it was hardcoded in three copies with two different wordings), the
+Windows LLM model menu, deps checker, `config_io.ahk` key names and the tooltip's
+three French fallbacks, and the Linux gesture action labels — which needed no
+translation at all, because the shared `sg_actions.*` catalogue already held all
+42 in 21 languages and only Linux was not reading it.
+
+Still hardcoded:
+
+- **Linux menu leaf titles** — `modules/menu/menu_builder.lua`, ~33 literals.
+  Note this file is slated for deletion by lot 5.3; route the labels through the
+  shared locales as part of that work rather than twice.
+- **Linux updater menu** — `modules/updater/manager.lua`, 5 literals. The keys
+  already exist (`_shared/data/locales/fr.json` `check_for_updates`, `channel_*`,
+  `install_update`, `open_releases_page`), so this needs no new translation.
+- **Linux GTK window titles** and the 9 literals in `ergopti_hotstrings.lua`.
+- **The metrics app picker.**
+- **`i18n_safe(key, "<French>")` fallbacks** throughout the Linux menu: the
+  locale-parity gate guarantees the key exists, so the French second argument is
+  dead code that can only ever surface French to a non-French user.
 
 ---
 
