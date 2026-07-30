@@ -405,45 +405,53 @@ function M.show(opts)
         M._terminal_cmd  = type(opts.terminal_cmd) == "string" and opts.terminal_cmd or ("ollama pull " .. M._current_model)
     end
 
-    if _wv then
-        -- Reuse existing window: just refresh kind and titles
-        eval(string.format("setKind(%s,%s,%s)", js_str(_kind), js_str(title), js_str(subtitle)))
-    else
-        ensure_webview(title)
-        -- Push the kind first so the page initialises in the correct mode
-        eval(string.format("setKind(%s,%s,%s)", js_str(_kind), js_str(title), js_str(subtitle)))
-    end
+    -- ONE decision, taken before anything can invalidate it. This used to be two
+    -- separate `if _wv then` tests with ensure_webview() in between, so a window
+    -- created two lines earlier looked "already open": the reuse branch then
+    -- cleared _queued (discarding the setKind that carries the title, subtitle and
+    -- kind) and forced _ready = true, which made every following eval() fire
+    -- against a page whose document had not finished loading. Nothing arrived, and
+    -- the block written to be the fresh-window path was unreachable.
+    local reusing = (_wv ~= nil)
 
-    Logger.success(LOG, "Progress UI shown (title=%q).", title)
-
-    if _wv then
-        -- Window already open — reset state to prevent zombie placeholders
-        _start_ts  = hs.timer.secondsSinceEpoch()
-        _queued    = {}
-        _ready     = true
-        _log_shown = false
-        M._total_files = nil
-        M._last_file_count = nil
-
-        eval("resetUI()")
-        eval(string.format("setKind(%s,null,null)", js_str(_kind)))
-        -- _current_model is nil for bootstrap kinds (mlx_install, ollama_install)
-        if M._current_model then
-            eval("setModel(" .. js_str(M._current_model) .. ")")
-        end
-        return
-    end
-
-    _start_ts  = hs.timer.secondsSinceEpoch()
-    M._total_files = nil
+    _start_ts          = hs.timer.secondsSinceEpoch()
+    _log_shown         = false
+    M._total_files     = nil
     M._last_file_count = nil
 
-    ensure_webview(i18n.get("mlx.download_title"))
+    if not reusing then
+        ensure_webview(title)
+    elseif not _ready then
+        -- Reusing a window whose page never finished loading: the previous
+        -- occupant's undelivered payload must not flush on top of this one's.
+        _queued = {}
+    end
 
-    eval(string.format("setKind(%s,null,null)", js_str(_kind)))
+    if reusing then
+        -- Same window, new occupant: clear the previous download's percentage, log
+        -- lines and "done" banner, or they linger as zombie placeholders.
+        --
+        -- Deliberately NOT done on a fresh page. resetUI() hides AND disables
+        -- #btn-cancel when download_window.btn_cancel is missing from
+        -- window._i18n_strings — and ui_builder injects that table only AFTER the
+        -- navigation callback that flushes this queue. The i18n pass rewrites
+        -- textContent and never restores `display`, so Cancel would be gone for the
+        -- entire life of every freshly opened window.
+        eval("resetUI()")
+    end
+
+    -- Exactly one setKind, carrying the RESOLVED pair. The old code followed the
+    -- real call with setKind(kind, null, null); script.js falls back to the kind's
+    -- default title and blanks the subtitle when they are null, so the second call
+    -- undid the first — and the subtitle is the deps checkers' current step label.
+    eval(string.format("setKind(%s,%s,%s)", js_str(_kind), js_str(title), js_str(subtitle)))
+
+    -- _current_model is nil for bootstrap kinds (mlx_install, ollama_install)
     if M._current_model then
         eval("setModel(" .. js_str(M._current_model) .. ")")
     end
+
+    Logger.success(LOG, "Progress UI shown (title=%q, reusing=%s).", title, tostring(reusing))
 end
 
 --- Updates the UI with current download metrics. Download mode only.
