@@ -36,7 +36,7 @@ let fail = 0;
 
 const TOML_PATH = path.join(ROOT, '_shared/tap_hold/defaults.toml');
 const TIMINGS_PATH = path.join(ROOT, '_shared/modules/timings/constants.toml');
-const KANATA_PATH = path.join(ROOT, 'kanata/kanata.kbd');
+const KANATA_PATH = path.join(ROOT, 'linux/modules/kanata/data/kanata.kbd');
 const GOLDEN_PATH = path.join(ROOT, '_shared/tap_hold/golden_kanata_defalias.kbd');
 
 // Minimal TOML section parser — extracts [tap_hold.keys.<name>] blocks

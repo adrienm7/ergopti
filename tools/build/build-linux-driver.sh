@@ -69,7 +69,7 @@ copy_tree() {
 
 LINUX_SRC="${REPO_ROOT}/static/ergopti_plus/linux"
 SHARED_SRC="${REPO_ROOT}/static/ergopti_plus/_shared"
-KANATA_SRC="${REPO_ROOT}/static/ergopti_plus/kanata/kanata.kbd"
+KANATA_SRC="${REPO_ROOT}/static/ergopti_plus/linux/modules/kanata/data/kanata.kbd"
 BUILD_DIR="${REPO_ROOT}/build/linux"
 
 echo "=== Ergopti Linux driver assembly ==="

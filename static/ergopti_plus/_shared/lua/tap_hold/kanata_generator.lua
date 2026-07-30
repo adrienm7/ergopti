@@ -18,7 +18,8 @@
 ---   { time_activation_seconds = number, tap_action = string, hold_modifier = string|nil, hold_layer = string|nil }
 ---
 --- The generated block REPLACES the last ``(defalias)`` block of
---- ``kanata/kanata.kbd`` wholesale, so it must be self-sufficient in two ways:
+--- ``linux/modules/kanata/data/kanata.kbd`` wholesale, so it must be
+--- self-sufficient in two ways:
 ---
 --- 1. Multi-key tap/hold expressions the shared data model cannot encode (such
 ---    as ``alt_gr``'s modifier-release sequence) come from EXPRESSION_OVERRIDES

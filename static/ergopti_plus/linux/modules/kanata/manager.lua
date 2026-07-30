@@ -43,6 +43,7 @@ local _kanata_pid    = nil    -- PID of the running kanata process.
 local _config_dir    = nil    -- ~/.config/kanata
 local _kbd_path      = nil    -- ~/.config/kanata/ergopti.kbd
 local _template_path = nil    -- Path to the static kanata.kbd template.
+local _shared_dir    = nil    -- Path to the _shared tree (sibling of the driver).
 local _user_toml     = nil    -- Path to the user's tap_hold.toml override.
 
 
@@ -69,12 +70,13 @@ local function _resolve_paths()
 	local src = debug.getinfo(1, "S").source:gsub("^@", "")
 	local driver_root = src:match("^(.*)[/\\]modules[/\\]kanata[/\\]manager%.lua$") or "."
 	driver_root = driver_root:gsub("\\", "/")
-	-- One level up from the driver root, NOT two: the template lives at
-	-- static/ergopti_plus/kanata/kanata.kbd, a sibling of the driver folders.
-	-- The extra "../" survived the static/drivers → static/ergopti_plus move and
-	-- pointed at static/kanata/, which does not exist — so the template never
-	-- opened, generate_kbd() always returned nil, and kanata got no config at all.
-	_template_path = driver_root .. "/../kanata/kanata.kbd"
+	-- The template sits beside this manager, mirroring how macOS keeps its
+	-- Karabiner assets in modules/karabiner/data/. kanata is Linux-only, so
+	-- nothing about it belongs outside this driver.
+	_template_path = driver_root .. "/modules/kanata/data/kanata.kbd"
+
+	-- _shared is a sibling of the driver folder in both a checkout and a build.
+	_shared_dir = driver_root .. "/../_shared"
 
 	-- Verify the template exists (fail-loud: kanata cannot work without it).
 	local fh = io.open(_template_path, "r")
@@ -138,12 +140,14 @@ end
 local function _load_tap_hold_config(user_toml_path)
 	_resolve_paths()
 
-	-- Try the shared defaults.toml first (always present in the repo).
-	local defaults_path = _template_path
-		and _template_path:gsub("/kanata/kanata%.kbd$", "/_shared/tap_hold/defaults.toml")
-		or nil
+	-- Resolved from the driver root, not by rewriting the template path. The
+	-- previous form substituted "/kanata/kanata.kbd" inside _template_path, so
+	-- moving the template one directory deeper silently stopped matching and the
+	-- generator was handed an empty key set — a full config with an empty
+	-- (defalias) block, which is far worse than a loud failure.
+	local defaults_path = _shared_dir and (_shared_dir .. "/tap_hold/defaults.toml") or nil
 
-	-- Fallback: try relative path from cwd.
+	-- Fallback: relative to the cwd, for a driver run straight from a checkout.
 	if not defaults_path then
 		defaults_path = "../../_shared/tap_hold/defaults.toml"
 	end
