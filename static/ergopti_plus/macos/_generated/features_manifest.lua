@@ -36,7 +36,7 @@ M.sections = {
 	["llm.profiles"] = { description_key = "menu.llm.profiles", platforms = { "ahk", "hs" }, subsections = {  } },
 	["llm.trigger"] = { description_key = "menu.llm.trigger", platforms = { "ahk", "hs" }, subsections = {  } },
 	["llm.navigation"] = { description_key = "menu.llm.navigation", platforms = { "ahk", "hs" }, subsections = {  } },
-	["metrics"] = { description_key = "menu.metrics", platforms = { "ahk", "hs" }, subsections = {  } },
+	["metrics"] = { description_key = "menu.metrics", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["shortcuts"] = { description_key = "menu.shortcuts", platforms = { "ahk", "hs" }, subsections = {  } },
 	["ahk"] = { description_key = "menu.ahk", platforms = { "ahk" }, subsections = { "category_enabled", "layout", "shortcuts", "gestures", "metrics" } },
 	["ahk.category_enabled"] = { description_key = "menu.ahk.category_enabled", platforms = { "ahk" }, subsections = {  } },
@@ -347,16 +347,16 @@ M.features = {
 		path = "llm.navigation.arrow_nav_enabled", id = "arrow_nav_enabled", section = "llm.navigation", default = false, type = "boolean", description_key = "menu.llm.navigation.arrow_nav_enabled", platforms = { "hs" },
 	},
 	{
-		path = "metrics.enabled", id = "enabled", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.enabled", platforms = { "ahk", "hs" },
+		path = "metrics.enabled", id = "enabled", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.enabled", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "metrics.private_filter_enabled", id = "private_filter_enabled", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.private_filter_enabled", platforms = { "ahk", "hs" },
+		path = "metrics.private_filter_enabled", id = "private_filter_enabled", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.private_filter_enabled", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "metrics.secure_filter_enabled", id = "secure_filter_enabled", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.secure_filter_enabled", platforms = { "ahk", "hs" },
+		path = "metrics.secure_filter_enabled", id = "secure_filter_enabled", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.secure_filter_enabled", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "metrics.system_auth_filter_enabled", id = "system_auth_filter_enabled", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.system_auth_filter_enabled", platforms = { "ahk", "hs" },
+		path = "metrics.system_auth_filter_enabled", id = "system_auth_filter_enabled", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.system_auth_filter_enabled", platforms = { "ahk", "hs", "linux" },
 	},
 	{
 		path = "metrics.encrypt", id = "encrypt", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.encrypt", platforms = { "hs" },

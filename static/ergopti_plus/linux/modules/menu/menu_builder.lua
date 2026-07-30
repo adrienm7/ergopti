@@ -169,6 +169,26 @@ local function _build_llm(ctx)
 end
 
 --- Builds the metrics/keylogger submenu.
+--- Builds one privacy-toggle entry for the metrics submenu.
+--- Reads the live value from get_privacy_state() rather than a cached copy, so
+--- the tick always reflects what the keylogger is actually doing.
+--- @param k       table    The keylogger module.
+--- @param key     string   Field of get_privacy_state() this entry reflects.
+--- @param label   string   User-facing label (French, per the UI convention).
+--- @param setter  function Setter to call on toggle.
+--- @return table The menu entry.
+local function _privacy_toggle(k, key, label, setter)
+	local available = type(k.get_privacy_state) == "function" and type(setter) == "function"
+	if not available then
+		return { title = label .. " (indisponible)", fn = function() end, disabled = true }
+	end
+	local active = k.get_privacy_state()[key] == true
+	return {
+		title = label .. (active and " ✓" or ""),
+		fn = function() setter(not k.get_privacy_state()[key]) end,
+	}
+end
+
 local function _build_metrics(ctx)
 	local k = ctx.keylogger
 	if type(k) ~= "table" then
@@ -204,6 +224,17 @@ local function _build_metrics(ctx)
 				end
 			end,
 		},
+		{ title = "-" },
+		-- Privacy posture. The four toggles below mirror macOS and Windows and
+		-- read the same shared manifest defaults; the driver shipped without any
+		-- of them, so metrics could not be turned off at all.
+		_privacy_toggle(k, "enabled", "Collecte activée", k.set_enabled),
+		_privacy_toggle(k, "private_filter_enabled",
+			"Ignorer la navigation privée", k.set_private_filter_enabled),
+		_privacy_toggle(k, "secure_filter_enabled",
+			"Ignorer les champs de mot de passe", k.set_secure_filter_enabled),
+		_privacy_toggle(k, "system_auth_filter_enabled",
+			"Ignorer les invites d'authentification", k.set_system_auth_filter_enabled),
 		{ title = "-" },
 		{
 			title = "Suspendre " .. (type(k.is_suppressed) == "function" and k.is_suppressed() and "✓" or ""),

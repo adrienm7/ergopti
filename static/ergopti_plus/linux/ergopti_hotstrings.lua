@@ -737,8 +737,12 @@ local function main()
 	-- input path so on_char never spawns subprocesses on every keystroke.
 	local tick_count = 0
 	if process_lifecycle then
-		process_lifecycle.onFocusChange(function(appName, _windowTitle)
+		process_lifecycle.onFocusChange(function(appName, windowTitle)
 			_cached_app_id = (type(appName) == "string" and appName ~= "" and appName) or nil
+			-- The private-browsing verdict is computed HERE, off the input path.
+			-- The title was previously received and discarded, which is why the
+			-- driver had no private-browsing filter at all.
+			keylogger.set_private_window(keylogger.is_private_window(windowTitle))
 			if _cached_app_id then
 				keylogger.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
 			end
@@ -749,6 +753,8 @@ local function main()
 		-- its foreground interval.
 		local foreground = process_lifecycle.getForegroundApp()
 		_cached_app_id = foreground and foreground.appId or nil
+		keylogger.set_private_window(
+			keylogger.is_private_window(foreground and foreground.windowTitle))
 		if type(_cached_app_id) == "string" and _cached_app_id ~= "" then
 			keylogger.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
 		end

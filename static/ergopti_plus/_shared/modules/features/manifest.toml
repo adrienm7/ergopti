@@ -175,7 +175,7 @@ platforms = ["ahk", "hs"]
 
 [sections.metrics]
 description_key = "menu.metrics"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 
 

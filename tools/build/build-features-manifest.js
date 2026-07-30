@@ -298,7 +298,7 @@ function luaLiteral(value) {
 	throw new Error(`cannot represent ${typeof value} in Lua literal`);
 }
 
-function renderLuaManifest(manifest, sections, features) {
+function renderLuaManifest(manifest, sections, features, platform) {
 	const lines = [];
 	lines.push('--- _generated/features_manifest.lua');
 	lines.push('--- AUTO-GENERATED from _shared/modules/features/manifest.toml.');
@@ -335,13 +335,13 @@ function renderLuaManifest(manifest, sections, features) {
 	lines.push('}');
 	lines.push('');
 	lines.push('M.features = {');
-	const platformFeatures = features.filter((f) => f.platforms.includes('hs'));
+	const platformFeatures = features.filter((f) => f.platforms.includes(platform));
 	for (const f of platformFeatures) {
 		const entry = {
 			path: f.path,
 			id: f.id,
 			section: f.section,
-			default: resolveDefault(f, 'hs'),
+			default: resolveDefault(f, platform),
 			type: f.type || '',
 			description_key: f.description_key || '',
 			platforms: f.platforms
@@ -500,13 +500,19 @@ function main() {
 	// HS outputs
 	writeOutput(
 		resolve(OUT_HS_DIR, 'features_manifest.lua'),
-		renderLuaManifest(manifest, sections, features)
+		renderLuaManifest(manifest, sections, features, 'hs')
 	);
 	writeOutput(
 		resolve(OUT_HS_DIR, 'config_template.toml'),
 		renderConfigTemplate(manifest, sections, features, 'hs')
 	);
-	// Linux outputs
+	// Linux outputs. The driver went without a features manifest for a long
+	// time, which is why its keylogger had none of the privacy toggles the
+	// other two read from the shared source — it had nowhere to read them from.
+	writeOutput(
+		resolve(OUT_LINUX_DIR, 'features_manifest.lua'),
+		renderLuaManifest(manifest, sections, features, 'linux')
+	);
 	writeOutput(
 		resolve(OUT_LINUX_DIR, 'config_template.toml'),
 		renderConfigTemplate(manifest, sections, features, 'linux')
