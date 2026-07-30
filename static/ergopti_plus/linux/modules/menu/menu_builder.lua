@@ -235,6 +235,8 @@ local function _build_metrics(ctx)
 			"Ignorer les champs de mot de passe", k.set_secure_filter_enabled),
 		_privacy_toggle(k, "system_auth_filter_enabled",
 			"Ignorer les invites d'authentification", k.set_system_auth_filter_enabled),
+		_privacy_toggle(k, "encrypt",
+			"Chiffrer les données au repos", k.set_encrypt_enabled),
 		{ title = "-" },
 		{
 			title = "Suspendre " .. (type(k.is_suppressed) == "function" and k.is_suppressed() and "✓" or ""),

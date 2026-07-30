@@ -35,6 +35,7 @@ local M = {}
 
 local Logger        = require("logger.shim")
 local SqliteCommand = require("modules.keylogger.sqlite_command")
+local TextCipher    = require("modules.keylogger.text_cipher")
 
 local LOG = "modules.keylogger.sqlite_writer"
 
@@ -336,18 +337,36 @@ function M.insert_typing_events(device_id, events)
 
 	local parts = {}
 	for i, ev in ipairs(events) do
+		local event_id = first_id + i - 1
+
+		-- `text` and `events_json` are the only columns holding what the user
+		-- literally typed, so they are the only ones encrypted. Everything else
+		-- is aggregate data the dashboard computes over, and encrypting it would
+		-- cost every query a decryption it does not need.
+		local raw_text = ev.text or ""
+		local raw_json = ev.events_json or "[]"
+		local enc_text = TextCipher.encrypt(device_id, event_id, raw_text)
+		local enc_json = TextCipher.encrypt(device_id, tostring(event_id) .. "j", raw_json)
+		if enc_text == nil or enc_json == nil then
+			-- Encryption is on but could not run. Storing the plaintext would
+			-- silently defeat the setting the user turned on, so drop the batch.
+			Logger.error(LOG, "At-rest encryption failed — %d typing event(s) dropped rather than stored in clear.",
+				#events)
+			return false
+		end
+
 		local ts      = _sql_escape(ev.ts      or os.date("!%Y-%m-%d %H:%M:%S"))
 		local date    = _sql_escape(ev.date    or os.date("!%Y-%m-%d"))
 		local app     = _sql_escape(ev.app     or "unknown")
-		local text    = _sql_escape(ev.text    or "")
+		local text    = _sql_escape(enc_text)
 		local title   = _sql_escape(ev.title   or "")
 		local wpm     = tonumber(ev.wpm) or 0
 		local layout  = _sql_escape(ev.layout  or "")
-		local events_json = _sql_escape(ev.events_json or "[]")
+		local events_json = _sql_escape(enc_json)
 
 		parts[#parts + 1] = string.format(
 			"('%s',%d,'%s','%s','%s','%s','','',0,0,0,0,0,%d,0,0,0.0,'%s','','%s')",
-			_sql_escape(device_id), first_id + i - 1, ts, date, app, title,
+			_sql_escape(device_id), event_id, ts, date, app, title,
 			wpm, text, events_json
 		)
 	end
