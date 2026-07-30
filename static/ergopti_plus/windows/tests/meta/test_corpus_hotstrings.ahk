@@ -58,20 +58,23 @@ _CorpusHS_Root() {
 	return A_ScriptDir . "\..\..\_shared\tests\corpus\hotstrings\vectors.json"
 }
 
+; THROWS when the corpus is missing or malformed. It used to return "", and
+; every consumer below opened with `if Corpus = "" { return }` — so moving or
+; breaking the corpus produced ONE red (the readability test) and EIGHT silent
+; greens. A cross-driver contract that can be deleted without the suite noticing
+; is not a contract.
 _CorpusHS_Load() {
 	Path := _CorpusHS_Root()
-	if not FileExist(Path) {
-		return ""
-	}
+	if not FileExist(Path)
+		throw Error("hotstring corpus not found at '" . Path . "' — the shared vectors are a cross-driver contract; a missing corpus must fail this suite, never skip it")
 	return FileRead(Path, "UTF-8")
 }
 
 _CorpusHS_Parse() {
-	Raw := _CorpusHS_Load()
-	if Raw = "" {
-		return ""
-	}
-	return JsonParse(Raw)
+	Corpus := JsonParse(_CorpusHS_Load())
+	if (Corpus = "")
+		throw Error("hotstring corpus at '" . _CorpusHS_Root() . "' did not parse into an object — a malformed corpus must fail this suite, never skip it")
+	return Corpus
 }
 
 
@@ -84,10 +87,10 @@ _CorpusHS_Parse() {
 ; ============================================
 
 _CorpusHS_FileIsReadableAndParseable() {
-	Raw := _CorpusHS_Load()
-	AssertTrue(Raw != "", "corpus JSON file must be readable")
+	; Readability and parseability are now enforced by the loader itself, which
+	; throws with the resolved path — asserting them again here would only
+	; restate what already cannot be false.
 	Corpus := _CorpusHS_Parse()
-	AssertTrue(Corpus != "", "corpus JSON must parse without error")
 	AssertTrue(Corpus.Has("vectors"), "corpus must have a vectors key")
 	AssertTrue(Corpus["vectors"].Length > 0, "corpus must contain at least one vector")
 }
@@ -95,9 +98,6 @@ Test("hotstring corpus  --  corpus file is readable and parseable", _CorpusHS_Fi
 
 _CorpusHS_EveryVectorHasRequiredFields() {
 	Corpus := _CorpusHS_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		AssertTrue(Vec.Has("id") and Vec["id"] != "",
 			"vector missing id")
@@ -111,9 +111,6 @@ Test("hotstring corpus  --  every vector has required fields: id, trigger, expec
 
 _CorpusHS_BackspaceCountFormula() {
 	Corpus := _CorpusHS_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		Expected := Vec["expected"]
 		if not (Expected.Has("matched") and Expected["matched"] = true) {
@@ -144,9 +141,6 @@ _CorpusHS_TriggerLengthMatchesBuffer() {
 	; Validates that every matched vector has a buffer that ends with the trigger  -- 
 	; this is required for a real hotstring match to fire in AHK.
 	Corpus := _CorpusHS_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		Expected := Vec["expected"]
 		if not (Expected.Has("matched") and Expected["matched"] = true) {
@@ -166,9 +160,6 @@ _CorpusHS_NonMatchedBuffersDontEndWithTrigger() {
 	; Validates that unmatched non-word vectors have buffers that do not end
 	; with the trigger (word-boundary blocking is tested elsewhere).
 	Corpus := _CorpusHS_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		Expected := Vec["expected"]
 		if not (Expected.Has("matched") and Expected["matched"] = false) {
@@ -200,9 +191,6 @@ _CorpusHS_Utf8BackspaceCountUsesCodepoints() {
 	; that StrLen equals the corpus backspace_count for all matched vectors --
 	; catching any future drift if AHK changes its string model.
 	Corpus := _CorpusHS_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		Expected := Vec["expected"]
 		if not (Expected.Has("matched") and Expected["matched"] = true) {
@@ -225,9 +213,6 @@ _CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag() {
 	; Validates that case_sensitive=true vectors correctly reflect whether the
 	; buffer casing matches the trigger casing.
 	Corpus := _CorpusHS_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		if not (Vec.Has("is_case_sensitive") and Vec["is_case_sensitive"] = true) {
 			continue
@@ -267,7 +252,6 @@ Test("hotstring corpus  --  case-sensitive vectors: exact match flag is consiste
 
 _CorpusHS_CollisionVectorsArePresent() {
 	Corpus := _CorpusHS_Parse()
-	AssertTrue(Corpus != "", "corpus must parse")
 	AssertTrue(Corpus.Has("collision_vectors"), "corpus must expose a collision_vectors array")
 	AssertTrue(Corpus["collision_vectors"].Length > 0, "collision_vectors must be non-empty")
 }
@@ -276,12 +260,8 @@ Test("hotstring corpus  --  collision_vectors array is present and non-empty", _
 _CorpusHS_EveryCollisionVectorResolvesToExpectedWinner() {
 	global HSE_PRIORITY_COMMON
 	Corpus := _CorpusHS_Parse()
-	if Corpus = "" {
-		return
-	}
-	if not Corpus.Has("collision_vectors") {
-		return
-	}
+	AssertTrue(Corpus.Has("collision_vectors"),
+		"corpus must expose collision_vectors — skipping the replay when the key is absent is how the whole tie-break contract stopped being exercised without a single red")
 	for Vec in Corpus["collision_vectors"] {
 		Id := Vec.Has("id") ? Vec["id"] : "?"
 		HSE_TestReset()
@@ -337,9 +317,6 @@ Test("hotstring corpus  --  every collision vector resolves to the expected winn
 
 _CorpusHS_EveryVectorReplayedThroughEngine() {
 	Corpus := _CorpusHS_Parse()
-	if Corpus = "" {
-		return
-	}
 	Failures := 0
 	Total    := 0
 	for Vec in Corpus["vectors"] {
