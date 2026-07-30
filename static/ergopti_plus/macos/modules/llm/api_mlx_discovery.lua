@@ -134,7 +134,11 @@ local CHAT_CANDIDATES = {
 	"/chat/completions",
 }
 
-local DISCOVERY_MAX_WAIT_SEC        = 180  -- Stop polling /v1/models after this much real time
+-- Read from the shared registry rather than hardcoded. The key existed there with
+-- NO reader while this file carried its own literal, so one concept had two values
+-- and the registry's was the stale one.
+local DISCOVERY_MAX_WAIT_SEC        = Timings.sec("llm", "discovery_max_wait_ms")
+                                           -- Stop polling /v1/models after this much real time
                                            -- (a cold mlx_lm import + 2B model load can take 45-70 s+
                                            -- on a slow disk; 60 s gave up prematurely. Warmup keeps
                                            -- retrying regardless, but a longer window keeps the
