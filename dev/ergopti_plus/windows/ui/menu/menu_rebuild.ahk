@@ -182,8 +182,22 @@ LoggerSetLevel(Level) {
 	}
 	LOGGER_MIN_LEVEL := Level
 	_LoggerRefreshFastFlags()
-	try TOML_Write(Level, ConfigurationFile, "script", "log_level")
-	try LoggerInfo("Menu", "Log level set to {1}.", Level)
+	; The level is applied live above, so a failed write leaves the running
+	; driver logging at a level the file does not record — the setting silently
+	; reverts on the next restart with nothing to explain it. TOML_Write fails
+	; without throwing, so the bare `try` swallowed both the exception and the
+	; false. Surface it instead; the level itself stays applied for this session,
+	; which is what the user asked for and is strictly better than reverting it.
+	Persisted := false
+	try Persisted := TOML_Write(Level, ConfigurationFile, "script", "log_level")
+	; Braces are load-bearing: AHK v2's `try` carries its OWN optional `else`
+	; clause, so a one-line `try` as an if-body captures the `else` that was meant
+	; for the `if` and the parser aborts the whole script with `Unexpected "Else"`.
+	if !Persisted {
+		try LoggerError("Menu", "Log level set to {1} for this session, but it could NOT be written to config.toml — it will revert on the next restart.", Level)
+	} else {
+		try LoggerInfo("Menu", "Log level set to {1}.", Level)
+	}
 	RebuildTrayMenu()
 }
 

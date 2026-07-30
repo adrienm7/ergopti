@@ -36,6 +36,10 @@
 global _I18nLocale := "fr"
 
 ; Flat map of key → translated string for the active locale. Populated lazily.
+; Keys already reported as untranslated, so the warning fires once per key
+; rather than on every menu rebuild.
+global _I18nMissWarned := Map()
+
 global _I18nCache := Map()
 global _I18nCacheLoaded := false
 
@@ -156,9 +160,22 @@ _I18nWriteTsvCache(TsvPath, Parsed) {
 				Esc := StrReplace(Esc, "`n", "\n")
 			Content .= Key . "`t" . Esc . "`n"
 		}
-		if FileExist(TsvPath)
-			FileDelete(TsvPath)
-		FileAppend(Content, TsvPath, "UTF-8-RAW")
+		; Stage then rename. FileDelete + FileAppend is a two-step publication that
+		; leaves the LIVE cache absent or half-written between the two calls, and a
+		; Reload lands in that window routinely (the layout-change watcher reloads
+		; on any Windows layout switch, and #SingleInstance replacement can kill the
+		; process mid-write). _I18nTsvIsFresh is a pure mtime compare and
+		; _I18nParseTSV has no line-count or sentinel check, so a torn file is served
+		; as "fresh" forever and every key past the truncation silently degrades to
+		; the EN fallback or to its raw dotted name. FileMove over an existing target
+		; is an atomic NTFS rename, so the cache is always either the old one or the
+		; new one, never a prefix of the new one (locale-tsv-non-atomic-write).
+		; Mirrors _HotstringsCacheWriteTsv, which was fixed first.
+		TmpPath := TsvPath . ".tmp"
+		if FileExist(TmpPath)
+			FileDelete(TmpPath)
+		FileAppend(Content, TmpPath, "UTF-8-RAW")
+		FileMove(TmpPath, TsvPath, 1)
 	} catch as err {
 		try LoggerWarn("i18n", "Could not write fast-cache '{1}' ({2}); JSON path stays active.", TsvPath, err.Message)
 	}
@@ -181,7 +198,15 @@ _I18nLoadLocaleMap(JsonPath, MagicKey) {
 	; ── Fast path: a fresh .tsv cache ──
 	if FileExist(TsvPath) and _I18nTsvIsFresh(TsvPath, JsonPath) {
 		try {
-			return { Cache: _I18nParseTSV(FileRead(TsvPath, "UTF-8"), MagicKey), Ok: true, Fast: true }
+			Fast := _I18nParseTSV(FileRead(TsvPath, "UTF-8"), MagicKey)
+			; A cache that parses to zero keys is damage, not content: every shipped
+			; locale carries thousands of entries. Falling through to the JSON makes
+			; the "self-healing cache" contract in this module's header true for a
+			; TRUNCATED cache too, not only for a missing one, and the slow path
+			; rewrites the cache on its way out.
+			if (Fast.Count > 0)
+				return { Cache: Fast, Ok: true, Fast: true }
+			try LoggerWarn("i18n", "Fast cache '{1}' parsed to 0 keys; rebuilding from JSON.", TsvPath)
 		} catch as err {
 			try LoggerWarn("i18n", "Fast cache '{1}' unreadable ({2}); rebuilding from JSON.", TsvPath, err.Message)
 		}
@@ -285,9 +310,21 @@ _I18nEnsureLoaded() {
 ; =============================
 ; =============================
 
-; Returns the localised string for the given dot-notation key.
-; Falls back to the raw key name if the locale file is missing or the key is absent.
-t(Key) {
+; Resolve a dot-notation key through the locale cascade WITHOUT reporting a miss.
+;
+; This is the accessor for SPECULATIVE lookups — a caller walking a chain of
+; candidate keys, where a miss is the normal control flow rather than a defect.
+; It exists because t() below both resolves and DIAGNOSES, and those two
+; contracts collided: lib/manifest_descriptions.ahk probes up to nine candidates
+; per menu label and expects all but one to miss, so every label emitted several
+; warnings claiming "the raw key is being displayed to the user" when it was not.
+; Measured 2026-07-29: 282 unique keys warned per boot, of which 281 were probes
+; and exactly one was a real, user-visible miss — which is how that one defect
+; survived a full day inside its own alarm.
+;
+; @param Key string Dot-notation locale key.
+; @returns {String} The translation, or "" when the key resolves nowhere.
+I18nLookup(Key) {
 	global _I18nCache, _I18nCacheLoaded, _I18nFallbacksWarmed
 	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
 	if !_I18nCacheLoaded
@@ -307,5 +344,33 @@ t(Key) {
 		return _I18nCacheEn[Key]
 	if _I18nCacheFrLoaded and _I18nCacheFr.Has(Key) and _I18nCacheFr[Key] != ""
 		return _I18nCacheFr[Key]
+	return ""
+}
+
+; Returns the localised string for the given dot-notation key.
+; Falls back to the raw key name if the locale file is missing or the key is absent.
+;
+; This is the accessor for the DISPLAY path, where a total miss really is a
+; defect worth a WARNING. A caller probing a chain of candidates must use
+; I18nLookup instead — see its comment.
+t(Key) {
+	Value := I18nLookup(Key)
+	if (Value != "")
+		return Value
+	; TOTAL miss: absent from the active locale AND from both fallbacks. The
+	; raw dotted key is still returned — rendering "menu.hotstrings.delay_prompt"
+	; in the UI is ugly but survivable, and throwing here would take the tray menu
+	; down over a typo. But it was returned in COMPLETE silence, so a stale or
+	; mistyped key showed up as garbage in the interface with nothing in the log
+	; to connect it to, and the locale-parity gate only covers keys that exist in
+	; en.json — precisely not this case.
+	;
+	; Warned once per key: t() is called for every menu label on every rebuild,
+	; so an unthrottled line would flood the log and bury the first occurrence.
+	global _I18nMissWarned
+	if !_I18nMissWarned.Has(Key) {
+		_I18nMissWarned[Key] := true
+		try LoggerWarn("Locale", "No translation for '{1}' in the active locale, en or fr — the raw key is being displayed to the user.", Key)
+	}
 	return Key
 }

@@ -90,8 +90,13 @@ TryMenuLabelFromDescriptionKey(DescKey, Path := "") {
         if (Cand == "") {
             continue
         }
-        Resolved := t(Cand)
-        if (Resolved != "" and Resolved != Cand) {
+        ; I18nLookup, never t(): a miss here is this loop's normal control flow,
+        ; and t() reports a miss as a user-visible defect. Probing through the
+        ; warning accessor made every label emit several false alarms — 281 of the
+        ; 282 warned keys in a boot were this loop talking about itself, and they
+        ; buried the one genuine miss (i18n-probe-warns-about-itself).
+        Resolved := I18nLookup(Cand)
+        if (Resolved != "") {
             Label := Resolved
             break
         }

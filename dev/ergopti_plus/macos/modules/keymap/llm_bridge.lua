@@ -28,6 +28,7 @@ local hs        = hs
 local keyStroke = hs.eventtap.keyStroke
 
 local km_utils         = require("modules.keymap.utils")
+local EventTapGuard = require("adapters.event_tap_guard")
 local text_utils       = require("lib.text_utils")
 local core_llm         = require("modules.llm")
 local Logger           = require("lib.logger")
@@ -38,6 +39,7 @@ local engine           = require("modules.llm.prediction_engine")
 local Registry         = require("modules.keymap.registry")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local expander         = require("modules.keymap.expander")
+local TimerScheduler   = require("adapters.timer_scheduler")
 
 local LOG    = "keymap.llm_bridge"
 local _state = nil  -- Shared CoreState, injected via M.init().
@@ -108,6 +110,31 @@ local last_shown_hotstring = nil
 -- Inserting a new eventtap at HEAD ensures it fires before any pre-existing tap (e.g. Raycast).
 -- The trap checks tooltip.is_visible() at runtime so it never needs to be disarmed.
 local _escape_trap = nil
+
+-- Identity of the most recently REQUESTED preview render.
+--
+-- The hotstring preview used to render synchronously inside the HID callback,
+-- and rendering is not cheap: resolving the anchor performs cross-process
+-- accessibility IPC and creates and destroys eventtaps, on EVERY preview
+-- keystroke. Against a beach-balling front app that IPC blocks until the AX
+-- timeout, which is long enough for macOS to disable the whole keyboard tap for
+-- being unresponsive — taking the driver down with it. The render is therefore
+-- deferred by one runloop tick, exactly as the LLM tooltip already defers its
+-- own re-renders.
+--
+-- Deferring introduces a gap in which the preview can be superseded or
+-- dismissed, so each request is stamped: a pending render that is no longer the
+-- newest drops itself rather than resurrecting a tooltip the user has already
+-- dismissed or replaced. Declared above every closure that reads it — a local
+-- declared below one binds a nil global instead.
+local _preview_render_generation = 0
+
+--- Invalidates any preview render still waiting on its deferral tick.
+--- Called wherever the tooltip is hidden or the predictions reset, so a render
+--- requested moments earlier cannot land afterwards.
+local function invalidate_pending_preview()
+	_preview_render_generation = _preview_render_generation + 1
+end
 
 -- ── Preview visibility toggles ────────────────────────────────────────────────
 -- Initial values are set in M.init() from the keymap defaults passed by keymap/init.lua.
@@ -222,7 +249,14 @@ end
 function M.set_preview_star_enabled(v)
 	is_star_preview_enabled = (v == true)
 	Logger.debug(LOG, "Star preview: %s.", is_star_preview_enabled and "on" or "off")
-	if not v then tooltip.hide() end
+	if not v then
+		-- hide_forced, not hide: a dequeue cycle in progress makes tooltip.hide()
+		-- a no-op so multi-row previews survive the first row's expiry — which
+		-- means turning the preview OFF left the rows the user just disabled
+		-- sitting on screen until they timed out on their own.
+		invalidate_pending_preview()
+		tooltip.hide_forced()
+	end
 end
 
 --- Enables or disables the autocorrect hotstring preview tooltip.
@@ -230,7 +264,14 @@ end
 function M.set_preview_autocorrect_enabled(v)
 	is_autocorrect_preview_enabled = (v == true)
 	Logger.debug(LOG, "Autocorrect preview: %s.", is_autocorrect_preview_enabled and "on" or "off")
-	if not v then tooltip.hide() end
+	if not v then
+		-- hide_forced, not hide: a dequeue cycle in progress makes tooltip.hide()
+		-- a no-op so multi-row previews survive the first row's expiry — which
+		-- means turning the preview OFF left the rows the user just disabled
+		-- sitting on screen until they timed out on their own.
+		invalidate_pending_preview()
+		tooltip.hide_forced()
+	end
 end
 
 --- Enables or disables the AI prediction tooltip.
@@ -246,7 +287,11 @@ function M.set_preview_enabled(enabled)
 	is_star_preview_enabled        = (enabled == true)
 	is_autocorrect_preview_enabled = (enabled == true)
 	Logger.debug(LOG, "All hotstring tooltips: %s.", enabled and "on" or "off")
-	if not enabled then tooltip.hide() end
+	if not enabled then
+		-- hide_forced for the same reason as the per-kind setters above.
+		invalidate_pending_preview()
+		tooltip.hide_forced()
+	end
 end
 
 --- Enables or disables background tinting for all tooltip types.
@@ -255,6 +300,9 @@ end
 function M.set_preview_colored_tooltips(v)
 	tooltip.set_colorization_enabled(v == true)
 	Logger.debug(LOG, "Colored tooltips: %s.", v and "on" or "off")
+	-- The hide clears the surface so the new tint applies to the next render; a
+	-- render still waiting on its tick would repaint it with the old one.
+	invalidate_pending_preview()
 	tooltip.hide()
 end
 
@@ -404,8 +452,23 @@ function M.update_preview(buf)
 		end
 	end
 
+	-- The expansion engine is hard-blocked during the rescan-suppression window
+	-- that follows an expansion, so any hotstring row offered now names a trigger
+	-- that CANNOT fire. The user pressed the validation key, nothing happened,
+	-- and the window then wiped the buffer — the trigger was lost with no way to
+	-- retry it except retyping the whole word. Read from the same CoreState field
+	-- the tap tests, so the preview and the engine cannot disagree about whether
+	-- a trigger is live. Custom providers above are unaffected: they do not go
+	-- through the trigger engine.
+	local epoch_fn = (hs and hs.timer and hs.timer.secondsSinceEpoch) or os.time
+	local engine_blocked = epoch_fn() < (_state.no_rescan_until or 0)
+	if engine_blocked then
+		Logger.debug(LOG, "Preview: static mappings skipped — engine suppressed for %.3fs more.",
+			(_state.no_rescan_until or 0) - epoch_fn())
+	end
+
 	-- Walk static mappings via the tail-char indexes.
-	if #matches == 0 then
+	if #matches == 0 and not engine_blocked then
 		-- Guard against malformed UTF-8: LuaJIT raises a C-level error on bad sequences
 		local ok_poff, poff = pcall(utf8.offset, buf, -1)
 		if not ok_poff then poff = nil end
@@ -433,9 +496,12 @@ function M.update_preview(buf)
 		-- The buffer the engine will actually match against once ★ is pressed. The
 		-- preview must ask about THAT buffer, not the current one, or it is
 		-- answering a different question than the engine will be asked.
-		local star_buf = buf .. (_state.magic_key or "")
-
+		-- Built only when the star bucket has something to match against. This is
+		-- a string concatenation on every keystroke, and the overwhelmingly common
+		-- case is an empty bucket — so the allocation was pure waste on the
+		-- latency-critical path for all but a handful of keys.
 		local star_bucket = Registry.mappings_for_star_tail(buf_tail_char)
+		local star_buf = star_bucket and (buf .. (_state.magic_key or "")) or nil
 		if star_bucket then
 			for _, mapping in ipairs(star_bucket) do
 				if group_active(mapping) then
@@ -462,6 +528,10 @@ function M.update_preview(buf)
 							input      = star_base,
 							type       = "star",
 							group      = mapping.group,
+							-- Carried so the row's lifetime can be resolved through
+							-- the same precedence chain the engine applies.
+							section    = mapping.section,
+							has_magic  = mapping.has_magic,
 							-- Carried so the DEBUG sink below can honour the same
 							-- privacy contract the expander applies (acc7946fc).
 							is_private = mapping.is_private,
@@ -498,13 +568,23 @@ function M.update_preview(buf)
 					-- case-conform resolution and word-boundary rules — the copy that
 					-- had to be kept in sync by hand and was not.
 					local matched_plain, matched_input = expander.would_fire(mapping, buf)
-					if matched_input then
+					-- Gated on the RESOLVED replacement, not on the typed text. A
+					-- no-op mapping returns (nil, typed, nil, true) — nil expansion
+					-- but a perfectly truthy second value — so gating on the input
+					-- built a row whose text was nil. render_stacked then threw and
+					-- took the ENTIRE preview stack down with it, so one no-op
+					-- mapping silently erased every other suggestion on screen. The
+					-- star bucket above already gates on the expansion, which is what
+					-- "the preview treats a no-op exactly like no match" means.
+					if matched_plain then
 						matches[#matches + 1] = {
 							repl       = matched_plain,
 							plain_repl = matched_plain,
 							input      = matched_input,
 							type       = "autocorrect",
 							group      = mapping.group,
+							section    = mapping.section,
+							has_magic  = mapping.has_magic,
 							-- Same privacy contract as the star bucket above.
 							is_private = mapping.is_private,
 						}
@@ -521,7 +601,13 @@ function M.update_preview(buf)
 		-- provider) the FIRST surviving row is the one the engine will fire — the
 		-- rest are rendered dimmed + strikethrough so the user can see the
 		-- alternatives without confusing them with the real outcome.
-		local magic_key = "★"
+		-- The key the user actually has to press to validate a star row. Read from
+		-- CoreState, which owns it and is what star_buf above is already built
+		-- from: a hard-coded ★ told anyone who customised the magic key to press a
+		-- character their layout no longer produces. The literal remains only as
+		-- the fallback for a state that has not resolved one yet.
+		local magic_key = (_state and _state.magic_key ~= nil and _state.magic_key ~= "")
+			and _state.magic_key or "★"
 		local rows          = {}
 		local any_enabled   = false
 		local min_timeout   = nil
@@ -530,6 +616,9 @@ function M.update_preview(buf)
 		-- Track whether each kind has already produced its primary row. Subsequent
 		-- enabled rows of the same kind are marked dimmed.
 		local primary_seen = { star = false, autocorrect = false, provider = false }
+		-- Kinds whose WINNER could not be displayed. Every later row of such a kind
+		-- describes an expansion the engine will not produce, so none may be shown.
+		local kind_suppressed = {}
 		-- Re-order matches so end-char (↵) rows come first, then star (★) rows,
 		-- then providers. End-char triggers usually have a shorter delay (the
 		-- user types space/tab quickly) so they need maximum visibility on top.
@@ -559,27 +648,58 @@ function M.update_preview(buf)
 			local enabled = is_star and is_star_preview_enabled
 				or (not is_star and is_autocorrect_preview_enabled)
 			if enabled and m.group and type(hotstrings_config.resolve) == "function" then
-				local ok_cfg, cfg = pcall(function() return hotstrings_config.resolve(m.group, nil) end)
+				-- m.section, not nil: the config window keys its per-section
+				-- "hide the bubble" override by exactly this name, so resolving with
+				-- nil consulted only the group level and every per-section override
+				-- the user set was silently ignored by the preview.
+				local ok_cfg, cfg = pcall(function() return hotstrings_config.resolve(m.group, m.section) end)
 				if ok_cfg and cfg and cfg.show_tooltip == false then enabled = false end
 			end
 
-			local delay_key = is_star and "STAR_TRIGGER"
-				or (m.type == "autocorrect" and "autocorrection" or "dynamichotstrings")
-			local raw_delay = _state.DELAYS[delay_key] or 0
+			-- Sized by the SAME precedence chain the engine uses to decide
+			-- whether the trigger may still fire. The old three-way key
+			-- (STAR_TRIGGER / autocorrection / dynamichotstrings) ignored
+			-- per-section overrides and user-overridden group delays entirely, so
+			-- the row could vanish while its trigger was still live — or linger
+			-- after it had expired, offering an expansion the engine would refuse.
+			-- Providers do not go through that chain and keep the group default.
+			local raw_delay
+			if m.type == "provider" or type(_state.resolve_mapping_delay) ~= "function" then
+				raw_delay = _state.DELAYS["dynamichotstrings"] or 0
+			else
+				raw_delay = _state.resolve_mapping_delay(m) or 0
+			end
 			local row_timeout = raw_delay == 0 and INFINITE_TOOLTIP_SEC
 				or math.max(MIN_TOOLTIP_DURATION_SEC, raw_delay)
 
-			if enabled then
+			-- The ledger advances for the WINNER of each kind, displayable or not.
+			-- Advancing it only for rendered rows meant that when the winning
+			-- mapping's group was silenced, the next mapping of the same kind was
+			-- promoted and drawn UNDIMMED — presented as what will happen, when the
+			-- engine will produce the silenced winner instead.
+			local is_primary = not primary_seen[m.type]
+			primary_seen[m.type] = true
+
+			-- And if that winner cannot be shown, no alternative of its kind may be
+			-- shown either: every remaining row of the kind is an expansion the
+			-- engine will not produce. The tooltip tells the truth or says nothing.
+			if not enabled and is_primary then
+				kind_suppressed[m.type] = true
+			end
+
+			if enabled and not kind_suppressed[m.type] then
 				any_enabled = true
 				if not min_timeout or row_timeout < min_timeout then
 					min_timeout = row_timeout
 				end
-				local is_primary = not primary_seen[m.type]
-				primary_seen[m.type] = true
 				rows[#rows + 1] = {
 					text          = m.plain_repl,
 					tint          = tooltip.tint(tint_key),
-					trigger_label = is_star and magic_key or "↵",
+					-- Providers are validated by the magic key, exactly like a star
+					-- trigger: both shipped ones fire from the interceptor on the
+					-- trigger char. Labelling their row "↵" told the user to press
+					-- Enter, which destroys the pending expansion instead of firing it.
+					trigger_label = (is_star or m.type == "provider") and magic_key or "↵",
 					dimmed        = not is_primary,
 					duration      = row_timeout,
 				}
@@ -604,7 +724,15 @@ function M.update_preview(buf)
 		tooltip.set_timeout(tooltip_timeout)
 
 		if any_enabled then
-			tooltip.show_stacked(rows, true)
+			-- Off the HID thread: see _preview_render_generation. One runloop tick
+			-- is imperceptible for a preview; a blocked AX query on this thread is
+			-- not — it can trip the tap-timeout that disables the keyboard tap.
+			invalidate_pending_preview()
+			local my_generation = _preview_render_generation
+			TimerScheduler.after(0, function()
+				if my_generation ~= _preview_render_generation then return end
+				tooltip.show_stacked(rows, true)
+			end)
 		end
 
 		-- Chain: arm the LLM timer so it fires just as the tooltip window closes.
@@ -644,7 +772,15 @@ function M.update_preview(buf)
 			or (primary_match.type == "autocorrect" and "autocorrect" or "personal")
 		if not last_shown_hotstring or last_shown_hotstring.trigger ~= trigger_key then
 			last_shown_hotstring = { trigger = trigger_key, replacement = primary_match.repl, h_type = type_str }
-			keylogger.log_hotstring_suggested(nil, trigger_key, primary_match.repl, type_str)
+			-- Off the HID thread. This is pure telemetry: nothing downstream depends
+			-- on it landing before the keystroke completes, and it ends in a
+			-- synchronous file write on the very callback whose overrun makes macOS
+			-- disable the keyboard tap. The values are captured now so a later
+			-- keystroke cannot change what gets recorded.
+			local t_key, t_repl, t_type = trigger_key, primary_match.repl, type_str
+			TimerScheduler.after(0, function()
+				pcall(keylogger.log_hotstring_suggested, nil, t_key, t_repl, t_type)
+			end)
 		end
 	else
 		-- No hotstring match — let the inactivity timer drive the LLM.
@@ -690,6 +826,7 @@ end
 local function arm_escape_trap()
 	if _escape_trap then return end
 	_escape_trap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
+		if EventTapGuard.handle_disabled(event, _escape_trap, "llm.escape_trap") then return false end
 		if event:getKeyCode() ~= KEYCODE_ESCAPE then return false end
 		-- Let Escape through when no tooltip is on screen — Raycast (or the system)
 		-- should handle it normally in that case.
@@ -707,11 +844,31 @@ end
 --- Clears all active predictions and optionally emits hotstring-dismissed telemetry.
 --- @param keep_hotstring_log boolean When true, skips the dismiss telemetry event.
 function M.reset_predictions(keep_hotstring_log)
+	-- A preview render requested a tick ago must not land after this reset and
+	-- put the tooltip back on screen.
+	invalidate_pending_preview()
 	if not keep_hotstring_log and last_shown_hotstring then
-		keylogger.log_hotstring_dismissed(nil,
-			last_shown_hotstring.trigger,
-			last_shown_hotstring.replacement,
-			last_shown_hotstring.h_type)
+		-- Deferred and pcall'd, exactly like the log_hotstring_suggested sibling a
+		-- few hundred lines up. That one was moved off the HID thread and this one
+		-- was not, because the deferral was applied per call site instead of at the
+		-- sink — so the telemetry writer still ran an open/write/flush inside the
+		-- keyDown tap on every dismissal.
+		--
+		-- The pcall matters for a second reason, and it is not about the throw being
+		-- silent: on the keyDown and mouse paths it is logged. It is about STATE. A
+		-- throw here skipped both `last_shown_hotstring = nil` below and
+		-- `engine.reset()`, leaving the tooltip state and the engine live, so every
+		-- later reset re-emitted the same stale dismiss event. The Escape trap path
+		-- has no pcall of its own, so there it was silent as well.
+		--
+		-- The values are captured NOW: a later keystroke must not change what gets
+		-- recorded, and the field is cleared immediately below.
+		local d_trigger = last_shown_hotstring.trigger
+		local d_repl    = last_shown_hotstring.replacement
+		local d_type    = last_shown_hotstring.h_type
+		TimerScheduler.after(0, function()
+			pcall(keylogger.log_hotstring_dismissed, nil, d_trigger, d_repl, d_type)
+		end)
 		last_shown_hotstring = nil
 	end
 	engine.reset()

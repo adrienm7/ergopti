@@ -184,8 +184,12 @@ LLM_Engine_FirePrediction(buffer) {
 			and Type(_LLM_Engine["last_results"]) == "Array"
 			and _LLM_Engine["last_results"].Length > 0) {
 		; Cancel both curl streams and in-flight WinHTTP requests so no stale
-		; response lands after the cache hit is already rendered.
+		; response lands after the cache hit is already rendered. The remote
+		; sibling has to be cancelled too: its result was already discarded by the
+		; request-id check, but without this its curl child and the temp files
+		; carrying the typed context survive until the poll tick reaps them.
 		try LLM_OllamaCancelAllAsync()
+		try LLM_RemoteCancelAllAsync()
 		LLM_Engine_OnResults(_LLM_Engine["last_results"], ctx, 1, true)
 		return
 	}
@@ -218,9 +222,11 @@ LLM_Engine_FirePrediction(buffer) {
 		}
 		if (sliced.Length > 0) {
 			; Same race fix as the exact-match cache branch above: cancel all
-			; in-flight WinHTTP requests and curl streams so no stale response
-			; clobbers the cache hit render.
+			; in-flight WinHTTP requests and curl streams — local AND remote — so
+			; no stale response clobbers the cache hit render and no orphaned curl
+			; child keeps a PII temp file alive.
 			try LLM_OllamaCancelAllAsync()
+			try LLM_RemoteCancelAllAsync()
 			LLM_Engine_OnResults(sliced, ctx, 1, true)
 			return
 		}
@@ -467,8 +473,7 @@ _LLM_Engine_DispatchBatch(state) {
 
 _LLM_Engine_OnBatchSuccess(state, text, meta := "") {
 	global _LLM_Engine
-	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	if (state["request_id"] != current_id)
+	if !_LLM_Engine_IsCurrent(state)
 		return
 	; Capture per-request token usage when the backend provided it. Same
 	; structure as the sequential path so the finalize step can emit a
@@ -490,8 +495,7 @@ _LLM_Engine_OnBatchFail(state) {
 	; of the first attempt. Let the tooltip fade via its auto-dismiss
 	; timer instead.
 	global _LLM_Engine
-	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	if (state["request_id"] != current_id)
+	if !_LLM_Engine_IsCurrent(state)
 		return
 	; Keep slots empty + finalize so any subsequent cache hit is consistent.
 	state["slots"]       := []
@@ -541,8 +545,7 @@ _LLM_Engine_DispatchVariant(state) {
 	; Bail if a newer request has been fired since this variant was queued —
 	; the closure may have been pending on the SetTimer queue and now lands
 	; into stale context.
-	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	if (state["request_id"] != current_id)
+	if !_LLM_Engine_IsCurrent(state)
 		return
 
 	; Done? Either we got enough predictions or we ran out of attempts.
@@ -617,8 +620,7 @@ _LLM_Engine_DispatchVariant(state) {
 ; comparison is meaningful.
 _LLM_Engine_OnStreamPartial(state, slot_idx, partial) {
 	global _LLM_Engine
-	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	if (state["request_id"] != current_id)
+	if !_LLM_Engine_IsCurrent(state)
 		return
 	preview := []
 	for _, s in state["slots"]
@@ -635,8 +637,7 @@ _LLM_Engine_OnStreamPartial(state, slot_idx, partial) {
 
 _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 	global _LLM_Engine
-	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	if (state["request_id"] != current_id) {
+	if !_LLM_Engine_IsCurrent(state) {
 		try LoggerInfo("LLM", "Variant success ignored — superseded by newer typing.")
 		return
 	}
@@ -688,8 +689,7 @@ _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 
 _LLM_Engine_OnVariantFail(state, failure := "") {
 	global _LLM_Engine
-	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	if (state["request_id"] != current_id) {
+	if !_LLM_Engine_IsCurrent(state) {
 		try LoggerInfo("LLM", "Variant failure ignored — superseded by newer typing.")
 		return
 	}
@@ -714,10 +714,29 @@ _LLM_Engine_OnVariantFail(state, failure := "") {
 	_LLM_Engine_DispatchVariant(state)
 }
 
-_LLM_Engine_FinalizeRequest(state) {
+/**
+ * True while `state` still describes the request the engine is waiting for.
+ *
+ * The engine bumps ``request_id`` on every fire, so a callback that was queued
+ * before the newest keystroke must not act. The check had four copies of the
+ * same expression and — more importantly — was only ever evaluated at callback
+ * ENTRY: finalization logs, hides tooltips and calls into the keylogger before
+ * it renders, and any of those can yield long enough for a keystroke to
+ * supersede the request. The render then painted a prediction for text the user
+ * had already moved past, and re-seeded the cache with that stale context so
+ * the NEXT prediction inherited it too.
+ * @param {Map} state The per-request state carried by the callback.
+ * @returns {Integer} 1 when the request is still current.
+ */
+_LLM_Engine_IsCurrent(state) {
 	global _LLM_Engine
 	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	if (state["request_id"] != current_id)
+	return (state["request_id"] == current_id)
+}
+
+_LLM_Engine_FinalizeRequest(state) {
+	global _LLM_Engine
+	if !_LLM_Engine_IsCurrent(state)
 		return
 	if (state["slots"].Length == 0) {
 		; Every variant failed — log a single ``llm_generation_failed`` so
@@ -743,12 +762,6 @@ _LLM_Engine_FinalizeRequest(state) {
 		}
 		return
 	}
-	_LLM_Engine["last_ctx"]     := state["ctx"]
-	_LLM_Engine["last_results"] := state["slots"]
-	; Keep ``last_result`` (singular) for the legacy cache hit path so any
-	; external code still reading that field keeps working.
-	_LLM_Engine["last_result"]  := state["slots"][1]
-
 	try LLM_ApiCommon_LogSummary((state.Has("is_batch") and state["is_batch"]) ? "batch" : "sequential", state["requested"], state["dedup_stats"], state["slots"].Length)
 	try LoggerInfo("LLM", "Prediction received — {1} suggestion(s).", state["slots"].Length)
 	global _LLM_Ollama_IsReady
@@ -794,18 +807,28 @@ _LLM_Engine_FinalizeRequest(state) {
 		KL_LogLlm("generation", evt)
 	}
 
-	; ``llm_suggested`` fires once per final render so a tail of the log
-	; pairs each suggestion with exactly one ``llm_accepted`` (Tab) or
-	; ``llm_dismissed`` (timeout / typing past it). Acceptance rate is
-	; the ratio of accepted vs suggested. Lives on the engine side so
-	; both the tooltip flow and the inline-autotype flow contribute.
-	try {
-		app_name := ""
-		try app_name := WIGetFocused()["appId"]
-		KL_LogLlmSuggested(app_name, state["slots"].Length)
+	; Re-checked HERE — as the LAST statement before anything observable. The
+	; entry check alone was never enough, but neither was a check placed above the
+	; block: the summary log, the focused-window query and the keylogger write all
+	; yield, and a keystroke arriving in that window supersedes this request.
+	; Painting anyway shows a prediction for text the user has already left (the
+	; deferred tooltip hide that should correct it is skipped on the generation
+	; mismatch the render itself creates), and seeding last_ctx with it hands the
+	; stale context to the next request too, which then replays it from cache.
+	if !_LLM_Engine_IsCurrent(state) {
+		try LoggerInfo("LLM", "Prediction superseded before render — discarding request #{1}.", state["request_id"])
+		return
 	}
+	_LLM_Engine["last_ctx"]     := state["ctx"]
+	_LLM_Engine["last_results"] := state["slots"]
+	; Keep ``last_result`` (singular) for the legacy cache hit path so any
+	; external code still reading that field keeps working.
+	_LLM_Engine["last_result"]  := state["slots"][1]
 
-	LLM_Engine_OnResults(state["slots"], state["ctx"], 1, true)
+	; ``request_id`` is threaded through so the render can gate once more on its
+	; own side: LLM_Diff_Compute and the display-opts resolution run between here
+	; and the paint, and both can yield.
+	LLM_Engine_OnResults(state["slots"], state["ctx"], 1, true, state["request_id"])
 }
 
 ; Returns the max number of attempts for ``n`` requested predictions,
@@ -892,12 +915,15 @@ _LLM_Engine_GetActiveApiEntry() {
  * full set is finalised. Mirrors the HS on_success(results, ms, is_final)
  * signature minus the timing field, which lives in the per-variant logs.
  *
- * @param {Array}    slots     - Slot strings (empty string = in-flight placeholder).
- * @param {string}   ctx       - The context that produced these slots.
- * @param {Integer}  active    - 1-based active slot index (the one Tab fires on).
- * @param {boolean}  is_final  - True only on the last update of a request.
+ * @param {Array}    slots      - Slot strings (empty string = in-flight placeholder).
+ * @param {string}   ctx        - The context that produced these slots.
+ * @param {Integer}  active     - 1-based active slot index (the one Tab fires on).
+ * @param {boolean}  is_final   - True only on the last update of a request.
+ * @param {string}   request_id - Request this render speaks for, when it has one.
+ *                                Empty for renders served from the local cache,
+ *                                which are current by construction.
  */
-LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
+LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "") {
 	global _LLM_Engine, _LLM_Bridge_Buffer
 	; Inline auto-type mode (Copilot-style): the prediction is typed
 	; directly into the active app instead of being shown in a tooltip.
@@ -916,6 +942,18 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 					try LoggerInfo("LLM", "Inline auto-type skipped while suspended.")
 					return
 				}
+				; The SAME staleness gate the tooltip render performs further down,
+				; applied here because this branch returns before ever reaching it.
+				; That gate exists because this thread can be pre-empted between the
+				; caller check and the paint, and the consequence is far worse on this
+				; path: a superseded tooltip paints a stale suggestion the user can
+				; ignore, while a superseded inline auto-type SendTexts model output for
+				; ABANDONED text straight into the document, where nothing takes it back
+				; (llm-inline-autotype-injects-superseded-prediction).
+				if (request_id != "" and !_LLM_Engine_IsCurrent(Map("request_id", request_id))) {
+					try LoggerInfo("LLM", "Inline auto-type skipped — prediction superseded during render (request #{1}).", request_id)
+					return
+				}
 				; Mute the hotstring InputHook so the injected characters do
 				; not re-enter the engine and trigger false hotstring matches.
 				if IsSet(PrefixWatcherSuppress)
@@ -926,6 +964,9 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 				; Without it the model output is recorded as words the human
 				; typed (inflating WPM, polluting n-gram stats).
 				try KL_MarkSynthetic("llm")
+				; The inline flow never reaches the tooltip, so it accounts for its
+				; own suggestion here — the pairing has to hold on both surfaces.
+				_LLM_Engine_LogSuggested(slots.Length)
 				; Completion is sender-owned: a clipboard-mode injection can return
 				; before Ctrl+V or fail after dispatch, so fixed-delay cleanup would
 				; release synthetic guards and commit context before visible output.
@@ -962,6 +1003,16 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 	}
 
 	_LLM_Engine_ApplyTooltipDisplayOpts(slots.Length)
+	; Last staleness gate, on the render's own side. LLM_Diff_Compute runs a
+	; RegExMatch per character over each slot and the display-opts resolution
+	; queries the focused window, so this thread can be pre-empted between the
+	; caller's check and the paint. Painting after a supersede leaves a prediction
+	; for abandoned text on screen that the keystroke's deferred hide can no longer
+	; dismiss, because the paint itself bumps the tooltip generation it compares.
+	if (is_final and request_id != "" and !_LLM_Engine_IsCurrent(Map("request_id", request_id))) {
+		try LoggerInfo("LLM", "Prediction superseded during render — discarding request #{1}.", request_id)
+		return
+	}
 	; Freeze the chain timings BEFORE the final render, not after it. The render
 	; reads TtftMs / TtltMs synchronously while building the info bar, so this
 	; ordering shows the same durations in a single rebuild — where the previous
@@ -970,6 +1021,30 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 	if is_final
 		try LLM_Tooltip_MarkChainTimingOnly(A_TickCount)
 	LLM_Tooltip_Show(display_slots, active, is_final)
+	; Emitted AFTER the paint, and here rather than in _LLM_Engine_FinalizeRequest,
+	; because the two prediction-cache shortcuts also render a final, Tab-acceptable
+	; tooltip and return before finalization ever runs. Their ``llm_accepted`` /
+	; ``llm_dismissed`` counterparts hang off the UI lifecycle and fired regardless,
+	; so an engine-scoped emission made the acceptance ratio exceed 100 %.
+	if is_final
+		_LLM_Engine_LogSuggested(slots.Length)
+}
+
+/**
+ * Emits the ``llm_suggested`` keylogger event for one final render.
+ *
+ * The event pairs 1:1 with exactly one ``llm_accepted`` (Tab) or
+ * ``llm_dismissed`` (timeout / typing past it), and the acceptance rate is the
+ * ratio of the two. It therefore belongs to every producer of a final render,
+ * not to the request finalizer alone.
+ * @param {Integer} slot_count Number of slots in the rendered suggestion.
+ */
+_LLM_Engine_LogSuggested(slot_count) {
+	try {
+		app_name := ""
+		try app_name := WIGetFocused()["appId"]
+		KL_LogLlmSuggested(app_name, slot_count)
+	}
 }
 
 LLM_Engine_OnInlineInjectComplete(InjectedText, Ok := true, ErrorMessage := "") {

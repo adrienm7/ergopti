@@ -15,11 +15,17 @@
 ---    no bundled Lua implementation is needed.
 --- 3. printf instead of echo: avoids trailing-newline contamination that would
 ---    silently produce a different hash than the expected value.
+--- 4. shell_runner quoting: the input is arbitrary caller data, so it is passed
+---    through the adapter's quote() rather than interpolated. The previous
+---    string.format("%q") form emitted a DOUBLE-quoted word, where $, ` and
+---    $( ) stay live — sha256("$HOME") hashed the expansion instead of the
+---    literal, and any input could run a command.
 --- ==============================================================================
 
 local M = {}
 
 local Logger = require("logger.shim")
+local Shell  = require("adapters.shell_runner")
 
 local LOG = "adapters.crypto"
 
@@ -38,13 +44,8 @@ local LOG = "adapters.crypto"
 function M.sha256(data)
 	local ok, result = pcall(function()
 		if type(data) ~= "string" then return "" end
-		local cmd = string.format(
-			"printf '%%s' %q | openssl dgst -sha256 -hex 2>/dev/null", data)
-		local fh = io.popen(cmd, "r")
-		if not fh then return "" end
-		local output = fh:read("*a")
-		fh:close()
-		if type(output) ~= "string" then return "" end
+		local output = Shell.exec(string.format(
+			"printf '%%s' %s | openssl dgst -sha256 -hex 2>/dev/null", Shell.quote(data)))
 		-- openssl output: "SHA2-256(stdin)= <hex>" or "(stdin)= <hex>"
 		local hex = output:match("[0-9a-f]+%s*$") or ""
 		return hex:gsub("%s+", "")

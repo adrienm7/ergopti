@@ -84,18 +84,16 @@ initMenu() {
 
 	BootProfile_Mark("MENU/initMenu: caches reset + tray staged")
 
-	; Shortcuts submenu — built by MenuRenderer_Build("shortcuts_menu", …).
-	; The renderer handles the category toggle, feature toggles, separator
-	; placement, modifier-combos group, and dynamic blocks (personal
-	; shortcuts, script control, extensions, edit action) via the handler
-	; Map injected by _BuildShortcutsSubmenu's dynamic handlers.
-	; InsertKeyboardShortcutGroups still splices the Alt/Ctrl/Win groups
-	; in before the modifier-combos anchor after the renderer runs.
+	; Shortcuts submenu — built by MenuRenderer_Build("shortcuts_menu", …) and
+	; owned by InitSubMenus. The renderer handles the category toggle, feature
+	; toggles, separator placement, modifier-combos group, and dynamic blocks
+	; (personal shortcuts, script control, extensions, edit action) via the
+	; handler Map injected by _BuildShortcutsSubmenu's dynamic handlers.
+	; The Alt/Ctrl/Ctrl+Shift/Win splice belongs to InitSubMenus, NOT here:
+	; initMenu only READS SubMenus. Mutating a SubMenus entry from here is
+	; unbounded, because _Updater_RebuildMenu calls initMenu() ALONE — the
+	; submenu is never rebuilt, and Menu.Insert appends rather than merging.
 	ShortcutsGated := IsCategoryGated("Shortcuts")
-	if SubMenus.Has("Shortcuts") {
-		InsertKeyboardShortcutGroups(SubMenus["Shortcuts"], t("menu.shortcuts.group_modifiers"))
-	}
-	BootProfile_Mark("MENU/initMenu: shortcuts splice")
 
 	; ── 🌐 Disposition clavier — built from manifest via MenuRenderer_Build.
 	; Dynamic handler ``layout_features`` iterates ``ahk.layout`` entries;
@@ -253,6 +251,16 @@ _MI_AppendTail() {
 		} else if Id == "suspend" {
 			MenuSuspend := t("menu.global.suspend")
 			TrayMenuStage_AddAction(MenuSuspend, ToggleSuspend)
+			; The row carries its own checked state at its single construction
+			; point, so no rebuild caller can forget it. UpdateTrayIcon owns the
+			; indicator but is wired only to state TRANSITIONS and to the boot
+			; build, while TrayMenuStage_Publish deletes and replays the whole
+			; root — a rebuild while paused (updater refresh, tray toggle) would
+			; otherwise show « Suspendre » UNCHECKED on a paused driver, and the
+			; click that reads as "pause" would in fact RESUME.
+			if A_IsSuspended {
+				TrayMenuStage_Check(MenuSuspend)
+			}
 		} else if Id == "reload" {
 			TrayMenuStage_AddAction(t("menu.global.reload"), ActivateReload)
 		} else if Id == "quit" {

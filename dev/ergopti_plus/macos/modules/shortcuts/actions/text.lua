@@ -189,7 +189,15 @@ end
 -- already used by lib/ui_restore and api_mlx, including their hard timeout: a
 -- flag that could stick would block every later transform for the session.
 local _transform_in_flight = false
+-- Same guard for the wrap path, declared beside its sibling so the pair stays visible.
+local _wrap_in_flight      = false
 local TRANSFORM_LOCK_TIMEOUT_SEC = 2.0
+
+-- Identity of the transform that currently owns the clipboard. The failsafe
+-- below fires on a fixed delay, so without this it released whichever transform
+-- was in flight when it happened to expire — including a newer one that had
+-- barely started.
+local _transform_generation = 0
 
 local function do_transform(transform_func)
 	if _transform_in_flight then
@@ -197,9 +205,25 @@ local function do_transform(transform_func)
 		return
 	end
 	_transform_in_flight = true
-	-- Failsafe release: every early return below must not be able to strand the
-	-- flag, and neither may a callback that never fires.
-	timer.doAfter(TRANSFORM_LOCK_TIMEOUT_SEC, function() _transform_in_flight = false end)
+	_transform_generation = _transform_generation + 1
+	local my_generation = _transform_generation
+
+	--- Releases the lock, but only if this transform still owns it.
+	--- Called at every terminal point rather than left to the failsafe: released
+	--- only by the 2 s timer, a transform that finished in half a second still
+	--- blocked the next one for the remaining second and a half, so deliberate
+	--- repeat transforms were simply dropped.
+	local function release()
+		if my_generation ~= _transform_generation then return end
+		_transform_in_flight = false
+	end
+
+	-- Failsafe release: a callback that never fires must not strand the flag for
+	-- the session. Generation-checked because a long selection legitimately
+	-- outlives this delay — the re-select walks the text one keystroke at a time
+	-- — and an unguarded failsafe then unlocked the clipboard mid-transform,
+	-- re-opening the very race the flag exists to close.
+	timer.doAfter(TRANSFORM_LOCK_TIMEOUT_SEC, release)
 
 	Logger.trace(LOG, "Text transformation started…")
 	local prior = pasteboard.getContents()
@@ -211,6 +235,7 @@ local function do_transform(transform_func)
 
 		if not sel or sel == "" then
 			if prior then pcall(pasteboard.setContents, prior) end
+			release()
 			Logger.warn(LOG, "Text transform aborted — no text was selected.")
 			return
 		end
@@ -218,6 +243,7 @@ local function do_transform(transform_func)
 		local ok, transformed = pcall(transform_func, sel)
 		if not ok or not transformed then
 			if prior then pcall(pasteboard.setContents, prior) end
+			release()
 			Logger.error(LOG, "Text transform callback failed.")
 			return
 		end
@@ -247,6 +273,7 @@ local function do_transform(transform_func)
 							pasteboard.clearContents()
 						end
 					end)
+					release()
 					Logger.done(LOG, "Text transformation completed.")
 				end)
 			end)
@@ -393,6 +420,16 @@ end
 --- @param left string Opening symbol to prepend.
 --- @param right string Closing symbol to append.
 function M.wrap_selection(sel, left, right)
+	-- The missed sibling of _transform_in_flight, twenty lines up in this same
+	-- file. Without it a second wrap fired while the first is still holding the
+	-- clipboard snapshots the text the FIRST one just wrote, then "restores" it
+	-- 250 ms later — so the user's real clipboard is replaced by a wrapped
+	-- fragment of their own selection and is gone for good.
+	if _wrap_in_flight then
+		Logger.debug(LOG, "Wrap already in flight — ignoring the second request.")
+		return
+	end
+	_wrap_in_flight = true
 	Logger.debug(LOG, "Wrapping %d-char selection with '%s'…'%s'.", #sel, left, right)
 	local prior = pasteboard.getContents()
 	pcall(pasteboard.setContents, left .. sel .. right)
@@ -403,6 +440,9 @@ function M.wrap_selection(sel, left, right)
 				if prior and prior ~= "" then pasteboard.setContents(prior)
 				else pasteboard.clearContents() end
 			end)
+			-- Released only after the restore, so the window the guard covers is
+			-- exactly the window in which `prior` is the value that must survive.
+			_wrap_in_flight = false
 			Logger.done(LOG, "Selection wrapped.")
 		end)
 	end)

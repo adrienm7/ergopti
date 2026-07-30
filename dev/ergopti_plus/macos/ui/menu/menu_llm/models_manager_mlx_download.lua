@@ -58,6 +58,28 @@ function M.install(ctx)
 	local invalidate_installed_cache  = ctx.invalidate_installed_cache
 
 	function obj.pull_model(target_model, repo, on_success)
+		-- Refuse re-entry while a download owns the shared slots.
+		--
+		-- Every piece of download state is a SINGLE global slot: the two task
+		-- entries, the menubar icon, /tmp/hs_mlx_active_download.json and the one
+		-- shared progress window. A second pull_model overwrote all of them, so
+		-- the first download became unstoppable (its cancel and timeout paths now
+		-- addressed the second one's slots) while the window narrated whichever
+		-- had written last. The timeout path is the sharpest edge: a stall in the
+		-- first called complete(false) and do_cancel(true) against the second
+		-- one's tasks and session file.
+		if deps.active_tasks
+			and (deps.active_tasks["download"] or deps.active_tasks["download_tail"]) then
+			Logger.warn(LOG, "A model download is already running — ignoring the request for '%s'.",
+				tostring(target_model))
+			-- Surface the download already in progress rather than failing silently:
+			-- from the user's side the click simply did nothing otherwise.
+			if download_window and type(download_window.show) == "function" then
+				pcall(download_window.show)
+			end
+			return
+		end
+
 		local function _internal_pull()
 			-- Upvalues shared between closures so do_cancel/tail can coordinate
 			local _dl_pid    = nil

@@ -311,12 +311,23 @@ _GestureRestartPoll(Epoch) {
 
 _GestureRestartReadResult(ResultPath) {
     Result := FSRead(ResultPath)
-    if (Result = false) {
+    ; Type-check the sentinel, never value-compare it. FSRead returns a String on
+    ; success and the BOOLEAN false on any failure, and the helper script writes
+    ; its exit code as a bare string whose SUCCESS value is "0" — a numeric
+    ; string that loosely equals false in v2. So `Result = false` was TRUE on
+    ; exactly the successful runs, which took the "missing" branch and made the
+    ; success return below unreachable: a working restart always reported failure.
+    if !(Result is String) {
         try LoggerError("gestures", "Touchpad restart result missing.")
         return False
     }
-    Result := Trim(Result)
-    return (Result = "0")
+    ; Newlines must be trimmed EXPLICITLY: AHK v2's default OmitChars is " `t"
+    ; only, so a bare Trim() leaves a "0`r`n" payload unequal to "0". The helper
+    ; writes no newline today, but a switch to WriteAllLines would silently turn
+    ; every success back into a failure.
+    ; == and not =, so a numeric coercion cannot creep back in and accept
+    ; "0.0" / "+0" as the success code.
+    return (Trim(Result, " `t`r`n") == "0")
 }
 
 _GestureRestartBuildPsScript(ResultPath) {
@@ -346,13 +357,20 @@ _GestureRestartBuildPsScript(ResultPath) {
 ; section, two after the header), so they are concatenated as-is here — adding
 ; extra ``\n`` separators surfaced as visible blank-line clutter inside the
 ; rendered popup.
+; The slot data comes from the constants ACCESSORS, never from the GESTURE_SLOTS
+; / GESTURE_SHORTCUT_LABELS globals. Those are top-level assignments in
+; modules/gestures/init.ahk, included ~300 lines after ErgoptiPlus.ahk calls
+; Onboarding_Run(), so during the whole first-run wizard they were unset — and
+; the IsSet() guard that used to wrap this loop turned that into a silently
+; EMPTY tutorial: the panel told the user to type the shortcut shown next to
+; each gesture and then listed no gestures at all. A function has no include
+; position, so this answers correctly whenever it is called.
 GestureBuildSetupInstructions() {
     Body := t("gesture.setup.header") . t("gesture.setup.open_path") . t("gesture.setup.for_each")
-    if IsSet(GESTURE_SLOTS) and IsSet(GESTURE_SHORTCUT_LABELS) {
-        for _, Slot in GESTURE_SLOTS {
-            Body .= "  " . t("gesture.slots." . Slot) . " :  "
-                . GESTURE_SHORTCUT_LABELS[Slot] . "`n"
-        }
+    Labels := GestureShortcutLabels()
+    for _, Slot in GestureSlotIds() {
+        Body .= "  " . t("gesture.slots." . Slot) . " :  "
+            . Labels[Slot] . "`n"
     }
     return Body
 }

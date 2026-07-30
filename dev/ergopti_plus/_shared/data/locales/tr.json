@@ -1,4 +1,4 @@
-﻿﻿{
+{
 	"_meta.flag": "🇹🇷",
 	"_meta.locale": "tr",
 	"_meta.name": "Türkçe",
@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "%s için yeni kategorinin adı:",
 	"metrics_apps.new_category_title": "Yeni kategori",
 	"metrics_apps.no_app_detected": "Hiçbir uygulama tespit edilemedi.",
+	"metrics_apps.pick_app_placeholder": "Sınıflandırılacak bir uygulama seçin…",
 	"metrics_apps.rename_chooser_placeholder": "Yeniden adlandırılacak kategori",
 	"metrics_apps.rename_item": "✎ Mevcut bir kategoriyi yeniden adlandır…",
 	"metrics_apps.rename_prompt": "\"%s\" kategorisi için yeni ad:",
@@ -1415,7 +1416,7 @@
 	"sfbsreduction.comma": "Virgül aynı parmak bigramlarını azaltır",
 	"sfbsreduction.ecirc": "Ê aynı parmak bigramlarını azaltır",
 	"sfbsreduction.egrave": "È aynı parmak bigramlarını azaltır",
-	"sfbsreduction.ié": "IE, IE/EI bigramlarını azaltır",
+	"sfbsreduction.ieacute": "IE, IE/EI bigramlarını azaltır",
 	"sg_actions.activity_simulation": "🖱 Etkinlik simüle et (uyku önleme)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (ekran)",
 	"sg_actions.app_expose": "◱ Exposé Uygulaması",
@@ -1652,6 +1653,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = İndirilenler klasörünü aç",
 	"shortcuts.pixel_read_error": "Piksel rengi okunamıyor",
 	"shortcuts.saved": "Kaydedildi: %s",
+	"shortcuts.screenshot_failed": "Ekran görüntüsü alınamadı",
 	"shortcuts.screen": "Win + H (screensHot) = Ekran görüntüsü (Win + Shift + S'yi tetikler)",
 	"shortcuts.screeninstant": "1'in solundaki tuş = Etkin pencerenin anlık görüntüsü, Resimler'e zaman damgasıyla kaydedilir",
 	"shortcuts.screenocr": "Win + C (OCR) = Metin çıkarma ile ekran görüntüsü (Win + Shift + T)",

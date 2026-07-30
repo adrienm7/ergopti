@@ -128,13 +128,61 @@ helpers.describe("the script-control picker configures before it binds", functio
 		helpers.assert_true(at ~= nil, "the script-control assignment must be locatable")
 		if not at then return end
 
-		local window = src:sub(math.max(1, at - 200), at + 1400)
+		-- Bounded by the END of the submenu builder rather than by a byte count.
+		-- A fixed window silently turns into a spelling pin: adding a few lines of
+		-- guard between the assignment and the prompt pushed the call out of a
+		-- 1400-char window and reported a correctly-gated picker as broken.
+		local stop = src:find("return sub", at, true) or (at + 4000)
+		local window = src:sub(math.max(1, at - 200), stop)
 		helpers.assert_true(window:find("get_action_parameter_spec", 1, true) ~= nil,
 			"the picker must ask whether the chosen action needs a parameter. Without it, "
 			.. "open_url and search_web bind to a key that silently does nothing when pressed")
 		helpers.assert_true(window:find("prompt_action_parameter", 1, true) ~= nil,
 			"and it must collect that parameter through the shared prompt rather than "
 			.. "reimplementing the validate/retry loop the gestures menu already has")
+	end)
+
+	helpers.it("prompts under the key dispatch actually reads (M11)", function()
+		-- The prompt storing the value is only half the contract. The parameter
+		-- store is keyed by (binding, action), and script_control dispatches under
+		-- a PREFIXED key — "script__backspace", never "backspace". Prompting under
+		-- the bare key name wrote the URL to an entry nothing consults, so the
+		-- handler found an empty parameter and returned silently: the same inert
+		-- binding the prompt was added to prevent, one layer deeper.
+		local SC = helpers.load_with_stubs("modules.shortcuts.script_control")
+		helpers.assert_eq(type(SC.BINDING_PREFIX), "string",
+			"script_control must EXPORT the binding prefix. Re-spelling it in the menu is "
+				.. "precisely the drift that made the configured link unreadable")
+
+		local sc_src = helpers.read_driver_source("BINDING_PREFIX")
+		local dispatches = 0
+		for _ in sc_src:gmatch("dispatch_action%([^\n]-BINDING_PREFIX") do dispatches = dispatches + 1 end
+		helpers.assert_true(dispatches >= 6,
+			"every dispatch must build its binding from that same constant (found " .. dispatches
+				.. ") — a literal on either side of the store re-opens the drift")
+
+		local menu_src = helpers.read_driver_source("local function dyn_script_control")
+		helpers.assert_true(menu_src ~= nil, "menu_shortcuts source must be locatable")
+		local at = menu_src:find("prompt_action_parameter", 1, true)
+		helpers.assert_true(at ~= nil, "the prompt call must be locatable")
+
+		-- The call itself must pass a prefixed binding. Read from the call site
+		-- rather than the surrounding block: the fix is which ARGUMENT is passed,
+		-- and a window wide enough to catch the comment above it would pass on a
+		-- file where only the comment was updated.
+		local call = menu_src:sub(at, at + 160)
+		helpers.assert_true(call:find("prefix", 1, true) ~= nil,
+			"the picker must prompt under the prefixed binding key. Passing the bare keyname "
+				.. "stores the URL where nothing reads it, and AltGr+Backspace bound to "
+				.. "\"Ouvrir un lien\" simply does nothing when pressed")
+		helpers.assert_true(call:find("keyname", 1, true) ~= nil,
+			"and it must still identify WHICH key is being configured, so the three slots do "
+				.. "not share one parameter")
+
+		local decl = menu_src:find("local prefix = script_control.BINDING_PREFIX", 1, true)
+		helpers.assert_true(decl ~= nil and decl < at,
+			"and that prefix must come from script_control itself — the module that dispatches "
+				.. "under it — not from a literal repeated in the menu")
 	end)
 
 	helpers.it("does not assign when the prompt is declined", function()

@@ -90,7 +90,13 @@ SC00F Up:: TapHoldSyntheticKeyUp("LAlt")
 
 ; ======= 8.2) Generic — hold-modifier, any other tap =======
 
-#HotIf TapHoldTapAction(TapHold, "tab") != "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "tab") != "" and TapHoldTapAction(TapHold, "tab") != "" and not LayerEnabled
+; The gate deliberately does NOT require a configured tap action. The tray
+; picker offers the hold options independently of the tap, persists the choice
+; and puts a checkmark next to it — so requiring a tap here made « Natif / Rien »
+; + hold=<modifier> match no variant at all, and the hold the user just picked
+; did nothing. _TabDispatch below emits the native Tab when no action is
+; configured, so the tap keeps working too.
+#HotIf TapHoldTapAction(TapHold, "tab") != "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "tab") != "" and not LayerEnabled
 $SC00F:: {
 	ModKey := _TabHoldModKey()
 	HoldGuardMs := TapHoldDuration(TapHold, "tab") * 1100
@@ -124,7 +130,9 @@ $SC00F:: {
 
 ; ======= 8.3) Generic — hold-layer, any other tap =======
 
-#HotIf TapHoldTapAction(TapHold, "tab") != "alt_tab_monitor" and TapHoldHoldLayer(TapHold, "tab") != "" and TapHoldTapAction(TapHold, "tab") != "" and not LayerEnabled
+; No tap-action conjunct, for the reason given on block 8.2: a hold must arm on
+; the hold alone or the picker offers a choice the driver silently ignores.
+#HotIf TapHoldTapAction(TapHold, "tab") != "alt_tab_monitor" and TapHoldHoldLayer(TapHold, "tab") != "" and not LayerEnabled
 $SC00F:: {
 	tap := KeyWait("SC00F", "T" . TapHoldDuration(TapHold, "tab"))
 	if tap {
@@ -142,7 +150,19 @@ $SC00F:: {
 	}
 	ActivateLayer()
 	try {
-		KeyWait("SC00F", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+		; The cap is a failsafe for waits that hold a SYNTHETIC modifier Down: those
+		; must never latch it forever if the key-up event is lost. A hold LAYER holds no
+		; synthetic key, so there is nothing to latch. Applied verbatim, the cap simply
+		; dropped the layer out from under the user after five seconds of legitimate
+		; navigation, and base-layer letters then landed in the document until it
+		; re-armed. Re-arm the wait instead while the key is still physically down: every
+		; iteration stays bounded, which is the property test_hold_layer_release_bounded
+		; pins, and a timeout with the key already up means the key-up really was lost --
+		; exactly the case the failsafe exists for.
+		while !KeyWait("SC00F", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
+			if !GetKeyState("SC00F", "P")
+				break
+		}
 	} finally {
 		DisableLayer()
 	}
@@ -170,5 +190,15 @@ SC00F:: _TabDispatch()
 ; ======= 8.5) Tap dispatch =======
 
 _TabDispatch() {
+	local action := TapHoldTapAction(TapHold, "tab")
+	; No tap configured → native key behaviour, exactly as Escape, Enter,
+	; Backspace, Delete and Space do. Blocks 8.2/8.3 now arm on the hold alone,
+	; so without this branch « Natif / Rien » + hold=<modifier> would replace
+	; SC00F with a hotkey that swallows the Tab keystroke entirely instead of
+	; passing it through.
+	if (action == "") {
+		TapHoldDispatchTap("tab", TextPressKey.Bind("Tab", []))
+		return
+	}
 	_TapHoldFireAction("tab")
 }

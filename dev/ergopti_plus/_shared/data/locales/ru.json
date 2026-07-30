@@ -1,4 +1,4 @@
-﻿﻿{
+{
 	"_meta.flag": "🇷🇺",
 	"_meta.locale": "ru",
 	"_meta.name": "Русский",
@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "Название новой категории для %s:",
 	"metrics_apps.new_category_title": "Новая категория",
 	"metrics_apps.no_app_detected": "Не удалось обнаружить ни одного приложения.",
+	"metrics_apps.pick_app_placeholder": "Выберите приложение для классификации…",
 	"metrics_apps.rename_chooser_placeholder": "Категория для переименования",
 	"metrics_apps.rename_item": "✎ Переименовать существующую категорию…",
 	"metrics_apps.rename_prompt": "Новое название для категории «%s»:",
@@ -1415,7 +1416,7 @@
 	"sfbsreduction.comma": "Запятая уменьшает биграммы одного пальца",
 	"sfbsreduction.ecirc": "Ê уменьшает биграммы одного пальца",
 	"sfbsreduction.egrave": "È уменьшает биграммы одного пальца",
-	"sfbsreduction.ié": "IE уменьшает биграммы IE/EI",
+	"sfbsreduction.ieacute": "IE уменьшает биграммы IE/EI",
 	"sg_actions.activity_simulation": "🖱 Симулировать активность (анти-сон)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (монитор)",
 	"sg_actions.app_expose": "◱ Приложение Exposé",
@@ -1652,6 +1653,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = Открыть папку Загрузки",
 	"shortcuts.pixel_read_error": "Не удалось прочитать цвет пикселя",
 	"shortcuts.saved": "Сохранено: %s",
+	"shortcuts.screenshot_failed": "Не удалось сделать снимок экрана",
 	"shortcuts.screen": "Win + H (screensHot) = Снимок экрана (запускает Win + Shift + S)",
 	"shortcuts.screeninstant": "Клавиша слева от 1 = Мгновенный снимок активного окна, сохраняется в Изображения с меткой времени",
 	"shortcuts.screenocr": "Win + C (OCR) = Снимок экрана с извлечением текста (Win + Shift + T)",

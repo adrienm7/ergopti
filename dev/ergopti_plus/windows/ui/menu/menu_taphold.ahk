@@ -241,5 +241,5 @@ _TH_MakeHoldFn(KeyId, HoldOpt) {
 _TH_ReloadTapHoldMenu(Reason, KeyId := "") {
 	try LoggerInfo("TapHoldMenu", "Reloading script after '{1}' on key '{2}' (pid={3}, script={4}).",
 		Reason, KeyId, DriverPid, A_ScriptName)
-	Reload()
+	ReloadPreservingSuspend()
 }

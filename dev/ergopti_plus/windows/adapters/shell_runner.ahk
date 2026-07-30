@@ -53,9 +53,17 @@ global _SR_POLL_INTERVAL_MS := 100
 ; driver includes logger.ahk before it, but direct /validate with #Warn must not
 ; report LoggerError as an unassigned local.  Resolve the logger dynamically and
 ; keep OutputDebug as a non-throwing diagnostic fallback for standalone use.
+;
+; The resolution is a dynamic variable dereference, NOT Func("LoggerError").
+; In AHK v2 Func is the native CLASS, not a name-lookup built-in, so calling it
+; raises `ValueError: Invalid base` every single time — measured, not assumed.
+; That throw was caught by this helper's own try and fell through to
+; OutputDebug, which is invisible without a debugger attached. Every shell_runner
+; error the driver has ever produced was therefore discarded, including the ones
+; explaining why a shell-out failed.
 _SR_LogError(FormatString, Args*) {
 	try {
-		LoggerFn := Func("LoggerError")
+		LoggerFn := %"LoggerError"%
 		LoggerFn.Call("adapters.shell_runner", FormatString, Args*)
 	} catch as Err {
 		try OutputDebug("[adapters.shell_runner] " . Format(FormatString, Args*))
@@ -138,8 +146,13 @@ ShellRunner_Exec(Cmd) {
  * no native mechanism to intercept a subprocess's stdout mid-run without
  * COM-based pipe redirection, which would require a dedicated background thread.
  *
+ * Every argument must be single-line. The command is routed through cmd.exe /c
+ * for the stdout redirection, and cmd.exe terminates its /c command string at
+ * the first newline, so an Arg containing one truncates the whole invocation.
+ * start() rejects that case loudly rather than producing a pseudo-success.
+ *
  * @param {string}        Executable Absolute path to the binary (e.g. "C:\...\curl.exe").
- * @param {Array}         Args       Array of string arguments (no shell expansion).
+ * @param {Array}         Args       Array of single-line string arguments (no shell expansion).
  * @param {Func|unset}    OnDone     Completion callback: fn(exit_code, stdout, stderr).
  * @param {Func|unset}    OnChunk    Streaming callback (accepted but unused on AHK).
  * @return {Object}       Handle with start() and terminate() methods.
@@ -162,7 +175,19 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 	; than a raw CreateProcess argv split, and a backslash-quote escape was
 	; empirically swallowed by Run(), silently aborting the spawn entirely.
 	local inner_cmd := '"' . Executable . '"'
+	; Index of the first Arg carrying a newline, or 0 when every Arg is single-line.
+	; cmd.exe ends its /c command string at the first 0x0A, so such an Arg drops
+	; the redirection tail AND every argument after it — the target program is
+	; never launched at all, yet cmd.exe still exits 0 and the poller reads an
+	; absent temp file as an empty stdout. That is a clean-looking success no
+	; caller can distinguish from a real one (measured: the updater's staging
+	; worker took its failure branch on every attempt with exit 0 / stdout ""),
+	; so the transport's limit is enforced at the door instead (conventions 5.3).
+	; A caller with a multi-line payload must stage it to a file and pass a path.
+	local bad_arg_index := 0
 	for Arg in Args {
+		if (bad_arg_index = 0 and (InStr(Arg, "`n") or InStr(Arg, "`r")))
+			bad_arg_index := A_Index
 		inner_cmd .= ' "' . StrReplace(Arg, '"', '""') . '"'
 	}
 
@@ -188,6 +213,13 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 	; functions close over the enclosing locals the same way, so start()/
 	; terminate() are defined as ordinary nested functions instead.
 	_SR_HandleStart(*) {
+		; Refuse before anything is spawned: the caller gets a false it already
+		; has to handle, plus the one log line that names the real constraint.
+		if bad_arg_index {
+			_SR_LogError("spawn() refused for '{1}': argument {2} contains a newline. The cmd.exe /c transport truncates at the first newline, so the command would never run and its stdout would be silently lost — stage a multi-line payload to a file and pass the path instead.",
+				Executable, bad_arg_index)
+			return false
+		}
 		if started {
 			return true
 		}

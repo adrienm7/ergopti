@@ -1,36 +1,60 @@
 --- tests/unit/lib/test_perf.lua
 
 --- ==============================================================================
---- MODULE: perf Unit Tests
+--- MODULE: lib.perf contract
 --- DESCRIPTION:
---- Smoke tests for the performance instrumentation helper. The module is
---- loaded under the hs stub; these tests verify that the public API doesn't
---- raise and that disabled mode is a no-op.
+--- Asserts the profiling API the driver actually calls exists and behaves.
+---
+--- ROOT CAUSE ENCODED:
+--- This file previously asserted nothing. A pcall-guarded load wrapped the WHOLE
+--- file in a skip — so a module that stopped loading reported a passing test
+--- named "module not loadable — skipping" — and the only other case walked five
+--- optional names asserting each "if present", which passes when none is. Two
+--- shapes of test that cannot fail, guarding the one subsystem whose job is to
+--- tell us when something got slow.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-local ok, perf = pcall(helpers.load_with_stubs, "lib.perf")
-if not ok then
-	helpers.describe("lib.perf", function()
-		helpers.it("module not loadable under stub — skipping", function() end)
-	end)
-	return
-end
+-- The surface keymap/init.lua and the Hammerspoon console actually call, read
+-- from the module rather than invented. Named
+-- here so a rename has to update this list deliberately rather than silently
+-- reduce the test to nothing.
+local REQUIRED_API = { "set_enabled", "is_enabled", "now", "sample", "report", "report_all", "reset" }
 
-helpers.describe("lib.perf basic API", function()
-	helpers.it("module returns a table", function()
-		helpers.assert_true(type(perf) == "table")
+helpers.describe("lib.perf: the profiling API exists and is callable", function()
+
+	helpers.it("loads under the test stubs", function()
+		package.loaded["lib.perf"] = nil
+		local perf = helpers.load_with_stubs("lib.perf")
+		helpers.assert_type(perf, "table",
+			"a module that stops loading must fail here, not report a passing skip")
 	end)
 
-	helpers.it("has timing helpers (if present)", function()
-		-- These are optional; we just assert each named field, when present,
-		-- is callable. This makes the test resilient to minor API changes.
-		for _, name in ipairs({ "enable", "disable", "reset", "report", "report_all" }) do
-			local fn = perf[name]
-			if fn ~= nil then
-				helpers.assert_true(type(fn) == "function", name .. " should be a function")
-			end
+	helpers.it("exposes every function the driver calls", function()
+		package.loaded["lib.perf"] = nil
+		local perf = helpers.load_with_stubs("lib.perf")
+		for _, name in ipairs(REQUIRED_API) do
+			helpers.assert_type(perf[name], "function",
+				"lib.perf." .. name .. " is called by the driver; an 'if present' check would "
+				.. "pass against a module that exports none of them")
 		end
 	end)
+
+	helpers.it("the sample/report/reset lifecycle runs and the toggle is observable", function()
+		package.loaded["lib.perf"] = nil
+		local perf = helpers.load_with_stubs("lib.perf")
+		local ok, err = pcall(function()
+			perf.set_enabled(true)
+			helpers.assert_true(perf.is_enabled(), "set_enabled(true) must be observable")
+			local t0 = perf.now()
+			perf.sample("unit_test_segment", t0)
+			perf.report("unit_test_segment")
+			perf.reset("unit_test_segment")
+			perf.set_enabled(false)
+			helpers.assert_true(not perf.is_enabled(), "set_enabled(false) must be observable")
+		end)
+		helpers.assert_true(ok, "the profiler lifecycle must not raise: " .. tostring(err))
+	end)
+
 end)

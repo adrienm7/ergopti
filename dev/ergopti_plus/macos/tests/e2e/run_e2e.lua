@@ -170,6 +170,14 @@ local function make_vkb(trigger, replacement, opts)
 	-- backspace counts after the first expansion.
 	package.loaded["adapters.text_sender"]        = nil
 	package.loaded["adapters.clipboard"]          = nil
+	-- The terminator is no longer emitted inline by the expander: it is handed to
+	-- TerminatorReplay, which holds it until the replacement has provably landed.
+	-- That module is stateful (M.init refuses a second call, and it owns the
+	-- pending slot), so it belongs in this reload wave for the same reason
+	-- utils and text_sender do — a cached instance would keep the FIRST
+	-- scenario's CoreState and answer "has the replacement landed?" from a
+	-- ledger this scenario never wrote.
+	package.loaded["modules.keymap.terminator_replay"] = nil
 
 	-- One load_with_stubs call — establishes the canonical hs stub for this
 	-- scenario; all dependencies (registry, utils, terminators) cascade from
@@ -177,6 +185,9 @@ local function make_vkb(trigger, replacement, opts)
 	local Expander = helpers.load_with_stubs("modules.keymap.expander")
 	local Registry = require("modules.keymap.registry")
 	local text_utils = require("lib.text_utils")
+	-- Required from the SAME load wave as Expander so the harness drives the very
+	-- instance the expander armed — a second instance would hold an empty slot.
+	local TerminatorReplay = require("modules.keymap.terminator_replay")
 
 	-- Magic key sentinel — same value as the live driver.
 	local MAGIC_KEY = "\xe2\x98\x85"
@@ -186,6 +197,13 @@ local function make_vkb(trigger, replacement, opts)
 		buffer                     = "",
 		magic_key                  = MAGIC_KEY,
 		expected_synthetic_deletes = 0,
+		-- The two other synthetic ledgers TerminatorReplay consults. Present so the
+		-- replay gate reads the same shape of CoreState it sees in production
+		-- instead of falling back to `or 0` / `or ""` defaults — a stub that models
+		-- a narrower shape than the real object is how a guaranteed defect ships
+		-- green (see the hs.fs.dir stub lesson).
+		expected_synthetic_chars   = "",
+		expected_synthetic_pastes  = 0,
 		groups                     = {},
 		current_group              = "e2e",
 		-- Required by word_boundary_blocks: treat start-of-buffer as a word
@@ -231,7 +249,10 @@ local function make_vkb(trigger, replacement, opts)
 	hs_stub.eventtap.__reset()
 
 	-- Result cache populated by inject(); accessed by emitted() and backspaces().
-	local _result = { expanded = false, replacement = "", logical_bs = 0 }
+	-- terminator_held records the ORDERING guarantee: true when the terminator was
+	-- still pending in the replay gate at the moment the expansion returned, i.e.
+	-- it did NOT race ahead of the replacement.
+	local _result = { expanded = false, replacement = "", logical_bs = 0, terminator_held = false }
 
 	-- Feed the buffer into state, then fire try_expand with the terminator.
 	--
@@ -248,14 +269,30 @@ local function make_vkb(trigger, replacement, opts)
 	-- buffer starting right after the context_prefix position.
 	local function inject(buffer_text, terminator)
 		-- Reset from any previous scenario.
-		_result.expanded    = false
-		_result.replacement = ""
-		_result.logical_bs  = 0
+		_result.expanded        = false
+		_result.replacement     = ""
+		_result.logical_bs      = 0
+		_result.terminator_held = false
 
 		state.buffer = buffer_text
 		local fired = Expander.try_expand and (Expander.try_expand(terminator) == true)
 		if not fired then return end
 		_result.expanded = true
+
+		-- The expander no longer re-types a non-consumed terminator inline: it hands
+		-- it to TerminatorReplay, which withholds it until the synthetic-echo ledger
+		-- proves the replacement landed. This harness has no keyboard tap, so no echo
+		-- is ever drained and the gate would hold the terminator forever.
+		--
+		-- Record that it IS being held — that is the ordering guarantee the gate
+		-- exists to provide, and asserting it here is what stops this harness from
+		-- silently accepting a replay module that never emits at all — then release
+		-- it so the accounting below sees the same keystroke log the pre-gate
+		-- expander produced.
+		if TerminatorReplay.is_pending() then
+			_result.terminator_held = true
+			TerminatorReplay.flush_now("e2e harness: no keyboard tap, so no echo can be drained")
+		end
 
 		local raw_bs = 0
 		local found_term_in_keystrokes = false
@@ -347,7 +384,19 @@ local function make_vkb(trigger, replacement, opts)
 		return _result.logical_bs
 	end
 
-	return { inject = inject, emitted = emitted, backspaces = backspaces }
+	--- Returns true when the expansion left its non-consumed terminator pending in
+	--- the replay gate instead of emitting it inline — the ordering guarantee that
+	--- stops Enter submitting the pre-expansion line.
+	local function terminator_held()
+		return _result.terminator_held
+	end
+
+	return {
+		inject          = inject,
+		emitted         = emitted,
+		backspaces      = backspaces,
+		terminator_held = terminator_held,
+	}
 end
 
 
@@ -414,6 +463,13 @@ local function run_hardcoded_scenarios()
 		vkb1.inject("btw", " ")
 		assert_eq("scenario1 — basic expansion text", "by the way", vkb1.emitted())
 		assert_eq("scenario1 — basic expansion backspaces", 3, vkb1.backspaces())
+		-- Ordering guarantee (terminator-replay-gate): a non-consumed terminator must
+		-- be WITHHELD by the replay gate, never posted inline behind the replacement.
+		-- Enter and Tab travel as raw key events while the replacement travels through
+		-- the text-input pipeline, so an inline re-type reaches the host first and
+		-- submits the pre-expansion line. Asserting the hold here is what keeps this
+		-- harness honest about the gate instead of merely tolerating it.
+		assert_eq("scenario1 — terminator withheld by the replay gate", true, vkb1.terminator_held())
 	else
 		fail_count = fail_count + 1
 		print("  FAIL  scenario1 — setup: " .. tostring(vkb1))

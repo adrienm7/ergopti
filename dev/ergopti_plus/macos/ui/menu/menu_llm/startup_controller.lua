@@ -267,8 +267,15 @@ function M.new(ctx)
 				Logger.info(LOG, string.format("Requirements verified for %s.", state.llm_model))
 				if state.llm_backend == "mlx" and state.llm_enabled
 					and keymap and type(keymap.set_llm_enabled) == "function" then
-					Logger.debug(LOG, "Reactivating MLX predictions.")
-					pcall(keymap.set_llm_enabled, true)
+					-- Re-read the LIVE flag: the user may have turned AI off during the
+					-- seconds this check was in flight, and a late success that
+					-- re-enables it silently reverts their choice.
+					if state.llm_enabled then
+						Logger.debug(LOG, "Reactivating MLX predictions.")
+						pcall(keymap.set_llm_enabled, true)
+					else
+						Logger.debug(LOG, "MLX check succeeded but AI was turned off meanwhile — not re-enabling.")
+					end
 				end
 			end, disable_llm)
 		end
@@ -297,7 +304,11 @@ function M.new(ctx)
 					end
 					_startup_check_generation = _startup_check_generation + 1
 					Logger.info(LOG, string.format("Startup MLX backup check succeeded for %s.", state.llm_model))
-					if keymap and type(keymap.set_llm_enabled) == "function" then
+					-- Same live re-read as the primary path: the generation guard
+					-- catches a terminal outcome, not a user toggle.
+					if not state.llm_enabled then
+						Logger.debug(LOG, "Backup check succeeded but AI was turned off meanwhile — not re-enabling.")
+					elseif keymap and type(keymap.set_llm_enabled) == "function" then
 						pcall(keymap.set_llm_enabled, true)
 					end
 				end, function()

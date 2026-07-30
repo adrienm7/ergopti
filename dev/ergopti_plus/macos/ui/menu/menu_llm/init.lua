@@ -186,6 +186,13 @@ end
 function M.terminate_helper_processes()
 	pcall(hs.execute, "pkill -f 'ergopti_plus_expander'", true)
 	pcall(hs.execute, "pkill -f 'ergopti_plus_http_server'", true)
+	-- The `ollama serve` wrapper this driver launches is a third helper and was
+	-- not on this list. It is spawned through a /bin/sh pipeline, so terminating
+	-- the hs.task only reaps the shell — the server itself survived every quit
+	-- path and kept appending to the Ergopti log after Hammerspoon was gone.
+	-- Matched on the same shape api_ollama uses to kill a stale one at launch, so
+	-- the two agree on what "our ollama serve" means.
+	pcall(hs.execute, "pkill -f '[o]llama serve'", true)
 end
 
 --- Kills any orphan mlx_lm.server and frees its listening port. stop_mlx_server()

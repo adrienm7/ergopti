@@ -149,8 +149,35 @@ ReadPersonalToml() {
 		. '(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?'
 		. '(?:\s*,\s*priority\s*=\s*([0-9]+))?\s*\}'
 
+	; Guarded. An unguarded FileRead here threw out of the boot loader (personal
+	; hotstrings simply vanished for the session) and out of the menu handlers
+	; that call this at click time. Worse, the empty Result it would otherwise
+	; produce is indistinguishable from a user with no personal hotstrings — and
+	; WritePersonalToml serializes from exactly that shape, so a transient lock
+	; could be turned into permanent deletion by the next edit.
+	;
+	; The unreadable-file sentinel is the same one the config readers use, so the
+	; writer can ask rather than guess.
+	Raw := ""
+	global _TomlUnreadableFiles
+	try {
+		Raw := FileRead(FilePath, "UTF-8")
+	} catch as Err {
+		_TomlUnreadableFiles[FilePath] := true
+		try LoggerError("PersonalToml", "Cannot read '{1}': {2}. No personal hotstrings are loaded this session, and writes to this file are blocked so the empty result cannot replace its contents.", FilePath, Err.Message)
+		return Result
+	}
+	; Lower the latch the catch above raises. It is keyed by PATH in a
+	; process-wide Map, and the only other code that clears it is ReadTomlFile —
+	; which is never reached for this path when every personal section is
+	; disabled. So one transient boot lock blocked EVERY personal-hotstrings save
+	; for the rest of the session, even though this very reader had since
+	; succeeded and _ReadPersonalTomlCache held the user's real model. The reader
+	; that raises the latch has to be the reader that lowers it.
+	if (IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath))
+		_TomlUnreadableFiles.Delete(FilePath)
 	; Normalise to LF so every line ends cleanly — eliminates CRLF anchor bugs
-	FileContent := StrReplace(FileRead(FilePath, "UTF-8"), "`r`n", "`n")
+	FileContent := StrReplace(Raw, "`r`n", "`n")
 	FileContent := StrReplace(FileContent, "`r", "`n")
 
 	; ── Extract sections_order directly from raw content ──
@@ -256,9 +283,19 @@ ReadPersonalToml() {
 ; Writes [_meta], [_meta.sections], then all [[section]] blocks.
 WritePersonalToml(Data) {
 	global _ReadPersonalTomlCache, _HS_GrandTotalCache
+	FilePath := PersonalTomlPath()
+	; Refuse while the file is flagged unreadable. Data is built from what
+	; ReadPersonalToml returned, and a failed read returns an EMPTY model that
+	; looks exactly like "this user has no personal hotstrings" — serializing it
+	; would replace the whole file with an empty one. The flag is cleared by any
+	; successful read of the same path, so this unblocks itself as soon as the
+	; transient lock clears and something re-reads.
+	if (IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath)) {
+		try LoggerError("PersonalToml", "Refusing to write '{1}': it could not be read, so the model in memory is empty rather than the user's hotstrings. Reopen the editor once the file is readable.", FilePath)
+		return false
+	}
 	_ReadPersonalTomlCache := false ; Invalidate
 	_HS_GrandTotalCache := -1
-	FilePath := PersonalTomlPath()
 	; The two lines above evict only this module's editor-model cache. The engine
 	; loader (LoadHotstringsSection) and the prefix-watcher read personal hotstrings
 	; through the raw-content _TomlFileCache, which they do NOT touch. Without this
@@ -365,12 +402,28 @@ ReadPersonalInfoToml(FilePath) {
 		return
 	}
 
+	global _TomlUnreadableFiles
 	try {
 		FileContent := FileRead(FilePath, "UTF-8")
 	} catch as e {
-		LoggerError("hotstrings", "Could not read personal info TOML '{1}': {2}.", FilePath, e.Message)
+		; Latch the failure the way the personal_hotstrings.toml sibling above
+		; already does. The placeholder identity left in PersonalInformation
+		; ("Prénom", "FR00 0000 …", "1234 5678 9012 3456", "1 99 99 99 999 999
+		; 99") is byte-for-byte what a user who never filled the form produces,
+		; so WritePersonalInfoToml cannot tell the two apart at write time — and
+		; by then the transient lock has cleared, so every write-time re-check
+		; would pass. Without the latch, opening the editor once and clicking OK
+		; overwrites the user's real IBAN, card number and SSN with the shipped
+		; placeholders, unrecoverably.
+		if IsSet(_TomlUnreadableFiles)
+			_TomlUnreadableFiles[FilePath] := true
+		LoggerError("hotstrings", "Could not read personal info TOML '{1}': {2}. Writes to this file are blocked so the placeholder identity cannot replace its contents.", FilePath, e.Message)
 		return
 	}
+	; The read succeeded: the in-memory identity is the user's again, so the
+	; writer may run. Same lower-what-you-raise rule as ReadPersonalToml.
+	if (IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath))
+		_TomlUnreadableFiles.Delete(FilePath)
 	NextInformation := PersonalInformation.Clone()
 	NextLetters := Map()
 	SawLetters := false
@@ -425,6 +478,18 @@ ReadPersonalInfoToml(FilePath) {
 ; Serialise PersonalInformation and PersonalInformationLetters to personal_info.toml.
 WritePersonalInfoToml(FilePath) {
 	global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
+	; Refuse while the file is flagged unreadable, exactly as WritePersonalToml
+	; does for personal_hotstrings.toml. A failed read leaves the compiled-in
+	; placeholder identity in memory, and this writer serialises EVERY key of
+	; PersonalInformation / PersonalInformationLetters over the file — so one
+	; transient lock at boot plus one visit to the editor destroys the user's
+	; real name, address, IBAN, card number and social-security number.
+	; EnsurePersonalInfoTomlFile only writes when the file does NOT exist, so
+	; this guard cannot block first-install materialisation.
+	if (IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath)) {
+		try LoggerError("PersonalToml", "Refusing to write '{1}': it could not be read, so the identity in memory is the shipped placeholder rather than the user's. Reopen the editor once the file is readable.", FilePath)
+		return False
+	}
 	_ReadPersonalInfoTomlCache := false ; Invalidate
 	Q := Chr(34)
 	Lines := []
@@ -496,6 +561,15 @@ ArrayJoin(Arr, Sep) {
 	return Out
 }
 
+; Coalescing delay before the preview index is rebuilt after a live reload.
+; Negative-period SetTimer with the same function object RE-ARMS rather than
+; queueing, so the webview save path — which reloads every edited section in a
+; loop — pays for exactly ONE rebuild instead of one per section. The rebuild
+; costs ~150 ms warm and far more on a cold TOML read, so it also belongs off
+; the save handler's synchronous path: the editor window closes immediately and
+; the index catches up a fraction of a second later.
+global HS_PERSONAL_RELOAD_INDEX_DELAY_MS := 120
+
 ; Re-register all hotstrings in a given section from the current TOML data.
 ; Called after save so new/edited entries are immediately active.
 ReloadPersonalSection(Data, SectionName, FeatureConfig) {
@@ -533,6 +607,21 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
 	; "Category"/"Section" (Meta.Category . "." . Meta.Section).
 	Group := "personal." . SectionName
 	HSE_ClearGroupForReload(Group)
+	; Resolve the expansion delay through the SAME cascade LoadHotstringsSection
+	; uses at boot (toml_loader.ahk). This used to be a hardcoded 0, and 0 is a
+	; legal value that DISABLES the time gate — so saving anything from the
+	; editor silently removed the 0.75 s window every personal spec is registered
+	; with at boot, for the rest of the session. The tooltip kept dequeueing its
+	; row at the resolved delay while the engine had stopped enforcing it, so the
+	; preview and the engine permanently disagreed about the expansion window.
+	ResolvedDelay := 0
+	try {
+		Resolved := HotstringsResolve("personal", SectionName)
+		if (Resolved.Delay != "")
+			ResolvedDelay := Resolved.Delay
+	} catch as DelayErr {
+		try LoggerWarn("PersonalToml", "Could not resolve the expansion delay for section '{1}': {2}. Registering without a time gate.", SectionName, DelayErr.Message)
+	}
 	for E in Data["sections"][SectionName]["entries"] {
 		Trigger := StrReplace(E["trigger"], "★", ScriptInformation["MagicKey"])
 		Output := E["output"]
@@ -555,7 +644,7 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
 			? E["priority"]
 			: _HSE_SourcePriority("personal")
 		Options := Map(
-			"TimeActivationSeconds", 0,
+			"TimeActivationSeconds", ResolvedDelay,
 			"FinalResult", E["final_result"],
 			"Category", "personal",
 			; Without this, HSE_Register's Group derivation requires BOTH
@@ -567,5 +656,30 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
 			"Priority", EntryPriority,
 		)
 		HSE_RegisterFromTomlFlags(E["is_case_sensitive"], Flags, Trigger, Output, Options)
+	}
+	; The engine registry has just been rewritten in place, and the tooltip's
+	; preview index has NOT — it still holds whatever the last full rebuild put
+	; there. Without this the editor's Save left the two describing different
+	; hotstrings: typing "zz" advertised the pre-edit expansion while typing the
+	; final character emitted the new one, and a DELETED trigger was worse still
+	; (the preview kept offering it, and _PreviewEngineWouldFire fails OPEN for a
+	; trigger it can no longer find in the registry).
+	;
+	; The resync belongs HERE rather than in the two save handlers: this is the
+	; function that mutates the engine registry, so pairing the two makes the
+	; guarantee hold for every caller instead of for the callers someone
+	; remembered. RebuildHotstringsLive (ui/menu/menu_rebuild.ahk) is the sibling
+	; that already pairs them; the editor path was the one that was forgotten.
+	global HS_PERSONAL_RELOAD_INDEX_DELAY_MS
+	if IsSet(HotstringPrefixWatcherRebuildIndex) {
+		try {
+			SetTimer(HotstringPrefixWatcherRebuildIndex, -HS_PERSONAL_RELOAD_INDEX_DELAY_MS)
+			try LoggerDebug("PersonalToml", "Preview-index resync armed after reloading '{1}'.", SectionName)
+		} catch as ResyncErr {
+			; A silent failure here is exactly the bug this pairing exists to
+			; prevent, so it must name itself rather than leave the two sides
+			; diverged with no trace.
+			try LoggerError("PersonalToml", "Could not arm the preview-index resync after reloading '{1}': {2}", SectionName, ResyncErr.Message)
+		}
 	}
 }

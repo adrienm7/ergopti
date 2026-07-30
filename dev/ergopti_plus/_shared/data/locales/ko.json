@@ -1,4 +1,4 @@
-﻿﻿{
+{
 	"_meta.flag": "🇰🇷",
 	"_meta.locale": "ko",
 	"_meta.name": "한국어",
@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "%s의 새 카테고리 이름:",
 	"metrics_apps.new_category_title": "새 카테고리",
 	"metrics_apps.no_app_detected": "앱을 감지할 수 없었습니다.",
+	"metrics_apps.pick_app_placeholder": "분류할 응용 프로그램 선택…",
 	"metrics_apps.rename_chooser_placeholder": "이름을 바꿀 카테고리",
 	"metrics_apps.rename_item": "✎ 기존 카테고리 이름 변경…",
 	"metrics_apps.rename_prompt": "카테고리 \"%s\"의 새 이름:",
@@ -1415,7 +1416,7 @@
 	"sfbsreduction.comma": "쉼표가 같은 손가락 바이그램을 줄입니다",
 	"sfbsreduction.ecirc": "Ê가 같은 손가락 바이그램을 줄입니다",
 	"sfbsreduction.egrave": "È가 같은 손가락 바이그램을 줄입니다",
-	"sfbsreduction.ié": "IE가 IE/EI 바이그램을 줄입니다",
+	"sfbsreduction.ieacute": "IE가 IE/EI 바이그램을 줄입니다",
 	"sg_actions.activity_simulation": "🖱 활동 시뮬레이션 (절전 방지)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (모니터)",
 	"sg_actions.app_expose": "◱ 앱 Exposé",
@@ -1652,6 +1653,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = 다운로드 폴더 열기",
 	"shortcuts.pixel_read_error": "픽셀 색상을 읽을 수 없습니다",
 	"shortcuts.saved": "저장됨: %s",
+	"shortcuts.screenshot_failed": "스크린샷 실패",
 	"shortcuts.screen": "Win + H (screensHot) = 화면 캡처 (Win + Shift + S 실행)",
 	"shortcuts.screeninstant": "1 왼쪽 키 = 활성 창의 즉시 캡처, 타임스탬프와 함께 사진에 저장",
 	"shortcuts.screenocr": "Win + C (OCR) = 텍스트 추출 스크린샷 (Win + Shift + T)",

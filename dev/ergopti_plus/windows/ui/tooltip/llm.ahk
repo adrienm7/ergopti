@@ -226,6 +226,17 @@ LLM_TooltipHide(accepted := false) {
 
 LLM_TooltipGetText() {
 	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx
+	; Reachable from a PARSE-TIME #HotIf (`Tab::` in menu_llm/tab_accept.ahk),
+	; which is armed before this module's globals are assigned. Bundle_Init's
+	; RunWait extraction pumps messages, so a Tab pressed during the ~250 ms
+	; unzip evaluates that #HotIf and lands here with all three still unset:
+	; the bare read raised UnsetError inside the evaluator, _DriverBootPhase was
+	; still "starting", and the boot was killed. Guarded rather than seeded in
+	; the pre-pump block so every future caller is covered too, and placed above
+	; the Critical so the unset path takes no lock. The sibling
+	; LLM_TooltipIsVisible already guards; this one did not.
+	if (!IsSet(_LLM_Tooltip_Visible) or !IsSet(_LLM_Tooltip_Slots) or !IsSet(_LLM_Tooltip_ActiveIdx))
+		return ""
 	; Critical serialises the multi-variable read against the timer callbacks
 	; that write _LLM_Tooltip_Visible / _LLM_Tooltip_Slots. Without it the
 	; #HotIf evaluator (a separate low-priority thread) can see Visible=true
@@ -883,6 +894,12 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration) {
         return false
     Row := Rows[1]
     _TooltipTimerGeneration := RenderGeneration
+    ; The LLM path presents the same stack as the hotstring path but had no
+    ; Present segment of its own, so a slow prediction render was invisible while
+    ; the identical work on the preview path was reported. Draining the sub-step
+    ; attribution here is also what stops _TooltipPresentStack's marks leaking
+    ; into whichever segment happens to be measured next.
+    _hpLlmPresent := HotPath_Now()
     try {
         _TooltipPresentStack(Pos, Row, true)
     } catch {
@@ -890,6 +907,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration) {
             TooltipHide("LlmPresentFail", true)
         return false
     }
+    HotPath_LogIfSlow("Tooltip.LlmPresent", _hpLlmPresent, HotPath_BreakdownDetail())
     if (RenderGeneration != _TooltipGeneration)
         return false
     return true

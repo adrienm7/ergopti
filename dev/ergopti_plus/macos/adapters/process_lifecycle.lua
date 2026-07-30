@@ -84,7 +84,7 @@ end
 --- @param callback function Called with (appName: string, appObject: userdata).
 function M.onAppActivate(callback)
 	if type(callback) ~= "function" then
-		Logger.warn(LOG, "onAppActivate(): argument is not a function â€” ignored.")
+		Logger.warn(LOG, "onAppActivate(): argument is not a function — ignored.")
 		return
 	end
 	_activate_callbacks[#_activate_callbacks + 1] = callback

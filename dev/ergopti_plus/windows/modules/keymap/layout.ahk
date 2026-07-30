@@ -413,11 +413,19 @@ AppState_TouchLastSentKey(Character) {
 ; drained — restoring strict per-key ordering. Same SendEvent semantics
 ; (``{Blind}`` / AltGr / modifiers unchanged); only ordering is enforced. There is
 ; NO Sleep on this path, so Critical's guarantee holds (a Sleep would yield it).
+; Profiled because this is the FIRST stage of every remapped keystroke and the
+; only one that had no segment at all: an "OnChar" line that looked slow could
+; equally have been a slow SendEvent that had already finished before OnChar
+; started, and nothing in the log distinguished the two. Two QPC reads, and the
+; WARNING path only runs above the 5 ms floor. LoggerWarn queues the line rather
+; than writing it, so the Critical section below never performs file I/O.
 _RemapEmit(SendStr, KeyChar, *) {
+	_hpEmit := HotPath_Now()
 	Critical("On")
 	SendEvent(SendStr)
 	if _EmitReachedScreen()
 		UpdateLastSentCharacter(KeyChar)
+	HotPath_LogIfSlow("RemapEmit", _hpEmit, KeyChar)
 }
 
 ; False while a dead-key InputHook is armed. That hook runs with VisibleText at
@@ -442,9 +450,38 @@ _RemapEmit(SendStr, KeyChar, *) {
 ; emitting its own result but leaves the sequence flag set until afterwards, so
 ; gating on the flag would suppress the push for the one character that IS
 ; visible.
+; THREE hooks share this shape, not one. The dead-key hook was the one the
+; original probe used, but _OneShotShiftInputHook and _SpaceHoldInputHook are
+; both armed "L1" with VisibleText off and consume the character an emit just
+; produced in exactly the same way. Tap RCtrl for a one-shot shift and type "a":
+; the ring recorded "a" (dead-key hook empty, so the old check passed), the armed
+; OSS hook ate that "a", and OneShotShift emitted and recorded "A" — two ring
+; entries for one visible capital.
+;
+; Enumerated as a list rather than a chain of ors so a fourth suppressive hook
+; is a one-line addition next to its siblings, and so the regression test can
+; require every _*InputHook global in the driver to appear here.
+global _EMIT_SUPPRESSING_HOOKS := ["_DeadKeyInputHook", "_OneShotShiftInputHook", "_SpaceHoldInputHook"]
+
+; Capture hooks that deliberately do NOT suppress, listed so every hook in the
+; driver is accounted for in exactly one of the two sets and a new one cannot
+; quietly default to "harmless". The prefix watcher is armed "V L0 I1": the V
+; makes its text VISIBLE, so it observes the keystream instead of eating it, and
+; a character it sees still reaches the application. Adding it to the set above
+; would suppress every ring push for the entire life of the driver.
+global _EMIT_NONSUPPRESSING_HOOKS := ["_PrefixInputHook"]
+
 _EmitReachedScreen() {
-	global _DeadKeyInputHook
-	return !IsSet(_DeadKeyInputHook) or _DeadKeyInputHook == ""
+	global _EMIT_SUPPRESSING_HOOKS
+	for HookName in _EMIT_SUPPRESSING_HOOKS {
+		; Read through the global namespace: these hooks live in three different
+		; modules and only one of them is this file's own.
+		if !IsSet(%HookName%)
+			continue
+		if (%HookName% != "")
+			return false
+	}
+	return true
 }
 
 ; Win + remapped-L locks the workstation. Locking is a focus-destroying,
@@ -460,7 +497,16 @@ _EmitReachedScreen() {
 _LockWorkstationEmit(*) {
 	Critical("On")
 	DllCall("LockWorkStation")
-	HSE_FeedReset(false)
+	; IsPhysical=true. Locking is a real, user-initiated event, but the default
+	; false makes HSE_FeedReset a NO-OP whenever HSE_Suppressed is non-zero —
+	; that is, whenever Win+L lands inside the ~60 ms post-expansion suppress
+	; window, which is exactly when a lock is most likely to follow a burst of
+	; typing. The preview was wiped unconditionally on the line below, so the
+	; two buffers ended up disagreeing across the lock: stale left-context
+	; survived unlock and the first expansion afterwards backspaced into
+	; unrelated text. Every other genuinely-physical reset site passes true for
+	; the same reason.
+	HSE_FeedReset(false, true)
 	if IsSet(_ResetPrefixBuffer)
 		_ResetPrefixBuffer()
 }
@@ -549,12 +595,105 @@ global UIA_SELECTION_IDLE_REQUIRED_MS := 250
 ; large document selection monopolise the keyboard/message thread.
 global UIA_SELECTION_MAX_TEXT_CHARS := 8192
 
+; Deadline for the WHOLE probe, not for one COM call. The timeout clamp below
+; bounds each individual call; this bounds their SUM, because a provider that
+; answers just under the per-call limit on each of five hops still owns the
+; keystroke-dispatch thread for a multiple of it. Measured 2026-07-29: one tick
+; reached 301.0 ms, i.e. past Windows' ~300 ms LowLevelHooksTimeout, where the
+; keystroke is delivered WITHOUT the hook's verdict — silent data loss, not a slow
+; feel. Chosen well under that ceiling while still leaving room for a healthy
+; probe (mean 14.3 ms over 2993 measured round trips).
+global UIA_SELECTION_SEGMENT_BUDGET_MS := 60
+
+; Inputs of the last probe. A selection cannot appear unless the FOCUS moved or
+; the user touched the input stream, so a probe whose inputs are identical to the
+; previous one can only produce the previous answer. Skipping those removed the
+; bulk of the round trips on an idle machine (~80 % of ticks exceeded the 5 ms
+; hot-path threshold before this gate). 0 means "no probe yet".
+global _UIA_LastProbeHwnd := 0
+global _UIA_LastProbeIdleEpoch := 0
+
+; Bound UIA's own waits before this poll makes its first COM round-trip.
+;
+; The library ships Windows' defaults — 2000 ms TransactionTimeout, 20000 ms
+; ConnectionTimeout — and the driver's worst measured stall (2560 ms, logged as
+; "Slow Tooltip.ResolvePos: 2560.32 ms") is exactly that 2000 ms plus overhead.
+; This poll fires twice a second, unattended, on the SAME message thread that
+; dispatches keystrokes, so an unresponsive provider blocks typing for as long
+; as Windows lets it. The idle gate below decides whether to START the round
+; trip; it does nothing at all about how long the round-trip may then take.
+;
+; Kept module-local, mirroring _SFD_ClampUiaTimeouts in the secure-field adapter
+; and _TooltipClampUiaTimeouts in ui/tooltip. A single shared helper would be
+; tidier, but the three owners sit in three layers that must not depend on each
+; other (an adapter may not reach into ui/, a module may not reach into an
+; adapter for a UI concern), and the driver's headless test runner loads those
+; trees selectively — a helper hoisted into any one of them would break the load
+; of the others. All three write the same two process-wide singleton properties
+; and are one-shot, so whichever probe touches UIA first wins and the rest are
+; no-ops; what matters is only that no probe can reach the COM call unclamped.
+; @returns {void}
+_UIA_ClampSelectionTimeouts() {
+	global UIA_TRANSACTION_TIMEOUT_MS, UIA_CONNECTION_TIMEOUT_MS
+	static Clamped := false
+	; Throttles the diagnostics below to one line per process. This runs twice a
+	; second, so an unthrottled warning would itself become the flood it exists to
+	; report.
+	static Warned := false
+	if Clamped
+		return
+	if !IsSet(UIA)
+		return
+	if (!IsSet(UIA_TRANSACTION_TIMEOUT_MS) or !IsSet(UIA_CONNECTION_TIMEOUT_MS)) {
+		if !Warned {
+			Warned := true
+			try LoggerWarn("Layout", "UIA timeout constants are unavailable — the selection poll would run against Windows' 2000 ms default; skipping the clamp.")
+		}
+		return
+	}
+	; Both properties are IUIAutomation2 vtable slots; an older interface must not
+	; throw into this callback, which shares the keystroke-dispatch thread.
+	Supported := false
+	try Supported := UIA.IsIUIAutomation2Available ? true : false
+	if !Supported {
+		; Latch: there is nothing to retry on an older interface. But SAY so — the
+		; poll now runs against Windows' 2000 ms transaction default, and the
+		; caller's own comment promises the round trip is bounded before it starts.
+		Clamped := true
+		if !Warned {
+			Warned := true
+			try LoggerWarn("Layout", "IUIAutomation2 is unavailable — the selection poll runs against Windows' 2000 ms transaction default and cannot be bounded here.")
+		}
+		return
+	}
+	; Latch only once the writes have LANDED. Setting the flag before attempting
+	; them meant a failed write left the driver believing it was clamped, for the
+	; whole session, with two bare `try`s swallowing the reason (conventions 5.3).
+	; That is the exact state behind the worst stall this driver ever logged.
+	Ok := true
+	try UIA.TransactionTimeout := UIA_TRANSACTION_TIMEOUT_MS
+	catch
+		Ok := false
+	try UIA.ConnectionTimeout := UIA_CONNECTION_TIMEOUT_MS
+	catch
+		Ok := false
+	if Ok {
+		Clamped := true
+		return
+	}
+	if !Warned {
+		Warned := true
+		try LoggerWarn("Layout", "Could not apply the UIA timeout clamp — the selection poll is NOT bounded; retrying on the next tick.")
+	}
+}
+
 ; Background timer to poll the current UIA selection. Moves the expensive
 ; COM round-trip off the synchronous keyboard path (uia-selection-blocks-keyboard-thread).
 _UIA_SelectionPollTick() {
 	global _UIA_SelectionCache, UIA, _UIA_NO_TP_CACHE, _UIA_NO_TP_TTL_MS
 	global UIA_SELECTION_IDLE_REQUIRED_MS, UIA_SELECTION_MAX_TEXT_CHARS
 	global _DriverBootPhase
+	global _UIA_LastProbeHwnd, _UIA_LastProbeIdleEpoch, UIA_SELECTION_SEGMENT_BUDGET_MS
 	; No UIA/COM work before the driver is ready. This timer is armed at include
 	; position, so without this gate it fires several times during the multi-second
 	; RegisterAllHotstrings boot phase — each tick doing out-of-proc STA COM round-trips
@@ -587,9 +726,39 @@ _UIA_SelectionPollTick() {
     ; starting new COM work until the input stream has been quiet long enough.
     if (A_TimeIdlePhysical < UIA_SELECTION_IDLE_REQUIRED_MS)
         return
+    ; Nothing can have changed since the last probe unless the FOCUS moved or the
+    ; user touched the input stream, and a selection cannot appear without one of
+    ; those. So once a probe has answered "no selection" for this window, repeating
+    ; it every 500 ms on an idle machine buys nothing and costs a cross-process COM
+    ; round trip on the thread that dispatches keystrokes. Measured over one
+    ; 31-minute session before this gate: 2993 round trips exceeded 5 ms, mean
+    ; 14.3 ms, worst 301.0 ms — past Windows' ~300 ms LowLevelHooksTimeout, where
+    ; the keystroke is delivered WITHOUT the hook's verdict.
+    ;
+    ; The skip is released by either signal, so correctness is preserved: making a
+    ; selection IS physical input, which resets A_TimeIdlePhysical and therefore
+    ; the epoch below. It only suppresses probes whose inputs are provably
+    ; identical to the previous one.
+    ActiveHwnd := WinExist("A")
+    ; A_TimeIdlePhysical counts DOWN from the last input, so the moment of that
+    ; input is what identifies the input stream's state, not the idle time itself.
+    IdleEpoch := A_TickCount - A_TimeIdlePhysical
+    if (_UIA_LastProbeHwnd == ActiveHwnd and _UIA_LastProbeIdleEpoch == IdleEpoch
+        and !IsObject(_UIA_SelectionCache))
+        return
+    _UIA_LastProbeHwnd := ActiveHwnd
+    _UIA_LastProbeIdleEpoch := IdleEpoch
     if (!IsSet(UIA))
         return
+    ; Bound the round-trip BEFORE making it. The gate above only decides whether
+    ; to start; without this the wait itself is unbounded, and a keystroke
+    ; arriving one millisecond later queues behind it on this same thread.
+    _UIA_ClampSelectionTimeouts()
 
+    ; This tick is the driver's only unattended repeating COM round-trip. It was
+    ; the one probe with no hot-path segment at all, so a provider that answered
+    ; slowly showed up in the logs as an unexplained gap rather than as itself.
+    _hpPoll := HotPath_Now()
     try {
         ProcName := ""
         try ProcName := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
@@ -604,16 +773,39 @@ _UIA_SelectionPollTick() {
             return
         }
 
+        ; Deadline for the WHOLE probe, checked between hops. The timeout clamp
+        ; above bounds each individual COM call, so a provider that answers just
+        ; under the per-call limit five times over still owns this thread for a
+        ; multiple of it — which is how a single tick reached 301.0 ms, past
+        ; Windows' ~300 ms LowLevelHooksTimeout. Abandoning mid-probe yields "no
+        ; selection", the same safe fallback every other early exit takes.
+        Deadline := Now + UIA_SELECTION_SEGMENT_BUDGET_MS
+
         el := UIA.GetFocusedElement()
         if !el.IsTextPatternAvailable {
             _UIA_NO_TP_CACHE[ProcName] := Now + _UIA_NO_TP_TTL_MS
 			_UIA_SelectionCache := 0
             return
         }
+        if (A_TickCount > Deadline) {
+            try LoggerWarn("Layout", "UIA selection probe abandoned after the focused element: {1} ms budget exceeded on the keystroke thread.", UIA_SELECTION_SEGMENT_BUDGET_MS)
+			_UIA_SelectionCache := 0
+            return
+        }
 
         tp := el.GetPattern("Text")
+        if (A_TickCount > Deadline) {
+            try LoggerWarn("Layout", "UIA selection probe abandoned after the text pattern: {1} ms budget exceeded on the keystroke thread.", UIA_SELECTION_SEGMENT_BUDGET_MS)
+			_UIA_SelectionCache := 0
+            return
+        }
         ranges := tp.GetSelection()
         if (ranges.Length > 0) {
+            if (A_TickCount > Deadline) {
+                try LoggerWarn("Layout", "UIA selection probe abandoned before reading the selection: {1} ms budget exceeded on the keystroke thread.", UIA_SELECTION_SEGMENT_BUDGET_MS)
+				_UIA_SelectionCache := 0
+                return
+            }
             Text := ranges[1].GetText(UIA_SELECTION_MAX_TEXT_CHARS)
             ; Blank-only selections (newlines) are not meaningful to wrap
             if (Text != "" and !RegExMatch(Text, "^(\r\n|\r|\n)+$")) {
@@ -632,6 +824,11 @@ _UIA_SelectionPollTick() {
         ; provider is diagnosable (uia-error-swallowed-silently). The poll then
         ; degrades to "no selection" below, which is the safe fallback.
         try LoggerWarn("Layout", "UIA selection probe failed: {1}.", e.Message)
+    } finally {
+        ; finally, not a trailing statement: the block above returns from four
+        ; places, and a segment that is only closed on the fall-through path
+        ; would silently stop measuring the exact cases that are slow.
+        HotPath_LogIfSlow("UIA.SelectionPoll", _hpPoll, "")
     }
 	_UIA_SelectionCache := 0
 }
@@ -711,17 +908,26 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 				; nothing — so degrade to the bare symbol instead of swallowing the
 				; keystroke entirely (the selection is untouched in the app since ^v
 				; never fired, exactly like the no-selection path below).
+				; SendNewResult records the character it sent, under the same
+				; reached-the-screen gate as every other emit. Recording here too
+				; pushed it twice and shifted every GetLastSentCharacterAt(-N)
+				; lookup by one. SendInstant, in contrast, does NOT record — so
+				; the explicit push belongs only to its success branch.
 				if !SendInstant(LeftSymbol Selection RightSymbol)
 					SendNewResult(Symbol)
-				UpdateLastSentCharacter(Symbol)
+				else
+					UpdateLastSentCharacter(Symbol)
 				return
 			}
 		} finally {
 			Critical(_WrapCrit)
 		}
 	}
-	SendNewResult(Symbol) ; SendEvent({Text}) doesn't work everywhere, for example in Google Sheets
-	UpdateLastSentCharacter(Symbol)
+	; SendEvent({Text}) doesn't work everywhere, for example in Google Sheets.
+	; No UpdateLastSentCharacter after it: SendNewResult already records the
+	; character it sent, and doing it again here pushed one visible character
+	; into the ring twice.
+	SendNewResult(Symbol)
 }
 
 
@@ -798,7 +1004,11 @@ SC00D:: _DigitShiftSend("=")
 _DigitRowDown(Digit, *) {
 	Critical("On")
 	SendEvent("{" Digit " Down}")
-	UpdateLastSentCharacter(Digit)
+	; Same rule as _RemapEmit and _DigitShiftSend ten lines below, which this
+	; sibling was left out of: an armed suppressing hook eats this character, so
+	; it must not be recorded as having reached the screen.
+	if _EmitReachedScreen()
+		UpdateLastSentCharacter(Digit)
 }
 _DigitRowUp(Digit, *) {
 	Critical("On")
@@ -972,21 +1182,42 @@ RegisterCapsLockLayer()
 ; base-row entries bind it — so it releases Critical itself around its clipboard
 ; round-trip. The old note here claimed the exemption came from a Sleep; there is
 ; no Sleep any more, but ClipboardAll() blocks just as effectively.
-_RollEmitCritical(Text, Record := "") {
+; The Record parameter is gone. SendNewResult already records the last character
+; of what it sent, so every caller that also passed Record pushed the SAME
+; character into the ring twice — and its two call sites passed exactly
+; SubStr(Text, -1). A doubled entry shifts every GetLastSentCharacterAt(-N)
+; lookup by one, which is what the roll handlers, the quote/hashtag guards and
+; the time-gated hotstring lookups all read.
+_RollEmitCritical(Text) {
 	_AtCrit := Critical("On")
 	try {
 		SendNewResult(Text)
-		if (Record != "")
-			UpdateLastSentCharacter(Record)
 	} finally {
 		Critical(_AtCrit)
 	}
 }
+; Serialized like AltGrShiftDispatch, which wraps EVERY base-row AltGr callback
+; in Critical("On"). These two roll handlers are the exception: they are
+; registered straight onto Hotkey() by _RegisterRollsAltGrHotkeys, so they never
+; passed through that dispatcher. The result was one callback with two different
+; concurrency contracts — WrapTextIfSelected and SendNewResult ran serialized
+; when reached from a base row and bare when reached from a roll, and the bare
+; path's SendEvent could interleave with a neighbouring remapped key's emit in
+; the single OS input queue and reorder the output.
+;
+; Nesting is safe and intentional: _RollEmitCritical takes its own Critical, and
+; WrapTextIfSelected releases and restores Critical itself around its clipboard
+; round-trip, which is precisely why it must be entered with a known state.
 _RollChevronEqualHandler(*) {
-	if GetKeyState("Shift", "P") {
-		Features["layout"]["ergopti_plus"] ? _RollEmitCritical(" %") : _RollEmitCritical("Œ")
-	} else {
-		AddRollEqual()
+	_AtCrit := Critical("On")
+	try {
+		if GetKeyState("Shift", "P") {
+			Features["layout"]["ergopti_plus"] ? _RollEmitCritical(" %") : _RollEmitCritical("Œ")
+		} else {
+			AddRollEqual()
+		}
+	} finally {
+		Critical(_AtCrit)
 	}
 }
 AddRollEqual() {
@@ -995,7 +1226,7 @@ AddRollEqual() {
 		LastSentCharacter == "<" or LastSentCharacter == ">")
 	and A_TimeSincePriorHotkey < (HotstringsResolve("rolls", "chevron_equal").Delay * 1000
 	) {
-		_RollEmitCritical("=", "=")
+		_RollEmitCritical("=")
 	} else if Features["layout"]["ergopti_plus"] {
 		WrapTextIfSelected("%", "%", "%")
 	} else {
@@ -1005,11 +1236,18 @@ AddRollEqual() {
 
 ; The AltGr roll for SC017 (# / " / %) is also registered dynamically — same
 ; rationale as the SC012 block above.
+; Same contract as _RollChevronEqualHandler above — its sibling registration,
+; and the second of the only two AltGr callbacks that bypass AltGrShiftDispatch.
 _RollHashtagQuoteHandler(*) {
-	if GetKeyState("Shift", "P") {
-		_RollEmitCritical("%")
-	} else {
-		HashtagOrQuote()
+	_AtCrit := Critical("On")
+	try {
+		if GetKeyState("Shift", "P") {
+			_RollEmitCritical("%")
+		} else {
+			HashtagOrQuote()
+		}
+	} finally {
+		Critical(_AtCrit)
 	}
 }
 HashtagOrQuote() {
@@ -1026,7 +1264,7 @@ HashtagOrQuote() {
 		and A_TimeSincePriorHotkey < (HotstringsResolve("rolls", "hashtag_quote").Delay * 1000)
 		and Features["hotstrings"]["rolls"].Has(_QuoteSection)
 		and Features["hotstrings"]["rolls"][_QuoteSection]["enabled"]) {
-		_RollEmitCritical('"', '"')
+		_RollEmitCritical('"')
 	} else {
 		WrapTextIfSelected("#", "#", "#")
 	}

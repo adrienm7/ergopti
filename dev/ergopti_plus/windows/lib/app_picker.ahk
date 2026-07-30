@@ -92,7 +92,7 @@ AppPicker_Show(opts) {
     btn_cancel := g.AddButton("x+5 yp",            t("common.cancel"))
     Gui_HarmoniseButtonWidths([btn_ok, btn_cancel])
 
-    btn_ok.OnEvent("Click", (*) => AppPicker_OnOK(g, lv, rows, on_save))
+    btn_ok.OnEvent("Click", (*) => AppPicker_OnOK(g, lv, on_save))
     btn_cancel.OnEvent("Click", (*) => g.Destroy())
     g.OnEvent("Close", (*) => g.Destroy())
     g.OnEvent("Escape", (*) => g.Destroy())
@@ -100,16 +100,28 @@ AppPicker_Show(opts) {
     g.Show()
 }
 
-AppPicker_OnOK(g, lv, rows, on_save) {
+; Collect the ticked rows and hand them to the caller's on_save callback.
+;
+; The process name is read back OUT of the control (column 2), never out of the
+; construction-time ``rows`` array: an AHK v2 ListView created without the
+; ``NoSort`` option reorders its items in place as soon as the user clicks a
+; column header, and the checkbox state travels with the item while ``rows``
+; stays in its original order. Indexing the model with a DISPLAY row number
+; therefore returned a different application than the one that was ticked —
+; silently, because the index always stayed in range (app-picker-listview-sort-
+; index). The control is the only object the sort touches, so it is the only
+; object allowed to answer "which app is on row N".
+AppPicker_OnOK(g, lv, on_save) {
     selected := []
     row_idx := 0
     loop {
         row_idx := lv.GetNext(row_idx, "Checked")
         if !row_idx
             break
-        if (row_idx > rows.Length)
+        proc := StrLower(Trim(lv.GetText(row_idx, 2)))
+        if (proc == "")
             continue
-        selected.Push(rows[row_idx].process)
+        selected.Push(proc)
     }
     g.Destroy()
     if (on_save != "" && on_save is Func)

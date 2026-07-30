@@ -72,7 +72,15 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	"ui/tray_menu.ahk", true,
 	"modules/gestures/actions.ahk", true,
 	"modules/llm/ollama_deps_checker.ahk", true,
-	"modules/keymap/layout.ahk", true
+	"modules/keymap/layout.ahk", true,
+	; _HardwareCapsLockOn — a self-initialising flag, not injected state. It is
+	; seeded from the real toggle at its declaration and thereafter written only
+	; by ToggleCapsLock, so there is no init to guard: a require_state early
+	; return would sit in UpdateCapsLockLED, which runs on the CapsWord path.
+	; It exists precisely BECAUSE the previous design had no such variable and
+	; re-derived the hardware intent from GetKeyState — the bit the same function
+	; writes — which made the CapsLock LED self-latching.
+	"modules/shortcuts/capsword.ahk", true
 )
 
 ; Captured 2026-07-21 after excluding UPPER_SNAKE constants from the state

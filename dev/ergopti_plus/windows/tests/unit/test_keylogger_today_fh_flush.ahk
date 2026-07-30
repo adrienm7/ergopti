@@ -1,0 +1,140 @@
+﻿; tests/unit/test_keylogger_today_fh_flush.ahk
+
+; ==============================================================================
+; MODULE: today.log Flush Regression (keylogger-today-fh-flush-is-a-no-op)
+; DESCRIPTION:
+; AHK v2's File object has no Flush() method. Both keylogger call sites called
+; fh.Flush() inside a bare try, so the MethodError was discarded with no log
+; line and the writer's buffer was never pushed to the OS. The line right after
+; one of them read new_offset := fh.Pos, and KL_SaveState persisted that as
+; today_log_offset -- so the durable bookmark routinely named bytes that existed
+; only inside this process. The ingest reader opens its own handle and could not
+; see the tail it had just claimed to consume, and any exit that skips
+; KL_CloseTodayFh (hard crash, power loss, taskkill, #SingleInstance
+; replacement) lost that tail while state.json recorded it as ingested.
+;
+; ROOT CAUSE ENCODED: the flush primitive must actually move bytes to disk, and
+; the driver must use that primitive at every site instead of a method that does
+; not exist.
+;
+; The behavioural half proves the primitive; the source half proves the driver
+; uses it. It has to be split that way because the headless harness does not
+; load modules/keylogger/keylogger.ahk (it registers live hooks at load), so
+; KL_FlushTodayFh cannot be called from here -- naming it in a call would be a
+; load-time "nonexistent function" error for the whole suite.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+
+; ===============================================
+; ===============================================
+; ======= 1/ The primitive really flushes =======
+; ===============================================
+; ===============================================
+
+_KLTF_HandleReadFlushesTheWriteBuffer() {
+	Path := A_Temp . "\ergopti_flush_probe_" . A_TickCount . ".log"
+	try FileDelete(Path)
+
+	Fh := FileOpen(Path, "a", "UTF-8")
+	Assert(IsObject(Fh), "the probe file must open for append")
+	try {
+		Loop 200
+			Fh.Write("line-" . A_Index . "-padpadpadpadpadpadpadpad`n")
+
+		; The premise: there is nothing to call. A driver-side fh.Flush() raises
+		; 'This value of type "File" has no method named "Flush".' and a bare try
+		; turns that into a silent no-op.
+		Assert(!HasMethod(Fh, "Flush"),
+			"AHK v2's File object exposes no Flush() -- any fh.Flush() in the driver is a "
+			. "swallowed MethodError, never a flush")
+
+		; Without this, the test could not observe the defect it guards: fh.Pos
+		; must genuinely run ahead of the file for the flush to be meaningful.
+		Assert(Fh.Pos > FileGetSize(Path),
+			"the probe must actually buffer -- fh.Pos must run ahead of the on-disk size "
+			. "before the flush, otherwise this test proves nothing")
+
+		; The idiom KL_FlushTodayFh uses: reading Handle forces AHK to commit its
+		; own buffer before it can hand out the raw OS handle.
+		_ := Fh.Handle
+
+		Assert(FileGetSize(Path) = Fh.Pos,
+			"after reading Handle the on-disk size must equal fh.Pos -- today_log_offset is "
+			. "persisted FROM fh.Pos, so a shorter file means the committed offset names a "
+			. "byte that exists only in this process")
+
+		Reader := FileOpen(Path, "r", "UTF-8")
+		try {
+			Assert(Reader.Length = Fh.Pos,
+				"and an independent reader handle -- exactly what KL_ReadNewTodayLog opens -- "
+				. "must see every byte the writer accounted for")
+		} finally {
+			Reader.Close()
+		}
+	} finally {
+		Fh.Close()
+		try FileDelete(Path)
+	}
+}
+
+Test("keylogger: reading File.Handle is what actually flushes the today.log writer (keylogger-today-fh-flush-is-a-no-op)",
+	_KLTF_HandleReadFlushesTheWriteBuffer)
+
+
+
+
+
+; =================================================
+; =================================================
+; ======= 2/ The driver uses that primitive =======
+; =================================================
+; =================================================
+
+; Class-wide, not site-wide: no file under modules/keylogger may call a method
+; that does not exist, whichever site a future edit adds it to.
+_KLTF_NoFileFlushCallsRemain() {
+	Src := _StripFullLineComments(_DriverDirConcat("modules/keylogger"))
+	Assert(Src != "", "the keylogger module source must be locatable")
+	Assert(InStr(Src, ".Flush()") = 0,
+		"no File.Flush() call may remain under modules/keylogger -- the method does not exist "
+		. "in AHK v2, so every such call is a MethodError the surrounding bare try discards, "
+		. "leaving the write buffer unflushed while fh.Pos is committed as today_log_offset")
+	Assert(InStr(Src, "RawWriteFlush") = 0,
+		"the RawWriteFlush marker assignment must go too -- it is a throw-and-swallow on a "
+		. "property the File object does not have either")
+}
+
+; Both producers of a today_log_offset must flush through the same helper, so a
+; future edit cannot fix one site and leave the other counting buffered bytes.
+_KLTF_BothOffsetSitesFlushThroughTheHelper() {
+	Helper := _DriverFuncBody("KL_FlushTodayFh")
+	Assert(Helper != "",
+		"KL_FlushTodayFh must exist -- one shared implementation is what stops the two call "
+		. "sites diverging again")
+	Assert(InStr(Helper, ".Handle") > 0,
+		"KL_FlushTodayFh must read the Handle property: that read IS the flush in AHK v2")
+
+	Reader := _DriverFuncBody("KL_ReadNewTodayLog")
+	Assert(InStr(Reader, "KL_FlushTodayFh(") > 0,
+		"KL_ReadNewTodayLog must flush the writer through KL_FlushTodayFh before opening its "
+		. "own handle -- a second handle can only ever see what the OS actually holds")
+
+	Ingest := _DriverFuncBody("KL_IngestOnce")
+	PosAt := InStr(Ingest, "new_offset := fh.Pos")
+	Assert(PosAt > 0,
+		"prerequisite: KL_IngestOnce still publishes the append handle's position as the "
+		. "commit point")
+	Assert(InStr(SubStr(Ingest, 1, PosAt), "KL_FlushTodayFh(") > 0,
+		"KL_IngestOnce must flush BEFORE reading fh.Pos -- the position it commits as "
+		. "today_log_offset must never name a byte that is still only in the write buffer")
+}
+
+Test("keylogger: no File.Flush() call survives under modules/keylogger (keylogger-today-fh-flush-is-a-no-op)",
+	_KLTF_NoFileFlushCallsRemain)
+Test("keylogger: both today_log_offset producers flush through KL_FlushTodayFh (keylogger-today-fh-flush-is-a-no-op)",
+	_KLTF_BothOffsetSitesFlushThroughTheHelper)

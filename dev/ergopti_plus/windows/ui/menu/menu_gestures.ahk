@@ -64,7 +64,7 @@ _GES_SetEverySlot(ActionName) {
 	for _, Slot in GESTURE_SLOTS
 		Assignments[Slot] := ActionName
 	GestureSaveAllAssignments(Assignments)
-	Reload
+	ReloadPreservingSuspend()
 }
 
 _GES_RestoreFactoryDefaults() {
@@ -73,7 +73,7 @@ _GES_RestoreFactoryDefaults() {
 	for _, Slot in GESTURE_SLOTS
 		Assignments[Slot] := GESTURE_FACTORY_DEFAULTS.Has(Slot) ? GESTURE_FACTORY_DEFAULTS[Slot] : "none"
 	GestureSaveAllAssignments(Assignments)
-	Reload
+	ReloadPreservingSuspend()
 }
 
 ; Dynamic handler: flat slot list for AHK (mirrors pre-refactor BuildGesturesMenu).
@@ -118,7 +118,7 @@ SetGestureSlotAction(Slot, ActionName) {
 	if !GestureEnsureActionParameter(GestureBindingId("gesture", Slot), ActionName)
 		return
 	GestureSaveAssignment(Slot, ActionName)
-	Reload
+	ReloadPreservingSuspend()
 }
 
 ; Toggles the Gestures enabled state and reloads.
@@ -130,7 +130,7 @@ ToggleGesturesEnabled() {
 	; WriteFeatureV2 derives the [ahk.gestures] section + the Features node from
 	; the path and persists in lock-step (see lib/feature_io.ahk).
 	WriteFeatureV2(Features, "ahk.gestures.enabled", NewVal)
-	Reload
+	ReloadPreservingSuspend()
 }
 
 

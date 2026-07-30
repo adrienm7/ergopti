@@ -32,6 +32,7 @@ local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
 local Timings        = require("lib.timings")
+local ApiCommon = require("modules.llm.api_common")
 local _probe_client  = require("adapters.http_client").new()  -- Dedicated client for discover() POST probes; never shares state with warmup
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"
@@ -63,6 +64,11 @@ local _completions_endpoint = nil
 local _chat_endpoint        = nil
 local _endpoints_discovered = false
 local _endpoint_probe_in_flight = false
+
+-- Inter-probe delay, carried ACROSS discovery cycles. Declared here rather than
+-- inside discover() so a failed cycle's backoff is still in force when the next
+-- caller retries.
+local _poll_delay_sec = nil
 -- Callbacks waiting for the current discovery probe to complete; each
 -- discover() call during a probe enqueues its on_done here so no
 -- caller is silently dropped when a second warmup fires mid-poll.
@@ -135,6 +141,9 @@ local DISCOVERY_MAX_WAIT_SEC        = 180  -- Stop polling /v1/models after this
                                            -- discovered routes fresh and silences the scary warning).
 local DISCOVERY_POLL_INITIAL_SEC    = Timings.sec("llm", "discovery_poll_initial_ms")  -- First inter-probe delay (doubles each miss, capped below)
 local DISCOVERY_POLL_MAX_SEC        = Timings.sec("llm", "discovery_poll_max_ms")       -- Cap for the exponential backoff interval
+
+-- Seeded once the initial value is known; reset to it on a successful discovery.
+_poll_delay_sec = DISCOVERY_POLL_INITIAL_SEC
 
 
 
@@ -241,9 +250,25 @@ end
 --- Idempotent: the timer runs only once; subsequent calls enqueue their
 --- on_done callback and return.
 --- @param on_done function|nil Optional callback invoked once the probe finishes.
+--- Reports whether the script is paused. Discovery spawns curl polls and POSTs
+--- inference probes, which the "pause = everything off" invariant forbids: this
+--- module had no reference to a pause predicate at all.
+--- @return boolean
+local function _is_paused()
+	local sc = package.loaded["modules.shortcuts.script_control"]
+	return type(sc) == "table" and type(sc.is_paused) == "function" and sc.is_paused() == true
+end
+
 function M.discover(on_done)
+	if _is_paused() then
+		Logger.debug(LOG, "Discovery skipped — script is paused.")
+		-- The caller is answered rather than dropped: a warmup waiting on a
+		-- callback that never fires is how the prediction lock got stuck.
+		if type(on_done) == "function" then ApiCommon.protected_call(on_done, "on_done") end
+		return
+	end
 	if _endpoints_discovered then
-		if type(on_done) == "function" then pcall(on_done) end
+		if type(on_done) == "function" then ApiCommon.protected_call(on_done, "on_done") end
 		return
 	end
 	-- Enqueue the callback so it fires when the in-flight probe completes —
@@ -274,6 +299,9 @@ function M.discover(on_done)
 		_endpoint_probe_in_flight = false
 		if success then
 			_endpoints_discovered = true
+			-- The server answered — that, and only that, justifies probing eagerly
+			-- again on the next cycle.
+			_poll_delay_sec = DISCOVERY_POLL_INITIAL_SEC
 			Logger.warn(LOG, "MLX endpoints resolved: completions=%s, chat=%s.",
 				_completions_endpoint, _chat_endpoint)
 		end
@@ -294,7 +322,7 @@ function M.discover(on_done)
 
 		local function probe_one(candidates, idx, found_so_far, kind, on_resolved)
 			if idx > #candidates then
-				pcall(on_resolved, found_so_far)
+				ApiCommon.protected_call(on_resolved, "on_resolved", found_so_far)
 				return
 			end
 			local path = candidates[idx]
@@ -306,7 +334,7 @@ function M.discover(on_done)
 				if type(r.status) == "number" and r.status >= 200 and r.status ~= 404 then
 					Logger.info(LOG, "Endpoint discovery (%s): %s -> HTTP %s — accepted as live route.",
 						kind, path, tostring(r.status))
-					pcall(on_resolved, _base_url .. path)
+					ApiCommon.protected_call(on_resolved, "on_resolved", _base_url .. path)
 				else
 					Logger.debug(LOG, "Endpoint discovery (%s): %s -> %s, trying next candidate.",
 						kind, path, tostring(r.status))
@@ -382,7 +410,13 @@ function M.discover(on_done)
 	-- so we react quickly on fast starts while not hammering the kernel during a
 	-- slow model load (weights can take 30 s+ to map into GPU memory).
 	local poll_timer       = nil
-	local poll_delay_sec   = DISCOVERY_POLL_INITIAL_SEC
+	-- Backoff read from module scope, not re-initialised here. As a local it
+	-- restarted at the shortest interval on every discover() call, so a cycle
+	-- that gave up followed by a retry on the next run-loop tick probed as
+	-- eagerly as the first attempt — a curl spawn and an HTTP POST per tick
+	-- against a server that is down, with the backoff resetting each time it was
+	-- supposed to grow.
+	local poll_delay_sec   = _poll_delay_sec
 	local function do_poll()
 		-- Guard: a reset() since this cycle started makes this an ORPHANED chain.
 		-- Relying on _endpoint_probe_in_flight alone is not enough — a newer
@@ -474,7 +508,9 @@ function M.discover(on_done)
 				Logger.debug(LOG,
 					"Endpoint discovery: server not ready — next probe in %.1fs.", poll_delay_sec)
 				poll_timer   = TimerScheduler.after(poll_delay_sec, do_poll)
-				poll_delay_sec = math.min(poll_delay_sec * 2, DISCOVERY_POLL_MAX_SEC)
+				poll_delay_sec  = math.min(poll_delay_sec * 2, DISCOVERY_POLL_MAX_SEC)
+				-- Persist it: the growth has to outlive the call that earned it.
+				_poll_delay_sec = poll_delay_sec
 			end
 		end)
 		curl_task.start()

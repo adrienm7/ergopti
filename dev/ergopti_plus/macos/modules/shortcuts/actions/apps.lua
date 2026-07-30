@@ -26,10 +26,12 @@ local urlevent      = hs.urlevent
 local http          = hs.http
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
+local text_utils = require("lib.text_utils")
 local i18n          = require("lib.i18n")
 local AppLauncher   = require("adapters.app_launcher")
 local WindowInfo    = require("adapters.window_info")
 local WindowManager = require("adapters.window_manager")
+local ShellRunner   = require("adapters.shell_runner")
 
 local LOG = "shortcuts.actions.apps"
 
@@ -200,12 +202,15 @@ end
 --- Focuses an existing Finder window already showing the given folder path.
 --- Compares each Finder window's target via AppleScript (handles localised
 --- titles like "Téléchargements" vs "Downloads" reliably).
+--- The result is delivered to a callback rather than returned: this script walks
+--- every open Finder window, so running it synchronously froze the whole driver —
+--- the keyboard tap included — for as long as that took, on a keystroke.
 --- @param folder_path string POSIX path of the folder to look for.
---- @return boolean True if an existing window was found and focused.
-local function focus_existing_finder_window(folder_path)
-	local script = string.format([[
+--- @param on_result function Called as on_result(focused) with a boolean.
+local function focus_existing_finder_window(folder_path, on_result)
+	local script = text_utils.applescript_format([[
 		tell application "Finder"
-			set targetPath to POSIX file %q as alias
+			set targetPath to POSIX file "%s" as alias
 			repeat with w in windows
 				try
 					if (target of w as alias) is targetPath then
@@ -219,8 +224,9 @@ local function focus_existing_finder_window(folder_path)
 		return "none"
 	]], folder_path)
 
-	local ok, result = hs.osascript.applescript(script)
-	return ok and result == "ok"
+	ShellRunner.applescript(script, function(ok, result)
+		on_result(ok and result == "ok")
+	end)
 end
 
 --- Opens the Downloads folder via the best available file manager.
@@ -229,31 +235,34 @@ function M.open_downloads()
 	local home = os.getenv("HOME") or "~"
 	local downloads = home .. "/Downloads"
 
-	-- First, try to focus an existing Finder window already on Downloads
-	if focus_existing_finder_window(downloads) then
-		Logger.info(LOG, "Focused existing Finder window for Downloads.")
-		center_frontmost_after(CENTER_DELAY_SEC)
-		return
-	end
+	-- The probe is asynchronous now, so everything that depended on its answer
+	-- moves into the continuation.
+	focus_existing_finder_window(downloads, function(focused)
+		if focused then
+			Logger.info(LOG, "Focused existing Finder window for Downloads.")
+			center_frontmost_after(CENTER_DELAY_SEC)
+			return
+		end
 
-	if not launch_first_available(FILE_MANAGERS) then
-		pcall(hs.execute, "open \"" .. downloads .. "\"")
-	else
-		timer.doAfter(FOLDER_OPEN_DELAY_SEC, function()
-			pcall(hs.execute, "open \"" .. downloads .. "\"")
-		end)
-	end
-	center_frontmost_after(CENTER_DELAY_SEC)
+		if not launch_first_available(FILE_MANAGERS) then
+			ShellRunner.open(downloads)
+		else
+			timer.doAfter(FOLDER_OPEN_DELAY_SEC, function()
+				ShellRunner.open(downloads)
+			end)
+		end
+		center_frontmost_after(CENTER_DELAY_SEC)
+	end)
 end
 
 --- Opens the home directory via the best available file manager.
 function M.open_finder()
 	local home = os.getenv("HOME") or "~"
 	if not launch_first_available(FILE_MANAGERS) then
-		pcall(hs.execute, "open \"" .. home .. "\"")
+		ShellRunner.open(home)
 	else
 		timer.doAfter(FOLDER_OPEN_DELAY_SEC, function()
-			pcall(hs.execute, "open \"" .. home .. "\"")
+			ShellRunner.open(home)
 		end)
 	end
 	center_frontmost_after(CENTER_DELAY_SEC)

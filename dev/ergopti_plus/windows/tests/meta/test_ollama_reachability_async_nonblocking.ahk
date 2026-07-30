@@ -58,7 +58,12 @@ _MetaCheckReachabilityNonBlocking() {
 	Assert(PollBody != "", "api_ollama.ahk must define _LLM_Ollama_PingPoll()")
 	Assert(InStr(PollBody, "ProcessExist("),
 		"_LLM_Ollama_PingPoll must poll the curl child via ProcessExist (non-blocking)")
-	Assert(InStr(PollBody, "on_result("),
+	; Either call shape satisfies the invariant. The completion callbacks now go
+	; through _LLM_InvokeCallback so a throw inside one cannot vanish, which
+	; changes the SPELLING of the hand-off but not the contract being asserted:
+	; the poll must still deliver its boolean through on_result rather than
+	; returning it or dropping it.
+	Assert(InStr(PollBody, "on_result(") or InStr(PollBody, "on_result,"),
 		"_LLM_Ollama_PingPoll must deliver the boolean result via on_result")
 }
 

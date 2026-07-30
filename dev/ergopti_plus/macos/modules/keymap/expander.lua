@@ -23,8 +23,10 @@ local hs = hs
 local text_utils = require("lib.text_utils")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("lib.logger")
+local CoreStateM = require("modules.keymap.state")
 local TextSender = require("adapters.text_sender")
-local TooltipRenderer = require("adapters.tooltip_renderer")
+local TooltipRenderer  = require("adapters.tooltip_renderer")
+local TerminatorReplay = require("modules.keymap.terminator_replay")
 local LOG        = "keymap.expander"
 
 -- Optional modules — loaded with pcall because they are not required for core expansion.
@@ -72,7 +74,7 @@ end
 --- @param is_ignored boolean When true, skips tooltip and LLM side-effects.
 --- @param source_type string Telemetry label passed to the keylogger.
 --- @param source_variant string|nil Optional sub-type for the keylogger.
-function M.perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored, source_type, source_variant)
+function M.perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored, source_type, source_variant, is_private)
 	Logger.trace(LOG, "Performing replacement (%d deletion(s))…", deletes)
 
 	_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + deletes
@@ -120,8 +122,14 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		-- can reach notify_synthetic with malformed UTF-8, and its utf8.codes loop
 		-- would otherwise raise, aborting the expansion mid-flight and leaving the
 		-- synthetic-injection trackers desynced (F-HIGH-16 fix).
+		-- is_private is forwarded, NOT used to skip the call. Skipping would let
+		-- the physical echoes fall through handle_key unclaimed and be logged as
+		-- ordinary human keystrokes in buffer_text - the same secret, recorded in
+		-- a worse place. The keylogger's private mode keeps the discard markers
+		-- intact and redacts only what it persists.
 		local ok_notify, notify_err = pcall(keylogger.notify_synthetic,
-			logical_text, source_type or "hotstring", deletes, source_variant, emitted_str)
+			logical_text, source_type or "hotstring", deletes, source_variant, emitted_str,
+			is_private)
 		if not ok_notify then
 			Logger.error(LOG, "notify_synthetic failed: %s.", tostring(notify_err))
 		end
@@ -160,7 +168,9 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		end)
 	end
 
-	if is_final then _state.suppress_rescan(1.0) end
+	-- Named constant rather than a bare 1.0: it is deliberately DOUBLE the module
+	-- default, and that relationship is invisible when the literal sits here.
+	if is_final then _state.suppress_rescan(CoreStateM.FINAL_RESULT_SUPPRESS_SEC) end
 
 	if not is_ignored and _llm.get_llm_enabled() then
 		_llm.start_timer()
@@ -340,6 +350,17 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	local trig_len         = m.tlen
 	local char_offset      = is_ignored and 0 or char_len
 	local screen_len       = trig_len - char_offset
+	-- Clamped at zero. A trigger shorter than the typed event's codepoint count
+	-- (a multi-codepoint composed character arriving as one event) made this
+	-- negative, and the negative flowed straight into expected_synthetic_deletes:
+	-- the counter then read as "fewer than zero deletes outstanding", so the NEXT
+	-- expansion's real deletes were mis-accounted and its echoes leaked into the
+	-- buffer as human keystrokes.
+	if screen_len < 0 then
+		Logger.warn(LOG, "Trigger shorter than the typed event (%d < %d) — clamping deletes to 0.",
+			trig_len, char_offset)
+		screen_len = 0
+	end
 	local deletes, to_type = screen_len, repl_text
 
 	if repl_text == eff_repl then
@@ -361,7 +382,8 @@ function M.try_auto_expand(m, char_len, is_ignored)
 		m.final_result,
 		is_ignored,
 		"hotstring",
-		m.group or nil
+		m.group or nil,
+		m.is_private
 	)
 
 	-- Private mappings carry PII sourced from personal_info.toml (phone, SSN,
@@ -467,6 +489,9 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		-- when we actually need to emit tokens (replacements with {Token} directives)
 		local repl_text        = m.plain_repl
 		local deletes, to_type = trig_len, repl_text
+		-- Filled in by the emit closure and consumed AFTER perform_text_replacement
+		-- has armed the echo bookkeeping the replay gate reads.
+		local replay_spec      = nil
 
 		if repl_text == m.repl then
 			-- Simple text: keep common prefix to reduce backspaces.
@@ -485,26 +510,37 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		M.perform_text_replacement(
 			deletes,
 			function()
-				local c, s, logical = emit_dispatch(m, to_type)
+				local c, s, logical, order_delay = emit_dispatch(m, to_type)
 
-				-- Re-type the terminator unless it should be consumed.
+				-- The terminator is NOT emitted here. Enter and Tab travel as raw
+				-- key events while the replacement travels through the text-input
+				-- pipeline (or a clipboard read the target schedules itself), and
+				-- posting the two back to back does not order them: the Enter
+				-- reached the host first and submitted the pre-expansion content.
+				-- It is instead handed to TerminatorReplay below, which releases it
+				-- once the replacement has provably landed. order_delay is carried
+				-- through as a floor for the paste path, where there is no
+				-- per-character echo to wait on.
 				if not consume_term then
 					if chars == "\r" or chars == "\n" then
-						TextSender.pressKey("return", nil, 0)
+						replay_spec = { kind = "key", key = "return", chars = chars }
 						-- Track the re-typed terminator so expected_synthetic_chars
 						-- and notify_synthetic see it; without this the keylogger
 						-- flushes its buffer mid-expansion on the Enter/Tab echo.
 						s = s .. chars
 						logical = logical .. chars
 					elseif chars == "\t" then
-						TextSender.pressKey("tab", nil, 0)
+						replay_spec = { kind = "key", key = "tab", chars = chars }
 						s = s .. chars
 						logical = logical .. chars
 					else
-						TextSender.send(chars, { mode = "direct" })
+						replay_spec = { kind = "text", chars = chars }
 						s = s .. chars
 						logical = logical .. chars
 					end
+					replay_spec.echo_bytes = #chars
+					replay_spec.min_delay  = (type(order_delay) == "number" and order_delay > 0)
+						and order_delay or 0
 					c = c + text_utils.utf8_len(chars)
 				end
 				return c, s, logical
@@ -519,8 +555,24 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 			m.final_result,
 			is_ignored,
 			"hotstring",
-			m.group or nil
+			m.group or nil,
+			m.is_private
 		)
+
+		-- Armed only now: the replay gate reads the synthetic-echo bookkeeping
+		-- that perform_text_replacement writes AFTER emit_action returns. Arming
+		-- from inside the emit closure would test an expectation that had not
+		-- been recorded yet and release the terminator immediately — the very
+		-- race this indirection exists to close.
+		if replay_spec then
+			TerminatorReplay.arm(replay_spec)
+			if is_ignored then
+				-- The keyboard handler exits before its synthetic-echo drain for
+				-- these windows, so no echo can ever be observed here. Waiting for
+				-- one would stall every Enter until the watchdog expired.
+				TerminatorReplay.flush_now("ignored window — echoes unobservable")
+			end
+		end
 
 		-- Same privacy contract as try_auto_expand: a private mapping's trigger
 		-- and replacement are both secrets and must reach neither the keylogger
@@ -730,6 +782,9 @@ function M.init(core_state, registry_mod, llm_mod)
 	_state    = core_state
 	_registry = registry_mod
 	_llm      = llm_mod
+	-- The replay gate reads the same synthetic-echo counters the expander writes,
+	-- so it is handed the identical state object rather than a copy.
+	TerminatorReplay.init(core_state)
 	Logger.success(LOG, "Expander initialized.")
 end
 

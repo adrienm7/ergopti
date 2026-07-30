@@ -519,8 +519,22 @@ function M.resync_context()
 	local app = hs.application.frontmostApplication()
 	if not app then return false end
 
-	local ok_name, app_name = pcall(function() return app:title() end)
-	if not ok_name or type(app_name) ~= "string" then return false end
+	-- app:name(), NOT app:title(). name() is the stable display-name API, which
+	-- is what the rest of this pipeline is keyed on: SecureFieldDetector's
+	-- isSecureApp exact-matches DISPLAY names, and capture_frontmost_app — the
+	-- sibling resume helper — already documents that title() is absent for some
+	-- application instances. Reading title() here meant a vault whose title is
+	-- nil or differs from its display name was not recognised on resume, so
+	-- is_secure_field stayed stale-false and keystrokes typed into a password
+	-- manager were logged, and mis-attributed to the previously focused app.
+	--
+	-- The empty-string check matters as much as the type check: an app with a
+	-- blank name must not be adopted as the active context.
+	local ok_name, app_name = pcall(function() return app:name() end)
+	if not ok_name or type(app_name) ~= "string" or app_name == "" then
+		Logger.debug(LOG, "resync_context(): foreground application has no usable name.")
+		return false
+	end
 
 	local now = hs.timer.absoluteTime() / 1000000
 

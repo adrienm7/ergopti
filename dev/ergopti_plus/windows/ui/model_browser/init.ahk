@@ -338,6 +338,13 @@ global _LLM_MBW_MsgSub     := unset
 global _LLM_MBW_Ready      := false
 global _LLM_MBW_Queue      := []
 
+; True once _LLM_MBW_Reset() has torn the controller down. Close, Escape and the
+; deferred _LLM_MBW_ApplyModel all reach the same teardown, and Controller.Close()
+; pumps messages — so a second trigger dispatched during that pump would re-enter
+; Reset and close a controller that is already mid-teardown. Same guard as every
+; other WebView2 host in the driver.
+global _LLM_MBW_ResetDone  := false
+
 ; Virtual host mapped to _SharedDir so the document and its relative assets
 ; and the locale fetch resolve over https:// -- file:// is an opaque origin
 ; and the chrome.webview JS->AHK channel does not reliably deliver from it
@@ -353,7 +360,7 @@ global LLM_MBW_HOST_ACCESS_ALLOW := 1
  * @returns {Gui|string}
  */
 _LLM_ModelBrowser_ShowWeb() {
-	global _LLM_MBW_Gui, _LLM_MBW_Controller, _LLM_MBW_WebView, _LLM_MBW_Ready, _LLM_MBW_Queue, _VendorDir, _I18nLocale
+	global _LLM_MBW_Gui, _LLM_MBW_Controller, _LLM_MBW_WebView, _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_ResetDone, _VendorDir, _I18nLocale
 
 	; Singleton: reuse the open window and just refresh the catalogue.
 	if IsSet(_LLM_MBW_Gui) {
@@ -387,10 +394,19 @@ _LLM_ModelBrowser_ShowWeb() {
 		try LoggerError("LLM.browser", "WebView2 create failed: {1}.", Err.Message)
 		try g.Destroy()
 		_LLM_MBW_Reset()
+		; Clear the handle explicitly: the reset above short-circuits when a
+		; previous session already latched _LLM_MBW_ResetDone, and a _LLM_MBW_Gui
+		; left pointing at the Gui just destroyed would make every later open take
+		; the singleton branch instead of building a window.
+		_LLM_MBW_Gui := unset
 		return ""
 	}
 
 	_LLM_MBW_WebView := _LLM_MBW_Controller.CoreWebView2
+	; This controller/webview pair is fresh — re-arm the Reset() guard so this
+	; session's close actually tears it down instead of short-circuiting on a flag
+	; left behind by an earlier _LLM_MBW_Reset() call.
+	_LLM_MBW_ResetDone := false
 
 	; Harden the webview — no devtools, context menu, status bar, or accelerators.
 	try {
@@ -692,7 +708,15 @@ _LLM_MBW_OnResize(GuiObj, MinMax, Width, Height) {
 }
 
 _LLM_MBW_Reset() {
-	global _LLM_MBW_Gui, _LLM_MBW_WebView, _LLM_MBW_Controller, _LLM_MBW_MsgSub, _LLM_MBW_Ready, _LLM_MBW_Queue
+	global _LLM_MBW_Gui, _LLM_MBW_WebView, _LLM_MBW_Controller, _LLM_MBW_MsgSub, _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_ResetDone
+	; Close, Escape and the deferred model-apply all land here, and
+	; Controller.Close() pumps messages — so a second dispatch can re-enter this
+	; function while the first teardown is still in flight. Short-circuit instead
+	; of running the release + Close sequence twice against a controller that is
+	; already going away.
+	if _LLM_MBW_ResetDone
+		return
+	_LLM_MBW_ResetDone := true
 	; Release the subscription FIRST, while the controller is still alive. Its
 	; __Delete unsubscribes via remove_WebMessageReceived on the live
 	; controller; doing it AFTER Controller.Close() raises a COM error.

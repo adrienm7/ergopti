@@ -64,11 +64,22 @@ _CLSO_LedConsultsHardwareToggle() {
 		"UpdateCapsLockLED must still consider CapsWordEnabled")
 	Assert(InStr(Seg, "LayerEnabled") > 0,
 		"UpdateCapsLockLED must still consider LayerEnabled")
-	; The distinctive line of the fix: the hardware CapsLock toggle is now part
-	; of the OR, making UpdateCapsLockLED the single LED owner.
+	; The GUARANTEE is that a genuine hardware CapsLock is part of the OR, so a
+	; real toggle is not overridden by CapsWord/layer state. This assertion used
+	; to pin the MECHANISM — GetKeyState("CapsLock", "T") — and that mechanism
+	; was the bug: it reads back the very bit SetCapsLockState writes two lines
+	; below, so once CapsWord lit the LED the next evaluation saw its own output,
+	; concluded the user wanted CapsLock, and re-asserted it. CapsLock then
+	; survived CapsWord and everything kept typing uppercase (reproduced live).
+	; The hardware intent now lives in its own variable, which satisfies the same
+	; guarantee without the feedback loop.
+	Assert(InStr(Seg, "_HardwareCapsLockOn") > 0,
+		"UpdateCapsLockLED must OR the recorded hardware CapsLock intent into its condition, "
+		. "otherwise a real CapsLock toggle desyncs the LED from CapsWord/layer state")
 	HardwareTerm := "GetKeyState(" . Chr(34) . "CapsLock" . Chr(34) . ", " . Chr(34) . "T" . Chr(34) . ")"
-	Assert(InStr(Seg, HardwareTerm) > 0,
-		"UpdateCapsLockLED must OR the hardware CapsLock toggle into its condition, otherwise a real CapsLock toggle desyncs the LED from CapsWord/layer state")
+	Assert(InStr(Seg, HardwareTerm) = 0,
+		"UpdateCapsLockLED must NOT read back GetKeyState(CapsLock, T) — that is the bit it "
+		. "writes, so ORing it makes the function self-latching and CapsLock outlives CapsWord")
 }
 Test("capsword: UpdateCapsLockLED ORs the hardware CapsLock toggle (capslock-led-multiple-owners)", _CLSO_LedConsultsHardwareToggle)
 

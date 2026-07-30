@@ -68,9 +68,20 @@ local MAX_ICON_LOOKUPS_PER_OPEN = 30
 
 local CONFIG_DIR          = hs.configdir .. "/data"
 local CATEGORIES_FILE     = CONFIG_DIR .. "/app_categories.json"
--- Fallback category assigned to an uncategorised app on first edit.
--- Single source of truth; duplicated "Général" literals were a bug (ui-windows-b-1).
-local DEFAULT_APP_CATEGORY = "Général"
+--- Fallback category assigned to an uncategorised app on first edit.
+---
+--- A FUNCTION rather than a module-level constant, and it reads the same i18n key
+--- list_existing_categories() reads. Collapsing the two duplicated literals into a
+--- constant left the constant itself French, so the file ended up with two SOURCES
+--- for one value: on any non-French locale the key returned "General"/"Allgemein"/…
+--- while the constant still returned the French spelling, the category picker's
+--- current-selection tick matched nothing, and every unclassified app was stored
+--- under a name no locale displays. A constant cannot fix it either - this module is
+--- required before the locale is settled, so the value has to resolve at call time.
+--- @return string The localised default category name.
+local function default_app_category()
+	return i18n.get("metrics_apps.general_category")
+end
 
 --- On-disk snapshot of the last successful render (instant pre-fill).
 local UI_TMP_DIR    = (os.getenv("TMPDIR") or "/tmp/"):gsub("/?$", "/")
@@ -238,10 +249,10 @@ local function prompt_pick_app()
 	chooser = hs.chooser.new(function(choice)
 		if not choice then return end
 		local cats    = load_categories()
-		local current = cats[choice.text] or { type = DEFAULT_APP_CATEGORY, score = 0 }
+		local current = cats[choice.text] or { type = default_app_category(), score = 0 }
 		M.prompt_category(choice.text, current.type, current.score)
 	end)
-	chooser:placeholderText("Choisir une application à classer…")
+	chooser:placeholderText(i18n.get("metrics_apps.pick_app_placeholder"))
 	chooser:choices(choices)
 	chooser:searchSubText(true)
 	chooser:show()
@@ -255,7 +266,7 @@ local function handle_bridge_message(msg)
 	local act = body.action
 	if act == "edit" then
 		local app_name = tostring(body.app or "")
-		local cat      = tostring(body.cat or DEFAULT_APP_CATEGORY)
+		local cat      = tostring(body.cat or default_app_category())
 		local score    = tonumber(body.score) or 0
 		hs.timer.doAfter(0, function() M.prompt_category(app_name, cat, score) end)
 	elseif act == "pick" then

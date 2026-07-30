@@ -104,9 +104,18 @@ M.open_editor = PersonalInfo.open_editor
 M.enable      = PersonalInfo.enable
 M.disable     = PersonalInfo.disable
 
--- Proxy the RulesEngine's live trigger-char setter so menu_state.lua's
--- sync_state_to_modules can update this engine the same way it already
--- updates keymap and hotstring_editor (F-HIGH-8 fix).
-M.set_trigger_char = RulesEngine.set_trigger_char
+--- Propagates a magic-key change to BOTH dynamic engines.
+---
+--- This used to be a bare alias to RulesEngine.set_trigger_char, so the live
+--- sync in menu_state.lua reached the date/prefix engine and never the @-tag
+--- one: changing the magic key silenced personal_info until the next reload,
+--- while its preview provider — which derives its answer from the keymap buffer
+--- and carries no trigger of its own — kept offering the expansion. A proxy that
+--- names one of a pair is how half a fix ships.
+--- @param char string The new trigger character.
+function M.set_trigger_char(char)
+	if type(RulesEngine.set_trigger_char) == "function" then RulesEngine.set_trigger_char(char) end
+	if type(PersonalInfo.set_trigger_char) == "function" then PersonalInfo.set_trigger_char(char) end
+end
 
 return M

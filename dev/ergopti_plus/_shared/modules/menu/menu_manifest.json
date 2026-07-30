@@ -654,7 +654,8 @@
 			"id": "disable_all",
 			"i18n": "menu.gestures.disable_all",
 			"platforms": [
-				"hs"
+				"hs",
+				"ahk"
 			]
 		},
 		{
@@ -662,7 +663,8 @@
 			"id": "restore_defaults",
 			"i18n": "menu.gestures.restore_defaults",
 			"platforms": [
-				"hs"
+				"hs",
+				"ahk"
 			]
 		},
 		{

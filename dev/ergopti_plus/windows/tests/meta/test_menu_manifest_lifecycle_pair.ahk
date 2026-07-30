@@ -10,18 +10,40 @@
 
 #Requires AutoHotkey v2.0
 
+; GUARANTEE, not spelling: every fallback return that happens AFTER the loader's
+; LoggerTrace must close the lifecycle with a LoggerDone first.
+;
+; The previous version asserted the same guarantee by naming the four fallback
+; REASON STRINGS that happened to exist at the time ("manifest is empty",
+; "manifest root is not a JSON object", ...). Two of those branches belonged to
+; the loader's own FileRead + JsonParse of menu_manifest.json, so the assertion
+; effectively pinned a second, redundant decode of a 12.5 KB file in place — a
+; mechanism — while what it meant to protect is the lifecycle pairing. The
+; branch set is now DERIVED from the loader body, so the rule survives the move
+; of those branches into the shared accessor and a newly added fallback inherits
+; it automatically instead of silently escaping the check.
 _MMLP_AllPostTraceFallbacksCloseLifecycle() {
     Body := _DriverFuncBody("MenuManifest_LoadHotstringGroups")
+    Assert(Body != "", "MenuManifest_LoadHotstringGroups must exist in the driver source")
     TracePos := InStr(Body, 'LoggerTrace("MenuManifest"')
-
     Assert(TracePos > 0, "MenuManifest_LoadHotstringGroups must begin its traced lifecycle")
-    for _, Reason in ["manifest is empty", "manifest root is not a JSON object", "hotstring_category_keys block not found", "hotstring_groups block not found"] {
-        Pos := InStr(Body, Reason)
-        DonePos := InStr(Body, "LoggerDone", , Pos)
-        ReturnPos := InStr(Body, "return _MM_BuildResult", , Pos)
-        Assert(Pos > TracePos && DonePos > Pos && DonePos < ReturnPos,
-            "Manifest fallback '" . Reason . "' must close LoggerTrace with LoggerDone before returning")
+
+    Fallbacks := 0
+    SegStart := TracePos
+    Pos := TracePos
+    while (ReturnPos := InStr(Body, "return _MM_BuildResult", , Pos)) {
+        Fallbacks += 1
+        DonePos := InStr(Body, "LoggerDone", , SegStart)
+        Assert(DonePos > 0 && DonePos < ReturnPos,
+            "fallback return #" . Fallbacks . " after the LoggerTrace must close it with a LoggerDone "
+            . "before returning — an unclosed trace makes an invalid manifest indistinguishable from a "
+            . "callback that never completed")
+        SegStart := ReturnPos
+        Pos := ReturnPos + 1
     }
+    Assert(Fallbacks >= 3,
+        "the fallback class must be derived from the loader body and hold at least three branches — "
+        . "an empty class would make this test vacuous")
 }
 
 _MMLP_OnboardingAndLiveRebuildCloseTheirLifecycles() {

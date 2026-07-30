@@ -53,8 +53,22 @@ _PrefixWatcherTomlPath(Category) {
 ; resolve to the live globals (the historical behaviour every direct caller
 ; relies on); HotstringPrefixWatcherRebuildIndex passes fresh locals instead so
 ; it can build the whole index off to the side and swap it in atomically.
+; One TOML hotstring entry, as written by the generator.
+; Capture: 1=trigger, 2=output, 3=is_case_sensitive,
+; 4=is_case_sensitive_strict (optional), 5=priority (optional). The individual
+; priority is captured so the preview can rank colliding candidates by the same
+; tie-break the engine uses (so the non-dimmed winner matches what actually fires).
+;
+; Hoisted to a single constant because the extension-pack indexer below parses the
+; SAME file shape: two copies of a regex this size drift, and a drift here shows up
+; as a hotstring that expands but is never previewed — the exact class of defect
+; the ext-pack indexing was added to close.
+global HS_PREFIX_ENTRY_PATTERN :=
+	'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(?:true|false)\s*,\s*auto_expand\s*=\s*(?:true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(?:true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?(?:\s*,\s*priority\s*=\s*([0-9]+))?\s*\}'
+
 _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "") {
 	global ScriptInformation, Features, _V1CatToV2CatMap, _PrefixIndex, _TriggerSet
+	global HS_PREFIX_ENTRY_PATTERN
 	if !IsObject(IndexTarget)
 		IndexTarget := _PrefixIndex
 	if !IsObject(SetTarget)
@@ -86,12 +100,7 @@ _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "") {
 		return 0
 	}
 
-	; Capture: 1=trigger, 2=output, 3=is_case_sensitive,
-	; 4=is_case_sensitive_strict (optional), 5=priority (optional). The individual
-	; priority is captured so the preview can rank colliding candidates by the same
-	; tie-break the engine uses (so the non-dimmed winner matches what actually fires).
-	EntryPattern :=
-		'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(?:true|false)\s*,\s*auto_expand\s*=\s*(?:true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(?:true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?(?:\s*,\s*priority\s*=\s*([0-9]+))?\s*\}'
+	EntryPattern := HS_PREFIX_ENTRY_PATTERN
 
 	CurrentSection := ""
 	Count := 0
@@ -148,6 +157,139 @@ _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "") {
 			Output  := StrReplace(Output,  "★", ScriptInformation["MagicKey"])
 		}
 		_AddTriggerVariants(Trigger, Output, Category, CurrentSection, IsCaseSensitive, IsStrict, Individual, IndexTarget, SetTarget)
+		Count += 1
+	}
+	return Count
+}
+
+; Enumerates the extension-pack TOMLs: every *.toml under PersonalHotstringsDir
+; except the root personal_hotstrings.toml, which is its own category. Sub-folders
+; produce hierarchical labels ("work / snippets"), matching what the engine's
+; registration already builds.
+;
+; Extracted so the engine registration and the preview index walk the SAME tree.
+; They used to disagree structurally — the engine recursed, the preview read one
+; hardcoded path — and every pack therefore expanded with no tooltip, forever. A
+; second copy of the walk would just drift back to that.
+; @returns {Array} Items of Map("Path", <full path>, "Label", <category label>).
+HS_EnumeratePersonalExtFiles() {
+	global ScriptInformation
+	Found := []
+	if !(IsSet(ScriptInformation) and ScriptInformation.Has("PersonalHotstringsDir"))
+		return Found
+	Root := RegExReplace(ScriptInformation["PersonalHotstringsDir"], "[/\\]+$")
+	if !DirExist(Root)
+		return Found
+
+	; Explicit stack rather than a recursive closure: this runs on the index
+	; rebuild path, and a closure that captures itself is the shape that already
+	; cost this driver a silent nil-binding elsewhere.
+	Pending := [Map("Dir", Root, "Prefix", "")]
+	while (Pending.Length > 0) {
+		Node := Pending.Pop()
+		Dir := Node["Dir"]
+		Prefix := Node["Prefix"]
+		Loop Files Dir . "\*", "DF" {
+			Child := (Prefix == "" ? "" : Prefix . " / ") . A_LoopFileName
+			if (A_LoopFileAttrib ~= "D") {
+				Pending.Push(Map("Dir", A_LoopFileFullPath, "Prefix", Child))
+				continue
+			}
+			if !(A_LoopFileName ~= "i)\.toml$")
+				continue
+			if (Prefix == "" and A_LoopFileName == "personal_hotstrings.toml")
+				continue
+			SplitPath A_LoopFileFullPath, , , , &Stem
+			Found.Push(Map("Path", A_LoopFileFullPath,
+				"Label", (Prefix == "" ? "" : Prefix . " / ") . Stem))
+		}
+	}
+	return Found
+}
+
+; Indexes one extension-pack TOML into the preview index.
+;
+; Deliberately does NOT apply the per-section Features gate _RegisterCategoryTriggers
+; applies: an extension pack has no per-section toggle in the menu — the engine loads
+; every section of it (LoadExtTomlFile, "all sections enabled") — so gating the preview
+; on a Features node that cannot exist would index nothing and reproduce the defect.
+; The master hotstrings gate still applies, because that one really can silence a pack.
+; @param Path        {String} Full path to the pack's TOML.
+; @param Label       {String} Category label to attribute previews to.
+; @param IndexTarget {Map}    Index being built.
+; @param SetTarget   {Map}    Trigger set being built.
+; @returns {Integer} Number of triggers indexed.
+_RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget) {
+	global ScriptInformation, HS_PREFIX_ENTRY_PATTERN
+	global HS_TOML_SECTION_HEADER_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN
+	global HSE_PRIORITY_PACKAGE
+	if !IsCategoryGated("Hotstrings")
+		return 0
+	if !FileExist(Path)
+		return 0
+
+	CurrentSection := ""
+	Count := 0
+	loop parse, ReadTomlFile(Path), "`n", "`r" {
+		Line := Trim(A_LoopField, " `t")
+		if (Line == "" or SubStr(Line, 1, 1) == "#")
+			continue
+		; The SHARED header pattern, which accepts one OR more brackets. This
+		; previously matched `[[section]]` only and reset CurrentSection on any
+		; other bracketed line, so every entry under a single-bracket `[section]`
+		; header was skipped — while LoadExtTomlFile registered them happily. The
+		; pack expanded and could never be previewed.
+		if RegExMatch(Line, HS_TOML_SECTION_HEADER_PATTERN, &SectionMatch) {
+			CurrentSection := StrLower(Trim(SectionMatch[1]))
+			continue
+		}
+		if (CurrentSection == "")
+			continue
+		; Metadata blocks describe the file and are not hotstrings. The engine skips
+		; them explicitly; here the old single-bracket RESET happened to stand in
+		; for that, so accepting single brackets above means the skip has to become
+		; explicit too — otherwise a [_meta] description would index as a trigger.
+		if (CurrentSection == "_meta" or InStr(CurrentSection, "_meta."))
+			continue
+
+		Trigger := ""
+		Output := ""
+		IsCaseSensitive := false
+		IsStrict := false
+		Individual := ""
+		if RegExMatch(Line, HS_PREFIX_ENTRY_PATTERN, &Match) {
+			Trigger := UnescapeTomlString(Match[1])
+			Output := UnescapeTomlString(Match[2])
+			IsCaseSensitive := (Match[3] == "true")
+			IsStrict := (Match.Count >= 4 and Match[4] == "true")
+			Individual := (Match[5] != "") ? Match[5] + 0 : ""
+		} else if RegExMatch(Line, _HOTSTRING_SIMPLE_ENTRY_PATTERN, &SimpleMatch) {
+			; The engine's second accepted shape: a bare `key = "value"` line, which
+			; LoadExtTomlFile registers through CreateCaseSensitiveHotstrings. The
+			; preview side ignored it entirely, so those entries expanded without
+			; ever being previewable.
+			Trigger := (SimpleMatch[1] != "") ? SimpleMatch[1] : SimpleMatch[2]
+			Output := SimpleMatch[3]
+		} else {
+			continue
+		}
+		if (Trigger == "")
+			continue
+		if (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
+			Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
+			Output := StrReplace(Output, "★", ScriptInformation["MagicKey"])
+		}
+		; Rank the preview at the priority the ENGINE fires this pack at.
+		; LoadExtTomlFile registers every ext-pack entry at HSE_PRIORITY_PACKAGE
+		; (both shapes: _ParseEntryPriority's fallback and the simple-entry
+		; Options), while the index's own fallback is HSE_PRIORITY_COMMON — and it
+		; is reached here because a pack's Category is its LABEL, which
+		; HotstringsResolve knows nothing about. A pack trigger colliding with a
+		; bundled one therefore previewed as the LOSER and fired as the winner:
+		; the tooltip named one expansion and the user got another
+		; (ext-pack-preview-ranked-below-its-fire).
+		_AddTriggerVariants(Trigger, Output, Label, CurrentSection, IsCaseSensitive, IsStrict,
+			Individual, IndexTarget, SetTarget, HSE_PRIORITY_PACKAGE)
 		Count += 1
 	}
 	return Count
@@ -269,30 +411,30 @@ _RegisterCategoryTriggersFromCache(Category, IndexTarget := "", SetTarget := "")
 ; letter-only trigger of any length — which used to suppress the UPPER
 ; variant globally and leave typings like ``IA`` without a tooltip even
 ; though the engine still fires on the upper variant.
-_AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStrict, Individual := "", IndexTarget := "", SetTarget := "") {
+_AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStrict, Individual := "", IndexTarget := "", SetTarget := "", SourceDefault := "") {
 	global ScriptInformation
 	if IsStrict {
 		; Strict triggers only match the exact casing in the TOML — anything
 		; else neither fires nor previews.
-		_AddTriggerToIndex(Trigger, Output, Category, Section, Individual, IndexTarget, SetTarget)
+		_AddTriggerToIndex(Trigger, Output, Category, Section, Individual, IndexTarget, SetTarget, SourceDefault)
 		return
 	}
 	if IsCaseSensitive {
 		; Single registration via plain CreateHotstring (no auto-folding) —
 		; only the literal lowercase form is matched in practice.
-		_AddTriggerToIndex(Trigger, Output, Category, Section, Individual, IndexTarget, SetTarget)
+		_AddTriggerToIndex(Trigger, Output, Category, Section, Individual, IndexTarget, SetTarget, SourceDefault)
 		return
 	}
 	LowerTrig := StrLower(Trigger)
 	TitleTrig := StrTitle(Trigger)
 	UpperTrig := StrUpper(Trigger)
-	_AddTriggerToIndex(LowerTrig, StrLower(Output), Category, Section, Individual, IndexTarget, SetTarget)
-	_AddTriggerToIndex(TitleTrig, StrTitle(Output), Category, Section, Individual, IndexTarget, SetTarget)
+	_AddTriggerToIndex(LowerTrig, StrLower(Output), Category, Section, Individual, IndexTarget, SetTarget, SourceDefault)
+	_AddTriggerToIndex(TitleTrig, StrTitle(Output), Category, Section, Individual, IndexTarget, SetTarget, SourceDefault)
 	MagicSuffix := (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey"))
 		? ScriptInformation["MagicKey"] : "★"
 	BodyLen := StrLen(RTrim(Trigger, MagicSuffix))
 	if (BodyLen != 1) {
-		_AddTriggerToIndex(UpperTrig, StrUpper(Output), Category, Section, Individual, IndexTarget, SetTarget)
+		_AddTriggerToIndex(UpperTrig, StrUpper(Output), Category, Section, Individual, IndexTarget, SetTarget, SourceDefault)
 	}
 }
 
@@ -317,7 +459,7 @@ _AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStric
 ; (everything else) are not indexed at all — their previews would
 ; fire on a single-letter typed buffer, which is too noisy to be
 ; useful.
-_AddTriggerToIndex(Trigger, Output, Category, Section, Individual := "", IndexTarget := "", SetTarget := "") {
+_AddTriggerToIndex(Trigger, Output, Category, Section, Individual := "", IndexTarget := "", SetTarget := "", SourceDefault := "") {
 	global _PrefixIndex, _TriggerSet, _MIN_PREFIX_LEN, ScriptInformation, HSE_PRIORITY_COMMON
 	; Default to the live globals so existing direct callers (and the test
 	; suite) keep populating _PrefixIndex / _TriggerSet exactly as before.
@@ -336,8 +478,24 @@ _AddTriggerToIndex(Trigger, Output, Category, Section, Individual := "", IndexTa
 	; individual `priority = N` wins, otherwise the section/file/source override
 	; cascade via HotstringsResolve. Stored on the entry so _LookupAndRender can
 	; rank colliding candidates so the non-dimmed preview = the engine's fire winner.
+	;
+	; SourceDefault is set only by the extension-pack caller, and it BYPASSES the
+	; override cascade on purpose, because the engine does too: LoadExtTomlFile
+	; applies _ParseEntryPriority(Line, HSE_PRIORITY_PACKAGE) — an individual
+	; `priority = N`, else the package default — and never consults
+	; HotstringsResolve, because a pack is not in the hotstrings config and has no
+	; section or category override to find.
+	;
+	; Asking the cascade anyway is what broke this: HotstringsResolve ends in
+	; _HSE_SourcePriority(CategoryName), whose package branch tests for an "ext."
+	; prefix that nothing in the driver ever produces, so a pack's LABEL fell
+	; through to HSE_PRIORITY_COMMON. A pack trigger colliding with a bundled one
+	; was previewed as the loser and fired as the winner: the tooltip named one
+	; expansion and the user got another (ext-pack-preview-ranked-below-its-fire).
 	if (Individual != "") {
 		Priority := Individual
+	} else if (SourceDefault != "") {
+		Priority := SourceDefault
 	} else {
 		Resolved := HotstringsResolve(Category, Section)
 		Priority := (Resolved.HasOwnProp("Priority") and Resolved.Priority != "")

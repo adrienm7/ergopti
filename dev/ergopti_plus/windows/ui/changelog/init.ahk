@@ -37,6 +37,12 @@ global _CLW_Ready      := false
 global _CLW_Queue      := []
 global _CLW_Channel    := "dev"
 
+; True once _CLW_Reset() has torn the controller down. Close and Escape are wired
+; to the SAME handler, and Controller.Close() pumps messages — so a second Close
+; dispatched during that pump would re-enter Reset and close a controller that is
+; already mid-teardown. Same guard as every other WebView2 host in the driver.
+global _CLW_ResetDone  := false
+
 ; Virtual host mapped to _SharedDir so the document and its relative assets
 ; and the locale fetch resolve over https:// -- file:// is an opaque origin
 ; and the chrome.webview JS->AHK channel does not reliably deliver from it
@@ -113,7 +119,7 @@ Changelog_Close() {
 ; ==========================================
 
 _CLW_BuildWindow(Channel) {
-	global _CLW_Gui, _CLW_Controller, _CLW_WebView, _VendorDir
+	global _CLW_Gui, _CLW_Controller, _CLW_WebView, _CLW_ResetDone, _VendorDir
 
 	WinTitle := t("changelog_window.window_title")
 	g := Gui_Create("+Resize +MinSize860x540", WinTitle)
@@ -144,12 +150,21 @@ _CLW_BuildWindow(Channel) {
 		try LoggerError("Changelog", "WebView2 create failed: {1}.", Err.Message)
 		try g.Destroy()
 		_CLW_Reset()
+		; Clear the handle explicitly: the reset above short-circuits when a
+		; previous session already latched _CLW_ResetDone, and a _CLW_Gui left
+		; pointing at the Gui just destroyed would make Changelog_Open take its
+		; singleton branch forever.
+		_CLW_Gui := unset
 		; Graceful degradation to the old AHK-native changelog window.
 		_Updater_OpenChangelogWindow(Channel)
 		return
 	}
 
 	_CLW_WebView := _CLW_Controller.CoreWebView2
+	; This controller/webview pair is fresh — re-arm the Reset() guard so this
+	; session's close actually tears it down instead of short-circuiting on a flag
+	; left behind by an earlier _CLW_Reset() call.
+	_CLW_ResetDone := false
 
 	; Harden the webview — no devtools, no context menu, no status bar.
 	try {
@@ -276,12 +291,31 @@ _CLW_FlushQueue() {
 }
 
 /**
+ * Everything the page becoming ready must trigger, in one place.
+ *
+ * Flushing the queue LATCHES _CLW_Ready, and no later message re-triggers the
+ * fetch — so an entry point that flushed without fetching left the window
+ * permanently empty, styled and localised but with no releases in it. That is
+ * the exact defect the model browser hit and fixed by routing both of its entry
+ * points through a single handler (_LLM_MBW_OnPageReady); the two paths here go
+ * through this one for the same reason.
+ */
+_CLW_OnPageReady() {
+	global _CLW_Channel
+	_CLW_FlushQueue()
+	; Kick off the first fetch from AHK so the page receives data immediately.
+	_CLW_FetchAndInject(_CLW_Channel)
+}
+
+/**
  * Safety-net flush: fires 2 s after window creation in case the "ready"
  * postMessage from JS never arrives (e.g. navigation error).
  */
 _CLW_SafetyFlush() {
-	if (!_CLW_Ready)
-		_CLW_FlushQueue()
+	if (_CLW_Ready)
+		return
+	try LoggerWarn("Changelog", "No 'ready' message from the page after the safety delay — flushing and fetching anyway.")
+	_CLW_OnPageReady()
 }
 
 /**
@@ -293,19 +327,22 @@ _CLW_SafetyFlush() {
  */
 _CLW_OnWebMessage(Handler, Args) {
 	global _CLW_Channel
-	; WebMessageReceived is a COM callback that bypasses native Suspend, so
-	; without this guard a paused driver would still dispatch a network fetch
-	; and mutate _CLW_Channel ("pause = tout éteint" invariant).
-	if A_IsSuspended
-		return
 	try Msg := Args.TryGetWebMessageAsString()
 	if !IsSet(Msg)
 		return
+	; WebMessageReceived is a COM callback that bypasses native Suspend, so
+	; without this guard a paused driver would still dispatch a network fetch
+	; and mutate _CLW_Channel ("pause = tout éteint" invariant).
+	; Page-lifecycle signals are deliberately NOT gated — the page posts "ready"
+	; exactly once, so dropping it while suspended stranded the window forever:
+	; the SafetyFlush then latched _CLW_Ready without fetching, and resuming the
+	; driver could not re-trigger anything. Same exemption as every hardened
+	; sibling host.
+	if (A_IsSuspended && Msg != "ready")
+		return
 
 	if (Msg == "ready") {
-		_CLW_FlushQueue()
-		; Kick off the first fetch from AHK so the page receives data immediately.
-		_CLW_FetchAndInject(_CLW_Channel)
+		_CLW_OnPageReady()
 		return
 	}
 
@@ -523,7 +560,14 @@ _CLW_JsStr(s) {
  * Resets all module-level state after window close.
  */
 _CLW_Reset() {
-	global _CLW_Gui, _CLW_WebView, _CLW_Controller, _CLW_MsgSub, _CLW_Ready, _CLW_Queue
+	global _CLW_Gui, _CLW_WebView, _CLW_Controller, _CLW_MsgSub, _CLW_Ready, _CLW_Queue, _CLW_ResetDone
+	; Close and Escape are wired to the same handler and Controller.Close() pumps
+	; messages, so a second dispatch can re-enter this function while the first
+	; teardown is still in flight. Short-circuit instead of running the release +
+	; Close sequence twice against a controller that is already going away.
+	if _CLW_ResetDone
+		return
+	_CLW_ResetDone := true
 	; Release the subscription FIRST, while the controller is still alive. Its
 	; __Delete unsubscribes via remove_WebMessageReceived on the live
 	; controller; doing it AFTER Controller.Close() raises a COM error.

@@ -138,7 +138,15 @@ local function _load_sub_files_toml(driver_root)
 	local in_plats    = false   -- accumulating a multi-line platforms array
 
 	--- Extracts all quoted strings from an array fragment like ["foo", "bar"]
-	local function extract_strings(fragment)
+	--- Removes every double-quoted segment from a line, so structural characters can
+--- be located without a string's contents standing in for them.
+--- @param line string
+--- @return string The line with quoted spans blanked out.
+local function strip_quoted(line)
+	return (line:gsub('"[^"]*"', ""))
+end
+
+local function extract_strings(fragment)
 		local out = {}
 		for s in fragment:gmatch('"([^"\\]*)"') do out[#out + 1] = s end
 		return out
@@ -172,15 +180,22 @@ local function _load_sub_files_toml(driver_root)
 			goto next_line
 		end
 
-		-- Accumulate multi-line arrays
+		-- Accumulate multi-line arrays.
+		--
+		-- The array closes on a "]" OUTSIDE a quoted string. Testing the raw line
+		-- ended the array on the first pattern that merely CONTAINED one — and the
+		-- file's own guidance is to "prefer tag-based patterns (e.g. \"[gestures\")",
+		-- so bracket-bearing patterns are the documented norm rather than an edge
+		-- case. Every pattern after such a line was silently discarded, and the
+		-- sub-file it belonged to simply never received those lines.
 		if in_pats then
 			for _, s in ipairs(extract_strings(line)) do cur_pats[#cur_pats + 1] = s end
-			if line:find("]", 1, true) then in_pats = false end
+			if strip_quoted(line):find("]", 1, true) then in_pats = false end
 			goto next_line
 		end
 		if in_plats then
 			for _, s in ipairs(extract_strings(line)) do cur_plats[#cur_plats + 1] = s end
-			if line:find("]", 1, true) then in_plats = false end
+			if strip_quoted(line):find("]", 1, true) then in_plats = false end
 			goto next_line
 		end
 
@@ -296,6 +311,10 @@ local _last_log_path  = nil
 -- test can never fire for the files that actually need resetting.
 local _sub_file_date  = {}
 
+-- Open append handles for the topical sub-files, keyed by path. Declared here
+-- with the other sink state and ABOVE every closure that touches it.
+local _sub_handles    = {}
+
 -- Forward declaration — implementation is in Section 3.2. Declared here for the
 -- same reason as the handles above: init_log_path() and _purge_old_logs() are
 -- defined before it and must reach the real dispatcher, not a nil global.
@@ -312,18 +331,37 @@ function M.init_log_path(config_dir, max_age_days)
 	if type(config_dir) ~= "string" or config_dir == "" then return end
 	if not config_dir:match("[/\\]$") then config_dir = config_dir .. "/" end
 
-	-- Lazy-require avoids a circular dependency: ShellRunner requires Logger,
-	-- but Logger is a foundational module loaded before adapters. By deferring
-	-- the require to init_log_path() (called post-startup, not at require time)
-	-- both modules are fully loaded before either references the other.
-	local ShellRunner = require("adapters.shell_runner")
-
 	local log_dir = config_dir .. "hammerspoon/logs/"
-	-- POSIX-quoted inline rather than via lib.text_utils: the logger is the most
-	-- foundational module in the driver and must not acquire a require() that could
-	-- reorder or cycle at boot. Same idiom as text_utils.shell_quote.
-	ShellRunner.exec("mkdir -p '" .. tostring(log_dir):gsub("'", "'\''") .. "'")
+
+	-- Created in-process, not by forking /bin/sh.
+	--
+	-- This runs on the boot critical path, and `mkdir -p` through the fully
+	-- synchronous ShellRunner is a fork+exec paid on every launch for a directory
+	-- that already exists on all but the first. Four other modules in this driver
+	-- create directories in-process already. hs.fs.mkdir creates ONE level, so the
+	-- components are walked; every call is best-effort, because a permission
+	-- problem must not block boot — exactly as the shell version's discarded exit
+	-- status did not.
+	local hs_ref = rawget(_G, "hs")
+	local fs_ref = (type(hs_ref) == "table") and hs_ref.fs or nil
+	if type(fs_ref) == "table" and type(fs_ref.mkdir) == "function" then
+		local built = (log_dir:sub(1, 1) == "/") and "/" or ""
+		for part in log_dir:gmatch("[^/]+") do
+			built = built .. part .. "/"
+			pcall(fs_ref.mkdir, built)
+		end
+	end
 	_log_dir = log_dir
+
+	-- Close every sub-file handle open on the OLD directory. They are keyed by
+	-- absolute path, so a re-point would otherwise keep writing the topical logs
+	-- into the previous config directory for the rest of the session — and the
+	-- per-day truncation decision, cached alongside them, would be stale too.
+	for path, entry in pairs(_sub_handles) do
+		pcall(function() entry.fh:close() end)
+		_sub_handles[path]   = nil
+		_sub_file_date[path] = nil
+	end
 
 	-- Close any handle open on the old path so the next write re-opens cleanly
 	if _file_handle then
@@ -625,27 +663,84 @@ local function _sub_file_mode(path, today)
 	return (os.date("%Y-%m-%d", attrs.modification) == today) and "a" or "w"
 end
 
-local function _write_to_file(stamp, line)
+-- DEBUG lines written since the last flush.
+local _unflushed_debug = 0
+
+--- Buffered DEBUG lines allowed before the handle is flushed anyway. A COUNT
+--- rather than a deadline so this needs no clock read of its own: the exposure
+--- is bounded by volume, which is what actually matters — a burst of tracing is
+--- exactly when losing the tail would hurt, and an idle driver writes nothing to
+--- lose.
+local FLUSH_EVERY_N_DEBUG = 40
+
+--- Appends one line to the unified log.
+---
+--- The flush is LEVEL-AWARE. The default level is DEBUG, and DEBUG lines are
+--- emitted from the keystroke path, so flushing every line meant a synchronous
+--- fsync inside the eventtap on every key the user pressed — the one place in
+--- the driver where blocking I/O is least affordable, since a stalled tap is
+--- exactly what macOS disables for being unresponsive.
+---
+--- Anything at INFO or above still flushes immediately: those are the lines that
+--- matter after a crash, and they are rare. DEBUG lines stay in the handle's
+--- buffer and are flushed by the next important line or once
+--- FLUSH_EVERY_N_DEBUG of them have accumulated, so only a bounded tail of
+--- verbose tracing is ever at risk.
+--- @param stamp string Formatted timestamp.
+--- @param line string The already-composed log line.
+--- @param immediate boolean|nil False to defer the flush; anything else flushes now.
+local function _write_to_file(stamp, line, immediate)
 	local full = stamp .. " " .. line .. "\n"
 	local fh = _ensure_log_file()
 	if fh then
 		pcall(function()
 			fh:write(full)
-			fh:flush()
+			if immediate == false then
+				_unflushed_debug = _unflushed_debug + 1
+				if _unflushed_debug >= FLUSH_EVERY_N_DEBUG then
+					fh:flush()
+					_unflushed_debug = 0
+				end
+			else
+				fh:flush()
+				_unflushed_debug = 0
+			end
 		end)
 	end
-	-- Fan-out to topical sub-files. Each is opened/closed per write so a crash
-	-- never leaves a stale handle. Cost is negligible vs. the operations logged.
+	-- Fan-out to topical sub-files.
+	--
+	-- Handles are kept OPEN, exactly like the main one. Opening and closing per
+	-- line looked cheap next to "the operations logged" — true of the operations,
+	-- and false of a keystroke: the default level is DEBUG and DEBUG lines are
+	-- emitted from the keystroke path, so every matching line paid an
+	-- open+write+close inside the eventtap callback. That is the same blocking
+	-- I/O the main handle's level-aware flush policy exists to avoid, arriving
+	-- through the back door.
+	--
+	-- Lines are still flushed on the same terms as the main handle, so a crash
+	-- loses at most the buffered DEBUG tail rather than leaving a stale handle
+	-- holding everything.
 	local today = os.date("%Y-%m-%d")
 	for _, sub in ipairs(SUB_LOG_NAMES) do
 		if _matches_any(line, sub.patterns) then
 			pcall(function()
 				local path = _log_dir .. sub.name
-				local f = io.open(path, _sub_file_mode(path, today))
-				if f then
-					f:write(full)
-					f:close()
+				local mode = _sub_file_mode(path, today)
+				local entry = _sub_handles[path]
+				-- Re-open when the mode changes: "w" means a new calendar day has
+				-- to truncate the file, which an already-open append handle cannot do.
+				if entry and entry.mode ~= mode then
+					pcall(function() entry.fh:close() end)
+					entry = nil
 				end
+				if not entry then
+					local fh = io.open(path, mode)
+					if not fh then return end
+					entry = { fh = fh, mode = "a" }
+					_sub_handles[path] = entry
+				end
+				entry.fh:write(full)
+				if immediate ~= false then entry.fh:flush() end
 			end)
 		end
 	end
@@ -744,7 +839,10 @@ _log = function(variant_key, module_name, msg, ...)
 	local sink_variant = variant_key == "WARNING" and "warn" or string.lower(variant_key)
 	if _test_sink then pcall(_test_sink, console_line, sink_variant) end
 
-	_write_to_file(stamp, line)
+	-- Only the DEBUG-class variants defer their flush; see _write_to_file. These
+	-- are the ones emitted per keystroke, and they are also the ones whose loss
+	-- in a crash costs least.
+	_write_to_file(stamp, line, variant.level ~= M.LEVELS.DEBUG)
 
 	-- Dedicated errors-only log (WARNING + ERROR). Separate open/close per
 	-- write (like sub-files) so a crash never leaks a handle. This file stays

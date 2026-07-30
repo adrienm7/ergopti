@@ -100,11 +100,19 @@ function M.spawn(executable, args, on_done, on_chunk)
 		-- reported success for the most common real failure (missing or non-executable
 		-- binary) — exactly the case this function's contract exists to surface.
 		local ok, started = pcall(function() return _task:start() end)
+		-- Release the GC pin on BOTH failure paths. The pin is taken at
+		-- construction so the task cannot be collected mid-run, and is released by
+		-- the completion callback — which never fires for a task that never
+		-- launched. Without this, every refused launch left a dead hs.task and its
+		-- captured closures in the GC root for the life of the process, and the
+		-- root is the one table that is never pruned.
 		if not ok then
+			if _task then M._active_tasks[_task] = nil end
 			Logger.error(LOG, "spawn.start(): hs.task:start() failed — %s", tostring(started))
 			return false
 		end
 		if not started then
+			if _task then M._active_tasks[_task] = nil end
 			Logger.error(LOG, "spawn.start(): hs.task:start() refused to launch %s", tostring(executable))
 			return false
 		end
@@ -201,6 +209,120 @@ function M.spawn(executable, args, on_done, on_chunk)
 	handle.terminate = _safe_terminate
 
 	return handle
+end
+
+
+
+
+-- ==============================================
+-- ==============================================
+-- ======= 3/ Non-blocking OS Conveniences ======
+-- ==============================================
+-- ==============================================
+
+-- These two exist so the interactive layer — everything that runs in response to
+-- a live keystroke or gesture — has a non-blocking way to do the two things it
+-- used `hs.execute` and `hs.osascript.applescript` for. Both of those APIs are
+-- synchronous: they hold the single Hammerspoon runloop until the child exits, so
+-- the keyboard tap receives nothing for the duration and macOS can disable it for
+-- missing its deadline. `hs.timer.doAfter(0, …)` does not help — the timer body
+-- runs on that same runloop, which moves the freeze instead of removing it.
+
+-- Absolute paths: the interactive layer must not depend on the inherited PATH,
+-- which differs between a login shell and the Hammerspoon process.
+local OPEN_BIN      = "/usr/bin/open"
+local OSASCRIPT_BIN = "/usr/bin/osascript"
+
+--- Invokes a caller-supplied callback so a throw inside it is LOGGED, not eaten.
+---
+--- `pcall` is deliberately not used: it returns the error and discards it, which
+--- is the swallowing pattern `wrapped_on_done` was fixed for and that
+--- `tests/unit/adapters/test_shell_runner_on_done_visible.lua` pins against. These
+--- callbacks run from an hs.task completion, where a bare throw is invisible.
+--- @param label string Identifies the call site in the log line.
+--- @param fn function|nil The callback. Nothing happens when it is absent.
+--- @param ... any Arguments forwarded to the callback.
+local function invoke_guarded(label, fn, ...)
+	if type(fn) ~= "function" then return end
+	local args = table.pack(...)
+	local ok, err = xpcall(function() return fn(table.unpack(args, 1, args.n)) end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "%s callback threw: %s", tostring(label), tostring(err))
+	end
+end
+
+--- Opens a file, folder or URL with Launch Services, without blocking.
+---
+--- `open` waits for Launch Services to resolve the handler and, on a cold start,
+--- for the target application to finish launching — seconds, not milliseconds.
+---
+--- @param target string Path or URL to open. Passed as an argv entry, so it needs
+---        no shell quoting and cannot be re-interpreted by a shell.
+--- @param on_done function|nil Optional fn(ok) called with true on exit code 0.
+--- @return boolean True when the subprocess was started.
+function M.open(target, on_done)
+	if type(target) ~= "string" or target == "" then
+		Logger.error(LOG, "open(): target must be a non-empty string — nothing opened.")
+		invoke_guarded("open.reject", on_done, false)
+		return false
+	end
+	Logger.trace(LOG, "Opening '%s' asynchronously…", target)
+	-- No shell is involved, so a target containing a space, a quote or a `$` is
+	-- delivered verbatim — the argv form removes the whole shell-quoting class of
+	-- bug that `hs.execute("open " .. quote(path))` had to defend against.
+	local handle = M.spawn(OPEN_BIN, { target }, function(exit_code)
+		local ok = (exit_code == 0)
+		if ok then
+			Logger.done(LOG, "Opened '%s'.", target)
+		else
+			Logger.warn(LOG, "open('%s') exited with code %s.", target, tostring(exit_code))
+		end
+		invoke_guarded("open.done", on_done, ok)
+	end)
+	local started = handle.start()
+	if not started then
+		Logger.error(LOG, "open(): could not start %s for '%s'.", OPEN_BIN, target)
+		-- A task that never launched never calls back, so a caller waiting on the
+		-- callback would wait forever.
+		invoke_guarded("open.launch_failed", on_done, false)
+	end
+	return started
+end
+
+--- Runs an AppleScript without blocking, reporting its result to a callback.
+---
+--- @param script string The AppleScript source.
+--- @param on_done function|nil fn(ok, output) where ok is true on exit code 0 and
+---        output is stdout with the trailing newline `osascript` always appends
+---        stripped — callers compare against bare tokens like "ok", and the raw
+---        stdout never equals one.
+--- @return boolean True when the subprocess was started.
+function M.applescript(script, on_done)
+	if type(script) ~= "string" or script == "" then
+		Logger.error(LOG, "applescript(): script must be a non-empty string — nothing run.")
+		invoke_guarded("applescript.reject", on_done, false, nil)
+		return false
+	end
+	Logger.trace(LOG, "Running AppleScript asynchronously (%d bytes)…", #script)
+	local handle = M.spawn(OSASCRIPT_BIN, { "-e", script }, function(exit_code, stdout, stderr)
+		local ok  = (exit_code == 0)
+		local out = type(stdout) == "string" and stdout:gsub("%s+$", "") or nil
+		if ok then
+			Logger.done(LOG, "AppleScript completed.")
+		else
+			Logger.warn(LOG, "AppleScript failed (code %s): %s",
+				tostring(exit_code), tostring(stderr):gsub("%s+$", ""))
+		end
+		invoke_guarded("applescript.done", on_done, ok, out)
+	end)
+	local started = handle.start()
+	if not started then
+		Logger.error(LOG, "applescript(): could not start %s.", OSASCRIPT_BIN)
+		-- The completion callback never fires for a task that never launched, so
+		-- a caller waiting on it would hang forever on its "in flight" branch.
+		invoke_guarded("applescript.launch_failed", on_done, false, nil)
+	end
+	return started
 end
 
 return M

@@ -21,8 +21,15 @@ Test("tooltip: a re-entrant render cannot present or hide a newer generation", T
 
 Test_TooltipShowDebouncesHeavyRenderWork() {
 	Entry := _DriverFuncBody("TooltipShow")
+	; The literal is asserted deliberately, and the assertion below now says why.
+	; It reads like a mechanism check — "defer via a timer" would be the obvious
+	; weaker form — but the exact delay IS the guarantee here: the preview render
+	; must land _PREFIX_RENDER_DEBOUNCE_MS + TOOLTIP_RENDER_DEBOUNCE_MS after the
+	; last character in order to clear TOOLTIP_UIA_IDLE_REQUIRED_MS, and a
+	; computed delay satisfies "defer via a timer" while breaking that. The
+	; relationship itself is pinned by test_tooltip_debounce_is_load_bearing.ahk.
 	Assert(InStr(Entry, "SetTimer(_TooltipDeferredShowFn, -TOOLTIP_RENDER_DEBOUNCE_MS)") > 0,
-		"TooltipShow must debounce rendering so GUI/UIA work does not execute in the prefix watcher callback")
+		"TooltipShow must hand rendering to a timer armed with TOOLTIP_RENDER_DEBOUNCE_MS itself, so that GUI/UIA work never runs in the prefix-watcher callback AND the render lands late enough to clear the UIA idle gate. A shorter or computed delay leaves every constant untouched while making stage 2 of the position cascade unreachable")
 	Assert(InStr(Entry, "_TooltipBuildGui(") = 0 and InStr(Entry, "_TooltipResolvePosition(") = 0,
 		"TooltipShow must not build a Gui or resolve UIA position synchronously on the keyboard path")
 	Resolve := _DriverFuncBody("_TooltipResolvePosition")

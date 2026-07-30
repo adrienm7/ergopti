@@ -315,7 +315,18 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full") {
     return written
 }
 
+; Diagnostic sink for the prefetch worker. Gated behind the debug level exactly
+; like its sibling KLR_PrefetchDebug in the same pipeline: it emits six lines per
+; projection, and KLPF_RequestBuild spawns a projection on every ingest tick
+; while a dashboard is open (~4 300/day). prefetch_debug.log is written next to
+; the dated ErgoptiPlus_*.log files but _LoggerPurgeOldLogs only matches those,
+; so nothing ever rotates or ages it out — unbounded growth for the lifetime of
+; the install, on top of the open+write+close NTFS/AV tax per line.
+; @param path {String} Destination log file.
+; @param line {String} Line to append, without a trailing newline.
 KLPF_DbgWrite(path, line) {
+    if !LoggerIsDebugEnabled()
+        return
     try FileAppend(line . "`r`n", path, "UTF-8")
 }
 
@@ -411,6 +422,33 @@ KLPF_MoveAtomic(source, destination, flags := unset) {
 ; the per-tick manifest cost from ~150 ms to ~20 ms.
 global KLPF_MANIFEST_CACHE := unset
 
+; Collapse a manifest's date x app grid into the SET of app names the SQL filter
+; needs. The manifest lists every app once PER DAY, but the consumers splice the
+; result into an ``app IN (...)`` clause that KLR_BuildTodayIdxJson re-parses in
+; eleven SELECTs on every ingest tick, so a duplicate member costs SQL text and
+; SQLite parse time while selecting exactly the same rows — and the count grows
+; with days-of-history x apps, forever, because nothing prunes agg_app_day. This
+; is one helper rather than two inline loops because the "live" and "full"
+; branches below each carried a copy and only the "full" one de-duplicated.
+; @param manifest {Map} manifest[date][app] grid as returned by KLR_ReadManifest.
+; @return {Array} Sorted, de-duplicated app names, with "Unknown" excluded.
+KLPF_UniqueAppsFromManifest(manifest) {
+    apps_set  := Map()
+    apps_list := []
+    for _, day_data in manifest {
+        for app_name, _ in day_data {
+            if (app_name = "Unknown")
+                continue
+            if !apps_set.Has(app_name) {
+                apps_set[app_name] := true
+                apps_list.Push(app_name)
+            }
+        }
+    }
+    KLPF_SortInPlace(apps_list)
+    return apps_list
+}
+
 KLPF_BuildTyping(db, mode := "full") {
     global KLPF_MANIFEST_CACHE
     today := FormatTime(A_Now, "yyyy-MM-dd")
@@ -460,15 +498,7 @@ KLPF_BuildTyping(db, mode := "full") {
         ; KL_JsonEncode runs. This bypasses ~600 ms of per-row Map
         ; allocation + ~300 ms of AHK-side JSON encoding for the
         ; n-gram tables, dropping live-tick total to under 200 ms.
-        apps_list := []
-        for date_str, day_data in manifest {
-            for app_name, _ in day_data {
-                if (app_name = "Unknown")
-                    continue
-                apps_list.Push(app_name)
-            }
-        }
-        today_json := KLR_BuildTodayIdxJson(db, apps_list)
+        today_json := KLR_BuildTodayIdxJson(db, KLPF_UniqueAppsFromManifest(manifest))
         blob["_prefetch_data"] := Map(
             "historical", Map(),
             "today", "__KLPF_TODAY_PLACEHOLDER__"
@@ -478,21 +508,11 @@ KLPF_BuildTyping(db, mode := "full") {
     }
 
     first_date := ""
-    apps_set := Map()
-    apps_list := []
-    for date_str, day_data in manifest {
+    for date_str, _ in manifest {
         if (first_date = "" || StrCompare(date_str, first_date) < 0)
             first_date := date_str
-        for app_name, _ in day_data {
-            if (app_name = "Unknown")
-                continue
-            if !apps_set.Has(app_name) {
-                apps_set[app_name] := true
-                apps_list.Push(app_name)
-            }
-        }
     }
-    KLPF_SortInPlace(apps_list)
+    apps_list := KLPF_UniqueAppsFromManifest(manifest)
 
     range_data := Map("historical", Map(), "today", Map())
     if (first_date != "")

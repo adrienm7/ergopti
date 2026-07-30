@@ -433,9 +433,14 @@ _OnbWeb_Finish(answers) {
 	_ob_layout   := answers.Has("use_ergopti")  && _OnbWeb_Truthy(answers["use_ergopti"])
 	_ob_metrics  := answers.Has("use_metrics")  && _OnbWeb_Truthy(answers["use_metrics"])
 	_ob_gestures := answers.Has("use_gestures") && _OnbWeb_Truthy(answers["use_gestures"])
-	if (answers.Has("magic_key") && answers["magic_key"] != "")
+	; Braced deliberately: a brace-less v2 `if` takes exactly ONE statement, so the
+	; provenance flag used to be set unconditionally while the indentation claimed
+	; it belonged to the branch — marking a magic key as explicitly chosen for a
+	; payload that carried none.
+	if (answers.Has("magic_key") && answers["magic_key"] != "") {
 		_ob_magic_key := answers["magic_key"]
 		_ob_magic_key_explicit := true
+	}
 	_ob_register_pending := false
 	_OB_ALTGR_PASSTHROUGH := false
 
@@ -445,7 +450,7 @@ _OnbWeb_Finish(answers) {
 		; Close the WebView2 controller before the host window is torn down by
 		; Reload (the WebView2 spec requires Controller.Close first).
 		_OnbWeb_Reset()
-		Reload
+		ReloadPreservingSuspend()
 	}
 }
 

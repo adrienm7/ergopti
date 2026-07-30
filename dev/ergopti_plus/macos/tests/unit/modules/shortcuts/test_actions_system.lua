@@ -356,8 +356,15 @@ local function make_sys_screenshot_spies(window_override)
 	-- lib.notifications uses hs.notify under the hood — stub it so the deferred
 	-- screencapture callback (and the nil-id guard branch) don't crash in headless tests.
 	package.loaded["lib.notifications"] = { notify = function() end }
+	-- The capture goes through adapters.shell_runner, which captures `local hs = hs`
+	-- at require-time. Cached from an earlier test file it stays bound to THAT file's
+	-- hs stub, so the module under test spawns correctly while the assertions below
+	-- read a different stub's records and see nothing. Cleared here rather than in
+	-- load_with_stubs: several tests install their own adapter doubles into
+	-- package.loaded before calling it, and a blanket adapter sweep wipes those.
+	package.loaded["adapters.shell_runner"] = nil
 
-	local spy = { captured_cb = nil, do_after_calls = {}, exec_calls = {} }
+	local spy = { captured_cb = nil, do_after_calls = {}, exec_calls = {}, tasks = {} }
 
 	local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
 		eventtap = {
@@ -379,6 +386,25 @@ local function make_sys_screenshot_spies(window_override)
 			usleep   = function() end,
 		},
 		execute  = function(cmd) table.insert(spy.exec_calls, cmd) return "", true, "exit", 0 end,
+		-- hs.task is stubbed rather than the ShellRunner module: the capture now
+		-- goes through the real adapter, so stubbing at the OS boundary exercises
+		-- that wiring instead of asserting against a hand-written double. It also
+		-- keeps package.loaded clean — a leaked adapter stub would make every later
+		-- test observe a driver that spawns nothing, silently.
+		--
+		-- The arity is the real one: hs.task.new(path, on_done, args) in the
+		-- 3-argument form, and start() RETURNS a boolean (a stub returning nil
+		-- would let a refused launch pass as success).
+		task = {
+			new = function(path, on_done, args)
+				local rec = { path = path, on_done = on_done, args = args, started = false }
+				table.insert(spy.tasks, rec)
+				return {
+					start     = function() rec.started = true return true end,
+					terminate = function() end,
+				}
+			end,
+		},
 		window   = window_override or {
 			frontmostWindow = function()
 				return { id = function() return 42 end }
@@ -389,10 +415,38 @@ local function make_sys_screenshot_spies(window_override)
 	return sys, spy
 end
 
+--- Returns the first recorded spawn whose binary basename matches, or nil.
+--- @param spy table The spy table from make_sys_screenshot_spies.
+--- @param basename string e.g. "mkdir", "screencapture".
+--- @return table|nil
+local function spawn_of(spy, basename)
+	for _, rec in ipairs(spy.tasks) do
+		if type(rec.path) == "string" and rec.path:find(basename, 1, true) then return rec end
+	end
+	return nil
+end
+
+
+--- Flattens a spawn's argv into one searchable string.
+--- @param rec table|nil A recorded spawn.
+--- @return string
+local function argv_of(rec)
+	if not rec or type(rec.args) ~= "table" then return "" end
+	local parts = {}
+	for _, a in ipairs(rec.args) do table.insert(parts, tostring(a)) end
+	return table.concat(parts, " ")
+end
+
+
 -- Regression: two synchronous hs.execute calls (mkdir + screencapture) were running
 -- inline on the CGEventTap thread, regularly exceeding the dispatch deadline and
--- silently disabling the tap (kCGEventTapDisabledByTimeout). The fix defers them via
--- hs.timer.doAfter(0, ...) and returns true immediately from the callback.
+-- silently disabling the tap (kCGEventTapDisabledByTimeout).
+--
+-- The first fix deferred them with hs.timer.doAfter(0, ...). That protected the tap
+-- deadline but NOT the driver: the timer body runs on the same single runloop, so
+-- the freeze simply moved one tick later, and every keystroke during mkdir +
+-- screencapture was still lost. They are now real asynchronous subprocesses, and
+-- these cases assert that — a doAfter would no longer satisfy them.
 helpers.describe("shortcuts.actions.system: bind_instant_screenshot defers exec (shortcuts-actions-1 regression)", function()
 
 	helpers.it("invoking the eventtap callback does NOT call hs.execute inline", function()
@@ -412,7 +466,7 @@ helpers.describe("shortcuts.actions.system: bind_instant_screenshot defers exec 
 			"hs.execute must NOT be called inline in the eventtap callback (would block CGEventTap thread)")
 	end)
 
-	helpers.it("invoking the eventtap callback schedules a doAfter(0) with the capture work", function()
+	helpers.it("invoking the eventtap callback launches the capture work as a subprocess", function()
 		local _sys, spy = make_sys_screenshot_spies()
 		_sys.bind_instant_screenshot()
 
@@ -422,13 +476,22 @@ helpers.describe("shortcuts.actions.system: bind_instant_screenshot defers exec 
 		}
 		spy.captured_cb(fake_event)
 
-		helpers.assert_true(#spy.do_after_calls >= 1,
-			"a doAfter must be scheduled for the deferred screenshot work")
-		helpers.assert_eq(spy.do_after_calls[#spy.do_after_calls].delay, 0,
-			"the deferred callback must be scheduled with delay 0 (next run-loop tick)")
+		-- This is the half of the invariant the "no inline hs.execute" case cannot
+		-- carry: silently doing NOTHING also calls no blocking API.
+		helpers.assert_true(#spy.tasks >= 1,
+			"the capture work must actually be launched, off the tap callback — a fix that "
+			.. "merely stops calling hs.execute inline and drops the screenshot would pass "
+			.. "the inline assertion above")
+		local first = spy.tasks[1]
+		helpers.assert_true(first.path:sub(1, 1) == "/",
+			"the binary must be an absolute path: the Hammerspoon process does not inherit "
+			.. "the login shell's PATH, so a bare name is not reliably resolvable")
+		helpers.assert_true(first.started,
+			"an hs.task that is created but never started is a subprocess that never runs, "
+			.. "and start() is where a refused launch is reported")
 	end)
 
-	helpers.it("running the deferred callback issues the mkdir and screencapture calls", function()
+	helpers.it("the capture runs only after the directory has been created", function()
 		local _sys, spy = make_sys_screenshot_spies()
 		_sys.bind_instant_screenshot()
 
@@ -438,19 +501,31 @@ helpers.describe("shortcuts.actions.system: bind_instant_screenshot defers exec 
 		}
 		spy.captured_cb(fake_event)
 
-		-- Fire the deferred work
-		local deferred = spy.do_after_calls[#spy.do_after_calls]
-		helpers.assert_true(deferred ~= nil, "deferred callback must have been scheduled")
-		deferred.fn()
+		local mkdir = spawn_of(spy, "mkdir")
+		helpers.assert_true(mkdir ~= nil, "the screenshots directory must still be created")
+		helpers.assert_true(argv_of(mkdir):find("-p", 1, true) ~= nil,
+			"mkdir needs -p: the parent Pictures/screenshots path may not exist either")
 
-		local has_mkdir  = false
-		local has_screen = false
-		for _, cmd in ipairs(spy.exec_calls) do
-			if cmd:find("mkdir",       1, true) then has_mkdir  = true end
-			if cmd:find("screencapture", 1, true) then has_screen = true end
-		end
-		helpers.assert_true(has_mkdir,  "deferred callback must run mkdir -p")
-		helpers.assert_true(has_screen, "deferred callback must run screencapture")
+		-- The ordering assertion the old mechanism could not express. Both calls used
+		-- to be issued back to back inside one deferred block, so nothing verified
+		-- that the directory existed before screencapture tried to write into it.
+		helpers.assert_nil(spawn_of(spy, "screencapture"),
+			"the capture must NOT be launched before mkdir reports completion — a capture "
+			.. "into a missing directory writes no file, and the old code notified success "
+			.. "regardless")
+
+		mkdir.on_done(0, "", "")
+
+		local capture = spawn_of(spy, "screencapture")
+		helpers.assert_true(capture ~= nil,
+			"once the directory exists the capture must be launched")
+		local argv = argv_of(capture)
+		helpers.assert_true(argv:find("-l", 1, true) ~= nil,
+			"the capture must still target the recorded window id with -l")
+		helpers.assert_true(argv:find("42", 1, true) ~= nil,
+			"and that id must be the one read from the frontmost window, not a placeholder")
+		helpers.assert_eq(#spy.exec_calls, 0,
+			"and none of this may go through the blocking shell at any point")
 	end)
 end)
 
@@ -503,24 +578,26 @@ helpers.describe("shortcuts.actions.system: bind_instant_screenshot guards nil w
 			"screencapture must NOT be called when window id is nil")
 	end)
 
-	helpers.it("source: id nil-check appears before the deferred screencapture command", function()
-		local src_path = helpers.driver_root() .. "modules/shortcuts/actions/system.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "system.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+	helpers.it("a nil window id launches no subprocess at all", function()
+		-- Replaces a source grep for the old shell command string. Asserting the
+		-- ORDER of two substrings in the file could only ever prove the guard is
+		-- written above the call; this proves it actually stops it, and it keeps
+		-- holding through any rewrite of the capture mechanism.
+		local _sys, spy = make_sys_screenshot_spies({
+			frontmostWindow = function() return { id = function() return nil end } end,
+		})
+		_sys.bind_instant_screenshot()
 
-		-- The guard must check `not id` before the deferred block that uses id.
-		-- Use the actual pcall invocation pattern (not the comment line that also mentions
-		-- screencapture -l, which appears one line before the guard and would give a false
-		-- position: "-- ... screencapture -l" → comment is found first, then "if not id").
-		local guard_pos = src:find("if not id then", 1, true)
-		local defer_pos = src:find('pcall(hs.execute, "screencapture -l ', 1, true)
-		helpers.assert_true(guard_pos ~= nil,
-			"system.lua must have an 'if not id then' guard for the nil window ID case")
-		helpers.assert_true(defer_pos ~= nil,
-			"system.lua must still contain the screencapture -l command in the deferred path")
-		helpers.assert_true(guard_pos < defer_pos,
-			"the nil-id guard must appear before the screencapture -l command")
+		spy.captured_cb({
+			getKeyCode = function() return 10 end,
+			getFlags   = function() return {} end,
+		})
+
+		helpers.assert_eq(#spy.tasks, 0,
+			"a borderless or system window returns nil from :id(), and screencapture -l "
+			.. "needs a valid CGWindowID — concatenating nil into the argv would raise "
+			.. "inside the callback, where the throw is invisible")
+		helpers.assert_eq(#spy.exec_calls, 0, "and nothing may reach the blocking shell either")
 	end)
 
 end)
@@ -664,10 +741,12 @@ end)
 helpers.describe("shortcuts.actions.system: schedule_awake_tick float random bounds (shortcuts-actions-3 regression)", function()
 
 	helpers.it("source: uses math.random() (no-arg) not math.random(m, n) for the tick interval", function()
-		local src_path = helpers.driver_root() .. "modules/shortcuts/actions/system.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "system.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/shortcuts/actions/system.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function read_wrap_ax_selection_cached")
+		helpers.assert_true(src ~= nil, "modules/shortcuts/actions/system.lua source must be locatable")
+		if not src then return end
 
 		-- The buggy form passes the float bounds directly to math.random(m, n).
 		local has_buggy = src:find("math.random(AWAKE_TICK_MIN_SEC, AWAKE_TICK_MAX_SEC)", 1, true) ~= nil
@@ -686,10 +765,12 @@ helpers.describe("shortcuts.actions.system: schedule_awake_tick float random bou
 	end)
 
 	helpers.it("source: span variable is computed before the interval assignment", function()
-		local src_path = helpers.driver_root() .. "modules/shortcuts/actions/system.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/shortcuts/actions/system.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function read_wrap_ax_selection_cached")
+		helpers.assert_true(src ~= nil, "modules/shortcuts/actions/system.lua source must be locatable")
+		if not src then return end
 
 		-- The float-safe pattern requires a span = max - min intermediate variable.
 		local span_pos    = src:find("local span = AWAKE_TICK_MAX_SEC", 1, true)

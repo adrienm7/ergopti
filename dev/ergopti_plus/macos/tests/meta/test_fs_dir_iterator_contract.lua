@@ -142,6 +142,27 @@ helpers.describe("meta: hs.fs.dir is always consumed by a generic-for (init-fsdi
 		end
 	end
 
+	-- Stronger invariant than "flows into a generic-for". That shape keeps the
+	-- state object alive but still THROWS on a missing or unreadable directory,
+	-- and five call sites shipped exactly that: a menu that crashed the moment the
+	-- extensions folder did not exist. lib/fs_dir.entries() is the only form that
+	-- is both state-correct AND throw-safe, and it is now the only form in the
+	-- tree — so the guard can demand it rather than merely tolerate the weaker one.
+	helpers.it("no driver file outside lib/fs_dir.lua references hs.fs.dir directly", function()
+		local direct = {}
+		for _, path in ipairs(files) do
+			if not path:find("fs_dir", 1, true) then
+				local code = strip_comments(read_file(path))
+				if code:find("hs%.fs%.dir") then direct[#direct + 1] = path end
+			end
+		end
+		helpers.assert_true(#direct == 0,
+			string.format("%d file(s) call hs.fs.dir directly instead of lib/fs_dir.entries(); "
+				.. "the raw call throws on a missing directory, which is a crash on a path the "
+				.. "user can simply not have created yet: %s",
+				#direct, table.concat(direct, ", ")))
+	end)
+
 	helpers.it(string.format("every hs.fs.dir reference flows into a generic-for (%d ref(s) across driver source)", total_refs), function()
 		helpers.assert_true(total_refs > 0,
 			"no hs.fs.dir references found — the source scan is broken (check SOURCE_ROOTS)")

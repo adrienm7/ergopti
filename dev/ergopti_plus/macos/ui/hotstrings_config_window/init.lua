@@ -59,8 +59,22 @@ local _config = {
 -- width/height constant: hardcoding here is what caused the cross-driver drift.
 
 -- The global delay fallback (seconds) that applies when no TOML default is set.
--- Mirrored from hotstrings_config GLOBAL_DEFAULT_DELAY — both must stay in sync.
-local GLOBAL_DEFAULT_DELAY_MS = 750
+-- Fallback only. The live value is read from hotstrings_config, which loads it
+-- from the shared canon the AutoHotkey driver also reads. A hand-mirrored copy
+-- with a comment saying the two "must stay in sync" IS the second source — and
+-- the one that silently stops matching when the canon moves.
+local GLOBAL_DEFAULT_DELAY_MS_FALLBACK = 750
+
+--- Returns the shared global default expansion delay in milliseconds.
+--- @return number
+local function global_default_delay_ms()
+	local ok, cfg = pcall(require, "modules.hotstrings.hotstrings_config")
+	if ok and type(cfg) == "table" and type(cfg.get_global_default_delay_ms) == "function" then
+		local v = cfg.get_global_default_delay_ms()
+		if type(v) == "number" then return v end
+	end
+	return GLOBAL_DEFAULT_DELAY_MS_FALLBACK
+end
 
 -- The frontend (index.html / script.js / style.css) lives in the cross-driver
 -- _shared/ui/ tree so the Windows WebView2 host renders the identical UI; both
@@ -330,7 +344,7 @@ local function build_state()
 		categories            = {},
 		groups                = {},
 		presets               = COLOR_PRESETS,
-		global_default_delay_ms = GLOBAL_DEFAULT_DELAY_MS,
+		global_default_delay_ms = global_default_delay_ms(),
 	}
 
 	-- Always present the common group

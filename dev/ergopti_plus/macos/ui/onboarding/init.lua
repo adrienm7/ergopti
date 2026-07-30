@@ -26,6 +26,7 @@ local toml_codec   = require("lib.toml.codec")
 local notifications = require("lib.notifications")
 local Paths        = require("lib.paths")
 local Logger       = require("lib.logger")
+local text_utils   = require("lib.text_utils")
 local LOG          = "onboarding"
 
 local SETTINGS_COMPLETED_KEY = "ergopti.onboarding.completed"
@@ -125,8 +126,10 @@ local function inject_strings(code)
 	-- Inject the privacy warning pre-formatted with the actual metrics path so
 	-- the user sees exactly the same text as the tray-menu toggle dialog
 	local metrics_dir = (_config_path or ""):match("^(.*[/\\])") or ""
+	-- i18n.format, not string.format: the shared locale strings use {1}, and
+	-- string.format looks for %s — it left the placeholder on screen verbatim.
 	strings["dialog.metrics.enable_warning_formatted"] =
-		string.format(i18n.get("dialog.metrics.enable_warning"), metrics_dir .. "metrics")
+		i18n.format("dialog.metrics.enable_warning", metrics_dir .. "metrics")
 
 	i18n.set_locale_no_reload(prev_code)
 
@@ -176,8 +179,10 @@ local function inject_init_data()
 
 	-- Same privacy warning as inject_strings — pre-formatted with the metrics path
 	local metrics_dir = (_config_path or ""):match("^(.*[/\\])") or ""
+	-- i18n.format, not string.format: the shared locale strings use {1}, and
+	-- string.format looks for %s — it left the placeholder on screen verbatim.
 	strings["dialog.metrics.enable_warning_formatted"] =
-		string.format(i18n.get("dialog.metrics.enable_warning"), metrics_dir .. "metrics")
+		i18n.format("dialog.metrics.enable_warning", metrics_dir .. "metrics")
 
 	-- Also include the labels needed by the inserted config-folder step.
 	local config_step_keys = {
@@ -501,16 +506,19 @@ local function handle_message(body)
 				if ok_v and type(v) == "string" then seed = v end
 			end
 		end
-		local escaped = seed:gsub('"', '\\"')
-		local prompt = (i18n.get("dialog.config_folder.select_title") or ""):gsub('"', '\\"')
-		local script = string.format([[
+		-- Both values land inside AppleScript string literals, where the
+		-- backslash is itself an escape character. Escaping only the double
+		-- quote left a seed path containing a backslash producing a literal the
+		-- picker could not parse — and the seed is the user-configurable config
+		-- directory, so it is exactly the value most likely to carry one.
+		local script = text_utils.applescript_format([[
 			try
 				set r to choose folder with prompt "%s" default location ((POSIX file "%s") as alias)
 				return POSIX path of r
 			on error
 				return ""
 			end try
-		]], prompt, escaped)
+		]], i18n.get("dialog.config_folder.select_title") or "", seed)
 		local ok_as, _r2, raw = hs.osascript.applescript(script)
 		Logger.debug(LOG, "pickConfigDir: ok=%s raw=%s.", tostring(ok_as), tostring(raw))
 		local chosen = type(raw) == "string" and raw or ""

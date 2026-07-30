@@ -27,6 +27,12 @@
 ;    per-user runtime data (personal hotstring categories, editor UI prefs),
 ;    not compile-time schema, so missing segments are auto-vivified rather
 ;    than logged as an error.
+; 6. An EXISTING ``config.toml`` that cannot be READ latches
+;    ``_ConfigBootReadFailed`` (declared with its siblings in ``toml_helpers``).
+;    It is the session-wide "the feature tree in memory is defaults, not the
+;    user's settings" signal that ``SaveFullConfig`` honours, and it is
+;    deliberately never cleared: nothing re-applies the config in-process, so
+;    the tree stays untrustworthy until the driver restarts.
 ; ==============================================================================
 
 
@@ -134,10 +140,25 @@ ApplyConfigToml(Features, FilePath) {
 	}
 	try LoggerStart("TomlConfigLoader", "Applying v2 config from '{1}'…", FilePath)
 
+	; Read once and check for an unreadable-but-existing file BEFORE applying
+	; anything. ReadTomlFile returns "" in that case, which `loop parse` happily
+	; treats as "zero overrides" — leaving Features at manifest DEFAULTS while
+	; the apply still logs SUCCESS "0 value(s)". The deferred boot save then
+	; serializes that default tree over the user's real config. Abort loudly and
+	; latch the failure so SaveFullConfig refuses to persist the feature tree.
+	global _ConfigBootReadFailed
+	Content := ReadTomlFile(FilePath)
+	if TOML_UnreadableFile(FilePath) {
+		_ConfigBootReadFailed := true
+		try LoggerError("TomlConfigLoader",
+			"v2 config at '{1}' exists but could not be read — applying NOTHING and blocking config persistence so the defaults now in memory cannot overwrite it.", FilePath)
+		return -1
+	}
+
 	CurrentSection := ""
 	SkippingForeign := false
 
-	loop parse, ReadTomlFile(FilePath), "`n", "`r" {
+	loop parse, Content, "`n", "`r" {
 		Line := Trim(A_LoopField, " `t")
 		if (Line == "" or SubStr(Line, 1, 1) == "#") {
 			continue

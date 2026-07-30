@@ -1,4 +1,4 @@
-﻿﻿{
+{
 	"_meta.flag": "🇯🇵",
 	"_meta.locale": "ja",
 	"_meta.name": "日本語",
@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "%s の新しいカテゴリ名:",
 	"metrics_apps.new_category_title": "新しいカテゴリ",
 	"metrics_apps.no_app_detected": "アプリケーションを検出できませんでした。",
+	"metrics_apps.pick_app_placeholder": "分類するアプリケーションを選択…",
 	"metrics_apps.rename_chooser_placeholder": "名前を変更するカテゴリ",
 	"metrics_apps.rename_item": "✎ 既存のカテゴリの名前を変更…",
 	"metrics_apps.rename_prompt": "カテゴリ「%s」の新しい名前:",
@@ -1415,7 +1416,7 @@
 	"sfbsreduction.comma": "カンマが同指バイグラムを減らす",
 	"sfbsreduction.ecirc": "Êが同指バイグラムを減らす",
 	"sfbsreduction.egrave": "Èが同指バイグラムを減らす",
-	"sfbsreduction.ié": "IEがIE/EIバイグラムを減らす",
+	"sfbsreduction.ieacute": "IEがIE/EIバイグラムを減らす",
 	"sg_actions.activity_simulation": "🖱 アクティビティをシミュレート（スリープ防止）",
 	"sg_actions.alt_tab_monitor": "Alt-Tab（モニター）",
 	"sg_actions.app_expose": "◱ アプリExposé",
@@ -1652,6 +1653,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = ダウンロードフォルダーを開く",
 	"shortcuts.pixel_read_error": "ピクセルカラーを読み取れません",
 	"shortcuts.saved": "保存しました：%s",
+	"shortcuts.screenshot_failed": "スクリーンショットに失敗しました",
 	"shortcuts.screen": "Win + H (screensHot) = スクリーンショット (Win + Shift + S を起動)",
 	"shortcuts.screeninstant": "1の左のキー = アクティブウィンドウの即時キャプチャ、タイムスタンプ付きでピクチャに保存",
 	"shortcuts.screenocr": "Win + C (OCR) = テキスト抽出付きスクリーンショット (Win + Shift + T)",

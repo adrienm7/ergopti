@@ -32,6 +32,8 @@
 local M = {}
 local hs        = hs
 local TomlCodec = require("lib.toml.codec")
+local Logger    = require("lib.logger")
+local LOG       = "preferences"
 
 
 --- Top-level TOML section names in the order they appear on disk.
@@ -142,6 +144,11 @@ local NESTED_KEY_MAP = {
 	-- binding__action → value, e.g. tap_3__open_url = "https://…".
 	gesture_action_parameters = { sec = "gestures",  key = "action_parameters"         },
 	-- Hotstrings nested tables
+	-- Per-category expansion delays. Written by the Hotstrings menu into
+	-- state.delays and read back at boot by menu_state, but absent from BOTH
+	-- maps: save_prefs therefore dropped every one of them, and the value the
+	-- user had just set was gone at the next reload with no diagnostic.
+	delays                   = { sec = "hotstrings", key = "delays"                    },
 	hotstrings               = { sec = "hotstrings", key = "groups"                    },
 	section_states           = { sec = "hotstrings", key = "modules"                   },
 	terminator_states        = { sec = "hotstrings", key = "terminator_states"          },
@@ -402,18 +409,45 @@ end
 --- Load preferences from the TOML configuration file and normalise
 --- it to the flat dict the rest of the codebase expects.
 --- @param prefs_file string Path to <config_dir>/hammerspoon/config.toml.
+--- Returns a SECOND value distinguishing the three outcomes this used to
+--- collapse into one silent empty table:
+---   absent   - no file at all, a genuine fresh install
+---   corrupt  - the file exists but could not be read or decoded
+---   ok       - decoded normally
+---
+--- The distinction is load-bearing. The caller derives `config_absent` from
+--- `next(saved) == nil`, and on a fresh install that flag legitimately triggers
+--- a factory seed AND a save. A corrupt file produced exactly the same empty
+--- table, so a typo in the expert [script]/[features] layer, a merge-conflict
+--- marker, or a torn write from a cloud-synced directory made the driver
+--- factory-reset every group and then OVERWRITE the recoverable file with
+--- defaults - permanently, since preferences.save only keeps a .bak on Windows.
+---
+--- The karabiner loader already fixed this exact class; this parallel loader
+--- never received it.
 --- @return table The decoded preferences (empty when the file is absent or invalid).
+--- @return string "ok" | "absent" | "corrupt"
 function M.load(prefs_file)
 	local ok, fh = pcall(io.open, prefs_file, "r")
-	if not ok or not fh then return {} end
+	if not ok or not fh then return {}, "absent" end
 
 	local content = fh:read("*a")
 	pcall(function() fh:close() end)
 
 	local dec_ok, tbl = pcall(TomlCodec.decode, content)
-	if not dec_ok or type(tbl) ~= "table" then return {} end
+	if not dec_ok or type(tbl) ~= "table" then
+		-- Loud, and never silently overwritten. The user's settings are still on
+		-- disk and are recoverable by hand; treating this as "fresh install" is
+		-- what destroys them.
+		Logger.error(LOG,
+			"config.toml exists but could not be decoded (%s). Keeping it untouched and running "
+				.. "with in-memory defaults for this session - fix the file, or delete it to start "
+				.. "from factory settings.",
+			tostring(tbl))
+		return {}, "corrupt"
+	end
 
-	return flatten_from_disk(tbl)
+	return flatten_from_disk(tbl), "ok"
 end
 
 --- Save the current state to the TOML configuration file. Atomic via
@@ -475,11 +509,19 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 	end
 
 	local ok, encoded = pcall(TomlCodec.encode, group_for_disk(existing))
-	if not ok or type(encoded) ~= "string" then return end
+	if not ok or type(encoded) ~= "string" then
+		-- A silent return here looks exactly like a successful save until the next
+		-- reload restores the previous file and the user's change is simply gone.
+		Logger.error(LOG, "Cannot encode preferences — settings NOT saved: %s.", tostring(encoded))
+		return
+	end
 
 	local tmp_path = prefs_file .. ".tmp"
 	local file_ok, fh = pcall(io.open, tmp_path, "w")
-	if not file_ok or not fh then return end
+	if not file_ok or not fh then
+		Logger.error(LOG, "Cannot open '%s' for writing — settings NOT saved.", tostring(tmp_path))
+		return
+	end
 	fh:write(encoded)
 	pcall(function() fh:close() end)
 	-- os.rename overwrites existing files on POSIX. The test host can be
@@ -499,7 +541,14 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 			end
 		end
 	end
-	if not renamed_ok or not renamed then return end
+	if not renamed_ok or not renamed then
+		-- The third and last silent exit. The temp file is left behind on purpose:
+		-- it holds the settings that failed to land, so the failure is recoverable
+		-- by hand instead of merely reported.
+		Logger.error(LOG, "Cannot replace '%s' — settings NOT saved (staged at '%s').",
+			tostring(prefs_file), tostring(tmp_path))
+		return
+	end
 end
 
 --- Merges the saved disk state into the current memory state.

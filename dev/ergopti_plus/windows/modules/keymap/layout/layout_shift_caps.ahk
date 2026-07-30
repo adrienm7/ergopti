@@ -212,28 +212,40 @@ RegisterCapsLockLayer() {
 	; --- Magic key overlay (registered first, lowest precedence) ---
 	; Use the configurable source scancode, not the hardcoded Ergopti-layout default,
 	; so users on bépo or other layouts bind the correct physical key.
-	HotIf((*) => GetCapsLockCondition() and Features["hotstrings"]["magic_key"]["replace"]["enabled"])
-	Hotkey(ScriptInformation["MagicKeySourceScan"], ((*) => SendNewResult(ScriptInformation["MagicKey"])), "I2")
+	;
+	; ONE try/finally covers the whole registration below, not just the second
+	; block: HotIf sets a PROCESS-WIDE criterion that stays in force until it is
+	; cleared, so a Hotkey() that throws anywhere in here — including this first
+	; overlay registration — used to propagate out with the CapsLock condition
+	; still armed. Every hotkey registered afterwards, in this module and in every
+	; later one, then silently inherited it and would only fire while CapsLock
+	; happened to be active. RegisterShiftLayer already guards this way; this
+	; sibling did not.
+	try {
+		HotIf((*) => GetCapsLockCondition() and Features["hotstrings"]["magic_key"]["replace"]["enabled"])
+		Hotkey(ScriptInformation["MagicKeySourceScan"], ((*) => SendNewResult(ScriptInformation["MagicKey"])), "I2")
 
-	; --- Letters and symbols (registered last, highest precedence) ---
-	; Same OS-layout-shifted-digit exclusion as RegisterShiftLayer: without it,
-	; toggling CapsLock on shadows the global direct_access_digits passthrough
-	; hotkeys with an ergopti_base variant, silently regressing the
-	; auto-advance-skips-a-field fix for OTP/device-login digit boxes.
-	SkipDigitRow := IsSet(Features)
-		&& Features["layout"]["direct_access_digits"]
-		&& IsSet(_OsLayoutDigitsAreShifted)
-		&& _OsLayoutDigitsAreShifted()
-	HotIf((*) => GetCapsLockCondition() and Features["layout"]["ergopti_base"])
-	for SC in SHIFTED_LETTERS {
-		if (SkipDigitRow && _SHIFT_DIGIT_SCS.Has(SC))
-			continue
-		Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS, true), "I2")
+		; --- Letters and symbols (registered last, highest precedence) ---
+		; Same OS-layout-shifted-digit exclusion as RegisterShiftLayer: without it,
+		; toggling CapsLock on shadows the global direct_access_digits passthrough
+		; hotkeys with an ergopti_base variant, silently regressing the
+		; auto-advance-skips-a-field fix for OTP/device-login digit boxes.
+		SkipDigitRow := IsSet(Features)
+			&& Features["layout"]["direct_access_digits"]
+			&& IsSet(_OsLayoutDigitsAreShifted)
+			&& _OsLayoutDigitsAreShifted()
+		HotIf((*) => GetCapsLockCondition() and Features["layout"]["ergopti_base"])
+		for SC in SHIFTED_LETTERS {
+			if (SkipDigitRow && _SHIFT_DIGIT_SCS.Has(SC))
+				continue
+			Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS, true), "I2")
+		}
+		for SC in CAPSLOCK_SYMBOLS {
+			Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS, true), "I2")
+		}
+	} finally {
+		HotIf() ; Reset to no condition
 	}
-	for SC in CAPSLOCK_SYMBOLS {
-		Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS, true), "I2")
-	}
-	HotIf()
 	try LoggerSuccess("LayoutCaps", "CapsLock layer registered ({1} entries).",
 		SHIFTED_LETTERS.Count + CAPSLOCK_SYMBOLS.Count + 1)
 }

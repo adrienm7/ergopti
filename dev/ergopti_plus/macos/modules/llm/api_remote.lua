@@ -250,7 +250,21 @@ function M.get_active_entry()
 	-- Lazy-resolve the Keychain reference on first use so the blocking
 	-- security(1) subprocess never fires on the boot or load tick.
 	if type(entry.token) == "string" and TokenCrypto.is_encrypted(entry.token) then
-		entry.token = TokenCrypto.decrypt(entry.token)
+		-- Cache ONLY a non-empty result. TokenCrypto.decrypt returns "" as its
+		-- failure sentinel, which is indistinguishable from a legitimately empty
+		-- value once stored -- and a locked or permission-denied Keychain
+		-- produces exactly that. Caching it replaced the encrypted REFERENCE in
+		-- the live entry, and the next persist_api_entries then wrote the empty
+		-- string back to disk, destroying the stored token permanently. Leaving
+		-- the reference in place means the next call simply retries.
+		local cleartext = TokenCrypto.decrypt(entry.token)
+		if type(cleartext) == "string" and cleartext ~= "" then
+			entry.token = cleartext
+		else
+			Logger.warn(LOG,
+				"Keychain decrypt returned nothing for entry '%s' - keeping the encrypted "
+					.. "reference so it is not persisted over.", tostring(entry.id))
+		end
 	end
 	return entry
 end
@@ -273,7 +287,10 @@ function M.prewarm_active_entry_decrypt()
 		-- STILL the active one and still holds the same encrypted reference
 		-- we resolved (otherwise we would clobber a fresher lazy decrypt).
 		local still_active = find_active_entry()
-		if still_active == entry and TokenCrypto.is_encrypted(entry.token) then
+		-- Same non-empty guard as the lazy path above: the async decrypt reports
+		-- failure the same way, and caching "" here is equally destructive.
+		if still_active == entry and TokenCrypto.is_encrypted(entry.token)
+			and type(cleartext) == "string" and cleartext ~= "" then
 			entry.token = cleartext
 			Logger.debug(LOG, "Pre-warmed Keychain decrypt for active API entry '%s'.", tostring(entry.id))
 		end
@@ -297,6 +314,35 @@ end
 
 --- Build the per-provider request URL. Gemini bakes the model and API key
 --- into the path; the OpenAI / Anthropic / OpenAI-compat shapes use a fixed
+--- Query parameters that carry a credential. Gemini authenticates by URL
+--- (`?key=<token>`) rather than by header, so the finished request URL contains
+--- the decrypted API key verbatim.
+local CREDENTIAL_QUERY_PARAMS = { "key", "api_key", "apikey", "access_token", "token" }
+
+--- Redact credentials from a URL so it can be written to a log file.
+---
+--- The whole point of api_token_crypto is that the cleartext token never lands
+--- on disk. Logging the finished Gemini URL defeated that in one line: the
+--- default log level is DEBUG, retention is fourteen days, and this is a file
+--- users are actively told to consult and attach to support requests — so the
+--- key was written on EVERY prediction, to a file designed to be shared.
+---
+--- Redacting rather than dropping the URL keeps the diagnostic that matters
+--- (which endpoint and model were hit) while removing the part that must never
+--- be persisted.
+--- @param url string The URL about to be logged.
+--- @return string The URL with every credential parameter's value replaced.
+local function redact_url(url)
+	local out = tostring(url or "")
+	for _, param in ipairs(CREDENTIAL_QUERY_PARAMS) do
+		-- Match the parameter after "?" or "&", case-insensitively, and replace
+		-- everything up to the next separator.
+		out = out:gsub("([%?&]" .. param .. "=)[^&#]*", "%1REDACTED")
+		out = out:gsub("([%?&]" .. param:upper() .. "=)[^&#]*", "%1REDACTED")
+	end
+	return out
+end
+
 --- endpoint with the model in the JSON payload.
 local function build_url(base_url, format, model, token)
 	local base = rtrim_slash(base_url)
@@ -527,17 +573,17 @@ end
 function M.check_availability(_model_name, on_available, on_missing)
 	local entry = M.get_active_entry()
 	if not entry then
-		if type(on_missing) == "function" then pcall(on_missing, true) end
+		if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
 		return
 	end
 	local provider = M.PROVIDERS[entry.provider]
 	if not provider then
-		if type(on_missing) == "function" then pcall(on_missing, true) end
+		if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
 		return
 	end
 	local base = (entry.base_url and entry.base_url ~= "") and entry.base_url or provider.base_url
 	if base == "" or (entry.token or "") == "" then
-		if type(on_missing) == "function" then pcall(on_missing, true) end
+		if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
 		return
 	end
 
@@ -552,9 +598,9 @@ function M.check_availability(_model_name, on_available, on_missing)
 
 	_check_client.get(url, build_headers(format, entry.token), function(r)
 		if r.ok then
-			if type(on_available) == "function" then pcall(on_available) end
+			if type(on_available) == "function" then ApiCommon.protected_call(on_available, "on_available") end
 		else
-			if type(on_missing) == "function" then pcall(on_missing, r.status == 0) end
+			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", r.status == 0) end
 		end
 	end)
 end
@@ -580,18 +626,18 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                                on_success, on_fail, dedup_stats)
 	local entry = M.get_active_entry()
 	if not entry then
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 	local provider = M.PROVIDERS[entry.provider]
 	if not provider then
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 	local base = (entry.base_url and entry.base_url ~= "") and entry.base_url or provider.base_url
 	local model = (model_name and model_name ~= "") and model_name or (entry.model and entry.model ~= "" and entry.model) or provider.default_model
 	if base == "" or model == "" then
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 
@@ -627,7 +673,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 	local encoded, enc_err = JsonCodec.encode(payload)
 	if not encoded then
 		Logger.error(LOG, "[%s] #%d Payload encode failed — %s", model, req_id, tostring(enc_err))
-		if type(on_fail) == "function" then pcall(on_fail) end
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 
@@ -636,11 +682,17 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 	local t0      = TimerScheduler.now()
 
 	Logger.debug(LOG, "[%s] #%d POST -> %s (provider=%s, %d chars prompt)",
-		model, req_id, url, provider.format, #(user_prompt or ""))
+		model, req_id, redact_url(url), provider.format, #(user_prompt or ""))
 
 	_infer_client.post(url, headers, encoded, function(r)
 		local status, body = r.status, r.body
-		pcall(function()
+		-- Logger.pcall, not a bare pcall. This closure IS the entire response
+		-- handler: parsing, dedup, telemetry and the on_success dispatch all live
+		-- inside it. A throw anywhere aborts the rest silently — the caller's
+		-- callback simply never fires and no line appears anywhere — which is the
+		-- documented "green but no prediction" failure mode. api_remote was the
+		-- one backend never migrated off that anti-pattern.
+		Logger.pcall(LOG, function()
 			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 			if not r.ok then
 				Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%s body=%s",
@@ -659,7 +711,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 						elapsed_ms     = ms,
 					})
 				end
-				if type(on_fail) == "function" then pcall(on_fail) end
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 				return
 			end
 
@@ -676,7 +728,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 						elapsed_ms     = ms,
 					})
 				end
-				if type(on_fail) == "function" then pcall(on_fail) end
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 				return
 			end
 
@@ -705,7 +757,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 						elapsed_ms     = ms,
 					})
 				end
-				if type(on_fail) == "function" then pcall(on_fail) end
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 				return
 			end
 
@@ -729,7 +781,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 					elapsed_ms        = ms,
 				})
 			end
-			if type(on_success) == "function" then pcall(on_success, results) end
+			if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results) end
 		end)
 	end)
 end
@@ -784,12 +836,12 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 					local subset = {}
 					for j = 1, idx do subset[j] = results[j] end
 					local is_final = (idx == #results)
-					if type(on_success) == "function" then pcall(on_success, subset, ms, is_final, not is_final) end
+					if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", subset, ms, is_final, not is_final) end
 					if not is_final then TimerScheduler.after(0, function() reveal_next(idx + 1) end) end
 				end
 				reveal_next(1)
 			else
-				if type(on_success) == "function" then pcall(on_success, results, ms, true) end
+				if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results, ms, true) end
 			end
 		end,
 		on_fail, dedup_stats)
@@ -823,12 +875,12 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 		end
 		if #results >= requested_predictions or attempt_index > max_attempts then
 			if #results == 0 then
-				if type(on_fail) == "function" then pcall(on_fail) end
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 				return
 			end
 			ApiCommon.log_prediction_summary(Logger, LOG, "sequential", requested_predictions, dedup_stats, #results)
 			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
-			if type(on_success) == "function" then pcall(on_success, results, ms, true) end
+			if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results, ms, true) end
 			return
 		end
 		local variant_index = attempt_index
@@ -844,7 +896,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 						if #results < requested_predictions then
 							ApiCommon.insert_prediction(results, preds[1], dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG)
 							local ms = math.floor((TimerScheduler.now() - t0) * 1000)
-							if type(on_success) == "function" then pcall(on_success, results, ms, false) end
+							if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results, ms, false) end
 						end
 					end
 					do_next()
@@ -886,5 +938,10 @@ function M.is_thinking_model(name)
 		or name:find("think") ~= nil
 		or name:find("reasoning") ~= nil
 end
+
+--- Exposed for the regression test only. The invariant being guarded is "no log
+--- line ever contains the token", and that cannot be asserted without being able
+--- to run the thing that produces the logged string.
+M.__redact_url_for_test = redact_url
 
 return M

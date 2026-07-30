@@ -56,3 +56,41 @@ _SIMF_MutexEstablishedBeforeHookAndPump() {
 }
 Test("boot: single-owner mutex is acquired before the message pump and hook registration",
 	_SIMF_MutexEstablishedBeforeHookAndPump)
+
+; The gate exists to stop two HOOK OWNERS coexisting. The driver also re-runs
+; this same entry on purpose, with /force and --keylogger-prefetch-worker, to
+; compute a metrics projection in a detached process — a process that registers
+; no hook, no log owner and no tray, and is therefore not what the gate is for.
+;
+; Because the gate is the FIRST auto-execute statement while the worker's own
+; gate sits ~300 lines below, every worker spawned while the driver was alive
+; blocked the full bounded wait on the live driver's mutex, timed out, and
+; ExitApp(0)'d before ever reaching its main. The projection could never publish
+; while the driver ran — which is every time it is asked for. Field logs showed
+; zero projection lines in eleven days.
+;
+; The exemption must be tested BEFORE the mutex is created, not merely present
+; somewhere in the file, so the ordering is what this asserts.
+_SIMF_WorkerInvocationIsExemptFromTheGate() {
+	SplitPath(A_ScriptDir, , &WindowsDir)
+	Src := ""
+	try Src := FileRead(WindowsDir . "\ErgoptiPlus.ahk")
+	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
+	Code := _StripFullLineComments(Src)
+
+	WorkerGatePos := InStr(Code, "KLPF_IsWorkerInvocation()")
+	MutexPos      := InStr(Code, "CreateMutexW")
+	Assert(WorkerGatePos > 0,
+		"the entry must ask whether this invocation is a prefetch worker — without it the worker blocks on the live driver's mutex and exits before reaching its own main")
+	Assert(MutexPos > 0, "the entry must still acquire the single-owner mutex")
+	Assert(WorkerGatePos < MutexPos,
+		"the worker exemption must be evaluated BEFORE CreateMutexW. Placed after it, the worker still waits the full DRIVER_MUTEX_WAIT_MS on the live driver and still yields, so the projection never publishes")
+
+	; The worker's own main must still run, and still run after the exemption —
+	; exempting it from the mutex is pointless if it never reaches its entry point.
+	MainPos := InStr(Code, "KLPF_WorkerMain()")
+	Assert(MainPos > WorkerGatePos,
+		"the worker's main must still be reachable after the exemption")
+}
+Test("boot: the prefetch worker is exempt from the single-owner mutex before it is created",
+	_SIMF_WorkerInvocationIsExemptFromTheGate)

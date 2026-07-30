@@ -130,21 +130,11 @@ local _pgid_pending_timeout = nil
 -- cannot resolve (e.g. cross-session leftover whose PGID was wrongly adopted as the
 -- active guard). The hook receives the expected short model name and is responsible
 -- for invoking start_server with the correct target.
-local _restart_hook = nil
 
---- Registers a callback that api_mlx invokes when it cannot recover from a model-ID
---- mismatch on its own and needs the menu layer to relaunch the server.
---- @param fn function|nil Callback receiving the expected model name, or nil to clear.
-function M.set_restart_hook(fn)
-	_restart_hook = (type(fn) == "function") and fn or nil
-	Logger.debug(LOG, "Restart hook %s.", _restart_hook and "registered" or "cleared")
-end
 
 --- Cooldown so we don't spam restart requests when the discovery loop fires repeatedly
 --- before the new server has had time to come up. 10 s is enough for bash to do its
 --- kill+lsof loop and for the new mlx_lm to start binding port 8080.
-local RESTART_HOOK_MIN_INTERVAL_SEC = Timings.sec("llm", "restart_hook_min_interval_ms")
-local _last_restart_hook_at = 0
 
 -- Timestamp of the most recent set_active_server_pgid() call. Used by discover_endpoints
 -- to grant a "fresh launch" grace window during which a mismatched /v1/models model ID
@@ -654,16 +644,27 @@ function M.warmup(model_name, profile)
 		_warmup_timeout = nil
 		if not _warmup_in_flight then return end
 		_warmup_in_flight = false
-		Logger.warn(LOG, "Warmup POST timed out after %.0fs — unblocking and retrying in 2s.",
-			WARMUP_POST_TIMEOUT_SEC)
+		-- Retire the generation before scheduling the retry. Abandoning a POST does
+		-- not stop the server answering it, and without this bump that late reply
+		-- still matched the generation check and flipped _is_ready — describing a
+		-- request nobody was waiting for any more, on behalf of the retry that had
+		-- meanwhile taken its place.
+		_warmup_gen = _warmup_gen + 1
+		Logger.warn(LOG, "Warmup POST timed out after %.0fs — unblocking and retrying in 2s (gen %d).",
+			WARMUP_POST_TIMEOUT_SEC, _warmup_gen)
 		TimerScheduler.after(2, function() M.warmup(model_name, profile) end)
 	end)
 	_warmup_timeout = _wt_handle
 	_warmup_client.post(endpoint, { ["Content-Type"] = "application/json" }, payload,
 		function(r)
 			local status, body = r.status, r.body
-			if _warmup_timeout then
-				TimerScheduler.cancel(_warmup_timeout)
+			-- Cancel THIS request's timeout, not whichever one happens to be
+			-- stored. After a timeout-triggered retry the slot holds the NEW
+			-- POST's timer, so a late reply from the abandoned request disarmed
+			-- the live request's only hard timeout — and warmup POSTs piled up
+			-- with nothing left to bound them.
+			if _warmup_timeout == _wt_handle then
+				TimerScheduler.cancel(_wt_handle)
 				_warmup_timeout = nil
 			end
 			-- Discard a stale warmup: a reset/load-failure since this POST was issued
@@ -740,10 +741,10 @@ function M.check_availability(model_name, on_available, on_missing)
 	_check_client.get(MLX_BASE_URL .. "/v1/models", {}, function(r)
 		if r.status == 200 then
 			Logger.info(LOG, "MLX server is available.")
-			if type(on_available) == "function" then pcall(on_available) end
+			if type(on_available) == "function" then ApiCommon.protected_call(on_available, "on_available") end
 		else
 			Logger.warn(LOG, "MLX server is missing or unreachable.")
-			if type(on_missing) == "function" then pcall(on_missing, false) end
+			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", false) end
 		end
 	end)
 end

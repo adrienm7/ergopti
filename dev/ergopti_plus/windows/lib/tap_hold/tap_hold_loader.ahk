@@ -71,8 +71,16 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 	else
 		try LoggerDebug("TapHoldLoader", "No user tap-hold file found yet at '{1}'.", FilePath)
 
-	if UserData.Has("inherit_defaults")
+	if UserData.Has("inherit_defaults") {
 		InheritDefaults := !!UserData["inherit_defaults"]
+		; Carry the flag into the map we RETURN, not only into this local. The
+		; writer gates its ``[tap_hold]`` emit on Data.Has("inherit_defaults")
+		; (tap_hold_writer.ahk), and it serializes the live TapHold global — so a
+		; loader that keeps the flag to itself makes the opt-out a one-way trip:
+		; the next individual tray write drops the line and the following reload
+		; re-merges every shipped default, undoing « Tout désactiver ».
+		Result["inherit_defaults"] := InheritDefaults
+	}
 
 	try LoggerDebug("TapHoldLoader", "Parsed user tap-hold: {1} key(s), {2} layer(s), inherit_defaults={3}.",
 		UserData["keys"].Count, UserData["layers"].Count, InheritDefaults)
@@ -159,8 +167,19 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 			FilePath)
 	}
 
-	try LoggerSuccess("TapHoldLoader", "Tap-hold config loaded ({1} key(s), {2} layer(s)).",
-		Result["keys"].Count, Result["layers"].Count)
+	; A user file that EXISTS but could not be READ is not an empty one. The
+	; defaults overlay above fills ``keys`` with the shipped mappings, so the
+	; truncated-write sentinel cannot fire and the map is indistinguishable from
+	; a user who customised nothing. Say so at ERROR rather than asserting a load
+	; that never happened — _TH_WriteTapHoldToml consults the same sentinel and
+	; refuses to rewrite the file from this map.
+	if TOML_UnreadableFile(FilePath) {
+		try LoggerError("TapHoldLoader", "Cannot read '{1}': the tap-hold config in memory is the shipped defaults, not the user's. Writes are blocked until the file is readable again.",
+			FilePath)
+	} else {
+		try LoggerSuccess("TapHoldLoader", "Tap-hold config loaded ({1} key(s), {2} layer(s)).",
+			Result["keys"].Count, Result["layers"].Count)
+	}
 	return Result
 }
 

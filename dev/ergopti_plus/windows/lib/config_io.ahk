@@ -123,7 +123,7 @@ ToggleAllFeatures(Value) {
     } catch as Err {
         try LoggerError("Config", "Bulk feature toggle could not be saved: {1}", Err.Message)
         try MsgBox(t("dialog.bulk_toggle.save_failed"), t("dialog.reset_defaults.failed_title"), "Iconx")
-        Reload
+        ReloadPreservingSuspend()
         return
     }
     if Bool {
@@ -133,7 +133,7 @@ ToggleAllFeatures(Value) {
         if (HsBatch.Length > 0)
             WriteFeatureBatchV2(Features, HsBatch)
     }
-    Reload
+    ReloadPreservingSuspend()
 }
 
 ToggleAllHotstringsOn(*) {
@@ -156,7 +156,7 @@ ToggleAllHotstrings(Value) {
         Batch.Push(Map("path", V2Path, "value", Bool))
     if (Batch.Length > 0)
         WriteFeatureBatchV2(Features, Batch)
-    Reload
+    ReloadPreservingSuspend()
 }
 
 IsCategoryAllEnabled(Categories) {
@@ -267,7 +267,7 @@ ToggleCategoryAllFeatures(Category, Value) {
         } catch as Err {
             try LoggerError("Config", "Category toggle for '{1}' could not be saved: {2}", Category, Err.Message)
             try MsgBox(t("dialog.bulk_toggle.save_failed"), t("dialog.reset_defaults.failed_title"), "Iconx")
-            Reload
+            ReloadPreservingSuspend()
             return
         }
         LoggerStart("Menu", "Applying live category toggle for {1}…", Category)
@@ -285,7 +285,7 @@ ToggleCategoryAllFeatures(Category, Value) {
         try LoggerError("Config", "Category toggle for '{1}' could not be saved: {2}", Category, Err.Message)
         try MsgBox(t("dialog.bulk_toggle.save_failed"), t("dialog.reset_defaults.failed_title"), "Iconx")
     }
-    Reload
+    ReloadPreservingSuspend()
 }
 
 ; Force every section of one hotstring category on/off (bulk action), scoped to
@@ -323,7 +323,7 @@ ToggleCategoryAllSections(V1Cat, Enable) {
         Batch.Push(Map("path", Entry["path"], "value", Bool))
     if (Batch.Length > 0)
         WriteFeatureBatchV2(Features, Batch)
-    Reload
+    ReloadPreservingSuspend()
 }
 
 ; Force every personal hotstring section (from personal_hotstrings.toml) on/off.
@@ -355,7 +355,7 @@ HS_TogglePersonalAllSections(Enable) {
     }
     if (Batch.Length > 0)
         WriteFeatureBatchV2(Features, Batch)
-    Reload
+    ReloadPreservingSuspend()
 }
 
 _CategoryEnabledKey(Category) {
@@ -383,6 +383,20 @@ SaveFullConfig() {
         SetTimer(SaveFullConfig, -100)
         return
     }
+    ; Guard: refuse to serialize the feature tree when boot could not READ an
+    ; existing config.toml. In that case ApplyConfigToml applied nothing and the
+    ; tree below is ManifestBuildFeaturesMap() DEFAULTS — writing it out replaces
+    ; the user's whole configuration with factory values. TOML_BatchWrite's own
+    ; TOML_ReadFailed guard cannot catch this: it re-parses at write time, and a
+    ; transient lock (sync client, AV scan, backup) has usually cleared by then,
+    ; so the write looks perfectly safe while the payload is already wrong.
+    ; Returns false — not a bare return — so a caller (and the regression test)
+    ; can tell "refused" from "deferred until ready" and from a completed save.
+    global _ConfigBootReadFailed
+    if (IsSet(_ConfigBootReadFailed) && _ConfigBootReadFailed) {
+        try LoggerError("ConfigIO", "Refusing to save: config.toml could not be read at boot, so the in-memory feature tree holds defaults rather than the user's settings. Restart the driver once the file is readable.")
+        return false
+    }
     Updates := []
     ; Only sync LLM state into Features if LLM_Menu_Init() has already run and
     ; populated _LLM_Menu with the user's persisted values. Calling it before
@@ -392,7 +406,7 @@ SaveFullConfig() {
     if IsSet(_LLM_Menu_SyncToFeatures) && (IsSet(_LLM_Menu_Loaded) && _LLM_Menu_Loaded)
         _LLM_Menu_SyncToFeatures()
     if IsSet(Features) {
-        _CollectFeatureUpdates(Updates, "", Features)
+        _CollectFeatureUpdates(Updates, "", _PruneMasterGatedFeatures(Features))
         Updates.Push({ Section: "_meta", Key: "schema_version", Value: 2 })
     }
     Updates.Push({ Section: "script", Key: "locale", Value: I18nGetLocale() })
@@ -464,10 +478,85 @@ SaveFullConfig() {
     PrevCanonState := _TOML_STRICT_CANON_IN_PROGRESS
     _TOML_STRICT_CANON_IN_PROGRESS := true
     try {
-        TOML_BatchWrite(ConfigurationFile, Updates)
+        ; RETURNED, not discarded. TOML_BatchWrite fails without throwing when
+        ; the staging file cannot be opened or the atomic replace is refused, and
+        ; every caller that dropped this boolean turned that into a silent no-op:
+        ; the live toggles mutate memory, re-init the engine and rebuild the menu
+        ; with no Reload, so memory, engine and menu all showed a state that never
+        ; reached disk — and the next restart silently undid it.
+        Written := TOML_BatchWrite(ConfigurationFile, Updates)
     } finally {
         _TOML_STRICT_CANON_IN_PROGRESS := PrevCanonState
     }
+    return Written
+}
+
+; Resolve the CategoryEnabled master-gate label that owns a Features node key
+; ("layout" -> "Layout", "distances_reduction" -> "DistancesReduction"), or ""
+; when that key has no dedicated gate. Derived from CategoryEnabled through
+; _CategoryEnabledKey rather than a second table, so a new master gate is picked
+; up here automatically instead of being silently unprotected.
+_MasterGateLabelFor(NodeKey) {
+    global CategoryEnabled
+    if !IsSet(CategoryEnabled)
+        return ""
+    for Category, _Bool in CategoryEnabled {
+        if (_CategoryEnabledKey(Category) == NodeKey)
+            return Category
+    }
+    return ""
+}
+
+; True when the Features node named NodeKey may be serialized right now. A node
+; with no gate is always persistable; a gated one only while its master is on.
+_MasterGateAllowsPersist(NodeKey) {
+    Label := _MasterGateLabelFor(NodeKey)
+    if (Label == "")
+        return true
+    return IsCategoryGated(Label)
+}
+
+; Return a shallow view of Features with every master-gated-OFF branch removed,
+; for the walker below to flatten.
+;
+; ApplyMasterGatesToFeatures (lib/master_gates.ahk) zeroes those branches IN
+; PLACE as a RUNTIME gate, and its own contract states the per-feature state on
+; disk is NOT touched and is restored at the next Reload once the master flips
+; back on. SaveFullConfig had no notion of that distinction: it walked the same
+; live map, so the boot-armed save wrote the runtime zeroes back as if they were
+; the user's intent, and re-enabling the category later revealed every child
+; unticked with nothing logged. TOML_BatchWrite preserves keys it does not
+; re-collect, so omitting the branch is exactly what "leave the disk alone"
+; means — the same mechanism the [llm] block already relies on.
+_PruneMasterGatedFeatures(FeaturesMap) {
+    Pruned := Map()
+    if (Type(FeaturesMap) != "Map")
+        return Pruned
+    for TopKey, TopVal in FeaturesMap {
+        ; Non-Map top-level entries are skipped by the walker anyway.
+        if (Type(TopVal) != "Map")
+            continue
+        if !_MasterGateAllowsPersist(TopKey) {
+            try LoggerDebug("ConfigIO", "Not serializing '{1}': its master gate is off, so the in-memory tree holds runtime zeroes rather than the user's settings.", TopKey)
+            continue
+        }
+        if (TopKey != "hotstrings") {
+            Pruned[TopKey] := TopVal
+            continue
+        }
+        ; Hotstring sub-categories own gates independent of the Hotstrings
+        ; master and are zeroed the same way when theirs is off.
+        SubTree := Map()
+        for SubKey, SubVal in TopVal {
+            if (Type(SubVal) == "Map" and !_MasterGateAllowsPersist(SubKey)) {
+                try LoggerDebug("ConfigIO", "Not serializing 'hotstrings.{1}': its sub-category gate is off.", SubKey)
+                continue
+            }
+            SubTree[SubKey] := SubVal
+        }
+        Pruned[TopKey] := SubTree
+    }
+    return Pruned
 }
 
 _CollectFeatureUpdates(Updates, SectionPath, Node) {
@@ -520,7 +609,7 @@ ReloadWithDefaultConfig(*) {
         try MsgBox(t("dialog.reset_defaults.placeholder_failed"),
             t("dialog.reset_defaults.failed_title"), "Icon!")
     }
-    Reload
+    ReloadPreservingSuspend()
 }
 
 ReadScriptShortcutsConfig() {
@@ -589,7 +678,7 @@ SetScriptShortcutAction(Slot, ActionName) {
         return
     ScriptShortcutAssignments[Slot] := ActionName
     TOML_Write(ActionName, ConfigurationFile, "ahk.shortcuts.script_control", Slot)
-    Reload
+    ReloadPreservingSuspend()
 }
 
 BuildScriptShortcutsMenu() {
@@ -680,7 +769,7 @@ SetKeyboardShortcutAction(SlotId, ActionName) {
         return
     KeyboardShortcutAssignments[SlotId] := ActionName
     TOML_Write(ActionName, ConfigurationFile, "ahk.shortcuts.keyboard", SlotId)
-    Reload
+    ReloadPreservingSuspend()
 }
 
 _MakeKeyboardShortcutHandler(SlotId, ActionName) {

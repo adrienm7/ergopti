@@ -45,6 +45,11 @@
 ; ============================================
 ; ============================================
 
+; Pure gesture data (slot ids, shortcut labels) behind order-independent
+; accessors. Included here rather than declared inline because consumers such as
+; the first-run wizard run long before this file's top-level statements do.
+#Include constants.ahk
+
 ; Registry path for precision touchpad settings
 global GESTURE_REG_PATH := "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad"
 
@@ -129,19 +134,12 @@ global GESTURE_REG_MASTER_ENABLES := [
     "FourFingerTapEnabled",
 ]
 
-; Slot names — mirrors Hammerspoon's slot identifiers
-global GESTURE_SLOTS := [
-    "tap_3",
-    "swipe_3_up",
-    "swipe_3_down",
-    "swipe_3_left",
-    "swipe_3_right",
-    "tap_4",
-    "swipe_4_up",
-    "swipe_4_down",
-    "swipe_4_left",
-    "swipe_4_right",
-]
+; Slot names — mirrors Hammerspoon's slot identifiers. The data itself lives in
+; constants.ahk behind a function so consumers that run BEFORE this file's
+; top-level statements (Onboarding_Run, ~300 lines earlier in ErgoptiPlus.ahk)
+; can still read it; this global is the convenience alias every later reader
+; already uses.
+global GESTURE_SLOTS := GestureSlotIds()
 
 ; Human-readable labels for each slot
 global GESTURE_SLOT_LABELS := Map()
@@ -150,19 +148,9 @@ for _GestureLabelIndex, _GestureLabelSlot in ["tap_3", "swipe_3_up", "swipe_3_do
     GESTURE_SLOT_LABELS[_GestureLabelSlot] := t("gesture.slots." . _GestureLabelSlot)
 }
 
-; Shortcut labels for setup instructions
-global GESTURE_SHORTCUT_LABELS := Map(
-    "tap_3", "Ctrl + Win + Shift + F1",
-    "swipe_3_up", "Ctrl + Win + Shift + F2",
-    "swipe_3_down", "Ctrl + Win + Shift + F3",
-    "swipe_3_left", "Ctrl + Win + Shift + F4",
-    "swipe_3_right", "Ctrl + Win + Shift + F5",
-    "tap_4", "Ctrl + Win + Shift + F6",
-    "swipe_4_up", "Ctrl + Win + Shift + F7",
-    "swipe_4_down", "Ctrl + Win + Shift + F8",
-    "swipe_4_left", "Ctrl + Win + Shift + F9",
-    "swipe_4_right", "Ctrl + Win + Shift + F10",
-)
+; Shortcut labels for setup instructions — same order-independence story as
+; GESTURE_SLOTS above.
+global GESTURE_SHORTCUT_LABELS := GestureShortcutLabels()
 
 
 #Include actions.ahk

@@ -227,10 +227,18 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
     }
     ; Notify the WPM widget for end-char fires only — star (immediate) fires
     ; are already logged by the prefix watcher via HSE_DispatchMatch.
-    ; KL_LogHotstring is guarded by Keylogger.initialized — safe to call here.
+    ;
+    ; Queued, not called inline: this is the hot path, it runs on the keystroke
+    ; thread inside the 60 ms suppress window armed just above, and
+    ; KL_LogHotstring is a buffer flush plus a JSONL append plus WPM pushes. A
+    ; disk spike there swallows the next physical keys. The direct call below is
+    ; kept only as the fallback for contexts where the prefix watcher — which
+    ; owns the queue — is not loaded (tools/, standalone tests).
     if (EndChar != "") and (Trigger != "") and (Category != "") {
         repl_str := HasMethod(Replacement) ? "" : Replacement
-        if IsSet(KL_LogHotstring) {
+        if IsSet(_HSE_QueueFireLog) {
+            try _HSE_QueueFireLog(Trigger, repl_str, "endchar", Category, Section)
+        } else if IsSet(KL_LogHotstring) {
             try KL_LogHotstring(Trigger, repl_str, "endchar", "", Category, Section)
         } else if IsSet(WPMWidget_Push) {
             repl_len := HasMethod(Replacement) ? 1 : StrLen(repl_str)

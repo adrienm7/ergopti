@@ -491,18 +491,19 @@ _RunCryptoContractVectors() {
 	}
 	Test("Crypto: sha256 returns a string and never throws", _Result_crypto_string)
 
-	; Lowercase hex; 64 chars via the COM SHA256Managed class, 8 via the DJB2
-	; fallback. When COM is present it must equal the canonical SHA-256 of "hello"
-	; (sha256_returns_64_hex_chars).
+	; Lowercase hex, and it must be a REAL SHA-256. This assertion used to accept
+	; "64 or 8" chars and gate the canonical-digest check behind `if len = 64` —
+	; so it passed while the adapter returned the 8-char DJB2 fallback on every
+	; single call, certifying the very defect it was meant to catch. CNG ships
+	; with Windows, so the degraded length is now a failure, not an alternative.
 	_Result_crypto_hex() {
 		Out := CryptoSha256("hello")
 		Assert(RegExMatch(Out, "^[0-9a-f]+$") > 0, "CryptoSha256 must be lowercase hex: " . Out)
-		Assert(StrLen(Out) = 64 || StrLen(Out) = 8,
-			"CryptoSha256 must be 64 (COM) or 8 (DJB2 fallback) hex chars, got " . StrLen(Out))
-		if (StrLen(Out) = 64) {
-			Assert(Out = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-				"CryptoSha256('hello') must equal the canonical SHA-256 digest, got: " . Out)
-		}
+		Assert(StrLen(Out) = 64,
+			"CryptoSha256 must return 64 hex chars — a length of 8 means the DJB2 fallback ran "
+			. "and every privacy hash in the product is collision-prone; got " . StrLen(Out))
+		Assert(Out = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+			"CryptoSha256('hello') must equal the canonical SHA-256 digest, got: " . Out)
 	}
 	Test("Crypto: sha256 returns the canonical lowercase hex digest", _Result_crypto_hex)
 

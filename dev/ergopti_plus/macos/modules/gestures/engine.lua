@@ -15,6 +15,7 @@ local M = {}
 
 local hs       = hs
 local Logger   = require("lib.logger")
+local EventTapGuard = require("adapters.event_tap_guard")
 local Timings  = require("lib.timings")
 local Geometry = require("modules.gestures.geometry")
 local LOG      = "gestures.engine"
@@ -624,10 +625,19 @@ function M.process_frame(touches)
 				gs.peakNFirstSeen = now
 				gs.peakNLastSeen  = now
 			elseif n == gs.peakN then
-				-- Extend the held span only while the peak is still on the trackpad,
-				-- so the override measures a sustained hold rather than the age of a
-				-- momentary spike
-				gs.peakNLastSeen = now
+				-- Extend the held span only while the peak is CONTINUOUSLY on the
+				-- trackpad. gs.lastN still holds the previous frame's count here, so
+				-- a mismatch means the peak was dropped and re-attained: two
+				-- momentary spikes with a dip between them, which the old
+				-- unconditional extension measured as one long hold and let the
+				-- override promote. Restarting the span on re-attainment means each
+				-- spike is judged on the time it was actually held.
+				if gs.lastN == gs.peakN then
+					gs.peakNLastSeen = now
+				else
+					gs.peakNFirstSeen = now
+					gs.peakNLastSeen  = now
+				end
 			end
 
 			-- StartPos Compensation: if finger count changed, the centroid (pos) jumps.
@@ -691,6 +701,16 @@ function M.process_frame(touches)
 							gs.candidateFingers     = nil
 							gs.candidateSince       = nil
 							gs.candidateFrames      = 0
+							-- Rebase the peak on the confirmed count as well. Demoting
+							-- maxFingers alone left peakN holding the count the user just
+							-- abandoned, and the peak override at commit re-promoted it —
+							-- so a confirmed 4→3 change still fired the 4-finger action,
+							-- the exact outcome this demotion exists to prevent. The peak
+							-- is meant to recover intent from a finger lifting a frame
+							-- early, not to outrank a change we spent frames confirming.
+							gs.peakN          = n
+							gs.peakNFirstSeen = now
+							gs.peakNLastSeen  = now
 						else
 							gs.lifting = true
 						end
@@ -857,7 +877,10 @@ function M.init(core_state, actions_mod)
 		local evTypes = hs.eventtap.event.types
 		scrollBlocker = hs.eventtap.new(
 			{ evTypes.scrollWheel, evTypes.gesture },
-			function() return isBlockingScroll end
+			function(e)
+				if EventTapGuard.handle_disabled(e, scrollBlocker, "gestures.scroll_blocker") then return false end
+				return isBlockingScroll
+			end
 		)
 		if scrollBlocker then
 			pcall(function() scrollBlocker:start() end)

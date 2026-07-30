@@ -58,11 +58,29 @@ Test("api_remote: LLM_RemoteGenerate_Async stores deadline_tick in the registry 
 ; ===================================================
 ; ===================================================
 
+; The invariant is unchanged: a cancelled request must really be ABORTED, not
+; merely flagged — a flag alone leaves the live request consuming bandwidth.
+; What changed is WHERE the abort runs. The singular cancel now hands its
+; transport to LLM_DeferCancelKills like the plural one, so both halves of the
+; public cancel API carry the same contract and neither can starve the keyboard
+; hook if a future caller reaches them from the per-keystroke Critical.
+;
+; The assertion follows the whole chain rather than grepping one token in one
+; body — strictly stronger than the old form, which the literal string alone
+; satisfied and which would have stayed green even if the collected object were
+; never actually aborted.
 _RPD_CancelAsyncAbortsHttp() {
 	Body := _DriverFuncBody("LLM_RemoteCancelAsync")
 	Assert(Body != "", "LLM_RemoteCancelAsync must exist in modules/llm/api_remote.ahk")
-	Assert(InStr(Body, ".Abort()") > 0,
-		"LLM_RemoteCancelAsync must call .Abort() on the WinHTTP object — setting cancelled:=true alone leaves the live HTTP request consuming bandwidth (remote-poll-no-deadline-cap)")
+	Assert(InStr(Body, 'entry["http"]') > 0,
+		"LLM_RemoteCancelAsync must still collect the live WinHTTP object — setting cancelled:=true alone leaves the request consuming bandwidth (remote-poll-no-deadline-cap)")
+	Assert(InStr(Body, "LLM_DeferCancelKills(") > 0,
+		"LLM_RemoteCancelAsync must hand the transport to LLM_DeferCancelKills — the abort must still happen, just not inline under a caller's Critical")
+
+	Runner := _DriverFuncBody("_LLM_RunCancelKills")
+	Assert(Runner != "", "_LLM_RunCancelKills must exist — it is where the deferred abort actually runs")
+	Assert(InStr(Runner, ".Abort()") > 0,
+		"_LLM_RunCancelKills must call .Abort() on every collected WinHTTP object — deferring the abort must not become dropping it (remote-poll-no-deadline-cap)")
 }
 Test("api_remote: LLM_RemoteCancelAsync calls .Abort() to kill the live WinHTTP request (remote-poll-no-deadline-cap)", _RPD_CancelAsyncAbortsHttp)
 
@@ -78,8 +96,11 @@ Test("api_remote: LLM_RemoteCancelAsync calls .Abort() to kill the live WinHTTP 
 ; literal string alone and would have stayed green even if the collected object
 ; were never actually aborted.
 ;
-; LLM_RemoteCancelAsync (singular) deliberately keeps its inline abort — it is
-; not reached from the keystroke path, so it pays no Critical penalty.
+; Both the singular and plural cancels now defer. Neither has a production caller
+; today — they are public API surface — so this is a uniformity change rather
+; than a measured latency win, and it removes the trap of a future caller
+; reaching the singular one from the keystroke path and finding an inline
+; cross-apartment COM call there.
 _RPD_CancelAllAbortsHttp() {
 	Body := _DriverFuncBody("LLM_RemoteCancelAllAsync")
 	Assert(Body != "", "LLM_RemoteCancelAllAsync must exist in modules/llm/api_remote.ahk")

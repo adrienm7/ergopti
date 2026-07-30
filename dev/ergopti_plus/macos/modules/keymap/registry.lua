@@ -37,6 +37,11 @@ local _state = nil  -- Injected via M.init(); required before all public functio
 -- Deferred-sort machinery. When _sort_deferred is true, sort_mappings() becomes
 -- a no-op that only sets _sort_pending; flush_sort() then performs exactly one
 -- final sort. Used at startup so the 6 TOML loads sort only once together.
+-- classify_trigger memo, keyed by query string. Declared above every function
+-- that touches it. Dropped by sort_mappings, which is the one funnel every
+-- registration, removal and group toggle passes through.
+local _classify_cache = {}
+
 local _sort_deferred = false
 local _sort_pending  = false
 
@@ -296,6 +301,10 @@ end
 --- Rebuilds the tail-char bucket indexes at the end so they stay in sync.
 function M.sort_mappings()
 	if not require_state("sort_mappings") then return end
+	-- Dropped BEFORE the deferral check: a deferred sort still means the corpus
+	-- has changed, and the memo must not survive that even if the sort itself
+	-- is coalesced to later.
+	M.drop_classify_cache()
 	if _sort_deferred then
 		_sort_pending = true
 		return
@@ -358,10 +367,32 @@ end
 --- @return boolean exact True when `str` matches a trigger exactly.
 --- @return boolean prefix True when `str` is a prefix of any trigger.
 --- @return boolean suffix True when `str` is a suffix of any trigger.
+--- Drops the classify_trigger memo.
+---
+--- Every corpus mutation must call this. sort_mappings used to be the only one
+--- that did, which was correct for every path that goes through it and wrong for
+--- disable_group, which shrinks the corpus and rebuilds the lookup and tail
+--- indexes without sorting. classify_trigger then kept answering `exact = true`
+--- for mappings that no longer existed, and the dynamic @-collector reads exactly
+--- that answer to decide whether a trigger is already claimed — so a stale true
+--- silently suppressed collection for the rest of the session.
+function M.drop_classify_cache()
+	_classify_cache = {}
+end
+
 function M.classify_trigger(str)
 	if not _state or type(str) ~= "string" or str == "" then
 		return false, false, false
 	end
+	-- Memoised. This walks every registered mapping and builds two substrings per
+	-- entry, inside the keyDown eventtap, to answer a question about a string that
+	-- is almost always the one it was asked about a keystroke earlier. The answer
+	-- is a pure function of (str, corpus), and the cache is dropped whenever the
+	-- corpus changes — a memo that outlived a re-registration would answer for a
+	-- mapping set that no longer exists, which is worse than the scan it replaces.
+	local hit = _classify_cache[str]
+	if hit then return hit[1], hit[2], hit[3] end
+
 	local n     = #str
 	local exact = false
 	local pref  = false
@@ -373,6 +404,7 @@ function M.classify_trigger(str)
 		if not suff  and t:sub(-n)    == str  then suff  = true end
 		if exact and pref and suff then break end
 	end
+	_classify_cache[str] = { exact, pref, suff }
 	return exact, pref, suff
 end
 
@@ -723,6 +755,7 @@ function M.init(core_state)
 		resolve_priority     = resolve_priority,
 		rebuild_lookup       = rebuild_lookup,
 		rebuild_tail_indexes = rebuild_tail_indexes,
+		drop_classify_cache  = M.drop_classify_cache,
 	})
 	Logger.debug(LOG, "Registry initialized.")
 end

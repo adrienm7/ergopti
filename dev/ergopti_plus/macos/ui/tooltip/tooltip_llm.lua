@@ -13,6 +13,7 @@
 local M = {}
 local hs = hs
 local Logger = require("lib.logger")
+local EventTapGuard = require("adapters.event_tap_guard")
 local Keycodes = require("lib.keycodes")
 local LOG = "tooltip_llm"
 
@@ -160,13 +161,32 @@ end
 -- ================================
 -- ================================
 
+--- Dismisses the tooltip through the FULL cancel contract.
+---
+--- Hiding is only half of a dismissal. The prediction engine tracks its own
+--- `predictions_visible` flag and only the cancel callback clears it, so a path
+--- that merely calls M.hide() leaves the engine believing a live prediction is
+--- still on screen — and the next Tab or Enter applies the stale one the user
+--- watched disappear. Every dismissal therefore goes through here rather than
+--- calling M.hide() directly, so the pair can never come apart again.
+--- @param reason string Why the tooltip is being dismissed, for the log.
+local function dismiss(reason)
+	Logger.debug(LOG, "Dismissing predictions tooltip (%s).", reason)
+	if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
+	M.hide()
+end
+
 --- Clears active timers and sets a new idle timeout if applicable.
 local function reset_idle_timer()
 	if _idle_timer and type(_idle_timer.stop) == "function" then _idle_timer:stop() end
 	local active_timeout = Config.settings.llm_timeout_sec
 
 	if active_timeout > 0 then
-		_idle_timer = hs.timer.doAfter(active_timeout, M.hide)
+		-- Was `M.hide` alone. The tooltip vanished on idle while the engine still
+		-- had predictions_visible set, so the next Tab typed the prediction that
+		-- had already timed out — text the user never asked for, from a tooltip
+		-- that was no longer on screen.
+		_idle_timer = hs.timer.doAfter(active_timeout, function() dismiss("idle timeout") end)
 		Logger.debug(LOG, "Auto-hide idle timer (re)armed: %.1fs.", active_timeout)
 	end
 end
@@ -224,9 +244,10 @@ local function start_watchers()
 	-- HID-thread latency on every pointer event while the tooltip is visible. Clicks
 	-- and scrolls are sufficient for dismissal; pure mouse movement should not
 	-- interfere with input delivery.
-	local ok_mouse, watcher_mouse = pcall(hs.eventtap.new, { event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel }, function(_)
-		if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
-		M.hide()
+	local ok_mouse, watcher_mouse
+	ok_mouse, watcher_mouse = pcall(hs.eventtap.new, { event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel }, function(e)
+		if EventTapGuard.handle_disabled(e, watcher_mouse, "tooltip.llm_mouse") then return false end
+		dismiss("mouse activity")
 		return false
 	end)
 	
@@ -239,7 +260,9 @@ local function start_watchers()
 	-- Track which shift key is held so Tab navigation uses the correct direction.
 	-- Left shift + Tab  → previous prediction (-1)
 	-- Right shift + Tab → next prediction    (+1)
-	local ok_flags, watcher_flags = pcall(hs.eventtap.new, { event_types.flagsChanged }, function(e)
+	local ok_flags, watcher_flags
+	ok_flags, watcher_flags = pcall(hs.eventtap.new, { event_types.flagsChanged }, function(e)
+		if EventTapGuard.handle_disabled(e, watcher_flags, "tooltip.llm_flags") then return false end
 		local kc = e:getKeyCode()
 		local f  = e:getFlags()
 		if not f.shift then
@@ -256,7 +279,9 @@ local function start_watchers()
 		table.insert(_watchers, watcher_flags)
 	end
 
-	local ok_key, watcher_key = pcall(hs.eventtap.new, { event_types.keyDown }, function(event)
+	local ok_key, watcher_key
+	ok_key, watcher_key = pcall(hs.eventtap.new, { event_types.keyDown }, function(event)
+		if EventTapGuard.handle_disabled(event, watcher_key, "tooltip.llm_key") then return false end
 		local keycode = event:getKeyCode()
 		local flags = event:getFlags()
 		local chars = event:getCharacters(true) or event:getCharacters(false) or ""
@@ -390,6 +415,14 @@ local function start_watchers()
 		-- 54-60 are physical modifiers; the rest are owned by lib.keycodes.
 		local ignored_keycodes = {
 			54, 55, 56, 58, 59, 60,
+			-- Escape belongs to the persistent trap, not to this watcher. This tap
+			-- is created per render, so it is always NEWER than the trap and runs
+			-- first: dismissing here and returning false left the trap looking at
+			-- an already-invisible tooltip, which is its signal to pass Escape
+			-- through — and the keystroke reached the app, opening Raycast on
+			-- every dismissal after the first show. Ignoring it lets the trap see
+			-- a visible tooltip, consume the key, and reset the predictions.
+			Keycodes.ESCAPE,
 			Keycodes.F13_KARABINER_RETURN,
 			Keycodes.F14_KARABINER_BACKSPACE,
 			Keycodes.F15_KARABINER_ESCAPE,
@@ -403,8 +436,7 @@ local function start_watchers()
 			if keycode == ignored_code then return false end
 		end
 		
-		if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end 
-		M.hide()
+		dismiss("keystroke")
 		return false
 	end)
 	

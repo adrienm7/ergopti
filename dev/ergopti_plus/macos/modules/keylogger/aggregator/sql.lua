@@ -37,6 +37,22 @@ local C = require("modules.keylogger.aggregator.core")
 -- ================================
 
 --- Execute a SQL statement against the open db; log on failure.
+---
+--- The statement itself is NEVER logged. Aggregate statements are built from user
+--- content — n-gram tokens and window titles are interpolated straight into them —
+--- so echoing the first 200 characters put typed text and window titles into the
+--- 14-day unified log. Every other diagnostic in this subsystem is careful about
+--- exactly this: notify_synthetic logs only a source type and counts, the context
+--- tracker logs only the app name, and the expander deliberately withholds a
+--- private trigger and replacement. This one call site was the exception, because
+--- it was written for developer convenience without classifying its payload.
+--- The table name plus the driver's own message is what a reader actually needs.
+---
+--- The name is derived from the statement rather than threaded through all
+--- nineteen call sites, for two reasons: an extra argument is exactly the kind of
+--- parameter one site forgets, and the pattern below can only ever yield a bare
+--- SQL identifier ([%w_]+), so this diagnostic is structurally incapable of
+--- carrying user content no matter what a future statement interpolates.
 --- @param sql string The statement to execute.
 --- @return boolean True on success; false when the db is unavailable or the
 --- statement failed (the row's caller must NOT drop its batch delta on false —
@@ -47,7 +63,12 @@ local function exec(sql)
 	if not db then return false end
 	local rc = db:exec(sql)
 	if rc ~= sqlite3.OK then
-		Logger.error(LOG, "exec failed: %s — %s.", db:errmsg() or "?", sql:sub(1, 200))
+		local target = sql:match("INSERT%s+INTO%s+([%w_]+)")
+			or sql:match("INSERT%s+OR%s+%u+%s+INTO%s+([%w_]+)")
+			or sql:match("UPDATE%s+([%w_]+)")
+			or sql:match("DELETE%s+FROM%s+([%w_]+)")
+			or "?"
+		Logger.error(LOG, "exec failed on '%s': %s.", target, db:errmsg() or "?")
 		return false
 	end
 	return true

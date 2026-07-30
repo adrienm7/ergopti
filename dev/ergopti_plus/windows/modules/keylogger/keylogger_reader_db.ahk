@@ -446,6 +446,13 @@ KLR_RebuildAggregates(db) {
 
 	; agg_app_day_titles — window titles seen per app from events_window_switch.
 	try SQLite_Exec(db, "INSERT INTO agg_app_day_titles (device_id, date, app, title, c) SELECT device_id, date, app, next_title, COUNT(*) FROM events_window_switch WHERE next_title IS NOT NULL AND next_title != '' GROUP BY device_id, date, app, next_title ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=excluded.c;")
+	; …then trim each (device_id, date, app) group back to the same per-app-day
+	; cap the live walker enforces. The GROUP BY above replays the entire
+	; events_window_switch history, so a cold rebuild would otherwise
+	; reintroduce every distinct title an app ever produced and silently undo
+	; the walker's cleanup — the table, and the win_titles list the dashboard
+	; downloads with it, must stay bounded on both paths.
+	try SQLite_Exec(db, "DELETE FROM agg_app_day_titles WHERE title NOT IN (SELECT t.title FROM agg_app_day_titles AS t WHERE t.device_id = agg_app_day_titles.device_id AND t.date = agg_app_day_titles.date AND t.app = agg_app_day_titles.app ORDER BY (t.c + t.ms) DESC LIMIT " . KLWConst.TITLE_CAP_PER_APP_DAY . ");")
 
 	; agg_app_day_switches_to — app switch destinations from events_app_switch.
 	; The real schema columns are (app_from, app_to, count); the former

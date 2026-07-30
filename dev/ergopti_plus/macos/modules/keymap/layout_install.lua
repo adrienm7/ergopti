@@ -146,7 +146,11 @@ local function path_exists(path)
 	end
 	-- Shell fallback — handles SIP-protected paths that hs.fs.attributes can't stat.
 	-- /bin/test -e accepts any filesystem object (file, dir, bundle symlink).
-	local cmd = string.format("/bin/test -e %q && echo OK", path)
+	-- shell_quote, not %q. Lua's %q escapes for a LUA literal: it leaves $,
+	-- backticks and ! untouched, every one of which /bin/sh expands. This path is
+	-- user-influenced (the config directory is a setting), so %q here is both
+	-- wrong for ordinary paths and a shell-injection hazard.
+	local cmd = string.format("/bin/test -e %s && echo OK", text_utils.shell_quote(path))
 	local out = hs.execute and hs.execute(cmd) or nil
 	if type(out) == "string" and out:find("OK") then return true end
 	-- Pure-Lua fallback for unit-test runs where hs is unavailable.
@@ -174,7 +178,10 @@ end
 local function find_installed_bundles(dir)
 	local out = {}
 	if type(dir) ~= "string" or dir == "" then return out end
-	local cmd = string.format("ls -1 %q 2>/dev/null", dir)
+	-- shell_quote, not %q: the sibling function 60 lines down already documents
+	-- why (%q escapes for a Lua literal and leaves $, backticks and ! live for
+	-- /bin/sh), and every path reaching here is user-configurable.
+	local cmd = string.format("ls -1 %s 2>/dev/null", text_utils.shell_quote(dir))
 	local p = io.popen(cmd)
 	if not p then return out end
 	local dir_with_slash = dir:match("[/\\]$") and dir or (dir .. "/")
@@ -271,11 +278,25 @@ local function install_system(bundles_dir, bundle_name)
 	-- Remove both the user copy (no privilege needed) and the old system copy
 	-- (done inside the privileged shell so both are cleaned atomically).
 	hs.execute("rm -rf " .. text_utils.shell_quote((USER_LAYOUTS_DIR:gsub("/$", ""))) .. "/Ergopti_v*.bundle")
+	-- POSIX-quoted, like the rm above and the 41 sites migrated by the quoting
+	-- campaign. This one kept raw %s inside hand-written single quotes, so an
+	-- apostrophe anywhere in the bundle path -- a relocated install, a user
+	-- directory like /Users/O'Brien -- closed the quoted run early and broke the
+	-- PRIVILEGED shell command. The glob must stay outside the quoting, so the
+	-- directory is quoted separately and concatenated.
 	local shell_cmd = string.format(
-		"rm -rf '%sErgopti_v'*.bundle && cp -R '%s%s' '%s'",
-		SYSTEM_LAYOUTS_DIR, bundles_dir, bundle_name, SYSTEM_LAYOUTS_DIR
+		"rm -rf %s && cp -R %s %s",
+		text_utils.shell_quote(SYSTEM_LAYOUTS_DIR .. "Ergopti_v") .. "*.bundle",
+		text_utils.shell_quote(bundles_dir .. bundle_name),
+		text_utils.shell_quote(SYSTEM_LAYOUTS_DIR)
 	)
-	local script = string.format(
+	-- TWO layers, and only the inner one was handled. shell_cmd above is correctly
+	-- quoted for /bin/sh, but shell_quote wraps in SINGLE quotes and escapes only
+	-- the single quote — so a `\` or a `"` anywhere in bundles_dir, bundle_name or
+	-- SYSTEM_LAYOUTS_DIR passed through untouched into this AppleScript literal.
+	-- The backslash was then eaten (the privileged cp -R targeting a different
+	-- path) or the quote terminated the literal outright.
+	local script = text_utils.applescript_format(
 		"do shell script \"%s\" with administrator privileges",
 		shell_cmd
 	)

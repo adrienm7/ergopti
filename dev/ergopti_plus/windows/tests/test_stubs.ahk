@@ -476,6 +476,18 @@ ToggleSuspend() {
     _Stub_SentText.Push({ kind: "toggle_suspend" })
 }
 
+; The pause-preserving reload. The real one lives in lib/lifecycle.ahk, which
+; this runner cannot include: it defines ToggleSuspend, colliding with the stub
+; above, and loading the genuine article would let a test actually Suspend(1) the
+; runner and arm its watchdog timers. Stubbed rather than IsSet-guarded at the
+; call sites so production keeps ONE reload rule with no silent fallback — a
+; guarded call would degrade to a bare Reload exactly where the guarantee
+; matters. Records the request so a test can assert the pause was carried.
+ReloadPreservingSuspend() {
+    global _Stub_SentText
+    _Stub_SentText.Push({ kind: "reload_preserving_suspend" })
+}
+
 OneShotShift() {
     global _Stub_SentText
     _Stub_SentText.Push({ kind: "one_shot_shift" })

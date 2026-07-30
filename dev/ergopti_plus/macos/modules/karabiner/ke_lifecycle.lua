@@ -184,7 +184,7 @@ function M.run_total_reset_async()
 	if not write_total_reset_script(script_path) then
 		return "Unable to create async reset script", false
 	end
-	local cmd = string.format("/usr/bin/nohup /bin/zsh %q >/tmp/ergopti_ke_total_reset_async.log 2>&1 </dev/null &", script_path)
+	local cmd = string.format("/usr/bin/nohup /bin/zsh %s >/tmp/ergopti_ke_total_reset_async.log 2>&1 </dev/null &", text_utils.shell_quote(script_path))
 	local _, ok = hs.execute(cmd)
 	if ok == true then
 		_last_async_reset_launch_ts = now
@@ -247,7 +247,7 @@ local KE_CLI_BIN =
 	"/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
 
 local KE_PRIME_HEADLESS_CMD =
-	string.format("/usr/bin/nohup %q", KE_CONSOLE_USER_SERVER_BIN)
+	"/usr/bin/nohup " .. text_utils.shell_quote(KE_CONSOLE_USER_SERVER_BIN)
 	.. " >/tmp/ke_console_user_server.out 2>/tmp/ke_console_user_server.err </dev/null &"
 
 -- GUI fallback intentionally disabled: the user explicitly requires 100%
@@ -504,10 +504,18 @@ end
 --- reboot, which is also when KE's in-memory rules state is wiped. This is
 --- a safer signal than tracking login sessions, which can be hard to detect.
 --- @return string|nil
+--- Memoised for the life of the process: the value is the machine's boot time,
+--- so it cannot change while this Lua state exists. Every ownership and
+--- prime-marker check called it, and each call forked /usr/sbin/sysctl and
+--- blocked the run loop for a constant that was already known.
+local _boot_timestamp = nil
+
 local function get_boot_timestamp()
+	if _boot_timestamp then return _boot_timestamp end
 	local out, ok = hs.execute("/usr/sbin/sysctl -n kern.boottime 2>/dev/null")
 	if ok ~= true or type(out) ~= "string" then return nil end
-	return out:match("sec = (%d+)")
+	_boot_timestamp = out:match("sec = (%d+)")
+	return _boot_timestamp
 end
 
 --- True when the KE bridge has been primed in the current boot session.
@@ -832,7 +840,20 @@ function M.prime_ke_for_session(callback, force)
 	-- then hands off to probe_and_commit. Schedules itself until success or timeout.
 	poll_attempt = function(attempt)
 		if attempt > PRIME_POLL_MAX_ATTEMPTS then
-			clear_hs_owned_bridge_marker()
+			-- Disowning is only correct when we never launched anything. If a
+			-- headless launch WAS fired, the bridge is ours whether or not it showed
+			-- up inside the polling window — and a bridge we have disowned is one we
+			-- will refuse to tear down at quit, which is the post-quit-remapping
+			-- class in PROJECT_MEMORY: the user's keyboard stays remapped after
+			-- Hammerspoon exits, with nothing left running that could undo it.
+			if headless_launch_attempts > 0 then
+				Logger.warn(LOG,
+					"Bridge did not appear in time but %d headless launch(es) were fired — "
+					.. "keeping ownership so quit still tears it down.",
+					headless_launch_attempts)
+			else
+				clear_hs_owned_bridge_marker()
+			end
 			_prime_in_progress = false
 			Logger.error(LOG,
 				"KE bridge did not appear after %d polls (%.1f s) — config may not be applied.",
@@ -948,9 +969,16 @@ function M.is_remapping_active()
 		return is_runtime_remapping_ready()
 	end
 	-- Lazy fallback: bridge is alive even though the polling callback missed it.
+	--
+	-- Only the SESSION marker is written here, matching what the non-forced prime
+	-- path already does when it finds a live bridge. This function is a read-only
+	-- status probe: a healthy bridge is evidence that remapping is applied, and no
+	-- evidence at all that WE started it. Writing the owner marker made merely
+	-- opening the Karabiner submenu — with the integration disabled and the user's
+	-- own Karabiner-Elements running — enough for the driver to believe it owned
+	-- their bridge and boot out their launchd agents.
 	if is_runtime_remapping_ready() then
 		mark_session_primed()
-		mark_hs_owned_bridge()
 		Logger.info(LOG, "Lazy prime marker written — runtime remapping probe is ready.")
 		return true
 	end

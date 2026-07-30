@@ -85,8 +85,13 @@ _HLRB_AssertBounded(RelPath, Anchor, Where) {
 
 _HLRB_RCtrlHoldLayer() {
 	Q := Chr(34)
+	; The anchor is a LOCATOR for block 7.5, not part of the guarantee. It used
+	; to include the gate's `and TapHoldTapAction(...) != ""` conjunct, which was
+	; dropped so a hold arms on the hold alone (taphold-hold-option-unreachable);
+	; the `not _RCtrlIsSpecialTap()` prefix is the stable half and is what
+	; test_hold_modifier_release_bounded already anchors on for block 7.4.
 	_HLRB_AssertBounded("modules/tap_holds/rctrl.ahk",
-		"TapHoldHoldLayer(TapHold, " . Q . "right_ctrl" . Q . ") != " . Q . Q . " and TapHoldTapAction(TapHold, " . Q . "right_ctrl" . Q . ") != " . Q . Q,
+		"not _RCtrlIsSpecialTap() and TapHoldHoldLayer(TapHold, " . Q . "right_ctrl" . Q . ") != " . Q . Q,
 		"rctrl.ahk 7.5")
 }
 Test("tap-holds: RCtrl hold-layer release is bounded + in finally (hold-layer-unbounded-keywait)", _HLRB_RCtrlHoldLayer)
@@ -127,9 +132,12 @@ Test("tap-holds: LAlt backspace+layer hold-layer release is bounded + in finally
 
 _HLRB_LAltGenericLayer() {
 	Q := Chr(34)
-	; Section 4.8: generic hold-layer, any non-special tap.
+	; Section 4.8: generic hold-layer, any non-special tap. The trailing
+	; `and TapHoldTapAction` was only a locator suffix; the gate no longer
+	; requires a tap action so a hold arms on the hold alone
+	; (taphold-hold-option-unreachable). The assertions are unchanged.
 	_HLRB_AssertBounded("modules/tap_holds/lalt.ahk",
-		"not _LAltIsSpecialTap() and TapHoldHoldLayer(TapHold, " . Q . "left_alt" . Q . ") != " . Q . Q . " and TapHoldTapAction",
+		"not _LAltIsSpecialTap() and TapHoldHoldLayer(TapHold, " . Q . "left_alt" . Q . ") != " . Q . Q,
 		"lalt.ahk 4.8")
 }
 Test("tap-holds: LAlt generic hold-layer release is bounded + in finally (hold-layer-unbounded-keywait)", _HLRB_LAltGenericLayer)

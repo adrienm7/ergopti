@@ -1,4 +1,4 @@
-﻿﻿{
+{
 	"_meta.flag": "🇳🇱",
 	"_meta.locale": "nl",
 	"_meta.name": "Nederlands",
@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "Naam van de nieuwe categorie voor %s:",
 	"metrics_apps.new_category_title": "Nieuwe categorie",
 	"metrics_apps.no_app_detected": "Er kon geen applicatie worden gedetecteerd.",
+	"metrics_apps.pick_app_placeholder": "Kies een applicatie om te classificeren…",
 	"metrics_apps.rename_chooser_placeholder": "Categorie hernoemen",
 	"metrics_apps.rename_item": "✎ Bestaande categorie hernoemen…",
 	"metrics_apps.rename_prompt": "Nieuwe naam voor categorie \"%s\":",
@@ -1415,7 +1416,7 @@
 	"sfbsreduction.comma": "Komma vermindert bigrammen van dezelfde vinger",
 	"sfbsreduction.ecirc": "Ê vermindert bigrammen van dezelfde vinger",
 	"sfbsreduction.egrave": "È vermindert bigrammen van dezelfde vinger",
-	"sfbsreduction.ié": "IE vermindert IE/EI-bigrammen",
+	"sfbsreduction.ieacute": "IE vermindert IE/EI-bigrammen",
 	"sg_actions.activity_simulation": "🖱 Activiteit simuleren (anti-slaapstand)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (monitor)",
 	"sg_actions.app_expose": "◱ App-Exposé",
@@ -1652,6 +1653,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = Open de map Downloads",
 	"shortcuts.pixel_read_error": "Kan pixelkleur niet lezen",
 	"shortcuts.saved": "Opgeslagen: %s",
+	"shortcuts.screenshot_failed": "Schermafbeelding mislukt",
 	"shortcuts.screen": "Win + H (screensHot) = Schermopname (activeert Win + Shift + S)",
 	"shortcuts.screeninstant": "Toets links van 1 = Directe opname van het actieve venster, opgeslagen in Afbeeldingen met tijdstempel",
 	"shortcuts.screenocr": "Win + C (OCR) = Schermafbeelding met tekstextractie (Win + Shift + T)",

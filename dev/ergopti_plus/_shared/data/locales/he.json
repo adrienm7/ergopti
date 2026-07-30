@@ -1,4 +1,4 @@
-﻿﻿{
+{
 	"_meta.flag": "🇮🇱",
 	"_meta.locale": "he",
 	"_meta.name": "עברית",
@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "שם הקטגוריה החדשה עבור %s:",
 	"metrics_apps.new_category_title": "קטגוריה חדשה",
 	"metrics_apps.no_app_detected": "לא ניתן לזהות יישום.",
+	"metrics_apps.pick_app_placeholder": "בחר יישום לסיווג…",
 	"metrics_apps.rename_chooser_placeholder": "קטגוריה לשינוי שם",
 	"metrics_apps.rename_item": "✎ שנה שם של קטגוריה קיימת…",
 	"metrics_apps.rename_prompt": "שם חדש לקטגוריה \"%s\":",
@@ -1415,7 +1416,7 @@
 	"sfbsreduction.comma": "פסיק מצמצם ביגרמות של אותו אצבע",
 	"sfbsreduction.ecirc": "Ê מצמצם ביגרמות של אותו אצבע",
 	"sfbsreduction.egrave": "È מצמצם ביגרמות של אותו אצבע",
-	"sfbsreduction.ié": "IE מצמצם ביגרמות IE/EI",
+	"sfbsreduction.ieacute": "IE מצמצם ביגרמות IE/EI",
 	"sg_actions.activity_simulation": "🖱 הדמיית פעילות (אנטי-שינה)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (מסך)",
 	"sg_actions.app_expose": "◱ App Exposé",
@@ -1652,6 +1653,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = פתח את תיקיית ההורדות",
 	"shortcuts.pixel_read_error": "לא ניתן לקרוא את צבע הפיקסל",
 	"shortcuts.saved": "נשמר: %s",
+	"shortcuts.screenshot_failed": "צילום המסך נכשל",
 	"shortcuts.screen": "Win + H (screensHot) = צילום מסך (מפעיל Win + Shift + S)",
 	"shortcuts.screeninstant": "מקש משמאל ל-1 = צילום מיידי של החלון הפעיל, נשמר ב-Pictures עם חותמת זמן",
 	"shortcuts.screenocr": "Win + C (OCR) = צילום מסך עם חילוץ טקסט (Win + Shift + T)",

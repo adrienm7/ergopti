@@ -27,6 +27,7 @@ local M = {}
 
 local hs             = hs
 local Logger         = require("lib.logger")
+local EventTapGuard = require("adapters.event_tap_guard")
 local Timings        = require("lib.timings")
 local Keycodes       = require("lib.keycodes")
 local ShellRunner    = require("adapters.shell_runner")
@@ -90,6 +91,20 @@ local _layout_poll_watchdog = nil
 -- session. Declared above the poll body for the same closure-before-local reason.
 local _layout_poll_handle = nil
 
+-- Identity of the CURRENT layout read. Bumped when a read starts, and again
+-- whenever one is abandoned (watchdog timeout, watcher stop), so a completion
+-- callback can tell whether it still speaks for the read in flight.
+--
+-- Terminating a read does not cancel its completion callback — the OS still
+-- delivers the SIGTERM exit, moments later, by which time the next tick has
+-- usually started read #2. That late callback then cleared read #2's handle
+-- (leaving its watchdog nothing to terminate), released read #2's pending guard
+-- (letting a third read pile on top), and cancelled read #2's watchdog outright
+-- — so the very read that was still running lost every protection it had.
+-- Declared above the poll body for the same closure-before-local reason as the
+-- handle itself.
+local _layout_read_generation = 0
+
 -- Previous hs.keycodes.inputSourceChanged callback saved before start_input_source_watcher
 -- installs its own, so stop_input_source_watcher can restore it instead of passing nil
 -- (karabiner-input-source-changed-overwrite).
@@ -107,6 +122,13 @@ local CAPSWORD_PROBE_TIMEOUT_SEC = 1.5
 -- Watchdog timer declared ABOVE deactivate_capsword (closure-nil rule) so the task
 -- callback can cancel it and the watchdog callback can reach the pending flag.
 local _capsword_probe_watchdog = nil
+
+-- Monotonic probe generation. A terminated or timed-out probe's callback still
+-- fires, and it used to clear _capsword_check_pending and cancel the watchdog
+-- unconditionally — the SUCCESSOR probe's, by then. The sibling layout read in
+-- this same module was generation-gated for exactly this; the CapsWord probe was
+-- not, so a slow probe could unlock a fresh one and leave two racing.
+local _capsword_gen = 0
 
 -- GC root for the CapsWord probe tasks. An hs.task that is not referenced from a
 -- GC root can be collected mid-run, which kills the subprocess and means its
@@ -143,11 +165,16 @@ local function deactivate_capsword()
 	if _capsword_check_pending then return end
 	_capsword_last_check_s    = now_s
 	_capsword_check_pending   = true
+	_capsword_gen             = _capsword_gen + 1
+	local my_capsword_gen     = _capsword_gen
 
 	-- Async get: unblocks the main loop immediately; callback fires on completion
 	local task
 	task = hs.task.new(KARABINER_CLI, function(exit_code, stdout, _)
 		if task then _active_tasks[task] = nil end
+		-- A superseded probe releases nothing: the flag and the watchdog it would
+		-- clear belong to the probe that replaced it.
+		if my_capsword_gen ~= _capsword_gen then return end
 		_capsword_check_pending = false
 		if _capsword_probe_watchdog then
 			TimerScheduler.cancel(_capsword_probe_watchdog)
@@ -227,7 +254,8 @@ end
 --- @return hs.eventtap The running eventtap watcher instance.
 function M.start_gesture_watcher(gestures_engine)
 	local ev = hs.eventtap.event.types
-	local watcher = hs.eventtap.new(
+	local watcher
+	watcher = hs.eventtap.new(
 		{
 			ev.mouseMoved,
 			ev.scrollWheel,
@@ -237,6 +265,7 @@ function M.start_gesture_watcher(gestures_engine)
 			ev.otherMouseDown,
 		},
 		function(_event)
+			if EventTapGuard.handle_disabled(_event, watcher, "karabiner.trackpad_capsword") then return false end
 			-- This callback fires on mouseMoved/scrollWheel/gesture/click — the
 			-- hottest possible eventtap. deactivate_capsword() contains an
 			-- unguarded hs.task.new(...) call; every sibling eventtap added in
@@ -300,6 +329,10 @@ end
 --- to eliminate, and worse on the Sequoia machines this poll exists for.
 --- @param callback fun(layout_name: string|nil)
 local function read_layout_async(callback)
+	-- Stamp this read so its completion can prove it is still the current one.
+	_layout_read_generation = _layout_read_generation + 1
+	local my_generation = _layout_read_generation
+
 	-- Capture the handle and call start() — ShellRunner.spawn() builds the task
 	-- but deliberately does NOT start it; the caller must invoke handle.start().
 	-- Without this the subprocess never launches, the completion callback never
@@ -307,6 +340,15 @@ local function read_layout_async(callback)
 	local handle = ShellRunner.spawn("/usr/bin/defaults",
 		{ "read", "com.apple.HIToolbox", "AppleSelectedInputSources" },
 		function(exit_code, stdout, _)
+			-- A terminated read still delivers its exit callback, and by then the
+			-- next read is usually in flight. Every line below mutates state that
+			-- now belongs to THAT read, so a stale completion must stop here rather
+			-- than clear its handle, release its guard and cancel its watchdog.
+			if my_generation ~= _layout_read_generation then
+				Logger.debug(LOG, "Ignoring completion of superseded layout read (gen %d, current %d).",
+					my_generation, _layout_read_generation)
+				return
+			end
 			-- Drop the ownership reference first: a handle that has completed must
 			-- never be terminated by a later watchdog tick.
 			_layout_poll_handle = nil
@@ -391,6 +433,11 @@ function M.start_input_source_watcher(on_change)
 				-- Terminate the abandoned read, don't just stop waiting for it.
 				-- handle.terminate() releases the GC pin as well as killing the
 				-- process, so neither the subprocess nor its pin outlives the timeout.
+				-- Retire the generation BEFORE terminating: terminate() only asks the
+				-- OS to kill the process, and its exit callback still arrives later.
+				-- Without this the abandoned read comes back to clear the NEXT
+				-- read's handle and cancel its watchdog.
+				_layout_read_generation = _layout_read_generation + 1
 				if _layout_poll_handle then
 					local stale = _layout_poll_handle
 					_layout_poll_handle = nil
@@ -439,6 +486,9 @@ function M.stop_input_source_watcher()
 		_layout_poll_watchdog = nil
 	end
 	_layout_poll_pending = false
+	-- Retire the in-flight read as well. Its completion would otherwise land on a
+	-- stopped watcher and fire a layout change nobody is listening for.
+	_layout_read_generation = _layout_read_generation + 1
 	Logger.done(LOG, "Input source watcher stopped.")
 end
 

@@ -56,10 +56,18 @@ _PBT_BackspaceIsNotAResetKey() {
 }
 
 ; The decrement must actually be a decrement, and must not underflow.
+;
+; HSE_Buffer is set explicitly throughout: the production caller always runs
+; HSE_FeedBackspace immediately BEFORE this helper, so the engine side is
+; already up to date by the time it is entered. Leaving it to whatever a
+; previous test happened to leave behind would make these assertions depend on
+; execution order.
 _PBT_BackspaceDecrementsByOne() {
-	global _PrefixBuffer
+	global _PrefixBuffer, HSE_Buffer
 	Saved := _PrefixBuffer
+	SavedEngine := HSE_Buffer
 	try {
+		HSE_Buffer := "abc"
 		_PrefixBuffer := "abc"
 		_PrefixFeedBackspace()
 		Assert(_PrefixBuffer == "ab",
@@ -70,12 +78,39 @@ _PBT_BackspaceDecrementsByOne() {
 		Assert(_PrefixBuffer == "",
 			"backspacing the whole buffer must empty it — got '" . _PrefixBuffer . "'")
 
-		; One more than there are characters must be harmless.
+		; One more than there are characters must be harmless. With the engine
+		; buffer also empty there is genuinely nothing on screen to recover.
+		HSE_Buffer := ""
 		_PrefixFeedBackspace()
 		Assert(_PrefixBuffer == "",
 			"backspacing an empty buffer must stay empty rather than underflow")
 	} finally {
 		_PrefixBuffer := Saved
+		HSE_Buffer := SavedEngine
+	}
+}
+
+; The other half of the same contract: an empty preview does NOT always mean
+; there is nothing on screen. Typing a terminator resets the preview while the
+; engine keeps it, so a backspace deleting that terminator re-exposes the
+; previous word on the engine side — and the preview must follow it back rather
+; than stay silent for the rest of that word.
+_PBT_BackspaceRecoversTheWordTheEngineStillHolds() {
+	global _PrefixBuffer, HSE_Buffer
+	Saved := _PrefixBuffer
+	SavedEngine := HSE_Buffer
+	try {
+		; State right after backspacing the space out of "bonjour ": the engine
+		; has shrunk back to the word, the preview was reset when the space was
+		; typed and has nothing of its own left.
+		HSE_Buffer := "bonjour"
+		_PrefixBuffer := ""
+		_PrefixFeedBackspace()
+		Assert(_PrefixBuffer == "bonjour",
+			"the preview must recover the word the engine still holds — left empty, the tooltip stays silent for a trigger the engine would expand, and cannot catch up for the rest of the word. Got: '" . _PrefixBuffer . "'")
+	} finally {
+		_PrefixBuffer := Saved
+		HSE_Buffer := SavedEngine
 	}
 }
 
@@ -194,14 +229,40 @@ _PBT_NoParallelExpansionArithmetic() {
 		"the watcher must not recompute a strip length from the match. The engine strips "
 		. "Spec.Length from a buffer that contains the magic key; this one used Length - 1 "
 		. "because its buffer does not — two rules for one edit")
-	Assert(InStr(Src, "_PrefixIndex.Has(Suffix)") == 0,
-		"the index-based truncation must not come back. It existed to stop a mis-derived "
-		. "buffer accumulating junk; it also discarded the left context _LookupAndRender "
-		. "needs to place a word boundary, which is what hid the 'att' suggestion")
+	; The banned thing is index membership DRIVING A BUFFER REWRITE — the loop that
+	; chopped _PrefixBuffer down until a suffix happened to be indexed, discarding
+	; the left context _LookupAndRender needs to place a word boundary, which is
+	; what hid the 'att' suggestion. This used to be asserted as "the token
+	; _PrefixIndex.Has(Suffix) must not appear anywhere", which is a proxy, not the
+	; guarantee: probing the ENGINE buffer's suffixes against the index is how the
+	; preview now reaches the same candidate set as the matcher, and it reads the
+	; index without touching any buffer. Assert the guarantee instead, so a real
+	; truncation is still caught however it is spelled.
+	Collect := _DriverFuncBody("_PrefixCollectCandidates")
+	Assert(Collect != "",
+		"_PrefixCollectCandidates() must exist — it is where the preview asks the index for "
+		. "candidates, and an absent body would make the assertion below pass vacuously")
+	Assert(InStr(Collect, "_PrefixBuffer") == 0,
+		"candidate collection must be READ-ONLY with respect to the preview buffer. "
+		. "Consulting the index is fine; letting index membership rewrite or shorten "
+		. "_PrefixBuffer is the truncation that hid 'att'")
+	; And from the other direction: every function that WRITES the preview buffer
+	; must decide without asking the index. Pairing the two in one body is the
+	; truncation, in whatever form it returns.
+	for , Writer in ["_PrefixFeedBackspace", "_PrefixAppendTypedChar", "_ResetPrefixBuffer", "_OnPrefixChar"] {
+		WBody := _DriverFuncBody(Writer)
+		Assert(WBody != "", Writer . "() must exist — it is one of the preview buffer's writers")
+		Assert(InStr(WBody, "_PrefixIndex.Has") == 0,
+			Writer . "() writes _PrefixBuffer, so it must not consult the trigger index: "
+			. "deciding the buffer's contents from index membership is exactly the "
+			. "truncation that discarded the left context and hid the 'att' suggestion")
+	}
 }
 
 Test("meta watcher: backspace shrinks the preview buffer", _PBT_BackspaceIsNotAResetKey)
 Test("meta watcher: backspace decrements by exactly one", _PBT_BackspaceDecrementsByOne)
+Test("meta watcher: backspace recovers the word the engine still holds",
+	_PBT_BackspaceRecoversTheWordTheEngineStillHolds)
 Test("meta watcher: VK_BACK is not a reset key", _PBT_ResetListExcludesBackspace)
 Test("meta watcher: a declined match takes the no-match path", _PBT_DeclinedMatchTakesTheNoMatchPath)
 Test("meta watcher: one path grows the preview buffer", _PBT_OneAppendPath)

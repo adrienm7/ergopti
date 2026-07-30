@@ -1,4 +1,4 @@
-﻿﻿{
+{
 	"_meta.flag": "🇳🇴",
 	"_meta.locale": "no",
 	"_meta.name": "Norsk",
@@ -1202,6 +1202,7 @@
 	"metrics_apps.new_category_prompt": "Navn på den nye kategorien for %s:",
 	"metrics_apps.new_category_title": "Ny kategori",
 	"metrics_apps.no_app_detected": "Ingen applikasjon kunne oppklares.",
+	"metrics_apps.pick_app_placeholder": "Velg et program å klassifisere…",
 	"metrics_apps.rename_chooser_placeholder": "Kategori som skal gis nytt navn",
 	"metrics_apps.rename_item": "✎ Gi nytt navn til en eksisterende kategori…",
 	"metrics_apps.rename_prompt": "Nytt navn for kategorien «%s»:",
@@ -1415,7 +1416,7 @@
 	"sfbsreduction.comma": "Komma reduserer bigrammer for samme finger",
 	"sfbsreduction.ecirc": "Ê reduserer bigrammer for samme finger",
 	"sfbsreduction.egrave": "È reduserer bigrammer for samme finger",
-	"sfbsreduction.ié": "IE reduserer IE/EI-bigrammer",
+	"sfbsreduction.ieacute": "IE reduserer IE/EI-bigrammer",
 	"sg_actions.activity_simulation": "🖱 Simuler aktivitet (anti-søvn)",
 	"sg_actions.alt_tab_monitor": "Alt-Tab (skjerm)",
 	"sg_actions.app_expose": "◱ App Exposé",
@@ -1652,6 +1653,7 @@
 	"shortcuts.opendownloads": "Win + D(ownloads) = Åpne Downloads-mappen",
 	"shortcuts.pixel_read_error": "Kan ikke lese pikselfargen",
 	"shortcuts.saved": "Lagret: %s",
+	"shortcuts.screenshot_failed": "Skjermbildet mislyktes",
 	"shortcuts.screen": "Win + H (screensHot) = Skjermbilde (utløser Win + Shift + S)",
 	"shortcuts.screeninstant": "Tast til venstre for 1 = Øyeblikkelig skjermbilde av aktivt vindu, lagret i Bilder med tidsstempel",
 	"shortcuts.screenocr": "Win + C (OCR) = Skjermbilde med tekstutdrag (Win + Shift + T)",
