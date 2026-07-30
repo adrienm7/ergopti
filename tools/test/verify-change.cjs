@@ -142,6 +142,25 @@ function checkScannedSymbolsExist(files) {
 // ==================================================
 
 /**
+ * True for the two `_shared/` sub-trees ADR-006 declares binding on EVERY
+ * driver: `core/` holds the port contracts, `tests/` holds the cross-driver
+ * corpora the three suites replay. Editing either changes what all three
+ * drivers are measured against, so all three suites have to run.
+ *
+ * Without this, the one file class the architecture calls mandatory everywhere
+ * was the only one whose edit selected no driver suite at all — a corpus vector
+ * could be changed and land fully "verified" having executed nothing.
+ * @param {string} f Repo-relative path.
+ * @returns {boolean} Whether the path is a cross-driver contract.
+ */
+function isCrossDriverContract(f) {
+	return (
+		f.startsWith('static/ergopti_plus/_shared/core/') ||
+		f.startsWith('static/ergopti_plus/_shared/tests/')
+	);
+}
+
+/**
  * Every rule states WHY the gate is required, because the non-obvious pairings
  * are the whole point of this file.
  */
@@ -153,8 +172,9 @@ const RULES = [
 	},
 	{
 		gate: 'ahk-suite',
-		why: 'the AHK unit + meta suite covers the Windows driver',
-		match: (f) => f.startsWith('static/ergopti_plus/windows/') && f.endsWith('.ahk'),
+		why: 'the AHK unit + meta suite covers the Windows driver — and replays the shared corpora and port contracts',
+		match: (f) =>
+			(f.startsWith('static/ergopti_plus/windows/') && f.endsWith('.ahk')) || isCrossDriverContract(f),
 	},
 	{
 		gate: 'ahk-e2e',
@@ -194,11 +214,12 @@ const RULES = [
 	},
 	{
 		gate: 'hs',
-		why: 'the macOS driver changed',
+		why: 'the macOS driver changed — or a shared corpus/port contract it replays did',
 		// Markdown under a driver tree is documentation, not driver code: it cannot
 		// break a Lua suite, and running one for a README edit trains people to
 		// ignore the tool's answer.
-		match: (f) => f.startsWith('static/ergopti_plus/macos/') && !f.endsWith('.md'),
+		match: (f) =>
+			(f.startsWith('static/ergopti_plus/macos/') && !f.endsWith('.md')) || isCrossDriverContract(f),
 	},
 	{
 		gate: 'linux-e2e',
@@ -214,8 +235,9 @@ const RULES = [
 	},
 	{
 		gate: 'linux',
-		why: 'the Linux driver changed',
-		match: (f) => f.startsWith('static/ergopti_plus/linux/') && !f.endsWith('.md'),
+		why: 'the Linux driver changed — or a shared corpus/port contract it replays did',
+		match: (f) =>
+			(f.startsWith('static/ergopti_plus/linux/') && !f.endsWith('.md')) || isCrossDriverContract(f),
 	},
 ];
 
