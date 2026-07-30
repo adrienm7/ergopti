@@ -1,8 +1,17 @@
 # ErgoptiPlus — macOS driver (Hammerspoon / Lua)
 
-The macOS implementation of ErgoptiPlus. It mirrors the Windows driver
-(`../windows/`) directory-for-directory so the analogue of any file lives at the
-same relative path on both platforms.
+The macOS implementation of ErgoptiPlus.
+
+> **The three driver trees do not currently mirror each other** (18.9 % tree
+> identity, measured). Use the cross-driver path table in
+> [`docs/ERGOPTI_PLUS.md`](../../../docs/ERGOPTI_PLUS.md) §2.1 to locate the
+> counterpart of a file; making the trees identical is invariant I1 of
+> [`docs/PLAN_SIMPLIFICATION.md`](../../../docs/PLAN_SIMPLIFICATION.md).
+>
+> Name collision to know first: `modules/keymap/` is the **hotstring expansion
+> engine** here, while on Windows the same path is the **physical layout remap**.
+> The layout remap lives in `modules/karabiner/` plus
+> `modules/keymap/{layout_install,input_sources}.lua`.
 
 ## Entry point
 
@@ -10,7 +19,7 @@ same relative path on both platforms.
 runs the boot sequence. Like the Windows entry it holds orchestration only —
 feature logic lives in the modules it loads.
 
-## Layout (mirror of `../windows/`)
+## Layout
 
 | Path | Role |
 |---|---|

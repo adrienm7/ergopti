@@ -16,11 +16,14 @@ if [ -n "$STAGED" ]; then
     done
 fi
 
-# AHK encoding — add UTF-8 BOM + CRLF to any staged .ahk file that is missing
-# them. AHK v2 silently aborts mid-file on encoding drift, which causes silent
-# CI failures with no error message. The fixer runs on all .ahk files in the
-# repo (fast — only reads/writes what needs changing), then re-stages any file
-# it touched so the corrected bytes land in the commit automatically.
+# AHK encoding — add UTF-8 BOM and normalise to LF on any staged .ahk file that
+# is missing them. AHK v2 silently aborts mid-file when the BOM is absent, which
+# causes silent CI failures with no error message; the LF half keeps one
+# line-ending convention repo-wide so no mixed-ending parser edge case can hide a
+# test. Both halves are exactly what tools/test/test-ahk-encoding.cjs enforces.
+# The fixer runs on all .ahk files in the repo (fast — only reads/writes what
+# needs changing), then re-stages any file it touched so the corrected bytes land
+# in the commit automatically.
 STAGED_AHK=$(git diff --cached --name-only --diff-filter=ACM | grep -i '\.ahk$' || true)
 if [ -n "$STAGED_AHK" ]; then
     echo "[pre-commit] Fixing AHK encoding (BOM + CRLF) on staged files…"

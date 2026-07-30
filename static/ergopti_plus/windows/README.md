@@ -1,8 +1,19 @@
 # ErgoptiPlus — Windows driver (AutoHotkey v2)
 
-The Windows implementation of ErgoptiPlus. It mirrors the macOS driver
-(`../macos/`) directory-for-directory so the analogue of any file lives at the
-same relative path on both platforms.
+The Windows implementation of ErgoptiPlus.
+
+> **The three driver trees do not currently mirror each other.** Measured: of 53
+> distinct depth-≤2 subdirectories across `windows/`, `macos/` and `linux/`, only
+> 10 are present in all three (18.9 % tree identity). Making them identical is
+> tracked in [`docs/PLAN_SIMPLIFICATION.md`](../../../docs/PLAN_SIMPLIFICATION.md)
+> (invariant I1). Until that lands, use the cross-driver path table in
+> [`docs/ERGOPTI_PLUS.md`](../../../docs/ERGOPTI_PLUS.md) §2.1 to locate the
+> counterpart of a file — do not assume the same relative path.
+>
+> Two name collisions to know before navigating: `modules/keymap/` is the
+> **physical layout remap** here and the **hotstring expansion engine** on macOS;
+> `lib/registry.ahk` is a **Windows-registry** wrapper while
+> `macos/modules/keymap/registry.lua` is the **hotstring registry**.
 
 ## Entry point
 
@@ -12,12 +23,13 @@ feature-map build, layout probes, hotkey registration, deferred post-"ready"
 tasks). It holds **only** orchestration — feature logic lives in the modules it
 includes.
 
-> Source-file rule: AHK v2 files MUST be UTF-8 **with BOM** and **CRLF** line
-> endings, or the parser silently aborts mid-file. Edit with tooling that
-> preserves this; never append via a POSIX `cat >>`. The suite enforces it
-> (`npm run test:ahk-encoding`).
+> Source-file rule: AHK v2 files MUST be UTF-8 **with BOM** and **LF** line
+> endings. Without the BOM the parser silently aborts mid-file; the LF rule keeps
+> one line-ending convention across the repo so no mixed-ending parser edge case
+> can hide a test. Edit with tooling that preserves both; never append via a POSIX
+> `cat >>`. The suite enforces it (`npm run test:ahk-encoding`).
 
-## Layout (mirror of `../macos/`)
+## Layout
 
 | Path | Role |
 |---|---|
@@ -26,7 +38,7 @@ includes.
 | `lib/` | Infrastructure & domain helpers (no UI windows). Foldered submodules (`lib/hotstrings/`, `lib/updater/`, …) for the large ones. |
 | `modules/<feature>/` | One folder per feature (`gestures/`, `keylogger/`, `keymap/`, `llm/`, `tap_holds/`, `shortcuts/`, …). |
 | `ui/<window>/` | One folder per UI window (`menu/`, `tooltip/`, `onboarding/`, `healthcheck/`, `changelog/`, `spotlight/`, `wpm/`, `model_browser/`, `hotstrings_config_window/`), each with an `init.ahk` index. |
-| `data/` | Pure data (default TOMLs, etc.). |
+| `build/` | Untracked build output (compiled bundle). |
 | `_generated/` | Codegen output — never hand-edited (regenerated from `_shared/`). |
 | `tests/` | `meta/` (source-introspection guards), unit/integration tests, `e2e/`, `helpers/`, `stubs/`. |
 
