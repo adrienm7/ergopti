@@ -90,7 +90,14 @@ This is a **deliberate trade-off** made at the architecture level:
 - It is only populated for keystrokes that passed all four guards — so password fields, auth dialogs, and private browsing windows contribute zero characters to it.
 - The `events` array contains per-character metadata (keycode, delay, hold-time, synthetic flag) which also holds the raw character in the `r` subfield.
 
-**Implication:** Ordinary text typed in non-sensitive contexts (documents, terminals, IDE, etc.) is logged in plaintext. Users who require complete plaintext privacy should disable the keylogger feature entirely, or set `keylogger_encrypt = true` to activate at-rest encryption of the metrics folder.
+**Implication:** Ordinary text typed in non-sensitive contexts (documents, terminals, IDE, etc.) is logged in plaintext. Users who require complete plaintext privacy should disable the keylogger feature entirely, or enable **at-rest encryption** from the Metrics menu (the "Chiffrement" / "Encrypt logs on disk" toggle, off by default on all three drivers).
+
+**What at-rest encryption does — and does not — protect.** With it enabled, the two columns that hold the characters you actually typed (`events_typing.text` and `events_json`) are encrypted with AES-256-CBC before they are written to the SQLite database; the aggregate statistics the dashboard computes over (n-grams, counters, WPM, physical scancodes) stay in clear, since they are not readable as text and keeping them clear is what keeps the dashboard fast.
+
+The key is derived from this machine's stable identifier — the hardware UUID on macOS, `/etc/machine-id` on Linux, the `MachineGuid` on Windows — so it can **never be lost**: there is no password to forget and no key file to back up. That durability is a deliberate trade-off against secrecy, and the limit must be stated plainly:
+
+- It protects against **off-machine** disclosure — a stolen disk, a backup, a synced folder, a database file copied to another computer. Without the originating machine's id, the encrypted columns are unreadable.
+- It does **not** protect against anything running **on the machine itself**. Any process that can run code as you can derive the same key, and this repository is public, so the derivation is not secret. If your threat model includes local malware or another user on the same account, at-rest encryption is not the control you want — disable the keylogger instead.
 
 ---
 
