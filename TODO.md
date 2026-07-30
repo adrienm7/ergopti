@@ -196,6 +196,21 @@ Two notes worth keeping:
 
 Evidence in `docs/PROJECT_MEMORY.md`.
 
+- **Moving the clipboard transaction off the keystroke tap** (raised as
+  `perform-paste-clipboard-io-inside-eventtap`): the deferral was tried and reverted
+  because it breaks the paste-ordering contract pinned by
+  `tests/unit/modules/keymap/test_emit_tokens_multi_paste.lua`. The two remaining
+  candidates turn out to be already done, which closes the item.
+  One round trip per EXPANSION rather than per token: already the case. The
+  expensive `hs.pasteboard.readAllData()` runs only on the branch where no restore
+  is pending (`keymap/utils.lua` `perform_paste`); every later paste in the same
+  expansion cancels the pending restore and KEEPS the captured original, precisely
+  so it does not re-read and capture its own payload.
+  Moving the RESTORE off the hot path: also already the case — it runs from the
+  `CLIPBOARD_RESTORE_SEC` timer, and its throw-path restore landed in 21c4a0208.
+  What is left inside the tap is one `setContents` plus the Cmd+V, which IS the
+  paste, and one `readAllData` per expansion. Neither can move without breaking the
+  ordering the pinned test exists to protect.
 - **Re-seeding the delay baseline at every remaining flush site** (raised as
   `shortcut-and-mouse-flush-skip-baseline-reseed`): the three keystroke-path sites
   were real and 17286ec2e fixed them. Widening it to the rest of the tree is
@@ -388,8 +403,3 @@ reproduce but the AppleScript grammar model behind the conclusion is wrong),
   - **Cause:** Ownership is asserted at the START of the prime cycle rather than at the moment HS actually launches the bridge (launch_headless_once(), ke_lifecycle.lua:779-787). And KILL_FAST_CMD at :922 is the one kill in the module with no is_hs_owned_bridge() gate — set_enabled(false) (karabiner/init.lua:200-209) and M.kill() (:886-896) both have one. The non-forced paths are correct: a running user bridge short-circuits at :752-757 BEFORE mark_hs_owned_bridge(), which is exactly why the gap only shows on force=true.
   - **Fix:** (1) Gate ke_lifecycle.lua:922 on `M.is_hs_owned_bridge()` (log and skip otherwise), mirroring karabiner/init.lua:200-209. (2) Move mark_hs_owned_bridge() out of :774 and into launch_headless_once() on the branch where hs.execute(KE_PRIME_HEADLESS_CMD) actually ran, so the marker only ever means "HS spawned this bridge". The three existing success sites (:800, :894, :913) already re-call it, so the happy path is unaffected.
   - **Test:** Extend tests/unit/modules/karabiner/test_ke_lifecycle.lua: stub hs.execute so is_ipc_bridge_running() reports a live bridge and is_cli_roundtrip_ready() reports failure, ensure no owner marker exists, call KE.prime_ke_for_session(function() end, true), then assert (a) `helpers.assert_eq(KE.is_hs_owned_bridge(), false, "a forced prime must not claim ownership of a bridge HS did not start")` and (b) the recorded hs.execute command list contains no KILL_FAST_CMD. Both fail today.
-- [ ] **perform-paste-clipboard-io-inside-eventtap** (keymap-core) — perform_paste() reads and rewrites the whole pasteboard synchronously inside the keyDown eventtap callback
-  - `static/ergopti_plus/macos/modules/keymap/utils.lua:157-182 (perform_paste; :167 hs.pasteboard.readAllData()`
-  - **Cause:** The expander's design note (expander.lua:14-16) justifies running expansions inline because "CGEventPost() is non-blocking, so keyStroke() calls return immediately". That is true of the key posts but not of the clipboard transaction that precedes them. perform_paste performs unbounded cross-process I/O whose cost is proportional to the SIZE OF THE USER'S CLIPBOARD — a quantity the driver neither controls nor bounds — on the hottest path in the driver.
-  - **Fix:** Defer the clipboard transaction one tick with the driver's own idiom: wrap the save / setContents / Cmd+V body of perform_paste in hs.timer.doAfter(0, function() ... end) so it leaves the eventtap callback (the same DEFER_TOKEN pattern pinned by tests/meta/test_pause_path_defers_blocking_work.lua:47). _paste_ops_pending must stay incremented synchronously at utils.lua:258/:328 so take_paste_ops() still arms expected_synthetic_pastes before perform_text_replacement returns, and emit_text must keep returning a non-zero order_delay so the terminator fence still applies. Stronger fix: keep an off-tap clipboard snapshot refreshed by an hs.pasteboard changeCount poll / watcher, so readAllData neve
-  - **Test:** New tests/meta/test_paste_defers_clipboard_io.lua, modelled on tests/meta/test_pause_path_defers_blocking_work.lua: slice `local function perform_paste` out of modules/keymap/utils.lua (bounded by the next top-level declaration) and assert, for each of "hs.pasteboard.readAllData()" and "hs.pasteboard.setContents(", that a "hs.timer.doAfter(0," token appears earlier in the slice — with the message naming the tap-disable consequence. Fails today (neither call is wrapped); passes after the deferral
