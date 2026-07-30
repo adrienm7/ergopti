@@ -149,7 +149,8 @@ const PIPELINE = [
 	//   - codegen:terminators       → terminators.ahk + terminators_catalogue.lua
 	//   - codegen:prompt-builder:ahk → prompt_builder.ahk (string-delimiter bug fixed)
 	// contracts.json is already gated by test:port-compliance (with line-ending
-	// normalisation); codegen:prompt-builder:hs is a documented no-op.
+	// normalisation). There is no macOS prompt-builder generator: the driver
+	// requires the shared Lua module directly (see macos/_generated/README.md).
 	{
 		name: 'codegen:terminators — regenerate terminators.{ahk,lua}',
 		run() {
