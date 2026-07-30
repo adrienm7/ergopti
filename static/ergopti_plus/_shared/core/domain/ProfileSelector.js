@@ -1,4 +1,4 @@
-// static/ergopti_plus/_shared/core/domain/ProfileSelector.js
+// _shared/core/domain/ProfileSelector.js
 
 /**
  * ==============================================================================

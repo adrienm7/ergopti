@@ -1,4 +1,5 @@
 #!/bin/bash
+# _shared/modules/llm/install/ollama_install.sh
 
 # ==============================================================================
 # SCRIPT: Ensure Ollama Engine Available

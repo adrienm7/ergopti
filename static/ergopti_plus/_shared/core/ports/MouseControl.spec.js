@@ -1,4 +1,4 @@
-// static/ergopti_plus/_shared/core/ports/MouseControl.spec.js
+// _shared/core/ports/MouseControl.spec.js
 
 /**
  * ==============================================================================

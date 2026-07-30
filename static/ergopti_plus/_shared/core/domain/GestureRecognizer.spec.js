@@ -1,4 +1,4 @@
-// static/ergopti_plus/_shared/core/domain/GestureRecognizer.spec.js
+// _shared/core/domain/GestureRecognizer.spec.js
 
 /**
  * ==============================================================================

@@ -1,4 +1,4 @@
-// static/ergopti_plus/_shared/modules/tooltip/draw_calls.js
+// _shared/modules/tooltip/draw_calls.js
 
 /**
  * ==============================================================================
