@@ -602,6 +602,33 @@ function M.install(ctx)
 		if deps.active_tasks then deps.active_tasks["download_tail"] = true end
 		pcall(deps.update_icon, "📥 …")
 
+		-- Byte accounting, as UPVALUES. These used to be declared inside the
+		-- per-chunk handler below, so every chunk reset them: nothing accumulated and
+		-- the total stayed 0 for the whole download, which is why a reattached
+		-- download showed neither a total nor an ETA. Declared above the closure so it
+		-- captures them - a local below would bind the nil global.
+		local _bytes_done, _current_pct = 0, 0
+		local _python_file_count = nil
+
+		-- The denominator, from the same preset field the launcher path reads. Without
+		-- it there is nothing to compute a percentage or an ETA against.
+		local _bytes_total = 0
+		for _, provider in ipairs(presets) do
+			for _, family in ipairs(provider.families or {}) do
+				for _, m in ipairs(family.models or {}) do
+					if m.name == model then
+						local hw = m.hardware_requirements and m.hardware_requirements.mlx or {}
+						if type(hw.download_gb) == "number" then
+							_bytes_total = math.floor(hw.download_gb * 1e9)
+						elseif type(hw.ram_gb) == "number" then
+							_bytes_total = math.floor(hw.ram_gb * 0.14 * 1e9)
+						end
+						break
+					end
+				end
+			end
+		end
+
 		local _tail_task = nil
 
 		local function do_cancel_reattached(silent)
@@ -645,22 +672,35 @@ function M.install(ctx)
 
 		local function process_stream_reattached(out)
 			if not out or out == "" then return end
-			local _bytes_done, _bytes_total, _current_pct = 0, 0, 0
 			local max_bytes = 0
 			for b_str in out:gmatch("__BYTES__:(%d+)") do
 				local b = tonumber(b_str)
 				if b and b > max_bytes then max_bytes = b end
 			end
-			if max_bytes > 0 then _bytes_done = max_bytes end
-			local _python_file_count = nil
+			-- Monotonic: the size watcher reports the total written so far, and a chunk
+			-- that happens to carry an older figure must not walk the bar backwards.
+			if max_bytes > _bytes_done then _bytes_done = max_bytes end
 			for fc_str in out:gmatch("__FILECOUNT__:(%d+)") do
 				local fc = tonumber(fc_str)
 				if fc and fc > 0 then _python_file_count = fc end
 			end
-			local icon_pct = math.min(tonumber(out:match("(%d+)%%") or 0) or 0, 99)
-			if icon_pct > 0 then pcall(deps.update_icon, "📥 " .. icon_pct .. "%") end
+
+			-- From the accumulated bytes over the estimated total, exactly as the
+			-- launcher path does. It used to be scraped out of the tool's own output
+			-- with out:match("(%d+)%%"), which is the progress of the file currently
+			-- being fetched and not of the download: a model with eight shards showed
+			-- the bar climb to 99% and snap back to 0, eight times over.
+			if _bytes_total > 0 and _bytes_done > 0 then
+				_current_pct = math.floor((_bytes_done / _bytes_total) * 100 + 0.5)
+			end
+			-- Capped at 99: only the exit code may declare completion.
+			_current_pct = math.min(math.max(0, _current_pct), 99)
+
+			if _current_pct > 0 then
+				pcall(deps.update_icon, "📥 " .. _current_pct .. "%")
+			end
 			if download_window then
-				pcall(download_window.update, icon_pct, _bytes_done, _bytes_total, out, _python_file_count)
+				pcall(download_window.update, _current_pct, _bytes_done, _bytes_total, out, _python_file_count)
 			end
 		end
 
