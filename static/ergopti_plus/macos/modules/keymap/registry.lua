@@ -304,7 +304,7 @@ function M.sort_mappings()
 	-- Dropped BEFORE the deferral check: a deferred sort still means the corpus
 	-- has changed, and the memo must not survive that even if the sort itself
 	-- is coalesced to later.
-	_classify_cache = {}
+	M.drop_classify_cache()
 	if _sort_deferred then
 		_sort_pending = true
 		return
@@ -367,6 +367,19 @@ end
 --- @return boolean exact True when `str` matches a trigger exactly.
 --- @return boolean prefix True when `str` is a prefix of any trigger.
 --- @return boolean suffix True when `str` is a suffix of any trigger.
+--- Drops the classify_trigger memo.
+---
+--- Every corpus mutation must call this. sort_mappings used to be the only one
+--- that did, which was correct for every path that goes through it and wrong for
+--- disable_group, which shrinks the corpus and rebuilds the lookup and tail
+--- indexes without sorting. classify_trigger then kept answering `exact = true`
+--- for mappings that no longer existed, and the dynamic @-collector reads exactly
+--- that answer to decide whether a trigger is already claimed — so a stale true
+--- silently suppressed collection for the rest of the session.
+function M.drop_classify_cache()
+	_classify_cache = {}
+end
+
 function M.classify_trigger(str)
 	if not _state or type(str) ~= "string" or str == "" then
 		return false, false, false
@@ -742,6 +755,7 @@ function M.init(core_state)
 		resolve_priority     = resolve_priority,
 		rebuild_lookup       = rebuild_lookup,
 		rebuild_tail_indexes = rebuild_tail_indexes,
+		drop_classify_cache  = M.drop_classify_cache,
 	})
 	Logger.debug(LOG, "Registry initialized.")
 end

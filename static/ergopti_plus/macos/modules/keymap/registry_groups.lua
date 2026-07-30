@@ -44,9 +44,35 @@ end
 --- Must be called exactly once, from within registry.lua'·s M.init().
 --- @param state table The shared CoreState.
 --- @param callbacks table {add, sort_mappings, is_section_enabled, resolve_priority, rebuild_lookup, rebuild_tail_indexes}.
+--- Required callback names. Validated once at init rather than checked at each
+--- call site: every caller of disable_group wraps it in pcall, so a missing
+--- callback would throw AFTER the group was marked disabled and its mappings
+--- purged, leaving exactly the half-disabled state this module's guards exist to
+--- forbid — and the pcall would swallow the reason. A guard per call site would
+--- also be the silent fallback convention 5.3/5.4 forbids.
+local REQUIRED_CALLBACKS = {
+	"add", "sort_mappings", "is_section_enabled", "resolve_priority",
+	"rebuild_lookup", "rebuild_tail_indexes", "drop_classify_cache",
+}
+
+--- Injects the shared state and the registry's callback table.
+--- @param state table The shared CoreState.
+--- @param callbacks table Must provide every name in REQUIRED_CALLBACKS.
 function M.init(state, callbacks)
 	_state     = state
 	_callbacks = callbacks
+
+	local missing = {}
+	for _, name in ipairs(REQUIRED_CALLBACKS) do
+		if type(callbacks) ~= "table" or type(callbacks[name]) ~= "function" then
+			table.insert(missing, name)
+		end
+	end
+	if #missing > 0 then
+		Logger.error(LOG, "M.init(): missing callback(s) %s — group operations will be "
+			.. "incomplete and their callers pcall the throw away.",
+			table.concat(missing, ", "))
+	end
 end
 
 
@@ -377,6 +403,11 @@ function M.disable_group(name)
 	_state.mappings = kept
 	_callbacks.rebuild_lookup()
 	_callbacks.rebuild_tail_indexes()
+	-- The third structure this purge invalidates. The classify_trigger memo is a
+	-- pure function of (string, corpus), and the corpus just shrank; sort_mappings
+	-- is the only other place it is dropped and this path deliberately does not
+	-- sort. Without this the disabled group's triggers keep classifying as present.
+	_callbacks.drop_classify_cache()
 
 	Logger.debug(LOG, "Group '%s' disabled (%d mapping(s) remaining).", name, #_state.mappings)
 end
