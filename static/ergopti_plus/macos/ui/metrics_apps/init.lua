@@ -240,22 +240,27 @@ local function prompt_pick_app()
 		Logger.error(LOG, "lib.app_picker module unavailable.")
 		return
 	end
-	local choices = app_picker.discover_apps()
-	if type(choices) ~= "table" or #choices == 0 then
-		dialog.alert(i18n.get("common.warning"), i18n.get("metrics_apps.no_app_detected"), i18n.get("button.ok"))
-		return
-	end
-	local chooser
-	chooser = hs.chooser.new(function(choice)
-		if not choice then return end
-		local cats    = load_categories()
-		local current = cats[choice.text] or { type = default_app_category(), score = 0 }
-		M.prompt_category(choice.text, current.type, current.score)
+	-- Discovery is asynchronous: it shells out to `find` across two application
+	-- trees, and doing that synchronously froze the runloop — and the keyboard tap
+	-- with it — for the whole scan. Everything that needs the result moves into the
+	-- continuation.
+	app_picker.discover_apps(function(choices)
+		if type(choices) ~= "table" or #choices == 0 then
+			dialog.alert(i18n.get("common.warning"), i18n.get("metrics_apps.no_app_detected"), i18n.get("button.ok"))
+			return
+		end
+		local chooser
+		chooser = hs.chooser.new(function(choice)
+			if not choice then return end
+			local cats    = load_categories()
+			local current = cats[choice.text] or { type = default_app_category(), score = 0 }
+			M.prompt_category(choice.text, current.type, current.score)
+		end)
+		chooser:placeholderText(i18n.get("metrics_apps.pick_app_placeholder"))
+		chooser:choices(choices)
+		chooser:searchSubText(true)
+		chooser:show()
 	end)
-	chooser:placeholderText(i18n.get("metrics_apps.pick_app_placeholder"))
-	chooser:choices(choices)
-	chooser:searchSubText(true)
-	chooser:show()
 end
 
 local function handle_bridge_message(msg)

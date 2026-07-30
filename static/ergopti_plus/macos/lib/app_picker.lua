@@ -13,6 +13,7 @@
 
 local M = {}
 local hs     = hs
+local ShellRunner = require("adapters.shell_runner")
 local Logger = require("lib.logger")
 local i18n   = require("lib.i18n")
 local text_utils = require("lib.text_utils")
@@ -36,13 +37,36 @@ local LOG = "app_picker"
 local _apps_cache    = nil
 local _apps_cache_at = 0
 
+-- Forward declaration: discover_apps's completion callback calls build_choices,
+-- which is defined below it. A local declared after the closure would bind the
+-- nil global instead.
+local build_choices
+
 -- How long a discovery result stays warm. Long enough that reopening the picker
 -- costs nothing, short enough that an app installed during the session shows up
 -- without a reload.
 local APPS_CACHE_TTL_SEC = 60
 
---- @return table A list of choices for hs.chooser.
-function M.discover_apps()
+-- Absolute path: this process does not inherit the login shell's PATH.
+local FIND_BIN = "/usr/bin/find"
+
+--- Scans the system for installed applications, asynchronously.
+---
+--- The enumeration is a `find` across two application trees. It used to run
+--- through the SYNCHRONOUS shell primitive on the main runloop, reached via a
+--- short timer as if that moved it off the thread. It does not: a timer callback
+--- runs on the same single runloop, so the picker froze the driver — and the
+--- keyboard tap with it — for the whole scan. It goes through the async spawner
+--- now, which also pins the task against the GC.
+---
+--- @param on_ready function Called as on_ready(choices) with the list. Invoked
+---        synchronously when the cache is warm, and from the subprocess callback
+---        otherwise, so callers must not depend on the return value.
+function M.discover_apps(on_ready)
+	if type(on_ready) ~= "function" then
+		Logger.error(LOG, "discover_apps() requires a callback — nothing discovered.")
+		return
+	end
 	-- Served from cache when it is still warm. The scan is a blocking `find`
 	-- across two application trees plus one Info.plist read and one icon
 	-- rasterisation PER INSTALLED APP, all on the main run loop — hs.timer.doAfter
@@ -52,18 +76,41 @@ function M.discover_apps()
 	local now = os.time()
 	if _apps_cache and (now - _apps_cache_at) < APPS_CACHE_TTL_SEC then
 		Logger.debug(LOG, "Serving %d application(s) from cache.", #_apps_cache)
-		return _apps_cache
+		on_ready(_apps_cache)
+		return
 	end
 
 	Logger.debug(LOG, "Discovering installed applications…")
-	local cmd = "find /Applications \"$HOME/Applications\" -maxdepth 2 -name \"*.app\" -not -name \".*\" 2>/dev/null | sort"
-	local ok, raw = pcall(hs.execute, cmd)
-	if not ok or type(raw) ~= "string" then
-		Logger.warn(LOG, "Failed to execute application discovery command.")
-		-- A failure is NOT cached: the next open should retry rather than serve
-		-- an empty picker for the whole TTL.
-		return {}
+	-- argv, not a shell string: the two roots are separate arguments, so a space or
+	-- a quote in HOME can no longer be re-interpreted. The `| sort` is dropped
+	-- because the choices are sorted in Lua further down anyway.
+	local home = os.getenv("HOME") or ""
+	local args = {
+		"/Applications", home .. "/Applications",
+		"-maxdepth", "2", "-name", "*.app", "-not", "-name", ".*",
+	}
+	local handle = ShellRunner.spawn(FIND_BIN, args, function(exit_code, stdout)
+		if type(stdout) ~= "string" or stdout == "" then
+			Logger.warn(LOG, "Application discovery returned nothing (exit %s).",
+				tostring(exit_code))
+			-- A failure is NOT cached: the next open should retry rather than serve
+			-- an empty picker for the whole TTL.
+			on_ready({})
+			return
+		end
+		on_ready(build_choices(stdout))
+	end)
+	if not handle.start() then
+		Logger.error(LOG, "Could not start the application discovery subprocess.")
+		on_ready({})
 	end
+end
+
+
+--- Turns the newline-separated `find` output into hs.chooser choices.
+--- @param raw string Subprocess stdout.
+--- @return table
+build_choices = function(raw)
 	
 	local choices, seen = {}, {}
 	for app_path in raw:gmatch("[^\n]+") do
@@ -93,7 +140,7 @@ function M.discover_apps()
 	end
 	
 	table.sort(choices, function(a, b) return a.text:lower() < b.text:lower() end)
-	Logger.info(LOG, "Application discovery completed.")
+	Logger.info(LOG, "Application discovery completed (%d app(s)).", #choices)
 	_apps_cache    = choices
 	_apps_cache_at = os.time()
 	return choices
@@ -177,8 +224,10 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 	table.insert(menu, {
 		title = i18n.get("app_picker.add_another_app"),
 		fn    = function()
-			hs.timer.doAfter(0.1, function()
-				local choices = M.discover_apps()
+			-- The chooser is built inside the discovery callback. The 0.1 s timer this
+			-- used to rely on moved the scan off the click's stack frame but not off
+			-- the runloop, so the whole driver froze for the duration of the `find`.
+			M.discover_apps(function(choices)
 				local chooser = hs.chooser.new(function(choice)
 					if not choice then return end
 

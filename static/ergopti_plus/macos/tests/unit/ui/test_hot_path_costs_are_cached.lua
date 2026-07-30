@@ -50,12 +50,34 @@ helpers.describe("app picker: installed applications are discovered once", funct
 	end)
 
 	helpers.it("does not cache a failed discovery", function()
-		local src = helpers.read_driver_source("Failed to execute application discovery")
-		local at  = src:find("Failed to execute application discovery", 1, true)
-		local body = src:sub(math.max(1, at - 200), at + 300)
-		helpers.assert_true(body:find("_apps_cache    = choices", 1, true) == nil,
-			"caching a failure would serve an empty picker for the whole TTL; the next open "
-			.. "must retry")
+		-- Anchored on the CACHE, not on the wording of a log line. The failure
+		-- message moved when the enumeration became asynchronous ("Failed to execute
+		-- application discovery" no longer exists), and a test pinned to that string
+		-- reported the change as a broken invariant when the invariant was intact.
+		local src = helpers.read_driver_source("_apps_cache_at")
+		helpers.assert_true(type(src) == "string" and src ~= "",
+			"the app picker source must be readable or this asserts nothing")
+		local code = src:gsub("%-%-[^\n]*", "")
+
+		-- The cache is written in exactly one place, and it must be on the path that
+		-- actually produced a list. Every early return for a failed or empty scan
+		-- hands the caller an empty table WITHOUT touching the cache, so the next
+		-- open retries instead of serving an empty picker for the whole TTL.
+		local writes = 0
+		for _ in code:gmatch("_apps_cache%s*=%s*choices") do writes = writes + 1 end
+		helpers.assert_eq(writes, 1,
+			"one cache write, on the success path only; a second one is where a failure "
+			.. "would get pinned for the TTL")
+
+		local at = code:find("_apps_cache%s*=%s*choices")
+		helpers.assert_true(at ~= nil, "the cache write must be findable")
+		-- The write must sit after the list was built, i.e. inside the builder that
+		-- returns choices — never in a branch that reached an empty result.
+		local before = code:sub(math.max(1, at - 600), at)
+		helpers.assert_true(before:find("table.sort(choices", 1, true) ~= nil,
+			"the cache is written only after a real list has been assembled and sorted; "
+			.. "reaching it from a failure branch is what would serve an empty picker for "
+			.. "the whole TTL")
 	end)
 
 end)
