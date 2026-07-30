@@ -42,6 +42,12 @@ ToggleFilterSystemAuth(*) {
 ; At-rest encryption of the typed-text columns. Refuses to enable when no key can
 ; be derived on this machine — a box that reports encryption while nothing
 ; encrypts is exactly the macOS defect this feature set out to fix.
+;
+; The rows ALREADY in data.sql are converted too, but not from here: this handler
+; ends in a reload, which would kill any pass started on this stack. The reload
+; comes back, restores the setting from the INI and reaches
+; KL_Mig_SyncToPosture, which compares the ledger's recorded posture against the
+; new one and starts the rewrite there.
 ToggleAtRestEncryption(*) {
 	want := !MetricsFilters.encrypt
 	if (want && !KL_Enc_IsAvailable()) {

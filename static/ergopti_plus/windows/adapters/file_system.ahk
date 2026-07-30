@@ -133,6 +133,41 @@ FSMove(Source, Destination, Overwrite := false) {
         }
 }
 
+; Opens a file for STREAMED reading and hands the handle back.
+; FSRead loads a whole file; the at-rest migration walks data.sql, which can be
+; hundreds of megabytes, and would have to hold all of it in memory to rewrite
+; two columns of a few statements. The handle is UTF-8-RAW so a byte-exact
+; passthrough is possible: the byte-order mark, if any, arrives as content and
+; leaves as content instead of being stripped on one side and re-added on the
+; other.
+; @param Path {String} Absolute path to the file.
+; @return {Object|String} An AHK file object, or "" on any error.
+FSOpenRead(Path) {
+	if !(Path is String) or Path = ""
+		return ""
+	try {
+		local FH := FileOpen(Path, "r", "UTF-8-RAW")
+		return IsObject(FH) ? FH : ""
+	} catch {
+		return ""
+	}
+}
+
+; Opens a file for STREAMED writing, truncating any existing content.
+; Counterpart of FSOpenRead; see its note on UTF-8-RAW.
+; @param Path {String} Absolute path to the file.
+; @return {Object|String} An AHK file object, or "" on any error.
+FSOpenWrite(Path) {
+	if !(Path is String) or Path = ""
+		return ""
+	try {
+		local FH := FileOpen(Path, "w", "UTF-8-RAW")
+		return IsObject(FH) ? FH : ""
+	} catch {
+		return ""
+	}
+}
+
 ; Machine-readable contract map - consumed by the generic adapter compliance test
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
