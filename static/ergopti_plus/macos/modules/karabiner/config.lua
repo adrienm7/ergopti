@@ -148,15 +148,29 @@ end
 --- keyboard layout — no hardcoded QWERTY positions.
 --- @param actions_file string Absolute path to actions.json.
 --- @return table|nil List of action definitions, or nil on failure.
-function M.load_available_actions(actions_file)
-	local list = load_json_file(actions_file)
-	if not list then
-		Logger.error(LOG, "Cannot load actions — module will be non-functional.")
-		return nil
-	end
-	append_shared_modifier_chords(list)
+-- Built action list, cached across layout changes. Declared above the functions
+-- that read it: a local placed below would bind the nil global instead.
+local _cached_actions = nil
 
-	-- Resolve layout-dependent actions: logical_char → physical key_code
+--- Re-resolves every layout-dependent action against the CURRENT keyboard layout.
+---
+--- Split out of load_available_actions because it is the only part of it that
+--- depends on the layout. The rest — a 20 kB JSON read and decode, plus the ~600
+--- generated modifier-chord entries — is layout-independent and was being redone
+--- on every single layout change.
+---
+--- It is also what the resume path needs. After a sleep/wake or a config reload the
+--- action list still holds the key codes of whatever layout was active when it was
+--- built, and re-running the whole loader to fix that was the only option; now the
+--- resolution can be re-run on its own, against the list already in memory.
+---
+--- @param list table The action list to re-resolve IN PLACE.
+--- @return number How many actions were resolved.
+function M.resolve_layout_actions(list)
+	if type(list) ~= "table" then
+		Logger.error(LOG, "resolve_layout_actions(): expected a table — nothing resolved.")
+		return 0
+	end
 	local resolved = 0
 	for _, action in ipairs(list) do
 		if action.logical_char then
@@ -170,11 +184,34 @@ function M.load_available_actions(actions_file)
 			resolved = resolved + 1
 		end
 	end
-
 	-- One summary line, not one per action. DEBUG is this driver's default level
-	-- and every layout change re-ran this loop, so the per-action lines were 548
-	-- log writes for a fact the total already conveys.
+	-- and every layout change re-runs this loop, so per-action lines were 548 log
+	-- writes for a fact the total already conveys.
 	Logger.debug(LOG, "Resolved %d logical-char action(s) to key codes.", resolved)
+	return resolved
+end
+
+function M.load_available_actions(actions_file)
+	-- The built list is cached and re-resolved rather than rebuilt. Everything up to
+	-- the resolution below is layout-INDEPENDENT: the JSON read and decode, and the
+	-- ~600 modifier-chord entries generated from the shared catalogue. A layout
+	-- change re-ran all of it to change only the key codes.
+	if _cached_actions then
+		M.resolve_layout_actions(_cached_actions)
+		Logger.debug(LOG, "Re-resolved %d cached action(s) for the current layout.",
+			#_cached_actions)
+		return _cached_actions
+	end
+
+	local list = load_json_file(actions_file)
+	if not list then
+		Logger.error(LOG, "Cannot load actions — module will be non-functional.")
+		return nil
+	end
+	append_shared_modifier_chords(list)
+	M.resolve_layout_actions(list)
+
+	_cached_actions = list
 	Logger.info(LOG, "Loaded %d action(s) from actions.json.", #list)
 	return list
 end
