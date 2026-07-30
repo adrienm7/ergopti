@@ -55,6 +55,11 @@ if ok_sr then SqliteReader = sr_mod end
 -- At-rest encryption of the typed-text columns. Hard require: the setting must
 -- never silently degrade into "stored in clear".
 local TextCipher = require("modules.keylogger.text_cipher")
+-- Bulk conversion of rows written BEFORE the setting changed. Without it the
+-- toggle only ever protects the future, which is not what a user with a year of
+-- logs is asking for when they tick it.
+local TextMigration = require("modules.keylogger.text_migration")
+local MigrationPlan = require("keylogger.text_migration")
 
 local LOG = "modules.keylogger.keylogger"
 
@@ -268,6 +273,21 @@ function M.init(opts)
 	else
 		Logger.info(LOG, "SQLite unavailable — JSON fallback active.")
 	end
+
+	-- Push the configured posture into the cipher. Without this the cipher stayed
+	-- off while get_privacy_state() reported the manifest's value, which is the
+	-- "the box is ticked and nothing is encrypted" defect this feature replaced.
+	if _encrypt_enabled and not TextCipher.is_available() then
+		Logger.error(LOG, "At-rest encryption is configured on but no key can be derived — staying off.")
+		_encrypt_enabled = false
+	end
+	TextCipher.set_enabled(_encrypt_enabled)
+	-- Resume only a pass a previous run left unfinished. Starting one
+	-- unconditionally would re-read every stored row at every daemon start, on
+	-- machines that may never have enabled the setting at all.
+	TextMigration.resume(
+		_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
+		_device_id)
 
 	-- Custom password apps (reset then rebuild to avoid duplicates on re-init).
 	if type(options.password_apps) == "table" then
@@ -768,10 +788,45 @@ function M.set_encrypt_enabled(enabled)
 		TextCipher.set_enabled(false)
 		return false
 	end
+	local changed = (want ~= _encrypt_enabled)
 	_encrypt_enabled = want
+	-- The cipher is flipped BEFORE the migration starts: encrypt() returns the
+	-- plaintext untouched while the toggle is off, so an encrypting pass launched
+	-- first would convert nothing and report success.
 	TextCipher.set_enabled(want)
 	Logger.debug(LOG, "At-rest encryption: %s.", tostring(_encrypt_enabled))
+	if changed then M.migrate_stored_text() end
 	return _encrypt_enabled
+end
+
+--- Starts (or resumes) the conversion of rows written before the current
+--- posture. Idempotent: a pass over an already-converted table skips every row.
+--- @return boolean True when a pass is in flight.
+function M.migrate_stored_text()
+	TextMigration.cancel()
+	return TextMigration.start(
+		_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
+		_device_id)
+end
+
+--- Advances the at-rest migration by one bounded batch.
+--- Driven from the daemon's periodic tick rather than from flush(): the work is
+--- one openssl spawn per value, and the flush path runs on the keystroke side of
+--- the daemon where that cost would be felt as input lag.
+function M.pump_migration()
+	TextMigration.pump()
+end
+
+--- Snapshot of the at-rest migration, for the menu and for diagnostics.
+--- @return table
+function M.get_migration_progress()
+	return TextMigration.get_progress()
+end
+
+--- Stops the at-rest migration. Converted rows stay converted and the stored
+--- cursor lets a later run pick up from there, so this is a pause, not a revert.
+function M.cancel_migration()
+	TextMigration.cancel()
 end
 
 --- Returns whether at-rest encryption is active.

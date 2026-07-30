@@ -763,19 +763,21 @@ local function main()
 
 	-- 8.13) Event loop — luv native when available, pump fallback otherwise.
 	-- The idle callback pumps the keyboard hook + tray menu;
-	-- the periodic callback drives process_lifecycle.tick() and
-	-- file_watchers.pump() (deadline check + mtime polling).
-	local on_periodic = nil
-	if process_lifecycle or file_watchers then
-		on_periodic = function()
-			tick_count = tick_count + 1
-			if process_lifecycle then
-				pcall(process_lifecycle.tick, tick_count)
-			end
-			if file_watchers then
-				file_watchers.pump()
-			end
+	-- the periodic callback drives process_lifecycle.tick(),
+	-- file_watchers.pump() (deadline check + mtime polling) and one batch of the
+	-- at-rest migration.
+	local on_periodic = function()
+		tick_count = tick_count + 1
+		if process_lifecycle then
+			pcall(process_lifecycle.tick, tick_count)
 		end
+		if file_watchers then
+			file_watchers.pump()
+		end
+		-- One bounded batch per tick, and only while a migration is in flight.
+		-- Deliberately NOT on the idle callback: that one runs between keystrokes,
+		-- and a batch costs one openssl spawn per value.
+		pcall(keylogger.pump_migration)
 	end
 
 	event_loop.run({
