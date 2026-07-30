@@ -511,10 +511,10 @@ _HS_InvalidatePersonalCache() {
 ; Pre-scans the bundled extensions directory to build the extension data
 ; so it is available for menu labels without doing file I/O under Critical.
 _HS_PreScanExtensions() {
-	global _StaticDir, _HS_ExtensionsCacheLoaded, _HS_ExtensionsCache
+	global _ExtensionsDir, _HS_ExtensionsCacheLoaded, _HS_ExtensionsCache
 	if _HS_ExtensionsCacheLoaded
 		return
-	ExtensionsBaseDir := _StaticDir . "\extensions\"
+	ExtensionsBaseDir := _ExtensionsDir . "\"
 	_HS_ExtensionsCache := []
 	if DirExist(ExtensionsBaseDir) {
 		Loop Files ExtensionsBaseDir . "*", "D" {

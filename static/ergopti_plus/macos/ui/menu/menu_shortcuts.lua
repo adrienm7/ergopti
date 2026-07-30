@@ -539,7 +539,7 @@ function M.build(ctx)
 	end
 
 	local function dyn_extensions_shortcuts(items, _ctx)
-		local ext_root = ctx.base_dir and (ctx.base_dir .. "../../extensions/")
+		local ext_root = ctx.base_dir and (ctx.base_dir .. "../extensions/")
 		-- Same truncation as hotstring_counter: `and pcall() or false` keeps only
 		-- the status, so attr was always nil and this branch never ran.
 		local ok_attr, attr = false, nil

@@ -174,6 +174,10 @@ global _VendorDir
 ; Sub-roots derived from _StaticDir — declared here so every #Include below can use them.
 global _SharedDir := _StaticDir . "\ergopti_plus\_shared"
 global _DriverDir := _StaticDir . "\ergopti_plus\windows"
+; Extension packs sit beside _shared, not under static/. Resolved once here because
+; two read sites had independently derived the pre-reorg path and both failed
+; silently behind a DirExist() guard.
+global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
 
 ; #Warn directives apply to the whole compilation unit in AHK v2 — they
 ; cannot be scoped to a single #Include. VarUnset and LocalSameAsGlobal are
@@ -353,8 +357,13 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 
 ; Bundled extension shortcut menus — each defines BuildExtMenu_<id>().
 ; ``*i`` keeps the driver runnable if an extension is removed without
-; updating this list.
-#Include *i ..\..\extensions\ergopti-demo\shortcuts\menu.ahk
+; updating this list. NOTE: one ``..`` only — this file lives in
+; static/ergopti_plus/windows/, so ``..\extensions`` is the real tree. The
+; previous ``..\..\extensions`` resolved to static/extensions/, which has not
+; existed since the static/ reorg, and ``*i`` suppressed the include error, so
+; BuildExtMenu_ergopti_demo() was never defined and the extensions submenu never
+; rendered.
+#Include *i ..\extensions\ergopti-demo\shortcuts\menu.ahk
 #Include modules/keylogger/keylogger_reader.ahk
 #Include modules/keylogger/keylogger_prefetch.ahk
 #Include modules/keylogger/keylogger_webview.ahk
