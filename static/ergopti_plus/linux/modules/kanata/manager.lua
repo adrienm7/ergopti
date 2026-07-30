@@ -69,7 +69,12 @@ local function _resolve_paths()
 	local src = debug.getinfo(1, "S").source:gsub("^@", "")
 	local driver_root = src:match("^(.*)[/\\]modules[/\\]kanata[/\\]manager%.lua$") or "."
 	driver_root = driver_root:gsub("\\", "/")
-	_template_path = driver_root .. "/../../kanata/kanata.kbd"
+	-- One level up from the driver root, NOT two: the template lives at
+	-- static/ergopti_plus/kanata/kanata.kbd, a sibling of the driver folders.
+	-- The extra "../" survived the static/drivers → static/ergopti_plus move and
+	-- pointed at static/kanata/, which does not exist — so the template never
+	-- opened, generate_kbd() always returned nil, and kanata got no config at all.
+	_template_path = driver_root .. "/../kanata/kanata.kbd"
 
 	-- Verify the template exists (fail-loud: kanata cannot work without it).
 	local fh = io.open(_template_path, "r")

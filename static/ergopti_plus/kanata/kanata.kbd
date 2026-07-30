@@ -104,6 +104,13 @@
 ;; === Functions and shortcuts ===
 ;; ===============================
 
+;; Hand-maintained. These are kanata-native expressions with no equivalent in
+;; the shared data model, so nothing generates them. They MUST stay in their own
+;; (defalias) block: the LAST block of this file is replaced wholesale by
+;; modules/kanata/manager.lua, and anything defined there would vanish. The
+;; generated block below references @copy and @paste, and the layers above
+;; reference @rollx and @deadtrema — kanata resolves every @name at load time,
+;; so one dangling reference makes the WHOLE file unloadable.
 (defalias
     rollc (switch
         ((key-history i 1)) (macro bspc 50 @w 30 @h 30) break ;; HC --> WH
@@ -116,14 +123,22 @@
     deadtrema (multi lsft ralt @trema)
     copy (multi lctl @c)
     paste (multi lctl @v)
-    alttab (tap-hold-press 200 200 (multi lalt tab) lalt)
-    cap (tap-hold-press 350 350 enter lctl)
-    lsft (tap-hold-press 350 350 @copy lsft)
-    lctl (tap-hold-press 200 200 @paste lctl)
-    lalt (tap-hold-press 200 200 bspc (layer-toggle navigation))
-    ralt (tap-hold-press 200 200
-        (multi (release-key lctl) (release-key lalt) tab)
-        (multi ralt (release-key lctl))
-    )
-    ossft (one-shot 2000 lsft)
+)
+
+;; ================================================================
+;; === GENERATED BLOCK — DO NOT EDIT BY HAND ======================
+;; ================================================================
+;; Replaced in full by modules/kanata/manager.lua, which renders it from
+;; _shared/tap_hold/defaults.toml through _shared/lua/tap_hold/kanata_generator.lua.
+;; The copy committed here is what that generator produces, byte for byte; a
+;; test pins the two together, so editing this block by hand only makes the
+;; suite red.
+(defalias
+    alttab     (tap-hold-press 200 200 (multi lalt tab) lalt)
+    cap        (tap-hold-press 350 350 enter lctl)
+    lsft       (tap-hold-press 350 350 @copy lsft)
+    lctl       (tap-hold-press 200 200 @paste lctl)
+    lalt       (tap-hold-press 200 200 bspc (layer-toggle navigation))
+    ralt       (tap-hold-press 200 200 (multi (release-key lctl) (release-key lalt) tab) (multi ralt (release-key lctl)))
+    ossft      (one-shot 2000 lsft)
 )

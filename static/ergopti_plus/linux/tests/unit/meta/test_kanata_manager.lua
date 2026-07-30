@@ -33,18 +33,73 @@ helpers.describe("kanata manager", function()
   helpers.describe("kbd generation", function()
 
     helpers.it("generate_kbd returns a non-empty string", function()
+      -- This assertion used to be wrapped in `if kbd then … end` "in case the
+      -- template is not found". It always was not found — the template path had
+      -- one "../" too many — so generate_kbd() returned nil on every run and the
+      -- test passed while asserting nothing at all. The path is resolved from
+      -- this module's own source location, so it does not depend on the cwd:
+      -- a nil here means the config is not being generated, and must fail.
       local kbd = km.generate_kbd()
-      -- May return nil if template not found (non-standard test cwd).
-      -- If template is found, it should produce valid content.
-      if kbd then
-        helpers.assert_true(type(kbd) == "string" and #kbd > 0,
-          "generate_kbd returns non-empty string")
-        -- Should contain kanata structural markers.
-        helpers.assert_true(kbd:find("defcfg", 1, true) or kbd:find("defsrc", 1, true),
-          "contains kanata structural markers")
-        helpers.assert_true(kbd:find("defalias", 1, true),
-          "contains defalias block")
+      helpers.assert_true(type(kbd) == "string" and #kbd > 0,
+        "generate_kbd must return the config — nil means kanata gets no config at all")
+      helpers.assert_true(kbd:find("defcfg", 1, true) or kbd:find("defsrc", 1, true),
+        "contains kanata structural markers")
+      helpers.assert_true(kbd:find("defalias", 1, true),
+        "contains defalias block")
+    end)
+
+    helpers.it("the generated defalias block matches the golden corpus", function()
+      -- Pins generator + manager + defaults.toml to the committed corpus in one
+      -- assertion. tools/test/test-kanata-defalias-parity.cjs substitutes that
+      -- corpus into the template to prove the merged config loads, which is only
+      -- meaningful while the corpus really is what the generator produces.
+      local kbd = km.generate_kbd()
+      helpers.assert_true(type(kbd) == "string", "generate_kbd must produce a config")
+
+      local golden_path = helpers.driver_root() .. "/../_shared/tap_hold/golden_kanata_defalias.kbd"
+      local fh = io.open(golden_path, "r")
+      helpers.assert_not_nil(fh, "golden corpus not found at " .. golden_path)
+      local golden = fh:read("*a")
+      fh:close()
+
+      -- The generated block is the LAST (defalias …) of the assembled config.
+      local generated = nil
+      for block in kbd:gmatch("(%(defalias.-\n%))") do generated = block end
+      helpers.assert_not_nil(generated, "no (defalias) block found in the generated config")
+
+      local function normalise(s) return (s:gsub("\r\n", "\n"):gsub("%s+$", "")) end
+      helpers.assert_eq(normalise(generated), normalise(golden),
+        "generated defalias block drifted from golden_kanata_defalias.kbd")
+    end)
+
+    helpers.it("generate_kbd emits a config kanata can actually load", function()
+      -- kanata resolves every @name at load time, so ONE dangling reference
+      -- rejects the WHOLE file. The generated block replaces the template's last
+      -- (defalias) wholesale, which used to drop @copy, @paste, @rollx and
+      -- @deadtrema on the floor.
+      local kbd = km.generate_kbd()
+      helpers.assert_true(type(kbd) == "string", "generate_kbd must produce a config")
+
+      -- Strip ";;" comments only: a lone ";" is a legitimate alias name here.
+      local clean = kbd:gsub(";;[^\n]*", "")
+
+      local defined = {}
+      for block in clean:gmatch("%(defalias(.-)\n%)") do
+        -- Alias entries alternate NAME then VALUE at the top level of the block.
+        -- Names are the atoms that start a line, which is enough here because
+        -- the generator and the template both emit one entry per line.
+        for name in block:gmatch("\n%s*([^%s()@]+)%s") do
+          defined[name] = true
+        end
       end
+
+      local dangling = {}
+      for ref in clean:gmatch("@([^%s()]+)") do
+        if not defined[ref] then dangling[#dangling + 1] = ref end
+      end
+
+      helpers.assert_eq(#dangling, 0,
+        "dangling @alias in the generated config: " .. table.concat(dangling, ", "))
     end)
 
     helpers.it("write_kbd writes a file to the kanata config dir", function()
