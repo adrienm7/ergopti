@@ -307,7 +307,7 @@ LLM_Deps_RunInstaller(model, on_ready?, on_failed?) {
 			Run('https://ollama.com/download')
 		} catch as err {
 			LoggerError("LLM", "Could not open the download page: " err.Message ".")
-			LLM_Deps_Fail("Impossible d'ouvrir la page de téléchargement Ollama.", on_failed)
+			LLM_Deps_Fail(t("menu.llm.deps_download_page_failed"), on_failed)
 			return
 		}
 		; Surface a tray tip so the user knows what to do — without it,

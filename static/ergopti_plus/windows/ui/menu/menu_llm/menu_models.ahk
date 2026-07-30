@@ -281,15 +281,17 @@ _LLM_Menu_BuildModelRowTitle(name, active, deps_ready := true) {
 	info := LLM_GetModelInfo(name)
 	installed := deps_ready ? LLM_IsModelInstalled(name) : false
 	status := installed ? "🟢 " : ""
-	type_str := (info.Has("type") and info["type"] == "completion")
-		? " [📝 Complétion]"
-		: " [💬 Chat]"
+	type_str := " [" . t((info.Has("type") and info["type"] == "completion")
+		? "menu.llm.model_type_completion"
+		: "menu.llm.model_type_chat") . "]"
 	params_b := info.Has("params_b") ? info["params_b"] : 0
 	ram_gb   := info.Has("ram_gb")   ? info["ram_gb"]   : 0
-	if (params_b > 0)
-		params_lbl := " (" . _LLM_Menu_FormatBillions(params_b) . "B params, ~" . Ceil(ram_gb) . " Go RAM)"
-	else
-		params_lbl := " (~" . Ceil(ram_gb) . " Go RAM)"
+	if (params_b > 0) {
+		params_lbl := StrReplace(t("menu.llm.model_specs_params"), "{1}", _LLM_Menu_FormatBillions(params_b))
+		params_lbl := StrReplace(params_lbl, "{2}", Ceil(ram_gb))
+	} else {
+		params_lbl := StrReplace(t("menu.llm.model_specs_ram"), "{1}", Ceil(ram_gb))
+	}
 	return status . name . type_str . params_lbl
 }
 
@@ -342,7 +344,7 @@ _LLM_Menu_BuildPerModelSubmenu(name, model, ollama_url, active, deps_ready := tr
 	sub.Disable(specs_header)
 
 	type_val := model.Has("type") ? model["type"] : ""
-	type_label_text := (type_val == "completion") ? "📝 Complétion" : "💬 Chat"
+	type_label_text := t((type_val == "completion") ? "menu.llm.model_type_completion" : "menu.llm.model_type_chat")
 	type_label := StrReplace(t("menu.llm.model_type"), "%s", type_label_text)
 	sub.Add(type_label, (*) => 0)
 	sub.Disable(type_label)
