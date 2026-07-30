@@ -459,8 +459,33 @@ reached.
 Flipping the default is not enough on its own. Intercept mode makes the daemon
 the sole path to the application, so it must re-emit **every** event — modifiers,
 control keys, key-repeat, releases — in order and without loss, or the keyboard
-becomes unusable. Verify with a deterministic harness (fake evdev source, fake
-injector) proving lossless raw-event pass-through, then on real evdev + ydotool.
+becomes unusable.
+
+**The harness half is already delivered** (re-derived 2026-07-31):
+`tests/unit/meta/test_keyboard_hook_intercept_passthrough.lua` drives a fake
+evdev source into a fake injector and pins the modifier down/up pair, the
+autorepeat (value 2), the release, a two-underscore key name, arrival order,
+EV_KEY-only filtering, and silence in observe mode. The pass-through itself, the
+`onEmitRaw` wiring and the `can_capture` refusal all exist. The daemon simply
+never passes `intercept = true`.
+
+**What actually blocks the flip** — two measured reasons, both named in
+`ergopti_hotstrings.lua` at the `keyboard_hook.start` call:
+
+1. `injector.emit_key` shells out **once per event** (`ydotool key <code>:<value>`,
+   `injector.lua:227`). Under a grab that is a fork on every physical keystroke.
+2. The device kanata auto-detects is not coordinated with the one `device_finder`
+   picks here.
+
+**Do not propose batching the pass-through.** `ydotool key` does accept several
+`code:value` pairs in one call, so collapsing a pump batch into one fork looks
+obvious — and it is wrong. `_pump_one` re-emits an event and then dispatches it,
+so an injection triggered by event N would run BEFORE the re-emit of N itself.
+That is precisely the interleaving this whole item exists to remove. A cheap
+channel has to be non-forking, not batched: `/dev/uinput` via LuaJIT FFI, or a
+persistent ydotoold client.
+
+The remaining verification needs real evdev + ydotool hardware.
 
 ---
 
