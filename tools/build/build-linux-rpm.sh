@@ -155,7 +155,7 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/ergopti
+ExecStart=/usr/bin/ergopti --tray
 Restart=on-failure
 RestartSec=5
 

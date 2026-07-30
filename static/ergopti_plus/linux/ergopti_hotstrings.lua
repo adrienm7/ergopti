@@ -649,6 +649,10 @@ local function main()
 		end
 	elseif opts.tray and not tray_menu then
 		Logger.warn(LOG, "Tray icon requested but tray_menu adapter unavailable (install yad).")
+	else
+		-- Always state the tray decision: without this a launch that forgot --tray
+		-- looks identical in the log to one where the adapter failed to load.
+		Logger.info(LOG, "Tray icon disabled (no --tray) — running headless.")
 	end
 
 	-- 8.10) Install signal handlers.

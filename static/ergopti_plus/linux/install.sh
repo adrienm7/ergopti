@@ -339,7 +339,7 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=${BIN_DIR}/ergopti-hotstrings
+ExecStart=${BIN_DIR}/ergopti-hotstrings --tray
 Restart=on-failure
 RestartSec=3s
 Environment=DISPLAY=:0

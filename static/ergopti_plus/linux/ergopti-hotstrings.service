@@ -23,7 +23,7 @@ After=graphical-session.target
 [Service]
 Type=simple
 # The wrapper sets LUA_PATH and verifies ydotool before exec-ing luajit.
-ExecStart=%h/.local/bin/ergopti-hotstrings
+ExecStart=%h/.local/bin/ergopti-hotstrings --tray
 # Restart on transient failures (device not yet accessible at login, etc.).
 Restart=on-failure
 RestartSec=3s

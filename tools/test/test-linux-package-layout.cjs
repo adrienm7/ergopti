@@ -92,11 +92,69 @@ for (const pkg of PACKAGERS) {
 	}
 }
 
+// ─── 5. Every packaged unit must launch the daemon with a user-facing surface ──
+//
+// ROOT CAUSE ENCODED: opts.tray defaults to false and the whole tray/menu block
+// is gated on `if opts.tray and tray_menu`, so a unit that omits --tray yields a
+// driver with no icon and no menu. All five ExecStart lines that launch the
+// daemon omitted it, which means the supported install path had no user-facing
+// surface at all. Enumerated as a class over every packaging file, so a new unit
+// definition is covered the moment it is added.
+
+// Files that may declare a systemd unit for this project.
+const UNIT_SOURCES = [
+	'static/ergopti_plus/linux/ergopti-hotstrings.service',
+	'static/ergopti_plus/linux/install.sh',
+	'tools/build/build-linux-deb.sh',
+	'tools/build/build-linux-rpm.sh',
+	'tools/build/PKGBUILD'
+];
+
+// An ExecStart launches the ergopti daemon when it points at the daemon launcher
+// or the wrapper. The kanata unit is a different binary and must NOT carry --tray.
+const DAEMON_EXEC_RE = /^ExecStart=(?<cmd>\S*(?:ergopti-hotstrings|\/ergopti))(?<args>.*)$/gm;
+
+let daemonExecStartsFound = 0;
+
+for (const rel of UNIT_SOURCES) {
+	const full = path.join(ROOT, rel);
+	if (!fs.existsSync(full)) {
+		errors.push(`${rel}: expected packaging file is missing — update UNIT_SOURCES or restore the file.`);
+		continue;
+	}
+	const src = fs.readFileSync(full, 'utf8');
+
+	for (const m of src.matchAll(DAEMON_EXEC_RE)) {
+		daemonExecStartsFound++;
+		if (!/\s--tray(\s|$)/.test(m.groups.args)) {
+			errors.push(
+				`${rel}: "${m[0].trim()}" launches the daemon without --tray, so the ` +
+				`installed service has no tray icon and no menu.`
+			);
+		}
+	}
+
+	// The kanata unit shares these files; it must never gain the daemon's flag.
+	for (const line of src.split('\n')) {
+		if (/^ExecStart=/.test(line) && /kanata/.test(line) && /--tray/.test(line)) {
+			errors.push(`${rel}: "${line.trim()}" — --tray belongs to the ergopti daemon, not kanata.`);
+		}
+	}
+}
+
+if (daemonExecStartsFound === 0) {
+	errors.push(
+		'no daemon ExecStart line matched in any packaging file — the selector is stale, ' +
+		'not the tree. A scan that silently finds nothing is the failure mode this check exists to avoid.'
+	);
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] Linux package layout diverges from the canonical runtime layout:\x1b[0m');
 	for (const e of errors) console.error('  - ' + e);
 	process.exit(1);
 }
 console.log(
-	'\x1b[32m[OK] Linux .deb/.rpm install into /usr/lib/ergopti and boot the same bundle entry (packagers agree).\x1b[0m'
+	'\x1b[32m[OK] Linux .deb/.rpm install into /usr/lib/ergopti, boot the same bundle entry, ' +
+	`and all ${daemonExecStartsFound} daemon ExecStart line(s) pass --tray.\x1b[0m`
 );

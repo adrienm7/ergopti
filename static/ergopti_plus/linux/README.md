@@ -124,7 +124,7 @@ a systemd user service.
 | Hotstrings + metrics     | ✅                   | ✅                     | evdev read works on both; injection via ydotool     |
 | Text injection           | ✅ ydotool           | ✅ ydotool             | Requires `ydotoold` daemon + uinput permissions     |
 | Window info (active app) | ✅ xdotool           | ⚠️ compositor-specific | No universal Wayland protocol                       |
-| Tray icon                | ⚠️ SNI, opt-in       | ⚠️ partial             | Requires `--tray`, which **no packaged unit passes** today; GNOME Wayland also needs the AppIndicator extension |
+| Tray icon                | ✅ SNI               | ⚠️ partial             | Every packaged systemd unit passes `--tray` (pinned by `test:linux-package-layout`); a manual launch without it runs headless and says so in the log. GNOME Wayland also needs the AppIndicator extension |
 | Tooltip overlay          | ❌ not implemented   | ❌ not implemented     | `adapters/tooltip_renderer.lua` shells out to `yad`/`zenity` and has **zero callers**: no hotstring preview, no LLM prediction preview |
 | Secure field detection   | ❌ not wired         | ❌ not standardised    | The AT-SPI adapter has no consumer; the only protection is a substring match on eight hardcoded app names, and the keylogger **cannot be turned off** |
 | Config UI                | ⚠️ WebKitGTK, 3 of 14 windows | ⚠️ same       | `modules/ui/` hosts the shared webviews, but only `healthcheck`, `onboarding` and `hotstrings_config_window` are ever opened |
