@@ -113,6 +113,10 @@ M.MOD_COMBOS = {}
 -- from a menu "Reload") must not re-prompt the user.
 local _wizard_ran_this_session  = false
 local _layout_rebuild_timer     = nil  -- Stored so rapid layout changes cancel the pending rebuild
+-- Wake-from-sleep watcher. Held at module scope so it survives past the function
+-- that arms it: an hs.caffeinate.watcher referenced only by a local is collected
+-- and stops delivering, silently.
+local _wake_watcher             = nil
 local _deferred_hotkeys_timer   = nil  -- Pending convenience-hotkey bind; cancelled by M.stop()
 local _kc_parent_ensured        = false -- metrics/ exists from the first regenerate onwards
 
@@ -821,6 +825,50 @@ function M.init(file_system)
 			end
 		end)
 	end) end)  -- close the input-source callback, then the timed() wrapper
+
+	-- Wake-from-sleep refresh of the layout-dependent key codes.
+	--
+	-- Every action carrying a logical_char is resolved against whatever layout was
+	-- active when the list was built, and the only thing that re-resolves them is
+	-- the input-source watcher above. That fires on
+	-- AppleSelectedInputSourcesChangedNotification, which is NOT delivered for a
+	-- layout that changed while the machine was asleep — and the TIS layer can
+	-- settle differently across a wake. So the list could hold the key codes of a
+	-- layout that is no longer active, Karabiner would be handed a config remapping
+	-- the wrong physical keys, and nothing re-derived it until the user switched
+	-- layout by hand.
+	--
+	-- The gestures module carries this same pattern for its touch device, for the
+	-- same reason: after a wake the OS reports state the process still believes.
+	local ok_cw, cw = pcall(require, "hs.caffeinate.watcher")
+	if ok_cw and cw then
+		if _wake_watcher then pcall(function() _wake_watcher:stop() end) end
+		_wake_watcher = cw.new(function(event)
+			if event ~= cw.systemDidWake and event ~= cw.screensDidUnlock then return end
+
+			-- Re-resolve only. The JSON read and the ~600 generated chord entries are
+			-- layout-independent, so the full loader would put a rebuild back on the
+			-- wake path that the split deliberately removed.
+			local n = Config.resolve_layout_actions(M.AVAILABLE_ACTIONS)
+			Logger.info(LOG, "Wake detected — re-resolved %d layout-dependent action(s).", n)
+
+			-- A wake while paused must not redeploy: regenerating hands Karabiner the
+			-- full Ergopti config back and would silently undo the pause, which is the
+			-- « pause = tout éteint » contract the layout-change path above protects
+			-- with the same check.
+			local ok_sc, shortcuts = pcall(require, "modules.shortcuts")
+			if ok_sc and shortcuts and type(shortcuts.is_paused) == "function"
+				and shortcuts.is_paused() then
+				Logger.info(LOG, "Wake refresh: not redeploying — script is paused.")
+				return
+			end
+			if _state and _state.enabled then M.regenerate() end
+		end)
+		pcall(function() _wake_watcher:start() end)
+	else
+		Logger.warn(LOG, "hs.caffeinate.watcher unavailable — layout key codes will not be "
+			.. "re-resolved after a wake.")
+	end
 
 	local active_combos = 0
 	for _, combo_def in ipairs(M.MOD_COMBOS) do
