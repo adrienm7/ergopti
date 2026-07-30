@@ -76,6 +76,13 @@ if utf8_compat.install() then
 end
 
 local Logger = require("logger.shim")
+
+-- The shared logger core only writes to an injected sink, so install ours before
+-- the first Logger.* call. Without this every log line on Linux — including the
+-- two fatal errors below — went to a ring buffer and nowhere else.
+local LoggerSink = require("lib.logger_sink")
+LoggerSink.install(Logger)
+
 -- Single source of the driver version (never a re-typed literal).
 local Version = require("lib.version")
 local LOG = "ergopti_hotstrings"
@@ -590,7 +597,11 @@ local function main()
 				os.execute(string.format("xdg-open '%s' 2>/dev/null &", d:gsub("'", "'\\''")))
 			end,
 			on_open_logs = function()
-				local log_dir = os.getenv("HOME") .. "/.local/share/ergopti/logs"
+				-- Single resolver, shared with the sink that writes there: this action
+				-- used to open a hardcoded HOME path that ignored XDG_DATA_HOME and
+				-- that nothing ever wrote to.
+				local log_dir = LoggerSink.log_dir()
+				Logger.info(LOG, "Opening log folder: %s", log_dir)
 				os.execute(string.format("xdg-open '%s' 2>/dev/null &", log_dir:gsub("'", "'\\''")))
 			end,
 			on_healthcheck = function()
