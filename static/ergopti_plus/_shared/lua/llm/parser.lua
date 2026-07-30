@@ -148,6 +148,92 @@ function M.strip_thinking(text)
 	return text
 end
 
+--- Opening and closing thinking tags. Named so the streaming filter below cannot
+--- drift from `strip_thinking`'s patterns.
+local THINK_OPEN  = "<think>"
+local THINK_CLOSE = "</think>"
+
+--- Creates a stateful filter that removes thinking blocks from a STREAM.
+---
+--- `strip_thinking` needs the whole response, which is useless on a streaming
+--- path that injects each delta into the user's document as it arrives: by the
+--- time the full text exists, the thinking block has already been typed. This
+--- filter is incremental and withholds any tail that could still turn out to be
+--- the start of a tag, so a tag split across two chunks is still recognised.
+---
+--- Usage:
+---   local f = Parser.new_thinking_filter()
+---   emit(f:feed(delta))   -- for every streamed chunk
+---   emit(f:flush())       -- once, when the stream ends
+---
+--- @return table Filter with :feed(chunk) -> string and :flush() -> string.
+function M.new_thinking_filter()
+	local filter = {
+		_inside  = false,   -- currently between <think> and </think>
+		_pending = "",      -- withheld tail that may be a partial tag
+	}
+
+	--- Longest suffix of `s` that is a proper prefix of `tag`.
+	--- That suffix must be withheld: the rest of the tag may arrive next chunk.
+	local function held_back(s, tag)
+		local max = math.min(#s, #tag - 1)
+		for len = max, 1, -1 do
+			if s:sub(-len) == tag:sub(1, len) then return len end
+		end
+		return 0
+	end
+
+	--- Feeds one streamed chunk and returns the text safe to emit now.
+	--- @param chunk string|nil
+	--- @return string
+	function filter:feed(chunk)
+		if type(chunk) ~= "string" or chunk == "" then return "" end
+		self._pending = self._pending .. chunk
+
+		local out = {}
+		while true do
+			if self._inside then
+				local s, e = self._pending:find(THINK_CLOSE, 1, true)
+				if not s then
+					-- Drop everything except a possible partial closing tag.
+					local keep = held_back(self._pending, THINK_CLOSE)
+					self._pending = keep > 0 and self._pending:sub(-keep) or ""
+					break
+				end
+				self._pending = self._pending:sub(e + 1)
+				self._inside  = false
+			else
+				local s, e = self._pending:find(THINK_OPEN, 1, true)
+				if not s then
+					local keep = held_back(self._pending, THINK_OPEN)
+					local cut  = #self._pending - keep
+					if cut > 0 then out[#out + 1] = self._pending:sub(1, cut) end
+					self._pending = keep > 0 and self._pending:sub(-keep) or ""
+					break
+				end
+				if s > 1 then out[#out + 1] = self._pending:sub(1, s - 1) end
+				self._pending = self._pending:sub(e + 1)
+				self._inside  = true
+			end
+		end
+
+		return table.concat(out)
+	end
+
+	--- Ends the stream: emits any withheld text that turned out not to be a tag.
+	--- Text still inside an unterminated thinking block is dropped — a truncated
+	--- block must never reach the document.
+	--- @return string
+	function filter:flush()
+		local rest = self._pending
+		self._pending = ""
+		if self._inside then return "" end
+		return rest
+	end
+
+	return filter
+end
+
 --- Splits batch output into individual prediction blocks based on separators.
 --- @param raw string The concatenated batch output.
 --- @return table An array of string blocks.

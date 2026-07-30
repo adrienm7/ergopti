@@ -44,6 +44,12 @@ local ProfileSelector = nil
 local ok_ps, ps_mod = pcall(require, "llm.profile_selector")
 if ok_ps then ProfileSelector = ps_mod end
 
+-- The shared response parser. Linux never loaded it, so a reasoning model's
+-- <think>…</think> block was streamed straight into the user's document, one
+-- delta at a time. A hard require: without it the streaming path would inject
+-- thinking text, which is a correctness bug, not a missing nicety.
+local Parser = require("llm.parser")
+
 
 -- =========================================
 -- =========================================
@@ -228,6 +234,10 @@ function M.predict(context, output_context)
 	Logger.info(LOG, "Sending prediction request to %s (model=%s, context=%d chars)...",
 		base_url, model, #user_context)
 
+	-- One filter per request: it carries the "am I inside <think>" state and the
+	-- withheld partial tag across the chunk callbacks below.
+	local think_filter = Parser.new_thinking_filter()
+
 	ollama.chat(
 		base_url,
 		model,
@@ -239,11 +249,16 @@ function M.predict(context, output_context)
 			temperature = (HttpBridge and HttpBridge.DEFAULT_TEMPERATURE) or 0.1,
 			max_tokens  = (PromptBuilder and PromptBuilder.DEFAULT_MAX_TOKENS) or 150,
 		},
-		-- on_chunk: inject each delta character immediately.
+		-- on_chunk: inject each delta immediately, minus any thinking block.
+		-- The filter is stateful and withholds a partial tag, so a <think> split
+		-- across two chunks is still caught. _predicted_text tracks what actually
+		-- reached the document, because on error it is erased by that count.
 		function(delta)
-			_predicted_text = _predicted_text .. delta
+			local visible = think_filter:feed(delta)
+			if visible == "" then return end
+			_predicted_text = _predicted_text .. visible
 			if _auto_inject and sender then
-				pcall(function() sender.send(delta, { mode = "direct" }) end)
+				pcall(function() sender.send(visible, { mode = "direct" }) end)
 			end
 		end,
 		-- on_done: log the result.
@@ -256,8 +271,22 @@ function M.predict(context, output_context)
 					pcall(function() sender.eraseChars(#_predicted_text) end)
 				end
 			else
-				Logger.info(LOG, "Prediction complete: %d chars → '%s'",
-					#full_text, full_text:sub(1, 80))
+				-- Emit whatever the filter withheld as a possible partial tag, then
+				-- strip any thinking block from the complete text before it reaches
+				-- the output observer. The streaming filter already protected the
+				-- document; this protects every non-streaming consumer.
+				local trailing = think_filter:flush()
+				if trailing ~= "" then
+					_predicted_text = _predicted_text .. trailing
+					if _auto_inject and sender then
+						pcall(function() sender.send(trailing, { mode = "direct" }) end)
+					end
+				end
+				full_text = Parser.strip_thinking(full_text)
+
+				-- Length only: the completion is about to be typed into the user's
+				-- document, so it is user content and does not belong in a log.
+				Logger.info(LOG, "Prediction complete: %d chars.", #full_text)
 				if _auto_inject and type(full_text) == "string" and full_text ~= "" and _on_output then
 					local ok_output, output_err = pcall(_on_output, full_text, output_context)
 					if not ok_output then
