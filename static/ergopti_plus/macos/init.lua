@@ -270,6 +270,33 @@ hs.shutdownCallback = function()
 			if karabiner and type(karabiner.kill) == "function" then
 				karabiner.kill()
 				Logger.info(LOG, "Shutdown KE bridge torn down via bootout (genuine quit).")
+				return
+			end
+
+			-- The module never loaded. Until now this branch simply no-opped, which is
+			-- the worst possible outcome: Karabiner-Elements keeps remapping after
+			-- Hammerspoon exits, launchd's KeepAlive restarts the grabber, and the two
+			-- things that could recover it — the menubar and the panic-button eventtap
+			-- — are required BELOW the raise and were never created either.
+			--
+			-- ke_lifecycle is required near the top of this file, far above the module
+			-- that can raise, and it owns both KILL_CMD and is_hs_owned_bridge: exactly
+			-- what karabiner.kill() consumes. So it is the one teardown path guaranteed
+			-- to be reachable here.
+			local ok_kl, kl = pcall(require, "modules.karabiner.ke_lifecycle")
+			if not ok_kl or type(kl) ~= "table" then
+				Logger.error(LOG, "Shutdown: neither the Karabiner module nor ke_lifecycle "
+					.. "could be loaded — the KE bridge cannot be torn down from here.")
+				return
+			end
+			-- Still gated on ownership: a bare kill would boot out a user-managed
+			-- Karabiner setup, which is the regression the ownership marker exists for.
+			if type(kl.is_hs_owned_bridge) == "function" and kl.is_hs_owned_bridge() then
+				pcall(function() hs.execute(kl.KILL_CMD) end)
+				Logger.info(LOG, "Shutdown KE bridge torn down via the ke_lifecycle "
+					.. "fallback (the Karabiner module had failed to load).")
+			else
+				Logger.info(LOG, "Shutdown: KE bridge left alive — not owned by Hammerspoon.")
 			end
 		end)
 	end
@@ -325,7 +352,18 @@ end
 
 -- Now safe to load modules that depend on config_dir
 local file_system        = require("adapters.file_system")
-karabiner                = require("modules.karabiner")
+-- Guarded: modules.karabiner reaches modules/karabiner/defaults.lua, whose
+-- top-level body calls load_sections() and require_section() and raises from both.
+-- This require sits above the menubar, the panic-button eventtap and every other
+-- line of boot, so a missing or truncated tap_hold defaults.toml used to cost the
+-- whole session rather than one feature.
+local ok_karabiner
+ok_karabiner, karabiner = pcall(require, "modules.karabiner")
+if not ok_karabiner then
+	Logger.error(LOG, "modules.karabiner failed to load: %s — the Karabiner bridge is "
+		.. "disabled for this session; everything else continues.", tostring(karabiner))
+	karabiner = nil
+end
 local menu               = require("ui.menu")
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
 local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
@@ -821,7 +859,9 @@ Boot.mark("Keymap engine started")
 -- Initialize the Karabiner bridge (starts trackpad watcher + loads feature flags)
 -- The FileSystem adapter is injected so KE config path resolution goes through
 -- the port boundary (hs.fs.pathToAbsolute) instead of raw os.getenv("HOME").
-karabiner.init(file_system)
+if karabiner then
+	karabiner.init(file_system)
+end
 Boot.mark("UI: karabiner.init")
 
 Logger.debug(LOG, "Starting user interface components…")
