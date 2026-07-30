@@ -144,8 +144,6 @@ Two conventions that make asymmetry legible:
 Constraints: **paths before moves, moves before content, data before code.**
 
 - **Lot 2 — the safety net before any rename.**
-  2. Extend `test-git-mv-resilience.cjs` (macOS-only today) to AHK directory pins
-     and Linux file pins.
   3. Convert the 88 auto-convertible macOS pinned reads
      (`tools/lint/fix-pinned-source-reads.cjs --all --fix`), hand-convert the
      other 90, **lower** both ratchets.
