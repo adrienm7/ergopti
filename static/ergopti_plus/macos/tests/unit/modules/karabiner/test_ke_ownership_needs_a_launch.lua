@@ -167,3 +167,55 @@ helpers.describe("KE ownership: a read-only status probe never claims the bridge
 	end)
 
 end)
+
+
+
+
+-- ==================================================================
+-- ==================================================================
+-- ======= 2/ Every kill is gated on ownership ======================
+-- ==================================================================
+-- ==================================================================
+
+helpers.describe("KE ownership: no kill fires on a bridge we do not own", function()
+
+	helpers.it("every KILL command in the lifecycle is ownership-gated", function()
+		-- The settle path's extra pkill was the one kill in this driver with no
+		-- ownership check, while set_enabled(false) and M.kill() both have one. A
+		-- forced prime that found a live bridge it had never started therefore killed
+		-- the user's own Karabiner-Elements session - and launchd's KeepAlive respawns
+		-- a bare pkill moments later, so the visible effect was their setup flapping.
+		local src = helpers.read_driver_source("KARABINER_KILL_FAST_CMD")
+		helpers.assert_true(src ~= nil and src ~= "",
+			"ke_lifecycle must be locatable by its kill constant")
+		local code = src:gsub("%-%-[^\n]*", "")
+
+		local offenders = {}
+		local from = 1
+		while true do
+			local at = code:find("hs.execute(KARABINER_KILL_FAST_CMD)", from, true)
+			if not at then break end
+			-- The gate must be in the enclosing branch, not merely somewhere in the file.
+			local before = code:sub(math.max(1, at - 260), at)
+			if not before:find("is_hs_owned_bridge", 1, true) then
+				local line_no = select(2, code:sub(1, at):gsub("\n", "")) + 1
+				table.insert(offenders, tostring(line_no))
+			end
+			from = at + 1
+		end
+
+		helpers.assert_eq(#offenders, 0,
+			"a kill that is not gated on ownership boots out a user-managed Karabiner "
+			.. "setup, which is the regression the ownership marker exists to prevent. "
+			.. "Ungated kill(s) at line(s): " .. table.concat(offenders, ", "))
+	end)
+
+	helpers.it("the kill is still reachable when we do own the bridge", function()
+		-- Without this case the assertion above would pass against a change that
+		-- deleted the kill outright, which would leave a stuck bridge un-recoverable.
+		local code = helpers.read_driver_source("KARABINER_KILL_FAST_CMD"):gsub("%-%-[^\n]*", "")
+		helpers.assert_true(code:find("hs.execute(KARABINER_KILL_FAST_CMD)", 1, true) ~= nil,
+			"the fast kill must still exist for the bridge Hammerspoon did start")
+	end)
+
+end)

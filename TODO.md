@@ -196,6 +196,22 @@ Two notes worth keeping:
 
 Evidence in `docs/PROJECT_MEMORY.md`.
 
+- **Moving the KE ownership mark into `launch_headless_once()`** (the last leg of
+  `ke-prime-force-claims-and-kills-unowned-bridge`): everything else in that finding
+  shipped — the read-only status probe no longer claims the bridge, the poll timeout
+  no longer disowns one we launched, and the settle path's pkill is ownership-gated
+  like every other kill in the driver.
+  What is left is moving `mark_hs_owned_bridge()` from the top of
+  `prime_ke_for_session` into the branch where a headless launch actually ran, plus
+  the two force-path re-marks. It stays undone deliberately. Ownership is what
+  authorises the quit-time bootout, so narrowing it narrows teardown too: a force
+  prime that finds a live, responsive bridge would stop claiming it and would
+  therefore stop tearing it down at quit — which may be right, or may reopen the
+  post-quit-remapping class recorded in PROJECT_MEMORY. The two readings cannot be
+  separated by a unit test, and a previous attempt in this exact area was reverted
+  for precisely that kind of unverifiable side effect. It needs one session on a real
+  machine: force-prime with a foreign bridge alive, quit, and check whether the
+  keyboard is still remapped.
 - **Moving the clipboard transaction off the keystroke tap** (raised as
   `perform-paste-clipboard-io-inside-eventtap`): the deferral was tried and reverted
   because it breaks the paste-ordering contract pinned by
@@ -398,8 +414,3 @@ reproduce but the AppleScript grammar model behind the conclusion is wrong),
 
 ### MEDIUM
 
-- [ ] **ke-prime-force-claims-and-kills-unowned-bridge** — PARTLY DONE (the read-only status probe no longer claims ownership, and the poll timeout no longer disowns a bridge we launched. STILL OPEN: mark_hs_owned_bridge() at the top of prime_ke_for_session claims a bridge before any launch, the two force-path re-marks, and the un-gated KILL_FAST_CMD. Left open deliberately: moving the mark into launch_headless_once() changes quit-time teardown for the force path, and a previous attempt in this area was reverted for exactly that kind of unverifiable side effect. It needs a real driver to confirm, not a unit test.) — (karabiner) — prime_ke_for_session marks HS ownership unconditionally and fires KILL_FAST_CMD with no is_hs_owned_bridge gate
-  - `static/ergopti_plus/macos/modules/karabiner/ke_lifecycle.lua:773-774 (mark_hs_owned_bridge before any launch) and :921-922 (un-gated pkill); consumers: ui/menu/menu_karabiner.lua:899-905 and :870-883; modules/karabiner/init.lua:571-586; gate that later trusts the marker: modules/karabiner/init.lua:886-896`
-  - **Cause:** Ownership is asserted at the START of the prime cycle rather than at the moment HS actually launches the bridge (launch_headless_once(), ke_lifecycle.lua:779-787). And KILL_FAST_CMD at :922 is the one kill in the module with no is_hs_owned_bridge() gate — set_enabled(false) (karabiner/init.lua:200-209) and M.kill() (:886-896) both have one. The non-forced paths are correct: a running user bridge short-circuits at :752-757 BEFORE mark_hs_owned_bridge(), which is exactly why the gap only shows on force=true.
-  - **Fix:** (1) Gate ke_lifecycle.lua:922 on `M.is_hs_owned_bridge()` (log and skip otherwise), mirroring karabiner/init.lua:200-209. (2) Move mark_hs_owned_bridge() out of :774 and into launch_headless_once() on the branch where hs.execute(KE_PRIME_HEADLESS_CMD) actually ran, so the marker only ever means "HS spawned this bridge". The three existing success sites (:800, :894, :913) already re-call it, so the happy path is unaffected.
-  - **Test:** Extend tests/unit/modules/karabiner/test_ke_lifecycle.lua: stub hs.execute so is_ipc_bridge_running() reports a live bridge and is_cli_roundtrip_ready() reports failure, ensure no owner marker exists, call KE.prime_ke_for_session(function() end, true), then assert (a) `helpers.assert_eq(KE.is_hs_owned_bridge(), false, "a forced prime must not claim ownership of a bridge HS did not start")` and (b) the recorded hs.execute command list contains no KILL_FAST_CMD. Both fail today.

@@ -939,8 +939,20 @@ function M.prime_ke_for_session(callback, force)
 					return
 				end
 
-				Logger.warn(LOG, "Bridge still alive after settle but IPC probe failed — firing extra kill before re-prime…")
-				pcall(function() hs.execute(KARABINER_KILL_FAST_CMD) end)
+				-- Gated on ownership, like every other kill in this driver
+				-- (karabiner/init.lua's set_enabled(false) and M.kill() both check it).
+				-- This was the one that did not: a forced prime that found a live bridge
+				-- it had never started would pkill the user's own Karabiner-Elements
+				-- session here, and the bare pkill is respawned by launchd's KeepAlive
+				-- moments later, so the visible effect was their setup flapping.
+				if M.is_hs_owned_bridge() then
+					Logger.warn(LOG, "Bridge still alive after settle but IPC probe failed — "
+						.. "firing extra kill before re-prime…")
+					pcall(function() hs.execute(KARABINER_KILL_FAST_CMD) end)
+				else
+					Logger.info(LOG, "Bridge still alive after settle and NOT owned by "
+						.. "Hammerspoon — leaving it alone and re-priming around it.")
+				end
 				_prime_settle_timer = hs.timer.doAfter(0.2, function()
 					_prime_settle_timer = nil
 					start_launch_and_poll()
