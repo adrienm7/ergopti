@@ -89,16 +89,16 @@ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
     if (Spec = "")
         return true
     if !RegExMatch(Value, "i)^https?://[^\s]+$") {
-        ErrorText := "Saisissez une URL http:// ou https:// valide."
+        ErrorText := t("dialog.gestures.param_err_url")
         return false
     }
     PlaceholderAt := InStr(Value, "%s")
     if (Spec = "search_url" && PlaceholderAt = 0) {
-        ErrorText := "L’URL de recherche doit contenir %s à l’emplacement de la requête."
+        ErrorText := t("dialog.gestures.param_err_no_placeholder")
         return false
     }
     if (Spec = "search_url" && InStr(Value, "%s",, PlaceholderAt + 2) != 0) {
-        ErrorText := "L’URL de recherche doit contenir un seul emplacement %s."
+        ErrorText := t("dialog.gestures.param_err_many_placeholders")
         return false
     }
     return true
@@ -111,11 +111,15 @@ GestureEnsureActionParameter(BindingId, ActionName) {
     if (Spec = "")
         return true
     Existing := GestureGetActionParameter(BindingId, ActionName)
+    ; The %s inside the search-URL prompt is LITERAL — it is the placeholder the
+    ; user has to type — so this string is never run through a formatter. The
+    ; title uses {1} precisely so the two can never be confused.
     Prompt := (Spec = "search_url")
-        ? "URL du moteur de recherche (incluez exactement un %s pour la requête) :"
-        : "Lien à ouvrir :"
+        ? t("dialog.gestures.param_search_url")
+        : t("dialog.gestures.param_link")
+    Title  := StrReplace(t("dialog.gestures.param_title"), "{1}", _GestureActionLabel(ActionName))
     loop {
-        Result := InputBox(Prompt, "Configurer " . _GestureActionLabel(ActionName), "w680 h160", Existing)
+        Result := InputBox(Prompt, Title, "w680 h160", Existing)
         if (Result.Result != "OK")
             return false
         Value := Trim(Result.Value)
@@ -124,7 +128,7 @@ GestureEnsureActionParameter(BindingId, ActionName) {
             GestureSetActionParameter(BindingId, ActionName, Value)
             return true
         }
-        MsgBox(ErrorText, "Valeur invalide", "Icon!")
+        MsgBox(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
         Existing := Value
     }
 }

@@ -501,7 +501,9 @@ function M.create(deps)
         local active_display_model = get_display_model_name(state.llm_model)
         local info = models_mgr.get_model_info(active_display_model) or {}
         local ram = models_mgr.get_model_ram(active_display_model) or 0
-        local type_str = (info.type == "completion") and " [📝 Complétion]" or " [💬 Chat]"
+        local type_str = " [" .. i18n.get((info.type == "completion")
+            and "menu.llm.model_type_completion"
+            or  "menu.llm.model_type_chat") .. "]"
         local params_ram_str = (info.params and info.params > 0)
             and string.format(" (%gB params, ~%d Go RAM)", info.params, math.ceil(ram))
             or string.format(" (~%d Go RAM)", math.ceil(ram))
