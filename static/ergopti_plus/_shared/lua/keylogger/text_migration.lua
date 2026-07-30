@@ -42,6 +42,7 @@ local M = {}
 
 
 
+
 -- ============================
 -- ============================
 -- ======= 1/ Constants =======
@@ -74,6 +75,7 @@ M.DEFAULT_BATCH_SIZE = 200
 --- Field separator for the one-line-per-row read format. The fields around it are
 --- a decimal id and hex digests, neither of which can contain it.
 M.ROW_SEPARATOR = "|"
+
 
 
 

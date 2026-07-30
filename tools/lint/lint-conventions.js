@@ -556,14 +556,39 @@ const ahkAll = [
 	...ahkTestDirs.flatMap((d) => walkFiles(d, ['.ahk']))
 ];
 
-// Lua files — hammerspoon driver only (skip vendor/)
+// Lua files — every Lua tree the repo owns (walkFiles skips vendor/).
+//
+// This used to be the macOS driver alone, so the Linux driver and _shared/lua
+// were never checked for file-path headers, banner alignment or section
+// spacing — the two trees that grew most recently, held to no convention at
+// all. The conventions are language-wide, not driver-wide.
 const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/lib'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/ui'),
-	join(REPO_ROOT, 'static/ergopti_plus/macos/tests')
+	join(REPO_ROOT, 'static/ergopti_plus/macos/tests'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/lib'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/modules'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/tests'),
+	join(REPO_ROOT, 'static/ergopti_plus/_shared/lua')
 ];
 const luaAll = luaDirs.flatMap((d) => walkFiles(d, ['.lua']));
+
+// Same guard as the TOML one below, for the same reason: a stale path makes
+// walkFiles() return [] and the whole Lua half pass over an empty set. Every
+// directory listed above is expected to hold Lua today, so an empty one is a
+// wrong selector rather than an empty tree.
+for (const dir of luaDirs) {
+	if (walkFiles(dir, ['.lua']).length === 0) {
+		console.error(
+			`lint-conventions: FATAL — no .lua found under ${dir}. ` +
+			'The scan path is stale; fix it rather than letting the Lua checks pass on an empty set.'
+		);
+		process.exit(1);
+	}
+}
 
 // TOML files — the shared data tree, plus the maintainer's sibling config repo
 // when it happens to be checked out next door.

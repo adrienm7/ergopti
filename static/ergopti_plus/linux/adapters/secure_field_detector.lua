@@ -30,6 +30,9 @@ local Logger = require("logger.shim")
 local LOG = "adapters.secure_field_detector"
 
 
+
+
+
 -- ============================
 -- ============================
 -- ======= 1/ Constants =======
@@ -50,6 +53,9 @@ local SECURE_APP_IDS = {
 	["authenticator"]       = true,
 	["yubikey-manager"]     = true,
 }
+
+
+
 
 
 -- =================================
@@ -110,6 +116,7 @@ local function _get_atspi_role()
 	if role_int == 57 then return "PASSWORD_TEXT" end
 	return nil
 end
+
 
 
 

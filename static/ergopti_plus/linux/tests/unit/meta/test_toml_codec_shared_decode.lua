@@ -40,6 +40,7 @@ end
 
 
 
+
 -- ===========================================
 -- ===========================================
 -- ======= 1/ Behavioural decode guard =======
@@ -69,6 +70,7 @@ describe("shared toml_codec.decode is live in the managers", function()
 	end)
 
 end)
+
 
 
 

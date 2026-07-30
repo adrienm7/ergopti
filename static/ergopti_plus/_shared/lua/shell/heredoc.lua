@@ -32,6 +32,7 @@ local M = {}
 
 
 
+
 -- ============================
 -- ============================
 -- ======= 1/ Constants =======
@@ -52,6 +53,7 @@ M.TOKEN_PADDING = "_X"
 --- payload's real byte length undoes both halves of that: nothing is added, and
 --- nothing is removed.
 M.TRUNCATE_COMMAND = "head -c"
+
 
 
 

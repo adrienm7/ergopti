@@ -68,10 +68,11 @@ end
 
 
 
+
 -- =========================================
--- =========================================
--- ======= 1/ Posture Comes From Data ======
--- =========================================
+-- ==========================================
+-- ======= 1/ Posture Comes From Data =======
+-- ==========================================
 -- =========================================
 
 helpers.describe("keylogger privacy — the posture is read, not re-typed", function()
@@ -208,6 +209,7 @@ helpers.describe("keylogger privacy — secure fields", function()
 			"the substring list must keep working when the adapter says 'not secure'")
 	end)
 end)
+
 
 
 

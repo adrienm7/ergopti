@@ -719,6 +719,10 @@ function M.set_check_interval(seconds)
 	Logger.info(LOG, "Check interval set to %ds (persisted).", _check_interval)
 end
 
+
+
+
+
 -- =========================================
 -- =========================================
 -- ======= 9/ Public State Accessors =======

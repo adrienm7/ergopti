@@ -49,6 +49,7 @@ local LOG = "modules.keylogger.text_migration"
 
 
 
+
 -- ==========================
 -- ==========================
 -- ======= 1/ Backend =======
@@ -105,6 +106,7 @@ end
 function RealBackend.set_cursor(value)
 	return SqliteWriter.set_meta(Runner.CURSOR_META_KEY, value)
 end
+
 
 
 

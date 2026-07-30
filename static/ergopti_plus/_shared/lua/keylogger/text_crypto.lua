@@ -49,6 +49,7 @@ local M = {}
 
 
 
+
 -- ============================
 -- ============================
 -- ======= 1/ Constants =======
@@ -84,6 +85,7 @@ M.KDF_SALT_HEX = "6572676f7074692d6d65747269637331"
 --- Length of an AES-256 key and of an AES block, in hex characters.
 M.KEY_HEX_LENGTH = 64
 M.IV_HEX_LENGTH  = 32
+
 
 
 
@@ -129,10 +131,11 @@ end
 
 
 
+
 -- ==============================
--- ==============================
--- ======= 3/ Derived Bits ======
--- ==============================
+-- ===============================
+-- ======= 3/ Derived Bits =======
+-- ===============================
 -- ==============================
 
 --- Derives the per-row initialisation vector.
@@ -160,6 +163,7 @@ function M.is_hex(value, length)
 	if type(value) ~= "string" or #value ~= length then return false end
 	return value:match("^%x+$") ~= nil
 end
+
 
 
 
