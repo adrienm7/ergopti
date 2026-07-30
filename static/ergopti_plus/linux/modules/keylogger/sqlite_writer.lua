@@ -33,7 +33,8 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger        = require("logger.shim")
+local SqliteCommand = require("modules.keylogger.sqlite_command")
 
 local LOG = "modules.keylogger.sqlite_writer"
 
@@ -92,28 +93,26 @@ end
 local function _exec(sql)
 	if not _db_path or not _available then return false end
 
-	-- Write SQL to a temp file to avoid shell quoting issues with long/multi-line SQL.
-	local tmp = (os.tmpname and os.tmpname() or "/tmp/ergopti_sql_" .. tostring(os.time()))
-	os.remove(tmp)  -- os.tmpname() creates the file; remove it so we can write our own.
-	local tmp_sql = tmp .. ".sql"
-	local fh = io.open(tmp_sql, "w")
-	if not fh then
-		Logger.error(LOG, "Cannot write temp SQL file: %s", tmp_sql)
+	-- The script carries the characters the user typed, so it travels on stdin.
+	-- Staging it in /tmp is what turned this module into a keystroke leak.
+	local cmd, reason = SqliteCommand.build(_db_path, sql, { capture_stderr = true })
+	if not cmd then
+		Logger.error(LOG, "Cannot compose the sqlite3 command: %s.", reason)
 		return false
 	end
-	fh:write(sql)
-	fh:close()
 
-	local db_esc = _db_path:gsub("'", "'\\''")
-	local cmd = string.format("sqlite3 '%s' < '%s' 2>&1", db_esc, tmp_sql:gsub("'", "'\\''"))
 	local pipe = io.popen(cmd, "r")
-	local err_out = pipe and pipe:read("*a") or ""
-	if pipe then pipe:close() end
-	os.remove(tmp_sql)
+	if not pipe then
+		Logger.error(LOG, "Cannot spawn the sqlite3 CLI.")
+		return false
+	end
+	local err_out = pipe:read("*a") or ""
+	pipe:close()
 
-	if err_out and err_out ~= "" and not err_out:match("^$") then
-		-- sqlite3 CLI only prints to stderr on actual errors.
-		Logger.error(LOG, "SQLite error: %s", err_out:gsub("\n", " | "):sub(1, 200))
+	if err_out ~= "" then
+		-- These statements select nothing, and stderr is merged into stdout, so
+		-- any output at all means the script failed.
+		Logger.error(LOG, "SQLite error: %s", SqliteCommand.sanitise_error(err_out))
 		return false
 	end
 	return true
@@ -124,18 +123,12 @@ end
 --- @return string|nil First output line, or nil when the query fails.
 local function _query_scalar(sql)
 	if not _db_path or not _available then return nil end
-	local tmp = (os.tmpname and os.tmpname() or "/tmp/ergopti_sql_" .. tostring(os.time()))
-	os.remove(tmp)
-	local tmp_sql = tmp .. ".sql"
-	local fh = io.open(tmp_sql, "w")
-	if not fh then return nil end
-	fh:write(sql); fh:close()
-	local db_esc = _db_path:gsub("'", "'\\''")
-	local cmd = string.format("sqlite3 -noheader '%s' < '%s' 2>/dev/null", db_esc, tmp_sql:gsub("'", "'\\''"))
+	local cmd = SqliteCommand.build(_db_path, sql, { flags = { "-noheader" } })
+	if not cmd then return nil end
 	local pipe = io.popen(cmd, "r")
-	local value = pipe and pipe:read("*l") or nil
-	if pipe then pipe:close() end
-	os.remove(tmp_sql)
+	if not pipe then return nil end
+	local value = pipe:read("*l")
+	pipe:close()
 	return value
 end
 

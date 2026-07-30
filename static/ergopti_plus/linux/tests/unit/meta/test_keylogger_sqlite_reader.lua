@@ -24,7 +24,14 @@ helpers.describe("keylogger sqlite_reader", function()
     local path = helpers.driver_root() .. "/modules/keylogger/sqlite_reader.lua"
     local fh = assert(io.open(path, "r"))
     local src = fh:read("*a"); fh:close()
-    helpers.assert_true(src:find("sqlite3 -json", 1, true) ~= nil)
+    -- The invocation is composed by modules/keylogger/sqlite_command.lua now
+    -- (the script travels on stdin instead of through a file in /tmp), so the
+    -- assertion follows the mechanism: the reader must still ask for JSON, and
+    -- must still go through the audited builder to get it.
+    helpers.assert_true(src:find("SqliteCommand.build", 1, true) ~= nil,
+      "reader must compose its sqlite3 invocation through the audited builder")
+    helpers.assert_true(src:find('flags = { "-json" }', 1, true) ~= nil,
+      "reader must request JSON output from sqlite3")
     helpers.assert_true(src:find("FROM agg_app_day", 1, true) ~= nil)
     helpers.assert_true(src:find("FROM ngram_chars", 1, true) ~= nil)
 	helpers.assert_true(src:find("FROM ngram_scancodes", 1, true) ~= nil,

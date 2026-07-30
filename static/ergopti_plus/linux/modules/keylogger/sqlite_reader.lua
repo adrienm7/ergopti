@@ -11,6 +11,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local SqliteCommand = require("modules.keylogger.sqlite_command")
 local ok_json, Json = pcall(require, "json")
 local LOG = "modules.keylogger.sqlite_reader"
 
@@ -27,18 +28,14 @@ end
 --- Executes a read-only JSON query through sqlite3.
 local function read_rows(sqlite_path, sql)
 	if not ok_json or type(sqlite_path) ~= "string" or sqlite_path == "" then return {} end
-	local tmp = (os.tmpname and os.tmpname() or "/tmp/ergopti_reader_" .. tostring(os.time()))
-	os.remove(tmp)
-	local tmp_sql = tmp .. ".sql"
-	local fh = io.open(tmp_sql, "w")
-	if not fh then return {} end
-	fh:write(sql); fh:close()
-	local db_esc = sqlite_path:gsub("'", "'\\''")
-	local cmd = string.format("sqlite3 -json '%s' < '%s' 2>/dev/null", db_esc, tmp_sql:gsub("'", "'\\''"))
+	-- Same rule as the writer: the script goes on stdin, never through a file in
+	-- a world-writable directory.
+	local cmd = SqliteCommand.build(sqlite_path, sql, { flags = { "-json" } })
+	if not cmd then return {} end
 	local pipe = io.popen(cmd, "r")
-	local body = pipe and pipe:read("*a") or ""
-	if pipe then pipe:close() end
-	os.remove(tmp_sql)
+	if not pipe then return {} end
+	local body = pipe:read("*a") or ""
+	pipe:close()
 	if body == "" then return {} end
 	local ok, rows = pcall(Json.decode, body)
 	if not ok or type(rows) ~= "table" then
