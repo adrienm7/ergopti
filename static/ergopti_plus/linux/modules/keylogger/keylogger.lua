@@ -52,6 +52,10 @@ local SqliteReader = nil
 local ok_sr, sr_mod = pcall(require, "modules.keylogger.sqlite_reader")
 if ok_sr then SqliteReader = sr_mod end
 
+-- At-rest encryption of the typed-text columns. Hard require: the setting must
+-- never silently degrade into "stored in clear".
+local TextCipher = require("modules.keylogger.text_cipher")
+
 local LOG = "modules.keylogger.keylogger"
 
 
@@ -99,6 +103,7 @@ local _enabled                    = Manifest.default_for("metrics.enabled")
 local _private_filter_enabled     = Manifest.default_for("metrics.private_filter_enabled")
 local _secure_filter_enabled      = Manifest.default_for("metrics.secure_filter_enabled")
 local _system_auth_filter_enabled = Manifest.default_for("metrics.system_auth_filter_enabled")
+local _encrypt_enabled            = Manifest.default_for("metrics.encrypt")
 
 -- Whether the focused window is a private/incognito browser session. Set from
 -- the focus-change callback, never computed on the keystroke path.
@@ -750,6 +755,31 @@ function M.set_system_auth_filter_enabled(enabled)
 	Logger.debug(LOG, "System-auth filter: %s.", tostring(_system_auth_filter_enabled))
 end
 
+--- Toggles at-rest encryption of the typed-text columns.
+--- Refuses to report success when no key can be derived on this machine: a
+--- setting that claims to encrypt and does not is the defect this replaced.
+--- @param enabled boolean
+--- @return boolean The posture actually in force after the call.
+function M.set_encrypt_enabled(enabled)
+	local want = (enabled == true)
+	if want and not TextCipher.is_available() then
+		Logger.error(LOG, "At-rest encryption requested but no key can be derived — staying off.")
+		_encrypt_enabled = false
+		TextCipher.set_enabled(false)
+		return false
+	end
+	_encrypt_enabled = want
+	TextCipher.set_enabled(want)
+	Logger.debug(LOG, "At-rest encryption: %s.", tostring(_encrypt_enabled))
+	return _encrypt_enabled
+end
+
+--- Returns whether at-rest encryption is active.
+--- @return boolean
+function M.is_encrypt_enabled()
+	return _encrypt_enabled
+end
+
 --- Snapshot of the active privacy posture, for the menu and for diagnostics.
 --- @return table
 function M.get_privacy_state()
@@ -758,6 +788,7 @@ function M.get_privacy_state()
 		private_filter_enabled     = _private_filter_enabled,
 		secure_filter_enabled      = _secure_filter_enabled,
 		system_auth_filter_enabled = _system_auth_filter_enabled,
+		encrypt                    = _encrypt_enabled,
 		private_window             = _private_window,
 		secure_field               = _secure_field,
 		suppressed                 = _suppressed,

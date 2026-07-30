@@ -298,6 +298,7 @@ enabled = true
 private_filter_enabled = true
 secure_filter_enabled = true
 system_auth_filter_enabled = true
+encrypt = false
 
 [shortcuts]
 chatgpt_url = "https://chat.openai.com"

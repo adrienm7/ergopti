@@ -1028,7 +1028,6 @@ id = "encrypt"
 default = false
 type = "boolean"
 description_key = "menu.metrics.encrypt"
-platforms = ["hs"]
 
 
 

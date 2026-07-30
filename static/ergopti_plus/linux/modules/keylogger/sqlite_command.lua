@@ -57,14 +57,6 @@ local Shell = require("adapters.shell_runner")
 -- heredoc_token(); the base value is only the starting point.
 local HEREDOC_BASE_TOKEN = "ERGOPTI_SQL"
 
--- Appended to the token until it no longer matches any line of the script. Any
--- non-empty string works; this one cannot occur in generated SQL by accident.
-local HEREDOC_TOKEN_PADDING = "_X"
-
--- The single quote that makes the heredoc token literal. Without it the shell
--- expands the body, which is attacker-controlled text by construction.
-local HEREDOC_QUOTE = "'"
-
 -- Merge the CLI's diagnostics into stdout so the caller can read them back.
 local STDERR_TO_STDOUT = "2>&1"
 
@@ -88,31 +80,14 @@ local ERROR_LOG_MAX_CHARS = 200
 -- ==================================
 -- ==================================
 
---- Reports whether any line of `text` is exactly `token`.
---- Exactness matters: `<<` (unlike `<<-`) strips nothing, so only a line equal
---- to the token byte for byte terminates the heredoc. A line of "TOKEN " or
---- "TOKEN\r" does not, and must not be treated as a collision.
---- @param text  string Script body to scan.
---- @param token string Candidate terminator.
---- @return boolean True when the token would terminate the body early.
-local function has_line_equal(text, token)
-	-- The trailing newline makes the last line match the pattern like any other.
-	for line in (text .. "\n"):gmatch("([^\n]*)\n") do
-		if line == token then return true end
-	end
-	return false
-end
-
 --- Returns a heredoc terminator that cannot appear as a line of `sql`.
+--- The framing itself lives in adapters/shell_runner: feeding data on stdin is
+--- not a SQLite concern, and a second copy of the collision rule is a second
+--- place for it to be wrong.
 --- @param sql string The script the terminator will delimit.
 --- @return string A token guaranteed absent from `sql` on a line of its own.
 function M.heredoc_token(sql)
-	if type(sql) ~= "string" then return HEREDOC_BASE_TOKEN end
-	local token = HEREDOC_BASE_TOKEN
-	while has_line_equal(sql, token) do
-		token = token .. HEREDOC_TOKEN_PADDING
-	end
-	return token
+	return Shell.heredoc_token(sql, HEREDOC_BASE_TOKEN)
 end
 
 
@@ -148,15 +123,7 @@ function M.build(db_path, sql, opts)
 	words[#words + 1] = Shell.quote(db_path)
 	words[#words + 1] = opts.capture_stderr and STDERR_TO_STDOUT or STDERR_DISCARDED
 
-	local token = M.heredoc_token(sql)
-	-- The terminator must sit on its own line, so the body is normalised to
-	-- exactly one trailing newline rather than however many it arrived with.
-	local body = (sql:gsub("\n+$", ""))
-
-	return table.concat(words, " ")
-		.. " <<" .. HEREDOC_QUOTE .. token .. HEREDOC_QUOTE .. "\n"
-		.. body .. "\n"
-		.. token .. "\n"
+	return Shell.with_stdin(table.concat(words, " "), sql, HEREDOC_BASE_TOKEN)
 end
 
 

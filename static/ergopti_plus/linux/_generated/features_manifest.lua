@@ -70,6 +70,9 @@ M.features = {
 	{
 		path = "metrics.system_auth_filter_enabled", id = "system_auth_filter_enabled", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.system_auth_filter_enabled", platforms = { "ahk", "hs", "linux" },
 	},
+	{
+		path = "metrics.encrypt", id = "encrypt", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.encrypt", platforms = { "ahk", "hs", "linux" },
+	},
 }
 
 return M
