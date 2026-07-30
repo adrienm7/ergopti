@@ -136,7 +136,9 @@ end
 --- @param device_id string The LOCAL device; foreign rows are never counted.
 --- @return string One SELECT statement.
 function M.count_sql(device_id)
-	return string.format("SELECT COUNT(*) FROM %s WHERE device_id = '%s';",
+	-- Aliased because the macOS reader addresses columns by name: without it the
+	-- column would be called "COUNT(*)" and the row would read back as nil.
+	return string.format("SELECT COUNT(*) AS row_count FROM %s WHERE device_id = '%s';",
 		M.TABLE, M.sql_quote(device_id))
 end
 
