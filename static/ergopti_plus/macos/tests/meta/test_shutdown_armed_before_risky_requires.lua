@@ -28,8 +28,14 @@ helpers.describe("boot: the shutdown teardown is armed before the risky requires
 		helpers.assert_true(type(src) == "string" and src ~= "",
 			"init.lua must be readable or this asserts nothing")
 
-		local armed   = src:find("hs.shutdownCallback = function", 1, true)
-		local require_kb = src:find('require("modules.karabiner")', 1, true)
+		local armed = src:find("hs.shutdownCallback = function", 1, true)
+
+		-- Matched on the MODULE NAME, not on a call spelling. That require is now
+		-- `pcall(require, "modules.karabiner")` — the chain below it reaches a
+		-- top-level error() — and pinning `require("modules.karabiner")` would reject
+		-- the guarded form, i.e. reject a change that makes this invariant matter
+		-- less rather than more. The ordering it asserts is unaffected either way.
+		local require_kb = src:find('"modules.karabiner"', 1, true)
 		helpers.assert_not_nil(armed, "the shutdown callback must be armed")
 		helpers.assert_not_nil(require_kb, "modules.karabiner must be required")
 		helpers.assert_true(armed < require_kb,
