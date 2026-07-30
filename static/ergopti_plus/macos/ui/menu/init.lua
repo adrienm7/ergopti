@@ -1060,11 +1060,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	_suppress_watcher_until = hs.timer.secondsSinceEpoch() + BOOT_SUPPRESS_SEC
 	Logger.debug(LOG, "Pathwatcher boot suppression active for %.0f s.", BOOT_SUPPRESS_SEC)
 
+	-- The same exclusion list lib/file_watchers already receives. Two recursive
+	-- watchers cover this tree and only that one was using it.
 	local configWatcher = MenuWatchers.start_config_watcher(
 		base_dir,
 		function() do_reload("watcher") end,
 		function() return _suppress_watcher_until end,
-		ui_restore
+		ui_restore,
+		{ (hs.configdir or ".") .. "/cache" }
 	)
 
 	M._menu    = myMenu
