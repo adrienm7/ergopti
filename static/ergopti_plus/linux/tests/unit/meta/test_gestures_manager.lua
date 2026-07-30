@@ -190,6 +190,34 @@ helpers.describe("modules/gestures/manager.lua", function()
     helpers.assert_true(#label > 0, "label should not be empty")
   end)
 
+  -- The registry used to hold hardcoded FRENCH labels, described in the source
+  -- as a "fallback when i18n is absent" that nothing ever replaced — so every
+  -- user of the other 20 locales read French gesture names. "not empty" above
+  -- could never have caught that, and neither could it catch the raw key being
+  -- echoed back, which is what i18n.get returns on a miss.
+  helpers.it("labels come from the shared sg_actions catalogue, not from a local table", function()
+    local i18n = require("lib.i18n")
+    local label = M.get_action_label("vol_up")
+    helpers.assert_eq(label, i18n.get("sg_actions.vol_up"),
+      "the label must be whatever the shared catalogue says for the active locale")
+    helpers.assert_true(label ~= "sg_actions.vol_up",
+      "i18n.get echoes the raw key back on a miss — an echoed key means the catalogue was never reached")
+  end)
+
+  helpers.it("the workspace ids resolve through their desktop_* catalogue entries", function()
+    local i18n = require("lib.i18n")
+    -- This driver says "workspace", the shared catalogue says "desktop". The
+    -- alias is what lets an existing user's config.toml keep resolving, so it
+    -- has to be exercised rather than assumed.
+    for id, suffix in pairs({ ws_prev = "desktop_prev", ws_next = "desktop_next" }) do
+      local label = M.get_action_label(id)
+      helpers.assert_eq(label, i18n.get("sg_actions." .. suffix),
+        id .. " must resolve through sg_actions." .. suffix)
+      helpers.assert_true(label ~= id and label ~= "sg_actions." .. suffix,
+        id .. " resolved to a raw identifier — the catalogue entry was not found")
+    end
+  end)
+
   helpers.it("get_action_label returns fallback for unknown action", function()
     local label = M.get_action_label("bogus_action")
     helpers.assert_true(type(label) == "string")
