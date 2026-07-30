@@ -360,7 +360,13 @@ _MR_FindItemById(MenuKey, ItemId) {
 MenuRenderer_ResolveDisabledWhen(MenuKey, ItemId, Getters) {
 	Item := _MR_FindItemById(MenuKey, ItemId)
 	if (Item == false) {
-		return false
+		; A lookup miss means the caller passed an id that is not in MenuKey's
+		; array — a typo'd or drifted manifest reference. Failing OPEN here
+		; silently renders a security-sensitive item (e.g. a keylogger-gated
+		; toggle) as always-enabled, so fail CLOSED, matching both the sibling
+		; getter-mismatch branch below and the macOS twin (§5.3).
+		try LoggerError("MenuRenderer", "No manifest item '{1}.{2}' — treating as disabled.", MenuKey, ItemId)
+		return true
 	}
 
 	Keys := _MR_Get(Item, "disabled_when", 0)

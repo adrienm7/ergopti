@@ -233,6 +233,7 @@ InstallSendNoOps()
 #Include unit/test_terminators.ahk
 #Include unit/test_personal_toml_editor.ahk
 #Include unit/test_menu_helpers.ahk
+#Include unit/test_manifest_menu_resolve_disabled_when_failclosed.ahk
 #Include unit/test_layout_tables.ahk
 
 #Include unit/test_config.ahk
@@ -568,6 +569,10 @@ _LogBootProgress("keylogger modules + tests included")
 ; the gestures-actions-separator regression test can exercise the real
 ; production loader (not a source-scan) against the real shared manifest.
 #Include ../lib/menu_manifest.ahk
+; The generic manifest walker. Pure function definitions — no top-level
+; statements, no includes — so pulling it in is side-effect free, and it lets
+; disabled_when tests exercise the real resolver instead of scanning its source.
+#Include ../lib/manifest_menu.ahk
 ; Drift gate: manifest top_level tail (from global_actions) must match the AHK dispatch table.
 #Include meta/test_menu_top_level_drift_gate.ahk
 ; Regression: the separator between Gestures and "Actions globales" must survive the tail loader.
