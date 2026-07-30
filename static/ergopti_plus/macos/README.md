@@ -6,7 +6,7 @@ The macOS implementation of ErgoptiPlus.
 > identity, measured). Use the cross-driver path table in
 > [`docs/ERGOPTI_PLUS.md`](../../../docs/ERGOPTI_PLUS.md) §2.1 to locate the
 > counterpart of a file; making the trees identical is invariant I1 of
-> [`docs/PLAN_SIMPLIFICATION.md`](../../../docs/PLAN_SIMPLIFICATION.md).
+> [`TODO.md`](../../../TODO.md) §0.
 >
 > Name collision to know first: `modules/keymap/` is the **hotstring expansion
 > engine** here, while on Windows the same path is the **physical layout remap**.

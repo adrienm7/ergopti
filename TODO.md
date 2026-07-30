@@ -6,23 +6,418 @@ Known, scoped, not done. Everything here was verified against the code on
 2026-07-21 — items that turned out to be already delivered were dropped rather
 than carried forward.
 
-## Simplification plan — remaining blockers (branch `simplification`)
+Working rules: no behaviour change without a regression test, never weaken a
+test to make a change pass, and run the gates that cover what you touched —
+`node ./tools/test/verify-change.cjs` derives them (see the `verify-change`
+skill). Read [docs/PROJECT_MEMORY.md](docs/PROJECT_MEMORY.md) before starting:
+several neighbouring ideas were tried and rejected with reasons.
+[docs/ERGOPTI_PLUS.md](docs/ERGOPTI_PLUS.md) describes how the system works today
+and holds the "how do I X" runbooks.
 
-[`docs/PLAN_SIMPLIFICATION.md`](docs/PLAN_SIMPLIFICATION.md) is the full audit and
-plan; [`docs/ERGOPTI_PLUS.md`](docs/ERGOPTI_PLUS.md) documents how the system works
-today. Lot 0 and 6 of the 12 blockers are done on that branch. What remains, in
-the plan's own priority order:
+**Delete an entry from this file the moment it is done.** This file is the whole
+remaining backlog; nothing else tracks it.
 
-| # | Blocker | Why it is next | Note before starting |
-| --- | --- | --- | --- |
-| **B5** | Linux writes every typed character, in plaintext, into a world-readable `/tmp` file on every keylogger flush (`linux/modules/keylogger/sqlite_writer.lua:96-112`, `:127-139`) | privacy, and the temp name is derived from `tmpnam(3)` then mutated, so it is not the reserved file — a symlink/TOCTOU target | the fix is to stop shelling the SQL through a file; the `sqlite3` CLI accepts a script on stdin |
-| **B4** | Linux keylogger is always on, in plaintext, with no off switch and no private-browsing/system-auth filter | privacy | ⚠ **do NOT simply wire `adapters/secure_field_detector.lua`** — the comment at `modules/keylogger/keylogger.lua:90-98` explains that its exact `WM_CLASS` match on a shorter list would *narrow* coverage and leak `gpg`/`ssh-agent`/`polkit`/`sudo`. The fix is additive |
-| **B3** | The generated kanata config is unloadable: the generator emits 7 of the 12 aliases the template defines, leaving `@copy`, `@paste`, `@rollx`, `@deadtrema` dangling | Linux remap is broken outright | `test:kanata-defalias-parity` never runs the generator against the template — extend it, then fix the generator |
-| **B6** | The macOS "Chiffrement" menu item is a complete no-op whose backend is ten empty stubs, and `docs/security/keylogger_privacy.md:93` tells users to enable it | a false security claim in the docs | needs a decision: implement or delete the feature *and* the doc sentence together |
-| **B9** | `llm_context_length` has no effect on the Windows automatic path (the `context_window_chars` fix was never ported into the AHK generator) | user-visible setting that does nothing | add a corpus vector with `context_window_chars` set — none of the 12 existing vectors does, which is why the corpus cannot catch it |
-| **B10** | Opposite secure-field defaults for LLM predictions (macOS hardcodes `true` and never reads the shared value; Windows sends context from password fields) | security posture | **maintainer decision required** on which default wins (D9 in the plan) |
+---
 
-Also carried over from the audit, not blockers:
+## 0. Simplification programme
+
+From the 2026-07-30 cross-driver audit. Everything here is measured; every claim
+carries a `file:line` that was re-read before being written down.
+
+### 0.0 The diagnosis, in two sentences
+
+The project already has the right mechanisms — hexagonal ports, a feature
+manifest, a declarative menu manifest, shared Lua, cross-driver corpora, ~80 CI
+gates. They are bypassed at the top, so the work is to **finish the abstractions
+that already exist and delete what short-circuits them**, not to add a layer.
+
+Root cause: `_shared/modules/features/manifest.toml` namespaces features by
+driver (`[sections.ahk]`, `[sections.hs]`) instead of by meaning, `linux` appears
+**0 times** in it and **0 times** in `menu_manifest.json`, and the mechanism that
+would have prevented all of this — per-entry `platforms` — exists and is barely
+used (116 declarations: 65 AHK-only, 30 macOS-only, 20 shared).
+
+### 0.1 The five target invariants
+
+Each is paired with the gate that makes it true. **An invariant without a gate is
+a wish.**
+
+| # | Invariant | Gate to build |
+| --- | --- | --- |
+| **I1** | One tree. The set of folder names under `modules/` is identical on the three drivers. A feature a driver does not implement is a folder with an `init` that says why, never an absence. | `test-driver-tree-parity.cjs`: identical recursive dir-name sets; no OS/vendor name outside `platform/` and `adapters/`; no platform segment under `_shared/`; every `_shared/ui/<app>` has a host or a STATUS stub |
+| **I2** | One feature namespace. A feature lives at its semantic path, never under a driver name. Platforms are `windows \| macos \| linux`. A feature missing on a platform carries a translated `reason_key`. | lint rejecting any `[sections.ahk*]` / `[sections.hs*]`; add `linux` to `KNOWN_PLATFORMS` (`tools/test/test-menu-manifest.cjs:36`); platform-coverage report requiring a `reason_key` |
+| **I3** | One menu. The manifest describes what the user sees; the renderer describes how this OS draws a row; the driver supplies only named actions, state getters and list providers. | `test-menu-parity` (render for the 3 platforms, diff the label trees); `action_id` ↔ handler bijection both ways; **ratchet "no menu row created outside the renderer"**, baselined at today's 265 AHK + 399 macOS + 101 Linux row-emitting sites |
+| **I4** | One action registry. An action is a row of `_shared/modules/actions/actions.toml`: id, i18n keys, platforms, and either `emit` (neutral chord notation) or `native` (`family.function`). | registry ↔ handler bijection; chord-notation validity per driver; a corpus of `neutral notation → native chord` vectors replayed by the three suites; boot check that every action declared for this driver resolves |
+| **I5** | One implementation per behaviour. Pure logic lives in `_shared/lua/`; macOS and Linux `require` it; AHK gets generated **data** or a ported twin **pinned by a shared vector corpus**. A second hand-written copy with no corpus is forbidden. | per-behaviour corpus replayed by all three suites; lint forbidding a second copy |
+
+**The platform seam, in one sentence:** OS-uniqueness may live in exactly two
+places — `adapters/` (the *how*) and a per-OS override column in shared data (the
+*what*). Anywhere else it is a bug. That is the whole answer to "how do I do
+`cmd+letter` on macOS vs `ctrl+letter` elsewhere": you do not — you write
+`driver+w` once and the seam resolves it.
+
+### 0.2 Two logical modifiers, not one
+
+Measured: of the 24 actions implemented as a pure keystroke on **both** Windows
+and macOS, **11 are byte-identical**, **2** differ only by `ctrl→cmd`, and **11
+differ genuinely** (macOS uses `alt` for word motion, `cmd+↑/↓` for document
+bounds, `cmd+w` vs `alt+F4`, `cmd+ctrl+f` vs `F11`). A single `mod` token
+therefore resolves 2 cases out of 24.
+
+| Token | Meaning | Windows | macOS | Linux |
+| --- | --- | --- | --- | --- |
+| `cmdorctrl` | the modifier applications use for their own shortcuts | `ctrl` | `cmd` | `ctrl` |
+| `driver` | the modifier reserved for the Ergopti+ layer | `win` | `ctrl` | `super` |
+
+`driver` reproduces today's real behaviour: the driver's own shortcut layer is on
+`Win+letter` on Windows and `Ctrl+letter` on macOS, because `Ctrl` is taken by
+applications on Windows and `Cmd` is on macOS.
+
+**AHK trap that survives the refactor:** for a chord whose suffix is a character,
+the translator must emit `RetrieveScancode(<char>)`, never the bare character, or
+the chord lands on the wrong physical key under the Ergopti emulation. For a named
+key (`enter`, `home`…) the bare AHK name is correct.
+
+### 0.3 The canonical tree
+
+Rule, printable on one line:
+
+> **If it has a user-visible name, it is `modules/<that name>/`. If it has a
+> contract in `_shared/core/ports/`, it is `adapters/`. If it is OS-unique, it is
+> `platform/`. Everything else is one flat file in `infra/`.**
+
+```
+<driver>/
+  main.{ahk,lua}            THE entry point, same basename on the three drivers
+  adapters/                 20 ports + shell_runner + driver-local OS helpers
+  infra/                    flat; cross-cutting plumbing only (toml/ is the only sub-namespace)
+  modules/<feature>/        one folder per feature, SAME NAMES on the three drivers
+    init / actions / menu / window / platform  (platform.* is the only place a difference may live)
+  platform/                 the ONLY place OS-uniqueness may live
+    remap/ launcher/ packaging/ apps/
+  _generated/               same filenames on the three drivers
+  tests/  vendor/
+```
+
+Canonical `modules/` list (becomes a data file, `_shared/core/features.json`, read
+by the tree-parity gate, by `new:driver` and by the drivers): `action_picker`,
+`apps`, `changelog`, `diagnostics`, `download`, `dynamic_hotstrings`, `gestures`,
+`healthcheck`, `hotstring_editor`, `hotstrings`, `hotstrings_config`, `layout`,
+`llm`, `menu`, `metrics`, `model_browser`, `onboarding`, `paths`, `personal_info`,
+`prompt_editor`, `shortcuts`, `spotlight`, `tooltip`, `updater`, `wpm`.
+
+Non-negotiable renames (these alone unblock "knowing one driver lets you deduce
+the others"):
+
+| Today | Target | Why |
+| --- | --- | --- |
+| `windows/modules/keymap/` (physical remap) | `modules/layout/` | the same name means two opposite subsystems depending on the driver |
+| `macos/modules/keymap/` (expansion engine) | `modules/hotstrings/` | idem |
+| `windows/lib/hotstrings/` | `modules/hotstrings/` | a feature is not a library |
+| `windows/modules/tap_holds/` + `lib/tap_hold/` | `platform/remap/` | plural and singular in the same driver, wired by a `../` include |
+| `macos/modules/karabiner/`, `linux/modules/kanata/` | `platform/remap/` | three names, no common parent |
+| `modules/keylogger/` | `modules/metrics/` | "keylogger" is the mechanism; `_shared/ui/` already says metrics |
+| `linux/modules/menu/`, `linux/modules/ui/` | `modules/menu/`, `modules/<feature>/window.lua` | Linux has **two** `ui` namespaces |
+| `windows/ui/personal_toml_editor*` | `modules/hotstring_editor/` | the Windows name means something else on Linux |
+| `_shared/lua/linux/tray_protocol.lua` | `_shared/lua/tray/protocol.lua` | a platform-named node inside `_shared/` |
+| `_shared/lua/llm/linux_bridge.lua` | `linux/infra/llm_bridge.lua` | 364 "shared" lines with a single consumer |
+| `windows/lib/registry.ahk` | `infra/win_registry.ahk` | name collision with the macOS hotstring registry |
+| `ErgoptiPlus.ahk` / `init.lua` / `ergopti_hotstrings.lua` | `main.{ahk,lua}` | ⚠ **defer this one** if the smallest safe change set is wanted — 7 consumer families pin these names for near-zero functional payoff |
+
+Two conventions that make asymmetry legible:
+
+- **Convention P** — `platform/` is the only word in the tree meaning "this
+  differs by OS". Every driver has the same `platform/` sub-folders; one with
+  nothing ships a `README.md` explaining the mechanism used instead. No file
+  outside `platform/` and `adapters/` may name an OS or vendor product
+  (`karabiner|kanata|webkit|webview2|hammerspoon|gtk|dbus|ydotool|autohotkey`).
+  That is one grep, and it is the whole rule.
+- **Convention S** — the stub with a reason. Every folder of the canonical list
+  exists on every driver; where unimplemented it holds an `init` with a
+  `STATUS: not implemented` line and a `REASON_KEY` that feeds the greyed-out menu
+  entry's tooltip. Buys three things: `diff <(ls -R windows/modules) <(ls -R
+  macos/modules)` becomes empty, "not implemented" becomes visible instead of
+  absent, and a junior asked to add a feature knows exactly which file to open.
+
+### 0.4 The remaining blockers
+
+| # | Blocker | Note before starting |
+| --- | --- | --- |
+| **B5** | Linux writes every typed character, in plaintext, into a world-readable `/tmp` file on every keylogger flush (`linux/modules/keylogger/sqlite_writer.lua:96-112`, `:127-139`) | the temp name comes from `tmpnam(3)` then is mutated, so it is not the reserved file — a symlink/TOCTOU target. Stop shelling SQL through a file; the `sqlite3` CLI reads a script on stdin |
+| **B4** | Linux keylogger is always on, in plaintext, with no off switch, no private-browsing and no system-auth filter | ⚠ **do NOT simply wire `adapters/secure_field_detector.lua`** — `modules/keylogger/keylogger.lua:90-98` documents that its exact `WM_CLASS` match on a shorter list would *narrow* coverage and leak `gpg`/`ssh-agent`/`polkit`/`sudo`, and a test guard locks "coverage must never narrow". The fix is **additive** |
+| **B3** | The generated kanata config is unloadable: the generator emits 7 of the 12 aliases the template defines, leaving `@copy`, `@paste`, `@rollx`, `@deadtrema` dangling | `test:kanata-defalias-parity` never runs the generator against the template — extend it first, then fix the generator. The generator's own docstring also warns `ralt` needs hand-merging, which `manager.lua` does not do |
+| **B6** | The macOS "Chiffrement" menu item is a complete no-op (ten empty stubs) and `docs/security/keylogger_privacy.md:93` tells users to enable it for at-rest privacy | the `type(...) == "function"` guard is always true because the stub exists, so the flow raises inside the stub's own `pcall`, the progress canvas is never deleted and no dialog appears. Decide: implement, or delete the feature **and** the doc sentence together |
+| **B9** | `llm_context_length` has no effect on the Windows automatic path — the `context_window_chars` fix was never ported into the AHK generator (`grep -c context_window windows/**/*.ahk` → 0) | add a corpus vector that sets `context_window_chars`: none of the 12 existing vectors does, which is why the corpus cannot catch it |
+| **B10** | Opposite secure-field defaults for LLM predictions: macOS hardcodes `true` (contradicting `defaults.json`, and both keys are absent from `_SHARED_SCALAR_KEYS` so the shared value is unreachable); Windows sends context from password fields | security posture — pick the default deliberately, then make both drivers read it from `defaults.json` |
+
+### 0.5 The lots, in dependency order
+
+Constraints: **paths before moves, moves before content, data before code.**
+
+- **Lot 2 — the safety net before any rename.** *Nothing below matters until 2.1
+  lands.*
+  1. **`_DriverDirConcat` and `_DriverFuncBody` must throw on empty.** They return
+     `""` when the directory or function is missing, and `InStr("", x)` is 0, so
+     **every "must NOT contain" assertion passes vacuously**. 220 call sites over
+     139 files, 24 hardcoded directory names — and
+     `test-no-pinned-source-reads.cjs:48` *certifies those 139 files as
+     move-resilient* because they use the helper. The macOS twin is safe by
+     accident (`read_driver_source` returns `nil`, and `nil:find` throws): the AHK
+     helper's design is the defect.
+  2. Extend `test-git-mv-resilience.cjs` (macOS-only today) to AHK directory pins
+     and Linux file pins.
+  3. Convert the 88 auto-convertible macOS pinned reads
+     (`tools/lint/fix-pinned-source-reads.cjs --all --fix`), hand-convert the
+     other 90, **lower** both ratchets.
+  4. Fix the 16 AHK corpus assertions that `return` silently when the corpus
+     cannot be parsed (`test_corpus_hotstrings.ahk` 8, `test_corpus_tap_hold.ahk`
+     8, `unit/test_tooltip_dequeue_contract.ahk` 1). Moving the corpus today
+     produces 1 red and 16 silent greens.
+  5. `verify-change.cjs`: an edit under `_shared/tests/**` or `_shared/core/**`
+     must select `ahk-suite`, `hs` and `linux`. Four lines. Today the one file
+     class ADR-006 declares mandatory for every driver is the one whose edit runs
+     no driver suite.
+  6. Parse coverage per driver: **115 of 240 production AHK files (48 %)** are
+     reachable from the entry point but not from `run_all.ahk`, so they are
+     validated only as text; the Linux entry point has **zero** parse coverage.
+     Use a compile (`exit 17`), **never `/validate`** — the flag is ignored and the
+     script runs.
+
+- **Lot 3 — one tree.** Four independently-green steps: (a) extract `platform/`;
+  (b) `lib/` → `infra/` with features promoted out — ⚠ the macOS `lib.text_utils`
+  and `lib/toml/*` shims must keep their basenames, and the `lib.` → `infra.`
+  prefix rewrite must touch production **and** the ~1 942 test require/stub sites
+  in the same commit or every stub silently stops intercepting; (c) `ui/`
+  dissolves into `modules/<feature>/{menu,window}`; (d) de-platform `_shared/` and
+  repair `tools/codegen/new-driver.js` (`REPO_ROOT` resolves to `tools/`, the
+  three spec paths are pre-reorg, it emits **zero** adapters and a README saying
+  "Ports to implement (0)"). Then the I1 gate and the Convention S stubs.
+  **Progress metric: tree-identity ratio, 18.9 % today** (10 of 53 depth-≤2
+  subdirectories present in all three drivers).
+
+- **Lot 4 — one namespace.** Migrate the **206 of 335 features (61.5 %)** out of
+  the `[ahk.*]` / `[hs.*]` silos to their semantic path with per-entry
+  `platforms`. **Approved by the maintainer, config-schema break accepted** — the
+  user deletes `config.toml` and the driver regenerates it, as the v1→v2 cut-over
+  already established. Add `linux` to the platforms of the features Linux really
+  implements and to `KNOWN_PLATFORMS`. Create `linux/_generated/features_manifest.lua`
+  + `linux/infra/manifest_reader.lua`; extend `test-config-schema.cjs` to the Linux
+  template. Merge the duplicated privacy toggles: the three filters exist **twice**
+  in the shared manifest (`metrics.*_filter_enabled` **and** `ahk.metrics.filter_*`)
+  and the AHK driver reads neither — it hardcodes `:= true`.
+  The extreme case: `ahk.gestures` = 11 features vs `hs.gestures` + `.modes` +
+  `.sensitivities` = 109, for the same feature, with the **same i18n key**
+  `menu.gestures` on both sides.
+
+- **Lot 5 — one menu.** The manifest must gain the 14 capabilities that explain
+  every hand-written row: `checked_when` (~14 rows), resolvable `action` id (12),
+  `label.format` + `args` with live values (~20), `provider` for dynamic lists
+  (~15 slots), `radio_group` (~5), `toggle_shape` (`parent` on macOS/Linux,
+  `first_row` on AHK — already solved for the IA submenu only), declarative
+  `prompt` (~12 twenty-line bodies), counts/badges (~12), the `linux` token,
+  groups nested beyond one level (~4), separator semantics (re-implemented 3
+  times), an `emoji` field, `visible_when` (~8), and a real top-level section list
+  (the 9 head ids are read by nobody).
+  Order: (1) pilot on the metrics menu — best-covered, and ~280 lines of handlers
+  across two drivers become ~26 manifest rows + ~26 registry entries; (2) kill the
+  five dead-manifest-key duplications and add the gate "every array key in the
+  manifest has at least one reader"; (3) make Linux a first-class platform —
+  write `_shared/lua/menu/render.lua` (shared macOS+Linux, ~230 l) and
+  `linux/infra/menu_host.lua` (~180 l), delete `menu_builder.lua` (833 l), route
+  its 101 hardcoded French labels through the shared locales; (4) migrate the
+  macOS hotstrings then layout submenus — layout needs `platforms:["macos"]` rows
+  for the TIS/bundle features first, because `layout_menu` currently describes a
+  Windows-only menu that the macOS drift gate pins without macOS implementing it;
+  delete `test_menu_hotstrings_layout_drift_gate.lua` **after**, never before;
+  (5) move the 1 812 lines of `macos/ui/menu/` that are not menu layout
+  (`preferences.lua`, `menu_state.lua`, `menu_watchers.lua`, `shortcut_utils.lua`,
+  `menu_paths.lua`) out; (6) fold `_shared/modules/llm/menu_layout.json` in — its
+  schema is a strict subset of v3 with exactly the fields v1 lacked; (7) lay the
+  "no menu row outside the renderer" ratchet.
+  Measured payoff anchor: the layout submenu is **721 lines on macOS vs 41 on
+  Windows (17.6×)** — and Windows is 41 lines *because the manifest does the work*.
+  Nothing to invent: do on macOS what Windows already does.
+
+- **Lot 6 — one action registry.** (1) Fix the **12 actions mis-declared
+  `platform = "ahk"`** that are fully implemented on macOS (`select_line`,
+  `teleport_mouse`, `pick_color`, `paste_plain`, `toggle_capslock`, …) — they live
+  in `macos/modules/shortcuts/actions/*.lua` instead of the gesture registry, so
+  the shared catalogue actively asserts the feature does not exist on macOS.
+  (2) Move `_shared/modules/gestures/actions.toml` to
+  `_shared/modules/actions/actions.toml` and add `emit` / `emit_<os>` / `native` /
+  `default_chord` / `ports`. (3) Convert the **62 measured pure-keystroke Windows
+  actions** to `emit` rows — deletes 62 AHK lambdas, 27 Lua closures and ~30 Linux
+  `elseif` branches (54 % of the Windows action registry is data pretending to be
+  code). (4) Write `chord.{ahk,lua}` and add the **21st port, `HotkeyRegistrar`** —
+  none of the 20 has a "bind a chord to a callback" operation, which is why each
+  driver invented its own. (5) Replace Windows layers A+B, which bind the same
+  intent to two different physical keys because layer B is registered *before*
+  `modules/keymap/layout.ahk` and therefore resolves against the OS layout instead
+  of Ergopti's. (6) Give macOS the binding UI it lacks — its keyboard-slot module
+  is dead machinery: `M.DEFAULTS` is empty by design and the only production
+  caller of `set_action` writes `"none"`. (7) Merge
+  `karabiner/data/actions.json` (73 actions, hardcoded French, no i18n keys) into
+  the one registry, `holdable` becoming a per-action flag. (8) Fix the Linux
+  `action_picker` bridge, which implements a **different, fictional** protocol
+  (`execute`/`search`/`ready`/`close` + three hardcoded French labels) and never
+  calls `init(...)`, so the page renders empty; the contract test covers 2 hosts
+  of 3. (9) Replace the macOS-only `ctrl_shortcuts`/`cmd_shortcuts` and the
+  AHK-only `modifier_combos` groups with one `chord_bindings` group rendered
+  identically everywhere. (10) Delete the 136-line macOS hardcoded label fallback
+  and the 13 `shortcuts.label_*` locale keys that duplicate an `sg_actions.*` key
+  (13 pairs × 21 locales = **273 redundant translation strings**).
+
+- **Lot 7 — the cross-cutting layer.** Order matters: (1) `linux/infra/shared_paths.lua`
+  + `config_paths.lua` mirroring macOS and `windows/lib/boot.ahk` — Linux has
+  **no resolver at all**: 12 independent expressions with 4 different depths and
+  14 files deriving `$HOME` separately, which is why the language menu offers
+  **2 locales of 21** (`../../` is one level too high) and the keylogger schema
+  load is CWD-dependent (two levels too high). Gate:
+  `test-shared-root-resolvers.cjs` must **execute** each expression and assert the
+  file exists — never merely that the module loaded. (2) Move the macOS
+  config-path SSOT out of `ui/menu/menu_paths.lua` (25 call sites): today `lib/`
+  depends on `ui/menu/`. (3) **Generate the logger sub-file routing tables** from
+  `sub_files.toml` — deletes two hand-rolled TOML array-of-tables parsers (150 +
+  112 lines) carrying **the same fix for the same bug** ("a `]` inside a quoted
+  pattern closed the array early"), and makes that bug structurally impossible.
+  (4) `[logger]` section in `_shared/modules/timings/constants.toml` + single-source
+  gate: retention 14 (4 copies), ring 200 (3), dedup 5 s (2 magic literals), flush
+  500 ms. (5) Add the `active → en → fr` cascade to `_shared/ui/i18n.js` — it
+  fetches one file and leaves missing keys **blank**, so a partially translated
+  locale renders empty labels in every shared webview while all three native menus
+  cascade. (6) Generate the three 21-locale tables from `locale_order.json` + a new
+  `locale_names.json` (the flag column stays per-driver: flag emoji do not render
+  in Windows menus). (7) **Only then** make macOS consume the shared logger core,
+  and only after writing `_shared/tests/corpus/logger/behaviour_vectors.json` —
+  this is the module with the worst bug history in the repo.
+
+- **Lot 8 — the engines.** Promise **one matcher, not one engine**: the genuinely
+  platform-agnostic core is ~350 lines (tail-char bucketing, suffix equality with
+  case folding, the word-boundary predicate, the collision tiebreak). The other
+  ~14 000 are emission, buffer/screen sync, suppression bookkeeping, TOML I/O,
+  tooltip preview and OS quirks, legitimately per-driver.
+  1. **Fix the corpus contract first.** `backspace_count` cannot be a cross-driver
+     assertion: Windows and Linux let the triggering keystroke reach the screen
+     before erasing, macOS consumes it and applies a common-prefix optimisation.
+     For `btw → by the way` the right answer is 3 on Windows/Linux and 1 on macOS.
+     **The corpus is wrong, not macOS** — and until this is fixed the corpus would
+     reject a correct implementation.
+  2. Extend the corpus to the branches measured as absent: `auto_expand`,
+     `final_result`, the terminator path, star/magic-key triggers, `case_conform`,
+     `is_case_sensitive_strict` (**1 302 entries use it**, documented nowhere), the
+     NBSP typographic rule, the buffer cap, consumed delimiters, the
+     `individual > section > file` priority levels, `is_word` as a tiebreaker.
+  3. Generate the single matcher core into both target languages, modelled on
+     `codegen-terminators.cjs` — it already emits both targets in one run and is
+     **the only part of the engine that has never drifted**.
+  4. Close the eight measured divergences, notably: Linux **never** fires a
+     non-`auto_expand` hotstring (its loader does not even read the field), has no
+     case propagation and no collision priority, and its default magic key is `\`
+     while the shared manifest says `★`.
+  5. **LLM**: prompt-builder constants from one JSON (5 hand-maintained copies
+     today, already diverged); route the **six** implementations of "POST a
+     completion" through the `HttpClient` port — macOS-MLX already proves the port
+     suffices; generate the settings map, which deletes
+     `menu_persistence_contract.json` (436 l) and its two unwired Python
+     validators. Note `menu_persistence_contract.json` documents that the two
+     drivers write **different keys, units and types** for the same three settings,
+     so a `config.toml` is not portable — normalising that is part of the job.
+  6. **Metrics**: shared aggregation core (two ~1 330-line walkers whose function
+     names map 1:1, one of which says in a comment that it "MIRRORS" the other);
+     eight constants declared three times where the shared copy exists only to be
+     shadowed; the WPM formula written **seven** times.
+  7. **Remap**: a shared tap-hold IR + three emitters
+     (`emit_kanata` / `emit_karabiner` / `emit_ahk`) — today only a kanata emitter
+     parked in `_shared/`. And `_shared/tap_hold/defaults.toml` must become **one**
+     namespace: it is currently two unrelated files in one, describing the same
+     seven physical keys with different ids, different actions and a 3–5× different
+     threshold; the AHK loader ignores every `[hs_*]` header and the macOS reader
+     ignores every `[tap_hold.*]` header. Also: four documents claim "no runtime
+     merge" while the code merges on every boot.
+  8. **Tooltip**: wire the 1 483 lines of shared JS **as an oracle** (vector
+     generator + conformance harness), not as runtime. Today the gate named
+     "tooltip corpus parity" requires neither JS module it claims to compare, the
+     macOS test replays a clone defined inside the test file instead of the
+     renderer, and the AHK test never compares the 6 golden values. Two
+     `[positioning]` constants never reach Windows, with three comments asserting
+     the opposite.
+
+- **Lot 9 — the tests.** Honest ceiling: `meta/` directories alone are **84 956
+  lines (44 %)** and each asserts on one driver's source text; the plan must not
+  promise the suites mutualise like the drivers. Achievable: **≈ −11 500 lines**.
+  | Target | Today | After | Mechanism |
+  | --- | ---: | ---: | --- |
+  | Corpus consumers (16 corpora, 258 vectors) | 9 122 | ~1 900 | one JSON replay schema per corpus + a ~120-line generic runner per driver |
+  | Port contract vectors (129) | 2 001 | ~700 | generate `_shared/tests/corpus/ports/<Port>_vectors.json` from `contractTestVectors()` |
+  | e2e harnesses | 1 319 | ~750 | one corpus-driven harness that fails loudly on a missing corpus |
+  | Lua assertion library | 352 | 176 | the diff of the two files is **62 lines, all comments, banners and declaration order** |
+  | Convention invariants (8, in 2–3 languages) | 1 594 | ~450 | one `.cjs` gate per invariant over the three trees — and Linux gains 6 it does not have |
+  | Port presence/compliance | 1 575 | ~500 | one JS gate over `contracts.json` × the three `adapters/` trees |
+  Also: **assertion argument order is inverted** between AHK (`AssertEqual(expected, actual)`) and Lua (`assert_eq(actual, expected)`) across **1 587 sites**, and `AssertEqual` is **case-insensitive** (AHK v2 `!=`), so `AssertEqual("BTW","btw")` passes — fix in a dedicated commit with the reds triaged. Skips become data (`_shared/tests/conformance/manifest.json` with `{status, reason, tracked}`), which converts the 6 Linux tautologies and the 7 `AssertTrue(true, "…macOS-only…")` skips into a ledger that cannot rot. Two macOS files (593 lines) replay 36 vectors against a **reimplementation defined inside the test**, with a docstring claiming any divergence fails — no `require` of the module; the AHK twin is 136 lines and calls the real code. 8 files under `windows/tests/` are invoked by nothing, including the **only** Windows consumer of `process_prediction_vectors.json` (17 vectors, zero CI coverage). 20 test files are named after a date or a plan phase (~2 900 lines).
+
+- **Lot 10 — pruning.** Port the macOS reachability gate to Windows and Linux, then
+  delete the **3 101 lines of dead adapter code** (12 of 21 Windows adapters and 11
+  of 21 Linux ones have no production caller; the 11 Linux files come from a single
+  commit written to green a presence gate). Each deletion carries the measured
+  zero-consumer proof in the commit body. Shrink `contracts.json` to the ports with
+  real traffic and supersede ADR-001 with the measured reality; honest demotion
+  candidates: `AppLauncher`, `Crypto`, `Storage`, `ProcessLifecycle`,
+  `MouseControl`, `TooltipRenderer`. Extend both purity ratchets to `ui/` and the
+  entry point and add the unwatched AHK families (`SetTimer` 264 lines,
+  `Hotkey/Hotstring/HotIf` 203, `Gui/Menu` 162, `Run` 59, `Win*` 54, `GetKeyState`
+  45 — **874 unwatched lines**, plus 130 in `ui/` that are inside the ratchet's own
+  categories but outside its scan). Route the 61 Linux module shell-outs and 54
+  hand-quoting sites through `shell_runner` — it exists, its docstring explains
+  exactly why (`string.format("%q")` is a Lua literal quoter, not a shell one), and
+  **no module requires it**. One `npm run gen` regenerating everything
+  deterministically in a single Node process, plus `npm run gen:check` writing to a
+  temp dir and diffing — which also fixes by construction the fact that
+  `test-features-manifest-no-drift.cjs` **silently rewrites three files it does not
+  guard** (it snapshots 2 targets, runs a generator that writes 5, restores 2). One
+  `_generated/` convention: same first line, same banner, no timestamps, a
+  generated `README.md`, and runtime-written files moved to `_runtime/`.
+
+### 0.6 Gates to build
+
+`test-driver-tree-parity.cjs` (I1) · `test-shared-root-resolvers.cjs` (executes
+every `_shared` resolver) · `test-menu-parity.cjs` (I3) · the "no menu row outside
+the renderer" ratchet · "every manifest array key has a reader" ·
+`test-logger-scalars-single-source.cjs` · `test-locale-catalogue-complete.cjs` ·
+`_shared/tests/corpus/logger/behaviour_vectors.json` ·
+`_shared/tests/conformance/manifest.json` + runner · boot-manifest parity gates ·
+"no hand-written duplicate of shared logic".
+
+### 0.7 Gates to extend (each hole measured)
+
+`test-git-mv-resilience.cjs` (macOS only) · `test-no-pinned-source-reads*.cjs`
+(its `HELPER_RE` certifies 139 directory-pinned files as move-resilient) · the AHK
+purity ratchet (3 families of ~12; ignores `ui/` and the entry point) · the macOS
+purity ratchet (ignores `macos/ui/`, 636 `hs.*` lines) ·
+`test-webview-geometry-single-source.cjs` (zero Linux coverage, 3 Windows apps
+absent) · `test-webview-teardown-order.cjs` (7 hosts of 12, and it pins exact
+internal whitespace) · `test_jsstr_cr_escaped.ahk` (names 2 helpers of 12; **3
+siblings still delete `\r` instead of escaping it**) · `test-config-schema.cjs`
+(2 templates of 3) · `test-updater-constants-single-source.cjs` (excludes Linux) ·
+`test-menu-labels-single-source.cjs` (blind to Linux; should become an exclusion
+ratchet, which would immediately flag the AHK copy) · `test-priority-parity.cjs`
+(a text scan of 3 declarations; sees neither Linux, nor the comparison-site
+fallback, nor the tiebreak chain) · `gen-architecture-diagram.cjs` (**0
+occurrences of "linux"** in a document titled "three-layer hexagonal
+architecture") · `test-ahk-test-coverage.cjs` (`readdirSync` depth 1; ignores
+`run_*.ahk` and `bench_*.ahk`) · `test-dev-tool-paths.cjs` (scoped to `tools/dev/`
+while `tools/build/` carries 2 absolute machine paths).
+
+### 0.8 Gates to retire — after migration only
+
+`macos/tests/meta/test_menu_hotstrings_layout_drift_gate.lua` (after lot 5.4) ·
+`test_menu_top_level_drift_gate.{lua,ahk}` (once the tail is manifest rows with
+registry-validated ids — **and a Linux twin exists first**) ·
+`linux/tests/unit/meta/test_port_adapter_presence.lua` (9 hardcoded names, 13
+behind) · `windows/tests/COVERAGE.md` and `macos/tests/COVERAGE.md` (hand-written
+inventories, already stale — `docs/TESTING.md` states the right principle: the
+inventory of checks is the run itself).
+
+### 0.9 Smaller carried-over items
 
 - The Lua half of `lint-conventions.js` scans macOS only: Linux (142 files) and
   `_shared/lua` (32) are never checked for headers, banners or section spacing.
@@ -30,16 +425,41 @@ Also carried over from the audit, not blockers:
   `audit-file-headers.cjs`. The specs use a repo-relative header where everything
   else under `_shared/` uses the BASE-relative form; unifying them is a 36-file
   rewrite touching files other meta-tests grep, so it needs its own commit.
-- `windows/tests/COVERAGE.md` and `macos/tests/COVERAGE.md` are hand-maintained
-  inventories that are already stale (one claims "~1 230+ assertions across ~34
-  unit-test files" against a measured 143 unit + 686 meta files). `docs/TESTING.md`
-  already states the right principle: the inventory of checks is the run itself.
+- The banner linter derives its index from an *assumed* rule-line count instead of
+  checking it, so **68 major banners** with a non-conforming count pass while
+  `npm run lint:conventions` reports zero violations.
+- **78 production files** are predominantly space-indented where the convention is
+  tabs, **30 of them mixing both**.
+- Delete `tools/codegen/codegen-prompt-builder-hs.cjs` (34 lines that emit
+  nothing; its own docstring says it exists to document an asymmetry) and its npm
+  alias, folding the explanation into `macos/_generated/README.md`.
+- Purge the remaining dead plan-phase references (`P5 refactor`, `P0 SSoT`,
+  `P6 split`) from driver sources, several of which point at files that no longer
+  exist.
+- The two glossaries disagree with the code and with each other:
+  `static/ergopti_plus/docs/glossary.md` announces "the **nine** port contracts",
+  then lists **thirteen**, where there are **20**, and names driver directories
+  `hammerspoon/` and `autohotkey/` that do not exist.
 
-Working rules: no behaviour change without a regression test, never weaken a
-test to make a change pass, and run the gates that cover what you touched —
-`node ./tools/test/verify-change.cjs` derives them (see the `verify-change`
-skill). Read [docs/PROJECT_MEMORY.md](docs/PROJECT_MEMORY.md) before starting:
-several neighbouring ideas were tried and rejected with reasons.
+### 0.10 Risks
+
+- **R1** — the tree move silently disables 220 assertions. Entirely mitigated by
+  lot 2.1; do that first.
+- **R2** — the macOS stubs stop intercepting unless the `lib.` → `infra.` rewrite
+  touches production and the ~1 942 test sites in one commit.
+- **R3** — the entry-point rename is the most dangerous move in the programme for
+  near-zero payoff (7 consumer families pin those names). Defer it.
+- **R4** — `_shared/` internal moves are **not** covered by the per-layer SSOT;
+  several sites bypass the resolver, so only the suites catch a rename. Every such
+  move needs a test asserting the resolver found a **real file**.
+- **R5** — never weaken a ratchet to permit a move; a pure relocation bump carries
+  an explicit "relocation, not new OS calls" note in the commit.
+- **R6** — the hotstrings corpus would today reject a correct implementation
+  (`backspace_count`); fix the contract before generating the matcher.
+- **R7** — land the "no hand-written duplicate" gate last: it generates findings,
+  and a finding-generating gate landed mid-refactor is noise.
+- **R8** — line numbers here are true as of 2026-07-30. Re-read the site before
+  editing and match by symbol, never by line.
 
 ---
 
@@ -123,10 +543,6 @@ languages. Note for planning: the update-related keys the earlier plan claimed
 were missing **do exist** (`_shared/data/locales/fr.json:607-610` plus
 `check_for_updates`, `channel_*`, `install_update`, `open_releases_page`), so
 routing the Linux updater menu needs no new translation.
-
-### Linux: the `shell_runner` adapter is missing
-
-The only adapter present in two drivers out of three.
 
 ---
 

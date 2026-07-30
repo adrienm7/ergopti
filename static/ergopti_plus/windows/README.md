@@ -5,7 +5,7 @@ The Windows implementation of ErgoptiPlus.
 > **The three driver trees do not currently mirror each other.** Measured: of 53
 > distinct depth-≤2 subdirectories across `windows/`, `macos/` and `linux/`, only
 > 10 are present in all three (18.9 % tree identity). Making them identical is
-> tracked in [`docs/PLAN_SIMPLIFICATION.md`](../../../docs/PLAN_SIMPLIFICATION.md)
+> tracked in [`TODO.md`](../../../TODO.md) §0
 > (invariant I1). Until that lands, use the cross-driver path table in
 > [`docs/ERGOPTI_PLUS.md`](../../../docs/ERGOPTI_PLUS.md) §2.1 to locate the
 > counterpart of a file — do not assume the same relative path.

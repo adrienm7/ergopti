@@ -15,7 +15,7 @@
 #
 # It is kept, not deleted, because it is the best-written description of the
 # shortcut model in the repo and is the target design for the one shared action
-# registry — see docs/PLAN_SIMPLIFICATION.md, invariant I4 and lot 6. Its
+# registry — see TODO.md section 0, invariant I4 and lot 6. Its
 # content folds into `_shared/modules/actions/actions.toml` as the
 # `default_chord` / `default_chord_<os>` fields, and this file is deleted in the
 # same commit that makes the drivers read those fields.
