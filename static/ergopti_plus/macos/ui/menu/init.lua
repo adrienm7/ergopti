@@ -680,7 +680,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				if kbd_layout_mod and type(kbd_layout_mod.schedule_pause_layout_switch) == "function" then
 					pcall(kbd_layout_mod.schedule_pause_layout_switch, is_paused, state)
 				end
-				update_icon()
+				-- updateMenu's first statement is pcall(update_icon), so a bare call
+				-- here rendered the icon twice per toggle — off disk, through an
+				-- off-screen canvas — from inside the script-control eventtap callback
+				-- that carries the key needed to un-pause. Going through updateMenu
+				-- also puts the refresh under its pcall, so a throw in the render can
+				-- no longer escape this listener.
 				updateMenu()
 			end)
 		end
@@ -1074,7 +1079,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	M._watcher = configWatcher
 
 	M._theme_watcher = MenuWatchers.start_theme_watcher(function()
-		if type(update_icon) == "function" then update_icon() end
+		-- updateMenu refreshes the icon itself, so the bare call was the same double
+		-- render as the pause listener's. And the icon does not depend on the system
+		-- theme in the first place: the variant is chosen from `paused` alone and it
+		-- is pushed with setIcon(icon, false) — the non-template form, so macOS never
+		-- re-tints it for light or dark either. What a theme change actually needs is
+		-- the menu rebuild below.
 		if type(updateMenu) == "function" then updateMenu() end
 	end)
 
