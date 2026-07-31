@@ -346,9 +346,17 @@ Constraints: **paths before moves, moves before content, data before code.**
   ["ctrl", "super"] }`) makes `decode` return **nil**, with no error. Single
   element works; a top-level multi-element array works; two scalar keys work.
   The Linux gesture suite lost 14 tests to it. Flat keys sidestep it and suit
-  the AHK and Lua hand-parsers that read this file too, but the codec bug is
-  still there — it is the same shape as the logger sub-files bug (a nested
-  delimiter confusing a flat scanner), and it deserves its own fix and test. (3) Convert the **62 measured pure-keystroke Windows
+  the AHK and Lua hand-parsers that read this file too — and the codec bug is
+  now **fixed** as well. Cause: the inline-table splitter tracked quoted regions
+  but not bracket depth, so a comma inside a nested value split the pair list
+  into fragments with no `=`, `split_kv` rejected them, and `decode` returned nil
+  for the entire document. Exactly the logger sub-files shape: a scanner that
+  tracks quotes but not nesting. Quotes alone are never enough when the delimiter
+  being searched for can also appear one level down.
+  Six regression cases in `test_toml_codec_edge_cases.lua`; three go red without
+  the fix (2-element, 3-element, nested inline table) and three guard behaviour
+  that already worked and must keep working — a comma inside a string, and the
+  trailing-comma rejection that depth tracking must not soften. (3) Convert the **62 measured pure-keystroke Windows
   actions** to `emit` rows — deletes 62 AHK lambdas, 27 Lua closures and ~30 Linux
   `elseif` branches (54 % of the Windows action registry is data pretending to be
   code). (4) Write `chord.{ahk,lua}` and add the **21st port, `HotkeyRegistrar`** —
