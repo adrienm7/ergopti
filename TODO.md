@@ -480,8 +480,23 @@ Constraints: **paths before moves, moves before content, data before code.**
   against the wrong item. That label is one of the 101 tracked in Lot 5(3). One `npm run gen` regenerating everything
   deterministically in a single Node process, plus `npm run gen:check` writing to a
   temp dir and diffing — which also fixes by construction the fact that
-  `test-features-manifest-no-drift.cjs` **silently rewrites three files it does not
-  guard** (it snapshots 2 targets, runs a generator that writes 5, restores 2). One
+  ~~`test-features-manifest-no-drift.cjs` **silently rewrites three files it does not
+  guard**~~ — **fixed**, and the real count was **four of six**, not three of five:
+  the generator writes a features manifest AND a `config_template.toml` for each
+  of the three drivers, and the guard listed two files. The consequence was worse
+  than the missed drift. Appending a line to
+  `linux/_generated/config_template.toml` and running the guard printed
+  `"[OK] … no drift"` and left `git status` **completely clean** — the
+  uncommitted edit was silently reverted by the test itself. A test that discards
+  your working-tree changes and then reports success is worse than no test,
+  because you trust it. The guard no longer names files at all: it snapshots
+  every file under all three `_generated/` trees (13 today) and compares each
+  one, so a seventh generator output is covered without anybody remembering.
+  `test-drift-guard-covers-every-output.cjs` perturbs each previously unguarded
+  output for real and asserts both halves — the guard goes red, and the edit is
+  still there afterwards. A static check ("does the guard mention
+  config_template?") would pass on a guard that mentions it and still restores
+  nothing. One
   `_generated/` convention: same first line, same banner, no timestamps, a
   generated `README.md`, and runtime-written files moved to `_runtime/`.
 
