@@ -213,11 +213,22 @@ Constraints: **paths before moves, moves before content, data before code.**
   Windows (17.6×)** — and Windows is 41 lines *because the manifest does the work*.
   Nothing to invent: do on macOS what Windows already does.
 
-- **Lot 6 — one action registry.** (1) Fix the **12 actions mis-declared
-  `platform = "ahk"`** that are fully implemented on macOS (`select_line`,
-  `teleport_mouse`, `pick_color`, `paste_plain`, `toggle_capslock`, …) — they live
-  in `macos/modules/shortcuts/actions/*.lua` instead of the gesture registry, so
-  the shared catalogue actively asserts the feature does not exist on macOS.
+- **Lot 6 — one action registry.** ~~(1) Fix the actions mis-declared
+  `platform = "ahk"` that are fully implemented on macOS.~~ Done, and the count
+  was **four**, not twelve: `select_line`, `teleport_mouse`, `spotlight_mouse`,
+  `toggle_capslock`. The others on the original list (`pick_color`,
+  `paste_plain`, `uppercase_selection`, `titlecase_selection`,
+  `surround_parens`…) have no macOS implementation at all — they were counted from
+  the LABEL table in `macos/modules/gestures/actions.lua`, which lists them but
+  registers no handler, so the label is dead weight rather than evidence.
+
+  The fix needed both halves. Flipping the TOML alone would have put four dead
+  rows in the macOS picker, because `execute_single()` refuses an action it has no
+  handler for — so each is now registered into the gesture registry, delegating
+  (lazily, to keep the shortcuts tree out of boot) to the shortcut-layer function
+  that already existed. `test-action-platform-truth.cjs` holds both directions:
+  a declaration claiming macOS with no handler, and a handler hidden by its
+  declaration. The second is what these four were.
   (2) Move `_shared/modules/gestures/actions.toml` to
   `_shared/modules/actions/actions.toml` and add `emit` / `emit_<os>` / `native` /
   `default_chord` / `ports`. (3) Convert the **62 measured pure-keystroke Windows

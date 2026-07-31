@@ -479,6 +479,34 @@ sg("screenshot_fullscreen_save",        function()
 	capture({ screenshot_path("full") })
 end)
 
+-- Four actions macOS has always implemented — in the keyboard-SHORTCUT layer —
+-- and never exposed as gestures. The shared catalogue declared them
+-- platform = "ahk", so the picker (which filters on that) hid them, and the
+-- cross-driver feature matrix read as "macOS does not have this" for four
+-- features it ships. Registering them here is what makes the declaration true;
+-- the TOML flip to "all" without this would have put four dead rows in the
+-- picker, since execute_single() refuses an action it has no handler for.
+--
+-- Required lazily, inside the closure: these modules pull in the whole shortcuts
+-- tree, and requiring it at gesture-registry load time would drag it into boot
+-- for users who never bind one of these.
+sg("select_line", function()
+	local ok, Text = pcall(require, "modules.shortcuts.actions.text")
+	if ok and type(Text.select_line) == "function" then Text.select_line() end
+end)
+sg("teleport_mouse", function()
+	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
+	if ok and type(Mouse.teleport_mouse) == "function" then Mouse.teleport_mouse() end
+end)
+sg("spotlight_mouse", function()
+	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
+	if ok and type(Mouse.spotlight_mouse) == "function" then Mouse.spotlight_mouse() end
+end)
+sg("toggle_capslock", function()
+	local ok, Sys = pcall(require, "modules.shortcuts.actions.system")
+	if ok and type(Sys.toggle_capslock) == "function" then Sys.toggle_capslock() end
+end)
+
 sg("lock_screen",                    function() pcall(hs.caffeinate.lockScreen) end)
 sg("notification_center",          function()
 	ShellRunner.applescript("tell application \"System Events\" to click menu bar item \"Notification Center\" of menu bar 1 of application process \"ControlCenter\"")

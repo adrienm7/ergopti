@@ -41,6 +41,7 @@ const CHECKS = [
 	{ name: 'dev-tool paths (private-AHK workflow points at live paths)', cmd: 'node', args: ['tools/test/test-dev-tool-paths.cjs'], repro: 'node tools/test/test-dev-tool-paths.cjs' },
 	{ name: 'fast repeating timers are inventoried (no silent poller)', cmd: 'node', args: ['tools/test/test-fast-timer-inventory.cjs'], repro: 'node tools/test/test-fast-timer-inventory.cjs' },
 	{ name: 'metrics categories are id-keyed (colours survive a language switch)', cmd: 'node', args: ['tools/test/test-metrics-category-ids.cjs'], repro: 'node tools/test/test-metrics-category-ids.cjs' },
+	{ name: 'action platform declarations match the macOS registry', cmd: 'node', args: ['tools/test/test-action-platform-truth.cjs'], repro: 'node tools/test/test-action-platform-truth.cjs' },
 	{ name: 'driver-doc paths (no stale static/drivers in docs)', cmd: 'node', args: ['tools/test/test-doc-paths.cjs'], repro: 'node tools/test/test-doc-paths.cjs' },
 	{ name: 'no new location-pinned source reads in AHK tests (ratchet)', cmd: 'node', args: ['tools/test/test-no-pinned-source-reads.cjs'], repro: 'node tools/test/test-no-pinned-source-reads.cjs' },
 	{ name: 'no new location-pinned source reads in macOS tests (ratchet)', cmd: 'node', args: ['tools/test/test-no-pinned-source-reads-lua.cjs'], repro: 'node tools/test/test-no-pinned-source-reads-lua.cjs' },
