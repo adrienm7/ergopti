@@ -108,49 +108,33 @@ helpers.describe("notifier (notify-send)", function()
     end)
   end)
 
-  helpers.describe("send()", function()
-    helpers.it("does not crash with basic title + body", function()
-      -- notify-send might not exist on this system (especially Windows).
-      -- The adapter wraps the call in pcall, so it should never crash.
-      local ok = pcall(function()
-        notifier.send("Test Title", { body = "Test body text" })
-      end)
-      helpers.assert_true(ok, "send(title, body) does not crash")
+  -- The block below used to call the REAL notify-send and assert a pcall status.
+  -- Thirteen cases, thirteen "does not crash" — on a machine without libnotify
+  -- the adapter's own pcall swallows the failure, so every one of them passed
+  -- while sending nothing at all. They go through the same _set_runner seam as
+  -- the composition tests above, so each now states what the command contains.
+  helpers.describe("send() composes a command for every input shape", function()
+    helpers.it("title and body both reach the command", function()
+      local cmd = captured("Test Title", { body = "Test body text" })
+      helpers.assert_true(cmd:find("Test Title", 1, true) ~= nil, "the title must reach the command")
+      helpers.assert_true(cmd:find("Test body text", 1, true) ~= nil, "the body must reach the command")
     end)
 
-    helpers.it("does not crash with only title (no opts)", function()
-      local ok = pcall(function()
-        notifier.send("Title only")
-      end)
-      helpers.assert_true(ok, "send(title) does not crash")
+    helpers.it("a title with no opts still composes a call", function()
+      local cmd = captured("Title only")
+      helpers.assert_true(cmd:find("notify-send", 1, true) ~= nil,
+        "a title-only notification must still invoke notify-send")
     end)
 
-    helpers.it("does not crash with kind='info'", function()
-      local ok = pcall(function()
-        notifier.send("Info", { body = "Info body", kind = "info" })
-      end)
-      helpers.assert_true(ok, "send(info) does not crash")
-    end)
-
-    helpers.it("does not crash with kind='warn'", function()
-      local ok = pcall(function()
-        notifier.send("Warning", { body = "Warn body", kind = "warn" })
-      end)
-      helpers.assert_true(ok, "send(warn) does not crash")
-    end)
-
-    helpers.it("does not crash with kind='error'", function()
-      local ok = pcall(function()
-        notifier.send("Error", { body = "Error body", kind = "error" })
-      end)
-      helpers.assert_true(ok, "send(error) does not crash")
-    end)
-
-    helpers.it("does not crash with unknown kind (falls back to normal)", function()
-      local ok = pcall(function()
-        notifier.send("Unknown", { body = "Body", kind = "custom" })
-      end)
-      helpers.assert_true(ok, "send(unknown kind) does not crash")
+    helpers.it("each kind maps to its own urgency", function()
+      helpers.assert_true(captured("Info", { kind = "info" }):find("--urgency=normal", 1, true) ~= nil,
+        "info is normal")
+      helpers.assert_true(captured("Warning", { kind = "warn" }):find("--urgency=", 1, true) ~= nil,
+        "warn must carry an urgency flag")
+      helpers.assert_true(captured("Error", { kind = "error" }):find("--urgency=critical", 1, true) ~= nil,
+        "error must be critical, or a failure is indistinguishable from routine noise")
+      helpers.assert_true(captured("Unknown", { kind = "custom" }):find("--urgency=normal", 1, true) ~= nil,
+        "an unknown kind falls back to normal rather than composing an invalid flag")
     end)
   end)
 
@@ -158,56 +142,62 @@ helpers.describe("notifier (notify-send)", function()
   -- 3. send() with special characters (shell safety)
   -- ==========================================================================
 
+  -- io.popen does not RAISE on unescaped input, it EXECUTES it. "Does not crash"
+  -- is therefore exactly what a command-injection hole looks like from the
+  -- outside, which is why every case here asserts the escaping instead.
   helpers.describe("send() shell safety", function()
-    helpers.it("handles single quotes in title", function()
-      local ok = pcall(function()
-        notifier.send("It's working", { body = "Body" })
-      end)
-      helpers.assert_true(ok, "send with quote in title does not crash")
+    helpers.it("escapes a single quote in the title", function()
+      local cmd = captured("It's working", { body = "Body" })
+      helpers.assert_true(cmd:find("'\\''", 1, true) ~= nil,
+        "the apostrophe must be escaped as '\\'' — raw, it closes the quoted argument "
+          .. "and everything after it is parsed as shell: " .. cmd)
     end)
 
-    helpers.it("handles single quotes in body", function()
-      local ok = pcall(function()
-        notifier.send("Title", { body = "Don't panic" })
-      end)
-      helpers.assert_true(ok, "send with quote in body does not crash")
+    helpers.it("escapes a single quote in the body", function()
+      local cmd = captured("Title", { body = "Don't panic" })
+      helpers.assert_true(cmd:find("'\\''", 1, true) ~= nil,
+        "the body is quoted the same way as the title: " .. cmd)
     end)
 
-    helpers.it("handles shell metacharacters in title", function()
-      local ok = pcall(function()
-        notifier.send("$HOME & `date`", { body = "test" })
-      end)
-      helpers.assert_true(ok, "send with shell chars in title does not crash")
+    helpers.it("renders shell metacharacters inert", function()
+      local cmd = captured("$HOME & `date`", { body = "test" })
+      helpers.assert_true(cmd:find("$HOME & `date`", 1, true) ~= nil,
+        "the payload must appear verbatim inside the quoting, not expanded: " .. cmd)
+      -- The whole payload sits between the quotes that open and close that one
+      -- argument, so neither & nor the backticks terminate it.
+      helpers.assert_true(count_of(cmd, "'") % 2 == 0,
+        "the quotes must balance — an odd count means one argument runs into the next: " .. cmd)
     end)
 
-    helpers.it("handles Unicode (UTF-8) in title and body", function()
-      local ok = pcall(function()
-        notifier.send("café résumé", { body = "àéèù" })
-      end)
-      helpers.assert_true(ok, "send with Unicode does not crash")
+    helpers.it("passes UTF-8 through unchanged", function()
+      local cmd = captured("café résumé", { body = "àéèù" })
+      helpers.assert_true(cmd:find("café résumé", 1, true) ~= nil,
+        "accented characters must survive composition byte for byte")
+      helpers.assert_true(cmd:find("àéèù", 1, true) ~= nil, "and so must the body")
     end)
 
-    helpers.it("handles long title and body", function()
+    helpers.it("does not truncate a long title or body", function()
       local long_title = string.rep("X", 200)
       local long_body  = string.rep("Y", 500)
-      local ok = pcall(function()
-        notifier.send(long_title, { body = long_body })
-      end)
-      helpers.assert_true(ok, "send with long text does not crash")
+      local cmd = captured(long_title, { body = long_body })
+      helpers.assert_true(cmd:find(long_title, 1, true) ~= nil,
+        "a 200-character title must reach the command whole")
+      helpers.assert_true(cmd:find(long_body, 1, true) ~= nil,
+        "a 500-character body must reach the command whole")
     end)
 
-    helpers.it("handles empty title gracefully", function()
-      local ok = pcall(function()
-        notifier.send("", { body = "body" })
-      end)
-      helpers.assert_true(ok, "send with empty title does not crash")
+    helpers.it("still composes a call for an empty title", function()
+      local cmd = captured("", { body = "body" })
+      helpers.assert_true(cmd:find("notify-send", 1, true) ~= nil,
+        "an empty title must not silently skip the notification")
+      helpers.assert_true(cmd:find("body", 1, true) ~= nil, "and the body must still be carried")
     end)
 
-    helpers.it("handles nil opts gracefully", function()
-      local ok = pcall(function()
-        notifier.send("Title", nil)
-      end)
-      helpers.assert_true(ok, "send with nil opts does not crash")
+    helpers.it("treats nil opts as an empty body", function()
+      local cmd = captured("Title", nil)
+      helpers.assert_true(cmd:find("notify-send", 1, true) ~= nil, "the call must still compose")
+      helpers.assert_true(cmd:find("nil", 1, true) == nil,
+        "a nil opts table must not stringify into the command line: " .. cmd)
     end)
   end)
 
