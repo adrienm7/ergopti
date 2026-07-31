@@ -151,12 +151,15 @@ describe("Corpus: tap_hold/vectors.json", function()
 		assert_true(n ~= nil and n >= 1, "expected >=1 vectors in tap_hold corpus")
 	end)
 
-	it("SKIP — tap-hold remapping handled by kanata on Linux (not a Lua module)", function()
-		-- Kanata reads the TOML config directly and emits uinput events;
-		-- there is no Lua tap-hold engine to exercise on Linux. ADR-006
-		-- compliance: corpus consumed (file loaded, count checked); vectors
-		-- skipped with explicit rationale.
-		assert_true(true, "skip acknowledged")
+	-- A skip has to assert the reason it skipped for, or it is just a green with
+	-- a sentence attached. Kanata reads the TOML config directly and emits
+	-- uinput events, so there is genuinely no Lua tap-hold engine here — and the
+	-- day someone writes one, this turns red rather than letting a whole corpus
+	-- stay unreplayed behind a stale rationale.
+	it("SKIP is still justified — no Lua tap-hold engine exists on Linux", function()
+		local ok = pcall(require, "modules.tap_hold")
+		assert_true(not ok,
+			"modules.tap_hold now loads on Linux — replay the tap_hold corpus against it instead of skipping it")
 	end)
 end)
 
@@ -183,11 +186,22 @@ describe("Corpus: llm/parser_test_vectors.json", function()
 		assert_true(n ~= nil and n >= 1, "expected >=1 vectors in llm/parser corpus")
 	end)
 
-	it("SKIP — LLM prediction engine not implemented on Linux", function()
-		-- The Linux driver provides hotstrings + basic metrics only; the LLM
-		-- engine (api_ollama, api_remote, prediction_engine) has not been ported.
-		-- When ported, this test should be updated to call the real Lua parser.
-		assert_true(true, "skip acknowledged — LLM port is a roadmap item")
+	-- STALE RATIONALE, corrected 2026-07-31. This skip said "the LLM engine
+	-- (api_ollama, api_remote, prediction_engine) has not been ported" — all
+	-- three modules exist and load. What is actually missing is a Lua PARSER for
+	-- the advanced-block reply format these vectors describe; the Linux engine
+	-- consumes predictions without going through one. Asserting the real reason
+	-- is what stops the rationale rotting again.
+	it("SKIP is still justified — Linux has no Lua reply parser to replay these vectors through", function()
+		-- Required directly: if the engine this skip talks about has genuinely
+		-- gone, the throw says so with the real error, and the rationale is wrong
+		-- in the other direction.
+		local engine = require("modules.llm.prediction_engine")
+		assert_true(type(engine) == "table",
+			"modules.llm.prediction_engine must return a module table — this skip's rationale is written around it existing")
+		local ok, mod = pcall(require, "modules.llm.parser")
+		assert_true(not ok or type(mod) ~= "table" or type(mod.process_prediction) ~= "function",
+			"a Lua reply parser now exists on Linux — replay the llm/parser corpus against it instead of skipping it")
 	end)
 end)
 
@@ -214,11 +228,17 @@ describe("Corpus: prompt_builder/vectors.json", function()
 		assert_true(n ~= nil and n >= 1, "expected >=1 vectors in prompt_builder corpus")
 	end)
 
-	it("SKIP — PromptBuilder not wired on Linux (depends on LLM engine)", function()
-		-- _shared/lua/llm/prompt_builder.lua exists but is not loaded by the Linux
-		-- daemon (no LLM engine to call it). When the LLM port lands, update this
-		-- to call the real PromptBuilder and assert output against the vectors.
-		assert_true(true, "skip acknowledged — PromptBuilder port is a roadmap item")
+	-- The skip's reason is that the Linux daemon does not LOAD the shared
+	-- PromptBuilder, not that the module is missing — so that is what is
+	-- checked. The day the daemon requires it, this turns red and the corpus
+	-- gets replayed instead of skipped.
+	it("SKIP is still justified — the Linux daemon does not load the shared PromptBuilder", function()
+		local root = helpers.driver_root()
+		local fh = io.open(root .. "/ergopti_hotstrings.lua", "r")
+		assert_true(fh ~= nil, "the Linux entry point must be readable")
+		local src = fh:read("*a"); fh:close()
+		assert_true(src:find("llm.prompt_builder", 1, true) == nil,
+			"the daemon now references llm.prompt_builder — replay the prompt_builder corpus against it instead of skipping it")
 	end)
 end)
 
@@ -248,11 +268,21 @@ describe("Corpus: security/keylogger_no_persist_vectors.json", function()
 	-- SEC-001..006 are macOS-only (AX APIs, bundle IDs, private window detection).
 	-- SEC-007..008 require a live keylogger session (cannot run headless anywhere).
 	-- SEC-009 and SEC-010 are AHK-specific (Win32 ES_PASSWORD, UIA.IsPassword).
-	-- Linux has its own secure-field detection path via /proc/bus/input but it is
-	-- not yet implemented. Until the Linux secure-field adapter lands, all vectors
-	-- are SKIP-marked with rationale.
-	it("SKIP — Linux secure-field detection not yet implemented (roadmap item)", function()
-		assert_true(true, "skip acknowledged — SecureFieldDetector adapter stub at adapters/secure_field_detector.lua")
+	-- STALE RATIONALE, corrected 2026-07-31. This skip said Linux secure-field
+	-- detection was "not yet implemented" and called the adapter a stub. It is a
+	-- real 157-line implementation exposing isSecureField and isSecureApp. The
+	-- honest reason the vectors are skipped is the one stated above: every one of
+	-- SEC-001..010 is macOS-only, AHK-specific, or needs a live session. So what
+	-- is asserted here is that the Linux adapter exists and answers.
+	it("the Linux SecureFieldDetector adapter exists and answers", function()
+		-- Required directly, not through pcall: a failed require throws and fails
+		-- this test with the real error, where asserting on a pcall status would
+		-- prove only that require returned.
+		local sfd = require("adapters.secure_field_detector")
+		assert_true(type(sfd) == "table", "adapters.secure_field_detector must return a module table")
+		assert_true(type(sfd.isSecureApp) == "function", "it must expose isSecureApp")
+		assert_true(sfd.isSecureApp("") == false,
+			"an empty app id must answer false rather than throw — the vectors above are skipped because they are macOS/AHK-specific, NOT because Linux lacks a detector")
 	end)
 end)
 
@@ -305,22 +335,33 @@ describe("Corpus: toml/fuzz_corpus.json", function()
 			table.insert(fuzz_inputs, unescaped)
 		end
 
-		it("TOML codec does not crash on any of " .. #fuzz_inputs .. " fuzz input(s)", function()
-			local crashes = 0
+		--- Decodes with whichever entry point this codec build exposes.
+		local function decode(input)
+			if toml_mod.decode then return toml_mod.decode(input) end
+			return toml_mod.parse(input)
+		end
+
+		it("the fuzz corpus leaves the TOML codec able to parse valid input", function()
+			-- The old assertion was assert_true(true) with the crash count in its
+			-- message, and its own comment said "this assertion always passes".
+			-- Rejecting malformed TOML is CORRECT behaviour, so the crash count is
+			-- not the thing to assert on. What must hold is that no fuzz input
+			-- leaves the codec broken for the next caller — a parser that
+			-- corrupts module-level state on a malformed input is the real defect
+			-- a fuzz corpus exists to find.
+			assert_true(#fuzz_inputs > 0,
+				"no fuzz input was extracted from the corpus — the regex above stopped matching, so this test measured nothing")
+
 			for _, input in ipairs(fuzz_inputs) do
-				local ok, _ = pcall(function()
-					if toml_mod.decode then toml_mod.decode(input)
-					elseif toml_mod.parse then toml_mod.parse(input)
-					end
-				end)
-				if not ok then crashes = crashes + 1 end
+				pcall(decode, input)   -- a rejection is a correct outcome here
 			end
-			-- Crashes are allowed (fuzz inputs can be invalid TOML); what must
-			-- NOT happen is an unprotected Lua error propagating to the runner.
-			-- The pcall() above catches those — this assertion always passes
-			-- because the pcall itself is the guard. We report crash count for
-			-- visibility without failing the test.
-			assert_true(true, "crashes=" .. crashes .. "/" .. #fuzz_inputs .. " (all caught by pcall)")
+
+			-- Called directly: if the fuzz sweep left the codec unable to parse
+			-- valid TOML, the throw IS the failure and carries the real error.
+			local decoded = decode("[section]\nkey = \"value\"\n")
+			assert_true(type(decoded) == "table" and type(decoded.section) == "table"
+				and decoded.section.key == "value",
+				"and it must still parse it CORRECTLY — a codec left in a broken state by a malformed input is what this corpus is for")
 		end)
 	end
 end)
@@ -388,13 +429,14 @@ describe("Corpus: tooltip/{layout,dequeue}_vectors.json", function()
 		assert_true(n ~= nil and n >= 1, "expected >=1 vectors in tooltip layout corpus")
 	end)
 
-	it("SKIP — tooltip layout/dequeue math is canonically JS (_shared/modules/tooltip); Linux uses the GTK renderer", function()
-		-- The canonical layout + dequeue math lives in _shared/modules/tooltip/
-		-- (layout.js, dequeue.js) and is pinned by the macOS Lua clone
-		-- (test_tooltip_layout_corpus.lua) plus the AHK consumer. The Linux driver
-		-- renders tooltips through WebKit2GTK and has no Lua port of this math yet;
-		-- corpus consumed (files loaded, vectors counted) with the gap tracked.
-		assert_true(true, "skip acknowledged — Lua tooltip layout port is a roadmap item")
+	-- The canonical layout + dequeue math lives in _shared/modules/tooltip/
+	-- (layout.js, dequeue.js) and is pinned by the macOS Lua clone plus the AHK
+	-- consumer. Linux renders through WebKit2GTK with no Lua port of that math,
+	-- which is the reason for the skip — so that is what is asserted.
+	it("SKIP is still justified — Linux has no Lua tooltip layout port", function()
+		local ok = pcall(require, "modules.tooltip.layout")
+		assert_true(not ok,
+			"a Lua tooltip layout module now loads on Linux — replay the layout corpus against it instead of skipping it")
 	end)
 end)
 
