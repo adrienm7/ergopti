@@ -1,7 +1,7 @@
---- tests/unit/lib/test_updater_version_compare.lua
+--- tests/unit/modules/updater/test_updater_version_compare.lua
 
 --- Behavior parity gate for the semver comparator (lib-update-03 + D-1).
---- Drives macos/lib/updater.lua compare_versions over the SHARED cross-driver
+--- Drives macos/modules/updater/init.lua compare_versions over the SHARED cross-driver
 --- vector table (_shared/modules/updater/version_vectors.json), which the JS
 --- (tools/test/test-version-compare-contract.cjs) and AHK (test_updater.ahk)
 --- suites also read. Non-semver tags MUST be fail-closed (expect 0) so an
@@ -16,10 +16,10 @@ local helpers = require("tests.helpers")
 local json    = require("json")
 
 helpers.describe("updater.compare_versions: cross-driver version vectors (version-compare-parity)", function()
-	-- lib.updater requires lib.logger / lib.dialog_util; stub the logger so the
+	-- modules.updater requires lib.logger / lib.dialog_util; stub the logger so the
 	-- pure comparator loads headless under the hs stub.
 	package.loaded["lib.logger"] = helpers.make_logger_stub()
-	local updater = helpers.load_with_stubs("lib.updater")
+	local updater = helpers.load_with_stubs("modules.updater")
 
 	local path = helpers.shared("modules/updater/version_vectors.json")
 	local fh = io.open(path, "r")

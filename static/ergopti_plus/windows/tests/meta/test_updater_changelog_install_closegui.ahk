@@ -6,12 +6,12 @@
 ; Regression guard for finding F31: InstallSelected (the changelog window's
 ; "Install this version" button handler, defined inside
 ; _Updater_BuildChangelogGui) was the sole close path in
-; lib/updater/changelog.ahk that bypassed the _Updater_CloseGui helper --
+; modules/updater/changelog.ahk that bypassed the _Updater_CloseGui helper --
 ; every other close path (BtnSwitch, G's Close/Escape events) routes through
 ; it. _Updater_CloseGui closes the WebView2 Controller before destroying the
 ; Gui; a bare G.Destroy() skips that step.
 ;
-; SCOPE: source introspection of lib/updater/changelog.ahk.
+; SCOPE: source introspection of modules/updater/changelog.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -27,7 +27,7 @@
 
 _UCIG_CheckInstallSelectedUsesCloseGui() {
 	Body := _DriverFuncBody("_Updater_BuildChangelogGui")
-	Assert(Body != "", "_Updater_BuildChangelogGui must exist in lib/updater/changelog.ahk")
+	Assert(Body != "", "_Updater_BuildChangelogGui must exist in modules/updater/changelog.ahk")
 
 	IdxAssign := InStr(Body, "InstallSelected := ")
 	Assert(IdxAssign > 0, "_Updater_BuildChangelogGui must still define InstallSelected")
@@ -40,7 +40,7 @@ _UCIG_CheckInstallSelectedUsesCloseGui() {
 	InstallSelectedBody := SubStr(Body, IdxAssign, IdxNext - IdxAssign)
 
 	Assert(InStr(InstallSelectedBody, "_Updater_CloseGui(G)") > 0,
-		"InstallSelected must close the window via _Updater_CloseGui(G), matching every other close path in lib/updater/changelog.ahk -- a bare G.Destroy() skips closing the WebView2 Controller first (updater-changelog-install-bare-destroy)")
+		"InstallSelected must close the window via _Updater_CloseGui(G), matching every other close path in modules/updater/changelog.ahk -- a bare G.Destroy() skips closing the WebView2 Controller first (updater-changelog-install-bare-destroy)")
 	Assert(InStr(InstallSelectedBody, "G.Destroy()") = 0,
 		"InstallSelected must not call the bare G.Destroy() -- it bypasses the _Updater_CloseGui helper that closes the WebView2 Controller before destroying the Gui (updater-changelog-install-bare-destroy)")
 }

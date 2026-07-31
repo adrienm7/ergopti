@@ -4,13 +4,13 @@
 ; MODULE: Updater Async OnJson Callback Catch Meta Test
 ; DESCRIPTION:
 ; Regression guard for finding F28: four "try OnJson(...)" call sites in
-; lib/updater/core.ahk had no catch clause. AHK v2 does not route an uncaught
+; modules/updater/core.ahk had no catch clause. AHK v2 does not route an uncaught
 ; exception from inside a try block to the registered global OnError handler
 ; when the try itself has no catch -- an exception thrown while building the
 ; changelog GUI from inside an OnJson callback was therefore completely
 ; invisible, with zero trace in the logs.
 ;
-; SCOPE: source introspection of lib/updater/core.ahk.
+; SCOPE: source introspection of modules/updater/core.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -45,7 +45,7 @@ for _UOCC_FnName in _UOCC_Functions() {
 
 _UOCC_CheckOnJsonHasCatch(FnName) {
 	Body := _DriverFuncBody(FnName)
-	Assert(Body != "", FnName . " must exist in lib/updater/core.ahk")
+	Assert(Body != "", FnName . " must exist in modules/updater/core.ahk")
 
 	TryPos := InStr(Body, "try OnJson(")
 	Assert(TryPos > 0, FnName . " must still call OnJson(...) via a try")

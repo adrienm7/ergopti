@@ -15,7 +15,7 @@
 ; The fix: add `if A_IsSuspended return` at the top of both callbacks, mirroring
 ; the existing guard in the background-check timer body.
 ;
-; SCOPE: source introspection of lib/updater.ahk.
+; SCOPE: source introspection of modules/updater.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -51,11 +51,11 @@ _UCSG_FuncBody(Src, FnDecl) {
 }
 
 _UCSG_CheckFnHasSuspendGuard(FnDecl) {
-	Src := _DriverDirConcat("lib/updater")
-	Assert(Src != "", "the lib/updater module must be readable")
+	Src := _DriverDirConcat("modules/updater")
+	Assert(Src != "", "the modules/updater module must be readable")
 
 	Body := _UCSG_FuncBody(Src, FnDecl)
-	Assert(Body != "", FnDecl . " must be present in the lib/updater module")
+	Assert(Body != "", FnDecl . " must be present in the modules/updater module")
 
 	; The guard must appear before any UI/install operation
 	SuspendPos := InStr(Body, "A_IsSuspended")
@@ -85,7 +85,7 @@ Test("meta updater-callback-suspend: _Updater_OneClickUpdateCallback guards A_Is
 	() => _UCSG_CheckFnHasSuspendGuard("_Updater_OneClickUpdateCallback(Json, Current) {"))
 
 _UCSG_SuspendedOneClickFinalisesMenu() {
-	Body := _UCSG_FuncBody(_DriverDirConcat("lib/updater"), "_Updater_OneClickUpdateCallback(Json, Current) {")
+	Body := _UCSG_FuncBody(_DriverDirConcat("modules/updater"), "_Updater_OneClickUpdateCallback(Json, Current) {")
 	RebuildPos := InStr(Body, "_Updater_RebuildMenu()")
 	SuspendPos := InStr(Body, "if A_IsSuspended")
 	Assert(RebuildPos > 0 && SuspendPos > RebuildPos,
@@ -105,11 +105,11 @@ Test("meta updater-callback-suspend: _Updater_HandleBackgroundResult guards A_Is
 ; here instead of through the FirstAction token list _UCSG_CheckFnHasSuspendGuard
 ; uses (that check is a no-op when none of its tokens are present).
 _UCSG_CheckBuildChangelogGuiHasSuspendGuard() {
-	Src := _DriverDirConcat("lib/updater")
-	Assert(Src != "", "the lib/updater module must be readable")
+	Src := _DriverDirConcat("modules/updater")
+	Assert(Src != "", "the modules/updater module must be readable")
 
 	Body := _UCSG_FuncBody(Src, "_Updater_BuildChangelogGui(Json, Channel) {")
-	Assert(Body != "", "_Updater_BuildChangelogGui must be present in the lib/updater module")
+	Assert(Body != "", "_Updater_BuildChangelogGui must be present in the modules/updater module")
 
 	SuspendPos := InStr(Body, "A_IsSuspended")
 	Assert(SuspendPos > 0,
@@ -134,11 +134,11 @@ Test("meta updater-callback-suspend: _Updater_BuildChangelogGui guards A_IsSuspe
 ; itself, which also backs the tray menu's "check for updates" item and must
 ; keep working while paused.
 _UCSG_CheckOnTrayMsgHasSuspendGuard() {
-	Src := _DriverDirConcat("lib/updater")
-	Assert(Src != "", "the lib/updater module must be readable")
+	Src := _DriverDirConcat("modules/updater")
+	Assert(Src != "", "the modules/updater module must be readable")
 
 	Body := _UCSG_FuncBody(Src, "_Updater_OnTrayMsg(wParam, lParam, msg, hwnd) {")
-	Assert(Body != "", "_Updater_OnTrayMsg must be present in the lib/updater module")
+	Assert(Body != "", "_Updater_OnTrayMsg must be present in the modules/updater module")
 
 	SuspendPos := InStr(Body, "A_IsSuspended")
 	Assert(SuspendPos > 0,

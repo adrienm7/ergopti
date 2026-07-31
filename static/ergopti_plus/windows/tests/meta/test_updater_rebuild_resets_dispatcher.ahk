@@ -22,7 +22,7 @@
 ;   3. All SetTimer(-50) tray-rebuild calls in the updater go through
 ;      _Updater_RebuildMenu, not bare initMenu() calls.
 ;
-; SCOPE: source introspection of lib/updater/.
+; SCOPE: source introspection of modules/updater/.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -37,7 +37,7 @@
 ; ====================================================
 
 _URRD_ReadSource() {
-	return _DriverDirConcat("lib/updater")
+	return _DriverDirConcat("modules/updater")
 }
 
 
@@ -49,10 +49,10 @@ _URRD_ReadSource() {
 
 _URRD_RebuildMenuWrapperDefined() {
 	Src := _URRD_ReadSource()
-	Assert(Src != "", "lib/updater/ source must be readable")
+	Assert(Src != "", "modules/updater/ source must be readable")
 
 	Body := _DriverFuncBody("_Updater_RebuildMenu")
-	Assert(Body != "", "_Updater_RebuildMenu must be defined in lib/updater/ — the wrapper is the single point that all updater-originated tray rebuilds must go through (AHK-15)")
+	Assert(Body != "", "_Updater_RebuildMenu must be defined in modules/updater/ — the wrapper is the single point that all updater-originated tray rebuilds must go through (AHK-15)")
 }
 
 Test("updater: _Updater_RebuildMenu wrapper is defined (updater-rebuild-resets-dispatcher)",
@@ -77,7 +77,7 @@ Test("updater: _Updater_RebuildMenu delegates to staged publication (updater-reb
 
 _URRD_NoBareinitMenuInSetTimerCalls() {
 	Src := _URRD_ReadSource()
-	Assert(Src != "", "lib/updater/ source must be readable")
+	Assert(Src != "", "modules/updater/ source must be readable")
 
 	; Every SetTimer call targeting a tray rebuild must go through _Updater_RebuildMenu,
 	; not invoke initMenu() directly. Count occurrences of the pattern.

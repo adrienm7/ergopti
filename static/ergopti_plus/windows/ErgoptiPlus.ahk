@@ -306,7 +306,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/menu_manifest.ahk
 #Include lib/manifest_menu.ahk
 #Include lib/llm_defaults.ahk
-#Include lib/updater.ahk
+#Include modules/updater.ahk
 #Include ui/changelog/init.ahk
 #Include ui/healthcheck/init.ahk
 #Include modules/diagnostics/crash_reporter.ahk

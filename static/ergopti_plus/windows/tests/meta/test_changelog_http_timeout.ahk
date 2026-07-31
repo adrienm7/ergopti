@@ -12,7 +12,7 @@
 ; the timer thread indefinitely, blocking every subsequent SetTimer callback and
 ; freezing all keyboard remapping until the network recovers.
 ;
-; The fix reuses UPDATER_HTTP_RESOLVE_TIMEOUT_MS (5 s) from lib/updater.ahk so
+; The fix reuses UPDATER_HTTP_RESOLVE_TIMEOUT_MS (5 s) from modules/updater.ahk so
 ; every WinHTTP call in the driver shares the same finite budget. These tests
 ; assert the infinite form is gone and the shared constant is used.
 ; ==============================================================================

@@ -24,7 +24,7 @@
  *
  * The metric is the share of DISTINCT directory paths that exist in all three
  * drivers. A path present in one driver only counts against it, which is the
- * point: `windows/lib/updater/` and `macos/modules/karabiner/` are both real
+ * point: `windows/modules/updater/` and `macos/modules/karabiner/` are both real
  * work that has no counterpart, and the number should say so.
  *
  * WHY IT IS NOT A LINE COUNT:
@@ -93,7 +93,7 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 
 // ── The ratchet ─────────────────────────────────────────────────────────────
 //
-// 2026-07-31: 12 of 51 distinct paths are present in all three drivers (23.5 %).
+// 2026-07-31: 13 of 50 distinct paths are present in all three drivers (26.0 %).
 // Raise BASELINE_SHARED as Lots 3–6 land; never lower it to make a change pass.
 //
 // History, so the ratchet reads as a trajectory rather than a number:
@@ -101,18 +101,22 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //   12/51 (23.5 %) — crash_reporter promoted out of lib/ into modules/diagnostics
 //                    on macOS and Windows, where Linux already had it. The union
 //                    did not grow: the path already existed, on one driver.
+//   13/50 (26.0 %) — updater promoted the same way. Here the union SHRANK too,
+//                    because Windows had a whole lib/updater/ directory that
+//                    moved rather than a single file: one unshared path removed
+//                    and one shared path gained, from the same move.
 //
 // Written as a literal, not as `shared.length`. Deriving the baseline from the
 // value it is supposed to constrain makes the comparison `x <= x` — a check that
 // passes for every possible input, which is the precise definition of the false
 // green this repo already ratchets against elsewhere.
-const BASELINE_SHARED = 12;
+const BASELINE_SHARED = 13;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
 // the programme drifting sideways — adding structure to one driver while the
 // shared count stands still.
-const BASELINE_UNION = 51;
+const BASELINE_UNION = 50;
 
 if (shared.length < BASELINE_SHARED) {
 	errors.push(

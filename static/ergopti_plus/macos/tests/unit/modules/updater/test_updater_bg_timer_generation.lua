@@ -1,4 +1,4 @@
---- tests/unit/lib/test_updater_bg_timer_generation.lua
+--- tests/unit/modules/updater/test_updater_bg_timer_generation.lua
 
 --- Regression test for lib-update-02: updater.lua background_tick() had no
 --- generation guard on its asyncGet callback. Switching channels mid-flight
@@ -11,11 +11,11 @@
 
 local helpers = require("tests.helpers")
 
--- Selected by a declaration unique to lib/updater.lua rather than by
+-- Selected by a declaration unique to modules/updater/init.lua rather than by
 -- path, so moving or splitting the module cannot turn this invariant
 -- into a path error.
 local src = helpers.read_driver_source("function M.unwrap_first_prerelease_json")
-helpers.assert_true(src ~= nil, "lib/updater.lua source must be locatable")
+helpers.assert_true(src ~= nil, "modules/updater/init.lua source must be locatable")
 
 -- Test 1: _poll_generation state variable must be declared.
 local has_gen_var = src:find("local _poll_generation", 1, true) ~= nil

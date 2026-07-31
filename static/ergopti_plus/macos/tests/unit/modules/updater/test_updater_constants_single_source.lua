@@ -1,6 +1,6 @@
---- tests/unit/lib/test_updater_constants_single_source.lua
+--- tests/unit/modules/updater/test_updater_constants_single_source.lua
 
---- Regression guard: asserts that lib.updater exports the
+--- Regression guard: asserts that modules.updater exports the
 --- canonical owner/repo/timing values from defaults.json. Tests assert the
 --- module's exported values at load-time — NOT source text — so they catch
 --- both a missing defaults.json read and a silent fallback mismatch.
@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("updater constants single source", function()
 	package.loaded["lib.logger"] = helpers.make_logger_stub()
-	local updater = helpers.load_with_stubs("lib.updater")
+	local updater = helpers.load_with_stubs("modules.updater")
 
 	helpers.it("GH_OWNER is the canonical GitHub owner", function()
 		helpers.assert_eq(updater.GH_OWNER, "adrienm7", "M.GH_OWNER must equal defaults.json github.owner")

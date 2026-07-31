@@ -22,7 +22,7 @@ _G5UD_ReadSource(RelPath) {
 }
 
 _G5UD_CheckDownloadPollGuards() {
-	Src := _G5UD_ReadSource("lib/updater.ahk")
+	Src := _G5UD_ReadSource("modules/updater.ahk")
 	Seg := _DriverFuncBody("_Updater_MonitorStagingWorker")
 	
 	Assert(Seg != "", "_Updater_MonitorStagingWorker must exist in updater.ahk")

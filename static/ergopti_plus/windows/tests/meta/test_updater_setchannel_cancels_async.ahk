@@ -49,9 +49,9 @@ _USCA_ReadSource(RelPath) {
 ; ==================================================
 
 _USCA_SetChannelCancelsAsyncBeforeReload() {
-	Src := _USCA_ReadSource("lib/updater.ahk")
+	Src := _USCA_ReadSource("modules/updater.ahk")
 	Seg := _DriverFuncBody("Updater_SetChannel")
-	Assert(Seg != "", "Updater_SetChannel(Channel) declaration must exist in lib/updater.ahk")
+	Assert(Seg != "", "Updater_SetChannel(Channel) declaration must exist in modules/updater.ahk")
 
 	StopIdx := InStr(Seg, "Updater_StopBackgroundChecks()")
 	Assert(StopIdx > 0,

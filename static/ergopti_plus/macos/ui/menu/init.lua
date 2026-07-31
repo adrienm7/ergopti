@@ -27,7 +27,7 @@ local HotCounter    = require("ui.menu.hotstring_counter")
 local MenuPaths     = require("ui.menu.menu_paths")
 local MenuState     = require("ui.menu.menu_state")
 local MenuWatchers  = require("ui.menu.menu_watchers")
-local Updater       = require("lib.updater")
+local Updater       = require("modules.updater")
 local TrayMenu      = require("adapters.tray_menu")
 
 local LOG = "menu"

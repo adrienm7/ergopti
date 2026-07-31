@@ -159,19 +159,30 @@ Constraints: **paths before moves, moves before content, data before code.**
      the same gates.
 
 - **Lot 3 — one tree.** Four independently-green steps.
-  **First promotion landed:** `crash_reporter` moved out of `lib/` into
-  `modules/diagnostics/` on macOS and Windows, where **Linux already had it**.
+  **Two promotions landed:** `crash_reporter` → `modules/diagnostics/` and
+  `updater` → `modules/updater/`, both on macOS and Windows, where **Linux
+  already had them**. I1: 21.6 % → 23.5 % → **26.0 %** (11/51 → 13/50).
+  The updater move shrank the union as well as raising the shared count, because
+  Windows had a whole `lib/updater/` directory rather than a single file — one
+  unshared path removed and one shared path gained from the same move. That is
+  the shape to look for in the remaining promotions.
   That third driver is what makes these moves objective rather than taste: the
   question "is this a feature or infrastructure?" has no clean answer in the
   abstract, but "where does the same code live in the other drivers?" does, and
   answering it raises I1 by construction. Ratio 21.6 % → **23.5 %** (11 → 12 of
   51); the union did not grow, because the path already existed on one driver.
-  Cost, for calibrating the rest: 5 references on macOS across 3 files, ~10 files
-  on Windows, plus four test files moved to mirror the code and two source-text
-  scans re-pointed from `_DriverDirConcat("lib")` to
-  `_DriverDirConcat("modules/diagnostics")` — that helper is move-resilient
-  *within* a directory, not across one, which is worth knowing before the bigger
-  moves. One JS gate named the file by path and had to follow.
+  Cost, for calibrating the rest. crash_reporter: 5 macOS references across 3
+  files, ~10 Windows files, four test files moved to mirror the code, two
+  source-text scans re-pointed from `_DriverDirConcat("lib")` to
+  `_DriverDirConcat("modules/diagnostics")`, one JS gate that named the file by
+  path. updater, roughly double: 11 macOS files, 29 Windows files, six test files
+  moved, seven `_DriverDirConcat("lib/updater")` scans re-pointed, and **three**
+  JS gates holding hardcoded paths (`test-updater-constants-single-source.cjs`,
+  `test-version-compare-contract.cjs`, and the I1 gate's own docstring).
+  Two lessons for the bigger moves: `_DriverDirConcat` is move-resilient *within*
+  a directory, not across one, so every scan scoped to `lib` needs re-pointing;
+  and the `.cjs` gates are where hardcoded paths hide — the Lua and AHK suites
+  went green while three JS gates were still reading the old locations.
   Remaining steps: (a) extract `platform/`;
   (b) `lib/` → `infra/` with features promoted out — ⚠ the macOS `lib.text_utils`
   and `lib/toml/*` shims must keep their basenames, and the `lib.` → `infra.`

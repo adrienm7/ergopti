@@ -15,7 +15,7 @@
 ;      foreground window and fanning out to every focus callback (which downstream
 ;      feed keylogger app-switch events). It must early-return on A_IsSuspended.
 ;
-;   2. Updater_BackgroundTick (lib/updater.ahk) dispatches a network check and can
+;   2. Updater_BackgroundTick (modules/updater.ahk) dispatches a network check and can
 ;      pop a TrayTip + rebuild the tray menu. It must re-arm its next tick (so the
 ;      loop survives pause) but then skip the dispatch on A_IsSuspended.
 ;
@@ -62,9 +62,9 @@ _UFPS_FocusPollHasSuspendGuard() {
 Test("process_lifecycle: PLC_Poll has an A_IsSuspended guard (no-suspend-guard-on-background-tick-and-focus-poll)", _UFPS_FocusPollHasSuspendGuard)
 
 _UFPS_BackgroundTickHasSuspendGuard() {
-	Src := _UFPS_ReadSource("lib/updater.ahk")
+	Src := _UFPS_ReadSource("modules/updater.ahk")
 	Seg := _DriverFuncBody("Updater_BackgroundTick")
-	Assert(Seg != "", "Updater_BackgroundTick(*) declaration must exist in lib/updater.ahk")
+	Assert(Seg != "", "Updater_BackgroundTick(*) declaration must exist in modules/updater.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
 		"Updater_BackgroundTick must skip its network dispatch / TrayTip / menu rebuild on A_IsSuspended — otherwise update notifications keep popping while the driver is paused (no-suspend-guard-on-background-tick-and-focus-poll)")
 }

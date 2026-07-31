@@ -76,9 +76,9 @@ Test("meta changelog-fetch-async: _CLW_DoFetch uses async WinHttp poll, not sync
 ; bug as _CLW_DoFetch. The fix delegates to _Updater_FetchReleasesListJsonAsync
 ; so the GUI is built in a poll-timer callback rather than inline.
 _CLFA_FallbackIsAsync() {
-	Src := _CLFA_ReadSource("lib/updater.ahk")
+	Src := _CLFA_ReadSource("modules/updater.ahk")
 	Body := _DriverFuncBody("_Updater_OpenChangelogWindow")
-	Assert(Body != "", "_Updater_OpenChangelogWindow must exist in lib/updater.ahk")
+	Assert(Body != "", "_Updater_OpenChangelogWindow must exist in modules/updater.ahk")
 	Assert(!InStr(Body, "Updater_FetchReleasesListJson("),
 		"_Updater_OpenChangelogWindow must not call the sync Updater_FetchReleasesListJson — it blocks the keyboard hook (HIGH-05 fallback)")
 	Assert(InStr(Body, "_Updater_FetchReleasesListJsonAsync(") > 0,

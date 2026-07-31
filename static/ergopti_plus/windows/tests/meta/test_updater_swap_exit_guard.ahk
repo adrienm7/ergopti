@@ -43,7 +43,7 @@
 
 _TUSEG_CheckSwapExitGuard() {
 	Body := _DriverFuncBody("_Updater_PollDownloadAsync")
-	Assert(Body != "", "_Updater_PollDownloadAsync must exist in lib/updater/self_update.ahk")
+	Assert(Body != "", "_Updater_PollDownloadAsync must exist in modules/updater/self_update.ahk")
 
 	; (a) A launch-success flag must exist so ExitApp is conditional
 	Assert(InStr(Body, "_SwapLaunched"),

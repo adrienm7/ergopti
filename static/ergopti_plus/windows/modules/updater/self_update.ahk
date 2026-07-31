@@ -1,11 +1,11 @@
-﻿; lib/updater/self_update.ahk
+﻿; modules/updater/self_update.ahk
 
 ; ==============================================================================
 ; MODULE: Updater / Self-update Download + Swap + Background
 ; DESCRIPTION:
 ; The self-update mechanism: release-asset URL parser, background polling timer, tray-notify handler, the update prompt, and the download + executable-swap install flow.
 ;
-; Split out of lib/updater.ahk (the module split); see lib/updater.ahk for the module
+; Split out of modules/updater.ahk (the module split); see modules/updater.ahk for the module
 ; overview. Functions and globals are hoisted, so load order across the
 ; updater/*.ahk files is irrelevant.
 ; ==============================================================================

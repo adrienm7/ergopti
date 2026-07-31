@@ -1,4 +1,4 @@
---- tests/unit/lib/test_updater_boot_timer_tracked.lua
+--- tests/unit/modules/updater/test_updater_boot_timer_tracked.lua
 
 --- Regression test for lib-update-01: the one-shot boot-check timer created
 --- by start_background_checks() was not tracked in any variable, so
@@ -11,31 +11,31 @@
 
 local helpers = require("tests.helpers")
 
--- Selected by a declaration unique to lib/updater.lua rather than by
+-- Selected by a declaration unique to modules/updater/init.lua rather than by
 -- path, so moving or splitting the module cannot turn this invariant
 -- into a path error.
 local src = helpers.read_driver_source("function M.unwrap_first_prerelease_json")
-helpers.assert_true(src ~= nil, "lib/updater.lua source must be locatable")
+helpers.assert_true(src ~= nil, "modules/updater/init.lua source must be locatable")
 
 -- Test 1: _boot_timer must be declared at module level.
 local decl_pos = src:find("local _boot_timer", 1, true)
 helpers.assert_true(
 	decl_pos ~= nil,
-	"lib/updater.lua must declare _boot_timer at module level (lib-update-01)"
+	"modules/updater/init.lua must declare _boot_timer at module level (lib-update-01)"
 )
 
 -- Test 2: doAfter result must be assigned to _boot_timer (not discarded).
 local assign_pos = src:find("_boot_timer = hs.timer.doAfter(", 1, true)
 helpers.assert_true(
 	assign_pos ~= nil,
-	"lib/updater.lua must assign the doAfter() result to _boot_timer (lib-update-01)"
+	"modules/updater/init.lua must assign the doAfter() result to _boot_timer (lib-update-01)"
 )
 
 -- Test 3: stop_background_checks must stop and nil _boot_timer.
 local stop_pos = src:find("_boot_timer:stop()", 1, true)
 helpers.assert_true(
 	stop_pos ~= nil,
-	"lib/updater.lua stop_background_checks() must stop _boot_timer (lib-update-01)"
+	"modules/updater/init.lua stop_background_checks() must stop _boot_timer (lib-update-01)"
 )
 
 print("[PASS] test_updater_boot_timer_tracked")

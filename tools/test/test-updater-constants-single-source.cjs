@@ -5,7 +5,7 @@
  * MODULE: Updater Constants Single-Source Gate
  * DESCRIPTION:
  * Drift gate: verifies that the owner/repo/timing literals in
- * windows/lib/updater/core.ahk and macos/lib/updater.lua agree with the
+ * windows/modules/updater/core.ahk and macos/modules/updater/init.lua agree with the
  * canonical values in _shared/modules/updater/defaults.json. A mismatch here
  * means someone edited a per-driver literal without updating the shared JSON
  * (or vice versa).
@@ -34,8 +34,8 @@ const path = require("path");
 const ROOT        = path.resolve(__dirname, "..", "..");
 const SHARED_ROOT = path.join(ROOT, "static", "ergopti_plus", "_shared");
 const DEFAULTS    = path.join(SHARED_ROOT, "modules", "updater", "defaults.json");
-const AHK_CORE    = path.join(ROOT, "static", "ergopti_plus", "windows", "lib", "updater", "core.ahk");
-const LUA_UPDATER = path.join(ROOT, "static", "ergopti_plus", "macos", "lib", "updater.lua");
+const AHK_CORE    = path.join(ROOT, "static", "ergopti_plus", "windows", "modules", "updater", "core.ahk");
+const LUA_UPDATER = path.join(ROOT, "static", "ergopti_plus", "macos", "modules", "updater", "init.lua");
 const LINUX_UPDATER = path.join(ROOT, "static", "ergopti_plus", "linux", "modules", "updater", "manager.lua");
 
 let exitCode = 0;
@@ -140,7 +140,7 @@ if (luaOldRepoLiteral.test(luaSrc)) {
 // is exactly the kind of literal this gate exists to pin — and it was the one
 // copy nothing checked.
 const LUA_DRIVERS = [
-	{ label: "macos/lib/updater.lua", file: LUA_UPDATER },
+	{ label: "macos/modules/updater/init.lua", file: LUA_UPDATER },
 	{ label: "linux/modules/updater/manager.lua", file: LINUX_UPDATER }
 ];
 

@@ -1,11 +1,11 @@
-﻿; lib/updater/changelog.ahk
+﻿; modules/updater/changelog.ahk
 
 ; ==============================================================================
 ; MODULE: Updater / Menu Actions + Changelog UI
 ; DESCRIPTION:
 ; The dynamic update menu state and label, one-click update flow, version dialog, and the changelog window (HTML/markdown rendering) shown to the user.
 ;
-; Split out of lib/updater.ahk (the module split); see lib/updater.ahk for the module
+; Split out of modules/updater.ahk (the module split); see modules/updater.ahk for the module
 ; overview. Functions and globals are hoisted, so load order across the
 ; updater/*.ahk files is irrelevant.
 ; ==============================================================================
