@@ -92,6 +92,7 @@ const CHECKS = [
 	{ name: 'menu manifest drift (feature paths + i18n keys resolve against manifest.toml)', cmd: 'node', args: ['tools/test/test-menu-manifest.cjs'], repro: 'node tools/test/test-menu-manifest.cjs' },
 	{ name: 'features manifest no-drift (every committed _generated/ file matches the live generator)', cmd: 'node', args: ['tools/test/test-features-manifest-no-drift.cjs'], repro: 'node tools/test/test-features-manifest-no-drift.cjs' },
 	{ name: 'drift guard covers every generator output (and never eats an uncommitted edit)', cmd: 'node', args: ['tools/test/test-drift-guard-covers-every-output.cjs'], repro: 'node tools/test/test-drift-guard-covers-every-output.cjs' },
+	{ name: 'hotstring corpus backspace_count is a logical count, not emitted keystrokes', cmd: 'node', args: ['tools/test/test-corpus-backspace-count-semantics.cjs'], repro: 'node tools/test/test-corpus-backspace-count-semantics.cjs' },
 	{ name: 'hotstring editor confirm dialog wiring (delete actually fires)', cmd: 'node', args: ['tools/test/test-hotstring-editor-confirm-wiring.cjs'], repro: 'node tools/test/test-hotstring-editor-confirm-wiring.cjs' },
 	{ name: 'WebView2 host teardown order (closing a window must not quit AHK)', cmd: 'node', args: ['tools/test/test-webview-teardown-order.cjs'], repro: 'node tools/test/test-webview-teardown-order.cjs' },
 	{ name: 'dynamic hotstrings menu labels (resolver bridge + locale keys)', cmd: 'node', args: ['tools/test/test-dynamic-hotstrings-menu-labels.cjs'], repro: 'node tools/test/test-dynamic-hotstrings-menu-labels.cjs' },

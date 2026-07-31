@@ -367,12 +367,30 @@ Constraints: **paths before moves, moves before content, data before code.**
   case folding, the word-boundary predicate, the collision tiebreak). The other
   ~14 000 are emission, buffer/screen sync, suppression bookkeeping, TOML I/O,
   tooltip preview and OS quirks, legitimately per-driver.
-  1. **Fix the corpus contract first.** `backspace_count` cannot be a cross-driver
-     assertion: Windows and Linux let the triggering keystroke reach the screen
-     before erasing, macOS consumes it and applies a common-prefix optimisation.
-     For `btw → by the way` the right answer is 3 on Windows/Linux and 1 on macOS.
-     **The corpus is wrong, not macOS** — and until this is fixed the corpus would
-     reject a correct implementation.
+  1. ~~**Fix the corpus contract first.** `backspace_count` cannot be a
+     cross-driver assertion…~~ — **the premise was wrong; measured and closed.**
+     The corpus is correct and macOS already conforms: its e2e replays all 13
+     matched vectors against the real expander and passes 39/39 today.
+     `backspace_count` is a **logical** count — how many codepoints the expansion
+     replaces — not the number of backspace keystrokes emitted. macOS keeps the
+     longest common prefix shared by trigger and replacement, so it emits fewer
+     keystrokes (`btw → by the way`: 2 emitted, not 3, and **not 1** — the figure
+     previously recorded here was neither the logical nor the physical count),
+     but it replaces the same codepoints. The macOS e2e harness reconstructs the
+     logical count from the screen precisely so the optimisation cannot change
+     the answer. Measured: **6 of the 13** matched vectors would give a different
+     number under the physical reading.
+     What was actually missing was that **nothing said so anywhere** — the field
+     name reads as physical, which is how this got recorded as a macOS
+     conformance bug in the first place. The corpus now carries a
+     `field_semantics.backspace_count` entry, and
+     `test-corpus-backspace-count-semantics.cjs` keeps it honest: it pins the
+     logical formula in one place instead of three near-identical per-driver
+     copies, and fails if no vector distinguishes the two readings — otherwise a
+     driver could satisfy the corpus by emitting either number.
+     The failure this prevents is the plausible one: someone "simplifies" the e2e
+     harness to count emitted backspaces, macOS goes red against a corpus that is
+     right, and the corpus gets "fixed" to match one driver's optimisation.
   2. Extend the corpus to the branches measured as absent: `auto_expand`,
      `final_result`, the terminator path, star/magic-key triggers, `case_conform`,
      `is_case_sensitive_strict` (**1 302 entries use it**, documented nowhere), the

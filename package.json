@@ -50,6 +50,7 @@
 		"test:i18n-fallback-path": "node ./tools/test/test-i18n-fallback-path.cjs",
 		"test:i18n-cascade": "node ./tools/test/test-webview-i18n-cascade.cjs",
 		"test:drift-guard-coverage": "node ./tools/test/test-drift-guard-covers-every-output.cjs",
+		"test:corpus-backspace-semantics": "node ./tools/test/test-corpus-backspace-count-semantics.cjs",
 		"test:linux-version-single-source": "node ./tools/test/test-linux-version-single-source.cjs",
 		"test:hotstring-buffer-cap-parity": "node ./tools/test/test-hotstring-buffer-cap-parity.cjs",
 		"test:macos-bundle-layout": "node ./tools/test/test-macos-bundle-layout.cjs",
