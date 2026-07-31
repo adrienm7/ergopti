@@ -147,11 +147,13 @@ helpers.describe("lazily required modules and methods exist", function()
 			"the source walk must find driver .lua files — an empty list would make this guard vacuous")
 
 		local unresolved = {}
+		local seen_requires = 0
 		for _, path in ipairs(files) do
 			local src = read_file(path)
 			if src then
 				local rel = path:sub(#root + 1)
 				for mod in src:gmatch('require%s*%(%s*"([%w_.]+)"') do
+					seen_requires = seen_requires + 1
 					if not resolve_module(root, mod) then
 						unresolved[#unresolved + 1] = rel .. " -> " .. mod
 					end
@@ -164,6 +166,13 @@ helpers.describe("lazily required modules and methods exist", function()
 			end
 		end
 
+		-- This check passes on an empty result, so a pattern that stops matching
+		-- retires it instead of failing it. The driver has hundreds of requires;
+		-- finding none means the scan is broken, not that the code is.
+		helpers.assert_true(seen_requires > 100,
+			"the require() scan matched only " .. seen_requires .. " call(s) across the driver — "
+			.. "the pattern no longer finds them, so an empty unresolved list proves nothing")
+
 		helpers.assert_true(#unresolved == 0, string.format(
 			"%d require() target(s) resolve to no file on package.path: %s. "
 			.. "Every one is a permanently dead branch — pcall(require, …) returns "
@@ -174,6 +183,7 @@ helpers.describe("lazily required modules and methods exist", function()
 	helpers.it("only type-guards methods the target module actually exports", function()
 		local root, files = driver_sources()
 		local missing = {}
+		local seen_sites = 0
 		for _, path in ipairs(files) do
 			local src = read_file(path)
 			if src then
@@ -189,6 +199,7 @@ helpers.describe("lazily required modules and methods exist", function()
 				local sites = {}
 				for pos, var, mod in src:gmatch('()([%w_]+)%s*=%s*pcall%s*%(%s*require%s*,%s*"([%w_.]+)"%s*%)') do
 					sites[#sites + 1] = { pos = pos, var = var, mod = mod }
+					seen_sites = seen_sites + 1
 				end
 				for i, site in ipairs(sites) do
 					local stop = sites[i + 1] and (sites[i + 1].pos - 1) or #src
@@ -213,6 +224,12 @@ helpers.describe("lazily required modules and methods exist", function()
 				end
 			end
 		end
+
+		-- Same floor as above: an empty `missing` must mean the guards are correct,
+		-- not that the pcall-require pattern found no call sites to check.
+		helpers.assert_true(seen_sites > 10,
+			"the pcall(require, …) scan matched only " .. seen_sites .. " site(s) — the pattern "
+			.. "no longer finds them, so an empty result proves nothing")
 
 		helpers.assert_true(#missing == 0, string.format(
 			"%d guarded call(s) name a method the module does not export: %s. "

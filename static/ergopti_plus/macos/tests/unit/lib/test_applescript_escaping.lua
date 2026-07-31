@@ -116,6 +116,12 @@ helpers.describe("the AppleScript call sites escape through the shared helper", 
 				end
 			end
 
+			-- This check passes on an empty result, so an unreadable or renamed source
+			-- would retire it rather than fail it.
+			helpers.assert_true(lineno > 0,
+				entry.what .. ": the scan walked no lines at all — the source is empty or was "
+					.. "not found, so finding no offenders proves nothing")
+
 			helpers.assert_eq(#offenders, 0,
 				entry.what .. " escapes the double quote without touching the backslash. "
 					.. "AppleScript treats the backslash as an escape character, so the value the "
