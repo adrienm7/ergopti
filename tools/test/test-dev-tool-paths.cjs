@@ -89,6 +89,47 @@ if (!gitignore.split(/\r?\n/).some((l) => l.trim() === OVERRIDE_SLASH)) {
 	errors.push(`.gitignore: must ignore "${OVERRIDE_SLASH}" so the private override pointer is never tracked.`);
 }
 
+// 5. NO tool anywhere under tools/ may hardcode one machine's checkout.
+//
+// This check used to be scoped to tools/dev/, and tools/build/ carried two:
+// gen-process-prediction-corpus.lua resolved both its module path and its output
+// path from "D:/Documents/GitHub/ergopti/…". The generator therefore could not
+// run on any other machine or in CI — it would fail to require the shared parser,
+// or write its corpus to a directory that does not exist. A path a contributor
+// cannot use is a path that quietly makes a tool single-user.
+const ABSOLUTE_HOME = [
+	{ label: 'a Windows drive-letter checkout', re: /["'][A-Za-z]:[/\\](?:Users|Documents|Dev|Projects|src)[/\\]/i },
+	{ label: 'a Unix home checkout', re: /["']\/(?:Users|home)\/[A-Za-z][\w.-]*\// },
+];
+
+/** Every tracked file under tools/, minus this guard itself. */
+function toolFiles(dir, acc = []) {
+	for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+		const p = path.join(dir, e.name);
+		if (e.isDirectory()) {
+			if (e.name !== 'node_modules') toolFiles(p, acc);
+		} else if (/\.(js|cjs|mjs|lua|py|sh|ps1)$/i.test(e.name)) {
+			acc.push(p);
+		}
+	}
+	return acc;
+}
+
+const SELF = path.join(ROOT, 'tools', 'test', 'test-dev-tool-paths.cjs');
+for (const abs of toolFiles(path.join(ROOT, 'tools'))) {
+	if (abs === SELF) continue;
+	const text = fs.readFileSync(abs, 'utf8');
+	const rel = path.relative(ROOT, abs).replace(/\\/g, '/');
+	text.split(/\r?\n/).forEach((line, i) => {
+		if (/^\s*(\/\/|#|--|;)/.test(line)) return;   // prose may cite a path
+		for (const { label, re } of ABSOLUTE_HOME) {
+			if (re.test(line)) {
+				errors.push(`${rel}:${i + 1}: hardcodes ${label} — derive the repo root from the script's own location instead.`);
+			}
+		}
+	});
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] Dead or inconsistent dev-tool paths:\x1b[0m');
 	for (const e of errors) console.error('  - ' + e);
