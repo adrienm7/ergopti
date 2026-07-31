@@ -23,6 +23,15 @@
 
 #Requires AutoHotkey v2.0
 
+; Delay before the menu is rebuilt after launching an `ollama pull` in its own
+; terminal. Long enough that a small model has usually finished and the green
+; "installed" dot appears on the first glance back at the tray; short enough that
+; the user is unlikely to have opened the menu again before it fires. It is a
+; cosmetic refresh, not a correctness deadline — the dot also updates on the next
+; health probe — so it is deliberately NOT tied to LLM_HEALTH_PROBE_THROTTLE_MS,
+; which happens to hold the same number for an unrelated reason.
+global LLM_MENU_POST_PULL_REBUILD_MS := 3000
+
 
 
 
@@ -491,6 +500,7 @@ _LLM_Menu_MakeDownloadModelHandler(name) {
  * @param {string} name - Catalogue display name (e.g. "Qwen 2.5 3B").
  */
 _LLM_Menu_PullModel(name) {
+	global LLM_MENU_POST_PULL_REBUILD_MS
 	tag := LLM_ResolveOllamaTag(name)
 	if (tag == "") {
 		MsgBox(StrReplace(t("menu.llm.ollama_model_hint"), "%s", name), t("menu.llm.download_model"), "16")
@@ -503,7 +513,7 @@ _LLM_Menu_PullModel(name) {
 	; Rebuild after a short delay so the green dot appears once Ollama finishes
 	; (the user will close the window manually; this just keeps the menu fresh
 	; if they glance at it again while the terminal is still open).
-	SetTimer(() => LLM_Menu_Build(), -3000)
+	SetTimer(() => LLM_Menu_Build(), -LLM_MENU_POST_PULL_REBUILD_MS)
 }
 
 _LLM_Menu_MakeOpenUrlHandler(url) {

@@ -666,8 +666,14 @@ every keystroke, with no segment at all; the keylogger fan-out and
 slow-render ratio is incalculable; five retroactive boot marks before
 `BootProfile_Begin`; and for idle, `UIA.SelectionPoll`, `Metrics.FocusRefresh`
 (a `WinGetTitle` on a Not Responding window blocks 20×/s with no trace) and
-`KL.Ingest` — plus a meta-test inventorying every `SetTimer` under 1000 ms
-against a whitelist, so a fast poller cannot reappear silently.
+`KL.Ingest`.
+
+**The `SetTimer` inventory is delivered** (`test-fast-timer-inventory.cjs`). Four
+repeating sub-second timers exist and each now carries what it polls and why its
+interval is what it is; a fifth cannot appear without writing that down. One-shots
+are deliberately excluded — `SetTimer(Fn, -50)` fires once and stops, and the
+driver uses it 101 times as a "run this off the current thread" idiom, so
+inventorying those would bury the four that matter.
 
 ### Follow-ups found while implementing
 
