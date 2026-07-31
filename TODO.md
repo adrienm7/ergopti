@@ -503,10 +503,27 @@ repo has documented this failure mode three times already.
 ### Burning down the false-green baseline
 
 The gate is delivered: `tools/test/find-false-greens.cjs` runs inside
-`npm run test:js` and ratchets five classes — tautology, vacuous-absence,
-dead-test, pcall-only, and `corpus-skip` (added 2026-07-31). It only turns down.
+`npm run test:js` and ratchets six classes — tautology, vacuous-absence,
+dead-test, pcall-only, `corpus-skip` and `unfloored-scan` (the last two added
+2026-07-31). It only turns down.
 
-**549 → 427 so far.** `dead-test` is at **0**: the two placeholders spliced into
+**`unfloored-scan` is the newest and came out of a live bug.** A test that loops
+over regex matches and asserts only INSIDE the loop passes for free when the
+pattern matches nothing — zero matches and only-good matches are
+indistinguishable from outside the loop. The AltGr number-row guard had been
+scanning nothing since it was written, through the `[^)]*` trap: the real
+registration is `HotIf((*) => Features[…]["ergopti_alt_gr"] and IsRealAltGrPress())`
+and `[^)]` stops dead at the `)` of `(*)`. Same trap as the first version of
+`test-ahk-loop-capture.cjs`. Recorded as `project-source-scan-loops-need-a-floor`.
+
+Calibrating that detector was most of the work, and the lesson generalises:
+**precision matters more than reach for a gate nobody owns yet.** Every finding
+was read against its source, and four shapes turned out to be real floors written
+differently — a Map keyed in the loop and sized after it, `Count++`, a floor
+compared against a variable rather than a literal, and a collector helper floored
+by its CALLER under a different variable name. 84 reported → 34 real.
+
+**549 → 441 so far**, over six classes rather than the original five. `dead-test` is at **0**: the two placeholders spliced into
 the body of `_DE_Add()` are gone, and the two Linux skips with empty bodies now
 assert the reason they skipped for. `tautology` is 153 → **60**.
 
