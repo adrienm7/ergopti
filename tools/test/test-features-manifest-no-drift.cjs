@@ -52,7 +52,14 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const GENERATOR = path.join(ROOT, 'tools/build/build-features-manifest.js');
+// Every generator that writes into the _generated/ trees below. A list, because
+// a single hardcoded generator is the same shape of mistake as the single
+// hardcoded file list this gate already had: adding one must not depend on
+// somebody remembering to widen a guard.
+const GENERATORS = [
+	'tools/build/build-features-manifest.js',
+	'tools/codegen/codegen-logger-sub-files.cjs'
+];
 
 // Every directory the generator can write into. Deliberately NOT a list of
 // files: the whole point of the fix is that no file list has to be kept in sync
@@ -72,7 +79,9 @@ const EXPECTED_TARGETS = [
 	'static/ergopti_plus/linux/_generated/features_manifest.lua',
 	'static/ergopti_plus/macos/_generated/config_template.toml',
 	'static/ergopti_plus/windows/_generated/config_template.toml',
-	'static/ergopti_plus/linux/_generated/config_template.toml'
+	'static/ergopti_plus/linux/_generated/config_template.toml',
+	'static/ergopti_plus/macos/_generated/logger_sub_files.lua',
+	'static/ergopti_plus/windows/_generated/logger_sub_files.ahk'
 ];
 
 /** Every file under a directory, as repo-relative POSIX paths. */
@@ -118,7 +127,9 @@ const drifted = [];
 const created = [];
 
 try {
-	execFileSync('node', [GENERATOR], { cwd: ROOT, stdio: 'pipe' });
+	for (const gen of GENERATORS) {
+		execFileSync('node', [path.join(ROOT, gen)], { cwd: ROOT, stdio: 'pipe' });
+	}
 } catch (err) {
 	regenerationFailed = true;
 	regenerationError = err;
@@ -151,7 +162,7 @@ try {
 // ── Report ──────────────────────────────────────────────────────────────────
 
 if (regenerationFailed) {
-	console.error('\x1b[31m[ERROR] failed to run the features-manifest generator:\x1b[0m');
+	console.error('\x1b[31m[ERROR] failed to run a _generated/ tree generator:\x1b[0m');
 	console.error('  ' + (regenerationError && regenerationError.message));
 	process.exit(1);
 }

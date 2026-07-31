@@ -218,6 +218,10 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; Logger pulled in first so every other lib/module can call it during init.
 ; ``LoggerInit()`` is invoked after the configuration file is parsed so the
 ; minimum log level can be honoured from the very first INFO/START line.
+; Generated sub-file routing table, included before the logger that calls it.
+; It defines a FUNCTION rather than a global, so this ordering is a convenience
+; and not a requirement — LoggerSubFilesData() is called at LoggerInit time.
+#Include _generated/logger_sub_files.ahk
 #Include lib/logger.ahk
 #Include lib/boot_profiler.ahk
 #Include lib/hotpath_profiler.ahk

@@ -86,6 +86,7 @@
 		"codegen:prompt-builder:ahk": "node ./tools/codegen/codegen-prompt-builder-ahk.cjs",
 		"codegen:contracts": "node ./tools/codegen/codegen-contracts-json.cjs",
 		"codegen:llm-profiles-data:ahk": "node ./tools/codegen/codegen-llm-profiles-data-ahk.cjs",
+		"codegen:logger-sub-files": "node ./tools/codegen/codegen-logger-sub-files.cjs",
 		"codegen:keycode-data:js": "node ./tools/codegen/codegen-keycode-data-js.cjs",
 		"test:mutation": "stryker run",
 		"fix:pinned-reads": "node ./tools/lint/fix-pinned-source-reads.cjs --fix",
