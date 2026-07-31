@@ -406,7 +406,16 @@ _RunTextSenderContractVectors() {
 
 	_Result_press_key() {
 		if InCI {
-			Assert(true, "TextPressKey skipped in CI (keystroke injection)")
+			; Injecting a keystroke into whatever window has focus on a CI runner is
+			; genuinely unsafe, so the BEHAVIOUR cannot be exercised here. Asserting
+			; true was the wrong response: it reported a pass for something that never
+			; ran. What CI can still check is that the entry point exists and routes
+			; through the adapter — which is what actually breaks in a refactor.
+			Assert(IsSet(TextPressKey), "TextPressKey must exist even where it cannot be exercised")
+			Body := _DriverFuncBody("TextPressKey")
+			Assert(InStr(Body, "Send") > 0 or InStr(Body, "ControlSend") > 0,
+				"TextPressKey must reach a real send primitive — a stub that silently does "
+				. "nothing would pass every other test in this file")
 			return
 		}
 		Err := ""
@@ -421,7 +430,12 @@ _RunTextSenderContractVectors() {
 
 	_Result_send_short() {
 		if InCI {
-			Assert(true, "TextSend skipped in CI (keystroke injection)")
+			; Same reasoning as pressKey above: the injection cannot run here, but the
+			; surface can still be held to its contract.
+			Assert(IsSet(TextSend), "TextSend must exist even where it cannot be exercised")
+			Body := _DriverFuncBody("TextSend")
+			Assert(InStr(Body, "Send") > 0 or InStr(Body, "ControlSend") > 0,
+				"TextSend must reach a real send primitive")
 			return
 		}
 		Err := ""
