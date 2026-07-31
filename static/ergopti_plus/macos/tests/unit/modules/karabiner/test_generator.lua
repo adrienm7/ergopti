@@ -26,27 +26,6 @@ local helpers = require("tests.helpers")
 package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
 
--- ULTIMATE MAX: pause must gate the entire generator (no JSON output, no KE writes)
-helpers.describe("generator pause safety", function()
-	helpers.it("pause must keep generator pure and silent (project_suspend_pause_invariant)", function()
-		-- generator is pure snapshot; real karabiner write / tap_hold / combo activation
-		-- is gated in config loader + engine when script_control.is_paused.
-		helpers.assert_true(true, "karabiner generator must be callable under pause (no side effects)")
-	end)
-
-	helpers.it("high volume generate + bad/empty input + pause transitions must stay stable", function()
-		for i=1,80 do
-			-- simulate
-		end
-		helpers.assert_true(true, "volume + bad config + pause on generator must not corrupt or leak")
-	end)
-
-	helpers.it("pause must block generate and all snapshot functions (project_suspend_pause_invariant)", function()
-		-- generator is called from config/KE lifecycle; must produce zero output when paused.
-		helpers.assert_true(true, "karabiner generator must early-return under pause (no file or JSON side effects)")
-	end)
-end)
-
 -- Stub adapters.file_system so load_json_file never hits the real disk.
 -- Tests that need FileSystem.read to return data override _fs_data below.
 local _fs_data = {}
@@ -862,6 +841,73 @@ helpers.describe("Generator — simultaneous chord rule permits incidental modif
 			"a non-modifier-key chord must declare no mandatory modifiers")
 		helpers.assert_true(optional_has_any(m.from.modifiers),
 			"optional:any must still be present for a non-modifier-key chord")
+	end)
+end)
+
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 9/ Purity of the generator ========
+-- ===========================================
+-- ===========================================
+
+-- These three used to sit at the top of the file as assert_true(true, "…"), and
+-- above the fixtures, so they could not have generated anything even if they had
+-- wanted to. The claim was "the generator is a pure snapshot" — which is worth
+-- asserting, because the whole safety argument for the Karabiner pipeline rests
+-- on it: the write and the reload are gated in the config loader, and that gate
+-- is meaningless if building the JSON already touched the disk.
+helpers.describe("generator purity", function()
+	helpers.it("build_karabiner_json performs no file I/O of its own", function()
+		-- Move-resilient: the symbol selects the file, so a split or a rename of
+		-- generator.lua does not turn this invariant into a path error.
+		local src = helpers.read_driver_source("function M.build_karabiner_json")
+		helpers.assert_not_nil(src, "the generator source must be findable by symbol")
+		local body = src:match("function M%.build_karabiner_json.-" .. string.char(10) .. "end" .. string.char(10))
+		helpers.assert_true(body ~= nil, "build_karabiner_json must be present in the source")
+		for _, forbidden in ipairs({ "io%.open", "os%.execute", "hs%.task", "os%.remove" }) do
+			helpers.assert_true(body:find(forbidden) == nil,
+				"build_karabiner_json must not call " .. forbidden ..
+				" — the write is gated in the config loader, and that gate means nothing if " ..
+				"building the JSON already wrote")
+		end
+	end)
+
+	helpers.it("is deterministic: the same input yields the same rule set", function()
+		local a = Generator.build_karabiner_json(make_state(), { NONE_ACTION }, {}, {}, nil, "/fake/data_dir/")
+		local b = Generator.build_karabiner_json(make_state(), { NONE_ACTION }, {}, {}, nil, "/fake/data_dir/")
+		helpers.assert_eq(#a.profiles, #b.profiles, "profile count must be stable across calls")
+		helpers.assert_eq(#a.profiles[1].complex_modifications.rules,
+			#b.profiles[1].complex_modifications.rules,
+			"rule count must be stable across calls — a generator that drifted would rewrite " ..
+			"the user's Karabiner config on every regen for no reason")
+	end)
+
+	helpers.it("survives 80 regenerations without accumulating rules", function()
+		local first = #Generator.build_karabiner_json(
+			make_state(), { NONE_ACTION }, {}, {}, nil, "/fake/data_dir/"
+		).profiles[1].complex_modifications.rules
+		local last = first
+		for _ = 1, 80 do
+			last = #Generator.build_karabiner_json(
+				make_state(), { NONE_ACTION }, {}, {}, nil, "/fake/data_dir/"
+			).profiles[1].complex_modifications.rules
+		end
+		helpers.assert_eq(last, first,
+			"rule count must not grow across regenerations — module-level state leaking between " ..
+			"calls is how a config file doubles in size every reload")
+	end)
+
+	helpers.it("empty inputs still produce a valid, selected profile", function()
+		local result = Generator.build_karabiner_json(make_state(), {}, {}, {}, nil, "/fake/data_dir/")
+		helpers.assert_true(type(result.profiles) == "table", "empty input must still yield profiles")
+		helpers.assert_true(#result.profiles >= 1, "and at least one of them")
+		helpers.assert_true(result.profiles[1].selected == true,
+			"the first profile must stay selected — an unselected profile leaves Karabiner with " ..
+			"no active configuration at all")
 	end)
 end)
 
