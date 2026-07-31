@@ -75,8 +75,10 @@ local function _resolve_paths()
 	-- nothing about it belongs outside this driver.
 	_template_path = driver_root .. "/modules/kanata/data/kanata.kbd"
 
-	-- _shared is a sibling of the driver folder in both a checkout and a build.
-	_shared_dir = driver_root .. "/../_shared"
+	-- Through the resolver: _shared is a sibling of the driver folder, and
+	-- letting each module rediscover that is how one of them gets it wrong.
+	local ok_paths, Paths = pcall(require, "lib.paths")
+	_shared_dir = ok_paths and Paths.shared_root() or nil
 
 	-- Verify the template exists (fail-loud: kanata cannot work without it).
 	local fh = io.open(_template_path, "r")
@@ -147,9 +149,12 @@ local function _load_tap_hold_config(user_toml_path)
 	-- (defalias) block, which is far worse than a loud failure.
 	local defaults_path = _shared_dir and (_shared_dir .. "/tap_hold/defaults.toml") or nil
 
-	-- Fallback: relative to the cwd, for a driver run straight from a checkout.
+	-- Through the resolver rather than a bare relative path: the old fallback
+	-- depended on the process's current directory, so a driver started from
+	-- anywhere but one exact folder read no defaults and silently used none.
 	if not defaults_path then
-		defaults_path = "../../_shared/tap_hold/defaults.toml"
+		local ok_paths, Paths = pcall(require, "lib.paths")
+		defaults_path = ok_paths and Paths.shared("tap_hold/defaults.toml") or nil
 	end
 
 	-- Load order: user override → shared defaults. The user's tap_hold.toml, when

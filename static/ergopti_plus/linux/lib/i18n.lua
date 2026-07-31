@@ -97,11 +97,16 @@ end
 local function _scan_locales()
 	local codes = {}
 
-	-- Resolve the locales directory relative to the driver root.
-	local src = debug.getinfo(1, "S").source:gsub("^@", "")
-	local driver_root = src:match("^(.*)[/\\]lib[/\\]i18n%.lua$") or "."
-	driver_root = driver_root:gsub("\\", "/")
-	local locales_dir = driver_root .. "/../../_shared/data/locales"
+	-- Through the shared resolver, not a per-file ".." count. This line used to
+	-- walk "../../" from the driver root — one level too high — so `ls` found
+	-- nothing, the scan collected zero codes, and the {"en","fr"} fallback below
+	-- took over: the language menu offered 2 locales out of the 21 that ship.
+	-- Nothing failed loudly; the menu simply had two rows.
+	local Paths = require("lib.paths")
+	local locales_dir = Paths.shared("data/locales")
+	if not locales_dir then
+		return { "en", "fr" }
+	end
 
 	local pipe = io.popen(string.format("ls '%s' 2>/dev/null", locales_dir:gsub("'", "'\\''")), "r")
 	if not pipe then
@@ -124,7 +129,10 @@ local function _scan_locales()
 
 	-- Order by the canonical shared list; codes absent from it fall to the end
 	-- alphabetically, so a newly added locale still appears before it is listed.
-	local rank = _load_order(driver_root .. "/../../_shared/data")
+	-- Same resolver: this line carried the same wrong depth, so the canonical
+	-- display order never loaded either and the two surviving locales sorted
+	-- alphabetically instead.
+	local rank = _load_order(Paths.shared("data"))
 	if rank then
 		table.sort(codes, function(a, b)
 			local ra, rb = rank[a] or math.huge, rank[b] or math.huge

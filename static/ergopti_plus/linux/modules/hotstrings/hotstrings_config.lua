@@ -102,7 +102,10 @@ function M.load_all()
 			local s = src.source
 			if s:sub(1, 1) == "@" then s = s:sub(2) end
 			local dir = s:match("^(.*[/\\])") or ""
-			local bundled = dir:gsub("[/\\]$", "") .. "/../../../_shared/modules/hotstrings"
+			-- Two steps up from modules/hotstrings/, not three: three lands outside
+			-- the tree entirely, so this bundled fallback found nothing.
+			local ok_paths, Paths = pcall(require, "lib.paths")
+			local bundled = ok_paths and Paths.shared("modules/hotstrings") or nil
 			_toml_paths = Loader.find_toml_files(bundled)
 		else
 			_toml_paths = {}
