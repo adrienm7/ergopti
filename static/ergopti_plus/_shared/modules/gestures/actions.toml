@@ -480,7 +480,9 @@ platform = "all"
 # --- Actions système avancées ---
 
 [sg_actions.select_line]
-platform = "ahk"
+# Implemented on BOTH: Windows in modules/shortcuts, macOS in
+# modules/shortcuts/actions/ and registered into the gesture registry.
+platform = "all"
 
 [sg_actions.screen_capture]
 platform = "ahk"
@@ -515,7 +517,9 @@ platform = "all"
 parameter = "search_url"
 
 [sg_actions.teleport_mouse]
-platform = "ahk"
+# Implemented on BOTH: Windows in modules/shortcuts, macOS in
+# modules/shortcuts/actions/ and registered into the gesture registry.
+platform = "all"
 
 [sg_actions.uppercase_selection]
 platform = "ahk"
@@ -524,10 +528,14 @@ platform = "ahk"
 platform = "ahk"
 
 [sg_actions.spotlight_mouse]
-platform = "ahk"
+# Implemented on BOTH: Windows in modules/shortcuts, macOS in
+# modules/shortcuts/actions/ and registered into the gesture registry.
+platform = "all"
 
 [sg_actions.toggle_capslock]
-platform = "ahk"
+# Implemented on BOTH: Windows in modules/shortcuts, macOS in
+# modules/shortcuts/actions/ and registered into the gesture registry.
+platform = "all"
 
 [sg_actions.microsoft_bold]
 platform = "ahk"
