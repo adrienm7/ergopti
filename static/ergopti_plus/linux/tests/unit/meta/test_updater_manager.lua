@@ -140,6 +140,36 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_true(#label > 0, "menu label should not be empty")
 	end)
 
+	-- Every one of these labels was hardcoded French, so a user on any of the
+	-- other 20 locales read French in the update menu. "not empty" above could
+	-- never have caught that, and neither can it catch i18n.get echoing the raw
+	-- key back on a miss.
+	helpers.it("the idle label comes from the shared catalogue", function()
+		local i18n = require("lib.i18n")
+		M.clear_cached_release()
+		local label = M.get_menu_label()
+		helpers.assert_eq(label, i18n.get("menu.about.check_for_updates"),
+			"the idle label must be whatever the catalogue says for the active locale")
+		helpers.assert_true(label ~= "menu.about.check_for_updates",
+			"an echoed key means the catalogue was never reached")
+	end)
+
+	helpers.it("the update-available label carries the tag through the catalogue template", function()
+		local i18n = require("lib.i18n")
+		-- A tag containing "%" is the reason the substitution is done on plain
+		-- indices: gsub would read it as a capture reference in the REPLACEMENT
+		-- string and raise "invalid use of '%'".
+		M._test_set_cached_release({ tag = "v9.9.9-100%", prerelease = false })
+		local label = M.get_menu_label()
+		helpers.assert_true(label:find("v9.9.9-100%", 1, true) ~= nil,
+			"the tag must appear verbatim in the label, percent signs included")
+		helpers.assert_true(label:find("{tag}", 1, true) == nil,
+			"the {tag} placeholder must be substituted, not rendered")
+		helpers.assert_true(label ~= i18n.get("menu.about.update_now"),
+			"the template must have been filled in, not returned as-is")
+		M.clear_cached_release()
+	end)
+
 	helpers.it("stop_background_checks is safe to call even without active timers", function()
 		-- Should not error.
 		local ok = pcall(M.stop_background_checks)
