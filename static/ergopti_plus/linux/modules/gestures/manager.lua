@@ -35,6 +35,20 @@ local Monotonic = require("lib.monotonic")
 local TomlCodec = require("toml_codec")
 local i18n = require("lib.i18n")
 local LOG = "modules.gestures.manager"
+
+-- Actions the shared catalogue describes as a single xdotool combo, generated
+-- from _shared/modules/actions/actions.toml. Loaded once at require time.
+--
+-- Fails loudly rather than falling back to an empty table: an empty table means
+-- 26 gestures silently do nothing, which is indistinguishable from a user
+-- mis-configuring them and is exactly the class of failure this driver has been
+-- bitten by before.
+local _ok_emit, _EMIT_ROWS = pcall(require, "_generated.gesture_emit_actions")
+if not _ok_emit or type(_EMIT_ROWS) ~= "table" then
+	Logger.error(LOG, "_generated/gesture_emit_actions.lua is missing or invalid (%s) — "
+		.. "26 gesture actions will not fire. Run `npm run gen`.", tostring(_EMIT_ROWS))
+	_EMIT_ROWS = {}
+end
 local _writer_ok, TomlWriter = pcall(require, "toml_codec.writer")
 if not _writer_ok then TomlWriter = nil end
 
@@ -322,6 +336,20 @@ local function _execute_action(action_name, go_next, binding)
 		return
 	end
 
+	-- Actions the shared catalogue describes as one xdotool combo.
+	--
+	-- 26 elseif branches used to sit here, each spelling out a combo that the
+	-- macOS and Windows registries also spelled out in their own vocabularies.
+	-- They now come from _shared/modules/actions/actions.toml via
+	-- _generated/gesture_emit_actions.lua. The combos are X11 keysym syntax and
+	-- are Linux's own: Linux and Windows agree far more often than either agrees
+	-- with macOS (alt+F4 and ctrl+Right on both, against cmd+w and alt+right).
+	local emit_combo = _EMIT_ROWS[action_name]
+	if emit_combo then
+		_run("xdotool key " .. emit_combo)
+		return
+	end
+
 	if action_name == "open_url" then
 		local url = M.get_action_parameter(binding, action_name)
 		if M.validate_action_parameter(action_name, url) then _run("xdg-open " .. shell_quote(url)) end
@@ -343,10 +371,6 @@ local function _execute_action(action_name, go_next, binding)
 		_run("wmctrl -s -1 2>/dev/null || xdotool key ctrl+alt+Left")
 	elseif action_name == "ws_next" then
 		_run("wmctrl -s +1 2>/dev/null || xdotool key ctrl+alt+Right")
-	elseif action_name == "tab_prev" then
-		_run("xdotool key ctrl+shift+Tab")
-	elseif action_name == "tab_next" then
-		_run("xdotool key ctrl+Tab")
 	elseif action_name == "vol_up" then
 		_run("pactl set-sink-volume @DEFAULT_SINK@ +5% 2>/dev/null || xdotool key XF86AudioRaiseVolume")
 	elseif action_name == "vol_down" then
@@ -363,56 +387,8 @@ local function _execute_action(action_name, go_next, binding)
 		_run("playerctl next 2>/dev/null || xdotool key XF86AudioNext")
 	elseif action_name == "track_prev" then
 		_run("playerctl previous 2>/dev/null || xdotool key XF86AudioPrev")
-	elseif action_name == "app_switcher" then
-		_run("xdotool key alt+Tab")
-	elseif action_name == "app_window_previous" then
-		_run("xdotool key alt+Escape")
-	elseif action_name == "close_window" then
-		_run("xdotool key alt+F4")
-	elseif action_name == "maximize" then
-		_run("xdotool key super+Up")
-	elseif action_name == "snap_left" then
-		_run("xdotool key super+Left")
-	elseif action_name == "snap_right" then
-		_run("xdotool key super+Right")
-	elseif action_name == "fullscreen" then
-		_run("xdotool key F11")
-	elseif action_name == "word_prev" then
-		_run("xdotool key ctrl+Left")
-	elseif action_name == "word_next" then
-		_run("xdotool key ctrl+Right")
-	elseif action_name == "line_up" then
-		_run("xdotool key Up")
-	elseif action_name == "line_down" then
-		_run("xdotool key Down")
-	elseif action_name == "line_start" then
-		_run("xdotool key Home")
-	elseif action_name == "line_end" then
-		_run("xdotool key End")
-	elseif action_name == "doc_start" then
-		_run("xdotool key ctrl+Home")
-	elseif action_name == "doc_end" then
-		_run("xdotool key ctrl+End")
-	elseif action_name == "enter" then
-		_run("xdotool key Return")
-	elseif action_name == "escape" then
-		_run("xdotool key Escape")
-	elseif action_name == "backspace" then
-		_run("xdotool key BackSpace")
-	elseif action_name == "delete" then
-		_run("xdotool key Delete")
-	elseif action_name == "arrow_up" then
-		_run("xdotool key Up")
-	elseif action_name == "arrow_down" then
-		_run("xdotool key Down")
-	elseif action_name == "arrow_left" then
-		_run("xdotool key Left")
-	elseif action_name == "arrow_right" then
-		_run("xdotool key Right")
 	elseif action_name == "lock_screen" then
 		_run("loginctl lock-session 2>/dev/null || xdg-screensaver lock")
-	elseif action_name == "notification_center" then
-		_run("xdotool key super+v")
 	else
 		Logger.debug(LOG, "Unknown action: %s", action_name)
 	end
