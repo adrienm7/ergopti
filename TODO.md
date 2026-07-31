@@ -194,9 +194,23 @@ Constraints: **paths before moves, moves before content, data before code.**
   times), an `emoji` field, `visible_when` (~8), and a real top-level section list
   (the 9 head ids are read by nobody).
   Order: (1) pilot on the metrics menu — best-covered, and ~280 lines of handlers
-  across two drivers become ~26 manifest rows + ~26 registry entries; (2) kill the
-  five dead-manifest-key duplications and add the gate "every array key in the
-  manifest has at least one reader"; (3) make Linux a first-class platform —
+  across two drivers become ~26 manifest rows + ~26 registry entries; ~~(2) kill
+  the dead-manifest-key duplications and add the "every key has a reader"
+  gate~~ — **done, and the count was two, not five.**
+  `dynamic_hotstrings_order` duplicated `_DYNAMIC_HOTSTRINGS_ORDER` in
+  `windows/ui/tray_menu.ahk` and DISAGREED with it, spelling the separator
+  `"---"` where the live one spells `"-"`; `word_delimiter_defs` carried 20
+  entries no driver asked for. Both removed at their source in
+  `features/manifest.toml`, since the JSON is generated.
+  The other three are alive, and each shows a way a manifest key is legitimately
+  reached — worth knowing before writing this kind of check again:
+  `gesture_slots` via Lua dot access, quoted nowhere; `modifier_combos_group` and
+  `accented_letters_group` dispatched BY VALUE, the id arriving from the manifest
+  at runtime and never appearing as a literal in the handling code. The first
+  version of the guard reported all five;
+  `test-menu-manifest-keys-have-readers.cjs` is deliberately generous for that
+  reason, because a gate that cries wolf on working code gets deleted and then
+  guards nothing; (3) make Linux a first-class platform —
   write `_shared/lua/menu/render.lua` (shared macOS+Linux, ~230 l) and
   `linux/infra/menu_host.lua` (~180 l), delete `menu_builder.lua` (833 l), route
   its 101 hardcoded French labels through the shared locales; (4) migrate the
