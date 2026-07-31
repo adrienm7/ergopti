@@ -327,7 +327,18 @@ local function coerce_value(raw)
 		local body = trim(raw:sub(2, -2))
 		local tbl = {}
 		if body == "" then return tbl end
+		-- `depth` tracks nested [ ] and { } so a comma INSIDE a nested value does
+		-- not split the pair list. Without it, { key = "Left", mods = ["ctrl",
+		-- "super"] } split into three fragments — `key = "Left"`, `mods = ["ctrl"`
+		-- and `"super"]` — the last two of which have no `=`, so split_kv failed
+		-- and decode returned nil for the WHOLE document with no error message.
+		-- A single-element nested array worked, which is what made it look fine.
+		--
+		-- Same shape as the logger sub-files bug: a scanner that tracks quotes but
+		-- not nesting. Quotes alone are not enough whenever the delimiter being
+		-- searched for can also appear one level down.
 		local in_str, escape = false, false
+		local depth = 0
 		local pairs_raw = {}
 		local cur = {}
 		for i = 1, #body do
@@ -335,7 +346,9 @@ local function coerce_value(raw)
 			if escape then cur[#cur+1]=c; escape=false
 			elseif c=="\\" and in_str then cur[#cur+1]=c; escape=true
 			elseif c=='"' then cur[#cur+1]=c; in_str=not in_str
-			elseif not in_str and c=="," then
+			elseif not in_str and (c=="[" or c=="{") then depth=depth+1; cur[#cur+1]=c
+			elseif not in_str and (c=="]" or c=="}") then depth=depth-1; cur[#cur+1]=c
+			elseif not in_str and c=="," and depth==0 then
 				pairs_raw[#pairs_raw+1] = table.concat(cur); cur={}
 			else
 				cur[#cur+1]=c
