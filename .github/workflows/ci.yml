@@ -416,6 +416,39 @@ jobs:
               Write-Error "Test suite failed (exit $exit)."; exit $exit
           }
 
+      # The two isolated LLM suites. They cannot join run_all.ahk: each installs
+      # its own global stubs (a WebView2 stand-in, a fake model index) that would
+      # collide with the shared harness, which is why they were written as
+      # separate runners in the first place. They were then referenced by
+      # nothing, so their ten tests had never run and one of them had rotted out
+      # of the code it stubs. tools/test/test-ahk-runners-are-invoked.cjs now
+      # fails if a runner under tests/ is referenced by nothing at all.
+      - name: Run isolated AHK LLM suites
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
+          $tests = "${{ github.workspace }}\static\ergopti_plus\windows\tests"
+          $failed = 0
+          foreach ($name in @("run_llm_model_browser.ahk", "run_llm_model_menu_disabled.ahk")) {
+              $runner = Join-Path $tests $name
+              if (-not (Test-Path $runner)) { Write-Error "Runner not found: $runner"; exit 2 }
+              $out = "$env:TEMP\$name.out"
+              $err = "$env:TEMP\$name.err"
+              # Start-Process, not the call operator: AutoHotkey is a GUI-subsystem
+              # binary, so a direct invocation returns neither the exit code nor
+              # stderr (PROJECT_MEMORY, feedback_ahk_ui_syntax_validation).
+              $proc = Start-Process -FilePath $ahk -ArgumentList @("/ErrorStdOut", $runner) `
+                  -Wait -PassThru -NoNewWindow -RedirectStandardOutput $out -RedirectStandardError $err
+              Write-Host "--- $name (exit $($proc.ExitCode)) ---"
+              if (Test-Path $out) { Get-Content $out | Write-Host }
+              if (Test-Path $err) { Get-Content $err | Write-Host }
+              if ($proc.ExitCode -ne 0) { $failed += 1 }
+          }
+          if ($failed -gt 0) { Write-Error "$failed isolated LLM suite(s) failed."; exit 1 }
+
       # Emit GitHub annotations + a JSON summary from the captured TAP. Purely
       # additive (continue-on-error): the step above remains the gate, so a
       # reporter hiccup can never flip a red run green or vice-versa.

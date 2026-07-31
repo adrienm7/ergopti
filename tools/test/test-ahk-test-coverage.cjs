@@ -93,20 +93,37 @@ function includeClosure(rootFile) {
 	return seen;
 }
 
-/** @returns {string[]} Absolute test_*.ahk paths under tests/ and tests/meta/. */
+// e2e/ has its own runner (run_e2e.ahk) and is deliberately outside this
+// closure; fixtures/ and stubs/ hold no tests.
+const NOT_RUN_ALL = new Set(['e2e', 'fixtures', 'stubs', 'scratch_test_dir']);
+
+/**
+ * Every test_*.ahk anywhere under tests/, at any depth.
+ *
+ * This used to list three directories and read each one flat. A test file in a
+ * nested folder — tests/unit/modules/foo/ — was therefore invisible to the
+ * orphan check, which is precisely the population most likely to be forgotten
+ * when wiring run_all.ahk: the ones someone filed away neatly.
+ * @returns {string[]} Absolute POSIX-style paths.
+ */
 function discoverTestFiles() {
 	const files = [];
-	for (const dir of [TESTS_DIR, path.join(TESTS_DIR, 'unit'), path.join(TESTS_DIR, 'meta')]) {
+	const walk = (dir) => {
 		let entries = [];
 		try {
-			entries = fs.readdirSync(dir);
+			entries = fs.readdirSync(dir, { withFileTypes: true });
 		} catch {
-			continue;
+			return;
 		}
 		for (const e of entries) {
-			if (/^test_.+\.ahk$/i.test(e)) files.push(path.join(dir, e).replace(/\\/g, '/'));
+			if (e.isDirectory()) {
+				if (!NOT_RUN_ALL.has(e.name)) walk(path.join(dir, e.name));
+			} else if (/^test_.+\.ahk$/i.test(e.name)) {
+				files.push(path.join(dir, e.name).replace(/\\/g, '/'));
+			}
 		}
-	}
+	};
+	walk(TESTS_DIR);
 	return files;
 }
 

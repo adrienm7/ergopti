@@ -39,6 +39,14 @@ LLM_OllamaListModels() {
 	_MBW_OllamaListHits += 1
 	return ["qwen3.5:2b"]
 }
+; The browser stopped probing Ollama synchronously and now reads the async
+; snapshot instead — opening a browser must never start blocking HTTP on the
+; message thread. This runner still stubbed only the old entry point, so the
+; catalogue test failed on an unassigned name. It went unnoticed because
+; nothing invoked this file: the orphan-runner gate added alongside this fix is
+; what stops a runner drifting out of the code again.
+LLM_SetInstalledTagsCache(tags) => ""
+_LLM_GetInstalledTagsCached()   => ["qwen3.5:2b"]
 LLM_GetModelIndex()    => _TestIndex
 LLM_GetModelInfo(n)    => (_TestIndex.Has(n) ? _TestIndex[n] : Map())
 
