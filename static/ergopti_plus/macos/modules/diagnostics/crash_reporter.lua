@@ -1,4 +1,4 @@
---- lib/crash_reporter.lua
+--- modules/diagnostics/crash_reporter.lua
 
 --- ==============================================================================
 --- MODULE: Crash Reporter

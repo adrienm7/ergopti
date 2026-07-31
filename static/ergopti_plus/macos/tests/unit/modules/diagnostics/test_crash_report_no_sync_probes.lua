@@ -1,4 +1,4 @@
---- tests/unit/lib/test_crash_report_no_sync_probes.lua
+--- tests/unit/modules/diagnostics/test_crash_report_no_sync_probes.lua
 
 --- ==============================================================================
 --- MODULE: Regression — a crash report must not fork subprocesses by default
@@ -44,8 +44,8 @@ local function load_reporter()
 			return { sys = {}, uptime_sec = 0, ports_validated = {}, failed_adapters = {} }
 		end,
 	}
-	package.loaded["lib.crash_reporter"] = nil
-	local CR = helpers.load_with_stubs("lib.crash_reporter")
+	package.loaded["modules.diagnostics.crash_reporter"] = nil
+	local CR = helpers.load_with_stubs("modules.diagnostics.crash_reporter")
 	return CR, probe
 end
 

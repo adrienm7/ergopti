@@ -1,4 +1,4 @@
-﻿; lib/crash_reporter.ahk
+﻿; modules/diagnostics/crash_reporter.ahk
 
 ; ==============================================================================
 ; MODULE: Crash Reporter

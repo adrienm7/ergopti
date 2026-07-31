@@ -1,4 +1,4 @@
---- tests/unit/lib/test_crash_reporter_mkdir_recursive.lua
+--- tests/unit/modules/diagnostics/test_crash_reporter_mkdir_recursive.lua
 
 --- Regression test for lib-update-05: crash_reporter.lua M.save() used a
 --- two-level mkdir (parent + dir). If two or more ancestor directories were
@@ -10,11 +10,11 @@
 
 local helpers = require("tests.helpers")
 
--- Selected by a declaration unique to lib/crash_reporter.lua rather than by
+-- Selected by a declaration unique to modules/diagnostics/crash_reporter.lua rather than by
 -- path, so moving or splitting the module cannot turn this invariant
 -- into a path error.
 local src = helpers.read_driver_source("local function _driver_version")
-helpers.assert_true(src ~= nil, "lib/crash_reporter.lua source must be locatable")
+helpers.assert_true(src ~= nil, "modules/diagnostics/crash_reporter.lua source must be locatable")
 
 -- Test 1: The old 2-level approach must not appear.
 local has_old_approach = src:find('dir:match("^(.*[/\\\\])[^/\\\\]+[/\\\\]?%$")', 1, true) ~= nil

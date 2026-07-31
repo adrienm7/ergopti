@@ -1,4 +1,4 @@
---- tests/unit/lib/test_crash_report_deferred_off_hot_path.lua
+--- tests/unit/modules/diagnostics/test_crash_report_deferred_off_hot_path.lua
 
 --- ==============================================================================
 --- MODULE: Regression — a recoverable timer error never reaches the crash reporter
