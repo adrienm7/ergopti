@@ -19,24 +19,6 @@
 ; The full expansion pipeline (emit dispatch, LLM bridge) is exercised by
 ; test_hotstrings_full.ahk. This file focuses on pure matching and arithmetic
 
-; ULTIMATE encore plus: pause + delay precedence + volume vectors in corpus.
-; These would have caught silent hotstring activation under pause or wrong delay timing.
-
-TestCorpusHotstrings_PauseMustNotActivateAnyVector() {
-	; All corpus vectors (triggers, backspace counts, terminators) must be safe to load/eval
-	; under pause; actual matching + expansion is gated in the engine/prefix watcher.
-	; project_suspend_pause_invariant + project-hotstring-delay-architecture.
-	AssertTrue(true, "hotstring corpus must be pause-resilient (no activation, correct arithmetic even under pause)")
-}
-Test("Corpus hotstrings: pause must not activate any vector (dispatchers gate)", TestCorpusHotstrings_PauseMustNotActivateAnyVector)
-
-TestCorpusHotstrings_DelayPrecedenceInVectors() {
-	; Corpus + engine must respect section > group > default for any time_activation.
-	; This documents the regression guard for the DYN_* early-load and per-section override bugs.
-	AssertTrue(true, "corpus hotstrings must preserve delay precedence invariants")
-}
-Test("Corpus hotstrings: delay precedence regression guard (section>group>default)", TestCorpusHotstrings_DelayPrecedenceInVectors)
-
 ; invariants shared with the Hammerspoon driver.
 ; ==============================================================================
 
@@ -183,6 +165,65 @@ _CorpusHS_NonMatchedBuffersDontEndWithTrigger() {
 	}
 }
 Test("hotstring corpus  --  non-matched vectors: buffer does not end with trigger", _CorpusHS_NonMatchedBuffersDontEndWithTrigger)
+
+; These two used to sit at the top of the file as AssertTrue(true, "…") with the
+; invariant written only in the message — and above the corpus load, so they
+; could not have read a vector even if they had wanted to. They are here now,
+; where the corpus exists, and they assert instead of assert nothing.
+
+_CorpusHS_ArithmeticIsIndependentOfSuspendState() {
+	; The corpus is a pure data contract: backspace_count is derived from the
+	; trigger and the terminator, never from runtime state. If any of that
+	; arithmetic ever consulted A_IsSuspended, a hotstring would delete a
+	; different number of characters after a pause than before one — the worst
+	; possible failure, because it silently eats the user's text.
+	for Fn in ["IsTimeActivationExpired", "GenerateUppercaseVariants"] {
+		Body := _DriverFuncBody(Fn)
+		Assert(InStr(Body, "A_IsSuspended") == 0,
+			Fn . "() must not read A_IsSuspended — corpus arithmetic has to hold identically "
+			. "whether or not the driver is paused")
+	}
+
+	; And the vectors themselves must be self-consistent: every matched vector's
+	; backspace_count equals the trigger length, plus one when the terminator is
+	; consumed. Recomputed here rather than trusted.
+	Checked := 0
+	Corpus := _CorpusHS_Parse()
+	for Vec in Corpus["vectors"] {
+		Expected := Vec["expected"]
+		if not (Expected.Has("matched") and Expected["matched"] = true)
+			continue
+		if !Expected.Has("backspace_count")
+			continue
+		Want := StrLen(Vec["trigger"])
+		if (Vec.Has("terminator_consumed") and Vec["terminator_consumed"] = true)
+			Want += 1
+		AssertEqual(Want, Expected["backspace_count"],
+			"vector '" . Vec["id"] . "': backspace_count must be trigger length"
+			. " (+1 when the terminator is consumed)")
+		Checked += 1
+	}
+	Assert(Checked > 0, "no matched vector carried a backspace_count — the corpus shape changed")
+}
+Test("hotstring corpus  --  backspace arithmetic holds, and reads no suspend state",
+	_CorpusHS_ArithmeticIsIndependentOfSuspendState)
+
+_CorpusHS_EveryVectorResolvesADelay() {
+	; Every corpus trigger belongs to a category, and every category must resolve
+	; a delay through the section > file > global cascade. A vector whose category
+	; resolved to an empty delay would expand with no activation window at all.
+	Checked := 0
+	Corpus := _CorpusHS_Parse()
+	for Vec in Corpus["vectors"] {
+		R := HotstringsResolve("rolls", Vec["id"])
+		Assert(R.Delay != "", "vector '" . Vec["id"] . "': resolution must yield a delay, never an empty one")
+		Assert(R.Delay >= 0, "vector '" . Vec["id"] . "': a negative activation delay is not a window")
+		Checked += 1
+	}
+	Assert(Checked > 0, "the corpus produced no vectors — the shared contract file is empty or unreadable")
+}
+Test("hotstring corpus  --  every vector's category resolves a usable delay",
+	_CorpusHS_EveryVectorResolvesADelay)
 
 _CorpusHS_Utf8BackspaceCountUsesCodepoints() {
 	; For UTF-8 triggers the corpus records backspace_count as the codepoint count,

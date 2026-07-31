@@ -394,29 +394,77 @@ Test("HotstringsConfig: DYN_HOTSTRINGS_DEFAULT_DELAY is defined in the early con
 ; These would have caught the early-load crash for DYN_* and silent activation of hotstrings under pause.
 ; project_suspend_pause_invariant + project-hotstring-delay-architecture (section > group > default).
 
+; The claim is that resolution is PURE: it reads config tables and returns a
+; result, without consulting suspend state. That has to be asserted, not stated
+; — if the cascade ever grew an `if A_IsSuspended` branch it would return a
+; different delay after a pause than before one, and the tooltip and the engine
+; would disagree about the same hotstring.
 TestHotstringsConfig_PauseMustGateAllResolution() {
-	; Config resolution (GetHotstringGroupConfig, per-section delay lookup) must be safe to call
-	; under pause (pure data), but the dispatch/Feed paths that consume it must early-return with
-	; zero expansions. Real guard lives in hotstring engine/prefix watcher.
-	AssertTrue(true, "hotstrings config resolution must be pause-resilient (callers gate side effects)")
+	_HCfgTestReset()
+	_HCfgTestSeedToml("rolls", 0.5, "#fb8c00", Map("ct", { Delay: 0.3, Color: "#2e7d32", ShowTooltip: "" }))
+
+	; Resolution reads no suspend flag anywhere in its cascade.
+	Body := _DriverFuncBody("_HotstringsResolveUncached")
+	Assert(InStr(Body, "A_IsSuspended") == 0,
+		"the resolution cascade must not branch on A_IsSuspended — a paused driver would "
+		. "resolve a different delay than a running one for the same hotstring")
+
+	; And it is deterministic: the same query twice yields the same values, so a
+	; caller that resolves before a pause and acts after it sees one answer.
+	A := HotstringsResolve("rolls", "ct")
+	B := HotstringsResolve("rolls", "ct")
+	AssertEqual(A.Delay, B.Delay, "resolution must be deterministic across calls")
+	AssertEqual(A.Color, B.Color, "resolution must be deterministic across calls")
+	AssertEqual(0.3, A.Delay, "and it must still return the seeded section delay")
 }
 Test("HotstringsConfig: pause must not break config resolution (dispatchers gate expansions)", TestHotstringsConfig_PauseMustGateAllResolution)
 
+; Section > file > global default. Each rung is asserted by resolving a query
+; that can only produce that rung's value, so a re-ordered cascade fails on the
+; specific level that broke rather than on a message that says it should not.
 TestHotstringsConfig_SectionDelayPrecedenceRegression() {
-	; Historical architecture: section override > group > DYN_HOTSTRINGS_DEFAULT_DELAY / TimeActivation.
-	; A bad re-order or late definition would have produced wrong delay (or the initMenu crash fixed earlier).
-	; Under pause the precedence tables must still be correct for when the driver resumes.
-	global DYN_HOTSTRINGS_DEFAULT_DELAY
+	global DYN_HOTSTRINGS_DEFAULT_DELAY, GLOBAL_DEFAULT_DELAY
 	AssertTrue(IsSet(DYN_HOTSTRINGS_DEFAULT_DELAY), "default must exist")
-	; In real run, HotstringGroupConfig["MySection"].TimeActivationSeconds would win if present.
-	AssertTrue(true, "section > group > default delay precedence must hold (would have caught wrong expansion timing)")
+
+	; Rung 1 — a section delay beats the file delay of the same category.
+	_HCfgTestReset()
+	_HCfgTestSeedToml("rolls", 0.5, "", Map("ct", { Delay: 0.3, Color: "", ShowTooltip: "" }))
+	AssertEqual(0.3, HotstringsResolve("rolls", "ct").Delay,
+		"section delay must win over the file delay")
+
+	; Rung 2 — with no section match, the file delay wins.
+	AssertEqual(0.5, HotstringsResolve("rolls", "no_such_section").Delay,
+		"with no matching section the file delay must win")
+
+	; Rung 3 — with neither, the global default is the floor.
+	_HCfgTestReset()
+	AssertEqual(GLOBAL_DEFAULT_DELAY, HotstringsResolve("rolls", "").Delay,
+		"with no section and no file delay the global default must be the floor")
 }
 Test("HotstringsConfig: section>group>default delay precedence regression (project-hotstring-delay-architecture)", TestHotstringsConfig_SectionDelayPrecedenceRegression)
 
+; Malformed section data must degrade to the file/global value, not throw and
+; not invent one. Volume matters because the cascade is memoised per
+; (category, section): a throw on entry 137 would poison the cache for every
+; later query, so the assertion is that all 200 resolve AND that they resolve to
+; the right fallback.
 TestHotstringsConfig_HighVolumeBadTomlUnderPause() {
-	; 150+ bad/malformed user overrides or personal entries must not crash resolution or
-	; cause expansions when the script is paused. Graceful fallback to defaults only.
-	AssertTrue(true, "high volume (150+) bad config under pause must degrade gracefully (no crash, no activation)")
+	_HCfgTestReset()
+	Bad := Map()
+	Loop 200 {
+		; Delay left empty (the malformed shape the TOML parser emits for an
+		; unparseable value) — resolution must fall through to the file delay.
+		Bad["sec" . A_Index] := { Delay: "", Color: "", ShowTooltip: "" }
+	}
+	_HCfgTestSeedToml("rolls", 0.5, "#fb8c00", Bad)
+
+	Loop 200 {
+		R := HotstringsResolve("rolls", "sec" . A_Index)
+		AssertEqual(0.5, R.Delay,
+			"malformed section " . A_Index . " must fall through to the file delay, not throw or invent one")
+	}
+	AssertEqual("#fb8c00", HotstringsResolve("rolls", "sec1").Color,
+		"and the colour must fall through the same way")
 }
 Test("HotstringsConfig: high volume bad TOML/overrides under pause must not crash or activate (resilience)", TestHotstringsConfig_HighVolumeBadTomlUnderPause)
 
