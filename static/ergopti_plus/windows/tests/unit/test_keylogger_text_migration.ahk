@@ -445,3 +445,56 @@ _KLMig_HoldsOffTheIngestWhileRewriting() {
 }
 
 Test("KL_Mig: the ingest guard is raised for the duration of the pass", _KLMig_HoldsOffTheIngestWhileRewriting)
+
+
+
+
+
+; =============================================================
+; =============================================================
+; ======= 8/ A tick landing mid-slice must not re-enter =======
+; =============================================================
+; =============================================================
+
+; A slice does blocking file I/O, and AHK PUMPS MESSAGES during it — so the
+; one-shot KL_Mig_Tick a pass schedules can dispatch while a slice is already
+; running. The inner slice can reach the end of the pass, call _KL_Mig_Release
+; (which sets writeFh back to "") and return into the outer one, whose very next
+; line is writeFh.Write(...).
+;
+; That surfaced twice as an intermittent
+;   This value of type "String" has no method named "Write"
+; in this file, and passed on every re-run — the shape a re-entrancy bug always
+; takes. This drives the re-entry deterministically instead of waiting for the
+; scheduler to do it.
+_KLMig_ReentrantSliceIsRefused() {
+    _KLMig_Reset()
+    _KLMig_WriteLedger(["alpha", "beta", "gamma"])
+    KL_Enc_SetEnabled(true)
+    try {
+        KL_Mig_Start(KL_MIG_MODE_ENCRYPT, false)
+
+        ; Stand where a dispatched tick stands: a pass is active and a slice is
+        ; notionally in flight.
+        KLMigration.inSlice := true
+        AssertTrue(KL_Mig_Slice(),
+            "a slice entered while another is in flight must YIELD and report the pass is still alive, not run a second slice over the same handles")
+        AssertTrue(KL_Mig_IsActive(),
+            "and it must not have ended the pass")
+        AssertTrue(IsObject(KLMigration.writeFh),
+            "nor released the write handle the outer slice is about to use — releasing it is what turned the next Write into a call on a String")
+
+        ; With the guard down the pass completes normally, so the refusal above
+        ; is a yield and not a permanent stall.
+        KLMigration.inSlice := false
+        _KLMig_Drain()
+        AssertFalse(KL_Mig_IsActive(), "the pass must still finish once the re-entrant window closes")
+        AssertEqual("alpha", KL_Enc_Decrypt(_KLMig_FieldOf(FileRead(Keylogger.data_sql_path, "UTF-8"), 1, "text")),
+            "and it must have converted the ledger exactly as an uninterrupted pass would")
+    } finally {
+        KLMigration.inSlice := false
+        KL_Enc_SetEnabled(false)
+    }
+}
+
+Test("KL_Mig: a tick landing mid-slice yields instead of re-entering", _KLMig_ReentrantSliceIsRefused)
