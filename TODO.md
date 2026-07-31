@@ -360,7 +360,27 @@ Constraints: **paths before moves, moves before content, data before code.**
   — **the Windows half is done.** All 62 hand-written lambdas are gone from
   `modules/gestures/actions.ahk`; the handlers are now built at static-init from
   `_generated/gesture_emit_actions.ahk`, itself generated from the shared
-  catalogue. The macOS closures and Linux `elseif` branches are still to follow.
+  catalogue. The macOS closures and Linux `elseif` branches are still to follow —
+  and **measurement says they cannot reuse the Windows rows**, which is the most
+  important thing this item turned up.
+  Of the **24 actions both drivers implement as a bare keystroke, 15 use a
+  different key or modifier.** `close_window` is alt+F4 on Windows and cmd+w on
+  macOS; `fullscreen` is F11 against cmd+ctrl+f; `word_next` is ctrl+Right
+  against alt+right (macOS moves by word with Option, Windows with Control);
+  `doc_start` is ctrl+Home against cmd+up. Several more differ in key-name
+  spelling alone — `BackSpace`/`delete`, `Enter`/`return`,
+  `Delete`/`forwarddelete`.
+  These are the platforms' own conventions, not accidents to normalise away. So
+  the rows are `emit_ahk_*` and `emit_hs_*`, never one portable `emit`. They were
+  briefly named `emit_key`/`emit_mods`, which reads as portable and invites
+  exactly one change — "map super→cmd and share them" — that would compile, pass
+  every existing test, and silently give macOS the wrong keystroke for more than
+  half of them. `word_next` sending ctrl+Right on macOS does nothing at all, and
+  no test in the suite invokes a gesture handler, so nothing would have caught
+  it. `test-action-emit-is-per-os.cjs` records the divergence as data, refuses a
+  portable row, and fails if a recorded divergence quietly disappears.
+  The 27 macOS rows are already in the catalogue, derived from the macOS source
+  the same way, so that conversion is now mechanical rather than a research task.
   **Generated rather than registered at runtime, for a measured reason:** the
   obvious move is to let `_GestureLoadActionCatalog()` install them while it
   already has the TOML parsed — but that loader is deliberately deferred off the
