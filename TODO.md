@@ -379,8 +379,25 @@ Constraints: **paths before moves, moves before content, data before code.**
   no test in the suite invokes a gesture handler, so nothing would have caught
   it. `test-action-emit-is-per-os.cjs` records the divergence as data, refuses a
   portable row, and fails if a recorded divergence quietly disappears.
-  The 27 macOS rows are already in the catalogue, derived from the macOS source
-  the same way, so that conversion is now mechanical rather than a research task.
+  ~~The 27 macOS rows are already in the catalogue … that conversion is now
+  mechanical~~ — **and it landed.** The 27 hand-written
+  `sg("id", function() postKeyStroke({mods}, "key") end)` registrations are gone;
+  macOS registers them in a loop over `_generated/gesture_emit_actions.lua`.
+  One language difference worth knowing before the Linux conversion: the AHK side
+  must build its emitters in helper functions because an AHK loop closure
+  captures the loop VARIABLE, while Lua's generic `for` binds fresh locals each
+  iteration, so the Lua loop can register directly. Same invariant, different
+  mechanism, and only one of the two needs the indirection.
+  Two gates had to follow the refactor, both for the same reason — they detect
+  handlers by scanning source text, and a loop is not a literal call:
+  `test-action-platform-truth.cjs` reported `sel_word_prev`/`sel_word_next` as
+  "declared but macOS registers no handler" when both work perfectly, so it now
+  counts generated rows as registrations. And the first draft of the macOS test
+  reached for the private `SG` registry, could not find it, and fell back to
+  `assert_true(true, …)` — a tautology that would have passed forever while
+  testing nothing. **The false-green ratchet caught it**, which is the clearest
+  demonstration this session that the gate earns its keep: it caught its author.
+  Linux's `elseif` branches remain.
   **Generated rather than registered at runtime, for a measured reason:** the
   obvious move is to let `_GestureLoadActionCatalog()` install them while it
   already has the TOML parsed — but that loader is deliberately deferred off the

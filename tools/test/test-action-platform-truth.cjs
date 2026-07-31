@@ -66,6 +66,17 @@ const macSrc = fs.readFileSync(MAC_ACTIONS, 'utf8');
 const macSg = new Set([...macSrc.matchAll(/\bsg\(\s*"([\w.]+)"/g)].map((m) => m[1]));
 const macAx = new Set([...macSrc.matchAll(/\bax\(\s*"([\w.]+)"/g)].map((m) => m[1]));
 
+// Actions registered from the generated table count as registered. 27 of them
+// used to be written out as `sg("word_next", function() … end)` and are now
+// installed by a loop over _generated/gesture_emit_actions.lua, so a scan that
+// only looks for literal sg() calls concludes macOS has no handler for them —
+// and reports a row that works perfectly as "a row that does nothing".
+const MAC_GENERATED = path.join(SP, 'macos', '_generated', 'gesture_emit_actions.lua');
+if (fs.existsSync(MAC_GENERATED)) {
+	const gen = fs.readFileSync(MAC_GENERATED, 'utf8');
+	for (const m of gen.matchAll(/id\s*=\s*"([\w.]+)"/g)) macSg.add(m[1]);
+}
+
 const decls = declarations();
 const errors = [];
 

@@ -350,23 +350,36 @@ sg("app_previous",      switch_to_previous_application)
 sg("app_window_previous",  switch_to_previous_window_precise)
 
 -- Keys
-sg("enter",                           function() postKeyStroke({}, "return") end)
-sg("tab",                                function() postKeyStroke({}, "tab") end)
-sg("escape",                           function() postKeyStroke({}, "escape") end)
-sg("backspace",               function() postKeyStroke({}, "delete") end)
-sg("delete",                    function() postKeyStroke({}, "forwarddelete") end)
+-- ── Actions the shared catalogue describes for macOS ────────────────────────
+--
+-- 27 registrations used to be written out here, each spelling a key and its
+-- modifiers into its own closure. They now come from
+-- _shared/modules/actions/actions.toml via _generated/gesture_emit_actions.lua.
+--
+-- These are macOS values, not shared ones: of the 24 actions both drivers
+-- implement as a bare keystroke, 15 differ. macOS moves by word with Option
+-- where Windows uses Control, closes a window with cmd+w against alt+F4, and
+-- spells several keys differently outright (return/Enter, delete/BackSpace).
+--
+-- The closure below captures `row` safely: a Lua generic `for` binds fresh
+-- locals each iteration, so every handler keeps its own values. The AHK twin
+-- cannot do this — an AHK loop closure captures the loop VARIABLE, so its
+-- emitters have to be built by helper functions taking the values as arguments.
+local ok_emit, emit_rows = pcall(require, "_generated.gesture_emit_actions")
+if not ok_emit or type(emit_rows) ~= "table" then
+	error("gestures/actions: _generated/gesture_emit_actions.lua is missing or invalid — "
+		.. "27 gesture actions would silently do nothing. Run `npm run gen`.")
+end
+for _, row in ipairs(emit_rows) do
+	sg(row.id, function() postKeyStroke(row.mods, row.key) end)
+end
+
 
 -- Tabs
-sg("tab_new",                  function() postKeyStroke({"cmd"}, "t") end)
-sg("tab_close",                function() postKeyStroke({"cmd"}, "w") end)
-sg("tab_prev",              function() postKeyStroke({"ctrl", "shift"}, "tab") end)
-sg("tab_next",                function() postKeyStroke({"ctrl"}, "tab") end)
 
 -- Windows & Spaces
 sg("win_prev",            function() winNav(false) end)
 sg("win_next",              function() winNav(true) end)
-sg("close_window",         function() postKeyStroke({"cmd"}, "w") end)
-sg("fullscreen",                 function() postKeyStroke({"cmd", "ctrl"}, "f") end)
 sg("snap_left",              function()
 	local win = hs.window.focusedWindow()
 	if win then pcall(function() win:moveToUnit(hs.layout.left50) end) end
@@ -395,16 +408,10 @@ sg("app_expose",                  function()
 end)
 
 -- Cursor movement
-sg("word_prev",                function() postKeyStroke({"alt"}, "left") end)
-sg("word_next",                  function() postKeyStroke({"alt"}, "right") end)
 sg("line_up",               function() hs.timer.doAfter(0, function() postKeyStroke({"alt"}, "up") end) end)
 sg("line_down",               function() hs.timer.doAfter(0, function() postKeyStroke({"alt"}, "down") end) end)
 sg("line_start",              function() hs.timer.doAfter(0, function() postKeyStroke({"cmd"}, "left") end) end)
 sg("line_end",                  function() hs.timer.doAfter(0, function() postKeyStroke({"cmd"}, "right") end) end)
-sg("para_prev",         function() postKeyStroke({"alt"}, "up") end)
-sg("para_next",           function() postKeyStroke({"alt"}, "down") end)
-sg("doc_start",            function() postKeyStroke({"cmd"}, "up") end)
-sg("doc_end",                function() postKeyStroke({"cmd"}, "down") end)
 
 -- Media
 sg("vol_up",                        function() sysKey("SOUND_UP") end)
@@ -417,20 +424,10 @@ sg("track_next",              function() sysKey("NEXT") end)
 sg("track_prev",            function() sysKey("PREVIOUS") end)
 
 -- Single arrows
-sg("arrow_up",                   function() postKeyStroke({}, "up") end)
-sg("arrow_down",                  function() postKeyStroke({}, "down") end)
-sg("arrow_left",               function() postKeyStroke({}, "left") end)
-sg("arrow_right",              function() postKeyStroke({}, "right") end)
 
 -- Shift + Arrows
-sg("sel_up",                  function() postKeyStroke({"shift"}, "up") end)
-sg("sel_down",                 function() postKeyStroke({"shift"}, "down") end)
-sg("sel_left",              function() postKeyStroke({"shift"}, "left") end)
-sg("sel_right",             function() postKeyStroke({"shift"}, "right") end)
 
 -- Shift + Alt + Arrows (Word selection)
-sg("sel_word_prev",     function() postKeyStroke({"shift", "alt"}, "left") end)
-sg("sel_word_next",       function() postKeyStroke({"shift", "alt"}, "right") end)
 
 -- Absolute path: the interactive layer must not inherit its binaries from PATH,
 -- which differs between a login shell and the Hammerspoon process.
