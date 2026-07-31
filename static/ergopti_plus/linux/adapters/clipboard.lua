@@ -144,6 +144,15 @@ end
 --- @param saved string|nil The text to restore, or nil to clear.
 --- @return boolean True on success, false on error.
 function M.restore(saved)
+	-- Same type gate as M.write. `saved` is whatever save() returned, so anything
+	-- other than a string or nil means the caller lost it — and silently putting
+	-- tostring(that) on the clipboard would overwrite the user's data with a
+	-- number. Refusing is the only honest answer, and it matches write(), which
+	-- has always refused.
+	if saved ~= nil and type(saved) ~= "string" then
+		Logger.error(LOG, "restore(): expected string or nil, got %s — clipboard left untouched.", type(saved))
+		return false
+	end
 	if saved == nil then
 		-- Clear by writing an empty string
 		local ok, err = pcall(_write_raw, "")
