@@ -123,6 +123,10 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/macos/_generated/gesture_emit_actions.lua']
 	},
 	{
+		script: 'codegen/codegen-gesture-emit-actions-linux.cjs',
+		outputs: ['static/ergopti_plus/linux/_generated/gesture_emit_actions.lua']
+	},
+	{
 		script: 'codegen/gen-architecture-diagram.cjs',
 		note: 'runs last: it describes the tree the others have just finished writing',
 		outputs: ['static/ergopti_plus/docs/architecture.md']

@@ -172,12 +172,14 @@ platform = "hs"
 platform = "all"
 emit_ahk_key = "Tab"
 emit_ahk_mods = ["alt"]
+emit_linux = "alt+Tab"
 
 [sg_actions.app_previous]
 platform = "hs"
 
 [sg_actions.app_window_previous]
 platform = "hs"
+emit_linux = "alt+Escape"
 
 # --- Édition (Windows uniquement — macOS utilise Cmd+C/V/X dans cmd_*) ---
 
@@ -224,6 +226,7 @@ emit_ahk_key = "Enter"
 emit_ahk_mods = []
 emit_hs_key = "return"
 emit_hs_mods = []
+emit_linux = "Return"
 
 [sg_actions.tab]
 platform = "all"
@@ -236,6 +239,7 @@ emit_ahk_key = "Escape"
 emit_ahk_mods = []
 emit_hs_key = "escape"
 emit_hs_mods = []
+emit_linux = "Escape"
 
 [sg_actions.backspace]
 platform = "all"
@@ -243,6 +247,7 @@ emit_ahk_key = "BackSpace"
 emit_ahk_mods = []
 emit_hs_key = "delete"
 emit_hs_mods = []
+emit_linux = "BackSpace"
 
 [sg_actions.delete]
 platform = "all"
@@ -250,6 +255,7 @@ emit_ahk_key = "Delete"
 emit_ahk_mods = []
 emit_hs_key = "forwarddelete"
 emit_hs_mods = []
+emit_linux = "Delete"
 
 # --- Onglets ---
 
@@ -271,11 +277,13 @@ emit_hs_mods = ["cmd"]
 platform = "all"
 emit_hs_key = "tab"
 emit_hs_mods = ["ctrl", "shift"]
+emit_linux = "ctrl+shift+Tab"
 
 [sg_actions.tab_next]
 platform = "all"
 emit_hs_key = "tab"
 emit_hs_mods = ["ctrl"]
+emit_linux = "ctrl+Tab"
 
 # --- Navigation navigateur ---
 
@@ -305,6 +313,7 @@ emit_ahk_key = "F4"
 emit_ahk_mods = ["alt"]
 emit_hs_key = "w"
 emit_hs_mods = ["cmd"]
+emit_linux = "alt+F4"
 
 [sg_actions.fullscreen]
 platform = "all"
@@ -312,21 +321,25 @@ emit_ahk_key = "F11"
 emit_ahk_mods = []
 emit_hs_key = "f"
 emit_hs_mods = ["cmd", "ctrl"]
+emit_linux = "F11"
 
 [sg_actions.snap_left]
 platform = "all"
 emit_ahk_key = "Left"
 emit_ahk_mods = ["super"]
+emit_linux = "super+Left"
 
 [sg_actions.snap_right]
 platform = "all"
 emit_ahk_key = "Right"
 emit_ahk_mods = ["super"]
+emit_linux = "super+Right"
 
 [sg_actions.maximize]
 platform = "all"
 emit_ahk_key = "Up"
 emit_ahk_mods = ["super"]
+emit_linux = "super+Up"
 
 # --- Espaces / bureaux virtuels ---
 
@@ -380,6 +393,7 @@ emit_ahk_key = "Left"
 emit_ahk_mods = ["ctrl"]
 emit_hs_key = "left"
 emit_hs_mods = ["alt"]
+emit_linux = "ctrl+Left"
 
 [sg_actions.word_next]
 platform = "all"
@@ -387,26 +401,31 @@ emit_ahk_key = "Right"
 emit_ahk_mods = ["ctrl"]
 emit_hs_key = "right"
 emit_hs_mods = ["alt"]
+emit_linux = "ctrl+Right"
 
 [sg_actions.line_up]
 platform = "all"
 emit_ahk_key = "Up"
 emit_ahk_mods = []
+emit_linux = "Up"
 
 [sg_actions.line_down]
 platform = "all"
 emit_ahk_key = "Down"
 emit_ahk_mods = []
+emit_linux = "Down"
 
 [sg_actions.line_start]
 platform = "all"
 emit_ahk_key = "Home"
 emit_ahk_mods = []
+emit_linux = "Home"
 
 [sg_actions.line_end]
 platform = "all"
 emit_ahk_key = "End"
 emit_ahk_mods = []
+emit_linux = "End"
 
 [sg_actions.para_prev]
 platform = "all"
@@ -428,6 +447,7 @@ emit_ahk_key = "Home"
 emit_ahk_mods = ["ctrl"]
 emit_hs_key = "up"
 emit_hs_mods = ["cmd"]
+emit_linux = "ctrl+Home"
 
 [sg_actions.doc_end]
 platform = "all"
@@ -435,6 +455,7 @@ emit_ahk_key = "End"
 emit_ahk_mods = ["ctrl"]
 emit_hs_key = "down"
 emit_hs_mods = ["cmd"]
+emit_linux = "ctrl+End"
 
 # --- Flèches ---
 
@@ -444,6 +465,7 @@ emit_ahk_key = "Up"
 emit_ahk_mods = []
 emit_hs_key = "up"
 emit_hs_mods = []
+emit_linux = "Up"
 
 [sg_actions.arrow_down]
 platform = "all"
@@ -451,6 +473,7 @@ emit_ahk_key = "Down"
 emit_ahk_mods = []
 emit_hs_key = "down"
 emit_hs_mods = []
+emit_linux = "Down"
 
 [sg_actions.arrow_left]
 platform = "all"
@@ -458,6 +481,7 @@ emit_ahk_key = "Left"
 emit_ahk_mods = []
 emit_hs_key = "left"
 emit_hs_mods = []
+emit_linux = "Left"
 
 [sg_actions.arrow_right]
 platform = "all"
@@ -465,6 +489,7 @@ emit_ahk_key = "Right"
 emit_ahk_mods = []
 emit_hs_key = "right"
 emit_hs_mods = []
+emit_linux = "Right"
 
 # --- Sélection ---
 
@@ -586,6 +611,7 @@ platform = "all"
 platform = "all"
 emit_ahk_key = "n"
 emit_ahk_mods = ["super"]
+emit_linux = "super+v"
 
 # --- UI / Fenêtres de l'app ---
 

@@ -397,7 +397,25 @@ Constraints: **paths before moves, moves before content, data before code.**
   `assert_true(true, …)` — a tautology that would have passed forever while
   testing nothing. **The false-green ratchet caught it**, which is the clearest
   demonstration this session that the gate earns its keep: it caught its author.
-  Linux's `elseif` branches remain.
+  ~~Linux's `elseif` branches remain.~~ — **all three drivers are converted.**
+  Linux's 26 single-`xdotool key` branches now resolve through a lookup in
+  `_generated/gesture_emit_actions.lua`.
+  Its rows are stored as the **verbatim xdotool combo**, not split into key +
+  modifiers, because a split would imply a portability that does not exist: X11
+  keysyms (`Return`, `BackSpace`) are neither AHK's names nor Hammerspoon's
+  (`return`, `delete`), so every driver rebuilds the string from its own
+  vocabulary regardless.
+  **What the three sets of rows finally show:** Linux and Windows agree far more
+  often than either agrees with macOS — `close_window` is alt+F4 on both,
+  `word_next` is ctrl+Right on both, against cmd+w and alt+right. The divergence
+  is macOS-versus-the-rest, not three-way, which is what two PC-convention
+  platforms and one Mac-convention platform should look like. That was invisible
+  while the same facts sat in three registries.
+  One placement trap, recorded because the next such conversion will meet it:
+  dropping the branches and inserting the lookup where the first one *was* put it
+  **inside the preceding branch's body** — the file still parsed, the suite still
+  ran, and the lookup fired for exactly one action. It belongs before the chain
+  begins, next to the existing modifier-command lookup.
   **Generated rather than registered at runtime, for a measured reason:** the
   obvious move is to let `_GestureLoadActionCatalog()` install them while it
   already has the TOML parsed — but that loader is deliberately deferred off the
