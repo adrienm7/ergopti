@@ -56,6 +56,16 @@ const FORBIDDEN = [
 	{ re: /REFACTOR_GUIDE/, label: 'REFACTOR_GUIDE pointer' },
 	{ re: /\bPhase 2B\b/, label: 'plan phase (Phase 2B)' },
 	{ re: /\bPhase P\d/, label: 'plan phase (Phase P#)' },
+	// A BARE plan token — "P4 entrypoint decomposition", "(P5 refactor)",
+	// "(P0 SSoT)", "the P6 split", "(P0-G)". The P#.# rule above missed every one
+	// of them because none carries a dot, so 38 of these survived the purge that
+	// was supposed to remove them. The plan they point at was consolidated and
+	// deleted, so the token is not a reference a reader can follow — it is noise
+	// that looks like one. Say what the change WAS instead.
+	{ re: /\bP\d+(?:-[A-Z])?\s+(?:refactor|entrypoint|split|SSoT|SSOT|decomposition)\b/i, label: 'bare plan token (P# <word>)' },
+	{ re: /\(\s*P\d+(?:-[A-Z])?\s*\)/, label: 'bare plan token ((P#))' },
+	{ re: /\(\s*P\d+\/P\d+\s*\)/, label: 'bare plan token ((P#/P#))' },
+	{ re: /\bthe P\d+ split\b/i, label: 'bare plan token (the P# split)' },
 ];
 // A bare "Phase <n>" — allowed only in the CAT-B files above.
 const BARE_PHASE = /\bPhase \d/;

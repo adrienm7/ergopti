@@ -12,7 +12,7 @@ M.bridge_name = "model_browser_bridge"
 local Logger = require("logger.shim")
 local LOG = "bridge.model_browser"
 
--- Read canonical Ollama defaults from the shared bridge (P0-B SSoT).
+-- Read canonical Ollama defaults from the shared bridge (single source of truth).
 local HttpBridge = require("llm.linux_bridge")
 
 --- Builds the initial model browser data payload.

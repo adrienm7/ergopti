@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Final config write and driver reload, plus the GUI utility helpers shared by every step (centering, progress-dots row, dynamic-width nav buttons, active-Gui cleanup).
 ;
-; Split out of the former lib/onboarding.ahk (P5 refactor); see
+; Split out of the former lib/onboarding.ahk (the module split); see
 ; ui/onboarding/init.ahk for the module overview. Functions and globals are
 ; hoisted, so load order across the onboarding/*.ahk files is irrelevant.
 ; ==============================================================================

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; InitSubMenus and the dynamic-hotstrings submenu builder plus the per-category enabled/total counters that feed the menu title suffixes.
 ;
-; Split out of ui/tray_menu.ahk (P5 refactor). tray_menu.ahk remains the module
+; Split out of ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
 ; index: it declares the shared menu globals and #Include-s this file. Every
 ; function here is hoisted into the global namespace, so load order across the
 ; menu/*.ahk files is irrelevant.

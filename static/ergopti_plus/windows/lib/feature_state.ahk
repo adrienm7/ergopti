@@ -7,7 +7,7 @@
 ; shortcut slot tables (SLOTS/LABELS/DEFAULTS/FALLBACKS/SEND_CODES + assignment
 ; maps) and CategoryEnabled — plus the readers that populate them from config
 ; (ReadCategoryEnabled, IsCategoryGated, ReadScriptConfig). Extracted verbatim
-; from ErgoptiPlus.ahk (P4 entrypoint decomposition) and #Include'd in place, so
+; from ErgoptiPlus.ahk (the entry-point decomposition) and #Include'd in place, so
 ; the global assignments still run at the same point in the boot sequence and the
 ; reader functions (hoisted) stay available to their boot call sites.
 ; ==============================================================================

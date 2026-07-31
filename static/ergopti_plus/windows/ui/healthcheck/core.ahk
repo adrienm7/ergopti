@@ -9,7 +9,7 @@
 ; shared frontend _shared/ui/healthcheck/ (loaded via virtual host); the
 ; snapshot is injected as JSON after navigation completes.
 ;
-; Split out of the former lib/healthcheck.ahk (P5 refactor); see
+; Split out of the former lib/healthcheck.ahk (the module split); see
 ; ui/healthcheck/init.ahk for the module overview. Functions and globals are
 ; hoisted, so load order across the healthcheck/*.ahk files is irrelevant.
 ; ==============================================================================

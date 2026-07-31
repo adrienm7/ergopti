@@ -2,7 +2,7 @@
 
 /**
  * ==============================================================================
- * MODULE: File Watchers Constants SSoT Gate (P0 SSoT)
+ * MODULE: File Watchers Constants SSoT Gate
  * DESCRIPTION:
  * `SCAN_MAX_DEPTH` and the debounce interval are the two tunable constants
  * that must stay identical between Linux and macOS `lib/file_watchers.lua`.
@@ -102,5 +102,5 @@ if (errors.length > 0) {
 }
 
 console.log(
-	'\x1b[32m[OK] file_watchers constants SSoT — SCAN_MAX_DEPTH=16, debounce=0.5s match across Linux + macOS lib/file_watchers.lua. (P0 SSoT)\x1b[0m'
+	'\x1b[32m[OK] file_watchers constants SSoT — SCAN_MAX_DEPTH=16, debounce=0.5s match across Linux + macOS lib/file_watchers.lua.\x1b[0m'
 );

@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Regression — models_manager_mlx_server closure-nil forward declarations
 --- DESCRIPTION:
---- start_server (extracted to models_manager_mlx_server.lua in the P6 split) has
+--- start_server (extracted to models_manager_mlx_server.lua in the models-manager split) has
 --- three hs.task sites whose callbacks reference the task handle itself (not a
 --- hardcoded string key):
 ---
@@ -28,13 +28,18 @@
 local helpers = require("tests.helpers")
 
 helpers.describe("models_manager_mlx: three dangerous hs.task closures forward-declare their handle", function()
+	-- The three dangerous hs.task sites live inside start_server, which moved to
+	-- the server-lifecycle sibling module during the models-manager split.
+	--
+	-- Selected by a literal unique to that module rather than by path, so moving
+	-- it cannot turn these invariants into a path error. The module declares no
+	-- function name unique to it, and the assertions below compare source
+	-- POSITIONS — so the anchor has to be one that resolves to exactly one file,
+	-- which was verified: "sweep = hs.task.new(" appears in no other production
+	-- Lua file.
 	local function read_src()
-		-- The three dangerous hs.task sites live inside start_server, which moved to
-		-- the server-lifecycle sibling module during the P6 split; assert there.
-		local path = helpers.driver_root() .. "ui/menu/menu_llm/models_manager_mlx_server.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open models_manager_mlx_server.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		local src = helpers.read_driver_source("sweep = hs.task.new(")
+		helpers.assert_true(src ~= nil, "models_manager_mlx_server.lua source must be locatable")
 		return src
 	end
 

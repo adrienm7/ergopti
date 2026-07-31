@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Registration + dispatch for the script's AltGr chord shortcuts (AltGr+Enter/
 ; BackSpace/Delete/Escape and their Kana-fixup / suspended-state variants).
-; Extracted verbatim from ErgoptiPlus.ahk (P4 entrypoint decomposition) and
+; Extracted verbatim from ErgoptiPlus.ahk (the entry-point decomposition) and
 ; #Include'd at the original position so boot order is unchanged.
 ; ==============================================================================
 

@@ -7,7 +7,7 @@
 ; watchdog and prefix drain), shutdown (Ergopti_OnShutdown), the deferred tray
 ; menu build + icon update, and the debug/control actions (reload, exit, WindowSpy,
 ; ListVars, KeyHistory, healthcheck, edit). Extracted verbatim from ErgoptiPlus.ahk
-; (P4 entrypoint decomposition) and #Include'd in place; functions are hoisted so
+; (the entry-point decomposition) and #Include'd in place; functions are hoisted so
 ; their OnExit/SetTimer/hotkey call sites in the entry boot section are unaffected.
 ; ==============================================================================
 

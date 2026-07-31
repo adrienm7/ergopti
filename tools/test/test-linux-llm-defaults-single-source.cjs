@@ -9,7 +9,7 @@
  *   - port / temperature / context-length / keep-alive → _shared/modules/llm/defaults.json
  *   - max_tokens                                        → _shared/lua/llm/prompt_builder.lua
  *
- * ROOT CAUSE ENCODED (P0-B):
+ * ROOT CAUSE ENCODED:
  * Linux had silently diverged — temperature 0.3 (prediction_engine) and 0.7
  * (linux_bridge) vs the canonical 0.1; context 2000 vs 500; max_tokens 200 vs
  * 150; the Ollama port re-typed as 11434 in four places; keep_alive "30m" with no
@@ -80,7 +80,7 @@ for (const [name, value, source] of bridgeChecks) {
 // which linux_bridge already requires — it must read them, never re-type them.
 for (const ref of ['PromptBuilder.CONTEXT_TAIL_WORDS', 'PromptBuilder.DEFAULT_MAX_TOKENS']) {
 	if (!bridge.includes(ref)) {
-		errors.push(`linux_bridge.lua: must read ${ref} from prompt_builder (P0-C), not a re-typed literal`);
+		errors.push(`linux_bridge.lua: must read ${ref} from prompt_builder, not a re-typed literal`);
 	}
 }
 if (/M\.CONTEXT_TAIL_WORDS\s*=\s*\d/.test(bridge)) {
@@ -127,7 +127,7 @@ if (!macOllama.includes('ApiCommon.OLLAMA_KEEP_ALIVE')) {
 	errors.push('macos/modules/llm/api_ollama.lua: must read keep_alive from ApiCommon.OLLAMA_KEEP_ALIVE');
 }
 
-// ── 5. Linux Ollama request timeout must come from the timings registry (P0-D)
+// ── 5. Linux Ollama request timeout must come from the timings registry
 // Scanned RAW (not comment-stripped): the literal lives in a shell string and
 // Lua's "--" comment marker would otherwise clip the max-time token.
 const linuxOllamaRaw = read('linux/modules/llm/api_ollama.lua');

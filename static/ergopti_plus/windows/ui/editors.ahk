@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Small modal GUI editors for user-configurable values: the magic key, the
 ; repeat-key toggle, personal information, and the ChatGPT link. Extracted
-; verbatim from ErgoptiPlus.ahk (P4 entrypoint decomposition) and #Include'd at
+; verbatim from ErgoptiPlus.ahk (the entry-point decomposition) and #Include'd at
 ; the original position so boot order is unchanged. Functions are hoisted, so
 ; their menu/hotkey call sites elsewhere are unaffected.
 ; ==============================================================================
