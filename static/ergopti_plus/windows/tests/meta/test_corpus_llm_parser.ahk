@@ -112,15 +112,17 @@ _LLMParserCorpus_RegisterAll() {
 				continue
 		}
 
-		; Capture loop variables for the closure.
-		VecCopy    := Vec
 		NameCopy   := "[corpus:" . Id . "] " . SubStr(Desc, 1, 70)
-		ExpText    := VecCopy.Has("expected") && VecCopy["expected"].Has("text")
-		             ? VecCopy["expected"]["text"] : ""
-		ExpOk      := VecCopy.Has("expected") && VecCopy["expected"].Has("ok")
-		             ? VecCopy["expected"]["ok"] : false
+		ExpText    := Vec.Has("expected") && Vec["expected"].Has("text")
+		             ? Vec["expected"]["text"] : ""
+		ExpOk      := Vec.Has("expected") && Vec["expected"].Has("ok")
+		             ? Vec["expected"]["ok"] : false
 
-		Test(NameCopy, () => _RunLLMParserVector(VecCopy, ExpText, ExpOk))
+		; .Bind, never an inline fat-arrow: the "capture loop variables" copies
+		; this replaces froze nothing — every closure shared those slots and ran
+		; the LAST vector under every name. Bind evaluates its arguments here, at
+		; registration, which is the only per-iteration snapshot AHK v2 offers.
+		Test(NameCopy, _RunLLMParserVector.Bind(Vec, ExpText, ExpOk))
 	}
 }
 

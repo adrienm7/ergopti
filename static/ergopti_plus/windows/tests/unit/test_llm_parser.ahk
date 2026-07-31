@@ -137,8 +137,9 @@ _LLMPP_RegisterCorpus() {
 	}
 	Data := JsonParse(FileRead(CorpusPath, "UTF-8"))
 	for Vec in Data["vectors"] {
-		VecCopy := Vec
-		Test("LLM pp-parity [" . Vec["id"] . "]", () => _LLMPP_RunVector(VecCopy))
+		; .Bind, never an inline fat-arrow over a loop-scoped copy — see
+		; project_ahk_loop_capture_copy_freezes_nothing.
+		Test("LLM pp-parity [" . Vec["id"] . "]", _LLMPP_RunVector.Bind(Vec))
 	}
 }
 _LLMPP_RegisterCorpus()

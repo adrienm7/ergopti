@@ -231,9 +231,11 @@ _KlgAggCorpus_RegisterAll() {
 		Id := Vec.Has("id") ? Vec["id"] : "unknown"
 		Desc := Vec.Has("description") ? Vec["description"] : Id
 		NameCopy := "[corpus:kl-agg:" . Id . "] " . SubStr(Desc, 1, 60)
-		VecCopy := Vec
-
-		Test(NameCopy, () => _KlgAggCorpus_RunVector(VecCopy))
+		; .Bind, never an inline fat-arrow over a loop-scoped copy: the copy is one
+		; variable in THIS function, every closure shares it, and they all run after
+		; the loop — so all 13 tests replayed the last vector. Measured: corrupting
+		; the FIRST vector produced zero failures.
+		Test(NameCopy, _KlgAggCorpus_RunVector.Bind(Vec))
 	}
 }
 
