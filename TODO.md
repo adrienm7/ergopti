@@ -161,8 +161,25 @@ Constraints: **paths before moves, moves before content, data before code.**
 - **Lot 3 — one tree.** Four independently-green steps: (a) extract `platform/`;
   (b) `lib/` → `infra/` with features promoted out — ⚠ the macOS `lib.text_utils`
   and `lib/toml/*` shims must keep their basenames, and the `lib.` → `infra.`
-  prefix rewrite must touch production **and** the ~1 942 test require/stub sites
-  in the same commit or every stub silently stops intercepting; (c) `ui/`
+  prefix rewrite must touch production **and** the test require/stub sites in the
+  same commit or every stub silently stops intercepting.
+  **That hazard is now detectable, which is what actually blocked the move.**
+  `test-stubs-intercept-something.cjs` fails on any `package.loaded["x.y"] = stub`
+  whose module does not resolve. Measured: **1 141 stub assignments across 708
+  Lua test files** (the "~1 942" figure counted requires and stubs together).
+  Renaming a production module now lists every stub site that would have gone
+  quiet — verified by moving `lib/logger.lua` aside and watching the gate name
+  them. Host-provided modules (`hs`, `hs.*`, `lgi`, `posix`, `luv`, `ffi`, …) are
+  allowlisted, and `= nil` is treated as a cache eviction rather than a stub.
+  **Three stubs were already dead before any rename**, which is the best evidence
+  the hazard is real rather than theoretical: `test_llm_models_presets.lua`
+  stubbed `modules.llm.models_mgr` and `ui.menu.menu_llm.models_mgr` — neither
+  module has ever existed, and the module under test requires
+  `models_manager_ollama`/`_mlx` instead — and
+  `test_build_inserts_missing_timestamp.lua` stubbed `lib.json` where
+  `sqlite_writer` requires `hs.json` and nothing in the driver requires
+  `lib.json` at all. None made a test fail, because an inert stub is
+  indistinguishable from a working one from inside the test. All three removed; (c) `ui/`
   dissolves into `modules/<feature>/{menu,window}`; (d) de-platform `_shared/` and
   ~~repair `tools/codegen/new-driver.js`~~ — **repaired.** All four paths were
   stale, not three: `REPO_ROOT` resolved to `tools/`, `DRIVERS_DIR` pointed at the
