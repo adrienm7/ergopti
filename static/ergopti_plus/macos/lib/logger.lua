@@ -548,9 +548,16 @@ end
 -- ===================================
 -- ===================================
 
+-- Window during which a repeated identical line is suppressed. Named rather than
+-- inlined because the AHK driver holds the same duration in MILLISECONDS, and two
+-- bare literals in two units, each with a comment claiming to match the other,
+-- are indistinguishable from two literals that have drifted apart.
+-- Single source: _shared/modules/timings/constants.toml [logger] dedup_window_ms.
+local DEDUP_WINDOW_SEC = 5
+
 -- Deduplication state: suppresses consecutive identical log lines to prevent spam.
 -- `time` stamps the start of the current streak so a recurring line re-surfaces
--- after the 5 s window instead of being silenced forever (matches the AHK driver).
+-- after the window instead of being silenced forever (matches the AHK driver).
 local _dedup = { line = nil, count = 0, variant_key = nil, time = 0 }
 
 -- Forward declaration — implementation is in Section 5 (ring buffer).
@@ -812,7 +819,7 @@ _log = function(variant_key, module_name, msg, ...)
 	-- outlives the window re-surfaces. The window matches the AHK driver so both
 	-- drivers dedup identically.
 	local _now = _gettime()
-	if line == _dedup.line and (_now - _dedup.time) < 5 then
+	if line == _dedup.line and (_now - _dedup.time) < DEDUP_WINDOW_SEC then
 		_dedup.count = _dedup.count + 1
 		return false
 	end
