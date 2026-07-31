@@ -69,6 +69,41 @@ _KL_ClassAndStyleIsPassword(Win32Class, Win32StyleHex) {
 ; =====================================================
 ; =====================================================
 
+; The three vector assertions below take their vector EXPLICITLY and are wired
+; up with .Bind(). The file used to freeze the loop variable by assigning it to
+; another outer local (``VidCopy := VecId``) — which freezes nothing: every
+; closure shares that one variable and sees whatever the LAST iteration left in
+; it. The six macOS-only vectors passed by coincidence, all expecting the same
+; value; the first assertion that differed between vectors surfaced it at once
+; ("Item has no value", from SEC-008's expected being read as SEC-007's).
+
+;--- One vector of the family that must persist nothing.
+_SecCorpus_ZeroPersistence(VecId, Expected) {
+	AssertEqual(0, Expected["events_persisted"],
+		VecId . ": this vector must demand ZERO persisted events — relaxing it silently weakens the privacy contract the macOS driver is held to")
+	AssertEqual(0, Expected["typing_entries"],
+		VecId . ": and zero typing entries")
+}
+
+;--- SEC-007 / SEC-008: only their EXECUTION needs a live session, not their shape.
+_SecCorpus_LiveShape(VecId, Expected) {
+	if (VecId = "SEC-007") {
+		AssertEqual(1, Expected["events_persisted"],
+			"SEC-007 is the vector documenting that normal typing IS logged — if it ever demanded zero, the secure-field vectors would no longer be testing anything different")
+		return
+	}
+	AssertEqual(0, Expected["typing_entries_for_secure"],
+		"SEC-008: keystrokes after the transition into a secure field must persist nothing")
+	AssertEqual(1, Expected["typing_entries_for_normal"],
+		"and the normal-field keystrokes before it must still be flushed, or the vector proves nothing about the transition")
+}
+
+;--- An id this driver handles nowhere.
+_SecCorpus_Unconsumed(VecId) {
+	Assert(false,
+		"corpus vector '" . VecId . "' has no AHK consumer. Either drive it from this file, or add it to one of the explicit skip families above WITH its rationale — leaving it unhandled means the corpus grew and this driver silently ignored the new case")
+}
+
 _SecurityCorpus_RunAll() {
 	CorpusPath := A_ScriptDir . "\..\..\_shared\tests\corpus\security\keylogger_no_persist_vectors.json"
 	_SecurityCorpus_Load() {
@@ -100,22 +135,25 @@ _SecurityCorpus_RunAll() {
 			or VecId = "SEC-004" or VecId = "SEC-005" or VecId = "SEC-006") {
 			; macOS-only: AXSecureTextField, bundle-ID lookup, private-window
 			; detection — all rely on Hammerspoon APIs not present on Windows.
-			VidCopy := VecId
-			_Skip() {
-				AssertTrue(true, VidCopy . " correctly skipped: macOS-only vector")
-			}
-			Test("[corpus:" . VecId . "] SKIP — macOS-only (AX/HS APIs)", _Skip)
+			;
+			; Windows cannot EXECUTE these vectors, but it can still hold the
+			; corpus to its promise. Each one exists to say "this input must
+			; persist nothing"; a vector quietly relaxed to allow persistence
+			; would weaken the macOS guarantee with nothing on this side
+			; noticing. The old body asserted AssertTrue(true).
+			Test("[corpus:" . VecId . "] contract — zero persistence (execution is macOS-only)",
+				_SecCorpus_ZeroPersistence.Bind(VecId, Vec["expected"]))
 			continue
 		}
 
 		if (VecId = "SEC-007" or VecId = "SEC-008") {
 			; Normal-field logging and mid-buffer flush: require a live keylogger
-			; session with real key events. Cannot run headless.
-			VidCopy := VecId
-			_SkipLive() {
-				AssertTrue(true, VidCopy . " correctly skipped: requires live keylogger session")
-			}
-			Test("[corpus:" . VecId . "] SKIP — requires live keylogger session", _SkipLive)
+			; session with real key events. Cannot run headless — but the shape of
+			; what they promise is still checkable, and SEC-007 is the one vector
+			; that deliberately ALLOWS persistence, so its distinctness from the
+			; secure-field family is exactly what must not drift.
+			Test("[corpus:" . VecId . "] contract — shape preserved (execution needs a live session)",
+				_SecCorpus_LiveShape.Bind(VecId, Vec["expected"]))
 			continue
 		}
 
@@ -164,20 +202,17 @@ _SecurityCorpus_RunAll() {
 			; UIA IsPassword property — requires a live COM UIA object.
 			; The class-name layer (PasswordBox etc.) is already covered by
 			; SEC-009-class tests above; the UIA layer is skipped headless.
-			VidCopy := VecId
-			_SkipUIA() {
-				AssertTrue(true, VidCopy . " correctly skipped: UIA COM object not available headless")
-			}
-			Test("[corpus:SEC-010] SKIP — UIA COM object unavailable headless", _SkipUIA)
+			Test("[corpus:SEC-010] contract — zero persistence (execution needs a live UIA object)",
+				_SecCorpus_ZeroPersistence.Bind(VecId, Vec["expected"]))
 			continue
 		}
 
-		; Unknown vector: emit a warning test (pass) so the corpus stays visible
-		VidUnknown := VecId
-		_SkipUnknown() {
-			AssertTrue(true, "Unknown corpus vector '" . VidUnknown . "' has no AHK consumer — add one or mark as SKIP")
-		}
-		Test("[corpus:" . VecId . "] WARN — no AHK consumer defined", _SkipUnknown)
+		; An id nobody handles is a coverage hole, and it used to be announced as a
+		; PASS whose message said "add one or mark as SKIP" — which is precisely
+		; the instruction a green test guarantees nobody will read. Adding a vector
+		; must now force the decision.
+		Test("[corpus:" . VecId . "] FAIL — no AHK consumer defined",
+			_SecCorpus_Unconsumed.Bind(VecId))
 	}
 }
 
