@@ -437,10 +437,38 @@ Constraints: **paths before moves, moves before content, data before code.**
      (`emit_kanata` / `emit_karabiner` / `emit_ahk`) — today only a kanata emitter
      parked in `_shared/`. And `_shared/tap_hold/defaults.toml` must become **one**
      namespace: it is currently two unrelated files in one, describing the same
-     seven physical keys with different ids, different actions and a 3–5× different
-     threshold; the AHK loader ignores every `[hs_*]` header and the macOS reader
-     ignores every `[tap_hold.*]` header. Also: four documents claim "no runtime
-     merge" while the code merges on every boot.
+     seven physical keys with different ids (`left_ctrl`/`left_control`,
+     `left_alt`/`left_option`), different actions (`caps_lock` holds **ctrl**
+     under `[tap_hold.*]` and **cmd** under `[hs_tap_hold]`; `tab` taps
+     `alt_tab_monitor` vs `alt_tab_windows`) and a 2.9–5× different threshold
+     (0.2–0.35 s per key vs a flat 1000 ms global); the AHK loader ignores every
+     `[hs_*]` header and the macOS reader ignores every `[tap_hold.*]` header.
+     **Found while measuring:** `right_ctrl` has **no macOS counterpart at all** —
+     `[hs_tap_hold]` carries right_command/right_option/right_shift but no
+     right-control slot, so the key that taps `one_shot_shift` on Windows and
+     Linux is simply unconfigured on macOS. Now recorded in the gate's
+     `KNOWN_UNPAIRED` so the list cannot grow silently.
+     ~~Also: four documents claim "no runtime merge" while the code merges on
+     every boot.~~ — **the documentation half is fixed**, and it was worse than
+     "the code merges": the three loaders do not agree with **each other**, and
+     each one's own comments claim it matches the others.
+     *Windows* parses the shared defaults first and merges the user file on top
+     **per key** — its docstring says "editing `defaults.toml` takes effect on
+     every reload even when the user file exists". *Linux* reads the same
+     sections but lets a user file **replace** them wholesale, describing this as
+     "mirroring the other drivers", which is the opposite of Windows. *macOS*
+     reads `[hs_*]` in a **module body at require time**, unconditionally, with no
+     user file for those sections at all.
+     Against that, `SCHEMA.md` — the config-schema contract — said in three
+     places that the file is "a generation template only", that the per-driver
+     copy is "the complete config", and that "the shared file is never read again
+     at runtime"; its own header repeated it. So a maintainer tuning a threshold
+     would believe the edit could not reach an installed driver, when on Windows
+     and macOS it reaches every one at the next reload. Both documents now state
+     the three real lifecycles, and `test-tap-hold-defaults-lifecycle.cjs` fails
+     if any document re-asserts the old claim while a loader still reads the file,
+     if a loader stops reading it without the docs changing in the same commit, or
+     if the two namespaces stop covering the same physical keys.
   8. **Tooltip**: wire the 1 483 lines of shared JS **as an oracle** (vector
      generator + conformance harness), not as runtime. Today the gate named
      "tooltip corpus parity" requires neither JS module it claims to compare, the

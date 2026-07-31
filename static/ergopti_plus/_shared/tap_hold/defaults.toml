@@ -1,10 +1,30 @@
 # _shared/tap_hold/defaults.toml
 # Canonical default values for the tap-hold configuration.
 #
-# Generation source only: at first boot, each driver renders this template into
-# its own ``config/ergopti_plus/<driver>/tap_hold.toml``. After that initial
-# generation, the per-driver file IS the complete config — there is no runtime
-# merge with this file, and the two drivers' configs may diverge freely.
+# READ AT RUNTIME, ON EVERY BOOT, BY ALL THREE DRIVERS. This header used to say
+# the opposite — "generation source only … there is no runtime merge with this
+# file" — and so did SCHEMA.md, in three places. Editing this file changes the
+# behaviour of already-installed drivers on their next reload. Do not treat it
+# as a template that only affects fresh installs.
+#
+# The three loaders do not agree with each other, and each one's own comments
+# claim that it matches the others:
+#   - Windows  lib/tap_hold/tap_hold_loader.ahk parses [tap_hold.*] here FIRST,
+#              then merges the user file on top PER KEY. A key the user has not
+#              overridden inherits the value below.
+#   - Linux    modules/kanata/manager.lua reads [tap_hold.*], but a user
+#              tap_hold.toml, when present, REPLACES these defaults wholesale —
+#              no per-key merge, so an edit here reaches only users without one.
+#   - macOS    modules/karabiner/defaults.lua reads [hs_timeouts], [hs_tap_hold]
+#              and [hs_combos] in its module body at require time. There is no
+#              user file for those sections, so an edit here always applies.
+#
+# The two namespaces below describe the SAME seven physical keys under different
+# ids (left_ctrl/left_control, left_alt/left_option), with different thresholds
+# (0.2–0.35 s per key vs a flat 1000 ms global) and in places different actions
+# — caps_lock holds ctrl under [tap_hold.*] and cmd under [hs_tap_hold].
+# Unifying them is tracked as Lot 8(7); until then, a change to one namespace is
+# NOT a change to the other.
 #
 # Consumers of the generated per-driver file:
 #   - AHK : ``modules/tap_holds.ahk`` arms the corresponding hotkeys.
