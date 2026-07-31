@@ -55,6 +55,7 @@ graph TD
         LINUX_timer_scheduler["TimerScheduler.lua"]
         LINUX_tooltip_renderer["TooltipRenderer.lua"]
         LINUX_tray_menu["TrayMenu.lua"]
+        LINUX_uinput_writer["UinputWriter.lua"]
         LINUX_window_info["WindowInfo.lua"]
         LINUX_window_manager["WindowManager.lua"]
     end

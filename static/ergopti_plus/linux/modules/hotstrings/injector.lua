@@ -71,6 +71,11 @@ local EVDEV_VALUE_DOWN   = 1
 -- =========================================
 -- =========================================
 
+--- The non-forking uinput channel, when one has been opened. nil means emit_key
+--- falls back to one `ydotool key` subprocess per event — correct, but far too
+--- expensive to run under a keyboard grab.
+local _uinput = nil
+
 --- Test seam: when set, shell_run delegates to this function instead of os.execute.
 --- The function receives the raw shell command string and must return a boolean.
 --- Set via M._set_runner(fn); reset via M._reset_runner().
@@ -223,12 +228,66 @@ function M.emit_key(code, value)
 			tostring(code), tostring(value))
 		return false
 	end
+	-- Preferred path: write the event straight to /dev/uinput. This exists
+	-- because the ydotool path below forks ONCE PER EVENT, and under EVIOCGRAB
+	-- that is a fork per physical keystroke on the input path — the measured
+	-- reason the daemon cannot take the grab. Batching is not an alternative:
+	-- _pump_one re-emits an event and then dispatches it, so collapsing a batch
+	-- would run an injection triggered by event N before the re-emit of N.
+	--
+	-- The uinput channel also carries the autorepeat value unchanged, which the
+	-- ydotool wire format cannot express (see the collapse below).
+	if _uinput and _uinput.is_open() then
+		return _uinput.emit(code, value)
+	end
+
 	local wire = (value == EVDEV_VALUE_UP) and EVDEV_VALUE_UP or EVDEV_VALUE_DOWN
 	local success = shell_run(string.format("ydotool key %d:%d", code, wire))
 	if not success then
 		Logger.warn(LOG, "emit_key(%d:%d): ydotool key returned non-zero.", code, wire)
 	end
 	return success
+end
+
+--- Opens the non-forking uinput channel, if this system can provide one.
+---
+--- Called by the daemon before taking a grab. Returns false rather than raising
+--- when FFI or /dev/uinput is unavailable, and emit_key() then keeps using
+--- ydotool — correct, just one fork per event, which is only affordable while
+--- the daemon is NOT grabbing.
+--- @return boolean True when the non-forking channel is live.
+function M.open_fast_channel()
+	local ok_mod, mod = pcall(require, "adapters.uinput_writer")
+	if not ok_mod or type(mod) ~= "table" then
+		Logger.debug(LOG, "uinput_writer unavailable — keeping the ydotool channel.")
+		return false
+	end
+	if not mod.is_available() then
+		Logger.info(LOG, "No uinput channel on this system — keeping the ydotool channel "
+			.. "(one subprocess per event, so the daemon must not take a grab).")
+		return false
+	end
+	if not mod.open() then
+		Logger.warn(LOG, "uinput channel could not be opened — keeping the ydotool channel.")
+		return false
+	end
+	_uinput = mod
+	Logger.success(LOG, "Non-forking uinput channel open.")
+	return true
+end
+
+--- Closes the non-forking channel, if one is open.
+function M.close_fast_channel()
+	if not _uinput then return end
+	_uinput.close()
+	_uinput = nil
+	Logger.done(LOG, "Non-forking uinput channel closed.")
+end
+
+--- Test seam: injects (or clears) the uinput channel without touching /dev.
+--- @param mod table|nil A module exposing is_open() and emit(code, value).
+function M._set_uinput(mod)
+	_uinput = mod
 end
 
 --- Performs a hotstring injection: erases the trigger then types the replacement.

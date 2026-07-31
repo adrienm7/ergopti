@@ -710,20 +710,53 @@ never passes `intercept = true`.
 **What actually blocks the flip** — two measured reasons, both named in
 `ergopti_hotstrings.lua` at the `keyboard_hook.start` call:
 
-1. `injector.emit_key` shells out **once per event** (`ydotool key <code>:<value>`,
-   `injector.lua:227`). Under a grab that is a fork on every physical keystroke.
+1. ~~`injector.emit_key` shells out **once per event**~~ — **delivered.**
+   `adapters/uinput_writer.lua` writes `struct input_event` straight to
+   `/dev/uinput` via LuaJIT FFI, and `emit_key` prefers it whenever
+   `open_fast_channel()` has succeeded. The fork per physical keystroke is gone,
+   so the cost that made a grab unaffordable is gone with it.
 2. The device kanata auto-detects is not coordinated with the one `device_finder`
-   picks here.
+   picks here. **Still open** — genuinely a hardware question.
 
 **Do not propose batching the pass-through.** `ydotool key` does accept several
 `code:value` pairs in one call, so collapsing a pump batch into one fork looks
 obvious — and it is wrong. `_pump_one` re-emits an event and then dispatches it,
 so an injection triggered by event N would run BEFORE the re-emit of N itself.
-That is precisely the interleaving this whole item exists to remove. A cheap
-channel has to be non-forking, not batched: `/dev/uinput` via LuaJIT FFI, or a
-persistent ydotoold client.
+That is precisely the interleaving this whole item exists to remove. (Now
+recorded in the adapter's own header as well, since the batched version is the
+mistake a reader arrives at independently.)
 
-The remaining verification needs real evdev + ydotool hardware.
+**How the channel is verified without hardware.** Every syscall goes through a
+swappable backend table, so the tests bind a recorder and assert the *bytes*:
+the 24-byte `struct input_event` with its fields at the 64-bit offsets,
+little-endian packing (a byte-swapped keycode is a different key), two's
+complement for the `__s32` value, the 92-byte `uinput_setup`, and the
+`SYN_REPORT` that must follow every key — without which the kernel buffers the
+event and the application sees nothing while every write still returns success.
+The ioctl ORDER is pinned too: capabilities must precede `UI_DEV_CREATE`,
+because the kernel freezes the capability bits at creation and a key registered
+afterwards succeeds while doing nothing, surfacing only as one key that quietly
+stops working. Encoding is hand-rolled little-endian rather than `string.pack`,
+because LuaJIT is 5.1 and has none — one code path on every interpreter beats a
+version branch that only one side of CI ever executes.
+Four mutation probes confirm the assertions are live: a 4-byte `timeval` → 5
+reds, a dropped `SYN_REPORT` → 3, `UI_DEV_CREATE` moved before the keybits → 1,
+autorepeat collapsed → 1.
+
+The injector half has its own test, and its assertion is the unusual one: not
+"emit_key works" — it always did — but **"emit_key does not fork"**. That cannot
+be read from a return value, since `os.execute` reports the same thing whether
+it ran once or not at all, so both spawn paths are made observable and required
+not to fire. Removing the channel check makes it print the exact two forks.
+
+Autorepeat is now passed through as `2` rather than collapsed to a press: the
+ydotool wire format has no representation for a repeat, `/dev/uinput` does, and
+a pass-through that rewrites what it passes is not one. The divergence between
+the two channels is deliberate and pinned on both sides.
+
+**What still needs real evdev + ydotool hardware:** flipping `intercept = true`,
+the device-coordination question in (2) above, and confirming the kernel accepts
+the virtual device. The code and its contract no longer do.
 
 ---
 
