@@ -392,25 +392,20 @@ behind) · `windows/tests/COVERAGE.md` and `macos/tests/COVERAGE.md` (hand-writt
 inventories, already stale — `docs/TESTING.md` states the right principle: the
 inventory of checks is the run itself).
 
-### 0.9 Smaller carried-over items
+### 0.9 Smaller carried-over items — **all delivered 2026-07-31**
 
-- The Lua half of `lint-conventions.js` scans macOS only: Linux (142 files) and
-  `_shared/lua` (32) are never checked for headers, banners or section spacing.
-- `_shared/core` (33 port specs) and `_shared/modules` (3 scripts) are outside
-  `audit-file-headers.cjs`. The specs use a repo-relative header where everything
-  else under `_shared/` uses the BASE-relative form; unifying them is a 36-file
-  rewrite touching files other meta-tests grep, so it needs its own commit.
-- The banner linter derives its index from an *assumed* rule-line count instead of
-  checking it, so **68 major banners** with a non-conforming count pass while
-  `npm run lint:conventions` reports zero violations.
-- **78 production files** are predominantly space-indented where the convention is
-  tabs, **30 of them mixing both**.
-- Delete `tools/codegen/codegen-prompt-builder-hs.cjs` (34 lines that emit
-  nothing; its own docstring says it exists to document an asymmetry) and its npm
-  alias, folding the explanation into `macos/_generated/README.md`.
-- Purge the remaining dead plan-phase references (`P5 refactor`, `P0 SSoT`,
-  `P6 split`) from driver sources, several of which point at files that no longer
-  exist.
+Kept only as a pointer to what now guards each one, because every fix here was a
+gate that had a blind spot rather than a one-off correction:
+
+| Was | Now guarded by |
+| --- | --- |
+| Lua conventions scanned macOS only | `lint-conventions.js` walks all three drivers + `_shared/lua`, and FATALs on an empty tree |
+| `_shared/core` + `_shared/modules` outside the header audit | both trees in `audit-file-headers.cjs` |
+| banner rule-line count never checked | `checkBannerAlignment` walks the whole run; the fixer inserts and never deletes |
+| 78 space-indented production files | converted; `git diff -w` was empty |
+| dead `codegen-prompt-builder-hs.cjs` | deleted; the asymmetry is explained in `macos/_generated/README.md` |
+| dead plan tokens (`P5 refactor`, `P0 SSoT`…) | `test-no-plan-refs-in-source.cjs` now matches bare tokens, not only `P#.#` |
+| glossaries disagreeing with the code | `test-glossary-matches-code.cjs`, deriving the port list from disk |
 
 ### 0.10 Risks
 
