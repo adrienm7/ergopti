@@ -96,6 +96,7 @@ const CHECKS = [
 	{ name: 'logger scalars single-source (retention/ring/dedup/flush vs the timing registry)', cmd: 'node', args: ['tools/test/test-logger-scalars-single-source.cjs'], repro: 'node tools/test/test-logger-scalars-single-source.cjs' },
 	{ name: 'tap-hold shared defaults lifecycle (docs match what the three loaders do)', cmd: 'node', args: ['tools/test/test-tap-hold-defaults-lifecycle.cjs'], repro: 'node tools/test/test-tap-hold-defaults-lifecycle.cjs' },
 	{ name: 'locale native names single-source (every ordered locale is named, no driver copy)', cmd: 'node', args: ['tools/test/test-locale-names-single-source.cjs'], repro: 'node tools/test/test-locale-names-single-source.cjs' },
+	{ name: 'generator registry runs (npm run gen: every declared output is produced)', cmd: 'node', args: ['tools/build/gen-all.cjs'], repro: 'npm run gen' },
 	{ name: 'hotstring editor confirm dialog wiring (delete actually fires)', cmd: 'node', args: ['tools/test/test-hotstring-editor-confirm-wiring.cjs'], repro: 'node tools/test/test-hotstring-editor-confirm-wiring.cjs' },
 	{ name: 'WebView2 host teardown order (closing a window must not quit AHK)', cmd: 'node', args: ['tools/test/test-webview-teardown-order.cjs'], repro: 'node tools/test/test-webview-teardown-order.cjs' },
 	{ name: 'dynamic hotstrings menu labels (resolver bridge + locale keys)', cmd: 'node', args: ['tools/test/test-dynamic-hotstrings-menu-labels.cjs'], repro: 'node tools/test/test-dynamic-hotstrings-menu-labels.cjs' },
