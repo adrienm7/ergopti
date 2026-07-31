@@ -658,7 +658,20 @@ Constraints: **paths before moves, moves before content, data before code.**
      right, and the corpus gets "fixed" to match one driver's optimisation.
   2. Extend the corpus to the branches measured as absent: `auto_expand`,
      `final_result`, the terminator path, star/magic-key triggers, `case_conform`,
-     `is_case_sensitive_strict` (**1 302 entries use it**, documented nowhere), the
+     `is_case_sensitive_strict` (**1 302 entries use it**, and the figure is exact —
+     1 300 in `magickey.toml`, one each in `autocorrection.toml` and
+     `rolls.toml`). **Now documented, and the divergence measured:** the flag is
+     implemented in **Windows only**, where it becomes AutoHotkey's `C`
+     hotstring flag. macOS and Linux read the same shared TOML and have **zero**
+     production references to it, so all 1 302 entries match case-insensitively
+     there. The consequence is behavioural: `"OUi" → "Oui"` exists so that typing
+     `oui` does NOT autocorrect, and on two of three drivers it does.
+     Not fixed here on purpose — implementing it changes the matching path of
+     both engines, and the vectors that would make that safe are the very thing
+     this item asks for. `test-hotstring-flag-support-per-driver.cjs` records
+     which driver honours which flag and fails in both directions: a driver
+     gaining support (good news, update the record) and a flag declared in shared
+     data that no engine reads at all), the
      NBSP typographic rule, the buffer cap, consumed delimiters, the
      `individual > section > file` priority levels, `is_word` as a tiebreaker.
   3. Generate the single matcher core into both target languages, modelled on
