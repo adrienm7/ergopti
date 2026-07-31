@@ -155,21 +155,22 @@ end
 --- Reads the canonical schema file from the _shared tree.
 --- @return string|nil Schema SQL, or nil on failure.
 local function _read_schema()
-	-- Resolve the _shared/data/db/ path relative to the driver root.
-	local src = debug.getinfo(1, "S").source:gsub("^@", "")
-	local driver_root = src:match("^(.*)[/\\]modules[/\\]keylogger[/\\]sqlite_writer%.lua$") or "."
-	driver_root = driver_root:gsub("\\", "/")
-	local schema_path = driver_root .. "/../../../_shared/data/db/schema.sql"
+	-- Through the shared resolver. This used to walk "../../../" from the driver
+	-- root — two levels too high — and fall back to a BARE RELATIVE path, which
+	-- made schema loading depend on the process's current directory rather than
+	-- on where the driver is installed. Started from anywhere but one exact
+	-- directory, the keylogger came up with no schema at all.
+	local Paths = require("lib.paths")
+	local schema_path = Paths.shared("data/db/schema.sql")
+	if not schema_path then
+		Logger.error(LOG, "Cannot locate the shared tree — schema.sql is unreachable.")
+		return nil
+	end
 
 	local fh = io.open(schema_path, "r")
 	if not fh then
-		-- Try relative path (works from the daemon entry point).
-		local alt = "../../_shared/data/db/schema.sql"
-		fh = io.open(alt, "r")
-		if not fh then
-			Logger.error(LOG, "Cannot read schema.sql from %s or %s.", schema_path, alt)
-			return nil
-		end
+		Logger.error(LOG, "Cannot read schema.sql at %s.", schema_path)
+		return nil
 	end
 	local content = fh:read("*a")
 	fh:close()

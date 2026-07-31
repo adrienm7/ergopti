@@ -292,12 +292,27 @@ Constraints: **paths before moves, moves before content, data before code.**
   belong. Left alone deliberately; the 273-string figure does not survive
   measurement.
 
-- **Lot 7 — the cross-cutting layer.** Order matters: (1) `linux/infra/shared_paths.lua`
-  + `config_paths.lua` mirroring macOS and `windows/lib/boot.ahk` — Linux has
-  **no resolver at all**: 12 independent expressions with 4 different depths and
-  14 files deriving `$HOME` separately, which is why the language menu offers
-  **2 locales of 21** (`../../` is one level too high) and the keylogger schema
-  load is CWD-dependent (two levels too high). Gate:
+- **Lot 7 — the cross-cutting layer.** ~~(1) the shared-tree resolver~~ — **done**,
+  as `linux/lib/paths.lua` (the name mirrors macOS `lib/paths.lua` rather than the
+  proposed `infra/`, since `infra/` does not exist yet — that rename belongs to
+  Lot 3). Every module now asks it, and
+  `test-linux-shared-path-resolver.cjs` fails on any hand-counted hop.
+
+  **Five wrong depths, not two.** Beyond the language menu (`../../`, one level
+  too high, which is why it offered 2 locales of 21 — the scan found nothing and
+  the `{"en","fr"}` fallback took over) and the CWD-dependent schema load
+  (`../../../`), the same file also got the locale DISPLAY-ORDER path wrong, so
+  the two survivors sorted alphabetically; `ergopti_hotstrings.lua`'s bundled-
+  hotstrings fallback overshot by one; and `hotstrings_config.lua`'s bundled
+  fallback overshot by one. Every one of them failed by finding nothing and
+  quietly using a default, which is why none had ever been reported.
+
+  Two bootstraps genuinely cannot use the resolver — they set `package.path`,
+  which is the thing they are computing — so the gate asserts their depth
+  directly instead of exempting them on trust. `engine.lua` was one of the five.
+
+  Still open in this item: the **14 files deriving `$HOME` separately**
+  (`config_paths.lua`). Gate:
   `test-shared-root-resolvers.cjs` must **execute** each expression and assert the
   file exists — never merely that the module loaded. (2) Move the macOS
   config-path SSOT out of `ui/menu/menu_paths.lua` (25 call sites): today `lib/`

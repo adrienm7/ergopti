@@ -343,14 +343,12 @@ end
 --- @return table { width, height, min_width, min_height }
 local function _read_app_geometry(app_name)
 	local defaults = { width = 800, height = 600, min_width = 400, min_height = 300 }
-	local root = _driver_root()
-	local manifest_path = root .. "/../_shared/ui/apps.manifest.json"
-	local fh = io.open(manifest_path, "r")
-	if not fh then
-		-- Try alternate path.
-		manifest_path = root .. "/../../_shared/ui/apps.manifest.json"
-		fh = io.open(manifest_path, "r")
-	end
+	-- One resolver, no "try the other depth" dance. The alternate path this used
+	-- to fall back to was simply wrong; keeping both meant the correct one was
+	-- indistinguishable from a lucky guess.
+	local ok_paths, Paths = pcall(require, "lib.paths")
+	local manifest_path = ok_paths and Paths.shared("ui/apps.manifest.json") or nil
+	local fh = manifest_path and io.open(manifest_path, "r") or nil
 	if not fh then return defaults end
 	local raw = fh:read("*a")
 	fh:close()

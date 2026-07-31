@@ -265,7 +265,12 @@ local function resolve_config_path(config_path)
 		return DEFAULT_CONFIG_DIR
 	end
 	-- Fall back to bundled shared hotstrings.
-	local shared = SCRIPT_DIR .. "/../../_shared/modules/hotstrings"
+	-- One level up, not two: SCRIPT_DIR is the driver root and _shared is its
+	-- sibling. The old "../../" resolved outside the tree, so this fallback
+	-- never found the bundled hotstrings and silently returned the default dir.
+	local Paths = require("lib.paths")
+	local shared = Paths.shared("modules/hotstrings")
+	if not shared then return DEFAULT_CONFIG_DIR end
 	local fh2 = io.open(shared, "r")
 	if fh2 then
 		fh2:close()
