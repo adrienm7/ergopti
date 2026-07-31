@@ -517,6 +517,7 @@ function findUnflooredScans(file, src, ext) {
 		const counters = new Set();
 		for (const m of block.text.matchAll(/(\w+)\s*\+=\s*1\b/g)) counters.add(m[1]);
 		for (const m of block.text.matchAll(/(\w+)\s*=\s*\1\s*\+\s*1\b/g)) counters.add(m[1]);
+		for (const m of block.text.matchAll(/(\w+)\+\+/g)) counters.add(m[1]);
 		let floored = false;
 		for (const c of counters) {
 			const re = new RegExp(`(?:Assert\\w*|assert_\\w+)\\s*\\([^\\n]*\\b${c}\\b`);
@@ -526,13 +527,24 @@ function findUnflooredScans(file, src, ext) {
 			}
 		}
 
+		// A collector is anything the loop accumulates into: a list it pushes to,
+		// or — just as common here — a Map it keys (`Found[Name] := true`), whose
+		// floor is then written as `Found.Count >= 4`.
 		const collectors = new Set();
 		for (const m of block.text.matchAll(/(\w+)\s*\.\s*(?:Push|insert)\s*\(/g)) collectors.add(m[1]);
 		for (const m of block.text.matchAll(/table\.insert\s*\(\s*(\w+)/g)) collectors.add(m[1]);
+		// `\[.*\]` greedy to the LAST bracket on the line, not `[^\]]*`: the key is
+		// routinely itself a subscript (`Names[M[1]] := true`), and a negated class
+		// stops at the inner `]` — the same bracket-nesting trap that made the
+		// AltGr guard match nothing in the first place.
+		for (const m of block.text.matchAll(/^[^\n]*?(\w+)\s*\[.*\]\s*:=/gm)) collectors.add(m[1]);
 		if (!floored) {
 			for (const c of collectors) {
+				// Compared against anything, not only a literal: `Stages.Count ==
+				// Counted` is a floor too — it ties the scan's result to a number
+				// derived elsewhere, so an empty scan fails.
 				const re = new RegExp(
-					`(?:${c}\\s*\\.\\s*(?:Length|Count)|#\\s*${c})\\s*(?:>|>=|!=|~=|==)\\s*\\d`
+					`(?:${c}\\s*\\.\\s*(?:Length|Count)|#\\s*${c})\\s*(?:>|>=|!=|~=|==)\\s*\\w`
 				);
 				if (re.test(src)) {
 					floored = true;
@@ -540,14 +552,20 @@ function findUnflooredScans(file, src, ext) {
 				}
 			}
 		}
+		// A collector HELPER — a scanning function that only gathers and returns,
+		// with the assertions in its caller — is floored by whatever the caller
+		// asserts about the returned list. The caller binds it to its OWN name
+		// (`Walkers := _WalkerEntryPoints()`), so matching on the helper's internal
+		// variable finds nothing. Any size assertion in the file is therefore taken
+		// as the floor: a file that asserts a scan result is non-empty anywhere is
+		// not the shape this pattern is about.
+		if (!floored && collectors.size > 0 && !ASSERT.test(block.text)) {
+			if (/(?:\.\s*(?:Length|Count)|#\s*\w+)\s*(?:>|>=|==|~=|!=)\s*\w/.test(src)) floored = true;
+		}
 		if (floored) continue;
 
-		// A block with no assertion at all is normally a dead test, and findDeadTests
-		// owns that. The exception is a COLLECTOR HELPER — a scanning function that
-		// legitimately only gathers and returns, with the assertions living in its
-		// caller. Skipping those on "no assertion here" would exempt exactly the
-		// shape this pattern is worst in, since the caller iterates the list and
-		// asserts inside the iteration.
+		// A block with no assertion and no collector is a dead test; findDeadTests
+		// owns that, and reporting it twice helps nobody.
 		if (!ASSERT.test(block.text) && collectors.size === 0) continue;
 
 		out.push({
