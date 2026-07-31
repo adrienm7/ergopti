@@ -395,9 +395,31 @@ Constraints: **paths before moves, moves before content, data before code.**
   Left alone deliberately: the **12 copies of `_t()`** in two flavours — 3 return
   `null` on a miss so callers can write `_t(k) || "French default"`, 3 return the
   key. Unifying them would silently disable those `||` fallbacks; it is a separate
-  change with its own reds. (6) Generate the three 21-locale tables from `locale_order.json` + a new
-  `locale_names.json` (the flag column stays per-driver: flag emoji do not render
-  in Windows menus). (7) **Only then** make macOS consume the shared logger core,
+  change with its own reds. ~~(6) Generate the three 21-locale tables from `locale_order.json` + a new
+  `locale_names.json`~~ — **done, and it was hiding a live user-facing gap.** The
+  display ORDER was already single-sourced and gated; the NAMES were not, and one
+  of the three hand-maintained tables had silently fallen behind.
+  `linux/lib/i18n.lua`'s `display_name()` held **16 of the 21** shipped locales
+  and ended in `return names[code] or code`, so **`da`, `no`, `cs`, `he` and
+  `hi` rendered in the Linux language menu as those bare two-letter codes**,
+  sitting between "Nederlands" and "Русский" while the other sixteen showed their
+  native names. Nothing failed: `or code` is a perfectly good fallback for an
+  unknown locale and indistinguishable from a forgotten one.
+  macOS and Windows agreed on all 21 names, which is what made
+  `_shared/data/locale_names.json` derivable rather than a judgement call about
+  whose spelling was right. `codegen-locale-tables.cjs` now emits all three
+  tables. The flag column does stay per-driver as predicted — Windows gets a
+  `[XX]` tag because flag emoji do not render in Win32 menus — but the tag is
+  *derived from the code*, so it carries no data that can drift.
+  `test-locale-names-single-source.cjs` holds three properties: every ordered
+  locale is named, every shipped `locales/*.json` is ordered, and **no driver
+  spells the names out again** — that last one is what prevents the regression
+  rather than re-detecting it, since a fourth copy is how the third one drifted.
+  `test-locale-order-single-source.cjs` was re-pointed at the generated tables
+  in the same commit. Watch for one trap when regenerating: the hand-written
+  tables aligned their columns with padding *after* the closing quote, and
+  padding inside the string literal puts trailing spaces into the name the menu
+  actually renders — invisible in a diff, visible in the UI. (7) **Only then** make macOS consume the shared logger core,
   and only after writing `_shared/tests/corpus/logger/behaviour_vectors.json` —
   this is the module with the worst bug history in the repo.
 

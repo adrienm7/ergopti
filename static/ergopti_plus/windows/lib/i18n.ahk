@@ -33,31 +33,17 @@
 ; =============================================
 ; =============================================
 
-; Ordered list of supported locales: { Code, Flag, Name }
-; Tag = short code shown in radio buttons (flag emojis don't render on Windows)
-global I18N_LOCALES := [
-	{ Code: "da", Tag: "[DA]", Name: "Dansk"       },
-	{ Code: "de", Tag: "[DE]", Name: "Deutsch"     },
-	{ Code: "en", Tag: "[EN]", Name: "English"     },
-	{ Code: "es", Tag: "[ES]", Name: "Español"     },
-	{ Code: "fr", Tag: "[FR]", Name: "Français"    },
-	{ Code: "it", Tag: "[IT]", Name: "Italiano"    },
-	{ Code: "nl", Tag: "[NL]", Name: "Nederlands"  },
-	{ Code: "no", Tag: "[NO]", Name: "Norsk"        },
-	{ Code: "pl", Tag: "[PL]", Name: "Polski"       },
-	{ Code: "pt", Tag: "[PT]", Name: "Português"   },
-	{ Code: "sv", Tag: "[SV]", Name: "Svenska"      },
-	{ Code: "tr", Tag: "[TR]", Name: "Türkçe"       },
-	{ Code: "cs", Tag: "[CS]", Name: "Čeština"    },
-	{ Code: "ru", Tag: "[RU]", Name: "Русский"      },
-	{ Code: "uk", Tag: "[UK]", Name: "Українська"   },
-	{ Code: "he", Tag: "[HE]", Name: "עברית"       },
-	{ Code: "ar", Tag: "[AR]", Name: "العربية"    },
-	{ Code: "hi", Tag: "[HI]", Name: "हिन्दी"      },
-	{ Code: "zh", Tag: "[ZH]", Name: "中文"          },
-	{ Code: "ja", Tag: "[JA]", Name: "日本語"       },
-	{ Code: "ko", Tag: "[KO]", Name: "한국어"       },
-]
+; Ordered list of supported locales: { Code, Tag, Name }.
+;
+; Filled at init from _generated/locale_table.ahk, itself generated from
+; _shared/data/locale_order.json (order) and locale_names.json (native names).
+; Three hand-maintained copies is how the Linux table came to hold 16 of the 21
+; shipped locales, its five missing rows rendering as bare two-letter codes.
+;
+; Tag = short code shown in radio buttons; flag emoji do not render in Win32
+; menus, so this driver's presentation column differs from the other two by
+; necessity rather than drift. It is derived from the code and carries no data.
+global I18N_LOCALES := LocaleTableData()
 
 ; Debounce delay for locale-change reloads (ms).
 ; Rapid language switches cancel the pending reload so only the last

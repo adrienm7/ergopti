@@ -40,32 +40,13 @@ local Labels     = require("menu.labels")
 -- =============================================
 
 --- Ordered list of supported locales, in the canonical language-menu order.
---- That order is single-sourced from _shared/data/locale_order.json and pinned
---- to this table by tools/test/test-locale-order-single-source.cjs — keep the
---- rows in exactly that order and do not re-sort at runtime.
-local LOCALES = {
-	{ code = "da", flag = "🇩🇰", name = "Dansk"       },
-	{ code = "de", flag = "🇩🇪", name = "Deutsch"     },
-	{ code = "en", flag = "🇬🇧", name = "English"     },
-	{ code = "es", flag = "🇪🇸", name = "Español"     },
-	{ code = "fr", flag = "🇫🇷", name = "Français"    },
-	{ code = "it", flag = "🇮🇹", name = "Italiano"    },
-	{ code = "nl", flag = "🇳🇱", name = "Nederlands"  },
-	{ code = "no", flag = "🇳🇴", name = "Norsk"        },
-	{ code = "pl", flag = "🇵🇱", name = "Polski"       },
-	{ code = "pt", flag = "🇧🇷", name = "Português"   },
-	{ code = "sv", flag = "🇸🇪", name = "Svenska"      },
-	{ code = "tr", flag = "🇹🇷", name = "Türkçe"       },
-	{ code = "cs", flag = "🇨🇿", name = "Čeština"    },
-	{ code = "ru", flag = "🇷🇺", name = "Русский"      },
-	{ code = "uk", flag = "🇺🇦", name = "Українська"   },
-	{ code = "he", flag = "🇮🇱", name = "עברית"       },
-	{ code = "ar", flag = "🇸🇦", name = "العربية"    },
-	{ code = "hi", flag = "🇮🇳", name = "हिन्दी"      },
-	{ code = "zh", flag = "🇨🇳", name = "中文"          },
-	{ code = "ja", flag = "🇯🇵", name = "日本語"       },
-	{ code = "ko", flag = "🇰🇷", name = "한국어"       },
-}
+---
+--- Generated, not written here: the order comes from
+--- _shared/data/locale_order.json and the native names from
+--- _shared/data/locale_names.json. Three hand-maintained copies is how the Linux
+--- table came to hold 16 of the 21 shipped locales, its five missing rows
+--- rendering in the menu as bare two-letter codes. Do not re-sort at runtime.
+local LOCALES = require("_generated.locale_table")
 
 --- hs.settings key used to persist the locale between reloads.
 local SETTINGS_KEY = "i18n_locale"
