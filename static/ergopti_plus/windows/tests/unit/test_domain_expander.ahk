@@ -28,19 +28,6 @@
 
 ; Shorthand: register an end-char trigger (no star) with optional is_word gate.
 _DE_Add(Trigger, Repl, Group := "default", IsWord := false) {
-
-; ULTIMATE MAX: pause must silence all domain/expander activity (no expansions under suspend)
-_DE_PauseNoExpansion() {
-	; All _DE_* and underlying HSE paths must be gated by A_IsSuspended in the hotstring dispatch.
-	AssertTrue(true, "domain expander must respect full pause silence (project_suspend_pause_invariant)")
-}
-Test("Domain expander: pause must silence every expansion path", _DE_PauseNoExpansion)
-
-_DE_HighVolumeVectors() {
-	; Run many vectors in a loop; must stay stable (no state corruption).
-	AssertTrue(true, "domain expander high volume must not degrade")
-}
-Test("Domain expander: high volume vector stress must remain stable", _DE_HighVolumeVectors)
 	Flags := IsWord ? "" : "?"
 	Meta := Map("group", Group, "Repl", Repl, "Replacement", Repl)
 	return HSE_Register(Flags, Trigger, 0, Meta)
@@ -233,3 +220,66 @@ _DE_ResetClearsState() {
 	AssertEqual("by the way", R["replacement"], "reset_clears_state: replacement must be 'by the way'")
 }
 Test("Expander: reset() clears buffer state but registry survives", _DE_ResetClearsState)
+
+
+
+
+
+; ============================================
+; ============================================
+; ======= 9/ Pause silences every path =======
+; ============================================
+; ============================================
+
+; These two replace a pair of placeholders that asserted AssertTrue(true) — and
+; that were declared INSIDE the body of _DE_Add, so they registered only if that
+; helper happened to be called. They promised "pause must silence every
+; expansion path" and "high volume must remain stable" and verified neither.
+;
+; The prefix watcher owns its OWN InputHook, so the HookDispatcher's suspend
+; guard does not cover it: each of its two entry points has to check
+; A_IsSuspended itself, and it has to do so BEFORE touching the buffer — a guard
+; placed after the buffer mutation still corrupts the preview state while paused.
+_DE_PauseSilencesEveryEntryPoint() {
+	for Name in ["_OnPrefixChar", "_OnPrefixKeyDown"] {
+		Body := _DriverFuncBody(Name)
+		GuardPos := InStr(Body, "if A_IsSuspended")
+		Assert(GuardPos > 0,
+			Name . "() must bail on A_IsSuspended — the prefix watcher runs on its own InputHook, which the HookDispatcher suspend guard does not reach")
+
+		; The guard has to precede every buffer mutation in the function.
+		for Mutation in ["_PrefixBuffer :=", "HSE_FeedChar(", "HSE_FeedBackspace(", "HSE_FeedReset("] {
+			MutPos := InStr(Body, Mutation)
+			if (MutPos > 0)
+				Assert(GuardPos < MutPos,
+					Name . "(): the A_IsSuspended guard must come before '" . Mutation . "' — a guard placed after it still mutates the buffer while paused")
+		}
+	}
+}
+Test("Expander: pause silences every expansion entry point (domain-expander-placeholders)",
+	_DE_PauseSilencesEveryEntryPoint)
+
+
+; Feeds the engine far more input than any single vector does, then asserts it
+; still decides correctly. The placeholder this replaces claimed to be a stress
+; test and ran no engine code at all.
+_DE_HighVolumeStaysCorrect() {
+	HSE_TestReset()
+	_DE_Add("btw", "by the way")
+
+	; 500 non-matching decisions, each seeding a fresh buffer, to shake out state
+	; that leaks between calls.
+	Loop 500 {
+		R := _DE_Decide("noise" . A_Index, " ")
+		if !R["is_null"]
+			Assert(false, "high volume: decision " . A_Index . " matched a buffer that ends with no trigger")
+	}
+
+	; The registry and the matcher must be exactly as good as on the first call.
+	Final := _DE_Decide("btw", " ")
+	AssertTrue(Final["not_null"], "high volume: the trigger must still match after 500 decisions")
+	AssertEqual("by the way", Final["replacement"], "high volume: the replacement must be unchanged")
+	AssertEqual(4, Final["backspace_count"], "high volume: the backspace arithmetic must be unchanged")
+}
+Test("Expander: 500 decisions leave the matcher correct (domain-expander-placeholders)",
+	_DE_HighVolumeStaysCorrect)

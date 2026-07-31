@@ -1,7 +1,7 @@
 {
-	"tautology": 153,
+	"tautology": 151,
 	"vacuous-absence": 17,
-	"dead-test": 4,
+	"dead-test": 0,
 	"pcall-only": 367,
 	"corpus-skip": 0
 }

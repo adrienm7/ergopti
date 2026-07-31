@@ -221,7 +221,12 @@ helpers.describe("file_watchers", function()
 
 		if not CAN_STAT then
 			helpers.it("SKIP — stat(1) not available on this system (tests require mtime detection)", function()
-				-- stateless marker so CI knows the path exists but is not exercisable
+				-- A skip must still assert the reason it skipped for. An empty body
+				-- reports a PASS, indistinguishable from the real test running — so a
+				-- broken _can_stat() probe would silently disable this whole section
+				-- on a machine that CAN stat.
+				helpers.assert_true(not CAN_STAT,
+					"this branch runs only when stat(1) is unavailable; CAN_STAT says otherwise")
 			end)
 		else
 			helpers.it("fires on_reload after .toml mtime changes and deadline passes", function()
@@ -388,7 +393,14 @@ helpers.describe("file_watchers", function()
 	helpers.describe("on_reload errors", function()
 
 		if not CAN_STAT then
-			helpers.it("SKIP — stat(1) not available on this system", function() end)
+			helpers.it("SKIP — stat(1) not available on this system", function()
+				-- A skip must still assert the reason it skipped for. An empty body
+				-- reports a PASS, indistinguishable from the real test running — so a
+				-- broken _can_stat() probe would silently disable this whole section
+				-- on a machine that CAN stat.
+				helpers.assert_true(not CAN_STAT,
+					"this branch runs only when stat(1) is unavailable; CAN_STAT says otherwise")
+			end)
 		else
 			helpers.it("pcall-guards the callback so a thrown error never reaches pump()", function()
 				local dir = make_temp_dir()
@@ -453,7 +465,14 @@ helpers.describe("file_watchers", function()
 		end)
 
 		if not CAN_STAT then
-			helpers.it("SKIP — stat(1) not available for callback-after-restart test", function() end)
+			helpers.it("SKIP — stat(1) not available for callback-after-restart test", function()
+				-- A skip must still assert the reason it skipped for. An empty body
+				-- reports a PASS, indistinguishable from the real test running — so a
+				-- broken _can_stat() probe would silently disable this whole section
+				-- on a machine that CAN stat.
+				helpers.assert_true(not CAN_STAT,
+					"this branch runs only when stat(1) is unavailable; CAN_STAT says otherwise")
+			end)
 		else
 			helpers.it("stop() prevents old callback from firing after restart", function()
 				local dir = make_temp_dir()
