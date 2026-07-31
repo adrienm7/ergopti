@@ -39,9 +39,11 @@ helpers.describe("sqlite_writer: build_inserts does not raise on missing timesta
 
 		-- Stub dependencies so the module loads without a real DB or device
 		package.loaded["lib.logger"] = helpers.make_logger_stub()
-		package.loaded["lib.json"] = helpers.make_json_stub and helpers.make_json_stub() or
-			{ encode = function(v) return tostring(v) end,
-			  decode = function(s) return nil, "stub" end }
+		-- No "lib.json" stub: sqlite_writer requires hs.json, and nothing in the
+		-- macOS driver requires lib.json at all. The stub that used to sit here
+		-- intercepted nothing — the module took the real hs.json from the hs stub
+		-- either way, so removing it changes no behaviour, only the impression
+		-- that a dependency was being controlled.
 
 		-- load_with_stubs, not a bare require: sqlite_writer pulls in hs.fs, which
 		-- does not exist outside Hammerspoon. A raw require therefore ALWAYS failed
