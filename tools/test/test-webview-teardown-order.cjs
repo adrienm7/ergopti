@@ -16,11 +16,24 @@
  * terminates the entire AHK process. The fix is to release the subscription
  * handles FIRST, while the controller is still alive, then Close() the controller.
  *
- * FEATURES & RATIONALE:
- * 1. Asserts, for every WebView2 host that stores subscription handles, that each
- *    `<sub> := unset` line precedes the matching `Controller.Close()` line inside
- *    its reset/teardown routine. A regression that reorders them (or appends a new
- *    stored subscription after Close) fails here instead of in a user's face.
+ * HOSTS ARE DISCOVERED, NOT LISTED:
+ * This guard used to carry a hand-written list of seven hosts. Thirteen files
+ * close a WebView2 controller, so six were unwatched — including the WebViewHost
+ * factory in lib/webview_utils.ahk, which is the shape every future host is meant
+ * to be built from. The list is now derived from the source.
+ *
+ * AND IT USED TO PASS FOR THE WRONG REASON:
+ * The old check compared the FIRST occurrence of a handle name against the Close.
+ * The first occurrence is the `global _X_MsgSub := unset` declaration at the top
+ * of the file, which precedes everything — so the assertion held whether or not
+ * the teardown released anything at all. Deleting the release from the teardown
+ * routine would not have failed it. Declarations are now excluded: only
+ * assignments after the file's first function/method definition count as
+ * releases, and each handle must have one.
+ *
+ * It also pinned the exact internal whitespace of each line
+ * ('_HsEdWeb_MsgSub     := unset'), so a reformat broke it with "line not found"
+ * rather than a behaviour signal. Matching is whitespace-insensitive now.
  * ==============================================================================
  */
 
@@ -33,53 +46,37 @@ const PASS_SYMBOL = '✓';
 const FAIL_SYMBOL = '✗';
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
+const WINDOWS_DIR = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'windows');
 
-// Each host: the file, the Controller.Close() marker, and the subscription
-// handle releases that MUST appear before it.
-const HOSTS = [
-	{
-		label: 'hotstring editor host',
-		file: 'static/ergopti_plus/windows/ui/personal_toml_editor_webview.ahk',
-		close: '_HsEdWeb_Controller.Close()',
-		subs: ['_HsEdWeb_MsgSub     := unset', '_HsEdWeb_NavSub     := unset']
-	},
-	{
-		label: 'onboarding wizard host',
-		file: 'static/ergopti_plus/windows/ui/onboarding/webview.ahk',
-		close: '_OnbWeb_Controller.Close()',
-		subs: ['_OnbWeb_MsgSub := unset']
-	},
-	{
-		label: 'paths editor host',
-		file: 'static/ergopti_plus/windows/ui/paths_editor/init.ahk',
-		close: '_PathsEdWeb_Controller.Close()',
-		subs: ['_PathsEdWeb_MsgSub := unset', '_PathsEdWeb_NavSub := unset']
-	},
-	{
-		label: 'personal info editor host',
-		file: 'static/ergopti_plus/windows/ui/personal_info_editor/init.ahk',
-		close: '_PiEdWeb_Controller.Close()',
-		subs: ['_PiEdWeb_MsgSub := unset', '_PiEdWeb_NavSub := unset']
-	},
-	{
-		label: 'hotstrings config window host',
-		file: 'static/ergopti_plus/windows/ui/hotstrings_config_window/webview.ahk',
-		close: '_HCWWeb_Controller.Close()',
-		subs: ['_HCWWeb_MsgSub     := unset', '_HCWWeb_NavSub     := unset']
-	},
-	{
-		label: 'prompt editor host',
-		file: 'static/ergopti_plus/windows/ui/prompt_editor/init.ahk',
-		close: '_PromptEdWeb_Controller.Close()',
-		subs: ['_PromptEdWeb_MsgSub     := unset', '_PromptEdWeb_NavSub     := unset']
-	},
-	{
-		label: 'action picker host',
-		file: 'static/ergopti_plus/windows/ui/action_picker_webview.ahk',
-		close: '_ActPickWeb_Controller.Close()',
-		subs: ['_ActPickWeb_MsgSub     := unset', '_ActPickWeb_NavSub     := unset']
+// A WebView2 controller being closed. Matches both the global-variable hosts
+// (`_HsEdWeb_Controller.Close()`) and the class-based factory
+// (`this.Controller.Close()`).
+const CLOSE_RE = /(\w+)\.Close\(\)/;
+// A subscription handle being released. The name is what the thqby binding
+// returns from add_WebMessageReceived / add_NavigationCompleted, so it always
+// carries "Sub" — `_OnbWeb_MsgSub`, `this.NavSub`.
+const RELEASE_RE = /(?:this\.)?(\w*Sub)\s*:=\s*unset/;
+// A function or method definition, at any indentation: `Name(args) {`.
+const FUNC_DEF_RE = /^\s*\w+\([^)]*\)\s*\{/;
+
+/**
+ * Every production .ahk file under windows/ (tests excluded — they stub these
+ * very patterns and would match themselves).
+ * @param {string} dir Absolute directory to walk.
+ * @param {string[]} acc Accumulator.
+ * @returns {string[]} Absolute paths.
+ */
+function walk(dir, acc = []) {
+	for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+		const p = path.join(dir, e.name);
+		if (e.isDirectory()) {
+			if (e.name !== 'tests' && e.name !== '_generated') walk(p, acc);
+		} else if (e.name.endsWith('.ahk')) {
+			acc.push(p);
+		}
 	}
-];
+	return acc;
+}
 
 let total_pass = 0;
 let total_fail = 0;
@@ -97,37 +94,82 @@ function pass(label) {
 
 console.log('\n=== WebView2 Host Teardown Order ===');
 
-for (const host of HOSTS) {
-	let content;
-	try {
-		content = fs.readFileSync(path.join(REPO_ROOT, host.file), 'utf8');
-	} catch (err) {
-		fail(host.label, `Error reading ${host.file}: ${err.message}`);
+let hostsSeen = 0;
+
+for (const abs of walk(WINDOWS_DIR)) {
+	const rel = path.relative(REPO_ROOT, abs).replace(/\\/g, '/');
+	const lines = fs.readFileSync(abs, 'utf8').split(/\r?\n/);
+
+	const closes = [];
+	const releases = [];
+	let firstFuncLine = Infinity;
+
+	lines.forEach((line, i) => {
+		const trimmed = line.trim();
+		if (trimmed.startsWith(';')) return; // prose describes this pattern at length
+		if (i < firstFuncLine && FUNC_DEF_RE.test(line)) firstFuncLine = i;
+
+		const c = trimmed.match(CLOSE_RE);
+		if (c && /controller/i.test(c[1])) closes.push({ line: i, name: c[1] });
+
+		const r = trimmed.match(RELEASE_RE);
+		// Before the first function definition these are declarations, not
+		// releases. Counting them is what made the old check vacuous.
+		if (r && i > firstFuncLine) releases.push({ line: i, name: r[1] });
+	});
+
+	if (closes.length === 0) continue;
+	hostsSeen++;
+
+	// A host with no subscription handles has no ordering to get wrong — the
+	// keylogger's abort path closes a controller it was handed and subscribes to
+	// nothing.
+	const declaresSubs = lines.some((l) => !l.trim().startsWith(';') && /\w*Sub\s*:=/.test(l));
+	if (!declaresSubs) {
+		pass(`${rel} — closes a controller, stores no subscription handle`);
 		continue;
 	}
 
-	const closeIdx = content.indexOf(host.close);
-	if (closeIdx === -1) {
-		fail(host.label, `Marker not found: ${host.close} in ${host.file}`);
+	if (releases.length === 0) {
+		fail(
+			`${rel} — releases its subscription handles`,
+			'The file stores subscription handles but its teardown releases none of them. ' +
+				'Each must be dropped (:= unset) while the controller is still alive.'
+		);
 		continue;
 	}
 
-	for (const sub of host.subs) {
-		const subIdx = content.indexOf(sub);
-		if (subIdx === -1) {
-			fail(`${host.label} — releases "${sub.trim()}"`, `Line not found in ${host.file}`);
-		} else if (subIdx > closeIdx) {
-			fail(
-				`${host.label} — "${sub.trim()}" before Controller.Close()`,
-				`Subscription is dropped AFTER Controller.Close() — closing the window will crash AHK.`
-			);
+	for (const close of closes) {
+		const late = releases.filter((r) => r.line > close.line);
+		if (late.length > 0) {
+			for (const r of late) {
+				fail(
+					`${rel}:${r.line + 1} — "${r.name} := unset" before ${close.name}.Close()`,
+					`Subscription is dropped AFTER ${close.name}.Close() (line ${close.line + 1}) — ` +
+						'its __Delete calls remove_X on a dead COM object, and an uncaught throw in a ' +
+						'GUI Close thread terminates the whole script.'
+				);
+			}
 		} else {
-			pass(`${host.label} — "${sub.trim()}" released before Controller.Close()`);
+			const names = [...new Set(releases.map((r) => r.name))].join(', ');
+			pass(`${rel} — ${names} released before ${close.name}.Close()`);
 		}
 	}
 }
 
-console.log(`\nResults: ${total_pass} passed, ${total_fail} failed.`);
+// A walk that finds nothing would report a clean run over an empty set. The
+// count is deliberately a floor, not an equality: a new host must not have to
+// edit this file.
+const MIN_HOSTS = 12;
+if (hostsSeen < MIN_HOSTS) {
+	fail(
+		'host discovery',
+		`Found only ${hostsSeen} WebView2 host(s) closing a controller, expected at least ${MIN_HOSTS}. ` +
+			'The walk or the Close() pattern is broken — this guard would pass over nothing.'
+	);
+}
+
+console.log(`\nResults: ${total_pass} passed, ${total_fail} failed (${hostsSeen} hosts discovered).`);
 
 if (total_fail > 0) {
 	process.exit(1);
