@@ -761,7 +761,30 @@ Constraints: **paths before moves, moves before content, data before code.**
   is the only thing preventing that, and it pins the four behaviours that must
   NOT change with the narrower operator — verified against the interpreter first:
   numbers still compare numerically (`1 == "1"`, `1 == 1.0`, `255 == "0xFF"`),
-  `""` stays distinct from `0`, `true` stays `1`, objects stay identity-compared. Skips become data (`_shared/tests/conformance/manifest.json` with `{status, reason, tracked}`), which converts the 6 Linux tautologies and the 7 `AssertTrue(true, "…macOS-only…")` skips into a ledger that cannot rot. Two macOS files (593 lines) replay 36 vectors against a **reimplementation defined inside the test**, with a docstring claiming any divergence fails — no `require` of the module; the AHK twin is 136 lines and calls the real code. 8 files under `windows/tests/` are invoked by nothing, including the **only** Windows consumer of `process_prediction_vectors.json` (17 vectors, zero CI coverage). 20 test files are named after a date or a plan phase (~2 900 lines).
+  `""` stays distinct from `0`, `true` stays `1`, objects stay identity-compared. Skips become data (`_shared/tests/conformance/manifest.json` with `{status, reason, tracked}`), which converts the 6 Linux tautologies and the 7 `AssertTrue(true, "…macOS-only…")` skips into a ledger that cannot rot. Two macOS files (593 lines) replay 36 vectors against a **reimplementation defined inside the test**, with a docstring claiming any divergence fails — no `require` of the module; the AHK twin is 136 lines and calls the real code. ~~8 files under `windows/tests/` are invoked by nothing, including the **only**
+Windows consumer of `process_prediction_vectors.json` (17 vectors, zero CI
+coverage).~~ — **measured: both halves were wrong, and the residue was worth
+finding.** `test-ahk-test-coverage.cjs` already proves all **838**
+`test_*.ahk` files are reachable from `run_all.ahk`. Only **two** files sit
+outside it, and one — `e2e/run_e2e.ahk` — is a separate runner CI invokes
+explicitly. `process_prediction_vectors.json` is fully covered: its Windows
+consumer is `tests/unit/test_llm_parser.ahk`, which IS in `run_all.ahk` and
+registers one test per vector — **all 17 execute**, confirmed by counting them
+in a suite run.
+The genuine orphan was **one** file: `startup/feature_state_boot_smoke.ahk`,
+which nothing invoked. It escapes the coverage gate on a technicality — that
+gate scopes to `test_*.ahk` and this is named `feature_state_boot_smoke.ahk` —
+and it cannot be `#Include`d into `run_all.ahk` without destroying its purpose:
+it boots the production include graph **in its own process with no stubs**,
+so a dependency or boot-order failure surfaces as a non-zero exit code.
+It had never run. Invoking it by hand shows why that matters: with no argument
+it throws `expected exactly one startup fixture name` and exits 1 — which from
+outside is indistinguishable from a broken boot, so a naive CI wiring would have
+produced a permanent red for the wrong reason. It takes a fixture name; all
+**four** (`parsed`, `missing`, `malformed`, `non_map`) pass.
+`test-feature-state-boot-smoke.cjs` now drives all four and fails if the harness
+stops handling one — a fixture silently removed is coverage silently lost. It
+skips loudly, rather than passing, on machines without AutoHotkey. 20 test files are named after a date or a plan phase (~2 900 lines).
 
 - **Lot 10 — pruning.** Port the macOS reachability gate to Windows and Linux, then
   delete the **3 101 lines of dead adapter code** (12 of 21 Windows adapters and 11
