@@ -239,10 +239,19 @@ local function compute_frame(mode)
 		local screen = hs.screen.mainScreen()
 		local f = screen and type(screen.frame) == "function" and screen:frame() or {x=0, y=0, w=1920, h=1080}
 
-		-- Both modes use the same 460x380 footprint: bootstrap now shows the live
-		-- terminal log so the user can see uv output without needing to expand.
-		local W = 460
-		local H = 380
+		-- Both modes use the same footprint: bootstrap now shows the live terminal
+		-- log so the user can see uv output without needing to expand. The size
+		-- itself comes from _shared/ui/apps.manifest.json (SSoT) — it used to be a
+		-- 460x380 literal here, a second copy of the manifest value free to drift
+		-- from it and from the other drivers. Only the corner placement below is
+		-- this window's own.
+		local geo = ui_builder.get_app_geometry("download_window")
+		if not geo then
+			Logger.error(LOG, "No geometry for 'download_window' in apps.manifest.json — cannot place the window.")
+			return nil
+		end
+		local W = geo.width
+		local H = geo.height
 		return {
 				x = f.x + f.w - W - 10,
 				y = f.y + f.h - H - 10,
@@ -257,8 +266,16 @@ local function ensure_webview(title)
 		_ready  = false
 		_queued = {}
 
+		-- compute_frame() returns nil when the manifest has no geometry for this
+		-- app; opening a webview with a nil frame is not a recoverable state.
+		local frame = compute_frame(_mode)
+		if not frame then
+				Logger.error(LOG, "Download window not opened — geometry unavailable.")
+				return
+		end
+
 		_wv = ui_builder.show_webview({
-				frame             = compute_frame(_mode),
+				frame             = frame,
 				title             = title or i18n.get("download_window.title"),
 				style_masks       = {"titled", "closable", "miniaturizable", "resizable", "nonactivating"},
 				level             = hs.drawing.windowLevels.floating,

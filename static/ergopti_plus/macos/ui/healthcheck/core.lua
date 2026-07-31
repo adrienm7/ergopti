@@ -407,12 +407,20 @@ function M.show_window()
 	local sf = (ok_scr and screen and type(screen.frame) == "function" and screen:frame())
 		or { x = 0, y = 0, w = 1440, h = 900 }
 
-	local W, H_ = 700, 600
+	-- Geometry comes from _shared/ui/apps.manifest.json (SSoT). This window used
+	-- to hardcode 700x600 while Windows opened the same diagnostic at the
+	-- manifest's 740x560 — the drift the manifest exists to prevent, invisible
+	-- because the geometry gate had no entry for the macOS healthcheck.
+	local geo = ui_builder.get_app_geometry("healthcheck")
+	if not geo then
+		Logger.error(LOG, "No geometry for 'healthcheck' in apps.manifest.json — cannot open the window.")
+		return
+	end
 	local frame = {
-		x = math.floor(sf.x + (sf.w - W) / 2),
-		y = math.floor(sf.y + (sf.h - H_) / 2),
-		w = W,
-		h = H_,
+		x = math.floor(sf.x + (sf.w - geo.width) / 2),
+		y = math.floor(sf.y + (sf.h - geo.height) / 2),
+		w = geo.width,
+		h = geo.height,
 	}
 	Logger.debug(LOG, "Webview frame: x=%d y=%d w=%d h=%d.", frame.x, frame.y, frame.w, frame.h)
 
