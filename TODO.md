@@ -486,20 +486,36 @@ This is the highest-leverage cluster in the file, because a false green is worse
 than a missing test: it actively deters anyone from writing the real one. The
 repo has documented this failure mode three times already.
 
-### ~50 registered AHK tests are tautological placeholders
+### Burning down the false-green baseline
 
-They assert `AssertTrue(true, …)` while promising concrete guarantees
-("TimerScheduler every(): must be silent under pause"), and invoke no production
-code at all. Verified still present: `windows/tests/unit/test_domain_expander.ahk`,
-where the two `Test()` calls are additionally declared *inside* the body of
-`_DE_Add()`, so they only register if that function is called.
+The gate is delivered: `tools/test/find-false-greens.cjs` runs inside
+`npm run test:js` and ratchets five classes — tautology, vacuous-absence,
+dead-test, pcall-only, and `corpus-skip` (added 2026-07-31). It only turns down.
 
-The gate is already delivered: `tools/test/find-false-greens.cjs` runs inside
-`npm run test:js` and ratchets four classes (tautology, vacuous-absence,
-dead-test, pcall-only) at a combined baseline of 549 — it only turns down. What
-remains is burning the baseline down by replacing the placeholders with real
-assertions, starting with the ones whose `Test()` calls are declared inside a
-function body and therefore only register if that function is called.
+**549 → 503 so far.** `dead-test` is at **0**: the two placeholders spliced into
+the body of `_DE_Add()` are gone, and the two Linux skips with empty bodies now
+assert the reason they skipped for. `tautology` is 153 → 119, from five files —
+`test_domain_expander.ahk`, `test_adapter_compliance_new.ahk`,
+`test_hotstrings_full.ahk`, macOS `test_aggregator.lua`, Linux
+`test_keylogger.lua`.
+
+The method that worked, in case it helps the next pass:
+
+1. **Read what the placeholder PROMISED.** The title is usually a real
+   invariant; only the assertion was missing.
+2. **Ask whether it is a property of THIS module.** Seven aggregator
+   placeholders restated "the callers gate on pause" — untestable there, because
+   the aggregator has no knowledge of suspend. Those get deleted and asserted at
+   the caller, once, not restated seven times.
+3. **Assert the post-condition, not the return.** `PLC_Start(); AssertTrue(1)`
+   became `PLC_Running` must be true; `on_keydown(); assert_true(true)` became
+   the app's counter must go up by exactly one.
+4. **Prove it red.** Every replacement above was verified by breaking the
+   production code it covers — dropping `I1`, removing a suspend guard, making
+   `on_keydown` return immediately (14 tests red, previously 0).
+
+What is left: 119 tautologies, thinly spread, and the 367 `pcall-only` sites —
+the largest class and the one lot 9 has a plan for.
 
 
 ---
