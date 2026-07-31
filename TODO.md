@@ -335,9 +335,27 @@ Constraints: **paths before moves, moves before content, data before code.**
   `sub_files.toml` — deletes two hand-rolled TOML array-of-tables parsers (150 +
   112 lines) carrying **the same fix for the same bug** ("a `]` inside a quoted
   pattern closed the array early"), and makes that bug structurally impossible.
-  (4) `[logger]` section in `_shared/modules/timings/constants.toml` + single-source
-  gate: retention 14 (4 copies), ring 200 (3), dedup 5 s (2 magic literals), flush
-  500 ms. ~~(5) Add the `active → en → fr` cascade to `_shared/ui/i18n.js`~~ — **done**,
+  ~~(4) `[logger]` section in `_shared/modules/timings/constants.toml` + single-source
+  gate~~ — **done.** Measured counts: retention 14 in **3** copies (not 4 — AHK
+  `LOGGER_RETENTION_DAYS` plus the macOS `max_age_days or 14` default written
+  twice in one file), ring 200 in 3 (AHK, macOS, shared core `RING_CAPACITY`),
+  flush 500 ms in 1 (AHK only — a single-source candidate, not a drift risk).
+  **The dedup window was the bad one**, and worse than "2 magic literals"
+  suggests: it existed ONLY as a bare literal on both sides, in different units
+  — `< 5` seconds on macOS, `< 5000` milliseconds on Windows — with each site
+  carrying a comment asserting it matched the other ("the window matches the AHK
+  driver so both drivers dedup identically" / "Mirrors the macOS driver") and
+  nothing checking it. Two unnamed numbers in two units, each documented as equal
+  to the other, are indistinguishable from two that have drifted apart. Both are
+  now named constants (`DEDUP_WINDOW_SEC`, `LOGGER_DEDUP_WINDOW_MS`) and
+  `test-logger-scalars-single-source.cjs` asserts the s↔ms conversion explicitly
+  rather than leaving it asserted in prose. The gate checks **every** occurrence
+  rather than the first — the macOS retention default is written twice, and a
+  first-match gate would have let the second drift freely — and refuses a bare
+  literal creeping back into the comparison. All five mutation probes (one per
+  guarded value) go red. Duplication is still duplication: the drivers do not yet
+  READ the registry at runtime, so the gate is the guarantee, exactly as with
+  `test-keylogger-timings-single-source.cjs`. ~~(5) Add the `active → en → fr` cascade to `_shared/ui/i18n.js`~~ — **done**,
   and the premise needed correcting twice. All 21 locales are key-complete today
   (2 339 keys, 0 missing, 0 blank), so "a partially translated locale" was not the
   live failure; and the native menus do not cascade either — they fall back to the

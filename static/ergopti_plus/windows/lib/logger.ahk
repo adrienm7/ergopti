@@ -171,10 +171,17 @@ global _LOGGER_SUB_PENDING := Map()
 ; cleared via LoggerClearTestSink().
 global _LOGGER_TEST_SINK := 0
 
+; Window during which a repeated identical line is suppressed. Named rather than
+; inlined because the macOS driver holds the same duration in SECONDS, and two
+; bare literals in two units, each with a comment claiming to match the other,
+; are indistinguishable from two literals that have drifted apart.
+; Single source: _shared/modules/timings/constants.toml [logger] dedup_window_ms.
+global LOGGER_DEDUP_WINDOW_MS := 5000
+
 ; Deduplication state (module-level so tests can reset it via _ResetLogger).
-; Suppresses consecutive identical lines within a 5000 ms window; a streak that
-; outlives the window re-surfaces. _LastErrTime keeps its historical name for the
-; logger-dedup-tick regression guard. Mirrors the macOS driver's _dedup table.
+; Suppresses consecutive identical lines within LOGGER_DEDUP_WINDOW_MS; a streak
+; that outlives the window re-surfaces. _LastErrTime keeps its historical name for
+; the logger-dedup-tick regression guard. Mirrors the macOS driver's _dedup table.
 global _LOGGER_DEDUP_KEY := ""
 global _LOGGER_DEDUP_LEVEL := ""
 global _LOGGER_DEDUP_COUNT := 0
@@ -732,7 +739,7 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 		; recurring line is de-bounced, not permanently silenced (logger-dedup-tick): a
 		; streak that outlives the window re-surfaces. When the streak ends a single
 		; "N identical lines suppressed" summary is emitted. Mirrors the macOS driver.
-		if (MsgLine == _LOGGER_DEDUP_KEY and ((A_TickCount - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < 5000) {
+		if (MsgLine == _LOGGER_DEDUP_KEY and ((A_TickCount - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < LOGGER_DEDUP_WINDOW_MS) {
 				_LOGGER_DEDUP_COUNT += 1
 				return
 		}

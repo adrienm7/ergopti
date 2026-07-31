@@ -521,3 +521,38 @@ onboarding_startup_delay_ms = 2000
 # LLM deps checker: Ollama poll interval (readiness probe loop).
 # AHK: ollama_deps_checker.ahk 3000 ms SetTimer.
 ollama_deps_poll_ms = 3000
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Logger
+# ──────────────────────────────────────────────────────────────────────
+#
+# Four scalars that every driver's logger declares for itself. Each was
+# written out independently, and the dedup window was worse than duplicated:
+# it existed only as a bare literal, in SECONDS on macOS (`< 5`) and in
+# MILLISECONDS on Windows (`< 5000`), with a comment on each side asserting it
+# matched the other and nothing checking that it did.
+# test-logger-scalars-single-source.cjs pins every copy to the values here.
+
+[logger]
+
+# Days of rolled log files kept before purging.
+# AHK: logger.ahk LOGGER_RETENTION_DAYS. HS: logger.lua max_age_days default
+# (declared twice — purge_old_logs and the rolled-dir purge).
+retention_days = 14
+
+# Entries held in the in-memory ring buffer the crash reporter dumps.
+# AHK: logger.ahk LOGGER_RING_BUFFER_SIZE. HS: logger.lua RING_BUFFER_SIZE.
+# Shared core: _shared/lua/logger/init.lua RING_CAPACITY.
+ring_buffer_size = 200
+
+# Window during which a repeated identical line is suppressed rather than
+# re-emitted. A streak outliving the window re-surfaces, so a recurring line is
+# de-bounced and never permanently silenced.
+# AHK: logger.ahk LOGGER_DEDUP_WINDOW_MS. HS: logger.lua DEDUP_WINDOW_SEC (the
+# same duration expressed in seconds — the gate converts and compares).
+dedup_window_ms = 5000
+
+# Interval at which the queued-write drain appends pending lines in one call.
+# AHK: logger.ahk LOGGER_FLUSH_INTERVAL_MS.
+flush_interval_ms = 500
